@@ -5,9 +5,9 @@
 >   qu'à **Vestiaire Collective** : Leboncoin et eBay gardent leurs photos
 >   d'origine, et il n'y a **plus de réglage** « Détourer mes photos » dans les
 >   Paramètres (la section 3 plus bas est périmée).
-> - Depuis le **29 octobre**, **chaque vendeur peut ranger SA clé** : Paramètres
->   → **Mon compte** → carte **« Ta clé Photoroom »** (la même carte est sur
->   l'écran Vestiaire). La clé est **vérifiée chez Photoroom** au moment de la
+> - Depuis le **29 octobre**, **chaque vendeur peut ranger SA clé** : écran
+>   **Vestiaire Collective** → carte **« Ta clé Photoroom »** (pas dans les
+>   Paramètres : décision du 17 octobre). La clé est **vérifiée chez Photoroom** au moment de la
 >   ranger (`GET https://image-api.photoroom.com/v2/account`, qui ne consomme
 >   aucune image), puis **chiffrée** dans le coffre du serveur (ligne
 >   `photoroom_cle`, AES-256-GCM, clé `VRM_COFFRE_CLE` ou dérivée de
@@ -19,7 +19,15 @@
 > - Elle sert dans **Studio photo** (Annonces → ⋯ Outils : bouton « Détourer
 >   avec Photoroom », à côté du détourage local gratuit) et pour Vestiaire.
 > - Une ancienne clé rangée en clair (`vrm_photoroom_cle`, 26 octobre) est
->   chiffrée puis effacée **à la première ouverture de la carte**.
+>   chiffrée à la première ouverture de la carte, puis effacée ; si la base
+>   refuse l'effacement, la carte le DIT et le serveur réessaie **à chaque
+>   ouverture** tant qu'elle existe.
+> - La clé du vendeur PAS LUE (base muette) : le détourage répond 503 « je n'ai
+>   pas pu lire ta clé » — jamais un repli sur la clé du serveur (§2.9).
+> - « Vérifier chez Photoroom » sans réponse de Photoroom ne change RIEN : la
+>   dernière réponse connue (acceptée, refusée, sans formule API) reste.
+> - Une clé connue « sans formule API » ou « refusée » : pas de bouton
+>   Photoroom dans le Studio (la raison y est dite).
 > - Preuves : `scripts/audit-photoroom-cle.cjs` (la vraie route),
 >   `scripts/bancs/photoroom-carte.cjs` (la carte rendue),
 >   `scripts/bancs/studio-photo.cjs` (le bouton du Studio).
@@ -46,9 +54,11 @@ parce que c'est **ton** compte et que ça t'est **facturé à l'image**.
    mange un lacet ou la semelle, dis-le-moi avant d'activer.
 
 **Le coût** : formule « Remove Background », environ **20 $ par mois pour
-1 000 photos** (≈ 2 centimes la photo). VRM ne paie **jamais deux fois la même
-photo** : chaque photo détourée est gardée (par son empreinte exacte) dans un
-espace privé de ta base.
+1 000 photos** (≈ 2 centimes la photo). Une photo **déjà détourée et gardée
+par VRM** n'est pas repayée : chaque photo détourée est gardée (par son
+empreinte exacte) dans un espace privé de ta base. ⚠️ Pas « jamais » : si la
+base n'arrive pas à la garder (une écriture ratée), la même photo se paiera
+une fois de plus.
 
 ## 2. Coller la clé dans Vercel (2 min)
 

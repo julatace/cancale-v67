@@ -77,7 +77,7 @@ import { captchaActif, routeProtegee, jetonCaptcha, etatCaptcha, abonnerCaptcha,
 import { boutiqueIci, boutiqueOrion, estAndroid, pageExtensionsIci, nomNavigateurIci, mobileIci, LIENS_BOUTIQUES, LIEN_FIREFOX_ANDROID, LIEN_ORION_FICHIER, NOTICE_ORION, phraseNavigateur } from "./navigateurExtension.js";
 import { etatFacturation, factureDepuisVente, pdfFacturX, nomFichierFacture, recapEReporting, recapCsv, recapJson, eurDe, frJour } from "./facturationElectronique.js";
 import { lireSuperPdp, appelSuperPdp, enBase64, libelleEnvoi, ENV_LIBELLE } from "./superpdp.js";
-import { lirePhotoroom, appelPhotoroom, phraseVerif, dateCourte, LIEN_CLE, LIEN_TARIFS } from "./photoroomCle.js";
+import { lirePhotoroom, appelPhotoroom, phraseVerif, phraseSansReponse, dateCourte, LIEN_CLE, LIEN_TARIFS } from "./photoroomCle.js";
 // §11 : l'adresse de réception se compare avec LA forme du serveur (celle qui
 // décide à qui appartient un email) — jamais une seconde normalisation ici.
 import { normAdresse, ADRESSE_COLLECTRICE, estAdresseCollectrice } from "../api/_lib/proprietaire-email.js";
@@ -23376,12 +23376,12 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
 // (`{}` = jamais relevé).
 // ── TA CLÉ PHOTOROOM (26 octobre ; carte refaite et coffre le 29 octobre) ────
 // Julien, 29 oct. : « fais un meilleur visuel pour la clé API Photoroom des
-// personnes qui utilisent VRM ». UNE carte (§11), rendue dans Paramètres → Mon
-// compte (une clé est un service de la personne) ET dans l'écran Vestiaire (là
-// où elle manque le plus : Vestiaire exige des photos sur fond net).
-// ⚠️ Ce n'est PAS le réglage « détourer avant de publier » qu'il a refusé dans
-//    les Paramètres le 17 octobre (Leboncoin et eBay gardent leurs photos
-//    d'origine) : la carte ne déclenche aucun détourage, elle range une clé.
+// personnes qui utilisent VRM ». UNE carte, rendue dans l'écran Vestiaire (là
+// où elle sert : Vestiaire exige des photos sur fond net).
+// ⚠️ (29 oct., revue) PAS dans les Paramètres : le 17 octobre il a dit du
+//    détourage « ne le mets pas dans les paramètres », et sa demande du 29 ne
+//    parle pas des Paramètres. Le banc `detourage-reglage` refuse la CARTE
+//    (`data-photoroom-cle`) dans les Paramètres — pas un mot de son titre.
 // La clé ne revient JAMAIS au navigateur : il l'envoie une fois, le serveur la
 // vérifie chez Photoroom, la chiffre et la range ; on n'en montre que les 4
 // derniers caractères. Trois états, jamais deux : `undefined` lecture · `null`
@@ -23393,11 +23393,16 @@ function ClePhotoroom({ cadre = true }) {
   const [remplacer, setRemplacer] = useState(false);
   const [occupe, setOccupe] = useState('');     // '' | 'poser' | 'verifier' | 'retirer'
   const [msg, setMsg] = useState(null);         // { ton, texte }
+  // (29 oct., revue) « maintenant chiffrée » n'est dit que si la copie EN CLAIR
+  // a vraiment été effacée (la base l'a confirmé) ; sinon on dit qu'elle reste,
+  // et le serveur réessaie à chaque ouverture de cette carte.
   const relire = React.useCallback(async () => {
     setS(undefined);
     const j = await lirePhotoroom(enTeteSession());
     setS(j);
-    if (j && j.migree) setMsg({ ton: 'neutre', texte: "Ta clé, rangée jusqu'ici lisible par ton navigateur, est maintenant chiffrée dans le coffre du serveur." });
+    if (j && j.ancienneEffacee === false) setMsg({ ton: 'attention', texte: "Ta clé est rangée chiffrée dans le coffre du serveur, mais son ancienne copie, lisible par ton navigateur, n'a pas pu être effacée cette fois. Je réessaie à chaque ouverture de cette carte." });
+    else if (j && j.migree && j.ancienneEffacee === true) setMsg({ ton: 'neutre', texte: "Ta clé, rangée jusqu'ici lisible par ton navigateur, est maintenant chiffrée dans le coffre du serveur." });
+    else if (j && j.ancienneEffacee === true) setMsg({ ton: 'neutre', texte: "L'ancienne copie de ta clé, lisible par ton navigateur, est maintenant effacée." });
   }, []);
   useEffect(() => { if (owner && MULTI_USER) relire(); }, [owner, relire]);
   if (!MULTI_USER || !owner) return null;
@@ -23408,14 +23413,17 @@ function ClePhotoroom({ cadre = true }) {
     setOccupe('poser'); setMsg(null);
     const { code, j } = await appelPhotoroom(enTeteSession(), { action: 'poser', cle });
     setOccupe('');
-    if (code === 200 && j.ok) { setS(j); setVal(''); setRemplacer(false); setMsg({ ton: 'ok', texte: `✓ Clé rangée (se termine par ${j.fin}). Elle est chiffrée sur le serveur : VRM ne te la remontrera jamais en entier.` }); return; }
+    if (code === 200 && j.ok) { setS(j); setVal(''); setRemplacer(false); setMsg({ ton: 'ok', texte: `✓ Clé rangée (se termine par ${j.fin}). Elle est chiffrée sur le serveur : VRM ne te la remontrera jamais en entier.` + (j.ancienneEffacee === false ? " Son ancienne copie lisible par ton navigateur n'a pas pu être effacée : je réessaie à la prochaine ouverture de cette carte." : '') }); return; }
     setMsg({ ton: 'attention', texte: code === 0 ? "Pas de réponse du serveur : je ne sais pas si ta clé a été rangée. Rouvre cet écran pour le voir." : (j.message || "La clé n'a pas pu être rangée — réessaie dans un moment.") });
   };
   const verifier = async () => {
     setOccupe('verifier'); setMsg(null);
     const { code, j } = await appelPhotoroom(enTeteSession(), { action: 'verifier' });
     setOccupe('');
-    if (code === 200 && j.ok) { setS(j); return; }
+    // (29 oct., revue) Photoroom muet : le serveur ne réécrit RIEN, la dernière
+    // réponse connue reste (un refus reste un refus) — et on le dit.
+    if (code === 200 && j.ok) { setS(j); if (j.sansReponse) setMsg({ ton: 'neutre', texte: phraseSansReponse(j) }); return; }
+    if (code === 409 && j.erreur === 'changee') { await relire(); setMsg({ ton: 'attention', texte: j.message }); return; }
     setMsg({ ton: 'attention', texte: code === 0 ? "Pas de réponse du serveur — réessaie." : (j.message || "La vérification n'a pas abouti — réessaie.") });
   };
   const retirer = async () => {
@@ -23472,7 +23480,11 @@ function ClePhotoroom({ cadre = true }) {
             <span data-photoroom-fin={s.fin || ''} style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', fontSize: 14, letterSpacing: '.08em', color: C.text, background: `${C.text}0a`, border: `1px solid ${C.border}`, borderRadius: 8, padding: '6px 10px' }}>•••• {s.fin || '····'}</span>
             <span style={ligneFine}>{s.at ? `rangée le ${dateCourte(s.at)}` : 'rangée'}{etat === 'posee' ? ' · chiffrée sur le serveur' : ''}</span>
           </div>
-          {etat === 'en-clair' && <div data-photoroom-en-clair="" style={{ ...ligneFine, color: C.warn }}>Elle sert, mais n'est pas encore chiffrée : le coffre du serveur n'est pas configuré.</div>}
+          {etat === 'en-clair' && <div data-photoroom-en-clair={s.cause || 'pas-su'} style={{ ...ligneFine, color: C.warn }}>{s.cause === 'coffre-absent'
+            ? "Elle sert, mais n'est pas encore chiffrée : le coffre du serveur n'est pas configuré."
+            : s.cause === 'rangement-rate'
+              ? "Elle sert, mais n'est pas encore chiffrée : la base n'a pas pu la ranger dans le coffre cette fois. Je réessaie à la prochaine ouverture de cette carte."
+              : "Elle sert, mais n'est pas encore chiffrée dans le coffre du serveur."}</div>}
           {verif && <div data-photoroom-verif={s.verif} style={{ ...ligneFine, color: verif.ton === 'attention' ? C.warn : C.text }}>{verif.texte}</div>}
           {!remplacer && (
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
@@ -23503,7 +23515,7 @@ function ClePhotoroom({ cadre = true }) {
       {msg && <div data-photoroom-msg={msg.ton} role="status" style={{ ...ligneFine, color: msg.ton === 'attention' ? C.warn : C.text }}>{msg.texte}</div>}
 
       <div className="vrm-photoroom-blocs" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: 14 }}>
-        {bloc('Ce que ça coûte', <>C'est <b style={{ color: C.text }}>ton</b> compte Photoroom qui paie, à la photo — jamais VRM, jamais un autre vendeur. Environ 0,02 $ la photo avec leur formule de base (relevé le 4 octobre). Une photo déjà détourée n'est jamais repayée. Une clé « sandbox » est gratuite, mais ses photos portent un filigrane.
+        {bloc('Ce que ça coûte', <>C'est <b style={{ color: C.text }}>ton</b> compte Photoroom qui paie, à la photo — jamais VRM, jamais un autre vendeur. Environ 0,02 $ la photo avec leur formule de base (relevé le 4 octobre). Une photo déjà détourée et gardée par VRM n'est pas repayée. Une clé « sandbox » est gratuite, mais ses photos portent un filigrane.
           <a data-photoroom-tarifs="" href={LIEN_TARIFS} target="_blank" rel="noopener noreferrer" style={{ display: 'flex', alignItems: 'center', width: 'fit-content', minHeight: 44, color: C.text, fontWeight: 600, textDecoration: 'none' }}>Leurs tarifs ↗</a></>, 'cout')}
         {bloc('Où elle sert', <>
           <span style={{ display: 'block' }}>· <b style={{ color: C.text }}>Vestiaire Collective</b> : les photos que l'extension prépare pour ton annonce (fond net exigé).</span>
@@ -52135,10 +52147,9 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       {id:'google',type:'el',el:<ConnexionsCompte theme={C} providers={OAUTH_PROVIDERS.filter(p=>p.id==='google')} enabled={providerEnabled} relier={oauthRelier} lire={lireConnexionsOAuth} retour={AUTH_REDIRECT?.error||(AUTH_REDIRECT?.liaison==='google'?'Ton compte Google est associé à VRM.':'')} icone={id=><BrandMark id={id}/>}/>},
       {id:'discord',type:'el',el:<DiscordCompte key="discord"/>},
     ]},
-    // (29 oct.) Ta clé Photoroom : un service de la PERSONNE (son compte
-    // Photoroom paie), rangée chiffrée par le serveur. Ce n'est pas le réglage
-    // « détourer avant de publier » refusé le 17 oct. (cf. banc detourage-reglage).
-    AUTH.user && { id:'photoroom', titre:'Photoroom', brut:true, items:[ { id:'photoroom', type:'el', el:<ClePhotoroom key="photoroom"/> } ] },
+    // (29 oct., revue) PAS de carte Photoroom ici : le 17 oct. Julien a dit du
+    // détourage « ne le mets pas dans les paramètres ». Elle vit sur l'écran
+    // Vestiaire Collective (le banc detourage-reglage refuse la carte ici).
     AUTH.user && {id:'photo-profil',titre:'Photo de profil',items:[{id:'photo-profil',type:'el',el:<PhotoProfil key={AUTH.user.id} owner={AUTH.user.id} headers={enTeteSession} theme={C}/>} ]},
     AUTH.user && { id:'equipe', titre:'Équipe', items:[
       { id:'equipe', type:'panneau', ic:'link', lib:'Équipe', el:<EquipeSetting/> },

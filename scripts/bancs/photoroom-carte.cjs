@@ -3,10 +3,12 @@ require('./_porte-banc.cjs');
 //  BANC « TA CLÉ PHOTOROOM » (29 octobre) — RENDU, 390 px tactile et 1512 px,
 //  clair ET sombre.        BANC_PORT=9341 node scripts/bancs/photoroom-carte.cjs
 //  Julien : « fais un meilleur visuel pour la clé API Photoroom des personnes
-//  qui utilisent VRM ». La carte vit dans Paramètres → Mon compte (et sur
-//  l'écran Vestiaire). Le VRAI api/compte.js (mode photoroom) est exécuté dans
-//  ce processus, devant une fausse base (clé de service, filtre owner) et un
-//  FAUX Photoroom ; la page, elle, ne voit que ce que la route renvoie.
+//  qui utilisent VRM ». La carte vit sur l'écran Vestiaire Collective — PAS
+//  dans les Paramètres (29 oct., revue : décision du 17 oct., « ne le mets pas
+//  dans les paramètres » ; `detourage-reglage.cjs` y refuse la carte). Le VRAI
+//  api/compte.js (mode photoroom) est exécuté dans ce processus, devant une
+//  fausse base (clé de service, filtre owner, comparer-et-échanger) et un FAUX
+//  Photoroom ; la page, elle, ne voit que ce que la route renvoie.
 //  Il exige :
 //    · trois états rendus : aucune clé (formulaire) · rangée (4 derniers
 //      caractères, date, ce que Photoroom a répondu) · pas su (AUCUN formulaire,
@@ -17,7 +19,12 @@ require('./_porte-banc.cjs');
 //      (Vestiaire, Studio photo — rien d'autre promis), le lien vers Photoroom ;
 //    · « Retirer » demande confirmation, puis efface ;
 //    · aucune couleur rouge, cibles ≥ 44 px affichés, rien ne déborde ;
-//    · sombre : la carte suit le thème (fond foncé, texte clair) et inversement.
+//    · sombre : la carte suit le thème (fond foncé, texte clair) et inversement ;
+//    · (revue du 29 oct.) « Vérifier » sans réponse de Photoroom : la dernière
+//      réponse connue reste et c'est DIT ; « maintenant chiffrée » seulement si
+//      la copie en clair est vraiment effacée ; « en clair » dit SA cause, sans
+//      prétendre que Photoroom a été interrogé ; aucune promesse « jamais
+//      repayée » ; la carte n'est dans AUCUN onglet des Paramètres.
 //  Données INVENTÉES (il vit dans le dépôt).
 // ════════════════════════════════════════════════════════════════════════════
 const path = require('path'), http = require('http'), fs = require('fs');
@@ -45,7 +52,7 @@ delete process.env.PHOTOROOM_API_KEY;
 
 // ── La base (vue du SERVEUR, clé de service) ─────────────────────────────────
 let B;
-const reset = () => { B = { lignes: {}, lectureKo: false, reponses: [] }; };
+const reset = () => { B = { lignes: {}, lectureKo: false, reponses: [], prMuet: false, effacerKo: false, ecrireKo: false }; };
 const projette = (data, sel) => {
   if (!sel) return { data };
   const out = {};
@@ -81,10 +88,31 @@ function fauxSupabase(urlBrut, methode, entetes, corps) {
   if (cible === 'app_data' && service) {
     const q = new URLSearchParams(qs);
     const idF = (q.get('id') || '').replace(/^eq\./, ''), ownF = (q.get('owner') || '').replace(/^eq\./, '');
+    // Les filtres sur un champ de `data` (comparer-et-échanger) : la FORME de
+    // PostgREST, appliquée pour de vrai (§6.3).
+    const filtres = [...q.entries()].filter(([k]) => k.startsWith('data->>')).map(([k, v]) => ({ k: k.slice(7), nul: v === 'is.null', v: v.replace(/^eq\./, '') }));
+    const passe = (d) => !!d && filtres.every((f) => { const x = d[f.k]; return f.nul ? x == null : (x != null && String(x) === f.v); });
+    const prefer = String(h.prefer || '');
+    const d0 = ownF && B.lignes[ownF] && B.lignes[ownF][idF];
     if (methode === 'GET' && B.lectureKo && /photoroom/.test(idF)) return json({ message: 'boom' }, 500);
-    if (methode === 'GET') { const d = ownF && B.lignes[ownF] && B.lignes[ownF][idF]; return json(d ? [projette(d, q.get('select'))] : []); }
-    if (methode === 'POST') { for (const r of [].concat(corps.json || [])) { B.lignes[r.owner] = B.lignes[r.owner] || {}; B.lignes[r.owner][r.id] = r.data; } return json(undefined, 201); }
-    if (methode === 'DELETE') { if (ownF && B.lignes[ownF]) delete B.lignes[ownF][idF]; return json(undefined, 204); }
+    if (methode === 'GET') return json(d0 ? [projette(d0, q.get('select'))] : []);
+    if (methode === 'DELETE') {
+      if (B.effacerKo && idF === 'vrm_photoroom_cle') return json({ message: 'boom' }, 500);
+      const ok = passe(d0); if (ok) delete B.lignes[ownF][idF];
+      return /return=representation/.test(prefer) ? json(ok ? [{ id: idF }] : []) : json(undefined, 204);
+    }
+    if (B.ecrireKo) return json({ message: 'boom' }, 500);
+    if (methode === 'PATCH') {
+      const ok = passe(d0); if (ok) B.lignes[ownF][idF] = (corps.json || {}).data;
+      return /return=representation/.test(prefer) ? json(ok ? [{ id: idF }] : []) : json(undefined, 204);
+    }
+    if (methode === 'POST') {
+      const lignes = [].concat(corps.json || []);
+      const fusion = /merge-duplicates/.test(prefer);
+      if (!fusion && lignes.some((r) => B.lignes[r.owner] && B.lignes[r.owner][r.id])) return json({ code: '23505', message: 'duplicate key' }, 409);
+      for (const r of lignes) { B.lignes[r.owner] = B.lignes[r.owner] || {}; B.lignes[r.owner][r.id] = r.data; }
+      return json(undefined, 201);
+    }
   }
   if (cible.startsWith('vinted_accounts')) return json([]);
   return json([], 200, { 'content-range': '0-0/0' });
@@ -97,6 +125,7 @@ global.fetch = async (url, opts = {}) => {
     return new Response(r.body === '' ? null : r.body, { status: r.status, headers: r.headers });
   }
   if (s === 'https://image-api.photoroom.com/v2/account') {
+    if (B.prMuet) return new Response('<html>503</html>', { status: 503, headers: { 'content-type': 'text/html' } });
     const k = String((opts.headers || {})['x-api-key'] || '');
     return k === CLE ? new Response(JSON.stringify({ images: { available: 83, subscription: 100 } }), { status: 200, headers: { 'content-type': 'application/json' } })
       : new Response('{"detail":"invalid api key"}', { status: 401, headers: { 'content-type': 'application/json' } });
@@ -112,15 +141,15 @@ const srv = http.createServer((q, r) => {
 });
 
 let compte = null;
-async function ouvrir(nav, { largeur, sombre, chemin = '/?tab=settings&vue=compte' }) {
+async function ouvrir(nav, { largeur, sombre, chemin = '/?tab=plat_vestiaire', vue = 'compte', attendre = 'carte' }) {
   const mobile = largeur < 600;
   const ctx = await nav.newContext({ viewport: { width: largeur, height: mobile ? 844 : 950 }, isMobile: mobile, hasTouch: mobile, serviceWorkers: 'block' });
   const pg = await ctx.newPage();
   const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
-  await pg.addInitScript(({ s, sombre }) => {
-    try { localStorage.setItem('vinted_dark', sombre ? 'true' : 'false'); localStorage.setItem('vrm_bascule_mineral_v1', '1'); localStorage.setItem('vrm_reglages_vue', 'compte'); } catch (_) {}
+  await pg.addInitScript(({ s, sombre, vue }) => {
+    try { localStorage.setItem('vinted_dark', sombre ? 'true' : 'false'); localStorage.setItem('vrm_bascule_mineral_v1', '1'); localStorage.setItem('vrm_reglages_vue', vue); } catch (_) {}
     try { localStorage.setItem('vrm_session', JSON.stringify(s)); localStorage.setItem('vrm_local_owner', s.user.id); } catch (_) {}
-  }, { s: SESSION, sombre });
+  }, { s: SESSION, sombre, vue });
   await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, async (r) => {
     const rq = r.request(), u = rq.url();
     if (/supabase\.co\//.test(u)) {
@@ -144,8 +173,9 @@ async function ouvrir(nav, { largeur, sombre, chemin = '/?tab=settings&vue=compt
     return r.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true}' });
   });
   await pg.goto(`http://localhost:${PORT}${chemin}`, { waitUntil: 'domcontentloaded' });
-  await pg.waitForFunction(() => { const e = document.querySelector('[data-photoroom-cle]'); return e && e.getAttribute('data-photoroom-cle') !== 'chargement'; }, null, { timeout: 20000 }).catch(() => {});
-  await pg.waitForTimeout(500);
+  if (attendre === 'carte') await pg.waitForFunction(() => { const e = document.querySelector('[data-photoroom-cle]'); return e && e.getAttribute('data-photoroom-cle') !== 'chargement'; }, null, { timeout: 20000 }).catch(() => {});
+  else await pg.waitForFunction(() => !!document.querySelector('[data-onglets-reglages]'), null, { timeout: 20000 }).catch(() => {});
+  await pg.waitForTimeout(attendre === 'carte' ? 500 : 2500);
   return { ctx, pg, errs };
 }
 const etat = (pg) => pg.evaluate(() => { const e = document.querySelector('[data-photoroom-cle]'); return e ? e.getAttribute('data-photoroom-cle') : null; });
@@ -193,12 +223,13 @@ const couleurs = (pg) => pg.evaluate(() => {
         reset();
         let o = await ouvrir(nav, { largeur, sombre });
         if (process.env.BANC_DEBUG) await o.pg.locator('[data-photoroom-cle]').screenshot({ path: `${process.env.BANC_DEBUG}/photoroom-aucune-${largeur}-${sombre ? 'sombre' : 'clair'}.png` }).catch(() => {});
-        dit(!o.errs.length, 'Paramètres → Mon compte se rend sans erreur', o.errs[0]);
-        dit(await etat(o.pg) === 'aucune', 'la carte « Ta clé Photoroom » est dans Mon compte : « aucune clé » (lue)', await etat(o.pg));
+        dit(!o.errs.length, 'l\'écran Vestiaire Collective se rend sans erreur', o.errs[0]);
+        dit(await etat(o.pg) === 'aucune', 'la carte « Ta clé Photoroom » est sur l\'écran Vestiaire : « aucune clé » (lue)', await etat(o.pg));
         const t0 = await texteCarte(o.pg);
         dit(/ton compte Photoroom qui paie|\bton\b compte Photoroom qui paie/i.test(t0.replace(/\s+/g, ' ')) && /à la photo/.test(t0), 'ce que ça coûte : SON compte Photoroom, à la photo', t0.slice(0, 120));
         dit(/Vestiaire Collective/.test(t0) && /Studio photo/.test(t0) && /Leboncoin et eBay gardent tes photos d'origine/.test(t0), 'où elle sert : Vestiaire, Studio photo — et Leboncoin/eBay gardent leurs photos d\'origine');
         dit(!/publi(e|er) automatiquement|tes annonces partent/i.test(t0), 'aucune publication promise');
+        dit(!/jamais repay/i.test(t0) && /gardée par VRM n'est pas repayée/.test(t0), '(revue) pas de promesse « jamais repayée » : seulement ce qui est vrai (une photo gardée par VRM)', (/[^.]*repay[^.]*\./.exec(t0) || [''])[0]);
         const lien = await o.pg.$eval('[data-photoroom-lien]', (a) => ({ href: a.href, cible: a.target, rel: a.rel })).catch(() => null);
         dit(!!lien && lien.href === 'https://app.photoroom.com/api-dashboard' && lien.cible === '_blank' && /noopener/.test(lien.rel), 'le lien mène à Photoroom (API dashboard), dans un nouvel onglet', JSON.stringify(lien));
         const tarifs = await o.pg.$eval('[data-photoroom-tarifs]', (a) => a.href).catch(() => null);
@@ -253,14 +284,67 @@ const couleurs = (pg) => pg.evaluate(() => {
       });
     }
 
-    console.log('\n── 390 px tactile · l\'écran Vestiaire porte la même carte');
-    await essaie('vestiaire', async () => {
-      reset();
-      const o = await ouvrir(nav, { largeur: 390, sombre: false, chemin: '/?tab=plat_vestiaire' });
-      dit(await etat(o.pg) === 'aucune', 'Vestiaire : la carte « Ta clé Photoroom » est là (même composant)', await etat(o.pg));
-      dit(!(await deborde(o.pg)), 'Vestiaire : rien ne déborde', await deborde(o.pg));
-      await o.ctx.close();
-    });
+    // ══ REVUE DU 29 OCTOBRE ═════════════════════════════════════════════════
+    const msgCarte = (pg) => pg.evaluate(() => { const e = document.querySelector('[data-photoroom-msg]'); return e ? { ton: e.getAttribute('data-photoroom-msg'), t: e.innerText } : null; });
+    for (const [largeur, sombre] of [[390, false], [1512, true]]) {
+      const nom = `${largeur} px${largeur < 600 ? ' tactile' : ''}, ${sombre ? 'sombre' : 'clair'}`;
+      console.log(`\n── revue · ${nom}`);
+      await essaie(`paramètres ${nom}`, async () => {
+        reset();
+        for (const vue of ['compte', 'reglages']) {
+          const o = await ouvrir(nav, { largeur, sombre, chemin: `/?tab=settings&vue=${vue}`, vue, attendre: 'parametres' });
+          const r = await o.pg.evaluate(() => ({ cartes: document.querySelectorAll('[data-photoroom-cle]').length, rendu: !!document.querySelector('[data-onglets-reglages]') }));
+          dit(r.rendu && r.cartes === 0, `Paramètres (${vue === 'compte' ? 'Mon compte' : 'Réglages'}) : AUCUNE carte Photoroom (décision du 17 oct.) — et l'écran est bien rendu`, JSON.stringify(r));
+          await o.ctx.close();
+        }
+      });
+      await essaie(`vérifier sans réponse ${nom}`, async () => {
+        reset();
+        let o = await ouvrir(nav, { largeur, sombre });
+        await o.pg.fill('[data-photoroom-champ]', CLE);
+        await o.pg.click('[data-photoroom-enregistrer]');
+        await o.pg.waitForFunction(() => document.querySelector('[data-photoroom-cle]')?.getAttribute('data-photoroom-cle') === 'posee', null, { timeout: 10000 }).catch(() => {});
+        B.prMuet = true;
+        await o.pg.click('[data-photoroom-verifier]');
+        await o.pg.waitForFunction(() => /répondu|abouti|réessaie/.test(document.querySelector('[data-photoroom-msg]')?.innerText || '') && !/Vérification…/.test(document.querySelector('[data-photoroom-verifier]')?.innerText || ''), null, { timeout: 12000 }).catch(() => {});
+        const m = await msgCarte(o.pg);
+        const v = await o.pg.$eval('[data-photoroom-verif]', (e) => ({ a: e.getAttribute('data-photoroom-verif'), t: e.innerText })).catch(() => null);
+        dit(!!m && /n'a pas répondu/.test(m.t) && /acceptée/.test(m.t), '« Vérifier » sans réponse de Photoroom : l\'écran le DIT et nomme la dernière réponse (acceptée, le …)', m && m.t);
+        dit(!!v && v.a === 'ok' && /acceptée/.test(v.t) && /83 images/.test(v.t), 'et la carte garde « Photoroom l\'a acceptée · 83 images » (rien n\'est effacé)', v && v.t);
+        dit(B.lignes[A].photoroom_cle.verif === 'ok' && B.lignes[A].photoroom_cle.restant === 83, 'en base : la vérification d\'avant reste', JSON.stringify({ v: B.lignes[A].photoroom_cle.verif, r: B.lignes[A].photoroom_cle.restant }));
+        dit((await rougeDans(o.pg)).length === 0, 'aucune couleur rouge', (await rougeDans(o.pg)).join(' · '));
+        await o.ctx.close();
+      });
+      await essaie(`migration ${nom}`, async () => {
+        reset();
+        B.lignes[A] = { vrm_photoroom_cle: { cle: CLE, at: '2026-10-26T10:00:00.000Z' } };
+        B.effacerKo = true;
+        let o = await ouvrir(nav, { largeur, sombre });
+        let m = await msgCarte(o.pg);
+        dit(await etat(o.pg) === 'posee' && !!B.lignes[A].photoroom_cle, 'ancienne clé en clair : rangée chiffrée au coffre', await etat(o.pg));
+        dit(!!m && m.ton === 'attention' && /n'a pas pu être effacée/.test(m.t) && !/maintenant chiffrée/.test(m.t), 'effacement raté : « maintenant chiffrée » n\'est PAS dit ; la copie restante l\'est, avec « je réessaie »', m && m.t);
+        dit(!(await contientCle(o.pg)), 'la clé n\'est nulle part dans la page');
+        await o.ctx.close();
+        B.effacerKo = false;
+        o = await ouvrir(nav, { largeur, sombre });
+        m = await msgCarte(o.pg);
+        dit(!B.lignes[A].vrm_photoroom_cle, 'l\'ouverture suivante efface la copie en clair', Object.keys(B.lignes[A]).join(','));
+        dit(!!m && /effacée/.test(m.t) && m.ton !== 'attention', 'et l\'écran dit qu\'elle est maintenant effacée', m && m.t);
+        await o.ctx.close();
+      });
+      await essaie(`en clair ${nom}`, async () => {
+        reset();
+        B.lignes[A] = { vrm_photoroom_cle: { cle: CLE, at: '2026-10-26T10:00:00.000Z' } };
+        B.ecrireKo = true;
+        const o = await ouvrir(nav, { largeur, sombre });
+        const t = await texteCarte(o.pg);
+        const c = await o.pg.$eval('[data-photoroom-en-clair]', (e) => e.getAttribute('data-photoroom-en-clair')).catch(() => null);
+        dit(await etat(o.pg) === 'en-clair' && c === 'rangement-rate', 'rangement raté : « en clair », cause « rangement raté »', `${await etat(o.pg)} · ${c}`);
+        dit(!/coffre du serveur n'est pas configuré/.test(t), 'jamais « le coffre du serveur n\'est pas configuré » quand il l\'est', t.replace(/\s+/g, ' ').slice(0, 200));
+        dit(!/n'a pas répondu|réponse lisible/.test(t), 'jamais « Photoroom n\'a pas répondu » : on ne lui a rien demandé', t.replace(/\s+/g, ' ').slice(0, 200));
+        await o.ctx.close();
+      });
+    }
   } catch (e) { ko++; console.log('❌ le banc a levé — ' + (e && e.message)); }
   await nav.close(); srv.close();
   console.log(`\n${ko ? '❌ ' + ko + ' contrôle(s) au rouge' : '✅ tout est vert'} (${ok} ok)`);

@@ -13,10 +13,11 @@
 //      navigateur, rien ne réapparaît.
 // L'autre sens (Réglages se rend, avec ses autres groupes) est vérifié : un
 // écran mort passerait tous les contrôles d'absence.
-// (29 oct.) L'onglet « Mon compte » porte la carte « Ta clé Photoroom » (une clé
-// est un service de la personne) : elle range une clé, elle ne déclenche AUCUN
-// détourage. Le banc rend aussi cet onglet et exige les mêmes absences — plus la
-// carte elle-même (sinon « rien de détourage » serait vrai d'un écran vide).
+// (29 oct., revue) La carte « Ta clé Photoroom » vit sur l'écran Vestiaire
+// Collective, PAS dans les Paramètres : le banc rend les DEUX onglets (Réglages
+// et Mon compte) et y refuse la CARTE elle-même (`data-photoroom-cle`) — jamais
+// un mot de son titre (un titre reformulé passerait un contrôle posé sur les
+// mots). L'autre sens : chaque onglet est bien rendu (un écran mort passerait).
 const { chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'));
 const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http'), path = require('path');
@@ -74,6 +75,7 @@ async function rendre(nav, largeur, vue = '') {
     texte: document.body.innerText,
     reglages: !!document.querySelector('[data-onglets-reglages]') || /Notifications/.test(document.body.innerText),
     cleCarte: !!document.querySelector('[data-photoroom-cle]'),
+    monCompte: !!document.querySelector('[data-onglets-reglages] [aria-selected="true"]') && /Mon compte/.test((document.querySelector('[data-onglets-reglages] [aria-selected="true"]') || {}).innerText || ''),
   }));
   await ctx.close();
   return { r, erreurs, vues };
@@ -90,9 +92,11 @@ async function rendre(nav, largeur, vue = '') {
       dit(x.r.cartes === 0, `${l} px : aucune carte « Détourage » dans les Paramètres`, `${x.r.cartes} élément(s)`);
       dit(!/D[ée]tourage des photos|D[ée]tourer mes photos/i.test(x.r.texte), `${l} px : le mot « Détourage » n'apparaît plus dans les Paramètres`);
       dit(x.vues.length === 0, `${l} px : aucune requête au compteur du détourage`, `${x.vues.length} requête(s)`);
+      dit(!x.r.cleCarte, `${l} px : Réglages n'a AUCUNE carte Photoroom (décision du 17 oct.)`);
       const c = await rendre(nav, l, 'compte');
       dit(!c.erreurs.length, `${l} px : Mon compte se rend sans erreur`, c.erreurs[0] || '');
-      dit(c.r.cleCarte, `${l} px : Mon compte porte la carte « Ta clé Photoroom » (l'autre sens)`);
+      dit(c.r.monCompte, `${l} px : l'onglet Mon compte est bien rendu (l'autre sens)`);
+      dit(!c.r.cleCarte, `${l} px : Mon compte n'a AUCUNE carte Photoroom (décision du 17 oct.)`);
       dit(c.r.cartes === 0, `${l} px : Mon compte n'a aucun réglage de détourage`, `${c.r.cartes} élément(s)`);
       dit(!/D[ée]tourage des photos|D[ée]tourer mes photos/i.test(c.r.texte), `${l} px : Mon compte ne propose pas de « détourer mes photos »`);
       dit(c.vues.length === 0, `${l} px : ouvrir Mon compte n'interroge pas le compteur du détourage`, `${c.vues.length} requête(s)`);

@@ -118,11 +118,17 @@ async function rendre(owner, mois) {
 // est encore lue tant qu'elle n'a pas été déplacée. Avec SA clé, c'est SON
 // compte Photoroom qui paie : on saute alors le verrou « propriétaire » et le
 // plafond (qui ne protègent que la clé de Julien).
-// Rend la clé (chaîne) ou '' — une lecture ratée ('') retombe sur la clé
-// serveur, où le verrou propriétaire protège Julien.
+// TROIS états : la clé (chaîne) · '' (aucune) · undefined (PAS SU).
+// ⚠️ (29 oct., revue) « pas su » ne vaut pas « aucune clé » : avant, une lecture
+// ratée du coffre retombait sur la clé du SERVEUR — un vendeur qui a rangé SA
+// clé recevait « réservé au propriétaire » (403), et le Studio lui disait
+// « aucune clé à toi n'est rangée » ; et si `PHOTOROOM_POUR=tous` était posé,
+// le même hoquet faisait payer la clé de Julien pour lui (§2.9). L'appelant
+// répond 503 `cle-pas-su`, sans jamais retomber sur la clé du serveur.
 async function lireCleVendeur(owner) {
   if (!service() || !owner) return '';
   const c = await lireClePhotoroom(owner);
+  if (c === undefined) return undefined;
   return typeof c === 'string' ? c.trim() : '';
 }
 // Combien ce vendeur a détouré ce mois-ci. undefined = pas su (jamais « 0 »).
@@ -172,6 +178,7 @@ export async function handleDetourage(req, res) {
     const u = await utilisateurDe(req);
     if (!u) { res.status(401).json({ ok: false, reason: 'session' }); return; }
     const cleUser = await lireCleVendeur(u.id);
+    if (cleUser === undefined) { res.status(503).json({ ok: false, reason: 'cle-pas-su', ready: !!cle }); return; }
     // Avec SA clé : prête, sans plafond serveur ni verrou propriétaire — c'est
     // son compte Photoroom qui facture, VRM ne compte rien.
     if (cleUser) { res.status(200).json({ ok: true, ready: true, clePropre: true, autorise: true }); return; }
@@ -189,6 +196,9 @@ export async function handleDetourage(req, res) {
   // secours. Avec SA clé : ni verrou propriétaire, ni plafond — ils ne protègent
   // que la clé de Julien.
   const cleUser = await lireCleVendeur(u.id);
+  // Pas su : on ne retombe JAMAIS sur la clé du serveur (§2.9), on ne dit pas
+  // « aucune clé » non plus — 503, le vendeur réessaie.
+  if (cleUser === undefined) { res.status(503).json({ ok: false, reason: 'cle-pas-su' }); return; }
   const propre = !!cleUser;
   const cleEff = cleUser || cle;
   if (!propre) {

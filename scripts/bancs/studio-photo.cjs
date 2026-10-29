@@ -20,7 +20,13 @@
 //      « posee »), le bouton existe, la photo part à /api/ai?mode=detourage
 //      AVEC sa session et l'empreinte de SES octets, et la détourée est rangée
 //      pour la bonne paire (`detourePar: 'photoroom'`) — jamais d'appel direct
-//      à Photoroom depuis le navigateur.
+//      à Photoroom depuis le navigateur ;
+//   7. (29 oct., revue) CHANGER DE PAIRE pendant un détourage Photoroom : la
+//      réponse (tenue par le banc jusqu'à ce que la N°43 soit affichée — un
+//      ÉTAT observé, jamais un délai) est rangée avec la N°42, et l'écran de la
+//      N°43 ne montre NI la photo de la 42, NI un « Enregistrer » nommé VRM-43 ;
+//   8. (revue) une clé connue « sans formule API » : pas de bouton Photoroom
+//      (le clic reviendrait en 402), la raison dite une fois.
 // Le moteur (onnxruntime-web 1.22.0, MIT) est servi au banc depuis une copie
 // locale à la place de cdn.jsdelivr.net (déterminisme) : BANC_ORT_DIR, sinon
 // téléchargé une fois dans le dossier temporaire du système (curl).
@@ -113,7 +119,8 @@ async function preparer(ctx, rows, ort, journal, opts = {}) {
     const q = r.request(), u = new URL(q.url()), mode = u.searchParams.get('mode');
     if (opts.photoroom && u.pathname === '/api/compte' && mode === 'photoroom' && q.method() === 'GET') {
       const auth = !!q.headers().authorization;
-      return r.fulfill({ status: auth ? 200 : 401, contentType: 'application/json', body: JSON.stringify(auth ? { ok: true, etat: 'posee', coffre: true, fin: 'K9QZ', at: new Date().toISOString(), verif: 'ok', verifAt: new Date().toISOString(), restant: 41 } : { ok: false, erreur: 'session' }) });
+      const verif = opts.photoroom.verif || 'ok';
+      return r.fulfill({ status: auth ? 200 : 401, contentType: 'application/json', body: JSON.stringify(auth ? { ok: true, etat: 'posee', coffre: true, fin: 'K9QZ', at: new Date().toISOString(), verif, verifAt: new Date().toISOString(), restant: verif === 'ok' ? 41 : null } : { ok: false, erreur: 'session' }) });
     }
     if (opts.photoroom && u.pathname === '/api/ai' && mode === 'detourage' && q.method() === 'POST') {
       // La forme de la vraie route : session exigée, l'empreinte DOIT être celle des octets reçus.
@@ -122,6 +129,7 @@ async function preparer(ctx, rows, ort, journal, opts = {}) {
       const buf = b && typeof b.b64 === 'string' ? Buffer.from(b.b64, 'base64') : null;
       const shaOk = !!(buf && buf.length && require('crypto').createHash('sha256').update(buf).digest('hex') === String(b.sha || ''));
       opts.photoroom.appels.push({ auth: /^Bearer /.test(auth), shaOk, jpeg: !!(buf && buf[0] === 0xff && buf[1] === 0xd8), octets: buf ? buf.length : 0 });
+      if (opts.photoroom.tenir) { const t = opts.photoroom.tenir; opts.photoroom.tenir = null; await t.attente; }
       if (!/^Bearer /.test(auth)) return r.fulfill({ status: 401, contentType: 'application/json', body: '{"ok":false,"reason":"session"}' });
       if (!shaOk) return r.fulfill({ status: 400, contentType: 'application/json', body: '{"ok":false,"reason":"sha"}' });
       return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, hit: false, b64: opts.photoroom.blanc, type: 'image/jpeg', bytes: 1000, clePropre: true }) });
@@ -317,6 +325,76 @@ const estPayant = (r) => PAYANT_HOTE.test(hoteDe(r.url)) || /\/api\/detourage|\/
         dit(sw[0] <= sw[1] + 1, 'aucun débordement horizontal', sw.join(' > '));
         if (process.env.BANC_CAPTURES) { fs.mkdirSync(process.env.BANC_CAPTURES, { recursive: true }); await pg.screenshot({ path: path.join(process.env.BANC_CAPTURES, `studio-photoroom-${vp.width}.png`) }); }
       } finally { await ctx4.close(); }
+    }
+    // (revue) Changer de paire PENDANT un détourage Photoroom.
+    for (const vp of [{ width: 390, height: 844 }, { width: 1512, height: 950 }]) {
+      console.log(`── ${vp.width} px — changer de paire pendant un détourage Photoroom`);
+      const ctx5 = await b.newContext({ viewport: vp, permissions: ['camera'], ...(vp.width < 600 ? { isMobile: true, hasTouch: true } : {}) });
+      await cspBanc(ctx5, `http://localhost:${PORT}`, 'studio course ' + vp.width);
+      const rows5 = departRows(), journal5 = [];
+      let lacher; const tenir = { attente: new Promise((ok) => { lacher = ok; }) };
+      const pr = { appels: [], blanc: '', tenir };
+      try {
+        const { pg, errs } = await preparer(ctx5, rows5, ort, journal5, { session: true, photoroom: pr });
+        const ouvert = await ouvrirStudio(pg);
+        dit(ouvert, 'le studio s’ouvre (course)');
+        if (!ouvert) { lacher(); continue; }
+        pr.blanc = await pg.evaluate(() => { const c = document.createElement('canvas'); c.width = 30; c.height = 40; const x = c.getContext('2d'); x.fillStyle = '#fff'; x.fillRect(0, 0, 30, 40); return c.toDataURL('image/jpeg', 0.9).split(',')[1]; });
+        await pg.locator('[data-studio-paire="42"]').click();
+        await pg.locator('[data-studio-ouvrir]').click();
+        await pg.waitForFunction(() => { const v = document.querySelector('[data-studio-video]'); return v && v.videoWidth > 0; }, null, { timeout: 10000 }).catch(() => {});
+        await pg.locator('[data-studio-declencher]').click();
+        await pg.waitForSelector('[data-studio-photo]', { timeout: 8000 }).catch(() => {});
+        const id42 = await pg.locator('[data-studio-photo]').first().getAttribute('data-studio-photo').catch(() => null);
+        const bouton = pg.locator('[data-studio-photoroom]').first();
+        const vu = await bouton.waitFor({ state: 'visible', timeout: 8000 }).then(() => true).catch(() => false);
+        if (!vu) { dit(false, 'le bouton « Détourer avec Photoroom » est là (préalable)'); lacher(); continue; }
+        await bouton.click();
+        // ÉTAT observé : la requête est partie (et le banc la tient).
+        for (let i = 0; i < 200 && !pr.appels.length; i++) await pg.waitForTimeout(25);
+        await pg.getByRole('button', { name: 'Changer de paire' }).click();
+        await pg.locator('[data-studio-paire="43"]').click();
+        await pg.waitForFunction(() => /N°43/.test(document.querySelector('[data-studio] span')?.textContent || ''), null, { timeout: 5000 }).catch(() => {});
+        const sur43 = await pg.evaluate(() => /N°43/.test(document.querySelector('[data-studio] span')?.textContent || ''));
+        lacher();
+        // La réponse arrive : attendre qu'elle soit RANGÉE (avec la 42).
+        for (let i = 0; i < 200; i++) { const l = rows5.get('studio_photos_42'); if (l && l.photos && l.photos[0] && l.photos[0].detourePar === 'photoroom') break; await pg.waitForTimeout(25); }
+        await pg.waitForTimeout(400);
+        const ecran = await pg.evaluate(() => ({ titre: document.querySelector('[data-studio] span')?.textContent || '', ids: [...document.querySelectorAll('[data-studio-photo]')].map((e) => e.getAttribute('data-studio-photo')), dl: [...document.querySelectorAll('[data-studio] a[download]')].map((a) => a.getAttribute('download')), msg: document.querySelector('[data-studio-msg]')?.textContent || '' }));
+        const l42 = rows5.get('studio_photos_42'), l43 = rows5.get('studio_photos_43');
+        dit(sur43 && /N°43/.test(ecran.titre), '(la N°43 est affichée pendant que Photoroom répond)', ecran.titre);
+        dit(!ecran.ids.includes(id42) && !ecran.dl.some((n) => /^VRM-43-/.test(n)), 'l’écran de la N°43 ne montre PAS la photo de la N°42, ni un « Enregistrer » VRM-43', JSON.stringify(ecran).slice(0, 200));
+        dit(!!(l42 && l42.photos && l42.photos[0] && l42.photos[0].detourePar === 'photoroom') && !l43, 'la détourée est rangée avec la N°42 ; rien sous la N°43', JSON.stringify({ p42: l42 && l42.photos && l42.photos[0] && l42.photos[0].detourePar, l43: !!l43 }));
+        dit(/N°42/.test(ecran.msg), 'l’écran dit que la photo de la N°42 a été rangée avec SA paire', ecran.msg);
+        dit(!errs.length, 'aucune erreur de page', errs[0]);
+      } finally { await ctx5.close(); }
+    }
+    // (revue) Une clé connue sans formule API : pas de bouton, la raison dite.
+    {
+      console.log('── 390 px — clé Photoroom « sans formule API »');
+      const ctx6 = await b.newContext({ viewport: { width: 390, height: 844 }, permissions: ['camera'], isMobile: true, hasTouch: true });
+      await cspBanc(ctx6, `http://localhost:${PORT}`, 'studio sans forfait');
+      const rows6 = departRows(), journal6 = [];
+      const pr = { appels: [], blanc: '', verif: 'sans-forfait' };
+      try {
+        const { pg, errs } = await preparer(ctx6, rows6, ort, journal6, { session: true, photoroom: pr });
+        const ouvert = await ouvrirStudio(pg);
+        dit(ouvert, 'le studio s’ouvre (sans formule API)');
+        if (ouvert) {
+          await pg.locator('[data-studio-paire="42"]').click();
+          await pg.locator('[data-studio-ouvrir]').click();
+          await pg.waitForFunction(() => { const v = document.querySelector('[data-studio-video]'); return v && v.videoWidth > 0; }, null, { timeout: 10000 }).catch(() => {});
+          await pg.locator('[data-studio-declencher]').click();
+          await pg.waitForSelector('[data-studio-photo]', { timeout: 8000 }).catch(() => {});
+          await pg.waitForTimeout(800);
+          dit(await pg.locator('[data-studio-photoroom]').count() === 0, 'clé « sans formule API » : PAS de bouton « Détourer avec Photoroom » (il reviendrait en 402)');
+          const r = await pg.locator('[data-studio-photoroom-indispo]').innerText().catch(() => '');
+          dit(/formule API/.test(r) && await pg.locator('[data-studio-photoroom-indispo]').count() === 1, 'la raison est dite, UNE fois', r);
+          dit(await pg.locator('[data-studio-detourer]').count() > 0, 'le détourage local reste proposé');
+          dit(!journal6.some(estPayant), 'aucune requête payante');
+          dit(!errs.length, 'aucune erreur de page', errs[0]);
+        }
+      } finally { await ctx6.close(); }
     }
     // Lecture KO, écriture OK (le cas qui détruit, §5) : la ligne de la paire
     // ne se lit pas ⇒ on ne range RIEN (sinon elle repartirait avec la seule
