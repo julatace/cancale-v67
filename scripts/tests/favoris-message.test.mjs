@@ -65,8 +65,14 @@ test('serveur : l’offre suit le favori, et une extension d’avant 5.281 est r
   const c=consommerFile(d,{owner:'o',jeton:'j',maintenant:T+1,version5281:true}).valeur.travail;
   assert.deepEqual(c.offre,offre);assert.equal(c.message,'Salut {username}');
   assert.throws(()=>lancerFile(null,{owner:'o',targets:[cible],message:'x',intervalleMinutes:0,maintenant:T,offre:{mode:'pct',valeur:150,arrondi:false}}),RefusFavoris);
-  // Forme d'avant (pourcentage seul, sans variable) : toujours permise à une 5.280.
+  // Forme d'avant (pourcentage seul, sans variable) : permise à une 5.280, refusée avant (l'offre ne partait pas).
   let v=lancerFile(null,{owner:'o',targets:[cible],message:'Merci',intervalleMinutes:0,maintenant:T,pourcentage:10,offre:{mode:'pct',valeur:10,arrondi:false}}).data;
   v=reserverFile(v,{owner:'o',maintenant:T,jeton:'k'}).data;
   assert.equal(consommerFile(v,{owner:'o',jeton:'k',maintenant:T+1,version5281:false}).valeur.travail.pourcentage,10);
+  let w=lancerFile(null,{owner:'o',targets:[cible],message:'Merci',intervalleMinutes:0,maintenant:T,pourcentage:10,offre:{mode:'pct',valeur:10,arrondi:false}}).data;
+  w=reserverFile(w,{owner:'o',maintenant:T,jeton:'l'}).data;
+  assert.throws(()=>consommerFile(w,{owner:'o',jeton:'l',maintenant:T+1,version5281:false,version5280:false}),RefusFavoris,'une 5.279 ne fait pas l’offre : rien ne part');
+  let x=lancerFile(null,{owner:'o',targets:[cible],message:'Merci',intervalleMinutes:0,maintenant:T}).data;
+  x=reserverFile(x,{owner:'o',maintenant:T,jeton:'m'}).data;
+  assert.ok(consommerFile(x,{owner:'o',jeton:'m',maintenant:T+1,version5281:false,version5280:false}).valeur.travail,'sans offre, une ancienne extension envoie toujours');
 });
