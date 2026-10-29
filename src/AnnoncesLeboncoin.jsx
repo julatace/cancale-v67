@@ -17,6 +17,20 @@ function Photo({src}) {
 // encore en ligne ou en pause — jamais sur une vendue ou déjà retirée. Le parent
 // confirme (« sans retour ») et envoie ; ici on ne fait que proposer le geste.
 const SUPPRIMABLE = new Set(['active','pause','inconnu']);
+// (29 oct., « mêmes méthodes d'affichage que Vinted ») Sous le titre, les
+// CHIFFRES de l'annonce quand Leboncoin les a donnés (statistiques lues par
+// l'extension sur sa page de statistiques : favoris, vues, messages) et depuis
+// quand elle est en ligne — jamais un chiffre inventé, jamais 0 pour « pas su ».
+const pluriel = (n, mot) => `${n} ${mot}${n > 1 ? 's' : ''}`;
+const dateCourte = (iso) => { const t = Date.parse(String(iso || '')); if (!Number.isFinite(t)) return ''; const d = new Date(t); return d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', ...(d.getFullYear() !== new Date().getFullYear() ? { year: 'numeric' } : {}) }); };
+export function chiffresAnnonceLbc(ad) {
+ const s = (ad && ad.stats) || {};
+ const out = [];
+ if (Number.isFinite(s.favoris)) out.push(pluriel(s.favoris, 'favori'));
+ if (Number.isFinite(s.vues)) out.push(pluriel(s.vues, 'vue') + (Number.isFinite(s.jours) && s.jours > 0 ? ` en ${s.jours} j` : ''));
+ if (Number.isFinite(s.messages)) out.push(pluriel(s.messages, 'message'));
+ return out.join(' · ');
+}
 export default function AnnoncesLeboncoin({annonces=[],ventes={},lectureKO=false,numeroDe=null,owner='',sortieDe=null,onSupprimer=null,enVol=null}) {
  const [recherche,setRecherche]=useState(''),[filtre,setFiltre]=useState('toutes');
  const lignes=useMemo(()=>annonces.map(ad=>({ad,num:(numeroDe&&numeroDe(ad))||'',...etatAnnonceLeboncoin(ad,ventes,sortieDe)})),[annonces,ventes,numeroDe,sortieDe]);
@@ -34,7 +48,7 @@ export default function AnnoncesLeboncoin({annonces=[],ventes={},lectureKO=false
    <div className="vrm-lbc-catalog-filtres" role="group" aria-label="État des annonces Leboncoin">{choix.map(([id,nom])=><button key={id} type="button" aria-pressed={filtre===id} onClick={()=>setFiltre(id)}>{nom}<span>{id==='toutes'?lignes.length:lignes.filter(l=>id==='autres'?!['active','pause','vendue'].includes(l.etat):l.etat===id).length}</span></button>)}</div>
    {!visibles.length?<p className="vrm-lbc-catalog-vide">{lignes.length?'Aucune annonce dans cette sélection.':'Aucune annonce reçue pour le moment. Ouvre « Mes annonces » sur Leboncoin avec l’extension.'}</p>:
     <ul>{visibles.map(({ad,num,etat,label,livraison,suivi})=>{const lien=lienAnnonceLeboncoin(ad);return <li key={ad.id} data-lbc-catalog-id={ad.id} data-lbc-catalog-etat={etat}>
-     <Photo key={ad.images?.[0]||ad.id} src={ad.images?.[0]}/><div className="vrm-lbc-catalog-info"><strong>{ad.subject||ad.title||'Annonce sans titre'}</strong><small>{ad.accountName||'Compte sans nom'}{num?<span data-lbc-catalog-num={num}>{` · N°${num}`}</span>:''}</small><div><span data-etat={etat}>{label}</span>{suivi&&<small>{livraison?'Livraison':'Vente'} · {suivi}</small>}</div></div>
+     <Photo key={ad.images?.[0]||ad.id} src={ad.images?.[0]}/><div className="vrm-lbc-catalog-info"><strong>{ad.subject||ad.title||'Annonce sans titre'}</strong><small>{ad.accountName||'Compte sans nom'}{num?<span data-lbc-catalog-num={num}>{` · N°${num}`}</span>:''}{etat==='active'&&dateCourte(ad.publieeLe)?<span data-lbc-catalog-depuis="">{` · en ligne depuis le ${dateCourte(ad.publieeLe)}`}</span>:''}</small><div><span data-etat={etat}>{label}</span>{suivi&&<small>{livraison?'Livraison':'Vente'} · {suivi}</small>}{chiffresAnnonceLbc(ad)&&<small data-lbc-catalog-chiffres="">{chiffresAnnonceLbc(ad)}</small>}</div></div>
      <b>{euros(ad.price)}</b><div className="vrm-lbc-catalog-gestes">{lien&&<a href={lien} target="_blank" rel="noreferrer" aria-label={`Gérer l’annonce : ${ad.subject||ad.title||ad.id}`}>Gérer <svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M7 17 17 7M7 7h10v10"/></svg></a>}
      {typeof onSupprimer==='function'&&SUPPRIMABLE.has(etat)&&ad.status!=='deleted'&&<button type="button" data-lbc-supprimer={ad.id} disabled={!!enVol} onClick={()=>onSupprimer({id:String(ad.id),numero:num,title:ad.subject||ad.title||'',prix:ad.price})} aria-label={`Supprimer de Leboncoin : ${ad.subject||ad.title||ad.id}`}>{enVol===String(ad.id)?'Suppression…':'Supprimer'}</button>}</div>
     </li>;})}</ul>}
