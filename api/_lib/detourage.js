@@ -27,6 +27,7 @@ import crypto from 'node:crypto';
 import { sbCle } from './cle.js';
 import { utilisateurDe } from './session.js';
 import { accesVendeur } from './abonnement.js';
+import { lireClePhotoroom } from './photoroom-cle.js';
 
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://lgonxzrzjcqthjtbdpzo.supabase.co';
 const PHOTOROOM_URL = 'https://sdk.photoroom.com/v1/segment';
@@ -106,26 +107,23 @@ async function rendre(owner, mois) {
   } catch (_) { /* au pire le compteur garde une unité de trop : on sous-dépense */ }
 }
 
-// ── LA CLÉ PHOTOROOM DU VENDEUR (26 octobre) ────────────────────────────────
+// ── LA CLÉ PHOTOROOM DU VENDEUR (26 octobre ; coffre le 29 octobre) ────────
 // Julien : « chaque personne puisse mettre sa clé API ». Le MÊME principe que
 // l'IA (`api/ai.js`) : la clé du vendeur d'abord, celle du serveur en secours.
-// Mais le détourage est appelé par l'EXTENSION, qui n'envoie qu'une session —
-// la clé ne peut donc pas voyager à chaque appel. Le vendeur la range dans SA
-// ligne (`vrm_photoroom_cle`, RLS : lui seul et la clé de service la lisent),
-// et le serveur la relit par la session. Avec SA clé, c'est SON compte
-// Photoroom qui paie : on saute alors le verrou « propriétaire » et le plafond
-// (qui ne protègent que la clé de Julien). On ne range jamais la clé ailleurs,
-// jamais dans une sauvegarde (le filet de `telechargerSauvegarde` l'exclut).
+// Mais le détourage est appelé par l'EXTENSION (et le Studio photo), qui
+// n'envoie qu'une session — la clé ne voyage donc jamais avec l'appel : le
+// serveur la relit par la session. Depuis le 29 octobre elle vit CHIFFRÉE dans
+// le coffre (`photoroom_cle`, api/_lib/photoroom-cle.js), plus en clair dans
+// une ligne que le navigateur relisait ; l'ancienne ligne (`vrm_photoroom_cle`)
+// est encore lue tant qu'elle n'a pas été déplacée. Avec SA clé, c'est SON
+// compte Photoroom qui paie : on saute alors le verrou « propriétaire » et le
+// plafond (qui ne protègent que la clé de Julien).
 // Rend la clé (chaîne) ou '' — une lecture ratée ('') retombe sur la clé
 // serveur, où le verrou propriétaire protège Julien.
 async function lireCleVendeur(owner) {
   if (!service() || !owner) return '';
-  try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vrm_photoroom_cle&owner=eq.${encodeURIComponent(owner)}&select=cle:data->>cle`, { headers: sbCle(service()) });
-    if (!r.ok) return '';
-    const j = await r.json();
-    return (Array.isArray(j) && j[0] && typeof j[0].cle === 'string') ? j[0].cle.trim() : '';
-  } catch (_) { return ''; }
+  const c = await lireClePhotoroom(owner);
+  return typeof c === 'string' ? c.trim() : '';
 }
 // Combien ce vendeur a détouré ce mois-ci. undefined = pas su (jamais « 0 »).
 async function lireUsage(owner, mois) {
