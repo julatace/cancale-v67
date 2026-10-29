@@ -198,13 +198,13 @@ async function brancher(p){
    if(nom==='eBay'){
     check((await p.locator('[data-ebay-vente="inconnu-1"]').locator('.vrm-ledger-sale-amount, .vrm-sale-price').first().innerText()).trim()==='—','montant vide eBay affiché inconnu plutôt que zéro');
     const search=p.getByLabel('Rechercher une vente');
-    await search.fill('AcheteurOrdi');check(await p.getByText('Paire eBay',{exact:true}).first().isVisible(),'recherche eBay par acheteur');
-    await search.fill('CHARGEUR-USB');check(await p.getByText('Paire eBay',{exact:true}).first().isVisible(),'recherche eBay sur un article secondaire et son SKU');
+    await search.fill('AcheteurOrdi');check(await p.getByText(/^Paire eBay/).first().isVisible(),'recherche eBay par acheteur');
+    await search.fill('CHARGEUR-USB');check(await p.getByText(/^Paire eBay/).first().isVisible(),'recherche eBay sur un article secondaire et son SKU');
     await search.fill('ABSENT-123');check(await p.getByText('Aucune commande dans cette sélection',{exact:true}).isVisible(),'sélection eBay vide expliquée');
-    await p.getByRole('button',{name:'Effacer les filtres',exact:true}).click();check(await search.inputValue()==='' && await p.getByText('Paire eBay',{exact:true}).first().isVisible(),'réinitialisation eBay restaure les commandes');
+    await p.getByRole('button',{name:'Effacer les filtres',exact:true}).click();check(await search.inputValue()==='' && await p.getByText(/^Paire eBay/).first().isVisible(),'réinitialisation eBay restaure les commandes');
     await p.getByRole('group',{name:'Filtrer les ventes'}).getByRole('button',{name:'Expédiées',exact:true}).click();check(await p.getByText('Aucune commande dans cette sélection',{exact:true}).isVisible(),'commandes non expédiées exclues du filtre expédiées');
     await p.getByRole('button',{name:'Effacer les filtres',exact:true}).click();
-    await p.getByRole('group',{name:'Filtrer les ventes'}).getByRole('button',{name:'À expédier',exact:true}).click();check(await p.getByText('Ordinateur annulé',{exact:true}).count()===0 && await p.getByText('Paire eBay',{exact:true}).first().isVisible(),'vente annulée exclue des commandes à expédier');
+    await p.getByRole('group',{name:'Filtrer les ventes'}).getByRole('button',{name:'À expédier',exact:true}).click();check(await p.getByText('Ordinateur annulé',{exact:true}).count()===0 && await p.getByText(/^Paire eBay/).first().isVisible(),'vente annulée exclue des commandes à expédier');
     await p.getByRole('button',{name:'Effacer les filtres',exact:true}).click();
    }
   }

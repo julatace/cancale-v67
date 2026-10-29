@@ -281,7 +281,9 @@ const capturer = async (pg, nom, vp) => {
           await pg.getByRole('button',{name:'← Retour',exact:true}).click();await pg.getByRole('button',{name:'← Retour',exact:true}).click();
           await pg.getByRole('button',{name:'Vérifier le premier sélectionné',exact:true}).click();
           await pg.getByRole('alert').filter({hasText:'Vérification interrompue'}).waitFor();
-          await pg.getByRole('button',{name:'Copier le contrôle',exact:true}).click();
+          // Le contrôle copiable vit dans « Assistance technique · favoris », replié.
+          await pg.evaluate(()=>document.querySelectorAll('details.vrm-favoris-diagnostic').forEach(d=>{d.open=true;}));
+          await pg.getByRole('button',{name:'Copier le contrôle',exact:true}).first().click();
           const avantMaj=await pg.evaluate(()=>JSON.parse(window.controleOuverture));
           dit(avantMaj.extension==='5.216.0'&&avantMaj.etape==='connexion'&&avantMaj.code==='extension_a_actualiser',`${T} refus avant ouverture : version mesurée et cause conservées`);
           dit(await pg.evaluate(()=>!window.favorisOuvertures?.length&&!window.favorisExec?.length),`${T} précontrôle refusé : aucune ouverture ni message`);

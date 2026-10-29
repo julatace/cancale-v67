@@ -137,6 +137,7 @@ async function rendre(b, { tab = 'cat_bord', tel = false, pont = { absente: true
       etat: et ? { niveau: et.getAttribute('data-etat-actions'), code: et.getAttribute('data-etat-code'), titre: et.getAttribute('title') || '' } : null,
       cmds: window.__cmds || [],
       corps: document.body.innerText,
+      tc: document.body.textContent,
       sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth,
     };
   });
@@ -160,7 +161,12 @@ const compte = (t, s) => String(t || '').split(s).length - 1;
       const r = await rendre(b, { tel }); const v = await r.lire();
       const phrase = tel ? "Depuis ton ordinateur : c'est là que tourne l'extension qui génère les bordereaux." : "Extension VRM pas détectée dans ce navigateur — c'est elle qui génère les bordereaux.";
       dit(v.tg && v.tg.etat === 'grise', `${tel ? 'téléphone' : 'ordinateur sans extension'} : « Tout générer » reste visible, grisé`, JSON.stringify(v.tg));
-      dit(compte(v.corps, phrase) === 1, `${tel ? 'téléphone' : 'ordinateur sans extension'} : la raison est écrite une seule fois sur l'écran`, `${compte(v.corps, phrase)} fois`);
+      // (27 oct., « téléphone épuré », sa demande) : sur téléphone la phrase longue
+      // est rangée derrière « ⓘ » (vrm-aide) — le bandeau « N bordereaux à générer »
+      // reste visible. Elle est jugée là où elle est : une fois dans la page.
+      const ou = tel ? v.tc : v.corps;
+      dit(compte(ou, phrase) === 1, `${tel ? 'téléphone' : 'ordinateur sans extension'} : la raison est écrite une seule fois${tel ? ' (repliée)' : ' sur l\'écran'}`, `${compte(ou, phrase)} fois`);
+      if (tel) dit(/bordereaux? à générer/.test(v.corps), 'téléphone : le bandeau « N bordereaux à générer » reste visible', '');
       dit(v.sw <= v.cw + 1, 'aucun débordement horizontal', `${v.sw} > ${v.cw}`);
       dit(r.errs.length === 0, 'aucune erreur d\'app', r.errs.join(' | ').slice(0, 140));
       await r.ctx.close();

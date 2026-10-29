@@ -283,7 +283,7 @@ const cliquer = (pg, tx) => pg.evaluate((tx) => { const b = document.querySelect
       await r.pg.getByRole('button', { name: 'Accepter', exact: true }).first().click({ timeout: 3000 }).catch(() => {});
       await r.pg.waitForTimeout(500);
       dit(r.journal.posts.length === avantAcc, 'accepter DEMANDE d’abord — rien n’est écrit avant', String(r.journal.posts.length - avantAcc));
-      await r.pg.locator('div[style*="z-index: 2000"] button', { hasText: 'Accepter' }).click({ timeout: 3000 }).catch(() => {});
+      await r.pg.locator('div[style*="z-index: 20000"] button', { hasText: 'Accepter' }).click({ timeout: 3000 }).catch(() => {});
       await r.pg.waitForTimeout(2600);
       const acc = r.journal.posts.find((x) => x.data && /accept$/.test(x.data.args.endpoint || ''));
       dit(acc && acc.data.confirme === true, 'puis la ligne porte la confirmation (`confirme`)', JSON.stringify(acc && acc.data));

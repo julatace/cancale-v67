@@ -164,6 +164,9 @@ const lireAnnonces = (pg) => pg.evaluate(() => {
     // d'attribut avant : un contrôle posé sur un attribut neuf serait vert par
     // accident sur le code d'avant).
     aJour: (document.body.innerText.match(/✓ (Données|Ventes) Vinted à jour/g) || []).length,
+    // (27 oct., téléphone épuré) la coche est rangée derrière « ⓘ » sur téléphone :
+    // elle est rendue (textContent) sans être visible.
+    aJourRendue: (document.body.textContent.match(/✓ (Données|Ventes) Vinted à jour/g) || []).length,
     texte: el ? el.innerText : '',
     couleurs: el ? [...el.querySelectorAll('*')].concat([el]).map((x) => getComputedStyle(x).color) : [],
     sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth,
@@ -284,10 +287,10 @@ const lireDash = (pg) => pg.evaluate(() => {
         const lignes = [...BASE(), ventes('111', 3), ventes('222', 3)];
         const r = await rendre(b, { lignes, tel, mobile: false, onglet: 'plat_vinted', section: 'annonces' });
         const a = await lireAnnonces(r.pg);
-        dit(a.nFraicheur === 1 && a.aJour === 0, `${t} : la date du dressing est dite, et AUCUNE coche « à jour » ne la contredit sur le même écran (§11, §5)`, JSON.stringify({ fraicheur: a.nFraicheur, aJour: a.aJour }));
+        dit(a.nFraicheur === 1 && a.aJourRendue === 0, `${t} : la date du dressing est dite, et AUCUNE coche « à jour » ne la contredit sur le même écran (§11, §5)`, JSON.stringify({ fraicheur: a.nFraicheur, aJour: a.aJourRendue }));
         await r.pg.click('[data-section="ventes"]'); await r.pg.waitForTimeout(2500);
         const v = await lireAnnonces(r.pg);
-        dit(v.aJour === 1, `${t} : l’autre sens — sur la section Ventes, la coche des ventes captées à l’instant reste`, JSON.stringify({ aJour: v.aJour }));
+        dit(v.aJourRendue === 1, `${t} : l’autre sens — sur la section Ventes, la coche des ventes captées à l’instant reste`, JSON.stringify({ aJour: v.aJourRendue }));
         dit(r.errs.length === 0, `${t} : aucune erreur d’app`, r.errs.join(' | ').slice(0, 160));
         await r.ctx.close();
       });

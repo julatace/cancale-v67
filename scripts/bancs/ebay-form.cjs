@@ -203,7 +203,10 @@ const envoisEbay = []; let avertir = false;
   // un bloc dit qu'eBay gère, et on ne réclame jamais un prix à Julien.
   const shipTxt = (await T());
   dit(/livraison.{0,30}g[ée]r[ée]e? par eBay|eBay.{0,20}(g[èe]re|propose).{0,20}(livraison|tarif|prix)/i.test(shipTxt), 'un bloc dit que la LIVRAISON est gérée par eBay (il propose le prix)', shipTxt.replace(/\s+/g,' ').slice(0,80));
-  dit(/tu ne paies jamais le port|tu ne fixes rien/i.test(shipTxt), 'et que Julien ne paie jamais le port / ne fixe rien');
+  // (27 oct., téléphone épuré) cette phrase est rangée derrière « ⓘ » sur téléphone :
+  // elle est jugée dans ce qui est RENDU (textContent), pas seulement visible.
+  const shipTc = await pg.evaluate(() => document.body.textContent);
+  dit(/tu ne paies jamais le port|tu ne fixes rien/i.test(shipTc), 'et que Julien ne paie jamais le port / ne fixe rien');
   // Aucune saisie de prix de port ne doit être demandée (eBay s'en charge).
   const aChampPort = await pg.evaluate(()=>[...document.querySelectorAll('label')].some(x=>/Frais de port/i.test(x.textContent)));
   dit(!aChampPort, 'aucun champ « frais de port » à remplir — eBay gère le tarif');

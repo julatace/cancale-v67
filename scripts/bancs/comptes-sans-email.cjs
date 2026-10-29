@@ -263,6 +263,9 @@ const PAS_MUETS = ['jujuf38', 'compte_neuf', 'llloollllaa', 'dormant', 'une_vent
     const { ctx, pg, errs } = await preparer(b, { width: 1512, height: 982 }, { exclus: [ACC.tomj606, ACC.arthuror2] });
     await pg.goto(`http://localhost:${PORT}/?tab=settings`, { waitUntil: 'domcontentloaded' });
     await pg.waitForTimeout(5500);
+    // (28 oct.) Sous-écran aux deux tailles : on ouvre « Notifications du téléphone ».
+    const sousPush2 = pg.locator('[data-sous-ouvrir="push"]').first();
+    if (await sousPush2.isVisible().catch(() => false)) { await sousPush2.click(); await pg.waitForTimeout(600); }
     const sum = pg.locator('summary', { hasText: 'Ce que tu reçois sur ton téléphone' }).first();
     await sum.scrollIntoViewIfNeeded({ timeout: 5000 });
     await sum.click(); await pg.waitForTimeout(500);

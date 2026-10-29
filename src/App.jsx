@@ -43154,10 +43154,17 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     {id:'annonces-vinted',libelle:'Annonces Vinted',onglet:'cat_annonces',comptes:accounts.filter(a=>!acctOff(a.vinted_user_id)).map(a=>({uid:String(a.vinted_user_id),nom:accNameOf(a)})),items:Array.isArray(listings.items)?listings.items.map(it=>({id:it.id,compte:String(it._acc?.vinted_user_id||''),titre:it.title,valeurs:[it.title,it.price,it.photo,it.photoCount,it.condition]})):null,charge:listings.loading,erreur:listings.error,echecs:listings.ko||[],partiel:!!listings.incomplet,revision:listings.lues},
     {id:'messages-vinted',libelle:'Conversations Vinted',onglet:'cat_msg',comptes:accounts.filter(a=>!acctOff(a.vinted_user_id)).map(a=>({uid:String(a.vinted_user_id),nom:accNameOf(a)})),items:Array.isArray(convs.items)?convs.items.map(c=>({id:c.id,compte:String(c._acc?.vinted_user_id||''),titre:c.description||c.title||c.opposite_user?.login,valeurs:[c.last_message,c.updated_at,c.unread]})):null,charge:convs.loading,erreur:convs.error,echecs:(convs.ko||[]).map(a=>String(a.vinted_user_id)),partiel:true,revision:accounts.map(a=>_harvestSeen[`${a.vinted_user_id}_inbox`])}
   ];
+  // Les deux résumés repliés (bilan des lectures, vendus ailleurs) : côte à côte
+  // sur ordinateur (bilanSynchronisation.css). Sur Ma journée ils passent SOUS la
+  // grille : les doubles ventes sont déjà dites en tête dans « À faire », et la
+  // journée doit rester visible sans défiler (banc journee-widgets, revendeurs).
+  const bilansTete = ['journee','annonces','messages'].includes(curSub) ? <div className="vrm-bilans-tete" data-bilans-tete="">
+    <BilanSynchronisation owner={AUTH.user?.id||''} sources={sourcesBilan} onNav={onNav}/>
+    {['journee','annonces'].includes(curSub)&&<VendusAilleurs owner={AUTH.user?.id||''} ownerActuel={()=>AUTH.user?.id||''} charger={chargerRetraitsMulti} onNav={onNav} PhotoVinted={PhotoVinted}/>}
+  </div> : null;
   return (
     <div style={{padding:'16px 14px 40px'}}>
-      {['journee','annonces','messages'].includes(curSub)&&<BilanSynchronisation owner={AUTH.user?.id||''} sources={sourcesBilan} onNav={onNav}/>}
-      {['journee','annonces'].includes(curSub)&&<VendusAilleurs owner={AUTH.user?.id||''} ownerActuel={()=>AUTH.user?.id||''} charger={chargerRetraitsMulti} onNav={onNav} PhotoVinted={PhotoVinted}/>}
+      {curSub!=='journee'&&bilansTete}
       <input ref={bordRef} type="file" accept="application/pdf,.pdf" onChange={onBordFile} style={{display:'none'}}/>
       {/* Le titre de l'écran est porté par <ScreenHead> plus bas, dans chaque
           section : ce <h2> le répétait juste au-dessus (« Annonces » puis
@@ -43885,6 +43892,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 Réglages ⇒ toujours visible (un seul propriétaire, §11). */}
             {!baseKO && !premierJour && !aWidget('vendu') && <BeneficeJournee onNav={onNav} place="carte"/>}
             {!baseKO && !premierJour && <BeneficeJournee onNav={onNav} place="lien"/>}
+            {bilansTete}
           </div>
         );      })()}
 

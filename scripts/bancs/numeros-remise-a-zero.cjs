@@ -286,6 +286,9 @@ const bloc = (pg) => pg.evaluate(() => { const b = document.querySelector('[data
       const ctx = await contexte(); const pg = await page(ctx, etat);
       await pg.goto(`http://localhost:${PORT}/?tab=settings`, { waitUntil: 'domcontentloaded' });
       await pg.waitForTimeout(6000);
+      // (28 oct.) Réglages en sous-écrans aux deux tailles : on ouvre « numéros ».
+      const sousN = pg.locator('[data-sous-ouvrir="numeros"]').first();
+      if (await sousN.isVisible().catch(() => false)) { await sousN.click(); await pg.waitForTimeout(600); }
       const R = pg.locator('[data-numeros-reglage]');
       await R.scrollIntoViewIfNeeded();
       const t0 = await R.innerText();

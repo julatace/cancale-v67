@@ -146,16 +146,31 @@ const MENSONGES = [
     const champs = await pg.evaluate(() => Array.from(document.querySelectorAll('input,textarea,select'))
       .map((e) => String(e.value == null ? '' : e.value)).filter(Boolean));
     const txt = (await pg.evaluate(() => document.body.innerText || '')) + '\n' + champs.join('\n');
+    // (28 oct., 77633d91) Les panneaux longs vivent dans des SOUS-ÉCRANS, aux
+    // deux tailles : on les ouvre un par un pour lire ce qu'ils montrent.
+    let sousTxt = '';
+    for (const id of ['adresses', 'push', 'import']) {
+      const o = pg.locator(`[data-sous-ouvrir="${id}"]`);
+      if (!(await o.count())) continue;
+      try {
+        await o.first().click({ timeout: 2500 }); await pg.waitForTimeout(700);
+        const ch = await pg.evaluate(() => Array.from(document.querySelectorAll('input,textarea,select')).filter((e) => e.offsetParent).map((e) => String(e.value == null ? '' : e.value)).filter(Boolean));
+        sousTxt += '\n' + (await pg.evaluate(() => document.body.innerText || '')) + '\n' + ch.join('\n');
+        await pg.locator('[data-sous-retour]').first().click({ timeout: 2500 }); await pg.waitForTimeout(400);
+      } catch (_) {}
+    }
     // (17 oct.) Le nom de l'entreprise est dans l'EN-TÊTE de toutes les pages
     // (`data-nom-entreprise`, exprès) : le corps de l'écran se lit sans lui.
     const corps = (await pg.evaluate(() => { const c = document.body.cloneNode(true); c.querySelectorAll('[data-nom-entreprise]').forEach((e) => e.remove()); document.body.appendChild(c); c.style.position = 'absolute'; const t = c.innerText || ''; c.remove(); return t; })) + '\n' + champs.join('\n');
     await ctx.close();
-    return { txt, corps, errs, ecrits };
+    return { txt, sousTxt, tout: txt + '\n' + sousTxt, corps, errs, ecrits };
   };
 
   // Le geste qui détruit : basculer UNE notification. Sur le code d'avant, il
   // réécrivait `push_prefs` avec une seule clé.
   const basculer = async (pg) => {
+    const o = pg.locator('[data-sous-ouvrir="push"]');
+    if (await o.count()) { try { await o.first().click({ timeout: 2500 }); await pg.waitForTimeout(600); } catch (_) {} }
     const b2 = pg.locator('button[aria-label*="Suivi du colis"]');
     if (await b2.count()) { try { await b2.first().click({ timeout: 2500 }); } catch (_) {} }
   };
@@ -165,7 +180,7 @@ const MENSONGES = [
   {
     const r = await rendre(true, basculer);
     for (const [re, quoi] of MENSONGES) {
-      dit(!re.test(r.txt), `Réglages n'affirme pas ${quoi}`);
+      dit(!re.test(r.tout), `Réglages n'affirme pas ${quoi}`);
     }
     // ⚠️ LE CONTRÔLE QUI COMPTE PORTE SUR L'ÉCRITURE PARTIE, pas sur un texte :
     //    une reformulation ne peut pas le rendre vert (§6.5).
@@ -194,13 +209,13 @@ const MENSONGES = [
     }
     // Et le panneau lui-même porte la marque — se taire dessus laisserait croire
     // que le formulaire vide est son vrai réglage.
-    const past = (r.txt.match(/réglage pas lu/g) || []).length;
+    const past = (r.sousTxt.match(/réglage pas lu/g) || []).length;
     dit(past >= 1 && past <= CIBLES.length, 'chaque panneau touché porte sa pastille, sans répéter l\'explication',
       `${past} pastille(s) pour ${CIBLES.length} panneau(x)`);
     // Le mensonge le plus discret : afficher la date du jour à la place de la sienne.
     const auj = new Date().toISOString().slice(0, 10);
     const [a, mo, d2] = auj.split('-');
-    dit(!new RegExp(`${d2}/${mo}/${a}|${auj}`).test(r.txt), 'et il n\'invente pas la date d\'import du jour',
+    dit(!new RegExp(`${d2}/${mo}/${a}|${auj}`).test(r.tout), 'et il n\'invente pas la date d\'import du jour',
       `la vraie est le 10/07/2026 — afficher ${d2}/${mo}/${a} lui ferait croire qu'il a perdu deux mois d'emails`);
     dit(r.errs.length === 0, 'aucune erreur d\'app', r.errs.slice(0, 2).join(' | '));
   }
@@ -210,11 +225,11 @@ const MENSONGES = [
   // Sans cette moitié, « ne rien écrire jamais » passerait le banc.
   {
     const r = await rendre(false, basculer);
-    dit(/10\/07\/2026|2026-07-10/.test(r.txt), 'la date d\'import lue est bien la sienne',
+    dit(/10\/07\/2026|2026-07-10/.test(r.tout), 'la date d\'import lue est bien la sienne',
       'sinon l\'écran affiche autre chose que ce qui est enregistré');
-    dit(/a@exemple\.test/.test(r.txt) && /b@exemple\.test/.test(r.txt),
+    dit(/a@exemple\.test/.test(r.tout) && /b@exemple\.test/.test(r.tout),
       'ses deux adresses de réception sont là');
-    dit(!/n'ai pas pu lire ce réglage/i.test(r.txt), 'et aucune fausse alerte quand la base répond');
+    dit(!/n'ai pas pu lire ce réglage/i.test(r.tout), 'et aucune fausse alerte quand la base répond');
     const w = r.ecrits.filter((x) => x && x.id === 'push_prefs');
     dit(w.length > 0, 'basculer une notification écrit pour de vrai',
       w.length ? '' : 'un panneau qui n\'écrit jamais passerait la première moitié de ce banc');

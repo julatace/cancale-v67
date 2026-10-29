@@ -76,3 +76,8 @@
   outline: 2px solid var(--vrm-accent, #42786e);
   outline-offset: 2px;
 }
+/* Ordinateur : les deux résumés repliés en tête d'écran sur UNE rangée. */
+@media (min-width: 1024px) {
+  .vrm-bilans-tete { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 0 10px; align-items: start; margin: 0 0 8px; }
+  .vrm-bilans-tete > .vrm-bilan-sync { margin: 0; }
+}

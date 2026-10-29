@@ -266,7 +266,9 @@ const lireFiche = (pg) => pg.evaluate(() => {
     await essaie('H2', async () => {
       const { ctx, pg } = await ouvrir(b, { width: 390, height: 844, tactile: true }, { version: EXT_ATTENDUE, suite: 'fait' });
       const etat = await pg.evaluate(() => document.querySelector('[data-bouton-publier]').getAttribute('data-bouton-publier'));
-      await pg.click('[data-bouton-publier] button', { force: true });
+      const vus = await pg.evaluate(() => [...document.querySelectorAll('[data-bouton-publier] button')].map((x) => !!x.offsetParent));
+      console.log('   H2 boutons (visibles) :', JSON.stringify(vus));
+      await pg.locator('[data-bouton-publier] button:visible').first().click({ timeout: 5000 });
       await pg.waitForSelector('[data-fiche-lbc]', { timeout: 5000 }).catch(() => {});
       const fiche = await pg.evaluate(() => !!document.querySelector('[data-fiche-lbc]'));
       dit(etat !== 'grise' && fiche, 'H2 · téléphone dont l’extension répond (Firefox pour Android) : le bouton agit, la fiche s’ouvre', JSON.stringify({ etat, fiche }));

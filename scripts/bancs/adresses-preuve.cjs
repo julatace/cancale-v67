@@ -146,6 +146,7 @@ const panneau = (pg) => pg.evaluate(() => { const t = document.querySelector('[d
     await essaie('B', async () => {
       const reg = { 'julien@exemple.test': { owner: SESSION.user.id }, 'relais@privaterelay.appleid.com': { owner: SESSION.user.id } };
       const { ctx, pg, erreurs } = await ouvrir(nav, { registre: reg, installation: true });
+      await ouvrirAdresses(pg);
       const l = await lignes(pg); const p = await panneau(pg);
       dit(l['julien@exemple.test'] && l['julien@exemple.test'].etat === 'transition' && /reçue — à confirmer/.test(l['julien@exemple.test'].texte) && l['julien@exemple.test'].bouton === 'Confirmer', 'à confirmer : reçue en attendant, et « Confirmer »', JSON.stringify(l['julien@exemple.test']));
       dit(l['relais@privaterelay.appleid.com'] && l['relais@privaterelay.appleid.com'].etat === 'transition' && !l['relais@privaterelay.appleid.com'].bouton && /relais Apple/.test(l['relais@privaterelay.appleid.com'].texte), 'un relais Apple : aucun bouton qui ne pourrait pas marcher, et pourquoi', JSON.stringify(l['relais@privaterelay.appleid.com']));
