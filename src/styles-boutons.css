@@ -41,7 +41,12 @@
 @media (pointer: coarse), (max-width: 767px) { :root { --vrm-b-h: 44px; } }
 
 /* ── 1. LES CLASSES (opt-in explicite) ──────────────────────────────────── */
-.vrm-b {
+/* Chaque règle est doublée sous `.vrm-app-shell .vrm-main` : sur téléphone,
+   styles-epure.css et styles-iphone.css visent les <button> par leur style en
+   ligne avec une spécificité de (0,3,1) et !important. Sans ce doublon, un
+   « Annuler » discret y prenait la pastille teintée (vu au rendu, 29 oct.). */
+.vrm-b,
+.vrm-app-shell .vrm-main .vrm-b {
   display: inline-flex; align-items: center; justify-content: center; gap: 7px;
   box-sizing: border-box; min-height: var(--vrm-b-h) !important; max-width: 100%;
   padding: 0 14px; margin: 0;
@@ -51,45 +56,61 @@
   cursor: pointer; -webkit-tap-highlight-color: transparent; white-space: nowrap;
   transition: background-color .12s ease, color .12s ease, opacity .12s ease, transform .1s ease;
 }
-.vrm-b > svg { width: 18px; height: 18px; flex-shrink: 0; }
-.vrm-b-plein { width: 100%; }
-.vrm-b-court { white-space: normal; }
-.vrm-b-icone { padding: 0 !important; width: var(--vrm-b-h); min-width: var(--vrm-b-h); }
+.vrm-b > svg,
+.vrm-app-shell .vrm-main .vrm-b > svg { width: 18px; height: 18px; flex-shrink: 0; }
+.vrm-b-plein,
+.vrm-app-shell .vrm-main .vrm-b.vrm-b-plein { width: 100%; }
+.vrm-b-court,
+.vrm-app-shell .vrm-main .vrm-b.vrm-b-court { white-space: normal; }
+.vrm-b-icone,
+.vrm-app-shell .vrm-main .vrm-b.vrm-b-icone { padding: 0 !important; width: var(--vrm-b-h); min-width: var(--vrm-b-h); }
 
-.vrm-b-primaire { background: var(--vrm-accent, #244E54) !important; color: var(--vrm-on-accent) !important; }
-.vrm-b-secondaire { background: var(--vrm-b-teinte) !important; color: var(--vrm-b-encre) !important; }
-.vrm-b-discret {
+.vrm-b-primaire,
+.vrm-app-shell .vrm-main .vrm-b.vrm-b-primaire { background: var(--vrm-accent, #244E54) !important; color: var(--vrm-on-accent) !important; }
+.vrm-b-secondaire,
+.vrm-app-shell .vrm-main .vrm-b.vrm-b-secondaire { background: var(--vrm-b-teinte) !important; color: var(--vrm-b-encre) !important; }
+.vrm-b-discret,
+.vrm-app-shell .vrm-main .vrm-b.vrm-b-discret {
   background: transparent !important; color: var(--vrm-b-lien) !important;
   padding: 0 4px; min-height: 44px !important; margin-block: -6px;
 }
 
 @media (hover: hover) and (pointer: fine) {
-  .vrm-b-primaire:not(:disabled):hover { filter: brightness(1.08); }
-  .vrm-b-secondaire:not(:disabled):hover { background: var(--vrm-b-teinte-f) !important; filter: none; }
-  .vrm-b-discret:not(:disabled):hover { text-decoration: underline !important; text-underline-offset: 3px; filter: none; }
+.vrm-b-primaire:not(:disabled):hover,
+.vrm-app-shell .vrm-main .vrm-b.vrm-b-primaire:not(:disabled):hover { filter: brightness(1.08); }
+.vrm-b-secondaire:not(:disabled):hover,
+.vrm-app-shell .vrm-main .vrm-b.vrm-b-secondaire:not(:disabled):hover { background: var(--vrm-b-teinte-f) !important; filter: none; }
+.vrm-b-discret:not(:disabled):hover,
+.vrm-app-shell .vrm-main .vrm-b.vrm-b-discret:not(:disabled):hover { text-decoration: underline !important; text-underline-offset: 3px; filter: none; }
 }
-.vrm-b:not(:disabled):active { transform: scale(.97); }
-.vrm-b-secondaire:not(:disabled):active { background: var(--vrm-b-teinte-f) !important; }
+.vrm-b:not(:disabled):active,
+.vrm-app-shell .vrm-main .vrm-b:not(:disabled):active { transform: scale(.97); }
+.vrm-b-secondaire:not(:disabled):active,
+.vrm-app-shell .vrm-main .vrm-b.vrm-b-secondaire:not(:disabled):active { background: var(--vrm-b-teinte-f) !important; }
 /* Grisé : visible, jamais caché ; la raison est dans `title` ou sur la ligne. */
-.vrm-b:disabled, .vrm-b[aria-disabled="true"] { opacity: .45; cursor: not-allowed; transform: none; filter: none; }
-.vrm-b:focus-visible { outline: 2px solid var(--vrm-accent, #244E54) !important; outline-offset: 2px; }
+.vrm-b:disabled,
+.vrm-app-shell .vrm-main .vrm-b:disabled,
+.vrm-b[aria-disabled="true"],
+.vrm-app-shell .vrm-main .vrm-b.vrm-b[aria-disabled="true"] { opacity: .45; cursor: not-allowed; transform: none; filter: none; }
+.vrm-b:focus-visible,
+.vrm-app-shell .vrm-main .vrm-b:focus-visible { outline: 2px solid var(--vrm-accent, #244E54) !important; outline-offset: 2px; }
 
 /* Une rangée de gestes : à droite sur ordinateur, pleine largeur en bas de la
    carte sur téléphone. */
 .vrm-b-rangee { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px; }
 @media (max-width: 767px) {
-  .vrm-b-rangee { justify-content: stretch; }
-  .vrm-b-rangee > .vrm-b:not(.vrm-b-discret) { flex: 1 1 0; min-width: 0; }
+.vrm-b-rangee{ justify-content: stretch; }
+.vrm-b-rangee > .vrm-b:not(.vrm-b-discret){ flex: 1 1 0; min-width: 0; }
 }
 /* L'action principale d'un écran : dans l'en-tête sur ordinateur (slot `right`
    de ScreenHead), dans une barre posée au-dessus de la navigation sur téléphone. */
 @media (max-width: 767px) {
-  .vrm-b-barre {
+.vrm-b-barre{
     position: fixed; left: 12px; right: 12px; z-index: 45;
     bottom: calc(76px + env(safe-area-inset-bottom));
     display: flex; gap: 8px; padding: 0; pointer-events: none;
   }
-  .vrm-b-barre > .vrm-b { flex: 1; pointer-events: auto; box-shadow: 0 6px 18px rgba(16, 32, 36, .18) !important; }
+.vrm-b-barre > .vrm-b{ flex: 1; pointer-events: auto; box-shadow: 0 6px 18px rgba(16, 32, 36, .18) !important; }
 }
 
 /* ── 2. LA NORMALISATION GLOBALE (prudente) ─────────────────────────────── */
@@ -143,4 +164,21 @@
 }
 @media (hover: hover) and (pointer: fine) {
   :is(.vrm-app-shell, body > :not(#root)) button[aria-label^="Fermer"]:not([data-visionneuse-fermer]):not(.vrm-chat-back):not(.vrm-b):not([style*="rgba(255, 255, 255"]):hover { background: var(--vrm-b-teinte) !important; }
+}
+
+/* Le petit (tables denses, barres d'outils) : 34 px à la souris, 44 au doigt. */
+.vrm-b.vrm-b-petit, .vrm-app-shell .vrm-main .vrm-b.vrm-b-petit { --vrm-b-h: 34px; font-size: 12.5px; padding: 0 11px; }
+@media (pointer: coarse), (max-width: 767px) { .vrm-b.vrm-b-petit, .vrm-app-shell .vrm-main .vrm-b.vrm-b-petit { --vrm-b-h: 44px; } }
+
+/* L'action principale posée par ScreenHead (`principal`). Ordinateur : dans
+   l'en-tête, à droite. Téléphone : une barre fixe au-dessus de la navigation
+   du bas, pleine largeur ; la page garde la place dessous. */
+@media (max-width: 767px) {
+  .vrm-b-principal {
+    position: fixed; left: 12px; right: 12px; z-index: 45;
+    bottom: calc(76px + env(safe-area-inset-bottom));
+    display: flex; gap: 8px; pointer-events: none;
+  }
+  .vrm-b-principal > .vrm-b { flex: 1; pointer-events: auto; box-shadow: 0 6px 18px rgba(16, 32, 36, .18) !important; }
+  .vrm-main:has(.vrm-b-principal)::after, .vrm-main:has(.vrm-b-barre)::after { content: ''; display: block; height: 64px; }
 }

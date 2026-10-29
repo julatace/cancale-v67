@@ -10260,17 +10260,16 @@ function Cell({value, onChange, align="left", mono=false}) {
 }
 
 /* ── UI ──────────────────────────────────────────────── */
-function Btn({children,onClick,color,small,danger,outline,disabled,style={}}) {
-  const tonal = danger ? C.danger : (color || C.accent);
+// (29 oct.) L'ancien bouton générique passe par LES TROIS FORMES (styles-boutons.css).
+// Avant : `color={C.border}` donnait un texte BLANC sur un fond gris clair
+// (illisible), `danger` un fond rouge (§7 : le rouge, c'est deux paires sous un
+// même N°), et `title`/`aria-*` étaient perdus. Plein + accent (ou sans couleur)
+// ⇒ primaire ; tout le reste ⇒ secondaire. `data-vrm-tone` reste (lecture seule).
+function Btn({children,onClick,color,small,danger,outline,disabled,style={},className='',...rest}) {
+  const primaire = !outline && !danger && (!color || color === C.accent);
   return (
-    <button data-vrm-tone={danger ? 'danger' : color ? 'custom' : 'brand'} className={`vrm-button${outline ? ' vrm-button--secondary' : ''}${small ? ' vrm-button--small' : ''}`} type="button" onClick={onClick} disabled={!!disabled} style={{
-      background:outline ? 'transparent' : tonal,
-      color:outline ? (danger || color ? tonal : C.text) : (color || danger ? '#fff' : C.onAccent),
-      border:`1px solid ${outline ? C.border : tonal}`,
-      fontSize:small?12.5:13,
-      cursor:disabled?'not-allowed':'pointer',
-      ...style,
-    }}>{children}</button>
+    <button data-vrm-tone={danger ? 'danger' : color ? 'custom' : 'brand'} type="button" onClick={onClick} disabled={!!disabled} {...rest}
+      className={`vrm-b vrm-b-${primaire ? 'primaire' : 'secondaire'}${small ? ' vrm-b-petit' : ''}${className ? ' ' + className : ''}`} style={style}>{children}</button>
   );
 }
 function Input({label,...p}) {
@@ -10544,7 +10543,7 @@ function AchatsHorsPlateforme({ achats, ouvert, onBasculer, onAjouter, onModifie
           <div style={{ display: 'flex', gap: 8 }}>
             <button type="button" data-achat-hors-enregistrer disabled={envoi} onClick={enregistrer}
               style={{ flex: 1, minWidth: 0, height: 48, border: 'none', borderRadius: 10, background: C.accent, color: '#fff', fontSize: 14.5, fontWeight: 600, cursor: envoi ? 'default' : 'pointer', fontFamily: 'inherit', opacity: envoi ? 0.7 : 1 }}>{envoi ? 'Enregistrement…' : (editId ? 'Enregistrer' : "Ajouter l'achat")}</button>
-            <button type="button" onClick={fermer} style={{ flexShrink: 0, height: 48, padding: '0 16px', border: `1px solid ${C.border}`, borderRadius: 10, background: C.card, color: C.text, fontSize: 14, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }}>Annuler</button>
+            <button className="vrm-b vrm-b-discret" type="button" onClick={fermer} style={{ flexShrink: 0, height: 48, padding: '0 16px', border: `1px solid ${C.border}`, borderRadius: 10, background: C.card, color: C.text, fontSize: 14, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }}>Annuler</button>
           </div>
           {editId && <button type="button" data-achat-hors-supprimer onClick={supprimer} style={{ alignSelf: 'flex-start', height: 44, padding: '0 4px', border: 'none', background: 'transparent', color: C.danger, fontSize: 13, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit', display: 'inline-flex', alignItems: 'center', gap: 6 }}><Icon name="trash" size={15} /> Supprimer cet achat</button>}
         </div></div>
@@ -10661,7 +10660,7 @@ function NotifsMuettes({ onNav }) {
       value={etat.devices ? `${etat.devices} appareil${etat.devices>1?'s':''} abonné${etat.devices>1?'s':''}` : null}
       desc="Le serveur n'a pas sa clé d'envoi : ni vente, ni colis, ni offre ne feront sonner ton téléphone tant qu'elle manque."
       detail={"Vercel → projet cancale-v67 → Settings → Environment Variables → ajouter VAPID_PRIVATE_KEY, puis redéployer. Rouvre ensuite l'app une fois sur chaque téléphone : il se réabonne tout seul."}
-      action={onNav && <button type="button" onClick={()=>onNav('settings')}
+      action={onNav && <button type="button" className="vrm-b vrm-b-primaire" onClick={()=>onNav('settings')}
         style={{border:'none',background:C.danger,color:'#fff',borderRadius:8,padding:'8px 14px',fontSize:12.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit',whiteSpace:'nowrap'}}>
         Voir les réglages
       </button>}
@@ -13770,7 +13769,10 @@ function ToutSurLeNumero({ q, numData, comptes, onNav, onStock, onChercher }) {
 // rendu : un grand titre d'écran IDENTIQUE se tait sur téléphone (§7, un mot écrit
 // deux fois à 60 px d'écart). Un titre différent (sous-écran de Réglages…) reste.
 let TITRE_BARRE = '';
-function ScreenHead({ icon, title, desc, right }) {
+// (29 oct.) `principal` : L'action principale de l'écran (UN <Bouton
+// variante="primaire">). En haut à droite sur ordinateur ; sur téléphone, une
+// barre fixe au-dessus de la navigation du bas (.vrm-b-principal, styles-boutons.css).
+function ScreenHead({ icon, title, desc, right, principal }) {
   const line = typeof icon === 'string' && ICON_PATHS[icon];
   // ⚠️ UNE MANCHETTE, PAS UN EN-TÊTE DE TABLEAU DE BORD. Le titre était une
   // ligne de 23 px avec une pastille ronde teintée devant — le gabarit de tous
@@ -13809,7 +13811,7 @@ function ScreenHead({ icon, title, desc, right }) {
         {/* ⚠️ `maxWidth:100%` : sans lui, une rangée de boutons ne pouvait pas
             revenir à la ligne sur téléphone (Factures débordait de 300 px sur
             le côté — mesuré le 30 sept.). */}
-        {right && <div style={{flexShrink:0,maxWidth:'100%'}}>{right}</div>}
+        {(right || principal) && <div style={{flexShrink:0,maxWidth:'100%',display:'flex',flexWrap:'wrap',alignItems:'center',justifyContent:'flex-end',gap:8}}>{right}{principal && <div className="vrm-b-principal">{principal}</div>}</div>}
       </div>
     </div>
   );
@@ -15122,10 +15124,7 @@ function BaseInjoignable() {
             Vérifie ta connexion, puis recharge la page. Si ça dure plus d'une heure, l'app te dira quoi faire.
           </>}
         </div>
-        <button type="button" onClick={()=>window.location.reload()}
-          style={{marginTop:14,border:'none',background:C.warn,color:'#fff',borderRadius:10,padding:'10px 17px',fontSize:13,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>
-          Recharger
-        </button>
+        <Bouton variante="primaire" icone="sync" onClick={()=>window.location.reload()} style={{marginTop:14}}>Recharger</Bouton>
       </div>
       {/* CODES DE RETRAIT HORS LIGNE (G9) : s'affichent MÊME quand la base ne
           répond pas — c'est au point relais, réseau faible, qu'il en a besoin.
@@ -16078,7 +16077,7 @@ function FicheLbc({ q, compteLbc, onClose, onMarquer }) {
             <div style={{ fontSize: 13, color: C.text, lineHeight: 1.45 }}><b>Relancer le dépôt ?</b> VRM n'a pas vu la fin du précédent. Si tu l'as publiée toi-même sur Leboncoin, un nouveau dépôt la publierait une seconde fois.</div>
             <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
               <button type="button" data-fiche-relancer="" onClick={() => publier(true)} style={{ flex: 1, padding: '10px 12px', borderRadius: 10, border: 'none', background: C.accent, color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>Relancer le dépôt</button>
-              <button type="button" onClick={() => setAConfirmer(false)} style={{ flex: 1, padding: '10px 12px', borderRadius: 10, border: `1px solid ${C.border}`, background: 'transparent', color: C.text, fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>Annuler</button>
+              <button className="vrm-b vrm-b-discret" type="button" onClick={() => setAConfirmer(false)} style={{ flex: 1, padding: '10px 12px', borderRadius: 10, border: `1px solid ${C.border}`, background: 'transparent', color: C.text, fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>Annuler</button>
             </div>
           </div>
         )}
@@ -16240,7 +16239,7 @@ function EtatActions({ onNav, ordi, sombre }) {
     : code === 'telephone' && rl.niveau === 'perime' ? { s: 'non', t: `sur ton ordinateur — pas de signe de vie depuis ${dureeRelais(rl.age)}` }
     : code === 'telephone' && rl.niveau === 'retard' ? { s: 'non', t: `sur ton ordinateur — version ${rl.ver || '?'}, trop ancienne pour agir pour ton téléphone` }
     : code === 'telephone' && rl.niveau === 'passu' ? { s: '…', t: "sur ton ordinateur — pas su (la base n'a pas répondu)" }
-    : code === 'telephone' ? { s: '—', t: "s'utilise sur l'ordinateur où elle est installée" }
+    : code === 'telephone' ? { s: '—', t: 'sur ton ordinateur' }
     : code === 'absente' ? { s: 'non', t: 'pas détectée dans ce navigateur' }
     : code === 'muette' ? { s: 'non', t: 'ne répond pas' }
     : code === 'plusieurs' ? { s: 'non', t: `deux extensions VRM répondent${(__vmrPlusieurs || []).filter((x) => x && x !== '?').length >= 2 ? ' (' + __vmrPlusieurs.join(' et ') + ')' : ''}` }
@@ -16269,7 +16268,9 @@ function EtatActions({ onNav, ordi, sombre }) {
   let geste = null;
   if (code === 'telephone' && rl.niveau === 'perime') geste = <span data-etat-geste="ordinateur">Ouvre Chrome sur ton ordinateur (l'extension VRM s'y réveille toute seule) : dès qu'elle donne signe de vie, les actions reviennent ici.</span>;
   else if (code === 'telephone' && rl.niveau === 'retard') geste = <span data-etat-geste="maj-ordinateur">Sur ton ordinateur : installe la {EXT_ATTENDUE} (Réglages → Extension), puis ⟳ dans chrome://extensions.</span>;
-  else if (code === 'telephone') geste = <span>Ouvre VRM sur l'ordinateur où l'extension est installée pour générer un bordereau, répondre ou publier{rl.niveau === 'absent' ? ' — avec l’extension à jour, tu pourras aussi le faire d’ici' : ''}.</span>;
+  // (29 oct.) Une ligne : le geste, sans la liste de ce qu'il débloque (le titre
+  // « Lecture seule » et la ligne « Extension » le disent déjà, §7).
+  else if (code === 'telephone') geste = <span data-etat-geste="telephone">Pour agir, ouvre VRM sur ton ordinateur.{rl.niveau === 'absent' ? <>{' '}<Pourquoi label="Et d'ici ?">Avec l’extension à jour sur ton ordinateur, tes demandes partiront aussi d’ici : elle les exécute pour toi.</Pourquoi></> : null}</span>;
   else if (code === 'absente' || code === 'retard') geste = <button type="button" data-etat-geste="maj" className="vrm-b vrm-b-primaire" onClick={() => { setOuvert(false); onNav && onNav('settings'); }}>{code === 'absente' ? "Installer l'extension (Réglages)" : `Mettre à jour en ${EXT_ATTENDUE} (Réglages)`}</button>;
   else if (code === 'muette') geste = <button type="button" data-etat-geste="recharger" className="vrm-b vrm-b-primaire" onClick={() => { try { window.location.reload(); } catch (_) {} }}>Recharger la page</button>;
   // Code périmé : le geste se fait DANS CHROME (une page web ne peut pas ouvrir
@@ -16391,7 +16392,7 @@ function EtatActions({ onNav, ordi, sombre }) {
             style={{ padding: '5px 0 0', borderTop: `1px solid ${C.border}`, color: C.muted }}>
             {derniere === undefined ? 'Dernière capture reçue : je regarde…'
               : derniere === null ? 'Dernière capture reçue : pas su (la base n’a pas répondu).'
-              : derniere === 'aucune' ? 'Aucune capture reçue de ton extension pour l’instant.'
+              : derniere === 'aucune' ? 'Aucune capture reçue pour l’instant.'
               // ⚠️⚠️ LA MISE À JOUR N'EST DITE ICI QUE LÀ OÙ LE PONT NE PARLE PAS
               //    (revue du 9 octobre). Sur l'ordinateur, la ligne « Extension »
               //    juste au-dessus vient du pont, qui a mesuré CE navigateur : la
@@ -20942,7 +20943,7 @@ function EbayAnnonceCard({ it, first, onSaved, numero = '', eligible, paires = [
           {et.offresFaites > 0 && <div data-regle-offres-faites={et.offresFaites} style={{ fontSize: 11.5, color: E.muted, marginTop: 6, lineHeight: 1.45 }}>eBay compte {et.offresFaites} offre{et.offresFaites > 1 ? 's' : ''} déjà faite{et.offresFaites > 1 ? 's' : ''} sur cette annonce : si l'une attend encore ta réponse et atteint le montant, eBay peut l'accepter dès que la règle est posée.</div>}
           <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
             <button type="button" data-regle-enregistrer={it.itemId} disabled={!peutEnregistrer} onClick={enregistrerRegle} style={{ ...btnE, border: 'none', background: E.accent, color: '#fff', opacity: peutEnregistrer ? 1 : 0.45, cursor: peutEnregistrer ? 'pointer' : 'default' }}>{envoiRegle === 'pose' ? 'Envoi…' : 'Enregistrer la règle'}</button>
-            <button type="button" data-regle-annuler={it.itemId} onClick={() => { setRegleOuverte(false); setRegleSignal(''); }} style={{ ...btnE, color: E.muted }}>Annuler</button>
+            <button className="vrm-b vrm-b-discret" type="button" data-regle-annuler={it.itemId} onClick={() => { setRegleOuverte(false); setRegleSignal(''); }} style={{ ...btnE, color: E.muted }}>Annuler</button>
             {et.lu && (et.lu.accepte != null || et.lu.refuse != null) && <button type="button" data-regle-retirer={it.itemId} disabled={!!envoiRegle || enLot} onClick={retirerRegle} style={{ ...btnE, opacity: (envoiRegle || enLot) ? 0.45 : 1 }}>{envoiRegle === 'retrait' ? 'Envoi…' : 'Retirer la règle'}</button>}
           </div>
         </div>
@@ -20983,7 +20984,7 @@ function EbayAnnonceCard({ it, first, onSaved, numero = '', eligible, paires = [
             style={{ ...inpE, width: '100%', marginTop: 9, resize: 'vertical', lineHeight: 1.45 }} />
           <div style={{ display: 'flex', gap: 8, marginTop: 9, flexWrap: 'wrap' }}>
             <button type="button" data-offre-envoyer={it.itemId} disabled={!!geste || !remiseOk} onClick={envoyerOffre} style={{ ...btnE, border: 'none', background: E.accent, color: '#fff', opacity: (geste || !remiseOk) ? 0.5 : 1 }}>{geste === 'offre' ? 'Envoi…' : 'Envoyer l\'offre'}</button>
-            <button type="button" onClick={() => setOffreOuverte(false)} style={{ ...btnE, color: E.muted }}>Annuler</button>
+            <button className="vrm-b vrm-b-discret" type="button" onClick={() => setOffreOuverte(false)} style={{ ...btnE, color: E.muted }}>Annuler</button>
           </div>
         </div>
       )}
@@ -21020,7 +21021,7 @@ function EbayAnnonceCard({ it, first, onSaved, numero = '', eligible, paires = [
               <label style={{fontSize:11.5,color:E.muted,flex:'1 1 100%'}}>Titre<input aria-label="Titre de l’annonce eBay" maxLength={80} value={titreEdite} onChange={e=>setTitreEdite(e.target.value)} style={{...inpE,width:'100%',marginTop:4}}/></label>
               <label style={{fontSize:11.5,color:E.muted,flex:'1 1 100%'}}>Description<textarea aria-label="Description de l’annonce eBay" value={descEditee} onChange={e=>setDescEditee(e.target.value)} rows={4} style={{...inpE,width:'100%',marginTop:4}}/></label>
               <button type="button" onClick={enregistrerTexte} disabled={saving} style={btnE}>Enregistrer le texte</button>
-              <button type="button" onClick={() => { setEdit(false); setMsg(''); }} style={{ border: `1px solid ${E.border}`, background: 'transparent', color: E.muted, borderRadius: 8, padding: '10px 12px', fontSize: 12.5, cursor: 'pointer', fontFamily: 'inherit' }}>Annuler</button>
+              <button className="vrm-b vrm-b-discret" type="button" onClick={() => { setEdit(false); setMsg(''); }} style={{ border: `1px solid ${E.border}`, background: 'transparent', color: E.muted, borderRadius: 8, padding: '10px 12px', fontSize: 12.5, cursor: 'pointer', fontFamily: 'inherit' }}>Annuler</button>
             </div>
           )}
           {/* (9 octobre) Une règle d'offre connue : le nouveau prix la touche peut-être. */}
@@ -23630,7 +23631,7 @@ function ClePhotoroom({ cadre = true }) {
               placeholder="Ta clé Photoroom" aria-label="Clé API Photoroom"
               style={{ flex: '1 1 200px', minWidth: 0, minHeight: 44, boxSizing: 'border-box', padding: '0 12px', borderRadius: 10, border: `1px solid ${C.border}`, background: C.bg, color: C.text, fontSize: 16, fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }}/>
             <button type="submit" data-photoroom-enregistrer="" disabled={!!occupe || !val.trim()} style={{ ...bouton(true), opacity: (occupe || !val.trim()) ? 0.55 : 1 }}>{occupe === 'poser' ? 'Vérification…' : 'Vérifier et ranger'}</button>
-            {remplacer && <button type="button" onClick={() => { setRemplacer(false); setVal(''); }} style={bouton(false)}>Annuler</button>}
+            {remplacer && <button className="vrm-b vrm-b-discret" type="button" onClick={() => { setRemplacer(false); setVal(''); }} style={bouton(false)}>Annuler</button>}
           </div>
           <div style={ligneFine}>VRM la vérifie chez Photoroom (sans dépenser d'image), puis la range chiffrée. Tu n'en reverras que les 4 derniers caractères.</div>
         </form>
@@ -26101,7 +26102,7 @@ function InvoiceForm({onClose,onSave,nextNumber,catalog}) {
 
           <div style={{display:'flex',gap:8,marginTop:6}}>
             <Btn onClick={submit} color={C.accent} style={{flex:1}}>✓ Créer la facture</Btn>
-            <Btn onClick={onClose} color={C.border}>Annuler</Btn>
+            <Bouton variante="discret" onClick={onClose}>Annuler</Bouton>
           </div>
         </div>
       </div>
@@ -26159,7 +26160,7 @@ function InvoiceSettings({settings,setSettings,entreprises,setEntreprises,active
           <div style={{display:'flex',gap:8,marginTop:6}}>
             <Btn onClick={saveCur} color={C.accent} style={{flex:1}}>✓ Enregistrer</Btn>
             {list.length>1&&<Btn onClick={delEnt} color={C.red||'#c0392b'}>🗑 Supprimer</Btn>}
-            <Btn onClick={onClose} color={C.border}>Annuler</Btn>
+            <Bouton variante="discret" onClick={onClose}>Annuler</Bouton>
           </div>
         </div>
       </div>
@@ -27124,7 +27125,7 @@ function AssistantPiece({ room, vide, nbArticles, onCreer, onClose }) {
           </div>
         )}
         <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
-          <button type="button" onClick={onClose} style={{ border: `1px solid ${C.border}`, borderRadius: 10, background: 'transparent', color: C.text, fontSize: 14, fontWeight: 600, padding: '0 16px', minHeight: 44, cursor: 'pointer', fontFamily: 'inherit' }}>Annuler</button>
+          <button className="vrm-b vrm-b-discret" type="button" onClick={onClose} style={{ border: `1px solid ${C.border}`, borderRadius: 10, background: 'transparent', color: C.text, fontSize: 14, fontWeight: 600, padding: '0 16px', minHeight: 44, cursor: 'pointer', fontFamily: 'inherit' }}>Annuler</button>
           <button type="button" data-piece-creer="" disabled={!prop || !prop.meubles.length} onClick={creer} style={{ border: 'none', borderRadius: 10, background: C.accent, color: C.onAccent || '#fff', fontSize: 14, fontWeight: 650, padding: '0 18px', minHeight: 44, cursor: prop && prop.meubles.length ? 'pointer' : 'default', opacity: prop && prop.meubles.length ? 1 : 0.5, fontFamily: 'inherit' }}>Créer cette pièce</button>
         </div>
       </div>
@@ -28198,7 +28199,7 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
                   <b>N°{pairePrete}</b> : touche une place libre dans la pièce{pp ? <> — ou range-la à la prochaine place : <b>{pp.nom}</b></> : <> — aucune place libre dans la pièce, ajoute un meuble.</>}
                 </span>
                 {pp && <button type="button" data-ranger-prochaine="" onClick={() => rangerPaire(pairePrete, pp.itemId, pp.cellKey)} style={{ border: 'none', borderRadius: 10, background: C.accent, color: C.onAccent || '#fff', fontSize: 13.5, fontWeight: 600, padding: '0 14px', minHeight: 38, cursor: 'pointer', fontFamily: 'inherit' }}>Ranger ici</button>}
-                <button type="button" onClick={() => setPairePrete(null)} style={{ border: `1px solid ${C.border}`, borderRadius: 10, background: 'transparent', color: C.muted, fontSize: 13, padding: '0 12px', minHeight: 38, cursor: 'pointer', fontFamily: 'inherit' }}>Annuler</button>
+                <button className="vrm-b vrm-b-discret" type="button" onClick={() => setPairePrete(null)} style={{ border: `1px solid ${C.border}`, borderRadius: 10, background: 'transparent', color: C.muted, fontSize: 13, padding: '0 12px', minHeight: 38, cursor: 'pointer', fontFamily: 'inherit' }}>Annuler</button>
               </div>
             )}
             <div ref={refFantome} aria-hidden="true" style={{ display: 'none', position: 'fixed', left: 0, top: 0, zIndex: 3000, pointerEvents: 'none', padding: '6px 12px', borderRadius: 999, background: C.text, color: C.card, fontSize: 13, fontWeight: 700, boxShadow: '0 6px 18px rgba(0,0,0,0.28)' }} />
@@ -28365,14 +28366,14 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
       {putOnSrc && (
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', padding: '8px 11px', border: `1.5px solid ${C.accent}`, borderRadius: 10, background: `${C.accent}14` }}>
           <span style={{ fontSize: 12.5, fontWeight: 800, color: C.text }}>👆 Touche le <b>meuble</b> (table, commode…) sur lequel poser la pile — elle se posera dessus, centrée.</span>
-          <button type="button" onClick={() => setPutOnSrc(null)} style={{ marginLeft: 'auto', border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.muted, fontSize: 12, fontWeight: 700, padding: '5px 10px', cursor: 'pointer' }}>Annuler</button>
+          <button className="vrm-b vrm-b-discret" type="button" onClick={() => setPutOnSrc(null)} style={{ marginLeft: 'auto', border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.muted, fontSize: 12, fontWeight: 700, padding: '5px 10px', cursor: 'pointer' }}>Annuler</button>
         </div>
       )}
       {/* Bandeau « empiler par toucher » actif */}
       {stackSrc && (()=>{ const s = items.find(o => o.id === stackSrc); return (
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', padding: '8px 11px', border: `1.5px solid ${C.accent}`, borderRadius: 10, background: `${C.accent}14` }}>
           <span style={{ fontSize: 12.5, fontWeight: 800, color: C.text }}>👆 Touche la boîte sur laquelle poser <b>N°{(s && s.num) || '?'}</b> (elle montera dessus).</span>
-          <button type="button" onClick={() => setStackSrc(null)} style={{ marginLeft: 'auto', border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.muted, fontSize: 12, fontWeight: 700, padding: '5px 10px', cursor: 'pointer' }}>Annuler</button>
+          <button className="vrm-b vrm-b-discret" type="button" onClick={() => setStackSrc(null)} style={{ marginLeft: 'auto', border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.muted, fontSize: 12, fontWeight: 700, padding: '5px 10px', cursor: 'pointer' }}>Annuler</button>
         </div>
       ); })()}
 
@@ -28714,7 +28715,7 @@ function AssistantRangement({ plan, planLu, ecrire, ficheParNum }) {
                     : <div data-prochaine="" style={{ fontSize: 12.5, color: C.text, lineHeight: 1.45, marginBottom: 10 }}>Plus aucune case libre : agrandis une grille ou ajoute un meuble (Ma pièce → Aménager la pièce).</div>}
                   {placer && <div data-rgt-placer={placer} style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 12.5, color: C.text, marginBottom: 10, padding: '8px 10px', borderRadius: 9, border: `1.5px solid ${C.accent}` }}>
                     <span style={{ flex: 1, minWidth: 0 }}>Touche une case entourée pour y ranger la <b>N°{placer}</b>.</span>
-                    <button type="button" onClick={() => setPlacer(null)} style={btn(false)}>Annuler</button>
+                    <button className="vrm-b vrm-b-discret" type="button" onClick={() => setPlacer(null)} style={btn(false)}>Annuler</button>
                   </div>}
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 460, overflowY: 'auto' }}>
                     {aRanger.map(p => (
@@ -30884,7 +30885,7 @@ function VintedAccounts({ accounts, setAccounts, baseKO, onRetour }) {
             </div>
             <div style={{borderTop:`1px solid ${C.border}`,padding:'12px 16px',display:'flex',flexDirection:'column',gap:8}}>
               <div style={{display:'flex',gap:8}}>
-                <button type="button" onClick={()=>!delBusy&&setDelCible(null)} style={{flex:1,border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:10,padding:'12px',fontSize:14,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Annuler</button>
+                <button className="vrm-b vrm-b-discret" type="button" onClick={()=>!delBusy&&setDelCible(null)} style={{flex:1,border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:10,padding:'12px',fontSize:14,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Annuler</button>
                 <button type="button" onClick={confirmerSuppression} disabled={delBusy||rienCoche} style={{flex:2,border:'none',background:rienCoche?C.border:C.danger,color:'#fff',borderRadius:10,padding:'12px',fontSize:14,fontWeight:700,cursor:(delBusy||rienCoche)?'default':'pointer',fontFamily:'inherit',opacity:delBusy?0.6:1}}>{delBusy?'…':rienCoche?'Coche au moins une case':'Supprimer'}</button>
               </div>
               {/* ── POUR DE BON : par catégorie (26 oct., demande de Julien) ──────
@@ -32102,7 +32103,7 @@ function Inventory({ inventory, setInventory, accounts, garageGrid, labels, onLo
               <option value="sold">💸 Vendu</option>
             </select>
             <div style={{display:'flex',gap:8,justifyContent:'flex-end'}}>
-              <button type="button" onClick={()=>{setEditing(null);setEditDraft(null);}} style={{...btn('transparent',C.text),border:`1px solid ${C.border}`}}>Annuler</button>
+              <button className="vrm-b vrm-b-discret" type="button" onClick={()=>{setEditing(null);setEditDraft(null);}} style={{...btn('transparent',C.text),border:`1px solid ${C.border}`}}>Annuler</button>
               <button type="button" onClick={commitEdit} style={btn(C.accent)}>Enregistrer</button>
             </div>
           </div>
@@ -33336,7 +33337,7 @@ function SuiviUrssaf({ onNav }) {
                       {edit.erreur ? <div role="alert" style={{ fontSize: 12.5, color: ambre }}>{edit.erreur}</div> : null}
                       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                         <button type="button" data-suivi-edit-ok="" onClick={enregistrer} style={{ ...btn, background: C.accent, color: C.onAccent || '#fff', border: 'none' }}>Enregistrer</button>
-                        <button type="button" onClick={() => setEdit(null)} style={btn}>Annuler</button>
+                        <button className="vrm-b vrm-b-discret" type="button" onClick={() => setEdit(null)} style={btn}>Annuler</button>
                       </div>
                       <div style={{ fontSize: 12, color: C.muted }}>Les ventes de la déclaration ne bougent pas : seuls ces deux chiffres sont gardés. Vide = pas noté.</div>
                     </div>
@@ -48966,7 +48967,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                             <button type="button" data-decl-passer onClick={()=>{ setDeclForm(null); allerMoisSuivantSerie(reportMonth); }} style={{border:`1px solid ${C.border}`,borderRadius:8,background:'transparent',color:C.text,cursor:'pointer',fontSize:13,padding:'8px 14px'}}>Pas encore déclaré — mois suivant</button>
                             <button type="button" data-decl-serie-stop onClick={()=>{ finirSerieDecl(); setDeclForm(null); }} style={{border:`1px solid ${C.border}`,borderRadius:8,background:'transparent',color:C.text,cursor:'pointer',fontSize:13,padding:'8px 14px'}}>Arrêter</button>
                           </>) : (
-                          <button type="button" onClick={()=>setDeclForm(null)} style={{border:`1px solid ${C.border}`,borderRadius:8,background:'transparent',color:C.text,cursor:'pointer',fontSize:13,padding:'8px 14px'}}>Annuler</button>)}
+                          <button className="vrm-b vrm-b-discret" type="button" onClick={()=>setDeclForm(null)} style={{border:`1px solid ${C.border}`,borderRadius:8,background:'transparent',color:C.text,cursor:'pointer',fontSize:13,padding:'8px 14px'}}>Annuler</button>)}
                         </div>
                       </div>
                     ) : (
@@ -49443,7 +49444,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               ))}
             </div>
             <div style={{padding:'12px 18px calc(16px + env(safe-area-inset-bottom))',borderTop:`1px solid ${C.border}`,display:'flex',gap:9,flexShrink:0,background:C.bg}}>
-              <button type="button" onClick={()=>setRenumOpen(false)} style={{flex:1,border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:10,padding:'12px',fontSize:13,fontWeight:500,cursor:'pointer',fontFamily:'inherit'}}>Annuler</button>
+              <button className="vrm-b vrm-b-discret" type="button" onClick={()=>setRenumOpen(false)} style={{flex:1,border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:10,padding:'12px',fontSize:13,fontWeight:500,cursor:'pointer',fontFamily:'inherit'}}>Annuler</button>
               {moves.length>0 && <button type="button" onClick={applyRenum} style={{flex:2,border:'none',background:C.accent,color:C.onAccent||'#fff',borderRadius:10,padding:'12px',fontSize:13,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Renuméroter {moves.length} article{moves.length>1?'s':''}</button>}
             </div>
           </div>
@@ -49812,7 +49813,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             <textarea autoFocus value={noteEdit.val} onChange={e=>setNoteEdit(n=>({...n,val:e.target.value}))} placeholder="ex : à retoucher · reçu demandé · pour un client…" rows={4}
               style={{width:'100%',boxSizing:'border-box',border:`1px solid ${C.border}`,borderRadius:10,padding:'10px 12px',fontSize:14,background:C.bg,color:C.text,outline:'none',fontFamily:'inherit',resize:'vertical'}}/>
             <div style={{display:'flex',gap:8,justifyContent:'flex-end',marginTop:12}}>
-              <button type="button" onClick={()=>setNoteEdit(null)} style={{border:`1px solid ${C.border}`,background:'transparent',color:C.muted,borderRadius:10,padding:'9px 14px',fontSize:13,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Annuler</button>
+              <button className="vrm-b vrm-b-discret" type="button" onClick={()=>setNoteEdit(null)} style={{border:`1px solid ${C.border}`,background:'transparent',color:C.muted,borderRadius:10,padding:'9px 14px',fontSize:13,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Annuler</button>
               <button type="button" onClick={()=>{ saveAchatNote(noteEdit.tid, noteEdit.val); setNoteEdit(null); }} style={{border:'none',background:C.accent,color:C.onAccent||'#fff',borderRadius:10,padding:'9px 16px',fontSize:13,fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>Enregistrer</button>
             </div>
           </div>
@@ -52254,7 +52255,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
           {acct.err && <div style={{fontSize:12.5,color:C.danger,marginTop:8,lineHeight:1.4}}>{acct.err}</div>}
           {M==='email' && resteEmail > 0 && <div role="status" data-auth-attente={resteEmail} style={{fontSize:12.5,color:C.text,marginTop:8,lineHeight:1.4}}>{TEXTE_DELAI_EMAIL_BOUTON}</div>}
           <div style={{display:'flex',gap:9,marginTop:14}}>
-            <button type="button" onClick={close} style={{flex:1,border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:10,padding:'12px',fontSize:13.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Annuler</button>
+            <button className="vrm-b vrm-b-discret" type="button" onClick={close} style={{flex:1,border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:10,padding:'12px',fontSize:13.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Annuler</button>
             <button type="button" onClick={valider} disabled={acct.busy || (M!=='out' && !acct.val.trim()) || (M==='email' && resteEmail > 0)}
               style={{flex:2,border:'none',background:M==='out'?C.danger:C.accent,color:'#fff',borderRadius:10,padding:'12px',fontSize:13.5,fontWeight:600,
                 cursor:(acct.busy||(M!=='out'&&!acct.val.trim())||(M==='email'&&resteEmail>0))?'default':'pointer',opacity:(acct.busy||(M!=='out'&&!acct.val.trim())||(M==='email'&&resteEmail>0))?0.5:1,fontFamily:'inherit'}}>
@@ -52951,7 +52952,7 @@ function DoubleVerification({ onEtat } = {}) {
         <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap',marginTop:8}}>
           <input data-mfa-code-activer="" type="text" inputMode="numeric" autoComplete="one-time-code" maxLength={6} placeholder="000000" value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))} style={champ}/>
           <button type="button" data-mfa-confirmer="" disabled={busy || code.length !== 6} onClick={confirmerActivation} style={btn(true, busy || code.length !== 6)}>{busy ? 'Vérification…' : 'Confirmer'}</button>
-          <button type="button" data-mfa-annuler="" disabled={busy} onClick={annulerActivation} style={btn(false, busy)}>Annuler</button>
+          <button className="vrm-b vrm-b-discret" type="button" data-mfa-annuler="" disabled={busy} onClick={annulerActivation} style={btn(false, busy)}>Annuler</button>
         </div>
       </>)}
       {actif && cours && cours.etape === 'nom' && (<>
@@ -52959,7 +52960,7 @@ function DoubleVerification({ onEtat } = {}) {
         {champDuNom}
         <div style={{display:'flex',gap:8,flexWrap:'wrap',marginTop:10}}>
           <button type="button" data-mfa-ajouter-continuer="" disabled={busy} onClick={creer} style={btn(true, busy)}>{busy ? 'Préparation…' : 'Afficher le code QR'}</button>
-          <button type="button" disabled={busy} onClick={() => { setCours(null); setMsg(null); }} style={btn(false, busy)}>Annuler</button>
+          <button className="vrm-b vrm-b-discret" type="button" disabled={busy} onClick={() => { setCours(null); setMsg(null); }} style={btn(false, busy)}>Annuler</button>
         </div>
       </>)}
       {actif && !cours && (<>
@@ -53068,7 +53069,7 @@ function FermerCompte() {
                   data-fermer-confirmation=""
                   style={{ width: '100%', boxSizing: 'border-box', marginTop: 6, border: `1px solid ${C.border}`, borderRadius: 10, padding: '11px 12px', fontSize: 15, background: C.bg, color: C.text, outline: 'none', fontFamily: 'inherit' }} />
               </label>
-              <button type="button" onClick={valider} disabled={!pareil || occupe} data-fermer-bouton=""
+              <button type="button" className="vrm-b vrm-b-primaire" onClick={valider} disabled={!pareil || occupe} data-fermer-bouton=""
                 style={{ marginTop: 10, border: 'none', background: C.danger, color: '#fff', borderRadius: 10, padding: '11px 14px', fontSize: 13, fontWeight: 600, cursor: (!pareil || occupe) ? 'default' : 'pointer', opacity: (!pareil || occupe) ? 0.45 : 1, fontFamily: 'inherit' }}>
                 {occupe ? 'Fermeture en cours…' : 'Fermer définitivement mon compte'}
               </button>
@@ -55683,7 +55684,7 @@ function DemandeCodeDiscord() {
             style={{ width:'100%', boxSizing:'border-box', minHeight:50, fontSize:22, letterSpacing:4, textAlign:'center', borderRadius:8, border:`1px solid ${C.border}`, background:C.bg, color:C.text, marginBottom:10 }}/>
           {e.erreur && <div data-discord-code-erreur="" style={{ fontSize:14, color:C.warn || C.text, marginBottom:10 }}>{e.erreur}</div>}
           <div style={{ display:'flex', gap:8 }}>
-            <button type="button" onClick={fermer} style={{ minHeight:44, flex:1, borderRadius:8, border:`1px solid ${C.border}`, background:'transparent', color:C.text }}>Annuler</button>
+            <button className="vrm-b vrm-b-discret" type="button" onClick={fermer} style={{ minHeight:44, flex:1, borderRadius:8, border:`1px solid ${C.border}`, background:'transparent', color:C.text }}>Annuler</button>
             <button type="button" data-discord-code-valider="" disabled={chiffres.length !== 6 || envoi} onClick={valider} style={{ minHeight:44, flex:1, borderRadius:8, border:'none', background:C.accent, color:'#fff', fontWeight:600, opacity:(chiffres.length !== 6 || envoi) ? .5 : 1 }}>{envoi ? 'Vérification…' : 'Relier Discord'}</button>
           </div>
         </>)}
