@@ -54,6 +54,25 @@
 > l'espacement entre deux paires est celui qu'il règle (Vintex : ~12 s) ; non mesuré : un vrai Chrome qui endort le
 > service worker pendant l'attente (le réveil par alarme est au plus 30 s en retard).
 
+> ⚠️⚠️ **29 octobre — MESSAGES AUX FAVORIS « COMME VINTEX » (5.280), sa demande : « je veux que tu copie vintex, c'est simple et
+> efficace ».** Mesuré dans son rapport Observateur (Vintex, favoris) : tout part de l'onglet vinted.fr ; par favori
+> `POST /api/v2/conversations {initiator,item_id,opposite_user_id}` → 3,2–6 s → `GET /api/v2/transactions/{tx}` → 0,3–0,8 s →
+> `POST …/transactions/{tx}/offers {offer:{currency,price:"45.00"}}` (une VRAIE offre Vinted) → 0,4–0,55 s → `POST
+> …/conversations/{id}/replies` → 6 à 9,6 s avant le favori suivant. `executerMessageFavori` fait pareil par `vintedPage`
+> (sans onglet ⇒ `onglet_vinted`, RIEN n'est envoyé), `PAUSES_FAVORI`, `prixDeTransaction` (réponse jamais vue : lue
+> défensivement, prix illisible ⇒ pas d'offre, le message part), `prixOffreFavori` (jamais ≥ prix, jamais < 1 €) ; le fil
+> n'est relu que si la réponse de création ne suffit pas aux contrôles. GARDÉ : autorisation serveur à usage unique,
+> vérification, identité, historique, plafond 10/60 min, une action consommée (l'offre n'en compte pas une de plus).
+> Rythme « Comme Vintex » (`intervalleMinutes: 0` ⇒ `delaiFavori` tire 6–9,6 s côté serveur, `DELAI_VINTEX_MS`) ; l'app
+> sonde la file à 3 s. **Republication** : la grille des tailles n'est PLUS JAMAIS lue pendant une republication (Vintex
+> ne la lit pas) — seulement le cache 24 h (`cacheSeul`, sinon la phrase et `tailles_cache_absent`) ; plafond
+> `REPUB_PAR_JOUR` **50** (il en a republié 50 avec Vintex) ; espacement par défaut « Comme Vintex » (8–16 s,
+> `REPUB_ESP_VINTEX`). Preuves : `audit-favoris-vintex.cjs` (17 ; `--prouve` 2 rouges sur origin/main : création depuis
+> le fond, pas de transaction ni d'offre), `audit-recreer.cjs` (144, grille jamais demandée), tests favoris (420, 51,
+> 105, 84). ⚠️ Restent différents, dits : `is_personal_data_sharing_check_skipped` à false (valeur de Vintex inconnue),
+> en-têtes de Vintex jamais vus, plafond 10/h gardé. **Geste de Julien** : installer la 5.280, laisser un onglet
+> vinted.fr ouvert sur le bon compte pendant les messages et la republication.
+
 > **29 octobre (suite, « parfait ») — le suivi URSSAF corrigé et complété :** ⚠️ la 1ʳᵉ version affichait « payé » le champ
 > `montant` du registre — c'est le **CA TAPÉ depuis son espace URSSAF**, pas un paiement. Désormais : déclaré = `montant` s'il
 > est tapé, sinon `ca` (VRM au moment de noter) ; un champ **`paye`** (cotisations payées, facultatif) dans le formulaire du
