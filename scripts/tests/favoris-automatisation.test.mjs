@@ -37,15 +37,13 @@ test('arrêt avant consommation interdit l’envoi ; arrêt après départ n’i
   parti=terminerFile(parti,{owner,jeton:'jeton-unique',resultat:'envoye'}).data;
   assert.deepEqual(parti.groupes[owner].jobs.map(x=>x.etat),['envoye','annule']);assert.equal(parti.groupes[owner].active,false);
 });
-test('dix réservations maximum sur une fenêtre glissante, même avec deux propriétaires et des refus',()=>{
+test('plus de plafond de dix par heure (29 oct.) : la onzième réservation part après son délai',()=>{
   let d=lancer(null,Array.from({length:10},(_,i)=>cible(i))).data;
   d=lancer(d,[cible(20),cible(21)],autre).data;
   for(let i=0;i<10;i++){const r=claim(d,T+i*60000,owner,'t'+i);assert.ok(r.valeur.travail);d=regler(r.data,T+i*60000,owner,'t'+i);}
-  assert.equal(claim(d,T+10*60000,autre).valeur.travail,undefined);
-  assert.equal(claim(d,T+3599999,autre).valeur.travail,undefined);
-  const r=claim(d,T+3600000,autre);assert.ok(r.valeur.travail);
+  const r=claim(d,T+10*60000,autre);assert.ok(r.valeur.travail);
   d=terminerFile(r.data,{owner:autre,jeton:'jeton-unique',resultat:'refuse'}).data;
-  assert.equal(d.tentatives.length,10);assert.equal(d.groupes[autre].active,false);
+  assert.equal(d.tentatives.length,11);assert.equal(d.groupes[autre].active,false);
 });
 test('cadence fixe prioritaire, et pas de rattrapage en rafale après une fermeture',()=>{
   let d=lancerFile(null,{owner,targets:[cible(1),cible(2),cible(3)],message:'Bonjour',intervalleMinutes:7,maintenant:T}).data;

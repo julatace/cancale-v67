@@ -15,3 +15,9 @@ test('l’accusé de réception efface seulement le brouillon envoyé',()=>{
 test('changement de propriétaire : effacement et aucun accusé tardif sur le nouveau compte',()=>{
  let owner='a';const b=creerBrouillonsReponses(()=>owner);b.ecrire('a',1,7,'Privé A');owner='b';assert.equal(b.lire('b',1,7),'');b.ecrire('b',1,7,'Privé B');b.ecrire('a',1,7,'Tardif A');b.confirmer('a',1,7,'Privé B');assert.equal(b.lire('b',1,7),'Privé B');assert.equal(b.lire('a',1,7),'');owner='a';assert.equal(b.lire('a',1,7),'');
 });
+
+test('un HTTP positif avec refus métier natif ne vide pas le brouillon',()=>{
+ assert.equal(retourReponseVinted({ok:true,status:200,data:{code:99,message:'Action refusée'}}).etat,'refuse');
+ assert.equal(retourReponseVinted({ok:true,status:200,data:{code:0}}).etat,'confirme');
+ for(const status of [0,408,500,503])assert.equal(retourReponseVinted({ok:true,status,data:{code:0}}).etat,'incertain');
+});

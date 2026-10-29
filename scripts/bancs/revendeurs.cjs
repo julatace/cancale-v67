@@ -198,14 +198,14 @@ async function brancher(p){
    if(nom==='eBay'){
     check((await p.locator('[data-ebay-vente="inconnu-1"]').locator('.vrm-ledger-sale-amount, .vrm-sale-price').first().innerText()).trim()==='—','montant vide eBay affiché inconnu plutôt que zéro');
     const search=p.getByLabel('Rechercher une vente');
-    await search.fill('AcheteurOrdi');check(await p.getByText('Paire eBay',{exact:true}).first().isVisible(),'recherche eBay par acheteur');
-    await search.fill('CHARGEUR-USB');check(await p.getByText('Paire eBay',{exact:true}).first().isVisible(),'recherche eBay sur un article secondaire et son SKU');
+    await search.fill('AcheteurOrdi');check(await p.locator('[data-ebay-vente]',{hasText:'Paire eBay'}).first().isVisible(),'recherche eBay par acheteur');
+    await search.fill('CHARGEUR-USB');check(await p.locator('[data-ebay-vente]',{hasText:'Paire eBay'}).first().isVisible(),'recherche eBay sur un article secondaire et son SKU');
     await search.fill('ABSENT-123');check(await p.getByText('Aucune commande dans cette sélection',{exact:true}).isVisible(),'sélection eBay vide expliquée');
-    await p.getByRole('button',{name:'Effacer les filtres',exact:true}).click();check(await search.inputValue()==='' && await p.getByText('Paire eBay',{exact:true}).first().isVisible(),'réinitialisation eBay restaure les commandes');
+    await p.locator('.vrm-filter-recap').getByRole('button',{name:'Réinitialiser',exact:true}).click();check(await search.inputValue()==='' && await p.locator('[data-ebay-vente]',{hasText:'Paire eBay'}).first().isVisible(),'réinitialisation eBay restaure les commandes');
     await p.getByRole('group',{name:'Filtrer les ventes'}).getByRole('button',{name:'Expédiées',exact:true}).click();check(await p.getByText('Aucune commande dans cette sélection',{exact:true}).isVisible(),'commandes non expédiées exclues du filtre expédiées');
-    await p.getByRole('button',{name:'Effacer les filtres',exact:true}).click();
-    await p.getByRole('group',{name:'Filtrer les ventes'}).getByRole('button',{name:'À expédier',exact:true}).click();check(await p.getByText('Ordinateur annulé',{exact:true}).count()===0 && await p.getByText('Paire eBay',{exact:true}).first().isVisible(),'vente annulée exclue des commandes à expédier');
-    await p.getByRole('button',{name:'Effacer les filtres',exact:true}).click();
+    await p.locator('.vrm-filter-recap').getByRole('button',{name:'Réinitialiser',exact:true}).click();
+    await p.getByRole('group',{name:'Filtrer les ventes'}).getByRole('button',{name:'À expédier',exact:true}).click();check(await p.getByText('Ordinateur annulé',{exact:true}).count()===0 && await p.locator('[data-ebay-vente]',{hasText:'Paire eBay'}).first().isVisible(),'vente annulée exclue des commandes à expédier');
+    await p.locator('.vrm-filter-recap').getByRole('button',{name:'Réinitialiser',exact:true}).click();
    }
   }
   await p.goto(base+'/?tab=plat_vinted');
@@ -246,18 +246,18 @@ async function brancher(p){
   await navigation.getByRole('button',{name:'Vinted',exact:true}).click();await p.locator('.vrm-platform-tabs').getByRole('button',{name:'Ventes',exact:true}).click();
   check(await p.getByLabel('Rechercher dans les ventes Vinted').inputValue()==='Nike', 'recherche de ventes conservée après passage dans le stock');
   await p.getByRole('button',{name:'Réinitialiser les ventes',exact:true}).click();
-  await p.waitForFunction(()=>document.querySelectorAll('.vrm-sale-row').length===2);
+  await p.waitForFunction(()=>[...document.querySelectorAll('.vrm-sale-row')].filter(e=>e.getClientRects().length>0).length===2);
   check(await p.getByLabel('Rechercher dans les ventes Vinted').inputValue()==='', 'réinitialiser retrouve toutes les ventes');
   await p.goto(base+'/?tab=plat_ebay');
-  const photo=p.getByRole('button',{name:'Agrandir la photo de Paire eBay',exact:true});
+  const photo=p.getByRole('button',{name:/^Agrandir la photo de Paire eBay( · \d+ articles)?$/});
   // (20 oct.) La photo agrandissable vit dans la vente ouverte (ventes « une ligne »).
   await p.getByRole('button',{name:/Ouvrir les actions : Paire eBay/}).first().click();
   await photo.click();
-  check(await p.getByRole('dialog',{name:'Photo de Paire eBay',exact:true}).isVisible(), 'photo de vente agrandie dans une fenêtre dédiée');
+  check(await p.getByRole('dialog',{name:/^Photo de Paire eBay( · \d+ articles)?$/}).isVisible(), 'photo de vente agrandie dans une fenêtre dédiée');
   await p.waitForFunction(()=>{const i=document.querySelector('.vrm-photo-panel img');return i&&i.complete&&i.naturalWidth>0;});
-  check(await p.getByRole('dialog',{name:'Photo de Paire eBay',exact:true}).locator('img').getAttribute('alt')==='Paire eBay', 'image agrandie chargée avec le nom exact de la paire');
+  check(await p.getByRole('dialog',{name:/^Photo de Paire eBay( · \d+ articles)?$/}).locator('img').getAttribute('alt').then(a=>/^Paire eBay( · \d+ articles)?$/.test(a)), 'image agrandie chargée avec le nom exact de la paire');
   await p.keyboard.press('Escape');
-  check(await p.getByRole('dialog',{name:'Photo de Paire eBay',exact:true}).count()===0, 'Échap ferme la photo');
+  check(await p.getByRole('dialog',{name:/^Photo de Paire eBay( · \d+ articles)?$/}).count()===0, 'Échap ferme la photo');
   check(await photo.evaluate(e=>e===document.activeElement), 'fermeture de photo rend le focus à la miniature');
   // La photo fermée retire son entrée d'historique (« retour » ferme d'abord la
   // feuille, 18 oct.) : on laisse ce retour se faire avant de changer d'adresse —

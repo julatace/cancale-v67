@@ -52,3 +52,25 @@ export function notificationUrssaf({ today, main }) {
   // de ses mois avant sa fin) ne donne AUCUN montant — jamais « au moins 0,00 € ».
   return { envoyer: true, titre: TITRE_URSSAF, corps: `${r.text}. ${r.sub}`, url, montant: r.apayer, raison: r.apayer == null ? (ligne ? 'ligne publiée trop tôt pour cette période — rappel sans montant' : 'sans ligne publiée — rappel sans montant') : 'avec le montant publié' };
 }
+
+// ── LE RAPPEL AVANT L'ÉCHÉANCE (29 octobre) ── Le 1er ne suffit pas : la
+// période se déclare ET se paie jusqu'au dernier jour de M+1. Une seconde
+// notification part quand il reste 3 jours ou moins (le jour même compris), une
+// fois par échéance, SEULEMENT si la période n'est pas notée « déclarée » — la
+// même règle et le même montant que le 1er (`notificationUrssaf`). Pas su ⇒
+// rien (le 1er a déjà sonné sans montant ; ici on ne relance pas à l'aveugle).
+export const JOURS_AVANT_ECHEANCE = 3;
+export function rappelAvantEcheance({ today, main }) {
+  if (main === undefined || main === null) return { envoyer: false, raison: 'réglages illisibles — rien' };
+  const [y, m, d] = String(today || '').split('-').map(Number);
+  const now = new Date(y, (m || 1) - 1, d || 1, 12);
+  const freq = objet(main).vinted_urssaf_freq || 'trimestriel';
+  const due = nextUrssafDeadline(freq, now);
+  if (!due || due.daysLeft > JOURS_AVANT_ECHEANCE || due.daysLeft < 0) return { envoyer: false, raison: 'échéance pas encore proche' };
+  const n = notificationUrssaf({ today, main });
+  if (!n.envoyer) return n;
+  const dd = due.dueDate;
+  const cle = `${dd.getFullYear()}-${String(dd.getMonth() + 1).padStart(2, '0')}-${String(dd.getDate()).padStart(2, '0')}`;
+  const quand = due.daysLeft === 0 ? "dernier jour aujourd'hui" : due.daysLeft === 1 ? 'plus que demain' : `plus que ${due.daysLeft} jours`;
+  return { ...n, cle, titre: `${TITRE_URSSAF} — ${quand}`, raison: 'avant l\'échéance · ' + n.raison };
+}

@@ -666,7 +666,7 @@ export default function Accueil({ onEntrer }) {
             </div>
             <div className="acc-conf" data-confiance="">
               <h2 className="acc-h2b">Tes comptes restent les tiens.</h2>
-              <p>VRM agit sur le compte ouvert dans Chrome : une action à la fois, jamais plus de 20 par heure.</p>
+              <p>VRM agit sur le compte ouvert dans Chrome : une action à la fois, jamais plus de 50 par heure.</p>
               <p>Tu gardes la main sur tes ventes et tes messages. Les automatismes — <span data-automatisme="">répondre aux questions des acheteurs</span>, <span data-automatisme="">retirer d’eBay une annonce vendue ailleurs</span> — restent éteints tant que tu ne les allumes pas.</p>
               <p>Pas de relances en série aux favoris, de republication en boucle, d’acceptation automatique des offres Vinted ou de suppression d’annonce.</p>
             </div>

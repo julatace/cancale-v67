@@ -164,7 +164,8 @@ const contrastes = (pg, sels) => pg.evaluate((liste) => {
   }
   return out;
 }, sels);
-const SELS_CHOIX = ['[data-depenses-choix] > span', '[data-depenses-aucune]', '[data-depenses-ajouter]'];
+// (le petit texte d'introduction a été retiré du choix : restent ses deux gestes)
+const SELS_CHOIX = ['[data-depenses-aucune]', '[data-depenses-ajouter]'];
 const juge = (cs, quoi) => {
   const faibles = Object.entries(cs).filter(([, v]) => !v || !(v.ratio >= 4.5));
   dit(!faibles.length, `${quoi} : le choix des dépenses se lit (contraste ≥ 4,5:1 sur ce qui est peint derrière)`,
@@ -270,10 +271,18 @@ const juge = (cs, quoi) => {
         dit(!!a && a.depenses === 'jamais', `E ${T} : Ma journée sait que rien n'a jamais été noté (depenses=jamais)`, JSON.stringify(a));
         dit(/avant tes dépenses/i.test(txt), `E ${T} : le net se dit « avant tes dépenses »`, txt.replace(/\n/g, ' | ').slice(0, 160));
         dit(await pg.locator('[data-journee-benef] [data-depenses-choix]').count() === 1, `E ${T} : le choix est proposé, une fois`);
+        // (27 oct., décision de Julien) Sur téléphone, Ma journée garde les chiffres
+        // sans les phrases : le choix y est caché, il se fait dans Comptabilité.
+        const tel = vp.width < 600;
+        if (tel) {
+          dit(!(await pg.locator('[data-journee-benef] [data-depenses-choix]').isVisible()), `E ${T} : sur téléphone, Ma journée garde le chiffre, le choix vit dans Comptabilité`);
+          await aller(pg, 'compta', '[data-depenses-choix]', 2500);
+        }
         juge(await contrastes(pg, SELS_CHOIX), `E ${T} (clair)`);
         if (await pg.locator('[data-depenses-aucune]').count()) {
           await touche(pg, '[data-depenses-aucune]', vp);
           await pg.waitForTimeout(2600);
+          if (tel) await aller(pg, 'journee', '[data-journee-benef]', 3000);
           const a2 = await attrs(pg, '[data-journee-benef]', 'data-journee-benef-');
           const txt2 = await pg.evaluate(() => { const e = document.querySelector('[data-journee-benef]'); return e ? e.innerText : ''; });
           dit(!!a2 && a2.depenses === 'aucune' && !/avant tes dépenses/i.test(txt2) && (await pg.locator('[data-depenses-choix]').count()) === 0, `E ${T} : « je n'ai pas de dépenses à noter » ⇒ le net redevient le net, le choix disparaît`, JSON.stringify(a2));
@@ -292,7 +301,8 @@ const juge = (cs, quoi) => {
         const opts = { main: mainDe({ vinted_dark: true }) };
         const { ctx, pg } = await rendre(b, vp, opts);
         await pg.addInitScript(() => { try { localStorage.setItem('vinted_dark', 'true'); } catch (_) {} });
-        await aller(pg, 'journee', '[data-depenses-choix]', 3500);
+        await aller(pg, 'journee', '[data-journee-benef-etat="lu"]', 1500);
+        await aller(pg, 'compta', '[data-depenses-choix]', 3500);
         const theme = await pg.evaluate(() => document.documentElement.getAttribute('data-theme'));
         dit(theme === 'dark', `E2 ${T} : l'app est bien en sombre`, String(theme));
         juge(await contrastes(pg, SELS_CHOIX), `E2 ${T} (sombre)`);
@@ -310,7 +320,7 @@ const juge = (cs, quoi) => {
         const lib = await pg.evaluate(() => { const l = document.querySelector('[data-benef-ligne="net"]'); return l ? l.innerText : ''; });
         dit(!!c && c.depenses === 'jamais' && /avant tes dépenses/i.test(lib), `F ${T} : Comptabilité dit aussi « net avant tes dépenses »`, lib.replace(/\n/g, ' | '));
         dit((await pg.locator('[data-depenses-choix]').count()) === 1, `F ${T} : une cause, une phrase : le choix est écrit UNE fois sur l'écran`);
-        await aller(pg, 'journee', '[data-journee-benef]', 3000);
+        if (vp.width >= 600) await aller(pg, 'journee', '[data-journee-benef]', 3000);
         if (await pg.locator('[data-depenses-ajouter]').count()) {
           await touche(pg, '[data-depenses-ajouter]', vp);
           await pg.waitForFunction(() => document.querySelector('[data-dep-form]'), null, { timeout: 20000 }).catch(() => {});
