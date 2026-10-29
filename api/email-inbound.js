@@ -38,6 +38,7 @@ import { limiteRetraitDepuisTexte, lieuDepuisExtrait, LIEU_AU_FUTUR } from './_l
 import { codeRetraitTournure } from './_lib/code-retrait-email.js';
 import { decoderEntitesHtml } from './_lib/entites-html.js';
 import { suiviDuSujet, finsDesLignes, sortiParSuivis } from './_lib/suivi-colis.js';
+import { transactionDuRecu } from './_lib/recu-achat.js';
 
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://lgonxzrzjcqthjtbdpzo.supabase.co';
 // ⚠️ CLÉ DE SERVICE QUAND ELLE EXISTE. Ces routes tournent sur le serveur, sans
@@ -2116,7 +2117,15 @@ export async function traiterEmail(req, res) {
       const article = ((achText.match(/commande\s*[«"“]\s*([^»"”\n]{2,70})\s*[»"”]/i)
         || achText.match(/(?:article|articles?\s+achet[ée]e?s?|achat)\s*:\s*[«"“']?([^«»"”'\n]{4,70})/i)
         || [])[1] || '').trim();
-      const transaction = (achText.match(/transaction\s*:?\s*#?(\d{6,})/i) || [])[1] || '';
+      // (29 oct.) LE N° DE TRANSACTION, UNE IDENTITÉ (§5), lu par LA règle de
+      // l'app (`api/_lib/recu-achat.js`, §11). L'ancien motif
+      // `transaction\s*:?\s*#?(\d{6,})` ne passait pas l'astérisque du gras
+      // (« *N° de transaction* 12345678901 ») : mesuré, `transaction` était VIDE
+      // sur les 117 reçus rangés, et un nombre au milieu d'une phrase (« ta
+      // transaction 123456789 est en cours ») l'aurait été pris. Le texte entier
+      // est lu, pas les 2 000 premiers caractères du tri (mesuré : le n° tombe
+      // entre le 490e et le 768e — rien ne le garantit pour un reçu plus long).
+      const transaction = transactionDuRecu(corpsTexte);
       const pdfA = (mail.attachments || []).find(a => /application\/pdf/i.test(a.contentType || '') || /\.pdf$/i.test(a.filename || ''));
       const key = transaction || shortHash(subject + corpsTexte.slice(0, 300));
       await supabaseUpsert([{ id: `email_achat_${key}`, data: {

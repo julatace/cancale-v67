@@ -1,5 +1,24 @@
 # VRM — dossier de passation
 
+> **29 octobre — « FACTURE REÇUE PAR EMAIL » SUR CHAQUE ACHAT (Achats) :** Julien : « essaie pour les achats de mettre en
+> place les factures si tu les reçois par mail ». **Mesuré (lecture seule, 117 lignes `email_achat_*`)** : 81 reçus Vinted
+> (« Ton reçu pour la commande « … » »), **0 avec un PDF** (le reçu est dans le corps), et le champ `transaction` **vide sur
+> les 117** — l'astérisque du gras (« *N° de transaction* 123… ») cassait le motif du serveur ; ce n° relie **61 des 81**
+> reçus à un achat capté (0 doublon), les 20 autres à aucun (comptes pas moissonnés) ; **aucun email de facture Leboncoin ni
+> eBay** n'arrive ; les reçus viennent presque tous d'UN compte (54 sur 55 récents). **Fait** : règle partagée
+> `api/_lib/recu-achat.js` (§11 : le serveur range le n° — `email_achat_{n°}` —, l'app relie) : n° lu ligne par ligne, gras
+> retiré, seulement quand la ligne ne porte QUE lui ; un achat se relie par SON n° et rien d'autre — le repli par TITRE de
+> `receiptFor` est retiré (§5) ; deux lignes d'un même n° = le même achat (PDF, puis détaillée, puis la plus récente) ;
+> « pas su » ne relie rien. Pastille « Facture reçue par email » sur la ligne de l'achat (`data-achat-facture`, 44 px au
+> doigt) qui ouvre le reçu ; la liste ne rapatrie plus `data` ni le PDF (`SELECT_RECUS_ACHAT`, `meta->>_pdf`, §4.4), un PDF
+> joint ne se lit qu'au clic (`lirePdfLigne`, visionneuse) ; l'archive des reçus dit combien sont reliés et le geste. Le mot
+> « Facture » est le sien : Vinted envoie un REÇU de paiement (il n'émet aucune facture entre particuliers). Preuves :
+> `audit-facture-achat.cjs` (43, la vraie route ; 19 rouges sur origin/main, 7 mutations rouges), banc `facture-achat.cjs`
+> (390 tactile clair/sombre + 1512 + reçus illisibles ; 31 rouges sur origin/main, repli par titre ⇒ 3 rouges).
+> ⚠️ Non mesuré : un vrai reçu avec PDF joint ; un vrai email après déploiement ; la projection `data->>texte` sur SA base.
+> **Geste de Julien** : faire suivre les emails Vinted de ses AUTRES comptes vers son adresse VRM (Réglages → Mes adresses
+> de réception) — sinon leurs achats n'auront jamais de reçu.
+
 > **29 octobre — TA MICRO-ENTREPRISE : profil, calendrier, seuils (Comptabilité) :** Julien : « une jauge plafond + seuil de TVA,
 > vérifie les seuils officiels 2026 », « vois si la personne a choisi le versement libératoire », « mensuel : elle déclare août
 > mais paie en septembre », « plus pro ». **Vérifié sur service-public.gouv.fr le 29 oct.** : plafond vente de marchandises
