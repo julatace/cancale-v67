@@ -601,6 +601,10 @@ function familleConnue(subject, from) {
   // « La commande "…" a été remboursée ! » : un de SES achats annulé, l'argent
   // revient sur sa carte tout seul. Rien à faire.
   if (/^La commande .+ a [ée]t[ée] rembours[ée]e/i.test(s)) return "remboursement d'un de tes achats";
+  // (29 oct.) « Demande de remboursement » de vinted@vinted.fr : l'accusé de
+  // réception AUTOMATIQUE du support (« Nous avons bien reçu ton message… »),
+  // mesuré sur 7 emails. Rien à faire.
+  if (/^Demande de remboursement\s*$/i.test(s) && /vinted\.fr/i.test(f)) return 'accusé de réception du support Vinted';
   // Le questionnaire de satisfaction du support Vinted (« Re: »).
   if (/^Re:\s*$/i.test(s) && /vinted\.fr/i.test(f)) return 'questionnaire du support Vinted';
   if (/@team\.vinted|newsletter/i.test(f) || /rentr[ée]e|d[ée]couvre|inspire|nouveaut[ée]s/i.test(s)) return 'newsletter Vinted';
@@ -2335,7 +2339,19 @@ export async function traiterEmail(req, res) {
       const plat = corpsTexte.replace(/\s+/g, ' ');
       const annul = /souhaite annuler son achat/i.test(subject);
       const livre = /Confirmation requise\s*$/i.test(subject) && /commande a [ée]t[ée] livr[ée]e/i.test(plat);
-      if (annul || livre) {
+      // (29 oct.) Deux formes MESURÉES de plus, qui tombaient dans « aucune règle » :
+      //  · « Action requise : problème avec la commande « X » » — un LITIGE sur une
+      //    de SES ventes : « Nous avons suspendu la commande jusqu'à ce que tu le
+      //    fasses » (proposer une solution). Exigé : le sujet ET « a signalé un
+      //    problème » dans le corps (un « Action requise » d'une autre forme ne
+      //    sonne pas).
+      //  · « Retourne ta commande d'ici le 14 oct. : X » — un retour d'un de SES
+      //    ACHATS accepté : passé la date, il garde l'article (corps : « Retourne
+      //    la commande d'ici le … »).
+      const litige = /^\s*Action requise\s*:\s*probl[èe]me avec la commande/i.test(subject) && /a signal[ée] un probl[èe]me/i.test(plat);
+      const mRetour = subject.match(/^\s*Retourne ta commande d['’]ici le\s+(.+?)\s*:\s*(.+?)\s*$/i);
+      const retour = !!mRetour && /Retourne la commande d['’]ici le/i.test(plat);
+      if (annul || livre || litige || retour) {
         const key = shortHash(subject + plat.slice(0, 400));
         let notif, famille;
         if (annul) {
@@ -2347,6 +2363,23 @@ export async function traiterEmail(req, res) {
             title: `⚠️ Annulation demandée${article ? ` — ${court(article, 60)}` : ''}`,
             body: `${qui || "L'acheteur"} veut annuler${raison ? ` (« ${court(raison, 70)} »)` : ''}${acc.login ? ` sur ${acc.login}` : ''} — accepte ou refuse dans la conversation Vinted.`,
             tag: `annul-${key}`, url: '/?tab=cat_msg',
+          };
+        } else if (litige) {
+          const article = ((subject.match(/commande\s*[«"“]\s*(.+?)\s*[»"”]?\s*$/i) || [])[1] || '').trim();
+          famille = 'litige ouvert par un acheteur (commande suspendue)';
+          notif = {
+            title: `⚠️ Litige ouvert${article ? ` — ${court(article, 60)}` : ''}`,
+            body: `L'acheteur a signalé un problème${acc.login ? ` sur ${acc.login}` : ''} : Vinted a suspendu la commande jusqu'à ta réponse — propose une solution dans la conversation Vinted.`,
+            tag: `litige-${key}`, url: '/?tab=cat_msg',
+          };
+        } else if (retour) {
+          const limite = String(mRetour[1] || '').trim().replace(/\.{2,}$/, '.');
+          const article = String(mRetour[2] || '').trim();
+          famille = 'retour d’un de tes achats à renvoyer avant la date limite';
+          notif = {
+            title: `↩️ Retour à renvoyer${article ? ` — ${court(article, 60)}` : ''}`,
+            body: `Renvoie ta commande${limite ? ` avant le ${limite}` : ''}${acc.login ? ` (${acc.login})` : ''} — sinon tu la gardes et le vendeur est payé.`,
+            tag: `retour-achat-${key}`, url: '/?tab=cat_achats',
           };
         } else {
           const article = subject.replace(/\s*-\s*Confirmation requise\s*$/i, '').trim();

@@ -122,6 +122,21 @@ const emailRembourse = {
   subject: 'La commande "Paire de banc" a été remboursée !',
   text: "Bonjour compte_banc,\nLe paiement que tu as fait à vendeur_banc a été annulé. Tu seras remboursé sous 5 jours ouvrés.", html: '', attachments: [],
 };
+// (29 oct.) Formes MESURÉES dans sa base (sujet et phrases clés ; article et pseudo inventés).
+const emailLitige = {
+  from: "\"L'équipe Vinted\" <no-reply@vinted.fr>", to: 'boite-de-reception@banc.test',
+  subject: 'Action requise : problème avec la commande « Paire litige taille 46 »',
+  text: " \n\nL'acheteur a signalé un problème avec la commande « Paire litige taille \n46 ». Consulte les détails et propose une solution.\n\ncompte_banc,\n\nL'acheteur a signalé un problème avec la commande « Paire litige taille \n46 ». Consulte les détails et propose-lui une solution. Nous avons suspendu \nla commande jusqu'à ce que tu le fasses.\n\nVoir le litige \n",
+  html: '', attachments: [],
+};
+const emailRetour = {
+  from: "\"L'équipe Vinted\" <no-reply@vinted.fr>", to: 'boite-de-reception@banc.test',
+  subject: "Retourne ta commande d'ici le 14 oct. : Paire retour",
+  text: " E-mail Vinted \n \nBonjour compte_banc, vendeur_banc a demandé le retour de la commande Paire \nretour et a accepté de prendre en charge les frais de port. Retourne \nla commande d'ici le 14 oct.. Sinon, tu devras la garder et ton paiement \nsera transféré au vendeur. \n",
+  html: '', attachments: [],
+};
+const emailActionAutre = { from: "\"L'équipe Vinted\" <no-reply@vinted.fr>", to: 'boite-de-reception@banc.test', subject: 'Action requise : problème avec la commande « X »', text: 'Un texte sans la phrase du litige.', html: '', attachments: [] };
+const emailSupport = { from: 'vinted@vinted.fr', to: 'boite-de-reception@banc.test', subject: 'Demande de remboursement', text: 'Bonjour ,\nNous avons bien reçu ton message et reviendrons vers toi dès que possible.', html: '', attachments: [] };
 const emailInconnu = { from: 'quelquun@ailleurs.test', to: 'boite-de-reception@banc.test', subject: 'Une lettre sans rapport', text: 'rien à voir', html: '', attachments: [] };
 const famillesInconnues = () => [...base.entries()].filter(([k]) => k.split('|')[1].startsWith('email_inconnu_')).map(([, d]) => d);
 
@@ -168,10 +183,42 @@ const famillesInconnues = () => [...base.entries()].filter(([k]) => k.split('|')
     dit(pushes.length === 1 && !/jusqu'au/.test(p2.body || ''), 'sans date dans l’email : aucune date inventée', JSON.stringify(p2.body));
   });
 
+  console.log('\n── D. « Action requise : problème avec la commande » (litige sur une VENTE) → notification');
+  await essaie('D', async () => {
+    reset();
+    await recoit(emailLitige);
+    const p = pushes[0] || {};
+    console.log(`     ce que lit le téléphone : « ${p.title} » / « ${p.body} »`);
+    dit(pushes.length === 1, 'une notification part', `${pushes.length}`);
+    dit(/Litige/i.test(p.title || '') && /Paire litige taille 46/.test(p.title || ''), 'le titre dit « litige » et nomme la commande lue dans le sujet', JSON.stringify(p.title));
+    dit(/suspendu/i.test(p.body || '') && /propose une solution/i.test(p.body || ''), 'le texte dit la commande suspendue et le geste', JSON.stringify(p.body));
+    dit(p.url === '/?tab=cat_msg', 'elle ouvre Messages', p.url);
+    dit(famillesInconnues().some((d) => /litige/.test(d.famille)), 'l’email reste conservé, rangé dans sa famille');
+    pushes.length = 0; await recoit(emailLitige);
+    dit(pushes.length === 0, 'le même email renvoyé ne sonne pas une seconde fois', `${pushes.length}`);
+    reset(); await recoit(emailActionAutre);
+    dit(pushes.length === 0, 'un « Action requise » SANS « a signalé un problème » ne sonne pas', `${pushes.length}`);
+  });
+
+  console.log('\n── E. « Retourne ta commande d\'ici le … » (retour d’un ACHAT) → notification avec la date');
+  await essaie('E', async () => {
+    reset();
+    await recoit(emailRetour);
+    const p = pushes[0] || {};
+    console.log(`     ce que lit le téléphone : « ${p.title} » / « ${p.body} »`);
+    dit(pushes.length === 1, 'une notification part', `${pushes.length}`);
+    dit(/Retour/i.test(p.title || '') && /Paire retour/.test(p.title || ''), 'le titre nomme l’achat lu dans le sujet', JSON.stringify(p.title));
+    dit(/avant le 14 oct\.(?!\.)/.test(p.body || '') && !/oct\.\./.test(p.body || ''), 'le texte porte la date limite LUE (sans le point en trop)', JSON.stringify(p.body));
+    dit(p.url === '/?tab=cat_achats', 'elle ouvre Achats', p.url);
+    reset(); await recoit(emailSupport);
+    dit(pushes.length === 0, 'l’accusé du support « Demande de remboursement » ne sonne pas', `${pushes.length}`);
+    dit(famillesInconnues().some((d) => d.famille === 'accusé de réception du support Vinted'), 'il est reconnu (famille connue, sans action)');
+  });
+
   console.log('\n── C. La catégorie se coupe ; le reste ne change pas');
   await essaie('C', async () => {
     reset({ action: false });
-    await recoit(emailAnnul); await recoit(emailLivre);
+    await recoit(emailAnnul); await recoit(emailLivre); await recoit(emailLitige); await recoit(emailRetour);
     dit(pushes.length === 0, 'catégorie « À trancher » coupée : rien ne sonne', `${pushes.length}`);
     reset();
     await recoit(emailRembourse); await recoit(emailInconnu);
