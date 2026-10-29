@@ -10,7 +10,7 @@
 > « ⋯ Gérer l'annonce » est retiré : ses gestes (`data-fiche-gestes`, 44 px au doigt) et ses infos sont à la vue. **Calendrier**
 > (`src/ChoixPeriode.jsx` + règle pure `src/periodeCalendrier.js`) : deux mois côte à côte à l'ordinateur, un calendrier qui
 > défile au doigt (feuille), raccourcis 7 jours · 30 jours · ce mois · mois dernier · cette année, deux touchers puis Appliquer,
-> plage dite en clair ; UN composant pour Ventes, Achats et la période du CA (`PeriodePicker` n'est plus qu'un nom) ; la valeur
+> plage dite en clair ; UN composant pour Ventes, Achats et la période du CA (`PeriodePicker` n'est plus qu'un nom ; Compta « Semaine · Mois · Trimestre · Année » reste un segment : c'est la période de DÉCLARATION, pas une plage libre) ; la valeur
 > garde sa forme `{from, to, label?}` lue par `dansPeriodeDate` (§11, aucun filtre réécrit). **Offres automatiques** : une
 > ligne (statut + interrupteur), le texte derrière ⓘ ; comportement INCHANGÉ (éteindre sans question, allumer demande).
 > **Pastille Actions** : ton, chevron, panneau avec en-tête et la chaîne des maillons, même source (`etatActionsExt`, sur `raisonExtGlobale`). Rien sur
