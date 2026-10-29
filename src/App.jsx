@@ -114,7 +114,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.272.0';
+const EXT_ATTENDUE = '5.273.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -11980,11 +11980,21 @@ const ETAPES_REPUB = {
 // tirées au hasard (5.263) sont annoncées par l'extension avec leur durée (5.265) :
 // on affiche ce qu'il reste à attendre, à la seconde.
 const PAUSE_NOM = { photo: 'avant la photo suivante', brouillon: 'avant de créer le brouillon', enLigne: 'avant la mise en ligne', reessai: 'avant un nouvel essai' };
+// (29 oct.) Vinted refuse les photos d'un brouillon : la mise en ligne se fait
+// en 3 essais au plus (1. tel quel, 2. forme courte des photos, 3. photos
+// renvoyées). La barre dit lequel, et la photo renvoyée en cours.
+function texteSecoursPhotos(p) {
+  const n = p && p.essais ? ` (essai ${p.essai} sur ${p.essais})` : '';
+  if (p && p.renvoi && !p.envoye && p.total > 0) return `Vinted a refusé les photos${n} : VRM les renvoie — photo ${Math.min(p.fait + 1, p.total)} sur ${p.total}`;
+  if (p && p.renvoi && p.envoye) return `Photos renvoyées : dernier essai de mise en ligne${n}`;
+  if (p && p.renvoi) return `Vinted a refusé les photos${n} : VRM va les renvoyer`;
+  return `Vinted a refusé les photos : nouvel essai${n}`;
+}
 function majProgRepub(p, d) {
   const id = String(d.id); const cur = p[id] || {};
   if (d.pause) return { ...p, [id]: { ...cur, pause: { quoi: String(d.pause), jusqua: Number(d.jusqua) || 0, ms: Number(d.ms) || 0 } } };
   const total = Number(d.total) || 0;
-  return { ...p, [id]: { etape: String(d.etape || ''), fait: Number(d.fait) || 0, total, renvoi: !!d.renvoi, nPhotos: d.etape === 'photos' && total > 0 ? total : (cur.nPhotos || 0) } };
+  return { ...p, [id]: { etape: String(d.etape || ''), fait: Number(d.fait) || 0, total, renvoi: !!d.renvoi, essai: Number(d.essai) || 0, essais: Number(d.essais) || 0, envoye: !!d.envoye, nPhotos: d.etape === 'photos' && total > 0 ? total : (cur.nPhotos || 0) } };
 }
 function texteAttente(p, now) {
   const pa = p && p.pause;
@@ -12010,7 +12020,7 @@ function DetailEtapes({ p, liste, issue, now }) {
         let detail = '';
         if (etat === 'encours') {
           if (cle === 'photos' && p && p.total > 0) detail = `photo ${Math.min(p.fait + 1, p.total)} sur ${p.total}`;
-          if (e === 'secours-photos') detail = p && p.renvoi ? 'Vinted refuse les photos : VRM les renvoie, puis un dernier essai' : 'Vinted refuse les photos : nouvel essai';
+          if (e === 'secours-photos') detail = texteSecoursPhotos(p);
           if (att) detail = detail ? `${detail} · ${att}` : att;
         }
         if (etat === 'fait' && cle === 'photos' && p && p.nPhotos > 0) detail = `${p.nPhotos} photo${p.nPhotos > 1 ? 's' : ''}`;
@@ -12057,7 +12067,7 @@ function SuiviGeste({ ids, liste, label }) {
 function progressionRepub(p, action, viaB, listeImposee) {
   const liste = listeImposee || (action === 'versBrouillon' ? ETAPES_REPUB.versBrouillon : (viaB ? ETAPES_REPUB.brouillon : ETAPES_REPUB.direct));
   if (!p || !p.etape) return { etape: '', part: 0.03, texte: 'Préparation…' };
-  if (p.etape === 'secours-photos') { const j = liste.findIndex((x) => x[0] === 'en-ligne'); return { etape: p.etape, part: Math.min(0.97, Math.max(0, j) / liste.length + 0.5 / liste.length), texte: p.renvoi ? 'Vinted refuse les photos : VRM les renvoie, puis un dernier essai…' : 'Vinted refuse les photos : nouvel essai…' }; }
+  if (p.etape === 'secours-photos') { const j = liste.findIndex((x) => x[0] === 'en-ligne'); return { etape: p.etape, part: Math.min(0.97, Math.max(0, j) / liste.length + 0.5 / liste.length), texte: texteSecoursPhotos(p) + '…' }; }
   const i = liste.findIndex((x) => x[0] === p.etape);
   if (i < 0) return { etape: p.etape, part: 0.05, texte: 'En cours…' };
   const dedans = p.etape === 'photos' && p.total > 0 ? Math.min(1, p.fait / p.total) : 0;
@@ -35547,7 +35557,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const basculerOffresAuto = async () => {
     if (offresAuto) { setOffresAuto(false); save('vinted_offres_auto', false); return; }
     const ok = await askConfirm({ title: 'Accepter les offres tout seul sur Vinted ?',
-      desc: "Dès qu'une offre atteint le « mini » d'une annonce, VRM l'accepte à ta place (une à la fois, un court délai entre chaque, uniquement le compte ouvert dans ce Chrome, plafond 20/h).\n\n⚠️ Important : sur Vinted, un programme qui accepte peut être vu comme un robot — c'est un risque pour le compte, que tu prends en l'allumant. Sur eBay c'est sans risque (réglage natif), pas sur Vinted.\n\nPose un « mini » sur les annonces que tu veux laisser partir à ce prix.",
+      desc: "Dès qu'une offre atteint le « mini » d'une annonce, VRM l'accepte à ta place, pas tout de suite : entre 3 et 20 minutes après l'avoir vue, tiré au hasard (une à la fois, uniquement le compte ouvert dans ce Chrome, plafond 20/h). L'extension doit rester ouverte dans Chrome pendant ce délai.\n\n⚠️ Important : sur Vinted, un programme qui accepte peut être vu comme un robot — c'est un risque pour le compte, que tu prends en l'allumant. Sur eBay c'est sans risque (réglage natif), pas sur Vinted.\n\nPose un « mini » sur les annonces que tu veux laisser partir à ce prix.",
       ok: 'Oui, accepter tout seul', cancel: 'Annuler' });
     if (!ok) return;
     setOffresAuto(true); save('vinted_offres_auto', true);
@@ -45163,7 +45173,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             <div style={{display:'flex',alignItems:'center',gap:10}}>
               <div style={{flex:1,minWidth:0}}>
                 <div style={{fontSize:13,fontWeight:600,color:C.text,display:'flex',alignItems:'center',gap:6}}><Icon name="tag" size={14} style={{color:offresAuto?C.accent:C.muted}}/>Accepter les offres automatiquement</div>
-                <div style={{fontSize:12,color:C.muted,marginTop:2,lineHeight:1.45}}>{offresAuto ? "Une offre qui atteint le « mini » d'une annonce est acceptée toute seule — une à la fois, un court délai entre chaque, le compte ouvert dans Chrome seulement. Sous ton « refuse », elle est refusée ; entre les deux, à toi de négocier." : "Pose un « mini » sur une annonce, et VRM accepte les offres au-dessus à ta place."}</div>
+                <div style={{fontSize:12,color:C.muted,marginTop:2,lineHeight:1.45}}>{offresAuto ? "Une offre qui atteint le « mini » d'une annonce est acceptée toute seule, entre 3 et 20 min après (au hasard) — une à la fois, le compte ouvert dans Chrome seulement. Sous ton « refuse », elle est refusée ; entre les deux, à toi de négocier." : "Pose un « mini » sur une annonce, et VRM accepte les offres au-dessus à ta place."}</div>
               </div>
               <button type="button" role="switch" aria-checked={offresAuto} data-offres-auto-toggle={offresAuto?'1':'0'} onClick={basculerOffresAuto}
                 style={{flexShrink:0,width:46,height:26,borderRadius:999,border:'none',cursor:'pointer',background:offresAuto?C.accent:C.border,position:'relative',transition:'background .15s'}} aria-label="Acceptation automatique des offres">
