@@ -241,6 +241,8 @@ const projette = (row, sel) => {
         await pg.screenshot({ path: path.join(require('os').tmpdir(), 'republier-ordre-' + vp.width + '.png') });
         const petits = await pg.$$eval('[data-republier-monter],[data-republier-descendre],[data-republier-melanger]', (els) => els.filter((e) => { const r = e.getBoundingClientRect(); return r.width < 44 || r.height < 44; }).length);
         dit(petits === 0, 'flèches et « Mélanger » font 44 px au doigt', String(petits));
+        dit(await pg.locator('[data-republier-esp-choix="vintex"]').getAttribute('aria-pressed') === 'true', '« Comme Vintex » est le rythme par défaut (8 à 16 s entre deux paires)');
+        await pg.locator('[data-republier-esp-choix="fixe"]').click();
         await pg.locator('[data-republier] input[inputmode="numeric"]').fill('0');
         await pg.locator('[data-republier-confirme]').check();
         await pg.locator('[data-republier-lancer]').click();
@@ -335,7 +337,7 @@ const projette = (row, sel) => {
       });
       await pg.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"pret":true}' }));
       const action = async (k) => { await pg.locator('[data-actions-ouvrir]').first().click(); await pg.locator(`[data-action="${k}"]`).click(); await pg.locator(`[data-republier-action="${k}"]`).waitFor({ state: 'visible', timeout: 4000 }); };
-      const lancer = async () => { await pg.locator('[data-republier] input[inputmode="numeric"]').fill('0').catch(() => {}); await pg.locator('[data-republier-confirme]').check(); await pg.locator('[data-republier-lancer]').click(); for (let i = 0; i < 40; i++) { const m = await pg.locator('[data-republier]').getAttribute('data-republier-mode'); if (m === 'fini' || m === 'pause') break; await pg.waitForTimeout(200); } };
+      const lancer = async () => { await pg.locator('[data-republier-esp-choix="fixe"]').click().catch(() => {}); await pg.locator('[data-republier] input[inputmode="numeric"]').fill('0').catch(() => {}); await pg.locator('[data-republier-confirme]').check(); await pg.locator('[data-republier-lancer]').click(); for (let i = 0; i < 40; i++) { const m = await pg.locator('[data-republier]').getAttribute('data-republier-mode'); if (m === 'fini' || m === 'pause') break; await pg.waitForTimeout(200); } };
       const fermer = async () => { await pg.locator('[data-republier-fermer]').click().catch(() => {}); await pg.waitForTimeout(250); await pg.evaluate(() => { window.__repub = []; }); };
       try {
         await pg.goto(`http://localhost:${PORT}/?tab=cat_annonces`, { waitUntil: 'domcontentloaded' });
@@ -608,6 +610,7 @@ const projette = (row, sel) => {
         await pg.locator('[data-republier-paire="9103"]').click();
         await pg.locator('[data-republier-suivant]').click();
         await pg.locator('[data-republier-suivant]').click();
+        await pg.locator('[data-republier-esp-choix="fixe"]').click().catch(() => {});
         await pg.locator('[data-republier] input[inputmode="numeric"]').fill('0').catch(() => {});
         await pg.locator('[data-republier-confirme]').check();
         await pg.locator('[data-republier-lancer]').click();
