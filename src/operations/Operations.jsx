@@ -3,6 +3,7 @@ import { passationMissions } from './syntheses.js';
 import React,{useEffect,useRef,useState} from 'react';
 import {montantSaisi,etatReservation,echeanceActive,trierOperations} from './metier.js';
 import './operations.css';
+import { DESCRIPTION_ORGANISATION } from './description.js';
 const EUR=new Intl.NumberFormat('fr-FR',{style:'currency',currency:'EUR'});
 const euros=n=>EUR.format(n/100);
 const date=n=>n?new Date(n).toLocaleString('fr-FR',{dateStyle:'short',timeStyle:'short'}):'Sans échéance';
@@ -71,7 +72,7 @@ export default function Operations({headers,vendeur,initialSection='missions',co
  const items=trierOperations(recherches,section,maintenant,tri);
  const changerSection=id=>{setSection(id);setNouveau(false);setEdition(null);setAction(null);setFiltre('');setProches(false);setTri('recent');setModeMission('');};
  return <section className="vrm-operations" data-ops-section={section} data-ops-dark={sombre?'true':'false'} aria-label={vendeur?'Missions de l’équipe':'Organisation'}>
- <header className={'ops-entete'+(!vendeur&&!contexteEbay?' ops-entete-doublon':'')}><div><span className="ops-surtitre">{vendeur?'Équipe':'Gestion'}</span><h2>{vendeur?'Mes missions':contexteEbay?'Recherches eBay':'Organisation'}</h2><p>{TITRES[section]}</p></div><div className="ops-actions"><button onClick={charger} disabled={charge||occupe}>Actualiser</button>{!vendeur&&donnees&&<button onClick={exporter}>Exporter</button>}</div></header>
+ <header className={'ops-entete'+(!vendeur&&!contexteEbay?' ops-entete-doublon':'')}><div><span className="ops-surtitre" data-ops-surtitre="">{vendeur?'Équipe':contexteEbay?'Gestion':'Réglages'}</span><h2>{vendeur?'Mes missions':contexteEbay?'Recherches eBay':'Organisation'}</h2><p data-ops-accroche="">{!vendeur&&!contexteEbay?DESCRIPTION_ORGANISATION:TITRES[section]}</p></div><div className="ops-actions"><button onClick={charger} disabled={charge||occupe}>Actualiser</button>{!vendeur&&donnees&&<button onClick={exporter}>Exporter</button>}</div></header>
  {!vendeur&&!contexteEbay&&<nav className="ops-onglets" aria-label="Outils d’organisation">{SECTIONS.map(([id,label])=><button key={id} aria-current={section===id?'page':undefined} onClick={()=>changerSection(id)}>{label}</button>)}</nav>}
  {erreur&&<div className="ops-erreur" role="alert">{erreur}{pending.current&&<button disabled={occupe||charge} onClick={async()=>{const j=await charger();if(j&&pending.current)await envoyer(null,null,true,j.donnees.revision);}}>Vérifier / réessayer</button>}{!donnees&&!pending.current&&<button disabled={charge} onClick={charger}>Réessayer</button>}</div>}
  {charge&&!donnees?<p role="status">Lecture de ton espace…</p>:!donnees?(erreur?null:<p>Impossible de lire cet espace. <button onClick={charger}>Réessayer</button></p>):<>
