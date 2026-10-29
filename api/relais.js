@@ -8,7 +8,60 @@
 // ────────────────────────────────────────────────────────────────────────────
 
 import './_lib/sans-bruit.js';
-import { vendeurExige } from './_lib/session.js';
+import { vendeurExige, baseCloisonnee } from './_lib/session.js';
+import { contexteVendeur } from './_lib/owner.js';
+import { accesVendeur } from './_lib/abonnement.js';
+import { normaliserSuivi } from './_lib/etat-colis-email.js';
+import { passageTransporteurs, transpALire, appliquerReponseBrute, ENVOI_MAX, MAX_APP, BUDGET_APP_MS } from './_lib/transporteurs-lecture.js';
+
+// ── (24 oct.) LE STATUT DES COLIS CHEZ LEUR TRANSPORTEUR (api/_lib/transporteurs*.js)
+// Trois modes, sans 13e fonction (le plan Hobby en permet 12) :
+//   POST ?mode=transp       — un passage (l'app ouverte, ou une page de suivi
+//                             ouverte dans l'extension) : C5 ;
+//   GET  ?mode=transp-a-lire — ce que l'extension doit lire depuis le navigateur
+//                             (seulement ce que le transporteur a REFUSÉ au
+//                             serveur, ou pendant sa pause — Mondial Relay
+//                             compris, lu par le serveur depuis le 24 oct., et
+//                             relu alors par l'extension par la même route
+//                             `_mvc`) : C3 ;
+//   POST ?mode=transp-brut  — la réponse BRUTE relayée par l'extension, jugée
+//                             ici par la même règle : C4.
+// Session du vendeur exigée (jamais un identifiant envoyé par le navigateur),
+// base cloisonnée exigée (sinon « pas su » : on ne mélange pas les boutiques),
+// abonnement en règle (coupé ⇒ 402 ; « pas su » ne coupe pas), rien en cache.
+const corpsDe = (req) => { if (typeof req.body === 'string') { try { return JSON.parse(req.body); } catch (_) { return undefined; } } return req.body || {}; };
+async function transp(req, res, mode) {
+  res.setHeader('Cache-Control', 'no-store');
+  const methode = String(req.method || 'GET').toUpperCase();
+  if ((mode === 'transp-a-lire' && methode !== 'GET') || (mode !== 'transp-a-lire' && methode !== 'POST')) { res.status(405).json({ error: 'methode' }); return; }
+  const lg = Number((req.headers && (req.headers['content-length'] || req.headers['Content-Length'])) || 0);
+  const brut = typeof req.body === 'string' ? req.body : (req.body ? JSON.stringify(req.body) : '');
+  if (mode === 'transp-brut' && (lg > ENVOI_MAX || Buffer.byteLength(brut, 'utf8') > ENVOI_MAX)) { res.status(413).json({ error: 'trop-gros' }); return; }
+  const u = await vendeurExige(req, res);
+  if (!u) return;
+  if (!(await baseCloisonnee())) { res.status(503).json({ error: 'pas-su' }); return; }
+  if ((await accesVendeur(u.id)) === false) { res.status(402).json({ error: 'abonnement' }); return; }
+  await contexteVendeur.run({ owner: u.id }, async () => {
+    try {
+      if (mode === 'transp-a-lire') {
+        const r = await transpALire();
+        if (!r) { res.status(503).json({ error: 'pas-su' }); return; }
+        res.status(200).json(r); return;
+      }
+      const body = corpsDe(req);
+      if (!body || typeof body !== 'object') { res.status(400).json({ error: 'forme' }); return; }
+      if (mode === 'transp-brut') { const r = await appliquerReponseBrute(body); res.status(r.status).json(r.corps); return; }
+      // C5. Un n° donné (page de suivi ouverte) : lu s'il est un achat de ce
+      // vendeur et que sa dernière lecture a plus de 5 min — sinon ignoré.
+      const suivi = body.suivi == null || body.suivi === '' ? null : normaliserSuivi(body.suivi);
+      if (suivi !== null && !/^[A-Z0-9]{8,24}$/.test(suivi)) { res.status(400).json({ error: 'suivi' }); return; }
+      const cp = /^\d{5}$/.test(String(body.cp || '')) ? String(body.cp) : '';
+      const r = await passageTransporteurs({ max: MAX_APP, budgetMs: BUDGET_APP_MS, suivi, force: !!suivi, cpPage: cp });
+      if (!r.ok) { res.status(503).json({ error: 'pas-su' }); return; }
+      res.status(200).json({ ok: true, lus: r.lus, besoinNavigateur: r.besoinNavigateur, pause: r.pause });
+    } catch (e) { res.status(500).json({ error: 'panne' }); }
+  });
+}
 
 // ⚠️ ANTI-ABUS (20 octobre) : cette route était PUBLIQUE, sans session — un
 // relais gratuit vers Nominatim et Overpass depuis l'adresse de Vercel, pour
@@ -78,6 +131,8 @@ function carrierFromTags(t) {
 }
 
 export default async function handler(req, res) {
+  const mode = String((req.query && req.query.mode) || '');
+  if (mode === 'transp' || mode === 'transp-a-lire' || mode === 'transp-brut') { await transp(req, res, mode); return; }
   if (!(await vendeurExige(req, res))) return;
   let city = (req.query && req.query.city ? String(req.query.city) : '').trim();
   const lat = req.query && req.query.lat, lon = req.query && req.query.lon;

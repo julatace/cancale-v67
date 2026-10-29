@@ -29,6 +29,11 @@ import { normaliserSuivi, etatColisDepuisTexte } from './etat-colis-email.js';
 import { arriveeColisEmail } from './arrivee-colis.js';
 import { etatRetrait, lieuDepuisExtrait, limiteRetraitDepuisTexte, LIEU_AU_FUTUR } from './retrait-colis.js';
 import { codeRetraitTournure } from './code-retrait-email.js';
+// (24 oct.) LE STATUT LU CHEZ LE TRANSPORTEUR (api/_lib/transporteurs.js) : une
+// ligne `transp_{transporteur}_{n°}` par n°, écrite par le SERVEUR seul. Elle se
+// joint aux e-mails PAR LE N° — jamais réécrite dans une ligne `email_track_*`.
+import { sensDeLigne, SUJET_SORTANT, SUJET_ENTRANT, SELECT_TRANSP_META, ligneTranspDeMeta, codesPostauxDe, CP_SIEGE_MR, dansFenetreLecteurs } from './transporteurs.js';
+export { sensDeLigne, SUJET_SORTANT, SUJET_ENTRANT, SELECT_TRANSP_META, ligneTranspDeMeta, dansFenetreLecteurs };
 
 // ── UNE LIGNE DE SUIVI RELUE AVEC LA RÈGLE D'AUJOURD'HUI (revue du 23 oct., n° 2)
 // Une ligne `email_track_*` déjà rangée ne sera jamais réécrite : elle est relue
@@ -142,16 +147,42 @@ export function finDeLigne(l) {
   return null;
 }
 const msDe = (v) => { const ms = Date.parse(String(v || '')); return Number.isFinite(ms) ? ms : null; };
-// Les fins connues, PAR N° NORMALISÉ : Map(n° → { retire, retours: [ms|null] }).
+// (24 oct.) CE QUE DIT LE TRANSPORTEUR DE LA FIN D'UN COLIS — l'adaptateur de
+// la ligne `transp_` (jamais `finDeLigne` : sa forme n'est pas celle d'un
+// e-mail). 'retire' (retiré ou livré, à n'importe quelle date : « un retiré
+// gagne toujours ») · 'retour' (repart chez l'expéditeur, daté) · 'incident' ·
+// 'inconnu' (daté : il ne compte qu'APRÈS l'arrivée) · null. On fait confiance à
+// `etat` : le serveur est le seul à l'écrire, avec la règle.
+export function finDeLigneTransporteur(t) {
+  if (!t || !t.etat) return null;
+  if (t.etat === 'retire' || t.etat === 'livre') return 'retire';
+  if (t.etat === 'retour_expediteur') return 'retour';
+  if (t.etat === 'incident') return 'incident';
+  if (t.etat === 'inconnu') return 'inconnu';
+  return null;
+}
+// Les fins connues, PAR N° NORMALISÉ : Map(n° → { retire, retours: [ms|null],
+// incidents: [{ at, etat, detail, libelle }] }).
 // `estSortant(l)` (facultatif) : un « retour » d'un colis qu'il a POSTÉ lui
 // revient — il ne dit rien d'un achat (la règle de l'app, `sensColis`).
-export function finsDesLignes(lignes, { estSortant } = {}) {
+// `transp` (facultatif) : les lignes `transp_` (tableau ou Map n° → ligne).
+export function finsDesLignes(lignes, { estSortant, transp } = {}) {
   const m = new Map();
+  const tl = transp instanceof Map ? [...transp.values()] : (Array.isArray(transp) ? transp : []);
+  for (const t of tl) {
+    const f = finDeLigneTransporteur(t); if (!f) continue;
+    const k = normaliserSuivi(t.suivi); if (!k) continue;
+    const e = m.get(k) || { retire: false, retours: [], incidents: [] };
+    if (f === 'retire') e.retire = true;
+    else if (f === 'retour') e.retours.push(msDe(t.etatAt));
+    else (e.incidents || (e.incidents = [])).push({ at: msDe(t.etatAt), etat: t.etat, detail: t.detail || null, libelle: t.libelle || '', carrier: t.carrier || '' });
+    m.set(k, e);
+  }
   for (const l of (Array.isArray(lignes) ? lignes : [])) {
     const f = finDeLigne(l); if (!f) continue;
     const k = suiviDeLigne(l); if (!k) continue;
     if (f === 'retour' && typeof estSortant === 'function' && estSortant(l)) continue;
-    const e = m.get(k) || { retire: false, retours: [] };
+    const e = m.get(k) || { retire: false, retours: [], incidents: [] };
     if (f === 'delivered') e.retire = true;
     // (revue du 23 oct., n° 4) La date d'un retour est celle de son E-MAIL
     // (`emailAt`, la date Gmail) quand on l'a, sinon l'heure de son traitement :
@@ -169,17 +200,94 @@ export function finsDesLignes(lignes, { estSortant } = {}) {
 //            jamais) ;
 // 'reparti' — une ligne du même n° dit qu'il repart chez l'expéditeur, écrite
 //            depuis son arrivée (ou dates inconnues) ;
+// 'a_verifier' — (24 oct.) le TRANSPORTEUR signale un incident (« a quitté le
+//            point relais sans être retiré »…) ou un statut qu'on ne connaît pas
+//            APRÈS l'arrivée : le colis sort de « à retirer » et passe « à
+//            vérifier » (avant l'arrivée : ignoré) ;
 // null — rien ne le dit sorti.
 export function sortiParSuivis(suivis, fins, arriveeMs = null) {
   const ks = (Array.isArray(suivis) ? suivis : [suivis]).map(normaliserSuivi).filter(Boolean);
   if (!ks.length || !fins) return null;
-  let reparti = false;
+  let reparti = false, verifier = false;
+  const connue = Number.isFinite(arriveeMs) && arriveeMs > 0;
   for (const k of ks) {
     const f = fins.get(k); if (!f) continue;
     if (f.retire) return 'retire';
-    if (f.retours.some((d) => !Number.isFinite(arriveeMs) || !arriveeMs || d == null || d >= arriveeMs)) reparti = true;
+    if (f.retours.some((d) => !connue || d == null || d >= arriveeMs)) reparti = true;
+    for (const i of (f.incidents || [])) {
+      if (i.etat === 'incident' && (!connue || i.at == null || i.at >= arriveeMs)) verifier = true;
+      if (i.etat === 'inconnu' && connue && i.at != null && i.at >= arriveeMs) verifier = true;
+    }
   }
-  return reparti ? 'reparti' : null;
+  return reparti ? 'reparti' : (verifier ? 'a_verifier' : null);
+}
+// Le motif d'un « à vérifier » venu du transporteur (le libellé brut, pour la carte).
+export function incidentDeSuivis(suivis, fins, arriveeMs = null) {
+  const ks = (Array.isArray(suivis) ? suivis : [suivis]).map(normaliserSuivi).filter(Boolean);
+  if (!fins) return null;
+  const connue = Number.isFinite(arriveeMs) && arriveeMs > 0;
+  for (const k of ks) { const f = fins.get(k); if (!f) continue; for (const i of (f.incidents || [])) if ((i.etat === 'incident' && (!connue || i.at == null || i.at >= arriveeMs)) || (i.etat === 'inconnu' && connue && i.at != null && i.at >= arriveeMs)) return i; }
+  return null;
+}
+
+// ── (24 oct.) LE TRANSPORTEUR FAIT MONTER, JAMAIS DESCENDRE (§1.7) ───────────
+// Une ligne d'e-mail ET la ligne `transp_` du même n° :
+//   · « disponible » chez le transporteur, PLUS RÉCENT que le dernier e-mail du
+//     même n° (en transit, info…) ⇒ la ligne devient « à retirer », avec le lieu
+//     et la limite du transporteur, mais SANS code ni QR ;
+//   · e-mail déjà « disponible » : le transporteur n'ajoute que la limite quand
+//     l'e-mail n'en a pas (sûre : `limite` ; déduite : `limiteVers`, dite « vers
+//     le ») — la limite de l'e-mail gagne quand les deux existent ;
+//   · une lecture « disponible » de moins de 6 h lève une « à vérifier » qui ne
+//     vient QUE de la garde (`transpDispoLu`, voir `leverGarde`) — jamais une
+//     date limite lue et dépassée ;
+//   · « disponible » chez le transporteur et « reparti » dans l'e-mail, plus
+//     récent : contradiction ⇒ « à vérifier » (`transpContradiction`) ;
+//   · « en route » ne fait jamais redescendre un « disponible ».
+// Pure ; ne touche jamais la ligne rangée (une COPIE).
+export const DISPO_LEVE_GARDE_MS = 6 * 3600000;
+const dernierEmailMs = (l) => msDe(l.emailAt != null ? l.emailAt : l.ea) ?? msDe(l.receivedAt != null ? l.receivedAt : l.r);
+export const lieuTransp = (t) => (t ? [t.lieuNom, [t.lieuCp, t.lieuVille].filter(Boolean).join(' ')].filter(Boolean).join(', ') : '');
+export function fusionTransporteur(l, t, maintenant = Date.now()) {
+  if (!l || !t || !t.etat) return l;
+  const st = l.status != null ? l.status : l.s;
+  const at = msDe(t.etatAt), luMs = msDe(t.lu);
+  if (t.etat !== 'disponible') return l;
+  const em = dernierEmailMs(l);
+  const recent = luMs != null && maintenant - luMs < DISPO_LEVE_GARDE_MS ? luMs : null;
+  if (st === 'available') {
+    const out = { ...l, transp: t };
+    if (!l.limite && t.limite && t.limiteSure) { out.limite = t.limite; out.limiteDuTransporteur = true; }
+    if (!out.limite && t.limite && !t.limiteSure) out.limiteVers = t.limite;
+    if (recent != null) out.transpDispoLu = recent;
+    return out;
+  }
+  if ((st === 'transit' || st === 'info' || !st) && at != null && (em == null || at > em)) {
+    return { ...l, status: 'available', statusLabel: 'Disponible (lu chez le transporteur)', lieu: lieuTransp(t) || null,
+      limite: (t.limiteSure && t.limite) || null, limiteVers: (!t.limiteSure && t.limite) || null, limiteDuTransporteur: !!(t.limiteSure && t.limite),
+      arriveLe: t.etatAt, viaTransporteur: true, transp: t, ...(recent != null ? { transpDispoLu: recent } : {}) };
+  }
+  if (st === 'retour' && at != null && em != null && at > em) return { ...l, transp: t, transpContradiction: true };
+  return l;
+}
+// Une ligne SYNTHÉTIQUE pour un n° sans e-mail (saisi à la main, suivi Vinted)
+// que le transporteur dit « disponible » : elle entre dans « à retirer » comme
+// une ligne d'e-mail, sans code ni QR.
+export function ligneDuTransporteur(t, maintenant = Date.now()) {
+  if (!t || t.etat !== 'disponible') return null;
+  const luMs = msDe(t.lu);
+  return { id: `transp:${t.carrier}:${t.suivi}`, suivi: t.suivi, carrier: t.carrier, status: 'available', statusLabel: 'Disponible (lu chez le transporteur)',
+    subject: '', receivedAt: t.etatAt || t.lu || null, arriveLe: t.etatAt || null, lieu: lieuTransp(t) || null, sens: 'entrant',
+    limite: (t.limiteSure && t.limite) || null, limiteVers: (!t.limiteSure && t.limite) || null, limiteDuTransporteur: !!(t.limiteSure && t.limite),
+    viaTransporteur: true, synthetique: true, transp: t, ...(luMs != null && maintenant - luMs < DISPO_LEVE_GARDE_MS ? { transpDispoLu: luMs } : {}) };
+}
+// La garde levée par une lecture « disponible » récente (une ligne fusionnée).
+// `e` : le résultat de `etatRetrait`. Une date limite lue et dépassée n'est
+// JAMAIS levée.
+export function leverGarde(e, l, maintenant = Date.now()) {
+  if (!e || e.etat !== 'trop_long' || !l || !Number.isFinite(l.transpDispoLu)) return e;
+  if (maintenant - l.transpDispoLu >= DISPO_LEVE_GARDE_MS) return e;
+  return { ...e, etat: 'a_retirer', gardeLevee: true };
 }
 export const sortiParSuivi = (ligne, fins, arriveeMs = null) => sortiParSuivis([suiviDeLigne(ligne)], fins, arriveeMs);
 
@@ -203,11 +311,14 @@ export const normaliserCodePostal = (cp) => { const s = String(cp || '').replace
 export const idSuiviManuel = (transporteur, n) => `colis_suivi_${TRANSPORTEURS_SAISIE.includes(transporteur) ? transporteur : 'autre'}_${normaliserSuivi(n)}`;
 
 // Le CODE POSTAL d'un colis d'e-mail, quand il est LU (le lieu « …, 56000 Vannes »
-// de l'e-mail) — jamais deviné. Sinon ''.
+// de l'e-mail, sinon le lieu gardé par la route, `extraitLieu`) — jamais deviné.
+// Le code du siège de Mondial Relay (59650, dans le pied de ses e-mails) n'est
+// jamais celui d'un point relais. Sinon ''.
 export function codePostalLu(t) {
   const lieu = String((t && t.lieu) || '');
-  const m = /(?:^|[\s,])(\d{5})\s+[A-Za-zÀ-ÿ]/.exec(lieu);
-  return m ? m[1] : '';
+  for (const m of lieu.matchAll(/(?:^|[\s,])(\d{5})\s+[A-Za-zÀ-ÿ]/g)) if (m[1] !== CP_SIEGE_MR) return m[1];
+  const ex = codesPostauxDe(t && (t.extraitLieu != null ? t.extraitLieu : t.el));
+  return ex[0] || '';
 }
 
 // ── LE LIEN DE SUIVI CHEZ LE TRANSPORTEUR ────────────────────────────────────
@@ -230,6 +341,9 @@ export function lienSuivi(transporteur, suivi, codePostal = '') {
     return { url: `https://www.mondialrelay.fr/suivi-de-colis/?numeroExpedition=${s}${cp ? `&codePostal=${cp}` : ''}`, site: true, codePostal: cp };
   }
   if (/chrono/.test(tr)) return { url: `https://www.chronopost.fr/tracking-no-cms/suivi-page?listeNumerosLT=${s}`, site: true, codePostal: '' };
+  // (24 oct.) Vinted Go : sa page publique de suivi (mesurée en 200), plus une
+  // recherche Google.
+  if (/vinted/.test(tr)) return { url: `https://vintedgo.com/fr/tracking/${s}`, site: true, codePostal: '' };
   return { url: `https://www.google.com/search?q=${s}+suivi+colis`, site: false, codePostal: '' };
 }
 
@@ -318,13 +432,17 @@ export function finDesTransactions(txs, achats, etats) {
 // classé fini (`finis` de sa publication : la commande reliée dit livrée ou non
 // réclamée). Le n° est l'identité (sans n°, rien).
 export const RATTRAPAGE_J = 1;
-export function rappelsRetraitDuJour({ lignes = [], collectes = [], envoyes = [], finis = [], maintenant = Date.now(), aujourdhui = null, finParCommande = null } = {}) {
+export function rappelsRetraitDuJour({ lignes = [], collectes = [], envoyes = [], finis = [], maintenant = Date.now(), aujourdhui = null, finParCommande = null, transp = null } = {}) {
   // (revue du 23 oct., n° 2) Chaque ligne relue avec la règle de l'app : un
   // colis « en transit » pour l'app ne reçoit jamais « à vérifier — va le
   // chercher » le matin.
-  lignes = (Array.isArray(lignes) ? lignes : []).map((l) => relireLigneMeta(l));
+  // (24 oct.) Et le statut lu chez le TRANSPORTEUR (lignes `transp_`, la règle
+  // de l'app) : un colis retiré ou reparti chez lui ne reçoit aucun rappel, une
+  // lecture « disponible » de moins de 6 h ne fait pas dire « à vérifier ».
+  const tMap = new Map((transp instanceof Map ? [...transp.values()] : (Array.isArray(transp) ? transp : [])).filter((t) => t && t.suivi).map((t) => [normaliserSuivi(t.suivi), t]));
+  lignes = (Array.isArray(lignes) ? lignes : []).map((l) => relireLigneMeta(l)).map((l) => { const k = suiviDeLigne(l); const t = k ? tMap.get(k) : null; return t ? fusionTransporteur(l, t, maintenant) : l; });
   const envoyesN = new Set((envoyes || []).map(normaliserSuivi).filter(Boolean));
-  const fins = finsDesLignes(lignes, { estSortant: (l) => (l.sens != null ? l.sens : l.se) === 'sortant' || envoyesN.has(suiviDeLigne(l)) });
+  const fins = finsDesLignes(lignes, { estSortant: (l) => (l.sens != null ? l.sens : l.se) === 'sortant' || envoyesN.has(suiviDeLigne(l)), transp: [...tMap.values()] });
   const coches = new Set((collectes || []).map((c) => String(c || '').trim()));
   const cochesN = new Set((collectes || []).map(normaliserSuivi).filter(Boolean));
   const finisS = new Set((finis || []).map(String));
@@ -352,7 +470,7 @@ export function rappelsRetraitDuJour({ lignes = [], collectes = [], envoyes = []
     }
     const limite = (l.limite != null ? l.limite : l.l) || null;
     const transporteur = (l.carrier != null ? l.carrier : l.c) || '';
-    const e = etatRetrait({ limite, arriveeMs, transporteur }, maintenant, aujourdhui);
+    const e = leverGarde(etatRetrait({ limite, arriveeMs, transporteur }, maintenant, aujourdhui), l, maintenant);
     let etat = null;
     if (e.etat === 'a_retirer' && limite && e.jours === 0) etat = 'dernier';
     else if (e.etat === 'delai_depasse' && e.jours >= -(1 + RATTRAPAGE_J)) etat = 'a_verifier';

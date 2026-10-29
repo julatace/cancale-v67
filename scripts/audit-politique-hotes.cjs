@@ -32,6 +32,9 @@ const SERVICE = {
   'cdn.discordapp.com': /Discord/,
   'cdn.jsdelivr.net': /jsDelivr/,
   'lgonxzrzjcqthjtbdpzo.supabase.co': /Supabase/,
+  'ws.chronopost.fr': /Chronopost/,
+  'carrier.vintedgo.com': /Vinted Go/,
+  'www.mondialrelay.fr': /Mondial Relay/,
 };
 const USAGES = {
   achats: { quoi: 'géocodage automatique des points relais (écran Achats)', role: /points? relais/i, donnee: /navigateur/i },
@@ -41,6 +44,10 @@ const USAGES = {
   pdfjs: { quoi: 'aperçu des bordereaux (pdf.js)', role: /pdf\.js|aperçu des bordereaux/i, donnee: /navigateur|adresse IP/i },
   ort: { quoi: 'détourage du Studio photo (onnxruntime)', role: /Studio photo|onnxruntime/i, donnee: /navigateur|adresse IP/i },
   base: { quoi: 'la base de données de VRM', role: /./, donnee: /./ },
+  // (24 oct.) Le statut public d'un colis, lu par le SERVEUR (Chronopost, Vinted Go).
+  transp: { quoi: 'statut public des colis, lu par le serveur', role: /statut public des colis/i, donnee: /n° de suivi[\s\S]*serveur VRM/i },
+  // (24 oct., suite) Mondial Relay lu par le SERVEUR (route `_mvc`) : n° ET code postal.
+  transpmr: { quoi: 'statut public des colis Mondial Relay, lu par le serveur (n° + code postal)', role: /statut public des colis/i, donnee: /code postal[\s\S]*serveur VRM/i },
 };
 // ── La liste FERMÉE des couples (fichier, hôte) écrits dans le code ─────────
 const LIEN = 'lien ouvert d’un clic par la personne (rien ne part tout seul)';
@@ -76,7 +83,23 @@ const COUPLES = {
   'src/ConfigurerTransfert.jsx|outlook.live.com': ['lien', LIEN],
   'src/ConfigurerTransfert.jsx|www.icloud.com': ['lien', LIEN],
   'src/navigateurExtension.js|play.google.com': ['lien', LIEN],
+  // Une origine SENTINELLE en `.invalid` (RFC 6761 : ne se résout jamais) quand
+  // le domaine Vinted reçu n'est pas reconnu — rien ne part.
+  'src/favorisVinted.js|invalide.invalid': ['vrm', 'origine sentinelle .invalid, jamais contactée'],
+  // (24 oct.) Le SERVEUR lit le statut public des colis (api/_lib/transporteurs-lecture.js).
+  'api/_lib/transporteurs-lecture.js|ws.chronopost.fr': ['politique', 'transp'],
+  'api/_lib/transporteurs-lecture.js|carrier.vintedgo.com': ['politique', 'transp'],
+  'api/_lib/transporteurs-lecture.js|www.mondialrelay.fr': ['politique', 'transpmr'],
+  'api/_lib/transporteurs-lecture.js|lgonxzrzjcqthjtbdpzo.supabase.co': ['politique', 'base'],
+  'api/_lib/transporteurs-lecture.js|vrm.center': ['vrm', 'le User-Agent honnête de VRM'],
 };
+// (24 oct.) Ce que la politique doit dire même si l'hôte n'est pas écrit dans
+// ces fichiers : Mondial Relay est AUSSI lu depuis le navigateur, par
+// l'extension (sa voie de secours, la même route `_mvc`), quand il refuse le
+// serveur — avec le n° ET le code postal.
+const DECLARATIONS = [
+  { quoi: 'Mondial Relay (secours : statut lu par l’extension, n° + code postal, depuis le navigateur)', service: /Mondial Relay/, role: /statut public des colis/i, donnee: /code postal[\s\S]*(navigateur|extension)/i },
+];
 
 function couplesDuCode(fichiers) {
   const out = new Map();
@@ -111,14 +134,21 @@ function juger(fichiers, politique, { muet = false } = {}) {
     const ligne = lignes.find((c) => service.test(c[0]) && u.role.test(c[1]) && u.donnee.test(c[2]));
     dit(!!ligne, `${k.split('|')[0]} contacte ${hote} (${u.quoi}) : une ligne de la politique nomme le service, dit à quoi il sert ici et qui l’envoie`, ligne ? '« ' + ligne[1].slice(0, 70) + ' »' : 'aucune ligne');
   }
+  for (const d of DECLARATIONS) {
+    const ligne = lignes.find((c) => d.service.test(c[0]) && d.role.test(c[1]) && d.donnee.test(c[2]));
+    dit(!!ligne, `la politique déclare ${d.quoi}`, ligne ? '« ' + ligne[2].slice(0, 70) + ' »' : 'aucune ligne');
+  }
   const eteints = Object.entries(COUPLES).filter(([k, [c]]) => c === 'eteint' && couples.has(k));
   if (!muet) for (const [k, [, quoi]] of eteints) console.log('ℹ️  ' + k + ' : ' + quoi);
   return ko;
 }
 
+const SERVEUR = ['api/_lib/transporteurs-lecture.js'];
 function lireFichiers() {
   const out = [];
   (function marche(d) { for (const f of fs.readdirSync(d)) { const p = path.join(d, f); if (fs.statSync(p).isDirectory()) marche(p); else if (/\.(jsx?|mjs)$/.test(f)) out.push([path.relative(R, p).split(path.sep).join('/'), fs.readFileSync(p, 'utf8')]); } })(path.join(R, 'src'));
+  // (24 oct.) + les fichiers SERVEUR qui contactent un tiers au nom du vendeur.
+  for (const rel of SERVEUR) { const p = path.join(R, rel); if (fs.existsSync(p)) out.push([rel, fs.readFileSync(p, 'utf8')]); }
   return out;
 }
 
@@ -133,6 +163,10 @@ if (PROUVE) {
     ['la ligne Achats dit « le serveur » au lieu du navigateur', () => [fichiers, politique.replace('Adresse du point relais, envoyée par ton navigateur (ton adresse IP)', 'Adresse du point relais, envoyée par le serveur VRM')]],
     ['la ligne jsDelivr retirée', () => [fichiers, sansLigne('jsDelivr')]],
     ['la ligne des photos Discord retirée', () => [fichiers, sansLigne('Photo de profil Discord')]],
+    ['la ligne Chronopost / Vinted Go retirée', () => [fichiers, sansLigne('Chronopost \\(groupe La Poste\\)')]],
+    ['la ligne Mondial Relay ne dit plus le secours par le navigateur', () => [fichiers, politique.replace('envoyés depuis ton navigateur par l’extension VRM', 'envoyés par le serveur VRM')]],
+    ['la ligne Mondial Relay ne dit plus que le serveur VRM l’appelle', () => [fichiers, politique.replace('envoyés par le serveur VRM (son adresse IP, pas la tienne) ; en secours, quand Mondial Relay refuse le serveur, ', '')]],
+    ['un nouvel hôte contacté par le serveur des transporteurs, non déclaré', () => [fichiers.map(([f, t]) => [f, f === 'api/_lib/transporteurs-lecture.js' ? t + '\nconst sonde = () => fetch(`https://suivi.exemple-tiers.com/v1/x`);\n' : t]), politique]],
     ['un nouvel hôte appelé par le navigateur, non déclaré', () => [fichiers.map(([f, t]) => [f, f === 'src/App.jsx' ? t + '\nconst sonde = () => fetch(`https://api.exemple-tiers.com/v1/x`);\n' : t]), politique]],
   ];
   let prouvees = 0;

@@ -83,7 +83,9 @@ async function ecrire(id, data) {
 // `undefined` (rien à écrire). Il peut être appelé plusieurs fois.
 // Rend true (écrit par NOUS) · false (rien à écrire) · null (pas su : une
 // lecture ou une écriture a échoué, ou toujours devancé — rien n'est affirmé).
-async function modifierCas(id, modifier, essais = 6) {
+// (24 oct.) Exportée telle quelle : les lignes `transp_*` et `push_transp_*`
+// (api/_lib/transporteurs-lecture.js) s'écrivent par la même règle.
+export async function modifierCas(id, modifier, essais = 6) {
   const owner = proprietaireCourant();
   if (!owner || !/^[a-z0-9_]+$/i.test(String(id || ''))) return null;
   const tete = { ...sbCle(SUPABASE_KEY), 'Content-Type': 'application/json' };

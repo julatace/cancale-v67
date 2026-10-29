@@ -236,7 +236,7 @@ const MR_TEXTE = ['Bonjour,', 'Votre colis 12345678 est disponible.', '', 'POINT
     const RealDate = Date;
     const DateFige = new Proxy(RealDate, { get: (t, p) => (p === 'now' ? () => NOW : t[p]), construct: (t, a) => new t(...a), apply: (t, th, a) => RealDate(...a) });
     const app = chargeApp(['SUJET_SORTANT', 'SUJET_ENTRANT', 'colisKey', 'sensColis', 'etatColisEmail', 'isColisEnAttente', 'isColisActive'],
-      { arriveeColisEmail: AR.arriveeColisEmail, etatRetrait: M.etatRetrait, Date: DateFige });
+      { arriveeColisEmail: AR.arriveeColisEmail, etatRetrait: M.etatRetrait, sensDeLigne: (await importer('api/_lib/suivi-colis.js')).sensDeLigne, Date: DateFige });
     const t = (o) => ({ status: 'available', subject: 'Votre colis 1 est disponible', ...o });
     const passe = t({ suivi: '1', limite: '2026-10-22', receivedAt: '2026-10-19T08:00:00Z' });
     const ok = t({ suivi: '2', limite: '2026-10-26', receivedAt: '2026-10-21T13:00:00Z' });

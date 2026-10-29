@@ -231,7 +231,12 @@ export function urgenceTri(e) {
 // « à retirer » jusqu'à sa date limite, et le nombre se disait complet. Ce que le
 // widget n'a pas pu relire est COMPTÉ (`nonRelus`) : l'appelant le dit.
 // Absente ou illisible ⇒ null (« pas su » : l'appelant retombe sur ce qu'il sait).
-export function retirerPublie(pub, maintenant = Date.now(), aujourdhui = null, sorti = null) {
+// ⚠️ (24 oct.) `leve(identité, entrée, e)` (facultatif) : la garde levée par ce que
+// le TRANSPORTEUR dit (une lecture « disponible » de moins de 6 h, la règle
+// `leverGarde` de l'app) — sans elle, le widget rangeait « à vérifier » un colis
+// que l'app compte « à retirer » (mesuré au banc `transporteurs.cjs`). Rend
+// l'état à garder ; jamais une date limite lue et dépassée n'est levée.
+export function retirerPublie(pub, maintenant = Date.now(), aujourdhui = null, sorti = null, leve = null) {
   if (!pub || typeof pub !== 'object' || !Array.isArray(pub.colis)) return null;
   let n = 0, aVerifier = Number.isFinite(pub.aVerifier) ? pub.aVerifier : 0, urgents = 0, sortis = 0, nonRelus = 0;
   for (const c of pub.colis) {
@@ -242,7 +247,8 @@ export function retirerPublie(pub, maintenant = Date.now(), aujourdhui = null, s
       if (s === true) { sortis++; continue; }
       if (s !== false) nonRelus++;
     }
-    const e = etatRetrait({ limite: c[0] || null, arriveeMs: Number(c[1]) || null, transporteur: c[2] || '' }, maintenant, aujourdhui);
+    let e = etatRetrait({ limite: c[0] || null, arriveeMs: Number(c[1]) || null, transporteur: c[2] || '' }, maintenant, aujourdhui);
+    if (typeof leve === 'function' && cle) { const l = leve(cle, c, e); if (l && l.etat) e = l; }
     if (estAVerifier(e)) { aVerifier++; continue; }
     n++;
     if (Number.isFinite(e.jours) && e.jours <= 1) urgents++;

@@ -27,7 +27,8 @@ import {preparerLiaisonOAuth,lireLiaisonOAuth,resultatLiaisonPermis} from './aut
 import ConnexionsCompte from './auth/ConnexionsCompte.jsx';
 import {etatColisDepuisTexte,normaliserSuivi} from '../api/_lib/etat-colis-email.js';
 import {achatDuColis,suivisAchat,entreeIndexAchat} from './liensColis.js';
-import {avecSuiviDuSujet,finsDesLignes,sortiParSuivis,sortiParSuivi,suiviDeLigne,lienSuivi,codePostalLu,nouvelleVinted,transporteurDeForme,suiviValide,TRANSPORTEURS_SAISIE,normaliserCodePostal,idSuiviManuel,relireLigneSuivi,finDeCommandeAchat} from '../api/_lib/suivi-colis.js';
+import {avecSuiviDuSujet,finsDesLignes,sortiParSuivis,sortiParSuivi,suiviDeLigne,lienSuivi,codePostalLu,nouvelleVinted,transporteurDeForme,suiviValide,TRANSPORTEURS_SAISIE,normaliserCodePostal,idSuiviManuel,relireLigneSuivi,finDeCommandeAchat,fusionTransporteur,ligneDuTransporteur,leverGarde,SELECT_TRANSP_META,ligneTranspDeMeta,dansFenetreLecteurs,sensDeLigne,incidentDeSuivis} from '../api/_lib/suivi-colis.js';
+import {ligneTransporteur,carrierLisible,carrierNonLu,nomTransporteur,LECTURE_SERVEUR_TRANSP} from '../api/_lib/transporteurs.js';
 import PhotoProfil,{AvatarCompte} from './profil/AvatarPersonnel.jsx';
 import PorteConfidentialite from './PorteConfidentialite.jsx';
 import {qrMfa} from './qrMfa.js';
@@ -121,7 +122,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.279.0';
+const EXT_ATTENDUE = '5.280.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -516,7 +517,11 @@ const extEnRetard = (v) => !!v && cmpVersion(v, EXT_ATTENDUE) < 0;
 //    « l'extension relève le suivi » plus tôt viserait une extension qui ne le
 //    fait pas — un faux dans l'autre sens (revue du 24 oct. ; corrigé le
 //    26 oct. avec la session extension, qui a relu l'historique).
-const EXT_CAPACITES = { favorisouvrir:'5.225.0', favorisliste:'5.218.0', suivivinted: '5.217.0', favoris: '5.217.0', liaison: '5.171.0', supprimees: '5.165.0', enligne: '5.170.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', preuves: '5.172.0', etatcompte: '5.181.0', lbcfiche: '5.182.0', relais: '5.183.0', lbcpack: '5.185.0', annulee: '5.185.0', confirmer: '5.206.0', retraitnotif: '5.206.0', offresauto: '5.234.0', vcpublier: '5.235.0', vcauto: '5.236.0', vcventes: '5.237.0', vcmessages: '5.238.0', vcachats: '5.239.0', republier: '5.240.0', republiermodif: '5.247.0', recreer: '5.248.0', lettre: '5.250.0', brouillon: '5.251.0', versbrouillon: '5.253.0', republierbrouillon: '5.254.0', refaire: '5.255.0', republierpage: '5.277.0', republierfile: '5.279.0' };
+// ⚠️ `transp` (le statut lu chez le transporteur, secours par l'extension,
+//    `transpTick`) : 5.280. Le chantier s'appelait « 5.217 » sur sa branche
+//    (24 oct.), mais la 5.217.0 PUBLIÉE par `main` porte d'autres choses (suivi
+//    Vinted, favoris) et pas `transpTick` : deux contenus, deux numéros (§C9).
+const EXT_CAPACITES = { transp: '5.280.0', favorisouvrir:'5.225.0', favorisliste:'5.218.0', suivivinted: '5.217.0', favoris: '5.217.0', liaison: '5.171.0', supprimees: '5.165.0', enligne: '5.170.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', preuves: '5.172.0', etatcompte: '5.181.0', lbcfiche: '5.182.0', relais: '5.183.0', lbcpack: '5.185.0', annulee: '5.185.0', confirmer: '5.206.0', retraitnotif: '5.206.0', offresauto: '5.234.0', vcpublier: '5.235.0', vcauto: '5.236.0', vcventes: '5.237.0', vcmessages: '5.238.0', vcachats: '5.239.0', republier: '5.240.0', republiermodif: '5.247.0', recreer: '5.248.0', lettre: '5.250.0', brouillon: '5.251.0', versbrouillon: '5.253.0', republierbrouillon: '5.254.0', refaire: '5.255.0', republierpage: '5.277.0', republierfile: '5.279.0' };
 // Trois états, jamais un seul : pas d'extension ici · en retard · à jour.
 const extSait = (quoi) => {
   if (!vmrExtPresent()) return 'absente';                    // téléphone, autre navigateur
@@ -557,6 +562,9 @@ const CAPACITES_DITES = [
   ['annulee', 'retirer tout seul le bordereau d\'une vente annulée'],
   ['confirmer', 'relever les colis à confirmer (« Tout est OK ») avant leur date limite'],
   ['retraitnotif', 'te prévenir quand elle lit un code de retrait dans une conversation'],
+  // (24 oct.) Le serveur lit lui-même Chronopost, Vinted Go et Mondial Relay :
+  // l'extension ne lit que ce qu'un transporteur REFUSE au serveur.
+  ['transp', 'lire depuis ton ordinateur le statut des colis qu\'un transporteur refuse au serveur de VRM'],
   // (revue du 11 octobre) Ce qui manque VRAIMENT : relier une vente qui a son
   // BORDEREAU, une 5.164 le fait déjà (le bordereau porte l'annonce).
   ['preuves', 'aller chercher toute seule la preuve des ventes qui n\'ont pas encore de bordereau (anti double vente)'],
@@ -3909,6 +3917,31 @@ const fetchEmailTrackingBrut = async () => {
 const fetchEmailTracking = async (opts = {}) => {
   if (opts.force) _rowCache.delete('email_track');
   return cachedRow('email_track', fetchEmailTrackingBrut);
+};
+// (24 oct.) LE STATUT LU CHEZ LE TRANSPORTEUR (`transp_{transporteur}_{n°}`,
+// écrit par le SERVEUR seul — api/_lib/transporteurs-lecture.js). Lu en
+// scalaires (jamais `select=data`, §4.4), paginé, STRICT : une page ratée vaut
+// « pas su » (null), jamais une demi-liste. Trois états chez le lecteur :
+// `undefined` pas encore lu · `null` pas su · un tableau (peut-être vide).
+// Une ligne finie depuis plus de 45 j ne sert plus à aucun écran.
+const fetchTranspLignesBrut = async () => {
+  try {
+    const rows = await lireTout(`id=like.transp_*&select=${SELECT_TRANSP_META}`, { strict: true });
+    if (!Array.isArray(rows)) return null;
+    const now = Date.now();
+    return rows.map(ligneTranspDeMeta).filter((t) => t && dansFenetreLecteurs(t, now));
+  } catch (_) { return null; }
+};
+const fetchTranspLignes = async (opts = {}) => {
+  if (opts.force) _rowCache.delete('transp');
+  return cachedRow('transp', fetchTranspLignesBrut);
+};
+// Les lignes du transporteur PAR N° NORMALISÉ (une Map, ou null = pas su).
+const transpParSuivi = (transp) => {
+  if (!Array.isArray(transp)) return null;
+  const m = new Map();
+  for (const t of transp) { const k = normaliserSuivi(t && t.suivi); if (k && !m.has(k)) m.set(k, t); }
+  return m;
 };
 // Solde BLOQUÉ (escrow) de chaque porte-monnaie Vinted, capté par l'extension
 // (lignes harvest_*_billing quand tu ouvres ton porte-monnaie). On somme sur
@@ -17158,6 +17191,89 @@ function BoutonSuivreColis({transporteur, suivi, codePostal = '', attrs, enLigne
     <Icon name="truck" size={14} style={{color:C.muted,flexShrink:0}}/>{court ? (l.site ? 'Suivre ↗' : 'Chercher ↗') : long}
   </a>;
 }
+// ── (24 oct.) CE QUE DIT LE TRANSPORTEUR, SUR SON SITE PUBLIC ─────────────────
+// Julien : « tu as juste à regarder sur le site du transporteur, je ne te
+// demande pas le code de retrait mais juste de regarder le statut ». La ligne
+// `transp_{transporteur}_{n°}` est écrite par le SERVEUR seul (Chronopost,
+// Vinted Go et Mondial Relay lus par lui — Mondial Relay par sa route `_mvc`,
+// mesurée le 24 oct. ; l'extension ne lit, depuis l'ordinateur, que ce que le
+// transporteur REFUSE au serveur). La phrase vient de la règle
+// partagée (`ligneTransporteur`, api/_lib/transporteurs.js, §11) : le libellé du
+// transporteur RECOPIÉ tel quel, l'âge de la lecture, puis ce qui en découle.
+// Trois états : lu · pas su (le transporteur n'a pas répondu) · jamais lu ;
+// plus cp-inconnu (son geste), expiré, introuvable. Texte neutre ; ambre pour
+// un retour, un incident, un statut inconnu ; jamais de rouge (§7).
+// Rien sur la carte quand c'est dit UNE fois en tête de liste (`TeteTransporteurs`) :
+// lecture de NOTRE base ratée, Mondial Relay sans extension à jour (si le
+// serveur ne le lisait pas) ou refusé au serveur, un transporteur que VRM ne lit pas.
+const ligneTranspDe = (transp, suivi) => {
+  const k = normaliserSuivi(suivi); if (!k || !transp) return null;
+  if (transp instanceof Map) return transp.get(k) || null;
+  return Array.isArray(transp) ? (transp.find(x => x && x.suivi === k) || null) : null;
+};
+function LigneTransporteur({ transp, suivi, carrier, style }) {
+  if (!Array.isArray(transp) && !(transp instanceof Map)) return null;
+  const k = normaliserSuivi(suivi); if (!k) return null;
+  const t = ligneTranspDe(transp, k);
+  const c = (t && t.carrier) || carrierLisible(carrier, k);
+  if (!c) return null;
+  // Mondial Relay pas encore lu : « jamais lu » sur la carte, comme les autres,
+  // dès que le SERVEUR le lit (`LECTURE_SERVEUR_TRANSP`, la même valeur que le
+  // serveur, §11) ; sinon la tête de liste dit le geste une fois.
+  if (!t && c === 'mondialrelay' && !LECTURE_SERVEUR_TRANSP.mondialrelay && extSait('transp') !== 'ok') return null;
+  const l = ligneTransporteur(t, c);
+  const age = Number.isFinite(l.age) ? String(Math.max(0, Math.round(l.age / 60000))) : '';
+  return <div className="vrm-transp" data-transp={l.etatAffiche} data-transp-etat={(t && t.etat) || ''} data-transp-age={age} data-transp-suivi={k}
+    style={{fontSize:11.5,color:l.ambre?C.warn:C.muted,marginTop:3,lineHeight:1.4,overflowWrap:'anywhere',...(style||{})}}>
+    <span>{l.texte}</span>{l.consequence ? <> — <b data-transp-consequence="" style={{fontWeight:600,color:l.ambre?C.warn:C.text}}>{l.consequence}</b></> : null}
+  </div>;
+}
+// En tête de la liste des colis, UNE fois chacune (§7) :
+//   · la lecture de NOTRE base a raté (`transp === null`) ;
+//   · SI LE SERVEUR NE LISAIT PAS Mondial Relay : des colis Mondial Relay sans
+//     lecture, et l'extension de CE navigateur ne sait pas le faire (« depuis ton
+//     ordinateur, avec l'extension à jour ») — plus jamais dit quand il le lit ;
+//   · Mondial Relay REFUSE en ce moment le serveur (`bloque`) : l'extension le
+//     lit à la place, depuis l'ordinateur — le geste selon CE navigateur ;
+//   · des colis d'un transporteur que VRM ne lit pas (Colissimo, DPD, UPS…).
+// `colis` : [{ carrier, suivi }] — les colis de la liste affichée.
+function TeteTransporteurs({ transp, colis, relire }) {
+  // Sur un téléphone sans extension : le geste se fait sur l'ordinateur.
+  const sansSouris = useSansSouris() && !vmrExtPresent();
+  if (transp === undefined) return null;
+  const liste = Array.isArray(colis) ? colis : [];
+  const nonLus = [...new Set(liste.map(x => x && carrierNonLu(x.carrier)).filter(Boolean))];
+  const mrServeur = !!LECTURE_SERVEUR_TRANSP.mondialrelay;
+  const estMr = x => x && carrierLisible(x.carrier, x.suivi) === 'mondialrelay';
+  const mrSans = (transp === null || mrServeur) ? 0 : liste.filter(x => estMr(x) && !ligneTranspDe(transp, x.suivi)).length;
+  const mrRefus = (transp === null || !mrServeur) ? 0 : new Set(liste.filter(x => { if (!estMr(x)) return false; const t = ligneTranspDe(transp, x.suivi); return !!t && t.essaiRes === 'bloque'; }).map(x => normaliserSuivi(x.suivi))).size;
+  const sait = extSait('transp');
+  const montrerMr = mrSans > 0 && sait !== 'ok';
+  if (transp !== null && !montrerMr && !mrRefus && !nonLus.length) return null;
+  const st = {fontSize:12,color:C.muted,lineHeight:1.45,margin:'0 0 10px'};
+  const geste = sansSouris || sait === 'absente'
+    ? <>ouvre VRM sur l'ordinateur où l'extension VRM est installée — c'est elle qui lit Mondial Relay.</>
+    : <>mets à jour l'extension VRM (version {EXT_CAPACITES.transp} ou plus récente) : elle lira Mondial Relay depuis ce Chrome.</>;
+  return <>
+    {transp === null && <div data-transp-passu="" style={{...st,display:'flex',alignItems:'center',gap:10,flexWrap:'wrap'}}>
+      <span style={{flex:'1 1 220px'}}>Le statut chez les transporteurs n'a pas pu être relu (la base n'a pas répondu) : ce que tu vois vient des e-mails et de Vinted. Rien n'est perdu.</span>
+      {relire && <button type="button" data-transp-reessayer="" onClick={relire} style={{flexShrink:0,border:`1px solid ${C.border}`,background:C.card,color:C.text,borderRadius:10,padding:'0 12px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit',minHeight:44}}>Réessayer</button>}
+    </div>}
+    {montrerMr && <div data-transp-mr={sansSouris ? 'telephone' : sait} data-transp-mr-n={String(mrSans)} style={st}>
+      Mondial Relay ne se lit que depuis ton ordinateur, avec l'extension à jour ({mrSans} colis) : {geste}
+    </div>}
+    {mrRefus > 0 && <div data-transp-mr-refus={sansSouris ? 'telephone' : sait} data-transp-mr-n={String(mrRefus)} style={st}>
+      Mondial Relay refuse en ce moment la lecture du serveur VRM ({mrRefus} colis) : {sait === 'ok' && !sansSouris
+        ? <>l'extension VRM de ce Chrome les lit à la place, depuis ton ordinateur.</>
+        : sansSouris || sait === 'absente'
+          ? <>l'extension VRM peut les lire à la place — ouvre VRM sur l'ordinateur où elle est installée.</>
+          : <>mets à jour l'extension VRM (version {EXT_CAPACITES.transp} ou plus récente) pour qu'elle les lise depuis ce Chrome.</>}
+    </div>}
+    {nonLus.length > 0 && <div data-transp-non-lu={nonLus.join(',')} style={st}>
+      VRM ne lit pas le suivi de {nonLus.join(' ni de ')} : regarde {nonLus.length > 1 ? 'leurs' : 'ses'} e-mails.
+    </div>}
+  </>;
+}
 // (23 oct.) « DERNIÈRE NOUVELLE DE VINTED » — l'étape écrite par Vinted sur la
 // ligne de suivi relevée par l'extension (`harvest_{uid}_suivi_{tx}`), recopiée
 // TELLE QUELLE (jamais interprétée : « livré » chez Vinted ne coche rien ici),
@@ -17225,6 +17341,12 @@ async function retirerSuiviManuel(id) {
 // la main (une phrase, §11).
 const raisonAVerifier = (x) => {
   if (!x || !x.e) return 'à voir';
+  // (24 oct.) Ce que dit le TRANSPORTEUR (son libellé recopié tel quel).
+  if (x.e.etat==='transporteur') {
+    if (x.e.contradiction) return "le transporteur le dit disponible, un e-mail dit qu'il repart — vérifie avant de te déplacer";
+    const i = x.e.incident; const nom = nomTransporteur((i && i.carrier) || (x.t && carrierLisible(x.t.carrier, x.t.suivi)) || '');
+    return i && i.libelle ? `${nom} dit « ${String(i.libelle).slice(0,120)} »` : `${nom} signale un problème`;
+  }
   if (x.e.etat==='delai_depasse') { const lim = x.kind==='email' && x.t ? x.t.limite : null; const jj = lim ? new Date(String(lim).slice(0,10)+'T00:00:00').toLocaleDateString('fr-FR',{day:'2-digit',month:'2-digit'}) : ''; return `délai de retrait dépassé${jj?` le ${jj}`:''}`; }
   // (revue du 23 oct.) La garde de SON transporteur (`x.e.garde`).
   const g = Number.isFinite(x.e.garde) ? x.e.garde : GARDE_MAX_J;
@@ -17341,7 +17463,7 @@ function EtatSuiviVinted({ achats, suivisVinted, etatDe, accName, relire }) {
     {nSD > 0 && <div data-suivi-vinted-sans-date-texte="" style={{marginTop: phrase ? 4 : 0}}>{nSD > 1 ? `${nSD} colis ont` : '1 colis a'} un suivi relevé par l'extension, mais Vinted ne donne pas de date pour ses étapes : la dernière étape relevée est recopiée sur {nSD > 1 ? 'leur carte' : 'sa carte'}, sans date.</div>}
   </div>;
 }
-function SuivisManuels({ liste, tracking, achats, accName, relire, etapeDe }) {
+function SuivisManuels({ liste, tracking, achats, accName, relire, etapeDe, transp }) {
   const [ouvert, setOuvert] = React.useState(false);
   const [n, setN] = React.useState('');
   const [tr, setTr] = React.useState('');
@@ -17397,7 +17519,7 @@ function SuivisManuels({ liste, tracking, achats, accName, relire, etapeDe }) {
           {choisi === 'mondialrelay' && <input aria-label="Code postal (facultatif)" data-suivi-cp="" value={cp} onChange={e => setCp(e.target.value)} inputMode="numeric" placeholder="Code postal du point relais (facultatif)" style={champ}/>}
           <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
             <button type="button" data-suivi-enregistrer="" disabled={envoi} onClick={enregistrer} style={{ ...bouton, borderColor: C.accent, color: C.accent, opacity: envoi ? .5 : 1 }}>{envoi ? 'Enregistrement…' : 'Enregistrer ce suivi'}</button>
-            <span className="vrm-aide" style={{ fontSize: 11.5, color: C.muted }}>Il ne devient pas « à retirer » : il attend l'e-mail du transporteur.</span>
+            <span className="vrm-aide" data-suivi-promesse="" style={{ fontSize: 11.5, color: C.muted }}>Il devient « à retirer » quand l'e-mail du transporteur arrive, ou quand VRM lit sur son site qu'il est disponible {LECTURE_SERVEUR_TRANSP.mondialrelay ? '(Mondial Relay : avec le code postal du point relais).' : '(Mondial Relay : depuis ton ordinateur, avec l\'extension).'}</span>
           </div>
           {msg && <div data-suivi-msg="" style={{ fontSize: 12.5, color: C.warn }}>{msg}</div>}
         </div>
@@ -17412,6 +17534,7 @@ function SuivisManuels({ liste, tracking, achats, accName, relire, etapeDe }) {
               <div key={m.id} data-suivi-manuel={m.suivi} data-suivi-etape={etape ? 'nouvelle' : 'attente'} data-suivi-ou={et ? et.ou : ''} style={{ borderTop: `1px solid ${C.border}`, paddingTop: 8 }}>
                 <div style={{ fontSize: 13, color: C.text, fontWeight: 600, overflowWrap: 'anywhere' }}>{NOMS_SAISIE[m.transporteur] || 'Transporteur'} · n° <span style={{ fontFamily: 'ui-monospace,monospace' }}>{m.suivi}</span></div>
                 <div style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>{etape ? (et.ou === 'email' ? `Dernière nouvelle par e-mail : ${etape}` : `Ce colis : ${etape}`) : 'Suivi ajouté — en attente d’une nouvelle'}</div>
+                <LigneTransporteur transp={transp} suivi={m.suivi} carrier={m.transporteur}/>
                 {m.tx && <div data-suivi-lie={m.tx} style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>Relié à : {lie ? `${lie.title || 'Achat'}${lie._acc ? ` (${accName(lie._acc)})` : ''}` : `l'achat ${m.tx}`}</div>}
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 4, alignItems: 'center' }}>
                   <BoutonSuivreColis transporteur={m.transporteur} suivi={m.suivi} codePostal={m.cp} enLigne/>
@@ -18694,6 +18817,69 @@ function relireEbaySiVieux() {
 function useRelectureEbay() {
   React.useEffect(() => {
     const tic = () => { try { if (document.visibilityState === 'hidden') return; } catch (_) {} relireEbaySiVieux(); };
+    tic();
+    const t = setInterval(tic, 60000);
+    document.addEventListener('visibilitychange', tic);
+    window.addEventListener('focus', tic);
+    return () => { clearInterval(t); document.removeEventListener('visibilitychange', tic); window.removeEventListener('focus', tic); };
+  }, []);
+}
+// ── (24 oct.) LE STATUT CHEZ LES TRANSPORTEURS, APP OUVERTE ───────────────
+// Le serveur lit Chronopost, Vinted Go et Mondial Relay (mesuré le 24 oct. ;
+// refusé, il donne le n° à l'extension, sa voie de secours). L'app ne fait que DEMANDER un passage (`POST /api/relais?mode=transp`,
+// C5) — c'est le serveur qui décide quels n° lire et à quel rythme
+// (api/_lib/transporteurs.js, `suivisAInterroger`). Bornes côté app :
+//   · session obligatoire, page visible ; à l'ouverture, toutes les minutes, au
+//     retour au premier plan — mais un appel au plus toutes les 5 min
+//     (`vrm_transp_vol`, une commodité d'appareil, dans try/catch), et un seul
+//     en vol (cet onglet) ;
+//   · « pas su » (503), route absente (404/405), abonnement coupé (402) ⇒ on
+//     recule (10 min, 6 h) ; rien n'est vidé ;
+//   · un état CHANGÉ ⇒ `vrm:transp-maj` (les écrans relisent `transp_*`).
+const RELECTURE_TRANSP_MS = 5 * 60 * 1000;
+let _relectureTranspVol = null;
+function relireTransporteursSiVieux({ force = false } = {}) {
+  if (_relectureTranspVol) return _relectureTranspVol;
+  _relectureTranspVol = (async () => {
+    try {
+      if (!AUTH.session || !AUTH.session.access_token) return { fait: false, raison: 'session' };
+      const maintenant = Date.now();
+      const vol = lireLocalJson('vrm_transp_vol');
+      if (Number(vol.prochain) > maintenant) return { fait: false, raison: 'recul' };
+      if (!force && maintenant - (Number(vol.at) || 0) < RELECTURE_TRANSP_MS) return { fait: false, raison: 'frais' };
+      ecrireLocalJson('vrm_transp_vol', { at: maintenant });
+      let r = null, j = null;
+      try {
+        // ⚠️ Un `Request`, pas une adresse : `lecturesPartagees` le laisse passer
+        // SANS vider ses lectures. Un POST vers /api/ y vaut une écriture et vide
+        // tout — à l'ouverture, ce passage refaisait TOUTES les lectures du
+        // démarrage en vol (mesuré au banc vitesse.cjs, Ma journée à 390 px :
+        // 57 → 64 lectures, 6 → 12 en double, les ventes au 3ᵉ aller-retour au
+        // lieu du 2ᵉ). Ce passage n'écrit que les lignes `transp_*` : quand il
+        // rend un changement, on vide les lectures partagées AVANT de prévenir.
+        r = await fetch(new Request('/api/relais?mode=transp', { method: 'POST', headers: { 'content-type': 'application/json', ...enTeteSession() }, body: JSON.stringify({ v: 1 }) }));
+        j = await r.json().catch(() => null);
+      } catch (_) { r = null; }
+      if (!r || !r.ok || !j || j.ok !== true) {
+        const st = r ? r.status : 0;
+        const attente = (st === 402 || st === 404 || st === 405) ? 6 * 3600 * 1000 : 10 * 60 * 1000;
+        ecrireLocalJson('vrm_transp_vol', { at: maintenant, prochain: maintenant + attente });
+        return { fait: false, raison: st ? `http-${st}` : 'reseau' };
+      }
+      const change = Array.isArray(j.lus) && j.lus.some((x) => x && x.change);
+      if (change) {
+        try { if (window.__vrmLecturesPartagees) window.__vrmLecturesPartagees.invalider(); } catch (_) {}
+        try { window.dispatchEvent(new Event('vrm:transp-maj')); } catch (_) {}
+      }
+      return { fait: true, change };
+    } catch (_) { return { fait: false, raison: 'erreur' }; }
+  })();
+  _relectureTranspVol.finally(() => { _relectureTranspVol = null; });
+  return _relectureTranspVol;
+}
+function useRelectureTransporteurs() {
+  React.useEffect(() => {
+    const tic = () => { try { if (document.visibilityState === 'hidden') return; } catch (_) {} relireTransporteursSiVieux(); };
     tic();
     const t = setInterval(tic, 60000);
     document.addEventListener('visibilitychange', tic);
@@ -31430,18 +31616,11 @@ const SUJET_ENTRANT = /est arriv|disponible|[àa] retirer|en consigne|en relais|
 // dont **9 que le sujet ne permettait pas de trancher** — et **0 conflit** avec
 // la lecture du sujet. Le pont ajoute donc de la précision sans jamais
 // contredire la règle existante.
-const sensColis = (t, envoyes) => {
-  // Preuve certaine d'abord : ce n° de suivi est celui d'un bordereau à lui.
-  if (envoyes && t && t.suivi && envoyes.has(String(t.suivi).trim().toUpperCase())) return 'sortant';
-  // Posé par le serveur quand il en est sûr (emails reçus à partir du 31 août).
-  if (t && t.sens) return t.sens;
-  const suj = String((t && (t.subject || t.sujet)) || '');
-  if (!suj) return null;
-  const so = SUJET_SORTANT.test(suj), en = SUJET_ENTRANT.test(suj);
-  if (so && !en) return 'sortant';
-  if (en && !so) return 'entrant';
-  return null;
-};
+// (24 oct.) La règle vit dans api/_lib/transporteurs.js (`sensDeLigne`) — la
+// MÊME pour l'app et le serveur, qui en a besoin pour ne JAMAIS interroger un
+// transporteur sur un colis qu'il a posté (§11). Les motifs ci-dessus restent
+// écrits ici pour l'audit qui les compare à ceux de la route des e-mails.
+const sensColis = (t, envoyes) => sensDeLigne(t, envoyes);
 
 // ⚠️⚠️ (23 octobre) « À RETIRER » NE VEUT PLUS DIRE « DANS LES 14 JOURS ».
 // Mesuré dans ses e-mails : un point relais garde un colis 4 à 7 jours
@@ -31493,7 +31672,11 @@ const isColisRetirable = (t, collected, envoyes) => isColisActive(t, collected, 
 // afgehaald door de ontvanger » compris) ou reparti (« retour ») sort du « à
 // retirer » ET du « à vérifier » tout colis au même n° normalisé. Un retiré reste
 // retiré : un rappel ou un « disponible » traité après ne le ressuscite pas.
-const finsColis = (tracking, envoyes) => finsDesLignes(tracking || [], { estSortant: (t) => sensColis(t, envoyes) === 'sortant' });
+// (24 oct.) + `transp` : ce que dit le TRANSPORTEUR sur son site (les lignes
+// `transp_*`) — un retiré gagne toujours, un retour daté après l'arrivée le
+// fait repartir, un incident ou un statut inconnu après l'arrivée le passe « à
+// vérifier » (`sortiParSuivis` rend alors 'a_verifier').
+const finsColis = (tracking, envoyes, transp) => finsDesLignes(tracking || [], { estSortant: (t) => sensColis(t, envoyes) === 'sortant', transp: Array.isArray(transp) ? transp : null });
 const suivisRetires = (tracking, envoyes) => {
   const s = new Set();
   for (const [k, f] of finsColis(tracking, envoyes)) if (f.retire) s.add(k);
@@ -35430,9 +35613,21 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // pas : avant, les colis d'e-mail disparaissaient, « À retirer » disait 0 et
   // la réception « aucun email de suivi reçu ».
   const [trackingKO, setTrackingKO] = useState(false);
-  const lireSuivis = (opts) => fetchEmailTracking(opts)
-    .then(t => { if (t) { setTracking(t); setTrackingKO(false); } else setTrackingKO(true); return t; })
-    .catch(() => { setTrackingKO(true); return null; });
+  // (24 oct.) Le statut lu chez le TRANSPORTEUR (`transp_*`), lu AVEC les
+  // e-mails et posé dans le MÊME rendu (le compte des rendus de Ma journée ne
+  // bouge pas). Trois états : `undefined` pas encore lu · `null` pas su (dit une
+  // fois en tête de liste) · un tableau. Une relecture ratée garde la dernière
+  // liste lue.
+  const [transp, setTransp] = useState(undefined);
+  const lireSuivis = (opts) => Promise.all([fetchEmailTracking(opts), fetchTranspLignes(opts).catch(() => null)])
+    .then(([t, tr]) => {
+      if (t) { setTracking(t); setTrackingKO(false); } else setTrackingKO(true);
+      setTransp(prev => (Array.isArray(tr) ? tr : (Array.isArray(prev) ? prev : null)));
+      return t;
+    })
+    .catch(() => { setTrackingKO(true); setTransp(prev => (Array.isArray(prev) ? prev : null)); return null; });
+  const lireTransp = () => fetchTranspLignes({ force: true }).catch(() => null)
+    .then(tr => setTransp(prev => (Array.isArray(tr) ? tr : (Array.isArray(prev) ? prev : null))));
   const [achEmails, setAchEmails] = useState(undefined); // reçus d'achat archivés (emails)
   // (23 oct.) Seuls les VRAIS reçus (un Montant payé) — les emails de statut
   // rangés là par l'ancien tri ne s'appellent plus « Reçu d'achat » — et leur n°
@@ -36464,8 +36659,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // (23 oct.) LA fin d'un colis par son n° de suivi (retiré · reparti), toutes
     // lignes confondues (api/_lib/suivi-colis.js, §11 : le widget, le rappel du
     // matin et l'écran d'équipe lisent la même).
-    const fins = finsColis(tracking, suivisEnvoyes);
-    const retires = suivisRetires(tracking, suivisEnvoyes);
+    const fins = finsColis(tracking, suivisEnvoyes, transp);
+    // Les n° retirés (e-mail OU transporteur : la même règle, `fins`).
+    const retires = new Set(); for (const [k, f] of fins) if (f.retire) retires.add(k);
+    // (24 oct.) Ce que dit le TRANSPORTEUR, par n° normalisé (null = pas su).
+    const tpm = transpParSuivi(transp);
     // ⚠️ LE MÊME COLIS VU DES DEUX CÔTÉS SE RECONNAÎT PAR SON CODE DE RETRAIT,
     // JAMAIS PAR SON TITRE (§5, 4 octobre). Aucun email transporteur ne porte le
     // titre de l'article (mesuré : 192 sur 192 vides). Un code de retrait, lui,
@@ -36510,14 +36708,58 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // shipping@relay.vinted.com ⇒ `email_track_vinted_…`). Le même n° de suivi est
     // une identité (§5) : un retiré sort le colis, toujours ; un retour écrit
     // APRÈS l'arrivée aussi (il est rendu plus bas, dans « repartis »).
-    for (const t of (tracking || [])) {
+    // ⚠️ (24 oct.) LE TRANSPORTEUR FAIT MONTER, JAMAIS DESCENDRE
+    // (api/_lib/suivi-colis.js, `fusionTransporteur`) : un e-mail « en transit »
+    // dont le transporteur dit, PLUS TARD, qu'il est disponible devient « à
+    // retirer » (le lieu et la limite du transporteur, sans code ni QR) — une
+    // seule ligne par n° (la plus récente : `tracking` est trié du plus récent
+    // au plus ancien), jamais une seconde à côté d'un e-mail déjà « disponible ».
+    // Un n° sans aucun e-mail (ajouté à la main, ou relevé par Vinted) que le
+    // transporteur dit disponible entre par une ligne SYNTHÉTIQUE
+    // (`ligneDuTransporteur`), sauf si Vinted montre déjà ce colis (`extra`).
+    // Les n° dont un E-MAIL dit déjà « retour » (rendu par la boucle des retours).
+    const nRetourEmail = new Set((tracking || []).filter(t => t && t.status === 'retour' && sensColis(t, suivisEnvoyes) !== 'sortant').map(suiviDeLigne).filter(Boolean));
+    const nDispoEmail = new Set((tracking || []).filter(t => t && t.status === 'available' && sensColis(t, suivisEnvoyes) !== 'sortant').map(suiviDeLigne).filter(Boolean));
+    const nTracking = new Set((tracking || []).map(suiviDeLigne).filter(Boolean));
+    const nMontes = new Set();
+    const lignesColis = [];
+    for (const t0 of (tracking || [])) {
+      const k = suiviDeLigne(t0); const tr = tpm && k ? tpm.get(k) : null;
+      if (!tr) { lignesColis.push(t0); continue; }
+      const f = fusionTransporteur(t0, tr, maintenant);
+      if (f !== t0 && f.viaTransporteur && t0.status !== 'available') {
+        if (nDispoEmail.has(k) || nMontes.has(k)) { lignesColis.push(t0); continue; }
+        nMontes.add(k);
+      }
+      lignesColis.push(f);
+    }
+    if (tpm) {
+      const nVinted = new Set(); for (const o of vintedToPickup) for (const su of suivisAchat(o, indexColis)) nVinted.add(normaliserSuivi(su));
+      for (const [k, tr] of tpm) {
+        if (tr.etat !== 'disponible' || nTracking.has(k) || nVinted.has(k)) continue;
+        const l = ligneDuTransporteur(tr, maintenant); if (l) lignesColis.push(l);
+      }
+    }
+    for (const t of lignesColis) {
       if (!isColisEnAttente(t, collected, suivisEnvoyes)) continue;
-      { const a = arriveeColisEmail(t); if (sortiParSuivi(t, fins, a ? a.ms : null)) { noterFini(t); continue; } }
+      { const a = arriveeColisEmail(t); const so = sortiParSuivi(t, fins, a ? a.ms : null);
+        // (24 oct.) Le transporteur signale un incident (« a quitté le point relais
+        // sans être retiré »…) ou un statut inconnu après l'arrivée : « à vérifier »,
+        // jamais « à retirer » — et pas « fini » (rien ne dit qu'il est retiré).
+        if (so === 'a_verifier') { aVerifier.push({ kind: 'email', t, e: { etat: 'transporteur', incident: incidentDeSuivis([suiviDeLigne(t)], fins, a ? a.ms : null) }, o: commandeDuColis(t) }); continue; }
+        // (24 oct.) Reparti d'après le TRANSPORTEUR seul (aucun e-mail « retour ») :
+        // rendu dans « repartis » — un colis qui sort sans un mot est un colis perdu.
+        if (so === 'reparti') { const k = suiviDeLigne(t); const tr = tpm && k ? tpm.get(k) : null;
+          if (tr && tr.etat === 'retour_expediteur' && !nRetourEmail.has(k)) repartis.push({ kind: 'email', t, o: commandeDuColis(t), statut: 'transporteur' }); }
+        if (so) { noterFini(t); continue; } }
       const cmd = commandeDuColis(t);
       const fin = finCommandeAchat(cmd);
       if (fin === 'retire') { noterFini(t); continue; }   // la commande liée dit livrée / finalisée : il l'a eu
       if (fin === 'reparti') { noterFini(t); repartis.push({ kind: 'email', t, o: cmd, statut: (etatTxn(cmd.transaction_id) || {}).ss || String(cmd.status || '') }); continue; }
-      const e = etatColisEmail(t, maintenant);
+      // (24 oct.) Une lecture « disponible » de moins de 6 h chez le transporteur
+      // lève une « à vérifier » qui ne vient QUE de la garde (jamais une date
+      // limite lue et dépassée : `leverGarde`).
+      const e = leverGarde(etatColisEmail(t, maintenant), t, maintenant);
       if (estAVerifier(e)) { aVerifier.push({ kind: 'email', t, e, o: cmd }); continue; }
       // Colis RÉELLEMENT à retirer = on sait OÙ aller, ou on a un code, ou un QR
       // (règle d'avant, `isColisRetirable`) : écarte les lignes de suivi parasites.
@@ -36540,6 +36782,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       if (collected && collected.has(colisKey(t))) continue;
       const d = Date.parse(t.receivedAt || '');
       if (Number.isFinite(d) && maintenant - d > 30 * 86400000) continue;
+      // (24 oct.) Le transporteur le dit DISPONIBLE, plus tard que cet e-mail de
+      // retour : les deux se contredisent ⇒ « à vérifier », jamais « reparti »
+      // en silence ni « à retirer » sur une seule voix.
+      { const k = suiviDeLigne(t); const tr = tpm && k ? tpm.get(k) : null;
+        const f = tr ? fusionTransporteur(t, tr, maintenant) : t;
+        if (f.transpContradiction) { aVerifier.push({ kind: 'email', t: f, e: { etat: 'transporteur', contradiction: true }, o: commandeDuColis(t) }); continue; } }
       repartis.push({ kind: 'email', t, o: commandeDuColis(t), statut: 'retour' });
     }
     const vusEmail = [...emailList, ...aVerifier.map(x => x.t)];
@@ -36550,7 +36798,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       // (23 oct.) Ses n° de suivi (la ligne de suivi Vinted relevée par
       // l'extension, `harvest_{uid}_suivi_{tx}`) : un e-mail « retiré » ou
       // « reparti » au même n° le sort aussi (le retour est rendu par son e-mail).
-      if (sortiParSuivis(suivisAchat(o, indexColis), fins, etatColisVinted(o, maintenant).arriveeMs)) continue;
+      { const so = sortiParSuivis(suivisAchat(o, indexColis), fins, etatColisVinted(o, maintenant).arriveeMs);
+        if (so === 'a_verifier') { aVerifier.push({ kind: 'vinted', o, e: { ...etatColisVinted(o, maintenant), etat: 'transporteur', incident: incidentDeSuivis(suivisAchat(o, indexColis), fins, etatColisVinted(o, maintenant).arriveeMs) } }); continue; }
+        if (so === 'reparti') { const ks = suivisAchat(o, indexColis).map(normaliserSuivi);
+          const tr = tpm ? ks.map(k => tpm.get(k)).find(x => x && x.etat === 'retour_expediteur') : null;
+          if (tr && !ks.some(k => nRetourEmail.has(k))) repartis.push({ kind: 'vinted', o, statut: 'transporteur' }); }
+        if (so) continue; }
       if (txLiesEmail.has(String(o.transaction_id))) continue;     // le même colis, déjà montré par son e-mail
       const r = colisRelais[String((o && o.transaction_id) || '')]; const c = r ? normCode(r.code) : '';
       if (c && codesEmail.has(c)) continue;
@@ -36582,7 +36835,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // avoir encore besoin (« si jamais il y a un problème, j'ai quand même le QR
     // code »). Il reste donc EN GRIS, avec son QR, jusqu'à ce que le transporteur
     // confirme le retrait — ou au plus PICKUP_CONFIRM_DAYS.
-    const attenteMail = (tracking || []).filter(t => {
+    // (24 oct.) Sur les lignes vues avec le transporteur (une ligne montée ou
+    // synthétique cochée « retiré » reste grisée, comme un e-mail).
+    const attenteMail = lignesColis.filter(t => {
       if (!t || t.status !== 'available') return false;
       const k = colisKey(t);
       if (!collected || !collected.has(k)) return false;             // pas coché
@@ -36635,10 +36890,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
              prets: (emailList.length - sansCodeEmail) + (extra.length - sansCode),
              total: emailList.length + extra.length };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tracking, collected, collectedAt, vintedToPickup, buysBase, pickupDone, colisRelais, indexSuivisAchats, suivisEnvoyes, txSuivisColis]);
+  }, [tracking, transp, collected, collectedAt, vintedToPickup, buysBase, pickupDone, colisRelais, indexSuivisAchats, suivisEnvoyes, txSuivisColis]);
   // Les fins par n° de suivi (la règle de `pickupUnion`), pour dire où en est un
   // n° ajouté à la main (`etapeDuSuiviManuel`).
-  const finsSuivis = useMemo(() => finsColis(tracking, suivisEnvoyes), [tracking, suivisEnvoyes]);
+  const finsSuivis = useMemo(() => finsColis(tracking, suivisEnvoyes, transp), [tracking, suivisEnvoyes, transp]);
+  const transpMap = useMemo(() => transpParSuivi(transp), [transp]);
   useEffect(() => {
     // ⚠️ ON NE PUBLIE PAS UNE PHOTO À MOITIÉ DÉVELOPPÉE (§4.2 : une capture
     // partielle n'écrase jamais une complète). Mesuré : rendu depuis Ma journée
@@ -39930,6 +40186,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       else if (ev.quoi === 'suivi') relireSuivisVinted();
       // 5.204 : une confirmation (« Tout est OK ») lue ou réglée dans une conversation.
       else if (ev.quoi === 'confirmer') relireAConfirmer();
+      // (24 oct., 5.217) Un statut lu chez le transporteur par l'extension
+      // (ce qu'il a refusé au serveur, depuis ce navigateur) : on relit les lignes `transp_*`.
+      else if (ev.quoi === 'transp') lireTransp();
       // 5.165 : une annonce SUPPRIMÉE sur Vinted (ou le dressing relu) — on
       // oublie la lecture d'avant et l'écran qui les montre se relit, sans squelette.
       // ⚠️ Revue 5.165 : la MOISSON seulement, regroupée (`signalAnnonces`) —
@@ -39942,6 +40201,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     };
     const signalAnnonces = regrouperSignaux((uids) => loadListings(false, true, uids));
     window.addEventListener('vrm:ext', ecoute);
+    // (24 oct.) La relecture chez les transporteurs (`useRelectureTransporteurs`)
+    // a changé un état : on relit les lignes `transp_*`.
+    const transpMaj = () => lireTransp();
+    window.addEventListener('vrm:transp-maj', transpMaj);
     if (ecrans.includes(curSub) && ventesPerimees.current) relire();
     const vus = vusSonde.current;
     const sonde = async () => {
@@ -39967,7 +40230,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     demander();
     sonde();
     const t = setInterval(sonde, 60000);
-    return () => { window.removeEventListener('vrm:ext', ecoute); document.removeEventListener('visibilitychange', onVis); clearInterval(t); signalAnnonces.arreter(); };
+    return () => { window.removeEventListener('vrm:ext', ecoute); window.removeEventListener('vrm:transp-maj', transpMaj); document.removeEventListener('visibilitychange', onVis); clearInterval(t); signalAnnonces.arreter(); };
   /* eslint-disable-next-line */ }, [curSub, cleComptes]);
   // ── COLIS ↔ ACHAT : rapprochement UNIQUE ou RIEN ──────────────────────────
   // Un email de suivi ne porte que le titre de l'article : il n'y a pas d'autre
@@ -43271,7 +43534,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             title:`${nv} colis à vérifier — sans doute ${nv>1?'repartis':'reparti'} chez le vendeur`,
             // (revue du 23 oct.) Plus de « 7 jours » écrit pour tous : chaque
             // transporteur a SA garde (`gardeDe`), dite dans Achats, colis par colis.
-            sub:`Délai de retrait dépassé, ou gardé plus longtemps que ne le fait son point relais : ${nv>1?'regarde-les':'regarde-le'} dans Achats (coche « Je l'ai eu » si c'est le cas)`,
+            sub:`Délai de retrait dépassé, ou gardé plus longtemps que ne le fait son point relais${pickupUnion.aVerifier.some(x=>x.e&&x.e.etat==='transporteur')?', ou le transporteur signale un problème':''} : ${nv>1?'regarde-les':'regarde-le'} dans Achats (coche « Je l'ai eu » si c'est le cas)`,
             tab:'cat_achats', prio:0.6 });
         }
         jobs.sort((a,b)=>a.prio-b.prio);
@@ -44696,6 +44959,20 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             <button type="button" data-suivis-reessayer="" onClick={()=>lireSuivis({ force:true })} style={{flexShrink:0,border:`1px solid ${C.border}`,background:C.card,color:C.text,borderRadius:10,padding:'6px 12px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit',minHeight:44}}>Réessayer</button>
           </div>
         )}
+        {/* (24 oct.) Ce que le statut chez les transporteurs ne peut pas dire ici,
+            UNE fois en tête de liste (§7) : la lecture ratée, Mondial Relay sans
+            l'extension à jour, un transporteur que VRM ne lit pas. */}
+        {aFilter==='attente' && (()=>{
+          const deAchat = (o) => { const su = suivisAchat(o, indexSuivisAchats)[0]; const e = entreeSuiviAchat(o); return su ? { suivi: su, carrier: (e && e.transporteur) || transporteurDeForme(su) || '' } : null; };
+          const colis = [...pickupUnion.emailList.map(t => ({ suivi: suiviDeLigne(t), carrier: t.carrier })),
+            ...pickupUnion.extra.map(deAchat).filter(Boolean),
+            ...pickupUnion.aVerifier.map(x => x.kind === 'email' ? { suivi: suiviDeLigne(x.t), carrier: x.t.carrier } : deAchat(x.o)).filter(Boolean)].filter(x => x.suivi);
+          return <TeteTransporteurs transp={transp} colis={colis} relire={lireTransp}/>;
+        })()}
+        {aFilter==='route' && (()=>{
+          const colis = achatsAffiches.filter(({st}) => st && st.step>=1 && st.step<4 && !st.retour).map(({o,tk}) => { const su = (tk && tk.suivi) || suivisAchat(o, indexSuivisAchats)[0]; const e = entreeSuiviAchat(o); return su ? { suivi: su, carrier: (tk && tk.carrier) || (e && e.transporteur) || transporteurDeForme(su) || '' } : null; }).filter(Boolean);
+          return <TeteTransporteurs transp={transp} colis={colis} relire={lireTransp}/>;
+        })()}
         {aFilter==='attente' && (()=>{
           const vieux = (accounts||[]).filter(a => a && !acctOff(a.vinted_user_id)).map(a => {
             const j = joursAchatsRelus(String(a.vinted_user_id));
@@ -44749,6 +45026,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                         <LigneArrivee arr={arriveeColisVinted(rel)}/>
                         {/* (23 oct.) La dernière nouvelle de Vinted pour CETTE transaction. */}
                         <LigneNouvelleVinted nv={nouvelleDe(o)}/>
+                        {/* (24 oct.) Ce que dit le transporteur, par le n° de suivi de CET achat. */}
+                        {(()=>{ const e=entreeSuiviAchat(o); const su=suivisAchat(o, indexSuivisAchats)[0]; return su ? <LigneTransporteur transp={transpMap} suivi={su} carrier={(e&&e.transporteur)||transporteurDeForme(su)||''}/> : null; })()}
                         {/* (23 oct.) « DÉPOSÉ EN POINT RELAIS » EST CE QUE VINTED DISAIT
                             À LA DERNIÈRE LECTURE de ce compte, pas forcément aujourd'hui :
                             au-delà d'un jour, on dit depuis quand (le compte n'est relu
@@ -45057,7 +45336,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                           {/* (revue du 23 oct.) Un colis d'e-mail sans code lu : le code
                               EST dans l'e-mail du transporteur (« disponible »), c'est
                               VRM qui n'a pas su le lire — pas « pas encore reçu ». */}
-                          {!code && !qrImage(t) && <div data-colis-code-pas-lu="" style={{fontSize:11,color:C.muted,marginTop:1}}>Code pas lu — ouvre l'e-mail du transporteur{t.suivi?' (ou le suivi du colis)':''}</div>}
+                          {!code && !qrImage(t) && (t.viaTransporteur
+                            // (24 oct.) « Disponible » LU CHEZ LE TRANSPORTEUR (aucun e-mail ne
+                            // l'a encore dit) : VRM ne lit que le statut, jamais le code.
+                            ? <div data-colis-code-pas-lu="transporteur" style={{fontSize:11,color:C.muted,marginTop:1}}>Code de retrait : dans l'e-mail du transporteur ou la conversation Vinted (VRM ne lit que le statut)</div>
+                            : <div data-colis-code-pas-lu="" style={{fontSize:11,color:C.muted,marginTop:1}}>Code pas lu — ouvre l'e-mail du transporteur{t.suivi?' (ou le suivi du colis)':''}</div>)}
                           {/* Le n° de suivi sur SA ligne, en chiffres lisibles :
                               au comptoir c'est ce qu'on demande quand le scan
                               ou le code ne passe pas. */}
@@ -45075,7 +45358,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                               indiquée dans l'e-mail » : mesuré, l'e-mail du Mondial
                               Relay du 21 octobre la portait (« RETRAIT JUSQU'AU 26/10 »),
                               c'est la route qui ne savait pas la lire. */}
-                          {jours==null && <div data-colis-limite="inconnue" style={{fontSize:11,color:C.muted,marginTop:1}}>Date limite de retrait inconnue — un point relais garde un colis 4 à 7 jours</div>}
+                          {jours==null && t.limiteVers && <div data-colis-limite="vers" data-colis-limite-vers={String(t.limiteVers)} style={{fontSize:11,color:C.text,marginTop:1}}>À retirer vers le {new Date(String(t.limiteVers).slice(0,10)+'T00:00:00').toLocaleDateString('fr-FR',{day:'2-digit',month:'2-digit'})} (estimé : le transporteur ne donne pas la date)</div>}
+                          {jours==null && !t.limiteVers && <div data-colis-limite="inconnue" style={{fontSize:11,color:C.muted,marginTop:1}}>Date limite de retrait inconnue — un point relais garde un colis 4 à 7 jours</div>}
                           {jours!=null && (
                             /* ⚠️ CETTE LIGNE-LÀ NE SE COUPE PAS. Elle était en
                                `nowrap + ellipsis` comme ses voisines : à 430 px
@@ -45097,6 +45381,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                           {/* (23 oct.) La dernière nouvelle de Vinted, par la commande reliée
                               par identité (n° de suivi ou code de retrait) — jamais le titre. */}
                           <LigneNouvelleVinted nv={nouvelleDe(pickupUnion.cmdParColis && pickupUnion.cmdParColis.get(colisKey(t)))}/>
+                          {/* (24 oct.) Ce que dit le transporteur sur son site, par le n°. */}
+                          <LigneTransporteur transp={transpMap} suivi={suiviDeLigne(t)} carrier={t.carrier}/>
                           {/* (23 oct.) Le suivi du transporteur, sur CHAQUE colis qui a un n°. */}
                           <BoutonSuivreColis transporteur={t.carrier} suivi={t.suivi} codePostal={codePostalLu(t)} attrs={{'data-colis-suivre':''}}/>
                         </div>
@@ -45348,7 +45634,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             extension qui sait le faire (`extSait('suivivinted')`). */}
         {aFilter==='attente' && <EtatSuiviVinted achats={[...pickupUnion.extra, ...pickupUnion.aVerifier.filter(x=>x.kind==='vinted').map(x=>x.o)]}
           suivisVinted={suivisVinted} etatDe={etatSuiviDe} accName={accName} relire={relireSuivisVinted}/>}
-        {aFilter==='attente' && <SuivisManuels liste={suivisManuels} tracking={tracking} achats={buysBase} accName={accName} relire={relireSuivisManuels}
+        {aFilter==='attente' && <SuivisManuels liste={suivisManuels} tracking={tracking} transp={transpMap} achats={buysBase} accName={accName} relire={relireSuivisManuels}
           etapeDe={(n)=>etapeDuSuiviManuel(n,{union:pickupUnion,fins:finsSuivis,tracking,collected,index:indexSuivisAchats,raison:raisonAVerifier})}/>}
         {aFilter==='attente' && (pickupUnion.aVerifier||[]).length>0 && (
           <div data-oublies={pickupUnion.aVerifier.length} data-a-verifier={pickupUnion.aVerifier.length} style={{border:`1px solid ${C.warn}`,background:`${C.warn}0e`,borderRadius:10,padding:'12px 14px',marginBottom:10}}>
@@ -45356,7 +45642,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               <Icon name="alert" size={16} color={C.warn}/>{pickupUnion.aVerifier.length} colis à vérifier — sans doute {pickupUnion.aVerifier.length>1?'repartis':'reparti'} chez le vendeur
             </div>
             <div style={{fontSize:11.5,color:C.muted,marginTop:4,lineHeight:1.45}}>
-              Délai de retrait dépassé, ou au point relais depuis plus longtemps que son transporteur ne garde un colis (mesuré sur tes e-mails : Chronopost 4 jours, Mondial Relay 5, Vinted Go 6 ; {GARDE_MAX_J} pour les autres).
+              Délai de retrait dépassé, ou au point relais depuis plus longtemps que son transporteur ne garde un colis (mesuré sur tes e-mails : Chronopost 4 jours, Mondial Relay 5, Vinted Go 6 ; {GARDE_MAX_J} pour les autres){pickupUnion.aVerifier.some(x=>x.e&&x.e.etat==='transporteur')?', ou le transporteur signale un problème (son message est recopié sur la ligne)':''}.
               Ils ne comptent plus dans « à retirer ». <b>Si tu l'as eu, coche « Je l'ai eu »</b> ; sinon, la conversation Vinted de la commande dit s'il est reparti et si tu es remboursé.
               {/* (revue du 23 oct.) Le compte suit la MÊME règle que les lignes
                   (`aEncoreCode`) : un colis vu par Vinted dont la conversation
@@ -45381,6 +45667,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                           n° {t.suivi||'?'}{cpt?` · ${cpt}`:''} · <b style={{color:C.warn,fontWeight:600}}>{raison}</b> · {texteArrivee(arr)}
                         </div>
                         <LigneNouvelleVinted nv={nouvelleDe(x.o)}/>
+                        <LigneTransporteur transp={transpMap} suivi={suiviDeLigne(t)} carrier={t.carrier}/>
                       </div>
                       <div className="vrm-oublie-gestes">
                       {code && <span style={{flexShrink:0,fontSize:12,fontWeight:700,color:C.text,fontFamily:'ui-monospace,monospace',border:`1px solid ${C.border}`,borderRadius:8,padding:'2px 7px'}}>{code}</span>}
@@ -45408,6 +45695,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                         {jCap!=null && jCap>=1 && jCap<FRAICHEUR_ACHATS_J ? ` · Vinted disait « déposé en point relais » il y a ${jCap} j (dernière lecture de ce compte)` : ''}
                       </div>
                       <LigneNouvelleVinted nv={nouvelleDe(o)}/>
+                      {(()=>{ const e=entreeSuiviAchat(o); const su=suivisAchat(o, indexSuivisAchats)[0]; return su ? <LigneTransporteur transp={transpMap} suivi={su} carrier={(e&&e.transporteur)||transporteurDeForme(su)||''}/> : null; })()}
                     </div>
                     <div className="vrm-oublie-gestes">
                       {(()=>{ const e=entreeSuiviAchat(o); const su=suivisAchat(o, indexSuivisAchats)[0]; return su ? <BoutonSuivreColis transporteur={(e&&e.transporteur)||transporteurDeForme(su)||''} suivi={su} enLigne court/> : null; })()}
@@ -45486,7 +45774,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       <div key={'nrt'+(t.suivi||ix)} data-reparti-suivi={t.suivi||''} className="vrm-achats-bloc-ligne" style={{borderColor:C.border}}>
                         <div style={{flex:1,minWidth:0}}>
                           <div style={{fontSize:14,fontWeight:500,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{carrierName(t.carrier)} · n° {t.suivi}</div>
-                          <div style={{fontSize:12,color:C.muted,marginTop:2}}>Le transporteur écrit qu'il repart chez l'expéditeur{compteDuColisEmail(t)?` · ${compteDuColisEmail(t)}`:''}</div>
+                          <div style={{fontSize:12,color:C.muted,marginTop:2}}>{r.statut==='transporteur'?"Le transporteur dit sur son site qu'il repart chez l'expéditeur":"Le transporteur écrit qu'il repart chez l'expéditeur"}{compteDuColisEmail(t)?` · ${compteDuColisEmail(t)}`:''}</div>
+                          <LigneTransporteur transp={transpMap} suivi={suiviDeLigne(t)} carrier={t.carrier}/>
                         </div>
                         {t.suivi && <a className="vrm-pickup-lien" href={trackUrl(t.carrier||'', String(t.suivi))} target="_blank" rel="noreferrer" style={{flexShrink:0,fontSize:12.5,fontWeight:600,color:C.accent,textDecoration:'none'}}>Suivi ↗</a>}
                       </div>
@@ -45495,7 +45784,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   const o = r.o;
                   const j = Math.round((Date.now() - new Date(o.date||0).getTime())/86400000);
                   const href = lienConv(o);
-                  const st = r.statut === 'retour' ? "le transporteur écrit qu'il repart chez l'expéditeur" : (r.statut && !/non r[ée]clam/i.test(r.statut) ? `Vinted : « ${r.statut} »` : '');
+                  const st = r.statut === 'retour' ? "le transporteur écrit qu'il repart chez l'expéditeur" : r.statut === 'transporteur' ? "le transporteur dit sur son site qu'il repart chez l'expéditeur" : (r.statut && !/non r[ée]clam/i.test(r.statut) ? `Vinted : « ${r.statut} »` : '');
                   return (
                     <div key={'nr'+o.transaction_id} data-reparti-tx={String(o.transaction_id)} className="vrm-achats-bloc-ligne" style={{borderColor:C.border}}>
                       <div style={{flex:1,minWidth:0}}>
@@ -45503,6 +45792,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                         <div style={{fontSize:12,color:C.muted,marginTop:2}}>
                           {montantCommande(o).toFixed(2).replace('.',',')} €{isFinite(j) ? ` · commandé il y a ${j} jour${j>1?'s':''}` : ''}{st?` · ${st}`:''}
                         </div>
+                        {(()=>{ const su = r.t ? suiviDeLigne(r.t) : suivisAchat(o, indexSuivisAchats)[0]; const e = entreeSuiviAchat(o); return su ? <LigneTransporteur transp={transpMap} suivi={su} carrier={(r.t && r.t.carrier) || (e && e.transporteur) || transporteurDeForme(su) || ''}/> : null; })()}
                       </div>
                       {href && <a className="vrm-pickup-lien" href={href} target="_blank" rel="noreferrer" style={{flexShrink:0,fontSize:12.5,fontWeight:600,color:C.accent,textDecoration:'none'}}>Ouvrir la conversation ↗</a>}
                     </div>
@@ -45577,6 +45867,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   {numA!=null && <span title="Numéro de l'article (lien avec l'annonce / la vente)" style={{fontWeight:600,color:C.text}}>N°{numA}</span>}
                   {o._fromEmail && <span title="Reconstituée depuis l'email — pas encore confirmée par Vinted" style={{fontSize:11,fontWeight:600,color:C.muted,border:`1px solid ${C.border}`,borderRadius:8,padding:'0 6px'}}>email</span>}
                 </div>
+                {/* (24 oct.) En route : ce que dit le transporteur, par le n° de CET achat. */}
+                {!cancelled && !st.retour && st.step>=1 && st.step<4 && (()=>{ const su = suivi || suivisAchat(o, indexSuivisAchats)[0]; const e = entreeSuiviAchat(o);
+                  return su ? <LigneTransporteur transp={transpMap} suivi={su} carrier={(tk && tk.carrier) || (e && e.transporteur) || transporteurDeForme(su) || ''}/> : null; })()}
                 {/* ⚠️ LITIGE / RETOUR : il doit RENVOYER la paire, et générer le
                     bordereau de retour. VRM ne le crée PAS à sa place : la route
                     qui GÉNÈRE un retour n'a jamais été observée (§4.10), et agir
@@ -55871,6 +56164,7 @@ function AppCoeur() {
   // de l'onglet eBay (le compte choisi, ou tous).
   const comptesEbay = useComptesEbay();
   useRelectureEbay();
+  useRelectureTransporteurs();
   // (17 oct.) LE MODE STREAM FLOUTE PARTOUT (src/streamFlou.js) : on lui donne
   // les jetons à reconnaître — pseudos et adresses de ses comptes, le compte
   // Vinted ouvert dans Chrome, son adresse VRM, son entreprise. Un pseudo qui

@@ -37,7 +37,7 @@ import { arriveLeAuRangement } from './_lib/arrivee-colis.js';
 import { limiteRetraitDepuisTexte, lieuDepuisExtrait, LIEU_AU_FUTUR } from './_lib/retrait-colis.js';
 import { codeRetraitTournure } from './_lib/code-retrait-email.js';
 import { decoderEntitesHtml } from './_lib/entites-html.js';
-import { suiviDuSujet, finsDesLignes, sortiParSuivis } from './_lib/suivi-colis.js';
+import { suiviDuSujet, finsDesLignes, sortiParSuivis, SELECT_TRANSP_META, ligneTranspDeMeta } from './_lib/suivi-colis.js';
 
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://lgonxzrzjcqthjtbdpzo.supabase.co';
 // ⚠️ CLÉ DE SERVICE QUAND ELLE EXISTE. Ces routes tournent sur le serveur, sans
@@ -1984,8 +1984,12 @@ export async function traiterEmail(req, res) {
           // (revue du 23 oct., n° 4) L'arrivée datée par l'e-mail (comme la ligne
           // rangée) : un retour du même n° écrit APRÈS elle — même traité avant —
           // fait taire « 📍 ».
+          // (24 oct.) + le statut lu chez le TRANSPORTEUR (ses lignes `transp_`,
+          // par le n°, en scalaires) : retiré, ou reparti / incident depuis
+          // l'arrivée ⇒ « 📍 » se tait. Illisible ⇒ comme avant (les e-mails seuls).
           const a = arriveLeAuRangement(prevLigne, subject, 'available', emailAt || now);
-          sortiAilleurs = sortiParSuivis([k], finsDesLignes(autres, { estSortant: (l) => l.sens === 'sortant' }), Date.parse(a || emailAt || now) || null);
+          const tl = await lireLignes(`id=in.(transp_chronopost_${k},transp_mondialrelay_${k},transp_vinted_${k})&select=${SELECT_TRANSP_META}`);
+          sortiAilleurs = sortiParSuivis([k], finsDesLignes(autres, { estSortant: (l) => l.sens === 'sortant', transp: Array.isArray(tl) ? tl.map(ligneTranspDeMeta).filter(Boolean) : [] }), Date.parse(a || emailAt || now) || null);
         }
       }
       // Notif push selon l'étape du colis.

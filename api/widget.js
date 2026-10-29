@@ -8,7 +8,7 @@ import { colisEbay, resumeColisEbay, lireCommandesEbayServeur } from './_lib/eba
 // du matin et du rappel du soir (§11, 22 octobre).
 import { bordsParTransaction, compterEcheances, lireDateLimite } from './_lib/limite-envoi.js';
 import { retirerPublie, etatRetrait } from './_lib/retrait-colis.js';
-import { suiviDeLigne, finDeLigne, finsDesLignes, sortiParSuivis, relireLigneMeta, SELECT_SUIVI_META } from './_lib/suivi-colis.js';
+import { suiviDeLigne, finDeLigne, finsDesLignes, sortiParSuivis, relireLigneMeta, SELECT_SUIVI_META, SELECT_TRANSP_META, ligneTranspDeMeta, dansFenetreLecteurs, leverGarde } from './_lib/suivi-colis.js';
 // api/widget.js
 // ────────────────────────────────────────────────────────────────────────────
 // DONNÉES DU WIDGET écran d'accueil (app Scriptable sur iPhone).
@@ -322,16 +322,41 @@ const normSuivi = (v) => String(v || '').toUpperCase().replace(/[\s\u00a0-]+/g, 
 // (`relireLigneMeta`, api/_lib/suivi-colis.js) : « sera disponible dans les
 // prochains jours » ou « arrive aujourd'hui », sans code ni QR, est en route —
 // pas à retirer ; un sujet « disponible » d'une ligne « info » est à retirer.
+// (24 oct.) + le statut lu chez le TRANSPORTEUR (lignes `transp_*`, scalaires,
+// la règle de l'app — §11) : un colis que le transporteur dit retiré, reparti,
+// ou « à vérifier » sort du compte « à retirer », comme dans l'app. Illisible ⇒
+// `transp: null` (« pas su » : un colis de la photo dont rien d'autre ne dit la
+// fin est alors « pas relu », jamais « toujours là »).
 async function lireSuivisEmail() {
-  const [dispo0, partis0] = await Promise.all([
+  const [dispo0, partis0, transp0] = await Promise.all([
     fetchPaginated(scoped(`app_data?id=like.email_track_*&meta->>status=eq.available&select=${SELECT_SUIVI_META}`)),
     fetchPaginated(scoped(`app_data?id=like.email_track_*&meta->>status=in.(delivered,retour,info)&select=${SELECT_SUIVI_META}`)),
+    fetchPaginated(scoped(`app_data?id=like.transp_*&select=${SELECT_TRANSP_META}`)),
   ]);
-  if (!Array.isArray(dispo0) || !Array.isArray(partis0)) return { dispo: Array.isArray(dispo0) ? dispo0.map(relireLigneMeta).filter((x) => x && x.s === 'available') : null, partis: Array.isArray(partis0) ? partis0.map(relireLigneMeta).filter((x) => x && finDeLigne(x)) : null };
+  const transp = Array.isArray(transp0) ? transp0.map(ligneTranspDeMeta).filter((t) => t && dansFenetreLecteurs(t)) : null;
+  if (!Array.isArray(dispo0) || !Array.isArray(partis0)) return { dispo: Array.isArray(dispo0) ? dispo0.map(relireLigneMeta).filter((x) => x && x.s === 'available') : null, partis: Array.isArray(partis0) ? partis0.map(relireLigneMeta).filter((x) => x && finDeLigne(x)) : null, transp };
   const toutes = [...dispo0, ...partis0].map(relireLigneMeta).filter(Boolean);
-  return { dispo: toutes.filter((x) => x.s === 'available'), partis: toutes.filter((x) => finDeLigne(x)) };
+  return { dispo: toutes.filter((x) => x.s === 'available'), partis: toutes.filter((x) => finDeLigne(x)), transp };
 }
-const finsDuWidget = (lu) => finsDesLignes(lu && Array.isArray(lu.partis) ? lu.partis : [], { estSortant: (x) => x.se === 'sortant' });
+const finsDuWidget = (lu) => finsDesLignes(lu && Array.isArray(lu.partis) ? lu.partis : [], { estSortant: (x) => x.se === 'sortant', transp: lu && Array.isArray(lu.transp) ? lu.transp : [] });
+// (24 oct.) Les n° que le TRANSPORTEUR dit encore « disponible » (sa ligne
+// `transp_`). Un colis que l'app compte « à retirer » parce que le transporteur
+// le dit au point relais (aucun e-mail « disponible » : `fusionTransporteur`)
+// n'est pas « sorti » parce qu'aucun e-mail ne le dit — et une lecture
+// « disponible » de moins de 6 h lève la garde comme dans l'app (`leverGarde`,
+// §11). Mesuré au banc `transporteurs.cjs` : le widget disait 4 quand Ma journée
+// disait 6.
+const transpDispoDe = (lu) => new Map((lu && Array.isArray(lu.transp) ? lu.transp : []).filter((t) => t && t.etat === 'disponible').map((t) => [normSuivi(t.suivi), t]));
+function leveDepuisTransp(lu) {
+  const m = transpDispoDe(lu);
+  return (cle, c, e) => {
+    if (!cle.startsWith('e:')) return e;
+    const t = m.get(normSuivi(cle.slice(2)));
+    if (!t) return e;
+    const luMs = Date.parse(t.lu || '');
+    return leverGarde(e, { transpDispoLu: Number.isFinite(luMs) ? luMs : null }, Date.now());
+  };
+}
 async function colisEmailDepuis(pub, retires, today, lu) {
   const pubAt = pub && Number.isFinite(pub.at) ? pub.at : null;
   if (pubAt == null) return 0;
@@ -359,7 +384,8 @@ async function colisEmailDepuis(pub, retires, today, lu) {
 // `sorti(identité, entrée)` de `retirerPublie` (true · false · null = pas su).
 //   · « e:<n° de suivi> » : coché « J'ai retiré » ⇒ sorti ; une ligne du même
 //     n° « retiré » (delivered), ou « reparti » (retour) écrit depuis son
-//     arrivée ⇒ sorti ; plus AUCUNE ligne « disponible » pour ce n° ⇒ sorti ;
+//     arrivée ⇒ sorti ; plus AUCUNE ligne « disponible » pour ce n° (ni e-mail, ni la ligne du
+//     transporteur, 24 oct.) ⇒ sorti ;
 //     lecture ratée ⇒ pas su.
 //   · « v:<compte>:<transaction> » : coché retiré ⇒ sorti ; la capture de ce
 //     compte POSTÉRIEURE à la photo ne le dit plus au point relais ⇒ sorti ;
@@ -370,6 +396,7 @@ function sortisDepuisPhoto(pub, retires, pickupDone, txBuy, lu) {
   const dispo = lu ? lu.dispo : null, partis = lu ? lu.partis : null;
   const dispoSuivi = new Set((dispo || []).filter((x) => x && x.se !== 'sortant').map(suiviDeLigne).filter(Boolean));
   const fins = Array.isArray(partis) ? finsDuWidget(lu) : null;
+  const tDispo = transpDispoDe(lu);
   return (cle, c) => {
     if (cle.startsWith('e:')) {
       const k = normSuivi(cle.slice(2));
@@ -378,7 +405,8 @@ function sortisDepuisPhoto(pub, retires, pickupDone, txBuy, lu) {
       if (!Array.isArray(dispo) || !Array.isArray(partis)) return null;
       const arr = Number(c && c[1]) || 0;
       if (sortiParSuivis([k], fins, arr || null)) return true;
-      return dispoSuivi.has(k) ? false : true;
+      if (!lu || !Array.isArray(lu.transp)) return null;            // le transporteur pas lu : pas su
+      return (dispoSuivi.has(k) || tDispo.has(k)) ? false : true;   // un e-mail OU le transporteur le dit encore là
     }
     if (cle.startsWith('v:')) {
       const [, uid, tx] = cle.split(':');
@@ -570,7 +598,7 @@ export default async function handler(req, res) {
     const retiresMain = new Set(Array.isArray(m.vrm_colis_collected) ? m.vrm_colis_collected.map(String) : []);
     const pubBrute = m.vrm_colis_retirer;
     const suivisLus = (pubBrute && Array.isArray(pubBrute.colis)) ? await lireSuivisEmail() : null;
-    const pubRetirer = retirerPublie(pubBrute, Date.now(), today, sortisDepuisPhoto(pubBrute, retiresMain, pickupDone, txBuy, suivisLus));
+    const pubRetirer = retirerPublie(pubBrute, Date.now(), today, sortisDepuisPhoto(pubBrute, retiresMain, pickupDone, txBuy, suivisLus), leveDepuisTransp(suivisLus));
     const nouveauxEmail = pubRetirer ? await colisEmailDepuis(pubBrute, retiresMain, today, suivisLus) : 0;
     const masques = new Set(Array.isArray(m.vinted_accounts_hidden) ? m.vinted_accounts_hidden.map(String) : []);
     const nouveauxVinted = pubRetirer ? colisVintedDepuis(m.vrm_colis_retirer, txBuy, pickupDone, masques, today) : 0;

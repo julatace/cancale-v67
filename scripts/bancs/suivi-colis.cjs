@@ -238,7 +238,10 @@ async function navigateur() {
         const b51 = s51 && s51.suivre[0];
         dit(b51 && b51.site === 'transporteur' && /mondialrelay\.fr\/suivi-de-colis\/\?numeroExpedition=30000051&codePostal=35260$/.test(b51.href) && /Suivre sur le site du transporteur/.test(b51.t), `${nom} : « Suivre sur le site du transporteur ↗ », n° pré-rempli, code postal LU dans le lieu`, b51 && b51.href);
         const bv = vgo && vgo.suivre[0];
-        dit(bv && bv.site === 'recherche' && /q=VGS12345678061/.test(bv.href) && /Chercher ce n° de suivi/.test(bv.t), `${nom} : Vinted Go (pas de page connue) : une RECHERCHE du n°, dite comme telle`, bv && bv.href);
+        // (24 oct.) Vinted Go a une page de suivi publique (`vintedgo.com/fr/tracking/{n}`,
+        // mesurée en 200) : le lien y mène. Un transporteur sans page connue reste
+        // une RECHERCHE dite comme telle (audit-suivi-colis, `lienSuivi('dpd')`).
+        dit(bv && bv.site === 'transporteur' && bv.href === 'https://vintedgo.com/fr/tracking/VGS12345678061' && /Suivre sur le site du transporteur/.test(bv.t), `${nom} : Vinted Go : « Suivre sur le site du transporteur ↗ », sa page de suivi, n° pré-rempli`, bv && bv.href);
         const ba1 = a1 && a1.suivre[0];
         dit(ba1 && /numeroExpedition=30000057$/.test(ba1.href), `${nom} : l'achat suivi par Vinted a son bouton, sans code postal (aucun lieu lu)`, ba1 && ba1.href);
         dit(a2 && a2.suivre.length === 0, `${nom} : l'achat au même titre n'emprunte pas le n° d'un autre`);
