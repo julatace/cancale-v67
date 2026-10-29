@@ -158,12 +158,23 @@ export function conserverRetraitsNonConfirmes(precedents, nouveau, data) {
     const natif = (data.annonces || []).find((x) => cle(x) === cle(a));
     if (natif?.active === false) continue;
     const preuve = (data.completes || []).find(
-      (x) => x.plateforme === a.plateforme,
+      (x) =>
+        x.plateforme === a.plateforme &&
+        x.compte != null &&
+        String(x.compte) === String(a.compte),
     );
     const capture =
       typeof a.capture === "number" ? a.capture : Date.parse(a.capture || "");
     const ancien = Number.isFinite(capture) ? capture : a.observeAt;
-    if (preuve && Number.isFinite(ancien) && preuve.at > ancien) continue;
+    if (
+      !natif &&
+      preuve &&
+      Number.isFinite(ancien) &&
+      Number.isFinite(preuve.at) &&
+      preuve.at > ancien &&
+      preuve.at <= Date.now() + 120000
+    )
+      continue;
     resultat.set(cle(a), { ...a, aConfirmer: true });
   }
   return [...resultat.values()];

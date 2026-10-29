@@ -42701,7 +42701,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       if(!ad||ad.id==null)continue;
       const lien = lienAnnonceLeboncoin(ad);
       const idDuLien = lien ? new URL(lien).pathname.split('/').filter(Boolean).at(-1)?.replace(/\.htm$/,'') : null;
-      const compte = String(ad.account || ad.lbcUser || "");
+      const compte = idCompteLbcApp(ad.account || ad.lbcUser || "");
       if (!comptesProuves.has(idCompteLbcApp(compte)) && !liens[String(ad.id)])
         continue;
       annonces.push({
@@ -42832,28 +42832,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           engagee: true,
         });
       }
-    if (
-      ea?.lignes?.length &&
-      ea.lignes.every(
-        (l) => l.ligne?.complet === true && Number(l.ligne.capturedAt) > 0,
-      )
-    )
-      completes.push({
-        plateforme: "eBay",
-        at: Math.min(...ea.lignes.map((l) => Number(l.ligne.capturedAt))),
-      });
-    if (
-      Array.isArray(listings.items) &&
-      !listings.incomplet &&
-      accounts.length &&
-      accounts.every((a) => Number(listings.lues?.[a.vinted_user_id]) > 0)
-    )
-      completes.push({
-        plateforme: "Vinted",
-        at: Math.min(
-          ...accounts.map((a) => Number(listings.lues[a.vinted_user_id])),
-        ),
-      });
+    for(const l of ea?.lignes||[])if(l.ligne?.complet===true&&Number(l.ligne.capturedAt)>0)completes.push({plateforme:'eBay',compte:String(l.compte.ref),at:Number(l.ligne.capturedAt)});
+    if(Array.isArray(listings.items)&&!listings.incomplet)for(const a of accounts)if(!acctOff(a.vinted_user_id)&&Number(listings.lues?.[a.vinted_user_id])>0)completes.push({plateforme:'Vinted',compte:String(a.vinted_user_id),at:Number(listings.lues[a.vinted_user_id])});
+    for(const [compte,l] of Object.entries(Array.isArray(rows)?rows.find(r=>r.id==='lbc_listings'&&r.owner===owner)?.lectures||{}:{})){const id=idCompteLbcApp(compte),at=Date.parse(l?.at||'');if(comptesProuves.has(id)&&Number.isFinite(at))completes.push({plateforme:'Leboncoin',compte:id,at});}
     return { numeros, annonces, ventes, manques, completes };
   };
   const sourcesBilan=[

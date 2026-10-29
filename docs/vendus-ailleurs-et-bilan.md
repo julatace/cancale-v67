@@ -4,7 +4,7 @@
 
 Dans Ma journée, Annonces et Ventes Vinted, la section repliée **Vendus ailleurs · annonces à retirer** vérifie Vinted, Leboncoin et eBay au premier clic. Elle montre le numéro VRM, l'article, la plateforme de vente, le compte et l'annonce encore proposée. Le lien ouvre l'annonce native lorsqu'une URL vérifiée est disponible ; **Gérer le retrait** ouvre les actions existantes de la plateforme dans VRM. Le vendeur utilise le compte indiqué et confirme l'action. Cette vue ne déclenche aucune suppression, pause ou fin d'annonce automatiquement.
 
-**Revérifier les annonces** relit les captures de VRM, pas directement les plateformes. Un changement sur la plateforme doit donc d'abord être capté/synchronisé. Une annonce inactive explicitement reçue confirme la sortie de vente ; une absence ne suffit que si une capture complète de cette plateforme est postérieure à la preuve précédente. Sinon l'ancienne alerte reste « retrait non confirmé ». Une erreur conserve les alertes ; une attente de plus de 20 secondes rend une erreur récupérable. Les correspondances contradictoires ne sont pas proposées comme certains retraits.
+**Revérifier les annonces** relit les captures de VRM, pas directement les plateformes. Un changement sur la plateforme doit donc d'abord être capté/synchronisé. Une annonce inactive explicitement reçue confirme la sortie de vente ; une absence ne suffit que si une capture complète du compte concerné est postérieure à la preuve précédente. Sinon l'ancienne alerte reste « retrait non confirmé ». Une erreur conserve les alertes ; une attente de plus de 20 secondes rend une erreur récupérable. Les correspondances contradictoires ne sont pas proposées comme certains retraits.
 
 Le **Bilan des données lues** compare les lectures confirmées d'une même vue/session, compte par compte. Première lecture : nombre d'éléments déjà présents, aucun faux « nouveau ». Ensuite : ajouts et modifications avec accès aux éléments concernés (30 premiers affichés). Une source qui échoue ne remplace pas sa référence précédente par du vide. Les éléments absents d'une liste limitée ne sont pas comptés comme supprimés. Les dates affichées désignent le bilan local VRM, jamais une nouvelle capture native inventée.
 
@@ -21,7 +21,7 @@ Le bilan couvre les ventes, annonces et conversations Vinted ; les annonces Lebo
 
 ## Vérification synthétique
 
-- `node scripts/tests/bilan-synchronisation.test.mjs` : 28 assertions (première lecture, ajouts, prix modifiés, échec, pagination, identités, ambiguïtés, doublons contradictoires, retrait confirmé).
+- `node scripts/tests/bilan-synchronisation.test.mjs` : 31 assertions (première lecture, ajouts, prix modifiés, échec, pagination, identités, ambiguïtés, doublons contradictoires, retrait confirmé).
 - `node scripts/tests/bilan-synchronisation-adaptateur.test.mjs` : exécute le vrai lecteur de l'app avec sources simulées ; vérifie `eBay.items`, URL/compte Leboncoin, contrôle propriétaire et changement de session.
 - `node scripts/tests/bilan-synchronisation-interface.cjs` : React à 320, 390 et 1512 px ; état partiel, erreur, sortie native confirmée et réponse tardive d'une ancienne session.
 - `node scripts/audit-parcours-production.mjs`, `npm run build` et banc de messagerie live.

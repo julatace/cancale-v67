@@ -142,14 +142,18 @@ eq(
 eq(
   conserverRetraitsNonConfirmes(garde, [], {
     annonces: [],
-    completes: [{ plateforme: "eBay", at: Date.parse("2026-09-01") }],
+    completes: [
+      { plateforme: "eBay", compte: "a", at: Date.parse("2026-09-01") },
+    ],
   }).length,
   1,
 );
 eq(
   conserverRetraitsNonConfirmes(garde, [], {
     annonces: [],
-    completes: [{ plateforme: "eBay", at: Date.parse("2026-10-02") }],
+    completes: [
+      { plateforme: "eBay", compte: "a", at: Date.parse("2026-10-02") },
+    ],
   }).length,
   0,
 );
@@ -173,4 +177,30 @@ eq(
   "erreur",
 );
 
+const preuve = {
+  plateforme: "eBay",
+  compte: "a",
+  at: Date.parse("2026-10-02"),
+};
+eq(
+  conserverRetraitsNonConfirmes(garde, [], {
+    annonces: [],
+    completes: [{ ...preuve, compte: "autre" }],
+  }).length,
+  1,
+);
+eq(
+  conserverRetraitsNonConfirmes(garde, [], {
+    annonces: [annonce],
+    completes: [preuve],
+  }).length,
+  1,
+);
+eq(
+  conserverRetraitsNonConfirmes(garde, [], {
+    annonces: [{ ...annonce, active: null }],
+    completes: [preuve],
+  }).length,
+  1,
+);
 console.log(n + " contrôles bilan et retraits réussis");
