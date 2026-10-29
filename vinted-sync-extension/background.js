@@ -2832,6 +2832,15 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
             const r = await noterRetraitVuLbc(ids, msg.quoi, statut);
             sendResponse({ ok: !!(r && r.ok) }); return;
           }
+          // 29 oct. : les statistiques d'UNE de SES annonces (page « Statistiques »
+          // de leboncoin.fr) — des nombres, jamais qui. Cadre principal d'un
+          // onglet leboncoin.fr seulement.
+          if (msg.action === 'lbcStatsAnnonce') {
+            const tabUrl = (sender && sender.tab && sender.tab.url) || '';
+            if ((sender && sender.frameId > 0) || !/^https:\/\/(?:[a-z0-9-]+\.)*leboncoin\.fr\//i.test(tabUrl) || !/^\d{5,15}$/.test(String(msg.id || ''))) { sendResponse({ ok: false }); return; }
+            const r = await noterStatsAnnonceLbc(String(msg.id), msg);
+            sendResponse({ ok: !!(r && r.ok) }); return;
+          }
           // LA VENTE LEBONCOIN : détail transaction / commande / livraison. On
           // range un échantillon capé par famille d'endpoint, pour voir la FORME
           // (où vivent l'état, l'acheteur, le bordereau) — sans rien analyser
@@ -13756,6 +13765,10 @@ async function storeLbcListingsUneFois(url, listings,owner) {
       //    l'annonce, revue active, restait hors de « en vente ».
       delete n.plusVueAt;
       if(n.pauseAt&&!(Date.now()-Date.parse(n.pauseAt)<=LBC_PAUSE_INDEX_MS)){delete n.pauseAt;delete n.pauseStatut;}
+      // (29 oct.) Une suppression ACCEPTÉE par Leboncoin (réponse 2xx, vue sur la
+      // page ou demandée depuis VRM) est sans retour : une réponse en retard de
+      // l'index qui la montre encore « active » ne la remet pas en vente.
+      if(ancien.supprimeeAt){n.statutLbc=String(l.status||n.statutLbc||'');n.status='deleted';}
       merged[String(l.id)]=n;
     } }
     // (22 oct.) On garde les autres clés de la ligne — `lectures`, la date de la
@@ -13929,6 +13942,34 @@ async function noterRetraitVuLbc(ids, quoi, statut) {
       const ok = await supabaseUpsert('app_data', [{ id: 'lbc_listings', data: Object.assign({}, data, { items, updatedAt: nowIso }) }], 'id');
       if (ok !== false) { try { notifierApp({ type: 'maj', quoi: 'lbc' }); } catch (_) {} }
       return { ok: ok !== false, n };
+    } catch (_) { return { ok: false, n: 0 }; }
+  });
+}
+// Les statistiques d'une annonce (29 oct.) : `stats` = { favoris, messages, vues,
+// du, au, jours, at } — les TOTAUX du dernier jour lu (favoris, messages) et les
+// vues sur la période lue. Seulement une annonce DÉJÀ rangée d'un de SES comptes
+// (§5) ; rien n'est créé. Lecture ratée ⇒ rien n'est écrit. Un chiffre absent de
+// la réponse reste absent (jamais 0).
+async function noterStatsAnnonceLbc(id, m) {
+  const nb = (v) => (typeof v === 'number' && Number.isFinite(v) && v >= 0 && v < 1e7 ? Math.round(v) : null);
+  const stats = { favoris: nb(m && m.favoris), messages: nb(m && m.messages), vues: nb(m && m.vues), jours: nb(m && m.jours) };
+  for (const k of ['du', 'au']) { const d = String((m && m[k]) || ''); if (/^\d{4}-\d{2}-\d{2}$/.test(d)) stats[k] = d; }
+  for (const k of Object.keys(stats)) if (stats[k] == null) delete stats[k];
+  if (stats.favoris == null && stats.messages == null && stats.vues == null) return { ok: false, n: 0 };
+  stats.at = new Date().toISOString();
+  const miens = new Set([...(await comptesMiens())].map(idCompteLbc).filter(Boolean));
+  return enChaineLbcListings(async () => {
+    try {
+      const rows = await sbGet('app_data?id=eq.lbc_listings&select=data');
+      if (rows === null) { noterDiag('lbc_stats_lecture_ratee'); return { ok: false, n: 0 }; }
+      const data = (rows[0] && rows[0].data) || {};
+      const ad = (data.items || {})[id];
+      if (!ad || typeof ad !== 'object' || !miens.has(idCompteLbc(ad.account || ad.lbcUser))) { noterDiag('lbc_stats_pas_a_lui'); return { ok: true, n: 0 }; }
+      const items = Object.assign({}, data.items, { [id]: Object.assign({}, ad, { stats }) });
+      const ok = await supabaseUpsert('app_data', [{ id: 'lbc_listings', data: Object.assign({}, data, { items, updatedAt: stats.at }) }], 'id');
+      noterDiag(ok !== false ? 'lbc_stats_ecrit' : 'lbc_stats_ecriture_ratee');
+      if (ok !== false) { try { notifierApp({ type: 'maj', quoi: 'lbc' }); } catch (_) {} }
+      return { ok: ok !== false, n: 1 };
     } catch (_) { return { ok: false, n: 0 }; }
   });
 }
@@ -15101,6 +15142,38 @@ async function sessionDeListe(sessionPage) {
   const meme = !!(c && c.v === 2 && String(c.id) === id);
   return { id, name: meme ? String(c.name || '') : '', type: meme ? String(c.type || '') : '' };
 }
+// ── LES CHIFFRES QUE LEBONCOIN DONNE PAR ANNONCE (29 oct.) ─────────────────
+// MESURÉ (`lbc_recon.schemas`, sa page « Mes annonces ») : `dashboard/v1/search`
+// porte, pour CHAQUE annonce, `stats.{Views, Favorites, Messages, Replies,
+// Leads, Phones}` et `first_publication_date` / `index_date`. C'est le NOMBRE de
+// favoris — jamais QUI (aucune réponse vue ne nomme une personne). On ne garde
+// que des entiers ≥ 0 et une date ISO lisible ; une clé absente n'est pas posée
+// (une capture sans chiffres n'efface jamais ceux d'avant : `Object.assign`).
+// (29 oct.) Ce que « Mes annonces » dit de CHAQUE annonce, sans rien deviner.
+// MESURÉ (schéma de `dashboard/v1/search` rangé dans `lbc_recon.schemas`) : une
+// annonce porte `first_publication_date`, `index_date` et `counters` — un objet
+// VIDE sur ses deux annonces du 29 octobre. On garde les compteurs tels que
+// Leboncoin les nomme (nombres seulement, jamais un texte), pour que l'écran
+// « Favoris » dise un chiffre quand il y en a un ; aucun nom de compteur n'est
+// supposé. Les dates : celles de Leboncoin, jamais l'heure de capture.
+function statsAnnonceLbc(node) {
+  const out = {};
+  const c = node && node.counters;
+  if (c && typeof c === 'object' && !Array.isArray(c)) {
+    const cpt = {};
+    for (const [k, v] of Object.entries(c)) {
+      const n = Number(v);
+      if (/^[A-Za-z_][A-Za-z0-9_]{0,39}$/.test(k) && typeof v !== 'boolean' && v !== '' && v !== null && Number.isFinite(n) && n >= 0 && n < 1e7) cpt[k] = Math.round(n);
+    }
+    if (Object.keys(cpt).length) { out.compteurs = cpt; out.compteursAt = new Date().toISOString(); }
+  }
+  for (const [k, cle] of [['first_publication_date', 'publieeLe'], ['index_date', 'indexeeLe']]) {
+    const brut = String((node && node[k]) || '');
+    // « 2026-10-17 18:36:52 » : heure de Paris (Leboncoin), gardée telle quelle.
+    if (/^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}(:\d{2})?/.test(brut)) out[cle] = brut.slice(0, 19);
+  }
+  return out;
+}
 async function handleLbcRaw(url, body, sessionPage,ownerAttendu=null) {
   const owner=ownerAttendu||(await loadSession())?.user_id;if(!owner)return {ok:false,etat:'ecriture-refusee'};
   let data = null;
@@ -15239,6 +15312,7 @@ async function handleLbcRaw(url, body, sessionPage,ownerAttendu=null) {
           account: aMoiParSession&&sessListe.prive?sessListe.id:ownerId || (aMoiParSession ? sessListe.id : null),
           accountName: aMoiParSession&&sessListe.prive?sessListe.name:String((node.owner && (node.owner.name || node.owner.pseudo)) || node.owner_name || '') || (aMoiParSession ? sessListe.name || null : null),
           platform: 'leboncoin',
+          ...statsAnnonceLbc(node),
         });
       }
     }

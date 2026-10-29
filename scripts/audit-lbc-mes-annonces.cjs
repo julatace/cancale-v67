@@ -40,6 +40,10 @@ if (process.argv.includes('--prouve')) {
     ['retraitMiens', 'src', "if (!miens.has(idCompteLbc(ad.account || ad.lbcUser))) continue;\n        if (quoi === 'supprime') {", "if (quoi === 'supprime') {"],
     ['etatSansSortie', 'etat', " const sortie = etat==='vendue' || etat==='retiree' ? null : (typeof sortieDe==='function' ? sortieDe(ad) : null);", " const sortie = null;"],
     ['retraitStatutFond', 'src', "|| !(msg.quoi === 'supprime' || msg.quoi === 'pause') || !(statut >= 200 && statut < 300)) { sendResponse({ ok: false }); return; }", "|| !(msg.quoi === 'supprime' || msg.quoi === 'pause')) { sendResponse({ ok: false }); return; }"],
+    ['statsUnId', 'inject', "if (new Set(ids).size !== 1) return;", "if (!ids.length) return;"],
+    ['statsMiens', 'src', "if (!ad || typeof ad !== 'object' || !miens.has(idCompteLbc(ad.account || ad.lbcUser))) { noterDiag('lbc_stats_pas_a_lui'); return { ok: true, n: 0 }; }", "if (!ad || typeof ad !== 'object') { return { ok: true, n: 0 }; }"],
+    ['suppressionCollante', 'src', "if(ancien.supprimeeAt){n.statutLbc=String(l.status||n.statutLbc||'');n.status='deleted';}", ""],
+    ['compteursSansFiltre', 'src', "if (/^[A-Za-z_][A-Za-z0-9_]{0,39}$/.test(k) && typeof v !== 'boolean' && v !== '' && v !== null && Number.isFinite(n) && n >= 0 && n < 1e7) cpt[k] = Math.round(n);", "cpt[k] = v;"],
     ['retraitSite', 'src', "|| !/^https:\\/\\/(?:[a-z0-9-]+\\.)*leboncoin\\.fr\\//i.test(tabUrl) || !ids", "|| !ids"],
   ];
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'lbc-mes-annonces-prouve-'));
@@ -298,6 +302,53 @@ const retraits = (p) => p.envoyes.filter((m) => m.action === 'lbcRetraitVu');
     const it = (f.base.lbc_listings || {}).items || {};
     dit(!!(it['3266097702'] && it['3266097702'].plusVueAt) && !!(it['3290168823'] && it['3290168823'].plusVueAt) && !it['3288619155'].plusVueAt, 'sa page « Mes annonces » sort les annonces qu’elle ne montre plus, et elles seules', JSON.stringify(Object.fromEntries(Object.entries(it).map(([k, v]) => [k, !!v.plusVueAt]))));
     dit(it['3266097702'] && it['3266097702'].status === 'active', '« plus vue » n’est pas « vendue » : le statut n’est pas réécrit');
+  });
+
+  console.log('\n── 3 bis. CE QUE LEBONCOIN DIT DE CHAQUE ANNONCE (des nombres, jamais qui)');
+  const pageFond = (f, reseau) => page({ reseau, fond: (m) => f.envoyer(m).then((r) => r || { ok: true }) });
+  await essaie('compteurs et dates', async () => {
+    const f = fond({ lbc_listings: { items: items0() }, lbc_accounts: comptes });
+    const a = annonce(3288619155, MON, { counters: { favorites: 3, libelle: 'x', vu: true }, first_publication_date: '2026-10-17 18:36:52', index_date: '2026-10-27 09:21:23' });
+    const p1 = pageFond(f, () => repT([a], 1));
+    await p1.charge(TABLEAU, { method: 'POST', body: corpsT() });
+    await attendre(250);
+    const it = ((f.base.lbc_listings || {}).items || {})['3288619155'] || {};
+    dit(it.compteurs && it.compteurs.favorites === 3 && !('libelle' in it.compteurs) && !('vu' in it.compteurs), 'les compteurs de « Mes annonces » sont gardés tels que Leboncoin les nomme, nombres seulement', JSON.stringify(it.compteurs));
+    dit(it.publieeLe === '2026-10-17 18:36:52' && it.indexeeLe === '2026-10-27 09:21:23', 'la date de mise en ligne vient de Leboncoin (jamais l’heure de capture)', JSON.stringify([it.publieeLe, it.indexeeLe]));
+    const p2 = pageFond(f, () => repT([annonce(3288619155, MON, { counters: {} })], 1));
+    await p2.charge(TABLEAU, { method: 'POST', body: corpsT() });
+    await attendre(250);
+    const it2 = ((f.base.lbc_listings || {}).items || {})['3288619155'] || {};
+    dit(it2.compteurs && it2.compteurs.favorites === 3, 'une lecture sans compteur n’efface pas le dernier chiffre connu', JSON.stringify(it2.compteurs));
+  });
+  const STATS = `${API}/stats/proxy/v2/classified/history/daily`;
+  const jours = [{ Date: '2026-10-27T00:00:00Z', Favorites: 1, TotalFavorites: 4, Views: 10, Messages: 0, TotalMessages: 2 }, { Date: '2026-10-28T00:00:00Z', Favorites: 2, TotalFavorites: 6, Views: 15, Messages: 1, TotalMessages: 3 }];
+  await essaie('statistiques d’une annonce', async () => {
+    const f = fond({ lbc_listings: { items: items0() }, lbc_accounts: comptes });
+    const p = pageFond(f, (u) => (u.startsWith(STATS) ? { status: 200, body: jours } : null));
+    await p.charge(STATS + '?id=3288619155&period=7', {});
+    await attendre(250);
+    const st = (((f.base.lbc_listings || {}).items || {})['3288619155'] || {}).stats || null;
+    dit(!!st && st.favoris === 6 && st.messages === 3 && st.vues === 25 && st.au === '2026-10-28', 'la page « Statistiques » d’une de SES annonces : favoris et messages du dernier jour, vues de la période', JSON.stringify(st));
+  });
+  await essaie('statistiques ambiguës', async () => {
+    const f = fond({ lbc_listings: { items: items0() }, lbc_accounts: comptes });
+    const p = pageFond(f, (u) => (u.startsWith(STATS) ? { status: 200, body: jours } : null));
+    await p.charge(STATS + '?id=3288619155&autre=3290168823', {});
+    await p.charge(STATS + '?id=90100001', {});
+    await attendre(250);
+    const it = (f.base.lbc_listings || {}).items || {};
+    dit(!(it['3288619155'] || {}).stats && !(it['90100001'] || {}).stats, 'deux identifiants dans l’adresse, ou l’annonce d’un autre vendeur ⇒ rien n’est attribué', JSON.stringify([!!(it['3288619155'] || {}).stats, !!(it['90100001'] || {}).stats]));
+  });
+  await essaie('suppression sans retour', async () => {
+    const f = fond({ lbc_listings: { items: items0() }, lbc_accounts: comptes });
+    await f.envoyer({ action: 'lbcRetraitVu', quoi: 'supprime', ids: ['3290168823'], statut: 200 });
+    await attendre(40);
+    const p = pageFond(f, () => repT([annonce(3290168823, MON)], 1));
+    await p.charge(TABLEAU, { method: 'POST', body: corpsT() });
+    await attendre(250);
+    const it = ((f.base.lbc_listings || {}).items || {})['3290168823'] || {};
+    dit(it.status === 'deleted' && !!it.supprimeeAt, 'une suppression acceptée par Leboncoin est sans retour : une lecture en retard qui la montre « active » ne la remet pas en vente', JSON.stringify({ status: it.status, supprimeeAt: !!it.supprimeeAt }));
   });
 
   console.log('\n── 4. LA RÈGLE PARTAGÉE (app) : supprimée ou plus vue ⇒ plus « en vente »');

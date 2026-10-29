@@ -526,6 +526,24 @@
     } catch (_) {}
   };
 
+  const STATS_JOUR = /^https:\/\/api\.leboncoin\.fr\/api\/stats\/proxy\/v\d+\/classified\/history\/daily\/?(?:\?|$)/i;
+  const noterStatsJour = (url, text) => {
+    try {
+      let u; try { u = new URL(url); } catch (_) { return; }
+      const ids = [...u.searchParams.entries()].filter(([, v]) => /^\d{5,15}$/.test(v)).map(([, v]) => v);
+      if (new Set(ids).size !== 1) return;
+      let j; try { j = JSON.parse(text); } catch (_) { return; }
+      if (!Array.isArray(j) || !j.length || j.length > 400) return;
+      const nb = (v) => (typeof v === 'number' && Number.isFinite(v) && v >= 0 && v < 1e7 ? Math.round(v) : null);
+      const jours = j.filter((x) => x && typeof x === 'object' && !Array.isArray(x) && typeof x.Date === 'string' && /^\d{4}-\d{2}-\d{2}/.test(x.Date));
+      if (!jours.length) return;
+      jours.sort((a, b) => (a.Date < b.Date ? -1 : a.Date > b.Date ? 1 : 0));
+      const der = jours[jours.length - 1];
+      let vues = 0, vuesConnues = 0;
+      for (const x of jours) { const v = nb(x.Views); if (v != null) { vues += v; vuesConnues++; } }
+      post({ kind: 'lbcstatsannonce', id: ids[0], favoris: nb(der.TotalFavorites), messages: nb(der.TotalMessages), vues: vuesConnues ? vues : null, du: jours[0].Date.slice(0, 10), au: der.Date.slice(0, 10), jours: jours.length });
+    } catch (_) {}
+  };
   const handle = (url, text, ctype, statut = 200, corpsReq = null) => {
     try {
       if (NOISE.test(url)||statut<200||statut>=300) return;
@@ -549,6 +567,15 @@
       if(text.length>1500000)return;
 
       noteSchema(url, text);                                // la structure, jamais les valeurs
+      // ── LES STATISTIQUES D'UNE ANNONCE (29 oct.) : DES NOMBRES, JAMAIS QUI ──
+      // Julien veut « les messages aux favoris, tout pareil » sur Leboncoin.
+      // MESURÉ (schéma rangé le 22 oct.) : la page « Statistiques » d'une annonce
+      // charge `GET …/stats/proxy/v2/classified/history/daily`, une liste par jour
+      // `[{Date, Favorites, TotalFavorites, Views, Messages, TotalMessages, …}]` —
+      // des COMPTES, aucun nom : Leboncoin ne dit pas QUI a mis en favori.
+      // L'annonce visée est dans la query (forme jamais vue) : on n'attribue que si
+      // UN SEUL paramètre porte un identifiant d'annonce ; sinon rien.
+      if (STATS_JOUR.test(url)) { noterStatsJour(url, text); return; }
       // ── LA MESSAGERIE (4 octobre) : SEULEMENT LE NOMBRE DE NON-LUS ─────────
       // Julien : « dans Leboncoin, il y ait les messages ». Mesuré : la page
       // recharge elle-même un compteur `{userId, unread, pollingTime}` — un
