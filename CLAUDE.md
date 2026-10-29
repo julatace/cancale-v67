@@ -1,5 +1,24 @@
 # VRM — dossier de passation
 
+> ⚠️⚠️ **29 octobre — REPUBLIER « COMME VINTEX » (5.277), après la restriction de 24 h d'angeled92 :** Vinted a écrit
+> « activité automatisée » après une republication de VRM. Mesuré (extension VRM Observateur, lecture seule, 266 requêtes
+> de Vintex sur 2 articles) : Vintex fait TOUT depuis l'onglet vinted.fr (cookies du site, `x-csrf-token` de la page,
+> aucun `Authorization`), GET de l'annonce → photos à 1,5–3 s → brouillon → suppression juste après → 1 à 3 min →
+> GET du brouillon → completion, sans renvoi ni nouvel essai. VRM partait du service worker (Bearer, `credentials:omit`),
+> supprimait AVANT le brouillon, et renvoyait photos/taille en rafale sur un refus. ⇒ `vintedPage` / `vintedPagePhoto`
+> (`executeScript` dans le monde MAIN, `credentials:'include'`, FormData rebâti dans la page) pour TOUTE la republication
+> (Republier, Refaire, Brouillons → en ligne, Modifier, lecture des recettes) ; sans onglet Vinted ⇒ `code:'onglet-vinted'`,
+> RIEN n'est envoyé ; plus de création directe (toujours un brouillon) ; ordre L P… B S (pause 1–3 min) L M ; un refus
+> s'arrête et DIT le geste (photos : « rajoute les photos » ; taille : Modifier) — `completionSecoursPhotos`,
+> `photosNeuvesBrouillon`, `secoursTaille` RETIRÉS (ne pas les remettre) ; `PAUSES_REPUB` photo 1,5–3 s, brouillon 2–5 s,
+> mise en ligne 60–180 s ; **10 paires par jour et par compte** (`REPUB_PAR_JOUR`, `vrmRepubJour`, 24 h glissantes,
+> `quota-jour`). États du coffre : brouillon refusé/sans id ⇒ « toujours en ligne », rien supprimé ; suppression floue ⇒
+> `incertain`, brouillon `a-publier` mais `supprime:false` (Refaire ne le met jamais en ligne). `EXT_CAPACITES.republierpage`
+> = 5.277.0 (le texte « comme Vintex » de Republier n'est dit qu'à elle). Preuve : `audit-recreer.cjs` (135 ; 49 rouges
+> sur la 5.276 — dont « toutes les requêtes partent de la page, sans Authorization »). ⚠️ Non mesuré : que ce soit ce qui
+> a déclenché la restriction (probable, pas prouvé) ; que Vinted ne restreigne plus. **Geste de Julien** : laisser un
+> onglet vinted.fr ouvert sur le bon compte pendant Republier ; ne pas republier sur angeled92 avant la fin des 24 h.
+
 > **29 octobre — un VRAI suivi de ses déclarations URSSAF (Comptabilité) :** Julien : « pour l'URSSAF fait un vrai suivi ».
 > Carte « Suivi de tes déclarations URSSAF » (`SuiviUrssaf`, sous la carte URSSAF, règle pure `suiviUrssaf` +
 > `periodesUrssaf`) : une ligne par période des 12 derniers mois (mois ou trimestre, SON rythme) — échéance, état
