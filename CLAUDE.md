@@ -1,5 +1,29 @@
 # VRM — dossier de passation
 
+> ⚠️ **29 octobre — LE STATUT LU CHEZ LE TRANSPORTEUR remis sur `main` (extension 5.281), PAS FINI :** Julien : « tu as
+> juste à regarder sur le site du transporteur… le statut », « ça marche si je n'ai pas l'extension allumée ? ». Le chantier
+> du 24 octobre (`v24-transp` : serveur + app ; `v24-transp-ext` : extension, numérotée « 5.217 » sur sa branche) est
+> fusionné sur `main` (f95adeb) dans `v29-colis`. Le SERVEUR lit seul Mondial Relay (`_mvc` de mondialrelay.fr, n° + code
+> postal du relais, voie `mr-fr-mvc`), Chronopost (`ws.chronopost.fr` trackSkybillV2, `cp-ws2`) et Vinted Go
+> (`carrier.vintedgo.com/public/v3/tracking_events`, `vg-v3`), User-Agent honnête `VRM-suivi/1.0 (+https://vrm.center)` —
+> sans l'extension (`api/_lib/transporteurs.js` règles pures, `transporteurs-lecture.js` réseau, `api/relais.js` modes
+> `transp` · `transp-a-lire` · `transp-brut`, matin et soir dans `ship-reminders`, widget, `email-inbound`). Lignes
+> `transp_{carrier}_{n°}` (serveur seul, compare-et-échange), règle des fins dans `suivi-colis.js` (`finsDesLignes`
+> + `transp`, `fusionTransporteur`, `sortiParSuivis` → `a_verifier`), app : `LigneTransporteur`, `TeteTransporteurs`,
+> `useRelectureTransporteurs`. L'extension n'est qu'un SECOURS (C3 : ce que le transporteur refuse au serveur ; C4 : la
+> réponse brute, jugée par la MÊME fonction serveur ; `transpTick`, `transp-page.js`). Version : la « 5.217 » du chantier
+> était déjà PUBLIÉE par `main` avec un autre contenu, et la 5.280 prise par `main` pendant la fusion ⇒ **5.281.0** (`EXT_ATTENDUE`, `EXT_CAPACITES.transp`,
+> `CODE_VERSION`, `CAPTEUR_VERSION`, `relaisVersion`, zips). ⚠️⚠️ **21 défauts reproduits par deux relecteurs le 24 oct.
+> ne sont PAS encore corrigés** (dont : retour/incident ignoré sur un achat Vinted sans arrivée ; colis email en transit
+> qui disparaît sur un retour transporteur ; nouvelle arrivée qui ne sonne pas ; pause Chronopost par vendeur), plus côté
+> extension : Chronopost à 14 caractères refusé (`\d{14}[0-9A-Z]` contre `[0-9A-Z]?` au serveur), `mr-be` jamais tenté en
+> repli de `mr-fr-mvc`, corps tronqué à 64 Ko (serveur 192 Ko). Un correcteur travaille dans `v29-colis-ext`. Ne pas
+> présenter ce suivi comme fiable avant. Preuves de la fusion : 172 audits (sans les 5 Postgres), mêmes rouges que `main`
+> (`audit-politique-hotes` 1, `audit-preuve-vente` 18 — déjà là) ; `audit-statut-transporteurs` (`--prouve` 29/29),
+> `audit-mondialrelay-serveur` (24/24), `audit-transp-ext` (11/11) verts, rouges sur `main` (24 · 6 · 54) ; banc
+> `transporteurs` vert (49 rouges sur le build de `main`) ; bancs colis, widget, rappels, notifications, popup, badge, pont,
+> premierjour verts.
+
 > ⚠️⚠️ **29 octobre — REPUBLIER « COMME VINTEX » (5.277), après la restriction de 24 h d'angeled92 :** Vinted a écrit
 > « activité automatisée » après une republication de VRM. Mesuré (extension VRM Observateur, lecture seule, 266 requêtes
 > de Vintex sur 2 articles) : Vintex fait TOUT depuis l'onglet vinted.fr (cookies du site, `x-csrf-token` de la page,

@@ -79,8 +79,11 @@ async function rendre(nav, etat, { carte = false, mode = '', geste = null, faux 
             : msg.action === 'codeVersion' ? (faux.codeMuet ? undefined : { ok: true, code: faux.code || null })
             // Une connexion qui met 300 ms : de quoi cliquer plusieurs fois.
             : msg.action === 'authLogin' ? (faux.loginRep || { ok: true, __lent: 300 })
+            // 5.281 : le fond dit si la lecture des transporteurs est permise ICI.
+            : msg.action === 'transpPermis' ? (faux.permis === undefined ? { ok: true } : { ok: true, permis: faux.permis, origines: ['https://www.mondialrelay.be/*', 'https://www.mondialrelay.fr/*', 'https://ws.chronopost.fr/*', 'https://carrier.vintedgo.com/*'] })
             : { ok: true };
           if (faux.codeMuet && msg.action === 'codeVersion') return;   // ne répond jamais
+          if (faux.permisMuet && msg.action === 'transpPermis') return; // ne répond jamais
           setTimeout(() => cb && cb(r), (r && r.__lent) || 0);
         },
         lastError: null,
@@ -100,6 +103,13 @@ async function rendre(nav, etat, { carte = false, mode = '', geste = null, faux 
       },
       windows: { update: () => {} },
     };
+    // `chrome.permissions.request` (5.281) : noté, et l'on sait s'il part DANS le
+    // geste (Firefox refuse une demande faite après une attente).
+    window.__permisDemandes = [];
+    window.__enClic = false;
+    window.addEventListener('click', () => { window.__enClic = true; }, true);
+    window.addEventListener('click', () => { window.__enClic = false; }, false);
+    if (!faux.sansApiPermis) window.chrome.permissions = { request: (q, cb) => { window.__permisDemandes.push({ origins: (q && q.origins) || [], dansLeGeste: window.__enClic === true }); setTimeout(() => cb && cb(faux.permisAccorde === true), 0); } };
     window.close = () => { window.__ferme = true; };
   }, { e: etat, faux });
   await pg.addScriptTag({ content: js });
@@ -119,6 +129,8 @@ async function rendre(nav, etat, { carte = false, mode = '', geste = null, faux 
   const reparation = await pg.evaluate(() => document.body.getAttribute('data-reparation'));
   const secours = await pg.evaluate(() => document.body.getAttribute('data-lier-secours'));
   const mem = await pg.evaluate(() => window.__mem);
+  const transp = await pg.evaluate(() => { const b = document.getElementById('transpBox'); const btn = document.getElementById('transpPermisBtn');
+    return { etat: b && !b.hidden ? b.getAttribute('data-transp-permis') : null, demandes: window.__permisDemandes, bouton: !!(btn && btn.offsetParent), h: btn && btn.offsetParent ? Math.round(btn.getBoundingClientRect().height) : 0 }; });
   // Tout doit tenir dans la carte, sans défilement horizontal ni coupe.
   const deborde = await pg.evaluate(() => document.documentElement.scrollWidth > window.innerWidth || document.documentElement.scrollHeight > window.innerHeight + 1);
   // Rien de l'ancienne palette (or, menthe) : la famille « VRM Noir » (§7).
@@ -141,7 +153,7 @@ async function rendre(nav, etat, { carte = false, mode = '', geste = null, faux 
   });
   if (carte && process.env.BANC_CAPTURES) await pg.screenshot({ path: path.join(process.env.BANC_CAPTURES, `popup-carte-${etat.connecte ? 'co' : 'deco'}.png`) });
   await ctx.close();
-  return { txt, champs, liens, erreurs, ouvert, ferme, envoyes, messages, boutons, deborde, anciens, recharges, reparation, mem, secours, look };
+  return { txt, champs, liens, erreurs, ouvert, ferme, envoyes, messages, boutons, deborde, anciens, recharges, reparation, mem, secours, look, transp };
 }
 const ouvrirMdp = async (pg) => { const a = await pg.$('#mdpLien'); if (a) { await a.click(); await pg.waitForTimeout(120); } };
 
@@ -243,6 +255,47 @@ const ouvrirMdp = async (pg) => { const a = await pg.$('#mdpLien'); if (a) { awa
     dit(!co.champs.some((c) => c.id === 'pw'), 'et aucun champ mot de passe');
     const lbc = await rendre(nav, { ok: true, connecte: true, cloisonne: true, __url: 'https://www.leboncoin.fr/compte/part/transaction/1' });
     dit(/tab=plat_leboncoin$/.test(lbc.ouvert || ''), 'depuis Leboncoin : l’onglet Leboncoin de VRM', lbc.ouvert);
+  });
+
+  // ── 2 bis. LE SUIVI DES TRANSPORTEURS (5.281) — la permission manque ────
+  // Firefox peut laisser non accordées les permissions d'hôte MV3 : sans elles
+  // l'extension se tait. Le seul endroit où le geste est possible est CETTE
+  // fenêtre (une page de l'extension) : connectée, elle ne s'ouvre plus sur VRM
+  // toute seule, elle propose « Autoriser VRM à lire le suivi des transporteurs ».
+  console.log('\n── Connecté, la lecture des transporteurs n’est pas permise (Firefox)');
+  const CO = { ok: true, connecte: true, email: 'sophie@exemple.fr', cloisonne: true };
+  await essaie('permission manquante', async () => {
+    const r = await rendre(nav, CO, { faux: { permis: false } });
+    dit(!r.erreurs.length, 'la popup s’exécute sans erreur', r.erreurs[0]);
+    dit(!r.ouvert && !r.ferme, 'la permission manque : la fenêtre RESTE ouverte (elle ne file pas sur VRM)', JSON.stringify({ ouvert: r.ouvert, ferme: r.ferme }));
+    dit(r.transp.bouton && r.transp.etat === 'manque' && /Autoriser VRM à lire le suivi des transporteurs/.test(r.txt), 'et propose « Autoriser VRM à lire le suivi des transporteurs »', r.txt.replace(/\n/g, ' · ').slice(0, 260));
+    dit(r.transp.h >= 44, 'le bouton fait au moins 44 px', String(r.transp.h));
+    dit(/sophie@exemple\.fr/.test(r.txt) && r.boutons.includes('vrmBtn'), 'le compte VRM est nommé et « Ouvrir VRM » reste là', JSON.stringify(r.boutons));
+    dit(r.transp.demandes.length === 0, 'rien n’est demandé avant le clic', JSON.stringify(r.transp.demandes));
+  });
+  for (const [accorde, nom] of [[true, 'accordée'], [false, 'refusée']]) {
+    await essaie('clic ' + nom, async () => {
+      const r = await rendre(nav, CO, { faux: { permis: false, permisAccorde: accorde }, geste: (pg) => pg.click('#transpPermisBtn') });
+      const d = r.transp.demandes[0] || {};
+      dit(r.transp.demandes.length === 1 && d.origins.length === 4 && d.origins.every((o) => /^https:\/\/[a-z.]+\/\*$/.test(o)), `clic (${nom}) : les quatre sites des transporteurs sont demandés, une fois`, JSON.stringify(r.transp.demandes));
+      dit(d.dansLeGeste === true, `et la demande part DANS le geste (sans attente)`, JSON.stringify(d));
+      dit(r.transp.etat === (accorde ? 'accorde' : 'refuse'), `l’issue est dite : ${accorde ? 'autorisé' : 'pas autorisé'}`, String(r.transp.etat));
+      dit(accorde ? (!r.transp.bouton && /C.est autorisé/.test(r.txt)) : (r.transp.bouton && /pas autorisé/.test(r.txt)), accorde ? 'accordée : le bouton s’efface, la phrase le dit' : 'refusée : le bouton reste, la phrase dit que rien n’est lu', r.txt.replace(/\n/g, ' · ').slice(0, 240));
+    });
+  }
+  await essaie('permission : l’autre sens', async () => {
+    const a = await rendre(nav, CO, { faux: { permis: true } });
+    dit(/^https:\/\/vrm\.center\/\?tab=plat_vinted$/.test(a.ouvert || '') && a.ferme && !a.transp.bouton, 'tout est permis (Chrome) : l’icône ouvre VRM comme avant, aucun bouton', JSON.stringify({ ouvert: a.ouvert, bouton: a.transp.bouton }));
+    const b = await rendre(nav, CO, { faux: { permis: null } });
+    dit(!!b.ouvert && !b.transp.bouton, '« pas su » (le fond n’a pas pu mesurer) : on ne propose rien, VRM s’ouvre', JSON.stringify({ ouvert: b.ouvert, bouton: b.transp.bouton }));
+    const c = await rendre(nav, CO, { faux: { permis: false, sansApiPermis: true } });
+    dit(!!c.ouvert && !c.transp.bouton, 'un navigateur qui ne sait pas demander la permission : aucun bouton qui ne mènerait à rien', JSON.stringify({ ouvert: c.ouvert, bouton: c.transp.bouton }));
+    const d = await rendre(nav, CO, { faux: { permisMuet: true }, geste: (pg) => pg.waitForTimeout(1700) });
+    dit(!!d.ouvert && d.ferme, 'le fond ne répond pas : VRM s’ouvre quand même (au plus 1,5 s d’attente)', JSON.stringify({ ouvert: d.ouvert, ferme: d.ferme }));
+    const e = await rendre(nav, { ok: true, connecte: false }, { faux: { permis: false } });
+    dit(!e.transp.bouton, 'pas connecté : pas de bouton (la connexion d’abord)', JSON.stringify(e.boutons));
+    const f = await rendre(nav, CO, { carte: true, faux: { permis: false } });
+    dit(f.transp.etat === 'manque-carte' && !f.transp.bouton && /icône VRM/.test(f.txt) && !f.deborde, 'dans la petite carte : une ligne qui dit où le faire (l’icône), et tout y tient', JSON.stringify({ etat: f.transp.etat, bouton: f.transp.bouton, deborde: f.deborde }));
   });
 
   // ── 3. SESSION EXPIRÉE — un troisième état, pas « non connecté » ─────────

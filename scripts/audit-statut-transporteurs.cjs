@@ -52,7 +52,7 @@ const MUTATIONS = {
   'c3-mr-toujours': ['api/_lib/transporteurs.js', '    if (!(refusServeur(t) || enPause(pause, it.carrier, maintenant))) continue;', "    if (it.carrier !== 'mondialrelay' && !(refusServeur(t) || enPause(pause, it.carrier, maintenant))) continue;"],
   'essai-cp-compte-echec': ['api/_lib/transporteurs-lecture.js', "      if (cpEssaye && (lu.res === 'introuvable' || lu.res === 'forme')) lu = { res: 'cp-inconnu' };", ''],
   // (fusion) C3 annonce à l'extension la route `_mvc` (`mr-fr-mvc`) : la seule
-  // que l'extension 5.217 lit d'abord (de `mr-be`, elle ne passe à `_mvc` qu'en repli).
+  // que l'extension 5.281 lit d'abord (de `mr-be`, elle ne passe à `_mvc` qu'en repli).
   'c3-voie-be': ['api/_lib/transporteurs.js', "export const VOIE_DE = { mondialrelay: 'mr-fr-mvc',", "export const VOIE_DE = { mondialrelay: 'mr-be',"],
   // (fusion) Le code postal de la page : un ESSAI (jamais « introuvable »), et
   // il suit le n° demandé seul jusqu'à l'extension.

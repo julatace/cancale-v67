@@ -43,7 +43,7 @@ export const CARRIERS_LUS = ['mondialrelay', 'chronopost', 'vinted'];
 // l'extension (C3, `aLireParNavigateur`) par la voie `VOIE_DE` : pour Mondial
 // Relay la MÊME route `_mvc`, lue depuis le navigateur de Julien (son adresse
 // IP, que Mondial Relay ne refuse pas comme celle du serveur) — une requête,
-// sans jeton ni page à charger (l'extension 5.217 ne passe de `mr-be` à
+// sans jeton ni page à charger (l'extension 5.281 ne passe de `mr-be` à
 // `mr-fr-mvc` qu'en repli, jamais l'inverse : annoncer `mr-be` lui ferait
 // d'abord charger la page .be puis l'API protégée par Cloudflare). En C4,
 // l'extension relaie l'une OU l'autre voie Mondial Relay (`VOIES`) : `mr-fr-mvc`
