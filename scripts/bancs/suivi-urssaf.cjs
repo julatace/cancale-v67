@@ -210,6 +210,35 @@ const ligneSuivi = (pg, label) => pg.evaluate((lb) => { const c = document.query
         dit(errs.length === 0, `D ${T} : aucune erreur de page`, errs.join(' | ').slice(0, 200));
         await ctx.close();
       });
+      // S (29 oct.) : rattrapage en série — « Noter mes N mois à la suite ».
+      await essaie(`S ${T}`, async () => {
+        const LIGNE_S = { ...LIGNE, mois: [...LIGNE.mois, { ym: '2026-08', ca: 120, n: 1, par: { Vinted: { n: 1, ca: 120 } } }, { ym: '2026-07', ca: 80, n: 1, par: { Vinted: { n: 1, ca: 80 } } }] };
+        const opts = { main: mainDe({ vinted_urssaf_mois: LIGNE_S }) };
+        const { ctx, pg, errs } = await rendre(b, vp, opts);
+        await aller(pg, 'compta', '[data-suivi-urssaf="lu"]', 2500);
+        const n = await pg.evaluate(() => { const e = document.querySelector('[data-suivi-serie]'); return e ? Number(e.getAttribute('data-suivi-serie')) : 0; });
+        dit(n >= 2, `S ${T} : plusieurs mois à noter ⇒ « Noter mes ${n} mois à la suite »`, String(n));
+        if (n >= 2) {
+          await touche(pg, '[data-suivi-serie]', vp);
+          await formulaire(pg);
+          const s1 = await pg.evaluate(() => { const e = document.querySelector('[data-decl-serie]'); return e ? e.getAttribute('data-decl-serie') : null; });
+          dit(s1 === `1/${n}`, `S ${T} : le plus ancien mois s'ouvre, « mois 1 sur ${n} »`, s1);
+          await touche(pg, '[data-decl-enregistrer]', vp);
+          await pg.waitForFunction((v) => { const e = document.querySelector('[data-decl-serie]'); return e && e.getAttribute('data-decl-serie') === v; }, `2/${n}`, { timeout: 25000 }).catch(() => {});
+          await pg.waitForTimeout(1500);   // l'écriture du registre part un peu après le geste
+          const s2 = await pg.evaluate(() => { const e = document.querySelector('[data-decl-serie]'); return e ? e.getAttribute('data-decl-serie') : null; });
+          const reg = await registre(pg) || {};
+          dit(s2 === `2/${n}` && Object.keys(reg).length === 1, `S ${T} : enregistré ⇒ le mois suivant s'ouvre tout seul (un seul mois noté)`, JSON.stringify({ s2, notes: Object.keys(reg) }));
+          await touche(pg, '[data-decl-passer]', vp);
+          await pg.waitForTimeout(1500);
+          const s3 = await pg.evaluate(() => { const e = document.querySelector('[data-decl-serie]'); return e ? e.getAttribute('data-decl-serie') : null; });
+          const reg2 = await registre(pg) || {};
+          dit((n === 2 ? s3 === null : s3 === `3/${n}`) && Object.keys(reg2).length === 1, `S ${T} : « Pas encore déclaré » passe au suivant sans rien noter`, JSON.stringify({ s3, notes: Object.keys(reg2) }));
+          if (n > 2) { await touche(pg, '[data-decl-serie-stop]', vp); await pg.waitForTimeout(600); dit(!(await pg.$('[data-decl-form]')), `S ${T} : « Arrêter » referme le formulaire`); }
+        }
+        dit(errs.length === 0, `S ${T} : aucune erreur de page`, errs.join(' | ').slice(0, 200));
+        await ctx.close();
+      });
     }
   } finally { if (b) await b.close(); srv.close(); }
   console.log(ko ? `\n${ko} KO` : '\nTout est vert');
