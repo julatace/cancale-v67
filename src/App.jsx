@@ -2189,9 +2189,9 @@ function BoutonSync({ ouvert, onBasculer }) {
               syncStatus==='error'?'La base n\u2019a pas répondu — la sauvegarde sera retentée':'En attente'
             }>
               {/* Icône au trait : neutre quand tout est synchronisé (l'état normal
-                  ne réclame pas l'œil — §7, l'accent est rare) ; ambre en cours,
-                  rouge seulement si la base refuse ou ne répond pas. */}
-              <span style={{display:'flex',color:(syncStatus==='error'||syncStatus==='refus')?C.danger:syncStatus==='synced'?C.muted:C.warn}}>
+                  ne réclame pas l'œil — §7, l'accent est rare) ; ambre sinon —
+                  l'icône barrée dit l'échec (29 oct. : plus de rouge, §7). */}
+              <span style={{display:'flex',color:syncStatus==='synced'?C.muted:C.warn}}>
                 <Icon name={(syncStatus==='error'||syncStatus==='refus')?'cloudOff':syncStatus==='synced'?'cloud':'sync'} size={20}/>
               </span>
               {/* ⚠️ L'HEURE DE SYNCHRO EST RETIRÉE. Sur un iPhone, l'en-tête
@@ -12306,7 +12306,9 @@ function BarreGeste({ p, liste, attrs, label, issue = null, detail = true }) {
       <div role="progressbar" aria-label={`${label ? label + ' : ' : ''}${pe.texte}`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(pe.part * 100)} style={{ height: 6, borderRadius: 3, background: C.border, overflow: 'hidden' }}>
         <div style={{ width: `${Math.max(4, Math.round(pe.part * 100))}%`, height: '100%', background: C.accent, transition: 'width .3s ease' }} />
       </div>
-      <div style={{ fontSize: 12, color: C.muted, marginTop: 4 }}>{issue === 'echec' ? 'Arrêté — voir l’étape en ✗ ci-dessous' : pe.texte}{att && issue !== 'echec' ? ` · ${att}` : ''}</div>
+      {/* (29 oct.) L'attente est dite UNE fois : sur l'étape en cours du détail
+          quand il est affiché, sinon ici. */}
+      <div style={{ fontSize: 12, color: C.muted, marginTop: 4 }}>{issue === 'echec' ? 'Arrêté — voir l’étape en ✗ ci-dessous' : pe.texte}{att && issue !== 'echec' && !detail ? ` · ${att}` : ''}</div>
       {detail && <DetailEtapes p={p} liste={liste} issue={issue} now={now} />}
     </div>
   );
@@ -12702,10 +12704,10 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
             {/* (28 oct.) Après un passage, les anciennes annonces sont supprimées de Vinted :
                 elles sortent de la liste et la phrase disait « 0 annonce à supprimer ». */}
             {!aFaire.length && <div data-republier-vide style={{ fontSize: 13.5, color: C.text, lineHeight: 1.5 }}>{mode === 'idle' ? <>Plus aucune des annonces choisies n'est en ligne sur Vinted (déjà republiées ou retirées). Le compte rendu de chacune est ci-dessous ; reviens à « 1. Choisir » pour en prendre d'autres.</> : <>Le passage est en cours : son avancée est ci-dessous.</>}</div>}
-            {action === 'recreer' && !!aFaire.length && <div data-republier-explique style={{ fontSize: 13.5, color: C.text, lineHeight: 1.5 }}><b>{aFaire.length} annonce{aFaire.length > 1 ? 's' : ''}</b> à supprimer et recréer sur Vinted, une par une. Pour chacune : ses photos sont renvoyées{regNeutre ? '' : ' avec tes réglages'}, {viaBrouillon && brouillonOk ? <>l'annonce est enregistrée dans VRM, retirée de Vinted, recréée en brouillon, puis mise en ligne. Si la mise en ligne échoue, le brouillon reste dans tes brouillons Vinted et rien n'est perdu.</> : <>la nouvelle annonce est créée, et <b>seulement si elle est bien en ligne</b> l'ancienne est supprimée.</>} Le N° VRM passe sur la nouvelle.</div>}
-            {action === 'modifier'  && !!aFaire.length && <div data-republier-explique style={{ fontSize: 13.5, color: C.text, lineHeight: 1.5 }}><b>{aFaire.length} annonce{aFaire.length > 1 ? 's' : ''}</b> à modifier sur Vinted, une par une, sur place : même annonce, même N°, favoris et vues gardés. Rien n'est supprimé ni créé.</div>}
-            {action === 'versBrouillon'  && !!aFaire.length && <div data-republier-explique style={{ fontSize: 13.5, color: C.text, lineHeight: 1.5 }}><b>{aFaire.length} annonce{aFaire.length > 1 ? 's' : ''}</b> à repasser en brouillon, une par une. Pour chacune : elle est <b>enregistrée dans VRM</b>, ses photos sont renvoyées{regNeutre ? '' : ' avec tes réglages'}, l'annonce en ligne est <b>retirée</b>, puis le <b>brouillon est créé</b> sur Vinted. Un brouillon n'est jamais en ligne : rien ne peut se vendre deux fois. Tu la remettras en ligne depuis « Actions → Brouillons → en ligne ».</div>}
-            {action === 'enLigne'  && !!aFaire.length && <div data-republier-explique style={{ fontSize: 13.5, color: C.text, lineHeight: 1.5 }}><b>{aFaire.length} brouillon{aFaire.length > 1 ? 's' : ''}</b> à mettre en ligne sur Vinted, un par un, tels que tu les as enregistrés.</div>}
+            {action === 'recreer' && !!aFaire.length && mode === 'idle' && <div data-republier-explique style={{ fontSize: 13.5, color: C.text, lineHeight: 1.5 }}><b>{aFaire.length} annonce{aFaire.length > 1 ? 's' : ''}</b> à supprimer et recréer sur Vinted, une par une. Pour chacune : ses photos sont renvoyées{regNeutre ? '' : ' avec tes réglages'}, {viaBrouillon && brouillonOk ? <>l'annonce est enregistrée dans VRM, retirée de Vinted, recréée en brouillon, puis mise en ligne. Si la mise en ligne échoue, le brouillon reste dans tes brouillons Vinted et rien n'est perdu.</> : <>la nouvelle annonce est créée, et <b>seulement si elle est bien en ligne</b> l'ancienne est supprimée.</>} Le N° VRM passe sur la nouvelle.</div>}
+            {action === 'modifier'  && !!aFaire.length && mode === 'idle' && <div data-republier-explique style={{ fontSize: 13.5, color: C.text, lineHeight: 1.5 }}><b>{aFaire.length} annonce{aFaire.length > 1 ? 's' : ''}</b> à modifier sur Vinted, une par une, sur place : même annonce, même N°, favoris et vues gardés. Rien n'est supprimé ni créé.</div>}
+            {action === 'versBrouillon'  && !!aFaire.length && mode === 'idle' && <div data-republier-explique style={{ fontSize: 13.5, color: C.text, lineHeight: 1.5 }}><b>{aFaire.length} annonce{aFaire.length > 1 ? 's' : ''}</b> à repasser en brouillon, une par une. Pour chacune : elle est <b>enregistrée dans VRM</b>, ses photos sont renvoyées{regNeutre ? '' : ' avec tes réglages'}, l'annonce en ligne est <b>retirée</b>, puis le <b>brouillon est créé</b> sur Vinted. Un brouillon n'est jamais en ligne : rien ne peut se vendre deux fois. Tu la remettras en ligne depuis « Actions → Brouillons → en ligne ».</div>}
+            {action === 'enLigne'  && !!aFaire.length && mode === 'idle' && <div data-republier-explique style={{ fontSize: 13.5, color: C.text, lineHeight: 1.5 }}><b>{aFaire.length} brouillon{aFaire.length > 1 ? 's' : ''}</b> à mettre en ligne sur Vinted, un par un, tels que tu les as enregistrés.</div>}
             {recree && (() => { const fav = aFaire.reduce((n, a) => n + (a.favoris || 0), 0); const nFav = aFaire.filter((a) => a.favoris > 0).length; const nRec = aFaire.filter(recente).length; return mode === 'idle' && <>
               {fav > 0 && <div data-republier-favoris={fav} style={{ fontSize: 12.5, color: C.warn }}>{fav} favori{fav > 1 ? 's' : ''} sur {nFav} de ces paires {fav > 1 ? 'seront perdus' : 'sera perdu'} : une annonce recréée repart de zéro (favoris, vues, ancienneté). Pour une paire qui a des favoris, baisser le prix de l'annonce actuelle les prévient — c'est souvent mieux que la recréer.</div>}
               {nRec > 0 && <div data-republier-recentes={nRec} style={{ fontSize: 12.5, color: C.warn }}>{nRec} de ces paires {nRec > 1 ? 'ont déjà été recréées' : 'a déjà été recréée'} il y a moins de 2 jours : Vinted peut la traiter comme un doublon. Mieux vaut la retirer de la sélection.</div>}
