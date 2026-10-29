@@ -123,19 +123,28 @@ async function ouvrir(nav, { liste, reponse, registre, vues = [], tab = 'setting
   // Réglages (chevron) : on l'ouvre, comme lui. Sur ordinateur tout est déplié.
   const sousAdr = pg.locator('[data-sous-ouvrir="adresses"]').first();
   if (await sousAdr.isVisible().catch(() => false)) { await sousAdr.click(); await pg.waitForTimeout(600); }
+  const navEmails=pg.getByRole('navigation',{name:'Rubriques des emails'});if(await navEmails.isVisible().catch(()=>false))await navEmails.getByRole('button',{name:/Comptes et transfert/}).click();
   return { ctx, pg, erreurs, appels, lecturesRls, etat };
 }
 // Le panneau « Mes adresses de réception », lu sur ce qui est RENDU.
-const panneau = (pg) => pg.evaluate(() => {
-  const t = [...document.querySelectorAll('div')].find((d) => d.firstElementChild && /^Mes adresses de réception$/.test((d.firstElementChild.innerText || '').trim()));
+const panneau = async (pg) => {
+  const nav=pg.getByRole('navigation',{name:'Rubriques des emails'});
+  await nav.getByRole('button',{name:/Comptes et transfert/}).click();
+  const adresses=await pg.evaluate(() => {
+  const t=document.querySelector('[data-reglage-adresses]');
   if (!t) return null;
   const pers = t.querySelector('[data-personne]');
   const vide = t.querySelector('[data-adresses-vide]');
-  return { texte: t.innerText, pasSu: !!t.querySelector('[data-mis-de-cote="pas-su"]'), boutons: [...t.querySelectorAll('button')].map((b) => b.innerText.trim()),
+  return { texte: t.innerText, pasSu:false, boutons: [...t.querySelectorAll('button')].map((b) => b.innerText.trim()),
     personne: pers ? { n: pers.getAttribute('data-personne'), texte: pers.innerText } : null,
     vide: vide ? { genre: vide.getAttribute('data-adresses-vide'), texte: vide.innerText } : null,
     suggestions: [...t.querySelectorAll('[data-suggestion]')].map((x) => x.getAttribute('data-suggestion')) };
 });
+  await nav.getByRole('button',{name:/À rattacher/}).click();
+  const rattachement=await pg.locator('[data-email-panneau="a-traiter"]').evaluate(t=>({texte:t.innerText,pasSu:!!t.querySelector('[data-mis-de-cote="pas-su"]')}));
+  await nav.getByRole('button',{name:/Comptes et transfert/}).click();
+  return adresses?{...adresses,texte:adresses.texte+'\n'+rattachement.texte,pasSu:rattachement.pasSu}:null;
+};
 // ── La partie 2 : Julien (propriétaire) à 0 adresse, un autre compte a déclaré.
 const JULIEN = 'julien.banc@exemple.test';
 const EMAIL_JULIEN = { id: 'email_quarantaine_julien01', sujet: 'Ton article est vendu ! (Julien, banc)', raison: 'adresse de réception inconnue, et l’app compte plusieurs vendeurs', quand: '2026-10-05T09:00:00.000Z' };
@@ -176,12 +185,13 @@ const jobPersonne = (pg) => pg.evaluate(() => [...document.querySelectorAll('[da
         const g = appels.filter((a) => a.liste);
         dit(g.length >= 1 && g.every((a) => a.auth === 'Bearer jeton-de-banc'),
           'la liste est demandée à la ROUTE, avec la session', JSON.stringify(g.map((a) => a.auth)));
-        dit(p && /2 emails en attente/.test(p.texte) && /vendu ! \(banc\)/.test(p.texte) && /Bordereau de banc/.test(p.texte),
+        dit(p && /2 emails conservés/.test(p.texte) && /vendu ! \(banc\)/.test(p.texte) && /Bordereau de banc/.test(p.texte),
           'les deux emails que la route dit À LUI sont proposés (la lecture RLS, elle, ne voit rien)', p && p.texte.replace(/\n/g, ' ').slice(0, 220));
         dit(p && !p.pasSu, 'lu : aucune phrase de panne');
         dit(lecturesRls.length === 0, 'la quarantaine n’est plus lue sous RLS (les lignes neutres y sont invisibles)', lecturesRls.join(' · '));
         // « C'est à moi » rejoue CE email, avec la session.
         const avant = appels.length;
+        await pg.getByRole('navigation',{name:'Rubriques des emails'}).getByRole('button',{name:/À rattacher/}).click();
         const b = pg.locator('button', { hasText: "C'est à moi" }).first();
         if (await b.count()) { await b.click(); await pg.waitForTimeout(1500); }
         const post = appels.slice(avant).find((a) => a.m === 'POST');
@@ -231,7 +241,7 @@ const jobPersonne = (pg) => pg.evaluate(() => [...document.querySelectorAll('[da
         dit(!!ecrite && Object.keys(ecrite.data.adresses).includes(JULIEN) && Object.keys(ecrite.data.adresses).length === 1,
           'un clic sur « + Ajouter » déclare CETTE adresse (et rien d’autre)', ecrite ? Object.keys(ecrite.data.adresses).join(', ') : 'aucune écriture');
         const p2 = await panneau(pg);
-        dit(!!p2 && /1 email en attente/.test(p2.texte) && /Julien, banc/.test(p2.texte) && !p2.suggestions.includes(JULIEN),
+        dit(!!p2 && /1 email conservé/.test(p2.texte) && /Julien, banc/.test(p2.texte) && !p2.suggestions.includes(JULIEN),
           'l’adresse déclarée, son email mis de côté lui est proposé (la liste relue)', p2 && p2.texte.replace(/\n/g, ' ').slice(-260));
         const avant = appels.length;
         const moi = pg.locator('button', { hasText: "C'est à moi" }).first();

@@ -32,6 +32,10 @@ jobs:
           node scripts/bancs/confidentialite.cjs
       - name: Vérifier le périmètre des numéros Vinted
         run: node scripts/tests/numeros-vinted-perimetre-interface.cjs
+      - name: Vérifier l’espace emails
+        run: node scripts/tests/espace-emails-interface.cjs
+      - name: Vérifier le guide de transfert
+        run: node scripts/tests/transfert-guide-interface.cjs
       - name: Vérifier la réception multi-comptes
         run: node scripts/tests/reception-synthese-interface.cjs
       - name: Vérifier la synchronisation Vinted
