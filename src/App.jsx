@@ -38,7 +38,7 @@ import { cheminMonotone } from "./courbeMonotone.js";
 import VuesVentes from "./VuesVentes.jsx";
 import BordereauxAuto from "./BordereauxAuto.jsx";
 import {resumerStockJournee} from './stockJournee.js';
-import {jaugeSeuils,optionsMicro,calendrierUrssaf,phraseRythme,seuilsDe} from './microEntreprise.js';
+import {jaugeSeuils,optionsMicro,calendrierUrssaf,phraseRythme,seuilsDe,declarationRevenus,rappelCfe} from './microEntreprise.js';
 import { toutSurLeNumero, lireNumeroCherche } from "./rechercheNumero.js";
 import { repriseNumerosRecreation, tableRecrees } from "./repriseNumero.js";
 import { polyDe, estRectangle, normaliserPoly, FORMES, rectDans, empreinte, chevauche, placerSansTraverser, modeCase, capaciteCase, articlesAutresPlateformes, unParArticle, empilerDansCase, retirerDeCase, retirerDePile, ajouterAPile, cartonsDePile, hauteurPile, changerHauteurPile, prochainePlaceMeuble, estPoseSur, caler, proposerPiece, planchesCases, planchesRangees, plateauxMeuble, plateauxReglables, tasserPlateaux } from './stockRegles.js';
@@ -32962,7 +32962,33 @@ function MicroEntreprise({ taux, poserTaux, officiel, vlTaux, acreTaux }) {
       </Card>
     );
   }
-  return (<div data-micro-entreprise="">{profil}{calendrier}{seuils}</div>);
+  // ── 4. Ta déclaration de revenus (et la CFE) ──
+  const dr = declarationRevenus({ ligne, now, liberatoire: vl });
+  const cfe = rappelCfe(now);
+  const impots = (
+    <Card style={sCarte}>
+      <div data-micro-impots={dr ? 'lu' : 'passu'} data-micro-impots-annee={dr ? String(dr.annee) : ''} data-micro-impots-ca={dr ? String(dr.ca) : ''} data-micro-impots-cases={dr ? dr.cases.join(',') : ''}>
+        <div style={sTitre}>Ta déclaration de revenus</div>
+        {!dr ? <div style={{ fontSize: 13, color: C.muted, marginTop: 6 }}>Le montant se calcule dans l'écran Ventes : ouvre-le une fois sur cet appareil.</div> : (<>
+          <div style={{ fontSize: 13, color: C.muted, marginTop: 6, lineHeight: 1.5 }}>
+            {dr.enCours ? <>Revenus {dr.annee}, à déclarer au printemps {dr.annee + 1} — pour l'instant :</> : <>Revenus {dr.annee}, à déclarer ce printemps (déclaration 2042-C-PRO) :</>}
+          </div>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap', marginTop: 6 }}>
+            <b className="vrm-display" style={{ fontSize: 22, color: C.text }}>{dr.partiel ? 'au moins ' : ''}{eurMicro(dr.ca)}</b>
+            <span style={{ fontSize: 13, color: C.text }}>{dr.liberatoire ? <>case <b>{dr.cases[0]}</b></> : <>case <b>5KO</b> sans versement libératoire, <b>5TA</b> avec</>}</span>
+          </div>
+          <div style={{ fontSize: 12.5, color: C.muted, marginTop: 6, lineHeight: 1.5 }}>
+            {dr.liberatoire === 'oui' ? <>Ton impôt est déjà payé avec tes cotisations : ce chiffre est déclaré pour information (il compte dans ton revenu fiscal de référence).</>
+              : <>Le chiffre d'affaires brut, sans retirer d'abattement : les impôts appliquent eux-mêmes les 71 % de la vente de marchandises.</>}
+            {dr.partiel ? <> C'est un minimum : {dr.raisons.join(' · ')}.</> : null}
+            {' '}VRM ne compte que ce qu'il a capté sur tes plateformes reliées : compare avec le total de tes déclarations URSSAF de l'année.
+          </div>
+        </>)}
+        {cfe ? <div data-micro-cfe="" style={{ fontSize: 12.5, color: C.text, marginTop: 10, paddingTop: 10, borderTop: `1px solid ${C.border}`, lineHeight: 1.5 }}>CFE : l'avis est à payer au plus tard le <b>{cfe.limite}</b>, dans ton espace professionnel sur impots.gouv.fr. Exonérée l'année de création de ton entreprise.</div> : null}
+      </div>
+    </Card>
+  );
+  return (<div data-micro-entreprise="">{profil}{calendrier}{seuils}{impots}</div>);
 }
 function SuiviUrssaf({ onNav }) {
   const v = useLigneUrssaf();
@@ -43383,6 +43409,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         // (16 oct.) Au-delà de deux comptes, le nombre : neuf identifiants à la suite
         // remplissaient la carte sur iPhone. Les noms restent dans `data-recu-sans`
         // et dans l'infobulle.
+        // (29 oct.) LES COTISATIONS À METTRE DE CÔTÉ — micro seulement. La base
+        // est le CA DÉCLARÉ de ce mois (`l.ym`, les mêmes lignes que Compta et la
+        // publication, §11) : l'argent reçu ce mois mais déjà déclaré ailleurs
+        // n'y est pas. Au même taux (`aPayerUrssaf`, arrondi une fois). Un compte
+        // pas lu ou des ventes sans date ⇒ « au moins ». Pas su ⇒ rien.
+        const caDeclMois = declarables ? declarables.lignes.reduce((x, l) => (l && l.ym === ymIci) ? x + l.eur : x, 0) : null;
+        const cotisMois = urssafConcerne() && caDeclMois != null && caDeclMois > 0 ? aPayerUrssaf(caDeclMois, tauxUrssaf()) : null;
+        const cotisAuMoins = !!(declarables && (nomsVentesKO.length || (declarables.aDater || []).length));
         const recuSans = declarables && nomsVentesKO.length ? `sans ${nomsVentesKO.length > 2 ? `${nomsVentesKO.length} comptes` : nomsVentesKO.join(', ')} (ventes pas lues) · ` : '';
         const caDeclareAilleurs = recuDeclareAilleurs.reduce((a, l) => a + l.eur, 0);
         const moisDeclAilleurs = [...new Set(recuDeclareAilleurs.map(l => l.ym))].sort().map(ym => { const [y, m] = ym.split('-'); return new Date(Number(y), Number(m) - 1, 1).toLocaleDateString('fr-FR', { month: 'long' }); }).join(', ');
@@ -43526,6 +43560,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               <div style={{minWidth:0}}>
                 <div className="vrm-day-k" style={{color:C.muted}}>Reçu en {moisNom}</div>
                 {declarables === null && <div className="vrm-day-note" style={{color:C.muted}}>dates de versement illisibles pour l'instant</div>}
+                {cotisMois != null && <div data-cotis-mois={Math.round(cotisMois*100)} data-cotis-aumoins={cotisAuMoins?'1':''} className="vrm-day-note" style={{color:C.muted}}>≈ {cotisAuMoins ? 'au moins ' : ''}{cotisMois.toLocaleString('fr-FR',{minimumFractionDigits:2,maximumFractionDigits:2})} € de cotisations à mettre de côté ({load('vinted_urssaf_freq','trimestriel')==='mensuel' ? 'à payer le mois prochain' : 'à payer après la fin du trimestre'})</div>}
               </div>
               <span className="vrm-display vrm-day-recu-n" style={{color:C.text}}>{declarables === undefined ? '…' : recuMois == null ? '—' : `${Math.round(recuMois).toLocaleString('fr-FR')} €`}</span>
             </div>

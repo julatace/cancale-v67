@@ -153,10 +153,14 @@ const ligneSuivi = (pg, label) => pg.evaluate((lb) => { const c = document.query
         const ms = await attrs(pg, '[data-micro-seuils]', 'data-micro-');
         dit(!!ms && ms.seuils === 'lu' && ms.tva === 'ok' && ms.plafond === 'ok' && Number(ms.ca) > 0, `M ${T} : jauge des seuils lue (TVA et plafond)`, JSON.stringify(ms));
         if (process.env.SHOTS) { const el = await pg.$('[data-micro-entreprise]'); if (el) await el.screenshot({ path: `${process.env.SHOTS}/micro-${vp.width}.png` }); }
+        const mi0 = await attrs(pg, '[data-micro-impots]', 'data-micro-impots-');
+        dit(!!mi0 && mi0.cases === '5KO,5TA' && Number(mi0.ca) > 0, `I ${T} : déclaration de revenus — versement libératoire pas répondu ⇒ les deux cases`, JSON.stringify(mi0));
         await touche(pg, '[data-micro-vl-choix="non"]', vp);
         await pg.waitForTimeout(1600);
         dit(opts.main && opts.main.vrm_micro_options && opts.main.vrm_micro_options.liberatoire === 'non', `M ${T} : « Non » est rangé au nuage`, JSON.stringify(opts.main && opts.main.vrm_micro_options));
         dit((await attrs(pg, '[data-micro-profil]', 'data-micro-') || {}).profil === 'non' && await pg.$('[data-micro-vl-question]') == null, `M ${T} : la question disparaît une fois répondue`);
+        dit(((await attrs(pg, '[data-micro-impots]', 'data-micro-impots-')) || {}).cases === '5KO', `I ${T} : « Non » ⇒ case 5KO seule`);
+        if (process.env.SHOTS) { const el = await pg.$('[data-micro-impots]'); if (el) await el.screenshot({ path: `${process.env.SHOTS}/impots-${vp.width}.png` }); }
         await touche(pg, '[data-micro-freq-choix="trimestriel"]', vp);
         await pg.waitForTimeout(1600);
         dit(opts.main && opts.main.vinted_urssaf_freq === 'trimestriel' && (await attrs(pg, '[data-micro-calendrier]', 'data-micro-') || {}).calendrier === 'trimestriel' && (await attrs(pg, '[data-urssaf-rythme]', 'data-urssaf-') || {}).rythme === 'trimestriel', `M ${T} : changer le rythme ⇒ un seul réglage, suivi par le calendrier et la carte du mois`);
