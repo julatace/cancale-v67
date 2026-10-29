@@ -1,3 +1,6 @@
+import {lienAnnonceLeboncoin,etatAnnonceLeboncoin} from './etatAnnonceLeboncoin.js';
+import BilanSynchronisation from './BilanSynchronisation.jsx';
+import VendusAilleurs from './VendusAilleurs.jsx';
 import {AnnoncesACompleter,ComparaisonComptesVinted,HistoriqueArticle} from './OutilsArticlesVinted.jsx';
 import {comparerComptes,diagnosticConnexion} from './outilsArticlesVinted.js';
 import {correspondRechercheMessage} from './rechercheMessagesVinted.js';
@@ -20195,6 +20198,7 @@ function EbayConnexion({ onAnnonces, vue = '*', comptesEbay }) {
   return (
     <div style={boite()}>
       <div style={{ ...eti, marginBottom: 6 }}>Compte eBay · connexion</div>
+      <BilanSynchronisation owner={AUTH.user?.id||''} sources={['annonces','commandes'].map(type=>({id:'ebay-'+type,libelle:type==='annonces'?'Annonces eBay':'Commandes eBay',comptes:(data?.lectures||[]).map(l=>({uid:l.compte.ref,nom:nomCompteEbay(l.compte)})),items:data?(type==='annonces'?data.listings:data.orders).map(x=>({id:type==='annonces'?x.itemId:x.orderId,compte:x._compte||'principal',titre:x.title||x.lineItems?.[0]?.title,valeurs:type==='annonces'?[x.title,x.price,x.quantity,x.listingStatus]:[x.orderPaymentStatus,x.orderFulfillmentStatus,x.cancelStatus]})):null,charge:syncing,echecs:(data?.lectures||[]).filter(l=>!l[type]||syncResult[l.compte.ref]?.etat==='erreur'||syncResult[l.compte.ref]?.manque?.includes(type)).map(l=>l.compte.ref),partiel:(data?.lectures||[]).some(l=>l[type]?.complet!==true),revision:(data?.lectures||[]).map(l=>[l.compte.ref,l[type]?.capturedAt])}))}/>
       {retour && <div style={{ fontSize: 12.5, color: C.text, background: C.bg || 'transparent', border: `1px solid ${C.border}`, borderRadius: 8, padding: '8px 10px', marginBottom: 10 }}>{retour}</div>}
       {st === null ? (
         <div style={{ fontSize: 13, color: C.muted }}>Vérification…</div>
@@ -42754,8 +42758,210 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         </div></ResponsiveChatPortal>
   );
 
+  const chargerRetraitsMulti = async () => {
+    const owner = AUTH.user?.id;
+    if (!owner) throw Error("Session indisponible");
+    const manques = [];
+    const annonces = [],
+      ventes = [],
+      completes = [];
+    const resultats = await Promise.allSettled([
+      lireTout(
+        `owner=eq.${encodeURIComponent(owner)}&id=in.(lbc_listings,lbc_ventes,lbc_accounts)&select=id,owner,items:data->items,ventes:data->ventes,accounts:data->accounts,lectures:data->lectures`,
+        { strict: true },
+      ),
+      lireEbayTous(
+        "ebay_listings",
+        "items:data->items,capturedAt:data->>capturedAt,complet:data->complet",
+        "items",
+      ),
+      lireEbayTous(
+        "ebay_orders",
+        "orders:data->orders,capturedAt:data->>capturedAt,complet:data->complet",
+        "orders",
+      ),
+    ]);
+    if (AUTH.user?.id !== owner) throw Error("Session modifiée");
+    const rows = resultats[0].status === "fulfilled" ? resultats[0].value : null;
+    let items = {},
+      ventesL = {},
+      comptesL = {};
+    if (
+      Array.isArray(rows) &&
+      rows.every(
+        (r) =>
+          r.owner === owner &&
+          ["lbc_listings", "lbc_ventes", "lbc_accounts"].includes(r.id),
+      )
+    ) {
+      items = rows.find((r) => r.id === "lbc_listings")?.items || {};
+      ventesL = rows.find((r) => r.id === "lbc_ventes")?.ventes || {};
+      comptesL = rows.find((r) => r.id === "lbc_accounts")?.accounts || {};
+      if (!rows.some((r) => r.id === "lbc_listings"))
+        manques.push("annonces Leboncoin jamais reçues");
+      if (!rows.some((r) => r.id === "lbc_ventes"))
+        manques.push("ventes Leboncoin jamais reçues");
+    } else manques.push("Leboncoin non relu");
+    const liens = load("vrm_lbc_liens", {}) || {},
+      comptesProuves = new Set(
+        [
+          ...comptesLbcProuves(ventesL, items),
+          ...comptesLbcSession(comptesL),
+        ].map(idCompteLbcApp),
+      ),
+      venduesL = annoncesLbcVendues(ventesL);
+    const nomL = (id) =>
+      Object.values(comptesL).find((c) => String(c.id) === String(id))?.name ||
+      String(id || "Compte Leboncoin");
+    for (const ad of Object.values(items)) {
+      if(!ad||ad.id==null)continue;
+      const lien = lienAnnonceLeboncoin(ad);
+      const idDuLien = lien ? new URL(lien).pathname.split('/').filter(Boolean).at(-1)?.replace(/\.htm$/,'') : null;
+      const compte = idCompteLbcApp(ad.account || ad.lbcUser || "");
+      if (!comptesProuves.has(idCompteLbcApp(compte)) && !liens[String(ad.id)])
+        continue;
+      annonces.push({
+        id: String(ad.id),
+        numero: numeroLbcIdentite({ itemId: ad.id }, items, liens),
+        plateforme: "Leboncoin",
+        compte,
+        compteNom: ad.accountName || nomL(compte),
+        titre: ad.subject || ad.title,
+        photo: ad.images?.[0],
+        capture: ad.seenAt,
+        active: !annonceLbcEnVente(ad, venduesL)
+          ? false
+          : etatAnnonceLeboncoin(ad, ventesL).etat === "active"
+            ? true
+            : null,
+        lien: idDuLien===String(ad.id)?lien:null,
+        onglet: "leboncoin",
+      });
+    }
+    for (const v of Object.values(ventesL))
+      if (v?.isSeller === true && !lbcAnnulee(v))
+        ventes.push({
+          id: String(v.id || v.itemId),
+          numero: numeroLbcIdentite(v, items, liens),
+          plateforme: "Leboncoin",
+          engagee: true,
+        });
+    const ea = resultats[1].status === "fulfilled" ? resultats[1].value : null,
+      ev = resultats[2].status === "fulfilled" ? resultats[2].value : null;
+    if (
+      !ea ||
+      ea.illisibles?.length ||
+      ea.lignes?.some((l) => !l.ligne || l.ligne.complet !== true)
+    )
+      manques.push("annonces eBay non entièrement relues");
+    if (
+      !ev ||
+      ev.illisibles?.length ||
+      ev.lignes?.some((l) => !l.ligne || l.ligne.complet !== true)
+    )
+      manques.push("commandes eBay non entièrement relues");
+    for (const a of ea?.items || [])
+      if(a?.itemId!=null)annonces.push({
+        id: String(a.itemId),
+        numero: numEbayLu(a.sku, a.itemId, null, a.depuis),
+        plateforme: "eBay",
+        compte: a._compte || "principal",
+        compteNom: a._compteNom || a._compte || "eBay",
+        titre: a.title,
+        photo: a.photo,
+        capture:
+          Number(
+            ea.lignes?.find((l) => l.compte.ref === (a._compte || "principal"))
+              ?.ligne?.capturedAt,
+          ) || null,
+        lien: /^\d+$/.test(String(a.itemId))
+          ? "https://www.ebay.fr/itm/" + a.itemId
+          : null,
+        active: !/(ended|sold|inactive|supprim)/i.test(
+          String(a.listingStatus || a.status || ""),
+        ),
+        onglet: "ebay_annonces",
+      });
+    for (const o of ev?.items || [])
+      if (commandeEbayEngagee(o))
+        for (const li of Array.isArray(o.lineItems)?o.lineItems:[])
+          if(li)ventes.push({
+            id:
+              String(o.orderId) +
+              ":" +
+              String(li.lineItemId || li.legacyItemId || ""),
+            numero: numLigneEbay(o, li),
+            plateforme: "eBay",
+            engagee: true,
+          });
+    if (!Array.isArray(listings.items) || listings.incomplet)
+      manques.push("annonces Vinted incomplètes");
+    if (!Array.isArray(sales.items) || sales.error || sales.failedUids?.length)
+      manques.push("ventes Vinted incomplètes");
+    if (!txnPret)
+      manques.push("liens entre transactions et annonces Vinted en cours");
+    if (annonces.some((a) => a.plateforme === "Leboncoin" && a.active === null))
+      manques.push("état de certaines annonces Leboncoin non confirmé");
+    const ventesVintedProuvees = new Set(venduesVinted);
+    for (const o of sales.items || [])
+      if (
+        !acctOffOf(o) &&
+        classifyOrderStatus(o.status) !== "cancelled" &&
+        txnItem[String(o.transaction_id)]
+      )
+        ventesVintedProuvees.add(String(txnItem[String(o.transaction_id)]));
+    for (const it of listings.items || [])
+      if (!acctOffOf(it) && !blockedAccts.has(String(it._acc?.vinted_user_id)))
+        annonces.push({
+          id: String(it.id),
+          numero: numeros[it.id]?.numero,
+          plateforme: "Vinted",
+          compte: String(it._acc?.vinted_user_id || ""),
+          compteNom: accNameOf(it._acc || {}),
+          titre: it.title,
+          photo: it.photo,
+          capture: listings.lues?.[String(it._acc?.vinted_user_id)],
+          active: !ventesVintedProuvees.has(String(it.id)),
+          lien: /^\d+$/.test(String(it.id))
+            ? "https://www.vinted.fr/items/" + it.id
+            : null,
+          onglet: "cat_annonces",
+        });
+    for (const id of ventesVintedProuvees)
+      ventes.push({
+        id: String(id),
+        numero: numeros[id]?.numero,
+        plateforme: "Vinted",
+        engagee: true,
+      });
+    for (const o of sales.items || [])
+      if (
+        !acctOffOf(o) &&
+        classifyOrderStatus(o.status) !== "cancelled" &&
+        txnItem[String(o.transaction_id)]
+      ) {
+        const id = String(txnItem[String(o.transaction_id)]);
+        ventes.push({
+          id,
+          numero: numeros[id]?.numero,
+          plateforme: "Vinted",
+          engagee: true,
+        });
+      }
+    for(const l of ea?.lignes||[])if(l.ligne?.complet===true&&Number(l.ligne.capturedAt)>0)completes.push({plateforme:'eBay',compte:String(l.compte.ref),at:Number(l.ligne.capturedAt)});
+    if(Array.isArray(listings.items)&&!listings.incomplet)for(const a of accounts)if(!acctOff(a.vinted_user_id)&&Number(listings.lues?.[a.vinted_user_id])>0)completes.push({plateforme:'Vinted',compte:String(a.vinted_user_id),at:Number(listings.lues[a.vinted_user_id])});
+    for(const [compte,l] of Object.entries(Array.isArray(rows)?rows.find(r=>r.id==='lbc_listings'&&r.owner===owner)?.lectures||{}:{})){const id=idCompteLbcApp(compte),at=Date.parse(l?.at||'');if(comptesProuves.has(id)&&Number.isFinite(at))completes.push({plateforme:'Leboncoin',compte:id,at});}
+    return { numeros, annonces, ventes, manques, completes };
+  };
+  const sourcesBilan=[
+    {id:'ventes-vinted',libelle:'Ventes Vinted',onglet:'cat_ventes',comptes:accounts.filter(a=>!acctOff(a.vinted_user_id)).map(a=>({uid:String(a.vinted_user_id),nom:accNameOf(a)})),items:Array.isArray(sales.items)?sales.items.map(o=>({id:o.transaction_id,compte:String(o._acc?.vinted_user_id||''),titre:o.title,valeurs:[o.status,o.price]})):null,charge:sales.loading,erreur:sales.error,echecs:sales.failedUids||[],partiel:true,revision:accounts.map(a=>_harvestSeen[`${a.vinted_user_id}_orders_sold`])},
+    {id:'annonces-vinted',libelle:'Annonces Vinted',onglet:'cat_annonces',comptes:accounts.filter(a=>!acctOff(a.vinted_user_id)).map(a=>({uid:String(a.vinted_user_id),nom:accNameOf(a)})),items:Array.isArray(listings.items)?listings.items.map(it=>({id:it.id,compte:String(it._acc?.vinted_user_id||''),titre:it.title,valeurs:[it.title,it.price,it.photo,it.photoCount,it.condition]})):null,charge:listings.loading,erreur:listings.error,echecs:listings.ko||[],partiel:!!listings.incomplet,revision:listings.lues},
+    {id:'messages-vinted',libelle:'Conversations Vinted',onglet:'cat_msg',comptes:accounts.filter(a=>!acctOff(a.vinted_user_id)).map(a=>({uid:String(a.vinted_user_id),nom:accNameOf(a)})),items:Array.isArray(convs.items)?convs.items.map(c=>({id:c.id,compte:String(c._acc?.vinted_user_id||''),titre:c.description||c.title||c.opposite_user?.login,valeurs:[c.last_message,c.updated_at,c.unread]})):null,charge:convs.loading,erreur:convs.error,echecs:(convs.ko||[]).map(a=>String(a.vinted_user_id)),partiel:true,revision:accounts.map(a=>_harvestSeen[`${a.vinted_user_id}_inbox`])}
+  ];
   return (
     <div style={{padding:'16px 14px 40px'}}>
+      {['journee','annonces','ventes','messages'].includes(curSub)&&<BilanSynchronisation owner={AUTH.user?.id||''} sources={sourcesBilan} onNav={onNav}/>}
+      {['journee','annonces','ventes'].includes(curSub)&&<VendusAilleurs owner={AUTH.user?.id||''} ownerActuel={()=>AUTH.user?.id||''} charger={chargerRetraitsMulti} onNav={onNav} PhotoVinted={PhotoVinted}/>}
       <input ref={bordRef} type="file" accept="application/pdf,.pdf" onChange={onBordFile} style={{display:'none'}}/>
       {/* Le titre de l'écran est porté par <ScreenHead> plus bas, dans chaque
           section : ce <h2> le répétait juste au-dessus (« Annonces » puis
@@ -50804,7 +51010,7 @@ function LeboncoinScreen() {
           ))}
         </Card>
       )}
-      {data && <AnnoncesLeboncoin annonces={data.catalogueAds} ventes={data.catalogueVentes} lectureKO={data.lbcKO} numeroDe={numeroAnnonceLbc}/>}
+      {data && <AnnoncesLeboncoin owner={AUTH.user?.id||''} annonces={data.catalogueAds} ventes={data.catalogueVentes} lectureKO={data.lbcKO} numeroDe={numeroAnnonceLbc}/>}
       {/* ⚠️ UNE LECTURE RATÉE SE DIT UNE FOIS (§7). L'écran la disait jusqu'à quatre
           fois (ventes Leboncoin, compteur, preuve de vente, file vide) et, sur une
           lecture ratée de ses annonces Leboncoin, il affirmait « je n'ai pas encore

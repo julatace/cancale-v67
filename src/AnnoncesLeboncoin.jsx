@@ -1,3 +1,4 @@
+import BilanSynchronisation from './BilanSynchronisation.jsx';
 import React,{useMemo,useState} from 'react';
 import {etatAnnonceLeboncoin,lienAnnonceLeboncoin} from './etatAnnonceLeboncoin.js';
 import './annonces-leboncoin.css';
@@ -11,13 +12,17 @@ function Photo({src}) {
 // (`numeroLbcIdentite` : lien posé à la main, sinon référence VRM traduite par la
 // remise à zéro 013) — passé par le parent. La référence BRUTE (« 493 ») n'est
 // jamais affichée : avant la 013 elle désignait une autre paire.
-export default function AnnoncesLeboncoin({annonces=[],ventes={},lectureKO=false,numeroDe=null}) {
+export default function AnnoncesLeboncoin({annonces=[],ventes={},lectureKO=false,numeroDe=null,owner=''}) {
  const [recherche,setRecherche]=useState(''),[filtre,setFiltre]=useState('toutes');
  const lignes=useMemo(()=>annonces.map(ad=>({ad,num:(numeroDe&&numeroDe(ad))||'',...etatAnnonceLeboncoin(ad,ventes)})),[annonces,ventes,numeroDe]);
  const choix=[['toutes','Toutes'],['active','Actives'],['pause','En pause'],['vendue','Vendues'],['autres','Autres états']];
  const visibles=lignes.filter(l=>(filtre==='toutes'||(filtre==='autres'?!['active','pause','vendue'].includes(l.etat):l.etat===filtre))
   && [l.ad.subject,l.ad.title,l.ad.accountName,l.num?'N°'+l.num:''].join(' ').toLocaleLowerCase('fr').includes(recherche.trim().toLocaleLowerCase('fr')));
+ const compteDe=ad=>String(ad?.account||ad?.lbcUser||'non-attribue');
+ const comptesBilan=[...new Map(annonces.map(ad=>[compteDe(ad),{uid:compteDe(ad),nom:ad.accountName||(compteDe(ad)==='non-attribue'?'Compte Leboncoin non attribué':compteDe(ad))}])).values()];
+ const bilan=[{id:'lbc-annonces',libelle:'Annonces Leboncoin',comptes:comptesBilan,items:annonces.map(ad=>({id:ad.id,compte:compteDe(ad),titre:ad.subject||ad.title,valeurs:[ad.price,ad.status,ad.pauseAt,ad.plusVueAt,ad.images?.[0],ad.images?.length]})),erreur:lectureKO,partiel:true,revision:annonces.map(ad=>ad.seenAt)}];
  return <section className="vrm-lbc-catalog" aria-label="Mes annonces Leboncoin">
+  <BilanSynchronisation owner={owner} sources={bilan}/>
   <header><div><h2>Mes annonces</h2></div><span>{lectureKO?'Lecture indisponible':`${lignes.length} reçue${lignes.length>1?'s':''}`}</span></header>
   {lectureKO?<p role="status">Impossible de relire tes annonces. L’historique reste conservé.</p>:<>
    <input type="search" aria-label="Rechercher une annonce Leboncoin" placeholder="Rechercher un article, un compte…" value={recherche} onChange={e=>setRecherche(e.target.value)}/>

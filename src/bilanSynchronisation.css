@@ -1,0 +1,78 @@
+.vrm-bilan-sync {
+  border: 1px solid var(--vrm-line, #dbe5e3);
+  border-radius: 10px;
+  padding: 10px 12px;
+  margin: 10px 0;
+  background: var(--vrm-surface, #fff);
+  color: var(--vrm-ink, inherit);
+  font-size: 12px;
+  min-width: 0;
+}
+.vrm-bilan-sync > summary {
+  font-weight: 650;
+  cursor: pointer;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.vrm-bilan-sync > summary span {
+  font-weight: 400;
+  opacity: 0.7;
+}
+.vrm-bilan-sync p {
+  line-height: 1.5;
+  opacity: 0.8;
+}
+.vrm-bilan-sync time,
+.vrm-bilan-sync small {
+  display: block;
+  font-size: 11px;
+  line-height: 1.5;
+  opacity: 0.75;
+  overflow-wrap: anywhere;
+}
+.vrm-bilan-sync article {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  border-top: 1px solid var(--vrm-line, #e2e8e7);
+  padding: 10px 0;
+}
+.vrm-bilan-sync article > div:not(.vrm-vendu-photo) {
+  flex: 1;
+  min-width: 120px;
+  overflow-wrap: anywhere;
+}
+.vrm-bilan-sync article > details {
+  flex-basis: 100%;
+}
+.vrm-bilan-sync button {
+  font: inherit;
+  color: inherit;
+  background: var(--vrm-card2, #edf2f0);
+  border: 1px solid var(--vrm-line, #dbe5e3);
+  border-radius: 7px;
+  padding: 7px 9px;
+  cursor: pointer;
+}
+.vrm-bilan-sync li {
+  padding: 4px 0;
+  overflow-wrap: anywhere;
+}
+.vrm-vendu-photo {
+  width: 32px;
+  height: 43px;
+  flex-shrink: 0;
+}
+.vrm-vendu-photo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 4px;
+}
+.vrm-bilan-sync button:focus-visible,
+.vrm-bilan-sync summary:focus-visible {
+  outline: 2px solid var(--vrm-accent, #42786e);
+  outline-offset: 2px;
+}
