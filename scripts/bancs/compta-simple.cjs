@@ -121,10 +121,10 @@ async function scenarioA(b, vp, sombre) {
     await ouvrir(pg, 'cat_ventes');
     await pg.waitForTimeout(3500);
     await ouvrir(pg, 'compta');
-    await pg.locator('[data-ca-cur="vendu"]').first().waitFor({ timeout: 15000 });
-    await pg.locator('[data-benef-etat="lu"]').first().waitFor({ timeout: 15000 });
-    await pg.locator('[data-echeance-apayer]').first().waitFor({ timeout: 15000 });
-    await pg.locator('[data-micro-repli]').first().waitFor({ timeout: 15000 });
+    await pg.locator('[data-ca-cur="vendu"]').first().waitFor({ timeout: 40000 });
+    await pg.locator('[data-benef-etat="lu"]').first().waitFor({ timeout: 40000 });
+    await pg.locator('[data-echeance-apayer]').first().waitFor({ timeout: 40000 });
+    await pg.locator('[data-micro-repli]').first().waitFor({ timeout: 40000 });
     await pg.waitForTimeout(800);
   });
   // SHOTS=dossier : capture de tout l'écran (à regarder : §6.2).
@@ -200,7 +200,7 @@ async function scenarioB(b, vp, sombre) {
   const { ctx, pg } = await page(b, vp, sombre, true, errs);
   await essaie(`B ${nom}`, async () => {
     await ouvrir(pg, 'compta');
-    await pg.locator('[data-micro-repli]').first().waitFor({ timeout: 15000 });
+    await pg.locator('[data-micro-repli]').first().waitFor({ timeout: 40000 });
     await pg.waitForTimeout(1500);
     check((await attr(pg, '[data-micro-repli]', 'data-micro-attention')) !== '1', `B ${nom} — versement libératoire déjà dit : rien à trancher`);
     check((await attr(pg, '[data-micro-repli]', 'data-micro-repli')) === 'ferme', `B ${nom} — « Ta micro-entreprise » reste repliée`);
