@@ -1,5 +1,16 @@
 # VRM — dossier de passation
 
+> **29 octobre — TOUT ce que Vinted exige est vérifié AVANT la mise en ligne (5.276) :** Julien : « il ne doit pas y avoir
+> d'erreur possible », « que toutes les catégories obligatoires soient remplies avant de valider la mise en ligne ».
+> `champsManquantsAvant` (une règle pour Mettre en ligne un brouillon, Refaire, Republier par brouillon et direct) : titre, prix,
+> photos, catégorie, description ≥ 5, couleur, taille du colis ; l'état si la grille de la catégorie en a un ; la taille (code
+> présent dans la grille, sinon celle de la PAIRE au libellé exact, posée) ; tout attribut que la réponse marque obligatoire
+> (`required`/`is_required`/`mandatory` — drapeau jamais vu, absent ⇒ rien d'exigé). Il manque quelque chose ⇒ RIEN n'est envoyé
+> (Republier : avant photos, suppression et création — l'annonce reste en ligne), le champ est NOMMÉ avec le geste. Grille
+> illisible ⇒ les champs connus seuls, et le secours après refus (5.275) reste. Lecture de la grille APRÈS le verrou. Preuve :
+> `audit-recreer.cjs` (132 ; 10 rouges sur la 5.275). ⚠️ Vinted peut encore refuser pour une règle qu'il ne publie pas : la
+> réponse le dit, rien n'est perdu.
+
 > **29 octobre — Republier GARDE la taille de la paire : VRM la retrouve dans la grille de Vinted (5.275) :** Julien : « VRM doit
 > pouvoir regarder la taille, garder toutes les infos de l'article ». Sur un refus `size` (Mise en ligne d'un brouillon, Refaire,
 > Republier par brouillon, création directe), `secoursTaille` lit la grille de la catégorie (`POST /api/v2/item_upload/attributes`

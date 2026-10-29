@@ -61,7 +61,9 @@ async function run(opts = {}) {
   let r = {}; try { r = await f.ctx.recreerVinted({ cmd: 'recreerVinted', uid: '111', id: '9101', prix: opts.prix != null ? opts.prix : 54, titre: opts.titre || 'Nike Air Max 1 — remise en ligne', plancher: opts.plancher, reglages: opts.reglages, lettre: opts.lettre, viaBrouillon: opts.viaBrouillon, versBrouillon: opts.versBrouillon, confirme: opts.confirme !== false }); } catch (e) { r = { erreur: String(e.message) }; }
   return { f, r };
 }
-const zero = (j) => j.vinted.filter((v) => !/\/item_upload\/colors$/.test(v.chemin)).length === 0;   // 5.266 : lire la liste des couleurs n'est pas un geste
+const LECTURE = /\/item_upload\/(colors|attributes)$/;   // lire la liste des couleurs ou des tailles n'est pas un geste
+const gestes = (j) => j.vinted.filter((v) => !LECTURE.test(v.chemin));
+const zero = (j) => gestes(j).length === 0;   // 5.266 : lire la liste des couleurs n'est pas un geste
 
 (async () => {
   if (process.argv.includes('--prouve')) {
@@ -76,7 +78,7 @@ const zero = (j) => j.vinted.filter((v) => !/\/item_upload\/colors$/.test(v.chem
 
   // A — tout prêt.
   { const { f, r } = await run();
-    const seq = f.j.vinted.map((v) => /photos$/.test(v.chemin) ? 'P' : /item_upload/.test(v.chemin) ? 'C' : /delete$/.test(v.chemin) ? 'S' : '?').join('');
+    const seq = gestes(f.j).map((v) => /photos$/.test(v.chemin) ? 'P' : /item_upload/.test(v.chemin) ? 'C' : /delete$/.test(v.chemin) ? 'S' : '?').join('');
     dit(seq === 'PPCS' && r.etape === 'fait' && r.nouvelId === '77001', "tout prêt : photos ×2, PUIS création, PUIS suppression de l'ancienne", `seq=${seq} etape=${r.etape} code=${r.code || ''} ${r.raison || ''}`);
     let corps = {}; try { corps = JSON.parse(creations(f.j)[0].corps); } catch (_) {}
     const it = corps.item || {};
@@ -202,7 +204,7 @@ const zero = (j) => j.vinted.filter((v) => !/\/item_upload\/colors$/.test(v.chem
   const brouillonsP = (j) => de(j, /\/item_upload\/drafts\/?$/);
   const completions = (j) => de(j, /\/item_upload\/drafts\/\d+\/completion$/);
   { const { f, r } = await run({ viaBrouillon: true });
-    const seq = f.j.vinted.map((v) => /photos$/.test(v.chemin) ? 'P' : /completion$/.test(v.chemin) ? 'M' : /drafts\/?$/.test(v.chemin) ? 'B' : /item_upload\/items/.test(v.chemin) ? 'C' : /delete$/.test(v.chemin) ? 'S' : '?').join('');
+    const seq = gestes(f.j).map((v) => /photos$/.test(v.chemin) ? 'P' : /completion$/.test(v.chemin) ? 'M' : /drafts\/?$/.test(v.chemin) ? 'B' : /item_upload\/items/.test(v.chemin) ? 'C' : /delete$/.test(v.chemin) ? 'S' : '?').join('');
     const cf = f.lignes['coffre_111_9101'];
     dit(seq === 'PPSBM' && r.etape === 'fait' && r.nouvelId === '88001' && cf && cf.versBrouillon && cf.versBrouillon.publier === true, "republier (sa décision, « comme eux ») : photos, enregistrée dans VRM, PUIS suppression, PUIS brouillon, PUIS mise en ligne", `seq=${seq} etape=${r.etape} id=${r.nouvelId} ${r.raison || ''}`);
     let b = {}, c = {}; try { b = JSON.parse(brouillonsP(f.j)[0].corps); c = JSON.parse(completions(f.j)[0].corps); } catch (_) {}
@@ -228,7 +230,7 @@ const zero = (j) => j.vinted.filter((v) => !/\/item_upload\/colors$/.test(v.chem
 
   // P — (28 oct. au soir, sa décision) « en ligne → brouillon » : l'annonce est
   // ENREGISTRÉE dans VRM, PUIS supprimée, PUIS le brouillon créé — jamais de mise en ligne.
-  const seqDe = (j) => j.vinted.map((v) => /photos$/.test(v.chemin) ? 'P' : /completion$/.test(v.chemin) ? 'M' : /drafts\/?$/.test(v.chemin) ? 'B' : /item_upload\/items/.test(v.chemin) ? 'C' : /delete$/.test(v.chemin) ? 'S' : '?').join('');
+  const seqDe = (j) => gestes(j).map((v) => /photos$/.test(v.chemin) ? 'P' : /completion$/.test(v.chemin) ? 'M' : /drafts\/?$/.test(v.chemin) ? 'B' : /item_upload\/items/.test(v.chemin) ? 'C' : /delete$/.test(v.chemin) ? 'S' : '?').join('');
   { const { f, r } = await run({ versBrouillon: true });
     const seq = seqDe(f.j);
     dit(seq === 'PPSB' && r.etape === 'fait' && r.draftId === '88001' && r.brouillon === true, "en ligne → brouillon : photos, PUIS suppression, PUIS brouillon — aucune mise en ligne", `seq=${seq} etape=${r.etape} ${r.raison || ''}`);
@@ -262,7 +264,7 @@ const zero = (j) => j.vinted.filter((v) => !/\/item_upload\/colors$/.test(v.chem
   };
   { const { f, r } = await pubB();
     let c = {}; try { c = JSON.parse(completions(f.j)[0].corps); } catch (_) {}
-    dit(f.j.vinted.length === 1 && r.etape === 'fait' && c.draft && c.draft.id === 10432342904 && c.push_up === false && c.draft.title === 'Nike Air Max 1 dark teal' && /drafts\/10432342904\/completion$/.test(completions(f.j)[0].chemin), "brouillon complet de son dressing : UNE requête, la mise en ligne, avec SON corps tel quel", `n=${f.j.vinted.length} etape=${r.etape} ${r.raison || r.erreur || ''}`);
+    dit(gestes(f.j).length === 1 && r.etape === 'fait' && c.draft && c.draft.id === 10432342904 && c.push_up === false && c.draft.title === 'Nike Air Max 1 dark teal' && /drafts\/10432342904\/completion$/.test(completions(f.j)[0].chemin), "brouillon complet de son dressing : UNE requête, la mise en ligne, avec SON corps tel quel", `n=${f.j.vinted.length} etape=${r.etape} ${r.raison || r.erreur || ''}`);
     dit(f.lignes.vinted_brouillon_10432342904.etat === 'publie' && f.lignes.vrm_vinted_modele && f.lignes.vrm_vinted_modele['10432342904'], "noté « publié », et sa recette gardée pour une prochaine republication"); }
   { const { f, r } = await pubB({ corps: CORPS_B({ price: 0 }) });
     dit(zero(f.j) && r.code === 'incomplet' && /prix/.test(r.raison || ''), "brouillon sans prix : refusé, aucune requête, il est nommé ce qui manque", `n=${f.j.vinted.length} ${r.raison || ''}`); }
@@ -347,29 +349,56 @@ const zero = (j) => j.vinted.filter((v) => !/\/item_upload\/colors$/.test(v.chem
     const extra = { ...dressing(['10432342904']), vinted_brouillon_10432342904: { id: '10432342904', uid: '111', corps, etat: 'brouillon', parVRM: true, ancienId: '9557' },
       coffre_111_9557: { id: '9557', photos: [PHOTOS[0]], ...(coffreSize ? { size: coffreSize } : {}) } };
     let nC = 0;
-    const f = monter({ src: process.env.BG_SRC || undefined, extra, attributsRep: grille, completion: () => (toujoursKO || ++nC <= 1 ? 400 : 200), completionCorps: () => tailleKO });
+    const f = monter({ src: process.env.BG_SRC || undefined, extra, attributsRep: grille, completion: () => (toujoursKO ? 400 : 200), completionCorps: () => tailleKO });
     let r = {}; try { r = await f.ctx.publierBrouillon({ cmd: 'publierBrouillon', uid: '111', draftId: '10432342904', confirme: true }); } catch (e) { r = { erreur: e.message }; }
     return { f, r, att: f.j.vinted.filter((x) => /item_upload\/attributes$/.test(x.chemin)) };
   };
   { const { f, r, att } = await pubT();
-    const cs = completions(f.j); let c2 = {}; try { c2 = JSON.parse(cs[1].corps); } catch (_) {}
+    const cs = completions(f.j); let c2 = {}; try { c2 = JSON.parse(cs[0].corps); } catch (_) {}
     const sz = c2.draft && (c2.draft.item_attributes || []).find((a) => a.code === 'size');
     let gard = {}; try { gard = JSON.parse(f.lignes.vinted_brouillon_10432342904.corps); } catch (_) {}
     const szG = gard.draft && (gard.draft.item_attributes || []).find((a) => a.code === 'size');
     const cond = c2.draft && (c2.draft.item_attributes || []).find((a) => a.code === 'condition');
     let corpsA = {}; try { corpsA = JSON.parse(att[0].corps); } catch (_) {}
-    dit(r.etape === 'fait' && att.length === 1 && JSON.stringify(corpsA) === JSON.stringify({ attributes: [{ code: 'category', value: [1242] }] }) && cs.length === 2 && sz && JSON.stringify(sz.ids) === '[1197]' && cond && JSON.stringify(cond.ids) === '[2]' && szG && JSON.stringify(szG.ids) === '[1197]',
-      "taille refusée : grille lue (forme mesurée), taille « 38 » de la paire posée (1197), l'état gardé, mise en ligne réussie, brouillon enregistré à jour", JSON.stringify({ e: r.etape, att: att.length, sz, szG, raison: r.raison || r.erreur })); }
+    dit(r.etape === 'fait' && att.length === 1 && JSON.stringify(corpsA) === JSON.stringify({ attributes: [{ code: 'category', value: [1242] }] }) && cs.length === 1 && sz && JSON.stringify(sz.ids) === '[1197]' && cond && JSON.stringify(cond.ids) === '[2]' && szG && JSON.stringify(szG.ids) === '[1197]',
+      "code de taille plus dans la grille : vérifié AVANT d'envoyer, taille « 38 » de la paire posée (1197), l'état gardé, UNE mise en ligne qui passe, brouillon enregistré à jour", JSON.stringify({ e: r.etape, att: att.length, sz, szG, raison: r.raison || r.erreur })); }
   { const { f, r, att } = await pubT({ grille: GRILLE([{ id: 1197, title: '38' }, { id: 1290, title: 'EU 38' }]) });
-    dit(r.etape === 'echec' && completions(f.j).length === 1 && /plusieurs tailles/.test(r.raison || '') && /choisis la taille/.test(r.raison || ''), "deux options au même libellé : VRM ne choisit pas, rien n'est renvoyé, c'est dit avec le geste", JSON.stringify({ e: r.etape, raison: (r.raison || '').slice(0, 200) })); }
+    dit(r.code === 'incomplet' && completions(f.j).length === 0 && /plusieurs tailles/.test(r.raison || '') && /Modifier/.test(r.raison || ''), "deux options au même libellé : VRM ne choisit pas, RIEN n'est envoyé, c'est dit avec le geste", JSON.stringify({ e: r.etape, raison: (r.raison || '').slice(0, 200) })); }
   { const { f, r, att } = await pubT({ coffreSize: '', grille: GRILLE([{ id: 1197, title: '38' }]) });
-    dit(r.etape === 'echec' && att.length === 0 && completions(f.j).length === 1 && /ne connaît pas la taille/.test(r.raison || ''), "taille de la paire inconnue : aucune lecture de grille, rien n'est deviné (pas même le titre)", JSON.stringify({ e: r.etape, att: att.length, raison: (r.raison || '').slice(0, 160) })); }
+    dit(r.code === 'incomplet' && completions(f.j).length === 0 && /ne connaît pas la taille/.test(r.raison || ''), "taille de la paire inconnue et code plus dans la grille : rien n'est deviné (pas même le titre), RIEN n'est envoyé", JSON.stringify({ e: r.etape, att: att.length, raison: (r.raison || '').slice(0, 160) })); }
   { const { f, r } = await pubT({ grille: GRILLE([{ id: 1196, title: '37,5' }]) });
-    dit(r.etape === 'echec' && completions(f.j).length === 1 && /ne propose pas de taille « 38 »/.test(r.raison || ''), "aucune taille au libellé exact : rien n'est posé, c'est dit", (r.raison || '').slice(0, 160)); }
-  { const { f, r } = await pubT({ grille: { status: 200, body: { foo: [1, 2] } } });
+    dit(r.code === 'incomplet' && completions(f.j).length === 0 && /ne propose pas de taille « 38 »/.test(r.raison || ''), "aucune taille au libellé exact : rien n'est posé ni envoyé, c'est dit", (r.raison || '').slice(0, 160)); }
+  { const { f, r } = await pubT({ toujoursKO: true, grille: { status: 200, body: { foo: [1, 2] } } });
     dit(r.etape === 'echec' && completions(f.j).length === 1 && /n'a pas su lire la liste des tailles/.test(r.raison || ''), "grille d'une forme inconnue : rien n'est posé, c'est dit (forme gardée)", (r.raison || '').slice(0, 160)); }
   { const { f, r } = await pubT({ toujoursKO: true });
-    dit(r.etape === 'echec' && completions(f.j).length === 2 && /même avec la taille « 38 »/.test(r.raison || ''), "taille posée et encore refusée : UN seul nouvel essai, c'est dit", JSON.stringify({ m: completions(f.j).length, raison: (r.raison || '').slice(0, 160) })); }
+    dit(r.etape === 'echec' && completions(f.j).length === 1 && /déjà celle du brouillon/.test(r.raison || ''), "taille de la grille posée et Vinted la refuse quand même : aucun essai de plus, c'est dit", JSON.stringify({ m: completions(f.j).length, raison: (r.raison || '').slice(0, 160) })); }
+  // (29 oct., « que toutes les catégories obligatoires soient remplies avant de
+  //  valider ») Un attribut que Vinted marque obligatoire (matière) et absent ⇒
+  //  rien n'est envoyé, il est NOMMÉ ; l'état exigé par la grille aussi.
+  { const g = { status: 200, body: { attributes: [{ code: 'size', configuration: { options: [{ id: 1197, title: '38' }] } }, { code: 'material', required: true, configuration: { options: [{ id: 44, title: 'Cuir' }] } }, { code: 'condition', configuration: { options: [{ id: 2, title: 'Très bon état' }] } }] } };
+    const { f, r } = await pubT({ grille: g });
+    dit(r.code === 'incomplet' && completions(f.j).length === 0 && /la matière/.test(r.raison || ''), "attribut marqué obligatoire par Vinted (matière) et absent : rien n'est envoyé, il est nommé", (r.raison || '').slice(0, 160));
+    const corps = CORPS_B({ item_attributes: [{ code: 'size', ids: [1197] }] });
+    const extra = { ...dressing(['10432342904']), vinted_brouillon_10432342904: { id: '10432342904', uid: '111', corps, etat: 'brouillon' } };
+    const f2 = monter({ src: process.env.BG_SRC || undefined, extra, attributsRep: { status: 200, body: { attributes: [{ code: 'size', configuration: { options: [{ id: 1197, title: '38' }] } }, { code: 'condition', configuration: { options: [{ id: 2, title: 'Très bon état' }] } }] } } });
+    let r2 = {}; try { r2 = await f2.ctx.publierBrouillon({ cmd: 'publierBrouillon', uid: '111', draftId: '10432342904', confirme: true }); } catch (e) { r2 = { erreur: e.message }; }
+    dit(r2.code === 'incomplet' && completions(f2.j).length === 0 && /l'état/.test(r2.raison || ''), "brouillon sans état alors que la catégorie en a un : rien n'est envoyé, « l'état » est nommé", (r2.raison || r2.erreur || '').slice(0, 160)); }
+  // (29 oct., « il ne doit pas y avoir d'erreur possible ») La taille est
+  //  vérifiée AVANT de toucher à l'annonce (Republier, par brouillon ou direct).
+  const coffreT = (size) => ({ coffre_111_9101: { id: '9101', title: 'Nike Air Max 1', price: 60, desc: 'Nickel, boîte d’origine', photos: PHOTOS, size } });
+  const GRILLE_A = (opts) => ({ status: 200, body: { attributes: [{ code: 'size', configuration: { options: opts } }] } });
+  for (const via of [false, true]) {
+    { const { f, r } = await run({ viaBrouillon: via, extra: coffreT('38'), attributsRep: GRILLE_A([{ id: 1197, title: '38' }, { id: 1198, title: '38,5' }]) });
+      const c = via ? brouillonsP(f.j)[0] : creations(f.j)[0]; let o = {}; try { o = JSON.parse(c.corps); } catch (_) {}
+      const it = o.item || o.draft || {}; const sz = (it.item_attributes || []).find((a) => a.code === 'size'); const cond = (it.item_attributes || []).find((a) => a.code === 'condition');
+      dit(r.etape === 'fait' && sz && JSON.stringify(sz.ids) === '[1197]' && cond && JSON.stringify(cond.ids) === '[2]', `${via ? 'par brouillon' : 'direct'} : code de taille plus dans la grille ⇒ la taille « 38 » de la grille est posée AVANT d'envoyer, l'état gardé`, JSON.stringify({ e: r.etape, sz, raison: r.raison || r.erreur })); }
+    { const { f, r } = await run({ viaBrouillon: via, extra: coffreT('38'), attributsRep: GRILLE_A([{ id: 1196, title: '37,5' }]) });
+      dit(r.code === 'incomplet' && suppressions(f.j).length === 0 && creations(f.j).length === 0 && brouillonsP(f.j).length === 0 && photosP(f.j).length === 0 && /Rien n'a été touché/.test(r.raison || ''), `${via ? 'par brouillon' : 'direct'} : taille absente de la grille ⇒ arrêt AVANT tout geste (ni photo, ni suppression, ni création)`, JSON.stringify({ code: r.code, s: suppressions(f.j).length, raison: (r.raison || '').slice(0, 140) })); }
+    { const { f, r } = await run({ viaBrouillon: via, extra: coffreT('38'), attributsRep: GRILLE_A([{ id: 56, title: '38' }]) });
+      dit(r.etape === 'fait', `${via ? 'par brouillon' : 'direct'} : code déjà juste ⇒ rien ne change`, r.raison || ''); }
+    { const { f, r } = await run({ viaBrouillon: via, extra: coffreT('38'), attributsRep: { status: 500, body: {} } });
+      dit(r.etape === 'fait', `${via ? 'par brouillon' : 'direct'} : grille illisible ⇒ comme avant (le secours après refus reste)`, r.raison || ''); }
+  }
   // … sans coffre lisible : rien n'est renvoyé, c'est dit avec le geste Vinted.
   { const corps = CORPS_B();
     const extra = { ...dressing(['10432342904']), vinted_brouillon_10432342904: { id: '10432342904', uid: '111', corps, etat: 'brouillon', parVRM: true, ancienId: '9556' } };

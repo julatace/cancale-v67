@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.275.0';
+const CODE_VERSION = '5.276.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -7828,18 +7828,22 @@ async function grilleTailles(uid, acc, catalogId) {
   if (!cat || cat === '0') return { raison: "la catégorie de l'annonce est inconnue" };
   let st = null; try { st = (await chrome.storage.local.get(TAILLES_VU))[TAILLES_VU] || null; } catch (_) {}
   const c = st && st[cat];
-  if (c && Array.isArray(c.options) && c.options.length && Number(c.at) > Date.now() - 24 * 3600000) return { options: c.options };
+  if (c && Array.isArray(c.options) && Number(c.at) > Date.now() - 24 * 3600000) return { options: c.options, requis: Array.isArray(c.requis) ? c.requis : [], sansTaille: !!c.sansTaille, codes: Array.isArray(c.codes) ? c.codes : [] };
   const g = await gardeLecture(uid, acc, 'clic');
   if (g) return { raison: g.error };
   const r = await vintedSend(acc, 'POST', '/api/v2/item_upload/attributes', { attributes: [{ code: 'category', value: [Number(cat)] }] }, { timeoutMs: 20000 });
   if (!r || !r.ok) { noterDiag('tailles_lecture_ratee_' + ((r && r.status) || 0)); return { raison: "Vinted n'a pas rendu la liste des tailles" }; }
   try { echantillonRate('tailles_reponse_forme', cat, JSON.stringify(formeJson(r.json)).slice(0, 1500)); } catch (_) {}
   const options = optionsTailleDe(r.json);
-  if (!options || !options.length) { noterDiag('tailles_forme_inconnue'); return { raison: "VRM n'a pas su lire la liste des tailles de Vinted (forme gardée pour la passe suivante)" }; }
-  const garde = options.slice(0, 300);
-  try { const tout = { ...(st || {}) }; tout[cat] = { options: garde, at: Date.now() }; const cles = Object.keys(tout); if (cles.length > 30) delete tout[cles[0]]; await chrome.storage.local.set({ [TAILLES_VU]: tout }); } catch (_) {}
+  const requis = codesRequis(r.json);
+  const lisible = !!(options && options.length) || codesAttributs(r.json).length > 0;
+  if (!lisible) { noterDiag('tailles_forme_inconnue'); return { raison: "VRM n'a pas su lire la liste des tailles de Vinted (forme gardée pour la passe suivante)" }; }
+  // Une catégorie SANS taille (aucun nœud « size ») : lue, rien à poser.
+  const garde = (options || []).slice(0, 300); const sansTaille = !options;
+  try { const tout = { ...(st || {}) }; tout[cat] = { options: garde, requis, sansTaille, codes: tout_codes(r.json), at: Date.now() }; const cles = Object.keys(tout); if (cles.length > 30) delete tout[cles[0]]; await chrome.storage.local.set({ [TAILLES_VU]: tout }); } catch (_) {}
   noterDiag('tailles_lues');
-  return { options: garde };
+  if (!garde.length && !sansTaille) return { raison: "Vinted n'a rendu aucune taille pour cette catégorie" };
+  return { options: garde, requis, sansTaille, codes: tout_codes(r.json) };
 }
 // La taille que Vinted donnait à la paire : le coffre de l'ancienne annonce,
 // sinon son annonce (ou le brouillon) dans le dressing. `null` = pas su.
@@ -7853,6 +7857,68 @@ async function libelleTaillePaire(uid, ids) {
   const items = (dr && dr[0] && Array.isArray(dr[0].items)) ? dr[0].items : [];
   for (const id of ids) { const it = items.find((x) => x && String(x.id) === String(id)); const s = it && String(it.size || it.size_title || '').trim(); if (s) return s; }
   return '';
+}
+// (29 oct., « que toutes les catégories obligatoires soient remplies avant de
+// valider ») Les attributs que la réponse de Vinted marque OBLIGATOIRES (un
+// drapeau `required` / `is_required` / `mandatory`, sur le nœud ou sa
+// configuration). Forme jamais vue : un drapeau absent ne rend rien obligatoire —
+// les champs connus le sont de toute façon (`champsManquantsAvant`).
+function codesAttributs(j) {
+  const out = [];
+  const voir = (o, prof) => {
+    if (!o || typeof o !== 'object' || prof > 8) return;
+    if (Array.isArray(o)) { for (const x of o) voir(x, prof + 1); return; }
+    if (typeof o.code === 'string' && /^[a-z_]{2,40}$/.test(o.code) && (o.configuration || o.options || o.required != null || o.is_required != null)) out.push(o);
+    for (const k of Object.keys(o)) if (o[k] && typeof o[k] === 'object') voir(o[k], prof + 1);
+  };
+  voir(j, 0);
+  return out;
+}
+function tout_codes(j) { return [...new Set(codesAttributs(j).map((o) => o.code))].slice(0, 30); }
+function codesRequis(j) {
+  const oui = (o) => o && (o.required === true || o.is_required === true || o.mandatory === true);
+  return [...new Set(codesAttributs(j).filter((o) => oui(o) || oui(o.configuration)).map((o) => o.code))].filter((c) => c !== 'category').slice(0, 20);
+}
+const NOM_CHAMP_VINTED = { size: 'la taille', condition: "l'état", status: "l'état", material: 'la matière', color: 'la couleur', brand: 'la marque', isbn: "l'ISBN", video_game_rating: 'la classification', measurements: 'les mesures' };
+// Tout ce qui est obligatoire, vérifié AVANT une mise en ligne. La taille fausse
+// (code plus dans la grille) est corrigée sur place quand la taille de la PAIRE
+// est trouvée au libellé exact ; le reste n'est jamais deviné : il est NOMMÉ.
+// Rend la liste de ce qui manque (vide = tout est là). `idsPaire` = l'ancienne
+// annonce / le brouillon (pour lire la taille de la paire).
+async function champsManquantsAvant(uid, acc, it, idsPaire) {
+  const manque = [];
+  const attrs = Array.isArray(it.item_attributes) ? it.item_attributes : [];
+  const a = (code) => attrs.find((x) => x && x.code === code && Array.isArray(x.ids) && x.ids.length);
+  if (!String(it.title || '').trim()) manque.push('le titre');
+  const prix = Number(it.price && typeof it.price === 'object' ? it.price.amount : it.price);
+  if (!(isFinite(prix) && prix > 0)) manque.push('le prix');
+  if (!(Array.isArray(it.assigned_photos) && it.assigned_photos.length)) manque.push('les photos');
+  if (!(Number(it.catalog_id) > 0)) manque.push('la catégorie');
+  if (String(it.description || '').trim().length < DESCRIPTION_MIN) manque.push('la description (5 caractères au moins)');
+  if (!idsCouleurVinted(it).length) manque.push('la couleur');
+  if (!(Number(it.package_size_id) > 0)) manque.push('la taille du colis');
+  if (Number(it.catalog_id) > 0) {
+    const g = await grilleTailles(uid, acc, it.catalog_id);
+    if (g.codes && g.codes.includes('condition') && !a('condition') && !a('status')) manque.push("l'état");
+    if (g.options && g.options.length) {
+      const sz = a('size'); const ids = sz ? sz.ids.map(Number) : [];
+      if (!ids.length || !ids.some((x) => g.options.some((o) => o.id === x))) {
+        const libelle = await libelleTaillePaire(uid, idsPaire || []);
+        const t = libelle ? choisirTaille(g.options, libelle) : { raison: "VRM ne connaît pas la taille de cette paire" };
+        if (t.id) { it.item_attributes = [...attrs.filter((x) => x && x.code !== 'size'), { code: 'size', ids: [t.id] }]; noterDiag('avant_taille_corrigee'); }
+        else manque.push(`la taille (${t.raison})`);
+      }
+    }
+    for (const code of (g.requis || [])) {
+      if (code === 'size' || code === 'condition' || code === 'status' || code === 'color' || code === 'brand') {
+        if (code === 'brand' && !(Number(it.brand_id) > 0)) manque.push('la marque');
+        continue;
+      }
+      if (!a(code)) manque.push(NOM_CHAMP_VINTED[code] || code.replace(/_/g, ' '));
+    }
+  }
+  if (manque.length) noterDiag('avant_manque_' + manque.length);
+  return [...new Set(manque)];
 }
 // Sur un refus de la taille : grille lue, taille au libellé exact posée, UN
 // nouvel essai (le corps est mis à jour sur place : l'appelant garde la bonne
@@ -8438,6 +8504,12 @@ async function publierBrouillon(msg) {
     else manque.push('de couleur');
   }
   if (manque.length) return { accepte: false, code: 'incomplet', raison: `ce brouillon n'a pas ${manque.join(', ')} — finis-le sur Vinted (« Modifier »), puis réessaie. Rien n'a été touché.` };
+  // (29 oct.) Tout ce que Vinted exige est vérifié AVANT d'envoyer : la taille
+  // fausse est corrigée au libellé exact de la paire ; le reste est nommé.
+  { const avant2 = JSON.stringify(r.d.item_attributes || []);
+    const manque2 = await champsManquantsAvant(uid, acc, r.d, [b.ancienId, id]);
+    if (!manque2.length && JSON.stringify(r.d.item_attributes || []) !== avant2) { try { await rangerBrouillon(id, { corps: JSON.stringify({ ...JSON.parse(b.corps), draft: r.d }) }); } catch (_) {} }
+    if (manque2.length) return { accepte: false, code: 'incomplet', raison: `Vinted refuserait ce brouillon : il manque ${manque2.join(', ')}. Finis-le sur Vinted (Mes brouillons → « Modifier »), puis réessaie. Rien n'a été touché.` }; }
   // (28 oct.) Un brouillon fait par VRM AVANT la 5.261 peut porter la même photo
   // plusieurs fois (liens du coffre en double). Ses photos ont été envoyées dans
   // l'ordre des liens du coffre de l'ancienne annonce : on retrouve la clé de
@@ -8653,6 +8725,9 @@ async function refaireBrouillon(msg) {
       return { accepte: true, etape: 'fait', brouillon: true, draftId, raison: 'le brouillon est rangé sur Vinted.' + pourquoi };
     }
     await majVersBrouillon(uid, id, { etat: 'brouillon-range', draftId });
+    { const manque3 = await champsManquantsAvant(uid, acc, corpsC.draft, [id, draftId]);
+      if (manque3.length) { await majVersBrouillon(uid, id, { etat: 'a-publier' }); return { accepte: true, etape: 'echec', refaire: true, draftId, raison: `le brouillon est rangé sur Vinted, mais il n'est PAS mis en ligne : Vinted le refuserait, il manque ${manque3.join(', ')}. Finis-le sur Vinted (Mes brouillons → « Modifier »).` }; }
+      try { await rangerBrouillon(draftId, { corps: JSON.stringify(corpsC) }); } catch (_) {} }
     // Mise en ligne DANS la même place de la file Vinted (publierBrouillon prend
     // sa propre place : l'appeler d'ici attendrait cette place pour toujours).
     etapeRepub(id, 'attente');
@@ -8939,6 +9014,23 @@ async function recreerVinted(msg) {
   // la suivante de la MÊME annonce : la relancer créerait une seconde copie.
   const verrou = await lireVerrouRecreer(id);
   if (verrou) return { accepte: false, code: 'recreer-incertaine', raison: `une recréation de cette annonce est partie il y a ${Math.max(1, Math.round((Date.now() - verrou) / 60000))} min sans réponse claire de Vinted — regarde ton dressing avant de réessayer (rien n'a été touché cette fois)` };
+  // (29 oct., « il ne doit pas y avoir d'erreur possible ») La TAILLE est vérifiée
+  // AVANT de toucher à l'annonce : sinon Vinted la refuse APRÈS la suppression.
+  // Grille lue (une fois par catégorie et par 24 h) : taille de la paire au
+  // libellé exact ⇒ posée ; le code enregistré n'est plus dans la grille et rien
+  // d'exact ⇒ on s'arrête, RIEN n'est touché. Taille ou grille pas sues ⇒ comme
+  // avant (le secours après refus reste).
+  let tailleAvant = null;
+  {
+    const it0 = { ...(essai.item || {}), assigned_photos: [{ id: 1 }] };
+    const avant = JSON.stringify(it0.item_attributes || []);
+    const manqueA = await champsManquantsAvant(uid, acc, it0, [id]);
+    if (manqueA.length) {
+      noterDiag('recreer_avant_bloque');
+      return { accepte: false, code: 'incomplet', raison: `Vinted refuserait cette annonce : il manque ${manqueA.join(', ')}. Rien n'a été touché : ton annonce est toujours en ligne. Sur Vinted → « Modifier » → complète → « Enregistrer », puis relance.` };
+    }
+    if (JSON.stringify(it0.item_attributes || []) !== avant) { const sz = (it0.item_attributes || []).find((x) => x && x.code === 'size'); tailleAvant = sz && sz.ids[0]; }
+  }
   // 3. Le 1er geste (créer) entre dans le plafond horaire ; la suppression compte le second.
   const stop = await gardeStricte(uid, acc, { reserve: RESERVE_GESTES });
   if (stop) return { accepte: false, code: stop.code, raison: stop.error };
@@ -8949,6 +9041,7 @@ async function recreerVinted(msg) {
     if (!tp.ids) return { accepte: true, etape: 'echec', raison: `${tp.erreur} — rien n'a été créé, ton annonce est intacte` };
     const ids = tp.ids;
     const built = itemPourRecreer({ modeleCorps: modele && modele.corps, codes: details.codes, titre, prix, description, brand: sauve && sauve.brand, photoIds: ids, temp });
+    if (tailleAvant && built.item) built.item.item_attributes = [...(Array.isArray(built.item.item_attributes) ? built.item.item_attributes.filter((a) => a && a.code !== 'size') : []), { code: 'size', ids: [tailleAvant] }];
     const corps = { item: built.item, parcel: null, push_up: false, upload_session_id: temp };
     // (28 oct., sa demande : « ça met en brouillon puis ça publie ») Formes
     // MESURÉES dans ses requêtes : `POST …/item_upload/drafts` `{draft:{id:null,…},
