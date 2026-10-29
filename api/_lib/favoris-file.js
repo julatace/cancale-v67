@@ -7,10 +7,15 @@ const clone=v=>structuredClone(v);
 // Tirage du temps avant le message suivant, entre le minimum et le maximum
 // choisis. Déterministe (empreinte du jeton de la tentative) : une décision
 // rejouée par le comparer-et-échanger donne le même temps.
+// 0 minute = « comme Vintex » (29 oct., sa demande) : MESURÉ sur 9 favoris
+// envoyés par Vintex, 6,0 à 9,6 s entre la fin d'un message et le favori
+// suivant. Le plafond de 10 messages sur 60 minutes passe toujours avant.
+export const DELAI_VINTEX_MS=[6000,9600];
 export function delaiFavori(min,max,jeton){
   const a=Number(min),b=Number.isInteger(max)&&max>a?max:a;
-  if(b===a)return a*60000;
   let h=0x811c9dc5;for(const c of String(jeton||''))h=Math.imul(h^c.charCodeAt(0),0x01000193)>>>0;
+  if(a===0)return DELAI_VINTEX_MS[0]+Math.round((h/4294967296)*(DELAI_VINTEX_MS[1]-DELAI_VINTEX_MS[0]));
+  if(b===a)return a*60000;
   return Math.round((a+(h/4294967296)*(b-a))*60)*1000;
 }
 export function initialiserFile(d){
@@ -22,9 +27,9 @@ export function vueFile(d,owner){
   const g=d?.groupes?.[owner];
   return g?{active:g.active,raison:g.raison||'',lot:g.lot||null,intervalleMinutes:g.intervalleMinutes,intervalleMaxMinutes:g.intervalleMax||null,prochain:d.enCours?null:Math.max(g.prochain||0,d.prochainGlobal||0,(d.tentatives||[]).length>=10?d.tentatives[d.tentatives.length-10]+3600000:0),jobs:g.jobs.map(({id,notificationId,etat,raison,lot,traiteLe,envoyeLe})=>({id,notificationId,etat,lot,traiteLe,envoyeLe,...(raison?{raison}:{})}))}:{active:false,raison:'',prochain:null,jobs:[]};
 }
-export function lancerFile(d,{owner,targets,message,intervalleMinutes,intervalleMax=null,maintenant,lot=String(maintenant)}){
+export function lancerFile(d,{owner,targets,message,intervalleMinutes,intervalleMax=null,maintenant,lot=String(maintenant),pourcentage=null}){
   d=initialiserFile(d);
-  if(!Array.isArray(targets)||!targets.length||targets.length>10||typeof message!=='string'||!message.trim()||message.length>2000||!Number.isInteger(intervalleMinutes)||intervalleMinutes<1||intervalleMinutes>1440||intervalleMax!=null&&(!Number.isInteger(intervalleMax)||intervalleMax<intervalleMinutes||intervalleMax>1440))throw new RefusFavoris('Sélection ou réglages invalides.',400);
+  if(!Array.isArray(targets)||!targets.length||targets.length>10||typeof message!=='string'||!message.trim()||message.length>2000||!Number.isInteger(intervalleMinutes)||intervalleMinutes<0||(intervalleMinutes===0&&intervalleMax!=null)||intervalleMinutes>1440||intervalleMax!=null&&(!Number.isInteger(intervalleMax)||intervalleMax<intervalleMinutes||intervalleMax>1440))throw new RefusFavoris('Sélection ou réglages invalides.',400);
   const max=intervalleMax>intervalleMinutes?intervalleMax:null;
   if(!Number.isSafeInteger(maintenant)||maintenant<0)throw new RefusFavoris('Horloge indisponible.',503);
   for(const t of targets)if(!t||!entier(t.itemId)||!entier(t.recipientId)||typeof t.notificationId!=='string'||!t.notificationId||t.notificationId.length>160||typeof t.initiator!=='string'||!t.initiator||t.initiator.length>80)throw new RefusFavoris('Le destinataire du favori n’est pas confirmé.');
@@ -35,7 +40,7 @@ export function lancerFile(d,{owner,targets,message,intervalleMinutes,intervalle
   for(const j of g.jobs)if(j.etat==='attente')j.etat='annule';
   const connus=new Set(Object.values({...d.groupes,[owner]:g}).flatMap(x=>x.jobs).filter(x=>!['annule','refuse'].includes(x.etat)).map(x=>x.itemId+':'+x.recipientId));
   const nouveaux=[];
-  for(const t of targets){const cle=t.itemId+':'+t.recipientId;if(!connus.has(cle)){connus.add(cle);nouveaux.push({...t,id:t.itemId+':'+t.recipientId,etat:'attente',message,intervalleMinutes,...(max?{intervalleMax:max}:{}),lot});}}
+  for(const t of targets){const cle=t.itemId+':'+t.recipientId;if(!connus.has(cle)){connus.add(cle);nouveaux.push({...t,id:t.itemId+':'+t.recipientId,etat:'attente',message,intervalleMinutes,...(max?{intervalleMax:max}:{}),...(Number.isInteger(pourcentage)&&pourcentage>=1&&pourcentage<=99?{pourcentage}:{}),lot});}}
   if(!nouveaux.length)throw new RefusFavoris('Ces destinataires ont déjà été préparés pour ces articles. Aucun nouvel envoi.');
   const anciens=g.jobs.filter(x=>!nouveaux.some(n=>n.id===x.id));
   if(anciens.length+nouveaux.length>500)throw new RefusFavoris('La file a atteint sa capacité. Aucun historique de dédoublonnage n’a été effacé.');
@@ -80,7 +85,7 @@ export function terminerFile(d,{owner,jeton,resultat,maintenant,raison}){
   if(resultat==='ignore'){
     d.tentatives=d.tentatives.filter(t=>t!==e.at);g.prochain=e.prochainAvant||0;d.prochainGlobal=e.globalAvant||0;
   }else{d.tentatives=d.tentatives.map(t=>t===e.at?fin:t);g.prochain=Math.max(g.prochain||0,fin+(Number.isSafeInteger(e.delai)?e.delai:j.intervalleMinutes*60000));d.prochainGlobal=g.prochain;}
-  const raisons=['article_vendu','ecran_inactif','compte_vinted_absent','quota_extension','pause_vinted','conversation_deja_contactee','historique_non_verifie','identite_non_confirmee','autorisation_expiree','compte_vinted_different','extension_indisponible','session_extension','vinted_refus','creation_non_confirmee','reponse_inconnue'];
+  const raisons=['article_vendu','ecran_inactif','compte_vinted_absent','quota_extension','pause_vinted','conversation_deja_contactee','historique_non_verifie','identite_non_confirmee','autorisation_expiree','compte_vinted_different','extension_indisponible','session_extension','vinted_refus','creation_non_confirmee','reponse_inconnue','onglet_vinted'];
   if(raisons.includes(raison))j.raison=raison;
   j.etat=resultat;d.enCours=null;
   j.traiteLe=fin;if(resultat==='envoye')j.envoyeLe=fin;
@@ -97,7 +102,7 @@ export function consommerFile(d,{owner,jeton,maintenant}){
   if(!e||e.owner!==owner||e.jeton!==jeton||e.autorise||!g?.active||maintenant<e.at||maintenant-e.at>60000)throw new RefusFavoris('L’autorisation d’envoi n’est plus disponible. Aucun renvoi automatique.');
   const j=g.jobs.find(x=>x.id===e.id);if(j?.etat!=='reserve')throw new RefusFavoris('La tentative n’est plus disponible.');
   e.autorise=true;
-  return {data:d,valeur:{suivi:e.suivi,travail:{itemId:j.itemId,recipientId:j.recipientId,initiator:j.initiator,message:j.message}}};
+  return {data:d,valeur:{suivi:e.suivi,travail:{itemId:j.itemId,recipientId:j.recipientId,initiator:j.initiator,message:j.message,...(Number.isInteger(j.pourcentage)?{pourcentage:j.pourcentage}:{})}}};
 }
 export function verifierReservation(d,{owner,jeton,maintenant}){
   d=initialiserFile(d);const e=d.enCours;

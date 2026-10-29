@@ -15,7 +15,9 @@ test('le pourcentage produit un texte, sans inventer de prix ou modifier le mess
 });
 test('cadence entière bornée et aucune activation cachée',()=>{
  for(const intervalleMinutes of [1,6,1440])assert.equal(validerReglagesFavoris({...reg,intervalleMinutes,envoisActifs:true}).envoisActifs,false);
- for(const intervalleMinutes of [0,-1,1441,'7.5','NaN',''])assert.throws(()=>validerReglagesFavoris({...reg,intervalleMinutes}));
+ for(const intervalleMinutes of [-1,1441,'7.5','NaN',''])assert.throws(()=>validerReglagesFavoris({...reg,intervalleMinutes}));
+ // 0 = « comme Vintex » (29 oct., 5.280) : 6 à 10 s tirés par le serveur, jamais un maximum.
+ assert.deepEqual([validerReglagesFavoris({...reg,intervalleMinutes:0,intervalleMaxMinutes:12}).intervalleMinutes,validerReglagesFavoris({...reg,intervalleMinutes:0,intervalleMaxMinutes:12}).intervalleMaxMinutes],[0,null]);
  assert.throws(()=>validerReglagesFavoris({...reg,message:null}));
  assert.throws(()=>validerReglagesFavoris({...reg,message:'',pourcentage:null}));
  const d=validerReglagesFavoris(reg);assert.equal(d.message,reg.message);assert.equal(d.pourcentage,10);
@@ -33,7 +35,7 @@ test('sauvegarde et relecture conservent le message, le taux et la cadence sans 
 });
 test('autre propriétaire, autre identifiant ou format inconnu : refus, pas de défaut prêt à écraser',async()=>{
  const data=validerReglagesFavoris(reg);
- for(const row of [{id,owner:'autre',data},{id:'autre',owner,data},{id,owner,data:{...data,version:2}},{id,owner,data:{...data,envoisActifs:true}},{id,owner,data:{...data,intervalleMinutes:0}}])await assert.rejects(lireReglagesFavoris({...opts(),fetcher:async()=>rep([row])}));
+ for(const row of [{id,owner:'autre',data},{id:'autre',owner,data},{id,owner,data:{...data,version:2}},{id,owner,data:{...data,envoisActifs:true}},{id,owner,data:{...data,intervalleMinutes:-1}}])await assert.rejects(lireReglagesFavoris({...opts(),fetcher:async()=>rep([row])}));
  await assert.rejects(lireReglagesFavoris({...opts(),fetcher:async()=>({ok:false})}));
 });
 test('absence de reçu exact ou changement de session : aucune confirmation de sauvegarde',async()=>{

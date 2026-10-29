@@ -121,7 +121,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.279.0';
+const EXT_ATTENDUE = '5.280.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -12071,6 +12071,10 @@ function BrouillonsVinted({ br, publier, brouillonOk, onClose, onFile }) {
   );
 }
 const REPUB_ESP_DEFAUT = 30;   // secondes entre deux annonces (borné par fileClamp)
+// (29 oct., « approche-toi le plus possible de Vintex ») MESURÉ : Vintex enchaîne
+// les paires à ~12 s d'écart. Le rythme « Comme Vintex » tire 8 à 16 s au hasard ;
+// c'est le choix par défaut tant qu'il n'en a pas retenu un autre.
+const REPUB_ESP_VINTEX = [8, 16];
 const REPUB_REG_DEF = { rot: 0, bright: 1, contrast: 1, sat: 1, zoom: 1 };
 // (28 oct., 5.252, sa demande : « un bouton Actions dans lequel on a republier,
 // mettre de brouillon à en ligne, de en ligne à brouillon, plein de choses »)
@@ -12299,7 +12303,7 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
   // (28 oct., sa demande) Temps ALÉATOIRE entre deux paires, entre SON minimum et
   // SON maximum (en minutes) — c'est lui qui le choisit et qui lance (§3, l'atelier).
   const espMem = (() => { const v = load('vrm_republier_esp', null); return v && typeof v === 'object' ? v : {}; })();
-  const [espMode, setEspMode] = useState(espMem.mode === 'aleatoire' ? 'aleatoire' : 'fixe');
+  const [espMode, setEspMode] = useState(espMem.mode === 'aleatoire' || espMem.mode === 'fixe' ? espMem.mode : 'vintex');
   const [espMin, setEspMin] = useState(Number(espMem.min) > 0 ? Number(espMem.min) : 1);
   const [espMax, setEspMax] = useState(Number(espMem.max) > 0 ? Number(espMem.max) : 3);
   const [prochaine, setProchaine] = useState(null);  // { at, s } : la prochaine paire part à `at`
@@ -12383,10 +12387,10 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
   // (28 oct.) Les temps d'attente sont TIRÉS AVANT de lancer et montrés sur
   // chaque ligne (« +1 min 23 s ») : il voit ce qui va se passer. « Tirer
   // d'autres temps » les refait. La première paire part tout de suite.
-  const tirerTemps = () => { const [a, b] = bornesAlea(); return a + Math.floor(Math.random() * (b - a + 1)); };
+  const tirerTemps = () => { const [a, b] = espMode === 'vintex' ? REPUB_ESP_VINTEX : bornesAlea(); return a + Math.floor(Math.random() * (b - a + 1)); };
   const [plan, setPlan] = useState({});
   const clePlan = aFaire.map((a) => a.id).join(',') + '|' + espMode + '|' + espMin + '|' + espMax + '|' + esp;
-  const refaitPlan = () => { const o = {}; aFaire.forEach((a, i) => { o[a.id] = i === 0 ? 0 : (espMode === 'aleatoire' ? tirerTemps() : fileClamp(esp)); }); setPlan(o); };
+  const refaitPlan = () => { const o = {}; aFaire.forEach((a, i) => { o[a.id] = i === 0 ? 0 : (espMode !== 'fixe' ? tirerTemps() : fileClamp(esp)); }); setPlan(o); };
   React.useEffect(() => { if (mode === 'idle') refaitPlan(); }, [clePlan]);   // eslint-disable-line react-hooks/exhaustive-deps
   const duree = (sec) => sec >= 60 ? `${Math.floor(sec / 60)} min ${String(sec % 60).padStart(2, '0')} s` : `${sec} s`;
   const autresComptes = compteChrome ? aFaire.filter((a) => a.uid && String(a.uid) !== String(compteChrome)).length : 0;
@@ -12401,7 +12405,7 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
     const premier = !Object.keys(st).length;
     let annule = false;
     let delai = 0;
-    if (!premier) { const pv = plan[suiv.id]; delai = Number.isFinite(pv) && pv > 0 ? pv : (espMode === 'aleatoire' ? tirerTemps() : fileClamp(esp)); }
+    if (!premier) { const pv = plan[suiv.id]; delai = Number.isFinite(pv) && pv > 0 ? pv : (espMode !== 'fixe' ? tirerTemps() : fileClamp(esp)); }
     setProchaine(delai > 0 ? { at: Date.now() + delai * 1000, s: delai } : null);
     const t = setTimeout(async () => {
       if (annule) return;
@@ -12625,7 +12629,8 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
             {mode === 'idle' && <>
               <div data-republier-esp={espMode} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 <span style={maj}>Temps entre deux paires</span>
-                <Segmente plein label="Temps entre deux paires" value={espMode} onChange={setEspMode} options={[{ v: 'fixe', l: 'Fixe', data: { 'data-republier-esp-choix': 'fixe' } }, { v: 'aleatoire', l: 'Aléatoire', data: { 'data-republier-esp-choix': 'aleatoire' } }]} />
+                <Segmente plein label="Temps entre deux paires" value={espMode} onChange={setEspMode} options={[{ v: 'vintex', l: 'Comme Vintex', data: { 'data-republier-esp-choix': 'vintex' } }, { v: 'fixe', l: 'Fixe', data: { 'data-republier-esp-choix': 'fixe' } }, { v: 'aleatoire', l: 'Aléatoire', data: { 'data-republier-esp-choix': 'aleatoire' } }]} />
+                {espMode === 'vintex' && <div data-republier-esp-vintex style={{ fontSize: 13, color: C.muted }}>Entre 8 et 16 secondes entre deux paires, tiré au hasard : le rythme mesuré chez Vintex.</div>}
                 {espMode === 'fixe' && <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13.5, color: C.text }}>Une annonce toutes les <input data-republier-esp-fixe value={esp} onChange={(ev) => setEsp(fileClamp(ev.target.value))} inputMode="numeric" style={{ ...champ, width: 70 }} /> secondes</label>}
                 {espMode === 'aleatoire' && <>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13.5, color: C.text, flexWrap: 'wrap' }}>

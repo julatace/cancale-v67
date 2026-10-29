@@ -61,7 +61,7 @@ export default function AutomatisationFavoris({uid,owner,ownerActuel,headers,sel
     }catch(e){if(courant()){setErreur(e.message+' Aucun renvoi automatique.');pauseLocale.current=true;}}
     finally{busy.current=false;travail.current=null;if(courant())setPhase('');}
   };
-  React.useEffect(()=>{if(!vue?.active||!ecranActif)return;avancer();const t=setInterval(avancer,15000);return()=>clearInterval(t);},[vue?.active,disponible,ecranActif]);
+  React.useEffect(()=>{if(!vue?.active||!ecranActif)return;avancer();const t=setInterval(avancer,vue?.intervalleMinutes===0?3000:15000);return()=>clearInterval(t);},[vue?.active,disponible,ecranActif,vue?.intervalleMinutes===0]);
   const agir=async action=>{
     if(!courant()||mutation.current)return;mutation.current=true;++lecture.current;setOccupe(true);setErreur('');setControleErreur(null);
     if(action==='lancer')onPreparation?.(true);
@@ -100,7 +100,7 @@ export default function AutomatisationFavoris({uid,owner,ownerActuel,headers,sel
       {!!p.total&&<><div className="vrm-favoris-progress-head" role="status"><strong>{p.termines} / {p.total} traités</strong><span>{p.envoyes} envoyé(s) · {p.ignores} ignoré(s)</span></div><progress aria-label="Traitement des favoris" aria-valuetext={`${p.termines} sur ${p.total} traités${phase?' · '+phase:''}`} value={avancement} max={p.total}/></>}
       <p role="status" aria-live={phase?'polite':'off'}>{phase|| (vue?.active?(p.secondes>0?`Prochaine vérification dans ${dureeFavoris(p.secondes)}`:'En attente du prochain passage'):p.incertains||p.refuses?'File interrompue : vérifie le résultat ci-dessous.':'Sélection traitée ou file arrêtée.')}</p>
       {!!p.ignores&&<small>Ignorés : la conversation contient déjà des messages. Aucun nouveau message envoyé à ces favoris.</small>}
-      {vue?.active&&vue.intervalleMinutes&&<small>{vue.intervalleMaxMinutes?`Temps entre les messages : entre ${vue.intervalleMinutes} et ${vue.intervalleMaxMinutes} min, tiré au hasard.`:`Temps entre les messages : ${vue.intervalleMinutes} min.`} Le plafond horaire peut prolonger l’attente.</small>}
+      {vue?.active&&vue.intervalleMinutes!=null&&<small>{vue.intervalleMinutes===0?'Temps entre les messages : 6 à 10 s, tiré au hasard (comme Vintex).':vue.intervalleMaxMinutes?`Temps entre les messages : entre ${vue.intervalleMinutes} et ${vue.intervalleMaxMinutes} min, tiré au hasard.`:`Temps entre les messages : ${vue.intervalleMinutes} min.`} Le plafond horaire peut prolonger l’attente.</small>}
       {!!p.total&&<p>{p.attente} en attente · {p.encours} en cours{p.incertains?` · ${p.incertains} à vérifier sur Vinted`:''}{p.refuses?` · ${p.refuses} interrompu(s)`:''}{p.annules?` · ${p.annules} annulé(s)`:''}{p.verifies?` · ${p.verifies} clôturé(s) après vérification manuelle`:''}</p>}
       {vue?.active&&!phase&&(!ecranActif||typeof document!=='undefined'&&document.visibilityState==='hidden'||!disponible)&&<p role="status">Envois suspendus : {disponible?'reviens sur cet écran pour reprendre.':'vérifie la connexion de l’extension au bon compte.'}</p>}
     </div>}
