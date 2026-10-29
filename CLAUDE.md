@@ -43,6 +43,14 @@
 > test, meurt déjà sur origin/main (« actions quotidiennes en haut », filtres eBay) : le bloc a été prouvé posé au début du banc.
 > Geste de Julien : aucun — s'il veut l'écran, Réglages → Stock et rangement → Organisation.
 
+> **29 octobre — offres, extension 5.286 :** la fusion partagée `src/conversations.js` /
+> worker garde un état accepté/refusé/expiré/précédent face à une ancienne copie en attente.
+> Deux identités d’offre contradictoires pour le même message font refuser la fusion.
+> `suiviNegociationVinted` exclut une offre d’une autre transaction explicitement identifiée ;
+> le sélecteur et le résumé ne réactivent plus « précédente » via un doublon.
+> `offres-fusion.test.mjs` exécute les deux versions. Archives 5.286 générées.
+> Rien n’a été envoyé à un compte marchand. Voir `docs/offres-etats-stables.md`.
+
 > **29 octobre (soir) — revue de la republication et des favoris (5.285) :** « tout doit être parfait ». Dix défauts
 > trouvés en relisant le code, tous corrigés : la file des mises en ligne planifiées s'écrit une à la fois (une
 > planification pendant un réveil effaçait une paire) ; un job resté « en cours » (Chrome a tué le service worker)
