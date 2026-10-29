@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.277.0';
+const CODE_VERSION = '5.278.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -8414,7 +8414,8 @@ function uuidRecreer() {
 // Le corps de création : la recette de CETTE annonce, jamais un champ deviné.
 // Rend { item } ou { manque: [...] }.
 function itemPourRecreer({ modeleCorps, codes, titre, prix, description, brand, photoIds, temp }) {
-  const assigned = photoIds.map((id) => ({ id, ai_detected: false, orientation: 0, c2pa_read_error: 'other', digital_source_type: [] }));
+  // (29 oct.) Tout passe par un brouillon : la forme COURTE {id, orientation} — celle des brouillons du site et de Vintex (mesurée).
+  const assigned = photoIds.map((id) => ({ id, orientation: 0 }));
   let base = null;
   if (modeleCorps) { try { const o = JSON.parse(modeleCorps); const it = o && (o.item && typeof o.item === 'object' ? o.item : null); if (it && it.catalog_id != null) { base = { ...it }; for (const k of ['photos', 'upload_session_id', 'is_draft', 'is_hidden', 'is_closed', 'push_up']) delete base[k]; } } catch (_) {} }
   if (!base) {
@@ -8454,7 +8455,9 @@ const DESCRIPTION_MIN = 5;   // mesuré : « Le champ Description doit comprendr
 // plage, jamais deux fois la même : entre deux photos 3–9 s, avant le brouillon
 // 6–15 s, avant la mise en ligne 15–40 s, avant de retenter 8–20 s. C'est lui qui
 // lance (atelier §3) ; les garde-fous (20 actions/h, file, pause Vinted) restent.
-const PAUSES_REPUB = { photo: [1500, 3000], brouillon: [2000, 5000], enLigne: [60000, 180000], reessai: [8000, 20000] };
+// Mesuré sur Vintex (29 oct., 2 articles) : lecture → 1re photo 1,6–4,2 s ; entre deux photos 2,1–4,4 s ;
+// dernière photo → brouillon ~1 s ; brouillon → suppression 0,4–0,7 s ; brouillon → mise en ligne 65–163 s.
+const PAUSES_REPUB = { lecture: [1500, 4000], photo: [2000, 4500], brouillon: [800, 2000], suppression: [400, 800], enLigne: [60000, 180000], reessai: [8000, 20000] };
 // (28 oct., « c'est trop long et on ne suit pas vraiment l'avancée ») Le geste en
 // cours (une annonce ou un brouillon) : chaque pause est annoncée à l'app avec sa
 // durée, pour qu'elle affiche le compte à rebours. Une seule à la fois (file Vinted).
@@ -8596,7 +8599,7 @@ async function publierBrouillon(msg) {
   if (stop) return { accepte: false, code: stop.code, raison: stop.error };
   return await avecVinted(async () => {
     const temp = (typeof r.d.temp_uuid === 'string' && r.d.temp_uuid) ? r.d.temp_uuid : uuidRecreer();
-    const corpsC = { draft: { ...r.d, id: Number(id) }, push_up: false, parcel: null, upload_session_id: temp };
+    const corpsC = { draft: { ...r.d, id: Number(id) }, feedback_id: null, parcel: null, push_up: false, upload_session_id: temp };
     suiviRepub(id); etapeRepub(id, 'en-ligne');
     await poserVerrouRecreer('b' + id);
     let rc = await vintedPage(acc, 'POST', `/api/v2/item_upload/drafts/${id}/completion`, corpsC, { timeoutMs: 60000 });
@@ -8732,9 +8735,9 @@ async function refaireBrouillon(msg) {
     const tp = await televerserPhotosRecreer(acc, urls, [], reglagesPhotoSurs(vb.reglages), temp, (k, n) => etapeRepub(id, 'photos', { fait: k, total: n }));
     if (tp.sansPage) return { accepte: false, code: 'onglet-vinted', raison: tp.erreur };
     if (!tp.ids) return { accepte: true, etape: 'echec', refaire: true, raison: `${tp.erreur} — aucun brouillon n'a été créé, tout reste enregistré dans VRM` };
-    const assigned = tp.ids.map((pid) => ({ id: pid, ai_detected: false, orientation: 0, c2pa_read_error: 'other', digital_source_type: [] }));
+    const assigned = tp.ids.map((pid) => ({ id: pid, orientation: 0 }));
     const brouillon = { ...d, id: null, temp_uuid: temp, assigned_photos: assigned }; delete brouillon.push_up;
-    const corpsB = { draft: brouillon, parcel: null, upload_session_id: temp };
+    const corpsB = { draft: brouillon, feedback_id: null, parcel: null, upload_session_id: temp };
     etapeRepub(id, 'brouillon');
     await pauseRepub('brouillon');
     await poserVerrouRecreer('r' + id);
@@ -8761,7 +8764,7 @@ async function refaireBrouillon(msg) {
       return { accepte: true, etape: 'fait', brouillon: true, raison: "le brouillon est rangé sur Vinted, mais VRM n'a pas pu lire son identifiant : mets-le en ligne depuis tes brouillons Vinted." };
     }
     const titre = String(d.title).replace(/\s+/g, ' ').trim();
-    const corpsC = { draft: { ...brouillon, id: Number(draftId) }, push_up: false, parcel: null, upload_session_id: temp };
+    const corpsC = { draft: { ...brouillon, id: Number(draftId) }, feedback_id: null, parcel: null, push_up: false, upload_session_id: temp };
     await rangerBrouillon(draftId, { uid, corps: JSON.stringify(corpsC), titre, prix: prixD, nPhotos: tp.ids.length, parVRM: true, ancienId: id, etat: 'brouillon' });
     if (!enLigneApres) {
       await majVersBrouillon(uid, id, { etat: 'fait', draftId });
@@ -9050,6 +9053,7 @@ async function recreerVinted(msg) {
     if (rl && rl.sansPage) return { accepte: false, code: 'onglet-vinted', raison: raisonSansPage(rl) };
     if (rl && (rl.status === 404 || rl.status === 410)) { noterDiag('recreer_annonce_absente'); return { accepte: true, etape: 'echec', raison: "Vinted dit que cette annonce n'existe plus (elle a peut-être été supprimée ou vendue) — VRM ne recrée rien. Regarde ton dressing." }; }
     // 2. Les photos, une par une, depuis la page.
+    await pauseRepub('lecture');
     const temp = uuidRecreer();
     const tp = await televerserPhotosRecreer(acc, urls, second, reglages, temp, (i, n) => etapeRepub(id, 'photos', { fait: i, total: n }));
     if (tp.sansPage) return { accepte: false, code: 'onglet-vinted', raison: tp.erreur };
@@ -9059,7 +9063,7 @@ async function recreerVinted(msg) {
     if (tailleAvant && built.item) built.item.item_attributes = [...(Array.isArray(built.item.item_attributes) ? built.item.item_attributes.filter((a) => a && a.code !== 'size') : []), { code: 'size', ids: [tailleAvant] }];
     const corps = { item: built.item, parcel: null, push_up: false, upload_session_id: temp };
     const brouillonV = { ...built.item, id: null }; delete brouillonV.push_up;
-    const corpsBV = { draft: brouillonV, parcel: null, upload_session_id: temp };
+    const corpsBV = { draft: brouillonV, feedback_id: null, parcel: null, upload_session_id: temp };
     // L'annonce ENREGISTRÉE dans VRM avant tout geste (écriture vérifiée).
     etapeRepub(id, 'enregistrement');
     const okCoffre = await unCoffreALaFois(() => supabaseUpsert('app_data', [{ id: `coffre_${uid}_${id}`, data: { ...(sauve || {}), id, uid, title: (sauve && sauve.title) || titre, price: (sauve && sauve.price) || prix, desc: descBase || (sauve && sauve.desc) || description, photos: (photosC.length >= urls.length ? photosC : urls), savedAt: new Date().toISOString(), firstSavedAt: (sauve && sauve.firstSavedAt) || new Date().toISOString(), versBrouillon: { corps: JSON.stringify(corpsBV), at: new Date().toISOString(), titre, prix, publier: !versB, reglages, etat: 'enregistre', uid } } }], 'id'));
@@ -9090,11 +9094,12 @@ async function recreerVinted(msg) {
       await majVersBrouillon(uid, id, { etat: 'fait', cause: 'sans-id' });
       return { accepte: true, etape: 'echec', raison: "le brouillon est rangé sur Vinted, mais VRM n'a pas pu lire son identifiant — VRM s'arrête là : rien n'a été supprimé, ton annonce est toujours en ligne (supprime le brouillon en trop dans tes brouillons Vinted)." };
     }
-    const corpsCV = { draft: { ...brouillonV, id: Number(draftId) }, push_up: false, parcel: null, upload_session_id: temp };
+    const corpsCV = { draft: { ...brouillonV, id: Number(draftId) }, feedback_id: null, parcel: null, push_up: false, upload_session_id: temp };
     await rangerBrouillon(draftId, { uid, corps: JSON.stringify(corpsCV), titre, prix, nPhotos: ids.length, parVRM: true, ancienId: id, etat: 'brouillon' });
     await majVersBrouillon(uid, id, { etat: 'brouillon-range', draftId, supprime: false });
     // 4. L'ancienne annonce SUPPRIMÉE, juste après (comme Vintex).
     etapeRepub(id, 'suppression');
+    await pauseRepub('suppression');
     const rdV = await vintedPage(acc, 'POST', `/api/v2/items/${id}/delete`, null, { timeoutMs: 60000 });
     const suppIncertaine = !rdV || rdV.sansPage || rdV.status === 0 || rdV.status >= 500;
     if (suppIncertaine && !versB) {

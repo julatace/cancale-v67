@@ -18,6 +18,13 @@
 > sur la 5.276 — dont « toutes les requêtes partent de la page, sans Authorization »). ⚠️ Non mesuré : que ce soit ce qui
 > a déclenché la restriction (probable, pas prouvé) ; que Vinted ne restreigne plus. **Geste de Julien** : laisser un
 > onglet vinted.fr ouvert sur le bon compte pendant Republier ; ne pas republier sur angeled92 avant la fin des 24 h.
+> **Suite (5.278), relu requête par requête contre le relevé de Vintex** : photos du brouillon en forme COURTE
+> `{id, orientation}` (VRM envoyait la forme longue de la création directe : `ai_detected`, `c2pa_read_error`,
+> `digital_source_type`), `feedback_id: null` comme Vintex, et les délais MESURÉS : lecture → 1re photo 1,5–4 s, entre
+> deux photos 2–4,5 s, ~1 s avant le brouillon, 0,4–0,8 s avant la suppression, 1 à 3 min avant la mise en ligne. Écarts
+> qui RESTENT, dits : en-têtes de Vintex jamais vus (l'Observateur ne les relève pas) ; VRM lit une fois par 24 h la
+> grille des tailles (`/item_upload/attributes`, Vintex non) ; VRM renvoie des photos réencodées en JPEG ; Vintex fait les
+> brouillons de plusieurs paires puis leurs mises en ligne, VRM une paire après l'autre.
 
 > **29 octobre — un VRAI suivi de ses déclarations URSSAF (Comptabilité) :** Julien : « pour l'URSSAF fait un vrai suivi ».
 > Carte « Suivi de tes déclarations URSSAF » (`SuiviUrssaf`, sous la carte URSSAF, règle pure `suiviUrssaf` +
