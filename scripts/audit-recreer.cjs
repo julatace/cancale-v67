@@ -63,7 +63,7 @@ const suppressions = (j) => de(j, /\/items\/\d+\/delete$/);
 async function run(opts = {}) {
   const f = monter({ src: process.env.BG_SRC || undefined, ...opts });
   if (typeof f.ctx.recreerVinted !== 'function') return { f, r: {}, absent: true };
-  let r = {}; try { r = await f.ctx.recreerVinted({ cmd: 'recreerVinted', uid: '111', id: '9101', prix: opts.prix != null ? opts.prix : 54, titre: opts.titre || 'Nike Air Max 1 — remise en ligne', plancher: opts.plancher, reglages: opts.reglages, lettre: opts.lettre, viaBrouillon: opts.viaBrouillon, versBrouillon: opts.versBrouillon, confirme: opts.confirme !== false }); } catch (e) { r = { erreur: String(e.message) }; }
+  let r = {}; try { r = await f.ctx.recreerVinted({ cmd: 'recreerVinted', uid: '111', id: '9101', prix: opts.prix != null ? opts.prix : 54, titre: opts.titre || 'Nike Air Max 1 — remise en ligne', plancher: opts.plancher, reglages: opts.reglages, lettre: opts.lettre, viaBrouillon: opts.viaBrouillon, versBrouillon: opts.versBrouillon, differer: opts.differer, confirme: opts.confirme !== false }); } catch (e) { r = { erreur: String(e.message) }; }
   return { f, r };
 }
 const LECTURE = /\/item_upload\/(colors|attributes)$/;   // lire la liste des couleurs ou des tailles n'est pas un geste
@@ -605,6 +605,30 @@ const zero = (j) => gestes(j).length === 0;   // 5.266 : lire la liste des coule
       } });
     let r = {}; try { r = await f.ctx.recreerVinted({ cmd: 'recreerVinted', uid: '111', id: GID, prix: 110, titre: 'Jordan 3 Fear', viaBrouillon: true, confirme: true }); } catch (e) { r = { erreur: String(e.message) }; }
     dit(r.code !== 'fiche-lecture' && r.etape === 'fait', `identifiant d'annonce > 2 147 483 647 : la fiche se lit et la republication aboutit`, JSON.stringify({ code: r.code, etape: r.etape, raison: r.raison })); }
+
+  // N — « à la suite, comme Vintex » (29 oct., 5.279) : la mise en ligne est
+  //     PLANIFIÉE (1 à 3 min après le brouillon) et ne bloque plus la file Vinted ;
+  //     l'extension la fait à son heure et rend le résultat (`maj · repub · fin`).
+  { const { f, r } = await run({ differer: true });
+    dit(r.etape === 'attente' && seqV(f.j) === 'LPPBS' && Number(r.jusqua) - Date.now() > 55000, "à la suite : brouillon et suppression faits, la mise en ligne est planifiée 1 à 3 min plus tard (rien n'attend dans la file)", `etape=${r.etape} seq=${seqV(f.j)} dans=${Math.round((Number(r.jusqua) - Date.now()) / 1000)}s`);
+    const att = (f.store.vrmRepubAttente || {})['9101'];
+    dit(att && att.draftId === '88001' && typeof att.corpsCV === 'string', "la mise en ligne à faire est rangée dans chrome.storage.local (survit à l'endormissement du service worker)", JSON.stringify(att && { d: att.draftId, du: att.du }));
+    let libre = false; try { libre = (await Promise.race([f.ctx.avecVinted(async () => 'ok'), new Promise((ok) => setTimeout(() => ok('bloquee'), 200))])) === 'ok'; } catch (_) {}
+    dit(libre, "pendant l'attente, la file Vinted est LIBRE : la paire suivante peut passer");
+    if (att) { f.store.vrmRepubAttente['9101'].du = 0; }
+    try { await f.ctx.miseEnLigneTick(); } catch (_) {}
+    const fin = f.j.evts.find((e) => e && e.quoi === 'repub' && e.id === '9101' && e.etape === 'fin');
+    dit(seqV(f.j) === 'LPPBSLM' && fin && fin.fin && fin.fin.etape === 'fait' && fin.fin.nouvelId === '88001', "à l'heure : lecture du brouillon, mise en ligne, et le résultat part à l'app", `seq=${seqV(f.j)} fin=${JSON.stringify(fin && fin.fin)}`);
+    dit(!Object.keys(f.store.vrmRepubAttente || {}).length && f.store.vrmRepubFins && f.store.vrmRepubFins['9101'], "faite une seule fois : retirée de l'attente, résultat gardé 24 h");
+    const n0 = gestes(f.j).length; try { await f.ctx.miseEnLigneTick(); } catch (_) {}
+    dit(gestes(f.j).length === n0, "un second réveil ne remet rien en ligne (jamais deux mises en ligne du même brouillon)"); }
+  { const { f, r } = await run({ differer: true, completion: 400 });
+    if (f.store.vrmRepubAttente && f.store.vrmRepubAttente['9101']) f.store.vrmRepubAttente['9101'].du = 0;
+    try { await f.ctx.miseEnLigneTick(); } catch (_) {}
+    const fin = f.j.evts.find((e) => e && e.quoi === 'repub' && e.id === '9101' && e.etape === 'fin');
+    dit(r.etape === 'attente' && fin && fin.fin && fin.fin.refaire === true && de(f.j, /completion$/).length === 1, "mise en ligne planifiée refusée : un seul envoi, le brouillon reste « à mettre en ligne » et l'app le sait", JSON.stringify(fin && fin.fin && { e: fin.fin.etape, r: fin.fin.refaire })); }
+  { const { f, r } = await run({ differer: true, versBrouillon: true });
+    dit(r.etape === 'fait' && r.brouillon === true && !Object.keys(f.store.vrmRepubAttente || {}).length, "En ligne → brouillon : rien n'est planifié (aucune mise en ligne)", `etape=${r.etape}`); }
 
   // L — côté app : une annonce et SA recréation au même N° (la suppression de
   //     l'ancienne a échoué) ne déclenchent AUCUNE renumérotation automatique

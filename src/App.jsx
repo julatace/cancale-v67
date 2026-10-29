@@ -118,7 +118,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.278.0';
+const EXT_ATTENDUE = '5.279.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -513,7 +513,7 @@ const extEnRetard = (v) => !!v && cmpVersion(v, EXT_ATTENDUE) < 0;
 //    « l'extension relève le suivi » plus tôt viserait une extension qui ne le
 //    fait pas — un faux dans l'autre sens (revue du 24 oct. ; corrigé le
 //    26 oct. avec la session extension, qui a relu l'historique).
-const EXT_CAPACITES = { favorisouvrir:'5.225.0', favorisliste:'5.218.0', suivivinted: '5.217.0', favoris: '5.217.0', liaison: '5.171.0', supprimees: '5.165.0', enligne: '5.170.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', preuves: '5.172.0', etatcompte: '5.181.0', lbcfiche: '5.182.0', relais: '5.183.0', lbcpack: '5.185.0', annulee: '5.185.0', confirmer: '5.206.0', retraitnotif: '5.206.0', offresauto: '5.234.0', vcpublier: '5.235.0', vcauto: '5.236.0', vcventes: '5.237.0', vcmessages: '5.238.0', vcachats: '5.239.0', republier: '5.240.0', republiermodif: '5.247.0', recreer: '5.248.0', lettre: '5.250.0', brouillon: '5.251.0', versbrouillon: '5.253.0', republierbrouillon: '5.254.0', refaire: '5.255.0', republierpage: '5.277.0' };
+const EXT_CAPACITES = { favorisouvrir:'5.225.0', favorisliste:'5.218.0', suivivinted: '5.217.0', favoris: '5.217.0', liaison: '5.171.0', supprimees: '5.165.0', enligne: '5.170.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', preuves: '5.172.0', etatcompte: '5.181.0', lbcfiche: '5.182.0', relais: '5.183.0', lbcpack: '5.185.0', annulee: '5.185.0', confirmer: '5.206.0', retraitnotif: '5.206.0', offresauto: '5.234.0', vcpublier: '5.235.0', vcauto: '5.236.0', vcventes: '5.237.0', vcmessages: '5.238.0', vcachats: '5.239.0', republier: '5.240.0', republiermodif: '5.247.0', recreer: '5.248.0', lettre: '5.250.0', brouillon: '5.251.0', versbrouillon: '5.253.0', republierbrouillon: '5.254.0', refaire: '5.255.0', republierpage: '5.277.0', republierfile: '5.279.0' };
 // Trois états, jamais un seul : pas d'extension ici · en retard · à jour.
 const extSait = (quoi) => {
   if (!vmrExtPresent()) return 'absente';                    // téléphone, autre navigateur
@@ -12093,6 +12093,12 @@ function texteSecoursTaille(p) {
   if (p && p.envoye) return `Vinted a refusé la taille : VRM a retrouvé la taille « ${p.taille || '?'} » dans la grille de Vinted — nouvel essai`;
   return 'Vinted a refusé la taille : VRM cherche la taille de la paire dans la grille de Vinted';
 }
+// (29 oct.) Le résultat d'une mise en ligne planifiée, lu comme celui d'une paire faite d'un trait.
+function etatDeFinRepub(fin) {
+  const f = fin || {};
+  const etat = f.accepte && ['fait', 'double', 'incertain'].includes(f.etape) ? f.etape : (f.accepte && f.refaire) ? 'a-refaire' : 'echec';
+  return { etat, raison: f.raison || (etat === 'echec' ? "la mise en ligne planifiée n'a pas abouti" : ''), nouveau: f.nouveau };
+}
 function majProgRepub(p, d) {
   const id = String(d.id); const cur = p[id] || {};
   if (d.pause) return { ...p, [id]: { ...cur, pause: { quoi: String(d.pause), jusqua: Number(d.jusqua) || 0, ms: Number(d.ms) || 0 } } };
@@ -12249,7 +12255,10 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
   // déduit : le résultat reste celui que rend l'extension à la fin.
   const [prog, setProg] = useState({});              // id → { etape, fait, total }
   useEffect(() => {
-    const f = (e) => { const d = e && e.detail; if (d && d.type === 'maj' && d.quoi === 'repub' && d.id) setProg((p) => majProgRepub(p, d)); };
+    const f = (e) => { const d = e && e.detail; if (!(d && d.type === 'maj' && d.quoi === 'repub' && d.id)) return;
+      // (29 oct.) La mise en ligne planifiée est faite : son résultat remplace « prévue vers… ».
+      if (d.etape === 'fin') { const fin = d.fin || {}; const id = String(d.id); setSt((p) => (p[id] && p[id].etat === 'planifiee') ? { ...p, [id]: etatDeFinRepub(fin) } : p); return; }
+      setProg((p) => majProgRepub(p, d)); };
     window.addEventListener('vrm:ext', f);
     return () => window.removeEventListener('vrm:ext', f);
   }, []);
@@ -12326,7 +12335,8 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
   React.useEffect(() => {
     if (mode !== 'run' || busy.current) return;
     const suiv = aFaire.find((a) => !st[a.id]);
-    if (!suiv) { setMode('fini'); return; }
+    // Des mises en ligne encore planifiées (« à la suite ») : la file n'est finie qu'après elles.
+    if (!suiv) { if (!aFaire.some((a) => (st[a.id] || {}).etat === 'planifiee')) setMode('fini'); return; }
     const premier = !Object.keys(st).length;
     let annule = false;
     let delai = 0;
@@ -12340,8 +12350,8 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
       const x = apercu(suiv);
       let r; try { r = await publier(suiv, { prix: x.prix != null ? x.prix : suiv.prix, titre: x.titre || suiv.titre, reglages: { ...reg }, lettre: lettreOn && lettreOk ? (lettres[suiv.id] || '') : '', viaBrouillon: viaBrouillon && !!brouillonOk }); } catch (_) { r = { etat: 'echec', raison: 'erreur' }; }
       busy.current = false;
-      const etat = r && ['fait', 'double', 'incertain', 'a-refaire'].includes(r.etat) ? r.etat : 'echec';
-      setSt((p) => ({ ...p, [suiv.id]: { etat, raison: (r && r.raison) || (etat === 'echec' ? "l'extension n'a pas répondu" : ''), nouveau: r && r.nouveau } }));
+      const etat = r && ['fait', 'double', 'incertain', 'a-refaire', 'planifiee'].includes(r.etat) ? r.etat : 'echec';
+      setSt((p) => ({ ...p, [suiv.id]: { etat, raison: (r && r.raison) || (etat === 'echec' ? "l'extension n'a pas répondu" : ''), nouveau: r && r.nouveau, jusqua: r && r.jusqua } }));
       // Un refus qui vaut pour TOUTE la file (Vinted demande de ralentir, plafond
       // de l'heure atteint) : on s'arrête au lieu d'enchaîner les refus.
       if (r && (r.code === 'vinted-pause' || r.code === 'plafond')) { setArret(r.raison || ''); setMode('pause'); }
@@ -12482,7 +12492,7 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
                 <input type="checkbox" data-republier-via-brouillon disabled={!brouillonOk} checked={viaBrouillon && !!brouillonOk} onChange={(ev) => setViaBrouillon(ev.target.checked)} style={{ width: 20, height: 20, accentColor: C.accent, flexShrink: 0 }} />
                 <span>Passer par un brouillon Vinted, puis le mettre en ligne</span>
               </label>
-              <div style={{ fontSize: 12, color: C.muted }}>{brouillonOk ? (viaBrouillon ? (extSait('republierpage') === 'ok' ? 'Comme Vintex : tout passe par l’onglet vinted.fr ouvert dans ce Chrome (laisse-le ouvert, connecté sur le bon compte). Chaque annonce est enregistrée dans VRM, rangée en brouillon sur Vinted, PUIS l’ancienne est supprimée, et le brouillon est mis en ligne 1 à 3 min plus tard. Aucun essai en rafale : un refus s’arrête et le dit. Au plus 10 paires par jour et par compte. Si Vinted ne répond pas clairement, VRM s’arrête (jamais deux fois en ligne) ; rien n’est perdu, tout est enregistré dans VRM.' : `L’extension VRM installée ici fait encore l’ancienne republication (depuis son fond, avec des renvois automatiques) — mets-la à jour en ${EXT_CAPACITES.republierpage} : elle passera par l’onglet vinted.fr, comme le site.`) : 'L’annonce est créée directement en ligne.') : `Demande l'extension VRM ${EXT_CAPACITES.republierbrouillon} ou plus récente dans ce navigateur.`}</div>
+              <div style={{ fontSize: 12, color: C.muted }}>{brouillonOk ? (viaBrouillon ? (extSait('republierpage') === 'ok' ? 'Comme Vintex : tout passe par l’onglet vinted.fr ouvert dans ce Chrome (laisse-le ouvert, connecté sur le bon compte). Chaque annonce est enregistrée dans VRM, rangée en brouillon sur Vinted, PUIS l’ancienne est supprimée, et le brouillon est mis en ligne 1 à 3 min plus tard.' + (extSait('republierfile') === 'ok' ? ' À la suite, comme Vintex : pendant cette attente la paire suivante est déjà préparée (l’extension met chaque brouillon en ligne à son heure, même si tu fermes cette fenêtre).' : '') + ' Aucun essai en rafale : un refus s’arrête et le dit. Au plus 10 paires par jour et par compte. Si Vinted ne répond pas clairement, VRM s’arrête (jamais deux fois en ligne) ; rien n’est perdu, tout est enregistré dans VRM.' : `L’extension VRM installée ici fait encore l’ancienne republication (depuis son fond, avec des renvois automatiques) — mets-la à jour en ${EXT_CAPACITES.republierpage} : elle passera par l’onglet vinted.fr, comme le site.`) : 'L’annonce est créée directement en ligne.') : `Demande l'extension VRM ${EXT_CAPACITES.republierbrouillon} ou plus récente dans ce navigateur.`}</div>
             </div>}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
               <span style={maj}>Prix</span>
@@ -12585,7 +12595,7 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
                     <button type="button" aria-label="Monter" data-republier-monter={a.id} disabled={i === 0} onClick={() => bouger(a.id, -1)} style={{ border: 'none', background: 'transparent', color: i === 0 ? C.border : C.text, minWidth: 44, minHeight: 44, fontSize: 16, cursor: i === 0 ? 'default' : 'pointer' }}>↑</button>
                     <button type="button" aria-label="Descendre" data-republier-descendre={a.id} disabled={i === aFaire.length - 1} onClick={() => bouger(a.id, 1)} style={{ border: 'none', background: 'transparent', color: i === aFaire.length - 1 ? C.border : C.text, minWidth: 44, minHeight: 44, fontSize: 16, cursor: i === aFaire.length - 1 ? 'default' : 'pointer' }}>↓</button>
                   </span>}
-                  <span style={{ flexShrink: 0, maxWidth: '55%', textAlign: 'right', color: (s.etat === 'echec' || s.etat === 'double' || s.etat === 'incertain' || s.etat === 'a-refaire') ? C.warn : s.etat === 'fait' ? C.text : C.muted, fontWeight: s.etat ? 600 : 400 }}>{s.etat === 'fait' ? (s.refait ? `brouillon refait${s.raison ? ' · ' + s.raison : ''}` : A.fait) : s.etat === 'encours' ? 'en cours…' : s.etat === 'echec' ? `pas faite · ${s.raison}` : s.etat ? `⚠ ${s.raison}` : (mode === 'idle' ? '' : 'en attente')}</span>
+                  <span style={{ flexShrink: 0, maxWidth: '55%', textAlign: 'right', color: (s.etat === 'echec' || s.etat === 'double' || s.etat === 'incertain' || s.etat === 'a-refaire') ? C.warn : s.etat === 'fait' ? C.text : C.muted, fontWeight: s.etat ? 600 : 400 }} data-republier-prevue={s.etat === 'planifiee' ? (s.jusqua || 0) : undefined}>{s.etat === 'fait' ? (s.refait ? `brouillon refait${s.raison ? ' · ' + s.raison : ''}` : A.fait) : s.etat === 'encours' ? 'en cours…' : s.etat === 'planifiee' ? `brouillon prêt · mise en ligne vers ${s.jusqua ? new Date(s.jusqua).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : '…'}` : s.etat === 'echec' ? `pas faite · ${s.raison}` : s.etat ? `⚠ ${s.raison}` : (mode === 'idle' ? '' : 'en attente')}</span>
                   {s.etat === 'a-refaire' && refaire && mode !== 'run' && <button type="button" data-republier-refaire={a.id} onClick={() => refaireLigne(a)} style={{ ...btn(true), flexShrink: 0 }}>Refaire le brouillon</button>}
                 </div>
                 {recree && (s.etat === 'encours' || (['echec', 'a-refaire', 'incertain', 'double'].includes(s.etat) && prog[String(a.id)] && prog[String(a.id)].etape)) && (() => { const lst = action === 'versBrouillon' ? ETAPES_REPUB.versBrouillon : ((viaBrouillon && !!brouillonOk) ? ETAPES_REPUB.brouillon : ETAPES_REPUB.direct); const pe = progressionRepub(prog[String(a.id)], action, viaBrouillon && !!brouillonOk); return (
@@ -12596,7 +12606,7 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
               </React.Fragment>); })}
             </div>
             {mode !== 'idle' && aFaire.length > 0 && (() => {
-              const finies = aFaire.filter((a) => { const e = (st[a.id] || {}).etat; return e && e !== 'encours'; }).length;
+              const finies = aFaire.filter((a) => { const e = (st[a.id] || {}).etat; return e && e !== 'encours' && e !== 'planifiee'; }).length;
               const enCours = aFaire.find((a) => (st[a.id] || {}).etat === 'encours');
               const partEnCours = enCours && recree ? progressionRepub(prog[String(enCours.id)], action, viaBrouillon && !!brouillonOk).part : 0;
               const part = Math.min(1, (finies + partEnCours) / aFaire.length);
@@ -48914,9 +48924,16 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         });
         const publierR = async (a, v) => {
           if(!a.uid) return { etat:'echec', raison:'compte introuvable' };
-          const r=await vmrCmdSuivi({ cmd:'recreerVinted', uid:a.uid, id:a.id, prix:v.prix!=null?v.prix:undefined, titre:v.titre!=null?v.titre:undefined, plancher:a.floor, reglages:v.reglages, lettre:v.lettre||undefined, viaBrouillon:v.viaBrouillon===true, confirme:true }, 480000);
+          const r=await vmrCmdSuivi({ cmd:'recreerVinted', uid:a.uid, id:a.id, prix:v.prix!=null?v.prix:undefined, titre:v.titre!=null?v.titre:undefined, plancher:a.floor, reglages:v.reglages, lettre:v.lettre||undefined, viaBrouillon:v.viaBrouillon===true, differer:v.viaBrouillon===true&&extSait('republierfile')==='ok', confirme:true }, 480000);
           if (r.sansReponse) { brRefaire.relire(); return { etat:'incertain', code:'sans-reponse', raison:TEXTE_SANS_REPONSE }; }
           if (r && r.accepte && r.nouvelId && (r.etape==='fait' || r.etape==='double')) reporterNumero(a.id, String(r.nouvelId));
+          // (29 oct., « à la suite comme Vintex ») Mise en ligne PLANIFIÉE par l'extension :
+          // la paire suivante part tout de suite ; le résultat arrive plus tard (`maj · repub · fin`).
+          if (r && r.accepte && r.etape==='attente') {
+            const f=(e)=>{ const d=e&&e.detail; if(!d||d.type!=='maj'||d.quoi!=='repub'||String(d.id)!==String(a.id)||d.etape!=='fin')return; window.removeEventListener('vrm:ext',f); const fin=d.fin||{}; if(fin.accepte&&fin.nouvelId&&(fin.etape==='fait'||fin.etape==='double'))reporterNumero(a.id,String(fin.nouvelId)); if(fin.refaire)brRefaire.relire(); };
+            window.addEventListener('vrm:ext', f);
+            return { etat:'planifiee', jusqua:Number(r.jusqua)||0, raison:'', nouveau:r.nouveau };
+          }
           if (r && r.accepte && ['fait','double','incertain'].includes(r.etape)) return { etat:r.etape, raison:r.raison||'', nouveau:r.nouveau };
           if (r && r.accepte && r.refaire) { brRefaire.relire(); return { etat:'a-refaire', raison:r.raison||'' }; }
           return { etat:'echec', code:(r&&r.code)||'', raison:(r&&(r.raison||r.error))||"l'extension n'a pas répondu" };
