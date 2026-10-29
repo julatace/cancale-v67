@@ -125,7 +125,9 @@ else if (MUT === 'bornetoutes') muter('FIN_VENTILATION_RECU.test(l) || (FIN_SI_S
 else if (MUT === 'nbsp') muter("m = m.replace(/•••• (?=\\d)/g, '••••\\u00a0');", '');
 else if (MUT === 'texte') muter('hasStructured: v.trouve };', 'hasStructured: v.trouve || !!(vendeur || mode || trans) };');
 else if (MUT === 'jete') muter('else lignes.push({ libelle: l, centimes: null });', 'else continue;');
-else if (MUT === 'txtexte') muter("for (const l of lignesRecu(a && a.texte)) {\n    const m = l.match(", "for (const l of []) {\n    const m = l.match(");
+// (29 oct.) le n° se lit par la règle partagée (`api/_lib/recu-achat.js`) : la
+// mutation remet « le champ du serveur ou rien » (le texte n'est plus lu).
+else if (MUT === 'txtexte') muter('const txRecuAchat = (a) => transactionDeLaLigne(a);', "const txRecuAchat = (a) => { const t = String((a && a.transaction) || '').trim(); return /^\\d{6,}$/.test(t) ? t : ''; };");
 else if (MUT === 'mode') muter(".replace(/\\*{3,}\\s*(\\d{2,4})\\b/g, '•••• $1')", '');
 else if (MUT) { console.log('❌ mutation inconnue : ' + MUT); process.exit(2); }
 
@@ -151,6 +153,11 @@ const manque = NOMS.filter((n) => !decl.has(n));
 dit(!manque.length, 'la règle du reçu existe dans App.jsx (une règle pour la feuille et la fenêtre PDF)', manque.length ? 'absent : ' + manque.join(', ') : '');
 const ctx = vm.createContext({ console });
 let F = {};
+// (29 oct.) La règle du n° de transaction vit dans `api/_lib/recu-achat.js`
+// (une règle pour le serveur et l'app, §11) : elle est chargée telle quelle.
+essaie('la règle partagée du n° se charge', () => {
+  vm.runInContext(fs.readFileSync(path.join(R, 'api', '_lib', 'recu-achat.js'), 'utf8').replace(/^export\s+/gm, ''), ctx);
+});
 essaie('la règle se charge', () => {
   vm.runInContext(NOMS.filter((n) => decl.has(n)).map((n) => decl.get(n)).join('\n') + `\n;this.__F = { ${NOMS.filter((n) => decl.has(n)).join(', ')} };`, ctx);
   F = ctx.__F || {};
@@ -264,7 +271,13 @@ essaie('transaction', () => {
   dit(l && l[0] && l[0].transaction === '23400000001', 'recusAchatDe pose le n° lu sur le reçu (la voie certaine de receiptFor)');
 });
 // receiptFor : la voie par titre ne prend plus un reçu qui porte un AUTRE n°.
-dit(/!a\.transaction && a\.article && normTitle\(a\.article\) === ot/.test(src) && /const list = Array\.isArray\(recusAchat\) \? recusAchat : \[\]/.test(src), 'receiptFor ne lit que les vrais reçus, et le titre ne relie qu’un reçu SANS n° de transaction (§5)');
+// (29 oct.) Le titre ne relie PLUS RIEN (§5) : receiptFor passe par la règle
+// d'identité partagée, indexée sur les SEULS vrais reçus.
+{
+  const rf = (/const receiptFor = [^\n]*/.exec(src) || [''])[0];
+  dit(/recuDeLAchat\(o, indexRecusAchat\)/.test(rf) && !/normTitle/.test(rf) && /indexRecusParTransaction\(recusAchat\b/.test(src),
+    'receiptFor ne lit que les vrais reçus, par le n° de transaction SEULEMENT — le titre ne relie rien (§5)', rf.slice(0, 120));
+}
 
 // ── 5. Le mode de paiement ────────────────────────────────────────────────
 essaie('mode de paiement', () => {

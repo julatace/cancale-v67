@@ -22,7 +22,7 @@
 //    D. les lignes font le total (Frais Vinted, Protection acheteurs, Réduction
 //       négative) ; une somme fausse est DITE ; la fenêtre PDF porte les MÊMES
 //       lignes ;
-//    E. le menu ⋯ d'un achat ne propose « Reçu d'achat (Vinted) » que pour un
+//    E. le menu ⋯ d'un achat ne propose « Reçu d'achat » que pour un
 //       vrai reçu, relié par le n° de transaction (jamais un email de statut ni
 //       le reçu d'un autre achat au même titre) ;
 //    F. « ‹ » et « PDF » font 44 px affichés ; Échap, « ‹ » et le retour du
@@ -434,8 +434,9 @@ async function fermerParEchap(pg) {
         // Le menu se ferme par son voile (le frère qui le précède), comme au doigt.
         const fermerMenu = async () => { await pg.evaluate(() => { const m = document.querySelector('[role="menu"].vrm-buy-menu'); if (m && m.previousElementSibling) m.previousElementSibling.click(); }); await pg.waitForTimeout(300); };
         const m1 = await libelleMenu(23400000001);
-        dit(m1.some((t) => /Reçu d'achat \(Vinted\)/.test(t)), 'E. l’achat dont le reçu porte son n° de transaction propose « Reçu d’achat (Vinted) »', JSON.stringify(m1));
-        const item = pg.locator('[data-achat-tx="23400000001"] [role="menuitem"]', { hasText: /Reçu d'achat \(Vinted\)/ });
+        // (29 oct.) Le document porte UN nom partout : « Reçu d'achat » (il disait « Reçu d'achat (Vinted) » dans ce menu).
+        dit(m1.some((t) => /^\s*Reçu d'achat\s*$/.test(t)), 'E. l’achat dont le reçu porte son n° de transaction propose « Reçu d’achat »', JSON.stringify(m1));
+        const item = pg.locator('[data-achat-tx="23400000001"] [role="menuitem"]', { hasText: /^\s*Reçu d'achat\s*$/ });
         if (await item.count()) {
           await item.first().click();
           await pg.locator(DIALOG).waitFor({ timeout: 8000 });
