@@ -200,11 +200,14 @@ async function contexte(b, W, H, tactile, sombre) {
       dit(mauvais.length === 0, `[${W}] Liens-textes : aucune marge négative qui écrase leur ligne`, mauvais.slice(0, 5).join(' | '));
     });
 
-    // F. Vinted → Annonces : « Gérer l'annonce » fait 44 px au doigt.
+    // F. Vinted → Annonces : les gestes de la fiche font 44 px au doigt.
+    //    (29 oct.) « ⋯ Gérer l'annonce » n'existe plus : ses gestes sont à la vue
+    //    sur chaque fiche (`.vrm-fiche-geste`) — c'est eux qu'on mesure.
     await essaie(`[${W}] F`, async () => {
       await aller(pg, 'plat_vinted'); await section(pg, 'Annonces');
-      const h = await pg.$$eval('.vrm-ann-actions > summary', ss => ss.map(s => s.getBoundingClientRect().height).filter(x => x > 0).map(Math.round)).catch(() => []);
-      dit(h.length > 0 && h.every(x => x >= 43.5), `[${W}] Vinted → Annonces : « Gérer l'annonce » fait 44 px de haut`, [...new Set(h)].join(', ') + ' px');
+      const h = await pg.$$eval('[data-fiche-gestes] .vrm-fiche-geste', ss => ss.map(s => s.getBoundingClientRect().height).filter(x => x > 0).map(Math.round)).catch(() => []);
+      const plancher = tactile ? 43.5 : 35.5;
+      dit(h.length > 0 && h.every(x => x >= plancher), `[${W}] Vinted → Annonces : les gestes de la fiche font ${tactile ? '44 px au doigt' : '36 px à la souris'}`, [...new Set(h)].join(', ') + ' px');
     });
 
     // G. Compta : le tableau « par période » tient dans l'écran (aucune colonne cachée).

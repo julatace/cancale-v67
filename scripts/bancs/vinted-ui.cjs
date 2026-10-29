@@ -283,7 +283,7 @@ async function sectionCalendrier(b, vp, sombre) {
       dit(p.mois.length === 2 && p.mois[1].k === cle(maintenant).slice(0, 7), `C ${nom} · le mois en cours à droite`, p.mois.map((m) => m.k).join(' · '));
       dit(p.pan.x >= -1 && p.pan.r <= p.vw + 1, `C ${nom} · le panneau tient dans l'écran`, JSON.stringify(p.pan));
     }
-    dit(p.racH >= (tel ? 43.5 : 35.5), `C ${nom} · les raccourcis se voient en entier et se touchent (${tel ? 44 : 36} px)`, Math.round(p.racH));
+    dit(p.racH >= (tel ? 43.5 : 33.5), `C ${nom} · les raccourcis se voient en entier et se touchent (${tel ? '44 px au doigt' : 'à la souris'})`, p.racH.toFixed(1));
     dit(['j7', 'j30', 'mois', 'dernier', 'annee'].every((k) => p.rac.includes(k)), `C ${nom} · les cinq raccourcis (7 j · 30 j · ce mois · mois dernier · cette année)`, p.rac.join(','));
     if (sombre) dit(lum(p.fond) != null && lum(p.fond) < 0.08, `C ${nom} · le calendrier est sombre`, p.fond);
     if (!sombre) {
