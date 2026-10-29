@@ -25,15 +25,16 @@ export function suiviNegociationVinted(c,uid,etatOffre){
  if(['inconnu','precedente'].includes(etat.etat))return null;
  if(etat.etat!=='attente')return {libelle:etat.libelle,detail:''};
  const opp=c?.opposite_user?.id;if(opp==null||derniere.e.user_id==null)return null;
- if(String(derniere.e.user_id)===String(opp))return {libelle:'Offre reçue',detail:'Une offre de l’acheteur attend une réponse.'};
+ if(String(derniere.e.user_id)===String(opp))return {libelle:'Offre reçue',detail:'Une offre attend ta réponse.'};
  if(uid!=null&&String(derniere.e.user_id)===String(uid)){
   const avant=offres.slice(0,-1).some(x=>x.e.user_id!=null&&String(x.e.user_id)===String(opp));
-  return {libelle:avant?'Contre-offre envoyée':'Offre envoyée',detail:'En attente de la réponse de l’acheteur.'};
+  return {libelle:avant?'Contre-offre envoyée':'Offre envoyée',detail:'En attente d’une réponse.'};
  }
  return null;
 }
 
 export function reponseAttendueVinted(c,r,captureTraitee){
+ if((c.transaction?.current_user_side||r?.side)!=='seller')return false;
  if(auteurDernierConfirme(c,r)!=='eux')return false;
  const traitee=instantVinted(captureTraitee),actuelle=instantVinted(c.updated_at);
  return traitee==null||actuelle>traitee;
