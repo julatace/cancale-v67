@@ -145,6 +145,7 @@ const ligneSuivi = (pg, label) => pg.evaluate((lb) => { const c = document.query
         dit(!!l && l.etat === 'declaree' && l.decl === '300' && l.paye === '', `A ${T} : septembre « déclarée », 300 € déclarés, cotisations pas notées`, JSON.stringify(l && { etat: l.etat, decl: l.decl, paye: l.paye }));
         dit(!!l && !/payé 300|payées 300/.test(l.texte) && /cotisations ≈/.test(l.texte), `A ${T} : le CA tapé n'est jamais affiché comme un paiement`, l && l.texte.replace(/\n/g, ' | ').slice(0, 160));
         if (process.env.SHOTS) { const el = await pg.$('[data-suivi-urssaf]'); if (el) await el.screenshot({ path: `${process.env.SHOTS}/suivi-avant-${vp.width}.png` }); }
+        if (process.env.SHOTS) { await pg.setViewportSize({ width: vp.width, height: 7000 }); await pg.waitForTimeout(600); await pg.screenshot({ path: `${process.env.SHOTS}/compta-${vp.width}.png` }); await pg.setViewportSize(vp); await pg.waitForTimeout(300); }
         // (29 oct.) Ta micro-entreprise : profil, calendrier, seuils.
         const mp = await attrs(pg, '[data-micro-profil]', 'data-micro-');
         dit(!!mp && mp.profil === 'passu' && await pg.$('[data-micro-vl-question]') != null, `M ${T} : versement libératoire pas encore répondu ⇒ la question est posée`, JSON.stringify(mp));
@@ -153,10 +154,14 @@ const ligneSuivi = (pg, label) => pg.evaluate((lb) => { const c = document.query
         const ms = await attrs(pg, '[data-micro-seuils]', 'data-micro-');
         dit(!!ms && ms.seuils === 'lu' && ms.tva === 'ok' && ms.plafond === 'ok' && Number(ms.ca) > 0, `M ${T} : jauge des seuils lue (TVA et plafond)`, JSON.stringify(ms));
         if (process.env.SHOTS) { const el = await pg.$('[data-micro-entreprise]'); if (el) await el.screenshot({ path: `${process.env.SHOTS}/micro-${vp.width}.png` }); }
+        const mi0 = await attrs(pg, '[data-micro-impots]', 'data-micro-impots-');
+        dit(!!mi0 && mi0.cases === '5KO,5TA' && Number(mi0.ca) > 0, `I ${T} : déclaration de revenus — versement libératoire pas répondu ⇒ les deux cases`, JSON.stringify(mi0));
         await touche(pg, '[data-micro-vl-choix="non"]', vp);
         await pg.waitForTimeout(1600);
         dit(opts.main && opts.main.vrm_micro_options && opts.main.vrm_micro_options.liberatoire === 'non', `M ${T} : « Non » est rangé au nuage`, JSON.stringify(opts.main && opts.main.vrm_micro_options));
         dit((await attrs(pg, '[data-micro-profil]', 'data-micro-') || {}).profil === 'non' && await pg.$('[data-micro-vl-question]') == null, `M ${T} : la question disparaît une fois répondue`);
+        dit(((await attrs(pg, '[data-micro-impots]', 'data-micro-impots-')) || {}).cases === '5KO', `I ${T} : « Non » ⇒ case 5KO seule`);
+        if (process.env.SHOTS) { const el = await pg.$('[data-micro-impots]'); if (el) await el.screenshot({ path: `${process.env.SHOTS}/impots-${vp.width}.png` }); }
         await touche(pg, '[data-micro-freq-choix="trimestriel"]', vp);
         await pg.waitForTimeout(1600);
         dit(opts.main && opts.main.vinted_urssaf_freq === 'trimestriel' && (await attrs(pg, '[data-micro-calendrier]', 'data-micro-') || {}).calendrier === 'trimestriel' && (await attrs(pg, '[data-urssaf-rythme]', 'data-urssaf-') || {}).rythme === 'trimestriel', `M ${T} : changer le rythme ⇒ un seul réglage, suivi par le calendrier et la carte du mois`);
@@ -189,6 +194,30 @@ const ligneSuivi = (pg, label) => pg.evaluate((lb) => { const c = document.query
         if (process.env.SHOTS) { const el = await pg.$('[data-suivi-urssaf]'); if (el) await el.screenshot({ path: `${process.env.SHOTS}/suivi-apres-${vp.width}.png` }); }
         await sain(pg, `Comptabilité ${T}`);
         dit(errs.length === 0, `A ${T} : aucune erreur de page`, errs.join(' | ').slice(0, 200));
+        await ctx.close();
+      });
+      await essaie(`R ${T}`, async () => {
+        // (29 oct.) Rien à confirmer, seuils loin ⇒ « Ta micro-entreprise » repliée, résumé lisible ;
+        // le récap mensuel aussi. Un geste l'ouvre.
+        const opts = { main: mainDe({ vrm_urssaf_declare: DECL_SEPT, vrm_micro_options: { liberatoire: 'non', acre: false, at: Date.parse('2026-10-20T09:00:00Z') } }) };
+        const { ctx, pg, errs } = await rendre(b, vp, opts);
+        await aller(pg, 'compta', '[data-suivi-urssaf="lu"]', 2500);
+        await pg.waitForTimeout(800);
+        const r = await attrs(pg, '[data-micro-repli]', 'data-micro-');
+        dit(!!r && r.repli === 'ferme' && !r.attention, `R ${T} : rien à confirmer ⇒ la micro-entreprise est repliée`, JSON.stringify(r));
+        const resume = await pg.evaluate(() => { const d = document.querySelector('[data-micro-repli]'); return d ? d.querySelector('summary').innerText : ''; });
+        dit(/Ta micro-entreprise/.test(resume) && /taux/.test(resume) && /à déclarer avant le/.test(resume), `R ${T} : le résumé dit le taux et la prochaine échéance`, resume.replace(/\n/g, ' | '));
+        const vis = await pg.evaluate(() => { const e = document.querySelector('[data-micro-seuils]'); return !!e && (e.checkVisibility ? e.checkVisibility() : e.getClientRects().length > 0); });
+        dit(!vis, `R ${T} : les seuils ne sont pas affichés tant que c'est replié`);
+        const rec = await pg.evaluate(() => { const d = document.querySelector('[data-recap-repli]'); return d ? { open: d.open } : null; });
+        dit(!rec || rec.open === false, `R ${T} : le récap mensuel est replié`, JSON.stringify(rec));
+        await touche(pg, '[data-micro-repli] > summary', vp);
+        await pg.waitForTimeout(400);
+        const r2 = await attrs(pg, '[data-micro-repli]', 'data-micro-');
+        const vis2 = await pg.evaluate(() => { const e = document.querySelector('[data-micro-seuils]'); return !!e && (e.checkVisibility ? e.checkVisibility() : e.getClientRects().length > 0); });
+        dit(!!r2 && r2.repli === 'ouvert' && vis2, `R ${T} : un geste l'ouvre et montre les seuils`, JSON.stringify(r2));
+        if (process.env.SHOTS) { await pg.setViewportSize({ width: vp.width, height: 7000 }); await pg.evaluate(() => { const d = document.querySelector('[data-micro-repli]'); if (d) d.open = false; }); await pg.waitForTimeout(600); await pg.screenshot({ path: `${process.env.SHOTS}/compta-replie-${vp.width}.png` }); await pg.setViewportSize(vp); }
+        dit(errs.length === 0, `R ${T} : aucune erreur de page`, errs.join(' | ').slice(0, 200));
         await ctx.close();
       });
       await essaie(`D ${T}`, async () => {

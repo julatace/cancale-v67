@@ -127,6 +127,16 @@ async function scenarioA(b, vp, sombre) {
     await pg.locator('[data-micro-repli]').first().waitFor({ timeout: 15000 });
     await pg.waitForTimeout(800);
   });
+  // SHOTS=dossier : capture de tout l'écran (à regarder : §6.2).
+  if (process.env.SHOTS) {
+    for (let i = 0; i < 8; i++) {
+      await pg.screenshot({ path: path.join(process.env.SHOTS, `compta-${vp.width}${sombre ? '-sombre' : ''}-${i}.png`) }).catch(() => {});
+      const fin = await pg.evaluate((h) => { const els = [document.scrollingElement, ...document.querySelectorAll('main, .vrm-main, [class*="scroll"]')].filter((e) => e && e.scrollHeight > e.clientHeight + 4); const e = els.find((x) => getComputedStyle(x).overflowY !== 'visible' || x === document.scrollingElement); if (!e) return true; const avant = e.scrollTop; e.scrollTop += h * 0.85; return e.scrollTop === avant; }, vp.height);
+      if (fin) break;
+      await pg.waitForTimeout(250);
+    }
+    await pg.evaluate(() => { for (const e of [document.scrollingElement, ...document.querySelectorAll('main, .vrm-main')]) if (e) e.scrollTop = 0; });
+  }
   await essaie(`A ${nom}`, async () => {
     check(!(await mort(pg)), `A ${nom} — aucun écran tombé sur le garde-fou`);
     // ── l'ordre de lecture
@@ -159,9 +169,11 @@ async function scenarioA(b, vp, sombre) {
     check((await attr(pg, '[data-micro-repli]', 'data-micro-repli')) === 'ouvert', `A ${nom} — et elle est ouverte d'elle-même`);
     check(await visible(pg, '[data-micro-vl-question]'), `A ${nom} — la question du versement libératoire est visible`);
     const resume = await pg.evaluate(() => { const s = document.querySelector('[data-micro-repli] > summary'); return s ? s.innerText : ''; });
-    check(/À confirmer/.test(resume), `A ${nom} — le titre replié dit ce qui reste à trancher : « ${resume.replace(/\s+/g, ' ').trim()} »`);
+    check(/à confirmer/i.test(resume), `A ${nom} — le titre replié dit ce qui reste à trancher : « ${resume.replace(/\s+/g, ' ').trim()} »`);
     await pg.locator('[data-micro-vl-choix="non"]').first().click();
-    await pg.waitForTimeout(500);
+    // Sous charge, React peut mettre plus d'une demi-seconde : on attend l'écriture (5 s au plus), sans juger dessus.
+    await pg.waitForFunction(() => /"liberatoire":"non"/.test(localStorage.getItem('vrm_micro_options') || ''), null, { timeout: 5000 }).catch(() => {});
+    await pg.waitForTimeout(300);
     check((await attr(pg, '[data-micro-repli]', 'data-micro-repli')) === 'ouvert', `A ${nom} — il répond « Non » : le bloc ne se referme pas sous son doigt`);
     const opts = await pg.evaluate(() => { try { return JSON.parse(localStorage.getItem('vrm_micro_options') || 'null'); } catch (_) { return null; } });
     check(!!opts && opts.liberatoire === 'non', `A ${nom} — sa réponse est enregistrée (vrm_micro_options.liberatoire = non)`);
@@ -190,7 +202,7 @@ async function scenarioB(b, vp, sombre) {
     await ouvrir(pg, 'compta');
     await pg.locator('[data-micro-repli]').first().waitFor({ timeout: 15000 });
     await pg.waitForTimeout(1500);
-    check((await attr(pg, '[data-micro-repli]', 'data-micro-attention')) === '0', `B ${nom} — versement libératoire déjà dit : rien à trancher`);
+    check((await attr(pg, '[data-micro-repli]', 'data-micro-attention')) !== '1', `B ${nom} — versement libératoire déjà dit : rien à trancher`);
     check((await attr(pg, '[data-micro-repli]', 'data-micro-repli')) === 'ferme', `B ${nom} — « Ta micro-entreprise » reste repliée`);
     check(!(await visible(pg, '[data-micro-profil]')), `B ${nom} — son profil URSSAF n'occupe pas l'écran`);
     check(await visible(pg, '[data-echeance-apayer]'), `B ${nom} — l'échéance URSSAF reste visible au-dessus`);

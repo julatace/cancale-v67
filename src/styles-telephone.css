@@ -64,6 +64,9 @@
   .vrm-app-shell .vrm-day-layout .vrm-day-week-help,
   .vrm-app-shell .vrm-day-layout .vrm-day-stock-prices,
   .vrm-app-shell .vrm-day-layout .vrm-day-stock-meter { display: none !important; }
+  /* … sauf les cotisations à mettre de côté (29 oct.) : un chiffre, en version courte. */
+  .vrm-app-shell .vrm-day-layout .vrm-day-money .vrm-day-recu [data-cotis-mois].vrm-day-note { display: block !important; }
+  .vrm-app-shell .vrm-day-layout [data-cotis-mois] .vrm-cotis-long { display: none; }
   .vrm-app-shell .vrm-day-layout [data-vendu-manque],
   .vrm-app-shell .vrm-day-layout .vrm-day-task-note {
     display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%;

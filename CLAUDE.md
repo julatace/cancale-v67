@@ -2,20 +2,20 @@
 
 > **29 octobre — COMPTABILITÉ SIMPLE :** Julien : « pour la compta, améliore tout, mets de côté la facturation électronique et
 > fais quelque chose de simple ». **Aucune règle de calcul ne change (§11) : seul l'ordre change.** En haut, ce qu'il regarde :
-> Vendu et reçu (`CaParPeriodeCarte`) → Bénéfice (`BeneficeCompta`) → URSSAF (`StatutFiscal` : la carte du mois et la prochaine
-> échéance, puis le « Suivi de tes déclarations URSSAF » de l'autre session, gardé tel quel, puis « Ta micro-entreprise » REPLIÉE
-> — ouverte d'elle-même seulement s'il y a une chose à trancher : versement libératoire pas dit, seuil de TVA ou plafond proche ;
-> elle ne se referme pas sous son doigt quand il répond) → Dépenses (les montants, « Ajouter une dépense », les abonnements). En
-> bas, **« Avancé », replié** (`data-compta-avance`) : résultat de l'année, récap mensuel, packs, ton entreprise, factures,
-> facturation électronique (Super PDP) — rien n'est supprimé, le sommaire y mène et l'ouvre. La tuile « Bénéfice — · saisis tes
-> prix d'achat » de la carte URSSAF est retirée : le bénéfice a sa carte juste au-dessus (§7, une notion une fois). Preuves : banc
-> `compta-simple.cjs` (port 9311, données inventées, 390 tactile clair + 1512 sombre ; 107 contrôles) — **53 rouges sur
-> origin/main**, et les mêmes chiffres sur les deux codes (vendu 60 €, reçu 60 €, bénéfice net −2,93 €, à payer 37,20 €,
-> dépenses du mois 25,49 €, résultat 321,52 €) ; 5 mutations rouges (« Avancé » ouvert d'office · micro-entreprise toujours
-> repliée · refermée sous le doigt · Organisation remise au menu · « Bénéfice — » redit). Les bancs qui lisent ces cartes
-> (chiffres-croises, compta-abonnements, compta-stock-ui, entreprise-stream, facturx, stats-compta, superpdp) ouvrent « Avancé »
-> d'un toucher, comme lui (`scripts/bancs/_compta.cjs`, sans effet sur un code d'avant). ⚠️ Non mesuré : sa vraie base. Geste
-> de Julien : aucun.
+> Vendu et reçu (`CaParPeriodeCarte`) → Bénéfice (`BeneficeCompta`) → URSSAF (`StatutFiscal` : carte du mois et prochaine
+> échéance, « Suivi de tes déclarations URSSAF », puis « Ta micro-entreprise » repliée — le repli et son ouverture d'office sont
+> ceux de l'autre session (« Comptabilité allégée », gardés tels quels à la fusion ; mon repli à moi est retiré : une règle pour une
+> notion) → **Tes dépenses** (les montants, « Ajouter une dépense », les abonnements). En bas, **« Avancé », replié**
+> (`data-compta-avance`) : résultat de l'année, récap mensuel (replié lui aussi, par l'autre session), packs, ton entreprise,
+> factures, facturation électronique (Super PDP) — rien n'est supprimé, le sommaire (Vendu et reçu · Bénéfice · URSSAF · Dépenses ·
+> Avancé) y mène et l'ouvre. La tuile « Bénéfice — · saisis tes prix d'achat » de la carte URSSAF est retirée : le bénéfice a sa
+> carte juste au-dessus (§7, une notion une fois). Preuves : banc `compta-simple.cjs` (port 9311, données inventées, 390 tactile
+> clair + 1512 sombre ; 107 contrôles ; `SHOTS=dossier` capture tout l'écran) — **38 rouges sur origin/main (cadafd4)**, et les
+> mêmes chiffres sur les deux codes (vendu 60 €, reçu 60 €, bénéfice net −2,93 €, à payer 37,20 €, dépenses du mois 25,49 €,
+> résultat 321,52 €) ; 3 mutations rouges sur le code fusionné (« Avancé » ouvert d'office : 12 · Organisation remise au menu : 2 ·
+> « Bénéfice — » redit : 2). Les bancs qui lisent les cartes rangées (chiffres-croises, compta-abonnements, compta-stock-ui,
+> entreprise-stream, facturx, stats-compta, superpdp) ouvrent « Avancé » d'un toucher, comme lui (`scripts/bancs/_compta.cjs`,
+> sans effet sur un code d'avant). ⚠️ Non mesuré : sa vraie base. Geste de Julien : aucun.
 
 > **29 octobre — ORGANISATION RETIRÉE DU MENU :** Julien : « on ne comprend pas à quoi ça sert, ça doit être utile sinon ça n'a
 > rien à faire ici ». **Mesuré (lecture seule, `vrm_operations_v1`)** : en dix jours, UN élément — une recherche eBay préparée,
@@ -27,6 +27,39 @@
 > `scripts/tests/operations-navigation.cjs` suit le nouveau chemin (rouge sur origin/main). ⚠️ `revendeurs.cjs`, qui porte ce
 > test, meurt déjà sur origin/main (« actions quotidiennes en haut », filtres eBay) : le bloc a été prouvé posé au début du banc.
 > Geste de Julien : aucun — s'il veut l'écran, Réglages → Stock et rangement → Organisation.
+
+> **29 octobre (suite, « c'est trop incompréhensible ») — Comptabilité allégée :** « Ta micro-entreprise » (calendrier,
+> seuils, profil, impôts) est REPLIÉE sous une ligne-résumé (taux · prochaine période à déclarer · seuils et impôts,
+> `data-micro-repli`) et s'ouvre d'elle-même si quelque chose demande son attention (versement libératoire pas répondu,
+> seuil proche ou dépassé : `data-micro-attention`). Le récap comptable mensuel est replié aussi (`data-recap-repli`).
+> « Vestiaire Co : pas encore relié » retiré de la carte URSSAF (dit à tous, n'apprenait rien) ; une vente Leboncoin sans
+> date renvoie à la saisie. Banc `suivi-urssaf.cjs` section R (replié par défaut, résumé, un geste l'ouvre).
+
+> **29 octobre — Comptabilité plus pro (mise en page) :** l'URSSAF « à faire » d'abord (carte du mois + prochaine
+> échéance, puis le suivi), ensuite calendrier · seuils · profil · déclaration de revenus, en GRILLE sur ordinateur
+> (`vrm-micro-grille`, deux colonnes ≥ 2 × 440 px), une colonne au téléphone. Les titres « Ton bénéfice », « Ta déclaration
+> URSSAF », « Tes charges », les sections et le récap ont tous le même style (15 px, 600, encre, `data-titre-section`) —
+> plus de petites capitales grises à côté de titres en gras. Récap mensuel : plus d'emoji, « Exporter (CSV) » en bouton
+> secondaire (§7 : un seul aplat d'accent). « Par mois / Par trimestre » (tenait mal à 390 px), espaces insécables
+> (« URSSAF ? », « « Compléter » »), « VRM ne remplace pas un comptable » (au lieu de « Je ne suis pas comptable »).
+> Aucune règle de calcul touchée. Banc `suivi-urssaf.cjs` : `SHOTS=dossier` capture maintenant tout l'écran.
+
+> **29 octobre — cotisations dans Ma journée, déclaration de revenus, CFE, ventes Leboncoin datées à la main :**
+> (2) Ma journée, sous « Reçu en {mois} » : « ≈ X € de cotisations à mettre de côté » = `aPayerUrssaf` du CA DÉCLARÉ du mois
+> (`declarables`, mois de versement, une vente déclarée ailleurs exclue), « au moins » si un compte ou des ventes sans date
+> manquent, rien hors micro ou sur dates illisibles (`data-cotis-mois`). Sur téléphone (où les phrases de Ma journée sont cachées
+> depuis le 27 oct.) il reste visible en version courte (`.vrm-cotis-long` cachée). (5) Comptabilité → « Ta déclaration de
+> revenus » (`declarationRevenus`, src/microEntreprise.js) : avant juillet l'année N-1, sinon N « en cours » ; cases VÉRIFIÉES
+> sur le formulaire 2042-C-PRO 2026 — **5KO** (micro BIC achat-revente, sans versement libératoire, CA brut, abattement 71 % fait
+> par les impôts) · **5TA** (avec versement libératoire) ; VL pas répondu ⇒ les deux dites, jamais devinée ; « au moins » sur une
+> source pas lue ; et `rappelCfe` (1er nov.–15 déc., exonérée l'année de création). (6) Une vente Leboncoin finalisée SANS date se
+> date à la main : `DaterVentesLbc` sous le CA par période (`data-dater-lbc`), `vrm_lbc_dates` (SYNC_KEYS, `{txId:'AAAA-MM-JJ'}`),
+> entre 2015 et aujourd'hui ; `avecDatesLbc` l'applique aux QUATRE lecteurs (CA par période, facturation, Comptabilité —
+> déclarables, rapport, vendu —, coque) ; **une date lue par l'extension gagne toujours**. (7) Banc `declare-urssaf` remis à la
+> forme : sur téléphone le choix des dépenses vit dans Comptabilité (caché dans Ma journée, décision du 27 oct.) ; `vendu-recu`
+> suit le retrait du masquage des ventes. Preuves : `audit-micro-entreprise.cjs` (26 ; mutations cases-devinees, annee-courante,
+> case-vl rouges), banc `dater-lbc.cjs` (390/1512 ; mutations « dates ignorées » 3 rouges, « la saisie écrase l'extension » 7
+> rouges), `vendu-recu` 62 verts, `declare-urssaf` vert. ⚠️ Non mesuré : sa vraie base (données inventées).
 
 > **29 octobre — rattraper les mois d'un coup, et un rappel 3 jours avant l'échéance :** « Noter mes N mois à la suite »
 > (Suivi URSSAF, dès 2 mois « pas notée »/« à déclarer ») ouvre le rapport sur le plus ancien ; « Enregistrer » ouvre
@@ -54,6 +87,24 @@
 > seulement si proche/dépassé). Le mot « encaissé » reste interdit à l'écran (`audit-urssaf`) : « Reçu en 2026 ». Preuves :
 > `audit-micro-entreprise.cjs` (20 ; 7 mutations rouges), banc `suivi-urssaf.cjs` section M (profil, question VL, « Non » rangé,
 > rythme partagé ; 390/1512). ⚠️ Non mesuré : sa vraie base ; le CA de l'année n'est que ce que VRM a capté (plateformes reliées).
+
+> ⚠️⚠️ **29 octobre — PLAFOND D'ACTIONS PASSÉ DE 20 À 50 PAR HEURE ET PAR COMPTE (5.283), SA DÉCISION :** Julien :
+> « augmente la limite à 50 par heure comme vintex » (après la 5.282, qui disait 5 republications/h au plus). Ce chiffre
+> n'est pas mesuré chez Vinted : c'est son choix, le risque de blocage lui a été dit. `ACTIONS_MAX_HEURE` = **50** ; la
+> réserve des gestes sur clic (`RESERVE_GESTES` = 5) reste ⇒ les commandes de l'app (Republier, bordereaux) s'arrêtent à
+> **45** = **15 republications par heure et par compte** (3 actions chacune). Inchangés : compte de l'onglet, une requête à
+> la fois, pause Vinted (429/403), `REPUB_PAR_JOUR` 50, budget de LECTURE (20/h). Tests mis au nouveau chiffre :
+> `audit-exec`, `audit-relais` §7, `audit-compteurs-concurrents`, `audit-tout-generer`, `audit-recreer` §Q (tous verts).
+> Ne PAS le redescendre à 20 sans qu'il le demande.
+
+> **29 octobre — « il a laissé en brouillon : pas plus de 15 actions par heure » (5.282) :** une republication comptait
+> **5** actions (garde de départ, brouillon, suppression, garde de la mise en ligne, mise en ligne) ; avec la mise en ligne
+> planifiée (5.279), d'autres paires passaient entre-temps et la mise en ligne était REFUSÉE par la borne des commandes de
+> l'app (15/h) — l'ancienne annonce déjà supprimée, il ne restait qu'un brouillon. Désormais la paire RÉSERVE ses 3 gestes
+> (2 pour « En ligne → brouillon ») d'un coup avant le premier (`gardeStricte({actions})`, `compterAction(…, n)`) ; plus
+> de place ⇒ rien ne part, l'annonce reste en ligne, c'est dit ; la mise en ligne ne revérifie que le compte et la pause.
+> Le plafond (20/h, 15 pour l'app) n'a PAS bougé (§3) : 5 republications par heure et par compte au plus. Preuve :
+> `audit-recreer.cjs` §Q (147 ; 2 rouges sur origin/main : « brouillon-a-refaire … 15 actions »).
 
 > ⚠️⚠️ **29 octobre — REPUBLIER « COMME VINTEX » (5.277), après la restriction de 24 h d'angeled92 :** Vinted a écrit
 > « activité automatisée » après une republication de VRM. Mesuré (extension VRM Observateur, lecture seule, 266 requêtes
@@ -108,7 +159,7 @@
 > (sans onglet ⇒ `onglet_vinted`, RIEN n'est envoyé), `PAUSES_FAVORI`, `prixDeTransaction` (réponse jamais vue : lue
 > défensivement, prix illisible ⇒ pas d'offre, le message part), `prixOffreFavori` (jamais ≥ prix, jamais < 1 €) ; le fil
 > n'est relu que si la réponse de création ne suffit pas aux contrôles. GARDÉ : autorisation serveur à usage unique,
-> vérification, identité, historique, plafond 10/60 min, une action consommée (l'offre n'en compte pas une de plus).
+> vérification, identité, historique, une action consommée (l'offre n'en compte pas une de plus).
 > Rythme « Comme Vintex » (`intervalleMinutes: 0` ⇒ `delaiFavori` tire 6–9,6 s côté serveur, `DELAI_VINTEX_MS`) ; l'app
 > sonde la file à 3 s. **Republication** : la grille des tailles n'est PLUS JAMAIS lue pendant une republication (Vintex
 > ne la lit pas) — seulement le cache 24 h (`cacheSeul`, sinon la phrase et `tailles_cache_absent`) ; plafond
@@ -116,8 +167,23 @@
 > `REPUB_ESP_VINTEX`). Preuves : `audit-favoris-vintex.cjs` (17 ; `--prouve` 2 rouges sur origin/main : création depuis
 > le fond, pas de transaction ni d'offre), `audit-recreer.cjs` (144, grille jamais demandée), tests favoris (420, 51,
 > 105, 84). ⚠️ Restent différents, dits : `is_personal_data_sharing_check_skipped` à false (valeur de Vintex inconnue),
-> en-têtes de Vintex jamais vus, plafond 10/h gardé. **Geste de Julien** : installer la 5.280, laisser un onglet
+> en-têtes de Vintex jamais vus. **Suite, « oui enlève le »** : le plafond de 10 messages / 60 min de la file
+> (`favoris-file.js`, `reserverFile`/`vueFile`) est RETIRÉ, sa décision ; seul reste le plafond de 20 actions/h de
+> l'extension (§3, jamais retiré : chaque message en consomme une). Tests favoris mis à jour (15, 420). **Geste de Julien** : installer la 5.280, laisser un onglet
 > vinted.fr ouvert sur le bon compte pendant les messages et la republication.
+
+> **29 octobre — FAVORIS « inspire-toi de Vintex » (5.281) :** Julien, captures de Vintex : « inspire-toi si jamais tu trouves ça
+> bien ». Repris : (1) variables du message `{username}` (pseudo lu dans le FIL VÉRIFIÉ, `c.opposite_user.login`, au moment
+> d'envoyer — jamais deviné ; absent ⇒ retiré proprement) et `{a|b}` (une variante tirée par message) ; toute autre accolade
+> est refusée (`erreurVariablesFavori`) ; (2) offre « Sans offre · Diminuer (% ou €) · Fixer à », arrondi à l'euro inférieur
+> (`offreFavori` dans les réglages : `offreMode`/`offreValeur`/`arrondi`, l'ancien `pourcentage` lu tel quel ; `prixOffreFavori`
+> jamais ≥ prix ni < 1 €) ; (3) « Attente 8 s… » sur la ligne du prochain favori. ⚠️ Plus de phrase « Je te propose une
+> réduction… » ajoutée au texte : la vraie offre Vinted suit (comme Vintex) ; un message est donc obligatoire. Règle UNIQUE
+> `src/favorisMessage.js`, recopiée entre les balises `<favoris-message-regle>` de `background.js` (test
+> `favoris-message.test.mjs` : copies identiques). Variables ou offre en € / arrondie ⇒ extension 5.281 exigée : l'app bloque
+> le lancement (`EXT_CAPACITES.favorisperso`) et le serveur refuse l'autorisation à une plus ancienne (`exige5281`). Pas repris :
+> les conditions de Vintex (≥ 2 favoris, jours, créneau) — elles servent ses règles automatiques, VRM n'envoie que sur son clic.
+> Preuves : `favoris-message.test.mjs` (6), `favoris-vinted-interface` (120), `favoris-serveur`, audit Vintex (17).
 
 > **29 octobre (suite, « parfait ») — le suivi URSSAF corrigé et complété :** ⚠️ la 1ʳᵉ version affichait « payé » le champ
 > `montant` du registre — c'est le **CA TAPÉ depuis son espace URSSAF**, pas un paiement. Désormais : déclaré = `montant` s'il
@@ -1308,8 +1374,8 @@ traduction des messages · mode équipe — les fonctions payantes selon la règ
 
 
 **Garde-fous de l'extension, à ne jamais retirer** : agir uniquement au nom du
-**compte connecté dans l'onglet** (`garde`), plafond de **20 actions/heure par
-compte**, plafond par visite, requêtes **une par une** en attendant la réponse.
+**compte connecté dans l'onglet** (`garde`), plafond de **50 actions/heure par
+compte** (20 jusqu'au 29 octobre, monté à 50 sur sa décision), plafond par visite, requêtes **une par une** en attendant la réponse.
 
 ---
 

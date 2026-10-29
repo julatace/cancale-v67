@@ -142,6 +142,7 @@ const aller=async(pg,tab,repere,ms=1500)=>{
 const publier=async(pg)=>{
   await aller(pg,'cat_ventes',null,500);
   await pg.waitForFunction(()=>{ try{ const v=JSON.parse(localStorage.getItem('vinted_urssaf_mois')||'null'); return !!(v&&Array.isArray(v.mois)); }catch(_){ return false; } },null,{timeout:25000}).catch(()=>{});
+  if(process.env.SHOTS){ const vp=pg.viewportSize(); await pg.setViewportSize({width:vp.width,height:4000}); await pg.waitForTimeout(700); await pg.screenshot({path:`${process.env.SHOTS}/ventes-${vp.width}.png`}); await pg.setViewportSize(vp); }
   return pg.evaluate(()=>{ try{ return JSON.parse(localStorage.getItem('vinted_urssaf_mois')||'null'); }catch(_){ return null; } });
 };
 // L'échéance : l'attribut si l'écran le porte, sinon le texte rendu (le build

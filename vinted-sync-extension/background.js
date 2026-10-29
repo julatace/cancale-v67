@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.280.0';
+const CODE_VERSION = '5.284.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -7833,8 +7833,12 @@ async function grilleTailles(uid, acc, catalogId, opts = {}) {
   let st = null; try { st = (await chrome.storage.local.get(TAILLES_VU))[TAILLES_VU] || null; } catch (_) {}
   const c = st && st[cat];
   if (c && Array.isArray(c.options) && Number(c.at) > Date.now() - 24 * 3600000) return { options: c.options, requis: Array.isArray(c.requis) ? c.requis : [], sansTaille: !!c.sansTaille, codes: Array.isArray(c.codes) ? c.codes : [] };
-  // 5.280 : la republication ne la lit JAMAIS chez Vinted (Vintex ne l'appelle pas) — seulement le cache.
-  if (opts.cacheSeul) { noterDiag('tailles_cache_absent'); return { raison: 'grille des tailles pas lue (comme Vintex, VRM ne la demande pas pendant une republication)' }; }
+  // (29 oct., sa décision : « l'extension doit, avant d'appuyer sur publier, regarder si
+  // toutes les catégories sont remplies ») La 5.280 ne la lisait JAMAIS pendant une
+  // republication (cache seulement) : grille absente ⇒ la taille n'était PAS vérifiée et
+  // Vinted refusait « Le champ Taille doit être renseigné » après coup. Elle est lue
+  // (une fois par catégorie et par 24 h, comme la page de dépôt le fait), AVANT tout geste.
+  if (opts.cacheSeul) noterDiag('tailles_cache_absent_lue');
   const g = await gardeLecture(uid, acc, 'clic');
   if (g) return { raison: g.error };
   const r = await vintedPage(acc, 'POST', '/api/v2/item_upload/attributes', { attributes: [{ code: 'category', value: [Number(cat)] }] }, { timeoutMs: 20000 });
@@ -7925,6 +7929,35 @@ async function champsManquantsAvant(uid, acc, it, idsPaire, opts = {}) {
   }
   if (manque.length) noterDiag('avant_manque_' + manque.length);
   return [...new Set(manque)];
+}
+// (29 oct.) Le brouillon tel que Vinted le montre MAINTENANT (`GET item_upload/items/{id}`,
+// la page « Modifier » du brouillon — Vintex la lit aussi avant la mise en ligne).
+// Ce qu'il a changé sur Vinted (taille, état, catégorie…) l'emporte sur le corps
+// rangé ; ses photos réelles (forme courte {id, orientation}) remplacent des numéros
+// peut-être périmés. Forme jamais vue : lue défensivement, ses NOMS de clés gardés.
+// Rend { photos: n | 0 (aucune) | null (pas su) }.
+function photosDuBrouillonLu(it) {
+  const l = Array.isArray(it.photos) ? it.photos : (Array.isArray(it.assigned_photos) ? it.assigned_photos : null);
+  if (!l) return null;
+  return l.map((p) => (p && typeof p === 'object' ? p : { id: p })).filter((p) => Number.isSafeInteger(Number(p.id)) && Number(p.id) > 0)
+    .map((p) => ({ id: Number(p.id), orientation: Number(p.orientation) || 0 }));
+}
+function appliquerBrouillonLu(d, rl, id) {
+  const j = rl && rl.ok && rl.json && typeof rl.json === 'object' ? rl.json : null;
+  const it = j && (j.item && typeof j.item === 'object' ? j.item : (j.draft && typeof j.draft === 'object' ? j.draft : null));
+  if (!it) { noterDiag('brouillon_lu_illisible_' + ((rl && rl.status) || 0)); return { photos: null }; }
+  try { echantillonRate('brouillon_lu_forme', String(id), Object.keys(it).slice(0, 60).join(',')); } catch (_) {}
+  const f = ficheDeCorpsVinted({ item: it }, id);
+  if (f && !f.contredit) {
+    const c = f.codes || {};
+    for (const k of ['catalog_id', 'brand_id', 'package_size_id', 'brand']) if (c[k] != null) d[k] = c[k];
+    if (Array.isArray(c.color_ids) && c.color_ids.length) d.color_ids = c.color_ids;
+    if (Array.isArray(c.item_attributes) && c.item_attributes.length) d.item_attributes = c.item_attributes;
+    if (f.description && f.description.length >= DESCRIPTION_MIN) d.description = f.description;
+  }
+  const ph = photosDuBrouillonLu(it);
+  if (ph && ph.length) { d.assigned_photos = ph; noterDiag('brouillon_lu_photos'); }
+  return { photos: ph ? ph.length : null };
 }
 // Sur un refus de la taille : grille lue, taille au libellé exact posée, UN
 // nouvel essai (le corps est mis à jour sur place : l'appelant garde la bonne
@@ -8578,6 +8611,16 @@ async function publierBrouillon(msg) {
   if (manque.length) return { accepte: false, code: 'incomplet', raison: `ce brouillon n'a pas ${manque.join(', ')} — finis-le sur Vinted (« Modifier »), puis réessaie. Rien n'a été touché.` };
   // (29 oct.) Tout ce que Vinted exige est vérifié AVANT d'envoyer : la taille
   // fausse est corrigée au libellé exact de la paire ; le reste est nommé.
+  // Le brouillon VIVANT d'abord (lecture) : la vérification porte sur ce que Vinted a.
+  { const gL = await gardeLecture(uid, acc, 'clic');
+    if (!gL) {
+      const rl = await vintedPage(acc, 'GET', `/api/v2/item_upload/items/${id}`, null, { timeoutMs: 30000 });
+      if (rl && rl.sansPage) return { accepte: false, code: 'onglet-vinted', raison: raisonSansPage(rl) };
+      if (rl && (rl.status === 404 || rl.status === 410)) return { accepte: false, code: 'pas-dans-dressing', raison: "Vinted dit que ce brouillon n'existe plus — rien n'a été touché." };
+      const lu = appliquerBrouillonLu(r.d, rl, id);
+      if (lu.photos === 0) return { accepte: false, code: 'incomplet', raison: "Vinted refuserait ce brouillon : il n'a plus aucune photo chez Vinted. Ouvre-le sur Vinted (Mes brouillons → « Modifier »), rajoute les photos, puis réessaie. Rien n'a été touché." };
+      r.nPhotos = Array.isArray(r.d.assigned_photos) ? r.d.assigned_photos.length : r.nPhotos;
+    } }
   { const avant2 = JSON.stringify(r.d.item_attributes || []);
     const manque2 = await champsManquantsAvant(uid, acc, r.d, [b.ancienId, id], { cacheSeul: true });
     if (!manque2.length && JSON.stringify(r.d.item_attributes || []) !== avant2) { try { await rangerBrouillon(id, { corps: JSON.stringify({ ...JSON.parse(b.corps), draft: r.d }) }); } catch (_) {} }
@@ -9029,8 +9072,14 @@ async function recreerVinted(msg) {
   // (29 oct.) Quelques paires par jour et par compte (le modèle de Vintex).
   const jour = await gardeJourRepub(uid);
   if (jour) return { accepte: false, code: jour.code, raison: jour.raison };
-  // 3. Le 1er geste (créer) entre dans le plafond horaire ; la suppression compte le second.
-  const stop = await gardeStricte(uid, acc, { reserve: RESERVE_GESTES });
+  // 3. (29 oct., « il a laissé en brouillon : pas plus de 15 actions par heure ») Les
+  //    gestes de la paire sont RÉSERVÉS d'un coup AVANT le premier : brouillon +
+  //    suppression (+ mise en ligne). Avant, la paire comptait 5 actions (la garde,
+  //    le brouillon, la suppression, la garde de la mise en ligne, la mise en ligne)
+  //    et la mise en ligne planifiée était REFUSÉE par le plafond quand d'autres
+  //    paires étaient passées entre-temps — l'ancienne annonce déjà supprimée, il ne
+  //    restait qu'un brouillon. Plus de place pour toute la paire ⇒ rien ne part.
+  const stop = await gardeStricte(uid, acc, { reserve: RESERVE_GESTES, actions: msg.versBrouillon === true ? 2 : 3 });
   if (stop) return { accepte: false, code: stop.code, raison: stop.error };
   return await avecVinted(async () => {
     suiviRepub(id);
@@ -9092,7 +9141,6 @@ async function recreerVinted(msg) {
       await majVersBrouillon(uid, id, { etat: 'fait', cause: `brouillon-refuse-${rbV.status}` });
       return { accepte: true, etape: 'echec', raison: `Vinted a refusé le brouillon (${rbV.status}${msgB ? ' : ' + String(msgB).slice(0, 200) : ''}) — rien n'a été supprimé, ton annonce est toujours en ligne.${gesteRefus(rbV, corps)}` };
     }
-    await compterAction(uid, ACTIONS_MAX_HEURE);
     const draftId = idDeBrouillon(rbV.json);
     if (!draftId) {
       noterDiag('versbrouillon_brouillon_sans_id');
@@ -9117,7 +9165,6 @@ async function recreerVinted(msg) {
       await majVersBrouillon(uid, id, { etat: 'fait', draftId, supprime: false, cause: `suppression-refusee-${rdV.status}` });
       return { accepte: true, etape: 'echec', draftId, raison: `Vinted a refusé de retirer l'annonce (${rdV.status}) — elle est toujours en ligne. Le brouillon rangé sur Vinted est en trop : supprime-le dans tes brouillons Vinted.` };
     }
-    await compterAction(uid, ACTIONS_MAX_HEURE);
     await noterRepubJour(uid);
     if (suppIncertaine) noterDiag(`versbrouillon_suppression_incertaine_${(rdV && rdV.status) || 0}`);
     else { try { await noterSuppressionCompte(uid, id, new Date().toISOString()); } catch (_) {} }
@@ -9210,9 +9257,21 @@ function miseEnLigneTick() {
 async function finRepubBrouillon(acc, job) {
   const { id, uid, draftId, titre, prix, urls, lettreFin, sauve, description } = job;
   const corpsCV = JSON.parse(job.corpsCV);
-    const stopC = await gardeStricte(uid, acc, { reserve: RESERVE_GESTES });
+    // Sa place est réservée depuis le départ de la paire : ici on ne revérifie que le
+    // compte connecté et la pause de Vinted, jamais le plafond (l'ancienne est partie).
+    const stopC = await gardeStricte(uid, acc, { lecture: true });
     if (stopC) { await leverVerrouRecreer(id); await majVersBrouillon(uid, id, { etat: 'a-publier', draftId }); return { refaire: true, accepte: true, etape: 'brouillon-a-refaire', draftId, raison: `l'ancienne annonce est supprimée et le brouillon est rangé, mais il n'a pas été mis en ligne (${stopC.error}) — « Brouillons → en ligne » le met en ligne, sans en créer un autre.` }; }
-    await vintedPage(acc, 'GET', `/api/v2/item_upload/items/${draftId}`, null, { timeoutMs: 30000 });
+    const rlB = await vintedPage(acc, 'GET', `/api/v2/item_upload/items/${draftId}`, null, { timeoutMs: 30000 });
+    if (corpsCV && corpsCV.draft) {
+      const lu = appliquerBrouillonLu(corpsCV.draft, rlB, draftId);
+      const manqueF = lu.photos === 0 ? ['les photos'] : await champsManquantsAvant(uid, acc, corpsCV.draft, [id, draftId], { cacheSeul: true });
+      if (manqueF.length) {
+        await leverVerrouRecreer(id);
+        await majVersBrouillon(uid, id, { etat: 'a-publier', draftId, cause: 'incomplet' });
+        noterDiag('republier_fin_bloque_incomplet');
+        return { refaire: true, accepte: true, etape: 'brouillon-a-refaire', draftId, raison: `l'ancienne annonce est supprimée et le brouillon est rangé, mais VRM ne l'a PAS mis en ligne : Vinted le refuserait, il manque ${manqueF.join(', ')}. Ouvre-le sur Vinted (Mes brouillons → « Modifier »), complète, puis « Publier ».` };
+      }
+    }
     etapeRepub(id, 'en-ligne');
     const rcV = await vintedPage(acc, 'POST', `/api/v2/item_upload/drafts/${draftId}/completion`, corpsCV, { timeoutMs: 60000 });
     if (rcV && rcV.sansPage) {
@@ -9238,7 +9297,6 @@ async function finRepubBrouillon(acc, job) {
     try { await rangerBrouillon(draftId, { uid, titre, prix, nPhotos: job.nPhotos, parVRM: true, ancienId: id, etat: 'publie', publieLe: new Date().toISOString(), itemId: nouvelIdV }); } catch (_) {}
     try { await noterModeleRepub(nouvelIdV, job.corps, uid, acc.domain || 'www.vinted.fr'); } catch (_) {}
     try { await supabaseUpsert('app_data', [{ id: `coffre_${uid}_${nouvelIdV}`, data: { ...(sauve || {}), versBrouillon: undefined, id: nouvelIdV, uid, title: titre, price: prix, desc: description, lettreVRM: lettreFin || null, photos: urls, savedAt: new Date().toISOString(), firstSavedAt: new Date().toISOString(), recreeDe: id } }], 'id'); } catch (_) {}
-    await compterAction(uid, ACTIONS_MAX_HEURE);
     await majVersBrouillon(uid, id, { etat: 'fait', draftId, nouvelId: nouvelIdV });
     noterDiag('republier_ok');
     return { accepte: true, etape: 'fait', nouvelId: nouvelIdV, draftId, ancien: sauve && Number(sauve.price), nouveau: prix, nouveauTitre: titre };
@@ -9264,7 +9322,7 @@ async function finRepubBrouillon(acc, job) {
 //
 // Si on n'arrive pas à savoir quel compte est connecté (cookie absent), on
 // LAISSE PASSER : bloquer sur une détection ratée casserait l'outil.
-const ACTIONS_MAX_HEURE = 20;
+const ACTIONS_MAX_HEURE = 50;   // (29 oct.) 50/h par compte, SA décision (« comme Vintex ») ; était 20
 
 async function compteConnecte(domain) {
   try { return await activeAccountId(domain || 'www.vinted.fr'); } catch (_) { return null; }
@@ -9288,16 +9346,20 @@ function unCompteurALaFois(fn) {
   _chaineCompteurs = suite.then(() => {}, () => {});
   return suite;
 }
-function compterAction(uid, plafond = ACTIONS_MAX_HEURE) { return unCompteurALaFois(() => compterActionUn(uid, plafond)); }
-async function compterActionUn(uid, plafond) {
+function compterAction(uid, plafond = ACTIONS_MAX_HEURE, n = 1) { return unCompteurALaFois(() => compterActionUn(uid, plafond, n)); }
+async function compterActionUn(uid, plafond, n = 1) {
   try {
     const cle = 'vrmActions';
     const cur = (await chrome.storage.local.get(cle))[cle] || {};
     const t = Date.now(), ilYaUneHeure = t - 3600000;
     const list = (cur[uid] || []).filter(x => x > ilYaUneHeure).sort((a, b) => a - b);
     const max = Math.min(ACTIONS_MAX_HEURE, plafond);
-    if (list.length >= max) return { ok: false, n: list.length, resteMs: Math.max(0, list[list.length - max] + 3600000 - t) };
-    list.push(t); cur[uid] = list;
+    // (29 oct.) `n` places d'un coup : une republication RÉSERVE ses 3 gestes avant
+    // le premier (brouillon, suppression, mise en ligne) — jamais une paire arrêtée
+    // entre la suppression et la mise en ligne par le plafond.
+    const k = Math.max(1, Math.floor(Number(n) || 1));
+    if (list.length + k > max) return { ok: false, n: list.length, resteMs: Math.max(0, list[Math.max(0, list.length + k - 1 - max)] + 3600000 - t) };
+    for (let i = 0; i < k; i++) list.push(t); cur[uid] = list;
     await chrome.storage.local.set({ [cle]: cur });
     return { ok: true, n: list.length };
   } catch (_) { return { ok: true, n: 0 }; }
@@ -9310,6 +9372,8 @@ async function compterActionUn(uid, plafond) {
 //    actions de l'heure restent à ce qui part sur SON clic un par un (répondre,
 //    trancher une offre). Le total ne bouge pas (20/h) — monter ce chiffre
 //    serait deviner le seuil de Vinted (§3).
+//    (29 oct.) Le total est passé à 50/h sur SA décision (« comme Vintex ») :
+//    l'app s'arrête donc à 45, la réserve reste 5.
 const RESERVE_GESTES = 5;
 
 // ⚠️ BUDGET DE *LECTURE*, SÉPARÉ DU BUDGET D'ACTIONS (Julien, 3 octobre :
@@ -9484,12 +9548,13 @@ async function gardeStricte(uid, acc, opts = {}) {
   }
   if (opts.lecture) return null;            // lire n'engage rien : pas de plafond
   const reserve = Math.max(0, Number(opts.reserve) || 0);
-  const c = await compterAction(String(uid), ACTIONS_MAX_HEURE - reserve);
+  const nA = Math.max(1, Math.floor(Number(opts.actions) || 1));
+  const c = await compterAction(String(uid), ACTIONS_MAX_HEURE - reserve, nA);
   if (!c.ok) {
     const min = Math.max(1, Math.ceil(Number(c.resteMs || 0) / 60000));
     if (reserve && c.n < ACTIONS_MAX_HEURE) {
       return { ok: false, code: 'plafond-bordereaux',
-               error: `${ACTIONS_MAX_HEURE - reserve} actions sur ce compte dans l'heure — les ${reserve} dernières sont gardées pour répondre à tes acheteurs. La suite dans ${min} min.` };
+               error: `${nA > 1 ? `une republication prend ${nA} actions (brouillon, suppression, mise en ligne) et il en reste ${Math.max(0, ACTIONS_MAX_HEURE - reserve - c.n)} sur ` : ''}${ACTIONS_MAX_HEURE - reserve} actions sur ce compte dans l'heure — les ${reserve} dernières sont gardées pour répondre à tes acheteurs. La suite dans ${min} min.` };
     }
     return { ok: false, code: 'plafond',
              error: `${ACTIONS_MAX_HEURE} actions sur ce compte dans l'heure — on s'arrête là pour ne pas attirer l'attention. Réessaie dans ${min} min.` };
@@ -9613,10 +9678,12 @@ async function executerMessageFavori(uid,acc,body){
   }else noterDiag('favori_sans_transaction');
   const arret=await gardeStricte(uid,acc); // le message (et son offre) consomment UNE action
   if(arret)return rep('refuse');
-  // L'offre native de Vinted : seulement si une réduction est choisie ET le prix lu.
+  // L'offre native de Vinted : seulement si une offre est choisie ET le prix lu.
+  // 5.281 : `offre` {mode:'pct'|'euros'|'prix', valeur, arrondi} ; sinon l'ancien `pourcentage`.
   const pct=Number(body.pourcentage);
-  if(id(tx)&&Number.isInteger(pct)&&pct>=1&&pct<=99){
-    const prix=prixOffreFavori(prixAnnonce,pct);
+  const offre=body.offre&&typeof body.offre==='object'?body.offre:Number.isInteger(pct)&&pct>=1&&pct<=99?{mode:'pct',valeur:pct,arrondi:false}:null;
+  if(id(tx)&&offre){
+    const prix=prixOffreFavori(prixAnnonce,offre);
     if(prix){
       await pauseFavori('offre');
       if(await gardeStricte(uid,acc,{lecture:true}))return rep('refuse');
@@ -9626,10 +9693,14 @@ async function executerMessageFavori(uid,acc,body){
       noterDiag(o.ok?'favori_offre_ok':'favori_offre_refusee_'+(o.status||'reseau'));
     }else noterDiag('favori_offre_prix_inconnu');
   }
+  // {username} = le pseudo du destinataire lu dans CE fil (vérifié plus haut) ;
+  // {a|b} = une variante tirée au hasard pour ce message.
+  const texteFinal=personnaliserMessageFavori(body.message,String(c?.opposite_user?.login||'')).slice(0,2000);
+  if(!texteFinal.trim())return rep('refuse',400);
   await pauseFavori('reponse');
   if(await gardeStricte(uid,acc,{lecture:true}))return rep('refuse');
   etape('envoi');
-  const r=await vintedPage(acc,'POST',`/api/v2/conversations/${convId}/replies`,{reply:{body:body.message,photo_temp_uuids:null,is_personal_data_sharing_check_skipped:false}},{timeoutMs:12000});
+  const r=await vintedPage(acc,'POST',`/api/v2/conversations/${convId}/replies`,{reply:{body:texteFinal,photo_temp_uuids:null,is_personal_data_sharing_check_skipped:false}},{timeoutMs:12000});
   if(r.sansPage)return rep('incertain',0,'reponse_inconnue');
   if(r.ok&&r.json?.code===0){etape('confirmation');return rep('envoye',r.status);}
   return rep(!r.ok&&r.status>=400&&r.status<500?'refuse':'incertain',r.status);
@@ -9658,14 +9729,53 @@ function prixDeTransaction(tr) {
   }
   return null;
 }
-// Le prix de l'offre, au centime, comme Vinted l'écrit (« 45.00 ») ; jamais ≥ au prix, jamais sous 1 €.
-function prixOffreFavori(montant, pct) {
-  const m = Number(montant);
-  if (!(isFinite(m) && m > 0) || !(pct >= 1 && pct <= 99)) return null;
-  const cents = Math.round(m * 100 * (100 - pct) / 100);
-  if (cents < 100 || cents >= Math.round(m * 100)) return null;
-  return (cents / 100).toFixed(2);
+// 5.281 (29 oct.) : variables du message et offre « Diminuer / Fixer à », comme
+// Vintex. COPIE EXACTE de src/favorisMessage.js (test favoris-message).
+// <favoris-message-regle>) : le test `favoris-message.test.mjs` exige les deux
+// copies identiques. Changer l'une sans l'autre le rend rouge.
+// <favoris-message-regle>
+function erreurVariablesFavori(modele) {
+  const texte = String(modele || '');
+  const reste = texte.replace(/\{([^{}]*)\}/g, (tout, dedans) => {
+    if (dedans === 'username') return '';
+    const options = dedans.split('|');
+    if (options.length >= 2 && options.every((o) => o.length <= 200)) return '';
+    return '\u0000' + tout + '\u0000';
+  });
+  const inconnue = /\u0000(\{[^{}]*\})\u0000/.exec(reste);
+  if (inconnue) return 'Variable inconnue : ' + inconnue[1].slice(0, 40) + '. Utilise {username} ou {a|b} (au moins deux choix séparés par |).';
+  if (/[{}]/.test(reste)) return 'Une accolade n’est pas fermée. Utilise {username} ou {a|b}.';
+  return '';
 }
+function personnaliserMessageFavori(modele, pseudo, hasard) {
+  const tirer = typeof hasard === 'function' ? hasard : Math.random;
+  const nom = typeof pseudo === 'string' ? pseudo.replace(/[{}\s]+/g, ' ').trim().slice(0, 80) : '';
+  return String(modele || '')
+    .replace(/\{([^{}]*)\}/g, (tout, dedans) => {
+      if (dedans === 'username') return nom;
+      const options = dedans.split('|');
+      if (options.length < 2) return tout;
+      return options[Math.min(options.length - 1, Math.floor(tirer() * options.length))];
+    })
+    .split('\n').map((l) => l.replace(/[ \t]{2,}/g, ' ').replace(/ +([,.])/g, '$1').trim()).join('\n')
+    .replace(/\n{3,}/g, '\n\n').trim();
+}
+// Le prix de l'offre, au centime, comme Vinted l'écrit (« 45.00 ») ; jamais ≥ au
+// prix de l'annonce, jamais sous 1 €. offre = {mode:'pct'|'euros'|'prix', valeur, arrondi}.
+function prixOffreFavori(montant, offre) {
+  const m = Number(montant);
+  if (!(isFinite(m) && m > 0) || !offre || typeof offre !== 'object') return null;
+  const base = Math.round(m * 100), v = Number(offre.valeur);
+  let c;
+  if (offre.mode === 'pct') { if (!(Number.isInteger(v) && v >= 1 && v <= 99)) return null; c = Math.round(base * (100 - v) / 100); }
+  else if (offre.mode === 'euros') { if (!(isFinite(v) && v > 0)) return null; c = base - Math.round(v * 100); }
+  else if (offre.mode === 'prix') { if (!(isFinite(v) && v > 0)) return null; c = Math.round(v * 100); }
+  else return null;
+  if (offre.arrondi === true) c = Math.floor(c / 100) * 100;
+  if (c < 100 || c >= base) return null;
+  return (c / 100).toFixed(2);
+}
+// </favoris-message-regle>
 let _fileVinted = Promise.resolve();
 function avecVinted(fn) {
   const suite = _fileVinted.then(() => fn(), () => fn());

@@ -8,7 +8,7 @@ const fs=require('fs'),path=require('path'),Module=require('module');const file=
    if(largeur<1024){await p.locator('.vrm-tabbar').getByRole('button',{name:'Gestion',exact:true}).click();await p.getByRole('menuitem',{name:'Comptabilité',exact:true}).waitFor();check(await p.getByRole('menuitem',{name:'Organisation',exact:true}).count()===0,'organisation hors du menu Gestion '+largeur);await p.keyboard.press('Escape');}
    else check(await p.locator('.vrm-sidebar').getByRole('button',{name:'Organisation',exact:true}).count()===0,'organisation hors du rail '+largeur);
    await p.goto(base+'/?tab=settings');await p.locator('[data-reglage-organisation]').click();
-   await p.locator('section.vrm-operations[aria-label="Organisation"]').waitFor();
+   await p.getByRole('region',{name:'Organisation',exact:true}).waitFor(); // sur téléphone le titre doublon de la barre se tait (26 oct.) : on attend la section
    check(await p.getByRole('button',{name:'Réservations',exact:true}).isVisible(),'organisation accessible via Réglages '+largeur);
    await p.getByRole('button',{name:'Lots',exact:true}).click();await p.getByRole('button',{name:'+ Ajouter',exact:true}).click();
    check(await p.getByLabel('Prix d’achat global (€)').isVisible(),'formulaire lots intégré '+largeur);

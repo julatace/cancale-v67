@@ -71,6 +71,8 @@ const COUPLES = {
   'src/App.jsx|www.leboncoin.fr': ['lien', LIEN],
   'src/App.jsx|www.mondialrelay.fr': ['lien', LIEN],
   'src/App.jsx|www.vinted.fr': ['lien', LIEN],
+  'src/OutilsArticlesVinted.jsx|www.vinted.fr': ['lien', LIEN],
+  'src/SynchronisationVinted.jsx|www.vinted.fr': ['lien', LIEN],
   'src/ebayGestion.jsx|www.ebay.fr': ['lien', LIEN],
   'src/ConfigurerTransfert.jsx|mail.google.com': ['lien', LIEN],
   'src/ConfigurerTransfert.jsx|outlook.live.com': ['lien', LIEN],

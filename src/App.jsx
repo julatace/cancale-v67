@@ -1,3 +1,4 @@
+import {creerGardeLectures,garderConversationsNonLues} from './lecturesVinted.js';
 import {lienAnnonceLeboncoin,etatAnnonceLeboncoin} from './etatAnnonceLeboncoin.js';
 import BilanSynchronisation from './BilanSynchronisation.jsx';
 import VendusAilleurs from './VendusAilleurs.jsx';
@@ -6,7 +7,7 @@ import {comparerComptes,diagnosticConnexion} from './outilsArticlesVinted.js';
 import {correspondRechercheMessage} from './rechercheMessagesVinted.js';
 import SynchronisationVinted from './SynchronisationVinted.jsx';
 import {auteurDernierConfirme,suiviNegociationVinted,reponseAttendueVinted} from './suiviMessagerieVinted.js';
-import {retourReponseVinted,cleReponseVinted,creerBrouillonsReponses} from './reponseVinted.js';
+import {retourReponseVinted,cleReponseVinted,creerBrouillonsReponses,etatActionVinted,cleActionOffreVinted} from './reponseVinted.js';
 import {etatOffreVinted,offreVintedEnAttente,cleOffreVinted,appliquerOffresConfirmees} from './offresVinted.js';
 import {etatSourceMemoire} from './suiviComptes.js';
 import {empreinteColis,controlePreparation} from './preparationColis.js';
@@ -38,7 +39,7 @@ import { cheminMonotone } from "./courbeMonotone.js";
 import VuesVentes from "./VuesVentes.jsx";
 import BordereauxAuto from "./BordereauxAuto.jsx";
 import {resumerStockJournee} from './stockJournee.js';
-import {jaugeSeuils,optionsMicro,calendrierUrssaf,phraseRythme,seuilsDe} from './microEntreprise.js';
+import {jaugeSeuils,optionsMicro,calendrierUrssaf,phraseRythme,seuilsDe,declarationRevenus,rappelCfe} from './microEntreprise.js';
 import { toutSurLeNumero, lireNumeroCherche } from "./rechercheNumero.js";
 import { repriseNumerosRecreation, tableRecrees } from "./repriseNumero.js";
 import { polyDe, estRectangle, normaliserPoly, FORMES, rectDans, empreinte, chevauche, placerSansTraverser, modeCase, capaciteCase, articlesAutresPlateformes, unParArticle, empilerDansCase, retirerDeCase, retirerDePile, ajouterAPile, cartonsDePile, hauteurPile, changerHauteurPile, prochainePlaceMeuble, estPoseSur, caler, proposerPiece, planchesCases, planchesRangees, plateauxMeuble, plateauxReglables, tasserPlateaux } from './stockRegles.js';
@@ -122,7 +123,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.280.0';
+const EXT_ATTENDUE = '5.284.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -517,7 +518,7 @@ const extEnRetard = (v) => !!v && cmpVersion(v, EXT_ATTENDUE) < 0;
 //    « l'extension relève le suivi » plus tôt viserait une extension qui ne le
 //    fait pas — un faux dans l'autre sens (revue du 24 oct. ; corrigé le
 //    26 oct. avec la session extension, qui a relu l'historique).
-const EXT_CAPACITES = { favorisouvrir:'5.225.0', favorisliste:'5.218.0', suivivinted: '5.217.0', favoris: '5.217.0', liaison: '5.171.0', supprimees: '5.165.0', enligne: '5.170.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', preuves: '5.172.0', etatcompte: '5.181.0', lbcfiche: '5.182.0', relais: '5.183.0', lbcpack: '5.185.0', annulee: '5.185.0', confirmer: '5.206.0', retraitnotif: '5.206.0', offresauto: '5.234.0', vcpublier: '5.235.0', vcauto: '5.236.0', vcventes: '5.237.0', vcmessages: '5.238.0', vcachats: '5.239.0', republier: '5.240.0', republiermodif: '5.247.0', recreer: '5.248.0', lettre: '5.250.0', brouillon: '5.251.0', versbrouillon: '5.253.0', republierbrouillon: '5.254.0', refaire: '5.255.0', republierpage: '5.277.0', republierfile: '5.279.0' };
+const EXT_CAPACITES = { favorisouvrir:'5.225.0', favorisliste:'5.218.0', suivivinted: '5.217.0', favoris: '5.217.0', liaison: '5.171.0', supprimees: '5.165.0', enligne: '5.170.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', preuves: '5.172.0', etatcompte: '5.181.0', lbcfiche: '5.182.0', relais: '5.183.0', lbcpack: '5.185.0', annulee: '5.185.0', confirmer: '5.206.0', retraitnotif: '5.206.0', offresauto: '5.234.0', vcpublier: '5.235.0', vcauto: '5.236.0', vcventes: '5.237.0', vcmessages: '5.238.0', vcachats: '5.239.0', republier: '5.240.0', republiermodif: '5.247.0', recreer: '5.248.0', lettre: '5.250.0', brouillon: '5.251.0', versbrouillon: '5.253.0', republierbrouillon: '5.254.0', refaire: '5.255.0', republierpage: '5.277.0', republierfile: '5.279.0', favorisperso: '5.281.0' };
 // Trois états, jamais un seul : pas d'extension ici · en retard · à jour.
 const extSait = (quoi) => {
   if (!vmrExtPresent()) return 'absente';                    // téléphone, autre navigateur
@@ -1722,7 +1723,7 @@ const ENTREPRISE_VIDE = {
 // Compta, Vendu, Colis, widget, rappels). UNE règle pour tous les lecteurs (§11).
 const VENTES_MASQUEES_AUCUNE = () => [];
 const SYNC_KEYS = [
-  'vrm_vc_etiquettes',
+  'vrm_vc_etiquettes','vrm_lbc_dates',
   'vinted_catalog','vinted_sales','vinted_garage_grid','vinted_blocked',
   'vinted_extracols','vinted_colors','vinted_invoices',
   'vinted_invoice_settings','vinted_dark','vinted_stock_vinted',
@@ -5945,6 +5946,27 @@ const indexDeclarations = (reg) => {
   return idx;
 };
 const moisDeclare = (reg, ym) => !!(reg && typeof reg === 'object' && reg[ym] && Array.isArray(reg[ym].ids));
+// ── DATER UNE VENTE LEBONCOIN À LA MAIN (29 octobre) ── La date d'une vente
+// Leboncoin ne vit que dans la liste v3 de « Mes transactions » ; une vente
+// ouverte autrement reste « à dater » et n'entre dans AUCUNE déclaration. Il peut
+// la recopier depuis Leboncoin : `vrm_lbc_dates` = { [txId]: 'AAAA-MM-JJ' }
+// (synchronisée). Une date LUE par l'extension gagne toujours sur la saisie ; la
+// ligne porte `dateSaisie` (dite à l'écran). Une seule fonction, appliquée là où
+// les ventes Leboncoin entrent dans un calcul (§11).
+const lireDatesLbc = () => { const v = load('vrm_lbc_dates', {}); return (v && typeof v === 'object' && !Array.isArray(v)) ? v : {}; };
+const DATE_LBC_OK = /^\d{4}-\d{2}-\d{2}$/;
+const avecDatesLbc = (ventes, dates) => {
+  if (!Array.isArray(ventes) || !dates || typeof dates !== 'object') return ventes || [];
+  let change = false;
+  const out = ventes.map((v) => {
+    if (!v || v.dateVente || !v.txId) return v;
+    const d = dates[String(v.txId)];
+    if (typeof d !== 'string' || !DATE_LBC_OK.test(d) || !Date.parse(d + 'T12:00:00')) return v;
+    change = true;
+    return { ...v, dateVente: d + 'T12:00:00', dateSaisie: true };
+  });
+  return change ? out : ventes;
+};
 const lireDeclarations = () => { const v = load('vrm_urssaf_declare', {}); return (v && typeof v === 'object' && !Array.isArray(v)) ? v : {}; };
 const ventesDeclarables = ({ vinted, lbc, ebay, masquee, exclu, versements, declare } = {}) => {
   const lignes = [], aDater = [], ecartees = [], vus = new Set();
@@ -11295,7 +11317,7 @@ function CountUp({ value, format, duration = 950, style }) {
 function AtelierBrouillon({ it, e, k, draft, onSave, onClose }) {
   const prix0 = (it && it.price && typeof it.price === 'object') ? it.price.amount : (it && it.price);
   const [title, setTitle] = useState(draft && draft.title != null ? draft.title : (it.title || ''));
-  const [price, setPrice] = useState(() => { const p = draft && draft.price != null ? draft.price : prix0; return p == null ? '' : String(p); });
+  const [price, setPrice] = useState(() => { const p = draft?.price!=null?draft.price:draft?.priceInput!=null?draft.priceInput:draft&&Object.prototype.hasOwnProperty.call(draft,'price')?'':prix0; return p == null ? '' : String(p); });
   const [desc,setDesc]=useState(draft?.desc??it.desc??it.description??'');
   const [dimensions,setDimensions]=useState(draft?.dimensions||'');
   const [caracteristiques,setCaracteristiques]=useState(draft?.caracteristiques||[it.brand,it.size].filter(Boolean).join(' · '));
@@ -11335,25 +11357,36 @@ function AtelierBrouillon({ it, e, k, draft, onSave, onClose }) {
         onChange={ev => majActif({ [cle]: Number(ev.target.value) })} style={{ flex: 1, accentColor: C.accent }} />
     </label>
   );
-  const prixNum = String(price).trim() === '' ? null : Number(String(price).replace(',', '.'));
+  const prixCentimes = centimes(price);
+  const prixNum = prixCentimes==null?null:prixCentimes/100;
   const prixOk = isFinite(prixNum) && prixNum > 0;
   const manques = [];
   if (!String(title).trim()) manques.push('le titre');
   if (!prixOk) manques.push('le prix');
   if (!photos.length) manques.push('au moins une photo');
   const photoReglages = { commun: rCommun, parPhoto: rParPhoto };
-  const enregistrer = () => { onSave({ title: String(title).trim(), desc:desc.trim(), dimensions:dimensions.trim(), caracteristiques:caracteristiques.trim(), price: prixOk ? prixNum : null, photos, photoReglages, id: it.id }); setDone(true); setTimeout(onClose, 700); };
+  const patch = { title: String(title).trim(), desc:desc.trim(), dimensions:dimensions.trim(), caracteristiques:caracteristiques.trim(), price: prixOk ? prixNum : null, priceInput:String(price), photos, photoReglages, id: it.id };
+  const initial = useRef(JSON.stringify(patch));
+  const ferme = useRef(false),fermeture=useRef(null),timerFermeture=useRef(null),proprietaire=useRef(AUTH.user?.id||'');
+  React.useEffect(()=>{ferme.current=false;return()=>{ferme.current=true;clearTimeout(timerFermeture.current);};},[]);
+  const [erreurSauvegarde,setErreurSauvegarde]=useState('');
+  const conserver=()=>{if(proprietaire.current!==(AUTH.user?.id||'')){setErreurSauvegarde('Le compte VRM a changé. Rouvre l’éditeur dans le bon compte.');return false;}try{onSave(patch);initial.current=JSON.stringify(patch);setErreurSauvegarde('');return true;}catch{setErreurSauvegarde('Le brouillon n’a pas pu être conservé. Réessaie avant de fermer.');return false;}};
+  const fermer = () => { if(ferme.current)return;if(proprietaire.current!==(AUTH.user?.id||'')){ferme.current=true;onClose();return;}if(JSON.stringify(patch)!==initial.current&&!conserver())return;ferme.current=true;onClose(); };fermeture.current=fermer;
+  const enregistrer = () => { if(!conserver())return;setDone(true);timerFermeture.current=setTimeout(()=>fermeture.current?.(),700); };
+
+
   const champ = { width: '100%', border: `1px solid ${C.border}`, borderRadius: 8, padding: '9px 11px', fontSize: 13, background: C.card, color: C.text, outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box' };
   const maj = { display: 'block', fontSize: 11, color: C.muted, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 500, marginBottom: 4 };
   return (
-    <div onClick={onClose} data-noswipe="1" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
+    <div onClick={fermer} data-noswipe="1" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
+      <FermeAuRetour fermer={fermer}/>
       <div onClick={ev => ev.stopPropagation()} data-atelier-brouillon={k} style={{ background: C.bg, width: '100%', maxWidth: 560, maxHeight: '92vh', borderRadius: '14px 14px 0 0', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         <div style={{ display: 'flex', gap: 10, alignItems: 'center', padding: '12px 16px', borderBottom: `1px solid ${C.border}`, flexShrink: 0 }}>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: 15, fontWeight: 700, color: C.text }}>✨ Préparer l'annonce</div>
-            <div style={{ fontSize: 11, color: C.muted, marginTop: 1 }}>Brouillon gardé dans VRM — <b>rien n'est envoyé à Vinted</b>. Le N° de l'article ne change pas.</div>
+            <div style={{ fontSize: 11, color: C.muted, marginTop: 1 }}>Brouillon conservé en quittant cet éditeur — <b>rien n'est envoyé à Vinted</b>. Le N° de l'article ne change pas.</div>
           </div>
-          <button type="button" onClick={onClose} aria-label="Fermer" style={{ border: 'none', background: 'transparent', fontSize: 22, color: C.muted, cursor: 'pointer', lineHeight: 1 }}>×</button>
+          <button type="button" onClick={fermer} aria-label="Fermer" style={{ border: 'none', background: 'transparent', fontSize: 22, color: C.muted, cursor: 'pointer', lineHeight: 1 }}>×</button>
         </div>
         <div style={{ overflowY: 'auto', padding: '12px 16px 16px', display: 'flex', flexDirection: 'column', gap: 12 }}>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 12, color: C.muted }}>
@@ -11413,6 +11446,7 @@ function AtelierBrouillon({ it, e, k, draft, onSave, onClose }) {
           <label style={{display:'block'}}><span style={maj}>Caractéristiques (marque, modèle, état…)</span><input aria-label="Caractéristiques du brouillon" value={caracteristiques} onChange={ev=>setCaracteristiques(ev.target.value)} style={champ}/></label>
           <label style={{display:'block'}}><span style={maj}>Dimensions — si utile, avec l’unité</span><input aria-label="Dimensions du brouillon" value={dimensions} onChange={ev=>setDimensions(ev.target.value)} placeholder="Ex. 30 × 20 × 10 cm" style={champ}/></label>
           <p style={{fontSize:12,color:C.muted}}>Ces informations sont préparées dans VRM. Pour ajouter des photos ou renseigner les champs du catalogue Vinted, <a href={'https://www.vinted.fr/items/'+it.id+'/edit'} target="_blank" rel="noreferrer">compléter l’annonce sur Vinted ↗</a>.</p>
+          {erreurSauvegarde&&<p role="alert">{erreurSauvegarde}</p>}
           {manques.length > 0 && <div data-atelier-manque style={{ fontSize: 12, color: C.warn, lineHeight: 1.45 }}>À compléter avant de publier : {manques.join(', ')}.</div>}
           {draft && <div style={{ fontSize: 11.5, color: C.muted }}>Dernier brouillon{draft.updatedAt ? ` le ${new Date(draft.updatedAt).toLocaleDateString('fr-FR')}` : ''}{draft.versions && draft.versions.length ? ` · ${draft.versions.length} version${draft.versions.length > 1 ? 's' : ''} gardée${draft.versions.length > 1 ? 's' : ''}` : ''}.</div>}
           <button type="button" data-atelier-enregistrer onClick={enregistrer} disabled={done}
@@ -15373,7 +15407,7 @@ function etatExtensionFavoris(uid,mesure=null){
   if(e?.vrm?.connecte!==true||String(e.vrm.user_id||'')!==String(AUTH.user?.id||''))return {disponible:false,raison:'L’extension doit être connectée au même compte VRM que cette page. Ouvre l’extension et connecte-la à VRM avant de relancer.'};
   const actif=String(e?.vinted?.uid||'');
   if(actif&&uid&&actif!==String(uid))return {disponible:false,raison:'Le navigateur est connecté à un autre compte Vinted. Connecte le compte sélectionné avant de lancer.'};
-  return {disponible:true,raison:''};
+  return {disponible:true,raison:'',perso:cmpVersion(version,EXT_CAPACITES.favorisperso)>=0};
 }
 function FavorisConnectes(props){
   const [,maj]=React.useReducer(n=>n+1,0),transport=React.useRef(null),directVu=React.useRef(null);
@@ -15418,7 +15452,7 @@ function FavorisConnectes(props){
     }
     const r=await vmrExecUn({uid:props.uid,method:'POST',endpoint,body},90000);return retour(r,r?'commande':'transport');
   };
-  return <FavorisVinted {...props} FermeAuRetour={FermeAuRetour} favorisDisponible={etat.disponible} favorisRaison={etat.raison} verifierExtension={verifier} executerFavori={t=>executer(t)} recupererPage={t=>executer(t,true)} ouvrirFavori={typeof canalExt()?.sendMessage==='function'||vmrExtPresent()?t=>executer(t,'ouvrir'):undefined}/>;
+  return <FavorisVinted {...props} FermeAuRetour={FermeAuRetour} favorisDisponible={etat.disponible} favorisRaison={etat.raison} favorisPerso={etat.perso===true} verifierExtension={verifier} executerFavori={t=>executer(t)} recupererPage={t=>executer(t,true)} ouvrirFavori={typeof canalExt()?.sendMessage==='function'||vmrExtPresent()?t=>executer(t,'ouvrir'):undefined}/>;
 }
 const CMD_ACTIVE = ['file', 'generation', 'pdf', 'relais-attente', 'relais-pris'];
 // Une demande est EN COURS tant que l'extension la dit réellement dans sa file
@@ -32130,8 +32164,43 @@ const caParPeriodes = (series, p, n = 6, maintenant = Date.now()) => {
 // Leboncoin, eBay) : aucune lecture de plus, sauf les dates de versement.
 // Trois états partout : `undefined` lecture en cours · `null` pas su · lu.
 const PERIODES_CA = [['semaine', 'Semaine'], ['mois', 'Mois'], ['trimestre', 'Trimestre'], ['annee', 'Année']];
+// Dater une vente Leboncoin à la main (29 oct.) : la date se recopie depuis
+// « Mes transactions » sur leboncoin.fr. Une date lue par l'extension gagne
+// toujours ; une date dans l'avenir ou avant 2015 est refusée.
+function DaterVentesLbc({ ventes, dates }) {
+  const liste = (ventes || []).filter((v) => v && v.isSeller === true && v.txId && !v.dateVente && !lbcAnnulee(v) && lbcFinalisee(v));
+  const [saisie, setSaisie] = React.useState({});
+  const [msg, setMsg] = React.useState(null);
+  if (!liste.length) return null;
+  const auj = new Date(); const max = `${auj.getFullYear()}-${String(auj.getMonth() + 1).padStart(2, '0')}-${String(auj.getDate()).padStart(2, '0')}`;
+  const poser = (tx, d) => {
+    if (d && (!DATE_LBC_OK.test(d) || d > max || d < '2015-01-01')) { setMsg({ tx, t: 'Une date entre 2015 et aujourd\'hui.' }); return; }
+    const u = { ...(dates || {}) }; if (d) u[String(tx)] = d; else delete u[String(tx)];
+    save('vrm_lbc_dates', u); setMsg(null);
+  };
+  const eur = (v) => v.price != null && isFinite(Number(v.price)) ? `${(Number(v.price) / 100).toFixed(2).replace('.', ',')} €` : '—';
+  return (
+    <div data-dater-lbc={liste.length} style={{ padding: '10px 16px 14px', borderTop: `1px solid ${C.border}`, fontSize: 13, color: C.text }}>
+      <div style={{ fontWeight: 600 }}>Dater tes ventes Leboncoin</div>
+      <div style={{ fontSize: 12, color: C.muted, marginTop: 2, lineHeight: 1.5 }}>Recopie la date de vente affichée dans « Mes transactions » sur leboncoin.fr : la vente compte alors dans son mois (CA, déclaration URSSAF).</div>
+      {liste.map((v) => {
+        const tx = String(v.txId), cur = (dates || {})[tx] || '';
+        const val = saisie[tx] != null ? saisie[tx] : cur;
+        return (
+          <div key={tx} data-dater-lbc-tx={tx} data-dater-lbc-date={cur} style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginTop: 10 }}>
+            <span style={{ flex: '1 1 180px', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{v.title || 'Vente Leboncoin'} · {eur(v)}</span>
+            <input type="date" aria-label={`Date de vente de ${v.title || 'cette vente'}`} max={max} min="2015-01-01" value={val} onChange={(e) => setSaisie((x) => ({ ...x, [tx]: e.target.value }))} style={{ border: `1px solid ${C.border}`, borderRadius: 8, padding: '8px 10px', fontSize: 16, minHeight: 44, background: C.bg, color: C.text, fontFamily: 'inherit' }}/>
+            <button type="button" data-dater-lbc-ok={tx} disabled={!val || val === cur} onClick={() => poser(tx, val)} style={{ border: 'none', borderRadius: 10, background: C.accent, color: C.onAccent || '#fff', padding: '8px 14px', minHeight: 44, fontSize: 13, fontWeight: 600, cursor: 'pointer', opacity: (!val || val === cur) ? 0.5 : 1, fontFamily: 'inherit' }}>Enregistrer</button>
+            {cur ? <button type="button" data-dater-lbc-retirer={tx} onClick={() => { setSaisie((x) => ({ ...x, [tx]: '' })); poser(tx, ''); }} style={{ border: `1px solid ${C.border}`, borderRadius: 10, background: 'transparent', color: C.text, padding: '8px 12px', minHeight: 44, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}>Retirer</button> : null}
+            {msg && msg.tx === tx ? <div role="alert" style={{ flexBasis: '100%', fontSize: 12, color: C.warn }}>{msg.t}</div> : null}
+          </div>);
+      })}
+    </div>
+  );
+}
 function CaParPeriodeCarte({ lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, accounts }) {
   const { ventes, ko } = useVentesCoque();
+  const [datesLbc] = useLigneSynchro('vrm_lbc_dates', lireDatesLbc);
   const [periode, setPeriode] = React.useState(() => { try { const v = localStorage.getItem('vrm_compta_periode'); return PERIODES_CA.some(([k]) => k === v) ? v : 'mois'; } catch (_) { return 'mois'; } });
   const choisir = (p) => { setPeriode(p); try { localStorage.setItem('vrm_compta_periode', p); } catch (_) {} };
   const [versements, setVersements] = React.useState(undefined);
@@ -32147,7 +32216,7 @@ function CaParPeriodeCarte({ lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, acc
     const hAcc = new Set((load('vinted_accounts_hidden', []) || []).map(String));
     const ecarte = (uid) => compteEcarte(uid, hAcc, panelOff || {});
     const uidDe = (o) => o && o._acc && o._acc.vinted_user_id;
-    const lbc = lbcCoqueLu === true ? ((lbcVentes && lbcVentes.ventes) || []) : [];
+    const lbc = lbcCoqueLu === true ? avecDatesLbc(((lbcVentes && lbcVentes.ventes) || []), datesLbc) : [];
     const ebay = Array.isArray(ebayCommandes) ? ebayCommandes : [];
     const vf = ventesFaites({ vinted: ventes, lbc, ebay, cachee: (o) => hTx.has(String(o && o.transaction_id)) || ecarte(uidDe(o)) });
     const decl = ventesDeclarables({ vinted: ventes, lbc, ebay, masquee: (o) => hTx.has(String(o && o.transaction_id)), exclu: (o) => ecarte(uidDe(o)), versements: versements || {} });
@@ -32168,7 +32237,7 @@ function CaParPeriodeCarte({ lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, acc
     const attente = lbcCoqueLu === undefined || ebayCommandes === undefined;
     return { etat: 'lu', vendu: vf.lignes, finalise, recu, aDater, venduSansDate: vf.sansDate, venduEbayEcartees: vf.ecartees || 0, finSansDate, manque, attente };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ventes, ko, lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, versements, accounts, tick]);
+  }, [ventes, ko, lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, versements, accounts, tick, datesLbc]);
   const lignes = calc.etat === 'lu' ? caParPeriodes({ vendu: calc.vendu, finalise: calc.finalise, recu: calc.recu }, periode, 6) : null;
   const cur = lignes ? lignes[0] : null;
   const partiel = calc.etat === 'lu' && (calc.manque.length > 0 || calc.attente);
@@ -32235,10 +32304,11 @@ function CaParPeriodeCarte({ lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, acc
               {!calc.manque.length && calc.attente && <div>Leboncoin ou eBay se lit encore : chaque montant est un minimum pour l'instant.</div>}
               {versements === null && <div>Les dates de versement Vinted sont illisibles : la colonne « reçu » attend, plutôt que d'afficher des zéros.</div>}
               {calc.aDater.length > 0 && <div>{calc.aDater.length} vente{calc.aDater.length > 1 ? 's' : ''} finalisée{calc.aDater.length > 1 ? 's' : ''} sans date de versement ({fmt(aDaterEur)}) : dans aucune période « reçu » tant que la date n'est pas captée.</div>}
-              {calc.venduSansDate > 0 && <div>{calc.venduSansDate} vente{calc.venduSansDate > 1 ? 's' : ''} Leboncoin sans date de vente : dans aucune période.</div>}
+              {calc.venduSansDate > 0 && <div>{calc.venduSansDate} vente{calc.venduSansDate > 1 ? 's' : ''} Leboncoin sans date de vente : dans aucune période — tu peux la dater ci-dessous.</div>}
               {calc.venduEbayEcartees > 0 && <div data-ca-ebay-ecartees={calc.venduEbayEcartees}>{calc.venduEbayEcartees} commande{calc.venduEbayEcartees > 1 ? 's' : ''} eBay écartée{calc.venduEbayEcartees > 1 ? 's' : ''} : le montant que tu reçois (frais eBay retirés, port non compté) n'est pas lisible ou n'est pas en euros.</div>}
             </div>
           )}
+          {lbcCoqueLu === true ? <DaterVentesLbc ventes={(lbcVentes && lbcVentes.ventes) || []} dates={datesLbc}/> : null}
         </>)}
       </div>
     </Card>
@@ -32405,6 +32475,7 @@ const telechargerFichier = (contenu, nom, type) => {
 };
 function FacturationElectroniqueCarte({ data, maj, lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, accounts }) {
   const { ventes, ko } = useVentesCoque();
+  const [datesLbc] = useLigneSynchro('vrm_lbc_dates', lireDatesLbc);
   const [versements, setVersements] = React.useState(undefined);
   React.useEffect(() => { let mort = false; fetchVersementsVinted().then((m) => { if (!mort) setVersements(m); }).catch(() => { if (!mort) setVersements(null); }); return () => { mort = true; }; }, []);
   // Le profil fiscal : relu à l'ouverture, et suivi quand la carte « Profil
@@ -32465,7 +32536,7 @@ function FacturationElectroniqueCarte({ data, maj, lbcVentes, lbcCoqueLu, ebayCo
     const hAcc = new Set((load('vinted_accounts_hidden', []) || []).map(String));
     const ecarte = (uid) => compteEcarte(uid, hAcc, panelOff || {});
     const uidDe = (o) => o && o._acc && o._acc.vinted_user_id;
-    const lbc = lbcCoqueLu === true ? ((lbcVentes && lbcVentes.ventes) || []) : [];
+    const lbc = lbcCoqueLu === true ? avecDatesLbc(((lbcVentes && lbcVentes.ventes) || []), datesLbc) : [];
     const ebay = Array.isArray(ebayCommandes) ? ebayCommandes : [];
     const decl = ventesDeclarables({ vinted: versements ? ventes : [], lbc, ebay, masquee: (o) => hTx.has(String(o && o.transaction_id)), exclu: (o) => ecarte(uidDe(o)), versements: versements || {} });
     const loginDe = (uid) => { const a = (accounts || []).find((x) => String(x.vinted_user_id) === String(uid)); return (a && a.login) || String(uid); };
@@ -32476,7 +32547,7 @@ function FacturationElectroniqueCarte({ data, maj, lbcVentes, lbcCoqueLu, ebayCo
     ];
     return { etat: 'lu', decl, manque, attente: lbcCoqueLu === undefined || ebayCommandes === undefined || versements === undefined };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ventes, ko, lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, versements, accounts, tick]);
+  }, [ventes, ko, lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, versements, accounts, tick, datesLbc]);
   const recap = calc.etat === 'lu' ? recapEReporting({ lignes: calc.decl.lignes, aDater: versements ? calc.decl.aDater : [], ym, ymDe: ymDeTs, manque: calc.manque, attente: calc.attente, versementsLus: versements !== null }) : null;
 
   const fx = (data && data.facturx) || {};
@@ -32764,13 +32835,11 @@ function StatutFiscal({ liveStats, onNav }) {
   return (
     <>
       {entete}
-      {/* (29 oct., « fais quelque chose de simple ») D'abord ce qu'il paie et
-          quand, puis le suivi de ses déclarations ; son profil (rythme, options,
-          calendrier, seuils) se règle une fois : replié dessous, ouvert de
-          lui-même quand quelque chose est à confirmer ou qu'un seuil approche. */}
+      {/* (29 oct.) Ce qui se FAIT ce mois d'abord (la déclaration, le suivi),
+          puis le profil, le calendrier, les seuils et l'impôt — qui se lisent. */}
       <CarteUrssafMois liveStats={liveStats} onNav={onNav} />
       <SuiviUrssaf onNav={onNav} />
-      <MicroEntreprise replie taux={taux} poserTaux={(o) => poserTaux(o)} officiel={officiel} vlTaux={vl} acreTaux={acre} />
+      <MicroEntreprise taux={taux} poserTaux={(o) => poserTaux(o)} officiel={officiel} vlTaux={vl} acreTaux={acre} />
     </>
   );
 }
@@ -32822,7 +32891,7 @@ function JaugeBarre({ pct, marques = [], etat, attr }) {
     </div>
   );
 }
-function MicroEntreprise({ taux, poserTaux, officiel, vlTaux, acreTaux, replie = false }) {
+function MicroEntreprise({ taux, poserTaux, officiel, vlTaux, acreTaux }) {
   const freq = useFreqUrssaf();
   const [opts, optsPret] = useLigneSynchro('vrm_micro_options', lireOptionsMicro);
   const ligne = useLigneUrssaf();
@@ -32833,6 +32902,9 @@ function MicroEntreprise({ taux, poserTaux, officiel, vlTaux, acreTaux, replie =
   const vl = opts.liberatoire;                     // 'oui' · 'non' · null (pas répondu)
   const acre = opts.acre || (opts.at === 0 && acreTaux);
   const s = seuilsDe(now.getFullYear());
+  const [microOuvert, setMicroOuvert] = React.useState(false);
+  const besoin = (optsPret && opts.liberatoire == null) || !!(jauge && ((jauge.tva && jauge.tva.etat && jauge.tva.etat !== 'ok') || (jauge.plafond && jauge.plafond.etat && jauge.plafond.etat !== 'ok')));
+  React.useEffect(() => { if (besoin) setMicroOuvert(true); }, [besoin]);
   const poserOptions = (o) => {
     const n = { ...opts, ...o, at: Date.now() };
     save('vrm_micro_options', { liberatoire: n.liberatoire, acre: !!n.acre, at: n.at });
@@ -32843,7 +32915,7 @@ function MicroEntreprise({ taux, poserTaux, officiel, vlTaux, acreTaux, replie =
   const poserFreq = (f) => save('vinted_urssaf_freq', f);
   const jour = (d) => `${d.getDate() === 1 ? '1er' : d.getDate()} ${d.toLocaleDateString('fr-FR', { month: 'long' })}`;
   const sTitre = { fontSize: 15, fontWeight: 700, color: C.text, letterSpacing: -0.15 };
-  const sCarte = { padding: '16px 18px', marginBottom: 12 };
+  const sCarte = { padding: '16px 18px', margin: 0, height: '100%', boxSizing: 'border-box' };
   const lignesTaux = [
     ['Cotisations sociales', acre ? TAUX_MICRO.acre : TAUX_MICRO.cotisations, acre ? 'ACRE, 1ʳᵉ année' : 'vente de marchandises (BIC)'],
     ['Formation professionnelle', TAUX_MICRO.formation, 'commerçant'],
@@ -32857,11 +32929,11 @@ function MicroEntreprise({ taux, poserTaux, officiel, vlTaux, acreTaux, replie =
         <div style={{ fontSize: 12.5, color: C.muted, marginTop: 2, marginBottom: 6, lineHeight: 1.5 }}>VRM ne lit pas ton espace URSSAF : dis-lui tes options, il calcule le reste. Tu les retrouves sur autoentrepreneur.urssaf.fr, rubrique « Mon compte ».</div>
         <LigneProfil titre="Tu déclares" attr={{ 'data-micro-freq': freq }} aide={phraseRythme(freq, now) + " L'URSSAF ne propose que ces deux rythmes (pas d'annuel)."}>
           <Segmente label="Rythme de déclaration" value={freq} onChange={poserFreq}
-            options={[{ v: 'mensuel', l: 'Chaque mois', data: { 'data-micro-freq-choix': 'mensuel' } }, { v: 'trimestriel', l: 'Chaque trimestre', data: { 'data-micro-freq-choix': 'trimestriel' } }]} />
+            options={[{ v: 'mensuel', l: 'Par mois', data: { 'data-micro-freq-choix': 'mensuel' } }, { v: 'trimestriel', l: 'Par trimestre', data: { 'data-micro-freq-choix': 'trimestriel' } }]} />
         </LigneProfil>
         <LigneProfil titre="Versement libératoire de l'impôt" attr={{ 'data-micro-vl': vl || 'passu' }}
           aide={<>
-            {vl == null && optsPret ? <div data-micro-vl-question="" style={{ color: C.warn, fontWeight: 600, marginBottom: 4 }}>À confirmer : as-tu choisi cette option auprès de l'URSSAF ?{vlTaux ? ' Ton taux actuel (13,4 %) laisse penser que oui.' : ''}</div> : null}
+            {vl == null && optsPret ? <div data-micro-vl-question="" style={{ color: C.warn, fontWeight: 600, marginBottom: 4 }}>À confirmer : as-tu choisi cette option auprès de l'URSSAF ?{vlTaux ? ' Ton taux actuel (13,4 %) laisse penser que oui.' : ''}</div> : null}
             {vl === 'oui' ? <>Ton impôt sur le revenu ({TAUX_MICRO.liberatoire} %) part avec tes cotisations, {freq === 'mensuel' ? 'chaque mois' : 'chaque trimestre'}.</> : vl === 'non' ? <>Ton impôt sur le revenu se calcule à part, sur ta déclaration de revenus du printemps.</> : <>Ton impôt sur le revenu payé avec tes cotisations ({TAUX_MICRO.liberatoire} %), ou à part sur ta déclaration de revenus.</>}
             <Pourquoi label="Comment savoir si je l'ai choisi">Sur autoentrepreneur.urssaf.fr, ta déclaration affiche une ligne « versement libératoire » à côté des cotisations si tu l'as choisi. Avec l'option, l'impôt sur ce chiffre d'affaires ({TAUX_MICRO.liberatoire} % pour l'achat-revente) est payé au même rythme que tes cotisations, et tu n'as plus rien à payer dessus au printemps.{s ? <> Elle est possible si ton revenu fiscal de référence d'il y a deux ans était sous {eurRond(s.rfrLiberatoire)} (personne seule), et se demande avant le 30 septembre pour l'année suivante.</> : null}</Pourquoi>
           </>}>
@@ -32882,7 +32954,7 @@ function MicroEntreprise({ taux, poserTaux, officiel, vlTaux, acreTaux, replie =
               {lignesTaux.map(([l, t, n]) => <React.Fragment key={l}><span>{l} <span style={{ fontSize: 11.5 }}>· {n}</span></span><span style={{ color: C.text, fontVariantNumeric: 'tabular-nums', textAlign: 'right' }}>{pctFr(t)}</span></React.Fragment>)}
             </div>
           ) : <div style={{ fontSize: 12.5, color: C.muted, marginTop: 6 }}>Posé à la main dans Réglages : VRM ne le change pas quand tu réponds ci-dessus.</div>}
-          <div style={{ fontSize: 12, color: C.muted, marginTop: 8 }}>Taux officiels 2026 de l'achat-revente, à vérifier sur ton espace URSSAF. Je ne suis pas comptable.</div>
+          <div style={{ fontSize: 12, color: C.muted, marginTop: 8 }}>Taux officiels 2026 de l'achat-revente, à vérifier sur ton espace URSSAF. VRM ne remplace pas un comptable.</div>
         </div>
       </div>
     </Card>
@@ -32975,33 +33047,51 @@ function MicroEntreprise({ taux, poserTaux, officiel, vlTaux, acreTaux, replie =
       </Card>
     );
   }
-  // (29 oct.) Replié dans Comptabilité : il se règle une fois. Il s'ouvre de
-  // lui-même quand quelque chose demande son attention (une option à confirmer,
-  // un seuil proche ou dépassé) — et reste ouvert une fois ouvert (sinon le
-  // panneau se refermerait sous son doigt dès qu'il répond). Son choix gagne.
-  const aConfirmer = optsPret && vl == null;
-  const alerteTva = !!(jauge && jauge.tva.etat !== 'ok');
-  const alertePlafond = !!(jauge && jauge.plafond.etat !== 'ok');
-  const attention = aConfirmer || alerteTva || alertePlafond;
-  const [choix, setChoix] = React.useState(null);           // null = il n'a pas encore touché
-  const [vuAttention, setVuAttention] = React.useState(false);
-  React.useEffect(() => { if (attention) setVuAttention(true); }, [attention]);
-  const corps = <div data-micro-entreprise="">{profil}{calendrier}{seuils}</div>;
-  if (!replie) return corps;
-  const ouvert = choix == null ? (attention || vuAttention) : choix;
-  const resume = [aConfirmer && 'À confirmer : le versement libératoire', alerteTva && 'Seuil de TVA à regarder', alertePlafond && 'Plafond du régime à regarder'].filter(Boolean);
-  return (
-    <details className="vrm-repli" data-micro-repli={ouvert ? 'ouvert' : 'ferme'} data-micro-attention={attention ? '1' : '0'} open={ouvert}
-      onToggle={(e) => { const o = e.currentTarget.open; if (o !== ouvert) setChoix(o); }} style={{ marginTop: 12 }}>
-      <summary>
-        <span style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}>
-          <span>Ta micro-entreprise</span>
-          <small style={{ fontSize: 12.5, fontWeight: resume.length ? 600 : 500, color: resume.length ? C.warn : C.muted, lineHeight: 1.4 }}>{resume.length ? resume.join(' · ') : 'Ton profil URSSAF, ton calendrier, tes seuils de TVA et du régime'}</small>
-        </span>
-      </summary>
-      <div style={{ paddingTop: 8 }}>{corps}</div>
-    </details>
+  // ── 4. Ta déclaration de revenus (et la CFE) ──
+  const dr = declarationRevenus({ ligne, now, liberatoire: vl });
+  const cfe = rappelCfe(now);
+  const impots = (
+    <Card style={sCarte}>
+      <div data-micro-impots={dr ? 'lu' : 'passu'} data-micro-impots-annee={dr ? String(dr.annee) : ''} data-micro-impots-ca={dr ? String(dr.ca) : ''} data-micro-impots-cases={dr ? dr.cases.join(',') : ''}>
+        <div style={sTitre}>Ta déclaration de revenus</div>
+        {!dr ? <div style={{ fontSize: 13, color: C.muted, marginTop: 6 }}>Le montant se calcule dans l'écran Ventes : ouvre-le une fois sur cet appareil.</div> : (<>
+          <div style={{ fontSize: 13, color: C.muted, marginTop: 6, lineHeight: 1.5 }}>
+            {dr.enCours ? <>Revenus {dr.annee}, à déclarer au printemps {dr.annee + 1} — pour l'instant :</> : <>Revenus {dr.annee}, à déclarer ce printemps (déclaration 2042-C-PRO) :</>}
+          </div>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap', marginTop: 6 }}>
+            <b className="vrm-display" style={{ fontSize: 22, color: C.text }}>{dr.partiel ? 'au moins ' : ''}{eurMicro(dr.ca)}</b>
+            <span style={{ fontSize: 13, color: C.text }}>{dr.liberatoire ? <>case <b>{dr.cases[0]}</b></> : <>case <b>5KO</b> sans versement libératoire, <b>5TA</b> avec</>}</span>
+          </div>
+          <div style={{ fontSize: 12.5, color: C.muted, marginTop: 6, lineHeight: 1.5 }}>
+            {dr.liberatoire === 'oui' ? <>Ton impôt est déjà payé avec tes cotisations : ce chiffre est déclaré pour information (il compte dans ton revenu fiscal de référence).</>
+              : <>Le chiffre d'affaires brut, sans retirer d'abattement : les impôts appliquent eux-mêmes les 71 % de la vente de marchandises.</>}
+            {dr.partiel ? <> C'est un minimum : {dr.raisons.join(' · ')}.</> : null}
+            {' '}VRM ne compte que ce qu'il a capté sur tes plateformes reliées : compare avec le total de tes déclarations URSSAF de l'année.
+          </div>
+        </>)}
+        {cfe ? <div data-micro-cfe="" style={{ fontSize: 12.5, color: C.text, marginTop: 10, paddingTop: 10, borderTop: `1px solid ${C.border}`, lineHeight: 1.5 }}>CFE : l'avis est à payer au plus tard le <b>{cfe.limite}</b>, dans ton espace professionnel sur impots.gouv.fr. Exonérée l'année de création de ton entreprise.</div> : null}
+      </div>
+    </Card>
   );
+  // (29 oct.) Sur ordinateur, le calendrier et les seuils côte à côte (puis le
+  // profil et l'impôt) : une carte pleine largeur de 1 300 px pour trois lignes
+  // de dates laissait l'écran à moitié vide. Au téléphone, une colonne.
+  // (29 oct., « c'est trop incompréhensible ») Ces quatre cartes se LISENT de
+  // temps en temps : repliées sous une ligne qui dit ce qu'il y a dedans. Elles
+  // s'ouvrent d'elles-mêmes quand quelque chose demande son attention (le
+  // versement libératoire pas encore répondu, un seuil proche ou dépassé).
+  const aConfirmer = optsPret && vl == null;
+  const seuilAlerte = besoin && !aConfirmer;
+  const prochaine = (cal || []).find((c) => !(regPret && c.ym.every((m) => moisDeclare(regLu, m))));
+  return (<details className="vrm-repli vrm-micro-repli" data-micro-repli={microOuvert ? 'ouvert' : 'ferme'} data-micro-attention={besoin ? '1' : ''} open={microOuvert} onToggle={(e) => setMicroOuvert(e.currentTarget.open)} style={{ margin: '12px 0', background: C.card, border: `1px solid ${C.border}`, borderRadius: 12, padding: '4px 16px 12px' }}>
+    <summary>
+      <span style={{ display: 'flex', flexDirection: 'column', gap: 2, flex: '1 1 auto', minWidth: 0 }}>
+        <span style={{ fontSize: 15, fontWeight: 600, color: C.text }}>Ta micro-entreprise</span>
+        <span style={{ fontSize: 12.5, color: besoin ? (C.warn || '#B7791F') : C.muted, fontWeight: 500, lineHeight: 1.4 }}>{aConfirmer ? '1 question à confirmer · ' : ''}{seuilAlerte ? 'un seuil approche · ' : ''}taux {String(taux).replace('.', ',')} %{prochaine ? ` · ${prochaine.periode} à déclarer avant le ${prochaine.limite.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}` : ''} · seuils et impôts</span>
+      </span>
+    </summary>
+    <div data-micro-entreprise="" className="vrm-micro-grille" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 440px), 1fr))', gap: 12, alignItems: 'stretch', marginTop: 8 }}>{calendrier}{seuils}{profil}{impots}</div>
+  </details>);
 }
 function SuiviUrssaf({ onNav }) {
   const v = useLigneUrssaf();
@@ -33040,7 +33130,7 @@ function SuiviUrssaf({ onNav }) {
         </div>
         <div data-suivi-annee={a.annee} data-suivi-annee-ca={String(a.ca)} data-suivi-annee-paye={a.paye == null ? '' : String(a.paye)} style={{ fontSize: 13, color: C.muted, marginTop: 2, lineHeight: 1.5 }}>
           {a.n === 0 ? <>Aucune déclaration notée en {a.annee}. Après chaque déclaration sur l'URSSAF, touche « C'est déclaré » : VRM garde ce que tu as déclaré et payé.</>
-            : <>{a.annee} : <b style={{ color: C.text }}>{eur(a.ca)}</b> déclarés sur {a.n} mois · {a.paye != null ? <>cotisations payées <b style={{ color: C.text }}>{eur(a.paye)}</b></> : <>cotisations ≈ <b style={{ color: C.text }}>{eur(a.estime)}</b> (estimées : note ce que tu as payé avec « Compléter »)</>}</>}
+            : <>{a.annee} : <b style={{ color: C.text }}>{eur(a.ca)}</b> déclarés sur {a.n} mois · {a.paye != null ? <>cotisations payées <b style={{ color: C.text }}>{eur(a.paye)}</b></> : <>cotisations ≈ <b style={{ color: C.text }}>{eur(a.estime)}</b> (estimées : note ce que tu as payé avec « Compléter »)</>}</>}
         </div>
         {suivi.enRetard > 0 ? <div data-suivi-retard-texte="" style={{ fontSize: 13, color: C.text, marginTop: 8, lineHeight: 1.5 }}>{suivi.enRetard === 1 ? '1 période passée n\'est' : `${suivi.enRetard} périodes passées ne sont`} pas notée{suivi.enRetard > 1 ? 's' : ''} « déclarée ». Si tu l'as déjà déclarée sur l'URSSAF, touche « C'est déclaré » pour la noter ; sinon, déclare-la vite (une déclaration en retard peut coûter une pénalité).</div> : null}
         {(() => {
@@ -33159,7 +33249,7 @@ function CarteUrssafMois({ liveStats, onNav }) {
   const sCarte = {padding:18,background:C.card,border:`1px solid ${C.border}`,borderRadius:12,boxShadow:C.shadow};
   return (
     <section data-compta-urssaf="" style={{display:'flex',flexDirection:'column',gap:8}}>
-      <h3 className="vrm-set-titre vrm-titre-compta" style={{color:C.muted,margin:'0 16px'}}>Ta déclaration URSSAF</h3>
+      <h3 className="vrm-titre-compta" data-titre-section="" style={{fontSize:15,fontWeight:600,color:C.text,letterSpacing:-0.15,margin:'8px 2px 0'}}>Ta déclaration URSSAF</h3>
       {/* ── LE MOIS EN COURS, EN UNE SEULE CARTE ────────────────────────────
           ⚠️ Il y en avait DEUX à la suite, toutes deux titrées du même mois
           (« Mois en cours — septembre », puis « À payer pour septembre »), et
@@ -33199,8 +33289,8 @@ function CarteUrssafMois({ liveStats, onNav }) {
           if (par.length > 1 || (par.length === 1 && par[0][0] !== 'Vinted')) morceaux.push(<Puce key="d">dont {par.map(([k,v],i)=><React.Fragment key={k}>{i?' · ':''}{k} <Mt v={v.ca}/></React.Fragment>)}</Puce>);
           if (pasSu.length) morceaux.push(<Puce key="p" warn>{pasSu.join(' et ')} : pas pu lire — {pasSu.length>1?'leurs':'ses'} ventes ne sont pas dans ce chiffre, rouvre l'écran dans un moment</Puce>);
           if (adV && adV.n > 0) morceaux.push(<Puce key="av">{adV.n} vente{adV.n>1?'s':''} Vinted finalisée{adV.n>1?'s':''} sans date de versement (<Mt v={adV.ca}/>) : dans aucun mois pour l'instant{extSait('versement')==='retard' && <span style={{color:C.warn}}> — mets l'extension à jour ({EXT_CAPACITES.versement}) : c'est elle qui va chercher ces dates</span>}</Puce>);
-          if (adL && adL.n > 0) morceaux.push(<Puce key="a">{adL.n} vente{adL.n>1?'s':''} Leboncoin sans date (<Mt v={adL.ca}/>) : dans aucun mois tant que leur date n'est pas captée{extSait('lbcdate')==='retard' && <span style={{color:C.warn}}> — mets d'abord l'extension à jour ({EXT_CAPACITES.lbcdate})</span>}</Puce>);
-          if (src.Vestiaire === 'nonRelie') morceaux.push(<Puce key="v">Vestiaire Co : pas encore relié</Puce>);
+          if (adL && adL.n > 0) morceaux.push(<Puce key="a">{adL.n} vente{adL.n>1?'s':''} Leboncoin sans date (<Mt v={adL.ca}/>) : dans aucun mois tant que leur date n'est pas captée — tu peux la saisir dans « Chiffre d'affaires par période »{extSait('lbcdate')==='retard' && <span style={{color:C.warn}}> — mets d'abord l'extension à jour ({EXT_CAPACITES.lbcdate})</span>}</Puce>);
+          // (29 oct.) « Vestiaire Co : pas encore relié » retiré : affiché à tous, même sans compte Vestiaire, il n'apprenait rien.
         }
         const Chiffre = ({ lib, val, fort, couleur, sous, sousStyle }) => (
           <div style={{minWidth:0}}>
@@ -33356,11 +33446,12 @@ function RecapComptableMensuel() {
     <>
       {/* Récap comptable mensuel */}
       {moisRecap.length>0&&(
-        <Card>
-          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:14}}>
-            <span style={{fontSize:13,fontWeight:600,color:C.text}}>📊 Récap comptable mensuel</span>
-            <Btn small onClick={exportCompta} style={{fontSize:13}}>📥 Exporter (CSV · Excel · Numbers)</Btn>
-          </div>
+        <Card><details className="vrm-repli" data-recap-repli="">
+          <summary style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8}}>
+            <span data-titre-section="" style={{fontSize:15,fontWeight:600,color:C.text,letterSpacing:-0.15}}>Récap comptable mensuel</span><span style={{fontSize:12.5,color:C.muted,fontWeight:500,marginLeft:'auto'}}>{moisRecap.length} mois</span>
+          </summary>
+          <div style={{display:'flex',justifyContent:'flex-end',margin:'8px 0 10px'}}><Btn small outline onClick={exportCompta} style={{fontSize:13}}>Exporter (CSV)</Btn></div>
+
           <div style={{overflowX:'auto'}}>
             <table style={{width:'100%',borderCollapse:'collapse',fontSize:13}}>
               <thead>
@@ -33397,7 +33488,7 @@ function RecapComptableMensuel() {
               ? <>Ventes <b>finalisées</b>, toutes plateformes, comptées dans le mois où l'argent a été versé (Vinted), de la vente (Leboncoin), de la commande payée (eBay) — ou dans le mois où tu les as déclarées. Annulées et remboursements exclus, ventes masquées comprises ; une vente sans date de versement n'est dans aucun mois.</>
               : <>Ventes de l'ancienne archive, à leur date de réception — annulées et remboursements exclus.</>} Cotisations estimées à {String(tauxUrssaf()).replace('.',',')} % (taux réglable dans Réglages). La déclaration se fait sur autoentrepreneur.urssaf.fr.
           </div>
-        </Card>
+        </details></Card>
       )}
 
 
@@ -33705,7 +33796,7 @@ function ComptaSection({ titre, note, total, totalSub, children, data }) {
   return (
     <section className="vrm-set-groupe vrm-compta-groupe" data-compta-section={data} style={{ margin: 0 }}>
       <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 12, margin: '0 16px 8px' }}>
-        <h3 className="vrm-set-titre vrm-titre-compta" style={{ color: C.muted, margin: 0 }}>{titre}</h3>
+        <h3 className="vrm-titre-compta" data-titre-section="" style={{ fontSize:15,fontWeight:600,color:C.text,letterSpacing:-0.15, margin: 0 }}>{titre}</h3>
         {total != null && <span style={{ fontSize: 13, color: C.muted, whiteSpace: 'nowrap' }}><b className="vrm-display" style={{ color: C.text, fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>{fmt(total)}</b>{totalSub ? ` ${totalSub}` : ''}</span>}
       </div>
       <div className="vrm-set-liste" style={{ background: C.card, border: `1px solid ${C.border}`, '--vrm-set-filet': C.border }}>{children}</div>
@@ -33852,7 +33943,7 @@ function BeneficeCompta({ compta, onNav, onSansDepenses, onAjouterDepense }) {
       data-benef-couverture={B ? couvertureBenefice(B) : ''} data-benef-plateformes={B ? (B.toutes ? 'toutes' : 'vinted') : ''}
       data-benef-depenses={B ? (nuagePret ? B.depenses : 'passu') : ''}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', margin: '0 16px 8px' }}>
-        <h3 className="vrm-set-titre vrm-titre-compta" style={{ color: C.muted, margin: 0, flex: '1 1 auto' }}>Ton bénéfice{B ? ` · ${B.libelle}` : ''}</h3>
+        <h3 className="vrm-titre-compta" data-titre-section="" style={{ fontSize:15,fontWeight:600,color:C.text,letterSpacing:-0.15, margin: 0, flex: '1 1 auto' }}>Ton bénéfice{B ? ` · ${B.libelle}` : ''}</h3>
         <Segmente label="Période du bénéfice" plein value={periode} onChange={choisir} style={{ margin: 0, flex: '0 1 300px' }}
           options={PERIODES_BENEF.map(([k, l]) => ({ v: k, l, data: { 'data-benef-choix': k } }))} />
       </div>
@@ -34570,7 +34661,7 @@ function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, pan
         {/* Trois repères de charges — une liste groupée, comme Réglages : le
             libellé à gauche, le montant à droite (les data-compta-kpi restent). */}
         <section className="vrm-set-groupe vrm-compta-groupe" data-compta-depenses="" style={{ margin: 0 }}>
-          <h3 className="vrm-set-titre vrm-titre-compta" style={{ color: C.muted }}>Tes dépenses</h3>
+          <h3 className="vrm-titre-compta" data-titre-section="" style={{ fontSize:15,fontWeight:600,color:C.text,letterSpacing:-0.15, margin: '0 2px 8px' }}>Tes dépenses</h3>
           <div className="vrm-set-liste" style={{ background: C.card, border: `1px solid ${C.border}`, '--vrm-set-filet': C.border }}>
             {[
               { k: 'abo', l: 'Abonnements ce mois', v: chargesDuMois.abo, s: abonnements.length ? `${abonnements.length} abonnement${abonnements.length > 1 ? 's' : ''}` : 'aucun déclaré' },
@@ -34682,7 +34773,7 @@ function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, pan
       <details id="compta-avance" className="vrm-repli vrm-compta-avance" data-compta-avance={avance ? 'ouvert' : 'ferme'} open={avance}
         onToggle={(e) => setAvance(e.currentTarget.open)} style={{ scrollMarginTop: 72, borderTop: `1px solid ${C.border}`, paddingTop: 4 }}>
         <summary>
-          <span style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}>
+          <span style={{ display: 'flex', flexDirection: 'column', gap: 2, flex: '1 1 auto', minWidth: 0 }}>
             <span>Avancé</span>
             <small style={{ fontSize: 12.5, fontWeight: 500, color: C.muted, lineHeight: 1.4 }}>Résultat de l'année, récap mensuel, packs, ton entreprise, factures, facturation électronique</small>
           </span>
@@ -35101,6 +35192,7 @@ function ListeComptes({ id, valeur, options, onChange, note, skin, attrs }) {
   );
 }
 function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, onFreeNum, liveStats, accountsReady, baseKO, premierJour: premierJourProp, compteSel = '', compteConnecte = '', alertes = null, panelOff = null, dansPlateforme = false }) {
+  const [datesLbc] = useLigneSynchro('vrm_lbc_dates', lireDatesLbc);
   const [facturesVentes,setFacturesVentes]=useState([]);
   useEffect(()=>{if(only && only!=='ventes')return;let stop=false;fetchProInvoices({metadata:true}).then(rows=>{if(!stop)setFacturesVentes(rows);});return()=>{stop=true;};},[only]);
   // L'IDENTITÉ de l'ensemble des comptes liés (triée) : c'est elle que suivent
@@ -36066,7 +36158,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const basculerOffresAuto = async () => {
     if (offresAuto) { setOffresAuto(false); save('vinted_offres_auto', false); return; }
     const ok = await askConfirm({ title: 'Accepter les offres tout seul sur Vinted ?',
-      desc: "Dès qu'une offre atteint le « mini » d'une annonce, VRM l'accepte à ta place, pas tout de suite : entre 3 et 20 minutes après l'avoir vue, tiré au hasard (une à la fois, uniquement le compte ouvert dans ce Chrome, plafond 20/h). L'extension doit rester ouverte dans Chrome pendant ce délai.\n\n⚠️ Important : sur Vinted, un programme qui accepte peut être vu comme un robot — c'est un risque pour le compte, que tu prends en l'allumant. Sur eBay c'est sans risque (réglage natif), pas sur Vinted.\n\nPose un « mini » sur les annonces que tu veux laisser partir à ce prix.",
+      desc: "Dès qu'une offre atteint le « mini » d'une annonce, VRM l'accepte à ta place, pas tout de suite : entre 3 et 20 minutes après l'avoir vue, tiré au hasard (une à la fois, uniquement le compte ouvert dans ce Chrome, plafond 50/h). L'extension doit rester ouverte dans Chrome pendant ce délai.\n\n⚠️ Important : sur Vinted, un programme qui accepte peut être vu comme un robot — c'est un risque pour le compte, que tu prends en l'allumant. Sur eBay c'est sans risque (réglage natif), pas sur Vinted.\n\nPose un « mini » sur les annonces que tu veux laisser partir à ce prix.",
       ok: 'Oui, accepter tout seul', cancel: 'Annuler' });
     if (!ok) return;
     setOffresAuto(true); save('vinted_offres_auto', true);
@@ -37151,6 +37243,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const listingsRef = useRef(listings); listingsRef.current = listings;
   const signalPendantLecture = useRef(false);
   const [convs, setConvs] = useState({ loading:false, items:null });
+  const dernieresConvs=useRef({items:[]});if(Array.isArray(convs.items)&&!convs.loading)dernieresConvs.current=convs;
   // Le résumé de chaque conversation captée (paire, état, dernier auteur) — trois
   // états : `undefined` en cours · `null` pas su · Map (19 octobre).
   const [resumesConv, setResumesConv] = useState(undefined);
@@ -37178,6 +37271,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const [contreOffreOuverte,setContreOffreOuverte]=useState(false);
   const prixOffreRef=useRef(null);
   const [offreBusy, setOffreBusy] = useState(false);
+  const [actionsOffresIncertaines,setActionsOffresIncertaines]=useState({});
   const verrouOffre=useRef(false),offresConfirmees=useRef(new Map()),filOffreActuel=useRef(null);
   filOffreActuel.current=openConv;
   const filAvecOffres=(c,acc)=>appliquerOffresConfirmees(c,acc?.vinted_user_id,offresConfirmees.current);
@@ -37514,10 +37608,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     if (lbcLu === undefined || ebayCmd === undefined || versements === undefined) return undefined;
     if (versements === null) return null;
     try {
-      return ventesDeclarables({ vinted: ventesComptees, lbc: lbcLu ? lbcVentes.ventes : [], ebay: ebayCmd || [], masquee: (o) => hiddenSales.has(String(o.transaction_id)), exclu: acctOffOf, versements, declare: declUrssaf });
+      return ventesDeclarables({ vinted: ventesComptees, lbc: lbcLu ? avecDatesLbc(lbcVentes.ventes, datesLbc) : [], ebay: ebayCmd || [], masquee: (o) => hiddenSales.has(String(o.transaction_id)), exclu: acctOffOf, versements, declare: declUrssaf });
     } catch (_) { return null; }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ventesComptees, hiddenSales, hiddenAccts, panelAcctOff, lbcLu, lbcVentes, ebayCmd, versements, declUrssaf]);
+  }, [ventesComptees, hiddenSales, hiddenAccts, panelAcctOff, lbcLu, lbcVentes, ebayCmd, versements, datesLbc, declUrssaf]);
   // ⚠️⚠️ CE QUE LISENT LES DEUX RAPPORTS (mensuel, annuel) — revue du 6 octobre.
   // Dates de versement illisibles ⇒ `declarables` vaut `null`, et c'est juste
   // pour Ma journée et la publication (elles ne disent rien de « reçu »). Mais
@@ -37533,15 +37627,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     if (declarables) return { lignes: declarables.lignes, aDater: declarables.aDater, vinted: 'lu' };
     if (lbcLu === undefined || ebayCmd === undefined) return { lignes: [], aDater: [], vinted: 'encours' };
     try {
-      const r = ventesDeclarables({ lbc: lbcLu ? lbcVentes.ventes : [], ebay: ebayCmd || [], declare: declUrssaf });
+      const r = ventesDeclarables({ lbc: lbcLu ? avecDatesLbc(lbcVentes.ventes, datesLbc) : [], ebay: ebayCmd || [], declare: declUrssaf });
       return { lignes: r.lignes, aDater: r.aDater, vinted: 'passu' };
     } catch (_) { return { lignes: [], aDater: [], vinted: 'passu' }; }
-  }, [declarables, lbcLu, lbcVentes, ebayCmd, declUrssaf]);
+  }, [declarables, lbcLu, lbcVentes, ebayCmd, datesLbc, declUrssaf]);
   // Les ventes FAITES, toutes plateformes (`ventesFaites`) : « Vendu aujourd'hui »,
   // « Vendu ce mois » et la colonne VENDU du graphique.
-  const vendus = useMemo(() => ventesFaites({ vinted: sales.items || [], lbc: lbcLu ? lbcVentes.ventes : [], ebay: ebayCmd || [], cachee: isHidden }),
+  const vendus = useMemo(() => ventesFaites({ vinted: sales.items || [], lbc: lbcLu ? avecDatesLbc(lbcVentes.ventes, datesLbc) : [], ebay: ebayCmd || [], cachee: isHidden }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [sales.items, hiddenSales, hiddenAccts, panelAcctOff, lbcLu, lbcVentes, ebayCmd]);
+    [sales.items, hiddenSales, hiddenAccts, panelAcctOff, lbcLu, lbcVentes, ebayCmd, datesLbc]);
   // VENDU sur une période (aujourd'hui, ce mois) — sur `vendus`, la même liste
   // que le graphique : la carte et la colonne du jour ne peuvent pas diverger.
   const bilanVentes = React.useCallback((depuisTs, jusquaTs) => {
@@ -39422,6 +39516,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // rien (« rien lu » ne vaut pas « rien »). Le squelette reste pour le PREMIER
   // chargement. Et un numéro de lecture : deux lectures qui se croisent, seule
   // la plus RÉCENTE écrit — l'ancienne ne peut plus écraser la nouvelle.
+  const comptesLectures = useRef(cleComptes);comptesLectures.current=cleComptes;
+  const gardesLectures = useRef(null);
+  if(!gardesLectures.current)gardesLectures.current={annonces:creerGardeLectures(()=>AUTH.user?.id||'',()=>comptesLectures.current),messages:creerGardeLectures(()=>AUTH.user?.id||'',()=>comptesLectures.current)};
+  useEffect(()=>{gardesLectures.current.annonces.reprendre();gardesLectures.current.messages.reprendre();return()=>{gardesLectures.current.annonces.arreter();gardesLectures.current.messages.arreter();};},[]);
   const lectureOrders = React.useRef({ sold: 0, purchased: 0 });
   const ventesPerimees = React.useRef(false);       // un signal « ventes » reçu hors des écrans qui les montrent
   const vusSonde = React.useRef({});                // horodatages vus par la sonde de 60 s (survit au changement d'écran)
@@ -39708,6 +39806,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     }
     // (22 oct.) Une entrée de cache d'avant les annonces MASQUÉES ne sait pas
     // lesquelles le sont : « pas su » — on relit plutôt que de servir « aucune ».
+    const courante=gardesLectures.current.annonces();if(!courante())return;
     const cached0 = !force && !parSignal && entreeCache('listings');
     const cached = cached0 && Array.isArray(cached0.masquees) ? cached0 : null;
     if (cached) { setListings({ loading:false, items:cached.items, comptes:cached.comptes, lues:cached.lues||{}, supprimees:cached.supprimees||{}, aConfirmer:cached.aConfirmer||[], masquees:cached.masquees, brouillons:cached.brouillons||null, ko:cached.failedUids, ...(cached.failedUids.length ? { incomplet: true } : {}) }); return; }
@@ -39719,10 +39818,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const results = await Promise.all(accounts.map(async acc => {
       const uid = String(acc.vinted_user_id);
       if (parSignal && surSignal && !surSignal.has(uid)) return { acc, r: null };      // pas signalé : on garde
-      const r = await fetchVintedListings(acc, 1, parSignal ? { moissonSeule: true } : { force });
+      let r;try{r=await fetchVintedListings(acc,1,parSignal?{moissonSeule:true}:{force});}catch{r={ok:false,error:'Lecture indisponible'};}
       if (parSignal && !r.ok) return { acc, r: null };                                   // pas de ligne : on garde
-      noteAcctLive(acc.vinted_user_id, r, force); return { acc, r };
+      if(courante())noteAcctLive(acc.vinted_user_id, r, force); return { acc, r };
     }));
+    if(!courante())return;
     const vendues = new Set();
     // 5.165 : DE QUAND date la lecture du dressing de chaque compte, et combien
     // d'annonces supprimées depuis en ont été retirées — pour le DIRE (une fois,
@@ -39769,6 +39869,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         if (info.photos && info.photos.length && !(Array.isArray(it.photos) && it.photos.length)) it.photosDetail = info.photos;
       }
     } catch (_) { /* sans ce complément, le critère reste simplement inconnu */ }
+    if(!courante())return;
     if (!error) putCache('listings', out, { failedUids }, demandes, { lues, supprimees, aConfirmer, masquees, brouillons });
     // Annonces que VINTED a marquées vendues (identité, jamais un titre). Sur
     // signal, seuls quelques comptes sont relus : on AJOUTE, on n'efface rien.
@@ -39779,13 +39880,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     if (!parSignal && signalPendantLecture.current) { signalPendantLecture.current = false; setTimeout(() => loadListings(false, true, null), 200); }
   };
   const loadConvs = async (force) => {
+    const courante=gardesLectures.current.messages();if(!courante())return;
     const demandes = cleComptesVinted(accounts);
     const cached = !force && entreeCache('convs');
-    if (cached) { const mrc = messagesRetires(); setConvs({ loading:false, items:(cached.items||[]).filter(c=>!mrc.has(String(c._acc&&c._acc.vinted_user_id))), comptes:cached.comptes }); return; }
+    if (cached) { const mrc = messagesRetires(); const suite={loading:false,items:(cached.items||[]).filter(c=>!mrc.has(String(c._acc&&c._acc.vinted_user_id))),comptes:cached.comptes,ko:accounts.filter(a=>(cached.failedUids||[]).includes(String(a.vinted_user_id)))};dernieresConvs.current=suite;setConvs(suite);return; }
     setConvs({ loading:true, items:null, error:false });
     const out = []; let anyOk=false, anyErr=false;
     // PARALLÈLE (voir loadOrders) : tous les comptes en même temps.
-    const results = await Promise.all(accounts.map(async acc => { const r = await fetchVintedConversations(acc, 1, { force }); return { acc, r }; }));
+    const results = await Promise.all(accounts.map(async acc => { try{const r=await fetchVintedConversations(acc,1,{force});return {acc,r};}catch{return {acc,r:{ok:false}};} }));
     // ⚠️ RIEN LU NE VAUT PAS RIEN (revue du 8 octobre) : une boîte qui n'a pas
     //    pu être lue disparaissait sans un mot dès qu'une autre l'était, et
     //    l'en-tête pouvait dire « Tout est lu » sur un compte dont on n'avait
@@ -39793,13 +39895,16 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     //    partielle n'est pas mise en cache (elle passerait pour complète).
     //    L'entrée de cache dit QUELS comptes elle couvre (`demandes`, revue DAC7
     //    du 9 octobre) : un compte lié depuis n'est pas servi par l'ancienne.
+    if(!courante())return;
     const ko = []; const failedUids = [];
     const mr = messagesRetires();  // messages retirés POUR DE BON : hors de la liste, de ses compteurs ET de « boîte pas lue »
     for (const { acc, r } of results) { if (mr.has(String(acc.vinted_user_id))) continue; if (r.ok) { anyOk=true; r.items.forEach(c => out.push({ ...c, _acc:acc })); } else { anyErr=true; ko.push(acc); failedUids.push(String(acc.vinted_user_id)); } }
     out.sort((a,b) => new Date(b.updated_at||0) - new Date(a.updated_at||0));
     const error = out.length===0 && anyErr && !anyOk;
     if (!anyErr) putCache('convs', out, { failedUids }, demandes);
-    setConvs({ loading:false, items: out, error, ko, comptes: demandes });
+    const echoues=new Set(failedUids),autorises=new Set(accounts.map(a=>String(a.vinted_user_id)));
+    const items=garderConversationsNonLues(dernieresConvs.current.items,out,echoues,autorises,mr);
+    const suite={loading:false,items,error:items.length===0&&error,ko,comptes:demandes};dernieresConvs.current=suite;setConvs(suite);
   };
   // ⚠️ `bordereaux` EN FAIT PARTIE : c'est l'écran où on imprime l'étiquette,
   // donc le seul endroit où un numéro en double coûte vraiment cher. Sans les
@@ -40454,7 +40559,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     conversationOrigin.current=document.activeElement;
     const request=++conversationRequest.current;
     const owner=AUTH.user?.id||'',brouillon=brouillonsReponse.current.lire(owner,conv._acc.vinted_user_id,conv.id);
-    setReplyText(brouillon);setReplyErr(null);setReplyNotice(brouillon?'Brouillon restauré pour cette conversation. Conservation temporaire, sans sauvegarde sur le serveur.':'');setPrixOffre('');setContreOffreOuverte(false);setOffreMsg(null);setOffreBusy(false);
+    setReplyText(brouillon);setReplyErr(null);setReplyNotice(brouillon?'Brouillon restauré pour cette conversation. Conservation temporaire, sans sauvegarde sur le serveur.':'');setPrixOffre('');setContreOffreOuverte(false);setOffreMsg(null);if(!verrouOffre.current)setOffreBusy(false);
     setOpenConv({request,owner,inboxUpdatedAt:conv.updated_at,loading:true,error:null,conversation:null,messages:[],acc:conv._acc,convId:conv.id,header:{login:conv.opposite_user?.login,title:conv.item_title||conv.item?.title||'',photo:conv.opposite_user?.photo?.url || photoArticle({photos:conv.item_photos})}});
     const res=await fetchVintedConversationDetail(conv._acc,conv.id,{force:extSait('messagerie')==='ok'});
     setOpenConv(o=>o?.request===request?({...o,loading:false,error:res.ok?null:res.error,source:res.source,conversation:filAvecOffres(res.conversation,conv._acc),messages:normalizeConversationMessages(filAvecOffres(res.conversation,conv._acc))}):o);
@@ -40486,7 +40591,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             const h = await fetchHarvest(capture.uid,'inbox');
             if (!arrete && Array.isArray(h?.conversations)) {
               const acc = accounts.find(a=>String(a.vinted_user_id)===capture.uid);
-              setConvs(prev=>({...prev,loading:false,error:false,items:[...(prev.items||[]).filter(c=>String(c._acc?.vinted_user_id)!==capture.uid),...h.conversations.map(c=>({...c,_acc:acc}))].sort((a,b)=>new Date(b.updated_at||0)-new Date(a.updated_at||0))}));
+              gardesLectures.current.messages.invalider();
+              setConvs(prev=>({...prev,loading:false,error:false,ko:(prev.ko||[]).filter(a=>String(a.vinted_user_id)!==capture.uid),items:[...(prev.items||dernieresConvs.current.items||[]).filter(c=>String(c._acc?.vinted_user_id)!==capture.uid),...h.conversations.map(c=>({...c,_acc:acc}))].sort((a,b)=>new Date(b.updated_at||0)-new Date(a.updated_at||0))}));
               delete _acctCache.convs;
             }
           }
@@ -40560,8 +40666,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // requête à la fois). Accepter fixe le prix, sans confirmer le paiement.
   const actionOffre = async (quoi, off) => {
     const oc = openConv;
-    if (!oc || !oc.acc || offreBusy || verrouOffre.current) return;
-    verrouOffre.current=true;
+    if (!oc || !oc.acc || !oc.owner || oc.owner!==AUTH.user?.id || offreBusy || verrouOffre.current) return;
+    const cleAction=cleActionOffreVinted(oc.owner,oc.acc.vinted_user_id,oc.convId);
+    if(actionsOffresIncertaines[cleAction])return;
+    verrouOffre.current=true;let tentative=false,resultatConfirme=false;
     try {
     let method = 'PUT', endpoint = '', body = null, p = 0;
     if (quoi === 'accept' || quoi === 'reject') {
@@ -40578,21 +40686,31 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     if(conversationRequest.current!==oc.request)return;
     if(off){const actuelle=offreEnAttenteDe(filOffreActuel.current?.conversation);if(!actuelle||cleOffreVinted(oc.acc.vinted_user_id,actuelle)!==cleOffreVinted(oc.acc.vinted_user_id,off)||actuelle.prix!==off.prix){setOffreMsg({err:'Cette offre a changé pendant la confirmation. Vérifie la conversation avant de continuer.'});return;}}
     if(off&&offresConfirmees.current.has(cleOffreVinted(oc.acc.vinted_user_id,off))){setOffreMsg({err:'Cette offre a déjà été traitée. Actualise la conversation.'});return;}
-    setOffreBusy(true); setOffreMsg(null);
+    setOffreBusy(true); setOffreMsg(null);tentative=true;
     const r = await vmrExec({ uid: oc.acc.vinted_user_id, method, endpoint, body, confirme: quoi === 'accept' });
+    if(oc.owner!==AUTH.user?.id)return;
+    const etat=etatActionVinted(r);resultatConfirme=etat==='confirme';
+    if(etat==='incertain')setActionsOffresIncertaines(v=>({...v,[cleAction]:true}));
+    if(etat==='confirme'&&off&&(quoi==='accept'||quoi==='reject'))offresConfirmees.current.set(cleOffreVinted(oc.acc.vinted_user_id,off),quoi==='accept'?20:30);
     if(conversationRequest.current!==oc.request)return;
     setOffreBusy(false);
-    if (r && r.ok) {
-      if(off&&(quoi==='accept'||quoi==='reject')){offresConfirmees.current.set(cleOffreVinted(oc.acc.vinted_user_id,off),quoi==='accept'?20:30);setOpenConv(o=>{if(o?.request!==oc.request)return o;const c=filAvecOffres(o.conversation,oc.acc);return {...o,conversation:c,messages:normalizeConversationMessages(c)};});}
+    if (etat==='confirme') {
+      if(off&&(quoi==='accept'||quoi==='reject'))setOpenConv(o=>{if(o?.request!==oc.request)return o;const c=filAvecOffres(o.conversation,oc.acc);return {...o,conversation:c,messages:normalizeConversationMessages(c)};});
       setOffreMsg({ ok: quoi === 'accept' ? 'Prix accepté sur Vinted. Le paiement de la vente n’est pas confirmé par cette acceptation.' : quoi === 'reject' ? 'Offre refusée.' : `Offre de ${fmtE(p)} envoyée.` });
-      setPrixOffre('');
+      if(quoi==='offre')setPrixOffre(v=>Number(String(v).replace(',','.'))===p?'':v);
       const res = await fetchVintedConversationDetail(oc.acc,oc.convId,{force:true});
-      if (res.ok) setOpenConv(o => o?.request===oc.request ? ({ ...o, conversation: filAvecOffres(res.conversation,oc.acc), messages: normalizeConversationMessages(filAvecOffres(res.conversation,oc.acc)) }) : o);
+      if (res.ok&&oc.owner===AUTH.user?.id) setOpenConv(o => o?.request===oc.request ? ({ ...o, conversation: filAvecOffres(res.conversation,oc.acc), messages: normalizeConversationMessages(filAvecOffres(res.conversation,oc.acc)) }) : o);
     } else {
-      setOffreMsg({ err: (r && (r.error || (r.status ? 'HTTP ' + r.status : ''))) || "Vinted n'a pas répondu." });
+      setOffreMsg({ err: etat==='incertain'?'Action non confirmée. Vérifie sur Vinted avant de relancer.':r?.error||(typeof r?.data?.message==='string'?r.data.message:'')||'Vinted a refusé cette action.' });
     }
-    } catch {if(conversationRequest.current===oc.request)setOffreMsg({err:'Réponse non confirmée. Actualise la conversation sur Vinted avant de réessayer pour éviter un doublon.'});}
-    finally {verrouOffre.current=false;if(conversationRequest.current===oc.request)setOffreBusy(false);}
+    } catch {if(tentative&&!resultatConfirme&&oc.owner===AUTH.user?.id)setActionsOffresIncertaines(v=>({...v,[cleAction]:true}));if(conversationRequest.current===oc.request){if(resultatConfirme)setOffreMsg(v=>({ok:(v?.ok||'Action confirmée sur Vinted.')+' Le fil n’a pas pu être relu ; actualise-le.'}));else setOffreMsg({err:'Réponse non confirmée. Vérifie la conversation sur Vinted avant de réessayer pour éviter un doublon.'});}}
+    finally {verrouOffre.current=false;if(oc.owner===AUTH.user?.id)setOffreBusy(false);}
+  };
+  const autoriserNouvelleActionOffre=async()=>{
+    const oc=openConv;if(!oc?.owner||oc.owner!==AUTH.user?.id)return;
+    if(!await askConfirm({title:'Autoriser une nouvelle action ?',desc:'Vérifie sur Vinted si l’offre a déjà été envoyée, acceptée ou refusée. Autoriser ne vérifie pas le résultat et n’envoie rien.',ok:'J’ai vérifié, autoriser',cancel:'Annuler'}))return;
+    if(oc.owner!==AUTH.user?.id||conversationRequest.current!==oc.request)return;
+    const cle=cleActionOffreVinted(oc.owner,oc.acc.vinted_user_id,oc.convId);setActionsOffresIncertaines(v=>{const n={...v};delete n[cle];return n;});setOffreMsg(null);
   };
 
   const accName = (acc) => { const labels = load('vinted_account_labels',{}); return labels[acc.vinted_user_id] || acc.login || `#${acc.vinted_user_id}`; };
@@ -41772,7 +41890,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // ⚠️ Dates de versement ILLISIBLES : ses ventes Vinted ne sont pas « sans
     //    date » (on n'a pas pu les lire) — seules Leboncoin et eBay comptent ici.
     const tousADater = versements === null ? (declRapport.aDater || [])
-      : ventesDeclarables({ vinted: ventesComptees || [], lbc: lbcLu ? lbcVentes.ventes : [], ebay: ebayCmd || [], exclu: acctOffOf, versements: versements || {}, declare: declUrssaf }).aDater;
+      : ventesDeclarables({ vinted: ventesComptees || [], lbc: lbcLu ? avecDatesLbc(lbcVentes.ventes, datesLbc) : [], ebay: ebayCmd || [], exclu: acctOffOf, versements: versements || {}, declare: declUrssaf }).aDater;
     const aDater = { n: tousADater.length, ca: tousADater.reduce((t, l) => t + l.eur, 0) };
     // Les comptes dont les ventes n'ont pas pu être lues — sauf ceux qu'il a
     // EXCLUS (leurs ventes ne comptent jamais : leur absence ne manque à rien).
@@ -42817,8 +42935,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               {!openConv.loading && !openConv.error && openConv.messages.length===0 && <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'20px 0'}}>Aucun message.</div>}
             </div>
             {/* Barre de réponse : envoi via l'extension (ton navigateur/IP). */}
-            {!openConv.loading && !openConv.error && openConv.convId && (()=>{ const ro = msgLectureSeule(openConv.acc); const sansExt = !vmrExtPresent() && !msgRelais; const lienVinted = `https://www.vinted.fr/inbox/${openConv.convId}`; return (
+            {!openConv.loading && !openConv.error && openConv.convId && (()=>{ const ro = msgLectureSeule(openConv.acc); const offreBloquee=!!actionsOffresIncertaines[cleActionOffreVinted(openConv.owner,openConv.acc?.vinted_user_id,openConv.convId)]; const sansExt = !vmrExtPresent() && !msgRelais; const lienVinted = `https://www.vinted.fr/inbox/${openConv.convId}`; return (
               <div className="vrm-chat-foot" data-conv-ro={ro?String(openConv.acc.vinted_user_id):undefined} style={{borderTop:`1px solid ${C.border}`,background:C.card}}>
+                {offreBusy&&<div className="vrm-chat-note" role="status">Action sur une offre en cours… Attends le résultat avant de recommencer.</div>}
+                {offreBloquee&&<div className="vrm-chat-note" role="alert" data-offre-incertaine>Une action sur cette offre n’est pas confirmée. Vérifie le résultat avant de recommencer. <a href={lienVinted} target="_blank" rel="noreferrer">Ouvrir sur Vinted ↗</a><button type="button" className="vrm-chat-btn" onClick={autoriserNouvelleActionOffre}>J’ai vérifié sur Vinted</button></div>}
                 {/* Lecture seule : CE fil-ci, nommé par son compte (ce qui le
                     distingue) — la raison générale est dite une fois au-dessus
                     de la liste (§7). */}
@@ -42857,16 +42977,16 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       {off && (
                         <div className="vrm-chat-offre-l vrm-chat-offre-traiter" data-offre-au-dessus-mini={auDessusMini?String(Math.round(minF)):undefined}>
                           <span className="vrm-chat-offre-t" style={{color:C.text}}><small className="vrm-chat-offre-label">{auDessusMini?`Offre ≥ ton mini (${prixCourt(minF)}) · à accepter`:'Offre reçue · à traiter'}</small><b data-montant="">{fmtE(off.prix)}</b></span>
-                          <div className="vrm-chat-offre-actions"><button type="button" className="vrm-chat-btn vrm-chat-btn-p" disabled={offreBusy||ro} onClick={()=>actionOffre('accept', off)} style={{background:ro?C.border:C.accent,color:ro?C.muted:(C.onAccent||'#fff'),opacity:offreBusy?0.6:1,fontWeight:auDessusMini?700:undefined}}>{auDessusMini?'✓ Accepter':'Accepter'}</button>
-                          <button type="button" className="vrm-chat-btn" disabled={offreBusy||ro} onClick={()=>actionOffre('reject', off)} style={{border:`1px solid ${C.border}`,background:C.card,color:ro?C.muted:C.text,opacity:offreBusy?0.6:1}}>Refuser</button><button type="button" className="vrm-chat-btn" disabled={!tx||ro||offreBusy} style={{border:`1px solid ${C.border}`,background:C.card,color:ro?C.muted:C.text}} onClick={()=>{setContreOffreOuverte(true);requestAnimationFrame(()=>prixOffreRef.current?.focus());}}>Contre-proposer</button></div>
+                          <div className="vrm-chat-offre-actions"><button type="button" className="vrm-chat-btn vrm-chat-btn-p" disabled={offreBusy||ro||offreBloquee} onClick={()=>actionOffre('accept', off)} style={{background:ro?C.border:C.accent,color:ro?C.muted:(C.onAccent||'#fff'),opacity:(offreBusy||offreBloquee)?0.6:1,fontWeight:auDessusMini?700:undefined}}>{auDessusMini?'✓ Accepter':'Accepter'}</button>
+                          <button type="button" className="vrm-chat-btn" disabled={offreBusy||ro||offreBloquee} onClick={()=>actionOffre('reject', off)} style={{border:`1px solid ${C.border}`,background:C.card,color:ro?C.muted:C.text,opacity:(offreBusy||offreBloquee)?0.6:1}}>Refuser</button><button type="button" className="vrm-chat-btn" disabled={!tx||ro||offreBusy||offreBloquee} style={{border:`1px solid ${C.border}`,background:C.card,color:ro?C.muted:C.text}} onClick={()=>{setContreOffreOuverte(true);requestAnimationFrame(()=>prixOffreRef.current?.focus());}}>Contre-proposer</button></div>
                         </div>
                       )}
                       {tx && (
                         <details className="vrm-chat-negociation" open={!off||!!prixOffre||contreOffreOuverte}><summary>{off?'Proposer un autre prix':'Proposer un prix'}</summary><div className="vrm-chat-offre-l">
                           <span className="vrm-chat-offre-k" style={{color:C.muted}}>Ton prix</span>
-                          <input ref={prixOffreRef} className="vrm-chat-prix" inputMode="decimal" disabled={ro||offreBusy} value={prixOffre} onChange={e=>setPrixOffre(e.target.value)} placeholder="Prix €" aria-label="Prix de l'offre"
+                          <input ref={prixOffreRef} className="vrm-chat-prix" inputMode="decimal" disabled={ro||offreBusy||offreBloquee} value={prixOffre} onChange={e=>setPrixOffre(e.target.value)} placeholder="Prix €" aria-label="Prix de l'offre"
                             style={{border:`1px solid ${C.border}`,background:C.card,color:C.text}}/>
-                          <button type="button" className="vrm-chat-btn" disabled={offreBusy||ro||!prixOffre.trim()} onClick={()=>actionOffre('offre')} style={{border:`1px solid ${C.border}`,background:C.card,color:ro?C.muted:C.text,opacity:(offreBusy||ro||!prixOffre.trim())?0.5:1}}>Envoyer l'offre</button>
+                          <button type="button" className="vrm-chat-btn" disabled={offreBusy||ro||offreBloquee||!prixOffre.trim()} onClick={()=>actionOffre('offre')} style={{border:`1px solid ${C.border}`,background:C.card,color:ro?C.muted:C.text,opacity:(offreBusy||ro||offreBloquee||!prixOffre.trim())?0.5:1}}>Envoyer l'offre</button>
                         </div></details>
                       )}
                       {offreMsg && <div role={offreMsg.err?'alert':'status'} aria-live="polite" style={{fontSize:12,marginTop:6,color:offreMsg.err?C.danger:C.text}}>{offreMsg.err||('✓ '+offreMsg.ok)}</div>}
@@ -43107,8 +43227,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   ];
   return (
     <div style={{padding:'16px 14px 40px'}}>
-      {['journee','annonces','ventes','messages'].includes(curSub)&&<BilanSynchronisation owner={AUTH.user?.id||''} sources={sourcesBilan} onNav={onNav}/>}
-      {['journee','annonces','ventes'].includes(curSub)&&<VendusAilleurs owner={AUTH.user?.id||''} ownerActuel={()=>AUTH.user?.id||''} charger={chargerRetraitsMulti} onNav={onNav} PhotoVinted={PhotoVinted}/>}
+      {['annonces','messages'].includes(curSub)&&<BilanSynchronisation owner={AUTH.user?.id||''} sources={sourcesBilan} onNav={onNav}/>}
+      {curSub==='annonces'&&<VendusAilleurs owner={AUTH.user?.id||''} ownerActuel={()=>AUTH.user?.id||''} charger={chargerRetraitsMulti} onNav={onNav} PhotoVinted={PhotoVinted}/>}
       <input ref={bordRef} type="file" accept="application/pdf,.pdf" onChange={onBordFile} style={{display:'none'}}/>
       {/* Le titre de l'écran est porté par <ScreenHead> plus bas, dans chaque
           section : ce <h2> le répétait juste au-dessus (« Annonces » puis
@@ -43447,6 +43567,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         // (16 oct.) Au-delà de deux comptes, le nombre : neuf identifiants à la suite
         // remplissaient la carte sur iPhone. Les noms restent dans `data-recu-sans`
         // et dans l'infobulle.
+        // (29 oct.) LES COTISATIONS À METTRE DE CÔTÉ — micro seulement. La base
+        // est le CA DÉCLARÉ de ce mois (`l.ym`, les mêmes lignes que Compta et la
+        // publication, §11) : l'argent reçu ce mois mais déjà déclaré ailleurs
+        // n'y est pas. Au même taux (`aPayerUrssaf`, arrondi une fois). Un compte
+        // pas lu ou des ventes sans date ⇒ « au moins ». Pas su ⇒ rien.
+        const caDeclMois = declarables ? declarables.lignes.reduce((x, l) => (l && l.ym === ymIci) ? x + l.eur : x, 0) : null;
+        const cotisMois = urssafConcerne() && caDeclMois != null && caDeclMois > 0 ? aPayerUrssaf(caDeclMois, tauxUrssaf()) : null;
+        const cotisAuMoins = !!(declarables && (nomsVentesKO.length || (declarables.aDater || []).length));
         const recuSans = declarables && nomsVentesKO.length ? `sans ${nomsVentesKO.length > 2 ? `${nomsVentesKO.length} comptes` : nomsVentesKO.join(', ')} (ventes pas lues) · ` : '';
         const caDeclareAilleurs = recuDeclareAilleurs.reduce((a, l) => a + l.eur, 0);
         const moisDeclAilleurs = [...new Set(recuDeclareAilleurs.map(l => l.ym))].sort().map(ym => { const [y, m] = ym.split('-'); return new Date(Number(y), Number(m) - 1, 1).toLocaleDateString('fr-FR', { month: 'long' }); }).join(', ');
@@ -43590,6 +43718,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               <div style={{minWidth:0}}>
                 <div className="vrm-day-k" style={{color:C.muted}}>Reçu en {moisNom}</div>
                 {declarables === null && <div className="vrm-day-note" style={{color:C.muted}}>dates de versement illisibles pour l'instant</div>}
+                {cotisMois != null && <div data-cotis-mois={Math.round(cotisMois*100)} data-cotis-aumoins={cotisAuMoins?'1':''} className="vrm-day-note" style={{color:C.muted}}>≈ {cotisAuMoins ? 'au moins ' : ''}{cotisMois.toLocaleString('fr-FR',{minimumFractionDigits:2,maximumFractionDigits:2})} € de cotisations<span className="vrm-cotis-long"> à mettre de côté ({load('vinted_urssaf_freq','trimestriel')==='mensuel' ? 'à payer le mois prochain' : 'à payer après la fin du trimestre'})</span></div>}
               </div>
               <span className="vrm-display vrm-day-recu-n" style={{color:C.text}}>{declarables === undefined ? '…' : recuMois == null ? '—' : `${Math.round(recuMois).toLocaleString('fr-FR')} €`}</span>
             </div>
@@ -43827,6 +43956,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 Réglages ⇒ toujours visible (un seul propriétaire, §11). */}
             {!baseKO && !premierJour && !aWidget('vendu') && <BeneficeJournee onNav={onNav} place="carte"/>}
             {!baseKO && !premierJour && <BeneficeJournee onNav={onNav} place="lien"/>}
+            {/* (29 oct.) Les deux résumés de contrôle passent SOUS la journée : au-dessus du
+                bonjour ils repoussaient les compteurs du jour. Les vraies doubles ventes
+                restent en tête (alertes qui coûtent de l'argent). */}
+            <BilanSynchronisation owner={AUTH.user?.id||''} sources={sourcesBilan} onNav={onNav}/>
+            <VendusAilleurs owner={AUTH.user?.id||''} ownerActuel={()=>AUTH.user?.id||''} charger={chargerRetraitsMulti} onNav={onNav} PhotoVinted={PhotoVinted}/>
           </div>
         );      })()}
 
@@ -43935,7 +44069,6 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           </div>
         )}
         {sales.loading && !sales.items && <Skeleton variant="row" count={5}/>}
-        <ComparaisonComptesVinted rows={comparerComptes({comptes:accounts.filter(a=>!acctOff(a.vinted_user_id)).map(a=>({uid:String(a.vinted_user_id),nom:accName(a)})),ventes:sales.items||[],stock:(listings.items||[]).filter(it=>!acctOffOf(it)&&!blockedAccts.has(String(it._acc?.vinted_user_id))&&!soldManual.has(String(it.id))&&!annoncesVendues.has(String(it.id))),dansPeriode:o=>dansPeriode(o,periode),finalisee:o=>classifyOrderStatus(o.status)==='completed',masquee:isHidden,meta:effEntry,aFaire:o=>aExpedier(o)&&!isShipDone(o)})} periode={libellePeriode(periode)} disponible={Array.isArray(sales.items)&&!sales.loading&&!sales.error&&!(sales.failedUids||[]).some(u=>!acctOff(u))} stockDisponible={Array.isArray(listings.items)&&!listings.loading&&!listings.error&&!listings.incomplet} charger={()=>{loadOrders('sold',setSales,true);loadListings(true);}}/>
         {sales.error && <LoadError onRetry={()=>loadOrders('sold',setSales,true)}/>}
         {sales.items && !sales.error && sales.items.length===0 && <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'28px 16px',lineHeight:1.5}}>Aucune vente pour l'instant.<br/><span style={{fontSize:12}}>Tes ventes finalisées apparaîtront ici automatiquement.</span></div>}
         {/* ⚠️ SUR ORDINATEUR, LA LISTE SE RANGE EN DEUX COLONNES.
@@ -43955,7 +44088,6 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             bordereau » sont grisés pour la même raison : on la dit ici, au-dessus
             de la liste, au lieu de la répéter sous chaque vente. */}
         <RaisonBordereauxGrises ventes={ventesAffichees.filter(o=>o && o.transaction_id!=null && !isHidden(o) && classifyOrderStatus(o.status)!=='cancelled' && aExpedier(o) && !isShipDone(o) && !labelsCaptes[String(o.transaction_id)] && !bordParTx[String(o.transaction_id)])}/>
-        <FiabiliteVentes partiel={nomsVentesKO.length>0} perimetre="Vinted · ventes finalisées, hors ventes masquées" lignes={ventesAffichees.map(o=>{const e=effEntry(o),b=beneficePaire(o.price?.amount,e);return {incluse:!isHidden(o)&&venteFinalisee(o),supporte:o.price?.currency_code==='EUR',achatConnu:b.achat!=null,prixConnu:b.vente!=null,valide:b.valid,fraisConfirmes:b.complet};})}/>
         <div className="vrm-ventes-liste" style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:12,overflow:'hidden',boxShadow:C.shadow||'none'}}>
           <div className="vrm-ledger-heading" aria-hidden="true"><span>Article</span><span className="vrm-ledger-state-heading">État</span><span>Montant</span></div>
           {/* ⚠️ UNE FRAPPE NE RECRÉE PLUS LES 60 LIGNES AU RENDU URGENT (16 oct.).
@@ -44138,6 +44270,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             Voir plus — {ventesMax} affichées sur {ventesAffichees.length}
           </button>
         )}
+        {/* (29 oct., « un peu moche ») Les contrôles passent SOUS la liste : avant la
+            première vente il y avait huit blocs empilés. Ils restent tous là, repliés. */}
+        <section className="vrm-ventes-controles" data-ventes-controles="" style={{display:'flex',flexDirection:'column',gap:8,margin:'16px 0 12px'}}>
+          <h3 data-titre-section="" style={{fontSize:15,fontWeight:600,color:C.text,letterSpacing:-0.15,margin:'0 2px'}}>Vérifications</h3>
+  <BilanSynchronisation owner={AUTH.user?.id||''} sources={sourcesBilan} onNav={onNav}/>
+  <VendusAilleurs owner={AUTH.user?.id||''} ownerActuel={()=>AUTH.user?.id||''} charger={chargerRetraitsMulti} onNav={onNav} PhotoVinted={PhotoVinted}/>
+        <ComparaisonComptesVinted rows={comparerComptes({comptes:accounts.filter(a=>!acctOff(a.vinted_user_id)).map(a=>({uid:String(a.vinted_user_id),nom:accName(a)})),ventes:sales.items||[],stock:(listings.items||[]).filter(it=>!acctOffOf(it)&&!blockedAccts.has(String(it._acc?.vinted_user_id))&&!soldManual.has(String(it.id))&&!annoncesVendues.has(String(it.id))),dansPeriode:o=>dansPeriode(o,periode),finalisee:o=>classifyOrderStatus(o.status)==='completed',masquee:isHidden,meta:effEntry,aFaire:o=>aExpedier(o)&&!isShipDone(o)})} periode={libellePeriode(periode)} disponible={Array.isArray(sales.items)&&!sales.loading&&!sales.error&&!(sales.failedUids||[]).some(u=>!acctOff(u))} stockDisponible={Array.isArray(listings.items)&&!listings.loading&&!listings.error&&!listings.incomplet} charger={()=>{loadOrders('sold',setSales,true);loadListings(true);}}/>
+        <FiabiliteVentes partiel={nomsVentesKO.length>0} perimetre="Vinted · ventes finalisées, hors ventes masquées" lignes={ventesAffichees.map(o=>{const e=effEntry(o),b=beneficePaire(o.price?.amount,e);return {incluse:!isHidden(o)&&venteFinalisee(o),supporte:o.price?.currency_code==='EUR',achatConnu:b.achat!=null,prixConnu:b.vente!=null,valide:b.valid,fraisConfirmes:b.complet};})}/>
+        </section>
         <div className="vrm-sales-analysis">
         {(totals.nb>0) && (
           <div style={{marginBottom:12}}>
@@ -56640,6 +56781,7 @@ function AppCoeur() {
   // (revue du 5 octobre) : une vente masquée d'un ✕, un compte écarté, une
   // nouvelle vente rangée par l'extension, et MINUIT (une PWA reste ouverte).
   const [masquesTick, setMasquesTick] = useState(0);
+  const [datesLbcTick] = useLigneSynchro('vrm_lbc_dates', lireDatesLbc);   // une date Leboncoin saisie : le vendu se recalcule
   useEffect(() => {
     const f = (e) => { const k = e && e.detail && e.detail.k; if (k === 'vinted_sales_hidden' || k === 'vinted_accounts_hidden') setMasquesTick(t => t + 1); };
     window.addEventListener('vrm:save', f);
@@ -56705,7 +56847,7 @@ function AppCoeur() {
       const hAcc = new Set((load('vinted_accounts_hidden', []) || []).map(String));
       const ecarte = (uid) => compteEcarte(uid, hAcc, panelOffCoque);
       const cachee = (o) => hTx.has(String(o && o.transaction_id)) || ecarte(o && o._acc && o._acc.vinted_user_id);
-      const v = ventesFaites({ vinted: ventesCoque, lbc: lbcCoqueLu === true ? ((lbcVentes && lbcVentes.ventes) || []) : [], ebay: Array.isArray(ebayCommandes) ? ebayCommandes : [], cachee });
+      const v = ventesFaites({ vinted: ventesCoque, lbc: lbcCoqueLu === true ? avecDatesLbc(((lbcVentes && lbcVentes.ventes) || []), lireDatesLbc()) : [], ebay: Array.isArray(ebayCommandes) ? ebayCommandes : [], cachee });
       const r = resumeVendu(v.lignes);
       const loginDe = (uid) => { const a = (vintedAccounts || []).find(x => String(x.vinted_user_id) === String(uid)); return (a && a.login) || String(uid); };
       const venduManque = [
@@ -56718,7 +56860,7 @@ function AppCoeur() {
         venduManque, venduEnAttente: lbcCoqueLu === undefined || ebayCommandes === undefined };
     } catch (_) { return liveStats; }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [liveStats, ventesCoque, ventesKO, lbcVentes, lbcCoqueLu, ebayCommandes, panelOffCoque, nuagePret, masquesTick, jourCle, vintedAccounts]);
+  }, [liveStats, ventesCoque, ventesKO, lbcVentes, lbcCoqueLu, ebayCommandes, panelOffCoque, nuagePret, masquesTick, jourCle, vintedAccounts, datesLbcTick]);
   // Le widget : écrit quand ce qu'il afficherait CHANGE (pas à chaque rendu),
   // et SEULEMENT un « vendu » complet : sources pas encore revenues, illisibles
   // ou un compte manquant ⇒ on n'écrit pas, l'iPhone garde la dernière photo

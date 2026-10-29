@@ -1,4 +1,5 @@
 import {decoderEntitesHtml} from '../api/_lib/entites-html.js';
+import {erreurVariablesFavori} from './favorisMessage.js';
 
 const texte = v => typeof v === 'string' ? decoderEntitesHtml(v.replace(/<[^>]*>/g,' ')).replace(/\s+/g,' ').trim().slice(0,2000) : '';
 export function preparerMessageFavori(message,pourcentage='') {
@@ -6,9 +7,11 @@ export function preparerMessageFavori(message,pourcentage='') {
   const brut=String(pourcentage??'').trim();
   if(brut&&(!/^\d{1,6}$/.test(brut)||Number(brut)<1||Number(brut)>99))return {message:'',pourcentage:null,erreur:'Saisis un pourcentage entier entre 1 et 99, ou laisse ce champ vide.'};
   const p=brut?Number(brut):null;
-  const resultat=p?(base?`${base}\n\nJe te propose une réduction de ${p} % sur cet article.`:`Bonjour ! Je te propose une réduction de ${p} % sur cet article.`):base;
-  if(resultat.length>2000)return {message:'',pourcentage:p,erreur:'Raccourcis ton message : le texte avec la réduction doit tenir en 2 000 caractères.'};
-  return {message:resultat,pourcentage:p,erreur:''};
+  // 29 oct. (comme Vintex) : plus de phrase « Je te propose une réduction… »
+  // ajoutée au texte — la VRAIE offre Vinted apparaît dans la conversation.
+  if(base.length>2000)return {message:'',pourcentage:p,erreur:'Raccourcis ton message : il doit tenir en 2 000 caractères.'};
+  const ev=erreurVariablesFavori(base);if(ev)return {message:'',pourcentage:p,erreur:ev};
+  return {message:base,pourcentage:p,erreur:''};
 }
 export function lienFavoriVinted(v,domain='www.vinted.fr') {
   if (typeof v !== 'string' || v.length>2000) return null;
