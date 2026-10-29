@@ -42698,6 +42698,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       Object.values(comptesL).find((c) => String(c.id) === String(id))?.name ||
       String(id || "Compte Leboncoin");
     for (const ad of Object.values(items)) {
+      if(!ad||ad.id==null)continue;
+      const lien = lienAnnonceLeboncoin(ad);
+      const idDuLien = lien ? new URL(lien).pathname.split('/').filter(Boolean).at(-1)?.replace(/\.htm$/,'') : null;
       const compte = String(ad.account || ad.lbcUser || "");
       if (!comptesProuves.has(idCompteLbcApp(compte)) && !liens[String(ad.id)])
         continue;
@@ -42715,7 +42718,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           : etatAnnonceLeboncoin(ad, ventesL).etat === "active"
             ? true
             : null,
-        lien: lienAnnonceLeboncoin(ad),
+        lien: idDuLien===String(ad.id)?lien:null,
         onglet: "leboncoin",
       });
     }
@@ -42742,7 +42745,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     )
       manques.push("commandes eBay non entièrement relues");
     for (const a of ea?.items || [])
-      annonces.push({
+      if(a?.itemId!=null)annonces.push({
         id: String(a.itemId),
         numero: numEbayLu(a.sku, a.itemId, null, a.depuis),
         plateforme: "eBay",
@@ -42765,8 +42768,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       });
     for (const o of ev?.items || [])
       if (commandeEbayEngagee(o))
-        for (const li of o.lineItems || [])
-          ventes.push({
+        for (const li of Array.isArray(o.lineItems)?o.lineItems:[])
+          if(li)ventes.push({
             id:
               String(o.orderId) +
               ":" +
