@@ -32880,6 +32880,9 @@ function MicroEntreprise({ taux, poserTaux, officiel, vlTaux, acreTaux }) {
   const vl = opts.liberatoire;                     // 'oui' · 'non' · null (pas répondu)
   const acre = opts.acre || (opts.at === 0 && acreTaux);
   const s = seuilsDe(now.getFullYear());
+  const [microOuvert, setMicroOuvert] = React.useState(false);
+  const besoin = (optsPret && opts.liberatoire == null) || !!(jauge && ((jauge.tva && jauge.tva.etat && jauge.tva.etat !== 'ok') || (jauge.plafond && jauge.plafond.etat && jauge.plafond.etat !== 'ok')));
+  React.useEffect(() => { if (besoin) setMicroOuvert(true); }, [besoin]);
   const poserOptions = (o) => {
     const n = { ...opts, ...o, at: Date.now() };
     save('vrm_micro_options', { liberatoire: n.liberatoire, acre: !!n.acre, at: n.at });
@@ -33051,7 +33054,22 @@ function MicroEntreprise({ taux, poserTaux, officiel, vlTaux, acreTaux }) {
   // (29 oct.) Sur ordinateur, le calendrier et les seuils côte à côte (puis le
   // profil et l'impôt) : une carte pleine largeur de 1 300 px pour trois lignes
   // de dates laissait l'écran à moitié vide. Au téléphone, une colonne.
-  return (<div data-micro-entreprise="" className="vrm-micro-grille" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 440px), 1fr))', gap: 12, alignItems: 'stretch', margin: '12px 0' }}>{calendrier}{seuils}{profil}{impots}</div>);
+  // (29 oct., « c'est trop incompréhensible ») Ces quatre cartes se LISENT de
+  // temps en temps : repliées sous une ligne qui dit ce qu'il y a dedans. Elles
+  // s'ouvrent d'elles-mêmes quand quelque chose demande son attention (le
+  // versement libératoire pas encore répondu, un seuil proche ou dépassé).
+  const aConfirmer = optsPret && vl == null;
+  const seuilAlerte = besoin && !aConfirmer;
+  const prochaine = (cal || []).find((c) => !(regPret && c.ym.every((m) => moisDeclare(regLu, m))));
+  return (<details className="vrm-repli vrm-micro-repli" data-micro-repli={microOuvert ? 'ouvert' : 'ferme'} data-micro-attention={besoin ? '1' : ''} open={microOuvert} onToggle={(e) => setMicroOuvert(e.currentTarget.open)} style={{ margin: '12px 0', background: C.card, border: `1px solid ${C.border}`, borderRadius: 12, padding: '4px 16px 12px' }}>
+    <summary>
+      <span style={{ display: 'flex', flexDirection: 'column', gap: 2, flex: '1 1 auto', minWidth: 0 }}>
+        <span style={{ fontSize: 15, fontWeight: 600, color: C.text }}>Ta micro-entreprise</span>
+        <span style={{ fontSize: 12.5, color: besoin ? (C.warn || '#B7791F') : C.muted, fontWeight: 500, lineHeight: 1.4 }}>{aConfirmer ? '1 question à confirmer · ' : ''}{seuilAlerte ? 'un seuil approche · ' : ''}taux {String(taux).replace('.', ',')} %{prochaine ? ` · ${prochaine.periode} à déclarer avant le ${prochaine.limite.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}` : ''} · seuils et impôts</span>
+      </span>
+    </summary>
+    <div data-micro-entreprise="" className="vrm-micro-grille" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 440px), 1fr))', gap: 12, alignItems: 'stretch', marginTop: 8 }}>{calendrier}{seuils}{profil}{impots}</div>
+  </details>);
 }
 function SuiviUrssaf({ onNav }) {
   const v = useLigneUrssaf();
@@ -33250,8 +33268,8 @@ function CarteUrssafMois({ liveStats, onNav }) {
           if (par.length > 1 || (par.length === 1 && par[0][0] !== 'Vinted')) morceaux.push(<Puce key="d">dont {par.map(([k,v],i)=><React.Fragment key={k}>{i?' · ':''}{k} <Mt v={v.ca}/></React.Fragment>)}</Puce>);
           if (pasSu.length) morceaux.push(<Puce key="p" warn>{pasSu.join(' et ')} : pas pu lire — {pasSu.length>1?'leurs':'ses'} ventes ne sont pas dans ce chiffre, rouvre l'écran dans un moment</Puce>);
           if (adV && adV.n > 0) morceaux.push(<Puce key="av">{adV.n} vente{adV.n>1?'s':''} Vinted finalisée{adV.n>1?'s':''} sans date de versement (<Mt v={adV.ca}/>) : dans aucun mois pour l'instant{extSait('versement')==='retard' && <span style={{color:C.warn}}> — mets l'extension à jour ({EXT_CAPACITES.versement}) : c'est elle qui va chercher ces dates</span>}</Puce>);
-          if (adL && adL.n > 0) morceaux.push(<Puce key="a">{adL.n} vente{adL.n>1?'s':''} Leboncoin sans date (<Mt v={adL.ca}/>) : dans aucun mois tant que leur date n'est pas captée{extSait('lbcdate')==='retard' && <span style={{color:C.warn}}> — mets d'abord l'extension à jour ({EXT_CAPACITES.lbcdate})</span>}</Puce>);
-          if (src.Vestiaire === 'nonRelie') morceaux.push(<Puce key="v">Vestiaire Co : pas encore relié</Puce>);
+          if (adL && adL.n > 0) morceaux.push(<Puce key="a">{adL.n} vente{adL.n>1?'s':''} Leboncoin sans date (<Mt v={adL.ca}/>) : dans aucun mois tant que leur date n'est pas captée — tu peux la saisir dans « Chiffre d'affaires par période »{extSait('lbcdate')==='retard' && <span style={{color:C.warn}}> — mets d'abord l'extension à jour ({EXT_CAPACITES.lbcdate})</span>}</Puce>);
+          // (29 oct.) « Vestiaire Co : pas encore relié » retiré : affiché à tous, même sans compte Vestiaire, il n'apprenait rien.
         }
         const Chiffre = ({ lib, val, fort, couleur, sous, sousStyle }) => (
           <div style={{minWidth:0}}>
@@ -33407,11 +33425,12 @@ function RecapComptableMensuel() {
     <>
       {/* Récap comptable mensuel */}
       {moisRecap.length>0&&(
-        <Card>
-          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:14}}>
-            <span data-titre-section="" style={{fontSize:15,fontWeight:600,color:C.text,letterSpacing:-0.15}}>Récap comptable mensuel</span>
-            <Btn small outline onClick={exportCompta} style={{fontSize:13}}>Exporter (CSV)</Btn>
-          </div>
+        <Card><details className="vrm-repli" data-recap-repli="">
+          <summary style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8}}>
+            <span data-titre-section="" style={{fontSize:15,fontWeight:600,color:C.text,letterSpacing:-0.15}}>Récap comptable mensuel</span><span style={{fontSize:12.5,color:C.muted,fontWeight:500,marginLeft:'auto'}}>{moisRecap.length} mois</span>
+          </summary>
+          <div style={{display:'flex',justifyContent:'flex-end',margin:'8px 0 10px'}}><Btn small outline onClick={exportCompta} style={{fontSize:13}}>Exporter (CSV)</Btn></div>
+
           <div style={{overflowX:'auto'}}>
             <table style={{width:'100%',borderCollapse:'collapse',fontSize:13}}>
               <thead>
@@ -33448,7 +33467,7 @@ function RecapComptableMensuel() {
               ? <>Ventes <b>finalisées</b>, toutes plateformes, comptées dans le mois où l'argent a été versé (Vinted), de la vente (Leboncoin), de la commande payée (eBay) — ou dans le mois où tu les as déclarées. Annulées et remboursements exclus, ventes masquées comprises ; une vente sans date de versement n'est dans aucun mois.</>
               : <>Ventes de l'ancienne archive, à leur date de réception — annulées et remboursements exclus.</>} Cotisations estimées à {String(tauxUrssaf()).replace('.',',')} % (taux réglable dans Réglages). La déclaration se fait sur autoentrepreneur.urssaf.fr.
           </div>
-        </Card>
+        </details></Card>
       )}
 
 

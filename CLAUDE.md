@@ -1,5 +1,12 @@
 # VRM — dossier de passation
 
+> **29 octobre (suite, « c'est trop incompréhensible ») — Comptabilité allégée :** « Ta micro-entreprise » (calendrier,
+> seuils, profil, impôts) est REPLIÉE sous une ligne-résumé (taux · prochaine période à déclarer · seuils et impôts,
+> `data-micro-repli`) et s'ouvre d'elle-même si quelque chose demande son attention (versement libératoire pas répondu,
+> seuil proche ou dépassé : `data-micro-attention`). Le récap comptable mensuel est replié aussi (`data-recap-repli`).
+> « Vestiaire Co : pas encore relié » retiré de la carte URSSAF (dit à tous, n'apprenait rien) ; une vente Leboncoin sans
+> date renvoie à la saisie. Banc `suivi-urssaf.cjs` section R (replié par défaut, résumé, un geste l'ouvre).
+
 > **29 octobre — Comptabilité plus pro (mise en page) :** l'URSSAF « à faire » d'abord (carte du mois + prochaine
 > échéance, puis le suivi), ensuite calendrier · seuils · profil · déclaration de revenus, en GRILLE sur ordinateur
 > (`vrm-micro-grille`, deux colonnes ≥ 2 × 440 px), une colonne au téléphone. Les titres « Ton bénéfice », « Ta déclaration

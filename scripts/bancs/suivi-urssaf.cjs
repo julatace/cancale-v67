@@ -196,6 +196,30 @@ const ligneSuivi = (pg, label) => pg.evaluate((lb) => { const c = document.query
         dit(errs.length === 0, `A ${T} : aucune erreur de page`, errs.join(' | ').slice(0, 200));
         await ctx.close();
       });
+      await essaie(`R ${T}`, async () => {
+        // (29 oct.) Rien à confirmer, seuils loin ⇒ « Ta micro-entreprise » repliée, résumé lisible ;
+        // le récap mensuel aussi. Un geste l'ouvre.
+        const opts = { main: mainDe({ vrm_urssaf_declare: DECL_SEPT, vrm_micro_options: { liberatoire: 'non', acre: false, at: Date.parse('2026-10-20T09:00:00Z') } }) };
+        const { ctx, pg, errs } = await rendre(b, vp, opts);
+        await aller(pg, 'compta', '[data-suivi-urssaf="lu"]', 2500);
+        await pg.waitForTimeout(800);
+        const r = await attrs(pg, '[data-micro-repli]', 'data-micro-');
+        dit(!!r && r.repli === 'ferme' && !r.attention, `R ${T} : rien à confirmer ⇒ la micro-entreprise est repliée`, JSON.stringify(r));
+        const resume = await pg.evaluate(() => { const d = document.querySelector('[data-micro-repli]'); return d ? d.querySelector('summary').innerText : ''; });
+        dit(/Ta micro-entreprise/.test(resume) && /taux/.test(resume) && /à déclarer avant le/.test(resume), `R ${T} : le résumé dit le taux et la prochaine échéance`, resume.replace(/\n/g, ' | '));
+        const vis = await pg.evaluate(() => { const e = document.querySelector('[data-micro-seuils]'); return !!e && (e.checkVisibility ? e.checkVisibility() : e.getClientRects().length > 0); });
+        dit(!vis, `R ${T} : les seuils ne sont pas affichés tant que c'est replié`);
+        const rec = await pg.evaluate(() => { const d = document.querySelector('[data-recap-repli]'); return d ? { open: d.open } : null; });
+        dit(!rec || rec.open === false, `R ${T} : le récap mensuel est replié`, JSON.stringify(rec));
+        await touche(pg, '[data-micro-repli] > summary', vp);
+        await pg.waitForTimeout(400);
+        const r2 = await attrs(pg, '[data-micro-repli]', 'data-micro-');
+        const vis2 = await pg.evaluate(() => { const e = document.querySelector('[data-micro-seuils]'); return !!e && (e.checkVisibility ? e.checkVisibility() : e.getClientRects().length > 0); });
+        dit(!!r2 && r2.repli === 'ouvert' && vis2, `R ${T} : un geste l'ouvre et montre les seuils`, JSON.stringify(r2));
+        if (process.env.SHOTS) { await pg.setViewportSize({ width: vp.width, height: 7000 }); await pg.evaluate(() => { const d = document.querySelector('[data-micro-repli]'); if (d) d.open = false; }); await pg.waitForTimeout(600); await pg.screenshot({ path: `${process.env.SHOTS}/compta-replie-${vp.width}.png` }); await pg.setViewportSize(vp); }
+        dit(errs.length === 0, `R ${T} : aucune erreur de page`, errs.join(' | ').slice(0, 200));
+        await ctx.close();
+      });
       await essaie(`D ${T}`, async () => {
         const opts = { main: mainDe() };
         const { ctx, pg, errs } = await rendre(b, vp, opts);
