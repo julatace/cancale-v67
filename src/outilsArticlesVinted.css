@@ -1,10 +1,10 @@
 .vrm-outils {
   margin: 12px 0;
   padding: 12px 14px;
-  border: 1px solid #dbe5e3;
+  border: 1px solid var(--vrm-line, #dbe5e3);
   border-radius: 12px;
-  background: var(--card, #fff);
-  color: inherit;
+  background: var(--vrm-surface, #fff);
+  color: var(--vrm-ink, inherit);
   font-size: 12px;
 }
 .vrm-outils summary {
@@ -27,7 +27,7 @@
 .vrm-outils button,
 .vrm-historique button {
   font: inherit;
-  border: 1px solid #cbd9d6;
+  border: 1px solid var(--vrm-line, #cbd9d6);
   border-radius: 7px;
   padding: 6px 9px;
   background: transparent;
@@ -35,7 +35,7 @@
   cursor: pointer;
 }
 .vrm-outils button[aria-pressed="true"] {
-  background: #e6f0ed;
+  background: var(--vrm-card2, #e6f0ed);
 }
 .vrm-outils-actions {
   display: flex;
@@ -51,7 +51,7 @@
   gap: 10px;
   align-items: center;
   padding: 10px 0;
-  border-bottom: 1px solid #e5ecea;
+  border-bottom: 1px solid var(--vrm-line, #e5ecea);
 }
 .vrm-outils-liste article > div {
   flex: 1;
@@ -87,7 +87,7 @@
 .vrm-outils th,
 .vrm-outils td {
   padding: 10px 8px;
-  border-bottom: 1px solid #e2e9e7;
+  border-bottom: 1px solid var(--vrm-line, #e2e9e7);
   min-width: 85px;
   vertical-align: top;
 }
@@ -96,7 +96,7 @@
 }
 .vrm-historique {
   margin-top: 20px;
-  border-top: 1px solid #dbe5e3;
+  border-top: 1px solid var(--vrm-line, #dbe5e3);
   font-size: 12px;
 }
 .vrm-historique > div {
@@ -129,3 +129,5 @@
     flex-shrink: 0;
   }
 }
+
+.vrm-outils button:focus-visible,.vrm-outils summary:focus-visible,.vrm-historique button:focus-visible{outline:2px solid var(--vrm-accent,#42786e);outline-offset:3px}
