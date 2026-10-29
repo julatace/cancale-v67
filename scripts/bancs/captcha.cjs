@@ -272,6 +272,10 @@ async function scenarios(nav, taille) {
     dit(err && /challenges\.cloudflare\.com/.test(t) && /bloqueur|réseau/i.test(t), 'le message dit ce qui bloque et quoi faire', t.slice(0, 110));
     const b = await bouton(pg);
     dit(b && b.off && /indisponible/i.test(b.txt), 'le bouton est grisé et dit pourquoi (jamais muet)', JSON.stringify(b));
+    // (29 oct.) La carte de connexion entre en grandissant de 98 % à 100 % (0,74 s) : mesuré
+    // pendant l'entrée, le bouton faisait 43,1 px. On attend la fin de SES animations
+    // (celles de ses ancêtres ; les halos du fond tournent sans fin, on ne les attend pas).
+    await pg.waitForFunction(() => { const e = document.querySelector('[data-captcha-reessayer]'); if (!e) return true; for (let n = e; n; n = n.parentElement) for (const a of n.getAnimations ? n.getAnimations() : []) if (a.playState === 'running') return false; return true; }, null, { timeout: 5000 }).catch(() => {});
     const r = await pg.evaluate(() => { const e = document.querySelector('[data-captcha-reessayer]'); if (!e) return 0; const x = e.getBoundingClientRect(); return Math.round(x.height); });
     dit(r >= 44, '« Réessayer » se touche au doigt (44 px)', r + ' px');
     dit(await sansDebord(pg), 'rien ne déborde');
