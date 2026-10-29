@@ -280,7 +280,7 @@ const cliquer = (pg, texte) => pg.evaluate((tx) => { const b = [...document.quer
       dit(/N°18/.test(lj) && !/N°15/.test(lj) && /(^|\D)1 à retirer de Leboncoin/.test(lj), 'Ma journée : « 1 à retirer de Leboncoin — N°18 », pas la N°15 rapprochée par titre', lj.slice(0, 120));
       const pubs = ECRITS.filter((x) => /lbc_a_retirer/.test(x.corps)).map((x) => { try { const c = JSON.parse(x.corps); const r = Array.isArray(c) ? c[0] : c; return r.data.liste; } catch (_) { return null; } });
       const toutes = pubs.flat().filter(Boolean);
-      dit(pubs.length >= 1 && toutes.every((r) => r.numero === '18') && toutes.every((r) => r.numero || r.lbcId), 'la liste publiée pour le logo VRM : la N°18 seulement, jamais une ligne vide', JSON.stringify(pubs).slice(0, 200));
+      dit(pubs.length >= 1 && pubs.every((l) => Array.isArray(l) && l.length === 1) && toutes.every((r) => r.numero === '18') && toutes.every((r) => r.numero || r.lbcId), 'la liste publiée pour le logo VRM : la N°18 seulement — jamais une ligne vide, jamais une liste vidée avant l’arrivée des numéros', JSON.stringify(pubs).slice(0, 200));
       // Le clic mène À la paire, pas en haut de l'écran Leboncoin.
       await oj.pg.evaluate(() => { const e = [...document.querySelectorAll('[data-job]')].find((x) => /à retirer de Leboncoin/.test(x.innerText)); if (e) e.click(); });
       await oj.pg.waitForSelector('[data-lbc-retirer]', { timeout: 20000 }).catch(() => {});

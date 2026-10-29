@@ -221,7 +221,16 @@ const projette = (row, sel) => {
         titres: [...document.querySelectorAll('.vrm-ledger-sale-title')].map((e) => e.textContent.trim()),
         benefs: [...document.querySelectorAll('[data-lbc-benef]')].map((e) => e.getAttribute('data-lbc-benef')),
       }));
-      dit(ven.titres.some((t) => /Nike Air Max/.test(t) && /N°12/.test(t)), 'vente Leboncoin reliée : le N° de la paire est sur la carte', JSON.stringify(ven.titres));
+      // (29 oct.) Julien : « côté vente… enlève N° » — le titre d'une vente
+      // Leboncoin ne porte plus le N° ; il reste dans le tiroir (« Fiche article N°… »).
+      dit(ven.titres.some((t) => /Nike Air Max/.test(t)) && !ven.titres.some((t) => /N°/.test(t)), 'vente Leboncoin reliée : pas de « N° » dans le titre (demande du 29 oct.)', JSON.stringify(ven.titres));
+      const tiroir = await pg.evaluate(async () => {
+        const row = [...document.querySelectorAll('.vrm-sale-row, [data-lbc-vente]')].find((e) => /Nike Air Max/.test(e.textContent));
+        const t = row && row.querySelector('.vrm-ledger-sale-toggle'); if (t) t.click();
+        await new Promise((r) => setTimeout(r, 500));
+        return [...document.querySelectorAll('.vrm-fiche-vente-acces button')].map((x) => x.textContent.trim());
+      });
+      dit(tiroir.some((x) => /N°12/.test(x)), '… le N° de la paire reste dans le tiroir de la vente', JSON.stringify(tiroir));
       dit(ven.benefs.length === 1 && ven.benefs[0] === '55.00', 'son bénéfice (85 € − 30 € d’achat saisi) = 55,00 €, et la vente NON reliée n’en a aucun', JSON.stringify(ven.benefs));
       dit(ven.titres.some((t) => /Adidas Samba/.test(t) && !/N°/.test(t)), 'vente NON reliée : aucun N° inventé', JSON.stringify(ven.titres));
       await pg.click('[data-section="annonces"]').catch(() => {});

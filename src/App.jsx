@@ -57838,7 +57838,7 @@ function AppCoeur() {
           lbcARetirer=aRetirerDeLbcVinted({posted:postedIds, numeros:nums, enLigne:lbcOnlineIds, vendus:vendusR, itemsLbc:items, liens:liensR, vendusLbc:ventesLbcLu?annoncesLbcVendues(ventesLbcLu):null, sortis});
           const toutesLues=[...lusParCompte.values()].every(v=>v&&v[2]&&Array.isArray(v[2].items));
           if(lbcARetirer && preuveN && items && ventesLbcLu && toutesLues) publierLbcARetirer(lbcARetirer).catch(()=>{});
-        } else if(items && ventesLbcLu) publierLbcARetirer([]).catch(()=>{});
+        } else if(!aJuger && items && ventesLbcLu) publierLbcARetirer([]).catch(()=>{});
         if(lbcARetirer){ lbcRemovePids=lbcARetirer.map(r=>r.vinted).filter(Boolean); lbcRemoveCount=lbcARetirer.length; }
       }catch(_){}
       // Pas su (preuve illisible, nuage pas encore là) ⇒ le compteur se tait : plus
