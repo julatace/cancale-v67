@@ -1,16 +1,205 @@
-import test from 'node:test';import assert from 'node:assert/strict';
-import {instantVinted,auteurDernierConfirme,suiviNegociationVinted,reponseAttendueVinted} from '../../src/suiviMessagerieVinted.js';
-import {etatOffreVinted} from '../../src/offresVinted.js';
-import {etatCaptureVinted,lireSynchronisationVinted} from '../../src/synchronisationVinted.js';
-const T=Date.parse('2026-10-28T10:00:00Z'),iso=t=>new Date(t).toISOString();
-const c={_acc:{vinted_user_id:1},opposite_user:{id:2},updated_at:iso(T)},r={side:'seller',opp:2,der:2,derTs:String(T/1000)};
-test('auteur vérifié : dates ISO/secondes/ms et identité du correspondant',()=>{assert.equal(instantVinted(T),T);assert.equal(instantVinted(String(T/1000)),T);assert.equal(auteurDernierConfirme(c,r),'eux');assert.equal(auteurDernierConfirme(c,{...r,der:1}),'toi');assert.equal(auteurDernierConfirme(c,{...r,der:999}),null);for(const v of [{...r,opp:3},{...r,derTs:iso(T-120000)},{...r,derTs:null}])assert.equal(auteurDernierConfirme(c,v),null);});
-test('À répondre ne confond pas non-lu, auteur inconnu et capture déjà traitée',()=>{assert.equal(reponseAttendueVinted(c,r),true);assert.equal(reponseAttendueVinted({...c,unread:true},{...r,der:1}),false);assert.equal(reponseAttendueVinted(c,null),false);assert.equal(reponseAttendueVinted(c,{...r,side:'buyer'}),false);assert.equal(reponseAttendueVinted(c,{...r,side:null}),false);assert.equal(reponseAttendueVinted({...c,transaction:{current_user_side:'buyer'}},r),false);assert.equal(reponseAttendueVinted(c,r,iso(T)),false);assert.equal(reponseAttendueVinted({...c,updated_at:iso(T+5000)},{...r,derTs:iso(T+5000)},iso(T)),true);});
-const offre=(user,status,t=T)=>({entity_type:'offer_request_message',created_at_ts:t/1000,entity:{user_id:user,status,current:true}});
-const suivi=(messages,transaction)=>suiviNegociationVinted({opposite_user:{id:2},messages,transaction},1,etatOffreVinted);
-test('négociation : offre reçue et contre-offre sur auteurs et dates natifs',()=>{assert.equal(suivi([offre(2,10)]).libelle,'Offre reçue');assert.equal(suivi([offre(2,10),offre(1,10,T+5000)]).libelle,'Contre-offre envoyée');assert.equal(suivi([offre(1,10)]).libelle,'Offre envoyée');assert.equal(suivi([offre(3,10)]),null);assert.equal(suivi([offre(2,10),offre(1,10)]),null);});
-test('prix accepté ne signifie jamais paiement attendu ; statut de paiement explicite requis',()=>{assert.equal(suivi([offre(2,20)]).libelle,'Prix accepté');assert.equal(suivi([],{status_title:'En attente du paiement'}).libelle,'Paiement attendu');assert.equal(suivi([],{status_title:'Pas de paiement attendu'}),null);assert.equal(suivi([],{status:230,status_title:'En attente du paiement'}),null);});
-test('capture : pas de faux horodatage ou de faux historique complet',()=>{assert.equal(etatCaptureVinted(null).libelle,'Aucune capture');assert.equal(etatCaptureVinted({cap:iso(T),pages:5},{maintenant:T}).libelle,'Historique à compléter');assert.equal(etatCaptureVinted({cap:iso(T),pages:1},{maintenant:T}).libelle,'Historique récupéré');assert.equal(etatCaptureVinted({cap:iso(T+300000)},{maintenant:T}).date,null);assert.equal(etatCaptureVinted({supprime:'true',cap:iso(T)},{maintenant:T}).date,null);assert.equal(etatCaptureVinted({updated_at:iso(T)},{maintenant:T}).date,null);});
-test('favoris : archive complète plus ancienne qu’une capture récente ne prouve pas une lecture complète',()=>{const archive={cap:iso(T-5000),sync:{complete:true},limite:false};assert.notEqual(etatCaptureVinted({cap:iso(T)},{favoris:true,archive,maintenant:T}).libelle,'Historique récupéré');assert.equal(etatCaptureVinted(null,{favoris:true,archive:{...archive,cap:iso(T)},maintenant:T}).libelle,'Historique récupéré');});
-test('synchronisation privée : projection légère, comptes exacts et refus de réponses étrangères',async()=>{let query;const opts={uids:['123'],owner:'a',ownerActuel:()=> 'a',lire:async q=>{query=q;return[{id:'harvest_123_inbox',owner:'a',cap:iso(T),pages:'1'}];}};assert.equal((await lireSynchronisationVinted(opts))[0].uid,'123');assert.match(query,/owner=eq.a/);assert.ok(!query.includes('select=data'));for(const rows of [null,[{id:'harvest_123_inbox',owner:'b'}],[{id:'harvest_999_inbox',owner:'a'}]])await assert.rejects(lireSynchronisationVinted({...opts,lire:async()=>rows}));});
-test('synchronisation : changement de session pendant la lecture ne livre aucune donnée',async()=>{let owner='a';await assert.rejects(lireSynchronisationVinted({uids:['123'],owner,ownerActuel:()=>owner,lire:async()=>{owner='b';return[];}}));});
+import test from "node:test";
+import assert from "node:assert/strict";
+import {
+  instantVinted,
+  auteurDernierConfirme,
+  suiviNegociationVinted,
+  reponseAttendueVinted,
+} from "../../src/suiviMessagerieVinted.js";
+import { etatOffreVinted } from "../../src/offresVinted.js";
+import {
+  etatCaptureVinted,
+  lireSynchronisationVinted,
+} from "../../src/synchronisationVinted.js";
+const T = Date.parse("2026-10-28T10:00:00Z"),
+  iso = (t) => new Date(t).toISOString();
+const c = {
+    _acc: { vinted_user_id: 1 },
+    opposite_user: { id: 2 },
+    updated_at: iso(T),
+  },
+  r = { side: "seller", opp: 2, der: 2, derTs: String(T / 1000) };
+test("auteur vérifié : dates ISO/secondes/ms et identité du correspondant", () => {
+  assert.equal(instantVinted(T), T);
+  assert.equal(instantVinted(String(T / 1000)), T);
+  assert.equal(auteurDernierConfirme(c, r), "eux");
+  assert.equal(auteurDernierConfirme(c, { ...r, der: 1 }), "toi");
+  assert.equal(auteurDernierConfirme(c, { ...r, der: 999 }), null);
+  for (const v of [
+    { ...r, opp: 3 },
+    { ...r, derTs: iso(T - 120000) },
+    { ...r, derTs: null },
+  ])
+    assert.equal(auteurDernierConfirme(c, v), null);
+});
+test("À répondre ne confond pas non-lu, auteur inconnu et capture déjà traitée", () => {
+  assert.equal(reponseAttendueVinted(c, r), true);
+  assert.equal(
+    reponseAttendueVinted({ ...c, unread: true }, { ...r, der: 1 }),
+    false,
+  );
+  assert.equal(reponseAttendueVinted(c, null), false);
+  assert.equal(reponseAttendueVinted(c, { ...r, side: "buyer" }), false);
+  assert.equal(reponseAttendueVinted(c, { ...r, side: null }), false);
+  assert.equal(
+    reponseAttendueVinted(
+      { ...c, transaction: { current_user_side: "buyer" } },
+      r,
+    ),
+    false,
+  );
+  assert.equal(reponseAttendueVinted(c, r, iso(T)), false);
+  assert.equal(
+    reponseAttendueVinted(
+      { ...c, updated_at: iso(T + 5000) },
+      { ...r, derTs: iso(T + 5000) },
+      iso(T),
+    ),
+    true,
+  );
+});
+const offre = (user, status, t = T) => ({
+  entity_type: "offer_request_message",
+  created_at_ts: t / 1000,
+  entity: { user_id: user, status, current: true },
+});
+const suivi = (messages, transaction) =>
+  suiviNegociationVinted(
+    { opposite_user: { id: 2 }, messages, transaction },
+    1,
+    etatOffreVinted,
+  );
+test("négociation : offre reçue et contre-offre sur auteurs et dates natifs", () => {
+  assert.equal(suivi([offre(2, 10)]).libelle, "Offre reçue");
+  assert.equal(
+    suivi([offre(2, 10), offre(1, 10, T + 5000)]).libelle,
+    "Contre-offre envoyée",
+  );
+  assert.equal(suivi([offre(1, 10)]).libelle, "Offre envoyée");
+  assert.equal(suivi([offre(3, 10)]), null);
+  assert.equal(suivi([offre(2, 10), offre(1, 10)]), null);
+});
+test("prix accepté ne signifie jamais paiement attendu ; statut de paiement explicite requis", () => {
+  assert.equal(suivi([offre(2, 20)]).libelle, "Prix accepté");
+  assert.equal(
+    suivi([], { status_title: "En attente du paiement" }).libelle,
+    "Paiement attendu",
+  );
+  assert.equal(suivi([], { status_title: "Pas de paiement attendu" }), null);
+  assert.equal(
+    suivi([], { status: 230, status_title: "En attente du paiement" }),
+    null,
+  );
+});
+test("capture : pas de faux horodatage ou de faux historique complet", () => {
+  assert.equal(etatCaptureVinted(null).libelle, "Aucune capture");
+  assert.equal(
+    etatCaptureVinted({ cap: iso(T), pages: 5 }, { maintenant: T }).libelle,
+    "Historique à compléter",
+  );
+  assert.equal(
+    etatCaptureVinted({ cap: iso(T), pages: 1 }, { maintenant: T }).libelle,
+    "Historique récupéré",
+  );
+  assert.equal(
+    etatCaptureVinted({ cap: iso(T + 300000) }, { maintenant: T }).date,
+    null,
+  );
+  assert.equal(
+    etatCaptureVinted({ supprime: "true", cap: iso(T) }, { maintenant: T })
+      .date,
+    null,
+  );
+  assert.equal(
+    etatCaptureVinted({ updated_at: iso(T) }, { maintenant: T }).date,
+    null,
+  );
+});
+test("favoris : archive complète plus ancienne qu’une capture récente ne prouve pas une lecture complète", () => {
+  const archive = {
+    cap: iso(T - 5000),
+    sync: { complete: true },
+    limite: false,
+  };
+  assert.notEqual(
+    etatCaptureVinted(
+      { cap: iso(T) },
+      { favoris: true, archive, maintenant: T },
+    ).libelle,
+    "Historique récupéré",
+  );
+  assert.equal(
+    etatCaptureVinted(null, {
+      favoris: true,
+      archive: { ...archive, cap: iso(T) },
+      maintenant: T,
+    }).libelle,
+    "Historique récupéré",
+  );
+});
+test("synchronisation privée : projection légère, comptes exacts et refus de réponses étrangères", async () => {
+  let query;
+  const opts = {
+    uids: ["123"],
+    owner: "a",
+    ownerActuel: () => "a",
+    lire: async (q) => {
+      query = q;
+      return [{ id: "harvest_123_inbox", owner: "a", cap: iso(T), pages: "1" }];
+    },
+  };
+  assert.equal((await lireSynchronisationVinted(opts))[0].uid, "123");
+  assert.match(query, /owner=eq.a/);
+  assert.ok(!query.includes("select=data"));
+  for (const rows of [
+    null,
+    [{ id: "harvest_123_inbox", owner: "b" }],
+    [{ id: "harvest_999_inbox", owner: "a" }],
+  ])
+    await assert.rejects(
+      lireSynchronisationVinted({ ...opts, lire: async () => rows }),
+    );
+});
+test("synchronisation : changement de session pendant la lecture ne livre aucune donnée", async () => {
+  let owner = "a";
+  await assert.rejects(
+    lireSynchronisationVinted({
+      uids: ["123"],
+      owner,
+      ownerActuel: () => owner,
+      lire: async () => {
+        owner = "b";
+        return [];
+      },
+    }),
+  );
+});
+
+test("une offre explicitement liée à une autre transaction ne décrit pas la négociation courante", () => {
+  const autre = {
+    ...offre(2, 20),
+    entity: { ...offre(2, 20).entity, transaction_id: 98, offer_request_id: 1 },
+  };
+  assert.equal(suivi([autre], { id: 99 }), null);
+  const courante = {
+    ...offre(2, 10, T + 1000),
+    entity: { ...offre(2, 10).entity, transaction_id: 99, offer_request_id: 2 },
+  };
+  assert.equal(suivi([courante, autre], { id: 99 }).libelle, "Offre reçue");
+});
+test("le suivi ne réactive pas une offre précédente à cause d’un doublon ancien", () => {
+  const precedent = {
+    ...offre(2, 10),
+    entity: {
+      ...offre(2, 10).entity,
+      transaction_id: 99,
+      offer_request_id: 1,
+      current: false,
+    },
+  };
+  const ancien = {
+    ...precedent,
+    entity: { ...precedent.entity, current: true },
+  };
+  assert.equal(suivi([precedent, ancien], { id: 99 }), null);
+});

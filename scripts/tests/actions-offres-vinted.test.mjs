@@ -35,6 +35,8 @@ function creer(mode = "panne") {
     fil = { current: oc };
   const d = {
     openConv: oc,
+    lectureConversationRequest: { current: 0 },
+    fusionnerConversation: (a, b) => b,
     AUTH,
     offreBusy: false,
     verrouOffre: { current: false },

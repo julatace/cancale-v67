@@ -38,6 +38,7 @@ import { limiteRetraitDepuisTexte, lieuDepuisExtrait, LIEU_AU_FUTUR } from './_l
 import { codeRetraitTournure } from './_lib/code-retrait-email.js';
 import { decoderEntitesHtml } from './_lib/entites-html.js';
 import { suiviDuSujet, finsDesLignes, sortiParSuivis } from './_lib/suivi-colis.js';
+import { transactionDuRecu } from './_lib/recu-achat.js';
 
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://lgonxzrzjcqthjtbdpzo.supabase.co';
 // ⚠️ CLÉ DE SERVICE QUAND ELLE EXISTE. Ces routes tournent sur le serveur, sans
@@ -2116,9 +2117,29 @@ export async function traiterEmail(req, res) {
       const article = ((achText.match(/commande\s*[«"“]\s*([^»"”\n]{2,70})\s*[»"”]/i)
         || achText.match(/(?:article|articles?\s+achet[ée]e?s?|achat)\s*:\s*[«"“']?([^«»"”'\n]{4,70})/i)
         || [])[1] || '').trim();
-      const transaction = (achText.match(/transaction\s*:?\s*#?(\d{6,})/i) || [])[1] || '';
+      // (29 oct.) LE N° DE TRANSACTION, UNE IDENTITÉ (§5), lu par LA règle de
+      // l'app (`api/_lib/recu-achat.js`, §11). L'ancien motif
+      // `transaction\s*:?\s*#?(\d{6,})` ne passait pas l'astérisque du gras
+      // (« *N° de transaction* 12345678901 ») : mesuré, `transaction` était VIDE
+      // sur les 117 reçus rangés, et un nombre au milieu d'une phrase (« ta
+      // transaction 123456789 est en cours ») l'aurait été pris. Le texte entier
+      // est lu, pas les 2 000 premiers caractères du tri (mesuré : le n° tombe
+      // entre le 490e et le 768e — rien ne le garantit pour un reçu plus long).
+      const transaction = transactionDuRecu(corpsTexte);
       const pdfA = (mail.attachments || []).find(a => /application\/pdf/i.test(a.contentType || '') || /\.pdf$/i.test(a.filename || ''));
-      const key = transaction || shortHash(subject + corpsTexte.slice(0, 300));
+      // ⚠️⚠️ (29 oct., revue) LA CLÉ EST CELLE DE L'EMAIL, JAMAIS LE N° SEUL.
+      // Premier jet : `email_achat_{n°}`. Or l'écriture remplace `data` en
+      // entier : un second email du MÊME n° (la copie « TR: » d'un reçu, le
+      // geste même qu'on lui conseille pour ses autres comptes) ÉCRASAIT le
+      // premier — son PDF joint compris (§5 « on ne jette aucun email »).
+      // ⇒ Une ligne par email : sujet + début du texte (la clé d'avant, stable
+      // pour un même email rejoué), le n° (deux achats AU MÊME TITRE chez le
+      // même vendeur au même prix ont les mêmes 300 premiers caractères — le n°
+      // tombe plus loin) et la présence d'un PDF (un email avec sa pièce jointe
+      // ne partage jamais sa ligne avec son jumeau sans). Le n° reste dans
+      // `transaction` : c'est l'app qui regroupe les lignes d'un même n°
+      // (`indexRecusParTransaction`, PDF d'abord).
+      const key = shortHash(subject + corpsTexte.slice(0, 300) + (transaction ? `|tx${transaction}` : '') + (pdfA ? '|pdf' : ''));
       await supabaseUpsert([{ id: `email_achat_${key}`, data: {
         type: 'achat', subject, article, prix, transaction,
         account: acc.login || '', uid: acc.uid || '',
@@ -2129,7 +2150,9 @@ export async function traiterEmail(req, res) {
       try { await pushOnce({
         title: '🛍 Achat confirmé',
         body: `${article || 'Commande Vinted'}${prix ? ` — ${prix} €` : ''}${acc.login ? ` (${acc.login})` : ''} — justificatif archivé.`,
-        tag: `achat-${key}`, url: '/?tab=cat_achats',
+        // Une notification par ACHAT (son n°), pas par email : la copie
+        // transférée d'un reçu déjà reçu ne sonne pas une seconde fois.
+        tag: transaction ? `achat-tx${transaction}` : `achat-${key}`, url: '/?tab=cat_achats',
         _cat: 'achat',
       }); } catch (_) {}
       await logEmail({ type: 'achat', subject, from: mail.from, prix, article, pdf: !!pdfA, account: acc.login || '' });
