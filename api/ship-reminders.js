@@ -528,7 +528,7 @@ async function traiterVendeurApresRelecture() {
     try { offremini = await rappelsOffresMini(); } catch (e) { offremini = 'échec : ' + String((e && e.message) || e).slice(0, 120); }
 
     // L'AGENT eBAY QUI DEMANDE (29 oct.) — posé comme les autres : un échec ici
-    // n'empêche rien. Rien n'est publié : la notification ouvre eBay → Agent.
+    // n'empêche rien. Rien n'est publié : la notification ouvre eBay → À traiter (section « Agent eBay »).
     let agentebay = null;
     try { agentebay = await rappelAgentEbay(); } catch (e) { agentebay = 'échec : ' + String((e && e.message) || e).slice(0, 120); }
 

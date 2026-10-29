@@ -1,24 +1,30 @@
 # VRM — dossier de passation
 
-> **29 octobre — L'AGENT eBAY QUI DEMANDE (eBay → Agent) :** Julien : « je veux un agent autonome, c'est-à-dire que je veux
-> juste qu'il demande s'il doit poster les articles, que tu puisses lui dire ce que tu veux qu'il publie ». L'agent PRÉPARE et
-> PROPOSE, Julien dit oui, il publie — **jamais sans son oui**. Règle pure `src/agentEbay.js` (`propositionAgent`, §11) : en
-> ligne, numérotée, pas vendue (preuves de toutes plateformes ; « pas su » ⇒ rien et c'est dit), pas déjà en vente/programmée
-> sur eBay (SKU, tous comptes), pas jumelle (photo), pas « jamais » ; ses réglages (`vrm_agent_ebay_regles`, synchronisé :
-> comptes, marques, tailles, prix, ancienneté, « cochées eBay », max/jour, prix eBay même/+%/+€ jamais sous le prix d'achat,
-> compte eBay) et une **phrase comprise SANS IA** (mots-clés, nombres), montrée avant d'être gardée. En tête d'eBay → Agent :
-> « N paires prêtes pour eBay — je les publie ? », chaque paire préparée (catégorie, caractéristiques, frais lus par la
-> vérification à blanc), cocher/décocher, « Jamais », « Pas maintenant », « Programmer plutôt » (brouillons). « Publier ces N »
-> confirme compte, prix, frais ; la route exige `agent:true` + `confirme:true` (400 sinon), garde les mêmes contrôles que
-> « Publier », journalise (« Publiée par l'agent ») ; incertain ⇒ arrêt, pas reproposée avant relecture. Ma journée : une ligne.
-> **Le matin** (`ship-reminders`, `rappelAgentEbay`) : l'app publie `vrm_agent_ebay_resume` {n, at, pause} ; le cron envoie
-> « 🛒 N paires prêtes pour eBay — publier ? » (préférence `agentebay`, défaut oui), une fois par jour (mémo écrit AVANT), rien
-> si > 48 h, pause du jour, illisible. Preuves : `audit-agent-ebay.cjs` (37, 11/11 mutations, 16 rouges sur origin/main) ;
-> `audit-ebay-route.cjs` [R-agent] (3 rouges sur origin/main, rouge sans la garde) ; banc `ebay-agent.cjs` (390 tactile + 1512
-> sombre, faux eBay ; 12 rouges sur origin/main, rouge sans la confirmation) ; banc `agent-ebay-push.cjs` (vraie route,
-> 16 contrôles ; 6 rouges sur origin/main, rouge si le mémo part après). ⚠️ **Non mesuré** : aucun appel réel à eBay (formes
-> pubinfo/pubverify/publish de la doc) ; sans migrations 014/015, l'agent prépare quand VRM est ouvert (le cron ne fait que
-> demander). **Gestes de Julien** : ouvrir eBay → Agent, régler « Ce que je publie » (ou écrire sa phrase), puis dire oui.
+> **29 octobre — L'AGENT eBAY QUI DEMANDE (eBay → « À traiter », section « Agent eBay ») :** Julien : « je veux un agent
+> autonome, c'est-à-dire que je veux juste qu'il demande s'il doit poster les articles, que tu puisses lui dire ce que tu veux
+> qu'il publie ». L'agent PRÉPARE et PROPOSE, Julien dit oui, il publie — **jamais sans son oui**. Règle pure
+> `src/agentEbay.js` (`propositionAgent`, §11) : en ligne, numérotée, pas vendue (toutes plateformes ; « pas su » ⇒ rien, dit),
+> pas déjà en vente/programmée sur eBay (SKU, tous comptes), pas déjà en brouillon, pas jumelle, pas « jamais », et **aucune
+> des deux paires d'un N° porté deux fois** ; réglages `vrm_agent_ebay_regles` (synchronisé) + une phrase comprise SANS IA,
+> montrée avant d'être gardée. La route exige `agent:true` + `confirme:true`, garde les contrôles de « Publier », journalise.
+> **Revue du même jour (16 défauts, tous reproduits puis corrigés)** : « N paires **prêtes** » n'est dit (écran, Ma journée,
+> notification) que pour des paires PRÉPARÉES chez eBay (`resume.pretes`, `phraseResumeAgent`) — sinon « N paires à
+> regarder » ; « **Compléter** » met la paire préparée en UN brouillon et l'ouvre dans le formulaire d'eBay → Annonces ; la
+> préparation repart par jeton (plus de lignes figées sur « Je prépare… »), frais gardés 30 min ; « par jour » et « + % / € »
+> s'enregistrent à la sortie du champ ; un 503 qui dit « rien n'a été envoyé » est un REFUS, jamais « incertaine » ; une
+> incertaine (`vrm_agent_ebay_incertains`, synchronisé) ne revient qu'après une relecture d'eBay ≥ 15 min plus tard, avec le
+> **même uuid** (la route `publish` accepte `uuid` et confirme un 488 par GetItem/SKU : jamais deux annonces) ; « Programmer
+> plutôt » crée des brouillons AVEC id, jamais en double, et la paire sort des propositions ; une négation (« pas »,
+> « sauf »…) n'est jamais appliquée à l'envers (rien n'est gardé, c'est dit), les nombres sans règle sont dits, « euros »
+> compris ; raisons accordées au nombre ; bilan avec le lien de chaque paire publiée. Décidé : pas d'onglet à part — l'agent est une
+> section titrée « Agent eBay » en tête d'« À traiter » (les consignes et la notification le disent).
+> **Le matin** (`ship-reminders`, `rappelAgentEbay`) : « 🛒 N paires à regarder pour eBay » (ou « prêtes » si préparées),
+> préférence `agentebay` (défaut oui), une fois par jour (mémo AVANT), rien si > 48 h, pause du jour, illisible.
+> Preuves : `audit-agent-ebay.cjs` (61, **17/17 mutations** ; 24 rouges sur le code relu, tout rouge sur origin/main) ;
+> `audit-ebay-route.cjs` [R-agent] (3 rouges sur le code relu : UUID, 488) ; banc `ebay-agent.cjs` (390 tactile + 1512 sombre,
+> faux eBay, scénarios A-K, 128 contrôles) ; banc `agent-ebay-push.cjs` (vraie route, 18). ⚠️ **Non mesuré** : aucun appel réel
+> à eBay (pubinfo, pubverify, publish, 488 : formes de la doc) ; le délai réel avant qu'eBay montre une annonce créée (15 min
+> est un choix). **Gestes de Julien** : eBay → À traiter, régler « Ce que je publie » (ou écrire ce qu'il VEUT), puis dire oui.
 
 > **29 octobre — offres, extension 5.286 :** la fusion partagée `src/conversations.js` /
 > worker garde un état accepté/refusé/expiré/précédent face à une ancienne copie en attente.

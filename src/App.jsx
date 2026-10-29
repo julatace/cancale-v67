@@ -22813,7 +22813,7 @@ function AgentEbay({ comptes, comptesEbay, onAnnonces }) {
     </details>}
   </section>;
 }
-// L'agent PENDANT que VRM est ouvert, ailleurs qu'à l'écran eBay → Agent : une
+// L'agent PENDANT que VRM est ouvert, ailleurs qu'à l'écran eBay → À traiter (section Agent) : une
 // fois par ouverture, si le dernier résumé a plus de 20 h, il refait la
 // proposition (aucun appel à eBay — seulement nos lectures) et publie le résumé
 // que lisent Ma journée et la notification du matin. Il ne prépare ni ne

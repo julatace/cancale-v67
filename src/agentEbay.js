@@ -9,7 +9,7 @@
 //    sans son clic (§2 : publier engage une vente). Ce module ne fait AUCUN
 //    appel : il dit, à partir de ce que l'app a LU, quelles paires proposer et
 //    pourquoi les autres sont écartées. Un seul propriétaire (§11) : l'écran
-//    eBay → Agent, la ligne de Ma journée et le résumé publié pour la
+//    eBay → À traiter (section « Agent eBay »), la ligne de Ma journée et le résumé publié pour la
 //    notification du matin lisent TOUS cette règle.
 //
 //  Trois états partout : `undefined` = en cours de lecture · `null` = la lecture
