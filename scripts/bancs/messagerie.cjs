@@ -217,6 +217,32 @@ async function rendre(b, { version, tel = false, lignes = rows, offresKO = false
   let b;
   try {
     b = await chromium.launch({ executablePath:process.env.CHROMIUM_PATH||(require('fs').existsSync('/usr/bin/chromium')?'/usr/bin/chromium':'/opt/pw-browsers/chromium'), args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
+    if(process.env.VRM_MESSAGES_SEARCH_ONLY==='1'){
+      for(const tel of [false,true]){
+        const r=await rendre(b,{version:'5.135.0',tel});
+        try{
+          const champ=r.pg.getByRole('searchbox',{name:'Rechercher une conversation'});
+          await r.pg.selectOption('#vrm-sel-compte','111');await r.pg.waitForTimeout(250);
+          await champ.fill('acheteur_2');await r.pg.locator('[data-conv="402"]').waitFor();
+          dit(await r.pg.locator('#vrm-sel-compte').inputValue()==='111','recherche sur un autre compte : le sélecteur reste inchangé');
+          dit((await r.pg.locator('[data-conv="402"]').innerText()).includes('compte_b'),'le compte du résultat est nommé même quand il est seul');
+          await champ.fill('N°7');await r.pg.locator('[data-conv="301"]').waitFor();
+          dit(await r.pg.locator('[data-conv]').count()===1,'N°7 retrouve uniquement la conversation reliée à cet article');
+          await champ.fill('N°70');await r.pg.getByText(/Aucun résultat parmi les conversations reçues/).waitFor();
+          dit(await r.pg.locator('[data-conv]').count()===0,'N°70 ne retrouve pas N°7');
+          await champ.fill('gazelle');await r.pg.locator('[data-conv="303"]').waitFor();
+          dit(await r.pg.locator('[data-conv]').count()===1,'le titre natif de l’article est recherché même s’il manque dans la boîte');
+          await r.pg.getByRole('button',{name:/^Non lues/}).click();await r.pg.getByRole('button',{name:'Afficher tous les résultats'}).click();
+          dit(await r.pg.locator('[data-conv="303"]').count()===1,'un filtre restant appliqué peut être levé sans changer de compte');
+          await champ.fill('');await r.pg.waitForTimeout(100);
+          dit(await r.pg.locator('[data-conv="402"]').count()===0&&await r.pg.locator('#vrm-sel-compte').inputValue()==='111','effacer la recherche rétablit le compte choisi');
+          dit(r.execs.every(x=>x.method==='GET'),'la recherche n’envoie aucun message ni offre');
+          dit(await r.pg.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'recherche sans débordement horizontal');
+          dit(r.errs.length===0,'aucune erreur de recherche');
+        }finally{await r.ctx.close();}
+      }
+      process.exitCode=ko?1:0;return;
+    }
     if(process.env.VRM_MESSAGES_LIVE_ONLY==='1'){
       for(const tel of [false,true]){
         const r=await rendre(b,{version:'5.135.0',tel});
