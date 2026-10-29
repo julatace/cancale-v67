@@ -58,8 +58,9 @@
 > courant, et le serveur qui le lit) : 7 rouges sur 980ef927 dans la copie fusionnée avec A (94f4d515), `--prouve`
 > 18/18 (`vg12`, `courant`, `paire`). ⚠️ Dans ce worktree SEUL, §13 et §16 sont rouges : `api/` y est celui d'avant A
 > (sans `\d{12}`) — c'est l'écart qu'on veut voir, il disparaît à la fusion. ⚠️⚠️ **VERSION** : `main` est en
-> **5.286.0** (mesuré 29 oct. 20:46) ; la 5.281 de ce chantier est PRISE avec un autre contenu ⇒ à la fusion, monter
-> TOUT à un numéro jamais servi (≥ 5.287.0, vérifier les sessions en cours) : manifeste, `CODE_VERSION`,
+> **5.287.0** (remesuré 29 oct. 23:45) et le worktree du chantier A (`v29-colis`) a déjà pris **5.290.0** ; la 5.281 de
+> ce chantier est PRISE avec un autre contenu ⇒ à la fusion, monter TOUT au numéro de A (un seul numéro pour A + B,
+> jamais servi ni réservé — vérifier les sessions en cours) : manifeste, `CODE_VERSION`,
 > `CAPTEUR_VERSION`, `relaisVersion`, `EXT_ATTENDUE`, `EXT_CAPACITES.transp`, notice Orion, zips. La double arrivée
 > Mondial Relay (`_mvc` puis `.be`) se corrige au serveur (A, `memeOccurrence`), pas ici.
 
