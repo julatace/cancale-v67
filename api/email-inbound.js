@@ -2127,7 +2127,19 @@ export async function traiterEmail(req, res) {
       // entre le 490e et le 768e — rien ne le garantit pour un reçu plus long).
       const transaction = transactionDuRecu(corpsTexte);
       const pdfA = (mail.attachments || []).find(a => /application\/pdf/i.test(a.contentType || '') || /\.pdf$/i.test(a.filename || ''));
-      const key = transaction || shortHash(subject + corpsTexte.slice(0, 300));
+      // ⚠️⚠️ (29 oct., revue) LA CLÉ EST CELLE DE L'EMAIL, JAMAIS LE N° SEUL.
+      // Premier jet : `email_achat_{n°}`. Or l'écriture remplace `data` en
+      // entier : un second email du MÊME n° (la copie « TR: » d'un reçu, le
+      // geste même qu'on lui conseille pour ses autres comptes) ÉCRASAIT le
+      // premier — son PDF joint compris (§5 « on ne jette aucun email »).
+      // ⇒ Une ligne par email : sujet + début du texte (la clé d'avant, stable
+      // pour un même email rejoué), le n° (deux achats AU MÊME TITRE chez le
+      // même vendeur au même prix ont les mêmes 300 premiers caractères — le n°
+      // tombe plus loin) et la présence d'un PDF (un email avec sa pièce jointe
+      // ne partage jamais sa ligne avec son jumeau sans). Le n° reste dans
+      // `transaction` : c'est l'app qui regroupe les lignes d'un même n°
+      // (`indexRecusParTransaction`, PDF d'abord).
+      const key = shortHash(subject + corpsTexte.slice(0, 300) + (transaction ? `|tx${transaction}` : '') + (pdfA ? '|pdf' : ''));
       await supabaseUpsert([{ id: `email_achat_${key}`, data: {
         type: 'achat', subject, article, prix, transaction,
         account: acc.login || '', uid: acc.uid || '',
@@ -2138,7 +2150,9 @@ export async function traiterEmail(req, res) {
       try { await pushOnce({
         title: '🛍 Achat confirmé',
         body: `${article || 'Commande Vinted'}${prix ? ` — ${prix} €` : ''}${acc.login ? ` (${acc.login})` : ''} — justificatif archivé.`,
-        tag: `achat-${key}`, url: '/?tab=cat_achats',
+        // Une notification par ACHAT (son n°), pas par email : la copie
+        // transférée d'un reçu déjà reçu ne sonne pas une seconde fois.
+        tag: transaction ? `achat-tx${transaction}` : `achat-${key}`, url: '/?tab=cat_achats',
         _cat: 'achat',
       }); } catch (_) {}
       await logEmail({ type: 'achat', subject, from: mail.from, prix, article, pdf: !!pdfA, account: acc.login || '' });

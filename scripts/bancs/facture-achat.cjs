@@ -9,8 +9,8 @@
 //
 //  Base INVENTÉE à la forme mesurée : aucune vraie donnée, ce banc vit dans le
 //  dépôt. 390 px tactile (iPhone), 390 px tactile sombre, 1512 px. Il juge :
-//    A. l'achat dont un reçu porte SON n° de transaction montre « Facture reçue
-//       par email » SUR SA LIGNE (pas seulement dans le menu) ;
+//    A. l'achat dont un reçu porte SON n° de transaction montre « Reçu
+//       d'achat » SUR SA LIGNE (pas seulement dans le menu) ;
 //    B. un reçu au MÊME TITRE mais sans n°, ou avec le n° d'un AUTRE achat, ne
 //       se relie pas (§5) ; un achat sans reçu ne montre rien ;
 //    C. un reçu qui porte un PDF joint est relié (« pdf »), et deux lignes pour
@@ -20,12 +20,21 @@
 //    E. le clic ouvre SON reçu (n° de transaction lu dans la feuille) ;
 //    F. le PDF joint s'ouvre dans la visionneuse (ordinateur) ou par un lien
 //       (iPhone) ;
-//    G. au doigt, « Facture reçue par email » fait 44 px affichés et ne déborde
+//    G. au doigt, « Reçu d'achat » fait 44 px affichés et ne déborde
 //       pas ; aucun débordement horizontal ; aucune erreur ;
-//    H. l'archive dit combien de reçus sont reliés à leur achat (et combien ne
-//       le sont pas) ;
-//    I. « pas su » : les reçus ne se lisent pas (503) ⇒ aucun « Facture reçue
-//       par email » inventé, et l'archive le dit.
+//    H. l'archive dit combien d'ACHATS ont leur reçu (n° distincts : deux
+//       emails d'un même reçu font un achat) et, pour les autres reçus, ce qui
+//       est mesuré — sans n° · n° qu'aucun achat affiché ne porte — sans
+//       deviner de cause (revue du 29 oct.) ;
+//    I. « pas su » : les reçus ne se lisent pas (503) ⇒ aucun « Reçu d'achat »
+//       inventé sur une ligne, et l'archive le dit ;
+//    J. les achats d'UN compte ne se lisent pas (503) ⇒ l'archive ne compare
+//       pas les reçus qui peuvent être les siens, et NOMME ce compte ;
+//    K. au doigt, sur un achat EN LITIGE, toute la hauteur de « Reçu d'achat »
+//       se touche : le lien « ↩ Bordereau de retour » n'en recouvre rien
+//       (mesuré par elementFromPoint, pas par la boîte) ;
+//    L. UN nom pour ce document : la ligne, le menu ⋯, la feuille et la
+//       visionneuse disent « Reçu d'achat » — jamais « facture » (§5).
 //
 //  Lancer : npm run build && NODE_OPTIONS="--require /tmp/claude-0/redir-pw.cjs" \
 //           BANC_PORT=9341 node scripts/bancs/facture-achat.cjs
@@ -43,6 +52,7 @@ const CHROME = process.env.CHROMIUM_PATH || '/opt/pw-browsers/chromium';
 const auj = new Date();
 const jour = (n) => new Date(auj.getTime() - n * 86400000).toISOString();
 const ACCOUNTS = [{ id: 1, vinted_user_id: '111', login: 'compte_banc', domain: 'www.vinted.fr', updated_at: auj.toISOString() }];
+const COMPTE_DEUX = { id: 2, vinted_user_id: '222', login: 'compte_deux', domain: 'www.vinted.fr', updated_at: auj.toISOString() };
 const achat = (tx, titre, prix, d) => ({ transaction_id: tx, title: titre, price: { amount: String(prix), currency_code: 'EUR' },
   status: "Commande finalisée - l'acheteur a validé la commande", transaction_user_status: 'completed', date: jour(d) });
 const ACHATS = [
@@ -69,16 +79,24 @@ const ROWS = [
   // Même titre que l'achat 99990000222, mais SANS n° de transaction (une forme future) : ne désigne aucun achat.
   ligneRecu('h4c5d6', { subject: 'Ton reçu pour la commande « Sandale jumelle banc »', article: 'Sandale jumelle banc', prix: '31,00', receivedAt: jour(3),
     texte: recu('Sandale jumelle banc', '31,00', ['Article 27,00 € ', 'Frais de port 3,00 € ', 'Frais Vinted 1,00 € '], '') }),
-  // Même titre, mais le reçu d'un AUTRE achat (n° 99990000999).
-  ligneRecu('99990000999', { subject: 'Ton reçu pour la commande « Sandale jumelle banc »', article: 'Sandale jumelle banc', prix: '31,00', transaction: '99990000999', receivedAt: jour(9),
+  // Même titre, mais le reçu d'un AUTRE achat (n° 99990000999). Les clés sont
+  // celles de la route : une par EMAIL (jamais le n° seul — revue du 29 oct.).
+  ligneRecu('s1t2u3', { subject: 'Ton reçu pour la commande « Sandale jumelle banc »', article: 'Sandale jumelle banc', prix: '31,00', transaction: '99990000999', receivedAt: jour(9),
     texte: recu('Sandale jumelle banc', '31,00', ['Article 27,00 € ', 'Frais de port 3,00 € ', 'Frais Vinted 1,00 € '], '99990000999') }),
-  // Le reçu de la botte, rangé par le serveur corrigé (clé = n°, champ rempli) AVEC un PDF joint…
-  ligneRecu('99990000333', { subject: 'Ton reçu pour la commande « Botte pdf banc »', article: 'Botte pdf banc', prix: '45,50', transaction: '99990000333', receivedAt: jour(4),
+  // Le reçu de la botte, rangé par le serveur corrigé (clé de l'email, n° dans `transaction`) AVEC un PDF joint…
+  ligneRecu('p4q5r6', { subject: 'Ton reçu pour la commande « Botte pdf banc »', article: 'Botte pdf banc', prix: '45,50', transaction: '99990000333', receivedAt: jour(4),
     filename: 'recu-botte.pdf', pdfB64: PDF_B64,
     texte: recu('Botte pdf banc', '45,50', ['Article 40,00 € ', 'Frais de port 3,79 € ', 'Frais Vinted 1,71 € '], '99990000333') }),
   // … et le même email, rangé une première fois par l'ancien serveur (clé hachée, champ vide, sans PDF).
   ligneRecu('k7e8f9', { subject: 'Ton reçu pour la commande « Botte pdf banc »', article: 'Botte pdf banc', prix: '45,50', receivedAt: jour(5),
     texte: recu('Botte pdf banc', '45,50', ['Article 40,00 € ', 'Frais de port 3,79 € ', 'Frais Vinted 1,71 € '], '99990000333') }),
+];
+// J. Le second compte : son achat et son reçu (sans compte nommé — 70 des 81
+// reçus mesurés n'en nomment aucun). Ses achats répondent 503.
+const ROWS_DEUX = [
+  { id: 'harvest_222_orders_purchased', data: { capturedAt: auj.toISOString(), payload: { my_orders: [achat(99990000555, 'Achat compte deux banc', 50, 2)] } } },
+  ligneRecu('w7x8y9', { subject: 'Ton reçu pour la commande « Achat compte deux banc »', article: 'Achat compte deux banc', prix: '50,00', transaction: '99990000555', receivedAt: jour(2),
+    texte: recu('Achat compte deux banc', '50,00', ['Article 50,00 € '], '99990000555') }),
 ];
 
 // La colonne `meta` de la base (`public.vrm_meta`) : les scalaires de premier
@@ -120,6 +138,10 @@ const essaie = async (nom, f) => { try { await f(); } catch (e) { dit(false, nom
 
 async function preparer(b, V) {
   const mobile = V.vp.width < 600;
+  const ACC = V.compteKo ? [...ACCOUNTS, COMPTE_DEUX] : ACCOUNTS;
+  const ROWS_V = (V.compteKo ? [...ROWS, ...ROWS_DEUX] : ROWS).map((r) => (V.litige && r.id === 'harvest_111_orders_purchased')
+    ? { ...r, data: { ...r.data, payload: { my_orders: r.data.payload.my_orders.map((o) => (o.transaction_id === 99990000111 ? { ...o, status: 'Retour initié', transaction_user_status: 'needs_action' } : o)) } } }
+    : r);
   const ctx = await b.newContext({ viewport: V.vp, ...(mobile ? { isMobile: true, hasTouch: true, deviceScaleFactor: 2,
     userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1' } : {}) });
   const pg = await ctx.newPage();
@@ -132,15 +154,17 @@ async function preparer(b, V) {
     const j = (d) => { const body = JSON.stringify(d); if (body.includes(PDF_B64)) journal.octetsPdf += PDF_B64.length; return route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body }); };
     if (route.request().method() !== 'GET') return j([]);
     if (/select=owner/.test(u)) return route.fulfill({ status: 400, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: '{"m":1}' });
-    if (/\/rest\/v1\/vinted_accounts/.test(u)) return j(ACCOUNTS);
+    if (/\/rest\/v1\/vinted_accounts/.test(u)) return j(ACC);
+    // J. Les achats du second compte ne répondent pas (lecture par compte ET lecture groupée du démarrage).
+    if (V.compteKo && (/harvest_222_orders/.test(u) || /id=like\.harvest_\*_orders_\*/.test(u))) { journal.ko222 = (journal.ko222 || 0) + 1; return route.fulfill({ status: 503, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: '{}' }); }
     if (/email_achat_/.test(u)) journal.lectures.push(u.replace(/^.*\/rest\/v1\//, ''));
     if (V.recusPasSu && /email_achat_/.test(u)) return route.fulfill({ status: 503, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: '{}' });
     const sel = (/[?&]select=([^&]*)/.exec(u) || [])[1] || null;
     const forme = (r) => (sel === 'data,updated_at,cap:data->>capturedAt') ? ({ ...r, updated_at: auj.toISOString(), cap: r.data.capturedAt }) : (sel ? projette(r, sel) : r);
     const eq = /id=eq\.([^&]*)/.exec(u);
-    if (eq) return j(ROWS.filter((r) => r.id === eq[1]).map(forme));
+    if (eq) return j(ROWS_V.filter((r) => r.id === eq[1]).map(forme));
     const lk = /id=like\.([^&]*)/.exec(u);
-    if (lk) { const re = new RegExp('^' + lk[1].replace(/[.]/g, '\\.').replace(/[*%]/g, '.*') + '$'); return j(ROWS.filter((r) => re.test(r.id)).map(forme)); }
+    if (lk) { const re = new RegExp('^' + lk[1].replace(/[.]/g, '\\.').replace(/[*%]/g, '.*') + '$'); return j(ROWS_V.filter((r) => re.test(r.id)).map(forme)); }
     return j([]);
   });
   await ctx.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"pret":true}' }));
@@ -170,6 +194,8 @@ const chip = (pg, tx) => pg.evaluate((tx) => {
       { nom: '390 tactile (iPhone) sombre', vp: { width: 390, height: 760 }, sombre: true },
       { nom: '1512 clair', vp: { width: 1512, height: 950 } },
       { nom: '1512 — reçus illisibles (pas su)', vp: { width: 1512, height: 950 }, recusPasSu: true },
+      { nom: '390 tactile — achat en litige (zone touchable)', vp: { width: 390, height: 760 }, litige: true },
+      { nom: '1512 — les achats d’un compte ne se lisent pas', vp: { width: 1512, height: 950 }, compteKo: true },
     ];
     for (const V of VUES) {
       console.log(`── ${V.nom}`);
@@ -179,7 +205,7 @@ const chip = (pg, tx) => pg.evaluate((tx) => {
       if (V.recusPasSu) {
         await essaie('I. pas su', async () => {
           const n = await pg.locator('[data-achat-facture]').count();
-          dit(n === 0, 'I. les reçus ne se lisent pas : AUCUN « Facture reçue par email » inventé', String(n));
+          dit(n === 0, 'I. les reçus ne se lisent pas : AUCUN « Reçu d’achat » inventé sur une ligne', String(n));
           const recus = pg.locator('[data-recus-email]');
           await recus.locator('summary').click();
           await pg.waitForTimeout(300);
@@ -191,11 +217,52 @@ const chip = (pg, tx) => pg.evaluate((tx) => {
         continue;
       }
 
+      if (V.litige) {
+        // ── K. Au doigt, sur un achat EN LITIGE : toute la zone se touche ──
+        await essaie('K. litige', async () => {
+          await pg.evaluate(() => { const e = document.querySelector('[data-achat-tx="99990000111"]'); if (e) e.scrollIntoView({ block: 'center' }); });
+          await pg.waitForTimeout(400);
+          const g = await pg.evaluate(() => {
+            const row = document.querySelector('[data-achat-tx="99990000111"]');
+            const b = row && row.querySelector('[data-achat-facture]'); const a = row && row.querySelector('.vrm-buy-retour > a');
+            if (!b || !a) return { pastille: !!b, retour: !!a };
+            const q = b.getBoundingClientRect();
+            const x = q.left + Math.min(20, q.width / 2);
+            const sonde = (y) => { const el = document.elementFromPoint(x, y); return el ? (el.closest('[data-achat-facture]') ? 'facture' : el.closest('.vrm-buy-retour') ? 'retour' : el.tagName) : null; };
+            const ys = []; for (let y = Math.ceil(q.top); y <= Math.floor(q.bottom) - 1; y++) ys.push([y, sonde(y)]);
+            return { pastille: true, retour: true, h: Math.round(q.height), touche: ys.filter(([, w]) => w === 'facture').length, ailleurs: ys.filter(([, w]) => w !== 'facture').map(([y, w]) => y + ':' + w) };
+          });
+          dit(g.pastille && g.retour, 'K. l’achat en litige montre « Reçu d’achat » ET le lien de retour (le cas est bien rendu)', JSON.stringify(g));
+          dit(g.touche >= 43 && g.ailleurs.length === 0, 'K. toute la hauteur de « Reçu d’achat » se touche (≥ 44 px), le lien de retour n’en recouvre rien', JSON.stringify(g));
+          dit(errs.length === 0, 'K. aucune erreur d’app', errs.join(' | ').slice(0, 200));
+        });
+        await ctx.close();
+        continue;
+      }
+
+      if (V.compteKo) {
+        // ── J. Les achats d'un compte ne se lisent pas : rien n'est deviné ──
+        await essaie('J. compte pas lu', async () => {
+          const recus = pg.locator('[data-recus-email]');
+          if (!(await recus.evaluate((e) => e.open))) await recus.locator('summary').click();
+          await pg.waitForTimeout(400);
+          const r = await recus.locator('[data-recus-relies]').evaluate((e) => ({ achats: e.getAttribute('data-recus-relies'), passu: e.getAttribute('data-recus-passu'), absents: e.getAttribute('data-recus-absents'), ko: e.getAttribute('data-recus-comptes-ko'), texte: e.innerText })).catch(() => null);
+          dit((journal.ko222 || 0) > 0, 'J. les achats du second compte ont bien répondu 503 (le cas est réel)', String(journal.ko222 || 0));
+          dit(r && r.achats === '2' && r.passu === '2' && r.absents === '0' && r.ko === '222', 'J. les reçus qui peuvent être ceux du compte pas lu ne sont comparés à rien (2 « pas su », 0 « sans achat »)', JSON.stringify(r));
+          dit(r && /compte_deux/.test(r.texte) && /pas pu être lus/.test(r.texte), 'J. l’archive NOMME le compte dont les achats n’ont pas pu être lus', r && JSON.stringify(r.texte));
+          const t = await recus.innerText();
+          dit(!/compte pas capté ou masqué|n’a pas reçu son reçu|ne correspond(ent)? à aucun achat affiché/.test(t), 'J. aucune cause devinée (« compte pas capté ou masqué », « n’a pas reçu son reçu »)', JSON.stringify(t.slice(0, 400)));
+          dit(errs.length === 0, 'J. aucune erreur d’app', errs.join(' | ').slice(0, 200));
+        });
+        await ctx.close();
+        continue;
+      }
+
       // ── A, B, C. Les lignes ──────────────────────────────────────────────
       await essaie('A-C. lignes', async () => {
         const a = await chip(pg, 99990000111);
-        dit(a.chip && a.texte === 'Facture reçue par email' && a.tx === '99990000111' && a.sorte === 'email',
-          'A. l’achat 99990000111 montre « Facture reçue par email » sur sa ligne (n° lu dans le texte du reçu)', JSON.stringify(a));
+        dit(a.chip && a.texte === "Reçu d'achat" && a.tx === '99990000111' && a.sorte === 'email',
+          'A. l’achat 99990000111 montre « Reçu d’achat » sur sa ligne (n° lu dans le texte du reçu)', JSON.stringify(a));
         const bb = await chip(pg, 99990000222);
         dit(bb.row && !bb.chip, 'B. deux reçus AU MÊME TITRE (l’un sans n°, l’autre d’un autre achat) ne se relient PAS à l’achat 99990000222 (§5)', JSON.stringify(bb));
         const d = await chip(pg, 99990000444);
@@ -203,10 +270,10 @@ const chip = (pg, tx) => pg.evaluate((tx) => {
         const c = await chip(pg, 99990000333);
         dit(c.chip && c.sorte === 'pdf' && c.tx === '99990000333', 'C. le reçu avec PDF joint est relié (« pdf »), même si l’email a été rangé deux fois', JSON.stringify(c));
         const n333 = await pg.locator('[data-achat-tx="99990000333"] [data-achat-facture]').count();
-        dit(n333 === 1, 'C. deux lignes pour le même n° : UN seul « Facture reçue par email »', String(n333));
+        dit(n333 === 1, 'C. deux lignes pour le même n° : UN seul « Reçu d’achat »', String(n333));
         if (mobile) {
-          dit(a.h >= 43, 'G. au doigt, « Facture reçue par email » fait 44 px affichés', JSON.stringify({ h: a.h, w: a.w }));
-          dit(a.droite <= V.vp.width, 'G. « Facture reçue par email » ne sort pas de l’écran', String(a.droite));
+          dit(a.h >= 43, 'G. au doigt, « Reçu d’achat » fait 44 px affichés', JSON.stringify({ h: a.h, w: a.w }));
+          dit(a.droite <= V.vp.width, 'G. « Reçu d’achat » ne sort pas de l’écran', String(a.droite));
         }
       });
 
@@ -224,7 +291,7 @@ const chip = (pg, tx) => pg.evaluate((tx) => {
         await pg.locator(DIALOG).waitFor({ timeout: 8000 });
         await pg.waitForTimeout(300);
         const f = await pg.evaluate((sel) => { const d = document.querySelector(sel); const tx = d && d.querySelector('[data-recu-transaction]'); const tot = d && d.querySelector('[data-recu-total]'); return d ? { tx: tx && tx.getAttribute('data-recu-transaction'), total: tot && Number(tot.getAttribute('data-recu-total')), pj: !!d.querySelector('[data-recu-pj]') } : null; }, DIALOG);
-        dit(f && f.tx === '99990000111' && f.total === 2493, 'E. « Facture reçue par email » ouvre SON reçu (n° 99990000111, 24,93 €)', JSON.stringify(f));
+        dit(f && f.tx === '99990000111' && f.total === 2493, 'E. « Reçu d’achat » ouvre SON reçu (n° 99990000111, 24,93 €)', JSON.stringify(f));
         dit(f && !f.pj, 'E. un reçu sans PDF ne propose pas de « PDF joint »', JSON.stringify(f));
         await pg.keyboard.press('Escape'); await pg.waitForTimeout(400);
         dit(await pg.locator(DIALOG).count() === 0, 'E. Échap referme le reçu');
@@ -248,7 +315,7 @@ const chip = (pg, tx) => pg.evaluate((tx) => {
         const lu = journal.lectures.length;
         await bouton.click();
         await pg.waitForTimeout(1200);
-        const lecturesPdf = journal.lectures.slice(lu).filter((l) => /id=eq\.email_achat_99990000333/.test(l) && /pdfB64/.test(l));
+        const lecturesPdf = journal.lectures.slice(lu).filter((l) => /id=eq\.email_achat_p4q5r6/.test(l) && /pdfB64/.test(l));
         dit(lecturesPdf.length === 1 && journal.octetsPdf > avant, 'F. le clic lit les octets du PDF, une fois, pour CE reçu', JSON.stringify({ lectures: lecturesPdf.length, octets: journal.octetsPdf - avant }));
         const etat = await pg.locator('[data-recu-pj]').getAttribute('data-recu-pj').catch(() => null);
         dit(etat === 'pret', 'F. le PDF est prêt', String(etat));
@@ -256,7 +323,7 @@ const chip = (pg, tx) => pg.evaluate((tx) => {
           dit(await pg.locator('[data-recu-pj-lien]').count() === 1, 'F. sur iPhone, un lien « Ouvrir le PDF » (un vrai geste, jamais une fenêtre bloquée)');
         } else {
           const v = await pg.evaluate(() => { const d = document.querySelector('[data-visionneuse-pdf]'); return d ? { etat: d.getAttribute('data-visionneuse-pdf'), titre: d.getAttribute('aria-label') } : null; });
-          dit(v && v.etat === 'pret' && v.titre === 'Facture reçue par email', 'F. sur ordinateur, le PDF s’ouvre dans la visionneuse de VRM, titrée « Facture reçue par email »', JSON.stringify(v));
+          dit(v && v.etat === 'pret' && v.titre === "Reçu d'achat", 'F. sur ordinateur, le PDF s’ouvre dans la visionneuse de VRM, titrée du même nom (« Reçu d’achat »)', JSON.stringify(v));
           await pg.keyboard.press('Escape'); await pg.waitForTimeout(300);
         }
         if (await pg.locator(DIALOG).count()) { await pg.keyboard.press('Escape'); await pg.waitForTimeout(400); }
@@ -267,9 +334,26 @@ const chip = (pg, tx) => pg.evaluate((tx) => {
         const recus = pg.locator('[data-recus-email]');
         if (!(await recus.evaluate((e) => e.open))) await recus.locator('summary').click();
         await pg.waitForTimeout(300);
-        const r = await recus.locator('[data-recus-relies]').evaluate((e) => ({ relies: e.getAttribute('data-recus-relies'), sans: e.getAttribute('data-recus-sans-achat'), texte: e.innerText })).catch(() => null);
-        dit(r && r.relies === '3' && r.sans === '2', 'H. l’archive dit 3 reçus reliés à leur achat (par le n°) et 2 sans achat correspondant', JSON.stringify(r));
-        dit(r && /n° de transaction/.test(r.texte), 'H. … et dit par quoi ils sont reliés (le n° de transaction)', r && JSON.stringify(r.texte.slice(0, 120)));
+        const r = await recus.locator('[data-recus-relies]').evaluate((e) => ({ achats: e.getAttribute('data-recus-relies'), lignes: e.getAttribute('data-recus-lignes'), sansTx: e.getAttribute('data-recus-sans-tx'), absents: e.getAttribute('data-recus-absents'), passu: e.getAttribute('data-recus-passu'), texte: e.innerText })).catch(() => null);
+        // (revue du 29 oct.) 2 ACHATS ont leur reçu (111, et 333 dont l'email est rangé deux fois) — le premier jet disait « 3 ».
+        dit(r && r.achats === '2' && r.lignes === '3', 'H. l’archive compte les ACHATS reliés (2), pas les lignes (3 : la botte a deux emails)', JSON.stringify(r));
+        dit(r && r.sansTx === '1' && r.absents === '1' && r.passu === '0', 'H. … et dit à part 1 reçu sans n° et 1 reçu au n° qu’aucun achat affiché ne porte', JSON.stringify(r));
+        dit(r && /n° de transaction/.test(r.texte), 'H. … et dit par quoi ils sont reliés (le n° de transaction)', r && JSON.stringify(r.texte.slice(0, 160)));
+        const t = await recus.innerText();
+        dit(!/compte pas capté ou masqué|n’a pas reçu son reçu/.test(t), 'H. aucune cause devinée (« compte pas capté ou masqué », « VRM n’a pas reçu son reçu »)', JSON.stringify(t.slice(0, 400)));
+        // Ce que VRM écrit (le bilan et le geste) — pas les titres d'articles, que le vendeur choisit.
+        const ecrit = await recus.locator('[data-recus-relies], [data-recus-geste], summary').allInnerTexts();
+        dit(ecrit.length >= 3 && !ecrit.some((x) => /[Ff]acture/.test(x)), 'L. l’archive ne parle pas de « facture » (§5 : Vinted envoie un reçu)', JSON.stringify(ecrit.map((x) => x.slice(0, 120))));
+      });
+
+      await essaie('L. menu', async () => {
+        const carte = pg.locator('[data-achat-tx="99990000111"]');
+        await carte.locator('button[title="Actions rapides"]').first().click();
+        await pg.waitForTimeout(300);
+        const items = await carte.locator('[role="menuitem"]').allInnerTexts();
+        dit(items.some((t) => /^\s*Reçu d'achat\s*$/.test(t)) && !items.some((t) => /[Ff]acture|\(Vinted\)/.test(t)), 'L. le menu ⋯ dit le MÊME nom que la ligne (« Reçu d’achat »)', JSON.stringify(items));
+        await pg.evaluate(() => { const m = document.querySelector('[role="menu"].vrm-buy-menu'); if (m && m.previousElementSibling) m.previousElementSibling.click(); });
+        await pg.waitForTimeout(300);
       });
 
       await essaie('fin', async () => {

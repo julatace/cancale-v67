@@ -31,7 +31,11 @@
 //   retiré) · phrase (le n° se prend n'importe où dans la ligne) · premier (le
 //   premier reçu d'un n° gagne, même sans PDF) · receiptfor (l'app ajoute un
 //   repli par titre) · select (la liste rapatrie `data`) · serveur (la route
-//   reprend l'ancien motif).
+//   reprend l'ancien motif) · cle-tx (la clé redevient le n° : la copie
+//   transférée écrase le PDF) · cle-unique (la clé ne dépend plus de l'email :
+//   un email rejoué fait une ligne de plus) · bilan-lignes (l'archive compte
+//   les lignes, pas les achats) · bilan-passu (un compte pas lu ne retient
+//   rien : « aucun achat » sur une lecture ratée).
 // ─────────────────────────────────────────────────────────────────────────────
 const fs = require('fs'), path = require('path'), os = require('os'), vm = require('vm');
 const { spawnSync } = require('child_process');
@@ -68,12 +72,21 @@ if (process.argv[2] === '--route') {
     return rep(lignes);
   };
   const faireRes = () => { const r = { code: null, corps: null }; r.status = (n) => { r.code = n; return r; }; r.json = (o) => { r.corps = o; return r; }; r.setHeader = () => {}; r.send = () => r; r.end = () => r; return r; };
-  const mail = (subject, text) => ({ from: 'no-reply@vinted.fr', to: 'boite@banc.test', subject, text, html: '', attachments: [] });
+  const mail = (subject, text, attachments = []) => ({ from: 'no-reply@vinted.fr', to: 'boite@banc.test', subject, text, html: '', attachments });
+  const PDF = Buffer.from('%PDF-1.4 reçu banc').toString('base64');
   // Formes INVENTÉES, au gabarit des reçus mesurés (aucune donnée réelle).
   const RECU = 'E-mail Vinted\n\nBonjour compte_banc,\n\n*Ton paiement a été reçu. *\n\nVoici les détails de ta commande :\n*Vendeur* vendeur_banc\n*Commande*\n\nBasket facture banc\n*Montant payé* 24,93 € \nArticle 20,00 € \nFrais de port 3,23 € \nFrais Vinted 1,70 € \n*Mode de paiement* Visa, **********4242 (24,93 €) \n*Date du paiement* 27/10/2026 10 h 47 \n*N° de transaction* 99990000111 \n';
+  // Le reçu d'un AUTRE achat, au même titre, chez le même vendeur, au même
+  // prix : les 300 premiers caractères sont identiques, seul le n° change.
+  const RECU_JUMEAU = RECU.replace('99990000111', '99990000555').replace('10 h 47', '11 h 02');
   const ETAPES = [
-    ['recu', mail('Ton reçu pour la commande « Basket facture banc »', RECU)],
-    ['double', mail('Ton reçu pour la commande « Basket facture banc »', RECU)],
+    // (revue du 29 oct.) Le reçu AVEC un PDF joint, puis sa copie transférée
+    // (« TR: », même n°, sans pièce jointe) : la copie ne doit RIEN écraser.
+    ['recu', mail('Ton reçu pour la commande « Basket facture banc »', RECU, [{ filename: 'recu.pdf', contentType: 'application/pdf', contentB64: PDF }])],
+    ['tr', { ...mail('TR: Ton reçu pour la commande « Basket facture banc »', '---------- Message transféré ---------\nDe : Vinted\n\n' + RECU), from: 'moi@banc.test' }],
+    // Le MÊME email (pièce jointe comprise) rejoué : une seule ligne.
+    ['double', mail('Ton reçu pour la commande « Basket facture banc »', RECU, [{ filename: 'recu.pdf', contentType: 'application/pdf', contentB64: PDF }])],
+    ['jumeau', mail('Ton reçu pour la commande « Basket facture banc »', RECU_JUMEAU)],
     ['phrase', mail('Merci pour ton achat !', 'Bonjour,\n\nMerci pour ton achat « Sandale phrase banc ».\nTa transaction 88880000222 est en cours de traitement chez Vinted.\nTotal payé : 31,00 €\n')],
   ];
   (async () => {
@@ -83,7 +96,7 @@ if (process.argv[2] === '--route') {
       const res = faireRes();
       try { await inbound.default({ method: 'POST', query: {}, headers: { 'x-vrm-email-key': 'cle-banc-facture' }, body: JSON.parse(JSON.stringify(m)) }, res); }
       catch (e) { out[k] = { erreur: String(e && e.message) }; continue; }
-      out[k] = { code: res.code, achats: [...base.entries()].filter(([x]) => x.includes('|email_achat_')).map(([x, d]) => ({ id: x.split('|')[1], transaction: d && d.transaction, article: d && d.article, texte: d && d.texte })) };
+      out[k] = { code: res.code, achats: [...base.entries()].filter(([x]) => x.includes('|email_achat_')).map(([x, d]) => ({ id: x.split('|')[1], transaction: d && d.transaction, article: d && d.article, texte: d && d.texte, sujet: d && d.subject, pdf: !!(d && d.pdfB64), receivedAt: d && d.receivedAt })) };
     }
     console.log('RESULTAT ' + JSON.stringify(out));
     process.exit(0);
@@ -117,6 +130,14 @@ else if (MUT === 'premier') muter('regle', 'if (!deja || score(r) > score(deja) 
 else if (MUT === 'receiptfor') muter('app', 'const receiptFor = (o) => recuDeLAchat(o, indexRecusAchat);', "const receiptFor = (o) => recuDeLAchat(o, indexRecusAchat) || (recusAchat || []).find((r) => normTitle(r.article || '') === normTitle(o.title || '')) || null;");
 else if (MUT === 'select') muter('app', "const SELECT_RECUS_ACHAT = 'id,", "const SELECT_RECUS_ACHAT = 'id,data,");
 else if (MUT === 'serveur') muter('route', 'const transaction = transactionDuRecu(corpsTexte);', "const transaction = (achText.match(/transaction\\s*:?\\s*#?(\\d{6,})/i) || [])[1] || '';");
+// (revue du 29 oct.) La clé redevient le n° seul (le premier jet) : la copie « TR: » écrase le PDF.
+else if (MUT === 'cle-tx') muter('route', "const key = shortHash(subject + corpsTexte.slice(0, 300) + (transaction ? `|tx${transaction}` : '') + (pdfA ? '|pdf' : ''));", 'const key = transaction || shortHash(subject + corpsTexte.slice(0, 300));');
+// La clé ne dépend plus de l'email : le même email rejoué fait une ligne de plus à chaque fois.
+else if (MUT === 'cle-unique') muter('route', "const key = shortHash(subject + corpsTexte.slice(0, 300) + (transaction ? `|tx${transaction}` : '') + (pdfA ? '|pdf' : ''));", 'const key = shortHash(subject + Date.now() + Math.random());');
+// Le bilan compte les LIGNES reliées (doublons d'un n° comptés deux fois).
+else if (MUT === 'bilan-lignes') muter('regle', 'return { achats: achats.size, lignes, sansTx, absents, passu };', 'return { achats: lignes, lignes, sansTx, absents, passu };');
+// Le bilan ignore les comptes pas lus (il dirait « aucun achat » sur une lecture ratée).
+else if (MUT === 'bilan-passu') muter('regle', "if (typeof nonLu === 'function' && nonLu(r)) { passu++; continue; }", '');
 else if (MUT) { console.log('❌ mutation inconnue : ' + MUT); process.exit(2); }
 
 let ko = 0;
@@ -128,7 +149,7 @@ dit(regleLue != null, 'la règle partagée api/_lib/recu-achat.js existe (une r�
 const ctx = vm.createContext({ console });
 let F = {};
 essaie('la règle partagée api/_lib/recu-achat.js se charge', () => {
-  vm.runInContext(regle.replace(/^export\s+/gm, '') + '\n;this.__F = { transactionDuRecu, transactionDeLaLigne, indexRecusParTransaction, recuDeLAchat };', ctx);
+  vm.runInContext(regle.replace(/^export\s+/gm, '') + '\n;this.__F = { transactionDuRecu, transactionDeLaLigne, indexRecusParTransaction, recuDeLAchat, bilanRecusAchat: typeof bilanRecusAchat === "function" ? bilanRecusAchat : null };', ctx);
   F = ctx.__F || {};
 });
 const GRAS = 'Basket facture banc\n*Montant payé* 24,93 € \n*Date du paiement* 27/10/2026 10 h 47 \n*N° de transaction* 99990000111 \n';
@@ -166,6 +187,26 @@ essaie('rattachement à l’achat', () => {
   dit(F.recuDeLAchat({ transaction_id: '99990000111' }, null) === null, 'sans index : rien, sans lever');
 });
 
+// ── 1 bis. Ce que l'archive peut DIRE (revue du 29 oct.) ─────────────────
+essaie('bilan des reçus', () => {
+  dit(typeof F.bilanRecusAchat === 'function', 'la règle partagée dit ce que l’archive peut affirmer (bilanRecusAchat)');
+  const B = F.bilanRecusAchat;
+  const recus = [
+    { id: 'a1', transaction: '99990000111' },
+    { id: 'a2', transaction: '99990000333', _pdf: true },
+    { id: 'a3', transaction: '', texte: GRAS.replace('*N° de transaction* 99990000111', '') },   // pas de n°
+    { id: 'a4', transaction: '99990000999' },                                                 // n° qu'aucun achat affiché ne porte
+    { id: 'a5', transaction: '99990000333' },                                                 // l'autre email du même reçu
+    { id: 'a6', transaction: '99990000888', uid: '222' },                                     // compte dont les achats n'ont pas pu être lus
+  ];
+  const tx = new Set(['99990000111', '99990000333', '99990000444']);
+  const b = B(recus, tx, (r) => r.uid === '222');
+  dit(b && b.achats === 2 && b.lignes === 3, 'l’archive compte les ACHATS reliés (n° distincts), pas les lignes : deux emails d’un même reçu = un achat', JSON.stringify(b));
+  dit(b && b.sansTx === 1 && b.absents === 1, 'un reçu sans n° et un reçu au n° absent de la liste sont dits À PART (aucune cause devinée)', JSON.stringify(b));
+  dit(b && b.passu === 1, 'un reçu qui peut être celui d’un compte pas lu n’est comparé à rien (« pas su »)', JSON.stringify(b));
+  dit(B(null, tx) === null && B(recus, null) === null, '« pas su » (reçus ou achats pas lus) : aucun bilan, jamais un 0 inventé');
+});
+
 // ── 2. Le câblage de l'app ────────────────────────────────────────────────
 dit(/import\s*\{[^}]*\brecuDeLAchat\b[^}]*\bindexRecusParTransaction\b[^}]*\}\s*from\s*'\.\.\/api\/_lib\/recu-achat\.js'|import\s*\{[^}]*\bindexRecusParTransaction\b[^}]*\brecuDeLAchat\b[^}]*\}\s*from\s*'\.\.\/api\/_lib\/recu-achat\.js'/.test(app), 'l’app importe la règle partagée (une règle pour le serveur et l’app, §11)');
 const rf = (app.match(/const receiptFor = \(o\) => ([^\n]*)/) || [])[1] || '';
@@ -182,10 +223,26 @@ if (sel) {
   dit(parts.includes('pdf:meta->>_pdf'), 'la présence d’un PDF se lit en scalaire (meta->>_pdf)', sel);
   dit(parts.includes('texte:data->>texte') && parts.includes('transaction:meta->>transaction'), 'le texte et le n° rangé sont projetés (la règle lit l’un puis l’autre)', sel);
 }
-dit(/data-achat-facture=\{rc\._pdf \|\| rc\.pdfB64 \? 'pdf' : 'email'\}[\s\S]{0,400}onClick=\{\(\)=>setReceiptView\(rc\)\}[\s\S]{0,700}Facture reçue par email/.test(app), 'la pastille « Facture reçue par email » ouvre CE reçu (setReceiptView(rc))');
+dit(/data-achat-facture=\{rc\._pdf \|\| rc\.pdfB64 \? 'pdf' : 'email'\}[\s\S]{0,400}onClick=\{\(\)=>setReceiptView\(rc\)\}[\s\S]{0,700}\{NOM_RECU_ACHAT\}/.test(app), 'la pastille de la ligne (« Reçu d’achat ») ouvre CE reçu (setReceiptView(rc))');
 dit(/const rc = receiptFor\(o\);/.test(app) && /\{rc && \(\s*<div className="vrm-buy-facture">/.test(app), 'la pastille n’existe que quand receiptFor a relié un reçu');
 dit(/lirePdfLigne\(recu\._emailId\)/.test(app), 'le PDF joint ne se lit qu’au clic, par le lecteur unique (lirePdfLigne)');
 dit(!/receiptFor[\s\S]{0,300}normTitle\(r\.article/.test(app), 'aucun repli par titre ne subsiste autour de receiptFor');
+// (revue du 29 oct.) L'archive : le bilan de la règle, les comptes pas lus PASSÉS.
+const rr = (app.match(/const recusRelies = useMemo\(\(\) => \{([\s\S]*?)\n  \}, \[/) || [])[1] || '';
+dit(/bilanRecusAchat\(recusAchat,/.test(rr), 'l’archive des reçus passe par bilanRecusAchat (une règle, §11)', rr.slice(0, 80));
+dit(/buys\.failedUids/.test(rr) && /koSet\.has/.test(rr), 'les comptes dont les achats n’ont pas pu être lus sont passés à la règle (« pas su »)');
+// Un audit lit le CODE : les commentaires (qui citent les phrases d'avant pour
+// dire pourquoi elles sont parties) sont retirés d'abord.
+const sansCommentaires = (t) => String(t || '').replace(/\/\*[\s\S]*?\*\//g, '').split('\n').map((l) => l.replace(/(^|[^:'"`\\])\/\/.*$/, '$1')).join('\n');
+const recusJsx = sansCommentaires(lire('src', 'RecusEmail.jsx') || '');
+const appCode = sansCommentaires(app);
+dit(!/compte pas capté ou masqué/.test(recusJsx) && !/n.a pas reçu son reçu/.test(recusJsx), 'l’archive n’affirme plus de cause qu’elle n’a pas mesurée (« compte pas capté ou masqué », « n’a pas reçu son reçu »)');
+dit(/data-recus-passu/.test(recusJsx) && /nomsKo/.test(recusJsx), 'l’archive NOMME les comptes dont les achats n’ont pas pu être lus');
+// (revue du 29 oct.) UN nom pour ce document, partout (§5 : Vinted n'émet aucune facture entre particuliers).
+const nom = (app.match(/const NOM_RECU_ACHAT = "([^"]*)";/) || [])[1];
+dit(nom && !/factur/i.test(nom), 'le document porte UN nom, et ce n’est pas « facture » (§5)', String(nom));
+dit(!/Facture reçue par email|Reçu d\\'achat \(Vinted\)/.test(appCode), 'aucun autre nom ne subsiste (« Facture reçue par email », « Reçu d’achat (Vinted) »)');
+dit((app.match(/NOM_RECU_ACHAT/g) || []).length >= 6, 'la ligne, le menu, la feuille et la visionneuse lisent ce nom', String((app.match(/NOM_RECU_ACHAT/g) || []).length));
 
 // ── 2 bis. Le serveur ─────────────────────────────────────────────────────
 dit(/import \{ transactionDuRecu \} from '\.\/_lib\/recu-achat\.js';/.test(route), 'la route importe la règle partagée');
@@ -194,7 +251,7 @@ dit(!/achText\.match\(\/transaction/.test(route), 'l’ancien motif (sans le gra
 
 // ── 3. La vraie route ─────────────────────────────────────────────────────
 let racine = R, tmp = null;
-if (MUT === 'serveur' || MUT === 'gras' || MUT === 'phrase') {
+if (MUT === 'serveur' || MUT === 'gras' || MUT === 'phrase' || MUT === 'cle-tx' || MUT === 'cle-unique') {
   // La route mutée tourne dans une COPIE (api + src), jamais dans le dépôt.
   tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'audit-facture-achat-'));
   fs.cpSync(path.join(R, 'api'), path.join(tmp, 'api'), { recursive: true });
@@ -212,18 +269,38 @@ const o = ligne ? JSON.parse(ligne.slice(9)) : null;
 dit(!!o, 'la vraie route email-inbound a été exécutée', o ? '' : (r.stderr || r.stdout || '').split('\n').slice(-4).join(' | ').slice(0, 300));
 if (o) {
   const recu = (o.recu && o.recu.achats) || [];
-  dit(recu.length === 1 && recu[0].id === 'email_achat_99990000111', 'route : le reçu au n° en gras est rangé sous email_achat_{n°}', JSON.stringify(recu.map((x) => x.id)));
-  dit(recu.length === 1 && recu[0].transaction === '99990000111', 'route : la ligne porte son n° de transaction (il était vide sur les 117 lignes)', JSON.stringify(recu.map((x) => x.transaction)));
-  const dbl = (o.double && o.double.achats) || [];
-  dit(dbl.length === 1, 'route : le même reçu reçu deux fois ne fait qu’UNE ligne (la clé est le n°)', JSON.stringify(dbl.map((x) => x.id)));
+  dit(recu.length === 1 && recu[0].transaction === '99990000111', 'route : la ligne du reçu porte son n° de transaction (il était vide sur les 117 lignes)', JSON.stringify(recu.map((x) => x.transaction)));
+  dit(recu.length === 1 && recu[0].pdf, 'route : le PDF joint au reçu est rangé', JSON.stringify(recu.map((x) => [x.id, x.pdf])));
+  // ⚠️⚠️ (revue du 29 oct.) Le premier jet rangeait sous `email_achat_{n°}` : la
+  // copie transférée du MÊME n° remplaçait la ligne entière, PDF compris. Le
+  // contrôle d'avant (« le même reçu reçu deux fois ne fait qu'UNE ligne »)
+  // envoyait deux emails IDENTIQUES — déjà vert sur origin/main, et aveugle à
+  // cet écrasement. Deux contrôles le remplacent :
+  const du111 = (k) => ((o[k] && o[k].achats) || []).filter((x) => x.transaction === '99990000111');
+  const tr = du111('tr');
+  dit(tr.length === 2 && tr.some((x) => x.pdf) && tr.some((x) => /^TR:/.test(x.sujet || '')),
+    'route : deux emails DIFFÉRENTS du même n° (le reçu + sa copie « TR: ») ⇒ aucun contenu perdu : le PDF est gardé, la copie aussi',
+    JSON.stringify(tr.map((x) => ({ id: x.id, pdf: x.pdf, sujet: (x.sujet || '').slice(0, 6) }))));
+  const dbl = du111('double');
+  dit(dbl.length === 2, 'route : le MÊME email reçu deux fois ne fait pas de ligne de plus (une ligne par email)', JSON.stringify(dbl.map((x) => x.id)));
+  essaie('une seule ligne relie l’achat', () => {
+    const ix = F.indexRecusParTransaction(dbl.map((x) => ({ id: x.id, transaction: x.transaction, texte: x.texte, _pdf: x.pdf, receivedAt: x.receivedAt })), () => false);
+    const r = F.recuDeLAchat({ transaction_id: '99990000111' }, ix);
+    dit(ix.size === 1 && !!r && r._pdf === true && !!dbl.find((x) => x.id === r.id && x.pdf),
+      'route → app : les lignes d’un même n° relient UN reçu à l’achat — celui qui porte le PDF', JSON.stringify({ taille: ix.size, choisi: r && r.id }));
+  });
+  const jum = ((o.jumeau && o.jumeau.achats) || []);
+  dit(jum.filter((x) => x.transaction === '99990000555').length === 1 && jum.filter((x) => x.transaction === '99990000111').length === 2 && jum.some((x) => x.transaction === '99990000111' && x.pdf),
+    'route : le reçu d’un AUTRE achat au même titre (mêmes 300 premiers caractères, autre n°) a sa propre ligne et n’écrase rien',
+    JSON.stringify(jum.map((x) => [x.id, x.transaction, x.pdf])));
   const ph = ((o.phrase && o.phrase.achats) || []).filter((x) => /Sandale phrase banc/.test(x.texte || ''));
   dit(ph.length === 1 && ph[0].transaction === '', 'route : « Ta transaction 88880000222 est en cours » ne devient PAS un n°', JSON.stringify(ph.map((x) => [x.id, x.transaction])));
   // §11 — ce que la route range, l'app le relie à l'achat de CE n°, et à aucun autre.
   essaie('route → app', () => {
-    const lignes = ((o.phrase && o.phrase.achats) || []).map((x) => ({ id: x.id, transaction: x.transaction, texte: x.texte, article: x.article }));
+    const lignes = ((o.phrase && o.phrase.achats) || []).map((x) => ({ id: x.id, transaction: x.transaction, texte: x.texte, article: x.article, _pdf: x.pdf }));
     const ix = F.indexRecusParTransaction(lignes, () => false);
     const bon = F.recuDeLAchat({ transaction_id: '99990000111', title: 'Basket facture banc' }, ix);
-    dit(!!bon && bon.id === 'email_achat_99990000111', 'route → app : le reçu rangé par la route se relie à l’achat de son n°', bon ? bon.id : 'aucun');
+    dit(!!bon && bon.transaction === '99990000111' && bon._pdf, 'route → app : le reçu rangé par la route se relie à l’achat de son n° (celui au PDF)', bon ? bon.id : 'aucun');
     const jumeau = F.recuDeLAchat({ transaction_id: '99990000777', title: 'Basket facture banc' }, ix);
     dit(jumeau === null, 'route → app : un AUTRE achat au même titre ne reçoit aucun reçu', jumeau ? jumeau.id : 'aucun');
     const phrase = F.recuDeLAchat({ transaction_id: '88880000222', title: 'Sandale phrase banc' }, ix);

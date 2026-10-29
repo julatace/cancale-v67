@@ -1,23 +1,27 @@
 # VRM — dossier de passation
 
-> **29 octobre — « FACTURE REÇUE PAR EMAIL » SUR CHAQUE ACHAT (Achats) :** Julien : « essaie pour les achats de mettre en
-> place les factures si tu les reçois par mail ». **Mesuré (lecture seule, 117 lignes `email_achat_*`)** : 81 reçus Vinted
-> (« Ton reçu pour la commande « … » »), **0 avec un PDF** (le reçu est dans le corps), et le champ `transaction` **vide sur
-> les 117** — l'astérisque du gras (« *N° de transaction* 123… ») cassait le motif du serveur ; ce n° relie **61 des 81**
-> reçus à un achat capté (0 doublon), les 20 autres à aucun (comptes pas moissonnés) ; **aucun email de facture Leboncoin ni
-> eBay** n'arrive ; les reçus viennent presque tous d'UN compte (54 sur 55 récents). **Fait** : règle partagée
-> `api/_lib/recu-achat.js` (§11 : le serveur range le n° — `email_achat_{n°}` —, l'app relie) : n° lu ligne par ligne, gras
-> retiré, seulement quand la ligne ne porte QUE lui ; un achat se relie par SON n° et rien d'autre — le repli par TITRE de
-> `receiptFor` est retiré (§5) ; deux lignes d'un même n° = le même achat (PDF, puis détaillée, puis la plus récente) ;
-> « pas su » ne relie rien. Pastille « Facture reçue par email » sur la ligne de l'achat (`data-achat-facture`, 44 px au
-> doigt) qui ouvre le reçu ; la liste ne rapatrie plus `data` ni le PDF (`SELECT_RECUS_ACHAT`, `meta->>_pdf`, §4.4), un PDF
-> joint ne se lit qu'au clic (`lirePdfLigne`, visionneuse) ; l'archive des reçus dit combien sont reliés et le geste. Le mot
-> « Facture » est le sien : Vinted envoie un REÇU de paiement (il n'émet aucune facture entre particuliers). Preuves :
-> `audit-facture-achat.cjs` (43, la vraie route ; 19 rouges sur origin/main, 7 mutations rouges), banc `facture-achat.cjs`
-> (390 tactile clair/sombre + 1512 + reçus illisibles ; 31 rouges sur origin/main, repli par titre ⇒ 3 rouges).
+> **29 octobre — LE REÇU D'ACHAT REÇU PAR EMAIL, SUR LA LIGNE DE CHAQUE ACHAT (Achats) :** Julien : « essaie pour les achats
+> de mettre en place les factures si tu les reçois par mail ». **Mesuré (lecture seule)** : 81 reçus Vinted (« Ton reçu pour la
+> commande « … » »), **0 PDF**, `transaction` **vide sur les 117** lignes `email_achat_*` (l'astérisque du gras cassait le motif) ;
+> par ce n°, **61 reçus = 61 achats distincts** captés ; **20 ne correspondent à aucun achat capté** — dont 2 dont le n° est dans
+> SES ventes (achat d'un de ses comptes à un autre), le reste **cause non mesurée** ; **70 des 81 ne nomment aucun compte**.
+> **Fait** : règle partagée `api/_lib/recu-achat.js` (§11) — n° lu ligne par ligne, gras retiré ; un achat se relie par SON n° et
+> rien d'autre (repli par TITRE retiré, §5) ; les lignes d'un même n° = le même achat (PDF, puis détaillée, puis récente) ;
+> « pas su » ne relie rien. Le serveur range le n° dans `transaction` mais garde **une clé PAR EMAIL** (sujet + début du texte +
+> n° + PDF) — ⚠️ revue : le premier jet rangeait sous `email_achat_{n°}` et la copie « TR: » d'un reçu ÉCRASAIT le premier, PDF
+> compris. Sur la ligne de l'achat : « Reçu d'achat » (`data-achat-facture`, 44 px touchables, y compris sur un achat en litige),
+> qui ouvre la feuille ; un PDF joint ne se lit qu'au clic (§4.4). **Un nom pour ce document** (`NOM_RECU_ACHAT`) sur la ligne,
+> le menu ⋯, la feuille et la visionneuse — pas « facture » : Vinted envoie un reçu de paiement, aucune facture entre
+> particuliers (§5). L'archive (`bilanRecusAchat`) compte les ACHATS reliés (n° distincts), dit à part les reçus sans n° et
+> ceux dont le n° n'est porté par aucun achat affiché, ne compare rien pour un compte dont les achats n'ont pas pu être lus
+> (« pas su », compte NOMMÉ) — aucune cause devinée. Preuves : `audit-facture-achat.cjs` (la vraie route ; 11 mutations
+> rouges, dont `cle-tx` = le premier jet), `audit-identite` §12 sur la RÈGLE exécutée (50+50 reçus au même titre), banc
+> `facture-achat.cjs` (390 clair/sombre, 1512, reçus illisibles, litige au doigt, compte pas lu ; 23 rouges sur la branche
+> d'avant la revue, 44 sur origin/main), `csp.cjs` injecte la règle partagée (il mourait sur `transactionDeLaLigne`).
 > ⚠️ Non mesuré : un vrai reçu avec PDF joint ; un vrai email après déploiement ; la projection `data->>texte` sur SA base.
-> **Geste de Julien** : faire suivre les emails Vinted de ses AUTRES comptes vers son adresse VRM (Réglages → Mes adresses
-> de réception) — sinon leurs achats n'auront jamais de reçu.
+> **Gestes de Julien** : (1) s'il veut d'autres reçus, faire suivre les emails Vinted de ses autres comptes vers son adresse
+> VRM (Réglages → Mes adresses de réception) ; (2) le mot : il avait dit « factures » — s'il y tient malgré §5, c'est
+> `NOM_RECU_ACHAT`, une ligne.
 
 > **29 octobre — cotisations dans Ma journée, déclaration de revenus, CFE, ventes Leboncoin datées à la main :**
 > (2) Ma journée, sous « Reçu en {mois} » : « ≈ X € de cotisations à mettre de côté » = `aPayerUrssaf` du CA DÉCLARÉ du mois

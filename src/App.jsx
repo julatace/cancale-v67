@@ -64,7 +64,7 @@ import {etatCommandeEbay} from '../api/_lib/ebay-etat-commande.js';
 import {colisEbay} from '../api/_lib/ebay-a-expedier.js';
 import {marcheDuCompte as marcheEbayDuCompte, MARCHE_DEFAUT as MARCHE_EBAY_DEFAUT, lienAnnonce as lienAnnonceMarche, lienCommande as lienCommandeMarche} from '../api/_lib/ebay-marches-table.js';
 import {arriveeColisEmail, arriveeColisVinted, jourLocal, texteArrivee} from '../api/_lib/arrivee-colis.js';
-import {transactionDeLaLigne, indexRecusParTransaction, recuDeLAchat} from '../api/_lib/recu-achat.js';
+import {transactionDeLaLigne, indexRecusParTransaction, recuDeLAchat, bilanRecusAchat} from '../api/_lib/recu-achat.js';
 import {codeRetraitTournure} from '../api/_lib/code-retrait-email.js';
 import {etatRetrait, estAVerifier, urgenceTri, lieuDepuisExtrait, limiteRetraitDepuisTexte, LIEU_AU_FUTUR, GARDE_MAX_J, gardeDe} from '../api/_lib/retrait-colis.js';
 import {aConfirmerVisibles, texteLimite, motAConfirmer} from './aConfirmer.js';
@@ -4286,6 +4286,14 @@ const ventilationRecuAchat = (texte) => {
 // (29 oct.) Le n° se lit par LA règle du serveur (`api/_lib/recu-achat.js`,
 // §11) : celui qu'il range désormais dans `transaction`, sinon celui du texte.
 const txRecuAchat = (a) => transactionDeLaLigne(a);
+// ⚠️ (29 oct., revue) UN SEUL NOM POUR CE DOCUMENT, PARTOUT : la ligne de
+// l'achat, le menu ⋯, la feuille et la visionneuse du PDF joint (§7/§11). Le
+// premier jet en portait trois (« Facture reçue par email », « Reçu d'achat
+// (Vinted) », « Reçu d'achat ») — et « facture » est faux : Vinted envoie un
+// REÇU de paiement, il n'émet aucune facture entre particuliers, et ce document
+// peut partir chez un comptable (§5). Julien avait dit « factures » : s'il
+// tient au mot, c'est ici, une fois.
+const NOM_RECU_ACHAT = "Reçu d'achat";
 // ⚠️ (23 oct., revue) « PAS UN REÇU » SE DÉFINIT PAR CE QUI A ÉTÉ MESURÉ, pas
 // par ce qu'un reçu doit contenir. Premier jet : un reçu DEVAIT porter un
 // Montant payé, un sujet « reçu pour la commande » ou un PDF — or la route
@@ -4465,14 +4473,14 @@ function FeuilleRecuAchat({ recu, fermer }) {
   const [pj, setPj] = useState(null);
   useEffect(() => () => { if (pj && pj.url) { try { URL.revokeObjectURL(pj.url); } catch (_) {} } }, [pj]);
   const ouvrirPj = async () => {
-    if (pj && pj.url) { if (!ouvrirPdfOnglet(pj.url, recu.filename || 'facture-achat.pdf', 'Facture reçue par email')) window.open(pj.url, '_blank'); return; }
+    if (pj && pj.url) { if (!ouvrirPdfOnglet(pj.url, recu.filename || 'recu-achat.pdf', NOM_RECU_ACHAT)) window.open(pj.url, '_blank'); return; }
     setPj({ etat: 'lecture' });
     const lu = recu.pdfB64 ? { octets: b64ToBytes(recu.pdfB64) } : await lirePdfLigne(recu._emailId);
     if (lu === null) { setPj({ etat: 'passu' }); return; }
     if (!lu || !lu.octets || !estOctetsPdf(lu.octets)) { setPj({ etat: 'absent' }); return; }
     const url = URL.createObjectURL(new Blob([lu.octets], { type: 'application/pdf' }));
     setPj({ etat: 'pret', url });
-    ouvrirPdfOnglet(url, recu.filename || 'facture-achat.pdf', 'Facture reçue par email');
+    ouvrirPdfOnglet(url, recu.filename || 'recu-achat.pdf', NOM_RECU_ACHAT);
   };
   const defile = useRef(null);
   const fermerRef = useRef(fermer); fermerRef.current = fermer;
@@ -4511,10 +4519,10 @@ function FeuilleRecuAchat({ recu, fermer }) {
   return createPortal(
     <div data-noswipe="1" data-recu-voile="" onClick={fermer} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:1400,display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
       <FermeAuRetour fermer={fermer}/>
-      <div ref={boite} className="vrm-recu-feuille" data-recu-feuille="" role="dialog" aria-modal="true" aria-label="Reçu d'achat" tabIndex={-1} onClick={e=>e.stopPropagation()} style={{background:C.bg,color:C.text,width:'100%',maxWidth:520,borderRadius:'18px 18px 0 0',display:'flex',flexDirection:'column',overflow:'hidden',outline:'none'}}>
+      <div ref={boite} className="vrm-recu-feuille" data-recu-feuille="" role="dialog" aria-modal="true" aria-label={NOM_RECU_ACHAT} tabIndex={-1} onClick={e=>e.stopPropagation()} style={{background:C.bg,color:C.text,width:'100%',maxWidth:520,borderRadius:'18px 18px 0 0',display:'flex',flexDirection:'column',overflow:'hidden',outline:'none'}}>
         <div style={{display:'flex',alignItems:'center',gap:10,padding:'10px 12px',borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
           <button type="button" data-recu-retour="" onClick={fermer} aria-label="Retour" style={{...cible,width:44,height:44,padding:0,fontSize:22,fontWeight:600,lineHeight:1}}>‹</button>
-          <div style={{flex:1,minWidth:0,fontSize:16,fontWeight:700,color:C.text}}>Reçu d'achat</div>
+          <div style={{flex:1,minWidth:0,fontSize:16,fontWeight:700,color:C.text}}>{NOM_RECU_ACHAT}</div>
           <button type="button" data-recu-pdf="" onClick={()=>openReceipt(recu)} title="Imprimer / PDF" style={{...cible,gap:6,padding:'0 14px',fontSize:14,fontWeight:600}}><Icon name="printer" size={15}/>PDF</button>
         </div>
         {aPdf && (
@@ -36625,12 +36633,31 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // (29 oct.) Combien de reçus reçus par email se relient à un achat AFFICHÉ, par
   // son n° de transaction (la même règle que la ligne, §11). `null` tant que les
   // reçus ou les achats ne sont pas lus — jamais un « 0 » inventé.
+  // ⚠️ (revue du 29 oct.) On COMPTE LES ACHATS (n° distincts), pas les lignes :
+  // deux emails d'un même reçu sont un seul achat. Et on ne devine AUCUNE cause :
+  // un reçu qui peut être celui d'un compte dont les achats n'ont pas pu être
+  // lus (son compte est en échec, ou son compte est inconnu — 70 des 81 reçus
+  // mesurés n'en nomment aucun — alors qu'un compte est en échec) n'est comparé
+  // à rien, et le compte est NOMMÉ.
   const recusRelies = useMemo(() => {
     if (!Array.isArray(recusAchat) || !Array.isArray(buys.items) || buys.error) return null;
-    const txAchats = new Set(buysBase.map((o) => String(o.transaction_id)));
-    const relies = recusAchat.filter((r) => { const tx = txRecuAchat(r); return !!tx && txAchats.has(tx); }).length;
-    return { relies, sans: recusAchat.length - relies };
-  }, [recusAchat, buys.items, buys.error, buysBase]);
+    const ko = (Array.isArray(buys.failedUids) ? buys.failedUids : []).map(String).filter((u) => !acctOff(u));
+    const koSet = new Set(ko);
+    const parLogin = new Map((accounts || []).filter((a) => a && a.login).map((a) => [String(a.login).toLowerCase(), String(a.vinted_user_id)]));
+    const nonLu = (r) => {
+      if (!ko.length) return false;
+      const uid = String((r && r.uid) || '').trim(), login = String((r && r.account) || '').trim().toLowerCase();
+      if (uid) return koSet.has(uid);
+      if (login) { const u = parLogin.get(login); return !!u && koSet.has(u); }   // un login qui n'est pas lié n'a jamais été lu : son achat n'est pas affiché, c'est un fait
+      return true;                                                                 // compte inconnu : il PEUT être celui d'un compte pas lu
+    };
+    const b = bilanRecusAchat(recusAchat, new Set(buysBase.map((o) => String(o.transaction_id))), nonLu);
+    if (!b) return null;
+    // Les comptes pas lus, par IDENTITÉ ; leur NOM se pose au rendu (accNameOf
+    // est déclaré plus bas — un useMemo s'exécute tout de suite, §4.6).
+    return { ...b, ko };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [recusAchat, buys.items, buys.error, buys.failedUids, buysBase, accounts, hiddenAccts, panelAcctOff]);
   const vintedToPickup = useMemo(() => buysBase.filter(o => isAtRelayStatus(o.status) && !pickupDone[String(o.transaction_id)]), [buysBase, pickupDone]);
   // (23 oct.) LES ACHATS QUI PEUVENT RELIER UN COLIS D'E-MAIL À SA COMMANDE (le
   // n° de suivi lu dans la transaction, une identité, §5) : ceux au point relais
@@ -45782,7 +45809,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     <button type="button" className="vrm-lien-action" data-achat-facture={rc._pdf || rc.pdfB64 ? 'pdf' : 'email'} data-achat-facture-tx={String(txRecuAchat(rc))}
                       onClick={()=>setReceiptView(rc)} title="Ouvrir le reçu d'achat que Vinted t'a envoyé par email"
                       style={{display:'inline-flex',alignItems:'center',gap:5,border:'none',background:'transparent',padding:0,font:'inherit',fontSize:11.5,fontWeight:600,lineHeight:1.25,color:C.text,cursor:'pointer',textAlign:'left',minHeight:0}}>
-                      <Icon name="receipt" size={13} style={{color:C.muted,flexShrink:0}}/>Facture reçue par email
+                      <Icon name="receipt" size={13} style={{color:C.muted,flexShrink:0}}/>{NOM_RECU_ACHAT}
                     </button>
                   </div>
                 )}
@@ -45842,7 +45869,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     {peutSuivre && <a role="menuitem" className="vrm-buy-menu-tel" href={trackUrl(tk.carrier||'', suivi)} target="_blank" rel="noreferrer" style={item} onClick={close}><Icon name="truck" size={15} style={{color:C.muted}}/>Suivre le colis</a>}
                     {arrive && <button type="button" role="menuitem" data-copier-prix={prixPaye} style={item} onClick={async ()=>{ close(); try { await navigator.clipboard.writeText(prixPaye); toast(`Prix payé copié : ${prixPaye} € — colle-le au numérotage`); } catch(_) { toast('Copie impossible','error'); } }}><Icon name="cash" size={15} style={{color:C.muted}}/>Copier le prix payé (pour le numérotage)</button>}
                     <button type="button" role="menuitem" style={item} onClick={()=>{ close(); setNoteEdit({tid,title:o.title,val:note}); }}><Icon name="doc" size={15} style={{color:C.muted}}/>{note?'Modifier la note interne':'Ajouter une note interne'}</button>
-                    <button type="button" role="menuitem" style={item} onClick={()=>{ close(); if(rc){ setReceiptView(rc); } else generateAchatJustificatif(o,{ account:accNameOf(o._acc), regime:load('vinted_regime','micro'), numero:numA||'' }); }}><Icon name="receipt" size={15} style={{color:C.muted}}/>{rc?'Reçu d\'achat (Vinted)':'Attestation d\'achat'}</button>
+                    <button type="button" role="menuitem" style={item} onClick={()=>{ close(); if(rc){ setReceiptView(rc); } else generateAchatJustificatif(o,{ account:accNameOf(o._acc), regime:load('vinted_regime','micro'), numero:numA||'' }); }}><Icon name="receipt" size={15} style={{color:C.muted}}/>{rc?NOM_RECU_ACHAT:'Attestation d\'achat'}</button>
                     {rembourse && <button type="button" role="menuitem" style={item} onClick={()=>{ close(); generateRemboursementAttestation(o,{ account:accNameOf(o._acc) }); }}><Icon name="receipt" size={15} style={{color:C.muted}}/>Attestation de remboursement</button>}
                     {numA && <button type="button" role="menuitem" style={item} onClick={()=>{ close(); generateEtiquetteSku(numA,{ title:o.title, transaction_id:o.transaction_id }); }}><Icon name="tag" size={15} style={{color:C.muted}}/>Étiquette N°{numA}</button>}
                     <div style={{height:1,background:C.border,margin:'4px 0'}}/>
@@ -45867,7 +45894,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         )}
         {/* (26 oct.) Les reçus par email sont une archive, pas le geste du jour :
             sous la liste, plus en tête (une carte « · 0 » poussait les colis vers le bas). */}
-        <div className="vrm-achats-recus-bas"><RecusEmail recus={recusAchat} autres={nonRecusAchat} relies={recusRelies} onOuvrir={r=>setReceiptView(r)} onActualiser={()=>{setAchEmails(undefined);fetchEmailAchats().then(setAchEmails);}}/></div>
+        <div className="vrm-achats-recus-bas"><RecusEmail recus={recusAchat} autres={nonRecusAchat} relies={recusRelies && { ...recusRelies, nomsKo: recusRelies.ko.map((u) => { const a = (accounts || []).find((x) => String(x.vinted_user_id) === u); return a ? accNameOf(a) : `#${u}`; }) }} nom={NOM_RECU_ACHAT} onOuvrir={r=>setReceiptView(r)} onActualiser={()=>{setAchEmails(undefined);fetchEmailAchats().then(setAchEmails);}}/></div>
       </div>)}
 
       {/* ── Annonces (toutes en ligne, tous comptes) ── */}
