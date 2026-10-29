@@ -1,4 +1,11 @@
 importScripts('regle.js');
+// Le sel des empreintes : tiré une fois, gardé sur CET ordinateur (jamais envoyé).
+chrome.storage.local.get('obsSel').then((s) => {
+  if (s.obsSel) { OBS.poserSel(s.obsSel); return; }
+  const a = new Uint8Array(12); crypto.getRandomValues(a);
+  const sel = [...a].map((x) => x.toString(16).padStart(2, '0')).join('');
+  OBS.poserSel(sel); chrome.storage.local.set({ obsSel: sel });
+});
 const MAX = 4000;
 let file = [];          // entrées en attente d'écriture (vidées toutes les 2 s)
 const enCours = new Map(); // requestId -> entrée (pour y poser le statut)

@@ -4,12 +4,24 @@
 const OBS = (() => {
   const VINTED = /(^|\.)vinted\.[a-z.]+$/i;
   function estVinted(host) { return VINTED.test(host || ''); }
+  // 1.1 (29 oct., messages aux favoris) : un identifiant devient une EMPREINTE
+  // courte ({id:a3f9c1}), salée par un sel propre à cet ordinateur : on voit que
+  // « la conversation créée » et « la réponse » visent la MÊME, sans la valeur.
+  let SEL = 'vrm';
+  function poserSel(s) { if (s) SEL = String(s); }
+  function empreinte(v) {
+    let h = 0x811c9dc5; const t = SEL + '|' + String(v);
+    for (let i = 0; i < t.length; i++) { h ^= t.charCodeAt(i); h = Math.imul(h, 16777619) >>> 0; }
+    return h.toString(16).padStart(8, '0').slice(0, 6);
+  }
+  const CLE_ID = /(^id$|_id$|_ids$|Id$|Ids$)/;
   function cheminNormalise(p) {
     return String(p || '')
       .split('/')
       .map((s) => {
         if (!s) return s;
-        if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s)) return '{uuid}';
+        if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s)) return '{uuid:' + empreinte(s.toLowerCase()) + '}';
+        if (/^\d{3,}$/.test(s)) return '{id:' + empreinte(s) + '}';
         if (/\d{3,}/.test(s)) return '{id}';
         if (/^[0-9a-f]{16,}$/i.test(s)) return '{x}';
         if (s.length > 40) return '{x}';
@@ -17,9 +29,13 @@ const OBS = (() => {
       })
       .join('/');
   }
-  function forme(v, prof = 0) {
+  function forme(v, prof = 0, cle = '') {
     if (v === null) return 'null';
-    if (Array.isArray(v)) return v.length ? ['n=' + v.length, prof < 5 ? forme(v[0], prof + 1) : '…'] : '[]';
+    if (Array.isArray(v)) {
+      if (!v.length) return '[]';
+      if (CLE_ID.test(cle) && v.every((x) => typeof x === 'number' || (typeof x === 'string' && /^\d{1,15}$/.test(x)))) return ['n=' + v.length, 'ids:' + v.slice(0, 10).map(empreinte).join(',')];
+      return ['n=' + v.length, prof < 5 ? forme(v[0], prof + 1, cle) : '…'];
+    }
     const t = typeof v;
     if (t === 'object') {
       if (prof >= 5) return '{…}';
@@ -28,11 +44,12 @@ const OBS = (() => {
       for (const k of Object.keys(v)) {
         if (n++ >= 60) { o['…'] = 'plus'; break; }
         const cle = /\d{3,}/.test(k) || k.length > 40 ? '{k}' : k;
-        o[cle] = forme(v[k], prof + 1);
+        o[cle] = forme(v[k], prof + 1, k);
       }
       return o;
     }
-    if (t === 'string') return 'texte';
+    if (CLE_ID.test(cle) && (t === 'number' || (t === 'string' && /^[\w-]{1,40}$/.test(v)))) return 'id:' + empreinte(v);
+    if (t === 'string') return 'texte:' + v.length;   // la LONGUEUR seulement (le même message à chacun ?)
     return t; // number, boolean
   }
   function formeCorps(details) {
@@ -69,6 +86,11 @@ const OBS = (() => {
   // Une requête « intéressante » : vers Vinted (hors bruit publicitaire), ou
   // partie d'une page Vinted vers un autre hôte (hôte seul).
   const BRUIT = /\/(vendorlist|api\/bid|api\/config\/prebid|a\/api\/fastlane|maps\/api|api\/esp\/increment)/;
+  function qIds(sp) {
+    const o = {}; let n = 0;
+    for (const [k, v] of sp) { if (n >= 10) break; if (/^\d{3,15}$/.test(v) || (CLE_ID.test(k) && /^[\w-]{1,40}$/.test(v))) { o[k] = 'id:' + empreinte(v); n++; } }
+    return n ? o : undefined;
+  }
   function entree(details) {
     let u;
     try { u = new URL(details.url); } catch (_) { return null; }
@@ -89,6 +111,7 @@ const OBS = (() => {
       h: u.hostname,
       p: versVinted ? chemin : '',
       q: versVinted ? [...u.searchParams.keys()].slice(0, 20) : undefined,
+      qid: versVinted ? qIds(u.searchParams) : undefined,
       ty: details.type,
       de: depuisExt ? 'extension:' + init.slice(19, 51) : (hInit || '?'),
       onglet: details.tabId,
@@ -99,6 +122,6 @@ const OBS = (() => {
     }
     return e;
   }
-  return { cheminNormalise, forme, formeCorps, entree, estVinted };
+  return { cheminNormalise, forme, formeCorps, entree, estVinted, poserSel, empreinte };
 })();
 if (typeof module !== 'undefined') module.exports = OBS;

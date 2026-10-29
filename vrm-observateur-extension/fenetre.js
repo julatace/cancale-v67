@@ -6,7 +6,7 @@ async function lire() {
 function rapport(j) {
   const t0 = j.length ? j[0].t : 0;
   return JSON.stringify({
-    outil: 'VRM Observateur 1.0.0',
+    outil: 'VRM Observateur 1.1.0',
     genereLe: new Date().toISOString(),
     n: j.length,
     // t = millisecondes depuis la première requête, d = depuis la précédente

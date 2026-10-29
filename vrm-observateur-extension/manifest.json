@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "VRM Observateur",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Note la forme des requêtes envoyées à Vinted (adresses, noms de champs, heures) — jamais une valeur. Rien ne quitte ton ordinateur.",
   "permissions": ["webRequest", "storage"],
   "host_permissions": ["<all_urls>"],
