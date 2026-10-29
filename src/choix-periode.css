@@ -88,6 +88,9 @@
   box-shadow: 0 -12px 40px rgba(8, 16, 20, .22); animation: vrm-cal-monte .26s cubic-bezier(.23, 1, .32, 1) both;
 }
 @keyframes vrm-cal-monte { from { transform: translateY(24px); opacity: .6; } to { transform: none; opacity: 1; } }
+/* Tout sauf la liste des mois garde sa hauteur : une rangée qui défile en
+   largeur (`overflow-x`) se laissait écraser à 0 par la liste (vu au rendu). */
+.vrm-cal-feuille > :not(.vrm-cal-defile) { flex-shrink: 0; }
 .vrm-cal-tete { display: flex; align-items: center; justify-content: space-between; padding: 6px 12px 6px 18px; font-size: 16px; }
 .vrm-cal-fermer { width: 44px; height: 44px; border: 0; border-radius: 50%; background: transparent; color: var(--vrm-ink); font-size: 26px; line-height: 1; cursor: pointer; }
 .vrm-cal-feuille .vrm-cal-raccourcis { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; padding: 0 16px; margin-bottom: 10px; -webkit-overflow-scrolling: touch; }

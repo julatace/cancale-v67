@@ -45719,7 +45719,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               <button type="button" className="vrm-offres-auto-info" data-offres-auto-info aria-expanded={offresInfo} aria-controls="vrm-offres-auto-detail" aria-label="Comment marchent les offres automatiques" title="Comment ça marche" onClick={() => setOffresInfo((v) => !v)}>i</button>
               <button type="button" role="switch" aria-checked={offresAuto} data-offres-auto-toggle={offresAuto?'1':'0'} onClick={basculerOffresAuto}
                 className="vrm-offres-auto-switch" aria-label="Acceptation automatique des offres">
-                <span aria-hidden="true"/>
+                <span className="vrm-offres-auto-piste" aria-hidden="true"><span/></span>
               </button>
             </div>
             {offresInfo && (

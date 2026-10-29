@@ -261,13 +261,17 @@ const projette = (row, sel) => {
         await pg.waitForFunction(()=>document.querySelectorAll('.vrm-ann-card').length>0);
         dit(await pg.getByLabel('Rechercher une annonce',{exact:true}).inputValue()==='', 'réinitialiser retrouve le stock sans recherche');
         // (27 oct., Julien : « les annonces sont beaucoup trop petites, on ne voit
-        // même pas la première photo ») Les annonces sont des FICHES PRODUIT côte à
-        // côte, la première photo en grand — y compris au téléphone (deux par rangée).
+        // même pas la première photo ») Les annonces sont des FICHES PRODUIT, la
+        // première photo en grand. (29 oct., « augmente la taille des photos ») :
+        // à l'ordinateur des fiches côte à côte, au téléphone UNE par rangée — la
+        // photo sur toute la largeur (≈ 360 px au lieu de 174 à deux par rangée).
         {
           const premier=await pg.locator('.vrm-ann-card').nth(0).boundingBox(), suivant=await pg.locator('.vrm-ann-card').nth(1).boundingBox();
-          dit(Math.abs(premier.y-suivant.y)<2 && suivant.x>premier.x+premier.width-1, 'les annonces sont des fiches côte à côte', JSON.stringify({premier,suivant}));
+          if (vp.width < 600) dit(Math.abs(premier.x-suivant.x)<2 && suivant.y>=premier.y+premier.height-1, 'au téléphone, une fiche par rangée (la photo prend toute la largeur)', JSON.stringify({premier,suivant}));
+          else dit(Math.abs(premier.y-suivant.y)<2 && suivant.x>premier.x+premier.width-1, 'les annonces sont des fiches côte à côte', JSON.stringify({premier,suivant}));
           const photo=await pg.locator('.vrm-ann-card').nth(0).locator('.vrm-ann-overview > a').boundingBox();
-          dit(photo && photo.height>=180 && photo.width>=premier.width-2, 'la première photo occupe toute la largeur de la fiche, en grand', photo && `${Math.round(photo.width)}×${Math.round(photo.height)} (fiche ${Math.round(premier.width)})`);
+          const plancher = vp.width < 600 ? 300 : 330;
+          dit(photo && photo.height>=plancher && photo.width>=premier.width-2, `la première photo occupe toute la largeur de la fiche, en grand (≥ ${plancher} px)`, photo && `${Math.round(photo.width)}×${Math.round(photo.height)} (fiche ${Math.round(premier.width)})`);
         }
 
       } catch(e) { dit(false, 'recherche et retour au stock', e.message.slice(0,120)); }

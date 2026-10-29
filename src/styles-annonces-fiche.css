@@ -49,7 +49,11 @@
 }
 :root body .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche [data-chiffres] > * {
   min-height: 52px !important; padding: 6px 8px !important; white-space: normal; overflow: hidden;
+  margin: 0 !important; align-self: stretch !important; justify-content: flex-start !important;
 }
+/* La marge ne se tape pas : sa valeur prend la hauteur d'une case qu'on tape,
+   pour que les quatre chiffres soient sur la même ligne. */
+:root body .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche [data-chiffres] [data-marge] { display: flex; align-items: center; min-height: 30px; }
 :root body .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche [data-etat-ligne] { font-size: 12px !important; flex-wrap: wrap !important; }
 :root body .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche [data-stats-annonce] { flex-basis: auto; font-size: 12px !important; }
 
@@ -99,6 +103,14 @@
   :root body .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche:has(.vrm-ann-actions[open]) { grid-column: auto; }
 }
 
+/* Téléphone : le contenu est à 80 % (`.vrm-main { zoom:.8 }`, styles-mineral) —
+   une cible doit faire 55 px CSS pour en faire 44 sous le doigt. Les gestes et
+   les cases qu'on tape portent la compensation (sinon 36 → 29 px affichés). */
+@media (max-width: 767px) {
+  :root body .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche .vrm-fiche-geste { min-height: 55px !important; }
+  :root body .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche [data-chiffres] > * { min-height: 56px !important; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   :root body .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche { animation: none !important; }
 }
@@ -133,18 +145,25 @@
 .vrm-offres-auto-info { position: relative; }
 .vrm-offres-auto-info[aria-expanded="true"] { color: var(--vrm-ink); }
 @media (hover: hover) and (pointer: fine) { .vrm-offres-auto-info:hover { color: var(--vrm-ink); } }
+/* L'interrupteur : le BOUTON est la zone au doigt (transparente, 44 px — la
+   compensation du zoom téléphone la porte à 55), la PISTE est le dessin. Un
+   bouton dessiné en pilule était déformé en rond par cette compensation. */
 .vrm-offres-auto-switch {
-  flex-shrink: 0; position: relative; width: 46px; height: 28px; min-height: 28px !important; padding: 0 !important; margin: 0 4px 0 0 !important;
-  border: 0 !important; border-radius: 999px !important; background: var(--vrm-line) !important; cursor: pointer;
+  flex-shrink: 0; position: relative; width: 54px; height: 44px; min-height: 44px; padding: 0 !important; margin: 0 !important;
+  border: 0 !important; border-radius: 10px; background: transparent !important; cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.vrm-offres-auto-piste {
+  position: relative; display: block; width: 46px; height: 28px; border-radius: 999px; background: var(--vrm-line);
   transition: background-color .18s ease;
 }
-.vrm-offres-auto-switch::after { content: ''; position: absolute; inset: -8px -2px; } /* 44 px au doigt, sans grossir le dessin */
-.vrm-offres-auto-switch > span {
+.vrm-offres-auto-piste > span {
   position: absolute; top: 3px; left: 3px; width: 22px; height: 22px; border-radius: 50%; background: #fff;
   box-shadow: 0 1px 3px rgba(0, 0, 0, .25); transition: transform .18s cubic-bezier(.23, 1, .32, 1);
 }
-.vrm-offres-auto-switch[aria-checked="true"] { background: var(--vrm-accent) !important; }
-.vrm-offres-auto-switch[aria-checked="true"] > span { transform: translateX(18px); }
+.vrm-offres-auto-switch[aria-checked="true"] .vrm-offres-auto-piste { background: var(--vrm-accent); }
+.vrm-offres-auto-switch[aria-checked="true"] .vrm-offres-auto-piste > span { transform: translateX(18px); }
+.vrm-offres-auto-switch:focus-visible { outline: 2px solid var(--vrm-accent); outline-offset: 1px; }
 .vrm-offres-auto-detail { border-top: 1px solid var(--vrm-line); padding: 10px 14px 12px; font-size: 12.5px; line-height: 1.5; color: var(--vrm-muted); }
 .vrm-offres-auto-detail p { margin: 0; }
 .vrm-offres-auto-detail b { color: var(--vrm-ink); font-weight: 600; }
@@ -161,5 +180,5 @@
   .vrm-offres-auto-refus textarea { font-size: 16px; } /* iOS ne zoome pas */
 }
 @media (prefers-reduced-motion: reduce) {
-  .vrm-offres-auto-switch, .vrm-offres-auto-switch > span { transition: none !important; }
+  .vrm-offres-auto-piste, .vrm-offres-auto-piste > span { transition: none !important; }
 }

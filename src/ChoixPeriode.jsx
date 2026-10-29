@@ -142,7 +142,7 @@ export default function ChoixPeriode({ value: brut, onChange, Retour, Icon, titr
   );
   const pied = (
     <div className="vrm-cal-pied">
-      <div className="vrm-cal-plage" data-periode-plage={choix ? 'choisie' : (sel.from ? 'debut' : 'vide')}
+      <div className="vrm-cal-plage" data-periode-plage={sel.from && !sel.to ? 'debut' : choix ? 'choisie' : 'vide'}
         data-periode-du={sel.from ? cleJour(sel.from) : ''} data-periode-au={sel.from ? cleJour(sel.to || sel.from) : ''} aria-live="polite">{plage}</div>
       <div className="vrm-cal-boutons">
         <button type="button" className="vrm-cal-effacer" data-periode-effacer onClick={() => appliquer(null)}>Effacer</button>
