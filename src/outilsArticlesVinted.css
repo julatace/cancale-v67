@@ -1,0 +1,131 @@
+.vrm-outils {
+  margin: 12px 0;
+  padding: 12px 14px;
+  border: 1px solid #dbe5e3;
+  border-radius: 12px;
+  background: var(--card, #fff);
+  color: inherit;
+  font-size: 12px;
+}
+.vrm-outils summary {
+  cursor: pointer;
+  font-weight: 650;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.vrm-outils summary span {
+  font-weight: 400;
+  opacity: 0.65;
+}
+.vrm-outils p,
+.vrm-historique p {
+  line-height: 1.55;
+  opacity: 0.75;
+}
+.vrm-outils button,
+.vrm-historique button {
+  font: inherit;
+  border: 1px solid #cbd9d6;
+  border-radius: 7px;
+  padding: 6px 9px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+.vrm-outils button[aria-pressed="true"] {
+  background: #e6f0ed;
+}
+.vrm-outils-actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.vrm-outils-liste {
+  max-height: 420px;
+  overflow: auto;
+}
+.vrm-outils-liste article {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  padding: 10px 0;
+  border-bottom: 1px solid #e5ecea;
+}
+.vrm-outils-liste article > div {
+  flex: 1;
+  min-width: 0;
+}
+.vrm-outils-liste strong {
+  display: block;
+  overflow-wrap: anywhere;
+}
+.vrm-outils-liste img {
+  width: 36px;
+  height: 48px;
+  object-fit: cover;
+  border-radius: 5px;
+}
+.vrm-outils small,
+.vrm-historique small {
+  display: block;
+  font-size: 11px;
+  line-height: 1.45;
+  opacity: 0.7;
+}
+.vrm-outils-table {
+  overflow: auto;
+  margin-top: 12px;
+}
+.vrm-outils table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  font-size: 12px;
+}
+.vrm-outils th,
+.vrm-outils td {
+  padding: 10px 8px;
+  border-bottom: 1px solid #e2e9e7;
+  min-width: 85px;
+  vertical-align: top;
+}
+.vrm-outils tbody th {
+  min-width: 110px;
+}
+.vrm-historique {
+  margin-top: 20px;
+  border-top: 1px solid #dbe5e3;
+  font-size: 12px;
+}
+.vrm-historique > div {
+  padding: 10px 0;
+}
+.vrm-historique > a {
+  display: block;
+  margin: 8px 0;
+}
+.vrm-historique a {
+  color: inherit;
+  overflow-wrap: anywhere;
+}
+.vrm-historique h3 {
+  font-size: 14px;
+}
+@media (max-width: 480px) {
+  .vrm-outils {
+    padding: 10px;
+  }
+  .vrm-outils table {
+    font-size: 11px;
+  }
+  .vrm-outils th,
+  .vrm-outils td {
+    padding: 8px 6px;
+  }
+  .vrm-outils-liste button {
+    padding: 6px;
+    flex-shrink: 0;
+  }
+}

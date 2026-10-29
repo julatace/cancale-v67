@@ -34,6 +34,7 @@ jobs:
         run: |
           node scripts/tests/reception-synthese-interface.cjs
           node scripts/tests/synchronisation-vinted-interface.cjs
+          node scripts/tests/outils-articles-vinted-interface.cjs
           node scripts/tests/favoris-historique-interface.cjs
           node scripts/tests/favoris-automatisation-interface.cjs
           node scripts/bancs/inscription-fiable.cjs
