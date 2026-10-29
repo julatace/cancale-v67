@@ -43,6 +43,9 @@ function monter({ connecte = '111', comptes = null, coffre = true, modele = true
       if (e.methode === 'GET' && /\/api\/v2\/item_upload\/colors$/.test(e.chemin)) return couleursRep || { status: 404, body: {} };
       if (e.methode === 'POST' && /\/api\/v2\/item_upload\/attributes$/.test(e.chemin)) return attributsRep || { status: 404, body: {} };
       if (e.methode === 'GET' && /\/api\/v2\/item_upload\/items\/9101$/.test(e.chemin) && lecture) return lecture;
+      // (29 oct., revue) Les anciennes annonces 9555-9557 des brouillons VRM sont SUPPRIMÉES chez Vinted (404) ;
+      // 9560 est encore en ligne (le cas qui vendrait deux fois).
+      if (e.methode === 'GET' && /\/api\/v2\/item_upload\/items\/955\d$/.test(e.chemin)) return { status: 404, body: {} };
       // 29 oct. : la page « Modifier » de l'annonce (et du brouillon) se lit, comme le site.
       if (e.methode === 'GET' && /\/api\/v2\/item_upload\/items\/\d+$/.test(e.chemin)) return { status: 200, body: { item: { id: Number(e.chemin.split('/').pop()) } } };
       if (e.methode === 'POST' && /\/api\/v2\/photos$/.test(e.chemin)) return { status: photo, body: photoSansId ? { ok: true } : { id: ++n } };
@@ -688,6 +691,46 @@ const zero = (j) => gestes(j).length === 0;   // 5.266 : lire la liste des coule
     dit(n === 45, "une republication compte 3 actions (brouillon, suppression, mise en ligne), pas 5", `actions=${n}`); }
   { const { f, r } = await run({ differer: true, avant: (f) => { f.store.vrmActions = { '111': Array.from({ length: 43 }, () => Date.now() - 60000) }; } });
     dit(r.accepte === false && r.code === 'plafond-bordereaux' && zero(f.j), "plus de place pour toute la paire : RIEN ne part (l'annonce reste en ligne), et c'est dit", `code=${r.code} seq=${seqV(f.j)} ${r.raison || ''}`); }
+
+  // R — (29 oct., revue) Les mises en ligne planifiées, les brouillons et les gestes réservés.
+  { // 1. La planification d'une paire B pendant le réveil de la paire A : aucune n'est perdue, A n'est faite qu'une fois.
+    const { f, r } = await run({ differer: true });
+    if (f.store.vrmRepubAttente && f.store.vrmRepubAttente['9101']) f.store.vrmRepubAttente['9101'].du = 0;
+    const jobB = { id: '9202', uid: '111', draftId: '88099', du: Date.now() + 600000, corpsCV: '{}' };
+    try { await Promise.all([f.ctx.miseEnLigneTick(), f.ctx.planifierMiseEnLigne(jobB)]); } catch (_) {}
+    try { await f.ctx.miseEnLigneTick(); } catch (_) {}
+    const att = f.store.vrmRepubAttente || {};
+    dit(r.etape === 'attente' && de(f.j, /drafts\/88001\/completion$/).length === 1 && att['9202'] && !att['9101'], "réveil et planification en même temps : A mise en ligne UNE fois, B toujours planifiée", JSON.stringify({ m: de(f.j, /drafts\/88001\/completion$/).length, cles: Object.keys(att) })); }
+  { // 2. Un job resté « en cours » (service worker tué) : jamais rejoué, il est DIT.
+    const { f } = await run({ differer: true });
+    if (f.store.vrmRepubAttente && f.store.vrmRepubAttente['9101']) { f.store.vrmRepubAttente['9101'].du = 0; f.store.vrmRepubAttente['9101'].enCoursLe = Date.now() - 60000; }
+    try { await f.ctx.miseEnLigneTick(); } catch (_) {}
+    const fin = f.j.evts.find((e) => e && e.quoi === 'repub' && e.id === '9101' && e.etape === 'fin');
+    dit(de(f.j, /completion$/).length === 0 && fin && fin.fin && fin.fin.etape === 'incertain' && !Object.keys(f.store.vrmRepubAttente || {}).length, "mise en ligne interrompue par Chrome : rien n'est renvoyé, l'app apprend que c'est incertain", JSON.stringify({ m: de(f.j, /completion$/).length, fin: fin && fin.fin && fin.fin.etape })); }
+  { // 3. « Brouillons → en ligne » sur un brouillon dont la mise en ligne est planifiée : refusé, rien n'est envoyé.
+    const { f } = await run({ differer: true });
+    const n0 = de(f.j, /completion$/).length;
+    let r2 = {}; try { r2 = await f.ctx.publierBrouillon({ cmd: 'publierBrouillon', uid: '111', draftId: '88001', confirme: true }); } catch (e) { r2 = { erreur: e.message }; }
+    dit(r2.accepte === false && r2.code === 'planifiee' && de(f.j, /completion$/).length === n0, "un brouillon déjà planifié ne se met pas en ligne une seconde fois depuis « Brouillons → en ligne »", JSON.stringify({ code: r2.code, raison: r2.raison || r2.erreur })); }
+  { // 4. Le brouillon mis en ligne entre-temps : la mise en ligne planifiée ne repart pas.
+    const { f } = await run({ differer: true });
+    if (f.lignes['vinted_brouillon_88001']) f.lignes['vinted_brouillon_88001'].etat = 'publie';
+    if (f.store.vrmRepubAttente && f.store.vrmRepubAttente['9101']) f.store.vrmRepubAttente['9101'].du = 0;
+    try { await f.ctx.miseEnLigneTick(); } catch (_) {}
+    dit(de(f.j, /completion$/).length === 0, "brouillon déjà en ligne : la mise en ligne planifiée n'envoie rien", `m=${de(f.j, /completion$/).length}`); }
+  { // 5. Un brouillon VRM dont l'ANCIENNE annonce est encore sur Vinted : jamais mis en ligne.
+    const extra = { ...dressing(['10432342904']), vinted_brouillon_10432342904: { id: '10432342904', uid: '111', corps: CORPS_B(), etat: 'brouillon', parVRM: true, ancienId: '9560' } };
+    const f = monter({ src: process.env.BG_SRC || undefined, extra });
+    let r2 = {}; try { r2 = await f.ctx.publierBrouillon({ cmd: 'publierBrouillon', uid: '111', draftId: '10432342904', confirme: true }); } catch (e) { r2 = { erreur: e.message }; }
+    dit(r2.accepte === false && r2.code === 'ancienne-en-ligne' && de(f.j, /completion$/).length === 0, "l'ancienne annonce toujours en ligne : le brouillon n'est PAS mis en ligne (jamais deux fois la même paire)", JSON.stringify({ code: r2.code, raison: r2.raison || r2.erreur })); }
+  { // 6. Une paire arrêtée avant tout geste (photos refusées) rend ses 3 actions réservées.
+    const { f, r } = await run({ photo: 400 });
+    const n = ((f.store.vrmActions || {})['111'] || []).length;
+    dit(r.etape === 'echec' && n === 0, "photos refusées, rien de créé : les 3 actions réservées sont rendues", JSON.stringify({ e: r.etape, actions: n })); }
+  { // 7. Brouillon sans réponse claire : la même annonce ne repart pas avant 30 min (sinon un second brouillon).
+    const { f, r } = await run({ brouillon: 503 });
+    let v = 0; try { v = await f.ctx.lireVerrouRecreer('9101'); } catch (_) {}
+    dit(r.etape === 'incertain' && v > 0, "brouillon sans réponse claire : 30 min sans nouvelle tentative de cette annonce", JSON.stringify({ e: r.etape, verrou: !!v })); }
 
   // L — côté app : une annonce et SA recréation au même N° (la suppression de
   //     l'ancienne a échoué) ne déclenchent AUCUNE renumérotation automatique
