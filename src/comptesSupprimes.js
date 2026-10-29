@@ -20,8 +20,8 @@
 //     pagination trop tôt. `lireTout` filtre lui-même après avoir tout lu
 //     (`sansComptesSupprimes`).
 //  ⚠️ « Pas su » ne cache rien : liste illisible ou vide ⇒ rien n'est retiré.
-//  ⚠️ Les écritures (POST, PATCH, DELETE) passent telles quelles : la purge et
-//     la suppression d'un compte doivent voir ses lignes.
+//  ⚠️ Les écritures (POST, PATCH, DELETE) passent telles quelles, et une lecture
+//     marquée `vrmVoirSupprimes` aussi : la purge doit voir ce qu'elle vide.
 // ═════════════════════════════════════════════════════════════════════════
 
 export const CLE_SUPPRIMES = 'vrm_comptes_supprimes';
@@ -66,6 +66,11 @@ export function creerFiltreSupprimes(fetchOrig, base, lire = lireSupprimes) {
     const methode = String((init && init.method) || 'GET').toUpperCase();
     if (url == null || methode !== 'GET' || url.indexOf(prefixe) !== 0 || url.indexOf('harvest') < 0) return fetchOrig(input, init);
     if (enteteRange(init && init.headers)) return fetchOrig(input, init);
+    // La purge (`purgerComptesSupprimes`) DOIT voir les lignes qu'elle vide : elle
+    // le dit par `vrmVoirSupprimes` (propriété ignorée par `fetch`, rien ne part
+    // au serveur). Sans ça, ce filtre lui rendait une liste vide et plus rien
+    // n'était vidé (banc compte-supprime, 29 oct.).
+    if (init && init.vrmVoirSupprimes === true) return fetchOrig(input, init);
     const s = lire();
     if (!s.size) return fetchOrig(input, init);
     return Promise.resolve(fetchOrig(input, init)).then(async (r) => {

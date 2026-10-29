@@ -2581,7 +2581,7 @@ const deleteVintedAccount = async (vintedUserId, login) => {
     // base, dont 96 annonces de shop_cancale). On VIDE les lignes à la place :
     // un upsert, lui, passe. La donnée part vraiment, et l'égress avec (§34).
     try {
-      const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?or=(id.like.harvest_${uid}_*,id.like.coffre_${uid}_*)&select=id`, { headers: sbAuth() });
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?or=(id.like.harvest_${uid}_*,id.like.coffre_${uid}_*)&select=id`, { headers: sbAuth(), vrmVoirSupprimes: true });
       const rows = r.ok ? await r.json() : [];
       if (rows.length) {
         await fetch(`${SUPABASE_URL}/rest/v1/app_data`, {
@@ -2617,7 +2617,7 @@ const purgerComptesSupprimes = async () => {
     const uids = (noirs.uids || []).map(String).filter((u) => /^\d+$/.test(u) && off[u] !== false);
     let n = 0;
     for (const uid of uids) {
-      const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?or=(id.like.harvest_${uid}_*,id.like.coffre_${uid}_*)&select=id,sup:data->>supprime`, { headers: sbAuth() });
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?or=(id.like.harvest_${uid}_*,id.like.coffre_${uid}_*)&select=id,sup:data->>supprime`, { headers: sbAuth(), vrmVoirSupprimes: true });
       if (!r.ok) continue;
       const rows = await r.json(); if (!Array.isArray(rows)) continue;
       const cibles = rows.filter((x) => (String(x.id).startsWith(`harvest_${uid}_`) || String(x.id).startsWith(`coffre_${uid}_`)) && String(x.sup) !== 'true');
@@ -2666,7 +2666,7 @@ const supprimerDonneesCompte = async (uid0, login, scopes) => {
   if (!uid) return { ok: false, n: 0 };
   let n = 0;
   try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?or=(id.like.harvest_${uid}_*,id.like.coffre_${uid}_*)&select=id`, { headers: sbAuth() });
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?or=(id.like.harvest_${uid}_*,id.like.coffre_${uid}_*)&select=id`, { headers: sbAuth(), vrmVoirSupprimes: true });
     if (!r.ok) return { ok: false, n: 0 };               // « pas su » : on n'efface rien à l'aveugle
     const rows = await r.json();
     if (!Array.isArray(rows)) return { ok: false, n: 0 };
