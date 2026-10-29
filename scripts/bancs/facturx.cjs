@@ -28,6 +28,7 @@ const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
 const { PDFDocument, PDFName, PDFDict, PDFArray, PDFRawStream } = require('/home/user/cancale-v67/node_modules/pdf-lib');
 const zlib = require('zlib');
 const { metaVersData } = require('./_meta.cjs');
+const { ouvrirAvanceCompta } = require('./_compta.cjs');
 const fs = require('fs'), http = require('http'), path = require('path'), os = require('os');
 const DIST = path.join(__dirname, '..', '..', 'dist');
 const PORT = Number(process.env.BANC_PORT) || 4931;
@@ -155,6 +156,7 @@ const telecharge = async (pg, clic, ms = 8000) => {
       await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) ? r.abort() : r.continue()));
       await brancher(pg, lignes({ profil, sansVersement }));
       await pg.goto(`http://localhost:${PORT}/?tab=compta`, { waitUntil: 'domcontentloaded' });
+      await ouvrirAvanceCompta(pg); // (29 oct.) ces cartes vivent dans « Avancé », replié
       return { ctx, pg, errs };
     };
     for (const vp of [{ width: 390, height: 844 }, { width: 1512, height: 950 }]) {

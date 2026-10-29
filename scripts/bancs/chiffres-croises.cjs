@@ -40,6 +40,7 @@ let chromium;
 try { ({ chromium } = require(path.join(__dirname, '..', '..', 'node_modules', 'playwright'))); }
 catch (_) { ({ chromium } = require('/home/user/cancale-v67/node_modules/playwright')); }
 const { metaVersData } = require('./_meta.cjs');
+const { ouvrirAvanceCompta } = require('./_compta.cjs');
 const fs=require('fs'), http=require('http');
 const DIST=path.join(__dirname,'..','..','dist');
 const PORT=Number(process.env.BANC_PORT)||4486;
@@ -134,6 +135,8 @@ async function page(b, opts={}){
 const aller=async(pg,tab,repere,ms=1500)=>{
   await pg.goto(`http://localhost:${PORT}/?tab=${tab}`,{waitUntil:'domcontentloaded'});
   if(repere) await pg.waitForFunction((r)=>document.querySelector(r)||/pas pu s'afficher/.test(document.body.innerText),repere,{timeout:20000}).catch(()=>{});
+  // (29 oct.) le récap mensuel et le résultat vivent dans « Avancé », replié : il l'ouvre comme Julien.
+  if(tab==='compta') await ouvrirAvanceCompta(pg).catch(()=>{});
   await pg.waitForTimeout(ms);
 };
 const publier=async(pg)=>{

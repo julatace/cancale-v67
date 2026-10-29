@@ -26,6 +26,7 @@ let chromium;
 try { ({ chromium } = require(path.join(__dirname, '..', '..', 'node_modules', 'playwright'))); }
 catch (_) { ({ chromium } = require('/home/user/cancale-v67/node_modules/playwright')); }
 const { metaVersData } = require('./_meta.cjs');
+const { ouvrirAvanceCompta } = require('./_compta.cjs');
 const fs = require('fs'), http = require('http');
 const DIST = path.join(__dirname, '..', '..', 'dist');
 const PORT = Number(process.env.BANC_PORT) || 6201;
@@ -139,6 +140,8 @@ const ouvrir = async (b, vp, tab, opts = {}) => {
   });
   await pg.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"pret":true}' }));
   await pg.goto(`http://localhost:${PORT}/?tab=${tab}`, { waitUntil: 'domcontentloaded' });
+  // (29 oct.) les packs vivent dans « Avancé », replié : il l'ouvre comme Julien.
+  if (tab === 'compta') await ouvrirAvanceCompta(pg).catch(() => {});
   await pg.waitForTimeout(2500);
   return { ctx, pg, errs };
 };

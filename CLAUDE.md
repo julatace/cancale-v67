@@ -12,7 +12,9 @@
 > `compta-simple.cjs` (port 9311, données inventées, 390 tactile clair + 1512 sombre ; 107 contrôles) — **53 rouges sur
 > origin/main**, et les mêmes chiffres sur les deux codes (vendu 60 €, reçu 60 €, bénéfice net −2,93 €, à payer 37,20 €,
 > dépenses du mois 25,49 €, résultat 321,52 €) ; 5 mutations rouges (« Avancé » ouvert d'office · micro-entreprise toujours
-> repliée · refermée sous le doigt · Organisation remise au menu · « Bénéfice — » redit). ⚠️ Non mesuré : sa vraie base. Geste
+> repliée · refermée sous le doigt · Organisation remise au menu · « Bénéfice — » redit). Les bancs qui lisent ces cartes
+> (chiffres-croises, compta-abonnements, compta-stock-ui, entreprise-stream, facturx, stats-compta, superpdp) ouvrent « Avancé »
+> d'un toucher, comme lui (`scripts/bancs/_compta.cjs`, sans effet sur un code d'avant). ⚠️ Non mesuré : sa vraie base. Geste
 > de Julien : aucun.
 
 > **29 octobre — ORGANISATION RETIRÉE DU MENU :** Julien : « on ne comprend pas à quoi ça sert, ça doit être utile sinon ça n'a
