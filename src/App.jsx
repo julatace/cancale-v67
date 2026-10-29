@@ -77,6 +77,7 @@ import { captchaActif, routeProtegee, jetonCaptcha, etatCaptcha, abonnerCaptcha,
 import { boutiqueIci, boutiqueOrion, estAndroid, pageExtensionsIci, nomNavigateurIci, mobileIci, LIENS_BOUTIQUES, LIEN_FIREFOX_ANDROID, LIEN_ORION_FICHIER, NOTICE_ORION, phraseNavigateur } from "./navigateurExtension.js";
 import { etatFacturation, factureDepuisVente, pdfFacturX, nomFichierFacture, recapEReporting, recapCsv, recapJson, eurDe, frJour } from "./facturationElectronique.js";
 import { lireSuperPdp, appelSuperPdp, enBase64, libelleEnvoi, ENV_LIBELLE } from "./superpdp.js";
+import { lirePhotoroom, appelPhotoroom, phraseVerif, dateCourte, LIEN_CLE, LIEN_TARIFS } from "./photoroomCle.js";
 // §11 : l'adresse de réception se compare avec LA forme du serveur (celle qui
 // décide à qui appartient un email) — jamais une seconde normalisation ici.
 import { normAdresse, ADRESSE_COLLECTRICE, estAdresseCollectrice } from "../api/_lib/proprietaire-email.js";
@@ -864,33 +865,13 @@ async function sauverBordereauxAuto(owner, active) {
   if (rows.length !== 1 || rows[0]?.data?.active !== active) throw Error('Enregistrement non confirmé');
 }
 
-// ── CLÉ API PHOTOROOM DU VENDEUR (26 octobre) ───────────────────────────────
-// Julien : « chaque personne puisse mettre sa clé API ». Sa ligne à lui (RLS :
-// lui seul et la clé de service la lisent) ; le serveur de détourage la relit
-// par la session et l'utilise à SA place (son compte Photoroom paie). Jamais
-// synchronisée dans `main`, jamais dans une sauvegarde (filet d'exclusion).
-// Rend la clé enregistrée ('' si aucune) ; lève sur lecture impossible.
-async function lireClePhotoroom(owner) {
-  if (!owner || owner !== AUTH.user?.id) throw Error('Session indisponible');
-  const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vrm_photoroom_cle&owner=eq.${encodeURIComponent(owner)}&select=cle:data->>cle`, { headers: sbAuth() });
-  if (!r.ok) throw Error('Lecture impossible');
-  const rows = await r.json();
-  return (rows.length === 1 && typeof rows[0]?.cle === 'string') ? rows[0].cle : '';
-}
-// cle='' efface la clé (le vendeur retombe sur la clé du serveur, si Julien l'ouvre).
-async function sauverClePhotoroom(owner, cle) {
-  if (!owner || owner !== AUTH.user?.id || !CLOISONNE) throw Error('Session indisponible');
-  const propre = String(cle || '').trim();
-  const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=owner,id`, {
-    method: 'POST', headers: sbAuth({'Content-Type':'application/json', Prefer:'resolution=merge-duplicates,return=representation'}),
-    body: JSON.stringify({id:'vrm_photoroom_cle',owner,data:{cle:propre, at:new Date().toISOString()},updated_at:new Date().toISOString()})
-  });
-  if (!r.ok) throw Error('Enregistrement impossible');
-  const rows = await r.json();
-  if (rows.length !== 1 || String(rows[0]?.data?.cle || '') !== propre) throw Error('Enregistrement non confirmé');
-}
+// ── CLÉ API PHOTOROOM DU VENDEUR ──────────────────────────────────────────────
+// (29 octobre) Le navigateur ne lit ni n'écrit PLUS la clé : elle passe par
+// /api/compte?mode=photoroom (src/photoroomCle.js), qui la range CHIFFRÉE dans le
+// coffre du serveur. L'ancienne ligne en clair (`vrm_photoroom_cle`, 26 oct.)
+// est déplacée dans le coffre par le serveur à la première lecture.
 
-const STUDIO_BASE = { url: SUPABASE_URL, auth: (e) => sbAuth(e), withOwner: (r) => withOwner(r), conflit: () => SB_CONFLICT };
+const STUDIO_BASE = { url: SUPABASE_URL, auth: (e) => sbAuth(e), withOwner: (r) => withOwner(r), conflit: () => SB_CONFLICT, entete: () => enTeteSession() };
 
 // ⚠️ Vérification anti-robot (src/captcha.js) : sur les routes que GoTrue
 // protège, le jeton Turnstile part dans le corps. Clé de site vide ⇒ le corps
@@ -23393,46 +23374,150 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
 // (colonne meta, §4.4 : jamais la ligne entière).
 // Trois états, jamais deux : `undefined` en cours · `null` pas su · objet lu
 // (`{}` = jamais relevé).
-// ── CLÉ API PHOTOROOM, PAR VENDEUR (26 octobre) ─────────────────────────────
-// Julien : « chaque personne puisse mettre sa clé API » (+ « le détourage QUE
-// dans Vestiaire Collective », 17 oct.) : le champ vit donc ICI, dans l'onglet
-// Vestiaire, jamais dans les Paramètres (le banc detourage-reglage l'y interdit).
-// La clé va dans SA ligne `vrm_photoroom_cle` (RLS) ; le serveur de détourage la
-// relit par la session et détoure avec SON compte Photoroom. Jamais affichée en
-// clair une fois enregistrée (on ne montre que « enregistrée »).
-function PhotoroomCle() {
+// ── TA CLÉ PHOTOROOM (26 octobre ; carte refaite et coffre le 29 octobre) ────
+// Julien, 29 oct. : « fais un meilleur visuel pour la clé API Photoroom des
+// personnes qui utilisent VRM ». UNE carte (§11), rendue dans Paramètres → Mon
+// compte (une clé est un service de la personne) ET dans l'écran Vestiaire (là
+// où elle manque le plus : Vestiaire exige des photos sur fond net).
+// ⚠️ Ce n'est PAS le réglage « détourer avant de publier » qu'il a refusé dans
+//    les Paramètres le 17 octobre (Leboncoin et eBay gardent leurs photos
+//    d'origine) : la carte ne déclenche aucun détourage, elle range une clé.
+// La clé ne revient JAMAIS au navigateur : il l'envoie une fois, le serveur la
+// vérifie chez Photoroom, la chiffre et la range ; on n'en montre que les 4
+// derniers caractères. Trois états, jamais deux : `undefined` lecture · `null`
+// pas su (aucun formulaire : on n'agit pas sur ce qu'on n'a pas lu) · l'objet.
+function ClePhotoroom({ cadre = true }) {
   const owner = AUTH.user?.id;
-  const [cle, setCle] = useState(undefined);   // undefined=on lit · ''=aucune · string=enregistrée · null=pas pu lire
+  const [s, setS] = useState(undefined);
   const [val, setVal] = useState('');
-  const [etat, setEtat] = useState('');        // '' | 'saving' | 'ok' | 'err'
-  const [msg, setMsg] = useState('');
-  useEffect(() => { let stop = false; (async () => {
-    if (!owner) { if (!stop) setCle(null); return; }
-    try { const c = await lireClePhotoroom(owner); if (!stop) setCle(c); } catch (_) { if (!stop) setCle(null); }
-  })(); return () => { stop = true; }; }, [owner]);
-  if (!MULTI_USER || !owner || cle === undefined) return null;
-  const poser = async (nouvelle) => {
-    setEtat('saving'); setMsg('');
-    try { await sauverClePhotoroom(owner, nouvelle); setCle(nouvelle.trim()); setVal(''); setEtat('ok'); setMsg(nouvelle.trim() ? '✓ Ta clé Photoroom est enregistrée.' : '✓ Clé retirée.'); }
-    catch (_) { setEtat('err'); setMsg(CLOISONNE ? "La clé n'a pas pu être enregistrée — réessaie dans un moment." : 'Disponible une fois ton espace vendeur activé.'); }
+  const [remplacer, setRemplacer] = useState(false);
+  const [occupe, setOccupe] = useState('');     // '' | 'poser' | 'verifier' | 'retirer'
+  const [msg, setMsg] = useState(null);         // { ton, texte }
+  const relire = React.useCallback(async () => {
+    setS(undefined);
+    const j = await lirePhotoroom(enTeteSession());
+    setS(j);
+    if (j && j.migree) setMsg({ ton: 'neutre', texte: "Ta clé, rangée jusqu'ici lisible par ton navigateur, est maintenant chiffrée dans le coffre du serveur." });
+  }, []);
+  useEffect(() => { if (owner && MULTI_USER) relire(); }, [owner, relire]);
+  if (!MULTI_USER || !owner) return null;
+
+  const poser = async () => {
+    const cle = val.trim();
+    if (!cle) return;
+    setOccupe('poser'); setMsg(null);
+    const { code, j } = await appelPhotoroom(enTeteSession(), { action: 'poser', cle });
+    setOccupe('');
+    if (code === 200 && j.ok) { setS(j); setVal(''); setRemplacer(false); setMsg({ ton: 'ok', texte: `✓ Clé rangée (se termine par ${j.fin}). Elle est chiffrée sur le serveur : VRM ne te la remontrera jamais en entier.` }); return; }
+    setMsg({ ton: 'attention', texte: code === 0 ? "Pas de réponse du serveur : je ne sais pas si ta clé a été rangée. Rouvre cet écran pour le voir." : (j.message || "La clé n'a pas pu être rangée — réessaie dans un moment.") });
   };
-  const inp = { padding:'8px 10px', borderRadius:8, border:`1px solid ${C.border}`, background:C.bg, color:C.text, fontSize:14, fontFamily:'inherit', flex:'1 1 180px', minWidth:0 };
-  const btn = (bg) => ({ border:'none', background:bg, color:'#fff', borderRadius:8, padding:'8px 12px', fontSize:12.5, fontWeight:600, cursor:'pointer', fontFamily:'inherit', whiteSpace:'nowrap' });
-  return (
-    <div data-photoroom-cle={cle ? 'posee' : cle === null ? 'pas-su' : 'vide'} style={{ marginTop:10, paddingTop:10, borderTop:`1px solid ${C.border}` }}>
-      <div style={{ fontSize:12.5, fontWeight:700, color:C.text }}>Détourage des photos (fond blanc)</div>
-      <div style={{ fontSize:11.5, color:C.muted, lineHeight:1.5, margin:'3px 0 8px' }}>
-        Vestiaire Co attend des photos sur fond net. VRM les détoure avec <b>Photoroom</b>, avec <b>ta</b> clé API (c'est ton compte Photoroom qui la facture — VRM ne s'en sert pas à ta place). {cle ? 'Ta clé est enregistrée.' : cle === null ? "Je n'ai pas pu lire si une clé est enregistrée — réessaie dans un moment." : "Colle ta clé Photoroom pour activer le détourage."}
-      </div>
-      <div style={{ display:'flex', gap:8, flexWrap:'wrap', alignItems:'center' }}>
-        <input data-photoroom-champ value={val} onChange={(e) => { setEtat(''); setVal(e.target.value); }} type="password" autoComplete="off" spellCheck={false}
-          placeholder={cle ? '•••••••••• (enregistrée) — colle une nouvelle clé pour remplacer' : 'Clé API Photoroom'} aria-label="Clé API Photoroom" style={inp} />
-        <button type="button" data-photoroom-enregistrer disabled={etat === 'saving' || !val.trim()} onClick={() => poser(val)} style={{ ...btn(C.accent), opacity:(etat === 'saving' || !val.trim()) ? 0.6 : 1 }}>{etat === 'saving' ? 'Enregistrement…' : 'Enregistrer'}</button>
-        {cle ? <button type="button" data-photoroom-effacer disabled={etat === 'saving'} onClick={() => poser('')} style={{ border:`1px solid ${C.border}`, background:'transparent', color:C.text, borderRadius:8, padding:'8px 12px', fontSize:12.5, fontWeight:600, cursor:'pointer', fontFamily:'inherit' }}>Retirer</button> : null}
-      </div>
-      {msg ? <div data-photoroom-msg={etat} style={{ fontSize:11.5, color: etat === 'err' ? C.warn : C.muted, marginTop:6 }}>{msg} <a href="https://app.photoroom.com/api-dashboard" target="_blank" rel="noreferrer" style={{ color:C.accentSoft, fontWeight:700 }}>Où trouver ma clé ↗</a></div>
-        : <div style={{ fontSize:11.5, color:C.muted, marginTop:6 }}><a href="https://app.photoroom.com/api-dashboard" target="_blank" rel="noreferrer" style={{ color:C.accentSoft, fontWeight:700, display:'inline-flex', alignItems:'center', minHeight:44 }}>Où trouver ma clé Photoroom ↗</a></div>}
+  const verifier = async () => {
+    setOccupe('verifier'); setMsg(null);
+    const { code, j } = await appelPhotoroom(enTeteSession(), { action: 'verifier' });
+    setOccupe('');
+    if (code === 200 && j.ok) { setS(j); return; }
+    setMsg({ ton: 'attention', texte: code === 0 ? "Pas de réponse du serveur — réessaie." : (j.message || "La vérification n'a pas abouti — réessaie.") });
+  };
+  const retirer = async () => {
+    if (!(await askConfirm({ title: 'Retirer ta clé Photoroom ?', desc: "Elle est effacée du coffre de VRM. Plus aucune photo ne sera détourée avec ton compte Photoroom (la clé reste valable chez Photoroom : désactive-la là-bas si tu ne t'en sers plus).", ok: 'Retirer la clé', cancel: 'Annuler', danger: true }))) return;
+    setOccupe('retirer'); setMsg(null);
+    const { code, j } = await appelPhotoroom(enTeteSession(), { action: 'retirer', confirme: true });
+    setOccupe('');
+    if (code === 200 && j.ok) { setS(j); setRemplacer(false); setMsg({ ton: 'neutre', texte: 'Clé retirée de VRM.' }); return; }
+    setMsg({ ton: 'attention', texte: code === 0 ? "Pas de réponse du serveur : ta clé est peut-être toujours rangée. Rouvre cet écran pour le voir." : (j.message || "La clé n'a pas pu être retirée — réessaie.") });
+  };
+
+  const etat = s === undefined ? 'chargement' : s === null ? 'pas-su' : s.etat;
+  const posee = etat === 'posee' || etat === 'en-clair';
+  const verif = posee ? phraseVerif(s) : null;
+  const aRevoir = etat === 'illisible' || (verif && verif.ton === 'attention');
+  const formulaire = s && s.coffre !== false && (etat === 'aucune' || etat === 'illisible' || remplacer);
+  const ligneFine = { fontSize: 12.5, color: C.muted, lineHeight: 1.55 };
+  const bouton = (plein) => ({ border: plein ? 'none' : `1px solid ${C.border}`, background: plein ? C.accent : 'transparent', color: plein ? (C.onAccent || '#fff') : C.text, borderRadius: 10, padding: '0 16px', minHeight: 44, fontSize: 13.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' });
+  const pastille = etat === 'chargement' ? null : (
+    <span data-photoroom-pastille={aRevoir ? 'a-revoir' : posee ? 'rangee' : etat === 'pas-su' ? 'pas-su' : 'aucune'}
+      style={{ fontSize: 12, fontWeight: 600, padding: '4px 10px', borderRadius: 999, border: `1px solid ${aRevoir ? C.warn + '66' : C.border}`, color: aRevoir ? C.warn : posee ? C.text : C.muted, background: aRevoir ? `${C.warn}12` : 'transparent', whiteSpace: 'nowrap' }}>
+      {aRevoir ? 'À revoir' : posee ? 'Rangée' : etat === 'pas-su' ? 'Pas lue' : 'Aucune clé'}
+    </span>
+  );
+  const bloc = (titre, enfants, data) => (
+    <div data-photoroom-bloc={data} style={{ borderTop: `1px solid ${C.border}`, paddingTop: 12 }}>
+      <div style={{ fontSize: 12, fontWeight: 700, color: C.text, letterSpacing: '.01em', marginBottom: 4 }}>{titre}</div>
+      <div style={ligneFine}>{enfants}</div>
     </div>
+  );
+  return (
+    <section data-photoroom-cle={etat} aria-label="Ta clé Photoroom"
+      style={cadre ? { background: C.card, border: `1px solid ${C.border}`, borderRadius: 12, padding: 16, display: 'grid', gap: 14 } : { display: 'grid', gap: 14 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        <span aria-hidden="true" style={{ width: 40, height: 40, borderRadius: 10, display: 'grid', placeItems: 'center', background: `${C.text}0d`, color: C.text, flex: '0 0 auto' }}><Icon name="image" size={20}/></span>
+        <span style={{ flex: 1, minWidth: 0 }}>
+          <span style={{ display: 'block', fontSize: 15.5, fontWeight: 650, color: C.text, letterSpacing: '-.01em' }}>Ta clé Photoroom</span>
+          <span style={{ display: 'block', fontSize: 12.5, color: C.muted, marginTop: 2 }}>Pour mettre tes photos sur fond blanc, avec <b style={{ color: C.text, fontWeight: 600 }}>ton</b> compte Photoroom.</span>
+        </span>
+        {pastille}
+      </div>
+
+      {etat === 'chargement' && <div style={ligneFine}>Lecture de ta clé…</div>}
+      {etat === 'pas-su' && (
+        <div data-photoroom-passu="" style={{ ...ligneFine, color: C.text }}>
+          Je n'ai pas pu lire si une clé est rangée — la base n'a pas répondu. Rien n'est changé.
+          <div style={{ marginTop: 8 }}><button type="button" data-photoroom-relire="" onClick={relire} style={bouton(false)}>Réessayer</button></div>
+        </div>
+      )}
+
+      {posee && (
+        <div data-photoroom-etat-cle="" style={{ display: 'grid', gap: 8 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+            <span data-photoroom-fin={s.fin || ''} style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', fontSize: 14, letterSpacing: '.08em', color: C.text, background: `${C.text}0a`, border: `1px solid ${C.border}`, borderRadius: 8, padding: '6px 10px' }}>•••• {s.fin || '····'}</span>
+            <span style={ligneFine}>{s.at ? `rangée le ${dateCourte(s.at)}` : 'rangée'}{etat === 'posee' ? ' · chiffrée sur le serveur' : ''}</span>
+          </div>
+          {etat === 'en-clair' && <div data-photoroom-en-clair="" style={{ ...ligneFine, color: C.warn }}>Elle sert, mais n'est pas encore chiffrée : le coffre du serveur n'est pas configuré.</div>}
+          {verif && <div data-photoroom-verif={s.verif} style={{ ...ligneFine, color: verif.ton === 'attention' ? C.warn : C.text }}>{verif.texte}</div>}
+          {!remplacer && (
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              {etat === 'posee' && <button type="button" data-photoroom-verifier="" disabled={!!occupe} onClick={verifier} style={bouton(false)}>{occupe === 'verifier' ? 'Vérification…' : 'Vérifier chez Photoroom'}</button>}
+              {s.coffre !== false && <button type="button" data-photoroom-remplacer="" disabled={!!occupe} onClick={() => { setRemplacer(true); setMsg(null); }} style={bouton(false)}>Remplacer</button>}
+              <button type="button" data-photoroom-retirer="" disabled={!!occupe} onClick={retirer} style={{ ...bouton(false), color: C.muted }}>{occupe === 'retirer' ? 'Retrait…' : 'Retirer'}</button>
+            </div>
+          )}
+        </div>
+      )}
+      {etat === 'illisible' && <div data-photoroom-illisible="" style={{ ...ligneFine, color: C.warn }}>Ta clé ne se lit plus côté serveur (la clé du coffre a changé) : colle-la de nouveau.</div>}
+      {s && s.coffre === false && !posee && <div data-photoroom-sans-coffre="" style={ligneFine}>Le coffre du serveur n'est pas configuré : aucune clé ne peut être rangée pour l'instant.</div>}
+
+      {formulaire && (
+        <form data-photoroom-form="" onSubmit={(e) => { e.preventDefault(); poser(); }} style={{ display: 'grid', gap: 8 }}>
+          <label htmlFor="vrm-photoroom-cle" style={{ fontSize: 12.5, fontWeight: 600, color: C.text }}>{remplacer ? 'Colle ta nouvelle clé' : 'Colle ta clé API Photoroom'}</label>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <input id="vrm-photoroom-cle" data-photoroom-champ="" value={val} onChange={(e) => setVal(e.target.value)} type="password" autoComplete="off" spellCheck={false} autoCapitalize="off"
+              placeholder="Ta clé Photoroom" aria-label="Clé API Photoroom"
+              style={{ flex: '1 1 200px', minWidth: 0, minHeight: 44, boxSizing: 'border-box', padding: '0 12px', borderRadius: 10, border: `1px solid ${C.border}`, background: C.bg, color: C.text, fontSize: 16, fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }}/>
+            <button type="submit" data-photoroom-enregistrer="" disabled={!!occupe || !val.trim()} style={{ ...bouton(true), opacity: (occupe || !val.trim()) ? 0.55 : 1 }}>{occupe === 'poser' ? 'Vérification…' : 'Vérifier et ranger'}</button>
+            {remplacer && <button type="button" onClick={() => { setRemplacer(false); setVal(''); }} style={bouton(false)}>Annuler</button>}
+          </div>
+          <div style={ligneFine}>VRM la vérifie chez Photoroom (sans dépenser d'image), puis la range chiffrée. Tu n'en reverras que les 4 derniers caractères.</div>
+        </form>
+      )}
+
+      {msg && <div data-photoroom-msg={msg.ton} role="status" style={{ ...ligneFine, color: msg.ton === 'attention' ? C.warn : C.text }}>{msg.texte}</div>}
+
+      <div className="vrm-photoroom-blocs" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: 14 }}>
+        {bloc('Ce que ça coûte', <>C'est <b style={{ color: C.text }}>ton</b> compte Photoroom qui paie, à la photo — jamais VRM, jamais un autre vendeur. Environ 0,02 $ la photo avec leur formule de base (relevé le 4 octobre). Une photo déjà détourée n'est jamais repayée. Une clé « sandbox » est gratuite, mais ses photos portent un filigrane.
+          <a data-photoroom-tarifs="" href={LIEN_TARIFS} target="_blank" rel="noopener noreferrer" style={{ display: 'flex', alignItems: 'center', width: 'fit-content', minHeight: 44, color: C.text, fontWeight: 600, textDecoration: 'none' }}>Leurs tarifs ↗</a></>, 'cout')}
+        {bloc('Où elle sert', <>
+          <span style={{ display: 'block' }}>· <b style={{ color: C.text }}>Vestiaire Collective</b> : les photos que l'extension prépare pour ton annonce (fond net exigé).</span>
+          <span style={{ display: 'block' }}>· <b style={{ color: C.text }}>Studio photo</b> (Annonces → Outils) : le bouton « Détourer avec Photoroom ».</span>
+          <span style={{ display: 'block', marginTop: 4 }}>Leboncoin et eBay gardent tes photos d'origine.</span>
+        </>, 'usages')}
+        {bloc('Où la trouver', <>
+          <span style={{ display: 'block' }}>1. Connecte-toi sur Photoroom.</span>
+          <span style={{ display: 'block' }}>2. « API dashboard » → « API keys ».</span>
+          <span style={{ display: 'block' }}>3. Copie la clé et colle-la ici.</span>
+          <a data-photoroom-lien="" href={LIEN_CLE} target="_blank" rel="noopener noreferrer" style={{ display: 'inline-flex', alignItems: 'center', minHeight: 44, color: C.accent, fontWeight: 600, textDecoration: 'none' }}>Ouvrir Photoroom ↗</a>
+        </>, 'trouver')}
+      </div>
+    </section>
   );
 }
 // ══════════════════════════════════════════════════════════════════════════════
@@ -24015,7 +24100,7 @@ function Plateforme({ plat, liveStats, lbcVentes = {ventes:[],inconnues:0}, ebay
               // (28 oct.) « Tes ventes ne remontent pas encore… choisis-la ci-dessous »
               // était faux depuis la 5.237 (les ventes sont lues) et la liste est
               // AU-DESSUS ; chaque carte dit déjà ce qui est lu et le geste (§7).
-              ? <PhotoroomCle/>
+              ? <ClePhotoroom cadre={false}/>
               : plat==='Leboncoin'
               ? <>Ce que VRM sait de Leboncoin passe par l'extension (elle tourne sur leboncoin.fr). Prépare tes annonces depuis <b>À publier</b> ; une vente n'est comptée que si la <b>référence VRM</b> de l'annonce la relie à un article — jamais par ressemblance de titre. Rien n'est inventé tant qu'il n'y a pas de donnée.</>
               : <>Aucune vente n'a encore été captée sur {court}. Tu prépares tes articles depuis l'écran <b>Annonces</b> (coche « aussi sur {court} ») ; dès qu'une vente y sera reconnue, son chiffre s'ajoutera ici et au total. Rien n'est inventé tant qu'il n'y a pas de donnée.</>}
@@ -52050,6 +52135,10 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       {id:'google',type:'el',el:<ConnexionsCompte theme={C} providers={OAUTH_PROVIDERS.filter(p=>p.id==='google')} enabled={providerEnabled} relier={oauthRelier} lire={lireConnexionsOAuth} retour={AUTH_REDIRECT?.error||(AUTH_REDIRECT?.liaison==='google'?'Ton compte Google est associé à VRM.':'')} icone={id=><BrandMark id={id}/>}/>},
       {id:'discord',type:'el',el:<DiscordCompte key="discord"/>},
     ]},
+    // (29 oct.) Ta clé Photoroom : un service de la PERSONNE (son compte
+    // Photoroom paie), rangée chiffrée par le serveur. Ce n'est pas le réglage
+    // « détourer avant de publier » refusé le 17 oct. (cf. banc detourage-reglage).
+    AUTH.user && { id:'photoroom', titre:'Photoroom', brut:true, items:[ { id:'photoroom', type:'el', el:<ClePhotoroom key="photoroom"/> } ] },
     AUTH.user && {id:'photo-profil',titre:'Photo de profil',items:[{id:'photo-profil',type:'el',el:<PhotoProfil key={AUTH.user.id} owner={AUTH.user.id} headers={enTeteSession} theme={C}/>} ]},
     AUTH.user && { id:'equipe', titre:'Équipe', items:[
       { id:'equipe', type:'panneau', ic:'link', lib:'Équipe', el:<EquipeSetting/> },
@@ -57393,7 +57482,7 @@ function AppCoeur() {
             };
             // `ebay_tokens*` (les jetons eBay, de chacun de ses comptes) et `push_subs` (les clés de ses téléphones)
             // ne quittent pas la base.
-            const EXCLUS = ['harvest_*_txn_*','harvest_*_label_*','email_bord_*','lbc_catalogue','lbc_recon','backup_*','harvest_*_seen_urls','harvest_*_wreq_*','harvest_*_pickup_points','ebay_tokens*','push_subs','vrm_photoroom_cle'];
+            const EXCLUS = ['harvest_*_txn_*','harvest_*_label_*','email_bord_*','lbc_catalogue','lbc_recon','backup_*','harvest_*_seen_urls','harvest_*_wreq_*','harvest_*_pickup_points','ebay_tokens*','push_subs','vrm_photoroom_cle','photoroom_cle'];
             const [lignes, legeres, comptes] = await Promise.all([
               toutLire(`app_data?select=id,data&and=(${EXCLUS.map(x=>`id.not.like.${x}`).join(',')})&order=id`),
               toutLire(`app_data?select=id,meta&or=(id.like.harvest_*_txn_*,id.like.harvest_*_label_*,id.like.email_bord_*)&order=id`),

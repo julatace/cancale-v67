@@ -14,7 +14,13 @@
 //   4. aucune requête vers un service payant (Photoroom, /api/ai, /api/detourage…)
 //      et rien de ce moteur n'est chargé avant le clic (ni le modèle, ni le CDN) ;
 //   5. l'autre sens : caméra REFUSÉE ⇒ repli fichier + la phrase qui le dit, et
-//      la photo choisie est rangée pour sa paire, recadrée au même format.
+//      la photo choisie est rangée pour sa paire, recadrée au même format ;
+//   6. (29 oct.) sans clé Photoroom à LUI, aucun bouton « Détourer avec
+//      Photoroom » ; avec SA clé rangée (session, /api/compte?mode=photoroom
+//      « posee »), le bouton existe, la photo part à /api/ai?mode=detourage
+//      AVEC sa session et l'empreinte de SES octets, et la détourée est rangée
+//      pour la bonne paire (`detourePar: 'photoroom'`) — jamais d'appel direct
+//      à Photoroom depuis le navigateur.
 // Le moteur (onnxruntime-web 1.22.0, MIT) est servi au banc depuis une copie
 // locale à la place de cdn.jsdelivr.net (déterminisme) : BANC_ORT_DIR, sinon
 // téléchargé une fois dans le dossier temporaire du système (curl).
@@ -45,6 +51,11 @@ function dossierOrt() {
 }
 
 const ilYa = (j) => Math.floor((Date.now() - j * 86400000) / 1000);
+// Une session INVENTÉE (scénario « clé Photoroom rangée »).
+const UID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+const b64u = (o) => Buffer.from(JSON.stringify(o)).toString('base64').replace(/=+$/, '').replace(/\+/g, '-').replace(/\//g, '_');
+const JWT = `${b64u({ alg: 'HS256', typ: 'JWT' })}.${b64u({ sub: UID, email: 'studio@exemple.test', role: 'authenticated', exp: Math.floor(Date.now() / 1000) + 3600 })}.c2ln`;
+const SESSION = { access_token: JWT, refresh_token: 'r-s', expires_at: Date.now() + 3600e3, totp: [], user: { id: UID, email: 'studio@exemple.test', totp: [] } };
 const ann = (id, o) => Object.assign({ id, price: { amount: '49.0', currency_code: 'EUR' }, is_closed: false, is_draft: false, photo: null, brand_title: 'Nike', size_title: '42', status: 'Très bon état', view_count: 4, favourite_count: 1, nPhotos: 3, created_at_ts: ilYa(3) }, o);
 const ITEMS = [
   ann(9101, { title: 'Nike Air Max 1 obsidian taille 42' }),
@@ -69,7 +80,10 @@ async function preparer(ctx, rows, ort, journal, opts = {}) {
   const pg = await ctx.newPage();
   const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
   pg.on('request', (q) => journal.push({ url: q.url(), m: q.method(), t: Date.now() }));
-  await pg.addInitScript(() => { try { localStorage.setItem('vrm_acces_direct', '1'); } catch (_) {} });
+  if (opts.session) {
+    await pg.addInitScript((sess) => { try { localStorage.setItem('vrm_session', JSON.stringify(sess)); localStorage.setItem('vrm_local_owner', sess.user.id); } catch (_) {} }, SESSION);
+    await pg.route('**/auth/v1/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(/\/user/.test(r.request().url()) ? SESSION.user : { access_token: JWT, refresh_token: 'r', expires_in: 3600, user: SESSION.user }) }));
+  } else await pg.addInitScript(() => { try { localStorage.setItem('vrm_acces_direct', '1'); } catch (_) {} });
   await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) ? r.abort() : r.continue()));
   await pg.route('**/rest/v1/**', async (route) => {
     const q = route.request();
@@ -95,7 +109,25 @@ async function preparer(ctx, rows, ort, journal, opts = {}) {
     if (lk) { const re = new RegExp('^' + lk[1].replace(/[.]/g, '\\.').replace(/[*%]/g, '.*') + '$'); return j([...rows].filter(([id]) => re.test(id)).map(([id, d]) => forme(id, d))); }
     return j([]);
   });
-  await pg.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"pret":true}' }));
+  await pg.route('**/api/**', async (r) => {
+    const q = r.request(), u = new URL(q.url()), mode = u.searchParams.get('mode');
+    if (opts.photoroom && u.pathname === '/api/compte' && mode === 'photoroom' && q.method() === 'GET') {
+      const auth = !!q.headers().authorization;
+      return r.fulfill({ status: auth ? 200 : 401, contentType: 'application/json', body: JSON.stringify(auth ? { ok: true, etat: 'posee', coffre: true, fin: 'K9QZ', at: new Date().toISOString(), verif: 'ok', verifAt: new Date().toISOString(), restant: 41 } : { ok: false, erreur: 'session' }) });
+    }
+    if (opts.photoroom && u.pathname === '/api/ai' && mode === 'detourage' && q.method() === 'POST') {
+      // La forme de la vraie route : session exigée, l'empreinte DOIT être celle des octets reçus.
+      let b = null; try { b = JSON.parse(q.postData() || 'null'); } catch (_) {}
+      const auth = String(q.headers().authorization || '');
+      const buf = b && typeof b.b64 === 'string' ? Buffer.from(b.b64, 'base64') : null;
+      const shaOk = !!(buf && buf.length && require('crypto').createHash('sha256').update(buf).digest('hex') === String(b.sha || ''));
+      opts.photoroom.appels.push({ auth: /^Bearer /.test(auth), shaOk, jpeg: !!(buf && buf[0] === 0xff && buf[1] === 0xd8), octets: buf ? buf.length : 0 });
+      if (!/^Bearer /.test(auth)) return r.fulfill({ status: 401, contentType: 'application/json', body: '{"ok":false,"reason":"session"}' });
+      if (!shaOk) return r.fulfill({ status: 400, contentType: 'application/json', body: '{"ok":false,"reason":"sha"}' });
+      return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, hit: false, b64: opts.photoroom.blanc, type: 'image/jpeg', bytes: 1000, clePropre: true }) });
+    }
+    return r.fulfill({ status: 200, contentType: 'application/json', body: '{"pret":true}' });
+  });
   await pg.route(`**/cdn.jsdelivr.net/npm/onnxruntime-web@${ORT_V}/dist/**`, (r) => {
     const f = path.join(ort, path.basename(new URL(r.request().url()).pathname));
     if (!fs.existsSync(f)) return r.fulfill({ status: 404, body: '' });
@@ -133,7 +165,8 @@ const lireImage = (pg, url) => pg.evaluate(async (src) => {
 // POST à /api/ai (l'IA facturée). Le GET nu de /api/ai ne fait que demander si
 // l'IA est branchée (gratuit) : l'app le fait déjà au chargement, hors studio.
 const PAYANT_HOTE = /photoroom|remove\.bg|clipdrop|anthropic|openai|replicate\.com/i;
-const estPayant = (r) => PAYANT_HOTE.test(r.url) || /\/api\/detourage|\/api\/ai\?[^#]*mode=detourage/.test(r.url) || (/\/api\/ai(\?|$)/.test(r.url) && r.m !== 'GET');
+const hoteDe = (u) => { try { return new URL(u).hostname; } catch (_) { return ''; } };
+const estPayant = (r) => PAYANT_HOTE.test(hoteDe(r.url)) || /\/api\/detourage|\/api\/ai\?[^#]*mode=detourage/.test(r.url) || (/\/api\/ai(\?|$)/.test(r.url) && r.m !== 'GET');
 
 (async () => {
   try { await new Promise((ok, ko) => { srv.once('error', ko); srv.listen(PORT, ok); }); }
@@ -180,6 +213,7 @@ const estPayant = (r) => PAYANT_HOTE.test(r.url) || /\/api\/detourage|\/api\/ai\
         }
         const msg = await pg.locator('[data-studio-msg]').innerText().catch(() => '');
         dit(/N°42/.test(msg), 'l’écran dit pour quelle paire la photo est rangée', msg);
+        dit(await pg.locator('[data-studio-photoroom]').count() === 0, 'sans clé Photoroom à lui : aucun bouton « Détourer avec Photoroom »');
 
         // Détourage local.
         console.log(`── ${vp.width} px — détourage local`);
@@ -235,6 +269,54 @@ const estPayant = (r) => PAYANT_HOTE.test(r.url) || /\/api\/detourage|\/api\/ai\
         dit(!journal2.some(estPayant), 'aucune requête vers un service payant');
         dit(!errs.length, 'aucune erreur de page', errs[0]);
       } finally { await ctx2.close(); }
+    }
+    // Avec SA clé Photoroom rangée : le bouton, la photo envoyée à la route de
+    // détourage avec SA session et l'empreinte de SES octets, la détourée rangée.
+    for (const vp of [{ width: 390, height: 844 }, { width: 1512, height: 950 }]) {
+      console.log(`── ${vp.width} px — clé Photoroom rangée (session)`);
+      const ctx4 = await b.newContext({ viewport: vp, permissions: ['camera'], ...(vp.width < 600 ? { isMobile: true, hasTouch: true } : {}) });
+      await cspBanc(ctx4, `http://localhost:${PORT}`, 'studio photoroom ' + vp.width);
+      const rows4 = departRows(), journal4 = [];
+      const pr = { appels: [], blanc: '' };
+      try {
+        const { pg, errs } = await preparer(ctx4, rows4, ort, journal4, { session: true, photoroom: pr });
+        const ouvert = await ouvrirStudio(pg);
+        dit(ouvert, 'le studio s’ouvre (session, clé Photoroom rangée)');
+        if (!ouvert) continue;
+        pr.blanc = await pg.evaluate(() => { const c = document.createElement('canvas'); c.width = 30; c.height = 40; const x = c.getContext('2d'); x.fillStyle = '#fff'; x.fillRect(0, 0, 30, 40); x.fillStyle = '#222'; x.fillRect(8, 22, 14, 10); return c.toDataURL('image/jpeg', 0.9).split(',')[1]; });
+        await pg.locator('[data-studio-paire="42"]').click();
+        await pg.locator('[data-studio-ouvrir]').click();
+        await pg.waitForFunction(() => { const v = document.querySelector('[data-studio-video]'); return v && v.videoWidth > 0; }, null, { timeout: 10000 }).catch(() => {});
+        await pg.locator('[data-studio-declencher]').click();
+        await pg.waitForSelector('[data-studio-photo]', { timeout: 8000 }).catch(() => {});
+        const bouton = pg.locator('[data-studio-photoroom]').first();
+        const vu = await bouton.waitFor({ state: 'visible', timeout: 8000 }).then(() => true).catch(() => false);
+        dit(vu, 'avec SA clé rangée : le bouton « Détourer avec Photoroom » est là');
+        dit(await pg.locator('[data-studio-detourer]').count() > 0, 'le détourage local reste proposé à côté');
+        const note = await pg.locator('[data-studio-photoroom-note]').innerText().catch(() => '');
+        dit(/K9QZ/.test(note) && /ton compte Photoroom qui paie/.test(note), 'l’écran dit que c’est SA clé (…K9QZ) et SON compte qui paie', note);
+        if (vu) {
+          const h = await bouton.evaluate((e) => e.getBoundingClientRect().height);
+          if (vp.width < 600) dit(h >= 43.5, 'au doigt, le bouton fait au moins 44 px affichés', h.toFixed(1) + ' px');
+          await bouton.click();
+          const fait = await pg.waitForSelector('[data-studio-detoure]', { timeout: 15000 }).then(() => true).catch(() => false);
+          const m = await pg.locator('[data-studio-msg]').innerText().catch(() => '');
+          dit(fait, 'la détourée par Photoroom apparaît à côté de l’originale', fait ? m : m);
+          const a = pr.appels[0];
+          dit(pr.appels.length === 1 && a.auth && a.shaOk && a.jpeg, 'UNE requête à /api/ai?mode=detourage, avec SA session et l’empreinte de SES octets (JPEG)', JSON.stringify(pr.appels));
+          const l = rows4.get('studio_photos_42');
+          const ph = l && l.photos && l.photos[0];
+          dit(!!(ph && ph.img && ph.detoure && ph.detourePar === 'photoroom' && /^data:image\/jpeg/.test(ph.detoure)), 'la détourée est RANGÉE pour la bonne paire (N°42), marquée Photoroom, l’originale gardée', ph ? JSON.stringify({ par: ph.detourePar, d: (ph.detoure || '').slice(0, 24) }) : '(rien)');
+          dit(![...rows4.keys()].some((k) => /^studio_photos_/.test(k) && k !== 'studio_photos_42'), 'rien sous une autre paire');
+        }
+        const directs = journal4.filter((r) => PAYANT_HOTE.test(hoteDe(r.url))).map((r) => r.url);
+        dit(directs.length === 0, 'le navigateur n’appelle JAMAIS Photoroom lui-même (la clé reste au serveur)', directs.slice(0, 2).join(' '));
+        dit(!journal4.some((r) => /u2netp|onnxruntime/.test(r.url)), 'le moteur local n’est pas chargé pour rien');
+        dit(!errs.length, 'aucune erreur de page', errs[0]);
+        const sw = await pg.evaluate(() => [document.documentElement.scrollWidth, document.documentElement.clientWidth]);
+        dit(sw[0] <= sw[1] + 1, 'aucun débordement horizontal', sw.join(' > '));
+        if (process.env.BANC_CAPTURES) { fs.mkdirSync(process.env.BANC_CAPTURES, { recursive: true }); await pg.screenshot({ path: path.join(process.env.BANC_CAPTURES, `studio-photoroom-${vp.width}.png`) }); }
+      } finally { await ctx4.close(); }
     }
     // Lecture KO, écriture OK (le cas qui détruit, §5) : la ligne de la paire
     // ne se lit pas ⇒ on ne range RIEN (sinon elle repartirait avec la seule

@@ -1,5 +1,29 @@
 # Détourage des photos avec Photoroom
 
+> ⚠️ **À jour au 29 octobre — lis ceci d'abord.**
+> - Depuis le **17 octobre** (décision de Julien), le détourage ne sert plus
+>   qu'à **Vestiaire Collective** : Leboncoin et eBay gardent leurs photos
+>   d'origine, et il n'y a **plus de réglage** « Détourer mes photos » dans les
+>   Paramètres (la section 3 plus bas est périmée).
+> - Depuis le **29 octobre**, **chaque vendeur peut ranger SA clé** : Paramètres
+>   → **Mon compte** → carte **« Ta clé Photoroom »** (la même carte est sur
+>   l'écran Vestiaire). La clé est **vérifiée chez Photoroom** au moment de la
+>   ranger (`GET https://image-api.photoroom.com/v2/account`, qui ne consomme
+>   aucune image), puis **chiffrée** dans le coffre du serveur (ligne
+>   `photoroom_cle`, AES-256-GCM, clé `VRM_COFFRE_CLE` ou dérivée de
+>   `SUPABASE_SERVICE_KEY` — le même coffre que Super PDP). Le navigateur ne la
+>   relit **jamais** : il n'en voit que les 4 derniers caractères.
+> - Avec SA clé, c'est **son** compte Photoroom qui paie, sans plafond VRM ; sans
+>   clé à lui, rien ne change (clé du serveur, propriétaire seul — jamais la clé
+>   de Julien pour un autre vendeur, §2.9 ; sauf si `PHOTOROOM_POUR=tous` est posé).
+> - Elle sert dans **Studio photo** (Annonces → ⋯ Outils : bouton « Détourer
+>   avec Photoroom », à côté du détourage local gratuit) et pour Vestiaire.
+> - Une ancienne clé rangée en clair (`vrm_photoroom_cle`, 26 octobre) est
+>   chiffrée puis effacée **à la première ouverture de la carte**.
+> - Preuves : `scripts/audit-photoroom-cle.cjs` (la vraie route),
+>   `scripts/bancs/photoroom-carte.cjs` (la carte rendue),
+>   `scripts/bancs/studio-photo.cjs` (le bouton du Studio).
+
 Le détourage (retirer le fond, ne garder que la chaussure sur fond blanc) se
 fait avec l'API **Photoroom**, **juste avant** que l'extension attache tes
 photos à une annonce **Leboncoin**. Tes photos sur Vinted ne changent pas.
@@ -43,7 +67,7 @@ Deux réglages facultatifs, au même endroit :
 coûter plus que son abonnement — c'est pour ça que le plafond existe. Photoroom
 est déjà listé comme sous-traitant dans la politique de confidentialité.
 
-## 3. L'allumer dans l'app
+## 3. L'allumer dans l'app — ⚠️ PÉRIMÉ (réglage retiré le 17 octobre)
 
 **Réglages → Détourer mes photos avant de publier** : *Éteint* (par défaut) ·
 *Photo de couverture* (conseillé : une photo par annonce) · *Toutes les photos*.

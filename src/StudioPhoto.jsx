@@ -9,12 +9,17 @@
 //   2. la caméra s'ouvre avec un CADRE au format des annonces (3:4), une ligne
 //      de sol et des repères : toutes les paires se photographient pareil ;
 //   3. la photo prise est rangée pour CETTE paire (`studio_photos_{N°}`) ;
-//   4. on peut la détourer ICI, dans le navigateur, sans envoi ni clé.
+//   4. on peut la détourer ICI, dans le navigateur, sans envoi ni clé ;
+//   5. (29 oct.) et, SI le vendeur a rangé SA clé Photoroom (Mon compte), la
+//      détourer avec Photoroom : la photo part au serveur, qui appelle Photoroom
+//      avec SA clé (son compte paie — jamais celle de Julien, §2.9). Sans clé à
+//      lui, le bouton n'existe pas et le détourage local reste.
 // VRM ne publie RIEN sur Vinted : la photo s'enregistre sur l'appareil et c'est
 // lui qui l'ajoute dans l'app Vinted. Caméra refusée ou absente ⇒ l'appareil
 // photo du téléphone (champ fichier), recadré au même format, et on le DIT.
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { RATIO_CADRE, PHOTOS_MAX_PAR_PAIRE, recadrer, recadrerFichier, lireStudio, modifierStudio, detourerLocal } from './studioPhoto.js';
+import { lirePhotoroom, cleUtilisable, detourerAvecPhotoroom } from './photoroomCle.js';
 
 const damier = 'repeating-conic-gradient(#d9dde3 0% 25%, #ffffff 0% 50%) 50% / 16px 16px';
 
@@ -43,6 +48,19 @@ export default function StudioPhoto({ C, paires, base, onClose }) {
   const [msg, setMsg] = useState('');
   const [occupe, setOccupe] = useState('');
   const videoRef = useRef(null), fluxRef = useRef(null), fichierRef = useRef(null);
+  // SA clé Photoroom : trois états (undefined lecture · null pas su · objet).
+  // Le bouton ne s'affiche que sur une clé LUE et utilisable.
+  const [cleP, setCleP] = useState(undefined);
+  useEffect(() => {
+    let vivant = true;
+    // Sans session (accès direct, base non cloisonnée), aucune clé n'est à lui :
+    // on ne demande rien.
+    const e = base && typeof base.entete === 'function' ? base.entete() : null;
+    if (!e || !e.Authorization) { setCleP(null); return undefined; }
+    lirePhotoroom(e).then((j) => { if (vivant) setCleP(j); });
+    return () => { vivant = false; };
+  }, [base]);
+  const avecPhotoroom = cleUtilisable(cleP);
 
   const liste = useMemo(() => {
     const t = q.trim().toLowerCase();
@@ -104,6 +122,21 @@ export default function StudioPhoto({ C, paires, base, onClose }) {
     setOccupe('');
     if (!w.ok) { setMsg('Détourée, mais la base n’a pas répondu : rien n’a été enregistré. Réessaie.'); return; }
     setPhotos(w.photos); setMsg('Détourée ici, sans rien envoyer. Vérifie les bords : la photo d’origine reste à côté.');
+  };
+  const detourerPhotoroom = async (ph) => {
+    setOccupe('photoroom:' + ph.id); setMsg('Détourage avec Photoroom… (ton compte Photoroom paie cette photo)');
+    const r = await detourerAvecPhotoroom(base.entete(), ph.img);
+    if (!r.ok) {
+      setOccupe('');
+      setMsg(r.incertain
+        ? 'Pas de réponse : Photoroom l’a peut-être détourée (et facturée). Ta photo d’origine est gardée ; réessaie dans un moment.'
+        : `Photoroom n’a pas détouré cette photo : ${r.raison}. Ta photo d’origine est gardée.`);
+      return;
+    }
+    const w = await modifierStudio(base, sel.cle, sel.num, (l) => l.map((x) => (x.id === ph.id ? { ...x, detoure: r.img, detoureAt: new Date().toISOString(), detourePar: 'photoroom' } : x)));
+    setOccupe('');
+    if (!w.ok) { setMsg('Détourée par Photoroom, mais la base n’a pas répondu : rien n’a été enregistré. Réessaie.'); return; }
+    setPhotos(w.photos); setMsg(r.cache ? 'Déjà détourée par Photoroom : reprise sans être repayée.' : 'Détourée par Photoroom, sur fond blanc. La photo d’origine reste à côté.');
   };
   const retirer = async (ph) => {
     const w = await modifierStudio(base, sel.cle, sel.num, (l) => l.filter((x) => x.id !== ph.id));
@@ -181,7 +214,8 @@ export default function StudioPhoto({ C, paires, base, onClose }) {
                     </div>
                     <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 6 }}>
                       {!ph.detoure && <button type="button" data-studio-detourer={ph.id} style={{ ...btn, padding: '6px 8px', fontSize: 11.5 }} disabled={!!occupe} onClick={() => detourer(ph)}>{occupe === 'detour:' + ph.id ? 'Détourage…' : 'Détourer ici'}</button>}
-                      <a href={ph.detoure || ph.img} download={`VRM-${sel.cle}-${i + 1}${ph.detoure ? (/webp/.test(ph.detoure.slice(0, 20)) ? '.webp' : '.png') : '.jpg'}`} style={{ ...btn, padding: '6px 8px', fontSize: 11.5, textDecoration: 'none' }}>Enregistrer</a>
+                      {!ph.detoure && avecPhotoroom && <button type="button" data-studio-photoroom={ph.id} style={{ ...btn, padding: '6px 8px', fontSize: 11.5 }} disabled={!!occupe} onClick={() => detourerPhotoroom(ph)}>{occupe === 'photoroom:' + ph.id ? 'Photoroom…' : 'Détourer avec Photoroom'}</button>}
+                      <a href={ph.detoure || ph.img} download={`VRM-${sel.cle}-${i + 1}${ph.detoure ? (/^data:image\/jpe?g/.test(ph.detoure) ? '.jpg' : /webp/.test(ph.detoure.slice(0, 20)) ? '.webp' : '.png') : '.jpg'}`} style={{ ...btn, padding: '6px 8px', fontSize: 11.5, textDecoration: 'none' }}>Enregistrer</a>
                       <button type="button" style={{ ...btn, padding: '6px 8px', fontSize: 11.5, color: C.muted }} disabled={!!occupe} onClick={() => retirer(ph)}>Retirer</button>
                     </div>
                   </div>
@@ -190,6 +224,7 @@ export default function StudioPhoto({ C, paires, base, onClose }) {
             )}
           <div style={{ fontSize: 11.5, color: C.muted, lineHeight: 1.5, marginTop: 10 }}>
             « Détourer ici » tourne dans ce navigateur, sans envoyer la photo nulle part et sans clé (modèle libre U²-Net). Détourage automatique : vérifie les bords avant de t’en servir.
+            {avecPhotoroom && <span data-studio-photoroom-note="" style={{ display: 'block', marginTop: 4 }}>« Détourer avec Photoroom » envoie la photo à Photoroom avec <b>ta</b> clé (se termine par {(cleP && cleP.fin) || '····'}) : c’est ton compte Photoroom qui paie, à la photo, sur fond blanc.</span>}
           </div>
         </>)}
       </div>
