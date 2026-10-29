@@ -25,6 +25,11 @@ const fs = require('fs'), http = require('http'), path = require('path');
 const DIST = process.env.BANC_DIST || path.join(__dirname, '..', '..', 'dist');
 const PORT = Number(process.env.BANC_PORT || process.env.PORT) || 9501;
 const auj = new Date();
+// L'horloge de la page ne doit jamais franchir minuit (heure de Paris) pendant le
+// banc : le plafond du jour repart à minuit, et un banc lancé à 23 h 50 voyait
+// une recherche légitime « après 30 min ». Près de minuit, on part 4 h plus tôt.
+const heureParis = parseInt(new Intl.DateTimeFormat('fr-FR', { timeZone: 'Europe/Paris', hour: '2-digit', hour12: false }).format(auj), 10);
+const DEPART = auj.getTime() - (heureParis >= 22 || heureParis < 1 ? 4 * 3600000 : 0);
 const ACCS = [{ id: 1, vinted_user_id: '111', login: 'compte_test', domain: 'www.vinted.fr', updated_at: auj.toISOString() }];
 const vente = (id, prix, d) => ({ transaction_id: id, title: 'Salomon XT-6 noir taille ' + (40 + (id % 4)), price: { amount: String(prix), currency_code: 'EUR' }, status: 'Commande finalisée', date: d.toISOString() });
 const il = (n) => new Date(auj.getTime() - n * 86400000);
@@ -36,6 +41,8 @@ const rows = [
 ];
 const VEILLE = { id: '00000000-0000-4000-8000-000000000001', titre: 'XT-6 en 43', mots: 'salomon xt-6', pointure: '43', exclus: '', categorie: '', etatArticle: 'tous', minimum: null, maximum: 9000, pays: 'FR', achatImmediat: true, livraisonFR: true, etat: 'preparee', version: 1, cree: '2026-10-20T10:00:00.000Z', evenements: [] };
 const item = (id, titre, prix, port) => ({ itemId: id, titre, prix, port, total: port == null ? null : prix + port, etat: 'Occasion', vendeur: 'vendeur_' + id.slice(-1), avis: 99.1, photo: null, url: 'https://www.ebay.fr/itm/' + id.replace(/\D/g, ''), achatImmediat: true, enchere: false, date: auj.toISOString(), pays: 'FR' });
+// L'horloge du SERVEUR est en avance de 2 h sur celle de l'appareil (lueA) :
+// la borne des 15 min doit se juger sur l'horloge de l'appareil.
 let mode = 'normal', appels = [], visite = 1, autres = [];
 const dit = (c, m, d) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m + (d ? ' — ' + d : '')); };
 let ko = 0;
@@ -68,13 +75,13 @@ const reponseChercher = (body) => {
   if (mode === 'plafond') return [429, { ok: false, reason: 'plafond', appels: { aujourdhui: 200, plafond: 200 }, error: 'Tu as fait tes 200 recherches eBay du jour : le fil s’arrête jusqu’à minuit (heure de Paris).' }];
   const base = [item('v1|5001|0', 'Salomon XT-6 noir taille 43', 6000, 650), item('v1|5002|0', 'Salomon XT-6 gris taille 43', 7000, null)];
   const items = visite >= 2 ? [item('v1|5009|0', 'Salomon XT-6 bleu taille 43 neuve', 7500, 500), ...base] : base;
-  return [200, { ok: true, items, total: items.length, horsBudget: 1, exclus: 0, autreDevise: 0, criteres: body, appels: { aujourdhui: appels.length, plafond: 200, jour: '2026-10-29' }, quotaEbay: null, plafondEbayDoc: 5000, octets: { ebay: 18432, vrm: 2150 }, lueA: new Date().toISOString() }];
+  return [200, { ok: true, items, total: items.length, horsBudget: 1, exclus: 0, autreDevise: 0, criteres: body, appels: { aujourdhui: appels.length, plafond: 200, jour: '2026-10-29' }, quotaEbay: null, plafondEbayDoc: 5000, octets: { ebay: 18432, vrm: 2150 }, lueA: new Date(Date.now() + 2 * 3600000).toISOString() }];
 };
 async function ouvrir(b, vp, sombre, etat) {
   const ctx = await b.newContext({ viewport: vp, locale: 'fr-FR', ...(vp.width < 600 ? { isMobile: true, hasTouch: true } : {}), ...(etat ? { storageState: etat } : {}) });
   const pg = await ctx.newPage();
   const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
-  await pg.clock.install({ time: Date.now() });
+  await pg.clock.install({ time: DEPART });
   await pg.addInitScript((s) => { try { localStorage.setItem('vrm_acces_direct', '1'); if (s) localStorage.setItem('vinted_dark', 'true'); } catch (_) {} }, !!sombre);
   await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) ? r.abort() : r.continue()));
   await pg.route('**/rest/v1/**', (route) => {

@@ -17,7 +17,9 @@
 > « le modèle, pas cette paire ». Rien n'est acheté : « Voir sur eBay ↗ ». Les achats gagnés (WonList) restent, repliés,
 > lus à l'ouverture seulement. Preuves : `audit-ebay-recherche.cjs` (43 ; **31 rouges sur origin/main** ; 7 mutations
 > rouges) · banc `ebay-achats-recherche.cjs` (390 tactile + 1512 sombre ; **18 rouges sur le build d'origin/main** ;
-> mutations « relecture sans borne » et « tout est nouveau » rouges). ⚠️ **Non mesuré** : aucun appel réel à eBay
+> mutations « relecture sans borne » et « tout est nouveau » rouges). La borne des 15 min se juge sur l'horloge de
+> l'APPAREIL (heure d'arrivée de la réponse), jamais sur `lueA` du serveur : un téléphone en avance relisait à chaque
+> minute (banc : serveur à +2 h ⇒ rouge sur le code d'avant) ; le banc ne franchit plus minuit (heure de Paris). ⚠️ **Non mesuré** : aucun appel réel à eBay
 > (formes de la doc Browse/OAuth/Analytics) ; la pointure part dans les mots-clés (« 42.5 »). **Geste de Julien** : rien —
 > l'onglet marche avec les clés eBay déjà posées.
 

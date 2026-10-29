@@ -151,14 +151,17 @@ export default function RechercheEbay({ headers, theme: C, owner, repere }) {
         if (plafondJour && plafondJour === jourParis()) return;
         const k = cleV(v), c = CACHE.get(k);
         const visible = typeof document === 'undefined' || document.visibilityState !== 'hidden';
-        if (!force && c && !aRelire(c.lueA, Date.now(), visible)) { setFil((p) => (p[v.id] && p[v.id].lueA === c.lueA ? p : { ...p, [v.id]: { etat: 'lu', r: c.r, lueA: c.lueA } })); continue; }
+        if (!force && c && !aRelire(c.ici, Date.now(), visible)) { setFil((p) => (p[v.id] && p[v.id].lueA === c.lueA ? p : { ...p, [v.id]: { etat: 'lu', r: c.r, lueA: c.lueA } })); continue; }
         if (!visible) continue;
         setFil((p) => ({ ...p, [v.id]: { ...(p[v.id] || {}), etat: 'encours' } }));
         const res = await appeler(criteresDeVeille(v));
         if (!vivant.current) return;
         if (res.r) {
           const lueA = res.r.lueA || new Date().toISOString();
-          CACHE.set(k, { lueA, r: res.r });
+          // La borne des 15 min se juge sur l'horloge de CET appareil (l'heure où
+          // la réponse est arrivée ici), jamais sur celle du serveur : un
+          // téléphone en avance relisait à chaque minute, un en retard jamais.
+          CACHE.set(k, { lueA, ici: new Date().toISOString(), r: res.r });
           ecrireVus(owner, v.id, (res.r.items || []).map((x) => x.itemId));
           setFil((p) => ({ ...p, [v.id]: { etat: 'lu', r: res.r, lueA } }));
         } else {
