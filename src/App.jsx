@@ -123,7 +123,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.284.0';
+const EXT_ATTENDUE = '5.285.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -6647,21 +6647,31 @@ const fetchVintedConversations = async (account, page = 1, opts = {}) => {
 // "l'acheteur" on compare entity.user_id a opposite_user.id (fiable meme si
 // l'id vendeur differe du vinted_user_id du compte).
 const fetchVintedConversationDetail = async (account, conversationId, {force=false}={}) => {
-  // 1) Données moissonnées (si tu as déjà ouvert ce fil sur vinted.fr).
-  const h = await fetchHarvestConversation(account.vinted_user_id, conversationId);
-  if (!force && h && h.conversation) return { ok:true,conversation:h.conversation,source:'harvest' };
-  // 2) L'extension, depuis TON navigateur (5.135) : une lecture, au nom du
-  //    compte connecté dans Chrome. Refusée (autre compte, absente) ⇒ repli.
+  // Chaque canal peut être indisponible sans condamner les autres.
+  const correspond = c => c && Array.isArray(c.messages) && (c.id==null || String(c.id)===String(conversationId));
+  let h;
+  try { h = await fetchHarvestConversation(account.vinted_user_id, conversationId); } catch {}
+  if(!correspond(h?.conversation))h=null;
+  if (!force && h?.conversation) return { ok:true,conversation:h.conversation,source:'harvest' };
   if (extSait('messagerie') === 'ok') {
-    const r = await vmrExec({ uid: account.vinted_user_id, method: 'GET', endpoint: `/api/v2/conversations/${conversationId}` });
-    if (r && r.ok && r.data && r.data.conversation) { const c = fusionnerConversation(h?.conversation, r.data.conversation); if (c) return { ok: true, conversation: c, source: 'extension' }; }
+    try {
+      const r = await vmrExec({ uid: account.vinted_user_id, method: 'GET', endpoint: `/api/v2/conversations/${conversationId}` });
+      if (r?.ok && correspond(r.data?.conversation)) {
+        const c = fusionnerConversation(h?.conversation, r.data.conversation);
+        if (c) return { ok:true,conversation:c,source:'extension' };
+      }
+    } catch {}
   }
-  if(h?.conversation)return {ok:true,conversation:h.conversation,source:'harvest'};
-  // 3) Repli : proxy.
-  const res = await vintedApiCall(account, `/api/v2/conversations/${conversationId}`);
-  if (!res.ok) return { ok: false, error: res.status || res.error, conversation: null };
-  const c = fusionnerConversation(h?.conversation, res.data?.conversation);
-  return c ? { ok: true, conversation: c } : { ok:false,conversation:null,error:'Cette conversation n’a pas pu être lue.' };
+  // Le repli conserve la lecture connue ; il ne confirme pas une actualisation.
+  if (h?.conversation) return {ok:true,conversation:h.conversation,source:'harvest',actualisationNonConfirmee:force};
+  try {
+    const res = await vintedApiCall(account, `/api/v2/conversations/${conversationId}`);
+    if (res.ok && correspond(res.data?.conversation)) {
+      const c = fusionnerConversation(null, res.data?.conversation);
+      if (c) return {ok:true,conversation:c,source:'proxy'};
+    }
+  } catch {}
+  return {ok:false,conversation:null,error:'Cette conversation n’a pas pu être lue. Réessaie ou ouvre-la sur Vinted.'};
 };
 
 // Aplati les entites d'une conversation en messages affichables et tries.
@@ -12399,7 +12409,10 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
   const [lettreOn, setLettreOn] = useState(false);
   // (28 oct., sa demande : « ça met en brouillon puis ça publie ») Allumé par défaut
   // quand l'extension sait le faire ; il peut repasser à la création directe.
-  const [viaBrouillon, setViaBrouillon] = useState(true);
+  const [viaBrouillonChoix, setViaBrouillon] = useState(true);
+  // (29 oct., revue) Depuis la 5.277 l'extension passe TOUJOURS par un brouillon (comme Vintex) :
+  // décocher la case annonçait « créée directement en ligne » et figeait la file Vinted 1 à 3 min.
+  const viaBrouillon = extSait('republierpage') === 'ok' ? true : viaBrouillonChoix;
   const [lettres, setLettres] = useState({});
   const tirerLettres = (ids) => { const o = {}; ids.forEach((id) => { o[id] = 'abcdefghijklmnopqrstuvwxyz'[Math.floor(Math.random() * 26)]; }); setLettres(o); };
   const presets = (() => { const p = load('vrm_photo_presets', []); return Array.isArray(p) ? p.filter((x) => x && x.nom && x.r) : []; })();
@@ -12613,7 +12626,7 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
             {action === 'recreer' && <div data-republier-brouillon={viaBrouillon && brouillonOk ? 'oui' : 'non'} style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
               <span style={maj}>Publication</span>
               <label style={{ display: 'flex', gap: 10, alignItems: 'center', fontSize: 13.5, color: brouillonOk ? C.text : C.muted, minHeight: 44, cursor: brouillonOk ? 'pointer' : 'default' }}>
-                <input type="checkbox" data-republier-via-brouillon disabled={!brouillonOk} checked={viaBrouillon && !!brouillonOk} onChange={(ev) => setViaBrouillon(ev.target.checked)} style={{ width: 20, height: 20, accentColor: C.accent, flexShrink: 0 }} />
+                <input type="checkbox" data-republier-via-brouillon disabled={!brouillonOk || extSait('republierpage') === 'ok'} checked={viaBrouillon && !!brouillonOk} onChange={(ev) => setViaBrouillon(ev.target.checked)} style={{ width: 20, height: 20, accentColor: C.accent, flexShrink: 0 }} />
                 <span>Passer par un brouillon Vinted, puis le mettre en ligne</span>
               </label>
               <div style={{ fontSize: 12, color: C.muted }}>{brouillonOk ? (viaBrouillon ? (extSait('republierpage') === 'ok' ? 'Comme Vintex : tout passe par l’onglet vinted.fr ouvert dans ce Chrome (laisse-le ouvert, connecté sur le bon compte). Chaque annonce est enregistrée dans VRM, rangée en brouillon sur Vinted, PUIS l’ancienne est supprimée, et le brouillon est mis en ligne 1 à 3 min plus tard.' + (extSait('republierfile') === 'ok' ? ' À la suite, comme Vintex : pendant cette attente la paire suivante est déjà préparée (l’extension met chaque brouillon en ligne à son heure, même si tu fermes cette fenêtre).' : '') + ' Aucun essai en rafale : un refus s’arrête et le dit. Au plus 10 paires par jour et par compte. Si Vinted ne répond pas clairement, VRM s’arrête (jamais deux fois en ligne) ; rien n’est perdu, tout est enregistré dans VRM.' : `L’extension VRM installée ici fait encore l’ancienne republication (depuis son fond, avec des renvois automatiques) — mets-la à jour en ${EXT_CAPACITES.republierpage} : elle passera par l’onglet vinted.fr, comme le site.`) : 'L’annonce est créée directement en ligne.') : `Demande l'extension VRM ${EXT_CAPACITES.republierbrouillon} ou plus récente dans ce navigateur.`}</div>
@@ -37252,7 +37265,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // `undefined` en cours · `null` pas su · Map lue.
   const [offresConv, setOffresConv] = useState(undefined);
   const [openConv,setOpenConv]=useState(null);
-  const conversationRequest=React.useRef(0);
+  const conversationRequest=React.useRef(0),lectureConversationRequest=React.useRef(0);
   const conversationOrigin=React.useRef(null);
   const chatScroll=React.useRef(null);
   const [messageSearch,setMessageSearch]=useVueSession('messages-recherche', '');
@@ -40557,17 +40570,27 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const openConversation = async (conv) => {
     if(!conv?._acc || conv.id==null)return;
     conversationOrigin.current=document.activeElement;
-    const request=++conversationRequest.current;
+    const request=++conversationRequest.current,lecture=++lectureConversationRequest.current;
     const owner=AUTH.user?.id||'',brouillon=brouillonsReponse.current.lire(owner,conv._acc.vinted_user_id,conv.id);
     setReplyText(brouillon);setReplyErr(null);setReplyNotice(brouillon?'Brouillon restauré pour cette conversation. Conservation temporaire, sans sauvegarde sur le serveur.':'');setPrixOffre('');setContreOffreOuverte(false);setOffreMsg(null);if(!verrouOffre.current)setOffreBusy(false);
     setOpenConv({request,owner,inboxUpdatedAt:conv.updated_at,loading:true,error:null,conversation:null,messages:[],acc:conv._acc,convId:conv.id,header:{login:conv.opposite_user?.login,title:conv.item_title||conv.item?.title||'',photo:conv.opposite_user?.photo?.url || photoArticle({photos:conv.item_photos})}});
     const res=await fetchVintedConversationDetail(conv._acc,conv.id,{force:extSait('messagerie')==='ok'});
-    setOpenConv(o=>o?.request===request?({...o,loading:false,error:res.ok?null:res.error,source:res.source,conversation:filAvecOffres(res.conversation,conv._acc),messages:normalizeConversationMessages(filAvecOffres(res.conversation,conv._acc))}):o);
+    if(owner!==(AUTH.user?.id||'')||lecture!==lectureConversationRequest.current)return;
+    setOpenConv(o=>o?.request===request?({...o,loading:false,error:res.ok?null:res.error,refreshError:res.actualisationNonConfirmee?'Actualisation non confirmée. Le fil enregistré reste affiché ; réessaie ou ouvre-le sur Vinted.':null,source:res.source,conversation:filAvecOffres(res.conversation,conv._acc),messages:normalizeConversationMessages(filAvecOffres(res.conversation,conv._acc))}):o);
   };
   const actualiserConversation=async()=>{
-    const oc=openConv;if(!oc || oc.loading)return;
-    const res=await fetchVintedConversationDetail(oc.acc,oc.convId,{force:true});
-    setOpenConv(o=>o?.request===oc.request?({...o,error:res.ok?null:res.error,source:res.source,conversation:res.ok?filAvecOffres(res.conversation,oc.acc):o.conversation,messages:res.ok?normalizeConversationMessages(filAvecOffres(res.conversation,oc.acc)):o.messages}):o);
+    const oc=openConv;if(!oc||oc.loading||!oc.owner||oc.owner!==(AUTH.user?.id||''))return;
+    const lecture=++lectureConversationRequest.current;
+    setOpenConv(o=>o?.request===oc.request?{...o,refreshing:true,refreshError:null}:o);
+    let res;
+    try {res=await fetchVintedConversationDetail(oc.acc,oc.convId,{force:true});}
+    catch {res={ok:false};}
+    if(oc.owner!==(AUTH.user?.id||'')||lecture!==lectureConversationRequest.current)return;
+    setOpenConv(o=>{
+      if(o?.request!==oc.request)return o;
+      const c=res.ok?(res.actualisationNonConfirmee&&o.conversation?o.conversation:fusionnerConversation(o.conversation,res.conversation)):null;
+      return {...o,refreshing:false,error:c?null:o.error,refreshError:!c||res.actualisationNonConfirmee?'Actualisation non confirmée. Le fil enregistré reste affiché ; réessaie ou ouvre-le sur Vinted.':null,source:c?res.source:o.source,conversation:c?filAvecOffres(c,oc.acc):o.conversation,messages:c&&c!==o.conversation?normalizeConversationMessages(filAvecOffres(c,oc.acc)):o.messages};
+    });
   };
 
   // Envoi d'une réponse via l'extension (depuis le navigateur = ton IP, sans
@@ -40606,11 +40629,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           }
           if (openConv && String(openConv.acc?.vinted_user_id)===capture.uid && (capture.conv===null || capture.conv.has(String(openConv.convId)))) {
             const h = await fetchHarvestConversation(capture.uid,openConv.convId);
-            if (!arrete && h?.conversation) setOpenConv(prev=>{
-              if (prev?.request!==openConv.request) return prev;
-              const conversation=fusionnerConversation(prev.conversation,h.conversation);
-              return conversation?{...prev,conversation:filAvecOffres(conversation,prev.acc),messages:normalizeConversationMessages(filAvecOffres(conversation,prev.acc)),source:'harvest'}:prev;
-            });
+            if (!arrete && Array.isArray(h?.conversation?.messages) && (h.conversation.id==null || String(h.conversation.id)===String(openConv.convId)) && openConv.owner===(AUTH.user?.id||'') && conversationRequest.current===openConv.request) {
+              lectureConversationRequest.current++;
+              setOpenConv(prev=>{
+                if (prev?.request!==openConv.request) return prev;
+                const conversation=fusionnerConversation(prev.conversation,h.conversation);
+                return conversation?{...prev,loading:false,refreshing:false,refreshError:null,error:null,conversation:filAvecOffres(conversation,prev.acc),messages:normalizeConversationMessages(filAvecOffres(conversation,prev.acc)),source:'harvest'}:prev;
+              });
+            }
           }
         }
       },350);
@@ -40647,15 +40673,17 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     if(retour.etat==='incertain')setReponsesIncertaines(v=>({...v,[cle]:true}));
     if(conversationRequest.current!==oc.request)return;
     if(retour.etat==='confirme'){
+      // Une lecture commencée avant cet accusé ne doit pas effacer le message confirmé.
+      lectureConversationRequest.current++;
       setReplyText(v=>v.trim()===text?'':v);setReplyNotice(retour.texte);
-      setOpenConv(o=>o?.request===oc.request?({...o,messages:[...o.messages,{kind:'message',mine:true,body:text,ts:Date.now(),photos:[],links:[]}]}):o);
+      setOpenConv(o=>o?.request===oc.request?({...o,refreshing:false,messages:[...o.messages,{kind:'message',mine:true,body:text,ts:Date.now(),photos:[],links:[]}]}):o);
     }else setReplyErr(retour.texte);
   };
   const autoriserNouvelleReponse=async()=>{
-    const oc=openConv;if(!oc?.acc)return;
+    const oc=openConv;if(!oc?.acc||!oc.owner||oc.owner!==(AUTH.user?.id||''))return;
     const cle=cleReponseVinted(oc.acc.vinted_user_id,oc.convId);
     if(!await askConfirm({title:'Autoriser un nouvel envoi ?',desc:'Vérifie d’abord sur Vinted que le message n’est pas déjà présent. Cette action ne vérifie pas la réception et ne renvoie rien.',ok:'Autoriser',cancel:'Annuler'}))return;
-    if(conversationRequest.current!==oc.request)return;
+    if(oc.owner!==(AUTH.user?.id||'')||conversationRequest.current!==oc.request)return;
     setReponsesIncertaines(v=>{const n={...v};delete n[cle];return n;});setReplyErr(null);setReplyNotice('Nouvel envoi autorisé. Relis ton texte avant de l’envoyer.');
   };
 
@@ -40698,8 +40726,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       if(off&&(quoi==='accept'||quoi==='reject'))setOpenConv(o=>{if(o?.request!==oc.request)return o;const c=filAvecOffres(o.conversation,oc.acc);return {...o,conversation:c,messages:normalizeConversationMessages(c)};});
       setOffreMsg({ ok: quoi === 'accept' ? 'Prix accepté sur Vinted. Le paiement de la vente n’est pas confirmé par cette acceptation.' : quoi === 'reject' ? 'Offre refusée.' : `Offre de ${fmtE(p)} envoyée.` });
       if(quoi==='offre')setPrixOffre(v=>Number(String(v).replace(',','.'))===p?'':v);
+      const lecture=++lectureConversationRequest.current;
       const res = await fetchVintedConversationDetail(oc.acc,oc.convId,{force:true});
-      if (res.ok&&oc.owner===AUTH.user?.id) setOpenConv(o => o?.request===oc.request ? ({ ...o, conversation: filAvecOffres(res.conversation,oc.acc), messages: normalizeConversationMessages(filAvecOffres(res.conversation,oc.acc)) }) : o);
+      if (lecture===lectureConversationRequest.current&&oc.owner===AUTH.user?.id) setOpenConv(o => {
+        if(o?.request!==oc.request)return o;
+        const c=res.ok?(res.actualisationNonConfirmee&&o.conversation?o.conversation:fusionnerConversation(o.conversation,res.conversation)):null;
+        return {...o,refreshing:false,refreshError:!c||res.actualisationNonConfirmee?'Action confirmée, mais le fil n’a pas pu être actualisé. Réessaie ou ouvre-le sur Vinted.':null,...(c?{conversation:filAvecOffres(c,oc.acc),messages:c===o.conversation?o.messages:normalizeConversationMessages(filAvecOffres(c,oc.acc))}:{})};
+      });
     } else {
       setOffreMsg({ err: etat==='incertain'?'Action non confirmée. Vérifie sur Vinted avant de relancer.':r?.error||(typeof r?.data?.message==='string'?r.data.message:'')||'Vinted a refusé cette action.' });
     }
@@ -42861,8 +42894,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 <div className="vrm-chat-head-n" style={{color:C.text}}><span className="vrm-sensible">{openConv.header?.login||'Conversation'}</span></div>
                 <div className="vrm-chat-head-s" style={{color:C.muted}}>{[openConv.conversation?.transaction?.item_title||openConv.conversation?.transaction?.item?.title||openConv.header?.title, accName(openConv.acc)].filter(Boolean).join(' · ')}</div>
               </div>
-              <button className="vrm-icon-control vrm-chat-sync" type="button" aria-label="Actualiser la conversation" onClick={actualiserConversation} style={{color:C.muted}}><Icon name="sync" size={17}/></button>
+              <button className="vrm-icon-control vrm-chat-sync" type="button" aria-label={openConv.refreshing?"Actualisation en cours":"Actualiser la conversation"} disabled={openConv.loading||openConv.refreshing} aria-busy={!!openConv.refreshing} onClick={actualiserConversation} style={{color:C.muted}}><Icon name="sync" size={17}/></button>
             </div>
+            {openConv.refreshing&&<div className="vrm-chat-note vrm-chat-read" role="status" data-fil-actualisation style={{color:C.muted}}>Actualisation de la conversation…</div>}
+            {openConv.refreshError&&<div className="vrm-chat-note vrm-chat-read" role="alert" data-fil-actualisation-erreur style={{color:C.text}}><span>{openConv.refreshError} <a href={`https://www.vinted.fr/inbox/${openConv.convId}`} target="_blank" rel="noreferrer">Ouvrir sur Vinted ↗</a></span></div>}
             {!openConv.loading&&!openConv.error&&(()=>{const suivi=suiviNegociationVinted(openConv.conversation,openConv.acc?.vinted_user_id,etatOffreVinted);return suivi?<div className="vrm-chat-negociation-etat" role="status" title={suivi.detail}><b>{suivi.libelle}</b>{suivi.libelle==='Prix accepté'&&<small>{suivi.detail}</small>}</div>:null;})()}
             {!openConv.loading && !openConv.error && openConv.messages.some(m=>m.kind==='event' && /code|retrait|pickup|pin|suivi|tracking|colis|r[ée]cup[ée]rer|point relais/i.test(m.body)) && <div className="vrm-chat-shortcuts" style={{borderBottom:`1px solid ${C.border}`}}><button type="button" style={{color:C.accent}} onClick={()=>chatScroll.current?.querySelector('.vrm-chat-event-colis')?.scrollIntoView({block:'center',behavior:window.matchMedia('(prefers-reduced-motion:reduce)').matches?'auto':'smooth'})}>Retrait et suivi ↓</button></div>}
             <div ref={chatScroll} className="vrm-chat-history" style={{flex:1,overflow:'auto',padding:16,display:'flex',flexDirection:'column',gap:8}}>
