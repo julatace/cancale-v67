@@ -79,7 +79,7 @@ async function rendre(nav, etat, { carte = false, mode = '', geste = null, faux 
             : msg.action === 'codeVersion' ? (faux.codeMuet ? undefined : { ok: true, code: faux.code || null })
             // Une connexion qui met 300 ms : de quoi cliquer plusieurs fois.
             : msg.action === 'authLogin' ? (faux.loginRep || { ok: true, __lent: 300 })
-            // 5.281 : le fond dit si la lecture des transporteurs est permise ICI.
+            // 5.290 : le fond dit si la lecture des transporteurs est permise ICI.
             : msg.action === 'transpPermis' ? (faux.permis === undefined ? { ok: true } : { ok: true, permis: faux.permis, origines: ['https://www.mondialrelay.be/*', 'https://www.mondialrelay.fr/*', 'https://ws.chronopost.fr/*', 'https://carrier.vintedgo.com/*'] })
             : { ok: true };
           if (faux.codeMuet && msg.action === 'codeVersion') return;   // ne répond jamais
@@ -103,7 +103,7 @@ async function rendre(nav, etat, { carte = false, mode = '', geste = null, faux 
       },
       windows: { update: () => {} },
     };
-    // `chrome.permissions.request` (5.281) : noté, et l'on sait s'il part DANS le
+    // `chrome.permissions.request` (5.290) : noté, et l'on sait s'il part DANS le
     // geste (Firefox refuse une demande faite après une attente).
     window.__permisDemandes = [];
     window.__enClic = false;
@@ -257,7 +257,7 @@ const ouvrirMdp = async (pg) => { const a = await pg.$('#mdpLien'); if (a) { awa
     dit(/tab=plat_leboncoin$/.test(lbc.ouvert || ''), 'depuis Leboncoin : l’onglet Leboncoin de VRM', lbc.ouvert);
   });
 
-  // ── 2 bis. LE SUIVI DES TRANSPORTEURS (5.281) — la permission manque ────
+  // ── 2 bis. LE SUIVI DES TRANSPORTEURS (5.290) — la permission manque ────
   // Firefox peut laisser non accordées les permissions d'hôte MV3 : sans elles
   // l'extension se tait. Le seul endroit où le geste est possible est CETTE
   // fenêtre (une page de l'extension) : connectée, elle ne s'ouvre plus sur VRM

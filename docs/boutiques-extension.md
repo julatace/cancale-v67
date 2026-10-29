@@ -160,7 +160,7 @@ nouveau module** → envoyer `VRM-firefox.zip`.
   > l'onglet Vinted ou VRM ; `downloads` — reconnaître un bordereau PDF
   > téléchargé par l'utilisateur. Hôtes : les sites Vinted, Leboncoin, eBay,
   > Vestiaire Collective (lecture des pages ouvertes par l'utilisateur), la base
-  > Supabase de VRM et vrm.center ; et (5.281) les sites de SUIVI des
+  > Supabase de VRM et vrm.center ; et (5.290) les sites de SUIVI des
   > transporteurs — www.mondialrelay.be, www.mondialrelay.fr, ws.chronopost.fr,
   > carrier.vintedgo.com — pour lire le statut des colis que l'utilisateur
   > attend (une liste d'adresses exactes, 12 lectures par heure et par
@@ -206,7 +206,7 @@ un **compte Apple Developer Program (99 $ par an)**, et la revue de l'App Store.
    Safari → Réglages → Extensions → cocher VRM. Sur l'iPhone : Réglages →
    Apps → Safari → Extensions → VRM → Autoriser, et « Toujours autoriser » sur
    vinted.fr, leboncoin.fr, ebay.fr, vrm.center (Safari demande l'accès site par
-   site avant d'injecter) — et, pour le suivi des colis (5.281),
+   site avant d'injecter) — et, pour le suivi des colis (5.290),
    mondialrelay.be, mondialrelay.fr, ws.chronopost.fr, carrier.vintedgo.com.
 5. Product → Archive → **Distribute App** → App Store Connect → créer la fiche
    (même texte et confidentialité qu'ailleurs) → soumettre à la revue.
@@ -306,7 +306,7 @@ Une ancienne valeur `lbcUser` n'est plus acceptée seule comme preuve d'apparten
 
 Validation : 140 tests unitaires, build, audits session/comptes/ventes/restes, double vente/places, 28 contrôles de notification double vente avec deux vendeurs, ZIP, sans bruit et en-têtes. Test natif préparé dans `scripts/bancs/extension-leboncoin-installee.cjs` : chargement de l'extension réelle, service worker, scripts isolés, base et pages simulées. Il n'a PAS pu être exécuté ici : Chromium répond « Loading of unpacked extensions is disabled by the administrator » ; le téléchargement d'un navigateur de test est aussi refusé par la politique réseau (403). Aucune politique n'a été contournée. Ne pas annoncer ce test natif comme réussi, ni la capture du compte réel de l'utilisateur comme vérifiée.
 
-## 5.281 — le suivi des colis chez les transporteurs : quatre sites de plus
+## 5.290 — le suivi des colis chez les transporteurs : quatre sites de plus
 
 Julien, 24 octobre : « tu as juste à regarder sur le site du transporteur ». Le
 serveur lit Chronopost et (selon la mesure du chantier serveur) Vinted Go ; il ne
@@ -345,4 +345,4 @@ du navigateur (partitionnement possible), la nécessité du `Referer` (interdit 
 `fetch`, non envoyé), la réponse réelle du repli `_mvc` en GET, le déroulé de la
 demande de permission dans un vrai Firefox (la fenêtre peut se fermer quand la
 demande s'affiche ; la lecture repart à l'accord par `permissions.onAdded`).
-`web-ext lint` n'est pas installé dans ce conteneur : pas relancé pour la 5.281.
+`web-ext lint` n'est pas installé dans ce conteneur : pas relancé pour la 5.290.

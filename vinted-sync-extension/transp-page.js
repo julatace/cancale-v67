@@ -1,5 +1,5 @@
 // transp-page.js — monde isolé, sur les pages de SUIVI des transporteurs
-// (Mondial Relay, Chronopost, Vinted Go) que Julien ouvre lui-même (5.281).
+// (Mondial Relay, Chronopost, Vinted Go) que Julien ouvre lui-même (5.290).
 //
 // Il ne fait qu'UNE chose : dire au fond « une page de suivi est ouverte ». Le
 // message ne porte AUCUN n° de suivi, aucun code postal, rien lu dans la page :

@@ -247,7 +247,7 @@ function ouvrirVRM() {
   try { chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => aller(tabs && tabs[0] && tabs[0].url)); }
   catch (_) { aller(''); }
 }
-// ── LE SUIVI DES TRANSPORTEURS (5.281) ─────────────────────────────────────
+// ── LE SUIVI DES TRANSPORTEURS (5.290) ─────────────────────────────────────
 // L'extension lit le statut d'un colis sur le site du transporteur (Mondial
 // Relay, Chronopost, Vinted Go) depuis CE navigateur. Chrome accorde ces sites
 // à l'installation ; Firefox peut les laisser NON accordés (permissions d'hôte

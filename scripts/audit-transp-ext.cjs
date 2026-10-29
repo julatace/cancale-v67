@@ -1,5 +1,5 @@
 // ════════════════════════════════════════════════════════════════════════════
-//  AUDIT DU SUIVI LU CHEZ LES TRANSPORTEURS (5.281) — node scripts/audit-transp-ext.cjs
+//  AUDIT DU SUIVI LU CHEZ LES TRANSPORTEURS (5.290) — node scripts/audit-transp-ext.cjs
 //  Julien, 24 octobre : « tu as juste à regarder sur le site du transporteur,
 //  je ne te demande pas le code de retrait mais juste de regarder le statut ».
 //
@@ -56,6 +56,10 @@ const MUTATIONS = {
   file: ['function unTranspALaFois(fn) {\n  const suite = _chaineTransp.then(() => fn(), () => fn());', 'function unTranspALaFois(fn) {\n  const suite = Promise.resolve().then(() => fn());'],
   // un défi Cloudflare pris pour une réponse
   defi: ["  if (rep && rep.cfMitigated) return 'defi';", ''],
+  // (tour 2 n° 11) « lu » compté sur un 2xx du transporteur, quoi qu'ait jugé le serveur
+  'lu-sans-jugement': ["    if (j.res === 'ok') noterDiag(`transp_lu_${it.carrier}`);", "    if (rep && rep.statut >= 200 && rep.statut < 300) noterDiag(`transp_lu_${it.carrier}`);"],
+  // (tour 2 n° 10) la forme Vinted Go du serveur oubliée par l'extension
+  'forme-vg-12': ['  vinted: /^(?:\\d{16}|VGS\\d{13}|[0-9A-Z]{13}|\\d{12})$/,', '  vinted: /^(?:\\d{16}|VGS\\d{13}|[0-9A-Z]{13})$/,'],
 };
 
 const argv = process.argv;
@@ -146,7 +150,7 @@ function monter({ items = [], session = true, permis = true, store = {}, sur = {
   const fauxVrm = (req) => {
     if (vrm.reseau && vrm.reseau[req.mode]) return { reseau: true };
     if (req.mode === 'transp-a-lire') return vrm.aLire || { status: 200, body: { v: 1, items, pause: {} } };
-    if (req.mode === 'transp-brut') { brut.push(req.corps); const r = typeof vrm.brut === 'function' ? vrm.brut(req) : vrm.brut; return r || { status: 200, body: { ok: true, res: 'lu', etat: 'transit', change: !!vrm.change } }; }
+    if (req.mode === 'transp-brut') { brut.push(req.corps); const r = typeof vrm.brut === 'function' ? vrm.brut(req) : vrm.brut; return r || { status: 200, body: { ok: true, res: vrm.res || 'ok', etat: 'transit', change: !!vrm.change } }; }
     if (req.mode === 'transp') return typeof vrm.transp === 'function' ? vrm.transp(req) : { status: 200, body: { ok: true, lus: [], besoinNavigateur: [], pause: {} } };
     return { status: 404, body: { error: 'introuvable' } };
   };
@@ -270,6 +274,13 @@ const sansCommentaires = (s) => s.replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(
     const f = monter({ items: [ITEM.cp], vrm: { change: false } });
     await tick(f);
     dit(f.brut.length === 1 && evtsTransp(f).length === 0, "l'autre sens : `change:false` ne prévient pas l'app", JSON.stringify(evtsTransp(f)));
+  });
+  // (tour 2 n° 11) Une réponse 2xx que le SERVEUR n'a pas pu juger (`forme` :
+  // tronquée, inattendue) n'est pas comptée « lue ».
+  await essaie('jugée « forme » par le serveur', async () => {
+    const f = monter({ items: [ITEM.cp], vrm: { res: 'forme' } });
+    await tick(f);
+    dit(f.brut.length === 1 && !f.j.diags.some((d) => /^transp_lu_/.test(d)) && f.j.diags.includes('transp_relaye_forme_chronopost'), 'n° 11 : une réponse que le serveur juge « forme » n\'est jamais comptée `transp_lu_*` (comptée `transp_relaye_forme_*`)', JSON.stringify(f.j.diags));
   });
 
   // ── 3. VINTED N'EST PAS DANS LA BOUCLE ─────────────────────────────────────
@@ -533,6 +544,27 @@ const sansCommentaires = (s) => s.replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(
     const rg = await g.envoyer({ from: 'cancale-popup', action: 'transpPermis' });
     dit(!!rg && rg.permis === true, "l'autre sens : tout permis ⇒ `permis: true`", JSON.stringify(rg));
     dit(f.j.permisAjout.length === 1, 'une permission accordée relance la lecture (`permissions.onAdded`)', String(f.j.permisAjout.length));
+  });
+
+  // ── (tour 2 n° 10) DE BOUT EN BOUT : TOUT N° QUE C3 ANNONCE EST LU ─────────
+  // Le serveur (`aLireParNavigateur`, la vraie règle) annonce, après un refus,
+  // des n° de chaque forme qu'IL accepte ; l'extension doit les lire (une
+  // requête chez le transporteur), jamais les refuser en silence
+  // (`transp_item_refuse`). Avant : un Vinted Go à 12 chiffres annoncé, refusé.
+  await essaie('de bout en bout : un n° annoncé par C3 est accepté', async () => {
+    const T = await import('file://' + path.join(__dirname, '..', 'api', '_lib', 'transporteurs.js'));
+    const NOW = Date.now(), iso = (ms) => new Date(ms).toISOString();
+    const cas = [['vinted', '123456789012'], ['vinted', '1234567890123456'], ['vinted', 'VGS0000000000001'], ['chronopost', 'XW000000003TS'], ['chronopost', '12345678901234'], ['chronopost', '12345678901234A']];
+    for (const [carrier, n] of cas) {
+      const lignes = [{ suivi: n, carrier, status: 'available', subject: 'Ton colis est disponible', receivedAt: iso(NOW - 3600e3) }];
+      const transp = new Map([[n, { suivi: n, carrier, essai: iso(NOW - 60e3), essaiRes: 'bloque', essaiSource: 'serveur', essais: 1 }]]);
+      const items = T.aLireParNavigateur({ lignes, transp, maintenant: NOW });
+      const it = items.find((x) => x.suivi === n);
+      if (!it) { dit(false, `C3 annonce le n° ${carrier} ${n}`, JSON.stringify(items)); continue; }
+      const f = monter({ items: [it] });
+      await tick(f);
+      dit(urls(f).length >= 1, `C3 annonce ${carrier} ${n} (voie ${it.voie}) ⇒ l'extension le lit chez le transporteur`, JSON.stringify(urls(f)));
+    }
   });
 
   console.log(`\n${ok} contrôle(s) conforme(s), ${ko} non conforme(s).`);

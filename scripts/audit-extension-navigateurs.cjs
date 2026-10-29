@@ -244,7 +244,7 @@ const lire = (p) => { try { return fs.readFileSync(p, 'utf8'); } catch (_) { ret
     await essaie(`profil ${nom}`, async () => {
       let f = null, leve = null;
       const appels = { sync: 0, active: 0, photos: 0, relais: 0, capture: 0 };
-      // 5.281 : chaque profil a l'API `permissions` (Chrome, Firefox, Safari et
+      // 5.290 : chaque profil a l'API `permissions` (Chrome, Firefox, Safari et
       // Orion l'exposent) et ses sites accordés — la section J juge le refus.
       try { f = faireFond({ src: SRC_G, retirer, vinted: vintedBanc, permis: true }); } catch (e) { leve = e; }
       dit(!!f && !leve, `${nom} : le fond démarre sans lever`, leve ? String(leve.message || leve) : '');
@@ -333,7 +333,7 @@ const lire = (p) => { try { return fs.readFileSync(p, 'utf8'); } catch (_) { ret
     dit(tente === 1 && !r2, 'un refus ordinaire (onglet fermé) reste un refus, comme sur Chrome — aucun relais', String(tente));
   });
 
-  // ── J. Le suivi chez les transporteurs (5.281) : sans permission, SILENCE ──
+  // ── J. Le suivi chez les transporteurs (5.290) : sans permission, SILENCE ──
   //    Firefox peut laisser non accordées les permissions d'hôte MV3 ; Orion
   //    iPhone n'expose peut-être pas l'API des permissions. Dans les deux cas le
   //    fond ne demande RIEN (ni à VRM, ni au transporteur) et l'état le dit

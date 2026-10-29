@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.281.0';
+const CODE_VERSION = '5.290.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -2284,14 +2284,14 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     recevoirCookiesPage(msg, sender).then(sendResponse, () => sendResponse({ ok: false }));
     return true;
   }
-  // 5.281 : une page de suivi d'un transporteur est ouverte (transp-page.js).
+  // 5.290 : une page de suivi d'un transporteur est ouverte (transp-page.js).
   // Le message ne porte AUCUN n° : le fond le tire de l'adresse de l'onglet.
   if (msg && msg.from === 'vrm-transp' && msg.action === 'transpVu') {
     transpVu(msg, sender).then(sendResponse, () => sendResponse({ ok: false }));
     return true;
   }
   if (!msg || msg.from !== 'cancale-content') {
-    // 5.281 : la fenêtre de l'icône demande si la lecture des transporteurs est
+    // 5.290 : la fenêtre de l'icône demande si la lecture des transporteurs est
     // permise ICI (Firefox peut ne pas l'accorder) — et les sites à demander.
     if (msg && msg.from === 'cancale-popup' && msg.action === 'transpPermis') {
       permisTransp().then((p) => sendResponse({ ok: true, permis: p === null ? null : transpTousPermis(p), origines: transpOrigines() }), () => sendResponse({ ok: false }));
@@ -6989,7 +6989,7 @@ function surAlarme(a) {
   else if (a.name === 'vrm-relais') relaisTick('alarme');
   else if (a.name === 'vrm-lbc') relireLbcEnFond().catch(() => {});
   else if (a.name === 'vrm-offres') offresTick();
-  // 5.281 : le statut des colis chez le transporteur (voir `transpTick`).
+  // 5.290 : le statut des colis chez le transporteur (voir `transpTick`).
   else if (a.name === 'vrm-transp') transpTick('alarme');
   // Le tampon de diagnostic survit au worker (chrome.storage.local) ; encore
   // faut-il qu'il PARTE un jour. Sans ce réveil, un tampon posé juste avant
@@ -7044,7 +7044,7 @@ if (CAP.alarms) {
 
 // <transporteurs>
 // ══════════════════════════════════════════════════════════════════════════
-// LE STATUT DU COLIS CHEZ LE TRANSPORTEUR, LU DEPUIS CE NAVIGATEUR (5.281)
+// LE STATUT DU COLIS CHEZ LE TRANSPORTEUR, LU DEPUIS CE NAVIGATEUR (5.290)
 // ══════════════════════════════════════════════════════════════════════════
 // Julien, 24 octobre : « tu as juste à regarder sur le site du transporteur, je
 // ne te demande pas le code de retrait mais juste de regarder le statut » (il
@@ -7103,8 +7103,10 @@ const TRANSP_CARRIERS = ['mondialrelay', 'chronopost', 'vinted'];
 // borne ce qui entre dans une adresse.
 const TRANSP_FORME = {
   mondialrelay: /^\d{8}$/,
-  chronopost: /^(?:[A-Z]{2}\d{9}[A-Z]{2}|\d{14}[0-9A-Z])$/,
-  vinted: /^(?:\d{16}|VGS\d{13}|[0-9A-Z]{13})$/,
+  chronopost: /^(?:[A-Z]{2}\d{9}[A-Z]{2}|\d{14}[0-9A-Z]?)$/,
+  // (tour 2 n° 10) + 12 chiffres : la forme du SERVEUR (`FORME_SUIVI.vinted`), une
+  // seule forme des deux côtés — un n° que C3 annonce est toujours accepté ici.
+  vinted: /^(?:\d{16}|VGS\d{13}|[0-9A-Z]{13}|\d{12})$/,
 };
 const TRANSP_CP = /^\d{5}$/;
 const MR_BE_PAGE = 'https://www.mondialrelay.be/fr-be/suivi-de-colis/';
@@ -7112,8 +7114,9 @@ const TRANSP_URL_PERMISES = [
   /^https:\/\/www\.mondialrelay\.be\/fr-be\/suivi-de-colis\/$/,
   /^https:\/\/www\.mondialrelay\.be\/api\/tracking\?shipment=\d{8}&postcode=\d{5}&brand=&codePays=$/,
   /^https:\/\/www\.mondialrelay\.fr\/_mvc\/fr-FR\/SuiviExpedition\/RechercherJsonResponsive\?NumeroExpedition=\d{8}&CodePostal=\d{5}$/,
-  /^https:\/\/ws\.chronopost\.fr\/tracking-cxf\/TrackingServiceWS\/trackSkybillV2\?language=fr_FR&skybillNumber=(?:[A-Z]{2}\d{9}[A-Z]{2}|\d{14}[0-9A-Z])$/,
-  /^https:\/\/carrier\.vintedgo\.com\/public\/v3\/tracking_events\/(?:\d{16}|VGS\d{13}|[0-9A-Z]{13})$/,
+  // (tour 2 n° 10) Les formes des n° DÉRIVENT de `TRANSP_FORME` (une seule forme).
+  new RegExp('^https:\\/\\/ws\\.chronopost\\.fr\\/tracking-cxf\\/TrackingServiceWS\\/trackSkybillV2\\?language=fr_FR&skybillNumber=' + TRANSP_FORME.chronopost.source.replace(/^\^/, '').replace(/\$$/, '') + '$'),
+  new RegExp('^https:\\/\\/carrier\\.vintedgo\\.com\\/public\\/v3\\/tracking_events\\/' + TRANSP_FORME.vinted.source.replace(/^\^/, '').replace(/\$$/, '') + '$'),
 ];
 const urlTranspPermise = (u) => TRANSP_URL_PERMISES.some((re) => re.test(String(u || '')));
 const TRANSP_MAX_HEURE = 12;            // requêtes par heure ET par transporteur
@@ -7398,7 +7401,11 @@ async function relayerTransp(it, voie, rep, source, jeton) {
   }
   const { status, j } = await appelVrmTransp('transp-brut', jeton, body);
   if (status === 200 && j && j.ok) {
-    if (rep && rep.statut >= 200 && rep.statut < 300) noterDiag(`transp_lu_${it.carrier}`);
+    // (tour 2 n° 11) « Lu » seulement si le SERVEUR a pu juger la réponse (`ok`) :
+    // une réponse 2xx tronquée ou d'une forme inattendue (`forme`) n'est pas une
+    // lecture — elle est comptée à part, pour qu'on la voie.
+    if (j.res === 'ok') noterDiag(`transp_lu_${it.carrier}`);
+    else noterDiag(`transp_relaye_${String(j.res || 'inconnu').replace(/[^a-z-]/g, '').slice(0, 20) || 'inconnu'}_${it.carrier}`);
     if (j.change === true) notifierApp({ type: 'maj', quoi: 'transp', carrier: it.carrier, suivi: it.suivi });
     return { relaye: true, res: j.res || '', etat: j.etat || null, change: j.change === true };
   }
@@ -7877,7 +7884,7 @@ async function visiteVinted() {
     // 5.183 : une commande du téléphone attend peut-être — relevée à chaque
     // visite aussi (NOTRE base, pas Vinted ; ses propres gardes s'appliquent).
     relaisTick('visite').catch(() => {});
-    // 5.281 : les n° que le serveur ne peut pas lire chez le transporteur
+    // 5.290 : les n° que le serveur ne peut pas lire chez le transporteur
     // (Mondial Relay toujours) — un passage au plus toutes les 5 min, son
     // propre budget : rien de la visite Vinted n'est consommé ni attendu.
     transpTick('visite').catch(() => {});
@@ -10414,7 +10421,7 @@ async function etatNavigateur() {
   if (!CAP.scripting || CAP_MAIN_REFUSE) remplace.push('scripting');
   if (!CAP.downloads) remplace.push('downloads');
   if (!CAP.externe) remplace.push('externe');
-  // 5.281 : la lecture du suivi chez les transporteurs depuis CE navigateur.
+  // 5.290 : la lecture du suivi chez les transporteurs depuis CE navigateur.
   //   · `transporteurs` : une permission de site n'est pas accordée (Firefox) —
   //     la fenêtre de l'icône la demande ; le serveur, lui, lit ce qu'il peut ;
   //   · `transporteurs-passu` : l'API des permissions manque ou ne répond pas.

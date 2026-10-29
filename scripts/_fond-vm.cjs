@@ -14,7 +14,7 @@
 //    Vinted, ou l'autre site si l'onglet a navigué (`onglets[i].url` est lu à
 //    chaque injection, `location` la suit ; une requête partie hors de Vinted
 //    est notée dans `j.horsVinted` et reçoit la réponse de ce site : 403).
-//  · 5.281 : un faux TRANSPORTEUR (`transporteur(req)` → { status, body,
+//  · 5.290 : un faux TRANSPORTEUR (`transporteur(req)` → { status, body,
 //    headers } — Mondial Relay, Chronopost, Vinted Go) qui note chaque requête
 //    (adresse, en-têtes, `credentials`, `redirect`) et combien sont en vol ; un
 //    faux VRM (`vrm(req)` pour `https://vrm.center/api/…`, corps lu) ; l'API
@@ -226,7 +226,7 @@ function faireFond({ src, lignes = {}, vinted = () => ({ status: 404, body: {} }
       return ms > 0 ? new Promise((ok) => setTimeout(() => ok(res), ms)) : res;
     },
   };
-  // L'API `permissions` (5.281) : seulement si l'audit la décrit — sinon elle
+  // L'API `permissions` (5.290) : seulement si l'audit la décrit — sinon elle
   // manque, comme avant (le fond se tait : « pas su »).
   if (permis !== undefined) {
     const permisDe = (o) => (typeof permis === 'function' ? permis(o) : permis);
