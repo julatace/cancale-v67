@@ -109,6 +109,17 @@
 @media (max-width: 767px) {
   :root body .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche .vrm-fiche-geste { min-height: 55px !important; }
   :root body .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche [data-chiffres] > * { min-height: 56px !important; }
+  /* Une case qu'on tape (achat, mini, refuse, boost) : le BOUTON couvre la case
+     entière (≥ 56 px CSS, 45 sous le doigt) — un voile `::after` élargissait la
+     zone, mais le bouton lui-même restait à 30 px affichés. La valeur garde sa
+     place, en bas de la case, sous son libellé. */
+  :root body .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche .vrm-fiche-cell:has(> [data-edition]) { justify-content: flex-start !important; }
+  :root body .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche .vrm-fiche-cell [data-edition] {
+    position: absolute !important; inset: 0; width: auto; min-height: 0 !important; box-sizing: border-box;
+    align-items: flex-end; padding: 0 9px 7px !important; background: transparent !important; border-radius: inherit;
+  }
+  :root body .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche .vrm-fiche-duo .vrm-fiche-cell [data-edition] { padding: 0 11px 9px !important; }
+  :root body .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche .vrm-fiche-cell [data-edition]::after { content: none; }
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -157,13 +157,15 @@ async function sectionAnnonces(b, vp, sombre) {
       }
       const c1 = carte('9201');
       const gestes = c1 ? [...c1.querySelectorAll('[data-fiche-gestes] .vrm-fiche-geste')].filter((g) => g.offsetParent !== null).map((g) => ({ t: g.textContent.trim(), h: g.getBoundingClientRect().height })) : [];
+      // Les cases qu'on tape (prix d'achat, mini, refuse, boost) : c'est le BOUTON qui se mesure (pas un voile).
+      const cases = c1 ? [...c1.querySelectorAll('.vrm-fiche-cell [data-edition]')].filter((g) => g.offsetParent !== null).map((g) => ({ t: g.getAttribute('data-edition'), h: g.getBoundingClientRect().height })) : [];
       const fond = getComputedStyle(document.body).backgroundColor, fondCarte = c1 ? getComputedStyle(c1).backgroundColor : '';
       return {
         photo: box(c1 && c1.querySelector('[data-fiche-photo]')), carte: box(c1),
         etat: box(c1 && c1.querySelector('[data-fiche-etat]')), achat: box(c1 && c1.querySelector('[data-fiche-achat]')),
         achatEtat: c1 && (c1.querySelector('[data-fiche-achat]') || {}).getAttribute && c1.querySelector('[data-fiche-achat]').getAttribute('data-fiche-achat'),
         achat2: (carte('9202') && carte('9202').querySelector('[data-fiche-achat]') || { getAttribute: () => null }).getAttribute('data-fiche-achat'),
-        niveaux, mots, gestes,
+        niveaux, mots, gestes, cases,
         detailsGerer: document.querySelectorAll('details.vrm-ann-actions').length,
         plusVisible: !!(c1 && c1.querySelector('[data-fiche-plus]') && c1.querySelector('[data-fiche-plus]').offsetParent !== null),
         infos: !!(c1 && c1.querySelector('[data-fiche-infos] [data-prepa]')),
@@ -186,6 +188,7 @@ async function sectionAnnonces(b, vp, sombre) {
     dit(r.plusVisible && /Passeport/.test(noms) && /Marquer vendue/.test(noms) && /Relier un achat/.test(noms) && r.infos, `A ${nom} · ce qui était dans « ⋯ » est à la vue (gestes + infos de préparation)`, noms);
     const petits = r.gestes.filter((g) => g.h < (tel ? 43.5 : 35.5));
     dit(petits.length === 0, `A ${nom} · chaque geste fait ${tel ? '44' : '36'} px au moins`, petits.map((g) => `${g.t} ${Math.round(g.h)}`).join(' · '));
+    if (tel) { const cp = r.cases.filter((g) => g.h < 43.5); dit(r.cases.length >= 4 && cp.length === 0, `A ${nom} · chaque case qu'on tape (achat, mini, refuse, boost) fait 44 px au doigt`, `${r.cases.length} case(s) · ` + cp.map((g) => `${g.t} ${Math.round(g.h)}`).join(' · ')); }
     dit(r.sw <= r.cw + 1, `A ${nom} · aucun débordement horizontal`, `${r.sw} > ${r.cw}`);
     if (sombre) { const lb = lum(r.fond), lc = lum(r.fondCarte); dit(lb != null && lb < 0.05 && lc != null && lc < 0.08, `A ${nom} · fond et fiche sombres`, `${r.fond} · ${r.fondCarte}`); }
     // Saisie du prix d'achat EN PLACE, à côté de l'état : la carte le dit, et il est enregistré.
@@ -262,7 +265,13 @@ async function sectionCalendrier(b, vp, sombre) {
     const n0 = await lignes();
     dit(n0 === 5, `C ${nom} · Ventes : les cinq ventes inventées sans période`, n0);
     await ouvrirCalendrier(pg, '');
-    await pg.waitForTimeout(250);
+    // La feuille MONTE (animation) : on la mesure une fois arrivée — même boîte
+    // deux fois de suite à 120 ms d'écart — jamais au milieu du mouvement.
+    await pg.waitForFunction(() => {
+      const pan = document.querySelector('[data-periode-panneau]'); if (!pan) return false;
+      const q = pan.getBoundingClientRect(), k = [q.left, q.top, q.width, q.height].map(Math.round).join(',');
+      const ok = window.__vuiPan === k; window.__vuiPan = k; return ok;
+    }, null, { timeout: 8000, polling: 120 }).catch(() => {});
     await capture(pg, `calendrier-${vp.width}${sombre ? '-sombre' : ''}`);
     const p = await pg.evaluate(() => {
       const pan = document.querySelector('[data-periode-panneau]');
