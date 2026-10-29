@@ -1,7 +1,7 @@
 import React from 'react';
 import {createPortal} from 'react-dom';
 import {lireFavorisVinted,preparerMessageFavori,ageFavori,indexerContactsFavoris,articleFavoriVendu,executerFavoriDisponible} from './favorisVinted.js';
-import {lireReglagesFavoris,sauverReglagesFavoris,validerReglagesFavoris,offreFavori} from './reglagesFavoris.js';
+import {lireReglagesFavoris,sauverReglagesFavoris,validerReglagesFavoris,offreFavori,MESSAGE_PAR_DEFAUT} from './reglagesFavoris.js';
 import {personnaliserMessageFavori,prixOffreFavori,aDesVariablesFavori} from './favorisMessage.js';
 import {controleOuvertureFavori,echecVerificationFavori} from './favorisOuverture.js';
 import AutomatisationFavoris from './AutomatisationFavoris.jsx';
@@ -208,6 +208,7 @@ export default function FavorisVinted({uid,owner,ownerActuel,base,headers,nomCom
           <label>Ton message<textarea ref={champMessage} data-favoris-message disabled={preparation} maxLength={2000} rows={4} value={message} onChange={e=>{setMessage(e.target.value);change();}} placeholder="Bonjour {username}, merci pour ton favori !"/></label>
           <div className="vrm-favoris-variables" role="group" aria-label="Variables du message"><button type="button" data-favoris-variable="username" disabled={preparation} onClick={()=>inserer('{username}')}>{'{username}'}</button><button type="button" data-favoris-variable="variante" disabled={preparation} onClick={()=>inserer('{Bonjour|Salut}')}>{'{a|b}'} variante</button></div>
           <small>{'{username}'} : le pseudo de la personne. {'{Bonjour|Salut}'} : un des choix, tiré au hasard pour chaque message.</small>
+          {!message.trim()&&offreChoix!=='aucune'&&<small data-favoris-message-defaut>Message vide : VRM enverra « {MESSAGE_PAR_DEFAUT} » avec ton offre.</small>}
           <div className="vrm-favoris-offre" data-favoris-offre={offreChoix}>
             <strong>Offre de prix Vinted</strong>
             <div role="group" aria-label="Offre de prix" className="vrm-favoris-segment">{[['aucune','Sans offre'],['diminuer','Diminuer'],['fixer','Fixer à']].map(([id,l])=><button type="button" key={id} data-favoris-offre-choix={id} disabled={preparation} aria-pressed={offreChoix===id} onClick={()=>{setOffreChoix(id);change();}}>{l}</button>)}</div>

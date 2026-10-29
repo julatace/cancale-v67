@@ -10,6 +10,7 @@ function identite({uid,owner,ownerActuel}) {
 // L'offre Vinted jointe au message (29 oct., comme Vintex) : « Diminuer » d'un
 // pourcentage (`pourcentage`, forme d'avant) ou d'un montant en euros, ou
 // « Fixer à » un prix ; arrondi à l'euro inférieur en option. Rien = pas d'offre.
+export const MESSAGE_PAR_DEFAUT='Bonjour ! Tu as mis cet article en favori : je te propose une offre dessus.';
 const MONTANT=/^\d{1,5}(?:[.,]\d{1,2})?$/;
 export function offreFavori({pourcentage=null,offreMode=null,offreValeur=null,arrondi=false}={}){
   const mode=offreMode==null||offreMode===''||offreMode==='aucune'?(String(pourcentage??'').trim()?'pct':null):offreMode;
@@ -40,10 +41,15 @@ export function validerReglagesFavoris({message='',pourcentage=null,offreMode=nu
     if(Number(maxTexte)>Number(intervalle))max=Number(maxTexte);
   }
   const o=offreFavori({pourcentage,offreMode,offreValeur,arrondi});
-  const m=preparerMessageFavori(message,o.pourcentage);
+  // (29 oct., « tout à l'heure ça marchait ») Avant la 5.281, un message VIDE avec une
+  // réduction partait avec « Je te propose une réduction… ». Message vide + offre ⇒ ce
+  // texte par défaut (sans variable : toute extension sait l'envoyer). Sans offre, un
+  // message vide n'a rien à envoyer : refusé.
+  const texte=message.trim()?message:(o.offreMode?MESSAGE_PAR_DEFAUT:'');
+  const m=preparerMessageFavori(texte,o.pourcentage);
   if(m.erreur)throw Error(m.erreur);
-  if(!m.message)throw Error('Écris le message avant d’enregistrer : Vinted n’envoie pas d’offre sans texte.');
-  return {version:1,message:message.trim(),...o,intervalleMinutes:Number(intervalle),intervalleMaxMinutes:max,envoisActifs:false};
+  if(!m.message)throw Error('Écris un message, ou choisis une offre : sans l’un ni l’autre, il n’y a rien à envoyer.');
+  return {version:1,message:texte.trim(),...o,intervalleMinutes:Number(intervalle),intervalleMaxMinutes:max,envoisActifs:false};
 }
 export async function lireReglagesFavoris(opts) {
   const id=identite(opts),{owner,ownerActuel,base,headers,fetcher=fetch}=opts;

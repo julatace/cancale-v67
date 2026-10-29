@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
 import {erreurVariablesFavori,personnaliserMessageFavori,prixOffreFavori} from '../../src/favorisMessage.js';
-import {validerReglagesFavoris,offreFavori} from '../../src/reglagesFavoris.js';
+import {validerReglagesFavoris,offreFavori,MESSAGE_PAR_DEFAUT} from '../../src/reglagesFavoris.js';
 import {lancerFile,reserverFile,consommerFile,RefusFavoris} from '../../api/_lib/favoris-file.js';
 
 const bloc=t=>{const a=t.indexOf('// <favoris-message-regle>'),b=t.indexOf('// </favoris-message-regle>');assert.ok(a>=0&&b>a,'balises présentes');return t.slice(a,b);};
@@ -47,7 +47,11 @@ test('réglages : formes d’avant lues telles quelles, nouvelles formes validé
   assert.equal(r.offreMode,'pct');assert.equal(r.pourcentage,10);assert.equal(r.message,'Merci','plus de phrase ajoutée au texte');
   const e=validerReglagesFavoris({message:'Merci {username}',offreMode:'euros',offreValeur:'4,50',arrondi:true,intervalleMinutes:0});
   assert.deepEqual([e.offreMode,e.offreValeur,e.arrondi,e.pourcentage],['euros',4.5,true,null]);
-  assert.throws(()=>validerReglagesFavoris({message:'',pourcentage:10,intervalleMinutes:0}),/message/);
+  // (29 oct., « tout à l'heure ça marchait ») message vide + offre ⇒ le texte par défaut ; vide sans offre ⇒ refusé.
+  const v=validerReglagesFavoris({message:'',pourcentage:10,intervalleMinutes:0});
+  assert.equal(v.message,MESSAGE_PAR_DEFAUT);assert.equal(v.pourcentage,10);
+  assert.equal(validerReglagesFavoris({message:'  ',offreMode:'prix',offreValeur:'45',intervalleMinutes:0}).message,MESSAGE_PAR_DEFAUT);
+  assert.throws(()=>validerReglagesFavoris({message:'',intervalleMinutes:0}),/message/);
   assert.throws(()=>validerReglagesFavoris({message:'Salut {nom}',intervalleMinutes:0}),/Variable inconnue/);
   assert.throws(()=>offreFavori({offreMode:'prix',offreValeur:'0,50'}));
   assert.deepEqual(offreFavori({}),{pourcentage:null,offreMode:null,offreValeur:null,arrondi:false});
