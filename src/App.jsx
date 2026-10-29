@@ -5605,6 +5605,73 @@ const rappelUrssaf = ({ freq, now = new Date(), declare = null, ligne = null, ta
   const aNoter = yms.filter((ym) => !moisDeclare(declare, ym));
   return { text, sub, label: due.label, dueIso: `${due.dueDate.getFullYear()}-${String(due.dueDate.getMonth() + 1).padStart(2, '0')}-${String(due.dueDate.getDate()).padStart(2, '0')}`, daysLeft: due.daysLeft, ca, apayer, partiel, proche, mois: yms, aNoter };
 };
+// ── LE SUIVI DE SES DÉCLARATIONS URSSAF (29 octobre) ─────────────────────
+// Julien : « pour l'URSSAF fait un vrai suivi ». Une ligne par période (mois ou
+// trimestre, SON rythme), des 12 derniers mois : son échéance, son état
+// (déclarée · à déclarer · en retard · en cours), ce qu'il a DÉCLARÉ (le CA et
+// le montant notés par « J'ai déclaré ce mois », `vrm_urssaf_declare`) à côté de
+// ce que VRM compte AUJOURD'HUI (la ligne publiée, `montantPeriodeUrssaf` — la
+// règle du rappel et de la carte, §11). L'écart se DIT, jamais corrigé : une
+// déclaration faite est faite (un compte retiré, une vente annulée font baisser
+// le chiffre de VRM ; une vente arrivée après la déclaration le fait monter).
+// Registre pas lu ⇒ `null` (« pas su », aucune ligne dite « en retard »).
+const periodesUrssaf = (freq, now = new Date()) => {
+  const out = [];
+  const Y = now.getFullYear(), M = now.getMonth();
+  if (freq === 'mensuel') {
+    for (let k = 11; k >= 0; k--) {
+      const ps = new Date(Y, M - k, 1), pe = new Date(ps.getFullYear(), ps.getMonth() + 1, 0);
+      out.push({ periodStart: ps, periodEnd: pe, dueDate: new Date(ps.getFullYear(), ps.getMonth() + 2, 0), label: `${MOIS_NOMS_FR[ps.getMonth()]} ${ps.getFullYear()}` });
+    }
+  } else {
+    const q0 = Math.floor(M / 3);
+    for (let k = 4; k >= 0; k--) {
+      const qi = q0 - k, y = Y + Math.floor(qi / 4), q = ((qi % 4) + 4) % 4;
+      const ps = new Date(y, q * 3, 1), pe = new Date(y, q * 3 + 3, 0);
+      out.push({ periodStart: ps, periodEnd: pe, dueDate: new Date(y, q * 3 + 4, 0), label: `T${q + 1} ${y}` });
+    }
+  }
+  return out;
+};
+const suiviUrssaf = ({ freq, now = new Date(), declare, ligne, taux = tauxUrssaf() } = {}) => {
+  if (!declare || typeof declare !== 'object' || Array.isArray(declare)) return null;
+  const aujourdhui = _startOfDay(now);
+  const lignes = [];
+  for (const p of periodesUrssaf(freq, now)) {
+    const yms = moisPeriodeUrssaf(p);
+    const notes = yms.filter((ym) => moisDeclare(declare, ym));
+    const finie = aujourdhui > _startOfDay(p.periodEnd);
+    const etat = notes.length === yms.length ? 'declaree' : !finie ? 'en_cours' : aujourdhui > _startOfDay(p.dueDate) ? 'en_retard' : 'a_declarer';
+    const calc = montantPeriodeUrssaf(p, ligne, taux);
+    let caDecl = null, montant = null, at = 0, regle = null;
+    if (notes.length) {
+      caDecl = Math.round(notes.reduce((t, ym) => t + (Number(declare[ym].ca) || 0), 0) * 100) / 100;
+      const ms = notes.map((ym) => declare[ym].montant);
+      montant = ms.every((x) => x != null && isFinite(Number(x))) ? Math.round(ms.reduce((t, x) => t + Number(x), 0) * 100) / 100 : null;
+      at = Math.max(...notes.map((ym) => Number(declare[ym].at) || 0));
+      regle = notes.map((ym) => declare[ym].regle).includes('vente') ? 'vente' : 'versement';
+    }
+    // L'écart ne se juge que sur une période ENTIÈREMENT notée et un chiffre de
+    // VRM complet (« au moins » ne prouve aucun écart).
+    const ecart = etat === 'declaree' && calc.ca != null && !calc.partiel ? Math.round((calc.ca - caDecl) * 100) / 100 : null;
+    // Une période sans rien (pas de vente comptée, rien noté, finie depuis
+    // longtemps) ne s'affiche pas : du bruit.
+    if (!notes.length && finie && calc.ca === 0 && !calc.partiel) continue;   // rien vendu : rien à déclarer
+    lignes.push({ label: p.label, yms, aNoter: yms.filter((ym) => !moisDeclare(declare, ym)), dueDate: p.dueDate, etat, caCalc: calc.ca, aPayerCalc: calc.apayer, partiel: calc.partiel, caDecl, montant, at, regle, ecart: ecart != null && Math.abs(ecart) >= 1 ? ecart : (ecart != null ? 0 : null) });
+  }
+  const annee = String(now.getFullYear());
+  let caAnnee = 0, montantAnnee = 0, montantsConnus = true, nAnnee = 0;
+  for (const [ym, d] of Object.entries(declare)) {
+    if (!d || !Array.isArray(d.ids) || ym.slice(0, 4) !== annee) continue;
+    nAnnee++; caAnnee += Number(d.ca) || 0;
+    if (d.montant != null && isFinite(Number(d.montant))) montantAnnee += Number(d.montant); else montantsConnus = false;
+  }
+  return {
+    lignes: lignes.reverse(),
+    annee: { annee, n: nAnnee, ca: Math.round(caAnnee * 100) / 100, montant: nAnnee && montantsConnus ? Math.round(montantAnnee * 100) / 100 : null, montantEstime: nAnnee ? aPayerUrssaf(caAnnee, taux) : null },
+    enRetard: lignes.filter((l) => l.etat === 'en_retard').length,
+  };
+};
 // ── BÉNÉFICE BRUT ET NET (19 octobre) — UNE règle, deux écrans (§11) ────────
 // L'écran Ventes (`totals`) et Comptabilité (« Ton bénéfice ») passent par ici :
 // Ventes cumule ses ventes, et PUBLIE ses cumuls par jour (`vrm_benefice_jours`)
@@ -32684,7 +32751,73 @@ function StatutFiscal({ liveStats, onNav }) {
         </div>
       </Card>
       <CarteUrssafMois liveStats={liveStats} onNav={onNav} />
+      <SuiviUrssaf onNav={onNav} />
     </>
+  );
+}
+function SuiviUrssaf({ onNav }) {
+  const v = useLigneUrssaf();
+  const [regLu, regPret] = useLigneSynchro('vrm_urssaf_declare', lireDeclarations);
+  const [freq] = React.useState(() => load('vinted_urssaf_freq', 'trimestriel'));
+  const [ouvert, setOuvert] = React.useState(false);
+  const suivi = React.useMemo(() => regPret ? suiviUrssaf({ freq: load('vinted_urssaf_freq', freq), declare: regLu, ligne: v }) : undefined, [regPret, regLu, v, freq]);
+  const eur = (n) => n == null ? '—' : `${Number(n).toFixed(2).replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, ' ')} €`;
+  const jour = (d) => new Date(d).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' });
+  const ETAT = { declaree: 'Notée déclarée', a_declarer: 'À déclarer', en_retard: 'Pas notée', en_cours: 'En cours' };
+  const titre = <div style={{ fontSize: 15, fontWeight: 700, color: C.text }}>Suivi de tes déclarations URSSAF</div>;
+  if (suivi === undefined) return <Card style={{ padding: '14px 16px', marginTop: 12 }}><div data-suivi-urssaf="charge">{titre}<div style={{ fontSize: 13, color: C.muted, marginTop: 6 }}>Lecture de tes déclarations…</div></div></Card>;
+  if (suivi === null) return <Card style={{ padding: '14px 16px', marginTop: 12 }}><div data-suivi-urssaf="passu">{titre}<div style={{ fontSize: 13, color: C.muted, marginTop: 6 }}>Je n'ai pas pu lire tes déclarations notées — rien n'est perdu, rouvre cet écran.</div></div></Card>;
+  const lignes = ouvert ? suivi.lignes : suivi.lignes.slice(0, 4);
+  const a = suivi.annee;
+  return (
+    <Card style={{ padding: '14px 16px', marginTop: 12 }}>
+      <div data-suivi-urssaf="lu" data-suivi-retard={String(suivi.enRetard)}>
+        {titre}
+        <div data-suivi-annee={a.annee} data-suivi-annee-ca={String(a.ca)} style={{ fontSize: 13, color: C.muted, marginTop: 4, lineHeight: 1.5 }}>
+          {a.n === 0 ? <>Aucune déclaration notée en {a.annee}. Après chaque déclaration sur l'URSSAF, touche « C'est déclaré » : VRM garde ce que tu as déclaré.</>
+            : <>{a.annee} : <b style={{ color: C.text }}>{eur(a.ca)}</b> déclarés sur {a.n} mois · {a.montant != null ? <>cotisations notées <b style={{ color: C.text }}>{eur(a.montant)}</b></> : <>cotisations ≈ <b style={{ color: C.text }}>{eur(a.montantEstime)}</b> (estimées : tape le montant de l'URSSAF en notant le mois)</>}</>}
+        </div>
+        {suivi.enRetard > 0 ? <div data-suivi-retard-texte="" style={{ fontSize: 13, color: C.text, marginTop: 8, lineHeight: 1.5 }}>{suivi.enRetard === 1 ? '1 période passée n\'est' : `${suivi.enRetard} périodes passées ne sont`} pas notée{suivi.enRetard > 1 ? 's' : ''} « déclarée ». Si tu l'as déjà déclarée sur l'URSSAF, touche « C'est déclaré » pour la noter ; sinon, déclare-la vite (une déclaration en retard peut coûter une pénalité).</div> : null}
+        {suivi.lignes.length === 0 ? <div style={{ fontSize: 13, color: C.muted, marginTop: 10 }}>Rien à suivre sur les derniers mois.</div> : (
+          <div style={{ display: 'flex', flexDirection: 'column', marginTop: 10 }}>
+            {lignes.map((l) => {
+              const alerte = l.etat === 'en_retard';
+              return (
+                <div key={l.label} data-suivi-periode={l.label} data-suivi-etat={l.etat} data-suivi-calc={l.caCalc == null ? '' : String(l.caCalc)} data-suivi-decl={l.caDecl == null ? '' : String(l.caDecl)} data-suivi-ecart={l.ecart == null ? '' : String(l.ecart)}
+                  style={{ borderTop: `1px solid ${C.border}`, padding: '10px 0', display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
+                    <span style={{ fontSize: 14, fontWeight: 600, color: C.text, textTransform: 'capitalize' }}>{l.label}</span>
+                    <span style={{ fontSize: 12, fontWeight: 600, color: alerte ? (C.warn || C.amber || '#B7791F') : C.muted }}>{ETAT[l.etat]}{l.etat === 'declaree' && l.at ? ` le ${jour(l.at)}` : l.etat === 'en_cours' ? '' : l.etat === 'en_retard' ? ` · échéance passée le ${jour(l.dueDate)}` : ` · avant le ${jour(l.dueDate)}`}</span>
+                  </div>
+                  {l.etat === 'declaree' ? (
+                    <div style={{ fontSize: 13, color: C.muted, lineHeight: 1.5 }}>
+                      Déclaré <b style={{ color: C.text }}>{eur(l.caDecl)}</b>{l.regle === 'vente' ? ' (à la date de vente)' : ''} · payé {l.montant != null ? <b style={{ color: C.text }}>{eur(l.montant)}</b> : <span>— (pas noté)</span>}
+                      {l.ecart ? <div data-suivi-ecart-texte="" style={{ marginTop: 2 }}>{l.ecart < 0
+                        ? <>VRM compte aujourd'hui <b style={{ color: C.text }}>{eur(-l.ecart)}</b> de moins (des ventes déclarées ne sont plus dans VRM : compte retiré, vente annulée). Ta déclaration reste celle-là.</>
+                        : <>VRM compte aujourd'hui <b style={{ color: C.text }}>{eur(l.ecart)}</b> de plus : des ventes de cette période ne sont dans aucune déclaration — à ajouter à la prochaine (régularisation).</>}</div> : null}
+                    </div>
+                  ) : (
+                    <div style={{ fontSize: 13, color: C.muted, lineHeight: 1.5 }}>
+                      {l.caCalc == null ? 'Le montant se calcule dans Ventes (ouvre-le une fois).' : <>Reçu {l.partiel ? 'au moins ' : ''}<b style={{ color: C.text }}>{eur(l.caCalc)}</b> · à payer ≈ {l.partiel ? 'au moins ' : ''}<b style={{ color: C.text }}>{eur(l.aPayerCalc)}</b>{l.etat === 'en_cours' ? ' (période en cours)' : ''}</>}
+                      {l.yms.length > 1 && l.aNoter.length < l.yms.length ? <> · noté : {l.yms.length - l.aNoter.length} mois sur {l.yms.length}</> : null}
+                    </div>
+                  )}
+                  {(l.etat === 'a_declarer' || l.etat === 'en_retard') && l.aNoter.length > 0 ? (
+                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 2 }}>
+                      <button type="button" data-suivi-noter={l.aNoter[0]} onClick={() => demanderDeclaration(l.aNoter[0], onNav)}
+                        style={{ fontSize: 13, fontWeight: 600, color: C.text, background: 'transparent', border: `1px solid ${C.border}`, borderRadius: 10, padding: '8px 14px', minHeight: 44, cursor: 'pointer', fontFamily: 'inherit' }}>
+                        {l.yms.length > 1 ? `C'est déclaré — noter ${MOIS_NOMS_FR[Number(l.aNoter[0].slice(5)) - 1]}` : "C'est déclaré"}
+                      </button>
+                    </div>
+                  ) : null}
+                </div>
+              );
+            })}
+            {suivi.lignes.length > 4 ? <button type="button" className="vrm-lien-action" data-suivi-tout="" onClick={() => setOuvert((o) => !o)} style={{ background: 'none', border: 'none', color: C.accent, fontSize: 13, fontWeight: 600, padding: 0, minHeight: 44, cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left' }}>{ouvert ? 'Moins' : `Voir les ${suivi.lignes.length} périodes`}</button> : null}
+          </div>
+        )}
+      </div>
+    </Card>
   );
 }
 function CarteUrssafMois({ liveStats, onNav }) {

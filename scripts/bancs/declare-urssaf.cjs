@@ -186,6 +186,11 @@ const juge = (cs, quoi) => {
         await aller(pg, 'compta', '[data-compta-urssaf]', 2500);
         const bt = await pg.evaluate(() => [...document.querySelectorAll('[data-urssaf-cest-declare]')].map((e) => e.getAttribute('data-urssaf-cest-declare')));
         dit(bt.length === 1 && bt[0] === '2026-09', `A ${T} : la carte URSSAF de Comptabilité porte « C'est déclaré », pour septembre`, JSON.stringify(bt));
+        // (29 oct.) Le suivi des déclarations : septembre, pas encore noté, a sa ligne et son geste.
+        await pg.waitForSelector('[data-suivi-urssaf="lu"]', { timeout: 8000 }).catch(() => {});
+        const su = await pg.evaluate(() => { const c = document.querySelector('[data-suivi-urssaf]'); if (!c) return null; const l = c.querySelector('[data-suivi-periode="septembre 2026"]'); return { etat: c.getAttribute('data-suivi-urssaf'), sept: l && l.getAttribute('data-suivi-etat'), noter: l && !!l.querySelector('[data-suivi-noter="2026-09"]') }; });
+        dit(!!su && su.etat === 'lu' && su.sept === 'a_declarer' && su.noter, `A ${T} : le suivi URSSAF montre septembre « à déclarer », avec « C'est déclaré »`, JSON.stringify(su));
+        if (process.env.SHOTS) { const el = await pg.$('[data-suivi-urssaf]'); if (el) await el.screenshot({ path: `${process.env.SHOTS}/suivi-${T.replace(/\W+/g, '')}.png` }); }
         await sain(pg, `Comptabilité ${T}`);
         if (bt.length) {
           await touche(pg, '[data-urssaf-cest-declare]', vp);

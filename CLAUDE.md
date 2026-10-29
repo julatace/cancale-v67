@@ -1,5 +1,16 @@
 # VRM — dossier de passation
 
+> **29 octobre — un VRAI suivi de ses déclarations URSSAF (Comptabilité) :** Julien : « pour l'URSSAF fait un vrai suivi ».
+> Carte « Suivi de tes déclarations URSSAF » (`SuiviUrssaf`, sous la carte URSSAF, règle pure `suiviUrssaf` +
+> `periodesUrssaf`) : une ligne par période des 12 derniers mois (mois ou trimestre, SON rythme) — échéance, état
+> (`declaree` notée « déclarée » le … · `a_declarer` · `en_retard` = « Pas notée », échéance passée · `en_cours`), ce qu'il
+> a DÉCLARÉ (CA et montant notés par « J'ai déclaré ce mois », `vrm_urssaf_declare`) et ce que VRM compte AUJOURD'HUI
+> (`montantPeriodeUrssaf`, §11). L'écart se DIT, jamais corrigé (moins : ventes déclarées plus dans VRM — compte retiré,
+> vente annulée ; plus : à régulariser) ; un chiffre « au moins » n'affirme aucun écart. Total de l'année (CA déclaré,
+> cotisations notées sinon estimées). « C'est déclaré » passe par le formulaire du rapport (`demanderDeclaration`).
+> Registre pas lu ⇒ « pas su », aucune période dite pas notée. Preuves : `audit-suivi-urssaf.cjs` (13 ; `--prouve` 3
+> rouges), banc `declare-urssaf.cjs` A (+1 contrôle par taille ; ses 5 rouges E/F le sont déjà sur `main`).
+
 > **29 octobre — shop_cancale : TOUT est retiré, ventes comprises (sa décision) :** Julien : « en vrai retire tout de ce
 > compte » (après lui avoir dit que ses ventes sortaient alors de son CA déclaré). Un compte supprimé pour de bon
 > (`vrm_blocked_accounts`, rangé sur l'appareil `vrm_comptes_supprimes`) ne sort plus d'AUCUNE lecture :
