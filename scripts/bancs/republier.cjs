@@ -259,6 +259,11 @@ const projette = (row, sel) => {
           dit(det === 'photos:fait,enregistrement:fait,suppression:fait,brouillon:encours,attente:avenir,en-ligne:avenir', 'la barre détaille CHAQUE étape (✓ faites, ● en cours, ○ à venir)', det || 'absente');
           const txtDet = await pg.locator('[data-republier-progression="9103"] [data-etape-detail="photos"]').innerText().catch(() => '');
           dit(/3 photos/.test(txtDet), 'l’étape des photos dit combien sont parties (« 3 photos »)', txtDet || 'absente');
+          const ev = (d) => pg.evaluate((x) => window.dispatchEvent(new CustomEvent('vrm:ext', { detail: { type: 'maj', quoi: 'repub', id: '9103', ...x } })), d);
+          await ev({ etape: 'secours-photos', renvoi: true, essai: 3, essais: 3, fait: 5, total: 14 });
+          const txtSec = await pg.locator('[data-republier-progression="9103"] [data-etape-detail="en-ligne"]').innerText().catch(() => '');
+          dit(/essai 3 sur 3/.test(txtSec) && /photo 6 sur 14/.test(txtSec), 'photos refusées : la barre dit l’essai (3 sur 3) et la photo renvoyée (6 sur 14)', txtSec || 'absente');
+          await ev({ etape: 'brouillon' });
           // (28 oct., sa demande) Le compte rendu est écrit à chaque pas, pendant la file.
           globalThis.__jMid = await pg.evaluate(() => localStorage.getItem('vrm_operation_repub'));
           let jm = {}; try { jm = JSON.parse(globalThis.__jMid || '{}'); } catch (_) {}

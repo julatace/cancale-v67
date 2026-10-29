@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.272.0';
+const CODE_VERSION = '5.273.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -6968,7 +6968,7 @@ function alarmeSiAbsente(nom, opts) {
 // ouvert, on complète tout seul (Julien, 29 sept.). Voir `tickPhotos`.
 // 5.183 : le relais du téléphone (`vrm-relais`, 30 s, le minimum de Chrome).
 // Rien ne part sans session VRM (voir `relaisTick`).
-const PERIODES = { 'cancale-sync': 10, 'cancale-active': 20, 'vrm-session': 40, 'vrm-photos': 1, 'vrm-relais': 0.5, 'vrm-lbc': 30 };
+const PERIODES = { 'cancale-sync': 10, 'cancale-active': 20, 'vrm-session': 40, 'vrm-photos': 1, 'vrm-relais': 0.5, 'vrm-lbc': 30, 'vrm-offres': 1 };
 function surAlarme(a) {
   if (a.name === 'cancale-sync') captureAllAccounts();
   else if (a.name === 'cancale-active') runActive();
@@ -6976,6 +6976,7 @@ function surAlarme(a) {
   else if (a.name === 'vrm-photos') tickPhotos();
   else if (a.name === 'vrm-relais') relaisTick('alarme');
   else if (a.name === 'vrm-lbc') relireLbcEnFond().catch(() => {});
+  else if (a.name === 'vrm-offres') offresTick();
   // Le tampon de diagnostic survit au worker (chrome.storage.local) ; encore
   // faut-il qu'il PARTE un jour. Sans ce réveil, un tampon posé juste avant
   // une longue période calme attendrait la prochaine capture pour être écrit.
@@ -7203,6 +7204,29 @@ const OFFRE_EN_ATTENTE = 10;
 const OFFRES_MAX_PAR_VISITE = 3;          // limite de VOLUME
 const ESPACE_ACCEPT_MIN_MS = 15000;       // étalement ALÉATOIRE entre deux acceptations (demandé par Julien)…
 const ESPACE_ACCEPT_MAX_MS = 45000;       // …le rate-limit réel reste le plafond 20/h + « une requête à la fois »
+// (29 oct., « accepter les offres automatiquement avec un délai aléatoire ») Une
+// offre qui passe la règle n'est plus acceptée dès que VRM la voit : un délai TIRÉ
+// AU HASARD (3 à 20 min) est posé à la première fois où elle est vue
+// (`vrmOffresPrevues[oid] = heure prévue`, chrome.storage.local — §4.9), puis
+// une alarme d'1 min regarde CE stockage seulement (zéro lecture de base, zéro
+// requête Vinted) et ne relance le moteur que quand une heure prévue est passée.
+// Le moteur garde TOUS ses garde-fous (compte de l'onglet, plafond 20/h, pause,
+// une fois par offre). Une offre déjà acceptée/refusée entre-temps sur Vinted ⇒
+// Vinted refuse le geste, rien d'autre.
+const DELAI_OFFRE_MIN_MS = 3 * 60000;
+const DELAI_OFFRE_MAX_MS = 20 * 60000;
+function delaiOffreMs() { return DELAI_OFFRE_MIN_MS + Math.floor(Math.random() * (DELAI_OFFRE_MAX_MS - DELAI_OFFRE_MIN_MS + 1)); }
+async function offresTick() {
+  try {
+    const pv = (await chrome.storage.local.get('vrmOffresPrevues')).vrmOffresPrevues || {};
+    const now = Date.now();
+    const dues = Object.values(pv).filter((x) => x && x.at <= now && x.at > now - 2 * 86400000);
+    if (!dues.length) return;
+    const uid = await activeUidForDomain('www.vinted.fr');
+    if (!uid || !dues.some((x) => String(x.uid) === String(uid))) return;
+    await autoAccepterOffres(uid);
+  } catch (_) {}
+}
 function espaceAcceptMs() { return ESPACE_ACCEPT_MIN_MS + Math.floor(Math.random() * (ESPACE_ACCEPT_MAX_MS - ESPACE_ACCEPT_MIN_MS + 1)); }
 // Trois états : objet lu · `null` pas su (⇒ éteint) · éteint par défaut. L'app
 // est propriétaire de `vinted_offres_auto` et des `min` (vinted_annonce_numeros) ;
@@ -7289,6 +7313,9 @@ async function autoAccepterOffres(uid) {
     const limite = Date.now() - 7 * 86400000;
     for (const k in st) if (!st[k] || st[k] < limite) delete st[k];
     let faites = 0;
+    const pv = (await chrome.storage.local.get('vrmOffresPrevues')).vrmOffresPrevues || {};
+    for (const k in pv) if (!pv[k] || st[k] || pv[k].at < Date.now() - 2 * 86400000) delete pv[k];
+    let pvChange = false;
     for (const o of offres) {
       if (faites >= OFFRES_MAX_PAR_VISITE) break;       // volume borné (accepts + refus confondus)
       if (st[o.oid]) continue;                          // déjà traitée : jamais deux fois
@@ -7301,10 +7328,13 @@ async function autoAccepterOffres(uid) {
       if (isFinite(min) && min > 0 && o.prix >= min) quoi = 'accept';
       else if (isFinite(refuse) && refuse > 0 && o.prix < refuse) quoi = 'reject';
       if (!quoi) continue;
+      // Délai aléatoire depuis la PREMIÈRE fois où VRM voit l'offre.
+      if (!pv[o.oid]) { pv[o.oid] = { at: Date.now() + delaiOffreMs(), uid: String(uid), quoi }; pvChange = true; await chrome.storage.local.set({ vrmOffresPrevues: pv }); noterDiag('offre_auto_prevue'); continue; }
+      if (pv[o.oid].at > Date.now()) continue;
       if (faites > 0) await new Promise((r) => setTimeout(r, espaceAcceptMs()));   // étalement aléatoire entre deux gestes
       const r = await repondreOffre({ uid, tx: o.tx, oid: o.oid, quoi, conv: o.conv, msg: quoi === 'reject' ? reg.msgRefus : null });
-      st[o.oid] = Date.now();
-      await chrome.storage.local.set({ vrmOffresFaites: st });   // écrit AVANT de boucler : un worker tué ne retraite pas
+      st[o.oid] = Date.now(); delete pv[o.oid]; pvChange = true;
+      await chrome.storage.local.set({ vrmOffresFaites: st, vrmOffresPrevues: pv });   // écrit AVANT de boucler : un worker tué ne retraite pas
       if (r && r.ok) {
         faites += 1;
         if (quoi === 'accept') logActivity(`✅ Offre de ${o.prix.toFixed(2)} € acceptée automatiquement (ton mini : ${min} €)`);
@@ -7312,6 +7342,7 @@ async function autoAccepterOffres(uid) {
         notifierApp({ type: 'maj', quoi: 'ventes', uid: String(uid) });
       } else if (r && r.code) { break; }                // garde-fou atteint (pause/plafond/autre compte) : on arrête le lot
     }
+    if (pvChange) await chrome.storage.local.set({ vrmOffresPrevues: pv });
     if (faites) noterDiag(`offres_auto_traitees_${faites}`);
     return faites;
   } catch (_) { return 0; }
@@ -8331,7 +8362,7 @@ async function publierBrouillon(msg) {
     // celles du brouillon et on réessaie UNE fois. Rien d'autre ne change.
     if (!rc.ok && rc.status < 500 && photosRefusees(rc)) {
       let neuvesErr = null;
-      const renvoyer = b.parVRM ? async () => { const n = await photosNeuvesBrouillon(acc, uid, b, temp); if (!n.ids) neuvesErr = n.erreur || null; return n; } : null;
+      const renvoyer = b.parVRM ? async (sv) => { const n = await photosNeuvesBrouillon(acc, uid, b, temp, sv); if (!n.ids) neuvesErr = n.erreur || null; return n; } : null;
       const rc2 = await completionSecoursPhotos(acc, id, corpsC, rc, renvoyer);
       if (!rc2 || rc2.status === 0 || rc2.status >= 500) {
         noterDiag(`brouillon_publier_incertain_${(rc2 && rc2.status) || 0}`);
@@ -8512,7 +8543,7 @@ async function refaireBrouillon(msg) {
     let rc = await vintedSend(acc, 'POST', `/api/v2/item_upload/drafts/${draftId}/completion`, corpsC, { timeoutMs: 60000 });
     if (rc && rc.status > 0 && rc.status < 500 && !rc.ok && photosRefusees(rc)) {
       await leverVerrouRecreer('b' + draftId);
-      rc = await completionSecoursPhotos(acc, draftId, corpsC, rc, () => televerserPhotosRecreer(acc, urls, [], reglagesPhotoSurs(vb.reglages), temp));
+      rc = await completionSecoursPhotos(acc, draftId, corpsC, rc, (sv) => televerserPhotosRecreer(acc, urls, [], reglagesPhotoSurs(vb.reglages), temp, sv));
     }
     if (!rc || rc.status === 0 || rc.status >= 500) {
       noterDiag(`refaire_mise_en_ligne_incertaine_${(rc && rc.status) || 0}`);
@@ -8582,7 +8613,7 @@ async function completionSecoursPhotos(acc, draftId, corpsC, rc, renvoyer) {
     if (r && r.status > 0 && r.status < 500) await leverVerrouRecreer('b' + draftId);
     return r;
   };
-  if (_repubSuivi) etapeRepub(_repubSuivi, 'secours-photos');
+  if (_repubSuivi) etapeRepub(_repubSuivi, 'secours-photos', { essai: 2, essais: 3 });
   const court = (ids) => ids.map((pid) => ({ id: pid, orientation: 0 }));
   const ids0 = ((corpsC.draft && corpsC.draft.assigned_photos) || []).map((p) => p && p.id).filter(Boolean);
   await pauseRepub('reessai'); await pauseRepub('reessai');
@@ -8590,11 +8621,13 @@ async function completionSecoursPhotos(acc, draftId, corpsC, rc, renvoyer) {
   noterDiag('completion_photos_reessai');
   let r = await envoyer();
   if (!r || r.status === 0 || r.status >= 500 || r.ok || !photosRefusees(r) || typeof renvoyer !== 'function') return r;
-  const neuves = await renvoyer();
+  if (_repubSuivi) etapeRepub(_repubSuivi, 'secours-photos', { renvoi: true, essai: 3, essais: 3 });
+  const s0 = _repubSuivi;
+  const neuves = await renvoyer((i, n) => { if (s0) etapeRepub(s0, 'secours-photos', { renvoi: true, essai: 3, essais: 3, fait: i, total: n }); });
   if (!neuves || !neuves.ids) { noterDiag('completion_photos_non_renvoyees'); return r; }
   corpsC.draft.assigned_photos = court(neuves.ids);
   noterDiag('completion_photos_renvoyees');
-  if (_repubSuivi) etapeRepub(_repubSuivi, 'secours-photos', { renvoi: true });
+  if (_repubSuivi) etapeRepub(_repubSuivi, 'secours-photos', { renvoi: true, essai: 3, essais: 3, envoye: true });
   await pauseRepub('enLigne');
   r = await envoyer();
   if (r && r.ok) noterDiag('completion_photos_secours_ok');
@@ -8603,7 +8636,7 @@ async function completionSecoursPhotos(acc, draftId, corpsC, rc, renvoyer) {
 // Les photos d'un brouillon fait par VRM, renvoyées depuis le coffre de
 // l'ancienne annonce (une par photo, avec ses réglages enregistrés).
 // Rend { ids } · { erreur } · {} (rien à renvoyer : pas de coffre).
-async function photosNeuvesBrouillon(acc, uid, b, temp) {
+async function photosNeuvesBrouillon(acc, uid, b, temp, suivi) {
   if (!/^\d{4,15}$/.test(String(b.ancienId || ''))) return {};
   let cf; try { cf = await sbGet(`app_data?id=eq.coffre_${uid}_${b.ancienId}&select=photos:data->photos,vb:data->versBrouillon`); } catch (_) { cf = null; }
   if (cf === null) return { erreur: "le coffre n'a pas pu être lu" };
@@ -8612,7 +8645,7 @@ async function photosNeuvesBrouillon(acc, uid, b, temp) {
   const urls = u.urls.filter((x) => /^https:\/\/images\d*\.vinted\.net\//i.test(x));
   if (!urls.length) return { erreur: 'aucune photo enregistrée dans VRM pour cette annonce' };
   const vb = (cf && cf[0] && cf[0].vb && typeof cf[0].vb === 'object') ? cf[0].vb : {};
-  const tp = await televerserPhotosRecreer(acc, urls, u.autres, reglagesPhotoSurs(vb.reglages), temp);
+  const tp = await televerserPhotosRecreer(acc, urls, u.autres, reglagesPhotoSurs(vb.reglages), temp, suivi);
   return tp.ids ? { ids: tp.ids } : { erreur: tp.erreur };
 }
 async function televerserPhotosRecreer(acc, urls, second, reglages, temp, suivi) {
@@ -8871,7 +8904,7 @@ async function recreerVinted(msg) {
       let rcV = await vintedSend(acc, 'POST', `/api/v2/item_upload/drafts/${draftId}/completion`, corpsCV, { timeoutMs: 60000 });
       if (rcV && rcV.status > 0 && rcV.status < 500 && !rcV.ok && photosRefusees(rcV)) {
         await leverVerrouRecreer(id);
-        rcV = await completionSecoursPhotos(acc, draftId, corpsCV, rcV, () => televerserPhotosRecreer(acc, urls, second, reglages, temp));
+        rcV = await completionSecoursPhotos(acc, draftId, corpsCV, rcV, (sv) => televerserPhotosRecreer(acc, urls, second, reglages, temp, sv));
         if (rcV && rcV.status > 0 && rcV.status < 500) await poserVerrouRecreer(id);
       }
       if (!rcV || rcV.status === 0 || rcV.status >= 500) {

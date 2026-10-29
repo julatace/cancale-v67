@@ -65,8 +65,14 @@ const messages = (j) => j.vinted.filter((v) => v.methode === 'POST' && /\/conver
 async function run(opts) {
   const f = monter(opts);
   if (typeof f.ctx.autoAccepterOffres !== 'function') return { f, n: 0, absent: true };
+  // (29 oct.) Premier passage : l'offre est PRÉVUE (délai au hasard), rien ne part.
+  // On avance son heure prévue dans le passé, puis second passage : elle part.
   let n = 0; try { n = await f.ctx.autoAccepterOffres(UID); } catch (_) {}
-  return { f, n };
+  const avant = f.j.vinted.length;
+  const pv = f.store.vrmOffresPrevues || {};
+  for (const k in pv) if (pv[k]) pv[k].at = Date.now() - 1000;
+  try { n += await f.ctx.autoAccepterOffres(UID); } catch (_) {}
+  return { f, n, avant, pvInit: opts && opts.garderPrevues };
 }
 
 const OFFRE = { item: 444, tx: 9001, oid: 7001, price: 45, min: 40 };   // 45 ≥ 40
@@ -88,6 +94,19 @@ const OFFRE = { item: 444, tx: 9001, oid: 7001, price: 45, min: 40 };   // 45 �
     dit(accepts(f.j) === 1 && n === 1, "offre ≥ mini : UNE acceptation part vers Vinted (PUT …/offer_requests/…/accept)", `accepts=${accepts(f.j)} n=${n}`);
     const memo = f.store.vrmOffresFaites || {};
     dit(!!memo[String(OFFRE.oid)], "l'offre acceptée est mémorisée (vrmOffresFaites) — jamais ré-acceptée", JSON.stringify(memo)); }
+
+  // A2 — (29 oct.) délai aléatoire : au premier passage RIEN ne part, l'heure
+  //      prévue tombe entre 3 et 20 min ; l'alarme ne relance rien avant l'heure.
+  { const f = monter({ offres: [OFFRE] });
+    const t0 = Date.now();
+    await f.ctx.autoAccepterOffres(UID);
+    const pv = (f.store.vrmOffresPrevues || {})[String(OFFRE.oid)];
+    dit(accepts(f.j) === 0, "délai aléatoire : à la première vue de l'offre, RIEN n'est accepté", `accepts=${accepts(f.j)}`);
+    dit(pv && pv.at - t0 >= 3 * 60000 - 50 && pv.at - t0 <= 20 * 60000 + 1000, "l'acceptation est prévue entre 3 et 20 min plus tard (tiré au hasard)", JSON.stringify(pv));
+    await f.ctx.offresTick();
+    dit(accepts(f.j) === 0, "l'alarme d'1 min ne relance rien tant que l'heure prévue n'est pas passée", `accepts=${accepts(f.j)}`);
+    const tires = new Set(); for (let i = 0; i < 40; i++) tires.add(f.ctx.delaiOffreMs());
+    dit(tires.size > 30, 'le délai change d’une offre à l’autre (pas une valeur fixe)', String(tires.size)); }
 
   // B — offre < mini : rien.
   { const { f } = await run({ offres: [{ ...OFFRE, min: 50 }] });   // 45 < 50

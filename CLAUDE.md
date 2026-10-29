@@ -1,5 +1,14 @@
 # VRM — dossier de passation
 
+> **29 octobre — offres acceptées avec un DÉLAI ALÉATOIRE, et les essais des photos dans la barre (5.273) :** Julien : « accepter
+> les offres automatiquement avec un délai aléatoire ». Le moteur (`autoAccepterOffres`, éteint par défaut) n'accepte plus dès
+> qu'il voit l'offre : à la première vue, l'heure est TIRÉE entre 3 et 20 min (`delaiOffreMs`, `vrmOffresPrevues` dans
+> chrome.storage.local) ; l'alarme `vrm-offres` (1 min) ne lit QUE ce stockage et relance le moteur quand une heure est passée
+> (`offresTick`). Tous les garde-fous restent (compte de l'onglet, 20/h, pause, une fois par offre, 15-45 s entre deux).
+> Preuve : `audit-moteur-offres.cjs` A2 (rien au 1er passage, heure entre 3 et 20 min, alarme muette avant l'heure). Barre :
+> photos refusées ⇒ « essai 2 sur 3 », « VRM les renvoie — photo 6 sur 14 » (`texteSecoursPhotos`) ; mesuré : sur la Spezial,
+> photos refusées puis renvoyées, PUIS refus de la taille (`completion_photos_renvoyees` 5 = `vinted_refus_champs_size` 5).
+
 > **29 octobre — Republier : la barre DÉTAILLE chaque étape, et la taille refusée par Vinted (5.272) :** Julien : « tout doit
 > être détaillé dans la barre de progression » ; « pas faite · Vinted a refusé la mise en ligne (400 : size (Le champ Taille
 > doit être renseigné)) ». Barre : `DetailEtapes` sous chaque barre (`data-etapes-detail`, `data-etape-detail`/`data-etape-etat`
