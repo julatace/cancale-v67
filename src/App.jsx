@@ -1,3 +1,4 @@
+import {correspondRechercheMessage} from './rechercheMessagesVinted.js';
 import SynchronisationVinted from './SynchronisationVinted.jsx';
 import {auteurDernierConfirme,suiviNegociationVinted,reponseAttendueVinted} from './suiviMessagerieVinted.js';
 import {retourReponseVinted,cleReponseVinted,creerBrouillonsReponses} from './reponseVinted.js';
@@ -46067,7 +46068,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         <FavorisConnectes articlesVendus={articlesVendusFavoris} ecranActif={zoneMessages==='favoris'} chargementAutomatique={zoneMessages==='favoris'} key={'favoris:'+String(AUTH.user?.id||'')+':'+favorisUid} uid={favorisUid} nomCompte={favorisCompte?accNameOf(favorisCompte):''} owner={AUTH.user?.id||''} ownerActuel={()=>AUTH.user?.id||''} base={SUPABASE_URL} headers={()=>sbAuth()} executerFavori={t=>sondageConnu().then(()=>vmrExecUn({uid:favorisUid,method:'POST',endpoint:'/vrm/favoris',body:{jeton:t.jeton}},60000))} PhotoVinted={PhotoVinted}/>
         </div>
         <div className="vrm-message-workspace" hidden={zoneMessages!=='conversations'} style={{display:zoneMessages==='conversations'?undefined:'none'}}><div className="vrm-inbox-column">
-        <label className="vrm-msg-search" style={{color:C.muted}}><Icon name="search" size={16}/><input type="search" aria-label="Rechercher une conversation" placeholder="Rechercher" value={messageSearch} onChange={e=>setMessageSearch(e.target.value)} style={{color:C.text}}/></label>
+        <label className="vrm-msg-search" style={{color:C.muted}}><Icon name="search" size={16}/><input type="search" aria-label="Rechercher une conversation" maxLength={200} placeholder="Pseudo, article, N° de rangement…" value={messageSearch} onChange={e=>setMessageSearch(e.target.value)} style={{color:C.text}}/></label>
+        {!!messageSearch.trim()&&<p className="vrm-msg-recherche-portee" role="status">Recherche sur tous les comptes actifs.{messageFilter!=='all'&&<> Le filtre de conversation reste appliqué. <button type="button" onClick={()=>{setMessageFilter('all');setConvMax(40);}}>Afficher tous les résultats</button></>}</p>}
         {convs.loading && !convs.items && <Skeleton variant="row" count={2}/>}
         {convs.error && <LoadError onRetry={()=>loadConvs(true)}/>}
         {/* ── LA MESSAGERIE INTÉGRÉE (3 octobre) ─────────────────────────────
@@ -46089,9 +46091,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           //    comptes en lecture seule. Seul un choix EXPLICITE dans la liste
           //    « Compte » filtre encore ; « pas su » garde le comportement d'avant.
           const choixExplicite = !!compteSel && compteSel!=='*' && String(compteSel)===selEff;
-          const filtreMsg = choixExplicite ? selEff : (msgCompteActif ? '' : selEff);
+          const rechercheMessages=messageSearch.trim();
+          const filtreMsg = rechercheMessages?'':choixExplicite ? selEff : (msgCompteActif ? '' : selEff);
           const prioMsg = !filtreMsg && msgCompteActif ? msgCompteActif : '';
-          const liste=(convs.items||[]).filter(c=>!acctOffOf(c) && (!filtreMsg || uidC(c)===filtreMsg) && (!messageSearch.trim() || `${c.opposite_user?.login || ''} ${c.description || ''} ${c.item_title||c.item?.title||''}`.toLowerCase().includes(messageSearch.trim().toLowerCase())));
+          const liste=(convs.items||[]).filter(c=>accountUids.has(uidC(c))&&!acctOffOf(c)&&(!filtreMsg||uidC(c)===filtreMsg)&&(!rechercheMessages||correspondRechercheMessage(c,paireDeConv(uidC(c),c.id,null),rechercheMessages)));
           // ⚠️⚠️ LE NOMBRE VIENT DE LA LISTE AFFICHÉE (§5, §11 — revue du
           //    8 octobre). Depuis que les autres comptes sont estompés au lieu
           //    d'être retirés, `liste` les contient tous ; or ce compte ne
@@ -46218,7 +46221,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   </span>
                 </div>
               )}
-              {liste.length===0 && messageSearch.trim() && <p style={{fontSize:12,color:C.muted}}>Aucune conversation trouvée.</p>}
+              {liste.length===0 && messageSearch.trim() && <p style={{fontSize:12,color:C.muted}}>Aucun résultat parmi les conversations reçues. Essaie un pseudo, des mots de l’article ou le numéro précédé de N°.</p>}
               {liste.length===0 && !messageSearch.trim() && !boitesKO.length && <div style={{fontSize:13,color:C.muted,padding:'14px 0'}}>Aucune conversation captée pour l'instant — elles arrivent quand l'extension passe sur la messagerie Vinted de chaque compte.</div>}
               <div className="vrm-msg-list" style={{border:liste.length?`1px solid ${C.border}`:'none',background:C.card}}>
                 {affiches.map((c,i)=>{
@@ -46262,7 +46265,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       <span className="vrm-msg-body">
                         <span className="vrm-msg-l1">
                           <span className="vrm-msg-name"><span className="vrm-sensible">{nom}</span></span>
-                          {plusieurs && c._acc && <span className="vrm-msg-acc" style={{color:C.muted}}>· {accName(c._acc)}</span>}
+                          {(plusieurs||!!messageSearch.trim()) && c._acc && <span className="vrm-msg-acc" style={{color:C.muted}}>· {accName(c._acc)}</span>}
                           <time className="vrm-msg-time" dateTime={tsConv?new Date(tsConv).toISOString():undefined} title={tsConv?new Date(tsConv).toLocaleString('fr-FR',{weekday:'long',day:'numeric',month:'long',hour:'2-digit',minute:'2-digit'}):undefined} style={{color:c.unread&&!ro?C.accent:C.muted}}>{tsConv?heureMessage(tsConv):''}</time>
                         </span>
                         {(()=>{ const titre=(paire&&paire.titre)||c.item_title||c.item?.title||''; const morceaux=[paire&&paire.num?`N°${paire.num}`:null, paire&&paire.prix!=null?prix(paire.prix,paire.devise):null, titre||null].filter(Boolean); if(!morceaux.length && !(paire&&paire.etat)) return null; return (
