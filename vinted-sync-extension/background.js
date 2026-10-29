@@ -11788,6 +11788,19 @@ function achatASuivre(o, derniers, maintenant) {
   if (da && SUIVI_ARRIVE.test(da.t || '')) return false;
   return tus === 'needs_action' || AT_RELAY(st) || SUIVI_EN_ROUTE.test(st);
 }
+// L'ordre de lecture (29 octobre). Trié par date seule, un achat au point
+// relais (Vinted : « à retirer », `needs_action`) passait APRÈS les achats en
+// route les plus récents, relus toutes les 3 h : avec 3 lectures par visite et
+// 6 par heure, son suivi (l'étape « disponible », le point de retrait) n'était
+// pas lu. Rang : au point relais jamais lu · au point relais déjà lu · en
+// route jamais lu · en route déjà lu ; à rang égal, le plus récent d'abord.
+// « Déjà lu » = une ligne `harvest_{uid}_suivi_{tx}` existe (lecture active ou
+// passive). Les bornes (3 par visite, 6 par heure, mémo de 3 h) ne bougent pas.
+function rangSuivi(o, derniers) {
+  const relais = String(o.transaction_user_status || '') === 'needs_action' || AT_RELAY(String(o.status || ''));
+  const lu = derniers.has(String(o.transaction_id));
+  return (relais ? 0 : 2) + (lu ? 1 : 0);
+}
 // Les lectures du suivi dans l'heure, par compte (`chrome.storage.local`, §4.9) ;
 // dans la chaîne des compteurs (deux visites ne comptent pas la même place).
 function compterLectureSuivi(uid) {
@@ -11828,7 +11841,7 @@ async function capterSuivisAchats(uid) {
     }
     const maintenant = Date.now();
     const cibles = [...achats.values()].filter((o) => achatASuivre(o, derniers, maintenant))
-      .sort((a, b) => (Date.parse(b.date || '') || 0) - (Date.parse(a.date || '') || 0));
+      .sort((a, b) => (rangSuivi(a, derniers) - rangSuivi(b, derniers)) || ((Date.parse(b.date || '') || 0) - (Date.parse(a.date || '') || 0)));
     if (!cibles.length) return 0;
     // Une forme jamais reconnue : une seule lecture de mesure par jour et par compte.
     let max = SUIVI_MAX_PAR_VISITE;
