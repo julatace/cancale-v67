@@ -17,10 +17,11 @@
 > 5.284 sans ce code** : à l'intégration, monter l'extension (≥ 5.285, jamais servie) ET `EXT_CAPACITES.transp` ensemble
 > (`audit-coherence`, `audit-extension-zip` le disent rouge d'ici là). Des 21 défauts reproduits le 24 oct., **les n° 1 à 11
 > (règles, états, écran) sont corrigés** — « Statut chez le transporteur, tour 1 » en fin de dossier ; **les n° 12 à 21
-> (notifications : nouvelle arrivée qui ne sonne pas, `push_dedup` raté, doublons suivi Vinted / transporteur, pause
-> Chronopost par vendeur, bornes de temps, garde des 72 h…) restent OUVERTS**. Côté extension (Chronopost 14 caractères,
+> (notifications) aussi** — « tour 1, les notifications », juste après (nouvelle arrivée, « pas su » qui ne consomme rien,
+> une notification pour suivi Vinted + transporteur + e-mail, pause globale par transporteur, bail, C4 daté, bornes, 72 h ;
+> `audit-transp-notif` 17/17). Côté extension (Chronopost 14 caractères,
 > `mr-be` en repli de `mr-fr-mvc`, corps 192 Ko, conversations UUID, achats au point relais lus d'abord) : branche
-> `v29-colis-ext`. Ne pas présenter les notifications de ce suivi comme fiables avant. Preuves de la fusion : 174 audits (sans les 5 Postgres), mêmes rouges que `main`
+> `v29-colis-ext`. Preuves de la fusion : 174 audits (sans les 5 Postgres), mêmes rouges que `main`
 > (`audit-politique-hotes` 1, `audit-preuve-vente` 18 — déjà là) ; `audit-statut-transporteurs` (`--prouve` 29/29),
 > `audit-mondialrelay-serveur` (24/24), `audit-transp-ext` (11/11) verts, rouges sur `main` (24 · 6 · 54) ; banc
 > `transporteurs` vert (49 rouges sur le build de `main`) ; bancs colis, widget, rappels, notifications, popup, badge, pont,
@@ -14892,3 +14893,54 @@ sans code s'affichait à côté de son propre e-mail. Règles (une, un propriét
 - ⚠️ **Non mesuré** : la vraie forme d'un `return_*` Vinted Go autre que ceux
   relevés ; une vraie séquence Mondial Relay « re-livré » ; aucun appel réel aux
   transporteurs n'a été fait pour ces corrections (formes de `mesures.json`).
+
+### Statut chez le transporteur, tour 1 : les notifications (n° 12 à 21, 29 octobre)
+Les dix défauts de notification reproduits le 24 octobre, chacun REPRODUIT d'abord
+(faux PostgREST à état, faux Chronopost / Vinted Go / Web Push), corrigé à la racine.
+- **Nouvelle arrivée (12)** : une arrivée = le point relais (lieu normalisé) + l'heure
+  de l'évènement qui l'a créée (`occurrenceArrivee`) ; la ligne garde les 5 dernières
+  (`arrivees`). Un autre point relais, ou le retour au relais après « a quitté le
+  point relais », sonne sous `relais-{n°}-r{empreinte}` ; la PREMIÈRE arrivée garde
+  `relais-{n°}-sans` et se tait devant toute annonce (`relais-{n°}-*`, `relais-tx{tx}-*`,
+  le code de l'e-mail). Le même point relu ne re-sonne jamais (`clefEtat` porte le lieu
+  seulement pour « disponible »).
+- **« Pas su » ne consomme rien (13)** : `push_transp_{n°}` est RETIRÉ. Ce qui doit
+  sonner est écrit DANS la ligne `transp_` (`notif` + le scalaire `notifEnAttente`, lu
+  en `meta->>`) par le MÊME comparer-et-échanger que le changement ; la notification
+  l'efface une fois faite ou décidée (déjà annoncée, préférence, abonnement), jamais
+  sur un `push_dedup` illisible ou non écrit. Reprise en tête de passage
+  (`reprendreNotifs`, 6 au plus), seulement dans les 72 h et pour le même état.
+- **Une notification pour trois voies (14, 16)** : vérifier ET réserver en UN
+  comparer-et-échanger sur `push_dedup` (`envoyerNotifTransp` : le modificateur relit
+  les clés au moment d'écrire et abandonne si l'une est apparue). Clés partagées par
+  transaction (`clesEtapeTx`) : transporteur `{retire|retour|track}-tx{tx}[-jour]`,
+  suivi Vinted `vs-…` ; chacun vérifie celles de l'autre (`suivi-vinted.js`, étape 5 bis :
+  `transporteur-deja`) ; l'e-mail `relais-{n°}-*` et `retrait-code-{CODE}` restent la
+  frontière avec la route des e-mails.
+- **Pause globale (15)** : `transp_pause` au propriétaire NEUTRE
+  (`00000000-…`, `PROPRIETAIRE_NEUTRE`, clé de service) — un 403 de Chronopost arrête
+  les requêtes de TOUS les vendeurs depuis l'adresse de Vercel ; plus une mémoire
+  d'instance posée dans la file du transporteur au moment du refus et lue juste avant
+  chaque requête (`pauseEnCours`, une règle pour les deux points d'arrêt). Une pause en
+  cours ne monte pas d'un palier (`pauseApresRefus`).
+- **Deux passages (17)** : un bail de 30 s sur la ligne (`enVol`, comparer-et-échanger)
+  — un n° n'est lu que par un passage à la fois.
+- **C4 (18, 19)** : la réponse relayée porte son heure (`at`, bornée à 30 min) ; plus
+  vieille que la dernière lecture ⇒ 409 `perime`, rien n'est rangé ; un n° en
+  « fermeture » se tait (`raisonDu`, la règle du serveur). Un état final (retiré, livré,
+  rendu) ne redescend jamais sur une lecture plus ancienne (`ligneApresEssai`).
+- **Bornes (20)** : un n° n'est lancé que s'il tient dans le budget (délai + écart +
+  marge de rangement) ; `fin` et `signal` vont jusqu'à la requête ; le cron arrête le
+  passage dès qu'il répond (`AbortController`, `finally`) — plus aucune écriture ni
+  notification après la réponse « délai ».
+- **72 h (21)** : `etatAt` = l'évènement qui CRÉE l'état (Chronopost : premier retour,
+  ou rendu après lui ; Vinted Go : début de la phase de retour), `dernierAt` à part.
+- Preuves : `audit-transp-notif.cjs` (N1-N10, ~50 s) **24 rouges sur 87188ff4** (§6.1,
+  audit copié dans l'arbre d'avant), `--prouve` **17/17** ; `audit-statut-transporteurs`
+  (`--prouve`, dont `notif-sans-push-dedup`, `notif-sans-reservation`, `pause-ignoree`
+  réancrées) et `audit-mondialrelay-serveur` (`pause-ignoree`, `essai-compte-introuvable`
+  réancrées sur la règle actuelle) verts ; bancs serveur, colis, retrait, widget,
+  rappels, notifications verts.
+- ⚠️ **Non mesuré** : aucun appel réel aux transporteurs ; `Retry-After` réel de
+  Chronopost ; un vrai envoi Web Push. Une notification en attente d'un n° qu'aucun
+  passage ne relit (vendeur sans app ni cron) attend le cron suivant (matin ou soir).
