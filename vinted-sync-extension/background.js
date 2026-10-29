@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.284.0';
+const CODE_VERSION = '5.285.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -8585,6 +8585,9 @@ async function publierBrouillon(msg) {
   if (!b || !b.corps) return { accepte: false, code: 'brouillon-inconnu', raison: "VRM n'a pas encore le contenu de ce brouillon. Ouvre-le sur Vinted et enregistre-le une fois (« Enregistrer le brouillon ») : l'extension l'apprend. Rien n'a été touché." };
   if (String(b.uid || '') !== uid) return { accepte: false, code: 'autre-compte', raison: "ce brouillon n'est pas sur ce compte — rien n'a été touché" };
   if (b.etat === 'publie') return { accepte: false, code: 'deja', raison: 'ce brouillon a déjà été mis en ligne par VRM' };
+  // (29 oct., revue) Sa mise en ligne est déjà PLANIFIÉE par Republier : jamais deux.
+  const plan = await brouillonPlanifie(id);
+  if (plan) return { accepte: false, code: 'planifiee', raison: `VRM met déjà ce brouillon en ligne${plan.du ? ` vers ${new Date(plan.du).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}` : ''} — rien à faire.` };
   if (!b.parVRM) {
     let dr; try { dr = await sbGet(`app_data?id=eq.harvest_${uid}_listings&select=items:data->payload->items`); } catch (_) { dr = null; }
     if (dr === null) return { accepte: false, code: 'lecture', raison: "je n'ai pas pu relire ton dressing — on ne touche à rien" };
@@ -8612,7 +8615,24 @@ async function publierBrouillon(msg) {
   // (29 oct.) Tout ce que Vinted exige est vérifié AVANT d'envoyer : la taille
   // fausse est corrigée au libellé exact de la paire ; le reste est nommé.
   // Le brouillon VIVANT d'abord (lecture) : la vérification porte sur ce que Vinted a.
+  // (29 oct., revue) Un brouillon fait par Republier : son ANCIENNE annonce doit être
+  // supprimée, sinon la même paire serait deux fois en ligne. Suppression pas confirmée
+  // dans le coffre ⇒ on la relit chez Vinted (une lecture) : encore là ⇒ rien ne part.
+  let ancienneOk = !(b.parVRM && /^\d{4,15}$/.test(String(b.ancienId || '')));
+  if (!ancienneOk) {
+    let cf; try { cf = await sbGet(`app_data?id=eq.coffre_${uid}_${b.ancienId}&select=supprime:data->versBrouillon->>supprime`); } catch (_) { cf = null; }
+    ancienneOk = !!(cf && cf[0] && cf[0].supprime === 'true');
+  }
   { const gL = await gardeLecture(uid, acc, 'clic');
+    if (!ancienneOk) {
+      if (gL) return { accepte: false, code: 'ancienne-pas-sure', raison: "VRM n'est pas sûr que l'ancienne annonce de cette paire a été supprimée, et ne peut pas la relire maintenant — réessaie dans un moment. Rien n'a été touché." };
+      const ra = await vintedPage(acc, 'GET', `/api/v2/item_upload/items/${b.ancienId}`, null, { timeoutMs: 30000 });
+      if (ra && ra.sansPage) return { accepte: false, code: 'onglet-vinted', raison: raisonSansPage(ra) };
+      if (!(ra && (ra.status === 404 || ra.status === 410))) {
+        noterDiag('brouillon_publier_ancienne_en_ligne');
+        return { accepte: false, code: 'ancienne-en-ligne', raison: ra && ra.ok ? "l'ancienne annonce de cette paire est TOUJOURS sur Vinted : la mettre en ligne la vendrait deux fois. Supprime l'ancienne sur Vinted, puis réessaie. Rien n'a été touché." : "VRM n'a pas pu vérifier que l'ancienne annonce de cette paire a été supprimée — réessaie dans un moment. Rien n'a été touché." };
+      }
+    }
     if (!gL) {
       const rl = await vintedPage(acc, 'GET', `/api/v2/item_upload/items/${id}`, null, { timeoutMs: 30000 });
       if (rl && rl.sansPage) return { accepte: false, code: 'onglet-vinted', raison: raisonSansPage(rl) };
@@ -8646,12 +8666,17 @@ async function publierBrouillon(msg) {
   const stop = await gardeStricte(uid, acc, { reserve: RESERVE_GESTES });
   if (stop) return { accepte: false, code: stop.code, raison: stop.error };
   return await avecVinted(async () => {
+    // Revérifié À SON TOUR dans la file : une mise en ligne planifiée a pu passer avant.
+    { let e2; try { e2 = await sbGet(`app_data?id=eq.vinted_brouillon_${id}&select=etat:data->>etat`); } catch (_) { e2 = null; }
+      if (e2 && e2[0] && e2[0].etat === 'publie') return { accepte: false, code: 'deja', raison: 'ce brouillon vient d’être mis en ligne par VRM — rien n’a été renvoyé' };
+      if (await brouillonPlanifie(id) || await lireVerrouRecreer('b' + id)) return { accepte: false, code: 'planifiee', raison: 'une mise en ligne de ce brouillon est déjà en cours — rien n’a été renvoyé' }; }
     const temp = (typeof r.d.temp_uuid === 'string' && r.d.temp_uuid) ? r.d.temp_uuid : uuidRecreer();
     const corpsC = { draft: { ...r.d, id: Number(id) }, feedback_id: null, parcel: null, push_up: false, upload_session_id: temp };
     suiviRepub(id); etapeRepub(id, 'en-ligne');
     await poserVerrouRecreer('b' + id);
     let rc = await vintedPage(acc, 'POST', `/api/v2/item_upload/drafts/${id}/completion`, corpsC, { timeoutMs: 60000 });
     if (rc && rc.sansPage) { await leverVerrouRecreer('b' + id); return { accepte: false, code: 'onglet-vinted', raison: raisonSansPage(rc) }; }
+    if (rc && rc.pause) { await leverVerrouRecreer('b' + id); return { accepte: false, code: 'vinted-pause', raison: `${rc.raison || 'Vinted demande de ralentir'} — rien n'a été envoyé.` }; }
     if (!rc || rc.status === 0 || rc.status >= 500) {
       noterDiag(`brouillon_publier_incertain_${(rc && rc.status) || 0}`);
       return { accepte: true, etape: 'incertain', raison: "Vinted n'a pas répondu clairement : le brouillon est PEUT-ÊTRE en ligne — regarde ton dressing avant de réessayer (VRM bloque une nouvelle tentative pendant 30 min)" };
@@ -9079,9 +9104,12 @@ async function recreerVinted(msg) {
   //    et la mise en ligne planifiée était REFUSÉE par le plafond quand d'autres
   //    paires étaient passées entre-temps — l'ancienne annonce déjà supprimée, il ne
   //    restait qu'un brouillon. Plus de place pour toute la paire ⇒ rien ne part.
-  const stop = await gardeStricte(uid, acc, { reserve: RESERVE_GESTES, actions: msg.versBrouillon === true ? 2 : 3 });
+  const nA = msg.versBrouillon === true ? 2 : 3;
+  const tRes = Date.now();
+  const stop = await gardeStricte(uid, acc, { reserve: RESERVE_GESTES, actions: nA });
   if (stop) return { accepte: false, code: stop.code, raison: stop.error };
-  return await avecVinted(async () => {
+  let envoyes = 0, confie = false;
+  return await avecVinted(async () => { try {
     suiviRepub(id);
     // (29 oct., « fait tout comme vintex ») L'ORDRE MESURÉ chez Vintex, sur deux
     // republications acceptées du premier coup, toutes ses requêtes parties de
@@ -9130,9 +9158,14 @@ async function recreerVinted(msg) {
     await pauseRepub('brouillon');
     const rbV = await vintedPage(acc, 'POST', '/api/v2/item_upload/drafts', corpsBV, { timeoutMs: 60000 });
     if (rbV && rbV.sansPage) { await majVersBrouillon(uid, id, { etat: 'fait', cause: 'sans-page' }); return { accepte: false, code: 'onglet-vinted', raison: raisonSansPage(rbV) }; }
+    if (rbV && rbV.pause) { await majVersBrouillon(uid, id, { etat: 'fait', cause: 'pause' }); return { accepte: false, code: 'vinted-pause', raison: `${rbV.raison || 'Vinted demande de ralentir'} — rien n'a été créé ni supprimé, ton annonce est toujours en ligne.` }; }
+    envoyes++;
     if (!rbV || rbV.status === 0 || rbV.status >= 500) {
       noterDiag(`versbrouillon_brouillon_flou_${(rbV && rbV.status) || 0}`);
       await majVersBrouillon(uid, id, { etat: 'fait', cause: 'brouillon-flou' });
+      // (29 oct., revue) Le brouillon a PEUT-ÊTRE été créé : 30 min sans nouvelle tentative
+      // de CETTE annonce (sinon un second brouillon, puis la suppression).
+      await poserVerrouRecreer(id);
       return { accepte: true, etape: 'incertain', raison: "Vinted n'a pas répondu clairement au brouillon : il est PEUT-ÊTRE dans tes brouillons Vinted. Rien n'a été supprimé — ton annonce est toujours en ligne. Regarde tes brouillons avant de réessayer." };
     }
     if (!rbV.ok) {
@@ -9154,7 +9187,15 @@ async function recreerVinted(msg) {
     etapeRepub(id, 'suppression');
     await pauseRepub('suppression');
     const rdV = await vintedPage(acc, 'POST', `/api/v2/items/${id}/delete`, null, { timeoutMs: 60000 });
-    const suppIncertaine = !rdV || rdV.sansPage || rdV.status === 0 || rdV.status >= 500;
+    // (29 oct., revue) Suppression PAS PARTIE (pas d'onglet, pause) : l'issue est certaine,
+    // l'ancienne est toujours en ligne — jamais « peut-être », jamais de verrou de 30 min.
+    if (pasParti(rdV)) {
+      noterDiag('republier_suppression_pas_partie');
+      await majVersBrouillon(uid, id, { etat: 'fait', draftId, supprime: false, cause: 'suppression-pas-partie' });
+      return { accepte: true, etape: 'echec', draftId, raison: `${rdV.sansPage ? raisonSansPage(rdV) : (rdV.raison || 'Vinted demande de ralentir')} — l'ancienne annonce n'a PAS été supprimée, elle est toujours en ligne. Le brouillon rangé sur Vinted est en trop : supprime-le dans tes brouillons Vinted.` };
+    }
+    envoyes++;
+    const suppIncertaine = !rdV || rdV.status === 0 || rdV.status >= 500;
     if (suppIncertaine && !versB) {
       noterDiag(`republier_suppression_incertaine_${(rdV && rdV.status) || 0}`);
       await majVersBrouillon(uid, id, { etat: 'a-publier', draftId, supprime: false, cause: 'suppression-incertaine' });
@@ -9178,8 +9219,9 @@ async function recreerVinted(msg) {
     // (29 oct., « fais les brouillons et tout à la suite comme Vintex ») `msg.differer` :
     // l'attente ne bloque plus — la mise en ligne est PLANIFIÉE (chrome.storage.local) et
     // faite par l'extension à l'heure tirée ; l'app enchaîne la paire suivante pendant ce temps.
-    const job = { id, uid, draftId, titre, prix, nPhotos: ids.length, urls, lettreFin: lettreFin || null, corpsCV: JSON.stringify(corpsCV), corps: JSON.stringify(corps), description, sauve };
+    const job = { id, uid, draftId, titre, prix, nPhotos: ids.length, urls, lettreFin: lettreFin || null, corpsCV: JSON.stringify(corpsCV), corps: JSON.stringify(corps), description, sauve, tRes };
     await poserVerrouRecreer(id);
+    confie = true;   // le dernier geste réservé (la mise en ligne) appartient désormais à finRepubBrouillon
     if (msg.differer === true) {
       const [pa, pb] = PAUSES_REPUB.enLigne; const du = Date.now() + pa + Math.floor(Math.random() * (pb - pa + 1));
       try { if (Array.isArray(globalThis.__vrmPausesVues)) globalThis.__vrmPausesVues.push(['enLigne', du - Date.now()]); } catch (_) {}
@@ -9194,7 +9236,7 @@ async function recreerVinted(msg) {
     etapeRepub(id, 'attente');
     await pauseRepub('enLigne');
     return await finRepubBrouillon(acc, job);
-  });
+  } finally { if (!confie && nA - envoyes > 0) await rendreActions(uid, tRes, nA - envoyes); } });
 }
 // ── LES MISES EN LIGNE PLANIFIÉES (29 oct., « comme Vintex ») ─────────────────
 // Vintex crée le brouillon de la paire 1, supprime l'ancienne, passe à la paire 2,
@@ -9206,11 +9248,26 @@ async function recreerVinted(msg) {
 const REPUB_ATTENTE = 'vrmRepubAttente';
 let _miseEnLigneTimer = null, _miseEnLigneEnCours = null;
 try { setTimeout(() => { try { armerMiseEnLigne(); } catch (_) {} }, 0); } catch (_) {}
+// (29 oct., revue) Deux écrivains (la planification, faite dans la file Vinted, et le
+// réveil, hors d'elle) lisaient puis réécrivaient tout l'objet : l'un effaçait l'autre
+// (une paire perdue, ou une mise en ligne rejouée). Toute écriture passe par UNE chaîne.
+let _chaineAttente = Promise.resolve();
+function modifierAttente(fn) {
+  const suite = _chaineAttente.then(async () => {
+    const cur = (await chrome.storage.local.get(REPUB_ATTENTE))[REPUB_ATTENTE] || {};
+    const r = await fn(cur);
+    await chrome.storage.local.set({ [REPUB_ATTENTE]: cur });
+    return r;
+  });
+  _chaineAttente = suite.then(() => {}, () => {});
+  return suite;
+}
+async function brouillonPlanifie(draftId) {
+  try { const cur = (await chrome.storage.local.get(REPUB_ATTENTE))[REPUB_ATTENTE] || {}; return Object.values(cur).find((j) => j && String(j.draftId) === String(draftId)) || null; } catch (_) { return null; }
+}
 async function planifierMiseEnLigne(job) {
   try {
-    const cur = (await chrome.storage.local.get(REPUB_ATTENTE))[REPUB_ATTENTE] || {};
-    cur[job.id] = job;
-    await chrome.storage.local.set({ [REPUB_ATTENTE]: cur });
+    await modifierAttente((cur) => { cur[job.id] = job; });
     armerMiseEnLigne();
     return true;
   } catch (_) { return false; }
@@ -9218,7 +9275,7 @@ async function planifierMiseEnLigne(job) {
 async function armerMiseEnLigne() {
   try {
     const cur = (await chrome.storage.local.get(REPUB_ATTENTE))[REPUB_ATTENTE] || {};
-    const dus = Object.values(cur).map((j) => Number(j.du)).filter(Number.isFinite);
+    const dus = Object.values(cur).filter((j) => j && !j.enCoursLe).map((j) => Number(j.du)).filter(Number.isFinite);
     if (_miseEnLigneTimer) { clearTimeout(_miseEnLigneTimer); _miseEnLigneTimer = null; }
     if (!dus.length) return;
     const ms = Math.max(0, Math.min(...dus) - Date.now());
@@ -9228,27 +9285,44 @@ async function armerMiseEnLigne() {
 function miseEnLigneTick() {
   if (_miseEnLigneEnCours) return _miseEnLigneEnCours;
   _miseEnLigneEnCours = (async () => {
+    const finir = async (job, r) => {
+      try { const f = (await chrome.storage.local.get('vrmRepubFins')).vrmRepubFins || {}; const lim = Date.now() - 864e5; for (const k of Object.keys(f)) if (!(f[k] && f[k].at > lim)) delete f[k]; f[job.id] = { ...(r || {}), at: Date.now() }; await chrome.storage.local.set({ vrmRepubFins: f }); } catch (_) {}
+      try { notifierApp({ type: 'maj', quoi: 'repub', id: String(job.id), etape: 'fin', fin: r || null }); } catch (_) {}
+    };
     try {
+      // (29 oct., revue) Un job MARQUÉ « en cours » au départ de cette boucle vient d'un
+      // service worker tué au milieu (pendant la lecture ou la mise en ligne) : son issue est
+      // inconnue. Jamais rejoué (deux mises en ligne) ; il est DIT, et bloqué 30 min.
+      const orphelins = await modifierAttente((cur) => { const o = Object.values(cur).filter((j) => j && j.enCoursLe); for (const j of o) delete cur[j.id]; return o; });
+      for (const job of orphelins) {
+        noterDiag('republier_mise_en_ligne_interrompue');
+        try { await poserVerrouRecreer('b' + job.draftId); } catch (_) {}
+        try { await majVersBrouillon(job.uid, job.id, { etat: 'mise-en-ligne-incertaine', draftId: job.draftId }); } catch (_) {}
+        await finir(job, { accepte: true, etape: 'incertain', draftId: job.draftId, raison: "la mise en ligne planifiée a été interrompue (Chrome a arrêté l'extension) : le brouillon est PEUT-ÊTRE en ligne — regarde ton dressing (sinon : Actions → Brouillons → en ligne, possible dans 30 min)." });
+      }
       for (;;) {
-        const cur = (await chrome.storage.local.get(REPUB_ATTENTE))[REPUB_ATTENTE] || {};
-        const dus = Object.values(cur).filter((j) => j && Number(j.du) <= Date.now()).sort((x, y) => x.du - y.du);
-        if (!dus.length) break;
-        const job = dus[0];
-        // Retirée de la file AVANT d'agir : jamais deux mises en ligne du même brouillon.
-        delete cur[job.id]; await chrome.storage.local.set({ [REPUB_ATTENTE]: cur });
+        // Marqué « en cours » AVANT d'agir (et pas effacé) : jamais deux mises en ligne du
+        // même brouillon, et une coupure laisse une trace.
+        const job = await modifierAttente((cur) => {
+          const dus = Object.values(cur).filter((j) => j && !j.enCoursLe && Number(j.du) <= Date.now()).sort((x, y) => x.du - y.du);
+          if (!dus.length) return null;
+          cur[dus[0].id] = { ...dus[0], enCoursLe: Date.now() };
+          return dus[0];
+        });
+        if (!job) break;
         let r;
         try {
           const accts = await getStoredAccounts();
           const acc = accts.find((x) => String(x.vinted_user_id) === String(job.uid));
-          if (!acc) { await leverVerrouRecreer(job.id); await majVersBrouillon(job.uid, job.id, { etat: 'a-publier', draftId: job.draftId }); r = { refaire: true, accepte: true, etape: 'brouillon-a-refaire', draftId: job.draftId, raison: "l'ancienne annonce est supprimée et le brouillon est rangé, mais le compte n'est plus dans ce Chrome — « Brouillons → en ligne » le met en ligne." }; }
+          if (!acc) { if (job.tRes) await rendreActions(String(job.uid), job.tRes, 1); await leverVerrouRecreer(job.id); await majVersBrouillon(job.uid, job.id, { etat: 'a-publier', draftId: job.draftId }); r = { refaire: true, accepte: true, etape: 'brouillon-a-refaire', draftId: job.draftId, raison: "l'ancienne annonce est supprimée et le brouillon est rangé, mais le compte n'est plus dans ce Chrome — « Brouillons → en ligne » le met en ligne." }; }
           else {
             _repubSuivi = String(job.id);
             r = await avecVinted(() => finRepubBrouillon(acc, job));
           }
         } catch (e) { r = { accepte: true, etape: 'incertain', draftId: job.draftId, raison: "la mise en ligne planifiée s'est interrompue — regarde ton dressing (sinon : Actions → Brouillons → en ligne)." }; }
         finally { _repubSuivi = ''; }
-        try { const f = (await chrome.storage.local.get('vrmRepubFins')).vrmRepubFins || {}; const lim = Date.now() - 864e5; for (const k of Object.keys(f)) if (!(f[k] && f[k].at > lim)) delete f[k]; f[job.id] = { ...(r || {}), at: Date.now() }; await chrome.storage.local.set({ vrmRepubFins: f }); } catch (_) {}
-        try { notifierApp({ type: 'maj', quoi: 'repub', id: String(job.id), etape: 'fin', fin: r || null }); } catch (_) {}
+        try { await modifierAttente((cur) => { delete cur[job.id]; }); } catch (_) {}
+        await finir(job, r);
       }
     } finally { _miseEnLigneEnCours = null; armerMiseEnLigne(); }
   })();
@@ -9259,32 +9333,39 @@ async function finRepubBrouillon(acc, job) {
   const corpsCV = JSON.parse(job.corpsCV);
     // Sa place est réservée depuis le départ de la paire : ici on ne revérifie que le
     // compte connecté et la pause de Vinted, jamais le plafond (l'ancienne est partie).
+    const rendre1 = async () => { if (job.tRes) await rendreActions(String(uid), job.tRes, 1); };
+    // (29 oct., revue) Le brouillon a-t-il été mis en ligne entre-temps (« Brouillons → en
+    // ligne », ou une mise en ligne restée sans réponse) ? Alors rien ne repart.
+    let deja; try { deja = await sbGet(`app_data?id=eq.vinted_brouillon_${draftId}&select=etat:data->>etat`); } catch (_) { deja = null; }
+    if (deja && deja[0] && deja[0].etat === 'publie') { await rendre1(); await leverVerrouRecreer(id); await majVersBrouillon(uid, id, { etat: 'fait', draftId }); return { accepte: true, etape: 'fait', draftId, nouvelId: draftId, raison: 'le brouillon était déjà en ligne — rien n’a été renvoyé.' }; }
+    if (await lireVerrouRecreer('b' + draftId)) { await rendre1(); await majVersBrouillon(uid, id, { etat: 'mise-en-ligne-incertaine', draftId }); return { accepte: true, etape: 'incertain', draftId, raison: "une autre mise en ligne de ce brouillon est partie sans réponse claire — VRM n'en renvoie pas une seconde. Regarde ton dressing." }; }
     const stopC = await gardeStricte(uid, acc, { lecture: true });
-    if (stopC) { await leverVerrouRecreer(id); await majVersBrouillon(uid, id, { etat: 'a-publier', draftId }); return { refaire: true, accepte: true, etape: 'brouillon-a-refaire', draftId, raison: `l'ancienne annonce est supprimée et le brouillon est rangé, mais il n'a pas été mis en ligne (${stopC.error}) — « Brouillons → en ligne » le met en ligne, sans en créer un autre.` }; }
+    if (stopC) { await rendre1(); await leverVerrouRecreer(id); await majVersBrouillon(uid, id, { etat: 'a-publier', draftId }); return { refaire: true, accepte: true, etape: 'brouillon-a-refaire', draftId, raison: `l'ancienne annonce est supprimée et le brouillon est rangé, mais il n'a pas été mis en ligne (${stopC.error}) — « Brouillons → en ligne » le met en ligne, sans en créer un autre.` }; }
     const rlB = await vintedPage(acc, 'GET', `/api/v2/item_upload/items/${draftId}`, null, { timeoutMs: 30000 });
     if (corpsCV && corpsCV.draft) {
       const lu = appliquerBrouillonLu(corpsCV.draft, rlB, draftId);
       const manqueF = lu.photos === 0 ? ['les photos'] : await champsManquantsAvant(uid, acc, corpsCV.draft, [id, draftId], { cacheSeul: true });
       if (manqueF.length) {
-        await leverVerrouRecreer(id);
+        await rendre1(); await leverVerrouRecreer(id);
         await majVersBrouillon(uid, id, { etat: 'a-publier', draftId, cause: 'incomplet' });
         noterDiag('republier_fin_bloque_incomplet');
         return { refaire: true, accepte: true, etape: 'brouillon-a-refaire', draftId, raison: `l'ancienne annonce est supprimée et le brouillon est rangé, mais VRM ne l'a PAS mis en ligne : Vinted le refuserait, il manque ${manqueF.join(', ')}. Ouvre-le sur Vinted (Mes brouillons → « Modifier »), complète, puis « Publier ».` };
       }
     }
     etapeRepub(id, 'en-ligne');
+    await poserVerrouRecreer('b' + draftId);
     const rcV = await vintedPage(acc, 'POST', `/api/v2/item_upload/drafts/${draftId}/completion`, corpsCV, { timeoutMs: 60000 });
-    if (rcV && rcV.sansPage) {
-      await leverVerrouRecreer(id);
+    if (pasParti(rcV)) {
+      await rendre1(); await leverVerrouRecreer(id); await leverVerrouRecreer('b' + draftId);
       await majVersBrouillon(uid, id, { etat: 'a-publier', draftId });
-      return { refaire: true, accepte: true, etape: 'brouillon-a-refaire', draftId, raison: `l'ancienne annonce est supprimée et le brouillon est rangé, mais il n'a pas été mis en ligne : ${raisonSansPage(rcV)}` };
+      return { refaire: true, accepte: true, etape: 'brouillon-a-refaire', draftId, raison: `l'ancienne annonce est supprimée et le brouillon est rangé, mais il n'a pas été mis en ligne : ${rcV.sansPage ? raisonSansPage(rcV) : (rcV.raison || 'Vinted demande de ralentir')} — « Brouillons → en ligne » le met en ligne, sans en créer un autre.` };
     }
     if (!rcV || rcV.status === 0 || rcV.status >= 500) {
       noterDiag(`republier_mise_en_ligne_incertaine_${(rcV && rcV.status) || 0}`);
       await majVersBrouillon(uid, id, { etat: 'mise-en-ligne-incertaine', draftId });
       return { accepte: true, etape: 'incertain', draftId, raison: "l'ancienne annonce est supprimée et le brouillon est rangé, mais Vinted n'a pas répondu clairement à la mise en ligne : il est PEUT-ÊTRE en ligne — regarde ton dressing (sinon : Actions → Brouillons → en ligne)." };
     }
-    await leverVerrouRecreer(id);
+    await leverVerrouRecreer(id); await leverVerrouRecreer('b' + draftId);
     if (!rcV.ok) {
       noterDiag(`republier_mise_en_ligne_refusee_${rcV.status}`);
       if (photosRefusees(rcV)) { try { echantillonRate('vinted_refus_photos', draftId, JSON.stringify((rcV.json && rcV.json.errors) || rcV.json || '')); } catch (_) {} }
@@ -9346,6 +9427,24 @@ function unCompteurALaFois(fn) {
   _chaineCompteurs = suite.then(() => {}, () => {});
   return suite;
 }
+// (29 oct., revue) Les gestes RÉSERVÉS par une paire qui s'arrête AVANT de les envoyer
+// (onglet absent, annonce disparue, photo illisible, brouillon refusé…) sont RENDUS :
+// sinon chaque essai raté brûlait 3 des actions de l'heure sans rien envoyer.
+function rendreActions(uid, depuis, n) {
+  return unCompteurALaFois(async () => {
+    try {
+      const cle = 'vrmActions';
+      const cur = (await chrome.storage.local.get(cle))[cle] || {};
+      const l = (cur[uid] || []).slice().sort((a, b) => a - b);
+      let k = Math.max(0, Math.floor(Number(n) || 0));
+      for (let i = l.length - 1; i >= 0 && k > 0; i--) if (l[i] >= depuis) { l.splice(i, 1); k--; }
+      cur[uid] = l; await chrome.storage.local.set({ [cle]: cur });
+    } catch (_) {}
+  });
+}
+// Une requête qui n'est PAS partie chez Vinted (pas d'onglet, onglet hors du site,
+// pause demandée par Vinted) : son issue est CERTAINE — rien n'a été fait.
+function pasParti(r) { return !!(r && (r.sansPage || r.pause)); }
 function compterAction(uid, plafond = ACTIONS_MAX_HEURE, n = 1) { return unCompteurALaFois(() => compterActionUn(uid, plafond, n)); }
 async function compterActionUn(uid, plafond, n = 1) {
   try {
@@ -9643,6 +9742,7 @@ async function executerMessageFavori(uid,acc,body){
   etape('conversation');
   const creation=await vintedPage(acc,'POST','/api/v2/conversations',{initiator:body.initiator,item_id:body.itemId,opposite_user_id:body.recipientId},{timeoutMs:12000});
   if(creation.sansPage)return rep('refuse',0,'onglet_vinted');
+  if(creation.pause)return rep('refuse',0,'pause_vinted');
   if(!creation.ok)return rep(creation.status>=400&&creation.status<500?'refuse':'incertain',creation.status);
   const cc=creation.json?.conversation;
   const convId=String(cc?.id||'');
@@ -9655,7 +9755,7 @@ async function executerMessageFavori(uid,acc,body){
   await pauseFavori('transaction');
   etape('verification');
   // Le fil : la réponse de création, si elle porte de quoi vérifier ; sinon relu (comme avant).
-  let c=cc,lu={status:creation.status};
+  let c=cc,lu={status:creation.status,json:creation.json}; // (29 oct., revue) la pagination de la réponse de création est vérifiée aussi
   if(!filVerifiable(c)){noterDiag('favori_fil_relu');lu=await vintedPage(acc,'GET',`/api/v2/conversations/${convId}`,null,{timeoutMs:12000});c=lu.json?.conversation;if(!lu.ok)return rep('refuse',lu.status,'identite_non_confirmee');}
   // Both identities must be in the actual thread immediately before reply.
   const article=String(c?.transaction?.item_id||c?.transaction?.item?.id||c?.item?.id||c?.item_id||'');
@@ -9701,7 +9801,11 @@ async function executerMessageFavori(uid,acc,body){
   if(await gardeStricte(uid,acc,{lecture:true}))return rep('refuse');
   etape('envoi');
   const r=await vintedPage(acc,'POST',`/api/v2/conversations/${convId}/replies`,{reply:{body:texteFinal,photo_temp_uuids:null,is_personal_data_sharing_check_skipped:false}},{timeoutMs:12000});
-  if(r.sansPage)return rep('incertain',0,'reponse_inconnue');
+  // (29 oct., revue) Pas d'onglet, onglet hors de Vinted, ou pause : le message n'est PAS
+  // parti (vérifié dans la page avant l'envoi) — un refus certain, pas « à vérifier »
+  // (qui arrêtait toutes les files).
+  if(r.sansPage)return rep('refuse',0,'onglet_vinted');
+  if(r.pause)return rep('refuse',0,'pause_vinted');
   if(r.ok&&r.json?.code===0){etape('confirmation');return rep('envoye',r.status);}
   return rep(!r.ok&&r.status>=400&&r.status<500?'refuse':'incertain',r.status);
 }
