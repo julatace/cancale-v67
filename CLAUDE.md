@@ -1,5 +1,25 @@
 # VRM — dossier de passation
 
+> **29 octobre — L'AGENT eBAY QUI DEMANDE (eBay → Agent) :** Julien : « je veux un agent autonome, c'est-à-dire que je veux
+> juste qu'il demande s'il doit poster les articles, que tu puisses lui dire ce que tu veux qu'il publie ». L'agent PRÉPARE et
+> PROPOSE, Julien dit oui, il publie — **jamais sans son oui**. Règle pure `src/agentEbay.js` (`propositionAgent`, §11) : en
+> ligne, numérotée, pas vendue (preuves de toutes plateformes ; « pas su » ⇒ rien et c'est dit), pas déjà en vente/programmée
+> sur eBay (SKU, tous comptes), pas jumelle (photo), pas « jamais » ; ses réglages (`vrm_agent_ebay_regles`, synchronisé :
+> comptes, marques, tailles, prix, ancienneté, « cochées eBay », max/jour, prix eBay même/+%/+€ jamais sous le prix d'achat,
+> compte eBay) et une **phrase comprise SANS IA** (mots-clés, nombres), montrée avant d'être gardée. En tête d'eBay → Agent :
+> « N paires prêtes pour eBay — je les publie ? », chaque paire préparée (catégorie, caractéristiques, frais lus par la
+> vérification à blanc), cocher/décocher, « Jamais », « Pas maintenant », « Programmer plutôt » (brouillons). « Publier ces N »
+> confirme compte, prix, frais ; la route exige `agent:true` + `confirme:true` (400 sinon), garde les mêmes contrôles que
+> « Publier », journalise (« Publiée par l'agent ») ; incertain ⇒ arrêt, pas reproposée avant relecture. Ma journée : une ligne.
+> **Le matin** (`ship-reminders`, `rappelAgentEbay`) : l'app publie `vrm_agent_ebay_resume` {n, at, pause} ; le cron envoie
+> « 🛒 N paires prêtes pour eBay — publier ? » (préférence `agentebay`, défaut oui), une fois par jour (mémo écrit AVANT), rien
+> si > 48 h, pause du jour, illisible. Preuves : `audit-agent-ebay.cjs` (37, 11/11 mutations, 16 rouges sur origin/main) ;
+> `audit-ebay-route.cjs` [R-agent] (3 rouges sur origin/main, rouge sans la garde) ; banc `ebay-agent.cjs` (390 tactile + 1512
+> sombre, faux eBay ; 12 rouges sur origin/main, rouge sans la confirmation) ; banc `agent-ebay-push.cjs` (vraie route,
+> 16 contrôles ; 6 rouges sur origin/main, rouge si le mémo part après). ⚠️ **Non mesuré** : aucun appel réel à eBay (formes
+> pubinfo/pubverify/publish de la doc) ; sans migrations 014/015, l'agent prépare quand VRM est ouvert (le cron ne fait que
+> demander). **Gestes de Julien** : ouvrir eBay → Agent, régler « Ce que je publie » (ou écrire sa phrase), puis dire oui.
+
 > **29 octobre (suite, « c'est trop incompréhensible ») — Comptabilité allégée :** « Ta micro-entreprise » (calendrier,
 > seuils, profil, impôts) est REPLIÉE sous une ligne-résumé (taux · prochaine période à déclarer · seuils et impôts,
 > `data-micro-repli`) et s'ouvre d'elle-même si quelque chose demande son attention (versement libératoire pas répondu,

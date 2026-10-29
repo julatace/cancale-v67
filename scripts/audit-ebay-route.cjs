@@ -2157,6 +2157,22 @@ const RA = {};
     const iQ = auCompte(q.journal).findIndex((x) => x.appel === 'AddFixedPriceItem');
     dit(q.code === 200 && q.corps.offre && q.corps.offre.verifie === true && auCompte(q.journal).slice(iQ + 1).filter((x) => x.appel === 'GetItem').length === 1, '[R-crea] publier avec une règle ⇒ UNE relecture après l\'ajout, « vérifiée »', `HTTP ${q.code} · ${appels(q.journal)}`);
   });
+  // (29 octobre) L'AGENT eBAY QUI DEMANDE : une publication marquée `agent`
+  // n'existe que sur SON oui — la route le revérifie (jamais le navigateur seul),
+  // passe par les mêmes gardes que « Publier », et l'inscrit au journal.
+  await essaie('[R-agent]', async () => {
+    for (const [nom, extra] of [['sans confirmation', {}], ['confirme « true » en texte', { confirme: 'true' }]]) {
+      avecR();
+      const x = await app(JWT_J, { action: 'publish', agent: true, ...extra, item: { ...itemC, numero: '63' } });
+      dit(x.code === 400 && x.corps.reason === 'confirmation' && zero(x), `[R-agent] ${nom} ⇒ 400 « confirmation », zéro appel eBay`, `HTTP ${x.code} · ${x.corps && x.corps.reason}`);
+    }
+    avecR();
+    const ok = await app(JWT_J, { action: 'publish', agent: true, confirme: true, item: { ...itemC, numero: '63' } });
+    dit(ok.code === 200 && auCompte(ok.journal).some((y) => y.appel === 'AddFixedPriceItem'), '[R-agent] confirmé ⇒ la publication part (mêmes gardes que « Publier »)', `HTTP ${ok.code} · ${appels(ok.journal)}`);
+    const jr = lignes.find((l) => /^ebay_agent_journal/.test(l.id));
+    const ent = jr && JSON.stringify(jr.data || {});
+    dit(!!ent && /agentpublie/.test(ent) && /VRM-63/.test(ent), '[R-agent] elle est inscrite au journal des actions (« Publiée par l\'agent », VRM-63)', ent ? ent.slice(0, 200) : 'aucune ligne');
+  });
   await essaie('[R-vide]', async () => {
     const st = iso(Date.now() + 2 * JOUR);
     const corpsDe = async (offre) => {
