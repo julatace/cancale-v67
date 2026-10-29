@@ -109,27 +109,30 @@ export function prixEbayAgent(prixVinted, regles, achat) {
 }
 
 // ── POURQUOI UNE PAIRE N'EST PAS PROPOSÉE (dit une fois, §7) ─────────────────
+// [singulier, pluriel] : « 1 déjà vendue ailleurs », « 2 déjà vendues ailleurs ».
 export const RAISONS_AGENT = {
-  'pas-en-ligne': 'plus en vente sur Vinted',
-  vendue: 'déjà vendues ailleurs',
-  'deja-ebay': 'déjà en vente ou programmées sur eBay',
-  jumelle: 'même photo qu’une autre paire (une paire, une annonce)',
-  incertain: 'publication incertaine, en attente d’une relecture chez eBay',
-  jamais: 'mises dans « jamais sur eBay »',
-  'hors-regles': 'hors de tes règles',
-  'marque-inconnue': 'marque inconnue (je ne la devine pas)',
-  'taille-inconnue': 'taille inconnue (je ne la devine pas)',
-  'anciennete-inconnue': 'date de mise en ligne inconnue',
-  'pas-cochee': 'pas cochées pour eBay',
-  'sans-prix': 'sans prix Vinted lisible',
-  'sous-achat': 'le prix eBay serait sous ton prix d’achat',
-  'sans-photo': 'sans photo captée',
-  quota: 'au-delà de ton maximum du jour',
+  'pas-en-ligne': ['plus en vente sur Vinted', 'plus en vente sur Vinted'],
+  'numero-double': ['dont le N° est porté par deux paires — à régler dans Colis ou Annonces', 'dont le N° est porté par deux paires — à régler dans Colis ou Annonces'],
+  vendue: ['déjà vendue ailleurs', 'déjà vendues ailleurs'],
+  'deja-ebay': ['déjà en vente ou programmée sur eBay', 'déjà en vente ou programmées sur eBay'],
+  brouillon: ['déjà en brouillon eBay, à programmer ou publier depuis Annonces', 'déjà en brouillon eBay, à programmer ou publier depuis Annonces'],
+  jumelle: ['à la même photo qu’une autre paire (une paire, une annonce)', 'à la même photo qu’une autre paire (une paire, une annonce)'],
+  incertain: ['à la publication incertaine, en attente d’une relecture chez eBay', 'à la publication incertaine, en attente d’une relecture chez eBay'],
+  jamais: ['mise dans « jamais sur eBay »', 'mises dans « jamais sur eBay »'],
+  'hors-regles': ['hors de tes règles', 'hors de tes règles'],
+  'marque-inconnue': ['à la marque inconnue (je ne la devine pas)', 'à la marque inconnue (je ne la devine pas)'],
+  'taille-inconnue': ['à la taille inconnue (je ne la devine pas)', 'à la taille inconnue (je ne la devine pas)'],
+  'anciennete-inconnue': ['sans date de mise en ligne connue', 'sans date de mise en ligne connue'],
+  'pas-cochee': ['pas cochée pour eBay', 'pas cochées pour eBay'],
+  'sans-prix': ['sans prix Vinted lisible', 'sans prix Vinted lisible'],
+  'sous-achat': ['dont le prix eBay serait sous ton prix d’achat', 'dont le prix eBay serait sous ton prix d’achat'],
+  'sans-photo': ['sans photo captée', 'sans photo captée'],
+  quota: ['au-delà de ton maximum du jour', 'au-delà de ton maximum du jour'],
 };
 const ORDRE_RAISONS = Object.keys(RAISONS_AGENT);
 export function phraseEcartees(ecartees) {
   const e = ecartees || {};
-  const parts = ORDRE_RAISONS.filter((k) => e[k] > 0).map((k) => `${e[k]} ${RAISONS_AGENT[k]}`);
+  const parts = ORDRE_RAISONS.filter((k) => e[k] > 0).map((k) => `${e[k]} ${RAISONS_AGENT[k][e[k] > 1 ? 1 : 0]}`);
   const n = ORDRE_RAISONS.reduce((s, k) => s + (e[k] > 0 ? e[k] : 0), 0);
   return n ? `${n} écartée${n > 1 ? 's' : ''} : ${parts.join(' · ')}.` : '';
 }
@@ -152,6 +155,10 @@ const marqueOk = (marque, marques) => {
 //  achatDe(p)      : prix d'achat connu (nombre) ou null
 //  cochee(p)       : la paire est-elle cochée « eBay » ?
 //  incertains      : Set de N° dont une publication est incertaine (relecture attendue)
+//  doubles         : Map clé du N° → nombre de paires EN LIGNE qui le portent (la
+//                    liste `paires` peut n'en garder qu'une : l'autre est comptée)
+//  brouillons      : Set de N° qui ont déjà un brouillon eBay (undefined = en cours · null = pas su ;
+//                    clé absente de l'appel = non jugé)
 //  publieesAujourdhui : ce que l'agent a déjà publié aujourd'hui (le maximum du jour en tient compte)
 export function propositionAgent(o) {
   const x = o || {};
@@ -169,6 +176,9 @@ export function propositionAgent(o) {
   if (!x.ventes || !estMap(x.ventes.vendus)) pasSu.push('tes ventes (Vinted, eBay, Leboncoin)');
   else if (Array.isArray(x.ventes.pasSu)) pasSu.push(...x.ventes.pasSu);
   if (!estMap(x.dejaSurEbay)) pasSu.push('tes annonces eBay');
+  const jugeBrouillons = Object.prototype.hasOwnProperty.call(x, 'brouillons');
+  if (jugeBrouillons && x.brouillons === undefined) return { etat: 'en-cours' };
+  if (jugeBrouillons && !estSet(x.brouillons)) pasSu.push('tes brouillons eBay');
   if (pasSu.length) return { etat: 'pas-su', pasSu };
 
   const jamais = new Set((r.jamais || []).map(cle));
@@ -178,16 +188,28 @@ export function propositionAgent(o) {
   const ecartees = {};
   const ecarte = (k) => { ecartees[k] = (ecartees[k] || 0) + 1; };
   const candidates = [];
-  const vus = new Set();
+  // ⚠️ Un N° porté par DEUX paires en vente (§5 : deux paires sous un même
+  // numéro) : aucune n'est proposée — choisir l'une des deux enverrait les
+  // photos de l'une sous un SKU qui en désigne deux. Comptées, et dites.
+  const parCle = new Map();
+  for (const p of x.paires) {
+    if (!p || p.num == null || !x.enLigne.has(String(p.id))) continue;
+    const k = cle(p.num); if (!k) continue;
+    const s = parCle.get(k) || new Set(); s.add(String(p.id)); parCle.set(k, s);
+  }
+  const vus = new Set(), doublesVus = new Set();
   for (const p of x.paires) {
     if (!p || p.num == null) continue;
     const k = cle(p.num);
-    if (!k || vus.has(k)) continue;
-    vus.add(k);
     const id = String(p.id);
+    if (!k || vus.has(id)) continue;
+    vus.add(id);
     if (!x.enLigne.has(id)) { ecarte('pas-en-ligne'); continue; }
+    const nDouble = Math.max((parCle.get(k) || new Set()).size, estMap(x.doubles) ? Number(x.doubles.get(k)) || 0 : 0);
+    if (nDouble > 1) { if (!doublesVus.has(k)) { doublesVus.add(k); ecartees['numero-double'] = (ecartees['numero-double'] || 0) + nDouble; } continue; }
     if (x.ventes.vendus.get(k)) { ecarte('vendue'); continue; }
     if (x.dejaSurEbay.get(k)) { ecarte('deja-ebay'); continue; }
+    if (jugeBrouillons && x.brouillons.has(k)) { ecarte('brouillon'); continue; }
     const j = estMap(x.jumelles) ? x.jumelles.get(id) : null;
     if (j && j.gardeId && String(j.gardeId) !== id) { ecarte('jumelle'); continue; }
     if (estSet(x.incertains) && x.incertains.has(k)) { ecarte('incertain'); continue; }
@@ -221,9 +243,24 @@ export function propositionAgent(o) {
 // Le résumé publié pour Ma journée et la notification du matin (`vrm_agent_ebay_resume`) :
 // seulement sur une proposition LUE — « pas su » ne publie rien (le dernier
 // résumé, daté, reste ; le serveur l'ignore au-delà de 48 h).
-export function resumeAgent(prop, maintenant = Date.now(), pause = null) {
+//  `n`      : les paires PROPOSÉES (elles suivent ses règles) ;
+//  `pretes` : celles que l'écran a PRÉPARÉES chez eBay et qui peuvent partir
+//             telles quelles — absent tant que personne n'a préparé. Jamais
+//             « prêtes » sans préparation (revue du 29 oct.).
+export function resumeAgent(prop, maintenant = Date.now(), pause = null, pretes) {
   if (!prop || prop.etat !== 'lu') return null;
-  return { v: 1, n: prop.proposees.length, at: maintenant, ...(pause ? { pause } : {}) };
+  const p = Number.isFinite(pretes) && pretes >= 0 ? Math.min(Math.round(pretes), prop.proposees.length) : null;
+  return { v: 1, n: prop.proposees.length, ...(p != null ? { pretes: p } : {}), at: maintenant, ...(pause ? { pause } : {}) };
+}
+// LA phrase du résumé — une seule règle pour la question de l'écran, Ma journée
+// et la notification du matin (§11, le serveur l'importe).
+export function phraseResumeAgent(n0, pretes0) {
+  const n = Math.round(Number(n0)), s = (k) => (k > 1 ? 's' : '');
+  if (!(n > 0)) return '';
+  const p = Number.isFinite(Number(pretes0)) && pretes0 !== null && pretes0 !== undefined && pretes0 !== '' ? Math.round(Number(pretes0)) : null;
+  if (p != null && p >= n) return `${n} paire${s(n)} prête${s(n)} pour eBay — je ${n > 1 ? 'les' : 'la'} publie ?`;
+  if (p != null && p > 0) return `${n} paire${s(n)} proposée${s(n)} pour eBay · ${p} prête${s(p)} à publier`;
+  return `${n} paire${s(n)} à regarder pour eBay`;
 }
 // La ligne de Ma journée : seulement un résumé frais, non nul, et pas mis de côté aujourd'hui.
 export function ligneJourneeAgent(resume, today, maintenant = Date.now()) {
@@ -233,7 +270,7 @@ export function ligneJourneeAgent(resume, today, maintenant = Date.now()) {
   if (!(at > 0) || maintenant - at > AGENT_RESUME_MAX_AGE_MS || at - maintenant > 600000) return null;
   if (r.pause && r.pause === today) return null;
   const n = Math.round(Number(r.n));
-  return { n, text: `${n} paire${n > 1 ? 's' : ''} prête${n > 1 ? 's' : ''} pour eBay — je les publie ?` };
+  return { n, pretes: Number.isFinite(Number(r.pretes)) && r.pretes != null ? Number(r.pretes) : null, text: phraseResumeAgent(n, r.pretes) };
 }
 
 // ── « CE QUE TU VEUX QU'IL PUBLIE », EN UNE PHRASE (sans IA, §2.9) ───────────
@@ -241,7 +278,7 @@ export function ligneJourneeAgent(resume, today, maintenant = Date.now()) {
 // DIT (jamais deviné), et la règle comprise lui est montrée AVANT d'être gardée.
 export const MARQUES_CONNUES = ['Nike', 'Jordan', 'Adidas', 'New Balance', 'Asics', 'Salomon', 'Puma', 'Reebok', 'Converse', 'Vans', 'Autry', 'Veja', 'On', 'Hoka', 'Saucony', 'Mizuno', 'Onitsuka Tiger', 'Diadora', 'Le Coq Sportif', 'Timberland', 'Dr. Martens', 'Birkenstock', 'Ralph Lauren', 'Lacoste', 'The North Face', 'Carhartt', 'Stone Island', 'Moncler', 'Balenciaga', 'Gucci', 'Louis Vuitton', 'Dior', 'Prada', 'Golden Goose', 'Common Projects', 'Yeezy', 'Arc\'teryx', 'Patagonia', 'Levi\'s', 'Supreme', 'Palace', 'Stüssy'];
 const MOT_NB = '(\\d+(?:[.,]\\d+)?)';
-const EUR = '\\s*(?:€|e|eur|euros?)?';
+const EUR = '\\s*(?:€|euros?|eur|e)?';   // « euros » AVANT « e » : sinon « 80 euros » laissait « uros »
 const TAILLE_TXT = '(?:\\d{2}(?:[.,]5)?|xxs|xs|s|m|l|xl|xxl)';
 const VIDES = new Set(['publie', 'publier', 'publies', 'poste', 'poster', 'mets', 'met', 'mettre', 'les', 'des', 'mes', 'mon', 'ma', 'ta', 'tes', 'en', 'a', 'au', 'aux', 'de', 'du', 'd', 'l', 'la', 'le', 'plus', 'moins', 'paire', 'paires', 'article', 'articles', 'toutes', 'tous', 'tout', 'sur', 'ebay', 'celles', 'ceux', 'qui', 'et', 'ou', 'que', 'je', 'veux', 'voudrais', 'chaussures', 'baskets', 'basket', 'sneakers', 'prix', 'euros', 'euro', 'eur', 'stp', 'merci', 'uniquement', 'seulement', 'avec', 'pour', 'mais', 'pas', 'les', 'une', 'un', 'cher', 'cheres', 'chers', 'vinted', 'compte', 'comptes', 'annonce', 'annonces', 'en', 'ligne', 'depuis', 'jours', 'jour', 'par', 'maximum', 'max', 'minimum', 'min', 'taille', 'tailles', 'pointure', 'pointures', 'entre', 'dessus', 'dessous', 'partir', 'jusqu', 'sous', 'meme', 'cochees', 'cochee', 'qu', 's', 'y', 'il', 'elle', 'on', 'ne']);
 
@@ -263,6 +300,11 @@ export function comprendrePhrase(texte, opts = {}) {
   let t = ' ' + normTexte(brut).replace(/[’'"«»]/g, ' ').replace(/(\d)\s*€/g, '$1 €') + ' ';
   const regles = {};
   const compris = [];
+  // ⚠️ UNE NÉGATION N'EST JAMAIS APPLIQUÉE (revue du 29 oct.) : « ne publie pas
+  // les Adidas » devenait « Paires : Adidas » — l'inverse, sans un mot. VRM ne
+  // sait pas encore EXCLURE par une phrase : il ne garde rien et le dit.
+  const neg = /(?:^|\s)(pas|sauf|sans|hors|aucune?s?|jamais|excepte|exclus?|exclure|ni)(?=\s)/.exec(t);
+  if (neg) return { regles: {}, compris: [], pasCompris: [], vide: true, negation: neg[1] };
   const ote = (m) => { if (m) t = t.replace(m[0], ' '); };
   let m;
   if ((m = /\bseulement (?:celles |ceux |les paires )?cochees?\b|\bcochees? (?:pour )?ebay\b/.exec(t))) { regles.seulementCochees = true; compris.push('seulement les paires cochées « eBay »'); ote(m); }
@@ -275,7 +317,7 @@ export function comprendrePhrase(texte, opts = {}) {
   }
   if ((m = new RegExp(`\\+\\s*${MOT_NB}\\s*%|${MOT_NB}\\s*%\\s*(?:de plus|plus cher)`).exec(t))) {
     const n = nombre(m[1] || m[2]); if (n != null) { regles.prixMode = 'pct'; regles.prixValeur = n; compris.push(`prix sur eBay : celui de Vinted + ${String(n).replace('.', ',')} %`); } ote(m);
-  } else if ((m = new RegExp(`\\+\\s*${MOT_NB}\\s*(?:€|e|eur|euros?)(?=\\s|,|$)|${MOT_NB}\\s*(?:€|e|eur|euros?)\\s*(?:de plus|plus cher)`).exec(t))) {
+  } else if ((m = new RegExp(`\\+\\s*${MOT_NB}\\s*(?:€|euros?|eur|e)(?=\\s|,|$)|${MOT_NB}\\s*(?:€|euros?|eur|e)\\s*(?:de plus|plus cher)`).exec(t))) {
     const n = nombre(m[1] || m[2]); if (n != null) { regles.prixMode = 'eur'; regles.prixValeur = n; compris.push(`prix sur eBay : celui de Vinted + ${String(n).replace('.', ',')} €`); } ote(m);
   } else if ((m = /\b(?:au )?meme prix\b/.exec(t))) { regles.prixMode = 'meme'; regles.prixValeur = 0; compris.push('prix sur eBay : le même que sur Vinted'); ote(m); }
   if ((m = new RegExp(`(?:\\ben|\\btailles?|\\bpointures?|\\bdu)\\s+(${TAILLE_TXT}(?:\\s*(?:,|et|ou|-|a|au|\\/)\\s*${TAILLE_TXT})*)\\b`).exec(t))) {
@@ -311,7 +353,11 @@ export function comprendrePhrase(texte, opts = {}) {
     if (re.test(t)) { if (!mq.some((x) => normTexte(x) === n)) mq.push(b); t = t.replace(re, ' '); }
   }
   if (mq.length) { regles.marques = mq; compris.push(`marque${mq.length > 1 ? 's' : ''} ${mq.join(', ')}`); }
-  const pasCompris = t.split(/[^a-z0-9]+/).filter((w) => w.length >= 3 && !VIDES.has(w) && !/^\d+$/.test(w));
+  // Un nombre resté sans règle (« Nike 42 43 44 », « taille 9 US », « -10 % »)
+  // est DIT, jamais ignoré en silence.
+  const signes = [...t.matchAll(/-\s*\d+(?:[.,]\d+)?\s*(?:%|€)/g)].map((x) => x[0].replace(/\s+/g, ' ').trim());
+  for (const x of signes) t = t.replace(x, ' ');
+  const pasCompris = [...signes, ...t.split(/[^a-z0-9]+/).filter((w) => (/^\d+$/.test(w) ? true : w.length >= 3 && !VIDES.has(w)))];
   return { regles, compris, pasCompris: [...new Set(pasCompris)].slice(0, 8), vide: !compris.length };
 }
 

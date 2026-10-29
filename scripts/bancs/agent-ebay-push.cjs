@@ -9,9 +9,10 @@
 //
 // §4.10 : on EXÉCUTE la vraie route `api/ship-reminders.js` contre une fausse
 // base et un faux Web Push. Données inventées. On exige :
-//   A. résumé frais (n = 3) ⇒ UNE notification « 🛒 3 paires prêtes pour eBay —
-//      publier ? » qui ouvre ?tab=ebay_agent, et le mémo du jour est écrit AVANT
-//      l'envoi ;
+//   A. résumé frais (n = 3, sans préparation) ⇒ UNE notification « 🛒 3 paires
+//      à regarder pour eBay » (jamais « prêtes » sans préparation, revue du
+//      29 oct.) qui ouvre ?tab=ebay_agent, et le mémo du jour est écrit AVANT
+//      l'envoi ; A2. résumé préparé ⇒ « 3 proposées · 1 prête », « 2 prêtes » ;
 //   B. résumé de plus de 48 h ⇒ rien ;
 //   C. « Pas maintenant » aujourd'hui (pause) ⇒ rien ;
 //   D. n = 0 ⇒ rien ;
@@ -94,12 +95,22 @@ const agent = () => pushes.filter((p) => /pour eBay/.test(`${p.title} ${p.body}`
   { const p = agent()[0] || {};
     console.log(`     téléphone : « ${p.title} » / « ${p.body} »`);
     dit(agent().length === 1, 'UNE notification', String(agent().length));
-    dit(p.title === '🛒 3 paires prêtes pour eBay — publier ?', 'elle pose la question : « 🛒 3 paires prêtes pour eBay — publier ? »', p.title);
+    dit(p.title === '🛒 3 paires à regarder pour eBay', 'sans préparation chez eBay : « 🛒 3 paires à regarder pour eBay » — jamais « prêtes »', p.title);
     dit(/Rien n.est publi/.test(p.body || ''), 'elle dit que rien n\'est publié sans son oui', p.body);
-    dit(p.url === '/?tab=ebay_agent', 'le clic ouvre eBay → Agent (?tab=ebay_agent)', p.url);
+    dit(p.url === '/?tab=ebay_agent', 'le clic ouvre eBay → À traiter, où vit l\'agent (?tab=ebay_agent)', p.url);
     const iM = journal.indexOf('memo'), iP = journal.findIndex((x) => /^push:agent-ebay/.test(x));
     dit(iM >= 0 && iP > iM, 'le mémo du jour est écrit AVANT l\'envoi', journal.join(' > '));
     dit(CFG.ecrits[0] && CFG.ecrits[0].date === auj() && CFG.ecrits[0].n === 3, 'le mémo porte le jour de Paris et le nombre', JSON.stringify(CFG.ecrits[0])); }
+
+  console.log('\n── A2. résumé PRÉPARÉ par l\'écran (3 proposées, 1 prête)');
+  reset({ resume: { v: 1, n: 3, pretes: 1, at: Date.now() - 3600000 } });
+  await lancer();
+  { const p = agent()[0] || {};
+    dit(p.title === '🛒 3 paires proposées pour eBay · 1 prête à publier', 'la notification suit les préparations : « 3 proposées · 1 prête »', p.title); }
+  reset({ resume: { v: 1, n: 2, pretes: 2, at: Date.now() - 3600000 } });
+  await lancer();
+  { const p = agent()[0] || {};
+    dit(p.title === '🛒 2 paires prêtes pour eBay — je les publie ?', 'toutes préparées et prêtes : « 🛒 2 paires prêtes pour eBay — je les publie ? »', p.title); }
 
   console.log('\n── B. résumé de plus de 48 h : rien');
   reset({ resume: { v: 1, n: 3, at: Date.now() - 49 * 3600000 } });

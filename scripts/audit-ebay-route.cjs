@@ -2172,6 +2172,25 @@ const RA = {};
     const jr = lignes.find((l) => /^ebay_agent_journal/.test(l.id));
     const ent = jr && JSON.stringify(jr.data || {});
     dit(!!ent && /agentpublie/.test(ent) && /VRM-63/.test(ent), '[R-agent] elle est inscrite au journal des actions (« Publiée par l\'agent », VRM-63)', ent ? ent.slice(0, 200) : 'aucune ligne');
+    // (29 oct., revue) L'identifiant d'envoi : un second essai après un
+    // résultat incertain ne peut plus créer une seconde annonce.
+    const U = 'ABCDEF0123456789ABCDEF0123456789';
+    avecR(); uuidsVus.clear();
+    const u1 = await app(JWT_J, { action: 'publish', agent: true, confirme: true, uuid: U, item: { ...itemC, numero: '64' } });
+    const add1 = auCompte(u1.journal).find((y) => y.appel === 'AddFixedPriceItem');
+    dit(u1.code === 200 && add1 && new RegExp('<UUID>' + U + '</UUID>').test(add1.corps || ''), '[R-agent] l\'identifiant d\'envoi part dans <UUID> de l\'ajout', `HTTP ${u1.code}`);
+    const ver1 = auCompte(u1.journal).filter((y) => y.appel === 'VerifyAddFixedPriceItem');
+    dit(!ver1.some((y) => /<UUID>/.test(y.corps || '')), '[R-agent] jamais d\'UUID dans une vérification à blanc');
+    avecR(); uuidsVus.clear(); mode.add = '488';
+    const u2 = await app(JWT_J, { action: 'publish', agent: true, confirme: true, uuid: U, item: { ...itemC, numero: '65' } });
+    dit(u2.code === 200 && u2.corps.ok === true && u2.corps.deja === true && auCompte(u2.journal).some((y) => y.appel === 'GetItem'), '[R-agent] 488 (cet envoi a DÉJÀ créé l\'annonce) CONFIRMÉ par GetItem ⇒ publiée, pas une seconde annonce', `HTTP ${u2.code} · ${appels(u2.journal)}`);
+    avecR(); uuidsVus.clear(); mode.add = '488'; mode.getitem = 'autre';
+    const u3 = await app(JWT_J, { action: 'publish', agent: true, confirme: true, uuid: U, item: { ...itemC, numero: '66' } });
+    dit(u3.code === 504 && u3.corps.reason === 'incertain' && u3.corps.ok === false, '[R-agent] 488 dont l\'annonce porte un AUTRE SKU ⇒ « incertain », jamais ok', `HTTP ${u3.code}`);
+    avecR(); uuidsVus.clear();
+    const u4 = await app(JWT_J, { action: 'publish', item: { ...itemC, numero: '67', uuid: U } });
+    const add4 = auCompte(u4.journal).find((y) => y.appel === 'AddFixedPriceItem');
+    dit(add4 && !/<UUID>/.test(add4.corps || ''), '[R-agent] « Publier » sans identifiant d\'envoi (et un uuid glissé dans `item` est ignoré) : le XML d\'avant', add4 ? 'sans UUID' : 'aucun ajout');
   });
   await essaie('[R-vide]', async () => {
     const st = iso(Date.now() + 2 * JOUR);

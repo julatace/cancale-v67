@@ -36,6 +36,12 @@ const MUTATIONS = {
   'marque-devinee': ["if (ok === null) { ecarte('marque-inconnue'); continue; }", ''],
   'rappel-vieux': ['maintenant - at > RESUME_AGENT_MAX_AGE_MS || ', ''],
   'rappel-pause': ["  if (r.pause && r.pause === today) return { envoyer: false, raison: '« pas maintenant » aujourd’hui (son choix)' };\n", ''],
+  'numero-double': ["    if (nDouble > 1) {", "    if (false) {"],
+  'brouillon': ["    if (jugeBrouillons && x.brouillons.has(k)) { ecarte('brouillon'); continue; }\n", ''],
+  'negation-ignoree': ["  if (neg) return { regles: {}, compris: [], pasCompris: [], vide: true, negation: neg[1] };\n", ''],
+  'nombres-tus': ["(/^\\d+$/.test(w) ? true : ", "(/^\\d+$/.test(w) ? false : "],
+  'prete-sans-prep': ["  if (p != null && p >= n) return", "  if (p == null || p >= n) return"],
+  'pluriel-fixe': ["RAISONS_AGENT[k][e[k] > 1 ? 1 : 0]", "RAISONS_AGENT[k][1]"],
   'rappel-memo': ["  if (memo === undefined) return { envoyer: false, raison: 'mémo illisible — rien envoyé' };\n", ''],
 };
 
@@ -139,10 +145,43 @@ async function verifier(fichier, fichierRappel) {
     dit(c.regles.prixMode === 'pct' && c.regles.prixValeur === 10 && c.regles.prixMin === 50 && c.regles.prixMax === 90 && c.regles.parJour === 3
       && JSON.stringify(c.regles.tailles) === '["40","40.5","41"]' && (c.regles.marques || []).join() === 'Adidas', 'une phrase complète devient des règles (marque, tailles, fourchette, +10 %, 3 par jour)', JSON.stringify(c.regles));
     dit(c.pasCompris.includes('rouges'), 'ce qui n’est pas compris est DIT (« rouges »), jamais deviné', c.pasCompris.join());
-    const d = A.comprendrePhrase('julatace3535 qui dorment', { comptes: [{ uid: '11', login: 'julatace3535' }] });
+    const d = A.comprendrePhrase('compte_test qui dorment', { comptes: [{ uid: '11', login: 'compte_test' }] });
     dit((d.regles.comptesVinted || []).join() === '11' && d.regles.joursMin === 30, 'un compte Vinted nommé, « qui dorment » ⇒ 30 jours', JSON.stringify(d.regles));
     const r = A.texteRegles(A.appliquerPhrase({ jamais: ['7'] }, A.comprendrePhrase('Nike +5 €'), 'Nike +5 €'));
     dit(r.some((l) => /Nike/.test(l)) && r.some((l) => /\+ 5 €.*jamais sous ton prix d’achat/.test(l)) && r.some((l) => /N°7/.test(l)), 'la règle comprise est montrée en clair (et « jamais » est gardé)', r.join(' | '));
+  });
+  await essaie('numero-double', async () => {
+    const p = A.propositionAgent(base({ paires: [paire(30, { id: 'a30', prix: 50 }), paire(30, { id: 'b30', prix: 90 }), paire(2)] }));
+    dit(nums(p) === '2' && p.ecartees['numero-double'] === 2, 'deux paires en ligne sous le même N° : aucune n’est proposée, les deux sont comptées', nums(p) + ' ' + JSON.stringify(p.ecartees));
+    dit(/2 dont le N° est porté par deux paires/.test(A.phraseEcartees(p.ecartees)), 'et c’est dit', A.phraseEcartees(p.ecartees));
+    const q = A.propositionAgent({ ...base({ paires: [paire(30, { id: 'a30' }), paire(2)] }), doubles: new Map([['30', 2]]) });
+    dit(nums(q) === '2' && q.ecartees['numero-double'] === 2, 'la liste n’en garde qu’une (l’autre fiche n’y est pas) : la N°30 n’est pas proposée, et les DEUX paires sont comptées', nums(q) + ' ' + JSON.stringify(q.ecartees));
+  });
+  await essaie('brouillons', async () => {
+    const p = A.propositionAgent({ ...base(), brouillons: new Set(['2']) });
+    dit(nums(p) === '1,3' && p.ecartees.brouillon === 1, 'une paire déjà en brouillon eBay n’est pas reproposée (et c’est compté)', nums(p));
+    dit(A.propositionAgent({ ...base(), brouillons: null }).etat === 'pas-su', 'brouillons illisibles ⇒ « pas su », rien n’est proposé');
+    dit(A.propositionAgent({ ...base(), brouillons: undefined }).etat === 'en-cours', 'brouillons en cours de lecture ⇒ « en cours »');
+  });
+  await essaie('pluriel', async () => {
+    const t = A.phraseEcartees({ vendue: 1, 'deja-ebay': 2, jamais: 1, 'sous-achat': 1 });
+    dit(/1 déjà vendue ailleurs/.test(t) && /2 déjà en vente ou programmées/.test(t) && /1 mise dans « jamais/.test(t) && /1 dont le prix eBay serait sous/.test(t), 'les raisons s’accordent au nombre (« 1 déjà vendue », « 1 mise »)', t);
+  });
+  await essaie('phrase-pieges', async () => {
+    for (const ph of ['ne publie pas les Adidas', 'pas de Nike', 'tout sauf les Adidas', 'publie tout à moins de 30 € sauf les Adidas', 'sans les Puma']) {
+      const c = A.comprendrePhrase(ph);
+      dit(c.vide && !(c.regles.marques || []).length && !!c.negation, `une négation n’est JAMAIS appliquée à l’envers : « ${ph} »`, JSON.stringify(c));
+    }
+    const a = A.comprendrePhrase('Nike 42 43 44');
+    dit(['42', '43', '44'].every((x) => a.pasCompris.includes(x)), '« Nike 42 43 44 » : les nombres sans règle sont DITS', a.pasCompris.join());
+    const b = A.comprendrePhrase('les Jordan entre 80 et 150 euros');
+    dit(b.regles.prixMin === 80 && b.regles.prixMax === 150 && !b.pasCompris.length, '« euros » est compris (pas de « uros »)', JSON.stringify(b));
+    const c = A.comprendrePhrase('à moins de 80 euros');
+    dit(c.regles.prixMax === 80 && !c.pasCompris.length, '« à moins de 80 euros » ⇒ prix max 80, rien de non compris', JSON.stringify(c));
+    const d = A.comprendrePhrase('publie les nike en taille 9 US');
+    dit(d.pasCompris.includes('9'), '« taille 9 US » : la taille non comprise est DITE', d.pasCompris.join());
+    const e = A.comprendrePhrase('à -10 %');
+    dit(e.pasCompris.some((x) => /-10/.test(x)) && e.regles.prixMode == null, '« -10 % » n’est pas appliqué en silence', JSON.stringify(e));
   });
   await essaie('resume', async () => {
     const p = A.propositionAgent(base());
@@ -150,14 +189,26 @@ async function verifier(fichier, fichierRappel) {
     dit(r && r.n === 3 && r.at === maintenant, 'le résumé publié porte le nombre proposé et l’heure', JSON.stringify(r));
     dit(A.resumeAgent(A.propositionAgent(base({ dejaSurEbay: null })), maintenant) === null, '« pas su » ne publie aucun résumé');
     const l = A.ligneJourneeAgent({ n: 2, at: maintenant - 3600000 }, '2026-10-29', maintenant);
-    dit(l && /2 paires prêtes pour eBay/.test(l.text), 'Ma journée : « 2 paires prêtes pour eBay — je les publie ? »', l && l.text);
+    dit(l && /2 paires à regarder pour eBay/.test(l.text) && !/prête/.test(l.text), 'Ma journée, sans préparation : « 2 paires à regarder pour eBay » (jamais « prêtes »)', l && l.text);
+    const l2 = A.ligneJourneeAgent({ n: 3, pretes: 1, at: maintenant }, '2026-10-29', maintenant);
+    dit(l2 && /3 paires proposées pour eBay · 1 prête à publier/.test(l2.text), 'Ma journée, préparées : « 3 paires proposées · 1 prête à publier »', l2 && l2.text);
+    const l3 = A.ligneJourneeAgent({ n: 2, pretes: 2, at: maintenant }, '2026-10-29', maintenant);
+    dit(l3 && /2 paires prêtes pour eBay — je les publie \?/.test(l3.text), 'Ma journée, toutes préparées et prêtes : « 2 paires prêtes pour eBay — je les publie ? »', l3 && l3.text);
+    const l4 = A.ligneJourneeAgent({ n: 3, pretes: 0, at: maintenant }, '2026-10-29', maintenant);
+    dit(l4 && /3 paires à regarder/.test(l4.text), 'préparées mais aucune prête ⇒ « à regarder »', l4 && l4.text);
+    const r4 = A.resumeAgent(p, maintenant, null, 2);
+    dit(r4 && r4.n === 3 && r4.pretes === 2, 'le résumé porte les prêtes quand l’écran a préparé', JSON.stringify(r4));
+    dit(!('pretes' in (A.resumeAgent(p, maintenant) || {})), 'sans préparation, le résumé ne porte AUCUN nombre de prêtes');
     dit(A.ligneJourneeAgent({ n: 2, at: maintenant - 49 * 3600000 }, '2026-10-29', maintenant) === null, 'Ma journée : un résumé de plus de 48 h ne s’affiche pas');
     dit(A.ligneJourneeAgent({ n: 2, at: maintenant, pause: '2026-10-29' }, '2026-10-29', maintenant) === null, 'Ma journée : « pas maintenant » aujourd’hui ⇒ rien');
   });
   await essaie('rappel', async () => {
     const t = '2026-10-29';
     const ok = N.notificationAgentEbay({ resume: { n: 4, at: maintenant - 3600000 }, memo: null, today: t, maintenant });
-    dit(ok.envoyer && /4 paires prêtes pour eBay — publier \?/.test(ok.titre) && ok.url === '/?tab=ebay_agent', 'notification « 🛒 4 paires prêtes pour eBay — publier ? » qui ouvre eBay → Agent', ok.titre);
+    dit(ok.envoyer && /4 paires à regarder pour eBay/.test(ok.titre) && !/prête/.test(ok.titre) && ok.url === '/?tab=ebay_agent', 'notification sans préparation : « 🛒 4 paires à regarder pour eBay » (jamais « prêtes »)', ok.titre);
+    const ok2 = N.notificationAgentEbay({ resume: { n: 4, pretes: 4, at: maintenant - 3600000 }, memo: null, today: t, maintenant });
+    dit(ok2.envoyer && /4 paires prêtes pour eBay — je les publie \?/.test(ok2.titre), 'notification après préparation : « 🛒 4 paires prêtes pour eBay — je les publie ? »', ok2.titre);
+    dit(/À traiter/.test(ok.corps || ''), 'la notification dit où aller : eBay → À traiter', ok.corps);
     dit(!N.notificationAgentEbay({ resume: { n: 4, at: maintenant - 49 * 3600000 }, memo: null, today: t, maintenant }).envoyer, 'résumé de plus de 48 h ⇒ rien');
     dit(!N.notificationAgentEbay({ resume: undefined, memo: null, today: t, maintenant }).envoyer, 'résumé illisible ⇒ rien');
     dit(!N.notificationAgentEbay({ resume: { n: 4, at: maintenant, pause: t }, memo: null, today: t, maintenant }).envoyer, '« pas maintenant » aujourd’hui ⇒ rien');
@@ -182,9 +233,13 @@ async function verifier(fichier, fichierRappel) {
     const cible = nom.startsWith('rappel-') ? SRC_RAPPEL : SRC;
     const src = fs.readFileSync(cible, 'utf8');
     if (!src.includes(de)) { console.log(`?? ${nom} : ancre introuvable`); rates++; continue; }
-    const f = path.join(tmp, nom + '-' + path.basename(cible));
-    fs.writeFileSync(f, src.replace(de, vers));
-    const { ko } = await verifier(cible === SRC ? f : SRC, cible === SRC ? SRC_RAPPEL : f);
+    // Une copie qui garde l'arborescence (le serveur importe la phrase de l'app, §11).
+    const d = path.join(tmp, nom);
+    fs.mkdirSync(path.join(d, 'src'), { recursive: true }); fs.mkdirSync(path.join(d, 'api', '_lib'), { recursive: true });
+    const fA = path.join(d, 'src', 'agentEbay.js'), fN = path.join(d, 'api', '_lib', 'agent-ebay-rappel.js');
+    fs.copyFileSync(SRC, fA); fs.copyFileSync(SRC_RAPPEL, fN);
+    fs.writeFileSync(cible === SRC ? fA : fN, src.replace(de, vers));
+    const { ko } = await verifier(fA, fN);
     console.log(`${ko ? 'ROUGE' : 'VERT (mutation non attrapée)'}  ${nom} — ${ko} contrôle(s) au rouge`);
     if (!ko) rates++;
   }

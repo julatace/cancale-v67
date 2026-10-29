@@ -943,7 +943,12 @@ async function handlePublish(b, ctx) {
   if (s.err) return { status: 400, body: { ok: false, reason: 'numero', error: s.err } };
   const ro = regleDeItem(it0);
   if (ro.err) return { status: 400, body: { ok: false, reason: ro.reason || 'offre', error: ro.err } };
-  const it = { ...s.item, regleOffre: ro.regle };
+  // (29 oct., l'agent eBay) Un identifiant d'envoi (`uuid`, 32 hex) peut
+  // accompagner la publication : eBay refuse alors un SECOND envoi identique
+  // (488) au lieu de créer une seconde annonce — un essai repris après un
+  // résultat incertain ne peut plus doubler la paire. Jamais lu dans `item`.
+  const uuidPub = UUID_EBAY.test(String(b.uuid || '')) ? String(b.uuid) : '';
+  const it = { ...s.item, regleOffre: ro.regle, uuid: uuidPub };
   let num={ok:true,mk:null};
   if(it.sku){num=await numerotationVendeur(ctx.owner);const ref=numerotationRefus(b,num);if(ref)return ref;}
   const at = await jetonDe(ctx);
@@ -960,6 +965,13 @@ async function handlePublish(b, ctx) {
   if (sansAck(r)) return { status: 504, body: { ok: false, reason: 'incertain', error: 'eBay n\'a pas répondu clairement — je ne sais pas si l\'annonce a été créée. Rafraîchis depuis eBay avant de recommencer.' } };
   // ⚠️ L'API Trading renvoie HTTP 200 même sur un refus (l'erreur est dans le
   // corps, Ack=Failure). On répond donc un vrai code d'échec (422) dans ce cas.
+  // 488 : CET envoi a déjà créé l'annonce (le premier essai, resté sans
+  // réponse). Relue chez eBay, son SKU exigé (`confirmerDoublon`) : sinon
+  // « incertain », jamais « publiée ».
+  if (!r.ok && it.uuid && (r.erreurs || []).some((e) => e.code === '488')) {
+    const d = await confirmerDoublon(at.token, r, it, null);
+    return d.status === 200 ? { status: 200, body: { ...d.body, compte: ctx.compte.pseudo || '' } } : d;
+  }
   if (!r.ok || !r.itemId) return { status: r.status >= 400 ? r.status : 422, body: { ok: false, error: r.err || 'eBay a refusé la publication', ack: r.ack } };
   // (9 octobre) Publiée AVEC une règle d'offre : on relit chez eBay ce qu'il en
   // a gardé (une catégorie qui n'accepte pas le seuil le perd sans refuser

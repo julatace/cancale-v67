@@ -21,6 +21,22 @@
 //      comprise est MONTRÉE (« rouges » pas compris), gardée, et seule la N°31
 //      reste proposée ;
 //   E. aucun débordement horizontal, cibles ≥ 44 px, aucune erreur de page.
+// Revue du 29 octobre (chaque scénario rouge sur le code relu) :
+//   F. un critère obligatoire impossible à déduire (Asics, Puma) : la question
+//      ne dit PAS « 3 prêtes » (« 3 proposées · 1 prête »), le résumé publié
+//      porte `pretes: 1`, et « Compléter » ouvre le brouillon préparé dans le
+//      formulaire d'eBay → Annonces (un seul brouillon) ;
+//   G. eBay lent + le prix changé PENDANT la préparation : toutes les paires
+//      finissent préparées au nouveau prix, le bouton Publier est là ;
+//   H. « Au plus N par jour » : vider puis taper 3 enregistre 3 (pas 20) ;
+//   I. un 503 « rien n'a été envoyé » (journal) est un REFUS dit tel quel —
+//      jamais « incertaine », la paire n'est pas mise de côté ;
+//   C2. une publication incertaine n'est PAS reproposée après une relecture
+//      d'eBay qui ne la montre pas encore ; elle revient 15 min plus tard avec
+//      le MÊME identifiant d'envoi ;
+//   J. « Programmer plutôt » : des brouillons (avec leur id) — les paires
+//      sortent des propositions, et y restent après rechargement ;
+//   K. deux paires sous le même N° : aucune n'est proposée, c'est dit.
 const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
 const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http'), path = require('path');
@@ -34,7 +50,8 @@ const PAIRES = [
 ];
 const idDe = (n) => 7000 + n;
 const LISTINGS = { capturedAt: new Date(MAINTENANT).toISOString(), payload: { items: PAIRES.map(([n, t, m, tl, p]) => ({ id: idDe(n), title: t, brand: m, size: tl, status: 'Très bon état', price: { amount: String(p), currency_code: 'EUR' }, is_closed: false, is_hidden: false, is_draft: false, nPhotos: 2, created_at_ts: Math.floor((MAINTENANT - 40 * 86400000) / 1000), photo: { url: `https://img.test/v${idDe(n)}.jpg` } })) } };
-const FICHES = Object.fromEntries(PAIRES.map(([n, t]) => [String(idDe(n)), { numero: String(n), title: t, photo: `https://img.test/v${idDe(n)}.jpg`, ...(n === 34 ? { buyPrice: '100' } : {}) }]));
+const FICHES0 = Object.fromEntries(PAIRES.map(([n, t]) => [String(idDe(n)), { numero: String(n), title: t, photo: `https://img.test/v${idDe(n)}.jpg`, ...(n === 34 ? { buyPrice: '100' } : {}) }]));
+let FICHES = FICHES0;
 const DETAILS = Object.fromEntries(PAIRES.map(([n]) => [String(idDe(n)), { photos: [`https://img.test/v${idDe(n)}.jpg`, `https://img.test/v${idDe(n)}b.jpg`] }]));
 const ANNONCES_EBAY = () => [{ itemId: '110000000033', title: 'Salomon XT-6 noir taille 41', price: '120.0', sku: 'VRM-33' }];
 const COMMANDES = [{ orderId: '07-032', orderPaymentStatus: 'PAID', orderFulfillmentStatus: 'FULFILLED', lineItems: [{ sku: 'VRM-32', title: 'Adidas Gazelle' }] }];
@@ -42,6 +59,7 @@ const COMMANDES = [{ orderId: '07-032', orderPaymentStatus: 'PAID', orderFulfill
 let rows = [], envois = [], ecritures = [], SC = {};
 const remettre = (sc = {}) => {
   SC = sc;
+  FICHES = sc.numeroDouble ? { ...FICHES0, [String(idDe(35))]: { ...FICHES0[String(idDe(35))], numero: '31' } } : FICHES0;
   rows = [
     { id: 'main', data: { vinted_annonce_numeros: FICHES } },
     { id: 'harvest_111_listings', data: LISTINGS },
@@ -76,6 +94,7 @@ const projette = (row, sel) => {
   }
   return out;
 };
+const attendre = (ms) => new Promise((r) => setTimeout(r, ms));
 async function ouvrir(b, vp, sombre) {
   const ctx = await b.newContext({ viewport: vp, locale: 'fr-FR', timezoneId: 'Europe/Paris', ...(vp.width < 600 ? { isMobile: true, hasTouch: true } : {}) });
   const pg = await ctx.newPage();
@@ -113,7 +132,7 @@ async function ouvrir(b, vp, sombre) {
   await pg.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"pret":true}' }));
   // Le faux eBay, aux formes de `api/ebay.js` (enregistré APRÈS le fourre-tout :
   // Playwright le prend en premier, §6.6).
-  await pg.route('**/api/ebay**', (route) => {
+  await pg.route('**/api/ebay**', async (route) => {
     const req = route.request();
     const j = (d, st) => route.fulfill({ status: st || 200, contentType: 'application/json', body: JSON.stringify(d) });
     if (req.method() !== 'POST') return j({ ok: true, ready: true, canConsent: true });
@@ -121,15 +140,19 @@ async function ouvrir(b, vp, sombre) {
     envois.push(JSON.parse(JSON.stringify(body)));
     const num = String((body.item && body.item.numero) || '');
     if (body.action === 'status') return j({ ok: true, connected: true, comptes: [{ cle: '', pseudo: 'vendeur_test', principal: true, relie: true }] });
+    if (SC.lent && ['pubinfo', 'pubverify'].includes(body.action)) await attendre(SC.lent);
+    if (body.action === 'pubinfo' && SC.semelle && /Asics|Puma/i.test(String(body.title || ''))) return j({ ok: true, categorie: { categoryId: '15709', suggeree: { categoryId: '15709', categoryName: 'Baskets' } }, categories: [{ categoryId: '15709', categoryName: 'Baskets' }], conditions: [{ id: '3000', label: "D'occasion" }], attributs: [{ nom: 'Marque', requis: true, mode: 'SELECTION_ONLY', valeurs: ['Nike', 'Adidas', 'Salomon', 'New Balance', 'Asics', 'Puma'] }, { nom: 'Matière de la semelle', requis: true, mode: 'SELECTION_ONLY', valeurs: ['Caoutchouc', 'Gomme'] }], attributsObligatoires: ['Marque', 'Matière de la semelle'] });
     if (body.action === 'pubinfo') return j({ ok: true, categorie: { categoryId: '15709', suggeree: { categoryId: '15709', categoryName: 'Baskets' } }, categories: [{ categoryId: '15709', categoryName: 'Baskets' }], conditions: [{ id: '3000', label: "D'occasion" }, { id: '1000', label: 'Neuf' }], attributs: [{ nom: 'Marque', requis: true, mode: 'SELECTION_ONLY', valeurs: ['Nike', 'Adidas', 'Salomon', 'New Balance', 'Asics', 'Puma'] }], attributsObligatoires: ['Marque'] });
     if (body.action === 'pubverify') return j({ ok: true, fees: 0.35, frais: { total: 0.35, insertion: 0.35, programmation: null, remises: null, devise: 'EUR', lignes: [] } });
     if (body.action === 'publish') {
+      if (SC.publish503) return j({ ok: false, reason: SC.publish503, error: 'Le suivi de cette action n’a pas pu être préparé. Réessaie plus tard ; rien n’a été envoyé.' }, 503);
       if (SC.incertain) return j({ ok: false, reason: 'incertain', error: 'eBay n\'a pas répondu clairement — je ne sais pas si l\'annonce a été créée. Rafraîchis depuis eBay avant de recommencer.' }, 504);
       if (num === '36') return j({ ok: false, error: 'La catégorie ne convient pas à cet objet.' }, 422);
       return j({ ok: true, itemId: '1100000000' + num, url: 'https://www.ebay.fr/itm/1100000000' + num, sku: 'VRM-' + num });
     }
     if (body.action === 'relire') {
       // eBay relu : la paire publiée « dans le doute » EST en ligne.
+      if (SC.incertain && SC.absente) { const i = rows.findIndex((r) => r.id === 'ebay_listings'); rows[i] = { id: 'ebay_listings', data: { items: ANNONCES_EBAY(), capturedAt: MAINTENANT + 60000 } }; return j({ ok: true }); }
       if (SC.incertain) { const der = envois.filter((e) => e.action === 'publish').pop(); const n = der && der.item && der.item.numero; SC.incertainNum = n; const i = rows.findIndex((r) => r.id === 'ebay_listings'); rows[i] = { id: 'ebay_listings', data: { items: [...ANNONCES_EBAY(), { itemId: '1100000000' + n, title: 'Paire ' + n, price: '95.0', sku: 'VRM-' + n }], capturedAt: MAINTENANT + 60000 } }; }
       return j({ ok: true });
     }
@@ -161,13 +184,18 @@ const preparees = (pg) => pg.waitForFunction(() => { const l = [...document.quer
           const et = await pg.$eval('[data-agent-ebay]', (e) => ({ etat: e.getAttribute('data-agent-etat'), n: e.getAttribute('data-agent-n') }));
           const p = await proposees(pg);
           dit(et.etat === 'lu' && p.join(',') === '31,35,36', 'trois paires proposées (31, 35, 36) ; vendue sur eBay, déjà sur eBay et sous le prix d\'achat écartées', `${et.etat} · ${p.join(',')}`);
-          const q = await pg.$eval('[data-agent-question]', (e) => e.textContent);
-          dit(/3 paires prêtes pour eBay — je les publie \?/.test(q), 'la question : « 3 paires prêtes pour eBay — je les publie ? »', q);
           const ec = await pg.$eval('[data-agent-ecartees]', (e) => e.textContent).catch(() => '');
-          dit(/3 écartées/.test(ec) && /déjà vendues ailleurs/.test(ec) && /déjà en vente ou programmées sur eBay/.test(ec) && /sous ton prix d’achat/.test(ec), 'ce qui est écarté est compté et dit UNE fois', ec);
+          dit(/3 écartées/.test(ec) && /1 déjà vendue ailleurs/.test(ec) && /1 déjà en vente ou programmée sur eBay/.test(ec) && /1 dont le prix eBay serait sous ton prix d’achat/.test(ec), 'ce qui est écarté est compté et dit UNE fois, accordé au nombre (« 1 déjà vendue »)', ec);
           await preparees(pg);
           const prep = (await pg.$$eval('[data-agent-paire]', (els) => els.map((e) => `${e.getAttribute('data-agent-paire')}:${e.getAttribute('data-agent-prep')}:${(e.querySelector('[data-agent-frais]') || {}).getAttribute ? e.querySelector('[data-agent-frais]').getAttribute('data-agent-frais') : ''}`))).sort();
           dit(prep.join(' ') === '31:prete:0.35 35:prete:0.35 36:prete:0.35', 'chaque paire est PRÉPARÉE (catégorie, frais lus chez eBay par la vérification à blanc)', prep.join(' '));
+          const q = await pg.$eval('[data-agent-question]', (e) => e.textContent);
+          dit(/3 paires prêtes pour eBay — je les publie \?/.test(q), 'préparées et prêtes : « 3 paires prêtes pour eBay — je les publie ? »', q);
+          const h2 = await pg.$eval('[data-agent-titre]', (e) => e.textContent).catch(() => '');
+          dit(/Agent eBay/.test(h2), 'un titre de section « Agent eBay » au-dessus de la question', h2);
+          await pg.waitForTimeout(800);
+          const r0 = await local(pg, 'vrm_agent_ebay_resume');
+          dit(r0 && r0.n === 3 && r0.pretes === 3, 'le résumé publié dit les PRÊTES (préparées chez eBay)', JSON.stringify(r0));
           dit(!envois.some((e) => e.action === 'publish'), 'rien n\'est publié tant qu\'il n\'a rien dit');
         });
         await essaie('A. jamais, décocher, confirmer', async () => {
@@ -179,7 +207,7 @@ const preparees = (pg) => pg.waitForFunction(() => { const l = [...document.quer
           dit(rj && (rj.jamais || []).includes('35'), '« jamais » est gardé dans les réglages de l’agent (clé synchronisée)', JSON.stringify(rj && rj.jamais));
           await pg.click('[data-agent-paire="36"] input[type=checkbox]');
           const bt = await pg.$eval('[data-agent-publier]', (e) => e.textContent);
-          dit(/Publier ces 1/.test(bt), 'décocher la 36 : « Publier ces 1 »', bt);
+          dit(/Publier celle-ci/.test(bt), 'décocher la 36 : « Publier celle-ci »', bt);
           await pg.click('[data-agent-publier]');
           await feuille(pg).getByRole('button', { name: /Oui, publier/ }).waitFor({ timeout: 5000 });
           const t = await feuille(pg).innerText();
@@ -196,10 +224,17 @@ const preparees = (pg) => pg.waitForFunction(() => { const l = [...document.quer
             'UN publish : la N°31, agent:true, confirme:true, au prix de Vinted, livraison gérée par eBay', JSON.stringify(pub.map((e) => [e.item && e.item.numero, e.agent, e.confirme, e.item && e.item.price])));
           const bil = await pg.$eval('[data-agent-bilan]', (e) => e.textContent);
           dit(/1 publiée/.test(bil), 'le bilan : « 1 publiée »', bil);
+          const lien = await pg.$eval('[data-agent-publiee="31"] a', (e) => e.getAttribute('href')).catch(() => '');
+          dit(/ebay\.fr\/itm\/110000000031/.test(lien), 'le bilan garde la paire publiée avec son lien « voir sur eBay ↗ »', lien);
+          await pg.click('[data-agent-paire="36"] input[type=checkbox]');
+          const bz = await pg.$eval('[data-agent-publier]', (e) => e.textContent).catch(() => '');
+          await pg.click('[data-agent-paire="36"] input[type=checkbox]');
+          const bz2 = await pg.$eval('[data-agent-publier]', (e) => e.textContent).catch(() => '');
+          dit(!/Publier ces 0/.test(bz2) && /Coche au moins une paire/.test(bz2) && /Publier celle-ci/.test(bz), 'rien de coché : « Coche au moins une paire », jamais « Publier ces 0 »', `${bz} / ${bz2}`);
           dit(envois.some((e) => e.action === 'relire'), 'eBay est relu après le lot');
           await pg.waitForTimeout(1500);
           const res = await local(pg, 'vrm_agent_ebay_resume');
-          dit(res && res.n === 1 && res.at === MAINTENANT, 'le résumé (Ma journée, notification du matin) est publié : 1 paire encore prête', JSON.stringify(res));
+          dit(res && res.n === 1 && res.pretes === 1 && res.at === MAINTENANT, 'le résumé (Ma journée, notification du matin) est publié : 1 paire encore prête', JSON.stringify(res));
           const jr = await local(pg, 'vrm_agent_ebay_jour');
           dit(jr && jr.publiees === 1, 'ce que l’agent a publié aujourd’hui est compté (le maximum du jour en tient compte)', JSON.stringify(jr));
         });
@@ -214,7 +249,7 @@ const preparees = (pg) => pg.waitForFunction(() => { const l = [...document.quer
           await pg.goto(`http://localhost:${PORT}/?tab=journee`, { waitUntil: 'domcontentloaded' });
           await pg.waitForSelector('[data-job="agent-ebay"]', { timeout: 15000 });
           const t = await pg.$eval('[data-job="agent-ebay"]', (e) => e.textContent);
-          dit(/prête?s? pour eBay — je les publie \?/.test(t), 'Ma journée : « … prête(s) pour eBay — je les publie ? »', t.trim().slice(0, 90));
+          dit(/1 paire prête pour eBay — je la publie \?/.test(t), 'Ma journée : « 1 paire prête pour eBay — je la publie ? » (préparée)', t.trim().slice(0, 90));
         });
         dit(!errs.length, 'aucune erreur de page', errs.slice(0, 2).join(' | '));
         await ctx.close(); }
@@ -251,6 +286,7 @@ const preparees = (pg) => pg.waitForFunction(() => { const l = [...document.quer
           await agent(pg);
           const p = await proposees(pg);
           dit(SC.incertainNum && !p.includes(String(SC.incertainNum)) && p.length === 2, `après relecture chez eBay (elle y est), la N°${SC.incertainNum} n'est PAS reproposée`, p.join(','));
+          dit(/^[0-9A-F]{32}$/.test(String(pub[0].uuid || '')), 'la publication de l\'agent part avec un identifiant d\'envoi (uuid)', String(pub[0].uuid));
         });
         dit(!errs.length, 'aucune erreur de page', errs.slice(0, 2).join(' | '));
         await ctx.close(); }
@@ -274,6 +310,140 @@ const preparees = (pg) => pg.waitForFunction(() => { const l = [...document.quer
           dit(r1 && (r1.marques || []).join() === 'Nike' && (r1.tailles || []).join() === '42' && r1.prixMin === 60, 'la règle est gardée (clé synchronisée)', JSON.stringify(r1));
           const r = await pg.$eval('[data-agent-regles]', (e) => e.textContent);
           dit(/Nike/.test(r) && /jamais sous ton prix d’achat/.test(r), 'les règles en clair, sous « Ce que je publie »', r.replace(/\s+/g, ' ').slice(0, 160));
+        });
+        dit(!errs.length, 'aucune erreur de page', errs.slice(0, 2).join(' | '));
+        await ctx.close(); }
+      // ── C2. incertaine, relecture qui ne la montre pas encore ──
+      remettre({ incertain: true, absente: true });
+      { const { ctx, pg, errs } = await ouvrir(b, vp, sombre);
+        await essaie('C2. incertaine pas encore visible', async () => {
+          await agent(pg); await preparees(pg);
+          for (const n of ['35', '36']) await pg.click(`[data-agent-paire="${n}"] input[type=checkbox]`);
+          await pg.click('[data-agent-publier]');
+          await feuille(pg).getByRole('button', { name: /Oui, publier/ }).click({ timeout: 20000 });
+          await pg.waitForSelector('[data-agent-bilan]', { timeout: 10000 });
+          const u0 = (envois.filter((e) => e.action === 'publish').pop() || {}).uuid;
+          await pg.waitForTimeout(1200);
+          await pg.reload({ waitUntil: 'domcontentloaded' }); await agent(pg);
+          const p = await proposees(pg);
+          dit(!p.includes('31'), 'relue (capturedAt plus récent) mais l\'annonce n\'y est pas ENCORE : la N°31 incertaine n\'est PAS reproposée', p.join(','));
+          const i = rows.findIndex((r) => r.id === 'ebay_listings'); rows[i] = { id: 'ebay_listings', data: { items: ANNONCES_EBAY(), capturedAt: MAINTENANT + 20 * 60000 } };
+          SC.incertain = false;
+          await pg.reload({ waitUntil: 'domcontentloaded' }); await agent(pg); await preparees(pg);
+          const p2 = await proposees(pg);
+          dit(p2.includes('31'), 'relue 20 min plus tard, toujours absente : la N°31 revient', p2.join(','));
+          for (const n of ['35', '36']) await pg.click(`[data-agent-paire="${n}"] input[type=checkbox]`).catch(() => {});
+          await pg.click('[data-agent-publier]');
+          await feuille(pg).getByRole('button', { name: /Oui, publier/ }).click({ timeout: 20000 });
+          await pg.waitForSelector('[data-agent-bilan]', { timeout: 10000 });
+          const u1 = (envois.filter((e) => e.action === 'publish').pop() || {}).uuid;
+          dit(!!u0 && u0 === u1, 'le second essai repart avec le MÊME identifiant d\'envoi (eBay refuse de la créer deux fois)', `${u0} / ${u1}`);
+        });
+        dit(!errs.length, 'aucune erreur de page', errs.slice(0, 2).join(' | '));
+        await ctx.close(); }
+      // ── F. critère impossible à déduire ──
+      remettre({ semelle: true });
+      { const { ctx, pg, errs } = await ouvrir(b, vp, sombre);
+        await essaie('F. à compléter', async () => {
+          await agent(pg); await preparees(pg);
+          const et = (await pg.$$eval('[data-agent-paire]', (els) => els.map((e) => `${e.getAttribute('data-agent-paire')}:${e.getAttribute('data-agent-prep')}`))).sort().join(' ');
+          dit(et === '31:prete 35:a-completer 36:a-completer', 'Asics et Puma : un critère obligatoire à compléter', et);
+          const q = await pg.$eval('[data-agent-question]', (e) => e.textContent);
+          dit(!/3 paires prêtes/.test(q) && /3 paires proposées pour eBay · 1 prête à publier/.test(q), 'la question ne dit PAS « 3 prêtes » : « 3 paires proposées · 1 prête à publier »', q);
+          await pg.waitForTimeout(800);
+          const r = await local(pg, 'vrm_agent_ebay_resume');
+          dit(r && r.n === 3 && r.pretes === 1, 'le résumé (Ma journée, notification) porte pretes: 1', JSON.stringify(r));
+          const nbC = await pg.$$eval('[data-agent-completer]', (els) => els.length);
+          dit(nbC === 2, 'chaque paire à compléter a un geste « Compléter »', String(nbC));
+          await pg.click('[data-agent-completer="35"]');
+          await pg.waitForSelector('[data-publier-brouillon-id]:not([data-publier-brouillon-id=""])', { timeout: 15000 });
+          const idOuvert = await pg.$eval('[data-publier-brouillon-id]', (e) => e.getAttribute('data-publier-brouillon-id'));
+          const br = (rows.find((x) => x.id === 'ebay_brouillons') || { data: { items: {} } }).data.items || {};
+          const de35 = Object.entries(br).filter(([, d]) => d && String(d.numero) === '35');
+          dit(de35.length === 1 && de35[0][0] === idOuvert && de35[0][1].id === idOuvert && de35[0][1].categorie && de35[0][1].categorie.id === '15709', '« Compléter » : UN brouillon préparé (catégorie, critères), ouvert dans le formulaire de publication', `${idOuvert} · ${de35.length}`);
+        });
+        dit(!errs.length, 'aucune erreur de page', errs.slice(0, 2).join(' | '));
+        await ctx.close(); }
+      // ── G. eBay lent + prix changé pendant la préparation ──
+      remettre({ lent: 1200 });
+      { const { ctx, pg, errs } = await ouvrir(b, vp, sombre);
+        await essaie('G. prix changé pendant la préparation', async () => {
+          await agent(pg);
+          await pg.click('[data-agent-reglages] summary');
+          await pg.selectOption('[data-agent-prixmode]', 'eur');
+          const champ = pg.locator('[data-agent-prixvaleur], [data-agent-reglages] input[inputmode=decimal]').first();
+          await champ.click(); await champ.fill('5'); await champ.press('Enter');
+          await pg.waitForFunction(() => { const l = [...document.querySelectorAll('[data-agent-paire]')]; return l.length === 3 && l.every((e) => e.getAttribute('data-agent-prep') === 'prete'); }, null, { timeout: 30000 }).catch(() => {});
+          const et = (await pg.$$eval('[data-agent-paire]', (els) => els.map((e) => `${e.getAttribute('data-agent-paire')}:${e.getAttribute('data-agent-prep')}`))).sort().join(' ');
+          dit(et === '31:prete 35:prete 36:prete', 'après le changement de prix, toutes les paires finissent préparées (jamais bloquées sur « Je prépare… »)', et);
+          const bt = await pg.$eval('[data-agent-publier]', (e) => e.textContent).catch(() => '');
+          dit(/Publier ces 3/.test(bt), 'le bouton Publier est là', bt || 'absent');
+          const t31 = await pg.$eval('[data-agent-paire="31"]', (e) => e.textContent).catch(() => '');
+          dit(/100,00/.test(t31), 'au nouveau prix (Vinted 95 € + 5 €)', t31.slice(0, 80));
+        });
+        dit(!errs.length, 'aucune erreur de page', errs.slice(0, 2).join(' | '));
+        await ctx.close(); }
+      // ── H. « Au plus N par jour » ──
+      remettre();
+      { const { ctx, pg, errs } = await ouvrir(b, vp, sombre);
+        await essaie('H. par jour', async () => {
+          await agent(pg);
+          await pg.click('[data-agent-reglages] summary');
+          const champ = pg.locator('[data-agent-parjour], [data-agent-reglages] input[inputmode=numeric]').first();
+          await champ.click(); await champ.press('End'); await champ.press('Backspace'); await champ.type('3'); await champ.press('Tab');
+          await pg.waitForTimeout(800);
+          const v = await champ.inputValue();
+          const r = await local(pg, 'vrm_agent_ebay_regles');
+          dit(v === '3' && r && r.parJour === 3, 'vider puis taper 3 : 3 par jour (jamais 53 → 20)', `champ ${v} · gardé ${r && r.parJour}`);
+        });
+        dit(!errs.length, 'aucune erreur de page', errs.slice(0, 2).join(' | '));
+        await ctx.close(); }
+      // ── I. 503 « rien n'a été envoyé » ──
+      remettre({ publish503: 'journal' });
+      { const { ctx, pg, errs } = await ouvrir(b, vp, sombre);
+        await essaie('I. refus certain du serveur', async () => {
+          await agent(pg); await preparees(pg);
+          await pg.click('[data-agent-publier]');
+          await feuille(pg).getByRole('button', { name: /Oui, publier/ }).click({ timeout: 20000 });
+          await pg.waitForSelector('[data-agent-bilan]', { timeout: 10000 });
+          const bil = await pg.$eval('[data-agent-bilan]', (e) => e.textContent);
+          dit(!/incertaine/.test(bil) && !/je ne sais pas si elle est partie/.test(bil) && /rien n’a été envoyé/.test(bil), 'un 503 « rien n’a été envoyé » est dit TEL QUEL, jamais « incertaine »', bil.slice(0, 160));
+          dit(envois.filter((e) => e.action === 'publish').length === 1, 'et le lot s’arrête là (le serveur ne peut pas publier pour l’instant)');
+          await pg.waitForTimeout(800);
+          const inc = await local(pg, 'vrm_agent_ebay_incertains');
+          dit(!inc || !Object.keys(inc).length, 'la paire n’est PAS rangée dans les incertaines', JSON.stringify(inc));
+        });
+        dit(!errs.length, 'aucune erreur de page', errs.slice(0, 2).join(' | '));
+        await ctx.close(); }
+      // ── J. Programmer plutôt ──
+      remettre();
+      { const { ctx, pg, errs } = await ouvrir(b, vp, sombre);
+        await essaie('J. programmer plutôt', async () => {
+          await agent(pg); await preparees(pg);
+          await pg.click('[data-agent-programmer]');
+          await pg.waitForSelector('[data-agent-brouillons]', { timeout: 10000 });
+          const p = await proposees(pg);
+          await pg.click('[data-agent-programmer]', { timeout: 1500 }).catch(() => {});
+          await pg.waitForTimeout(800);
+          const br = (rows.find((x) => x.id === 'ebay_brouillons') || { data: { items: {} } }).data.items || {};
+          const vals = Object.values(br);
+          dit(vals.length === 3 && vals.every((d) => d && d.id && d.etatBrouillon === 'brouillon'), 'trois brouillons, chacun avec son id (visibles dans la liste des brouillons) — jamais en double', `${vals.length} · ${vals.map((d) => d && d.numero).join(',')}`);
+          dit(!p.length, 'les paires mises en brouillon sortent tout de suite des propositions (plus de « Publier » à côté)', p.join(','));
+          await pg.reload({ waitUntil: 'domcontentloaded' }); await agent(pg);
+          const p2 = await proposees(pg);
+          const ec = await pg.$eval('[data-agent-ecartees]', (e) => e.textContent).catch(() => '');
+          dit(!p2.length && /3 déjà en brouillon eBay/.test(ec), 'après rechargement : toujours pas reproposées, et c’est dit (« déjà en brouillon »)', `${p2.join(',')} · ${ec.slice(0, 120)}`);
+        });
+        dit(!errs.length, 'aucune erreur de page', errs.slice(0, 2).join(' | '));
+        await ctx.close(); }
+      // ── K. deux paires sous le même N° ──
+      remettre({ numeroDouble: true });
+      { const { ctx, pg, errs } = await ouvrir(b, vp, sombre);
+        await essaie('K. N° porté par deux paires', async () => {
+          await agent(pg);
+          const p = await proposees(pg);
+          const ec = await pg.$eval('[data-agent-ecartees]', (e) => e.textContent).catch(() => '');
+          dit(p.join(',') === '36' && /2 dont le N° est porté par deux paires/.test(ec), 'la N°31 portée par la Nike ET l’Asics : aucune des deux n’est proposée, et c’est dit', `${p.join(',')} · ${ec.slice(0, 160)}`);
         });
         dit(!errs.length, 'aucune erreur de page', errs.slice(0, 2).join(' | '));
         await ctx.close(); }
