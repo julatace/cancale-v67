@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.281.0';
+const CODE_VERSION = '5.282.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -9029,8 +9029,14 @@ async function recreerVinted(msg) {
   // (29 oct.) Quelques paires par jour et par compte (le modèle de Vintex).
   const jour = await gardeJourRepub(uid);
   if (jour) return { accepte: false, code: jour.code, raison: jour.raison };
-  // 3. Le 1er geste (créer) entre dans le plafond horaire ; la suppression compte le second.
-  const stop = await gardeStricte(uid, acc, { reserve: RESERVE_GESTES });
+  // 3. (29 oct., « il a laissé en brouillon : pas plus de 15 actions par heure ») Les
+  //    gestes de la paire sont RÉSERVÉS d'un coup AVANT le premier : brouillon +
+  //    suppression (+ mise en ligne). Avant, la paire comptait 5 actions (la garde,
+  //    le brouillon, la suppression, la garde de la mise en ligne, la mise en ligne)
+  //    et la mise en ligne planifiée était REFUSÉE par le plafond quand d'autres
+  //    paires étaient passées entre-temps — l'ancienne annonce déjà supprimée, il ne
+  //    restait qu'un brouillon. Plus de place pour toute la paire ⇒ rien ne part.
+  const stop = await gardeStricte(uid, acc, { reserve: RESERVE_GESTES, actions: msg.versBrouillon === true ? 2 : 3 });
   if (stop) return { accepte: false, code: stop.code, raison: stop.error };
   return await avecVinted(async () => {
     suiviRepub(id);
@@ -9092,7 +9098,6 @@ async function recreerVinted(msg) {
       await majVersBrouillon(uid, id, { etat: 'fait', cause: `brouillon-refuse-${rbV.status}` });
       return { accepte: true, etape: 'echec', raison: `Vinted a refusé le brouillon (${rbV.status}${msgB ? ' : ' + String(msgB).slice(0, 200) : ''}) — rien n'a été supprimé, ton annonce est toujours en ligne.${gesteRefus(rbV, corps)}` };
     }
-    await compterAction(uid, ACTIONS_MAX_HEURE);
     const draftId = idDeBrouillon(rbV.json);
     if (!draftId) {
       noterDiag('versbrouillon_brouillon_sans_id');
@@ -9117,7 +9122,6 @@ async function recreerVinted(msg) {
       await majVersBrouillon(uid, id, { etat: 'fait', draftId, supprime: false, cause: `suppression-refusee-${rdV.status}` });
       return { accepte: true, etape: 'echec', draftId, raison: `Vinted a refusé de retirer l'annonce (${rdV.status}) — elle est toujours en ligne. Le brouillon rangé sur Vinted est en trop : supprime-le dans tes brouillons Vinted.` };
     }
-    await compterAction(uid, ACTIONS_MAX_HEURE);
     await noterRepubJour(uid);
     if (suppIncertaine) noterDiag(`versbrouillon_suppression_incertaine_${(rdV && rdV.status) || 0}`);
     else { try { await noterSuppressionCompte(uid, id, new Date().toISOString()); } catch (_) {} }
@@ -9210,7 +9214,9 @@ function miseEnLigneTick() {
 async function finRepubBrouillon(acc, job) {
   const { id, uid, draftId, titre, prix, urls, lettreFin, sauve, description } = job;
   const corpsCV = JSON.parse(job.corpsCV);
-    const stopC = await gardeStricte(uid, acc, { reserve: RESERVE_GESTES });
+    // Sa place est réservée depuis le départ de la paire : ici on ne revérifie que le
+    // compte connecté et la pause de Vinted, jamais le plafond (l'ancienne est partie).
+    const stopC = await gardeStricte(uid, acc, { lecture: true });
     if (stopC) { await leverVerrouRecreer(id); await majVersBrouillon(uid, id, { etat: 'a-publier', draftId }); return { refaire: true, accepte: true, etape: 'brouillon-a-refaire', draftId, raison: `l'ancienne annonce est supprimée et le brouillon est rangé, mais il n'a pas été mis en ligne (${stopC.error}) — « Brouillons → en ligne » le met en ligne, sans en créer un autre.` }; }
     await vintedPage(acc, 'GET', `/api/v2/item_upload/items/${draftId}`, null, { timeoutMs: 30000 });
     etapeRepub(id, 'en-ligne');
@@ -9238,7 +9244,6 @@ async function finRepubBrouillon(acc, job) {
     try { await rangerBrouillon(draftId, { uid, titre, prix, nPhotos: job.nPhotos, parVRM: true, ancienId: id, etat: 'publie', publieLe: new Date().toISOString(), itemId: nouvelIdV }); } catch (_) {}
     try { await noterModeleRepub(nouvelIdV, job.corps, uid, acc.domain || 'www.vinted.fr'); } catch (_) {}
     try { await supabaseUpsert('app_data', [{ id: `coffre_${uid}_${nouvelIdV}`, data: { ...(sauve || {}), versBrouillon: undefined, id: nouvelIdV, uid, title: titre, price: prix, desc: description, lettreVRM: lettreFin || null, photos: urls, savedAt: new Date().toISOString(), firstSavedAt: new Date().toISOString(), recreeDe: id } }], 'id'); } catch (_) {}
-    await compterAction(uid, ACTIONS_MAX_HEURE);
     await majVersBrouillon(uid, id, { etat: 'fait', draftId, nouvelId: nouvelIdV });
     noterDiag('republier_ok');
     return { accepte: true, etape: 'fait', nouvelId: nouvelIdV, draftId, ancien: sauve && Number(sauve.price), nouveau: prix, nouveauTitre: titre };
@@ -9288,16 +9293,20 @@ function unCompteurALaFois(fn) {
   _chaineCompteurs = suite.then(() => {}, () => {});
   return suite;
 }
-function compterAction(uid, plafond = ACTIONS_MAX_HEURE) { return unCompteurALaFois(() => compterActionUn(uid, plafond)); }
-async function compterActionUn(uid, plafond) {
+function compterAction(uid, plafond = ACTIONS_MAX_HEURE, n = 1) { return unCompteurALaFois(() => compterActionUn(uid, plafond, n)); }
+async function compterActionUn(uid, plafond, n = 1) {
   try {
     const cle = 'vrmActions';
     const cur = (await chrome.storage.local.get(cle))[cle] || {};
     const t = Date.now(), ilYaUneHeure = t - 3600000;
     const list = (cur[uid] || []).filter(x => x > ilYaUneHeure).sort((a, b) => a - b);
     const max = Math.min(ACTIONS_MAX_HEURE, plafond);
-    if (list.length >= max) return { ok: false, n: list.length, resteMs: Math.max(0, list[list.length - max] + 3600000 - t) };
-    list.push(t); cur[uid] = list;
+    // (29 oct.) `n` places d'un coup : une republication RÉSERVE ses 3 gestes avant
+    // le premier (brouillon, suppression, mise en ligne) — jamais une paire arrêtée
+    // entre la suppression et la mise en ligne par le plafond.
+    const k = Math.max(1, Math.floor(Number(n) || 1));
+    if (list.length + k > max) return { ok: false, n: list.length, resteMs: Math.max(0, list[Math.max(0, list.length + k - 1 - max)] + 3600000 - t) };
+    for (let i = 0; i < k; i++) list.push(t); cur[uid] = list;
     await chrome.storage.local.set({ [cle]: cur });
     return { ok: true, n: list.length };
   } catch (_) { return { ok: true, n: 0 }; }
@@ -9484,12 +9493,13 @@ async function gardeStricte(uid, acc, opts = {}) {
   }
   if (opts.lecture) return null;            // lire n'engage rien : pas de plafond
   const reserve = Math.max(0, Number(opts.reserve) || 0);
-  const c = await compterAction(String(uid), ACTIONS_MAX_HEURE - reserve);
+  const nA = Math.max(1, Math.floor(Number(opts.actions) || 1));
+  const c = await compterAction(String(uid), ACTIONS_MAX_HEURE - reserve, nA);
   if (!c.ok) {
     const min = Math.max(1, Math.ceil(Number(c.resteMs || 0) / 60000));
     if (reserve && c.n < ACTIONS_MAX_HEURE) {
       return { ok: false, code: 'plafond-bordereaux',
-               error: `${ACTIONS_MAX_HEURE - reserve} actions sur ce compte dans l'heure — les ${reserve} dernières sont gardées pour répondre à tes acheteurs. La suite dans ${min} min.` };
+               error: `${nA > 1 ? `une republication prend ${nA} actions (brouillon, suppression, mise en ligne) et il en reste ${Math.max(0, ACTIONS_MAX_HEURE - reserve - c.n)} sur ` : ''}${ACTIONS_MAX_HEURE - reserve} actions sur ce compte dans l'heure — les ${reserve} dernières sont gardées pour répondre à tes acheteurs. La suite dans ${min} min.` };
     }
     return { ok: false, code: 'plafond',
              error: `${ACTIONS_MAX_HEURE} actions sur ce compte dans l'heure — on s'arrête là pour ne pas attirer l'attention. Réessaie dans ${min} min.` };
