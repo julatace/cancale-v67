@@ -34,6 +34,7 @@ import PorteConfidentialite from './PorteConfidentialite.jsx';
 import {qrMfa} from './qrMfa.js';
 import {conflitAdresseCompte} from './receptionEmail.js';
 import SuiviReceptionEmails from './ReceptionEmails.jsx';
+import EspaceEmails from './EspaceEmails.jsx';
 import RecusEmail from "./RecusEmail.jsx";
 import { cheminMonotone } from "./courbeMonotone.js";
 import VuesVentes from "./VuesVentes.jsx";
@@ -125,7 +126,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.286.0';
+const EXT_ATTENDUE = '5.287.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -54953,6 +54954,12 @@ function EmailsSetting({onComptes}) {
   const [vues, setVues] = useState(null);
   const [busy, setBusy] = useState('');
   const [versionReception,setVersionReception]=useState(0);
+  const [rubriqueEmail,setRubriqueEmail]=useState(()=>DEMANDE_ADRESSES.on?'adresses':'reception');
+  const espaceId=React.useId();
+  const [adresseGuide,setAdresseGuide]=useState(''),[guideOuvert,setGuideOuvert]=useState(false);
+  const configurerAdresse=adr=>{setAdresseGuide(adr);setGuideOuvert(true);requestAnimationFrame(()=>racine.current?.querySelector('.vrm-reception-parcours')?.scrollIntoView({block:'start',behavior:'smooth'}));};
+  const [rechercheRattachement,setRechercheRattachement]=useState(''),[limiteRattachement,setLimiteRattachement]=useState(10);
+  useEffect(()=>{const ouvrir=()=>setRubriqueEmail('adresses');window.addEventListener('vrm:ouvrir-adresses',ouvrir);return()=>window.removeEventListener('vrm:ouvrir-adresses',ouvrir);},[]);
   const [suiviAdresses,setSuiviAdresses]=useState(null);
   const [preuves, setPreuves] = useState(undefined);
   const [preuveBusy, setPreuveBusy] = useState('');
@@ -55103,6 +55110,8 @@ function EmailsSetting({onComptes}) {
   };
   const liste = Object.keys(reg || {});
   const enAttente = Array.isArray(quarantaine) ? quarantaine : [];
+  const motsRattachement=rechercheRattachement.trim().toLocaleLowerCase('fr-FR');
+  const rattachementsVisibles=enAttente.filter(q=>!motsRattachement||[q.sujet,q.raison].join(' ').toLocaleLowerCase('fr-FR').includes(motsRattachement));
   // ── CE QUE LA ROUTE DIT AU SEUL PROPRIÉTAIRE DE L'INSTALLATION ─────────────
   const inst = (misDeCote && misDeCote.installation) || null;
   const pers = inst ? phrasePersonne(inst.personne) : null;
@@ -55154,44 +55163,17 @@ function EmailsSetting({onComptes}) {
     if (ok) await ajouterAdresses(sugg.map((v) => v.adresse));
   };
   return (
-    <>
-      <SuiviReceptionEmails key={uid} owner={uid} headers={sbAuth} theme={C} version={versionReception} onAdresses={setSuiviAdresses} onComptes={onComptes} onDeclarer={ajouterAdresses} preuves={preuves} onConfirmer={adr=>confirmerAdresse(adr,false)} quarantaine={quarantaine} onVerifier={()=>racine.current?.querySelector('[data-emails-mis-de-cote]')?.scrollIntoView({block:'center',behavior:'smooth'})}/>
-    <div ref={racine} data-reglage-adresses="" style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:10,padding:'12px 14px'}}>
+    <div ref={racine}>
+    <EspaceEmails onglet={rubriqueEmail} onOnglet={setRubriqueEmail} adresses={reg?liste.length:null} aRattacher={Array.isArray(quarantaine)?quarantaine.length:null} idBase={espaceId} theme={C}>
+    <div id={espaceId+'-adresses'} data-email-panneau="adresses" hidden={rubriqueEmail!=='adresses'}>
+    <div data-reglage-adresses="" style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:10,padding:'12px 14px'}}>
       <div style={{fontSize:13,fontWeight:600,color:C.text,marginBottom:2}}>Mes adresses de réception</div>
+      <p className="vrm-email-intro-adresses">Ajoute les adresses où Vinted t’écrit, puis configure leur transfert vers VRM.</p>
       {/* ⚠️ (16 octobre) Julien : « je ne comprends pas à quoi ça sert ». Le
           paragraphe d'avant disait la RÈGLE (« l'adresse d'arrivée décide »)
           sans dire l'USAGE. Trois lignes visibles — à quoi ça sert, un exemple,
           ce qui se passe si une adresse manque — et le pas-à-pas replié. */}
-      <div data-adresses-explication="" style={{background:C.bg,border:`1px solid ${C.border}`,borderRadius:8,padding:'10px 12px',margin:'6px 0 12px'}}>
-        <div style={{display:'grid',gridTemplateColumns:'auto 1fr',columnGap:9,rowGap:6,fontSize:12.5,lineHeight:1.45,color:C.text}}>
-          <span aria-hidden="true" style={{color:C.accent,marginTop:2}}><Icon name="mail" size={14}/></span>
-          <span>VRM range tes emails Vinted (bordereaux, ventes, colis) dans ta boutique <b>grâce à l'adresse où ils arrivent</b>.</span>
-          <span aria-hidden="true" style={{color:C.muted,marginTop:2}}><Icon name="check" size={14}/></span>
-          <span><span style={{color:C.muted}}>Exemple :</span> Vinted t'écrit sur <b style={{whiteSpace:'nowrap'}}>tonnom@exemple.fr</b> → ajoute cette adresse ici.</span>
-          <span aria-hidden="true" style={{color:C.muted,marginTop:2}}><Icon name="clock" size={14}/></span>
-          <span data-adresses-promesse={promesse}>{promesse === 'confirmation'
-            ? "Une adresse manque, ou n'est pas encore confirmée ? Ses emails sont mis de côté, gardés entiers — ils te sont proposés ici dès que tu l'as ajoutée puis confirmée."
-            : promesse === 'directe'
-              ? "Une adresse manque ? Ses emails sont mis de côté, gardés entiers — ils te sont proposés ici dès que tu l'ajoutes."
-              : "Une adresse manque ? Ses emails sont mis de côté, gardés entiers — rien n'est perdu."}</span>
-        </div>
-        <div data-adresse-transfert-vrm="" style={{display:'flex',alignItems:'center',flexWrap:'wrap',gap:8,marginTop:10,fontSize:12}}><span>Adresse de transfert : <b style={{overflowWrap:'anywhere'}}>{ADRESSE_COLLECTRICE}</b></span><button type="button" onClick={async()=>{try{await navigator.clipboard.writeText(ADRESSE_COLLECTRICE);toast('Adresse de transfert copiée.');}catch(_){toast('Sélectionne l’adresse affichée pour la copier.');}}} style={{font:'inherit',color:C.text,background:'transparent',border:`1px solid ${C.border}`,borderRadius:8,padding:'7px 10px',cursor:'pointer'}}>Copier l’adresse</button></div>
-        <details style={{marginTop:8}}>
-          <summary style={{cursor:'pointer',fontSize:12.5,fontWeight:600,color:C.accent,padding:'13px 0',minHeight:44,boxSizing:'border-box'}}>Comment faire suivre mes emails Vinted vers VRM&nbsp;?</summary>
-          <ol style={{margin:'8px 0 0',paddingLeft:18,fontSize:12,color:C.text,lineHeight:1.5,display:'grid',gap:5}}>
-            <li>Sur Vinted, dans chaque compte : <b>Paramètres → Notifications</b>, laisse les emails activés (ventes, bordereaux, messages).</li>
-            <li>Ajoute ici <b>ton adresse personnelle</b>, celle où Vinted et les transporteurs t’écrivent. La boîte collective VRM n’est pas ton adresse personnelle.</li>
-            <li>Dans Gmail : <b>Paramètres → Voir tous les paramètres → Transfert et POP/IMAP → Ajouter une adresse de transfert</b>, puis indique <b>{ADRESSE_COLLECTRICE}</b>. Dans Outlook ou iCloud, utilise une règle de transfert automatique vers cette même adresse.</li>
-            <li>Google peut demander une validation à la boîte VRM : tant qu’elle n’est pas faite, le transfert n’est pas actif. Une règle de transfert manuel qui masque ton adresse personnelle peut nécessiter une vérification.</li>
-            <li>Crée une règle pour <b>les emails Vinted et de tes transporteurs</b>, avec leurs pièces jointes. Garde une copie dans ta boîte. Le transfert général de tous tes emails personnels n’est pas nécessaire.</li>
-            <li>Après le prochain email, vérifie sa réception dans VRM. Les reçus d’achat sont dans <b>Vinted → Achats → Reçus d’achat par email</b>. Un reçu reçu par email ne crée pas une commande synchronisée.</li>
-            <li>Adresse « Masquer mon adresse » d'Apple : sur l'iPhone, <b>Réglages → ton nom → Connexion et sécurité → Se connecter avec Apple → Vinted → Transférer à</b>.</li>
-          </ol>
-          <div style={{fontSize:11.5,color:C.muted,lineHeight:1.45,marginTop:8}}>
-            Pourquoi l'adresse et pas le contenu ? Un expéditeur ou un texte se falsifient ; l'adresse d'arrivée, non. Personne ne peut donc déposer ses emails dans ta boutique, et un email dont l'adresse n'est déclarée par personne n'est jamais donné au hasard.
-          </div>
-        </details>
-      </div>
+
       {reg === undefined ? <div style={{fontSize:12,color:C.muted}}>Chargement…</div>
       : reg === null ? <span style={{display:'inline-block',fontSize:11,fontWeight:600,color:C.muted,background:C.bg,border:`1px solid ${C.border}`,borderRadius:999,padding:'2px 9px'}}>{REGLAGE_PAS_LU}</span>
       : liste.length === 0 ? (
@@ -55231,6 +55213,7 @@ function EmailsSetting({onComptes}) {
               </span>
             )}
           </span>
+          <button type="button" className="vrm-email-configurer" aria-label={`Configurer le transfert de ${adr}`} onClick={()=>configurerAdresse(adr)}>Configurer</button>
           {geste && (
             <button type="button" data-confirmer-adresse={normAdresse(adr)} disabled={preuveBusy === adr} onClick={()=>confirmerAdresse(adr, false)} aria-label={`${geste} ${adr}`}
               style={{flexShrink:0,border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:8,padding:'5px 9px',fontSize:11.5,fontWeight:600,cursor:preuveBusy===adr?'default':'pointer',fontFamily:'inherit',opacity:preuveBusy===adr?0.5:1}}>{preuveBusy === adr ? '…' : geste}</button>
@@ -55290,22 +55273,65 @@ function EmailsSetting({onComptes}) {
         style={{marginTop:10,border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:8,padding:'8px 12px',fontSize:12.5,fontWeight:600,cursor:reg?'pointer':'default',fontFamily:'inherit',opacity:reg?1:0.45}}>
         + Ajouter une adresse
       </button>
+      <details className="vrm-email-aide-adresses"><summary>Comprendre les adresses et le transfert</summary>
+      <div data-adresses-explication="" style={{background:C.bg,border:`1px solid ${C.border}`,borderRadius:8,padding:'10px 12px',margin:'6px 0 12px'}}>
+        <div style={{display:'grid',gridTemplateColumns:'auto 1fr',columnGap:9,rowGap:6,fontSize:12.5,lineHeight:1.45,color:C.text}}>
+          <span aria-hidden="true" style={{color:C.accent,marginTop:2}}><Icon name="mail" size={14}/></span>
+          <span>VRM range tes emails Vinted (bordereaux, ventes, colis) dans ta boutique <b>grâce à l'adresse où ils arrivent</b>.</span>
+          <span aria-hidden="true" style={{color:C.muted,marginTop:2}}><Icon name="check" size={14}/></span>
+          <span><span style={{color:C.muted}}>Exemple :</span> Vinted t'écrit sur <b style={{whiteSpace:'nowrap'}}>tonnom@exemple.fr</b> → ajoute cette adresse ici.</span>
+          <span aria-hidden="true" style={{color:C.muted,marginTop:2}}><Icon name="clock" size={14}/></span>
+          <span data-adresses-promesse={promesse}>{promesse === 'confirmation'
+            ? "Une adresse manque, ou n'est pas encore confirmée ? Ses emails sont mis de côté, gardés entiers — ils te sont proposés ici dès que tu l'as ajoutée puis confirmée."
+            : promesse === 'directe'
+              ? "Une adresse manque ? Ses emails sont mis de côté, gardés entiers — ils te sont proposés ici dès que tu l'ajoutes."
+              : "Une adresse manque ? Ses emails sont mis de côté, gardés entiers — rien n'est perdu."}</span>
+        </div>
+        <div data-adresse-transfert-vrm="" style={{display:'flex',alignItems:'center',flexWrap:'wrap',gap:8,marginTop:10,fontSize:12}}><span>Adresse de transfert : <b style={{overflowWrap:'anywhere'}}>{ADRESSE_COLLECTRICE}</b></span><button type="button" onClick={async()=>{try{await navigator.clipboard.writeText(ADRESSE_COLLECTRICE);toast('Adresse de transfert copiée.');}catch(_){toast('Sélectionne l’adresse affichée pour la copier.');}}} style={{font:'inherit',color:C.text,background:'transparent',border:`1px solid ${C.border}`,borderRadius:8,padding:'7px 10px',cursor:'pointer'}}>Copier l’adresse</button></div>
+        <details style={{marginTop:8}}>
+          <summary style={{cursor:'pointer',fontSize:12.5,fontWeight:600,color:C.accent,padding:'13px 0',minHeight:44,boxSizing:'border-box'}}>Comment faire suivre mes emails Vinted vers VRM&nbsp;?</summary>
+          <ol style={{margin:'8px 0 0',paddingLeft:18,fontSize:12,color:C.text,lineHeight:1.5,display:'grid',gap:5}}>
+            <li>Sur Vinted, dans chaque compte : <b>Paramètres → Notifications</b>, laisse les emails activés (ventes, bordereaux, messages).</li>
+            <li>Ajoute ici <b>ton adresse personnelle</b>, celle où Vinted et les transporteurs t’écrivent. La boîte collective VRM n’est pas ton adresse personnelle.</li>
+            <li>Dans Gmail : <b>Paramètres → Voir tous les paramètres → Transfert et POP/IMAP → Ajouter une adresse de transfert</b>, puis indique <b>{ADRESSE_COLLECTRICE}</b>. Dans Outlook ou iCloud, utilise une règle de transfert automatique vers cette même adresse.</li>
+            <li>Google peut demander une validation à la boîte VRM : tant qu’elle n’est pas faite, le transfert n’est pas actif. Une règle de transfert manuel qui masque ton adresse personnelle peut nécessiter une vérification.</li>
+            <li>Crée une règle pour <b>les emails Vinted et de tes transporteurs</b>, avec leurs pièces jointes. Garde une copie dans ta boîte. Le transfert général de tous tes emails personnels n’est pas nécessaire.</li>
+            <li>Après le prochain email, vérifie sa réception dans VRM. Les reçus d’achat sont dans <b>Vinted → Achats → Reçus d’achat par email</b>. Un reçu reçu par email ne crée pas une commande synchronisée.</li>
+            <li>Adresse « Masquer mon adresse » d'Apple : sur l'iPhone, <b>Réglages → ton nom → Connexion et sécurité → Se connecter avec Apple → Vinted → Transférer à</b>.</li>
+          </ol>
+          <div style={{fontSize:11.5,color:C.muted,lineHeight:1.45,marginTop:8}}>
+            Pourquoi l'adresse et pas le contenu ? Un expéditeur ou un texte se falsifient ; l'adresse d'arrivée, non. Personne ne peut donc déposer ses emails dans ta boutique, et un email dont l'adresse n'est déclarée par personne n'est jamais donné au hasard.
+          </div>
+        </details>
+      </div>
+      </details>
+    </div>
+    </div>
+    <div id={espaceId+'-reception'} data-email-panneau="reception" hidden={rubriqueEmail==='a-traiter'}>
+      <SuiviReceptionEmails onAdresseGuide={setAdresseGuide} adresseGuide={adresseGuide} guideOuvert={guideOuvert} onFermerGuide={()=>setGuideOuvert(false)} onVoirReception={()=>setRubriqueEmail('reception')} section={rubriqueEmail==='adresses'?'configuration':'reception'} key={uid} owner={uid} headers={sbAuth} theme={C} version={versionReception} onAdresses={setSuiviAdresses} onComptes={onComptes} onDeclarer={ajouterAdresses} preuves={preuves} onConfirmer={adr=>confirmerAdresse(adr,false)} quarantaine={quarantaine} onVerifier={()=>{setRubriqueEmail('a-traiter');requestAnimationFrame(()=>racine.current?.querySelector('[data-emails-mis-de-cote]')?.scrollIntoView({block:'center',behavior:'smooth'}));}}/>
+    </div>
+    <div id={espaceId+'-a-traiter'} data-email-panneau="a-traiter" hidden={rubriqueEmail!=='a-traiter'} className="vrm-email-rattachement">
+      <h3>Emails à rattacher</h3><p>Les emails conservés en attendant de retrouver leur compte.</p>
+      {quarantaine===undefined&&<p role="status">Lecture des emails mis de côté…</p>}
+      {Array.isArray(quarantaine)&&quarantaine.length===0&&<div className="vrm-email-vide">Aucun email à rattacher pour le moment.</div>}
       {/* Pas su ≠ aucun. Une seule phrase, et seulement si le registre, lui, a
           été lu (sinon la pastille du dessus et le bloc de Réglages le disent). */}
-      {quarantaine === null && reg !== null && reg !== undefined && (
+      {quarantaine === null && (
         <div data-mis-de-cote="pas-su" style={{marginTop:10,fontSize:11.5,color:C.muted,lineHeight:1.45}}>
           Je n'ai pas pu vérifier s'il y a des emails mis de côté pour toi — rien n'est perdu, rouvre cet écran dans un moment.
         </div>
       )}
       {enAttente.length > 0 && (
         <div data-emails-mis-de-cote="" style={{marginTop:12,borderTop:`1px solid ${C.border}`,paddingTop:10}}>
-          <div style={{fontSize:12.5,fontWeight:600,color:C.warn,marginBottom:6}}>📥 {enAttente.length} email{enAttente.length>1?'s':''} en attente d'un propriétaire</div>
+          <div style={{fontSize:12.5,fontWeight:600,color:C.text,marginBottom:6}}>{enAttente.length} email{enAttente.length>1?'s':''} conservé{enAttente.length>1?'s':''}</div>
           <div className="vrm-aide" style={{fontSize:11.5,color:C.muted,marginBottom:8,lineHeight:1.45}}>Arrivés avant que leur adresse soit déclarée. Ils sont conservés entiers — rien n'est perdu.</div>
+          <label className="vrm-email-recherche">Rechercher dans les emails à rattacher<input type="search" value={rechercheRattachement} onChange={e=>{setRechercheRattachement(e.target.value);setLimiteRattachement(10);}} placeholder="Sujet ou motif"/></label>
+          <p className="vrm-email-resultats">{rattachementsVisibles.length} sur {enAttente.length} emails{motsRattachement?' · recherche appliquée':''}</p>
           <button type="button" disabled={!!lot} onClick={toutRejouer}
             style={{width:'100%',marginBottom:10,border:'none',background:lot?C.border:C.accent,color:lot?C.muted:(C.onAccent||'#fff'),borderRadius:8,padding:'10px 12px',fontSize:12.5,fontWeight:700,cursor:lot?'default':'pointer',fontFamily:'inherit'}}>
-            {lot ? `Traitement… ${lot.fait}/${lot.total}` : `▶ Tout rejouer (${enAttente.length})`}
+            {lot ? `Traitement… ${lot.fait}/${lot.total}` : `Réessayer les ${enAttente.length} emails`}
           </button>
-          {enAttente.slice(0,8).map(q => (
+          {rattachementsVisibles.slice(0,limiteRattachement).map(q => (
             <div key={q.id} style={{display:'flex',alignItems:'center',gap:8,padding:'7px 0',borderTop:`1px solid ${C.border}`}}>
               <span style={{flex:'1 1 130px',minWidth:0,fontSize:12,color:C.text,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
                 {q.sujet || '(sans sujet)'} <span style={{color:C.muted}}>· {q.raison || ''}</span>
@@ -55316,10 +55342,13 @@ function EmailsSetting({onComptes}) {
               </button>
             </div>
           ))}
+          {rattachementsVisibles.length===0&&<div className="vrm-email-vide">Aucun email ne correspond à cette recherche.</div>}
+          {rattachementsVisibles.length>limiteRattachement&&<button type="button" className="vrm-email-suivants" onClick={()=>setLimiteRattachement(n=>n+10)}>Afficher les suivants ({rattachementsVisibles.length-limiteRattachement})</button>}
         </div>
       )}
     </div>
-    </>
+    </EspaceEmails>
+    </div>
   );
 }
 
