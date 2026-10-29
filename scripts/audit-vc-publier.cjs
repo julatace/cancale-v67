@@ -220,13 +220,80 @@ function faire({ numero = '401', vendus = [], preuveKO = false, posted = [], pos
     const ctxN = await nav.newContext();
     const pg = await ctxN.newPage();
     await ctxN.route('https://fr.vestiairecollective.com/**', (r) => r.fulfill({ contentType: 'text/html; charset=utf-8', body: /sell-clothes/.test(r.request().url()) ? '<!doctype html><html><body><a href="#">Vendre un article</a></body></html>' : FORM }));
-    // Sans formulaire : rien n'est touché, le bandeau dit le geste.
+    // 28 oct. (5.268) — « ça m'amène juste sur Vendre un article et ça ne fait
+    // rien après » : la page d'ACCUEIL « vendre » n'a aucun champ. VRM va au
+    // smart listing (`/smart-listing/`, mesuré) UNE fois, puis remplit.
     await pg.addInitScript(fauxChrome(AD));
     await pg.goto('https://fr.vestiairecollective.com/sell-clothes-online/');
     await pg.addScriptTag({ content: code });
-    await pg.waitForTimeout(1500);
-    const b0 = await pg.evaluate(() => (document.getElementById('vrm-vc-b') || {}).innerText || '');
-    dit(/Vendre un article/.test(b0), 'sans formulaire : le bandeau dit de cliquer « Vendre un article »', b0);
+    let arrive = false;
+    try { await pg.waitForURL(/\/smart-listing\//, { timeout: 6000 }); arrive = true; } catch (_) {}
+    dit(arrive, 'page d\'accueil « vendre » : VRM ouvre tout seul le formulaire (/smart-listing/)', pg.url());
+    if (arrive) {
+      await pg.waitForLoadState('domcontentloaded');
+      await pg.addScriptTag({ content: code });
+      await pg.waitForTimeout(3500);
+      const d0 = await pg.evaluate(() => (document.getElementById('d') || {}).value || '');
+      dit(/VRM-401/.test(d0), 'et là, il remplit le formulaire', d0.slice(0, 60));
+      // L'autre sens : revenir sur l'accueil dans le même onglet ne boucle pas.
+      await pg.goto('https://fr.vestiairecollective.com/sell-clothes-online/');
+      await pg.addScriptTag({ content: code });
+      await pg.waitForTimeout(3000);
+      const b0 = await pg.evaluate(() => ({ u: location.pathname, b: (document.getElementById('vrm-vc-b') || {}).innerText || '' }));
+      dit(b0.u === '/sell-clothes-online/' && /Vendre un article/.test(b0.b), 'une seule redirection par paire : pas de boucle, le bandeau dit le geste', JSON.stringify(b0).slice(0, 160));
+    }
+    // ── B1bis. 28 oct. (5.269) : l'écran « Détails » du smart listing, à la
+    // forme MESURÉE (lignes-boutons « Taille Ajouter »… qui ouvrent une fiche
+    // avec « Retourner en arrière »). L'extension choisit la taille et l'état au
+    // texte EXACT, tape le prix, et ne clique JAMAIS « Mettre en vente » tant
+    // qu'une ligne obligatoire dit encore « Ajouter ».
+    {
+      const SMART = (opts) => `<!doctype html><html><body><header><input name="q"></header><main>
+        <input type="file" multiple accept="image/jpeg,image/png" id="f">
+        <h2>Détails</h2>
+        <button type="button" class="row" data-k="marque"><span>Marque</span><span>Nike</span></button>
+        <button type="button" class="row" data-k="taille"><span>Taille</span><span>Ajouter</span></button>
+        <button type="button" class="row" data-k="etat"><span>État</span><span>Ajouter</span></button>
+        <button type="button" class="row" data-k="prix"><span>Prix</span><span>Ajouter</span></button>
+        <button type="button" class="row" data-k="adresse"><span>Votre adresse</span><span>${opts.adresse ? 'Rue X' : 'Ajouter'}</span></button>
+        <textarea id="description" placeholder="Incluez des informations"></textarea>
+        <button type="button" id="pub" onclick="window.__pub=(window.__pub||0)+1">Mettre en vente</button>
+        <div id="sheet"></div></main>
+        <script>
+          const OPTS = { taille: ${JSON.stringify(opts.tailles)}, etat: ['Neuf avec étiquette', 'Très bon état', 'Bon état'] };
+          document.querySelectorAll('.row').forEach((r) => r.onclick = () => {
+            const k = r.dataset.k; if (k === 'marque' || k === 'adresse') return;
+            const sh = document.getElementById('sheet');
+            sh.innerHTML = '<div role="dialog"><button type="button" aria-label="Retourner en arrière" id="back">‹</button><h3>' + k + '</h3>' +
+              (k === 'prix' ? '<input id="px" inputmode="decimal"><button type="button" id="ok">Enregistrer</button>'
+                : OPTS[k].map((o) => '<button type="button" class="opt">' + o + '</button>').join('')) + '</div>';
+            sh.querySelector('#back').onclick = () => { sh.innerHTML = ''; };
+            sh.querySelectorAll('.opt').forEach((b) => b.onclick = () => { window.__clics = (window.__clics || []).concat(b.textContent); r.lastElementChild.textContent = b.textContent; sh.innerHTML = ''; });
+            const ok = sh.querySelector('#ok'); if (ok) ok.onclick = () => { r.lastElementChild.textContent = sh.querySelector('#px').value + ' €'; sh.innerHTML = ''; };
+          });
+        </script></body></html>`;
+      for (const [quoi, opts, attendu] of [
+        ['taille et état présents, adresse manquante', { tailles: ['39', 'EU 40', '40,5', '41'], adresse: false }, { taille: 'EU 40', etat: 'Très bon état', prix: '99,00 €', pub: 0 }],
+        ['taille absente des options', { tailles: ['39', '41'], adresse: true }, { taille: 'Ajouter', etat: 'Très bon état', prix: '99,00 €', pub: 0 }],
+        ['tout présent', { tailles: ['40', '41'], adresse: true }, { taille: '40', etat: 'Très bon état', prix: '99,00 €', pub: 1 }],
+      ]) {
+        const cx = await nav.newContext();
+        await cx.route('https://fr.vestiairecollective.com/**', (r) => r.fulfill({ contentType: 'text/html; charset=utf-8', body: SMART(opts) }));
+        const ps = await cx.newPage();
+        await ps.addInitScript(fauxChrome(Object.assign({}, AD, { publier: true, etiquette: 'placee' })));
+        await ps.goto('https://fr.vestiairecollective.com/smart-listing/9999');
+        await ps.addScriptTag({ content: code });
+        await ps.waitForTimeout(11000);
+        const r = await ps.evaluate(() => { const v = (k) => document.querySelector('.row[data-k="' + k + '"]').lastElementChild.textContent; return { taille: v('taille'), etat: v('etat'), prix: v('prix'), pub: window.__pub || 0, clics: window.__clics || [], sheet: document.getElementById('sheet').innerHTML, b: (document.getElementById('vrm-vc-b') || {}).innerText || '' }; });
+        dit(r.taille === attendu.taille, `smart listing (${quoi}) : la taille`, r.taille + ' · clics ' + JSON.stringify(r.clics));
+        dit(r.etat === attendu.etat, `smart listing (${quoi}) : l'état au libellé EXACT`, r.etat);
+        dit(r.prix === attendu.prix, `smart listing (${quoi}) : le prix tapé dans sa fiche`, r.prix);
+        dit(r.sheet === '', `smart listing (${quoi}) : aucune fiche laissée ouverte`, r.sheet.slice(0, 80));
+        dit(r.pub === attendu.pub, `smart listing (${quoi}) : « Mettre en vente » cliqué ${attendu.pub} fois`, String(r.pub) + ' · ' + r.b.slice(0, 200));
+        if (attendu.taille === 'Ajouter') dit(/Taille : à choisir/.test(r.b), `smart listing (${quoi}) : le bandeau le dit`, r.b.slice(0, 200));
+        await cx.close();
+      }
+    }
     const p2 = await ctxN.newPage();
     await p2.addInitScript(fauxChrome(AD));
     await p2.goto('https://fr.vestiairecollective.com/sell/');
@@ -254,6 +321,23 @@ function faire({ numero = '401', vendus = [], preuveKO = false, posted = [], pos
       dit(sq.n === attendu && sq.types.every((t) => /^image\/(jpeg|png):VRM-401-\d\.(jpg|png)$/.test(t)), `photos ${quoi} : ${attendu} attachée(s), en JPG/PNG seulement`, JSON.stringify(sq.types));
       dit(sq.pub === 0 && /détour|JPG ou PNG/.test(sq.b), `photos ${quoi} : rien n'est publié, et le bandeau dit pourquoi`, sq.b.slice(0, 200));
       await pq.close();
+    }
+    // 28 oct. — « ça ne veut pas faire de smart listing » : sans clé Photoroom,
+    // aucune photo n'était attachée et rien ne le débloquait. Le bandeau le dit en
+    // français et propose, sur SON clic, les photos d'origine.
+    {
+      const pk = await ctxN.newPage();
+      await pk.addInitScript(fauxChrome(AD, [{ b64: '/9j/AA==', type: 'image/jpeg', detoure: false, detourage: 'no-key' }, { b64: 'iVBORw0KGgo=', type: 'image/png', detoure: false, detourage: 'no-key' }]));
+      await pk.goto('https://fr.vestiairecollective.com/sell/');
+      await pk.addScriptTag({ content: code });
+      await pk.waitForTimeout(3500);
+      const k0 = await pk.evaluate(() => ({ n: document.getElementById('f').files.length, b: (document.getElementById('vrm-vc-b') || {}).innerText || '', bouton: !!document.querySelector('[data-vc-photos-origine]') }));
+      dit(k0.n === 0 && /clé Photoroom/.test(k0.b) && !/no-key/.test(k0.b), 'sans clé Photoroom : aucune photo attachée d\'office, et la raison est dite en français', k0.b.slice(0, 200));
+      dit(k0.bouton, 'et le bandeau propose « Attacher mes photos sans détourage »', String(k0.bouton));
+      if (k0.bouton) { await pk.click('[data-vc-photos-origine]'); await pk.waitForTimeout(1500); }
+      const k1 = await pk.evaluate(() => ({ n: document.getElementById('f').files.length, b: (document.getElementById('vrm-vc-b') || {}).innerText || '' }));
+      dit(k1.n === 2 && /sans détourage/.test(k1.b), 'sur son clic, les photos d\'origine sont attachées et le bandeau le dit', k1.n + ' · ' + k1.b.slice(0, 160));
+      await pk.close();
     }
     dit(st.pub === 0, 'sans feu vert (app d\'avant / « préparer seulement ») : VRM ne clique pas « Publier »', String(st.pub));
     dit(/champ/.test(st.b) && /publies?/.test(st.b), 'le bandeau dit le chiffre et que c\'est lui qui publie', st.b);

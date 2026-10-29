@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.265.0';
+const CODE_VERSION = '5.270.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -2948,6 +2948,9 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   } else if (msg.kind === 'catalogueVinted' && typeof msg.body === 'string') {
     // 5.243 : l'arbre des catégories Vinted (libellés publics), une ligne à part.
     if (/(^|\.)vinted\.[a-z.]+$/i.test(String(domain || ''))) storeVintedCatalogue(msg.body);
+  } else if (msg.kind === 'couleursVinted') {
+    // 5.266 : la liste des couleurs de Vinted (libellés publics, aucune personne).
+    rangerCouleursVinted(domain, msg.couleurs);
   } else if (msg.kind === 'suivi') {
     // 5.214 : le suivi / l'expédition / le code de retrait qu'une page Vinted
     // vient de recevoir — sa FORME, et pour le suivi le contenu allégé (voir
@@ -7713,6 +7716,61 @@ function raisonRefusVinted(rc) {
 // acceptées (« Nike p-6000 noir » ⇒ color_ids [1]). Seules celles-ci peuvent être
 // posées depuis VRM, sur SON choix : une autre se choisit sur Vinted.
 const COULEURS_VINTED_SURES = { 1: 'Noir' };
+// 5.266 (28 oct., « Republier sans blocage sur la couleur ») : la LISTE des
+// couleurs de Vinted, telle que la page de dépôt la charge
+// (`GET /api/v2/item_upload/colors`, vu dans ses chemins). Son identifiant ET
+// son nom viennent de Vinted : rien n'est deviné. Gardée dans le stockage de
+// l'extension ; sinon lue UNE fois (lecture, file Vinted, budget des clics),
+// au moment où un brouillon sans couleur demande le choix. Une liste dont le
+// n°1 n'est pas « Noir » (le seul mesuré dans une annonce acceptée) est
+// refusée : ce ne serait pas la liste des couleurs.
+const COULEURS_VU = 'vrmCouleursVinted';
+function nettoyerCouleurs(j) {
+  const liste = Array.isArray(j) ? j : (j && Array.isArray(j.colors) ? j.colors : (j && Array.isArray(j.item_colors) ? j.item_colors : null));
+  if (!liste || liste.length < 3 || liste.length > 80) return null;
+  const out = {};
+  for (const c of liste) {
+    if (!c || typeof c !== 'object') continue;
+    const id = Number(c.id);
+    const t = String(c.title != null ? c.title : (c.name != null ? c.name : '')).replace(/\s+/g, ' ').trim();
+    if (!Number.isSafeInteger(id) || id < 1 || id > 999999) continue;
+    if (!/^[\p{L}][\p{L} '’\-\/]{0,29}$/u.test(t)) continue;
+    out[id] = t;
+  }
+  const n = Object.keys(out).length;
+  if (n < 3) return null;
+  if (out[1] && !/^noir$/i.test(out[1])) return null;
+  return out;
+}
+let _couleursChaine = Promise.resolve();
+function rangerCouleursVinted(domain, liste) {
+  if (!/(^|\.)vinted\.[a-z.]+$/i.test(String(domain || ''))) return Promise.resolve(false);
+  const n = nettoyerCouleurs(liste);
+  if (!n) { try { noterDiag('couleurs_forme_inconnue'); } catch (_) {} return Promise.resolve(false); }
+  const run = _couleursChaine.then(async () => {
+    try { await chrome.storage.local.set({ [COULEURS_VU]: { liste: n, at: Date.now() } }); } catch (_) { return false; }
+    try { noterDiag('couleurs_rangees'); } catch (_) {}
+    return true;
+  });
+  _couleursChaine = run.catch(() => {});
+  return run;
+}
+async function couleursConnues(uid, acc) {
+  let st = null; try { st = (await chrome.storage.local.get(COULEURS_VU))[COULEURS_VU] || null; } catch (_) {}
+  let liste = st && st.liste && typeof st.liste === 'object' ? st.liste : null;
+  const essaiRecent = st && Number(st.essaiAt) > Date.now() - 24 * 3600000;
+  if ((!liste || !Object.keys(liste).length) && acc && !essaiRecent) {
+    try { await chrome.storage.local.set({ [COULEURS_VU]: { ...(st || {}), essaiAt: Date.now() } }); } catch (_) {}
+    const g = await gardeLecture(uid, acc, 'clic');
+    if (!g) {
+      const r = await vintedGet(acc, '/api/v2/item_upload/colors', { timeoutMs: 20000 });
+      const n = r && r.ok ? nettoyerCouleurs(r.json) : null;
+      if (n) { liste = n; try { await chrome.storage.local.set({ [COULEURS_VU]: { liste: n, at: Date.now() } }); } catch (_) {} try { noterDiag('couleurs_lues'); } catch (_) {} }
+      else { try { noterDiag('couleurs_lecture_ratee_' + (r ? r.status : 0)); } catch (_) {} }
+    }
+  }
+  return { ...(liste || {}), ...COULEURS_VINTED_SURES };
+}
 function idsCouleurVinted(it, num) {
   if (!it || typeof it !== 'object') return [];
   const n = num || ((v) => (typeof v === 'number' && isFinite(v)) ? v : ((typeof v === 'string' && /^\d{1,12}$/.test(v)) ? Number(v) : null));
@@ -8188,8 +8246,9 @@ async function publierBrouillon(msg) {
   if (!idsCouleurVinted(r.d).length) {
     // (28 oct.) Il a CHOISI la couleur dans VRM : on la pose (seulement une couleur mesurée).
     const ch = Number(msg.couleur);
-    if (COULEURS_VINTED_SURES[ch]) r.d.color_ids = [ch];
-    else if (!manque.length) return { accepte: false, code: 'couleur-absente', couleurs: COULEURS_VINTED_SURES, raison: "ce brouillon n'a pas de couleur, et Vinted refuse de le mettre en ligne sans. Choisis-la (dans VRM, ou sur Vinted → « Modifier »). Rien n'a été touché." };
+    const couleurs = await couleursConnues(uid, acc);
+    if (couleurs[ch]) r.d.color_ids = [ch];
+    else if (!manque.length) return { accepte: false, code: 'couleur-absente', couleurs, raison: "ce brouillon n'a pas de couleur, et Vinted refuse de le mettre en ligne sans. Choisis-la (dans VRM, ou sur Vinted → « Modifier »). Rien n'a été touché." };
     else manque.push('de couleur');
   }
   if (manque.length) return { accepte: false, code: 'incomplet', raison: `ce brouillon n'a pas ${manque.join(', ')} — finis-le sur Vinted (« Modifier »), puis réessaie. Rien n'a été touché.` };
@@ -8340,8 +8399,9 @@ async function refaireBrouillon(msg) {
   }
   const prixD = Number(d && (d.price && typeof d.price === 'object' ? d.price.amount : d.price));
   if (!d || !String(d.title || '').trim() || !(prixD > 0) || !(Number(d.catalog_id) > 0) || !String(d.description || '').trim()) return { accepte: false, code: 'illisible', raison: "le contenu enregistré est incomplet — rien n'a été touché" };
-  if (!idsCouleurVinted(d).length && COULEURS_VINTED_SURES[Number(msg.couleur)]) d.color_ids = [Number(msg.couleur)];
-  if (!idsCouleurVinted(d).length) return { accepte: false, code: 'couleur-absente', couleurs: COULEURS_VINTED_SURES, raison: "le contenu enregistré n'a pas de couleur, et Vinted refuse de mettre en ligne une annonce sans couleur. Si le brouillon est dans tes brouillons Vinted, ouvre-le, choisis la couleur et publie-le ; sinon, rien n'a été touché." };
+  const couleursR = idsCouleurVinted(d).length ? null : await couleursConnues(uid, acc);
+  if (couleursR && couleursR[Number(msg.couleur)]) d.color_ids = [Number(msg.couleur)];
+  if (!idsCouleurVinted(d).length) return { accepte: false, code: 'couleur-absente', couleurs: couleursR || COULEURS_VINTED_SURES, raison: "le contenu enregistré n'a pas de couleur, et Vinted refuse de mettre en ligne une annonce sans couleur. Si le brouillon est dans tes brouillons Vinted, ouvre-le, choisis la couleur et publie-le ; sinon, rien n'a été touché." };
   const okUrl = (u) => typeof u === 'string' && /^https:\/\/images\d*\.vinted\.net\//i.test(u);
   const urls = photosUniques([Array.isArray(sauve.photos) ? sauve.photos : []], 20).urls.filter(okUrl);
   if (!urls.length) return { accepte: false, code: 'coffre-absent', raison: "aucune photo enregistrée pour cette annonce — rien n'a été touché" };
@@ -12002,15 +12062,26 @@ function categorieLbcDe(titre, description, taille, chemin, marque) {
 }
 function descriptionLbcDe(o) {
   const ref = String(o.ref || '');
+  // Le texte de Vinted, sans la lettre ajoutée par Republier (une lettre seule
+  // sur sa dernière ligne) ni une ancienne « Réf. VRM-n » : elles reviennent
+  // sinon en double (28 oct., « ça met deux descriptions »).
+  let texte = String(o.texte || o.base || '').trim();
+  texte = texte.replace(/\n\s*\n\s*[a-z]\s*$/i, '').replace(/^[^\S\n]*(?:📦\s*)?R[ée]f\.?\s*VRM-[A-Z0-9]+[^\S\n]*$/gim, '').replace(/\n{3,}/g, '\n\n').trim();
+  const sans = (s) => String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, ' ');
+  const t = sans(texte);
+  const dit = (v) => { const x = sans(v).trim(); return !!x && t.includes(x); };
+  // Une caractéristique que le texte dit déjà n'est pas répétée.
   const specs = [];
-  if (o.marque) specs.push('Marque : ' + o.marque);
-  if (o.taille) specs.push('Taille : ' + o.taille);
-  if (o.etat) specs.push('État : ' + o.etat);
-  if (o.couleur) specs.push('Couleur : ' + o.couleur);
-  const parts = ['📦 Réf. ' + ref, '', String(o.texte || o.base || '').trim()];
+  if (o.marque && !dit(o.marque)) specs.push('Marque : ' + o.marque);
+  if (o.taille && !new RegExp('(taille|pointure|\\bt)\\s*:?\\s*' + sans(o.taille).replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b').test(t)) specs.push('Taille : ' + o.taille);
+  if (o.etat && !dit(o.etat)) specs.push('État : ' + o.etat);
+  if (o.couleur && !dit(o.couleur)) specs.push('Couleur : ' + o.couleur);
+  const parts = ['📦 Réf. ' + ref, '', texte];
   if (specs.length) { parts.push(''); parts.push(specs.join('\n')); }
-  parts.push('');
-  parts.push('Envoi rapide et soigné (remise en main propre possible). N\'hésitez pas pour toute question.');
+  if (!/envoi|exp[ée]di|envoye/.test(t)) {
+    parts.push('');
+    parts.push('Envoi rapide et soigné (remise en main propre possible). N\'hésitez pas pour toute question.');
+  }
   parts.push('Réf. ' + ref);
   return parts.join('\n');
 }
@@ -12631,7 +12702,27 @@ async function annonceVestiaire(id) {
   // (§ « familleArticle ») et vérifiée contre le catalogue de dépôt capté.
   const fam = familleArticle({ chemin: cheminDeLAnnonce(trouve.it, det), titre: firstDefined(det.title, trouve.it.title), description: det.description || '', taille: ad.taille, marque: ad.marque });
   ad.vcCategorie = categorieVcDe(fam, _catVc);
+  // (28 oct.) Vestiaire veut la photo de l'ÉTIQUETTE en 2ᵉ (case « Étiquette »,
+  // mesurée dans le smart listing). C'est Julien qui la désigne dans VRM
+  // (`vrm_vc_etiquettes[id]` = la clé de la photo, `clePhotoLbc` ; une clé à
+  // elle, synchronisée : jamais un champ de la fiche N°, que d'autres écrans
+  // réécrivent). Rien ne la devine. Pas choisie, illisible, ou plus dans les
+  // photos ⇒ l'ordre de Vinted, et le bandeau le dit.
+  const me = await lireMain(['vrm_vc_etiquettes']);
+  const etiq = me && me.vrm_vc_etiquettes ? me.vrm_vc_etiquettes[String(id)] : '';
+  const o = ordrePhotosVestiaire(ad.photos, etiq);
+  ad.photos = o.photos; ad.etiquette = o.etiquette;
   return { ad };
+}
+function ordrePhotosVestiaire(photos, etiq) {
+  const l = Array.isArray(photos) ? photos.slice() : [];
+  const k = String(etiq || '');
+  if (!k) return { photos: l, etiquette: 'pas-choisie' };
+  const i = l.findIndex((u) => clePhotoLbc(typeof u === 'string' ? u : (u && u.url)) === k);
+  if (i < 0) return { photos: l, etiquette: 'introuvable' };
+  if (i === 0) return { photos: l, etiquette: 'couverture' };
+  const [p] = l.splice(i, 1); l.splice(1, 0, p);
+  return { photos: l, etiquette: 'placee' };
 }
 async function publierVestiaire(msg) {
   const cmd = String(msg.cmd || ''); const id = String(msg.id || '');
@@ -12670,11 +12761,14 @@ async function publierVestiaire(msg) {
     return { accepte: true, jobId: cleJob, etape: 'depot' };
   } finally { PUBLICATIONS_EN_VOL.delete(cleJob); }
 }
-// ⚠️ ADRESSE NON MESURÉE : la page « vendre » publique de Vestiaire (vue sur
-//    us.vestiairecollective.com, même chemin supposé en fr). Elle mène à
-//    « Vendre un article » ; vc-depot.js attend le formulaire quel que soit
-//    son chemin, seulement dans CET onglet.
-const VC_PAGE_VENDRE = 'https://fr.vestiairecollective.com/sell-clothes-online/';
+// 28 oct. (5.268) : Julien — « ça m'amène juste sur Vestiaire, sur Vendre un
+//    article, et ça ne fait rien après ». On ouvrait la page d'ACCUEIL « vendre »
+//    (`/sell-clothes-online/`), qui ne porte aucun champ : il fallait cliquer
+//    « Vendre un article » soi-même. Le formulaire est le SMART LISTING,
+//    `/smart-listing/` — MESURÉ dans son navigateur (`vc_recon.pages`, et
+//    `panel_vc_form` relevé sur ce chemin le 28 à 13 h 37). On l'ouvre direct.
+//    vc-depot.js attend le formulaire, seulement dans CET onglet.
+const VC_PAGE_VENDRE = 'https://fr.vestiairecollective.com/smart-listing/';
 
 // ── VESTIAIRE : TES ANNONCES ET LEUR BOOST (5.236) ─────────────────────────
 // `vc_listings` = { items: { [id Vestiaire]: { boost: true|false|null, cles, ref,

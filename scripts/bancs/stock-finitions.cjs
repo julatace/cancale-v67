@@ -67,6 +67,19 @@ const PLAN_BACS = { rooms: [{ id: 'r1', name: 'Garage', room: { w: 6, h: 5, wall
 const PLAN_BOIS = { rooms: [{ id: 'r1', name: 'Garage', room: { w: 6, h: 5, wallH: 3 }, items: [
   { id: 'w1', type: 'bois', name: 'Étagère bois', x: 2, y: 0.1, w: 1.2, h: 0.45, rows: 4, cols: 2, h3d: 1.2, slots: { '1_0': ['611'], '1_1': ['612'] } },
 ] }], active: 'r1' };
+// XV. Anciens meubles (physique « colonne ») : une grille 3 × 2 et une commode 3 × 1.
+const PLAN_ANCIENS = { rooms: [{ id: 'r1', name: 'Garage', room: { w: 6, h: 5, wallH: 3 }, items: [
+  { id: 'g1', type: 'grille', name: 'Grille', x: 1, y: 0.1, w: 1, h: 0.5, rows: 3, cols: 2, cell: 0.5, slots: { '2_0': ['921'] } },
+  { id: 'k1', type: 'commode', name: 'Commode', x: 3.5, y: 0.1, w: 1.2, h: 0.5, rows: 3, cols: 1, h3d: 1.0, slots: { '2_0': ['922'] } },
+] }], active: 'r1' };
+// XVI. Les photos sur les cartons : N°931 a une photo sûre, N°932 est porté par deux
+// fiches aux photos DIFFÉRENTES (on ne choisit pas), N°933 n'a pas de photo.
+const PLAN_PHOTOS = { rooms: [{ id: 'r1', name: 'Garage', room: { w: 6, h: 5, wallH: 3 }, items: [
+  { id: 'f1', type: 'metal', name: 'Étagère photos', x: 2, y: 0.1, w: 1.2, h: 0.5, rows: 3, cols: 2, h3d: 1.25, slots: { '2_0': ['931'], '2_1': ['932'], '1_0': ['933'] } },
+] }], active: 'r1' };
+const PHOTO_A = 'https://images1.vinted.net/t/01_aaa/f800/931.jpeg?s=x', PHOTO_B = 'https://images1.vinted.net/t/02_bbb/f800/932b.jpeg?s=x', PHOTO_C = 'https://images1.vinted.net/t/03_ccc/f800/932c.jpeg?s=x';
+const FICHES_PHOTOS = { a931: { numero: '931', title: 'Paire 931', photo: PHOTO_A, numberedAt: 1 }, a932: { numero: '932', title: 'Paire 932', photo: PHOTO_B, numberedAt: 2 }, b932: { numero: '932', title: 'Autre 932', photo: PHOTO_C, numberedAt: 3 }, a933: { numero: '933', title: 'Paire 933', numberedAt: 4 } };
+const PNG_ROUGE = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAAFklEQVR4nGP8z8DAwMDAxMDAwMDAAAANHQEDasKb6QAAAABJRU5ErkJggg==', 'base64');
 const FICHES = { a700: { numero: '700', title: 'Paire test 700 taille 42', numberedAt: 7 } };
 const PRESENTS = { nums: ['700', '401', '402', '501', '801', '601', '602', '701', '702', '703', '801', '802', '803', '901', '902', '903', '611', '612'], at: Date.now() };
 const ACCOUNTS = [{ id: 1, vinted_user_id: '111', login: 'compte_a', domain: 'www.vinted.fr', updated_at: new Date().toISOString() }];
@@ -99,15 +112,16 @@ const projette = (row, sel) => {
   return out;
 };
 
-async function ouvrir(b, vp, planObj) {
-  const ROWS = [{ id: 'vrm_room', data: planObj }, { id: 'main', data: { vinted_annonce_numeros: FICHES } }];
+async function ouvrir(b, vp, planObj, fichesObj) {
+  const FX = fichesObj || FICHES;
+  const ROWS = [{ id: 'vrm_room', data: planObj }, { id: 'main', data: { vinted_annonce_numeros: FX } }];
   const ctx = await b.newContext({ viewport: vp, ...(vp.width < 600 ? { isMobile: true, hasTouch: true } : {}) });
   const pg = await ctx.newPage();
   const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
   await pg.addInitScript(([f, pr]) => { try {
     localStorage.setItem('vrm_acces_direct', '1'); localStorage.setItem('vinted_garage_view', '"plan"');
     localStorage.setItem('vinted_annonce_numeros', JSON.stringify(f)); localStorage.setItem('vinted_nums_physiques', JSON.stringify(pr));
-  } catch (_) {} }, [FICHES, PRESENTS]);
+  } catch (_) {} }, [FX, PRESENTS]);
   await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) ? r.abort() : r.continue()));
   await pg.route('**/rest/v1/**', (route) => {
     const u = decodeURIComponent(metaVersData(route.request().url()));
@@ -123,9 +137,13 @@ async function ouvrir(b, vp, planObj) {
     if (lk) { const re = new RegExp('^' + lk[1].replace(/[.]/g, '\\.').replace(/[*%]/g, '.*') + '$'); return j(ROWS.filter((r) => re.test(r.id)).map(forme)); }
     return j([]);
   });
-  await pg.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"pret":true}' }));
+  const photosDemandees = [];
+  await pg.route('**/api/**', (r) => {
+    if (/mode=photo/.test(r.request().url())) { let u = ''; try { u = JSON.parse(r.request().postData() || '{}').url; } catch (_) {} photosDemandees.push(u); return r.fulfill({ status: 200, contentType: 'image/png', body: PNG_ROUGE }); }
+    return r.fulfill({ status: 200, contentType: 'application/json', body: '{"pret":true}' });
+  });
   await pg.goto(`http://localhost:${PORT}/?tab=garage`, { waitUntil: 'domcontentloaded' });
-  return { ctx, pg, errs };
+  return { ctx, pg, errs, photosDemandees };
 }
 const plan = (pg) => pg.evaluate(() => { try { return JSON.parse(localStorage.getItem('vrm_room_plan')); } catch (_) { return null; } });
 const attendrePlan = async (pg, cond, ms = 9000) => { const t0 = Date.now(); let p = null; while (Date.now() - t0 < ms) { p = await plan(pg); try { if (p && cond(p)) return p; } catch (_) {} await pg.waitForTimeout(250); } return p; };
@@ -324,6 +342,8 @@ const chevRect = (a, b) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h
       dit(await attendre3D(pg), t + ' : la 3D se monte');
       const pl0 = await sonde(pg, 'plateaux', 'm1');
       dit(pl0 && pl0.length === 6 && pl0.every((x) => x.w > 1.0), t + ' : sans réglage, les 6 plateaux sont pleins (comme avant)', JSON.stringify(pl0));
+      const mc0 = await sonde(pg, 'maxCases', 'm1');
+      dit(mc0 && Object.keys(mc0).length === 10 && Object.values(mc0).every((x) => x.texte === 'max 2'), t + ' : chaque case de l\'étagère porte son nombre max (10 × « max 2 »)', JSON.stringify(mc0));
       await cliquerSel(pg, '[data-mode-stock="amenager"]'); await pg.waitForTimeout(400);
       await pg.evaluate(() => document.querySelector('[data-stock3d]').scrollIntoView({ block: 'center' })); await pg.waitForTimeout(900);
       const p = await sonde(pg, 'project', 'm1', { cell: '1_0', num: '601' });
@@ -341,6 +361,8 @@ const chevRect = (a, b) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h
       await pg.screenshot({ path: path.join(CAPT, 'stock-plateaux-reglage-' + vp.width + '.png') }).catch(() => {});
       const pl1 = await sonde(pg, 'plateaux', 'm1');
       dit(pl1 && pl1.filter((x) => x.w < 0.7).length === 1 && pl1.length === 6, t + ' : la 3D dessine un plateau de moitié', JSON.stringify(pl1));
+      const mc1 = await sonde(pg, 'maxCases', 'm1');
+      dit(mc1 && !mc1['1_0'] && mc1['1_1'] && Object.keys(mc1).length === 9, t + ' : la case sans plateau dessous n\'a plus de « max » (elle ne tient rien), sa voisine le garde', JSON.stringify(mc1 && Object.keys(mc1)));
       // « Aucun » : tout tombe en bas de sa colonne.
       await cliquerTexte(pg, '^Aucune$');
       q = await attendrePlan(pg, (x) => JSON.stringify(item(x, 'm1').planches) === '[]');
@@ -360,6 +382,10 @@ const chevRect = (a, b) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h
       dit(await attendre3D(pg), t + ' : la 3D se monte');
       const pl0 = await sonde(pg, 'plateaux', 't1');
       dit(pl0 && pl0.length === 1 && pl0[0].w > 1.5, t + ' : sans réglage, le plateau sous la table est plein', JSON.stringify(pl0));
+      if (process.env.CAPT_FACE) { await pg.evaluate(() => document.querySelector('[data-stock3d]').scrollIntoView({ block: 'center' })); await pg.waitForTimeout(500); const pe = await sonde(pg, 'project', 't1', { cell: '1_1', num: '703' }); await pg.mouse.move(pe.x, pe.y); for (let k = 0; k < 7; k++) { await pg.mouse.wheel(0, -300); await pg.waitForTimeout(200); } await pg.waitForTimeout(2000); await pg.screenshot({ path: path.join(CAPT, 'stock-table-face-' + vp.width + '.png') }); }
+      const mt0 = await sonde(pg, 'maxCases', 't1');
+      dit(mt0 && Object.keys(mt0).length === 6 && mt0['0_0'] && mt0['0_0'].texte === 'max 8' && ['1_0', '1_1', '2_0', '2_1'].every((k) => mt0[k] && mt0[k].texte === 'max 2'), t + ' : chaque place de la table porte son nombre max (8 dessus, 2 par niveau dessous)', JSON.stringify(mt0));
+      dit(mt0 && mt0['0_0'] && mt0['1_0'] && mt0['0_0'].y > mt0['1_0'].y && mt0['1_0'].y > mt0['2_0'].y, t + ' : le nombre du dessus est au-dessus de la table, ceux du dessous dans leur niveau', JSON.stringify(mt0));
       await cliquerSel(pg, '[data-mode-stock="amenager"]'); await pg.waitForTimeout(400);
       await pg.evaluate(() => document.querySelector('[data-stock3d]').scrollIntoView({ block: 'center' })); await pg.waitForTimeout(900);
       const p = await sonde(pg, 'project', 't1', { cell: '0_0', num: '701' });
@@ -376,6 +402,8 @@ const chevRect = (a, b) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h
       await pg.waitForTimeout(1200);
       const pl1 = await sonde(pg, 'plateaux', 't1');
       dit(pl1 && pl1.length === 1 && pl1[0].w < 1.0, t + ' : la 3D dessine un plateau de moitié sous la table', JSON.stringify(pl1));
+      const mt1 = await sonde(pg, 'maxCases', 't1');
+      dit(mt1 && !mt1['1_0'] && mt1['1_1'] && Object.keys(mt1).length === 5, t + ' : la place sans plateau sous la table n\'a plus de « max », sa voisine le garde', JSON.stringify(mt1 && Object.keys(mt1)));
       await pg.screenshot({ path: path.join(CAPT, 'stock-table-' + vp.width + '.png') });
       const x = await pg.evaluate(() => ({ sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth }));
       dit(x.sw <= x.cw + 1, t + ' : aucun débordement', `${x.sw} > ${x.cw}`);
@@ -390,6 +418,8 @@ const chevRect = (a, b) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h
       dit(await attendre3D(pg), t + ' : la 3D se monte');
       const pl0 = await sonde(pg, 'plateaux', 'p1');
       dit(pl0 && pl0.length === 2, t + ' : sans réglage, les deux barres sont entières', JSON.stringify(pl0));
+      const mp0 = await sonde(pg, 'maxCases', 'p1');
+      dit(mp0 && mp0.barre_0 && mp0.barre_0.texte === 'max 3' && mp0.barre_1 && mp0.barre_1.texte === 'max 3' && mp0.barre_0.y > mp0.barre_1.y, t + ' : chaque barre affiche « max 3 », au-dessus d\'elle', JSON.stringify(mp0));
       await cliquerSel(pg, '[data-mode-stock="amenager"]'); await pg.waitForTimeout(400);
       await pg.evaluate(() => document.querySelector('[data-stock3d]').scrollIntoView({ block: 'center' })); await pg.waitForTimeout(900);
       const p = await sonde(pg, 'project', 'p1', { cell: '0_0', num: '801' });
@@ -405,7 +435,10 @@ const chevRect = (a, b) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h
       await pg.waitForTimeout(1200);
       const pl1 = await sonde(pg, 'plateaux', 'p1');
       dit(pl1 && pl1.length === 2 && Math.min(...pl1.map(v => v.w)) < Math.max(...pl1.map(v => v.w)) * 0.8, t + ' : la 3D dessine une barre du haut raccourcie', JSON.stringify(pl1));
+      const mp1 = await sonde(pg, 'maxCases', 'p1');
+      dit(mp1 && mp1.barre_0 && mp1.barre_0.texte === 'max 2' && mp1.barre_1 && mp1.barre_1.texte === 'max 3', t + ' : barre du haut raccourcie ⇒ « max 2 », celle du bas reste « max 3 »', JSON.stringify(mp1));
       await pg.screenshot({ path: path.join(CAPT, 'stock-portant-' + vp.width + '.png') });
+      if (process.env.CAPT_FACE) { await pg.evaluate(() => document.querySelector('[data-stock3d]').scrollIntoView({ block: 'center' })); await pg.waitForTimeout(500); const pe = await sonde(pg, 'project', 'p1', { cell: '1_1', num: '803' }); await pg.mouse.move(pe.x, pe.y); for (let k = 0; k < 10; k++) { await pg.mouse.wheel(0, -300); await pg.waitForTimeout(200); } await pg.waitForTimeout(2000); await pg.screenshot({ path: path.join(CAPT, 'stock-portant-face-' + vp.width + '.png') }); }
       const x = await pg.evaluate(() => ({ sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth }));
       dit(x.sw <= x.cw + 1, t + ' : aucun débordement', `${x.sw} > ${x.cw}`);
       dit(errs.length === 0, t + ' : aucune erreur d’app', errs.join(' | ').slice(0, 200));
@@ -419,6 +452,8 @@ const chevRect = (a, b) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h
       dit(await attendre3D(pg), t + ' : la 3D se monte');
       const pl0 = await sonde(pg, 'plateaux', 'b1');
       dit(pl0 && pl0.length === 4 && pl0.every((x) => x.w > 1.0), t + ' : sans réglage, les 4 plateaux sont pleins (comme avant)', JSON.stringify(pl0));
+      const mb0 = await sonde(pg, 'maxCases', 'b1');
+      dit(mb0 && Object.keys(mb0).length === 6 && Object.values(mb0).every((v) => v.texte === 'max 1'), t + ' : chaque case des bacs porte « max 1 »', JSON.stringify(mb0));
       await cliquerSel(pg, '[data-mode-stock="amenager"]'); await pg.waitForTimeout(400);
       await pg.evaluate(() => document.querySelector('[data-stock3d]').scrollIntoView({ block: 'center' })); await pg.waitForTimeout(900);
       const p = await sonde(pg, 'project', 'b1', { cell: '0_0', num: '901' });
@@ -434,6 +469,8 @@ const chevRect = (a, b) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h
       await pg.waitForTimeout(1200);
       const pl1 = await sonde(pg, 'plateaux', 'b1');
       dit(pl1 && pl1.length === 4 && pl1.filter((x) => x.w < 0.7).length === 1, t + ' : la 3D dessine un plateau de moitié', JSON.stringify(pl1));
+      const mb1 = await sonde(pg, 'maxCases', 'b1');
+      dit(mb1 && !mb1['0_0'] && mb1['0_1'] && Object.keys(mb1).length === 5, t + ' : plus de « max 1 » sur la case sans plateau dessous, l\'autre la garde', JSON.stringify(mb1));
       await pg.screenshot({ path: path.join(CAPT, 'stock-bacs-' + vp.width + '.png') });
       const x = await pg.evaluate(() => ({ sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth }));
       dit(x.sw <= x.cw + 1, t + ' : aucun débordement', `${x.sw} > ${x.cw}`);
@@ -448,6 +485,9 @@ const chevRect = (a, b) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h
       dit(await attendre3D(pg), t + ' : la 3D se monte');
       const pl0 = await sonde(pg, 'plateaux', 'w1');
       dit(pl0 && pl0.length === 5 && pl0.every((x) => x.w > 1.0), t + ' : sans réglage, les 5 plateaux sont pleins (comme avant)', JSON.stringify(pl0));
+      const mcb = await sonde(pg, 'maxCases', 'w1');
+      if (process.env.CAPT_FACE) { await pg.evaluate(() => document.querySelector('[data-stock3d]').scrollIntoView({ block: 'center' })); await pg.waitForTimeout(500); const pe = await sonde(pg, 'project', 'w1', { cell: '1_0', num: '611' }); await pg.mouse.move(pe.x, pe.y); for (let k = 0; k < 10; k++) { await pg.mouse.wheel(0, -300); await pg.waitForTimeout(200); } await pg.waitForTimeout(2000); await pg.screenshot({ path: path.join(CAPT, 'stock-bois-face-' + vp.width + '.png') }); }
+      dit(mcb && Object.keys(mcb).length === 8 && Object.values(mcb).every((x) => x.texte === 'max 2'), t + ' : l\'étagère en bois porte aussi son nombre max par case', JSON.stringify(mcb));
       await cliquerSel(pg, '[data-mode-stock="amenager"]'); await pg.waitForTimeout(400);
       await pg.evaluate(() => document.querySelector('[data-stock3d]').scrollIntoView({ block: 'center' })); await pg.waitForTimeout(900);
       const p = await sonde(pg, 'project', 'w1', { cell: '1_0', num: '611' });
@@ -463,6 +503,39 @@ const chevRect = (a, b) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h
       const pl1 = await sonde(pg, 'plateaux', 'w1');
       dit(pl1 && pl1.length === 5 && pl1.filter((x) => x.w < 0.7).length === 1, t + ' : la 3D dessine un plateau de bois de moitié', JSON.stringify(pl1));
       await pg.screenshot({ path: path.join(CAPT, 'stock-bois-' + vp.width + '.png') });
+      const x = await pg.evaluate(() => ({ sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth }));
+      dit(x.sw <= x.cw + 1, t + ' : aucun débordement', `${x.sw} > ${x.cw}`);
+      dit(errs.length === 0, t + ' : aucune erreur d’app', errs.join(' | ').slice(0, 200));
+      await ctx.close();
+    });
+
+    // ── XV. ANCIENS MEUBLES : LE NOMBRE MAX PAR CASE (28 oct.) ──────────────
+    if (fait('XV')) for (const vp of [{ width: 1512, height: 950 }, { width: 390, height: 844 }]) await essaie('XV. anciens ' + vp.width, async () => {
+      const t = 'XV. ' + vp.width + ' px';
+      const { ctx, pg, errs } = await ouvrir(b, vp, PLAN_ANCIENS);
+      dit(await attendre3D(pg), t + ' : la 3D se monte');
+      const mg = await sonde(pg, 'maxCases', 'g1');
+      dit(mg && Object.keys(mg).length === 6 && Object.values(mg).every((v) => v.texte === 'max 1'), t + ' : chaque case de la grille porte « max 1 »', JSON.stringify(mg));
+      const mk = await sonde(pg, 'maxCases', 'k1');
+      dit(mk && Object.keys(mk).length === 3 && Object.values(mk).every((v) => v.texte === 'max 1'), t + ' : chaque tiroir de la commode porte « max 1 »', JSON.stringify(mk));
+      dit(mk && mk['0_0'].y > mk['1_0'].y && mk['1_0'].y > mk['2_0'].y, t + ' : une plaque en haut de chaque case, de haut en bas', JSON.stringify(mk));
+      await pg.screenshot({ path: path.join(CAPT, 'stock-anciens-' + vp.width + '.png') });
+      const x = await pg.evaluate(() => ({ sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth }));
+      dit(x.sw <= x.cw + 1, t + ' : aucun débordement', `${x.sw} > ${x.cw}`);
+      dit(errs.length === 0, t + ' : aucune erreur d’app', errs.join(' | ').slice(0, 200));
+      await ctx.close();
+    });
+
+    // ── XVI. LES PHOTOS SUR LES CARTONS (28 oct.) ───────────────────────────
+    if (fait('XVI')) for (const vp of [{ width: 1512, height: 950 }, { width: 390, height: 844 }]) await essaie('XVI. photos ' + vp.width, async () => {
+      const t = 'XVI. ' + vp.width + ' px';
+      const { ctx, pg, errs, photosDemandees } = await ouvrir(b, vp, PLAN_PHOTOS, FICHES_PHOTOS);
+      dit(await attendre3D(pg), t + ' : la 3D se monte');
+      let ph = null; for (let k = 0; k < 30; k++) { ph = await sonde(pg, 'photosBoites', 'f1'); if (ph && ph['931']) break; await pg.waitForTimeout(300); }
+      dit(ph && ph['931'] === true, t + ' : le carton N°931 porte la photo de sa paire', JSON.stringify(ph));
+      dit(ph && ph['932'] === false && !photosDemandees.some((u) => /932/.test(u)), t + ' : N°932 (deux fiches, deux photos) garde son numéro seul, aucune photo demandée', JSON.stringify({ ph, photosDemandees }));
+      dit(ph && ph['933'] === false, t + ' : N°933 (sans photo) garde son numéro seul', JSON.stringify(ph));
+      if (process.env.CAPT_FACE) { await pg.evaluate(() => document.querySelector('[data-stock3d]').scrollIntoView({ block: 'center' })); await pg.waitForTimeout(500); const pe = await sonde(pg, 'project', 'f1', { cell: '2_0', num: '931' }); await pg.mouse.move(pe.x, pe.y); for (let k = 0; k < 12; k++) { await pg.mouse.wheel(0, -300); await pg.waitForTimeout(200); } await pg.waitForTimeout(2000); await pg.screenshot({ path: path.join(CAPT, 'stock-photos-face-' + vp.width + '.png') }); }
       const x = await pg.evaluate(() => ({ sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth }));
       dit(x.sw <= x.cw + 1, t + ' : aucun débordement', `${x.sw} > ${x.cw}`);
       dit(errs.length === 0, t + ' : aucune erreur d’app', errs.join(' | ').slice(0, 200));
@@ -500,6 +573,8 @@ const chevRect = (a, b) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h
       const hm = await sonde(pg, 'hauteursMax', 'p1');
       const hs3 = hm && hm.map((x) => x.h), ht3 = hm && hm.map((x) => x.haut);
       dit(JSON.stringify(hs3) === '[3,5,3]' && ht3[1] > ht3[0] + 0.5 && Math.abs(ht3[0] - ht3[2]) < 0.005, t + ' : en 3D, le cadre de la pile 2 monte à 5, les autres restent à 3', JSON.stringify(hm));
+      dit(hm && JSON.stringify(hm.map((x) => x.texte)) === '["max 3","max 5","max 3"]', t + ' : en 3D, le nombre max est écrit au-dessus de chaque pile (3, 5, 3)', JSON.stringify(hm && hm.map((x) => x.texte)));
+      dit(hm && hm.every((x) => x.texteY != null && x.texteY > x.haut), t + ' : le nombre est posé au-dessus du sommet de sa pile', JSON.stringify(hm));
       await cliquerSel(pg, '[aria-label="Réduire la pile 1"]'); await pg.waitForTimeout(700);
       const m2 = item(await plan(pg), 'p1');
       dit(JSON.stringify(m2.hauteurs) === '[3,5,3]' && m2.nums.length === 13, t + ' : réduire la pile 1 sous ses 3 cartons est refusé, rien ne bouge', JSON.stringify(m2.hauteurs));

@@ -7,6 +7,87 @@
 > Mercari) sans qu'il le redemande. Les comptes eBay.co.uk/.com déjà gérés (26 oct.) restent, sans plus.
 > La priorité : que tout ce qui est français soit juste et fiable.
 
+> **28 octobre (nuit, fin) — STOCK : un article une fois, et les articles de TOUTES les plateformes :** Julien
+> (« les deux ») : (1) une paire sur Vinted, Leboncoin et eBay n'apparaît qu'UNE fois dans « À ranger » — même N° (clé)
+> ou même PHOTO EXACTE (deux fiches = une paire, l'autre N° dit à côté ; l'une rangée ⇒ aucune proposée) :
+> `unParArticle` (stockRegles.js), 3D, « Mes meubles », En photos ; (2) une paire en vente SEULEMENT sur eBay (SKU
+> `numEbayLu`) ou Leboncoin (`numeroLbcIdentite`, annonce en vente `annonceLbcEnVente`) est présente :
+> `articlesAutresPlateformes`, publiée avec la liste `vinted_nums_physiques` (`autres`, `sansNumero`), jamais un N°
+> dont la vente Vinted est prouvée et le colis parti ; Vinted pas lu ⇒ rien publié. Une annonce sans N° n'est pas
+> proposée. Preuve : banc `stock-plateformes.cjs` (10 rouges sur l'avant ; mutations « autres vidés » 8, « sans
+> garde vendue + sans photo » rouges). ⚠️ Non mesuré : sa vraie base.
+
+> **28-29 octobre (nuit) — VESTIAIRE : étiquette en 2ᵉ, Taille/État/Prix remplis, description sans doublon (5.269-5.270) :**
+> MESURÉ (`panel_vc_form`, 28 oct. 23 h 06, 5.268) : après les photos, l'écran « Détails » est une liste de LIGNES-BOUTONS
+> (« Marque Nike », « Taille Ajouter », « État Ajouter », « Prix Ajouter », « Votre adresse Ajouter »…), chacune ouvre une
+> fiche (« Retourner en arrière »). `vc-depot.js` (`remplirFiches`) ouvre Taille, État, Prix une fois par paire et par onglet,
+> ne clique que l'option au texte EXACT (taille « 40 » = « 40 », « EU 40 », « FR 40 » ; état mot pour mot), tape le prix
+> dans le seul champ de la fiche, puis « Enregistrer/Valider » ; rien d'exact ⇒ fiche refermée et DIT. `obligatoiresVides`
+> compte toute ligne « Ajouter » (Catégorie, Modèle, Taille, État, Prix, Votre adresse) : « Mettre en vente » n'est jamais
+> cliqué avant (le prix se relit sur la ligne « Prix 99,00 € »). ⚠️ La forme des fiches n'a jamais été vue : écrite sur
+> l'écran mesuré, à confirmer à son prochain essai (`rapporterEtape` relève chaque fiche ouverte). Étiquette : Vestiaire
+> veut la photo de l'étiquette en 2ᵉ ; Julien la CHOISIT dans VRM → Vestiaire (`vrm_vc_etiquettes[id]` = `clePhotoLbc`,
+> synchronisé, clé à part — jamais un champ de la fiche N°), `ordrePhotosVestiaire` la met en 2ᵉ ; jamais devinée.
+> Description (`descriptionLbcDe`, app = extension) : une caractéristique que le texte Vinted dit déjà n'est plus répétée,
+> « Envoi rapide » non plus s'il parle d'envoi, la lettre de Republier retirée. Preuves : `audit-vc-publier.cjs` (110,
+> section smart listing) ; banc `vc-publier.cjs` (étiquette).
+
+> **28 octobre (nuit, fin) — VESTIAIRE : on ouvre le FORMULAIRE, pas l'accueil (5.268) :** Julien : « ça m'amène
+> juste sur Vestiaire, sur Vendre un article, et ça ne fait rien après ». Cause : `VC_PAGE_VENDRE` ouvrait
+> `/sell-clothes-online/` (page d'accueil, aucun champ) ; à 22:50, `vc_recon` le voit passer, `panel_vc_form` rien.
+> Le formulaire est le smart listing `/smart-listing/` (MESURÉ : `vc_recon.pages`, `panel_vc_form` du 28 à 13 h 37).
+> On l'ouvre directement ; et `vc-depot.js`, sur une page « vendre » sans formulaire avec une paire en cours, y va UNE
+> fois par paire et par onglet (`vrmVcVersSmart:{id}`, pas de boucle). Preuve : `audit-vc-publier.cjs` (94 ; rouge sur
+> la 5.267). ⚠️ Toujours non mesuré : les écrans du smart listing après les photos.
+
+> **28 octobre (nuit, fin) — VESTIAIRE bloqué faute de clé Photoroom (5.267) :** Julien : « ça ne veut pas faire de smart
+> listing ni de Photoroom ». Mesuré : aucune clé Photoroom (ni `PHOTOROOM_API_KEY` sur Vercel, ni `vrm_photoroom_cle`), 24
+> `detourage_no_key` ; or `vc-depot.js` n'attache QUE des photos détourées (sa règle du 27 oct.) ⇒ 0 photo, et le smart
+> listing (photos d'abord) ne démarrait jamais. Le bandeau dit la raison en français et propose, sur SON clic, « Attacher mes
+> photos sans détourage » (WebP converti en JPEG) ; la publication ne les bloque plus ensuite. Geste : coller sa clé Photoroom
+> dans VRM → Vestiaire (son compte paie). Preuve : `audit-vc-publier.cjs` (+3). ⚠️ Non mesuré : les écrans du smart listing
+> après les photos (`panel_vc_form` n'en a jamais vu).
+
+> **28 octobre (nuit, fin) — la file des FAVORIS prévient quand elle finit :** `terminerFile` rend `valeur.fin` (total,
+> envoyés, à vérifier, interrompus, interrompue) UNE fois, à la transition active → inactive ; `routeFavoris` envoie alors
+> « ✅ … file terminée » / « ⏸️ … file interrompue » (`texteFinFavoris`, catégorie `favoris`, activée par défaut, dans
+> `PUSH_CATS` et `PUSH_DEFAUT`), dans le contexte du vendeur. Un rejeu de l'accusé ne renotifie pas. Preuve :
+> `scripts/tests/favoris-fin-file.test.mjs` (rouge sur l'avant). ⚠️ Le moteur reste dans l'écran des favoris : quitter
+> l'écran arrête toujours la file (`ecran_inactif`) — la notification le dira.
+
+> **28 octobre (nuit, fin) — LES COULEURS DE VINTED, mesurées (5.266) :** « Republier sans blocage sur la couleur ».
+> Mesuré : aucune ligne de sa base ne porte le NOM d'une couleur (les corps acceptés n'ont que `color_ids`), mais sa page de
+> dépôt charge `GET /api/v2/item_upload/colors` (vu sur ses 7 comptes). `inject.js` la capte en passant
+> (`noteCouleursVinted`, id + nom seulement) ; sinon `couleursConnues` la lit UNE fois (lecture, budget « clic », 24 h
+> entre deux essais) quand un brouillon sans couleur demande le choix. Rangée dans `chrome.storage.local.vrmCouleursVinted`
+> (`nettoyerCouleurs` : un nom de couleur, ≥ 3 entrées, et si le n°1 existe il doit être « Noir » — le seul mesuré dans une
+> annonce acceptée — sinon refusée). `couleur-absente` rend toute la liste ; l'app (`askChoix`, une feuille, un bouton de
+> 44 px par couleur, « Pas maintenant ») le laisse choisir ; une couleur hors liste n'est jamais envoyée. Une seule connue ⇒
+> l'ancienne question « Noir — publier ». Preuves : `audit-recreer.cjs` (116 ; 3 rouges sur la 5.265), banc `republier.cjs`.
+
+> **28 octobre (nuit, fin) — MESSAGES AUX FAVORIS refaits comme Republier :** Julien : « fais comme pour les
+> republications, un onglet qui s'ouvre avec les paramètres, les réductions, le temps aléatoire… enlève ce qui existe et
+> restructure ». Messages → Favoris reçus ne garde qu'un résumé (`data-favoris-resume` : à contacter · déjà envoyés · en
+> conversation), l'état d'une file (`data-favoris-file`) et UN bouton « Envoyer un message aux favoris »
+> (`data-favoris-ouvrir`). La fenêtre (`data-favoris-feuille`, portail sur `<body>`, `FermeAuRetour` passé par l'app) :
+> 1. Choisir (filtres, recherche, 10 au plus, outils : récupérer les pages, vérifier un favori, tester) · 2. Message
+> (texte, réduction, aperçu) · 3. Envoi (rythme **Fixe** ou **Aléatoire** min–max, compte rendu par favori
+> `data-favoris-envoi`, Lancer/Arrêter, « Enregistrer sans envoyer »). Le moteur (`AutomatisationFavoris`, plus de
+> `<details>`) reste monté fenêtre fermée. Temps aléatoire : `intervalleMaxMinutes` dans `vrm_favoris_reglages_{uid}`
+> (null = fixe, réglages d'avant lus tels quels) ; c'est le SERVEUR qui tire (`delaiFavori`, empreinte du jeton : une
+> décision rejouée donne le même temps), `enCours.delai` repris par `terminerFile` ; le plafond 10/60 min passe avant.
+> Preuves : `scripts/tests/favoris-temps-aleatoire.test.mjs` (215, rouge sur l'avant), interfaces `favoris-vinted`
+> (105), `favoris-historique` (132), `favoris-automatisation` (84), banc `achats-messages-premium` (61).
+
+> **28 octobre (nuit, fin) — messages aux favoris sur ses AUTRES comptes :** « Le lien du favori n'est pas confirmé ».
+> Mesuré : sur 3175765377 (deux favoris ouverts depuis la cloche) les 77 favoris se résolvent, chacun vers SA personne
+> (`offering_id`, 77 destinataires distincts, des messages sont partis) ; sur ses autres comptes, aucune ouverture ⇒ refus.
+> ⚠️ Le `user_id` des notifications est le MÊME pour toutes (3175383732 sur deux comptes) : il n'est JAMAIS une preuve
+> de destinataire. ⇒ Seul le PARAMÈTRE prouvé (`offering_id`, deux destinataires natifs distincts) sur un autre compte du
+> MÊME vendeur vaut ici (`parametresDesAutresComptes`, owner filtré ; `parametresAilleurs`, deux clés contradictoires ⇒
+> rien). Preuve : `audit-favoris-autres-comptes.cjs` (3 mutations rouges). Et Republier ne dit plus « 0 annonce à supprimer »
+> après un passage (les anciennes sont parties de Vinted).
+
 > **28 octobre (nuit, fin) — la paire REPUBLIÉE garde son numéro, et les N° revus sur Vinted (5.265) :** Julien :
 > « quand la paire est republiée elle ne conserve pas son numéro, sur Vinted il n'y a plus les numéros ». Mesuré :
 > Jordan 3 N°2→107, Air Max 1 N°53→108, zoom fly N°94→109 (toutes `auto`, données après la mise en ligne d'un brouillon :
@@ -141,6 +222,46 @@
 > vente : un brouillon n'est jamais en ligne. Le §3 « recréer PUIS supprimer » vaut toujours pour Republier (en ligne →
 > en ligne). Marché : Crosslist supprime puis recrée, Relister for Vinted recrée puis supprime (pages d'éditeurs).
 > `EXT_CAPACITES.versbrouillon = '5.253.0'`. Preuve : `audit-recreer.cjs` P (59 ; 7 rouges sur la 5.252).
+
+> **28 octobre (nuit, fin) — la PHOTO de la paire sur chaque carton (3D) :** « mettre les photos avec les numéros sur
+> les boîtes ». Face avant : la photo à gauche de l'étiquette (dessinée carrée malgré la face allongée), le N° à droite,
+> toujours en gros. La photo d'un N° (`photoParNum`, Stock) : seulement si TOUTES les fiches qui portent ce N° montrent
+> la même photo (`photoKey`) — deux paires sous un N° ⇒ aucune photo, rien demandé (§5). Octets par l'extension, sinon
+> `/api/compte?mode=photo` (`chargerPhotoBoite` : le CDN n'envoie pas de CORS, une image directe salirait la toile WebGL) ;
+> gardés pour la session (`IMAGES_BOITES`) ; illisible ⇒ le numéro seul. Sonde `photosBoites`. Banc `stock-finitions.cjs`
+> XVI (+3 par taille ; garde « une seule photo » retirée ⇒ 2 rouges). ⚠️ Non mesuré : sur sa vraie pièce, le nombre
+> d'appels à la route photo (un par carton, une fois par session ; 3 en vol au plus).
+
+> **28 octobre (nuit, fin) — le nombre max sur les ANCIENS MEUBLES :** « fais pareil pour les anciens meubles ».
+> Grille de boîtes, commode, étagère d'avant, casiers, armoire (physique « colonne ») : une boîte par case
+> (`capaciteCase`) ⇒ une plaque « max 1 » en façade, en haut de chaque case, taille dans la pièce. Sonde
+> `maxCases`. Banc `stock-finitions.cjs` XV (+3 par taille ; plaques retirées ⇒ 6 rouges).
+
+> **28 octobre (nuit, fin) — le nombre max sur les ÉTAGÈRES À BACS :** « fais pareil pour les étagères à bacs ».
+> Une plaque « max 1 » en façade, en haut de chaque case (un bac par case), taille dans la pièce ; pas sur une case
+> sans plateau dessous (son bac tomberait). Sonde `maxCases`. Banc `stock-finitions.cjs` XII (+2 par taille ; plaques
+> retirées ⇒ 4 rouges).
+
+> **28 octobre (nuit, fin) — le nombre max sur les PORTANTS :** « fais pareil pour les portants ». Un cintre porte UN
+> vêtement : la plaque « max N » est par BARRE (N = ses cintres où la barre existe), au-dessus de la barre, en façade,
+> taille dans la pièce ; barre raccourcie ⇒ N baisse ; barre absente partout ⇒ pas de plaque. Sonde `maxCases`
+> (`barre_r`). Banc `stock-finitions.cjs` XI (+2 par taille ; plaques retirées ⇒ 5 rouges).
+
+> **28 octobre (nuit, fin) — le nombre max sur les TABLES aussi :** « fais pareil pour les tables ». Dessus : la plaque
+> flotte au-dessus de la plus haute pile possible (comme une pile au sol) ; sous la table : en façade, en haut de chaque
+> niveau. Même règle que les étagères (`cap`, pas de plaque sans plateau dessous). Banc `stock-finitions.cjs` X (+3 par
+> taille ; table exclue ⇒ 6 rouges).
+
+> **28 octobre (nuit, fin) — le nombre max dans chaque case des ÉTAGÈRES :** Julien : « fais pareil pour les étagères ».
+> Étagère métal et bois : une plaque « max N » en façade, en haut de chaque case (N = la capacité de la case, la règle du
+> rangement), à taille DANS la pièce (une plaque par case : à taille fixe à l'écran elles couvriraient le meuble vu de
+> loin — lisibles en s'approchant). Pas sur une case sans plateau dessous (elle ne tient rien), ni sur une table ou des
+> bacs (1). Sonde `maxCases`. Banc `stock-finitions.cjs` IX et XIII (+3 par taille ; plaques retirées ⇒ 4 rouges).
+
+> **28 octobre (nuit, fin) — le NOMBRE max au-dessus de chaque pile :** Julien : « affiche le nombre max au-dessus
+> de chaque pile ». `buildPile` pose, au-dessus du couvercle, une plaque « max N » (`plaqueMaxPile`, sprite à taille
+> FIXE à l'écran — `sizeAttenuation: false` —, encre sombre, décor seul, raycast vide). Sonde `hauteursMax` rend
+> `texte` et `texteY`. Banc `stock-finitions.cjs` XIV (+2 par taille ; plaque retirée ⇒ rouge).
 
 > **28 octobre (nuit, fin) — la HAUTEUR MAX de chaque pile en 3D :** Julien : « montre la hauteur max de chaque pile
 > en 3D ». `buildPile` (Room3D) dessine, par pile, un cadre fin gris ardoise jusqu'à `hauteurPile(rows, hauteurs, c)` (la

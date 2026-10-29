@@ -20,7 +20,7 @@ const LISTINGS = { payload: { items: [
   { id: 7002, title: 'Autry blanc taille 36', brand_title: 'Autry', size_title: '36', price: { amount: '24.0' }, nPhotos: 0 },
   { id: 7003, title: 'Nike Air Max 1', brand_title: 'Nike', size_title: '42', price: { amount: '60.0' }, nPhotos: 3 },
 ] }, capturedAt: auj };
-const DETAILS = { '7001': { photos: ['https://img.test/a.jpg', 'https://img.test/b.jpg'], description: 'Très bon état, portées deux fois.' } };
+const DETAILS = { '7001': { photos: ['https://images1.vinted.net/t/a/f800/a.jpg', 'https://images1.vinted.net/t/a/f800/b.jpg'], description: 'Très bon état, portées deux fois.' } };
 const rows = [
   { id: 'main', data: MAIN },
   { id: 'harvest_111_listings', data: LISTINGS },
@@ -121,6 +121,14 @@ const PONT = ({ mode, version, suite = 'fait' }) => {
       dit(!v.large, 'aucun débordement horizontal');
       if (cas.version === SEUIL_PUBLIER) {
         dit(!v.raison, 'extension à jour : aucune raison de blocage', v.raison);
+        // 28 oct. : la photo de l'ÉTIQUETTE, choisie par lui, rangée par la clé de la photo.
+        const e0 = await pg.evaluate(() => (document.querySelector('[data-vc-paire="7001"] [data-vc-etiq]') || {}).getAttribute ? document.querySelector('[data-vc-paire="7001"] [data-vc-etiq]').getAttribute('data-vc-etiq') : null);
+        dit(e0 === 'pas-choisie', 'l\'étiquette n\'est jamais devinée : « pas choisie » au départ', e0);
+        await pg.click('[data-vc-etiq-ouvrir="7001"]');
+        await pg.click('[data-vc-etiq-choix="7001"] [data-vc-etiq-photo="2"]');
+        await pg.waitForTimeout(900);
+        const e1 = await pg.evaluate(() => ({ et: document.querySelector('[data-vc-paire="7001"] [data-vc-etiq]').getAttribute('data-vc-etiq'), ls: localStorage.getItem('vrm_vc_etiquettes') }));
+        dit(e1.et === 'choisie' && /"7001":"\/t\/a\/b\.jpg"/.test(e1.ls || ''), 'toucher la photo 2 la note comme étiquette (clé de la photo, synchronisée)', JSON.stringify(e1));
         await pg.click('[data-vc-preparer="7001"]');
         await pg.waitForFunction(() => window.__cmds && window.__cmds.length > 0, null, { timeout: 8000 }).catch(() => {});
         await pg.waitForTimeout(500);

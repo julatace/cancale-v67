@@ -34,7 +34,7 @@ import BordereauxAuto from "./BordereauxAuto.jsx";
 import {resumerStockJournee} from './stockJournee.js';
 import { toutSurLeNumero, lireNumeroCherche } from "./rechercheNumero.js";
 import { repriseNumerosRecreation, tableRecrees } from "./repriseNumero.js";
-import { polyDe, estRectangle, normaliserPoly, FORMES, rectDans, empreinte, chevauche, placerSansTraverser, modeCase, capaciteCase, empilerDansCase, retirerDeCase, retirerDePile, ajouterAPile, cartonsDePile, hauteurPile, changerHauteurPile, prochainePlaceMeuble, estPoseSur, caler, proposerPiece, planchesCases, planchesRangees, plateauxMeuble, plateauxReglables, tasserPlateaux } from './stockRegles.js';
+import { polyDe, estRectangle, normaliserPoly, FORMES, rectDans, empreinte, chevauche, placerSansTraverser, modeCase, capaciteCase, articlesAutresPlateformes, unParArticle, empilerDansCase, retirerDeCase, retirerDePile, ajouterAPile, cartonsDePile, hauteurPile, changerHauteurPile, prochainePlaceMeuble, estPoseSur, caler, proposerPiece, planchesCases, planchesRangees, plateauxMeuble, plateauxReglables, tasserPlateaux } from './stockRegles.js';
 import {formaterMontantEbay} from './montantsEbay.js';
 import {cibleEbay} from "./ebayParcours.js";
 import {centimes,coutsVente,beneficePaire,champsCharges} from "./beneficePaire.js";
@@ -114,7 +114,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.265.0';
+const EXT_ATTENDUE = '5.270.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -378,15 +378,26 @@ function categorieLbcDe(titre, description, taille, chemin, marque) {
 }
 function descriptionLbcDe(o) {
   const ref = String(o.ref || '');
+  // Le texte de Vinted, sans la lettre ajoutée par Republier (une lettre seule
+  // sur sa dernière ligne) ni une ancienne « Réf. VRM-n » : elles reviennent
+  // sinon en double (28 oct., « ça met deux descriptions »).
+  let texte = String(o.texte || o.base || '').trim();
+  texte = texte.replace(/\n\s*\n\s*[a-z]\s*$/i, '').replace(/^[^\S\n]*(?:📦\s*)?R[ée]f\.?\s*VRM-[A-Z0-9]+[^\S\n]*$/gim, '').replace(/\n{3,}/g, '\n\n').trim();
+  const sans = (s) => String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, ' ');
+  const t = sans(texte);
+  const dit = (v) => { const x = sans(v).trim(); return !!x && t.includes(x); };
+  // Une caractéristique que le texte dit déjà n'est pas répétée.
   const specs = [];
-  if (o.marque) specs.push('Marque : ' + o.marque);
-  if (o.taille) specs.push('Taille : ' + o.taille);
-  if (o.etat) specs.push('État : ' + o.etat);
-  if (o.couleur) specs.push('Couleur : ' + o.couleur);
-  const parts = ['📦 Réf. ' + ref, '', String(o.texte || o.base || '').trim()];
+  if (o.marque && !dit(o.marque)) specs.push('Marque : ' + o.marque);
+  if (o.taille && !new RegExp('(taille|pointure|\\bt)\\s*:?\\s*' + sans(o.taille).replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b').test(t)) specs.push('Taille : ' + o.taille);
+  if (o.etat && !dit(o.etat)) specs.push('État : ' + o.etat);
+  if (o.couleur && !dit(o.couleur)) specs.push('Couleur : ' + o.couleur);
+  const parts = ['📦 Réf. ' + ref, '', texte];
   if (specs.length) { parts.push(''); parts.push(specs.join('\n')); }
-  parts.push('');
-  parts.push('Envoi rapide et soigné (remise en main propre possible). N\'hésitez pas pour toute question.');
+  if (!/envoi|exp[ée]di|envoye/.test(t)) {
+    parts.push('');
+    parts.push('Envoi rapide et soigné (remise en main propre possible). N\'hésitez pas pour toute question.');
+  }
   parts.push('Réf. ' + ref);
   return parts.join('\n');
 }
@@ -1695,6 +1706,7 @@ const ENTREPRISE_VIDE = {
 // l'interrupteur local : aucune annonce en ligne n'a de plancher — mesuré —
 // donc elle n'accepte rien.)
 const SYNC_KEYS = [
+  'vrm_vc_etiquettes',
   'vinted_catalog','vinted_sales','vinted_garage_grid','vinted_blocked',
   'vinted_extracols','vinted_colors','vinted_invoices',
   'vinted_invoice_settings','vinted_dark','vinted_stock_vinted',
@@ -1838,6 +1850,14 @@ const askText = (opts) => new Promise((resolve)=>{
   const o = typeof opts === 'string' ? { desc: opts } : (opts || {});
   if (!_askListener) { resolve(window.prompt(o.desc || o.title || '', o.value || '')); return; }
   _askListener({ ...o, kind: 'text', resolve });
+});
+
+// (28 oct.) Un choix parmi plusieurs (la couleur d'un brouillon) : une feuille,
+// un bouton par option. Rend la valeur choisie, ou null si on annule.
+const askChoix = (opts) => new Promise((resolve)=>{
+  const o = opts || {};
+  if (!_askListener) { resolve(null); return; }
+  _askListener({ ...o, kind: 'choix', resolve });
 });
 
 // Découpe le message en un titre et un corps. Les anciens messages étaient
@@ -2099,6 +2119,22 @@ function ConfirmHost() {
   const close = (val) => { try { q.resolve(val); } catch (_) {} setQ(null); };
   // Dans document.body, posée en dernier, au-dessus de toute feuille (Z_CONFIRMATION).
   if (q.kind === 'text') return createPortal(<AskTextSheet q={q} close={close}/>, document.body);
+  if (q.kind === 'choix') {
+    const { titre: tc, corps: cc } = sheetTexte(q, 'Choisis');
+    return createPortal(
+      <SheetShell onClose={() => close(null)} z={Z_CONFIRMATION}>
+        <div style={{fontSize:17,fontWeight:700,color:C.text,letterSpacing:'-0.02em',lineHeight:1.35}}>{tc}</div>
+        {cc.length > 0 && <div style={{fontSize:12.5,color:C.muted,marginTop:6,lineHeight:1.55,whiteSpace:'pre-wrap'}}>{cc.join('\n')}</div>}
+        <div data-ask-choix style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(120px,1fr))',gap:8,marginTop:14}}>
+          {(q.options || []).map(([val, lib]) => (
+            <button type="button" key={val} data-choix={val} onClick={() => close(val)}
+              style={{minHeight:44,border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:10,padding:'10px',fontSize:13.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>{lib}</button>
+          ))}
+        </div>
+        <button type="button" onClick={() => close(null)}
+          style={{width:'100%',minHeight:44,marginTop:12,border:'none',background:'transparent',color:C.muted,fontSize:13.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>{q.cancel || 'Annuler'}</button>
+      </SheetShell>, document.body);
+  }
   // Le premier paragraphe du message sert de titre : les anciens messages
   // étaient écrits d'un bloc avec des retours à la ligne.
   const { titre, corps } = sheetTexte(q, 'Confirmer ?');
@@ -7557,6 +7593,15 @@ function photoViaServeur(url) {
   pomperPhotosServeur();return promesse;
 }
 
+// (28 oct.) Les octets d'une photo pour la DESSINER sur un carton en 3D : le CDN
+// Vinted n'envoie aucun en-tête CORS, une image chargée directement salirait la
+// toile WebGL. L'extension d'abord (rien ne sort de l'appareil), sinon la route.
+async function chargerPhotoBoite(url) {
+  if (!photosVinted.estPhotoVinted(url)) return null;
+  if (__vmrExtReady && __vmrEtat !== null) { const d = await vmrPhoto(url, 8000).catch(() => null); if (d) return d; }
+  return photoViaServeur(url);
+}
+
 const __photosDebut = Date.now();
 const PHOTOS_GRACE_EXT_MS = 7000;
 const secoursPhotos = () => {
@@ -8221,6 +8266,33 @@ const numsPresents = () => {
   const l = Array.isArray(p) ? p : (p && Array.isArray(p.nums) ? p.nums : null);
   return l && l.length ? new Set(l.map(cleNum)) : null;
 };
+// (28 oct.) Les paires présentes QUE sur eBay ou Leboncoin, publiées avec la même
+// liste (titre, photo, plateformes) — pour les montrer « à ranger » comme les
+// fiches Vinted. [] si jamais publiées.
+const autresPresents = () => {
+  const p = load('vinted_nums_physiques', null);
+  return p && Array.isArray(p.autres) ? p.autres.filter((a) => a && cleNum(a.numero)) : [];
+};
+// Les fiches du Stock : celles de Vinted, puis les paires vues seulement sur eBay
+// ou Leboncoin (un N° qu'aucune fiche Vinted ne porte). Les fiches Vinted
+// reçoivent les autres plateformes de leur N°.
+const fichesStockToutes = (fiches) => {
+  const vint = Object.values(fiches || {}).filter(Boolean);
+  const autres = autresPresents(); const parCle = new Map(autres.map((a) => [cleNum(a.numero), a]));
+  const cles = new Set();
+  const out = vint.map((f) => { const k = cleNum(f.numero); if (!k) return f; cles.add(k); const a = parCle.get(k); return { ...f, plateformes: a ? [...(a.vinted ? ['vinted'] : []), ...(a.plateformes || [])] : ['vinted'] }; });
+  for (const a of autres) { const k = cleNum(a.numero); if (!cles.has(k)) { cles.add(k); out.push({ numero: a.numero, title: a.title || '', photo: a.photo || null, plateformes: a.plateformes || [], horsVinted: true }); } }
+  return out;
+};
+// Ajoute aux fiches Vinted (déjà filtrées) les paires présentes que sur eBay ou
+// Leboncoin dont aucune fiche ne porte le N°. Identifiant synthétique « plat:N ».
+const ajouterAutresPresents = (fiches) => {
+  const cles = new Set(fiches.map((f) => cleNum(f.numero)));
+  const plus = [];
+  for (const a of autresPresents()) { const k = cleNum(a.numero); if (k && !cles.has(k)) { cles.add(k); plus.push({ id: 'plat:' + k, numero: a.numero, title: a.title || '', photo: a.photo || null, plateformes: a.plateformes || [], horsVinted: true }); } }
+  return plus.length ? fiches.concat(plus) : fiches;
+};
+const NOM_PLAT_STOCK = { vinted: 'Vinted', ebay: 'eBay', leboncoin: 'Leboncoin' };
 
 // ── LA REMISE À ZÉRO DU 9 OCTOBRE : LES ANCIENS NUMÉROS SONT EN « B » ─────────
 // Julien : « tous les anciens numéros, tu les fais commencer par B1, B2… ; on
@@ -11951,9 +12023,18 @@ async function avecCouleurBrouillon(envoyer, titre) {
   if (r && r.accepte === false && r.code === 'couleur-absente') {
     const cs = r.couleurs && typeof r.couleurs === 'object' ? Object.entries(r.couleurs).filter(([id, nom]) => /^\d+$/.test(id) && nom) : [];
     if (!cs.length) return r;
-    const [id, nom] = cs[0];
-    const ok = await askConfirm({ title: 'Ce brouillon n’a pas de couleur', desc: `Vinted refuse de mettre en ligne une annonce sans couleur.${titre ? `\n« ${titre} »` : ''}\nVRM peut mettre la couleur ${nom} et la publier tout de suite. Si c'est une autre couleur, choisis-la sur Vinted (« Modifier »).`, ok: `${nom} — publier`, cancel: 'Autre couleur' });
-    if (!ok) return { ...r, raison: "pas mise en ligne — choisis sa couleur sur Vinted (« Modifier »), puis publie-le. Rien n'a été touché." };
+    let id = null;
+    if (cs.length === 1) {
+      const [i1, nom] = cs[0];
+      const ok = await askConfirm({ title: 'Ce brouillon n’a pas de couleur', desc: `Vinted refuse de mettre en ligne une annonce sans couleur.${titre ? `\n« ${titre} »` : ''}\nVRM peut mettre la couleur ${nom} et la publier tout de suite. Si c'est une autre couleur, choisis-la sur Vinted (« Modifier »).`, ok: `${nom} — publier`, cancel: 'Autre couleur' });
+      if (ok) id = i1;
+    } else {
+      // 5.266 : la liste des couleurs de Vinted (lue par l'extension, id et nom
+      // de Vinted). Il choisit ; rien n'est deviné.
+      const options = cs.sort((a, b) => Number(a[0]) - Number(b[0])).map(([i, nom]) => [i, String(nom)]);
+      id = await askChoix({ title: 'Quelle est la couleur de cette paire ?', desc: `Vinted refuse de mettre en ligne une annonce sans couleur.${titre ? `\n« ${titre} »` : ''}\nChoisis-la : VRM la met et publie le brouillon tout de suite.`, options, cancel: 'Pas maintenant' });
+    }
+    if (id == null) return { ...r, raison: "pas mise en ligne — choisis sa couleur sur Vinted (« Modifier »), puis publie-le. Rien n'a été touché." };
     r = await envoyer(Number(id));
   }
   return r;
@@ -12281,10 +12362,13 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
             </div>
           </>}
           {etape === 'envoi' && <>
-            {action === 'recreer' && <div data-republier-explique style={{ fontSize: 13.5, color: C.text, lineHeight: 1.5 }}><b>{aFaire.length} annonce{aFaire.length > 1 ? 's' : ''}</b> à supprimer et recréer sur Vinted, une par une. Pour chacune : ses photos sont renvoyées{regNeutre ? '' : ' avec tes réglages'}, {viaBrouillon && brouillonOk ? <>l'annonce est enregistrée dans VRM, retirée de Vinted, recréée en brouillon, puis mise en ligne. Si la mise en ligne échoue, le brouillon reste dans tes brouillons Vinted et rien n'est perdu.</> : <>la nouvelle annonce est créée, et <b>seulement si elle est bien en ligne</b> l'ancienne est supprimée.</>} Le N° VRM passe sur la nouvelle.</div>}
-            {action === 'modifier' && <div data-republier-explique style={{ fontSize: 13.5, color: C.text, lineHeight: 1.5 }}><b>{aFaire.length} annonce{aFaire.length > 1 ? 's' : ''}</b> à modifier sur Vinted, une par une, sur place : même annonce, même N°, favoris et vues gardés. Rien n'est supprimé ni créé.</div>}
-            {action === 'versBrouillon' && <div data-republier-explique style={{ fontSize: 13.5, color: C.text, lineHeight: 1.5 }}><b>{aFaire.length} annonce{aFaire.length > 1 ? 's' : ''}</b> à repasser en brouillon, une par une. Pour chacune : elle est <b>enregistrée dans VRM</b>, ses photos sont renvoyées{regNeutre ? '' : ' avec tes réglages'}, l'annonce en ligne est <b>retirée</b>, puis le <b>brouillon est créé</b> sur Vinted. Un brouillon n'est jamais en ligne : rien ne peut se vendre deux fois. Tu la remettras en ligne depuis « Actions → Brouillons → en ligne ».</div>}
-            {action === 'enLigne' && <div data-republier-explique style={{ fontSize: 13.5, color: C.text, lineHeight: 1.5 }}><b>{aFaire.length} brouillon{aFaire.length > 1 ? 's' : ''}</b> à mettre en ligne sur Vinted, un par un, tels que tu les as enregistrés.</div>}
+            {/* (28 oct.) Après un passage, les anciennes annonces sont supprimées de Vinted :
+                elles sortent de la liste et la phrase disait « 0 annonce à supprimer ». */}
+            {!aFaire.length && <div data-republier-vide style={{ fontSize: 13.5, color: C.text, lineHeight: 1.5 }}>{mode === 'idle' ? <>Plus aucune des annonces choisies n'est en ligne sur Vinted (déjà republiées ou retirées). Le compte rendu de chacune est ci-dessous ; reviens à « 1. Choisir » pour en prendre d'autres.</> : <>Le passage est en cours : son avancée est ci-dessous.</>}</div>}
+            {action === 'recreer' && !!aFaire.length && <div data-republier-explique style={{ fontSize: 13.5, color: C.text, lineHeight: 1.5 }}><b>{aFaire.length} annonce{aFaire.length > 1 ? 's' : ''}</b> à supprimer et recréer sur Vinted, une par une. Pour chacune : ses photos sont renvoyées{regNeutre ? '' : ' avec tes réglages'}, {viaBrouillon && brouillonOk ? <>l'annonce est enregistrée dans VRM, retirée de Vinted, recréée en brouillon, puis mise en ligne. Si la mise en ligne échoue, le brouillon reste dans tes brouillons Vinted et rien n'est perdu.</> : <>la nouvelle annonce est créée, et <b>seulement si elle est bien en ligne</b> l'ancienne est supprimée.</>} Le N° VRM passe sur la nouvelle.</div>}
+            {action === 'modifier'  && !!aFaire.length && <div data-republier-explique style={{ fontSize: 13.5, color: C.text, lineHeight: 1.5 }}><b>{aFaire.length} annonce{aFaire.length > 1 ? 's' : ''}</b> à modifier sur Vinted, une par une, sur place : même annonce, même N°, favoris et vues gardés. Rien n'est supprimé ni créé.</div>}
+            {action === 'versBrouillon'  && !!aFaire.length && <div data-republier-explique style={{ fontSize: 13.5, color: C.text, lineHeight: 1.5 }}><b>{aFaire.length} annonce{aFaire.length > 1 ? 's' : ''}</b> à repasser en brouillon, une par une. Pour chacune : elle est <b>enregistrée dans VRM</b>, ses photos sont renvoyées{regNeutre ? '' : ' avec tes réglages'}, l'annonce en ligne est <b>retirée</b>, puis le <b>brouillon est créé</b> sur Vinted. Un brouillon n'est jamais en ligne : rien ne peut se vendre deux fois. Tu la remettras en ligne depuis « Actions → Brouillons → en ligne ».</div>}
+            {action === 'enLigne'  && !!aFaire.length && <div data-republier-explique style={{ fontSize: 13.5, color: C.text, lineHeight: 1.5 }}><b>{aFaire.length} brouillon{aFaire.length > 1 ? 's' : ''}</b> à mettre en ligne sur Vinted, un par un, tels que tu les as enregistrés.</div>}
             {recree && (() => { const fav = aFaire.reduce((n, a) => n + (a.favoris || 0), 0); const nFav = aFaire.filter((a) => a.favoris > 0).length; const nRec = aFaire.filter(recente).length; return mode === 'idle' && <>
               {fav > 0 && <div data-republier-favoris={fav} style={{ fontSize: 12.5, color: C.warn }}>{fav} favori{fav > 1 ? 's' : ''} sur {nFav} de ces paires {fav > 1 ? 'seront perdus' : 'sera perdu'} : une annonce recréée repart de zéro (favoris, vues, ancienneté). Pour une paire qui a des favoris, baisser le prix de l'annonce actuelle les prévient — c'est souvent mieux que la recréer.</div>}
               {nRec > 0 && <div data-republier-recentes={nRec} style={{ fontSize: 12.5, color: C.warn }}>{nRec} de ces paires {nRec > 1 ? 'ont déjà été recréées' : 'a déjà été recréée'} il y a moins de 2 jours : Vinted peut la traiter comme un doublon. Mieux vaut la retirer de la sélection.</div>}
@@ -15049,7 +15133,7 @@ function FavorisConnectes(props){
     }
     const r=await vmrExecUn({uid:props.uid,method:'POST',endpoint,body},90000);return retour(r,r?'commande':'transport');
   };
-  return <FavorisVinted {...props} favorisDisponible={etat.disponible} favorisRaison={etat.raison} verifierExtension={verifier} executerFavori={t=>executer(t)} recupererPage={t=>executer(t,true)} ouvrirFavori={typeof canalExt()?.sendMessage==='function'||vmrExtPresent()?t=>executer(t,'ouvrir'):undefined}/>;
+  return <FavorisVinted {...props} FermeAuRetour={FermeAuRetour} favorisDisponible={etat.disponible} favorisRaison={etat.raison} verifierExtension={verifier} executerFavori={t=>executer(t)} recupererPage={t=>executer(t,true)} ouvrirFavori={typeof canalExt()?.sendMessage==='function'||vmrExtPresent()?t=>executer(t,'ouvrir'):undefined}/>;
 }
 const CMD_ACTIVE = ['file', 'generation', 'pdf', 'relais-attente', 'relais-pris'];
 // Une demande est EN COURS tant que l'extension la dit réellement dans sa file
@@ -23198,6 +23282,16 @@ function PhotoroomCle() {
 // publiée » note la paire (`vinted_vc_posted`) : elle sort de la liste.
 function PublierVestiaire({ comptes }) {
   const { paires, enLigne } = useEbayPaires(comptes);
+  // (28 oct.) La photo de l'ÉTIQUETTE, choisie par lui : Vestiaire la veut en
+  // 2ᵉ (case « Étiquette » du smart listing). `vrm_vc_etiquettes[id]` = la clé
+  // de la photo (`clePhotoLbc`, la même règle que l'extension, §11).
+  const [etiquettes, setEtiquettes] = React.useState(() => load('vrm_vc_etiquettes', {}) || {});
+  React.useEffect(() => onCloudReady(() => setEtiquettes((v) => (v && Object.keys(v).length) ? v : (load('vrm_vc_etiquettes', {}) || {}))), []);
+  const [choixEtiq, setChoixEtiq] = React.useState('');
+  const poserEtiquette = (id, cle) => {
+    setEtiquettes((prev) => { const u = { ...(load('vrm_vc_etiquettes', {}) || {}), ...(prev || {}) }; if (cle) u[String(id)] = cle; else delete u[String(id)]; save('vrm_vc_etiquettes', u); return u; });
+    setChoixEtiq('');
+  };
   const { jobs } = useExtVivante();
   const sansSouris = useSansSouris();
   const [publiees, setPubliees] = React.useState(undefined);   // undefined en cours · null pas su · Set
@@ -23301,6 +23395,30 @@ function PublierVestiaire({ comptes }) {
               <div style={{ fontSize: 13, color: C.text, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>N°{p.num} · {p.title || '—'}</div>
               <div style={{ fontSize: 11.5, color: C.muted }}>{p.prix != null ? fmt(p.prix) : 'prix —'}{p.photos && p.photos.length ? ` · ${p.photos.length} photo${p.photos.length > 1 ? 's' : ''}` : ''}{job && job.etape === 'fait' ? ' · publiée sur Vestiaire' : ''}</div>
               {boostParNum.has(cleNum(p.num)) ? <div data-vc-boost={String(boostParNum.get(cleNum(p.num)))} style={{ fontSize: 11.5, color: C.muted }}>Déjà sur Vestiaire{boostParNum.get(cleNum(p.num)) === true ? ' · boostée' : boostParNum.get(cleNum(p.num)) === false ? ' · pas boostée' : ''}</div> : null}
+              {(() => {
+                const ph = (p.photos || []).filter((u) => clePhotoLbc(u));
+                const k = etiquettes[String(p.id)] || '';
+                const i = k ? ph.findIndex((u) => clePhotoLbc(u) === k) : -1;
+                if (ph.length < 2) return null;
+                return (
+                  <div data-vc-etiq={k ? (i >= 0 ? 'choisie' : 'introuvable') : 'pas-choisie'} style={{ fontSize: 11.5, color: C.muted, display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                    {i >= 0 ? <><PhotoVinted src={ph[i]} alt="" style={{ width: 22, height: 28, objectFit: 'cover', borderRadius: 4 }}/>Étiquette : photo {i + 1}</> : k ? 'Étiquette : la photo choisie n\'est plus là' : 'Étiquette : pas choisie'}
+                    <button type="button" className="vrm-lien-action" data-vc-etiq-ouvrir={p.id} onClick={() => setChoixEtiq(choixEtiq === p.id ? '' : p.id)} style={{ background: 'none', border: 'none', color: C.accent, fontWeight: 600, fontSize: 11.5, cursor: 'pointer', fontFamily: 'inherit', padding: 0 }}>{i >= 0 ? 'changer' : 'choisir'}</button>
+                  </div>
+                );
+              })()}
+              {choixEtiq === p.id ? (
+                <div data-vc-etiq-choix={p.id} style={{ marginTop: 6 }}>
+                  <div style={{ fontSize: 11.5, color: C.muted, marginBottom: 4 }}>Touche la photo de l'étiquette : l'extension la mettra en 2ᵉ sur Vestiaire (case « Étiquette »).</div>
+                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                    {(p.photos || []).filter((u) => clePhotoLbc(u)).map((u, j) => {
+                      const c = clePhotoLbc(u); const on = etiquettes[String(p.id)] === c;
+                      return <button key={c} type="button" data-vc-etiq-photo={j + 1} aria-label={`Photo ${j + 1} : c'est l'étiquette`} aria-pressed={on ? 'true' : 'false'} onClick={() => poserEtiquette(p.id, c)} style={{ padding: 0, border: `2px solid ${on ? C.accent : C.border}`, borderRadius: 6, background: 'transparent', cursor: 'pointer', width: 48, height: 60, overflow: 'hidden' }}><PhotoVinted src={u} alt={`photo ${j + 1}`} loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}/></button>;
+                    })}
+                    {etiquettes[String(p.id)] ? <button type="button" data-vc-etiq-retirer={p.id} onClick={() => poserEtiquette(p.id, '')} style={btn(false)}>Aucune</button> : null}
+                  </div>
+                </div>
+              ) : null}
               {msg[p.id] ? <div data-vc-refus="" style={{ fontSize: 11, color: C.warn, marginTop: 2 }}>{msg[p.id]}</div> : null}
             </div>
             <div style={{ display: 'flex', gap: 6 }}>
@@ -23320,8 +23438,8 @@ function PublierVestiaire({ comptes }) {
       <div style={{ fontSize: 14, fontWeight: 700, color: C.text, marginBottom: 4 }}>Mettre une paire en vente sur Vestiaire</div>
       <div style={{ fontSize: 12, color: C.muted, lineHeight: 1.5, marginBottom: 10 }}>
         {auto
-          ? <span data-vc-auto="oui">L'extension ouvre Vestiaire (clique « Vendre un article » si besoin), remplit la description, le prix et ce qu'elle reconnaît, attache les photos — détourées si ta clé Photoroom est posée — <b style={{ color: C.text }}>et publie toute seule, sans booster</b> : elle décoche toute option payante et ne clique jamais un bouton qui porte un prix. Si Vestiaire exige un champ qu'elle ne devine pas (catégorie, modèle), elle attend que tu le choisisses, puis publie.</span>
-          : <span data-vc-auto="non">L'extension ouvre Vestiaire (clique « Vendre un article » si besoin), remplit la description, le prix et ce qu'elle reconnaît, et attache les photos{' '}— détourées si ta clé Photoroom est posée. <b style={{ color: C.text }}>C'est toi qui choisis la catégorie et le modèle, puis qui publies</b>{extSait('vcauto') === 'retard' ? <> — pour qu'elle publie toute seule, sans booster, mets l'extension à jour ({EXT_CAPACITES.vcauto}).</> : '.'}</span>}
+          ? <span data-vc-auto="oui">L'extension ouvre Vestiaire (clique « Vendre un article » si besoin), remplit la description, le prix et ce qu'elle reconnaît, attache les photos — détourées si ta clé Photoroom est posée, sinon elle te propose de les attacher sans détourage — <b style={{ color: C.text }}>et publie toute seule, sans booster</b> : elle décoche toute option payante et ne clique jamais un bouton qui porte un prix. Si Vestiaire exige un champ qu'elle ne devine pas (catégorie, modèle), elle attend que tu le choisisses, puis publie.</span>
+          : <span data-vc-auto="non">L'extension ouvre Vestiaire (clique « Vendre un article » si besoin), remplit la description, le prix et ce qu'elle reconnaît, et attache les photos{' '}— détourées si ta clé Photoroom est posée, sinon elle te propose de les attacher sans détourage. <b style={{ color: C.text }}>C'est toi qui choisis la catégorie et le modèle, puis qui publies</b>{extSait('vcauto') === 'retard' ? <> — pour qu'elle publie toute seule, sans booster, mets l'extension à jour ({EXT_CAPACITES.vcauto}).</> : '.'}</span>}
         {glob ? <div data-vc-raison={glob.code} style={{ color: C.warn, marginTop: 6 }}>{glob.texte}</div> : null}
         {resumeBoost ? <div data-vc-boost-resume={resumeBoost.code} style={{ marginTop: 6 }}>{resumeBoost.texte}</div> : null}
       </div>
@@ -27262,14 +27380,16 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
   const aRanger = useMemo(() => {
     const fiches = load('vinted_annonce_numeros', {}) || {};
     const presents = numsPresents();
-    const vues = new Set(), out = [];
-    Object.values(fiches).forEach(f => {
+    // (28 oct.) Les fiches Vinted + les paires vues seulement sur eBay/Leboncoin,
+    // puis UN élément par article : même N° (clé) ou même photo exacte = une
+    // paire (`unParArticle`). Une paire déjà rangée sous l'un de ses N° sort.
+    const rangeesCle = new Set([...dejaRangees].map(cleNum));
+    const candidates = fichesStockToutes(fiches).filter(f => {
       const n = f && f.numero != null ? String(f.numero).trim() : '';
-      if (!n || vues.has(n) || dejaRangees.has(n)) return;
-      if (presents && !presents.has(cleNum(n))) return;
-      vues.add(n);
-      out.push({ numero: n, title: f.title || '', photo: f.photo || null, taille: extractSize(f.title || ''), at: f.numberedAt || 0, sur: !!presents });
+      return n && (!presents || presents.has(cleNum(n)));
     });
+    const out = unParArticle(candidates, { cle: cleNum, clePhoto: photoKey, estRangee: (f) => rangeesCle.has(cleNum(f.numero)) })
+      .map(f => { const n = String(f.numero).trim(); return { numero: n, title: f.title || '', photo: f.photo || null, taille: extractSize(f.title || ''), at: f.numberedAt || 0, sur: !!presents, plateformes: f.plateformes || [], aussi: f.aussi || [] }; });
     // ⚠️ L'ORDRE CHANGE SELON CE QU'ON SAIT, et on le dit dans la feuille.
     // Avec la liste des paires présentes : par numéro, c'est un inventaire.
     // SANS elle (écran Annonces jamais ouvert sur cet appareil), la liste
@@ -27297,7 +27417,7 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
     const fiches = load('vinted_annonce_numeros', {}) || {};
     const presents = numsPresents();
     const par = {};
-    Object.values(fiches).forEach(f => {
+    fichesStockToutes(fiches).forEach(f => {
       const n = f && f.numero != null ? String(f.numero).trim() : ''; if (!n) return;
       (par[n] = par[n] || []).push(f);
     });
@@ -27311,6 +27431,23 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
     });
     return out;
   }, [items]);
+
+  // (28 oct., « les photos avec les numéros sur les boîtes ») : la photo d'un
+  // carton, par son NUMÉRO — seulement si toutes les fiches qui portent ce N°
+  // montrent la MÊME photo (§5 : deux paires sous un N°, on ne choisit pas).
+  const photoParNum = useMemo(() => {
+    const fiches = load('vinted_annonce_numeros', {}) || {};
+    const par = {};
+    Object.values(fiches).forEach(f => {
+      const n = f && f.numero != null ? String(f.numero).trim() : ''; if (!n) return;
+      const u = typeof (f && f.photo) === 'string' ? f.photo : (f && f.photo && f.photo.url) || '';
+      (par[n] = par[n] || []).push(u);
+    });
+    const out = {};
+    Object.entries(par).forEach(([n, us]) => { const cles = new Set(us.map(u => photoKey(u) || u)); if (cles.size === 1 && us[0] && /^https?:\/\//.test(us[0])) out[n] = us[0]; });
+    return out;
+  }, [items]);
+  const photoBoite = React.useCallback((n) => photoParNum[String(n == null ? '' : n).trim()] || null, [photoParNum]);
 
   const contenuMeuble = (it) => {
     const out = [];
@@ -27661,10 +27798,11 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
               {aRanger.slice(0, 60).map(p => {
                 const on = pairePrete === p.numero;
                 return (
-                  <button type="button" key={p.numero} data-paire-a-ranger={p.numero} aria-pressed={on} onPointerDown={(e) => debutGlisser(e, p)} onClick={(e) => e.preventDefault()}
+                  <button type="button" key={p.numero} data-paire-a-ranger={p.numero} data-paire-plateformes={(p.plateformes || []).join(' ')} data-paire-aussi={(p.aussi || []).join(' ') || undefined} title={p.aussi && p.aussi.length ? `Même photo que N°${p.aussi.join(', N°')} : c'est une seule paire — range le carton sous le numéro écrit dessus.` : undefined} aria-pressed={on} onPointerDown={(e) => debutGlisser(e, p)} onClick={(e) => e.preventDefault()}
                     style={{ flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 7, padding: '5px 10px 5px 5px', borderRadius: 999, border: `1px solid ${on ? C.text : C.border}`, background: on ? `${C.text}10` : C.bg, color: C.text, cursor: 'grab', fontFamily: 'inherit', touchAction: 'pan-x', userSelect: 'none' }}>
                     {p.photo ? <PhotoVinted src={p.photo} alt="" style={{ width: 28, height: 28, borderRadius: 999, objectFit: 'cover', background: C.card2 }}/> : <span style={{ width: 28, height: 28, borderRadius: 999, background: C.card2, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}><Icon name="box" size={14} style={{ color: C.muted }}/></span>}
-                    <span style={{ fontSize: 13, fontWeight: 650 }}>N°{p.numero}</span>
+                    <span style={{ fontSize: 13, fontWeight: 650 }}>N°{p.numero}{p.aussi && p.aussi.length ? <span style={{ fontWeight: 500, color: C.muted }}> · N°{p.aussi.join(' · N°')}</span> : null}</span>
+                    {p.plateformes && p.plateformes.length && !p.plateformes.includes('vinted') ? <span style={{ fontSize: 11.5, color: C.muted }}>{p.plateformes.map(x => NOM_PLAT_STOCK[x] || x).join(' · ')}</span> : null}
                   </button>
                 );
               })}
@@ -27699,7 +27837,7 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
       )}
 
       <React.Suspense fallback={<div style={{ fontSize: 12, color: C.muted, padding: 16 }}>Chargement du stock 3D…</div>}>
-        <Room3D key={`${activeRoom.id}-${room.w}-${room.h}-${room.wallH || 3.4}-${room.wallColor || 'def'}-${estRectangle(room) ? 'r' : poly.map(q => q.join(',')).join(';')}`} items={items} room={room} poly={poly} hi={hi} sel={sel} canMove={moveMode} onSelect={selectItem} onOpen={(id) => setSel(id)} onCellTap={fillCell} onPileTap={pileTap} onMove={moveItem} colorOf={colorOf} emojiOf={emojiOf} h3dOf={h3dOf} storedCount={storedCount} depot={depot} sortie={sortie} vueDessus={dispo} cibles={cibles3D} viseurRef={viseurRef} C={C} Icon={Icon} load={load} save={save} FURN_TYPES={FURN_TYPES} GARAGE_AMBIANCES={GARAGE_AMBIANCES} />
+        <Room3D key={`${activeRoom.id}-${room.w}-${room.h}-${room.wallH || 3.4}-${room.wallColor || 'def'}-${estRectangle(room) ? 'r' : poly.map(q => q.join(',')).join(';')}`} items={items} room={room} poly={poly} hi={hi} sel={sel} canMove={moveMode} onSelect={selectItem} onOpen={(id) => setSel(id)} onCellTap={fillCell} onPileTap={pileTap} onMove={moveItem} colorOf={colorOf} emojiOf={emojiOf} h3dOf={h3dOf} storedCount={storedCount} depot={depot} sortie={sortie} vueDessus={dispo} cibles={cibles3D} viseurRef={viseurRef} C={C} Icon={Icon} load={load} save={save} FURN_TYPES={FURN_TYPES} GARAGE_AMBIANCES={GARAGE_AMBIANCES} photoBoite={photoBoite} chargerPhoto={chargerPhotoBoite} />
       </React.Suspense>
       {chercheLoc && (
         <div data-a-chercher={chercheLoc.length} style={{ border: `1px solid ${C.border}`, borderRadius: 12, background: C.card, padding: '11px 13px', display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -28328,8 +28466,10 @@ function StockPhotos() {
   const estVendu = (f) => vendus.has(cleNum(f.numero));
   // Paires EN STOCK : une fiche numérotée, pas déclarée partie (même règle que
   // l'écran Annonces, `annonceDeclareePartie`).
-  const fiches = Object.keys(numeros).map((id) => ({ id, ...(numeros[id] || {}) }))
-    .filter((f) => String(f.numero == null ? '' : f.numero).trim() && !annonceDeclareePartie(f.id, numeros, pairsLost) && !horsCompte(f));
+  // (28 oct.) UN article une fois (même N° ou même photo exacte, `unParArticle`),
+  // et les paires vues seulement sur eBay ou Leboncoin (`ajouterAutresPresents`).
+  const fiches = unParArticle(ajouterAutresPresents(Object.keys(numeros).map((id) => ({ id, ...(numeros[id] || {}) }))
+    .filter((f) => String(f.numero == null ? '' : f.numero).trim() && !annonceDeclareePartie(f.id, numeros, pairsLost) && !horsCompte(f))), { cle: cleNum, clePhoto: photoKey });
   const filtre = q.trim().toLowerCase();
   const liste = fiches
     .filter((f) => !filtre || String(f.numero).toLowerCase().includes(filtre) || String(f.title || '').toLowerCase().includes(filtre))
@@ -28472,8 +28612,10 @@ function StockMeubles() {
   const vendus = new Set((venduSig && Array.isArray(venduSig.nums) ? venduSig.nums : []).map((x) => cleNum(x)).filter(Boolean));
   const estVendu = (f) => vendus.has(cleNum(f.numero));
   // Paires EN STOCK (même règle que StockPhotos et l'écran Annonces).
-  const fiches = Object.keys(numeros).map((id) => ({ id, ...(numeros[id] || {}) }))
-    .filter((f) => String(f.numero == null ? '' : f.numero).trim() && !annonceDeclareePartie(f.id, numeros, pairsLost) && !horsCompte(f));
+  // (28 oct.) Les paires vues seulement sur eBay ou Leboncoin s'ajoutent
+  // (`ajouterAutresPresents`) ; « À ranger » ne montre chaque article qu'une fois.
+  const fiches = ajouterAutresPresents(Object.keys(numeros).map((id) => ({ id, ...(numeros[id] || {}) }))
+    .filter((f) => String(f.numero == null ? '' : f.numero).trim() && !annonceDeclareePartie(f.id, numeros, pairsLost) && !horsCompte(f)));
   const ficheParCle = {}; fiches.forEach((f) => { const k = cleNum(f.numero); if (k && !ficheParCle[k]) ficheParCle[k] = f; });
   // Toute écriture des cases passe par la gravité des meubles qui l'ont.
   const tasserTout = (u, ms) => { let cur = u, b = {}; (ms || meubles).forEach((m) => { const r = tasserMeuble(cur, m, new Set(Object.keys(ficheParCle))); cur = r.slots; Object.assign(b, r.bouges); }); return { slots: cur, bouges: b }; };
@@ -28484,7 +28626,7 @@ function StockMeubles() {
   const cleDeFiche = (f) => cleNum(f.numero);
   const posee = (f) => !!slots[cleDeFiche(f)];
   const occupant = (mid, i) => { const k = Object.keys(slots).find((c) => slots[c] && slots[c].m === mid && slots[c].i === i && ficheParCle[c]); return k ? ficheParCle[k] : null; };
-  const aRanger = fiches.filter((f) => !posee(f)).sort((a, b) => (+cleNum(a.numero) || 0) - (+cleNum(b.numero) || 0));
+  const aRanger = unParArticle(fiches.slice().sort((a, b) => (+cleNum(a.numero) || 0) - (+cleNum(b.numero) || 0)), { cle: cleNum, clePhoto: photoKey, estRangee: posee });
   const filtre = q.trim().toLowerCase();
   // Plusieurs mots : tous doivent y être (« nike 42 noir »). Un N° seul se juge
   // par IDENTITÉ (« 12 » ne montre pas la N°128) ; un mot cherche aussi le titre.
@@ -28766,7 +28908,7 @@ function StockMeubles() {
         <div style={{ display: 'flex', gap: 9, overflowX: 'auto', paddingBottom: 3 }}>
           {aRanger.map((f) => { const sold = estVendu(f); const sel = place === cleDeFiche(f);
             return (
-              <button type="button" key={f.id} onClick={() => setPlace(sel ? null : cleDeFiche(f))} aria-pressed={sel} style={{ position: 'relative', flex: 'none', width: 70, height: 88, borderRadius: 10, overflow: 'hidden', cursor: 'pointer', padding: 0, background: C.card2, border: sel ? `2px solid ${C.accent}` : (sold ? `2px solid ${C.accent}` : `1px solid ${C.line}`), opacity: filtre && !correspond(f) ? 0.3 : 1 }}>
+              <button type="button" key={f.id} onClick={() => setPlace(sel ? null : cleDeFiche(f))} aria-pressed={sel} aria-label={`Ranger la paire N°${f.numero}${f.title ? ' · ' + f.title : ''}${sold ? ' (vendue)' : ''}`} style={{ position: 'relative', flex: 'none', width: 70, height: 88, borderRadius: 10, overflow: 'hidden', cursor: 'pointer', padding: 0, background: C.card2, border: sel ? `2px solid ${C.accent}` : (sold ? `2px solid ${C.accent}` : `1px solid ${C.line}`), opacity: filtre && !correspond(f) ? 0.3 : 1 }}>
                 <Vignette f={f} sold={sold} />
               </button>
             );
@@ -34455,13 +34597,40 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // (identité, §5), lu une fois (la ligne est petite). Illisible ⇒ Set vide :
   // aucune pastille eBay, jamais une fausse.
   const [ebayNums, setEbayNums] = useState(() => new Set());
+  // (28 oct.) Les annonces eBay EN LIGNE avec leur N° (SKU, identité) — pour le
+  // Stock : une paire qui n'est QUE sur eBay est chez lui aussi. `null` = pas su.
+  const [ebayStock, setEbayStock] = useState(null);
+  // Les annonces Leboncoin EN VENTE (la règle `annonceLbcEnVente`, §11) avec leur
+  // N° par IDENTITÉ (`numeroLbcIdentite` : lien posé à la main, référence VRM —
+  // jamais le « nXXX » d'un titre). `null` = pas su (rien n'est ajouté).
+  const [lbcStock, setLbcStock] = useState(null);
+  useEffect(() => { let stop = false; (async () => {
+    try {
+      const items = await lbcAnnoncesSession();
+      if (!items || stop) return;
+      const vr = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.lbc_ventes&select=ventes:data->ventes`, { headers: sbAuth() });
+      if (!vr.ok) return;
+      const vrows = await vr.json(); if (!Array.isArray(vrows) || stop) return;
+      const vendues = annoncesLbcVendues((vrows[0] && vrows[0].ventes) || {});
+      const liens = { ...(load('vrm_lbc_liens', {}) || {}) };
+      const liste = [];
+      for (const ad of Object.values(items || {})) {
+        if (!annonceLbcEnVente(ad, vendues)) continue;
+        if (!(ad.ref || ad.customRef || (liens[String(ad.id)] != null && String(liens[String(ad.id)]).trim()))) continue;   // pas une de ses annonces reliées
+        const n = numeroLbcIdentite({ itemId: ad.id }, items, liens);
+        liste.push({ numero: n || '', title: ad.subject || ad.title || '', photo: (Array.isArray(ad.images) && typeof ad.images[0] === 'string' && ad.images[0]) || null });
+      }
+      setLbcStock(liste);
+    } catch (_) {}
+  })(); return () => { stop = true; }; }, []);
   useEffect(() => { let stop = false; (async () => {
     try {
       const lu = await lireEbayTous('ebay_listings', 'items:data->items', 'items');
       if (!lu || stop) return;
-      const set = new Set();
-      for (const x of lu.items) { const c = numEbayLu(x && x.sku, x && x.itemId, null, x && x.depuis); if (c) set.add(cleNum(c)); }
+      const set = new Set(); const liste = [];
+      for (const x of lu.items) { const c = numEbayLu(x && x.sku, x && x.itemId, null, x && x.depuis); if (c) set.add(cleNum(c)); liste.push({ numero: c || '', title: (x && x.title) || '', photo: (x && x.photo) || null }); }
       setEbayNums(set);
+      setEbayStock(liste);
     } catch (_) {}
   })(); return () => { stop = true; }; }, []);
   useEffect(() => { (async () => {
@@ -36722,27 +36891,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // règle « la paire est physiquement là » — on la PUBLIE au lieu de la refaire ailleurs
   // (§11 : une seule règle par notion). Clé LOCALE (pas dans SYNC_KEYS) : c'est
   // une photo recalculable, elle n'a rien à faire dans le nuage.
-  useEffect(() => {
-    // Revue de la 5.167 : les annonces « à confirmer » sont peut-être encore sur
-    // l'étagère — leur numéro reste PHYSIQUE (une seule source des paires
-    // présentes, `porteursNum`/`numDoublons`, §11).
-    // 22 oct. : et les masquées par Vinted (`annoncesPresentes`).
-    const presentes = annoncesPresentes;
-    if (!presentes.length) return;   // rien de sûr à publier
-    if (!sales.items) return;
-    const vivants = new Set();
-    for (const it of presentes) { const n = String((numeros[it.id] || {}).numero || '').trim(); if (n) vivants.add(n); }
-    for (const o of (sales.items || [])) {
-      if (!needsBordereau(o.status)) continue;
-      const n = String((saleOv[String(o.transaction_id)] || {}).numero || '').trim(); if (n) vivants.add(n);
-    }
-    const liste = [...vivants].sort((a,b)=>(+a||0)-(+b||0));
-    try {
-      const avant = load('vinted_nums_physiques', null);
-      const memeChose = avant && Array.isArray(avant.nums) && avant.nums.length === liste.length && avant.nums.every((x,i)=>x===liste[i]);
-      if (!memeChose) save('vinted_nums_physiques', { nums: liste, at: Date.now() });
-    } catch (_) {}
-  }, [annoncesPresentes, sales.items, numeros, saleOv]);
+  // ⚠️ (28 oct.) La publication est plus bas, après `annoncesVendues` (TDZ, §4.6).
 
   // ⚠️⚠️ LE RÉCAP URSSAF DU TABLEAU DE BORD AFFICHAIT 0 € PARTOUT.
   // Il lit `vinted_sales` — l'archive des anciennes ventes, VIDÉE en juillet
@@ -37447,6 +37596,38 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     return ids;
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sales.items, txnItem, numeros]);
+  useEffect(() => {
+    // Revue de la 5.167 : les annonces « à confirmer » sont peut-être encore sur
+    // l'étagère — leur numéro reste PHYSIQUE (une seule source des paires
+    // présentes, `porteursNum`/`numDoublons`, §11).
+    // 22 oct. : et les masquées par Vinted (`annoncesPresentes`).
+    // 28 oct. : et les paires EN VENTE sur eBay ou Leboncoin, même absentes de
+    // Vinted (`articlesAutresPlateformes`, par leur N° lu par identité), sauf un
+    // N° dont la vente Vinted est prouvée et le colis parti. Publiées aussi avec
+    // leur titre et leur photo (`autres`) : le Stock les propose « à ranger ».
+    const presentes = annoncesPresentes;
+    if (!presentes.length) return;   // rien de sûr à publier (Vinted pas encore lu : on ne publie pas eBay seul)
+    if (!sales.items) return;
+    const vivants = new Set();
+    for (const it of presentes) { const n = String((numeros[it.id] || {}).numero || '').trim(); if (n) vivants.add(n); }
+    for (const o of (sales.items || [])) {
+      if (!needsBordereau(o.status)) continue;
+      const n = String((saleOv[String(o.transaction_id)] || {}).numero || '').trim(); if (n) vivants.add(n);
+    }
+    const clesVivants = new Set([...vivants].map(cleNum));
+    const vendusPartis = new Set();
+    for (const id of annoncesVendues) { const k = cleNum((numeros[id] || {}).numero); if (k && !clesVivants.has(k)) vendusPartis.add(k); }
+    const { articles, sansNumero } = articlesAutresPlateformes({ ebay: ebayStock || [], lbc: lbcStock || [], cle: cleNum, vendusPartis });
+    const autres = [];
+    for (const a of articles) { const surVinted = clesVivants.has(a.cle); if (!surVinted) { vivants.add(a.numero); clesVivants.add(a.cle); } autres.push({ numero: a.numero, title: a.title, photo: a.photo, plateformes: a.plateformes, vinted: surVinted }); }
+    const liste = [...vivants].sort((a,b)=>(+a||0)-(+b||0));
+    try {
+      const avant = load('vinted_nums_physiques', null);
+      const memeChose = avant && Array.isArray(avant.nums) && avant.nums.length === liste.length && avant.nums.every((x,i)=>x===liste[i])
+        && JSON.stringify(avant.autres || []) === JSON.stringify(autres) && JSON.stringify(avant.sansNumero || null) === JSON.stringify(sansNumero);
+      if (!memeChose) save('vinted_nums_physiques', { nums: liste, autres, sansNumero, at: Date.now() });
+    } catch (_) {}
+  }, [annoncesPresentes, sales.items, numeros, saleOv, annoncesVendues, ebayStock, lbcStock]);
   const articlesVendusFavoris=useMemo(()=>{
     const ids=new Set([...soldManual,...venduesVinted].map(String));
     for(const vente of sales.items||[]){
@@ -50820,6 +51001,7 @@ const PUSH_CATS = [
   { id:'urssaf',   def:true,  titre:'🧾 Déclaration URSSAF', desc:'Le 1er du mois, si tu es micro-entrepreneur (ton statut se choisit dans Comptabilité).' },
   { id:'bilan',    def:true,  titre:'📊 Bilan de la semaine', desc:"Le lundi matin : vendu, reçu, colis à poster, paires qui dorment." },
   { id:'doublevente', def:true, titre:'⚠️ Double vente', desc:"Vendue sur Vinted alors que la même paire (son N°) est encore en vente sur eBay ou Leboncoin — même app fermée." },
+  { id:'favoris',  def:true,  titre:'❤️ Messages aux favoris', desc:"Quand la file d'envoi aux favoris est finie ou s'arrête, avec le bilan." },
   { id:'action',   def:true,  titre:'⏳ À trancher sur Vinted', desc:"Un acheteur demande d'annuler, ou un de tes achats est livré : tu as une date limite pour répondre ou signaler un problème." },
   { id:'suivi',   def:false, titre:'🚚 Suivi du colis',    desc:'« En transit », « livré ». Rien à faire.' },
   { id:'achat',    def:false, titre:'🛍 Achat confirmé',    desc:"Tu viens de l'acheter, tu le sais déjà." },

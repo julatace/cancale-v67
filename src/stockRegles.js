@@ -411,3 +411,66 @@ export const proposerPiece = ({ w, h, mw, md, cap, besoin, max = 40 }) => {
   const capacite = meubles.length * capM;
   return { meubles, porte, capacite, manque: Math.max(0, (Number(besoin) || 0) - capacite), voulu };
 };
+
+// ── (28 oct.) UN ARTICLE, UNE FOIS — ET LES ARTICLES DE TOUTES LES PLATEFORMES ──
+// Julien : « il faut qu'il n'y ait que les articles différents de toutes les
+// plateformes » — les deux sens, sa réponse : (1) une paire en vente à la fois
+// sur Vinted, Leboncoin et eBay n'apparaît qu'UNE fois dans « À ranger » ;
+// (2) une paire qui n'est QUE sur Leboncoin ou eBay y apparaît aussi.
+// L'identité d'une paire hors Vinted est son N° LU PAR IDENTITÉ (§5) : le SKU
+// « VRM-{n°} » d'eBay, le lien posé à la main ou la référence VRM de Leboncoin —
+// calculés par l'app (`numEbayLu`, `numeroLbcIdentite`), jamais un titre. Une
+// annonce sans N° ne désigne aucune paire : elle n'est pas proposée (on range
+// un carton par son numéro), elle est seulement comptée (`sansNumero`).
+// `vendusPartis` (clés) : N° dont la vente est prouvée et le colis parti — une
+// annonce eBay/Leboncoin restée en ligne n'en refait pas une paire présente.
+// Rend { articles: [{ numero, cle, title, photo, plateformes }], sansNumero }.
+export const articlesAutresPlateformes = ({ ebay, lbc, cle, vendusPartis }) => {
+  const par = new Map(); const sans = { ebay: 0, leboncoin: 0 };
+  const ajoute = (liste, plat) => {
+    for (const a of arr(liste)) {
+      const n = a && a.numero != null ? String(a.numero).trim() : '';
+      const k = n ? cle(n) : '';
+      if (!k) { sans[plat] += 1; continue; }
+      if (vendusPartis && vendusPartis.has(k)) continue;
+      const x = par.get(k) || { numero: n, cle: k, title: '', photo: null, plateformes: [] };
+      if (!x.title && a.title) x.title = String(a.title);
+      if (!x.photo && a.photo) x.photo = String(a.photo);
+      if (!x.plateformes.includes(plat)) x.plateformes.push(plat);
+      par.set(k, x);
+    }
+  };
+  ajoute(ebay, 'ebay'); ajoute(lbc, 'leboncoin');
+  return { articles: [...par.values()], sansNumero: sans };
+};
+
+// Une liste de fiches → un élément par ARTICLE. Deux fiches au même N° (clé)
+// sont le même carton ; deux fiches à la même PHOTO EXACTE (`clePhoto`, le
+// fichier — §5, « une paire, une proposition » du 17 oct.) sont la même paire
+// sous deux numéros : elle n'apparaît qu'une fois, avec les autres N° dans
+// `aussi`, et si l'un d'eux est déjà rangé (`estRangee`), aucun n'est proposé.
+// L'ordre d'entrée est gardé ; le premier de chaque groupe représente l'article.
+export const unParArticle = (liste, { cle, clePhoto, estRangee } = {}) => {
+  const l = arr(liste).filter((f) => f && cle(f.numero));
+  const parent = l.map((_, i) => i);
+  const racine = (i) => { while (parent[i] !== i) { parent[i] = parent[parent[i]]; i = parent[i]; } return i; };
+  const lie = (i, j) => { parent[racine(i)] = racine(j); };
+  const parCle = new Map(), parPhoto = new Map();
+  l.forEach((f, i) => {
+    const k = cle(f.numero);
+    if (parCle.has(k)) lie(i, parCle.get(k)); else parCle.set(k, i);
+    const p = clePhoto ? clePhoto(f.photo) : '';
+    if (p) { if (parPhoto.has(p)) lie(i, parPhoto.get(p)); else parPhoto.set(p, i); }
+  });
+  const groupes = new Map();
+  l.forEach((f, i) => { const r = racine(i); if (!groupes.has(r)) groupes.set(r, []); groupes.get(r).push(f); });
+  const out = [];
+  for (const g of groupes.values()) {
+    if (estRangee && g.some((f) => estRangee(f))) continue;
+    const t = g[0];
+    const plats = [...new Set(g.flatMap((f) => arr(f.plateformes)))];
+    const aussi = [...new Set(g.map((f) => String(f.numero).trim()).filter((n) => cle(n) !== cle(t.numero)))];
+    out.push({ ...t, plateformes: plats, aussi });
+  }
+  return out;
+};

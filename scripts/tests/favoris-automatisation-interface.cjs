@@ -34,7 +34,7 @@ const {build}=require('esbuild'),{chromium}=require('playwright');const racine=p
   check(await p.evaluate(()=>window.envois.length===1),'un seul dispatch');
   check(await p.evaluate(()=>JSON.stringify(window.appels.find(x=>x.c.action==='lancer').c.selection)==='["n1","n2"]'),'seule la sélection est lancée');
   check(await p.evaluate(()=>window.appels.filter(x=>x.c.action==='terminer').every(x=>x.c.resultat==='envoye')),'reçu affiché seulement après finition serveur');
-  check(await p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'aucun débordement horizontal');check(await p.locator('summary').evaluate(e=>e.getBoundingClientRect().height>=44),'résumé tactile de 44px');
+  check(await p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'aucun débordement horizontal');check(await p.locator('summary').count()===0,'plus de repli : le moteur vit dans l’étape « Envoi » de la fenêtre');
   if(process.env.SHOTS){fs.mkdirSync(process.env.SHOTS,{recursive:true});await p.screenshot({path:path.join(process.env.SHOTS,'automatisation-'+largeur+'.png'),fullPage:true});}await p.close();
   for(const changement of ['selection','message','ecran']){
    p=await page();await p.evaluate(()=>{window.savePause=true;window.afficher(true,true,'owner-test',true);});
