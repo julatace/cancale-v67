@@ -145,6 +145,7 @@ const ligneSuivi = (pg, label) => pg.evaluate((lb) => { const c = document.query
         dit(!!l && l.etat === 'declaree' && l.decl === '300' && l.paye === '', `A ${T} : septembre « déclarée », 300 € déclarés, cotisations pas notées`, JSON.stringify(l && { etat: l.etat, decl: l.decl, paye: l.paye }));
         dit(!!l && !/payé 300|payées 300/.test(l.texte) && /cotisations ≈/.test(l.texte), `A ${T} : le CA tapé n'est jamais affiché comme un paiement`, l && l.texte.replace(/\n/g, ' | ').slice(0, 160));
         if (process.env.SHOTS) { const el = await pg.$('[data-suivi-urssaf]'); if (el) await el.screenshot({ path: `${process.env.SHOTS}/suivi-avant-${vp.width}.png` }); }
+        if (process.env.SHOTS) { await pg.setViewportSize({ width: vp.width, height: 7000 }); await pg.waitForTimeout(600); await pg.screenshot({ path: `${process.env.SHOTS}/compta-${vp.width}.png` }); await pg.setViewportSize(vp); await pg.waitForTimeout(300); }
         // (29 oct.) Ta micro-entreprise : profil, calendrier, seuils.
         const mp = await attrs(pg, '[data-micro-profil]', 'data-micro-');
         dit(!!mp && mp.profil === 'passu' && await pg.$('[data-micro-vl-question]') != null, `M ${T} : versement libératoire pas encore répondu ⇒ la question est posée`, JSON.stringify(mp));
@@ -153,10 +154,14 @@ const ligneSuivi = (pg, label) => pg.evaluate((lb) => { const c = document.query
         const ms = await attrs(pg, '[data-micro-seuils]', 'data-micro-');
         dit(!!ms && ms.seuils === 'lu' && ms.tva === 'ok' && ms.plafond === 'ok' && Number(ms.ca) > 0, `M ${T} : jauge des seuils lue (TVA et plafond)`, JSON.stringify(ms));
         if (process.env.SHOTS) { const el = await pg.$('[data-micro-entreprise]'); if (el) await el.screenshot({ path: `${process.env.SHOTS}/micro-${vp.width}.png` }); }
+        const mi0 = await attrs(pg, '[data-micro-impots]', 'data-micro-impots-');
+        dit(!!mi0 && mi0.cases === '5KO,5TA' && Number(mi0.ca) > 0, `I ${T} : déclaration de revenus — versement libératoire pas répondu ⇒ les deux cases`, JSON.stringify(mi0));
         await touche(pg, '[data-micro-vl-choix="non"]', vp);
         await pg.waitForTimeout(1600);
         dit(opts.main && opts.main.vrm_micro_options && opts.main.vrm_micro_options.liberatoire === 'non', `M ${T} : « Non » est rangé au nuage`, JSON.stringify(opts.main && opts.main.vrm_micro_options));
         dit((await attrs(pg, '[data-micro-profil]', 'data-micro-') || {}).profil === 'non' && await pg.$('[data-micro-vl-question]') == null, `M ${T} : la question disparaît une fois répondue`);
+        dit(((await attrs(pg, '[data-micro-impots]', 'data-micro-impots-')) || {}).cases === '5KO', `I ${T} : « Non » ⇒ case 5KO seule`);
+        if (process.env.SHOTS) { const el = await pg.$('[data-micro-impots]'); if (el) await el.screenshot({ path: `${process.env.SHOTS}/impots-${vp.width}.png` }); }
         await touche(pg, '[data-micro-freq-choix="trimestriel"]', vp);
         await pg.waitForTimeout(1600);
         dit(opts.main && opts.main.vinted_urssaf_freq === 'trimestriel' && (await attrs(pg, '[data-micro-calendrier]', 'data-micro-') || {}).calendrier === 'trimestriel' && (await attrs(pg, '[data-urssaf-rythme]', 'data-urssaf-') || {}).rythme === 'trimestriel', `M ${T} : changer le rythme ⇒ un seul réglage, suivi par le calendrier et la carte du mois`);
@@ -208,6 +213,35 @@ const ligneSuivi = (pg, label) => pg.evaluate((lb) => { const c = document.query
           dit(lu === '37.2', `D ${T} : le rapport le dit (« Cotisations payées »)`, lu);
         }
         dit(errs.length === 0, `D ${T} : aucune erreur de page`, errs.join(' | ').slice(0, 200));
+        await ctx.close();
+      });
+      // S (29 oct.) : rattrapage en série — « Noter mes N mois à la suite ».
+      await essaie(`S ${T}`, async () => {
+        const LIGNE_S = { ...LIGNE, mois: [...LIGNE.mois, { ym: '2026-08', ca: 120, n: 1, par: { Vinted: { n: 1, ca: 120 } } }, { ym: '2026-07', ca: 80, n: 1, par: { Vinted: { n: 1, ca: 80 } } }] };
+        const opts = { main: mainDe({ vinted_urssaf_mois: LIGNE_S }) };
+        const { ctx, pg, errs } = await rendre(b, vp, opts);
+        await aller(pg, 'compta', '[data-suivi-urssaf="lu"]', 2500);
+        const n = await pg.evaluate(() => { const e = document.querySelector('[data-suivi-serie]'); return e ? Number(e.getAttribute('data-suivi-serie')) : 0; });
+        dit(n >= 2, `S ${T} : plusieurs mois à noter ⇒ « Noter mes ${n} mois à la suite »`, String(n));
+        if (n >= 2) {
+          await touche(pg, '[data-suivi-serie]', vp);
+          await formulaire(pg);
+          const s1 = await pg.evaluate(() => { const e = document.querySelector('[data-decl-serie]'); return e ? e.getAttribute('data-decl-serie') : null; });
+          dit(s1 === `1/${n}`, `S ${T} : le plus ancien mois s'ouvre, « mois 1 sur ${n} »`, s1);
+          await touche(pg, '[data-decl-enregistrer]', vp);
+          await pg.waitForFunction((v) => { const e = document.querySelector('[data-decl-serie]'); return e && e.getAttribute('data-decl-serie') === v; }, `2/${n}`, { timeout: 25000 }).catch(() => {});
+          await pg.waitForTimeout(1500);   // l'écriture du registre part un peu après le geste
+          const s2 = await pg.evaluate(() => { const e = document.querySelector('[data-decl-serie]'); return e ? e.getAttribute('data-decl-serie') : null; });
+          const reg = await registre(pg) || {};
+          dit(s2 === `2/${n}` && Object.keys(reg).length === 1, `S ${T} : enregistré ⇒ le mois suivant s'ouvre tout seul (un seul mois noté)`, JSON.stringify({ s2, notes: Object.keys(reg) }));
+          await touche(pg, '[data-decl-passer]', vp);
+          await pg.waitForTimeout(1500);
+          const s3 = await pg.evaluate(() => { const e = document.querySelector('[data-decl-serie]'); return e ? e.getAttribute('data-decl-serie') : null; });
+          const reg2 = await registre(pg) || {};
+          dit((n === 2 ? s3 === null : s3 === `3/${n}`) && Object.keys(reg2).length === 1, `S ${T} : « Pas encore déclaré » passe au suivant sans rien noter`, JSON.stringify({ s3, notes: Object.keys(reg2) }));
+          if (n > 2) { await touche(pg, '[data-decl-serie-stop]', vp); await pg.waitForTimeout(600); dit(!(await pg.$('[data-decl-form]')), `S ${T} : « Arrêter » referme le formulaire`); }
+        }
+        dit(errs.length === 0, `S ${T} : aucune erreur de page`, errs.join(' | ').slice(0, 200));
         await ctx.close();
       });
     }

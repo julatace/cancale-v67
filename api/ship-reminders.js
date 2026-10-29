@@ -23,7 +23,7 @@
 import './_lib/sans-bruit.js';
 import { sendPushToAll, pushCategorieActive } from './_lib/push.js';
 import { semainePassee, semaineCourante, calculerBilan, bilanAEnvoyer, texteBilan, versementsDeLignes } from './_lib/bilan-semaine.js';
-import { notificationUrssaf, MAIN_URSSAF } from './_lib/rappel-urssaf.js';
+import { notificationUrssaf, rappelAvantEcheance, MAIN_URSSAF } from './_lib/rappel-urssaf.js';
 // « À expédier » : la règle du widget (elle-même jugée identique à celle de
 // l'app et de l'extension par audit-statuts.cjs). Importée, jamais recopiée.
 import { aExpedier } from './widget.js';
@@ -473,6 +473,20 @@ async function traiterVendeurApresRelecture() {
             await ecrireDedup('urssaf_reminder_dedup', { mois });
           }
           urssaf = n.envoyer ? 'envoyé · ' + n.raison : n.raison;
+        }
+      } else {
+        // (29 oct.) Le rappel avant l'échéance : une fois par échéance (`veille`
+        // dans le même mémo), écrit APRÈS l'envoi comme celui du 1er.
+        const n = rappelAvantEcheance({ today, main: await getRowProjete('main', MAIN_URSSAF) });
+        if (n.envoyer) {
+          const deja = await getRow('urssaf_reminder_dedup');
+          if (deja && deja.veille === n.cle) urssaf = 'déjà rappelé avant l\'échéance';
+          else if (deja === undefined) urssaf = 'mémo illisible — rien';
+          else if (await pushCategorieActive('urssaf')) {
+            await sendPushToAll({ title: n.titre, body: n.corps, tag: 'urssaf-veille-' + n.cle, url: n.url });
+            await ecrireDedup('urssaf_reminder_dedup', { ...(deja || {}), veille: n.cle });
+            urssaf = 'envoyé · ' + n.raison;
+          }
         }
       }
     } catch (_) { urssaf = 'échec'; }

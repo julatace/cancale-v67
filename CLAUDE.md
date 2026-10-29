@@ -1,5 +1,40 @@
 # VRM — dossier de passation
 
+> **29 octobre — Comptabilité plus pro (mise en page) :** l'URSSAF « à faire » d'abord (carte du mois + prochaine
+> échéance, puis le suivi), ensuite calendrier · seuils · profil · déclaration de revenus, en GRILLE sur ordinateur
+> (`vrm-micro-grille`, deux colonnes ≥ 2 × 440 px), une colonne au téléphone. Les titres « Ton bénéfice », « Ta déclaration
+> URSSAF », « Tes charges », les sections et le récap ont tous le même style (15 px, 600, encre, `data-titre-section`) —
+> plus de petites capitales grises à côté de titres en gras. Récap mensuel : plus d'emoji, « Exporter (CSV) » en bouton
+> secondaire (§7 : un seul aplat d'accent). « Par mois / Par trimestre » (tenait mal à 390 px), espaces insécables
+> (« URSSAF ? », « « Compléter » »), « VRM ne remplace pas un comptable » (au lieu de « Je ne suis pas comptable »).
+> Aucune règle de calcul touchée. Banc `suivi-urssaf.cjs` : `SHOTS=dossier` capture maintenant tout l'écran.
+
+> **29 octobre — cotisations dans Ma journée, déclaration de revenus, CFE, ventes Leboncoin datées à la main :**
+> (2) Ma journée, sous « Reçu en {mois} » : « ≈ X € de cotisations à mettre de côté » = `aPayerUrssaf` du CA DÉCLARÉ du mois
+> (`declarables`, mois de versement, une vente déclarée ailleurs exclue), « au moins » si un compte ou des ventes sans date
+> manquent, rien hors micro ou sur dates illisibles (`data-cotis-mois`). Sur téléphone (où les phrases de Ma journée sont cachées
+> depuis le 27 oct.) il reste visible en version courte (`.vrm-cotis-long` cachée). (5) Comptabilité → « Ta déclaration de
+> revenus » (`declarationRevenus`, src/microEntreprise.js) : avant juillet l'année N-1, sinon N « en cours » ; cases VÉRIFIÉES
+> sur le formulaire 2042-C-PRO 2026 — **5KO** (micro BIC achat-revente, sans versement libératoire, CA brut, abattement 71 % fait
+> par les impôts) · **5TA** (avec versement libératoire) ; VL pas répondu ⇒ les deux dites, jamais devinée ; « au moins » sur une
+> source pas lue ; et `rappelCfe` (1er nov.–15 déc., exonérée l'année de création). (6) Une vente Leboncoin finalisée SANS date se
+> date à la main : `DaterVentesLbc` sous le CA par période (`data-dater-lbc`), `vrm_lbc_dates` (SYNC_KEYS, `{txId:'AAAA-MM-JJ'}`),
+> entre 2015 et aujourd'hui ; `avecDatesLbc` l'applique aux QUATRE lecteurs (CA par période, facturation, Comptabilité —
+> déclarables, rapport, vendu —, coque) ; **une date lue par l'extension gagne toujours**. (7) Banc `declare-urssaf` remis à la
+> forme : sur téléphone le choix des dépenses vit dans Comptabilité (caché dans Ma journée, décision du 27 oct.) ; `vendu-recu`
+> suit le retrait du masquage des ventes. Preuves : `audit-micro-entreprise.cjs` (26 ; mutations cases-devinees, annee-courante,
+> case-vl rouges), banc `dater-lbc.cjs` (390/1512 ; mutations « dates ignorées » 3 rouges, « la saisie écrase l'extension » 7
+> rouges), `vendu-recu` 62 verts, `declare-urssaf` vert. ⚠️ Non mesuré : sa vraie base (données inventées).
+
+> **29 octobre — rattraper les mois d'un coup, et un rappel 3 jours avant l'échéance :** « Noter mes N mois à la suite »
+> (Suivi URSSAF, dès 2 mois « pas notée »/« à déclarer ») ouvre le rapport sur le plus ancien ; « Enregistrer » ouvre
+> le suivant (`SERIE_DECLARATION`, `allerMoisSuivantSerie` : même formulaire, mêmes gardes) ; « Pas encore déclaré — mois
+> suivant » passe sans rien noter ; « Arrêter » ; 30 min sans geste ⇒ série oubliée. Cron du matin :
+> `rappelAvantEcheance` (api/_lib/rappel-urssaf.js) — 3 jours ou moins avant la date limite, période pas notée, une fois
+> par échéance (`urssaf_reminder_dedup.veille`), même texte et montant que le 1er ; réglages/mémo illisibles ⇒ rien.
+> Preuves : `audit-rappel-echeance.cjs` (9 ; mutations seuil/declare/passu rouges), banc `suivi-urssaf.cjs` S (mutation
+> « pas d'enchaînement » ⇒ 4 KO).
+
 > **29 octobre — TA MICRO-ENTREPRISE : profil, calendrier, seuils (Comptabilité) :** Julien : « une jauge plafond + seuil de TVA,
 > vérifie les seuils officiels 2026 », « vois si la personne a choisi le versement libératoire », « mensuel : elle déclare août
 > mais paie en septembre », « plus pro ». **Vérifié sur service-public.gouv.fr le 29 oct.** : plafond vente de marchandises
