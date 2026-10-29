@@ -10726,6 +10726,30 @@ const demanderDeclaration = (ym, onNav) => {
   DEMANDE_DECLARATION.ym = ym; DEMANDE_DECLARATION.at = Date.now();
   if (onNav) onNav('cat_ventes');
 };
+// ── RATTRAPAGE EN SÉRIE (29 octobre) ── Julien a beaucoup de mois « Pas
+// notée » (rien n'était noté avant le 22 oct.). « Noter mes N mois à la
+// suite » (Suivi de Comptabilité) ouvre le rapport sur le plus ancien ; après
+// « Enregistrer » (ou « Passer »), le suivant s'ouvre tout seul — le MÊME
+// formulaire, les MÊMES gardes que « C'est déclaré » (§11). Une série vieillit
+// (30 min sans geste) : oubliée, elle ne rouvre rien à la prochaine visite.
+const SERIE_DECLARATION = { liste: [], total: 0, at: 0 };
+const SERIE_MAX_MS = 30 * 60 * 1000;
+const serieDeclActive = () => SERIE_DECLARATION.liste.length > 0 && Date.now() - SERIE_DECLARATION.at < SERIE_MAX_MS;
+const finirSerieDecl = () => { SERIE_DECLARATION.liste = []; SERIE_DECLARATION.total = 0; SERIE_DECLARATION.at = 0; };
+const demanderSerieDeclaration = (liste, onNav) => {
+  const l = [...new Set((liste || []).filter((ym) => /^\d{4}-\d{2}$/.test(String(ym || ''))))].sort();
+  if (!l.length) return;
+  SERIE_DECLARATION.liste = l; SERIE_DECLARATION.total = l.length; SERIE_DECLARATION.at = Date.now();
+  demanderDeclaration(l[0], onNav);
+};
+// Le mois suivant de la série, une fois `ym` noté ou passé (null : fini).
+const suivantSerieDecl = (ym) => {
+  if (!serieDeclActive()) { finirSerieDecl(); return null; }
+  SERIE_DECLARATION.liste = SERIE_DECLARATION.liste.filter((m) => m !== ym);
+  SERIE_DECLARATION.at = Date.now();
+  if (!SERIE_DECLARATION.liste.length) { finirSerieDecl(); return null; }
+  return SERIE_DECLARATION.liste[0];
+};
 // « Ajouter une dépense » depuis Ma journée : Comptabilité s'ouvre avec le
 // formulaire des dépenses déplié (le sien, pas une copie).
 const DEMANDE_DEPENSE = { on: false, at: 0 };
@@ -33019,6 +33043,13 @@ function SuiviUrssaf({ onNav }) {
             : <>{a.annee} : <b style={{ color: C.text }}>{eur(a.ca)}</b> déclarés sur {a.n} mois · {a.paye != null ? <>cotisations payées <b style={{ color: C.text }}>{eur(a.paye)}</b></> : <>cotisations ≈ <b style={{ color: C.text }}>{eur(a.estime)}</b> (estimées : note ce que tu as payé avec « Compléter »)</>}</>}
         </div>
         {suivi.enRetard > 0 ? <div data-suivi-retard-texte="" style={{ fontSize: 13, color: C.text, marginTop: 8, lineHeight: 1.5 }}>{suivi.enRetard === 1 ? '1 période passée n\'est' : `${suivi.enRetard} périodes passées ne sont`} pas notée{suivi.enRetard > 1 ? 's' : ''} « déclarée ». Si tu l'as déjà déclarée sur l'URSSAF, touche « C'est déclaré » pour la noter ; sinon, déclare-la vite (une déclaration en retard peut coûter une pénalité).</div> : null}
+        {(() => {
+          const aNoter = suivi.lignes.filter((l) => l.etat === 'en_retard' || l.etat === 'a_declarer').flatMap((l) => l.aNoter);
+          return aNoter.length >= 2 ? (
+            <button type="button" data-suivi-serie={aNoter.length} onClick={() => demanderSerieDeclaration(aNoter, onNav)} style={{ ...btn, marginTop: 8, alignSelf: 'flex-start' }}>
+              Noter mes {aNoter.length} mois à la suite
+            </button>) : null;
+        })()}
         {suivi.aRegulariser > 0 ? <div data-suivi-regul-texte="" style={{ fontSize: 13, color: C.text, marginTop: 8, lineHeight: 1.5 }}>À ajouter à ta prochaine déclaration : <b>{eur(suivi.aRegulariser)}</b> de ventes que VRM compte et qui ne sont dans aucune déclaration (≈ {eur(aPayerUrssaf(suivi.aRegulariser, tauxUrssaf()))} de cotisations).</div> : null}
         {suivi.lignes.length === 0 ? <div style={{ fontSize: 13, color: C.muted, marginTop: 10 }}>Rien à suivre sur les 12 derniers mois.</div> : (
           <div style={{ display: 'flex', flexDirection: 'column', marginTop: 10 }}>
@@ -41832,6 +41863,16 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const rec = { ids, n: ids.length, ca, montant: isFinite(m) && m >= 0 ? Math.round(m * 100) / 100 : null, paye: p == null ? null : p, regle: regle === 'vente' ? 'vente' : 'versement', at: Date.now() };
     setDeclUrssaf(prev => { const u = { ...(prev || {}), [reportMonth]: rec }; save('vrm_urssaf_declare', u); return u; });
     setDeclForm(null);
+    allerMoisSuivantSerie(reportMonth);
+  };
+  // Série de rattrapage : le mois suivant s'ouvre, formulaire déplié (mêmes
+  // gardes que « C'est déclaré » : `declVoulue`).
+  const allerMoisSuivantSerie = (ym) => {
+    const suite = suivantSerieDecl(ym);
+    if (!suite) return;
+    moisChoisiMain.current = true;
+    setReportMonth(suite); setReportAnnee(Number(suite.slice(0, 4)));
+    declVoulue.current = { ym: suite, arme: false };
   };
   const annulerDeclaration = () => {
     if (declUrssaf == null || !moisDeclare(declUrssaf, reportMonth)) return;
@@ -48567,6 +48608,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       passe && <div style={{color:C.muted}}>Tes déclarations passées ne sont pas encore chargées : rouvre le rapport dans un instant.</div>
                     ) : passe && (declForm ? (
                       <div data-decl-form style={{display:'flex',flexDirection:'column',gap:8}}>
+                        {serieDeclActive() && SERIE_DECLARATION.liste.includes(reportMonth) ? (
+                          <div data-decl-serie={`${SERIE_DECLARATION.total - SERIE_DECLARATION.liste.length + 1}/${SERIE_DECLARATION.total}`} style={{fontSize:12,color:C.muted}}>
+                            Rattrapage : mois {SERIE_DECLARATION.total - SERIE_DECLARATION.liste.length + 1} sur {SERIE_DECLARATION.total} — le suivant s'ouvre après « Enregistrer ».
+                          </div>) : null}
                         <div><b>Qu'as-tu déclaré pour {report.monthLabel} ?</b></div>
                         {moisAncienneRegle && ancienneRegle ? (
                           <div style={{display:'flex',flexDirection:'column',gap:4}}>
@@ -48592,7 +48637,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                         {(report.incomplet || (declForm.refus && !declarables)) && <RaisonDeclBloquee manque={report.incomplet || declForm.refus} refus={!!declForm.refus}/>}
                         <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
                           <button type="button" data-decl-enregistrer onClick={()=>declarerMois(declForm.regle, declForm.montant, declForm.paye)} style={{border:'none',borderRadius:8,background:C.accent,color:C.onAccent,cursor:'pointer',fontSize:13,fontWeight:600,padding:'8px 14px'}}>Enregistrer</button>
-                          <button type="button" onClick={()=>setDeclForm(null)} style={{border:`1px solid ${C.border}`,borderRadius:8,background:'transparent',color:C.text,cursor:'pointer',fontSize:13,padding:'8px 14px'}}>Annuler</button>
+                          {serieDeclActive() && SERIE_DECLARATION.liste.includes(reportMonth) ? (<>
+                            <button type="button" data-decl-passer onClick={()=>{ setDeclForm(null); allerMoisSuivantSerie(reportMonth); }} style={{border:`1px solid ${C.border}`,borderRadius:8,background:'transparent',color:C.text,cursor:'pointer',fontSize:13,padding:'8px 14px'}}>Pas encore déclaré — mois suivant</button>
+                            <button type="button" data-decl-serie-stop onClick={()=>{ finirSerieDecl(); setDeclForm(null); }} style={{border:`1px solid ${C.border}`,borderRadius:8,background:'transparent',color:C.text,cursor:'pointer',fontSize:13,padding:'8px 14px'}}>Arrêter</button>
+                          </>) : (
+                          <button type="button" onClick={()=>setDeclForm(null)} style={{border:`1px solid ${C.border}`,borderRadius:8,background:'transparent',color:C.text,cursor:'pointer',fontSize:13,padding:'8px 14px'}}>Annuler</button>)}
                         </div>
                       </div>
                     ) : (
