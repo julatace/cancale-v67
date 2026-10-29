@@ -93,11 +93,11 @@ function monter({ store = {}, vinted, lenteLabelMs = 0 } = {}) {
   console.log('── UNE RÉSERVE POUR LES GESTES SUR CLIC (répondre à un acheteur)');
   await essaie('réserve', async () => {
     const t = Date.now();
-    // 15 actions déjà faites dans l'heure, toutes hors de la fenêtre de 5 min.
-    const H = monter({ store: { vrmActions: { [UID]: Array.from({ length: 15 }, (_, i) => t - 20 * 60000 - i * 1000) } } });
+    // 45 actions déjà faites dans l'heure, toutes hors de la fenêtre de 5 min.
+    const H = monter({ store: { vrmActions: { [UID]: Array.from({ length: 45 }, (_, i) => t - 20 * 60000 - i * 1000) } } });
     const r = await H.cmd(TX(50));
     dit(r && r.accepte === false && r.code === 'plafond-bordereaux' && /\d+ min/.test(String(r.raison || '')),
-      'les bordereaux de l\'app s\'arrêtent à 15 actions sur 20 — refus dit, avec l\'heure', JSON.stringify(r));
+      'les bordereaux de l\'app s\'arrêtent à 45 actions sur 50 — refus dit, avec l\'heure', JSON.stringify(r));
     const rep = await H.F.envoyer({ from: 'vmr-bridge', action: 'exec', uid: UID, method: 'POST', endpoint: '/api/v2/conversations/123456/replies', body: { body: 'Bonjour' } });
     dit(rep && rep.ok === true, 'et une réponse à un acheteur PART encore (les 5 dernières actions lui sont gardées)', JSON.stringify(rep && { ok: rep.ok, code: rep.code, error: rep.error }));
   });

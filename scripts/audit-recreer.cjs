@@ -644,14 +644,14 @@ const zero = (j) => gestes(j).length === 0;   // 5.266 : lire la liste des coule
   //     La paire réserve ses 3 gestes d'un coup AVANT le premier ; la mise en ligne
   //     planifiée n'est jamais refusée par le plafond (l'ancienne est déjà supprimée).
   { const deja = (k) => (f) => { f.store.vrmActions = { '111': Array.from({ length: k }, () => Date.now() - 60000) }; };
-    const { f, r } = await run({ differer: true, avant: deja(12) });
+    const { f, r } = await run({ differer: true, avant: deja(42) });
     if (f.store.vrmRepubAttente && f.store.vrmRepubAttente['9101']) f.store.vrmRepubAttente['9101'].du = 0;
     try { await f.ctx.miseEnLigneTick(); } catch (_) {}
     const fin = f.j.evts.find((e) => e && e.quoi === 'repub' && e.id === '9101' && e.etape === 'fin');
     const n = ((f.store.vrmActions || {})['111'] || []).length;
-    dit(r.etape === 'attente' && fin && fin.fin && fin.fin.etape === 'fait' && seqV(f.j) === 'LPPBSLM', "12 actions déjà dans l'heure : la paire part ET sa mise en ligne planifiée aboutit (jamais laissée en brouillon par le plafond)", `etape=${r.etape} fin=${JSON.stringify(fin && fin.fin && { e: fin.fin.etape, r: fin.fin.raison })} seq=${seqV(f.j)}`);
-    dit(n === 15, "une republication compte 3 actions (brouillon, suppression, mise en ligne), pas 5", `actions=${n}`); }
-  { const { f, r } = await run({ differer: true, avant: (f) => { f.store.vrmActions = { '111': Array.from({ length: 13 }, () => Date.now() - 60000) }; } });
+    dit(r.etape === 'attente' && fin && fin.fin && fin.fin.etape === 'fait' && seqV(f.j) === 'LPPBSLM', "42 actions déjà dans l'heure : la paire part ET sa mise en ligne planifiée aboutit (jamais laissée en brouillon par le plafond)", `etape=${r.etape} fin=${JSON.stringify(fin && fin.fin && { e: fin.fin.etape, r: fin.fin.raison })} seq=${seqV(f.j)}`);
+    dit(n === 45, "une republication compte 3 actions (brouillon, suppression, mise en ligne), pas 5", `actions=${n}`); }
+  { const { f, r } = await run({ differer: true, avant: (f) => { f.store.vrmActions = { '111': Array.from({ length: 43 }, () => Date.now() - 60000) }; } });
     dit(r.accepte === false && r.code === 'plafond-bordereaux' && zero(f.j), "plus de place pour toute la paire : RIEN ne part (l'annonce reste en ligne), et c'est dit", `code=${r.code} seq=${seqV(f.j)} ${r.raison || ''}`); }
 
   // L — côté app : une annonce et SA recréation au même N° (la suppression de

@@ -205,5 +205,5 @@ essaie('eBay', () => {
   dit(!/function RepondreSetting|<RepondreSetting/.test(app), "l'app ne propose plus d'allumer une réponse automatique");
 }
 
-console.log(ko ? `\n❌ audit-offres-auto : ${ko} contrôle(s) rouge(s), ${ok} vert(s)` : `\n✅ audit-offres-auto : ${ok} contrôles — le moteur d'acceptation auto reste sous garde (compte connecté, plafond 20/h, pause, éteint par défaut)`);
+console.log(ko ? `\n❌ audit-offres-auto : ${ko} contrôle(s) rouge(s), ${ok} vert(s)` : `\n✅ audit-offres-auto : ${ok} contrôles — le moteur d'acceptation auto reste sous garde (compte connecté, plafond 50/h, pause, éteint par défaut)`);
 process.exit(ko ? 1 : 0);

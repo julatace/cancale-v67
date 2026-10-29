@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.282.0';
+const CODE_VERSION = '5.283.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -9269,7 +9269,7 @@ async function finRepubBrouillon(acc, job) {
 //
 // Si on n'arrive pas à savoir quel compte est connecté (cookie absent), on
 // LAISSE PASSER : bloquer sur une détection ratée casserait l'outil.
-const ACTIONS_MAX_HEURE = 20;
+const ACTIONS_MAX_HEURE = 50;   // (29 oct.) 50/h par compte, SA décision (« comme Vintex ») ; était 20
 
 async function compteConnecte(domain) {
   try { return await activeAccountId(domain || 'www.vinted.fr'); } catch (_) { return null; }
@@ -9319,6 +9319,8 @@ async function compterActionUn(uid, plafond, n = 1) {
 //    actions de l'heure restent à ce qui part sur SON clic un par un (répondre,
 //    trancher une offre). Le total ne bouge pas (20/h) — monter ce chiffre
 //    serait deviner le seuil de Vinted (§3).
+//    (29 oct.) Le total est passé à 50/h sur SA décision (« comme Vintex ») :
+//    l'app s'arrête donc à 45, la réserve reste 5.
 const RESERVE_GESTES = 5;
 
 // ⚠️ BUDGET DE *LECTURE*, SÉPARÉ DU BUDGET D'ACTIONS (Julien, 3 octobre :

@@ -23,17 +23,17 @@ const S = { origin: 'https://vrm.center', url: 'https://vrm.center/' };
 const rep = (c) => ({ uid: '111', method: 'POST', endpoint: `/api/v2/conversations/${c}/replies`, body: { reply: { body: 'Bonjour' } } });
 
 (async () => {
-  console.log('── 1. Trois réponses simultanées, 19 actions déjà dans l\'heure');
+  console.log('── 1. Trois réponses simultanées, 49 actions déjà dans l\'heure');
   await essaie('actions', async () => {
     const t = Date.now();
-    const store = { vrmActions: { '111': Array.from({ length: 19 }, (_, i) => t - 60000 - i * 1000) } };
+    const store = { vrmActions: { '111': Array.from({ length: 49 }, (_, i) => t - 60000 - i * 1000) } };
     const f = faireFond({ src: SRC, connecte: '111', store, vinted: () => ({ status: 200, body: { ok: true } }) });
     const r = await Promise.all([1, 2, 3].map((c) => f.ctx.executerPourApp(rep(c), S)));
     const parties = f.j.vinted.filter((v) => /\/replies$/.test(v.chemin)).length;
-    dit(parties === 1, 'une seule part chez Vinted (la 20ᵉ de l\'heure)', `parties=${parties}, ${JSON.stringify(r.map((x) => x.code || (x.ok ? 'ok' : 'ko')))}`);
+    dit(parties === 1, 'une seule part chez Vinted (la 50ᵉ de l\'heure)', `parties=${parties}, ${JSON.stringify(r.map((x) => x.code || (x.ok ? 'ok' : 'ko')))}`);
     dit(r.filter((x) => x.code === 'plafond').length === 2, 'les deux autres sont refusées « plafond »', JSON.stringify(r.map((x) => x.code || '')));
     const notes = ((f.store.vrmActions || {})['111'] || []).length;
-    dit(notes === 20, 'et le compteur porte bien les 20 actions de l\'heure (aucune perdue)', `notées=${notes}`);
+    dit(notes === 50, 'et le compteur porte bien les 50 actions de l\'heure (aucune perdue)', `notées=${notes}`);
   });
 
   console.log('── 2. L\'autre sens : sous le plafond, les gestes simultanés partent tous');

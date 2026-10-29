@@ -122,7 +122,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.282.0';
+const EXT_ATTENDUE = '5.283.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -35971,7 +35971,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const basculerOffresAuto = async () => {
     if (offresAuto) { setOffresAuto(false); save('vinted_offres_auto', false); return; }
     const ok = await askConfirm({ title: 'Accepter les offres tout seul sur Vinted ?',
-      desc: "Dès qu'une offre atteint le « mini » d'une annonce, VRM l'accepte à ta place, pas tout de suite : entre 3 et 20 minutes après l'avoir vue, tiré au hasard (une à la fois, uniquement le compte ouvert dans ce Chrome, plafond 20/h). L'extension doit rester ouverte dans Chrome pendant ce délai.\n\n⚠️ Important : sur Vinted, un programme qui accepte peut être vu comme un robot — c'est un risque pour le compte, que tu prends en l'allumant. Sur eBay c'est sans risque (réglage natif), pas sur Vinted.\n\nPose un « mini » sur les annonces que tu veux laisser partir à ce prix.",
+      desc: "Dès qu'une offre atteint le « mini » d'une annonce, VRM l'accepte à ta place, pas tout de suite : entre 3 et 20 minutes après l'avoir vue, tiré au hasard (une à la fois, uniquement le compte ouvert dans ce Chrome, plafond 50/h). L'extension doit rester ouverte dans Chrome pendant ce délai.\n\n⚠️ Important : sur Vinted, un programme qui accepte peut être vu comme un robot — c'est un risque pour le compte, que tu prends en l'allumant. Sur eBay c'est sans risque (réglage natif), pas sur Vinted.\n\nPose un « mini » sur les annonces que tu veux laisser partir à ce prix.",
       ok: 'Oui, accepter tout seul', cancel: 'Annuler' });
     if (!ok) return;
     setOffresAuto(true); save('vinted_offres_auto', true);
