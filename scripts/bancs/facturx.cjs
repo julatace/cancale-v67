@@ -247,7 +247,7 @@ const telecharge = async (pg, clic, ms = 8000) => {
         const r = await attendre(pg, (x) => x.etat === 'siren' && x.btn);
         dit(r.etat === 'siren', 'SIREN absent ⇒ pas de facture', r.etat);
         dit(r.btn && r.btn.disabled, 'le bouton « Facture » est désactivé');
-        dit(/SIREN/.test(r.raison) && /Profil fiscal/.test(r.raison), 'la raison ET le geste sont dits', r.raison.slice(0, 140));
+        dit(/SIREN/.test(r.raison) && /Ton entreprise/.test(r.raison) && !/Profil fiscal/.test(r.raison), 'la raison ET le geste sont dits', r.raison.slice(0, 140));
         const dl = await telecharge(pg, () => pg.click('[data-fe-facture="vinted:7001"]', { force: true }).catch(() => {}), 2500);
         dit(!dl, 'aucun PDF ne part');
         dit(r.total === ATTENDU.total, 'le récap, lui, reste disponible (il ne dépend pas du profil)', r.total);

@@ -53,17 +53,17 @@ export const frJour = (t) => { const d = new Date(t); return isNaN(d) ? '' : `${
 export const etatFacturation = ({ cfg, regime, verifier }) => {
   if (cfg === undefined) return { ok: false, etat: 'encours', raison: 'Je lis ton profil fiscal…', geste: '' };
   if (cfg === null) return { ok: false, etat: 'passu', raison: "Ton profil fiscal n'a pas pu être lu (la base n'a pas répondu).", geste: 'Rouvre cet écran dans un moment : aucune facture ne part sur un profil que je n\'ai pas lu.' };
-  if (regime == null || regime === '') return { ok: false, etat: 'regime', raison: "Ton régime fiscal n'est pas renseigné : je ne sais pas quelle mention de TVA écrire.", geste: 'Choisis-le dans « Profil fiscal », plus haut sur cette page.' };
+  if (regime == null || regime === '') return { ok: false, etat: 'regime', raison: "Ton régime fiscal n'est pas renseigné : je ne sais pas quelle mention de TVA écrire.", geste: 'Choisis-le dans « Ton entreprise » (Comptabilité → Avancé).' };
   if (regime === 'marge') return { ok: false, etat: 'regime', raison: "Le régime de la marge n'est pas encore pris en charge par cette facture (sa mention de TVA est différente).", geste: 'Émets-la depuis ta plateforme agréée, ou vois-la avec ton comptable.' };
-  if (regime !== 'micro') return { ok: false, etat: 'regime', raison: 'Régime fiscal inconnu.', geste: 'Choisis-le dans « Profil fiscal ».' };
+  if (regime !== 'micro') return { ok: false, etat: 'regime', raison: 'Régime fiscal inconnu.', geste: 'Choisis-le dans « Ton entreprise » (Comptabilité → Avancé).' };
   if (String(cfg.tva || '').trim()) return { ok: false, etat: 'tva', raison: "Un n° de TVA est renseigné : tu es assujetti, la mention « art. 293 B » ne s'applique pas et VRM ne sait pas encore faire une facture avec TVA.", geste: 'Si tu es en franchise de TVA, vide le champ « N° TVA » de ton profil fiscal.' };
   const s = typeof verifier === 'function' ? verifier(cfg.siret) : { etat: 'invalide', raison: 'vérification indisponible' };
-  if (s.etat === 'vide') return { ok: false, etat: 'siren', raison: 'Ton SIREN est absent : une facture doit le porter.', geste: 'Renseigne-le dans « Profil fiscal » (9 chiffres, sur ton avis de situation INSEE).' };
-  if (s.etat !== 'ok') return { ok: false, etat: 'siren', raison: `Ton SIREN ne semble pas valide (${s.raison || 'clé de contrôle'}).`, geste: 'Corrige-le dans « Profil fiscal ».' };
+  if (s.etat === 'vide') return { ok: false, etat: 'siren', raison: 'Ton SIREN est absent : une facture doit le porter.', geste: 'Renseigne-le dans « Ton entreprise » (Comptabilité → Avancé) : 9 chiffres, sur ton avis de situation INSEE.' };
+  if (s.etat !== 'ok') return { ok: false, etat: 'siren', raison: `Ton SIREN ne semble pas valide (${s.raison || 'clé de contrôle'}).`, geste: 'Corrige-le dans « Ton entreprise » (Comptabilité → Avancé).' };
   const nom = String(cfg.nom || '').trim();
-  if (!nom) return { ok: false, etat: 'nom', raison: 'Ta raison sociale (ou ton nom) est vide.', geste: 'Renseigne-la dans « Profil fiscal ».' };
+  if (!nom) return { ok: false, etat: 'nom', raison: 'Ta raison sociale (ou ton nom) est vide.', geste: 'Renseigne-la dans « Ton entreprise » (Comptabilité → Avancé).' };
   const manque = [['adresse', "l'adresse"], ['codePostal', 'le code postal'], ['ville', 'la ville']].filter(([k]) => !String(cfg[k] || '').trim()).map(([, l]) => l);
-  if (manque.length) return { ok: false, etat: 'adresse', raison: `Ton adresse est incomplète (${manque.join(', ')}) : une facture doit la porter.`, geste: 'Complète-la dans « Profil fiscal ».' };
+  if (manque.length) return { ok: false, etat: 'adresse', raison: `Ton adresse est incomplète (${manque.join(', ')}) : une facture doit la porter.`, geste: 'Complète-la dans « Ton entreprise » (Comptabilité → Avancé).' };
   return {
     ok: true, etat: 'ok', raison: '', geste: '',
     vendeur: { nom, siren: s.siren, siret: String(cfg.siret || '').replace(/[\s.-]/g, ''), adresse: String(cfg.adresse).trim(), codePostal: String(cfg.codePostal).trim(), ville: String(cfg.ville).trim(), mention: MENTION_293B },

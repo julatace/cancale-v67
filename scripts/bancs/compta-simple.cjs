@@ -16,6 +16,19 @@
 //       trancher (versement libératoire pas dit) : alors ouverte, et elle ne
 //       se referme pas sous le doigt quand il répond ;
 //     • le sommaire mène à « Avancé » et l'ouvre ; cibles ≥ 44 px au doigt.
+//  A bis (revue du 29 oct.) — ce que l'écran DIT, jugé sur la page rendue :
+//     • « Tes dépenses » à moins de 2 400 px (téléphone) / 1 900 px (ordinateur)
+//       du haut, AVANT le suivi URSSAF et « Ta micro-entreprise » — même
+//       quand celle-ci s'ouvre d'elle-même (question pas tranchée) ;
+//     • « Année » sur la carte Vendu et reçu : jamais un en-tête de tableau
+//       sans ligne ; chaque carte nomme SA période (deux libellés distincts) ;
+//     • l'URSSAF du mois en cours ne se redit pas : « à payer » une fois (la
+//       carte), le suivi n'en redonne pas le montant, le calendrier ne redit
+//       pas « notée déclarée » ;
+//     • « connu pour 1 vente » (jamais « pour les 1 vente ») ; le geste de la
+//       facturation électronique nomme « Ton entreprise », jamais « Profil
+//       fiscal » ; le « ⓘ » du résultat ne dit pas « juste en dessous » d'un
+//       bénéfice qui est AU-DESSUS (la position est jugée, pas le mot seul).
 //  B. versement libératoire déjà dit ⇒ la micro-entreprise reste repliée.
 //  C. Organisation n'est plus dans le menu (Gestion au téléphone, rail à
 //     l'ordinateur), mais on y entre par Réglages → Stock et rangement, et
@@ -111,6 +124,9 @@ const deborde = async (pg) => pg.evaluate(() => document.documentElement.scrollW
 const avant = (pg, a, b) => pg.evaluate(([a, b]) => { const x = document.querySelector(a), y = document.querySelector(b); return !!(x && y && (x.compareDocumentPosition(y) & Node.DOCUMENT_POSITION_FOLLOWING)); }, [a, b]);
 const visible = (pg, sel) => pg.evaluate((sel) => { const e = document.querySelector(sel); return !!(e && e.checkVisibility && e.checkVisibility()); }, sel);
 const attr = (pg, sel, a) => pg.evaluate(([sel, a]) => { const e = document.querySelector(sel); return e ? e.getAttribute(a) : null; }, [sel, a]);
+// La position d'un élément dans la page qui défile (px depuis le haut du contenu).
+const topDe = (pg, sel) => pg.evaluate((sel) => { const e = document.querySelector(sel); if (!e) return null; const sc = document.querySelector('.vrm-main'); const t = e.getBoundingClientRect().top + (sc && sc.scrollHeight > sc.clientHeight ? sc.scrollTop : (document.scrollingElement || document.documentElement).scrollTop); return Math.round(t); }, sel);
+const texte = (pg, sel) => pg.evaluate((sel) => { const e = document.querySelector(sel); return e ? e.innerText : null; }, sel);
 const dansAvance = (pg, sel) => pg.evaluate((sel) => { const d = document.querySelector('[data-compta-avance]'); const e = document.querySelector(sel); return !!(d && e && d.contains(e)); }, sel);
 
 async function scenarioA(b, vp, sombre) {
@@ -164,6 +180,24 @@ async function scenarioA(b, vp, sombre) {
     // ── la carte URSSAF ne redit pas un « Bénéfice — » : il a sa carte
     const carteMois = await pg.evaluate(() => { const e = document.querySelector('[data-stats-carte="mois"]'); return e ? e.innerText : null; });
     check(carteMois != null && !/Bénéfice/.test(carteMois), `A ${nom} — la carte URSSAF du mois ne redit pas « Bénéfice » (la carte Bénéfice est juste au-dessus)`);
+    // ── (revue du 29 oct.) les dépenses près du haut, même micro-entreprise ouverte
+    const dep = await topDe(pg, '#compta-charges'), suivi = await topDe(pg, '[data-suivi-urssaf]'), micro = await topDe(pg, '[data-micro-repli]');
+    const seuilDep = tel ? 2400 : 1900;
+    check(dep != null && dep < seuilDep, `A ${nom} — « Tes dépenses » à moins de ${seuilDep} px du haut : ${dep} px`);
+    check(dep != null && micro != null && dep < micro && (suivi == null || dep < suivi), `A ${nom} — les dépenses avant le suivi URSSAF et « Ta micro-entreprise » (dépenses ${dep}, suivi ${suivi}, micro ${micro})`);
+    // ── une phrase une fois : l'URSSAF du mois en cours
+    // (la carte Bénéfice retire aussi ces cotisations de son net : c'est un autre calcul, hors du compte)
+    const tout = await pg.evaluate(() => { const m = document.querySelector('.vrm-main'); if (!m) return ''; const c = m.cloneNode(true); for (const b of c.querySelectorAll('[data-benef-etat]')) b.remove(); document.body.appendChild(c); const t = c.innerText; c.remove(); return t; });
+    const nApayer = (tout.match(/7,44/g) || []).length;
+    check(nApayer === 1, `A ${nom} — l'« à payer » du mois en cours (7,44 €) est écrit une fois hors du bénéfice : ${nApayer} fois`);
+    const enCours = await texte(pg, '[data-suivi-etat="en_cours"]');
+    check(enCours != null && !/à payer/.test(enCours), `A ${nom} — le suivi ne redonne pas l'« à payer » du mois en cours : « ${(enCours || '').replace(/\s+/g, ' ').trim()} »`);
+    const cal = await texte(pg, '[data-micro-calendrier]');
+    check(cal != null && !/déclarée/.test(cal) && (await pg.locator('[data-micro-calendrier] [aria-label="notée déclarée"]').count()) === 1, `A ${nom} — le calendrier marque septembre d'une coche, sans redire « notée déclarée »`);
+    // (le titre replié de la micro-entreprise GARDE l'échéance : `suivi-urssaf.cjs` R l'exige — une décision de l'autre session.)
+    // ── accord : « connu pour 1 vente »
+    const benef = (await texte(pg, '[data-benef-etat]')) || '';
+    check(!/pour les 1 vente/.test(benef) && /connu pour 1 vente/.test(benef), `A ${nom} — « prix d'achat connu pour 1 vente » (jamais « pour les 1 vente »)`);
     // ── la micro-entreprise : une question à trancher ⇒ ouverte
     check((await attr(pg, '[data-micro-repli]', 'data-micro-attention')) === '1', `A ${nom} — versement libératoire pas dit ⇒ « Ta micro-entreprise » signale une chose à trancher`);
     check((await attr(pg, '[data-micro-repli]', 'data-micro-repli')) === 'ouvert', `A ${nom} — et elle est ouverte d'elle-même`);
@@ -182,12 +216,32 @@ async function scenarioA(b, vp, sombre) {
       const hauteurs = await pg.evaluate(() => [...document.querySelectorAll('[data-compta-aller], [data-compta-avance] > summary, [data-micro-repli] > summary')].map((e) => Math.round(e.getBoundingClientRect().height)));
       check(hauteurs.length >= 7 && hauteurs.every((h) => h >= 43), `A ${nom} — sommaire et replis ≥ 44 px au doigt : ${hauteurs.join(', ')}`);
     }
+    // ── deux cartes, deux périodes : « Année » sur Vendu et reçu
+    await pg.locator('[data-ca-choix="annee"]').first().click();
+    await pg.waitForFunction(() => { const e = document.querySelector('[data-ca-periode]'); return e && e.getAttribute('data-ca-periode') === 'annee'; }, null, { timeout: 5000 }).catch(() => {});
+    await pg.waitForTimeout(300);
+    const tableVide = await pg.evaluate(() => { const t = document.querySelector('[data-ca-table]'); return !!t && t.querySelectorAll('[data-ca-ligne]').length === 0; });
+    check(!tableVide, `A ${nom} — « Année » : aucun en-tête de tableau sans ligne`);
+    const labels = await pg.evaluate(() => { const ca = document.querySelector('[data-ca-periode] [role="group"]'); const be = document.querySelector('[data-benef-etat] [role="group"], [data-benef-etat] [aria-label*="Période"]'); return [ca && ca.getAttribute('aria-label'), be && be.getAttribute('aria-label')]; });
+    check(!!labels[0] && !!labels[1] && labels[0] !== labels[1] && /chiffre|vendu/i.test(labels[0]) && /bénéfice/i.test(labels[1]), `A ${nom} — chaque carte nomme SA période : ${JSON.stringify(labels)}`);
+    check(/ne vaut que pour cette carte/.test((await texte(pg, '[data-ca-periode]')) || ''), `A ${nom} — la carte Vendu et reçu dit que sa période ne vaut que pour elle`);
+    await pg.locator('[data-ca-choix="mois"]').first().click();
+    await pg.waitForTimeout(300);
     // ── le sommaire mène à « Avancé » et l'ouvre
     await pg.locator('[data-compta-aller="compta-avance"]').first().click();
     await pg.waitForTimeout(700);
     check((await attr(pg, '[data-compta-avance]', 'data-compta-avance')) === 'ouvert', `A ${nom} — « Avancé » du sommaire ouvre le repli`);
     check(await visible(pg, '[data-compta-resultat]'), `A ${nom} — le résultat de l'année apparaît une fois « Avancé » ouvert`);
     check(await visible(pg, '[data-fe-etat]'), `A ${nom} — la facturation électronique est là, en bas`);
+    // ── le geste de la facturation électronique nomme une carte qui existe
+    const avanceTxt = (await texte(pg, '[data-compta-avance]')) || '';
+    check(!/Profil fiscal/.test(avanceTxt) && /dans « Ton entreprise »/.test(avanceTxt), `A ${nom} — « Avancé » renvoie à « Ton entreprise » (jamais à un « Profil fiscal » introuvable)`);
+    // ── le « ⓘ » du résultat ne place pas le bénéfice au mauvais endroit
+    await pg.locator('[data-compta-resultat] [data-pourquoi] > summary').first().click().catch(() => {});
+    await pg.waitForTimeout(200);
+    const benefAuDessus = await avant(pg, '[data-benef-etat]', '[data-compta-resultat]');
+    const pq = await pg.evaluate(() => { const d = document.querySelector('[data-compta-resultat] [data-pourquoi]'); return d ? { open: d.open, t: d.textContent } : null; });
+    check(!!pq && pq.open && /bénéfice/.test(pq.t) && !(benefAuDessus && /en dessous|ci-dessous/.test(pq.t)), `A ${nom} — le « ⓘ » du résultat dit où est le bénéfice sans le mettre « en dessous » (il est ${benefAuDessus ? 'au-dessus' : 'en dessous'})`);
     check(!(await deborde(pg)), `A ${nom} — aucun débordement horizontal`);
     check(!errs.length, `A ${nom} — aucune erreur JavaScript${errs.length ? ' : ' + errs[0].slice(0, 160) : ''}`);
   });
@@ -230,6 +284,8 @@ async function scenarioC(b, vp, sombre) {
     }
     await ouvrir(pg, 'settings');
     await pg.locator('[data-reglage-organisation]').first().waitFor({ timeout: 10000 });
+    const descOrga = (await pg.locator('[data-reglage-organisation]').first().innerText()).replace(/\s+/g, ' ');
+    check(/à plusieurs|mises de côté|à racheter/.test(descOrga) && !/Missions, réservations, lots et consommables/.test(descOrga), `C ${nom} — l'entrée de Réglages dit à quoi sert Organisation : « ${descOrga.trim().slice(0, 140)} »`);
     await pg.locator('[data-reglage-organisation]').first().click();
     // L'écran (au téléphone son titre est celui de l'en-tête de l'app : on vise la section).
     const ecran = pg.locator('section.vrm-operations[aria-label="Organisation"]');

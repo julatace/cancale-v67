@@ -1,5 +1,20 @@
 # VRM — dossier de passation
 
+> **29 octobre (revue) — Comptabilité simple sur SA configuration :** mesuré (lecture seule) : sa ligne `main` est en micro,
+> mensuel, **sans `vrm_micro_options`** — « Ta micro-entreprise » s'ouvre donc d'elle-même (règle de l'autre session, gardée) et
+> poussait « Tes dépenses » à 3 768 px du haut au téléphone (plus loin qu'avant). **Les dépenses passent juste après la carte URSSAF
+> du mois**, avant le suivi et la micro-entreprise (`StatutFiscal` prend `apresMois`, rendu dans TOUS ses états) : 1 741 px au
+> téléphone, 1 367 à l'ordinateur. La carte CA s'appelle « Vendu et reçu », dit que sa période ne vaut que pour elle (le bénéfice a la
+> sienne, deux libellés distincts) et ne montre plus d'en-tête de tableau vide (« Année »). URSSAF, une phrase une fois (§7) : le
+> suivi ne redonne plus l'« à payer » du mois EN COURS (la carte du mois le dit), le calendrier marque d'une coche (sans redire
+> « notée déclarée ») ; le titre replié de la micro-entreprise GARDE l'échéance (`suivi-urssaf.cjs` R l'exige : décision de l'autre
+> session, pas défaite). « connu pour 1 vente » ; la facturation
+> électronique renvoie à « Ton entreprise (Comptabilité → Avancé) » (« Profil fiscal » n'existait plus) ; le « ⓘ » du résultat ne
+> dit plus que le bénéfice est « juste en dessous » (il est en haut). Réglages → Organisation dit à quoi sert l'écran. Aucun chiffre
+> ne change. Preuves : `compta-simple.cjs` (133 contrôles) **26 rouges sur le code d'avant** (la branche avant cette revue), 0 après ;
+> mutation (dépenses après la micro + tableau vide + « juste en dessous ») ⇒ 8 rouges ; `facturx.cjs` suit le nouveau geste.
+> ⚠️ Non mesuré : sa vraie base dans l'app. Geste de Julien : aucun (répondre une fois « versement libératoire » referme le bloc).
+
 > **29 octobre — COMPTABILITÉ SIMPLE :** Julien : « pour la compta, améliore tout, mets de côté la facturation électronique et
 > fais quelque chose de simple ». **Aucune règle de calcul ne change (§11) : seul l'ordre change.** En haut, ce qu'il regarde :
 > Vendu et reçu (`CaParPeriodeCarte`) → Bénéfice (`BeneficeCompta`) → URSSAF (`StatutFiscal` : carte du mois et prochaine
