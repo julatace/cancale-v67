@@ -46,6 +46,22 @@
 > trames, forme) et les données Next (oui/non), dans `harvest_{uid}_seen_urls.conversation`. **À lire en lecture seule
 > après sa prochaine conversation ouverte avec cette extension** : c'est elle qui dira par où passent les messages.
 > `audit-endpoints-vus` C1-C3 (46 contrôles, 23 rouges sur l'avant, 8 mutations rouges).
+> (4) **Tour 2 des relecteurs (29 oct., soir), côté extension** : `TRANSP_FORME.vinted` prend les **12 chiffres** du
+> serveur (A, `FORME_SUIVI`) — C3 les annonçait et l'extension les refusait (`transp_item_refuse`, lu par personne) ;
+> `contratSuivi` (bloc `<suivi-regle>`, même texte dans inject.js) nomme le transporteur par `current_carrier` ou
+> l'unique `carriers[]` `is_current`, avec SON `tracking_code` (code machine seulement ; deux « courants » ⇒ rien) —
+> `transporteur` était `null` sur ses 7 suivis rangés, et le n° pris était celui du PREMIER trajet. ⚠️ Le code réel
+> (« vinted_go » ?) n'est pas mesuré : le serveur le lit par `carrierLisible` (`/vinted/`, `/mondial/`…). Le reste du
+> défaut (une carte « vue par Vinted » sans ligne transporteur, trois états) est côté A. `audit-extension-zip` lit
+> l'historique par `VRM_GIT` puis la racine, et un historique illisible est ROUGE (il sortait vert « sans conclusion »
+> depuis une copie §6.1). `audit-transp-ext` §16 (C3 → `itemTranspValide` → lu → page C5) et §17 (transporteur
+> courant, et le serveur qui le lit) : 7 rouges sur 980ef927 dans la copie fusionnée avec A (94f4d515), `--prouve`
+> 18/18 (`vg12`, `courant`, `paire`). ⚠️ Dans ce worktree SEUL, §13 et §16 sont rouges : `api/` y est celui d'avant A
+> (sans `\d{12}`) — c'est l'écart qu'on veut voir, il disparaît à la fusion. ⚠️⚠️ **VERSION** : `main` est en
+> **5.286.0** (mesuré 29 oct. 20:46) ; la 5.281 de ce chantier est PRISE avec un autre contenu ⇒ à la fusion, monter
+> TOUT à un numéro jamais servi (≥ 5.287.0, vérifier les sessions en cours) : manifeste, `CODE_VERSION`,
+> `CAPTEUR_VERSION`, `relaisVersion`, `EXT_ATTENDUE`, `EXT_CAPACITES.transp`, notice Orion, zips. La double arrivée
+> Mondial Relay (`_mvc` puis `.be`) se corrige au serveur (A, `memeOccurrence`), pas ici.
 
 > **29 octobre — TA MICRO-ENTREPRISE : profil, calendrier, seuils (Comptabilité) :** Julien : « une jauge plafond + seuil de TVA,
 > vérifie les seuils officiels 2026 », « vois si la personne a choisi le versement libératoire », « mensuel : elle déclare août
