@@ -453,7 +453,7 @@ const boutons = (pg) => pg.evaluate(() => { const e = document.querySelector('[d
     // Le serveur décide et dit ce qu'il a fait (audit-fermer-compte.cjs) ; ici
     // on vérifie que l'écran dit CE QUE LE SERVEUR DIT, rien de plus.
     console.log('\n── « Fermer mon compte » et le contact (onglet Mon compte)');
-    const ouvrirFermer = async (pg) => { const b = pg.locator('[data-fermer-compte] button[aria-expanded]'); if (await b.count()) { await b.first().click(); await pg.waitForTimeout(900); } };
+    const ouvrirFermer = async (pg) => { const sous = pg.locator('[data-sous-ouvrir="fermer"]'); if (await sous.count() && await sous.first().isVisible()) { await sous.first().click(); await pg.waitForTimeout(600); } const b = pg.locator('[data-fermer-compte] button[aria-expanded]'); if (await b.count()) { await b.first().click(); await pg.waitForTimeout(900); } };
     const etatFermer = (pg) => pg.evaluate(() => { const e = document.querySelector('[data-fermer-compte] [data-fermer-etat]'); return e ? e.getAttribute('data-fermer-etat') : null; });
     await essaie('contact', async () => {
       const { ctx, pg } = await ouvrir(nav, { abo: ETATS.actif, onglet: 'compte' });

@@ -34,6 +34,7 @@ const verif = (c, m) => { if (c) { ok++; console.log('✅', m); } else { ko++; c
   verif(M.sansComptesSupprimes(null, sup) === null, 'une réponse illisible passe telle quelle');
   verif(M.compteDeLigne('harvest_111_txn_42') === '111' && M.compteDeLigne('main') === '', 'compte d\'une ligne lu dans son identifiant');
 
+  const app0 = fs.readFileSync(path.join(RACINE, 'src', 'App.jsx'), 'utf8');
   // 2. Sur fetch.
   const fe = M.creerFiltreSupprimes(vrai(lignes), BASE, () => sup);
   const r1 = await (await fe(`${BASE}/rest/v1/app_data?id=like.harvest_*_listings&select=id,data`)).json();
@@ -46,6 +47,11 @@ const verif = (c, m) => { if (c) { ok++; console.log('✅', m); } else { ko++; c
   const fw = M.creerFiltreSupprimes(async (u, i) => { methodeVue = i && i.method; return new Response('[]'); }, BASE, () => sup);
   await fw(`${BASE}/rest/v1/app_data?id=like.harvest_199082413_*`, { method: 'DELETE' });
   verif(methodeVue === 'DELETE', 'une écriture (suppression) passe telle quelle');
+  // La lecture de la purge doit voir ses lignes (sinon rien n'est vidé, 29 oct.).
+  const rp = await (await fe(`${BASE}/rest/v1/app_data?or=(id.like.harvest_199082413_*)&select=id`, { vrmVoirSupprimes: true })).json();
+  verif(rp.length === 3, 'la lecture marquée vrmVoirSupprimes (purge) voit les lignes du compte supprimé');
+  const purge = app0.slice(app0.indexOf('const purgerComptesSupprimes'), app0.indexOf('const purgerComptesSupprimes') + 2500);
+  verif(/select=id,sup:data->>supprime`, \{[^}]*vrmVoirSupprimes: true/.test(purge), 'la purge passe vrmVoirSupprimes à sa lecture');
   const fv = M.creerFiltreSupprimes(vrai(lignes), BASE, () => new Set());
   verif((await (await fv(`${BASE}/rest/v1/app_data?id=like.harvest_*`)).json()).length === 3, 'aucun compte supprimé ⇒ réponse intacte');
   const ferr = M.creerFiltreSupprimes(async () => new Response('x', { status: 522 }), BASE, () => sup);
