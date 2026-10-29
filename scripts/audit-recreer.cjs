@@ -289,7 +289,7 @@ const zero = (j) => gestes(j).length === 0;   // 5.266 : lire la liste des coule
   };
   { const { f, r } = await pubB();
     let c = {}; try { c = JSON.parse(completions(f.j)[0].corps); } catch (_) {}
-    dit(gestes(f.j).length === 1 && r.etape === 'fait' && c.draft && c.draft.id === 10432342904 && c.push_up === false && c.draft.title === 'Nike Air Max 1 dark teal' && /drafts\/10432342904\/completion$/.test(completions(f.j)[0].chemin), "brouillon complet de son dressing : UNE requête, la mise en ligne, avec SON corps tel quel", `n=${f.j.vinted.length} etape=${r.etape} ${r.raison || r.erreur || ''}`);
+    dit(gestes(f.j).length === 2 && gestes(f.j)[0].methode === 'GET' && /item_upload\/items\/10432342904$/.test(gestes(f.j)[0].chemin) && r.etape === 'fait' && c.draft && c.draft.id === 10432342904 && c.push_up === false && c.draft.title === 'Nike Air Max 1 dark teal' && /drafts\/10432342904\/completion$/.test(completions(f.j)[0].chemin), "brouillon complet de son dressing : la page du brouillon lue (comme Vintex), puis UNE mise en ligne, avec SON corps tel quel", `n=${f.j.vinted.length} etape=${r.etape} ${r.raison || r.erreur || ''}`);
     dit(f.lignes.vinted_brouillon_10432342904.etat === 'publie' && f.lignes.vrm_vinted_modele && f.lignes.vrm_vinted_modele['10432342904'], "noté « publié », et sa recette gardée pour une prochaine republication"); }
   { const { f, r } = await pubB({ corps: CORPS_B({ price: 0 }) });
     dit(zero(f.j) && r.code === 'incomplet' && /prix/.test(r.raison || ''), "brouillon sans prix : refusé, aucune requête, il est nommé ce qui manque", `n=${f.j.vinted.length} ${r.raison || ''}`); }
@@ -424,6 +424,41 @@ const zero = (j) => gestes(j).length === 0;   // 5.266 : lire la liste des coule
     { const { f, r } = await run({ viaBrouillon: via, extra: coffreT('38'), attributsRep: { status: 500, body: {} } });
       dit(r.etape === 'fait', `${via ? 'par brouillon' : 'direct'} : grille illisible ⇒ comme avant (le secours après refus reste)`, r.raison || ''); }
   }
+  // (29 oct., « l'extension doit, avant d'appuyer sur publier, regarder si toutes
+  //  les catégories sont remplies ») LE CAS RÉEL : la grille n'est PAS dans le cache
+  //  (le banc la posait d'office, ce qui masquait le défaut). Elle est lue AVANT la
+  //  mise en ligne, la taille fausse corrigée, et une seconde fois non relue.
+  { const corps = CORPS_B({ item_attributes: [{ code: 'condition', ids: [2] }, { code: 'size', ids: [2033] }] });
+    const extra = { ...dressing(['10432342904']), vinted_brouillon_10432342904: { id: '10432342904', uid: '111', corps, etat: 'brouillon', parVRM: true, ancienId: '9557' }, coffre_111_9557: { id: '9557', photos: [PHOTOS[0]], size: '40' } };
+    const f = monter({ src: process.env.BG_SRC || undefined, extra, attributsRep: GRILLE([{ id: 1199, title: '39' }, { id: 1200, title: '40' }]) });
+    delete f.store.vrmTaillesVinted;
+    let r = {}; try { r = await f.ctx.publierBrouillon({ cmd: 'publierBrouillon', uid: '111', draftId: '10432342904', confirme: true }); } catch (e) { r = { erreur: e.message }; }
+    const att = f.j.vinted.filter((x) => /item_upload\/attributes$/.test(x.chemin)); const cs = completions(f.j); let c2 = {}; try { c2 = JSON.parse(cs[0].corps); } catch (_) {}
+    const sz = c2.draft && (c2.draft.item_attributes || []).find((a) => a.code === 'size');
+    const iA = f.j.vinted.findIndex((x) => /item_upload\/attributes$/.test(x.chemin)), iM = f.j.vinted.findIndex((x) => /completion$/.test(x.chemin));
+    dit(r.etape === 'fait' && att.length === 1 && iA >= 0 && iA < iM && sz && JSON.stringify(sz.ids) === '[1200]', "grille PAS en cache : lue AVANT la mise en ligne, la taille « 40 » de la paire posée, une seule mise en ligne qui passe", JSON.stringify({ e: r.etape, att: att.length, sz, raison: (r.raison || r.erreur || '').slice(0, 160) }));
+    let r2 = {}; try { r2 = await f.ctx.publierBrouillon({ cmd: 'publierBrouillon', uid: '111', draftId: '10432342904', confirme: true, }); } catch (_) {}
+    dit(f.j.vinted.filter((x) => /item_upload\/attributes$/.test(x.chemin)).length === 1, "la grille lue n'est pas redemandée (une fois par catégorie et par 24 h)"); }
+  { const corps = CORPS_B({ item_attributes: [{ code: 'condition', ids: [2] }, { code: 'size', ids: [2033] }] });
+    const extra = { ...dressing(['10432342904']), vinted_brouillon_10432342904: { id: '10432342904', uid: '111', corps, etat: 'brouillon' } };
+    const f = monter({ src: process.env.BG_SRC || undefined, extra, attributsRep: { status: 200, body: { attributes: [{ code: 'size', configuration: { options: [{ id: 1200, title: '40' }] } }] } } });
+    delete f.store.vrmTaillesVinted;
+    let r = {}; try { r = await f.ctx.publierBrouillon({ cmd: 'publierBrouillon', uid: '111', draftId: '10432342904', confirme: true }); } catch (e) { r = { erreur: e.message }; }
+    dit(r.code === 'incomplet' && completions(f.j).length === 0 && /la taille/.test(r.raison || ''), "grille PAS en cache, taille de la paire inconnue : rien n'est envoyé, « la taille » est nommée avec le geste", (r.raison || r.erreur || '').slice(0, 160)); }
+  // Le brouillon VIVANT l'emporte : taille corrigée sur Vinted, photos réelles.
+  { const corps = CORPS_B({ item_attributes: [{ code: 'size', ids: [2033] }], assigned_photos: [{ id: 11, orientation: 0 }] });
+    const extra = { ...dressing(['10432342904']), vinted_brouillon_10432342904: { id: '10432342904', uid: '111', corps, etat: 'brouillon' } };
+    const f = monter({ src: process.env.BG_SRC || undefined, extra, attributsRep: { status: 200, body: { attributes: [{ code: 'size', configuration: { options: [{ id: 1200, title: '40' }] } }] } } });
+    const vO = f.ctx.vintedPage; f.ctx.vintedPage = async (acc, m, ch, b, o) => (m === 'GET' && /item_upload\/items\/10432342904$/.test(ch)) ? { ok: true, status: 200, json: { item: { id: 10432342904, item_attributes: [{ code: 'size', ids: [1200] }], photos: [{ id: 501, url: 'x' }, { id: 502, url: 'y' }] } } } : vO(acc, m, ch, b, o);
+    let r = {}; try { r = await f.ctx.publierBrouillon({ cmd: 'publierBrouillon', uid: '111', draftId: '10432342904', confirme: true }); } catch (e) { r = { erreur: e.message }; }
+    let c2 = {}; try { c2 = JSON.parse(completions(f.j)[0].corps); } catch (_) {}
+    const sz = c2.draft && (c2.draft.item_attributes || []).find((a) => a.code === 'size'); const ph = c2.draft && (c2.draft.assigned_photos || []).map((p) => p.id);
+    dit(r.etape === 'fait' && sz && JSON.stringify(sz.ids) === '[1200]' && JSON.stringify(ph) === '[501,502]', "le brouillon tel que Vinted le montre l'emporte : taille changée sur Vinted et ses photos réelles partent", JSON.stringify({ e: r.etape, sz, ph, raison: (r.raison || r.erreur || '').slice(0, 120) }));
+    f.ctx.vintedPage = async (acc, m, ch, b, o) => (m === 'GET' && /item_upload\/items\/10432342904$/.test(ch)) ? { ok: true, status: 200, json: { item: { id: 10432342904, photos: [] } } } : vO(acc, m, ch, b, o);
+    f.lignes.vinted_brouillon_10432342904 = { id: '10432342904', uid: '111', corps, etat: 'brouillon' };
+    const n0 = completions(f.j).length; let r2 = {}; try { r2 = await f.ctx.publierBrouillon({ cmd: 'publierBrouillon', uid: '111', draftId: '10432342904', confirme: true }); } catch (e) { r2 = { erreur: e.message }; }
+    dit(r2.code === 'incomplet' && completions(f.j).length === n0 && /photo/.test(r2.raison || ''), "le brouillon n'a plus de photo chez Vinted : rien n'est envoyé, c'est dit avec le geste", (r2.raison || r2.erreur || '').slice(0, 160)); }
+
   // … sans coffre lisible : rien n'est renvoyé, c'est dit avec le geste Vinted.
   { const corps = CORPS_B();
     const extra = { ...dressing(['10432342904']), vinted_brouillon_10432342904: { id: '10432342904', uid: '111', corps, etat: 'brouillon', parVRM: true, ancienId: '9556' } };
@@ -542,7 +577,7 @@ const zero = (j) => gestes(j).length === 0;   // 5.266 : lire la liste des coule
     await f.ctx.recreerVinted({ cmd: 'recreerVinted', uid: '111', id: '9101', prix: 54, titre: 'Nike', viaBrouillon: true, confirme: true });
     dit(vb(f).etat === 'a-publier' && vb(f).draftId === '88001', "mise en ligne refusée : « à mettre en ligne », le brouillon rangé est noté", JSON.stringify({ e: vb(f).etat, d: vb(f).draftId }));
     st = 200; const n0 = f.j.vinted.length; const r = await refaire(f);
-    dit(seqDe({ vinted: f.j.vinted.slice(n0) }) === 'M' && r.etape === 'fait' && vb(f).etat === 'fait', "Refaire : le brouillon EXISTANT est mis en ligne — aucune photo, aucun second brouillon", `seq=${seqDe({ vinted: f.j.vinted.slice(n0) })} ${r.raison || r.erreur || ''}`); }
+    dit(seqDe({ vinted: f.j.vinted.slice(n0) }) === 'CM' && r.etape === 'fait' && vb(f).etat === 'fait', "Refaire : le brouillon EXISTANT est mis en ligne — aucune photo, aucun second brouillon", `seq=${seqDe({ vinted: f.j.vinted.slice(n0) })} ${r.raison || r.erreur || ''}`); }
   // (28 oct., N°72) Le brouillon rangé n'est PLUS sur Vinted (une lecture complète
   //  de son dressing, faite après, ne le montre pas) : Refaire en crée un neuf.
   for (const garde of [false, true]) {
@@ -552,7 +587,7 @@ const zero = (j) => gestes(j).length === 0;   // 5.266 : lire la liste des coule
     f.lignes.harvest_111_listings = { capturedAt: new Date(Date.now() + 1000).toISOString(), payload: { items, pagination: { total_entries: items.length } } };
     st = 200; const n0 = f.j.vinted.length; const r = await refaire(f);
     const seq = seqDe({ vinted: f.j.vinted.slice(n0) });
-    if (garde) dit(seq === 'M' && r.etape === 'fait', "brouillon encore dans son dressing : Refaire met CE brouillon en ligne (aucun second)", `seq=${seq} ${r.raison || r.erreur || ''}`);
+    if (garde) dit(seq === 'CM' && r.etape === 'fait', "brouillon encore dans son dressing : Refaire met CE brouillon en ligne (aucun second)", `seq=${seq} ${r.raison || r.erreur || ''}`);
     else dit(seq === 'PPBM' && r.etape === 'fait' && vb(f).etat === 'fait', "brouillon disparu de Vinted (dressing complet lu après) : Refaire en crée un NEUF depuis VRM, puis le met en ligne", `seq=${seq} ${r.raison || r.erreur || ''}`); }
   { for (const [etat, code, msg] of [['fait', 'deja', 'déjà fait'], ['mise-en-ligne-incertaine', 'incertaine', 'mise en ligne sans réponse claire'], ['enregistre', 'en-cours', 'passage commencé il y a moins de 10 min']]) {
       const f = monter({ src: process.env.BG_SRC || undefined, extra: { coffre_111_9101: { id: '9101', title: 'Nike', price: 60, photos: PHOTOS, versBrouillon: { corps: JSON.stringify({ draft: { title: 'Nike', price: '60', catalog_id: 1, description: 'x' } }), etat, at: nowISO(), uid: '111', publier: true, supprime: true } } } });
