@@ -286,6 +286,10 @@ const bloc = (pg) => pg.evaluate(() => { const b = document.querySelector('[data
       const ctx = await contexte(); const pg = await page(ctx, etat);
       await pg.goto(`http://localhost:${PORT}/?tab=settings`, { waitUntil: 'domcontentloaded' });
       await pg.waitForTimeout(6000);
+      // Depuis le 28 oct., les panneaux des Paramètres s'ouvrent dans un
+      // sous-écran à toutes les tailles : on l'ouvre, comme lui.
+      const sous = pg.locator('[data-sous-ouvrir="numeros"]');
+      if (await sous.count()) { await sous.first().scrollIntoViewIfNeeded(); await sous.first().click(); await pg.waitForTimeout(800); }
       const R = pg.locator('[data-numeros-reglage]');
       await R.scrollIntoViewIfNeeded();
       const t0 = await R.innerText();

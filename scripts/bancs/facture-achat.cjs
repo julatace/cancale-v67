@@ -324,9 +324,15 @@ const chip = (pg, tx) => pg.evaluate((tx) => {
         } else {
           const v = await pg.evaluate(() => { const d = document.querySelector('[data-visionneuse-pdf]'); return d ? { etat: d.getAttribute('data-visionneuse-pdf'), titre: d.getAttribute('aria-label') } : null; });
           dit(v && v.etat === 'pret' && v.titre === "Reçu d'achat", 'F. sur ordinateur, le PDF s’ouvre dans la visionneuse de VRM, titrée du même nom (« Reçu d’achat »)', JSON.stringify(v));
-          await pg.keyboard.press('Escape'); await pg.waitForTimeout(300);
+          // Fermer la visionneuse par SON bouton : quand le PDF de l'iframe a pris
+          // le focus, Échap part dans l'iframe et ne la referme pas (vu une fois
+          // sur quatre : la visionneuse restait par-dessus H et L).
+          const ferme = pg.locator('[data-visionneuse-fermer]');
+          if (await ferme.count()) await ferme.first().click();
+          await pg.locator('[data-visionneuse-pdf]').waitFor({ state: 'detached', timeout: 5000 }).catch(() => {});
         }
         if (await pg.locator(DIALOG).count()) { await pg.keyboard.press('Escape'); await pg.waitForTimeout(400); }
+        await pg.locator(DIALOG).waitFor({ state: 'detached', timeout: 5000 }).catch(() => {});
       });
 
       // ── H. L'archive ─────────────────────────────────────────────────────

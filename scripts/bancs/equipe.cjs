@@ -23,6 +23,19 @@ require('./_porte-banc.cjs');
 //  Aucune fixture : tout est inventé ici (le dépôt est public).
 // ════════════════════════════════════════════════════════════════════════════
 const path = require('path'), http = require('http'), fs = require('fs');
+const os = require('os'), { execFileSync } = require('child_process');
+// pdf.js du banc : BANC_PDFJS_DIR, sinon la copie téléchargée une fois (celle d'imprimante.cjs).
+const PDFJS_V = '3.11.174';
+function dossierPdfjs() {
+  if (process.env.BANC_PDFJS_DIR && fs.existsSync(path.join(process.env.BANC_PDFJS_DIR, 'pdf.min.js'))) return process.env.BANC_PDFJS_DIR;
+  const base = path.join(os.tmpdir(), 'vrm-banc-pdfjs-' + PDFJS_V), build = path.join(base, 'package', 'build');
+  if (fs.existsSync(path.join(build, 'pdf.min.js'))) return build;
+  fs.mkdirSync(base, { recursive: true });
+  const tgz = path.join(base, 'pdfjs.tgz');
+  execFileSync('curl', ['-sSL', '-m', '180', '-o', tgz, `https://registry.npmjs.org/pdfjs-dist/-/pdfjs-dist-${PDFJS_V}.tgz`]);
+  execFileSync('tar', ['-xzf', tgz, '-C', base]);
+  return build;
+}
 const RACINE = path.join(__dirname, '..', '..');
 let chromium;
 try { ({ chromium } = require(path.join(RACINE, 'node_modules', 'playwright'))); }
@@ -261,6 +274,14 @@ async function ouvrir(nav, { qui, largeur = 1512, tab = '', vue = undefined, cac
   }, { s: session(qui), vue, uid: qui, cache, sombre });
   await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, async (r) => {
     const rq = r.request(), u = rq.url();
+    // Depuis 77633d9, imprimer un bordereau vérifie l'espace blanc avec pdf.js
+    // (chargé depuis cdn.jsdelivr.net) : le banc le sert d'une copie locale,
+    // comme imprimante.cjs — sans lui, l'impression échoue (« Ce PDF n'a pas pu être lu »).
+    if (/cdn\.jsdelivr\.net\/npm\/pdfjs-dist@/.test(u)) {
+      const f = path.join(dossierPdfjs(), path.basename(new URL(u).pathname));
+      if (!fs.existsSync(f)) return r.fulfill({ status: 404, body: '' });
+      return r.fulfill({ status: 200, contentType: 'text/javascript', headers: { 'access-control-allow-origin': '*' }, body: fs.readFileSync(f) });
+    }
     if (/supabase\.co\//.test(u)) {
       const x = fauxSupabase(u, rq.method(), rq.headers(), rq.postData() || '');
       return r.fulfill({ status: x.status, headers: x.headers, body: x.body });
