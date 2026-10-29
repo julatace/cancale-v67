@@ -1249,22 +1249,46 @@ let registreEmailsEnVol=null;
 // Lues sous le propriétaire NEUTRE (aucune session ne peut les écrire), toutes
 // pages comprises. Une page ratée ⇒ `null` : « pas su », et l'email est
 // renvoyé (503) plutôt qu'attribué ou mis de côté sur une lecture partielle.
-async function lirePreuvesProuvees() {
+async function lirePreuvesProuvees(signal) {
   const preuves = new Map(), taille = 500;
-  for (let debut = 0; debut < 100 * taille; debut += taille) {
-    let r;
+  let debut = 0;
+  for (let page = 0; page < 500; page++) {
     try {
-      r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?owner=eq.${PROPRIETAIRE_NEUTRE}&id=like.${PREFIXE_PREUVE}*&data->>etat=eq.prouvee&select=id,owner:data->>owner,adresse:data->>adresse,etat:data->>etat&order=id.asc`, {
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?owner=eq.${PROPRIETAIRE_NEUTRE}&id=like.${PREFIXE_PREUVE}*&data->>etat=eq.prouvee&select=id,owner:data->>owner,adresse:data->>adresse,etat:data->>etat&order=id.asc`, {
         headers: { ...sbCle(SUPABASE_KEY), Range: `${debut}-${debut + taille - 1}`, 'Range-Unit': 'items' },
-        signal: AbortSignal.timeout(10000),
+        signal: AbortSignal.any([signal, AbortSignal.timeout(10000)]),
       });
-    } catch (_) { return null; }
-    if (r.status === 416) return preuves;
-    if (!r.ok) return null;
-    let j; try { j = await r.json(); } catch (_) { return null; }
-    if (!Array.isArray(j)) return null;
-    for (const l of j) if (l && l.id) preuves.set(String(l.id), { owner: String(l.owner || ''), adresse: String(l.adresse || ''), etat: String(l.etat || '') });
-    if (j.length < taille) return preuves;
+      if (r.status === 416) {
+        const fin = /^\*\/(\d+)$/.exec(r.headers?.get?.('content-range') || '');
+        return debut > 0 && fin && Number(fin[1]) === debut ? preuves : null;
+      }
+      if (!r.ok) return null;
+      const j = await r.json();
+      if (!Array.isArray(j) || preuves.size + j.length > 50000) return null;
+      for (const l of j) {
+        if (!l?.id || preuves.has(String(l.id))) return null;
+        preuves.set(String(l.id), { owner: String(l.owner || ''), adresse: String(l.adresse || ''), etat: String(l.etat || '') });
+      }
+      // La limite réelle peut être inférieure à 500 : avancer de ce qui a été lu.
+      const plage = r.headers?.get?.('content-range');
+      const cr = plage && /^(\d+)-(\d+)\/(\d+|\*)$/.exec(plage);
+      if (cr) {
+        if (Number(cr[1]) !== debut || Number(cr[2]) - debut + 1 !== j.length) return null;
+        debut += j.length;
+        if (cr[3] !== '*') {
+          if (debut > Number(cr[3])) return null;
+          if (debut === Number(cr[3])) return preuves;
+        }
+      } else {
+        if (plage) {
+          const fin = /^\*\/(\d+|\*)$/.exec(plage);
+          if (!fin || j.length !== 0 || (fin[1] !== '*' && Number(fin[1]) !== debut)) return null;
+        }
+        if (j.length < taille) return preuves;
+        debut += j.length;
+      }
+      if (j.length === 0) return preuves;
+    } catch { return null; }
   }
   return null;
 }
@@ -1278,7 +1302,8 @@ export async function lireRegistreEmails(cloisonnee) {
 async function chargerRegistreEmails() {
   // (22 oct.) Les preuves d'abord : sans elles, aucune adresse d'un vendeur ne
   // peut être retenue — on ne décide rien (« pas su »).
-  const preuves=await lirePreuvesProuvees();
+  const signal=AbortSignal.timeout(20000);
+  const preuves=await lirePreuvesProuvees(signal);
   if(preuves===null)return null;
   const garde={retenue:(adresse,owner)=>retenue(adresse,owner,{preuves,installation:process.env.VRM_OWNER_UID||''})};
   const fusionnerRegistres=(l,c)=>fusionnerRegistresLib(l,c,garde);
@@ -1289,7 +1314,7 @@ async function chargerRegistreEmails() {
     try {
       const r=await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vrm_email_owners&select=owner,data&order=owner.asc`,{
         headers:{...sbCle(SUPABASE_KEY),Range:`${debut}-${debut+taille-1}`,'Range-Unit':'items'},
-        signal:AbortSignal.timeout(10000),
+        signal:AbortSignal.any([signal,AbortSignal.timeout(10000)]),
       });
       // À une frontière exacte, PostgREST peut répondre 416 plutôt qu'une
       // page vide. Seul son total confirmé égal au nombre déjà lu conclut.

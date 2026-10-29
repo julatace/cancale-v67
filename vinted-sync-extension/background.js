@@ -2511,6 +2511,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           if (msg.action === 'saveDetail' && msg.id && msg.detail) { await saveItemDetail(msg.id, msg.detail); sendResponse({ ok: true }); return; }
           if (msg.action === 'numeroPourPublier') { sendResponse(await reserverNumeroPourOnglet(sender && sender.tab ? sender.tab.id : null, msg.domain || 'www.vinted.fr')); return; }
           if (msg.action === 'numeros') {
+            if (!await numerosPermisDansPage(sender)) { sendResponse({ok:true,items:{},convs:{},txs:{},portee:'hors_compte'}); return; }
             const m = await numerosPourAffichage();
             if (!m) { sendResponse({ ok: false }); return; }
             const pick = (src, ids) => { const o = {}; for (const id of (Array.isArray(ids) ? ids.slice(0, 400) : [])) if (src[String(id)]) o[String(id)] = src[String(id)]; return o; };
@@ -3377,10 +3378,23 @@ async function lierPublicationsEnAttente() {
   _numsAffichage = null;
   notifierApp({ type: 'maj', quoi: 'annonces' });
 }
+// Une visite d'un autre profil ne doit afficher aucun numéro de rangement.
+async function numerosPermisDansPage(sender) {
+  let u; try { u = new URL(sender?.tab?.url || sender?.url || ''); } catch { return false; }
+  if (u.protocol !== 'https:' || !/^(?:www\.)?vinted\.(?:fr|com|it|de)$/.test(u.hostname)) return false;
+  const membre = /^\/member\/(\d+)(?:[-/]|$)/.exec(u.pathname);
+  if (!membre) return !/^\/member(?:\/|$)/.test(u.pathname);
+  const uid = await activeAccountId(u.host);
+  if (!uid) return false;
+  const profil = await profilIdRange(uid);
+  return !!profil && String(profil) === membre[1];
+}
 // Les numéros à AFFICHER sur Vinted, par identité seulement (cache 2 min).
 let _numsAffichage = null;
 async function numerosPourAffichage() {
-  if (_numsAffichage && Date.now() - _numsAffichage.at < 120000) return _numsAffichage;
+  const owner = String((await loadSession())?.user_id || '');
+  if (!owner) return null;
+  if (_numsAffichage && _numsAffichage.owner === owner && Date.now() - _numsAffichage.at < 120000) return _numsAffichage;
   const main = await lireMain(['vinted_annonce_numeros', 'vinted_sale_overrides']);
   if (main === null) return null;
   const r = await lireResa();
@@ -3395,7 +3409,8 @@ async function numerosPourAffichage() {
     const tx = o && o.transaction_id != null ? String(o.transaction_id) : '', cv = o && o.conversation_id != null ? String(o.conversation_id) : '';
     if (tx && cv && parTx[tx]) parConv[cv] = parTx[tx];
   }
-  _numsAffichage = { at: Date.now(), parItem, parTx, parConv };
+  if (String((await loadSession())?.user_id || '') !== owner) return null;
+  _numsAffichage = { owner, at: Date.now(), parItem, parTx, parConv };
   return _numsAffichage;
 }
 // <supprimees-regle> — LA MÊME RÈGLE QUE L'APP (src/App.jsx), §11 ; comparées par

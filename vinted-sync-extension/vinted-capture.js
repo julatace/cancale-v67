@@ -242,8 +242,19 @@
   }
   // Annonces, ventes : les numéros connus pour les liens de la page.
   const connus = { items: {}, convs: {}, txs: {} }, demandes = { items: new Set(), convs: new Set(), txs: new Set() };
-  let enVol = false;
+  let enVol = false, generationNumeros = 0, cheminNumeros = location.pathname;
+  const viderNumeros = (oublierDemandes = true) => {
+    for (const famille of ['items','convs','txs']) { connus[famille] = {}; if (oublierDemandes) demandes[famille].clear(); }
+    document.querySelectorAll('[data-vrm-num-pour],[data-vrm-num-page]').forEach(e=>e.remove());
+  };
+  const suivrePageNumeros = () => {
+    if (cheminNumeros === location.pathname) return;
+    cheminNumeros = location.pathname; generationNumeros++; enVol = false; viderNumeros();
+  };
+  window.addEventListener('popstate', suivrePageNumeros);
+  window.navigation?.addEventListener?.('navigatesuccess', suivrePageNumeros);
   async function completer() {
+    suivrePageNumeros();
     if (enVol || !vivant()) return;
     const items = [], convs = [], txs = [];
     for (const a of document.querySelectorAll('a[href*="/items/"], a[href*="/inbox/"], a[href*="/transactions/"]')) {
@@ -256,12 +267,16 @@
     const conv = /^\/inbox\/(\d{4,15})/.exec(location.pathname); if (conv && !demandes.convs.has(conv[1])) { demandes.convs.add(conv[1]); convs.push(conv[1]); }
     if (!items.length && !convs.length && !txs.length) return;
     enVol = true;
+    const generation = generationNumeros, chemin = location.pathname;
     const r = await demander({ action: 'numeros', items, convs, txs });
+    if (generation !== generationNumeros || chemin !== location.pathname) return;
     enVol = false;
+    if (r?.portee === 'hors_compte') { viderNumeros(false); return; }
     if (!r || !r.ok) { items.forEach((x) => demandes.items.delete(x)); convs.forEach((x) => demandes.convs.delete(x)); txs.forEach((x) => demandes.txs.delete(x)); return; }
     Object.assign(connus.items, r.items || {}); Object.assign(connus.convs, r.convs || {}); Object.assign(connus.txs, r.txs || {});
   }
   function poserSurLiens() {
+    suivrePageNumeros();
     for (const a of document.querySelectorAll('a[href*="/items/"], a[href*="/inbox/"], a[href*="/transactions/"]')) {
       if (a.querySelector('[' + NUM_ATTR + ']') || a.closest('[' + NUM_ATTR + ']')) continue;
       const h = a.getAttribute('href') || '';
@@ -285,6 +300,7 @@
     }
   }
   function poserSurPage() {
+    suivrePageNumeros();
     const ici = currentItemId();
     const conv = /^\/inbox\/(\d{4,15})/.exec(location.pathname);
     const n = (ici && connus.items[ici]) || (conv && connus.convs[conv[1]]) || null;
