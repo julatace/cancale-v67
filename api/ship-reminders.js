@@ -22,6 +22,7 @@
 
 import './_lib/sans-bruit.js';
 import { sendPushToAll, pushCategorieActive } from './_lib/push.js';
+import { notificationAgentEbay } from './_lib/agent-ebay-rappel.js';
 import { semainePassee, semaineCourante, calculerBilan, bilanAEnvoyer, texteBilan, versementsDeLignes } from './_lib/bilan-semaine.js';
 import { notificationUrssaf, rappelAvantEcheance, MAIN_URSSAF } from './_lib/rappel-urssaf.js';
 // « À expédier » : la règle du widget (elle-même jugée identique à celle de
@@ -417,6 +418,23 @@ async function rappelsOffresMini(maintenant = Date.now()) {
   return { offremini: 'envoyé', n, envoi: envoi && (envoi.coupe || envoi.erreur || envoi.sent) };
 }
 
+// ── L'AGENT eBAY QUI DEMANDE (29 oct.) ──────────────────────────────────────
+// « 🛒 N paires prêtes pour eBay — publier ? », une fois par jour. Le nombre est
+// celui que l'APP a publié (`vrm_agent_ebay_resume`, sa règle, §11) — le
+// serveur ne recalcule rien et ne publie rien. Le mémo est écrit AVANT l'envoi
+// et CONFIRMÉ (comme le bilan) : jamais deux demandes le même jour.
+async function rappelAgentEbay(maintenant = Date.now()) {
+  if (!(await pushCategorieActive('agentebay'))) return 'désactivé par le vendeur';
+  const main = await getRowProjete('main', ['vrm_agent_ebay_resume']);
+  const today = parisDate(0);
+  const memo = await getRow('agent_ebay_dedup');
+  const n = notificationAgentEbay({ resume: main === undefined ? undefined : ((main && main.vrm_agent_ebay_resume) || null), memo, today, maintenant });
+  if (!n.envoyer) return n.raison;
+  if (!(await ecrireDedup('agent_ebay_dedup', { date: today, n: n.n, at: new Date(maintenant).toISOString() }))) return 'mémo non écrit — rien envoyé';
+  const envoi = await sendPushToAll({ title: n.titre, body: n.corps, tag: 'agent-ebay-' + today, url: n.url });
+  return { agentebay: 'envoyé', n: n.n, envoi: envoi && (envoi.coupe || envoi.erreur || envoi.sent) };
+}
+
 // Le traitement d'UN vendeur (celui du `contexteVendeur` courant, ou l'unique
 // vendeur d'une base non cloisonnée). Rend un bilan, n'écrit jamais dans `res`.
 // ── (20 octobre) RELIRE eBAY AVANT DE COMPTER, APP FERMÉE ──────────────────
@@ -509,6 +527,11 @@ async function traiterVendeurApresRelecture() {
     let offremini = null;
     try { offremini = await rappelsOffresMini(); } catch (e) { offremini = 'échec : ' + String((e && e.message) || e).slice(0, 120); }
 
+    // L'AGENT eBAY QUI DEMANDE (29 oct.) — posé comme les autres : un échec ici
+    // n'empêche rien. Rien n'est publié : la notification ouvre eBay → Agent.
+    let agentebay = null;
+    try { agentebay = await rappelAgentEbay(); } catch (e) { agentebay = 'échec : ' + String((e && e.message) || e).slice(0, 120); }
+
     // ── LES COLIS DU MATIN : LA RÈGLE DU SOIR, DU WIDGET ET DE L'APP (22 oct.) ──
     // ⚠️⚠️ CE RAPPEL ANNONÇAIT « RIEN À ENVOYER » À TORT. Mesuré le 22 octobre
     // sur sa base : `ship_reminder_dedup` = {total 0} le matin, alors que le
@@ -541,7 +564,7 @@ async function traiterVendeurApresRelecture() {
     else if (!Array.isArray(d.bords)) vintedSkip = 'bordereaux illisibles';
     // Vinted illisible et rien à dire pour eBay : on se tait, sans mémo (le
     // passage suivant, tout lu, ne doit pas se croire « déjà notifié »).
-    if (vintedSkip && (!eb || (!(eb.overdue + eb.today + eb.tomorrow) && !eb.nePasPoster))) return { urssaf, bilan, retrait, offremini, skipped: vintedSkip + ' — aucune notification envoyée' };
+    if (vintedSkip && (!eb || (!(eb.overdue + eb.today + eb.tomorrow) && !eb.nePasPoster))) return { urssaf, bilan, retrait, offremini, agentebay, skipped: vintedSkip + ' — aucune notification envoyée' };
 
     const c = vintedSkip ? null : compterEcheances({ txs: [...t.vinted], ventes: ventesParTx(d), bords: bordsDuVendeur(d), maintenant: Date.now() });
     // ⚠️ (revue du 22 oct.) `overdue` = une limite LUE (email du bordereau, ou
@@ -558,14 +581,14 @@ async function traiterVendeurApresRelecture() {
 
     // Anti-doublon : une seule notification par jour pour un même total.
     const dedup = (await getRow('ship_reminder_dedup')) || {};
-    if (dedup.date === today && dedup.total === total && (dedup.nePasPoster || 0) === nePasPoster) return { urssaf, bilan, retrait, offremini, skipped: 'déjà notifié', total };
+    if (dedup.date === today && dedup.total === total && (dedup.nePasPoster || 0) === nePasPoster) return { urssaf, bilan, retrait, offremini, agentebay, skipped: 'déjà notifié', total };
 
     if ((total > 0 || nePasPoster > 0) && await pushCategorieActive('expedier')) {
       const txt = texteMatin({ overdue, aVerifier, dueToday, dueTomorrow, ebayDus, nePasPoster, vinted: c });
       await sendPushToAll({ ...txt, tag: 'ship-reminder', url: '/?tab=cat_bord' });
     }
     await ecrireDedup('ship_reminder_dedup', { date: today, total, nePasPoster });
-    return { urssaf, bilan, retrait, offremini, overdue, aVerifier, dueToday, dueTomorrow, total,
+    return { urssaf, bilan, retrait, offremini, agentebay, overdue, aVerifier, dueToday, dueTomorrow, total,
       ...(c ? { heures: { aujourdhui: c.premier.aujourdhui ? c.premier.aujourdhui.heure : null, demain: c.premier.demain ? c.premier.demain.heure : null }, estimees: c.estimees, sansLimite: c.sansLimite } : {}),
       ebay: eb ? { aPoster: eb.total, dus: ebayDus, nePasPoster } : null, ...(vintedSkip ? { vintedSkip } : {}) };
 }
