@@ -1,3 +1,4 @@
+import {correspondRechercheMessage} from './rechercheMessagesVinted.js';
 import SynchronisationVinted from './SynchronisationVinted.jsx';
 import {auteurDernierConfirme,suiviNegociationVinted,reponseAttendueVinted} from './suiviMessagerieVinted.js';
 import {retourReponseVinted,cleReponseVinted,creerBrouillonsReponses} from './reponseVinted.js';
@@ -114,7 +115,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.271.0';
+const EXT_ATTENDUE = '5.274.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -11993,10 +11994,21 @@ const ETAPES_REPUB = {
 // tirées au hasard (5.263) sont annoncées par l'extension avec leur durée (5.265) :
 // on affiche ce qu'il reste à attendre, à la seconde.
 const PAUSE_NOM = { photo: 'avant la photo suivante', brouillon: 'avant de créer le brouillon', enLigne: 'avant la mise en ligne', reessai: 'avant un nouvel essai' };
+// (29 oct.) Vinted refuse les photos d'un brouillon : la mise en ligne se fait
+// en 3 essais au plus (1. tel quel, 2. forme courte des photos, 3. photos
+// renvoyées). La barre dit lequel, et la photo renvoyée en cours.
+function texteSecoursPhotos(p) {
+  const n = p && p.essais ? ` (essai ${p.essai} sur ${p.essais})` : '';
+  if (p && p.renvoi && !p.envoye && p.total > 0) return `Vinted a refusé les photos${n} : VRM les renvoie — photo ${Math.min(p.fait + 1, p.total)} sur ${p.total}`;
+  if (p && p.renvoi && p.envoye) return `Photos renvoyées : dernier essai de mise en ligne${n}`;
+  if (p && p.renvoi) return `Vinted a refusé les photos${n} : VRM va les renvoyer`;
+  return `Vinted a refusé les photos : nouvel essai${n}`;
+}
 function majProgRepub(p, d) {
   const id = String(d.id); const cur = p[id] || {};
   if (d.pause) return { ...p, [id]: { ...cur, pause: { quoi: String(d.pause), jusqua: Number(d.jusqua) || 0, ms: Number(d.ms) || 0 } } };
-  return { ...p, [id]: { etape: String(d.etape || ''), fait: Number(d.fait) || 0, total: Number(d.total) || 0, renvoi: !!d.renvoi } };
+  const total = Number(d.total) || 0;
+  return { ...p, [id]: { etape: String(d.etape || ''), fait: Number(d.fait) || 0, total, renvoi: !!d.renvoi, essai: Number(d.essai) || 0, essais: Number(d.essais) || 0, envoye: !!d.envoye, nPhotos: d.etape === 'photos' && total > 0 ? total : (cur.nPhotos || 0) } };
 }
 function texteAttente(p, now) {
   const pa = p && p.pause;
@@ -12004,7 +12016,40 @@ function texteAttente(p, now) {
   const s = Math.ceil((pa.jusqua - now) / 1000);
   return `pause au hasard ${PAUSE_NOM[pa.quoi] || ''} : encore ${s} s`.replace(/\s+:/, ' :');
 }
-function BarreGeste({ p, liste, attrs, label }) {
+// (29 oct., « tout doit être détaillé dans la barre de progression ») Chaque
+// étape de la liste, dans l'ordre : ✓ faite · ● en cours (son détail : photo n
+// sur N, pause au hasard et son compte à rebours, nouvel essai des photos) ·
+// ○ à venir · ✗ là où ça s'est arrêté (`issue` = 'echec'). Les étapes viennent
+// de l'extension (`maj · repub`) : rien n'est supposé fait sans qu'elle l'ait dit.
+function DetailEtapes({ p, liste, issue, now }) {
+  if (!Array.isArray(liste) || !liste.length) return null;
+  const e = p && p.etape;
+  let i = e === 'secours-photos' ? liste.findIndex((x) => x[0] === 'en-ligne') : liste.findIndex((x) => x[0] === e);
+  if (issue === 'fait') i = liste.length;
+  const att = texteAttente(p, now);
+  return (
+    <ol data-etapes-detail style={{ listStyle: 'none', margin: '6px 0 0', padding: 0, display: 'flex', flexDirection: 'column', gap: 2, fontSize: 12, lineHeight: 1.45 }}>
+      {liste.map(([cle, nom], k) => {
+        const etat = k < i ? 'fait' : k === i ? (issue === 'echec' ? 'echec' : 'encours') : 'avenir';
+        let detail = '';
+        if (etat === 'encours') {
+          if (cle === 'photos' && p && p.total > 0) detail = `photo ${Math.min(p.fait + 1, p.total)} sur ${p.total}`;
+          if (e === 'secours-photos') detail = texteSecoursPhotos(p);
+          if (att) detail = detail ? `${detail} · ${att}` : att;
+        }
+        if (etat === 'fait' && cle === 'photos' && p && p.nPhotos > 0) detail = `${p.nPhotos} photo${p.nPhotos > 1 ? 's' : ''}`;
+        const signe = etat === 'fait' ? '✓' : etat === 'encours' ? '●' : etat === 'echec' ? '✗' : '○';
+        return (
+          <li key={cle} data-etape-detail={cle} data-etape-etat={etat} style={{ display: 'flex', gap: 6, color: etat === 'avenir' ? C.muted : etat === 'echec' ? C.warn : C.text, fontWeight: etat === 'encours' || etat === 'echec' ? 600 : 400 }}>
+            <span aria-hidden="true" style={{ width: 14, flexShrink: 0, textAlign: 'center', color: etat === 'encours' ? C.accent : 'inherit' }}>{signe}</span>
+            <span>{nom}{detail ? <span style={{ fontWeight: 400, color: C.muted }}> — {detail}</span> : null}{etat === 'echec' ? <span style={{ fontWeight: 400 }}> — arrêté ici</span> : null}</span>
+          </li>
+        );
+      })}
+    </ol>
+  );
+}
+function BarreGeste({ p, liste, attrs, label, issue = null, detail = true }) {
   const [now, setNow] = useState(() => Date.now());
   const enPause = !!(p && p.pause && p.pause.jusqua > now);
   useEffect(() => { if (!enPause) return undefined; const t = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(t); }, [enPause, p && p.pause && p.pause.jusqua]);
@@ -12016,7 +12061,8 @@ function BarreGeste({ p, liste, attrs, label }) {
       <div role="progressbar" aria-label={`${label ? label + ' : ' : ''}${pe.texte}`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(pe.part * 100)} style={{ height: 6, borderRadius: 3, background: C.border, overflow: 'hidden' }}>
         <div style={{ width: `${Math.max(4, Math.round(pe.part * 100))}%`, height: '100%', background: C.accent, transition: 'width .3s ease' }} />
       </div>
-      <div style={{ fontSize: 12, color: C.muted, marginTop: 4 }}>{pe.texte}{att ? ` · ${att}` : ''}</div>
+      <div style={{ fontSize: 12, color: C.muted, marginTop: 4 }}>{issue === 'echec' ? 'Arrêté — voir l’étape en ✗ ci-dessous' : pe.texte}{att && issue !== 'echec' ? ` · ${att}` : ''}</div>
+      {detail && <DetailEtapes p={p} liste={liste} issue={issue} now={now} />}
     </div>
   );
 }
@@ -12035,7 +12081,7 @@ function SuiviGeste({ ids, liste, label }) {
 function progressionRepub(p, action, viaB, listeImposee) {
   const liste = listeImposee || (action === 'versBrouillon' ? ETAPES_REPUB.versBrouillon : (viaB ? ETAPES_REPUB.brouillon : ETAPES_REPUB.direct));
   if (!p || !p.etape) return { etape: '', part: 0.03, texte: 'Préparation…' };
-  if (p.etape === 'secours-photos') { const j = liste.findIndex((x) => x[0] === 'en-ligne'); return { etape: p.etape, part: Math.min(0.97, Math.max(0, j) / liste.length + 0.5 / liste.length), texte: p.renvoi ? 'Vinted refuse les photos : VRM les renvoie, puis un dernier essai…' : 'Vinted refuse les photos : nouvel essai…' }; }
+  if (p.etape === 'secours-photos') { const j = liste.findIndex((x) => x[0] === 'en-ligne'); return { etape: p.etape, part: Math.min(0.97, Math.max(0, j) / liste.length + 0.5 / liste.length), texte: texteSecoursPhotos(p) + '…' }; }
   const i = liste.findIndex((x) => x[0] === p.etape);
   if (i < 0) return { etape: p.etape, part: 0.05, texte: 'En cours…' };
   const dedans = p.etape === 'photos' && p.total > 0 ? Math.min(1, p.fait / p.total) : 0;
@@ -12451,9 +12497,9 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
                   <span style={{ flexShrink: 0, maxWidth: '55%', textAlign: 'right', color: (s.etat === 'echec' || s.etat === 'double' || s.etat === 'incertain' || s.etat === 'a-refaire') ? C.warn : s.etat === 'fait' ? C.text : C.muted, fontWeight: s.etat ? 600 : 400 }}>{s.etat === 'fait' ? (s.refait ? `brouillon refait${s.raison ? ' · ' + s.raison : ''}` : A.fait) : s.etat === 'encours' ? 'en cours…' : s.etat === 'echec' ? `pas faite · ${s.raison}` : s.etat ? `⚠ ${s.raison}` : (mode === 'idle' ? '' : 'en attente')}</span>
                   {s.etat === 'a-refaire' && refaire && mode !== 'run' && <button type="button" data-republier-refaire={a.id} onClick={() => refaireLigne(a)} style={{ ...btn(true), flexShrink: 0 }}>Refaire le brouillon</button>}
                 </div>
-                {s.etat === 'encours' && recree && (() => { const lst = action === 'versBrouillon' ? ETAPES_REPUB.versBrouillon : ((viaBrouillon && !!brouillonOk) ? ETAPES_REPUB.brouillon : ETAPES_REPUB.direct); const pe = progressionRepub(prog[String(a.id)], action, viaBrouillon && !!brouillonOk); return (
+                {recree && (s.etat === 'encours' || (['echec', 'a-refaire', 'incertain', 'double'].includes(s.etat) && prog[String(a.id)] && prog[String(a.id)].etape)) && (() => { const lst = action === 'versBrouillon' ? ETAPES_REPUB.versBrouillon : ((viaBrouillon && !!brouillonOk) ? ETAPES_REPUB.brouillon : ETAPES_REPUB.direct); const pe = progressionRepub(prog[String(a.id)], action, viaBrouillon && !!brouillonOk); return (
                   <div data-republier-progression={a.id} data-republier-etape={pe.etape || 'attente'} style={{ padding: '0 10px 10px 36px', borderBottom: `1px solid ${C.border}` }}>
-                    <BarreGeste p={prog[String(a.id)]} liste={lst} label={`Paire ${i + 1}`} />
+                    <BarreGeste p={prog[String(a.id)]} liste={lst} label={`Paire ${i + 1}`} issue={s.etat === 'encours' ? null : 'echec'} />
                   </div>
                 ); })()}
               </React.Fragment>); })}
@@ -35529,7 +35575,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const basculerOffresAuto = async () => {
     if (offresAuto) { setOffresAuto(false); save('vinted_offres_auto', false); return; }
     const ok = await askConfirm({ title: 'Accepter les offres tout seul sur Vinted ?',
-      desc: "Dès qu'une offre atteint le « mini » d'une annonce, VRM l'accepte à ta place (une à la fois, un court délai entre chaque, uniquement le compte ouvert dans ce Chrome, plafond 20/h).\n\n⚠️ Important : sur Vinted, un programme qui accepte peut être vu comme un robot — c'est un risque pour le compte, que tu prends en l'allumant. Sur eBay c'est sans risque (réglage natif), pas sur Vinted.\n\nPose un « mini » sur les annonces que tu veux laisser partir à ce prix.",
+      desc: "Dès qu'une offre atteint le « mini » d'une annonce, VRM l'accepte à ta place, pas tout de suite : entre 3 et 20 minutes après l'avoir vue, tiré au hasard (une à la fois, uniquement le compte ouvert dans ce Chrome, plafond 20/h). L'extension doit rester ouverte dans Chrome pendant ce délai.\n\n⚠️ Important : sur Vinted, un programme qui accepte peut être vu comme un robot — c'est un risque pour le compte, que tu prends en l'allumant. Sur eBay c'est sans risque (réglage natif), pas sur Vinted.\n\nPose un « mini » sur les annonces que tu veux laisser partir à ce prix.",
       ok: 'Oui, accepter tout seul', cancel: 'Annuler' });
     if (!ok) return;
     setOffresAuto(true); save('vinted_offres_auto', true);
@@ -45138,7 +45184,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             <div style={{display:'flex',alignItems:'center',gap:10}}>
               <div style={{flex:1,minWidth:0}}>
                 <div style={{fontSize:13,fontWeight:600,color:C.text,display:'flex',alignItems:'center',gap:6}}><Icon name="tag" size={14} style={{color:offresAuto?C.accent:C.muted}}/>Accepter les offres automatiquement</div>
-                <div style={{fontSize:12,color:C.muted,marginTop:2,lineHeight:1.45}}>{offresAuto ? "Une offre qui atteint le « mini » d'une annonce est acceptée toute seule — une à la fois, un court délai entre chaque, le compte ouvert dans Chrome seulement. Sous ton « refuse », elle est refusée ; entre les deux, à toi de négocier." : "Pose un « mini » sur une annonce, et VRM accepte les offres au-dessus à ta place."}</div>
+                <div style={{fontSize:12,color:C.muted,marginTop:2,lineHeight:1.45}}>{offresAuto ? "Une offre qui atteint le « mini » d'une annonce est acceptée toute seule, entre 3 et 20 min après (au hasard) — une à la fois, le compte ouvert dans Chrome seulement. Sous ton « refuse », elle est refusée ; entre les deux, à toi de négocier." : "Pose un « mini » sur une annonce, et VRM accepte les offres au-dessus à ta place."}</div>
               </div>
               <button type="button" role="switch" aria-checked={offresAuto} data-offres-auto-toggle={offresAuto?'1':'0'} onClick={basculerOffresAuto}
                 style={{flexShrink:0,width:46,height:26,borderRadius:999,border:'none',cursor:'pointer',background:offresAuto?C.accent:C.border,position:'relative',transition:'background .15s'}} aria-label="Acceptation automatique des offres">
@@ -46032,7 +46078,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         <FavorisConnectes articlesVendus={articlesVendusFavoris} ecranActif={zoneMessages==='favoris'} chargementAutomatique={zoneMessages==='favoris'} key={'favoris:'+String(AUTH.user?.id||'')+':'+favorisUid} uid={favorisUid} nomCompte={favorisCompte?accNameOf(favorisCompte):''} owner={AUTH.user?.id||''} ownerActuel={()=>AUTH.user?.id||''} base={SUPABASE_URL} headers={()=>sbAuth()} executerFavori={t=>sondageConnu().then(()=>vmrExecUn({uid:favorisUid,method:'POST',endpoint:'/vrm/favoris',body:{jeton:t.jeton}},60000))} PhotoVinted={PhotoVinted}/>
         </div>
         <div className="vrm-message-workspace" hidden={zoneMessages!=='conversations'} style={{display:zoneMessages==='conversations'?undefined:'none'}}><div className="vrm-inbox-column">
-        <label className="vrm-msg-search" style={{color:C.muted}}><Icon name="search" size={16}/><input type="search" aria-label="Rechercher une conversation" placeholder="Rechercher" value={messageSearch} onChange={e=>setMessageSearch(e.target.value)} style={{color:C.text}}/></label>
+        <label className="vrm-msg-search" style={{color:C.muted}}><Icon name="search" size={16}/><input type="search" aria-label="Rechercher une conversation" maxLength={200} placeholder="Pseudo, article, N° de rangement…" value={messageSearch} onChange={e=>setMessageSearch(e.target.value)} style={{color:C.text}}/></label>
+        {!!messageSearch.trim()&&<p className="vrm-msg-recherche-portee" role="status">Recherche sur tous les comptes actifs.{messageFilter!=='all'&&<> Le filtre de conversation reste appliqué. <button type="button" onClick={()=>{setMessageFilter('all');setConvMax(40);}}>Afficher tous les résultats</button></>}</p>}
         {convs.loading && !convs.items && <Skeleton variant="row" count={2}/>}
         {convs.error && <LoadError onRetry={()=>loadConvs(true)}/>}
         {/* ── LA MESSAGERIE INTÉGRÉE (3 octobre) ─────────────────────────────
@@ -46054,9 +46101,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           //    comptes en lecture seule. Seul un choix EXPLICITE dans la liste
           //    « Compte » filtre encore ; « pas su » garde le comportement d'avant.
           const choixExplicite = !!compteSel && compteSel!=='*' && String(compteSel)===selEff;
-          const filtreMsg = choixExplicite ? selEff : (msgCompteActif ? '' : selEff);
+          const rechercheMessages=messageSearch.trim();
+          const filtreMsg = rechercheMessages?'':choixExplicite ? selEff : (msgCompteActif ? '' : selEff);
           const prioMsg = !filtreMsg && msgCompteActif ? msgCompteActif : '';
-          const liste=(convs.items||[]).filter(c=>!acctOffOf(c) && (!filtreMsg || uidC(c)===filtreMsg) && (!messageSearch.trim() || `${c.opposite_user?.login || ''} ${c.description || ''} ${c.item_title||c.item?.title||''}`.toLowerCase().includes(messageSearch.trim().toLowerCase())));
+          const liste=(convs.items||[]).filter(c=>accountUids.has(uidC(c))&&!acctOffOf(c)&&(!filtreMsg||uidC(c)===filtreMsg)&&(!rechercheMessages||correspondRechercheMessage(c,paireDeConv(uidC(c),c.id,null),rechercheMessages)));
           // ⚠️⚠️ LE NOMBRE VIENT DE LA LISTE AFFICHÉE (§5, §11 — revue du
           //    8 octobre). Depuis que les autres comptes sont estompés au lieu
           //    d'être retirés, `liste` les contient tous ; or ce compte ne
@@ -46183,7 +46231,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   </span>
                 </div>
               )}
-              {liste.length===0 && messageSearch.trim() && <p style={{fontSize:12,color:C.muted}}>Aucune conversation trouvée.</p>}
+              {liste.length===0 && messageSearch.trim() && <p style={{fontSize:12,color:C.muted}}>Aucun résultat parmi les conversations reçues. Essaie un pseudo, des mots de l’article ou le numéro précédé de N°.</p>}
               {liste.length===0 && !messageSearch.trim() && !boitesKO.length && <div style={{fontSize:13,color:C.muted,padding:'14px 0'}}>Aucune conversation captée pour l'instant — elles arrivent quand l'extension passe sur la messagerie Vinted de chaque compte.</div>}
               <div className="vrm-msg-list" style={{border:liste.length?`1px solid ${C.border}`:'none',background:C.card}}>
                 {affiches.map((c,i)=>{
@@ -46227,7 +46275,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       <span className="vrm-msg-body">
                         <span className="vrm-msg-l1">
                           <span className="vrm-msg-name"><span className="vrm-sensible">{nom}</span></span>
-                          {plusieurs && c._acc && <span className="vrm-msg-acc" style={{color:C.muted}}>· {accName(c._acc)}</span>}
+                          {(plusieurs||!!messageSearch.trim()) && c._acc && <span className="vrm-msg-acc" style={{color:C.muted}}>· {accName(c._acc)}</span>}
                           <time className="vrm-msg-time" dateTime={tsConv?new Date(tsConv).toISOString():undefined} title={tsConv?new Date(tsConv).toLocaleString('fr-FR',{weekday:'long',day:'numeric',month:'long',hour:'2-digit',minute:'2-digit'}):undefined} style={{color:c.unread&&!ro?C.accent:C.muted}}>{tsConv?heureMessage(tsConv):''}</time>
                         </span>
                         {(()=>{ const titre=(paire&&paire.titre)||c.item_title||c.item?.title||''; const morceaux=[paire&&paire.num?`N°${paire.num}`:null, paire&&paire.prix!=null?prix(paire.prix,paire.devise):null, titre||null].filter(Boolean); if(!morceaux.length && !(paire&&paire.etat)) return null; return (

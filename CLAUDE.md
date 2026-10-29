@@ -1,5 +1,33 @@
 # VRM — dossier de passation
 
+> **29 octobre — « les photos sont déjà là, pourquoi Vinted les refuse ? » (5.274) :** MESURÉ : sur ses brouillons faits par
+> VRM, Vinted refuse les photos à la mise en ligne ; le nouvel essai avec les MÊMES photos n'a jamais passé (0 sur 5), les photos
+> RENVOYÉES ont passé 5 fois sur 5. Cause pas encore mesurée (les numéros de photo que VRM rattache au brouillon). ⇒
+> `completionSecoursPhotos` renvoie tout de suite les photos du coffre (« essai 2 sur 2 », « photo n sur N »), plus d'essai inutile ;
+> si la mise en ligne bloque ensuite sur autre chose (la taille), les photos neuves sont GARDÉES dans le brouillon enregistré ; la
+> forme de la réponse de `POST /api/v2/photos` est relevée (`photo_reponse_forme`, clés et types) pour trouver la cause. Preuve :
+> `audit-recreer.cjs` (3 contrôles revus + « taille après photos »).
+
+> **29 octobre — offres acceptées avec un DÉLAI ALÉATOIRE, et les essais des photos dans la barre (5.273) :** Julien : « accepter
+> les offres automatiquement avec un délai aléatoire ». Le moteur (`autoAccepterOffres`, éteint par défaut) n'accepte plus dès
+> qu'il voit l'offre : à la première vue, l'heure est TIRÉE entre 3 et 20 min (`delaiOffreMs`, `vrmOffresPrevues` dans
+> chrome.storage.local) ; l'alarme `vrm-offres` (1 min) ne lit QUE ce stockage et relance le moteur quand une heure est passée
+> (`offresTick`). Tous les garde-fous restent (compte de l'onglet, 20/h, pause, une fois par offre, 15-45 s entre deux).
+> Preuve : `audit-moteur-offres.cjs` A2 (rien au 1er passage, heure entre 3 et 20 min, alarme muette avant l'heure). Barre :
+> photos refusées ⇒ « essai 2 sur 3 », « VRM les renvoie — photo 6 sur 14 » (`texteSecoursPhotos`) ; mesuré : sur la Spezial,
+> photos refusées puis renvoyées, PUIS refus de la taille (`completion_photos_renvoyees` 5 = `vinted_refus_champs_size` 5).
+
+> **29 octobre — Republier : la barre DÉTAILLE chaque étape, et la taille refusée par Vinted (5.272) :** Julien : « tout doit
+> être détaillé dans la barre de progression » ; « pas faite · Vinted a refusé la mise en ligne (400 : size (Le champ Taille
+> doit être renseigné)) ». Barre : `DetailEtapes` sous chaque barre (`data-etapes-detail`, `data-etape-detail`/`data-etape-etat`
+> fait · encours · avenir · echec) — photo n sur N, nombre de photos parties, pause au hasard et son compte à rebours, nouvel
+> essai des photos ; une paire qui n'aboutit pas GARDE son détail avec ✗ à l'étape où elle s'est arrêtée. MESURÉ : le brouillon
+> de la Spezial 38 (10579996668) porte catalogue 2632 + taille 2033 (acceptés par Vinted le 15 oct.) ; une P-6000 du même
+> catalogue passe avec 1197 ⇒ Vinted ne reconnaît plus ce code de taille. VRM ne choisit jamais une taille : `tailleRefusee` /
+> `gesteRefus` ajoutent le geste (Mes brouillons → Modifier → taille → Publier) aux quatre refus de mise en ligne et gardent la
+> forme (`rates.vinted_refus_taille` : catalogue + codes). `/api/v2/item_upload/attributes` est vu, sa forme jamais. Preuve :
+> banc `republier.cjs` (221 ; détail par étape, ✗ sur la paire arrêtée).
+
 > **29 octobre — BROUILLON MIS EN LIGNE À LA MAIN, et les RÉDUCTIONS lisibles (5.271) :** Julien : « elle n'a pas capté
 > que j'avais fait passer un brouillon en ligne à la main », « j'ai encore un brouillon qu'elle ne capte pas », « les
 > réductions je ne comprends rien ». MESURÉ (lecture seule) : Sacai 10577417715 et Zoom Fly 10576081722 EN LIGNE dans leur

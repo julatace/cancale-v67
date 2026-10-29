@@ -254,6 +254,16 @@ const projette = (row, sel) => {
           dit(/pause au hasard avant la mise en ligne : encore 2\d s/.test(txtPause), 'une pause annoncée par l’extension : la barre dit ce qu’il reste à attendre (« encore 25 s »)', txtPause || 'absente');
           dit(vu && /Étape 4 sur 6/.test(txt) && /brouillon/i.test(txt), 'barre de progression : la paire en cours dit son étape (« Étape 4 sur 6 · Création du brouillon »)', txt || 'absente');
           dit(tot === '0/4', 'barre d’ensemble : « 0 sur 4 terminées » pendant la première paire', String(tot));
+          // (29 oct., « tout doit être détaillé dans la barre de progression ») chaque étape, son état.
+          const det = await pg.$$eval('[data-republier-progression="9103"] [data-etape-detail]', (els) => els.map((e) => e.getAttribute('data-etape-detail') + ':' + e.getAttribute('data-etape-etat')).join(','));
+          dit(det === 'photos:fait,enregistrement:fait,suppression:fait,brouillon:encours,attente:avenir,en-ligne:avenir', 'la barre détaille CHAQUE étape (✓ faites, ● en cours, ○ à venir)', det || 'absente');
+          const txtDet = await pg.locator('[data-republier-progression="9103"] [data-etape-detail="photos"]').innerText().catch(() => '');
+          dit(/3 photos/.test(txtDet), 'l’étape des photos dit combien sont parties (« 3 photos »)', txtDet || 'absente');
+          const ev = (d) => pg.evaluate((x) => window.dispatchEvent(new CustomEvent('vrm:ext', { detail: { type: 'maj', quoi: 'repub', id: '9103', ...x } })), d);
+          await ev({ etape: 'secours-photos', renvoi: true, essai: 2, essais: 2, fait: 5, total: 14 });
+          const txtSec = await pg.locator('[data-republier-progression="9103"] [data-etape-detail="en-ligne"]').innerText().catch(() => '');
+          dit(/essai 2 sur 2/.test(txtSec) && /photo 6 sur 14/.test(txtSec), 'photos refusées : la barre dit l’essai (2 sur 2) et la photo renvoyée (6 sur 14)', txtSec || 'absente');
+          await ev({ etape: 'brouillon' });
           // (28 oct., sa demande) Le compte rendu est écrit à chaque pas, pendant la file.
           globalThis.__jMid = await pg.evaluate(() => localStorage.getItem('vrm_operation_repub'));
           let jm = {}; try { jm = JSON.parse(globalThis.__jMid || '{}'); } catch (_) {}
@@ -261,7 +271,10 @@ const projette = (row, sel) => {
           dit(jm.action === 'recreer' && !jm.fini && pc.etat === 'encours' && pc.etape === 'brouillon' && (jm.paires || []).filter((x) => x.etat === 'attente').length === 3, 'pendant la file, l’appareil garde où elle en est (9103 en cours, étape brouillon, 3 pas commencées)', String(globalThis.__jMid).slice(0, 200)); }
         for (let i = 0; i < 40; i++) { const m = await pg.locator('[data-republier]').getAttribute('data-republier-mode'); if (m === 'fini' || m === 'pause') break; await pg.waitForTimeout(250); }
         const envois = await pg.evaluate(() => window.__repub || []);
-        dit(await pg.locator('[data-republier-progression]').count() === 0, 'plus aucune barre de paire une fois la file arrêtée', String(await pg.locator('[data-republier-progression]').count()));
+        { const ids = await pg.$$eval('[data-republier-progression]', (els) => els.map((e) => e.getAttribute('data-republier-progression')).join(','));
+          const ko = await pg.$$eval('[data-republier-progression="9103"] [data-etape-etat="echec"]', (els) => els.map((e) => e.getAttribute('data-etape-detail')).join(','));
+          dit(ids === '9103', 'file arrêtée : seule la paire qui n’a pas abouti garde son détail', ids || 'aucune');
+          dit(ko === 'brouillon', 'la paire qui n’a pas abouti montre ✗ à l’étape où elle s’est arrêtée', ko || 'aucune'); }
         dit(envois.length === 4, 'UNE commande par paire choisie (4)', JSON.stringify(envois.map((x) => x.id)));
         dit(envois.map((x) => x.id).join(',') === '9103,9102,9106,9107', 'les paires sont recréées DANS L’ORDRE affiché', envois.map((x) => x.id).join(','));
         dit(await pg.locator('[data-republier]').getAttribute('data-republier-mode') === 'pause' && await pg.locator('[data-republier-arret]').count() === 1, 'Vinted demande de ralentir : la file S’ARRÊTE et le dit (pas une rafale de refus)', await pg.locator('[data-republier-arret]').innerText().catch(() => 'absent'));
