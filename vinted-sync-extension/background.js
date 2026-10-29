@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.286.0';
+const CODE_VERSION = '5.287.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -143,7 +143,7 @@ async function saveSession(sess) {
   VRM_SESSION = s;
   if (avant?.user_id !== s?.user_id) {
     try { _memoVisite.clear(); } catch (_) {}
-    try { await chrome.storage.local.remove(['vrmLogins','vrmCompteEcrit']); } catch (_) {}
+    try { await chrome.storage.local.remove(['vrmLogins','vrmCompteEcrit','vrmLbcARetirer']); } catch (_) {}
   }
   try {
     if (s) await chrome.storage.local.set({ [SESSION_STORE]: s });
@@ -10043,14 +10043,21 @@ const BASCULE_VISIBLE_MS = 7 * 86400000;
 // ⇒ la dernière connue, sinon rien (pas su ≠ rien à retirer : la carte se tait).
 const LBC_A_RETIRER_RELU_MS = 5 * 60e3;
 async function lbcARetirerPourCarte() {
+  // (29 oct., revue) La copie est celle d'UN compte VRM : un autre compte connecté
+  // dans ce Chrome ne voit jamais la liste du précédent (`u`, et le changement de
+  // session l'efface aussi).
+  let u = '';
+  try { const s = await loadSession(); u = String((s && (s.user_id || subDuJwt(s.access_token))) || ''); } catch (_) { u = ''; }
+  if (!u) return null;
   let c = null;
   try { c = (await chrome.storage.local.get('vrmLbcARetirer')).vrmLbcARetirer || null; } catch (_) { c = null; }
+  if (c && c.u !== u) c = null;
   if (!c || !(Date.now() - Number(c.lu || 0) < LBC_A_RETIRER_RELU_MS)) {
     const lire = (async () => {
       const rows = await sbGet('app_data?id=eq.lbc_a_retirer&select=a:data');
       if (rows === null) return null;
       const d = rows[0] && rows[0].a;
-      const v = { lu: Date.now(), data: d && typeof d === 'object' && Array.isArray(d.liste) ? { at: String(d.at || ''), liste: d.liste.slice(0, 30) } : null };
+      const v = { u, lu: Date.now(), data: d && typeof d === 'object' && Array.isArray(d.liste) ? { at: String(d.at || ''), liste: d.liste.slice(0, 30) } : null };
       try { await chrome.storage.local.set({ vrmLbcARetirer: v }); } catch (_) {}
       return v;
     })();
@@ -14030,7 +14037,16 @@ async function storeLbcListingsUneFois(url, listings,owner) {
       // (29 oct.) Une suppression ACCEPTÉE par Leboncoin (réponse 2xx, vue sur la
       // page ou demandée depuis VRM) est sans retour : une réponse en retard de
       // l'index qui la montre encore « active » ne la remet pas en vente.
-      if(ancien.supprimeeAt){n.statutLbc=String(l.status||n.statutLbc||'');n.status='deleted';}
+      // ⚠️ (29 oct., revue) BORNÉE COMME LA PAUSE : la marque peut venir d'un
+      // message de la page (qu'un script du site peut forger), et la réponse de
+      // Leboncoin à la suppression n'est jamais relue. Au-delà de
+      // `LBC_PAUSE_INDEX_MS`, une capture qui montre l'annonce vivante la remet en
+      // vente : la donnée la plus récente gagne.
+      if(ancien.supprimeeAt){
+        const st=String(l.status||'');
+        if(st&&!LBC_ANNONCE_MORTE.test(st)&&!(Date.now()-Date.parse(ancien.supprimeeAt)<=LBC_PAUSE_INDEX_MS)){n.status=st;delete n.supprimeeAt;delete n.supprimeeStatut;delete n.supprimeePar;n.statutLbc=st;}
+        else{n.statutLbc=String(l.status||n.statutLbc||'');n.status='deleted';}
+      }
       merged[String(l.id)]=n;
     } }
     // (22 oct.) On garde les autres clés de la ligne — `lectures`, la date de la
@@ -14144,6 +14160,14 @@ async function noterListeLbcComplete(owner, ids, total) {
           const n = Object.assign({}, ad); let change = false;
           if (n.plusVueAt) { delete n.plusVueAt; change = true; }
           if (n.pauseAt && maintenant - Date.parse(n.pauseAt) > LBC_PAUSE_INDEX_MS) { delete n.pauseAt; delete n.pauseStatut; change = true; }
+          // (29 oct., revue) Une suppression marquée il y a plus d'une heure, et
+          // l'annonce TOUJOURS dans sa liste complète : elle n'est pas supprimée.
+          // Son dernier état connu de Leboncoin revient (`statutLbc`), sauf s'il
+          // dit lui-même qu'elle est morte.
+          if (n.supprimeeAt && maintenant - Date.parse(n.supprimeeAt) > LBC_PAUSE_INDEX_MS) {
+            const st = String(n.statutLbc || 'active');
+            if (!LBC_ANNONCE_MORTE.test(st)) { n.status = st; delete n.supprimeeAt; delete n.supprimeeStatut; delete n.supprimeePar; change = true; }
+          }
           if (change) { items[id] = n; reviennent++; }
         } else if (lbcSortieDe(ad) !== 'plusvue') {
           const vu = Date.parse(ad.seenAt || '');

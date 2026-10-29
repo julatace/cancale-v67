@@ -25,7 +25,7 @@
 .vrm-lbc-catalog li>b{font-size:12px;white-space:nowrap;font-variant-numeric:tabular-nums;}
 .vrm-lbc-catalog-gestes{display:flex;align-items:center;gap:4px;}
 .vrm-lbc-catalog-gestes a,.vrm-lbc-catalog-gestes button{display:flex;align-items:center;justify-content:center;gap:4px;min-height:44px;min-width:44px;color:inherit;font:inherit;font-size:11px;text-decoration:none;background:transparent;border:0;padding:0 6px;cursor:pointer;border-radius:8px;}
-.vrm-lbc-catalog-gestes button{color:var(--vrm-danger,#b0443d);}
+/* (29 oct., revue) Les gestes de la ligne à l’encre neutre (§7) : le danger se dit dans la confirmation. */
 .vrm-lbc-catalog-gestes button:disabled{opacity:.5;cursor:default;}
 .vrm-lbc-catalog-note,.vrm-lbc-catalog-vide,.vrm-lbc-catalog>p{padding:12px 16px;margin:0;color:var(--gestion-muted,#52636b);line-height:1.6;}
 .vrm-lbc-catalog-note{font-size:11px;border-top:1px solid var(--gestion-line,#dce5e1);}

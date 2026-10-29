@@ -182,11 +182,19 @@ const deborde = (pg) => pg.evaluate(() => ({ sw: document.documentElement.scroll
       // UNE fois sous la liste, pas sur chaque ligne ; chaque compte reste nommé.
       const g0 = await o2.pg.evaluate(() => { const e = document.querySelector('[data-messages-lbc]'); const t = e ? e.innerText : ''; return { n: (t.match(/connecte-toi une fois/g) || []).length, shop: /SHOPCANCALE/.test(t), autre: /Autre boutique/.test(t), tirets: [...document.querySelectorAll('[data-compte-lbc]')].length }; });
       dit(g0.n === 1 && g0.shop && g0.autre && g0.tirets === 3, 'Messages : deux comptes pas encore lus — le geste est dit UNE fois, chaque compte reste nommé', JSON.stringify(g0));
+      // (29 oct., revue) Un compte pas encore lu n'est pas dit deux fois : la
+      // ligne ne porte que « — », son état est dans la phrase du dessous.
+      const g1 = await o2.pg.evaluate(() => { const e = document.querySelector('[data-messages-lbc]'); const t = e ? e.innerText : ''; return { etat: (t.match(/pas encore (?:été )?lus?\b/g) || []).length, shop: (t.match(/SHOPCANCALE/g) || []).length }; });
+      dit(g1.etat === 1 && g1.shop === 1, '… l’état « pas encore lu » est écrit UNE fois, et chaque compte nommé une fois', JSON.stringify(g1));
       await o2.pg.click('[data-lbc-zone-favoris]').catch(() => {});
       await o2.pg.waitForSelector('[data-favoris-lbc]', { timeout: 10000 }).catch(() => {});
       await o2.pg.waitForTimeout(400);
       const f = await o2.pg.evaluate(() => { const e = document.querySelector('[data-favoris-lbc]'); return e ? { etat: e.getAttribute('data-favoris-lbc'), t: e.innerText, lignes: [...e.querySelectorAll('[data-favoris-lbc-annonce]')].map((x) => x.getAttribute('data-favoris-lbc-annonce') + ':' + x.getAttribute('data-favoris')) } : null; });
       dit(f && f.lignes.join() === '3290000001:9,3290000002:4,3290000005:passu', 'Favoris reçus : SES annonces EN VENTE sur Leboncoin, triées par favoris (pas celle vendue sur Leboncoin)', f && f.lignes.join());
+      // (29 oct., revue) Un relevé sans date de fin (`au`) : daté par l'heure où
+      // l'extension l'a pris, jamais un « relevé » en l'air.
+      const l1 = await o2.pg.evaluate(() => { const e = document.querySelector('[data-favoris-lbc-annonce="3290000001"]'); return e ? e.innerText.replace(/\s+/g, ' ') : ''; });
+      dit(/relevé il y a/.test(l1) && !/relevé(?!\s+(?:le|il y a))/.test(l1), 'Favoris reçus : un relevé sans date de fin est daté (« relevé il y a … »)', l1);
       dit(f && /jamais qui/i.test(f.t) && /écrire à personne/.test(f.t), '… la phrase dit que Leboncoin ne donne pas QUI, et que VRM n’écrit à personne', f && f.t.slice(0, 160));
       dit(f && !/\b0 ♡/.test(f.t) && /—/.test(f.t), '… un nombre jamais relevé s’écrit « — », pas 0', f && f.t.replace(/\n/g, ' · ').slice(0, 200));
       dit(f && (f.t.match(/ouvre (?:ses|les) statistiques/gi) || []).length === 1, '… le geste « ouvre ses statistiques » est dit UNE fois (pas sur chaque annonce pas relevée)', f && String((f.t.match(/ouvre (?:ses|les) statistiques/gi) || []).length));

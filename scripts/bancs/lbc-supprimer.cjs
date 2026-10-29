@@ -48,15 +48,18 @@ const ITEMS = {
   '3290000005': { id: '3290000005', subject: 'Salomon XT-6 blanc taille 40', price: 99, account: MON, platform: 'leboncoin', status: 'active', seenAt: auj.toISOString(), images: ['https://img.test/l5.jpg'] },
   '3290000006': { id: '3290000006', subject: 'Asics gel kayano vendue', price: 70, account: MON, platform: 'leboncoin', status: 'sold', seenAt: auj.toISOString(), images: [] },
 };
-const rows = [
-  { id: 'main', data: MAIN },
+// (29 oct., revue) Les variantes : `items` remplace des annonces Leboncoin,
+// `main` ajoute des clés à la ligne `main`, `extra` ajoute des lignes.
+const construire = (o = {}) => [
+  { id: 'main', data: Object.assign({}, MAIN, o.main || {}) },
   { id: 'harvest_111_listings', data: LISTINGS },
   txn(9001, 5001), txn(9003, 5003),
   // La marque « publiée » (sa dernière écriture) : AVANT la liste complète lue il y a 72 min.
   { id: 'vinted_lbc_posted', data: { ids: ['5001', '5003'], updatedAt: ilYa(3) } },
-  { id: 'lbc_listings', data: { items: ITEMS, lectures: { [MON]: { at: ilYa(0.05), total: 3, n: 3 } } } },
+  { id: 'lbc_listings', data: { items: Object.assign({}, ITEMS, o.items || {}), lectures: { [MON]: { at: ilYa(0.05), total: 3, n: 3 } } } },
   { id: 'lbc_accounts', data: { accounts: { [MON]: { id: MON, name: 'Totomondu', sessionAt: auj.toISOString(), source: 'session:messagerie' } } } },
   { id: 'lbc_ventes', data: { ventes: {} } },
+  ...(o.extra || []),
 ];
 const ECRITS = [];
 let ko = 0;
@@ -106,7 +109,8 @@ const PONT = ({ mode, suite }) => {
   post({ __vmr: 'ready', version, id: 'ext-banc' });
 };
 
-async function ouvrir(b, vp, pont) {
+async function ouvrir(b, vp, pont, o = {}) {
+  const rows = construire(o);
   const ctx = await b.newContext({ viewport: vp, ...(vp.width < 600 ? { isMobile: true, hasTouch: true } : {}) });
   const pg = await ctx.newPage();
   const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
@@ -130,7 +134,8 @@ async function ouvrir(b, vp, pont) {
     return j([]);
   });
   await pg.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"pret":true}' }));
-  await pg.goto(`http://localhost:${PORT}/?tab=leboncoin`, { waitUntil: 'domcontentloaded' });
+  await pg.goto(`http://localhost:${PORT}/?tab=${o.tab || 'leboncoin'}`, { waitUntil: 'domcontentloaded' });
+  if (o.tab && o.tab !== 'leboncoin') { await pg.waitForTimeout(2500); return { ctx, pg, errs }; }
   await pg.waitForSelector('[data-lbc-retirer]', { timeout: 20000 }).catch(() => {});
   await pg.waitForTimeout(1500);
   return { ctx, pg, errs };
@@ -174,6 +179,14 @@ const cliquer = (pg, texte) => pg.evaluate((tx) => { const b = [...document.quer
       dit(v.suppr.join() === '3290000001', '« Supprimer de Leboncoin » sur la N°18 vendue sur Vinted (la ligne « à retirer »)', JSON.stringify(v.suppr));
       dit(v.boutons.includes('3290000001'), '… la mise en pause reste proposée à côté', JSON.stringify(v.boutons));
       dit(v.supprCat.includes('3290000002') && !v.supprCat.includes('3290000006'), '« Mes annonces » : Supprimer sur une annonce en ligne, jamais sur une vendue', JSON.stringify({ supprCat: v.supprCat, cat: v.catIds }));
+      // (29 oct., revue) §7 : le rouge est réservé à deux paires sous un même N°.
+      // Aucun geste de la ligne (« à retirer », « Mes annonces ») n'est rouge : le
+      // danger se dit dans la confirmation.
+      const rouges = await pg.evaluate(() => {
+        const rouge = (c) => { const m = /rgba?\((\d+),\s*(\d+),\s*(\d+)/.exec(c || ''); return !!m && +m[1] > 150 && +m[2] < 110 && +m[3] < 110; };
+        return [...document.querySelectorAll('[data-lbc-retirer] button, [data-lbc-catalog-id] button')].filter((e) => { const cs = getComputedStyle(e); return rouge(cs.color) || rouge(cs.borderTopColor); }).map((e) => e.textContent.trim() + ' ' + getComputedStyle(e).color);
+      });
+      dit(rouges.length === 0, 'aucun geste de la ligne n’est en rouge (« Supprimer », « Supprimer de Leboncoin »)', rouges.slice(0, 4).join(' | '));
       await pg.click('[data-lbc-retirer] [data-lbc-supprimer="3290000001"]').catch(() => {});
       await pg.waitForTimeout(500);
       const f1 = await feuilleS(pg);
@@ -237,6 +250,58 @@ const cliquer = (pg, texte) => pg.evaluate((tx) => { const b = [...document.quer
       const v5 = await lire(o4.pg);
       dit(v5.suppr.length === 0 && v5.supprCat.length === 0 && v5.liens.length >= 1, 'aucun bouton ; le lien « voir sur Leboncoin » reste', JSON.stringify({ s: v5.suppr, c: v5.supprCat }));
       await o4.ctx.close();
+
+      // (29 oct., revue) eBay → Leboncoin : une annonce désignée par le SEUL
+      // « n15 » de son titre ne reçoit ni « Supprimer » (sans retour) ni la pause.
+      console.log(`── ${vp.width} px · vendue sur eBay, annonce Leboncoin reliée par son titre seulement`);
+      const ebayRow = { id: 'ebay_orders', data: { capturedAt: auj.toISOString(), orders: [{ orderId: '11-0001', creationDate: auj.toISOString(), orderPaymentStatus: 'PAID', orderFulfillmentStatus: 'NOT_STARTED', lineItems: [{ sku: 'VRM-15', legacyItemId: '1100001', title: 'Salomon XT-6' }] }] } };
+      const o5 = await ouvrir(b, vp, { mode: 'ok', suite: 'fait' }, { items: { '3290000005': Object.assign({}, ITEMS['3290000005'], { subject: 'Salomon XT-6 blanc n15' }) }, extra: [ebayRow] });
+      await o5.pg.waitForTimeout(1500);
+      const v6 = await o5.pg.evaluate(() => ({ suppr: [...document.querySelectorAll('[data-lbc-retirer] [data-lbc-supprimer="3290000005"]')].length, pause: [...document.querySelectorAll('[data-lbc-retirer] [data-lbc-pause="3290000005"]')].length, ebay: [...document.querySelectorAll('[data-lbc-retirer-ebay] ~ [data-lbc-retirer], [data-lbc-retirer="3290000005"]')].map((e) => e.innerText.slice(0, 60)) }));
+      dit(v6.suppr === 0 && v6.pause === 0, 'aucun « Supprimer » ni pause sur une annonce désignée par le seul « n15 » de son titre', JSON.stringify(v6));
+      await o5.ctx.close();
+      // L'autre sens : la même annonce porte la RÉFÉRENCE VRM 15 ⇒ « vendue sur eBay », avec ses gestes.
+      const o6 = await ouvrir(b, vp, { mode: 'ok', suite: 'fait' }, { items: { '3290000005': Object.assign({}, ITEMS['3290000005'], { ref: '15' }) }, extra: [ebayRow] });
+      await o6.pg.waitForSelector('[data-lbc-retirer-ebay]', { timeout: 8000 }).catch(() => {});
+      const v7 = await o6.pg.evaluate(() => ({ ebay: (document.querySelector('[data-lbc-retirer-ebay]') || { getAttribute: () => null }).getAttribute('data-lbc-retirer-ebay'), suppr: document.querySelectorAll('[data-lbc-retirer] [data-lbc-supprimer="3290000005"]').length }));
+      dit(v7.ebay === '1' && v7.suppr === 1, '… et par sa référence VRM : « vendue sur eBay — à retirer » avec « Supprimer de Leboncoin »', JSON.stringify(v7));
+      await o6.ctx.close();
+
+      // (29 oct., revue) Ma journée et le logo VRM : LA MÊME preuve que l'écran
+      // Leboncoin (la transaction). La N°15 n'est « vendue » que par un rapprochement
+      // de titre (`vinted_annonces_email_sold`) : ni Ma journée, ni la liste publiée
+      // pour le logo ne la comptent ; aucune entrée sans N° ni annonce ne part.
+      console.log(`── ${vp.width} px · Ma journée = l'écran Leboncoin (preuve par transaction seulement)`);
+      ECRITS.length = 0;
+      const oj = await ouvrir(b, vp, { mode: 'ok', suite: 'fait' }, { tab: 'journee', main: { vinted_annonces_email_sold: ['5004'] }, items: { '3290000005': Object.assign({}, ITEMS['3290000005'], { ref: '15' }) } });
+      await oj.pg.waitForFunction(() => [...document.querySelectorAll('[data-job]')].some((e) => /à retirer de Leboncoin/.test(e.innerText)), null, { timeout: 15000 }).catch(() => {});
+      await oj.pg.waitForTimeout(1200);
+      const lj = await oj.pg.evaluate(() => { const e = [...document.querySelectorAll('[data-job]')].find((x) => /à retirer de Leboncoin/.test(x.innerText)); return e ? e.innerText.replace(/\s+/g, ' ') : ''; });
+      dit(/N°18/.test(lj) && !/N°15/.test(lj) && /(^|\D)1 à retirer de Leboncoin/.test(lj), 'Ma journée : « 1 à retirer de Leboncoin — N°18 », pas la N°15 rapprochée par titre', lj.slice(0, 120));
+      const pubs = ECRITS.filter((x) => /lbc_a_retirer/.test(x.corps)).map((x) => { try { const c = JSON.parse(x.corps); const r = Array.isArray(c) ? c[0] : c; return r.data.liste; } catch (_) { return null; } });
+      const toutes = pubs.flat().filter(Boolean);
+      dit(pubs.length >= 1 && toutes.every((r) => r.numero === '18') && toutes.every((r) => r.numero || r.lbcId), 'la liste publiée pour le logo VRM : la N°18 seulement, jamais une ligne vide', JSON.stringify(pubs).slice(0, 200));
+      // Le clic mène À la paire, pas en haut de l'écran Leboncoin.
+      await oj.pg.evaluate(() => { const e = [...document.querySelectorAll('[data-job]')].find((x) => /à retirer de Leboncoin/.test(x.innerText)); if (e) e.click(); });
+      await oj.pg.waitForSelector('[data-lbc-retirer]', { timeout: 20000 }).catch(() => {});
+      await oj.pg.waitForTimeout(3500);
+      const pos = await oj.pg.evaluate(() => { const e = document.querySelector('[data-lbc-retirer]'); if (!e) return null; const r = e.getBoundingClientRect(); return { top: Math.round(r.top), h: window.innerHeight }; });
+      dit(pos && pos.top >= 0 && pos.top < pos.h, '« Voir » de Ma journée amène la paire à retirer à l’écran', JSON.stringify(pos));
+      dit(oj.errs.length === 0, 'aucune erreur d’app (Ma journée)', oj.errs.join(' | ').slice(0, 160));
+      await oj.ctx.close();
+
+      // (29 oct., revue) Republier sans extension, sur un ORDINATEUR : la cause est
+      // l'extension absente d'ici, pas le relais du téléphone.
+      if (vp.width > 600) {
+        console.log(`── ${vp.width} px · Republier sans extension, sur ordinateur`);
+        const or = await ouvrir(b, vp, { mode: 'absente' }, { items: { '3290000005': Object.assign({}, ITEMS['3290000005'], { ref: '15' }) } });
+        await or.pg.waitForSelector('[data-repub-lbc-ouvrir]', { timeout: 8000 }).catch(() => {});
+        await or.pg.click('[data-repub-lbc-ouvrir]').catch(() => {});
+        await or.pg.waitForTimeout(800);
+        const tr = await or.pg.evaluate(() => document.body.innerText);
+        dit(!/relais du téléphone/.test(tr) && /pas détectée dans ce navigateur/.test(tr), 'la feuille dit « l’extension n’est pas détectée dans ce navigateur », pas « le relais du téléphone »', (tr.match(/.{0,60}(relais du téléphone|pas détectée dans ce navigateur).{0,40}/) || [''])[0]);
+        await or.ctx.close();
+      }
     }
   } catch (e) { dit(false, 'le banc a tourné jusqu’au bout', String(e && e.message).slice(0, 160)); }
   finally { if (b) await b.close(); srv.close(); }

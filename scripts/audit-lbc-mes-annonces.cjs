@@ -42,7 +42,9 @@ if (process.argv.includes('--prouve')) {
     ['retraitStatutFond', 'src', "|| !(msg.quoi === 'supprime' || msg.quoi === 'pause') || !(statut >= 200 && statut < 300)) { sendResponse({ ok: false }); return; }", "|| !(msg.quoi === 'supprime' || msg.quoi === 'pause')) { sendResponse({ ok: false }); return; }"],
     ['statsUnId', 'inject', "if (new Set(ids).size !== 1) return;", "if (!ids.length) return;"],
     ['statsMiens', 'src', "if (!ad || typeof ad !== 'object' || !miens.has(idCompteLbc(ad.account || ad.lbcUser))) { noterDiag('lbc_stats_pas_a_lui'); return { ok: true, n: 0 }; }", "if (!ad || typeof ad !== 'object') { return { ok: true, n: 0 }; }"],
-    ['suppressionCollante', 'src', "if(ancien.supprimeeAt){n.statutLbc=String(l.status||n.statutLbc||'');n.status='deleted';}", ""],
+    ['suppressionCollante', 'src', "if(st&&!LBC_ANNONCE_MORTE.test(st)&&!(Date.now()-Date.parse(ancien.supprimeeAt)<=LBC_PAUSE_INDEX_MS))", "if(st&&!LBC_ANNONCE_MORTE.test(st))"],
+    ['suppressionDefinitiveCapture', 'src', "if(st&&!LBC_ANNONCE_MORTE.test(st)&&!(Date.now()-Date.parse(ancien.supprimeeAt)<=LBC_PAUSE_INDEX_MS))", "if(false)"],
+    ['suppressionDefinitiveListe', 'src', "if (n.supprimeeAt && maintenant - Date.parse(n.supprimeeAt) > LBC_PAUSE_INDEX_MS) {", "if (false) {"],
     ['compteursSansFiltre', 'src', "if (/^[A-Za-z_][A-Za-z0-9_]{0,39}$/.test(k) && typeof v !== 'boolean' && v !== '' && v !== null && Number.isFinite(n) && n >= 0 && n < 1e7) cpt[k] = Math.round(n);", "cpt[k] = v;"],
     ['retraitSite', 'src', "|| !/^https:\\/\\/(?:[a-z0-9-]+\\.)*leboncoin\\.fr\\//i.test(tabUrl) || !ids", "|| !ids"],
   ];
@@ -203,11 +205,11 @@ const retraits = (p) => p.envoyes.filter((m) => m.action === 'lbcRetraitVu');
 (async () => {
   console.log('── 1. « MES ANNONCES » (dashboard/v1/search) : une liste complète décide');
   await essaie('tableau complet', async () => {
-    const p = page({ reseau: (u) => (u === TABLEAU ? repT([annonce(3288619155, MON), annonce(3290171110, MON)], 2) : null) });
+    const p = page({ reseau: (u) => (u === TABLEAU ? repT([annonce(3290000101, MON), annonce(3290000102, MON)], 2) : null) });
     await p.charge(TABLEAU, { method: 'POST', body: corpsT() });
     await attendre(60);
     const l = listes(p);
-    dit(l.length === 1 && l[0].owner === MON && l[0].total === 2 && JSON.stringify(l[0].ids.slice().sort()) === JSON.stringify(['3288619155', '3290171110']), 'sa page « Mes annonces » lue en entier (total atteint) ⇒ la liste complète part au fond', JSON.stringify(l.map((x) => [x.total, x.ids])));
+    dit(l.length === 1 && l[0].owner === MON && l[0].total === 2 && JSON.stringify(l[0].ids.slice().sort()) === JSON.stringify(['3290000101', '3290000102']), 'sa page « Mes annonces » lue en entier (total atteint) ⇒ la liste complète part au fond', JSON.stringify(l.map((x) => [x.total, x.ids])));
   });
   await essaie('tableau en deux pages', async () => {
     let n = 0;
@@ -242,21 +244,21 @@ const retraits = (p) => p.envoyes.filter((m) => m.action === 'lbcRetraitVu');
   console.log('\n── 2. UNE SUPPRESSION FAITE SUR LA PAGE EST VUE (réponse 2xx seulement)');
   await essaie('suppression 200', async () => {
     const p = page({ reseau: (u) => (u === URL_SUPPR ? { status: 200, body: {} } : null) });
-    await p.charge(URL_SUPPR, { method: 'DELETE', body: JSON.stringify({ list_ids: [3290168823] }) });
+    await p.charge(URL_SUPPR, { method: 'DELETE', body: JSON.stringify({ list_ids: [3290000104] }) });
     await attendre(60);
     const r = retraits(p);
-    dit(r.length === 1 && r[0].quoi === 'supprime' && JSON.stringify(r[0].ids) === JSON.stringify(['3290168823']) && r[0].statut === 200, 'le bouton « Supprimer » de Leboncoin (200) ⇒ le fond est prévenu, identifiant seulement', JSON.stringify(r));
+    dit(r.length === 1 && r[0].quoi === 'supprime' && JSON.stringify(r[0].ids) === JSON.stringify(['3290000104']) && r[0].statut === 200, 'le bouton « Supprimer » de Leboncoin (200) ⇒ le fond est prévenu, identifiant seulement', JSON.stringify(r));
   });
   await essaie('suppression refusée', async () => {
     const p = page({ reseau: (u) => (u === URL_SUPPR ? { status: 403, body: {} } : null) });
-    await p.charge(URL_SUPPR, { method: 'DELETE', body: JSON.stringify({ list_ids: [3290168823] }) });
+    await p.charge(URL_SUPPR, { method: 'DELETE', body: JSON.stringify({ list_ids: [3290000104] }) });
     await attendre(60);
     dit(retraits(p).length === 0, 'Leboncoin refuse (403) ⇒ rien n’est dit au fond (l’annonce est toujours en ligne)', `${retraits(p).length} envoi(s)`);
   });
   await essaie('pause 200', async () => {
     const URLP = `${API}/pintad/v1/public/manual/pause/ads`;
     const p = page({ reseau: (u) => (u === URLP ? { status: 200, body: {} } : null) });
-    await p.charge(URLP, { method: 'PUT', body: JSON.stringify({ list_ids: [3288619155] }) });
+    await p.charge(URLP, { method: 'PUT', body: JSON.stringify({ list_ids: [3290000101] }) });
     await attendre(60);
     const r = retraits(p);
     dit(r.length === 1 && r[0].quoi === 'pause', 'une mise en pause faite sur la page (200) est vue aussi', JSON.stringify(r));
@@ -265,60 +267,60 @@ const retraits = (p) => p.envoyes.filter((m) => m.action === 'lbcRetraitVu');
   console.log('\n── 3. LE FOND : SES annonces seulement, et jamais sur une lecture ratée');
   const comptes = { accounts: { ['lbc-account:' + MON]: { id: 'lbc-account:' + MON, name: 'Totomondu', sessionAt: '2026-10-29T09:32:00.000Z', preuveCompte: 'membre-prive-v1' }, [MON]: { id: MON, sessionAt: '2026-10-29T09:32:00.000Z', source: 'session:messagerie' } } };
   const items0 = () => ({
-    '3288619155': { id: '3288619155', subject: 'Jordan 3', ref: '2', account: MON, status: 'active', seenAt: new Date().toISOString() },
-    '3290168823': { id: '3290168823', subject: 'Shox TL', ref: '18', account: MON, status: 'active', seenAt: '2026-10-28T22:47:52.000Z' },
-    '3266097702': { id: '3266097702', subject: 'Spezial noir', account: MON, status: 'active', seenAt: '2026-09-20T16:08:20.000Z' },
-    '90100001': { id: '90100001', subject: 'Chalet', account: AUTRE, status: 'active', seenAt: '2026-09-20T16:08:20.000Z' },
+    '3290000101': { id: '3290000101', subject: 'Jordan 4 gris', ref: '2', account: MON, status: 'active', seenAt: new Date().toISOString() },
+    '3290000104': { id: '3290000104', subject: 'Shox TL', ref: '18', account: MON, status: 'active', seenAt: '2026-10-27T09:00:00.000Z' },
+    '3290000103': { id: '3290000103', subject: 'Gazelle bleue', account: MON, status: 'active', seenAt: '2026-09-21T10:00:00.000Z' },
+    '90100001': { id: '90100001', subject: 'Chalet', account: AUTRE, status: 'active', seenAt: '2026-09-21T10:00:00.000Z' },
   });
   await essaie('suppression rangée', async () => {
     const f = fond({ lbc_listings: { items: items0() }, lbc_accounts: comptes });
-    const r = await f.envoyer({ action: 'lbcRetraitVu', quoi: 'supprime', ids: ['3290168823', '90100001'], statut: 200 });
+    const r = await f.envoyer({ action: 'lbcRetraitVu', quoi: 'supprime', ids: ['3290000104', '90100001'], statut: 200 });
     await attendre(40);
     const it = (f.base.lbc_listings || {}).items || {};
     dit(r && r.ok === true, 'le fond accepte', JSON.stringify(r));
-    dit(it['3290168823'] && it['3290168823'].status === 'deleted' && !!it['3290168823'].supprimeeAt && it['3290168823'].statutLbc === 'active', 'son annonce supprimée sur Leboncoin ⇒ `deleted`, l’heure notée, l’état d’avant gardé', JSON.stringify(it['3290168823']));
+    dit(it['3290000104'] && it['3290000104'].status === 'deleted' && !!it['3290000104'].supprimeeAt && it['3290000104'].statutLbc === 'active', 'son annonce supprimée sur Leboncoin ⇒ `deleted`, l’heure notée, l’état d’avant gardé', JSON.stringify(it['3290000104']));
     dit(it['90100001'] && it['90100001'].status === 'active' && !it['90100001'].supprimeeAt, 'l’annonce d’un autre vendeur n’est jamais touchée', JSON.stringify(it['90100001']));
-    dit(!!it['3290168823'] && it['3290168823'].subject === 'Shox TL', 'rien n’est effacé : l’annonce reste en base');
+    dit(!!it['3290000104'] && it['3290000104'].subject === 'Shox TL', 'rien n’est effacé : l’annonce reste en base');
   });
   await essaie('suppression : lecture ratée', async () => {
     const f = fond({ lbc_listings: { items: items0() }, lbc_accounts: comptes }, {}, { pannes: ['lbc_listings'] });
-    await f.envoyer({ action: 'lbcRetraitVu', quoi: 'supprime', ids: ['3290168823'], statut: 200 });
+    await f.envoyer({ action: 'lbcRetraitVu', quoi: 'supprime', ids: ['3290000104'], statut: 200 });
     await attendre(40);
     dit(!f.ecrits.includes('lbc_listings'), 'lecture de lbc_listings KO (522) ⇒ RIEN n’est écrit', JSON.stringify(f.ecrits));
   });
   await essaie('suppression : message hors Leboncoin', async () => {
     const f = fond({ lbc_listings: { items: items0() }, lbc_accounts: comptes });
-    await f.envoyer({ action: 'lbcRetraitVu', quoi: 'supprime', ids: ['3290168823'], statut: 200 }, { tab: { id: 1, url: 'https://www.exemple.fr/' }, frameId: 0 });
-    await f.envoyer({ action: 'lbcRetraitVu', quoi: 'supprime', ids: ['3290168823'], statut: 404 });
+    await f.envoyer({ action: 'lbcRetraitVu', quoi: 'supprime', ids: ['3290000104'], statut: 200 }, { tab: { id: 1, url: 'https://www.exemple.fr/' }, frameId: 0 });
+    await f.envoyer({ action: 'lbcRetraitVu', quoi: 'supprime', ids: ['3290000104'], statut: 404 });
     await attendre(40);
     dit(!f.ecrits.includes('lbc_listings'), 'autre site, ou réponse non 2xx ⇒ rien', JSON.stringify(f.ecrits));
   });
   await essaie('bout en bout tableau', async () => {
     const f = fond({ lbc_listings: { items: items0() }, lbc_accounts: comptes });
-    const p = page({ reseau: () => repT([annonce(3288619155, MON)], 1),
+    const p = page({ reseau: () => repT([annonce(3290000101, MON)], 1),
       fond: (m) => (m.action === 'lbcListeComplete' || m.action === 'lbcRetraitVu' ? f.envoyer(m).then((r) => r || { ok: true }) : { ok: true }) });
     await p.charge(TABLEAU, { method: 'POST', body: corpsT() });
     await attendre(250);
     const it = (f.base.lbc_listings || {}).items || {};
-    dit(!!(it['3266097702'] && it['3266097702'].plusVueAt) && !!(it['3290168823'] && it['3290168823'].plusVueAt) && !it['3288619155'].plusVueAt, 'sa page « Mes annonces » sort les annonces qu’elle ne montre plus, et elles seules', JSON.stringify(Object.fromEntries(Object.entries(it).map(([k, v]) => [k, !!v.plusVueAt]))));
-    dit(it['3266097702'] && it['3266097702'].status === 'active', '« plus vue » n’est pas « vendue » : le statut n’est pas réécrit');
+    dit(!!(it['3290000103'] && it['3290000103'].plusVueAt) && !!(it['3290000104'] && it['3290000104'].plusVueAt) && !it['3290000101'].plusVueAt, 'sa page « Mes annonces » sort les annonces qu’elle ne montre plus, et elles seules', JSON.stringify(Object.fromEntries(Object.entries(it).map(([k, v]) => [k, !!v.plusVueAt]))));
+    dit(it['3290000103'] && it['3290000103'].status === 'active', '« plus vue » n’est pas « vendue » : le statut n’est pas réécrit');
   });
 
   console.log('\n── 3 bis. CE QUE LEBONCOIN DIT DE CHAQUE ANNONCE (des nombres, jamais qui)');
   const pageFond = (f, reseau) => page({ reseau, fond: (m) => f.envoyer(m).then((r) => r || { ok: true }) });
   await essaie('compteurs et dates', async () => {
     const f = fond({ lbc_listings: { items: items0() }, lbc_accounts: comptes });
-    const a = annonce(3288619155, MON, { counters: { favorites: 3, libelle: 'x', vu: true }, first_publication_date: '2026-10-17 18:36:52', index_date: '2026-10-27 09:21:23' });
+    const a = annonce(3290000101, MON, { counters: { favorites: 3, libelle: 'x', vu: true }, first_publication_date: '2026-10-17 18:36:52', index_date: '2026-10-27 09:21:23' });
     const p1 = pageFond(f, () => repT([a], 1));
     await p1.charge(TABLEAU, { method: 'POST', body: corpsT() });
     await attendre(250);
-    const it = ((f.base.lbc_listings || {}).items || {})['3288619155'] || {};
+    const it = ((f.base.lbc_listings || {}).items || {})['3290000101'] || {};
     dit(it.compteurs && it.compteurs.favorites === 3 && !('libelle' in it.compteurs) && !('vu' in it.compteurs), 'les compteurs de « Mes annonces » sont gardés tels que Leboncoin les nomme, nombres seulement', JSON.stringify(it.compteurs));
     dit(it.publieeLe === '2026-10-17 18:36:52' && it.indexeeLe === '2026-10-27 09:21:23', 'la date de mise en ligne vient de Leboncoin (jamais l’heure de capture)', JSON.stringify([it.publieeLe, it.indexeeLe]));
-    const p2 = pageFond(f, () => repT([annonce(3288619155, MON, { counters: {} })], 1));
+    const p2 = pageFond(f, () => repT([annonce(3290000101, MON, { counters: {} })], 1));
     await p2.charge(TABLEAU, { method: 'POST', body: corpsT() });
     await attendre(250);
-    const it2 = ((f.base.lbc_listings || {}).items || {})['3288619155'] || {};
+    const it2 = ((f.base.lbc_listings || {}).items || {})['3290000101'] || {};
     dit(it2.compteurs && it2.compteurs.favorites === 3, 'une lecture sans compteur n’efface pas le dernier chiffre connu', JSON.stringify(it2.compteurs));
   });
   const STATS = `${API}/stats/proxy/v2/classified/history/daily`;
@@ -326,29 +328,65 @@ const retraits = (p) => p.envoyes.filter((m) => m.action === 'lbcRetraitVu');
   await essaie('statistiques d’une annonce', async () => {
     const f = fond({ lbc_listings: { items: items0() }, lbc_accounts: comptes });
     const p = pageFond(f, (u) => (u.startsWith(STATS) ? { status: 200, body: jours } : null));
-    await p.charge(STATS + '?id=3288619155&period=7', {});
+    await p.charge(STATS + '?id=3290000101&period=7', {});
     await attendre(250);
-    const st = (((f.base.lbc_listings || {}).items || {})['3288619155'] || {}).stats || null;
+    const st = (((f.base.lbc_listings || {}).items || {})['3290000101'] || {}).stats || null;
     dit(!!st && st.favoris === 6 && st.messages === 3 && st.vues === 25 && st.au === '2026-10-28', 'la page « Statistiques » d’une de SES annonces : favoris et messages du dernier jour, vues de la période', JSON.stringify(st));
   });
   await essaie('statistiques ambiguës', async () => {
     const f = fond({ lbc_listings: { items: items0() }, lbc_accounts: comptes });
     const p = pageFond(f, (u) => (u.startsWith(STATS) ? { status: 200, body: jours } : null));
-    await p.charge(STATS + '?id=3288619155&autre=3290168823', {});
+    await p.charge(STATS + '?id=3290000101&autre=3290000104', {});
     await p.charge(STATS + '?id=90100001', {});
     await attendre(250);
     const it = (f.base.lbc_listings || {}).items || {};
-    dit(!(it['3288619155'] || {}).stats && !(it['90100001'] || {}).stats, 'deux identifiants dans l’adresse, ou l’annonce d’un autre vendeur ⇒ rien n’est attribué', JSON.stringify([!!(it['3288619155'] || {}).stats, !!(it['90100001'] || {}).stats]));
+    dit(!(it['3290000101'] || {}).stats && !(it['90100001'] || {}).stats, 'deux identifiants dans l’adresse, ou l’annonce d’un autre vendeur ⇒ rien n’est attribué', JSON.stringify([!!(it['3290000101'] || {}).stats, !!(it['90100001'] || {}).stats]));
   });
   await essaie('suppression sans retour', async () => {
     const f = fond({ lbc_listings: { items: items0() }, lbc_accounts: comptes });
-    await f.envoyer({ action: 'lbcRetraitVu', quoi: 'supprime', ids: ['3290168823'], statut: 200 });
+    await f.envoyer({ action: 'lbcRetraitVu', quoi: 'supprime', ids: ['3290000104'], statut: 200 });
     await attendre(40);
-    const p = pageFond(f, () => repT([annonce(3290168823, MON)], 1));
+    const p = pageFond(f, () => repT([annonce(3290000104, MON)], 1));
     await p.charge(TABLEAU, { method: 'POST', body: corpsT() });
     await attendre(250);
-    const it = ((f.base.lbc_listings || {}).items || {})['3290168823'] || {};
+    const it = ((f.base.lbc_listings || {}).items || {})['3290000104'] || {};
     dit(it.status === 'deleted' && !!it.supprimeeAt, 'une suppression acceptée par Leboncoin est sans retour : une lecture en retard qui la montre « active » ne la remet pas en vente', JSON.stringify({ status: it.status, supprimeeAt: !!it.supprimeeAt }));
+  });
+
+  // (29 oct., revue) LA MARQUE « SUPPRIMÉE » EST BORNÉE COMME LA PAUSE : elle peut
+  // venir d'un message de la page (forgeable), et la réponse de Leboncoin n'est
+  // jamais relue. Plus d'une heure après, ce qui montre l'annonce vivante gagne.
+  const ilYaH = (h) => new Date(Date.now() - h * 3600e3).toISOString();
+  await essaie('suppression ancienne, capture qui la montre active', async () => {
+    const items = items0(); items['3290000104'] = Object.assign({}, items['3290000104'], { status: 'deleted', statutLbc: 'active', supprimeeAt: ilYaH(2), supprimeeStatut: 200 });
+    const f = fond({ lbc_listings: { items }, lbc_accounts: comptes });
+    // Une page PARTIELLE (1 annonce sur 3) : elle ne décide rien de la liste, mais montre l'annonce active.
+    const p = pageFond(f, () => repT([annonce(3290000104, MON)], 3));
+    await p.charge(TABLEAU, { method: 'POST', body: corpsT() });
+    await attendre(250);
+    const it = ((f.base.lbc_listings || {}).items || {})['3290000104'] || {};
+    dit(it.status === 'active' && !it.supprimeeAt, 'une suppression marquée il y a plus d’une heure : une capture qui la montre active la remet en vente', JSON.stringify({ status: it.status, supprimeeAt: !!it.supprimeeAt }));
+  });
+  await essaie('suppression ancienne, liste complète qui la porte', async () => {
+    const items = items0(); items['3290000104'] = Object.assign({}, items['3290000104'], { status: 'deleted', statutLbc: 'active', supprimeeAt: ilYaH(2), supprimeeStatut: 200 });
+    const f = fond({ lbc_listings: { items }, lbc_accounts: comptes });
+    await f.envoyer({ action: 'lbcListeComplete', owner: MON, ids: ['3290000101', '3290000104'], total: 2 });
+    await attendre(80);
+    const it = ((f.base.lbc_listings || {}).items || {})['3290000104'] || {};
+    dit(it.status === 'active' && !it.supprimeeAt, '… et une liste « Mes annonces » COMPLÈTE plus récente qui la porte aussi', JSON.stringify({ status: it.status, supprimeeAt: !!it.supprimeeAt }));
+  });
+  await essaie('suppression forgée par la page', async () => {
+    const f = fond({ lbc_listings: { items: items0() }, lbc_accounts: comptes });
+    const p = pageFond(f, () => null);
+    // Un script du site poste le message sans AUCUNE requête DELETE.
+    p.win.postMessage({ __tag: 'CANCALE_LBC', kind: 'lbcretraitvu', quoi: 'supprime', ids: ['3290000104'], statut: 200 });
+    await attendre(200);
+    const avant = ((f.base.lbc_listings || {}).items || {})['3290000104'] || {};
+    if (avant.supprimeeAt) avant.supprimeeAt = ilYaH(2);   // l'index de Leboncoin a eu le temps
+    await f.envoyer({ action: 'lbcListeComplete', owner: MON, ids: ['3290000101', '3290000104'], total: 2 });
+    await attendre(80);
+    const it = ((f.base.lbc_listings || {}).items || {})['3290000104'] || {};
+    dit(it.status === 'active' && !it.supprimeeAt, 'une marque posée par un message de la page (sans requête) n’est pas définitive', JSON.stringify({ forgee: !!avant.supprimeeAt, status: it.status }));
   });
 
   console.log('\n── 4. LA RÈGLE PARTAGÉE (app) : supprimée ou plus vue ⇒ plus « en vente »');

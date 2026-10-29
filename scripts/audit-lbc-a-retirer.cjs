@@ -23,6 +23,7 @@ if (process.argv.includes('--prouve')) {
     ['pasSuVautRien', 'app', "if (!(vendus && typeof vendus.has === 'function')) return null;", "if (!(vendus && typeof vendus.has === 'function')) vendus = new Set();"],
     ['revenueIgnoree', 'app', "if (k && (vivants.has(k) || out.has(k) || (sortis && sortis.has(k)))) continue;", "if (k && (out.has(k) || (sortis && sortis.has(k)))) continue;"],
     ['carteSansCache', 'src', "if (!c || !(Date.now() - Number(c.lu || 0) < LBC_A_RETIRER_RELU_MS)) {", "if (true) {"],
+    ['carteSansCompte', 'src', "if (c && c.u !== u) c = null;", ""],
   ];
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'lbc-a-retirer-'));
   let tous = true;
@@ -66,17 +67,17 @@ function extraire(src, nom) {
   const f = R ? R.aRetirerDeLbcVinted : () => { throw new Error('règle absente'); };
   const num = (n, t) => ({ numero: n, title: t || 'Paire ' + n });
   const ad = (id, ref, extra) => Object.assign({ id: String(id), subject: 'Annonce ' + id, ref, status: 'active', account: 'compte', seenAt: new Date().toISOString(), url: 'https://www.leboncoin.fr/ad/chaussures/' + id, price: 55 }, extra || {});
-  const nums = { '1001': num('18', 'Nike shox TL'), '2001': num('2', 'Jordan 3'), '2002': num('2', 'Jordan 3'), '3001': num('23', 'Air max 1') };
+  const nums = { '1001': num('18', 'Nike shox TL'), '2001': num('2', 'Jordan 4 gris'), '2002': num('2', 'Jordan 4 gris'), '3001': num('23', 'Air max 1') };
   await essaie('N°18 réelle', async () => {
-    const r = f({ posted: ['1001'], numeros: nums, enLigne: new Set(['1001', '3001']), vendus: new Set(['1001']), itemsLbc: { '3290168823': ad(3290168823, '18'), '3290171110': ad(3290171110, '23') }, liens: {}, vendusLbc: new Set(), sortis: new Set() });
-    dit(Array.isArray(r) && r.length === 1 && r[0].numero === '18' && r[0].lbcId === '3290168823', 'vendue PROUVÉE sur Vinted, annonce Vinted encore ouverte, annonce Leboncoin réf 18 en vente ⇒ à retirer (une ligne, son annonce)', JSON.stringify(r));
+    const r = f({ posted: ['1001'], numeros: nums, enLigne: new Set(['1001', '3001']), vendus: new Set(['1001']), itemsLbc: { '3290000104': ad(3290000104, '18'), '3290000102': ad(3290000102, '23') }, liens: {}, vendusLbc: new Set(), sortis: new Set() });
+    dit(Array.isArray(r) && r.length === 1 && r[0].numero === '18' && r[0].lbcId === '3290000104', 'vendue PROUVÉE sur Vinted, annonce Vinted encore ouverte, annonce Leboncoin réf 18 en vente ⇒ à retirer (une ligne, son annonce)', JSON.stringify(r));
   });
   await essaie('republiée', async () => {
-    const r = f({ posted: ['2001'], numeros: nums, enLigne: new Set(['2002']), vendus: new Set(['2001']), itemsLbc: { '3288619155': ad(3288619155, '2') }, liens: {}, vendusLbc: new Set(), sortis: new Set() });
+    const r = f({ posted: ['2001'], numeros: nums, enLigne: new Set(['2002']), vendus: new Set(['2001']), itemsLbc: { '3290000101': ad(3290000101, '2') }, liens: {}, vendusLbc: new Set(), sortis: new Set() });
     dit(Array.isArray(r) && r.length === 0, 'une AUTRE annonce Vinted en ligne et non vendue porte le N° ⇒ la paire est revenue : rien', JSON.stringify(r));
   });
   await essaie('pas su', async () => {
-    const r = f({ posted: ['1001'], numeros: nums, enLigne: new Set(), vendus: null, itemsLbc: { '3290168823': ad(3290168823, '18') }, liens: {}, vendusLbc: new Set(), sortis: new Set() });
+    const r = f({ posted: ['1001'], numeros: nums, enLigne: new Set(), vendus: null, itemsLbc: { '3290000104': ad(3290000104, '18') }, liens: {}, vendusLbc: new Set(), sortis: new Set() });
     dit(r === null, 'preuve de vente illisible ⇒ `null` (pas su), jamais une alerte inventée ni « rien »', JSON.stringify(r));
   });
   await essaie('titre seul', async () => {
@@ -88,20 +89,20 @@ function extraire(src, nom) {
     dit(Array.isArray(r) && r.length === 1 && r[0].lbcId === '3290000009', 'un lien posé à la main est une identité ⇒ à retirer', JSON.stringify(r));
   });
   await essaie('déjà partie de Leboncoin', async () => {
-    const it = { '3290168823': ad(3290168823, '18', { status: 'deleted', supprimeeAt: new Date().toISOString() }) };
+    const it = { '3290000104': ad(3290000104, '18', { status: 'deleted', supprimeeAt: new Date().toISOString() }) };
     const r1 = f({ posted: ['1001'], numeros: nums, enLigne: new Set(), vendus: new Set(['1001']), itemsLbc: it, liens: {}, vendusLbc: new Set(), sortis: new Set() });
     dit(Array.isArray(r1) && r1.length === 1 && r1[0].lbcId === '', 'annonce reliée supprimée mais SANS preuve qu’aucune autre ne porte la paire ⇒ la ligne « publiée » reste (doute)', JSON.stringify(r1));
     const r2 = f({ posted: ['1001'], numeros: nums, enLigne: new Set(), vendus: new Set(['1001']), itemsLbc: it, liens: {}, vendusLbc: new Set(), sortis: new Set(['18']) });
     dit(Array.isArray(r2) && r2.length === 0, '… avec la preuve (liste complète de ses comptes après la marque) ⇒ plus rien à retirer', JSON.stringify(r2));
   });
   await essaie('vendue sur Leboncoin', async () => {
-    const r = f({ posted: [], numeros: nums, enLigne: new Set(), vendus: new Set(['1001']), itemsLbc: { '3290168823': ad(3290168823, '18') }, liens: {}, vendusLbc: new Set(['3290168823']), sortis: new Set() });
+    const r = f({ posted: [], numeros: nums, enLigne: new Set(), vendus: new Set(['1001']), itemsLbc: { '3290000104': ad(3290000104, '18') }, liens: {}, vendusLbc: new Set(['3290000104']), sortis: new Set() });
     dit(Array.isArray(r) && r.length === 0, 'une annonce vendue sur Leboncoin n’y est plus en vente : rien à retirer (l’autre alerte, « vendue deux fois », la dit)', JSON.stringify(r));
   });
 
   console.log('\n── 2. LE LOGO VRM SUR LEBONCOIN.FR LIT LE RÉSUMÉ PUBLIÉ (background.js)');
   await essaie('carte du logo', async () => {
-    const base = { lbc_a_retirer: { v: 1, at: '2026-10-29T10:00:00.000Z', liste: [{ numero: '18', lbcId: '3290168823', titre: 'Nike shox TL', url: 'https://www.leboncoin.fr/ad/chaussures/3290168823' }] } };
+    const base = { lbc_a_retirer: { v: 1, at: '2026-10-29T10:00:00.000Z', liste: [{ numero: '18', lbcId: '3290000104', titre: 'Nike shox TL', url: 'https://www.leboncoin.fr/ad/chaussures/3290000104' }] } };
     let panne = false, lectures = 0;
     const local = {};
     const dual = (fn) => function (...a) { const cb = a[a.length - 1]; const v = fn(...(typeof cb === 'function' ? a.slice(0, -1) : a)); if (typeof cb === 'function') { Promise.resolve(v).then(cb); return; } return Promise.resolve(v); };
@@ -126,6 +127,15 @@ function extraire(src, nom) {
     dit(d1 && Array.isArray(d1.liste) && d1.liste.length === 1 && d1.liste[0].numero === '18', 'le résumé publié par VRM arrive sur la carte', JSON.stringify(d1));
     const n1 = lectures; await ctx.lbcARetirerPourCarte();
     dit(lectures === n1, 'relu au plus toutes les 5 min (pas une lecture par page)', `${n1} → ${lectures}`);
+    // (29 oct., revue) Un AUTRE compte VRM connecté dans ce Chrome ne voit jamais
+    // la liste du précédent (copie liée au compte).
+    const sessA = ctx.loadSession;
+    ctx.loadSession = async () => ({ access_token: 'jetonB', user_id: 'vendeur_B', expires_at: Date.now() + 3600e3 }); ctx.authToken = ctx.loadSession;
+    const sauve = base.lbc_a_retirer; base.lbc_a_retirer = { v: 1, at: '2026-10-29T11:00:00.000Z', liste: [] };
+    const dB = await ctx.lbcARetirerPourCarte();
+    dit(dB && Array.isArray(dB.liste) && dB.liste.length === 0, 'un autre compte VRM dans ce Chrome ne voit pas la liste du précédent', JSON.stringify(dB));
+    base.lbc_a_retirer = sauve; ctx.loadSession = sessA; ctx.authToken = sessA;
+    await ctx.lbcARetirerPourCarte();
     local.vrmLbcARetirer.lu = Date.now() - 6 * 60e3; panne = true;
     const d2 = await ctx.lbcARetirerPourCarte();
     dit(d2 && d2.liste && d2.liste.length === 1, 'base en panne ⇒ la dernière connue (pas su ≠ rien à retirer)', JSON.stringify(d2));

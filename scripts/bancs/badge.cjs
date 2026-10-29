@@ -256,8 +256,8 @@ const cliquer = async (pg) => { await pg.mouse.click(1512 - 16 - 22, 900 - 16 - 
   console.log('\n── Leboncoin : une paire vendue sur Vinted est encore en ligne ici');
   const LBC_OK = { ok: true, plateforme: 'leboncoin', capte: true, version: '5.250.0', vrm: { ok: true, connecte: true, email: 'sophie@exemple.fr', cloisonne: true }, site: { id: '9', nom: 'Sophie B.', type: 'particulier' }, flux: { okAt: Date.now() - 3 * MIN }, bascule: null };
   await essaie('à retirer', async () => {
-    const etat = Object.assign({}, LBC_OK, { aRetirer: { at: new Date(Date.now() - 5 * MIN).toISOString(), liste: [{ numero: '18', lbcId: '3290168823', titre: 'Nike shox TL noir et bleu marine taille 40', url: 'https://www.leboncoin.fr/ad/chaussures/3290168823' }] } });
-    const { ctx, pg } = await rendre(nav, etat, { url: 'https://www.leboncoin.fr/ad/chaussures/3290168823' });
+    const etat = Object.assign({}, LBC_OK, { aRetirer: { at: new Date(Date.now() - 5 * MIN).toISOString(), liste: [{ numero: '18', lbcId: '3290000104', titre: 'Paire inventée taille 40', url: 'https://www.leboncoin.fr/ad/chaussures/3290000104' }] } });
+    const { ctx, pg } = await rendre(nav, etat, { url: 'https://www.leboncoin.fr/ad/chaussures/3290000104' });
     await survoler(pg);
     const l = await lire(pg);
     dit(l.point, 'la pastille s’allume : il y a un geste à faire');

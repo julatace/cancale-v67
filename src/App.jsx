@@ -125,7 +125,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.286.0';
+const EXT_ATTENDUE = '5.287.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -520,7 +520,7 @@ const extEnRetard = (v) => !!v && cmpVersion(v, EXT_ATTENDUE) < 0;
 //    « l'extension relève le suivi » plus tôt viserait une extension qui ne le
 //    fait pas — un faux dans l'autre sens (revue du 24 oct. ; corrigé le
 //    26 oct. avec la session extension, qui a relu l'historique).
-const EXT_CAPACITES = { favorisouvrir:'5.225.0', favorisliste:'5.218.0', suivivinted: '5.217.0', favoris: '5.217.0', liaison: '5.171.0', supprimees: '5.165.0', enligne: '5.170.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', preuves: '5.172.0', etatcompte: '5.181.0', lbcfiche: '5.182.0', relais: '5.183.0', lbcpack: '5.185.0', annulee: '5.185.0', confirmer: '5.206.0', retraitnotif: '5.206.0', offresauto: '5.234.0', vcpublier: '5.235.0', vcauto: '5.236.0', vcventes: '5.237.0', vcmessages: '5.238.0', vcachats: '5.239.0', republier: '5.240.0', republiermodif: '5.247.0', recreer: '5.248.0', lettre: '5.250.0', brouillon: '5.251.0', versbrouillon: '5.253.0', republierbrouillon: '5.254.0', refaire: '5.255.0', republierpage: '5.277.0', republierfile: '5.279.0', favorisperso: '5.281.0', lbcsupprime: '5.286.0', lbcstats: '5.286.0' };
+const EXT_CAPACITES = { favorisouvrir:'5.225.0', favorisliste:'5.218.0', suivivinted: '5.217.0', favoris: '5.217.0', liaison: '5.171.0', supprimees: '5.165.0', enligne: '5.170.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', preuves: '5.172.0', etatcompte: '5.181.0', lbcfiche: '5.182.0', relais: '5.183.0', lbcpack: '5.185.0', annulee: '5.185.0', confirmer: '5.206.0', retraitnotif: '5.206.0', offresauto: '5.234.0', vcpublier: '5.235.0', vcauto: '5.236.0', vcventes: '5.237.0', vcmessages: '5.238.0', vcachats: '5.239.0', republier: '5.240.0', republiermodif: '5.247.0', recreer: '5.248.0', lettre: '5.250.0', brouillon: '5.251.0', versbrouillon: '5.253.0', republierbrouillon: '5.254.0', refaire: '5.255.0', republierpage: '5.277.0', republierfile: '5.279.0', favorisperso: '5.281.0', lbcsupprime: '5.287.0', lbcstats: '5.287.0' };
 // Trois états, jamais un seul : pas d'extension ici · en retard · à jour.
 const extSait = (quoi) => {
   if (!vmrExtPresent()) return 'absente';                    // téléphone, autre navigateur
@@ -26883,6 +26883,10 @@ const DEMANDE_STOCK_CHERCHE = { nums: null, at: 0 };
 // commande à ouvrir dans eBay → Ventes. Au niveau MODULE (l'écran eBay n'est pas
 // monté au moment du clic) ; lue une fois, valable 30 s.
 const DEMANDE_EBAY_CIBLE = { compte: null, id: null, at: 0 };
+// (29 oct., revue) Ma journée « N à retirer de Leboncoin » ouvrait Leboncoin →
+// Annonces en HAUT, deux écrans au-dessus de la paire. La cible est posée au clic
+// (`avant`), l'écran Leboncoin la consomme une fois ses données rendues.
+const DEMANDE_LBC_CIBLE = { sel: null, at: 0 };
 
 // ── LA PIÈCE VUE DU DESSUS (17 oct.) ────────────────────────────────────────
 // Julien : « je veux avoir la possibilité quand on crée la pièce de la créer avec
@@ -43644,7 +43648,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         //    passent ici, après les tuiles (§4.11 : rien ne disparaît en silence).
         if (Array.isArray(alertes)) for (const a of alertes) {
           if (!a || !(a.dv || a.jr)) continue;
-          if (a.dv) jobs.push({id:'double-vente', n:a.n, icon:a.ic||'alert', color:a.dv==='num'?C.danger:C.warn, urgent:true, title:a.text, tab:a.tab, prio:-1});
+          if (a.dv) jobs.push({id:'double-vente', n:a.n, icon:a.ic||'alert', color:a.dv==='num'?C.danger:C.warn, urgent:true, title:a.text, tab:a.tab, prio:-1, avant:a.avant});
           else jobs.push({id:a.job||('a-faire-'+a.ic), n:a.n, icon:a.ic||'info', color:a.urssaf&&a.urssaf.proche?C.warn:C.text, title:a.text, sub:a.sub, tab:a.tab, prio:3, urssaf:a.urssaf});
         }
         // (21-22 oct.) MA JOURNÉE EN WIDGETS : les colis EN RETARD et les colis
@@ -43809,7 +43813,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         const tache = (j, i) => (j.urssaf && Array.isArray(j.urssaf.aNoter) && j.urssaf.aNoter.length > 0) ? (
           <div className="vrm-day-task" key={(j.id||'j')+i} role="group" data-job={j.id||undefined} data-n={j.n!=null?j.n:undefined} data-urssaf-echeance={j.urssaf.dueIso} data-urssaf-apayer={j.urssaf.apayer==null?'':String(j.urssaf.apayer)} data-urssaf-partiel={j.urssaf.partiel?'1':undefined}
             style={{display:'flex',alignItems:'center',gap:13,padding:'14px 15px',borderRadius:10,border:`1px solid ${C.border}`,background:C.card,boxShadow:C.shadow||'none',textAlign:'left',width:'100%',minWidth:0,boxSizing:'border-box',flexWrap:'wrap'}}>
-            <button type="button" title={j.sub} onClick={()=>{ if (onNav) onNav(j.tab); }} style={{display:'flex',alignItems:'center',gap:13,flex:'1 1 220px',minWidth:0,background:'transparent',border:0,padding:0,margin:0,cursor:'pointer',textAlign:'left',fontFamily:'inherit',color:'inherit'}}>
+            <button type="button" title={j.sub} onClick={()=>{ if (j.avant) j.avant(); if (onNav) onNav(j.tab); }} style={{display:'flex',alignItems:'center',gap:13,flex:'1 1 220px',minWidth:0,background:'transparent',border:0,padding:0,margin:0,cursor:'pointer',textAlign:'left',fontFamily:'inherit',color:'inherit'}}>
               <div style={{width:42,height:42,borderRadius:8,background:C.bg,border:`1px solid ${C.border}`,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,color:j.color}}><Icon name={j.icon} size={20}/></div>
               <div style={{flex:1,minWidth:0}}>
                 <div className="vrm-day-task-title" style={{fontSize:15,fontWeight:700,color:C.text}}>{j.title}</div>
@@ -50241,7 +50245,7 @@ function numerosLbcSortis(items, liens, vendues, preuve) {
 // sur une lecture incomplète (l'appelant le garde).
 async function publierLbcARetirer(liste) {
   if (!AUTH.user) return;
-  const propre = (liste || []).slice(0, 30).map((r) => ({ numero: String(r.numero || ''), lbcId: /^\d{5,15}$/.test(String(r.lbcId || '')) ? String(r.lbcId) : '', titre: String(r.titre || '').slice(0, 80), url: /^https:\/\/(?:www\.)?leboncoin\.fr\//.test(String(r.url || '')) ? String(r.url) : '' }));
+  const propre = (liste || []).filter((r) => r && (cleNum(r.numero) || /^\d{5,15}$/.test(String(r.lbcId || '')))).slice(0, 30).map((r) => ({ numero: String(r.numero || ''), lbcId: /^\d{5,15}$/.test(String(r.lbcId || '')) ? String(r.lbcId) : '', titre: String(r.titre || '').slice(0, 80), url: /^https:\/\/(?:www\.)?leboncoin\.fr\//.test(String(r.url || '')) ? String(r.url) : '' }));
   const empreinte = JSON.stringify(propre);
   const memo = load('vrm_lbc_a_retirer_pub', null);
   if (memo && memo.e === empreinte && Date.now() - Number(memo.at || 0) < 6 * 3600e3) return;
@@ -50984,8 +50988,11 @@ function RepublierLeboncoin({ liste, exclues, onClose, onFini }) {
   const glob = raisonExtGlobale(sansSouris, { cap: 'publication', role: 'publie tes annonces' });
   // La suppression ne passe PAS par le relais du téléphone (`RELAIS_CMDS`) :
   // sans extension dans CE navigateur, on le dit au lieu de réclamer une mise à jour.
-  const bloqueExt = !vmrExtPresent() ? "La republication se fait sur l'ordinateur où l'extension VRM est installée : la suppression d'une annonce ne passe pas par le relais du téléphone."
+  // (29 oct., revue) Sur un ORDINATEUR sans extension, le téléphone n'a rien à y
+  // voir : la cause est l'extension absente de ce navigateur (celle de l'indicateur).
+  const bloqueExt = !vmrExtPresent() && sansSouris ? "La republication se fait sur l'ordinateur où l'extension VRM est installée : la suppression d'une annonce ne passe pas par le relais du téléphone."
     : glob ? glob.texte
+    : !vmrExtPresent() ? "L'extension VRM n'est pas détectée dans ce navigateur — installe-la, ou ouvre VRM dans le Chrome où elle est installée."
     : __vmrEtat === undefined ? "Je vérifie l'extension…"
     : !saitSuppr ? `Ton extension (${vmrExtVersion() || 'version ?'}) ne sait pas encore supprimer une annonce Leboncoin : mets-la à jour (${EXT_CAPACITES.lbcsupprime}) depuis Réglages.` : '';
   const triees = (liste || []).filter((it) => !q || `${it.numero} ${it.lbc.titre} ${it.title}`.toLowerCase().includes(q.toLowerCase())).slice()
@@ -51220,9 +51227,9 @@ function ConversationsLeboncoin() {
           <div key={l.id} data-compte-lbc={l.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 0', borderTop: `1px solid ${C.border}` }}>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: 13.5, fontWeight: 600, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{l.nom}{l.type ? <span style={{ fontWeight: 400, color: C.muted }}>{' · ' + l.type}</span> : null}</div>
-              <div style={{ fontSize: 11.5, color: C.muted, marginTop: 1 }}>
-                {l.c ? <>mis à jour {age(l.c.at)}{vieux ? ' — ouvre leboncoin.fr sur ce compte pour le mettre à jour' : ''}</> : 'pas encore lu'}
-              </div>
+              {/* (29 oct., revue) Un compte pas encore lu : la ligne ne porte que
+                  « — » à droite ; la phrase sous la liste le nomme avec le geste. */}
+              {l.c ? <div style={{ fontSize: 11.5, color: C.muted, marginTop: 1 }}>mis à jour {age(l.c.at)}{vieux ? ' — ouvre leboncoin.fr sur ce compte pour le mettre à jour' : ''}</div> : null}
             </div>
             <div style={{ flexShrink: 0, textAlign: 'right', opacity: vieux ? 0.55 : 1 }}>
               {l.c ? <><span style={{ fontSize: 20, fontWeight: 700, color: l.c.unread > 0 ? C.text : C.muted, fontVariantNumeric: 'tabular-nums' }}>{l.c.unread}</span>{' '}<span style={{ fontSize: 11.5, color: C.muted }}>non lu{l.c.unread > 1 ? 's' : ''}</span></> : <span style={{ fontSize: 13, color: C.muted }}>—</span>}
@@ -51294,7 +51301,13 @@ function FavorisLeboncoin() {
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 13, fontWeight: 600, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{ad.subject || 'Annonce'}</div>
                 <div style={{ fontSize: 11.5, color: C.muted }}>
-                  {f != null ? <>{Number.isFinite(st.vues) ? `${st.vues} vue${st.vues > 1 ? 's' : ''} · ` : ''}{Number.isFinite(st.messages) ? `${st.messages} message${st.messages > 1 ? 's' : ''} · ` : ''}relevé {st.au ? `le ${new Date(st.au + 'T12:00:00').toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}` : ''}</> : 'pas encore relevé'}
+                  {f != null ? [
+                    Number.isFinite(st.vues) ? `${st.vues} vue${st.vues > 1 ? 's' : ''}` : '',
+                    Number.isFinite(st.messages) ? `${st.messages} message${st.messages > 1 ? 's' : ''}` : '',
+                    // (29 oct., revue) Sans date de fin du relevé (`au`), l'heure où
+                    // l'extension l'a pris (`at`) ; sans l'une ni l'autre, rien.
+                    st.au ? `relevé le ${new Date(st.au + 'T12:00:00').toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}` : isFinite(Date.parse(st.at || '')) ? `relevé il y a ${ilYaBr(Date.parse(st.at))}` : '',
+                  ].filter(Boolean).join(' · ') : 'pas encore relevé'}
                 </div>
               </div>
               <div style={{ flexShrink: 0, textAlign: 'right' }}>
@@ -51675,7 +51688,7 @@ function LeboncoinScreen() {
       if (ar) {
         const kAr = new Set(ar.map((r) => cleNum(r.numero)).filter(Boolean));
         for (let i = removals.length - 1; i >= 0; i--) { const r = removals[i]; if (r.etat === 'vendue' || kAr.has(cleNum(r.numero))) removals.splice(i, 1); }
-        for (const r of ar) { const so = !r.lbcId && r.numero ? numsSortiesDoute.get(cleNum(r.numero)) : null; removals.push({ numero: r.numero || '?', title: r.titre, lbc: !!r.lbcId, url: r.url, etat: 'vendue', id: r.lbcId, prix: r.prix, ...(so ? { sortie: so.quoi } : {}) }); }
+        for (const r of ar) { const so = !r.lbcId && r.numero ? numsSortiesDoute.get(cleNum(r.numero)) : null; removals.push({ numero: r.numero || '?', title: r.titre, lbc: !!r.lbcId, ident: !!r.lbcId, url: r.url, etat: 'vendue', id: r.lbcId, prix: r.prix, ...(so ? { sortie: so.quoi } : {}) }); }
       }
     }
     // ── CROISEMENT eBay → LEBONCOIN (26 oct.) : une paire VENDUE SUR eBAY et
@@ -51692,12 +51705,16 @@ function LeboncoinScreen() {
         if (soldEbay.size) {
           const parN = new Map(); removals.forEach((r) => { const k = cleNum(r.numero); if (k && !parN.has(k)) parN.set(k, r); });
           for (const ad of liveAds) {
-            const k = adKeys(ad).filter((x) => keysKnown.has(x)).find((x) => soldEbay.has(x));
-            if (!k) continue;
+            // (29 oct., revue) PAR IDENTITÉ SEULEMENT : le lien posé à la main ou
+            // la référence VRM de l'annonce — jamais le « nXXX » d'un titre, qui
+            // peut désigner l'ancienne paire B… (§5). La suppression proposée sur
+            // cette ligne est sans retour.
+            const k = numeroLbcIdentite({ itemId: ad.id }, lbcItems, liens);
+            if (!k || !keysKnown.has(k) || !soldEbay.has(k)) continue;
             const ex = parN.get(k);
             if (ex && ex.etat === 'vendue') continue;   // déjà « à retirer » (vendue ailleurs, prouvée) — une paire, une ligne
             if (ex) { const i = removals.indexOf(ex); if (i >= 0) removals.splice(i, 1); }   // un simple doute devient une vente eBay PROUVÉE
-            const entry = { numero: k, title: ad.subject || '', lbc: true, ou: 'eBay', url: ad.url || '', etat: 'vendue', id: ad.id != null ? String(ad.id) : '', prix: ad.price != null && isFinite(Number(ad.price)) ? Number(ad.price) : null };
+            const entry = { numero: k, title: ad.subject || '', lbc: true, ident: true, ou: 'eBay', url: ad.url || '', etat: 'vendue', id: ad.id != null ? String(ad.id) : '', prix: ad.price != null && isFinite(Number(ad.price)) ? Number(ad.price) : null };
             removals.push(entry); parN.set(k, entry);
           }
         }
@@ -51890,6 +51907,22 @@ function LeboncoinScreen() {
     data.queue && data.queue.length && { k: 'publier', sel: '.vrm-lbc-a-publier', txt: `${data.queue.length} paire${plurLbc(data.queue.length)} prête${plurLbc(data.queue.length)} à publier sur Leboncoin` },
   ].filter(Boolean) : [];
   const allerLbc = (c) => () => { try { const el = document.querySelector(c.sel); if (el) el.scrollIntoView({ behavior: (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) ? 'auto' : 'smooth', block: 'center' }); } catch (_) {} };
+  // La cible posée par Ma journée : consommée une fois, dans la minute ; la mémoire
+  // de défilement de l'écran peut repasser derrière (2,5 s), d'où quelques essais
+  // tant que la paire n'est pas à l'écran — jamais après un geste de défilement.
+  useEffect(() => {
+    const d = DEMANDE_LBC_CIBLE;
+    if (!data || !d.sel || Date.now() - d.at > 60000) return undefined;
+    const sel = d.sel; d.sel = null;
+    let fini = false; const stop = () => { fini = true; };
+    const evts = ['wheel', 'touchstart', 'keydown', 'pointerdown'];
+    evts.forEach((e) => window.addEventListener(e, stop, { passive: true, once: true }));
+    const ids = [60, 500, 1300, 2800].map((ms) => setTimeout(() => {
+      if (fini) return;
+      try { const el = document.querySelector(sel); if (!el) return; const r = el.getBoundingClientRect(); if (r.top >= 0 && r.top < (window.innerHeight || 800) * 0.8) return; el.scrollIntoView({ behavior: 'auto', block: 'start' }); } catch (_) {}
+    }, ms));
+    return () => { ids.forEach(clearTimeout); evts.forEach((e) => window.removeEventListener(e, stop)); };
+  }, [data]);
   return (
     <div className="vrm-lbc-ecran" style={{ padding: '16px 14px 40px', maxWidth: 920, margin: '0 auto' }}>
       {fiche && <FicheLbc q={fiche} compteLbc={data && data.lbcConnecte} onClose={() => setFiche(null)} onMarquer={marquer}/>}
@@ -52076,21 +52109,24 @@ function LeboncoinScreen() {
               <span><b>N°{r.numero}</b> · {r.title || '—'}
               {r.url ? <> · <a href={r.url} target="_blank" rel="noreferrer" style={{ color: coul, fontWeight: 700 }}>voir sur Leboncoin</a></> : null}
               {r.sortie ? <span style={{ color: C.muted }}> · {r.sortie === 'pause' ? "l'annonce reliée est en pause depuis VRM" : r.sortie === 'supprimee' ? "l'annonce reliée a été supprimée de Leboncoin" : "l'annonce reliée n'est plus dans ta liste"}</span> : null}</span>
-              {pausable && pe === 'ok' && r.lbc && r.id ? (
+              {/* (29 oct., revue) La pause et la suppression ne sont proposées que sur
+                  une annonce désignée par IDENTITÉ (lien posé, référence VRM) :
+                  jamais sur une annonce reliée par son seul titre. */}
+              {pausable && pe === 'ok' && r.ident && r.lbc && r.id ? (
                 <button type="button" data-lbc-pause={r.id} disabled={!!pauseEnVol} onClick={() => mettreEnPause(r)}
                   style={{ border: `1px solid ${C.border}`, background: 'transparent', color: C.text, borderRadius: 8, padding: '4px 10px', fontSize: 12, fontWeight: 600, cursor: pauseEnVol ? 'default' : 'pointer', opacity: pauseEnVol && pauseEnVol !== r.id ? 0.5 : 1 }}>
                   {pauseEnVol === r.id ? 'Mise en pause…' : '⏸ Mettre en pause sur Leboncoin'}
                 </button>
               ) : null}
-              {pausable && se === 'ok' && r.lbc && r.id ? (
+              {pausable && se === 'ok' && r.ident && r.lbc && r.id ? (
                 <button type="button" data-lbc-supprimer={r.id} disabled={!!pauseEnVol} onClick={() => supprimerSurLbc({ ...r, pourquoi: r.ou === 'eBay' ? 'vendue sur eBay' : 'vendue sur Vinted' })}
-                  style={{ border: `1px solid ${C.danger}`, background: 'transparent', color: C.danger, borderRadius: 8, padding: '4px 10px', fontSize: 12, fontWeight: 600, cursor: pauseEnVol ? 'default' : 'pointer', opacity: pauseEnVol && pauseEnVol !== r.id ? 0.5 : 1 }}>
+                  style={{ border: `1px solid ${C.border}`, background: 'transparent', color: C.text, borderRadius: 8, padding: '4px 10px', fontSize: 12, fontWeight: 600, cursor: pauseEnVol ? 'default' : 'pointer', opacity: pauseEnVol && pauseEnVol !== r.id ? 0.5 : 1 }}>
                   {pauseEnVol === r.id ? 'Suppression…' : 'Supprimer de Leboncoin'}
                 </button>
               ) : null}
             </div>
           );
-          const pausables = vendues.some((r) => r.lbc && r.id);
+          const pausables = vendues.some((r) => r.ident && r.lbc && r.id);
           // (22 oct., revue) Une paire dont l'annonce RELIÉE est sortie, mais sans
           // la preuve qu'aucune autre annonce de la paire n'est en ligne : la ligne
           // reste (sens sûr). Le pourquoi et le geste, une fois (§7).
@@ -52119,9 +52155,9 @@ function LeboncoinScreen() {
               <Card style={{ borderColor: C.warn }}>
                 <Titre>{venduesEbay.length} vendue{venduesEbay.length > 1 ? 's' : ''} sur eBay — à retirer de Leboncoin</Titre>
                 <div data-lbc-retirer-ebay={venduesEbay.length} style={{ fontSize: 11, color: C.muted, marginBottom: 8 }}>La vente eBay est <b>certaine</b> (le SKU <b>VRM-N°</b> de la commande désigne cette paire). Retire-{venduesEbay.length > 1 ? 'les' : 'la'} de Leboncoin pour ne pas vendre le même article deux fois. Le numéro de l'article ne change pas.
-                  {venduesEbay.some((r) => r.lbc && r.id) && se === 'ok' ? <> <span data-lbc-supprimer-geste-ebay="ok">Tu peux {venduesEbay.length > 1 ? 'les' : 'la'} supprimer d'ici (sans retour) ou {venduesEbay.length > 1 ? 'les' : 'la'} mettre en pause, une à la fois.</span></>
-                    : venduesEbay.some((r) => r.lbc && r.id) && pe === 'ok' ? <> <span data-lbc-pause-geste-ebay="ok">Ou mets-{venduesEbay.length > 1 ? 'les' : 'la'} en pause d'ici, une à la fois : ce n'est pas une suppression.</span></> : null}
-                  {venduesEbay.some((r) => r.lbc && r.id) && pe === 'retard' ? <> <span data-lbc-pause-geste-ebay="retard">Pour {venduesEbay.length > 1 ? 'les' : 'la'} mettre en pause d'ici, mets l'extension à jour (Réglages).</span></> : null}
+                  {venduesEbay.some((r) => r.ident && r.lbc && r.id) && se === 'ok' ? <> <span data-lbc-supprimer-geste-ebay="ok">Tu peux {venduesEbay.length > 1 ? 'les' : 'la'} supprimer d'ici (sans retour) ou {venduesEbay.length > 1 ? 'les' : 'la'} mettre en pause, une à la fois.</span></>
+                    : venduesEbay.some((r) => r.ident && r.lbc && r.id) && pe === 'ok' ? <> <span data-lbc-pause-geste-ebay="ok">Ou mets-{venduesEbay.length > 1 ? 'les' : 'la'} en pause d'ici, une à la fois : ce n'est pas une suppression.</span></> : null}
+                  {venduesEbay.some((r) => r.ident && r.lbc && r.id) && pe === 'retard' ? <> <span data-lbc-pause-geste-ebay="retard">Pour {venduesEbay.length > 1 ? 'les' : 'la'} mettre en pause d'ici, mets l'extension à jour (Réglages).</span></> : null}
                 </div>
                 {venduesEbay.slice(0, 30).map((r, i) => Ligne(r, i, C.danger, true))}
               </Card>
@@ -57738,7 +57774,7 @@ function AppCoeur() {
       let postedDepuis='';
       try{
         const r=await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vinted_lbc_posted&select=data`,{headers:sbAuth()});
-        if(r.ok){ const rows=await r.json(); const posted=(rows&&rows[0]&&rows[0].data&&rows[0].data.ids)||[]; postedIds=posted; postedDepuis=(Array.isArray(rows)&&rows[0]&&rows[0].data&&rows[0].data.updatedAt)||''; lbcRemovePids=posted.filter(x=>/^\d+$/.test(String(x))&&soldIdsN.has(String(x))).map(String); lbcRemoveCount=lbcRemovePids.length; }
+        if(r.ok){ const rows=await r.json(); const posted=(rows&&rows[0]&&rows[0].data&&rows[0].data.ids)||[]; postedIds=posted; postedDepuis=(Array.isArray(rows)&&rows[0]&&rows[0].data&&rows[0].data.updatedAt)||''; }
       }catch(_){}
       // ── ET L'AUTRE SENS : VENDUE SUR LEBONCOIN, ENCORE EN VENTE SUR VINTED ──
       // La MÊME règle que l'écran Leboncoin (`doublesVenteLbc`, §11). Les ventes
@@ -57790,15 +57826,24 @@ function AppCoeur() {
           sortisN=sortis;
         }
         const aJuger=(postedIds||[]).some(x=>/^\d+$/.test(String(x))) || Object.values(items||{}).some(ad=>ad&&(ad.ref||ad.customRef||liensR[String(ad.id)]!=null));
-        if(aJuger){
+        // (29 oct., revue) LA MÊME PREUVE QUE L'ÉCRAN LEBONCOIN (§11) : la
+        // transaction seule. `soldIdsN` mêle `vinted_annonces_email_sold`, rapproché
+        // par titre et taille (§5) — il faisait dire « à retirer » ici et sur le
+        // logo VRM à une paire que l'écran Leboncoin ne listait pas. Et rien n'est
+        // jugé avant l'arrivée des numéros (`nuageAuDepart`) : sinon des lignes sans
+        // N° ni annonce partaient vers le logo.
+        if(aJuger && nuageAuDepart){
           const preuveN=await lirePreuvesVenteVinted().catch(()=>null);
-          const vendusR=preuveN&&preuveN.vendus?new Set([...preuveN.vendus,...soldIdsN]):(soldIdsN.size?soldIdsN:null);
+          const vendusR=preuveN&&preuveN.vendus?preuveN.vendus:null;
           lbcARetirer=aRetirerDeLbcVinted({posted:postedIds, numeros:nums, enLigne:lbcOnlineIds, vendus:vendusR, itemsLbc:items, liens:liensR, vendusLbc:ventesLbcLu?annoncesLbcVendues(ventesLbcLu):null, sortis});
           const toutesLues=[...lusParCompte.values()].every(v=>v&&v[2]&&Array.isArray(v[2].items));
           if(lbcARetirer && preuveN && items && ventesLbcLu && toutesLues) publierLbcARetirer(lbcARetirer).catch(()=>{});
         } else if(items && ventesLbcLu) publierLbcARetirer([]).catch(()=>{});
         if(lbcARetirer){ lbcRemovePids=lbcARetirer.map(r=>r.vinted).filter(Boolean); lbcRemoveCount=lbcARetirer.length; }
       }catch(_){}
+      // Pas su (preuve illisible, nuage pas encore là) ⇒ le compteur se tait : plus
+      // de repli sur les ventes déduites par titre.
+      if(!lbcARetirer){ lbcRemovePids=[]; lbcRemoveCount=0; }
       // eBay : ventes PAYÉES pas encore expédiées — le MÊME to-do qu'un colis
       // Vinted (« tout centralisé dans VRM », §11). Lu sur les commandes captées
       // (scope fulfillment, déjà accordé — aucune reconnexion). Une lecture
@@ -57918,8 +57963,8 @@ function AppCoeur() {
       if(toShipCount>0)  items.push({icon:'⏰', ic:'truck', text:`${toShipCount} vente${toShipCount>1?'s':''} à expédier`, n:toShipCount, tab:'cat_bord'});
       if(ebayShipCount>0) items.push({icon:'📮', ic:'truck', text:`${ebayShipCount} vente${ebayShipCount>1?'s':''} eBay à expédier`, n:ebayShipCount, tab:'plat_ebay', jr:true});
       if(lbcDoubles>0) items.push({icon:'🟠', ic:'tag', text:`${lbcDoubles} article${lbcDoubles>1?'s':''} vendu${lbcDoubles>1?'s':''} sur Leboncoin, encore en vente sur Vinted — à retirer de Vinted`, n:lbcDoubles, tab:'leboncoin', dv:true});
-      if(lbcRemoveCount>0){ const noms=(lbcARetirer||[]).slice(0,3).map(r=>r.numero?`N°${r.numero}`:'').filter(Boolean); const reste=lbcRemoveCount-noms.length; items.push({icon:'🟠', ic:'tag', text: noms.length ? `${lbcRemoveCount} à retirer de Leboncoin — ${noms.join(', ')}${reste>0?` et ${reste} autre${reste>1?'s':''}`:''} vendue${lbcRemoveCount>1?'s':''} sur Vinted` : `${lbcRemoveCount} à retirer de Leboncoin (vendue${lbcRemoveCount>1?'s':''} sur Vinted)`, n:lbcRemoveCount, tab:'leboncoin', dv:true}); }
-      if(lbcRemoveEbayCount>0) items.push({icon:'🟠', ic:'tag', text:`${lbcRemoveEbayCount} à retirer de Leboncoin (vendue${lbcRemoveEbayCount>1?'s':''} sur eBay)`, n:lbcRemoveEbayCount, tab:'leboncoin', dv:true});
+      if(lbcRemoveCount>0){ const noms=(lbcARetirer||[]).slice(0,3).map(r=>r.numero?`N°${r.numero}`:'').filter(Boolean); const reste=lbcRemoveCount-noms.length; items.push({icon:'🟠', ic:'tag', text: noms.length ? `${lbcRemoveCount} à retirer de Leboncoin — ${noms.join(', ')}${reste>0?` et ${reste} autre${reste>1?'s':''}`:''} vendue${lbcRemoveCount>1?'s':''} sur Vinted` : `${lbcRemoveCount} à retirer de Leboncoin (vendue${lbcRemoveCount>1?'s':''} sur Vinted)`, n:lbcRemoveCount, tab:'leboncoin', dv:true, avant:()=>{ DEMANDE_LBC_CIBLE.sel='[data-lbc-retirer]'; DEMANDE_LBC_CIBLE.at=Date.now(); }}); }
+      if(lbcRemoveEbayCount>0) items.push({icon:'🟠', ic:'tag', text:`${lbcRemoveEbayCount} à retirer de Leboncoin (vendue${lbcRemoveEbayCount>1?'s':''} sur eBay)`, n:lbcRemoveEbayCount, tab:'leboncoin', dv:true, avant:()=>{ DEMANDE_LBC_CIBLE.sel='[data-lbc-retirer-ebay]'; DEMANDE_LBC_CIBLE.at=Date.now(); }});
       // Une vente Leboncoin non reliée ne sonne plus (Julien, 16 oct. : « ça sert à
       // rien de relier une paire vendue ») : l'écran Leboncoin ne la demande que si
       // une paire qui y ressemble est encore en vente sur Vinted.

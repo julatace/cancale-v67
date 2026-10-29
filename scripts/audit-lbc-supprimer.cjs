@@ -181,35 +181,35 @@ function fond(seed, local0, opts = {}) {
   await essaie('ordre exécuté', async () => {
     const p = page({ reseau: site(200, '{"ok":true}') });
     await p.charge(`${API}/pintad/v1/public/expired`, { method: 'GET', headers: { api_key: 'cle_du_site' } });
-    const rep = await p.ordre({ from: 'vrm-fond', action: 'lbcSupprimeAnnonce', id: '3290168823' });
+    const rep = await p.ordre({ from: 'vrm-fond', action: 'lbcSupprimeAnnonce', id: '3290000104' });
     const a = p.appels.filter((x) => x.url.indexOf('/pintad/v1/public/manual/') > 0);
     dit(a.length === 1 && a[0].url === URL_SUPPR && a[0].methode === 'DELETE', 'UNE requête, à l’adresse EXACTE vue dans ses gestes, en DELETE', JSON.stringify(a.map((x) => x.methode + ' ' + x.url)));
-    dit(a[0] && a[0].corps === '{"list_ids":[3290168823]}' && a[0].credentials === 'include', 'corps {list_ids:[n]} — une seule annonce — avec sa session', a[0] && a[0].corps);
+    dit(a[0] && a[0].corps === '{"list_ids":[3290000104]}' && a[0].credentials === 'include', 'corps {list_ids:[n]} — une seule annonce — avec sa session', a[0] && a[0].corps);
     dit(a[0] && a[0].entetes && a[0].entetes.api_key === 'cle_du_site', 'avec les en-têtes que le SITE met lui-même', a[0] && JSON.stringify(Object.keys(a[0].entetes || {})));
     dit(rep && rep.ok === true && rep.statut === 200 && rep.corps === '{"ok":true}', 'la réponse de Leboncoin revient telle quelle', JSON.stringify(rep));
   });
   await essaie('pause reste une pause', async () => {
     const p = page({ reseau: site(200, '{}') });
-    await p.ordre({ from: 'vrm-fond', action: 'lbcPauseAnnonce', id: '3290168823' });
-    p.win.postMessage({ __tag: 'CANCALE_LBC_ORDRE', kind: 'pause', id: '3290168823', jeton: 'abcdefgh-9', url: URL_SUPPR });
+    await p.ordre({ from: 'vrm-fond', action: 'lbcPauseAnnonce', id: '3290000104' });
+    p.win.postMessage({ __tag: 'CANCALE_LBC_ORDRE', kind: 'pause', id: '3290000104', jeton: 'abcdefgh-9', url: URL_SUPPR });
     await attendre(60);
     const a = p.appels.filter((x) => x.url.indexOf('/manual/') > 0);
     dit(a.length >= 1 && a.every((x) => x.url === URL_PAUSE && x.methode === 'PUT'), 'un ordre « pause » ne supprime JAMAIS, même avec une adresse de suppression dans l’ordre', JSON.stringify(a.map((x) => x.methode + ' ' + x.url)));
   });
   await essaie('adresse imposée', async () => {
     const p = page({ reseau: site(200, '{}') });
-    p.win.postMessage({ __tag: 'CANCALE_LBC_ORDRE', kind: 'supprime', id: '3290168823', jeton: 'abcdefgh-7', url: `${API}/autre/chose` });
+    p.win.postMessage({ __tag: 'CANCALE_LBC_ORDRE', kind: 'supprime', id: '3290000104', jeton: 'abcdefgh-7', url: `${API}/autre/chose` });
     await attendre(60);
     dit(p.appels.length === 1 && p.appels[0].url === URL_SUPPR, 'l’adresse d’un ordre est celle écrite en dur — jamais celle qu’il apporte', JSON.stringify(p.appels.map((x) => x.url)));
   });
   await essaie('ordres refusés', async () => {
     const p = page({ reseau: site(200, '{}') });
     const r1 = await p.ordre({ from: 'vrm-fond', action: 'lbcSupprimeAnnonce', id: 'abc' });
-    const r2 = await p.ordre({ from: 'vrm-fond', action: 'lbcSupprimeAnnonce', id: '3290168823' }, { id: 'une-autre-extension' });
+    const r2 = await p.ordre({ from: 'vrm-fond', action: 'lbcSupprimeAnnonce', id: '3290000104' }, { id: 'une-autre-extension' });
     const q = page({ reseau: site(200, '{}'), top: false });
-    await q.ordre({ from: 'vrm-fond', action: 'lbcSupprimeAnnonce', id: '3290168823' });
+    await q.ordre({ from: 'vrm-fond', action: 'lbcSupprimeAnnonce', id: '3290000104' });
     const h = page({ reseau: site(200, '{}'), hote: 'www.exemple.fr' });
-    h.win.postMessage({ __tag: 'CANCALE_LBC_ORDRE', kind: 'supprime', id: '3290168823', jeton: 'abcdefgh-2' });
+    h.win.postMessage({ __tag: 'CANCALE_LBC_ORDRE', kind: 'supprime', id: '3290000104', jeton: 'abcdefgh-2' });
     await attendre(60);
     dit(r1 && r1.ok === false && !p.appels.length, 'un identifiant illisible est refusé, rien ne part', JSON.stringify(r1));
     dit(r2 === undefined, 'un ordre qui ne vient pas de CETTE extension est ignoré', JSON.stringify(r2));
@@ -217,7 +217,7 @@ function fond(seed, local0, opts = {}) {
   });
 
   console.log('\n── 2. LE FOND : CONFIRMATION, COMPTE CONNECTÉ, UNE À LA FOIS, PLAFOND, RÉPONSE');
-  const ID = '3290168823';
+  const ID = '3290000104';
   const comptes = { accounts: { ['lbc-account:' + MON]: { id: MON, name: 'Totomondu', type: 'particulier' }, ['lbc-account:' + AUTRE]: { id: AUTRE, name: 'ShopAutre', type: 'pro' } } };
   const baseS = () => ({ lbc_listings: { items: { [ID]: { id: ID, subject: 'Nike shox TL noir', account: MON, status: 'active', ref: '18' } } }, lbc_accounts: comptes });
   const transport = (compte) => ({ vrmLbcTransport: { 1: { source: 'prive', compte: 'lbc-account:' + compte, at: Date.now() } } });
