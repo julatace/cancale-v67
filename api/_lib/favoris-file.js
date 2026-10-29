@@ -9,7 +9,8 @@ const clone=v=>structuredClone(v);
 // rejouée par le comparer-et-échanger donne le même temps.
 // 0 minute = « comme Vintex » (29 oct., sa demande) : MESURÉ sur 9 favoris
 // envoyés par Vintex, 6,0 à 9,6 s entre la fin d'un message et le favori
-// suivant. Le plafond de 10 messages sur 60 minutes passe toujours avant.
+// suivant. Plus de plafond de 10 messages par heure (29 oct., sa demande :
+// « enlève-le », comme Vintex) ; le plafond d'actions de l'extension reste.
 export const DELAI_VINTEX_MS=[6000,9600];
 export function delaiFavori(min,max,jeton){
   const a=Number(min),b=Number.isInteger(max)&&max>a?max:a;
@@ -25,7 +26,7 @@ export function initialiserFile(d){
 }
 export function vueFile(d,owner){
   const g=d?.groupes?.[owner];
-  return g?{active:g.active,raison:g.raison||'',lot:g.lot||null,intervalleMinutes:g.intervalleMinutes,intervalleMaxMinutes:g.intervalleMax||null,prochain:d.enCours?null:Math.max(g.prochain||0,d.prochainGlobal||0,(d.tentatives||[]).length>=10?d.tentatives[d.tentatives.length-10]+3600000:0),jobs:g.jobs.map(({id,notificationId,etat,raison,lot,traiteLe,envoyeLe})=>({id,notificationId,etat,lot,traiteLe,envoyeLe,...(raison?{raison}:{})}))}:{active:false,raison:'',prochain:null,jobs:[]};
+  return g?{active:g.active,raison:g.raison||'',lot:g.lot||null,intervalleMinutes:g.intervalleMinutes,intervalleMaxMinutes:g.intervalleMax||null,prochain:d.enCours?null:Math.max(g.prochain||0,d.prochainGlobal||0),jobs:g.jobs.map(({id,notificationId,etat,raison,lot,traiteLe,envoyeLe})=>({id,notificationId,etat,lot,traiteLe,envoyeLe,...(raison?{raison}:{})}))}:{active:false,raison:'',prochain:null,jobs:[]};
 }
 export function lancerFile(d,{owner,targets,message,intervalleMinutes,intervalleMax=null,maintenant,lot=String(maintenant),pourcentage=null}){
   d=initialiserFile(d);
@@ -63,7 +64,7 @@ export function reserverFile(d,{owner,maintenant,jeton,suivi=''}){
     return {valeur:{vue:vueFile(d,owner)}};
   }
   const t=d.tentatives.filter(x=>x>maintenant-3600000);
-  const prochain=Math.max(g.prochain||0,d.prochainGlobal||0,t.length>=10?t[0]+3600000:0);
+  const prochain=Math.max(g.prochain||0,d.prochainGlobal||0);
   if(maintenant<prochain)return {valeur:{vue:{...vueFile(d,owner),prochain}}};
   const j=g.jobs.find(x=>x.etat==='attente');
   if(!j){g.active=false;return {data:d,valeur:{vue:vueFile(d,owner)}};}
