@@ -1,5 +1,16 @@
 # VRM — dossier de passation
 
+> **29 octobre — Republier : la barre DÉTAILLE chaque étape, et la taille refusée par Vinted (5.272) :** Julien : « tout doit
+> être détaillé dans la barre de progression » ; « pas faite · Vinted a refusé la mise en ligne (400 : size (Le champ Taille
+> doit être renseigné)) ». Barre : `DetailEtapes` sous chaque barre (`data-etapes-detail`, `data-etape-detail`/`data-etape-etat`
+> fait · encours · avenir · echec) — photo n sur N, nombre de photos parties, pause au hasard et son compte à rebours, nouvel
+> essai des photos ; une paire qui n'aboutit pas GARDE son détail avec ✗ à l'étape où elle s'est arrêtée. MESURÉ : le brouillon
+> de la Spezial 38 (10579996668) porte catalogue 2632 + taille 2033 (acceptés par Vinted le 15 oct.) ; une P-6000 du même
+> catalogue passe avec 1197 ⇒ Vinted ne reconnaît plus ce code de taille. VRM ne choisit jamais une taille : `tailleRefusee` /
+> `gesteRefus` ajoutent le geste (Mes brouillons → Modifier → taille → Publier) aux quatre refus de mise en ligne et gardent la
+> forme (`rates.vinted_refus_taille` : catalogue + codes). `/api/v2/item_upload/attributes` est vu, sa forme jamais. Preuve :
+> banc `republier.cjs` (221 ; détail par étape, ✗ sur la paire arrêtée).
+
 > **29 octobre — BROUILLON MIS EN LIGNE À LA MAIN, et les RÉDUCTIONS lisibles (5.271) :** Julien : « elle n'a pas capté
 > que j'avais fait passer un brouillon en ligne à la main », « j'ai encore un brouillon qu'elle ne capte pas », « les
 > réductions je ne comprends rien ». MESURÉ (lecture seule) : Sacai 10577417715 et Zoom Fly 10576081722 EN LIGNE dans leur

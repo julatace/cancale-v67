@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.271.0';
+const CODE_VERSION = '5.272.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -7716,6 +7716,27 @@ function raisonRefusVinted(rc) {
   if (champs.length) { try { noterDiag('vinted_refus_champs_' + errs.map((e) => String((e && (e.field || e.name)) || '').replace(/[^a-z0-9_]/gi, '')).join('_').slice(0, 80)); } catch (_) {} }
   return champs.length ? `${msg ? msg + ' — ' : ''}${champs.join(', ')}` : msg;
 }
+// (29 oct., « 400 : size (Le champ Taille doit être renseigné) » sur la Spezial
+// 38 : catalogue 2632, taille 2033 — acceptée par Vinted le 15 oct. ; une P-6000
+// du même catalogue passe avec la taille 1197.) Vinted ne reconnaît plus le code
+// de taille enregistré pour cette catégorie. VRM ne choisit JAMAIS une taille à
+// sa place (§5) : la phrase dit le geste, et la forme (catégorie + codes, aucune
+// donnée personnelle) est gardée pour mesurer la nouvelle grille.
+function tailleRefusee(rc) {
+  const j = rc && rc.json && typeof rc.json === 'object' ? rc.json : null;
+  const errs = j && Array.isArray(j.errors) ? j.errors : [];
+  return errs.some((e) => e && (/^(size|size_id)\b/i.test(String(e.field || e.name || '')) || /champ taille/i.test(String(e.value || e.message || ''))));
+}
+const TEXTE_TAILLE_REFUSEE = " Vinted ne reconnaît plus la taille enregistrée pour cette catégorie : ouvre le brouillon sur Vinted (Mes brouillons → Modifier), choisis la taille, puis « Publier ». VRM ne choisit jamais une taille à ta place.";
+function gesteRefus(rc, corps) {
+  if (!tailleRefusee(rc)) return '';
+  try {
+    const d = (corps && (corps.draft || corps.item)) || {};
+    const t = (Array.isArray(d.item_attributes) ? d.item_attributes : []).filter((a) => a && a.code === 'size').map((a) => (a.ids || []).join('+')).join(',');
+    echantillonRate('vinted_refus_taille', String(d.id || ''), JSON.stringify({ catalog_id: d.catalog_id || null, size: t || null }));
+  } catch (_) {}
+  return TEXTE_TAILLE_REFUSEE;
+}
 // Les couleurs dont l'identifiant Vinted est MESURÉ dans ses propres requêtes
 // acceptées (« Nike p-6000 noir » ⇒ color_ids [1]). Seules celles-ci peuvent être
 // posées depuis VRM, sur SON choix : une autre se choisit sur Vinted.
@@ -8324,7 +8345,7 @@ async function publierBrouillon(msg) {
     if (!rc.ok) {
       noterDiag(`brouillon_publier_refuse_${rc.status}`);
       const msgV = raisonRefusVinted(rc);
-      return { accepte: true, etape: 'echec', raison: `Vinted a refusé la mise en ligne (${rc.status}${msgV ? ' : ' + String(msgV).slice(0, 200) : ''}) — le brouillon est intact` };
+      return { accepte: true, etape: 'echec', taille: tailleRefusee(rc) || undefined, raison: `Vinted a refusé la mise en ligne (${rc.status}${msgV ? ' : ' + String(msgV).slice(0, 200) : ''}) — le brouillon est intact.${gesteRefus(rc, corpsC)}` };
     }
     const j = rc.json || {}; const it = (j.item && typeof j.item === 'object') ? j.item : (j.draft && typeof j.draft === 'object') ? j.draft : j;
     const itemId = it && it.id != null && /^\d{4,15}$/.test(String(it.id)) ? String(it.id) : id;
@@ -8503,7 +8524,7 @@ async function refaireBrouillon(msg) {
       noterDiag(`refaire_mise_en_ligne_refusee_${rc.status}`);
       const msgV = raisonRefusVinted(rc);
       await majVersBrouillon(uid, id, { etat: 'a-publier' });
-      return { accepte: true, etape: 'echec', refaire: true, draftId, raison: `le brouillon est rangé sur Vinted, mais Vinted a refusé de le mettre en ligne (${rc.status}${msgV ? ' : ' + String(msgV).slice(0, 200) : ''}) — « Refaire » le remet en ligne, sans en créer un autre.` };
+      return { accepte: true, etape: 'echec', refaire: true, draftId, raison: `le brouillon est rangé sur Vinted, mais Vinted a refusé de le mettre en ligne (${rc.status}${msgV ? ' : ' + String(msgV).slice(0, 200) : ''}) — « Refaire » le remet en ligne, sans en créer un autre.${gesteRefus(rc, corpsC)}` };
     }
     const jC = rc.json || {}; const itC = (jC.item && typeof jC.item === 'object') ? jC.item : (jC.draft && typeof jC.draft === 'object') ? jC.draft : jC;
     const nouvelId = itC && itC.id != null && /^\d{4,15}$/.test(String(itC.id)) ? String(itC.id) : draftId;
@@ -8863,7 +8884,7 @@ async function recreerVinted(msg) {
         noterDiag(`republier_mise_en_ligne_refusee_${rcV.status}`);
         const msgV = raisonRefusVinted(rcV);
         await majVersBrouillon(uid, id, { etat: 'a-publier', draftId, cause: `refuse-${rcV.status}` });
-        return { refaire: true, accepte: true, etape: 'brouillon-a-refaire', draftId, raison: `l'ancienne annonce est supprimée et le brouillon est rangé, mais Vinted a refusé de le mettre en ligne (${rcV.status}${msgV ? ' : ' + String(msgV).slice(0, 200) : ''}) — il est dans tes brouillons : Actions → Brouillons → en ligne.` };
+        return { refaire: true, accepte: true, etape: 'brouillon-a-refaire', draftId, raison: `l'ancienne annonce est supprimée et le brouillon est rangé, mais Vinted a refusé de le mettre en ligne (${rcV.status}${msgV ? ' : ' + String(msgV).slice(0, 200) : ''}) — il est dans tes brouillons : Actions → Brouillons → en ligne.${gesteRefus(rcV, corpsCV)}` };
       }
       const jV = rcV.json || {}; const itV = (jV.item && typeof jV.item === 'object') ? jV.item : (jV.draft && typeof jV.draft === 'object') ? jV.draft : jV;
       const nouvelIdV = itV && itV.id != null && /^\d{4,15}$/.test(String(itV.id)) ? String(itV.id) : draftId;
@@ -8890,7 +8911,7 @@ async function recreerVinted(msg) {
       await leverVerrouRecreer(id);
       noterDiag(`recreer_creation_refusee_${(rc && rc.status) || 0}`);
       const msgV = raisonRefusVinted(rc);
-      return { accepte: true, etape: 'echec', draftId: draftId || undefined, raison: viaB ? `Vinted a refusé la mise en ligne du brouillon (${(rc && rc.status) || 0}${msgV ? ' : ' + String(msgV).slice(0, 200) : ''}) — il reste dans tes brouillons, ton annonce d'origine est intacte` : `Vinted a refusé la nouvelle annonce (${(rc && rc.status) || 0}${msgV ? ' : ' + String(msgV).slice(0, 200) : ''}) — ton annonce d'origine est intacte` };
+      return { accepte: true, etape: 'echec', draftId: draftId || undefined, raison: viaB ? `Vinted a refusé la mise en ligne du brouillon (${(rc && rc.status) || 0}${msgV ? ' : ' + String(msgV).slice(0, 200) : ''}) — il reste dans tes brouillons, ton annonce d'origine est intacte.${gesteRefus(rc, corps)}` : `Vinted a refusé la nouvelle annonce (${(rc && rc.status) || 0}${msgV ? ' : ' + String(msgV).slice(0, 200) : ''}) — ton annonce d'origine est intacte.${gesteRefus(rc, corps)}` };
     }
     const j = rc.json || {}; const it = (j.item && typeof j.item === 'object') ? j.item : (j.draft && typeof j.draft === 'object') ? j.draft : j;
     const nouvelId = it && it.id != null && /^\d{4,15}$/.test(String(it.id)) ? String(it.id) : (draftId || '');

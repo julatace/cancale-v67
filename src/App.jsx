@@ -114,7 +114,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.271.0';
+const EXT_ATTENDUE = '5.272.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -11983,7 +11983,8 @@ const PAUSE_NOM = { photo: 'avant la photo suivante', brouillon: 'avant de crée
 function majProgRepub(p, d) {
   const id = String(d.id); const cur = p[id] || {};
   if (d.pause) return { ...p, [id]: { ...cur, pause: { quoi: String(d.pause), jusqua: Number(d.jusqua) || 0, ms: Number(d.ms) || 0 } } };
-  return { ...p, [id]: { etape: String(d.etape || ''), fait: Number(d.fait) || 0, total: Number(d.total) || 0, renvoi: !!d.renvoi } };
+  const total = Number(d.total) || 0;
+  return { ...p, [id]: { etape: String(d.etape || ''), fait: Number(d.fait) || 0, total, renvoi: !!d.renvoi, nPhotos: d.etape === 'photos' && total > 0 ? total : (cur.nPhotos || 0) } };
 }
 function texteAttente(p, now) {
   const pa = p && p.pause;
@@ -11991,7 +11992,40 @@ function texteAttente(p, now) {
   const s = Math.ceil((pa.jusqua - now) / 1000);
   return `pause au hasard ${PAUSE_NOM[pa.quoi] || ''} : encore ${s} s`.replace(/\s+:/, ' :');
 }
-function BarreGeste({ p, liste, attrs, label }) {
+// (29 oct., « tout doit être détaillé dans la barre de progression ») Chaque
+// étape de la liste, dans l'ordre : ✓ faite · ● en cours (son détail : photo n
+// sur N, pause au hasard et son compte à rebours, nouvel essai des photos) ·
+// ○ à venir · ✗ là où ça s'est arrêté (`issue` = 'echec'). Les étapes viennent
+// de l'extension (`maj · repub`) : rien n'est supposé fait sans qu'elle l'ait dit.
+function DetailEtapes({ p, liste, issue, now }) {
+  if (!Array.isArray(liste) || !liste.length) return null;
+  const e = p && p.etape;
+  let i = e === 'secours-photos' ? liste.findIndex((x) => x[0] === 'en-ligne') : liste.findIndex((x) => x[0] === e);
+  if (issue === 'fait') i = liste.length;
+  const att = texteAttente(p, now);
+  return (
+    <ol data-etapes-detail style={{ listStyle: 'none', margin: '6px 0 0', padding: 0, display: 'flex', flexDirection: 'column', gap: 2, fontSize: 12, lineHeight: 1.45 }}>
+      {liste.map(([cle, nom], k) => {
+        const etat = k < i ? 'fait' : k === i ? (issue === 'echec' ? 'echec' : 'encours') : 'avenir';
+        let detail = '';
+        if (etat === 'encours') {
+          if (cle === 'photos' && p && p.total > 0) detail = `photo ${Math.min(p.fait + 1, p.total)} sur ${p.total}`;
+          if (e === 'secours-photos') detail = p && p.renvoi ? 'Vinted refuse les photos : VRM les renvoie, puis un dernier essai' : 'Vinted refuse les photos : nouvel essai';
+          if (att) detail = detail ? `${detail} · ${att}` : att;
+        }
+        if (etat === 'fait' && cle === 'photos' && p && p.nPhotos > 0) detail = `${p.nPhotos} photo${p.nPhotos > 1 ? 's' : ''}`;
+        const signe = etat === 'fait' ? '✓' : etat === 'encours' ? '●' : etat === 'echec' ? '✗' : '○';
+        return (
+          <li key={cle} data-etape-detail={cle} data-etape-etat={etat} style={{ display: 'flex', gap: 6, color: etat === 'avenir' ? C.muted : etat === 'echec' ? C.warn : C.text, fontWeight: etat === 'encours' || etat === 'echec' ? 600 : 400 }}>
+            <span aria-hidden="true" style={{ width: 14, flexShrink: 0, textAlign: 'center', color: etat === 'encours' ? C.accent : 'inherit' }}>{signe}</span>
+            <span>{nom}{detail ? <span style={{ fontWeight: 400, color: C.muted }}> — {detail}</span> : null}{etat === 'echec' ? <span style={{ fontWeight: 400 }}> — arrêté ici</span> : null}</span>
+          </li>
+        );
+      })}
+    </ol>
+  );
+}
+function BarreGeste({ p, liste, attrs, label, issue = null, detail = true }) {
   const [now, setNow] = useState(() => Date.now());
   const enPause = !!(p && p.pause && p.pause.jusqua > now);
   useEffect(() => { if (!enPause) return undefined; const t = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(t); }, [enPause, p && p.pause && p.pause.jusqua]);
@@ -12003,7 +12037,8 @@ function BarreGeste({ p, liste, attrs, label }) {
       <div role="progressbar" aria-label={`${label ? label + ' : ' : ''}${pe.texte}`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(pe.part * 100)} style={{ height: 6, borderRadius: 3, background: C.border, overflow: 'hidden' }}>
         <div style={{ width: `${Math.max(4, Math.round(pe.part * 100))}%`, height: '100%', background: C.accent, transition: 'width .3s ease' }} />
       </div>
-      <div style={{ fontSize: 12, color: C.muted, marginTop: 4 }}>{pe.texte}{att ? ` · ${att}` : ''}</div>
+      <div style={{ fontSize: 12, color: C.muted, marginTop: 4 }}>{issue === 'echec' ? 'Arrêté — voir l’étape en ✗ ci-dessous' : pe.texte}{att && issue !== 'echec' ? ` · ${att}` : ''}</div>
+      {detail && <DetailEtapes p={p} liste={liste} issue={issue} now={now} />}
     </div>
   );
 }
@@ -12438,9 +12473,9 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
                   <span style={{ flexShrink: 0, maxWidth: '55%', textAlign: 'right', color: (s.etat === 'echec' || s.etat === 'double' || s.etat === 'incertain' || s.etat === 'a-refaire') ? C.warn : s.etat === 'fait' ? C.text : C.muted, fontWeight: s.etat ? 600 : 400 }}>{s.etat === 'fait' ? (s.refait ? `brouillon refait${s.raison ? ' · ' + s.raison : ''}` : A.fait) : s.etat === 'encours' ? 'en cours…' : s.etat === 'echec' ? `pas faite · ${s.raison}` : s.etat ? `⚠ ${s.raison}` : (mode === 'idle' ? '' : 'en attente')}</span>
                   {s.etat === 'a-refaire' && refaire && mode !== 'run' && <button type="button" data-republier-refaire={a.id} onClick={() => refaireLigne(a)} style={{ ...btn(true), flexShrink: 0 }}>Refaire le brouillon</button>}
                 </div>
-                {s.etat === 'encours' && recree && (() => { const lst = action === 'versBrouillon' ? ETAPES_REPUB.versBrouillon : ((viaBrouillon && !!brouillonOk) ? ETAPES_REPUB.brouillon : ETAPES_REPUB.direct); const pe = progressionRepub(prog[String(a.id)], action, viaBrouillon && !!brouillonOk); return (
+                {recree && (s.etat === 'encours' || (['echec', 'a-refaire', 'incertain', 'double'].includes(s.etat) && prog[String(a.id)] && prog[String(a.id)].etape)) && (() => { const lst = action === 'versBrouillon' ? ETAPES_REPUB.versBrouillon : ((viaBrouillon && !!brouillonOk) ? ETAPES_REPUB.brouillon : ETAPES_REPUB.direct); const pe = progressionRepub(prog[String(a.id)], action, viaBrouillon && !!brouillonOk); return (
                   <div data-republier-progression={a.id} data-republier-etape={pe.etape || 'attente'} style={{ padding: '0 10px 10px 36px', borderBottom: `1px solid ${C.border}` }}>
-                    <BarreGeste p={prog[String(a.id)]} liste={lst} label={`Paire ${i + 1}`} />
+                    <BarreGeste p={prog[String(a.id)]} liste={lst} label={`Paire ${i + 1}`} issue={s.etat === 'encours' ? null : 'echec'} />
                   </div>
                 ); })()}
               </React.Fragment>); })}
