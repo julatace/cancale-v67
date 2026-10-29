@@ -132,7 +132,7 @@ async function seConnecter(pg) {
 async function ouvrirPanneau(pg, taille) {
   await pg.goto(`http://localhost:${PORT}/?tab=settings&vue=compte`, { waitUntil: 'domcontentloaded' });
   await pg.waitForTimeout(2500);
-  if (taille === 390) { const l = await pg.$('[data-sous-ouvrir="double"]'); if (l) { await l.click(); await pg.waitForTimeout(400); } }
+  { const l = await pg.$('[data-sous-ouvrir="double"]'); if (l) { await l.click(); await pg.waitForTimeout(400); } }
   return attendre(pg, '[data-mfa-panneau="inactive"], [data-mfa-panneau="active"], [data-mfa-panneau="passu"]', 10000);
 }
 const panneau = (pg) => pg.evaluate(() => { const e = document.querySelector('[data-mfa-panneau]'); return e ? e.getAttribute('data-mfa-panneau') : null; });
