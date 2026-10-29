@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.278.0';
+const CODE_VERSION = '5.279.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -6987,6 +6987,9 @@ function surAlarme(a) {
   // 11 octobre : les morceaux Leboncoin en attente (au plus une écriture par
   // 30 s) partent ici si le service worker s'est endormi entre-temps.
   try { viderLbcRecon(); viderLbcCatalogue(); } catch (_) {}
+  // 29 oct. : une mise en ligne planifiée (republier « à la suite », comme Vintex)
+  // dont l'heure est passée pendant que le service worker dormait repart ici.
+  try { miseEnLigneTick(); } catch (_) {}
 }
 // ── SANS `chrome.alarms` (Orion iPhone, 20 octobre) ─────────────────────────
 // Des minuteries tant que le fond est éveillé, ET la date du dernier passage de
@@ -9123,9 +9126,88 @@ async function recreerVinted(msg) {
       return { accepte: true, etape: 'fait', draftId, brouillon: true, nouveau: prix, nouveauTitre: titre };
     }
     // 5. Attente (1 à 3 min), puis 6. la page du brouillon, puis 7. la mise en ligne.
-    etapeRepub(id, 'attente');
+    // (29 oct., « fais les brouillons et tout à la suite comme Vintex ») `msg.differer` :
+    // l'attente ne bloque plus — la mise en ligne est PLANIFIÉE (chrome.storage.local) et
+    // faite par l'extension à l'heure tirée ; l'app enchaîne la paire suivante pendant ce temps.
+    const job = { id, uid, draftId, titre, prix, nPhotos: ids.length, urls, lettreFin: lettreFin || null, corpsCV: JSON.stringify(corpsCV), corps: JSON.stringify(corps), description, sauve };
     await poserVerrouRecreer(id);
+    if (msg.differer === true) {
+      const [pa, pb] = PAUSES_REPUB.enLigne; const du = Date.now() + pa + Math.floor(Math.random() * (pb - pa + 1));
+      try { if (Array.isArray(globalThis.__vrmPausesVues)) globalThis.__vrmPausesVues.push(['enLigne', du - Date.now()]); } catch (_) {}
+      const ok = await planifierMiseEnLigne({ ...job, du });
+      if (ok) {
+        etapeRepub(id, 'attente');
+        try { notifierApp({ type: 'maj', quoi: 'repub', id: String(id), pause: 'enLigne', ms: du - Date.now(), jusqua: du }); } catch (_) {}
+        return { accepte: true, etape: 'attente', draftId, jusqua: du, nouveau: prix, nouveauTitre: titre };
+      }
+      // Planification impossible (stockage illisible) : on attend ici, comme avant.
+    }
+    etapeRepub(id, 'attente');
     await pauseRepub('enLigne');
+    return await finRepubBrouillon(acc, job);
+  });
+}
+// ── LES MISES EN LIGNE PLANIFIÉES (29 oct., « comme Vintex ») ─────────────────
+// Vintex crée le brouillon de la paire 1, supprime l'ancienne, passe à la paire 2,
+// et met la paire 1 en ligne 1 à 3 min après SON brouillon (mesuré : 65 et 163 s).
+// La file vit dans `chrome.storage.local` (§4.9) ; un réveil (minuterie à l'heure,
+// sinon chaque alarme de l'extension) fait les mises en ligne dues, UNE à la fois,
+// dans la file Vinted, avec les mêmes gardes. Le résultat final part à l'app
+// (`maj · repub · etape:'fin'`) et reste 24 h dans `vrmRepubFins`.
+const REPUB_ATTENTE = 'vrmRepubAttente';
+let _miseEnLigneTimer = null, _miseEnLigneEnCours = null;
+try { setTimeout(() => { try { armerMiseEnLigne(); } catch (_) {} }, 0); } catch (_) {}
+async function planifierMiseEnLigne(job) {
+  try {
+    const cur = (await chrome.storage.local.get(REPUB_ATTENTE))[REPUB_ATTENTE] || {};
+    cur[job.id] = job;
+    await chrome.storage.local.set({ [REPUB_ATTENTE]: cur });
+    armerMiseEnLigne();
+    return true;
+  } catch (_) { return false; }
+}
+async function armerMiseEnLigne() {
+  try {
+    const cur = (await chrome.storage.local.get(REPUB_ATTENTE))[REPUB_ATTENTE] || {};
+    const dus = Object.values(cur).map((j) => Number(j.du)).filter(Number.isFinite);
+    if (_miseEnLigneTimer) { clearTimeout(_miseEnLigneTimer); _miseEnLigneTimer = null; }
+    if (!dus.length) return;
+    const ms = Math.max(0, Math.min(...dus) - Date.now());
+    _miseEnLigneTimer = setTimeout(() => { _miseEnLigneTimer = null; miseEnLigneTick(); }, ms + 50);
+  } catch (_) {}
+}
+function miseEnLigneTick() {
+  if (_miseEnLigneEnCours) return _miseEnLigneEnCours;
+  _miseEnLigneEnCours = (async () => {
+    try {
+      for (;;) {
+        const cur = (await chrome.storage.local.get(REPUB_ATTENTE))[REPUB_ATTENTE] || {};
+        const dus = Object.values(cur).filter((j) => j && Number(j.du) <= Date.now()).sort((x, y) => x.du - y.du);
+        if (!dus.length) break;
+        const job = dus[0];
+        // Retirée de la file AVANT d'agir : jamais deux mises en ligne du même brouillon.
+        delete cur[job.id]; await chrome.storage.local.set({ [REPUB_ATTENTE]: cur });
+        let r;
+        try {
+          const accts = await getStoredAccounts();
+          const acc = accts.find((x) => String(x.vinted_user_id) === String(job.uid));
+          if (!acc) { await leverVerrouRecreer(job.id); await majVersBrouillon(job.uid, job.id, { etat: 'a-publier', draftId: job.draftId }); r = { refaire: true, accepte: true, etape: 'brouillon-a-refaire', draftId: job.draftId, raison: "l'ancienne annonce est supprimée et le brouillon est rangé, mais le compte n'est plus dans ce Chrome — « Brouillons → en ligne » le met en ligne." }; }
+          else {
+            _repubSuivi = String(job.id);
+            r = await avecVinted(() => finRepubBrouillon(acc, job));
+          }
+        } catch (e) { r = { accepte: true, etape: 'incertain', draftId: job.draftId, raison: "la mise en ligne planifiée s'est interrompue — regarde ton dressing (sinon : Actions → Brouillons → en ligne)." }; }
+        finally { _repubSuivi = ''; }
+        try { const f = (await chrome.storage.local.get('vrmRepubFins')).vrmRepubFins || {}; const lim = Date.now() - 864e5; for (const k of Object.keys(f)) if (!(f[k] && f[k].at > lim)) delete f[k]; f[job.id] = { ...(r || {}), at: Date.now() }; await chrome.storage.local.set({ vrmRepubFins: f }); } catch (_) {}
+        try { notifierApp({ type: 'maj', quoi: 'repub', id: String(job.id), etape: 'fin', fin: r || null }); } catch (_) {}
+      }
+    } finally { _miseEnLigneEnCours = null; armerMiseEnLigne(); }
+  })();
+  return _miseEnLigneEnCours;
+}
+async function finRepubBrouillon(acc, job) {
+  const { id, uid, draftId, titre, prix, urls, lettreFin, sauve, description } = job;
+  const corpsCV = JSON.parse(job.corpsCV);
     const stopC = await gardeStricte(uid, acc, { reserve: RESERVE_GESTES });
     if (stopC) { await leverVerrouRecreer(id); await majVersBrouillon(uid, id, { etat: 'a-publier', draftId }); return { refaire: true, accepte: true, etape: 'brouillon-a-refaire', draftId, raison: `l'ancienne annonce est supprimée et le brouillon est rangé, mais il n'a pas été mis en ligne (${stopC.error}) — « Brouillons → en ligne » le met en ligne, sans en créer un autre.` }; }
     await vintedPage(acc, 'GET', `/api/v2/item_upload/items/${draftId}`, null, { timeoutMs: 30000 });
@@ -9151,14 +9233,13 @@ async function recreerVinted(msg) {
     }
     const jV = rcV.json || {}; const itV = (jV.item && typeof jV.item === 'object') ? jV.item : (jV.draft && typeof jV.draft === 'object') ? jV.draft : jV;
     const nouvelIdV = itV && itV.id != null && /^\d{4,15}$/.test(String(itV.id)) ? String(itV.id) : draftId;
-    try { await rangerBrouillon(draftId, { uid, titre, prix, nPhotos: ids.length, parVRM: true, ancienId: id, etat: 'publie', publieLe: new Date().toISOString(), itemId: nouvelIdV }); } catch (_) {}
-    try { await noterModeleRepub(nouvelIdV, JSON.stringify(corps), uid, acc.domain || 'www.vinted.fr'); } catch (_) {}
+    try { await rangerBrouillon(draftId, { uid, titre, prix, nPhotos: job.nPhotos, parVRM: true, ancienId: id, etat: 'publie', publieLe: new Date().toISOString(), itemId: nouvelIdV }); } catch (_) {}
+    try { await noterModeleRepub(nouvelIdV, job.corps, uid, acc.domain || 'www.vinted.fr'); } catch (_) {}
     try { await supabaseUpsert('app_data', [{ id: `coffre_${uid}_${nouvelIdV}`, data: { ...(sauve || {}), versBrouillon: undefined, id: nouvelIdV, uid, title: titre, price: prix, desc: description, lettreVRM: lettreFin || null, photos: urls, savedAt: new Date().toISOString(), firstSavedAt: new Date().toISOString(), recreeDe: id } }], 'id'); } catch (_) {}
     await compterAction(uid, ACTIONS_MAX_HEURE);
     await majVersBrouillon(uid, id, { etat: 'fait', draftId, nouvelId: nouvelIdV });
     noterDiag('republier_ok');
     return { accepte: true, etape: 'fait', nouvelId: nouvelIdV, draftId, ancien: sauve && Number(sauve.price), nouveau: prix, nouveauTitre: titre };
-  });
 }
 
 // ══════════════════════════════════════════════════════════════════════════════

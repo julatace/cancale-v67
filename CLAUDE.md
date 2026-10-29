@@ -25,6 +25,16 @@
 > qui RESTENT, dits : en-têtes de Vintex jamais vus (l'Observateur ne les relève pas) ; VRM lit une fois par 24 h la
 > grille des tailles (`/item_upload/attributes`, Vintex non) ; VRM renvoie des photos réencodées en JPEG ; Vintex fait les
 > brouillons de plusieurs paires puis leurs mises en ligne, VRM une paire après l'autre.
+> **Suite (5.279), « fais aussi les brouillons et tout à la suite comme Vintex »** : avec `msg.differer` (l'app l'envoie
+> si l'extension sait `republierfile` = 5.279), après brouillon + suppression la mise en ligne est PLANIFIÉE à +1–3 min
+> (`planifierMiseEnLigne`, `vrmRepubAttente` dans chrome.storage.local, minuterie + réveil par chaque alarme
+> `miseEnLigneTick`) : la file Vinted est libre, la paire suivante passe ; à l'heure, UNE à la fois, `finRepubBrouillon`
+> (lecture du brouillon, `completion`, mêmes gardes), job retiré AVANT d'agir (jamais deux mises en ligne), résultat
+> envoyé à l'app (`maj · repub · etape:'fin'`, gardé 24 h `vrmRepubFins`). App : ligne « brouillon prêt · mise en ligne
+> vers HH:MM » (`planifiee`), la file ne se dit finie qu'après elles, le N° est reporté à la fin. Le verrou 30 min de
+> l'annonce est posé dès le brouillon. Preuve : `audit-recreer.cjs` §N (144 ; 5 rouges sur la 5.278). Reste différent :
+> l'espacement entre deux paires est celui qu'il règle (Vintex : ~12 s) ; non mesuré : un vrai Chrome qui endort le
+> service worker pendant l'attente (le réveil par alarme est au plus 30 s en retard).
 
 > **29 octobre (suite, « parfait ») — le suivi URSSAF corrigé et complété :** ⚠️ la 1ʳᵉ version affichait « payé » le champ
 > `montant` du registre — c'est le **CA TAPÉ depuis son espace URSSAF**, pas un paiement. Désormais : déclaré = `montant` s'il

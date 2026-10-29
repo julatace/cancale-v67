@@ -252,11 +252,11 @@ const projette = (row, sel) => {
             txtPause = await pg.locator('[data-republier-progression="9103"]').innerText().catch(() => ''); }
           const tot = await pg.locator('[data-republier-total]').getAttribute('data-republier-total').catch(() => null);
           dit(/pause au hasard avant la mise en ligne : encore 2\d s/.test(txtPause), 'une pause annoncée par l’extension : la barre dit ce qu’il reste à attendre (« encore 25 s »)', txtPause || 'absente');
-          dit(vu && /Étape 4 sur 6/.test(txt) && /brouillon/i.test(txt), 'barre de progression : la paire en cours dit son étape (« Étape 4 sur 6 · Création du brouillon »)', txt || 'absente');
+          dit(vu && /Étape 4 sur 7/.test(txt) && /brouillon/i.test(txt), 'barre de progression : la paire en cours dit son étape (« Étape 4 sur 7 · Création du brouillon »)', txt || 'absente');
           dit(tot === '0/4', 'barre d’ensemble : « 0 sur 4 terminées » pendant la première paire', String(tot));
           // (29 oct., « tout doit être détaillé dans la barre de progression ») chaque étape, son état.
           const det = await pg.$$eval('[data-republier-progression="9103"] [data-etape-detail]', (els) => els.map((e) => e.getAttribute('data-etape-detail') + ':' + e.getAttribute('data-etape-etat')).join(','));
-          dit(det === 'photos:fait,enregistrement:fait,suppression:fait,brouillon:encours,attente:avenir,en-ligne:avenir', 'la barre détaille CHAQUE étape (✓ faites, ● en cours, ○ à venir)', det || 'absente');
+          dit(det === 'lecture:fait,photos:fait,enregistrement:fait,brouillon:encours,suppression:avenir,attente:avenir,en-ligne:avenir', 'la barre détaille CHAQUE étape (✓ faites, ● en cours, ○ à venir)', det || 'absente');
           const txtDet = await pg.locator('[data-republier-progression="9103"] [data-etape-detail="photos"]').innerText().catch(() => '');
           dit(/3 photos/.test(txtDet), 'l’étape des photos dit combien sont parties (« 3 photos »)', txtDet || 'absente');
           const ev = (d) => pg.evaluate((x) => window.dispatchEvent(new CustomEvent('vrm:ext', { detail: { type: 'maj', quoi: 'repub', id: '9103', ...x } })), d);
