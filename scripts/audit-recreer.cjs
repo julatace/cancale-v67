@@ -38,7 +38,7 @@ function monter({ connecte = '111', comptes = null, coffre = true, modele = true
   if (cdn) lignes.vinted_item_details['9101'] = { ...(lignes.vinted_item_details['9101'] || {}), photos: PHOTOS_D };
   if (extra) Object.assign(lignes, extra);
   let n = 500;
-  return faireFond({ src, lignes, connecte, comptes, retardLecture: retardLecture || (() => 0), ecritureKO: (id) => coffreEcritureKO && /^coffre_/.test(id), cdn: cdn || (() => ({ status: 200 })),
+  const fond = faireFond({ src, lignes, connecte, comptes, retardLecture: retardLecture || (() => 0), ecritureKO: (id) => coffreEcritureKO && /^coffre_/.test(id), cdn: cdn || (() => ({ status: 200 })),
     vinted: (e) => {
       if (e.methode === 'GET' && /\/api\/v2\/item_upload\/colors$/.test(e.chemin)) return couleursRep || { status: 404, body: {} };
       if (e.methode === 'POST' && /\/api\/v2\/item_upload\/attributes$/.test(e.chemin)) return attributsRep || { status: 404, body: {} };
@@ -52,6 +52,15 @@ function monter({ connecte = '111', comptes = null, coffre = true, modele = true
       if (e.methode === 'POST' && /\/api\/v2\/items\/9101\/delete$/.test(e.chemin)) return { status: suppression, body: {} };
       return { status: 404, body: {} };
     } });
+  // 5.280 (« copie Vintex », qui ne lit jamais la grille des tailles) : une
+  //  republication n'interroge plus Vinted — elle n'utilise qu'une grille déjà
+  //  connue. Le banc la pose dans le cache, comme une lecture d'avant l'aurait fait.
+  if (attributsRep && attributsRep.status === 200 && typeof fond.ctx.optionsTailleDe === 'function') {
+    const jb = attributsRep.body, o = fond.ctx.optionsTailleDe(jb), lisible = !!(o && o.length) || fond.ctx.tout_codes(jb).length > 0;
+    if (lisible) { const g = { options: (o || []).slice(0, 300), requis: fond.ctx.codesRequis(jb), sansTaille: !o, codes: fond.ctx.tout_codes(jb), at: Date.now() };
+      fond.store.vrmTaillesVinted = Object.fromEntries(['1234', '1242', '88', '77'].map((c) => [c, g])); }
+  }
+  return fond;
 }
 const de = (j, re, m = 'POST') => j.vinted.filter((v) => v.methode === m && re.test(v.chemin));
 const photosP = (j) => de(j, /\/api\/v2\/photos$/);
@@ -105,9 +114,9 @@ const zero = (j) => gestes(j).length === 0;   // 5.266 : lire la liste des coule
     dit(r.accepte === false && r.code === 'onglet-vinted' && /ouvre vinted\.fr/.test(r.raison || '') && f.j.vinted.filter((v) => !LECTURE.test(v.chemin)).length === 0, "sans onglet Vinted ouvert : aucune requête chez Vinted, « ouvre vinted.fr » dit", JSON.stringify({ code: r.code, n: f.j.vinted.length, raison: r.raison })); }
   // A3 — (29 oct.) quelques paires par jour et par compte : au-delà, rien ne part.
   { const f = monter({ src: process.env.BG_SRC || undefined }); const t = Date.now();
-    await f.ctx.chrome.storage.local.set({ vrmRepubJour: { '111': Array.from({ length: 10 }, (_, k) => t - k * 60000) } });
+    await f.ctx.chrome.storage.local.set({ vrmRepubJour: { '111': Array.from({ length: 50 }, (_, k) => t - k * 60000) } });
     let r = {}; try { r = await f.ctx.recreerVinted({ cmd: 'recreerVinted', uid: '111', id: '9101', prix: 54, titre: 'Nike', confirme: true }); } catch (e) { r = { erreur: e.message }; }
-    dit(r.code === 'quota-jour' && zero(f.j), "10 paires republiées en 24 h sur ce compte : la suivante est refusée, aucune requête", JSON.stringify({ code: r.code, n: f.j.vinted.length })); }
+    dit(r.code === 'quota-jour' && zero(f.j), "50 paires republiées en 24 h sur ce compte : la suivante est refusée, aucune requête", JSON.stringify({ code: r.code, n: f.j.vinted.length })); }
 
   // B — une photo refusée : rien n'est créé, rien n'est supprimé.
   { const { f, r } = await run({ photo: 422 });
@@ -375,7 +384,7 @@ const zero = (j) => gestes(j).length === 0;   // 5.266 : lire la liste des coule
     const szG = gard.draft && (gard.draft.item_attributes || []).find((a) => a.code === 'size');
     const cond = c2.draft && (c2.draft.item_attributes || []).find((a) => a.code === 'condition');
     let corpsA = {}; try { corpsA = JSON.parse(att[0].corps); } catch (_) {}
-    dit(r.etape === 'fait' && att.length === 1 && JSON.stringify(corpsA) === JSON.stringify({ attributes: [{ code: 'category', value: [1242] }] }) && cs.length === 1 && sz && JSON.stringify(sz.ids) === '[1197]' && cond && JSON.stringify(cond.ids) === '[2]' && szG && JSON.stringify(szG.ids) === '[1197]',
+    dit(r.etape === 'fait' && att.length === 0 && cs.length === 1 && sz && JSON.stringify(sz.ids) === '[1197]' && cond && JSON.stringify(cond.ids) === '[2]' && szG && JSON.stringify(szG.ids) === '[1197]',
       "code de taille plus dans la grille : vérifié AVANT d'envoyer, taille « 38 » de la paire posée (1197), l'état gardé, UNE mise en ligne qui passe, brouillon enregistré à jour", JSON.stringify({ e: r.etape, att: att.length, sz, szG, raison: r.raison || r.erreur })); }
   { const { f, r, att } = await pubT({ grille: GRILLE([{ id: 1197, title: '38' }, { id: 1290, title: 'EU 38' }]) });
     dit(r.code === 'incomplet' && completions(f.j).length === 0 && /plusieurs tailles/.test(r.raison || '') && /Modifier/.test(r.raison || ''), "deux options au même libellé : VRM ne choisit pas, RIEN n'est envoyé, c'est dit avec le geste", JSON.stringify({ e: r.etape, raison: (r.raison || '').slice(0, 200) })); }

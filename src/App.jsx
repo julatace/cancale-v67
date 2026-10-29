@@ -39,6 +39,7 @@ import { cheminMonotone } from "./courbeMonotone.js";
 import VuesVentes from "./VuesVentes.jsx";
 import BordereauxAuto from "./BordereauxAuto.jsx";
 import {resumerStockJournee} from './stockJournee.js';
+import {jaugeSeuils,optionsMicro,calendrierUrssaf,phraseRythme,seuilsDe} from './microEntreprise.js';
 import { toutSurLeNumero, lireNumeroCherche } from "./rechercheNumero.js";
 import { repriseNumerosRecreation, tableRecrees } from "./repriseNumero.js";
 import { polyDe, estRectangle, normaliserPoly, FORMES, rectDans, empreinte, chevauche, placerSansTraverser, modeCase, capaciteCase, articlesAutresPlateformes, unParArticle, empilerDansCase, retirerDeCase, retirerDePile, ajouterAPile, cartonsDePile, hauteurPile, changerHauteurPile, prochainePlaceMeuble, estPoseSur, caler, proposerPiece, planchesCases, planchesRangees, plateauxMeuble, plateauxReglables, tasserPlateaux } from './stockRegles.js';
@@ -1737,7 +1738,7 @@ const SYNC_KEYS = [
   'vinted_invoice_settings','vinted_dark','vinted_stock_vinted',
   'vinted_accounts','vinted_account_labels','vinted_account_emails','vinted_account_phones',
   'vinted_inventory','vinted_annonce_numeros','vinted_used_numeros','vinted_annonces_vendues','vinted_bords_shipped',
-  'vinted_goal','vinted_regime','vinted_tva','vinted_bordereau_formats','vinted_bords_printed','vrm_imprimante','vrm_prenom','vrm_num_prefixe',
+  'vinted_goal','vinted_regime','vrm_micro_options','vinted_tva','vinted_bordereau_formats','vinted_bords_printed','vrm_imprimante','vrm_prenom','vrm_num_prefixe',
   // (27 oct.) La présentation d'arrivée a été vue (ou passée) : ne revient pas sur un autre appareil.
   'vrm_bienvenue_vue',
   // (28 oct., 5.252) Les brouillons qu'il a retirés de la liste (« plus sur Vinted »).
@@ -4792,7 +4793,8 @@ function OsmMap({ points, height = 230, selected, onSelect }) {
   // immobile, centré sur le même point et à la même échelle que les épingles
   // (une tuile MapLibre fait 512 px : zoom MapLibre = z − 1). CARTO retiré (clé
   // exigée). Injoignable ⇒ un fond uni et les épingles restent, jamais rien.
-  const sombreCarte = typeof document !== 'undefined' && document.documentElement.getAttribute('data-theme') === 'dark';
+  // (29 oct.) La carte garde ses couleurs claires en mode sombre (décision de Julien, comme la communauté).
+  const sombreCarte = false;
   return (
     <div data-mini-carte style={{ position: 'relative', width: '100%', height, overflow: 'hidden', background: sombreCarte ? '#1a1f27' : '#eaeef2' }}>
       <FondMiniCarte lat={clat} lon={clon} zoom={z - 1} sombre={sombreCarte} />
@@ -12105,6 +12107,10 @@ function BrouillonsVinted({ br, publier, brouillonOk, onClose, onFile }) {
   );
 }
 const REPUB_ESP_DEFAUT = 30;   // secondes entre deux annonces (borné par fileClamp)
+// (29 oct., « approche-toi le plus possible de Vintex ») MESURÉ : Vintex enchaîne
+// les paires à ~12 s d'écart. Le rythme « Comme Vintex » tire 8 à 16 s au hasard ;
+// c'est le choix par défaut tant qu'il n'en a pas retenu un autre.
+const REPUB_ESP_VINTEX = [8, 16];
 const REPUB_REG_DEF = { rot: 0, bright: 1, contrast: 1, sat: 1, zoom: 1 };
 // (28 oct., 5.252, sa demande : « un bouton Actions dans lequel on a republier,
 // mettre de brouillon à en ligne, de en ligne à brouillon, plein de choses »)
@@ -12333,7 +12339,7 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
   // (28 oct., sa demande) Temps ALÉATOIRE entre deux paires, entre SON minimum et
   // SON maximum (en minutes) — c'est lui qui le choisit et qui lance (§3, l'atelier).
   const espMem = (() => { const v = load('vrm_republier_esp', null); return v && typeof v === 'object' ? v : {}; })();
-  const [espMode, setEspMode] = useState(espMem.mode === 'aleatoire' ? 'aleatoire' : 'fixe');
+  const [espMode, setEspMode] = useState(espMem.mode === 'aleatoire' || espMem.mode === 'fixe' ? espMem.mode : 'vintex');
   const [espMin, setEspMin] = useState(Number(espMem.min) > 0 ? Number(espMem.min) : 1);
   const [espMax, setEspMax] = useState(Number(espMem.max) > 0 ? Number(espMem.max) : 3);
   const [prochaine, setProchaine] = useState(null);  // { at, s } : la prochaine paire part à `at`
@@ -12417,10 +12423,10 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
   // (28 oct.) Les temps d'attente sont TIRÉS AVANT de lancer et montrés sur
   // chaque ligne (« +1 min 23 s ») : il voit ce qui va se passer. « Tirer
   // d'autres temps » les refait. La première paire part tout de suite.
-  const tirerTemps = () => { const [a, b] = bornesAlea(); return a + Math.floor(Math.random() * (b - a + 1)); };
+  const tirerTemps = () => { const [a, b] = espMode === 'vintex' ? REPUB_ESP_VINTEX : bornesAlea(); return a + Math.floor(Math.random() * (b - a + 1)); };
   const [plan, setPlan] = useState({});
   const clePlan = aFaire.map((a) => a.id).join(',') + '|' + espMode + '|' + espMin + '|' + espMax + '|' + esp;
-  const refaitPlan = () => { const o = {}; aFaire.forEach((a, i) => { o[a.id] = i === 0 ? 0 : (espMode === 'aleatoire' ? tirerTemps() : fileClamp(esp)); }); setPlan(o); };
+  const refaitPlan = () => { const o = {}; aFaire.forEach((a, i) => { o[a.id] = i === 0 ? 0 : (espMode !== 'fixe' ? tirerTemps() : fileClamp(esp)); }); setPlan(o); };
   React.useEffect(() => { if (mode === 'idle') refaitPlan(); }, [clePlan]);   // eslint-disable-line react-hooks/exhaustive-deps
   const duree = (sec) => sec >= 60 ? `${Math.floor(sec / 60)} min ${String(sec % 60).padStart(2, '0')} s` : `${sec} s`;
   const autresComptes = compteChrome ? aFaire.filter((a) => a.uid && String(a.uid) !== String(compteChrome)).length : 0;
@@ -12435,7 +12441,7 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
     const premier = !Object.keys(st).length;
     let annule = false;
     let delai = 0;
-    if (!premier) { const pv = plan[suiv.id]; delai = Number.isFinite(pv) && pv > 0 ? pv : (espMode === 'aleatoire' ? tirerTemps() : fileClamp(esp)); }
+    if (!premier) { const pv = plan[suiv.id]; delai = Number.isFinite(pv) && pv > 0 ? pv : (espMode !== 'fixe' ? tirerTemps() : fileClamp(esp)); }
     setProchaine(delai > 0 ? { at: Date.now() + delai * 1000, s: delai } : null);
     const t = setTimeout(async () => {
       if (annule) return;
@@ -12659,7 +12665,8 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
             {mode === 'idle' && <>
               <div data-republier-esp={espMode} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 <span style={maj}>Temps entre deux paires</span>
-                <Segmente plein label="Temps entre deux paires" value={espMode} onChange={setEspMode} options={[{ v: 'fixe', l: 'Fixe', data: { 'data-republier-esp-choix': 'fixe' } }, { v: 'aleatoire', l: 'Aléatoire', data: { 'data-republier-esp-choix': 'aleatoire' } }]} />
+                <Segmente plein label="Temps entre deux paires" value={espMode} onChange={setEspMode} options={[{ v: 'vintex', l: 'Comme Vintex', data: { 'data-republier-esp-choix': 'vintex' } }, { v: 'fixe', l: 'Fixe', data: { 'data-republier-esp-choix': 'fixe' } }, { v: 'aleatoire', l: 'Aléatoire', data: { 'data-republier-esp-choix': 'aleatoire' } }]} />
+                {espMode === 'vintex' && <div data-republier-esp-vintex style={{ fontSize: 13, color: C.muted }}>Entre 8 et 16 secondes entre deux paires, tiré au hasard : le rythme mesuré chez Vintex.</div>}
                 {espMode === 'fixe' && <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13.5, color: C.text }}>Une annonce toutes les <input data-republier-esp-fixe value={esp} onChange={(ev) => setEsp(fileClamp(ev.target.value))} inputMode="numeric" style={{ ...champ, width: 70 }} /> secondes</label>}
                 {espMode === 'aleatoire' && <>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13.5, color: C.text, flexWrap: 'wrap' }}>
@@ -17646,89 +17653,6 @@ function LigneVenteCompacte({ photo, photoNoeud = null, titre, sous = '', etat, 
     </div>,document.body)}
   </div>;
 }
-// ── (27 oct.) LE PAVÉ NUMÉRIQUE SUR LEBONCOIN ET eBAY — Julien : « fais pareil
-// pour le pavé numérique sur Leboncoin et eBay » (comme le Stock, 26 oct.).
-// Sur ordinateur, un chiffre tapé n'importe où dans l'espace Leboncoin ou eBay
-// ouvre la saisie ; N° + Entrée MONTRE la paire sur ce site : sa vente d'abord,
-// sinon son annonce en ligne, sinon (Leboncoin) sa carte « à publier ». Une
-// LECTURE : rien n'est publié, retiré, ni modifié, aucun numéro ne change. La
-// paire se trouve par IDENTITÉ seulement (SKU, référence VRM, lien posé à la
-// main — les règles de chaque écran, §5) ; un N° qui ne désigne rien le dit.
-// Verr Num éteint : la touche du pavé arrive en « Clear »/« End » ; on lit aussi
-// `e.code` (`Numpad5`), comme le Stock.
-const DEMANDE_NUM_PLAT = { plateforme: '', section: '', q: '', at: 0 };
-const chiffrePave = (e) => /^[0-9]$/.test(e.key) ? e.key : ((/^Numpad([0-9])$/.exec(e.code || '') || [])[1] || '');
-function SaisieNumeroPlateforme({ plateforme, chercher, onSection = () => {}, nom = '', invite = '', barre = false }) {
-  const sansSouris = useSansSouris();
-  const champ = React.useRef(null);
-  const [v, setV] = React.useState('');
-  const [msg, setMsg] = React.useState(null);   // { texte, ton: 'ok' | 'info' }
-  const [occupe, setOccupe] = React.useState(false);
-  const enCours = React.useRef(0);
-  React.useEffect(() => {
-    if (sansSouris) return;
-    const surTouche = (e) => {
-      if (e.defaultPrevented || e.ctrlKey || e.metaKey || e.altKey) return;
-      const t = e.target, tag = (t && t.tagName) || '';
-      if (/^(INPUT|TEXTAREA|SELECT)$/.test(tag) || (t && t.isContentEditable)) return;
-      // Une feuille ou une vente ouverte (un dialogue VISIBLE) garde son clavier.
-      if ([...document.querySelectorAll('[role="dialog"]')].some((d) => !d.closest('[hidden]') && d.getBoundingClientRect().height > 0)) return;
-      const ch = chiffrePave(e); if (!ch) return;
-      const el = champ.current; if (!el) return;
-      e.preventDefault(); el.focus(); setV(ch); setMsg(null);
-    };
-    // En CAPTURE : Verr Num éteint, la touche 4 du pavé arrive en « ArrowLeft »,
-    // que la coque prend pour « site précédent ». Pris ici d'abord (et
-    // `preventDefault`), le chiffre va à la saisie et l'onglet ne bouge pas.
-    window.addEventListener('keydown', surTouche, true);
-    return () => window.removeEventListener('keydown', surTouche, true);
-  }, [sansSouris]);
-  if (sansSouris) return null;
-  const montrer = (sel, n = 0) => {
-    const el = typeof sel === 'function' ? sel() : document.querySelector(sel);
-    if (el) {
-      try { el.scrollIntoView({ block: 'center', behavior: (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) ? 'auto' : 'smooth' }); } catch (_) {}
-      document.querySelectorAll('[data-num-trouve]').forEach((x) => x.removeAttribute('data-num-trouve'));
-      el.setAttribute('data-num-trouve', '1');
-      setTimeout(() => el.removeAttribute('data-num-trouve'), 3500);
-      return Promise.resolve(true);
-    }
-    if (n >= 25) return Promise.resolve(false);
-    return new Promise((r) => setTimeout(() => r(montrer(sel, n + 1)), 200));
-  };
-  const valider = async () => {
-    const brut = String(v || '').trim(); const cle = cleNum(brut);
-    if (!cle) { setMsg({ texte: 'Tape un numéro, puis Entrée.', ton: 'info' }); return; }
-    const id = ++enCours.current; setOccupe(true);
-    document.querySelectorAll('[data-num-trouve]').forEach((x) => x.removeAttribute('data-num-trouve'));
-    let r = null; try { r = await chercher(cle); } catch (_) { r = null; }
-    if (id !== enCours.current) return;
-    setOccupe(false);
-    if (!r) { setMsg({ texte: 'Je n’ai pas pu lire tes données — réessaie dans un instant.', ton: 'info' }); return; }
-    if (!r.section) { setMsg({ texte: r.texte, ton: 'info' }); return; }
-    Object.assign(DEMANDE_NUM_PLAT, { plateforme, section: r.section, q: r.q || '', at: Date.now() });
-    onSection(r.section);
-    window.dispatchEvent(new Event('vrm:num-plat'));
-    const vu = await montrer(r.sel);
-    if (id !== enCours.current) return;
-    setMsg(vu ? { texte: r.texte, ton: 'ok' } : { texte: r.texteSiAbsent || r.texte, ton: 'info' });
-    if (vu) setV('');
-  };
-  return (
-    <div className={barre ? 'vrm-num-plat vrm-num-plat-barre' : 'vrm-num-plat'} data-num-plat={plateforme}>
-      <label className="vrm-num-plat-champ"><span>N°</span>
-        <input ref={champ} data-num-plat-saisie="" value={v} inputMode="numeric" autoComplete="off" placeholder="+ Entrée"
-          aria-label={`Numéro : Entrée pour trouver la paire ${nom || (plateforme === 'ebay' ? 'sur eBay' : 'sur Leboncoin')}`}
-          onChange={(e) => { setV(e.target.value); setMsg(null); }}
-          onKeyDown={(e) => {
-            // Verr Num éteint, DANS le champ : « ArrowDown » + Numpad2 ne tape rien ; on pose le chiffre.
-            const ch = chiffrePave(e); if (ch && ch !== e.key) { e.preventDefault(); e.stopPropagation(); setV((x) => x + ch); setMsg(null); return; }
-            if (e.key === 'Enter') { e.preventDefault(); valider(); } else if (e.key === 'Escape') { e.preventDefault(); setV(''); setMsg(null); e.currentTarget.blur(); } }}/>
-      </label>
-      <span role="status" className="vrm-num-plat-msg" data-num-plat-msg={msg ? msg.ton : undefined}>{occupe ? 'Je cherche…' : (msg ? msg.texte : (barre ? '' : (invite || 'Tape un N° au clavier : je montre la paire sur ce site.')))}</span>
-    </div>
-  );
-}
 function LigneVente({ photo, titre, meta, montant, actions, etat, etatNoeud = null, details, sous = '', ton = '', data = null, numerosArticle = [], plateforme = '' }) {
   return <LigneVenteCompacte {...(data || {})} numerosArticle={numerosArticle} plateforme={plateforme} photo={photo} titre={titre} sous={sous} ton={ton} etat={etat} etatNoeud={etatNoeud} montant={montant} initialOuvert={!!details?.props.ouvrir} className="vrm-sale-row vrm-shared-sale" style={{padding:'12px 14px',borderBottom:`1px solid ${C.border}`}}>
     <div className="vrm-sale-overview" style={{display:'flex',gap:12,alignItems:'flex-start'}}>
@@ -22502,12 +22426,6 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
   const [annMax, setAnnMax] = React.useState(60);
   const qAnn = React.useDeferredValue(q);
   React.useEffect(() => { setAnnMax(60); }, [qAnn, filtreAnn]);
-  // (27 oct.) Le pavé numérique de l'espace eBay pose « n°41 » dans la recherche
-  // (la liste est paginée à 60 : sans ça la carte peut être hors de la tranche).
-  React.useEffect(() => {
-    const lire = () => { const d = DEMANDE_NUM_PLAT; if (d.plateforme === 'ebay' && d.section === 'annonces' && d.q && Date.now() - d.at < 5000) { setQ(d.q); setFiltreAnn('toutes'); d.at = 0; } };
-    lire(); window.addEventListener('vrm:num-plat', lire); return () => window.removeEventListener('vrm:num-plat', lire);
-  }, []);
   const [eligibles, setEligibles] = React.useState(undefined);       // offre : undefined · null · { ids:Set, complet }
   const [retraits, setRetraits] = React.useState({});                // itemId → '…' (en cours) | message
   // Retrait automatique (proposition 8) : l'interrupteur, et ce qui a été retiré
@@ -32998,31 +32916,220 @@ function StatutFiscal({ liveStats, onNav }) {
   return (
     <>
       {entete}
-      <Card style={{ padding: '14px 16px', marginBottom: 12 }}>
-        <div data-statut-taux={String(taux)} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          <div style={{ fontSize: 13.5, color: C.text, lineHeight: 1.5 }}>Ton taux : <b className="vrm-display">{String(taux).replace('.', ',')} %</b> de ce que tu encaisses{officiel ? '' : ' (posé à la main)'}.</div>
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            <button type="button" data-taux-option="liberatoire" aria-pressed={vl} className="vrm-pastille-choix" onClick={() => poserTaux({ liberatoire: !vl, acre })}>Versement libératoire de l'impôt</button>
-            <button type="button" data-taux-option="acre" aria-pressed={acre} className="vrm-pastille-choix" onClick={() => poserTaux({ liberatoire: vl, acre: !acre })}>ACRE (1ʳᵉ année)</button>
-          </div>
-          <Pourquoi label="D'où vient ce taux">Achat-revente en micro-entreprise (vente de marchandises, BIC) : {String(TAUX_MICRO.cotisations).replace('.', ',')} % de cotisations sociales + {String(TAUX_MICRO.formation).replace('.', ',')} % de contribution à la formation. Le versement libératoire ajoute {TAUX_MICRO.liberatoire} % (l'impôt sur le revenu payé en même temps). L'ACRE réduit les cotisations à {String(TAUX_MICRO.acre).replace('.', ',')} % la première année. Vérifie le tien sur ton espace autoentrepreneur.urssaf.fr ; un autre taux se pose à la main dans Réglages.</Pourquoi>
-        </div>
-      </Card>
+      <MicroEntreprise taux={taux} poserTaux={(o) => poserTaux(o)} officiel={officiel} vlTaux={vl} acreTaux={acre} />
       <CarteUrssafMois liveStats={liveStats} onNav={onNav} />
       <SuiviUrssaf onNav={onNav} />
     </>
   );
 }
+// ── TA MICRO-ENTREPRISE (29 octobre) ─────────────────────────────────────
+// Julien : « vois si la personne a choisi le versement libératoire », « si elle
+// paie tous les mois, elle déclare août mais paie en septembre », « une jauge
+// avec le plafond et le seuil de TVA », « une interface plus pro ». Trois cartes,
+// une règle pure (`src/microEntreprise.js`, chiffres officiels vérifiés) :
+//   1. Ton profil URSSAF — le rythme (UN réglage, `vinted_urssaf_freq`, partagé
+//      par la carte du mois et le suivi), le versement libératoire DEMANDÉ
+//      (`vrm_micro_options` : VRM ne lit pas son espace URSSAF), l'ACRE, et le
+//      taux détaillé ligne par ligne.
+//   2. Ton calendrier — quel mois se paie quand, avec SES dates.
+//   3. Tes seuils — CA de l'année (la ligne publiée, datée au versement) face
+//      au seuil de TVA et au plafond du régime ; « au moins » quand c'est un
+//      minimum ; une projection à ce rythme, jamais sur un total partiel.
+const lireFreqUrssaf = () => load('vinted_urssaf_freq', 'trimestriel') === 'mensuel' ? 'mensuel' : 'trimestriel';
+function useFreqUrssaf() {
+  const [f, setF] = React.useState(lireFreqUrssaf);
+  React.useEffect(() => onCloudReady(() => setF(lireFreqUrssaf())), []);
+  React.useEffect(() => {
+    const h = (e) => { if (e && e.detail && e.detail.k === 'vinted_urssaf_freq') setF(lireFreqUrssaf()); };
+    window.addEventListener('vrm:save', h); return () => window.removeEventListener('vrm:save', h);
+  }, []);
+  return f;
+}
+const lireOptionsMicro = () => optionsMicro(load('vrm_micro_options', null));
+const eurMicro = (n) => n == null ? '—' : `${Number(n).toFixed(2).replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, ' ')} €`;
+const eurRond = (n) => `${Math.round(Number(n)).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ')} €`;
+const pctFr = (n) => `${String(n).replace('.', ',')} %`;
+function LigneProfil({ titre, aide, children, attr }) {
+  return (
+    <div className="vrm-micro-ligne" {...(attr || {})} style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: '12px 0', borderTop: `1px solid ${C.border}` }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px 12px', flexWrap: 'wrap' }}>
+        <span style={{ fontSize: 14, fontWeight: 600, color: C.text }}>{titre}</span>
+        {children}
+      </div>
+      {aide ? <div style={{ fontSize: 12.5, color: C.muted, lineHeight: 1.5 }}>{aide}</div> : null}
+    </div>
+  );
+}
+function JaugeBarre({ pct, marques = [], etat, attr }) {
+  const alerte = etat && etat !== 'ok';
+  const fond = alerte ? C.warn : C.text;
+  return (
+    <div {...(attr || {})} role="meter" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.min(100, Math.round(pct))} style={{ position: 'relative', height: 10, borderRadius: 999, background: C.card2 || C.bg, border: `1px solid ${C.border}`, overflow: 'hidden' }}>
+      <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: `${Math.max(0, Math.min(100, pct))}%`, background: fond, opacity: alerte ? 0.9 : 0.55, borderRadius: 999 }} />
+      {marques.map((m) => <div key={m} aria-hidden="true" style={{ position: 'absolute', top: -1, bottom: -1, left: `${m}%`, width: 2, background: C.muted, opacity: 0.7 }} />)}
+    </div>
+  );
+}
+function MicroEntreprise({ taux, poserTaux, officiel, vlTaux, acreTaux }) {
+  const freq = useFreqUrssaf();
+  const [opts, optsPret] = useLigneSynchro('vrm_micro_options', lireOptionsMicro);
+  const ligne = useLigneUrssaf();
+  const [regLu, regPret] = useLigneSynchro('vrm_urssaf_declare', lireDeclarations);
+  const now = new Date();
+  const jauge = React.useMemo(() => jaugeSeuils({ ligne, now }), [ligne]); // eslint-disable-line react-hooks/exhaustive-deps
+  const cal = React.useMemo(() => calendrierUrssaf(freq, now, 3), [freq]); // eslint-disable-line react-hooks/exhaustive-deps
+  const vl = opts.liberatoire;                     // 'oui' · 'non' · null (pas répondu)
+  const acre = opts.acre || (opts.at === 0 && acreTaux);
+  const s = seuilsDe(now.getFullYear());
+  const poserOptions = (o) => {
+    const n = { ...opts, ...o, at: Date.now() };
+    save('vrm_micro_options', { liberatoire: n.liberatoire, acre: !!n.acre, at: n.at });
+    // Le taux suit ses réponses — sauf un taux posé À LA MAIN (Réglages), qu'on
+    // ne remplace jamais en silence.
+    if (officiel) poserTaux({ liberatoire: n.liberatoire === 'oui', acre: !!n.acre });
+  };
+  const poserFreq = (f) => save('vinted_urssaf_freq', f);
+  const jour = (d) => `${d.getDate() === 1 ? '1er' : d.getDate()} ${d.toLocaleDateString('fr-FR', { month: 'long' })}`;
+  const sTitre = { fontSize: 15, fontWeight: 700, color: C.text, letterSpacing: -0.15 };
+  const sCarte = { padding: '16px 18px', marginBottom: 12 };
+  const lignesTaux = [
+    ['Cotisations sociales', acre ? TAUX_MICRO.acre : TAUX_MICRO.cotisations, acre ? 'ACRE, 1ʳᵉ année' : 'vente de marchandises (BIC)'],
+    ['Formation professionnelle', TAUX_MICRO.formation, 'commerçant'],
+    ...(vl === 'oui' || (vl == null && vlTaux) ? [['Impôt sur le revenu', TAUX_MICRO.liberatoire, 'versement libératoire']] : []),
+  ];
+  // ── 1. Profil ──
+  const profil = (
+    <Card style={sCarte}>
+      <div data-micro-profil={vl || 'passu'}>
+        <div style={sTitre}>Ton profil URSSAF</div>
+        <div style={{ fontSize: 12.5, color: C.muted, marginTop: 2, marginBottom: 6, lineHeight: 1.5 }}>VRM ne lit pas ton espace URSSAF : dis-lui tes options, il calcule le reste. Tu les retrouves sur autoentrepreneur.urssaf.fr, rubrique « Mon compte ».</div>
+        <LigneProfil titre="Tu déclares" attr={{ 'data-micro-freq': freq }} aide={phraseRythme(freq, now) + " L'URSSAF ne propose que ces deux rythmes (pas d'annuel)."}>
+          <Segmente label="Rythme de déclaration" value={freq} onChange={poserFreq}
+            options={[{ v: 'mensuel', l: 'Chaque mois', data: { 'data-micro-freq-choix': 'mensuel' } }, { v: 'trimestriel', l: 'Chaque trimestre', data: { 'data-micro-freq-choix': 'trimestriel' } }]} />
+        </LigneProfil>
+        <LigneProfil titre="Versement libératoire de l'impôt" attr={{ 'data-micro-vl': vl || 'passu' }}
+          aide={<>
+            {vl == null && optsPret ? <div data-micro-vl-question="" style={{ color: C.warn, fontWeight: 600, marginBottom: 4 }}>À confirmer : as-tu choisi cette option auprès de l'URSSAF ?{vlTaux ? ' Ton taux actuel (13,4 %) laisse penser que oui.' : ''}</div> : null}
+            {vl === 'oui' ? <>Ton impôt sur le revenu ({TAUX_MICRO.liberatoire} %) part avec tes cotisations, {freq === 'mensuel' ? 'chaque mois' : 'chaque trimestre'}.</> : vl === 'non' ? <>Ton impôt sur le revenu se calcule à part, sur ta déclaration de revenus du printemps.</> : <>Ton impôt sur le revenu payé avec tes cotisations ({TAUX_MICRO.liberatoire} %), ou à part sur ta déclaration de revenus.</>}
+            <Pourquoi label="Comment savoir si je l'ai choisi">Sur autoentrepreneur.urssaf.fr, ta déclaration affiche une ligne « versement libératoire » à côté des cotisations si tu l'as choisi. Avec l'option, l'impôt sur ce chiffre d'affaires ({TAUX_MICRO.liberatoire} % pour l'achat-revente) est payé au même rythme que tes cotisations, et tu n'as plus rien à payer dessus au printemps.{s ? <> Elle est possible si ton revenu fiscal de référence d'il y a deux ans était sous {eurRond(s.rfrLiberatoire)} (personne seule), et se demande avant le 30 septembre pour l'année suivante.</> : null}</Pourquoi>
+          </>}>
+          <Segmente label="Versement libératoire" value={vl} onChange={(v) => poserOptions({ liberatoire: v })}
+            options={[{ v: 'oui', l: 'Oui', data: { 'data-taux-option': 'liberatoire' } }, { v: 'non', l: 'Non', data: { 'data-micro-vl-choix': 'non' } }]} />
+        </LigneProfil>
+        <LigneProfil titre="ACRE (première année)" attr={{ 'data-micro-acre': acre ? 'oui' : 'non' }} aide="L'aide à la création réduit tes cotisations sociales la première année d'activité.">
+          <Segmente label="ACRE" value={acre ? 'oui' : 'non'} onChange={(v) => poserOptions({ acre: v === 'oui' })}
+            options={[{ v: 'oui', l: 'Oui', data: { 'data-taux-option': 'acre' } }, { v: 'non', l: 'Non' }]} />
+        </LigneProfil>
+        <div data-statut-taux={String(taux)} style={{ borderTop: `1px solid ${C.border}`, paddingTop: 12, marginTop: 2 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8 }}>
+            <span style={{ fontSize: 14, fontWeight: 600, color: C.text }}>Ton taux</span>
+            <span className="vrm-display" style={{ fontSize: 22, fontWeight: 700, color: C.text, fontVariantNumeric: 'tabular-nums' }}>{pctFr(taux)}</span>
+          </div>
+          {officiel ? (
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '4px 12px', marginTop: 8, fontSize: 13, color: C.muted }}>
+              {lignesTaux.map(([l, t, n]) => <React.Fragment key={l}><span>{l} <span style={{ fontSize: 11.5 }}>· {n}</span></span><span style={{ color: C.text, fontVariantNumeric: 'tabular-nums', textAlign: 'right' }}>{pctFr(t)}</span></React.Fragment>)}
+            </div>
+          ) : <div style={{ fontSize: 12.5, color: C.muted, marginTop: 6 }}>Posé à la main dans Réglages : VRM ne le change pas quand tu réponds ci-dessus.</div>}
+          <div style={{ fontSize: 12, color: C.muted, marginTop: 8 }}>Taux officiels 2026 de l'achat-revente, à vérifier sur ton espace URSSAF. Je ne suis pas comptable.</div>
+        </div>
+      </div>
+    </Card>
+  );
+  // ── 2. Calendrier ──
+  const calendrier = (
+    <Card style={sCarte}>
+      <div data-micro-calendrier={freq}>
+        <div style={sTitre}>Ton calendrier</div>
+        <div style={{ fontSize: 12.5, color: C.muted, marginTop: 2, lineHeight: 1.5 }}>
+          {freq === 'mensuel' ? 'Le chiffre d\'affaires d\'un mois se déclare et se paie le mois suivant.' : 'Le chiffre d\'affaires d\'un trimestre se déclare et se paie le mois qui suit le trimestre.'}
+          {vl === 'oui' ? ' Ton impôt (1 %) part en même temps.' : vl === 'non' ? ' Ton impôt sur le revenu se paie à part (déclaration de revenus).' : ''}
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', marginTop: 8 }}>
+          {cal.map((p, i) => {
+            const notee = regPret && p.ym.every((ym) => moisDeclare(regLu, ym));
+            const presse = !notee && p.ouverte && p.joursRestants <= 7;
+            return (
+              <div key={p.periode} data-micro-echeance={p.ym.join(',')} data-micro-echeance-etat={notee ? 'notee' : p.ouverte ? 'ouverte' : 'avenir'}
+                style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '2px 12px', alignItems: 'baseline', padding: '10px 0', borderTop: i ? `1px solid ${C.border}` : 'none' }}>
+                <span style={{ fontSize: 14, fontWeight: 600, color: C.text, textTransform: 'capitalize' }}>{p.periode}</span>
+                <span style={{ fontSize: 12.5, fontWeight: 600, color: notee ? C.muted : presse ? C.warn : C.muted, whiteSpace: 'nowrap' }}>
+                  {notee ? '✓ notée déclarée' : !p.ouverte ? 'à venir' : p.joursRestants <= 0 ? "dernier jour aujourd'hui" : `${p.joursRestants} j restants`}
+                </span>
+                <span style={{ gridColumn: '1 / -1', fontSize: 12.5, color: C.muted }}>Déclarer et payer du {jour(p.ouvre)} au {jour(p.limite)}</span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </Card>
+  );
+  // ── 3. Seuils ──
+  let seuils;
+  if (!s) seuils = null;
+  else if (!jauge) seuils = (
+    <Card style={sCarte}><div data-micro-seuils="passu"><div style={sTitre}>Tes seuils {now.getFullYear()}</div><div style={{ fontSize: 13, color: C.muted, marginTop: 6 }}>Ton chiffre d'affaires de l'année se calcule dans l'écran Ventes : ouvre-le une fois sur cet appareil.</div></div></Card>
+  );
+  else {
+    const j = jauge, am = j.partiel ? 'au moins ' : '';
+    const tvaTxt = {
+      due_depuis_janvier: <>Ton chiffre d'affaires {j.annee - 1} a dépassé {eurRond(j.seuils.tvaBase)} : la TVA est due depuis le 1er janvier {j.annee}. Vérifie avec ton service des impôts des entreprises.</>,
+      majore_depasse: <>Seuil majoré de {eurRond(j.seuils.tvaMajore)} dépassé : la TVA est due <b>depuis le jour du dépassement</b>. Contacte ton service des impôts des entreprises sans attendre.</>,
+      base_depasse: <>Seuil de {eurRond(j.seuils.tvaBase)} dépassé : tu restes sans TVA jusqu'au 31 décembre, puis tu factures la TVA dès le 1er janvier {j.annee + 1}. Attention, au-delà de {eurRond(j.seuils.tvaMajore)} (encore {eurMicro(j.tva.resteMajore)}), elle serait due tout de suite.</>,
+      proche: <>Plus que {eurMicro(j.tva.reste)} avant le seuil de {eurRond(j.seuils.tvaBase)}.</>,
+      ok: <>Encore {am ? 'au plus ' : ''}{eurMicro(j.tva.reste)} avant {eurRond(j.seuils.tvaBase)}. Au-delà, tu factures la TVA à partir du 1er janvier suivant.</>,
+    }[j.tva.etat];
+    const plafTxt = {
+      sortie: <>Plafond dépassé deux années de suite : sortie du régime micro au 1er janvier {j.annee + 1}. Parles-en à un comptable.</>,
+      depasse: <>Plafond dépassé cette année. Un dépassement isolé ne fait pas sortir du régime ; s'il se répète l'an prochain, tu en sors au 1er janvier suivant.</>,
+      proche: <>Plus que {eurMicro(j.plafond.reste)} avant le plafond.</>,
+      ok: <>Encore {am ? 'au plus ' : ''}{eurMicro(j.plafond.reste)} de marge.</>,
+    }[j.plafond.etat];
+    seuils = (
+      <Card style={sCarte}>
+        <div data-micro-seuils="lu" data-micro-ca={String(j.ca)} data-micro-partiel={j.partiel ? '1' : ''} data-micro-tva={j.tva.etat} data-micro-plafond={j.plafond.etat} data-micro-projection={j.projection == null ? '' : String(j.projection)}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
+            <span style={sTitre}>Tes seuils {j.annee}</span>
+            <span style={{ fontSize: 13, color: C.muted }}>Reçu en {j.annee} : <b className="vrm-display" style={{ color: C.text, fontSize: 16 }}>{am}{eurMicro(j.ca)}</b></span>
+          </div>
+          {j.partiel ? <div data-micro-partiel-texte="" style={{ fontSize: 12.5, color: C.muted, marginTop: 4 }}>C'est un minimum : {j.raisons.join(' · ')}.</div> : null}
+          <div style={{ marginTop: 14 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, fontSize: 13, marginBottom: 6 }}>
+              <span style={{ fontWeight: 600, color: C.text }}>Franchise de TVA</span>
+              <span style={{ color: j.tva.etat === 'ok' ? C.muted : C.warn, fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>{pctFr(Math.round(j.tva.pct))} de {eurRond(j.seuils.tvaBase)}</span>
+            </div>
+            <JaugeBarre attr={{ 'data-micro-jauge': 'tva' }} pct={j.ca / j.seuils.tvaMajore * 100} marques={[j.seuils.tvaBase / j.seuils.tvaMajore * 100]} etat={j.tva.etat} />
+            <div style={{ position: 'relative', height: 16, fontSize: 11, color: C.muted, marginTop: 3 }}>
+              <span style={{ position: 'absolute', left: 0 }}>0</span>
+              <span style={{ position: 'absolute', right: `${100 - j.seuils.tvaBase / j.seuils.tvaMajore * 100}%`, transform: 'translateX(50%)', whiteSpace: 'nowrap' }}>{eurRond(j.seuils.tvaBase)}</span>
+            </div>
+            <div style={{ fontSize: 11, color: C.muted }}>Le trait marque le seuil ; la barre va jusqu'au seuil majoré ({eurRond(j.seuils.tvaMajore)}).</div>
+            <div data-micro-tva-texte="" style={{ fontSize: 12.5, color: j.tva.etat === 'ok' ? C.muted : C.text, marginTop: 6, lineHeight: 1.5 }}>{tvaTxt}</div>
+          </div>
+          <div style={{ marginTop: 16 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, fontSize: 13, marginBottom: 6 }}>
+              <span style={{ fontWeight: 600, color: C.text }}>Plafond de la micro-entreprise</span>
+              <span style={{ color: j.plafond.etat === 'ok' ? C.muted : C.warn, fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>{pctFr(Math.round(j.plafond.pct))} de {eurRond(j.seuils.plafondVente)}</span>
+            </div>
+            <JaugeBarre attr={{ 'data-micro-jauge': 'plafond' }} pct={j.plafond.pct} etat={j.plafond.etat} />
+            <div data-micro-plafond-texte="" style={{ fontSize: 12.5, color: j.plafond.etat === 'ok' ? C.muted : C.text, marginTop: 6, lineHeight: 1.5 }}>{plafTxt}</div>
+          </div>
+          {j.projection != null ? (
+            <div data-micro-projection-texte="" style={{ fontSize: 12.5, color: (j.projTva || j.projPlafond) ? C.text : C.muted, marginTop: 14, paddingTop: 10, borderTop: `1px solid ${C.border}`, lineHeight: 1.5 }}>
+              À ce rythme, tu finirais l'année vers <b>{eurRond(j.projection)}</b>{j.projPlafond ? <> : au-dessus du plafond de {eurRond(j.seuils.plafondVente)}.</> : j.projTva ? <> : au-dessus du seuil de TVA — anticipe ({eurRond(j.seuils.tvaBase)}).</> : '.'} Une estimation, pas une prévision.
+            </div>
+          ) : null}
+          <Pourquoi label="D'où viennent ces seuils">Seuils {j.annee} de la vente de marchandises, vérifiés le {j.seuils.verifie} : franchise de TVA {eurRond(j.seuils.tvaBase)} (seuil majoré {eurRond(j.seuils.tvaMajore)}), plafond du régime micro {eurRond(j.seuils.plafondVente)}. Le chiffre est ce que tes plateformes t'ont versé dans l'année (toutes plateformes), hors comptes que tu as retirés.</Pourquoi>
+        </div>
+      </Card>
+    );
+  }
+  return (<div data-micro-entreprise="">{profil}{calendrier}{seuils}</div>);
+}
 function SuiviUrssaf({ onNav }) {
   const v = useLigneUrssaf();
   const [regLu, regPret] = useLigneSynchro('vrm_urssaf_declare', lireDeclarations);
   // Son rythme : synchronisé (§5.49) et suivi s'il le change ailleurs.
-  const [freq, setFreq] = React.useState(() => load('vinted_urssaf_freq', 'trimestriel'));
-  React.useEffect(() => onCloudReady(() => setFreq(load('vinted_urssaf_freq', 'trimestriel'))), []);
-  React.useEffect(() => {
-    const f = (e) => { if (e && e.detail && e.detail.k === 'vinted_urssaf_freq') setFreq(load('vinted_urssaf_freq', 'trimestriel')); };
-    window.addEventListener('vrm:save', f); return () => window.removeEventListener('vrm:save', f);
-  }, []);
+  const freq = useFreqUrssaf();
   const [ouvert, setOuvert] = React.useState(false);
   const [edit, setEdit] = React.useState(null);   // { ym, montant, paye, erreur? }
   const suivi = React.useMemo(() => regPret ? suiviUrssaf({ freq, declare: regLu, ligne: v }) : undefined, [regPret, regLu, v, freq]);
@@ -33144,9 +33251,8 @@ function CarteUrssafMois({ liveStats, onNav }) {
   const moisCourantN = urssafMois ? (eCour ? (eCour.n || 0) : 0) : null;
   const urssafEstime = moisCourantCA == null ? null : aPayerUrssaf(moisCourantCA, TAUX_URSSAF * 100);
   const netApresUrssaf = moisCourantCA == null ? null : netApresUrssafDe(moisCourantCA, TAUX_URSSAF * 100);
-  const [urssafFreq, setUrssafFreq] = React.useState(() => load('vinted_urssaf_freq', 'trimestriel'));
-  // §5.49 : réglage synchronisé, rattrapé seulement s'il est resté au défaut.
-  React.useEffect(() => onCloudReady(() => setUrssafFreq((x) => x === 'trimestriel' ? load('vinted_urssaf_freq', 'trimestriel') : x)), []);
+  // (29 oct.) UN réglage, posé dans « Ton profil URSSAF » : la carte le suit.
+  const urssafFreq = useFreqUrssaf();
   const urssafDue = React.useMemo(() => nextUrssafDeadline(urssafFreq), [urssafFreq]);
   // (22 oct.) Le registre « J'ai déclaré ce mois », en TROIS états : `null` tant
   // que le nuage n'est pas arrivé (pas su ⇒ on ne dit pas « déclarée »).
@@ -33281,11 +33387,7 @@ function CarteUrssafMois({ liveStats, onNav }) {
         <div style={{marginTop:12,paddingTop:14,borderTop:`1px solid ${C.border}`}}>
           <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:10,flexWrap:'wrap'}}>
             <span style={{...sTitre,fontSize:13,flex:1}}>Prochaine déclaration</span>
-            <div style={{display:'flex',gap:2,background:C.card2||C.surface,borderRadius:10,padding:2}}>
-              {[['trimestriel','Trimestre'],['mensuel','Mois']].map(([v,l])=>(
-                <button type="button" key={v} onClick={()=>{setUrssafFreq(v);save('vinted_urssaf_freq',v);}} style={{border:'none',borderRadius:8,padding:'5px 11px',fontSize:13,fontWeight:600,cursor:'pointer',fontFamily:'inherit',minHeight:0,background:urssafFreq===v?C.card:'transparent',color:urssafFreq===v?C.text:C.muted,boxShadow:urssafFreq===v?C.shadow:'none'}}>{l}</button>
-              ))}
-            </div>
+            <span data-urssaf-rythme={urssafFreq} style={{fontSize:12.5,color:C.muted}}>{urssafFreq==='mensuel'?'chaque mois':'chaque trimestre'}</span>
           </div>
           {urssafDue ? (()=>{
             // (22 oct.) « C'EST DÉCLARÉ » ICI, À CÔTÉ DU LIEN : le rappel envoie sur
@@ -42323,14 +42425,6 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // en suivant chaque identifiant libre de son rendu). Une valeur oubliée ici
   // ferait garder une ligne périmée : tout ce que `rendre` lit dans l'écran
   // doit passer par `preparerLigneVente` ou par `actionsVentes`.
-  // ── (27 oct.) LE PAVÉ NUMÉRIQUE SUR VENTES ET COLIS — Julien : « fais pareil
-  // pour le pavé numérique sur Colis et Ventes ». Même saisie que Leboncoin et
-  // eBay (`SaisieNumeroPlateforme`) : N° + Entrée MONTRE la vente / le colis,
-  // en lecture seule. Le N° est celui que la ligne affiche elle-même (Ventes :
-  // `effEntry(o).numero`, celui de `preparerLigneVente` ; Colis : `numForBord`, sinon la fiche de
-  // la vente) — aucune autre règle, jamais le titre (§5). Si la vente est cachée
-  // par un filtre, une recherche, la période ou « Voir plus », on la remontre
-  // (un geste qui ne trouve pas ce qu'il cherche à cause d'un filtre ment).
   // (27 oct.) Les articles partis sortent tout seuls du Stock (`sortirPartisDuStock`).
   // Seulement quand tout est lu : ventes de tous les comptes, annonces, nuage.
   useEffect(() => {
@@ -42377,68 +42471,6 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     if (parCle.size) sortirPartisDuStock([...parCle.values()]);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sales.items, listings.items, porteursNum, baseKO, lbcLu, lbcVentes, ebayCmd, lbcItemsBenef]);
-  const chercherNumVente = async (cle) => {
-    if (!Array.isArray(sales.items)) return null;   // pas encore lu : « pas su »
-    const tous = sales.items.filter(o => o && o.transaction_id != null && cleNum(effEntry(o)?.numero || '') === cle).sort(parDateDesc);
-    if (!tous.length) return { texte: `Aucune vente Vinted ne porte le N°${cle}.` };
-    const o = tous[0], tx = String(o.transaction_id);
-    if (!ventesAffichees.some(x => String(x.transaction_id) === tx)) {
-      const st = classifyOrderStatus(o.status);
-      setOrdSearch(''); setPeriode(null);
-      if (isHidden(o)) setShowHidden(true);
-      setVFilter(st === 'cancelled' && !venteQuiRevient(o) ? 'annulees' : 'all');
-    }
-    const sel = () => { const el = document.querySelector(`.vrm-ventes-liste .vrm-sale-row[data-tx="${tx}"]`); if (!el) setVentesMax(n => n + 120); return el; };
-    const plus = tous.length > 1 ? ` · ${tous.length} ventes portent ce N°, voici la plus récente` : '';
-    return { section: 'ventes', sel, texte: `N°${cle} — ${venteStage(o).label}${plus}`, texteSiAbsent: `La vente N°${cle} existe, mais je n'ai pas pu l'afficher dans la liste.` };
-  };
-  // (27 oct.) Même pavé sur Achats et Annonces. Achats : un achat porte un N°
-  // seulement s'il a été RELIÉ à une paire (sur son clic : `buyFromId` posé par
-  // Annonces ou par une vente) — jamais deviné. Annonces : la carte dont la fiche
-  // porte ce N°, en ligne sur Vinted.
-  const chercherNumAchat = async (cle) => {
-    if (!Array.isArray(buys.items)) return null;
-    const txs = new Set();
-    for (const k in numeros) { const e = numeros[k]; if (e && e.buyFromId && cleNum(e.numero || '') === cle) txs.add(String(e.buyFromId)); }
-    for (const o of (sales.items || [])) { const ov = o && o.transaction_id != null ? saleOv[String(o.transaction_id)] : null; if (ov && ov.buyFromId && cleNum(effEntry(o)?.numero || '') === cle) txs.add(String(ov.buyFromId)); }
-    if (!txs.size) return { texte: `Aucun achat n'est relié au N°${cle} — tu relies un achat depuis la carte de l'annonce ou depuis sa vente.` };
-    const o = buysBase.filter(b => txs.has(String(b.transaction_id))).sort(parDateDesc)[0];
-    if (!o) return { texte: `L'achat relié au N°${cle} n'est pas dans tes achats captés (compte écarté ou plus relu).` };
-    const tx = String(o.transaction_id);
-    if (!achatsAffiches.some(x => String(x.o.transaction_id) === tx)) { setAFilter('all'); setOrdSearch(''); setPeriode(null); }
-    const sel = () => { const el = document.querySelector(`.vrm-buy-row[data-achat-tx="${tx}"]`); if (!el) setAchatsMax(n => n + 120); return el; };
-    return { section: 'achats', sel, texte: `N°${cle} — acheté le ${o.date ? new Date(o.date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }) : '?'}, ${achatStage(o, trackForBuy(o)).label}`, texteSiAbsent: `L'achat du N°${cle} existe, mais je n'ai pas pu l'afficher dans la liste.` };
-  };
-  const chercherNumAnnonce = async (cle) => {
-    if (!Array.isArray(listings.items)) return null;
-    const it = annBase.find(x => cleNum(numeros[x.id]?.numero || '') === cle);
-    if (it) {
-      if (!annShown.some(x => x.id === it.id)) { setAnnSearch(''); setAnnSort('oldest'); }
-      return { section: 'annonces', sel: `[data-carte-annonce="${it.id}"]`, texte: `N°${cle} — en ligne sur Vinted`, texteSiAbsent: `L'annonce N°${cle} est en ligne, mais je n'ai pas pu l'afficher dans la liste.` };
-    }
-    const v = (sales.items || []).filter(o => o && cleNum(effEntry(o)?.numero || '') === cle).sort(parDateDesc)[0];
-    if (v) return { texte: `N°${cle} n'est plus en ligne — sa vente : ${venteStage(v).label}. Elle est dans Ventes.` };
-    if (Object.values(numeros).some(e => e && cleNum(e.numero || '') === cle)) return { texte: `N°${cle} n'est pas en ligne sur Vinted en ce moment (retirée, ou à confirmer).` };
-    return { texte: `Aucune annonce ne porte le N°${cle}.` };
-  };
-  const chercherNumColis = async (cle) => {
-    if (!Array.isArray(sales.items)) return null;
-    const numEx = (e) => (e.b ? numForBord(e.b) : '') || (e.o ? (effEntry(e.o)?.numero || '') : '');
-    const ex = expeditions().filter(e => cleNum(numEx(e)) === cle);
-    if (ex.length) {
-      const e = ex[0];
-      const poste = !!(e.o ? isShipDone(e.o) : isBordShippedManual(e.b));
-      if (poste && !voirPostes) setVoirPostes(true);
-      if (e.o && !matchOrd(e.o)) setOrdSearch('');
-      const plus = ex.length > 1 ? ` · ${ex.length} colis portent ce N°` : '';
-      return { section: 'bordereaux', sel: `[data-bord-card][data-tx-colis="${e.txn}"]`, texte: `N°${cle} — ${poste ? 'marqué « posté »' : 'à envoyer'}${plus}` };
-    }
-    const xe = colisEb && colisEb.aPoster ? colisEb.aPoster.find(x => x.ordre && cleNum(numLigneEbay(x.ordre, (x.ordre.lineItems || [])[0]) || '') === cle) : null;
-    if (xe) return { section: 'bordereaux', sel: `[data-colis-ebay-cmd="${xe.orderId}"]`, texte: `N°${cle} — vente eBay à poster` };
-    const v = sales.items.filter(o => o && cleNum(effEntry(o)?.numero || '') === cle).sort(parDateDesc)[0];
-    if (v) return { texte: `N°${cle} n'est pas dans tes colis à envoyer — sa vente : ${venteStage(v).label}. Elle est dans Ventes.` };
-    return { texte: `Aucun colis ni vente Vinted ne porte le N°${cle}.` };
-  };
   const preparerLigneVente = (o) => {
     const tx = String(o.transaction_id);
     const e = effEntry(o); const num = e?.numero;
@@ -43970,7 +44002,6 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
 
       {curSub==='ventes' && (<>
         {!dansPlateforme && <ScreenHead icon="cash" title="Ventes" desc="Tout ce que tu as vendu : bénéfice par article, expédition, et tes documents comptables."/>}
-        <SaisieNumeroPlateforme plateforme="ventes" nom="dans tes ventes" invite="Tape un N° au clavier : je montre sa vente." chercher={chercherNumVente}/>
         {/* ⚠️ LES OUTILS DE TRAVAIL AVANT LES COMMENTAIRES. La période et la
             recherche étaient sous six bandeaux d'explication : il fallait
             défiler un écran et demi pour filtrer ses ventes. Ce qu'on manipule
@@ -44780,7 +44811,6 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       {curSub==='achats' && (<div className="vrm-achats">
         {/* (26 oct.) Dans l'espace Vinted, l'onglet « Achats » sélectionné dit déjà le titre : pas deux fois (§7). */}
         {!dansPlateforme && <ScreenHead icon="bag" title="Achats" desc="Tes achats Vinted : ce qui est en route, ce qui t'attend en point relais avec son code de retrait, et le prix payé pour chaque article."/>}
-        <SaisieNumeroPlateforme plateforme="achats" nom="dans tes achats" invite="Tape un N° au clavier : je montre l'achat relié à cette paire." chercher={chercherNumAchat}/>
         <NoAcc/>
         {/* ⚠️ LE BANDEAU DE L'EXTENSION VIT AUSSI ICI, PAS SEULEMENT SUR MA
             JOURNÉE. C'est sur CET écran que Julien compte les codes qui
@@ -46007,8 +46037,6 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               style={{flex:'1 1 180px',minWidth:0,border:`1px solid ${C.border}`,borderRadius:8,padding:'8px 12px',fontSize:13,background:C.card,color:C.text,outline:'none'}}/>
             {annSearch && <button className="vrm-icon-control" type="button" aria-label="Effacer la recherche d’annonces" onClick={()=>setAnnSearch('')}><Icon name="close" size={16}/></button>}
             <MicDictee onText={(t)=>setAnnSearch(t)} titre="Dicter la recherche"/></div>
-            {/* (27 oct.) Le pavé numérique : dans la barre, pas une ligne de plus avant la grille. */}
-            <SaisieNumeroPlateforme barre plateforme="annonces" nom="dans tes annonces" chercher={chercherNumAnnonce}/>
             <select className="vrm-ann-tri" aria-label="Trier les annonces" value={annSort} onChange={e=>setAnnSort(e.target.value)}
               style={{border:`1px solid ${C.border}`,borderRadius:8,padding:'8px 10px',fontSize:13,background:C.card,color:C.text,cursor:'pointer',fontWeight:500}}>
               <option value="oldest">Les plus anciennes</option>
@@ -47125,7 +47153,6 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       {/* ── Bordereaux (ventes non annulées avec un numéro, à imprimer) ── */}
       {curSub==='bordereaux' && (<>
         <ScreenHead icon="doc" title="Colis" desc="Ce que Vinted attend de toi, capté par l'extension. Le bordereau manquant est généré tout seul quand tu passes sur Vinted, puis déposé ici. Un colis parti disparaît sans rien cocher."/>
-        <SaisieNumeroPlateforme plateforme="colis" nom="dans tes colis" invite="Tape un N° au clavier : je montre son colis." chercher={chercherNumColis}/>
         {/* ⚠️ Un colis déjà expédié qui traîne ici vient presque toujours d'une
             capture ancienne (statut figé), pas d'un défaut. On le dit (§11, même
             message partout). */}
@@ -57850,19 +57877,6 @@ function AppCoeur() {
             <PlatResume baseKO={baseKO} note={note} cases={[[`CA finalisé${ar.nRecu ? ' · ' + ar.nRecu : ''}`, ar.actives ? e2(ar.recu) : null], [`En attente${ar.nAttente ? ' · ' + ar.nAttente : ''}`, ar.actives ? e2(ar.attente) : null, true]]}/>
           ); })()}
           <PlatSubNav sub={platSub} setSub={setPlatSub} sections={[['ventes','Ventes'],['achats','Achats'],['annonces','Annonces'],['messages','Messages'],['colis','Colis']]}/>
-          <SaisieNumeroPlateforme plateforme="leboncoin" onSection={setPlatSub} chercher={async (cle) => {
-            const brut = await lbcAnnoncesSession(); if (brut == null) return null;
-            // Les annonces captées, indexées par leur identifiant (la forme que lit `numeroLbcIdentite`).
-            const items = Array.isArray(brut) ? Object.fromEntries(brut.filter((a) => a && a.id != null).map((a) => [String(a.id), a])) : brut;
-            const liens = load('vrm_lbc_liens', {}) || {};
-            const ventes = (lbcVentes.ventes || []).filter((o) => o && o.isSeller === true && numeroLbcIdentite(o, items, liens) === cle);
-            if (ventes.length) { const o = ventes.find((x) => !lbcAnnulee(x)) || ventes[0];
-              return { section: 'ventes', sel: `[data-lbc-vente="${String(o.txId).replace(/"/g, '')}"]`, texte: `N°${cle} : vendue sur Leboncoin${lbcAnnulee(o) ? ' (annulée)' : ''} — ${o.stepLabel || o.title || ''}`.replace(/ — $/, '') }; }
-            const vendues = new Set((lbcVentes.ventes || []).filter((o) => o && o.isSeller === true && !lbcAnnulee(o) && o.itemId != null).map((o) => String(o.itemId)));
-            const ad = Object.values(items || {}).find((a) => a && annonceLbcEnVente(a, vendues) && numeroLbcIdentite({ itemId: a.id }, items, liens) === cle);
-            if (ad) return { section: 'annonces', sel: `[data-lbc-catalog-id="${String(ad.id).replace(/"/g, '')}"]`, texte: `N°${cle} : en ligne sur Leboncoin.`, texteSiAbsent: `N°${cle} est en ligne sur Leboncoin, mais pas dans « Mes annonces » : ouvre-la depuis Leboncoin.` };
-            return { section: 'annonces', sel: () => [...document.querySelectorAll('[data-apub]')].find((e) => cleNum(e.getAttribute('data-apub')) === cle), texte: `N°${cle} : pas encore sur Leboncoin — la voici dans « à publier ».`, texteSiAbsent: `N°${cle} : aucune vente ni annonce Leboncoin, et elle n'est pas dans « à publier ».` };
-          }}/>
           {platSub==='messages'&&<div style={{padding:16}}>{baseKO?<LignePanne>Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui a échoué.</LignePanne>:<MessagesLeboncoin/>}</div>}
           {platSub==='ventes'&&<div style={{padding:16}}>{baseKO?<LignePanne>Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui a échoué.</LignePanne>:<>
             {(() => { const ar = lbcArgent(lbcVentes); const vide = !(lbcVentes.ventes||[]).length && !lbcVentes.inconnues; const lu = !!lbcVentes.maj;
@@ -57906,19 +57920,6 @@ function AppCoeur() {
             return <PlatResume dark baseKO={baseKO} note={note} cases={[[lib, ca != null ? fmt(ca) : null]]}/>;
           })()}
           <div><PlatSubNav sub={platSub} setSub={sub=>{setEbayCible(null);setPlatSub(sub);}} sections={[['ventes','Ventes'],['annonces','Annonces'],['messages','Messages'],['offres','Offres'],['agent','À traiter'],['promo','Promotion'],['achats','Achats'],['compte','Compte']]} dark/></div>
-          <SaisieNumeroPlateforme plateforme="ebay" onSection={(sec) => { setEbayCible(null); setPlatSub(sec); }} chercher={async (cle) => {
-            if (!Array.isArray(comptesEbay)) return null;
-            const [cmd, ann] = await Promise.all([lireEbayTous('ebay_orders', 'orders:data->orders', 'orders', comptesEbay), lireEbayTous('ebay_listings', 'items:data->items', 'items', comptesEbay)]);
-            if (!cmd || !ann) return null;
-            const ventes = cmd.items.filter((o) => (o.lineItems || []).some((li) => cleNum(numLigneEbay(o, li) || '') === cle));
-            if (ventes.length) { const o = ventes.find((x) => commandeEbayEngagee(x)) || ventes[0];
-              if (ebayVueEff !== '*' && (o._compte || 'principal') !== ebayVueEff) setEbayVue('*');
-              return { section: 'ventes', sel: `[data-ebay-vente="${String(o.orderId).replace(/"/g, '')}"]`, texte: `N°${cle} : vendue sur eBay — ${etatCommandeEbay(o).label}.` }; }
-            const a = ann.items.find((it) => cleNum(numEbayLu(it.sku, it.itemId, null, it.depuis) || '') === cle);
-            if (a) { if (ebayVueEff !== '*' && (a._compte || 'principal') !== ebayVueEff) setEbayVue('*');
-              return { section: 'annonces', q: 'n°' + cle, sel: `[data-ebay-annonce="${String(a.itemId).replace(/"/g, '')}"]`, texte: `N°${cle} : en ligne sur eBay.` }; }
-            return { texte: `N°${cle} : ni vendue ni en ligne sur eBay${cmd.illisibles.length || ann.illisibles.length ? ' (un compte eBay n’a pas pu être lu)' : ''}.` };
-          }}/>
           {/* Le SÉLECTEUR DE COMPTE : seulement à partir de deux comptes reliés
               (un seul compte : rien ne change). La même forme que la liste des
               comptes Vinted (§11). Il ne change que ce qu'on VOIT. */}
