@@ -28,6 +28,9 @@ export function AnnoncesACompleter({
     b: bilanAnnonce(it, drafts[String(numeros[it.id]?.numero || it.id)]),
   }));
   const n = lignes.filter((x) => x.b.manque.length).length;
+  // Rien à compléter ni à récupérer, lecture complète : le bloc se tait (§7,
+  // demande de Julien du 29 oct. — « 0 avec champs manquants » était du bruit).
+  if (!n && !charge && !incomplet && !lignes.some((x) => x.b.inconnu.length)) return null;
   return (
     <details className="vrm-outils" data-annonces-completer>
       <summary>
