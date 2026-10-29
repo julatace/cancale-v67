@@ -21,6 +21,7 @@
 > mis à la nouvelle fiche sans les affaiblir : `annonces-carte` (une fiche par rangée au téléphone), `feuilles-coque`
 > (« Passeport » dans les gestes), `revue-20oct` (gestes 44 px). ⚠️ Non mesuré : sa vraie base, un vrai iPhone/Safari. Extension
 > inchangée. Julien : rien.
+
 > **29 octobre (suite, « c'est trop incompréhensible ») — Comptabilité allégée :** « Ta micro-entreprise » (calendrier,
 > seuils, profil, impôts) est REPLIÉE sous une ligne-résumé (taux · prochaine période à déclarer · seuils et impôts,
 > `data-micro-repli`) et s'ouvre d'elle-même si quelque chose demande son attention (versement libératoire pas répondu,

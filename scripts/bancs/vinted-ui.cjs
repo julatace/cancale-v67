@@ -269,6 +269,9 @@ async function sectionCalendrier(b, vp, sombre) {
     // deux fois de suite à 120 ms d'écart — jamais au milieu du mouvement.
     await pg.waitForFunction(() => {
       const pan = document.querySelector('[data-periode-panneau]'); if (!pan) return false;
+      // Sous charge, la première image peut tarder : deux mesures égales AVANT le
+      // départ de l'animation (décalée de 24 px) passaient pour « arrivée ».
+      if (pan.getAnimations && pan.getAnimations({ subtree: true }).some((a) => a.playState !== 'finished')) { window.__vuiPan = ''; return false; }
       const q = pan.getBoundingClientRect(), k = [q.left, q.top, q.width, q.height].map(Math.round).join(',');
       const ok = window.__vuiPan === k; window.__vuiPan = k; return ok;
     }, null, { timeout: 8000, polling: 120 }).catch(() => {});
