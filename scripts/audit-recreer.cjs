@@ -28,7 +28,7 @@ const MODELE = JSON.stringify({ item: { id: 9101, title: 'Nike Air Max 1', descr
 const PHOTOS = ['https://images1.vinted.net/t/01_0121e_hsUzFGeDP3Vk/f800/1.jpeg', 'https://images1.vinted.net/t/02_02248_Ka3jojtDMin8/f800/2.jpeg'];
 const PHOTOS_D = ['https://images1.vinted.net/tc/01_0121e_hsUzFGeDP3Vk/aa1.jpeg', 'https://images1.vinted.net/tc/02_02248_Ka3jojtDMin8/bb2.jpeg'];
 
-function monter({ connecte = '111', comptes = null, coffre = true, modele = true, codes = null, photo = 200, photoSansId = false, creation = 200, creationSansId = false, suppression = 200, src, cdn = null, descDetails = null, lettreCoffre = null, brouillon = 200, brouillonSansId = false, completion = 200, extra = null, coffreEcritureKO = false, retardLecture = null, lecture = null, completionCorps = null, couleursRep = null } = {}) {
+function monter({ connecte = '111', comptes = null, coffre = true, modele = true, codes = null, photo = 200, photoSansId = false, creation = 200, creationSansId = false, suppression = 200, src, cdn = null, descDetails = null, lettreCoffre = null, brouillon = 200, brouillonSansId = false, completion = 200, extra = null, coffreEcritureKO = false, retardLecture = null, lecture = null, completionCorps = null, couleursRep = null, attributsRep = null } = {}) {
   const lignes = { main: { capturedAt: nowISO(), vinted_annonce_numeros: { '9101': { numero: '41' } } }, vinted_item_details: {} };
   if (coffre) lignes['coffre_111_9101'] = { id: '9101', title: 'Nike Air Max 1', price: 60, desc: 'Nickel, boîte d’origine', photos: PHOTOS };
   if (modele) lignes['vrm_vinted_modele'] = { '9101': { corps: MODELE, at: nowISO(), uid: '111' } };
@@ -41,6 +41,7 @@ function monter({ connecte = '111', comptes = null, coffre = true, modele = true
   return faireFond({ src, lignes, connecte, comptes, retardLecture: retardLecture || (() => 0), ecritureKO: (id) => coffreEcritureKO && /^coffre_/.test(id), cdn: cdn || (() => ({ status: 200 })),
     vinted: (e) => {
       if (e.methode === 'GET' && /\/api\/v2\/item_upload\/colors$/.test(e.chemin)) return couleursRep || { status: 404, body: {} };
+      if (e.methode === 'POST' && /\/api\/v2\/item_upload\/attributes$/.test(e.chemin)) return attributsRep || { status: 404, body: {} };
       if (e.methode === 'GET' && /\/api\/v2\/item_upload\/items\/9101$/.test(e.chemin) && lecture) return lecture;
       if (e.methode === 'POST' && /\/api\/v2\/photos$/.test(e.chemin)) return { status: photo, body: photoSansId ? { ok: true } : { id: ++n } };
       if (e.methode === 'POST' && /\/api\/v2\/item_upload\/items\/?$/.test(e.chemin)) return { status: creation, body: creationSansId ? { code: 0 } : { item: { id: 77001 } } };
@@ -336,6 +337,39 @@ const zero = (j) => j.vinted.filter((v) => !/\/item_upload\/colors$/.test(v.chem
     let gard = {}; try { gard = JSON.parse(f.lignes.vinted_brouillon_10432342904.corps); } catch (_) {}
     const idsG = gard.draft && Array.isArray(gard.draft.assigned_photos) ? gard.draft.assigned_photos.map((p) => p.id) : [];
     dit(r.etape === 'echec' && /choisis la taille/.test(r.raison || '') && idsG.length === 2 && !idsG.includes(11), "photos renvoyées puis taille refusée : le geste de la taille est dit, et les NOUVELLES photos sont gardées pour la suite", JSON.stringify({ e: r.etape, idsG, raison: (r.raison || '').slice(0, 160) })); }
+  // (29 oct., Spezial 38) Vinted refuse la TAILLE : VRM lit la grille de tailles
+  //  de la catégorie, pose la taille au libellé EXACT de la paire (coffre), et
+  //  réessaie UNE fois ; jamais deux options au même libellé, jamais devinée.
+  const GRILLE = (opts) => ({ status: 200, body: { attributes: [{ code: 'condition', configuration: { options: [{ id: 2, title: 'Très bon état' }] } }, { code: 'size', configuration: { groups: [{ id: 4, title: 'Femmes', options: opts }] } }] } });
+  const tailleKO = { code: 99, message: 'Erreurs trouvées', errors: [{ field: 'size', value: 'Le champ Taille doit être renseigné' }] };
+  const pubT = async ({ coffreSize = '38', grille = GRILLE([{ id: 1196, title: '37,5' }, { id: 1197, title: '38' }, { id: 1198, title: '38,5' }]), toujoursKO = false } = {}) => {
+    const corps = CORPS_B({ item_attributes: [{ code: 'condition', ids: [2] }, { code: 'size', ids: [2033] }] });
+    const extra = { ...dressing(['10432342904']), vinted_brouillon_10432342904: { id: '10432342904', uid: '111', corps, etat: 'brouillon', parVRM: true, ancienId: '9557' },
+      coffre_111_9557: { id: '9557', photos: [PHOTOS[0]], ...(coffreSize ? { size: coffreSize } : {}) } };
+    let nC = 0;
+    const f = monter({ src: process.env.BG_SRC || undefined, extra, attributsRep: grille, completion: () => (toujoursKO || ++nC <= 1 ? 400 : 200), completionCorps: () => tailleKO });
+    let r = {}; try { r = await f.ctx.publierBrouillon({ cmd: 'publierBrouillon', uid: '111', draftId: '10432342904', confirme: true }); } catch (e) { r = { erreur: e.message }; }
+    return { f, r, att: f.j.vinted.filter((x) => /item_upload\/attributes$/.test(x.chemin)) };
+  };
+  { const { f, r, att } = await pubT();
+    const cs = completions(f.j); let c2 = {}; try { c2 = JSON.parse(cs[1].corps); } catch (_) {}
+    const sz = c2.draft && (c2.draft.item_attributes || []).find((a) => a.code === 'size');
+    let gard = {}; try { gard = JSON.parse(f.lignes.vinted_brouillon_10432342904.corps); } catch (_) {}
+    const szG = gard.draft && (gard.draft.item_attributes || []).find((a) => a.code === 'size');
+    const cond = c2.draft && (c2.draft.item_attributes || []).find((a) => a.code === 'condition');
+    let corpsA = {}; try { corpsA = JSON.parse(att[0].corps); } catch (_) {}
+    dit(r.etape === 'fait' && att.length === 1 && JSON.stringify(corpsA) === JSON.stringify({ attributes: [{ code: 'category', value: [1242] }] }) && cs.length === 2 && sz && JSON.stringify(sz.ids) === '[1197]' && cond && JSON.stringify(cond.ids) === '[2]' && szG && JSON.stringify(szG.ids) === '[1197]',
+      "taille refusée : grille lue (forme mesurée), taille « 38 » de la paire posée (1197), l'état gardé, mise en ligne réussie, brouillon enregistré à jour", JSON.stringify({ e: r.etape, att: att.length, sz, szG, raison: r.raison || r.erreur })); }
+  { const { f, r, att } = await pubT({ grille: GRILLE([{ id: 1197, title: '38' }, { id: 1290, title: 'EU 38' }]) });
+    dit(r.etape === 'echec' && completions(f.j).length === 1 && /plusieurs tailles/.test(r.raison || '') && /choisis la taille/.test(r.raison || ''), "deux options au même libellé : VRM ne choisit pas, rien n'est renvoyé, c'est dit avec le geste", JSON.stringify({ e: r.etape, raison: (r.raison || '').slice(0, 200) })); }
+  { const { f, r, att } = await pubT({ coffreSize: '', grille: GRILLE([{ id: 1197, title: '38' }]) });
+    dit(r.etape === 'echec' && att.length === 0 && completions(f.j).length === 1 && /ne connaît pas la taille/.test(r.raison || ''), "taille de la paire inconnue : aucune lecture de grille, rien n'est deviné (pas même le titre)", JSON.stringify({ e: r.etape, att: att.length, raison: (r.raison || '').slice(0, 160) })); }
+  { const { f, r } = await pubT({ grille: GRILLE([{ id: 1196, title: '37,5' }]) });
+    dit(r.etape === 'echec' && completions(f.j).length === 1 && /ne propose pas de taille « 38 »/.test(r.raison || ''), "aucune taille au libellé exact : rien n'est posé, c'est dit", (r.raison || '').slice(0, 160)); }
+  { const { f, r } = await pubT({ grille: { status: 200, body: { foo: [1, 2] } } });
+    dit(r.etape === 'echec' && completions(f.j).length === 1 && /n'a pas su lire la liste des tailles/.test(r.raison || ''), "grille d'une forme inconnue : rien n'est posé, c'est dit (forme gardée)", (r.raison || '').slice(0, 160)); }
+  { const { f, r } = await pubT({ toujoursKO: true });
+    dit(r.etape === 'echec' && completions(f.j).length === 2 && /même avec la taille « 38 »/.test(r.raison || ''), "taille posée et encore refusée : UN seul nouvel essai, c'est dit", JSON.stringify({ m: completions(f.j).length, raison: (r.raison || '').slice(0, 160) })); }
   // … sans coffre lisible : rien n'est renvoyé, c'est dit avec le geste Vinted.
   { const corps = CORPS_B();
     const extra = { ...dressing(['10432342904']), vinted_brouillon_10432342904: { id: '10432342904', uid: '111', corps, etat: 'brouillon', parVRM: true, ancienId: '9556' } };
