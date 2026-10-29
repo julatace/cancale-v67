@@ -160,3 +160,34 @@ export const phraseRythme = (freq, now = new Date()) => {
     ? `Chaque mois, tu déclares et tu paies le chiffre d'affaires du mois d'avant. Exemple : ${p.periode} se déclare et se paie du ${j(p.ouvre)} au ${j(p.limite)}.`
     : `Chaque trimestre, tu déclares et tu paies le chiffre d'affaires des trois mois d'avant. Exemple : ${p.periode} se déclare et se paie du ${j(p.ouvre)} au ${j(p.limite)}.`;
 };
+
+// ── TA DÉCLARATION DE REVENUS (29 octobre) ── Vérifié sur la notice officielle
+// 2042-C-PRO 2026 (impots.gouv.fr, revenus 2025) le 29 oct. : vente de
+// marchandises, DÉCLARANT 1 — avec versement libératoire case 5TA (cadre
+// « micro-entrepreneur ayant opté pour le versement libératoire », à titre
+// d'information : déjà payé avec les cotisations) ; sans, régime micro BIC case
+// 5KO, « chiffre d'affaires brut sans déduire aucun abattement » (l'abattement
+// de 71 % est appliqué par les impôts). Le CA = l'argent ENCAISSÉ dans l'année
+// civile (la ligne publiée, datée au versement). Avant juillet : l'année
+// PASSÉE (la déclaration se fait au printemps) ; ensuite l'année en cours, pour
+// prévoir. Versement libératoire pas répondu ⇒ les deux cases, jamais devinée.
+export const CASES_IMPOT = { oui: ['5TA'], non: ['5KO'] };
+export const declarationRevenus = ({ ligne, now = new Date(), liberatoire = null } = {}) => {
+  const annee = now.getMonth() < 6 ? now.getFullYear() - 1 : now.getFullYear();
+  const r = caAnnee(ligne, annee);
+  if (!r) return null;
+  return {
+    annee, ca: r.ca, mois: r.mois, partiel: r.partiel, raisons: r.raisons,
+    enCours: annee === now.getFullYear(),
+    cases: CASES_IMPOT[liberatoire] || ['5KO', '5TA'],
+    liberatoire: liberatoire === 'oui' || liberatoire === 'non' ? liberatoire : null,
+  };
+};
+// La CFE (service-public, vérifié le 29 oct.) : à payer au plus tard le
+// 15 décembre ; exonérée l'année de création. Rappel seulement du 1er novembre
+// au 15 décembre.
+export const rappelCfe = (now = new Date()) => {
+  const m = now.getMonth(), d = now.getDate();
+  if (!(m === 10 || (m === 11 && d <= 15))) return null;
+  return { limite: `15 décembre ${now.getFullYear()}` };
+};
