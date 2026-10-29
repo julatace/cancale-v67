@@ -66,6 +66,8 @@ const menuEcrans=(p)=>p.locator('button.vrm-nav-more').first();
       // L'en-tête se lit juste après : on l'attend aussi (la mesure tombait parfois avant lui, une course du banc).
       await p.goto(base+'/?tab='+tab);await p.locator('main').waitFor();await p.locator('header').first().waitFor({state:'attached'}).catch(()=>{});
       check(!(await p.locator('main').innerText()).includes("Cet écran n'a pas pu s'afficher"),largeur+' '+tab+' écran rendu');
+      // L'entrée d'écran (styles-mouvement.css, 220 ms, translateY) se mesure finie, pas en route.
+      await p.evaluate(()=>Promise.all(document.getAnimations().map(a=>a.finished.catch(()=>{}))));
       const geometrie=await p.evaluate(()=>{
         const h=document.querySelector('header'),nav=document.querySelector('.vrm-mobile-nav') || [...document.querySelectorAll('nav')].at(-1),main=document.querySelector('main');
         const visible=e=>{const r=e.getBoundingClientRect();return r.width>0&&r.height>0;};

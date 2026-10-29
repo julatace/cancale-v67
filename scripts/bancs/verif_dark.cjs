@@ -156,7 +156,10 @@ const TABS=['journee','collectif','plat_vinted','plat_leboncoin','plat_ebay','pl
         const f=v=>{v/=255;return v<=0.03928?v/12.92:Math.pow((v+0.055)/1.055,2.4);};
         return 0.2126*f(+m[1])+0.7152*f(+m[2])+0.0722*f(+m[3]); };
       const d = await pg.evaluate(() => {
-        const nav = document.querySelector('nav') || document.querySelector('aside');
+        // Le RAIL de l'app (barre latérale, barre du bas) — pas le premier <nav> venu :
+        // les sous-onglets des plateformes sont aussi un <nav> (translucide, 27 oct.).
+        const vis = (e) => e && e.getBoundingClientRect().width > 0;
+        const nav = [...document.querySelectorAll('.vrm-sidebar, aside, .vrm-tabbar')].find(vis) || document.querySelector('nav');
         const main = document.querySelector('main') || document.body;
         let carte = null;
         for (const el of main.querySelectorAll('div')) { const bg = getComputedStyle(el).backgroundColor;
