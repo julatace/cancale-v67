@@ -9,7 +9,8 @@
 //  « non appliquée »), `vite build` DANS la copie, puis la section E du banc
 //  `scripts/bancs/transporteurs.cjs` lancée DEPUIS la copie (son `DIST` se
 //  déduit de son `__dirname` : il rend le build muté). Le contrôle nommé doit
-//  sortir rouge (`KO`), pour chaque mutation.
+//  sortir rouge (`KO`), pour chaque mutation. (29 oct., tour 2) Une mutation
+//  peut viser une autre section que E (5e élément : 'A', 'F').
 //  Les règles serveur (api/_lib) sont prouvées par
 //  `node scripts/audit-statut-transporteurs.cjs --prouve`.
 //  Le banc écoute $BANC_PORT (8505 par défaut) : lancer ce script SEUL.
@@ -46,6 +47,25 @@ const MUTATIONS = [
   ['fenetre-45j', 'return rows.map(ligneTranspDeMeta).filter(Boolean);', "return rows.map(ligneTranspDeMeta).filter((t) => t && (Date.now() - Date.parse(t.lu || '') < 45 * 86400000));", /n° 8 : retiré il y a 60 jours/],
   // constat d : « sans doute repartis » revient au titre du bloc.
   ['sans-doute', '<Icon name="alert" size={16} color={C.warn}/>{pickupUnion.aVerifier.length} colis à vérifier', '<Icon name="alert" size={16} color={C.warn}/>{pickupUnion.aVerifier.length} colis à vérifier — sans doute repartis chez le vendeur', /constat d : le bloc « à vérifier »/],
+  // ── Tour 2 du 29 octobre (section F du banc, ou A) ──
+  // n° 1 : la publication part même quand les codes et les n° de suivi des achats ne sont pas lus (l'écran Colis).
+  ['publie-sans-lecture', "    if (!colisRelaisLu || suivisVinted == null || !Array.isArray(suivisManuels)) return;\n", '', /F n° 1 : la publication `vrm_colis_retirer` reste/, 'F'],
+  // n° 4 : la promesse « l'extension le cherche » revient dans le bloc « en vérification ».
+  ['verification-promet', "pas dans « à retirer » tant que {n>1?'leur':'son'} n° de suivi n'est pas connu.", "pas dans « à retirer » tant que {n>1?'leur':'son'} n° de suivi n'est pas connu — l'extension le cherche chez Vinted quand tu passes sur ce compte.", /F n° 4 : le bloc/, 'F'],
+  // n° 5 : un n° sans transporteur connu n'a plus aucune ligne.
+  ['sans-transporteur-muet', "  if (!c) return String(carrier || '').trim() ? null : <div", "  if (!c) return null; if (false) return <div", /F n° 5 : un achat dont le suivi Vinted/, 'F'],
+  // n° 6 : la carte redit le libellé, le lieu et la limite du transporteur.
+  ['carte-redit-tout', "  if (court && t && t.etat === 'disponible' && t.essaiRes === 'ok'", "  if (false && court && t && t.etat === 'disponible' && t.essaiRes === 'ok'", /A : ligne LUE « disponible » : une marque courte/, 'A'],
+  // n° 6 : une étape Vinted plus ancienne que la lecture du transporteur s'affiche de nouveau sous elle.
+  ['nouvelle-depassee', '  if (transp && suivi && nouvelleDepassee(nv, ligneTranspDe(transp, suivi))) return null;\n', '', /F n° 6 : « vient de partir du centre de tri »/, 'F'],
+  // n° 7 : la publication ne porte plus l'identité des « à vérifier ».
+  ['verif-sans-identite', 'colis, verif, vus, vusTx, finis, at: Date.now() };', 'colis, vus, vusTx, finis, at: Date.now() };', /F n° 7 : la publication porte les « à vérifier »/, 'F'],
+  // n° 8 : le nombre d'un onglet d'Achats repasse à la ligne.
+  ['onglet-coupe', "aria-label={cnt?`${label} ${cnt}`:undefined} style={{whiteSpace:'nowrap'}}>{label}{cnt?<span className=\"vrm-seg-n\" title={String(cnt)}> {cnt>=1000?`${(Math.floor(cnt/100)/10).toLocaleString('fr-FR')} k`:cnt}</span>:null}", ">{label}{cnt?<span className=\"vrm-seg-n\"> {cnt}</span>:null}", /F n° 8 : « Reçus 1,7 k » sur UNE ligne/, 'F'],
+  // n° 12 : l'app promet la lecture par l'extension sans lire ce qu'elle dit d'elle-même.
+  ['nav-ignore', "  const navTransp = indispo.includes('transporteurs') ? 'permission' : (indispo.includes('transporteurs-passu') ? 'passu' : '');", "  const navTransp = '';", /F n° 12 : l'extension dit qu'elle n'a pas la permission/, 'F'],
+  // n° 2 : le geste « ajoute ce n° avec son code postal » n'est plus dit en tête.
+  ['cp-tete-absente', '  const phrasesCp = texteCodePostalMr(cpMr);', '  const phrasesCp = [];', /A : « code postal inconnu » : le GESTE/, 'A'],
 ];
 
 const copier = (dest) => {
@@ -55,7 +75,7 @@ const copier = (dest) => {
   fs.symlinkSync(fs.realpathSync(path.join(RACINE, 'node_modules')), path.join(dest, 'node_modules'));
 };
 
-for (const [nom, ancre, rempl, controle] of MUTATIONS) {
+for (const [nom, ancre, rempl, controle, section = 'E'] of MUTATIONS) {
   if (SEULE && SEULE !== nom) continue;
   const dest = path.join(os.tmpdir(), 'mut-transp-' + nom);
   try {
@@ -68,7 +88,7 @@ for (const [nom, ancre, rempl, controle] of MUTATIONS) {
     cp.execSync(`node ${JSON.stringify(path.join(dest, 'node_modules', 'vite', 'bin', 'vite.js'))} build`, { cwd: dest, stdio: 'ignore', env });
     let sortie = '';
     try {
-      sortie = cp.execSync('node scripts/bancs/transporteurs.cjs', { cwd: dest, encoding: 'utf8', env: { ...process.env, BANC_SEUL: 'E', BANC_PORT: PORT, PORT, BANC_DIST: '' }, maxBuffer: 1 << 28 });
+      sortie = cp.execSync('node scripts/bancs/transporteurs.cjs', { cwd: dest, encoding: 'utf8', env: { ...process.env, BANC_SEUL: section, BANC_PORT: PORT, PORT, BANC_DIST: '' }, maxBuffer: 1 << 28 });
     } catch (e) { sortie = String(e.stdout || '') + String(e.stderr || ''); }
     const rouges = sortie.split('\n').filter((l) => /^KO /.test(l));
     const vise = rouges.filter((l) => controle.test(l));

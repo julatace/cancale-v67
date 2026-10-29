@@ -130,6 +130,17 @@ async function preparer(b, vp, sombre, opts = {}) {
   const c5 = []; const lecturesTransp = [];
   const etat = { c5Change: false };
   if (opts.horloge) await pg.clock.install({ time: Date.now() });
+  // `opts.pont` : une extension À JOUR qui répond au pont (version d'`EXT_ATTENDUE`),
+  // avec ce qu'elle dit d'elle-même (`nav`, tour 2 n° 12).
+  if (opts.pont) await pg.addInitScript((p) => {
+    const post = (m) => window.postMessage(m, '*');
+    window.addEventListener('message', (e) => {
+      const d = e.data; if (e.source !== window || !d || typeof d !== 'object') return;
+      if (d.__vmr === 'ping') post({ __vmr: 'ready', version: p.version, id: p.id });
+      if (d.__vmr === 'etat') post({ __vmr: 'etat:result', reqId: d.reqId, resp: Object.assign({ ok: true, version: p.version, code: p.version, ext: p.id, vrm: { ok: true, connecte: true, email: 'transp@example.test', user_id: '11111111-1111-4111-8111-111111111111' }, vinted: { uid: '111', login: 'compte_banc' }, cmds: {} }, p.nav ? { nav: p.nav } : {}) });
+    });
+    post({ __vmr: 'ready', version: p.version, id: p.id });
+  }, opts.pont);
   await pg.addInitScript(([s, dark]) => {
     localStorage.setItem('vrm_session', JSON.stringify(s)); localStorage.setItem('vrm_local_owner', s.user.id); localStorage.setItem('schema_cloisonne', '1'); localStorage.setItem('vinted_dark', dark ? 'true' : 'false');
     window.__cache = false;
@@ -189,7 +200,7 @@ const ROUGE_JS = `(v) => { const m = /rgba?\\(([\\d.]+),\\s*([\\d.]+),\\s*([\\d.
 const lire = (pg) => pg.evaluate((rougeSrc) => {
   const rouge = new Function('return ' + rougeSrc)();
   const lieuDuGroupe = (el) => { for (let e = el; e; e = e.parentElement) { const d = e.querySelector && e.querySelector('.vrm-pickup-dest'); if (d) return d.innerText; } return ''; };
-  const ligneT = (c) => { const x = c.querySelector('.vrm-transp'); return x ? { etat: x.getAttribute('data-transp'), etatLu: x.getAttribute('data-transp-etat'), t: x.innerText, color: getComputedStyle(x).color } : null; };
+  const ligneT = (c) => { const x = c.querySelector('.vrm-transp'); return x ? { etat: x.getAttribute('data-transp'), etatLu: x.getAttribute('data-transp-etat'), t: x.innerText, color: getComputedStyle(x).color, court: x.hasAttribute('data-transp-court') } : null; };
   const cartes = [...document.querySelectorAll('.vrm-pickup-card')].map((c) => {
     const s = c.querySelector('[data-colis-suivi]');
     const lim = c.querySelector('[data-colis-limite]');
@@ -218,6 +229,7 @@ const lire = (pg) => pg.evaluate((rougeSrc) => {
     cartes, verif, repartis, rougesVus,
     mr: mr ? { n: mr.getAttribute('data-transp-mr-n'), etat: mr.getAttribute('data-transp-mr-refus'), t: mr.innerText } : null,
     mrOrdi: mrOrdi ? mrOrdi.innerText : null, nMr: document.querySelectorAll('[data-transp-mr-refus]').length,
+    cpTete: [...document.querySelectorAll('[data-transp-cp]')].map((x) => ({ k: x.getAttribute('data-transp-cp'), n: x.getAttribute('data-transp-cp-n'), t: x.innerText })),
     passu: passu ? passu.innerText : null, nPassu: document.querySelectorAll('[data-transp-passu]').length, hReessayer: h(reessayer), hAjouter: h(ajouter),
     suivre: [...document.querySelectorAll('.vrm-pickup-card a[data-suivre-colis]')].map((a) => a.getBoundingClientRect().height),
     total: onglet ? onglet.getAttribute('data-n') : null,
@@ -296,11 +308,15 @@ async function navigateur() {
         dit(!!c6 && !r.verif.some((x) => x.suivi === '12345606'), `${nom} A : la garde de 5 j (Mondial Relay, sans date limite) est levée par une lecture « disponible » d'il y a 1 h ⇒ « à retirer »`, c6 ? 'à retirer' : (r.verif.find((x) => x.suivi === '12345606') || {}).raison);
         // Les trois états de la ligne, plus « code postal inconnu ».
         const lu = c6 && c6.transp, passu = carte('XW000000002TS'), jamais = carte('XW000000003TS'), cpi = carte('12345604'), bl = carte('12345605');
-        dit(lu && lu.etat === 'lu' && /« Colis disponible au Point Relais » · lu /.test(lu.t), `${nom} A : ligne LUE : le libellé du transporteur entre guillemets, et l'âge de la lecture`, lu && lu.t);
+        // (tour 2 n° 6) La carte dit DÉJÀ le point et la limite : « disponible » confirmé
+        // chez le transporteur n'y laisse qu'une marque courte, avec l'âge de la lecture.
+        dit(lu && lu.etat === 'lu' && lu.court && /^Confirmé chez Mondial Relay (il y a|à l'instant)/.test(lu.t) && !/Point Relais|jusqu|vers le/i.test(lu.t), `${nom} A : ligne LUE « disponible » : une marque courte (« Confirmé chez Mondial Relay il y a 1 h »), sans redire le point ni la limite`, lu && lu.t);
         dit(lu && ambre && lu.color !== ambre, `${nom} A : une ligne « disponible » reste NEUTRE (l'ambre est pour un retour, un incident, un inconnu)`, lu && lu.color);
         dit(passu && passu.transp && passu.transp.etat === 'passu' && /n'a pas répondu/.test(passu.transp.t), `${nom} A : ligne PAS SU : « n'a pas répondu — VRM réessaie plus tard »`, passu && passu.transp && passu.transp.t);
         dit(jamais && jamais.transp && jamais.transp.etat === 'jamais' && /pas encore lu chez le transporteur/.test(jamais.transp.t), `${nom} A : ligne JAMAIS LUE : « pas encore lu chez le transporteur »`, jamais && jamais.transp && jamais.transp.t);
-        dit(cpi && cpi.transp && cpi.transp.etat === 'cp-inconnu' && /code postal du point relais inconnu/.test(cpi.transp.t) && /N° de suivi ajoutés/.test(cpi.transp.t), `${nom} A : « code postal inconnu » dit son GESTE (l'ajouter avec son code postal)`, cpi && cpi.transp && cpi.transp.t);
+        // (tour 2 n° 2) Le geste est dit UNE fois en tête, la carte n'en garde que l'état.
+        dit(cpi && cpi.transp && cpi.transp.etat === 'cp-inconnu' && /code postal du point relais inconnu/.test(cpi.transp.t) && !/N° de suivi ajoutés/.test(cpi.transp.t), `${nom} A : « code postal inconnu » sur la carte, sans le geste (dit en tête)`, cpi && cpi.transp && cpi.transp.t);
+        dit(r.cpTete.length === 1 && r.cpTete[0].k === 'inconnu' && r.cpTete[0].n === '1' && /N° de suivi ajoutés/.test(r.cpTete[0].t), `${nom} A : « code postal inconnu » : le GESTE (l'ajouter avec son code postal) dit UNE fois en tête de liste`, JSON.stringify(r.cpTete));
         dit(r.hAjouter != null && r.hAjouter >= 43.5, `${nom} A : le geste « Ajouter un n° de suivi » fait 44 px`, String(r.hAjouter));
         const inc = r.verif.find((x) => x.suivi === 'XW000000004TS');
         dit(inc && inc.transp && inc.transp.t.includes(`« ${LIB_INCONNU} »`) && /statut que VRM ne connaît pas/.test(inc.transp.t), `${nom} A : un statut inconnu est recopié TEL QUEL, et ce n'est pas « à retirer »`, inc ? inc.transp && inc.transp.t : 'absent de « à vérifier »');
@@ -500,6 +516,97 @@ async function navigateur() {
         await ctx.close();
       });
     }
+    // ── F. Tour 2 du 29 octobre (revue n° 1, 4, 5, 8, 12) ──
+    const EXT_V = (/const EXT_ATTENDUE\s*=\s*'([\d.]+)'/.exec(fs.readFileSync(path.join(RACINE, 'src', 'App.jsx'), 'utf8')) || [])[1] || '9.9.9';
+    await essaie('F 390 · n° 1 : ouvrir Colis après Achats ne change pas la publication', async () => {
+      const { ctx, pg, errs } = await preparer(b, { width: 390, height: 844 }, false, { rows: ROWS_E() });
+      await ouvrirAchats(pg, errs);
+      const p1 = await publication(pg);
+      await pg.goto(`http://localhost:${PORT}/?tab=cat_bord`, { waitUntil: 'domcontentloaded' });
+      await pg.waitForTimeout(4500);
+      const p2 = await publication(pg);
+      const r = (p) => p ? `total=${p.total} sansCode=${p.sansCode} enVérif=${p.enVerification}` : 'aucune';
+      dit(!!p1 && !!p2 && p2.total === p1.total && p2.enVerification === p1.enVerification && (p2.sansCode || 0) === (p1.sansCode || 0), 'F n° 1 : la publication `vrm_colis_retirer` reste celle d\'Achats après l\'ouverture de Colis (les achats « en vérification » n\'y sont pas recomptés)', `Achats : ${r(p1)} · après Colis : ${r(p2)}`);
+      dit(!!p1 && Array.isArray(p1.verif) && p1.verif.some((c) => Array.isArray(c) && c[3] === 'e:XW000000072TS') && p1.aVerifier === p1.verif.length, 'F n° 7 : la publication porte les « à vérifier » avec leur IDENTITÉ (`verif`), que le widget relit chez le transporteur', p1 && JSON.stringify(p1.verif));
+      const w = await widgetPickup(ROWS_E(), p2);
+      dit(w.pickup === 2 && w.corps && w.corps.pickupAuMoins === true, 'F n° 1 : le widget dit toujours 2, « au moins »', `pickup=${w.pickup} auMoins=${w.corps && w.corps.pickupAuMoins}`);
+      dit(!errs.length, 'F n° 1 : aucune erreur d\'app', errs[0]);
+      await ctx.close();
+    });
+    await essaie('F 390 · n° 4 et n° 5 : le bloc « en vérification » et la carte d\'un n° sans transporteur', async () => {
+      const ROWS = ROWS_E();
+      const ach = ROWS.find((x) => x.id === 'harvest_111_orders_purchased');
+      ach.data.payload.my_orders.push(achatE(9708, 7708, 'Achat au n° Vinted Go sans transporteur'));
+      ROWS.push({ id: 'harvest_111_suivi_9708', data: { v: 1, tx: '9708', source: 'journey', capturedAt: j(0.05), transporteur: null, suivi: '1792999999999001', etapes: [{ t: 'Ton colis est disponible au point relais', at: j(0.2) }], dernier: { t: 'Ton colis est disponible au point relais', at: j(0.2) }, forme: {} } });
+      const { ctx, pg, errs } = await preparer(b, { width: 390, height: 844 }, false, { rows: ROWS });
+      await ouvrirAchats(pg, errs);
+      const x = await pg.evaluate(() => {
+        const bloc = document.querySelector('[data-en-verification]');
+        const carte = [...document.querySelectorAll('.vrm-pickup-card, [data-en-verification-tx], [data-a-verifier-vinted]')].find((c) => [...c.querySelectorAll('a[href*="/inbox/"]')].some((a) => /\/inbox\/7708/.test(a.getAttribute('href') || '')) || c.getAttribute('data-en-verification-tx') === '9708');
+        const l = carte ? carte.querySelector('.vrm-transp') : null;
+        return { bloc: bloc ? bloc.innerText : null, ligne: l ? { etat: l.getAttribute('data-transp'), t: l.innerText } : null, trouve: !!carte };
+      });
+      dit(x.bloc != null && !/extension/i.test(x.bloc), 'F n° 4 : le bloc « en cours de vérification » ne promet rien de l\'extension (le geste vit dans « Suivi Vinted », gardé par sa version)', (x.bloc || 'absent').replace(/\s+/g, ' ').slice(0, 220));
+      dit(x.trouve && x.ligne && x.ligne.etat === 'transporteur-inconnu', 'F n° 5 : un achat dont le suivi Vinted donne un n° sans transporteur ⇒ sa carte dit « transporteur pas encore connu », jamais rien', x.ligne ? `${x.ligne.etat} « ${x.ligne.t} »` : (x.trouve ? 'aucune ligne' : 'carte introuvable'));
+      dit(!errs.length, 'F n° 4-5 : aucune erreur d\'app', errs[0]);
+      await ctx.close();
+    });
+    await essaie('F 390 · n° 6 : une étape Vinted plus ancienne que la lecture du transporteur ne s\'affiche pas', async () => {
+      // L'achat 9703 : Vinted Go le dit « disponible » depuis 1 j (lu il y a 30 min).
+      const lireNv = async (atNv) => {
+        const ROWS = ROWS_E();
+        const sv = ROWS.find((x) => x.id === 'harvest_111_suivi_9703');
+        sv.data.dernier = { t: 'Ton colis vient de partir du centre de tri', at: atNv };
+        sv.data.etapes = [sv.data.dernier];
+        const { ctx, pg, errs } = await preparer(b, { width: 390, height: 844 }, false, { rows: ROWS });
+        await ouvrirAchats(pg, errs);
+        const x = await pg.evaluate(() => {
+          const carte = [...document.querySelectorAll('.vrm-pickup-card')].find((c) => [...c.querySelectorAll('a[href*="/inbox/"]')].some((a) => /\/inbox\/7703/.test(a.getAttribute('href') || '')));
+          return carte ? { nv: !!carte.querySelector('[data-nouvelle-vinted]'), transp: !!carte.querySelector('.vrm-transp') } : null;
+        });
+        await ctx.close();
+        return { x, errs };
+      };
+      const vieux = await lireNv(j(2));
+      dit(vieux.x && vieux.x.transp && !vieux.x.nv, 'F n° 6 : « vient de partir du centre de tri » (il y a 2 j) sous « disponible » chez le transporteur (depuis 1 j) ne s\'affiche pas', JSON.stringify(vieux.x));
+      const recent = await lireNv(j(0.01));
+      dit(recent.x && recent.x.nv, 'F n° 6, l\'autre sens : une étape Vinted PLUS RÉCENTE que l\'évènement du transporteur reste affichée', JSON.stringify(recent.x));
+      dit(!vieux.errs.length && !recent.errs.length, 'F n° 6 : aucune erreur d\'app', vieux.errs[0] || recent.errs[0]);
+    });
+    await essaie('F 1512 · n° 12 : ce que l\'extension dit d\'elle-même (`nav.indispo`)', async () => {
+      const lireRefus = async (nav) => {
+        const { ctx, pg, errs } = await preparer(b, { width: 1512, height: 950 }, false, { pont: { version: EXT_V, id: 'a'.repeat(32), nav } });
+        await ouvrirAchats(pg, errs);
+        await pg.waitForTimeout(1500);
+        const m = await pg.evaluate(() => { const x = document.querySelector('[data-transp-mr-refus]'); return x ? { etat: x.getAttribute('data-transp-mr-refus'), t: x.innerText } : null; });
+        await ctx.close();
+        return { m, errs };
+      };
+      const a = await lireRefus({ indispo: ['transporteurs'] });
+      dit(a.m && a.m.etat === 'permission' && /Autoriser/.test(a.m.t) && !/les lit à la place/.test(a.m.t), 'F n° 12 : l\'extension dit qu\'elle n\'a pas la permission des transporteurs ⇒ « autorise VRM… », jamais « elle les lit à la place »', a.m ? `${a.m.etat} « ${a.m.t.slice(0, 160)} »` : 'absente');
+      const c = await lireRefus(null);
+      dit(c.m && c.m.etat === 'ok' && /les lit à la place/.test(c.m.t), 'F n° 12, l\'autre sens : rien d\'indisponible ⇒ « l\'extension de ce Chrome les lit à la place »', c.m ? `${c.m.etat} « ${c.m.t.slice(0, 160)} »` : 'absente');
+      dit(!a.errs.length && !c.errs.length, 'F n° 12 : aucune erreur d\'app', a.errs[0] || c.errs[0]);
+    });
+    await essaie('F 390 · n° 8 : « Reçus 1 779 » tient sur une ligne', async () => {
+      const ROWS = ROWS_E();
+      const ach = ROWS.find((x) => x.id === 'harvest_111_orders_purchased');
+      for (let i = 0; i < 1779; i++) ach.data.payload.my_orders.push({ transaction_id: 800000 + i, conversation_id: 900000 + i, title: 'Achat reçu ' + i, price: { amount: '20', currency_code: 'EUR' }, status: 'Commande finalisée', transaction_user_status: 'completed', date: j(30 + (i % 200)) });
+      const { ctx, pg, errs } = await preparer(b, { width: 390, height: 844 }, false, { rows: ROWS });
+      await ouvrirAchats(pg, errs);
+      const x = await pg.evaluate(() => {
+        const btns = [...document.querySelectorAll('[data-achats-onglet]')];
+        // Une ligne = le libellé et le nombre côte à côte (même milieu vertical), rien de
+        // coupé (le bouton ne déborde pas). `innerText` ne sert pas : le nombre est un
+        // élément flex, qu'il compte comme un bloc.
+        const ligne = (el) => { const tn = [...el.childNodes].find((n) => n.nodeType === 3 && n.textContent.trim()); const sp = el.querySelector('.vrm-seg-n'); if (!tn || !sp) return 0; const r = document.createRange(); r.selectNodeContents(tn); const a = r.getBoundingClientRect(), b = sp.getBoundingClientRect(); const meme = Math.abs((a.top + a.bottom) / 2 - (b.top + b.bottom) / 2) < 6 && b.left >= a.right - 1; return meme && el.scrollWidth <= el.clientWidth + 1 ? 1 : 2; };
+        const recus = document.querySelector('[data-achats-onglet="recus"]');
+        return { n: recus && recus.getAttribute('data-n'), t: recus && recus.textContent, lignes: recus ? ligne(recus) : 0, h: btns.map((x) => Math.round(x.getBoundingClientRect().height)), deborde: document.documentElement.scrollWidth > window.innerWidth + 1 };
+      });
+      dit(x.n === '1779' && x.lignes === 1 && new Set(x.h).size === 1 && /1,7\s?k/.test(x.t || ''), 'F n° 8 : « Reçus 1,7 k » sur UNE ligne, les onglets à la même hauteur (le nombre exact dans l\'infobulle)', `data-n=${x.n} « ${x.t} » lignes=${x.lignes} hauteurs=${x.h.join(',')}`);
+      dit(!x.deborde && !errs.length, 'F n° 8 : rien ne déborde, aucune erreur', errs[0]);
+      await ctx.close();
+    });
   } finally { await b.close(); }
 }
 
