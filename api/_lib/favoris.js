@@ -92,7 +92,8 @@ export async function routeFavoris(req,res){
             targets=resoudreCiblesFavoris({...opts,conversations,parametresAilleurs});
           }
         }
-        const lot=randomUUID();decision=d=>lancerFile(d,{owner,targets,message,intervalleMinutes:p.intervalleMinutes,intervalleMax:p.intervalleMaxMinutes,maintenant,lot,pourcentage:p.pourcentage});
+        const lot=randomUUID();const offre=p.offreMode?{mode:p.offreMode,valeur:p.offreMode==='pct'?p.pourcentage:p.offreValeur,arrondi:p.arrondi===true}:null;
+        decision=d=>lancerFile(d,{owner,targets,message,intervalleMinutes:p.intervalleMinutes,intervalleMax:p.intervalleMaxMinutes,maintenant,lot,pourcentage:p.pourcentage,offre});
       }else if(c.action==='suivant'){
         const jeton=randomUUID(),suivi=randomUUID();decision=d=>reserverFile(d,{owner,maintenant,jeton,suivi});
       }else if(c.action==='terminer'){
@@ -102,7 +103,8 @@ export async function routeFavoris(req,res){
         const v=typeof c.version==='string'&&c.version.length<32?/^(\d+)\.(\d+)\.(\d+)$/.exec(c.version):null;
         if(!v||!(Number(v[1])>5||Number(v[1])===5&&Number(v[2])>=217))throw new RefusFavoris('Recharge l’extension 5.217 pour vérifier l’historique avant tout envoi.');
         if(typeof c.jeton!=='string'||!/^[0-9a-f-]{36}$/.test(c.jeton))throw new RefusFavoris('Tentative invalide.',400);
-        decision=d=>consommerFile(d,{owner,jeton:c.jeton,maintenant});
+        const version5281=Number(v[1])>5||Number(v[1])===5&&Number(v[2])>=281;
+        decision=d=>consommerFile(d,{owner,jeton:c.jeton,maintenant,version5281});
       }else if(c.action==='verifier'){
         if(typeof c.jeton!=='string'||!/^[0-9a-f-]{36}$/.test(c.jeton))throw new RefusFavoris('Tentative invalide.',400);
         decision=d=>verifierReservation(d,{owner,jeton:c.jeton,maintenant});

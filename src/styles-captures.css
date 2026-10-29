@@ -245,3 +245,12 @@
 .vrm-chat-offre-traiter{display:block!important;}.vrm-chat-offre-actions{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;width:100%;margin-top:7px;}.vrm-chat-offre-actions button{min-width:0;max-width:100%;padding:7px 4px!important;font-size:11px!important;white-space:normal;overflow-wrap:anywhere;min-height:44px;}
 @media(max-width:600px){.vrm-sync-lignes article{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;}.vrm-sync-lignes article>strong{grid-column:1/-1;}.vrm-inbox-filters{flex-wrap:wrap;}}
 .vrm-msg-recherche-portee{font-size:11px;color:var(--vrm-muted);line-height:1.5;margin:0 0 9px;overflow-wrap:anywhere;}.vrm-msg-recherche-portee button{font:inherit;color:var(--vrm-ink);background:var(--vrm-surface);border:1px solid var(--vrm-line);border-radius:6px;min-height:32px;padding:4px 7px;}
+/* 29 oct. — favoris : variables du message et offre « Diminuer / Fixer à » (comme Vintex). */
+.vrm-favoris-variables{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0 2px;}
+.vrm-favoris-variables button{min-height:44px;padding:6px 12px;border:1px solid var(--vrm-line);border-radius:6px;background:var(--vrm-surface);color:var(--vrm-ink);font:inherit;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:13px;}
+.vrm-favoris-offre{display:flex;flex-direction:column;gap:10px;margin:14px 0;padding:12px;border:1px solid var(--vrm-line);border-radius:10px;}
+.vrm-favoris-offre>label{max-width:240px;}
+.vrm-favoris-offre>label input[type=text]{display:block;box-sizing:border-box;width:100%;min-height:44px;margin-top:6px;padding:8px 10px;border:1px solid var(--vrm-line);border-radius:6px;background:var(--vrm-surface);color:var(--vrm-ink);font:inherit;font-weight:400;}
+.vrm-favoris-offre .vrm-favoris-remise{margin:0;}
+.vrm-favoris-arrondi{display:flex;align-items:center;gap:8px;min-height:44px;max-width:none!important;}
+.vrm-favoris-arrondi input{width:20px;height:20px;}

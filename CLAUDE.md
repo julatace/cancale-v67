@@ -84,6 +84,19 @@
 > l'extension (§3, jamais retiré : chaque message en consomme une). Tests favoris mis à jour (15, 420). **Geste de Julien** : installer la 5.280, laisser un onglet
 > vinted.fr ouvert sur le bon compte pendant les messages et la republication.
 
+> **29 octobre — FAVORIS « inspire-toi de Vintex » (5.281) :** Julien, captures de Vintex : « inspire-toi si jamais tu trouves ça
+> bien ». Repris : (1) variables du message `{username}` (pseudo lu dans le FIL VÉRIFIÉ, `c.opposite_user.login`, au moment
+> d'envoyer — jamais deviné ; absent ⇒ retiré proprement) et `{a|b}` (une variante tirée par message) ; toute autre accolade
+> est refusée (`erreurVariablesFavori`) ; (2) offre « Sans offre · Diminuer (% ou €) · Fixer à », arrondi à l'euro inférieur
+> (`offreFavori` dans les réglages : `offreMode`/`offreValeur`/`arrondi`, l'ancien `pourcentage` lu tel quel ; `prixOffreFavori`
+> jamais ≥ prix ni < 1 €) ; (3) « Attente 8 s… » sur la ligne du prochain favori. ⚠️ Plus de phrase « Je te propose une
+> réduction… » ajoutée au texte : la vraie offre Vinted suit (comme Vintex) ; un message est donc obligatoire. Règle UNIQUE
+> `src/favorisMessage.js`, recopiée entre les balises `<favoris-message-regle>` de `background.js` (test
+> `favoris-message.test.mjs` : copies identiques). Variables ou offre en € / arrondie ⇒ extension 5.281 exigée : l'app bloque
+> le lancement (`EXT_CAPACITES.favorisperso`) et le serveur refuse l'autorisation à une plus ancienne (`exige5281`). Pas repris :
+> les conditions de Vintex (≥ 2 favoris, jours, créneau) — elles servent ses règles automatiques, VRM n'envoie que sur son clic.
+> Preuves : `favoris-message.test.mjs` (6), `favoris-vinted-interface` (120), `favoris-serveur`, audit Vintex (17).
+
 > **29 octobre (suite, « parfait ») — le suivi URSSAF corrigé et complété :** ⚠️ la 1ʳᵉ version affichait « payé » le champ
 > `montant` du registre — c'est le **CA TAPÉ depuis son espace URSSAF**, pas un paiement. Désormais : déclaré = `montant` s'il
 > est tapé, sinon `ca` (VRM au moment de noter) ; un champ **`paye`** (cotisations payées, facultatif) dans le formulaire du
