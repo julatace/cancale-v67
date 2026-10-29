@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.283.0';
+const CODE_VERSION = '5.284.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -7833,8 +7833,12 @@ async function grilleTailles(uid, acc, catalogId, opts = {}) {
   let st = null; try { st = (await chrome.storage.local.get(TAILLES_VU))[TAILLES_VU] || null; } catch (_) {}
   const c = st && st[cat];
   if (c && Array.isArray(c.options) && Number(c.at) > Date.now() - 24 * 3600000) return { options: c.options, requis: Array.isArray(c.requis) ? c.requis : [], sansTaille: !!c.sansTaille, codes: Array.isArray(c.codes) ? c.codes : [] };
-  // 5.280 : la republication ne la lit JAMAIS chez Vinted (Vintex ne l'appelle pas) — seulement le cache.
-  if (opts.cacheSeul) { noterDiag('tailles_cache_absent'); return { raison: 'grille des tailles pas lue (comme Vintex, VRM ne la demande pas pendant une republication)' }; }
+  // (29 oct., sa décision : « l'extension doit, avant d'appuyer sur publier, regarder si
+  // toutes les catégories sont remplies ») La 5.280 ne la lisait JAMAIS pendant une
+  // republication (cache seulement) : grille absente ⇒ la taille n'était PAS vérifiée et
+  // Vinted refusait « Le champ Taille doit être renseigné » après coup. Elle est lue
+  // (une fois par catégorie et par 24 h, comme la page de dépôt le fait), AVANT tout geste.
+  if (opts.cacheSeul) noterDiag('tailles_cache_absent_lue');
   const g = await gardeLecture(uid, acc, 'clic');
   if (g) return { raison: g.error };
   const r = await vintedPage(acc, 'POST', '/api/v2/item_upload/attributes', { attributes: [{ code: 'category', value: [Number(cat)] }] }, { timeoutMs: 20000 });
@@ -7925,6 +7929,35 @@ async function champsManquantsAvant(uid, acc, it, idsPaire, opts = {}) {
   }
   if (manque.length) noterDiag('avant_manque_' + manque.length);
   return [...new Set(manque)];
+}
+// (29 oct.) Le brouillon tel que Vinted le montre MAINTENANT (`GET item_upload/items/{id}`,
+// la page « Modifier » du brouillon — Vintex la lit aussi avant la mise en ligne).
+// Ce qu'il a changé sur Vinted (taille, état, catégorie…) l'emporte sur le corps
+// rangé ; ses photos réelles (forme courte {id, orientation}) remplacent des numéros
+// peut-être périmés. Forme jamais vue : lue défensivement, ses NOMS de clés gardés.
+// Rend { photos: n | 0 (aucune) | null (pas su) }.
+function photosDuBrouillonLu(it) {
+  const l = Array.isArray(it.photos) ? it.photos : (Array.isArray(it.assigned_photos) ? it.assigned_photos : null);
+  if (!l) return null;
+  return l.map((p) => (p && typeof p === 'object' ? p : { id: p })).filter((p) => Number.isSafeInteger(Number(p.id)) && Number(p.id) > 0)
+    .map((p) => ({ id: Number(p.id), orientation: Number(p.orientation) || 0 }));
+}
+function appliquerBrouillonLu(d, rl, id) {
+  const j = rl && rl.ok && rl.json && typeof rl.json === 'object' ? rl.json : null;
+  const it = j && (j.item && typeof j.item === 'object' ? j.item : (j.draft && typeof j.draft === 'object' ? j.draft : null));
+  if (!it) { noterDiag('brouillon_lu_illisible_' + ((rl && rl.status) || 0)); return { photos: null }; }
+  try { echantillonRate('brouillon_lu_forme', String(id), Object.keys(it).slice(0, 60).join(',')); } catch (_) {}
+  const f = ficheDeCorpsVinted({ item: it }, id);
+  if (f && !f.contredit) {
+    const c = f.codes || {};
+    for (const k of ['catalog_id', 'brand_id', 'package_size_id', 'brand']) if (c[k] != null) d[k] = c[k];
+    if (Array.isArray(c.color_ids) && c.color_ids.length) d.color_ids = c.color_ids;
+    if (Array.isArray(c.item_attributes) && c.item_attributes.length) d.item_attributes = c.item_attributes;
+    if (f.description && f.description.length >= DESCRIPTION_MIN) d.description = f.description;
+  }
+  const ph = photosDuBrouillonLu(it);
+  if (ph && ph.length) { d.assigned_photos = ph; noterDiag('brouillon_lu_photos'); }
+  return { photos: ph ? ph.length : null };
 }
 // Sur un refus de la taille : grille lue, taille au libellé exact posée, UN
 // nouvel essai (le corps est mis à jour sur place : l'appelant garde la bonne
@@ -8578,6 +8611,16 @@ async function publierBrouillon(msg) {
   if (manque.length) return { accepte: false, code: 'incomplet', raison: `ce brouillon n'a pas ${manque.join(', ')} — finis-le sur Vinted (« Modifier »), puis réessaie. Rien n'a été touché.` };
   // (29 oct.) Tout ce que Vinted exige est vérifié AVANT d'envoyer : la taille
   // fausse est corrigée au libellé exact de la paire ; le reste est nommé.
+  // Le brouillon VIVANT d'abord (lecture) : la vérification porte sur ce que Vinted a.
+  { const gL = await gardeLecture(uid, acc, 'clic');
+    if (!gL) {
+      const rl = await vintedPage(acc, 'GET', `/api/v2/item_upload/items/${id}`, null, { timeoutMs: 30000 });
+      if (rl && rl.sansPage) return { accepte: false, code: 'onglet-vinted', raison: raisonSansPage(rl) };
+      if (rl && (rl.status === 404 || rl.status === 410)) return { accepte: false, code: 'pas-dans-dressing', raison: "Vinted dit que ce brouillon n'existe plus — rien n'a été touché." };
+      const lu = appliquerBrouillonLu(r.d, rl, id);
+      if (lu.photos === 0) return { accepte: false, code: 'incomplet', raison: "Vinted refuserait ce brouillon : il n'a plus aucune photo chez Vinted. Ouvre-le sur Vinted (Mes brouillons → « Modifier »), rajoute les photos, puis réessaie. Rien n'a été touché." };
+      r.nPhotos = Array.isArray(r.d.assigned_photos) ? r.d.assigned_photos.length : r.nPhotos;
+    } }
   { const avant2 = JSON.stringify(r.d.item_attributes || []);
     const manque2 = await champsManquantsAvant(uid, acc, r.d, [b.ancienId, id], { cacheSeul: true });
     if (!manque2.length && JSON.stringify(r.d.item_attributes || []) !== avant2) { try { await rangerBrouillon(id, { corps: JSON.stringify({ ...JSON.parse(b.corps), draft: r.d }) }); } catch (_) {} }
@@ -9218,7 +9261,17 @@ async function finRepubBrouillon(acc, job) {
     // compte connecté et la pause de Vinted, jamais le plafond (l'ancienne est partie).
     const stopC = await gardeStricte(uid, acc, { lecture: true });
     if (stopC) { await leverVerrouRecreer(id); await majVersBrouillon(uid, id, { etat: 'a-publier', draftId }); return { refaire: true, accepte: true, etape: 'brouillon-a-refaire', draftId, raison: `l'ancienne annonce est supprimée et le brouillon est rangé, mais il n'a pas été mis en ligne (${stopC.error}) — « Brouillons → en ligne » le met en ligne, sans en créer un autre.` }; }
-    await vintedPage(acc, 'GET', `/api/v2/item_upload/items/${draftId}`, null, { timeoutMs: 30000 });
+    const rlB = await vintedPage(acc, 'GET', `/api/v2/item_upload/items/${draftId}`, null, { timeoutMs: 30000 });
+    if (corpsCV && corpsCV.draft) {
+      const lu = appliquerBrouillonLu(corpsCV.draft, rlB, draftId);
+      const manqueF = lu.photos === 0 ? ['les photos'] : await champsManquantsAvant(uid, acc, corpsCV.draft, [id, draftId], { cacheSeul: true });
+      if (manqueF.length) {
+        await leverVerrouRecreer(id);
+        await majVersBrouillon(uid, id, { etat: 'a-publier', draftId, cause: 'incomplet' });
+        noterDiag('republier_fin_bloque_incomplet');
+        return { refaire: true, accepte: true, etape: 'brouillon-a-refaire', draftId, raison: `l'ancienne annonce est supprimée et le brouillon est rangé, mais VRM ne l'a PAS mis en ligne : Vinted le refuserait, il manque ${manqueF.join(', ')}. Ouvre-le sur Vinted (Mes brouillons → « Modifier »), complète, puis « Publier ».` };
+      }
+    }
     etapeRepub(id, 'en-ligne');
     const rcV = await vintedPage(acc, 'POST', `/api/v2/item_upload/drafts/${draftId}/completion`, corpsCV, { timeoutMs: 60000 });
     if (rcV && rcV.sansPage) {
