@@ -125,7 +125,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.284.0';
+const EXT_ATTENDUE = '5.285.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -12418,7 +12418,10 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
   const [lettreOn, setLettreOn] = useState(false);
   // (28 oct., sa demande : « ça met en brouillon puis ça publie ») Allumé par défaut
   // quand l'extension sait le faire ; il peut repasser à la création directe.
-  const [viaBrouillon, setViaBrouillon] = useState(true);
+  const [viaBrouillonChoix, setViaBrouillon] = useState(true);
+  // (29 oct., revue) Depuis la 5.277 l'extension passe TOUJOURS par un brouillon (comme Vintex) :
+  // décocher la case annonçait « créée directement en ligne » et figeait la file Vinted 1 à 3 min.
+  const viaBrouillon = extSait('republierpage') === 'ok' ? true : viaBrouillonChoix;
   const [lettres, setLettres] = useState({});
   const tirerLettres = (ids) => { const o = {}; ids.forEach((id) => { o[id] = 'abcdefghijklmnopqrstuvwxyz'[Math.floor(Math.random() * 26)]; }); setLettres(o); };
   const presets = (() => { const p = load('vrm_photo_presets', []); return Array.isArray(p) ? p.filter((x) => x && x.nom && x.r) : []; })();
@@ -12632,7 +12635,7 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
             {action === 'recreer' && <div data-republier-brouillon={viaBrouillon && brouillonOk ? 'oui' : 'non'} style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
               <span style={maj}>Publication</span>
               <label style={{ display: 'flex', gap: 10, alignItems: 'center', fontSize: 13.5, color: brouillonOk ? C.text : C.muted, minHeight: 44, cursor: brouillonOk ? 'pointer' : 'default' }}>
-                <input type="checkbox" data-republier-via-brouillon disabled={!brouillonOk} checked={viaBrouillon && !!brouillonOk} onChange={(ev) => setViaBrouillon(ev.target.checked)} style={{ width: 20, height: 20, accentColor: C.accent, flexShrink: 0 }} />
+                <input type="checkbox" data-republier-via-brouillon disabled={!brouillonOk || extSait('republierpage') === 'ok'} checked={viaBrouillon && !!brouillonOk} onChange={(ev) => setViaBrouillon(ev.target.checked)} style={{ width: 20, height: 20, accentColor: C.accent, flexShrink: 0 }} />
                 <span>Passer par un brouillon Vinted, puis le mettre en ligne</span>
               </label>
               <div style={{ fontSize: 12, color: C.muted }}>{brouillonOk ? (viaBrouillon ? (extSait('republierpage') === 'ok' ? 'Comme Vintex : tout passe par l’onglet vinted.fr ouvert dans ce Chrome (laisse-le ouvert, connecté sur le bon compte). Chaque annonce est enregistrée dans VRM, rangée en brouillon sur Vinted, PUIS l’ancienne est supprimée, et le brouillon est mis en ligne 1 à 3 min plus tard.' + (extSait('republierfile') === 'ok' ? ' À la suite, comme Vintex : pendant cette attente la paire suivante est déjà préparée (l’extension met chaque brouillon en ligne à son heure, même si tu fermes cette fenêtre).' : '') + ' Aucun essai en rafale : un refus s’arrête et le dit. Au plus 10 paires par jour et par compte. Si Vinted ne répond pas clairement, VRM s’arrête (jamais deux fois en ligne) ; rien n’est perdu, tout est enregistré dans VRM.' : `L’extension VRM installée ici fait encore l’ancienne republication (depuis son fond, avec des renvois automatiques) — mets-la à jour en ${EXT_CAPACITES.republierpage} : elle passera par l’onglet vinted.fr, comme le site.`) : 'L’annonce est créée directement en ligne.') : `Demande l'extension VRM ${EXT_CAPACITES.republierbrouillon} ou plus récente dans ce navigateur.`}</div>

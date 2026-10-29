@@ -1,5 +1,16 @@
 # VRM — dossier de passation
 
+> **29 octobre (soir) — revue de la republication et des favoris (5.285) :** « tout doit être parfait ». Dix défauts
+> trouvés en relisant le code, tous corrigés : la file des mises en ligne planifiées s'écrit une à la fois (une
+> planification pendant un réveil effaçait une paire) ; un job resté « en cours » (Chrome a tué le service worker)
+> n'est jamais rejoué, il est dit « incertain » ; « Brouillons → en ligne » refuse un brouillon déjà planifié, déjà
+> publié, verrouillé, ou dont l'ANCIENNE annonce n'est pas prouvée supprimée (sinon deux fois la même paire en ligne) ;
+> un brouillon sans réponse claire verrouille l'annonce 30 min ; une requête jamais partie (pas d'onglet Vinted, pause)
+> n'est plus « incertaine » et rend ses actions réservées ; avec la 5.277+, « via brouillon » est forcé (la création
+> directe n'existe plus côté extension) ; le serveur refuse une offre en % à une extension < 5.280 (elle ne
+> l'enverrait pas). Preuves : `audit-recreer.cjs` §R (7 contrôles, 7 rouges avec `BG_SRC=` le background.js
+> d'origin/main), `favoris-message.test.mjs`. ⚠️ Non mesuré : le vrai Vinted.
+
 > **29 octobre (suite, « c'est trop incompréhensible ») — Comptabilité allégée :** « Ta micro-entreprise » (calendrier,
 > seuils, profil, impôts) est REPLIÉE sous une ligne-résumé (taux · prochaine période à déclarer · seuils et impôts,
 > `data-micro-repli`) et s'ouvre d'elle-même si quelque chose demande son attention (versement libératoire pas répondu,
