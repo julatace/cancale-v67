@@ -1,0 +1,96 @@
+/* ── LA FICHE D'ANNONCE, 29 octobre (Julien : « augmente la taille des photos
+   dans Vinted ; l'état plus original avec à côté la saisie du prix d'achat ;
+   toutes les infos qui sont dans les 3 petits points »).
+   Chargé EN DERNIER : il prend le pas sur les couches « liste » et « fiche
+   produit » du 26-27 oct. (styles-mineral, -gestion, -mobile-studio,
+   -annonces-ventes, -annonces-pro). Une classe de plus (`.vrm-fiche`,
+   `.vrm-fiches`) suffit à gagner : aucune règle d'avant n'est retirée.
+   · Ordinateur : fiches de ~300 px (4 par rangée à 1512 px au lieu de 5 de
+     236 px) — la photo passe de 236×295 à ~300×375.
+   · Téléphone : UNE fiche par rangée, la photo carrée sur toute la largeur
+     (≈ 360 px affichés au lieu de 174).
+   §7 : aucune couleur de plus — l'encre, le filet, le fond ; l'accent reste rare. */
+
+:root body .vrm-main .vrm-ann-grid.vrm-fiches.vrm-fiches {
+  grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)) !important;
+  gap: 20px !important;
+  align-items: start;
+}
+
+:root body .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche {
+  border-radius: 16px !important;
+}
+
+/* La photo, en grand. */
+:root body .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche .vrm-ann-overview {
+  display: flex !important; flex-direction: column !important; gap: 0 !important; padding: 0 !important;
+}
+:root body .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche .vrm-ann-overview > a.vrm-fiche-photo {
+  position: relative; display: flex !important; width: 100% !important; height: auto !important;
+  aspect-ratio: 4 / 5; border: 0 !important; border-radius: 0 !important; margin: 0 !important; overflow: hidden;
+  background: var(--vrm-bg) !important;
+}
+:root body .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche .vrm-ann-overview > a.vrm-fiche-photo img {
+  width: 100%; height: 100%; object-fit: cover;
+}
+
+/* Les informations, sous la photo. */
+:root body .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche .vrm-ann-ledger-info {
+  display: flex !important; flex-direction: column !important; gap: 10px !important;
+  padding: 14px 14px 12px !important;
+}
+:root body .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche [data-titre] { min-height: 0; }
+:root body .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche [data-chiffres] {
+  display: grid !important; grid-template-columns: repeat(4, minmax(0, 1fr)) !important; gap: 6px !important;
+  margin: 0 !important; padding: 0 !important; border-top: 0 !important;
+}
+:root body .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche [data-chiffres] > * {
+  min-height: 52px !important; padding: 6px 8px !important; white-space: normal; overflow: hidden;
+}
+:root body .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche [data-etat-ligne] { font-size: 12px !important; flex-wrap: wrap !important; }
+:root body .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche [data-stats-annonce] { flex-basis: auto; font-size: 12px !important; }
+
+/* Une case qu'on tape (achat, mini, refuse, boost) : TOUTE la case se touche. */
+:root body .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche .vrm-fiche-cell [data-edition] {
+  display: flex !important; align-items: center; min-height: 30px !important; width: 100%;
+  margin: 0 !important; text-align: left !important;
+}
+:root body .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche .vrm-fiche-cell { position: relative; }
+:root body .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche .vrm-fiche-cell [data-edition]::after {
+  /* la cible s'étend à la case entière, sans bouger le texte */
+  content: ''; position: absolute; inset: 0;
+}
+:root body .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche .vrm-fiche-duo .vrm-fiche-cell { min-height: 58px; padding: 8px 11px !important; }
+
+/* L'ÉTAT EN JAUGE : cinq barres montantes, comme un signal. */
+.vrm-fiche-etat-val { display: inline-flex; align-items: flex-end; gap: 8px; min-width: 0; }
+.vrm-fiche-jauge { display: inline-flex; align-items: flex-end; gap: 2px; flex-shrink: 0; height: 18px; }
+.vrm-fiche-jauge > span { display: block; width: 5px; border-radius: 2px; }
+.vrm-fiche-etat-mot { font-size: 13px; font-weight: 650; line-height: 1.15; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+
+/* Ce qui était dans « ⋯ » : à la vue, une bande sous la fiche. */
+:root body .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche .vrm-fiche-plus {
+  padding: 12px 14px 14px; margin-top: auto;
+}
+:root body .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche .vrm-fiche-plus > div:first-child[style*="border"] { margin: 0 !important; }
+:root body .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche [data-fiche-gestes] > *,
+:root body .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche [data-fiche-infos] > button { min-height: 44px !important; }
+
+@media (hover: hover) and (pointer: fine) {
+  :root body .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche [data-fiche-gestes] > :is(button, a):hover,
+  :root body .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche [data-fiche-infos] > button:hover { background: var(--vrm-bg) !important; }
+}
+
+/* Téléphone : UNE fiche par rangée, la photo carrée sur toute la largeur. */
+@media (max-width: 600px) {
+  :root body .vrm-main .vrm-ann-grid.vrm-fiches.vrm-fiches { grid-template-columns: minmax(0, 1fr) !important; gap: 14px !important; }
+  :root body .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche .vrm-ann-overview > a.vrm-fiche-photo { aspect-ratio: 1 / 1; }
+  :root body .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche [data-titre] { font-size: 15px !important; }
+  :root body .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche [data-prix] { font-size: 22px !important; }
+  /* Une fiche ouverte sur toute la largeur : plus de « une rangée à deux ». */
+  :root body .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche:has(.vrm-ann-actions[open]) { grid-column: auto; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root body .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche { animation: none !important; }
+}

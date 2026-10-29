@@ -80,6 +80,9 @@ import { lireSuperPdp, appelSuperPdp, enBase64, libelleEnvoi, ENV_LIBELLE } from
 // décide à qui appartient un email) — jamais une seconde normalisation ici.
 import { normAdresse, ADRESSE_COLLECTRICE, estAdresseCollectrice } from "../api/_lib/proprietaire-email.js";
 import { retoursEnCours, remiseEnStock, LIBELLE_ETAPE, ETAPES_RETOUR } from "./retoursStock.js";
+import { etatVinted, NIVEAU_ETAT_MAX } from "./carteAnnonce.js";
+import ChoixPeriode from "./ChoixPeriode.jsx";
+import { libellePlage } from "./periodeCalendrier.js";
 import { installerLecturesPartagees } from "./lecturesPartagees.js";
 import { installerFiltreSupprimes, sansComptesSupprimes, lireSupprimes, CLE_SUPPRIMES } from "./comptesSupprimes.js";
 import { lectureComplete, construirePhoto, ecrirePhoto, lirePhoto, listeDuSoir, joursAvantJour, heurePhoto, adresseQrLocale, CACHE_QR } from "./journeeHorsLigne.js";
@@ -10252,6 +10255,27 @@ function Input({label,...p}) {
 // prix d'achat DEUX fois (le texte, puis un champ de saisie juste dessous). Le
 // texte reste — c'est lui qu'on lit — et un clic le transforme en champ ;
 // Entrée ou un clic ailleurs enregistre (ChampSaisie), Échap annule.
+// ── L'ÉTAT EN JAUGE (29 octobre) : cinq barres montantes, comme le signal d'un
+// téléphone — de « Satisfaisant » (1) à « Neuf avec étiquette » (5). Les barres
+// pleines sont à l'encre, les autres au filet : aucune couleur de plus (§7).
+// Un état inconnu de VRM est ÉCRIT tel quel, sans jauge (jamais un niveau
+// deviné) ; aucun état ⇒ « — ». La règle : `etatVinted` (src/carteAnnonce.js).
+function JaugeEtat({ statut }) {
+  const e = etatVinted(statut);
+  const niv = e && e.niveau;
+  return (
+    <span className="vrm-fiche-etat-val" data-etat-niveau={niv ? String(niv) : (e ? 'inconnu' : 'aucun')}>
+      {niv ? (
+        <span className="vrm-fiche-jauge" role="img" aria-label={`État ${niv} sur ${NIVEAU_ETAT_MAX}`}>
+          {Array.from({ length: NIVEAU_ETAT_MAX }, (_, i) => (
+            <span key={i} className={i < niv ? 'plein' : ''} style={{ height: 6 + i * 3, background: i < niv ? C.text : C.border }}/>
+          ))}
+        </span>
+      ) : null}
+      <span className="vrm-fiche-etat-mot" style={{ color: e ? C.text : C.muted }}>{e ? e.libelle : '—'}</span>
+    </span>
+  );
+}
 function EnLigne({ value, onCommit, rendu, placeholder, inputMode, largeur = 64, titre, data }) {
   const [edit, setEdit] = useState(false);
   if (edit) return (
@@ -13203,11 +13227,13 @@ const dansPeriodeDate = (t, p) => {
   return true;
 };
 const dansPeriode = (o, p) => dansPeriodeDate(o && o.date ? Date.parse(o.date) : NaN, p);
+// (29 oct.) La plage se dit EN CLAIR (« du 12 au 28 oct. 2026 »), par la même
+// règle que le calendrier (`libellePlage`, periodeCalendrier.js — §11).
 const libellePeriode = (p) => {
   if (!p || (!p.from && !p.to)) return 'Toute la période';
   if (p.label) return p.label;
-  const f = (d) => d ? d.toLocaleDateString('fr-FR', { day:'2-digit', month:'2-digit', year:'2-digit' }) : '…';
-  return `${f(p.from)} → ${f(p.to)}`;
+  const d = (x) => { if (!x) return null; const t = x instanceof Date ? x : new Date(x); return isNaN(t.getTime()) ? null : t; };
+  return libellePlage(d(p.from), d(p.to));
 };
 
 /* ── RÉCEPTION DES EMAILS : « est-ce que ça arrive ? » ─────────────────────
@@ -13497,58 +13523,13 @@ function ReceptionEmails({ tracking, comptes, colisParTransporteur }) {
     </details>
   );
 }
-function PeriodePicker({ value, onChange, compact = false }) {
-  const [open,setOpen] = useState(false);
-  const [mode,setMode] = useState('mois');
-  const localDate = d => d ? `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}` : '';
-  const now = new Date();
-  const [mois,setMois] = useState(()=>localDate(value?.from || now).slice(0,7));
-  const [debut,setDebut] = useState(()=>localDate(value?.from));
-  const [fin,setFin] = useState(()=>localDate(value?.to));
-  const [erreur,setErreur] = useState('');
-  const panneauId = React.useId();
-  const choisir = (from,to,label) => { onChange({from,to,label});setOpen(false);setErreur(''); };
-  const choisirMois = m => {
-    if (!/^\d{4}-\d{2}$/.test(m) || m>localDate(now).slice(0,7)) {setErreur('Choisis un mois passé ou le mois en cours.');return;}
-    const [y,n]=m.split('-').map(Number);
-    if(n<1 || n>12 || y<2000){setErreur('Choisis un mois valide.');return;}
-    choisir(new Date(y,n-1,1),new Date(y,n,0),`${MOIS_FR[n-1]} ${y}`);
-  };
-  const appliquer = () => {
-    if(mode==='mois')return choisirMois(mois);
-    if(!debut||!fin||debut>fin){setErreur('La date de fin doit suivre la date de début.');return;}
-    const date = v => {const [y,m,d]=v.split('-').map(Number);return new Date(y,m-1,d);};
-    choisir(date(debut),date(fin));
-  };
-  const preset = k => {
-    if(k==='mois')return choisirMois(localDate(now).slice(0,7));
-    if(k==='dernier'){const d=new Date(now.getFullYear(),now.getMonth()-1,1);return choisirMois(localDate(d).slice(0,7));}
-    const jours=k==='j7'?7:30;
-    choisir(new Date(now.getFullYear(),now.getMonth(),now.getDate()-jours+1),now,`${jours} derniers jours`);
-  };
-  const chip = {border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:8,padding:'6px 10px',fontSize:12,fontWeight:500,cursor:'pointer',whiteSpace:'nowrap',flexShrink:0};
-  return <div className="vrm-period" style={{marginBottom:10}}>
-    <div className="vrm-rangee" style={{display:'flex',gap:6,alignItems:'center'}}>
-      <button type="button" onClick={()=>{setOpen(v=>!v);setErreur('');}} aria-expanded={open} aria-controls={panneauId} style={{...chip,display:'inline-flex',alignItems:'center',gap:6}}><Icon name="calendar" size={14}/>{libellePeriode(value)}</button>
-      {!compact && <><button type="button" onClick={()=>preset('mois')} style={chip}>Ce mois</button>
-      <button type="button" onClick={()=>preset('dernier')} style={chip}>Mois dernier</button></>}
-      {value && <button className="vrm-icon-control" type="button" aria-label="Effacer la période" onClick={()=>{onChange(null);setOpen(false);}} style={chip}><Icon name="close" size={14}/></button>}
-    </div>
-    {open && <div id={panneauId} className="vrm-period-panel" style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:10,padding:12,marginTop:8}}>
-      <div style={{display:'flex',gap:6,marginBottom:12,flexWrap:'wrap'}}>{compact && <><button type="button" onClick={()=>preset('mois')} style={chip}>Ce mois</button><button type="button" onClick={()=>preset('dernier')} style={chip}>Mois dernier</button></>}<button type="button" onClick={()=>preset('j7')} style={chip}>7 jours</button><button type="button" onClick={()=>preset('j30')} style={chip}>30 jours</button></div>
-      <div role="group" aria-label="Choix de période" style={{display:'flex',gap:8,marginBottom:10}}>
-        <button type="button" aria-pressed={mode==='mois'} onClick={()=>setMode('mois')} style={{...chip,fontWeight:mode==='mois'?700:400}}>Un mois</button>
-        <button type="button" aria-pressed={mode==='dates'} onClick={()=>setMode('dates')} style={{...chip,fontWeight:mode==='dates'?700:400}}>Deux dates</button>
-      </div>
-      {mode==='mois' ? <label style={{display:'block',fontSize:12,color:C.muted}}>Mois<input aria-label="Mois de la période" type="month" max={localDate(now).slice(0,7)} value={mois} onChange={e=>setMois(e.target.value)} style={{display:'block',width:'100%',marginTop:6,padding:8,border:`1px solid ${C.border}`,borderRadius:8,background:C.bg,color:C.text}}/></label>
-        : <div style={{display:'grid',gridTemplateColumns:'repeat(2,minmax(0,1fr))',gap:8}}>
-          <label style={{fontSize:12,color:C.muted}}>Du<input aria-label="Début de la période" type="date" value={debut} onChange={e=>setDebut(e.target.value)} style={{display:'block',width:'100%',minWidth:0,marginTop:6,padding:8,border:`1px solid ${C.border}`,borderRadius:8,background:C.bg,color:C.text}}/></label>
-          <label style={{fontSize:12,color:C.muted}}>Au<input aria-label="Fin de la période" type="date" value={fin} min={debut||undefined} onChange={e=>setFin(e.target.value)} style={{display:'block',width:'100%',minWidth:0,marginTop:6,padding:8,border:`1px solid ${C.border}`,borderRadius:8,background:C.bg,color:C.text}}/></label>
-        </div>}
-      {erreur && <p role="alert" style={{fontSize:12,color:C.danger}}>{erreur}</p>}
-      <button type="button" className="vrm-button" onClick={appliquer} style={{marginTop:10,background:C.accent,color:C.onAccent,border:0}}>Appliquer</button>
-    </div>}
-  </div>;
+// (29 oct.) LE CALENDRIER « COMME AIRBNB » — Julien : « pour le filtre des
+// périodes je veux que ce soit mieux, un calendrier comme avec Airbnb ». Le
+// composant et sa règle vivent dans ChoixPeriode.jsx / periodeCalendrier.js ;
+// ce nom reste pour les écrans qui l'appelaient (Ventes, Achats). La VALEUR ne
+// change pas de forme : `{from, to, label?}` ou `null` (§11).
+function PeriodePicker({ value, onChange, titre = 'Période' }) {
+  return <ChoixPeriode value={value} onChange={onChange} Retour={FermeAuRetour} Icon={Icon} titre={titre}/>;
 }
 
 function EmptyState({ icon, title, desc, action }) {
@@ -24809,29 +24790,18 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
       <Card>
         <div style={{fontSize:13,fontWeight:600,color:C.text,marginBottom:2}}>📅 Chiffre d'affaires entre deux dates</div>
         <div className="vrm-aide" style={{fontSize:11,color:C.muted,marginBottom:10}}>Choisis une période — le total porte sur tes ventes finalisées, à leur date de vente.</div>
-        <div style={{display:'flex',gap:10,flexWrap:'wrap',alignItems:'flex-end'}}>
-          <div>
-            <label style={{fontSize:11,color:C.muted,display:'block',marginBottom:4,fontWeight:600}}>Du</label>
-            <input type="date" value={caDu} onChange={e=>setCaDu(e.target.value)} style={{border:`1px solid ${C.border}`,background:C.card,color:C.text,borderRadius:10,padding:'10px 12px',fontSize:15,fontFamily:'inherit',outline:'none',colorScheme:'inherit'}}/>
-          </div>
-          <div>
-            <label style={{fontSize:11,color:C.muted,display:'block',marginBottom:4,fontWeight:600}}>Au</label>
-            <input type="date" value={caAu} onChange={e=>setCaAu(e.target.value)} style={{border:`1px solid ${C.border}`,background:C.card,color:C.text,borderRadius:10,padding:'10px 12px',fontSize:15,fontFamily:'inherit',outline:'none',colorScheme:'inherit'}}/>
-          </div>
-          {(caDu||caAu) && <button type="button" onClick={()=>{setCaDu('');setCaAu('');}} style={{border:`1px solid ${C.border}`,background:'transparent',color:C.muted,borderRadius:10,padding:'10px 12px',fontSize:13,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Effacer</button>}
-        </div>
+        {/* (29 oct.) Le même calendrier « comme Airbnb » que Ventes et Achats (§11). */}
+        <PeriodePicker titre="Période du chiffre d'affaires" value={(caDu||caAu)?{from:caDu?new Date(caDu+'T00:00:00'):null,to:caAu?new Date(caAu+'T00:00:00'):null}:null}
+          onChange={v=>{ const k=(d)=>{ if(!d) return ''; const t=d instanceof Date?d:new Date(d); return isNaN(t.getTime())?'':`${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,'0')}-${String(t.getDate()).padStart(2,'0')}`; }; setCaDu(v?k(v.from):''); setCaAu(v?k(v.to):''); }}/>
         {caRange ? (
           <div style={{marginTop:14}}>
             <div className="vrm-display" style={{fontSize:28,fontWeight:800,color:C.text}}>{fmt(caRange.ca)}</div>
             <div style={{fontSize:13,color:C.muted,marginTop:2}}>
-              {caRange.count} vente{caRange.count>1?'s':''} finalisée{caRange.count>1?'s':''}
-              {caDu&&caAu?` du ${caDu.split('-').reverse().join('/')} au ${caAu.split('-').reverse().join('/')}`
-                : caDu?` depuis le ${caDu.split('-').reverse().join('/')}`
-                : ` jusqu'au ${caAu.split('-').reverse().join('/')}`}
+              {caRange.count} vente{caRange.count>1?'s':''} finalisée{caRange.count>1?'s':''}{' '}{libellePlage(caDu?new Date(caDu+'T00:00:00'):null, caAu?new Date(caAu+'T00:00:00'):null)}
             </div>
           </div>
         ) : (
-          <div className="vrm-aide" style={{fontSize:13,color:C.muted,marginTop:12,lineHeight:1.5}}>Renseigne une date de début et/ou de fin pour voir le CA de la période.</div>
+          <div className="vrm-aide" style={{fontSize:13,color:C.muted,marginTop:12,lineHeight:1.5}}>Choisis une période dans le calendrier (ou un raccourci : 7 jours, ce mois…) pour voir le CA.</div>
         )}
       </Card>
 
@@ -35865,6 +35835,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // rattrapé au nuage et SEULEMENT s'il est resté vide (§5.49 : jamais par-dessus
   // un texte tapé pendant le chargement).
   const [refusMsg, setRefusMsg] = useState(() => load('vinted_offre_refus_msg', '') || '');
+  // (29 oct.) Le détail de l'acceptation automatique ne s'affiche que sur ⓘ.
+  const [offresInfo, setOffresInfo] = useState(false);
   React.useEffect(() => onCloudReady(() => setRefusMsg(v => (v && v.trim()) ? v : (load('vinted_offre_refus_msg', '') || ''))), []);
   const basculerOffresAuto = async () => {
     if (offresAuto) { setOffresAuto(false); save('vinted_offres_auto', false); return; }
@@ -43751,7 +43723,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             au-dessus de tout : six pastilles + la recherche formaient deux blocs
             pleins avant la première vente. Ici, elle est là où on l'utilise —
             on choisit « Finalisées », puis le mois. */}
-        {sales.items && sales.items.length>0 && <PeriodePicker value={periode} onChange={setPeriode} compact/>}
+        {sales.items && sales.items.length>0 && <PeriodePicker value={periode} onChange={setPeriode} titre="Période des ventes"/>}
         </div>
         <NoAcc/>
         {/* ⚠️ LES VENTES LEBONCOIN NE SONT PLUS ICI : elles vivent dans l'espace
@@ -44617,7 +44589,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             le bas, alors que c'est exactement ce qu'on vient chercher quand on
             part au relais. Ils reviennent tels quels sur En route / Reçus /
             Tous, où ils filtrent vraiment quelque chose. */}
-        {buysBase.length>0 && aFilter!=='attente' && <PeriodePicker value={periode} onChange={setPeriode}/>}
+        {buysBase.length>0 && aFilter!=='attente' && <PeriodePicker value={periode} onChange={setPeriode} titre="Période des achats"/>}
         {buysBase.length>0 && aFilter!=='attente' && (
           <label className="vrm-msg-search vrm-achats-search" style={{color:C.muted}}><Icon name="search" size={16}/><input type="search" aria-label="Rechercher un achat" value={ordSearch} onChange={e=>setOrdSearch(e.target.value)} placeholder="Titre, N°, vendeur"
             style={{color:C.text}}/></label>
@@ -45678,33 +45650,49 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         {/* (27 oct.) Acceptation automatique des offres — interrupteur, éteint par
             défaut. Le risque est dit à l'allumage (askConfirm). L'extension doit
             savoir le faire (capacité `offresauto`) et tourner dans CE Chrome. */}
-        {listings.items?.length>0 && (
-          <div data-offres-auto-carte style={{display:'flex',flexDirection:'column',gap:8,border:`1px solid ${offresAuto?C.accent:C.border}`,background:offresAuto?`${C.accent}0c`:C.card,borderRadius:10,padding:'10px 12px',margin:'0 0 12px'}}>
-            <div style={{display:'flex',alignItems:'center',gap:10}}>
-              <div style={{flex:1,minWidth:0}}>
-                <div style={{fontSize:13,fontWeight:600,color:C.text,display:'flex',alignItems:'center',gap:6}}><Icon name="tag" size={14} style={{color:offresAuto?C.accent:C.muted}}/>Accepter les offres automatiquement</div>
-                <div style={{fontSize:12,color:C.muted,marginTop:2,lineHeight:1.45}}>{offresAuto ? "Une offre qui atteint le « mini » d'une annonce est acceptée toute seule, entre 3 et 20 min après (au hasard) — une à la fois, le compte ouvert dans Chrome seulement. Sous ton « refuse », elle est refusée ; entre les deux, à toi de négocier." : "Pose un « mini » sur une annonce, et VRM accepte les offres au-dessus à ta place."}</div>
+        {/* (29 oct.) Julien : « que ce ne soit pas un bouton comme ça, j'aime pas avec
+            tout le texte, c'est moche ». UNE ligne courte (nom · état · ⓘ · interrupteur) ;
+            le fonctionnement et le message de refus vivent derrière ⓘ. Le comportement ne
+            change pas (`basculerOffresAuto` : confirmation à l'allumage, éteint par défaut).
+            Seul ce qui demande un GESTE reste visible : l'extension qui ne peut pas. */}
+        {listings.items?.length>0 && (() => {
+          const nbMini = (annBase || []).filter((it) => { const v = Number(String(((numeros || {})[it.id] || {}).min ?? '').replace(',', '.')); return isFinite(v) && v > 0; }).length;
+          const ext = offresAuto ? extSait('offresauto') : 'ok';
+          const etat = !offresAuto ? 'Éteintes' : nbMini === 0 ? 'Allumées · aucune annonce n’a de mini' : `Allumées · ${nbMini} annonce${nbMini > 1 ? 's' : ''} avec un mini`;
+          return (
+          <div data-offres-auto-carte data-offres-auto-etat={offresAuto ? 'on' : 'off'} data-offres-auto-mini={offresAuto ? String(nbMini) : undefined} className={`vrm-offres-auto${offresAuto ? ' on' : ''}`}>
+            <div className="vrm-offres-auto-ligne">
+              <span className="vrm-offres-auto-icone" aria-hidden="true"><Icon name="tag" size={15}/></span>
+              <div className="vrm-offres-auto-texte">
+                <span className="vrm-offres-auto-nom">Offres automatiques</span>
+                <span className="vrm-offres-auto-statut" data-offres-auto-statut>{etat}</span>
               </div>
+              <button type="button" className="vrm-offres-auto-info" data-offres-auto-info aria-expanded={offresInfo} aria-controls="vrm-offres-auto-detail" aria-label="Comment marchent les offres automatiques" title="Comment ça marche" onClick={() => setOffresInfo((v) => !v)}>i</button>
               <button type="button" role="switch" aria-checked={offresAuto} data-offres-auto-toggle={offresAuto?'1':'0'} onClick={basculerOffresAuto}
-                style={{flexShrink:0,width:46,height:26,borderRadius:999,border:'none',cursor:'pointer',background:offresAuto?C.accent:C.border,position:'relative',transition:'background .15s'}} aria-label="Acceptation automatique des offres">
-                <span style={{position:'absolute',top:3,left:offresAuto?23:3,width:20,height:20,borderRadius:'50%',background:'#fff',transition:'left .15s',boxShadow:'0 1px 3px rgba(0,0,0,.3)'}}/>
+                className="vrm-offres-auto-switch" aria-label="Acceptation automatique des offres">
+                <span aria-hidden="true"/>
               </button>
             </div>
-            {offresAuto && (
-              <div data-offre-refus style={{display:'flex',flexDirection:'column',gap:4,marginTop:2}}>
-                <div style={{fontSize:11.5,color:C.muted,lineHeight:1.4}}>Pose aussi un <b style={{color:C.text,fontWeight:600}}>{'« refuse < »'}</b> sur une annonce : une offre sous ce montant est refusée toute seule. Le message ci-dessous part à l'acheteur quand VRM refuse — <b style={{color:C.text,fontWeight:600}}>ton texte</b>, laissé vide = refus sans message.</div>
-                <textarea data-offre-refus-msg value={refusMsg} onChange={e=>{ setRefusMsg(e.target.value); save('vinted_offre_refus_msg', e.target.value); }}
-                  rows={2} placeholder="Ex. : Merci pour ton offre ! Je ne peux pas descendre aussi bas, mais n'hésite pas à m'en refaire une 🙂"
-                  style={{width:'100%',border:`1px solid ${C.border}`,borderRadius:8,padding:'8px 10px',fontSize:12.5,background:C.card,color:C.text,outline:'none',resize:'vertical',fontFamily:'inherit',boxSizing:'border-box'}}/>
+            {offresInfo && (
+              <div id="vrm-offres-auto-detail" className="vrm-offres-auto-detail" data-offres-auto-detail>
+                <p>Pose un <b>« mini »</b> sur une annonce : une offre qui l’atteint est acceptée toute seule, entre 3 et 20 min après, une à la fois, sur le compte ouvert dans Chrome. Sous ton <b>{'« refuse < »'}</b>, elle est refusée ; entre les deux, c’est toi qui négocies.</p>
+                {offresAuto && (
+                  <div data-offre-refus className="vrm-offres-auto-refus">
+                    <label htmlFor="vrm-offre-refus-msg">Message quand VRM refuse <span>(vide = refus sans message)</span></label>
+                    <textarea id="vrm-offre-refus-msg" data-offre-refus-msg value={refusMsg} onChange={e=>{ setRefusMsg(e.target.value); save('vinted_offre_refus_msg', e.target.value); }}
+                      rows={2} placeholder="Ex. : Merci pour ton offre ! Je ne peux pas descendre aussi bas, mais n'hésite pas à m'en refaire une 🙂"/>
+                  </div>
+                )}
               </div>
             )}
-            {offresAuto && extSait('offresauto')!=='ok' && (
-              <div data-offres-auto-ext={extSait('offresauto')} style={{fontSize:11.5,color:C.warn,lineHeight:1.4}}>{extSait('offresauto')==='absente'
-                ? "Pour que l'acceptation tourne, ouvre VRM dans le Chrome (ordinateur) où l'extension est installée et connectée."
-                : `Mets l'extension à jour (${EXT_CAPACITES.offresauto.replace(/\.0$/,'')}) : celle installée ne sait pas encore accepter les offres. En attendant, rien ne part.`}</div>
+            {offresAuto && ext!=='ok' && (
+              <div data-offres-auto-ext={ext} className="vrm-offres-auto-ext">{ext==='absente'
+                ? "Rien ne part d'ici : ouvre VRM dans le Chrome (ordinateur) où l'extension est installée."
+                : `Rien ne part : mets l'extension à jour (${EXT_CAPACITES.offresauto.replace(/\.0$/,'')}).`}</div>
             )}
           </div>
-        )}
+          );
+        })()}
         <div className="vrm-workbar vrm-ann-workbar">
         {listings.items?.length>0 && <div className="vrm-ann-toolbar" style={{display:'flex',gap:8,marginBottom:12,flexWrap:'wrap'}}>
             <div className="vrm-ann-search"><Icon name="search" size={17}/>
@@ -46375,7 +46363,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             achat) en bas ; le reste dans « ⋯ ». Une seule couleur d'accent,
             rare (§7) : l'ambre ne sert qu'à « dort » et à une marge négative. */}
         <div className="vrm-ledger-heading vrm-ann-ledger-heading" aria-hidden="true"><span>Article · stock</span><span>Prix</span></div>
-        <div className="vrm-ann-grid" style={{display:'grid',gridTemplateColumns:'repeat(auto-fill, minmax(min(100%, 360px), 1fr))',gap:12}}>
+        <div className="vrm-ann-grid vrm-fiches" style={{display:'grid',gridTemplateColumns:'repeat(auto-fill, minmax(min(100%, 300px), 1fr))',gap:16}}>
           {annShown.map(it=>{
             // ⚠️ `item` porte TOUT ce que la carte lit (photos captées, date) :
             //    reconstruit avec 5 champs, la pastille « prête » valait
@@ -46393,149 +46381,134 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             const marge = (it.price!=null && achat!=null && !isNaN(achat)) ? Math.round(Number(it.price) - achat - boost) : null;
             const ailleurs = lbcAussi.has(String(it.id));
             const sugg = (it.price!=null && (sleeps || (it.views>=30 && it.favourites===0))) ? Math.max(1, Math.round(Number(it.price)*0.85)) : null;
-            const lab = { fontSize:11, color:C.muted };
-            const val = { fontSize:12, fontWeight:600, color:C.text };
-            // (27 oct., « boutons trop petits au doigt ») Les champs qu'on TAPE
-            // (N°, prix d'achat) sont des pastilles VISIBLES : la zone au doigt
-            // faisait 44 px de boîte mais le texte visé n'en faisait que 12
-            // (le tiret de « achat — ») à 23 (« N°2 »). Une pastille bordée avec
-            // du padding fait du tiret une cible qu'on VOIT, ~30 px de haut. §7 :
-            // pas de couleur — juste le fond et le filet neutres déjà en usage.
-            const pillEdit = { display:'inline-flex', alignItems:'center', gap:5, border:`1px solid ${C.border}`, borderRadius:8, padding:'5px 9px', background:C.bg, lineHeight:1 };
+            // (29 oct., Julien : « augmente la taille des photos ; l'état plus
+            // original avec à côté la saisie du prix d'achat ; toutes les infos
+            // qui sont dans les 3 petits points ») LA FICHE : la photo en grand,
+            // puis titre, prix et N° ; une rangée « état (jauge) · prix d'achat » ;
+            // les chiffres (mini, refuse, boost, marge) TOUS libellés ; ce qui
+            // était replié dans « Gérer l'annonce » est VISIBLE (achat relié,
+            // stock, Leboncoin et sa préparation, les gestes). Les écritures sont
+            // les MÊMES qu'avant (`updatePair`, `poserNumero`, §11).
+            const cell = { display:'flex', flexDirection:'column', justifyContent:'center', gap:2, minWidth:0, border:`1px solid ${C.border}`, borderRadius:10, background:C.bg, padding:'6px 9px' };
+            const lib = { fontSize:10.5, fontWeight:600, color:C.muted, letterSpacing:'.01em', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' };
+            const valeur = { fontSize:13.5, fontWeight:650, color:C.text, fontVariantNumeric:'tabular-nums', whiteSpace:'nowrap' };
+            const mn = e.min==null||String(e.min).trim()===''?null:Number(String(e.min).replace(',','.'));
+            const rf = e.refuse==null||String(e.refuse).trim()===''?null:Number(String(e.refuse).replace(',','.'));
+            const geste = { border:`1px solid ${C.border}`, background:'transparent', color:C.text, borderRadius:9, padding:'0 12px', minHeight:44, fontSize:12.5, fontWeight:600, cursor:'pointer', fontFamily:'inherit', whiteSpace:'nowrap', display:'inline-flex', alignItems:'center', gap:6, textDecoration:'none', boxSizing:'border-box' };
+            const prepa = (() => {
+              if (!num) return null;
+              const total = Number(item.photoCount)||0, capt = Number(item.captPhotos)||0, descOk = (Number(item.descLen)||0) > 0;
+              if (total>0 && capt===0) return 'photos à capter — passe sur Vinted (ce compte)';
+              if (total>0 && capt<total) return `${capt}/${total} photos — passe sur Vinted (ce compte)`;
+              if (total>0 && !descOk) return 'description à capter — passe sur Vinted (ce compte)';
+              if (total>0) return 'prête pour Leboncoin';
+              return null;
+            })();
+            const tailleHorsTitre = it.size && !tailleDansTitre(it.title, it.size) ? it.size : '';
             return (
-              <div className="vrm-ann-card" key={it._acc.vinted_user_id+'_'+it.id} data-carte-annonce={it.id} style={{borderRadius:10,background:C.card,border:`1px solid ${soldBord?C.warn:C.border}`,boxShadow:C.shadow||'none',display:'flex',flexDirection:'column',overflow:'hidden',...(estFloute(it)?STYLE_FLOU:null)}}>
-                <div className="vrm-ann-overview" style={{display:'flex',gap:10,padding:10}}>
-                  <a href={it.url||undefined} target="_blank" rel="noreferrer" title="Ouvrir l'annonce sur Vinted" style={{flexShrink:0,width:88,height:118,borderRadius:8,overflow:'hidden',background:C.bg,border:`1px solid ${C.border}`,display:'flex',alignItems:'center',justifyContent:'center',position:'relative'}}>
-                    {it.photo?<PhotoVinted src={it.photo} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<Icon name="image" size={20} style={{color:C.muted,opacity:.55}}/>}
-                    {it.promoted===true && <span data-boostee title="Vinted dit que cette annonce est boostée en ce moment" style={{position:'absolute',left:4,right:4,bottom:4,textAlign:'center',fontSize:9,fontWeight:600,letterSpacing:'-0.2px',whiteSpace:'nowrap',color:C.text,background:C.card,border:`1px solid ${C.border}`,borderRadius:5,padding:'1px 0'}}>Boostée</span>}
+              <div className="vrm-ann-card vrm-fiche" key={it._acc.vinted_user_id+'_'+it.id} data-carte-annonce={it.id} data-fiche="29oct" style={{borderRadius:14,background:C.card,border:`1px solid ${soldBord?C.warn:C.border}`,boxShadow:C.shadow||'none',display:'flex',flexDirection:'column',overflow:'hidden',...(estFloute(it)?STYLE_FLOU:null)}}>
+                <div className="vrm-ann-overview" style={{display:'flex',flexDirection:'column'}}>
+                  <a className="vrm-fiche-photo" data-fiche-photo href={it.url||undefined} target="_blank" rel="noreferrer" title="Ouvrir l'annonce sur Vinted" style={{display:'flex',alignItems:'center',justifyContent:'center',position:'relative',background:C.bg}}>
+                    {it.photo?<PhotoVinted src={it.photo} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<Icon name="image" size={28} style={{color:C.muted,opacity:.55}}/>}
+                    {it.promoted===true && <span data-boostee title="Vinted dit que cette annonce est boostée en ce moment" style={{position:'absolute',left:10,top:10,fontSize:11,fontWeight:650,whiteSpace:'nowrap',color:C.text,background:C.card,border:`1px solid ${C.border}`,borderRadius:999,padding:'4px 9px'}}>Boostée</span>}
                   </a>
-                  <div className="vrm-ann-ledger-info" style={{flex:1,minWidth:0,display:'flex',flexDirection:'column',gap:2}}>
-                    <div data-titre style={{fontSize:12.5,fontWeight:500,color:C.text,lineHeight:1.3,display:'-webkit-box',WebkitLineClamp:2,WebkitBoxOrient:'vertical',overflow:'hidden'}}>{it.title||it.brand||'—'}</div>
-                    <div className="vrm-ann-price-line" style={{display:'flex',alignItems:'baseline',gap:8}}>
-                      <span data-prix style={{fontSize:19,fontWeight:700,color:C.text,fontVariantNumeric:'tabular-nums'}}>{prix(it.price,it.currency)||'—'}</span>
-                      <span style={{marginLeft:'auto',flexShrink:0,display:'inline-block',verticalAlign:'middle',fontSize:12,fontWeight:700,color:num?C.text:C.muted,background:C.bg,border:`1px solid ${C.border}`,borderRadius:8,padding:'3px 9px'}}>
+                  <div className="vrm-ann-ledger-info" style={{display:'flex',flexDirection:'column',gap:8}}>
+                    <div data-titre style={{fontSize:14.5,fontWeight:600,color:C.text,lineHeight:1.35,display:'-webkit-box',WebkitLineClamp:2,WebkitBoxOrient:'vertical',overflow:'hidden'}}>{it.title||it.brand||'—'}</div>
+                    <div className="vrm-ann-price-line" style={{display:'flex',alignItems:'center',gap:10}}>
+                      <span data-prix style={{fontSize:22,fontWeight:750,color:C.text,fontVariantNumeric:'tabular-nums',letterSpacing:'-.02em'}}>{prix(it.price,it.currency)||'—'}</span>
+                      <span style={{marginLeft:'auto',flexShrink:0,fontSize:13,fontWeight:700,color:num?C.text:C.muted,background:C.bg,border:`1px solid ${C.border}`,borderRadius:999,padding:'3px 10px'}}>
                         <EnLigne data="numero" value={num} onCommit={(v,avant)=>poserNumero(item,v,avant)} inputMode={clavierNum()} placeholder={String(nextNumero)} largeur={46}
                           titre="Numéro de rangement (écrit sur la boîte) — cliquer pour le changer" rendu={num?`N°${num}`:'+ N°'}/>
                       </span>
                     </div>
-                    {/* (26 oct., « trop brouillon ») Une ligne : l'état (et la taille
-                        seulement si le titre ne la dit pas déjà), puis où elle est en
-                        ligne. Les logos avaient leur propre ligne, pour un seul logo. */}
-                    <div data-etat-ligne style={{fontSize:11,color:C.muted,display:'flex',alignItems:'center',gap:8,minWidth:0}}>
-                    <span style={{whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',minWidth:0}}>{[it.size && !tailleDansTitre(it.title, it.size) ? `taille ${it.size}` : '', it.condition].filter(Boolean).join(' · ')}</span>
-                    {/* La présence AILLEURS, prouvée seulement (Vinted : l'en-tête le dit une fois). */}
-                    <span data-plateformes style={{display:'inline-flex',alignItems:'center',gap:4,flexShrink:0}}>
-                      <MarquePlateforme p="vinted"/>
-                      {ailleurs && <MarquePlateforme p="leboncoin"/>}
-                      {num && ebayNums.has(cleNum(num)) && <MarquePlateforme p="ebay"/>}
-                      {/* Revue du 16 octobre : le logo Leboncoin le dit déjà — le texte
-                          qui le redisait ne reste que pour un lecteur d'écran. */}
-                      {ailleurs && <span data-aussi-sur className="vrm-sr">aussi sur Leboncoin</span>}
-                    </span>
+                    {/* L'ÉTAT EN JAUGE, et JUSTE À CÔTÉ le prix d'achat qu'on tape en place. */}
+                    <div className="vrm-fiche-duo" data-fiche-duo style={{display:'grid',gridTemplateColumns:'minmax(0,1fr) minmax(0,1fr)',gap:8}}>
+                      <div className="vrm-fiche-cell" data-fiche-etat style={cell}>
+                        <span style={lib}>État</span>
+                        <JaugeEtat statut={it.condition}/>
+                      </div>
+                      <div className="vrm-fiche-cell vrm-fiche-achat" data-fiche-achat style={cell}>
+                        <span style={lib}>Prix d'achat</span>
+                        <EnLigne data="achat" value={buy} onCommit={v=>updatePair(item,{buyPrice:v,buyFromId:null,buyFrom:null})} inputMode="decimal" placeholder={achat!=null&&!isNaN(achat)?String(achat):'€'} largeur={72}
+                          titre="Prix d'achat — cliquer pour le saisir" rendu={<span style={valeur}>{achat!=null&&!isNaN(achat)?prixCourt(achat):'—'}</span>}/>
+                      </div>
                     </div>
-                    {soldBord && <div title="Un bordereau d'envoi a été reçu pour cet article : il est vendu. Il disparaîtra des annonces à la prochaine mise à jour Vinted." style={{fontSize:11,fontWeight:600,color:C.warn}}>Vendue — bordereau reçu</div>}
-                    {/* Les chiffres, TOUS libellés ; « — » quand on ne sait pas, jamais 0 (§7).
-                        (26 oct.) Vues, favoris, âge et compte sur la MÊME ligne : « achat — »
-                        restait seul sur la sienne. */}
-                    <div data-chiffres style={{display:'flex',flexWrap:'wrap',gap:'2px 10px',marginTop:2}}>
-                      <span style={pillEdit}><span style={lab}>achat</span><EnLigne data="achat" value={buy} onCommit={v=>updatePair(item,{buyPrice:v,buyFromId:null,buyFrom:null})} inputMode="decimal" placeholder={achat!=null&&!isNaN(achat)?String(achat):'€'} largeur={56}
-                        titre="Prix d'achat — cliquer pour le saisir" rendu={<span style={val}>{achat!=null&&!isNaN(achat)?prixCourt(achat):'—'}</span>}/></span>
-                      {/* (27 oct., demande de Julien) Prix MINI d'acceptation, à côté du N°.
-                          Une offre ≥ ce montant est mise en avant pour que tu l'acceptes en
-                          1 tap depuis Messages. Sur Vinted on n'accepte JAMAIS tout seul (un
-                          programme qui accepte = signal robot, le compte bloqué, §3) : c'est
-                          TON tap qui vend. L'app est propriétaire du mini, l'extension le lit (§11). */}
-                      {(()=>{ const min = e.min==null||String(e.min).trim()===''?null:Number(String(e.min).replace(',','.')); return (
-                      <span style={pillEdit} title="Prix mini : une offre à ce montant ou plus est mise en avant pour l'accepter en 1 tap — et, si tu as activé l'acceptation automatique, acceptée à ta place"><span style={lab}>mini</span><EnLigne data="min" value={e.min??''} onCommit={v=>updatePair(item,{min:v})} inputMode="decimal" placeholder="€" largeur={56}
-                        titre="Prix mini d'acceptation d'offre — cliquer pour le saisir" rendu={<span style={val}>{min!=null&&isFinite(min)&&min>0?prixCourt(min):'—'}</span>}/></span>); })()}
-                      {(()=>{ const rf = e.refuse==null||String(e.refuse).trim()===''?null:Number(String(e.refuse).replace(',','.')); return (
-                      <span style={pillEdit} title="Seuil de refus : si l'acceptation auto est activée, une offre SOUS ce montant est refusée toute seule (avec ton message, si tu en as écrit un)"><span style={lab}>{'refuse <'}</span><EnLigne data="refuse" value={e.refuse??''} onCommit={v=>updatePair(item,{refuse:v})} inputMode="decimal" placeholder="€" largeur={56}
-                        titre="Seuil de refus d'offre — cliquer pour le saisir" rendu={<span style={val}>{rf!=null&&isFinite(rf)&&rf>0?prixCourt(rf):'—'}</span>}/></span>); })()}
-                      {/* (28 oct.) « ✨ Préparer » retiré des cartes : la republication passe
-                          par UN parcours, le bouton « Republier » de la barre (Julien). */}
-                      {boost>0 && <span><span style={lab}>boost </span><span style={val}>{prixCourt(boost)}</span></span>}
-                      {marge!=null && <span title="Si elle part à ce prix : prix − achat − boost"><span style={lab}>marge </span><span style={{...val,color:marge<0?C.warn:C.text}}>{marge>=0?'+':''}{marge} €</span></span>}
-                      <span data-stats-annonce style={{display:'inline-flex',flexWrap:'wrap',alignItems:'center',gap:'2px 10px',fontSize:11,color:C.muted}}>
-                      {it.views!=null && <span style={{display:'inline-flex',alignItems:'center',gap:3}}><Icon name="eye" size={12}/>{it.views}</span>}
-                      {it.favourites!=null && <span style={{display:'inline-flex',alignItems:'center',gap:3}}><Icon name="heart" size={12}/>{it.favourites}</span>}
-                      {age!=null && <span title={`En ligne depuis ${age} jours`} style={{color:sleeps?C.warn:C.muted,fontWeight:sleeps?600:400}}>{age} j{sleeps?' · dort':''}</span>}
-                      {!annUnCompte && <span style={{whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',maxWidth:120}}>{accNameOf(it._acc)}</span>}
+                    {/* Les chiffres, TOUS libellés ; « — » quand on ne sait pas, jamais 0 (§7). */}
+                    <div data-chiffres className="vrm-fiche-chiffres" style={{display:'grid',gridTemplateColumns:'repeat(4,minmax(0,1fr))',gap:6}}>
+                      <div className="vrm-fiche-cell" style={cell} title="Prix mini : une offre à ce montant ou plus est mise en avant pour l'accepter en 1 tap — et, si tu as activé l'acceptation automatique, acceptée à ta place">
+                        <span style={lib}>mini</span>
+                        <EnLigne data="min" value={e.min??''} onCommit={v=>updatePair(item,{min:v})} inputMode="decimal" placeholder="€" largeur={56}
+                          titre="Prix mini d'acceptation d'offre — cliquer pour le saisir" rendu={<span style={valeur}>{mn!=null&&isFinite(mn)&&mn>0?prixCourt(mn):'—'}</span>}/>
+                      </div>
+                      <div className="vrm-fiche-cell" style={cell} title="Seuil de refus : si l'acceptation auto est activée, une offre SOUS ce montant est refusée toute seule (avec ton message, si tu en as écrit un)">
+                        <span style={lib}>{'refuse <'}</span>
+                        <EnLigne data="refuse" value={e.refuse??''} onCommit={v=>updatePair(item,{refuse:v})} inputMode="decimal" placeholder="€" largeur={56}
+                          titre="Seuil de refus d'offre — cliquer pour le saisir" rendu={<span style={valeur}>{rf!=null&&isFinite(rf)&&rf>0?prixCourt(rf):'—'}</span>}/>
+                      </div>
+                      <div className="vrm-fiche-cell" style={cell} title="Coût d'un boost / mise en avant payée sur cette annonce (déduit de la marge et du bénéfice)">
+                        <span style={lib}>boost</span>
+                        <EnLigne data="boost" value={e.fees ?? ''} onCommit={v=>updatePair(item,{fees:v})} inputMode="decimal" placeholder="€" largeur={56}
+                          titre="Boost payé — cliquer pour le saisir" rendu={<span style={valeur}>{boost>0?prixCourt(boost):'—'}</span>}/>
+                      </div>
+                      <div className="vrm-fiche-cell" style={cell} title="Si elle part à ce prix : prix − achat − boost">
+                        <span style={lib}>marge</span>
+                        <span data-marge={marge==null?'':String(marge)} style={{...valeur,color:marge!=null&&marge<0?C.warn:marge==null?C.muted:C.text}}>{marge==null?'—':`${marge>=0?'+':''}${marge} €`}</span>
+                      </div>
+                    </div>
+                    <div data-etat-ligne style={{fontSize:12,color:C.muted,display:'flex',alignItems:'center',flexWrap:'wrap',gap:'4px 12px',minWidth:0}}>
+                      <span data-stats-annonce style={{display:'inline-flex',flexWrap:'wrap',alignItems:'center',gap:'2px 12px'}}>
+                        {it.views!=null && <span style={{display:'inline-flex',alignItems:'center',gap:4}}><Icon name="eye" size={13}/>{it.views}</span>}
+                        {it.favourites!=null && <span style={{display:'inline-flex',alignItems:'center',gap:4}}><Icon name="heart" size={13}/>{it.favourites}</span>}
+                        {age!=null && <span title={`En ligne depuis ${age} jours`} style={{color:sleeps?C.warn:C.muted,fontWeight:sleeps?600:400}}>{age} j{sleeps?' · dort':''}</span>}
+                        {tailleHorsTitre && <span>taille {tailleHorsTitre}</span>}
+                        {!annUnCompte && <span style={{whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',maxWidth:140}}>{accNameOf(it._acc)}</span>}
+                      </span>
+                      {/* La présence AILLEURS, prouvée seulement (Vinted : l'en-tête le dit une fois). */}
+                      <span data-plateformes style={{display:'inline-flex',alignItems:'center',gap:4,marginLeft:'auto',flexShrink:0}}>
+                        <MarquePlateforme p="vinted"/>
+                        {ailleurs && <MarquePlateforme p="leboncoin"/>}
+                        {num && ebayNums.has(cleNum(num)) && <MarquePlateforme p="ebay"/>}
+                        {ailleurs && <span data-aussi-sur className="vrm-sr">aussi sur Leboncoin</span>}
                       </span>
                     </div>
+                    {soldBord && <div title="Un bordereau d'envoi a été reçu pour cet article : il est vendu. Il disparaîtra des annonces à la prochaine mise à jour Vinted." style={{fontSize:12,fontWeight:600,color:C.warn}}>Vendue — bordereau reçu</div>}
                   </div>
                 </div>
-                {/* ⋯ : tout le secondaire, replié. Déplié d'office si un réglage
-                    est posé (un réglage rempli ne se cache jamais). */}
-                {(() => {
-                  const rempli = (e.fees != null && e.fees !== '') || !!e.buyFromId;
-                  return (
-                    <details className="vrm-ann-actions" style={{borderTop:`1px solid ${C.border}`,padding:'6px 10px 8px'}}>
-                      <summary aria-label={`Gérer ${it.title || 'cette annonce'}`} style={{listStyle:'none',cursor:'pointer',fontSize:11.5,color:C.muted,fontWeight:600,userSelect:'none'}}><Icon name="gear" size={15}/> Gérer l’annonce <span className="vrm-action-chevron" aria-hidden="true">⌄</span></summary>
-                      <div style={{display:'flex',flexDirection:'column',gap:7,marginTop:7}}>
-                        <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
-                          {/* « Min. accepté » (le prix plancher) est RETIRÉ avec l'acceptation
-                              automatique des offres (5 octobre, à sa demande) : il ne servait
-                              qu'à elle. Les montants déjà saisis restent en base, rien n'est effacé. */}
-                          {num && (
-                            <div style={{flex:'1 1 110px',display:'flex',alignItems:'center',gap:4,border:`1px solid ${C.border}`,borderRadius:8,padding:'2px 6px',background:C.bg}} title="Coût d'un boost / mise en avant payée sur cette annonce (déduit de la marge et du bénéfice)">
-                              <span style={{fontSize:11,color:C.muted,fontWeight:600,whiteSpace:'nowrap'}}>Boost payé</span>
-                              <ChampSaisie value={e.fees ?? ''} onCommit={v=>updatePair(item,{fees:v})} placeholder="—" inputMode="decimal" style={{width:'100%',minWidth:0,border:'none',background:'transparent',color:C.text,fontSize:13,fontWeight:500,outline:'none'}}/>
-                              <span style={{fontSize:11,color:C.muted}}>€</span>
-                            </div>
-                          )}
-                        </div>
-                        <AchatRelie entry={e} numero={num}/>
-                        {/* ── 13 oct. (Julien : « l'ergonomie des boutons… c'est
-                            catastrophique ») ── Les actions de gestion étaient du
-                            TEXTE bleu nu : on ne voyait pas que c'était des boutons.
-                            Elles deviennent des puces bordées, clairement tappables,
-                            avec une cible de clic correcte. L'ACCENT reste réservé à
-                            la seule action « argent » (baisser le prix) — §7, une
-                            teinte d'accent, rare. */}
-                        <div style={{display:'flex',gap:7,flexWrap:'wrap',alignItems:'center',fontSize:11.5}}>
-                          {(()=>{ const actBtn={border:`1px solid ${C.border}`,background:C.bg,color:C.text,borderRadius:8,padding:'7px 11px',minHeight:0,fontSize:11.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit',whiteSpace:'nowrap'}; return (<>
-                          <button type="button" onClick={()=>openPicker(item)} style={actBtn}>Relier un achat</button>
-                          {num && <button type="button" onClick={()=>atGarage?(onLocate&&onLocate(num)):(onStore&&onStore(num))} style={actBtn}>{atGarage?'Voir au stock':'Ranger au stock'}</button>}
-                          <button type="button" onClick={()=>setPassportFor({it,e,num})} style={actBtn}>Passeport de l'article</button>
-                          <button type="button" onClick={async ()=>{ if(await askConfirm('Marquer cet article VENDU et le retirer des annonces ?')) markSold(it.id); }} title="Marquer vendue : la retire des annonces tout de suite (sans attendre la synchro Vinted)" style={actBtn}>Marquer vendue</button>
-                          {sugg!=null && sugg < Number(it.price) && <a href={it.url||undefined} target="_blank" rel="noreferrer" title="Ouvrir l'annonce sur Vinted pour baisser le prix" style={{...actBtn,border:`1px solid ${C.accent}`,background:`${C.accent}14`,color:C.accent,textDecoration:'none',display:'inline-block'}}>Baisser à {sugg} {cur(it.currency)} ↗</a>}
-                          </>); })()}
-                        </div>
-                        {/* La FILE vers les autres places (ce qui SERA préparé),
-                            distincte de la présence ci-dessus (ce qui EST publié). */}
-                        <div style={{display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
-                          <span style={{fontSize:11,color:C.muted}}>À publier aussi sur</span>
-                          {MP_PLACES_UI.map(pl => {
-                            const on = mpChoisi(e, pl.cle);
-                            return (
-                              <button key={pl.cle} type="button"
-                                onClick={()=>updatePair(item,{ mp: { ...(e.mp||{}), [pl.cle]: !on } })}
-                                title={!num
-                                  ? `Mets un N° à cet article d'abord : c'est la référence qui permet de le retrouver ensuite sur ${pl.nom}.`
-                                  : on ? `Elle est dans la file ${pl.nom}. Clique pour l'en retirer.`
-                                       : `Elle n'ira pas sur ${pl.nom}. Clique pour l'y mettre.`}
-                                style={{border:`1px solid ${on?C.accent:C.border}`,background:on?`${C.accent}14`:'transparent',
-                                  color:on?C.accent:C.muted,borderRadius:8,padding:'2px 9px',fontSize:11,fontWeight:600,
-                                  cursor:'pointer',fontFamily:'inherit',minHeight:0}}>
-                                {on ? '✓ ' : ''}{pl.nom}
-                              </button>
-                            );
-                          })}
-                          {!num && <span style={{fontSize:10.5,color:C.warn}}>il lui faut un N°</span>}
-                          {num && (() => {
-                            const total = Number(item.photoCount)||0, capt = Number(item.captPhotos)||0, descOk = (Number(item.descLen)||0) > 0;
-                            let txt=null;
-                            if (total>0 && capt===0) txt='photos à capter — passe sur Vinted (ce compte)';
-                            else if (total>0 && capt<total) txt=`${capt}/${total} photos — passe sur Vinted (ce compte)`;
-                            else if (total>0 && !descOk) txt='description à capter — passe sur Vinted (ce compte)';
-                            else if (total>0) txt='prête pour Leboncoin';
-                            return txt ? <span data-prepa style={{fontSize:10.5,color:C.muted}}>{txt}</span> : null;
-                          })()}
-                        </div>
-                      </div>
-                    </details>
-                  );
-                })()}
+                {/* CE QUI ÉTAIT DANS « ⋯ Gérer l'annonce », À LA VUE (29 oct.) : l'achat
+                    relié, le stock, Leboncoin (la file et sa préparation), les gestes. */}
+                <div className="vrm-fiche-plus" data-fiche-plus style={{display:'flex',flexDirection:'column',gap:8,borderTop:`1px solid ${C.border}`}}>
+                  <AchatRelie entry={e} numero={num}/>
+                  <div data-fiche-infos style={{display:'flex',flexWrap:'wrap',alignItems:'center',gap:8}}>
+                    {num && (
+                      <button type="button" data-fiche-stock={atGarage?'range':'a-ranger'} onClick={()=>atGarage?(onLocate&&onLocate(num)):(onStore&&onStore(num))} style={geste}
+                        title={atGarage?`La N°${num} est rangée dans ton stock — la voir`:`La N°${num} n'est pas encore rangée dans ton stock — la ranger`}>
+                        <Icon name="box" size={15}/>{atGarage?'Voir au stock':'Ranger au stock'}
+                      </button>
+                    )}
+                    {MP_PLACES_UI.map(pl => {
+                      const on = mpChoisi(e, pl.cle);
+                      return (
+                        <button key={pl.cle} type="button" data-fiche-place={pl.cle} aria-pressed={on}
+                          onClick={()=>updatePair(item,{ mp: { ...(e.mp||{}), [pl.cle]: !on } })}
+                          title={!num
+                            ? `Mets un N° à cet article d'abord : c'est la référence qui permet de le retrouver ensuite sur ${pl.nom}.`
+                            : on ? `Elle est dans la file ${pl.nom}. Clique pour l'en retirer.`
+                                 : `Elle n'ira pas sur ${pl.nom}. Clique pour l'y mettre.`}
+                          style={{...geste,border:`1px solid ${on?C.accent:C.border}`,background:on?`${C.accent}14`:'transparent',color:on?C.accent:C.muted}}>
+                          {on ? '✓ ' : ''}À publier sur {pl.nom}
+                        </button>
+                      );
+                    })}
+                    {!num && <span style={{fontSize:12,color:C.warn}}>il lui faut un N° pour aller sur Leboncoin</span>}
+                    {prepa && <span data-prepa style={{fontSize:12,color:C.muted}}>{prepa}</span>}
+                  </div>
+                  <div className="vrm-fiche-gestes" data-fiche-gestes style={{display:'flex',flexWrap:'wrap',gap:8}}>
+                    <button type="button" onClick={()=>openPicker(item)} style={geste}>Relier un achat</button>
+                    <button type="button" onClick={()=>setPassportFor({it,e,num})} style={geste}>Passeport</button>
+                    <button type="button" onClick={async ()=>{ if(await askConfirm('Marquer cet article VENDU et le retirer des annonces ?')) markSold(it.id); }} title="Marquer vendue : la retire des annonces tout de suite (sans attendre la synchro Vinted)" style={geste}>Marquer vendue</button>
+                    {sugg!=null && sugg < Number(it.price) && <a href={it.url||undefined} target="_blank" rel="noreferrer" title="Ouvrir l'annonce sur Vinted pour baisser le prix" style={{...geste,border:`1px solid ${C.accent}`,background:`${C.accent}14`,color:C.accent}}>Baisser à {sugg} {cur(it.currency)} ↗</a>}
+                  </div>
+                </div>
               </div>
             );
           })}
