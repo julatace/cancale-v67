@@ -94,7 +94,10 @@ async function preparer(b, vp) {
       }
       return j([]);
     }
-    if (/select=owner/.test(u)) return route.fulfill({ status: 400, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: '{"m":1}' });
+    // (29 oct.) Base CLOISONNÉE, comme la production : sur une base non cloisonnée
+    // (400 à la sonde de schéma), l'app n'envoie plus `main` au nuage (439081d),
+    // et les contrôles d'écriture n'avaient plus rien à lire.
+    if (/select=owner&limit=1/.test(u)) return j([]);
     if (/\/rest\/v1\/vinted_accounts/.test(u)) return j(ACCOUNTS);
     const sel = (/[?&]select=([^&]*)/.exec(u) || [])[1] || null;
     const forme = (r) => (sel && sel !== 'data,updated_at,cap:data->>capturedAt' && !/^id,data/.test(sel)) ? projette(r, sel) : ({ ...r, updated_at: new Date(MAINTENANT).toISOString(), cap: r.data && r.data.capturedAt });

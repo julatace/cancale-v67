@@ -136,6 +136,10 @@ const attendre = async (pg, f, ms = 8000) => { const t0 = Date.now(); for (;;) {
       dit(r0.ca.vendu === 190, 'VENDU ce mois = 80 finalisée + 50 en cours + 60 eBay (l’annulée et la vente du mois dernier exclues)', JSON.stringify(r0.ca));
       dit(r0.ca.finalise === 140, 'FINALISÉ ce mois (au jour de la vente) = 80 + 60', String(r0.ca.finalise));
       dit(r0.ca.recu === 180, 'REÇU (versé) ce mois = 80 + 40 (vendue le mois dernier, versée ce mois) + 60 eBay', String(r0.ca.recu));
+      // (29 oct.) Leboncoin et eBay se lisent APRÈS les ventes : tant que l'un se lit encore,
+      // l'écran dit « minimum pour l'instant » (juste). On juge une fois cette lecture finie.
+      await pg.waitForFunction(() => { const e = document.querySelector('[data-ca-periode]'); return e && !/se lit encore/.test(e.innerText); }, null, { timeout: 20000 }).catch(() => {});
+      r0.caPartiel = await pg.evaluate(() => document.querySelector('[data-ca-periode]').getAttribute('data-ca-partiel'));
       dit(r0.caPartiel === '0', 'toutes les sources lues : rien n’est dit partiel', r0.caPartiel);
       dit(r0.caDecl === 500 && r0.charges === 0 && r0.resultat === 500, 'avant : CA déclaré 500, charges 0, résultat 500', `${r0.caDecl} · ${r0.charges} · ${r0.resultat}`);
       await pg.setViewportSize({ width: vp.width, height: 3400 }); await pg.waitForTimeout(300);
