@@ -69,7 +69,7 @@ const ouvrirVente=async(p)=>{const t=p.locator('.vrm-sale-row .vrm-ledger-sale-t
   const errors=[];p.on('pageerror',e=>errors.push(e.message));
   await p.goto(base+'/?tab=journee');await p.locator('main').waitFor();
   const home=await p.locator('main').innerText();check(!/sans prix d’achat|ventes masquées|ventes repérées/i.test(home),'accueil sans rappels inutiles');
-  if(await p.locator('.vrm-day-greeting').count())check(await p.locator('.vrm-day-greeting').evaluate(e=>e.getBoundingClientRect().height)<=56,'accueil compact après rétablissement des chiffres');
+  if(await p.locator('.vrm-day-greeting').count())check(await p.locator('.vrm-day-greeting').evaluate(e=>e.getBoundingClientRect().height)<=130,'accueil compact après rétablissement des chiffres (bandeau pétrole du 27 oct. compris)');
   for(const tab of ['cat_ventes','plat_leboncoin','plat_ebay']){
     await p.goto(base+'/?tab='+tab);await p.locator('.vrm-sale-row').first().waitFor();
     // ⚠️ (20 octobre) Depuis fc4c73e/5cdffcb (design de Julien, « les ventes mobiles sur une seule ligne »),

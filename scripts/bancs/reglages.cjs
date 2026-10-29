@@ -173,6 +173,9 @@ const MENSONGES = [
     if (await o.count()) { try { await o.first().click({ timeout: 2500 }); await pg.waitForTimeout(600); } catch (_) {} }
     const b2 = pg.locator('button[aria-label*="Suivi du colis"]');
     if (await b2.count()) { try { await b2.first().click({ timeout: 2500 }); } catch (_) {} }
+    // Puis retour à la liste : le bloc « n'ont pas pu être lus » vit en tête de Réglages.
+    const ret = pg.locator('[data-sous-retour]');
+    if (await ret.count()) { try { await pg.waitForTimeout(800); await ret.first().click({ timeout: 2500 }); await pg.waitForTimeout(400); } catch (_) {} }
   };
 
   // ══════════════════════════════════════════════════════════════════════════
