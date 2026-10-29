@@ -104,10 +104,15 @@ export function terminerFile(d,{owner,jeton,resultat,maintenant,raison}){
   if(etaitActive&&!g.active){const lot=g.jobs.filter(x=>x.lot===g.lot);const n=k=>lot.filter(x=>x.etat===k).length;valeur.fin={lot:g.lot||null,total:lot.length,envoyes:n('envoye'),incertains:n('incertain'),interrompus:n('refuse'),interrompue:!['envoye','ignore'].includes(resultat)};}
   return {data:d,valeur};
 }
-export function consommerFile(d,{owner,jeton,maintenant,version5281=true}){
+// (29 oct., revue) Une offre (même un simple %) ne part que d'une extension ≥ 5.280 : avant, elle
+// était ignorée et, depuis la 5.281, plus aucune phrase de réduction n'est ajoutée au texte —
+// l'acheteur ne recevait rien de la réduction, sans un mot.
+export const exige5280=j=>!!j?.offre||Number.isInteger(j?.pourcentage)&&j.pourcentage>0;
+export function consommerFile(d,{owner,jeton,maintenant,version5281=true,version5280=true}){
   d=initialiserFile(d);const e=d.enCours,g=d.groupes[owner];
   if(!e||e.owner!==owner||e.jeton!==jeton||e.autorise||!g?.active||maintenant<e.at||maintenant-e.at>60000)throw new RefusFavoris('L’autorisation d’envoi n’est plus disponible. Aucun renvoi automatique.');
   const j=g.jobs.find(x=>x.id===e.id);if(j?.etat!=='reserve')throw new RefusFavoris('La tentative n’est plus disponible.');
+  if(!version5280&&exige5280(j))throw new RefusFavoris('Mets à jour l’extension (5.281) : celle-ci n’envoie pas la vraie offre Vinted aux favoris. Rien n’a été envoyé.');
   if(!version5281&&exige5281(j))throw new RefusFavoris('Mets à jour l’extension (5.281) : celle-ci ne sait pas faire les variables du message ni cette offre. Rien n’a été envoyé.');
   e.autorise=true;
   return {data:d,valeur:{suivi:e.suivi,travail:{itemId:j.itemId,recipientId:j.recipientId,initiator:j.initiator,message:j.message,...(Number.isInteger(j.pourcentage)?{pourcentage:j.pourcentage}:{}),...(j.offre?{offre:j.offre}:{})}}};

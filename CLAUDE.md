@@ -1,6 +1,6 @@
 # VRM — dossier de passation
 
-> ⚠️⚠️ **29 octobre — LEBONCOIN COMME VINTED : capture juste, « à retirer » visible, Supprimer, Republier, favoris (5.285) :**
+> ⚠️⚠️ **29 octobre — LEBONCOIN COMME VINTED : capture juste, « à retirer » visible, Supprimer, Republier, favoris (5.286) :**
 > Julien : « il n'y a plus que 2 annonces et VRM en a encore 8 », « j'ai vendu une paire sur Vinted et VRM ne m'a pas dit de
 > la supprimer », « je veux pouvoir supprimer une annonce de Leboncoin », « trop brouillon… mêmes méthodes d'affichage que
 > Vinted », « un outil de republication… exactement pareil », « les messages aux favoris » (Leboncoin SEULEMENT, rien côté
@@ -29,13 +29,23 @@
 > sans relevé, et dit que VRM n'écrit à personne. L'extension relève déjà chemins, formes et envois (jamais les valeurs).
 > **Preuves** : `audit-lbc-mes-annonces` (14 rouges sur l'avant, 11 mutations), `audit-lbc-a-retirer` (9, 5/5),
 > `audit-lbc-supprimer` (19, 8/8), bancs `lbc-pause`, `badge`, `lbc-supprimer` (16 rouges sur l'avant), `lbc-comme-vinted`
-> (390/1512 ; 39 rouges sur l'avant, + « geste dit une fois » rouge sur l'avant). Extension **5.285.0** (5.282/5.284 prises sur
+> (390/1512 ; 39 rouges sur l'avant, + « geste dit une fois » rouge sur l'avant). Extension **5.286.0** (5.282, 5.284 et 5.285 prises sur
 > main), `EXT_CAPACITES.lbcsupprime` / `.lbcstats`. **Non mesuré** : le vrai leboncoin.fr (403 d'ici) — réponse réelle d'une
 > suppression demandée par VRM, une liste « Mes annonces » de plusieurs pages, ce que fait le ciblage des abonnés.
-> **Gestes de Julien** : installer la 5.285 (remplacer le dossier, puis ⟳ dans chaque Chrome) ; ouvrir « Mes annonces » sur
+> **Gestes de Julien** : installer la 5.286 (remplacer le dossier, puis ⟳ dans chaque Chrome) ; ouvrir « Mes annonces » sur
 > CHACUN de ses comptes Leboncoin (la liste complète fait sortir les annonces disparues) ; pour un chiffre de favoris, ouvrir
 > « Statistiques » de l'annonce ; s'il veut que VRM sache écrire à ses abonnés, utiliser UNE fois à la main le geste de
 > Leboncoin qui cible les abonnés (s'il lui est proposé) : l'extension en relèvera la forme pour la passe suivante.
+> **29 octobre (soir) — revue de la republication et des favoris (5.285) :** « tout doit être parfait ». Dix défauts
+> trouvés en relisant le code, tous corrigés : la file des mises en ligne planifiées s'écrit une à la fois (une
+> planification pendant un réveil effaçait une paire) ; un job resté « en cours » (Chrome a tué le service worker)
+> n'est jamais rejoué, il est dit « incertain » ; « Brouillons → en ligne » refuse un brouillon déjà planifié, déjà
+> publié, verrouillé, ou dont l'ANCIENNE annonce n'est pas prouvée supprimée (sinon deux fois la même paire en ligne) ;
+> un brouillon sans réponse claire verrouille l'annonce 30 min ; une requête jamais partie (pas d'onglet Vinted, pause)
+> n'est plus « incertaine » et rend ses actions réservées ; avec la 5.277+, « via brouillon » est forcé (la création
+> directe n'existe plus côté extension) ; le serveur refuse une offre en % à une extension < 5.280 (elle ne
+> l'enverrait pas). Preuves : `audit-recreer.cjs` §R (7 contrôles, 7 rouges avec `BG_SRC=` le background.js
+> d'origin/main), `favoris-message.test.mjs`. ⚠️ Non mesuré : le vrai Vinted.
 
 > **29 octobre (suite, « c'est trop incompréhensible ») — Comptabilité allégée :** « Ta micro-entreprise » (calendrier,
 > seuils, profil, impôts) est REPLIÉE sous une ligne-résumé (taux · prochaine période à déclarer · seuils et impôts,

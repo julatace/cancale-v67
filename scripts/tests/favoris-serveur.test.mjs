@@ -31,7 +31,7 @@ test('route réelle : session, RLS, CAS sous concurrence, autorisation unique et
  };
  const call=async(action,extra={},token='fixture.session.jwt')=>{
   let code,body;const res={setHeader(){},status(v){code=v;return this;},json(v){body=v;return this;}};
-  await handler({method:action?'POST':'GET',query:{uid:'123',mode:'favoris'},headers:{authorization:token?'Bearer '+token:''},body:action?{action,...(action==='consommer'?{version:'5.217.0'}:{}),...(action==='lancer'?{reglages:captures[2]}:{}),...extra}:undefined},res);return {code,body};
+  await handler({method:action?'POST':'GET',query:{uid:'123',mode:'favoris'},headers:{authorization:token?'Bearer '+token:''},body:action?{action,...(action==='consommer'?{version:'5.285.0'}:{}),...(action==='lancer'?{reglages:captures[2]}:{}),...extra}:undefined},res);return {code,body};
  };
  try{
   assert.equal((await call(null,{},'')).code,401);
