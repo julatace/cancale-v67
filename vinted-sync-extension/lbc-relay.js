@@ -52,6 +52,9 @@
     // 22 oct. : une liste COMPLÈTE d'un vendeur (identifiants + total), dans la
     // MÊME file que ses annonces — elle arrive après elles.
     else if (d.kind === 'lbclistecomplete' && typeof d.owner === 'string' && Array.isArray(d.ids)) { try { transmettre({ from: 'cancale-lbc', action: 'lbcListeComplete', owner: d.owner.slice(0, 64), ids: d.ids.slice(0, 2000).map(String), total: Number(d.total) }); } catch (_) {} }
+    // 29 oct. : une suppression / mise en pause faite SUR LA PAGE (réponse 2xx de
+    // Leboncoin) — identifiants seulement, dans la MÊME file que ses annonces.
+    else if (d.kind === 'lbcretraitvu' && Array.isArray(d.ids) && (d.quoi === 'supprime' || d.quoi === 'pause')) { try { transmettre({ from: 'cancale-lbc', action: 'lbcRetraitVu', quoi: d.quoi, ids: d.ids.slice(0, 50).map(String), statut: Number(d.statut) || 0 }); } catch (_) {} }
     // 22 oct. : la réponse de Leboncoin à une mise en pause demandée par le fond.
     else if (d.kind === 'lbcpauseresultat' && typeof d.jeton === 'string') { const r = pausesEnAttente.get(d.jeton); if (r) { pausesEnAttente.delete(d.jeton); r({ ok: true, statut: Number(d.statut) || 0, corps: String(d.corps || '').slice(0, 300), cles: Array.isArray(d.cles) ? d.cles.slice(0, 60).map(String) : [], erreur: String(d.erreur || '').slice(0, 80), entetes: Number(d.entetes) || 0 }); } }
     else if (d.kind === 'lbccomptes' && Array.isArray(d.comptes)) { try { chrome.runtime.sendMessage({ from: 'cancale-lbc', action: 'lbcComptes', comptes: d.comptes.slice(0, 10).map((c) => ({ id: String(c.id || '').slice(0, 64), name: String(c.name || '').slice(0, 60), pro: !!c.pro })) }); } catch (_) {} }

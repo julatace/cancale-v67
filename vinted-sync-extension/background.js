@@ -2802,7 +2802,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           }
           if (msg.action === 'lbcRaw' && msg.body) {
             if(/\/compte\/(?:part|pro)\/mes-annonces/i.test(String(msg.url))){try{const u=new URL(msg.url),t=new URL(sender.url||sender.tab?.url);if(sender.frameId>0||u.origin+u.pathname!==t.origin+t.pathname){sendResponse({ok:false});return;}}catch(_){sendResponse({ok:false});return;}}
-            const r=await handleLbcRaw(msg.url,msg.body,msg.session);if(r&&(r.etat==='enregistre'||/\/adfinder\/v\d+\/myads\b|\/classifieds\/analysis\/list|\/compte\/(?:part|pro)\/mes-annonces/i.test(String(msg.url))))await noterReceptionLbc('annonces',r,sender);sendResponse(r||{ok:true,etat:'sans-annonce'});return;
+            const r=await handleLbcRaw(msg.url,msg.body,msg.session);if(r&&(r.etat==='enregistre'||/\/adfinder\/v\d+\/myads\b|\/classifieds\/analysis\/list|\/dashboard\/v\d+\/search|\/compte\/(?:part|pro)\/mes-annonces/i.test(String(msg.url))))await noterReceptionLbc('annonces',r,sender);sendResponse(r||{ok:true,etat:'sans-annonce'});return;
           }
           // 22 oct. : une liste COMPLÈTE d'un vendeur (toutes les pages, total
           // atteint — prouvé par la page, voir lbc-inject.js). Seulement depuis le
@@ -2818,6 +2818,19 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
             if (!miens.has(owner) && !miens.has('lbc-account:' + owner)) { noterDiag('lbc_liste_complete_autrui'); sendResponse({ ok: true }); return; }
             await noterListeLbcComplete(owner, ids, total);
             sendResponse({ ok: true }); return;
+          }
+          // 29 oct. : une suppression / mise en pause faite par Julien SUR LA PAGE
+          // Leboncoin (réponse 2xx vue par lbc-inject.js). Seulement depuis le
+          // cadre principal d'un onglet leboncoin.fr ; seules SES annonces sont
+          // marquées (voir `noterRetraitVuLbc`).
+          if (msg.action === 'lbcRetraitVu') {
+            const tabUrl = (sender && sender.tab && sender.tab.url) || '';
+            const ids = Array.isArray(msg.ids) ? msg.ids.map(String) : null;
+            const statut = Number(msg.statut);
+            if ((sender && sender.frameId > 0) || !/^https:\/\/(?:[a-z0-9-]+\.)*leboncoin\.fr\//i.test(tabUrl) || !ids || !ids.length || ids.length > 50
+              || ids.some((x) => !/^\d{5,15}$/.test(x)) || !(msg.quoi === 'supprime' || msg.quoi === 'pause') || !(statut >= 200 && statut < 300)) { sendResponse({ ok: false }); return; }
+            const r = await noterRetraitVuLbc(ids, msg.quoi, statut);
+            sendResponse({ ok: !!(r && r.ok) }); return;
           }
           // LA VENTE LEBONCOIN : détail transaction / commande / livraison. On
           // range un échantillon capé par famille d'endpoint, pour voir la FORME
@@ -13796,6 +13809,49 @@ async function noterListeLbcComplete(owner, ids, total) {
       if (ok !== false && (sortent || reviennent)) { try { notifierApp({ type: 'maj', quoi: 'lbc' }); } catch (_) {} }
       return { ok: ok !== false, sortent, reviennent, ecrit: ok !== false };
     } catch (_) { return { ok: false, code: 'erreur' }; }
+  });
+}
+// ── UNE SUPPRESSION / PAUSE FAITE SUR LA PAGE, OU DEPUIS VRM (29 oct.) ─────
+// Julien : « les 4 plus en ligne […] on passe à côté quand on va sur LBC ».
+// Mesuré : il a supprimé la N°18 sur leboncoin.fr le 28 oct. à 22:47
+// (`lbc_recon.envois` : `DELETE …/manual/delete/ads`) ; VRM la disait encore
+// « en ligne » le lendemain. Une réponse 2xx de Leboncoin est une PREUVE :
+//   · supprimée ⇒ `status: 'deleted'` (la règle partagée `<lbc-en-vente-regle>`
+//     la sort déjà de « en vente » : `LBC_ANNONCE_MORTE`), l'état d'avant gardé
+//     dans `statutLbc`, l'heure dans `supprimeeAt` ;
+//   · en pause ⇒ `pauseAt` (même règle que la pause demandée depuis VRM).
+// Seulement les annonces DÉJÀ rangées d'un de SES comptes (§5) ; rien n'est
+// créé, rien n'est effacé ; jamais « vendue ». Lecture ratée ⇒ rien n'est écrit.
+async function noterRetraitVuLbc(ids, quoi, statut) {
+  const vus = new Set((ids || []).map(String));
+  if (!vus.size || !(quoi === 'supprime' || quoi === 'pause')) return { ok: false, n: 0 };
+  const miens = new Set([...(await comptesMiens())].map(idCompteLbc).filter(Boolean));
+  return enChaineLbcListings(async () => {
+    try {
+      const rows = await sbGet('app_data?id=eq.lbc_listings&select=data');
+      if (rows === null) { noterDiag('lbc_retrait_vu_lecture_ratee'); return { ok: false, n: 0 }; }
+      const data = (rows[0] && rows[0].data) || {};
+      const items = Object.assign({}, data.items || {});
+      const nowIso = new Date().toISOString();
+      let n = 0;
+      for (const id of vus) {
+        const ad = items[id];
+        if (!ad || typeof ad !== 'object') continue;
+        if (!miens.has(idCompteLbc(ad.account || ad.lbcUser))) continue;
+        if (quoi === 'supprime') {
+          if (ad.supprimeeAt && ad.status === 'deleted') continue;
+          items[id] = Object.assign({}, ad, { statutLbc: ad.status || '', status: 'deleted', supprimeeAt: nowIso, supprimeeStatut: statut });
+        } else {
+          items[id] = Object.assign({}, ad, { pauseAt: nowIso, pauseStatut: statut });
+        }
+        n++;
+      }
+      noterDiag(n ? `lbc_${quoi}_vu` : `lbc_${quoi}_vu_rien`);
+      if (!n) return { ok: true, n: 0 };
+      const ok = await supabaseUpsert('app_data', [{ id: 'lbc_listings', data: Object.assign({}, data, { items, updatedAt: nowIso }) }], 'id');
+      if (ok !== false) { try { notifierApp({ type: 'maj', quoi: 'lbc' }); } catch (_) {} }
+      return { ok: ok !== false, n };
+    } catch (_) { return { ok: false, n: 0 }; }
   });
 }
 // Après une mise en pause que Leboncoin a ACCEPTÉE (réponse 2xx) : l'état, sur

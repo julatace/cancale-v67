@@ -1,6 +1,10 @@
 // L'état de publication et la livraison sont deux informations distinctes.
 // Aucune absence dans une page de résultats ne prouve une vente ou une pause.
-export function etatAnnonceLeboncoin(ad, ventes = []) {
+// (29 oct.) `sortieDe` = la règle partagée `lbcSortieDe` (App.jsx, §11) : une
+// annonce absente d'une lecture COMPLÈTE plus récente de « Mes annonces »
+// (`plusVueAt`) ou mise en pause (`pauseAt`) n'est plus « Active », même si son
+// dernier `status` lu le disait. Jamais « vendue » sur une absence.
+export function etatAnnonceLeboncoin(ad, ventes = [], sortieDe = null) {
  const transactions = Array.isArray(ventes) ? ventes : Object.values(ventes || {});
  const vente = transactions.filter(v => v && v.isSeller === true && v.itemId != null && String(v.itemId) === String(ad?.id)
   && !/annul|cancel|refund|rembours/i.test([v.stepStatus,v.parcelStatus,v.stepLabel].join(' ')))
@@ -16,6 +20,10 @@ export function etatAnnonceLeboncoin(ad, ventes = []) {
  else if (codes.some(s=>/^(active|actif|online|published|en ligne)$/.test(s))) {etat='active';label='Active';}
  else if (codes.some(s=>/^(deleted|supprime|supprimee|expired|expire|expiree|refused|refusee|refuse)$/.test(s))) {etat='retiree';label='Retirée ou expirée';}
  else if (textes.length) label = textes[textes.length-1].slice(0,100);
+ if (etat==='retiree' && ad?.supprimeeAt) label='Supprimée sur Leboncoin';
+ const sortie = etat==='vendue' || etat==='retiree' ? null : (typeof sortieDe==='function' ? sortieDe(ad) : null);
+ if (sortie==='plusvue') {etat='plusvue';label='Plus dans « Mes annonces »';}
+ else if (sortie==='pause') {etat='pause';label='En pause';}
  const suivi=vente ? String(vente.stepLabel || vente.parcelStatus || '').slice(0,160) : '';
  const livraison=vente && (vente.parcelStatus || /colis|livr|expedi|transit|parcel|deliver|ship/i.test(suivi)) ? suivi : '';
  return {etat,label,livraison,suivi};

@@ -12,10 +12,10 @@ function Photo({src}) {
 // (`numeroLbcIdentite` : lien posé à la main, sinon référence VRM traduite par la
 // remise à zéro 013) — passé par le parent. La référence BRUTE (« 493 ») n'est
 // jamais affichée : avant la 013 elle désignait une autre paire.
-export default function AnnoncesLeboncoin({annonces=[],ventes={},lectureKO=false,numeroDe=null,owner=''}) {
+export default function AnnoncesLeboncoin({annonces=[],ventes={},lectureKO=false,numeroDe=null,owner='',sortieDe=null}) {
  const [recherche,setRecherche]=useState(''),[filtre,setFiltre]=useState('toutes');
- const lignes=useMemo(()=>annonces.map(ad=>({ad,num:(numeroDe&&numeroDe(ad))||'',...etatAnnonceLeboncoin(ad,ventes)})),[annonces,ventes,numeroDe]);
- const choix=[['toutes','Toutes'],['active','Actives'],['pause','En pause'],['vendue','Vendues'],['autres','Autres états']];
+ const lignes=useMemo(()=>annonces.map(ad=>({ad,num:(numeroDe&&numeroDe(ad))||'',...etatAnnonceLeboncoin(ad,ventes,sortieDe)})),[annonces,ventes,numeroDe,sortieDe]);
+ const choix=[['toutes','Toutes'],['active','Actives'],['pause','En pause'],['vendue','Vendues'],['autres','Retirées et autres']];
  const visibles=lignes.filter(l=>(filtre==='toutes'||(filtre==='autres'?!['active','pause','vendue'].includes(l.etat):l.etat===filtre))
   && [l.ad.subject,l.ad.title,l.ad.accountName,l.num?'N°'+l.num:''].join(' ').toLocaleLowerCase('fr').includes(recherche.trim().toLocaleLowerCase('fr')));
  const compteDe=ad=>String(ad?.account||ad?.lbcUser||'non-attribue');

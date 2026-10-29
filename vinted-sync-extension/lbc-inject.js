@@ -442,9 +442,37 @@
     return { total: j.total, ids };
   };
   const lecturesProprio = new Map();          // cle → { ids:Set, t0, envoye } — en mémoire, ce document seulement
+  // ── « MES ANNONCES » (29 oct.) : LA MÊME PREUVE, SUR SA PAGE PRIVÉE ──────
+  // Julien : « il n'y a plus que 2 annonces et VRM en a encore 8 ». MESURÉ (sa
+  // base, lecture seule) : sa page « Mes annonces » ne charge plus `myads` mais
+  // `POST api.leboncoin.fr/api/dashboard/v1/search`, corps
+  // `{context, filters:{owner:{user_id}}, limit, offset, sort_by, sort_order,
+  //   include_inactive, include_draft}`, réponse
+  // `{total, account_stats, pivot, ads:[{list_id, status, owner:{user_id}, …}]}`.
+  // Ses annonces passaient (lbcraw) mais ne DÉCIDAIENT rien : une annonce
+  // supprimée ou expirée n'en sortait jamais (8 « en ligne » pour 2). On applique
+  // la règle de la liste publique : requête filtrée sur le SEUL vendeur, chaque
+  // annonce à lui, le total atteint par toutes les pages lues ⇒ elle décide ;
+  // une page partielle ne décide rien (§4.2).
+  const DASHBOARD = /^https:\/\/api\.leboncoin\.fr\/api\/dashboard\/v\d+\/search\/?(?:\?.*)?$/i;
+  const LISTE_VENDEUR = (u) => OWNER_LISTING.test(String(u || '')) || DASHBOARD.test(String(u || ''));
+  const requeteTableau = (corps) => {
+    let r; try { r = typeof corps === 'string' ? JSON.parse(corps) : null; } catch (_) { return null; }
+    if (!r || typeof r !== 'object' || Array.isArray(r)) return null;
+    for (const k of Object.keys(r)) if (!['context', 'filters', 'limit', 'offset', 'sort_by', 'sort_order', 'include_inactive', 'include_draft', 'pivot'].includes(k)) return null;
+    const f = r.filters;
+    if (!f || typeof f !== 'object' || Array.isArray(f) || Object.keys(f).length !== 1) return null;
+    const o = f.owner;
+    if (!o || typeof o !== 'object' || Object.keys(o).length !== 1 || typeof o.user_id !== 'string' || !/^[0-9a-f-]{8,64}$/i.test(o.user_id)) return null;
+    for (const k of ['include_inactive', 'include_draft']) if (r[k] !== undefined && typeof r[k] !== 'boolean') return null;
+    const offset = r.offset === undefined ? 0 : r.offset;
+    if (!Number.isInteger(offset) || offset < 0 || (r.limit !== undefined && (!Number.isInteger(r.limit) || r.limit <= 0))) return null;
+    return { owner: o.user_id, offset, tri: 'tableau/' + String(r.sort_by || '') + '/' + String(r.sort_order || '') + '/' + String(r.include_inactive === true) + '/' + String(r.include_draft === true) };
+  };
   const noterListeProprietaire = (url, texte, corpsReq) => {
-    if (!OWNER_LISTING.test(String(url || ''))) return;
-    const req = requeteProprietaire(corpsReq); if (!req) return;
+    const u = String(url || '');
+    if (!LISTE_VENDEUR(u)) return;
+    const req = DASHBOARD.test(u) ? requeteTableau(corpsReq) : requeteProprietaire(corpsReq); if (!req) return;
     const rep = reponseProprietaire(texte, req.owner); if (!rep) return;
     const cle = req.owner + '|' + req.tri + '|' + rep.total;
     // Un autre total pour ce vendeur : la liste a bougé, on repart.
@@ -473,6 +501,28 @@
       for (const k of Object.keys(o)) if (SANS_ENTETE.test(k) || typeof o[k] !== 'string') delete o[k];
       if (!Object.keys(o).length) return;
       if (/\/api\/pintad\//i.test(url)) entetesPintad = o; else entetesApi = o;
+    } catch (_) {}
+  };
+
+  // ── UNE SUPPRESSION / MISE EN PAUSE FAITE SUR LA PAGE (29 oct.) ─────────
+  // MESURÉ (`lbc_recon.envois`) : le bouton « Supprimer » de Leboncoin envoie
+  // `DELETE api.leboncoin.fr/api/pintad/v1/public/manual/delete/ads`, corps
+  // `{list_ids:[nombre]}` (vu le 28 oct. à 22:47, après la vente de la N°18 sur
+  // Vinted), et « Mettre en pause » `PUT …/manual/pause/ads`, même corps. VRM
+  // n'en savait rien : l'annonce restait « en ligne » jusqu'à une liste complète.
+  // On relaie, SEULEMENT sur une réponse 2xx de Leboncoin, les identifiants et
+  // ce qui a été fait — jamais autre chose. Le fond ne marque que SES annonces.
+  const RETRAIT_PAGE = /^https:\/\/api\.leboncoin\.fr\/api\/pintad\/v\d+\/public\/manual\/(delete|pause)\/ads\/?(?:\?.*)?$/i;
+  const noterRetraitPage = (url, methode, corps, statut) => {
+    try {
+      const m = RETRAIT_PAGE.exec(String(url || ''));
+      if (!m || !(statut >= 200 && statut < 300)) return;
+      const quoi = m[1].toLowerCase() === 'delete' ? 'supprime' : 'pause';
+      if ((quoi === 'supprime' && !/^DELETE$/i.test(methode || '')) || (quoi === 'pause' && !/^PUT$/i.test(methode || ''))) return;
+      let j; try { j = typeof corps === 'string' ? JSON.parse(corps) : null; } catch (_) { return; }
+      const ids = (j && Array.isArray(j.list_ids) ? j.list_ids : []).map((x) => String(x)).filter((x) => /^\d{5,15}$/.test(x));
+      if (!ids.length || ids.length > 50) return;
+      post({ kind: 'lbcretraitvu', quoi, ids, statut });
     } catch (_) {}
   };
 
@@ -576,8 +626,10 @@
       try { if (MODIFIE.test(meth)) noteEnvoi(url, init && init.body, meth); } catch (_) {}
       // La liste d'un vendeur : son corps de requête dit si elle peut DÉCIDER (22 oct.).
       let corpsReq = null;
-      try { if (init && typeof init.body === 'string' && OWNER_LISTING.test(url)) corpsReq = init.body; } catch (_) {}
+      try { if (init && typeof init.body === 'string' && LISTE_VENDEUR(url)) corpsReq = init.body; } catch (_) {}
       try { noterEntetes(url, init && init.headers); } catch (_) {}
+      let corpsRetrait = null;
+      try { if (init && typeof init.body === 'string' && RETRAIT_PAGE.test(url)) corpsRetrait = init.body; } catch (_) {}
       // En-têtes d'une requête du SITE vers ses transactions : on les réutilise
       // tels quels pour lire le détail (restent dans la page, jamais envoyés ailleurs).
       try {
@@ -593,6 +645,7 @@
             const ct = res.headers && res.headers.get && res.headers.get('content-type');
             if (/vinted|supabase/i.test(url)) return; // ne touche pas aux autres domaines
             noteSeen(url, meth, res.status, ct);
+            if (corpsRetrait) noterRetraitPage(url, meth, corpsRetrait, res.status);
             res.clone().text().then((t) => handle(url, t, ct, res.status, corpsReq)).catch(() => {});
           } catch (_) {}
         }).catch(() => {});
@@ -608,7 +661,7 @@
     if (origSetH) OX.prototype.setRequestHeader = function (k, v) { try { (this.__lbcH = this.__lbcH || {})[String(k)] = String(v); } catch (_) {} return origSetH.apply(this, arguments); };
     OX.prototype.send = function (corps) {
       try { if (MODIFIE.test(this.__lbcMeth || '')) noteEnvoi(this.__lbcUrl || '', corps, this.__lbcMeth); } catch (_) {}
-      try { this.__lbcCorps = (typeof corps === 'string' && OWNER_LISTING.test(this.__lbcUrl || '')) ? corps : null; noterEntetes(this.__lbcUrl || '', this.__lbcH); } catch (_) {}
+      try { this.__lbcCorps = (typeof corps === 'string' && LISTE_VENDEUR(this.__lbcUrl || '')) ? corps : null; this.__lbcRetrait = (typeof corps === 'string' && RETRAIT_PAGE.test(this.__lbcUrl || '')) ? corps : null; noterEntetes(this.__lbcUrl || '', this.__lbcH); } catch (_) {}
       try {
         this.addEventListener('load', function () {
           try {
@@ -616,6 +669,7 @@
             if (/vinted|supabase/i.test(url)) return;
             const ct = this.getResponseHeader && this.getResponseHeader('content-type');
             noteSeen(url, this.__lbcMeth, this.status, ct);
+            if (this.__lbcRetrait) noterRetraitPage(url, this.__lbcMeth, this.__lbcRetrait, this.status);
             const t = this.responseType === 'json' ? JSON.stringify(this.response) : (this.responseType === '' || this.responseType === 'text') ? this.responseText : null;
             if (t) handle(url, t, ct, this.status, this.__lbcCorps || null);
           } catch (_) {}
