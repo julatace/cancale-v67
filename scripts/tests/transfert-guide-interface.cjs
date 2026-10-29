@@ -9,7 +9,7 @@ const fs=require('fs'),path=require('path'),assert=require('assert/strict'),{chr
  await p.addStyleTag({content:fs.readFileSync('src/reception-emails.css','utf8')});
  const helper=fs.readFileSync('src/receptionEmail.js','utf8').slice(fs.readFileSync('src/receptionEmail.js','utf8').indexOf('export function etapesTransfert')).replace('export function','function');
  const source=fs.readFileSync('src/ConfigurerTransfert.jsx','utf8').replace(/^import .*\n/gm,'').replace('export default function','function');
- await p.addScriptTag({content:esbuild.transformSync(`const {useState}=React;const ADRESSE_COLLECTRICE='reception@example.test';${helper}\n${source};window.ConfigurerTransfert=ConfigurerTransfert;`,{loader:'jsx'}).code});
+ await p.addScriptTag({content:esbuild.transformSync(`const {useState,useEffect}=React;const ADRESSE_COLLECTRICE='reception@example.test';${helper}\n${source};window.ConfigurerTransfert=ConfigurerTransfert;`,{loader:'jsx'}).code});
  await p.evaluate(()=>{window.root=ReactDOM.createRoot(document.getElementById('root'));window.actualisations=0;root.render(React.createElement(ConfigurerTransfert,{adresses:[{adresse:'vendeur@example.test',comptes:[{id:1,nom:'Boutique test'}],declaree:false}],preuves:{cloisonnee:true,adresses:{}},onDeclarer:async()=>false,onActualiser:async()=>{actualisations++;return true;},onComptes:()=>{}}));});
  await p.getByText('Configurer un transfert · étape par étape',{exact:true}).click();
  await p.getByRole('combobox',{name:'Compte et adresse'}).selectOption('vendeur@example.test');

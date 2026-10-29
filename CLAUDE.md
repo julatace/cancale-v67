@@ -58,6 +58,14 @@
 > test, meurt déjà sur origin/main (« actions quotidiennes en haut », filtres eBay) : le bloc a été prouvé posé au début du banc.
 > Geste de Julien : aucun — s'il veut l'écran, Réglages → Stock et rangement → Organisation.
 
+> **29 octobre — 5.287, numéros sur les profils visités :** Julien a précisé que
+> l’affichage semble seulement sur Vinted, l’import dans VRM n’est pas confirmé.
+> `/member/{id}` : aucun numéro renvoyé sans égalité avec le PROFIL du compte
+> connecté ; aucun numéro créé par une visite. Les pastilles sont purgées après
+> navigation et les réponses tardives ignorées ; cache du fond séparé par owner VRM.
+> Huit contrôles UI + trois tests du fond ; ancien affichage reproduit. Pas de
+> nettoyage de stock ni de réattribution. `docs/numeros-profils-vinted.md`.
+
 > **29 octobre — offres, extension 5.286 :** la fusion partagée `src/conversations.js` /
 > worker garde un état accepté/refusé/expiré/précédent face à une ancienne copie en attente.
 > Deux identités d’offre contradictoires pour le même message font refuser la fusion.
