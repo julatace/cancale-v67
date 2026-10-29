@@ -1,5 +1,13 @@
 # VRM — dossier de passation
 
+> **29 octobre — « les photos sont déjà là, pourquoi Vinted les refuse ? » (5.274) :** MESURÉ : sur ses brouillons faits par
+> VRM, Vinted refuse les photos à la mise en ligne ; le nouvel essai avec les MÊMES photos n'a jamais passé (0 sur 5), les photos
+> RENVOYÉES ont passé 5 fois sur 5. Cause pas encore mesurée (les numéros de photo que VRM rattache au brouillon). ⇒
+> `completionSecoursPhotos` renvoie tout de suite les photos du coffre (« essai 2 sur 2 », « photo n sur N »), plus d'essai inutile ;
+> si la mise en ligne bloque ensuite sur autre chose (la taille), les photos neuves sont GARDÉES dans le brouillon enregistré ; la
+> forme de la réponse de `POST /api/v2/photos` est relevée (`photo_reponse_forme`, clés et types) pour trouver la cause. Preuve :
+> `audit-recreer.cjs` (3 contrôles revus + « taille après photos »).
+
 > **29 octobre — offres acceptées avec un DÉLAI ALÉATOIRE, et les essais des photos dans la barre (5.273) :** Julien : « accepter
 > les offres automatiquement avec un délai aléatoire ». Le moteur (`autoAccepterOffres`, éteint par défaut) n'accepte plus dès
 > qu'il voit l'offre : à la première vue, l'heure est TIRÉE entre 3 et 20 min (`delaiOffreMs`, `vrmOffresPrevues` dans

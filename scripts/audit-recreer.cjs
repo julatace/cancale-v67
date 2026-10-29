@@ -45,7 +45,7 @@ function monter({ connecte = '111', comptes = null, coffre = true, modele = true
       if (e.methode === 'POST' && /\/api\/v2\/photos$/.test(e.chemin)) return { status: photo, body: photoSansId ? { ok: true } : { id: ++n } };
       if (e.methode === 'POST' && /\/api\/v2\/item_upload\/items\/?$/.test(e.chemin)) return { status: creation, body: creationSansId ? { code: 0 } : { item: { id: 77001 } } };
       if (e.methode === 'POST' && /\/api\/v2\/item_upload\/drafts\/?$/.test(e.chemin)) return { status: typeof brouillon === 'function' ? brouillon() : brouillon, body: brouillonSansId ? { code: 0 } : { draft: { id: 88001 } } };
-      if (e.methode === 'POST' && /\/api\/v2\/item_upload\/drafts\/\d+\/completion$/.test(e.chemin)) return { status: typeof completion === 'function' ? completion() : completion, body: completionCorps || { code: 0 } };
+      if (e.methode === 'POST' && /\/api\/v2\/item_upload\/drafts\/\d+\/completion$/.test(e.chemin)) return { status: typeof completion === 'function' ? completion() : completion, body: (typeof completionCorps === "function" ? completionCorps() : completionCorps) || { code: 0 } };
       if (e.methode === 'POST' && /\/api\/v2\/items\/9101\/delete$/.test(e.chemin)) return { status: suppression, body: {} };
       return { status: 404, body: {} };
     } });
@@ -316,22 +316,33 @@ const zero = (j) => j.vinted.filter((v) => !/\/item_upload\/colors$/.test(v.chem
     const extra = { ...dressing(['10432342904']), vinted_brouillon_10432342904: { id: '10432342904', uid: '111', corps, etat: 'brouillon', parVRM: true, ancienId: '9555' },
       coffre_111_9555: { id: '9555', photos: [PHOTOS[0], PHOTOS[1], PHOTOS_D[0]] } };
     let nC = 0;
-    const f = monter({ src: process.env.BG_SRC || undefined, extra, completion: () => (++nC <= 2 ? 400 : 200),
+    const f = monter({ src: process.env.BG_SRC || undefined, extra, completion: () => (++nC <= 1 ? 400 : 200),
       completionCorps: { code: 99, message: 'Erreurs trouvées', errors: [{ field: 'assigned_photos', value: 'Erreur lors du chargement de la photo' }] } });
     let r = {}; try { r = await f.ctx.publierBrouillon({ cmd: 'publierBrouillon', uid: '111', draftId: '10432342904', confirme: true }); } catch (e) { r = { erreur: e.message }; }
-    const cs = completions(f.j); let c2 = {}; try { c2 = JSON.parse(cs[1].corps); } catch (_) {}
-    const ids = c2.draft && Array.isArray(c2.draft.assigned_photos) ? c2.draft.assigned_photos.map((p) => p.id) : [];
-    let c3 = {}; try { c3 = JSON.parse(cs[2].corps); } catch (_) {}
+    const cs = completions(f.j);
+    let c3 = {}; try { c3 = JSON.parse(cs[1].corps); } catch (_) {}
     const ids3 = c3.draft && Array.isArray(c3.draft.assigned_photos) ? c3.draft.assigned_photos.map((p) => p.id) : [];
-    dit(JSON.stringify(ids) === '[11,12]', "photos refusées : d'abord un nouvel essai, mêmes photos (forme courte), après une attente", JSON.stringify(ids));
-    dit(r.etape === 'fait' && cs.length === 3 && photosP(f.j).length === 2 && ids3.length === 2 && !ids3.includes(11) && !ids3.includes(12), "toujours refusées : renvoyées depuis le coffre (une par photo), puis la mise en ligne repart avec les NOUVELLES", JSON.stringify({ e: r.etape, m: cs.length, p: photosP(f.j).length, ids3, raison: r.raison || r.erreur })); }
+    // (29 oct.) MESURÉ : l'essai « mêmes photos » n'a jamais passé (0 sur 5) — VRM renvoie tout de suite.
+    dit(r.etape === 'fait' && cs.length === 2 && photosP(f.j).length === 2 && ids3.length === 2 && !ids3.includes(11) && !ids3.includes(12), "photos refusées : renvoyées tout de suite depuis le coffre (une par photo), et la mise en ligne repart avec les NOUVELLES — pas d'essai inutile avec les mêmes", JSON.stringify({ e: r.etape, m: cs.length, p: photosP(f.j).length, ids3, raison: r.raison || r.erreur })); }
+  // (29 oct.) Photos renvoyées, puis refus pour la TAILLE : les nouvelles photos
+  //  sont gardées dans le brouillon enregistré, et le geste de la taille est dit.
+  { const corps = CORPS_B({ assigned_photos: [{ id: 11, orientation: 0 }, { id: 12, orientation: 0 }] });
+    const extra = { ...dressing(['10432342904']), vinted_brouillon_10432342904: { id: '10432342904', uid: '111', corps, etat: 'brouillon', parVRM: true, ancienId: '9555' },
+      coffre_111_9555: { id: '9555', photos: [PHOTOS[0], PHOTOS[1]] } };
+    let nC = 0;
+    const f = monter({ src: process.env.BG_SRC || undefined, extra, completion: () => 400,
+      completionCorps: () => (++nC <= 1 ? { code: 99, message: 'Erreurs trouvées', errors: [{ field: 'assigned_photos', value: 'Erreur lors du chargement de la photo' }] } : { code: 99, message: 'Erreurs trouvées', errors: [{ field: 'size', value: 'Le champ Taille doit être renseigné' }] }) });
+    let r = {}; try { r = await f.ctx.publierBrouillon({ cmd: 'publierBrouillon', uid: '111', draftId: '10432342904', confirme: true }); } catch (e) { r = { erreur: e.message }; }
+    let gard = {}; try { gard = JSON.parse(f.lignes.vinted_brouillon_10432342904.corps); } catch (_) {}
+    const idsG = gard.draft && Array.isArray(gard.draft.assigned_photos) ? gard.draft.assigned_photos.map((p) => p.id) : [];
+    dit(r.etape === 'echec' && /choisis la taille/.test(r.raison || '') && idsG.length === 2 && !idsG.includes(11), "photos renvoyées puis taille refusée : le geste de la taille est dit, et les NOUVELLES photos sont gardées pour la suite", JSON.stringify({ e: r.etape, idsG, raison: (r.raison || '').slice(0, 160) })); }
   // … sans coffre lisible : rien n'est renvoyé, c'est dit avec le geste Vinted.
   { const corps = CORPS_B();
     const extra = { ...dressing(['10432342904']), vinted_brouillon_10432342904: { id: '10432342904', uid: '111', corps, etat: 'brouillon', parVRM: true, ancienId: '9556' } };
     const f = monter({ src: process.env.BG_SRC || undefined, extra, completion: 400,
       completionCorps: { code: 99, message: 'Erreurs trouvées', errors: [{ field: 'assigned_photos', value: 'Erreur lors du chargement de la photo' }] } });
     let r = {}; try { r = await f.ctx.publierBrouillon({ cmd: 'publierBrouillon', uid: '111', draftId: '10432342904', confirme: true }); } catch (e) { r = { erreur: e.message }; }
-    dit(r.etape === 'echec' && completions(f.j).length === 2 && photosP(f.j).length === 0 && /rajoute/.test(r.raison || ''), "photos refusées sans photo dans VRM : un seul nouvel essai, et le geste sur Vinted est dit", JSON.stringify({ e: r.etape, m: completions(f.j).length, raison: r.raison })); }
+    dit(r.etape === 'echec' && completions(f.j).length === 1 && photosP(f.j).length === 0 && /rajoute/.test(r.raison || ''), "photos refusées sans photo dans VRM : aucun essai inutile, et le geste sur Vinted est dit", JSON.stringify({ e: r.etape, m: completions(f.j).length, raison: r.raison })); }
   // Une photo d'origine en WEBP part en JPEG (son nom est « photo-N.jpg »).
   { const f = monter({ src: process.env.BG_SRC || undefined });
     f.ctx.createImageBitmap = async () => ({ width: 4, height: 4, close() {} });

@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.273.0';
+const CODE_VERSION = '5.274.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -8369,6 +8369,10 @@ async function publierBrouillon(msg) {
         return { accepte: true, etape: 'incertain', raison: "nouvel essai pour les photos, mais Vinted n'a pas répondu clairement : le brouillon est PEUT-ÊTRE en ligne — regarde ton dressing avant de réessayer (VRM bloque une nouvelle tentative pendant 30 min)" };
       }
       rc = rc2;
+      // (29 oct.) Photos renvoyées et refus pour AUTRE chose (la taille) : on
+      // garde les nouvelles photos dans le brouillon enregistré — la tentative
+      // suivante ne repasse pas par les photos.
+      if (!rc.ok && !photosRefusees(rc) && rc.status < 500) { try { await rangerBrouillon(id, { corps: JSON.stringify(corpsC) }); noterDiag('brouillon_photos_neuves_gardees'); } catch (_) {} }
       if (!rc.ok && photosRefusees(rc)) {
         return { accepte: true, etape: 'echec', raison: `Vinted refuse encore les photos de ce brouillon${neuvesErr ? ` (VRM n'a pas pu les renvoyer : ${neuvesErr})` : ''}. Sur Vinted, ouvre le brouillon (Mes brouillons), retire les photos et rajoute-les, puis publie — le brouillon est intact.` };
       }
@@ -8613,21 +8617,28 @@ async function completionSecoursPhotos(acc, draftId, corpsC, rc, renvoyer) {
     if (r && r.status > 0 && r.status < 500) await leverVerrouRecreer('b' + draftId);
     return r;
   };
-  if (_repubSuivi) etapeRepub(_repubSuivi, 'secours-photos', { essai: 2, essais: 3 });
   const court = (ids) => ids.map((pid) => ({ id: pid, orientation: 0 }));
-  const ids0 = ((corpsC.draft && corpsC.draft.assigned_photos) || []).map((p) => p && p.id).filter(Boolean);
-  await pauseRepub('reessai'); await pauseRepub('reessai');
-  corpsC.draft.assigned_photos = court(ids0);
-  noterDiag('completion_photos_reessai');
-  let r = await envoyer();
-  if (!r || r.status === 0 || r.status >= 500 || r.ok || !photosRefusees(r) || typeof renvoyer !== 'function') return r;
-  if (_repubSuivi) etapeRepub(_repubSuivi, 'secours-photos', { renvoi: true, essai: 3, essais: 3 });
+  let r = rc;
+  // (29 oct.) MESURÉ chez lui : 5 refus de photos, l'essai « mêmes photos, forme
+  // courte » n'a JAMAIS passé (`completion_photos_reessai` 5, `…_secours_ok` 0),
+  // le renvoi des photos a passé les 5 fois (le refus suivant portait sur autre
+  // chose). Quand VRM peut renvoyer les photos, il les renvoie tout de suite ;
+  // l'essai court ne reste que pour un brouillon fait sur Vinted (rien à renvoyer).
+  if (typeof renvoyer !== 'function') {
+    if (_repubSuivi) etapeRepub(_repubSuivi, 'secours-photos', { essai: 2, essais: 2 });
+    const ids0 = ((corpsC.draft && corpsC.draft.assigned_photos) || []).map((p) => p && p.id).filter(Boolean);
+    await pauseRepub('reessai');
+    corpsC.draft.assigned_photos = court(ids0);
+    noterDiag('completion_photos_reessai');
+    return await envoyer();
+  }
+  if (_repubSuivi) etapeRepub(_repubSuivi, 'secours-photos', { renvoi: true, essai: 2, essais: 2 });
   const s0 = _repubSuivi;
-  const neuves = await renvoyer((i, n) => { if (s0) etapeRepub(s0, 'secours-photos', { renvoi: true, essai: 3, essais: 3, fait: i, total: n }); });
+  const neuves = await renvoyer((i, n) => { if (s0) etapeRepub(s0, 'secours-photos', { renvoi: true, essai: 2, essais: 2, fait: i, total: n }); });
   if (!neuves || !neuves.ids) { noterDiag('completion_photos_non_renvoyees'); return r; }
   corpsC.draft.assigned_photos = court(neuves.ids);
   noterDiag('completion_photos_renvoyees');
-  if (_repubSuivi) etapeRepub(_repubSuivi, 'secours-photos', { renvoi: true, essai: 3, essais: 3, envoye: true });
+  if (_repubSuivi) etapeRepub(_repubSuivi, 'secours-photos', { renvoi: true, essai: 2, essais: 2, envoye: true });
   await pauseRepub('enLigne');
   r = await envoyer();
   if (r && r.ok) noterDiag('completion_photos_secours_ok');
@@ -8665,6 +8676,9 @@ async function televerserPhotosRecreer(acc, urls, second, reglages, temp, suivi)
     fd.append('photo[temp_uuid]', temp);
     const rp = await vintedEnvoyerForm(acc, '/api/v2/photos', fd);
     const pid = rp && rp.ok ? idPhotoReponse(rp.json) : null;
+    // (29 oct.) La forme de la réponse n'a jamais été vue : noms de clés et types
+    // seulement (aucune valeur), une fois, pour savoir QUEL identifiant Vinted attend.
+    if (rp && rp.ok && i === 0) { try { const j = rp.json || {}; echantillonRate('photo_reponse_forme', String(pid || ''), JSON.stringify(Object.keys(j).slice(0, 20).map((k) => k + ':' + (Array.isArray(j[k]) ? 'array' : typeof j[k])).concat(j.photo && typeof j.photo === 'object' ? Object.keys(j.photo).slice(0, 20).map((k) => 'photo.' + k) : []))); } catch (_) {} }
     if (!pid) {
       noterDiag(rp && rp.ok ? 'recreer_photo_sans_id' : `recreer_photo_refuse_${(rp && rp.status) || 0}`);
       if (rp && rp.ok && rp.json && typeof rp.json === 'object') { try { await noterDiag('recreer_photo_cles_' + Object.keys(rp.json).slice(0, 6).join('_').replace(/[^a-z0-9_]/gi, '').slice(0, 60)); } catch (_) {} }
