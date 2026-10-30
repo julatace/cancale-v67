@@ -1338,6 +1338,23 @@
 > Annonces, Colis, Compta). L'écran de connexion/inscription est celui de #911/#912, non retouché. **Reste (seconde
 > passe)** : Annonces, Messages, Leboncoin, eBay, Colis, Compta ; et UN primaire par écran, par le slot principal
 > de `ScreenHead`.
+> **Même passe — la mise en page sur Edge sous Windows** (mesuré : `scratchpad/edge/rapport.md`, Chromium à barres de
+> défilement classiques) : (1) fenêtre basse, le bas du rail (Stats, Compta, Communauté) disparaissait sans indice →
+> rail resserré `(min-width:768px) and (max-height:800px)` (logo 40 px, entrées 38 px), fondu `data-rail-suite` posé
+> par `SideBar`, entrée active ramenée dans la vue ; (2) Messages faisait défiler la PAGE en plus de la liste (un
+> `.vrm-sr` repéré sur <body>) → `.vrm-main{position:relative}` et `html{overflow:hidden}` à TOUTES les largeurs
+> (styles-epure) ; (3) 768–1023 px à la SOURIS = coque ordinateur : `MQ_ORDINATEUR` = `(min-width:1024px),
+> (min-width:768px) and (hover:hover) and (pointer:fine)` dans `useOrdinateur` ET les media queries de COQUE
+> (île, en-tête, barre du bas, 44 px, fondus des rangées, `.vrm-rangee`/carrousel) — leur complément au doigt ; les
+> règles de CONTENU restent à la largeur ; une tablette au doigt garde la coque téléphone ; (4) colonne des
+> conversations `minmax(340px,36%)`, filtres qui reviennent à la ligne ; (5) une seule hauteur `--vrm-msg-h` pour liste
+> et panneau ; (6) l'île FLOTTE (`absolute`, plus de rangée de 66 px) — chaque première ligne qui n'est pas un
+> `ScreenHead` lui réserve `--vrm-ile` (résumé de plateforme, Organisation, Communauté, Réglages, « Modifier » de Ma
+> journée) ; titres à 26 px si `max-height:760px` ; (7) Ma journée 1024–1279 : « À faire » en 2 colonnes, une tâche
+> seule (ou à côté du rappel URSSAF pleine largeur) prend la ligne ; widgets à 6 colonnes seulement dès 1280. Banc
+> `scripts/bancs/edge-tailles.cjs` (8 tailles, souris/doigt, rail, double défilement, coque, débordement, île
+> mesurée sur les LETTRES, case vide) : 73 rouges sur un build d'origin/main, 0 après. ⚠️ Non mesuré : un vrai Edge
+> sous Windows (polices ClearType, barres « Fluent »).
 
 > ⛔⛔ **DÉCISION DE JULIEN, 22 OCTOBRE : PAS DE DOUBLE VÉRIFICATION PAR SMS — C'EST PAYANT.**
 > Mesuré dans la doc Supabase (« Advanced MFA Phone ») : **75 $/mois** pour le premier projet,
