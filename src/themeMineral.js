@@ -20,8 +20,8 @@ export const MINERAL_DARK = Object.freeze({
  danger:'#FF9188',warn:'#EBC080',gold:'#CFBE97',blue:'#A1C6D1',purple:'#BEB5D5',
  shadow:'0 2px 8px rgba(0,0,0,.12)',shadowMd:'0 8px 24px rgba(0,0,0,.18)',shadowLg:'0 16px 48px rgba(0,0,0,.30)',
  ring:'rgba(183,214,200,.20)',glass:'rgba(28,51,57,.96)',bar:'rgba(28,51,57,.94)',hair:'rgba(237,245,241,.10)',
- sidebar:'#19373F',chrome:'#102D35',onChrome:'#F4F8F5',chromeMuted:'#BECEC9',chromeLine:'rgba(255,255,255,.13)',
- chromeGradient:'linear-gradient(160deg,#102D35 0%,#1C4148 65%,#294E4B 100%)',
+ sidebar:'#0B1A1F',chrome:'#0A181D',onChrome:'#F4F8F5',chromeMuted:'#BECEC9',chromeLine:'rgba(255,255,255,.13)',
+ chromeGradient:'linear-gradient(160deg,#0A181D 0%,#0E2026 65%,#11242A 100%)',
  s1:'#B7D6C8',s2:'#83B5A2',selection:'#B7D6C8'
 });
 // Les portails (détails de vente, fenêtres) héritent du document : mêmes jetons
