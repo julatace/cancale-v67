@@ -6,7 +6,11 @@ const normaliser=new Function('extractLinks','extractEventText','etatOffreVinted
 const offre=(user,price,extra={})=>({entity_type:'offer_request_message',created_at:'2026-10-25T08:00:00Z',entity:{user_id:user,price,status:10,current:true,...extra}});
 test('les offres reçues et envoyées sont des événements financiers distincts',()=>{
  const r=normaliser({opposite_user:{id:22},messages:[offre(22,{amount:'45,50',currency_code:'EUR'}),offre(11,{amount:'50.00',currency:'EUR'})]});
- assert.equal(r[0].kind,'offer');assert.deepEqual(r[0].offre,{montant:45.5,devise:'EUR',sens:'recue',statut:'En attente'});assert.equal(r[1].offre.sens,'envoyee');
+ assert.equal(r[0].kind,'offer');assert.deepEqual(r[0].offre,{montant:45.5,devise:'EUR',sens:'recue',statut:'En attente',oid:null});assert.equal(r[1].offre.sens,'envoyee');
+});
+test('l’identité de l’offre (offer_request_id) est gardée telle quelle, jamais inventée',()=>{
+ const [a,b]=normaliser({opposite_user:{id:22},messages:[offre(22,{amount:'45',currency_code:'EUR'},{offer_request_id:987}),offre(22,{amount:'46',currency_code:'EUR'})]});
+ assert.equal(a.offre.oid,'987');assert.equal(b.offre.oid,null);
 });
 test('aucune direction ni devise n’est inventée si la source ne les donne pas',()=>{
  const [r]=normaliser({messages:[offre(null,{amount:'19'})]});assert.equal(r.offre.sens,'inconnu');assert.equal(r.offre.devise,null);
