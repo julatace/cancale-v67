@@ -442,6 +442,10 @@ const attendre = async (pg, fn, arg, ms = 8000) => { const t0 = Date.now(); whil
     // Coche la première ligne qui porte un N° (les fixtures sont anciennes : rien n'est coché d'office).
     const num = await pg.evaluate(() => { const l = [...document.querySelectorAll('[data-lot-ligne]')].find((x) => /N°\s*([A-Z]{0,3}\d+)/.test(x.innerText)); if (!l) return null; if (l.dataset.coche !== '1') l.querySelector('input[type=checkbox]').click(); return /N°\s*([A-Z]{0,3}\d+)/.exec(l.innerText)[1]; });
     await pg.waitForTimeout(600);
+    // (29-30 oct.) « Article contrôlé » sur chaque ligne cochée, comme lui —
+    // sinon « Imprimer » ouvre d'abord la question « Vérifier les articles ».
+    for (const c of await pg.locator('[data-lot-ligne][data-coche="1"] input[aria-label^="Article contrôlé"]').all()) await c.check({ force: true }).catch(() => {});
+    await pg.waitForTimeout(300);
     return num;
   };
   // ⚠️ La confirmation ne se déclenche QUE si un N° imprimé est ambigu (porté par
