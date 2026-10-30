@@ -26,7 +26,8 @@ const MIME={'.html':'text/html','.js':'text/javascript','.css':'text/css','.json
 const srv=http.createServer((q,r)=>{let f=q.url.split('?')[0]; if(f==='/'||!path.extname(f))f='/index.html';
   const p=path.join(DIST,f); if(!fs.existsSync(p)){r.writeHead(404);return r.end();}
   r.writeHead(200,{'content-type':MIME[path.extname(p)]||'application/octet-stream'}); r.end(fs.readFileSync(p));});
-srv.listen(4341);
+const PORT_BANC=Number(process.env.BANC_PORT||process.env.PORT)||4341;
+srv.listen(PORT_BANC);
 const ecrits=[];
 let ko=0; const dit=(c,m,d)=>{if(!c)ko++;console.log((c?'OK  ':'KO  ')+m+(d?' — '+d:''));};
 (async()=>{
@@ -45,7 +46,7 @@ let ko=0; const dit=(c,m,d)=>{if(!c)ko++;console.log((c?'OK  ':'KO  ')+m+(d?' �
     const m=/id=like\.([^&]*)/.exec(u); if(m){const pat=decodeURIComponent(m[1]).replace(/[*%]/g,'.*');const re=new RegExp('^'+pat+'$');return j(rows.filter(r=>re.test(r.id)));}
     return j([]);});
   await pg.route('**/api/**',r2=>r2.fulfill({status:200,contentType:'application/json',body:'{"pret":true,"devices":1}'}));
-  await pg.goto('http://localhost:4341/?tab=cat_ventes',{waitUntil:'domcontentloaded'});
+  await pg.goto(`http://localhost:${PORT_BANC}/?tab=cat_ventes`,{waitUntil:'domcontentloaded'});
   await pg.waitForTimeout(4000);
   // (30 sept.) Sans aucun prix d'achat, la case « Coût d'achat » se tait et c'est
   // « Bénéfice estimé — » qui ouvre la saisie : une absence, une case (§7).

@@ -259,10 +259,13 @@ const projette = (row, sel) => {
           // (29 oct., « tout doit être détaillé dans la barre de progression ») chaque étape, son état.
           const det = await pg.$$eval('[data-republier-progression="9103"] [data-etape-detail]', (els) => els.map((e) => e.getAttribute('data-etape-detail') + ':' + e.getAttribute('data-etape-etat')).join(','));
           dit(det === 'lecture:fait,photos:fait,enregistrement:fait,brouillon:encours,suppression:avenir,attente:avenir,en-ligne:avenir', 'la barre détaille CHAQUE étape (✓ faites, ● en cours, ○ à venir)', det || 'absente');
+          // (30 oct.) La liste des étapes est repliée (« Voir les 7 étapes ») : on l'ouvre, comme lui, avant de la lire.
+          await pg.$$eval('[data-republier-progression="9103"] details', (els) => els.forEach((e) => { e.open = true; }));
           const txtDet = await pg.locator('[data-republier-progression="9103"] [data-etape-detail="photos"]').innerText().catch(() => '');
           dit(/3 photos/.test(txtDet), 'l’étape des photos dit combien sont parties (« 3 photos »)', txtDet || 'absente');
           const ev = (d) => pg.evaluate((x) => window.dispatchEvent(new CustomEvent('vrm:ext', { detail: { type: 'maj', quoi: 'repub', id: '9103', ...x } })), d);
           await ev({ etape: 'secours-photos', renvoi: true, essai: 2, essais: 2, fait: 5, total: 14 });
+          await pg.$$eval('[data-republier-progression="9103"] details', (els) => els.forEach((e) => { e.open = true; }));
           const txtSec = await pg.locator('[data-republier-progression="9103"] [data-etape-detail="en-ligne"]').innerText().catch(() => '');
           dit(/essai 2 sur 2/.test(txtSec) && /photo 6 sur 14/.test(txtSec), 'photos refusées : la barre dit l’essai (2 sur 2) et la photo renvoyée (6 sur 14)', txtSec || 'absente');
           await ev({ etape: 'brouillon' });
