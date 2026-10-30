@@ -53,6 +53,8 @@ async function brancher(ctx, st) {
     if (chemin === 'token' && u.searchParams.get('grant_type') === 'refresh_token') {
       st.refresh++;
       if (st.mode === 'reseau') return route.abort('internetdisconnected');
+      if (st.mode === 'limite') return json(429,{msg:'Too many requests'});
+      if (st.mode === 'incomplet') return json(200,{});
       if (st.mode === 'refus') return json(400, { error: 'invalid_grant', error_description: 'Invalid Refresh Token: Refresh Token Not Found' });
       return json(200, { access_token: jwt(), refresh_token: 'r-neuf-' + st.refresh, expires_in: 3600, token_type: 'bearer', user: { id: USER.id, email: USER.email } });
     }
@@ -83,7 +85,7 @@ async function main() {
       console.log(`\n── ${taille} px`);
       const opts = taille === 390 ? { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true } : { viewport: { width: 1512, height: 950 } };
       // A / B : jeton expiré à l'ouverture.
-      for (const mode of ['reseau', 'refus']) {
+      for (const mode of ['reseau', 'limite', 'incomplet', 'refus']) {
         const ctx = await nav.newContext(opts); const st = { mode, refresh: 0 };
         await brancher(ctx, st);
         await ctx.addInitScript((s) => { try { if (!sessionStorage.getItem('_banc')) { localStorage.setItem('vrm_session', s); localStorage.setItem('vrm_schema_cloisonne', '1'); sessionStorage.setItem('_banc', '1'); } } catch (_) {} }, JSON.stringify(sessionRangee(Date.now() - 3600 * 1000)));
@@ -91,9 +93,9 @@ async function main() {
         await pg.goto(`http://localhost:${PORT}/?tab=journee`, { waitUntil: 'domcontentloaded' });
         await pg.waitForTimeout(5000);
         const conn = await ecranConnexion(pg), garde = await sessionPresente(pg);
-        if (mode === 'reseau') {
+        if (mode !== 'refus') {
           dit(st.refresh >= 1 && st.refresh <= 3, 'A. jeton expiré : le renouvellement est tenté, sans rafale', `${st.refresh} demande(s) en 5 s`);
-          dit(!conn && garde, 'A. coupure réseau au renouvellement : PAS déconnecté', `écran de connexion=${conn}, session gardée=${garde}`);
+          dit(!conn && garde, 'A. '+mode+' au renouvellement : PAS déconnecté', `écran de connexion=${conn}, session gardée=${garde}`);
         } else {
           dit(conn && !garde, 'B. renouvellement REFUSÉ : retour à l\'écran de connexion', `écran de connexion=${conn}, session gardée=${garde}`);
         }

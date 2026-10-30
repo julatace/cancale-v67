@@ -941,7 +941,7 @@ let _authRefreshEchecAt = 0;
 const authRefresh = (opt) => {
   if (_authRefreshEnVol) return _authRefreshEnVol;
   if (opt && opt.discret && Date.now() - _authRefreshEchecAt < 15000) return Promise.resolve(null);
-  _authRefreshEnVol = (async () => {
+  _authRefreshEnVol = Promise.resolve().then(async () => {
     try {
       const s = AUTH.session;
       if (!s || !s.refresh_token) return false;
@@ -949,14 +949,22 @@ const authRefresh = (opt) => {
       // Trois états : true (renouvelé) · false (REFUSÉ par le service : jeton
       // révoqué, compte supprimé) · null (pas su : réseau coupé, service qui ne
       // répond pas). Seul un refus déconnecte — une coupure, jamais.
-      if (!r.ok) { _authRefreshEchecAt = Date.now(); return (r.status >= 400 && r.status < 500) ? false : null; }
-      // La session a pu changer pendant la demande (déconnexion, autre compte) :
-      // on ne range pas un jeton renouvelé par-dessus.
-      if (!AUTH.session || AUTH.session.refresh_token !== s.refresh_token) return false;
-      writeSession(sessionFrom(r.json));
+      // Une réponse de l’ancienne session, même refusée, ne doit ni remplacer
+      // ni faire effacer la nouvelle session par authBoot.
+      if (!AUTH.session || AUTH.session.refresh_token!==s.refresh_token || AUTH.session.access_token!==s.access_token) return null;
+      if (!r.ok) { _authRefreshEchecAt=Date.now(); return (r.status>=400&&r.status<500&&![408,425,429].includes(r.status))?false:null; }
+      const j=r.json;
+      if(typeof j?.access_token!=='string'||!j.access_token.trim()
+        ||typeof j.refresh_token!=='string'||!j.refresh_token.trim()
+        ||typeof j.user?.id!=='string'||!j.user.id.trim()
+        ||(s.user?.id&&j.user.id!==s.user.id)
+        ||(j.expires_in!==undefined&&(!Number.isFinite(Number(j.expires_in))||Number(j.expires_in)<=0))){_authRefreshEchecAt=Date.now();return null;}
+      writeSession(sessionFrom(j));
+      _authRefreshEchecAt=0;
       return true;
-    } finally { _authRefreshEnVol = null; }
-  })();
+    } catch (_) {_authRefreshEchecAt=Date.now();return null;}
+    finally { _authRefreshEnVol = null; }
+  });
   return _authRefreshEnVol;
 };
 const sessionFrom = (j) => ({
@@ -1149,6 +1157,8 @@ const authSignIn  = async (email, password) => {
     // qui se règle, pas une erreur de saisie — on le dit, et on propose de
     // renvoyer l'email plutôt que de laisser l'utilisateur devant un mur.
     if (/not confirmed/i.test(r.error)) return { ok: false, needsConfirm: true, error: "Ton compte existe, mais l'email n'est pas encore confirmé." };
+    if (r.status>=500) return {ok:false,error:'Le service de connexion est momentanément indisponible. Réessaie dans un instant.'};
+    if (r.status===429) return {ok:false,error:'Trop de tentatives de connexion. Patiente un moment avant de réessayer.'};
     if (/invalid|credential/i.test(r.error)) return { ok: false, error: 'Email ou mot de passe incorrect.' };
     return { ok: false, error: r.error };
   }
@@ -1173,14 +1183,15 @@ const authSignIn  = async (email, password) => {
 const authConfirmFromLink = async (raw, email) => {
   const txt = String(raw || '').trim();
   if (!txt) return { ok: false, error: 'Colle le lien reçu par email.' };
-  let q = null;
+  let q = null, typeFragment='';
   if (/^\d{6}$/.test(txt)) q = new URLSearchParams({ token: txt, type: 'signup' });  // code à 6 chiffres collé tel quel
   else {
-    try { q = new URL(txt).searchParams; }
+    try { const u=new URL(txt);q=u.searchParams;typeFragment=new URLSearchParams(u.hash.slice(1)).get('type')||''; }
     catch (_) { const i = txt.indexOf('?'); if (i >= 0) q = new URLSearchParams(txt.slice(i + 1)); }
   }
   if (!q) return { ok: false, error: "Ce n'est ni un lien, ni un code à 6 chiffres." };
   const type = q.get('type') || 'signup';
+  if(type==='recovery'||typeFragment==='recovery')return{ok:false,recovery:true,error:'Ce lien sert à changer ton mot de passe. Ouvre la récupération ci-dessous, puis colle le lien reçu.'};
   const hash = q.get('token_hash');
   const token = q.get('token');
   if (!hash && !token) return { ok: false, error: "Ce lien ne contient pas de jeton de confirmation." };
@@ -1197,8 +1208,11 @@ const authConfirmFromLink = async (raw, email) => {
     if (/expired|invalid/i.test(r.error)) return { ok: false, error: 'Lien expiré ou déjà utilisé. Redemande un email, et colle le PLUS RÉCENT.' };
     return { ok: false, error: r.error };
   }
-  if (r.json && r.json.access_token) { writeSession(sessionFrom(r.json)); return { ok: true, connected: true }; }
-  return { ok: true };
+  const j=r.json;
+  if (typeof j?.access_token==='string' && j.access_token.trim() && typeof j.user?.id==='string' && j.user.id.trim()) { writeSession(sessionFrom(j)); return {ok:true,connected:true}; }
+  const u=j?.user||j;
+  if (!j?.access_token && typeof u?.id==='string' && u.id.trim() && typeof u.email_confirmed_at==='string' && u.email_confirmed_at.trim()) return {ok:true,connected:false};
+  return {ok:false,error:'La confirmation n’a pas pu être vérifiée. Réessaie avec le lien le plus récent.'};
 };
 
 // Renvoyer l'email de confirmation (le premier peut s'être perdu, ou avoir été
@@ -1283,7 +1297,8 @@ const authSignUp  = async (email, password) => {
     else if (/signups? not allowed|disabled/i.test(r.error)) msg = 'Les inscriptions sont fermées pour le moment.';
     return { ok: false, incertain:r.status===0 || r.status>=500, error: r.status===0 || r.status>=500 ? 'Je ne peux pas confirmer le résultat de la création. Si tu as reçu un email VRM, ton compte peut déjà être créé : confirme-le, puis utilise « Se connecter » ici.' : msg };
   }
-  if(!r.json?.access_token && !r.json?.id && !r.json?.user?.id)return {ok:false,incertain:true,error:'La réponse du serveur est incomplète. Si tu as reçu un email, confirme-le puis connecte-toi ici ; sinon réessaie dans un instant.'};
+  const j=r.json,uid=j?.user?.id||j?.id;
+  if(typeof uid!=='string'||!uid.trim()||(j?.access_token&&(typeof j.access_token!=='string'||!j.access_token.trim()||typeof j.user?.id!=='string'||!j.user.id.trim())))return {ok:false,incertain:true,error:'La réponse du serveur est incomplète. Si tu as reçu un email, confirme-le puis connecte-toi ici ; sinon réessaie dans un instant.'};
   // Si la confirmation par email est activée côté Supabase, il n'y a pas encore
   // de jeton : le compte n'existe vraiment qu'une fois le lien cliqué.
   if (r.json && r.json.access_token) { writeSession(sessionFrom(r.json)); return { ok: true }; }
@@ -1324,15 +1339,36 @@ const OAUTH_PROVIDERS = [
 // noire avec du JSON brut — l'utilisateur se retrouvait dehors, devant un
 // message d'erreur technique, sans bouton retour.
 let AUTH_SETTINGS = null;
-const loadAuthSettings = async () => {
-  try {
-    const r = await fetch(`${SUPABASE_URL}/auth/v1/settings`, { headers: { apikey: SUPABASE_KEY },signal:AbortSignal.timeout(15000) });
-    if (r.ok) { AUTH_SETTINGS = await r.json(); _emitAuth(); }  // réveille l'écran de connexion
-  } catch (_) {}
-  return AUTH_SETTINGS;
+let AUTH_SETTINGS_ETAT='initial',AUTH_SETTINGS_PROMESSE=null;
+const AUTH_SETTINGS_ABONNES=new Set();
+const etatAuthSettings=()=>({statut:AUTH_SETTINGS_ETAT,reglages:AUTH_SETTINGS});
+const onAuthSettingsChange=fn=>{AUTH_SETTINGS_ABONNES.add(fn);return()=>AUTH_SETTINGS_ABONNES.delete(fn);};
+const notifierAuthSettings=()=>{for(const fn of AUTH_SETTINGS_ABONNES){try{fn();}catch(_){}}};
+const loadAuthSettings = () => {
+  if(AUTH_SETTINGS_PROMESSE)return AUTH_SETTINGS_PROMESSE;
+  AUTH_SETTINGS_ETAT='chargement';
+  // La microtâche empêche un échec synchrone du fetch de laisser une promesse
+  // déjà terminée dans le verrou. AbortController fonctionne aussi sans
+  // AbortSignal.timeout (anciens Safari).
+  AUTH_SETTINGS_PROMESSE=Promise.resolve().then(async()=>{
+    const controle=new AbortController(),delai=setTimeout(()=>controle.abort(),15000);
+    try{
+      const r=await fetch(`${SUPABASE_URL}/auth/v1/settings`,{headers:{apikey:SUPABASE_KEY},signal:controle.signal});
+      if(!r.ok)throw Error('Lecture indisponible');
+      const j=await r.json();
+      if(!j||!j.external||typeof j.external!=='object'||Array.isArray(j.external)
+        ||['google','discord'].some(id=>j.external[id]!==undefined&&typeof j.external[id]!=='boolean')
+        ||(j.mailer_autoconfirm!==undefined&&typeof j.mailer_autoconfirm!=='boolean'))throw Error('Réponse incomplète');
+      AUTH_SETTINGS=j;AUTH_SETTINGS_ETAT='pret';
+    }catch(_){AUTH_SETTINGS=null;AUTH_SETTINGS_ETAT='erreur';}
+    finally{clearTimeout(delai);AUTH_SETTINGS_PROMESSE=null;notifierAuthSettings();}
+    return AUTH_SETTINGS;
+  });
+  notifierAuthSettings();
+  return AUTH_SETTINGS_PROMESSE;
 };
 // Un fournisseur n'est proposé que s'il est réellement activé côté Supabase.
-const providerEnabled = (id) => !!(AUTH_SETTINGS && AUTH_SETTINGS.external && AUTH_SETTINGS.external[id]);
+const providerEnabled = (id) => AUTH_SETTINGS?.external?.[id]===true;
 // La création de compte attend-elle un email de confirmation ? Si oui, on le
 // dit AVANT que la personne tape son mot de passe.
 const confirmRequired = () => !!(AUTH_SETTINGS && AUTH_SETTINGS.mailer_autoconfirm === false);
@@ -1368,8 +1404,13 @@ const oauthRelier = async provider => {
 // Dans les deux cas on NETTOIE l'URL derrière nous : un jeton ne doit pas
 // rester dans la barre d'adresse ni partir dans l'historique.
 const cleanAuthUrl = () => {
-  try { window.history.replaceState({}, '', window.location.pathname + window.location.search.replace(/[?&](code|error|error_description|error_code)=[^&]*/g, '').replace(/^&/, '?')); } catch (_) {}
-  try { if (window.location.hash) window.history.replaceState({}, '', window.location.pathname + window.location.search); } catch (_) {}
+  try {
+    const q=new URLSearchParams(window.location.search||'');
+    // URLSearchParams reconnaît aussi les noms encodés et les doublons.
+    for(const k of ['code','error','error_description','error_code','token','token_hash','access_token','refresh_token','provider_token','provider_refresh_token','expires_in','expires_at','token_type','type','state'])q.delete(k);
+    const reste=q.toString();
+    window.history.replaceState({},'',window.location.pathname+(reste?'?'+reste:''));
+  }catch(_){}
 };
 const consumeAuthRedirect = async () => {
   if (!MULTI_USER) return null;
@@ -1377,7 +1418,7 @@ const consumeAuthRedirect = async () => {
   const hash = new URLSearchParams((window.location.hash || '').replace(/^#/, ''));
 
   const err = q.get('error_description') || q.get('error') || hash.get('error_description') || hash.get('error');
-  if (err) { lireLiaisonOAuth(sessionStorage,localStorage); cleanAuthUrl(); return { error: decodeURIComponent(String(err).replace(/\+/g, ' ')) }; }
+  if (err) { lireLiaisonOAuth(sessionStorage,localStorage); cleanAuthUrl(); return { error: String(err) }; }
 
   const code = q.get('code');
   if (code) {
@@ -1393,25 +1434,30 @@ const consumeAuthRedirect = async () => {
     if (!verifier) return { error: 'Connexion expirée, réessaie depuis cet appareil.' };
     const r = await authCall('token?grant_type=pkce', { auth_code: code, code_verifier: verifier });
     if (!r.ok) return { error: r.error };
+    if(typeof r.json?.access_token!=='string'||!r.json.access_token.trim()||typeof r.json?.user?.id!=='string'||!r.json.user.id.trim())return{error:'La connexion n’a pas pu être vérifiée. Recommence depuis VRM.'};
     if(!resultatLiaisonPermis(liaison,r.json))return{error:'La liaison ne correspond pas à ton compte VRM. Ta session a été conservée.'};
+    const recovery=q.get('type')==='recovery';
+    if(recovery)RECOVERY_PENDING=true;
     writeSession(sessionFrom(r.json));
-    return { ok: true, liaison:liaison?.provider };
+    return { ok: true, liaison:liaison?.provider, recovery };
   }
 
   const at = hash.get('access_token');
   if (at) {
     const type = hash.get('type');
+    const valeurDuree=hash.get('expires_in'),duree=valeurDuree===null?3600:Number(valeurDuree);
+    if(!Number.isFinite(duree)||duree<=0||!Number.isFinite(Date.now()+duree*1000)){cleanAuthUrl();return{error:'Ce lien n’est pas utilisable. Redemande un email depuis la connexion.'};}
     const sess = {
       access_token: at,
       refresh_token: hash.get('refresh_token') || '',
-      expires_at: Date.now() + ((parseInt(hash.get('expires_in') || '3600', 10)) * 1000),
+      expires_at: Date.now() + duree * 1000,
       user: null,
     };
     cleanAuthUrl();
-    AUTH = { ...AUTH, session: sess };
     const me = await fetchMe(at);                        // qui es-tu ?
-    writeSession({ ...sess, user: me ? { id: me.id, email: me.email } : null, ...(me ? { totp: me._totp, totpNoms: me._totpNoms } : {}) });
+    if(typeof me?.id!=='string'||!me.id.trim())return{error:'La connexion n’a pas pu être vérifiée. Recommence depuis VRM.'};
     if (type === 'recovery') RECOVERY_PENDING = true;
+    writeSession({ ...sess, user: me ? { id: me.id, email: me.email } : null, ...(me ? { totp: me._totp, totpNoms: me._totpNoms } : {}) });
     return { ok: true, recovery: type === 'recovery' };
   }
   return null;
@@ -1419,14 +1465,17 @@ const consumeAuthRedirect = async () => {
 
 // Le jeton ne dit pas l'email en clair : on demande à Supabase qui il désigne.
 const fetchMe = async (token) => {
+  const controle=new AbortController(),delai=setTimeout(()=>controle.abort(),20000);
   try {
-    const res = await fetch(`${SUPABASE_URL}/auth/v1/user`, { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${token}` } });
+    const res = await fetch(`${SUPABASE_URL}/auth/v1/user`, { signal:controle.signal, headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${token}` } });
     if (!res.ok) return null;
     const j = await res.json();
+    if(typeof j?.id!=='string'||!j.id.trim())return null;
     // `_totp` : les facteurs TOTP vérifiés (double vérification), rangés à part
     // dans la session par l'appelant — jamais dans `user`.
     return { id: j.id, email: j.email, _totp: totpVerifies(j), _totpNoms: totpNoms(j) };
   } catch (_) { return null; }
+  finally{clearTimeout(delai);}
 };
 
 // Changer son adresse email. Supabase envoie une confirmation aux DEUX adresses
@@ -1450,18 +1499,21 @@ const authSetEmail = async (email) => {
 
 // Choisir un nouveau mot de passe (après le lien « mot de passe oublié »).
 const authSetPassword = async (password) => {
-  const tok = AUTH.session && AUTH.session.access_token;
-  if (!tok) return { ok: false, error: 'Lien expiré, redemande un email.' };
+  const tok=AUTH.session?.access_token,uid=AUTH.session?.user?.id;
+  if(!tok||!uid)return{ok:false,error:'Lien expiré, redemande un email.'};
+  const controle=new AbortController(),delai=setTimeout(()=>controle.abort(),20000);
   try {
-    const res = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
-      method: 'PUT',
-      headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${tok}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ password }),
+    const res=await fetch(`${SUPABASE_URL}/auth/v1/user`,{
+      method:'PUT',signal:controle.signal,
+      headers:{apikey:SUPABASE_KEY,Authorization:`Bearer ${tok}`,'Content-Type':'application/json'},
+      body:JSON.stringify({password}),
     });
-    const j = await res.json().catch(() => ({}));
-    if (!res.ok) return { ok: false, error: j.msg || j.message || 'Mot de passe refusé.' };
-    return { ok: true };
-  } catch (_) { return { ok: false, error: 'Pas de connexion internet.' }; }
+    const j=await res.json().catch(()=>({}));
+    if(!res.ok)return{ok:false,error:res.status>=500?'Le changement n’a pas pu être confirmé. Réessaie dans un instant.':j?.msg||j?.message||'Mot de passe refusé.'};
+    if(j?.id!==uid||AUTH.session?.access_token!==tok)return{ok:false,error:'Le changement n’a pas pu être confirmé pour ce compte. Reconnecte-toi avant de continuer.'};
+    return{ok:true};
+  }catch(_){return{ok:false,error:'Le changement n’a pas pu être confirmé. Vérifie ta connexion avant de réessayer.'};}
+  finally{clearTimeout(delai);}
 };
 // « Se déconnecter » (un GESTE) déconnecte aussi l'extension de ce Chrome —
 // adressé, et seulement si elle écrit sous CE compte. Une session qui meurt
@@ -14549,6 +14601,11 @@ function AuthScreen() {
   // · `false` = fermée · `null` = pas su. Une seule requête, en lecture seule
   // (§2.3 : une sonde n'écrit jamais dans sa base).
   const [ouverte, setOuverte] = React.useState(undefined);
+  const [moyensConnexion,setMoyensConnexion]=React.useState(etatAuthSettings);
+  React.useEffect(()=>{
+    const actualiser=()=>setMoyensConnexion(etatAuthSettings());
+    const off=onAuthSettingsChange(actualiser);actualiser();return off;
+  },[]);
   React.useEffect(() => {
     let stop = false;
     (async () => { const v = await sondeLectureSansCompte(); if (!stop) setOuverte(v); })();
@@ -14557,7 +14614,7 @@ function AuthScreen() {
   // `?inscription` = le bouton « Créer mon compte » de la page d'accueil : on
   // ouvre directement le bon formulaire (un clic de plus pour s'inscrire, c'est
   // des inscriptions en moins).
-  const [mode, setMode] = React.useState(() => (AUTH_REDIRECT && AUTH_REDIRECT.recovery) ? 'newpw'
+  const [mode, setMode] = React.useState(() => (RECOVERY_PENDING || (AUTH_REDIRECT && AUTH_REDIRECT.recovery)) ? 'newpw'
     : (/[?&]inscription(=|&|$)/.test(window.location.search || '') ? 'up' : 'in')); // in · up · reset · newpw
   const [email, setEmail] = React.useState('');
   // Le prénom demandé à l'inscription : il sert au bonjour de l'accueil, rien
@@ -14568,6 +14625,7 @@ function AuthScreen() {
   const [motDePasseVisible, setMotDePasseVisible] = React.useState(false);
   React.useEffect(()=>setMotDePasseVisible(false),[mode]);
   const [busy, setBusy] = React.useState(false);
+  const [fournisseurEnCours,setFournisseurEnCours]=React.useState('');
   const demandeEnCours=React.useRef(false);
   const [err, setErr] = React.useState(() => (AUTH_REDIRECT && AUTH_REDIRECT.error) || '');
   const [info, setInfo] = React.useState('');
@@ -14589,7 +14647,7 @@ function AuthScreen() {
   // bouton « Se connecter » reste bloqué sur « ... ». `pageshow`+`persisted` est
   // le seul signal d'une restauration bfcache : on débloque le bouton.
   React.useEffect(() => {
-    const onShow = (e) => { if (e && e.persisted) setBusy(false); };
+    const onShow = (e) => { if (e && e.persisted) {demandeEnCours.current=false;setBusy(false);setFournisseurEnCours('');} };
     window.addEventListener('pageshow', onShow);
     return () => window.removeEventListener('pageshow', onShow);
   }, []);
@@ -14601,10 +14659,29 @@ function AuthScreen() {
 
   const oauth = async (p) => {
     if(busy||demandeEnCours.current)return;
-    setErr(''); setBusy(true);
-    const r = await oauthStart(p);
-    if (!r.ok) { setErr(r.error); setBusy(false); }
-    // Si ça marche, la page part chez le fournisseur : rien d'autre à faire.
+    demandeEnCours.current=true;setErr('');setInfo('');setBusy(true);setFournisseurEnCours(p);
+    try {
+      const r=await oauthStart(p);
+      if (!r.ok) {demandeEnCours.current=false;setErr(r.error);setBusy(false);setFournisseurEnCours('');}
+    } catch (_) {demandeEnCours.current=false;setErr('Impossible d’ouvrir cette connexion. Réessaie.');setBusy(false);setFournisseurEnCours('');}
+    // Le verrou reste pris pendant le départ chez le fournisseur ; pageshow
+    // le libère si l’utilisateur revient en arrière avec le cache du navigateur.
+  };
+
+  const actionConfirmation = async (action) => {
+    if(busy||demandeEnCours.current||(action!=='confirmer'&&enAttenteEmail))return;
+    demandeEnCours.current=true;setBusy(true);setErr('');setInfo('');
+    try {
+      const r=await (action==='confirmer'?authConfirmFromLink(confirmLink,email):action==='renvoyer'?authResendConfirm(email):authMagicLink(email));
+      if(!r.ok){if(r.recovery){setMode('reset');setNeedConfirm(false);setConfirmLink('');}if(!attendreEmail(r))setErr(r.error);return;}
+      if(action==='confirmer'){
+        setNeedConfirm(false);setConfirmLink('');
+        setInfo(r.connected?'Compte confirmé. Connexion en cours…':'Adresse confirmée. Tu peux maintenant te connecter avec ton mot de passe.');
+        if(r.connected)setTimeout(()=>location.reload(),800);
+      } else if(action==='renvoyer')setInfo('Nouvel email envoyé — utilise le plus récent.');
+      else setInfo('Lien de connexion envoyé. Ouvre le lien du mail pour continuer. S’il ne s’ouvre pas, utilise l’aide « Le lien de confirmation ne s’ouvre pas ? ».');
+    } catch (_) {setErr('La demande n’a pas pu être confirmée. Réessaie dans un instant.');}
+    finally {demandeEnCours.current=false;setBusy(false);}
   };
 
   const submit = async (e) => {
@@ -14613,7 +14690,8 @@ function AuthScreen() {
     if (enAttenteEmail && (mode === 'up' || mode === 'reset')) return;
     setErr(''); setInfo('');
     if (mode !== 'newpw' && !email.trim()) { setErr('Indique ton email.'); return; }
-    if (mode !== 'reset' && pw.length < 8) { setErr('Le mot de passe doit faire au moins 8 caractères.'); return; }
+    if (mode !== 'reset' && !pw) {setErr('Indique ton mot de passe.');return;}
+    if ((mode === 'up' || mode === 'newpw') && pw.length < 8) { setErr('Le mot de passe doit faire au moins 8 caractères.'); return; }
     // Un mot de passe qui protège une comptabilité mérite mieux que « 12345678 ».
     if ((mode === 'up' || mode === 'newpw') && /^(\d+|[a-z]+)$/i.test(pw)) { setErr('Mélange lettres et chiffres — ce mot de passe protège ta compta.'); return; }
     demandeEnCours.current=true;setBusy(true);
@@ -14647,7 +14725,8 @@ function AuthScreen() {
         // pourrait garder en mémoire les données du vendeur précédent.
         else location.reload();
       }
-    } finally { demandeEnCours.current=false;setBusy(false); }
+    } catch (_) {setErr('La demande n’a pas pu être confirmée. Réessaie dans un instant.');}
+    finally { demandeEnCours.current=false;setBusy(false); }
   };
 
   // 16 px : sous 16 px, Safari iPhone ZOOME la page au toucher d'un champ.
@@ -14786,6 +14865,12 @@ function AuthScreen() {
             </div>
           )}
 
+          {(mode==='in'||mode==='up') && moyensConnexion.statut==='chargement' && <div role="status" style={{fontSize:12,color:C.muted,lineHeight:1.5,marginBottom:12}}>Chargement des autres moyens de connexion… Tu peux déjà utiliser ton email.</div>}
+          {(mode==='in'||mode==='up') && moyensConnexion.statut==='erreur' && <div data-auth-moyens-indisponibles="" style={{fontSize:12,color:C.text,lineHeight:1.5,marginBottom:14,padding:'10px 12px',border:`1px solid ${C.border}`,borderRadius:8}}>
+            Les autres moyens de connexion n’ont pas pu être chargés. L’email reste disponible.
+            <button type="button" disabled={busy} onClick={()=>loadAuthSettings()} style={{display:'block',minHeight:44,padding:'8px 0 0',border:0,background:'transparent',color:C.accent,font:'inherit',fontWeight:600,cursor:busy?'default':'pointer'}}>Réessayer les moyens de connexion</button>
+          </div>}
+
           {/* Connexion par Google / Discord, EN PREMIER : c'est le chemin le plus
               court et le plus sûr (aucun mot de passe à créer, donc aucun mot de
               passe à se faire voler ici). */}
@@ -14801,7 +14886,7 @@ function AuthScreen() {
                   style={{width:'100%',display:'flex',alignItems:'center',justifyContent:'center',gap:10,
                     border:`1px solid ${C.border}`,background:C.bg,color:C.text,borderRadius:10,padding:'12px',
                     fontSize:14,fontWeight:600,cursor:busy?'default':'pointer',marginBottom:9,fontFamily:'inherit'}}>
-                  <BrandMark id={p.id}/> {mode==='up' ? `Créer mon compte avec ${p.label}` : `Continuer avec ${p.label}`}
+                  <BrandMark id={p.id}/> {fournisseurEnCours===p.id ? `Ouverture de ${p.label}…` : mode==='up' ? `Créer mon compte avec ${p.label}` : `Continuer avec ${p.label}`}
                 </button>
               ))}
               <div style={{display:'flex',alignItems:'center',gap:10,margin:'4px 0 12px'}}>
@@ -14867,15 +14952,13 @@ function AuthScreen() {
               Ton compte <b>{email}</b> attend sa confirmation.
               <div style={{display:'flex',gap:7,marginTop:8,flexWrap:'wrap'}}>
                 <button type="button" data-auth-renvoyer="" disabled={busy||enAttenteEmail}
-                  onClick={async()=>{ setBusy(true); const r=await authResendConfirm(email); setBusy(false);
-                    if(r.ok){ setErr(''); setInfo('Nouvel email envoyé — utilise le plus récent.'); } else if(!attendreEmail(r)) setErr(r.error); }}
+                  onClick={()=>actionConfirmation('renvoyer')}
                   style={{border:`1px solid ${C.warn}`,background:'transparent',color:C.warn,
                     borderRadius:8,padding:'9px 13px',fontSize:12,fontWeight:600,cursor:(busy||enAttenteEmail)?'default':'pointer',opacity:enAttenteEmail?0.5:1,fontFamily:'inherit'}}>
                   {enAttenteEmail ? `Renvoyer dans ${resteAttente} s` : "Renvoyer l'email"}
                 </button>
                 <button type="button" data-auth-lien-connexion="" disabled={busy||enAttenteEmail}
-                  onClick={async()=>{ setBusy(true); const r=await authMagicLink(email); setBusy(false);
-                    if(r.ok){ setErr(''); setInfo("Lien de connexion envoyé. Ouvre le lien du mail pour continuer. S’il ne s’ouvre pas, utilise l’aide « Le lien de confirmation ne s’ouvre pas ? »."); } else if(!attendreEmail(r)) setErr(r.error); }}
+                  onClick={()=>actionConfirmation('lien')}
                   style={{border:`1px solid ${C.border}`,background:'transparent',color:C.text,
                     borderRadius:8,padding:'9px 13px',fontSize:12,fontWeight:600,cursor:(busy||enAttenteEmail)?'default':'pointer',opacity:enAttenteEmail?0.5:1,fontFamily:'inherit'}}>
                   Recevoir un lien de connexion
@@ -14895,8 +14978,7 @@ function AuthScreen() {
                 style={{width:'100%',boxSizing:'border-box',marginTop:8,border:`1px solid ${C.border}`,borderRadius:8,
                   padding:'10px 11px',fontSize:16,background:C.card,color:C.text,outline:'none',fontFamily:'inherit'}}/>
                 <button type="button" disabled={busy||!confirmLink.trim()}
-                  onClick={async()=>{ setBusy(true); setErr(''); const r=await authConfirmFromLink(confirmLink, email); setBusy(false);
-                    if(r.ok){ setNeedConfirm(false); setInfo('Compte confirmé !'); setTimeout(()=>location.reload(), 800); } else setErr(r.error); }}
+                  onClick={()=>actionConfirmation('confirmer')}
                   style={{border:'none',background:C.accent,color:C.onAccent||'#fff',borderRadius:8,padding:'9px 13px',
                     fontSize:12,fontWeight:600,cursor:(busy||!confirmLink.trim())?'default':'pointer',opacity:(busy||!confirmLink.trim())?0.5:1,fontFamily:'inherit'}}>
                   Confirmer avec ce lien
@@ -14906,13 +14988,13 @@ function AuthScreen() {
           )}
           {info && <div role="status" aria-live="polite" style={{fontSize:12.5,color:C.accent,background:`${C.accent}12`,border:`1px solid ${C.accent}44`,borderRadius:8,padding:'9px 11px',marginBottom:10,lineHeight:1.4}}>{info}</div>}
 
-          {mode==='reset' && <div data-auth-recuperation-secours style={{fontSize:12,lineHeight:1.5,marginBottom:12,color:C.muted}}>Le lien ne s’ouvre pas dans Safari ? <a href="/recuperation.html" style={{color:C.accent}}>Ouvrir la récupération dans VRM</a>, puis colle le lien reçu.</div>}
+          {mode==='reset' && <div data-auth-recuperation-secours style={{fontSize:12,lineHeight:1.5,marginBottom:12,color:C.muted}}>Tu as déjà un lien qui ne s’ouvre pas ? <a href="/recuperation.html" style={{color:C.accent}}>Ouvrir la récupération dans VRM</a>, puis colle le lien reçu.</div>}
           {/* L'attente ne porte que sur ce qui ENVOIE un email (inscription, lien de
               mot de passe) — jamais sur « Se connecter ». */}
           {(()=>{ const bloque = busy || attendCaptcha || (enAttenteEmail && (mode==='up'||mode==='reset')); return (
           <button type="submit" data-auth-valider="" disabled={bloque} style={{width:'100%',border:'none',background:C.accent,color:C.onAccent||'#fff',
             borderRadius:10,padding:'13px',fontSize:15,fontWeight:600,cursor:bloque?'default':'pointer',opacity:bloque?0.6:1,fontFamily:'inherit'}}>
-            {busy ? (mode==='up'?'Création du compte…':mode==='reset'?'Envoi du lien…':mode==='newpw'?'Enregistrement…':'Connexion…') : (enAttenteEmail && (mode==='up'||mode==='reset')) ? `Réessaie dans ${resteAttente} s` : attendCaptcha ? (captcha.statut==='erreur' ? 'Vérification anti-robot indisponible' : captcha.statut==='interactif' ? 'Coche la vérification ci-dessus' : 'Vérification anti-robot…') : mode==='up' ? 'Créer mon compte' : mode==='reset' ? 'Envoyer le lien' : mode==='newpw' ? 'Enregistrer' : 'Se connecter'}
+            {busy ? (fournisseurEnCours?'Ouverture de la connexion…':mode==='up'?'Création du compte…':mode==='reset'?'Envoi du lien…':mode==='newpw'?'Enregistrement…':'Connexion…') : (enAttenteEmail && (mode==='up'||mode==='reset')) ? `Réessaie dans ${resteAttente} s` : attendCaptcha ? (captcha.statut==='erreur' ? 'Vérification anti-robot indisponible' : captcha.statut==='interactif' ? 'Coche la vérification ci-dessus' : 'Vérification anti-robot…') : mode==='up' ? 'Créer mon compte' : mode==='reset' ? 'Envoyer le lien' : mode==='newpw' ? 'Enregistrer' : 'Se connecter'}
           </button>);})()}
           {/* Acceptation des conditions AVANT la création du compte (art. 1127-1
               C. civ., RGPD art. 13 : l'information est donnée au moment de la
