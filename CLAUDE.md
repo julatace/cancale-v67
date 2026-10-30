@@ -1329,6 +1329,16 @@
 > et relues mais PAS en ligne (leur contenu est dans `docs/passation/branches-2026-10-30.bundle`), l'ordre de
 > mise en ligne (une seule intégration, un seul numéro d'extension), la refonte des boutons en cours, Vestiaire.
 
+> **30 octobre — refonte visuelle en ligne (première passe, `v29-refonte` sur #911/#912) :** trois formes de
+> bouton seulement — `vrm-b-primaire` · `vrm-b-secondaire` · `vrm-b-discret` (`src/styles-boutons.css`, composant
+> `Bouton` ; `Btn` est secondaire par défaut, un primaire se DEMANDE ; plus de rouge hors doublon de N°, Annuler
+> en discret). `Avancement` (une barre : où j'en suis, combien, ce qui a raté) pour Republier. Une ligne de texte
+> par bloc, le détail derrière ⓘ ; menus « Outils » en feuille du bas sur téléphone. Écrans traités : coque, Ma
+> journée, Ventes, Achats, Republier, Stock, Statistiques, Communauté, Réglages (et une première touche sur
+> Annonces, Colis, Compta). L'écran de connexion/inscription est celui de #911/#912, non retouché. **Reste (seconde
+> passe)** : Annonces, Messages, Leboncoin, eBay, Colis, Compta ; et UN primaire par écran, par le slot principal
+> de `ScreenHead`.
+
 > ⛔⛔ **DÉCISION DE JULIEN, 22 OCTOBRE : PAS DE DOUBLE VÉRIFICATION PAR SMS — C'EST PAYANT.**
 > Mesuré dans la doc Supabase (« Advanced MFA Phone ») : **75 $/mois** pour le premier projet,
 > hors plafond de dépenses, **plus** chaque SMS facturé par Twilio/MessageBird. Julien : « si c'est
