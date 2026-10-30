@@ -434,7 +434,7 @@ async function partie019(nav) {
       dit(sansSecret(dom).length === 0, 'aucun email ni identifiant de compte dans le DOM', sansSecret(dom).join(', '));
       if (sombre) {
         const l = await pg.evaluate(() => { const c = document.querySelector('[data-cm-classement] .vrm-cm-carton'); const v = (getComputedStyle(c).backgroundColor.match(/[\d.]+/g) || []).map(Number); return (v[0] + v[1] + v[2]) / 3; });
-        dit(l < 40, 'mode sombre : le classement est sombre', String(l));
+        dit(l < 70, 'mode sombre : le classement est sombre (surface du thème, ~45 ; clair ≈ 250)', String(l));
       }
       const lp = await pg.evaluate(() => document.documentElement.scrollWidth);
       dit(lp <= largeur, 'classement : aucun débordement horizontal', String(lp));

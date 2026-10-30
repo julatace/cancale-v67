@@ -9546,8 +9546,8 @@ const ImprimanteSetting = ({ nu = false }) => {
       ]}/>
       <div data-imprimante-phrase style={{fontSize:12.5,color:C.muted,marginTop:10,lineHeight:1.5}}>
         {mode === 'thermique'
-          ? <>Chaque étiquette sort <b style={{color:C.text}}>seule, au format 10 × 15 cm</b>, tournée à l’endroit et entière (sans la fiche destinataire ni la pub), ton N° dans un espace blanc vérifié sur l’étiquette. Quand l’app ne sait pas repérer l’étiquette sur un bordereau, la page part <b style={{color:C.text}}>entière</b> et l’écran le dit — jamais un code-barres coupé. Dans la fenêtre d’impression, choisis le papier <b style={{color:C.text}}>100 × 150 mm</b> et l’échelle <b style={{color:C.text}}>100 %</b> (ou « taille réelle »).</>
-          : <>La page complète, <b style={{color:C.text}}>une feuille A4 par bordereau</b>, ton N° dans un espace blanc vérifié sur ce PDF, sans réduire le document. Si ton imprimante sort du recto-verso, décoche-le dans sa fenêtre d’impression : le PDF le demande, le pilote peut passer outre.</>}
+          ? <>Une étiquette par page, <b style={{color:C.text}}>10 × 15 cm</b>, ton N° dessus ; étiquette pas repérée ⇒ page <b style={{color:C.text}}>entière</b>. <Pourquoi label="Détail">Chaque étiquette sort seule, tournée à l’endroit et entière (sans la fiche destinataire ni la pub), ton N° dans un espace blanc vérifié. Quand l’app ne sait pas repérer l’étiquette sur un bordereau, la page part entière et l’écran le dit — jamais un code-barres coupé.</Pourquoi></>
+          : <>A4, <b style={{color:C.text}}>une feuille par bordereau</b>, ton N° dans un blanc du PDF. <Pourquoi label="Recto-verso ?">Le document n’est pas réduit. Si ton imprimante sort du recto-verso, décoche-le dans sa fenêtre d’impression : le PDF le demande, le pilote peut passer outre.</Pourquoi></>}
       </div>
       <div style={{marginTop:14,paddingTop:12,borderTop:`1px solid ${C.border}`}}>
         <div style={{fontSize:13,fontWeight:600,color:C.text}}>Tes types de bordereaux</div>
@@ -29715,7 +29715,7 @@ function Garage({catalog,garageGrid,setGarageGrid,blockedCells,setBlockedCells,e
           de plateforme) : plus de segment rempli d'accent, plus de boîte bordée. */}
       <nav role="group" aria-label="Vue du stock" className="vrm-seg" data-segment="" data-stock-vues="" style={{'--seg-ink':C.text,'--seg-muted':C.muted,'--seg-point':C.accent,margin:0}}>
         {/* (30 oct.) Des mots courts : à 390 px le 4ᵉ onglet était coupé (« En photos » à moitié). */}
-        {[['meubles','box','Meubles'],['plan','home','Pièce'],['ranger','grid','Cases'],['photos','image','Photos']].map(([v,ic,l])=>(
+        {[['meubles','box','Meubles'],['plan','home','Ma pièce'],['ranger','grid','Cases'],['photos','image','Photos']].map(([v,ic,l])=>(
           <button type="button" key={v} onClick={()=>{setGarageView(v);save('vinted_garage_view',v);}} aria-current={garageView===v?'page':undefined} aria-pressed={garageView===v} data-stock-vue={v} className="vrm-seg-btn">
             <Icon name={ic} size={15}/>{l}
           </button>
