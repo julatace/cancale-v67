@@ -1183,14 +1183,15 @@ const authSignIn  = async (email, password) => {
 const authConfirmFromLink = async (raw, email) => {
   const txt = String(raw || '').trim();
   if (!txt) return { ok: false, error: 'Colle le lien reçu par email.' };
-  let q = null;
+  let q = null, typeFragment='';
   if (/^\d{6}$/.test(txt)) q = new URLSearchParams({ token: txt, type: 'signup' });  // code à 6 chiffres collé tel quel
   else {
-    try { q = new URL(txt).searchParams; }
+    try { const u=new URL(txt);q=u.searchParams;typeFragment=new URLSearchParams(u.hash.slice(1)).get('type')||''; }
     catch (_) { const i = txt.indexOf('?'); if (i >= 0) q = new URLSearchParams(txt.slice(i + 1)); }
   }
   if (!q) return { ok: false, error: "Ce n'est ni un lien, ni un code à 6 chiffres." };
   const type = q.get('type') || 'signup';
+  if(type==='recovery'||typeFragment==='recovery')return{ok:false,recovery:true,error:'Ce lien sert à changer ton mot de passe. Ouvre la récupération ci-dessous, puis colle le lien reçu.'};
   const hash = q.get('token_hash');
   const token = q.get('token');
   if (!hash && !token) return { ok: false, error: "Ce lien ne contient pas de jeton de confirmation." };
@@ -1403,8 +1404,13 @@ const oauthRelier = async provider => {
 // Dans les deux cas on NETTOIE l'URL derrière nous : un jeton ne doit pas
 // rester dans la barre d'adresse ni partir dans l'historique.
 const cleanAuthUrl = () => {
-  try { window.history.replaceState({}, '', window.location.pathname + window.location.search.replace(/[?&](code|error|error_description|error_code)=[^&]*/g, '').replace(/^&/, '?')); } catch (_) {}
-  try { if (window.location.hash) window.history.replaceState({}, '', window.location.pathname + window.location.search); } catch (_) {}
+  try {
+    const q=new URLSearchParams(window.location.search||'');
+    // URLSearchParams reconnaît aussi les noms encodés et les doublons.
+    for(const k of ['code','error','error_description','error_code','token','token_hash','access_token','refresh_token','provider_token','provider_refresh_token','expires_in','expires_at','token_type','type','state'])q.delete(k);
+    const reste=q.toString();
+    window.history.replaceState({},'',window.location.pathname+(reste?'?'+reste:''));
+  }catch(_){}
 };
 const consumeAuthRedirect = async () => {
   if (!MULTI_USER) return null;
@@ -1430,24 +1436,28 @@ const consumeAuthRedirect = async () => {
     if (!r.ok) return { error: r.error };
     if(typeof r.json?.access_token!=='string'||!r.json.access_token.trim()||typeof r.json?.user?.id!=='string'||!r.json.user.id.trim())return{error:'La connexion n’a pas pu être vérifiée. Recommence depuis VRM.'};
     if(!resultatLiaisonPermis(liaison,r.json))return{error:'La liaison ne correspond pas à ton compte VRM. Ta session a été conservée.'};
+    const recovery=q.get('type')==='recovery';
+    if(recovery)RECOVERY_PENDING=true;
     writeSession(sessionFrom(r.json));
-    return { ok: true, liaison:liaison?.provider };
+    return { ok: true, liaison:liaison?.provider, recovery };
   }
 
   const at = hash.get('access_token');
   if (at) {
     const type = hash.get('type');
+    const valeurDuree=hash.get('expires_in'),duree=valeurDuree===null?3600:Number(valeurDuree);
+    if(!Number.isFinite(duree)||duree<=0||!Number.isFinite(Date.now()+duree*1000)){cleanAuthUrl();return{error:'Ce lien n’est pas utilisable. Redemande un email depuis la connexion.'};}
     const sess = {
       access_token: at,
       refresh_token: hash.get('refresh_token') || '',
-      expires_at: Date.now() + ((parseInt(hash.get('expires_in') || '3600', 10)) * 1000),
+      expires_at: Date.now() + duree * 1000,
       user: null,
     };
     cleanAuthUrl();
     const me = await fetchMe(at);                        // qui es-tu ?
     if(typeof me?.id!=='string'||!me.id.trim())return{error:'La connexion n’a pas pu être vérifiée. Recommence depuis VRM.'};
-    writeSession({ ...sess, user: me ? { id: me.id, email: me.email } : null, ...(me ? { totp: me._totp, totpNoms: me._totpNoms } : {}) });
     if (type === 'recovery') RECOVERY_PENDING = true;
+    writeSession({ ...sess, user: me ? { id: me.id, email: me.email } : null, ...(me ? { totp: me._totp, totpNoms: me._totpNoms } : {}) });
     return { ok: true, recovery: type === 'recovery' };
   }
   return null;
@@ -14487,7 +14497,7 @@ function AuthScreen() {
   // `?inscription` = le bouton « Créer mon compte » de la page d'accueil : on
   // ouvre directement le bon formulaire (un clic de plus pour s'inscrire, c'est
   // des inscriptions en moins).
-  const [mode, setMode] = React.useState(() => (AUTH_REDIRECT && AUTH_REDIRECT.recovery) ? 'newpw'
+  const [mode, setMode] = React.useState(() => (RECOVERY_PENDING || (AUTH_REDIRECT && AUTH_REDIRECT.recovery)) ? 'newpw'
     : (/[?&]inscription(=|&|$)/.test(window.location.search || '') ? 'up' : 'in')); // in · up · reset · newpw
   const [email, setEmail] = React.useState('');
   // Le prénom demandé à l'inscription : il sert au bonjour de l'accueil, rien
@@ -14546,7 +14556,7 @@ function AuthScreen() {
     demandeEnCours.current=true;setBusy(true);setErr('');setInfo('');
     try {
       const r=await (action==='confirmer'?authConfirmFromLink(confirmLink,email):action==='renvoyer'?authResendConfirm(email):authMagicLink(email));
-      if(!r.ok){if(!attendreEmail(r))setErr(r.error);return;}
+      if(!r.ok){if(r.recovery){setMode('reset');setNeedConfirm(false);setConfirmLink('');}if(!attendreEmail(r))setErr(r.error);return;}
       if(action==='confirmer'){
         setNeedConfirm(false);setConfirmLink('');
         setInfo(r.connected?'Compte confirmé. Connexion en cours…':'Adresse confirmée. Tu peux maintenant te connecter avec ton mot de passe.');
@@ -14861,7 +14871,7 @@ function AuthScreen() {
           )}
           {info && <div role="status" aria-live="polite" style={{fontSize:12.5,color:C.accent,background:`${C.accent}12`,border:`1px solid ${C.accent}44`,borderRadius:8,padding:'9px 11px',marginBottom:10,lineHeight:1.4}}>{info}</div>}
 
-          {mode==='reset' && <div data-auth-recuperation-secours style={{fontSize:12,lineHeight:1.5,marginBottom:12,color:C.muted}}>Le lien ne s’ouvre pas dans Safari ? <a href="/recuperation.html" style={{color:C.accent}}>Ouvrir la récupération dans VRM</a>, puis colle le lien reçu.</div>}
+          {mode==='reset' && <div data-auth-recuperation-secours style={{fontSize:12,lineHeight:1.5,marginBottom:12,color:C.muted}}>Tu as déjà un lien qui ne s’ouvre pas ? <a href="/recuperation.html" style={{color:C.accent}}>Ouvrir la récupération dans VRM</a>, puis colle le lien reçu.</div>}
           {/* L'attente ne porte que sur ce qui ENVOIE un email (inscription, lien de
               mot de passe) — jamais sur « Se connecter ». */}
           {(()=>{ const bloque = busy || attendCaptcha || (enAttenteEmail && (mode==='up'||mode==='reset')); return (

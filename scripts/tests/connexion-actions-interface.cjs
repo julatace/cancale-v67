@@ -19,6 +19,7 @@ const { build } = require("esbuild"),
  const sondeLectureSansCompte=async()=>false,useSecondesRestantes=()=>0,useCaptcha=()=>({statut:'pret'}),captchaActif=()=>false,confirmRequired=()=>false,CaptchaConnexion=()=>null,LiensLegaux=()=>null,BrandMark=()=>null;
  const etatAuthSettings=()=>({statut:'pret'}),onAuthSettingsChange=()=>()=>{},loadAuthSettings=async()=>{};
  const OAUTH_PROVIDERS=[{id:'google',label:'Google'},{id:'discord',label:'Discord'}],providerEnabled=()=>true,delaiDemandeEmail=()=>null,TEXTE_DELAI_EMAIL_BOUTON='',texteDelaiEmail=()=>'',save=()=>{};
+ let RECOVERY_PENDING=false;window.forcerRecuperation=()=>{RECOVERY_PENDING=true;window.remonter();};
  window.appels=[];window.attentes={};const demande=(action)=>{window.appels.push(action);return new Promise((resolve,reject)=>{window.attentes[action]={resolve,reject};});};
  const oauthStart=p=>demande(p),authSignIn=()=>demande('connexion'),authSignUp=()=>demande('inscription'),authReset=()=>demande('reset'),authSetPassword=()=>demande('motdepasse'),authResendConfirm=()=>demande('renvoyer'),authMagicLink=()=>demande('lien'),authConfirmFromLink=()=>demande('confirmer');
  ${s.slice(a, b)}
@@ -187,6 +188,46 @@ const { build } = require("esbuild"),
           () => document.documentElement.scrollWidth <= innerWidth,
         ),
         true,
+      );
+      await p
+        .getByRole("button", { name: "Se connecter", exact: true })
+        .click();
+      await resoudre("connexion", { ok: false, needsConfirm: true });
+      await p.locator(".vrm-cx-aide-confirmation summary").click();
+      await p
+        .getByLabel("Lien de confirmation reçu par email")
+        .fill(
+          "https://vrm.center/recuperation.html#type=recovery&token_hash=fictif",
+        );
+      await p
+        .getByRole("button", { name: "Confirmer avec ce lien", exact: true })
+        .click();
+      await resoudre("confirmer", {
+        ok: false,
+        recovery: true,
+        error: "Ce lien sert à changer ton mot de passe.",
+      });
+      await p
+        .getByRole("heading", { name: "Mot de passe oublié", exact: true })
+        .waitFor();
+      assert.equal(
+        await p
+          .getByRole("link", {
+            name: "Ouvrir la récupération dans VRM",
+            exact: true,
+          })
+          .getAttribute("href"),
+        "/recuperation.html",
+      );
+      assert.equal(await p.locator("[data-auth-renvoyer]").count(), 0);
+      await p.evaluate(() => window.forcerRecuperation());
+      await p
+        .getByRole("heading", { name: "Nouveau mot de passe", exact: true })
+        .waitFor();
+      assert.equal(
+        await p.getByLabel("Adresse email", { exact: true }).count(),
+        0,
+        "Le lien de récupération affiche le bon formulaire avant même le retour global",
       );
       assert.deepEqual(erreurs, []);
       await p.close();
