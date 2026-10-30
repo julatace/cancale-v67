@@ -42,7 +42,10 @@ try {
 } catch (_) { /* pas de config vite : rien à ajouter */ }
 
 const fichiers = process.argv.slice(2).length ? process.argv.slice(2)
-  : ['src/App.jsx', 'src/main.jsx'].map(f => path.join(__dirname, '..', f)).filter(fs.existsSync);
+  // (30 oct.) Les écrans découpés d'App.jsx (`src/Ecran*.jsx`) aussi : une fusion
+  // y avait laissé `EspaceEmails` sans import — Réglages tombait sur le garde-fou.
+  : ['src/App.jsx', 'src/main.jsx', ...fs.readdirSync(path.join(__dirname, '..', 'src')).filter(n => /^Ecran.*\.jsx$/.test(n)).map(n => 'src/' + n)]
+      .map(f => path.join(__dirname, '..', f)).filter(fs.existsSync);
 
 let ko = 0;
 for (const f of fichiers) {

@@ -131,3 +131,9 @@
 }
 
 .vrm-outils button:focus-visible,.vrm-outils summary:focus-visible,.vrm-historique button:focus-visible{outline:2px solid var(--vrm-accent,#42786e);outline-offset:3px}
+
+/* (30 oct.) Téléphone : replié, la ligne tient dans sa cible de 44 px (voir bilanSynchronisation.css). */
+@media (max-width: 767px) {
+  .vrm-outils:not([open]) { padding-block: 0; margin-block: 6px; }
+  .vrm-outils > summary { min-height: 44px; display: flex; flex-wrap: wrap; align-items: center; align-content: center; column-gap: 6px; row-gap: 0; line-height: 1.3; }
+}

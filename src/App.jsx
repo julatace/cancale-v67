@@ -26961,16 +26961,21 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // (30 oct.) Relue quand l'ENSEMBLE des annonces change, pas à chaque nouvelle
   // liste identique (relecture des annonces d'un autre compte, signal de
   // l'extension) : deux lectures de moins au démarrage de Ma journée (banc `vitesse`).
-  // Rien n'est lu tant que les annonces ne sont pas lues (elles seules s'en servent).
-  const cleAnnoncesNum = useMemo(() => Array.isArray(listings.items) ? listings.items.map((i) => i && i.id).sort().join(',') : null, [listings.items]);
+  // ⚠️ Lue aussi AVANT les annonces (clé '') : l'alerte « deux paires sous un N° » de
+  // Ma journée en dépend (banc journee-widgets A2, rouge quand elle attendait les annonces).
+  const cleAnnoncesNum = useMemo(() => Array.isArray(listings.items) ? listings.items.map((i) => i && i.id).sort().join(',') : '', [listings.items]);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { if (cleAnnoncesNum !== null) relireReservesNum(); }, [cleAnnoncesNum]);
+  const luNumAt = useRef({ res: 0, rec: 0 });
+  // Relue quand l'ensemble change, mais pas une seconde fois dans les 15 s de la
+  // première lecture (les annonces arrivent ~2 s après le démarrage : rien n'a pu changer).
+  useEffect(() => { if (Date.now() - luNumAt.current.res < 15000) return; luNumAt.current.res = Date.now(); relireReservesNum(); }, [cleAnnoncesNum]);
   // (28 oct.) Qui remplace qui après une republication : `vinted_brouillon_*`
   // (ancienId, itemId) et `coffre_*_*` (recreeDe), écrits par l'extension. Trois
   // états : undefined pas encore lu (on attend) · null pas su (comme avant) · objet.
   const [recreesNum, setRecreesNum] = useState(undefined);
   useEffect(() => {
-    if (cleAnnoncesNum === null) return undefined;
+    if (Date.now() - luNumAt.current.rec < 15000) return undefined;
+    luNumAt.current.rec = Date.now();
     let vivant = true;
     (async () => {
       try {
@@ -26983,7 +26988,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         if (vivant) setRecreesNum((v) => (v && JSON.stringify(v) === JSON.stringify(t) ? v : t));
       } catch (_) { if (vivant) setRecreesNum((v) => (v === undefined ? null : v)); }
     })();
-    return () => { vivant = false; };
+    // Pas de nettoyage « vivant = false » : un passage sauté (moins de 15 s) l'aurait
+    // déclenché et la première lecture n'aurait jamais abouti (numérotation bloquée).
+    return undefined;
   }, [cleAnnoncesNum]);
   const takenNums = useMemo(() => {
     const taken = new Set();
@@ -32707,6 +32714,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const bilansTete = ['journee','annonces','messages'].includes(curSub) ? <div className="vrm-bilans-tete" data-bilans-tete="">
     <BilanSynchronisation owner={AUTH.user?.id||''} sources={sourcesBilan} onNav={onNav}/>
     {['journee','annonces'].includes(curSub)&&<VendusAilleurs owner={AUTH.user?.id||''} ownerActuel={()=>AUTH.user?.id||''} charger={chargerRetraitsMulti} onNav={onNav} PhotoVinted={PhotoVinted}/>}
+    {/* (30 oct.) « Annonces à compléter » rejoint la rangée des résumés : sur ordinateur trois colonnes, une ligne de moins avant les annonces. */}
+    {curSub==='annonces'&&<AnnoncesACompleter items={annBase} numeros={numeros} drafts={drafts} ouvrir={setAtelier} charger={()=>loadListings(true)} charge={listings.loading} PhotoVinted={PhotoVinted} incomplet={!Array.isArray(listings.items)||!!listings.error||!!listings.incomplet}/>}
+    {curSub==='messages'&&<SynchronisationVinted comptes={accounts.filter(a=>!acctOff(a.vinted_user_id)).map(a=>({uid:String(a.vinted_user_id),nom:accName(a)}))} owner={AUTH.user?.id||''} ownerActuel={()=>AUTH.user?.id||''} lire={q=>lireTout(q,{strict:true})} connexion={uid=>diagnosticConnexion({uid,owner:AUTH.user?.id,extension:__vmrEtat,reponse:syncReponses[String(uid)]})} ecouter={onVmrExt} verifier={()=>sonderPonts()} relire={()=>{loadOrders('sold',setSales,true);loadListings(true);}}/>}
   </div> : null;
   return (
     <div style={{padding:'16px 14px 40px'}}>
@@ -35435,7 +35445,6 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             dit déjà où l'on est : pas de second titre. */}
         {!dansPlateforme && <ScreenHead icon="tag" title="Annonces en ligne" />}
         <NoAcc/>
-        <AnnoncesACompleter items={annBase} numeros={numeros} drafts={drafts} ouvrir={setAtelier} charger={()=>loadListings(true)} charge={listings.loading} PhotoVinted={PhotoVinted} incomplet={!Array.isArray(listings.items)||!!listings.error||!!listings.incomplet}/>
         {astuceNum && listings.items?.length>0 && (
           <div data-astuce-numeros style={{display:'flex',gap:10,alignItems:'flex-start',background:`${C.accent}0e`,border:`1px solid ${C.border}`,borderRadius:10,padding:'10px 12px',margin:'0 0 12px',fontSize:12.5,lineHeight:1.5,color:C.muted}}>
             <span aria-hidden="true" style={{fontSize:15,lineHeight:1.3}}>🔢</span>
@@ -35447,11 +35456,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             défaut. Le risque est dit à l'allumage (askConfirm). L'extension doit
             savoir le faire (capacité `offresauto`) et tourner dans CE Chrome. */}
         {listings.items?.length>0 && (
-          <div data-offres-auto-carte style={{display:'flex',flexDirection:'column',gap:8,border:`1px solid ${offresAuto?C.accent:C.border}`,background:offresAuto?`${C.accent}0c`:C.card,borderRadius:10,padding:'10px 12px',margin:'0 0 12px'}}>
+          <div data-offres-auto-carte style={{display:'flex',flexDirection:'column',gap:8,border:`1px solid ${offresAuto?C.accent:C.border}`,background:offresAuto?`${C.accent}0c`:C.card,borderRadius:10,padding:offresAuto?'10px 12px':'6px 12px',margin:'0 0 10px'}}>
             <div style={{display:'flex',alignItems:'center',gap:10}}>
               <div style={{flex:1,minWidth:0}}>
-                <div style={{fontSize:13,fontWeight:600,color:C.text,display:'flex',alignItems:'center',gap:6}}><Icon name="tag" size={14} style={{color:offresAuto?C.accent:C.muted}}/>Accepter les offres automatiquement</div>
-                <div style={{fontSize:12,color:C.muted,marginTop:2,lineHeight:1.45}}>{offresAuto ? "Une offre qui atteint le « mini » d'une annonce est acceptée toute seule, entre 3 et 20 min après (au hasard) — une à la fois, le compte ouvert dans Chrome seulement. Sous ton « refuse », elle est refusée ; entre les deux, à toi de négocier." : "Pose un « mini » sur une annonce, et VRM accepte les offres au-dessus à ta place."}</div>
+                <div style={{fontSize:13,fontWeight:600,color:C.text,display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}><Icon name="tag" size={14} style={{color:offresAuto?C.accent:C.muted}}/>Accepter les offres automatiquement{/* (30 oct.) éteint : l'explication tient sur la même ligne que le titre (une ligne de moins avant les annonces) */}{!offresAuto && <span data-offres-auto-resume style={{fontSize:12,fontWeight:400,color:C.muted}}>· VRM accepte à ta place les offres au-dessus du « mini » d'une annonce</span>}</div>
+                {offresAuto && <div style={{fontSize:12,color:C.muted,marginTop:2,lineHeight:1.45}}>{offresAuto ? "Une offre qui atteint le « mini » d'une annonce est acceptée toute seule, entre 3 et 20 min après (au hasard) — une à la fois, le compte ouvert dans Chrome seulement. Sous ton « refuse », elle est refusée ; entre les deux, à toi de négocier." : "Pose un « mini » sur une annonce, et VRM accepte les offres au-dessus à ta place."}</div>}
               </div>
               <button type="button" role="switch" aria-checked={offresAuto} data-offres-auto-toggle={offresAuto?'1':'0'} onClick={basculerOffresAuto}
                 style={{flexShrink:0,width:46,height:26,borderRadius:999,border:'none',cursor:'pointer',background:offresAuto?C.accent:C.border,position:'relative',transition:'background .15s'}} aria-label="Acceptation automatique des offres">
@@ -36334,7 +36343,6 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       {curSub==='messages' && (<>
         {!dansPlateforme && <ScreenHead icon="chat" title="Messages" />}
         <NoAcc/>
-        <SynchronisationVinted comptes={accounts.filter(a=>!acctOff(a.vinted_user_id)).map(a=>({uid:String(a.vinted_user_id),nom:accName(a)}))} owner={AUTH.user?.id||''} ownerActuel={()=>AUTH.user?.id||''} lire={q=>lireTout(q,{strict:true})} connexion={uid=>diagnosticConnexion({uid,owner:AUTH.user?.id,extension:__vmrEtat,reponse:syncReponses[String(uid)]})} ecouter={onVmrExt} verifier={()=>sonderPonts()} relire={()=>{loadOrders('sold',setSales,true);loadListings(true);}}/>
         <div className="vrm-messages-sections" role="group" aria-label="Choisir Conversations ou Favoris">
           <button type="button" aria-pressed={zoneMessages==='conversations'} onClick={()=>setZoneMessages('conversations')}><Icon name="chat" size={17}/>Conversations</button>
           <button type="button" aria-pressed={zoneMessages==='favoris'} onClick={()=>setZoneMessages('favoris')}><span aria-hidden="true">♡</span>Favoris reçus</button>

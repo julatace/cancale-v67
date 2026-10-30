@@ -22,16 +22,29 @@ export function AnnoncesACompleter({
   PhotoVinted,
   incomplet = false,
 }) {
-  const [filtre, setFiltre] = React.useState("manque");
   const lignes = items.map((it) => ({
     it,
     b: bilanAnnonce(it, drafts[String(numeros[it.id]?.numero || it.id)]),
   }));
   const n = lignes.filter((x) => x.b.manque.length).length;
+  const nInconnu = lignes.filter((x) => x.b.inconnu.length).length;
+  const [filtre, setFiltre] = React.useState(n || !nInconnu ? "manque" : "inconnu");
+  // (30 oct.) Rien à compléter, rien de non récupéré, lecture complète : la ligne
+  // se tait (« 0 avec champs manquants » n'apprenait rien et repoussait la liste).
+  if (!n && !nInconnu && !incomplet && !charge) return null;
   return (
-    <details className="vrm-outils" data-annonces-completer>
+    <details className="vrm-outils" data-annonces-completer data-n={n} data-n-inconnu={nInconnu}>
       <summary>
-        Annonces à compléter <span>{n} avec champs manquants</span>
+        Annonces à compléter{" "}
+        <span>
+          {n
+            ? `${n} avec champs manquants`
+            : nInconnu
+              ? `${nInconnu} à vérifier`
+              : charge
+                ? "lecture en cours…"
+                : "lecture incomplète"}
+        </span>
       </summary>
       <p>
         Prépare les informations ici dans un brouillon VRM. Elles ne modifient

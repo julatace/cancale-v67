@@ -14,6 +14,7 @@ import ConnexionsCompte from "./auth/ConnexionsCompte.jsx";
 import PhotoProfil, { AvatarCompte } from "./profil/AvatarPersonnel.jsx";
 import { qrMfa } from "./qrMfa.js";
 import SuiviReceptionEmails from "./ReceptionEmails.jsx";
+import EspaceEmails from "./EspaceEmails.jsx";
 import React, { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { VAPID_PUBLIC_KEY } from "./vapid.js";

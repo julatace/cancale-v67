@@ -528,6 +528,9 @@ if (require.main === module) (async () => {
         // Réglages l'allume ⇒ il apparaît dans Ma journée.
         const etatK2 = { main: { ...etatK.main } };
         s1 = await page(b, T, PORT, { etat: etatK2, tab: 'settings' });
+        // (28 oct.) Réglages en sous-écrans : on ouvre « Affichage » comme lui, s'il est replié.
+        await s1.pg.waitForFunction(() => document.querySelector('[data-sous-ouvrir="affichage"],[data-reglage-benef-journee]'), null, { timeout: 15000 }).catch(() => {});
+        if (await s1.pg.locator('[data-sous-ouvrir="affichage"]').count()) await appuyer(s1.pg, T, '[data-sous-ouvrir="affichage"]');
         await s1.pg.waitForFunction(() => document.querySelector('[data-reglage-benef-journee]'), null, { timeout: 15000 }).catch(() => {});
         const avantR = await s1.pg.evaluate(() => { const e = document.querySelector('[data-reglage-benef-journee]'); return e ? e.getAttribute('data-reglage-benef-journee') : null; });
         if (avantR === 'off') await appuyer(s1.pg, T, '[data-reglage-benef-journee] button');
