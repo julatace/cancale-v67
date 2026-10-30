@@ -24681,7 +24681,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
             <Bouton variante="primaire" onClick={()=>{ const n=Number(objTmp); if(!Number.isFinite(n)||n<0){toast('Indique un objectif valide.');return;} setObjectif(n); save('vrm_ca_objectif',n); setObjEdit(false); }}>OK</Bouton>
           </div>
         ) : objectif>0 && caMoisCourant==null ? (
-          <div style={{fontSize:13,color:C.muted,marginTop:6,lineHeight:1.5}}>— · ventes pas lues, la jauge revient dès qu'elles le sont.</div>
+          <div style={{fontSize:13,color:C.muted,marginTop:6,lineHeight:1.5}}>— · ventes pas pu être lues, la jauge revient dès qu'elles le sont.</div>
         ) : objectif>0 ? (()=>{ const pct=Math.min(100,Math.round(caMoisCourant/objectif*100)); const done=caMoisCourant>=objectif; return (
           <>
             <div style={{display:'flex',alignItems:'baseline',gap:8}}>
@@ -26853,7 +26853,7 @@ function SortisDuStock({ plan, planLu, ecrire }) {
             <b>N°{x.num}</b>{x.titre ? ` · ${x.titre}` : ''}
             <span style={{ display: 'block', color: C.muted, fontSize: 11.5 }}>sortie de « {x.itemName} »{x.nom ? ` · ${x.nom}` : ''} le {jour(x.at)} — {x.plateforme || 'Vinted'} : {x.statut || 'colis parti'}</span>
           </span>
-          <button className="vrm-b vrm-b-secondaire vrm-b-petit" type="button" data-stock-remettre={x.num} onClick={() => remettre(x)}>Remettre</button>
+          <button className="vrm-b vrm-b-secondaire" type="button" data-stock-remettre={x.num} onClick={() => remettre(x)} style={{ minHeight: 44 }}>Remettre</button>
         </div>
       ))}
     </div>
@@ -33533,7 +33533,7 @@ function RepartitionsVentes({ panelOff, apercu = false }) {
   const sNote = {fontSize:13,color:C.muted,lineHeight:1.5};
   const titre = <div style={{fontSize:15,fontWeight:600,color:C.text,letterSpacing:-0.15}}>Ce qui se vend</div>;
   if (ventes === undefined) return <div data-stats-carte="repartitions" data-repart-etat="encours" style={sCarte}>{titre}<div style={{...sNote,marginTop:8}}>Je lis tes ventes…</div></div>;
-  if (!R) return <div data-stats-carte="repartitions" data-repart-etat="passu" style={sCarte}>{titre}<div style={{...sNote,marginTop:8}}>Ventes pas lues : aucune répartition affichée. Rouvre l'écran dans un moment.</div></div>;
+  if (!R) return <div data-stats-carte="repartitions" data-repart-etat="passu" style={sCarte}>{titre}<div style={{...sNote,marginTop:8}}>Tes ventes n'ont pas pu être lues : rien n'est réparti. Rouvre l'écran dans un moment.</div></div>;
   if (apercu) return <section className="vrm-analyses-ventes" aria-label="Analyses des ventes">
     <p className="vrm-analyses-perimetre">Vinted · toutes périodes · données reçues</p>
     <div className="vrm-analyses-duo">{[['marques','Marques vendues'],['pays','Pays des acheteurs']].map(([cle,titre])=>{
@@ -33592,7 +33592,7 @@ function RepartitionsVentes({ panelOff, apercu = false }) {
       <div className="vrm-repartition-visuel">
       {bloc?.n>0 && <RepartitionAnneau elements={top.map(e=>({...e,k:lib(e.k)}))} total={bloc.n}/>}
       <div data-repart-liste={mode} style={{marginTop:12}}>
-        {mode === 'pays' && extrasPasSu ? <div style={sNote}>Transactions pas lues : le pays des clients n'est pas affiché.</div>
+        {mode === 'pays' && extrasPasSu ? <div style={sNote}>Le détail des transactions n'a pas pu être lu : pays non affiché.</div>
           : mode === 'pays' && extras === undefined ? <div style={sNote}>Je lis le pays de tes clients…</div>
           : !top.length ? <div style={sNote}>Rien à répartir pour l'instant.</div>
           : <div style={{display:'flex',flexDirection:'column',gap:9}}>
@@ -33648,7 +33648,7 @@ function BoostRentable({ panelOff }) {
   const sNote = {fontSize:13,color:C.muted,lineHeight:1.5};
   const titre = <div style={{fontSize:15,fontWeight:600,color:C.text,letterSpacing:-0.15}}>Le boost est-il rentable ?</div>;
   if (ventes === undefined || extras === undefined || !nuage) return <div data-stats-carte="boost" data-boost-etat="encours" style={sCarte}>{titre}<div style={{...sNote,marginTop:8}}>Je lis tes ventes et tes annonces…</div></div>;
-  if (!R || R.etat !== 'lu') return <div data-stats-carte="boost" data-boost-etat="passu" style={sCarte}>{titre}<div style={{...sNote,marginTop:8}}>Ventes ou annonces pas lues : rien n'est comparé. Rouvre l'écran dans un moment.</div></div>;
+  if (!R || R.etat !== 'lu') return <div data-stats-carte="boost" data-boost-etat="passu" style={sCarte}>{titre}<div style={{...sNote,marginTop:8}}>Ventes ou annonces pas pu être lues : rien n'est comparé. Rouvre l'écran dans un moment.</div></div>;
   const jFmt = (j) => (j == null ? '—' : j < 1 ? 'moins d’un jour' : `${Math.round(j)} j`);
   const nFmt = (v) => (v == null ? '—' : String(Math.round(v * 10) / 10).replace('.', ','));
   const eFmt = (v) => (v == null ? '—' : fmt(v));
