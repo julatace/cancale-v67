@@ -192,10 +192,29 @@ export function joursAvantLimite(limite, aujourdhui) {
 }
 //   transporteur : 'mondialrelay' · 'chronopost' · 'vinted' (Vinted Go) · autre ⇒
 //                  la garde mesurée de ce transporteur (`gardeDe`), sinon GARDE_MAX_J.
-export function etatRetrait({ limite = null, arriveeMs = null, transporteur = '' } = {}, maintenant = Date.now(), aujourdhui = null) {
+//   limiteAt   : (29 oct.) l'HEURE de la limite quand le transporteur la donne
+//                (Vinted Go `expiration_time`, ISO). Passée ⇒ « délai dépassé »
+//                même si le jour n'est pas fini (un colis qui expire à 11 h 34
+//                n'est plus « à retirer » à 15 h) ; sinon elle est rendue
+//                (`limiteAt`) pour être DITE (« avant 11 h 34 »). Le jour reste
+//                la clé de tri ; sans `limite`, le jour de `limiteAt` (Paris).
+export const jourParis = (ms) => jourDe(ms);
+const msIso = (v) => { if (!v) return null; const ms = Date.parse(String(v)); return Number.isFinite(ms) ? ms : null; };
+export function etatRetrait({ limite = null, arriveeMs = null, transporteur = '', limiteAt = null } = {}, maintenant = Date.now(), aujourdhui = null) {
   const auj = aujourdhui || jourDe(maintenant);
+  const atMs = msIso(limiteAt);
+  if (!limite && atMs != null) limite = jourDe(atMs);
   const j = limite ? joursAvantLimite(limite, auj) : null;
-  if (j != null) return j < 0 ? { etat: 'delai_depasse', jours: j } : { etat: 'a_retirer', jours: j };
+  if (j != null) {
+    if (j < 0) return { etat: 'delai_depasse', jours: j };
+    // L'heure n'est jugée que le jour même de la limite (un `limiteAt` d'un
+    // autre jour que `limite` ne dit rien de ce jour-là).
+    if (atMs != null && jourDe(atMs) === limite) {
+      if (maintenant >= atMs) return { etat: 'delai_depasse', jours: j, heurePassee: true, limiteAt: new Date(atMs).toISOString() };
+      return { etat: 'a_retirer', jours: j, limiteAt: new Date(atMs).toISOString() };
+    }
+    return { etat: 'a_retirer', jours: j };
+  }
   const garde = gardeDe(transporteur);
   if (Number.isFinite(arriveeMs) && arriveeMs > 0) {
     const age = joursAvantLimite(auj, jourDe(arriveeMs));
@@ -231,21 +250,53 @@ export function urgenceTri(e) {
 // « à retirer » jusqu'à sa date limite, et le nombre se disait complet. Ce que le
 // widget n'a pas pu relire est COMPTÉ (`nonRelus`) : l'appelant le dit.
 // Absente ou illisible ⇒ null (« pas su » : l'appelant retombe sur ce qu'il sait).
-export function retirerPublie(pub, maintenant = Date.now(), aujourdhui = null, sorti = null) {
+// ⚠️ (24 oct.) `leve(identité, entrée, e)` (facultatif) : la garde levée par ce que
+// le TRANSPORTEUR dit (une lecture « disponible » de moins de 6 h, la règle
+// `leverGarde` de l'app) — sans elle, le widget rangeait « à vérifier » un colis
+// que l'app compte « à retirer » (mesuré au banc `transporteurs.cjs`). Rend
+// l'état à garder ; jamais une date limite lue et dépassée n'est levée.
+// ⚠️ (29 oct.) `sorti` peut rendre 'a_verifier' : le transporteur signale un
+// incident (« a quitté le point relais sans être retiré ») ou un statut inconnu
+// depuis la photo — le colis passe « à vérifier » (compté dans `aVerifier`),
+// JAMAIS « sorti » : rien ne dit qu'il a été retiré (la règle de l'app,
+// `sortiParSuivis`). Avant, il était compté sorti et disparaissait du widget.
+// L'entrée publiée : [limite, arrivée, transporteur, identité, arrivée sûre
+// (1 · 0 = une borne · absent = publication d'avant), n° de suivi (achat Vinted),
+// heure de la limite (ISO, `limiteAt`)].
+export function retirerPublie(pub, maintenant = Date.now(), aujourdhui = null, sorti = null, leve = null) {
   if (!pub || typeof pub !== 'object' || !Array.isArray(pub.colis)) return null;
-  let n = 0, aVerifier = Number.isFinite(pub.aVerifier) ? pub.aVerifier : 0, urgents = 0, sortis = 0, nonRelus = 0;
+  let n = 0, aVerifier = Number.isFinite(pub.aVerifier) ? pub.aVerifier : 0, urgents = 0, sortis = 0, nonRelus = 0, devenusAVerifier = 0;
+  // (29 oct., tour 2 n° 7) LES « À VÉRIFIER » PUBLIÉS AVEC LEUR IDENTITÉ (`verif`,
+  // la forme de `colis`) : relus par la même règle (`sorti`) — un colis que le
+  // transporteur dit retiré ou reparti depuis sort aussi de « à vérifier », sans
+  // attendre la prochaine ouverture de l'app. Une photo d'avant (sans `verif`) :
+  // le nombre publié, tel quel.
+  if (Array.isArray(pub.verif) && typeof sorti === 'function') {
+    aVerifier = 0;
+    for (const c of pub.verif) {
+      const cle = Array.isArray(c) && typeof c[3] === 'string' ? c[3] : '';
+      if (cle && sorti(cle, c) === true) { sortis++; continue; }
+      aVerifier++;
+    }
+  }
   for (const c of pub.colis) {
     if (!Array.isArray(c)) return null;
     const cle = typeof c[3] === 'string' ? c[3] : '';
     if (typeof sorti === 'function') {
       const s = cle ? sorti(cle, c) : null;
       if (s === true) { sortis++; continue; }
+      if (s === 'a_verifier') { aVerifier++; devenusAVerifier++; continue; }
       if (s !== false) nonRelus++;
     }
-    const e = etatRetrait({ limite: c[0] || null, arriveeMs: Number(c[1]) || null, transporteur: c[2] || '' }, maintenant, aujourdhui);
+    let e = etatRetrait({ limite: c[0] || null, arriveeMs: Number(c[1]) || null, transporteur: c[2] || '', limiteAt: typeof c[6] === 'string' && c[6] ? c[6] : null }, maintenant, aujourdhui);
+    if (typeof leve === 'function' && cle) { const l = leve(cle, c, e); if (l && l.etat) e = l; }
     if (estAVerifier(e)) { aVerifier++; continue; }
     n++;
     if (Number.isFinite(e.jours) && e.jours <= 1) urgents++;
   }
-  return { n, aVerifier, urgents, sortis, nonRelus, at: Number.isFinite(pub.at) ? pub.at : null };
+  // (29 oct.) Les achats « au point relais » qu'aucune identité ne relie encore
+  // (ni code, ni n° de suivi, compte pas encore relu) : l'app ne les compte pas
+  // dans le total, elle les dit à part. Le widget le dit (« au moins »).
+  const enVerification = Number.isFinite(pub.enVerification) && pub.enVerification > 0 ? pub.enVerification : 0;
+  return { n, aVerifier, urgents, sortis, nonRelus, devenusAVerifier, enVerification, at: Number.isFinite(pub.at) ? pub.at : null };
 }

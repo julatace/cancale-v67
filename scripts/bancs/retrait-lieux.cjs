@@ -37,6 +37,11 @@ const ROWS = [
   track('email_track_vinted_1790000000000001', 'vinted', '*Consigne Vinted Go*, * Kusmi Tea *, * 13 Rue Saint-Vincent', 'A22222', '1790000000000001'),
   track('email_track_vinted_1790000000000002', 'vinted', '*Consigne Vinted Go*, * Speed Queen - Vannes *, * 24 Rue Hoche', 'N33333', '1790000000000002'),
   track('email_track_mondialrelay_12345678', 'mondialrelay', '® juste ici !', '494400', '12345678'),
+  // (29 oct.) Le suivi Vinted de 9402 a été RELEVÉ, sans n° : son n° a été
+  // cherché, sa carte reste « à retirer ». Sans cette ligne, un achat sans code
+  // ni n° à côté d'un colis d'e-mail sans commande est « en cours de
+  // vérification » (peut-être le même colis — banc transporteurs, constat b).
+  { id: 'harvest_111_suivi_9402', data: { v: 1, tx: '9402', source: 'journey', capturedAt: new Date(MAINTENANT).toISOString(), transporteur: 'mondialrelay', suivi: null, etapes: [], dernier: null, forme: {} } },
 ];
 
 let ko = 0;

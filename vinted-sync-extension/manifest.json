@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "VRM — outil du revendeur",
-  "version": "5.287.0",
+  "version": "5.290.0",
   "description": "Relie tes comptes Vinted, Leboncoin et eBay à VRM : annonces, ventes, colis et bordereaux, depuis ton navigateur.",
   "permissions": [
     "cookies",
@@ -23,7 +23,11 @@
     "https://cancale-v67-ten.vercel.app/*",
     "https://vrm.center/*",
     "https://*.ebay.fr/*",
-    "https://*.ebay.com/*"
+    "https://*.ebay.com/*",
+    "https://www.mondialrelay.be/*",
+    "https://www.mondialrelay.fr/*",
+    "https://ws.chronopost.fr/*",
+    "https://carrier.vintedgo.com/*"
   ],
   "background": {
     "service_worker": "background.js"
@@ -148,6 +152,19 @@
       ],
       "js": [
         "vc-depot.js"
+      ],
+      "run_at": "document_idle",
+      "all_frames": false
+    },
+    {
+      "matches": [
+        "https://www.mondialrelay.fr/*",
+        "https://www.mondialrelay.be/*",
+        "https://www.chronopost.fr/tracking-no-cms/*",
+        "https://vintedgo.com/*"
+      ],
+      "js": [
+        "transp-page.js"
       ],
       "run_at": "document_idle",
       "all_frames": false

@@ -35,7 +35,10 @@ import { sbCle } from './_lib/cle.js';
 import { comptesActifs, normaliserRegistre } from './_lib/ebay.js';
 import { colisEbay, resumeColisEbay, lireCommandesEbayServeur } from './_lib/ebay-a-expedier.js';
 import { relireCommandesVendeur } from './_lib/ebay-relecture.js';
-import { rappelsRetraitDuJour, texteRappelRetrait, SELECT_SUIVI_META, txDuColis, liensDesLignes, finDesTransactions } from './_lib/suivi-colis.js';
+import { rappelsRetraitDuJour, texteRappelRetrait, SELECT_SUIVI_META, txDuColis, liensDesLignes, finDesTransactions, SELECT_TRANSP_META, ligneTranspDeMeta } from './_lib/suivi-colis.js';
+// (24 oct.) Le statut des colis lu chez leur transporteur (C1, C5).
+import { passageTransporteurs, MAX_CRON, BUDGET_CRON_MS } from './_lib/transporteurs-lecture.js';
+import { accesVendeur } from './_lib/abonnement.js';
 
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://lgonxzrzjcqthjtbdpzo.supabase.co';
 // ⚠️ CLÉ DE SERVICE QUAND ELLE EXISTE. Ces routes tournent sur le serveur, sans
@@ -274,15 +277,19 @@ async function bilanDeLaSemaine(maintenant = Date.now(), soir = false) {
 // pour rien ». Au cron du matin (10 h à Paris), pour CE vendeur :
 //   · « 📍 Dernier jour pour retirer … » quand la date limite LUE dans l'e-mail
 //     est aujourd'hui (heure de Paris) ;
-//   · « Colis à vérifier — sans doute reparti : n°… » le jour où un colis passe
-//     sa date limite ou la garde de son transporteur.
+//   · « Colis à vérifier : n°… » le jour où un colis passe sa date limite ou la
+//     garde de son transporteur (29 oct. : plus « sans doute reparti » — seul le
+//     transporteur ou Vinted le disent).
 // LA règle de l'app (api/_lib/suivi-colis.js → `etatRetrait`, `gardeDe`, §11).
 // Une fois par colis et par état : mémo `colis_retrait_dedup` lu en TROIS états
 // (illisible ⇒ rien), écrit AVANT l'envoi et confirmé. Préférence « colis »
 // coupée ⇒ rien ; abonnement coupé ⇒ rien (`sendPushToAll`) ; une lecture ratée
 // (lignes de suivi, réglages, bordereaux) ⇒ rien. Jamais un colis retiré,
 // reparti, coché « J'ai retiré », qu'il envoie, ou que l'app a dit fini.
-const MAIN_RETRAIT = ['vrm_colis_collected', 'vrm_colis_retirer'];
+// (29 oct.) + `vinted_pickup_done` : un colis que SEUL le transporteur dit
+// disponible (aucun e-mail) n'est jamais rappelé si sa commande Vinted, reliée
+// par son n° de suivi, est cochée « Je l'ai retiré » (la règle de l'app).
+const MAIN_RETRAIT = ['vrm_colis_collected', 'vrm_colis_retirer', 'vinted_pickup_done'];
 const MEMO_RETRAIT_J = 60;
 async function rappelsColisRetrait(maintenant = Date.now()) {
   const deja = await getRow('colis_retrait_dedup');
@@ -290,19 +297,28 @@ async function rappelsColisRetrait(maintenant = Date.now()) {
   if (!(await pushCategorieActive('colis'))) return 'désactivé par le vendeur';
   // (revue du 23 oct., n° 2) Les scalaires dont la règle partagée a besoin pour
   // RELIRE une ligne comme l'app (code, QR, extraits gardés, date de l'e-mail).
-  const [lignes, m, bords] = await Promise.all([
+  // (24 oct.) + le statut lu chez le TRANSPORTEUR (lignes `transp_*`, scalaires) :
+  // un colis retiré ou reparti chez lui ne reçoit aucun rappel ; illisible ⇒
+  // « pas su » ⇒ rien n'est envoyé (un « dernier jour » pour un colis retiré
+  // ferait courir pour rien).
+  const [lignes, m, bords, transp0] = await Promise.all([
     fetchPaginated(scoped(`app_data?id=like.email_track_*&meta->>status=in.(available,delivered,retour,info)&select=${SELECT_SUIVI_META}`)),
     getRowProjete('main', MAIN_RETRAIT),
     fetchPaginated(scoped('app_data?id=like.email_bord_*&select=suivi:meta->>suivi')),
+    fetchPaginated(scoped(`app_data?id=like.transp_*&select=${SELECT_TRANSP_META}`)),
   ]);
-  if (!Array.isArray(lignes) || m === undefined || !Array.isArray(bords)) return 'lecture ratée — rien envoyé';
+  if (!Array.isArray(lignes) || m === undefined || !Array.isArray(bords) || !Array.isArray(transp0)) return 'lecture ratée — rien envoyé';
+  // (29 oct.) Toutes les lignes, quel que soit leur âge : une ligne finie qu'on
+  // ne lirait plus ferait revenir un colis RETIRÉ (rien lu ≠ pas fini).
+  const transp = transp0.map(ligneTranspDeMeta).filter(Boolean);
   const mm = objet(m);
   const pub = objet(mm.vrm_colis_retirer);
   const today = parisDate(0);
   const entree = {
     lignes, collectes: Array.isArray(mm.vrm_colis_collected) ? mm.vrm_colis_collected : [],
     envoyes: bords.map((b) => b && b.suivi).filter(Boolean), finis: Array.isArray(pub.finis) ? pub.finis : [],
-    maintenant, aujourdhui: today,
+    maintenant, aujourdhui: today, transp,
+    cocheTx: new Set(Object.keys(objet(mm.vinted_pickup_done)).map(String)),
   };
   // (revue du 23 oct., n° 3) LA FIN D'UN ACHAT, LUE ICI — pas seulement dans la
   // publication de l'app (`finis`) : absente (app pas ouverte depuis) ou plus
@@ -334,7 +350,7 @@ async function rappelsColisRetrait(maintenant = Date.now()) {
     achats = a;
     for (const r of e) if (r && r.tx && r.s != null && Number.isFinite(Number(r.s))) etats.set(String(r.tx), { s: Number(r.s), ss: String(r.ss || '') });
   }
-  const liste = rappelsRetraitDuJour({ ...entree,
+  const liste = rappelsRetraitDuJour({ ...entree, liens,
     finParCommande: ({ suivi, code }) => finDesTransactions(txDuColis({ suivi, code }, relais, liens), achats, etats) });
   const envoyes = objet(deja && deja.envoyes);
   const nouveaux = liste.filter((x) => !envoyes[x.cle]);
@@ -443,10 +459,36 @@ async function relireEbayDuVendeur() {
 }
 // Le bilan ne porte aucun jeton ni montant : l'état de chaque compte.
 const resumeRelecture = (r) => !r ? null : (!r.fait ? { fait: false, reason: r.reason } : { fait: true, ok: r.comptes.filter((c) => c.ok === true).length, ko: r.comptes.filter((c) => c.ok === false).length });
+// ── (24 oct.) LIRE LE STATUT CHEZ LES TRANSPORTEURS AVANT DE COMPTER ────────
+// Le matin ET le soir, pour CE vendeur, en même temps que la relecture d'eBay
+// (des hôtes différents) : au plus 12 lectures et 20 s, puis les rappels
+// comptent avec ce qui a été lu. Un abonnement coupé ⇒ aucune lecture ; « pas
+// su » ne coupe pas. Un échec ne bloque RIEN (les rappels partent sur ce qu'on
+// savait). Le bilan ne porte que des nombres — aucun n° de suivi.
+async function lireTransporteursDuVendeur() {
+  const owner = proprietaireCourant() || '';
+  if (!owner) return { fait: false, reason: 'vendeur' };
+  if ((await accesVendeur(owner)) === false) return { fait: false, reason: 'abonnement' };
+  // (29 oct., revue n° 20) La borne TIENT : le passage ne lance un élément que
+  // s'il peut le finir dans son budget, et à l'expiration du filet l'ARRÊT lui
+  // est signalé (`AbortController`) — plus aucune lecture, écriture ni
+  // notification après la réponse du cron. Le bilan dit ce qui a été FAIT.
+  const arret = new AbortController();
+  let minuteur;
+  try {
+    const r = await Promise.race([
+      passageTransporteurs({ max: MAX_CRON, budgetMs: BUDGET_CRON_MS - 2000, signal: arret.signal }),
+      new Promise((ok) => { minuteur = setTimeout(() => ok({ ok: false, raison: 'delai' }), BUDGET_CRON_MS); }),
+    ]);
+    if (!r || !r.ok) return { fait: false, reason: (r && r.raison) || 'pas-su' };
+    return { fait: true, lus: r.lus.filter((x) => x.res === 'ok').length, echecs: r.lus.filter((x) => x.res !== 'ok').length, changes: r.lus.filter((x) => x.change).length, navigateur: r.besoinNavigateur.length, ...(r.arrete ? { arrete: true } : {}) };
+  } catch (_) { return { fait: false, reason: 'erreur' }; }
+  finally { clearTimeout(minuteur); arret.abort(); }   // l'arrêt, dès la réponse (le filet ou le passage)
+}
 async function traiterVendeur() {
-  const relu = await relireEbayDuVendeur();
+  const [relu, transp] = await Promise.all([relireEbayDuVendeur(), lireTransporteursDuVendeur()]);
   const out = await traiterVendeurApresRelecture();
-  return { ...out, ebayRelu: resumeRelecture(relu) };
+  return { ...out, ebayRelu: resumeRelecture(relu), transporteurs: transp };
 }
 async function traiterVendeurApresRelecture() {
     const today = parisDate(0);
@@ -716,14 +758,15 @@ async function rappelDuSoir() {
   return { soir: 'envoyé', n, retard, aVerifier, demain, auMoins, envoi: envoi && (envoi.coupe || envoi.erreur || envoi.sent) };
 }
 async function traiterVendeurSoir() {
-  const relu = await relireEbayDuVendeur();
+  // Le soir : lire et notifier les changements, puis le rappel du soir.
+  const [relu, transp] = await Promise.all([relireEbayDuVendeur(), lireTransporteursDuVendeur()]);
   const out = await rappelDuSoir();
   // Le bilan de la semaine part le DIMANCHE SOIR (26 oct.) — même dédoublonnage
   // que le lundi matin (un seul bilan par semaine). Un échec du bilan n'empêche
   // jamais le rappel d'expédition du soir.
   let bilan = null;
   try { bilan = await bilanDeLaSemaine(Date.now(), true); } catch (e) { bilan = 'échec : ' + String((e && e.message) || e).slice(0, 120); }
-  return { ...out, bilan, ebayRelu: resumeRelecture(relu) };
+  return { ...out, bilan, ebayRelu: resumeRelecture(relu), transporteurs: transp };
 }
 
 export default async function handler(req, res) {

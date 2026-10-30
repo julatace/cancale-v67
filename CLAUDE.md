@@ -151,6 +151,75 @@
 > la carte sur un vrai iPhone. **Geste de Julien** : ouvrir l'écran Vestiaire Collective → « Ta clé Photoroom » (sa clé
 > d'avant se chiffre toute seule), puis « Vérifier chez Photoroom ».
 
+> ⚠️ **29 octobre — LE STATUT LU CHEZ LE TRANSPORTEUR remis sur `main` (extension 5.281), PAS FINI :** Julien : « tu as
+> juste à regarder sur le site du transporteur… le statut », « ça marche si je n'ai pas l'extension allumée ? ». Le chantier
+> du 24 octobre (`v24-transp` : serveur + app ; `v24-transp-ext` : extension, numérotée « 5.217 » sur sa branche) est
+> fusionné sur `main` (a0d43bd) dans `v29-colis`. Le SERVEUR lit seul Mondial Relay (`_mvc` de mondialrelay.fr, n° + code
+> postal du relais, voie `mr-fr-mvc`), Chronopost (`ws.chronopost.fr` trackSkybillV2, `cp-ws2`) et Vinted Go
+> (`carrier.vintedgo.com/public/v3/tracking_events`, `vg-v3`), User-Agent honnête `VRM-suivi/1.0 (+https://vrm.center)` —
+> sans l'extension (`api/_lib/transporteurs.js` règles pures, `transporteurs-lecture.js` réseau, `api/relais.js` modes
+> `transp` · `transp-a-lire` · `transp-brut`, matin et soir dans `ship-reminders`, widget, `email-inbound`). Lignes
+> `transp_{carrier}_{n°}` (serveur seul, compare-et-échange), règle des fins dans `suivi-colis.js` (`finsDesLignes`
+> + `transp`, `fusionTransporteur`, `sortiParSuivis` → `a_verifier`), app : `LigneTransporteur`, `TeteTransporteurs`,
+> `useRelectureTransporteurs`. L'extension n'est qu'un SECOURS (C3 : ce que le transporteur refuse au serveur ; C4 : la
+> réponse brute, jugée par la MÊME fonction serveur ; `transpTick`, `transp-page.js`). Version : la « 5.217 » du chantier
+> était déjà PUBLIÉE par `main` avec un autre contenu, et la 5.280 prise par `main` pendant la fusion ⇒ **5.281.0** (`EXT_ATTENDUE`, `EXT_CAPACITES.transp`,
+> `CODE_VERSION`, `CAPTEUR_VERSION`, `relaisVersion`, zips). ⚠️⚠️ **Le 29 oct. au soir, `main` a publié 5.281, 5.283 et
+> 5.284 sans ce code** : à l'intégration, monter l'extension (≥ 5.285, jamais servie) ET `EXT_CAPACITES.transp` ensemble
+> (`audit-coherence`, `audit-extension-zip` le disent rouge d'ici là) — **fait au tour 2 : 5.290.0**. **Les 19 défauts du tour 2 (relecture du 29 oct. au soir) sont corrigés** — « tour 2 » en fin de dossier. Des 21 défauts reproduits le 24 oct., **les n° 1 à 11
+> (règles, états, écran) sont corrigés** — « Statut chez le transporteur, tour 1 » en fin de dossier ; **les n° 12 à 21
+> (notifications) aussi** — « tour 1, les notifications », juste après (nouvelle arrivée, « pas su » qui ne consomme rien,
+> une notification pour suivi Vinted + transporteur + e-mail, pause globale par transporteur, bail, C4 daté, bornes, 72 h ;
+> `audit-transp-notif` 17/17). Côté extension (Chronopost 14 caractères,
+> `mr-be` en repli de `mr-fr-mvc`, corps 192 Ko, conversations UUID, achats au point relais lus d'abord) : branche
+> `v29-colis-ext`. Preuves de la fusion : 174 audits (sans les 5 Postgres), mêmes rouges que `main`
+> (`audit-politique-hotes` 1, `audit-preuve-vente` 18 — déjà là) ; `audit-statut-transporteurs` (`--prouve` 29/29),
+> `audit-mondialrelay-serveur` (24/24), `audit-transp-ext` (11/11) verts, rouges sur `main` (24 · 6 · 54) ; banc
+> `transporteurs` vert (49 rouges sur le build de `main`) ; bancs colis, widget, rappels, notifications, popup, badge, pont,
+> premierjour verts.
+
+> **29 octobre — `v29-colis-ext` : l'extension (5.281, version inchangée) suit le serveur, et mesure la route des messages :**
+> (1) **Transporteurs (secours)** : `TRANSP_FORME` reprend la forme du serveur (`FORME_SUIVI` : Chronopost
+> `XX123456789XX` ou `\d{14}[0-9A-Z]?`) et la liste blanche d'adresses en dérive ; un refus de `mr-fr-mvc` bascule sur
+> `mr-be` (page puis API), même budget, une requête à la fois, pause posée sur la voie refusée seule ; le corps Mondial
+> Relay est lu jusqu'à 192 Ko (`CORPS_MAX_MR`) et, sur un 413 du serveur, renvoyé UNE fois borné au contrat d'avant
+> (64 Ko / 80 Ko). ⚠️ **Pour le chantier A (serveur)** : C4 (`appliquerReponseBrute`, `CORPS_MAX`) et `api/relais.js`
+> (`ENVOI_MAX` 80 Ko) refusent encore plus de 64 Ko — les 192 Ko ne seront jugés qu'une fois ces deux bornes montées pour
+> Mondial Relay ; et les n° Vinted Go à 12 chiffres (mesure au serveur) relèvent de A. `audit-transp-ext` 113/113,
+> 12 rouges sur 8f62e6f2, `--prouve` 15/15. (2) **Suivi des achats** : `capterSuivisAchats` lit d'abord les achats AU
+> POINT RELAIS (`needs_action` / `AT_RELAY`), jamais lus puis déjà lus, avant les achats en route (`rangSuivi`) — triés
+> par date seule, un colis arrivé passait après 35 achats en route relus toutes les 3 h. `audit-suivi-vinted` section L
+> (2 rouges sur l'avant, mutation `priorite-relais`). Mesuré : aucun n° de suivi dans une conversation, une transaction
+> ou l'escrow (seul `journey_summary` le porte) — rien de neuf à ranger. (3) **Conversations** : la capture reconnaît une
+> conversation chargée par son UUID (le `conversation_id` des commandes), règle ANCRÉE (plus aucun sous-chemin
+> `…/replies`) ; le fond la range sous l'id NUMÉRIQUE de la réponse (sans id numérique, ou un autre id : rien).
+> `<chemin-regle>` partagée page/fond (UUID → `{uuid}`, hex → `{hex}`, nombre → `{id}`). `seen_urls` garde les 400
+> réponses et 600 chemins les plus RÉCENTS (elle gardait les 400 premières clés : un chemin neuf était perdu).
+> ⚠️⚠️ **MESURÉ : depuis le 18 oct., plus AUCUNE requête `/api/v2/conversations/…` ne part de la page d'une conversation**
+> (escrow, bannières, litiges, anti-hameçonnage seulement). On ne devine pas la nouvelle route : sur la page d'une
+> conversation l'extension relève chaque requête vers Vinted (hors `/api/` compris : chemin normalisé, statut, type),
+> la FORME d'une liste de messages (où, combien, clés et types — jamais une valeur), les sockets/flux (hôte, chemin,
+> trames, forme) et les données Next (oui/non), dans `harvest_{uid}_seen_urls.conversation`. **À lire en lecture seule
+> après sa prochaine conversation ouverte avec cette extension** : c'est elle qui dira par où passent les messages.
+> `audit-endpoints-vus` C1-C3 (46 contrôles, 23 rouges sur l'avant, 8 mutations rouges).
+> (4) **Tour 2 des relecteurs (29 oct., soir), côté extension** : `TRANSP_FORME.vinted` prend les **12 chiffres** du
+> serveur (A, `FORME_SUIVI`) — C3 les annonçait et l'extension les refusait (`transp_item_refuse`, lu par personne) ;
+> `contratSuivi` (bloc `<suivi-regle>`, même texte dans inject.js) nomme le transporteur par `current_carrier` ou
+> l'unique `carriers[]` `is_current`, avec SON `tracking_code` (code machine seulement ; deux « courants » ⇒ rien) —
+> `transporteur` était `null` sur ses 7 suivis rangés, et le n° pris était celui du PREMIER trajet. ⚠️ Le code réel
+> (« vinted_go » ?) n'est pas mesuré : le serveur le lit par `carrierLisible` (`/vinted/`, `/mondial/`…). Le reste du
+> défaut (une carte « vue par Vinted » sans ligne transporteur, trois états) est côté A. `audit-extension-zip` lit
+> l'historique par `VRM_GIT` puis la racine, et un historique illisible est ROUGE (il sortait vert « sans conclusion »
+> depuis une copie §6.1). `audit-transp-ext` §16 (C3 → `itemTranspValide` → lu → page C5) et §17 (transporteur
+> courant, et le serveur qui le lit) : 7 rouges sur 980ef927 dans la copie fusionnée avec A (94f4d515), `--prouve`
+> 18/18 (`vg12`, `courant`, `paire`). ⚠️ Dans ce worktree SEUL, §13 et §16 sont rouges : `api/` y est celui d'avant A
+> (sans `\d{12}`) — c'est l'écart qu'on veut voir, il disparaît à la fusion. ⚠️⚠️ **VERSION** : `main` est en
+> **5.287.0** (remesuré 29 oct. 23:45) et le worktree du chantier A (`v29-colis`) a déjà pris **5.290.0** ; la 5.281 de
+> ce chantier est PRISE avec un autre contenu ⇒ à la fusion, monter TOUT au numéro de A (un seul numéro pour A + B,
+> jamais servi ni réservé — vérifier les sessions en cours) : manifeste, `CODE_VERSION`,
+> `CAPTEUR_VERSION`, `relaisVersion`, `EXT_ATTENDUE`, `EXT_CAPACITES.transp`, notice Orion, zips. La double arrivée
+> Mondial Relay (`_mvc` puis `.be`) se corrige au serveur (A, `memeOccurrence`), pas ici.
+
 > **29 octobre — TA MICRO-ENTREPRISE : profil, calendrier, seuils (Comptabilité) :** Julien : « une jauge plafond + seuil de TVA,
 > vérifie les seuils officiels 2026 », « vois si la personne a choisi le versement libératoire », « mensuel : elle déclare août
 > mais paie en septembre », « plus pro ». **Vérifié sur service-public.gouv.fr le 29 oct.** : plafond vente de marchandises
@@ -15003,3 +15072,192 @@ DEPUIS ce conteneur cette fois (curl 200), alors que §8 le disait bloqué : la
 connexion Vercel de la session, elle, ne voyait pas l'équipe du projet (404 sur
 `list_deployments`/`web_fetch_vercel_url`) — vérifier d'abord par `curl` l'endpoint
 public `/api/sante`, sans supposer l'un ou l'autre.
+
+### Statut chez le transporteur, tour 1 : un colis sorti l'est PARTOUT (29 octobre)
+Plainte de Julien : un colis que le transporteur dit retiré, livré ou reparti
+restait « à retirer » (Achats, Ma journée, widget, rappels), et un achat Vinted
+sans code s'affichait à côté de son propre e-mail. Règles (une, un propriétaire) :
+- **Arrivée SÛRE ≠ borne** (`etatColisVinted` : `arriveeSure`, `borneMs`) : la
+  capture des achats n'est jamais l'arrivée d'un retour ; `sortiParSuivis(…, {borne})`
+  (retour/incident comptent sans arrivée sûre ; un statut inconnu après la borne).
+  La publication `vrm_colis_retirer.colis` porte `[limite, arrivée, transporteur,
+  clé, sûre 1/0, n° d'un achat Vinted, limiteAt]` + `enVerification` ; le widget
+  relit avec la même règle (`issueDesFins` : incident ⇒ « à vérifier », jamais
+  « sorti » ; un n° que le transporteur seul dit disponible depuis la photo est
+  compté ; `pickupAuMoins` si des achats sont en vérification).
+- **Un colis qui sort de « à retirer » atterrit ailleurs** : e-mail resté « en
+  transit » ou n° ajouté à la main, que le transporteur dit reparti/incident ⇒
+  « repartis » / « à vérifier ». Repartis : 30 jours (`repartiAffichable`), toutes
+  sources. **Un n°, une carte** : un achat sans code au n° d'un e-mail connu ne
+  s'affiche pas deux fois. Achat sans code NI n° à côté d'un e-mail sans commande
+  ⇒ « en cours de vérification » (Achats + une ligne de Ma journée), hors total.
+- **Plus de fenêtre de 45 j** chez les lecteurs (app, widget, cron) : une ligne
+  finie se lit toujours. **Mondial Relay** : route/prise en charge APRÈS
+  « N jours restants » ⇒ `incident/quitte_relais` ; une limite « vers le » passée
+  ne lève jamais la garde ; `introuvable` à un code postal saisi non prouvé ⇒
+  `cp-inconnu` + `cpRefuse` (corrigé ⇒ relu tout de suite ; un n° fermé ainsi
+  sous l'ancienne règle se relit). **Vinted Go** : retour seulement sur les
+  valeurs relevées (`return_cancelled` n'est pas un retour), `limiteAt` (l'heure
+  d'`expiration_time`) jusqu'à la carte, `etatRetrait` (heure passée ⇒ délai
+  dépassé le jour même) et le rappel (« avant 10 h 34 ») ; n° à 12 chiffres lisible.
+- **Rappel du matin** : les n° que le transporteur seul dit disponibles (ligne
+  synthétique, comme l'app), sauf commande cochée « Je l'ai retiré »
+  (`vinted_pickup_done`, reliée par le n°). Plus jamais « sans doute reparti ».
+- **« Sans doute reparti » retiré partout** (Achats, Ma journée, notifications) : mesuré
+  le 29, les 5 colis ainsi nommés avaient TOUS été retirés ; « à vérifier », et seuls le
+  transporteur ou Vinted disent « reparti ».
+- Preuves : `audit-statut-transporteurs.cjs` §9 (**23 rouges sur 8f62e6f2**,
+  `--prouve` 49/49) ; banc `transporteurs.cjs` §E (390 + 1512, **29 rouges sur le
+  build de 8f62e6f2**, constat d compris) ; `node scripts/prouve-banc-transporteurs.cjs`
+  (9 mutations de l'app — borne d'arrivée, « nulle part », une carte, en vérification,
+  limite sur la carte et dans la publication, 30 jours, fenêtre de 45 j, « sans doute »
+  — chacune rouge sur SON contrôle, build et banc lancés dans une copie de l'arbre).
+- **À faire côté extension (v29-colis-ext) pour le constat c** : le n° de suivi d'un
+  achat au point relais (`journey_summary`, `harvest_{uid}_suivi_{tx}`) doit être lu
+  AVANT de relire les achats en route ; tant qu'il manque, l'app range l'achat « en
+  cours de vérification » (hors total) — jamais relié par lieu, date ou titre.
+- ⚠️ **Non mesuré** : la vraie forme d'un `return_*` Vinted Go autre que ceux
+  relevés ; une vraie séquence Mondial Relay « re-livré » ; aucun appel réel aux
+  transporteurs n'a été fait pour ces corrections (formes de `mesures.json`).
+
+### Statut chez le transporteur, tour 1 : les notifications (n° 12 à 21, 29 octobre)
+Les dix défauts de notification reproduits le 24 octobre, chacun REPRODUIT d'abord
+(faux PostgREST à état, faux Chronopost / Vinted Go / Web Push), corrigé à la racine.
+- **Nouvelle arrivée (12)** : une arrivée = le point relais (lieu normalisé) + l'heure
+  de l'évènement qui l'a créée (`occurrenceArrivee`) ; la ligne garde les 5 dernières
+  (`arrivees`). Un autre point relais, ou le retour au relais après « a quitté le
+  point relais », sonne sous `relais-{n°}-r{empreinte}` ; la PREMIÈRE arrivée garde
+  `relais-{n°}-sans` et se tait devant toute annonce (`relais-{n°}-*`, `relais-tx{tx}-*`,
+  le code de l'e-mail). Le même point relu ne re-sonne jamais (`clefEtat` porte le lieu
+  seulement pour « disponible »).
+- **« Pas su » ne consomme rien (13)** : `push_transp_{n°}` est RETIRÉ. Ce qui doit
+  sonner est écrit DANS la ligne `transp_` (`notif` + le scalaire `notifEnAttente`, lu
+  en `meta->>`) par le MÊME comparer-et-échanger que le changement ; la notification
+  l'efface une fois faite ou décidée (déjà annoncée, préférence, abonnement), jamais
+  sur un `push_dedup` illisible ou non écrit. Reprise en tête de passage
+  (`reprendreNotifs`, 6 au plus), seulement dans les 72 h et pour le même état.
+- **Une notification pour trois voies (14, 16)** : vérifier ET réserver en UN
+  comparer-et-échanger sur `push_dedup` (`envoyerNotifTransp` : le modificateur relit
+  les clés au moment d'écrire et abandonne si l'une est apparue). Clés partagées par
+  transaction (`clesEtapeTx`) : transporteur `{retire|retour|track}-tx{tx}[-jour]`,
+  suivi Vinted `vs-…` ; chacun vérifie celles de l'autre (`suivi-vinted.js`, étape 5 bis :
+  `transporteur-deja`) ; l'e-mail `relais-{n°}-*` et `retrait-code-{CODE}` restent la
+  frontière avec la route des e-mails.
+- **Pause globale (15)** : `transp_pause` au propriétaire NEUTRE
+  (`00000000-…`, `PROPRIETAIRE_NEUTRE`, clé de service) — un 403 de Chronopost arrête
+  les requêtes de TOUS les vendeurs depuis l'adresse de Vercel ; plus une mémoire
+  d'instance posée dans la file du transporteur au moment du refus et lue juste avant
+  chaque requête (`pauseEnCours`, une règle pour les deux points d'arrêt). Une pause en
+  cours ne monte pas d'un palier (`pauseApresRefus`).
+- **Deux passages (17)** : un bail de 30 s sur la ligne (`enVol`, comparer-et-échanger)
+  — un n° n'est lu que par un passage à la fois.
+- **C4 (18, 19)** : la réponse relayée porte son heure (`at`, bornée à 30 min) ; plus
+  vieille que la dernière lecture ⇒ 409 `perime`, rien n'est rangé ; un n° en
+  « fermeture » se tait (`raisonDu`, la règle du serveur). Un état final (retiré, livré,
+  rendu) ne redescend jamais sur une lecture plus ancienne (`ligneApresEssai`).
+- **Bornes (20)** : un n° n'est lancé que s'il tient dans le budget (délai + écart +
+  marge de rangement) ; `fin` et `signal` vont jusqu'à la requête ; le cron arrête le
+  passage dès qu'il répond (`AbortController`, `finally`) — plus aucune écriture ni
+  notification après la réponse « délai ».
+- **72 h (21)** : `etatAt` = l'évènement qui CRÉE l'état (Chronopost : premier retour,
+  ou rendu après lui ; Vinted Go : début de la phase de retour), `dernierAt` à part.
+- Preuves : `audit-transp-notif.cjs` (N1-N10, ~50 s) **24 rouges sur 87188ff4** (§6.1,
+  audit copié dans l'arbre d'avant), `--prouve` **17/17** ; `audit-statut-transporteurs`
+  (`--prouve`, dont `notif-sans-push-dedup`, `notif-sans-reservation`, `pause-ignoree`
+  réancrées) et `audit-mondialrelay-serveur` (`pause-ignoree`, `essai-compte-introuvable`
+  réancrées sur la règle actuelle) verts ; bancs serveur, colis, retrait, widget,
+  rappels, notifications verts.
+- ⚠️ **Non mesuré** : aucun appel réel aux transporteurs ; `Retry-After` réel de
+  Chronopost ; un vrai envoi Web Push. Une notification en attente d'un n° qu'aucun
+  passage ne relit (vendeur sans app ni cron) attend le cron suivant (matin ou soir).
+
+
+### Statut chez le transporteur, tour 2 : les 19 défauts des relecteurs (29 octobre, 5.290)
+Relecture du chantier remis sur `main` (94f4d515) sur SA base (copie lecture seule) et
+de bout en bout (vraies routes, vrai fond). Chaque défaut REPRODUIT, corrigé à la
+racine, rouge sur 94f4d515 (§6.1 : audits et banc copiés dans l'arbre d'avant, build
+refait là-bas), vert après, rouge sous mutation.
+- **Publication `vrm_colis_retirer` (1)** : elle n'est écrite que quand les codes des
+  conversations (`colisRelaisLu`), les n° des achats (`suivisVinted`) et les n° ajoutés
+  (`suivisManuels`) sont LUS. Rendue depuis Colis (qui ne les lit pas), elle passait de
+  22 à 38 « complet » : les achats « en vérification » et les colis fondus par n° y
+  revenaient. Pas lu ⇒ rien n'est écrit (la dernière photo complète reste).
+- **Code postal Mondial Relay (2)** : un code refusé par un ESSAI alors qu'il reste un
+  code prouvé à essayer ⇒ `cpCherche` (calculé au rangement par
+  `codePostalPourMondialRelay`, la règle du passage) ⇒ « VRM cherche le code postal du
+  point relais », sans geste. Le geste (« ajoute ce n° avec son code postal ») n'est dit
+  qu'une fois en tête (`texteCodePostalMr`), seulement quand plus rien n'est à essayer.
+- **Ordre de lecture (3)** : `ordreAInterroger` — page demandée, puis les DISPONIBLES
+  par limite la plus proche puis arrivée la plus ancienne, puis les autres actifs, puis
+  les anciens n° ; les places du passage se réservent PAR TRANSPORTEUR dans cet ordre
+  (`placesParTransporteur`) : le colis du « dernier jour » n'attend plus derrière de
+  vieux n° Chronopost.
+- **Une voix (4, 6)** : le bloc « en cours de vérification » ne promet plus rien de
+  l'extension (le geste vit dans « Suivi Vinted », gardé par `extSait`). Une carte « à
+  retirer » dont le transporteur confirme « disponible » (même limite) ne garde qu'une
+  marque courte (« Confirmé chez Chronopost il y a 3 min », `court`) ; une étape Vinted
+  plus ancienne que l'évènement du transporteur ne s'affiche plus sous lui
+  (`nouvelleDepassee`).
+- **N° sans transporteur (5)** : un n° du suivi Vinted sans transporteur rangé ⇒ la
+  carte dit « Transporteur pas encore connu » (jamais rien) ; avec « Vinted Go » rangé
+  (nom ou code), il est lu chez Vinted Go. Jamais deviné par la forme. (L'extension qui
+  range le transporteur courant de `journey_summary` : `v29-colis-ext`.)
+- **« À vérifier » relus par le widget (7)** : la publication porte `verif` (même forme
+  que `colis`) ; `retirerPublie` les relit par la même règle (`sorti`).
+- **Achats → « Reçus 1,7 k » (8)** : `nowrap`, et au-delà de 999 « 1,7 k » (le nombre
+  exact en infobulle et dans `data-n`).
+- **Version (9)** : 5.281 à 5.286 publiées par `main` avec un autre contenu ⇒ **5.290.0**
+  (5.287 à 5.289 prises ou réservées) : manifeste, `CODE_VERSION`, `CAPTEUR_VERSION`,
+  `relaisVersion`, `EXT_ATTENDUE`, `EXT_CAPACITES.transp`, notice Orion, zips.
+- **Une forme des deux côtés (10)** : Vinted Go à 12 chiffres et Chronopost à 14
+  caractères acceptés par l'extension comme par le serveur ; les adresses permises en
+  DÉRIVENT. `audit-transp-ext` : tout n° que C3 annonce est lu.
+- **C4 Mondial Relay de bout en bout (11)** : la route accepte un corps jusqu'à
+  `CORPS_MAX_MR` (192 Ko) pour Mondial Relay (`corpsMaxDe`), 64 Ko pour les autres ;
+  l'extension ne compte `transp_lu_*` que si le serveur a jugé `ok` (sinon
+  `transp_relaye_{res}_*`). La borne d'ENVOI de l'extension à 192 Ko : `v29-colis-ext`.
+- **L'extension dit ce qu'elle ne peut pas (12)** : `TeteTransporteurs` lit `nav.indispo`
+  de l'état du pont — `transporteurs` ⇒ le geste « Autoriser » ; `transporteurs-passu` ⇒
+  aucune promesse ; sinon « l'extension de ce Chrome les lit à la place ».
+- **`audit-extension-zip` (13)** : l'historique se lit par `VRM_GIT` puis la racine ;
+  illisible ⇒ ROUGE (il sortait vert « sans conclusion » depuis une copie §6.1).
+- **Une borne n'est pas une arrivée, partout (14)** : `arriveesDeLigne` (sûre ⇒ arrivée ;
+  « TR : », rappel, sujet inconnu ⇒ borne) dans `sortiParSuivi` / `incidentDeLigne`
+  (app : Achats, Ma journée, colis de l'équipe, compteur de la coque), le rappel du
+  matin et le widget — les trois disent le même nombre.
+- **E-mail et transporteur en même temps (15)** : `shouldNotify` (email-inbound) vérifie
+  ET réserve en un `modifierCas('push_dedup')` (garde `rev`, relit au moment d'écrire) :
+  plus de double « retiré », plus de clé du transporteur effacée.
+- **Suivi Vinted « disponible » (16)** : les alias `relais-tx{tx}-sans` / `relais-{n°}-sans`
+  vérifiés et posés en UN comparer-et-échanger AVANT l'envoi.
+- **Mondial Relay `_mvc` puis `.be` (17)** : une arrivée qui ne fait que s'enrichir (lieu
+  vide → connu) n'est pas un changement (`etatAChange`), et deux occurrences à la même
+  minute sont la même (`memeOccurrence`).
+- **Ancien n° dont la 1re lecture rate (18)** : relu à son recul tant qu'aucune lecture
+  n'a réussi (`jamaisLueAvecSucces`, 5 essais au plus), en silence (`raisonDu`).
+- **N° Chronopost dans un e-mail shipping@ (19)** : une forme Chronopost stricte n'est
+  jamais lue chez Vinted Go (`carrierLisible`) ; un transporteur NOMMÉ l'emporte sur le
+  « vinted » par défaut (`carrierPrefere`), quel que soit l'ordre des lignes.
+- Preuves : `audit-statut-transporteurs` §10 (**12 rouges sur 94f4d515**, `--prouve`
+  57/57) ; `audit-transp-notif` N11-N14 (**7 rouges**, `--prouve` 22/22 — `change-sans-lieu`
+  réancrée sur `etatAChange`) ; `audit-transp-ext` (**2 rouges**, 13/13, dont
+  `lu-sans-jugement`) ; `audit-extension-zip` (rouge depuis une copie ; l'ancien y était
+  vert « sans conclusion ») ; banc `transporteurs` §A + §F (**15 rouges sur le build de
+  94f4d515**) et `node scripts/prouve-banc-transporteurs.cjs` : 9 mutations de l'app de
+  plus (publication sans lecture, promesse, n° sans transporteur, carte qui redit tout,
+  étape Vinted dépassée, `verif` absent, onglet coupé, `nav` ignoré, geste du code
+  postal absent), chacune rouge sur SON contrôle.
+- ⚠️ **Deux faux PostgREST servaient une forme que le code ne lit plus (§6.3)** :
+  `audit-suivi-colis` et `audit-retrait-fiable` rendaient un POST
+  `return=representation` VIDE (et aucun PATCH conditionnel) — le comparer-et-échanger
+  de `shouldNotify` (n° 15) y lisait « créé entre-temps », relisait ses propres clés et
+  se taisait. Ils rendent les lignes vraiment écrites et honorent `data->>rev`.
+  `audit-retrait-fiable` et `audit-suivi-colis` : deux ancres de mutation périmées chacun
+  (déjà sur 94f4d515) suivies jusqu'au code actuel (`--prouve` 29/29 et 30/30). Banc `suivi-colis` K : `panel_colis_relais`
+  illisible ⇒ **aucune** publication (avant : une publication à `finis: null`).
+- Rouges restants, tous déjà rouges sur `main` ou sur 94f4d515 : `audit-politique-hotes`
+  (1), `audit-preuve-vente` (18), banc `journee-widgets` (8, mêmes contrôles sur le build
+  de 94f4d515).
+- ⚠️ **Non mesuré** : aucun appel réel aux transporteurs (formes de `mesures.json`) ;
+  rien lu en production pour ce tour ; la vraie forme de `nav.indispo` sur un Firefox
+  réel.

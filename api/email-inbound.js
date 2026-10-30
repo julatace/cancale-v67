@@ -37,8 +37,9 @@ import { arriveLeAuRangement } from './_lib/arrivee-colis.js';
 import { limiteRetraitDepuisTexte, lieuDepuisExtrait, LIEU_AU_FUTUR } from './_lib/retrait-colis.js';
 import { codeRetraitTournure } from './_lib/code-retrait-email.js';
 import { decoderEntitesHtml } from './_lib/entites-html.js';
-import { suiviDuSujet, finsDesLignes, sortiParSuivis } from './_lib/suivi-colis.js';
 import { transactionDuRecu } from './_lib/recu-achat.js';
+import { suiviDuSujet, finsDesLignes, sortiParSuivis, SELECT_TRANSP_META, ligneTranspDeMeta } from './_lib/suivi-colis.js';
+import { modifierCas } from './_lib/suivi-vinted.js';
 
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://lgonxzrzjcqthjtbdpzo.supabase.co';
 // ⚠️ CLÉ DE SERVICE QUAND ELLE EXISTE. Ces routes tournent sur le serveur, sans
@@ -516,23 +517,29 @@ async function shouldNotify(key, aussi = []) {
   const ecrites = [cles[0], ...(aussi || []).filter(Boolean)];
   cles.push(...ecrites.slice(1));
   const attente = enAttente();
-  try {
-    let lu = await supabaseLireRow('push_dedup');
-    if (!lu.lu) lu = await supabaseLireRow('push_dedup');
-    if (!lu.lu) {
-      if (cles.some((k) => attente.has(k))) return false;
-      ecrites.forEach((k) => attente.add(k));
-      while (attente.size > 300) attente.delete(attente.values().next().value);
-      return true;
-    }
-    const keys = (lu.data && Array.isArray(lu.data.keys)) ? lu.data.keys : [];
-    if (cles.some((k) => keys.includes(k) || attente.has(k))) return false;
-    const enPlus = [...attente].filter((k) => !keys.includes(k));
-    const next = [...ecrites, ...enPlus.filter((k) => !ecrites.includes(k)), ...keys].slice(0, 300);
-    if (await supabaseUpsert([{ id: 'push_dedup', data: { keys: next } }])) attente.clear();
-    else ecrites.forEach((k) => attente.add(k));                      // pas rangé : l'instance s'en souvient (la route répondra 503)
-    return true;
-  } catch (_) { return true; }
+  if (cles.some((k) => attente.has(k))) return false;
+  // (29 oct., tour 2 n° 15) LA VÉRIFICATION ET LA RÉSERVATION EN UN SEUL
+  // comparer-et-échanger sur `push_dedup` (`modifierCas`, la règle du
+  // transporteur et du suivi Vinted) : le modificateur relit les clés AU MOMENT
+  // D'ÉCRIRE et abandonne si l'une est apparue ; `rev` est gardé. Avant : lire,
+  // puis réécrire la liste ENTIÈRE depuis cette lecture (sans version) — un
+  // passage du transporteur entre les deux sonnait aussi (deux « retiré »), et
+  // les clés qu'il venait de poser étaient EFFACÉES.
+  const modif = (d) => {
+    const ks = (d && Array.isArray(d.keys)) ? d.keys.filter((x) => typeof x === 'string') : [];
+    if (cles.some((k) => ks.includes(k))) return undefined;
+    const enPlus = [...attente].filter((k) => !ks.includes(k) && !ecrites.includes(k));
+    return { ...(d || {}), keys: [...ecrites.filter((k) => !ks.includes(k)), ...enPlus, ...ks].slice(0, 300) };
+  };
+  let r = null;
+  for (let i = 0; i < 2 && r === null; i++) { try { r = await modifierCas('push_dedup', modif); } catch (_) { r = null; } }   // un hoquet : relu une fois
+  if (r === true) { attente.clear(); return true; }
+  if (r === false) return false;
+  // « Pas su » (la base n'a pas répondu, ou l'écriture a été refusée) : on
+  // ENVOIE (un message manqué ne se rattrape pas) et l'instance retient la clé.
+  ecrites.forEach((k) => attente.add(k));
+  while (attente.size > 300) attente.delete(attente.values().next().value);
+  return true;
 }
 // ── CE QU'ON NOTIFIE, ET CE QU'ON NE NOTIFIE PAS ────────────────────────────
 // Julien : « des fois je reçois des choses complètement débiles ». Il a raison :
@@ -2010,8 +2017,12 @@ export async function traiterEmail(req, res) {
           // (revue du 23 oct., n° 4) L'arrivée datée par l'e-mail (comme la ligne
           // rangée) : un retour du même n° écrit APRÈS elle — même traité avant —
           // fait taire « 📍 ».
+          // (24 oct.) + le statut lu chez le TRANSPORTEUR (ses lignes `transp_`,
+          // par le n°, en scalaires) : retiré, ou reparti / incident depuis
+          // l'arrivée ⇒ « 📍 » se tait. Illisible ⇒ comme avant (les e-mails seuls).
           const a = arriveLeAuRangement(prevLigne, subject, 'available', emailAt || now);
-          sortiAilleurs = sortiParSuivis([k], finsDesLignes(autres, { estSortant: (l) => l.sens === 'sortant' }), Date.parse(a || emailAt || now) || null);
+          const tl = await lireLignes(`id=in.(transp_chronopost_${k},transp_mondialrelay_${k},transp_vinted_${k})&select=${SELECT_TRANSP_META}`);
+          sortiAilleurs = sortiParSuivis([k], finsDesLignes(autres, { estSortant: (l) => l.sens === 'sortant', transp: Array.isArray(tl) ? tl.map(ligneTranspDeMeta).filter(Boolean) : [] }), Date.parse(a || emailAt || now) || null);
         }
       }
       // Notif push selon l'étape du colis.

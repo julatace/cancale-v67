@@ -46,7 +46,8 @@ const MUTATIONS = {
   'rappel-memo-passu': ['api/ship-reminders.js', "  const deja = await getRow('colis_retrait_dedup');\n  if (deja === undefined) return 'mémo illisible — rien envoyé';", "  const deja = await getRow('colis_retrait_dedup');"],
   'rappel-memo-non-ecrit': ['api/ship-reminders.js', "  if (!(await ecrireDedup('colis_retrait_dedup', { envoyes: memo, at: new Date(maintenant).toISOString() }))) return 'mémo non écrit — rien envoyé';", "  await ecrireDedup('colis_retrait_dedup', { envoyes: memo, at: new Date(maintenant).toISOString() });"],
   'rappel-pref-ignoree': ['api/ship-reminders.js', "  if (!(await pushCategorieActive('colis'))) return 'désactivé par le vendeur';", ''],
-  'rappel-main-passu': ['api/ship-reminders.js', 'if (!Array.isArray(lignes) || m === undefined || !Array.isArray(bords))', 'if (!Array.isArray(lignes) || !Array.isArray(bords))'],
+  // (29 oct.) Ancres suivies jusqu'au code actuel (la lecture des transporteurs s'y est ajoutée).
+  'rappel-main-passu': ['api/ship-reminders.js', 'if (!Array.isArray(lignes) || m === undefined || !Array.isArray(bords) || !Array.isArray(transp0))', 'if (!Array.isArray(lignes) || !Array.isArray(bords) || !Array.isArray(transp0))'],
   'rappel-coche-ignoree': ['api/_lib/suivi-colis.js', '    if (coches.has(brut) || cochesN.has(k)) continue;', ''],
   'rappel-garde-ignoree': ['api/_lib/suivi-colis.js', "    else if (e.etat === 'trop_long' && Number.isFinite(e.age) && e.age <= e.garde + 1 + RATTRAPAGE_J) etat = 'a_verifier';", ''],
   'rappel-finis-ignores': ['api/_lib/suivi-colis.js', "    if (finisS.has('e:' + k)) continue;", ''],
@@ -56,7 +57,7 @@ const MUTATIONS = {
   // ── revue du 23 oct. ──
   'arrivee-a-venir-ignoree': ['api/_lib/etat-colis-email.js', "if((FUTUR.test(t)||ARRIVEE_A_VENIR.test(t))&&", "if((FUTUR.test(t))&&"],
   'sujet-preuve-arrivee': ['api/email-inbound.js', "if (track.status === 'available' && track.suiviDuSujetSeul && !track.code", "if (false && track.status === 'available' && track.suiviDuSujetSeul && !track.code"],
-  'cron-sans-relecture': ['api/_lib/suivi-colis.js', "  lignes = (Array.isArray(lignes) ? lignes : []).map((l) => relireLigneMeta(l));", "  lignes = (Array.isArray(lignes) ? lignes : []).map((l) => ligneDeMeta(l));"],
+  'cron-sans-relecture': ['api/_lib/suivi-colis.js', "  lignes = (Array.isArray(lignes) ? lignes : []).map((l) => relireLigneMeta(l)).map(", "  lignes = (Array.isArray(lignes) ? lignes : []).map((l) => l).map("],
   'widget-sans-relecture': ['api/widget.js', "  const toutes = [...dispo0, ...partis0].map(relireLigneMeta).filter(Boolean);", "  const toutes = [...dispo0, ...partis0].filter(Boolean);"],
   'cron-commande-ignoree': ['api/_lib/suivi-colis.js', "      if (f === undefined || f) continue;", ""],
   'cron-relais-passu-envoie': ['api/ship-reminders.js', "  const relais = relaisRow === undefined ? null : objet(relaisRow);", "  const relais = objet(relaisRow);"],
@@ -164,14 +165,19 @@ global.fetch = async (url, opts = {}) => {
   if (u.pathname !== '/rest/v1/app_data') return rep([]);
   if (m === 'POST') {
     const prefer = String((opts.headers && (opts.headers.Prefer || opts.headers.prefer)) || '');
+    // (29 oct.) `return=representation` rend les lignes VRAIMENT écrites, comme
+    // PostgREST (une ligne ignorée en doublon n'y est pas) — le comparer-et-échanger
+    // de `push_dedup` (`modifierCas`) le lit (§6.3 : la forme de la réponse).
+    const ecritesIci = [];
     for (const r of JSON.parse(opts.body || '[]')) {
       ecrits.push({ id: r.id, owner: r.owner || A });
       if (pannes.has('ecrire:' + r.id)) return rep('<html>522</html>', 522);
       const cle = `${r.owner || A}|${r.id}`;
       if (/ignore-duplicates/.test(prefer) && base.has(cle)) continue;
       base.set(cle, r.data);
+      ecritesIci.push({ owner: r.owner || A, id: r.id, data: r.data });
     }
-    return /return=representation/.test(prefer) ? rep([], 201) : new Response('', { status: 201 });
+    return /return=representation/.test(prefer) ? rep(ecritesIci, 201) : new Response('', { status: 201 });
   }
   if (m === 'PATCH') {
     const corps = JSON.parse(opts.body || '{}');
@@ -267,7 +273,7 @@ function chargeApp(noms, injecte) {
   await essaie('règles de l\'app (src/App.jsx, Babel)', async () => {
     const etat = await importer('api/_lib/etat-colis-email.js');
     const app = chargeApp(['SUJET_SORTANT', 'SUJET_ENTRANT', 'colisKey', 'sensColis', 'finsColis', 'suivisRetires', 'colisRetireAilleurs', 'trackUrl'],
-      { normaliserSuivi: etat.normaliserSuivi, finsDesLignes: S.finsDesLignes, suiviDeLigne: S.suiviDeLigne, lienSuivi: S.lienSuivi, sortiParSuivi: S.sortiParSuivi });
+      { normaliserSuivi: etat.normaliserSuivi, finsDesLignes: S.finsDesLignes, suiviDeLigne: S.suiviDeLigne, lienSuivi: S.lienSuivi, sortiParSuivi: S.sortiParSuivi, sensDeLigne: S.sensDeLigne });
     const manque = ['finsColis', 'suivisRetires', 'colisRetireAilleurs', 'colisKey', 'trackUrl'].filter((n) => !app[n] || app['__err_' + n]);
     dit(!manque.length, 'les règles de l\'app se chargent', manque.join(', '));
     if (manque.length) return;
@@ -378,7 +384,10 @@ function chargeApp(noms, injecte) {
     const d = p1.find((p) => p.tag === 'retrait-dernier-30000021') || {};
     dit(/^📍 Dernier jour pour retirer /.test(d.title || '') && /30000021/.test(d.body || '') && /Bar Test/.test(`${d.title} ${d.body}`) && d.url === '/?tab=cat_achats', '« 📍 Dernier jour pour retirer <lieu> », le n° dans le texte, ouvre Achats', `${d.title} | ${d.body}`);
     const v = p1.find((p) => p.tag === 'retrait-a_verifier-09440000000022') || {};
-    dit(/^Colis à vérifier — sans doute reparti : n°09440000000022/.test(v.title || '') && !/perdu/i.test(`${v.title} ${v.body}`), '« Colis à vérifier — sans doute reparti : n°… », jamais « perdu »', v.title);
+    // (29 oct.) « sans doute reparti » ne s'écrit plus : un délai dépassé ne prouve
+    // rien (mesuré le 29 : 5 « sans doute repartis » sur 5 avaient été RETIRÉS) —
+    // seul le transporteur ou Vinted dit « reparti ». Jamais « perdu » non plus.
+    dit(/^Colis à vérifier : n°09440000000022/.test(v.title || '') && !/perdu|sans doute reparti/i.test(`${v.title} ${v.body}`), '« Colis à vérifier : n°… », jamais « perdu » ni « sans doute reparti » (le délai ne prouve rien)', v.title);
     const lect = lus.filter((u) => /email_track_|colis_retrait_dedup|id=eq\.main/.test(u) && !/select=owner(&|$)/.test(u));
     dit(lect.length > 0 && lect.every((u) => /owner=eq\./.test(u)), 'cron : toutes les lectures du rappel portent owner=eq.<vendeur>', lect.filter((u) => !/owner=eq\./.test(u)).slice(0, 2).join(' | '));
     dit(!JSON.stringify((r1.corps && r1.corps.bilans) || r1.corps || {}).match(/30000021|Bar Test/), 'cron : la réponse ne contient ni n° ni lieu (des nombres)');
