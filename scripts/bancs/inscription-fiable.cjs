@@ -10,7 +10,7 @@ const dist=process.env.BANC_DIST||path.join(__dirname,'../../dist');
  });
  await new Promise(r=>serveur.listen(0,'127.0.0.1',r));const origine='http://127.0.0.1:'+serveur.address().port;
  const nav=await chromium.launch({executablePath:process.env.VRM_CHROMIUM_PATH||'/usr/bin/chromium',args:['--no-sandbox']});
- try{for(const largeur of [390,1512])for(const mode of ['confirmation','incertain']){
+ try{for(const largeur of [320,390,1512])for(const mode of ['confirmation','incertain']){
   const p=await nav.newPage({viewport:{width:largeur,height:900}});let appels=0,liberer,corps,retour;
   await p.route('**/*',async r=>{
    const u=r.request().url(),json=(status,data)=>r.fulfill({status,json:data});
@@ -21,6 +21,24 @@ const dist=process.env.BANC_DIST||path.join(__dirname,'../../dist');
    if(u.startsWith(origine+'/'))return r.continue();return r.abort();
   });
   await p.goto(origine+'/?inscription');await p.getByPlaceholder('Email',{exact:true}).fill('Client@exemple.test');await p.getByPlaceholder('Mot de passe',{exact:true}).fill('Secret123');
+  assert.equal(await p.getByRole('textbox',{name:'Adresse email',exact:true}).count(),1,'Libellé email permanent');
+  const secret=p.locator('#vrm-cx-password');
+  assert.equal(await secret.getAttribute('type'),'password');
+  await p.getByRole('button',{name:'Afficher le mot de passe',exact:true}).click();
+  assert.equal(await secret.getAttribute('type'),'text');
+  assert.equal(await secret.inputValue(),'Secret123','Afficher conserve la saisie');
+  await p.getByRole('button',{name:'Masquer le mot de passe',exact:true}).click();
+  assert.equal(await secret.getAttribute('type'),'password');
+  assert.equal(await p.locator('#vrm-cx-regles [data-valide=true]').count(),2,'Les règles reflètent la saisie');
+  await secret.fill('abc');
+  assert.equal(await p.locator('#vrm-cx-regles [data-valide=true]').count(),0);
+  await p.getByRole('button',{name:'Créer mon compte',exact:true}).click();
+  await p.getByRole('alert').filter({hasText:'au moins 8 caractères'}).waitFor();
+  assert.equal(appels,0,'Un mot de passe incomplet ne lance pas une inscription');
+  await secret.fill('Secret123');
+  assert.equal(await p.getByRole('alert').count(),0,'L’erreur précédente disparaît pendant la correction');
+  assert.equal(await p.getByRole('button',{name:'Mot de passe oublié ?',exact:true}).count(),0,'Pas de diversion de récupération pendant la création');
+  await p.screenshot({path:`/tmp/vrm-inscription-${largeur}.png`,fullPage:true});
   await p.evaluate(()=>{const f=document.querySelector('[data-connexion] form');f.requestSubmit();f.requestSubmit();});
   for(let i=0;i<100&&!liberer;i++)await p.waitForTimeout(20);
   assert.ok(liberer);await p.waitForTimeout(100);assert.equal(appels,1,'Une seule demande pour les deux validations');
