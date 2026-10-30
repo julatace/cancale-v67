@@ -12797,7 +12797,7 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
               const pl = (n, s1, s2x) => `${n} ${n > 1 ? (s2x || s1 + 's') : s1}`;
               const motF = (n) => (n > 1 ? A.faits.replace(/^(\S+)/, '$1s') : A.faits);
               const bilan = `${nFait} sur ${total} ${motF(nFait)}`;
-              const titre = mode === 'fini' ? (arret ? `Arrêté · ${bilan}` : (nPasFaites || nDouble) ? `Fini · ${bilan}` : 'Terminé') : mode === 'pause' ? (arret ? 'Arrêté' : 'En pause') : enCours ? `Paire ${aFaire.indexOf(enCours) + 1} sur ${total}` : `Paire ${prochN} sur ${total}`;
+              const titre = mode === 'fini' ? (arret ? 'Arrêté' : (nPasFaites || nDouble) ? 'Fini' : 'Terminé') : mode === 'pause' ? (arret ? 'Arrêté' : 'En pause') : enCours ? `Paire ${aFaire.indexOf(enCours) + 1} sur ${total}` : `Paire ${prochN} sur ${total}`;
               const r = mode === 'run' && prochaine ? Math.max(0, Math.round((prochaine.at - Date.now()) / 1000)) : null;
               const phrase = mode === 'run'
                 ? (enCours ? <b>{enCours.numero ? `N°${enCours.numero} · ` : ''}{enCours.titre}</b> : r != null ? <span data-republier-prochaine={prochaine.s}>Prochaine paire dans {r >= 60 ? `${Math.floor(r / 60)} min ${String(r % 60).padStart(2, '0')} s` : `${r} s`}</span> : 'Préparation de la suite…')
@@ -32974,7 +32974,7 @@ function MicroEntreprise({ taux, poserTaux, officiel, vlTaux, acreTaux }) {
   let seuils;
   if (!s) seuils = null;
   else if (!jauge) seuils = (
-    <Card style={sCarte}><div data-micro-seuils="passu"><div style={sTitre}>Tes seuils {now.getFullYear()}</div><div style={{ fontSize: 13, color: C.muted, marginTop: 6 }}>Ton chiffre d'affaires de l'année se calcule dans l'écran Ventes : ouvre-le une fois sur cet appareil.</div></div></Card>
+    <Card style={sCarte}><div data-micro-seuils="passu"><div style={sTitre}>Tes seuils {now.getFullYear()}</div><div style={{ fontSize: 13, color: C.muted, marginTop: 6 }}>— pas encore calculé</div></div></Card>
   );
   else {
     const j = jauge, am = j.partiel ? 'au moins ' : '';
@@ -33037,7 +33037,7 @@ function MicroEntreprise({ taux, poserTaux, officiel, vlTaux, acreTaux }) {
     <Card style={sCarte}>
       <div data-micro-impots={dr ? 'lu' : 'passu'} data-micro-impots-annee={dr ? String(dr.annee) : ''} data-micro-impots-ca={dr ? String(dr.ca) : ''} data-micro-impots-cases={dr ? dr.cases.join(',') : ''}>
         <div style={sTitre}>Ta déclaration de revenus</div>
-        {!dr ? <div style={{ fontSize: 13, color: C.muted, marginTop: 6 }}>Le montant se calcule dans l'écran Ventes : ouvre-le une fois sur cet appareil.</div> : (<>
+        {!dr ? <div style={{ fontSize: 13, color: C.muted, marginTop: 6 }}>— pas encore calculé</div> : (<>
           <div style={{ fontSize: 13, color: C.muted, marginTop: 6, lineHeight: 1.5 }}>
             {dr.enCours ? <>Revenus {dr.annee}, à déclarer au printemps {dr.annee + 1} — pour l'instant :</> : <>Revenus {dr.annee}, à déclarer ce printemps (déclaration 2042-C-PRO) :</>}
           </div>
@@ -33151,7 +33151,7 @@ function SuiviUrssaf({ onNav }) {
                     </div>
                   ) : (
                     <div style={{ fontSize: 13, color: C.muted, lineHeight: 1.5 }}>
-                      {l.caCalc == null ? 'Le montant se calcule dans Ventes (ouvre-le une fois).' : <>Reçu {l.partiel ? 'au moins ' : ''}<b style={{ color: C.text }}>{eur(l.caCalc)}</b> · à payer ≈ {l.partiel ? 'au moins ' : ''}<b style={{ color: C.text }}>{eur(l.aPayerCalc)}</b>{l.etat === 'en_cours' ? ' (pour l\'instant)' : ''}</>}
+                      {l.caCalc == null ? '— pas encore calculé' : <>Reçu {l.partiel ? 'au moins ' : ''}<b style={{ color: C.text }}>{eur(l.caCalc)}</b> · à payer ≈ {l.partiel ? 'au moins ' : ''}<b style={{ color: C.text }}>{eur(l.aPayerCalc)}</b>{l.etat === 'en_cours' ? ' (pour l\'instant)' : ''}</>}
                       {l.yms.length > 1 && l.aNoter.length < l.yms.length ? <> · noté : {l.yms.length - l.aNoter.length} mois sur {l.yms.length}</> : null}
                     </div>
                   )}
@@ -33320,7 +33320,7 @@ function CarteUrssafMois({ liveStats, onNav }) {
             dit aussi quand le registre n'était pas encore lu (`declare`). */}
         <div style={{...sNote,fontSize:13,marginTop:10,paddingTop:14,borderTop:`1px solid ${C.border}`,lineHeight:1.55}}>
           {moisCourantCA==null
-            ? <>Ce chiffre se calcule sur l'écran <b>Ventes</b> : ouvre-le une fois sur cet appareil et il s'affichera ici.</>
+            ? <>— pas encore calculé</>
             : <span data-urssaf-declare={decl}>Calculé sur le CA des ventes finalisées en {moisCourant.nom}, toutes plateformes (<b style={{color:C.text,fontWeight:600}}><Mt v={moisCourantCA}/></b>)
                 {nA > 0 && <span data-urssaf-ailleurs={Math.round(caA*100)} data-urssaf-ailleurs-n={nA}>, hors {nA} vente{nA>1?'s':''} (<Mt v={caA}/>) déjà dans ta déclaration{ou ? <> de {ou}</> : null}</span>}
                 .
@@ -33738,7 +33738,7 @@ function BoostRentable({ panelOff }) {
     <div data-stats-carte="boost" data-boost-etat="lu" data-boost-assez={R.assez ? 'oui' : 'non'} data-boost-b={R.boostees} data-boost-montant={R.avecMontant} data-boost-nb={R.nonBoostees} data-boost-comp={`${R.comparables.b}/${R.comparables.nb}`} style={sCarte}>
       {titre}
       {/* (30 oct.) Une ligne, en mots ; le détail (montants saisis, ventes pas reliées) derrière ⓘ. */}
-      <div data-boost-couverture="" style={{...sNote,fontSize:11.5,marginTop:6,display:'flex',alignItems:'center',gap:4,flexWrap:'wrap'}}>
+      <div data-boost-couverture="" data-boost-sans-annonce={R.sansAnnonce || 0} data-boost-inconnues={R.inconnues || 0} style={{...sNote,fontSize:11.5,marginTop:6,display:'flex',alignItems:'center',gap:4,flexWrap:'wrap'}}>
         {s(R.comparables.b, 'boostée')} · {R.comparables.nb} non boostée{R.comparables.nb > 1 ? 's' : ''} comparées (même tranche de prix)
         <Pourquoi label="Détail">{s(R.boostees, 'boostée')} vendue{R.boostees > 1 ? 's' : ''}, dont {R.avecMontant} avec le montant du boost saisi · {R.nonBoostees} non boostée{R.nonBoostees > 1 ? 's' : ''}.{(R.inconnues > 0 || R.sansAnnonce > 0) ? ` Pas comptées : ${[R.inconnues > 0 ? `${R.inconnues} sans information de boost` : '', R.sansAnnonce > 0 ? `${R.sansAnnonce} pas reliée${R.sansAnnonce > 1 ? 's' : ''} à leur annonce` : ''].filter(Boolean).join(', ')}.` : ''}</Pourquoi>
       </div>
@@ -34601,9 +34601,16 @@ function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, pan
   // interligne de ~2 dans le paragraphe du résultat.
   const lienBtn = (txt, tab, fs = 13) => <a href={`?tab=${tab}`} onClick={(e) => { e.preventDefault(); if (onNav) onNav(tab); }} style={{ color: C.accent, fontWeight: 600, cursor: 'pointer', fontSize: fs, textDecoration: 'none' }}>{txt}</a>;
 
+  // (30 oct.) « Se calcule dans Ventes » était écrit ~9 fois sur cet écran : la cause
+  // se dit UNE fois ici, avec le geste ; les cartes ne gardent que « — ».
+  const ligneComptaPub = useLigneUrssaf();
   return (
     <div className="vrm-finance-page" style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 16 }}>
       <ScreenHead icon="euro" title="Comptabilité" desc="Ton résultat, ta déclaration URSSAF, tes charges et tes factures." />
+      {!ligneComptaPub && <div data-compta-pas-calcule="" style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', padding: '10px 14px', borderRadius: 12, background: 'var(--vrm-b-teinte)', fontSize: 13, color: C.text }}>
+        <span style={{ flex: '1 1 220px' }}>Pas encore calculé : ouvre <b>Ventes</b> une fois sur cet appareil.</span>
+        <Bouton className="vrm-b-petit" onClick={() => onNav && onNav('cat_ventes')}>Ouvrir Ventes</Bouton>
+      </div>}
       {/* (26 octobre) Julien : « la compta, c'est horrible ». La page fait plus de
           6 000 px au téléphone : un sommaire en tête mène à chaque partie, et la
           déclaration URSSAF remonte juste sous le bénéfice. Aucune règle de
@@ -34900,7 +34907,7 @@ function RetoursEnCoursBloc({ res, nomCompte, plusieursComptes, onRecu, onRemett
           <a data-geste="republier" href="https://www.vinted.fr/items/new" target="_blank" rel="noreferrer" style={{...btn,display:'inline-flex',alignItems:'center',textDecoration:'none'}}>Republier ↗</a>
           <button type="button" data-geste="annuler-remise" onClick={()=>onAnnulerRemise(l.cle)} style={{...btn,color:C.muted}}>Annuler la remise</button>
         </> : <>
-          <button type="button" data-geste="recu" aria-pressed={l.recu} onClick={()=>onRecu(l.cle)} style={{...btn,color:l.recu?C.text:C.muted}}>{l.recu ? '✓ Reçu chez moi' : 'Reçu chez moi ?'}</button>
+          <button type="button" data-geste="recu" aria-pressed={l.recu} onClick={()=>onRecu(l.cle)} style={{...btn,color:l.recu?C.text:C.muted}}>{l.recu ? '✓ Reçu' : 'Reçu'}</button>
           {l.recu && l.num && <button type="button" data-geste="remise-en-stock" onClick={()=>onRemettre(l)} style={{...btn,background:C.text,color:C.bg,border:`1px solid ${C.text}`}}>Remise en stock</button>}
           <button type="button" className="vrm-icon-control" data-geste="masquer-retour" onClick={()=>onMasquer(l.cle)} title="Masquer cette ligne (déjà réglé)" aria-label="Masquer" style={{...btn,minWidth:44,padding:0,color:C.muted}}><Icon name="close" size={15}/></button>
         </>}
@@ -34912,7 +34919,7 @@ function RetoursEnCoursBloc({ res, nomCompte, plusieursComptes, onRecu, onRemett
         <span aria-hidden="true" style={{color:C.muted,flexShrink:0,marginTop:1}}><Icon name="truck" size={18}/></span>
         <div style={{minWidth:0}}>
           <div style={{fontSize:13.5,fontWeight:700,color:C.text}}>Retours en cours{lignes.length ? ` · ${lignes.length}` : ''}</div>
-          <div style={{fontSize:11.5,color:C.muted,marginTop:3,lineHeight:1.45}}>Coche « Reçu chez moi » quand le colis est là, puis « Remise en stock » : l'article garde son N°. Rien ne change tout seul — la vente remboursée sort déjà de ton CA.{manques.length ? <span data-retours-pas-su> Je n'ai pas pu lire {manques.join(', ')} : un retour peut manquer.</span> : null}</div>
+          <div style={{fontSize:11.5,color:C.muted,marginTop:3,lineHeight:1.45}}>« Reçu » à l'arrivée, puis « Remise en stock » (le N° reste). <Pourquoi label="Pourquoi">Rien ne change tout seul : c'est toi qui dis que le colis est revenu. La vente remboursée sort déjà de ton CA.</Pourquoi>{manques.length ? <span data-retours-pas-su> Je n'ai pas pu lire {manques.join(', ')} : un retour peut manquer.</span> : null}</div>
         </div>
       </div>
       <div style={{display:'grid',gap:6,marginTop:9}}>
@@ -47327,7 +47334,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 <span aria-hidden="true" style={{color:C.warn,flexShrink:0,marginTop:1}}><Icon name="truck" size={18}/></span>
                 <div style={{minWidth:0}}>
                   <div style={{fontSize:13.5,fontWeight:700,color:C.text}}>{nb} colis coché{pl} « posté » que Vinted n'a pas vu{pl} partir</div>
-                  <div style={{fontSize:11.5,color:C.muted,marginTop:3,lineHeight:1.45}}>Vinted dit toujours qu'il{nb>1?'s attendent':' attend'} ton envoi — un statut lu après ta coche. Vérifie que le colis a bien été déposé (garde le reçu du point relais) ; s'il est encore chez toi, dépose-le ou remets-le dans « à envoyer ». Passé la date limite, Vinted peut annuler la vente.</div>
+                  <div style={{fontSize:11.5,color:C.muted,marginTop:3,lineHeight:1.45,display:'flex',alignItems:'center',gap:4,flexWrap:'wrap'}}>Vérifie le dépôt, ou remets-le dans « à envoyer ». <Pourquoi label="Pourquoi">Vinted dit toujours qu'il{nb>1?'s attendent':' attend'} ton envoi — un statut lu après ta coche. Vérifie que le colis a bien été déposé (garde le reçu du point relais) ; s'il est encore chez toi, dépose-le ou remets-le dans « à envoyer ». Passé la date limite, Vinted peut annuler la vente.</Pourquoi></div>
                 </div>
               </div>
               <div style={{display:'grid',gap:6,marginTop:9}}>
@@ -47534,9 +47541,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           const estPosteT = (x) => !!(x.o ? isShipDone(x.o) : isBordShippedManual(x.b));
           const nbMasquesPostes = exTout.filter(estPosteT).length;
           const lignePostes = nbMasquesPostes > 0 ? (
-            <button type="button" onClick={()=>setVoirPostes(v=>!v)}
+            <button type="button" data-voir-postes={nbMasquesPostes} onClick={()=>setVoirPostes(v=>!v)}
               style={{alignSelf:'flex-start',border:'none',background:'transparent',padding:'2px 2px',color:C.muted,fontSize:12,cursor:'pointer',fontFamily:'inherit',textAlign:'left'}}>
-              {voirPostes ? 'Cacher' : 'Afficher'} les {nbMasquesPostes} colis marqué{nbMasquesPostes>1?'s':''} « posté{nbMasquesPostes>1?'s':''} » — ils disparaissent seuls quand Vinted confirme l'envoi
+              {voirPostes ? 'Cacher' : 'Voir'} {nbMasquesPostes>1 ? `les ${nbMasquesPostes} colis postés` : 'le colis posté'}
             </button>) : null;
           const ex = voirPostes ? exTout : exTout.filter(x => !estPosteT(x));
           if (!ex.length && colisEb && colisEb.aPoster.length) return lignePostes;
@@ -47776,7 +47783,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       {b && <button type="button" onClick={()=>toggleBordPrinted(b)}
                         title={isBordPrinted(b)?'Remettre en « à imprimer »':'Marquer comme imprimé'} data-geste="imprime"
                         className="vrm-colis-sec vrm-colis-ter" style={{...sec,border:`1px solid ${C.border}`,background:isBordPrinted(b)?C.bg:'transparent',color:isBordPrinted(b)?C.text:C.muted}}>
-                        {isBordPrinted(b)?'✓ Imprimé':'Imprimé ?'}
+                        {isBordPrinted(b)?'✓ Imprimé':'Marquer imprimé'}
                       </button>}
                       {/* « Colis fait » marque LES DEUX (la vente et le bordereau) :
                           deux marqueurs pour un même carton, c'était deux chiffres
