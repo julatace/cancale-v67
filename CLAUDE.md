@@ -114,6 +114,53 @@
 > **3 rouges sur la branche d'avant**, `--prouve` 13/13 (`phrase-message-seul`). **Geste de Julien** : si une conversation
 > retirée revient après qu'il a accepté ou refusé l'offre sur Vinted, la retirer encore une fois.
 
+> **29 octobre — revue des écrans Vinted, dernier tour (deux défauts) :** « il lui faut un N° pour aller sur Leboncoin »
+> était écrit en ambre sur CHAQUE fiche sans N° (§7) — retiré de la fiche (« + N° » y suffit) ; la pastille de l'en-tête
+> dit une fois « N sans N° — il leur en faut un pour Leboncoin » (`data-sans-num`). Statistiques gardait seulement deux
+> dates (`caDu`/`caAu`) et réécrivait « 7 jours » en « Du 24 au 30 oct. » quand Ventes disait « 7 derniers jours » : le
+> libellé du raccourci est gardé (`caLabel`), le même choix s'écrit pareil partout. Preuves : banc `vinted-ui` (9205 et 9206
+> sans N°, libellé Ventes = Statistiques) **6 rouges sur e314e0ee**, 0 après ; mutation (ligne remise sur la fiche +
+> libellé jeté) ⇒ 6 rouges. ⚠️ Non mesuré : sa vraie base (une annonce en ligne sans N° aujourd'hui, hors shop_cancale).
+
+> **29 octobre — revue des écrans Vinted : neuf défauts reproduits, corrigés (app seule) :** la préparation Leboncoin
+> (`etatPrepaLbc`, une règle pour la fiche et l'en-tête) dit l'état COMMUN une fois au-dessus de la grille (« N à recapturer
+> pour Leboncoin ») — la fiche ne garde que ce qui la distingue (« 2/5 photos captées ») ; chez lui ~125 fiches sur 179
+> auraient porté « photos pas encore captées ». Statut des offres auto court et à la ligne (« Allumées · 2 annonces avec
+> mini »), jamais « … ». Plus aucun renvoi à « Gérer l'annonce » (Statistiques → « la case boost de sa fiche »). Raccourcis
+> du calendrier à la ligne dans la feuille (« Cette année » n'est plus hors de l'écran). « CA entre deux dates » somme le CA
+> finalisé PAR JOUR publié par la coque (`caFinaliseParJour`, la population de « Finalisé sur Vinted », §11) au lieu de
+> l'archive vide — « — » tant que pas lu, jamais 0,00 € ; la phrase passe par `phrasePlage` (« en octobre 2026 », « en 2026 »,
+> « du … au … »). « À publier sur Leboncoin » neutre (habillé comme les autres gestes) et absent d'une paire PROUVÉE sur
+> Leboncoin. Feuille du calendrier au doigt : le haut de la zone se cale sur le DÉBUT d'un mois (marge basse ajoutée quand
+> c'est le dernier). `updatePair` compte `fees` : un boost tapé sur une annonce sans N° est gardé. Calendrier sur tablette
+> tactile (`pointer: coarse`, fenêtre à deux mois) : jours, flèches, raccourcis, boutons à 44 px. Preuves : banc `vinted-ui`
+> (+ section T tablette, contrôle R du texte de l'app) **30 rouges sur fd505d59** (le code relu), 0 après ; mutations
+> « préparation sur chaque fiche », « `fees` ignoré », « CA hors plage » ⇒ rouges. 175 audits verts ; bancs voisins :
+> `chiffres-croises` vert, `annonces-carte` 3 · `perfv` 1 · `stats-premium` 3 · `feuilles-coque` 7 · `revue-20oct` 12 rouges, tous
+> présents (et plus nombreux) sur le build d'origin/main d1e76ab2. ⚠️ Non mesuré : un vrai iPad.
+
+> **29 octobre — ÉCRANS VINTED : grandes photos, état en jauge, calendrier « comme Airbnb », offres auto, pastille (app seule) :**
+> Julien : « augmente la taille des photos », « l'état plus original avec à côté la saisie du prix d'achat », « toutes les infos
+> des 3 petits points », « un calendrier comme Airbnb » pour les périodes, « accepter les offres automatiquement… c'est moche »,
+> « améliore la pastille Actions possibles / Lecture seule ». **Fiche d'annonce** : au téléphone UNE fiche par rangée (photo
+> ≈ 360 px), à l'ordinateur côte à côte (≥ 330 px) ; l'état en **jauge à cinq barres** (`src/carteAnnonce.js`, `etatVinted` :
+> les cinq libellés MESURÉS chez lui le 29 oct. — 131 « Très bon état », 18 « Bon état », 4/2/2 —, comparés EN ENTIER ; inconnu ⇒
+> affiché tel quel sans niveau ; aucun ⇒ « — ») et le prix d'achat saisi À CÔTÉ (`EnLigne data="achat"`, le même geste) ; le
+> « ⋯ Gérer l'annonce » est retiré : ses gestes (`data-fiche-gestes`, 44 px au doigt) et ses infos sont à la vue. **Calendrier**
+> (`src/ChoixPeriode.jsx` + règle pure `src/periodeCalendrier.js`) : deux mois côte à côte à l'ordinateur, un calendrier qui
+> défile au doigt (feuille), raccourcis 7 jours · 30 jours · ce mois · mois dernier · cette année, deux touchers puis Appliquer,
+> plage dite en clair ; UN composant pour Ventes, Achats et la période du CA (`PeriodePicker` n'est plus qu'un nom ; Compta « Semaine · Mois · Trimestre · Année » reste un segment : c'est la période de DÉCLARATION, pas une plage libre) ; la valeur
+> garde sa forme `{from, to, label?}` lue par `dansPeriodeDate` (§11, aucun filtre réécrit). **Offres automatiques** : une
+> ligne (statut + interrupteur), le texte derrière ⓘ ; comportement INCHANGÉ (éteindre sans question, allumer demande).
+> **Pastille Actions** : ton, chevron, panneau avec en-tête et la chaîne des maillons, même source (`etatActionsExt`, sur `raisonExtGlobale`). Rien sur
+> les favoris (sa demande). Preuves : banc `vinted-ui.cjs` (port `BANC_PORT`, données inventées, 390 tactile + 1512, clair et
+> sombre) **68 rouges sur le build d'origin/main (634932dd)**, 0 après ; mutations rouges : deux fiches par rangée au téléphone,
+> saisie d'achat non enregistrée, allumer sans confirmation, raccourcis écrasés dans la feuille, ton du panneau d'une autre
+> source. `audit-choix-periode.cjs` (règles exécutées, 32 contrôles ; 5 rouges sur origin/main ; `--prouve` 9/9). Bancs voisins
+> mis à la nouvelle fiche sans les affaiblir : `annonces-carte` (une fiche par rangée au téléphone), `feuilles-coque`
+> (« Passeport » dans les gestes), `revue-20oct` (gestes 44 px). Rouges déjà sur origin/main (mêmes lignes, prouvé sur son build) : `stats-premium` 3, `revue-20oct` 12, `capacites` 38, `feuilles-coque`
+> 7 (Tout imprimer, Passeport). ⚠️ Non mesuré : sa vraie base, un vrai iPhone/Safari. Extension inchangée. Julien : rien.
+
 > **29 octobre — 5.287, numéros sur les profils visités :** Julien a précisé que
 > l’affichage semble seulement sur Vinted, l’import dans VRM n’est pas confirmé.
 > `/member/{id}` : aucun numéro renvoyé sans égalité avec le PROFIL du compte
