@@ -43231,8 +43231,6 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   ];
   return (
     <div style={{padding:'16px 14px 40px'}}>
-      {['annonces','messages'].includes(curSub)&&<BilanSynchronisation owner={AUTH.user?.id||''} sources={sourcesBilan} onNav={onNav}/>}
-      {curSub==='annonces'&&<VendusAilleurs owner={AUTH.user?.id||''} ownerActuel={()=>AUTH.user?.id||''} charger={chargerRetraitsMulti} onNav={onNav} PhotoVinted={PhotoVinted}/>}
       <input ref={bordRef} type="file" accept="application/pdf,.pdf" onChange={onBordFile} style={{display:'none'}}/>
       {/* Le titre de l'écran est porté par <ScreenHead> plus bas, dans chaque
           section : ce <h2> le répétait juste au-dessus (« Annonces » puis
@@ -44004,10 +44002,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             </div>}
           </div>
         )}
-        <div className="vrm-rangee vrm-filtres" style={{display:'flex',gap:6,marginBottom:12,alignItems:'center',WebkitOverflowScrolling:'touch',scrollbarWidth:'none',msOverflowStyle:'none',paddingBottom:2}}>
+        {/* (30 oct.) Les OUTILS sortent de la rangée des filtres : collés au bout, ils
+            couvraient « Finalisées » (coupé en « Finalis… ») et cachaient « Annulées ».
+            Les filtres défilent seuls, « Outils » reste à droite, à part. */}
+        <div className="vrm-filtres-et-outils" style={{display:'flex',gap:8,alignItems:'center',marginBottom:12,minWidth:0}}>
+        <div className="vrm-rangee vrm-filtres" style={{display:'flex',gap:6,alignItems:'center',WebkitOverflowScrolling:'touch',scrollbarWidth:'none',msOverflowStyle:'none',paddingBottom:2,flex:'1 1 auto',minWidth:0}}>
           {[['all','Toutes'],['aexpedier','À expédier'],['transit','En transit'],['finalisees','Finalisées'],['annulees','Annulées']].map(([id,label])=>(
             <button type="button" key={id} onClick={()=>setVFilter(id)} aria-pressed={vFilter===id} style={{flexShrink:0,whiteSpace:'nowrap',padding:'7px 14px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit',transition:'background-color .15s ease, color .15s ease'}}>{label}</button>
           ))}
+        </div>
           {/* OUTILS regroupés : la barre mélangeait filtres et outils (10 boutons
               sur une ligne). Les filtres restent visibles — c'est le réglage du
               quotidien — et Compta / Registre / CSV passent derrière un seul
@@ -46032,11 +46035,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     passé à la ligne, est trop près du bord gauche pour cela. */}
                 <div className="vrm-menu-flottant" data-outils-annonces="" style={{position:'absolute',...(annToolsCote==='gauche'?{left:0}:{right:0}),top:'calc(100% + 6px)',zIndex:71,minWidth:230,maxWidth:'calc(100vw - 32px)',background:C.card,border:`1px solid ${C.border}`,borderRadius:10,boxShadow:C.shadowLg||'0 8px 24px rgba(0,0,0,.2)',padding:6,display:'flex',flexDirection:'column',gap:2}}>
                   {[
-                    {k:'lot', icon:'🧮', lab:'Répartir un lot', desc:"Ventiler le prix d'un achat groupé", on:()=>{ setAnnToolsOpen(false); setLotSel(new Set()); setLotTotal(''); setLotSearch(''); setLotMode('equal'); setLotOpen(true); }},
-                    {k:'studio', icon:'📷', lab:'Studio photo', desc:'Cadre guide à la prise de vue, détourage sans envoi', on:()=>{ setAnnToolsOpen(false); setStudioOpen(true); }},
-                    {k:'inv', icon:'📋', lab:'Inventaire physique', desc:'Les paires qui doivent être chez toi, par numéro', on:()=>{ setAnnToolsOpen(false); setInventOpen(true); }},
-                    {k:'aud', icon:'🔎', lab:'Audit du stock', desc:'Retrouver les paires mal rangées', on:()=>{ setAnnToolsOpen(false); setAuditOpen(true); }},
-                    {k:'fillbuy', icon:'💶', lab:"Compléter les prix d'achat", desc:`${fillBuyRows.length} article${fillBuyRows.length>1?'s':''} sans coût — le bénéfice est faux sans eux`, on:()=>{ setAnnToolsOpen(false); setFillBuyOpen(true); }},
+                    {k:'lot', icon:'grid', lab:'Répartir un lot', desc:"Ventiler le prix d'un achat groupé", on:()=>{ setAnnToolsOpen(false); setLotSel(new Set()); setLotTotal(''); setLotSearch(''); setLotMode('equal'); setLotOpen(true); }},
+                    {k:'studio', icon:'camera', lab:'Studio photo', desc:'Cadre guide à la prise de vue, détourage sans envoi', on:()=>{ setAnnToolsOpen(false); setStudioOpen(true); }},
+                    {k:'inv', icon:'box', lab:'Inventaire physique', desc:'Les paires qui doivent être chez toi, par numéro', on:()=>{ setAnnToolsOpen(false); setInventOpen(true); }},
+                    {k:'aud', icon:'search', lab:'Audit du stock', desc:'Retrouver les paires mal rangées', on:()=>{ setAnnToolsOpen(false); setAuditOpen(true); }},
+                    {k:'fillbuy', icon:'euro', lab:"Compléter les prix d'achat", desc:`${fillBuyRows.length} article${fillBuyRows.length>1?'s':''} sans coût — le bénéfice est faux sans eux`, on:()=>{ setAnnToolsOpen(false); setFillBuyOpen(true); }},
                     /* « Rédiger une annonce (IA) » retiré le 30 septembre (Julien : « ça ne
                        va pas servir »). */
                     /* ⚠️ « Renuméroter à la suite » A ÉTÉ RETIRÉ DU MENU (23 août 2026).
@@ -46046,7 +46049,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                        Ne pas le remettre sans son accord explicite. */
                   ].map(t=>(
                     <button key={t.k} type="button" onClick={t.on} style={{display:'flex',alignItems:'center',gap:10,textAlign:'left',border:'none',background:'transparent',borderRadius:8,padding:'9px 10px',cursor:'pointer',fontFamily:'inherit'}}>
-                      <span style={{fontSize:17,flexShrink:0}}>{t.icon}</span>
+                      <span aria-hidden="true" style={{flexShrink:0,display:'flex',color:C.muted}}><Icon name={t.icon} size={18}/></span>
                       <span style={{minWidth:0}}>
                         <span style={{display:'block',fontSize:13,fontWeight:600,color:C.text}}>{t.lab}</span>
                         <span style={{display:'block',fontSize:11,color:C.muted,marginTop:1}}>{t.desc}</span>
@@ -46816,6 +46819,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           })}
         </div>
       </>)}
+      {curSub==='annonces' && <section className="vrm-ventes-controles" data-annonces-controles="" style={{display:'flex',flexDirection:'column',gap:8,margin:'16px 0 12px'}}>
+        <h3 data-titre-section="" style={{fontSize:15,fontWeight:600,color:C.text,letterSpacing:-0.15,margin:'0 2px'}}>Vérifications</h3>
+        <BilanSynchronisation owner={AUTH.user?.id||''} sources={sourcesBilan} onNav={onNav}/>
+        <VendusAilleurs owner={AUTH.user?.id||''} ownerActuel={()=>AUTH.user?.id||''} charger={chargerRetraitsMulti} onNav={onNav} PhotoVinted={PhotoVinted}/>
+      </section>}
 
       {/* ── ONGLET « REPUBLIER » RETIRÉ (demande de Julien, août 2026) ───────────
           « L'onglet republier sur l'application ça sert à rien, tu peux
@@ -47101,6 +47109,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         </div>
         </details>}
       </>)}
+      {/* (30 oct.) Les vérifications passent SOUS la liste, comme sur Ventes : avant, on ne voyait
+          aucune annonce au premier écran. Rien n'est retiré, tout reste replié. */}
+      {curSub==='messages' && <section data-verifications-messages="" style={{marginTop:16}}><BilanSynchronisation owner={AUTH.user?.id||''} sources={sourcesBilan} onNav={onNav}/></section>}
 
       {/* ── Bordereaux (ventes non annulées avec un numéro, à imprimer) ── */}
       {curSub==='bordereaux' && (<>

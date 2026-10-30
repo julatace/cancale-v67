@@ -31,7 +31,7 @@ export function AnnoncesACompleter({
   const nInconnu = lignes.filter((x) => x.b.inconnu.length).length;
   // (30 oct.) Rien à compléter, rien d'illisible, lecture complète : le bloc se tait
   // (« 0 avec champs manquants » était une ligne de plus avant la recherche).
-  if (!n && !nInconnu && !incomplet && !charge) return null;
+  if (!n && !nInconnu && !charge) return null;
   return (
     <details className="vrm-outils" data-annonces-completer>
       <summary>

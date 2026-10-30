@@ -153,7 +153,7 @@
 }
 .vrm-outils summary::-webkit-details-marker, .vrm-bilan-sync summary::-webkit-details-marker { display: none; }
 .vrm-outils summary::after, .vrm-bilan-sync summary::after {
-  content: ""; position: absolute; right: 4px; top: 50%; width: 7px; height: 7px; margin-top: -5px;
+  content: ""; position: absolute; right: 4px; top: calc(50% - 5px); width: 7px; height: 7px; margin-top: -5px;
   border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; transform: rotate(-45deg); opacity: .5;
   transition: transform .2s ease;
 }

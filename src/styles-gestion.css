@@ -30,12 +30,12 @@
  border-color:var(--gestion-accent)!important;
  box-shadow:0 0 0 3px color-mix(in srgb,var(--gestion-accent) 14%,transparent);
 }
-.vrm-main :is(.vrm-sales-workbar>.vrm-rangee,.vrm-sales-filters,.vrm-stock-views)>button[aria-pressed]{
+.vrm-main :is(.vrm-sales-workbar>.vrm-rangee,.vrm-sales-workbar>.vrm-filtres-et-outils>.vrm-rangee,.vrm-sales-filters,.vrm-stock-views)>button[aria-pressed]{
  border-radius:8px!important;border:1px solid var(--gestion-line)!important;
  background:var(--gestion-surface)!important;color:var(--gestion-muted)!important;
  font-weight:600!important;box-shadow:none!important;
 }
-.vrm-main :is(.vrm-sales-workbar>.vrm-rangee,.vrm-sales-filters,.vrm-stock-views)>button[aria-pressed=true]{
+.vrm-main :is(.vrm-sales-workbar>.vrm-rangee,.vrm-sales-workbar>.vrm-filtres-et-outils>.vrm-rangee,.vrm-sales-filters,.vrm-stock-views)>button[aria-pressed=true]{
  background:var(--gestion-accent)!important;border-color:var(--gestion-accent)!important;
  color:var(--gestion-on-accent)!important;
 }
@@ -173,7 +173,7 @@
  .vrm-main .vrm-ventes-liste>.vrm-ledger-heading>span:last-child{text-align:right;}
  .vrm-main .vrm-sales-workbar{display:grid!important;grid-template-columns:minmax(180px,1fr) auto;gap:8px 12px!important;padding:12px!important;}
  .vrm-main .vrm-sales-workbar>.vrm-sales-search-group{margin-bottom:0!important;}
- .vrm-main .vrm-sales-workbar>.vrm-rangee{grid-column:1 / -1;}
+ .vrm-main .vrm-sales-workbar>.vrm-rangee,.vrm-main .vrm-sales-workbar>.vrm-filtres-et-outils{grid-column:1 / -1;}
  .vrm-main .vrm-ann-toolbar{padding:12px!important;border-radius:8px!important;background:var(--gestion-surface)!important;}
 }
 @media(max-width:767px){
@@ -461,3 +461,8 @@
    le ⓘ et le petit bouton s'y alignent sur 13 px. */
 .vrm-statistiques-premium .vrm-pourquoi > summary { font-size: 13px; }
 .vrm-app-shell .vrm-main .vrm-statistiques-premium .vrm-b.vrm-b-petit, .vrm-statistiques-premium .vrm-b.vrm-b-petit { font-size: 13px; }
+
+/* (30 oct.) Les filtres et « Outils » côte à côte, chacun à sa place : les filtres
+   défilent, « Outils » reste au bout, hors de la rangée (il ne couvre plus rien). */
+.vrm-sales-workbar>.vrm-filtres-et-outils{grid-column:1 / -1;}
+.vrm-sales-workbar>.vrm-filtres-et-outils>.vrm-outils-ventes>button{min-height:40px;white-space:nowrap;}
