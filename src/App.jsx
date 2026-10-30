@@ -32734,7 +32734,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   </div> : null;
   return (
     <div style={{padding:'16px 14px 40px'}}>
-      {curSub!=='journee'&&bilansTete}
+      {/* (30 oct.) Annonces et Messages : les résumés (bilan, vendus ailleurs, à compléter, synchro) passent SOUS la liste, comme sur Ma journée — la première annonce et la recherche arrivent plus haut. */}
       <input ref={bordRef} type="file" accept="application/pdf,.pdf" onChange={onBordFile} style={{display:'none'}}/>
       {/* Le titre de l'écran est porté par <ScreenHead> plus bas, dans chaque
           section : ce <h2> le répétait juste au-dessus (« Annonces » puis
@@ -35460,9 +35460,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         {!dansPlateforme && <ScreenHead icon="tag" title="Annonces en ligne" />}
         <NoAcc/>
         {astuceNum && listings.items?.length>0 && (
-          <div data-astuce-numeros style={{display:'flex',gap:10,alignItems:'flex-start',background:`${C.accent}0e`,border:`1px solid ${C.border}`,borderRadius:10,padding:'10px 12px',margin:'0 0 12px',fontSize:12.5,lineHeight:1.5,color:C.muted}}>
+          <div data-astuce-numeros style={{display:'flex',gap:10,alignItems:'flex-start',background:`${C.accent}0e`,border:`1px solid ${C.border}`,borderRadius:10,padding:'7px 12px',margin:'0 0 10px',fontSize:12.5,lineHeight:1.45,color:C.muted}}>
             <span aria-hidden="true" style={{fontSize:15,lineHeight:1.3}}>🔢</span>
-            <div style={{flex:1,minWidth:0}}>Chaque article reçoit un <b style={{color:C.text,fontWeight:600}}>numéro</b> dans l’ordre de mise en ligne, pour le retrouver sur ton étagère, Leboncoin et eBay. Il se change d’un clic et n’est jamais redonné.</div>
+            <div style={{flex:1,minWidth:0}}>Chaque article reçoit un <b style={{color:C.text,fontWeight:600}}>numéro</b> pour le retrouver sur ton étagère, Leboncoin et eBay — jamais redonné.</div>
             <button type="button" aria-label="J’ai compris, masquer cette astuce" onClick={()=>{ save('vrm_astuce_numeros', false); setAstuceNum(false); }} style={{flexShrink:0,border:'none',background:'transparent',color:C.muted,cursor:'pointer',fontSize:16,lineHeight:1,padding:2,fontFamily:'inherit'}}>✕</button>
           </div>
         )}
@@ -39267,6 +39267,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           </div>
         </div>
       )}
+      {['annonces','messages'].includes(curSub)&&<div style={{marginTop:24}}>{bilansTete}</div>}
     </div>
   );
 }

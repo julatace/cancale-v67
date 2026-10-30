@@ -127,3 +127,7 @@
 /* (28 oct.) Stock « Mes meubles », vue de loin : la case est trop petite pour
    « pas de photo » — le N° suffit. */
 [data-meuble-grille][data-zoom="loin"] .vrm-sans-photo { font-size: 0 !important; }
+
+/* (30 oct.) Annonces, ordinateur : le groupe « Actions » portait 12 px de marge en haut et en bas,
+   la barre d’outils faisait 88 px pour une rangée de 40 px (la première annonce arrivait plus bas). */
+@media (min-width: 768px) { :root body .vrm-main .vrm-ann-toolbar > .vrm-ann-actions { padding-top: 0 !important; padding-bottom: 0 !important; } }
