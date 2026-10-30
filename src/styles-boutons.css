@@ -195,3 +195,27 @@
 .vrm-avancement-erreur { font-size: 12.5px; color: #965900; line-height: 1.45; }
 :root[data-theme="dark"] .vrm-avancement-erreur { color: #EBC080; }
 @media (prefers-reduced-motion: reduce) { .vrm-avancement-barre > span { transition: none; } }
+
+/* ── Achats (30 oct.) : « J'ai retiré » à la forme secondaire ────────────────
+   Le bouton garde sa place (grille de la carte, styles-captures.css) ; seul son
+   dessin passe aux trois formes : fond teinté, aucune bordure, texte encre —
+   plus de vert pâle écrit en dur (styles-mobile-studio.css) ni de bordure grise.
+   Spécificité (0,5,0) : au-dessus de `:root[data-theme=dark] .vrm-main :is(…)`. */
+:root .vrm-app-shell .vrm-main .vrm-achats .vrm-pickup-collect,
+:root .vrm-app-shell .vrm-main .vrm-achats .vrm-pickup-collect.vrm-pickup-collect {
+  background: var(--vrm-b-teinte) !important; color: var(--vrm-b-encre) !important;
+  border: 0 !important; box-shadow: none !important; border-radius: 10px !important; font-weight: 600 !important;
+}
+@media (hover: hover) and (pointer: fine) {
+  :root .vrm-app-shell .vrm-main .vrm-achats .vrm-pickup-collect:hover { background: var(--vrm-b-teinte-f) !important; }
+}
+/* Les liens-gestes d'un colis ne coupent pas leur flèche seule sur une ligne. */
+.vrm-app-shell .vrm-main .vrm-achats .vrm-b.vrm-pickup-lien,
+.vrm-app-shell .vrm-main .vrm-achats .vrm-b.vrm-pickup-cta { white-space: nowrap; }
+.vrm-app-shell .vrm-main .vrm-b.vrm-suivre-colis { white-space: normal; text-align: left; }
+/* La recherche des achats : le champ vit DANS sa pastille (plus de second
+   cadre gris à l'intérieur, vu au rendu à 390 px). Spécificité au-dessus des
+   règles génériques des champs (styles-iphone / styles-mineral). */
+:root body .vrm-app-shell .vrm-main .vrm-achats-search input[type=search]:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=file]):not([type=hidden]) {
+  background: transparent !important; border: 0 !important; box-shadow: none !important; padding: 0 !important;
+}
