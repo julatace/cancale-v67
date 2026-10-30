@@ -140,7 +140,7 @@ nouveau module** → envoyer `VRM-firefox.zip`.
   lit les pages Vinted, Leboncoin et eBay que tu ouvres toi-même, et range dans
   TON compte VRM tes annonces, ventes, achats, messages, colis et bordereaux.
   Elle ne publie rien et n'accepte aucune offre toute seule ; elle agit
-  seulement au nom du compte ouvert dans l'onglet, au plus 20 actions par heure,
+  seulement au nom du compte ouvert dans l'onglet, au plus 50 actions par heure,
   une requête à la fois. Ton mot de passe Vinted n'est jamais lu. »
 - **Catégorie** : « Boutiques et achats » (Shopping) ; secondaire « Productivité ».
 - **Étiquettes** : vinted, leboncoin, ebay, revente, colis.
@@ -160,7 +160,13 @@ nouveau module** → envoyer `VRM-firefox.zip`.
   > l'onglet Vinted ou VRM ; `downloads` — reconnaître un bordereau PDF
   > téléchargé par l'utilisateur. Hôtes : les sites Vinted, Leboncoin, eBay,
   > Vestiaire Collective (lecture des pages ouvertes par l'utilisateur), la base
-  > Supabase de VRM et vrm.center.
+  > Supabase de VRM et vrm.center ; et (5.290) les sites de SUIVI des
+  > transporteurs — www.mondialrelay.be, www.mondialrelay.fr, ws.chronopost.fr,
+  > carrier.vintedgo.com — pour lire le statut des colis que l'utilisateur
+  > attend (une liste d'adresses exactes, 12 lectures par heure et par
+  > transporteur au plus, une à la fois) ; la page de suivi Chronopost
+  > (www.chronopost.fr/tracking-no-cms) et vintedgo.com portent un script qui
+  > lit seulement l'ADRESSE de la page, jamais son contenu.
   > `data_collection_permissions` : authenticationInfo (jetons de session
   > Vinted, session VRM), personallyIdentifyingInfo (nom/pseudo du vendeur, des
   > acheteurs sur les commandes), personalCommunications (messages Vinted),
@@ -200,7 +206,8 @@ un **compte Apple Developer Program (99 $ par an)**, et la revue de l'App Store.
    Safari → Réglages → Extensions → cocher VRM. Sur l'iPhone : Réglages →
    Apps → Safari → Extensions → VRM → Autoriser, et « Toujours autoriser » sur
    vinted.fr, leboncoin.fr, ebay.fr, vrm.center (Safari demande l'accès site par
-   site avant d'injecter).
+   site avant d'injecter) — et, pour le suivi des colis (5.290),
+   mondialrelay.be, mondialrelay.fr, ws.chronopost.fr, carrier.vintedgo.com.
 5. Product → Archive → **Distribute App** → App Store Connect → créer la fiche
    (même texte et confidentialité qu'ailleurs) → soumettre à la revue.
 6. Une fois en ligne : `LIENS_BOUTIQUES.safari`.
@@ -298,3 +305,44 @@ Les annonces peuvent arriver dans plusieurs réponses partielles : une mise à j
 Une ancienne valeur `lbcUser` n'est plus acceptée seule comme preuve d'appartenance. Son compte doit avoir été confirmé par une session/vente, selon les mêmes règles dans l'app, l'extension et les alertes du serveur. Le serveur lit les comptes confirmés du vendeur concerné ; une lecture impossible ne produit pas de rapprochement. Les liens/références explicites restent traités comme avant. Aucun prix ni calcul de bénéfice modifié, aucune suppression/réattribution de données historiques.
 
 Validation : 140 tests unitaires, build, audits session/comptes/ventes/restes, double vente/places, 28 contrôles de notification double vente avec deux vendeurs, ZIP, sans bruit et en-têtes. Test natif préparé dans `scripts/bancs/extension-leboncoin-installee.cjs` : chargement de l'extension réelle, service worker, scripts isolés, base et pages simulées. Il n'a PAS pu être exécuté ici : Chromium répond « Loading of unpacked extensions is disabled by the administrator » ; le téléchargement d'un navigateur de test est aussi refusé par la politique réseau (403). Aucune politique n'a été contournée. Ne pas annoncer ce test natif comme réussi, ni la capture du compte réel de l'utilisateur comme vérifiée.
+
+## 5.290 — le suivi des colis chez les transporteurs : quatre sites de plus
+
+Julien, 24 octobre : « tu as juste à regarder sur le site du transporteur ». Le
+serveur lit Chronopost et (selon la mesure du chantier serveur) Vinted Go ; il ne
+lit **jamais** Mondial Relay (l'API `/api/tracking` de la .be répond 403 HTML à
+un User-Agent honnête depuis Vercel, mesuré le 24 octobre). Le navigateur de
+Julien lit donc les n° que le serveur lui donne et relaie la réponse brute.
+
+**Nouveaux `host_permissions`** : `https://www.mondialrelay.be/*`,
+`https://www.mondialrelay.fr/*` (repli `_mvc` si la .be refuse — le serveur
+accepte ou refuse cette voie), `https://ws.chronopost.fr/*`,
+`https://carrier.vintedgo.com/*`. **Nouveau script de contenu** `transp-page.js`
+sur `www.mondialrelay.fr`, `www.mondialrelay.be`,
+`www.chronopost.fr/tracking-no-cms/*`, `vintedgo.com` : il prévient seulement le
+fond qu'une page de suivi est ouverte ; le n° est tiré de l'ADRESSE de l'onglet.
+
+**Ce que ça change, boutique par boutique** :
+- **Chrome, extension non empaquetée** (le cas de Julien) : les sites sont
+  accordés au rechargement (⟳ dans chaque Chrome), sans question.
+- **Chrome Web Store, Edge, Opera (plus tard)** : une mise à jour qui ajoute un
+  site avec un nouvel avertissement **désactive l'extension** jusqu'à ce que la
+  personne accepte. D'où : ces sites sont ajoutés AVANT toute première
+  publication. Les `matches` d'un script de contenu comptent aussi comme accès.
+- **Firefox (ordinateur, Android)** : les permissions d'hôte MV3 peuvent rester
+  NON accordées (selon la version, et pour une mise à jour qui en ajoute). Le fond
+  le mesure (`permissions.contains`) et se TAIT ; la fenêtre de l'icône propose
+  « Autoriser VRM à lire le suivi des transporteurs » (`permissions.request`,
+  dans le geste). L'app voit `nav.indispo: ['transporteurs']`.
+- **Orion / Safari** : même test ; si l'API des permissions manque,
+  `nav.indispo: ['transporteurs-passu']` (« pas su ») et rien ne part.
+- **Notes pour le relecteur d'AMO** (section 3) : mises à jour avec ces sites.
+- Sans extension, ou sans permission, **rien ne casse** : le serveur reste la voie
+  principale pour Chronopost (et Vinted Go si le serveur le lit).
+
+**Non mesuré** : un `fetch` depuis le service worker vers la .be avec les cookies
+du navigateur (partitionnement possible), la nécessité du `Referer` (interdit à
+`fetch`, non envoyé), la réponse réelle du repli `_mvc` en GET, le déroulé de la
+demande de permission dans un vrai Firefox (la fenêtre peut se fermer quand la
+demande s'affiche ; la lecture repart à l'accord par `permissions.onAdded`).
+`web-ext lint` n'est pas installé dans ce conteneur : pas relancé pour la 5.290.

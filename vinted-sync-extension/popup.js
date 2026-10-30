@@ -141,9 +141,11 @@ function rendreAuth(e) {
     // qu'on s'est trompé), et le geste suivant est d'ouvrir VRM.
     poserHtml(box, `<div class="who"><span class="dot"></span><span class="nom">${esc(e.email || 'connecté')}</span></div>
       <div class="muted" style="margin-top:4px">L'extension capte maintenant pour ce compte VRM. Tout se pilote depuis l'app.</div>
+      <div id="transpBox" hidden></div>
       <button id="vrmBtn">Ouvrir VRM</button>
       <button class="sec" id="outBtn">Se déconnecter</button>`);
     document.getElementById('vrmBtn').addEventListener('click', ouvrirVRM);
+    rendreTranspPermis(e.transp);
     document.getElementById('outBtn').addEventListener('click', () => {
       chrome.runtime.sendMessage({ from: 'cancale-popup', action: 'authLogout' }, () => chargerAuth(true));
     });
@@ -245,13 +247,85 @@ function ouvrirVRM() {
   try { chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => aller(tabs && tabs[0] && tabs[0].url)); }
   catch (_) { aller(''); }
 }
+// ── LE SUIVI DES TRANSPORTEURS (5.290) ─────────────────────────────────────
+// L'extension lit le statut d'un colis sur le site du transporteur (Mondial
+// Relay, Chronopost, Vinted Go) depuis CE navigateur. Chrome accorde ces sites
+// à l'installation ; Firefox peut les laisser NON accordés (permissions d'hôte
+// MV3) : sans elles, le fond se tait. Le bouton ne s'affiche QUE dans ce cas
+// (le fond a mesuré `permissions.contains` = faux), et seulement si ce
+// navigateur sait les demander. `chrome.permissions.request` doit partir DANS
+// le geste (Firefox refuse une demande faite après une attente) : la liste des
+// sites est connue AVANT le clic.
+function lirePermisTransp(cb) {
+  let fini = false;
+  const fin = (v) => { if (fini) return; fini = true; cb(v); };
+  setTimeout(() => fin(null), 1500);
+  try {
+    chrome.runtime.sendMessage({ from: 'cancale-popup', action: 'transpPermis' }, (r) => {
+      try { void chrome.runtime.lastError; } catch (_) {}
+      fin(r && r.ok ? r : null);
+    });
+  } catch (_) { fin(null); }
+}
+const peutDemanderPermis = () => { try { return !!(chrome.permissions && typeof chrome.permissions.request === 'function'); } catch (_) { return false; } };
+// Le cas utile : la permission manque (mesuré faux, jamais « pas su ») ET ce
+// navigateur sait la demander.
+const PERMIS_MANQUE = (t) => !!(t && t.permis === false && Array.isArray(t.origines) && t.origines.length && peutDemanderPermis());
+function rendreTranspPermis(t) {
+  const box = document.getElementById('transpBox');
+  if (!box) return;
+  if (!PERMIS_MANQUE(t)) { box.hidden = true; return; }
+  box.hidden = false;
+  // Dans la petite carte (un cadre posé dans le site) : une ligne, pas le
+  // bouton. La demande se fait depuis la fenêtre de l'icône — une page de
+  // l'extension, le seul endroit mesuré où le geste vaut — et la carte n'a pas
+  // la place d'un second bouton.
+  if (CARTE) {
+    box.setAttribute('data-transp-permis', 'manque-carte');
+    poserHtml(box, '<div class="muted">Pour lire le suivi de tes colis chez les transporteurs, clique l’icône VRM de la barre du navigateur et autorise-le.</div>');
+    return;
+  }
+  box.setAttribute('data-transp-permis', 'manque');
+  poserHtml(box, `<div class="muted">Pour lire le suivi de tes colis sur les sites des transporteurs (Mondial Relay, Chronopost, Vinted Go), ce navigateur doit d'abord l'autoriser. VRM n'y lit que le statut des colis que tu attends.</div>
+    <button id="transpPermisBtn">Autoriser VRM à lire le suivi des transporteurs</button>
+    <div class="muted" id="transpPermisEtat" hidden></div>`);
+  const origines = t.origines.slice();
+  document.getElementById('transpPermisBtn').addEventListener('click', () => {
+    const btn = document.getElementById('transpPermisBtn');
+    const etat = document.getElementById('transpPermisEtat');
+    const dire = (ok) => {
+      box.setAttribute('data-transp-permis', ok ? 'accorde' : 'refuse');
+      if (etat) {
+        etat.hidden = false;
+        etat.textContent = ok
+          ? 'C’est autorisé : l’extension peut maintenant lire le suivi de tes colis sur ces sites.'
+          : 'Ce n’est pas autorisé : rien n’est lu sur ces sites depuis ce navigateur. VRM lit ce qu’il peut de son côté.';
+      }
+      // `hidden` ne suffit pas : la règle `button { display: block }` l'emporte.
+      if (btn && ok) btn.remove();
+    };
+    let fini = false;
+    const fin = (v) => { if (fini) return; fini = true; dire(v === true); };
+    try {
+      // Appelé TOUT DE SUITE, dans le geste : aucune attente avant.
+      const r = chrome.permissions.request({ origins: origines }, (v) => { try { void chrome.runtime.lastError; } catch (_) {} fin(v); });
+      if (r && typeof r.then === 'function') r.then(fin, () => fin(false));
+    } catch (_) { fin(false); }
+  });
+}
+
 // `rester` : après une déconnexion, on montre la connexion au lieu de rouvrir.
+// Connecté : l'icône ouvre VRM — SAUF quand une permission des transporteurs
+// manque et peut se demander ici (le seul endroit où le geste est possible).
 function chargerAuth(rester) {
   chrome.runtime.sendMessage({ from: 'cancale-popup', action: 'authEtat' }, (r) => {
     const e = r || {};
-    if (e.connecte && !CARTE && !rester) { ouvrirVRM(); return; }
-    document.body.classList.remove('decide');
-    rendreAuth(e);
+    if (!e.connecte) { document.body.classList.remove('decide'); rendreAuth(e); return; }
+    lirePermisTransp((t) => {
+      if (!CARTE && !rester && !PERMIS_MANQUE(t)) { ouvrirVRM(); return; }
+      document.body.classList.remove('decide');
+      rendreAuth(Object.assign({}, e, { transp: t }));
+    });
   });
 }
 if (REPARER) reparerSiPerime().then((r) => { try { document.body.setAttribute('data-reparation', r); } catch (_) {} });

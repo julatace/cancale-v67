@@ -249,6 +249,30 @@ const cliquer = async (pg) => { await pg.mouse.click(1512 - 16 - 22, 900 - 16 - 
     await ctx.close();
   });
 
+  // ── 4ter. À RETIRER DE LEBONCOIN (29 oct.) ───────────────────────────────
+  // Julien : « J'ai vendu une paire sur Vinted et VRM ne m'a pas dit de la
+  // supprimer ». Sur leboncoin.fr, la carte du logo dit ce que VRM a calculé
+  // (`lbc_a_retirer`), et sur la page de l'annonce : « c'est cette annonce ».
+  console.log('\n── Leboncoin : une paire vendue sur Vinted est encore en ligne ici');
+  const LBC_OK = { ok: true, plateforme: 'leboncoin', capte: true, version: '5.250.0', vrm: { ok: true, connecte: true, email: 'sophie@exemple.fr', cloisonne: true }, site: { id: '9', nom: 'Sophie B.', type: 'particulier' }, flux: { okAt: Date.now() - 3 * MIN }, bascule: null };
+  await essaie('à retirer', async () => {
+    const etat = Object.assign({}, LBC_OK, { aRetirer: { at: new Date(Date.now() - 5 * MIN).toISOString(), liste: [{ numero: '18', lbcId: '3290000104', titre: 'Paire inventée taille 40', url: 'https://www.leboncoin.fr/ad/chaussures/3290000104' }] } });
+    const { ctx, pg } = await rendre(nav, etat, { url: 'https://www.leboncoin.fr/ad/chaussures/3290000104' });
+    await survoler(pg);
+    const l = await lire(pg);
+    dit(l.point, 'la pastille s’allume : il y a un geste à faire');
+    dit(/à retirer de leboncoin/i.test(l.carte) && /N°18/.test(l.carte) && /vendue sur Vinted/.test(l.carte), 'la carte nomme la paire vendue sur Vinted, à retirer', l.carte.replace(/\n/g, ' · ').slice(0, 260));
+    dit(/C’est cette annonce/.test(l.carte), 'sur la page de CETTE annonce, elle le dit', l.carte.replace(/\n/g, ' · ').slice(0, 260));
+    await ctx.close();
+  });
+  await essaie('rien à retirer', async () => {
+    const { ctx, pg } = await rendre(nav, Object.assign({}, LBC_OK, { aRetirer: { at: new Date().toISOString(), liste: [] } }), { url: 'https://www.leboncoin.fr/mes-annonces' });
+    await survoler(pg);
+    const l = await lire(pg);
+    dit(!l.point && !/à retirer/i.test(l.carte), 'l’autre sens : rien à retirer ⇒ ni pastille, ni ligne', l.carte.replace(/\n/g, ' · ').slice(0, 160));
+    await ctx.close();
+  });
+
   // ── 5. PAS SU : le service worker ne répond pas ──────────────────────────
   console.log('\n── Le service worker ne répond pas (« pas su »)');
   await essaie('pas su', async () => {

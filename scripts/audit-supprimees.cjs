@@ -173,6 +173,11 @@ function lecteurAnnoncesApp(ligne, ids) {
   const videe = lv ? lv[0] : '';
   const rt = /const ANNONCES_RETIREES = [\s\S]*?\nconst resRetire = [\s\S]*?\}\);\n/.exec(F.app);
   const retirees = rt ? rt[0] : '';
+  // 29 oct. : `dressingEnLigne` dit si la lecture qui fait foi est COMPLÈTE
+  // (`lectureDressingComplete`, règle de l'offre en attente). Sans elle le lecteur
+  // levait et l'écran rendait [] (§6.3). Absente d'un code d'avant : rien à charger.
+  const lc = /const lectureDressingComplete = [\s\S]*?\n\};\n/.exec(F.app);
+  const complete = lc ? lc[0] : '';
   const ctx = { console, Date, JSON, Number, isNaN, isFinite, Array, Object, String, Map, Set, SUPABASE_URL: 'https://base.test', sbAuth: () => ({}),
     busyStart() {}, busyEnd() {}, load: (k, d) => d, _harvestSeen: {}, _supprRetirees: {}, lireSupprimees: async () => ids, lireEnLigneTous: async () => [], lecturesPubliquesKO: () => false,   // (5.167 revue : `dressingEnLigne` dit si les lectures publiques ont pu être lues)
    
@@ -182,7 +187,7 @@ function lecteurAnnoncesApp(ligne, ids) {
       return { ok: true, json: async () => projette([ligne], u) };
     } };
   vm.createContext(ctx);
-  vm.runInContext(`${harvestTs}\n${videe}\n${regle}\n${enligne}\n${masquees}\n${retirees}\n${dressingEnLigne}\n${brut}\n;this.lire = fetchHarvestBrut;`, ctx);
+  vm.runInContext(`${harvestTs}\n${videe}\n${regle}\n${enligne}\n${masquees}\n${retirees}\n${complete}\n${dressingEnLigne}\n${brut}\n;this.lire = fetchHarvestBrut;`, ctx);
   return ctx.lire;
 }
 

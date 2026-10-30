@@ -30,7 +30,8 @@ import {creerGestionEbay,lireXmlEbay} from './_lib/ebay-gestion.js';
 import {creerApresVenteEbay,annulerCommandeRangee} from './_lib/ebay-apres-vente.js';
 import { vendeurExige, baseCloisonnee } from './_lib/session.js';
 import { accesVendeur } from './_lib/abonnement.js';
-import { keysReady, canConsent, ruName, authUrl, appToken, hasRefresh, accessToken, storeData, lireReglageVendeur, lireDonnee, lireResumeCommandes, modifierDonnee,
+import { creerRechercheEbay } from './_lib/ebay-recherche.js';
+import { keysReady, canConsent, ruName, authUrl, appToken, jetonApplication, oublierJetonApplication, hasRefresh, accessToken, storeData, lireReglageVendeur, lireDonnee, lireResumeCommandes, modifierDonnee,
   lireComptes, comptesActifs, rangerConnexion, apprendrePrincipal, apprendreTypes, resoudreCompte, deconnecterCompte, suffixeCompte,
   montantOk, valideRegleOffre, seuilTropBas } from './_lib/ebay.js';
 
@@ -943,7 +944,12 @@ async function handlePublish(b, ctx) {
   if (s.err) return { status: 400, body: { ok: false, reason: 'numero', error: s.err } };
   const ro = regleDeItem(it0);
   if (ro.err) return { status: 400, body: { ok: false, reason: ro.reason || 'offre', error: ro.err } };
-  const it = { ...s.item, regleOffre: ro.regle };
+  // (29 oct., l'agent eBay) Un identifiant d'envoi (`uuid`, 32 hex) peut
+  // accompagner la publication : eBay refuse alors un SECOND envoi identique
+  // (488) au lieu de créer une seconde annonce — un essai repris après un
+  // résultat incertain ne peut plus doubler la paire. Jamais lu dans `item`.
+  const uuidPub = UUID_EBAY.test(String(b.uuid || '')) ? String(b.uuid) : '';
+  const it = { ...s.item, regleOffre: ro.regle, uuid: uuidPub };
   let num={ok:true,mk:null};
   if(it.sku){num=await numerotationVendeur(ctx.owner);const ref=numerotationRefus(b,num);if(ref)return ref;}
   const at = await jetonDe(ctx);
@@ -960,6 +966,13 @@ async function handlePublish(b, ctx) {
   if (sansAck(r)) return { status: 504, body: { ok: false, reason: 'incertain', error: 'eBay n\'a pas répondu clairement — je ne sais pas si l\'annonce a été créée. Rafraîchis depuis eBay avant de recommencer.' } };
   // ⚠️ L'API Trading renvoie HTTP 200 même sur un refus (l'erreur est dans le
   // corps, Ack=Failure). On répond donc un vrai code d'échec (422) dans ce cas.
+  // 488 : CET envoi a déjà créé l'annonce (le premier essai, resté sans
+  // réponse). Relue chez eBay, son SKU exigé (`confirmerDoublon`) : sinon
+  // « incertain », jamais « publiée ».
+  if (!r.ok && it.uuid && (r.erreurs || []).some((e) => e.code === '488')) {
+    const d = await confirmerDoublon(at.token, r, it, null);
+    return d.status === 200 ? { status: 200, body: { ...d.body, compte: ctx.compte.pseudo || '' } } : d;
+  }
   if (!r.ok || !r.itemId) return { status: r.status >= 400 ? r.status : 422, body: { ok: false, error: r.err || 'eBay a refusé la publication', ack: r.ack } };
   // (9 octobre) Publiée AVEC une règle d'offre : on relit chez eBay ce qu'il en
   // a gardé (une catégorie qui n'accepte pas le seuil le perd sans refuser
@@ -1904,6 +1917,8 @@ const apresVenteEbay=creerApresVenteEbay({accessToken:jetonDe,tradingCall,apiOri
   marquerCommandeAnnulee:async(orderId,ctx)=>{let vu=false;const r=await modifierDonnee(ligneDe('ebay_orders',ctx),ctx.owner,(d)=>{const n=annulerCommandeRangee(d,orderId);vu=!!n;return n;});return r===true?vu:(r===null?null:false);},
 });
 
+const rechercheEbay = creerRechercheEbay({ jetonApplication, oublierJetonApplication, modifierDonnee });
+
 async function handleApp(req, res) {
   if (req.method === 'GET') {
     res.status(200).json({ ok: true, ready: keysReady(), canConsent: canConsent(), env: 'production' });
@@ -1946,6 +1961,15 @@ async function handleApp(req, res) {
       const nonce = crypto.randomBytes(16).toString('hex');
       res.setHeader('Set-Cookie', cookieEtat(nonce, Math.round(ETAT_VALIDITE_MS / 1000)));
       res.status(200).json({ ok: true, url: authUrl(signerEtat(owner, nonce, ajout), { ajout }) });
+      return;
+    }
+    // (29 octobre) CHERCHER des paires à acheter : l'API Browse avec le jeton
+    // d'APPLICATION de VRM (jamais celui du vendeur) — aucun compte eBay relié
+    // n'est nécessaire. Session exigée plus haut (401 sinon) ; un plafond par
+    // vendeur et par jour, compté en base AVANT l'appel. Lecture seule.
+    if (action === 'chercher') {
+      const r = await rechercheEbay.chercher(b, owner);
+      res.status(r.status).json(r.body);
       return;
     }
     if (action === 'apptoken') {
@@ -2069,6 +2093,19 @@ async function handleApp(req, res) {
       return;
     }
     const commerciales=new Set(['expedier','messageacheteur','repondre','repondreoffre','modifierannonce','terminerannonce','evaluer','deciderretour','rembourserretour','decannulation','promouvoir','changertaux','arreterpromo']);
+    // (29 oct.) L'AGENT eBAY QUI DEMANDE : une publication lancée par l'agent
+    // n'est JAMAIS sans le oui de Julien — le serveur l'exige (`confirme:true`,
+    // posé par la confirmation de l'écran), puis la garde ordinaire de publish
+    // (SKU, déjà en vente / programmée relue chez eBay, prix, livraison gérée
+    // par eBay). Elle est inscrite au journal des actions (« Publiée par
+    // l'agent ») : un résultat incertain se relit avant tout nouvel essai.
+    if (action === 'publish' && b.agent === true) {
+      if (b.confirme !== true) { res.status(400).json({ ok: false, reason: 'confirmation', error: 'L\'agent ne publie qu\'après ton oui — rien n\'a été publié.' }); return; }
+      const num = b.item && b.item.numero != null ? String(b.item.numero).slice(0, 16) : '';
+      const r = await avecMarche(marche||MARCHE_DEFAUT, () => executerAvecJournal({ action: 'agentpublie', b: { listingId: num ? 'VRM-' + num : '' }, execute: () => ACTIONS.publish(ctx), modifier: fn => modifierDonnee(ligneDe('ebay_agent_journal', ctx), owner, fn) }));
+      res.status(r.status).json(r.body);
+      return;
+    }
     const r = await avecMarche(marche||MARCHE_DEFAUT, () => commerciales.has(action) && b.confirme===true
       ? executerAvecJournal({action,b,execute:()=>ACTIONS[action](ctx),modifier:fn=>modifierDonnee(ligneDe('ebay_agent_journal',ctx),owner,fn)})
       : ACTIONS[action](ctx));

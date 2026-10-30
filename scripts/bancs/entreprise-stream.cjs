@@ -1,4 +1,5 @@
 require('./_porte-banc.cjs');
+const { ouvrirAvanceCompta } = require('./_compta.cjs');
 // BANC — SIRET → nom de l'entreprise dans l'en-tête, et le MODE STREAM qui
 // floute partout (17 octobre, Julien).
 //
@@ -97,6 +98,8 @@ async function page(nav, telephone, tab, { stream = false, registre = 'ok', prof
   });
   await pg.route('**://*.vinted.net/**', (r) => r.abort());
   await pg.goto(`http://localhost:${PORT}/?tab=${tab}`, { waitUntil: 'domcontentloaded' });
+  // (29 oct.) « Ton entreprise » vit dans « Avancé », replié : il l'ouvre comme Julien.
+  if (tab === 'compta') await ouvrirAvanceCompta(pg).catch(() => {});
   await pg.waitForTimeout(3200);
   return { ctx, pg, ecrits };
 }

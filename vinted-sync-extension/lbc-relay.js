@@ -3,7 +3,7 @@
   if(window.__vrmLbcRelayLoaded)return;window.__vrmLbcRelayLoaded=true;
   const vus=new Set();
   const pausesEnAttente=new Map();     // jeton → réponse au fond (22 oct.)
-  const diagnostic=(capteur,capteurVersion)=>{try{chrome.runtime.sendMessage({from:'cancale-lbc',action:'lbcTransport',capteur,relaisVersion:'5.287.0',capteurVersion});}catch(_){}};
+  const diagnostic=(capteur,capteurVersion)=>{try{chrome.runtime.sendMessage({from:'cancale-lbc',action:'lbcTransport',capteur,relaisVersion:'5.291.0',capteurVersion});}catch(_){}};
   diagnostic(false);
   // Enregistrer l'identité avant de traiter les annonces arrivées ensuite.
   const file=[];let enCours=false,tailleFile=0,identiteRefusee=false;
@@ -52,23 +52,29 @@
     // 22 oct. : une liste COMPLÈTE d'un vendeur (identifiants + total), dans la
     // MÊME file que ses annonces — elle arrive après elles.
     else if (d.kind === 'lbclistecomplete' && typeof d.owner === 'string' && Array.isArray(d.ids)) { try { transmettre({ from: 'cancale-lbc', action: 'lbcListeComplete', owner: d.owner.slice(0, 64), ids: d.ids.slice(0, 2000).map(String), total: Number(d.total) }); } catch (_) {} }
+    // 29 oct. : une suppression / mise en pause faite SUR LA PAGE (réponse 2xx de
+    // Leboncoin) — identifiants seulement, dans la MÊME file que ses annonces.
+    else if (d.kind === 'lbcretraitvu' && Array.isArray(d.ids) && (d.quoi === 'supprime' || d.quoi === 'pause')) { try { transmettre({ from: 'cancale-lbc', action: 'lbcRetraitVu', quoi: d.quoi, ids: d.ids.slice(0, 50).map(String), statut: Number(d.statut) || 0 }); } catch (_) {} }
+    // 29 oct. : les statistiques d'UNE annonce (des nombres, jamais qui).
+    else if (d.kind === 'lbcstatsannonce' && /^\d{5,15}$/.test(String(d.id || ''))) { const n = (v) => (typeof v === 'number' && Number.isFinite(v) && v >= 0 && v < 1e7 ? Math.round(v) : null); try { transmettre({ from: 'cancale-lbc', action: 'lbcStatsAnnonce', id: String(d.id), favoris: n(d.favoris), messages: n(d.messages), vues: n(d.vues), du: String(d.du || '').slice(0, 10), au: String(d.au || '').slice(0, 10), jours: n(d.jours) }); } catch (_) {} }
     // 22 oct. : la réponse de Leboncoin à une mise en pause demandée par le fond.
     else if (d.kind === 'lbcpauseresultat' && typeof d.jeton === 'string') { const r = pausesEnAttente.get(d.jeton); if (r) { pausesEnAttente.delete(d.jeton); r({ ok: true, statut: Number(d.statut) || 0, corps: String(d.corps || '').slice(0, 300), cles: Array.isArray(d.cles) ? d.cles.slice(0, 60).map(String) : [], erreur: String(d.erreur || '').slice(0, 80), entetes: Number(d.entetes) || 0 }); } }
     else if (d.kind === 'lbccomptes' && Array.isArray(d.comptes)) { try { chrome.runtime.sendMessage({ from: 'cancale-lbc', action: 'lbcComptes', comptes: d.comptes.slice(0, 10).map((c) => ({ id: String(c.id || '').slice(0, 64), name: String(c.name || '').slice(0, 60), pro: !!c.pro })) }); } catch (_) {} }
   }, false);
   // ── METTRE EN PAUSE, SUR SON CLIC (22 octobre) ───────────────────────────
+  // (29 oct.) et SUPPRIMER, sur son clic confirmé : même chemin, l'ordre dit lequel.
   // L'ordre ne vient QUE du fond de l'extension (jamais de la page), et ne vaut
   // que pour le cadre principal. Il passe au capteur (monde MAIN, lbc-inject.js)
   // qui seul porte l'adresse et les en-têtes du site. Pas de réponse en 15 s ⇒
   // « muet » : le fond dit qu'il ne SAIT PAS (jamais « fait », jamais « pas fait »).
   try{chrome.runtime.onMessage.addListener((msg,sender,sendResponse)=>{
-    if(!msg||msg.from!=='vrm-fond'||msg.action!=='lbcPauseAnnonce')return;
+    if(!msg||msg.from!=='vrm-fond'||(msg.action!=='lbcPauseAnnonce'&&msg.action!=='lbcSupprimeAnnonce'))return;
     if(!sender||sender.id!==chrome.runtime.id||window.top!==window)return;
     const id=String(msg.id||'');if(!/^\d{6,12}$/.test(id)){sendResponse({ok:false,code:'invalide'});return;}
     const jeton=(self.crypto&&crypto.randomUUID)?crypto.randomUUID():(Date.now().toString(36)+Math.random().toString(36).slice(2,12));
     const t=setTimeout(()=>{if(pausesEnAttente.delete(jeton))sendResponse({ok:false,code:'muet'});},15000);
     pausesEnAttente.set(jeton,(r)=>{clearTimeout(t);sendResponse(r);});
-    window.postMessage({__tag:'CANCALE_LBC_ORDRE',kind:'pause',id,jeton},'*');
+    window.postMessage({__tag:'CANCALE_LBC_ORDRE',kind:msg.action==='lbcSupprimeAnnonce'?'supprime':'pause',id,jeton},'*');
     return true;
   });}catch(_){}
   window.postMessage({__tag:'CANCALE_LBC_RELAY',kind:'pret'},'*');

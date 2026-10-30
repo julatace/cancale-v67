@@ -22,7 +22,8 @@ const R = process.env.AUDIT_RACINE || path.join(__dirname, '..');
 // ── --prouve : chaque mutation doit faire tomber l'audit ────────────────────
 const MUTATIONS = {
   'limite-ignoree': ['api/_lib/retrait-colis.js', 'const j = limite ? joursAvantLimite(limite, auj) : null;', 'const j = null;'],
-  'limite-passee-a-retirer': ['api/_lib/retrait-colis.js', "return j < 0 ? { etat: 'delai_depasse', jours: j }", "return j < 0 ? { etat: 'a_retirer', jours: j }"],
+  // (29 oct.) Ancres suivies jusqu'au code actuel (la règle n'a pas changé, sa forme si).
+  'limite-passee-a-retirer': ['api/_lib/retrait-colis.js', "    if (j < 0) return { etat: 'delai_depasse', jours: j };", "    if (j < 0) return { etat: 'a_retirer', jours: j };"],
   'annee-absente': ['api/_lib/retrait-colis.js', '    note(avecAnnee(+m[1], +m[2], recuLe), m);', ''],
   'widget-sans-nouveaux': ['api/widget.js', 'const nouveauxEmail = pubRetirer ? await colisEmailDepuis(pubBrute, retiresMain, today, suivisLus) : 0;', 'const nouveauxEmail = 0;'],
   'widget-rappel-double': ['api/widget.js', "    if (cle && vus.has(cle)) continue;", ''],
@@ -52,7 +53,7 @@ const MUTATIONS = {
   // (23 oct., soir) Le widget lit LA règle partagée par n° de suivi
   // (api/_lib/suivi-colis.js, `sortiParSuivis`) : les deux mutations la visent.
   'widget-retire-ignore': ['api/_lib/suivi-colis.js', "    if (f.retire) return 'retire';", ""],
-  'widget-retour-ignore': ['api/_lib/suivi-colis.js', "    if (f.retours.some((d) => !Number.isFinite(arriveeMs) || !arriveeMs || d == null || d >= arriveeMs)) reparti = true;", ""],
+  'widget-retour-ignore': ['api/_lib/suivi-colis.js', "    if (f.retours.some((d) => !connue || d == null || d >= arriveeMs)) reparti = true;", ""],
   'widget-vinted-releve-ignore': ['api/widget.js', "      return (pubAt != null && Number.isFinite(cap) && cap > pubAt) ? true : false;", "      return false;"],
   'widget-photo-muette': ['api/widget.js', "      pickupPhoto: pubRetirer && pubRetirer.nonRelus > 0 &&", "      pickupPhoto: false &&"],
 };
@@ -97,7 +98,32 @@ global.fetch = async (url, opts = {}) => {
   const m = (opts.method || 'GET').toUpperCase();
   if (u.pathname === '/rest/v1/rpc/vrm_acces_pour') return rep(true);
   if (u.pathname !== '/rest/v1/app_data') return rep([]);
-  if (m === 'POST') { for (const r of JSON.parse(opts.body || '[]')) base.set(`${r.owner || A}|${r.id}`, r.data); return new Response('', { status: 201 }); }
+  // (29 oct.) La forme de PostgREST pour le comparer-et-échanger de `push_dedup`
+  // (`modifierCas`) : POST `ignore-duplicates` + `return=representation` rend les
+  // lignes VRAIMENT écrites ; PATCH filtré sur `data->>rev` n'écrit que si la
+  // version est la bonne et rend les lignes touchées (§6.3).
+  if (m === 'POST') {
+    const prefer = String((opts.headers && (opts.headers.Prefer || opts.headers.prefer)) || '');
+    const faites = [];
+    for (const r of JSON.parse(opts.body || '[]')) {
+      const cle = `${r.owner || A}|${r.id}`;
+      if (/ignore-duplicates/.test(prefer) && base.has(cle)) continue;
+      base.set(cle, r.data); faites.push({ id: r.id });
+    }
+    return /return=representation/.test(prefer) ? rep(faites, 201) : new Response('', { status: 201 });
+  }
+  if (m === 'PATCH') {
+    const id = (u.searchParams.get('id') || '').replace(/^eq\./, '');
+    const own = (u.searchParams.get('owner') || '').replace(/^eq\./, '') || A;
+    const rev = u.searchParams.get('data->>rev');
+    const cle = `${own}|${id}`;
+    if (!base.has(cle)) return rep([]);
+    const d = base.get(cle) || {};
+    const ok = rev === 'is.null' ? (d.rev == null) : (rev && rev.startsWith('eq.') ? String(d.rev) === rev.slice(3) : true);
+    if (!ok) return rep([]);
+    base.set(cle, JSON.parse(opts.body || '{}').data);
+    return rep([{ id }]);
+  }
   if (m !== 'GET') return rep([]);
   const sel = u.searchParams.get('select') || '';
   if (sel === 'owner' && u.searchParams.get('limit') === '1') return rep([]);
@@ -236,7 +262,7 @@ const MR_TEXTE = ['Bonjour,', 'Votre colis 12345678 est disponible.', '', 'POINT
     const RealDate = Date;
     const DateFige = new Proxy(RealDate, { get: (t, p) => (p === 'now' ? () => NOW : t[p]), construct: (t, a) => new t(...a), apply: (t, th, a) => RealDate(...a) });
     const app = chargeApp(['SUJET_SORTANT', 'SUJET_ENTRANT', 'colisKey', 'sensColis', 'etatColisEmail', 'isColisEnAttente', 'isColisActive'],
-      { arriveeColisEmail: AR.arriveeColisEmail, etatRetrait: M.etatRetrait, Date: DateFige });
+      { arriveeColisEmail: AR.arriveeColisEmail, etatRetrait: M.etatRetrait, sensDeLigne: (await importer('api/_lib/suivi-colis.js')).sensDeLigne, Date: DateFige });
     const t = (o) => ({ status: 'available', subject: 'Votre colis 1 est disponible', ...o });
     const passe = t({ suivi: '1', limite: '2026-10-22', receivedAt: '2026-10-19T08:00:00Z' });
     const ok = t({ suivi: '2', limite: '2026-10-26', receivedAt: '2026-10-21T13:00:00Z' });

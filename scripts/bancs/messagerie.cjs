@@ -119,6 +119,40 @@ const rowsOffres = () => {
   r.push({ id: 'harvest_222_conv_407', data: { capturedAt: iso(0), payload: { conversation: filOffre(407, 10, 'Expirée', '32.0') } } });
   return r;
 };
+// 10. (29 oct.) L'XT-6 de Julien, mesurée en lecture seule : une conversation
+//     captée il y a six semaines porte une offre au statut 10 sur une annonce qui
+//     n'est plus dans son dressing (lu en entier depuis, `total_entries`). Elle
+//     restait EN TÊTE de Messages avec « Offre … en attente », pour toujours.
+//      · 309 (compte_a) : offre sur l'annonce 999, absente du dressing COMPLET de
+//        compte_a lu après l'offre ⇒ plus en attente (ni pastille, ni en tête,
+//        ni Accepter) ;
+//      · 410 (compte_b) : la même forme, mais compte_b n'a aucun dressing lu ⇒
+//        pas su : l'offre RESTE (une offre cachée fait rater une vente) ;
+//      · `complet: false` : le dressing de compte_a sans son total (une page peut
+//        manquer) ⇒ pas su : l'offre de 309 RESTE.
+const FIL_XT6 = (id, item) => ({ id, opposite_user: { id: 5000 + id, login: 'ach_' + id }, transaction: { id: 9500 + id, item_id: item, status: 1, current_user_side: 'seller', item_title: 'Salomon XT-6 blanc 40' },
+  messages: [
+    { id: id * 10 + 1, created_at_ts: iso(24 * 42), entity_type: 'offer_request_message', entity: { id: id * 10 + 1, user_id: 5000 + id, current: true, status: 10, status_title: '', price: { amount: '70.0' }, transaction_id: 9500 + id, offer_request_id: 600 + id } },
+  ] });
+// (revue) 311 (compte_a) : il est l'ACHETEUR, le vendeur lui fait une contre-offre
+//   sur SON annonce (777), jamais dans les dressings de Julien ⇒ l'offre RESTE
+//   (« plus en vente » serait faux, et Accepter disparaîtrait).
+const FIL_CONTRE = (id, item) => ({ id, opposite_user: { id: 5000 + id, login: 'vend_' + id }, transaction: { id: 9500 + id, item_id: item, status: 1, current_user_side: 'buyer', item_title: 'Nike Cortez 41' },
+  messages: [
+    { id: id * 10 + 1, created_at_ts: iso(30), entity_type: 'offer_request_message', entity: { id: id * 10 + 1, user_id: 5000 + id, current: true, status: 10, status_title: '', price: { amount: '55.0' }, transaction_id: 9500 + id, offer_request_id: 600 + id } },
+  ] });
+const rowsXt6 = ({ complet = true } = {}) => {
+  const r = rowsDe();
+  const l = r.find((x) => x.id === 'harvest_111_listings');
+  if (complet) l.data.payload.pagination = { total_entries: 1 };
+  r.find((x) => x.id === 'harvest_111_inbox').data.payload.conversations.push(conv(309, 'ach_309', 'Je vous propose 70 €', true, 24 * 42));
+  r.find((x) => x.id === 'harvest_222_inbox').data.payload.conversations.push(conv(410, 'ach_410', 'Je vous propose 70 €', true, 24 * 42));
+  r.push({ id: 'harvest_111_conv_309', data: { capturedAt: iso(24 * 42), payload: { conversation: FIL_XT6(309, 999) } } });
+  r.push({ id: 'harvest_222_conv_410', data: { capturedAt: iso(24 * 42), payload: { conversation: FIL_XT6(410, 998) } } });
+  r.find((x) => x.id === 'harvest_111_inbox').data.payload.conversations.push(conv(311, 'vend_311', 'Je te la laisse à 55 €', true, 30));
+  r.push({ id: 'harvest_111_conv_311', data: { capturedAt: iso(30), payload: { conversation: FIL_CONTRE(311, 777) } } });
+  return r;
+};
 // jsonb @> : un tableau contient chaque élément de l'autre ; un objet, chaque clé ;
 // un scalaire, la même valeur DU MÊME TYPE (10 ≠ "10").
 const contient = (a, b) => {
@@ -173,7 +207,7 @@ const PONT = ({ version, filExt, fils }) => {
   post({ __vmr: 'ready', version });
 };
 
-async function rendre(b, { version, tel = false, lignes = rows, offresKO = false }) {
+async function rendre(b, { version, tel = false, lignes = rows, offresKO = false, filsEnPlus = {} }) {
   const vp = tel ? { width: 390, height: 844 } : { width: 1512, height: 950 };
   const ctx = await b.newContext({ viewport: vp, ...(tel ? { isMobile: true, hasTouch: true } : {}) });
   const pg = await ctx.newPage();
@@ -181,7 +215,7 @@ async function rendre(b, { version, tel = false, lignes = rows, offresKO = false
   const execs = [];
   await pg.exposeFunction('__exec', (s) => execs.push(JSON.parse(s)));
   await pg.addInitScript(() => { try { localStorage.setItem('vrm_acces_direct', '1'); localStorage.setItem('vinted_annonce_numeros', JSON.stringify({ '444': { numero: '7', min: '40' }, '555': { numero: '12' } })); } catch (_) {} });
-  await pg.addInitScript(PONT, { version, filExt: FIL_EXT, fils: { 301: FIL_OFFRE, 303: FIL_VENTE, 402: FIL_EXT } });
+  await pg.addInitScript(PONT, { version, filExt: FIL_EXT, fils: { 301: FIL_OFFRE, 303: FIL_VENTE, 402: FIL_EXT, ...filsEnPlus } });
   await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) ? r.abort() : r.continue()));
   await pg.route('**/rest/v1/**', (route) => {
     const u = decodeURIComponent(metaVersData(route.request().url()));
@@ -431,6 +465,147 @@ async function rendre(b, { version, tel = false, lignes = rows, offresKO = false
         dit(JSON.stringify(ids) === '["301"]', 'et ne montre qu’elle', JSON.stringify(ids));
       }
       dit(r.execs.filter((x) => x.method !== 'GET').length === 0, 'aucun geste n’est parti tout seul', JSON.stringify(r.execs));
+      dit(r.errs.length === 0, 'aucune erreur d’app', r.errs.join(' | ').slice(0, 160));
+      await r.ctx.close();
+    }
+    for (const tel of [false, true]) {
+      console.log(`── XT-6 : une offre sur une annonce qui n'est plus en vente · ${tel ? '390 px' : '1512 px'}`);
+      const fils = { 309: FIL_XT6(309, 999), 410: FIL_XT6(410, 998), 311: FIL_CONTRE(311, 777) };
+      const r = await rendre(b, { version: '5.135.0', tel, lignes: rowsXt6(), filsEnPlus: fils });
+      await r.pg.waitForTimeout(1200);
+      const lst = await r.pg.evaluate(() => [...document.querySelectorAll('[data-messagerie] [data-conv]')].map((x) => ({ id: x.getAttribute('data-conv'), o: x.getAttribute('data-conv-offre') })));
+      const o = Object.fromEntries(lst.map((x) => [x.id, x.o]));
+      const ids = lst.map((x) => x.id);
+      dit(ids.includes('309') && !o['309'], 'l’offre sur une annonce PARTIE (absente du dressing complet lu après) : plus de pastille', JSON.stringify(lst));
+      dit(ids.indexOf('309') > ids.indexOf('303') && ids.indexOf('303') >= 0, 'et elle ne passe plus devant les conversations plus récentes', JSON.stringify(ids));
+      dit(o['410'] === '70', 'autre sens : sur un compte dont le dressing n’est pas lu (pas su), l’offre GARDE sa pastille', JSON.stringify(o));
+      dit(o['301'] === '45', 'l’offre d’une annonce encore en ligne garde sa pastille', JSON.stringify(o));
+      const f = await r.pg.evaluate(() => { const bt = document.querySelector('[data-filtre-offres]'); return bt ? bt.getAttribute('data-filtre-offres') : null; });
+      dit(o['311'] === '55', 'contre-offre reçue quand il est l’ACHETEUR (annonce du vendeur, jamais dans ses dressings) : l’offre GARDE sa pastille', JSON.stringify(o));
+      dit(f === '3', 'le filtre « Offres » ne la compte plus (301, 410 et 311)', String(f));
+      const aRep = await r.pg.evaluate(() => { const bt = document.querySelector('[data-a-repondre]'); return bt ? bt.getAttribute('data-a-repondre') : null; });
+      await r.pg.click('[data-a-repondre]'); await r.pg.waitForTimeout(400);
+      const idsRep = await r.pg.evaluate(() => [...document.querySelectorAll('[data-messagerie] [data-conv]')].map((x) => x.getAttribute('data-conv')));
+      dit(!idsRep.includes('309') && idsRep.includes('410'), '« À répondre » laisse de côté une conversation dont le dernier message est une offre close (pas celle d’un compte pas lu)', JSON.stringify({ aRep, idsRep }));
+      await r.pg.click('[data-messagerie] .vrm-inbox-filters button'); await r.pg.waitForTimeout(400);
+      await r.pg.click('[data-conv="309"]');
+      await r.pg.waitForTimeout(1200);
+      const fil = await r.pg.evaluate(() => { const e = document.querySelector('[data-offre]'); return e ? { etat: e.getAttribute('data-offre'), txt: e.innerText } : null; });
+      const acc = await r.pg.locator('.vrm-chat-offre-actions button').count();
+      dit(fil && fil.etat === 'annonce-partie' && acc === 0, 'dans le fil : le bloc de l’offre dit qu’elle ne peut plus être acceptée, sans Accepter ni Refuser', JSON.stringify({ fil, acc }));
+      const panneau = await r.pg.evaluate(() => {
+        const p = document.querySelector('.vrm-chat-panel'); const t = p ? p.innerText : '';
+        const bulle = document.querySelector('.vrm-chat-offer-event');
+        const ret = document.querySelector('[data-offre-retirer]'); const rb = ret ? ret.getBoundingClientRect() : null;
+        const hd = document.querySelector('[data-conv-retirer]'); const hs = hd ? hd.querySelector('span') : null; const hsb = hs ? hs.getBoundingClientRect() : null;
+        return { plusEnVente: (t.match(/plus en vente/gi) || []).length, bulle: bulle ? { st: bulle.getAttribute('data-offer-status'), txt: bulle.innerText } : null,
+          dispo: /toujours disponible/i.test([...document.querySelectorAll('.vrm-chat-rapides button')].map((b) => b.title || b.innerText).join(' ')), rapides: document.querySelectorAll('.vrm-chat-rapides').length,
+          enHaut: /« Retirer », en haut/.test(t), ret: rb ? { h: rb.height, txt: ret.innerText } : null, entete: hd ? { txt: hd.innerText.trim(), w: hsb ? hsb.width : 0 } : null };
+      });
+      dit(panneau.bulle && panneau.bulle.st === 'close' && !/en attente/i.test(panneau.bulle.txt) && /plus acceptable/i.test(panneau.bulle.txt), 'la bulle de l’offre ne dit plus « En attente » (« Plus acceptable »)', JSON.stringify(panneau.bulle));
+      dit(panneau.plusEnVente === 1, '« plus en vente » est dit UNE fois dans le fil (la bande d’état)', String(panneau.plusEnVente));
+      dit(!panneau.dispo && panneau.rapides === 0, 'aucune réponse rapide « l’article est toujours disponible » sous une annonce partie', JSON.stringify(panneau));
+      dit(panneau.ret && panneau.ret.h >= 44 && /Retirer de la liste/.test(panneau.ret.txt) && !panneau.enHaut, 'le bloc porte le bouton « Retirer de la liste » (44 px), sans renvoyer à un bouton sans texte', JSON.stringify(panneau.ret));
+      const nGestes = await r.pg.evaluate(() => document.querySelectorAll('[data-conv-retirer],[data-offre-retirer]').length);
+      dit(!panneau.entete && nGestes === 1, 'UN seul geste « Retirer » sur ce fil : celui du bloc de l’offre, pas aussi dans l’en-tête (§7)', JSON.stringify({ entete: panneau.entete, nGestes }));
+      await r.pg.screenshot({ path: path.join(require('os').tmpdir(), 'messagerie-xt6-fil-' + (tel ? 390 : 1512) + '.png') });
+      const nToasts0 = await r.pg.evaluate(() => document.body.innerText.match(/revient dès qu/gi)?.length || 0);
+      await r.pg.click('[data-offre-retirer]'); await r.pg.waitForTimeout(500);
+      const apresR = await r.pg.evaluate(() => ({ ids: [...document.querySelectorAll('[data-messagerie] [data-conv]')].map((x) => x.getAttribute('data-conv')), dit: document.body.innerText.match(/revient dès qu/gi)?.length || 0 }));
+      dit(!apresR.ids.includes('309') && apresR.dit === 1, 'le geste du bloc la retire ; la règle n’est dite qu’UNE fois (pas de toast qui la redit sur « La remettre »)', JSON.stringify({ nToasts0, apresR }));
+      await r.pg.screenshot({ path: path.join(require('os').tmpdir(), 'messagerie-xt6-' + (tel ? 390 : 1512) + '.png') });
+      if (await r.pg.$('[data-conv="311"]')) {
+        await r.pg.click('[data-conv="311"]'); await r.pg.waitForTimeout(1200);
+        const c311 = await r.pg.evaluate(() => ({ partie: !!document.querySelector('[data-offre="annonce-partie"]'), acc: document.querySelectorAll('.vrm-chat-offre-actions button').length, bande: (document.querySelector('.vrm-chat-negociation-etat') || {}).innerText || '' }));
+        dit(!c311.partie && c311.acc > 0 && !/plus en vente/i.test(c311.bande), 'dans le fil de la contre-offre (il achète) : Accepter / Refuser restent, rien ne dit « plus en vente »', JSON.stringify(c311));
+      } else dit(false, 'la contre-offre (311) est dans la liste');
+      dit(r.execs.filter((x) => x.method !== 'GET').length === 0, 'aucun geste n’est parti chez Vinted', JSON.stringify(r.execs));
+      dit(r.errs.length === 0, 'aucune erreur d’app', r.errs.join(' | ').slice(0, 160));
+      await r.ctx.close();
+    }
+    {
+      console.log('── XT-6 : dressing sans son total (une page peut manquer) — pas su');
+      const r = await rendre(b, { version: '5.135.0', lignes: rowsXt6({ complet: false }), filsEnPlus: { 309: FIL_XT6(309, 999), 410: FIL_XT6(410, 998), 311: FIL_CONTRE(311, 777) } });
+      await r.pg.waitForTimeout(1200);
+      const o = await r.pg.evaluate(() => Object.fromEntries([...document.querySelectorAll('[data-messagerie] [data-conv]')].map((x) => [x.getAttribute('data-conv'), x.getAttribute('data-conv-offre')])));
+      dit(o['309'] === '70', 'un dressing dont on ne sait pas s’il est complet ne cache pas l’offre', JSON.stringify(o));
+      await r.ctx.close();
+    }
+    for (const tel of [false, true]) {
+      console.log(`── « Retirer de la liste » · ${tel ? '390 px' : '1512 px'}`);
+      const lignes = rowsDe();
+      const r = await rendre(b, { version: '5.135.0', tel, lignes });
+      await r.pg.waitForTimeout(900);
+      await r.pg.click('[data-conv="303"]');
+      await r.pg.waitForTimeout(900);
+      // Un banc ne meurt pas, il rapporte : sans le bouton, on le dit et on passe.
+      if (!(await r.pg.$('[data-conv-retirer]'))) { dit(false, 'le fil porte un bouton « Retirer »'); await r.ctx.close(); continue; }
+      const bt = await r.pg.locator('[data-conv-retirer]').boundingBox();
+      dit(bt && bt.height >= 44 && bt.width >= 44, 'le bouton « Retirer » du fil fait au moins 44 px', JSON.stringify(bt));
+      const ent = await r.pg.evaluate(() => { const hd = document.querySelector('[data-conv-retirer]'); const hs = hd ? hd.querySelector('span') : null; const b = hs ? hs.getBoundingClientRect() : null; return hd ? { txt: hd.innerText.trim(), w: b ? b.width : 0 } : null; });
+      dit(ent && ent.txt === 'Retirer' && ent.w > 10, 'le bouton de l’en-tête dit « Retirer » en toutes lettres, téléphone compris', JSON.stringify(ent));
+      // (revue) Le nom du compte reste lisible dans l'en-tête du fil, à côté de
+      // « Retirer » : on mesure le texte du compte lui-même (une Range), jamais
+      // une classe — il doit tenir dans la boîte du sous-titre.
+      const cpt = await r.pg.evaluate(() => {
+        const hs = document.querySelector('.vrm-chat-head-s'); if (!hs) return null;
+        const box = hs.getBoundingClientRect();
+        const w = document.createTreeWalker(hs, NodeFilter.SHOW_TEXT); let n; 
+        while ((n = w.nextNode())) { const i = n.nodeValue.indexOf('compte_a'); if (i >= 0) { const rg = document.createRange(); rg.setStart(n, i); rg.setEnd(n, i + 8); const b = rg.getBoundingClientRect(); const el = n.parentElement; return { gauche: b.left, droite: b.right, boxD: box.right, w: b.width, coupe: el.scrollWidth > el.clientWidth + 1 && el !== hs }; } }
+        return { absent: true };
+      });
+      dit(cpt && !cpt.absent && cpt.w > 0 && cpt.droite <= cpt.boxD + 1 && !cpt.coupe, 'le nom du compte reste lisible dans l’en-tête du fil (pas coupé par « Retirer »)', JSON.stringify(cpt));
+      await r.pg.click('[data-conv-retirer]');
+      await r.pg.waitForTimeout(600);
+      const apres = await r.pg.evaluate(() => ({ ids: [...document.querySelectorAll('[data-messagerie] [data-conv]')].map((x) => x.getAttribute('data-conv')), ret: (document.querySelector('[data-conv-retirees]') || {}).getAttribute?.('data-conv-retirees') || null, ls: localStorage.getItem('vrm_conversations_retirees') }));
+      dit(!apres.ids.includes('303') && apres.ids.includes('301'), 'la conversation retirée sort de la liste, les autres restent', JSON.stringify(apres.ids));
+      dit(apres.ret === '1' && /"111_303"/.test(apres.ls || ''), 'la liste dit « 1 conversation retirée », et le choix est gardé (compte + conversation)', JSON.stringify({ ret: apres.ret, ls: apres.ls }));
+      // (revue) La ligne « retirée » s'aligne sur les lignes de la liste (pas
+      // collée au bord du panneau).
+      const al = await r.pg.evaluate(() => { const p = document.querySelector('[data-conv-retirees]'); const sp = p ? p.querySelector('span') : null; const l = document.querySelector('.vrm-msg-list') || (p && p.parentElement); return sp && l ? { marge: Math.round(sp.getBoundingClientRect().left - l.getBoundingClientRect().left) } : null; });
+      dit(al && al.marge >= 10, 'la ligne « conversation retirée » a la même marge que les lignes de la liste (≥ 10 px du bord)', JSON.stringify(al));
+      // (revue) Une recherche qui ne trouve QUE la conversation retirée ne dit
+      // pas « Aucun résultat » : elle dit qu'une conversation correspond, retirée.
+      const champR = r.pg.getByLabel('Rechercher une conversation');
+      await champR.fill('curieux'); await r.pg.waitForTimeout(600);
+      const rech = await r.pg.evaluate(() => { const t = (document.querySelector('[data-messagerie]') || document.body).innerText; const p = document.querySelector('[data-conv-retirees]'); return { aucun: /Aucun résultat/.test(t), ligne: p ? p.innerText : null, remettre: !!document.querySelector('[data-conv-remettre]') }; });
+      dit(!rech.aucun && rech.ligne && /correspond/.test(rech.ligne) && rech.remettre, 'recherche : une conversation retirée qui correspond n’est pas « Aucun résultat » — c’est dit, avec « La remettre »', JSON.stringify(rech));
+      await champR.fill(''); await r.pg.waitForTimeout(500);
+      await r.pg.click('[data-conv-remettre]');
+      await r.pg.waitForTimeout(500);
+      dit(await r.pg.locator('[data-messagerie] [data-conv="303"]').count() === 1 && await r.pg.locator('[data-conv-retirees]').count() === 0, '« La remettre » la remet dans la liste');
+      await r.pg.click('[data-conv="303"]'); await r.pg.waitForTimeout(700);
+      await r.pg.click('[data-conv-retirer]'); await r.pg.waitForTimeout(500);
+      dit(await r.pg.locator('[data-messagerie] [data-conv="303"]').count() === 0, 'retirée à nouveau');
+      // Un nouveau message arrive (la boîte relue porte une date plus récente).
+      const boite = lignes.find((x) => x.id === 'harvest_111_inbox').data.payload.conversations.find((x) => x.id === 303);
+      boite.updated_at = new Date().toISOString(); boite.description = 'Nouveau message';
+      await r.pg.evaluate(() => window.postMessage({ __vmr: 'evt', evt: { type: 'maj', quoi: 'messages', uid: '111', conv: '303' } }, '*'));
+      let revenu = false;
+      try { await r.pg.waitForSelector('[data-messagerie] [data-conv="303"]', { timeout: 10000 }); revenu = true; } catch (_) {}
+      dit(revenu, 'un NOUVEAU message la remet dans la liste tout seul');
+      dit(r.execs.filter((x) => x.method !== 'GET').length === 0, 'retirer ne touche à rien sur Vinted', JSON.stringify(r.execs));
+      const sw = await r.pg.evaluate(() => ({ sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth }));
+      dit(sw.sw <= sw.cw + 1, 'aucun débordement horizontal', `${sw.sw} > ${sw.cw}`);
+      dit(r.errs.length === 0, 'aucune erreur d’app', r.errs.join(' | ').slice(0, 160));
+      await r.ctx.close();
+    }
+    {
+      console.log('── le point « nouveau » de Messages suit « Retirer » sans recharger · 390 px');
+      const r = await rendre(b, { version: '5.135.0', tel: true, lignes: rowsDe() });
+      await r.pg.waitForTimeout(1200);
+      const point = () => r.pg.evaluate(() => document.querySelectorAll('[data-section="messages"] [data-point]').length);
+      await r.pg.click('[data-section="ventes"]'); await r.pg.waitForTimeout(1500);
+      const avant = await point();
+      await r.pg.click('[data-section="messages"]'); await r.pg.waitForTimeout(900);
+      for (const id of ['301', '402']) {
+        if (!(await r.pg.$(`[data-conv="${id}"]`))) continue;
+        await r.pg.click(`[data-conv="${id}"]`); await r.pg.waitForTimeout(900);
+        if (await r.pg.$('[data-conv-retirer]')) { await r.pg.click('[data-conv-retirer]'); await r.pg.waitForTimeout(500); }
+      }
+      await r.pg.click('[data-section="ventes"]'); await r.pg.waitForTimeout(1500);
+      const apres = await point();
+      dit(avant === 1 && apres === 0, 'toutes les non lues retirées : le point disparaît tout de suite', JSON.stringify({ avant, apres }));
       dit(r.errs.length === 0, 'aucune erreur d’app', r.errs.join(' | ').slice(0, 160));
       await r.ctx.close();
     }

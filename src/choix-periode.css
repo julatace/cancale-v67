@@ -1,0 +1,128 @@
+/* ── Le calendrier des périodes « comme Airbnb » (29 oct.) — ChoixPeriode.jsx.
+   Les couleurs viennent des jetons de la coque (--vrm-*, posés sur la racine :
+   la feuille du téléphone, montée sur <body>, les a aussi). Les jours choisis
+   sont à l'ENCRE (pleins, comme Airbnb), la plage au fond doux ; l'accent ne
+   sert qu'au bouton « Appliquer » (§7 : une teinte, rare). */
+
+.vrm-cal { position: relative; margin-bottom: 10px; }
+.vrm-cal-declencheur {
+  display: inline-flex; align-items: center; gap: 7px; min-height: 40px; padding: 0 13px;
+  border: 1px solid var(--vrm-line); border-radius: 999px; background: var(--vrm-surface); color: var(--vrm-ink);
+  font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap; max-width: 100%;
+}
+.vrm-cal-declencheur > span { overflow: hidden; text-overflow: ellipsis; }
+.vrm-cal-declencheur[aria-expanded="true"] { border-color: var(--vrm-ink); }
+.vrm-cal-croix { border: 1px solid var(--vrm-line) !important; border-radius: 999px !important; background: transparent; color: var(--vrm-muted); min-height: 40px; min-width: 40px; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; }
+
+/* Ordinateur : la fenêtre sous le bouton. */
+.vrm-cal-pop {
+  position: absolute; top: calc(100% + 8px); z-index: 75; width: 660px; max-width: calc(100vw - 32px);
+  box-sizing: border-box; padding: 16px 18px 14px; border: 1px solid var(--vrm-line); border-radius: 18px;
+  background: var(--vrm-surface); color: var(--vrm-ink);
+  box-shadow: 0 2px 6px rgba(10, 20, 24, .06), 0 22px 48px -12px rgba(10, 20, 24, .28);
+  animation: vrm-cal-entre .18s cubic-bezier(.23, 1, .32, 1) both;
+}
+.vrm-cal-pop.gauche { left: 0; }
+.vrm-cal-pop.droite { right: 0; }
+@keyframes vrm-cal-entre { from { opacity: 0; transform: translateY(-4px) scale(.985); } to { opacity: 1; transform: none; } }
+
+.vrm-cal-raccourcis { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; }
+.vrm-cal-raccourcis > button {
+  border: 1px solid var(--vrm-line); border-radius: 999px; background: transparent; color: var(--vrm-ink);
+  min-height: 36px; padding: 0 14px; font: inherit; font-size: 12.5px; font-weight: 600; cursor: pointer; white-space: nowrap;
+}
+.vrm-cal-raccourcis > button[aria-pressed="true"] { background: var(--vrm-ink); color: var(--vrm-surface); border-color: var(--vrm-ink); }
+
+.vrm-cal-duo { display: grid; grid-template-columns: 34px minmax(0, 1fr) minmax(0, 1fr) 34px; gap: 6px 18px; align-items: start; }
+.vrm-cal-fleches { display: flex; flex-direction: column; gap: 6px; }
+.vrm-cal-fleche.an { font-size: 15px; color: var(--vrm-muted); }
+.vrm-cal-avant { display: block; width: 100%; min-height: 44px; margin: 6px 0 2px; border: 1px dashed var(--vrm-line); border-radius: 12px; background: transparent; color: var(--vrm-ink); font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; }
+.vrm-cal-fleche {
+  width: 34px; height: 34px; margin-top: -4px; border: 1px solid var(--vrm-line); border-radius: 50%;
+  background: transparent; color: var(--vrm-ink); font-size: 18px; line-height: 1; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; padding: 0;
+}
+.vrm-cal-fleche:disabled { opacity: .3; cursor: default; }
+.vrm-cal-mois-nom { text-align: center; font-size: 14px; font-weight: 650; margin-bottom: 8px; color: var(--vrm-ink); }
+.vrm-cal-jours-tete { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); font-size: 11px; font-weight: 600; color: var(--vrm-muted); text-align: center; margin-bottom: 4px; }
+.vrm-cal-semaine { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); }
+.vrm-cal-case, .vrm-cal-vide { position: relative; height: 40px; display: flex; align-items: center; justify-content: center; }
+/* La plage : le fond doux d'un bord à l'autre ; le début et la fin à moitié. */
+.vrm-cal-case.dans, .vrm-cal-case.apercu { background: var(--vrm-card2); }
+.vrm-cal-case.debut::before, .vrm-cal-case.fin::before, .vrm-cal-case.fin-apercu::before {
+  content: ''; position: absolute; top: 0; bottom: 0; background: var(--vrm-card2); z-index: 0;
+}
+.vrm-cal-case.debut::before { left: 50%; right: 0; }
+.vrm-cal-case.fin::before, .vrm-cal-case.fin-apercu::before { left: 0; right: 50%; }
+.vrm-cal-case.debut:last-child::before, .vrm-cal-case.fin:first-child::before { display: none; }
+.vrm-cal-jour {
+  position: relative; z-index: 1; width: 38px; height: 38px; border-radius: 50%; border: 1px solid transparent;
+  background: transparent; color: var(--vrm-ink); font: inherit; font-size: 13px; font-weight: 550; cursor: pointer;
+  display: inline-flex; flex-direction: column; align-items: center; justify-content: center; padding: 0; min-height: 0 !important; min-width: 0 !important;
+  font-variant-numeric: tabular-nums;
+}
+.vrm-cal-jour > i { position: absolute; bottom: 5px; width: 4px; height: 4px; border-radius: 50%; background: currentColor; }
+.vrm-cal-jour:disabled { opacity: .32; cursor: default; }
+.vrm-cal-case:is(.debut, .fin, .seul) > .vrm-cal-jour { background: var(--vrm-ink); color: var(--vrm-surface); font-weight: 700; }
+.vrm-cal-case.fin-apercu > .vrm-cal-jour { border-color: var(--vrm-ink); }
+@media (hover: hover) and (pointer: fine) {
+  .vrm-cal-jour:not(:disabled):hover { border-color: var(--vrm-ink); }
+  .vrm-cal-raccourcis > button:hover:not([aria-pressed="true"]) { background: var(--vrm-bg); }
+}
+.vrm-cal-jour:focus-visible { outline: 2px solid var(--vrm-focus, var(--vrm-ink)); outline-offset: 1px; }
+
+.vrm-cal-pied { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; border-top: 1px solid var(--vrm-line); margin-top: 12px; padding-top: 12px; }
+.vrm-cal-plage { flex: 1 1 220px; min-width: 0; font-size: 13.5px; font-weight: 650; color: var(--vrm-ink); }
+.vrm-cal-plage[data-periode-plage="vide"], .vrm-cal-plage[data-periode-plage="debut"] { color: var(--vrm-muted); font-weight: 550; }
+.vrm-cal-boutons { display: flex; gap: 8px; margin-left: auto; }
+.vrm-cal-effacer { border: 0; background: transparent; color: var(--vrm-ink); font: inherit; font-size: 13px; font-weight: 600; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; min-height: 40px; padding: 0 8px; }
+.vrm-cal-appliquer { border: 0; border-radius: 10px; background: var(--vrm-accent); color: var(--vrm-surface); font: inherit; font-size: 13.5px; font-weight: 700; min-height: 40px; padding: 0 20px; cursor: pointer; }
+.vrm-cal-appliquer:disabled { opacity: .4; cursor: default; }
+
+/* Au doigt : une feuille du bas, UN calendrier qui défile. */
+.vrm-cal-voile { position: fixed; inset: 0; z-index: 89; background: rgba(8, 16, 20, .38); animation: vrm-cal-fondu .2s ease both; }
+@keyframes vrm-cal-fondu { from { opacity: 0; } to { opacity: 1; } }
+.vrm-cal-feuille {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 90; display: flex; flex-direction: column;
+  max-height: min(88dvh, 760px); box-sizing: border-box; padding: 6px 0 calc(8px + env(safe-area-inset-bottom));
+  border-radius: 20px 20px 0 0; background: var(--vrm-surface); color: var(--vrm-ink);
+  box-shadow: 0 -12px 40px rgba(8, 16, 20, .22); animation: vrm-cal-monte .26s cubic-bezier(.23, 1, .32, 1) both;
+}
+@keyframes vrm-cal-monte { from { transform: translateY(24px); opacity: .6; } to { transform: none; opacity: 1; } }
+/* Tout sauf la liste des mois garde sa hauteur : une rangée qui défile en
+   largeur (`overflow-x`) se laissait écraser à 0 par la liste (vu au rendu). */
+.vrm-cal-feuille > :not(.vrm-cal-defile) { flex-shrink: 0; }
+.vrm-cal-tete { display: flex; align-items: center; justify-content: space-between; padding: 6px 12px 6px 18px; font-size: 16px; }
+.vrm-cal-fermer { width: 44px; height: 44px; border: 0; border-radius: 50%; background: transparent; color: var(--vrm-ink); font-size: 26px; line-height: 1; cursor: pointer; }
+/* (29 oct., revue) Les raccourcis passent à la ligne : en une rangée qui défile,
+   « Cette année » était hors de l'écran à 390 px, sans rien qui le dise. */
+.vrm-cal-feuille .vrm-cal-raccourcis { flex-wrap: wrap; padding: 0 16px; margin-bottom: 10px; }
+.vrm-cal-feuille .vrm-cal-raccourcis > button { min-height: 44px; flex: 0 0 auto; font-size: 14px; }
+.vrm-cal-feuille > .vrm-cal-jours-tete { padding: 0 16px 6px; margin: 0; border-bottom: 1px solid var(--vrm-line); font-size: 12px; }
+.vrm-cal-defile { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 4px 16px 8px; -webkit-overflow-scrolling: touch; }
+.vrm-cal-defile .vrm-cal-mois { padding-top: 14px; }
+.vrm-cal-defile .vrm-cal-mois-nom { text-align: left; font-size: 15px; margin-bottom: 6px; }
+.vrm-cal-defile .vrm-cal-case, .vrm-cal-defile .vrm-cal-vide { height: 48px; }
+.vrm-cal-defile .vrm-cal-jour { width: 44px; height: 44px; font-size: 15px; }
+.vrm-cal-feuille .vrm-cal-pied { margin: 0; padding: 12px 16px 4px; }
+.vrm-cal-feuille .vrm-cal-boutons { width: 100%; }
+.vrm-cal-feuille .vrm-cal-appliquer { flex: 1; min-height: 48px; font-size: 15px; }
+.vrm-cal-feuille .vrm-cal-effacer { min-height: 48px; font-size: 14px; }
+.vrm-cal-feuille .vrm-cal-plage { flex-basis: 100%; font-size: 15px; }
+
+/* (29 oct., revue) Tablette au doigt (pointeur grossier, au-delà de 767 px : la
+   fenêtre à deux mois reste) : jours, flèches et boutons à 44 px — ils faisaient
+   38 et 34 px sur un iPad. La fenêtre s'élargit pour que 7 jours de 44 px
+   tiennent dans chaque mois. */
+@media (pointer: coarse) {
+  .vrm-cal-pop { width: 780px; padding: 16px 16px 14px; }
+  .vrm-cal-pop .vrm-cal-duo { grid-template-columns: 44px minmax(0, 1fr) minmax(0, 1fr) 44px; gap: 6px 10px; }
+  .vrm-cal-pop .vrm-cal-fleche { width: 44px; height: 44px; }
+  .vrm-cal-pop .vrm-cal-case, .vrm-cal-pop .vrm-cal-vide { height: 46px; }
+  .vrm-cal-pop .vrm-cal-jour { width: 44px; height: 44px; font-size: 14px; }
+  .vrm-cal-pop .vrm-cal-raccourcis > button { min-height: 44px; }
+  .vrm-cal-pop .vrm-cal-effacer, .vrm-cal-pop .vrm-cal-appliquer { min-height: 44px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vrm-cal-pop, .vrm-cal-feuille, .vrm-cal-voile { animation: none !important; }
+}

@@ -32,6 +32,7 @@ try {
 ${grab('montantCommande')}
 ${grab('KNOWN_MODELS')}
 ${grab('extractModel')}
+${FULL.includes('function contientModele(')?grab('contientModele'):''}
 ${grab('extractSize')}
 ${grab('medianeNb')}
 ${grab('grouperPrixMarche')}

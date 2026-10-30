@@ -833,6 +833,17 @@ summary.vrm-sidebar-label { cursor:pointer; min-height:32px; }
   .vrm-buy-retour > a { width:100%; justify-content:center; }
 }
 
+/* (30 oct., revue) Une annonce trouvée sur eBay (eBay → Achats) n'a que trois
+   blocs : photo, contenu, « Voir sur eBay ↗ ». Sur téléphone, la grille des
+   achats gagnés (4 colonnes, la dernière de 44 px) laissait 84 px au contenu
+   (titre coupé, prix sur 3 lignes, ~260 px par ligne). Le lien passe sous le
+   prix, le contenu prend toute la largeur. */
+@media(max-width:767px){
+  .vrm-buy-row.vrm-ebay-res { grid-template-columns:60px minmax(0,1fr); }
+  .vrm-buy-row.vrm-ebay-res > .vrm-buy-act { grid-column:2; margin-top:0; }
+  .vrm-buy-row.vrm-ebay-res > .vrm-buy-act > a { padding-left:0 !important; }
+}
+
 /* À retirer : un en-tête, des destinations, et le code mis en avant. */
 .vrm-achats .vrm-pickup-board { margin-bottom:8px !important; }
 .vrm-pickup-head { margin:0 2px 12px; }
