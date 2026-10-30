@@ -6,7 +6,7 @@
 > D'APPLICATION (`jetonApplication`, client_credentials — jamais celui du vendeur, aucun compte eBay relié nécessaire),
 > session exigée (401), 30 annonces, plus récentes d'abord, filtres achat immédiat · livrable en France · état · prix max ;
 > le budget se juge PORT COMPRIS (port « calculé » = inconnu, jamais gratuit), mots exclus, photo `i.ebayimg.com` seule.
-> Plafond VRM **200 recherches/jour/vendeur** (`ebay_recherches_jour`, compté AVANT l'appel, compare-et-échange ;
+> Plafond VRM **200 recherches/jour/vendeur** (`ebay_tokens_recherches_jour`, compté AVANT l'appel, compare-et-échange ;
 > illisible ⇒ 503, rien ne part ; atteint ⇒ 429, le fil s'arrête et le dit). Plafond d'eBay : 5 000/jour pour TOUTE
 > l'application (doc d'eBay, non mesuré) — le restant réel est rendu si eBay le dit (`rate_limit`). Octets reçus
 > d'eBay / envoyés à l'appareil mesurés et affichés. eBay muet ou illisible ⇒ 502 « pas pu chercher », jamais « aucun
@@ -22,6 +22,20 @@
 > minute (banc : serveur à +2 h ⇒ rouge sur le code d'avant) ; le banc ne franchit plus minuit (heure de Paris). ⚠️ **Non mesuré** : aucun appel réel à eBay
 > (formes de la doc Browse/OAuth/Analytics) ; la pointure part dans les mots-clés (« 42.5 »). **Geste de Julien** : rien —
 > l'onglet marche avec les clés eBay déjà posées.
+> **Revue du 30 oct. (12 défauts reproduits, corrigés) :** un ÉCHEC attend comme une lecture — rien avant 15 min (le fil
+> relançait chaque minute et vidait les 200 du jour en ~20 min de panne d'eBay) ; une panne commune (eBay, session,
+> compteur) arrête tout le fil et se dit UNE fois ; critères refusés (400) jamais relancés avant une modification.
+> Le compteur vit sous `ebay_tokens…` : la garde de la base (`vrm_garde_ebay_tokens`, préfixe, lue en production) refuse
+> qu'un navigateur le crée, le réécrive ou l'efface (sous l'ancien id, un vendeur effaçait sa ligne et repartait de zéro).
+> Un appel parti chez eBay compte même raté (il compte aussi chez eBay) — décidé. Une règle de critères
+> (`erreurCriteresEbay`, metier.js) pour Organisation ET la route ; « Dans le fil » / « Hors du fil » par la même règle
+> que le fil (`veillesDuFil`). 390 px : grille propre (contenu 84 → 262 px). Repère : une fois au-dessus d'une liste
+> homogène, jamais sur une clé générique (air max, dunk, blazer, forum, chuck), un accessoire ou une taille enfant.
+> « Aucune annonce gardée : eBay en avait N » ; « Ajouter au fil » sans second appel ; espace illisible : une phrase,
+> un « Réessayer » ; pastille lisible en sombre ; total du jour en Ko sur cet appareil. Preuves : audit (49 ; 2 rouges
+> sur 773e7c6e, mutations id/critères rouges) · banc (**40 rouges sur le build de 773e7c6e** ; mutations recul, repère,
+> grille rouges). Sur origin/main la fonction n'existe pas (audit : 35 rouges). Bancs eBay voisins verts ; `ebay-form`
+> sort 1 rouge (« Julien ne paie jamais le port ») déjà sur origin/main. ⚠️ Non mesuré : aucun appel réel à eBay.
 
 > **29 octobre — 5.287, numéros sur les profils visités :** Julien a précisé que
 > l’affichage semble seulement sur Vinted, l’import dans VRM n’est pas confirmé.
