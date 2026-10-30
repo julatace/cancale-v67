@@ -37,11 +37,11 @@ let ko=0; const dit=(c,m,d)=>{if(!c)ko++;console.log((c?'OK  ':'KO  ')+m+(d?' �
   await pg.route('**/api/**',r2=>r2.fulfill({status:200,contentType:'application/json',body:'{"pret":true,"devices":1}'}));
   const t0=Date.now();
   await pg.goto('http://localhost:'+PORT+'/?tab=cat_ventes',{waitUntil:'domcontentloaded'});
-  for(let i=0;i<400;i++){ const n=await pg.evaluate(()=>document.querySelectorAll("input[placeholder*='prix']").length); if(n>50) break; await pg.waitForTimeout(50); }
+  for(let i=0;i<400;i++){ const n=await pg.evaluate(()=>document.querySelectorAll(".vrm-sale-row[data-tx]").length); if(n>50) break; await pg.waitForTimeout(50); }
   const pret=Date.now()-t0;
   const m=await pg.evaluate(()=>({noeuds:document.querySelectorAll('*').length,
      haut:document.documentElement.scrollHeight,
-     cartes:document.querySelectorAll("input[placeholder*='prix']").length,
+     cartes:document.querySelectorAll(".vrm-sale-row[data-tx]").length,
      // ⚠️ On ne compte QUE les photos de CONTENU (vignettes de ventes). Le LOGO
      //    (`/logo-vrm*.png`, en-tête/rail) est de la CHROME au-dessus de la ligne
      //    de flottaison : il doit charger TOUT DE SUITE, pas en lazy (sinon il
@@ -100,13 +100,16 @@ let ko=0; const dit=(c,m,d)=>{if(!c)ko++;console.log((c?'OK  ':'KO  ')+m+(d?' �
       for(let j=i+1;j<Math.min(t.length,i+4);j++){const m=re2.exec(t[j]); if(m) return m[1];} return null;};
     return {ca:apres(/^CA finalis/i,/^([\d\s\u202f\u00a0.,]+\s?€)$/), nb:apres(/^CA finalis/i,/^(\d+) ventes?$/)};
   });
+  // (30 oct.) Les lignes se comptent par `.vrm-sale-row[data-tx]` : le champ
+  // « prix d'achat » de « N° et frais » n'existe plus tant que « Saisir le prix »
+  // est visible (même écriture), il ne compte plus les ventes.
   // ⚠️ ON NE DESSINE QU'UNE TRANCHE — mais RIEN n'est perdu : le bouton dit le
   // total, et un clic ouvre la suite. Et les totaux du haut portent TOUJOURS
   // sur l'ensemble, jamais sur la tranche affichée.
   const av=await pg.evaluate(()=>{
     const t=document.body.innerText||'';
     const b=[...document.querySelectorAll('button')].find(x=>/Voir plus/.test(x.textContent));
-    return {n:document.querySelectorAll("input[placeholder*='prix']").length,
+    return {n:document.querySelectorAll(".vrm-sale-row[data-tx]").length,
             bouton:b?b.textContent.trim():null};
   });
   Object.assign(av, await totaux());
@@ -120,7 +123,7 @@ let ko=0; const dit=(c,m,d)=>{if(!c)ko++;console.log((c?'OK  ':'KO  ')+m+(d?' �
     if(b && b.previousElementSibling) b.previousElementSibling.setAttribute('data-banc-liste','1');});
   await pg.evaluate(()=>{const b=[...document.querySelectorAll('button')].find(x=>/Voir plus/.test(x.textContent)); if(b)b.click();});
   await pg.waitForTimeout(400);
-  const ap=await pg.evaluate(()=>({n:document.querySelectorAll("input[placeholder*='prix']").length}));
+  const ap=await pg.evaluate(()=>({n:document.querySelectorAll(".vrm-sale-row[data-tx]").length}));
   Object.assign(ap, await totaux());
   dit(ap.n > av.n, `${tag} : un clic ouvre la suite`, av.n+' -> '+ap.n+' cartes');
   dit(!!av.ca && !!av.nb && av.ca === ap.ca && av.nb === ap.nb,

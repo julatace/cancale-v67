@@ -184,9 +184,11 @@ const jugerSegment = async (pg, label, ecran) => {
       // 4. Les replis de Colis : un chevron, pas de triangle natif.
       const replis = await pg.evaluate(() => [...document.querySelectorAll('.vrm-main details > summary')].filter((s) => s.getBoundingClientRect().height > 0).map((s) => ({
         t: s.innerText.trim().slice(0, 30), apres: getComputedStyle(s, '::after').content, liste: getComputedStyle(s).display,
-        marque: getComputedStyle(s, '::marker').content,
+        marque: getComputedStyle(s, '::marker').content, info: !!s.closest('[data-pourquoi]'),
       })));
-      const sansChevron = replis.filter((r) => r.apres === 'none' || r.liste === 'list-item');
+      // (30 oct.) Un ⓘ (`Pourquoi`, data-pourquoi) n'est pas un repli : il n'a pas de
+      // chevron, mais le triangle du navigateur lui reste interdit comme aux autres.
+      const sansChevron = replis.filter((r) => r.liste === 'list-item' || (!r.info && r.apres === 'none') || (r.info && r.marque !== 'none' && r.marque !== '""' && r.marque !== "''"));
       dit(replis.length >= 2 && sansChevron.length === 0, 'Colis : chaque repli porte le chevron commun, sans triangle du navigateur', JSON.stringify(sansChevron));
       await ctx.close();
     });

@@ -228,19 +228,29 @@
        la place, sinon les boutons d'écran passent dessous. */
     /* Sa largeur RÉELLE est publiée par l'app (`--vrm-ile`) : elle change
        avec la pastille « Actions possibles · compte ». 208 px en repli. */
-    @media (min-width: 1024px){ .vrm-tete-row{ padding-right: var(--vrm-ile, 208px); } }
+    @media (min-width: 1024px), (min-width: 768px) and (hover: hover) and (pointer: fine){ .vrm-tete-row{ padding-right: var(--vrm-ile, 208px); } }
     /* La phrase des photos Vinted, posée en tête de page sur la coque : même
        réserve (son geste passait sous l'île — revue du 11 octobre). */
     .vrm-sous-ile{ padding-right: 16px; }
-    @media (min-width: 1024px){ .vrm-sous-ile{ padding-right: var(--vrm-ile, 208px); } }
+    @media (min-width: 1024px), (min-width: 768px) and (hover: hover) and (pointer: fine){ .vrm-sous-ile{ padding-right: var(--vrm-ile, 208px); } }
+    /* (30 oct.) L'île FLOTTE (elle n'occupe plus de rangée au-dessus de
+       l'écran) : chaque première ligne qui n'est pas un `ScreenHead` lui
+       réserve aussi sa place — le résumé d'une plateforme (CA finalisé,
+       Disponible…), l'en-tête d'Organisation, de la Communauté, la ligne
+       d'état des Réglages (banc edge-tailles). */
+    @media (min-width: 1024px), (min-width: 768px) and (hover: hover) and (pointer: fine){
+      html .vrm-app-shell .vrm-market-space > .vrm-platform-summary,
+      html .vrm-app-shell .ops-entete, html .vrm-app-shell .vrm-cm-entete,
+      html .vrm-app-shell .vrm-settings-status{ padding-right: var(--vrm-ile, 208px); }
+    }
     .vrm-rangee{ flex-wrap:nowrap; overflow-x:auto; }
-    @media (min-width: 1024px){ .vrm-rangee{ flex-wrap:wrap; overflow-x:visible; } }
+    @media (min-width: 1024px), (min-width: 768px) and (hover: hover) and (pointer: fine){ .vrm-rangee{ flex-wrap:wrap; overflow-x:visible; } }
     /* Carrousel photo (dernières ventes) : on fait défiler au doigt sur
        téléphone, une grille sur ordinateur. */
     .vrm-carrousel{ display:grid; grid-auto-flow:column; grid-auto-columns:minmax(150px,46%); gap:12px; overflow-x:auto; scroll-snap-type:x mandatory; scroll-padding-inline:16px; scrollbar-width:none; margin:0 -16px; padding:0 16px 4px; }
     .vrm-carrousel::-webkit-scrollbar{ display:none; }
     .vrm-carrousel > *{ scroll-snap-align:start; }
-    @media (min-width: 1024px){ .vrm-carrousel{ grid-auto-flow:row; grid-template-columns:repeat(auto-fill,minmax(170px,1fr)); grid-auto-columns:auto; overflow-x:visible; margin:0; padding:0; } }
+    @media (min-width: 1024px), (min-width: 768px) and (hover: hover) and (pointer: fine){ .vrm-carrousel{ grid-auto-flow:row; grid-template-columns:repeat(auto-fill,minmax(170px,1fr)); grid-auto-columns:auto; overflow-x:visible; margin:0; padding:0; } }
     :focus-visible{ outline:2px solid rgba(36,88,230,.55); outline-offset:2px; border-radius:10px; }
     @media (prefers-color-scheme: dark){ :focus-visible{ outline-color:rgba(61,123,255,.6); } }
 
