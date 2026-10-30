@@ -74,6 +74,12 @@
   background: transparent !important; color: var(--vrm-b-lien) !important;
   padding: 0 4px; min-height: 44px !important; margin-block: -6px;
 }
+/* Au doigt, la boîte du bouton discret garde ses 44 px mais ne gonfle pas sa
+   ligne (même marge que `vrm-lien-action`) : « Tout voir › » de Ma journée
+   faisait une ligne de 32 px (banc formes-communes). */
+@media (pointer: coarse), (max-width: 767px) {
+.vrm-app-shell .vrm-main .vrm-b.vrm-b-discret { margin-block: -12px; }
+}
 
 @media (hover: hover) and (pointer: fine) {
 .vrm-b-primaire:not(:disabled):hover,
