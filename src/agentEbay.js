@@ -247,7 +247,14 @@ export function propositionAgent(o) {
 //  `pretes` : celles que l'écran a PRÉPARÉES chez eBay et qui peuvent partir
 //             telles quelles — absent tant que personne n'a préparé. Jamais
 //             « prêtes » sans préparation (revue du 29 oct.).
+// ⚠️ (dernier tour du 29 oct.) « Arrêter l'agent » doit le faire TAIRE : un
+// agent éteint, sans compte eBay relié, ou sur un compte eBay qui ne vend pas en
+// euros publie un résumé NEUTRE ({ n: 0, raison }) — sinon l'ancien « 3 paires
+// prêtes » restait 48 h dans Ma journée et la notification du matin.
+// « Pas su » (une lecture ratée) ne publie toujours rien : un hoquet n'efface pas.
+export const ETATS_AGENT_MUET = Object.freeze(['eteint', 'sans-ebay', 'devise']);
 export function resumeAgent(prop, maintenant = Date.now(), pause = null, pretes) {
+  if (prop && ETATS_AGENT_MUET.includes(prop.etat)) return { v: 1, n: 0, at: maintenant, raison: prop.etat };
   if (!prop || prop.etat !== 'lu') return null;
   const p = Number.isFinite(pretes) && pretes >= 0 ? Math.min(Math.round(pretes), prop.proposees.length) : null;
   return { v: 1, n: prop.proposees.length, ...(p != null ? { pretes: p } : {}), at: maintenant, ...(pause ? { pause } : {}) };
@@ -263,7 +270,11 @@ export function phraseResumeAgent(n0, pretes0) {
   return `${n} paire${s(n)} à regarder pour eBay`;
 }
 // La ligne de Ma journée : seulement un résumé frais, non nul, et pas mis de côté aujourd'hui.
-export function ligneJourneeAgent(resume, today, maintenant = Date.now()) {
+// L'agent est-il ARRÊTÉ par Julien ? — une règle pour Ma journée et le serveur
+// (§11). Réglages absents ou illisibles ⇒ non (le défaut est « actif »).
+export const agentArrete = (regles) => !!(regles && typeof regles === 'object' && regles.actif === false);
+export function ligneJourneeAgent(resume, today, maintenant = Date.now(), regles = null) {
+  if (agentArrete(regles)) return null;
   const r = resume && typeof resume === 'object' ? resume : null;
   if (!r || !(Number(r.n) > 0)) return null;
   const at = Number(r.at);
@@ -280,18 +291,27 @@ export const MARQUES_CONNUES = ['Nike', 'Jordan', 'Adidas', 'New Balance', 'Asic
 const MOT_NB = '(\\d+(?:[.,]\\d+)?)';
 const EUR = '\\s*(?:€|euros?|eur|e)?';   // « euros » AVANT « e » : sinon « 80 euros » laissait « uros »
 const TAILLE_TXT = '(?:\\d{2}(?:[.,]5)?|xxs|xs|s|m|l|xl|xxl)';
+// Une taille n'est JAMAIS un nombre suivi d'une unité de prix (« en 41 à 50 € » :
+// 41 est la pointure, 50 € n'est pas une pointure — avant, 41 → 50 en 19 tailles).
+const PRIX_SUIT = '(?!\\d|[.,]\\d)(?!\\s*(?:€|euros?\\b|eur\\b|e\\b))';
+const TAILLE_SEULE = `${TAILLE_TXT}${PRIX_SUIT}`;
+// Un nombre suivi de « jours » / « j » n'est JAMAIS un prix (« depuis moins de 10 jours »).
+const PAS_JOURS = '(?!\\d|[.,]\\d)(?!\\s*(?:€|euros?|eur|e)?\\s*(?:jours?|j)\\b)';
+// Ponctuation qui n'est pas une décimale : « Nike, Adidas » · « les Adidas. »
+const sansPonctuation = (s) => String(s).replace(/(?<!\d)[,.;!?:]|[,.;!?:](?!\d)/g, ' ');
+const normMarque = (s) => sansPonctuation(normTexte(s).replace(/[’'"«»]/g, ' ')).replace(/\s+/g, ' ').trim();
 const VIDES = new Set(['publie', 'publier', 'publies', 'poste', 'poster', 'mets', 'met', 'mettre', 'les', 'des', 'mes', 'mon', 'ma', 'ta', 'tes', 'en', 'a', 'au', 'aux', 'de', 'du', 'd', 'l', 'la', 'le', 'plus', 'moins', 'paire', 'paires', 'article', 'articles', 'toutes', 'tous', 'tout', 'sur', 'ebay', 'celles', 'ceux', 'qui', 'et', 'ou', 'que', 'je', 'veux', 'voudrais', 'chaussures', 'baskets', 'basket', 'sneakers', 'prix', 'euros', 'euro', 'eur', 'stp', 'merci', 'uniquement', 'seulement', 'avec', 'pour', 'mais', 'pas', 'les', 'une', 'un', 'cher', 'cheres', 'chers', 'vinted', 'compte', 'comptes', 'annonce', 'annonces', 'en', 'ligne', 'depuis', 'jours', 'jour', 'par', 'maximum', 'max', 'minimum', 'min', 'taille', 'tailles', 'pointure', 'pointures', 'entre', 'dessus', 'dessous', 'partir', 'jusqu', 'sous', 'meme', 'cochees', 'cochee', 'qu', 's', 'y', 'il', 'elle', 'on', 'ne']);
 
 function etendreTailles(txt) {
   const out = [];
   const t = normTexte(txt);
-  const r = /(\d{2}(?:[.,]5)?)\s*(?:-|a|au)\s*(\d{2}(?:[.,]5)?)/.exec(t);
+  const r = new RegExp(`(\\d{2}(?:[.,]5)?)\\s*(?:-|a|au)\\s*(\\d{2}(?:[.,]5)?)${PRIX_SUIT}`).exec(t);
   if (r) {
     const a = Number(r[1].replace(',', '.')), b = Number(r[2].replace(',', '.'));
     if (a >= 16 && b <= 60 && b >= a && b - a <= 12) for (let v = a; v <= b + 1e-9; v += 0.5) out.push(Number.isInteger(v) ? String(v) : `${Math.floor(v)}.5`);
   }
   const reste = r ? t.replace(r[0], ' ') : t;
-  for (const m of reste.matchAll(new RegExp(`\\b${TAILLE_TXT}\\b`, 'g'))) { const n = normTaille(m[0]); if (n) out.push(n); }
+  for (const m of reste.matchAll(new RegExp(`\\b${TAILLE_SEULE}\\b`, 'g'))) { const n = normTaille(m[0]); if (n) out.push(n); }
   return [...new Set(out)];
 }
 
@@ -312,6 +332,10 @@ export function comprendrePhrase(texte, opts = {}) {
   if ((m = new RegExp(`(?:en ligne )?depuis (?:plus de |au moins )?(\\d{1,3})\\s*(?:jours?|j)\\b|(?:plus de|au moins) (\\d{1,3})\\s*(?:jours?|j)\\b`).exec(t))) {
     const n = Number(m[1] || m[2]); if (n >= 1 && n <= 365) { regles.joursMin = n; compris.push(`en ligne sur Vinted depuis au moins ${n} jour${n > 1 ? 's' : ''}`); } ote(m);
   }
+  // « depuis moins de N jours » : l'agent ne sait pas filtrer les annonces RÉCENTES
+  // — dit, jamais lu comme un prix (avant : « prix jusqu'à 10 € »).
+  const nonCompris = [];
+  if ((m = /(?:en ligne )?depuis moins de (\d{1,3})\s*(?:jours?|j)\b|(?:il y a )?moins de (\d{1,3})\s*(?:jours?|j)\b/.exec(t))) { nonCompris.push(m[0].trim()); ote(m); }
   if ((m = /(?:max(?:imum)? |au plus )?(\d{1,2})\s*(?:paires? |annonces? |articles? )?(?:par|\/)\s*jour\b/.exec(t))) {
     const n = Number(m[1]); if (n >= 1) { regles.parJour = Math.min(AGENT_MAX_PAR_JOUR, n); compris.push(`au plus ${regles.parJour} par jour`); } ote(m);
   }
@@ -320,7 +344,7 @@ export function comprendrePhrase(texte, opts = {}) {
   } else if ((m = new RegExp(`\\+\\s*${MOT_NB}\\s*(?:€|euros?|eur|e)(?=\\s|,|$)|${MOT_NB}\\s*(?:€|euros?|eur|e)\\s*(?:de plus|plus cher)`).exec(t))) {
     const n = nombre(m[1] || m[2]); if (n != null) { regles.prixMode = 'eur'; regles.prixValeur = n; compris.push(`prix sur eBay : celui de Vinted + ${String(n).replace('.', ',')} €`); } ote(m);
   } else if ((m = /\b(?:au )?meme prix\b/.exec(t))) { regles.prixMode = 'meme'; regles.prixValeur = 0; compris.push('prix sur eBay : le même que sur Vinted'); ote(m); }
-  if ((m = new RegExp(`(?:\\ben|\\btailles?|\\bpointures?|\\bdu)\\s+(${TAILLE_TXT}(?:\\s*(?:,|et|ou|-|a|au|\\/)\\s*${TAILLE_TXT})*)\\b`).exec(t))) {
+  if ((m = new RegExp(`(?:\\ben|\\btailles?|\\bpointures?|\\bdu)\\s+(${TAILLE_SEULE}(?:\\s*(?:,|et|ou|-|a|au|\\/)\\s*${TAILLE_SEULE})*)\\b`).exec(t))) {
     const tl = etendreTailles(m[1]);
     // Une lettre seule (« en s ») n'est une taille qu'après « taille ».
     const garde = /^\s*(?:\btailles?|\bpointures?)/.test(m[0]) ? tl : tl.filter((x) => /^\d/.test(x));
@@ -329,8 +353,8 @@ export function comprendrePhrase(texte, opts = {}) {
   if ((m = new RegExp(`entre\\s+${MOT_NB}${EUR}\\s+et\\s+${MOT_NB}${EUR}`).exec(t))) {
     const a = nombre(m[1]), b = nombre(m[2]); if (a != null && b != null) { regles.prixMin = Math.min(a, b); regles.prixMax = Math.max(a, b); } ote(m);
   }
-  if ((m = new RegExp(`(?:a plus de|plus de|au[- ]dessus de|a partir de|minimum|min|superieure? a|plus cher que|>=?)\\s*${MOT_NB}${EUR}`).exec(t))) { const n = nombre(m[1]); if (n != null) regles.prixMin = n; ote(m); }
-  if ((m = new RegExp(`(?:a moins de|moins de|en dessous de|au[- ]dessous de|sous|jusqu a|maximum|max|inferieure? a|<=?)\\s*${MOT_NB}${EUR}`).exec(t))) { const n = nombre(m[1]); if (n != null) regles.prixMax = n; ote(m); }
+  if ((m = new RegExp(`(?:a plus de|plus de|au[- ]dessus de|a partir de|minimum|min|superieure? a|plus cher que|>=?)\\s*${MOT_NB}${PAS_JOURS}${EUR}`).exec(t))) { const n = nombre(m[1]); if (n != null) regles.prixMin = n; ote(m); }
+  if ((m = new RegExp(`(?:a moins de|moins de|en dessous de|au[- ]dessous de|sous|jusqu a|maximum|max|inferieure? a|<=?)\\s*${MOT_NB}${PAS_JOURS}${EUR}`).exec(t))) { const n = nombre(m[1]); if (n != null) regles.prixMax = n; ote(m); }
   if (regles.prixMin != null || regles.prixMax != null) {
     const f = (n) => String(n).replace('.', ',') + ' €';
     compris.push(regles.prixMin != null && regles.prixMax != null ? `prix Vinted entre ${f(regles.prixMin)} et ${f(regles.prixMax)}` : regles.prixMin != null ? `prix Vinted à partir de ${f(regles.prixMin)}` : `prix Vinted jusqu’à ${f(regles.prixMax)}`);
@@ -342,22 +366,26 @@ export function comprendrePhrase(texte, opts = {}) {
     if (l && l.length >= 3 && t.includes(' ' + l + ' ')) { cs.push(String(c.uid)); t = t.replace(' ' + l + ' ', ' '); }
   }
   if (cs.length) { regles.comptesVinted = cs; compris.push(`compte${cs.length > 1 ? 's' : ''} Vinted ${comptes.filter((c) => cs.includes(String(c.uid))).map((c) => c.login).join(', ')}`); }
-  const toutes = [...new Set([...(Array.isArray(opts.marques) ? opts.marques : []), ...MARQUES_CONNUES])].filter((x) => normTexte(x).length >= 2);
-  toutes.sort((a, b) => normTexte(b).length - normTexte(a).length);   // « new balance » avant « on »
+  // La ponctuation (« Nike, Adidas et Puma », « les Adidas. ») ne colle plus une
+  // marque à sa virgule : ôtée ici (les tailles et les prix sont déjà lus, une
+  // décimale « 41,5 » ne passe jamais par là).
+  t = ' ' + sansPonctuation(t) + ' ';
+  const toutes = [...new Set([...(Array.isArray(opts.marques) ? opts.marques : []), ...MARQUES_CONNUES])].filter((x) => normMarque(x).length >= 2);
+  toutes.sort((a, b) => normMarque(b).length - normMarque(a).length);   // « new balance » avant « on »
   const mq = [];
   for (const b of toutes) {
-    const n = normTexte(b);
+    const n = normMarque(b);
     // « On » (la marque) n'est pris qu'écrit avec sa majuscule dans la phrase.
     if (n === 'on' && !/\bOn\b/.test(brut)) continue;
-    const re = new RegExp(`(^|\\s)${n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?=\\s)`);
-    if (re.test(t)) { if (!mq.some((x) => normTexte(x) === n)) mq.push(b); t = t.replace(re, ' '); }
+    const re = new RegExp(`(^|\\s)${n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/ /g, '\\s+')}(?=\\s)`);
+    if (re.test(t)) { if (!mq.some((x) => normMarque(x) === n)) mq.push(b); t = t.replace(re, ' '); }
   }
   if (mq.length) { regles.marques = mq; compris.push(`marque${mq.length > 1 ? 's' : ''} ${mq.join(', ')}`); }
   // Un nombre resté sans règle (« Nike 42 43 44 », « taille 9 US », « -10 % »)
   // est DIT, jamais ignoré en silence.
   const signes = [...t.matchAll(/-\s*\d+(?:[.,]\d+)?\s*(?:%|€)/g)].map((x) => x[0].replace(/\s+/g, ' ').trim());
   for (const x of signes) t = t.replace(x, ' ');
-  const pasCompris = [...signes, ...t.split(/[^a-z0-9]+/).filter((w) => (/^\d+$/.test(w) ? true : w.length >= 3 && !VIDES.has(w)))];
+  const pasCompris = [...nonCompris, ...signes, ...t.split(/[^a-z0-9]+/).filter((w) => (/^\d+$/.test(w) ? true : w.length >= 3 && !VIDES.has(w)))];
   return { regles, compris, pasCompris: [...new Set(pasCompris)].slice(0, 8), vide: !compris.length };
 }
 

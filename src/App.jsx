@@ -74,7 +74,7 @@ import {aConfirmerVisibles, texteLimite, motAConfirmer} from './aConfirmer.js';
 // journée, Ventes, le rappel du matin, le rappel du soir et le widget (§11).
 import {DELAI_EXPEDITION_J, limiteExpedition, lireDateLimite, echeanceLimite, texteLimiteEnvoi, bordsParTransaction} from '../api/_lib/limite-envoi.js';
 import { photoArticle, photoCommande, demandesPhotosVentes, photosTransactionsLues, photosVenteVintedCandidates, choisirPhotoDisponible } from "./photosArticles.js";
-import { REGLES_AGENT_DEFAUT, AGENT_MAX_PAR_JOUR, normaliserReglesAgent, propositionAgent, resumeAgent, ligneJourneeAgent, phraseResumeAgent, comprendrePhrase, appliquerPhrase, texteRegles, phraseEcartees } from './agentEbay.js';
+import { REGLES_AGENT_DEFAUT, AGENT_MAX_PAR_JOUR, ETATS_AGENT_MUET, normaliserReglesAgent, propositionAgent, resumeAgent, ligneJourneeAgent, phraseResumeAgent, comprendrePhrase, appliquerPhrase, texteRegles, phraseEcartees } from './agentEbay.js';
 import {appelerEbay,ResponsiveChatPortal,EbayCommande,EbayMessages,EbayOffres,EbayAgent,EbayEvaluations,EbayRetours,EbayPromotion,EbayAchats} from "./ebayGestion.jsx";
 import { contactEmail, CONTACT_A_VENIR } from "./contact.js";
 import { captchaActif, routeProtegee, jetonCaptcha, etatCaptcha, abonnerCaptcha, consommerCaptcha, corpsAvecCaptcha, monterWidget, MSG_CAPTCHA_ATTENTE, MSG_CAPTCHA_REFUS, MSG_CAPTCHA_ERREUR } from "./captcha.js";
@@ -22462,8 +22462,9 @@ function useEtatPublicationEbay(comptes, comptesEbay) {
 }
 // La préparation d'UNE annonce : la même chaîne que « Publier en un clic »
 // (pubinfo → critères PROUVÉS → état → vérification à blanc). Gardée 30 min
-// (une paire, un compte, un prix) : rouvrir l'écran ne repaie aucun appel, et
-// les frais montrés dans la confirmation ne datent jamais de plus d'une demi-heure.
+// (une paire, un compte, un prix) : rouvrir l'écran ne repaie aucun appel. Les
+// frais de la confirmation ne datent jamais de plus d'une demi-heure : `publierLot`
+// REFAIT, juste avant de demander, toute préparation plus vieille (écran resté ouvert).
 const _prepAgentEbay = new Map();
 const AGENT_PREP_MAX_MS = 30 * 60000;
 async function preparerAnnonceAgent(prop, compte) {
@@ -22597,31 +22598,54 @@ function AgentEbay({ comptes, comptesEbay, onAnnonces }) {
   // Le résumé (Ma journée, notification du matin) : publié quand la préparation
   // est FINIE — il dit alors combien sont vraiment prêtes à partir.
   React.useEffect(() => { if (prop.etat === 'lu' && (!nProp || prepFinie)) publierResumeAgent(prop, nProp ? nPretes : 0); }, [prop, prepFinie, nPretes]);   // eslint-disable-line react-hooks/exhaustive-deps
+  // (dernier tour du 29 oct.) Arrêté, sans compte eBay relié, ou sur un compte eBay
+  // qui ne vend pas en euros : le résumé devient NEUTRE (n : 0) — Ma journée et
+  // la notification du matin se taisent au lieu de redemander pendant 48 h.
+  React.useEffect(() => { if (ETATS_AGENT_MUET.includes(prop.etat)) publierResumeAgent(prop); }, [prop.etat]);   // eslint-disable-line react-hooks/exhaustive-deps
   const choisies = pretes.filter((x) => !choix.has(x.cle));
-  const fraisConnus = choisies.filter((x) => typeof preps[kp(x)].frais === 'number');
-  const totalFrais = fraisConnus.reduce((s, x) => s + preps[kp(x)].frais, 0);
   const pause = jour.pause === true;
   const pasMaintenant = () => { const j = ecrireJourAgent({ pause: true }); setJour(j); if (prop.etat === 'lu') publierResumeAgent(prop, nPretes); };
   const reprendre = () => { const j = ecrireJourAgent({ pause: false }); setJour(j); if (prop.etat === 'lu') publierResumeAgent(prop, nPretes); };
   const jamaisCelleCi = (x) => { garderRegles({ ...regles, jamais: [...(regles.jamais || []), x.cle] }); toast(`N°${x.num} ne sera plus jamais proposée pour eBay — tu peux l'enlever dans « Ce que je publie ».`, 'ok'); };
+  const [relitFrais, setRelitFrais] = React.useState(false);
   const publierLot = async () => {
     if (!choisies.length || busy) return;
-    const lignes = choisies.map((x) => `N°${x.num} · ${eurEbay(x.prix)}${typeof preps[kp(x)].frais === 'number' ? ` · frais ${eurEbay(preps[kp(x)].frais)}` : ' · frais non annoncés'}`);
-    const sansFrais = choisies.length - fraisConnus.length;
+    // ⚠️ (dernier tour du 29 oct.) Les frais montrés dans la confirmation datent de
+    // MOINS de 30 min, toujours : une préparation plus vieille (écran resté
+    // ouvert) est REFAITE chez eBay ici, avant de demander — avant, seul le cache
+    // du module expirait, et l'écran gardait des frais de plusieurs heures.
+    setBusy(true); setRelitFrais(true);
+    const pm = { ...preps };
+    for (const x of choisies) {
+      const k = kp(x), pr = pm[k];
+      if (pr && pr.etat === 'prete' && Date.now() - (Number(pr.at) || 0) < AGENT_PREP_MAX_MS) continue;
+      let r; try { r = await preparerAnnonceAgent(x, compte); } catch (_) { r = { etat: 'refusee', erreur: 'Préparation impossible (réseau).' }; }
+      pm[k] = { ...r, essaye: true };
+    }
+    setPreps((m) => ({ ...m, ...Object.fromEntries(choisies.map((x) => [kp(x), pm[kp(x)]])) }));
+    setRelitFrais(false); setBusy(false);
+    const lot = choisies.filter((x) => pm[kp(x)] && pm[kp(x)].etat === 'prete');
+    if (!lot.length) { toast('Relues chez eBay, ces paires ne peuvent plus partir telles quelles — la raison est sur chaque paire. Rien n\'a été publié.', 'error'); return; }
+    const avecFrais = lot.filter((x) => typeof pm[kp(x)].frais === 'number');
+    const totalLot = avecFrais.reduce((t, x) => t + pm[kp(x)].frais, 0);
+    const lignes = lot.map((x) => `N°${x.num} · ${eurEbay(x.prix)}${typeof pm[kp(x)].frais === 'number' ? ` · frais ${eurEbay(pm[kp(x)].frais)}` : ' · frais non annoncés'}`);
+    const sansFrais = lot.length - avecFrais.length;
+    const changees = choisies.length - lot.length;
     const ok = await askConfirm({
-      title: `Publier ${choisies.length} paire${choisies.length > 1 ? 's' : ''} sur eBay ?`,
+      title: `Publier ${lot.length} paire${lot.length > 1 ? 's' : ''} sur eBay ?`,
       desc: [`Sur ton compte eBay « ${nomCompte} », tout de suite, l'une après l'autre.`, lignes.join('\n'),
-        `Frais d'insertion annoncés par eBay : ${eurEbay(totalFrais)}${sansFrais ? ` (eBay n'a pas annoncé ceux de ${sansFrais} paire${sansFrais > 1 ? 's' : ''})` : ''}.`,
+        `Frais d'insertion annoncés par eBay : ${eurEbay(totalLot)}${sansFrais ? ` (eBay n'a pas annoncé ceux de ${sansFrais} paire${sansFrais > 1 ? 's' : ''})` : ''}.`,
+        ...(changees ? [`${changees} paire${changees > 1 ? 's' : ''} relue${changees > 1 ? 's' : ''} chez eBay ne ${changees > 1 ? 'peuvent' : 'peut'} plus partir telle${changees > 1 ? 's' : ''} quelle${changees > 1 ? 's' : ''} : je ne ${changees > 1 ? 'les' : 'la'} publie pas.`] : []),
         'Livraison gérée par eBay : c\'est l\'acheteur qui paie le port. Juste avant chaque paire, eBay est relu (déjà en vente ou programmée : rien ne part) ; au moindre doute je m\'arrête.'].join('\n\n'),
-      ok: `Oui, publier ${choisies.length}`, cancel: 'Annuler' });
+      ok: `Oui, publier ${lot.length}`, cancel: 'Annuler' });
     if (!ok) return;
     setBusy(true); setBilan(null);
     const res = {}; let refus = 0, deja = 0, incertaine = null, arret = null;
     const publieesL = [];
     const incert = { ...lireIncertainsAgent() };
     let incertChange = false;
-    for (const x of choisies) {
-      const pr = preps[kp(x)];
+    for (const x of lot) {
+      const pr = pm[kp(x)];
       // Le MÊME identifiant d'envoi qu'un essai incertain d'avant : eBay refuse
       // un second envoi qui aurait déjà créé l'annonce (488).
       const uuid = (incert[x.cle] && incert[x.cle].uuid) || uuidEnvoiEbay();
@@ -22764,7 +22788,7 @@ function AgentEbay({ comptes, comptesEbay, onAnnonces }) {
             </div>; })}
         </div>}
         {!pause && pretes.length > 0 && <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 12 }}>
-          <button type="button" data-agent-publier="" disabled={busy || !choisies.length} onClick={publierLot} style={s({ background: E.accent, color: E.onAccent, border: 'none', opacity: busy || !choisies.length ? 0.55 : 1 })}>{busy ? 'En cours…' : choisies.length ? `Publier ${choisies.length > 1 ? `ces ${choisies.length}` : 'celle-ci'}` : 'Coche au moins une paire'}</button>
+          <button type="button" data-agent-publier="" disabled={busy || !choisies.length} onClick={publierLot} style={s({ background: E.accent, color: E.onAccent, border: 'none', opacity: busy || !choisies.length ? 0.55 : 1 })}>{relitFrais ? 'Je relis les frais chez eBay…' : busy ? 'En cours…' : choisies.length ? `Publier ${choisies.length > 1 ? `ces ${choisies.length}` : 'celle-ci'}` : 'Coche au moins une paire'}</button>
           <button type="button" data-agent-plustard="" disabled={busy} onClick={pasMaintenant} style={s()}>Pas maintenant</button>
           <button type="button" data-agent-programmer="" disabled={busy || !choisies.length} onClick={programmerALaPlace} style={s({ fontWeight: 500 })}>Programmer plutôt</button>
         </div>}
@@ -22808,7 +22832,7 @@ function AgentEbay({ comptes, comptesEbay, onAnnonces }) {
         {regles.jamais.length > 0 && <div data-agent-jamais-liste="">Jamais sur eBay : {regles.jamais.map((k) => <button key={k} type="button" onClick={() => garderRegles({ ...regles, jamais: regles.jamais.filter((x) => x !== k) })} style={s({ fontSize: 12, fontWeight: 500, margin: '4px 6px 0 0' })} aria-label={`Reproposer la N°${k}`}>N°{k} ✕</button>)}</div>}
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <button type="button" onClick={() => garderRegles({ ...REGLES_AGENT_DEFAUT, jamais: regles.jamais, compteEbay: regles.compteEbay, actif: regles.actif })} style={s({ fontWeight: 500 })}>Effacer les filtres</button>
-          <button type="button" data-agent-actif="" onClick={() => garderRegles({ ...regles, actif: !regles.actif })} style={s({ fontWeight: 500 })}>{regles.actif ? 'Arrêter l\'agent' : 'Relancer l\'agent'}</button>
+          <button type="button" data-agent-actif="" onClick={() => { const n = garderRegles({ ...regles, actif: !regles.actif }); if (n.actif === false) publierResumeAgent({ etat: 'eteint' }); }} style={s({ fontWeight: 500 })}>{regles.actif ? 'Arrêter l\'agent' : 'Relancer l\'agent'}</button>
         </div>
       </div>
     </details>}
@@ -22824,9 +22848,12 @@ function AgentEbayFond({ comptes, comptesEbay }) {
   const etat = useEtatPublicationEbay(comptes, comptesEbay);
   const fait = React.useRef(false);
   React.useEffect(() => {
-    if (fait.current || !regles || regles.actif === false || !Array.isArray(comptesEbay) || !comptesEbay.length) return;
+    if (fait.current || !regles) return;
+    // Arrêté ailleurs (un autre appareil) : un ancien résumé ne doit plus demander.
+    if (regles.actif === false) { fait.current = true; publierResumeAgent({ etat: 'eteint' }); return; }
+    if (!Array.isArray(comptesEbay) || !comptesEbay.length) return;
     const ref = (regles.compteEbay && comptesEbay.some((c) => c.ref === regles.compteEbay)) ? regles.compteEbay : comptesEbay[0].ref;
-    if (marcheEbayDeRef(ref).devise !== 'EUR') return;
+    if (marcheEbayDeRef(ref).devise !== 'EUR') { fait.current = true; publierResumeAgent({ etat: 'devise' }); return; }
     const incertains = incertainsAttendusAgent(lireIncertainsAgent(), etat.luesA);
     const prop = propositionAgent({ regles, paires: etat.paires, enLigne: etat.enLigne, ventes: etat.ventes, dejaSurEbay: etat.dejaSurEbay, jumelles: etat.jumelles,
       achatDe: (p) => prixAchatDe(etat.fiches[p.id], load('vinted_buyprice_by_num', {}) || {}), cochee: (p) => mpChoisi(etat.fiches[p.id], 'ebay') === true,
@@ -52624,7 +52651,7 @@ const PUSH_CATS = [
   { id:'offremini',def:true,  titre:'🎯 Offre à accepter',   desc:"Une offre a passé ton prix mini — à accepter en 1 tap." },
   { id:'urssaf',   def:true,  titre:'🧾 Déclaration URSSAF', desc:'Le 1er du mois, si tu es micro-entrepreneur (ton statut se choisit dans Comptabilité).' },
   { id:'bilan',    def:true,  titre:'📊 Bilan de la semaine', desc:"Le lundi matin : vendu, reçu, colis à poster, paires qui dorment." },
-  { id:'agentebay', def:true, titre:'🛒 Agent eBay', desc:"Une fois par jour : « N paires prêtes pour eBay — publier ? ». Rien n'est publié sans ton oui." },
+  { id:'agentebay', def:true, titre:'🛒 Agent eBay', desc:"Une fois par jour : combien de paires l'agent te propose pour eBay. Rien n'est publié sans ton oui." },
   { id:'doublevente', def:true, titre:'⚠️ Double vente', desc:"Vendue sur Vinted alors que la même paire (son N°) est encore en vente sur eBay ou Leboncoin — même app fermée." },
   { id:'favoris',  def:true,  titre:'❤️ Messages aux favoris', desc:"Quand la file d'envoi aux favoris est finie ou s'arrête, avec le bilan." },
   { id:'action',   def:true,  titre:'⏳ À trancher sur Vinted', desc:"Un acheteur demande d'annuler, ou un de tes achats est livré : tu as une date limite pour répondre ou signaler un problème." },
@@ -58012,7 +58039,7 @@ function AppCoeur() {
       const numDbl=Object.entries(numPorteurs).filter(([,v])=>v.length>1);
       // (29 oct.) L'AGENT eBAY QUI DEMANDE : le résumé PUBLIÉ par l'agent (§11) —
       // frais (48 h), non nul, et pas mis de côté aujourd'hui.
-      { const l = ligneJourneeAgent(load('vrm_agent_ebay_resume', null), partsParis(Date.now()).date); if (l) items.push({icon:'🛒', ic:'tag', text:l.text, n:l.n, tab:'ebay_agent', jr:true, job:'agent-ebay'}); }
+      { const l = ligneJourneeAgent(load('vrm_agent_ebay_resume', null), partsParis(Date.now()).date, Date.now(), load('vrm_agent_ebay_regles', null)); if (l) items.push({icon:'🛒', ic:'tag', text:l.text, n:l.n, tab:'ebay_agent', jr:true, job:'agent-ebay'}); }
       if(numDbl.length>0) items.push({icon:'🚨', ic:'alert', text:`${numDbl.length} numéro${numDbl.length>1?'s':''} porté${numDbl.length>1?'s':''} par deux annonces (N°${numDbl.map(([n])=>n).slice(0,3).join(', N°')}) — la mauvaise paire peut partir`, n:numDbl.length, tab:'cat_annonces', dv:'num'});
       if(noNumCount>0)   items.push({icon:'🔢', ic:'tag', text:`${noNumCount} annonce${noNumCount>1?'s':''} sans numéro`, n:noNumCount, tab:'cat_annonces', jr:true});
       if(sleepCount>0)   items.push({icon:'😴', ic:'sleep', text:`${sleepCount} annonce${sleepCount>1?'s':''} qui ${sleepCount>1?'dorment':'dort'} → baisser le prix`, n:sleepCount, tab:'cat_annonces'});

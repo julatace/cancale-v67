@@ -23,6 +23,8 @@
 //   I. mémo illisible (522) ⇒ rien ;
 //   J. mémo non écrit (la base refuse l'écriture) ⇒ rien ;
 //   K. le rappel du SOIR ne pose pas la question.
+//   L. (dernier tour du 29 oct.) agent ARRÊTÉ (`vrm_agent_ebay_regles.actif`
+//      false) ⇒ rien, même avec un résumé frais ; actif ⇒ la question part.
 // §6.1 : RACINE se déduit de __dirname.
 const path = require('path');
 const RACINE = path.join(__dirname, '..', '..');
@@ -63,7 +65,7 @@ function poserFetch() {
     if (/select=owner&limit=1/.test(u)) return J([{ owner: OWNER }]);
     if (/id=eq\.main/.test(u) && /select=owner/.test(u) && !/owner=eq\./.test(u)) return J([{ owner: OWNER }]);
     if (/id=eq\.main/.test(u)) {
-      if (/vrm_agent_ebay_resume:data->vrm_agent_ebay_resume/.test(u)) return CFG.mainKO ? KO() : J([{ vrm_agent_ebay_resume: CFG.resume }]);
+      if (/vrm_agent_ebay_resume:data->vrm_agent_ebay_resume/.test(u)) return CFG.mainKO ? KO() : J([{ vrm_agent_ebay_resume: CFG.resume, ...(/vrm_agent_ebay_regles/.test(u) ? { vrm_agent_ebay_regles: CFG.regles || null } : {}) }]);
       return J([{ data: {} }]);
     }
     if (/id=eq\.agent_ebay_dedup/.test(u)) return CFG.memoKO ? KO() : J(CFG.dedup ? [{ data: CFG.dedup }] : []);
@@ -161,6 +163,15 @@ const agent = () => pushes.filter((p) => /pour eBay/.test(`${p.title} ${p.body}`
   reset();
   await lancer({ moment: 'soir' });
   dit(agent().length === 0, 'seul le cron du matin demande', String(agent().length));
+
+  console.log('\n── L. agent ARRÊTÉ par Julien, ancien résumé « 3 prêtes » encore frais : rien (dernier tour du 29 oct.)');
+  reset({ resume: { v: 1, n: 3, pretes: 3, at: Date.now() - 3600000 }, regles: { v: 1, actif: false } });
+  await lancer();
+  dit(agent().length === 0, '« Arrêter l’agent » fait taire la notification du matin, même avec un résumé frais', String(agent().length));
+  dit(!CFG.ecrits.length, 'et aucun mémo n’est écrit', JSON.stringify(CFG.ecrits));
+  reset({ resume: { v: 1, n: 3, pretes: 3, at: Date.now() - 3600000 }, regles: { v: 1, actif: true } });
+  await lancer();
+  dit(agent().length === 1, 'l’autre sens : agent actif ⇒ la question part', String(agent().length));
 
   console.log(`\n${okc} contrôle(s) OK, ${ko} en échec`);
   process.exit(ko ? 1 : 0);

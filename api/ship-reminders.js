@@ -425,10 +425,13 @@ async function rappelsOffresMini(maintenant = Date.now()) {
 // et CONFIRMÉ (comme le bilan) : jamais deux demandes le même jour.
 async function rappelAgentEbay(maintenant = Date.now()) {
   if (!(await pushCategorieActive('agentebay'))) return 'désactivé par le vendeur';
-  const main = await getRowProjete('main', ['vrm_agent_ebay_resume']);
+  // (dernier tour du 29 oct.) Les réglages de l'agent sont lus AVEC le résumé :
+  // « Arrêter l'agent » le fait taire ici aussi, même si un ancien résumé traîne.
+  const main = await getRowProjete('main', ['vrm_agent_ebay_resume', 'vrm_agent_ebay_regles']);
   const today = parisDate(0);
   const memo = await getRow('agent_ebay_dedup');
-  const n = notificationAgentEbay({ resume: main === undefined ? undefined : ((main && main.vrm_agent_ebay_resume) || null), memo, today, maintenant });
+  const n = notificationAgentEbay({ resume: main === undefined ? undefined : ((main && main.vrm_agent_ebay_resume) || null),
+    regles: main === undefined ? undefined : ((main && main.vrm_agent_ebay_regles) || null), memo, today, maintenant });
   if (!n.envoyer) return n.raison;
   if (!(await ecrireDedup('agent_ebay_dedup', { date: today, n: n.n, at: new Date(maintenant).toISOString() }))) return 'mémo non écrit — rien envoyé';
   const envoi = await sendPushToAll({ title: n.titre, body: n.corps, tag: 'agent-ebay-' + today, url: n.url });

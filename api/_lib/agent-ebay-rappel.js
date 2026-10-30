@@ -12,18 +12,22 @@
 //   · le résumé est illisible (`undefined`, « pas su ») ou absent ;
 //   · il a plus de 48 h (ce n'est plus une mesure : des paires ont pu se vendre) ;
 //   · il ne compte aucune paire, ou Julien a dit « Pas maintenant » aujourd'hui ;
+//   · Julien a ARRÊTÉ l'agent (`vrm_agent_ebay_regles.actif === false`) ;
 //   · le mémo du jour est illisible, ou dit que c'est déjà fait (une par jour).
 // ════════════════════════════════════════════════════════════════════════════
 // La phrase est celle de l'app (§11) : « N paires prêtes » seulement quand
 // l'écran a PRÉPARÉ ces paires chez eBay (`pretes`), sinon « N paires à
 // regarder » (revue du 29 oct. : la notification annonçait « prêtes » des
 // paires que personne n'avait vérifiées).
-import { phraseResumeAgent } from '../../src/agentEbay.js';
+import { phraseResumeAgent, agentArrete } from '../../src/agentEbay.js';
 
 export const RESUME_AGENT_MAX_AGE_MS = 48 * 3600000;
 
-export function notificationAgentEbay({ resume, memo, today, maintenant = Date.now() }) {
+export function notificationAgentEbay({ resume, regles = null, memo, today, maintenant = Date.now() }) {
   if (resume === undefined) return { envoyer: false, raison: 'résumé illisible — rien envoyé' };
+  // Julien a arrêté l'agent : rien, quel que soit le dernier résumé (§11 : la
+  // même règle que Ma journée, `agentArrete`).
+  if (agentArrete(regles)) return { envoyer: false, raison: 'agent arrêté (son choix)' };
   const r = resume && typeof resume === 'object' ? resume : null;
   if (!r) return { envoyer: false, raison: 'aucun résumé publié' };
   const n = Math.round(Number(r.n));

@@ -42,6 +42,12 @@ const MUTATIONS = {
   'nombres-tus': ["(/^\\d+$/.test(w) ? true : ", "(/^\\d+$/.test(w) ? false : "],
   'prete-sans-prep': ["  if (p != null && p >= n) return", "  if (p == null || p >= n) return"],
   'pluriel-fixe': ["RAISONS_AGENT[k][e[k] > 1 ? 1 : 0]", "RAISONS_AGENT[k][1]"],
+  'arret-resume': ["  if (prop && ETATS_AGENT_MUET.includes(prop.etat)) return", "  if (false) return"],
+  'arret-journee': ["  if (agentArrete(regles)) return null;\n  const r = resume", "  const r = resume"],
+  'rappel-arret': ["  if (agentArrete(regles)) return { envoyer: false, raison: 'agent arrêté (son choix)' };\n", ''],
+  'taille-prix': ["const TAILLE_SEULE = `${TAILLE_TXT}${PRIX_SUIT}`;", "const TAILLE_SEULE = TAILLE_TXT;"],
+  'jours-prix': ["${MOT_NB}${PAS_JOURS}${EUR}`).exec(t))) { const n = nombre(m[1]); if (n != null) regles.prixMax", "${MOT_NB}${EUR}`).exec(t))) { const n = nombre(m[1]); if (n != null) regles.prixMax"],
+  'ponctuation': ["  t = ' ' + sansPonctuation(t) + ' ';\n", ''],
   'rappel-memo': ["  if (memo === undefined) return { envoyer: false, raison: 'mémo illisible — rien envoyé' };\n", ''],
 };
 
@@ -201,7 +207,36 @@ async function verifier(fichier, fichierRappel) {
     dit(!('pretes' in (A.resumeAgent(p, maintenant) || {})), 'sans préparation, le résumé ne porte AUCUN nombre de prêtes');
     dit(A.ligneJourneeAgent({ n: 2, at: maintenant - 49 * 3600000 }, '2026-10-29', maintenant) === null, 'Ma journée : un résumé de plus de 48 h ne s’affiche pas');
     dit(A.ligneJourneeAgent({ n: 2, at: maintenant, pause: '2026-10-29' }, '2026-10-29', maintenant) === null, 'Ma journée : « pas maintenant » aujourd’hui ⇒ rien');
+     // Dernier tour du 29 oct. : « Arrêter l'agent » le fait taire.
+    for (const e of ['eteint', 'sans-ebay', 'devise']) {
+      const rn = A.resumeAgent({ etat: e }, maintenant);
+      dit(rn && rn.n === 0 && rn.at === maintenant && !('pretes' in rn), `agent « ${e} » : le résumé publié devient NEUTRE (n : 0) — plus rien ne demande`, JSON.stringify(rn));
+    }
+    dit(A.ligneJourneeAgent({ n: 3, pretes: 3, at: maintenant }, '2026-10-29', maintenant, { actif: false }) === null, 'Ma journée : agent arrêté ⇒ rien, même avec un ancien résumé « 3 prêtes »');
+    dit(!!A.ligneJourneeAgent({ n: 3, pretes: 3, at: maintenant }, '2026-10-29', maintenant, { actif: true }), 'l’autre sens : agent actif ⇒ la ligne reste');
   });
+  await essaie('phrase-pieges', async () => {
+    // Dernier tour du 29 oct. : quatre mauvaises lectures, désormais dites ou justes.
+    const a = A.comprendrePhrase('les Nike en 41 à 50 €');
+    dit(JSON.stringify(a.regles.tailles) === '["41"]' && a.regles.prixMin == null && a.regles.prixMax == null && a.pasCompris.includes('50'), '« en 41 à 50 € » : la pointure 41, et « 50 » dit non compris (jamais 19 pointures 41 → 50)', JSON.stringify(a));
+    const b = A.comprendrePhrase('nike taille 40 à 50 euros');
+    dit(JSON.stringify(b.regles.tailles) === '["40"]' && b.pasCompris.includes('50'), '« taille 40 à 50 euros » : la pointure 40, « 50 » dit non compris', JSON.stringify(b));
+    const c = A.comprendrePhrase('publie les nike en ligne depuis moins de 10 jours');
+    dit(c.regles.prixMax == null && c.pasCompris.some((x) => /moins de 10 jours/.test(x)), '« depuis moins de 10 jours » n’est JAMAIS un prix : dit non compris', JSON.stringify(c));
+    const c2 = A.comprendrePhrase('à moins de 10 j');
+    dit(c2.regles.prixMax == null && c2.pasCompris.length > 0, '« moins de 10 j » non plus', JSON.stringify(c2));
+    const c3 = A.comprendrePhrase('nike maximum 10 jours');
+    dit(c3.regles.prixMax == null && c3.pasCompris.includes('10'), '« maximum 10 jours » n’est pas un prix de 10 € (dit non compris)', JSON.stringify(c3));
+    const d = A.comprendrePhrase('publie les Nike, Adidas et Puma');
+    dit(['Nike', 'Adidas', 'Puma'].every((m) => (d.regles.marques || []).includes(m)) && !d.pasCompris.length, '« les Nike, Adidas et Puma » : les trois marques (la virgule ne colle plus)', JSON.stringify(d));
+    const e = A.comprendrePhrase('publie les Adidas.');
+    dit(JSON.stringify(e.regles.marques) === '["Adidas"]' && !e.pasCompris.length, '« publie les Adidas. » : Adidas (le point ne colle plus)', JSON.stringify(e));
+    const f = A.comprendrePhrase('nike en 41,5 et 42 à moins de 80 €');
+    dit(JSON.stringify(f.regles.tailles) === '["41.5","42"]' && f.regles.prixMax === 80, 'une décimale reste une décimale : « 41,5 et 42 », « moins de 80 € »', JSON.stringify(f.regles));
+    const g = A.comprendrePhrase('Nike en 41 à 45');
+    dit((g.regles.tailles || []).length === 9, 'l’autre sens : « en 41 à 45 » reste un intervalle de pointures', JSON.stringify(g.regles.tailles));
+  });
+
   await essaie('rappel', async () => {
     const t = '2026-10-29';
     const ok = N.notificationAgentEbay({ resume: { n: 4, at: maintenant - 3600000 }, memo: null, today: t, maintenant });
@@ -215,6 +250,8 @@ async function verifier(fichier, fichierRappel) {
     dit(!N.notificationAgentEbay({ resume: { n: 4, at: maintenant }, memo: undefined, today: t, maintenant }).envoyer, 'mémo illisible ⇒ rien (jamais deux demandes)');
     dit(!N.notificationAgentEbay({ resume: { n: 4, at: maintenant }, memo: { date: t }, today: t, maintenant }).envoyer, 'déjà demandé aujourd’hui ⇒ rien');
     dit(!N.notificationAgentEbay({ resume: { n: 0, at: maintenant }, memo: null, today: t, maintenant }).envoyer, 'aucune paire prête ⇒ rien');
+    dit(!N.notificationAgentEbay({ resume: { n: 3, pretes: 3, at: maintenant }, regles: { actif: false }, memo: null, today: t, maintenant }).envoyer, 'agent arrêté par Julien ⇒ rien, même avec un résumé frais « 3 prêtes »');
+    dit(N.notificationAgentEbay({ resume: { n: 3, pretes: 3, at: maintenant }, regles: { actif: true }, memo: null, today: t, maintenant }).envoyer, 'l’autre sens : agent actif ⇒ la question part');
   });
   return { ko, out };
 }

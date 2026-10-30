@@ -37,6 +37,14 @@
 //   J. « Programmer plutôt » : des brouillons (avec leur id) — les paires
 //      sortent des propositions, et y restent après rechargement ;
 //   K. deux paires sous le même N° : aucune n'est proposée, c'est dit.
+// Dernier tour du 29 octobre (chaque scénario rouge sur cf5f710b) :
+//   L. « Arrêter l'agent » le fait TAIRE : le résumé devient neutre (n : 0),
+//      Ma journée ne demande plus — même avec un ANCIEN résumé « 3 prêtes »
+//      resté dans le nuage (un autre appareil) ;
+//   M. écran resté ouvert 2 h : « Publier » REFAIT la préparation chez eBay
+//      avant la confirmation (les frais montrés datent de moins de 30 min) ;
+//   N. Réglages → Notifications ne promet pas « N paires prêtes » (la
+//      notification dit souvent « N paires à regarder »).
 const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
 const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http'), path = require('path');
@@ -444,6 +452,76 @@ const preparees = (pg) => pg.waitForFunction(() => { const l = [...document.quer
           const p = await proposees(pg);
           const ec = await pg.$eval('[data-agent-ecartees]', (e) => e.textContent).catch(() => '');
           dit(p.join(',') === '36' && /2 dont le N° est porté par deux paires/.test(ec), 'la N°31 portée par la Nike ET l’Asics : aucune des deux n’est proposée, et c’est dit', `${p.join(',')} · ${ec.slice(0, 160)}`);
+        });
+        dit(!errs.length, 'aucune erreur de page', errs.slice(0, 2).join(' | '));
+        await ctx.close(); }
+      // ── L. arrêter l'agent ──
+      remettre();
+      { const { ctx, pg, errs } = await ouvrir(b, vp, sombre);
+        await essaie('L. arrêter l’agent', async () => {
+          await agent(pg); await preparees(pg);
+          await pg.waitForTimeout(1200);
+          const r0 = await local(pg, 'vrm_agent_ebay_resume');
+          dit(r0 && r0.n === 3, 'avant : le résumé dit 3 paires', JSON.stringify(r0));
+          await pg.click('[data-agent-reglages] summary');
+          await pg.click('[data-agent-actif]');
+          await pg.waitForFunction(() => document.querySelector('[data-agent-ebay]').getAttribute('data-agent-etat') === 'eteint', null, { timeout: 8000 });
+          await pg.waitForTimeout(1500);
+          const r1 = await local(pg, 'vrm_agent_ebay_resume');
+          dit(r1 && r1.n === 0 && !r1.pretes, '« Arrêter l’agent » : le résumé devient NEUTRE (n : 0) — plus rien à demander', JSON.stringify(r1));
+          // (le banc tourne en accès direct, sans session : rien ne part au nuage ici ;
+          // la lecture serveur de l'arrêt est prouvée par agent-ebay-push.cjs, scénario « arrêté ».)
+          await pg.goto(`http://localhost:${PORT}/?tab=journee`, { waitUntil: 'domcontentloaded' });
+          await pg.waitForSelector('[data-job]', { timeout: 15000 }).catch(() => {});
+          await pg.waitForTimeout(1500);
+          dit(!(await pg.$('[data-job="agent-ebay"]')), 'Ma journée ne demande plus « … prêtes pour eBay »');
+          // Un ANCIEN résumé « 3 prêtes » (écrit par un autre appareil avant l'arrêt) :
+          const vieux = { v: 1, n: 3, pretes: 3, at: MAINTENANT };
+          const i = rows.findIndex((r) => r.id === 'main'); rows[i] = { id: 'main', data: { ...rows[i].data, vrm_agent_ebay_resume: vieux } };
+          await pg.evaluate((v) => { try { localStorage.setItem('vrm_agent_ebay_resume', JSON.stringify(v)); } catch (_) {} }, vieux);
+          await pg.reload({ waitUntil: 'domcontentloaded' });
+          await pg.waitForSelector('[data-job]', { timeout: 15000 }).catch(() => {});
+          await pg.waitForTimeout(1500);
+          dit(!(await pg.$('[data-job="agent-ebay"]')), 'agent arrêté + ancien résumé « 3 prêtes » : Ma journée se tait quand même');
+        });
+        dit(!errs.length, 'aucune erreur de page', errs.slice(0, 2).join(' | '));
+        await ctx.close(); }
+      // ── M. écran resté ouvert : frais relus avant la confirmation ──
+      remettre();
+      { const { ctx, pg, errs } = await ouvrir(b, vp, sombre);
+        await essaie('M. frais relus', async () => {
+          await agent(pg); await preparees(pg);
+          const v0 = envois.filter((e) => e.action === 'pubverify').length;
+          await pg.clock.setFixedTime(new Date(MAINTENANT + 2 * 3600000));
+          await pg.click('[data-agent-publier]');
+          await feuille(pg).getByRole('button', { name: /Oui, publier/ }).waitFor({ timeout: 20000 });
+          const v1 = envois.filter((e) => e.action === 'pubverify').length;
+          dit(v0 === 3 && v1 === 6, 'préparées il y a 2 h : les 3 annonces sont REVÉRIFIÉES chez eBay avant la confirmation', `${v0} → ${v1} vérifications`);
+          const t = await feuille(pg).innerText();
+          dit(/0,35/.test(t) && /vendeur_test/.test(t), 'la confirmation montre les frais relus', t.replace(/\s+/g, ' ').slice(0, 160));
+          await feuille(pg).getByRole('button', { name: 'Annuler' }).click();
+          await pg.waitForTimeout(500);
+          await pg.click('[data-agent-publier]');
+          await feuille(pg).getByRole('button', { name: /Oui, publier/ }).waitFor({ timeout: 20000 });
+          dit(envois.filter((e) => e.action === 'pubverify').length === 6, 'relues à l’instant : pas revérifiées une seconde fois');
+          await feuille(pg).getByRole('button', { name: 'Annuler' }).click();
+          dit(!envois.some((e) => e.action === 'publish'), 'rien n’est publié sans le oui');
+        });
+        dit(!errs.length, 'aucune erreur de page', errs.slice(0, 2).join(' | '));
+        await ctx.close(); }
+      // ── N. Réglages → Notifications ──
+      remettre();
+      { const { ctx, pg, errs } = await ouvrir(b, vp, sombre);
+        await essaie('N. la catégorie de notification', async () => {
+          await pg.goto(`http://localhost:${PORT}/?tab=settings`, { waitUntil: 'domcontentloaded' });
+          await pg.waitForTimeout(4000);
+          const sousPush = pg.locator('[data-sous-ouvrir="push"]').first();
+          if (await sousPush.isVisible().catch(() => false)) { await sousPush.click(); await pg.waitForTimeout(600); }
+          const sum = pg.locator('summary', { hasText: 'Ce que tu reçois sur ton téléphone' }).first();
+          await sum.scrollIntoViewIfNeeded({ timeout: 8000 }); await sum.click(); await pg.waitForTimeout(400);
+          const det = (await pg.locator('details', { has: sum }).first().innerText()).replace(/\s+/g, ' ');
+          const l = (/🛒 Agent eBay(.{0,200})/.exec(det) || [])[1] || '';
+          dit(!!l && !/prêtes? pour eBay/.test(l) && /Rien n'est publié sans ton oui/.test(l), 'la catégorie ne promet pas « N paires prêtes » (la notification dit souvent « à regarder »)', l.slice(0, 160));
         });
         dit(!errs.length, 'aucune erreur de page', errs.slice(0, 2).join(' | '));
         await ctx.close(); }
