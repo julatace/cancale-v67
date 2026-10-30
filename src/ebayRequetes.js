@@ -9,7 +9,7 @@ export async function appelerEbay(action,payload,headers,{write=false,fetcher=gl
   if(!r.ok || !j.ok){
    const reason=j.reason || (write && r.status>=500?'incertain':undefined);
    if(reason==='incertain')throw incertain();
-   throw erreur(j.error || 'eBay est indisponible.',reason);
+   throw Object.assign(erreur(j.error || 'eBay est indisponible.',reason),{status:r.status});
   }
   return j;
  }catch(e){if(e.name==='AbortError' || e instanceof TypeError)throw write?incertain():erreur('Lecture indisponible. Réessaie.','lecture');throw e;}

@@ -78,6 +78,7 @@ import {DELAI_EXPEDITION_J, limiteExpedition, lireDateLimite, echeanceLimite, te
 import { photoArticle, photoCommande, demandesPhotosVentes, photosTransactionsLues, photosVenteVintedCandidates, choisirPhotoDisponible } from "./photosArticles.js";
 import { REGLES_AGENT_DEFAUT, AGENT_MAX_PAR_JOUR, ETATS_AGENT_MUET, normaliserReglesAgent, propositionAgent, resumeAgent, ligneJourneeAgent, phraseResumeAgent, comprendrePhrase, appliquerPhrase, texteRegles, phraseEcartees } from './agentEbay.js';
 import {appelerEbay,ResponsiveChatPortal,EbayCommande,EbayMessages,EbayOffres,EbayAgent,EbayEvaluations,EbayRetours,EbayPromotion,EbayAchats} from "./ebayGestion.jsx";
+import RechercheEbay,{repereAdmis} from "./ebayRecherche.jsx";
 import { contactEmail, CONTACT_A_VENIR } from "./contact.js";
 import { captchaActif, routeProtegee, jetonCaptcha, etatCaptcha, abonnerCaptcha, consommerCaptcha, corpsAvecCaptcha, monterWidget, MSG_CAPTCHA_ATTENTE, MSG_CAPTCHA_REFUS, MSG_CAPTCHA_ERREUR } from "./captcha.js";
 import { boutiqueIci, boutiqueOrion, estAndroid, pageExtensionsIci, nomNavigateurIci, mobileIci, LIENS_BOUTIQUES, LIEN_FIREFOX_ANDROID, LIEN_ORION_FICHIER, NOTICE_ORION, phraseNavigateur } from "./navigateurExtension.js";
@@ -10324,8 +10325,19 @@ function extractModel(text){
   // On rend le PLUS LONG modèle reconnu : « air max 95 » doit gagner sur « air max ».
   let best=null;
   for(const m of KNOWN_MODELS){ const k=m.replace(/[^a-z0-9]+/g,' ').trim();
-    if(t.includes(k) && (!best || k.length>best.length)) best=k; }
+    if(contientModele(t,k) && (!best || k.length>best.length)) best=k; }
   return best;
+}
+// (30 oct., revue) Un modèle qui finit par un chiffre ne se lit que si AUCUN
+// chiffre ne le suit : « air max 1 » n'est pas dans « air max 180 » ni dans
+// « air max 1000 » (une autre paire, un autre prix) — avant, une sous-chaîne
+// suffisait et l'Air Max 180 recevait le repère de l'Air Max 1, côté ventes
+// comme côté eBay. Mieux vaut un blanc qu'un faux.
+function contientModele(t,k){
+  if(!/\d$/.test(k)) return t.includes(k);
+  let i=t.indexOf(k);
+  while(i>=0){ if(!/\d/.test(t.charAt(i+k.length))) return true; i=t.indexOf(k,i+1); }
+  return false;
 }
 const COUNTRY_MAP_DATA=[
   [['france'],'France'],[['allemagne','deutschland','germany'],'Allemagne'],
@@ -20881,6 +20893,38 @@ function EbayConnexion({ onAnnonces, vue = '*', comptesEbay }) {
 // ── eBay · VENTES (commandes captées par l'API officielle) ──────────────────
 // Même esprit que les Ventes Leboncoin : on rend ce qui est MESURÉ (ebay_orders),
 // jamais un chiffre inventé. Skin eBay (noir). La place de la photo est réservée.
+// ── eBAY → ACHATS (29 octobre) : la recherche et le fil, puis les achats
+// gagnés, repliés. Le repère de revente est celui du MODÈLE, calculé par LA
+// règle `moyennesParModele` sur ses ventes Vinted (comptes écartés exclus,
+// §11) — dit « le modèle, pas cette paire ». Ventes pas lues ⇒ aucun repère.
+// (30 oct., revue) La session du fil eBay : au réveil, attendre le renouvellement
+// en cours plutôt que d'envoyer un jeton expiré ; sur un 401, renouveler puis
+// réessayer une fois. Trois états : true · false (refusé, plus de session) · null (pas su).
+const SESSION_FIL_EBAY={
+  prete:async()=>{ if(!AUTH.session) return true; if(authValid()) return true; return authRefresh(); },
+  renouveler:()=>authRefresh(),
+};
+function EbayAchatsOnglet({headers,panelOff,vue,comptes,onCompte}){
+  const {ventes}=useVentesCoque();
+  const repere=React.useMemo(()=>{
+    if(!Array.isArray(ventes))return null;
+    const hAcc=new Set((load('vinted_accounts_hidden',[])||[]).map(String));
+    const V=moyennesParModele(ventes,(o)=>compteEcarte(o&&o._acc&&o._acc.vinted_user_id,hAcc,panelOff||{}));
+    // (30 oct.) Pas de repère sur une clé générique (« air max ») ni sur un accessoire
+    // ou une taille enfant (« lacets », « boîte vide », « enfant ») : mieux vaut un blanc qu'un faux.
+    return (titre)=>{const k=extractModel(titre);if(!repereAdmis(titre,k))return null;const e=k&&V[k];if(!e||e.n<REPERE_MIN)return null;return {modele:k,moyenne:e.s/e.n,n:e.n};};
+  },[ventes,panelOff]);
+  const [gagnes,setGagnes]=React.useState(false);
+  return <div style={{padding:16}} data-ebay-achats-onglet="">
+    <RechercheEbay headers={headers} theme={C} owner={AUTH.user?.id || ''} repere={repere} session={SESSION_FIL_EBAY}/>
+    <Suspense fallback={<p>Lecture des recherches…</p>}><Operations sombre={C===THEMES.dark} headers={headers} initialSection="veilles" contexteEbay/></Suspense>
+    {/* Les achats GAGNÉS (WonList) : gardés, repliés — lus seulement à l'ouverture. */}
+    <details className="vrm-repli" data-ebay-achats-gagnes="" onToggle={e=>{if(e.currentTarget.open)setGagnes(true);}} style={{marginTop:18}}>
+      <summary>Tes achats gagnés sur eBay · 60 derniers jours</summary>
+      {gagnes&&<div style={{paddingTop:10}}><EbayActionCompte vue={vue} comptes={comptes} onCompte={onCompte}>{ref=><EbayAchats key={'ac-'+ref} headers={headers} theme={C} compte={ref} sansTitre/>}</EbayActionCompte></div>}
+    </details>
+  </div>;
+}
 function EbayActionCompte({vue,comptes,onCompte,children}){
  if(comptes===undefined)return <p>Lecture des comptes eBay…</p>;
  if(comptes===null)return <LignePanne>Les comptes eBay n’ont pas pu être lus. Actualise avant de continuer.</LignePanne>;
@@ -60271,7 +60315,7 @@ function AppCoeur() {
           {platSub==='agent'&&!baseKO&&<div style={{padding:'16px 16px 0'}}><AgentEbay comptes={accountsLoaded?vintedAccounts:undefined} comptesEbay={comptesEbay} onAnnonces={()=>setPlatSub('annonces')}/></div>}
           {platSub==='agent'&&<div style={{padding:16}}><EbayActionCompte vue={ebayVueEff} comptes={comptesEbay} onCompte={setEbayVue}>{ref=><><EbayRetours key={'rt-'+ref} headers={enTeteSession} confirm={askConfirm} theme={C} compte={ref}/><EbayAgent key={ref} headers={enTeteSession} theme={C} compte={ref} onSection={(section,t)=>{setEbayVue(ref);setEbayCible(cibleEbay(ref,{...t,section}));setPlatSub(section);}}/><EbayEvaluations key={'ev-'+ref} headers={enTeteSession} confirm={askConfirm} theme={C} compte={ref}/></>}</EbayActionCompte></div>}
           {platSub==='promo'&&<div style={{padding:16}}><EbayActionCompte vue={ebayVueEff} comptes={comptesEbay} onCompte={setEbayVue}>{ref=><EbayPromotion key={'pr-'+ref} headers={enTeteSession} confirm={askConfirm} theme={C} compte={ref}/>}</EbayActionCompte></div>}
-          {platSub==='achats'&&<div style={{padding:16}}><EbayActionCompte vue={ebayVueEff} comptes={comptesEbay} onCompte={setEbayVue}>{ref=><><EbayAchats key={'ac-'+ref} headers={enTeteSession} theme={C} compte={ref}/><Suspense fallback={<p>Lecture des recherches…</p>}><Operations sombre={C===THEMES.dark} headers={enTeteSession} initialSection="veilles" contexteEbay/></Suspense></>}</EbayActionCompte></div>}
+          {platSub==='achats'&&<EbayAchatsOnglet headers={enTeteSession} panelOff={panelOffCoque} vue={ebayVueEff} comptes={comptesEbay} onCompte={setEbayVue}/>}
           {platSub==='offres'&&<div style={{padding:16}}><EbayActionCompte vue={ebayVueEff} comptes={comptesEbay} onCompte={setEbayVue}>{ref=><EbayOffres key={ref} cible={ebayCible?.compte===ref && ebayCible.section==='offres'?ebayCible:null} onClearCible={()=>setEbayCible(null)} headers={enTeteSession} confirm={askConfirm} theme={C} compte={ref} onAnnonces={()=>setPlatSub('annonces')}/>}</EbayActionCompte></div>}
           {platSub==='annonces'&&<EbayAnnonces baseKO={baseKO} comptes={vintedAccounts} vue={ebayVueEff} comptesEbay={comptesEbay}/>}
           {platSub==='compte'&&<div data-ebay-compte-section="" style={{ padding: 16 }}>{baseKO?<div style={{ color: EBAY_SKIN.muted, fontSize: 13 }}>Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui a échoué.</div>:<EbayConnexion onAnnonces={()=>setPlatSub('annonces')} vue={ebayVueEff} comptesEbay={comptesEbay}/>}</div>}

@@ -266,6 +266,57 @@
 > à eBay (pubinfo, pubverify, publish, 488 : formes de la doc) ; le délai réel avant qu'eBay montre une annonce créée (15 min
 > est un choix). **Gestes de Julien** : eBay → À traiter, régler « Ce que je publie » (ou écrire ce qu'il VEUT), puis dire oui.
 
+> **29 octobre — eBay → Achats : CHERCHER, et un FIL (sa demande : « le côté achat ne sert à rien ; fais la recherche
+> comme pour Vinted, avec un feed ; tout dépend si ça utilise beaucoup de données ») :** action `chercher` d'`api/ebay.js`
+> (toujours 12 fonctions ; logique `api/_lib/ebay-recherche.js`) : API Browse `item_summary/search`, EBAY_FR, jeton
+> D'APPLICATION (`jetonApplication`, client_credentials — jamais celui du vendeur, aucun compte eBay relié nécessaire),
+> session exigée (401), 30 annonces, plus récentes d'abord, filtres achat immédiat · livrable en France · état · prix max ;
+> le budget se juge PORT COMPRIS (port « calculé » = inconnu, jamais gratuit), mots exclus, photo `i.ebayimg.com` seule.
+> Plafond VRM **200 recherches/jour/vendeur** (`ebay_tokens_recherches_jour`, compté AVANT l'appel, compare-et-échange ;
+> illisible ⇒ 503, rien ne part ; atteint ⇒ 429, le fil s'arrête et le dit). Plafond d'eBay : 5 000/jour pour TOUTE
+> l'application (doc d'eBay, non mesuré) — le restant réel est rendu si eBay le dit (`rate_limit`). Octets reçus
+> d'eBay / envoyés à l'appareil mesurés et affichés. eBay muet ou illisible ⇒ 502 « pas pu chercher », jamais « aucun
+> résultat ». **Le fil = les « veilles » de l'espace Organisation (§11, la même liste)**, 10 actives au plus (`metier.js`
+> refuse la 11ᵉ ; mesuré : 1 veille en base), + pointure / achat immédiat / livraison en France (défauts pour une
+> recherche d'avant). Relu à l'ouverture de l'onglet puis au plus toutes les 15 min, page visible, une à une ; « nouveau »
+> par itemId depuis la dernière visite (cet appareil). Repère du MODÈLE (`moyennesParModele` sur ses ventes, ≥ 3), dit
+> « le modèle, pas cette paire ». Rien n'est acheté : « Voir sur eBay ↗ ». Les achats gagnés (WonList) restent, repliés,
+> lus à l'ouverture seulement. Preuves : `audit-ebay-recherche.cjs` (43 ; **31 rouges sur origin/main** ; 7 mutations
+> rouges) · banc `ebay-achats-recherche.cjs` (390 tactile + 1512 sombre ; **18 rouges sur le build d'origin/main** ;
+> mutations « relecture sans borne » et « tout est nouveau » rouges). La borne des 15 min se juge sur l'horloge de
+> l'APPAREIL (heure d'arrivée de la réponse), jamais sur `lueA` du serveur : un téléphone en avance relisait à chaque
+> minute (banc : serveur à +2 h ⇒ rouge sur le code d'avant) ; le banc ne franchit plus minuit (heure de Paris). ⚠️ **Non mesuré** : aucun appel réel à eBay
+> (formes de la doc Browse/OAuth/Analytics) ; la pointure part dans les mots-clés (« 42.5 »). **Geste de Julien** : rien —
+> l'onglet marche avec les clés eBay déjà posées.
+> **Revue du 30 oct. (12 défauts reproduits, corrigés) :** un ÉCHEC attend comme une lecture — rien avant 15 min (le fil
+> relançait chaque minute et vidait les 200 du jour en ~20 min de panne d'eBay) ; une panne commune (eBay, session,
+> compteur) arrête tout le fil et se dit UNE fois ; critères refusés (400) jamais relancés avant une modification.
+> Le compteur vit sous `ebay_tokens…` : la garde de la base (`vrm_garde_ebay_tokens`, préfixe, lue en production) refuse
+> qu'un navigateur le crée, le réécrive ou l'efface (sous l'ancien id, un vendeur effaçait sa ligne et repartait de zéro).
+> Un appel parti chez eBay compte même raté (il compte aussi chez eBay) — décidé. Une règle de critères
+> (`erreurCriteresEbay`, metier.js) pour Organisation ET la route ; « Dans le fil » / « Hors du fil » par la même règle
+> que le fil (`veillesDuFil`). 390 px : grille propre (contenu 84 → 262 px). Repère : une fois au-dessus d'une liste
+> homogène, jamais sur une clé générique (air max, dunk, blazer, forum, chuck), un accessoire ou une taille enfant.
+> « Aucune annonce gardée : eBay en avait N » ; « Ajouter au fil » sans second appel ; espace illisible : une phrase,
+> un « Réessayer » ; pastille lisible en sombre ; total du jour en Ko sur cet appareil. Preuves : audit (49 ; 2 rouges
+> sur 773e7c6e, mutations id/critères rouges) · banc (**40 rouges sur le build de 773e7c6e** ; mutations recul, repère,
+> grille rouges). Sur origin/main la fonction n'existe pas (audit : 35 rouges). Bancs eBay voisins verts ; `ebay-form`
+> sort 1 rouge (« Julien ne paie jamais le port ») déjà sur origin/main. ⚠️ Non mesuré : aucun appel réel à eBay.
+> **Dernier tour (chantier du 29 oct., revue du 30) — six défauts reproduits, corrigés :** (1) le repère se décide sur les
+> SEULES lignes qui en ont un (`reperesDeListe`) : « Voir les 21 » avec des lacets le disait 20 fois ⇒ une fois au-dessus,
+> « pour les paires de ce modèle » ; sur la ligne seulement quand deux modèles se côtoient. (2) Un 401 isolé (jeton expiré
+> au réveil) ne fige plus le fil 15 min : la session est attendue/renouvelée (`SESSION_FIL_EBAY` : `authValid`,
+> `authRefresh`) puis UN nouvel essai ; « reconnecte-toi » seulement si le renouvellement est REFUSÉ ou qu'un second 401
+> suit un renouvellement réussi ; « pas su » ⇒ nouvel essai dans 1 min. (3) Une recherche enregistrée avant la règle
+> commune (catégorie « baskets ») se CORRIGE : `veille.modifier` ne revalide plus l'ancienne (instantané brut pour
+> l'historique) ; `veille.dupliquer` dit « modifie-la d'abord ». (4) Une PART du plafond est gardée pour la main : le fil
+> (`source:'fil'`) s'arrête à **150** relectures/jour (429 `plafond-fil`), les 50 restantes ne servent qu'à « Chercher »
+> (le fil vidait seul les 200 en ~5 h 30 et grisait « Chercher » jusqu'à minuit) ; l'écran dit « dont N par le fil ».
+> (5) `extractModel` : un modèle qui finit par un chiffre ne se lit plus dans un nombre plus long (« air max 1 » ≠
+> « air max 180 / 1000 », « xt 6 » ≠ « xt 60 ») — vaut aussi côté ventes. (6) Achats gagnés : titre dit une fois
+> (`EbayAchats sansTitre`). Preuves : audit (59 ; **8 rouges sur 7cd0cbec** ; mutations part du fil, ancienne revalidée,
+> sous-chaîne rouges) · banc (**20 rouges sur le build de 7cd0cbec**, 0 après ; mutations des quatre correctifs d'écran
+> rouges). ⚠️ Non mesuré : aucun appel réel à eBay ; le renouvellement réel au réveil d'un iPhone (formes du banc).
 
 > **29 octobre — 5.287, numéros sur les profils visités :** Julien a précisé que
 > l’affichage semble seulement sur Vinted, l’import dans VRM n’est pas confirmé.

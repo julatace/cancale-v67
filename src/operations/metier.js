@@ -16,11 +16,42 @@ export function repartir(total,poids){
 }
 export const etatReservation=(r,now)=>r.etat==='active'&&Date.parse(r.expire)<=Date.parse(now)?'expiree':r.etat;
 // La même validation sert à la création et à la modification d’une recherche.
-export function criteresVeille(p){
- const minimum=p.minimum===null?null:entier(p.minimum),maximum=entier(p.maximum,1);
- exige(minimum===null||minimum<=maximum,'Le minimum dépasse le budget.');
- return {titre:texte(p.titre),mots:texte(p.mots,200),exclus:texte(p.exclus||'',200,true),categorie:texte(p.categorie||'',80,true),etatArticle:choix(p.etatArticle,['tous','neuf','occasion']),minimum,maximum,pays:choix(p.pays,['FR','BE','DE','ES','IT','tous'])};
+// (29 octobre) Les recherches enregistrées ALIMENTENT le fil eBay (eBay →
+// Achats) : trois critères de plus, facultatifs — une recherche d'avant les
+// reçoit par défaut (pas de pointure, achat immédiat, livraison en France).
+// Et au plus `MAX_VEILLES_ACTIVES` relues : chacune coûte un appel à eBay.
+export const MAX_VEILLES_ACTIVES=10;
+// (30 octobre, revue) UNE règle pour ce qu'eBay peut chercher (§11) : la route
+// `chercher` (api/_lib/ebay-recherche.js) et l'espace Organisation l'appliquent
+// toutes les deux. Avant, Organisation acceptait « x » ou une catégorie en
+// lettres, que la route refusait ensuite à chaque lecture du fil.
+export function erreurCriteresEbay({mots,pointure,categorie}={}){
+ const m=typeof mots==='string'?mots.trim().replace(/\s+/g,' '):'';
+ if(m.length<2||m.length>200)return 'Mots-clés : au moins deux lettres (200 au plus).';
+ const p=pointure==null?'':String(pointure).trim();
+ if(p&&!/^\d{2}([.,]5)?$/.test(p))return 'Pointure attendue : deux chiffres, et « ,5 » au besoin (42 ou 42,5).';
+ const c=categorie==null?'':String(categorie).trim();
+ if(c&&!/^\d{1,10}$/.test(c))return 'Identifiant de catégorie eBay : des chiffres seulement (ex. 15709), ou laisse vide.';
+ return '';
 }
+// Les recherches du FIL d'eBay → Achats : actives, les plus récentes d'abord,
+// 10 au plus. Une seule règle pour le fil et pour l'espace Organisation (qui
+// dit « Dans le fil » ou « Hors du fil »).
+export function veillesDuFil(veilles){
+ const actives=(Array.isArray(veilles)?veilles:[]).filter(v=>v&&v.etat==='preparee');
+ actives.sort((a,b)=>String(b.cree||'').localeCompare(String(a.cree||'')));
+ return {fil:actives.slice(0,MAX_VEILLES_ACTIVES),horsFil:Math.max(0,actives.length-MAX_VEILLES_ACTIVES)};
+}
+export function criteresVeille(p){
+ const minimum=p.minimum===null||p.minimum===undefined?null:entier(p.minimum),maximum=entier(p.maximum,1);
+ exige(minimum===null||minimum<=maximum,'Le minimum dépasse le budget.');
+ const mots=texte(p.mots,200),categorie=texte(p.categorie||'',80,true),pointure=p.pointure==null||p.pointure===''?'':texte(String(p.pointure),6,true);
+ const e=erreurCriteresEbay({mots,pointure,categorie});exige(!e,e);
+ return {titre:texte(p.titre),mots,exclus:texte(p.exclus||'',200,true),categorie,etatArticle:choix(p.etatArticle,['tous','neuf','occasion']),minimum,maximum,pays:choix(p.pays,['FR','BE','DE','ES','IT','tous']),pointure,achatImmediat:p.achatImmediat!==false,livraisonFR:p.livraisonFR!==false};
+}
+// Les critères d'une recherche tels qu'ils sont rangés, SANS les juger (l'historique).
+const instantaneVeille=x=>({titre:String(x.titre??''),mots:String(x.mots??''),exclus:String(x.exclus??''),categorie:String(x.categorie??''),etatArticle:x.etatArticle??'tous',minimum:x.minimum??null,maximum:x.maximum??null,pays:x.pays??'tous',pointure:String(x.pointure??''),achatImmediat:x.achatImmediat!==false,livraisonFR:x.livraisonFR!==false});
+const placeVeille=d=>exige(d.veilles.filter(x=>x.etat==='preparee').length<MAX_VEILLES_ACTIVES,`${MAX_VEILLES_ACTIVES} recherches actives au plus (chacune coûte un appel à eBay) : archive-en une d’abord.`);
 export function echeanceActive(section,x,maintenant){
  const active=section==='missions'?['attribuee','en_cours','bloquee'].includes(x.etat):section==='reservations'?etatReservation(x,maintenant)==='active':section==='dossiers'?x.etat!=='clos':false;
  const at=active?Date.parse(section==='reservations'?x.expire:x.echeance):NaN,now=Date.parse(maintenant);
@@ -94,20 +125,27 @@ export function appliquer(source,commande,{acteur,maintenant,equipe=[],membre=nu
   x.mouvements.push({...commun,nature,quantite:n,motif,avant:x.stock,apres:suivant});x.stock=suivant;break;
  }
  case 'veille.creer':{
-  ajoute(d.veilles,{...commun,...criteresVeille(p),version:1,etat:'preparee',evenements:[]});break;
+  placeVeille(d);ajoute(d.veilles,{...commun,...criteresVeille(p),version:1,etat:'preparee',evenements:[]});break;
  }
  case 'veille.modifier':{
   const x=trouve(d.veilles,p.cible);exige(x.etat==='preparee','Restaure cette recherche avant de la modifier.');
   exige((x.evenements||[]).length<100,'Historique de cette recherche plein.');
   exige(p.versionAttendue===(x.version||1),'Cette recherche a changé. Ferme le formulaire et rouvre-la avant de sauvegarder.');
-  const avant=criteresVeille(x),apres=criteresVeille(p);(x.evenements??=[]).push({...commun,nature:'modification',avant,apres});Object.assign(x,apres,{version:(x.version||1)+1,modifie:maintenant});break;
+  // (30 oct., revue) L'ANCIENNE recherche n'est pas revalidée : une recherche
+  // enregistrée avant la règle commune (catégorie en lettres, mots d'une lettre)
+  // doit pouvoir être CORRIGÉE — c'est le geste que le fil lui demande. On en
+  // garde un instantané brut pour l'historique ; seule la nouvelle est jugée.
+  const avant=instantaneVeille(x),apres=criteresVeille(p);(x.evenements??=[]).push({...commun,nature:'modification',avant,apres});Object.assign(x,apres,{version:(x.version||1)+1,modifie:maintenant});break;
  }
  case 'veille.dupliquer':{
-  const x=trouve(d.veilles,p.cible);ajoute(d.veilles,{...commun,...criteresVeille(x),titre:texte(p.titre),version:1,etat:'preparee',evenements:[],origine:x.id});break;
+  const x=trouve(d.veilles,p.cible);placeVeille(d);
+  // Une copie se valide comme une nouvelle recherche ; refusée, on dit QUOI changer.
+  let copie;try{copie=criteresVeille(x);}catch(e){if(e instanceof Refus)throw new Refus(`Cette recherche a un critère que eBay refuse (${e.message.replace(/\.$/,'')}) : modifie-la d’abord, puis duplique-la.`);throw e;}
+  ajoute(d.veilles,{...commun,...copie,titre:texte(p.titre),version:1,etat:'preparee',evenements:[],origine:x.id});break;
  }
  case 'veille.archiver':
  case 'veille.restaurer':{
-  const x=trouve(d.veilles,p.cible),archiver=type==='veille.archiver';exige(x.etat===(archiver?'preparee':'archivee'),'Cette recherche a déjà changé d’état.');
+  const x=trouve(d.veilles,p.cible),archiver=type==='veille.archiver';exige(x.etat===(archiver?'preparee':'archivee'),'Cette recherche a déjà changé d’état.');if(!archiver)placeVeille(d);
   exige((x.evenements||[]).length<100,'Historique de cette recherche plein.');
   (x.evenements??=[]).push({...commun,nature:archiver?'archivage':'restauration'});x.etat=archiver?'archivee':'preparee';break;
  }
