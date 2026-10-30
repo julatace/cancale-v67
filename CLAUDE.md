@@ -1,5 +1,14 @@
 # VRM — dossier de passation
 
+> **30 octobre — arbitrages tranchés (« comme tu veux ») :** (1) Chronopost thermique sans espace blanc ⇒ imprimée SANS
+> numéro + message « écris-le au feutre » (jamais posé sur un code-barres) ; (2) Annonces/Messages : bilan, vendus ailleurs,
+> à compléter, synchro passent SOUS la liste, astuce des numéros en une ligne (1ʳᵉ annonce 861→670 px tél., 735→658 ordi) ;
+> (3) barre du bas déjà à 11 px (banc `mobile` vert) ; (4) rail sombre ramené sous la page (même pétrole). Production :
+> 0 erreur serveur sur 3 j ; plantage « reading 'default' » (morceau d'ancien déploiement) corrigé (`attendreMorceau`).
+> Revue sécurité des routes récentes de `api/compte.js` : aucun défaut confirmé (photo/entreprise sans quota ni abonnement,
+> `vinted-pris` oui/non sans quota — faibles, laissés). Découper Messages/Achats/Compta = réécriture (sections d'un même
+> composant), pas fait.
+
 > **29 octobre (soir) — audit sécurité + séparation, notifications d'action, bancs remis à la forme (branche
 > `claude/site-improvements-060ub8`) :** (1) **Notifications** : un e-mail « Action requise : problème avec la commande »
 > (litige ouvert sur une vente) et « Retourne ta commande d'ici le … » (retour d'achat à renvoyer) sonnent une fois
