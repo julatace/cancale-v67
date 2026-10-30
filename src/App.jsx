@@ -14442,6 +14442,8 @@ function AuthScreen() {
   // (§11) — un seul propriétaire, `vrm_prenom`.
   const [prenom, setPrenom] = React.useState('');
   const [pw, setPw] = React.useState('');
+  const [motDePasseVisible, setMotDePasseVisible] = React.useState(false);
+  React.useEffect(()=>setMotDePasseVisible(false),[mode]);
   const [busy, setBusy] = React.useState(false);
   const demandeEnCours=React.useRef(false);
   const [err, setErr] = React.useState(() => (AUTH_REDIRECT && AUTH_REDIRECT.error) || '');
@@ -14548,6 +14550,16 @@ function AuthScreen() {
 .vrm-cx-form button[type=submit]{min-height:50px;transition:transform 140ms cubic-bezier(0.23,1,0.32,1),opacity 140ms ease}
 .vrm-cx-form button[type=submit]:active{transform:scale(.98)}
 .vrm-cx-liens button{min-height:44px}
+.vrm-cx-champ{display:block;margin-bottom:12px;font-size:12.5px;font-weight:600;color:${C.text}}
+.vrm-cx-champ>span:first-child{display:block;margin-bottom:6px}
+.vrm-cx-secret{position:relative;display:block}
+.vrm-cx-secret button{position:absolute;right:4px;top:3px;min-height:44px;padding:0 10px;border:0;border-radius:7px;background:transparent;color:${C.accent};font-size:12px;font-weight:600;font-family:inherit;cursor:pointer}
+.vrm-cx-form button:focus-visible,.vrm-cx-form a:focus-visible{outline:2px solid ${C.accent};outline-offset:3px}
+.vrm-cx-regles{display:flex;flex-wrap:wrap;gap:5px 12px;margin:0 0 14px;padding:0;list-style:none;font-size:12px;line-height:1.5;color:${C.muted}}
+.vrm-cx-regles [data-valide=true]{color:${C.accent}}
+.vrm-cx-regles li:before{content:'○ ';font-weight:700}
+.vrm-cx-regles [data-valide=true]:before{content:'✓ '}
+.vrm-cx-form [role=status],.vrm-cx-form [role=alert]{overflow-wrap:anywhere}
 @media (min-width:900px){
  .vrm-cx{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
  .vrm-cx-marque{display:flex;flex-direction:column;padding:40px 56px}
@@ -14670,8 +14682,8 @@ function AuthScreen() {
           {/* Création de compte alors que la confirmation par email est active :
               on prévient AVANT, sinon on tape son mot de passe pour rien. */}
           {mode==='up' && confirmRequired() && (
-            <div style={{fontSize:11.5,color:C.warn,background:`${C.warn}12`,border:`1px solid ${C.warn}44`,borderRadius:8,padding:'9px 11px',marginBottom:10,lineHeight:1.45}}>
-              Un <b>email de confirmation</b> va t'être envoyé : ouvre-le et clique le lien avant de te connecter. Rien reçu au bout de quelques minutes ? Regarde dans les indésirables.
+            <div style={{fontSize:12,color:C.text,background:`${C.accent}08`,border:`1px solid ${C.border}`,borderRadius:8,padding:'9px 11px',marginBottom:14,lineHeight:1.5}}>
+              Après l’inscription, <b>confirme ton adresse</b> avec le lien reçu par email.
             </div>
           )}
 
@@ -14682,18 +14694,32 @@ function AuthScreen() {
               du monde. Facultatif : un champ obligatoire de plus pour un
               bonjour serait un péage. */}
           {mode==='up' && (
-            <input type="text" autoComplete="given-name" placeholder="Ton prénom (facultatif)"
-              disabled={busy} value={prenom} onChange={e=>setPrenom(e.target.value.slice(0,24))} style={{...field, marginBottom:9}}/>
+            <label className="vrm-cx-champ"><span>Prénom <span style={{fontWeight:400,color:C.muted}}>(facultatif)</span></span>
+              <input type="text" autoComplete="given-name" placeholder="Ton prénom (facultatif)"
+                disabled={busy} value={prenom} onChange={e=>setPrenom(e.target.value.slice(0,24))} style={field}/>
+            </label>
           )}
           {mode!=='newpw' && (
-            <input type="email" inputMode="email" autoComplete="email" autoCapitalize="none" placeholder="Email"
-              disabled={busy} value={email} onChange={e=>{setEmail(e.target.value);setNeedConfirm(false);setConfirmLink('');setInfo('');setErr('');setFinAttente(0);}} style={{...field, marginBottom:9}}/>
+            <label className="vrm-cx-champ"><span>Adresse email</span>
+              <input type="email" inputMode="email" autoComplete="email" autoCapitalize="none" autoCorrect="off" spellCheck={false} placeholder="Email" required
+                disabled={busy} value={email} onChange={e=>{setEmail(e.target.value);setNeedConfirm(false);setConfirmLink('');setInfo('');setErr('');setFinAttente(0);}} style={field}/>
+            </label>
           )}
           {mode!=='reset' && (
-            <input type="password" autoComplete={(mode==='up'||mode==='newpw')?'new-password':'current-password'}
-              placeholder={mode==='newpw'?'Nouveau mot de passe (8 caractères min.)':'Mot de passe'}
-              disabled={busy} value={pw} onChange={e=>setPw(e.target.value)} style={{...field, marginBottom:9}}/>
+            <div className="vrm-cx-champ"><label htmlFor="vrm-cx-password" style={{display:'block',marginBottom:6}}>{mode==='newpw'?'Nouveau mot de passe':'Mot de passe'}</label>
+              <span className="vrm-cx-secret">
+                <input id="vrm-cx-password" type={motDePasseVisible?'text':'password'} autoComplete={(mode==='up'||mode==='newpw')?'new-password':'current-password'} required
+                  aria-describedby={(mode==='up'||mode==='newpw')?'vrm-cx-regles':undefined}
+                  placeholder={mode==='newpw'?'Nouveau mot de passe (8 caractères min.)':'Mot de passe'}
+                  disabled={busy} value={pw} onChange={e=>setPw(e.target.value)} style={{...field,paddingRight:88}}/>
+                <button type="button" disabled={busy} aria-label={motDePasseVisible?'Masquer le mot de passe':'Afficher le mot de passe'} aria-pressed={motDePasseVisible} onClick={()=>setMotDePasseVisible(v=>!v)}>{motDePasseVisible?'Masquer':'Afficher'}</button>
+              </span>
+            </div>
           )}
+          {(mode==='up'||mode==='newpw') && <ul id="vrm-cx-regles" className="vrm-cx-regles" aria-label="Conditions du mot de passe">
+            <li data-valide={pw.length>=8}>8 caractères minimum</li>
+            <li data-valide={pw.length>0&&!/^(\d+|[a-z]+)$/i.test(pw)}>Mélange de caractères</li>
+          </ul>}
 
           {mode!=='newpw' && <CaptchaConnexion etat={captcha}/>}
           {err  && <div role="alert" style={{fontSize:12.5,color:C.danger,background:`${C.danger}12`,border:`1px solid ${C.danger}44`,borderRadius:8,padding:'9px 11px',marginBottom:10,lineHeight:1.4}}>{err}</div>}
@@ -14747,7 +14773,7 @@ function AuthScreen() {
           {(()=>{ const bloque = busy || attendCaptcha || (enAttenteEmail && (mode==='up'||mode==='reset')); return (
           <button type="submit" data-auth-valider="" disabled={bloque} style={{width:'100%',border:'none',background:C.accent,color:C.onAccent||'#fff',
             borderRadius:10,padding:'13px',fontSize:15,fontWeight:600,cursor:bloque?'default':'pointer',opacity:bloque?0.6:1,fontFamily:'inherit'}}>
-            {busy ? '…' : (enAttenteEmail && (mode==='up'||mode==='reset')) ? `Réessaie dans ${resteAttente} s` : attendCaptcha ? (captcha.statut==='erreur' ? 'Vérification anti-robot indisponible' : captcha.statut==='interactif' ? 'Coche la vérification ci-dessus' : 'Vérification anti-robot…') : mode==='up' ? 'Créer mon compte' : mode==='reset' ? 'Envoyer le lien' : mode==='newpw' ? 'Enregistrer' : 'Se connecter'}
+            {busy ? (mode==='up'?'Création du compte…':mode==='reset'?'Envoi du lien…':mode==='newpw'?'Enregistrement…':'Connexion…') : (enAttenteEmail && (mode==='up'||mode==='reset')) ? `Réessaie dans ${resteAttente} s` : attendCaptcha ? (captcha.statut==='erreur' ? 'Vérification anti-robot indisponible' : captcha.statut==='interactif' ? 'Coche la vérification ci-dessus' : 'Vérification anti-robot…') : mode==='up' ? 'Créer mon compte' : mode==='reset' ? 'Envoyer le lien' : mode==='newpw' ? 'Enregistrer' : 'Se connecter'}
           </button>);})()}
           {/* Acceptation des conditions AVANT la création du compte (art. 1127-1
               C. civ., RGPD art. 13 : l'information est donnée au moment de la
@@ -14772,7 +14798,7 @@ function AuthScreen() {
             ) : (
               <span style={{fontSize:14,color:C.muted,fontWeight:500}}>Inscriptions bientôt ouvertes</span>
             )}
-            {mode!=='reset' && (
+            {mode==='in' && (
               <button type="button" onClick={()=>{ setMode('reset'); setErr(''); setInfo(''); }}
                 style={{border:'none',background:'transparent',color:C.muted,fontSize:14,fontWeight:500,cursor:'pointer',padding:0,fontFamily:'inherit'}}>
                 Mot de passe oublié ?
