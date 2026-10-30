@@ -237,3 +237,13 @@
   background: var(--vrm-surface, #FDFEFC) !important; color: var(--vrm-accent, #244E54) !important;
   box-shadow: inset 0 0 0 2px var(--vrm-accent, #244E54) !important; font-weight: 700 !important;
 }
+/* (30 oct.) « Voir › » sur une carte « À faire » : la carte entière est déjà le
+   bouton. Plus de pastille verte (4ᵉ forme) : un chevron discret, à la couleur
+   des liens-actions. Une action nommée (« Imprimer », « Répondre ») garde son mot. */
+.vrm-app-shell .vrm-day-task .vrm-day-task-action { background: transparent !important; padding: 0 2px !important; color: var(--vrm-muted, #53696D) !important; font-weight: 600 !important; }
+:root[data-theme="dark"] .vrm-app-shell .vrm-day-task .vrm-day-task-action { background: transparent !important; color: var(--vrm-muted, #98A2B3) !important; }
+/* (30 oct.) La recherche de Réglages : même dessin que celle des achats — le champ vit
+   DANS sa pastille, plus de second cadre gris à l'intérieur. */
+:root body .vrm-app-shell .vrm-main .vrm-settings-search input[type=search]:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=file]):not([type=hidden]) {
+  background: transparent !important; border: 0 !important; box-shadow: none !important; padding: 0 !important; min-width: 0; flex: 1 1 auto;
+}

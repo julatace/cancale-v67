@@ -541,8 +541,9 @@ async function partie019(nav) {
       dit(Math.abs(ddx - 120) <= 6 && Math.abs(ddy - 60) <= 6, 'son épingle suit la carte qu’on déplace, sans traîner derrière (déplacement 120 × 60 px)', JSON.stringify({ ddx, ddy }));
       const trans = await pg.evaluate(() => { const m = document.querySelector('.vrm-cm-carte .maplibregl-marker'); return m ? getComputedStyle(m).transitionProperty : null; });
       dit(trans != null && !/transform|\ball\b/.test(trans), 'le marqueur de MapLibre n’a aucune transition sur sa position', trans);
-      const fondMoi = await pg.evaluate(() => { const b = document.querySelector('[data-cm-pin].moi'); return b ? getComputedStyle(b).backgroundColor : null; });
-      dit(fondMoi === 'rgb(36, 88, 230)', 'son épingle est EN ACCENT (la seule couleur de la carte), même avec ses initiales', fondMoi);
+      // (30 oct.) Communauté suit l'accent du THÈME (plus son bleu à elle) : on compare à la couleur que prend `var(--vrm-accent)`.
+      const [fondMoi, accentTheme] = await pg.evaluate(() => { const b = document.querySelector('[data-cm-pin].moi'); const t = document.createElement('i'); const host = document.querySelector('.vrm-communaute') || document.body; t.style.background = 'var(--vrm-accent, rgb(36, 88, 230))'; host.appendChild(t); const a = getComputedStyle(t).backgroundColor; t.remove(); return [b ? getComputedStyle(b).backgroundColor : null, a]; });
+      dit(fondMoi && fondMoi === accentTheme, 'son épingle est EN ACCENT (la seule couleur de la carte), même avec ses initiales', `${fondMoi} / ${accentTheme}`);
       if (process.env.BANC_DEBUG) await pg.screenshot({ path: process.env.BANC_DEBUG + '/a1512.png', fullPage: true });
       await A1.ctx.close();
     });

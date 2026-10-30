@@ -162,7 +162,9 @@ function ctxAvec(numeros, txns, lbcItems, exclus, quiEchoue, bloquesDef) {
   dit(troisEtats(src) && troisEtats(APP), '« jamais touché » reste distinct de « retiré exprès »',
     'sinon décocher et ne rien faire deviennent la même chose');
   // Une annonce qu'il a retirée ne doit pas disparaître SANS UN MOT (§5).
-  dit(/retirees/.test(APP) && /pas dans cette file/.test(APP),
+  // (30 oct.) La phrase a été raccourcie : la règle est que le NOMBRE retiré soit rendu
+  // (`{data.retirees} retirée…`), pas une formulation précise.
+  dit(/retirees/.test(APP) && /\{data\.retirees\} retirée/.test(APP),
     'une annonce retirée est comptée et dite, jamais effacée en silence');
 
   // ── eBAY : MÊME RÈGLE, MAIS LE DÉFAUT EST NON ────────────────────────────

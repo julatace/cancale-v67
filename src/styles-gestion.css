@@ -466,3 +466,7 @@
    défilent, « Outils » reste au bout, hors de la rangée (il ne couvre plus rien). */
 .vrm-sales-workbar>.vrm-filtres-et-outils{grid-column:1 / -1;}
 .vrm-sales-workbar>.vrm-filtres-et-outils>.vrm-outils-ventes>button{min-height:40px;white-space:nowrap;}
+/* (30 oct.) « N° et frais » dans la feuille d'une vente : une rangée repliable comme
+   les autres (sans bordure grise, chevron à droite), pas une 4ᵉ forme. */
+.vrm-ledger-drawer-body .vrm-sale-details>summary{border:0!important;background:var(--vrm-b-teinte,rgba(36,78,84,.08))!important;border-radius:10px!important;display:flex!important;align-items:center;justify-content:space-between;gap:8px;}
+.vrm-ledger-drawer-body .vrm-sale-details>summary::after{margin-left:auto!important;}

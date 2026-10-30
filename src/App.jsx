@@ -10265,8 +10265,10 @@ function Cell({value, onChange, align="left", mono=false}) {
 // (illisible), `danger` un fond rouge (§7 : le rouge, c'est deux paires sous un
 // même N°), et `title`/`aria-*` étaient perdus. Plein + accent (ou sans couleur)
 // ⇒ primaire ; tout le reste ⇒ secondaire. `data-vrm-tone` reste (lecture seule).
-function Btn({children,onClick,color,small,danger,outline,disabled,style={},className='',...rest}) {
-  const primaire = !outline && !danger && (!color || color === C.accent);
+function Btn({children,onClick,color,small,danger,outline,disabled,primaire:primaireDemande=false,style={},className='',...rest}) {
+  // (30 oct.) Secondaire par défaut : une couleur d'accent ne fait plus un primaire (une
+  // barre en avait quatre). Le primaire se DEMANDE (`primaire`), un par écran.
+  const primaire = !!primaireDemande && !outline && !danger;
   return (
     <button data-vrm-tone={danger ? 'danger' : color ? 'custom' : 'brand'} type="button" onClick={onClick} disabled={!!disabled} {...rest}
       className={`vrm-b vrm-b-${primaire ? 'primaire' : 'secondaire'}${small ? ' vrm-b-petit' : ''}${className ? ' ' + className : ''}`} style={style}>{children}</button>
@@ -10608,7 +10610,7 @@ function CoutAchatVente({ onSaisir, onRelier }) {
           </form>
         ) : (
           <>
-            <Bouton variante="secondaire" icone="pencil" data-cout-vente-saisir onClick={() => setEdit(true)} title="Taper le prix payé, sans relier d'achat">Saisir le prix</Bouton>
+            <Bouton variante="secondaire" icone="pencil" data-cout-vente-saisir onClick={() => setEdit(true)} title="Taper le prix payé, sans relier d'achat">Prix d’achat</Bouton>
             <Bouton variante="secondaire" icone="link" data-cout-vente-relier onClick={onRelier} title="Choisir l'achat Vinted correspondant : son prix remplit le coût">Relier un achat</Bouton>
           </>
         )}
@@ -17743,7 +17745,7 @@ function LigneVenteCompacte({ photo, photoNoeud = null, titre, sous = '', etat, 
         <header className="vrm-ledger-drawer-head"><div><span>VENTE</span><h2 id={panneau+'-titre'}>{titre || 'Vente'}</h2><p>{etat}{etat&&montant?' · ':''}{montant}</p></div><button ref={fermer} type="button" aria-label="Fermer les détails de la vente" onClick={close}><Icon name="close" size={18}/></button></header>
         <div className="vrm-main vrm-ledger-drawer-body">
           <div className="vrm-fiche-vente-acces"><span>{plateforme?plateforme[0].toUpperCase()+plateforme.slice(1):'Vente'} · {sous||'Compte et date dans les détails'}</span>
-          {numerosFiche.length?numerosFiche.map(n=><Bouton variante="discret" key={n} onClick={()=>{close();window.dispatchEvent(new CustomEvent('vrm:fiche-article',{detail:n}));}}>Fiche N°{n} →</Bouton>):<small title="Pas de numéro VRM confirmé pour cette vente : aucune fiche n’est choisie au hasard.">Sans N° VRM</small>}</div>
+          {numerosFiche.length?numerosFiche.map(n=><Bouton variante="discret" key={n} onClick={()=>{close();window.dispatchEvent(new CustomEvent('vrm:fiche-article',{detail:n}));}}>Fiche N°{n} ›</Bouton>):<small title="Pas de numéro VRM confirmé pour cette vente : aucune fiche n’est choisie au hasard.">Sans N° VRM</small>}</div>
           <div className="vrm-ventes-liste"><div className={props.className} data-ligne-ouverte="true"><div className="vrm-ledger-sale-content">{children}</div></div></div></div>
       </section>
     </div>,document.body)}
@@ -25263,7 +25265,7 @@ function Catalog({catalog,setCatalog,onDeleteId}) {
           {search&&<Btn small onClick={clearSearch} color={C.border}>✕</Btn>}
         </div>
         {['all','stock','vendu'].map(f=>(
-          <Btn key={f} small onClick={()=>setFilter(f)} color={filter===f?C.accent:C.border} style={{color:filter===f?'#fff':C.muted}}>
+          <Btn key={f} small onClick={()=>setFilter(f)} aria-pressed={filter===f} color={C.border} style={{color:filter===f?C.text:C.muted,fontWeight:filter===f?700:500,boxShadow:filter===f?`inset 0 0 0 2px ${C.accent}`:'none'}}>
             {f==='all'?'Tous':f==='stock'?'Stock':'Vendus'}
           </Btn>
         ))}
@@ -25341,7 +25343,7 @@ function Catalog({catalog,setCatalog,onDeleteId}) {
           Page <b style={{color:C.text}}>{currentPage+1}</b> / {totalPages} <span style={{color:C.muted,fontSize:11}}>({fullList.length} résultats)</span>
         </span>
         <Btn small onClick={()=>setPage(p=>Math.min(totalPages-1,(p===null?totalPages-1:p)+1))} color={C.border} style={{opacity:currentPage>=totalPages-1?0.4:1}}>Suivant →</Btn>
-        <Btn small onClick={()=>setShowAll(true)} color={C.warn} style={{color:'#fff',marginLeft:8}}>📋 Voir tout</Btn>
+        <Btn small onClick={()=>setShowAll(true)} color={C.border} style={{marginLeft:8}}>Voir tout</Btn>
       </div>}
       {showAll&&<div style={{display:'flex',justifyContent:'center',alignItems:'center',gap:8,fontSize:12,padding:'4px 0'}}>
         <span style={{color:C.warn}}>📋 Affichage complet — {fullList.length} articles</span>
@@ -25669,7 +25671,7 @@ function Sales({catalog,setCatalog,sales,setSales,invoices,invoiceSettings,entre
           Page <b style={{color:C.text}}>{currentPage+1}</b> / {totalPages} <span style={{color:C.muted,fontSize:11}}>({fullFiltered.length} résultats)</span>
         </span>
         <Btn small onClick={()=>setPage(p=>Math.min(totalPages-1,(p===null?totalPages-1:p)+1))} color={C.border} style={{opacity:currentPage>=totalPages-1?0.4:1}}>Suivant →</Btn>
-        <Btn small onClick={()=>setShowAll(true)} color={C.warn} style={{color:'#fff',marginLeft:8}}>📋 Voir tout</Btn>
+        <Btn small onClick={()=>setShowAll(true)} color={C.border} style={{marginLeft:8}}>Voir tout</Btn>
       </div>}
       {showAll&&<div style={{display:'flex',justifyContent:'center',alignItems:'center',gap:8,fontSize:12,padding:'4px 0'}}>
         <span style={{color:C.warn}}>📋 Affichage complet — {fullFiltered.length} ventes</span>
@@ -25679,7 +25681,7 @@ function Sales({catalog,setCatalog,sales,setSales,invoices,invoiceSettings,entre
       {/* Barre flottante en bas : bouton sélection + somme */}
       <div style={{position:'sticky',bottom:0,zIndex:20,padding:'8px 0',background:`linear-gradient(180deg, transparent 0%, ${C.bg} 30%)`}}>
         <Card style={{padding:'10px 14px',display:'flex',gap:12,flexWrap:'wrap',alignItems:'center',background:selectMode?`${C.accent}15`:C.card,borderColor:selectMode?`${C.accent}66`:C.border}}>
-          <Btn small onClick={()=>{setSelectMode(!selectMode);if(selectMode)setSelectedIds(new Set());}} color={selectMode?C.accent:C.border} style={{color:selectMode?'#fff':C.muted}}>
+          <Btn small onClick={()=>{setSelectMode(!selectMode);if(selectMode)setSelectedIds(new Set());}} aria-pressed={selectMode} color={C.border} style={{color:selectMode?C.text:C.muted,boxShadow:selectMode?`inset 0 0 0 2px ${C.accent}`:'none'}}>
             {selectMode?'✓ Mode sélection actif':'☑️ Activer la sélection'}
           </Btn>
           {selectMode&&<>
@@ -25917,7 +25919,7 @@ function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoice
       <div>
         <ScreenHead icon="receipt" title="Factures" desc="Les justificatifs de tes ventes, importés depuis tes emails Vinted."
           right={<div style={{display:'flex',gap:6,flexWrap:'wrap',alignItems:'center'}}>
-          <Btn small onClick={()=>setShowForm(true)} color={C.accent}>+ Nouvelle facture</Btn>
+          <Btn small primaire onClick={()=>setShowForm(true)}>+ Nouvelle facture</Btn>
           {/* ⚠️ « Récupérer Vinted » appelait l'Apps Script mort : le bouton ne
               pouvait QUE échouer. Il relit maintenant les reçus arrivés par
               email — la source qui remplit vraiment cet écran. */}
@@ -26056,7 +26058,7 @@ function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoice
                   <td style={{padding:'8px',textAlign:'right',color:C.accent,fontWeight:500}}>{fmt(+inv.sellPrice||0)}</td>
                   <td style={{padding:'8px',color:C.muted,fontSize:11}}>{inv.buyerName||'—'}</td>
                   <td style={{padding:'8px',textAlign:'right',whiteSpace:'nowrap'}}>
-                    <Btn small onClick={()=>generatePDF(inv,entForInvoice(inv,entreprises,activeEnt,invoiceSettings))} color={C.blue} style={{marginRight:4}}>📄</Btn>
+                    <Btn small onClick={()=>generatePDF(inv,entForInvoice(inv,entreprises,activeEnt,invoiceSettings))} color={C.blue} style={{marginRight:4}} aria-label="Imprimer la facture" title="Imprimer la facture"><Icon name="printer" size={15}/></Btn>
                     <Btn small onClick={()=>generateFacturXPdf(inv,entForInvoice(inv,entreprises,activeEnt,invoiceSettings))} color={C.muted} style={{marginRight:4}} title="Facture électronique Factur-X (PDF + XML EN16931 embarqué)">🧾</Btn>
                     <Btn small onClick={()=>deleteInvoice(inv.id)} color={C.danger}>🗑</Btn>
                   </td>
@@ -26074,7 +26076,7 @@ function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoice
           Page <b style={{color:C.text}}>{currentPage+1}</b> / {totalPages} <span style={{color:C.muted,fontSize:11}}>({fullList.length} résultats)</span>
         </span>
         <Btn small onClick={()=>setPage(p=>Math.min(totalPages-1,(p===null?0:p)+1))} color={C.border} style={{opacity:currentPage>=totalPages-1?0.4:1}}>Suivant →</Btn>
-        <Btn small onClick={()=>setShowAll(true)} color={C.warn} style={{color:'#fff',marginLeft:8}}>📋 Voir tout</Btn>
+        <Btn small onClick={()=>setShowAll(true)} color={C.border} style={{marginLeft:8}}>Voir tout</Btn>
       </div>}
       {showAll&&<div style={{display:'flex',justifyContent:'center',alignItems:'center',gap:8,fontSize:12,padding:'4px 0'}}>
         <span style={{color:C.warn}}>📋 Affichage complet — {fullList.length} factures</span>
@@ -26154,7 +26156,7 @@ function InvoiceForm({onClose,onSave,nextNumber,catalog}) {
           {err&&<div style={{color:C.danger,fontSize:12}}>⚠ {err}</div>}
 
           <div style={{display:'flex',gap:8,marginTop:6}}>
-            <Btn onClick={submit} color={C.accent} style={{flex:1}}>✓ Créer la facture</Btn>
+            <Btn primaire onClick={submit} style={{flex:1}}>Créer la facture</Btn>
             <Bouton variante="discret" onClick={onClose}>Annuler</Bouton>
           </div>
         </div>
@@ -26209,9 +26211,9 @@ function InvoiceSettings({settings,setSettings,entreprises,setEntreprises,active
           <Field label="SIRET"><Input value={data.siret||''} onChange={e=>setData(d=>({...d,siret:e.target.value}))}/></Field>
           <Field label="Mention TVA (bas de facture)"><Input value={data.tvaMention!=null?data.tvaMention:'TVA non applicable, art. 293 B du CGI'} onChange={e=>setData(d=>({...d,tvaMention:e.target.value}))}/></Field>
           <Field label="Message de bas de page"><Input value={data.footer||''} onChange={e=>setData(d=>({...d,footer:e.target.value}))}/></Field>
-          {sel!==activeEnt&&<Btn onClick={makeActive} color={C.blue} style={{fontSize:12}}>⭐ Utiliser cette entité pour les nouvelles factures</Btn>}
+          {sel!==activeEnt&&<Btn onClick={makeActive} color={C.blue} style={{fontSize:12}}>Utiliser pour les nouvelles factures</Btn>}
           <div style={{display:'flex',gap:8,marginTop:6}}>
-            <Btn onClick={saveCur} color={C.accent} style={{flex:1}}>✓ Enregistrer</Btn>
+            <Btn primaire onClick={saveCur} style={{flex:1}}>Enregistrer</Btn>
             {list.length>1&&<Btn onClick={delEnt} color={C.red||'#c0392b'}>🗑 Supprimer</Btn>}
             <Bouton variante="discret" onClick={onClose}>Annuler</Bouton>
           </div>
@@ -29371,7 +29373,8 @@ function StockMeubles() {
     {nEcartes > 0 && <div data-stock-ecartes={nEcartes} style={{ fontSize: 12, color: C.muted }}>{nEcartes} paire{nEcartes > 1 ? 's' : ''} d'un compte retiré ou masqué {nEcartes > 1 ? 'ne sont' : "n'est"} pas montrée{nEcartes > 1 ? 's' : ''} ici.</div>}
     <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', justifyContent: 'space-between' }}>
       <div style={{ fontSize: 13, color: C.muted, flex: '1 1 200px', minWidth: 0 }}>{fiches.length} paire{fiches.length > 1 ? 's' : ''} en stock{nVendus > 0 ? <> · <button className="vrm-b vrm-b-discret" type="button" data-vendues-chercher={nVendus} onClick={() => { setQ(''); setCibles(fiches.filter(estVendu).map(cleDeFiche)); try { window.scrollTo({ top: 0, behavior: 'smooth' }); } catch (_) {} }} style={{ textDecoration: 'underline' }}>{nVendus} vendue{nVendus > 1 ? 's' : ''} à sortir — où sont-elles ?</button></> : (venduSig ? '' : ' · ventes pas encore lues')}</div>
-      <div data-meubles-zoom={zoom}><Segmente label="Taille des cases" value={zoom} onChange={setZoom} options={[{ v: 'loin', l: 'De loin', data: { 'data-zoom-choix': 'loin' } }, { v: 'normal', l: 'Normale', data: { 'data-zoom-choix': 'normal' } }, { v: 'pres', l: 'De près', data: { 'data-zoom-choix': 'pres' } }]} /></div>
+      {/* (30 oct.) Sans meuble, « De loin / De près » ne montrait rien : le choix attend le premier meuble. */}
+      {meubles.length > 0 && <div data-meubles-zoom={zoom}><Segmente label="Taille des cases" value={zoom} onChange={setZoom} options={[{ v: 'loin', l: 'De loin', data: { 'data-zoom-choix': 'loin' } }, { v: 'normal', l: 'Normale', data: { 'data-zoom-choix': 'normal' } }, { v: 'pres', l: 'De près', data: { 'data-zoom-choix': 'pres' } }]} /></div>}
     </div>
 
     {/* De loin, les meubles se rangent côte à côte : toute la pièce d'un coup d'œil. */}
@@ -29379,7 +29382,8 @@ function StockMeubles() {
       {meubles.map((m) => <div key={m.id} style={{ flex: zoom === 'pres' ? '1 1 100%' : '0 1 auto', minWidth: 0, maxWidth: '100%' }}>{cadreMeuble(m)}</div>)}
     </div>
 
-    <button className="vrm-b vrm-b-secondaire" type="button" onClick={() => setModal({ type: 'meuble' })} style={{ width: '100%' }}>+ Créer un meuble</button>
+    {/* (30 oct.) Pièce vide : créer un meuble est LE geste de l'écran (primaire) ; ensuite il redevient secondaire. */}
+    <button className={`vrm-b ${meubles.length ? 'vrm-b-secondaire' : 'vrm-b-primaire'}`} type="button" data-creer-meuble="" onClick={() => setModal({ type: 'meuble' })} style={{ alignSelf: meubles.length ? 'stretch' : 'flex-start' }}>+ Créer un meuble</button>
 
     {Modale()}
   </>);
@@ -29710,7 +29714,8 @@ function Garage({catalog,garageGrid,setGarageGrid,blockedCells,setBlockedCells,e
       {/* (16 oct.) Le contrôle segmenté PARTAGÉ (`.vrm-seg`, celui des sous-onglets
           de plateforme) : plus de segment rempli d'accent, plus de boîte bordée. */}
       <nav role="group" aria-label="Vue du stock" className="vrm-seg" data-segment="" data-stock-vues="" style={{'--seg-ink':C.text,'--seg-muted':C.muted,'--seg-point':C.accent,margin:0}}>
-        {[['meubles','box','Mes meubles'],['plan','home','Ma pièce'],['ranger','grid','Liste des cases'],['photos','image','En photos']].map(([v,ic,l])=>(
+        {/* (30 oct.) Des mots courts : à 390 px le 4ᵉ onglet était coupé (« En photos » à moitié). */}
+        {[['meubles','box','Meubles'],['plan','home','Pièce'],['ranger','grid','Cases'],['photos','image','Photos']].map(([v,ic,l])=>(
           <button type="button" key={v} onClick={()=>{setGarageView(v);save('vinted_garage_view',v);}} aria-current={garageView===v?'page':undefined} aria-pressed={garageView===v} data-stock-vue={v} className="vrm-seg-btn">
             <Icon name={ic} size={15}/>{l}
           </button>
@@ -29796,7 +29801,7 @@ function BackupModal({catalog,sales,garageGrid,blockedCells,onClose,onImport}) {
             <div style={{fontSize:12,color:C.text,marginBottom:10}}>
               <b>{catalog.length}</b> articles ·<b>{sales.length}</b> ventes
             </div>
-            <Btn small onClick={exportData} color={C.accent}>💾 Télécharger sauvegarde</Btn>
+            <Btn small onClick={exportData}>Télécharger la sauvegarde</Btn>
           </div>
 
           <div style={{background:`${C.warn}11`,border:`1px solid ${C.warn}44`,borderRadius:8,padding:14}}>
@@ -43662,14 +43667,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         // la ligne devient un groupe de deux, même surface, mêmes attributs.
         const tache = (j, i) => (j.urssaf && Array.isArray(j.urssaf.aNoter) && j.urssaf.aNoter.length > 0) ? (
           <div className="vrm-day-task" key={(j.id||'j')+i} role="group" data-job={j.id||undefined} data-n={j.n!=null?j.n:undefined} data-urssaf-echeance={j.urssaf.dueIso} data-urssaf-apayer={j.urssaf.apayer==null?'':String(j.urssaf.apayer)} data-urssaf-partiel={j.urssaf.partiel?'1':undefined}
-            style={{display:'flex',alignItems:'center',gap:13,padding:'14px 15px',borderRadius:10,border:`1px solid ${C.border}`,background:C.card,boxShadow:C.shadow||'none',textAlign:'left',width:'100%',minWidth:0,boxSizing:'border-box',flexWrap:'wrap'}}>
+            style={{display:'flex',alignItems:'center',gap:13,padding:'14px 15px',borderRadius:10,border:`1px solid ${C.border}`,background:C.card,boxShadow:C.shadow||'none',textAlign:'left',width:'100%',minWidth:0,boxSizing:'border-box',flexWrap:'wrap',gridColumn:'1 / -1'}}>
             <button type="button" title={j.sub} onClick={()=>{ if (onNav) onNav(j.tab); }} style={{display:'flex',alignItems:'center',gap:13,flex:'1 1 220px',minWidth:0,background:'transparent',border:0,padding:0,margin:0,cursor:'pointer',textAlign:'left',fontFamily:'inherit',color:'inherit'}}>
               <div style={{width:42,height:42,borderRadius:8,background:C.bg,border:`1px solid ${C.border}`,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,color:j.color}}><Icon name={j.icon} size={20}/></div>
               <div style={{flex:1,minWidth:0}}>
                 <div className="vrm-day-task-title" style={{fontSize:15,fontWeight:700,color:C.text}}>{j.title}</div>
                 <div className="vrm-day-task-note" style={{fontSize:12,color:C.muted,fontWeight:400,marginTop:2,lineHeight:1.35}}>{j.sub}</div>
               </div>
-              <span className="vrm-day-task-action" style={{fontSize:12,color:j.color,fontWeight:600,flexShrink:0}}>Voir <span aria-hidden="true">›</span></span>
+              <span className="vrm-day-task-action" aria-hidden="true" style={{fontSize:16,color:j.color,fontWeight:600,flexShrink:0}}>›</span>
             </button>
             <Bouton variante="secondaire" icone="check" className="vrm-b-petit" data-urssaf-cest-declare={j.urssaf.aNoter[0]} onClick={()=>demanderDeclaration(j.urssaf.aNoter[0], onNav)} style={{flexShrink:0}}>
               {j.urssaf.mois && j.urssaf.mois.length > 1 ? `Noter ma déclaration — ${(() => { const [y, m] = j.urssaf.aNoter[0].split('-'); return new Date(Number(y), Number(m) - 1, 1).toLocaleDateString('fr-FR', { month: 'long' }); })()}` : 'Noter ma déclaration'}
@@ -44989,7 +44994,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           const parAge = []; for (const x of vieux) { const g = parAge.find(y => y.j === x.j); if (g) g.l.push(x.a); else parAge.push({ j: x.j, l: [x.a] }); }
           return (
             <div data-fraicheur-achats={vieux.map(x => `${x.a.vinted_user_id}:${x.j}`).join(',')} style={{fontSize:12,color:C.muted,lineHeight:1.45,margin:'0 0 10px'}}>
-              Achats relus {parAge.map((g, i) => <span key={g.j}>{i ? (i === parAge.length - 1 ? ' et ' : ', ') : ''}il y a {g.j} j sur {g.l.map((a, k) => <React.Fragment key={a.vinted_user_id}>{k ? ', ' : ''}<b style={{color:C.text,fontWeight:600}}>{accName(a)}</b></React.Fragment>)}</span>)} — ouvre Vinted sur {vieux.length > 1 ? 'chacun' : 'ce compte'}. <Pourquoi label="Pourquoi">Un colis arrivé depuis sur {vieux.length > 1 ? 'ces comptes' : 'ce compte'} n'est pas encore ici : les achats d'un compte ne sont relus que quand Chrome est connecté dessus, avec l'extension VRM.</Pourquoi>
+              {vieux.length <= 2
+                ? <>Achats relus {parAge.map((g, i) => <span key={g.j}>{i ? ' et ' : ''}il y a {g.j} j sur {g.l.map((a, k) => <React.Fragment key={a.vinted_user_id}>{k ? ', ' : ''}<b style={{color:C.text,fontWeight:600}}>{accName(a)}</b></React.Fragment>)}</span>)} — ouvre Vinted sur {vieux.length > 1 ? 'chacun' : 'ce compte'}. </>
+                : <>Achats de {vieux.length} comptes pas relus depuis {vieux[vieux.length - 1].j} j ou plus — ouvre Vinted sur chacun. </>}
+              <Pourquoi label="Quels comptes">{vieux.length > 2 ? <>{parAge.map((g, i) => <span key={g.j}>{i ? ' · ' : ''}il y a {g.j} j : {g.l.map((a) => accName(a)).join(', ')}</span>)}. </> : null}Un colis arrivé depuis sur {vieux.length > 1 ? 'ces comptes' : 'ce compte'} n'est pas encore ici : les achats d'un compte ne sont relus que quand Chrome est connecté dessus, avec l'extension VRM.</Pourquoi>
             </div>
           );
         })()}
@@ -48536,9 +48544,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   </div>
                  </div>
                  {(()=>{ const cs=fillBuySugg[r.key]; if(!cs||!cs.length) return null;
-                   return (
-                     <div style={{marginTop:6,display:'flex',flexDirection:'column',gap:4}}>
-                       {cs.map((cand,ci)=>{ const p=cand.o, sur=cand.sur;
+                   // (30 oct.) Seules les pistes sûres (« C'est ça ») restent en clair ; les
+                   // « à vérifier » se replient (« N pistes ») : l'œil va au champ, pas aux pistes.
+                   // Le barème ne change pas (§5.23).
+                   const rendre = (cand,ci)=>{ const p=cand.o, sur=cand.sur;
                          const pr=p.price?.amount!=null?Number(p.price.amount):null;
                          const d=p.date?new Date(p.date):null;
                          return (
@@ -48555,7 +48564,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                              </span>
                              <span style={{flexShrink:0,fontSize:11,fontWeight:700,color:sur?C.accent:C.muted,border:`1px solid ${sur?C.accent:C.border}`,borderRadius:8,padding:'3px 9px'}}>{sur?"C'est ça":'à vérifier'}</span>
                            </button>
-                         ); })}
+                         ); };
+                   const sures = cs.filter(c=>c.sur), autres = cs.filter(c=>!c.sur);
+                   return (
+                     <div style={{marginTop:6,display:'flex',flexDirection:'column',gap:4}}>
+                       {sures.map(rendre)}
+                       {autres.length>0 && <details className="vrm-repli" data-pistes-a-verifier={autres.length}><summary style={{fontSize:12,minHeight:36}}>{autres.length} piste{autres.length>1?'s':''} à vérifier</summary>
+                         <div style={{display:'flex',flexDirection:'column',gap:2,marginTop:4}}>{autres.map((c,ci)=>rendre(c,ci+sures.length))}</div>
+                       </details>}
                      </div>
                    ); })()}
                 </div>
@@ -51547,7 +51563,7 @@ function LeboncoinScreen() {
               fait ». On dit combien, et où c'est réglé. */}
           {data.vendues > 0 && (
             <div style={{ fontSize: 11, color: C.muted, marginBottom: 8, lineHeight: 1.5 }}>
-              {data.vendues} article{data.vendues > 1 ? 's' : ''} {data.vendues > 1 ? 'sont' : 'est'} <b>déjà vendu{data.vendues > 1 ? 's' : ''} sur Vinted</b> — {data.vendues > 1 ? 'ils ne sont' : "il n'est"} pas dans cette file. (Vinted laisse parfois l'annonce ouverte après la vente ; c'est la transaction qui fait foi.)
+              {data.vendues} <b>déjà vendu{data.vendues > 1 ? 's' : ''} sur Vinted</b>, hors de cette file. <Pourquoi label="Pourquoi">Vinted laisse parfois l'annonce ouverte après la vente ; c'est la transaction qui fait foi.</Pourquoi>
             </div>
           )}
           {/* ⚠️ Revue de la 5.167 : les annonces « à confirmer » (compte pas relu
@@ -51556,7 +51572,7 @@ function LeboncoinScreen() {
               La cause est connue : on la dit, une fois, au-dessus de la file. */}
           {data.aConfirmer > 0 && !data.echecLecture && (
             <div data-lbc-a-confirmer={data.aConfirmer} style={{ fontSize: 11, color: C.muted, marginBottom: 8, lineHeight: 1.5 }}>
-              {data.aConfirmer} annonce{data.aConfirmer > 1 ? 's' : ''} {data.aConfirmer > 1 ? 'ne sont' : "n'est"} pas dans cette file : {data.aConfirmer > 1 ? 'leurs comptes n’ont' : 'son compte n’a'} pas été relu{data.aConfirmer > 1 ? 's' : ''} depuis plus de 24 h — <b>à confirmer</b> (le détail est sur l'écran <b>Annonces</b>). Rien n'est supprimé.
+              {data.aConfirmer} à confirmer (compte{data.aConfirmer > 1 ? 's' : ''} pas relu{data.aConfirmer > 1 ? 's' : ''} depuis 24 h) — rien n'est supprimé, détail sur <b>Annonces</b>.
             </div>
           )}
           {data.retirees > 0 && (
@@ -51683,7 +51699,7 @@ function LeboncoinScreen() {
               return (<>
                 {nues.length > 0 && <Groupe titre="Aucune photo" ton liste={nues} note={<>Leboncoin <b>refuse une annonce sans photo</b>. Ouvre l'annonce sur Vinted, sur ton ordinateur : ses photos arrivent ici au passage.</>} />}
                 {pretes.length > 0 && <Groupe titre="Prêtes" liste={pretes} />}
-                {maigres.length > 0 && <Groupe titre="Une seule photo" liste={maigres} note={<>Une annonce Leboncoin avec une seule photo se vend mal. <b>Vinted ne donne les autres que sur la page de l'annonce</b> : ouvre-la une fois sur ton ordinateur et elles arrivent ici toutes seules.</>} />}
+                {maigres.length > 0 && <Groupe titre="Une seule photo" liste={maigres} note={<>Ouvre l'annonce Vinted une fois sur ton ordinateur : les autres photos arrivent seules. <Pourquoi label="Pourquoi">Une annonce Leboncoin avec une seule photo se vend mal. Vinted ne donne les autres photos que sur la page de l'annonce.</Pourquoi></>} />}
               </>);
             })()}
           </>)}
@@ -52312,7 +52328,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
     AUTH.user && {id:'photo-profil',titre:'Photo de profil',items:[{id:'photo-profil',type:'el',el:<PhotoProfil key={AUTH.user.id} owner={AUTH.user.id} headers={enTeteSession} theme={C}/>} ]},
     // (17 oct.) L'abonnement a SON onglet (« Abonnement ») ; ici, un renvoi.
     AUTH.user && { id:'boutique', titre:'Ta boutique', items:[
-      { id:'abonnement-lien', type:'nav', ic:'wallet', lib:'Abonnement et factures', desc:'Statut, carte, factures', onClick:()=>setVue('abonnement') },
+      // (30 oct.) « Abonnement et factures » retiré : l'onglet « Abonnement » du haut fait la même chose.
       { id:'equipe', type:'panneau', ic:'link', lib:'Équipe', desc:'Inviter un aide pour les colis', el:<EquipeSetting/> },
     ]},
     { id:'connexion', titre:'Connexion', items:[
