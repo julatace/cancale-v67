@@ -313,13 +313,15 @@ export function EbayPromotion({compte='principal',headers,confirm,theme:C}){
  </section>;
 }
 
-export function EbayAchats({compte='principal',headers,theme:C}){
+// `sansTitre` : rendu sous le repli « Tes achats gagnés sur eBay » d'eBay → Achats,
+// qui le dit déjà (§7, une phrase une fois) — seul « Actualiser » reste.
+export function EbayAchats({compte='principal',headers,theme:C,sansTitre=false}){
  const call=(action,payload,headers)=>appelerEbay(action,{...payload,...(compte && compte!=='principal'?{compte}:{})},headers);
  const S=styleUI(C),[rows,setRows]=useState(undefined),[raison,setRaison]=useState(''),[busy,setBusy]=useState(false);
  async function charger(){setBusy(true);try{const j=await call('achats',{},headers);setRows(Array.isArray(j.achats)?j.achats:null);setRaison('');}catch(e){setRows(null);setRaison(e.message);}finally{setBusy(false);}}
  useEffect(()=>{charger();},[]);
  return <section data-ebay-achats={rows===undefined?'en-cours':rows===null?'pas-su':rows.length}>
-  <div style={{display:'flex',alignItems:'center',gap:8,margin:'0 0 10px'}}><h3 className="vrm-ebay-titre-onglet" style={{margin:0,fontSize:15,color:C.text}}>Achats eBay · 60 derniers jours</h3><button type="button" onClick={charger} disabled={busy} style={{...S.button,marginLeft:'auto'}}>Actualiser</button></div>
+  <div style={{display:'flex',alignItems:'center',gap:8,margin:'0 0 10px'}}>{!sansTitre && <h3 className="vrm-ebay-titre-onglet" style={{margin:0,fontSize:15,color:C.text}}>Achats eBay · 60 derniers jours</h3>}<button type="button" onClick={charger} disabled={busy} style={{...S.button,marginLeft:'auto'}}>Actualiser</button></div>
   {rows===undefined && <p style={{fontSize:12,color:C.muted}}>Lecture de tes achats…</p>}
   {rows===null && <p style={{fontSize:12,color:C.muted}} data-pas-su="achats">{raison || 'Je n’ai pas pu lire tes achats eBay.'}</p>}
   {Array.isArray(rows) && !rows.length && <p style={{fontSize:12,color:C.muted}}>Aucun achat eBay sur les 60 derniers jours.</p>}

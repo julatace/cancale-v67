@@ -157,10 +157,19 @@ export function reduireResultats(j, c) {
 
 // Le compteur du jour (compare-et-échange par `modifierDonnee`) : `undefined` =
 // le plafond est atteint, rien n'est écrit.
-export function compterAppel(d, jour, plafond = PLAFOND_VRM_JOUR) {
-  const n = d && d.jour === jour && Number.isSafeInteger(d.n) && d.n >= 0 ? d.n : 0;
+// (30 oct., revue) Une PART du plafond est réservée aux recherches à la main :
+// le fil (10 recherches × 4 par heure) épuisait seul les 200 du jour en ~5 h 30
+// d'onglet ouvert, et « Chercher » restait grisé jusqu'à minuit. Le fil
+// s'arrête à `PLAFOND_FIL_JOUR` ; les 50 restantes ne servent qu'à la main.
+// Les deux sous-totaux comptent dans les 200. `null` = la part du fil est faite.
+export const PLAFOND_FIL_JOUR = 150;
+export function compterAppel(d, jour, plafond = PLAFOND_VRM_JOUR, source = 'main') {
+  const meme = !!(d && d.jour === jour);
+  const n = meme && Number.isSafeInteger(d.n) && d.n >= 0 ? d.n : 0;
+  const fil = meme && Number.isSafeInteger(d.fil) && d.fil >= 0 ? d.fil : 0;
   if (n >= plafond) return undefined;
-  return { jour, n: n + 1, plafond };
+  if (source === 'fil' && fil >= PLAFOND_FIL_JOUR) return null;
+  return { jour, n: n + 1, fil: fil + (source === 'fil' ? 1 : 0), plafond };
 }
 
 // Le restant RÉEL du plafond d'eBay pour l'application, quand eBay le dit
@@ -198,15 +207,19 @@ export function creerRechercheEbay({ jetonApplication, oublierJetonApplication =
     const cr = criteresRecherche(b);
     if (!cr.ok) return { status: 400, body: { ok: false, reason: 'criteres', error: cr.error } };
     const jour = jourParis(maintenant());
-    let compte = null, plafond = false;
+    const source = b && b.source === 'fil' ? 'fil' : 'main';
+    let compte = null, plafond = false, partFil = false, fil = 0;
     const ecrit = await modifierDonnee(ID_COMPTEUR, owner, (d) => {
-      const n = compterAppel(d, jour);
-      if (n === undefined) { plafond = true; compte = d && d.jour === jour ? d.n : PLAFOND_VRM_JOUR; return undefined; }
-      compte = n.n; plafond = false; return n;
+      const n = compterAppel(d, jour, PLAFOND_VRM_JOUR, source);
+      const meme = !!(d && d.jour === jour);
+      if (n === undefined) { plafond = true; partFil = false; compte = meme ? d.n : PLAFOND_VRM_JOUR; fil = meme && Number.isSafeInteger(d.fil) ? d.fil : 0; return undefined; }
+      if (n === null) { partFil = true; plafond = false; compte = d.n; fil = d.fil; return undefined; }
+      compte = n.n; fil = n.fil; plafond = false; partFil = false; return n;
     });
     if (ecrit !== true) return { status: 503, body: { ok: false, reason: 'pas-su', error: 'Je n’ai pas pu compter tes recherches du jour : rien n’a été envoyé à eBay. Réessaie dans un moment.' } };
-    const appels = { aujourdhui: compte, plafond: PLAFOND_VRM_JOUR, jour };
+    const appels = { aujourdhui: compte, plafond: PLAFOND_VRM_JOUR, fil, plafondFil: PLAFOND_FIL_JOUR, jour };
     if (plafond) return { status: 429, body: { ok: false, reason: 'plafond', appels, error: `Tu as fait tes ${PLAFOND_VRM_JOUR} recherches eBay du jour : le fil s’arrête jusqu’à minuit (heure de Paris).` } };
+    if (partFil) return { status: 429, body: { ok: false, reason: 'plafond-fil', appels, error: `Ton fil a fait ses ${PLAFOND_FIL_JOUR} relectures du jour : il s’arrête jusqu’à minuit (heure de Paris). Il te reste ${Math.max(0, PLAFOND_VRM_JOUR - compte)} recherches à la main.` } };
     // Une recherche que eBay a reçue compte, même ratée (502) : elle compte aussi
     // chez eBay dans le quota de l'application. C'est l'APPAREIL qui ne relance
     // pas une recherche ratée avant 15 min (src/ebayRecherche.jsx) — décidé le

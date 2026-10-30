@@ -49,6 +49,8 @@ export function criteresVeille(p){
  const e=erreurCriteresEbay({mots,pointure,categorie});exige(!e,e);
  return {titre:texte(p.titre),mots,exclus:texte(p.exclus||'',200,true),categorie,etatArticle:choix(p.etatArticle,['tous','neuf','occasion']),minimum,maximum,pays:choix(p.pays,['FR','BE','DE','ES','IT','tous']),pointure,achatImmediat:p.achatImmediat!==false,livraisonFR:p.livraisonFR!==false};
 }
+// Les critères d'une recherche tels qu'ils sont rangés, SANS les juger (l'historique).
+const instantaneVeille=x=>({titre:String(x.titre??''),mots:String(x.mots??''),exclus:String(x.exclus??''),categorie:String(x.categorie??''),etatArticle:x.etatArticle??'tous',minimum:x.minimum??null,maximum:x.maximum??null,pays:x.pays??'tous',pointure:String(x.pointure??''),achatImmediat:x.achatImmediat!==false,livraisonFR:x.livraisonFR!==false});
 const placeVeille=d=>exige(d.veilles.filter(x=>x.etat==='preparee').length<MAX_VEILLES_ACTIVES,`${MAX_VEILLES_ACTIVES} recherches actives au plus (chacune coûte un appel à eBay) : archive-en une d’abord.`);
 export function echeanceActive(section,x,maintenant){
  const active=section==='missions'?['attribuee','en_cours','bloquee'].includes(x.etat):section==='reservations'?etatReservation(x,maintenant)==='active':section==='dossiers'?x.etat!=='clos':false;
@@ -129,10 +131,17 @@ export function appliquer(source,commande,{acteur,maintenant,equipe=[],membre=nu
   const x=trouve(d.veilles,p.cible);exige(x.etat==='preparee','Restaure cette recherche avant de la modifier.');
   exige((x.evenements||[]).length<100,'Historique de cette recherche plein.');
   exige(p.versionAttendue===(x.version||1),'Cette recherche a changé. Ferme le formulaire et rouvre-la avant de sauvegarder.');
-  const avant=criteresVeille(x),apres=criteresVeille(p);(x.evenements??=[]).push({...commun,nature:'modification',avant,apres});Object.assign(x,apres,{version:(x.version||1)+1,modifie:maintenant});break;
+  // (30 oct., revue) L'ANCIENNE recherche n'est pas revalidée : une recherche
+  // enregistrée avant la règle commune (catégorie en lettres, mots d'une lettre)
+  // doit pouvoir être CORRIGÉE — c'est le geste que le fil lui demande. On en
+  // garde un instantané brut pour l'historique ; seule la nouvelle est jugée.
+  const avant=instantaneVeille(x),apres=criteresVeille(p);(x.evenements??=[]).push({...commun,nature:'modification',avant,apres});Object.assign(x,apres,{version:(x.version||1)+1,modifie:maintenant});break;
  }
  case 'veille.dupliquer':{
-  const x=trouve(d.veilles,p.cible);placeVeille(d);ajoute(d.veilles,{...commun,...criteresVeille(x),titre:texte(p.titre),version:1,etat:'preparee',evenements:[],origine:x.id});break;
+  const x=trouve(d.veilles,p.cible);placeVeille(d);
+  // Une copie se valide comme une nouvelle recherche ; refusée, on dit QUOI changer.
+  let copie;try{copie=criteresVeille(x);}catch(e){if(e instanceof Refus)throw new Refus(`Cette recherche a un critère que eBay refuse (${e.message.replace(/\.$/,'')}) : modifie-la d’abord, puis duplique-la.`);throw e;}
+  ajoute(d.veilles,{...commun,...copie,titre:texte(p.titre),version:1,etat:'preparee',evenements:[],origine:x.id});break;
  }
  case 'veille.archiver':
  case 'veille.restaurer':{

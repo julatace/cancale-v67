@@ -36,6 +36,21 @@
 > sur 773e7c6e, mutations id/critères rouges) · banc (**40 rouges sur le build de 773e7c6e** ; mutations recul, repère,
 > grille rouges). Sur origin/main la fonction n'existe pas (audit : 35 rouges). Bancs eBay voisins verts ; `ebay-form`
 > sort 1 rouge (« Julien ne paie jamais le port ») déjà sur origin/main. ⚠️ Non mesuré : aucun appel réel à eBay.
+> **Dernier tour (chantier du 29 oct., revue du 30) — six défauts reproduits, corrigés :** (1) le repère se décide sur les
+> SEULES lignes qui en ont un (`reperesDeListe`) : « Voir les 21 » avec des lacets le disait 20 fois ⇒ une fois au-dessus,
+> « pour les paires de ce modèle » ; sur la ligne seulement quand deux modèles se côtoient. (2) Un 401 isolé (jeton expiré
+> au réveil) ne fige plus le fil 15 min : la session est attendue/renouvelée (`SESSION_FIL_EBAY` : `authValid`,
+> `authRefresh`) puis UN nouvel essai ; « reconnecte-toi » seulement si le renouvellement est REFUSÉ ou qu'un second 401
+> suit un renouvellement réussi ; « pas su » ⇒ nouvel essai dans 1 min. (3) Une recherche enregistrée avant la règle
+> commune (catégorie « baskets ») se CORRIGE : `veille.modifier` ne revalide plus l'ancienne (instantané brut pour
+> l'historique) ; `veille.dupliquer` dit « modifie-la d'abord ». (4) Une PART du plafond est gardée pour la main : le fil
+> (`source:'fil'`) s'arrête à **150** relectures/jour (429 `plafond-fil`), les 50 restantes ne servent qu'à « Chercher »
+> (le fil vidait seul les 200 en ~5 h 30 et grisait « Chercher » jusqu'à minuit) ; l'écran dit « dont N par le fil ».
+> (5) `extractModel` : un modèle qui finit par un chiffre ne se lit plus dans un nombre plus long (« air max 1 » ≠
+> « air max 180 / 1000 », « xt 6 » ≠ « xt 60 ») — vaut aussi côté ventes. (6) Achats gagnés : titre dit une fois
+> (`EbayAchats sansTitre`). Preuves : audit (59 ; **8 rouges sur 7cd0cbec** ; mutations part du fil, ancienne revalidée,
+> sous-chaîne rouges) · banc (**20 rouges sur le build de 7cd0cbec**, 0 après ; mutations des quatre correctifs d'écran
+> rouges). ⚠️ Non mesuré : aucun appel réel à eBay ; le renouvellement réel au réveil d'un iPhone (formes du banc).
 
 > **29 octobre — 5.287, numéros sur les profils visités :** Julien a précisé que
 > l’affichage semble seulement sur Vinted, l’import dans VRM n’est pas confirmé.

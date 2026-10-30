@@ -10173,8 +10173,19 @@ function extractModel(text){
   // On rend le PLUS LONG modèle reconnu : « air max 95 » doit gagner sur « air max ».
   let best=null;
   for(const m of KNOWN_MODELS){ const k=m.replace(/[^a-z0-9]+/g,' ').trim();
-    if(t.includes(k) && (!best || k.length>best.length)) best=k; }
+    if(contientModele(t,k) && (!best || k.length>best.length)) best=k; }
   return best;
+}
+// (30 oct., revue) Un modèle qui finit par un chiffre ne se lit que si AUCUN
+// chiffre ne le suit : « air max 1 » n'est pas dans « air max 180 » ni dans
+// « air max 1000 » (une autre paire, un autre prix) — avant, une sous-chaîne
+// suffisait et l'Air Max 180 recevait le repère de l'Air Max 1, côté ventes
+// comme côté eBay. Mieux vaut un blanc qu'un faux.
+function contientModele(t,k){
+  if(!/\d$/.test(k)) return t.includes(k);
+  let i=t.indexOf(k);
+  while(i>=0){ if(!/\d/.test(t.charAt(i+k.length))) return true; i=t.indexOf(k,i+1); }
+  return false;
 }
 const COUNTRY_MAP_DATA=[
   [['france'],'France'],[['allemagne','deutschland','germany'],'Allemagne'],
@@ -20444,6 +20455,13 @@ function EbayConnexion({ onAnnonces, vue = '*', comptesEbay }) {
 // gagnés, repliés. Le repère de revente est celui du MODÈLE, calculé par LA
 // règle `moyennesParModele` sur ses ventes Vinted (comptes écartés exclus,
 // §11) — dit « le modèle, pas cette paire ». Ventes pas lues ⇒ aucun repère.
+// (30 oct., revue) La session du fil eBay : au réveil, attendre le renouvellement
+// en cours plutôt que d'envoyer un jeton expiré ; sur un 401, renouveler puis
+// réessayer une fois. Trois états : true · false (refusé, plus de session) · null (pas su).
+const SESSION_FIL_EBAY={
+  prete:async()=>{ if(!AUTH.session) return true; if(authValid()) return true; return authRefresh(); },
+  renouveler:()=>authRefresh(),
+};
 function EbayAchatsOnglet({headers,panelOff,vue,comptes,onCompte}){
   const {ventes}=useVentesCoque();
   const repere=React.useMemo(()=>{
@@ -20456,12 +20474,12 @@ function EbayAchatsOnglet({headers,panelOff,vue,comptes,onCompte}){
   },[ventes,panelOff]);
   const [gagnes,setGagnes]=React.useState(false);
   return <div style={{padding:16}} data-ebay-achats-onglet="">
-    <RechercheEbay headers={headers} theme={C} owner={AUTH.user?.id || ''} repere={repere}/>
+    <RechercheEbay headers={headers} theme={C} owner={AUTH.user?.id || ''} repere={repere} session={SESSION_FIL_EBAY}/>
     <Suspense fallback={<p>Lecture des recherches…</p>}><Operations sombre={C===THEMES.dark} headers={headers} initialSection="veilles" contexteEbay/></Suspense>
     {/* Les achats GAGNÉS (WonList) : gardés, repliés — lus seulement à l'ouverture. */}
     <details className="vrm-repli" data-ebay-achats-gagnes="" onToggle={e=>{if(e.currentTarget.open)setGagnes(true);}} style={{marginTop:18}}>
       <summary>Tes achats gagnés sur eBay · 60 derniers jours</summary>
-      {gagnes&&<div style={{paddingTop:10}}><EbayActionCompte vue={vue} comptes={comptes} onCompte={onCompte}>{ref=><EbayAchats key={'ac-'+ref} headers={headers} theme={C} compte={ref}/>}</EbayActionCompte></div>}
+      {gagnes&&<div style={{paddingTop:10}}><EbayActionCompte vue={vue} comptes={comptes} onCompte={onCompte}>{ref=><EbayAchats key={'ac-'+ref} headers={headers} theme={C} compte={ref} sansTitre/>}</EbayActionCompte></div>}
     </details>
   </div>;
 }

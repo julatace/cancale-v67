@@ -37,13 +37,13 @@ const rows = [
   { id: 'main', data: {} },
   { id: 'ebay_comptes', data: { comptes: [{ cle: 'aaaaaaaaaaaaaaa1', pseudo: 'paire_perso', principal: true }] } },
   { id: 'ebay_orders', data: { orders: [], capturedAt: Date.now() } },
-  { id: 'harvest_111_orders_sold', data: { capturedAt: auj.toISOString(), payload: { my_orders: [vente(9001, 80, il(3)), vente(9002, 90, il(5)), vente(9003, 100, il(9))] } } },
+  { id: 'harvest_111_orders_sold', data: { capturedAt: auj.toISOString(), payload: { my_orders: [vente(9001, 80, il(3)), vente(9002, 90, il(5)), vente(9003, 100, il(9)), ...[9101, 9102, 9103].map((id, i) => ({ ...vente(id, 120, il(4 + i)), title: 'Nike Air Max 1 blanc taille 43' }))] } } },
 ];
 const VEILLE = { id: '00000000-0000-4000-8000-000000000001', titre: 'XT-6 en 43', mots: 'salomon xt-6', pointure: '43', exclus: '', categorie: '', etatArticle: 'tous', minimum: null, maximum: 9000, pays: 'FR', achatImmediat: true, livraisonFR: true, etat: 'preparee', version: 1, cree: '2026-10-20T10:00:00.000Z', evenements: [] };
 const item = (id, titre, prix, port) => ({ itemId: id, titre, prix, port, total: port == null ? null : prix + port, etat: 'Occasion', vendeur: 'vendeur_' + id.slice(-1), avis: 99.1, photo: null, url: 'https://www.ebay.fr/itm/' + id.replace(/\D/g, ''), achatImmediat: true, enchere: false, date: auj.toISOString(), pays: 'FR' });
 // L'horloge du SERVEUR est en avance de 2 h sur celle de l'appareil (lueA) :
 // la borne des 15 min doit se juger sur l'horloge de l'appareil.
-let mode = 'normal', appels = [], visite = 1, autres = [];
+let mode = 'normal', appels = [], visite = 1, autres = [], session1Fait = false;
 // (30 oct., revue) Les recherches enregistrées servies, et l'espace qui échoue.
 let veillesBanc = [VEILLE], opsKo = false;
 const veilleN = (i, extra) => ({ ...VEILLE, id: '00000000-0000-4000-8000-' + String(100 + i).padStart(12, '0'), titre: 'Recherche ' + i, mots: 'salomon xt-6 ' + i, cree: new Date(Date.UTC(2026, 9, 1, 10, i)).toISOString(), ...(extra || {}) });
@@ -76,6 +76,12 @@ const reponseChercher = (body) => {
   // La route refuse des critères (400) sans les compter : la règle d'Organisation est la même depuis le 30 oct.
   if (body.categorie && !/^\d{1,10}$/.test(String(body.categorie))) return [400, { ok: false, reason: 'criteres', error: 'Identifiant de catégorie eBay : des chiffres seulement (ex. 15709), ou laisse vide. Rien n’a été envoyé à eBay.' }];
   if (mode === 'ecartees') return [200, { ok: true, items: [], total: 30, horsBudget: 30, exclus: 0, autreDevise: 0, criteres: body, appels: { aujourdhui: appels.length, plafond: 200 }, quotaEbay: null, plafondEbayDoc: 5000, octets: { ebay: 9000, vrm: 400 }, lueA: new Date().toISOString() }];
+  if (mode === 'session1' && !session1Fait) { session1Fait = true; return [401, { ok: false, error: 'Ta session VRM a expiré : reconnecte-toi (rien n’a été envoyé à eBay).' }]; }
+  if (mode === 'plafondfil' && body.source === 'fil') return [429, { ok: false, reason: 'plafond-fil', appels: { aujourdhui: 150, plafond: 200, fil: 150, plafondFil: 150 }, error: 'Ton fil a fait ses 150 relectures du jour : il s’arrête jusqu’à minuit (heure de Paris). Il te reste 50 recherches à la main.' }];
+  // (30 oct.) Une vraie recherche de 21 annonces : 20 XT-6 et des lacets.
+  if (body.maximum === 8800) { const items = [...Array.from({ length: 20 }, (_, i) => item('v1|' + (6000 + i) + '|0', 'Salomon XT-6 noir taille 43 lot ' + i, 6000 + i, 500)), item('v1|6100|0', 'Lacets de rechange Salomon XT-6', 900, 300)]; return [200, { ok: true, items, total: items.length, horsBudget: 0, exclus: 0, autreDevise: 0, criteres: body, appels: { aujourdhui: appels.length, plafond: 200 }, quotaEbay: null, plafondEbayDoc: 5000, octets: { ebay: 30000, vrm: 9000 }, lueA: new Date().toISOString() }]; }
+  // Deux modèles qui se côtoient, et une Air Max 180 (pas une Air Max 1).
+  if (body.maximum === 8900) { const items = [item('v1|7001|0', 'Salomon XT-6 noir taille 43', 6000, 500), item('v1|7002|0', 'Salomon XT-6 gris taille 43', 6200, 500), item('v1|7003|0', 'Nike Air Max 1 blanc taille 43', 7000, 500), item('v1|7004|0', 'Nike Air Max 180 blanc taille 43', 7000, 500)]; return [200, { ok: true, items, total: items.length, horsBudget: 0, exclus: 0, autreDevise: 0, criteres: body, appels: { aujourdhui: appels.length, plafond: 200 }, quotaEbay: null, plafondEbayDoc: 5000, octets: { ebay: 9000, vrm: 2000 }, lueA: new Date().toISOString() }]; }
   if (mode === 'session') return [401, { ok: false, error: 'Ta session VRM a expiré : reconnecte-toi (rien n’a été envoyé à eBay).' }];
   if (mode === 'ebay') return [502, { ok: false, reason: 'ebay', appels: { aujourdhui: appels.length, plafond: 200 }, error: 'Je n’ai pas pu chercher sur eBay (pas de réponse) — ce n’est pas « aucun résultat ». Réessaie dans un moment.' }];
   if (mode === 'plafond') return [429, { ok: false, reason: 'plafond', appels: { aujourdhui: 200, plafond: 200 }, error: 'Tu as fait tes 200 recherches eBay du jour : le fil s’arrête jusqu’à minuit (heure de Paris).' }];
@@ -147,6 +153,7 @@ const tic = (pg, ms) => pg.clock.runFor(ms);
         const n = await pg.$eval('[data-ebay-fil]', (e) => e.getAttribute('data-ebay-fil'));
         dit(n === '1', 'le fil lit la recherche enregistrée', n);
         dit(appels.length === 1 && appels[0].mots === 'salomon xt-6' && appels[0].pointure === '43' && appels[0].maximum === 9000 && appels[0].achatImmediat === true && appels[0].livraisonFR === true, 'la recherche enregistrée part avec ses critères', JSON.stringify(appels[0] || {}));
+        dit(appels[0] && appels[0].source === 'fil', 'une relecture du fil se dit « fil » (comptée dans sa part du plafond)', JSON.stringify(appels[0] || {}));
         const nv = await pg.$$eval('[data-ebay-fil-recherche] [data-nouveau="oui"]', (l) => l.length);
         dit(nv === 0, 'première lecture : rien n’est marqué « nouveau »', String(nv));
         const txt = await pg.$eval('[data-ebay-fil-recherche]', (e) => e.innerText);
@@ -190,7 +197,9 @@ const tic = (pg, ms) => pg.clock.runFor(ms);
         const lac = await pg.$$eval('[data-ebay-liste="manuel"] [data-ebay-resultat="v1|5101|0"] [data-ebay-repere], [data-ebay-liste="manuel"] [data-ebay-resultat="v1|5102|0"] [data-ebay-repere]', (l) => l.length);
         const liste = await pg.$$eval('[data-ebay-liste="manuel"] [data-ebay-repere-liste]', (l) => l.length);
         const sous = await pg.$$eval('[data-ebay-liste="manuel"] [data-ebay-resultat="v1|5001|0"] [data-ebay-repere]', (l) => l.length);
-        dit(lac === 0 && liste === 0 && sous === 1, 'aucun repère de revente sous des lacets ni une taille enfant (ni au-dessus d’une liste qui en contient)', `lacets/enfant ${lac} · liste ${liste} · paire ${sous}`);
+        const partiel = await pg.$$eval('[data-ebay-liste="manuel"] [data-ebay-repere-liste]', (l) => l.map((e) => e.getAttribute('data-ebay-repere-liste') + ' · ' + e.innerText));
+        dit(lac === 0 && liste === 1 && sous === 0 && /^partiel/.test(partiel[0] || '') && /pour les paires de ce modèle/.test(partiel[0] || ''), 'liste mêlée (2 XT-6, des lacets, une taille enfant) : le repère est dit UNE fois au-dessus, « pour les paires de ce modèle », rien sous les lacets', `lacets/enfant ${lac} · liste ${liste} · paire ${sous} · ${partiel[0] || ''}`);
+        dit(!(a.source === 'fil'), 'une recherche à la main n’est pas comptée dans la part du fil', JSON.stringify(a));
         // (30 oct., revue) Sur téléphone, le contenu d'une annonce prend la largeur (avant : 84 px, ~260 px de haut).
         const g = await pg.$eval('[data-ebay-liste="manuel"] [data-ebay-resultat="v1|5001|0"]', (e) => ({ main: e.querySelector('.vrm-buy-main').getBoundingClientRect().width, h: e.getBoundingClientRect().height, row: e.getBoundingClientRect().width }));
         dit(g.main >= Math.min(200, g.row * 0.55) && g.h <= 200, 'une annonce trouvée se lit : contenu large, ligne basse', JSON.stringify(g));
@@ -203,6 +212,31 @@ const tic = (pg, ms) => pg.clock.runFor(ms);
         const c = autres.find((x) => x.type === 'veille.creer');
         dit(appels.length === avantAjout, '« Ajouter au fil » ne relance pas chez eBay la recherche qu’il vient de faire', `${appels.length - avantAjout} appel(s)`);
         dit(!!c && c.donnees.mots === 'salomon xt-6' && c.donnees.maximum === 7990 && c.donnees.pointure === '43' && c.revision === 4, 'ajouter au fil enregistre une recherche (la même liste que l’espace Organisation)', JSON.stringify(c || {}).slice(0, 200));
+      });
+      // ── (30 oct., dernier tour) « Voir les 21 » : un accessoire dans la liste ne
+      // fait plus écrire le repère sous chacune des 20 autres paires (§7).
+      await essaie('liste longue mêlée', async () => {
+        await pg.fill('[aria-label="Prix maximum"]', '88');
+        await pg.click('[data-geste="chercher"]');
+        await pg.waitForSelector('[data-ebay-liste="manuel"][data-ebay-nb="21"]', { timeout: 10000 });
+        await pg.click('[data-ebay-liste="manuel"] button:text-is("Voir les 21")');
+        await pg.waitForFunction(() => document.querySelectorAll('[data-ebay-liste="manuel"] [data-ebay-resultat]').length === 21, null, { timeout: 5000 });
+        const nb = await pg.$$eval('[data-ebay-liste="manuel"] [data-ebay-repere]', (l) => l.length);
+        const txt = await pg.innerText('[data-ebay-liste="manuel"]');
+        const fois = (txt.match(/Repère du modèle/g) || []).length;
+        dit(nb === 1 && fois === 1, '« Voir les 21 » (20 XT-6 et des lacets) : le repère est dit une fois, pas 20', `${nb} élément(s), « Repère du modèle » ×${fois}`);
+      });
+      // ── Deux modèles qui se côtoient : sur la ligne ; et l'Air Max 180 n'a pas
+      // le repère de l'Air Max 1 (le modèle était trouvé par une sous-chaîne).
+      await essaie('deux modèles, air max 180', async () => {
+        await pg.fill('[aria-label="Prix maximum"]', '89');
+        await pg.click('[data-geste="chercher"]');
+        await pg.waitForSelector('[data-ebay-resultat="v1|7004|0"]', { timeout: 10000 });
+        const rp = async (id) => pg.$$eval('[data-ebay-resultat="' + id + '"] [data-ebay-repere]', (l) => l.map((e) => e.getAttribute('data-ebay-repere')));
+        const am180 = await rp('v1|7004|0'), am1 = await rp('v1|7003|0'), xt = await rp('v1|7001|0');
+        const liste = await pg.$$eval('[data-ebay-liste="manuel"] [data-ebay-repere-liste]', (l) => l.length);
+        dit(am180.length === 0, 'l’Air Max 180 ne reçoit pas le repère de l’Air Max 1', JSON.stringify(am180));
+        dit(liste === 0 && am1[0] === 'air max 1' && xt[0] === 'xt 6', 'deux modèles différents : le repère sur chaque ligne qui en a un', `liste ${liste} · am1 ${JSON.stringify(am1)} · xt ${JSON.stringify(xt)}`);
       });
       dit(errs.length === 0, 'aucune erreur de page', errs.join(' | ').slice(0, 200));
       dit((await deborde(pg)) <= 1, 'aucun débordement horizontal');
@@ -248,15 +282,48 @@ const tic = (pg, ms) => pg.clock.runFor(ms);
           // (30 oct., revue) Une cause, une phrase ; et une panne commune arrête le fil entier.
           const nbM = (fil.match(m === 'session' ? /session VRM a expiré/g : /pas pu chercher/g) || []).length;
           dit(nbM === 1, nom + ' : dit une fois pour les 3 recherches', nbM + ' fois');
-          dit(appels.length === 1, nom + ' : une seule recherche part, pas une par recherche', appels.length + ' appel(s)');
+          // Sans session : la session est renouvelée puis UN nouvel essai (deux appels, refusés avant
+          // tout compte) ; un second 401 après un renouvellement réussi dit « reconnecte-toi ».
+          const parTour = m === 'session' ? 2 : 1;
+          dit(appels.length === parTour, nom + ' : une seule recherche part, pas une par recherche' + (m === 'session' ? ' (+ un essai après le renouvellement de la session)' : ''), appels.length + ' appel(s)');
           // (30 oct., revue) Un échec attend comme une lecture : rien avant 15 min.
           const avant = appels.length;
           for (let i = 0; i < 5; i++) { await tic(pg, 60 * 1000); await pg.waitForTimeout(150); }
           dit(appels.length === avant, nom + ' : rien n’est relancé pendant 5 min (avant : une relance par minute)', `${appels.length - avant} appel(s) en 5 min`);
           await tic(pg, 11 * 60 * 1000); await pg.waitForTimeout(400);
-          dit(appels.length === avant + 1, nom + ' : un seul nouvel essai après 15 min', `${appels.length - avant} appel(s)`);
+          dit(appels.length === avant + parTour, nom + ' : un seul nouvel essai après 15 min', `${appels.length - avant} appel(s)`);
         });
       }
+      // ── (30 oct., dernier tour) UN 401 ISOLÉ (jeton périmé au réveil) : la session
+      // se renouvelle et le fil se lit — jamais « reconnecte-toi » à quelqu'un de connecté.
+      await essaie('401 isolé', async () => {
+        await ctx.close(); mode = 'session1'; session1Fait = false; appels = []; visite = 1; veillesBanc = [VEILLE];
+        ({ ctx, pg, errs } = await ouvrir(b, vp, sombre));
+        await ouvrirAchats(pg);
+        await pg.waitForFunction(() => { const e = document.querySelector('[data-ebay-fil-recherche]'); return e && /^(lu|pas-su)$/.test(e.getAttribute('data-etat')); }, null, { timeout: 15000 });
+        await pg.waitForTimeout(600);
+        const etat = await pg.$eval('[data-ebay-fil-recherche]', (e) => e.getAttribute('data-etat'));
+        const fil = await pg.$eval('[data-ebay-fil]', (e) => e.innerText);
+        dit(etat === 'lu' && appels.length === 2, '401 isolé : la session est renouvelée, la recherche est relue aussitôt', `état ${etat} · ${appels.length} appel(s)`);
+        dit(!/reconnecte-toi/.test(fil), '401 isolé : jamais « reconnecte-toi » à quelqu’un de connecté', fil.replace(/\s+/g, ' ').slice(0, 160));
+      });
+      // ── (30 oct., dernier tour) LA PART DU FIL EST FAITE : « Chercher » reste possible.
+      await essaie('part du fil faite', async () => {
+        await ctx.close(); mode = 'plafondfil'; appels = []; visite = 1; veillesBanc = [VEILLE, veilleN(1)];
+        ({ ctx, pg, errs } = await ouvrir(b, vp, sombre));
+        await ouvrirAchats(pg);
+        await pg.waitForSelector('[data-ebay-plafond-fil]', { timeout: 15000 });
+        const fil = await pg.innerText('[data-ebay-fil]');
+        dit((fil.match(/relectures du jour/g) || []).length === 1, 'part du fil faite : dit une fois', fil.replace(/\s+/g, ' ').slice(0, 200));
+        const avant = appels.length;
+        await tic(pg, 31 * 60 * 1000); await pg.waitForTimeout(400);
+        dit(appels.length === avant, 'part du fil faite : le fil ne relit plus', `${appels.length - avant} appel(s)`);
+        dit(!(await pg.$eval('[data-geste="chercher"]', (e) => e.disabled)), 'part du fil faite : « Chercher » reste possible');
+        await pg.fill('[aria-label="Mots à chercher"]', 'salomon xt-6'); await pg.fill('[aria-label="Prix maximum"]', '79,90');
+        await pg.click('[data-geste="chercher"]');
+        await pg.waitForSelector('[data-ebay-liste="manuel"]', { timeout: 10000 });
+        dit(appels.length === avant + 1 && appels[appels.length - 1].source !== 'fil', 'part du fil faite : la recherche à la main part et répond');
+      });
       // ── (30 oct., revue) Trois recherches lues pour la première fois ⇒ UNE phrase.
       await essaie('première lecture', async () => {
         await ctx.close(); mode = 'normal'; appels = []; visite = 1; veillesBanc = [VEILLE, veilleN(1), veilleN(2)];
@@ -323,6 +390,10 @@ const tic = (pg, ms) => pg.clock.runFor(ms);
         await pg.click('[data-ebay-achats-gagnes] > summary');
         await pg.waitForSelector('[data-ebay-achat="4001"]', { timeout: 10000 });
         dit(autres.some((x) => x.action === 'achats'), 'ouvrir le repli lit les achats gagnés (WonList)');
+        // (30 oct., dernier tour) Le repli dit déjà son titre : l'en-tête intérieur ne le redit pas (§7).
+        const rep = await pg.innerText('[data-ebay-achats-gagnes]');
+        const titres = (rep.match(/60 derniers jours/g) || []).length;
+        dit(titres === 1 && /Actualiser/.test(rep), 'achats gagnés : le titre est dit une fois, « Actualiser » reste', `« 60 derniers jours » ×${titres}`);
       });
       if (process.env.SHOT) await pg.screenshot({ path: path.join(process.env.SHOT, 'achats-' + vp.width + '.png'), fullPage: true });
       dit(errs.length === 0, 'aucune erreur de page (fin)', errs.join(' | ').slice(0, 200));

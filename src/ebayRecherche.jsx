@@ -50,16 +50,29 @@ export const rechercheDuFil = veillesDuFil;
 // pour apprendre la même chose.
 export function attenteEchec(echec, maintenant) {
   if (!echec || !Number.isFinite(echec.ici)) return false;
+  // Une attente COURTE (la session qui se renouvelle) porte sa propre échéance.
+  if (Number.isFinite(echec.jusqua)) return maintenant < echec.jusqua;
   return maintenant - echec.ici < RELIRE_MS;
 }
 // La raison d'une lecture ratée. `criteres` (400) ne se réessaie qu'après une
 // modification de la recherche (une nouvelle version, une autre clé) ;
 // le reste arrête tout le fil 15 min.
+// (30 oct., revue) Un 401 n'est pas toujours une session perdue : au réveil
+// (iPhone en PWA rouvert après une heure), le jeton a expiré et le
+// renouvellement est en route. Le fil attendait 15 min en demandant de se
+// reconnecter à quelqu'un de connecté. Désormais : renouveler, puis réessayer
+// UNE fois ; « reconnecte-toi » seulement si le service REFUSE le renouvellement
+// (ou qu'il n'y a plus de session), ou qu'un second 401 suit un renouvellement
+// réussi. Renouvellement « pas su » (réseau) ⇒ un nouvel essai dans une minute.
+export const MSG_SESSION = 'Ta session VRM a expiré : reconnecte-toi (rien n’a été envoyé à eBay).';
+export const MSG_SESSION_RENOUVEL = 'Ta session VRM se renouvelle : je relis ton fil dans une minute (rien n’a été envoyé à eBay).';
+export const ATTENTE_RENOUVEL_MS = 60 * 1000;
 export function raisonEchec(res) {
   if (!res) return 'ebay';
   if (res.reason === 'plafond') return 'plafond';
+  if (res.reason === 'plafond-fil') return 'plafond-fil';
   if (res.reason === 'criteres' || res.status === 400) return 'criteres';
-  if (res.status === 401) return 'session';
+  if (res.status === 401) return res.renouvel === 'pas-su' ? 'session-renouvel' : 'session';
   if (res.reason === 'pas-su') return 'pas-su';
   return 'ebay';
 }
@@ -107,7 +120,7 @@ const eur = (c) => (Number.isFinite(c) ? (c / 100).toLocaleString('fr-FR', { min
 const ko = (n) => (Number.isFinite(n) ? (Math.max(1, Math.round(n / 102.4)) / 10).toLocaleString('fr-FR') + ' Ko' : '—');
 const heure = (iso) => { const t = Date.parse(iso || ''); return Number.isFinite(t) ? new Date(t).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : ''; };
 
-const phraseRepere = (rp) => <>Repère du modèle « {rp.modele} » : {eur(Math.round(rp.moyenne * 100))} en moyenne sur {rp.n} de tes ventes — le modèle, pas cette paire.</>;
+const phraseRepere = (rp) => <>Repère du modèle « {rp.modele} »{rp.partiel ? ' (pour les paires de ce modèle)' : ''} : {eur(Math.round(rp.moyenne * 100))} en moyenne sur {rp.n} de tes ventes — le modèle, pas cette paire.</>;
 function Resultat({ x, nouveau, rp, C }) {
   return <div className="vrm-buy-row vrm-ebay-res" data-ebay-resultat={x.itemId} data-nouveau={nouveau ? 'oui' : 'non'}>
     <div className="vrm-buy-ph" style={{ background: C.card2 || C.bg }}>{x.photo ? <img src={x.photo} alt="" loading="lazy" decoding="async" referrerPolicy="no-referrer" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : null}</div>
@@ -125,13 +138,18 @@ function Resultat({ x, nouveau, rp, C }) {
   </div>;
 }
 
-// Le repère se dit UNE fois au-dessus de la liste quand toutes les lignes
-// affichées portent le même modèle (§7) ; sur la ligne seulement quand il
-// distingue une annonce de ses voisines.
+// Le repère se dit UNE fois au-dessus de la liste quand toutes les lignes QUI
+// EN ONT UN portent le même modèle (§7) ; sur la ligne seulement quand deux
+// modèles différents se côtoient — là seulement il distingue.
+// (30 oct., revue) Une ligne SANS repère (lacets, taille enfant, modèle
+// générique) ne décide plus : avant, un seul accessoire dans la liste faisait
+// écrire la même phrase sous chacune des 20 autres paires. Quand certaines
+// lignes n'en ont pas, la phrase le dit (« pour les paires de ce modèle »).
 export function reperesDeListe(titres, repere) {
   const rps = titres.map((t) => (repere ? repere(t) : null));
-  const cles = new Set(rps.map((r) => (r ? r.modele : '')));
-  const commun = titres.length >= 2 && cles.size === 1 && rps[0] ? rps[0] : null;
+  const avec = rps.filter(Boolean);
+  const cles = new Set(avec.map((r) => r.modele));
+  const commun = avec.length >= 2 && cles.size === 1 ? { ...avec[0], partiel: avec.length < titres.length } : null;
   return { commun, parLigne: commun ? titres.map(() => null) : rps };
 }
 function Liste({ r, nouveaux, repere, C, max = 8, cle }) {
@@ -148,19 +166,20 @@ function Liste({ r, nouveaux, repere, C, max = 8, cle }) {
       // ne compte pas le port, VRM l'ajoute ensuite).
       ? <>Aucune annonce gardée : eBay en avait {ecartees}, toutes écartées — {filtres.join(' · ')}.</>
       : <>eBay n’a aucune annonce pour ces critères en ce moment.</>}</p>
-      : <>{commun && <p data-ebay-repere={commun.modele} data-ebay-repere-liste="" style={{ fontSize: 11.5, color: C.muted, margin: '0 0 6px', lineHeight: 1.4 }}>{phraseRepere(commun)}</p>}
+      : <>{commun && <p data-ebay-repere={commun.modele} data-ebay-repere-liste={commun.partiel ? 'partiel' : 'tout'} style={{ fontSize: 11.5, color: C.muted, margin: '0 0 6px', lineHeight: 1.4 }}>{phraseRepere(commun)}</p>}
         <div className="vrm-buy-list" style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 10 }}>{vus.map((x, i) => <Resultat key={x.itemId} x={x} nouveau={nouveaux && nouveaux.has(x.itemId)} rp={parLigne[i]} C={C} />)}</div></>}
     {items.length > max && <button type="button" onClick={() => setTout((v) => !v)} style={{ marginTop: 6, minHeight: 44, border: 'none', background: 'transparent', color: C.text, fontWeight: 600, fontSize: 12.5, cursor: 'pointer', padding: 0 }}>{tout ? 'Voir moins' : `Voir les ${items.length}`}</button>}
     {items.length > 0 && filtres.length > 0 && <p style={{ fontSize: 11.5, color: C.muted, margin: '6px 0 0' }}>Écartées : {filtres.join(' · ')}.</p>}
   </div>;
 }
 
-export default function RechercheEbay({ headers, theme: C, owner, repere }) {
+export default function RechercheEbay({ headers, theme: C, owner, repere, session }) {
   const S = { input: { width: '100%', minHeight: 44, padding: '9px 10px', border: `1px solid ${C.border}`, borderRadius: 8, color: C.text, background: C.card, fontFamily: 'inherit', fontSize: 16, boxSizing: 'border-box' }, bouton: { minHeight: 44, padding: '0 14px', border: `1px solid ${C.border}`, borderRadius: 8, color: C.text, background: C.card, fontFamily: 'inherit', fontSize: 13, fontWeight: 600, cursor: 'pointer' }, label: { display: 'grid', gap: 5, fontSize: 12, color: C.muted } };
   const [f, setF] = useState({ mots: '', pointure: '', maximum: '', etat: 'tous', achatImmediat: true, livraisonFR: true });
   const [manuel, setManuel] = useState(undefined);   // undefined rien · 'encours' · {r} · {erreur}
   const [usage, setUsage] = useState(null);           // { appels, octets, quotaEbay, plafondEbayDoc }
   const [plafondJour, setPlafondJour] = useState('');
+  const [plafondFilJour, setPlafondFilJour] = useState('');   // la part du FIL est faite (la main garde la sienne)
   const [veilles, setVeilles] = useState(undefined);  // undefined lecture · null pas su · { liste, revision }
   const [fil, setFil] = useState({});                 // vid → { etat, r?, erreur?, lueA? }
   const [ajout, setAjout] = useState('');
@@ -172,11 +191,19 @@ export default function RechercheEbay({ headers, theme: C, owner, repere }) {
   useEffect(() => () => { vivant.current = false; }, []);
 
   const noterUsage = (j) => { if (j && j.appels) setUsage((u) => ({ ...(u || {}), appels: j.appels, ...(j.octets ? { octets: j.octets } : {}), ...(j.quotaEbay !== undefined ? { quotaEbay: j.quotaEbay, plafondEbayDoc: j.plafondEbayDoc } : {}) })); };
-  const appeler = async (criteres) => {
+  const appeler = async (criteres, essai = 0) => {
     try { const j = await appelerEbay('chercher', criteres, headers); noterUsage(j); const o = noterOctets(owner, j.octets); if (o && vivant.current) setOctetsJour(o); return { r: j }; }
     catch (e) {
+      if (e.status === 401 && essai === 0 && session && session.renouveler) {
+        // Le jeton a pu expirer pendant la veille : on le renouvelle, puis UN essai.
+        let ok = null; try { ok = await session.renouveler(); } catch (_) { ok = null; }
+        if (ok === true) return appeler(criteres, 1);
+        return ok === null ? { erreur: MSG_SESSION_RENOUVEL, reason: 'session', status: 401, renouvel: 'pas-su' } : { erreur: MSG_SESSION, reason: 'session', status: 401, renouvel: 'refuse' };
+      }
       if (e.reason === 'plafond') setPlafondJour(jourParis());
-      return { erreur: e.message || 'Je n’ai pas pu chercher sur eBay.', reason: e.reason || '', status: e.status || 0 };
+      if (e.reason === 'plafond-fil') setPlafondFilJour(jourParis());
+      // Un second 401 juste après un renouvellement réussi : la session est vraiment perdue.
+      return { erreur: e.status === 401 ? MSG_SESSION : (e.message || 'Je n’ai pas pu chercher sur eBay.'), reason: e.reason || '', status: e.status || 0 };
     }
   };
 
@@ -211,11 +238,21 @@ export default function RechercheEbay({ headers, theme: C, owner, repere }) {
     if (force) { ARRET = null; setArret(null); }
     // Une panne commune : rien n'est relancé avant 15 min (l'horloge de cet appareil).
     if (ARRET && attenteEchec(ARRET, Date.now())) { setArret(ARRET); return; }
+    if ((plafondJour && plafondJour === jourParis()) || (plafondFilJour && plafondFilJour === jourParis())) return;
     enVol.current = true;
     try {
+      // Au réveil, le renouvellement de la session part sur le même évènement :
+      // on l'attend AVANT de lire, plutôt que d'envoyer l'ancien jeton.
+      if (session && session.prete) {
+        let sp = true; try { sp = await session.prete(); } catch (_) { sp = null; }
+        if (!vivant.current) return;
+        if (sp === false) { ARRET = { ici: Date.now(), raison: 'session', message: MSG_SESSION }; setArret(ARRET); return; }
+        if (sp === null) { ARRET = { ici: Date.now(), jusqua: Date.now() + ATTENTE_RENOUVEL_MS, raison: 'session-renouvel', message: MSG_SESSION_RENOUVEL }; setArret(ARRET); return; }
+      }
       for (const v of dansFil) {
         if (!vivant.current) return;
         if (plafondJour && plafondJour === jourParis()) return;
+        if (plafondFilJour && plafondFilJour === jourParis()) return;
         const k = cleV(v), c = CACHE.get(k);
         // Critères refusés par la route : pas de nouvel essai pour CETTE version.
         if (REFUS.has(k)) { const m = REFUS.get(k); setFil((p) => (p[v.id] && p[v.id].etat === 'criteres' ? p : { ...p, [v.id]: { etat: 'criteres', erreur: m } })); continue; }
@@ -223,7 +260,7 @@ export default function RechercheEbay({ headers, theme: C, owner, repere }) {
         if (!force && c && !aRelire(c.ici, Date.now(), visible)) { setFil((p) => (p[v.id] && p[v.id].lueA === c.lueA && p[v.id].etat === 'lu' ? p : { ...p, [v.id]: { etat: 'lu', r: c.r, lueA: c.lueA } })); continue; }
         if (!visible) continue;
         setFil((p) => ({ ...p, [v.id]: { ...(p[v.id] || {}), etat: 'encours' } }));
-        const res = await appeler(criteresDeVeille(v));
+        const res = await appeler({ ...criteresDeVeille(v), source: 'fil' });
         if (!vivant.current) return;
         if (res.r) {
           const lueA = res.r.lueA || new Date().toISOString();
@@ -238,25 +275,25 @@ export default function RechercheEbay({ headers, theme: C, owner, repere }) {
         }
         const raison = raisonEchec(res);
         if (raison === 'criteres') { REFUS.set(k, res.erreur); setFil((p) => ({ ...p, [v.id]: { etat: 'criteres', erreur: res.erreur } })); continue; }
-        setFil((p) => ({ ...p, [v.id]: { ...(p[v.id] || {}), etat: raison === 'plafond' ? 'plafond' : 'pas-su' } }));
-        if (raison === 'plafond') return;
+        setFil((p) => ({ ...p, [v.id]: { ...(p[v.id] || {}), etat: raison === 'plafond' || raison === 'plafond-fil' ? 'plafond' : 'pas-su' } }));
+        if (raison === 'plafond' || raison === 'plafond-fil') return;
         // eBay injoignable, session expirée, compteur illisible : la même cause
         // pour toutes les recherches ⇒ le fil s'arrête, et le dit une fois.
-        ARRET = { ici: Date.now(), raison, message: res.erreur };
+        ARRET = { ici: Date.now(), raison, message: res.erreur, ...(raison === 'session-renouvel' ? { jusqua: Date.now() + ATTENTE_RENOUVEL_MS } : {}) };
         setArret(ARRET);
         return;
       }
     } finally { enVol.current = false; }
   };
   const signature = dansFil.map((v) => v.id + ':' + (v.version || 1)).join(',');
-  useEffect(() => { if (veilles && veilles.liste) relireFil(false); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [signature, plafondJour]);
+  useEffect(() => { if (veilles && veilles.liste) relireFil(false); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [signature, plafondJour, plafondFilJour]);
   useEffect(() => {
     const t = setInterval(() => { relireFil(false); }, 60 * 1000);
     const vis = () => { if (document.visibilityState === 'visible') relireFil(false); };
     document.addEventListener('visibilitychange', vis);
     return () => { clearInterval(t); document.removeEventListener('visibilitychange', vis); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [signature, plafondJour]);
+  }, [signature, plafondJour, plafondFilJour]);
 
   const prixCentimes = (s) => { const t = String(s || '').trim().replace(',', '.'); if (!t) return null; if (!/^\d{1,7}(\.\d{1,2})?$/.test(t)) return NaN; const [a, b = ''] = t.split('.'); return Number(a) * 100 + Number(b.padEnd(2, '0')); };
   const criteresManuels = () => ({ mots: f.mots, pointure: f.pointure.trim(), maximum: prixCentimes(f.maximum), etat: f.etat, achatImmediat: f.achatImmediat, livraisonFR: f.livraisonFR, pays: 'tous' });
@@ -300,9 +337,11 @@ export default function RechercheEbay({ headers, theme: C, owner, repere }) {
   const nbNouveaux = dansFil.reduce((s, v) => s + (fil[v.id] && fil[v.id].r ? nouveauxV(v, fil[v.id].r).size : 0), 0);
   const ap = usage && usage.appels;
   const plafondAuj = plafondJour === jourParis();
+  const plafondFilAuj = !plafondAuj && plafondFilJour === jourParis();
+  const filArrete = plafondAuj || plafondFilAuj;
   // Ce que montre chaque recherche (§7 : une cause commune se dit une fois en
   // tête du fil ; la recherche ne garde qu'une mention courte).
-  const etatAffiche = (e) => e.etat === 'criteres' ? 'criteres' : e.etat === 'encours' ? 'encours' : e.etat === 'lu' ? 'lu' : plafondAuj ? 'plafond' : arret ? 'pas-su' : (e.etat || 'attente');
+  const etatAffiche = (e) => e.etat === 'criteres' ? 'criteres' : e.etat === 'encours' ? 'encours' : e.etat === 'lu' ? 'lu' : filArrete ? 'plafond' : arret ? 'pas-su' : (e.etat || 'attente');
   const premieres = dansFil.filter((v) => { const e = fil[v.id]; return e && e.r && (e.r.items || []).length > 0 && !vusAvant.current[v.id]; }).length;
   const heureMs = (t) => new Date(t).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
 
@@ -339,7 +378,8 @@ export default function RechercheEbay({ headers, theme: C, owner, repere }) {
       {veilles && !dansFil.length && <p data-ebay-fil-vide="" style={{ fontSize: 12.5, color: C.muted }}>Ton fil est vide : cherche une paire ci-dessus puis « Ajouter au fil », ou ajoute une recherche plus bas.</p>}
       {horsFil > 0 && <p data-ebay-hors-fil={horsFil} style={{ fontSize: 12, color: C.muted }}>{horsFil > 1 ? `${horsFil} autres recherches actives ne sont pas relues` : '1 autre recherche active n’est pas relue'} : {MAX_FIL} au plus, les plus récentes d’abord — archive celles qui ne servent plus.</p>}
       {plafondAuj && <p data-ebay-plafond="" style={{ fontSize: 12.5, color: C.text, lineHeight: 1.5 }}>Tes recherches eBay du jour sont faites : le fil s’arrête jusqu’à minuit (heure de Paris).</p>}
-      {!plafondAuj && arret && <p data-ebay-fil-panne={arret.raison} style={{ fontSize: 12.5, color: C.text, lineHeight: 1.5 }}>{arret.message}{arret.raison !== 'session' ? ` Prochain essai vers ${heureMs(arret.ici + RELIRE_MS)}, ou « Relire maintenant ».` : ''}</p>}
+      {plafondFilAuj && <p data-ebay-plafond-fil="" style={{ fontSize: 12.5, color: C.text, lineHeight: 1.5 }}>Ton fil a fait ses {(ap && ap.plafondFil) || 150} relectures du jour : il s’arrête jusqu’à minuit (heure de Paris). Les recherches restantes sont gardées pour chercher à la main, ci-dessus.</p>}
+      {!filArrete && arret && <p data-ebay-fil-panne={arret.raison} style={{ fontSize: 12.5, color: C.text, lineHeight: 1.5 }}>{arret.message}{arret.raison !== 'session' && arret.raison !== 'session-renouvel' ? ` Prochain essai vers ${heureMs(arret.ici + RELIRE_MS)}, ou « Relire maintenant ».` : ''}</p>}
       {premieres > 0 && <p data-ebay-fil-premiere={premieres} style={{ fontSize: 11.5, color: C.muted, margin: '0 0 8px' }}>{premieres > 1 ? `Première lecture de ${premieres} recherches` : 'Première lecture d’une recherche'} : rien n’y est marqué « nouveau ».</p>}
       <div style={{ display: 'grid', gap: 14 }}>{dansFil.map((v) => { const e = fil[v.id] || {}; const nv = e.r ? nouveauxV(v, e.r) : null; const aff = etatAffiche(e);
         return <article key={v.id} data-ebay-fil-recherche={v.id} data-etat={aff}>
@@ -353,12 +393,12 @@ export default function RechercheEbay({ headers, theme: C, owner, repere }) {
           {aff === 'criteres' && <p data-ebay-fil-etat="criteres" style={{ fontSize: 12.5, color: C.text, lineHeight: 1.5 }}>Critères refusés : {e.erreur} Modifie cette recherche plus bas (elle ne sera pas relue avant).</p>}
           {e.r && <Liste r={e.r} nouveaux={nv} repere={repere} C={C} cle={v.id} />}
         </article>; })}</div>
-      {dansFil.length > 0 && !plafondAuj && <button type="button" onClick={() => relireFil(true)} data-geste="relire-fil" style={{ ...S.bouton, marginTop: 10 }}>Relire maintenant</button>}
+      {dansFil.length > 0 && !filArrete && <button type="button" onClick={() => relireFil(true)} data-geste="relire-fil" style={{ ...S.bouton, marginTop: 10 }}>Relire maintenant</button>}
     </div>
 
     <div data-ebay-donnees="" style={{ fontSize: 12, color: C.muted, lineHeight: 1.6, borderTop: `1px solid ${C.border}`, paddingTop: 10 }}>
       <b style={{ color: C.text, fontWeight: 600 }}>Les données</b>
-      <p style={{ margin: '4px 0' }} data-ebay-appels={ap ? ap.aujourdhui : ''}>{ap ? <>Aujourd’hui : {ap.aujourdhui} recherche{ap.aujourdhui > 1 ? 's' : ''} sur {ap.plafond} (ton plafond dans VRM).</> : <>Chaque recherche = un appel à eBay ; {MAX_FIL} recherches au plus dans le fil, relues au plus toutes les 15 min.</>}</p>
+      <p style={{ margin: '4px 0' }} data-ebay-appels={ap ? ap.aujourdhui : ''}>{ap ? <>Aujourd’hui : {ap.aujourdhui} recherche{ap.aujourdhui > 1 ? 's' : ''} sur {ap.plafond} (ton plafond dans VRM){Number.isFinite(ap.fil) && Number.isFinite(ap.plafondFil) ? <>, dont {ap.fil} par le fil ({ap.plafondFil} au plus : le reste est gardé pour chercher à la main)</> : null}.</> : <>Chaque recherche = un appel à eBay ; {MAX_FIL} recherches au plus dans le fil, relues au plus toutes les 15 min.</>}</p>
       <p style={{ margin: '4px 0' }} data-ebay-quota={usage && usage.quotaEbay ? usage.quotaEbay.restant : ''}>{usage && usage.quotaEbay ? <>eBay : {usage.quotaEbay.restant.toLocaleString('fr-FR')} recherches restantes sur {usage.quotaEbay.limite.toLocaleString('fr-FR')} aujourd’hui, pour toute l’application VRM (dit par eBay).</> : <>eBay limite toute l’application VRM à 5 000 recherches par jour (documentation d’eBay — pas encore mesuré).</>}</p>
       {usage && usage.octets && <p style={{ margin: '4px 0' }} data-ebay-octets={usage.octets.vrm}>Dernière recherche : {ko(usage.octets.ebay)} reçus d’eBay par VRM, {ko(usage.octets.vrm)} envoyés à cet appareil (hors photos, chargées à l’affichage).</p>}
       {octetsJour && octetsJour.n > 0 && <p style={{ margin: '4px 0' }} data-ebay-octets-jour={octetsJour.vrm}>Aujourd’hui sur cet appareil : {octetsJour.n} recherche{octetsJour.n > 1 ? 's' : ''}, {ko(octetsJour.vrm)} reçus ici ({ko(octetsJour.ebay)} reçus d’eBay par VRM, réduits avant l’envoi).</p>}

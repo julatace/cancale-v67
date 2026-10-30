@@ -271,6 +271,64 @@ const faireRes = () => { const x = { code: null, corps: null, entetes: {} }; x.s
     dit(r.code === 400 && r.corps.reason === 'criteres' && !browse(r.journal).length && !compteur(J), 'J. critères refusés ⇒ 400 « criteres », zéro appel, rien compté', 'code ' + r.code);
   });
 
+  // ── K. (30 oct., dernier tour) UNE PART DU PLAFOND POUR LA MAIN ─────────────
+  // Le fil (10 recherches × 4 par heure) épuisait seul les 200 du jour : après
+  // une matinée d'onglet ouvert, plus une seule recherche à la main. Le fil
+  // s'arrête à 150 ; les 50 restantes sont gardées pour « Chercher ».
+  await essaie('K. part du fil', async () => {
+    lignes = []; mode = {};
+    const r0 = await app(JWT_J, { ...criteres, source: 'fil' });
+    const auj = (compteur(J) || {}).jour;
+    dit(r0.code === 200 && (compteur(J) || {}).fil === 1 && (compteur(J) || {}).n === 1, 'K. une relecture du fil est comptée dans le total ET dans la part du fil', JSON.stringify(compteur(J)));
+    lignes = [{ owner: J, id: CPT, data: { jour: auj, n: 150, fil: 150, rev: 4 } }];
+    const r = await app(JWT_J, { ...criteres, source: 'fil' });
+    dit(r.code === 429 && r.corps.reason === 'plafond-fil' && !browse(r.journal).length, 'K. 150 relectures du fil ⇒ le fil s’arrête (429 « plafond-fil »), zéro appel à Browse', 'code ' + r.code + ' ' + (r.corps.reason || ''));
+    dit(/il te reste 50 recherches à la main/i.test(String(r.corps.error || '')), 'K. la phrase dit ce qui reste pour chercher à la main', String(r.corps.error || ''));
+    const r2 = await app(JWT_J, criteres);
+    dit(r2.code === 200 && (compteur(J) || {}).n === 151 && (compteur(J) || {}).fil === 150, 'K. une recherche à la main passe encore (comptée dans le total, pas dans le fil)', 'code ' + r2.code + ' ' + JSON.stringify(compteur(J)));
+    lignes = [{ owner: J, id: CPT, data: { jour: auj, n: 200, fil: 150, rev: 5 } }];
+    const r3 = await app(JWT_J, criteres);
+    dit(r3.code === 429 && r3.corps.reason === 'plafond', 'K. le total de 200 reste le plafond de la main', 'code ' + r3.code);
+  });
+
+  // ── L. (30 oct., dernier tour) UNE RECHERCHE D'AVANT LA RÈGLE SE CORRIGE ────
+  // Enregistrée avant la règle commune (catégorie en lettres), elle était
+  // refusée par le fil (« modifie-la ») ET par « Modifier » (l'ANCIENNE était
+  // revalidée) : seule issue, archiver et recréer.
+  await essaie('L. recherche d’avant', async () => {
+    const met = await import('file://' + path.join(RACINE, 'src', 'operations', 'metier.js'));
+    const id = '00000000-0000-4000-8000-0000000000aa';
+    const vieille = { id, titre: 'XT-6', mots: 'salomon xt-6', exclus: '', categorie: 'baskets', etatArticle: 'tous', minimum: null, maximum: 9000, pays: 'FR', pointure: '', achatImmediat: true, livraisonFR: true, etat: 'preparee', version: 1, cree: '2026-10-01T10:00:00.000Z', evenements: [] };
+    const src = { ...met.VIDE(), revision: 3, veilles: [vieille] };
+    const m = new Date().toISOString();
+    let d = null, err = '';
+    try { d = met.appliquer(src, { id: '00000000-0000-4000-8000-0000000000b1', type: 'veille.modifier', revision: 3, donnees: { cible: id, versionAttendue: 1, titre: 'XT-6', mots: 'salomon xt-6', exclus: '', categorie: '', etatArticle: 'tous', minimum: null, maximum: 9000, pays: 'FR', pointure: '43' } }, { acteur: J, maintenant: m }); } catch (e) { err = e.message; }
+    const x = d && d.veilles.find((v) => v.id === id);
+    dit(!!x && x.categorie === '' && x.version === 2, 'L. une recherche enregistrée avant la règle (catégorie « baskets ») peut être corrigée', err || JSON.stringify(x && { categorie: x.categorie, version: x.version }));
+    const ev = x && x.evenements && x.evenements[0];
+    dit(!!ev && ev.avant && ev.avant.categorie === 'baskets' && ev.apres.categorie === '', 'L. l’historique garde l’ancienne recherche telle qu’elle était', JSON.stringify(ev && ev.avant));
+    let err2 = '';
+    try { met.appliquer(src, { id: '00000000-0000-4000-8000-0000000000b2', type: 'veille.modifier', revision: 3, donnees: { cible: id, versionAttendue: 1, titre: 'XT-6', mots: 'salomon xt-6', categorie: 'chaussures', etatArticle: 'tous', minimum: null, maximum: 9000, pays: 'FR' } }, { acteur: J, maintenant: m }); } catch (e) { err2 = e.message; }
+    dit(/catégorie/i.test(err2), 'L. la NOUVELLE recherche reste jugée par la règle commune', err2);
+    let err3 = '';
+    try { met.appliquer(src, { id: '00000000-0000-4000-8000-0000000000b3', type: 'veille.dupliquer', revision: 3, donnees: { cible: id, titre: 'copie' } }, { acteur: J, maintenant: m }); } catch (e) { err3 = e.message; }
+    dit(/modifie-la d’abord/.test(err3), 'L. dupliquer une recherche refusée dit quoi changer', err3);
+  });
+
+  // ── M. (30 oct., dernier tour) « AIR MAX 1 » N'EST PAS DANS « AIR MAX 180 » ──
+  // Le modèle était trouvé par une sous-chaîne : l'Air Max 180 (une autre paire,
+  // un autre prix) recevait le repère de l'Air Max 1, côté ventes et côté eBay.
+  await essaie('M. modèle sur une frontière', async () => {
+    const fs = require('fs');
+    const SRC = fs.readFileSync(path.join(RACINE, 'src', 'App.jsx'), 'utf8');
+    const prendre = (nom) => { const i = SRC.search(new RegExp('(^|\\n)(const ' + nom + ' ?=|function ' + nom + '\\()')); if (i < 0) return ''; let j = SRC.indexOf('{', SRC.indexOf(nom, i)), p = 0; if (/^\s*const /.test(SRC.slice(i, i + 12)) && SRC.slice(i).search(/=\s*\[/) < 40) { j = SRC.indexOf('[', i); for (let k = j; k < SRC.length; k++) { if (SRC[k] === '[') p++; if (SRC[k] === ']') { p--; if (!p) return SRC.slice(i, k + 2); } } } for (let k = j; k < SRC.length; k++) { if (SRC[k] === '{') p++; if (SRC[k] === '}') { p--; if (!p) return SRC.slice(i, k + 1); } } return ''; };
+    const code = [prendre('KNOWN_MODELS'), prendre('extractModel'), prendre('contientModele')].join('\n');
+    const em = new Function(code + '\nreturn extractModel;')();
+    const cas = [['Nike Air Max 180 blanc 43', 'air max'], ['Nike Air Max 1000 noir', 'air max'], ['Nike Air Max 1 blanc 43', 'air max 1'], ['Nike air max 1 86 OG', 'air max 1'], ['Salomon XT-6 noir', 'xt 6'], ['Salomon XT-60 test', null]];
+    const faux = cas.filter(([t, m]) => em(t) !== m).map(([t, m]) => t + ' → ' + em(t) + ' (attendu ' + m + ')');
+    dit(faux.length === 0, 'M. un modèle qui finit par un chiffre ne se lit pas dans un nombre plus long (Air Max 180 ≠ Air Max 1)', faux.join(' · '));
+  });
+
   console.log(`\n${ko ? '❌' : '✅'} audit-ebay-recherche : ${ok} vert(s), ${ko} rouge(s)`);
   process.exit(ko ? 1 : 0);
 })();
