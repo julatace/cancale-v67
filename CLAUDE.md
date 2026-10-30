@@ -10,7 +10,8 @@
 > **Revue du même jour (16 défauts, tous reproduits puis corrigés)** : « N paires **prêtes** » n'est dit (écran, Ma journée,
 > notification) que pour des paires PRÉPARÉES chez eBay (`resume.pretes`, `phraseResumeAgent`) — sinon « N paires à
 > regarder » ; « **Compléter** » met la paire préparée en UN brouillon et l'ouvre dans le formulaire d'eBay → Annonces ; la
-> préparation repart par jeton (plus de lignes figées sur « Je prépare… »), frais gardés 30 min ; « par jour » et « + % / € »
+> préparation repart par jeton (plus de lignes figées sur « Je prépare… »), frais gardés 30 min et **refaits chez eBay avant la
+> confirmation** s'ils sont plus vieux (écran resté ouvert) ; « par jour » et « + % / € »
 > s'enregistrent à la sortie du champ ; un 503 qui dit « rien n'a été envoyé » est un REFUS, jamais « incertaine » ; une
 > incertaine (`vrm_agent_ebay_incertains`, synchronisé) ne revient qu'après une relecture d'eBay ≥ 15 min plus tard, avec le
 > **même uuid** (la route `publish` accepte `uuid` et confirme un 488 par GetItem/SKU : jamais deux annonces) ; « Programmer
@@ -18,11 +19,16 @@
 > « sauf »…) n'est jamais appliquée à l'envers (rien n'est gardé, c'est dit), les nombres sans règle sont dits, « euros »
 > compris ; raisons accordées au nombre ; bilan avec le lien de chaque paire publiée. Décidé : pas d'onglet à part — l'agent est une
 > section titrée « Agent eBay » en tête d'« À traiter » (les consignes et la notification le disent).
+> **Dernier tour (4 défauts, rouges sur cf5f710b)** : « **Arrêter l'agent** » le fait TAIRE — résumé neutre `{n:0}` au geste
+> (aussi sans compte eBay relié ou hors euros, `ETATS_AGENT_MUET`), et Ma journée + la notification lisent les réglages
+> (`agentArrete`) : plus de « 3 prêtes » pendant 48 h ; phrase libre : « en 41 à 50 € » = pointure 41 et « 50 » dit non compris
+> (plus 19 pointures), « depuis moins de 10 jours » jamais un prix, « Nike, Adidas et Puma » / « les Adidas. » lus ; Réglages →
+> Notifications ne promet plus « prêtes ». « Pas su » ne réécrit toujours pas le résumé (un hoquet n'efface rien).
 > **Le matin** (`ship-reminders`, `rappelAgentEbay`) : « 🛒 N paires à regarder pour eBay » (ou « prêtes » si préparées),
 > préférence `agentebay` (défaut oui), une fois par jour (mémo AVANT), rien si > 48 h, pause du jour, illisible.
-> Preuves : `audit-agent-ebay.cjs` (61, **17/17 mutations** ; 24 rouges sur le code relu, tout rouge sur origin/main) ;
+> Preuves : `audit-agent-ebay.cjs` (77, **23/23 mutations**, 12 rouges sur cf5f710b ; 24 rouges sur le code relu, tout rouge sur origin/main) ;
 > `audit-ebay-route.cjs` [R-agent] (3 rouges sur le code relu : UUID, 488) ; banc `ebay-agent.cjs` (390 tactile + 1512 sombre,
-> faux eBay, scénarios A-K, 128 contrôles) ; banc `agent-ebay-push.cjs` (vraie route, 18). ⚠️ **Non mesuré** : aucun appel réel
+> faux eBay, scénarios A-N, 152 contrôles, 12 rouges sur le build de cf5f710b) ; banc `agent-ebay-push.cjs` (vraie route, 21). ⚠️ **Non mesuré** : aucun appel réel
 > à eBay (pubinfo, pubverify, publish, 488 : formes de la doc) ; le délai réel avant qu'eBay montre une annonce créée (15 min
 > est un choix). **Gestes de Julien** : eBay → À traiter, régler « Ce que je publie » (ou écrire ce qu'il VEUT), puis dire oui.
 
