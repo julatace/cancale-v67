@@ -14492,6 +14492,18 @@ function PorteNouveauOAuth({ fournisseur, email, onContinuer }) {
   const [etape, setEtape] = React.useState('choix');
   const [busy, setBusy] = React.useState(false);
   const [err, setErr] = React.useState('');
+  // Ce Discord est-il celui déjà affiché (vérifié) sur un AUTRE compte VRM ?
+  // { email, pseudo } si oui · null sinon ou « pas su » (rien n'est dit).
+  const [deja, setDeja] = React.useState(null);
+  React.useEffect(() => {
+    if (fournisseur !== 'discord') return;
+    let fini = false;
+    fetch('/api/compte?mode=discord-deja', { headers: { ...enTeteSession() } })
+      .then(r => r.ok ? r.json() : null)
+      .then(j => { if (!fini && j && j.trouve === true && j.email) setDeja({ email: String(j.email), pseudo: String(j.pseudo || '') }); })
+      .catch(() => {});
+    return () => { fini = true; };
+  }, [fournisseur]);
   const supprimer = async () => {
     setBusy(true); setErr('');
     try {
@@ -14506,16 +14518,19 @@ function PorteNouveauOAuth({ fournisseur, email, onContinuer }) {
   return <div data-porte-nouveau-oauth={etape} style={{ minHeight: '100vh', background: C.bg, padding: 16, boxSizing: 'border-box' }}>
     <div style={boite} role="dialog" aria-modal="true" aria-labelledby="vrm-nouveau-oauth-titre">
       {etape === 'choix' && <>
-        <h1 id="vrm-nouveau-oauth-titre" style={{ fontSize: 20, margin: '0 0 10px' }}>Nouveau compte VRM ?</h1>
-        <p style={{ fontSize: 14, lineHeight: 1.5, margin: '0 0 18px', color: C.muted }}>Ce compte {nom} n’était relié à aucun compte VRM : VRM vient d’en créer un nouveau, vide.</p>
+        <h1 id="vrm-nouveau-oauth-titre" style={{ fontSize: 20, margin: '0 0 10px' }}>{deja ? 'Ce Discord est déjà sur ton compte VRM' : 'Nouveau compte VRM ?'}</h1>
+        {deja
+          ? <p data-nouveau-oauth-deja={deja.email} style={{ fontSize: 14, lineHeight: 1.5, margin: '0 0 18px', color: C.muted }}>{deja.pseudo ? `« ${deja.pseudo} »` : 'Ce compte Discord'} est affiché sur ton compte VRM <strong style={{ color: C.text }}>{deja.email}</strong>, mais seulement comme pseudo pour la carte — pas pour te connecter. VRM vient donc de créer un second compte, vide.</p>
+          : <p style={{ fontSize: 14, lineHeight: 1.5, margin: '0 0 18px', color: C.muted }}>Ce compte {nom} n’était relié à aucun compte VRM : VRM vient d’en créer un nouveau, vide.</p>}
         <div style={{ display: 'grid', gap: 10 }}>
-          <button type="button" className="vrm-b vrm-b-primaire vrm-b-plein" data-nouveau-oauth="continuer" onClick={onContinuer}>Oui, c’est un nouveau compte</button>
-          <button type="button" className="vrm-b vrm-b-secondaire vrm-b-plein" data-nouveau-oauth="existant" onClick={() => setEtape('confirmer')}>J’ai déjà un compte VRM</button>
+          {deja && <button type="button" className="vrm-b vrm-b-primaire vrm-b-plein" data-nouveau-oauth="existant" onClick={() => setEtape('confirmer')}>Supprimer ce compte vide et revenir au mien</button>}
+          <button type="button" className={`vrm-b ${deja ? 'vrm-b-discret' : 'vrm-b-primaire'} vrm-b-plein`} data-nouveau-oauth="continuer" onClick={onContinuer}>Oui, c’est un nouveau compte</button>
+          {!deja && <button type="button" className="vrm-b vrm-b-secondaire vrm-b-plein" data-nouveau-oauth="existant" onClick={() => setEtape('confirmer')}>J’ai déjà un compte VRM</button>}
         </div>
       </>}
       {etape === 'confirmer' && <>
         <h1 id="vrm-nouveau-oauth-titre" style={{ fontSize: 20, margin: '0 0 10px' }}>Supprimer ce compte vide ?</h1>
-        <p style={{ fontSize: 14, lineHeight: 1.5, margin: '0 0 18px', color: C.muted }}>Ton vrai compte n’est pas touché. Ensuite : connecte-toi avec ton email, puis Réglages → Mon compte → Comptes associés → « Connecter {nom} ». La prochaine fois, « Se connecter avec {nom} » ouvrira ton vrai compte.</p>
+        <p style={{ fontSize: 14, lineHeight: 1.5, margin: '0 0 18px', color: C.muted }}>Ton vrai compte n’est pas touché. Ensuite : connecte-toi {deja ? <>avec <strong>{deja.email}</strong></> : 'avec ton email'}, puis Réglages → Mon compte → Comptes associés → « Connecter {nom} ». La prochaine fois, « Se connecter avec {nom} » ouvrira ton vrai compte.</p>
         {err && <p role="alert" style={{ fontSize: 13, color: C.warn || C.text, margin: '0 0 12px' }}>{err}</p>}
         <div style={{ display: 'grid', gap: 10 }}>
           <button type="button" className="vrm-b vrm-b-primaire vrm-b-plein" data-nouveau-oauth="supprimer" disabled={busy || !email} onClick={supprimer}>{busy ? 'Suppression…' : 'Supprimer ce compte vide'}</button>
