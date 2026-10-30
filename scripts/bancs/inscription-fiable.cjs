@@ -36,6 +36,7 @@ const dist=process.env.BANC_DIST||path.join(__dirname,'../../dist');
   await p.getByRole('alert').filter({hasText:'au moins 8 caractères'}).waitFor();
   assert.equal(appels,0,'Un mot de passe incomplet ne lance pas une inscription');
   await secret.fill('Secret123');
+  assert.equal(await p.getByRole('alert').count(),0,'L’erreur précédente disparaît pendant la correction');
   assert.equal(await p.getByRole('button',{name:'Mot de passe oublié ?',exact:true}).count(),0,'Pas de diversion de récupération pendant la création');
   await p.screenshot({path:`/tmp/vrm-inscription-${largeur}.png`,fullPage:true});
   await p.evaluate(()=>{const f=document.querySelector('[data-connexion] form');f.requestSubmit();f.requestSubmit();});

@@ -14711,7 +14711,7 @@ function AuthScreen() {
                 <input id="vrm-cx-password" type={motDePasseVisible?'text':'password'} autoComplete={(mode==='up'||mode==='newpw')?'new-password':'current-password'} required
                   aria-describedby={(mode==='up'||mode==='newpw')?'vrm-cx-regles':undefined}
                   placeholder={mode==='newpw'?'Nouveau mot de passe (8 caractères min.)':'Mot de passe'}
-                  disabled={busy} value={pw} onChange={e=>setPw(e.target.value)} style={{...field,paddingRight:88}}/>
+                  disabled={busy} value={pw} onChange={e=>{setPw(e.target.value);setErr('');}} style={{...field,paddingRight:88}}/>
                 <button type="button" disabled={busy} aria-label={motDePasseVisible?'Masquer le mot de passe':'Afficher le mot de passe'} aria-pressed={motDePasseVisible} onClick={()=>setMotDePasseVisible(v=>!v)}>{motDePasseVisible?'Masquer':'Afficher'}</button>
               </span>
             </div>
