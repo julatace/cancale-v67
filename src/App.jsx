@@ -10655,15 +10655,12 @@ function NotifsMuettes({ onNav }) {
   }, []);
   if (!etat || etat.pret) return null;
   return (
-    <Notice tone="danger" icon="alert"
+    <Notice tone="warn" icon="alert"
       title="Ton téléphone ne recevra aucune notification"
       value={etat.devices ? `${etat.devices} appareil${etat.devices>1?'s':''} abonné${etat.devices>1?'s':''}` : null}
-      desc="Le serveur n'a pas sa clé d'envoi : ni vente, ni colis, ni offre ne feront sonner ton téléphone tant qu'elle manque."
+      desc="Le serveur n'a pas sa clé d'envoi : ni vente, ni colis, ni offre ne sonneront."
       detail={"Vercel → projet cancale-v67 → Settings → Environment Variables → ajouter VAPID_PRIVATE_KEY, puis redéployer. Rouvre ensuite l'app une fois sur chaque téléphone : il se réabonne tout seul."}
-      action={onNav && <button type="button" className="vrm-b vrm-b-primaire" onClick={()=>onNav('settings')}
-        style={{border:'none',background:C.danger,color:'#fff',borderRadius:8,padding:'8px 14px',fontSize:12.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit',whiteSpace:'nowrap'}}>
-        Voir les réglages
-      </button>}
+      action={onNav && <Bouton variante="secondaire" icone="gear" className="vrm-b-petit" onClick={()=>onNav('settings')}>Réglages</Bouton>}
       style={{marginBottom:14}}/>
   );
 }
@@ -15218,7 +15215,7 @@ function LigneRetraitHorsLigne({ r, i, quand, grise, maintenant, verifier = fals
         {r.code
           ? <div data-hl-code={r.code} style={{display:'inline-block',marginTop:8,fontSize:19,fontWeight:800,letterSpacing:1.2,color:C.text,background:C.card2 || C.bg,border:`1px solid ${C.border}`,borderRadius:8,padding:'5px 12px'}}>{r.code}</div>
           : !r.qr && <div style={{marginTop:6,fontSize:12,color:C.muted}}>Code pas lu à {quand}.</div>}
-        <div style={{marginTop:8}}><button type="button" disabled aria-disabled="true" data-hl-geste="" style={grise}>{verifier ? "Je l'ai eu" : "Je l'ai retiré"}</button></div>
+        <div style={{marginTop:8}}><Bouton variante="secondaire" className="vrm-b-petit" disabled aria-disabled="true" data-hl-geste="" title="Hors ligne : rien ne peut être envoyé" style={{flexShrink:0}}>{verifier ? "Je l'ai eu" : "Je l'ai retiré"}</Bouton></div>
       </div>
       <QrHorsLigne qr={r.qr} code={r.code}/>
     </div>
@@ -15284,7 +15281,7 @@ function JourneeHorsLigne({ uid, tab }) {
                 <div style={{fontSize:14,fontWeight:600,color:C.text,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{e.numero ? `N°${e.numero} · ` : ''}{e.titre || '(sans titre)'}</div>
                 <div style={{fontSize:12,color:C.muted,marginTop:2}}>{[e.plateforme === 'ebay' ? 'eBay' : 'Vinted', e.compte, limiteTxt(e)].filter(Boolean).join(' · ')}</div>
               </div>
-              <button type="button" disabled aria-disabled="true" data-hl-geste="" style={grise}>Colis fait</button>
+              <Bouton variante="secondaire" className="vrm-b-petit" disabled aria-disabled="true" data-hl-geste="" title="Hors ligne : rien ne peut être envoyé" style={{flexShrink:0}}>Colis fait</Bouton>
             </div>
           ))}
         {photo.nEnvoyer > photo.envoyer.length && <div style={{fontSize:12,color:C.muted,padding:'6px 0 10px'}}>… et {photo.nEnvoyer - photo.envoyer.length} autres.</div>}
@@ -16662,26 +16659,26 @@ function PremiersPas({ onNav, titreNeuf, introNeuf }) {
   // de la déconnecter d'ici (son icône, connectée, ouvre VRM : pas sa fenêtre).
   const majLiaison = fait.ext && !fait.lien && voie === 'retard' && (etape === 'pasconnectee' || etape === 'autrecompte');
   const bouton = (!fait.ext && mobile==='ios-orion')
-    ? <a href={`${LIEN_ORION_FICHIER}?v=${EXT_ATTENDUE}`} download data-premiers-geste="orion-fichier" style={{textDecoration:'none',background:C.accent,color:C.onAccent||'#fff',borderRadius:10,padding:'12px 18px',fontSize:14,fontWeight:600}}>Télécharger pour Orion</a>
+    ? <a href={`${LIEN_ORION_FICHIER}?v=${EXT_ATTENDUE}`} download data-premiers-geste="orion-fichier" className="vrm-b vrm-b-primaire">Télécharger pour Orion</a>
     : (!fait.ext && boutique.lien && (!sansSouris || (boutique.nav === 'firefox' && estAndroid())))
-    ? <a href={boutique.lien} target="_blank" rel="noreferrer" data-premiers-geste="boutique" style={{textDecoration:'none',background:C.accent,color:C.onAccent||'#fff',borderRadius:10,padding:'12px 18px',fontSize:14,fontWeight:600}}>Installer depuis la boutique</a>
+    ? <a href={boutique.lien} target="_blank" rel="noreferrer" data-premiers-geste="boutique" className="vrm-b vrm-b-primaire">Installer depuis la boutique</a>
     : (!fait.ext && orion && (boutique.nav === 'safari' || boutique.nav === 'orion') && !(sansSouris && estAndroid()))
-    ? <a href={orion} target="_blank" rel="noreferrer" data-premiers-geste="orion" style={{textDecoration:'none',background:C.accent,color:C.onAccent||'#fff',borderRadius:10,padding:'12px 18px',fontSize:14,fontWeight:600}}>Installer dans Orion</a>
+    ? <a href={orion} target="_blank" rel="noreferrer" data-premiers-geste="orion" className="vrm-b vrm-b-primaire">Installer dans Orion</a>
     : (!fait.ext && sansSouris && LIENS_BOUTIQUES.firefox && (mobile === 'samsung' || mobile === 'android' || mobile === 'duckduckgo'))
-    ? <a href={LIEN_FIREFOX_ANDROID} target="_blank" rel="noreferrer" data-premiers-geste="firefox-android" style={{textDecoration:'none',background:C.accent,color:C.onAccent||'#fff',borderRadius:10,padding:'12px 18px',fontSize:14,fontWeight:600}}>Installer Firefox pour Android</a>
+    ? <a href={LIEN_FIREFOX_ANDROID} target="_blank" rel="noreferrer" data-premiers-geste="firefox-android" className="vrm-b vrm-b-primaire">Installer Firefox pour Android</a>
     : (!fait.ext && sansSouris)
     ? null   // un zip sur un téléphone est du poids mort, pas un geste
     : (!fait.ext && (boutique.nav === 'firefox' || boutique.nav === 'safari' || boutique.nav === 'samsung' || boutique.nav === 'duckduckgo' || boutique.nav === 'orion'))
     ? null   // le zip est un paquet Chromium : rien à proposer ici
     : !fait.ext
-    ? <a href="/VRM-extension.zip" download style={{textDecoration:'none',background:C.accent,color:C.onAccent||'#fff',borderRadius:10,padding:'12px 18px',fontSize:14,fontWeight:600}}>Télécharger l’extension</a>
+    ? <a href="/VRM-extension.zip" download className="vrm-b vrm-b-primaire">Télécharger l’extension</a>
     : majLiaison
       ? <>
-          <a href="/VRM-extension.zip" download data-premiers-geste="maj" style={{textDecoration:'none',background:C.accent,color:C.onAccent||'#fff',borderRadius:10,padding:'12px 18px',fontSize:14,fontWeight:600}}>Télécharger la mise à jour ({EXT_ATTENDUE})</a>
-          {etape === 'autrecompte' && <button type="button" data-premiers-geste="deconnecter" disabled={deconnectee} onClick={deconnecter} style={{border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:10,padding:'12px 18px',fontSize:14,fontWeight:600,cursor:deconnectee?'default':'pointer',fontFamily:'inherit'}}>{deconnectee ? 'Déconnectée — connecte-la avec ton mot de passe VRM' : 'Déconnecter l’extension de ce Chrome'}</button>}
+          <a href="/VRM-extension.zip" download data-premiers-geste="maj" className="vrm-b vrm-b-primaire">Télécharger la mise à jour ({EXT_ATTENDUE})</a>
+          {etape === 'autrecompte' && <button type="button" className="vrm-b vrm-b-secondaire vrm-b-court" data-premiers-geste="deconnecter" disabled={deconnectee} onClick={deconnecter}>{deconnectee ? 'Déconnectée — connecte-la avec ton mot de passe VRM' : 'Déconnecter l’extension de ce Chrome'}</button>}
         </>
     : etape === 'connectee'
-      ? <a href="https://www.vinted.fr" target="_blank" rel="noreferrer" style={{textDecoration:'none',background:C.accent,color:C.onAccent||'#fff',borderRadius:10,padding:'12px 18px',fontSize:14,fontWeight:600}}>Ouvrir vinted.fr</a>
+      ? <a href="https://www.vinted.fr" target="_blank" rel="noreferrer" className="vrm-b vrm-b-primaire">Ouvrir vinted.fr</a>
       : null;
 
   return (
@@ -16694,7 +16691,7 @@ function PremiersPas({ onNav, titreNeuf, introNeuf }) {
       {/* Où on en est — trois pastilles, lisibles d'un coup d'œil. */}
       <div style={{display:'flex',gap:6,marginBottom:14}}>
         {ETAPES.map((e,k)=>(
-          <span key={e.c} style={{flex:1,height:4,borderRadius:999,background:(k+1)<n?(INV_STATUS.online.color):(k+1)===n?C.accent:C.border}}/>
+          <span key={e.c} style={{flex:1,height:4,borderRadius:999,background:(k+1)<=n?C.accent:C.border,opacity:(k+1)===n?.55:1}}/>
         ))}
       </div>
       {/* Mini-tuto illustré de l'étape courante — sur le parcours normal (3 étapes),
@@ -16706,7 +16703,7 @@ function PremiersPas({ onNav, titreNeuf, introNeuf }) {
       {(bouton || onNav) && (
         <div style={{display:'flex',gap:8,flexWrap:'wrap',marginTop:16,alignItems:'center'}}>
           {bouton}
-          <button type="button" onClick={()=>onNav&&onNav('vintedaccounts')} style={{border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:10,padding:'12px 18px',fontSize:14,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Voir mes comptes liés</button>
+          <Bouton variante="discret" onClick={()=>onNav&&onNav('vintedaccounts')}>Mes comptes liés ›</Bouton>
         </div>
       )}
 
@@ -33791,7 +33788,7 @@ function AnalysesStatistiques({panelOff}) {
 }
 function PerformanceJournee({panelOff,onNav,moisN,moisEur,partiel}) {
  return <section className="vrm-day-performance vrm-day-card" aria-label="Performance des ventes" style={{background:C.card,border:`1px solid ${C.border}`,color:C.text}}>
-  <div className="vrm-day-head"><h3>Analyses des ventes</h3><button type="button" onClick={()=>onNav?.('dashboard')}>Statistiques ›</button></div>
+  <div className="vrm-day-head"><h3>Analyses des ventes</h3><Bouton variante="discret" onClick={()=>onNav?.('dashboard')}>Statistiques ›</Bouton></div>
   <RepartitionsVentes panelOff={panelOff} apercu/>
   <div className="vrm-performance-chiffres"><div><span>Ventes ce mois</span><b>{partiel?'—':moisN}</b></div><div><span>Prix de vente moyen</span><b>{!partiel&&moisN?fmt(moisEur/moisN):'—'}</b></div></div>
   {partiel&&<p style={{fontSize:11,color:C.muted}}>Lecture partielle : les indicateurs attendent les ventes manquantes.</p>}
@@ -34216,10 +34213,7 @@ function BeneficeJournee({ onNav, place }) {
     if (on) return null;
     return (
       <div style={{ marginTop: 14, textAlign: 'center' }}>
-        <button type="button" className="vrm-lien-action" data-journee-benef-activer="" onClick={() => poser(true)}
-          style={{ background: 'none', border: 0, padding: 0, color: C.muted, fontSize: 12.5, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }}>
-          + Afficher ton bénéfice dans Ma journée
-        </button>
+        <Bouton variante="discret" data-journee-benef-activer="" onClick={() => poser(true)}>+ Afficher mon bénéfice</Bouton>
       </div>
     );
   }
@@ -34256,11 +34250,11 @@ function BeneficeJournee({ onNav, place }) {
       style={place === 'integre' ? {borderTop:`1px solid ${C.border}`} : { border: `1px solid ${C.border}`, background: C.card, boxShadow: C.shadow || 'none' }}>
       <div className="vrm-day-head">
         <span className="vrm-day-k" style={{ color: C.muted }}>Ton bénéfice{B ? ` · ${B.libelle}` : ''}</span>
-        <a href="?tab=compta" className="vrm-day-lien" data-journee-benef-detail="" onClick={allerCompta} style={{ color: C.accent, textDecoration: 'none' }}>Détail ›</a>
+        <Bouton variante="discret" href="?tab=compta" className="vrm-day-lien" data-journee-benef-detail="" onClick={allerCompta}>Détail ›</Bouton>
       </div>
       {!B ? (
         <div className="vrm-day-note" style={{ color: C.muted, marginTop: 6, lineHeight: 1.5 }}>
-          {etat === 'encours' ? 'Je lis ton bénéfice…' : <>Ton bénéfice se calcule dans l'écran Ventes, à partir de tes prix d'achat : ouvre-le une fois (<a href="?tab=cat_ventes" onClick={(ev) => { ev.preventDefault(); if (onNav) onNav('cat_ventes'); }} style={{ color: C.accent, fontWeight: 600, textDecoration: 'none' }}>Ventes</a>), il arrivera ici.</>}
+          {etat === 'encours' ? 'Je lis ton bénéfice…' : <>Il se calcule dans l'écran Ventes : ouvre-le une fois. <Bouton variante="discret" href="?tab=cat_ventes" onClick={(ev) => { ev.preventDefault(); if (onNav) onNav('cat_ventes'); }}>Ventes ›</Bouton></>}
         </div>
       ) : (<>
         <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(0,1fr)', gap: 12, marginTop: 8 }}>
@@ -34274,17 +34268,17 @@ function BeneficeJournee({ onNav, place }) {
         )}
         {B.nCout < B.n && (
           <div className="vrm-day-note" style={{ marginTop: 6 }}>
-            <button type="button" className="vrm-lien-action" data-journee-benef-porte="" onClick={versSaisiePrix} style={{ background: 'none', border: 0, padding: 0, color: C.accent, fontWeight: 600, cursor: 'pointer', fontSize: 'inherit', fontFamily: 'inherit' }}>Compléter les prix d'achat</button>
+            <Bouton variante="discret" data-journee-benef-porte="" onClick={versSaisiePrix}>Compléter les prix d'achat ›</Bouton>
           </div>
         )}
         <div className="vrm-day-note" data-journee-benef-ligne="jour" style={{ color: C.muted, marginTop: 10, paddingTop: 10, borderTop: `1px solid ${C.border}`, lineHeight: 1.5 }}>
           {J && J.n > 0
-            ? <>Aujourd'hui : <b style={{ color: C.text, fontWeight: 600 }}>{val(brutDe(J))}</b> brut{J.nCout > 0 ? <> · <b style={{ color: C.text, fontWeight: 600 }}>{val(J.net)}</b> net des ventes</> : null}{J.nCout < J.n ? ` (prix d'achat connus pour ${J.nCout} sur ${J.n})` : ''} — charges et cotisations se comptent au mois.</>
+            ? <>Aujourd'hui : <b style={{ color: C.text, fontWeight: 600 }}>{val(brutDe(J))}</b> brut{J.nCout > 0 ? <> · <b style={{ color: C.text, fontWeight: 600 }}>{val(J.net)}</b> net des ventes</> : null}{J.nCout < J.n ? ` (prix d'achat connus pour ${J.nCout} sur ${J.n})` : ''}</>
             : null}
         </div>
       </>)}
       <div style={{ marginTop: 6 }}>
-        <button type="button" className="vrm-lien-action" data-journee-benef-masquer="" onClick={() => poser(false)} style={{ background: 'none', border: 0, padding: 0, color: C.muted, cursor: 'pointer', fontSize: 12, fontWeight: 400, fontFamily: 'inherit' }}>Masquer de Ma journée</button>
+        <Bouton variante="discret" data-journee-benef-masquer="" onClick={() => poser(false)}>Masquer de Ma journée</Bouton>
       </div>
     </div>
   );
@@ -34344,15 +34338,15 @@ function FeuilleAjoutWidget({ dispo, onAjout, onDefaut, onClose }) {
             <div style={{ fontSize: 16, fontWeight: 700 }}>Ajouter un widget</div>
             <div className="vrm-aide" style={{ fontSize: 12.5, color: C.muted }}>Il se place à la fin — glisse-le ensuite où tu veux.</div>
           </div>
-          <button type="button" className="vrm-w-btn" data-widgets-fermer="" onClick={onClose} style={{ color: C.text, background: C.card, border: `1px solid ${C.border}` }}>Fermer</button>
+          <Bouton variante="secondaire" data-widgets-fermer="" onClick={onClose} style={{ flexShrink: 0 }}>Fermer</Bouton>
         </div>
         <div className="vrm-w-feuille-corps">
           {libres.length === 0 && <div style={{ fontSize: 13, color: C.muted, padding: '6px 2px 12px' }}>Tous les widgets sont déjà sur ta journée.</div>}
           {retenu && (
             <div data-widgets-retenu={retenu} style={{ fontSize: 12.5, color: C.muted, lineHeight: 1.45, padding: '0 2px 4px' }}>
               {retenu === 'tuiles'
-                ? <>Les petites cases (à envoyer, à retirer, messages, prix) redisent la barre « Les quatre gestes » : retire la barre pour les choisir une par une.</>
-                : <>« Les quatre gestes » redirait tes petites cases : retire-les pour remettre la barre.</>}
+                ? <>Les petites cases redisent la barre « Les quatre gestes » : retire-la pour les choisir.</>
+                : <>La barre redirait tes petites cases : retire-les pour la remettre.</>}
             </div>
           )}
           {libres.map((id) => {
@@ -34368,7 +34362,7 @@ function FeuilleAjoutWidget({ dispo, onAjout, onDefaut, onClose }) {
               </button>
             );
           })}
-          <button type="button" data-widgets-defaut="" onClick={onDefaut} className="vrm-w-lien" style={{ color: C.muted }}>Remettre la disposition d'origine</button>
+          <Bouton variante="discret" data-widgets-defaut="" onClick={onDefaut} style={{ alignSelf: 'center', marginTop: 8 }}>Remettre la disposition d'origine</Bouton>
         </div>
       </div>
     </div>,
@@ -34575,8 +34569,8 @@ function GrilleJournee({ dispo, poser, rendus, edition, setEdition, peutModifier
       {edition && (
         <div className="vrm-w-outils" data-widgets-outils="" data-noswipe="1" style={{ background: C.card, border: `1px solid ${C.border}`, boxShadow: C.shadow || 'none' }}>
           <span style={{ flex: 1, minWidth: 0, fontSize: 12.5, color: C.muted, lineHeight: 1.35 }}>Glisse pour déplacer · − pour retirer</span>
-          <button type="button" className="vrm-w-btn" data-widgets-ajouter="" onClick={() => setAjout(true)} style={{ color: C.text, background: C.card, border: `1px solid ${C.border}` }}>+ Ajouter</button>
-          <button type="button" className="vrm-w-btn" data-widgets-ok="" onClick={() => { finirTire(false); setEdition(false); }} style={{ color: '#fff', background: C.accent, border: `1px solid ${C.accent}` }}>OK</button>
+          <Bouton variante="secondaire" data-widgets-ajouter="" onClick={() => setAjout(true)} style={{ flexShrink: 0 }}>+ Ajouter</Bouton>
+          <Bouton variante="primaire" data-widgets-ok="" onClick={() => { finirTire(false); setEdition(false); }} style={{ flexShrink: 0 }}>OK</Bouton>
         </div>
       )}
       <div ref={grilleRef} className="vrm-widgets" data-widgets={liste.map((w) => w.id).join(',')} data-edition={edition ? '' : undefined} data-noswipe={edition ? '1' : undefined}
@@ -34621,8 +34615,7 @@ function GrilleJournee({ dispo, poser, rendus, edition, setEdition, peutModifier
           l'iPhone. Un seul des deux se voit à une largeur donnée. */}
       {!edition && peutModifier && (
         <div className="vrm-w-modifier-bas">
-          <button type="button" className="vrm-w-btn" data-widgets-modifier="" data-widgets-modifier-bas="" aria-label="Modifier les widgets de Ma journée" onClick={() => setEdition(true)}
-            style={{ color: C.text, background: C.card, border: `1px solid ${C.border}` }}>Modifier l'écran</button>
+          <Bouton variante="discret" data-widgets-modifier="" data-widgets-modifier-bas="" aria-label="Modifier les widgets de Ma journée" onClick={() => setEdition(true)}>Modifier l'écran</Bouton>
         </div>
       )}
       {ajout && (
@@ -43523,7 +43516,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           const nb = colisEb.nePasPoster.length;
           jobs.push({ id:'ebay-ne-pas-poster', n:nb, icon:'alert', color:C.warn, urgent:true,
             title:`Ne poste pas ${nb>1?`ces ${nb} colis eBay`:'ce colis eBay'}`,
-            sub:`${nb>1?'Les acheteurs ont':"L'acheteur a"} demandé l'annulation — accepte ou refuse dans eBay → À traiter`,
+            sub:`Annulation demandée — réponds dans eBay → À traiter`,
             tab:'cat_bord', prio:0.1 });
         }
         // ── (22 oct.) L'HEURE LIMITE DU COLIS LE PLUS PRESSÉ, SUR SA LIGNE ──
@@ -43549,7 +43542,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             const verif = p.depasse && !p.retard;
             jobs.push({ id:'colis-limite', n:presses.length, icon:'truck', color:C.warn, urgent:!!p.depasse,
               title: presses.length===1 ? `1 colis${verif?' :':''} ${quand}` : `${presses.length} colis pressés — le plus urgent${verif?' :':''} ${quand}`,
-              sub: `${num}${o.title||''}${qui?` · ${qui}`:''}${p.limite==='estimee'?(verif?' · vente + 7 j, pas de bordereau reçu par email':' · date estimée (vente + 7 j, pas de bordereau reçu par email)'):''}`,
+              sub: `${num}${o.title||''}${qui?` · ${qui}`:''}${p.limite==='estimee'?' · date estimée (vente + 7 j)':''}`,
               tab:'cat_bord', prio:p.depasse?0.15:0.6, limiteHeure:p.heure||'' });
           }
         }
@@ -43560,9 +43553,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         if(cochesNonPartis.length){
           const nb=cochesNonPartis.length, pl=nb>1?'s':'';
           const limite=cochesNonPartis.some(x=>x.limiteDepassee);
-          jobs.push({id:'poste-sans-depart',n:nb,icon:'truck',color:limite?C.danger:C.warn,urgent:limite,
+          jobs.push({id:'poste-sans-depart',n:nb,icon:'truck',color:C.warn,urgent:limite,  // ambre : le rouge est pour deux paires sous un N° (§7)
             title:`Vérifier ${nb} colis coché${pl} « posté »`,
-            sub:`${nb>1?'Vinted ne les a pas vus partir':"Vinted ne l'a pas vu partir"}${limite?' et la date limite est passée':''} — vérifie le dépôt`,
+            sub:`${nb>1?'Vinted ne les a pas vus':"Vinted ne l'a pas vu"} partir${limite?', date limite passée':''} — vérifie le dépôt`,
             tab:'cat_bord',prio:limite?0.2:1.5,
             photos:cochesNonPartis.map(x=>orderPhoto(x.o)).filter(ph=>ph && !imgMortes.has(ph)).slice(0,3)});
         }
@@ -43575,7 +43568,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           const nb=conflitsNum.length;
           jobs.push({id:'numeros-en-double',n:nb,icon:'alert',color:C.danger,urgent:true,
             title:`${nb} numéro${nb>1?'s':''} porté${nb>1?'s':''} par deux paires`,
-            sub:`N°${conflitsNum.slice(0,4).map(c=>c.numero).join(', N°')}${nb>4?'…':''} — corrige-en un avant d'expédier, sinon le mauvais article part`,
+            sub:`N°${conflitsNum.slice(0,4).map(c=>c.numero).join(', N°')}${nb>4?'…':''} — corrige avant d'expédier`,
             tab:'cat_bord',prio:0.05});
         }
         const pickupCount=pickupUnion.total; // UNION email + statut Vinted — EXACTEMENT le compte de l'onglet Achats
@@ -43621,7 +43614,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         { const ar = (buysBase||[]).filter(o=>ACHAT_A_RENVOYER.test(String(o.status||'')));
           if (ar.length) { const cs=[...new Set(ar.map(o=>o._acc?accNameOf(o._acc):'').filter(Boolean))];
             jobs.push({id:'a-renvoyer',n:ar.length,icon:'box',color:C.warn,title:`Renvoyer ${ar.length} article${ar.length>1?'s':''} (litige)`,
-              sub:`Génère l'étiquette de retour sur Vinted${cs.length===1?` — compte ${cs[0]}`:cs.length>1?` — comptes ${cs.slice(0,3).join(', ')}`:''}`,tab:'cat_achats',prio:0.8}); } }
+              sub:`Étiquette de retour sur Vinted${cs.length===1?` — compte ${cs[0]}`:cs.length>1?` — comptes ${cs.slice(0,3).join(', ')}`:''}`,tab:'cat_achats',prio:0.8}); } }
         // (21 oct., 5.204) « Tout est OK » à confirmer sur Vinted avant la date
         //    limite — sinon Vinted conclut sans lui. Même liste qu'Achats
         //    (`aConfirmer`, §11). « Pas su » ⇒ aucune ligne (on n'affirme rien).
@@ -43632,7 +43625,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           jobs.push({id:'a-confirmer',n:nb,icon:'check',color:C.warn,urgent:proche,  // ambre : le rouge est pour deux paires sous un N° (§7)
            
             title:`${nb} ${motAConfirmer(l)} à confirmer avant le ${texteLimite(prem)}`,
-            sub:`Ouvre la conversation sur Vinted et appuie sur « Tout est OK » (ou signale un problème)${cs.length===1?` — compte ${cs[0]}`:cs.length>1?` — comptes ${cs.slice(0,3).join(', ')}`:''}`,
+            sub:`Sur Vinted : « Tout est OK » dans la conversation${cs.length===1?` — compte ${cs[0]}`:cs.length>1?` — comptes ${cs.slice(0,3).join(', ')}`:''}`,
             tab:'cat_achats',prio:proche?0.15:0.7});
         }
         tuiles.messages = { n: unread, sub: unread ? `${unread} conversation${unread>1?'s':''} non lue${unread>1?'s':''} de moins de 7 jours` : 'Aucun message récent non lu' };
@@ -43650,7 +43643,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             const seul = avecMsg.length === 1 ? avecMsg[0].ref : null;
             jobs.push({ id:'messages-ebay', n:nE, icon:'chat', color:C.text,
               title:`${ebayMsg.auMoins ? 'Au moins ' : ''}${nE} message${nE>1?'s':''} eBay sans réponse`,
-              sub: ebayMsg.plusieurs && avecMsg.length ? `Sur ${avecMsg.map(c => `${c.nom} (${c.n})`).join(', ')} — réponds dans eBay → Messages` : 'Réponds dans eBay → Messages',
+              sub: ebayMsg.plusieurs && avecMsg.length ? `${avecMsg.map(c => `${c.nom} (${c.n})`).join(', ')} — réponds dans eBay` : 'Réponds dans eBay → Messages',
               tab:'ebay_messages', avant:()=>{ DEMANDE_EBAY_MSG.compte = seul; DEMANDE_EBAY_MSG.at = Date.now(); }, prio:2 });
           }
         } else if (ebayMsg === null || (ebayMsg && ebayMsg.illisibles.length)) {
@@ -43664,7 +43657,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             const presse = j.length && Math.min(...j) <= 1;
             jobs.push({ id: 'vestiaire-envoyer', n, icon: 'box', color: presse ? C.warn : C.text, urgent: !!presse,
               title: `${n} vente${n > 1 ? 's' : ''} Vestiaire à envoyer`,
-              sub: presse ? (Math.min(...j) < 0 ? 'Une date limite est passée — prends le bordereau sur Vestiaire' : 'À envoyer d’ici demain — le bordereau est sur Vestiaire') : 'Le bordereau se prend sur Vestiaire',
+              sub: presse ? (Math.min(...j) < 0 ? 'Date limite passée — bordereau sur Vestiaire' : 'À envoyer d’ici demain — bordereau sur Vestiaire') : 'Le bordereau se prend sur Vestiaire',
               tab: 'cat_bord', prio: presse ? 0.3 : 1.2 });
           }
           if (vc && vc.messages > 0) jobs.push({ id: 'vestiaire-messages', n: vc.messages, icon: 'chat', color: C.text,
@@ -43710,14 +43703,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           const nl = lateV + lateE;
           if (nl > 0) jobs.push({ id:'colis-en-retard', n:nl, icon:'truck', color:C.warn, urgent:true,
             title: lateV ? `${nl} colis en retard` : `${nl} colis eBay en retard`,
-            sub:`La date limite d'envoi est passée${lateV && lateE ? ` (dont ${lateE} eBay)` : ''} — à poster en priorité`,
+            sub:`Date limite passée${lateV && lateE ? ` (dont ${lateE} eBay)` : ''} — à poster en priorité`,
             tab:'cat_bord', prio:0.15 });
         }
         if (!caseVisible(dispoJournee, 'retirer') && pickupCount && pickupUnion.urgents && tracking !== null) {
           const hd = pickupUnion.urgents, lx = pickupUnion.lieux || [];
           jobs.push({ id:'retrait-dernier-jour', n:hd, icon:'box', color:C.warn, urgent:true,
             title:`${hd} colis à retirer aujourd'hui ou demain`,
-            sub:`Dernier délai : non retiré, un colis repart chez l'expéditeur — va ${hd>1?'les':'le'} chercher${lx.length===1?` chez ${lx[0]}`:''}`,
+            sub:`Dernier délai, sinon il repart — va ${hd>1?'les':'le'} chercher${lx.length===1?` chez ${lx[0]}`:''}`,
             tab:'cat_achats', prio:0.15 });
         }
         // (23 oct.) « À VÉRIFIER » : délai de retrait dépassé, ou arrivé depuis
@@ -43729,10 +43722,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         if (tracking !== null && (pickupUnion.aVerifier||[]).length) {
           const nv = pickupUnion.aVerifier.length;
           jobs.push({ id:'retrait-a-verifier', n:nv, icon:'box', color:C.warn,
-            title:`${nv} colis à vérifier — sans doute ${nv>1?'repartis':'reparti'} chez le vendeur`,
+            title:`${nv} colis à vérifier`,
             // (revue du 23 oct.) Plus de « 7 jours » écrit pour tous : chaque
             // transporteur a SA garde (`gardeDe`), dite dans Achats, colis par colis.
-            sub:`Délai de retrait dépassé, ou gardé plus longtemps que ne le fait son point relais : ${nv>1?'regarde-les':'regarde-le'} dans Achats (coche « Je l'ai eu » si c'est le cas)`,
+            sub:`Délai de retrait dépassé : sans doute ${nv>1?'repartis':'reparti'} chez le vendeur`,
             tab:'cat_achats', prio:0.6 });
         }
         jobs.sort((a,b)=>a.prio-b.prio);
@@ -43863,10 +43856,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               </div>
               <span className="vrm-day-task-action" style={{fontSize:12,color:j.color,fontWeight:600,flexShrink:0}}>Voir <span aria-hidden="true">›</span></span>
             </button>
-            <button type="button" data-urssaf-cest-declare={j.urssaf.aNoter[0]} onClick={()=>demanderDeclaration(j.urssaf.aNoter[0], onNav)}
-              style={{flexShrink:0,fontSize:12.5,fontWeight:600,color:C.text,background:'transparent',border:`1px solid ${C.border}`,borderRadius:8,padding:'7px 12px',cursor:'pointer',fontFamily:'inherit'}}>
+            <Bouton variante="secondaire" icone="check" className="vrm-b-petit" data-urssaf-cest-declare={j.urssaf.aNoter[0]} onClick={()=>demanderDeclaration(j.urssaf.aNoter[0], onNav)} style={{flexShrink:0}}>
               {j.urssaf.mois && j.urssaf.mois.length > 1 ? `C'est déclaré — ${(() => { const [y, m] = j.urssaf.aNoter[0].split('-'); return new Date(Number(y), Number(m) - 1, 1).toLocaleDateString('fr-FR', { month: 'long' }); })()}` : "C'est déclaré"}
-            </button>
+            </Bouton>
           </div>
         ) : tacheSimple(j, i);
         const listeTaches = (liste, attr) => (
@@ -43902,7 +43894,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           <div className="vrm-day-money vrm-day-card" style={{border:`1px solid ${C.border}`,background:C.card,boxShadow:C.shadow||'none'}}>
             <div className="vrm-day-head">
               <span className="vrm-day-k" style={{color:C.muted}}>Vendu en {moisNom}</span>
-              <button type="button" className="vrm-day-lien" onClick={()=>onNav&&onNav('cat_ventes')} style={{color:C.accent}}>Mes ventes ›</button>
+              <Bouton variante="discret" className="vrm-day-lien" onClick={()=>onNav&&onNav('cat_ventes')}>Mes ventes ›</Bouton>
             </div>
             {/* (16 oct.) « Rien lu » ne vaut pas « 0 € » (§5) : si AUCUN compte
                 n'a pu être lu, le chiffre est « — » ; si une partie seulement,
@@ -43929,7 +43921,6 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             <div data-ca-annee={caAnnee==null?'':Math.round(caAnnee*100)} className="vrm-day-recu" style={{borderTop:`1px solid ${C.border}`}}>
               <div style={{minWidth:0}}>
                 <div className="vrm-day-k" style={{color:C.muted}}>Chiffre d'affaires {anIci}</div>
-                {declarables === null && <div className="vrm-day-note" style={{color:C.muted}}>dates de versement illisibles pour l'instant</div>}
               </div>
               <span className="vrm-display vrm-day-recu-n" style={{color:C.text}}>{declarables === undefined ? '…' : caAnnee == null ? '—' : `${Math.round(caAnnee).toLocaleString('fr-FR')} €`}</span>
             </div>
@@ -43963,9 +43954,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             <div className="vrm-day-week-n" style={{color:C.text}}><span className="vrm-display" data-total-semaine={Math.round(totSem*100)}>{Math.round(totSem).toLocaleString('fr-FR')} €</span> <span style={{fontSize:13,fontWeight:500,color:C.muted}}>vendus</span></div>
             <CourbeSemaine jours={semaine}/>
             <DayWeekNote><div className="vrm-day-note" style={{color:C.muted,marginTop:8}}>
-              Vendu : au jour de la vente · Reçu : au jour du versement.
-              {declarables === null && <> Dates de versement illisibles : « reçu » n'est pas dessiné — ce n'est pas zéro.</>}
-              {adVinted > 0 && <span data-a-dater={adVinted}> {adVinted} vente{adVinted>1?'s':''} finalisée{adVinted>1?'s':''} sans date de versement, pas encore dans « reçu » — {geste==='ok' ? <>l'extension {adVinted>1?'les':'la'} cherche à tes prochaines visites sur Vinted.</> : geste==='retard' ? <>mets l'extension à jour ({EXT_CAPACITES.versement}) pour {adVinted>1?'les':'la'} récupérer.</> : <>l'extension, sur ton ordinateur, {adVinted>1?'les':'la'} récupère.</>}</span>}
+              Vendu : jour de la vente · Reçu : jour du versement.
+              {declarables === null && <> « Reçu » pas lu — ce n'est pas zéro.</>}
+              {adVinted > 0 && <span data-a-dater={adVinted}> {adVinted} vente{adVinted>1?'s':''} sans date de versement, pas encore dans « reçu ».{' '}
+                <Pourquoi label="Et ensuite ?">{geste==='ok' ? <>L'extension {adVinted>1?'les':'la'} cherche à tes prochaines visites sur Vinted.</> : geste==='retard' ? <>Mets l'extension à jour ({EXT_CAPACITES.versement}) pour {adVinted>1?'les':'la'} récupérer.</> : <>L'extension, sur ton ordinateur, {adVinted>1?'les':'la'} récupère.</>}</Pourquoi></span>}
             </div></DayWeekNote>
           </div>
           );
@@ -43996,8 +43988,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             <div className="vrm-day-recent">
               <div className="vrm-w-etiquette" style={{display:'flex',alignItems:'baseline',gap:8,marginBottom:10,paddingLeft:2}}>
                 <div className="vrm-label" style={{color:C.muted,flex:1}}>Dernières ventes</div>
-                <button type="button" onClick={()=>onNav&&onNav('cat_ventes')}
-                  style={{border:'none',background:'transparent',color:C.accent,fontSize:12.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit',padding:0}}>tout voir ›</button>
+                <Bouton variante="discret" onClick={()=>onNav&&onNav('cat_ventes')}>Tout voir ›</Bouton>
               </div>
               <div className="vrm-carrousel">
                 {dernieresVentes.map((o,i)=>{
@@ -44043,10 +44034,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             {stock ? <>
               <div className="vrm-day-stock-meter" role="img" aria-label={`${stock.renseignes} annonces sur ${stock.total} avec un prix d’achat`}><span style={{width:(stock.total?stock.renseignes/stock.total*100:0)+'%',background:C.accent}}/></div>
               <div className="vrm-day-stock-prices"><span>Coût d’achat renseigné</span><b>{stock.renseignes?stock.cout.toLocaleString('fr-FR',{style:'currency',currency:'EUR'}):'—'}</b></div>
-              <p>{stock.renseignes} prix d’achat renseigné{stock.renseignes>1?'s':''}{stock.manquants>0?` · ${stock.manquants} à compléter`:''}</p>
-            </> : <p>{baseKO || listings.error?'Lecture du stock indisponible.':'En attente de lecture des annonces.'}</p>}
-            {stock && listings.incomplet && <p role="status">Lecture partielle : certains comptes n’ont pas pu être lus.</p>}
-            <div className="vrm-day-stock-links"><button type="button" onClick={()=>onNav&&onNav('cat_annonces')}>Voir les annonces</button><button type="button" onClick={()=>onNav&&onNav('garage')}>Ouvrir le stock</button></div>
+              <p>{stock.renseignes} sur {stock.total} avec un prix d’achat{stock.manquants>0 ? <> · <Bouton variante="discret" data-stock-completer="" onClick={()=>{ DEMANDE_SAISIE_PRIX.on = true; if (onNav) onNav('vinted_annonces'); }}>{stock.manquants} à compléter ›</Bouton></> : null}</p>
+            </> : <p>{listings.error?'Annonces pas lues pour l’instant.':'Lecture des annonces…'}</p>}
+            {stock && listings.incomplet && <p role="status">Lecture partielle : des comptes n’ont pas pu être lus.</p>}
+            <div className="vrm-day-stock-links vrm-b-rangee"><Bouton variante="secondaire" icone="tag" className="vrm-b-petit" onClick={()=>onNav&&onNav('cat_annonces')}>Voir les annonces</Bouton><Bouton variante="secondaire" icone="box" className="vrm-b-petit" onClick={()=>onNav&&onNav('garage')}>Ouvrir le stock</Bouton></div>
           </section>;
         })() : null;
         // Les widgets AJOUTABLES (absents de la disposition d'origine) : ils
@@ -44086,7 +44077,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 <div className="vrm-day-date" style={{color:C.muted}}>{dateStr}</div>
                 {!loading && jobs.length>0 && <div className="vrm-day-todo" style={{color:C.muted}}><b style={{color:C.text,fontWeight:600}}>{jobs.length} chose{jobs.length>1?'s':''}</b> à faire aujourd'hui</div>}
                 {!premierJour && !editJournee && (
-                  <button type="button" className="vrm-w-modifier" data-widgets-modifier="" aria-label="Modifier les widgets de Ma journée" onClick={()=>setEditJournee(true)} style={{color:C.muted}}>Modifier</button>
+                  <button type="button" className="vrm-w-modifier" data-widgets-modifier="" aria-label="Modifier les widgets de Ma journée" onClick={()=>setEditJournee(true)} style={{color:'var(--vrm-b-lien)',fontWeight:600}}>Modifier</button>
                 )}
               </div>
             )}
@@ -44100,13 +44091,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 fois ou un colis qui ne part pas. */}
             {!loading && alertesArgent.length>0 && listeTaches(alertesArgent, {'data-alertes-argent': ''})}
             {editJournee && !loading && alertesArgent.length>0 && (
-              <div className="vrm-aide" data-alertes-fixes="" style={{fontSize:12,color:C.muted,margin:'-4px 2px 12px'}}>Ces alertes restent toujours en tête : elles peuvent te coûter de l'argent.</div>
+              <div className="vrm-aide" data-alertes-fixes="" style={{fontSize:12,color:C.muted,margin:'-4px 2px 12px'}}>Ces alertes restent en tête : elles peuvent te coûter de l'argent.</div>
             )}
 
             {/* (21 octobre) Les messages eBay n'ont pas pu être lus : dit UNE fois,
                 sans chiffre — la case « Messages » ne compte alors que Vinted. */}
             {!baseKO && !premierJour && !loading && tuiles.messages && tuiles.messages.ebay === null && (
-              <div data-ebay-msg-passu="" style={{fontSize:12.5,color:C.muted,margin:'-4px 2px 12px'}}>Messages eBay : je n'ai pas pu les lire — rien n'est perdu, la case « Messages » ne compte pour l'instant que Vinted.</div>
+              <div data-ebay-msg-passu="" style={{fontSize:12.5,color:C.muted,margin:'-4px 2px 12px'}}>Messages eBay pas lus — la case « Messages » ne compte que Vinted pour l'instant.</div>
             )}
 
             {/* ⚠️ La grille est rendue AUSSI le premier jour : ses widgets s'y
@@ -44124,7 +44115,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 l'app le matin, lit ça, et ne poste pas ses colis.
                 « Rien à faire » ne se dit QUE si on a pu regarder. */}
             {!loading && jobs.length===0 && (baseKO
-              ? <LignePanne>Je n'ai pas pu lire tes données — cette liste est vide parce que la lecture a échoué, pas parce qu'il n'y a rien à expédier ni à retirer.</LignePanne>
+              ? <LignePanne>Je n'ai pas pu lire tes données — liste vide pour ça, pas parce qu'il n'y a rien à faire.</LignePanne>
               /* ⚠️⚠️ LA FÊTE SUR UNE BOUTIQUE QUI N'EXISTE PAS ENCORE. Mesuré au
                  rendu le 16 septembre, sur une installation neuve : « 🎉 Tout
                  est à jour ! Rien à expédier, rien à retirer » — à quelqu'un
@@ -44139,7 +44130,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                  au rendu le 16 septembre. */
               ? <PremiersPas onNav={onNav}
                   titreNeuf="Bienvenue — il reste une chose à brancher"
-                  introNeuf={<>Ta journée est vide parce qu'aucun compte Vinted n'est encore relié, pas parce qu'il n'y a rien à faire. VRM ne va rien chercher tout seul&nbsp;: c'est l'extension, dans ton navigateur Chrome, qui range ce que Vinted t'envoie déjà.</>}/>
+                  introNeuf={<>Aucun compte Vinted n'est encore relié&nbsp;: c'est l'extension, dans Chrome, qui range tes ventes.</>}/>
               : (tuiles.envoyer && tuiles.envoyer.n === 0 && colisEb != null && tuiles.retirer && tuiles.retirer.n === 0 && tracking !== null && !(tuiles.messages && tuiles.messages.n > 0)
                   ? <div data-tout-a-jour="" style={{fontSize:12.5,color:C.muted,margin:'-4px 2px 14px'}}><span style={{fontWeight:600,color:C.text}}>Tout est à jour.</span> Rien à expédier ni à retirer.</div>
                   : null)
@@ -44153,17 +44144,20 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 des actions sans aucun compte lié (des colis repérés par email,
                 par exemple) — là seulement elle apprend quelque chose. */}
             {accounts.length===0 && !baseKO && !(jobs.length===0 && !loading && premierJour) && (
-              <div style={{marginTop:16,fontSize:13,color:C.muted,textAlign:'center',lineHeight:1.5,padding:'0 10px'}}>Lie un compte Vinted (⚙️ → Comptes liés) pour que ta journée se remplisse automatiquement.</div>
+              <div style={{marginTop:16,fontSize:13,color:C.muted,textAlign:'center',lineHeight:1.5,padding:'0 10px'}}>Lie un compte Vinted (Réglages → Comptes liés) pour remplir ta journée.</div>
             )}
             {/* Le bénéfice vit dans « Vendu et reçu » ; si cette carte n'est pas
                 sur l'écran (retirée), il garde sa propre carte ici : allumé dans
                 Réglages ⇒ toujours visible (un seul propriétaire, §11). */}
             {!baseKO && !premierJour && !aWidget('vendu') && <BeneficeJournee onNav={onNav} place="carte"/>}
             {!baseKO && !premierJour && <BeneficeJournee onNav={onNav} place="lien"/>}
-            {/* (29 oct.) Les deux résumés de contrôle passent SOUS la journée : au-dessus du
-                bonjour ils repoussaient les compteurs du jour. Les vraies doubles ventes
-                restent en tête (alertes qui coûtent de l'argent). */}
-            <BilanSynchronisation owner={AUTH.user?.id||''} sources={sourcesBilan} onNav={onNav}/>
+            {/* (29 oct.) Le contrôle « vendus ailleurs » passe SOUS la journée : au-dessus du
+                bonjour il repoussait les compteurs du jour. Les vraies doubles ventes
+                restent en tête (alertes qui coûtent de l'argent).
+                (30 oct., revue des boutons) « Bilan des données lues » n'est plus ici :
+                c'est un diagnostic de lecture (ajouts/modifications depuis la lecture
+                précédente de la session), sans geste pour la journée — il reste sur
+                Ventes, Annonces et Messages, là où les données qu'il compare s'affichent. */}
             <VendusAilleurs owner={AUTH.user?.id||''} ownerActuel={()=>AUTH.user?.id||''} charger={chargerRetraitsMulti} onNav={onNav} PhotoVinted={PhotoVinted}/>
           </div>
         );      })()}
