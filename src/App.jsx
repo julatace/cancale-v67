@@ -53880,7 +53880,7 @@ function DiscordCompte() {
         {lu.connexion && <button type="button" data-discord-compte-connecter="" disabled={occupe} onClick={connecter} className="vrm-b vrm-b-secondaire">{occupe ? 'Un instant…' : lu.discord ? 'Changer de compte' : 'Connecter Discord'}</button>}
         {lu.discord && <button type="button" data-discord-compte-retirer="" disabled={occupe} onClick={retirer} className="vrm-b vrm-b-discret">Retirer</button>}
       </div>
-      {!lu.connexion && !lu.discord && <div style={{ fontSize: 12.5, color: C.muted, marginTop: 4 }}>{DISCORD_ERREURS['non-configure']}</div>}
+      {!lu.connexion && !lu.discord && <span data-discord-compte-indispo="" title={DISCORD_ERREURS['non-configure']} style={{ fontSize: 12, color: C.muted, fontWeight: 600 }}>Bientôt</span>}
       {note}
     </div>
   );
@@ -54029,18 +54029,15 @@ function NumerosSetting({ nu = false, onStock }) {
       <div style={{fontSize:12.5,color:C.muted,marginTop:nu?0:3,lineHeight:1.5}}>
         Le format des <b>prochains</b> numéros. Ceux déjà donnés ne changent pas.
       </div>
-      <GuideReglage titre="Du numéro à l’emplacement" etapes={[
-        ['Choisis un format', 'Chiffres seuls ou lettres suivies de chiffres. Les exemples montrent un format, pas le prochain numéro disponible.'],
-        ['Identifie ton article', 'Reporte le numéro attribué par VRM sur son support physique pour le retrouver sans hésiter.'],
-        ['Indique où il est rangé', 'Exemple : l’article N° C125 est dans Étagère A, case 3. Dans Stock 3D, choisis son numéro puis sa place libre. Le numéro identifie l’article ; la case indique où le trouver.']
-      ]}/>
-      <div className="vrm-numeros-recap" style={{borderColor:C.border,background:C.bg}}>
-        <span style={{color:C.muted}}>Format appliqué sur cet appareil</span><b>{enregistree?`${enregistree} + chiffres`:'Chiffres seuls'}</b>
-        <span style={{color:C.muted}}>Exemples de lecture</span><strong>{enregistree?`${enregistree}125 · ${enregistree}126`:'125 · 126'}</strong>
-      </div>
       {erreurLocal&&<p role="alert" style={{fontSize:12,color:C.warn}}>{erreurLocal}</p>}
       <Segmente label="Format des prochains numéros" value={mode} onChange={choix} style={{marginTop:10}}
         options={[{ v:'chiffres', l:'Chiffres · 1, 2, 3…' }, { v:'lettre', l:`Avec une lettre · ${ex}1, ${ex}2…` }]}/>
+      {/* (30 oct.) Le format ENREGISTRÉ, en une ligne (une carte à quatre cases
+          redisait le choix du dessus). Il peut différer du choix tant qu'aucune
+          lettre n'est tapée : c'est lui qui fait foi. */}
+      <div data-numeros-applique={enregistree || 'chiffres'} style={{fontSize:12.5,color:C.muted,marginTop:10}}>
+        Format enregistré : <b style={{color:C.text,fontVariantNumeric:'tabular-nums'}}>{enregistree?`${enregistree} + chiffres (ex. ${enregistree}125)`:'chiffres seuls (ex. 125)'}</b>
+      </div>
       {mode === 'lettre' && (
         <label style={{display:'flex',alignItems:'center',gap:8,marginTop:10,fontSize:12.5,color:C.text}}>
           Lettre(s) de ta série
@@ -54063,6 +54060,11 @@ function NumerosSetting({ nu = false, onStock }) {
         <Pourquoi label="Numéros tapés à la main">Exemples : 125, {lettreEx}125, {lettreEx2}40. « {lettreEx.toLowerCase()}125 » et « {lettreEx}125 » sont le même numéro.</Pourquoi>
         {arch && <> Les anciens numéros (<b>{arch}…</b>) ne se redonnent pas.</>}
       </div>
+      <GuideReglage titre="Du numéro à l’emplacement" etapes={[
+        ['Choisis un format', 'Chiffres seuls ou lettres suivies de chiffres. Les exemples montrent un format, pas le prochain numéro disponible.'],
+        ['Identifie ton article', 'Reporte le numéro attribué par VRM sur son support physique pour le retrouver sans hésiter.'],
+        ['Indique où il est rangé', 'Exemple : l’article N° C125 est dans Étagère A, case 3. Dans Stock 3D, choisis son numéro puis sa place libre. Le numéro identifie l’article ; la case indique où le trouver.']
+      ]}/>
       {onStock&&<div className="vrm-settings-next" style={{borderColor:C.border}}><b>Ensuite : indiquer l’emplacement</b><p style={{color:C.muted}}>Choisis la place de l’article dans le stock.</p><Bouton variante="secondaire" onClick={onStock}>Ouvrir mon stock</Bouton></div>}
     </div>
   );
