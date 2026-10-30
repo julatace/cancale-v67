@@ -932,6 +932,43 @@ const NON_TOUCHE = "Rien n'a été effacé.";
 const nb = (n, un, plusieurs) => `${n} ${n > 1 ? plusieurs : un}`;
 const PROPRIO_REFUS = "Ce compte est celui du propriétaire de VRM : le fermer effacerait toute la boutique. C'est désactivé exprès.";
 
+
+// ── Discord déjà affiché sur un AUTRE compte VRM (30 octobre) ────────────────
+// Julien avait relié Discord à son compte pour la carte (pseudo vérifié, ligne
+// `vrm_discord`), puis « Se connecter avec Discord » a créé un compte neuf : la
+// ligne de la carte n'est pas une méthode de connexion. Ici, le compte neuf
+// demande si SON Discord (prouvé : il vient de s'y connecter) est celui qu'un
+// autre compte VRM a vérifié — identité : l'identifiant Discord dans l'adresse
+// de l'avatar, sinon le pseudo (unique chez Discord). Rend l'email MASQUÉ de ce
+// compte, jamais rien d'autre. Pas su ⇒ { trouve: null }.
+const masquerEmail = (e) => { const [l, d] = String(e || '').split('@'); if (!l || !d) return ''; return `${l.slice(0, 2)}•••@${d}`; };
+async function discordDeja(req, res) {
+  const jeton = jetonDe(req);
+  const SERVICE = process.env.SUPABASE_SERVICE_KEY || '';
+  if (!jeton || !SERVICE) return repondre(res, 200, { trouve: null });
+  try {
+    const ru = await fetch(`${SUPABASE_URL}/auth/v1/user`, { signal: AbortSignal.timeout(8000), headers: { apikey: ANON, Authorization: `Bearer ${jeton}` } });
+    if (!ru.ok) return repondre(res, ru.status === 401 ? 401 : 200, { trouve: null });
+    const u = await ru.json();
+    const ident = (Array.isArray(u && u.identities) ? u.identities : []).find(i => i && i.provider === 'discord');
+    if (!ident) return repondre(res, 200, { trouve: false });
+    const did = String((ident.identity_data && (ident.identity_data.provider_id || ident.identity_data.sub)) || ident.id || '');
+    const pseudo = String((ident.identity_data && (ident.identity_data.name || ident.identity_data.full_name)) || '').replace(/#0$/, '').toLowerCase();
+    const h = sbCle(SERVICE);
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vrm_discord&data->>verifie=eq.true&select=owner,discord:data->>discord,avatar:data->>avatar&limit=1000`, { headers: h, signal: AbortSignal.timeout(8000) });
+    if (!r.ok) return repondre(res, 200, { trouve: null });
+    const rows = await r.json();
+    if (!Array.isArray(rows)) return repondre(res, 200, { trouve: null });
+    const meme = rows.find(x => x && x.owner !== u.id && ((/^\d{5,25}$/.test(did) && String(x.avatar || '').includes(`/avatars/${did}/`)) || (pseudo && String(x.discord || '').toLowerCase() === pseudo)));
+    if (!meme) return repondre(res, 200, { trouve: false });
+    const ra = await fetch(`${SUPABASE_URL}/auth/v1/admin/users/${encodeURIComponent(meme.owner)}`, { headers: h, signal: AbortSignal.timeout(8000) });
+    const a = ra.ok ? await ra.json() : null;
+    const email = masquerEmail(a && a.email);
+    if (!email) return repondre(res, 200, { trouve: null });
+    return repondre(res, 200, { trouve: true, email, pseudo: String(meme.discord || '') });
+  } catch (_) { return repondre(res, 200, { trouve: null }); }
+}
+
 async function fermerCompte(req, res) {
   const u = await utilisateurDe(req);
   if (!u) return repondre(res, 401, { erreur: 'session', message: 'Connecte-toi à VRM pour fermer ton compte.' });
@@ -1154,6 +1191,7 @@ export default async function handler(req, res) {
   if (mode === 'discord-attente') return m === 'POST' ? discordAttente(req, res) : repondre(res, 405, { erreur: 'POST seulement' });
   if (mode === 'discord') return m === 'GET' ? retourDiscord(req, res) : repondre(res, 405, { erreur: 'GET seulement' });
   if (mode === 'entreprise') return m === 'GET' ? entreprise(req, res) : repondre(res, 405, { erreur: 'GET seulement' });
+  if (mode === 'discord-deja') return m === 'GET' ? discordDeja(req, res) : repondre(res, 405, { erreur: 'GET seulement' });
   if (mode === 'fermer') return m === 'POST' ? fermerCompte(req, res) : repondre(res, 405, { erreur: 'POST seulement' });
   return repondre(res, 404, { erreur: 'mode inconnu' });
 }

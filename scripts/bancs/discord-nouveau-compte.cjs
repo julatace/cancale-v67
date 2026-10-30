@@ -12,7 +12,7 @@ let ko = 0; const dit = (ok, m, d) => { console.log(`  ${ok ? "✅" : "❌"} ${m
   await new Promise((r) => srv.listen(Number(process.env.BANC_PORT || 0), "127.0.0.1", r));
   const origine = "http://127.0.0.1:" + srv.address().port;
   const nav = await chromium.launch({ executablePath: process.env.BANC_CHROMIUM || "/opt/pw-browsers/chromium", args: ["--no-sandbox"] });
-  const cas = async (W, { identites, creeIlYa, erreur }) => {
+  const cas = async (W, { identites, creeIlYa, erreur, deja }) => {
     const ctx = await nav.newContext({ viewport: { width: W, height: 860 }, ...(W < 600 ? { isMobile: true, hasTouch: true } : {}) });
     const pg = await ctx.newPage();
     const user = { id: "22222222-2222-4222-8222-222222222222", email: "pseudo@discord.test", created_at: new Date(Date.now() - creeIlYa).toISOString(), identities: identites.map((p) => ({ provider: p })) };
@@ -25,6 +25,7 @@ let ko = 0; const dit = (ok, m, d) => { console.log(`  ${ok ? "✅" : "❌"} ${m
       if (/grant_type=pkce/.test(u)) { appels.token++; return r.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ access_token: "jeton", refresh_token: "r", expires_in: 3600, user }) }); }
       if (/\/auth\/v1\/user/.test(u)) return r.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(user) });
       if (/\/auth\/v1\/logout/.test(u)) return r.fulfill({ status: 204, body: "" });
+      if (/mode=discord-deja/.test(u)) return r.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(deja ? { trouve: true, email: "sh•••@gmail.com", pseudo: "vrm.center" } : { trouve: false }) });
       if (/mode=fermer/.test(u)) { appels.fermer.push(JSON.parse(r.request().postData() || "{}")); return r.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ ok: true }) }); }
       if (/\/api\//.test(u)) return r.fulfill({ status: 200, contentType: "application/json", body: "{}" });
       if (/\/rest\/v1\//.test(u)) return r.fulfill({ status: 200, contentType: "application/json", headers: { "content-range": "0-0/0" }, body: "[]" });
@@ -47,6 +48,17 @@ let ko = 0; const dit = (ok, m, d) => { console.log(`  ${ok ? "✅" : "❌"} ${m
         await pg.click('[data-nouveau-oauth="supprimer"]'); await pg.waitForTimeout(800);
         dit(appels.fermer.length === 1 && appels.fermer[0].confirmation === "pseudo@discord.test", `[${W}] la suppression passe par « Fermer mon compte », avec l'adresse de CE compte`, JSON.stringify(appels.fermer));
         dit(await pg.locator('[data-porte-nouveau-oauth="fait"]').count() === 1 && /Connecter Discord/.test(await pg.evaluate(() => document.body.innerText)), `[${W}] puis le geste : se connecter par email et relier Discord`);
+        await ctx.close();
+      }
+      { // Ce Discord est déjà le pseudo vérifié d'un AUTRE compte VRM (la carte) :
+        // l'écran nomme ce compte et met en avant « revenir au mien ».
+        const { ctx, pg, appels } = await cas(W, { identites: ["discord"], creeIlYa: 20000, deja: true });
+        const t = await pg.evaluate(() => document.body.innerText);
+        dit(await pg.locator('[data-nouveau-oauth-deja]').count() === 1 && /sh•••@gmail\.com/.test(t) && /pas pour te connecter/.test(t), `[${W}] Discord déjà affiché ailleurs : le compte est nommé (masqué)`, t.slice(0, 300));
+        const prim = await pg.locator('.vrm-b-primaire[data-nouveau-oauth="existant"]').count();
+        dit(prim === 1, `[${W}] « revenir au mien » est le geste principal`);
+        await pg.click('[data-nouveau-oauth="existant"]'); await pg.click('[data-nouveau-oauth="supprimer"]'); await pg.waitForTimeout(800);
+        dit(appels.fermer.length === 1, `[${W}] la suppression part une fois, après confirmation`);
         await ctx.close();
       }
       { // « Oui, c'est un nouveau compte » : l'app s'ouvre.

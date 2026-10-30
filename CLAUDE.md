@@ -1337,6 +1337,15 @@
 > ⚠️ Non mesuré : que « Manual linking » soit activé dans Supabase (sinon l'écran le dit). **Gestes de Julien** : supprimer le
 > compte vide (se connecter avec Discord ⇒ « J'ai déjà un compte VRM »), puis email ⇒ Mon compte ⇒ « Connecter Discord ».
 
+> **30 octobre (suite) — le Discord de la carte était le MÊME que celui de la connexion :** mesuré, `vrm.center`
+> (id Discord 1562201720438788168) est le pseudo VÉRIFIÉ de `vrm_discord` sur son compte (relié le 22 oct. pour la
+> carte) ET l'identité du compte vide créé à 10 h 55 (email Discord vrm.vinted35@gmail.com ≠ shopcancale35@…).
+> `GET /api/compte?mode=discord-deja` (session) : l'identifiant Discord du compte neuf (ou son pseudo, unique chez
+> Discord) comparé aux `vrm_discord` vérifiés d'AUTRES comptes ⇒ l'email MASQUÉ de ce compte, rien d'autre ; pas su ⇒
+> rien. `PorteNouveauOAuth` dit alors « Ce Discord est déjà sur ton compte VRM sh•••@gmail.com — seulement pour la
+> carte » et met « Supprimer ce compte vide et revenir au mien » en geste principal. Banc `discord-nouveau-compte.cjs`
+> (+3 par taille). ⚠️ Non mesuré : le vrai Discord. Geste de Julien inchangé (supprimer le vide, puis « Connecter Discord »).
+
 > 🔴🔴 **PASSATION DU 30 OCTOBRE — LIS D'ABORD `docs/passation/2026-10-30.md`** : sept branches v29-* construites
 > et relues mais PAS en ligne (leur contenu est dans `docs/passation/branches-2026-10-30.bundle`), l'ordre de
 > mise en ligne (une seule intégration, un seul numéro d'extension), la refonte des boutons en cours, Vestiaire.
