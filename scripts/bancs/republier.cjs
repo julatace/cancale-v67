@@ -282,7 +282,17 @@ const projette = (row, sel) => {
           dit(ko === 'brouillon', 'la paire qui n’a pas abouti montre ✗ à l’étape où elle s’est arrêtée', ko || 'aucune'); }
         dit(envois.length === 4, 'UNE commande par paire choisie (4)', JSON.stringify(envois.map((x) => x.id)));
         dit(envois.map((x) => x.id).join(',') === '9103,9102,9106,9107', 'les paires sont recréées DANS L’ORDRE affiché', envois.map((x) => x.id).join(','));
-        dit(await pg.locator('[data-republier]').getAttribute('data-republier-mode') === 'pause' && await pg.locator('[data-republier-arret]').count() === 1, 'Vinted demande de ralentir : la file S’ARRÊTE et le dit (pas une rafale de refus)', await pg.locator('[data-republier-arret]').innerText().catch(() => 'absent'));
+        dit(['pause', 'fini'].includes(await pg.locator('[data-republier]').getAttribute('data-republier-mode')) && await pg.locator('[data-republier-arret]').count() === 1, 'Vinted demande de ralentir : la file S’ARRÊTE et le dit (pas une rafale de refus)', await pg.locator('[data-republier-arret]').innerText().catch(() => 'absent'));
+        { // (30 oct.) La barre mesure les RÉUSSIES (jamais pleine sur des échecs), une seule façon de compter,
+          // la paire « à vérifier » a son lien vers l'ancienne annonce, et rien à reprendre ⇒ « Réessayer » + « Fermer ».
+          const reu = await pg.locator('[data-republier-reussies]').getAttribute('data-republier-reussies').catch(() => null);
+          const val = Number(await pg.locator('[data-republier-bilan] [role="progressbar"]').getAttribute('aria-valuenow').catch(() => '100'));
+          const fin = await pg.locator('[data-republier]').getAttribute('data-republier-mode');
+          dit(reu && Number(reu.split('/')[0]) < 4 && val < 100, 'arrêt avec des échecs : la barre ne se remplit pas (réussies seulement)', `${reu} · ${val}%`);
+          const tete = await pg.locator('[data-republier-bilan] .vrm-avancement-compte').innerText().catch(() => '');
+          dit(!/ratée/.test(tete) && /sur 4/.test(tete), 'un seul compte, en mots : « N sur 4 … », jamais « ratées »', tete);
+          dit(await pg.locator('[data-republier-voir-ancienne="9103"]').count() === 1, 'la paire « à vérifier » porte son lien vers l’ancienne annonce sur Vinted');
+          if (fin === 'fini') dit(await pg.locator('[data-republier-reessayer]').count() === 1 && await pg.locator('[data-republier-fermer]').count() === 1, 'rien à reprendre : « Réessayer les pas faites » + « Fermer » (pas de « Reprendre »)'); }
         const e1 = envois.find((x) => x.id === '9102'), e2 = envois.find((x) => x.id === '9106');
         dit(envois.every((x) => x.cmd === 'recreerVinted'), 'chaque paire est SUPPRIMÉE ET RECRÉÉE (commande recreerVinted)', envois.map((x) => x.cmd).join(','));
         dit(e1 && e1.uid === '111' && Math.abs(e1.prix - 44.1) < 1e-9 && e1.confirme === true, 'la commande porte SON prix (44,10), son compte, et la confirmation', JSON.stringify(e1));

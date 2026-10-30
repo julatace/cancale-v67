@@ -225,3 +225,15 @@
 :root body .vrm-app-shell .vrm-main .vrm-achats-search input[type=search]:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=file]):not([type=hidden]) {
   background: transparent !important; border: 0 !important; box-shadow: none !important; padding: 0 !important;
 }
+/* (30 oct.) La barre d'un parcours : ce qui est réussi à l'accent, ce qui demande
+   un regard (pas faite, à vérifier) en ambre hachuré à la suite, le reste vide. */
+.vrm-avancement-barre { display: flex; }
+.vrm-avancement-barre > span { flex: 0 0 auto; }
+.vrm-avancement-barre > span.vrm-avancement-rate { border-radius: 0 99px 99px 0; background: repeating-linear-gradient(135deg, #C98A14 0 4px, rgba(201, 138, 20, .45) 4px 8px); }
+/* (30 oct.) Les réductions de Republier : un CHOIX, pas une action. L'actif se lit
+   en surface élevée cernée d'accent — jamais plein comme le bouton principal. */
+.vrm-app-shell [data-republier-reductions].vrm-filtres > button[aria-pressed="true"],
+.vrm-app-shell .vrm-main [data-republier-reductions].vrm-filtres button[aria-pressed="true"] {
+  background: var(--vrm-surface, #FDFEFC) !important; color: var(--vrm-accent, #244E54) !important;
+  box-shadow: inset 0 0 0 2px var(--vrm-accent, #244E54) !important; font-weight: 700 !important;
+}

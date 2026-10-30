@@ -12368,7 +12368,7 @@ async function avecCouleurBrouillon(envoyer, titre) {
   }
   return r;
 }
-function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChrome, compteVinted, majExt, lettreOk, brouillonOk, onClose, action = 'recreer', reprise = null }) {
+function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChrome, compteVinted, majExt, lettreOk, brouillonOk, onClose, onReessayer = null, action = 'recreer', reprise = null }) {
   const A = ACTIONS_REPUB[action] || ACTIONS_REPUB.recreer;
   // (28 oct., sa demande) Seules les paires du compte Vinted OUVERT DANS CHROME
   // (cookie lu par l'extension, `vintedDeChrome`) : c'est le seul au nom duquel
@@ -12420,6 +12420,10 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
   }, []);
   const [tri, setTri] = useState('anciennes');       // anciennes | vues | favoris
   const [arret, setArret] = useState('');            // un refus qui vaut pour toute la file
+  // (30 oct.) Vinted a dit « réessaie dans N min » : « Reprendre » attend jusque-là
+  // (relancer tout de suite se ferait refuser à son tour). Le délai vient du message.
+  const [arretJusqua, setArretJusqua] = useState(0);
+  React.useEffect(() => { if (!(arretJusqua > Date.now())) return undefined; const t = setInterval(() => setTic((n) => n + 1), 15000); return () => clearInterval(t); }, [arretJusqua]);
   const [ordre, setOrdre] = useState(null);          // null = l'ordre de sa sélection
   // (28 oct.) Réglages photo, communs à la sélection : les VALEURS de l'aperçu
   // (CSS), refaites en pixels par l'extension à partir de l'ORIGINAL.
@@ -12510,14 +12514,17 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
       let r; try { r = await publier(suiv, { prix: x.prix != null ? x.prix : suiv.prix, titre: x.titre || suiv.titre, reglages: { ...reg }, lettre: lettreOn && lettreOk ? (lettres[suiv.id] || '') : '', viaBrouillon: viaBrouillon && !!brouillonOk }); } catch (_) { r = { etat: 'echec', raison: 'erreur' }; }
       busy.current = false;
       const etat = r && ['fait', 'double', 'incertain', 'a-refaire', 'planifiee'].includes(r.etat) ? r.etat : 'echec';
-      setSt((p) => ({ ...p, [suiv.id]: { etat, raison: (r && r.raison) || (etat === 'echec' ? "l'extension n'a pas répondu" : ''), nouveau: r && r.nouveau, jusqua: r && r.jusqua } }));
+      setSt((p) => ({ ...p, [suiv.id]: { etat, code: (r && r.code) || '', raison: (r && r.raison) || (etat === 'echec' ? "l'extension n'a pas répondu" : ''), nouveau: r && r.nouveau, jusqua: r && r.jusqua } }));
+      // (30 oct.) Plus aucune paire à tenter : l'arrêt est l'état FINAL (rien à reprendre).
+      const resteApres = aFaire.some((a) => a.id !== suiv.id && !st[a.id]);
+      const arreter = (raison) => { setArret(raison || ''); const m = /dans (\d+) ?min/.exec(String(raison || '')); setArretJusqua(m ? Date.now() + Number(m[1]) * 60000 : 0); setMode(resteApres ? 'pause' : 'fini'); };
       // Un refus qui vaut pour TOUTE la file (Vinted demande de ralentir, plafond
       // de l'heure atteint) : on s'arrête au lieu d'enchaîner les refus.
-      if (r && (r.code === 'vinted-pause' || r.code === 'plafond')) { setArret(r.raison || ''); setMode('pause'); }
+      if (r && (r.code === 'vinted-pause' || r.code === 'plafond')) arreter(r.raison);
       // (28 oct.) L'extension n'a pas répondu à temps : elle travaille peut-être
       // encore sur CETTE paire. Enchaîner empilerait la suivante derrière elle et
       // laisserait croire à un échec : la file s'arrête, la ligne dit « pas su ».
-      else if (r && r.code === 'sans-reponse') { setArret(r.raison || ''); setMode('pause'); }
+      else if (r && r.code === 'sans-reponse') arreter(r.raison);
     }, delai * 1000);
     return () => { annule = true; clearTimeout(t); setProchaine(null); };
   }, [mode, st, esp, espMode, espMin, espMax, plan]);   // eslint-disable-line react-hooks/exhaustive-deps
@@ -12745,12 +12752,12 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
               {nRec > 0 && <div data-republier-recentes={nRec} style={{ fontSize: 12.5, color: C.warn }}>{nRec > 1 ? `${nRec} paires déjà recréées` : '1 paire déjà recréée'} il y a moins de 2 jours : risque de doublon, retire-{nRec > 1 ? 'les' : 'la'}.</div>}
             </>; })()}
             {majExt && <div data-republier-maj style={{ fontSize: 12.5, color: C.warn }}>Extension VRM à mettre à jour ({EXT_ATTENDUE}) et à connecter : sinon rien ne partira.</div>}
-            {autresComptes > 0 && <div data-republier-autres-comptes style={{ fontSize: 12.5, color: C.warn }}>{autresComptes} sur un autre compte que celui de Chrome : {autresComptes > 1 ? 'elles ne partiront' : 'elle ne partira'} pas.</div>}
+            {autresComptes > 0 && <div data-republier-autres-comptes style={{ fontSize: 12.5, color: C.warn }}>{autresComptes} sur un autre compte : ouvre Vinted sur ce compte dans Chrome, sinon {autresComptes > 1 ? 'elles ne partiront' : 'elle ne partira'} pas.</div>}
             {mode === 'idle' && <>
               <div data-republier-esp={espMode} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 <span style={maj}>Temps entre deux paires</span>
-                <Segmente plein label="Temps entre deux paires" value={espMode} onChange={setEspMode} options={[{ v: 'vintex', l: 'Comme Vintex', data: { 'data-republier-esp-choix': 'vintex' } }, { v: 'fixe', l: 'Fixe', data: { 'data-republier-esp-choix': 'fixe' } }, { v: 'aleatoire', l: 'Aléatoire', data: { 'data-republier-esp-choix': 'aleatoire' } }]} />
-                {espMode === 'vintex' && <div data-republier-esp-vintex style={{ fontSize: 12.5, color: C.muted }}>8 à 16 secondes, tirées au hasard.</div>}
+                <Segmente plein label="Temps entre deux paires" value={espMode} onChange={setEspMode} options={[{ v: 'vintex', l: 'Rapide (8–16 s)', data: { 'data-republier-esp-choix': 'vintex' } }, { v: 'aleatoire', l: `Lent (${minutesOk(espMin)}–${minutesOk(espMax)} min)`, data: { 'data-republier-esp-choix': 'aleatoire' } }, { v: 'fixe', l: 'Fixe', data: { 'data-republier-esp-choix': 'fixe' } }]} />
+                {(() => { const n = aFaire.length; if (n < 2) return null; const moy = espMode === 'vintex' ? 12 : espMode === 'fixe' ? fileClamp(esp) : (bornesAlea()[0] + bornesAlea()[1]) / 2; const sec = Math.round(moy * (n - 1)); const txt = sec < 60 ? `${sec} s` : sec < 3600 ? `${Math.round(sec / 60)} min` : `${Math.floor(sec / 3600)} h ${String(Math.round((sec % 3600) / 60)).padStart(2, '0')}`; return <div data-republier-esp-vintex={espMode === 'vintex' ? '' : undefined} data-republier-duree={sec} style={{ fontSize: 12.5, color: C.muted }}>Attente entre les {n} paires : environ {txt} en tout.</div>; })()}
                 {espMode === 'fixe' && <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13.5, color: C.text }}>Une annonce toutes les <input data-republier-esp-fixe value={esp} onChange={(ev) => setEsp(fileClamp(ev.target.value))} inputMode="numeric" style={{ ...champ, width: 70 }} /> secondes</label>}
                 {espMode === 'aleatoire' && <>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13.5, color: C.text, flexWrap: 'wrap' }}>
@@ -12779,20 +12786,32 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
               const nPlanif = aFaire.filter((a) => (st[a.id] || {}).etat === 'planifiee').length;
               const pasCommencees = aFaire.filter((a) => !st[a.id]).length;
               const peEnCours = enCours && recree ? progressionRepub(prog[String(enCours.id)], action, viaBrouillon && !!brouillonOk) : null;
-              const part = Math.min(1, (finies + (peEnCours ? peEnCours.part : 0)) / aFaire.length);
-              const ratees = nEchec + nRefaire + nDouble;
-              const prochN = Math.min(aFaire.length, aFaire.length - pasCommencees + 1);
-              const titre = mode === 'fini' ? 'Terminé' : mode === 'pause' ? (arret ? 'Arrêté' : 'En pause') : enCours ? `Paire ${aFaire.indexOf(enCours) + 1} sur ${aFaire.length}` : `Paire ${prochN} sur ${aFaire.length}`;
+              // (30 oct., « la barre est incompréhensible ») La barre mesure ce qui est
+              // RÉUSSI : jamais pleine quand 3 paires sur 4 ont raté. Ce qui demande un
+              // regard (pas faite, à vérifier) se lit en ambre à la suite.
+              const nPasFaites = nEchec + nRefaire;
+              const total = aFaire.length;
+              const part = Math.min(1, (nFait + (peEnCours ? peEnCours.part : 0)) / total);
+              const partRate = Math.min(1 - part, (nPasFaites + nDouble) / total);
+              const prochN = Math.min(total, total - pasCommencees + 1);
+              const pl = (n, s1, s2x) => `${n} ${n > 1 ? (s2x || s1 + 's') : s1}`;
+              const motF = (n) => (n > 1 ? A.faits.replace(/^(\S+)/, '$1s') : A.faits);
+              const bilan = `${nFait} sur ${total} ${motF(nFait)}`;
+              const titre = mode === 'fini' ? (arret ? `Arrêté · ${bilan}` : (nPasFaites || nDouble) ? `Fini · ${bilan}` : 'Terminé') : mode === 'pause' ? (arret ? 'Arrêté' : 'En pause') : enCours ? `Paire ${aFaire.indexOf(enCours) + 1} sur ${total}` : `Paire ${prochN} sur ${total}`;
               const r = mode === 'run' && prochaine ? Math.max(0, Math.round((prochaine.at - Date.now()) / 1000)) : null;
               const phrase = mode === 'run'
                 ? (enCours ? <b>{enCours.numero ? `N°${enCours.numero} · ` : ''}{enCours.titre}</b> : r != null ? <span data-republier-prochaine={prochaine.s}>Prochaine paire dans {r >= 60 ? `${Math.floor(r / 60)} min ${String(r % 60).padStart(2, '0')} s` : `${r} s`}</span> : 'Préparation de la suite…')
-                : mode === 'pause' ? (arret ? <span data-republier-arret>{String(arret).replace(/[.\s]+$/, '')}. Rien d'autre n'est parti.</span> : 'Rien ne part tant que tu ne reprends pas.')
-                : (!ratees ? 'Tout est fait.' : null);
-              const erreur = ratees ? <>{[nEchec ? `${nEchec} pas faite${nEchec > 1 ? 's' : ''}` : null, nRefaire ? `${nRefaire} brouillon${nRefaire > 1 ? 's' : ''} à refaire` : null, nDouble ? `${nDouble} à vérifier sur Vinted` : null].filter(Boolean).join(' · ')} — la raison et le geste sont sur sa ligne.</> : null;
+                : arret ? <span data-republier-arret>{String(arret).replace(/[.\s]+$/, '')}. Rien d'autre n'est parti.</span>
+                : mode === 'pause' ? 'Rien ne part tant que tu ne reprends pas.'
+                : (!(nPasFaites || nDouble) ? 'Tout est fait.' : null);
+              // Deux mots seulement : « pas faite » (rien n'a changé sur Vinted) et
+              // « à vérifier » (la nouvelle annonce est en ligne, l'ancienne est restée).
+              const erreur = (nPasFaites || nDouble) ? <>{[nPasFaites ? `${pl(nPasFaites, 'pas faite', 'pas faites')} : rien n'a changé sur Vinted${onReessayer && nEchec ? ' — « Réessayer » en bas' : ''}` : null, nDouble ? `${pl(nDouble, 'à vérifier', 'à vérifier')} : ouvre l'ancienne annonce sur Vinted (lien sur sa ligne)` : null].filter(Boolean).join(' · ')}.</> : null;
+              const compte = [bilan, enCours ? '1 en cours' : null, nPasFaites ? pl(nPasFaites, 'pas faite', 'pas faites') : null, nDouble ? pl(nDouble, 'à vérifier', 'à vérifier') : null, nPlanif ? pl(nPlanif, 'prévue') : null, pasCommencees ? pl(pasCommencees, 'restante') : null].filter(Boolean).join(' · ');
               const lstEnCours = action === 'versBrouillon' ? ETAPES_REPUB.versBrouillon : ((viaBrouillon && !!brouillonOk) ? ETAPES_REPUB.brouillon : ETAPES_REPUB.direct);
-              return <Avancement titre={titre} phrase={phrase} part={part} label={`${finies} sur ${aFaire.length} terminées`} erreur={erreur}
-                data={{ 'data-republier-total': `${finies}/${aFaire.length}`, 'data-republier-bilan': '' }}
-                compte={<span>{compteAvancement({ faites: nFait, ratees, restent: pasCommencees, motFait: A.faits, motFaits: A.faits.replace(/^(\S+)/, '$1s') })}{nPlanif ? ` · ${nPlanif} prévue${nPlanif > 1 ? 's' : ''}` : ''}</span>}>
+              return <Avancement titre={titre} phrase={phrase} part={part} partRate={partRate} label={`${nFait} sur ${total} ${motF(nFait)}`} erreur={erreur}
+                data={{ 'data-republier-total': `${finies}/${total}`, 'data-republier-reussies': `${nFait}/${total}`, 'data-republier-bilan': '' }}
+                compte={<span>{compte}</span>}>
                 {peEnCours && <div data-republier-progression={enCours.id} data-republier-etape={peEnCours.etape || 'attente'}>
                   <BarreGeste p={prog[String(enCours.id)]} liste={lstEnCours} label={`Paire ${aFaire.indexOf(enCours) + 1}`} barre={false} />
                 </div>}
@@ -12807,7 +12826,10 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
               {aFaire.map((a, i) => { const s = st[a.id] || {};
                 const pb = s.etat === 'echec' || s.etat === 'double' || s.etat === 'incertain' || s.etat === 'a-refaire';
                 const statut = s.etat === 'fait' ? (s.refait ? 'brouillon refait' : A.fait) : s.etat === 'encours' ? 'en cours…' : s.etat === 'planifiee' ? `brouillon prêt · en ligne vers ${s.jusqua ? new Date(s.jusqua).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : '…'}` : s.etat === 'echec' ? 'pas faite' : s.etat === 'a-refaire' ? 'brouillon à refaire' : s.etat ? '⚠ à vérifier' : (mode === 'idle' ? '' : 'en attente');
-                const raison = s.raison && (pb || s.refait) ? s.raison : '';
+                // (30 oct.) La pause de Vinted est dite UNE fois, dans le bloc du haut :
+                // la ligne dit seulement que la paire n'est pas partie à cause d'elle.
+                const raison = s.code === 'vinted-pause' || s.code === 'plafond' ? 'pas partie : arrêt demandé par Vinted (voir en haut)' : s.raison && (pb || s.refait) ? s.raison : '';
+                const urlAncienne = action !== 'enLigne' && /^\d+$/.test(String(a.id || '')) ? `https://www.vinted.fr/items/${a.id}` : '';
                 return (
                 <div key={a.id} data-republier-ligne={a.id} data-republier-statut={s.etat || 'attente'} style={{ padding: '6px 10px', borderBottom: `1px solid ${C.border}`, fontSize: 13 }}>
                   <div style={{ display: 'flex', gap: 8, alignItems: 'center', minHeight: 32 }}>
@@ -12822,6 +12844,7 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
                   </div>
                   {raison && <div style={{ fontSize: 12.5, color: pb ? C.warn : C.muted, padding: '0 0 4px 26px', lineHeight: 1.45 }}>{raison}</div>}
                   {s.etat === 'a-refaire' && refaire && mode !== 'run' && <div className="vrm-b-rangee" style={{ padding: '2px 0 4px 26px' }}><Bouton data-republier-refaire={a.id} onClick={() => refaireLigne(a)}>Refaire le brouillon</Bouton></div>}
+                  {(s.etat === 'double' || s.etat === 'incertain') && urlAncienne && <div style={{ padding: '0 0 4px 26px' }}><Bouton variante="discret" href={urlAncienne} target="_blank" rel="noopener noreferrer" data-republier-voir-ancienne={a.id}>{s.etat === 'double' ? "Supprimer l'ancienne sur Vinted ↗" : 'Vérifier sur Vinted ↗'}</Bouton></div>}
                   {recree && pb && prog[String(a.id)] && prog[String(a.id)].etape && (() => { const lst = action === 'versBrouillon' ? ETAPES_REPUB.versBrouillon : ((viaBrouillon && !!brouillonOk) ? ETAPES_REPUB.brouillon : ETAPES_REPUB.direct); const pe = progressionRepub(prog[String(a.id)], action, viaBrouillon && !!brouillonOk); return (
                     <div data-republier-progression={a.id} data-republier-etape={pe.etape || 'attente'} style={{ padding: '0 0 4px 26px' }}>
                       <BarreGeste p={prog[String(a.id)]} liste={lst} label={`Paire ${i + 1}`} issue="echec" barre={false} />
@@ -12845,11 +12868,14 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
             <span style={{ flex: 1, minWidth: 0, fontSize: 12.5, color: C.muted }}>Garde cette fenêtre ouverte.</span>
             <Bouton data-republier-pause onClick={() => setMode('pause')} style={{ flex: '0 0 auto' }}>Pause</Bouton>
           </>}
-          {mode === 'pause' && <>
-            <Bouton onClick={() => setMode('fini')}>Arrêter</Bouton>
-            <Bouton variante="primaire" onClick={() => setMode('run')}>Reprendre</Bouton>
-          </>}
-          {mode === 'fini' && <Bouton variante="primaire" data-republier-fermer onClick={onClose}>Terminé</Bouton>}
+          {mode === 'pause' && (() => { const resteMin = arretJusqua > Date.now() ? Math.ceil((arretJusqua - Date.now()) / 60000) : 0; return <>
+            <Bouton data-republier-arreter onClick={() => setMode('fini')}>Arrêter</Bouton>
+            <Bouton variante="primaire" data-republier-reprendre disabled={resteMin > 0} title={resteMin > 0 ? `Vinted demande d'attendre : possible dans ${resteMin} min` : undefined} onClick={() => setMode('run')}>{resteMin > 0 ? `Reprendre (dans ${resteMin} min)` : 'Reprendre'}</Bouton>
+          </>; })()}
+          {mode === 'fini' && (() => { const ids = aFaire.filter((a) => { const x = st[a.id] || {}; return x.etat === 'echec' || !x.etat; }).map((a) => a.id); return <>
+            {onReessayer && ids.length > 0 && <Bouton data-republier-reessayer={ids.length} onClick={() => onReessayer(ids)}>{ids.length > 1 ? `Réessayer les ${ids.length} pas faites` : 'Réessayer la pas faite'}</Bouton>}
+            <Bouton variante="primaire" data-republier-fermer onClick={onClose}>Fermer</Bouton>
+          </>; })()}
         </div>
       </div>
     </div>
@@ -17099,12 +17125,13 @@ function compteAvancement({ faites = 0, ratees = 0, restent = 0, motFait = 'fait
   const pl = (n, s, p) => `${n} ${n > 1 ? (p || s + 's') : s}`;
   return [pl(faites, motFait, motFaits), ratees ? pl(ratees, 'ratée') : null, restent ? pl(restent, 'restante') : null].filter(Boolean).join(' · ');
 }
-function Avancement({ titre, phrase, part = 0, compte, erreur, label, data, children }) {
+function Avancement({ titre, phrase, part = 0, partRate = 0, compte, erreur, label, data, children }) {
   const pct = Math.max(0, Math.min(100, Math.round((Number(part) || 0) * 100)));
+  const pctR = Math.max(0, Math.min(100 - pct, Math.round((Number(partRate) || 0) * 100)));
   return (
     <div className="vrm-avancement" {...(data || {})}>
       <div className="vrm-avancement-tete"><b>{titre}</b>{compte ? <span className="vrm-avancement-compte">{compte}</span> : null}</div>
-      <div className="vrm-avancement-barre" role="progressbar" aria-label={label || (typeof titre === 'string' ? titre : 'Avancement')} aria-valuemin={0} aria-valuemax={100} aria-valuenow={pct}><span style={{ width: `${Math.max(pct ? 3 : 0, pct)}%` }}/></div>
+      <div className="vrm-avancement-barre" role="progressbar" aria-label={label || (typeof titre === 'string' ? titre : 'Avancement')} aria-valuemin={0} aria-valuemax={100} aria-valuenow={pct}><span style={{ width: `${Math.max(pct ? 3 : 0, pct)}%` }}/>{pctR ? <span className="vrm-avancement-rate" style={{ width: `${pctR}%` }}/> : null}</div>
       {phrase ? <div className="vrm-avancement-phrase">{phrase}</div> : null}
       {erreur ? <div className="vrm-avancement-erreur" role="status">{erreur}</div> : null}
       {children}
@@ -29237,7 +29264,7 @@ function StockMeubles() {
     }
     return (
       <div data-stock-modale="" onClick={fermerModal} style={{ position: 'fixed', inset: 0, background: 'rgba(2,5,10,0.55)', zIndex: 9400, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
-        <div onClick={(e) => e.stopPropagation()} style={{ width: 'min(540px,100%)', maxHeight: '86vh', overflowY: 'auto', background: C.card, border: `1px solid ${C.line}`, borderRadius: '20px 20px 0 0', padding: '18px 18px calc(20px + env(safe-area-inset-bottom,0px))' }}>
+        <div className="vrm-feuille-surface" onClick={(e) => e.stopPropagation()} style={{ width: 'min(540px,100%)', maxHeight: '86vh', overflowY: 'auto', background: C.card, border: `1px solid ${C.line}`, borderRadius: '20px 20px 0 0', padding: '18px 18px calc(20px + env(safe-area-inset-bottom,0px))' }}>
           <div style={{ display: 'flex', justifyContent: 'flex-end' }}><button type="button" onClick={fermerModal} aria-label="Fermer" style={{ background: 'transparent', border: 'none', color: C.muted, fontSize: 22, cursor: 'pointer', lineHeight: 1 }}>×</button></div>
           {corps}
         </div>
@@ -35545,6 +35572,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const [refaireOpen, setRefaireOpen] = useState(false);
   const [repubAction, setRepubAction] = useState(null); // null | 'recreer' | 'modifier' | 'versBrouillon' | 'enLigne'
   const [repubReprise, setRepubReprise] = useState(null); // ids des paires pas commencées (compte rendu)
+  const [repubCle, setRepubCle] = useState(0);          // (30 oct.) « Réessayer » rouvre Republier à neuf
   const [photoEdit, setPhotoEdit] = useState(null); // { refPhoto, refTitle } → éditeur de photo (recadrer/zoomer)
   const [auditOpen, setAuditOpen] = useState(false); // modale « Audit d'inventaire »
   const [inventOpen, setInventOpen] = useState(false); // modale « Inventaire physique » (déménagement)
@@ -42735,8 +42763,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // tête « Bordereaux auto » et « Mes vues », sortis de la barre (22 oct.).
   const menuOutilsVentes = (sousBarre) => (
     <>
-      <div onClick={()=>setToolsOpen(false)} style={{position:'fixed',inset:0,zIndex:70}}/>
-      <div data-outils-ventes={sousBarre?'sous-barre':'bouton'} style={{position:'absolute',zIndex:71,background:C.card,border:`1px solid ${C.border}`,borderRadius:10,boxShadow:C.shadowLg||'0 8px 24px rgba(0,0,0,.2)',padding:6,display:'flex',flexDirection:'column',gap:2,...(sousBarre?{left:8,right:8,top:'calc(100% - 4px)'}:{right:0,top:'calc(100% + 6px)',minWidth:270})}}>
+      <div className="vrm-menu-voile" onClick={()=>setToolsOpen(false)} style={{position:'fixed',inset:0,zIndex:70}}/>
+      <div className="vrm-menu-flottant" data-outils-ventes={sousBarre?'sous-barre':'bouton'} style={{position:'absolute',zIndex:71,background:C.card,border:`1px solid ${C.border}`,borderRadius:10,boxShadow:C.shadowLg||'0 8px 24px rgba(0,0,0,.2)',padding:6,display:'flex',flexDirection:'column',gap:2,...(sousBarre?{left:8,right:8,top:'calc(100% - 4px)'}:{right:0,top:'calc(100% + 6px)',minWidth:270})}}>
         {(
           <div className="vrm-outils-reglages" style={{padding:'4px 6px 8px',borderBottom:`1px solid ${C.border}`,marginBottom:2}}>
             <BordereauxAuto key={AUTH.user?.id} owner={AUTH.user?.id} lire={lireBordereauxAuto} sauver={sauverBordereauxAuto}/>
@@ -45997,13 +46025,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               <button type="button" aria-label="Outils" onClick={(e)=>{ try { const r=e.currentTarget.getBoundingClientRect(); setAnnToolsCote(r.right>=246?'droite':'gauche'); } catch(_){} setAnnToolsOpen(v=>!v); }} aria-expanded={annToolsOpen} title="Outils : répartir un lot, audit du stock"
                 style={{border:`1px solid ${annToolsOpen?C.accent:C.border}`,borderRadius:8,padding:'8px 12px',fontSize:13,fontWeight:600,background:annToolsOpen?`${C.accent}12`:'transparent',color:annToolsOpen?C.accent:C.text,cursor:'pointer',fontFamily:'inherit'}}>⋯<span className="vrm-ann-outils-mot"> Outils</span></button>
               {annToolsOpen && (<>
-                <div onClick={()=>setAnnToolsOpen(false)} style={{position:'fixed',inset:0,zIndex:70}}/>
+                <div className="vrm-menu-voile" onClick={()=>setAnnToolsOpen(false)} style={{position:'fixed',inset:0,zIndex:70}}/>
                 {/* Le menu s'ancrait à GAUCHE du bouton, posé au bord droit de la ligne :
                     ses quatre outils sortaient de l'écran (1512 px : 1332→1562 pour une zone
                     visible jusqu'à 1452 ; 390 px : 274→504), leurs noms coupés, sans erreur.
                     Il s'ancre à droite comme le menu de l'écran Ventes — sauf si le bouton,
                     passé à la ligne, est trop près du bord gauche pour cela. */}
-                <div style={{position:'absolute',...(annToolsCote==='gauche'?{left:0}:{right:0}),top:'calc(100% + 6px)',zIndex:71,minWidth:230,maxWidth:'calc(100vw - 32px)',background:C.card,border:`1px solid ${C.border}`,borderRadius:10,boxShadow:C.shadowLg||'0 8px 24px rgba(0,0,0,.2)',padding:6,display:'flex',flexDirection:'column',gap:2}}>
+                <div className="vrm-menu-flottant" data-outils-annonces="" style={{position:'absolute',...(annToolsCote==='gauche'?{left:0}:{right:0}),top:'calc(100% + 6px)',zIndex:71,minWidth:230,maxWidth:'calc(100vw - 32px)',background:C.card,border:`1px solid ${C.border}`,borderRadius:10,boxShadow:C.shadowLg||'0 8px 24px rgba(0,0,0,.2)',padding:6,display:'flex',flexDirection:'column',gap:2}}>
                   {[
                     {k:'lot', icon:'🧮', lab:'Répartir un lot', desc:"Ventiler le prix d'un achat groupé", on:()=>{ setAnnToolsOpen(false); setLotSel(new Set()); setLotTotal(''); setLotSearch(''); setLotMode('equal'); setLotOpen(true); }},
                     {k:'studio', icon:'📷', lab:'Studio photo', desc:'Cadre guide à la prise de vue, détourage sans envoi', on:()=>{ setAnnToolsOpen(false); setStudioOpen(true); }},
@@ -49557,14 +49585,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             note: b._source==='extension' ? `enregistré il y a ${ilYaBr(b._enregistre)}` : Number.isFinite(b._vu) ? `vu sur Vinted il y a ${ilYaBr(b._vu)}` : '',
             bloque: b._etat==='pret' ? '' : (RAISON_BR[b._etat]||'pas prêt') }; });
         const fermer = ()=>{ setRepubAction(null); setRepubReprise(null); };
+        const reessayer = (ids)=>{ setRepubReprise(ids.map(String)); setRepubCle(c=>c+1); };
         // (28 oct.) « Refaire le brouillon » sur la ligne ratée : la même commande que
         // la liste « Brouillons à refaire » (§11), l'annonce désignée par son identité.
         const refaireOk = extSait('refaire')==='ok';
         const refaireLigne = refaireOk ? async (a) => { const r = await refaireBrouillon({ uid:a.uid, id:a.id }); return r.etape==='fait' ? { etat:'fait', raison:r.raison||'' } : r.etape==='incertain' ? { etat:'incertain', raison:r.raison||'' } : r.refaire ? { etat:'a-refaire', raison:r.raison||'' } : { etat:'echec', raison:r.raison||'' }; } : null;
-        if (repubAction==='enLigne') return <RepublierVinted key="enLigne" action="enLigne" reprise={repubReprise} annonces={annoncesBr} publier={publierEnLigne} compteChrome={etatX} compteVinted={vc} majExt={extSait('brouillon')!=='ok'} lettreOk={false} brouillonOk={extSait('brouillon')==='ok'} onClose={fermer} />;
-        if (repubAction==='modifier') return <RepublierVinted key="modifier" action="modifier" reprise={repubReprise} annonces={annoncesR} publier={publierModif} compteChrome={etatX} compteVinted={vc} majExt={extSait('republiermodif')!=='ok'} lettreOk={false} brouillonOk={false} onClose={fermer} />;
-        if (repubAction==='versBrouillon') return <RepublierVinted key="versBrouillon" action="versBrouillon" reprise={repubReprise} annonces={annoncesR} publier={publierVersB} refaire={refaireLigne} compteChrome={etatX} compteVinted={vc} majExt={extSait('versbrouillon')!=='ok'} lettreOk={extSait('lettre')==='ok'} brouillonOk={extSait('versbrouillon')==='ok'} onClose={fermer} />;
-        return <RepublierVinted key="recreer" reprise={repubReprise} annonces={annoncesR} publier={publierR} refaire={refaireLigne} compteChrome={etatX} compteVinted={vc} majExt={extSait('recreer')!=='ok'} lettreOk={extSait('lettre')==='ok'} brouillonOk={extSait('republierbrouillon')==='ok'} onClose={fermer} />;
+        if (repubAction==='enLigne') return <RepublierVinted key={"enLigne"+repubCle} action="enLigne" onReessayer={reessayer} reprise={repubReprise} annonces={annoncesBr} publier={publierEnLigne} compteChrome={etatX} compteVinted={vc} majExt={extSait('brouillon')!=='ok'} lettreOk={false} brouillonOk={extSait('brouillon')==='ok'} onClose={fermer} />;
+        if (repubAction==='modifier') return <RepublierVinted key={"modifier"+repubCle} action="modifier" onReessayer={reessayer} reprise={repubReprise} annonces={annoncesR} publier={publierModif} compteChrome={etatX} compteVinted={vc} majExt={extSait('republiermodif')!=='ok'} lettreOk={false} brouillonOk={false} onClose={fermer} />;
+        if (repubAction==='versBrouillon') return <RepublierVinted key={"versBrouillon"+repubCle} action="versBrouillon" onReessayer={reessayer} reprise={repubReprise} annonces={annoncesR} publier={publierVersB} refaire={refaireLigne} compteChrome={etatX} compteVinted={vc} majExt={extSait('versbrouillon')!=='ok'} lettreOk={extSait('lettre')==='ok'} brouillonOk={extSait('versbrouillon')==='ok'} onClose={fermer} />;
+        return <RepublierVinted key={"recreer"+repubCle} onReessayer={reessayer} reprise={repubReprise} annonces={annoncesR} publier={publierR} refaire={refaireLigne} compteChrome={etatX} compteVinted={vc} majExt={extSait('recreer')!=='ok'} lettreOk={extSait('lettre')==='ok'} brouillonOk={extSait('republierbrouillon')==='ok'} onClose={fermer} />;
       })()}
       {fileOpen && (()=>{
         // Candidats = brouillons PRÊTS (titre + prix > 0 + au moins une photo) dont
