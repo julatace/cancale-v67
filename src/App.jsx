@@ -17081,7 +17081,10 @@ function Bouton({ variante = 'secondaire', icone, plein = false, className = '',
   const cls = `vrm-b vrm-b-${variante}${plein ? ' vrm-b-plein' : ''}${!children && icone ? ' vrm-b-icone' : ''}${className ? ' ' + className : ''}`;
   const contenu = <>{icone && ICON_PATHS[icone] ? <Icon name={icone} size={18}/> : null}{children}</>;
   if (href) return <a href={href} className={cls} {...rest}>{contenu}</a>;
-  return <button type={type} className={cls} {...rest}>{contenu}</button>;
+  // Type écrit en clair (audit-commandes) : « submit » seulement quand on le
+  // demande, sinon « button » — jamais un envoi de formulaire par défaut.
+  if (type === 'submit') return <button type="submit" className={cls} {...rest}>{contenu}</button>;
+  return <button type="button" className={cls} {...rest}>{contenu}</button>;
 }
 // (29 oct.) UN PARCOURS EN PLUSIEURS ÉTAPES se lit toujours pareil — Julien :
 // « pour les republications la barre de progression est incompréhensible ».
