@@ -24646,7 +24646,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
             noire, plus de filet vertical parasite à gauche de chaque texte
             (l'ombre « -1px » de StatBox compact). */}
         <div className="vrm-display" style={{...sHero,fontSize:28,marginTop:6}}>{fmt(liveStats&&liveStats.caEncaisse!=null?liveStats.caEncaisse:ca)}</div>
-        <div className="vrm-aide" style={{...sNote,marginTop:6}}>Ventes finalisées, Vinted seul (tous comptes) · au jour de la vente · Leboncoin et eBay sont dans « Finalisé par plateforme »</div>
+        <div style={{...sNote,marginTop:6,display:'flex',alignItems:'center',gap:4,flexWrap:'wrap'}}>Vinted seul · tous comptes · au jour de la vente <Pourquoi label="Et Leboncoin, eBay ?">Ce chiffre ne compte que les ventes finalisées sur Vinted. Leboncoin et eBay sont dans « Finalisé par plateforme », plus bas.</Pourquoi></div>
         {liveStats && liveStats.nMasque > 0 && liveStats.caEncaisse != null && (
           <div data-finalise-masquees={liveStats.nMasque} data-finalise-masquees-eur={Math.round(liveStats.caMasque*100)} style={{...sNote,marginTop:4}}>
             {liveStats.nMasque>1 ? `Sans tes ${liveStats.nMasque} ventes masquées (${fmt(liveStats.caMasque)}) — elles restent dans ton CA déclaré (Comptabilité).` : `Sans ta vente masquée (${fmt(liveStats.caMasque)}) — elle reste dans ton CA déclaré (Comptabilité).`}
@@ -24673,15 +24673,15 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
       <div className="vrm-finance-goal"><Card>
         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8,marginBottom:objectif>0&&!objEdit?8:2}}>
           <div style={{fontSize:13,fontWeight:600,color:C.text}}>Objectif du mois</div>
-          <button type="button" onClick={()=>{ setObjTmp(objectif>0?String(objectif):''); setObjEdit(e=>!e); }} style={{border:`1px solid ${C.border}`,background:'transparent',color:C.muted,borderRadius:8,padding:'6px 11px',fontSize:13,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>{objEdit?'Annuler':(objectif>0?'Modifier':'Fixer')}</button>
+          <Bouton variante={objEdit?'discret':'secondaire'} className="vrm-b-petit" onClick={()=>{ setObjTmp(objectif>0?String(objectif):''); setObjEdit(e=>!e); }}>{objEdit?'Annuler':(objectif>0?'Modifier':'Fixer')}</Bouton>
         </div>
         {objEdit ? (
           <div style={{display:'flex',gap:8,alignItems:'center',marginTop:8}}>
             <input aria-label="Objectif de chiffre d’affaires du mois" type="number" min="0" step="0.01" inputMode="decimal" value={objTmp} onChange={e=>setObjTmp(e.target.value)} placeholder="ex. 2000" style={{flex:1,minWidth:0,border:`1px solid ${C.border}`,background:C.card,color:C.text,borderRadius:10,padding:'11px 12px',fontSize:15,fontFamily:'inherit',outline:'none'}}/>
-            <button type="button" onClick={()=>{ const n=Number(objTmp); if(!Number.isFinite(n)||n<0){toast('Indique un objectif valide.');return;} setObjectif(n); save('vrm_ca_objectif',n); setObjEdit(false); }} style={{border:'none',background:C.accent,color:'#fff',borderRadius:10,padding:'11px 16px',fontSize:13,fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>OK</button>
+            <Bouton variante="primaire" onClick={()=>{ const n=Number(objTmp); if(!Number.isFinite(n)||n<0){toast('Indique un objectif valide.');return;} setObjectif(n); save('vrm_ca_objectif',n); setObjEdit(false); }}>OK</Bouton>
           </div>
         ) : objectif>0 && caMoisCourant==null ? (
-          <div style={{fontSize:13,color:C.muted,marginTop:6,lineHeight:1.5}}>— · tes ventes n'ont pas pu être lues, la jauge revient dès qu'elles le sont.</div>
+          <div style={{fontSize:13,color:C.muted,marginTop:6,lineHeight:1.5}}>— · ventes pas lues, la jauge revient dès qu'elles le sont.</div>
         ) : objectif>0 ? (()=>{ const pct=Math.min(100,Math.round(caMoisCourant/objectif*100)); const done=caMoisCourant>=objectif; return (
           <>
             <div style={{display:'flex',alignItems:'baseline',gap:8}}>
@@ -24692,7 +24692,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
             <div style={{fontSize:13,color:C.muted,marginTop:6}}>{done?'Objectif atteint':`${pct}% de ton objectif`} · vendu ce mois, toutes plateformes, ventes en cours comprises</div>
           </>
         ); })() : (
-          <div className="vrm-aide" style={{fontSize:13,color:C.muted,marginTop:6,lineHeight:1.5}}>Fixe un objectif de CA pour ce mois et suis ta progression au fil de tes ventes.</div>
+          <div style={{fontSize:13,color:C.muted,marginTop:6,lineHeight:1.5}}>Fixe un montant à atteindre ce mois-ci.</div>
         )}
       </Card></div>
 
@@ -24762,9 +24762,8 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
         return (
           <div data-stats-carte="courbe" data-stats-courbe data-notion="vendu" style={{...sCarte,marginTop:4}}>
             <div style={sLib}>Vendu · 12 derniers mois</div>
-            <div className="vrm-aide" style={{fontSize:11,color:C.muted,marginTop:4}}>Toutes plateformes · ventes en cours comprises</div>
+            <div style={{fontSize:11,color:C.muted,marginTop:4,display:'flex',alignItems:'center',gap:4}}>Toutes plateformes · ventes en cours comprises <Pourquoi label="Pourquoi plus que le finalisé ?">Au jour de la vente, ventes en cours comprises : ce n'est pas le finalisé, c'est pourquoi ce total peut dépasser celui du dessus.</Pourquoi></div>
             <div className="vrm-display" style={{...sHero,fontSize:28,letterSpacing:-0.8,marginTop:6}}>{fmt(tot)}</div>
-            <DayWeekNote label="Comprendre ce graphique"><div style={{...sNote,marginTop:6}}>Toutes plateformes, ventes en cours comprises, au jour de la vente — ce n'est pas le finalisé, c'est pourquoi ce total peut dépasser celui du dessus.</div></DayWeekNote>
             <div style={{marginTop:14}}><CourbeMois mois={mois.map((m,i)=>({...m,enCours:i===mois.length-1}))} attr="data-courbe-vendu" presentation="ligne" legende={false}/></div>
             <div style={{display:'flex',flexDirection:'column',gap:6,marginTop:12}}>
               <div style={{display:'flex',alignItems:'center',gap:8,fontSize:13,color:C.muted}}>
@@ -24846,27 +24845,8 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
         );
       })()}
 
-      {/* Barre de progression du garage */}
-      <div data-stats-carte="garage" style={sCarte}>
-        <div style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',marginBottom:10}}>
-          <span style={{...sTitre,display:'inline-flex',alignItems:'center',gap:6}}><Icon name="home" size={14}/>Remplissage du stock</span>
-          <span className="vrm-display" style={{fontSize:15,fontWeight:700,color:C.text,fontVariantNumeric:'tabular-nums'}}>{fillRate}%</span>
-        </div>
-        <div style={{height:6,background:C.card2||C.surface,borderRadius:999,overflow:'hidden'}}>
-          <div style={{
-            height:'100%',
-            width:`${fillRate}%`,
-            background:C.accent,
-            borderRadius:999,
-            transition:'width 0.4s ease',
-          }}/>
-        </div>
-        <div style={{display:'flex',justifyContent:'space-between',gap:8,marginTop:9,fontSize:13,color:C.muted}}>
-          <span><b style={{color:C.text,fontWeight:600}}>{stockCount}</b> boîtes occupées</span>
-          <span><b style={{color:C.text,fontWeight:600}}>{freeSlots}</b> libres / {TOTAL_SLOTS} total</span>
-        </div>
-      </div>
-
+      {/* (30 oct.) « Remplissage du stock » lisait l'ancienne grille de zones, que plus aucun
+          écran ne remplit (le Stock range dans Mes meubles / Ma pièce) : 0 % à vie. Retiré. */}
       {/* Stats secondaires */}
       {/* Ces cartes venaient du vieux catalogue (vide) → toutes à 0 (plainte de
           Julien). « Vente moyenne » se calcule sur la moisson (CA encaissé /
@@ -24904,7 +24884,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
                 </div>
               ))}
             </div>
-            {hv && <div style={{marginTop:6}}><LignePrixAchat quoi="Le multiplicateur et le bénéfice moyen" dans/></div>}
+            {hv && !manquePrix && <div style={{marginTop:6}}><LignePrixAchat quoi="Le multiplicateur et le bénéfice moyen" dans/></div>}
           </div>
         );
       })()}
@@ -24944,14 +24924,10 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
           <Card>
             <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap',marginBottom:6}}>
               <span style={{fontSize:13,fontWeight:600,color:C.text,flex:1,minWidth:120}}>Évolution — ventes finalisées</span>
-              <div style={{display:'flex',gap:4,background:C.surface,borderRadius:8,padding:2,border:`1px solid ${C.border}`}}>
-                {[['ca','CA €'],['ventes','Ventes']].map(([v,l])=>(
-                  <button type="button" key={v} onClick={()=>setCaMode(v)} style={{border:'none',borderRadius:8,padding:'3px 10px',fontSize:11,fontWeight:600,cursor:'pointer',fontFamily:'inherit',background:caMode===v?C.accent:'transparent',color:caMode===v?'#fff':C.muted}}>{l}</button>
-                ))}
-              </div>
+              <Segmente label="Montrer" value={caMode} onChange={setCaMode} options={[{v:'ca',l:'CA €'},{v:'ventes',l:'Ventes'}]}/>
             </div>
             <div style={{fontSize:11,color:C.muted,marginBottom:14}}>
-              {moisMoisson.length} mois · même source que le récap comptable (Comptabilité) — touche un point pour le détail.
+              {moisMoisson.length} mois · touche un point pour le détail
             </div>
             <CourbeMois mois={moisMoisson.map(h=>({cle:h.key,long:h.nomComplet,n:h.ventes,ca:h.ca,ventes:h.ventes,enCours:h.enCours}))} valeur={(m)=>caMode==='ca'?m.ca:m.ventes} format={(v)=>caMode==='ca'?`${Math.round(v).toLocaleString('fr-FR')} €`:String(Math.round(v))} choisi={selMois} onChoisir={setSelMois} attr="data-courbe-finalise"/>
             {sel&&(
@@ -24970,7 +24946,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
         const sel=caHistory.find(h=>h.key===selMonthEnc);
         return (
           <Card>
-            <div style={{fontSize:13,fontWeight:600,color:C.text,marginBottom:6}}>💰 Évolution du CA (ventes finalisées, 12 derniers mois)</div>
+            <div style={{fontSize:13,fontWeight:600,color:C.text,marginBottom:6}}>Évolution du CA (ventes finalisées, 12 derniers mois)</div>
             <div className="vrm-aide" style={{fontSize:11,color:C.muted,marginBottom:14}}>Touche un point pour voir le détail des ventes du mois.</div>
             <CourbeMois mois={caHistory.map(h=>({cle:h.key,long:h.nomComplet,ca:h.ca,n:h.ventes.length}))} valeur={(m)=>m.ca} format={(v)=>`${Math.round(v).toLocaleString('fr-FR')} €`} choisi={selMonthEnc} onChoisir={setSelMonthEnc} attr="data-courbe-encaisse"/>
             {sel&&<MonthDetail mois={sel} type="encaisse" C={C} fmt={fmt} catMap={catMap} catalog={catalog} onClose={()=>setSelMonthEnc(null)}/>}
@@ -24980,8 +24956,8 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
 
       {/* CA SUR MESURE : d'une date à une autre (Julien, 28 sept.). */}
       <Card>
-        <div style={{fontSize:13,fontWeight:600,color:C.text,marginBottom:2}}>📅 Chiffre d'affaires entre deux dates</div>
-        <div className="vrm-aide" style={{fontSize:11,color:C.muted,marginBottom:10}}>Choisis une période — le total porte sur tes ventes finalisées, à leur date de vente.</div>
+        <div style={{fontSize:13,fontWeight:600,color:C.text,marginBottom:2}}>CA entre deux dates</div>
+        <div style={{fontSize:11,color:C.muted,marginBottom:10}}>Ventes finalisées, à leur date de vente</div>
         <div style={{display:'flex',gap:10,flexWrap:'wrap',alignItems:'flex-end'}}>
           <div>
             <label style={{fontSize:11,color:C.muted,display:'block',marginBottom:4,fontWeight:600}}>Du</label>
@@ -24991,7 +24967,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
             <label style={{fontSize:11,color:C.muted,display:'block',marginBottom:4,fontWeight:600}}>Au</label>
             <input type="date" value={caAu} onChange={e=>setCaAu(e.target.value)} style={{border:`1px solid ${C.border}`,background:C.card,color:C.text,borderRadius:10,padding:'10px 12px',fontSize:15,fontFamily:'inherit',outline:'none',colorScheme:'inherit'}}/>
           </div>
-          {(caDu||caAu) && <button type="button" onClick={()=>{setCaDu('');setCaAu('');}} style={{border:`1px solid ${C.border}`,background:'transparent',color:C.muted,borderRadius:10,padding:'10px 12px',fontSize:13,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Effacer</button>}
+          {(caDu||caAu) && <Bouton variante="discret" onClick={()=>{setCaDu('');setCaAu('');}}>Effacer</Bouton>}
         </div>
         {caRange ? (
           <div style={{marginTop:14}}>
@@ -25003,49 +24979,11 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
                 : ` jusqu'au ${caAu.split('-').reverse().join('/')}`}
             </div>
           </div>
-        ) : (
-          <div className="vrm-aide" style={{fontSize:13,color:C.muted,marginTop:12,lineHeight:1.5}}>Renseigne une date de début et/ou de fin pour voir le CA de la période.</div>
-        )}
+        ) : null}
       </Card>
 
-      {/* 🍩 ANNEAU PAR PLATEFORME — une seule teinte (accent), variée par opacité
-          FIXE par plateforme (§7) ; identité portée par la légende, pas la couleur. */}
-      {platParts.total>0 && (()=>{
-        const op={'Vinted':1,'Leboncoin':0.6,'eBay':0.4,'Vestiaire Collective':0.24};
-        const cx=66,cy=66,r=52,CIRC=2*Math.PI*r; let acc=0;
-        return (
-          <Card>
-            <div style={{fontSize:13,fontWeight:600,color:C.text,marginBottom:2}}>Répartition du CA par plateforme</div>
-            <div className="vrm-aide" style={{fontSize:11,color:C.muted,marginBottom:12}}>La part de chaque plateforme dans ton chiffre d'affaires.</div>
-            <div style={{display:'flex',gap:18,alignItems:'center',flexWrap:'wrap'}}>
-              <svg width="132" height="132" viewBox="0 0 132 132" style={{flexShrink:0}} role="img" aria-label="Répartition du CA par plateforme">
-                <circle cx={cx} cy={cy} r={r} fill="none" stroke={C.card2||C.border} strokeWidth="14"/>
-                {platParts.arr.map((p)=>{ const len=p.ca/platParts.total*CIRC; const el=(
-                  <circle key={p.nom} cx={cx} cy={cy} r={r} fill="none" stroke={C.accent} strokeOpacity={op[p.nom]!=null?op[p.nom]:0.3} strokeWidth="14"
-                    strokeDasharray={`${len} ${CIRC-len}`} strokeDashoffset={-acc} transform={`rotate(-90 ${cx} ${cy})`} strokeLinecap="butt"/>);
-                  acc+=len; return el; })}
-                {/* (20 oct., revue) Le centre disait « 6984 € » à côté de « 6983,57 € » dans la
-                    légende : le même total, arrondi deux fois (§7). Le montant exact. */}
-                <text x="66" y="62" textAnchor="middle" className="vrm-display" data-anneau-total={Math.round(platParts.total*100)} style={{fontSize:'13px',fontWeight:800,fill:C.text}}>{fmt(platParts.total)}</text>
-                <text x="66" y="79" textAnchor="middle" style={{fontSize:'11px',fill:C.muted}}>CA total</text>
-              </svg>
-              {/* 220 px : sur téléphone la légende passe SOUS l'anneau — à 150 px elle
-                  tenait à côté et le nom de la plateforme tombait à « Vin… ». */}
-              <div data-anneau-legende="" style={{flex:'1 1 220px',minWidth:0,display:'flex',flexDirection:'column',gap:8}}>
-                {platParts.arr.map((p)=>(
-                  <div key={p.nom} style={{display:'flex',alignItems:'center',gap:8,fontSize:13}}>
-                    <span style={{width:11,height:11,borderRadius:999,background:C.accent,opacity:op[p.nom]!=null?op[p.nom]:0.3,flexShrink:0}}/>
-                    <span style={{flex:1,color:C.text,minWidth:0,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{p.court}</span>
-                    <span style={{color:C.text,fontWeight:700}}>{fmt(p.ca)}</span>
-                    <span style={{color:C.muted,width:40,textAlign:'right'}}>{Math.round(p.ca/platParts.total*100)}%</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </Card>
-        );
-      })()}
-
+      {/* (30 oct.) L'anneau « Répartition du CA par plateforme » redisait « Finalisé par plateforme »
+          (mêmes montants, mêmes parts) : une notion, un bloc (§7). */}
       {/* Ce qui se vend : marque, taille, modèle, pays, temps de vente (17 oct.). */}
       <AnalysesStatistiques panelOff={panelOff}/>
 
@@ -25058,7 +24996,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
         const sel=caHistoryVente.find(h=>h.key===selMonthVente);
         return (
           <Card>
-            <div style={{fontSize:13,fontWeight:600,color:C.text,marginBottom:6}}>🛒 Évolution du CA par date de vente (12 derniers mois)</div>
+            <div style={{fontSize:13,fontWeight:600,color:C.text,marginBottom:6}}>Évolution du CA par date de vente (12 derniers mois)</div>
             <div className="vrm-aide" style={{fontSize:11,color:C.muted,marginBottom:14}}>Touche un point pour voir le détail des ventes du mois.</div>
             <CourbeMois mois={caHistoryVente.map(h=>({cle:h.key,long:h.nomComplet,ca:h.ca,n:h.ventes.length}))} valeur={(m)=>m.ca} format={(v)=>`${Math.round(v).toLocaleString('fr-FR')} €`} choisi={selMonthVente} onChoisir={setSelMonthVente} attr="data-courbe-vente"/>
             {sel&&<MonthDetail mois={sel} type="vente" C={C} fmt={fmt} catMap={catMap} catalog={catalog} onClose={()=>setSelMonthVente(null)}/>}
@@ -25073,7 +25011,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
         const moyenne=(totalAjouts/ajoutsParJour.length);
         return (
           <Card>
-            <div style={{fontSize:13,fontWeight:600,color:C.text,marginBottom:6}}>📦 Articles ajoutés par jour</div>
+            <div style={{fontSize:13,fontWeight:600,color:C.text,marginBottom:6}}>Articles ajoutés par jour</div>
             <div style={{fontSize:11,color:C.muted,marginBottom:14}}>
               {totalAjouts} article{totalAjouts>1?'s':''} sur {ajoutsParJour.length} jour{ajoutsParJour.length>1?'s':''} d'activité — moyenne {moyenne.toFixed(1)}/jour.
             </div>
@@ -25095,17 +25033,17 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
 
       {/* Récap hebdomadaire */}
       {showWeekly&&weeklyRecapData.count>0&&(
-        <Card style={{borderLeft:`4px solid ${C.blue}`,background:`${C.blue}11`}}>
+        <Card>
           <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:8}}>
             <div>
-              <div style={{fontSize:13,fontWeight:600,color:C.blue,marginBottom:6}}>📅 Récap semaine dernière ({weeklyRecapData.from} → {weeklyRecapData.to})</div>
+              <div style={{fontSize:13,fontWeight:600,color:C.text,marginBottom:6}}>Semaine dernière ({weeklyRecapData.from} → {weeklyRecapData.to})</div>
               <div style={{display:'flex',gap:16,flexWrap:'wrap',fontSize:13}}>
                 <span><b style={{color:C.text}}>{weeklyRecapData.count}</b> <span style={{color:C.muted}}>vente{weeklyRecapData.count>1?'s':''}</span></span>
                 <span><b style={{color:C.accent}}>{fmt(weeklyRecapData.ca)}</b> <span style={{color:C.muted}}>vendu</span></span>
                 <span><b style={{color:C.accent}}>{fmt(weeklyRecapData.profit)}</b> <span style={{color:C.muted}}>bénéfice</span></span>
               </div>
               {(()=>{ const pc=weeklyRecapData.prevCa||0, c=weeklyRecapData.ca; if(pc<=0&&c<=0) return null; const diff=c-pc; const pct=pc>0?Math.round(diff/pc*100):null; const up=diff>=0; return (
-                <div style={{fontSize:11,color:up?C.accent:C.danger,fontWeight:600,marginTop:6}}>{up?'▲':'▼'} {up?'+':''}{fmt(diff)} vs semaine précédente{pct!=null?` (${up?'+':''}${pct} %)`:''} <span style={{color:C.muted,fontWeight:600}}>— {fmt(pc)} vendus</span></div>
+                <div style={{fontSize:11,color:up?C.accent:C.muted,fontWeight:600,marginTop:6}}>{up?'▲':'▼'} {up?'+':''}{fmt(diff)} vs semaine précédente{pct!=null?` (${up?'+':''}${pct} %)`:''} <span style={{color:C.muted,fontWeight:600}}>— {fmt(pc)} vendus</span></div>
               ); })()}
             </div>
             <button className="vrm-icon-control" aria-label="Fermer le bilan de la semaine" type="button" onClick={()=>{localStorage.setItem('vinted_last_weekly_recap',isoWeek);setShowWeekly(false);}}
@@ -25116,10 +25054,10 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
 
       {/* Récap mensuel */}
       {showMonthly&&monthlyRecapData.count>0&&(
-        <Card style={{borderLeft:`4px solid ${C.purple}`,background:`${C.purple}11`}}>
+        <Card>
           <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:8}}>
             <div>
-              <div style={{fontSize:13,fontWeight:600,color:C.purple,marginBottom:6}}>📆 Récap {monthlyRecapData.nom}</div>
+              <div style={{fontSize:13,fontWeight:600,color:C.text,marginBottom:6}}>Récap {monthlyRecapData.nom}</div>
               <div style={{display:'flex',gap:16,flexWrap:'wrap',fontSize:13}}>
                 <span><b style={{color:C.text}}>{monthlyRecapData.count}</b> <span style={{color:C.muted}}>vente{monthlyRecapData.count>1?'s':''}</span></span>
                 <span><b style={{color:C.accent}}>{fmt(monthlyRecapData.ca)}</b> <span style={{color:C.muted}}>vendu</span></span>
@@ -26915,7 +26853,7 @@ function SortisDuStock({ plan, planLu, ecrire }) {
             <b>N°{x.num}</b>{x.titre ? ` · ${x.titre}` : ''}
             <span style={{ display: 'block', color: C.muted, fontSize: 11.5 }}>sortie de « {x.itemName} »{x.nom ? ` · ${x.nom}` : ''} le {jour(x.at)} — {x.plateforme || 'Vinted'} : {x.statut || 'colis parti'}</span>
           </span>
-          <button type="button" data-stock-remettre={x.num} onClick={() => remettre(x)} style={{ border: `1px solid ${C.border}`, borderRadius: 10, background: 'transparent', color: C.text, fontSize: 12.5, fontWeight: 600, padding: '0 14px', minHeight: 44, cursor: 'pointer', fontFamily: 'inherit' }}>Remettre</button>
+          <button className="vrm-b vrm-b-secondaire vrm-b-petit" type="button" data-stock-remettre={x.num} onClick={() => remettre(x)}>Remettre</button>
         </div>
       ))}
     </div>
@@ -27077,8 +27015,8 @@ function FeuilleToutRanger({ plan, numeros, plusieursPieces, onValider, onClose 
           </div>
         )}
         <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
-          <button type="button" onClick={onClose} style={{ border: `1px solid ${C.border}`, borderRadius: 10, background: 'transparent', color: C.text, fontSize: 14, fontWeight: 600, padding: '0 16px', minHeight: 44, cursor: 'pointer', fontFamily: 'inherit' }}>{n > 0 ? 'Annuler' : 'Fermer'}</button>
-          {n > 0 && <button type="button" data-tout-ranger-ok="" onClick={() => onValider(prop)} style={{ border: 'none', borderRadius: 10, background: C.accent, color: C.onAccent || '#fff', fontSize: 14, fontWeight: 650, padding: '0 18px', minHeight: 44, cursor: 'pointer', fontFamily: 'inherit' }}>Ranger les {n}</button>}
+          <button className="vrm-b vrm-b-discret" type="button" onClick={onClose}>{n > 0 ? 'Annuler' : 'Fermer'}</button>
+          {n > 0 && <button className="vrm-b vrm-b-primaire" type="button" data-tout-ranger-ok="" onClick={() => onValider(prop)}>Ranger les {n}</button>}
         </div>
       </div>
     </SheetShell>, document.body
@@ -27158,8 +27096,8 @@ function AssistantPiece({ room, vide, nbArticles, onCreer, onClose }) {
           </div>
         )}
         <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
-          <button className="vrm-b vrm-b-discret" type="button" onClick={onClose} style={{ border: `1px solid ${C.border}`, borderRadius: 10, background: 'transparent', color: C.text, fontSize: 14, fontWeight: 600, padding: '0 16px', minHeight: 44, cursor: 'pointer', fontFamily: 'inherit' }}>Annuler</button>
-          <button type="button" data-piece-creer="" disabled={!prop || !prop.meubles.length} onClick={creer} style={{ border: 'none', borderRadius: 10, background: C.accent, color: C.onAccent || '#fff', fontSize: 14, fontWeight: 650, padding: '0 18px', minHeight: 44, cursor: prop && prop.meubles.length ? 'pointer' : 'default', opacity: prop && prop.meubles.length ? 1 : 0.5, fontFamily: 'inherit' }}>Créer cette pièce</button>
+          <button className="vrm-b vrm-b-discret" type="button" onClick={onClose}>Annuler</button>
+          <button className="vrm-b vrm-b-primaire" type="button" data-piece-creer="" disabled={!prop || !prop.meubles.length} onClick={creer} style={{ opacity: prop && prop.meubles.length ? 1 : 0.5 }}>Créer cette pièce</button>
         </div>
       </div>
     </SheetShell>, document.body
@@ -28171,12 +28109,12 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
       <div data-stock-barre="" style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
         <Segmente label="Ce que je fais" className="vrm-seg-stock" value={edition ? 'amenager' : 'ranger'} onChange={(v) => setEdition(v === 'amenager')}
           options={[{ v: 'ranger', l: 'Ranger', icone: 'box', data: { 'data-mode-stock': 'ranger' } }, { v: 'amenager', l: 'Aménager', icone: 'pencil', data: { 'data-mode-stock': 'amenager' } }]} />
-        {edition && items.length > 0 && <button type="button" data-piece-assistant="" onClick={() => setAssistPiece(true)} style={{ border: `1px solid ${C.border}`, borderRadius: 10, background: 'transparent', color: C.text, fontSize: 13.5, fontWeight: 600, padding: '0 12px', minHeight: 40, cursor: 'pointer', fontFamily: 'inherit' }}>Nouvelle pièce en 3 questions</button>}
+        {edition && items.length > 0 && <button className="vrm-b vrm-b-secondaire vrm-b-petit" type="button" data-piece-assistant="" onClick={() => setAssistPiece(true)}>Nouvelle pièce en 3 questions</button>}
         <div style={{ flex: '1 1 200px', display: 'flex', gap: 6, minWidth: 0 }}>
           <input ref={refRecherche} data-stock-saisie="" aria-label="Numéro : Entrée pour le trouver ou le ranger" value={search} onChange={e => { setSearch(e.target.value); doSearch(e.target.value); if (rangeClavier && !rangeClavier.numero) setRangeClavier(null); }}
             onKeyDown={e => { const ch = !/^[0-9]$/.test(e.key) && chiffreTouche(e); if (ch) { e.preventDefault(); const v = search + ch; setSearch(v); doSearch(v); return; } if (e.key === 'Enter') { e.preventDefault(); entreeClavier(); } else if (e.key === 'Escape') { e.preventDefault(); if (search) { setSearch(''); setHi(null); } else if (rangeClavier && rangeClavier.numero) annulerClavier(); } }}
             placeholder={sansSourisStock ? 'Cherche un N° → le meuble + la case' : 'Tape un N° puis Entrée : trouver ou ranger'} inputMode="numeric" style={{ flex: 1, minWidth: 0, border: `1px solid ${C.border}`, borderRadius: 10, padding: '9px 12px', fontSize: 14, background: C.card, color: C.text, outline: 'none', fontFamily: 'inherit' }} />
-          {search && <button className="vrm-icon-control" type="button" aria-label="Effacer la recherche de rangement" onClick={() => { setSearch(''); setHi(null); }} style={{ border: `1px solid ${C.border}`, borderRadius: 10, background: 'transparent', color: C.muted, cursor: 'pointer', fontSize: 13, padding: '0 12px' }}><Icon name="close" size={15}/></button>}
+          {search && <button className="vrm-icon-control vrm-b vrm-b-discret vrm-b-icone" type="button" aria-label="Effacer la recherche de rangement" onClick={() => { setSearch(''); setHi(null); }}><Icon name="close" size={15}/></button>}
         </div>
       </div>
       <GuideReglage titre={edition ? 'Aménager ton espace' : 'Retrouver et ranger tes articles'} etapes={edition ? [
@@ -28191,7 +28129,7 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
       {rangeClavier && (
         <div data-stock-clavier={rangeClavier.numero ? 'range' : 'info'} style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', fontSize: 13, color: C.text, lineHeight: 1.45, border: `1px solid ${C.border}`, borderRadius: 10, background: C.card, padding: '8px 10px' }}>
           <span style={{ flex: '1 1 220px', minWidth: 0 }}>{rangeClavier.numero ? <><b>N°{rangeClavier.numero}</b> rangée : {rangeClavier.itemName} · {rangeClavier.nom}. Tape le N° suivant.</> : rangeClavier.info}</span>
-          {rangeClavier.numero && <button type="button" data-stock-clavier-annuler="" onClick={annulerClavier} style={{ border: `1px solid ${C.border}`, borderRadius: 10, background: 'transparent', color: C.text, fontSize: 13, fontWeight: 600, padding: '0 12px', minHeight: 40, cursor: 'pointer', fontFamily: 'inherit' }}>Annuler{sansSourisStock ? '' : ' (Échap)'}</button>}
+          {rangeClavier.numero && <button className="vrm-b vrm-b-discret" type="button" data-stock-clavier-annuler="" onClick={annulerClavier}>Annuler{sansSourisStock ? '' : ' (Échap)'}</button>}
         </div>
       )}
       {hi && hi.itemId && (()=>{
@@ -28211,7 +28149,7 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
             <div style={{ display: 'flex', alignItems: 'baseline', gap: '2px 8px', flexWrap: 'wrap' }}>
               <span style={{ fontSize: 14, fontWeight: 650, color: C.text, whiteSpace: 'nowrap' }}>À ranger</span>
               <span style={{ fontSize: 12.5, color: C.muted, flex: '1 1 160px' }}>{aRanger.length} article{aRanger.length > 1 ? 's' : ''} · touche-en un, ou glisse-le dans la pièce</span>
-              <button type="button" data-tout-ranger-ouvrir={aRanger.length} onClick={() => setToutRanger(true)} style={{ border: 'none', borderRadius: 10, background: C.accent, color: C.onAccent || '#fff', fontSize: 13.5, fontWeight: 650, padding: '0 14px', minHeight: 40, cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0 }}>Tout ranger</button>
+              <button className="vrm-b vrm-b-primaire" type="button" data-tout-ranger-ouvrir={aRanger.length} onClick={() => setToutRanger(true)} style={{ flexShrink: 0 }}>Tout ranger</button>
             </div>
             <div className="vrm-rangee" style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 2 }}>
               {aRanger.slice(0, 60).map(p => {
@@ -28231,8 +28169,8 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
                 <span style={{ flex: '1 1 220px', minWidth: 0 }}>
                   <b>N°{pairePrete}</b> : touche une place libre dans la pièce{pp ? <> — ou range-la à la prochaine place : <b>{pp.nom}</b></> : <> — aucune place libre dans la pièce, ajoute un meuble.</>}
                 </span>
-                {pp && <button type="button" data-ranger-prochaine="" onClick={() => rangerPaire(pairePrete, pp.itemId, pp.cellKey)} style={{ border: 'none', borderRadius: 10, background: C.accent, color: C.onAccent || '#fff', fontSize: 13.5, fontWeight: 600, padding: '0 14px', minHeight: 38, cursor: 'pointer', fontFamily: 'inherit' }}>Ranger ici</button>}
-                <button className="vrm-b vrm-b-discret" type="button" onClick={() => setPairePrete(null)} style={{ border: `1px solid ${C.border}`, borderRadius: 10, background: 'transparent', color: C.muted, fontSize: 13, padding: '0 12px', minHeight: 38, cursor: 'pointer', fontFamily: 'inherit' }}>Annuler</button>
+                {pp && <button className="vrm-b vrm-b-secondaire" type="button" data-ranger-prochaine="" onClick={() => rangerPaire(pairePrete, pp.itemId, pp.cellKey)}>Ranger ici</button>}
+                <button className="vrm-b vrm-b-discret" type="button" onClick={() => setPairePrete(null)}>Annuler</button>
               </div>
             )}
             <div ref={refFantome} aria-hidden="true" style={{ display: 'none', position: 'fixed', left: 0, top: 0, zIndex: 3000, pointerEvents: 'none', padding: '6px 12px', borderRadius: 999, background: C.text, color: C.card, fontSize: 13, fontWeight: 700, boxShadow: '0 6px 18px rgba(0,0,0,0.28)' }} />
@@ -28246,11 +28184,11 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
         <div data-piece-vide="" style={{ border: `1px solid ${C.border}`, borderRadius: 12, background: C.card, padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
           <span style={{ flex: '1 1 220px', minWidth: 0 }}>
             <span style={{ display: 'block', fontSize: 15, fontWeight: 600, color: C.text }}>Ta pièce est vide</span>
-            <span className="vrm-aide" style={{ display: 'block', fontSize: 13, color: C.muted, marginTop: 2, lineHeight: 1.45 }}>Dis-moi sa taille, ton meuble et combien d'articles tu ranges : je te propose une pièce prête, tu valides. VRM retrouve ensuite chaque article par son numéro.</span>
+            <span className="vrm-aide" style={{ display: 'block', fontSize: 13, color: C.muted, marginTop: 2, lineHeight: 1.45 }}>Trois questions et VRM te propose une pièce prête à ranger.</span>
           </span>
           <span data-piece-vide-gestes="" style={{ display: 'flex', gap: 8, flexWrap: 'wrap', flex: '1 1 auto', minWidth: 0 }}>
-            <button type="button" data-piece-assistant="" onClick={() => setAssistPiece(true)} style={{ border: 'none', background: C.accent, color: C.onAccent || '#fff', borderRadius: 10, padding: '0 16px', minHeight: 44, fontSize: 15, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>Créer ma pièce en 3 questions</button>
-            <button type="button" data-piece-vide-geste="" onClick={() => { setEdition(true); const d = refAmenager.current; if (d) { d.open = true; try { setTimeout(() => d.scrollIntoView({ behavior: 'smooth', block: 'start' }), 60); } catch (_) {} } }} style={{ border: `1px solid ${C.border}`, background: 'transparent', color: C.text, borderRadius: 10, padding: '0 16px', minHeight: 44, fontSize: 15, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>Ajouter un meuble à la main</button>
+            <button className="vrm-b vrm-b-primaire" type="button" data-piece-assistant="" onClick={() => setAssistPiece(true)}>Créer ma pièce en 3 questions</button>
+            <button className="vrm-b vrm-b-secondaire" type="button" data-piece-vide-geste="" onClick={() => { setEdition(true); const d = refAmenager.current; if (d) { d.open = true; try { setTimeout(() => d.scrollIntoView({ behavior: 'smooth', block: 'start' }), 60); } catch (_) {} } }}>Ajouter un meuble à la main</button>
           </span>
         </div>
       )}
@@ -28265,13 +28203,13 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
               {chercheLoc.length} article{chercheLoc.length > 1 ? 's' : ''} à aller chercher
               <span style={{ fontWeight: 500, color: C.muted }}> · en couleur dans la pièce</span>
             </span>
-            <button className="vrm-icon-control" type="button" aria-label="Ne plus colorer les articles à aller chercher" onClick={() => setAChercher(null)} style={{ border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.muted, padding: '0 10px', minHeight: 32, cursor: 'pointer' }}><Icon name="close" size={14}/></button>
+            <button className="vrm-icon-control vrm-b vrm-b-discret vrm-b-icone" type="button" aria-label="Ne plus colorer les articles à aller chercher" onClick={() => setAChercher(null)}><Icon name="close" size={14}/></button>
           </div>
           {chercheLoc.map(x => (
             <div key={x.numero} data-cherche={x.numero} data-trouve={x.ou ? '1' : '0'} style={{ fontSize: 13, color: x.ou ? C.text : C.muted, lineHeight: 1.45 }}>
               <b>N°{x.numero}</b>{' '}
               {x.ou
-                ? <>→ {x.ou.itemName}{plan.rooms.length > 1 ? ` (${x.ou.roomName})` : ''} · {x.ou.nom}{x.ou.roomId !== activeRoom.id ? <> — <button type="button" onClick={() => switchRoom(x.ou.roomId)} style={{ border: 'none', background: 'transparent', color: C.accent, padding: 0, cursor: 'pointer', fontFamily: 'inherit', fontSize: 13, fontWeight: 600 }}>ouvrir cette pièce</button></> : null}</>
+                ? <>→ {x.ou.itemName}{plan.rooms.length > 1 ? ` (${x.ou.roomName})` : ''} · {x.ou.nom}{x.ou.roomId !== activeRoom.id ? <> — <button className="vrm-b vrm-b-discret" type="button" onClick={() => switchRoom(x.ou.roomId)}>ouvrir cette pièce</button></> : null}</>
                 : <>— rangée nulle part dans le stock</>}
             </div>
           ))}
@@ -28306,9 +28244,9 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
             </button>
           );
         })}
-        <button type="button" onClick={addRoom} title="Ajouter une pièce" style={{ border: `1px dashed ${C.border}`, borderRadius: 999, background: 'transparent', color: C.text, fontSize: 13, fontWeight: 600, padding: '6px 12px', cursor: 'pointer', fontFamily: 'inherit' }}>＋ {plan.rooms.length > 1 ? 'Pièce' : 'Ajouter une pièce'}</button>
-        <button className="vrm-icon-control" type="button" aria-label="Renommer la pièce" onClick={renameRoom} title="Renommer la pièce" style={{ border: `1px solid ${C.border}`, borderRadius: 999, background: 'transparent', color: C.muted, fontSize: 12, padding: '6px 9px', cursor: 'pointer' }}><Icon name="pencil" size={15}/></button>
-        {plan.rooms.length > 1 && <button className="vrm-icon-control" type="button" aria-label="Supprimer la pièce" onClick={removeRoom} title="Supprimer la pièce" style={{ border: `1px solid ${C.border}`, borderRadius: 999, background: 'transparent', color: C.warn, fontSize: 12, padding: '6px 9px', cursor: 'pointer' }}><Icon name="trash" size={16}/></button>}
+        <button className="vrm-b vrm-b-secondaire vrm-b-petit" type="button" onClick={addRoom} title="Ajouter une pièce">＋ {plan.rooms.length > 1 ? 'Pièce' : 'Ajouter une pièce'}</button>
+        <button className="vrm-icon-control vrm-b vrm-b-secondaire vrm-b-petit" type="button" aria-label="Renommer la pièce" onClick={renameRoom} title="Renommer la pièce"><Icon name="pencil" size={15}/></button>
+        {plan.rooms.length > 1 && <button className="vrm-icon-control vrm-b vrm-b-secondaire vrm-b-petit" type="button" aria-label="Supprimer la pièce" onClick={removeRoom} title="Supprimer la pièce"><Icon name="trash" size={16}/></button>}
       </div>
       {/* ⚠️ UTILISER AVANT AMÉNAGER. Julien : « mets-toi à la place d'un
           revendeur pour son rangement, ça doit être plus facile à prendre en
@@ -28344,7 +28282,7 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
             <div key={titre} style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
               <span title={aide} style={{ fontSize: 11.5, color: C.muted, fontWeight: 700, alignSelf: 'center', minWidth: 74 }}>{titre}</span>
               {liste.map(([k, t]) => (
-                <button type="button" key={k} onClick={() => addFurn(k)} title={aide} style={{ border: `1px solid ${C.border}`, borderRadius: 999, background: C.card, color: C.text, fontSize: 12, fontWeight: 600, padding: '6px 11px', cursor: 'pointer', fontFamily: 'inherit' }}>{t.emoji} {k === 'autre' ? 'Autre…' : t.label}</button>
+                <button className="vrm-b vrm-b-secondaire vrm-b-petit" type="button" key={k} onClick={() => addFurn(k)} title={aide}>{t.emoji} {k === 'autre' ? 'Autre…' : t.label}</button>
               ))}
             </div>
           ) : null);
@@ -28369,13 +28307,13 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
         {/* Taille de la pièce */}
         <div style={{ display: 'flex', gap: 5, alignItems: 'center', flexWrap: 'wrap', fontSize: 11.5, color: C.muted }}>
           <span style={{ fontWeight: 800 }}>Pièce {room.w}×{room.h} :</span>
-          <button type="button" onClick={() => setRoom(1, 0)} style={{ border: `1px solid ${C.border}`, borderRadius: 6, background: 'transparent', color: C.text, fontWeight: 700, padding: '3px 8px', cursor: 'pointer' }}>largeur +</button>
-          <button className="vrm-icon-control" type="button" aria-label="Réduire la largeur de la pièce" onClick={() => setRoom(-1, 0)} style={{ border: `1px solid ${C.border}`, borderRadius: 6, background: 'transparent', color: C.text, fontWeight: 700, padding: '3px 8px', cursor: 'pointer' }}>−</button>
-          <button type="button" onClick={() => setRoom(0, 1)} style={{ border: `1px solid ${C.border}`, borderRadius: 6, background: 'transparent', color: C.text, fontWeight: 700, padding: '3px 8px', cursor: 'pointer' }}>profondeur +</button>
-          <button className="vrm-icon-control" type="button" aria-label="Réduire la profondeur de la pièce" onClick={() => setRoom(0, -1)} style={{ border: `1px solid ${C.border}`, borderRadius: 6, background: 'transparent', color: C.text, fontWeight: 700, padding: '3px 8px', cursor: 'pointer' }}>−</button>
+          <button className="vrm-b vrm-b-secondaire vrm-b-petit" type="button" onClick={() => setRoom(1, 0)}>largeur +</button>
+          <button className="vrm-icon-control vrm-b vrm-b-secondaire vrm-b-petit" type="button" aria-label="Réduire la largeur de la pièce" onClick={() => setRoom(-1, 0)}>−</button>
+          <button className="vrm-b vrm-b-secondaire vrm-b-petit" type="button" onClick={() => setRoom(0, 1)}>profondeur +</button>
+          <button className="vrm-icon-control vrm-b vrm-b-secondaire vrm-b-petit" type="button" aria-label="Réduire la profondeur de la pièce" onClick={() => setRoom(0, -1)}>−</button>
           <span style={{ fontWeight: 800, marginLeft: 8 }}>Plafond :</span>
-          <button className="vrm-icon-control" type="button" aria-label="Augmenter la hauteur du plafond" onClick={() => patchRoom(r => ({ room: { ...r.room, wallH: Math.min(6, Math.round(((r.room.wallH || 3.4) + 0.4) * 10) / 10) } }))} style={{ border: `1px solid ${C.border}`, borderRadius: 6, background: 'transparent', color: C.text, fontWeight: 700, padding: '3px 8px', cursor: 'pointer' }}>+</button>
-          <button className="vrm-icon-control" type="button" aria-label="Réduire la hauteur du plafond" onClick={() => patchRoom(r => ({ room: { ...r.room, wallH: Math.max(2.4, Math.round(((r.room.wallH || 3.4) - 0.4) * 10) / 10) } }))} style={{ border: `1px solid ${C.border}`, borderRadius: 6, background: 'transparent', color: C.text, fontWeight: 700, padding: '3px 8px', cursor: 'pointer' }}>−</button>
+          <button className="vrm-icon-control vrm-b vrm-b-secondaire vrm-b-petit" type="button" aria-label="Augmenter la hauteur du plafond" onClick={() => patchRoom(r => ({ room: { ...r.room, wallH: Math.min(6, Math.round(((r.room.wallH || 3.4) + 0.4) * 10) / 10) } }))}>+</button>
+          <button className="vrm-icon-control vrm-b vrm-b-secondaire vrm-b-petit" type="button" aria-label="Réduire la hauteur du plafond" onClick={() => patchRoom(r => ({ room: { ...r.room, wallH: Math.max(2.4, Math.round(((r.room.wallH || 3.4) - 0.4) * 10) / 10) } }))}>−</button>
           <span style={{ fontWeight: 800, marginLeft: 8 }}>Murs :</span>
           {['#e4e8ee', '#dfe7d8', '#efe4d6', '#e2dced', '#d6e6ec', '#f0dede', '#d8dde3', '#2b2f36'].map(c => (
             <button type="button" aria-label={`Couleur de mur ${['#e4e8ee', '#dfe7d8', '#efe4d6', '#e2dced', '#d6e6ec', '#f0dede', '#d8dde3', '#2b2f36'].indexOf(c)+1}`} aria-pressed={(room.wallColor || '#e4e8ee')===c} key={c} onClick={() => patchRoom(r => ({ room: { ...r.room, wallColor: c } }))} title="Couleur des murs" style={{ width: 18, height: 18, borderRadius: 4, background: c, border: (room.wallColor || '#e4e8ee') === c ? `2px solid ${C.accent}` : '1px solid rgba(0,0,0,0.2)', cursor: 'pointer', padding: 0 }} />
@@ -28387,10 +28325,10 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
 
         {/* Mode déplacement — les meubles ne bougent QUE si ce mode est activé */}
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-          <button type="button" onClick={() => setMoveMode(m => !m)} style={{ border: `1.5px solid ${moveMode ? C.accent : C.border}`, borderRadius: 999, background: moveMode ? C.accent : C.card, color: moveMode ? '#fff' : C.text, fontSize: 12.5, fontWeight: 800, padding: '7px 14px', cursor: 'pointer', fontFamily: 'inherit' }}>
-            {moveMode ? '✋ Mode déplacement ACTIVÉ' : '🔒 Déplacer les meubles'}
+          <button type="button" aria-pressed={moveMode} onClick={() => setMoveMode(m => !m)} className={'vrm-b vrm-b-petit vrm-b-' + (moveMode ? 'primaire' : 'secondaire')}>
+            {moveMode ? 'Verrouiller les meubles' : 'Déplacer les meubles'}
           </button>
-          <span style={{ fontSize: 11.5, color: C.muted }}>{moveMode ? 'Glisse un meuble pour le déplacer. Re-clique pour verrouiller.' : 'Les meubles sont verrouillés — glisse pour tourner la vue.'}</span>
+          <span style={{ fontSize: 11.5, color: C.muted }}>{moveMode ? 'Glisse un meuble pour le déplacer.' : 'Glisser tourne la vue.'}</span>
         </div>
         </div>
       </details>
@@ -28398,23 +28336,23 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
       {/* Bandeau « poser une pile sur un meuble » actif */}
       {putOnSrc && (
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', padding: '8px 11px', border: `1.5px solid ${C.accent}`, borderRadius: 10, background: `${C.accent}14` }}>
-          <span style={{ fontSize: 12.5, fontWeight: 800, color: C.text }}>👆 Touche le <b>meuble</b> (table, commode…) sur lequel poser la pile — elle se posera dessus, centrée.</span>
-          <button className="vrm-b vrm-b-discret" type="button" onClick={() => setPutOnSrc(null)} style={{ marginLeft: 'auto', border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.muted, fontSize: 12, fontWeight: 700, padding: '5px 10px', cursor: 'pointer' }}>Annuler</button>
+          <span style={{ fontSize: 12.5, fontWeight: 800, color: C.text }}>Touche le <b>meuble</b> (table, commode…) sur lequel poser la pile — elle se posera dessus, centrée.</span>
+          <button className="vrm-b vrm-b-discret" type="button" onClick={() => setPutOnSrc(null)} style={{ marginLeft: 'auto' }}>Annuler</button>
         </div>
       )}
       {/* Bandeau « empiler par toucher » actif */}
       {stackSrc && (()=>{ const s = items.find(o => o.id === stackSrc); return (
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', padding: '8px 11px', border: `1.5px solid ${C.accent}`, borderRadius: 10, background: `${C.accent}14` }}>
-          <span style={{ fontSize: 12.5, fontWeight: 800, color: C.text }}>👆 Touche la boîte sur laquelle poser <b>N°{(s && s.num) || '?'}</b> (elle montera dessus).</span>
-          <button className="vrm-b vrm-b-discret" type="button" onClick={() => setStackSrc(null)} style={{ marginLeft: 'auto', border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.muted, fontSize: 12, fontWeight: 700, padding: '5px 10px', cursor: 'pointer' }}>Annuler</button>
+          <span style={{ fontSize: 12.5, fontWeight: 800, color: C.text }}>Touche la boîte sur laquelle poser <b>N°{(s && s.num) || '?'}</b> (elle montera dessus).</span>
+          <button className="vrm-b vrm-b-discret" type="button" onClick={() => setStackSrc(null)} style={{ marginLeft: 'auto' }}>Annuler</button>
         </div>
       ); })()}
 
       {/* Tableau de bord d'occupation de la pièce */}
       {items.length > 0 && (
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', padding: '8px 12px', border: `1px solid ${C.border}`, borderRadius: 12, background: C.card, fontSize: 12.5 }}>
-          <span style={{ fontWeight: 900, color: C.text }}>📊 {activeRoom.name}</span>
-          <span style={{ fontWeight: 800, color: INV_STATUS.online.color }}>📦 {capacity.boxes} boîte{capacity.boxes > 1 ? 's' : ''} rangée{capacity.boxes > 1 ? 's' : ''}</span>
+          <span style={{ fontWeight: 900, color: C.text }}>{activeRoom.name}</span>
+          <span style={{ fontWeight: 800, color: C.text }}>{capacity.boxes} boîte{capacity.boxes > 1 ? 's' : ''} rangée{capacity.boxes > 1 ? 's' : ''}</span>
           {capacity.freeCells > 0 && <span style={{ fontWeight: 700, color: C.muted }}>· {capacity.freeCells} place{capacity.freeCells > 1 ? 's' : ''} libre{capacity.freeCells > 1 ? 's' : ''}</span>}
           <span style={{ fontWeight: 700, color: C.muted }}>· {capacity.furn} meuble{capacity.furn > 1 ? 's' : ''}</span>
         </div>
@@ -28449,8 +28387,8 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
                           {p.ambigu ? '⚠️ N° porté par plusieurs articles' : (p.title || '—')}
                         </span>
                       </span>
-                      <button type="button" onClick={() => sortirDeCase(selItem.id, p.cell, p.numero)} title="Sortir cet article du stock"
-                        style={{ flexShrink: 0, border: `1px solid ${C.border}`, borderRadius: 9, background: 'transparent', color: C.muted, fontSize: 11.5, fontWeight: 600, padding: '6px 9px', cursor: 'pointer', fontFamily: 'inherit' }}>Sortir</button>
+                      <button className="vrm-b vrm-b-secondaire vrm-b-petit" type="button" onClick={() => sortirDeCase(selItem.id, p.cell, p.numero)} title="Sortir cet article du stock"
+                        style={{ flexShrink: 0 }}>Sortir</button>
                     </div>
                   ))}
                 </div>
@@ -28460,9 +28398,9 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
           {/* Boîte à empiler : empiler (par toucher), reposer au sol, changer le N° */}
           {(FURN_TYPES[selItem.type] || {}).box && (
             <div style={{ flex: '1 1 100%', display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 4 }}>
-              <button type="button" onClick={() => setStackSrc(selItem.id)} style={{ flex: '1 1 auto', border: 'none', borderRadius: 8, background: C.accent, color: '#fff', fontSize: 12.5, fontWeight: 900, padding: '9px 12px', cursor: 'pointer' }}>⬆️ Poser sur une autre boîte</button>
-              {(selItem.lvl || 0) > 0 && <button type="button" onClick={() => boxToFloor(selItem)} style={{ flex: '0 0 auto', border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.text, fontSize: 12, fontWeight: 800, padding: '9px 11px', cursor: 'pointer' }}>⬇️ Au sol</button>}
-              <button type="button" onClick={async ()=>{ const n = (await askText({ numeric: clavierNum() === 'numeric', desc: 'Numéro de cette boîte :', value: selItem.num || '' }) || '').trim(); if (n) updateItem(selItem.id, { num: n }); }} style={{ flex: '0 0 auto', border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.text, fontSize: 12, fontWeight: 800, padding: '9px 11px', cursor: 'pointer' }}>✏️ N°{selItem.num || '?'}</button>
+              <button className="vrm-b vrm-b-secondaire vrm-b-petit" type="button" onClick={() => setStackSrc(selItem.id)} style={{ flex: '1 1 auto' }}>Poser sur une autre boîte</button>
+              {(selItem.lvl || 0) > 0 && <button className="vrm-b vrm-b-secondaire vrm-b-petit" type="button" onClick={() => boxToFloor(selItem)} style={{ flex: '0 0 auto' }}>Au sol</button>}
+              <button className="vrm-b vrm-b-secondaire vrm-b-petit" type="button" onClick={async ()=>{ const n = (await askText({ numeric: clavierNum() === 'numeric', desc: 'Numéro de cette boîte :', value: selItem.num || '' }) || '').trim(); if (n) updateItem(selItem.id, { num: n }); }} style={{ flex: '0 0 auto' }}><Icon name="pencil" size={15}/>N°{selItem.num || '?'}</button>
             </div>
           )}
           {!edition && (()=>{
@@ -28471,10 +28409,10 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
             return (
               <div style={{ flex: '1 1 100%', display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
                 {ft.cases && <span style={{ fontSize: 12.5, color: C.muted, flex: '1 1 200px' }}>{p ? <>Prochaine place libre : <b style={{ color: C.text }}>{nomCase(Math.max(1, selItem.rows || 1), p.cell, modeCase(ft), selItem)}</b></> : 'Ce meuble est plein.'} Touche une place libre (en transparence) pour y ranger ; une boîte pour la changer ou la sortir.</span>}
-                {ft.cases && p && <button type="button" data-ranger-dans-meuble="" onClick={() => { if (pairePrete) rangerPaire(pairePrete, selItem.id, p.cell); else fillCell(selItem.id, p.cell, { ghost: true }); }} style={{ border: 'none', borderRadius: 10, background: C.accent, color: C.onAccent || '#fff', fontSize: 13, fontWeight: 600, padding: '0 14px', minHeight: 36, cursor: 'pointer', fontFamily: 'inherit' }}>{pairePrete ? `Ranger N°${pairePrete} ici` : 'Ranger une paire ici'}</button>}
+                {ft.cases && p && <button className="vrm-b vrm-b-secondaire" type="button" data-ranger-dans-meuble="" onClick={() => { if (pairePrete) rangerPaire(pairePrete, selItem.id, p.cell); else fillCell(selItem.id, p.cell, { ghost: true }); }}>{pairePrete ? `Ranger N°${pairePrete} ici` : 'Ranger une paire ici'}</button>}
                 {ft.build === 'pile' && <span className="vrm-aide" style={{ fontSize: 12.5, color: C.muted }}>Touche une boîte pour changer son numéro ou le retirer — ceux du dessus descendent d'un cran.</span>}
-                {!ft.cases && ft.build !== 'pile' && !ft.box && !ft.deco && <button type="button" onClick={() => setOpenItem(selItem.id)} style={{ border: 'none', borderRadius: 10, background: C.accent, color: C.onAccent || '#fff', fontSize: 13, fontWeight: 600, padding: '0 14px', minHeight: 36, cursor: 'pointer', fontFamily: 'inherit' }}>Ranger dedans ({storedCount(selItem)})</button>}
-                <button type="button" onClick={() => setEdition(true)} style={{ marginLeft: 'auto', border: `1px solid ${C.border}`, borderRadius: 10, background: 'transparent', color: C.text, fontSize: 12.5, fontWeight: 600, padding: '0 12px', minHeight: 34, cursor: 'pointer', fontFamily: 'inherit' }}>Régler ce meuble</button>
+                {!ft.cases && ft.build !== 'pile' && !ft.box && !ft.deco && <button className="vrm-b vrm-b-secondaire vrm-b-petit" type="button" onClick={() => setOpenItem(selItem.id)}>Ranger dedans ({storedCount(selItem)})</button>}
+                <button className="vrm-b vrm-b-secondaire vrm-b-petit" type="button" onClick={() => setEdition(true)} style={{ marginLeft: 'auto' }}>Régler ce meuble</button>
               </div>
             );
           })()}
@@ -28486,22 +28424,22 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
             <label title="Couleur libre" style={{ width: 22, height: 22, borderRadius: 5, overflow: 'hidden', border: `1px solid ${C.border}`, cursor: 'pointer', position: 'relative', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, background: `conic-gradient(red,orange,yellow,lime,cyan,blue,magenta,red)` }}>
               <input type="color" value={colorOf(selItem)} onChange={e => updateItem(selItem.id, { color: e.target.value })} style={{ position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer' }} />🎨
             </label>
-            {!(FURN_TYPES[selItem.type] || {}).box && <button type="button" onClick={async ()=>{ const e = (await askText({ desc: 'Emoji du meuble :', value: emojiOf(selItem) }) || '').trim(); if (e) updateItem(selItem.id, { emoji: e }); }} title="Changer l'emoji" style={{ border: `1px solid ${C.border}`, borderRadius: 6, background: 'transparent', fontSize: 13, padding: '2px 7px', cursor: 'pointer' }}>{emojiOf(selItem)}</button>}
+            {!(FURN_TYPES[selItem.type] || {}).box && <button className="vrm-b vrm-b-secondaire vrm-b-petit" type="button" onClick={async ()=>{ const e = (await askText({ desc: 'Emoji du meuble :', value: emojiOf(selItem) }) || '').trim(); if (e) updateItem(selItem.id, { emoji: e }); }} title="Changer l'emoji">{emojiOf(selItem)}</button>}
             {(FURN_TYPES[selItem.type] || {}).build !== 'grille' && !(FURN_TYPES[selItem.type] || {}).box && !(FURN_TYPES[selItem.type] || {}).cases && <>
               <span style={{ fontSize: 10.5, color: C.muted, fontWeight: 700, marginLeft: 6 }}>Hauteur</span>
-              {[['Bas', 0.5], ['Moyen', 1.0], ['Haut', 1.8]].map(([l, v]) => (<button type="button" key={l} onClick={() => updateItem(selItem.id, { h3d: v })} style={{ border: `1px solid ${Math.abs(h3dOf(selItem) - v) < 0.01 ? C.accent : C.border}`, borderRadius: 6, background: Math.abs(h3dOf(selItem) - v) < 0.01 ? `${C.accent}18` : 'transparent', color: C.text, fontSize: 10.5, fontWeight: 700, padding: '3px 8px', cursor: 'pointer' }}>{l}</button>))}
+              <Segmente label="Hauteur du meuble" value={[0.5, 1.0, 1.8].find(v => Math.abs(h3dOf(selItem) - v) < 0.01) ?? null} onChange={(v) => updateItem(selItem.id, { h3d: v })} options={[{ v: 0.5, l: 'Bas' }, { v: 1.0, l: 'Moyen' }, { v: 1.8, l: 'Haut' }]} />
             </>}
           </div>
           {/* (17 oct.) ÉTAGÈRE, TABLE, PORTANT : combien de cases, de plateaux, de cintres. */}
           {(FURN_TYPES[selItem.type] || {}).cases && (()=>{
             const ft = FURN_TYPES[selItem.type]; const { nr, nc } = dimsMeuble(selItem); const cz = casesDe(selItem, room.wallH);
-            const stepBtn = { border: `1px solid ${C.border}`, borderRadius: 8, background: C.card, color: C.text, fontSize: 15, fontWeight: 700, minWidth: 36, minHeight: 36, cursor: 'pointer', lineHeight: 1 };
+            const stepBtn = { minWidth: 36, padding: 0, fontSize: 15, lineHeight: 1 };
             const pas = (lib, val, moins, plus, cle) => (
               <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }} data-reglage={cle}>
                 <span style={{ fontSize: 12, color: C.muted, fontWeight: 600 }}>{lib}</span>
-                <button className="vrm-icon-control" type="button" aria-label={`${lib} : moins`} onClick={moins} style={stepBtn}>−</button>
+                <button className="vrm-icon-control vrm-b vrm-b-secondaire vrm-b-petit" type="button" aria-label={`${lib} : moins`} onClick={moins} style={stepBtn}>−</button>
                 <b style={{ fontSize: 14, minWidth: 18, textAlign: 'center' }}>{val}</b>
-                <button className="vrm-icon-control" type="button" aria-label={`${lib} : plus`} onClick={plus} style={stepBtn}>+</button>
+                <button className="vrm-icon-control vrm-b vrm-b-secondaire vrm-b-petit" type="button" aria-label={`${lib} : plus`} onClick={plus} style={stepBtn}>+</button>
               </span>);
             return (
               <div style={{ flex: '1 1 100%', display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap', marginBottom: 4, padding: '8px 10px', border: `1px solid ${C.border}`, borderRadius: 10 }}>
@@ -28527,60 +28465,60 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
           })()}
           {/* GRILLE personnalisable : nb de colonnes, de rangées, taille des cases */}
           {(FURN_TYPES[selItem.type] || {}).build === 'grille' && (()=>{
-            const stepBtn = { border: `1px solid ${C.border}`, borderRadius: 6, background: C.card, color: C.text, fontSize: 13, fontWeight: 800, width: 26, height: 26, cursor: 'pointer', lineHeight: 1 };
+            const stepBtn = { minWidth: 34, padding: 0, fontSize: 14, lineHeight: 1 };
             const cellCm = Math.round((selItem.cell || 0.5) * 100);
             return (
               <div style={{ flex: '1 1 100%', display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', marginBottom: 4, padding: '7px 9px', border: `1px dashed ${C.border}`, borderRadius: 9 }}>
-                <span style={{ fontSize: 11, color: C.text, fontWeight: 900 }}>🔳 Grille</span>
-                <span style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}><span style={{ fontSize: 10.5, color: C.muted, fontWeight: 700 }}>↔ Boîtes en largeur</span><button className="vrm-icon-control" type="button" aria-label="Réduire les colonnes" onClick={() => gridCols(selItem, -1)} style={stepBtn}>−</button><b style={{ fontSize: 13, minWidth: 16, textAlign: 'center' }}>{selItem.cols || 4}</b><button className="vrm-icon-control" type="button" aria-label="Augmenter les colonnes" onClick={() => gridCols(selItem, 1)} style={stepBtn}>+</button></span>
-                <span style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}><span style={{ fontSize: 10.5, color: C.muted, fontWeight: 700 }}>↕ Boîtes en hauteur</span><button className="vrm-icon-control" type="button" aria-label="Réduire les rangées" onClick={() => gridRows(selItem, -1)} style={stepBtn}>−</button><b style={{ fontSize: 13, minWidth: 16, textAlign: 'center' }}>{selItem.rows || 3}</b><button className="vrm-icon-control" type="button" aria-label="Augmenter les rangées" onClick={() => gridRows(selItem, 1)} style={stepBtn}>+</button><button type="button" onClick={() => gridToCeiling(selItem)} title="Empiler jusqu'au plafond" style={{ border: `1px solid ${C.border}`, borderRadius: 6, background: 'transparent', color: C.text, fontSize: 10.5, fontWeight: 800, padding: '3px 7px', cursor: 'pointer' }}>⬆️ Plafond</button></span>
-                <span style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}><span style={{ fontSize: 10.5, color: C.muted, fontWeight: 700 }}>Taille case</span><button className="vrm-icon-control" type="button" aria-label="Réduire la taille des cases" onClick={() => gridCell(selItem, -0.06)} style={stepBtn}>−</button><b style={{ fontSize: 12, minWidth: 34, textAlign: 'center' }}>{cellCm} cm</b><button className="vrm-icon-control" type="button" aria-label="Augmenter la taille des cases" onClick={() => gridCell(selItem, 0.06)} style={stepBtn}>+</button></span>
+                <span style={{ fontSize: 11, color: C.text, fontWeight: 900 }}>Grille</span>
+                <span style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}><span style={{ fontSize: 10.5, color: C.muted, fontWeight: 700 }}>↔ Boîtes en largeur</span><button className="vrm-icon-control vrm-b vrm-b-secondaire vrm-b-petit" type="button" aria-label="Réduire les colonnes" onClick={() => gridCols(selItem, -1)} style={stepBtn}>−</button><b style={{ fontSize: 13, minWidth: 16, textAlign: 'center' }}>{selItem.cols || 4}</b><button className="vrm-icon-control vrm-b vrm-b-secondaire vrm-b-petit" type="button" aria-label="Augmenter les colonnes" onClick={() => gridCols(selItem, 1)} style={stepBtn}>+</button></span>
+                <span style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}><span style={{ fontSize: 10.5, color: C.muted, fontWeight: 700 }}>↕ Boîtes en hauteur</span><button className="vrm-icon-control vrm-b vrm-b-secondaire vrm-b-petit" type="button" aria-label="Réduire les rangées" onClick={() => gridRows(selItem, -1)} style={stepBtn}>−</button><b style={{ fontSize: 13, minWidth: 16, textAlign: 'center' }}>{selItem.rows || 3}</b><button className="vrm-icon-control vrm-b vrm-b-secondaire vrm-b-petit" type="button" aria-label="Augmenter les rangées" onClick={() => gridRows(selItem, 1)} style={stepBtn}>+</button><button className="vrm-b vrm-b-secondaire vrm-b-petit" type="button" onClick={() => gridToCeiling(selItem)} title="Empiler jusqu'au plafond">Jusqu'au plafond</button></span>
+                <span style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}><span style={{ fontSize: 10.5, color: C.muted, fontWeight: 700 }}>Taille case</span><button className="vrm-icon-control vrm-b vrm-b-secondaire vrm-b-petit" type="button" aria-label="Réduire la taille des cases" onClick={() => gridCell(selItem, -0.06)} style={stepBtn}>−</button><b style={{ fontSize: 12, minWidth: 34, textAlign: 'center' }}>{cellCm} cm</b><button className="vrm-icon-control vrm-b vrm-b-secondaire vrm-b-petit" type="button" aria-label="Augmenter la taille des cases" onClick={() => gridCell(selItem, 0.06)} style={stepBtn}>+</button></span>
                 <span style={{ fontSize: 10.5, color: C.muted, fontWeight: 700 }}>= {(selItem.cols || 4) * (selItem.rows || 3)} places</span>
-                <button type="button" onClick={() => addBoxToGrid(selItem)} title="Pose une boîte à la prochaine place libre (repère bleu)" style={{ border: 'none', borderRadius: 7, background: C.accent, color: '#fff', fontSize: 11.5, fontWeight: 900, padding: '6px 11px', cursor: 'pointer' }}>➕ Ajouter une boîte</button>
-                <button type="button" onClick={() => fillGridSeries(selItem)} title="Remplir toutes les places vides en croissant" style={{ border: `1px solid ${C.accent}`, borderRadius: 7, background: `${C.accent}14`, color: C.text, fontSize: 11, fontWeight: 800, padding: '5px 9px', cursor: 'pointer' }}>🔢 Remplir en série</button>
-                <button type="button" onClick={() => clearGrid(selItem)} title="Vider toutes les cases" style={{ border: `1px solid ${C.border}`, borderRadius: 7, background: 'transparent', color: C.muted, fontSize: 11, fontWeight: 700, padding: '5px 9px', cursor: 'pointer' }}>🧹 Vider</button>
+                <button className="vrm-b vrm-b-secondaire vrm-b-petit" type="button" onClick={() => addBoxToGrid(selItem)} title="Pose une boîte à la prochaine place libre (repère bleu)">Ajouter une boîte</button>
+                <button className="vrm-b vrm-b-secondaire vrm-b-petit" type="button" onClick={() => fillGridSeries(selItem)} title="Remplir toutes les places vides en croissant">Remplir en série</button>
+                <button className="vrm-b vrm-b-secondaire vrm-b-petit" type="button" onClick={() => clearGrid(selItem)} title="Vider toutes les cases">Vider</button>
               </div>
             );
           })()}
           {/* PILE de boîtes : nb de boîtes (±) + hauteur par colonne + renuméroter */}
           {(FURN_TYPES[selItem.type] || {}).build === 'pile' && (()=>{
-            const stepBtn = { border: `1px solid ${C.border}`, borderRadius: 6, background: C.card, color: C.text, fontSize: 13, fontWeight: 800, width: 26, height: 26, cursor: 'pointer', lineHeight: 1 };
+            const stepBtn = { minWidth: 34, padding: 0, fontSize: 14, lineHeight: 1 };
             const nums = pileNums(selItem), total = cartonsDePile(nums).length, rows = Math.max(1, selItem.rows || 5), cols = Math.max(1, Math.ceil(nums.length / rows));
             return (
               <div style={{ flex: '1 1 100%', display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', marginBottom: 4, padding: '7px 9px', border: `1px dashed ${C.border}`, borderRadius: 9 }}>
-                <span style={{ fontSize: 11, color: C.text, fontWeight: 900 }}>📦 Pile</span>
-                <span style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}><span style={{ fontSize: 10.5, color: C.muted, fontWeight: 700 }}>Nombre de boîtes</span><button className="vrm-icon-control" type="button" aria-label="Retirer la dernière boîte de la pile" onClick={() => pileRemoveLast(selItem)} style={stepBtn}>−</button><b style={{ fontSize: 14, minWidth: 24, textAlign: 'center' }}>{total}</b><button className="vrm-icon-control" type="button" aria-label="Ajouter une boîte à la pile" onClick={() => pileAdd(selItem)} style={stepBtn}>+</button></span>
-                <span style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}><span style={{ fontSize: 10.5, color: C.muted, fontWeight: 700 }}>{cols > 1 ? 'Boîtes de haut (toutes les piles)' : 'Boîtes de haut'}</span><button className="vrm-icon-control" type="button" aria-label="Réduire la hauteur de la pile" onClick={() => pileHeight(selItem, -1)} style={stepBtn}>−</button><b style={{ fontSize: 12, minWidth: 14, textAlign: 'center' }}>{rows}</b><button className="vrm-icon-control" type="button" aria-label="Augmenter la hauteur de la pile" onClick={() => pileHeight(selItem, 1)} style={stepBtn}>+</button></span>
+                <span style={{ fontSize: 11, color: C.text, fontWeight: 900 }}>Pile</span>
+                <span style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}><span style={{ fontSize: 10.5, color: C.muted, fontWeight: 700 }}>Nombre de boîtes</span><button className="vrm-icon-control vrm-b vrm-b-secondaire vrm-b-petit" type="button" aria-label="Retirer la dernière boîte de la pile" onClick={() => pileRemoveLast(selItem)} style={stepBtn}>−</button><b style={{ fontSize: 14, minWidth: 24, textAlign: 'center' }}>{total}</b><button className="vrm-icon-control vrm-b vrm-b-secondaire vrm-b-petit" type="button" aria-label="Ajouter une boîte à la pile" onClick={() => pileAdd(selItem)} style={stepBtn}>+</button></span>
+                <span style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}><span style={{ fontSize: 10.5, color: C.muted, fontWeight: 700 }}>{cols > 1 ? 'Boîtes de haut (toutes les piles)' : 'Boîtes de haut'}</span><button className="vrm-icon-control vrm-b vrm-b-secondaire vrm-b-petit" type="button" aria-label="Réduire la hauteur de la pile" onClick={() => pileHeight(selItem, -1)} style={stepBtn}>−</button><b style={{ fontSize: 12, minWidth: 14, textAlign: 'center' }}>{rows}</b><button className="vrm-icon-control vrm-b vrm-b-secondaire vrm-b-petit" type="button" aria-label="Augmenter la hauteur de la pile" onClick={() => pileHeight(selItem, 1)} style={stepBtn}>+</button></span>
                 {cols > 1 && <span data-pile-hauteurs style={{ flex: '1 1 100%', display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
                   <span style={{ fontSize: 10.5, color: C.muted, fontWeight: 700 }}>Hauteur de chaque pile (depuis la gauche)</span>
                   {Array.from({ length: cols }, (_, c) => { const h = hauteurPile(rows, selItem.hauteurs, c); return (
                     <span key={c} data-pile-col={c + 1} data-pile-h={h} style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}>
                       <span style={{ fontSize: 10.5, color: C.muted, fontWeight: 700 }}>Pile {c + 1}</span>
-                      <button className="vrm-icon-control" type="button" aria-label={`Réduire la pile ${c + 1}`} onClick={() => pileHauteurCol(selItem, c, -1)} style={stepBtn}>−</button>
+                      <button className="vrm-icon-control vrm-b vrm-b-secondaire vrm-b-petit" type="button" aria-label={`Réduire la pile ${c + 1}`} onClick={() => pileHauteurCol(selItem, c, -1)} style={stepBtn}>−</button>
                       <b style={{ fontSize: 12, minWidth: 14, textAlign: 'center' }}>{h}</b>
-                      <button className="vrm-icon-control" type="button" aria-label={`Agrandir la pile ${c + 1}`} onClick={() => pileHauteurCol(selItem, c, 1)} style={stepBtn}>+</button>
+                      <button className="vrm-icon-control vrm-b vrm-b-secondaire vrm-b-petit" type="button" aria-label={`Agrandir la pile ${c + 1}`} onClick={() => pileHauteurCol(selItem, c, 1)} style={stepBtn}>+</button>
                     </span>); })}
                 </span>}
-                <button type="button" onClick={() => pileRestart(selItem)} style={{ border: `1px solid ${C.accent}`, borderRadius: 7, background: `${C.accent}14`, color: C.text, fontSize: 11, fontWeight: 800, padding: '5px 9px', cursor: 'pointer' }}>🔢 Renuméroter</button>
-                <button type="button" onClick={() => setPutOnSrc(selItem.id)} title="Poser cette pile sur un meuble (table, commode…)" style={{ border: 'none', borderRadius: 7, background: C.accent, color: '#fff', fontSize: 11, fontWeight: 900, padding: '6px 10px', cursor: 'pointer' }}>🪑 Poser sur un meuble</button>
-                {(selItem.lift || 0) > 0 && <button type="button" onClick={() => updateItem(selItem.id, { lift: 0 })} title="Reposer la pile au sol" style={{ border: `1px solid ${C.border}`, borderRadius: 7, background: 'transparent', color: C.text, fontSize: 11, fontWeight: 800, padding: '5px 9px', cursor: 'pointer' }}>⬇️ Au sol</button>}
-                <span style={{ fontSize: 10.5, color: C.muted, fontWeight: 700 }}>{cols} colonne{cols > 1 ? 's' : ''} · touche une boîte pour changer son N° ✏️ (ou la retirer)</span>
+                <button className="vrm-b vrm-b-secondaire vrm-b-petit" type="button" onClick={() => pileRestart(selItem)}>Renuméroter</button>
+                <button className="vrm-b vrm-b-secondaire vrm-b-petit" type="button" onClick={() => setPutOnSrc(selItem.id)} title="Poser cette pile sur un meuble (table, commode…)">Poser sur un meuble</button>
+                {(selItem.lift || 0) > 0 && <button className="vrm-b vrm-b-secondaire vrm-b-petit" type="button" onClick={() => updateItem(selItem.id, { lift: 0 })} title="Reposer la pile au sol">Au sol</button>}
+                <span style={{ fontSize: 10.5, color: C.muted, fontWeight: 700 }}>{cols} colonne{cols > 1 ? 's' : ''} · touche une boîte pour changer son N° (ou la retirer)</span>
               </div>
             );
           })()}
-          {!(FURN_TYPES[selItem.type] || {}).box && (FURN_TYPES[selItem.type] || {}).build !== 'pile' && !(FURN_TYPES[selItem.type] || {}).cases && <button type="button" onClick={() => setOpenItem(selItem.id)} style={{ border: 'none', borderRadius: 8, background: C.accent, color: '#fff', fontSize: 12, fontWeight: 800, padding: '7px 12px', cursor: 'pointer', fontFamily: 'inherit' }}>📂 Ranger dedans ({storedCount(selItem)})</button>}
-          {!(FURN_TYPES[selItem.type] || {}).box && <button type="button" onClick={() => stickToWall(selItem)} title="Coller au mur suivant" style={{ border: `1px solid ${C.accent}`, borderRadius: 8, background: `${C.accent}14`, color: C.text, fontSize: 12, fontWeight: 800, padding: '7px 10px', cursor: 'pointer' }}>📌 Coller au mur</button>}
+          {!(FURN_TYPES[selItem.type] || {}).box && (FURN_TYPES[selItem.type] || {}).build !== 'pile' && !(FURN_TYPES[selItem.type] || {}).cases && <button className="vrm-b vrm-b-secondaire vrm-b-petit" type="button" onClick={() => setOpenItem(selItem.id)}>Ranger dedans ({storedCount(selItem)})</button>}
+          {!(FURN_TYPES[selItem.type] || {}).box && <button className="vrm-b vrm-b-secondaire vrm-b-petit" type="button" onClick={() => stickToWall(selItem)} title="Coller au mur suivant">Coller au mur</button>}
           {(FURN_TYPES[selItem.type] || {}).build !== 'grille' && (FURN_TYPES[selItem.type] || {}).build !== 'pile' && !(FURN_TYPES[selItem.type] || {}).box && <>
-            <button className="vrm-icon-control" type="button" aria-label="Pivoter" onClick={() => changerDimensions(selItem, { rot: ((selItem.rot || 0) + Math.PI / 2) % (2 * Math.PI) })} title="Pivoter" style={{ border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.text, fontSize: 12, fontWeight: 700, padding: '7px 10px', cursor: 'pointer' }}>🔄</button>
-            {!(FURN_TYPES[selItem.type] || {}).cases && <><button className="vrm-icon-control" type="button" aria-label="Élargir le meuble" onClick={() => changerDimensions(selItem, { w: Math.min(room.w, selItem.w + 0.5) })} style={{ border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.text, fontSize: 12, fontWeight: 700, padding: '7px 10px', cursor: 'pointer' }}>↔️+</button>
-            <button className="vrm-icon-control" type="button" aria-label="Réduire la largeur du meuble" onClick={() => changerDimensions(selItem, { w: Math.max(0.5, selItem.w - 0.5) })} style={{ border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.text, fontSize: 12, fontWeight: 700, padding: '7px 10px', cursor: 'pointer' }}>↔️−</button>
+            <button className="vrm-icon-control vrm-b vrm-b-secondaire vrm-b-petit" type="button" aria-label="Pivoter" onClick={() => changerDimensions(selItem, { rot: ((selItem.rot || 0) + Math.PI / 2) % (2 * Math.PI) })} title="Pivoter">↻</button>
+            {!(FURN_TYPES[selItem.type] || {}).cases && <><button className="vrm-icon-control vrm-b vrm-b-secondaire vrm-b-petit" type="button" aria-label="Élargir le meuble" onClick={() => changerDimensions(selItem, { w: Math.min(room.w, selItem.w + 0.5) })}>↔️+</button>
+            <button className="vrm-icon-control vrm-b vrm-b-secondaire vrm-b-petit" type="button" aria-label="Réduire la largeur du meuble" onClick={() => changerDimensions(selItem, { w: Math.max(0.5, selItem.w - 0.5) })}>↔️−</button>
             </>}
-            {!(FURN_TYPES[selItem.type] || {}).cases && <><button className="vrm-icon-control" type="button" aria-label="Augmenter la profondeur du meuble" onClick={() => changerDimensions(selItem, { h: Math.min(room.h, selItem.h + 0.25) })} style={{ border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.text, fontSize: 12, fontWeight: 700, padding: '7px 10px', cursor: 'pointer' }}>↕️+</button>
-            <button className="vrm-icon-control" type="button" aria-label="Réduire la profondeur du meuble" onClick={() => changerDimensions(selItem, { h: Math.max(0.3, selItem.h - 0.25) })} style={{ border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.text, fontSize: 12, fontWeight: 700, padding: '7px 10px', cursor: 'pointer' }}>↕️−</button></>}
+            {!(FURN_TYPES[selItem.type] || {}).cases && <><button className="vrm-icon-control vrm-b vrm-b-secondaire vrm-b-petit" type="button" aria-label="Augmenter la profondeur du meuble" onClick={() => changerDimensions(selItem, { h: Math.min(room.h, selItem.h + 0.25) })}>↕️+</button>
+            <button className="vrm-icon-control vrm-b vrm-b-secondaire vrm-b-petit" type="button" aria-label="Réduire la profondeur du meuble" onClick={() => changerDimensions(selItem, { h: Math.max(0.3, selItem.h - 0.25) })}>↕️−</button></>}
           </>}
-          <button className="vrm-icon-control" type="button" aria-label="Renommer le meuble" onClick={async ()=>{ const n = await askText({ desc: 'Nom du meuble :', value: selItem.name }); if (n != null && n.trim()) updateItem(selItem.id, { name: n.trim() }); }} style={{ border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.text, fontSize: 12, fontWeight: 700, padding: '7px 10px', cursor: 'pointer' }}><Icon name="pencil" size={15}/></button>
-          <button className="vrm-icon-control" type="button" aria-label="Dupliquer" onClick={() => dupItem(selItem)} title="Dupliquer" style={{ border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.text, fontSize: 12, fontWeight: 700, padding: '7px 10px', cursor: 'pointer' }}>⧉</button>
-          <button className="vrm-icon-control" type="button" aria-label="Supprimer le meuble" onClick={() => removeItem(selItem.id)} style={{ marginLeft: 'auto', border: `1px solid ${C.danger}66`, borderRadius: 8, background: `${C.danger}12`, color: C.danger, fontSize: 12, fontWeight: 800, padding: '7px 10px', cursor: 'pointer' }}><Icon name="trash" size={16}/></button>
+          <button className="vrm-icon-control vrm-b vrm-b-secondaire vrm-b-petit" type="button" aria-label="Renommer le meuble" onClick={async ()=>{ const n = await askText({ desc: 'Nom du meuble :', value: selItem.name }); if (n != null && n.trim()) updateItem(selItem.id, { name: n.trim() }); }}><Icon name="pencil" size={15}/></button>
+          <button className="vrm-icon-control vrm-b vrm-b-secondaire vrm-b-petit" type="button" aria-label="Dupliquer" onClick={() => dupItem(selItem)} title="Dupliquer">⧉</button>
+          <button className="vrm-icon-control vrm-b vrm-b-secondaire vrm-b-petit" type="button" aria-label="Supprimer le meuble" onClick={() => removeItem(selItem.id)} style={{ marginLeft: 'auto' }}><Icon name="trash" size={16}/></button>
           </>)}
         </div>
       )}
@@ -28598,12 +28536,12 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
           <div onClick={e => e.stopPropagation()} style={{ background: C.bg, borderRadius: 16, maxWidth: 460, width: '100%', maxHeight: '92vh', overflow: 'auto', padding: 16 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
               <span style={{ fontSize: 15, fontWeight: 900, color: C.text, flex: 1 }}>{emojiOf(opened)} {opened.name}</span>
-              <button className="vrm-icon-control" type="button" aria-label="Fermer le contenu du meuble" onClick={() => setOpenItem(null)} style={{ border: 'none', background: 'transparent', color: C.muted, fontSize: 20, cursor: 'pointer', lineHeight: 1 }}><Icon name="close" size={15}/></button>
+              <button className="vrm-icon-control vrm-b vrm-b-discret vrm-b-icone" type="button" aria-label="Fermer le contenu du meuble" onClick={() => setOpenItem(null)}><Icon name="close" size={15}/></button>
             </div>
             <div style={{ fontSize: 11.5, color: C.muted, marginBottom: 10 }}>Vue de face — touche une case pour y ranger un N° (empilable).
               <span style={{ display: 'inline-flex', gap: 4, marginLeft: 8 }}>
-                <button type="button" onClick={() => setGrid(opened, opened.rows + 1, opened.cols)} style={{ border: `1px solid ${C.border}`, borderRadius: 6, background: 'transparent', color: C.text, fontSize: 11, fontWeight: 700, padding: '2px 7px', cursor: 'pointer' }}>+ rangée</button>
-                <button type="button" onClick={() => setGrid(opened, opened.rows, opened.cols + 1)} style={{ border: `1px solid ${C.border}`, borderRadius: 6, background: 'transparent', color: C.text, fontSize: 11, fontWeight: 700, padding: '2px 7px', cursor: 'pointer' }}>+ colonne</button>
+                <button className="vrm-b vrm-b-secondaire vrm-b-petit" type="button" onClick={() => setGrid(opened, opened.rows + 1, opened.cols)}>+ rangée</button>
+                <button className="vrm-b vrm-b-secondaire vrm-b-petit" type="button" onClick={() => setGrid(opened, opened.rows, opened.cols + 1)}>+ colonne</button>
               </span>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6, background: colorOf(opened) + '22', border: `2px solid ${colorOf(opened)}`, borderRadius: 8, padding: 8 }}>
@@ -28695,9 +28633,8 @@ function AssistantRangement({ plan, planLu, ecrire, ficheParNum }) {
   };
 
   const raisonPasSu = planLu === undefined ? 'Je relis le plan de ton stock…'
-    : planLu === false ? "Le plan de ton stock n'a pas pu être relu (la base n'a pas répondu) : je ne propose rien tant que je ne l'ai pas — rouvre cet écran dans un instant."
-    : presents == null ? "Je ne sais pas encore quels articles sont chez toi : ouvre une fois l'écran Annonces sur cet appareil, puis reviens ici. D'ici là je ne propose rien — ranger d'après une liste devinée mettrait un article parti dans une case." : null;
-  const btn = (primaire) => ({ border: primaire ? 'none' : `1px solid ${C.border}`, borderRadius: 8, background: primaire ? C.accent : 'transparent', color: primaire ? (C.onAccent || '#fff') : C.text, fontSize: 12.5, fontWeight: 600, padding: '8px 12px', cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap', minHeight: 36 });
+    : planLu === false ? "Le plan de ton stock n'a pas pu être relu : rien n'est proposé. Rouvre l'écran dans un instant."
+    : presents == null ? "Articles en stock pas encore lus : ouvre une fois Annonces sur cet appareil, puis reviens." : null;
   const carte = { border: `1px solid ${C.border}`, borderRadius: 12, background: C.card, boxShadow: C.shadow, padding: 14, minWidth: 0 };
   const titreBloc = (t, n) => <div className="vrm-label" style={{ color: C.muted, marginBottom: 10, display: 'flex', justifyContent: 'space-between', gap: 8 }}><span>{t}</span>{n != null ? <span style={{ color: C.text }}>{n}</span> : null}</div>;
 
@@ -28724,7 +28661,7 @@ function AssistantRangement({ plan, planLu, ecrire, ficheParNum }) {
       <div style={{ display: 'flex', gap: 8 }}>
         <input value={q} onChange={e => setQ(e.target.value)} onKeyDown={e => { if (e.key !== 'Enter') return; e.preventDefault(); const v = q.trim(); if (!v || ouEstNumero(plan, v)) return; const p = aRanger.find(x => cleNum(x.numero) === cleNum(v)); if (p && prochaine) { ranger(p.numero, prochaine.itemId, prochaine.key); setQ(''); } else toast(p ? 'Plus aucune case libre.' : `N°${v} n'est pas parmi tes articles en stock — rien n'est rangé.`); }} placeholder="Où est la N° … ? (Entrée : la ranger)" inputMode={clavierNum()} aria-label="Chercher un numéro dans le stock" data-rgt-cherche=""
           style={{ flex: 1, minWidth: 0, border: `1px solid ${C.border}`, borderRadius: 10, padding: '10px 12px', fontSize: 16, background: C.card, color: C.text, outline: 'none', fontFamily: 'inherit' }} />
-        {q && <button className="vrm-icon-control" type="button" aria-label="Effacer la recherche" onClick={() => setQ('')} style={{ ...btn(false), padding: '0 12px' }}><Icon name="close" size={15} /></button>}
+        {q && <Bouton variante="discret" icone="close" aria-label="Effacer la recherche" onClick={() => setQ('')} />}
       </div>
       {q.trim() && <div data-rgt-trouve={hit ? '1' : '0'} style={{ fontSize: 12.5, color: hit ? C.text : C.muted, lineHeight: 1.45, marginTop: -4 }}>
         {hit ? <>N°{q.trim()} → <b>{hit.itemName}</b>{plusieursPieces ? ` (${hit.roomName})` : ''} · {hit.nom}</> : <>Aucune case ne porte la N°{q.trim()}.</>}
@@ -28736,7 +28673,7 @@ function AssistantRangement({ plan, planLu, ecrire, ficheParNum }) {
           {sur && (
             <div style={carte} data-rgt-liste="">
               {titreBloc('À ranger', aRanger.length)}
-              {aRanger.length > 0 && prochaine && <button type="button" data-tout-ranger-ouvrir={aRanger.length} onClick={() => setToutRanger(true)} style={{ ...btn(true), width: '100%', minHeight: 44, marginBottom: 10 }}>Tout ranger d'un geste</button>}
+              {aRanger.length > 0 && prochaine && <Bouton variante="primaire" plein data-tout-ranger-ouvrir={aRanger.length} onClick={() => setToutRanger(true)} style={{ marginBottom: 10 }}>Tout ranger d'un geste</Bouton>}
               {toutRanger && <FeuilleToutRanger plan={plan} numeros={aRanger.map(p => p.numero)} plusieursPieces={plusieursPieces} onClose={() => setToutRanger(false)} onValider={(prop) => { setToutRanger(false); if (!prop || !prop.poses.length) return; ecrire(prop.plan); toast(`${prop.poses.length} article${prop.poses.length > 1 ? 's' : ''} rangé${prop.poses.length > 1 ? 's' : ''}.`); }} />}
               {aRanger.length === 0
                 ? <div style={{ fontSize: 12.5, color: C.muted, lineHeight: 1.5 }}>Tout ce qui est chez toi est déjà posé dans une case.</div>
@@ -28748,7 +28685,7 @@ function AssistantRangement({ plan, planLu, ecrire, ficheParNum }) {
                     : <div data-prochaine="" style={{ fontSize: 12.5, color: C.text, lineHeight: 1.45, marginBottom: 10 }}>Plus aucune case libre : agrandis une grille ou ajoute un meuble (Ma pièce → Aménager la pièce).</div>}
                   {placer && <div data-rgt-placer={placer} style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 12.5, color: C.text, marginBottom: 10, padding: '8px 10px', borderRadius: 9, border: `1.5px solid ${C.accent}` }}>
                     <span style={{ flex: 1, minWidth: 0 }}>Touche une case entourée pour y ranger la <b>N°{placer}</b>.</span>
-                    <button className="vrm-b vrm-b-discret" type="button" onClick={() => setPlacer(null)} style={btn(false)}>Annuler</button>
+                    <Bouton variante="discret" onClick={() => setPlacer(null)}>Annuler</Bouton>
                   </div>}
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 460, overflowY: 'auto' }}>
                     {aRanger.map(p => (
@@ -28761,8 +28698,8 @@ function AssistantRangement({ plan, planLu, ecrire, ficheParNum }) {
                           <span style={{ display: 'block', fontSize: 11.5, color: C.muted, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.title || 'article présent'}</span>
                         </span>
                         <span style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
-                          {prochaine && <button type="button" data-ranger-ici={p.numero} onClick={() => ranger(p.numero, prochaine.itemId, prochaine.key)} style={btn(true)}>Ranger ici</button>}
-                          {casesLibres > 0 && <button type="button" data-autre-case={p.numero} aria-label={`Choisir une autre case pour la N°${p.numero}`} title="Choisir une autre case" onClick={() => setPlacer(placer === p.numero ? null : p.numero)} style={{ ...btn(false), padding: '8px 10px' }}>Autre</button>}
+                          {prochaine && <Bouton variante="secondaire" className="vrm-b-petit" data-ranger-ici={p.numero} onClick={() => ranger(p.numero, prochaine.itemId, prochaine.key)}>Ranger ici</Bouton>}
+                          {casesLibres > 0 && <Bouton variante="discret" data-autre-case={p.numero} aria-label={`Choisir une autre case pour la N°${p.numero}`} title="Choisir une autre case" onClick={() => setPlacer(placer === p.numero ? null : p.numero)}>Autre</Bouton>}
                         </span>
                       </div>
                     ))}
@@ -28773,16 +28710,16 @@ function AssistantRangement({ plan, planLu, ecrire, ficheParNum }) {
           {sur && aLiberer.length > 0 && (
             <div style={carte} data-rgt-liberer="">
               {titreBloc('À libérer', aLiberer.length)}
-              <div style={{ fontSize: 12, color: C.muted, lineHeight: 1.5, marginBottom: 8 }}>Ces cases portent le N° d'un article qui n'est plus en stock (vendu ou parti). Libère-la quand la place est vide.</div>
+              <div style={{ fontSize: 12, color: C.muted, lineHeight: 1.5, marginBottom: 8 }}>Articles partis (vendus ou retirés) : libère la case quand elle est vide.</div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                 {(voirLiberer ? aLiberer : aLiberer.slice(0, 5)).map(x => (
                   <div key={x.itemId + x.key + x.numero} data-a-liberer={x.numero} style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 12.5, color: C.text }}>
                     <span style={{ flex: 1, minWidth: 0 }}><b>N°{x.numero}</b> <span style={{ color: C.muted }}>· {x.itemName} · {x.nom}</span></span>
-                    <button type="button" onClick={() => liberer(x)} style={btn(false)}>Libérer</button>
+                    <Bouton variante="secondaire" className="vrm-b-petit" onClick={() => liberer(x)}>Libérer</Bouton>
                   </div>
                 ))}
               </div>
-              {aLiberer.length > 5 && <button type="button" onClick={() => setVoirLiberer(v => !v)} style={{ ...btn(false), marginTop: 8, border: 'none', padding: '4px 0', color: C.muted }}>{voirLiberer ? 'Réduire' : `Voir les ${aLiberer.length}`}</button>}
+              {aLiberer.length > 5 && <Bouton variante="discret" onClick={() => setVoirLiberer(v => !v)} style={{ marginTop: 8 }}>{voirLiberer ? 'Réduire' : `Voir les ${aLiberer.length}`}</Bouton>}
             </div>
           )}
         </div>
@@ -28841,7 +28778,7 @@ function AssistantRangement({ plan, planLu, ecrire, ficheParNum }) {
               </React.Fragment>
             );
           })}
-          {meubles.length > 0 && <div className="vrm-aide" style={{ fontSize: 11.5, color: C.muted, lineHeight: 1.5 }}>Vu de face, comme dans la 3D : sur une étagère ou une table les boîtes s'empilent dans leur case ; dans un mur de boîtes elles tombent en bas de la colonne. Touche une case pleine pour la retrouver.</div>}
+          {meubles.length > 0 && <div style={{ fontSize: 11.5, color: C.muted, lineHeight: 1.5, display: 'flex', alignItems: 'center', gap: 4 }}>Vu de face · touche une case pleine pour la retrouver <Pourquoi label="Comment les boîtes se rangent">Comme dans la 3D : sur une étagère ou une table les boîtes s'empilent dans leur case ; dans un mur de boîtes elles tombent en bas de la colonne.</Pourquoi></div>}
         </div>
       </div>
     </div>
@@ -28911,7 +28848,7 @@ function StockPhotos() {
       <div data-stock-resume="" style={{ fontSize: 13, color: C.muted }}>{fiches.length} paire{fiches.length > 1 ? 's' : ''} en stock{nVendus > 0 ? <> · <b style={{ color: C.accent }}>{nVendus} vendue{nVendus > 1 ? 's' : ''} à sortir</b></> : (venduSu ? '' : ' · ventes pas encore lues')}</div>
       <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="N° ou titre" aria-label="Chercher une paire" style={{ marginLeft: 'auto', padding: '7px 11px', borderRadius: 8, border: `1px solid ${C.line}`, background: C.card, color: C.text, fontSize: 13, maxWidth: 180 }} />
     </div>
-    {nVendus > 0 && <div style={{ fontSize: 12.5, color: C.muted, lineHeight: 1.5 }}>Les paires qui clignotent sont vendues : touche <b style={{ color: C.text }}>Sortie du stock</b> une fois sortie de ton carton. Une vente annulée qui repart en ligne s'éteint toute seule et reste.</div>}
+    {nVendus > 0 && <div style={{ fontSize: 12.5, color: C.muted, lineHeight: 1.5, display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>Celles qui clignotent sont vendues : touche <b style={{ color: C.text }}>Sortie du stock</b> une fois sortie. <Pourquoi label="Et si la vente est annulée ?">Une vente annulée qui repart en ligne s'éteint toute seule et la paire reste en stock.</Pourquoi></div>}
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(118px,1fr))', gap: 12 }}>
       {vus.map((f) => {
         const sold = estVendu(f);
@@ -28925,13 +28862,13 @@ function StockPhotos() {
             </div>
             <div style={{ padding: '7px 9px', display: 'flex', flexDirection: 'column', gap: 6 }}>
               <div style={{ fontSize: 12, color: C.text, lineHeight: 1.3, minHeight: 31, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{f.title || '—'}</div>
-              {sold && <button type="button" onClick={() => sortir(f)} style={{ background: C.accent, color: C.onAccent, border: 'none', borderRadius: 8, padding: '7px 8px', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>Sortie du stock</button>}
+              {sold && <button className="vrm-b vrm-b-secondaire vrm-b-petit" type="button" onClick={() => sortir(f)}>Sortie du stock</button>}
             </div>
           </div>
         );
       })}
     </div>
-    {liste.length > max && <button type="button" onClick={() => setMax((m) => m + 60)} style={{ alignSelf: 'center', background: 'transparent', border: `1px solid ${C.line}`, borderRadius: 8, color: C.text, padding: '8px 14px', fontSize: 13, cursor: 'pointer' }}>Voir plus — {Math.min(max, liste.length)} sur {liste.length}</button>}
+    {liste.length > max && <button className="vrm-b vrm-b-discret" type="button" onClick={() => setMax((m) => m + 60)} style={{ alignSelf: 'center' }}>Voir plus — {Math.min(max, liste.length)} sur {liste.length}</button>}
   </>);
 }
 
@@ -29151,7 +29088,7 @@ function StockMeubles() {
           <span style={{ fontSize: 12, color: C.muted, fontWeight: 600 }}>{m.cols}×{m.rows} · {filled}/{total(m)}{m.gravite ? ' · empilé' : ''}</span>
           {cherche && <span style={{ fontSize: 12, fontWeight: 800, color: nIci ? C.onAccent : C.muted, background: nIci ? C.accent : 'transparent', borderRadius: 999, padding: '1px 8px' }}>{nIci ? `${nIci} ici` : 'rien ici'}</span>}
           <span style={{ flex: 1 }} />
-          <button type="button" onClick={() => setModal({ type: 'meuble', id: m.id, name: m.name, cols: m.cols, rows: m.rows, planches: planchesDe(m), gravite: !!m.gravite })} aria-label="Modifier le meuble" style={{ background: 'transparent', border: `1px solid ${C.line}`, color: C.muted, borderRadius: 9, width: 36, height: 36, cursor: 'pointer', display: 'grid', placeItems: 'center' }}><Icon name="pencil" size={15} /></button>
+          <button className="vrm-b vrm-b-secondaire vrm-b-petit vrm-b-icone" type="button" onClick={() => setModal({ type: 'meuble', id: m.id, name: m.name, cols: m.cols, rows: m.rows, planches: planchesDe(m), gravite: !!m.gravite })} aria-label="Modifier le meuble" style={{ width: 36, height: 36, display: 'grid', placeItems: 'center' }}><Icon name="pencil" size={15} /></button>
         </div>
         {!replie && (
         <div data-meuble-grille="" data-zoom={zoom} style={{ display: 'grid', gridTemplateColumns: `16px repeat(${m.cols},1fr)`, gap: zoom === 'loin' ? 4 : 6, background: C.line, padding: '6px 8px 8px 4px', borderRadius: 12, boxShadow: 'inset 0 2px 7px rgba(0,0,0,0.25)', maxWidth: `min(100%, ${m.cols * (caseMax + (zoom === 'loin' ? 4 : 6)) + 28}px)` }}>
@@ -29237,10 +29174,10 @@ function StockMeubles() {
           {m && (() => { const p = placeDansMeubles(s.i, m); return <div data-fiche-place="" style={{ fontSize: 15, fontWeight: 700, color: C.text, marginTop: 4 }}>Rangée {p.rangee} <span style={{ color: C.muted, fontWeight: 500 }}>(en partant du haut)</span> · colonne {p.colonne} <span style={{ color: C.muted, fontWeight: 500 }}>(depuis la gauche)</span></div>; })()}
         </div>
         <div style={{ display: 'flex', gap: 9 }}>
-          <button type="button" onClick={() => { setPlace(modal.cle); fermerModal(); }} style={btnSec}>Déplacer</button>
-          <button type="button" onClick={() => { retirerCase(modal.cle); fermerModal(); }} style={btnSec}>Retirer de la case</button>
+          <button className="vrm-b vrm-b-secondaire" type="button" onClick={() => { setPlace(modal.cle); fermerModal(); }} style={btnSec}>Déplacer</button>
+          <button className="vrm-b vrm-b-secondaire" type="button" onClick={() => { retirerCase(modal.cle); fermerModal(); }} style={btnSec}>Retirer de la case</button>
         </div>
-        {sold && <button type="button" onClick={() => { sortir(f); fermerModal(); }} style={{ ...btnPri, width: '100%', marginTop: 9 }}>✓ Je l'ai sorti du stock</button>}
+        {sold && <button className="vrm-b vrm-b-primaire" type="button" onClick={() => { sortir(f); fermerModal(); }} style={{ ...btnPri, width: '100%', marginTop: 9 }}>✓ Je l'ai sorti du stock</button>}
       </>);
     }
     return (
@@ -29253,8 +29190,8 @@ function StockMeubles() {
     );
   };
 
-  const btnSec = { flex: 1, border: `1px solid ${C.line}`, background: C.card2, color: C.text, borderRadius: 12, padding: '12px', fontSize: 14, fontWeight: 700, cursor: 'pointer', minHeight: 46 };
-  const btnPri = { border: 'none', background: C.accent, color: C.onAccent, borderRadius: 12, padding: '12px', fontSize: 14, fontWeight: 700, cursor: 'pointer', minHeight: 46 };
+  const btnSec = { flex: 1 };
+  const btnPri = {};
 
   if (!fiches.length) return <Card style={{ fontSize: 13, color: C.muted, lineHeight: 1.5 }}>Aucune paire numérotée en stock. Donne un numéro à tes annonces dans l'onglet <b style={{ color: C.text }}>Annonces</b> et tu pourras les ranger dans tes meubles ici.</Card>;
 
@@ -29293,7 +29230,7 @@ function StockMeubles() {
                   <span style={{ color: C.accent, fontSize: 13, fontWeight: 700, flexShrink: 0 }}>{ou ? 'Voir ›' : 'Ranger ›'}</span>
                 </button>
               ); })}
-          {resultats.length > 1 && <button type="button" data-stock-tout-montrer={resultats.length} onClick={() => { setCibles(resultats.map(cleDeFiche)); setQ(''); }} style={{ width: '100%', minHeight: 46, background: 'transparent', border: 'none', color: C.accent, fontWeight: 700, fontSize: 14, cursor: 'pointer' }}>Les montrer toutes dans les meubles ({resultats.length})</button>}
+          {resultats.length > 1 && <button className="vrm-b vrm-b-discret" type="button" data-stock-tout-montrer={resultats.length} onClick={() => { setCibles(resultats.map(cleDeFiche)); setQ(''); }} style={{ width: '100%' }}>Les montrer toutes dans les meubles ({resultats.length})</button>}
           {resultats.length > MAX_RES && <div style={{ padding: '9px 12px', fontSize: 12, color: C.muted }}>{resultats.length} trouvées — {MAX_RES} affichées, précise ta recherche.</div>}
         </div>
       )}
@@ -29306,7 +29243,7 @@ function StockMeubles() {
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
             <b>À aller chercher{cibles.length > 1 ? ` · ${cibles.length}` : ''}</b>
             <span style={{ flex: 1 }} />
-            <button type="button" onClick={() => setCibles([])} style={{ background: 'transparent', border: 'none', color: C.muted, fontSize: 13, cursor: 'pointer', minHeight: 36 }}>Fermer</button>
+            <button className="vrm-b vrm-b-discret" type="button" onClick={() => setCibles([])}>Fermer</button>
           </div>
           {tri.map((k) => { const f = ficheParCle[k]; const ou = f && ouEst(f);
             return (
@@ -29333,7 +29270,7 @@ function StockMeubles() {
         <div style={{ display: 'flex', gap: 9, overflowX: 'auto', paddingBottom: 3 }}>
           {aRanger.map((f) => { const sold = estVendu(f); const sel = place === cleDeFiche(f);
             return (
-              <button type="button" key={f.id} onClick={() => setPlace(sel ? null : cleDeFiche(f))} aria-pressed={sel} aria-label={`Ranger la paire N°${f.numero}${f.title ? ' · ' + f.title : ''}${sold ? ' (vendue)' : ''}`} style={{ position: 'relative', flex: 'none', width: 70, height: 88, borderRadius: 10, overflow: 'hidden', cursor: 'pointer', padding: 0, background: C.card2, border: sel ? `2px solid ${C.accent}` : (sold ? `2px solid ${C.accent}` : `1px solid ${C.line}`), opacity: filtre && !correspond(f) ? 0.3 : 1 }}>
+              <button type="button" key={f.id} onClick={() => setPlace(sel ? null : cleDeFiche(f))} aria-pressed={sel} aria-label={`Ranger la paire N°${f.numero}${f.title ? ' · ' + f.title : ''}${sold ? ' (vendue)' : ''}`} style={{ position: 'relative', flex: 'none', width: 70, height: 88, borderRadius: 10, overflow: 'hidden', cursor: 'pointer', padding: 0, background: C.card2, border: sel ? `2px solid ${C.accent}` : (sold ? `2px solid ${C.accent}` : `1px solid ${C.border}`), opacity: filtre && !correspond(f) ? 0.3 : 1 }}>
                 <Vignette f={f} sold={sold} />
               </button>
             );
@@ -29349,18 +29286,18 @@ function StockMeubles() {
       </div>
     )}
 
-    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+    {nEcartes > 0 && <div data-stock-ecartes={nEcartes} style={{ fontSize: 12, color: C.muted }}>{nEcartes} paire{nEcartes > 1 ? 's' : ''} d'un compte retiré ou masqué {nEcartes > 1 ? 'ne sont' : "n'est"} pas montrée{nEcartes > 1 ? 's' : ''} ici.</div>}
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', justifyContent: 'space-between' }}>
+      <div style={{ fontSize: 13, color: C.muted, flex: '1 1 200px', minWidth: 0 }}>{fiches.length} paire{fiches.length > 1 ? 's' : ''} en stock{nVendus > 0 ? <> · <button className="vrm-b vrm-b-discret" type="button" data-vendues-chercher={nVendus} onClick={() => { setQ(''); setCibles(fiches.filter(estVendu).map(cleDeFiche)); try { window.scrollTo({ top: 0, behavior: 'smooth' }); } catch (_) {} }} style={{ textDecoration: 'underline' }}>{nVendus} vendue{nVendus > 1 ? 's' : ''} à sortir — où sont-elles ?</button></> : (venduSig ? '' : ' · ventes pas encore lues')}</div>
       <div data-meubles-zoom={zoom}><Segmente label="Taille des cases" value={zoom} onChange={setZoom} options={[{ v: 'loin', l: 'De loin', data: { 'data-zoom-choix': 'loin' } }, { v: 'normal', l: 'Normale', data: { 'data-zoom-choix': 'normal' } }, { v: 'pres', l: 'De près', data: { 'data-zoom-choix': 'pres' } }]} /></div>
     </div>
-    {nEcartes > 0 && <div data-stock-ecartes={nEcartes} style={{ fontSize: 12, color: C.muted }}>{nEcartes} paire{nEcartes > 1 ? 's' : ''} d'un compte retiré ou masqué {nEcartes > 1 ? 'ne sont' : "n'est"} pas montrée{nEcartes > 1 ? 's' : ''} ici.</div>}
-    <div style={{ fontSize: 13, color: C.muted }}>{fiches.length} paire{fiches.length > 1 ? 's' : ''} en stock{nVendus > 0 ? <> · <button type="button" data-vendues-chercher={nVendus} onClick={() => { setQ(''); setCibles(fiches.filter(estVendu).map(cleDeFiche)); try { window.scrollTo({ top: 0, behavior: 'smooth' }); } catch (_) {} }} style={{ background: 'transparent', border: 'none', padding: '0 2px', minHeight: 36, color: C.accent, fontWeight: 800, fontSize: 13, cursor: 'pointer', textDecoration: 'underline' }}>{nVendus} vendue{nVendus > 1 ? 's' : ''} à sortir — où sont-elles ?</button></> : (venduSig ? '' : ' · ventes pas encore lues')}</div>
 
     {/* De loin, les meubles se rangent côte à côte : toute la pièce d'un coup d'œil. */}
     <div data-meubles-liste="" style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-start', columnGap: zoom === 'pres' ? 0 : 28 }}>
       {meubles.map((m) => <div key={m.id} style={{ flex: zoom === 'pres' ? '1 1 100%' : '0 1 auto', minWidth: 0, maxWidth: '100%' }}>{cadreMeuble(m)}</div>)}
     </div>
 
-    <button type="button" onClick={() => setModal({ type: 'meuble' })} style={{ width: '100%', background: 'transparent', border: `1.5px dashed ${C.line}`, color: C.accent, borderRadius: 14, padding: 15, fontWeight: 700, fontSize: 15, cursor: 'pointer' }}>+ Créer un meuble</button>
+    <button className="vrm-b vrm-b-secondaire" type="button" onClick={() => setModal({ type: 'meuble' })} style={{ width: '100%' }}>+ Créer un meuble</button>
 
     {Modale()}
   </>);
@@ -29418,8 +29355,8 @@ function ChoixPlanches({ cols, rows, planches, setPlanches, plateau = false, fix
         </div>
       </div>
       {rows > 1 && <div style={{ display: 'flex', gap: 8, justifyContent: 'center', marginTop: 10 }}>
-        <button type="button" data-planches-toutes="" onClick={() => setPlanches(Array.from({ length: rows - 1 }, (_, i) => i + 1))} style={{ border: `1px solid ${C.line}`, background: 'transparent', color: C.text, borderRadius: 9, padding: '8px 12px', fontSize: 13, cursor: 'pointer', minHeight: 40 }}>Une à chaque rangée</button>
-        <button type="button" onClick={() => setPlanches([])} style={{ border: `1px solid ${C.line}`, background: 'transparent', color: C.text, borderRadius: 9, padding: '8px 12px', fontSize: 13, cursor: 'pointer', minHeight: 40 }}>Aucune</button>
+        <button className="vrm-b vrm-b-secondaire vrm-b-petit" type="button" data-planches-toutes="" onClick={() => setPlanches(Array.from({ length: rows - 1 }, (_, i) => i + 1))}>Une à chaque rangée</button>
+        <button className="vrm-b vrm-b-secondaire vrm-b-petit" type="button" onClick={() => setPlanches([])}>Aucune</button>
       </div>}
   </>);
 }
@@ -29461,8 +29398,8 @@ function EditeurMeuble({ modal, onSave, onDelete }) {
     <div style={{ background: C.card2, border: `1px solid ${C.line}`, borderRadius: 14, padding: 13, margin: '8px 0 4px', textAlign: 'center' }}>
       <ChoixPlanches cols={cols} rows={rows} planches={planches} setPlanches={setPlanches} />
     </div>
-    <button type="button" data-meuble-enregistrer="" onClick={() => onSave((name || '').trim() || 'Meuble', cols, rows, { planches: pl, gravite })} style={{ width: '100%', border: 'none', background: C.accent, color: C.onAccent, borderRadius: 12, padding: 13, fontSize: 15, fontWeight: 800, cursor: 'pointer', marginTop: 9 }}>{modal.id ? 'Enregistrer' : 'Créer le meuble'}</button>
-    {onDelete && <button type="button" onClick={onDelete} style={{ width: '100%', border: `1px solid ${C.line}`, background: 'transparent', color: C.danger, borderRadius: 12, padding: 12, fontSize: 14, fontWeight: 700, cursor: 'pointer', marginTop: 9 }}>Supprimer ce meuble</button>}
+    <button className="vrm-b vrm-b-primaire" type="button" data-meuble-enregistrer="" onClick={() => onSave((name || '').trim() || 'Meuble', cols, rows, { planches: pl, gravite })} style={{ width: '100%', marginTop: 9 }}>{modal.id ? 'Enregistrer' : 'Créer le meuble'}</button>
+    {onDelete && <button className="vrm-b vrm-b-secondaire" type="button" onClick={onDelete} style={{ width: '100%', marginTop: 9 }}>Supprimer ce meuble</button>}
   </>);
 }
 
@@ -29703,225 +29640,8 @@ function Garage({catalog,garageGrid,setGarageGrid,blockedCells,setBlockedCells,e
       {garageView==='ranger' && <RoomPlan mode="2d"/>}
       {garageView==='photos' && <StockPhotos/>}
 
-      {garageView==='grid' && (<>
-      {placing && (
-        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:10,padding:'12px 14px',borderRadius:10,background:C.accent,color:C.onAccent,fontSize:13,fontWeight:600,position:'sticky',top:8,zIndex:20,boxShadow:'0 3px 12px rgba(0,0,0,0.18)'}}>
-          <span>📦 Range l'article <b>N°{placing}</b> — touche une boîte pour l'y mettre.</span>
-          <button type="button" onClick={clearPlacing} style={{background:'transparent',border:`1px solid ${C.onAccent}`,borderRadius:8,color:C.onAccent,cursor:'pointer',fontSize:11,fontWeight:500,padding:'4px 11px',flexShrink:0}}>Annuler</button>
-        </div>
-      )}
-
-      {/* Compteurs */}
-      <div style={{display:'flex',gap:12,flexWrap:'wrap'}}>
-        {duplicates.length>0&&<Card style={{flex:'none',padding:'10px 16px',background:`${C.danger}22`,borderColor:`${C.danger}66`}}>
-          <div style={{fontSize:9,color:C.danger,textTransform:'uppercase',letterSpacing:1,fontWeight:500}}>⚠ Doublons</div>
-          <div style={{fontSize:20,fontWeight:600,color:C.danger,marginTop:4}}>{duplicates.length}</div>
-        </Card>}
-      </div>
-      
-      {/* Liste des doublons */}
-      {duplicates.length>0&&<Card style={{padding:12,background:`${C.danger}11`,borderColor:`${C.danger}44`}}>
-        <div style={{fontSize:11,color:C.danger,fontWeight:500,marginBottom:6,textTransform:'uppercase',letterSpacing:1}}>⚠ Numéros en doublon</div>
-        <div style={{display:'flex',flexWrap:'wrap',gap:8,fontSize:11}}>
-          {duplicates.map(d=>(
-            <span key={d.num} onClick={()=>{setSearchInput(d.num);setGarageSearch(d.num);}}
-              style={{background:C.bg,padding:'4px 10px',borderRadius:5,cursor:'pointer',color:C.text,border:`1px solid ${C.danger}66`}}>
-              <b style={{color:C.danger}}>#{d.num}</b> <span style={{color:C.muted}}>×{d.count}</span>
-            </span>
-          ))}
-        </div>
-      </Card>}
-      
-      {/* Cohérence : paires numérotées vs garage */}
-      {(numberedNotStored.length>0||storedUnknown.length>0)&&(
-        <div style={{display:'flex',flexDirection:'column',gap:8}}>
-          {numberedNotStored.length>0&&(
-            <Card style={{padding:12,background:`${C.warn}11`,borderColor:`${C.warn}44`}}>
-              <div style={{fontSize:11,color:C.warn,fontWeight:500,marginBottom:6,textTransform:'uppercase',letterSpacing:1}}>📦 À ranger ({numberedNotStored.length})</div>
-              <div style={{fontSize:11,color:C.muted,marginBottom:8}}>Ces articles ont un numéro mais ne sont dans aucune boîte. <b>Touche-en une</b>, puis touche la boîte où tu la ranges.</div>
-              <div style={{display:'flex',flexWrap:'wrap',gap:8,fontSize:11}}>
-                {numberedNotStored.map(n=>(
-                  <button key={n} type="button" onClick={()=>{ setLocalPlace(n); try{window.scrollTo({top:document.body.scrollHeight,behavior:'smooth'});}catch(_){} }}
-                    style={{background:placing===n?C.warn:C.bg,color:placing===n?'#fff':C.text,padding:'5px 11px',borderRadius:8,border:`1px solid ${C.warn}66`,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>📦 N°{n}</button>
-                ))}
-              </div>
-            </Card>
-          )}
-          {storedUnknown.length>0&&(
-            <Card style={{padding:12,background:`${C.blue||C.accent}11`,borderColor:`${C.blue||C.accent}44`}}>
-              <div style={{fontSize:11,color:C.blue||C.accent,fontWeight:500,marginBottom:6,textTransform:'uppercase',letterSpacing:1}}>❓ Au stock mais numéro inconnu ({storedUnknown.length})</div>
-              <div className="vrm-aide" style={{fontSize:11,color:C.muted,marginBottom:6}}>Numéros présents au stock sans article numéroté correspondant (ancien numéro, faute de frappe, ou vendu).</div>
-              <div style={{display:'flex',flexWrap:'wrap',gap:8,fontSize:11}}>
-                {storedUnknown.map(n=>(<span key={n} onClick={()=>{setSearchInput(n);setGarageSearch(n);}} style={{background:C.bg,padding:'4px 10px',borderRadius:5,cursor:'pointer',color:C.text,border:`1px solid ${(C.blue||C.accent)}66`,fontWeight:500}}>#{n}</span>))}
-              </div>
-            </Card>
-          )}
-        </div>
-      )}
-
-      {/* Recherche avec bouton + Entrée */}
-      <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
-        <div style={{flex:1,minWidth:200,display:'flex',gap:6}}>
-          <Input value={searchInput}
-            onChange={e=>setSearchInput(e.target.value)}
-            onKeyDown={e=>{if(e.key==='Enter')triggerSearch();}}
-            placeholder="Numéro à chercher (puis Entrée)..."
-          />
-          <Btn small onClick={triggerSearch} color={C.accent}>Chercher</Btn>
-          {garageSearch&&<Btn small onClick={clearSearch} color={C.border}>✕</Btn>}
-        </div>
-      </div>
-      {searchTrim&&<div style={{fontSize:12,color:C.muted}}>
-        {allValsSet.has(searchTrim)
-          ?<span style={{color:C.warn}}>✓ Numéro #{garageSearch} trouvé — case en surbrillance</span>
-          :<span style={{color:C.danger}}>✗ Numéro #{garageSearch} non trouvé dans le stock</span>}
-      </div>}
-      
-      {/* Réglages avancés repliés par défaut : le vendeur n'a besoin que de
-          « À ranger » + recherche + les boîtes. Le reste (blocage, couleurs,
-          colonnes) est là pour qui veut, mais ne pollue plus l'écran. */}
-      <button type="button" onClick={()=>{ const v=!advanced; setAdvanced(v); if(!v){setAddMode(false);setBlockMode(false);setColorMode(false);} }}
-        style={{alignSelf:'flex-start',border:`1px solid ${C.border}`,background:'transparent',color:C.muted,borderRadius:8,padding:'5px 13px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>
-        ⚙️ {advanced?'Masquer les réglages':'Réglages (couleurs, blocage, colonnes)'}
-      </button>
-      {advanced && (<>
-      {/* Modes & boutons */}
-      <div style={{display:'flex',gap:10,alignItems:'center',flexWrap:'wrap'}}>
-        <Btn small onClick={()=>{setAddMode(!addMode);setBlockMode(false);setColorMode(false);}} color={addMode?C.accent:C.border} style={{color:addMode?'#fff':C.muted}}>
-          {addMode?'✓ Mode ajout actif':'➕ Mode ajout'}
-        </Btn>
-        <Btn small onClick={()=>{setBlockMode(!blockMode);setColorMode(false);setAddMode(false);}} color={blockMode?C.danger:C.border} style={{color:blockMode?'#fff':C.muted}}>
-          {blockMode?'✓ Mode blocage':'🔒 Mode blocage'}
-        </Btn>
-        <Btn small onClick={()=>{setColorMode(!colorMode);setBlockMode(false);setAddMode(false);}} color={colorMode?activeColor:C.border} style={{color:colorMode?'#fff':C.muted}}>
-          {colorMode?'✓ Mode couleur':'🎨 Mode couleur'}
-        </Btn>
-        {colorMode&&<div style={{display:'flex',gap:4,alignItems:'center'}}>
-          {COLORS.map(col=>(
-            <button type="button" aria-label={col} key={col} onClick={()=>setActiveColor(col)}
-              style={{width:22,height:22,borderRadius:'50%',background:col,border:activeColor===col?'2px solid #fff':'2px solid transparent',cursor:'pointer'}}
-              title={col}/>
-          ))}
-          <button className="vrm-icon-control" type="button" aria-label="Effacer" onClick={()=>setActiveColor(null)}
-            style={{width:22,height:22,borderRadius:'50%',background:'transparent',border:'2px dashed #555',cursor:'pointer',fontSize:11,color:'#666'}}
-            title="Effacer"><Icon name="close" size={15}/></button>
-        </div>}
-      </div>
-      {allValsSet.size===0&&!addMode&&<div style={{fontSize:12,color:C.text,background:`${C.accent}0e`,border:`1px solid ${C.accent}44`,borderRadius:10,padding:'10px 13px',marginBottom:10,lineHeight:1.45}}>
-        🗄️ <b>Ton stock est vide.</b> Clique une case pour y poser un numéro de boîte, ou va sur une annonce et utilise « Ranger » pour la placer d'un tap.
-      </div>}
-      {(blockMode||colorMode||addMode)&&<div style={{fontSize:11,color:C.muted}}>
-        {addMode&&'Toutes les cases sont visibles. Tu peux ajouter des articles dans les cases vides.'}
-        {blockMode&&'Clique sur une case vide pour la bloquer/débloquer (zone non utilisable). '}
-        {colorMode&&(activeColor?'Clique sur une case pour la colorier. Re-clique pour effacer la couleur.':'Sélectionne une couleur, ou ✕ pour effacer la couleur d\'une case.')}
-      </div>}
-      {/* Boutons d'ajout de colonnes */}
-      <Card style={{padding:10}}>
-        <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,marginBottom:6,fontWeight:500}}>Colonnes</div>
-        <div style={{display:'flex',gap:8,flexWrap:'wrap',alignItems:'center'}}>
-          {LAYOUT.map(z=>(
-            <div key={z.id} style={{display:'flex',alignItems:'center',gap:4,fontSize:11,background:C.bg,padding:'4px 8px',borderRadius:5}}>
-              <span style={{color:C.muted}}>Colonnes :</span>
-              <button className="vrm-icon-control" type="button" aria-label="Retirer une colonne de rangement" onClick={()=>removeColumn(z.id)} style={{background:'transparent',border:`1px solid ${C.border}`,color:C.danger,borderRadius:5,padding:'2px 8px',cursor:'pointer',fontSize:11,fontFamily:'inherit'}}>−</button>
-              <span style={{color:C.accent,fontWeight:500,minWidth:24,textAlign:'center'}}>{z.cols.length+(extraCols[z.id]||0)}</span>
-              <button className="vrm-icon-control" type="button" aria-label="Ajouter une colonne de rangement" onClick={()=>addColumn(z.id)} style={{background:'transparent',border:`1px solid ${C.border}`,color:C.accent,borderRadius:5,padding:'2px 8px',cursor:'pointer',fontSize:11,fontFamily:'inherit'}}>+</button>
-            </div>
-          ))}
-        </div>
-      </Card>
-      
-      </>)}
-
-      {/* Garage visuel */}
-      <Card style={{overflowX:'auto',padding:'14px 10px'}}>
-        <div style={{display:'flex',gap:GAP,marginBottom:6}}>
-          {effectiveLayout.flatMap((z,zi)=>{
-            const labels=z.cols.map((_,ci)=>(
-              <div key={`l${zi}_${ci}`} style={{width:CW,flexShrink:0,fontSize:7,fontWeight:600,color:ci===0?C.accent:'transparent',textTransform:'uppercase',letterSpacing:0.5}}>
-                {ci===0?z.name:''}
-              </div>
-            ));
-            return labels;
-          })}
-        </div>
-        <div style={{display:'flex',alignItems:'flex-end',gap:GAP}}>
-          {effectiveLayout.flatMap((z,zi)=>{
-            const cols=z.cols.map((maxBoxes,ci)=>{
-              const spacerTop=globalMax-(maxBoxes+z.elev);
-              const arr=getCol(z.id,ci,maxBoxes);
-              const cn=++colN;
-              return (
-                <div key={`c${zi}_${ci}`} style={{display:'flex',flexDirection:'column',alignItems:'flex-start',gap:GAP}}>
-                  {Array.from({length:spacerTop},(_,i)=><div key={`sp${i}`} style={{width:CW,height:CH}}/>)}
-                  {Array.from({length:z.elev},(_,i)=><div key={`ev${i}`} style={{width:CW,height:CH}}/>)}
-                  {arr.map((val,si)=>{
-                    const t=val?val.trim():'';
-                    const isSold=t!==''&&soldIds.has(t);
-                    const highlight=searchTrim!==''&&t.toLowerCase()===searchTrim;
-                    const blocked=isBlocked(z.id,ci,si);
-                    const cellColor=getColor(z.id,ci,si);
-                    
-                    // Masquer les cases vides (non bloquées, sans couleur) sauf en mode ajout/blocage/couleur/rangement
-                    // ⚠️ GARAGE VIDE = ÉCRAN VIDE. Les cases vides sont masquées par
-                    // défaut ; quand AUCUNE case n'est remplie, l'écran ne montrait
-                    // donc plus rien du tout — « le garage ne marche plus ». Tant
-                    // qu'il n'y a rien à ranger, on montre l'étagère.
-                    const showAllCells=addMode||blockMode||colorMode||!!placing||allValsSet.size===0;
-                    if(!showAllCells&&!blocked&&t===''&&!cellColor){
-                      // Case invisible : on rend juste un placeholder vide pour garder l'alignement
-                      return <div key={si} style={{width:CW,height:CH}}/>;
-                    }
-                    
-                    if(blocked) return (
-                      <div key={si} onClick={()=>{if(blockMode)toggleBlock(z.id,ci,si);}}
-                        style={{position:'relative',width:CW,height:CH,
-                          cursor:blockMode?'pointer':'default',
-                          opacity:0.5}}>
-                        <svg width={BW+SW} height={BH+TH} style={{display:'block',overflow:'visible'}}>
-                          <rect x={0} y={TH} width={BW} height={BH} rx={2} fill='transparent' stroke='#444' strokeWidth='1' strokeDasharray='3,2'/>
-                          <line x1={4} y1={TH+4} x2={BW-4} y2={TH+BH-4} stroke='#666' strokeWidth='1.5'/>
-                          <line x1={BW-4} y1={TH+4} x2={4} y2={TH+BH-4} stroke='#666' strokeWidth='1.5'/>
-                        </svg>
-                      </div>
-                    );
-                    
-                    return (
-                      <div key={si} ref={highlight?highlightRef:null} onClick={()=>{
-                        if(blockMode&&!t) toggleBlock(z.id,ci,si);
-                        else if(colorMode) setColor(z.id,ci,si,activeColor);
-                      }}
-                        style={{position:'relative',width:CW,height:CH,
-                          cursor:(blockMode&&!t)||colorMode?'pointer':'auto'}}>
-                        {cellColor&&<div style={{position:'absolute',inset:0,top:TH,background:cellColor,opacity:0.35,borderRadius:5,zIndex:1,pointerEvents:'none'}}/>}
-                        <Box val={val} isSold={isSold} highlight={highlight}/>
-                        {!blockMode&&!colorMode&&<input value={val}
-                          data-cell={`${z.id}_${ci}_${si}`}
-                          onChange={e=>onChange(z.id,ci,si,e.target.value,maxBoxes)}
-                          onClick={()=>{ if(placing&&!t){ onChange(z.id,ci,si,String(placing),maxBoxes); onBlur(z.id,ci,maxBoxes); clearPlacing(); } }}
-                          onBlur={()=>onBlur(z.id,ci,maxBoxes)}
-                          onKeyDown={e=>{
-                            if(e.key==='ArrowUp'){e.preventDefault();navigateFromCell(z.id,ci,si,'up');}
-                            else if(e.key==='ArrowDown'){e.preventDefault();navigateFromCell(z.id,ci,si,'down');}
-                            else if(e.key==='ArrowLeft'&&e.target.selectionStart===0){e.preventDefault();navigateFromCell(z.id,ci,si,'left');}
-                            else if(e.key==='ArrowRight'&&e.target.selectionStart===e.target.value.length){e.preventDefault();navigateFromCell(z.id,ci,si,'right');}
-                            else if(e.key==='Enter'){e.preventDefault();navigateFromCell(z.id,ci,si,'down');}
-                          }}
-                          style={{position:'absolute',left:0,top:TH,width:BW,height:BH,background:'transparent',border:'none',outline:'none',textAlign:'center',fontSize:8,fontWeight:600,color:'transparent',caretColor:C.warn,fontFamily:'inherit',cursor:'text',zIndex:3,boxSizing:'border-box'}}
-                          onFocus={e=>{e.target.parentElement.style.filter='brightness(1.35)';}}
-                          onBlurCapture={e=>{e.target.parentElement.style.filter='';}}
-                        />}
-                      </div>
-                    );
-                  })}
-                  <div style={{fontSize:7,color:'#333',textAlign:'center',width:CW}}>{cn}</div>
-                </div>
-              );
-            });
-            return cols;
-          })}
-        </div>
-      </Card>
-      </>)}
+      {/* (30 oct.) L'ancienne grille de zones (cases bloquées, couleurs, colonnes) n'était plus
+          joignable depuis le 17 oct. (aucune vue « grid ») : ses ~20 boutons sont retirés. */}
     </div>
   );
 }
@@ -33813,7 +33533,7 @@ function RepartitionsVentes({ panelOff, apercu = false }) {
   const sNote = {fontSize:13,color:C.muted,lineHeight:1.5};
   const titre = <div style={{fontSize:15,fontWeight:600,color:C.text,letterSpacing:-0.15}}>Ce qui se vend</div>;
   if (ventes === undefined) return <div data-stats-carte="repartitions" data-repart-etat="encours" style={sCarte}>{titre}<div style={{...sNote,marginTop:8}}>Je lis tes ventes…</div></div>;
-  if (!R) return <div data-stats-carte="repartitions" data-repart-etat="passu" style={sCarte}>{titre}<div style={{...sNote,marginTop:8}}>Tes ventes n'ont pas pu être lues : aucune répartition plutôt qu'une répartition fausse. Rouvre l'écran dans un moment.</div></div>;
+  if (!R) return <div data-stats-carte="repartitions" data-repart-etat="passu" style={sCarte}>{titre}<div style={{...sNote,marginTop:8}}>Ventes pas lues : aucune répartition affichée. Rouvre l'écran dans un moment.</div></div>;
   if (apercu) return <section className="vrm-analyses-ventes" aria-label="Analyses des ventes">
     <p className="vrm-analyses-perimetre">Vinted · toutes périodes · données reçues</p>
     <div className="vrm-analyses-duo">{[['marques','Marques vendues'],['pays','Pays des acheteurs']].map(([cle,titre])=>{
@@ -33872,7 +33592,7 @@ function RepartitionsVentes({ panelOff, apercu = false }) {
       <div className="vrm-repartition-visuel">
       {bloc?.n>0 && <RepartitionAnneau elements={top.map(e=>({...e,k:lib(e.k)}))} total={bloc.n}/>}
       <div data-repart-liste={mode} style={{marginTop:12}}>
-        {mode === 'pays' && extrasPasSu ? <div style={sNote}>Le détail de tes transactions n'a pas pu être lu : le pays de tes clients n'est pas affiché plutôt qu'un pays faux.</div>
+        {mode === 'pays' && extrasPasSu ? <div style={sNote}>Transactions pas lues : le pays des clients n'est pas affiché.</div>
           : mode === 'pays' && extras === undefined ? <div style={sNote}>Je lis le pays de tes clients…</div>
           : !top.length ? <div style={sNote}>Rien à répartir pour l'instant.</div>
           : <div style={{display:'flex',flexDirection:'column',gap:9}}>
@@ -33928,7 +33648,7 @@ function BoostRentable({ panelOff }) {
   const sNote = {fontSize:13,color:C.muted,lineHeight:1.5};
   const titre = <div style={{fontSize:15,fontWeight:600,color:C.text,letterSpacing:-0.15}}>Le boost est-il rentable ?</div>;
   if (ventes === undefined || extras === undefined || !nuage) return <div data-stats-carte="boost" data-boost-etat="encours" style={sCarte}>{titre}<div style={{...sNote,marginTop:8}}>Je lis tes ventes et tes annonces…</div></div>;
-  if (!R || R.etat !== 'lu') return <div data-stats-carte="boost" data-boost-etat="passu" style={sCarte}>{titre}<div style={{...sNote,marginTop:8}}>Tes ventes ou tes annonces n'ont pas pu être lues : rien n'est comparé plutôt qu'une comparaison fausse. Rouvre l'écran dans un moment.</div></div>;
+  if (!R || R.etat !== 'lu') return <div data-stats-carte="boost" data-boost-etat="passu" style={sCarte}>{titre}<div style={{...sNote,marginTop:8}}>Ventes ou annonces pas lues : rien n'est comparé. Rouvre l'écran dans un moment.</div></div>;
   const jFmt = (j) => (j == null ? '—' : j < 1 ? 'moins d’un jour' : `${Math.round(j)} j`);
   const nFmt = (v) => (v == null ? '—' : String(Math.round(v * 10) / 10).replace('.', ','));
   const eFmt = (v) => (v == null ? '—' : fmt(v));
@@ -33943,10 +33663,10 @@ function BoostRentable({ panelOff }) {
     <div data-stats-carte="boost" data-boost-etat="lu" data-boost-assez={R.assez ? 'oui' : 'non'} data-boost-b={R.boostees} data-boost-montant={R.avecMontant} data-boost-nb={R.nonBoostees} data-boost-comp={`${R.comparables.b}/${R.comparables.nb}`} style={sCarte}>
       {titre}
       <div data-boost-couverture="" style={{...sNote,fontSize:11,marginTop:6}}>
-        Sur {s(R.boostees, 'paire')} boostée{R.boostees > 1 ? 's' : ''} vendue{R.boostees > 1 ? 's' : ''} dont {R.avecMontant} avec montant saisi · {R.nonBoostees} non boostée{R.nonBoostees > 1 ? 's' : ''} · comparées dans une même tranche de prix : {R.comparables.b} contre {R.comparables.nb}.
-        {(R.inconnues > 0 || R.sansAnnonce > 0) ? <> Pas comptées : {[R.inconnues > 0 ? `${R.inconnues} sans information de boost` : '', R.sansAnnonce > 0 ? `${R.sansAnnonce} pas reliée${R.sansAnnonce > 1 ? 's' : ''} à leur annonce` : ''].filter(Boolean).join(' · ')}.</> : null}
+        {s(R.boostees, 'boostée')} vendue{R.boostees > 1 ? 's' : ''} ({R.avecMontant} avec montant) · {R.nonBoostees} autre{R.nonBoostees > 1 ? 's' : ''} · comparables {R.comparables.b} / {R.comparables.nb}
+        {(R.inconnues > 0 || R.sansAnnonce > 0) ? <> · pas comptées : {[R.inconnues > 0 ? `${R.inconnues} sans information de boost` : '', R.sansAnnonce > 0 ? `${R.sansAnnonce} pas reliée${R.sansAnnonce > 1 ? 's' : ''} à leur annonce` : ''].filter(Boolean).join(' · ')}.</> : null}
       </div>
-      {!R.assez && <div data-boost-verdict="pas-assez" style={{...sNote,marginTop:10,color:C.text}}>Pas assez de ventes pour juger : il en faut au moins {SEUIL_BOOST} boostées et {SEUIL_BOOST} non boostées dans une même tranche de prix.</div>}
+      {!R.assez && <div data-boost-verdict="pas-assez" style={{...sNote,marginTop:10,color:C.text}}>Pas assez de ventes pour juger (il en faut {SEUIL_BOOST} de chaque côté, même tranche de prix).</div>}
       <div style={{display:'grid',gridTemplateColumns:'minmax(0,1fr) auto auto',gap:'8px 14px',marginTop:12,paddingTop:12,borderTop:`1px solid ${C.border}`,alignItems:'baseline'}}>
         <span/>
         <span style={{fontSize:11,color:C.muted,fontWeight:600,textAlign:'right'}}>Boostées</span>
@@ -33959,8 +33679,8 @@ function BoostRentable({ panelOff }) {
           </React.Fragment>
         ))}
       </div>
-      <div style={{...sNote,fontSize:11,marginTop:10}}>
-        Un repère, pas de la comptabilité : rien ici n'entre dans un total. Chaque vente est reliée à son annonce par la transaction, jamais par le titre. Vinted ne dit « boostée » que pendant le boost : une paire boostée puis vendue après la fin du boost compte parmi « les autres » si tu n'as pas saisi son « Boost payé » (Annonces → Gérer l’annonce). La marge d'une boostée demande ce montant et son prix d'achat. « — » = moins de {SEUIL_BOOST} ventes connues d'un côté.
+      <div style={{...sNote,fontSize:11,marginTop:10,display:'flex',alignItems:'center',gap:4,flexWrap:'wrap'}}>
+        Un repère : rien ici n'entre dans un total. <Pourquoi label="Comment c'est compté">Chaque vente est reliée à son annonce par la transaction, jamais par le titre. Vinted ne dit « boostée » que pendant le boost : une paire boostée puis vendue après la fin du boost compte parmi « les autres » si tu n'as pas saisi son « Boost payé » (Annonces → Gérer l’annonce). La marge d'une boostée demande ce montant et son prix d'achat. « — » = moins de {SEUIL_BOOST} ventes connues d'un côté.</Pourquoi>
       </div>
     </div>
   );
