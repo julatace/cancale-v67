@@ -35,7 +35,7 @@ export function AnnoncesACompleter({
   return (
     <details className="vrm-outils" data-annonces-completer>
       <summary>
-        Annonces à compléter <span>{n} avec champs manquants</span>
+        Annonces à compléter <span>{n ? `${n} avec champs manquants` : charge ? "lecture…" : `${nInconnu} à relire sur Vinted`}</span>
       </summary>
       <p>Un brouillon VRM : l’annonce en ligne ne change pas.</p>
       {incomplet && <p role="status">Lecture des annonces incomplète : ce bilan porte uniquement sur les données récupérées.</p>}

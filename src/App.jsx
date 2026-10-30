@@ -17026,7 +17026,8 @@ function FraicheurDonnees({ jours, compte, comptes = null, siAJour = true }) {
     const noms = liste.map((x, i) => <React.Fragment key={x.login}>{i ? (i === liste.length - 1 ? ' et ' : ', ') : ''}<b>{x.login}</b> ({x.jours} j)</React.Fragment>);
     return (
       <div data-fraicheur-comptes={liste.map((x) => x.login + ':' + x.jours).join(',')} style={{fontSize:12,color:C.warn,background:`${C.warn}12`,border:`1px solid ${C.warn}55`,borderRadius:10,padding:'9px 12px',lineHeight:1.5}}>
-        Les données de {noms} ne sont plus à jour : une de leurs ventes récentes peut manquer, et un colis déjà expédié peut encore apparaître. Repasse sur Vinted connecté sur chacun de ces comptes pour les rafraîchir.
+        {/* (30 oct.) Une ligne (le « pas à jour » reste dit) ; les comptes, leur âge et la conséquence derrière ⓘ. */}
+        <span style={{display:'inline-flex',alignItems:'center',gap:4,flexWrap:'wrap'}}>{liste.length} comptes pas relus depuis {Math.min(...liste.map((x) => Number(x.jours) || 0))} j ou plus — repasse sur Vinted connecté sur chacun. <Pourquoi label="Quels comptes">{noms}. Une de leurs ventes récentes peut manquer, et un colis déjà expédié peut encore apparaître.</Pourquoi></span>
       </div>
     );
   }
@@ -30541,7 +30542,7 @@ function VintedAccounts({ accounts, setAccounts, baseKO, onRetour }) {
         //    panne », ils sont ailleurs. Les mêler aux autres, c'était annoncer
         //    « 2 en panne » pour une panne réelle et un choix assumé.
         const ok    = st.filter(s=>s.etat==='ok').length;
-        const warn  = st.filter(s=>s.etat==='warn').length;
+        const warn  = st.filter(s=>s.etat==='warn'||s.etat==='inconnu').length;
         const bad   = st.filter(s=>s.etat==='bad').length;
         const exclu = st.filter(s=>s.etat==='exclu').length;
         return (

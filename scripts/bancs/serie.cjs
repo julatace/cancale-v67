@@ -98,7 +98,9 @@ let ko=0; const dit=(c,m,d)=>{if(!c)ko++;console.log((c?'OK  ':'KO  ')+m+(d?' �
     // une ligne = le plus haut ancêtre du champ qui ne contient QUE ce champ
     const ligne=inp=>{ let n=inp; while(n.parentElement && n.parentElement.querySelectorAll('[data-fillbuy]').length===1) n=n.parentElement; return n; };
     const rendues=[...document.querySelectorAll('[data-fillbuy]')].map(ligne)
-      .filter(n=>[...n.querySelectorAll('button')].some(b=>/C'est [çc]a|à v[ée]rifier/i.test(b.innerText||''))).length;
+      // (30 oct.) Les pistes « à vérifier » sont repliées derrière « N pistes à vérifier »
+      // (`data-pistes-a-verifier`) : une ligne qui en a une la MONTRE toujours (le repli est visible).
+      .filter(n=>[...n.querySelectorAll('button')].some(b=>/C'est [çc]a|à v[ée]rifier/i.test(b.innerText||'')) || !!n.querySelector('[data-pistes-a-verifier]')).length;
     return {annonce:m?+m[1]:null, rendues};
   });
   const sug=sugInfo.annonce;

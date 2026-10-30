@@ -65,7 +65,9 @@ let ko=0; const dit=(c,m,d)=>{if(!c)ko++;console.log((c?'OK  ':'KO  ')+m+(d?' �
     const boutons=[...document.querySelectorAll('button')];
     const txt=b=>(b.innerText||'').trim();
     const cestCa=boutons.filter(b=>/C'est [çc]a/i.test(txt(b))).length;
-    const aVerifier=boutons.filter(b=>/à v[ée]rifier/i.test(txt(b))).length;
+    // (30 oct.) Les pistes « à vérifier » sont repliées (« N pistes à vérifier ») : elles sont
+    // dans la page, pliées — on les compte par leur texte, pas par ce qui est déplié.
+    const aVerifier=boutons.filter(b=>/à v[ée]rifier/i.test((b.textContent||'').trim())).length;
     const modaleOuverte=/Compl[ée]ter|prix d'achat|sans co[ûu]t/i.test(document.body.innerText||'') && (cestCa+aVerifier)>=0;
     // nombre de lignes de la modale (un champ de saisie par paire)
     const lignes=document.querySelectorAll('[data-fillbuy]').length;
