@@ -1325,6 +1325,10 @@
 > Voir `docs/passation/2026-10-24-offres-messages.md`.
 
 
+> 🔴🔴 **PASSATION DU 30 OCTOBRE — LIS D'ABORD `docs/passation/2026-10-30.md`** : sept branches v29-* construites
+> et relues mais PAS en ligne (leur contenu est dans `docs/passation/branches-2026-10-30.bundle`), l'ordre de
+> mise en ligne (une seule intégration, un seul numéro d'extension), la refonte des boutons en cours, Vestiaire.
+
 > ⛔⛔ **DÉCISION DE JULIEN, 22 OCTOBRE : PAS DE DOUBLE VÉRIFICATION PAR SMS — C'EST PAYANT.**
 > Mesuré dans la doc Supabase (« Advanced MFA Phone ») : **75 $/mois** pour le premier projet,
 > hors plafond de dépenses, **plus** chaque SMS facturé par Twilio/MessageBird. Julien : « si c'est
