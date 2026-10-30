@@ -48,10 +48,14 @@ if (typeof window !== 'undefined') {
 }
 // L'app n'est téléchargée que par ceux qui y entrent : un visiteur qui lit la
 // page d'accueil ne charge pas 340 Ko compressés pour rien (§ montée en charge).
-const App = React.lazy(() => import('./App.jsx'));
+// Un morceau d'un ancien déploiement manque : `vite:preloadError` recharge la page
+// et l'import rend `undefined` — on attend le rechargement au lieu de planter sur
+// « reading 'default' » (plantage noté le 23 oct.).
+const attendreRechargement = (f) => () => f().then((m) => m || new Promise(() => {}));
+const App = React.lazy(attendreRechargement(() => import('./App.jsx')));
 // Le film de la page d'accueil (`?film`, export MP4) est un morceau à part : un
 // visiteur de la page ne le télécharge jamais, et `?film` ne charge pas l'app.
-const Film = React.lazy(() => import('./AccueilFilm.jsx'));
+const Film = React.lazy(attendreRechargement(() => import('./AccueilFilm.jsx')));
 // Polices HÉBERGÉES SUR LE SITE (30 sept.) : charger Google Fonts envoyait
 // l'adresse IP de chaque visiteur à Google (recommandation CNIL, jugement
 // LG München 3 O 17493/20). Mêmes familles, même rendu, plus aucun tiers.

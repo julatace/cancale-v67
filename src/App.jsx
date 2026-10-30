@@ -52,17 +52,20 @@ import { boostRentable, SEUIL_BOOST } from "./boostRentable.js";
 import { CLE_WIDGETS_JOURNEE, WIDGETS_JOURNEE, NOM_TAILLE, DISPO_JOURNEE_DEFAUT, normaliserDispoJournee, deplacerWidget, retirerWidget, widgetFixe, tailleSuivante, tailleDefautWidget, caseVisible, widgetsAjoutables } from "./journeeWidgets.js";
 import {appelerFavorisDirect} from './favorisTransport.js';
 import React, { useState, useMemo, useEffect, useRef, lazy, Suspense } from "react";
-const Operations = lazy(() => import("./operations/Operations.jsx"));
-const Communaute = lazy(() => import("./communaute/Communaute.jsx"));
+// Morceau manquant après un déploiement : la page se recharge (vite:preloadError,
+// main.jsx) et l'import rend `undefined` — on attend au lieu de planter.
+const attendreMorceau = (f) => () => f().then((m) => m || new Promise(() => {}));
+const Operations = lazy(attendreMorceau(() => import("./operations/Operations.jsx")));
+const Communaute = lazy(attendreMorceau(() => import("./communaute/Communaute.jsx")));
 // (29 oct.) Écrans découpés d'App.jsx : chargés à leur ouverture, plus au démarrage
 // (le code de l'app pesait 824 Ko compressés d'un bloc). Leur contenu n'a pas changé.
-const Garage = lazy(() => import("./EcranStock.jsx"));
-const SettingsScreen = lazy(() => import("./EcranReglages.jsx"));
-const ComptaPro = lazy(() => import("./EcranComptaPro.jsx"));
-const LeboncoinScreen = lazy(() => import("./EcranLeboncoin.jsx"));
-const EbayAnnonces = lazy(() => import("./EcranEbayAnnonces.jsx"));
-const Invoices = lazy(() => import("./EcranFactures.jsx"));
-const VintedAccounts = lazy(() => import("./EcranComptesVinted.jsx"));
+const Garage = lazy(attendreMorceau(() => import("./EcranStock.jsx")));
+const SettingsScreen = lazy(attendreMorceau(() => import("./EcranReglages.jsx")));
+const ComptaPro = lazy(attendreMorceau(() => import("./EcranComptaPro.jsx")));
+const LeboncoinScreen = lazy(attendreMorceau(() => import("./EcranLeboncoin.jsx")));
+const EbayAnnonces = lazy(attendreMorceau(() => import("./EcranEbayAnnonces.jsx")));
+const Invoices = lazy(attendreMorceau(() => import("./EcranFactures.jsx")));
+const VintedAccounts = lazy(attendreMorceau(() => import("./EcranComptesVinted.jsx")));
 const ChargementEcran = ({ quoi }) => <p style={{ padding: 20, fontSize: 13, color: C.muted }}>Chargement {quoi}…</p>;
 import { createPortal } from "react-dom";
 import Bienvenue from "./Bienvenue.jsx";
@@ -21411,7 +21414,7 @@ function CountUpEuro({ value }) {
 // initial. `C`, `Icon`, `load`, `save` lui sont passés en props. Rendu
 // derrière <Suspense> à l'ouverture du Stock.
 // Studio photo (fonction n°33) : chargé au clic, jamais à l'ouverture de l'app.
-const StudioPhoto = React.lazy(() => import('./StudioPhoto.jsx'));
+const StudioPhoto = React.lazy(attendreMorceau(() => import('./StudioPhoto.jsx')));
 // Un plan peut contenir PLUSIEURS pièces. On normalise l'ancien format
 // mono-pièce ({ room, items }) vers { rooms:[{id,name,room,items}], active }.
 const ROOM_DEFAULT = { w: 10, h: 8, wallH: 3.4, wallColor: '#e4e8ee' };
