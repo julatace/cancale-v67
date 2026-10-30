@@ -52162,7 +52162,7 @@ function PushPrefsSetting({ comptes, onMuets }) {
             {/* §7 (revue du 11 oct.) : déplié, le bloc dessous dit tout — le résumé se tait. */}
             {muets && muets.length > 0 && !ouvert && (
               <div style={{color:C.warn,fontWeight:600,marginTop:3}} data-resume-muets={muets.length}>
-                ⚠ {muets.length} compte{muets.length>1?'s':''} sans email&nbsp;: pas de notification pour {muets.length>1?'eux':'lui'} — déplie.
+                ⚠ {muets.length} compte{muets.length>1?'s':''} sans email&nbsp;: ni {muets.length>1?'leurs':'ses'} ventes ni {muets.length>1?'leurs':'ses'} messages ne sonneront.
               </div>
             )}
           </div>
@@ -55451,7 +55451,7 @@ function ConnexionsSetting({comptes=[],onComptes,onPlateforme}) {
         <p>Dans Orion : autorise les extensions Firefox, puis installe le fichier XPI depuis Extensions → + → depuis un fichier. Autorise ensuite VRM sur les sites utilisés.</p>
         <a href="/VRM-Orion-installation.txt" target="_blank" rel="noopener noreferrer">Voir les instructions Orion</a>
       </details>
-      <details><summary>Dernière version observée dans ma boutique</summary><p>{derniereExt===undefined?'Lecture en cours…':derniereExt===null?'Cette information n’a pas pu être lue.':derniereExt==='aucune'?'Aucune version enregistrée.':`Version ${derniereExt.v} · ${dateLisible(derniereExt.at)}.`} Elle peut venir d’un autre navigateur : elle ne confirme pas la version utilisée ici.</p></details>
+      <details><summary>Dernière version observée dans ma boutique</summary><p>{derniereExt===undefined?'Lecture en cours…':derniereExt===null?'Cette information n’a pas pu être lue.':derniereExt==='aucune'?'Aucune version enregistrée.':`Version ${derniereExt.v} · ${dateLisible(derniereExt.at)}.`} Celle de la dernière capture, peut-être faite ailleurs : elle ne confirme pas la version utilisée ici.</p></details>
     </section>
     <section className="vrm-connexion-source" data-connexion="capture" style={{borderColor:C.border}}><h3>Données de l’extension</h3><strong>{capture.titre}</strong>{capture.date&&<time dateTime={capture.date}>{dateLisible(capture.date)}</time>}<p style={{color:C.muted}}>Pour la rafraîchir : ouvre le compte sur sa plateforme, extension active.</p></section>
     <SuiviComptes comptes={comptes} lignes={capt?.lignes||null} onComptes={onComptes}/>
