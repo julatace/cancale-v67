@@ -104,6 +104,7 @@ export const PUSH_DEFAUT = {
   soir:     true,   // la veille au soir : « Demain : N colis à poster » (api/ship-reminders.js?moment=soir)
   urssaf:   true,   // rappel de déclaration, le 1er du mois
   bilan:    true,   // bilan de la semaine, le lundi matin (api/_lib/bilan-semaine.js)
+  agentebay: true,  // « 🛒 N paires prêtes pour eBay — publier ? » (29 oct., api/_lib/agent-ebay-rappel.js) — l'agent DEMANDE, rien ne part seul
   doublevente: true, // vendue sur Vinted, N° PROUVÉ encore en vente sur eBay/Leboncoin (api/_lib/double-vente.js)
   action:   true,
   favoris:  true,   // la file des messages aux favoris est finie ou interrompue (api/_lib/favoris.js)   // Vinted attend une réponse avant une échéance : annulation demandée, achat livré à vérifier
