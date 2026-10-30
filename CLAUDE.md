@@ -1325,6 +1325,18 @@
 > Voir `docs/passation/2026-10-24-offres-messages.md`.
 
 
+> **30 octobre — Discord créait un second compte, et la voix de la démo :** mesuré (lecture seule) : « Se connecter avec
+> Discord » a créé le compte `99457424…` (vide, une ligne `main`) — l'email Discord n'est pas celui de son compte VRM, et le
+> « Discord relié » de Mon compte ne rangeait qu'un PSEUDO (`vrm_discord`), pas une méthode de connexion. Corrigé : Mon compte
+> → Comptes associés propose aussi « Connecter Discord » (liaison d'identité Supabase, `preparerLiaisonOAuth`) ; un compte
+> que Supabase vient de créer par Discord/Google sans email (`compteOAuthNeuf`, < 10 min) passe par `PorteNouveauOAuth` :
+> « nouveau compte » ou « j'ai déjà un compte » ⇒ suppression du compte vide par la route « Fermer mon compte », confirmée ;
+> « Identity is already linked » est traduit (`erreurRetourOAuth`). Banc `discord-nouveau-compte.cjs` (rouge sur l'avant).
+> Voix de la démo : plus la première voix française venue (la « compacte », robotique) — classement naturelle/neuronale ›
+> améliorée/premium › Google ; aucune voix de qualité ⇒ pas de bouton (`bienvenue.cjs` : 4 rouges sur l'avant).
+> ⚠️ Non mesuré : que « Manual linking » soit activé dans Supabase (sinon l'écran le dit). **Gestes de Julien** : supprimer le
+> compte vide (se connecter avec Discord ⇒ « J'ai déjà un compte VRM »), puis email ⇒ Mon compte ⇒ « Connecter Discord ».
+
 > 🔴🔴 **PASSATION DU 30 OCTOBRE — LIS D'ABORD `docs/passation/2026-10-30.md`** : sept branches v29-* construites
 > et relues mais PAS en ligne (leur contenu est dans `docs/passation/branches-2026-10-30.bundle`), l'ordre de
 > mise en ligne (une seule intégration, un seul numéro d'extension), la refonte des boutons en cours, Vestiaire.
