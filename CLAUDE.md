@@ -1,5 +1,12 @@
 # VRM — dossier de passation
 
+> **30 octobre — intégration des chantiers du 29 oct., extension 5.291.0 :** `v29-colis` (+ `v29-colis-ext`, fusionnée
+> dedans), `v29-lbc`, `v29-msg-ecrase` (revue 3 de `v29-msg` reprise dessus), `v29-vinted-ui`, `v29-compta`,
+> `v29-ebay-agent`, par vrais merges sur `origin/main` (5.287.0). UN numéro pour l'ensemble : **5.291.0** (5.288 et
+> 5.290 étaient des numéros de branche, jamais servis) — manifeste, `CODE_VERSION`, `CAPTEUR_VERSION`, `relaisVersion`,
+> `EXT_ATTENDUE`, notice Orion, zips, et `EXT_CAPACITES.transp` · `.lbcsupprime` · `.lbcstats` (aucune version publiée
+> ne porte ces fonctions). `v29-ebay-achats` n'est PAS dans ce lot. `audit-extension-zip` et `audit-coherence` verts.
+
 > ⚠️⚠️ **29 octobre — LEBONCOIN COMME VINTED : capture juste, « à retirer » visible, Supprimer, Republier, favoris (5.288) :**
 > Julien : « il n'y a plus que 2 annonces et VRM en a encore 8 », « j'ai vendu une paire sur Vinted et VRM ne m'a pas dit de
 > la supprimer », « je veux pouvoir supprimer une annonce de Leboncoin », « trop brouillon… mêmes méthodes d'affichage que
