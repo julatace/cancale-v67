@@ -35,7 +35,7 @@ let ko = 0;
 const dit = (ok, nom, det) => { if (!ok) ko++; console.log(`${ok ? '✅' : '❌'} ${nom}${det ? ' — ' + det : ''}`); };
 
 function charger(store) {
-  let APP = fs.readFileSync(path.join(R, 'src', 'App.jsx'), 'utf8');
+  let APP = require('./_source-app.cjs').sourceApp(path.join(R));
   if (PROUVE) APP = APP.replace(/const numEbayLu = \(sku, itemId, dateMs, depuis\) => \{/, "const numEbayLu = (sku, itemId, dateMs, depuis) => { return numeroExterne(numDeSkuEbay(sku), itemId, 'ebayAnnonces', dateMs);");
   const { src, manquants } = decls(APP, NOMS);
   if (manquants.length) dit(false, 'les règles se trouvent dans App.jsx', manquants.join(', '));

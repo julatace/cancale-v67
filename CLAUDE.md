@@ -22,8 +22,16 @@
 > `annonces-ventes-brouillon` (la 1ʳᵉ annonce descend à 808 px sur ordinateur, 952 au téléphone, sous quatre blocs
 > ajoutés le 29 oct. : bilan, annonces à compléter, astuce des numéros, acceptation auto ; la recherche de Messages sous
 > le bilan) ; `mobile`/`stats-premium` « navigation lisible » (libellés à 9 px, son choix du 19 oct.) ; `session` G/P
-> (limite de Chrome 153). (7) **Découpage d'App.jsx** : 7 écrans en morceaux chargés à la demande (Stock, Réglages,
-> Compta Pro, Leboncoin, Annonces eBay, Factures, Comptes Vinted) — voir plus bas si fusionné.
+> (limite de Chrome 153). (7) **Découpage d'App.jsx** : 7 écrans en morceaux chargés à leur ouverture
+> (`src/EcranStock.jsx`, `EcranReglages`, `EcranComptaPro`, `EcranLeboncoin`, `EcranEbayAnnonces`, `EcranFactures`,
+> `EcranComptesVinted` ; `React.lazy` + `Suspense`, code INCHANGÉ, déplacé). Le morceau App : 824 → 584 Ko compressés.
+> Ils importent d'App.jsx (UNE liste `export {…}` en fin de fichier) : ⚠️ un nom ajouté dans App.jsx et lu par un écran
+> découpé doit y être exporté. ⚠️ **Rien qui lit l'adresse au chargement ne va dans un écran découpé** (il est évalué
+> après que l'app a nettoyé l'URL) : `RETOUR_VUE`/`RETOUR_ABONNEMENT` restent dans App.jsx (sinon `?vue=compte` et le
+> retour de Stripe étaient perdus — vu au banc). ⚠️ Une demande d'écran (`DEMANDE_*`) ne se vide plus dans un
+> initialiseur `useState` mais APRÈS le montage : un rendu interrompu par Suspense le rejoue (Colis → Stock perdait la
+> paire cherchée). Audits et tests qui extraient du code par son nom lisent `scripts/_source-app.cjs`
+> (`sourceApp()` = App.jsx + les écrans). Prouvé : les 171 audits verts, 40 bancs identiques avant/après.
 
 > **29 octobre (suite, « c'est trop incompréhensible ») — Comptabilité allégée :** « Ta micro-entreprise » (calendrier,
 > seuils, profil, impôts) est REPLIÉE sous une ligne-résumé (taux · prochaine période à déclarer · seuils et impôts,

@@ -22,7 +22,7 @@ const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 const RACINE = path.join(__dirname, '..');
-const SRC = fs.readFileSync(path.join(RACINE, 'src', 'App.jsx'), 'utf8');
+const SRC = require('./_source-app.cjs').sourceApp(path.join(RACINE));
 // (revue argent, 20 oct.) la règle d'engagement eBay que ventesDeclarables
 // appelle maintenant — extraite du source, jamais recopiée (§6.3).
 const ENGAGEE_SRC = (() => {

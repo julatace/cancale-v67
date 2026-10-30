@@ -31,7 +31,7 @@
 //     locale peut être en retard (`git fetch` d'abord) : l'audit dit ce qu'il a lu.
 const fs = require('fs'), path = require('path'), vm = require('vm'), cp = require('child_process');
 const RACINE = path.join(__dirname, '..');
-const APP = fs.readFileSync(path.join(RACINE, 'src/App.jsx'), 'utf8');
+const APP = require('./_source-app.cjs').sourceApp(path.join(RACINE));
 const EXT = (f) => fs.readFileSync(path.join(RACINE, 'vinted-sync-extension', f), 'utf8');
 
 let ko = 0;

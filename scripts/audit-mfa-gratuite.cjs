@@ -57,7 +57,7 @@ const fichiers = (dir, ext) => {
   }
 
   console.log("── 2. Le code de N'IMPORTE LEQUEL de ses appareils (règle exécutée)");
-  const app = fs.readFileSync(path.join(RACINE, 'src', 'App.jsx'), 'utf8');
+  const app = require('./_source-app.cjs').sourceApp(path.join(RACINE));
   const a = app.indexOf('const MFA_CODE_FAUX'), b = app.indexOf('const authValid', a);
   if (a < 0 || b < 0) { dit(false, 'la règle `mfaVerifierCodeParmi` est trouvée dans App.jsx', 'introuvable'); return fin(); }
   let code = app.slice(a, b);

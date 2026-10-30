@@ -6,7 +6,7 @@ const fs=require('fs'),path=require('path'),assert=require('assert/strict'),{chr
  const p=await b.newPage();await p.route('http://vrm.test/**',r=>r.fulfill({contentType:'text/html',body:'<div id="root"></div>'}));await p.goto('http://vrm.test/');
  for(const file of ['react/umd/react.development.js','react-dom/umd/react-dom.development.js'])await p.addScriptTag({path:path.resolve('node_modules',file)});
  await p.evaluate(()=>{localStorage.setItem('vrm_num_prefixe','"C"');localStorage.setItem('articles-fixture','[{"numero":"C125"}]');window.prefixeNumeros=()=>JSON.parse(localStorage.getItem('vrm_num_prefixe')||'""');window.archiveNumeros=()=> 'B';window.onCloudReady=()=>()=>{};window.save=(k,v)=>{window.appels.push({k,v});};window.appels=[];window.C={text:'#123',muted:'#456',bg:'#eee',border:'#ccc',card:'#fff',accent:'#245',onAccent:'#fff'};window.GuideReglage=()=>null;});
- const s=fs.readFileSync('src/App.jsx','utf8');const code=s.slice(s.indexOf('function NumerosSetting('),s.indexOf('// ⛔ DÉTOURAGE DES PHOTOS'));
+ const s=require('../_source-app.cjs').sourceApp();const code=s.slice(s.indexOf('function NumerosSetting('),s.indexOf('// ⛔ DÉTOURAGE DES PHOTOS',s.indexOf('function NumerosSetting(')));
  await p.addScriptTag({content:esbuild.transformSync(code+';window.NumerosSetting=NumerosSetting;',{loader:'jsx'}).code});
  await p.evaluate(()=>ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(NumerosSetting,{nu:true})));
  const input=p.getByRole('textbox',{name:'Lettres de la série'});

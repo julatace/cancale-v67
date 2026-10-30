@@ -45,7 +45,7 @@ let parser;
 try { parser = require(path.join(RACINE, 'node_modules', '@babel', 'parser')); }
 catch (e) { dit(false, 'l’analyseur Babel est disponible', e.message); fin(); }
 
-const SRC = fs.readFileSync(path.join(RACINE, 'src', 'App.jsx'), 'utf8');
+const SRC = require('./_source-app.cjs').sourceApp(path.join(RACINE));
 let ast;
 try { ast = parser.parse(SRC, { sourceType: 'module', plugins: ['jsx'], errorRecovery: true }); }
 catch (e) { dit(false, 'App.jsx se lit', e.message); fin(); }

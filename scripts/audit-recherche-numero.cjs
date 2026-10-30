@@ -17,7 +17,7 @@
 // `--prouve` réaffaiblit la règle de six façons : chacune doit passer au ROUGE.
 const fs = require('fs'), path = require('path'), os = require('os');
 const SRC = path.join(__dirname, '..', 'src', 'rechercheNumero.js');
-const APP = fs.readFileSync(path.join(__dirname, '..', 'src', 'App.jsx'), 'utf8');
+const APP = require('./_source-app.cjs').sourceApp(path.join(__dirname, '..'));
 
 function extraire(src, nom) {
   const re = new RegExp(`^( *)(?:async )?function ${nom}\\(|^( *)const ${nom} = `, 'm');

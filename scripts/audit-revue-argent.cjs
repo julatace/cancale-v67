@@ -26,7 +26,7 @@
 // `--prouve` réaffaiblit chaque correctif tour à tour : au moins un contrôle
 // doit passer au ROUGE à chaque fois.
 const fs = require('fs'), vm = require('vm'), path = require('path');
-const APP0 = fs.readFileSync(path.join(__dirname, '..', 'src', 'App.jsx'), 'utf8');
+const APP0 = require('./_source-app.cjs').sourceApp(path.join(__dirname, '..'));
 
 function extraire(src, nom) {
   const re = new RegExp(`^( *)(?:async )?function ${nom}\\(|^( *)const ${nom} = `, 'm');

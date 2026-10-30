@@ -4,7 +4,7 @@
 // de litige, « c'est très important » — Julien) et la disparition d'un colis vendu.
 // Exécute le VRAI code extrait d'App.jsx dans un vm (§4.10 : on EXÉCUTE la règle).
 const fs = require('fs'), path = require('path'), vm = require('vm');
-const SRC = fs.readFileSync(path.join(__dirname, '..', 'src', 'App.jsx'), 'utf8');
+const SRC = require('./_source-app.cjs').sourceApp(path.join(__dirname, '..'));
 
 // Extraire le bloc des deux fonctions (const lbcAnnulee … puis lbcFinalisee … };).
 const i0 = SRC.indexOf('const lbcAnnulee');

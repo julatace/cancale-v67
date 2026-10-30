@@ -15,7 +15,7 @@
 // ════════════════════════════════════════════════════════════════════════════
 const fs = require('fs'), vm = require('vm'), path = require('path');
 const { parse } = require(path.join(__dirname, '..', 'node_modules', '@babel', 'parser'));
-const SRC = fs.readFileSync(path.join(__dirname, '..', 'src', 'App.jsx'), 'utf8');
+const SRC = require('./_source-app.cjs').sourceApp(path.join(__dirname, '..'));
 
 let ko = 0, ok = 0;
 const dit = (c, m, d) => { if (c) ok++; else ko++; console.log((c ? '✅ ' : '❌ ') + m + (d ? ' — ' + d : '')); };

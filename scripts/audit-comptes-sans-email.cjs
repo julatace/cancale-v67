@@ -25,7 +25,7 @@
 //      vendu — `--prouve=calme` remet l'ancien « calme » et doit sortir ROUGE.
 // ════════════════════════════════════════════════════════════════════════════
 const fs = require('fs'), vm = require('vm'), path = require('path');
-const APP = fs.readFileSync(path.join(__dirname, '..', 'src', 'App.jsx'), 'utf8');
+const APP = require('./_source-app.cjs').sourceApp(path.join(__dirname, '..'));
 const arg = process.argv.find((a) => a.startsWith('--prouve'));
 const PROUVE = arg ? (arg.split('=')[1] || 'ancienne') : '';
 

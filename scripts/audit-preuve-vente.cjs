@@ -121,7 +121,7 @@ const M = MUTATION ? MUTATIONS[MUTATION] : null;
 if (MUTATION && !M) { console.log('❌ mutation inconnue : ' + MUTATION); process.exit(1); }
 
 // ── LES SOURCES (éventuellement mutées) ─────────────────────────────────────
-let APP = fs.readFileSync(path.join(RACINE, 'src/App.jsx'), 'utf8');
+let APP = require('./_source-app.cjs').sourceApp(path.join(RACINE));
 let EXT = fs.readFileSync(path.join(RACINE, 'vinted-sync-extension/background.js'), 'utf8');
 try {
   if (M && M.regle) { APP = M.regle(APP); EXT = M.regle(EXT); }

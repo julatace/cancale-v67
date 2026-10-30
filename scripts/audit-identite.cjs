@@ -13,7 +13,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 const fs = require('fs');
 const path = require('path');
-const SRC = fs.readFileSync(path.join(__dirname, '..', 'src', 'App.jsx'), 'utf8');
+const SRC = require('./_source-app.cjs').sourceApp(path.join(__dirname, '..'));
 
 const TITRE = 'adidas spezial noir taille 38';
 const N = 50;
@@ -437,7 +437,7 @@ const nok = (nom, d) => { ko++; console.log(`❌ ${nom}${d ? ' — ' + d : ''}`)
 // physique et du panneau « à ranger » du Garage — alors qu'elle est là.
 // ⚠️ Une vente annulée APRÈS expédition (remboursement) ne compte pas.
 {
-  const app = require('fs').readFileSync(require('path').join(__dirname, '..', 'src', 'App.jsx'), 'utf8');
+  const app = require('./_source-app.cjs').sourceApp(require('path').join(__dirname, '..'));
   const i = app.indexOf('const porteursNum = useMemo');
   // Le CORPS du useMemo, jusqu'à sa liste de dépendances — pas 2 200 caractères
   // fixes : le 22 octobre une boucle de plus (annonces masquées) poussait la règle

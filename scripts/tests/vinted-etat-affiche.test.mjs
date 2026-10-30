@@ -2,7 +2,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
-const source=fs.readFileSync(new URL('../../src/App.jsx',import.meta.url),'utf8');
+import{createRequire}from'node:module';
+// App.jsx et les écrans découpés (29 oct.) : la règle peut vivre dans src/Ecran*.jsx.
+const source=createRequire(import.meta.url)('../_source-app.cjs').sourceApp();
 const debut=source.indexOf('  const acctHealth = (acc) => {');
 const fin=source.indexOf('  // Comptes exclus de la comptabilité',debut);
 function lire(etat,refuse=false){

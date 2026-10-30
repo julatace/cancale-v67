@@ -18,7 +18,7 @@
 // complet est pire qu'un total absent.
 // ────────────────────────────────────────────────────────────────────────────
 const fs = require('fs'), path = require('path');
-const app = fs.readFileSync(path.join(__dirname, '..', 'src/App.jsx'), 'utf8');
+const app = require('./_source-app.cjs').sourceApp(path.join(__dirname, '..'));
 let ko = 0;
 const ok  = m => console.log('✅ ' + m);
 const nok = (m, d) => { ko++; console.log('❌ ' + m + (d ? ' — ' + d : '')); };

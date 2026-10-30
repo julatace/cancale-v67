@@ -23,7 +23,7 @@ const bloc = (t) => { const m = /\/\/ <annonce-lbc-regle>[^\n]*\n([\s\S]*?)\/\/ 
 const extrait = (t, debut, fin) => { const a = t.indexOf(debut); if (a < 0) return ''; const b = t.indexOf(fin, a); return b < 0 ? '' : t.slice(a, b + fin.length); };
 const b = bloc(s);
 dit(!!b, 'le bloc partagé existe dans l\'extension');
-dit(bloc(fs.readFileSync(APP, 'utf8')) === b, 'le bloc est IDENTIQUE dans l\'app (§11)');
+dit(bloc(require('./_source-app.cjs').sourceApp(path.join(__dirname, '..'))) === b, 'le bloc est IDENTIQUE dans l\'app (§11)');
 const vc = extrait(s, 'const VC_SOUS = {', '\n  return out;\n}\n');
 dit(!!vc, 'categorieVcDe existe');
 const ctx = {};

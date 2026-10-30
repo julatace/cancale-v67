@@ -24,7 +24,7 @@
 // `--prouve` réaffaiblit la règle de trois façons : chacune doit passer au ROUGE.
 // Un audit ne meurt pas, il rapporte : chaque bloc passe par `essaie()`.
 const fs = require('fs'), path = require('path'), os = require('os');
-const APP = fs.readFileSync(path.join(__dirname, '..', 'src', 'App.jsx'), 'utf8');
+const APP = require('./_source-app.cjs').sourceApp(path.join(__dirname, '..'));
 const RECH = fs.readFileSync(path.join(__dirname, '..', 'src', 'rechercheNumero.js'), 'utf8');
 
 let ko = 0, vu = 0;

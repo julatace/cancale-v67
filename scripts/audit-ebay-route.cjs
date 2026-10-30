@@ -473,7 +473,7 @@ function extraire(src, nom) {
   }
   return '';
 }
-const APP = (() => { try { return fs.readFileSync(path.join(RACINE, 'src', 'App.jsx'), 'utf8'); } catch (_) { return ''; } })();
+const APP = (() => { try { return require('./_source-app.cjs').sourceApp(path.join(RACINE)); } catch (_) { return ''; } })();
 const RA = {};
 {
   const noms = ['cleNum', 'NUM_OK', 'numDeSkuEbay', 'skuEbayDe'];

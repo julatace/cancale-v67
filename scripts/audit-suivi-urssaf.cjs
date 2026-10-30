@@ -6,7 +6,7 @@
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
-const src0 = fs.readFileSync(path.join(__dirname, '..', 'src', 'App.jsx'), 'utf8');
+const src0 = require('./_source-app.cjs').sourceApp(path.join(__dirname, '..'));
 const prouve = process.argv.includes('--prouve');
 let ok = 0, ko = 0;
 const verif = (c, m) => { if (c) { ok++; console.log('✅', m); } else { ko++; console.log('❌', m); } };

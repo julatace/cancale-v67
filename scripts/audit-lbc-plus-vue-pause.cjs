@@ -82,7 +82,7 @@ if (process.argv.includes('--prouve')) {
 const SRC = fs.readFileSync(F.src, 'utf8');
 const INJ = fs.readFileSync(F.inject, 'utf8');
 const REL = fs.readFileSync(F.relay, 'utf8');
-const APP = fs.readFileSync(F.app, 'utf8');
+const APP = process.argv.includes('--app') ? fs.readFileSync(F.app, 'utf8') : require('./_source-app.cjs').sourceApp(racine);
 const SRV = fs.readFileSync(F.serveur, 'utf8');
 
 let ko = 0;

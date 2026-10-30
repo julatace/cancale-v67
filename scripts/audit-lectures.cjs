@@ -92,7 +92,7 @@ for (const f of FICHIERS) {
 // UN lecteur (`lirePdfLigne`), qui ne demande que `pdfB64`.
 console.log('\n── LES LIGNES QUI PORTENT UN PDF NE SONT JAMAIS LUES EN ENTIER (app)');
 {
-  const app = sansCommentaires(fs.readFileSync(path.join(racine, 'src/App.jsx'), 'utf8'));
+  const app = sansCommentaires(require('./_source-app.cjs').sourceApp(path.join(racine)));
   const PDF_FAMILLES = /app_data\?id=(?:eq|like)\.[^`&]*(?:_label_|_receipt_latest|email_bord_)[^`&]*&select=(?:id,)?data(?![-,>])/g;
   const blobs = app.match(PDF_FAMILLES) || [];
   dit(blobs.length === 0, 'aucun `select=data` sur une ligne de bordereau ou de reçu', blobs.map((x) => x.slice(0, 70)).join(' | '));
@@ -212,7 +212,7 @@ console.log('\n── ET UNE PROJECTION DÉCLARE TOUTES LES CLÉS QUE SA FONCTIO
   const LECTEURS = [
     { f: 'vinted-sync-extension/background.js', fn: 'buildLbcData',   liste: 'MAIN_FILE' },
     { f: 'vinted-sync-extension/background.js', fn: 'buildEbayData',  liste: 'MAIN_FILE' },
-    { f: 'src/App.jsx',                         fn: 'LeboncoinScreen', liste: 'MAIN_LEBONCOIN' },
+    { f: 'src/EcranLeboncoin.jsx',              fn: 'LeboncoinScreen', liste: 'MAIN_LEBONCOIN' },
     { f: 'api/widget.js',                       fn: 'handler',         liste: 'MAIN_WIDGET' },
   ];
   for (const L of LECTEURS) {

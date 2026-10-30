@@ -29,7 +29,7 @@
 // Lecture seule.
 const fs = require('fs'), path = require('path'), zlib = require('zlib');
 const RACINE = path.join(__dirname, '..');
-const APP = fs.readFileSync(path.join(RACINE, 'src/App.jsx'), 'utf8');
+const APP = require('./_source-app.cjs').sourceApp(path.join(RACINE));
 const SRC = path.join(RACINE, 'vinted-sync-extension');
 const ZIP = path.join(RACINE, 'public/VRM-extension.zip');
 
