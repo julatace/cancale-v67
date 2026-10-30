@@ -186,7 +186,7 @@ const TABS=['journee','plat_vinted','plat_leboncoin','plat_ebay','plat_vestiaire
       if(t==='dashboard') { await pg.waitForFunction(()=>/Finalisé par plateforme/i.test(document.body.innerText||''),null,{timeout:8000}).catch(()=>{}); dashTxt=await pg.evaluate(()=>document.body.innerText||'');
         // La carte héros du « finalisé » porte la notion qu'elle mesure
         // (`data-notion="finalise-vinted"`) : on juge SON texte, pas la page.
-        heroTxt=await pg.evaluate(()=>{ const e=document.querySelector('[data-stats-carte="hero"]'); return e ? (e.innerText||'') : null; }); }
+        heroTxt=await pg.evaluate(()=>{ const e=document.querySelector('[data-stats-carte="hero"]'); return e ? (e.textContent||'') : null; /* (27 oct.) explications derrière ⓘ au téléphone : textContent */ }); }
       if(t==='journee') collTxt=r.txt;
       // Le résumé est replié au téléphone (`<details>`) : on lit son CONTENU.
       if(t==='plat_vinted') vintedTxt=await pg.evaluate(()=>{ const e=document.querySelector('.vrm-summary-strip'); return e ? (e.textContent||'') : ''; });
