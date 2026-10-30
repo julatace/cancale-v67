@@ -126,7 +126,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.287.0';
+const EXT_ATTENDUE = '5.288.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -521,7 +521,7 @@ const extEnRetard = (v) => !!v && cmpVersion(v, EXT_ATTENDUE) < 0;
 //    « l'extension relève le suivi » plus tôt viserait une extension qui ne le
 //    fait pas — un faux dans l'autre sens (revue du 24 oct. ; corrigé le
 //    26 oct. avec la session extension, qui a relu l'historique).
-const EXT_CAPACITES = { favorisouvrir:'5.225.0', favorisliste:'5.218.0', suivivinted: '5.217.0', favoris: '5.217.0', liaison: '5.171.0', supprimees: '5.165.0', enligne: '5.170.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', preuves: '5.172.0', etatcompte: '5.181.0', lbcfiche: '5.182.0', relais: '5.183.0', lbcpack: '5.185.0', annulee: '5.185.0', confirmer: '5.206.0', retraitnotif: '5.206.0', offresauto: '5.234.0', vcpublier: '5.235.0', vcauto: '5.236.0', vcventes: '5.237.0', vcmessages: '5.238.0', vcachats: '5.239.0', republier: '5.240.0', republiermodif: '5.247.0', recreer: '5.248.0', lettre: '5.250.0', brouillon: '5.251.0', versbrouillon: '5.253.0', republierbrouillon: '5.254.0', refaire: '5.255.0', republierpage: '5.277.0', republierfile: '5.279.0', favorisperso: '5.281.0', lbcsupprime: '5.287.0', lbcstats: '5.287.0' };
+const EXT_CAPACITES = { favorisouvrir:'5.225.0', favorisliste:'5.218.0', suivivinted: '5.217.0', favoris: '5.217.0', liaison: '5.171.0', supprimees: '5.165.0', enligne: '5.170.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', preuves: '5.172.0', etatcompte: '5.181.0', lbcfiche: '5.182.0', relais: '5.183.0', lbcpack: '5.185.0', annulee: '5.185.0', confirmer: '5.206.0', retraitnotif: '5.206.0', offresauto: '5.234.0', vcpublier: '5.235.0', vcauto: '5.236.0', vcventes: '5.237.0', vcmessages: '5.238.0', vcachats: '5.239.0', republier: '5.240.0', republiermodif: '5.247.0', recreer: '5.248.0', lettre: '5.250.0', brouillon: '5.251.0', versbrouillon: '5.253.0', republierbrouillon: '5.254.0', refaire: '5.255.0', republierpage: '5.277.0', republierfile: '5.279.0', favorisperso: '5.281.0', lbcsupprime: '5.288.0', lbcstats: '5.288.0' };
 // Trois états, jamais un seul : pas d'extension ici · en retard · à jour.
 const extSait = (quoi) => {
   if (!vmrExtPresent()) return 'absente';                    // téléphone, autre navigateur
@@ -50285,6 +50285,44 @@ function aRetirerDeLbcVinted({ posted, numeros, enLigne, vendus, itemsLbc, liens
   return [...out.values()].sort((a, b) => String(a.numero).localeCompare(String(b.numero), 'fr', { numeric: true }));
 }
 // </lbc-a-retirer-regle>
+// (29 oct., revue 2) « VENDUE SUR eBAY ⇒ À RETIRER DE LEBONCOIN » : UNE règle pour
+// l'écran Leboncoin ET Ma journée (§11). La vente eBay est prouvée par le SKU
+// VRM-{n°} d'une commande engagée. L'annonce Leboncoin qui porte la paire :
+//   · reliée par IDENTITÉ (lien posé, référence VRM) ⇒ `ident: true`, avec son
+//     identifiant — la seule ligne où pause et suppression sont proposées ;
+//   · sinon marquée « publiée » depuis une annonce Vinted de ce N° ⇒ la ligne
+//     RESTE (la paire est sans doute encore en ligne là-bas), `ident: false`,
+//     sans aucun geste : il la retire lui-même. Jamais le « nXXX » d'un titre.
+// `soldEbay === null` (un compte eBay illisible) ⇒ `null`, rien d'inventé.
+// `deja` : les N° déjà « à retirer » parce que vendus sur Vinted (une paire, une ligne).
+function numerosVendusEbay(cmds) {
+  if (!Array.isArray(cmds)) return null;
+  const out = new Set();
+  for (const o of cmds) { if (!commandeEbayEngagee(o)) continue; for (const li of (Array.isArray(o.lineItems) ? o.lineItems : [])) { const k = cleNum(numLigneEbay(o, li)); if (k) out.add(k); } }
+  return out;
+}
+function aRetirerDeLbcEbay({ soldEbay, posted, numeros, itemsLbc, liens, vendusLbc, sortis, deja }) {
+  if (!(soldEbay && typeof soldEbay.has === 'function')) return null;
+  const nums = numeros || {};
+  const out = new Map();
+  const ecarte = (k) => !k || !soldEbay.has(k) || out.has(k) || (deja && deja.has(k)) || (sortis && sortis.has(k));
+  for (const ad of Object.values(itemsLbc || {})) {
+    if (!ad || ad.id == null) continue;
+    const k = numeroLbcIdentite({ itemId: ad.id }, itemsLbc, liens);
+    if (ecarte(k)) continue;
+    if (!annonceLbcEnVente(ad, vendusLbc)) continue;
+    const prix = Number(ad.price);
+    out.set(k, { numero: k, lbcId: String(ad.id), ident: true, titre: String(ad.subject || ad.title || ''), url: String(ad.url || ''), prix: isFinite(prix) && prix > 0 ? prix : null });
+  }
+  for (const pid of (posted || [])) {
+    const p = String(pid);
+    if (!/^\d+$/.test(p)) continue;
+    const k = cleNum((nums[p] || {}).numero);
+    if (ecarte(k)) continue;
+    out.set(k, { numero: k, lbcId: '', ident: false, titre: String((nums[p] || {}).title || ''), url: '', prix: null });
+  }
+  return [...out.values()].sort((a, b) => String(a.numero).localeCompare(String(b.numero), 'fr', { numeric: true }));
+}
 // Une annonce pas revue depuis plus de 7 jours : on ne sait pas si elle est
 // encore sur Leboncoin. On ne demande pas « quelle paire ? » pour elle (relier
 // une annonce morte à une paire vivante), on dit le geste qui tranche. Sans date
@@ -51699,25 +51737,19 @@ function LeboncoinScreen() {
     //    VRM-{n°} (§5), jamais le titre. Une paire déjà « à retirer » (vendue
     //    sur Vinted) n'est pas doublée — une paire, une ligne.
     try {
-      const cmdsEbay = await commandesEbayTous();   // null si un compte eBay illisible ⇒ pas su
-      if (Array.isArray(cmdsEbay)) {
-        const soldEbay = new Set();
-        for (const o of cmdsEbay) { if (!commandeEbayEngagee(o)) continue; for (const li of (Array.isArray(o.lineItems) ? o.lineItems : [])) { const k = cleNum(numLigneEbay(o, li)); if (k) soldEbay.add(k); } }
-        if (soldEbay.size) {
-          const parN = new Map(); removals.forEach((r) => { const k = cleNum(r.numero); if (k && !parN.has(k)) parN.set(k, r); });
-          for (const ad of liveAds) {
-            // (29 oct., revue) PAR IDENTITÉ SEULEMENT : le lien posé à la main ou
-            // la référence VRM de l'annonce — jamais le « nXXX » d'un titre, qui
-            // peut désigner l'ancienne paire B… (§5). La suppression proposée sur
-            // cette ligne est sans retour.
-            const k = numeroLbcIdentite({ itemId: ad.id }, lbcItems, liens);
-            if (!k || !keysKnown.has(k) || !soldEbay.has(k)) continue;
-            const ex = parN.get(k);
-            if (ex && ex.etat === 'vendue') continue;   // déjà « à retirer » (vendue ailleurs, prouvée) — une paire, une ligne
-            if (ex) { const i = removals.indexOf(ex); if (i >= 0) removals.splice(i, 1); }   // un simple doute devient une vente eBay PROUVÉE
-            const entry = { numero: k, title: ad.subject || '', lbc: true, ident: true, ou: 'eBay', url: ad.url || '', etat: 'vendue', id: ad.id != null ? String(ad.id) : '', prix: ad.price != null && isFinite(Number(ad.price)) ? Number(ad.price) : null };
-            removals.push(entry); parN.set(k, entry);
-          }
+      // (29 oct., revue 2) LA règle partagée avec Ma journée (`aRetirerDeLbcEbay`) :
+      // une annonce reliée seulement par sa marque « publiée » reste listée, sans
+      // geste ; pause et suppression demandent l'identité.
+      const soldEbay = numerosVendusEbay(await commandesEbayTous());   // null si un compte eBay illisible ⇒ pas su
+      const deja = new Set(removals.filter((r) => r.etat === 'vendue' && r.ou !== 'eBay').map((r) => cleNum(r.numero)).filter(Boolean));
+      const re = aRetirerDeLbcEbay({ soldEbay, posted, numeros, itemsLbc: lbcRows === null ? null : lbcItems, liens, vendusLbc: ventesLbcKO ? null : vendusLbc, sortis: numsSortis, deja });
+      if (re && re.length) {
+        const parN = new Map(); removals.forEach((r) => { const k = cleNum(r.numero); if (k && !parN.has(k)) parN.set(k, r); });
+        for (const r of re) {
+          const ex = parN.get(r.numero);
+          if (ex) { const i = removals.indexOf(ex); if (i >= 0) removals.splice(i, 1); }   // un simple doute devient une vente eBay PROUVÉE
+          const entry = { numero: r.numero, title: r.titre, lbc: !!r.lbcId, ident: !!r.ident, ou: 'eBay', url: r.url, etat: 'vendue', id: r.lbcId, prix: r.prix };
+          removals.push(entry); parN.set(r.numero, entry);
         }
       }
     } catch (_) { /* une lecture eBay qui tombe ne casse jamais l'écran Leboncoin */ }
@@ -52159,6 +52191,7 @@ function LeboncoinScreen() {
                   {venduesEbay.some((r) => r.ident && r.lbc && r.id) && se === 'ok' ? <> <span data-lbc-supprimer-geste-ebay="ok">Tu peux {venduesEbay.length > 1 ? 'les' : 'la'} supprimer d'ici (sans retour) ou {venduesEbay.length > 1 ? 'les' : 'la'} mettre en pause, une à la fois.</span></>
                     : venduesEbay.some((r) => r.ident && r.lbc && r.id) && pe === 'ok' ? <> <span data-lbc-pause-geste-ebay="ok">Ou mets-{venduesEbay.length > 1 ? 'les' : 'la'} en pause d'ici, une à la fois : ce n'est pas une suppression.</span></> : null}
                   {venduesEbay.some((r) => r.ident && r.lbc && r.id) && pe === 'retard' ? <> <span data-lbc-pause-geste-ebay="retard">Pour {venduesEbay.length > 1 ? 'les' : 'la'} mettre en pause d'ici, mets l'extension à jour (Réglages).</span></> : null}
+                  {venduesEbay.some((r) => !r.ident) ? <> <span data-lbc-ebay-sans-ident={venduesEbay.filter((r) => !r.ident).length}>{(() => { const sans = venduesEbay.filter((r) => !r.ident); const ns = sans.map((r) => 'N°' + r.numero).join(', '); return sans.length > 1 ? `${ns} ne sont reliées que par ta marque « publiée » : VRM ne sait pas quelles annonces c'est sur Leboncoin, retire-les toi-même dans « Mes annonces ».` : `La ${ns} n'est reliée que par ta marque « publiée » : VRM ne sait pas quelle annonce c'est sur Leboncoin, retire-la toi-même dans « Mes annonces ».`; })()}</span></> : null}
                 </div>
                 {venduesEbay.slice(0, 30).map((r, i) => Ligne(r, i, C.danger, true))}
               </Card>
@@ -57919,13 +57952,17 @@ function AppCoeur() {
         //    sur Vinted » juste au-dessus, avec le MÊME verdict que l'écran eBay
         //    (`ventesE.vendus`, §11). Hors de celles déjà comptées « sur Vinted »
         //    (une paire, une ligne). « pas su » (verdict sans Map) ⇒ 0, jamais inventé.
-        if(ventesE && ventesE.vendus && typeof ventesE.vendus.get==='function'){
-          const soldEbayN=new Set([...ventesE.vendus].filter(([,v])=>v==='eBay').map(([k])=>k));
-          if(soldEbayN.size){
-            const vintedRemN=new Set(lbcRemovePids.map(pid=>cleNum((nums[pid]||{}).numero)).filter(Boolean));
-            // Même refinement que le compte Vinted (§11) : une annonce LBC SORTIE
-            // n'est plus « à retirer » ; une déjà comptée « sur Vinted » non plus.
-            lbcRemoveEbayCount=postedIds.filter(pid=>/^\d+$/.test(String(pid))).filter(pid=>{ const k=cleNum((nums[pid]||{}).numero); return k && soldEbayN.has(k) && !vintedRemN.has(k) && !sortisN.has(k); }).length;
+        // (29 oct., revue 2) LA règle de l'écran Leboncoin (`aRetirerDeLbcEbay`,
+        // §11) : même base (commandes eBay engagées, annonces Leboncoin, marques
+        // « publiée »), mêmes exclusions — Ma journée dit exactement les lignes que
+        // l'écran montre. Commandes illisibles ⇒ 0, jamais inventé.
+        {
+          const soldEbayN=numerosVendusEbay(ords);
+          if(soldEbayN && soldEbayN.size){
+            const vintedRemN=new Set((lbcARetirer||[]).map(r=>cleNum(r.numero)).filter(Boolean));
+            const liensE=load('vrm_lbc_liens',{})||{};
+            const reE=aRetirerDeLbcEbay({soldEbay:soldEbayN, posted:postedIds, numeros:nums, itemsLbc:lbcItemsLu||null, liens:liensE, vendusLbc:ventesLbcLu?annoncesLbcVendues(ventesLbcLu):null, sortis:sortisN, deja:vintedRemN});
+            lbcRemoveEbayCount=reE?reE.length:0;
           }
         }
         // Retrait automatique (proposition 8) : allumé par lui, nuage là AU

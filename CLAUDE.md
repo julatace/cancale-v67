@@ -1,6 +1,6 @@
 # VRM — dossier de passation
 
-> ⚠️⚠️ **29 octobre — LEBONCOIN COMME VINTED : capture juste, « à retirer » visible, Supprimer, Republier, favoris (5.287) :**
+> ⚠️⚠️ **29 octobre — LEBONCOIN COMME VINTED : capture juste, « à retirer » visible, Supprimer, Republier, favoris (5.288) :**
 > Julien : « il n'y a plus que 2 annonces et VRM en a encore 8 », « j'ai vendu une paire sur Vinted et VRM ne m'a pas dit de
 > la supprimer », « je veux pouvoir supprimer une annonce de Leboncoin », « trop brouillon… mêmes méthodes d'affichage que
 > Vinted », « un outil de republication… exactement pareil », « les messages aux favoris » (Leboncoin SEULEMENT, rien côté
@@ -29,10 +29,10 @@
 > sans relevé, et dit que VRM n'écrit à personne. L'extension relève déjà chemins, formes et envois (jamais les valeurs).
 > **Preuves** : `audit-lbc-mes-annonces` (14 rouges sur l'avant, 11 mutations), `audit-lbc-a-retirer` (9, 5/5),
 > `audit-lbc-supprimer` (19, 8/8), bancs `lbc-pause`, `badge`, `lbc-supprimer` (16 rouges sur l'avant), `lbc-comme-vinted`
-> (390/1512 ; 39 rouges sur l'avant, + « geste dit une fois » rouge sur l'avant). Extension **5.287.0** (5.282, 5.284, 5.285 et 5.286 prises sur
+> (390/1512 ; 39 rouges sur l'avant, + « geste dit une fois » rouge sur l'avant). Extension **5.288.0** (5.282, 5.284, 5.285, 5.286 et 5.287 prises sur
 > main), `EXT_CAPACITES.lbcsupprime` / `.lbcstats`. **Non mesuré** : le vrai leboncoin.fr (403 d'ici) — réponse réelle d'une
 > suppression demandée par VRM, une liste « Mes annonces » de plusieurs pages, ce que fait le ciblage des abonnés.
-> **Gestes de Julien** : installer la 5.287 (remplacer le dossier, puis ⟳ dans chaque Chrome) ; ouvrir « Mes annonces » sur
+> **Gestes de Julien** : installer la 5.288 (remplacer le dossier, puis ⟳ dans chaque Chrome) ; ouvrir « Mes annonces » sur
 > CHACUN de ses comptes Leboncoin (la liste complète fait sortir les annonces disparues) ; pour un chiffre de favoris, ouvrir
 > « Statistiques » de l'annonce ; s'il veut que VRM sache écrire à ses abonnés, utiliser UNE fois à la main le geste de
 > Leboncoin qui cible les abonnés (s'il lui est proposé) : l'extension en relèvera la forme pour la passe suivante.
@@ -45,6 +45,13 @@
 > lié au compte VRM ; Republier sur ordinateur sans extension dit la vraie cause ; Messages et « relevé » sans date ;
 > identifiants réels retirés des audits. Preuves : banc `lbc-supprimer` **11 rouges** sur la branche d'avant, 6 sous
 > mutation ; `lbc-comme-vinted` 4 ; `audit-lbc-mes-annonces` +3 contrôles (3 mutations neuves), `audit-lbc-a-retirer` +1.
+> **Revue 2 (29 oct., nuit)** : (a) main a publié SA 5.287 (numéros des profils) — ce chantier passe en **5.288.0**
+> (`lbcsupprime`/`lbcstats` à 5.288 : une 5.287 de main ne sait ni supprimer ni relever les chiffres) ; (b) « vendue sur
+> eBay ⇒ à retirer de Leboncoin » : UNE règle (`aRetirerDeLbcEbay`, `numerosVendusEbay`) pour l'écran ET Ma journée —
+> l'annonce reliée par identité a ses gestes, celle reliée seulement par la marque « publiée » RESTE listée sans geste
+> (« retire-la toi-même », `data-lbc-ebay-sans-ident`) ; avant, l'écran la faisait disparaître pendant que Ma journée la
+> comptait (« Voir » menait à un écran vide). Banc `lbc-supprimer` : 4 rouges sur la branche d'avant, 4 sous mutation
+> (lignes sans identité retirées de l'écran).
 > **29 octobre — 5.287, numéros sur les profils visités :** Julien a précisé que
 > l’affichage semble seulement sur Vinted, l’import dans VRM n’est pas confirmé.
 > `/member/{id}` : aucun numéro renvoyé sans égalité avec le PROFIL du compte

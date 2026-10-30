@@ -55,7 +55,7 @@ const construire = (o = {}) => [
   { id: 'harvest_111_listings', data: LISTINGS },
   txn(9001, 5001), txn(9003, 5003),
   // La marque « publiée » (sa dernière écriture) : AVANT la liste complète lue il y a 72 min.
-  { id: 'vinted_lbc_posted', data: { ids: ['5001', '5003'], updatedAt: ilYa(3) } },
+  { id: 'vinted_lbc_posted', data: { ids: o.posted || ['5001', '5003'], updatedAt: ilYa(3) } },
   { id: 'lbc_listings', data: { items: Object.assign({}, ITEMS, o.items || {}), lectures: { [MON]: { at: ilYa(0.05), total: 3, n: 3 } } } },
   { id: 'lbc_accounts', data: { accounts: { [MON]: { id: MON, name: 'Totomondu', sessionAt: auj.toISOString(), source: 'session:messagerie' } } } },
   { id: 'lbc_ventes', data: { ventes: {} } },
@@ -266,6 +266,31 @@ const cliquer = (pg, texte) => pg.evaluate((tx) => { const b = [...document.quer
       const v7 = await o6.pg.evaluate(() => ({ ebay: (document.querySelector('[data-lbc-retirer-ebay]') || { getAttribute: () => null }).getAttribute('data-lbc-retirer-ebay'), suppr: document.querySelectorAll('[data-lbc-retirer] [data-lbc-supprimer="3290000005"]').length }));
       dit(v7.ebay === '1' && v7.suppr === 1, '… et par sa référence VRM : « vendue sur eBay — à retirer » avec « Supprimer de Leboncoin »', JSON.stringify(v7));
       await o6.ctx.close();
+
+      // (29 oct., revue 2) La paire N°15 VENDUE SUR eBAY (SKU VRM-15), marquée
+      // « publiée » depuis son annonce Vinted, l'annonce Leboncoin reliée par son
+      // seul titre (« n15 ») : la ligne RESTE à l'écran (sans geste), et Ma journée
+      // compte EXACTEMENT ce que l'écran montre ; « Voir » trouve sa cible.
+      console.log(`── ${vp.width} px · vendue sur eBay, reliée par la marque « publiée » : écran = Ma journée`);
+      const lbcN15 = { '3290000005': Object.assign({}, ITEMS['3290000005'], { subject: 'Salomon XT-6 blanc n15' }) };
+      const oe = await ouvrir(b, vp, { mode: 'ok', suite: 'fait' }, { posted: ['5001', '5003', '5004'], items: lbcN15, extra: [ebayRow] });
+      await oe.pg.waitForSelector('[data-lbc-retirer-ebay]', { timeout: 10000 }).catch(() => {});
+      await oe.pg.waitForTimeout(800);
+      const ve = await oe.pg.evaluate(() => { const bl = document.querySelector('[data-lbc-retirer-ebay]'); const zone = bl ? bl.parentElement : null; const lignes = zone ? [...zone.querySelectorAll('[data-lbc-retirer]')].map((e) => (/N°(\S+)/.exec(e.innerText) || [])[1]) : []; return { n: bl ? bl.getAttribute('data-lbc-retirer-ebay') : null, lignes, gestes: zone ? zone.querySelectorAll('[data-lbc-supprimer],[data-lbc-pause]').length : -1, sansIdent: !!document.querySelector('[data-lbc-ebay-sans-ident]') }; });
+      dit(ve.n === '1' && ve.lignes.join(',') === '15' && ve.gestes === 0 && ve.sansIdent, 'écran Leboncoin : « 1 vendue sur eBay — à retirer » (N°15), sans « Supprimer » ni pause, et la raison dite', JSON.stringify(ve));
+      await oe.ctx.close();
+      const oje = await ouvrir(b, vp, { mode: 'ok', suite: 'fait' }, { tab: 'journee', posted: ['5001', '5003', '5004'], items: lbcN15, extra: [ebayRow] });
+      await oje.pg.waitForFunction(() => /vendues? sur eBay/.test(document.body.innerText), null, { timeout: 15000 }).catch(() => {});
+      await oje.pg.waitForTimeout(1200);
+      const tj = await oje.pg.evaluate(() => { const m = /(\d+) à retirer de Leboncoin \(vendues? sur eBay\)/.exec(document.body.innerText); return m ? Number(m[1]) : 0; });
+      dit(tj === 1, 'Ma journée : « 1 à retirer de Leboncoin (vendue sur eBay) » — le même nombre que l’écran', String(tj));
+      await oje.pg.evaluate(() => { const e = [...document.querySelectorAll('[data-job], button, a, div')].reverse().find((x) => /à retirer de Leboncoin \(vendues? sur eBay\)/.test(x.innerText || '') && x.innerText.length < 200); if (e) e.click(); });
+      await oje.pg.waitForSelector('[data-lbc-retirer-ebay]', { timeout: 20000 }).catch(() => {});
+      await oje.pg.waitForTimeout(1500);
+      const cible = await oje.pg.evaluate(() => !!document.querySelector('[data-lbc-retirer-ebay]'));
+      dit(cible, '« Voir » de Ma journée trouve « vendue sur eBay — à retirer » sur l’écran Leboncoin');
+      dit(oje.errs.length === 0, 'aucune erreur d’app (Ma journée, eBay)', oje.errs.join(' | ').slice(0, 160));
+      await oje.ctx.close();
 
       // (29 oct., revue) Ma journée et le logo VRM : LA MÊME preuve que l'écran
       // Leboncoin (la transaction). La N°15 n'est « vendue » que par un rapprochement
