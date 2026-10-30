@@ -44426,7 +44426,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   <Bouton variante="discret" onClick={()=>unmarkPairLost(num)} title={`Annuler : l'article N°${num} est finalement revenu.`} aria-label="Annuler article perdu" style={{flexShrink:0}}>Il est revenu</Bouton>
                 )}
                 {isLotTitle(o.title) && (
-                  <button className="vrm-b vrm-b-secondaire vrm-b-petit" type="button" onClick={async(ev)=>{ lotOrigineRef.current = ev.currentTarget; setLotView({loading:true,order:o,items:[]}); const items=await fetchLotItems(o._acc,o.transaction_id); setLotView({loading:false,order:o,items}); }} title="Voir les paires du lot" aria-label="Voir les paires du lot" style={{flexShrink:0}}><Icon name="box" size={18}/>Paires du lot</button>
+                  <button className="vrm-b vrm-b-secondaire vrm-b-petit" type="button" onClick={async(ev)=>{ lotOrigineRef.current = ev.currentTarget; setLotView({loading:true,order:o,items:[]}); const items=await fetchLotItems(o._acc,o.transaction_id); setLotView({loading:false,order:o,items}); }} title="Voir les paires du lot" aria-label="Voir les paires du lot" style={{flexShrink:0}}><Icon name="box" size={18}/>Voir le lot</button>
                 )}
                 </div>
                </div>
