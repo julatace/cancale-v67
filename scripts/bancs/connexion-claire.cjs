@@ -42,7 +42,9 @@ const { chromium } = require("playwright"),
       let appels = 0,
         liberer,
         compteNonConfirme = false,
-        recuperations = 0;
+        recuperations = 0,
+        lecturesMoyens = 0,
+        libererMoyens;
       const erreurs = [];
       p.on("pageerror", (e) => erreurs.push(e.message));
       await p.route("**/*", async (r) => {
@@ -62,8 +64,17 @@ const { chromium } = require("playwright"),
           recuperations++;
           return json(200, {});
         }
-        if (u.includes("/auth/v1/settings"))
-          return json(200, { external: {}, mailer_autoconfirm: false });
+        if (u.includes("/auth/v1/settings")) {
+          lecturesMoyens++;
+          if (lecturesMoyens === 1) return json(503, {});
+          await new Promise((resolve) => {
+            libererMoyens = resolve;
+          });
+          return json(200, {
+            external: { google: true, discord: false },
+            mailer_autoconfirm: false,
+          });
+        }
         if (u.includes("/rest/v1/")) {
           assert.equal(r.request().method(), "GET");
           return json(200, []);
@@ -72,7 +83,60 @@ const { chromium } = require("playwright"),
         if (u.startsWith(origine + "/")) return r.continue();
         return r.abort();
       });
+      await p.addInitScript(() =>
+        Object.defineProperty(AbortSignal, "timeout", {
+          value: undefined,
+          configurable: true,
+        }),
+      );
       await p.goto(origine + "/?connexion");
+      await p.locator("[data-auth-moyens-indisponibles]").waitFor();
+      assert.equal(
+        await p
+          .getByRole("button", { name: "Se connecter", exact: true })
+          .isEnabled(),
+        true,
+        "L’email reste utilisable après une panne de lecture",
+      );
+      assert.equal(
+        await p
+          .getByRole("button", { name: "Continuer avec Google", exact: true })
+          .count(),
+        0,
+      );
+      await p
+        .getByRole("button", {
+          name: "Réessayer les moyens de connexion",
+          exact: true,
+        })
+        .click();
+      for (let i = 0; i < 100 && !libererMoyens; i++)
+        await p.waitForTimeout(20);
+      assert.ok(libererMoyens);
+      assert.equal(lecturesMoyens, 2);
+      assert.equal(
+        await p
+          .getByRole("button", { name: "Se connecter", exact: true })
+          .isEnabled(),
+        true,
+        "La relecture ne bloque pas le formulaire",
+      );
+      libererMoyens();
+      await p
+        .getByRole("button", { name: "Continuer avec Google", exact: true })
+        .waitFor();
+      assert.equal(
+        await p
+          .getByRole("button", { name: "Continuer avec Discord", exact: true })
+          .count(),
+        0,
+        "Un fournisseur désactivé reste masqué",
+      );
+      assert.equal(
+        await p.locator("[data-auth-moyens-indisponibles]").count(),
+        0,
+      );
+
       await p
         .getByRole("textbox", { name: "Adresse email", exact: true })
         .fill("Client@exemple.test");

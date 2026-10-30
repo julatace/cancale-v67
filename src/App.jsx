@@ -1330,15 +1330,36 @@ const OAUTH_PROVIDERS = [
 // noire avec du JSON brut — l'utilisateur se retrouvait dehors, devant un
 // message d'erreur technique, sans bouton retour.
 let AUTH_SETTINGS = null;
-const loadAuthSettings = async () => {
-  try {
-    const r = await fetch(`${SUPABASE_URL}/auth/v1/settings`, { headers: { apikey: SUPABASE_KEY },signal:AbortSignal.timeout(15000) });
-    if (r.ok) { AUTH_SETTINGS = await r.json(); _emitAuth(); }  // réveille l'écran de connexion
-  } catch (_) {}
-  return AUTH_SETTINGS;
+let AUTH_SETTINGS_ETAT='initial',AUTH_SETTINGS_PROMESSE=null;
+const AUTH_SETTINGS_ABONNES=new Set();
+const etatAuthSettings=()=>({statut:AUTH_SETTINGS_ETAT,reglages:AUTH_SETTINGS});
+const onAuthSettingsChange=fn=>{AUTH_SETTINGS_ABONNES.add(fn);return()=>AUTH_SETTINGS_ABONNES.delete(fn);};
+const notifierAuthSettings=()=>{for(const fn of AUTH_SETTINGS_ABONNES){try{fn();}catch(_){}}};
+const loadAuthSettings = () => {
+  if(AUTH_SETTINGS_PROMESSE)return AUTH_SETTINGS_PROMESSE;
+  AUTH_SETTINGS_ETAT='chargement';
+  // La microtâche empêche un échec synchrone du fetch de laisser une promesse
+  // déjà terminée dans le verrou. AbortController fonctionne aussi sans
+  // AbortSignal.timeout (anciens Safari).
+  AUTH_SETTINGS_PROMESSE=Promise.resolve().then(async()=>{
+    const controle=new AbortController(),delai=setTimeout(()=>controle.abort(),15000);
+    try{
+      const r=await fetch(`${SUPABASE_URL}/auth/v1/settings`,{headers:{apikey:SUPABASE_KEY},signal:controle.signal});
+      if(!r.ok)throw Error('Lecture indisponible');
+      const j=await r.json();
+      if(!j||!j.external||typeof j.external!=='object'||Array.isArray(j.external)
+        ||['google','discord'].some(id=>j.external[id]!==undefined&&typeof j.external[id]!=='boolean')
+        ||(j.mailer_autoconfirm!==undefined&&typeof j.mailer_autoconfirm!=='boolean'))throw Error('Réponse incomplète');
+      AUTH_SETTINGS=j;AUTH_SETTINGS_ETAT='pret';
+    }catch(_){AUTH_SETTINGS=null;AUTH_SETTINGS_ETAT='erreur';}
+    finally{clearTimeout(delai);AUTH_SETTINGS_PROMESSE=null;notifierAuthSettings();}
+    return AUTH_SETTINGS;
+  });
+  notifierAuthSettings();
+  return AUTH_SETTINGS_PROMESSE;
 };
 // Un fournisseur n'est proposé que s'il est réellement activé côté Supabase.
-const providerEnabled = (id) => !!(AUTH_SETTINGS && AUTH_SETTINGS.external && AUTH_SETTINGS.external[id]);
+const providerEnabled = (id) => AUTH_SETTINGS?.external?.[id]===true;
 // La création de compte attend-elle un email de confirmation ? Si oui, on le
 // dit AVANT que la personne tape son mot de passe.
 const confirmRequired = () => !!(AUTH_SETTINGS && AUTH_SETTINGS.mailer_autoconfirm === false);
@@ -14442,6 +14463,11 @@ function AuthScreen() {
   // · `false` = fermée · `null` = pas su. Une seule requête, en lecture seule
   // (§2.3 : une sonde n'écrit jamais dans sa base).
   const [ouverte, setOuverte] = React.useState(undefined);
+  const [moyensConnexion,setMoyensConnexion]=React.useState(etatAuthSettings);
+  React.useEffect(()=>{
+    const actualiser=()=>setMoyensConnexion(etatAuthSettings());
+    const off=onAuthSettingsChange(actualiser);actualiser();return off;
+  },[]);
   React.useEffect(() => {
     let stop = false;
     (async () => { const v = await sondeLectureSansCompte(); if (!stop) setOuverte(v); })();
@@ -14700,6 +14726,12 @@ function AuthScreen() {
               Connecte-toi ici : l'extension de ce Chrome sera connectée en même temps — rien à taper dans l'extension.
             </div>
           )}
+
+          {(mode==='in'||mode==='up') && moyensConnexion.statut==='chargement' && <div role="status" style={{fontSize:12,color:C.muted,lineHeight:1.5,marginBottom:12}}>Chargement des autres moyens de connexion… Tu peux déjà utiliser ton email.</div>}
+          {(mode==='in'||mode==='up') && moyensConnexion.statut==='erreur' && <div data-auth-moyens-indisponibles="" style={{fontSize:12,color:C.text,lineHeight:1.5,marginBottom:14,padding:'10px 12px',border:`1px solid ${C.border}`,borderRadius:8}}>
+            Les autres moyens de connexion n’ont pas pu être chargés. L’email reste disponible.
+            <button type="button" disabled={busy} onClick={()=>loadAuthSettings()} style={{display:'block',minHeight:44,padding:'8px 0 0',border:0,background:'transparent',color:C.accent,font:'inherit',fontWeight:600,cursor:busy?'default':'pointer'}}>Réessayer les moyens de connexion</button>
+          </div>}
 
           {/* Connexion par Google / Discord, EN PREMIER : c'est le chemin le plus
               court et le plus sûr (aucun mot de passe à créer, donc aucun mot de

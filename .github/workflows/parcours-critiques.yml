@@ -56,7 +56,7 @@ jobs:
         run: node scripts/bancs/inscription-fiable.cjs
       - name: Vérifier la connexion
         run: |
-          node --test scripts/tests/connexion-session.test.mjs
+          node --test scripts/tests/connexion-session.test.mjs scripts/tests/connexion-moyens.test.mjs
           node scripts/bancs/connexion-claire.cjs
           node scripts/tests/connexion-actions-interface.cjs
       - name: Vérifier les captures de messagerie
