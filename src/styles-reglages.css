@@ -119,13 +119,13 @@ button.vrm-set-ligne:active { background:var(--vrm-set-appui, rgba(15,23,42,.05)
 @media(max-width:767px){.vrm-settings-search input {font-size:16px;}.vrm-set-lib > small {font-size:12px;}.vrm-set-val{max-width:24%;}.vrm-set-ligne{gap:9px;padding-inline:12px;}}
 .vrm-settings-status{font-size:12px;line-height:1.5;margin:0 0 16px;}
 .vrm-settings-status small{display:block;font-size:11px;margin-top:3px;}
-.vrm-settings-status button{margin-left:8px;min-height:36px;font:inherit;}
+.vrm-settings-status button:not(.vrm-b){margin-left:8px;min-height:36px;font:inherit;}
 .vrm-settings-todo{border:1px solid;border-radius:12px;padding:14px;margin-bottom:18px;}
 .vrm-settings-todo h3{font-size:14px;margin:0 0 8px;}
 .vrm-settings-todo>div{display:flex;align-items:center;gap:12px;padding-block:8px;}
 .vrm-settings-todo span{flex:1;min-width:0;font-size:13px;}
 .vrm-settings-todo small{display:block;font-size:12px;margin-top:3px;}
-.vrm-settings-todo button{font:inherit;font-size:12px;min-height:40px;padding:6px 12px;border:1px solid;border-radius:8px;background:transparent;cursor:pointer;}
+.vrm-settings-todo button:not(.vrm-b){font:inherit;font-size:12px;min-height:40px;padding:6px 12px;border:1px solid;border-radius:8px;background:transparent;cursor:pointer;}
 .vrm-settings-scope{font-size:11px;margin:4px 0 10px;}
 .vrm-placement-overlay{position:fixed;inset:0;z-index:12000;background:#0a192b99;display:grid;place-items:center;padding:16px;}
 .vrm-placement-panel{width:100%;max-width:1050px;max-height:90dvh;overflow:auto;border-radius:16px;padding:20px;box-sizing:border-box;}
@@ -141,13 +141,13 @@ button.vrm-set-ligne:active { background:var(--vrm-set-appui, rgba(15,23,42,.05)
 @media(max-width:767px){.vrm-placement-pages{grid-template-columns:1fr;}.vrm-placement-panel{padding:14px;}.vrm-placement-overlay{padding:10px;}}
 .vrm-settings-help details{padding:12px 0;border-bottom:1px solid #dce2e2;font-size:13px;line-height:1.6;}
 .vrm-settings-help summary{font-weight:600;cursor:pointer;min-height:36px;}
-.vrm-settings-help button{min-height:44px;padding:8px 12px;border:1px solid currentColor;border-radius:9px;background:transparent;color:inherit;font:inherit;cursor:pointer;}
+.vrm-settings-help button:not(.vrm-b){min-height:44px;padding:8px 12px;border:1px solid currentColor;border-radius:9px;background:transparent;color:inherit;font:inherit;cursor:pointer;}
 .vrm-numeros-recap{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px 16px;border:1px solid;border-radius:12px;padding:14px;margin-top:12px;font-size:13px;align-items:center;}
 .vrm-numeros-recap small{grid-column:1/-1;font-size:11.5px;line-height:1.5;}
 .vrm-numeros-recap strong{font-variant-numeric:tabular-nums;}
 .vrm-settings-next{border-top:1px solid;margin-top:18px;padding-top:14px;font-size:13px;line-height:1.5;}
 .vrm-settings-next p{margin:5px 0 10px;}
-.vrm-settings-next button{min-height:44px;padding:8px 14px;border:1px solid;border-radius:10px;background:transparent;font:inherit;cursor:pointer;}
+.vrm-settings-next button:not(.vrm-b){min-height:44px;padding:8px 14px;border:1px solid;border-radius:10px;background:transparent;font:inherit;cursor:pointer;}
 .vrm-setting-applique{font-size:12px;line-height:1.5;margin-top:10px;}
 @media(max-width:420px){.vrm-numeros-recap{grid-template-columns:1fr;gap:5px;}.vrm-numeros-recap small{margin-top:5px;}}
 .vrm-settings-search button{min-height:44px;flex-shrink:0;padding:6px 8px;border:0;background:transparent;font:inherit;font-size:12px;cursor:pointer;}
@@ -163,5 +163,7 @@ button.vrm-set-ligne:active { background:var(--vrm-set-appui, rgba(15,23,42,.05)
 .vrm-connexion-source summary{min-height:36px;cursor:pointer;font-weight:600;}
 .vrm-connexion-source code{overflow-wrap:anywhere;}
 .vrm-connexions-actions{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0;}
-.vrm-connexions-actions a,.vrm-connexion-source button,.vrm-connexions-entete button{display:inline-flex;align-items:center;min-height:44px;padding:8px 12px;box-sizing:border-box;border:1px solid #9aacab88;border-radius:9px;background:transparent;color:inherit;font:inherit;font-size:12px;text-decoration:none;cursor:pointer;}
+/* (30 oct.) Les liens de téléchargement prennent la forme « secondaire » des
+   boutons (src/styles-boutons.css) : fond teinté, aucune bordure. */
+.vrm-connexions-actions a,.vrm-connexion-source button:not(.vrm-b),.vrm-connexions-entete button:not(.vrm-b){display:inline-flex;align-items:center;min-height:44px;padding:0 14px;box-sizing:border-box;border:0;border-radius:10px;background:var(--vrm-b-teinte);color:var(--vrm-b-encre);font:inherit;font-size:13px;font-weight:600;text-decoration:none;cursor:pointer;}
 .vrm-connexions-entete button:disabled{opacity:.6;cursor:default;}

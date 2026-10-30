@@ -257,10 +257,10 @@ function Rejoindre({ api, moi, prenom, discordCompte = '', onFait, onAnnuler, Fe
     <FermeAuRetour fermer={onAnnuler} />
     <div className="vrm-cm-feuille" role="dialog" aria-modal="true" aria-label="Apparaître sur la carte" data-cm-rejoindre>
       <div className="vrm-cm-feuille-tete"><h3>{moi ? 'Changer ma présence' : 'Apparaître sur la carte'}</h3><button type="button" className="vrm-cm-x" onClick={onAnnuler} aria-label="Fermer">×</button></div>
-      <p className="vrm-cm-note">Les autres verront <b>ton pseudo et ta ville</b>, placée à environ 5 km près. Jamais ton adresse, ton email ni tes comptes Vinted. Tu peux te retirer quand tu veux.</p>
+      <p className="vrm-cm-note">Visible : <b>ton pseudo et ta ville</b> (à 5 km près). Jamais ton adresse, ton email ni tes comptes Vinted.</p>
       <label className="vrm-cm-champ"><span>Ton pseudo (unique sur la carte)</span>
         <input value={pseudo} maxLength={30} onChange={(e) => setPseudo(e.target.value)} placeholder="Ton nom de revendeur" data-cm-pseudo /></label>
-      {(() => { const dd = (moi && moi.discord) || discordCompte; return dd && pseudo !== dd && <button type="button" className="vrm-cm-lien" onClick={() => setPseudo(dd)} data-cm-pseudo-discord>Utiliser mon pseudo Discord ({dd})</button>; })()}
+      {(() => { const dd = (moi && moi.discord) || discordCompte; return dd && pseudo !== dd && <button type="button" className="vrm-cm-lien" onClick={() => setPseudo(dd)} data-cm-pseudo-discord>Prendre « {dd} » (Discord)</button>; })()}
       <form className="vrm-cm-ville" onSubmit={chercher}>
         <label className="vrm-cm-champ"><span>Ta ville</span>
           <input value={q} maxLength={80} autoComplete="off" onChange={(e) => { setQ(e.target.value); setChoix(null); }} placeholder="Commence à taper : Cancale, Lyon…" data-cm-ville-q /></label>
@@ -486,11 +486,11 @@ export default function Communaute({ headers, sombre = false, prenom = '', Ferme
         <div><b>Tu es sur la carte à {moi.ville}</b><span> sous le pseudo « {moi.pseudo} »{r.premier ? ' · 🥇 premier de ta ville sur VRM' : ''}</span></div>
         <div className="vrm-cm-ligne-boutons">
           <button type="button" onClick={() => setRejoindre(true)} data-cm-changer>Changer</button>
-          <button type="button" onClick={quitter} data-cm-quitter>Me retirer de la carte</button>
+          <button type="button" className="vrm-cm-lien" onClick={quitter} data-cm-quitter>Me retirer de la carte</button>
         </div>
 
       </> : <>
-        <div><b>Tu n’es pas sur la carte.</b><span> Personne ne te voit tant que tu ne l’as pas décidé.</span></div>
+        <div><b>Tu n’es pas sur la carte.</b><span> Personne ne te voit.</span></div>
         <button type="button" className="vrm-cm-primaire" onClick={() => setRejoindre(true)} data-cm-apparaitre>Apparaître sur la carte</button>
       </>}
     </div>
@@ -515,19 +515,19 @@ export default function Communaute({ headers, sombre = false, prenom = '', Ferme
       <ul className="vrm-cm-liste">{pres.slice(0, 8).map((p) => <li key={p.pid}><AvatarProfil profil={p}/><div><b>{p.pseudo}</b>{p.premier && <span className="vrm-cm-badge"> 🥇</span>}<small>{p.ville}</small>{p.discord && <DiscordDe pseudo={p.discord} />}</div>
         <div className="vrm-cm-ligne-boutons">
           <button type="button" onClick={() => coucou(p)} disabled={envoye.has(p.pid)}>{envoye.has(p.pid) ? 'Coucou envoyé ✓' : '👋 Coucou'}</button>
-          <button type="button" className="vrm-cm-primaire" onClick={() => ouvrirEcrire(p)}>Écrire</button>
+          <button type="button" onClick={() => ouvrirEcrire(p)}>Écrire</button>
         </div></li>)}</ul>
     </div>}
 
     <div className="vrm-cm-carton" data-cm-conversations={convs.length}>
       <h3>Messages{nonLus > 0 ? <span className="vrm-cm-pastille" data-cm-nonlus={nonLus}>{nonLus} non lu{nonLus > 1 ? 's' : ''}</span> : null}</h3>
-      {convs.length === 0 ? <p className="vrm-cm-note">Aucune conversation. Touche une épingle de la carte pour dire bonjour.</p>
+      {convs.length === 0 ? <p className="vrm-cm-note">Aucune conversation. Touche une épingle pour dire bonjour.</p>
         : <ul className="vrm-cm-liste">{convs.map((c) => <li key={c.conv}><button type="button" className="vrm-cm-conv" onClick={() => setFilOuvert({ conv: c.conv, entete: c })} data-cm-conv={c.conv}>
           <b>{c.pseudo || 'Ancien membre de la carte'}{c.ville ? <small> · {c.ville}</small> : null}</b>
           <span>{c.deMoi ? 'Toi : ' : ''}{c.dernier}</span>
           <time>{quandCourt(c.quand)}</time>{c.nonLus > 0 && <span className="vrm-cm-pastille">{c.nonLus}</span>}
         </button></li>)}</ul>}
-      <p className="vrm-cm-note">Messages courts entre revendeurs de la carte (20 par heure). Tu peux bloquer ou signaler quelqu’un depuis la conversation.</p>
+      <p className="vrm-cm-note">20 messages par heure au plus · bloquer ou signaler depuis la conversation.</p>
     </div>
 
     {rejoindre && portail(<Rejoindre api={api} moi={moi} prenom={prenom} discordCompte={discordCompte} FermeAuRetour={FermeAuRetour} onAnnuler={() => setRejoindre(false)} onFait={() => { setRejoindre(false); setToast('Te voilà sur la carte !'); lire(true); }} />)}
@@ -585,7 +585,7 @@ function MonDiscord({ api, headers, oauth, actuel, compte = '', onFait }) {
     } catch (_) { setMsg(DISCORD_ERREURS.discord); }
     setOccupe(false);
   };
-  const boutonOauth = oauth && <button type="button" className="vrm-cm-primaire" onClick={connecter} disabled={occupe} data-cm-discord-oauth>{occupe ? 'Un instant…' : actuel ? 'Changer avec Discord' : 'Se connecter avec Discord'}</button>;
+  const boutonOauth = oauth && <button type="button" onClick={connecter} disabled={occupe} data-cm-discord-oauth>{occupe ? 'Un instant…' : actuel ? 'Changer avec Discord' : 'Se connecter avec Discord'}</button>;
   const poser = async (valeur) => {
     const d = discordPropre(valeur);
     if (d && !discordValide(d)) { setMsg('2 à 32 caractères : lettres minuscules, chiffres, « . » ou « _ » (comme ton pseudo Discord).'); return; }
@@ -598,9 +598,9 @@ function MonDiscord({ api, headers, oauth, actuel, compte = '', onFait }) {
   if (!ouvert) return <div className="vrm-cm-discord-moi" data-cm-mon-discord={actuel ? 'oui' : 'non'}>
     {actuel ? <><span>Discord : <b>{actuel}</b></span>
       <div className="vrm-cm-ligne-boutons">{boutonOauth}<button type="button" onClick={() => { setV(actuel); setOuvert(true); }} data-cm-discord-modifier>Modifier</button>
-        <button type="button" onClick={() => poser('')} disabled={occupe} data-cm-discord-retirer>Retirer</button></div></>
-      : <><span>Pas de pseudo Discord (facultatif).</span>
-        <div className="vrm-cm-ligne-boutons">{compte && <button type="button" className="vrm-cm-primaire" onClick={() => poser(compte)} disabled={occupe} data-cm-discord-du-compte={compte}>Afficher mon Discord relié ({compte})</button>}
+        <button type="button" className="vrm-cm-lien" onClick={() => poser('')} disabled={occupe} data-cm-discord-retirer>Retirer</button></div></>
+      : <><span>Discord : <i>facultatif</i></span>
+        <div className="vrm-cm-ligne-boutons">{compte && <button type="button" onClick={() => poser(compte)} disabled={occupe} data-cm-discord-du-compte={compte}>Afficher mon Discord relié ({compte})</button>}
           {boutonOauth}
           <button type="button" onClick={() => { setV(''); setOuvert(true); }} data-cm-discord-ajouter>{oauth ? 'Le taper à la main' : 'Ajouter mon pseudo Discord'}</button></div></>}
     {msg && <p className="vrm-cm-msg" role="alert">{msg}</p>}
@@ -608,10 +608,10 @@ function MonDiscord({ api, headers, oauth, actuel, compte = '', onFait }) {
   return <form className="vrm-cm-discord-moi" onSubmit={(e) => { e.preventDefault(); poser(v); }} data-cm-mon-discord="saisie">
     <label className="vrm-cm-champ"><span>Ton pseudo Discord</span>
       <input value={v} maxLength={33} autoCapitalize="none" autoCorrect="off" spellCheck={false} onChange={(e) => setV(e.target.value)} placeholder="ton.pseudo" data-cm-discord-champ /></label>
-    <p className="vrm-cm-note">Facultatif. Les autres membres de la carte le verront pour t’écrire sur Discord. VRM ne se connecte jamais à Discord.</p>
+    <p className="vrm-cm-note">Visible des membres de la carte. VRM ne se connecte jamais à Discord.</p>
     <div className="vrm-cm-ligne-boutons">
       <button type="submit" className="vrm-cm-primaire" disabled={occupe} data-cm-discord-valider>{occupe ? 'Un instant…' : 'Enregistrer'}</button>
-      <button type="button" onClick={() => { setOuvert(false); setMsg(''); }}>Annuler</button>
+      <button type="button" className="vrm-cm-lien" onClick={() => { setOuvert(false); setMsg(''); }}>Annuler</button>
     </div>
     {msg && <p className="vrm-cm-msg" role="alert">{msg}</p>}
   </form>;
@@ -650,7 +650,8 @@ function Classement({ api, moi, groupe }) {
   const choix = <div className="vrm-cm-onglets vrm-cm-periodes" role="group" aria-label="Période">
     {PERIODES.map(([k, t]) => <button key={k} type="button" className="vrm-cm-onglet" aria-pressed={periode === k} onClick={() => setPeriode(k)} data-cm-periode={k}>{t}</button>)}
   </div>;
-  const note = <p className="vrm-cm-note" data-cm-classement-regle>Le chiffre : tes ventes Vinted faites sur la période (annulées et remboursées non comptées), comptées par VRM à partir de ce que l’extension a capté — jamais un montant. Leboncoin et eBay n’y entrent pas.</p>;
+  const note = <div className="vrm-cm-note" data-cm-classement-regle>Le chiffre : tes ventes Vinted de la période — jamais un montant.{' '}
+    <details className="vrm-pourquoi" data-pourquoi><summary aria-label="Comment c'est compté" title="Comment c'est compté">ⓘ</summary><div>Comptées par VRM à partir de ce que l’extension a capté. Annulées et remboursées non comptées. Leboncoin et eBay n’y entrent pas.</div></details></div>;
 
   if (etat === 'non-installe' || etat === 'abonnement' || etat === 'pas-su') return <div className="vrm-cm-carton" data-cm-classement={etat}>
     {etat === 'non-installe' ? <><b>Le classement n’est pas encore activé sur ta base.</b><p>Il s’ouvrira dès que la mise à jour de la base sera faite. Rien n’est partagé d’ici là.</p></>
@@ -664,15 +665,15 @@ function Classement({ api, moi, groupe }) {
     : <div className="vrm-cm-carton vrm-cm-moi" data-cm-inscrit={inscrit ? 'oui' : 'non'}>
       {!c ? <span>Lecture du classement…</span>
         : inscrit ? <><div><b>Tu es dans le classement</b><span> sous le pseudo « {(moi && moi.pseudo) || '—'} ».</span></div>
-          <button type="button" onClick={() => inscrire(false)} disabled={occupe} data-cm-classement-sortir>Me retirer du classement</button></>
-        : !visible ? <div><b>Tu n’es pas dans le classement.</b><span> Mets-toi d’abord sur la carte (onglet Carte) : le classement montre ton pseudo et ta ville.</span></div>
+          <button type="button" className="vrm-cm-lien" onClick={() => inscrire(false)} disabled={occupe} data-cm-classement-sortir>Me retirer du classement</button></>
+        : !visible ? <div><b>Tu n’es pas dans le classement.</b><span> Mets-toi d’abord sur la carte (onglet Carte).</span></div>
         : <><div><b>Tu n’es pas dans le classement.</b><span> Personne ne voit tes ventes tant que tu ne l’as pas décidé.</span></div>
           <button type="button" className="vrm-cm-primaire" onClick={() => inscrire(true)} disabled={occupe} data-cm-classement-entrer>Entrer dans le classement</button></>}
       {msg && etat === 'lu' && <p className="vrm-cm-msg" role="alert">{msg}</p>}
     </div>}
     {choix}
     {etat === 'charge' ? <p role="status" className="vrm-cm-note">Lecture du classement…</p>
-      : c.n === 0 && !groupe ? <div className="vrm-cm-carton vrm-cm-vide" data-cm-classement-vide><b>Personne n’est encore dans le classement.</b><p>Sois le premier : entre dans le classement, les prochains te trouveront en haut.</p></div>
+      : c.n === 0 && !groupe ? <div className="vrm-cm-carton vrm-cm-vide" data-cm-classement-vide><b>Personne n’est encore dans le classement.</b><p>Sois le premier à y entrer.</p></div>
       : <div className="vrm-cm-carton">
         <div className="vrm-cm-palmares-tete"><div><span className="vrm-cm-sur-titre">LA COMMUNAUTÉ VRM</span><h2>Classement des vendeurs</h2><p>{PERIODES.find(([k])=>k===periode)?.[1]} · {c.n} membre{c.n>1?'s':''}</p></div><span className="vrm-cm-palmares-metrique">Ventes Vinted</span></div>
         {c.moi ? <div className="vrm-cm-rang-moi" data-cm-rang-moi={c.moi.rang}><span>Ta position <b>{rangTexte(c.moi.rang)} <small>/ {c.n}</small></b></span><span><b>{c.moi.ventes}</b> vente{c.moi.ventes>1?'s':''}</span></div>
@@ -739,7 +740,7 @@ function Groupes({ api, moi, groupes, actif, onChoisir, onFait }) {
   };
   return <div className="vrm-cm-carton vrm-cm-groupes" data-cm-groupes={groupes.length}>
     <div className="vrm-cm-groupes-tete"><b>Groupe d’accompagnement</b>
-      <span className="vrm-cm-note"> Entre le code de ton accompagnement pour vous comparer entre vous.</span></div>
+      <span className="vrm-cm-note"> Pour vous comparer entre membres d’un accompagnement.</span></div>
     {groupes.length > 0 && <div className="vrm-cm-onglets vrm-cm-choix-groupe" role="group" aria-label="Qui afficher">
       <button type="button" className="vrm-cm-onglet" aria-pressed={!actif} onClick={() => onChoisir(null)} data-cm-groupe-choix="tous">Tous les membres</button>
       {groupes.map((g) => <button key={g.id} type="button" className="vrm-cm-onglet" aria-pressed={!!actif && actif.id === g.id} onClick={() => onChoisir(g.id)} data-cm-groupe-choix={g.id}>{g.nom}</button>)}
@@ -748,13 +749,13 @@ function Groupes({ api, moi, groupes, actif, onChoisir, onFait }) {
       <span>{actif.membres.length} membre{actif.membres.length > 1 ? 's' : ''} · code <b className="vrm-cm-select" data-cm-groupe-code={actif.code}>{codeLisible(actif.code)}</b></span>
       <div className="vrm-cm-ligne-boutons">
         <button type="button" onClick={copier} data-cm-groupe-copier>{copie || 'Copier le code'}</button>
-        {actif.createur && <button type="button" onClick={nouveauCode} data-cm-groupe-nouveau-code>Nouveau code</button>}
-        <button type="button" onClick={quitter} data-cm-groupe-quitter>Quitter le groupe</button>
+        {actif.createur && <button type="button" className="vrm-cm-lien" onClick={nouveauCode} data-cm-groupe-nouveau-code>Nouveau code</button>}
+        <button type="button" className="vrm-cm-lien" onClick={quitter} data-cm-groupe-quitter>Quitter le groupe</button>
       </div>
     </div>}
-    {!moi ? <p className="vrm-cm-note" data-cm-groupe-carte-requise>Mets-toi d’abord sur la carte (onglet Carte) : un groupe montre ton pseudo et ta ville à ses membres.</p>
+    {!moi ? <p className="vrm-cm-note" data-cm-groupe-carte-requise>Mets-toi d’abord sur la carte : un groupe montre ton pseudo et ta ville.</p>
       : mode === '' ? <div className="vrm-cm-ligne-boutons">
-        <button type="button" className="vrm-cm-primaire" onClick={() => setMode('entrer')} data-cm-groupe-entrer>Entrer un code</button>
+        <button type="button" onClick={() => setMode('entrer')} data-cm-groupe-entrer>Entrer un code</button>
         <button type="button" onClick={() => setMode('creer')} data-cm-groupe-creer>Créer un groupe</button>
       </div>
       : <form className="vrm-cm-ville" onSubmit={mode === 'entrer' ? entrer : creer} data-cm-groupe-form={mode}>
@@ -762,10 +763,10 @@ function Groupes({ api, moi, groupes, actif, onChoisir, onFait }) {
           <input value={v} maxLength={mode === 'entrer' ? 12 : 40} autoCapitalize={mode === 'entrer' ? 'characters' : 'sentences'} autoCorrect="off" spellCheck={false}
             onChange={(e) => setV(e.target.value)} placeholder={mode === 'entrer' ? 'ABCD-2345' : 'Accompagnement de Julien'} data-cm-groupe-champ /></label>
         {mode === 'entrer' ? <p className="vrm-cm-note">Ses membres verront ton pseudo, ta ville et ton nombre de ventes Vinted — jamais un montant.</p>
-          : <p className="vrm-cm-note">Tu recevras un code à donner aux membres de ton accompagnement. Toi seul pourras le changer.</p>}
+          : <p className="vrm-cm-note">Tu recevras un code à donner à tes membres. Toi seul pourras le changer.</p>}
         <div className="vrm-cm-ligne-boutons">
           <button type="submit" className="vrm-cm-primaire" disabled={occupe} data-cm-groupe-valider>{occupe ? 'Un instant…' : mode === 'entrer' ? 'Entrer dans le groupe' : 'Créer le groupe'}</button>
-          <button type="button" onClick={fermer}>Annuler</button>
+          <button type="button" className="vrm-cm-lien" onClick={fermer}>Annuler</button>
         </div>
       </form>}
     {msg && <p className="vrm-cm-msg" role="alert">{msg}</p>}
