@@ -165,22 +165,27 @@ dit((APP.match(/VRM-extension\.zip/g) || []).length >= 2,
 //    manifeste porte `vSrc`. Chaque fichier de la source doit être, octet pour
 //    octet, celui de ce commit — sinon c'est un autre contenu sous un numéro
 //    déjà servi : monter la version (jamais un numéro réservé par un autre
-//    chantier). Historique illisible ⇒ on le DIT, on ne conclut rien.
+//    chantier). Historique illisible ⇒ ROUGE (« pas su » ne vaut pas « numéro
+//    neuf ») : on ne conclut pas, mais on ne laisse pas passer non plus.
+//    ⚠️ (29 oct., tour 2) L'historique se lit comme `_versions-publiees.cjs` :
+//    `VRM_GIT` d'abord, puis la racine. Lancé depuis une copie (§6.1, `git
+//    archive` n'emporte pas `.git`), l'audit lisait la seule racine, ne trouvait
+//    rien, sortait VERT « sans conclusion » — et ne voyait pas une 5.281.0 déjà
+//    servie par main avec un autre contenu.
 {
   const { execFileSync } = require('child_process');
   const crypto = require('crypto');
-  // (29 oct., tour 2 n° 13) L'historique se lit comme `_versions-publiees.cjs` :
-  // `VRM_GIT` d'abord (le dépôt, quand l'audit tourne depuis une copie §6.1 — un
-  // `git archive` n'a pas de .git), puis la racine. Avant, depuis une copie, il
-  // répondait « aucune conclusion » et sortait VERT sur une version déjà servie.
-  const depots = [process.env.VRM_GIT, RACINE].filter(Boolean);
-  const peutLire = (d) => { try { execFileSync('git', ['rev-parse', '--git-dir'], { cwd: d, stdio: ['ignore', 'pipe', 'ignore'] }); return true; } catch (_) { return false; } };
-  const DEPOT = depots.find(peutLire) || RACINE;
-  const git = (...a) => execFileSync('git', a, { cwd: DEPOT, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], maxBuffer: 64 << 20 });
+  let depot = RACINE;
+  const git = (...a) => execFileSync('git', a, { cwd: depot, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], maxBuffer: 64 << 20 });
   const versionA = (rev) => { try { return JSON.parse(git('show', `${rev}:vinted-sync-extension/manifest.json`)).version || null; } catch (_) { return null; } };
   const cmp = (a, b) => { const x = String(a).split('.').map(Number), y = String(b).split('.').map(Number); for (let i = 0; i < 3; i++) { if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) - (y[i] || 0); } return 0; };
-  let ref = process.env.VRM_REF_MAIN || null;
-  if (!ref) for (const r of ['origin/main', 'main']) { try { git('rev-parse', '--verify', '-q', `${r}^{commit}`); ref = r; break; } catch (_) {} }
+  let ref = null;
+  const refsVoulues = process.env.VRM_REF_MAIN ? [process.env.VRM_REF_MAIN] : ['origin/main', 'main'];
+  for (const d of [process.env.VRM_GIT, RACINE].filter(Boolean)) {
+    depot = d;
+    for (const r of refsVoulues) { try { git('rev-parse', '--verify', '-q', `${r}^{commit}`); ref = r; break; } catch (_) {} }
+    if (ref) break;
+  }
   let publie = null;                                   // le commit de main qui a servi vSrc en dernier
   let lisible = !!ref;
   if (ref) {
@@ -197,8 +202,7 @@ dit((APP.match(/VRM-extension\.zip/g) || []).length >= 2,
     } catch (_) { lisible = false; }
   }
   if (!lisible) {
-    // « Pas su » ne vaut pas « oui » : compté ROUGE (jamais un vert sans conclusion).
-    dit(false, 'historique de main lisible (la version ' + vSrc + ' a-t-elle déjà été servie ?)', 'illisible — lance avec VRM_GIT=<dépôt> depuis une copie');
+    dit(false, `l'historique de main se lit (la version ${vSrc} a-t-elle déjà été servie ?)`, 'illisible — lance l\'audit depuis le dépôt, ou depuis une copie avec VRM_GIT=<dépôt> : pas su ne vaut pas « numéro neuf »');
   } else if (!publie) {
     dit(true, `la version ${vSrc} n'a jamais été servie par ${ref}`, 'numéro neuf');
   } else {

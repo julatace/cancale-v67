@@ -1479,6 +1479,16 @@ function fusionnerConversation(avant, neuf) {
 }
 // END CONVERSATION PARTAGEE
 
+// L'id NUMÉRIQUE d'une réponse de conversation (`{conversation:{id}}` ou
+// `{id}`), sinon null.
+function idConversationReponse(parsed) {
+  const c = parsed && (parsed.conversation || parsed);
+  const v = c && c.id;
+  if (Number.isSafeInteger(v) && v > 0) return String(v);
+  if (typeof v === 'string' && /^[1-9]\d{0,19}$/.test(v)) return v;
+  return null;
+}
+
 async function conversationFusionnee(rowId, neuf) {
   const rows = await sbGet(`app_data?id=eq.${encodeURIComponent(rowId)}&select=p:data->payload`);
   if (rows === null) return null;
@@ -2067,6 +2077,22 @@ async function storeHarvest(domain, type, id, body, sourceUrl=null,tabId=null,so
     const pid = await profilIdRange(uid);
     if (pid === null) { noterDiag('ignore_dressing_profil_pas_lu'); return; }
     if (!pid || id == null || String(id) !== pid) { noterDiag('ignore_dressing_autre_membre'); return; }
+  }
+
+  // (29 octobre) LA CONVERSATION EST RANGÉE SOUS SON ID NUMÉRIQUE. La page peut
+  // la charger par l'UUID que portent les commandes (`conversation_id`) ; l'app
+  // et la boîte de réception, elles, la connaissent par son id numérique
+  // (`harvest_{uid}_conv_{id}`). C'est la RÉPONSE qui le dit
+  // (`conversation.id`) — une identité, jamais une ressemblance (§5) :
+  //   · adresse par UUID ⇒ rangée sous l'id numérique de la réponse ; sans id
+  //     numérique lisible, rien n'est rangé (mieux vaut un blanc qu'un faux) ;
+  //   · adresse numérique et réponse qui porte un AUTRE id ⇒ rien (doute).
+  if (type === 'conversation') {
+    const idRep = idConversationReponse(parsed);
+    if (!/^\d{1,20}$/.test(String(id == null ? '' : id))) {
+      if (!idRep) { noterDiag('ignore_conversation_sans_id_numerique'); return; }
+      id = idRep;
+    } else if (idRep && idRep !== String(id)) { noterDiag('ignore_conversation_id_different'); return; }
   }
 
   // Cle de ligne app_data selon le type de donnee.
@@ -2940,7 +2966,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     storeWriteReq(domain,msg.method,msg.url,msg.body,msg.contexteFavori,sender?.frameId>0?null:sender?.tab?.id).then(()=>sendResponse({ok:true}),()=>sendResponse({ok:false}));
     return true;
   } else if (msg.kind === 'seen_urls' && Array.isArray(msg.paths)) {
-    storeSeenUrls(domain, msg.paths, msg.reponses);
+    storeSeenUrls(domain, msg.paths, msg.reponses, msg.conversation);
   } else if (msg.kind === 'suppression' && msg.itemId) {
     noterSuppression(domain, msg.itemId, msg.status, msg.at);
   } else if (msg.kind === 'publication') {
@@ -3014,10 +3040,92 @@ async function noterStatutsOffres(parsed) {
   } catch (_) { /* purement diagnostique : ne doit jamais gêner la capture */ }
 }
 
+// <chemin-regle> (29 octobre) — la MÊME dans la page et dans le fond (§11).
+  // Mesuré en base : les pages d'une conversation appellent un contrôle
+  // anti-hameçonnage dont le chemin porte un UUID, qui passait EN CLAIR dans
+  // `seen_urls` (17 à 55 clés de ce genre par compte) — un identifiant réel, et
+  // une clé de plus par conversation ouverte. Un UUID devient `{uuid}`, une
+  // longue suite hexadécimale `{hex}`, un nombre de 3 chiffres ou plus `{id}`.
+  function cheminNormalise(p) {
+    return String(p == null ? '' : p)
+      .replace(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi, '{uuid}')
+      .replace(/\/(?=[0-9a-f]*\d)[0-9a-f]{20,}(?=\/|$)/gi, '/{hex}')
+      .replace(/\/\d{3,}/g, '/{id}');
+  }
+  // </chemin-regle>
+
+// La fusion du relevé (29 octobre) — une fonction pure.
+// ⚠️⚠️ ELLE GARDAIT LES 400 PREMIÈRES CLÉS, donc les PLUS ANCIENNES : mesuré
+//    en base, des comptes portent déjà plusieurs centaines de clés (dont une
+//    par conversation ouverte, l'UUID en clair) ; une fois le plafond atteint,
+//    un chemin vu pour la première fois — justement ce que ce relevé doit
+//    attraper — ne serait plus jamais rangé. Désormais :
+//    · chaque clé (ancienne ou neuve) passe par `cheminNormalise` : les UUID
+//      d'avant se fondent en une seule clé `{uuid}` ;
+//    · pour une même clé, l'entrée la plus RÉCENTE (`at`) gagne ;
+//    · on garde les 400 réponses les plus récentes, et les 600 chemins les plus
+//      récemment vus (ceux de ce passage d'abord).
+//    · `conversation` (le relevé de la page d'une conversation, `inject.js`) :
+//      fusionné par clé, le plus récent gagne, une forme déjà vue n'est jamais
+//      perdue, bornes par construction.
+const SEEN_REP_MAX = 400, SEEN_PATHS_MAX = 600;
+const SEEN_CONV_REQ_MAX = 80, SEEN_CONV_CANAUX_MAX = 20, SEEN_CONV_PAGES_MAX = 20;
+function fusionnerSeen(cur, paths, reponses, conversation) {
+  const ms = (e) => { const t = Date.parse((e && e.at) || ''); return Number.isFinite(t) ? t : 0; };
+  const cleRep = (k) => { const t = String(k == null ? '' : k); const i = t.indexOf(' '); return (i > 0 ? t.slice(0, i + 1) + cheminNormalise(t.slice(i + 1)) : cheminNormalise(t)).slice(0, 220); };
+  const plusRecent = (a, b) => (!a ? b : !b ? a : ms(b) >= ms(a) ? b : a);
+  // les réponses
+  const rep = {};
+  for (const src of [(cur && cur.reponses) || {}, reponses || {}]) {
+    if (!src || typeof src !== 'object') continue;
+    for (const [k, v] of Object.entries(src)) { if (!v || typeof v !== 'object') continue; const c = cleRep(k); rep[c] = plusRecent(rep[c], v); }
+  }
+  const reponsesOut = {};
+  for (const [k, v] of Object.entries(rep).sort((a, b) => ms(b[1]) - ms(a[1])).slice(0, SEEN_REP_MAX)) reponsesOut[k] = v;
+  // les chemins : ceux de ce passage (le plus récent d'abord), puis les anciens
+  const vus = new Set(), pathsOut = [];
+  const neufs = (Array.isArray(paths) ? paths : []).slice().reverse();
+  for (const p of [...neufs, ...(Array.isArray(cur && cur.paths) ? cur.paths : [])]) {
+    const n = cheminNormalise(p).slice(0, 300);
+    if (!n || vus.has(n)) continue;
+    vus.add(n); pathsOut.push(n);
+    if (pathsOut.length >= SEEN_PATHS_MAX) break;
+  }
+  // le relevé de la page d'une conversation
+  let conv = (cur && cur.conversation && typeof cur.conversation === 'object') ? cur.conversation : null;
+  if (conversation && typeof conversation === 'object' && JSON.stringify(conversation).length <= 200000) {
+    const fusion = (a, b, max) => {
+      const t = {};
+      for (const src of [a || {}, b || {}]) {
+        if (!src || typeof src !== 'object') continue;
+        for (const [k, v] of Object.entries(src)) {
+          if (!v || typeof v !== 'object') continue;
+          const c = cleRep(k);
+          const av = t[c], neuf = plusRecent(av, v);
+          // une forme déjà vue (messages, tête) n'est jamais perdue
+          t[c] = Object.assign({}, neuf, (!neuf.messages && av && av.messages) ? { messages: av.messages } : {}, (!neuf.tete && av && av.tete) ? { tete: av.tete } : {});
+        }
+      }
+      const o = {};
+      for (const [k, v] of Object.entries(t).sort((x, y) => ms(y[1]) - ms(x[1])).slice(0, max)) o[k] = v;
+      return o;
+    };
+    conv = {
+      req: fusion(conv && conv.req, conversation.req, SEEN_CONV_REQ_MAX),
+      canaux: fusion(conv && conv.canaux, conversation.canaux, SEEN_CONV_CANAUX_MAX),
+      pages: fusion(conv && conv.pages, conversation.pages, SEEN_CONV_PAGES_MAX),
+      next: (conversation.next && typeof conversation.next === 'object') ? conversation.next : ((conv && conv.next) || null),
+    };
+  }
+  const out = { paths: pathsOut, reponses: reponsesOut };
+  if (conv) out.conversation = conv;
+  return out;
+}
+
 // Diagnostic : liste des CHEMINS d'API que le site appelle réellement (aucun
 // contenu, aucun paramètre). Sert à repérer tout de suite quand Vinted déplace
 // un endpoint — c'est ce qui avait rendu la moisson muette pendant 18 jours.
-async function storeSeenUrls(domain, paths, reponses) {
+async function storeSeenUrls(domain, paths, reponses, conversation) {
   const uid = await activeAccountId(domain);
   if (!uid) return;
   if (await compteNonCapte(uid)) return;
@@ -3033,16 +3141,14 @@ async function storeSeenUrls(domain, paths, reponses) {
   const rows = await sbGet(`app_data?id=eq.harvest_${uid}_seen_urls&select=data`);
   if (rows === null) return;
   const cur = (rows[0] && rows[0].data) || {};
-  const tous = new Set([...(Array.isArray(cur.paths) ? cur.paths : []), ...paths]);
-  const rep = Object.assign({}, cur.reponses || {}, reponses || {});
-  // Bornes par construction : un diagnostic ne doit jamais grossir sans fin.
-  const repBorne = {};
-  for (const k of Object.keys(rep).slice(0, 400)) repBorne[k] = rep[k];
-  const data = { uid, paths: Array.from(tous).slice(0, 600), reponses: repBorne,
-    capturedAt: new Date().toISOString(), ver: EXT_VERSION };
+  // Bornes par construction : un diagnostic ne doit jamais grossir sans fin
+  // (`fusionnerSeen` : les plus RÉCENTS gardés, les clés normalisées).
+  const f = fusionnerSeen(cur, paths, reponses, conversation);
+  const data = Object.assign({ uid }, f, { capturedAt: new Date().toISOString(), ver: EXT_VERSION });
   // Rien de neuf → on ne repousse pas la même ligne.
-  if (JSON.stringify(data.paths) === JSON.stringify(cur.paths || [])
-      && JSON.stringify(repBorne) === JSON.stringify(cur.reponses || {})) return;
+  if (JSON.stringify(f.paths) === JSON.stringify(cur.paths || [])
+      && JSON.stringify(f.reponses) === JSON.stringify(cur.reponses || {})
+      && JSON.stringify(f.conversation || null) === JSON.stringify(cur.conversation || null)) return;
   await supabaseUpsert('app_data', [{ id: `harvest_${uid}_seen_urls`, data }], 'id');
 }
 
@@ -5863,6 +5969,41 @@ function contratSuivi(a) {
     }
   };
   cherche(a, '', 0);
+  // (29 oct.) LE TRANSPORTEUR COURANT. Le suivi d'un achat (`journey_summary`)
+  // nomme ses transporteurs par un CODE (`current_carrier.code`, `carriers[].code`,
+  // `is_current`) et jamais par un nom : `transporteur` restait `null` sur ses
+  // 7 suivis rangés (mesuré), et un n° Vinted Go sans e-mail n'était jamais lu
+  // chez le transporteur. On prend `current_carrier`, sinon l'UNIQUE entrée de
+  // `carriers[]` marquée `is_current: true` (deux ⇒ aucune : pas deviné), et SON
+  // n° (`tracking_code`) avec lui — un trajet à deux transporteurs ne mêle
+  // jamais le code de l'un au n° de l'autre. Le code n'est gardé que s'il a la
+  // forme d'un code machine (lettre d'abord, sans espace) ; s'il n'y a pas de n°
+  // dans cet objet, on garde le n° trouvé ailleurs et on ne nomme personne.
+  const courant = (v, prof) => {
+    if (prof > 8 || !v || typeof v !== 'object' || Array.isArray(v)) return null;
+    for (const k of Object.keys(v)) {
+      const x = v[k];
+      if (/^current_carrier$/i.test(k) && x && typeof x === 'object' && !Array.isArray(x)) return x;
+      if (/^carriers$/i.test(k) && Array.isArray(x)) {
+        const c = x.filter((e) => e && typeof e === 'object' && !Array.isArray(e) && e.is_current === true);
+        if (c.length === 1) return c[0];
+      }
+    }
+    for (const k of Object.keys(v)) {
+      const x = v[k];
+      if (Array.isArray(x)) { for (const y of x) { const r = courant(y, prof + 1); if (r) return r; } continue; }
+      const r = courant(x, prof + 1); if (r) return r;
+    }
+    return null;
+  };
+  const cc = courant(a, 0);
+  if (cc) {
+    let nom = null;
+    for (const k of ['name', 'title', 'label']) { const x = cc[k]; if (typeof x === 'string' && x.trim() && !/^\d+$/.test(x.trim())) { nom = x.trim().slice(0, 80); break; } }
+    const code = typeof cc.code === 'string' && /^[A-Za-z][A-Za-z0-9_.:-]{1,39}$/.test(cc.code.trim()) ? cc.code.trim() : null;
+    const n = suiviNumero(cc.tracking_code != null ? cc.tracking_code : cc.tracking_number);
+    if ((nom || code) && n) { transporteur = nom || code; suivi = n; }
+  }
   return { etapes: toutes, dernier: datees.length ? datees[0] : null, transporteur, suivi };
 }
 // </suivi-regle>
@@ -7054,13 +7195,14 @@ if (CAP.alarms) {
 // ne fait que la LIRE, depuis le navigateur de Julien, et la RELAYER telle quelle.
 // L'extension n'interprète rien : ni « retiré », ni « disponible », ni « reparti ».
 //
-// ⚠️⚠️ MONDIAL RELAY N'EST LU QUE D'ICI (mesuré le 24 oct. à 11:19 UTC depuis
-//    dub1, User-Agent honnête : la page .be répond, son API `/api/tracking`
-//    répond 403 HTML — Cloudflare). Le serveur ne se fait jamais passer pour un
-//    navigateur : il donne les n° Mondial Relay dont il connaît le code postal,
-//    et ce navigateur les lit, avec SON User-Agent (jamais changé) et SES
-//    cookies. Chronopost (ws.chronopost.fr) et Vinted Go (carrier.vintedgo.com)
-//    ne passent ici que si le serveur les rend dans C3.
+// ⚠️⚠️ CE NAVIGATEUR N'EST QU'UN SECOURS. Le SERVEUR lit lui-même Chronopost
+//    (`cp-ws2`), Vinted Go (`vg-v3`) et Mondial Relay par la route `_mvc` de
+//    mondialrelay.fr (`mr-fr-mvc`, n° + code postal du relais — mesuré le 24 et
+//    le 29 oct. depuis dub1, User-Agent honnête, 15 lectures sur 15 en 200).
+//    Ce que le transporteur REFUSE au serveur arrive ici par C3 ; ce navigateur
+//    le lit avec SON User-Agent (jamais changé) et SES cookies, puis relaie la
+//    réponse brute. Pour Mondial Relay, C3 annonce `mr-fr-mvc` : la `.be` (page
+//    puis API, `mr-be`) n'est que son REPLI — et réciproquement (29 oct.).
 //
 // LES GARDE-FOUS — aucun n'est celui de Vinted, et aucun ne le touche :
 //   · session VRM exigée, sinon AUCUNE requête (ni VRM, ni transporteur) ;
@@ -7071,7 +7213,8 @@ if (CAP.alarms) {
 //     seul point d'appel réseau (`appelTransp`) ; une redirection n'est pas
 //     suivie (`redirect: 'error'`) : aucune autre adresse, jamais ;
 //   · une requête à la fois (`unTranspALaFois`), 2 s d'écart FIXE (jamais
-//     aléatoire), 10 s de délai, corps lu sur 64 Ko au plus ;
+//     aléatoire), 10 s de délai, corps lu au plus sur ce que le SERVEUR lit
+//     lui-même (Mondial Relay 192 Ko, les autres 64 Ko — `corpsMaxTransp`) ;
 //   · un budget PROPRE : 12 requêtes par heure et par transporteur
 //     (`vrmTranspCompte`) — jamais `requeteVinted`, `gardeLecture`,
 //     `compterLecture` ni `compterAction` : un transporteur n'est pas Vinted, une
@@ -7082,8 +7225,9 @@ if (CAP.alarms) {
 //     ou de XML, et 401 de Mondial Relay : 30 min, 1 h, 2 h, 6 h, 24 h (le palier
 //     monte si le transporteur refuse encore dans les 24 h qui suivent), ou
 //     `Retry-After` s'il est plus long ; elle tombe à la première lecture réussie.
-//     Chronopost et Vinted Go ont une voie chacun ; Mondial Relay en a deux (.be,
-//     puis le repli .fr), pour qu'un refus de l'une n'éteigne pas l'autre.
+//     Chronopost et Vinted Go ont une voie chacun ; Mondial Relay en a deux
+//     (`mr-fr-mvc` et `mr-be`, chacune REPLI de l'autre — `TRANSP_REPLIS`),
+//     pour qu'un refus de l'une n'éteigne pas l'autre.
 // ⚠️ Le `Referer` de la page .be n'est PAS envoyé : c'est un en-tête interdit à
 //    `fetch`, et un `referrer` d'une autre origine est remplacé par le
 //    navigateur. On ne le fabrique pas (`declarativeNetRequest` demanderait une
@@ -7101,30 +7245,61 @@ const TRANSP_VOIES = {
 const TRANSP_CARRIERS = ['mondialrelay', 'chronopost', 'vinted'];
 // La FORME d'un n° par transporteur (celles mesurées chez lui) — c'est elle qui
 // borne ce qui entre dans une adresse.
+// ⚠️⚠️ (29 octobre) LA MÊME QUE CELLE DU SERVEUR (`FORME_SUIVI`, api/_lib/
+//    transporteurs.js — §11) : le serveur annonce en C3 ce qu'il a lui-même jugé
+//    lisible. Chronopost acceptait ici `\d{14}[0-9A-Z]` (15 caractères exigés)
+//    quand le serveur dit `\d{14}[0-9A-Z]?` : un n° de 14 chiffres que le
+//    serveur confiait à ce navigateur était refusé en silence
+//    (`transp_item_refuse`), jamais lu. `audit-transp-ext` compare les SORTIES
+//    des deux règles sur les mêmes n° ; la liste blanche des adresses en DÉRIVE
+//    (une forme, un seul endroit).
 const TRANSP_FORME = {
   mondialrelay: /^\d{8}$/,
   chronopost: /^(?:[A-Z]{2}\d{9}[A-Z]{2}|\d{14}[0-9A-Z]?)$/,
-  // (tour 2 n° 10) + 12 chiffres : la forme du SERVEUR (`FORME_SUIVI.vinted`), une
-  // seule forme des deux côtés — un n° que C3 annonce est toujours accepté ici.
+  // (29 oct.) + 12 chiffres, comme `FORME_SUIVI.vinted` du serveur (deux de ses
+  // e-mails Vinted Go en portent ; c'est l'exemple de la page de Vinted Go) :
+  // le serveur le confiait en C3 et ce navigateur le refusait en silence
+  // (`transp_item_refuse`) — un colis lu par personne. La page de suivi
+  // Vinted Go ouverte (`transpDeAdresse`) et la liste blanche en dérivent.
   vinted: /^(?:\d{16}|VGS\d{13}|[0-9A-Z]{13}|\d{12})$/,
 };
 const TRANSP_CP = /^\d{5}$/;
 const MR_BE_PAGE = 'https://www.mondialrelay.be/fr-be/suivi-de-colis/';
+// Le corps d'une forme, sans ses ancres (`^…$`), pour l'insérer dans une adresse.
+const formeSansAncres = (re) => re.source.replace(/^\^/, '').replace(/\$$/, '');
 const TRANSP_URL_PERMISES = [
   /^https:\/\/www\.mondialrelay\.be\/fr-be\/suivi-de-colis\/$/,
-  /^https:\/\/www\.mondialrelay\.be\/api\/tracking\?shipment=\d{8}&postcode=\d{5}&brand=&codePays=$/,
-  /^https:\/\/www\.mondialrelay\.fr\/_mvc\/fr-FR\/SuiviExpedition\/RechercherJsonResponsive\?NumeroExpedition=\d{8}&CodePostal=\d{5}$/,
-  // (tour 2 n° 10) Les formes des n° DÉRIVENT de `TRANSP_FORME` (une seule forme).
-  new RegExp('^https:\\/\\/ws\\.chronopost\\.fr\\/tracking-cxf\\/TrackingServiceWS\\/trackSkybillV2\\?language=fr_FR&skybillNumber=' + TRANSP_FORME.chronopost.source.replace(/^\^/, '').replace(/\$$/, '') + '$'),
-  new RegExp('^https:\\/\\/carrier\\.vintedgo\\.com\\/public\\/v3\\/tracking_events\\/' + TRANSP_FORME.vinted.source.replace(/^\^/, '').replace(/\$$/, '') + '$'),
+  new RegExp(`^https:\\/\\/www\\.mondialrelay\\.be\\/api\\/tracking\\?shipment=(?:${formeSansAncres(TRANSP_FORME.mondialrelay)})&postcode=\\d{5}&brand=&codePays=$`),
+  new RegExp(`^https:\\/\\/www\\.mondialrelay\\.fr\\/_mvc\\/fr-FR\\/SuiviExpedition\\/RechercherJsonResponsive\\?NumeroExpedition=(?:${formeSansAncres(TRANSP_FORME.mondialrelay)})&CodePostal=\\d{5}$`),
+  new RegExp(`^https:\\/\\/ws\\.chronopost\\.fr\\/tracking-cxf\\/TrackingServiceWS\\/trackSkybillV2\\?language=fr_FR&skybillNumber=(?:${formeSansAncres(TRANSP_FORME.chronopost)})$`),
+  new RegExp(`^https:\\/\\/carrier\\.vintedgo\\.com\\/public\\/v3\\/tracking_events\\/(?:${formeSansAncres(TRANSP_FORME.vinted)})$`),
 ];
 const urlTranspPermise = (u) => TRANSP_URL_PERMISES.some((re) => re.test(String(u || '')));
 const TRANSP_MAX_HEURE = 12;            // requêtes par heure ET par transporteur
 const TRANSP_MAX_PAR_PASSAGE = 6;       // le contrat C3 n'en donne pas plus
 const TRANSP_ECART_MS = 2000;           // écart FIXE entre deux requêtes
 const TRANSP_DELAI_MS = 10000;
-const TRANSP_CORPS_MAX = 65536;         // octets du corps relayé
-const TRANSP_ENVOI_MAX = 80 * 1024;     // octets du POST vers VRM (C4)
+const TRANSP_CORPS_MAX = 65536;         // octets du corps relayé (Chronopost, Vinted Go : `CORPS_MAX` du serveur)
+const TRANSP_ENVOI_MAX = 80 * 1024;     // octets du POST vers VRM (C4, contrat d'origine : corps ≤ 64 Ko)
+// ⚠️⚠️ (29 octobre) MONDIAL RELAY : LE MÊME PLAFOND QUE LE SERVEUR. Le serveur
+//    lit la réponse `_mvc` sur 192 Ko (`CORPS_MAX_MR`, api/_lib/transporteurs-
+//    lecture.js : ~45 Ko pour 14 évènements). Ce navigateur la COUPAIT à 64 Ko :
+//    au-delà, un JSON tronqué, que le serveur ne peut que ranger « forme ».
+//    Lu et relayé sur 192 Ko ; le POST monte à 256 Ko pour Mondial Relay. Un
+//    serveur dont C4 est encore borné à 64 Ko répond 413 : le corps est alors
+//    renvoyé UNE fois, borné au contrat d'origine (comme avant, « forme »).
+//    `audit-transp-ext` compare ces valeurs à celles du serveur.
+const TRANSP_CORPS_MAX_MR = 196608;     // `CORPS_MAX_MR` du serveur (192 Ko)
+const TRANSP_ENVOI_MAX_MR = TRANSP_CORPS_MAX_MR + 64 * 1024;
+const corpsMaxTransp = (carrier) => (carrier === 'mondialrelay' ? TRANSP_CORPS_MAX_MR : TRANSP_CORPS_MAX);
+const envoiMaxTransp = (carrier) => (carrier === 'mondialrelay' ? TRANSP_ENVOI_MAX_MR : TRANSP_ENVOI_MAX);
+// Les REPLIS par voie : Mondial Relay a deux routes, chacune essayée quand
+// l'autre est refusée (403, 429, défi, HTML, 401), en pause, ou sans jeton —
+// dans le MÊME budget (12 par heure et par transporteur) et la MÊME file (une
+// requête à la fois). C3 annonce `mr-fr-mvc` (la route que le serveur lit) :
+// avant le 29 octobre, `mr-be` n'était tenté qu'en repli de… `mr-be`, donc
+// jamais, et un `_mvc` refusé à ce navigateur restait « bloqué » sans repli.
+const TRANSP_REPLIS = { 'mr-fr-mvc': ['mr-be'], 'mr-be': ['mr-fr-mvc'] };
 const TRANSP_TICK_MIN_MS = 5 * 60000;   // au plus un C3 toutes les 5 min
 const TRANSP_VU_MS = 5 * 60000;         // une page de suivi : un même n° au plus 1 fois / 5 min
 const TRANSP_ROUTE_ABSENTE_MS = 6 * 3600000;
@@ -7295,7 +7470,7 @@ async function appelTransp(url, init, voie) {
   try {
     const r = await fetch(url, Object.assign({}, init, { signal: ctrl.signal, redirect: 'error', cache: 'no-store' }));
     const entete = (k) => { try { return (r.headers && r.headers.get(k)) || ''; } catch (_) { return ''; } };
-    const corps = await lireCorpsBorne(r, TRANSP_CORPS_MAX);
+    const corps = await lireCorpsBorne(r, corpsMaxTransp(v.carrier));
     return { statut: Number(r.status) || 0, ctype: entete('content-type'), corps: String(corps || ''), cfMitigated: entete('cf-mitigated'), retryAfter: entete('retry-after') };
   } catch (_) {
     noterDiag(`transp_reseau_${v.carrier}`);
@@ -7385,21 +7560,35 @@ async function appelVrmTransp(mode, jeton, corps) {
   } catch (_) { return { status: 0, j: null }; } finally { clearTimeout(t); }
 }
 // C4 : la réponse brute, telle quelle (bornée), au serveur qui la juge.
-async function relayerTransp(it, voie, rep, source, jeton) {
+// `corpsMax` / `envoiMax` : le plafond du corps relayé et du POST (celui du
+// transporteur, puis — sur un 413 d'un serveur encore borné — le contrat d'origine).
+function corpsC4(it, voie, rep, source, corpsMax, envoiMax) {
   const enc = new TextEncoder();
-  let corps = String((rep && rep.corps) || '');
-  const corpsDe = (octets) => new TextDecoder('utf-8').decode(enc.encode(corps).subarray(0, octets), { stream: true });
-  if (enc.encode(corps).byteLength > TRANSP_CORPS_MAX) corps = corpsDe(TRANSP_CORPS_MAX);
+  const brut = String((rep && rep.corps) || '');
+  let corps = brut;
+  const corpsDe = (octets) => new TextDecoder('utf-8').decode(enc.encode(brut).subarray(0, octets), { stream: true });
+  if (enc.encode(corps).byteLength > corpsMax) corps = corpsDe(corpsMax);
   const fabriquer = () => JSON.stringify(Object.assign({ v: 1, carrier: it.carrier, suivi: it.suivi },
     it.carrier === 'mondialrelay' ? { cp: it.cp } : {},
     { voie, statut: Number(rep && rep.statut) || 0, ctype: String((rep && rep.ctype) || '').slice(0, 120), corps, at: new Date().toISOString(), source }));
   let body = fabriquer();
-  for (let i = 0; i < 6 && enc.encode(body).byteLength > TRANSP_ENVOI_MAX; i++) {
-    const trop = enc.encode(body).byteLength - TRANSP_ENVOI_MAX;
+  for (let i = 0; i < 6 && enc.encode(body).byteLength > envoiMax; i++) {
+    const trop = enc.encode(body).byteLength - envoiMax;
     corps = corpsDe(Math.max(0, enc.encode(corps).byteLength - trop - 256));
     body = fabriquer();
   }
-  const { status, j } = await appelVrmTransp('transp-brut', jeton, body);
+  return { body, octetsCorps: enc.encode(corps).byteLength, octetsEnvoi: enc.encode(body).byteLength };
+}
+async function relayerTransp(it, voie, rep, source, jeton) {
+  const premier = corpsC4(it, voie, rep, source, corpsMaxTransp(it.carrier), envoiMaxTransp(it.carrier));
+  let { status, j } = await appelVrmTransp('transp-brut', jeton, premier.body);
+  // Un serveur dont C4 est encore borné au contrat d'origine (corps ≤ 64 Ko,
+  // POST ≤ 80 Ko) refuse un corps Mondial Relay plus gros (413) : renvoyé UNE
+  // fois, borné comme avant — jamais pour un envoi qui tenait déjà dans ce contrat.
+  if (status === 413 && (premier.octetsCorps > TRANSP_CORPS_MAX || premier.octetsEnvoi > TRANSP_ENVOI_MAX)) {
+    noterDiag('transp_envoi_413_borne');
+    ({ status, j } = await appelVrmTransp('transp-brut', jeton, corpsC4(it, voie, rep, source, TRANSP_CORPS_MAX, TRANSP_ENVOI_MAX).body));
+  }
   if (status === 200 && j && j.ok) {
     // (tour 2 n° 11) « Lu » seulement si le SERVEUR a pu juger la réponse (`ok`) :
     // une réponse 2xx tronquée ou d'une forme inattendue (`forme`) n'est pas une
@@ -7413,9 +7602,10 @@ async function relayerTransp(it, voie, rep, source, jeton) {
   noterDiag(`transp_envoi_ko_${status || 'reseau'}`);
   return { relaye: false, status };
 }
-// UN N°, LU DEPUIS CE NAVIGATEUR puis relayé. Mondial Relay : la voie .be, puis
-// le repli .fr si la .be refuse (et seulement alors). On ne relaie QUE la
-// dernière réponse obtenue.
+// UN N°, LU DEPUIS CE NAVIGATEUR puis relayé. Mondial Relay : la voie annoncée
+// par C3 (`mr-fr-mvc`), puis son repli (`mr-be`, page puis API) si elle est
+// refusée, en pause ou sans jeton (et seulement alors) — `TRANSP_REPLIS`. On ne
+// relaie QUE la dernière réponse obtenue.
 async function lireTransporteurNavigateur(item, source) {
   const it = itemTranspValide(item);
   if (!it) { noterDiag('transp_item_refuse'); return { lu: false, raison: 'item' }; }
@@ -7427,7 +7617,7 @@ async function lireTransporteurNavigateur(item, source) {
   if (!tok || !tok.access_token) return { lu: false, raison: 'session' };
   return unTranspALaFois(async () => {
     const refusees = await voiesRefusees();
-    const voies = [it.voie].concat(it.voie === 'mr-be' ? ['mr-fr-mvc'] : [])
+    const voies = [it.voie].concat(TRANSP_REPLIS[it.voie] || [])
       .filter((v) => permis[v] === true && !(refusees && Date.now() - Number(refusees[v] || 0) < TRANSP_VOIE_REFUSEE_MS));
     if (!voies.length) { noterDiag(permis[it.voie] === true ? 'transp_voie_refusee' : 'transp_sans_permission'); return { lu: false, raison: 'voie' }; }
     let dernier = null;
@@ -11748,6 +11938,19 @@ function achatASuivre(o, derniers, maintenant) {
   if (da && SUIVI_ARRIVE.test(da.t || '')) return false;
   return tus === 'needs_action' || AT_RELAY(st) || SUIVI_EN_ROUTE.test(st);
 }
+// L'ordre de lecture (29 octobre). Trié par date seule, un achat au point
+// relais (Vinted : « à retirer », `needs_action`) passait APRÈS les achats en
+// route les plus récents, relus toutes les 3 h : avec 3 lectures par visite et
+// 6 par heure, son suivi (l'étape « disponible », le point de retrait) n'était
+// pas lu. Rang : au point relais jamais lu · au point relais déjà lu · en
+// route jamais lu · en route déjà lu ; à rang égal, le plus récent d'abord.
+// « Déjà lu » = une ligne `harvest_{uid}_suivi_{tx}` existe (lecture active ou
+// passive). Les bornes (3 par visite, 6 par heure, mémo de 3 h) ne bougent pas.
+function rangSuivi(o, derniers) {
+  const relais = String(o.transaction_user_status || '') === 'needs_action' || AT_RELAY(String(o.status || ''));
+  const lu = derniers.has(String(o.transaction_id));
+  return (relais ? 0 : 2) + (lu ? 1 : 0);
+}
 // Les lectures du suivi dans l'heure, par compte (`chrome.storage.local`, §4.9) ;
 // dans la chaîne des compteurs (deux visites ne comptent pas la même place).
 function compterLectureSuivi(uid) {
@@ -11788,7 +11991,7 @@ async function capterSuivisAchats(uid) {
     }
     const maintenant = Date.now();
     const cibles = [...achats.values()].filter((o) => achatASuivre(o, derniers, maintenant))
-      .sort((a, b) => (Date.parse(b.date || '') || 0) - (Date.parse(a.date || '') || 0));
+      .sort((a, b) => (rangSuivi(a, derniers) - rangSuivi(b, derniers)) || ((Date.parse(b.date || '') || 0) - (Date.parse(a.date || '') || 0)));
     if (!cibles.length) return 0;
     // Une forme jamais reconnue : une seule lecture de mesure par jour et par compte.
     let max = SUIVI_MAX_PAR_VISITE;

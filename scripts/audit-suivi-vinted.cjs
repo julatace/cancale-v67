@@ -44,6 +44,9 @@
 //      est ATOMIQUE (comparer-et-échanger), la clé est le LIBELLÉ (jamais
 //      l'instant), l'arrivée au point relais déjà annoncée par l'e-mail ou la
 //      conversation se tait, une étape datée dans l'avenir ne sonne pas.
+//   L. (29 octobre) l'ordre de lecture : les achats au point relais (jamais
+//      lus, puis déjà lus) AVANT ceux en route jamais lus, puis ceux en route
+//      déjà lus — mutation `priorite-relais` (le tri par date seule d'avant).
 //  Mutations (§6.1) : `--mutation nom` (la liste : `--mutation ?`).
 // ════════════════════════════════════════════════════════════════════════════
 const fs = require('fs'), vm = require('vm'), path = require('path'), os = require('os');
@@ -133,6 +136,9 @@ const MUTATIONS = {
                      ['bg', `        memo[tx] = Date.now() + SUIVI_INCONNU_MS - SUIVI_RETRY_MS;`, `        memo[tx] = Date.now();`]],
   // un achat déjà arrivé (dernière étape « disponible ») est relu quand même
   arrive: [['bg', `  if (da && SUIVI_ARRIVE.test(da.t || '')) return false;`, ``]],
+  // ── 29 octobre ──
+  // les achats au point relais ne passent plus devant (tri par date seule, comme avant)
+  'priorite-relais': [['bg', `  return (relais ? 0 : 2) + (lu ? 1 : 0);`, `  return 0;`]],
 };
 const iM = process.argv.indexOf('--mutation');
 const MUT = iM > 0 ? process.argv[iM + 1] : '';
@@ -906,6 +912,36 @@ const ecrits = (f, id) => f.j.posts.filter((ids) => ids.includes(id)).length;
       await fr.ctx.capterSuivisAchats('111');
       const chemins = lusJ(fr).map((v) => v.chemin.split('/')[4]);
       dit(JSON.stringify(chemins) === JSON.stringify(['35000000002']), 'un achat déjà arrivé au point relais n’est plus relu ; celui en route, si', JSON.stringify(chemins));
+    });
+
+    // ═══ L ═══════════════════════════════════════════════════════════════════
+    console.log('\n── L. (29 oct.) Un achat au point relais jamais lu passe AVANT ceux déjà lus en route');
+    await essaie('L', async () => {
+      // R1 : au point relais (Vinted dit « à retirer »), jamais lu, le plus ancien ;
+      // R2 : au point relais, déjà lu (dernière étape « en transit ») ;
+      // E1 : en route, jamais lu ; E2 à E4 : en route, déjà lus, les plus récents.
+      const RELAIS = "La livraison n'a pas encore eu lieu - colis déposé en bureau de Poste ou point relais";
+      const achats = [
+        { transaction_id: 36000000001, title: 'R1', status: RELAIS, transaction_user_status: 'needs_action', date: H(100) },
+        { transaction_id: 36000000002, title: 'R2', status: RELAIS, transaction_user_status: 'needs_action', date: H(90) },
+        { transaction_id: 36000000003, title: 'E1', status: 'Colis expédié', transaction_user_status: 'waiting', date: H(40) },
+        { transaction_id: 36000000004, title: 'E2', status: 'Colis expédié', transaction_user_status: 'waiting', date: H(5) },
+        { transaction_id: 36000000005, title: 'E3', status: 'Colis expédié', transaction_user_status: 'waiting', date: H(6) },
+        { transaction_id: 36000000006, title: 'E4', status: 'Colis expédié', transaction_user_status: 'waiting', date: H(7) },
+        // statut Vinted encore « expédié » mais Vinted demande un geste (needs_action) : au relais aussi
+        { transaction_id: 36000000007, title: 'R3', status: 'Colis expédié', transaction_user_status: 'needs_action', date: H(200) },
+      ];
+      const lu = (tx) => ({ v: 1, tx, source: 'journey', capturedAt: H(4), etapes: [{ t: 'Colis en transit', at: H(4), code: 'in_transit' }], dernier: { t: 'Colis en transit', at: H(4), code: 'in_transit' }, transporteur: null, suivi: null, forme: {} });
+      const ll = { harvest_111_orders_purchased: { type: 'orders_purchased', payload: { my_orders: achats } } };
+      for (const tx of ['36000000002', '36000000004', '36000000005', '36000000006']) ll[`harvest_111_suivi_${tx}`] = lu(tx);
+      const fl = faireFond({ src: BG, lignes: ll, vinted: vintedSuivi() });
+      await fl.ctx.capterSuivisAchats('111');
+      const v1 = lusJ(fl).map((v) => v.chemin.split('/')[4]);
+      dit(JSON.stringify(v1) === JSON.stringify(['36000000001', '36000000007', '36000000002']), 'première visite : d’abord les achats au point relais (jamais lus, puis déjà lus), avant ceux en route', JSON.stringify(v1));
+      await fl.ctx.capterSuivisAchats('111');
+      const v2 = lusJ(fl).map((v) => v.chemin.split('/')[4]).slice(3);
+      dit(v2[0] === '36000000003', 'ensuite l’achat en route jamais lu, avant ceux en route déjà lus', JSON.stringify(v2));
+      dit(v2.length === 3 && v2.slice(1).every((t) => ['36000000004', '36000000005', '36000000006'].includes(t)), 'puis ceux en route déjà lus (le plus récent d’abord)', JSON.stringify(v2));
     });
   } finally {
     nettoyer();

@@ -17,7 +17,14 @@
 //    · pause sur 403, 429, défi, HTML au lieu de JSON/XML, 401 Mondial Relay :
 //      30 min, palier qui monte, `Retry-After` respecté, levée au succès ;
 //    · aucune autre adresse que la liste blanche ;
-//    · corps relayé TEL QUEL et borné (64 Ko, POST ≤ 80 Ko) ;
+//    · corps relayé TEL QUEL et borné au plafond de lecture du SERVEUR
+//      (Chronopost, Vinted Go 64 Ko ; Mondial Relay 192 Ko — valeurs LUES dans
+//      api/_lib/transporteurs-lecture.js) ; un 413 d'un serveur encore borné ⇒
+//      renvoi UNE fois au contrat d'origine (64 Ko, POST ≤ 80 Ko) ;
+//    · (29 oct.) la FORME d'un n° est celle du serveur (`FORME_SUIVI`, sorties
+//      comparées sur les mêmes n°) — un Chronopost de 14 chiffres est lu ;
+//    · (29 oct.) Mondial Relay : `mr-fr-mvc` (ce que C3 annonce) refusé ⇒
+//      `mr-be` en repli (page puis API), même budget, une requête à la fois ;
 //    · `transpVu` : le n° vient de `sender.url`, jamais du message ; mauvais
 //      site refusé ; une fois par n° toutes les 5 min.
 //  `--src chemin` : la preuve sur le code d'AVANT (§6.1).
@@ -60,6 +67,20 @@ const MUTATIONS = {
   'lu-sans-jugement': ["    if (j.res === 'ok') noterDiag(`transp_lu_${it.carrier}`);", "    if (rep && rep.statut >= 200 && rep.statut < 300) noterDiag(`transp_lu_${it.carrier}`);"],
   // (tour 2 n° 10) la forme Vinted Go du serveur oubliée par l'extension
   'forme-vg-12': ['  vinted: /^(?:\\d{16}|VGS\\d{13}|[0-9A-Z]{13}|\\d{12})$/,', '  vinted: /^(?:\\d{16}|VGS\\d{13}|[0-9A-Z]{13})$/,'],
+  // (29 oct.) Chronopost : la forme d'avant (15 caractères exigés)
+  chronoForme: ['  chronopost: /^(?:[A-Z]{2}\\d{9}[A-Z]{2}|\\d{14}[0-9A-Z]?)$/,', '  chronopost: /^(?:[A-Z]{2}\\d{9}[A-Z]{2}|\\d{14}[0-9A-Z])$/,'],
+  // (29 oct.) Mondial Relay : plus de `.be` en repli de `_mvc`
+  repliMr: ["const TRANSP_REPLIS = { 'mr-fr-mvc': ['mr-be'], 'mr-be': ['mr-fr-mvc'] };", "const TRANSP_REPLIS = { 'mr-be': ['mr-fr-mvc'] };"],
+  // (29 oct.) Mondial Relay coupé à 64 Ko comme avant
+  corpsMr: ['const TRANSP_CORPS_MAX_MR = 196608;', 'const TRANSP_CORPS_MAX_MR = 65536;'],
+  // (29 oct.) un 413 d'un serveur encore borné : plus de renvoi au contrat d'origine
+  renvoi413: ["  if (status === 413 && (premier.octetsCorps > TRANSP_CORPS_MAX || premier.octetsEnvoi > TRANSP_ENVOI_MAX)) {", "  if (false) {"],
+  // (29 oct., tour 2) Vinted Go : la forme d'avant, sans les 12 chiffres du serveur
+  vg12: ['  vinted: /^(?:\\d{16}|VGS\\d{13}|[0-9A-Z]{13}|\\d{12})$/,', '  vinted: /^(?:\\d{16}|VGS\\d{13}|[0-9A-Z]{13})$/,'],
+  // (29 oct., tour 2) le transporteur courant du suivi Vinted n'est plus lu
+  courant: ['  const cc = courant(a, 0);', '  const cc = null;'],
+  // (29 oct., tour 2) le n° pris ailleurs que chez le transporteur courant
+  paire: ['    if ((nom || code) && n) { transporteur = nom || code; suivi = n; }', '    if (nom || code) transporteur = nom || code;'],
 };
 
 const argv = process.argv;
@@ -522,6 +543,178 @@ const sansCommentaires = (s) => s.replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(
     ].map((p) => p.catch((e) => { throw e; })));
     await attendre(40);
     dit(f.j.transp.length >= 4 && f.j.transpMaxEnVol === 1, 'un passage, une page ouverte et une lecture en même temps : jamais deux requêtes en vol', JSON.stringify({ n: f.j.transp.length, max: f.j.transpMaxEnVol }));
+  });
+
+  // ── 13. LA FORME D'UN N° EST CELLE DU SERVEUR (29 oct., §11) ────────────────
+  // Le serveur annonce en C3 ce que SA règle (`FORME_SUIVI`) juge lisible : un
+  // n° qu'il confie à ce navigateur doit y être lu. On compare les SORTIES des
+  // deux règles sur les mêmes n° (inventés, aux formes mesurées), jamais le texte.
+  await essaie('formes du serveur', async () => {
+    let T = null;
+    try { T = await import(path.join(__dirname, '..', 'api', '_lib', 'transporteurs.js')); } catch (e) { dit(false, 'la règle du serveur se charge', e && e.message); return; }
+    const f = monter({ items: [] });
+    const voieDe = { mondialrelay: 'mr-fr-mvc', chronopost: 'cp-ws2', vinted: 'vg-v3' };
+    const cas = {
+      mondialrelay: ['12345678', '1234567', '123456789', 'A2345678'],
+      chronopost: ['XW000000001TS', '12345678901234', '123456789012345', '12345678901234A', '1234567890123', '1234567890123456', 'XW00000001TS'],
+      vinted: ['1234567890123456', 'VGS0000000000001', 'AB12CD34EF56G', '123456789012', '12345678901234567'],
+    };
+    const ecarts = [];
+    for (const carrier of Object.keys(cas)) for (const n of cas[carrier]) {
+      const serveur = T.FORME_SUIVI[carrier].test(n);
+      const ext = typeof f.ctx.itemTranspValide === 'function'
+        ? !!f.ctx.itemTranspValide({ carrier, voie: voieDe[carrier], suivi: n, cp: carrier === 'mondialrelay' ? CP_MR : null }) : null;
+      const url = typeof f.ctx.urlTransp === 'function' ? f.ctx.urlTransp(voieDe[carrier], n, CP_MR) : null;
+      if (ext !== serveur || (!!url !== serveur)) ecarts.push(`${carrier} ${n} : serveur=${serveur} extension=${ext} adresse=${!!url}`);
+    }
+    dit(!ecarts.length, 'la forme d\'un n° (et son adresse) est celle du serveur, sur les mêmes n°', ecarts.join(' · '));
+  });
+  await essaie('Chronopost à 14 chiffres', async () => {
+    const N14 = '12345678901234';
+    const f = monter({ items: [{ carrier: 'chronopost', suivi: N14, cp: null, voie: 'cp-ws2' }] });
+    await tick(f);
+    dit(JSON.stringify(urls(f)) === JSON.stringify([URL_CP(N14)]), 'un n° Chronopost de 14 chiffres confié par le serveur est lu, à l\'adresse exacte', JSON.stringify({ u: urls(f), d: f.j.diags }));
+    dit(f.brut.length === 1 && f.brut[0].suivi === N14, 'et relayé (C4)', JSON.stringify(f.brut.map((x) => x && x.suivi)));
+    const g = monter();
+    await g.envoyer({ from: 'vrm-transp', action: 'transpVu' }, { tab: { id: 31, url: `https://www.chronopost.fr/tracking-no-cms/suivi-page?listeNumerosLT=${N14}` }, url: `https://www.chronopost.fr/tracking-no-cms/suivi-page?listeNumerosLT=${N14}`, frameId: 0 });
+    const c5 = g.j.vrmApi.filter((x) => x.mode === 'transp');
+    dit(c5.length === 1 && c5[0].corps && c5[0].corps.suivi === N14, 'sa page de suivi ouverte le fait lire tout de suite (C5)', JSON.stringify(c5.map((x) => x.corps)));
+  });
+
+  // ── 14. MONDIAL RELAY : `.be` EN REPLI DE `_mvc` (29 oct.) ─────────────────
+  // C3 annonce `mr-fr-mvc` (la route que le serveur lit). Refusée à ce
+  // navigateur aussi, elle se rabat sur la `.be` (page puis API) — même budget,
+  // une requête à la fois — et c'est la DERNIÈRE réponse qui est relayée.
+  const ITEM_MVC = { carrier: 'mondialrelay', suivi: MR, cp: CP_MR, voie: 'mr-fr-mvc' };
+  await essaie('repli .be', async () => {
+    const f = monter({ items: [ITEM_MVC], sur: { 'https://www.mondialrelay.fr/_mvc/': { status: 403, body: '<html>Forbidden</html>', headers: ENTETES.html } } });
+    await tick(f);
+    dit(JSON.stringify(urls(f)) === JSON.stringify([URL_MVC(), URL_MR_PAGE, URL_MR_API()]), '`_mvc` refusée : le repli `.be` est lu (page puis API), aux adresses exactes', JSON.stringify(urls(f)));
+    dit(f.brut.length === 1 && f.brut[0].voie === 'mr-be' && f.brut[0].corps === JSON_MR && f.brut[0].statut === 200, 'seule la réponse du repli est relayée, sur sa voie `mr-be`', JSON.stringify(f.brut.map((x) => x && { voie: x.voie, statut: x.statut })));
+    dit(f.j.transpMaxEnVol === 1 && f.attentes.length === 2 && f.attentes.every((ms) => ms >= 1900 && ms <= 2000), 'une requête à la fois, 2 s d\'écart', JSON.stringify({ max: f.j.transpMaxEnVol, a: f.attentes }));
+    dit(((f.store.vrmTranspPause || {})['mr-fr-mvc'] || {}).jusqua > Date.now() && !(f.store.vrmTranspPause || {})['mr-be'], 'la pause porte sur `_mvc` seulement');
+    dit((f.store.vrmTranspCompte || {}).mondialrelay && f.store.vrmTranspCompte.mondialrelay.length === 3, 'les trois requêtes comptent dans LE budget Mondial Relay', JSON.stringify(f.store.vrmTranspCompte));
+  });
+  await essaie('_mvc en pause', async () => {
+    const f = monter({ items: [ITEM_MVC], store: { vrmTranspPause: { 'mr-fr-mvc': { jusqua: Date.now() + 600000, palier: 0 } } } });
+    await tick(f);
+    dit(JSON.stringify(urls(f)) === JSON.stringify([URL_MR_PAGE, URL_MR_API()]) && f.brut.length === 1 && f.brut[0].voie === 'mr-be', '`_mvc` en pause : la `.be` est lue', JSON.stringify({ u: urls(f), b: f.brut.map((x) => x && x.voie) }));
+  });
+  await essaie('_mvc qui répond', async () => {
+    const f = monter({ items: [ITEM_MVC] });
+    await tick(f);
+    dit(JSON.stringify(urls(f)) === JSON.stringify([URL_MVC()]) && f.brut.length === 1 && f.brut[0].voie === 'mr-fr-mvc', 'l\'autre sens : `_mvc` répond ⇒ aucun repli, une seule requête', JSON.stringify(urls(f)));
+  });
+  await essaie('repli et budget', async () => {
+    const t = Date.now() - 60000;
+    const f = monter({ items: [ITEM_MVC], store: { vrmTranspCompte: { mondialrelay: Array(11).fill(t) } }, sur: { 'https://www.mondialrelay.fr/_mvc/': { status: 403, body: '<html>Forbidden</html>', headers: ENTETES.html } } });
+    await tick(f);
+    dit(JSON.stringify(urls(f)) === JSON.stringify([URL_MVC()]), 'le repli est dans le MÊME budget : la 12ᵉ requête de l\'heure faite, la `.be` ne part pas', JSON.stringify(urls(f)));
+  });
+
+  // ── 15. LE CORPS : LE PLAFOND DU SERVEUR (29 oct.) ─────────────────────────
+  await essaie('plafonds du serveur', async () => {
+    const texte = fs.readFileSync(path.join(__dirname, '..', 'api', '_lib', 'transporteurs-lecture.js'), 'utf8');
+    const lit = (nom) => { const m = new RegExp(`export const ${nom} = ([^;]+);`).exec(texte); try { return m ? Number(vm.runInNewContext(m[1])) : NaN; } catch (_) { return NaN; } };
+    const MAX = lit('CORPS_MAX'), MAX_MR = lit('CORPS_MAX_MR');
+    dit(MAX > 0 && MAX_MR > MAX, 'les plafonds de lecture du serveur se lisent', JSON.stringify({ MAX, MAX_MR }));
+    const corpsMr = (n) => JSON.stringify({ Success: true, Data: { NumeroExpedition: MR, Html: 'é'.repeat(Math.floor(n / 4)) + 'x'.repeat(n) } });
+    const gros = corpsMr(MAX_MR + 40000);
+    const f = monter({ items: [ITEM_MVC], sur: { 'https://www.mondialrelay.fr/_mvc/': { status: 200, body: gros, headers: ENTETES.json } } });
+    await tick(f);
+    const b = f.brut[0] || {};
+    const octets = Buffer.byteLength(String(b.corps || ''));
+    dit(octets > MAX_MR - 8 && octets <= MAX_MR, `Mondial Relay : le corps est lu et relayé sur le plafond du serveur (${MAX_MR} octets), plus sur 64 Ko`, String(octets));
+    dit(gros.startsWith(String(b.corps || '').slice(0, -2)), 'et c\'est le DÉBUT du corps, tel quel');
+    const moyen = corpsMr(100000);
+    const g = monter({ items: [ITEM_MVC], sur: { 'https://www.mondialrelay.fr/_mvc/': { status: 200, body: moyen, headers: ENTETES.json } } });
+    await tick(g);
+    dit(g.brut.length === 1 && g.brut[0].corps === moyen, 'un corps Mondial Relay de ~125 Ko (sous le plafond du serveur) part ENTIER — un JSON coupé ne se lit plus', String(Buffer.byteLength(String((g.brut[0] || {}).corps || ''))));
+    const cp = monter({ items: [ITEM.cp], sur: { 'https://ws.chronopost.fr/': { status: 200, body: XML_CP + '<!--' + 'x'.repeat(150000) + '-->', headers: ENTETES.xml } } });
+    await tick(cp);
+    const oc = Buffer.byteLength(String((cp.brut[0] || {}).corps || ''));
+    dit(oc > MAX - 8 && oc <= MAX, `l'autre sens : Chronopost reste au plafond du serveur pour lui (${MAX} octets)`, String(oc));
+  });
+  await essaie('serveur encore borné (413)', async () => {
+    const moyen = JSON.stringify({ Success: true, Data: { NumeroExpedition: MR, Html: 'x'.repeat(100000) } });
+    const f = monter({ items: [ITEM_MVC], sur: { 'https://www.mondialrelay.fr/_mvc/': { status: 200, body: moyen, headers: ENTETES.json } },
+      vrm: { brut: (req) => (Buffer.byteLength(String((req.corps && req.corps.corps) || '')) > 65536 ? { status: 413, body: { error: 'trop-gros' } } : null) } });
+    await tick(f);
+    const tailles = f.brut.map((x) => Buffer.byteLength(String((x && x.corps) || '')));
+    const envois = f.j.vrmApi.filter((r) => r.mode === 'transp-brut').map((r) => r.octets || 0);
+    dit(f.brut.length === 2 && tailles[0] > 65536 && tailles[1] <= 65536 && envois[1] <= 80 * 1024, 'un 413 (C4 encore borné) : le corps est renvoyé UNE fois, au contrat d\'origine (64 Ko, POST ≤ 80 Ko)', JSON.stringify({ tailles, envois }));
+    dit(f.j.transp.length === 1, 'sans relire le transporteur', JSON.stringify(urls(f)));
+    const g = monter({ items: [ITEM.cp], vrm: { brut: () => ({ status: 413, body: { error: 'trop-gros' } }) } });
+    await tick(g);
+    dit(g.brut.length === 1, "l'autre sens : un 413 sur un envoi qui tenait déjà dans le contrat n'est pas renvoyé", String(g.brut.length));
+  });
+
+  // ── 16. DE BOUT EN BOUT : CE QUE C3 ANNONCE, CE NAVIGATEUR LE LIT (tour 2) ─
+  // Vinted Go à 12 chiffres : le serveur le confiait (C3) et l'extension le
+  // refusait en silence (`transp_item_refuse`). On passe par la VRAIE règle de
+  // sélection du serveur (`suivisAInterroger`), puis par `itemTranspValide` et
+  // un passage réel : un n° annoncé est un n° LU.
+  await essaie('C3 lu de bout en bout', async () => {
+    let T = null;
+    try { T = await import(path.join(__dirname, '..', 'api', '_lib', 'transporteurs.js')); } catch (e) { dit(false, 'la règle du serveur se charge', e && e.message); return; }
+    const maintenant = Date.now(), recu = new Date(maintenant - 3600000).toISOString();
+    const lignes = [
+      { suivi: '100000000023', carrier: 'Vinted Go', status: 'available', emailAt: recu, receivedAt: recu },
+      { suivi: 'VGS0000000000002', carrier: 'Vinted Go', status: 'available', emailAt: recu, receivedAt: recu },
+      { suivi: '12345678901234', carrier: 'Chronopost', status: 'available', emailAt: recu, receivedAt: recu },
+    ];
+    let c3 = [];
+    try { c3 = T.suivisAInterroger({ lignes, maintenant, max: 6 }) || []; } catch (e) { dit(false, 'la sélection du serveur s\'exécute', e && e.message); return; }
+    const voieDe = T.VOIE_DE || T.VOIE_SERVEUR || { mondialrelay: 'mr-fr-mvc', chronopost: 'cp-ws2', vinted: 'vg-v3' };
+    const items = c3.map((x) => ({ carrier: x.carrier, suivi: x.suivi, cp: x.cp || null, voie: voieDe[x.carrier] }));
+    const vg12 = items.find((x) => x.suivi === '100000000023');
+    dit(!!vg12 && vg12.carrier === 'vinted', 'le serveur annonce bien un Vinted Go à 12 chiffres (C3)', JSON.stringify(items));
+    const g0 = monter();
+    const refuses = items.filter((x) => !(typeof g0.ctx.itemTranspValide === 'function' && g0.ctx.itemTranspValide(x)));
+    dit(items.length >= 3 && !refuses.length, 'chaque n° que C3 annonce est accepté par `itemTranspValide`', JSON.stringify(refuses));
+    if (!vg12) return;
+    const f = monter({ items: [vg12] });
+    await tick(f);
+    dit(JSON.stringify(urls(f)) === JSON.stringify([URL_VG('100000000023')]) && f.brut.length === 1, 'et il est LU chez Vinted Go, à l\'adresse exacte, puis relayé (C4)', JSON.stringify({ u: urls(f), d: f.j.diags }));
+    const g = monter();
+    const adresse = 'https://vintedgo.com/fr/tracking/100000000023';
+    await g.envoyer({ from: 'vrm-transp', action: 'transpVu' }, { tab: { id: 33, url: adresse }, url: adresse, frameId: 0 });
+    const c5 = g.j.vrmApi.filter((x) => x.mode === 'transp');
+    dit(c5.length === 1 && c5[0].corps && c5[0].corps.suivi === '100000000023', 'sa page de suivi Vinted Go ouverte le fait lire tout de suite (C5)', JSON.stringify(c5.map((x) => x.corps)));
+  });
+
+  // ── 17. LE SUIVI VINTED NOMME SON TRANSPORTEUR (tour 2) ────────────────────
+  // Mesuré sur sa base : `journey_summary.current_carrier.code`, `carriers[].code`
+  // et `is_current` existent, et ses 7 suivis rangés avaient `transporteur: null`
+  // ⇒ un n° Vinted Go trouvé là, sans e-mail, n'était lu par PERSONNE chez le
+  // transporteur. Le code et son n° viennent du MÊME objet (le transporteur
+  // courant). Valeurs inventées (le code réel « vinted_go » n'est pas mesuré).
+  await essaie('suivi Vinted : le transporteur courant', async () => {
+    const f = monter();
+    if (typeof f.ctx.contratSuivi !== 'function') { dit(false, '`contratSuivi` existe dans le fond'); return; }
+    const d = (h) => new Date(Date.now() - h * 3600000).toISOString();
+    const etapes = [{ title: 'Disponible pour retrait', status: 'available_for_pickup', date: d(2) }, { title: 'En transit', status: 'in_transit', date: d(30) }];
+    const VG16 = '1792000000000001';
+    const j1 = { journey_summary: {
+      carriers: [{ code: 'mondial_relay', priority: 0, is_current: false, tracking_code: '12345678', network_party_type: 'carrier' },
+        { code: 'vinted_go', priority: 1, is_current: true, tracking_code: VG16, network_party_type: 'carrier' }],
+      current_carrier: { code: 'vinted_go', priority: 1, is_current: true, tracking_code: VG16, tracking_url: 'https://vintedgo.com/fr/tracking/' + VG16 },
+      details: etapes } };
+    const r1 = f.ctx.contratSuivi(j1) || {};
+    dit(r1.transporteur === 'vinted_go' && r1.suivi === VG16, '`current_carrier` : son code ET son n° (jamais le n° de l\'autre trajet)', JSON.stringify({ t: r1.transporteur, s: r1.suivi }));
+    const j2 = { journey_summary: { carriers: [{ code: 'mondial_relay', is_current: false, tracking_code: '12345678' }, { code: 'vinted_go', is_current: true, tracking_code: VG16 }], details: etapes } };
+    const r2 = f.ctx.contratSuivi(j2) || {};
+    dit(r2.transporteur === 'vinted_go' && r2.suivi === VG16, 'sans `current_carrier` : l\'unique entrée `is_current` de `carriers[]`', JSON.stringify({ t: r2.transporteur, s: r2.suivi }));
+    const j3 = { journey_summary: { carriers: [{ code: 'mondial_relay', is_current: true, tracking_code: '12345678' }, { code: 'vinted_go', is_current: true, tracking_code: VG16 }], details: etapes } };
+    const r3 = f.ctx.contratSuivi(j3) || {};
+    dit(r3.transporteur == null, 'deux entrées « courantes » : aucun transporteur deviné', JSON.stringify({ t: r3.transporteur }));
+    const j4 = { journey_summary: { current_carrier: { code: 'vinted go !', tracking_code: VG16 }, details: etapes } };
+    const r4 = f.ctx.contratSuivi(j4) || {};
+    dit(r4.transporteur == null, 'un code qui n\'a pas la forme d\'un code machine n\'est pas pris', JSON.stringify({ t: r4.transporteur }));
+    let T = null;
+    try { T = await import(path.join(__dirname, '..', 'api', '_lib', 'transporteurs.js')); } catch (e) { dit(false, 'la règle du serveur se charge', e && e.message); return; }
+    const sel = T.suivisAInterroger({ vinted: [{ suivi: r1.suivi, transporteur: r1.transporteur, cap: d(1) }], maintenant: Date.now() }) || [];
+    dit(sel.length === 1 && sel[0].carrier === 'vinted' && sel[0].suivi === VG16, 'et le serveur le lit chez Vinted Go (sa règle `suivisAInterroger`, sans e-mail)', JSON.stringify(sel));
   });
 
   // ── 12. L'ÉTAT DIT AU NAVIGATEUR (C9, nav.indispo) ──────────────────────────
