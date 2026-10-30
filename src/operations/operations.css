@@ -61,3 +61,6 @@
  .vrm-operations[data-ops-section=missions] .ops-carte>.ops-actions{grid-column:1;grid-row:auto;justify-content:flex-start;}
  .vrm-operations[data-ops-section=missions] .ops-carte>:is(.ops-consigne,.ops-checklist,.ops-info){grid-column:1;}
 }
+/* (30 oct., revue) En sombre, la pastille neutre gardait son fond clair #edf1f3 sous un texte clair : « Dans le fil » était un rectangle blanc vide. Les pastilles colorées gardent leurs couleurs. */
+.vrm-operations[data-ops-dark=true] .ops-statut:not(.ops-statut-bloquee):not(.ops-statut-partielle):not(.ops-statut-validee):not(.ops-statut-controlee):not(.ops-statut-terminee):not(.ops-echeance-retard):not(.ops-echeance-proche):not(.ops-statut-horsfil){background:#243843;color:#e6edf2}
+.ops-statut-horsfil{background:#f4ecdc;color:#6b4d12}.vrm-operations[data-ops-dark=true] .ops-statut.ops-statut-horsfil{background:#42391f;color:#ffe1a3}

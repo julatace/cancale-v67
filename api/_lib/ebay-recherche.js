@@ -26,10 +26,21 @@
 //
 // Rien n'est acheté : la route ne fait que LIRE. Le geste est « Voir sur eBay ».
 
+import { erreurCriteresEbay } from '../../src/operations/metier.js';
+
 export const PLAFOND_VRM_JOUR = 200;
 export const PLAFOND_EBAY_DOC = 5000;
 export const LIMITE_RESULTATS = 30;
-export const ID_COMPTEUR = 'ebay_recherches_jour';
+// (30 octobre, revue) Le compteur vit sous un id `ebay_tokens…` : la garde de la
+// base (`vrm_garde_ebay_tokens`, déclencheurs sur `starts_with(id,
+// 'ebay_tokens')`, posée par la migration 014 et en place en production —
+// lu le 30 oct.) interdit à un NAVIGATEUR de créer, réécrire ou effacer cette
+// ligne. Sous `ebay_recherches_jour`, un vendeur effaçait sa propre ligne
+// (RLS le lui permet) et repartait de zéro autant qu'il voulait : le plafond
+// ne protégeait pas le quota d'eBay, commun à toute l'application. Seule la
+// route (clé de service) l'écrit. Le suffixe n'est pas un `_{clé de compte}`
+// (16 hexadécimaux) : il ne peut pas être pris pour les jetons d'un compte.
+export const ID_COMPTEUR = 'ebay_tokens_recherches_jour';
 const PAYS = ['FR', 'BE', 'DE', 'ES', 'IT', 'tous'];
 
 // Le jour de Paris (le compteur repart à minuit, heure de Paris).
@@ -46,11 +57,14 @@ const centimesOk = (v) => Number.isSafeInteger(v) && v >= 1 && v <= 100000000;
 // d'une recherche enregistrée (`veilles` de l'espace Organisation, §11).
 export function criteresRecherche(b) {
   const x = b || {};
-  const mots = typeof x.mots === 'string' ? x.mots.trim().replace(/\s+/g, ' ') : '';
-  if (mots.length < 2 || mots.length > 200) return { ok: false, error: 'Tape au moins deux lettres (200 au plus) : rien n’a été envoyé à eBay.' };
+  // La règle des mots, de la pointure et de la catégorie est CELLE de l'espace
+  // Organisation (`erreurCriteresEbay`, §11) : une recherche enregistrée là-bas
+  // n'est jamais refusée ici ensuite.
+  const regle = erreurCriteresEbay(x);
+  if (regle) return { ok: false, error: regle + ' Rien n’a été envoyé à eBay.' };
+  const mots = String(x.mots).trim().replace(/\s+/g, ' ');
   const exclus = typeof x.exclus === 'string' ? x.exclus.slice(0, 200) : '';
   const pointure = x.pointure == null ? '' : String(x.pointure).trim();
-  if (pointure && !/^\d{2}([.,]5)?$/.test(pointure)) return { ok: false, error: 'Pointure attendue : deux chiffres, et « ,5 » au besoin (42 ou 42,5).' };
   const maximum = x.maximum == null || x.maximum === '' ? null : x.maximum;
   const minimum = x.minimum == null || x.minimum === '' ? null : x.minimum;
   if (maximum !== null && !centimesOk(maximum)) return { ok: false, error: 'Prix maximum illisible : rien n’a été envoyé à eBay.' };
@@ -59,7 +73,6 @@ export function criteresRecherche(b) {
   const etat = ['tous', 'neuf', 'occasion'].includes(x.etat) ? x.etat : 'tous';
   const pays = PAYS.includes(x.pays) ? x.pays : 'tous';
   const categorie = x.categorie == null ? '' : String(x.categorie).trim();
-  if (categorie && !/^\d{1,10}$/.test(categorie)) return { ok: false, error: 'Identifiant de catégorie eBay : des chiffres seulement.' };
   return { ok: true, c: { mots, exclus, pointure, maximum, minimum, etat, achatImmediat: x.achatImmediat !== false, livraisonFR: x.livraisonFR !== false, pays, categorie } };
 }
 
@@ -194,6 +207,10 @@ export function creerRechercheEbay({ jetonApplication, oublierJetonApplication =
     if (ecrit !== true) return { status: 503, body: { ok: false, reason: 'pas-su', error: 'Je n’ai pas pu compter tes recherches du jour : rien n’a été envoyé à eBay. Réessaie dans un moment.' } };
     const appels = { aujourdhui: compte, plafond: PLAFOND_VRM_JOUR, jour };
     if (plafond) return { status: 429, body: { ok: false, reason: 'plafond', appels, error: `Tu as fait tes ${PLAFOND_VRM_JOUR} recherches eBay du jour : le fil s’arrête jusqu’à minuit (heure de Paris).` } };
+    // Une recherche que eBay a reçue compte, même ratée (502) : elle compte aussi
+    // chez eBay dans le quota de l'application. C'est l'APPAREIL qui ne relance
+    // pas une recherche ratée avant 15 min (src/ebayRecherche.jsx) — décidé le
+    // 30 oct., plutôt que de « rendre » un appel que eBay a bien compté.
     const jeton = await jetonApplication();
     if (!jeton) return { status: 502, body: { ok: false, reason: 'ebay', appels, error: 'Je n’ai pas pu chercher sur eBay (eBay n’a pas donné d’accès) — ce n’est pas « aucun résultat ». Réessaie dans un moment.' } };
     const c = cr.c;

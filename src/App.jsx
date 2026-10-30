@@ -75,7 +75,7 @@ import {aConfirmerVisibles, texteLimite, motAConfirmer} from './aConfirmer.js';
 import {DELAI_EXPEDITION_J, limiteExpedition, lireDateLimite, echeanceLimite, texteLimiteEnvoi, bordsParTransaction} from '../api/_lib/limite-envoi.js';
 import { photoArticle, photoCommande, demandesPhotosVentes, photosTransactionsLues, photosVenteVintedCandidates, choisirPhotoDisponible } from "./photosArticles.js";
 import {appelerEbay,ResponsiveChatPortal,EbayCommande,EbayMessages,EbayOffres,EbayAgent,EbayEvaluations,EbayRetours,EbayPromotion,EbayAchats} from "./ebayGestion.jsx";
-import RechercheEbay from "./ebayRecherche.jsx";
+import RechercheEbay,{repereAdmis} from "./ebayRecherche.jsx";
 import { contactEmail, CONTACT_A_VENIR } from "./contact.js";
 import { captchaActif, routeProtegee, jetonCaptcha, etatCaptcha, abonnerCaptcha, consommerCaptcha, corpsAvecCaptcha, monterWidget, MSG_CAPTCHA_ATTENTE, MSG_CAPTCHA_REFUS, MSG_CAPTCHA_ERREUR } from "./captcha.js";
 import { boutiqueIci, boutiqueOrion, estAndroid, pageExtensionsIci, nomNavigateurIci, mobileIci, LIENS_BOUTIQUES, LIEN_FIREFOX_ANDROID, LIEN_ORION_FICHIER, NOTICE_ORION, phraseNavigateur } from "./navigateurExtension.js";
@@ -20424,7 +20424,9 @@ function EbayAchatsOnglet({headers,panelOff,vue,comptes,onCompte}){
     if(!Array.isArray(ventes))return null;
     const hAcc=new Set((load('vinted_accounts_hidden',[])||[]).map(String));
     const V=moyennesParModele(ventes,(o)=>compteEcarte(o&&o._acc&&o._acc.vinted_user_id,hAcc,panelOff||{}));
-    return (titre)=>{const k=extractModel(titre);const e=k&&V[k];if(!e||e.n<REPERE_MIN)return null;return {modele:k,moyenne:e.s/e.n,n:e.n};};
+    // (30 oct.) Pas de repère sur une clé générique (« air max ») ni sur un accessoire
+    // ou une taille enfant (« lacets », « boîte vide », « enfant ») : mieux vaut un blanc qu'un faux.
+    return (titre)=>{const k=extractModel(titre);if(!repereAdmis(titre,k))return null;const e=k&&V[k];if(!e||e.n<REPERE_MIN)return null;return {modele:k,moyenne:e.s/e.n,n:e.n};};
   },[ventes,panelOff]);
   const [gagnes,setGagnes]=React.useState(false);
   return <div style={{padding:16}} data-ebay-achats-onglet="">

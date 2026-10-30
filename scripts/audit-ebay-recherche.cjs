@@ -42,6 +42,9 @@ process.env.EBAY_CERT_ID = 'secret-de-banc';
 process.env.SUPABASE_SERVICE_KEY = 'cle-service-de-banc';
 
 let lignes = [], journal = [], mode = {};
+// L'id du compteur est lu dans la route (il a changé le 30 oct. : sous le
+// préfixe gardé `ebay_tokens`) ; un ancien id ne serait jamais servi.
+let CPT = 'ebay_tokens_recherches_jour';
 const rep = (corps, status = 200) => new Response(typeof corps === 'string' ? corps : JSON.stringify(corps), { status, headers: { 'content-type': 'application/json' } });
 const ITEMS = () => ([
   { itemId: 'v1|1001|0', title: 'Salomon XT-6 noir taille 43', price: { value: '60.00', currency: 'EUR' }, shippingOptions: [{ shippingCostType: 'FIXED', shippingCost: { value: '6.50', currency: 'EUR' } }], condition: 'Occasion', seller: { username: 'vendeur_a', feedbackPercentage: '99.5' }, image: { imageUrl: 'https://i.ebayimg.com/images/g/a/s-l225.jpg' }, itemWebUrl: 'https://www.ebay.fr/itm/1001', buyingOptions: ['FIXED_PRICE'], itemCreationDate: '2026-10-29T08:00:00.000Z', itemLocation: { country: 'FR' } },
@@ -84,7 +87,7 @@ global.fetch = async (url, opts = {}) => {
     const owner = (/[?&]owner=eq\.([^&]*)/.exec(q) || [])[1];
     if (m === 'GET') {
       journal.push({ ou: 'lecture', u: q });
-      if (id === 'ebay_recherches_jour' && mode.compteur === 'ko') return rep({ message: 'boom' }, 500);
+      if (id === CPT && mode.compteur === 'ko') return rep({ message: 'boom' }, 500);
       return rep(lignes.filter((r) => (!id || r.id === id) && (!owner || r.owner === owner)).map((r) => ({ data: r.data })));
     }
     let rows = []; try { rows = [].concat(JSON.parse(opts.body || '[]')); } catch (_) {}
@@ -110,10 +113,12 @@ const faireRes = () => { const x = { code: null, corps: null, entetes: {} }; x.s
   let route;
   await essaie('chargement de la route', async () => { route = await import('file://' + path.join(RACINE, 'api', 'ebay.js')); });
   if (!route) { console.log('\n❌ audit-ebay-recherche : la route n\'a pas pu être chargée'); process.exit(1); }
+  let lib = null;
+  await essaie('chargement de la règle', async () => { lib = await import('file://' + path.join(RACINE, 'api', '_lib', 'ebay-recherche.js')); if (lib.ID_COMPTEUR) CPT = lib.ID_COMPTEUR; });
   const app = async (jwt, corps) => { journal = []; const res = faireRes(); await route.default({ method: 'POST', query: {}, headers: jwt ? { authorization: 'Bearer ' + jwt } : {}, body: corps }, res); return { code: res.code, corps: res.corps || {}, journal: journal.slice() }; };
   const browse = (j) => j.filter((x) => x.ou === 'ebay' && /item_summary\/search/.test(x.u));
   const criteres = { action: 'chercher', mots: 'salomon xt-6', pointure: '43', maximum: 8000, etat: 'occasion', achatImmediat: true, livraisonFR: true, exclus: 'replica, copie' };
-  const compteur = (o) => { const l = lignes.find((x) => x.id === 'ebay_recherches_jour' && x.owner === o); return l && l.data; };
+  const compteur = (o) => { const l = lignes.find((x) => x.id === CPT && x.owner === o); return l && l.data; };
 
   await essaie('A. sans session', async () => {
     const r = await app(null, criteres);
@@ -136,7 +141,7 @@ const faireRes = () => { const x = { code: null, corps: null, entetes: {} }; x.s
     dit(r.code === 200 && r.corps.ok === true, 'C. la recherche répond 200', 'code ' + r.code + ' ' + JSON.stringify(r.corps).slice(0, 160));
     const tok = r.journal.filter((x) => x.ou === 'ebay' && /oauth2\/token/.test(x.u));
     dit(tok.length >= 1 && tok.every((x) => /grant_type=client_credentials/.test(x.corps) && !/refresh_token/.test(x.corps)), 'C. jeton d\'APPLICATION (client_credentials), jamais un refresh_token de vendeur');
-    dit(!r.journal.some((x) => x.ou === 'lecture' && /ebay_tokens/.test(x.u)), 'C. aucun jeton de vendeur lu en base');
+    dit(!r.journal.some((x) => x.ou === 'lecture' && /id=eq\.ebay_tokens(&|$|_[0-9a-f]{16}(&|$))/.test(x.u)), 'C. aucun jeton de vendeur lu en base');
     dit(!r.journal.some((x) => x.appel), 'C. aucun appel Trading (rien au nom du vendeur)');
     const b = browse(r.journal)[0] || { u: '', auth: '' };
     const q = decodeURIComponent(b.u);
@@ -163,15 +168,15 @@ const faireRes = () => { const x = { code: null, corps: null, entetes: {} }; x.s
 
   await essaie('D. plafond', async () => {
     const auj = (compteur(J) || {}).jour;
-    lignes = [{ owner: J, id: 'ebay_recherches_jour', data: { jour: auj, n: 200, rev: 7 } }];
+    lignes = [{ owner: J, id: CPT, data: { jour: auj, n: 200, rev: 7 } }];
     const r = await app(JWT_J, criteres);
     dit(r.code === 429 && r.corps.reason === 'plafond', 'D. 200 recherches faites ⇒ 429 plafond', 'code ' + r.code);
     dit(!browse(r.journal).length, 'D. plafond atteint ⇒ zéro appel à Browse');
     dit((compteur(J) || {}).n === 200, 'D. le compteur ne monte pas au-delà');
-    lignes = [{ owner: J, id: 'ebay_recherches_jour', data: { jour: '2020-01-01', n: 200, rev: 3 } }];
+    lignes = [{ owner: J, id: CPT, data: { jour: '2020-01-01', n: 200, rev: 3 } }];
     const r2 = await app(JWT_J, criteres);
     dit(r2.code === 200 && (compteur(J) || {}).n === 1, 'D. un nouveau jour (Paris) ⇒ le compteur repart à 1', 'code ' + r2.code + ' ' + JSON.stringify(compteur(J)));
-    lignes = [{ owner: J, id: 'ebay_recherches_jour', data: { jour: auj, n: 200, rev: 3 } }];
+    lignes = [{ owner: J, id: CPT, data: { jour: auj, n: 200, rev: 3 } }];
     const r3 = await app(JWT_B, criteres);
     dit(r3.code === 200 && (compteur(B) || {}).n === 1 && (compteur(J) || {}).n === 200, 'D. chaque vendeur son compteur (B n\'est pas bloqué par J)');
   });
@@ -226,6 +231,44 @@ const faireRes = () => { const x = { code: null, corps: null, entetes: {} }; x.s
     let d = base, err = '';
     for (let i = 0; i < 11; i++) { try { d = met.appliquer(d, cmd(i), { acteur: J, maintenant: new Date().toISOString() }); } catch (e) { err = e.message; } }
     dit(d.veilles.length === 10 && /10 recherches actives/.test(err), 'H. 10 recherches actives au plus (la 11ᵉ est refusée)', d.veilles.length + ' · ' + err);
+  });
+
+  // ── I. (30 oct., revue) LE COMPTEUR NE S'ÉCRIT PAS PAR UN NAVIGATEUR ─────────
+  // Sous `ebay_recherches_jour`, une ligne app_data ordinaire, un vendeur
+  // effaçait sa propre ligne (RLS le lui permet) et repartait de zéro : le
+  // plafond ne protégeait pas le quota d'eBay commun. La garde de la base
+  // (`vrm_garde_ebay_tokens`, migration 014, en place en production) couvre
+  // tout id qui COMMENCE par `ebay_tokens`.
+  await essaie('I. compteur gardé', async () => {
+    const fs = require('fs');
+    dit(CPT.startsWith('ebay_tokens') && CPT !== 'ebay_tokens' && !/_[0-9a-f]{16}$/.test(CPT), 'I. le compteur vit sous le préfixe gardé `ebay_tokens…`, sans pouvoir être pris pour les jetons d\'un compte', CPT);
+    const m14 = fs.readFileSync(path.join(RACINE, 'supabase', 'migrations', '014-agent.sql'), 'utf8');
+    const garde = ['before insert', 'before update', 'before delete'].every((ev) => new RegExp(ev + "[^;]*starts_with\\((new|old)\\.id, 'ebay_tokens'\\)", 'i').test(m14));
+    dit(garde, 'I. la garde de la base couvre ce préfixe en création, réécriture et effacement (migration 014)');
+    const lire = (d) => fs.readdirSync(d, { withFileTypes: true }).flatMap((e) => e.isDirectory() ? (e.name === 'node_modules' ? [] : lire(path.join(d, e.name))) : [path.join(d, e.name)]);
+    const ecrivains = [...lire(path.join(RACINE, 'src')), ...lire(path.join(RACINE, 'vinted-sync-extension'))].filter((f) => /\.(jsx?|mjs)$/.test(f) && fs.readFileSync(f, 'utf8').includes(CPT));
+    dit(ecrivains.length === 0, 'I. ni l\'app ni l\'extension ne nomment le compteur (seule la route l\'écrit, clé de service)', ecrivains.join(', '));
+    const balayages = [...lire(path.join(RACINE, 'api')), ...lire(path.join(RACINE, 'src'))].filter((f) => /\.(jsx?|mjs)$/.test(f) && /like\.ebay_tokens/.test(fs.readFileSync(f, 'utf8')));
+    dit(balayages.length === 0, 'I. aucun balayage `ebay_tokens*` ne prendrait le compteur pour un compte', balayages.join(', '));
+  });
+
+  // ── J. (30 oct., revue) UNE RÈGLE DE CRITÈRES (§11) ─────────────────────────
+  // Une recherche qu'Organisation enregistre doit être une recherche que la
+  // route accepte : sinon elle reste « pas pu chercher » pour toujours.
+  await essaie('J. une règle de critères', async () => {
+    const met = await import('file://' + path.join(RACINE, 'src', 'operations', 'metier.js'));
+    const base = { titre: 't', etatArticle: 'tous', minimum: null, maximum: 5000, pays: 'FR' };
+    const cas = [{ mots: 'x' }, { mots: 'x  ' }, { mots: 'salomon', categorie: 'baskets' }, { mots: 'salomon', categorie: '15709' }, { mots: 'ab', pointure: '42,5' }, { mots: 'nike', pointure: '4x' }, { mots: 'nike', categorie: '12a' }, { mots: ' a b ' }];
+    const ecarts = [];
+    for (const c of cas) {
+      let veille = true; try { met.criteresVeille({ ...base, ...c }); } catch (_) { veille = false; }
+      const routeOk = !!(lib && lib.criteresRecherche({ ...c }).ok);
+      if (veille !== routeOk) ecarts.push(JSON.stringify(c) + ' → Organisation ' + (veille ? 'accepte' : 'refuse') + ', la route ' + (routeOk ? 'accepte' : 'refuse'));
+    }
+    dit(ecarts.length === 0, 'J. Organisation et la route acceptent et refusent les MÊMES critères', ecarts.join(' · '));
+    lignes = []; mode = {};
+    const r = await app(JWT_J, { action: 'chercher', mots: 'salomon', categorie: 'baskets' });
+    dit(r.code === 400 && r.corps.reason === 'criteres' && !browse(r.journal).length && !compteur(J), 'J. critères refusés ⇒ 400 « criteres », zéro appel, rien compté', 'code ' + r.code);
   });
 
   console.log(`\n${ko ? '❌' : '✅'} audit-ebay-recherche : ${ok} vert(s), ${ko} rouge(s)`);

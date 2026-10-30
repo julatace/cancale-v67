@@ -21,11 +21,33 @@ export const etatReservation=(r,now)=>r.etat==='active'&&Date.parse(r.expire)<=D
 // reçoit par défaut (pas de pointure, achat immédiat, livraison en France).
 // Et au plus `MAX_VEILLES_ACTIVES` relues : chacune coûte un appel à eBay.
 export const MAX_VEILLES_ACTIVES=10;
-const pointureVeille=v=>{if(v==null||v==='')return '';const s=texte(String(v),6,true);exige(!s||/^\d{2}([.,]5)?$/.test(s),'Pointure attendue : deux chiffres, et « ,5 » au besoin (42 ou 42,5).');return s;};
+// (30 octobre, revue) UNE règle pour ce qu'eBay peut chercher (§11) : la route
+// `chercher` (api/_lib/ebay-recherche.js) et l'espace Organisation l'appliquent
+// toutes les deux. Avant, Organisation acceptait « x » ou une catégorie en
+// lettres, que la route refusait ensuite à chaque lecture du fil.
+export function erreurCriteresEbay({mots,pointure,categorie}={}){
+ const m=typeof mots==='string'?mots.trim().replace(/\s+/g,' '):'';
+ if(m.length<2||m.length>200)return 'Mots-clés : au moins deux lettres (200 au plus).';
+ const p=pointure==null?'':String(pointure).trim();
+ if(p&&!/^\d{2}([.,]5)?$/.test(p))return 'Pointure attendue : deux chiffres, et « ,5 » au besoin (42 ou 42,5).';
+ const c=categorie==null?'':String(categorie).trim();
+ if(c&&!/^\d{1,10}$/.test(c))return 'Identifiant de catégorie eBay : des chiffres seulement (ex. 15709), ou laisse vide.';
+ return '';
+}
+// Les recherches du FIL d'eBay → Achats : actives, les plus récentes d'abord,
+// 10 au plus. Une seule règle pour le fil et pour l'espace Organisation (qui
+// dit « Dans le fil » ou « Hors du fil »).
+export function veillesDuFil(veilles){
+ const actives=(Array.isArray(veilles)?veilles:[]).filter(v=>v&&v.etat==='preparee');
+ actives.sort((a,b)=>String(b.cree||'').localeCompare(String(a.cree||'')));
+ return {fil:actives.slice(0,MAX_VEILLES_ACTIVES),horsFil:Math.max(0,actives.length-MAX_VEILLES_ACTIVES)};
+}
 export function criteresVeille(p){
  const minimum=p.minimum===null||p.minimum===undefined?null:entier(p.minimum),maximum=entier(p.maximum,1);
  exige(minimum===null||minimum<=maximum,'Le minimum dépasse le budget.');
- return {titre:texte(p.titre),mots:texte(p.mots,200),exclus:texte(p.exclus||'',200,true),categorie:texte(p.categorie||'',80,true),etatArticle:choix(p.etatArticle,['tous','neuf','occasion']),minimum,maximum,pays:choix(p.pays,['FR','BE','DE','ES','IT','tous']),pointure:pointureVeille(p.pointure),achatImmediat:p.achatImmediat!==false,livraisonFR:p.livraisonFR!==false};
+ const mots=texte(p.mots,200),categorie=texte(p.categorie||'',80,true),pointure=p.pointure==null||p.pointure===''?'':texte(String(p.pointure),6,true);
+ const e=erreurCriteresEbay({mots,pointure,categorie});exige(!e,e);
+ return {titre:texte(p.titre),mots,exclus:texte(p.exclus||'',200,true),categorie,etatArticle:choix(p.etatArticle,['tous','neuf','occasion']),minimum,maximum,pays:choix(p.pays,['FR','BE','DE','ES','IT','tous']),pointure,achatImmediat:p.achatImmediat!==false,livraisonFR:p.livraisonFR!==false};
 }
 const placeVeille=d=>exige(d.veilles.filter(x=>x.etat==='preparee').length<MAX_VEILLES_ACTIVES,`${MAX_VEILLES_ACTIVES} recherches actives au plus (chacune coûte un appel à eBay) : archive-en une d’abord.`);
 export function echeanceActive(section,x,maintenant){
