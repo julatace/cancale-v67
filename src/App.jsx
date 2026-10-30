@@ -27811,9 +27811,12 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
   // on dit où est chacun — ou qu'il n'est rangé nulle part (jamais deviné).
   const [aChercher, setAChercher] = useState(() => {
     const d = DEMANDE_STOCK_CHERCHE;
-    if (Array.isArray(d.nums) && d.nums.length && Date.now() - d.at < 120000) { const n = d.nums; d.nums = null; return n; }
+    if (Array.isArray(d.nums) && d.nums.length && Date.now() - d.at < 120000) return d.nums;
     return null;
   });
+  // La demande n'est vidée qu'une fois MONTÉ : un rendu interrompu (Suspense d'un
+  // écran chargé à la demande) rejoue l'initialiseur, qui doit la retrouver.
+  useEffect(() => { if (aChercher && DEMANDE_STOCK_CHERCHE.nums === aChercher) DEMANDE_STOCK_CHERCHE.nums = null; }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const chercheLoc = useMemo(() => aChercher ? aChercher.map(n => ({ numero: String(n), ou: ouEstNumero(plan, n) })) : null, [aChercher, plan]);
   const cibles3D = useMemo(() => (chercheLoc || []).filter(x => x.ou && x.ou.roomId === activeRoom.id).map(x => ({ itemId: x.ou.itemId, cell: x.ou.key, pileIdx: x.ou.pileIdx, num: x.numero })), [chercheLoc, activeRoom.id]);
   // Changer la DIMENSION d'un meuble (largeur, profondeur, pivot) : refusé s'il

@@ -133,6 +133,8 @@ async function ouvrirPanneau(pg, taille) {
   await pg.goto(`http://localhost:${PORT}/?tab=settings&vue=compte`, { waitUntil: 'domcontentloaded' });
   await pg.waitForTimeout(2500);
   // (29 oct.) Le panneau est une ligne à ouvrir aux deux tailles (plus seulement au téléphone).
+  // L'écran Réglages peut arriver en morceau chargé à la demande : on attend sa ligne.
+  await pg.waitForSelector('[data-sous-ouvrir="double"], [data-mfa-panneau]', { timeout: 10000 }).catch(() => {});
   { const l = await pg.$('[data-sous-ouvrir="double"]'); if (l && await l.isVisible()) { await l.click(); await pg.waitForTimeout(400); } }
   return attendre(pg, '[data-mfa-panneau="inactive"], [data-mfa-panneau="active"], [data-mfa-panneau="passu"]', 10000);
 }
