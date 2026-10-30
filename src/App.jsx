@@ -5712,16 +5712,20 @@ const suiviUrssaf = ({ freq, now = new Date(), declare, ligne, taux = tauxUrssaf
   // L'année civile : ce qu'il a déclaré (le CA tapé, sinon celui de VRM) et ses
   // cotisations — payées si toutes notées, sinon ESTIMÉES (et dit).
   const annee = String(now.getFullYear());
+  // (29 oct., revue 3) `periodes` compte les PÉRIODES déclarées (un trimestre =
+  // trois mois) : une seule ⇒ l'en-tête ne redit pas le détail de sa ligne.
   let caAnnee = 0, payeAnnee = 0, payesConnus = true, nAnnee = 0;
+  const periodesAnnee = new Set();
   for (const [ym, d] of Object.entries(declare)) {
     if (!d || !Array.isArray(d.ids) || ym.slice(0, 4) !== annee) continue;
     nAnnee++; caAnnee += caDeclareDe(d);
+    periodesAnnee.add(freq === 'mensuel' ? ym : `${ym.slice(0, 4)}-T${Math.floor((Number(ym.slice(5, 7)) - 1) / 3)}`);
     const x = payeDe(d); if (x != null) payeAnnee += x; else payesConnus = false;
   }
   const rev = lignes.reverse();
   return {
     lignes: rev,
-    annee: { annee, n: nAnnee, ca: r2(caAnnee), paye: nAnnee && payesConnus ? r2(payeAnnee) : null, estime: nAnnee ? aPayerUrssaf(caAnnee, taux) : null },
+    annee: { annee, n: nAnnee, periodes: periodesAnnee.size, ca: r2(caAnnee), paye: nAnnee && payesConnus ? r2(payeAnnee) : null, estime: nAnnee ? aPayerUrssaf(caAnnee, taux) : null },
     enRetard: rev.filter((l) => l.etat === 'en_retard').length,
     // La prochaine échéance à faire (la plus proche, pas notée, période finie).
     prochaine: rev.filter((l) => l.etat === 'a_declarer').sort((a, b) => a.joursRestants - b.joursRestants)[0] || null,
@@ -33298,7 +33302,7 @@ function SuiviUrssaf({ onNav }) {
         </div>
         <div data-suivi-annee={a.annee} data-suivi-annee-ca={String(a.ca)} data-suivi-annee-paye={a.paye == null ? '' : String(a.paye)} style={{ fontSize: 13, color: C.muted, marginTop: 2, lineHeight: 1.5 }}>
           {a.n === 0 ? <>Aucune déclaration notée en {a.annee}. Après chaque déclaration sur l'URSSAF, touche « C'est déclaré » : VRM garde ce que tu as déclaré et payé.</>
-            : a.n === 1 ? <>{a.annee} : 1 mois noté « déclaré » — son détail est juste en dessous.</>
+            : a.periodes === 1 ? <>{a.annee} : {freq === 'mensuel' ? '1 mois noté « déclaré »' : '1 période notée « déclarée »'} — son détail est juste en dessous.</>
             : <>{a.annee} : <b style={{ color: C.text }}>{eur(a.ca)}</b> déclarés sur {a.n} mois · {a.paye != null ? <>cotisations payées <b style={{ color: C.text }}>{eur(a.paye)}</b></> : <>cotisations ≈ <b style={{ color: C.text }}>{eur(a.estime)}</b> (estimées : note ce que tu as payé avec « Compléter »)</>}</>}
         </div>
         {suivi.enRetard > 0 ? <div data-suivi-retard-texte="" style={{ fontSize: 13, color: C.text, marginTop: 8, lineHeight: 1.5 }}>{suivi.enRetard === 1 ? '1 période passée n\'est' : `${suivi.enRetard} périodes passées ne sont`} pas notée{suivi.enRetard > 1 ? 's' : ''} « déclarée ». Si tu l'as déjà déclarée sur l'URSSAF, touche « C'est déclaré » pour la noter ; sinon, déclare-la vite (une déclaration en retard peut coûter une pénalité).</div> : null}

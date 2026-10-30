@@ -30,6 +30,7 @@
 //       fiscal » ; le « ⓘ » du résultat ne dit pas « juste en dessous » d'un
 //       bénéfice qui est AU-DESSUS (la position est jugée, pas le mot seul).
 //  B. versement libératoire déjà dit ⇒ la micro-entreprise reste repliée.
+//  F (revue 3). Trimestriel, un seul trimestre noté : 37,20 € écrit une fois.
 //  C. Organisation n'est plus dans le menu (Gestion au téléphone, rail à
 //     l'ordinateur), mais on y entre par Réglages → Stock et rangement, et
 //     `?tab=organisation` marche toujours.
@@ -86,7 +87,7 @@ async function page(b, vp, sombre, avecVl, errs, o = {}) {
   await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) ? r.abort() : r.continue()));
   // La ligne `main` GARDE ce que l'app y écrit (une relecture du nuage ne doit
   // pas rendre l'ancienne valeur : un banc qui jette les écritures mesure une fiction).
-  let m = main(sombre, avecVl, o.ligne);
+  let m = { ...main(sombre, avecVl, o.ligne), ...(o.extra || {}) };
   await pg.route('**/rest/v1/**', (route) => {
     const u = decodeURIComponent(metaVersData(route.request().url()));
     const j = (d) => route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*', 'content-range': `0-${Math.max(0, d.length - 1)}/${d.length}` }, body: JSON.stringify(d) });
@@ -373,6 +374,34 @@ async function scenarioE(b, vp, sombre) {
   await ctx.close();
 }
 
+// F (revue 3) — déclaration TRIMESTRIELLE, un seul trimestre noté (T3 :
+// juillet, août, septembre) : l'en-tête du suivi ne redit pas le trimestre que
+// sa ligne détaille juste dessous (le total annuel compte des PÉRIODES, pas des
+// mois). Le montant des cotisations de T3 (37,20 €) est écrit UNE fois.
+async function scenarioF(b, vp, sombre) {
+  const nom = `${vp.width}${sombre ? ' sombre' : ' clair'}`;
+  const errs = [];
+  const decl = (ym, ids) => ({ ids, n: ids.length, ca: 100, montant: 100, regle: 'versement', at: Date.parse('2026-10-12T09:00:00Z') });
+  const extra = { vinted_urssaf_freq: 'trimestriel', vrm_urssaf_declare: { '2026-07': decl('2026-07', ['vinted:9311']), '2026-08': decl('2026-08', ['vinted:9312']), '2026-09': decl('2026-09', ['vinted:9301']) } };
+  const { ctx, pg } = await page(b, vp, sombre, true, errs, { extra });
+  await essaie(`F ${nom}`, async () => {
+    await ouvrir(pg, 'compta');
+    await pg.locator('[data-suivi-urssaf="lu"]').first().waitFor({ timeout: 40000 });
+    await pg.locator('[data-suivi-periode="T3 2026"]').first().waitFor({ timeout: 40000 });
+    await pg.waitForTimeout(600);
+    check((await attr(pg, '[data-suivi-periode="T3 2026"]', 'data-suivi-etat')) === 'declaree', `F ${nom} — T3 2026 est noté « déclaré » (trois mois)`);
+    check((await attr(pg, '[data-suivi-periode="T3 2026"]', 'data-suivi-decl')) === '300', `F ${nom} — le suivi garde T3 déclaré 300 € (inchangé)`);
+    check((await attr(pg, '[data-suivi-annee]', 'data-suivi-annee-ca')) === '300', `F ${nom} — le total de l'année reste 300 € (attribut, chiffre inchangé)`);
+    const entete = (await texte(pg, '[data-suivi-annee]')) || '';
+    check(!/37,20|300,00/.test(entete), `F ${nom} — l'en-tête du suivi ne redit pas le trimestre détaillé dessous : « ${entete.replace(/\s+/g, ' ').trim()} »`);
+    const tout = await pg.evaluate(() => { const m = document.querySelector('.vrm-main'); if (!m) return ''; const c = m.cloneNode(true); for (const b of c.querySelectorAll('[data-benef-etat]')) b.remove(); document.body.appendChild(c); const t = c.innerText; c.remove(); return t; });
+    const n = (tout.match(/37,20/g) || []).length;
+    check(n === 1, `F ${nom} — les cotisations de T3 (37,20 €) sont écrites une fois : ${n} fois`);
+    check(!errs.length, `F ${nom} — aucune erreur JavaScript${errs.length ? ' : ' + errs[0].slice(0, 160) : ''}`);
+  });
+  await ctx.close();
+}
+
 (async () => {
   const b = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || '/opt/pw-browsers/chromium', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
   const TEL = { width: 390, height: 844 }, ORDI = { width: 1512, height: 950 };
@@ -387,6 +416,8 @@ async function scenarioE(b, vp, sombre) {
     await scenarioD(b, ORDI, true);
     await scenarioE(b, TEL, false);
     await scenarioE(b, ORDI, true);
+    await scenarioF(b, TEL, false);
+    await scenarioF(b, ORDI, true);
   } finally { await b.close(); srv.close(); }
   console.log(`\n${ok} vert(s), ${ko} rouge(s)`);
   process.exit(ko ? 1 : 0);

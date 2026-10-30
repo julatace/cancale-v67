@@ -1,5 +1,13 @@
 # VRM — dossier de passation
 
+> **29 octobre (revue 3) — Comptabilité, suivi URSSAF en trimestriel :** un seul trimestre noté (T3 = juillet, août,
+> septembre) était encore dit deux fois — l'en-tête « 300,00 € déclarés sur 3 mois · cotisations ≈ 37,20 € » au-dessus de la
+> ligne T3 qui dit la même chose. La revue 2 ne retirait le total que pour UN MOIS (`a.n === 1`) ; `suiviUrssaf` rend maintenant
+> `annee.periodes` (périodes déclarées de l'année selon le rythme, un trimestre = trois mois) et l'en-tête dit « 1 période notée
+> « déclarée » — son détail est juste en dessous ». Aucun chiffre ne change (`data-suivi-annee-ca` inchangé). Preuves : banc
+> `compta-simple.cjs` scénario F (390 tactile clair, 1512 sombre) **4 rouges sur la branche d'avant (93824bf7)**, 0 après ;
+> mutation « périodes comptées en mois » ⇒ 4 rouges ; banc entier 176 verts. Geste de Julien : aucun.
+
 > **29 octobre (revue 2) — Comptabilité : cinq défauts des relecteurs, corrigés :** (1) la carte URSSAF renvoyait une vente
 > Leboncoin à dater vers « Chiffre d'affaires par période », carte renommée « Vendu et reçu » : une source (`TITRE_CARTE_CA`) pour
 > le titre, le sommaire et la phrase, singulier accordé ; (2) **une période déjà notée « déclarée »** gardait « dans 4 j · à payer
