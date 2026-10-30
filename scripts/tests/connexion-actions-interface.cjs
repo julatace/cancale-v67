@@ -17,6 +17,7 @@ const { build } = require("esbuild"),
       contents: `import React from'react';import{createRoot}from'react-dom/client';
  const C={text:'#223d41',muted:'#647676',bg:'#f2f5f0',card:'#fff',border:'#dce4de',accent:'#315e62',warn:'#946d27',danger:'#a33c36',onAccent:'#fff'},AUTH_REDIRECT=null,CLOISONNE=true,__lier=null;
  const sondeLectureSansCompte=async()=>false,useSecondesRestantes=()=>0,useCaptcha=()=>({statut:'pret'}),captchaActif=()=>false,confirmRequired=()=>false,CaptchaConnexion=()=>null,LiensLegaux=()=>null,BrandMark=()=>null;
+ const etatAuthSettings=()=>({statut:'pret'}),onAuthSettingsChange=()=>()=>{},loadAuthSettings=async()=>{};
  const OAUTH_PROVIDERS=[{id:'google',label:'Google'},{id:'discord',label:'Discord'}],providerEnabled=()=>true,delaiDemandeEmail=()=>null,TEXTE_DELAI_EMAIL_BOUTON='',texteDelaiEmail=()=>'',save=()=>{};
  window.appels=[];window.attentes={};const demande=(action)=>{window.appels.push(action);return new Promise((resolve,reject)=>{window.attentes[action]={resolve,reject};});};
  const oauthStart=p=>demande(p),authSignIn=()=>demande('connexion'),authSignUp=()=>demande('inscription'),authReset=()=>demande('reset'),authSetPassword=()=>demande('motdepasse'),authResendConfirm=()=>demande('renvoyer'),authMagicLink=()=>demande('lien'),authConfirmFromLink=()=>demande('confirmer');
