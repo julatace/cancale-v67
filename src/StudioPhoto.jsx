@@ -241,7 +241,7 @@ export default function StudioPhoto({ C, paires, base, onClose }) {
                     <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 6 }}>
                       {!ph.detoure && <button type="button" data-studio-detourer={ph.id} className={B.sp} disabled={!!occupe} onClick={() => detourer(ph)}>{occupe === 'detour:' + ph.id ? 'Détourage…' : 'Détourer ici'}</button>}
                       {!ph.detoure && avecPhotoroom && <button type="button" data-studio-photoroom={ph.id} className={B.sp} disabled={!!occupe} onClick={() => detourerPhotoroom(ph)}>{occupe === 'photoroom:' + ph.id ? 'Photoroom…' : 'Détourer avec Photoroom'}</button>}
-                      <a href={ph.detoure || ph.img} download={`VRM-${sel.cle}-${i + 1}${ph.detoure ? (/^data:image\/jpe?g/.test(ph.detoure) ? '.jpg' : /webp/.test(ph.detoure.slice(0, 20)) ? '.webp' : '.png') : '.jpg'}`} className={B.sp}>Enregistrer</a>
+                      <a href={ph.detoure || ph.img} download={`VRM-${sel.cle}-${i + 1}${ph.detoure ? (/^data:image\/jpe?g/.test(ph.detoure) ? '.jpg' : /webp/.test(ph.detoure.slice(0, 20)) ? '.webp' : '.png') : '.jpg'}`} className={B.sp}>Télécharger</a>
                       <button type="button" className={B.d} disabled={!!occupe} onClick={() => retirer(ph)}>Retirer</button>
                     </div>
                   </div>

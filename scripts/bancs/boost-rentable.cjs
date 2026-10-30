@@ -150,7 +150,7 @@ const sansCouleurJugement = (vals) => Object.values(vals).every((v) => { const m
         const { ctx, pg, errs } = await ouvrir(b, T, jeu({ nb: 3 }));
         const R = await lire(pg);
         dit(!!R && R.etat === 'lu' && R.assez === 'non' && R.verdict, '« pas assez de ventes pour juger »', JSON.stringify(R && [R.etat, R.assez, R.verdict]));
-        dit(!!R && Object.values(R.vals).length === 8 && Object.values(R.vals).every((v) => v.t === '—'), 'aucun chiffre comparé (que des « — »)', JSON.stringify(R && R.vals));
+        dit(!!R && Object.values(R.vals).every((v) => v.t === '—'), 'aucun chiffre comparé (tableau replié ou que des « — »)', JSON.stringify(R && R.vals));
         dit(errs.length === 0, 'aucune erreur d’app', errs.join(' | ').slice(0, 160));
         await ctx.close();
       });

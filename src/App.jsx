@@ -10486,7 +10486,7 @@ function AchatsHorsPlateforme({ achats, ouvert, onBasculer, onAjouter, onModifie
   return (
     <div data-achats-hors style={{ border: `1px solid ${C.border}`, background: C.card, borderRadius: 12, marginBottom: 12, boxShadow: C.shadow || 'none', overflow: 'hidden' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 6px 6px 14px', minHeight: 58 }}>
-        <button type="button" data-achats-hors-entete onClick={() => onBasculer(!ouvert)} aria-expanded={ouvert}
+        <button type="button" data-achats-hors-entete onClick={() => (liste.length ? onBasculer(!ouvert) : ouvrirAjout())} aria-expanded={liste.length ? ouvert : undefined}
           style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 10, border: 'none', background: 'transparent', padding: '6px 0', minHeight: 44, cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left', color: C.text }}>
           <span aria-hidden="true" style={{ flexShrink: 0, color: C.muted, display: 'flex' }}><Icon name="tag" size={18} /></span>
           <span style={{ flex: 1, minWidth: 0 }}>
@@ -12806,7 +12806,7 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
                 : (!(nPasFaites || nDouble) ? 'Tout est fait.' : null);
               // Deux mots seulement : « pas faite » (rien n'a changé sur Vinted) et
               // « à vérifier » (la nouvelle annonce est en ligne, l'ancienne est restée).
-              const erreur = (nPasFaites || nDouble) ? <>{[nPasFaites ? `${pl(nPasFaites, 'pas faite', 'pas faites')} : rien n'a changé sur Vinted${onReessayer && nEchec ? ' — « Réessayer » en bas' : ''}` : null, nDouble ? `${pl(nDouble, 'à vérifier', 'à vérifier')} : ouvre l'ancienne annonce sur Vinted (lien sur sa ligne)` : null].filter(Boolean).join(' · ')}.</> : null;
+              const erreur = (nPasFaites || nDouble) ? <>{[nPasFaites ? `${pl(nPasFaites, 'pas faite', 'pas faites')}${nRefaire ? ` (dont ${pl(nRefaire, 'brouillon à refaire', 'brouillons à refaire')} : bouton sur sa ligne)` : ''} : rien n'a changé sur Vinted${onReessayer && nEchec ? ' — « Réessayer » en bas' : ''}` : null, nDouble ? `${pl(nDouble, 'à vérifier', 'à vérifier')} : ouvre l'ancienne annonce sur Vinted (lien sur sa ligne)` : null].filter(Boolean).join(' · ')}.</> : null;
               const compte = [bilan, enCours ? '1 en cours' : null, nPasFaites ? pl(nPasFaites, 'pas faite', 'pas faites') : null, nDouble ? pl(nDouble, 'à vérifier', 'à vérifier') : null, nPlanif ? pl(nPlanif, 'prévue') : null, pasCommencees ? pl(pasCommencees, 'restante') : null].filter(Boolean).join(' · ');
               const lstEnCours = action === 'versBrouillon' ? ETAPES_REPUB.versBrouillon : ((viaBrouillon && !!brouillonOk) ? ETAPES_REPUB.brouillon : ETAPES_REPUB.direct);
               return <Avancement titre={titre} phrase={phrase} part={part} partRate={partRate} label={`${nFait} sur ${total} ${motF(nFait)}`} erreur={erreur}
@@ -30480,7 +30480,7 @@ function VintedAccounts({ accounts, setAccounts, baseKO, onRetour }) {
 
   return (
     <div style={{padding:'16px 14px 40px'}}>
-      {onRetour && <button type="button" className="vrm-settings-back" onClick={onRetour} style={{color:C.accent,borderColor:C.border}}>← Retour aux paramètres</button>}
+      {onRetour && <Bouton variante="discret" className="vrm-settings-back" onClick={onRetour}>‹ Réglages</Bouton>}
       <GuideReglage titre="Relier et vérifier un compte" etapes={[
         ['Connecte ton compte', 'Ouvre Vinted avec l’extension VRM active, puis actualise cette liste.'],
         ['Vérifie son identité', 'Contrôle le pseudo et associe l’adresse qui reçoit les emails de ce compte.'],
@@ -30506,17 +30506,12 @@ function VintedAccounts({ accounts, setAccounts, baseKO, onRetour }) {
             {(retires && retires.logins && retires.logins.length)
               ? ` Retiré${retires.logins.length>1?'s':''} : ${retires.logins.join(', ')}.` : ''}
           </div>
-          <button type="button" onClick={toutAfficher} disabled={remise}
-            style={{width:'100%',border:'none',background:C.accent,color:C.onAccent||'#fff',borderRadius:10,padding:'11px',fontSize:13,fontWeight:600,cursor:remise?'default':'pointer',fontFamily:'inherit'}}>
-            {remise ? '…' : 'Tout réafficher'}
-          </button>
+          <Bouton data-tout-reafficher onClick={toutAfficher} disabled={remise}>{remise ? '…' : 'Tout réafficher'}</Bouton>
         </div>
       )}
       <ScreenHead icon="link" title="Comptes Vinted liés"
         desc="Ceux que l'extension Chrome capte quand tu navigues sur Vinted. Annonces, ventes, achats et messages se consultent dans leurs onglets."
-        right={<button type="button" onClick={refreshAccounts} title="Recharge la liste des comptes captés par l'extension" style={{background:'transparent',border:`1px solid ${C.border}`,borderRadius:8,padding:'6px 12px',cursor:'pointer',fontSize:12,fontWeight:500,color:C.text}}>
-          {loading ? '…' : '↻ Actualiser'}
-        </button>}/>
+        right={<Bouton icone="sync" className="vrm-b-petit" onClick={refreshAccounts} title="Recharge la liste des comptes captés par l'extension">{loading ? '…' : 'Actualiser'}</Bouton>}/>
 
       {/* ⚠️ « Aucun compte détecté · installe l'extension » à quelqu'un qui en a
           NEUF : c'est ce que cet écran affichait quand la base ne répondait pas.
@@ -30547,8 +30542,9 @@ function VintedAccounts({ accounts, setAccounts, baseKO, onRetour }) {
         return (
           <div style={{display:'flex',gap:8,flexWrap:'wrap',alignItems:'center',padding:'9px 12px',border:`1px solid ${C.border}`,borderRadius:10,background:C.card,marginBottom:14,fontSize:13,fontWeight:600}}>
             <span style={{color:C.text}}>Tes comptes :</span>
-            <span data-comptes-actifs={ok} style={{display:'inline-flex',alignItems:'center',gap:4,color:C.text}}><Icon name="check" size={13}/>{ok} actif{ok>1?'s':''}</span>
-            {bad>0 && <span data-comptes-bannis={bad} style={{display:'inline-flex',alignItems:'center',gap:4,color:C.danger}}><Icon name="alert" size={13}/>{bad} banni{bad>1?'s':''} par Vinted</span>}
+            <span data-comptes-actifs={ok} style={{display:'inline-flex',alignItems:'center',gap:4,color:C.text}}>{ok>0 && <Icon name="check" size={13}/>}{ok} actif{ok>1?'s':''}</span>
+            {warn>0 && <span data-comptes-non-verifies={warn} style={{display:'inline-flex',alignItems:'center',gap:4,color:C.muted,fontWeight:500}}>· {warn} pas encore vérifié{warn>1?'s':''}</span>}
+            {bad>0 && <span data-comptes-bannis={bad} style={{display:'inline-flex',alignItems:'center',gap:4,color:C.warn}}><Icon name="alert" size={13}/>{bad} banni{bad>1?'s':''} par Vinted</span>}
             {exclu>0 && <span style={{display:'inline-flex',alignItems:'center',gap:4,color:C.muted}}><Icon name="eyeOff" size={13}/>{exclu} masqué{exclu>1?'s':''} — ton choix</span>}
           </div>
         );
@@ -30663,10 +30659,7 @@ function VintedAccounts({ accounts, setAccounts, baseKO, onRetour }) {
                       <button type="button" className="vrm-lien-action" onClick={()=>remettreMessages(acc)} style={{border:'none',background:'transparent',color:C.accent,fontSize:11,fontWeight:600,cursor:'pointer',padding:0,fontFamily:'inherit'}}>Les remettre</button>
                     </span>
                   )}
-                  <button type="button" onClick={()=>ouvrirSuppression(acc)} title="Supprimer les données de ce compte — tu choisis quoi effacer (annonces, ventes, achats, messages, le compte). Récupérable en reconnectant l'extension."
-                    style={{background:'transparent',border:`1px solid ${C.danger}`,borderRadius:8,padding:'5px 12px',cursor:'pointer',fontSize:11,fontWeight:500,color:C.danger}}>
-                    <span style={{display:'inline-flex',alignItems:'center',gap:4}}><Icon name="trash" size={12}/>Supprimer des données…</span>
-                  </button>
+                  <Bouton variante="discret" icone="trash" onClick={()=>ouvrirSuppression(acc)} title="Supprimer les données de ce compte — tu choisis quoi effacer (annonces, ventes, achats, messages, le compte). Récupérable en reconnectant l'extension.">Supprimer des données…</Bouton>
                 </div>
                   </div>
                   </div>
@@ -33119,10 +33112,10 @@ function SuiviUrssaf({ onNav }) {
           {suivi.lignes.length ? <button type="button" className="vrm-lien-action" data-suivi-export="" onClick={exporter} style={{ background: 'none', border: 'none', color: C.accent, fontSize: 13, fontWeight: 600, padding: 0, minHeight: 44, cursor: 'pointer', fontFamily: 'inherit' }}>Exporter (CSV)</button> : null}
         </div>
         <div data-suivi-annee={a.annee} data-suivi-annee-ca={String(a.ca)} data-suivi-annee-paye={a.paye == null ? '' : String(a.paye)} style={{ fontSize: 13, color: C.muted, marginTop: 2, lineHeight: 1.5 }}>
-          {a.n === 0 ? <>Aucune déclaration notée en {a.annee}. Après chaque déclaration sur l'URSSAF, touche « C'est déclaré » : VRM garde ce que tu as déclaré et payé.</>
+          {a.n === 0 ? <>Aucune déclaration notée en {a.annee}. Après chaque déclaration sur l'URSSAF, touche « Noter ma déclaration » : VRM garde ce que tu as déclaré et payé.</>
             : <>{a.annee} : <b style={{ color: C.text }}>{eur(a.ca)}</b> déclarés sur {a.n} mois · {a.paye != null ? <>cotisations payées <b style={{ color: C.text }}>{eur(a.paye)}</b></> : <>cotisations ≈ <b style={{ color: C.text }}>{eur(a.estime)}</b> (estimées : note ce que tu as payé avec « Compléter »)</>}</>}
         </div>
-        {suivi.enRetard > 0 ? <div data-suivi-retard-texte="" style={{ fontSize: 13, color: C.text, marginTop: 8, lineHeight: 1.5 }}>{suivi.enRetard === 1 ? '1 période passée n\'est' : `${suivi.enRetard} périodes passées ne sont`} pas notée{suivi.enRetard > 1 ? 's' : ''} « déclarée ». Si tu l'as déjà déclarée sur l'URSSAF, touche « C'est déclaré » pour la noter ; sinon, déclare-la vite (une déclaration en retard peut coûter une pénalité).</div> : null}
+        {suivi.enRetard > 0 ? <div data-suivi-retard-texte="" style={{ fontSize: 13, color: C.text, marginTop: 8, lineHeight: 1.5 }}>{suivi.enRetard === 1 ? '1 période passée n\'est' : `${suivi.enRetard} périodes passées ne sont`} pas notée{suivi.enRetard > 1 ? 's' : ''} « déclarée ». Si tu l'as déjà déclarée sur l'URSSAF, touche « Noter ma déclaration » ; sinon, déclare-la vite (une déclaration en retard peut coûter une pénalité).</div> : null}
         {(() => {
           const aNoter = suivi.lignes.filter((l) => l.etat === 'en_retard' || l.etat === 'a_declarer').flatMap((l) => l.aNoter);
           return aNoter.length >= 2 ? (
@@ -33181,7 +33174,7 @@ function SuiviUrssaf({ onNav }) {
                     <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 2 }}>
                       {(l.etat === 'a_declarer' || l.etat === 'en_retard') && l.aNoter.length > 0 ? (
                         <button type="button" data-suivi-noter={l.aNoter[0]} onClick={() => demanderDeclaration(l.aNoter[0], onNav)} style={btn}>
-                          {l.yms.length > 1 ? `C'est déclaré — noter ${nomMois(l.aNoter[0])}` : "C'est déclaré"}
+                          {l.yms.length > 1 ? `Noter ma déclaration — ${nomMois(l.aNoter[0])}` : 'Noter ma déclaration'}
                         </button>) : null}
                       {l.aCompleter.length > 0 ? (
                         <button type="button" data-suivi-completer={l.aCompleter[0]} onClick={() => ouvrirEdit(l.aCompleter[0])} style={btn}>
@@ -33394,7 +33387,7 @@ function CarteUrssafMois({ liveStats, onNav }) {
                   {finie && aNoter.length > 0 && (
                     <button type="button" data-urssaf-cest-declare={aNoter[0]} onClick={() => demanderDeclaration(aNoter[0], onNav)}
                       style={{fontSize:13,fontWeight:600,color:C.text,background:'transparent',border:`1px solid ${C.border}`,borderRadius:10,padding:'8px 14px',minHeight:44,cursor:'pointer',fontFamily:'inherit'}}>
-                      {ymsDue.length > 1 ? `C'est déclaré — noter ${nomYm(aNoter[0])}` : "C'est déclaré"}
+                      {ymsDue.length > 1 ? `Noter ma déclaration — ${nomYm(aNoter[0])}` : 'Noter ma déclaration'}
                     </button>
                   )}
                   <span style={{fontSize:11,color:C.muted,lineHeight:1.4,flex:'1 1 160px'}}>Estimation ({String(tauxUrssaf()).replace('.',',')} %) — le chiffre officiel se saisit là‑bas.{finie && aNoter.length > 0 ? <> Une fois déclaré, note-le ici : ses ventes ne seront plus recomptées le mois suivant.</> : null}{finie && ymsDue.length > 1 && aNoter.length > 0 && aNoter.length < ymsDue.length ? <> {ymsDue.length - aNoter.length} mois sur {ymsDue.length} déjà noté{ymsDue.length - aNoter.length > 1 ? 's' : ''}.</> : null}</span>
@@ -33744,12 +33737,13 @@ function BoostRentable({ panelOff }) {
   return (
     <div data-stats-carte="boost" data-boost-etat="lu" data-boost-assez={R.assez ? 'oui' : 'non'} data-boost-b={R.boostees} data-boost-montant={R.avecMontant} data-boost-nb={R.nonBoostees} data-boost-comp={`${R.comparables.b}/${R.comparables.nb}`} style={sCarte}>
       {titre}
-      <div data-boost-couverture="" style={{...sNote,fontSize:11,marginTop:6}}>
-        {s(R.boostees, 'boostée')} vendue{R.boostees > 1 ? 's' : ''} ({R.avecMontant} avec montant) · {R.nonBoostees} autre{R.nonBoostees > 1 ? 's' : ''} · comparables {R.comparables.b} / {R.comparables.nb}
-        {(R.inconnues > 0 || R.sansAnnonce > 0) ? <> · pas comptées : {[R.inconnues > 0 ? `${R.inconnues} sans information de boost` : '', R.sansAnnonce > 0 ? `${R.sansAnnonce} pas reliée${R.sansAnnonce > 1 ? 's' : ''} à leur annonce` : ''].filter(Boolean).join(' · ')}.</> : null}
+      {/* (30 oct.) Une ligne, en mots ; le détail (montants saisis, ventes pas reliées) derrière ⓘ. */}
+      <div data-boost-couverture="" style={{...sNote,fontSize:11.5,marginTop:6,display:'flex',alignItems:'center',gap:4,flexWrap:'wrap'}}>
+        {s(R.comparables.b, 'boostée')} · {R.comparables.nb} non boostée{R.comparables.nb > 1 ? 's' : ''} comparées (même tranche de prix)
+        <Pourquoi label="Détail">{s(R.boostees, 'boostée')} vendue{R.boostees > 1 ? 's' : ''}, dont {R.avecMontant} avec le montant du boost saisi · {R.nonBoostees} non boostée{R.nonBoostees > 1 ? 's' : ''}.{(R.inconnues > 0 || R.sansAnnonce > 0) ? ` Pas comptées : ${[R.inconnues > 0 ? `${R.inconnues} sans information de boost` : '', R.sansAnnonce > 0 ? `${R.sansAnnonce} pas reliée${R.sansAnnonce > 1 ? 's' : ''} à leur annonce` : ''].filter(Boolean).join(', ')}.` : ''}</Pourquoi>
       </div>
-      {!R.assez && <div data-boost-verdict="pas-assez" style={{...sNote,marginTop:10,color:C.text}}>Pas assez de ventes pour juger (il en faut {SEUIL_BOOST} de chaque côté, même tranche de prix).</div>}
-      <div style={{display:'grid',gridTemplateColumns:'minmax(0,1fr) auto auto',gap:'8px 14px',marginTop:12,paddingTop:12,borderTop:`1px solid ${C.border}`,alignItems:'baseline'}}>
+      {!R.assez && <div data-boost-verdict="pas-assez" style={{...sNote,marginTop:10,color:C.text}}>Pas assez de ventes pour juger — il en faut {SEUIL_BOOST} boostées et {SEUIL_BOOST} autres.</div>}
+      {R.assez && <div style={{display:'grid',gridTemplateColumns:'minmax(0,1fr) auto auto',gap:'8px 14px',marginTop:12,paddingTop:12,borderTop:`1px solid ${C.border}`,alignItems:'baseline'}}>
         <span/>
         <span style={{fontSize:11,color:C.muted,fontWeight:600,textAlign:'right'}}>Boostées</span>
         <span style={{fontSize:11,color:C.muted,fontWeight:600,textAlign:'right'}}>Les autres</span>
@@ -33760,7 +33754,7 @@ function BoostRentable({ panelOff }) {
             <span data-boost-val={`${l.k}-nb`} className="vrm-display" style={{fontSize:15,fontWeight:600,color:l.m.nonb == null ? C.muted : C.text,textAlign:'right',fontVariantNumeric:'tabular-nums',whiteSpace:'nowrap'}}>{l.f(l.m.nonb)}</span>
           </React.Fragment>
         ))}
-      </div>
+      </div>}
       <div style={{...sNote,fontSize:11,marginTop:10,display:'flex',alignItems:'center',gap:4,flexWrap:'wrap'}}>
         Un repère : rien ici n'entre dans un total. <Pourquoi label="Comment c'est compté">Chaque vente est reliée à son annonce par la transaction, jamais par le titre. Vinted ne dit « boostée » que pendant le boost : une paire boostée puis vendue après la fin du boost compte parmi « les autres » si tu n'as pas saisi son « Boost payé » (Annonces → Gérer l’annonce). La marge d'une boostée demande ce montant et son prix d'achat. « — » = moins de {SEUIL_BOOST} ventes connues d'un côté.</Pourquoi>
       </div>
@@ -33935,8 +33929,9 @@ function BeneficeCompta({ compta, onNav, onSansDepenses, onAjouterDepense }) {
       data-benef-depenses={B ? (nuagePret ? B.depenses : 'passu') : ''}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', margin: '0 16px 8px' }}>
         <h3 className="vrm-titre-compta" data-titre-section="" style={{ fontSize:15,fontWeight:600,color:C.text,letterSpacing:-0.15, margin: 0, flex: '1 1 auto' }}>Ton bénéfice{B ? ` · ${B.libelle}` : ''}</h3>
-        <Segmente label="Période du bénéfice" plein value={periode} onChange={choisir} style={{ margin: 0, flex: '0 1 300px' }}
-          options={PERIODES_BENEF.map(([k, l]) => ({ v: k, l, data: { 'data-benef-choix': k } }))} />
+        {/* (30 oct.) Sans bénéfice publié, changer de période ne changeait rien : le choix attend. */}
+        {B && <Segmente label="Période du bénéfice" plein value={periode} onChange={choisir} style={{ margin: 0, flex: '0 1 300px' }}
+          options={PERIODES_BENEF.map(([k, l]) => ({ v: k, l, data: { 'data-benef-choix': k } }))} />}
       </div>
       <div className="vrm-set-liste" style={{ background: C.card, border: `1px solid ${C.border}`, '--vrm-set-filet': C.border }}>
         {!B ? (
@@ -43566,6 +43561,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         const anIci = String(new Date().getFullYear());
         const caAnnee = declarables ? declarables.lignes.reduce((x, l) => (l && String(l.ym || '').startsWith(anIci)) ? x + l.eur : x, 0) : null;
         const adVinted = declarables ? declarables.aDater.filter(l => l.plateforme === 'Vinted').length : 0;
+        // (30 oct.) Des ventes finalisées sans date de versement ne sont dans aucun mois :
+        // « Reçu » et le CA de l'année sont alors des MINIMUMS — la couverture se dit à côté (§5).
+        const adTous = declarables && Array.isArray(declarables.aDater) ? declarables.aDater.length : 0;
         // Ce qui a été versé ce mois-ci mais DÉCLARÉ dans un autre mois : c'est
         // de l'argent reçu, ce n'est pas le CA déclaré de ce mois. La phrase sous
         // le chiffre le dit, des MÊMES lignes (§5).
@@ -43669,7 +43667,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               <span className="vrm-day-task-action" style={{fontSize:12,color:j.color,fontWeight:600,flexShrink:0}}>Voir <span aria-hidden="true">›</span></span>
             </button>
             <Bouton variante="secondaire" icone="check" className="vrm-b-petit" data-urssaf-cest-declare={j.urssaf.aNoter[0]} onClick={()=>demanderDeclaration(j.urssaf.aNoter[0], onNav)} style={{flexShrink:0}}>
-              {j.urssaf.mois && j.urssaf.mois.length > 1 ? `C'est déclaré — ${(() => { const [y, m] = j.urssaf.aNoter[0].split('-'); return new Date(Number(y), Number(m) - 1, 1).toLocaleDateString('fr-FR', { month: 'long' }); })()}` : "C'est déclaré"}
+              {j.urssaf.mois && j.urssaf.mois.length > 1 ? `Noter ma déclaration — ${(() => { const [y, m] = j.urssaf.aNoter[0].split('-'); return new Date(Number(y), Number(m) - 1, 1).toLocaleDateString('fr-FR', { month: 'long' }); })()}` : 'Noter ma déclaration'}
             </Bouton>
           </div>
         ) : tacheSimple(j, i);
@@ -43725,6 +43723,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             <div data-recu-mois={recuMois==null?'':Math.round(recuMois*100)} data-recu-sans={recuSans ? nomsVentesKO.join(',') : ''} className="vrm-day-recu" style={{borderTop:`1px solid ${C.border}`}}>
               <div style={{minWidth:0}}>
                 <div className="vrm-day-k" style={{color:C.muted}}>Reçu en {moisNom}</div>
+                {adTous > 0 && <div data-recu-adater={adTous} className="vrm-day-note" style={{color:C.muted}}>au moins · {adTous} vente{adTous>1?'s':''} à dater</div>}
                 {declarables === null && <div className="vrm-day-note" style={{color:C.muted}}>dates de versement illisibles pour l'instant</div>}
                 {cotisMois != null && <div data-cotis-mois={Math.round(cotisMois*100)} data-cotis-aumoins={cotisAuMoins?'1':''} className="vrm-day-note" style={{color:C.muted}}>≈ {cotisAuMoins ? 'au moins ' : ''}{cotisMois.toLocaleString('fr-FR',{minimumFractionDigits:2,maximumFractionDigits:2})} € de cotisations<span className="vrm-cotis-long"> à mettre de côté ({load('vinted_urssaf_freq','trimestriel')==='mensuel' ? 'à payer le mois prochain' : 'à payer après la fin du trimestre'})</span></div>}
               </div>
@@ -43733,6 +43732,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             <div data-ca-annee={caAnnee==null?'':Math.round(caAnnee*100)} className="vrm-day-recu" style={{borderTop:`1px solid ${C.border}`}}>
               <div style={{minWidth:0}}>
                 <div className="vrm-day-k" style={{color:C.muted}}>Chiffre d'affaires {anIci}</div>
+                {adTous > 0 && <div data-ca-adater={adTous} className="vrm-day-note" style={{color:C.muted}}>au moins · {adTous} vente{adTous>1?'s':''} à dater</div>}
               </div>
               <span className="vrm-display vrm-day-recu-n" style={{color:C.text}}>{declarables === undefined ? '…' : caAnnee == null ? '—' : `${Math.round(caAnnee).toLocaleString('fr-FR')} €`}</span>
             </div>
@@ -45947,10 +45947,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         <NoAcc/>
         <AnnoncesACompleter items={annBase} numeros={numeros} drafts={drafts} ouvrir={setAtelier} charger={()=>loadListings(true)} charge={listings.loading} PhotoVinted={PhotoVinted} incomplet={!Array.isArray(listings.items)||!!listings.error||!!listings.incomplet}/>
         {astuceNum && listings.items?.length>0 && (
-          <div data-astuce-numeros style={{display:'flex',gap:10,alignItems:'flex-start',background:`${C.accent}0e`,border:`1px solid ${C.border}`,borderRadius:10,padding:'10px 12px',margin:'0 0 12px',fontSize:12.5,lineHeight:1.5,color:C.muted}}>
-            <span aria-hidden="true" style={{fontSize:15,lineHeight:1.3}}>🔢</span>
-            <div style={{flex:1,minWidth:0}}>Chaque article reçoit un <b style={{color:C.text,fontWeight:600}}>numéro</b> dans l’ordre de mise en ligne, pour le retrouver sur ton étagère, Leboncoin et eBay. Il se change d’un clic et n’est jamais redonné.</div>
-            <button type="button" aria-label="J’ai compris, masquer cette astuce" onClick={()=>{ save('vrm_astuce_numeros', false); setAstuceNum(false); }} style={{flexShrink:0,border:'none',background:'transparent',color:C.muted,cursor:'pointer',fontSize:16,lineHeight:1,padding:2,fontFamily:'inherit'}}>✕</button>
+          <div data-astuce-numeros style={{display:'flex',gap:8,alignItems:'center',background:'var(--vrm-b-teinte)',borderRadius:10,padding:'0 4px 0 12px',margin:'0 0 12px',fontSize:12.5,lineHeight:1.45,color:C.muted}}>
+            <span aria-hidden="true" style={{display:'flex',color:C.muted}}><Icon name="tag" size={16}/></span>
+            <div style={{flex:1,minWidth:0,display:'flex',alignItems:'center',gap:4,flexWrap:'wrap'}}>Chaque article a un <b style={{color:C.text,fontWeight:600}}>numéro</b>, jamais redonné. <Pourquoi label="À quoi il sert">Il suit l’ordre de mise en ligne : il sert à retrouver la paire sur ton étagère, sur Leboncoin et sur eBay. Il se change d’un clic sur la carte et n’est jamais donné à une autre paire.</Pourquoi></div>
+            <button type="button" aria-label="J’ai compris, masquer cette astuce" onClick={()=>{ save('vrm_astuce_numeros', false); setAstuceNum(false); }} style={{flexShrink:0,border:'none',background:'transparent',color:C.muted,cursor:'pointer',fontSize:16,lineHeight:1,minWidth:44,minHeight:44,padding:0,fontFamily:'inherit'}}>✕</button>
           </div>
         )}
         {/* (27 oct.) Acceptation automatique des offres — interrupteur, éteint par
@@ -46015,8 +46015,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             <div className="vrm-ann-actions" style={{display:'flex',gap:8,flexWrap:'wrap'}}>
             {/* (28 oct., 5.252) UN bouton « Actions » (sa demande) : le menu porte
                 republier, modifier sur place, brouillon → en ligne, en ligne → brouillon. */}
-            <button type="button" data-actions-ouvrir aria-haspopup="dialog" onClick={()=>setActionsOpen(true)}
-              style={{border:`1px solid ${C.border}`,borderRadius:8,padding:'8px 12px',minHeight:40,fontSize:13,fontWeight:600,background:'transparent',color:C.text,cursor:'pointer',fontFamily:'inherit',whiteSpace:'nowrap'}}>Actions{brVinted.liste && brVinted.liste.length ? ` · ${brVinted.liste.length} brouillon${brVinted.liste.length>1?'s':''}` : ''} ▾</button>
+            <Bouton icone="sync" data-actions-ouvrir aria-haspopup="dialog" onClick={()=>setActionsOpen(true)} style={{whiteSpace:'nowrap'}}>Republier…{brVinted.liste && brVinted.liste.length ? ` · ${brVinted.liste.length} brouillon${brVinted.liste.length>1?'s':''}` : ''}</Bouton>
             {nRefaire > 0 && <button type="button" data-refaire-ouvrir={nRefaire} onClick={()=>setRefaireOpen(true)}
               style={{border:`1px solid ${C.warn}`,borderRadius:8,padding:'8px 12px',minHeight:40,fontSize:13,fontWeight:600,background:'transparent',color:C.text,cursor:'pointer',fontFamily:'inherit',whiteSpace:'nowrap'}}>{nRefaire} brouillon{nRefaire>1?'s':''} à refaire</button>}
             </div>
@@ -47197,7 +47196,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       s'il désigne un SOUS-ENSEMBLE strict ; sinon l'urgence
                       tient sur cette ligne. */}
                   {(()=>{ const u=urgenceColis(); if(!u.total || u.total<aPoster.length) return null;
-                    return <div style={{fontSize:11.5,color:u.danger?C.danger:C.warn,fontWeight:600,marginTop:3}}>{u.parts.join(' · ')} — {ouSontLesPresses(u)}</div>; })()}
+                    return <div data-colis-urgence-ligne="" style={{fontSize:11.5,color:C.warn,fontWeight:600,marginTop:3}}>{u.parts.join(' · ')}{u.presseAttente ? <> — {ouSontLesPresses(u)}</> : null}</div>; })()}
                 </div>
                 {avecPdf.length>0 && (
                   <button type="button" data-lot-ouvrir="1" onClick={ouvrirLot} disabled={batchBusy}
@@ -47338,7 +47337,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                         <div style={{fontSize:11,color:C.muted,marginTop:2,display:'flex',gap:8,flexWrap:'wrap'}}>
                           <span>coché il y a {depuis}</span>
                           {limiteDepassee
-                            ? <span style={{color:C.danger,fontWeight:600}}>date limite dépassée</span>
+                            ? <span style={{color:C.warn,fontWeight:600}}>date limite dépassée</span>
                             : joursLimite!=null && <span>{joursLimite===0 ? 'limite aujourd’hui' : `limite dans ${joursLimite} j`}</span>}
                           {prix && <span>{prix}</span>}
                           {plusieursComptes && o._acc && <span>· {accNameOf(o._acc)}</span>}
@@ -48616,8 +48615,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           <div onClick={e=>e.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:560,maxHeight:'88vh',borderRadius:'14px 14px 0 0',display:'flex',flexDirection:'column',overflow:'hidden',paddingBottom:'env(safe-area-inset-bottom)',}}>
             <div style={{display:'flex',gap:10,alignItems:'center',padding:'12px 16px',borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
               <div style={{flex:1,minWidth:0}}>
-                <div style={{fontSize:15,fontWeight:700,color:C.text}}>📊 Rapport comptable</div>
-                <div style={{fontSize:11,color:C.muted}}>{libelleRegime(report.regime)} · <span style={{opacity:0.8}}>régime modifiable dans ⚙️ Paramètres</span></div>
+                <div style={{fontSize:15,fontWeight:700,color:C.text,display:'flex',alignItems:'center',gap:8}}><Icon name="doc" size={17}/>Rapport comptable</div>
+                <div style={{fontSize:11,color:C.muted}}>{libelleRegime(report.regime)} · <span style={{opacity:0.8}}>régime modifiable dans Réglages</span></div>
               </div>
               <button type="button" onClick={()=>setShowReport(false)} aria-label="Fermer" style={{border:'none',background:'transparent',fontSize:22,color:C.muted,cursor:'pointer',lineHeight:1}}>×</button>
             </div>
@@ -48895,7 +48894,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             </div>
             <div style={{display:'flex',gap:8,padding:'12px 16px',borderTop:`1px solid ${C.border}`,flexShrink:0}}>
               <Bouton variante="secondaire" icone="save" data-rapport-csv onClick={exportReportCsv} style={{flex:1}}>CSV</Bouton>
-              <Bouton variante="primaire" icone="doc" data-rapport-pdf onClick={exportReportPdf} style={{flex:1}}>PDF</Bouton>
+              <Bouton icone="doc" data-rapport-pdf onClick={exportReportPdf} style={{flex:1}}>PDF</Bouton>
             </div>
           </div>
         </div>
@@ -49476,11 +49475,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         const nPret = brVinted.liste ? brVinted.liste.filter(b=>b._etat==='pret').length : 0;
         const ent = [
           ...(nRefaire ? [{ k:'refaire', t:`Brouillons à refaire · ${nRefaire}`, d:'Un passage par brouillon n’est pas allé au bout : le refaire depuis ce qui est enregistré dans VRM.', cap:'refaire' }] : []),
-          { k:'recreer', t:'Republier', d:'Supprimer et recréer des annonces en ligne (photos réglées, temps aléatoire). Favoris et vues repartent de zéro.', cap:'recreer' },
-          { k:'modifier', t:'Modifier prix ou titre', d:'Sur place : même annonce, même N°, favoris et vues gardés.', cap:'republiermodif' },
-          { k:'enLigne', t:'Brouillons → en ligne', d: nBr ? `${nBr} brouillon${nBr>1?'s':''} sur Vinted, dont ${nPret} prêt${nPret>1?'s':''} à mettre en ligne d'ici, à la suite.` : 'Aucun brouillon sur Vinted pour l’instant.', cap:'brouillon' },
-          { k:'versBrouillon', t:'En ligne → brouillon', d:'Retirer des annonces de la vente en les gardant en brouillon sur Vinted (favoris et vues perdus).', cap:'versbrouillon' },
-          { k:'voir', t:`Voir mes brouillons${nBr?` · ${nBr}`:''}`, d:'La liste, un par un : ouvrir sur Vinted, mettre en ligne, retirer un brouillon qui n’y est plus.' },
+          { k:'recreer', t:'Republier', d:'Supprimer et recréer : favoris et vues repartent de zéro.', cap:'recreer' },
+          { k:'modifier', t:'Modifier prix ou titre', d:'Sur place : favoris et vues gardés.', cap:'republiermodif' },
+          { k:'enLigne', t:'Brouillons → en ligne', d: nBr ? `${nPret} prêt${nPret>1?'s':''} sur ${nBr} brouillon${nBr>1?'s':''}.` : 'Aucun brouillon sur Vinted.', cap:'brouillon', vide: !nBr },
+          { k:'versBrouillon', t:'En ligne → brouillon', d:'Retirer de la vente, gardé en brouillon (favoris et vues perdus).', cap:'versbrouillon' },
+          { k:'voir', t:`Voir mes brouillons${nBr?` · ${nBr}`:''}`, d:'Ouvrir, mettre en ligne ou retirer un brouillon.' },
         ];
         return (
           <SheetShell onClose={()=>setActionsOpen(false)} maxWidth={460}>
@@ -49489,11 +49488,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 <h2 style={{margin:0,fontSize:18,fontWeight:700,color:C.text,flex:1}}>Actions sur Vinted</h2>
                 <button type="button" onClick={()=>setActionsOpen(false)} aria-label="Fermer" style={{border:'none',background:'transparent',color:C.muted,fontSize:22,minWidth:44,minHeight:44,cursor:'pointer'}}>✕</button>
               </div>
-              {ent.map(e=>{ const capOk = !e.cap || extSait(e.cap)==='ok'; return (
-                <button key={e.k} type="button" data-action={e.k} data-action-ok={capOk?'oui':'non'} onClick={()=>{ setActionsOpen(false); if(e.k==='voir') setBrouillonsOpen(true); else if(e.k==='refaire') setRefaireOpen(true); else setRepubAction(e.k); }}
-                  style={{display:'flex',flexDirection:'column',alignItems:'flex-start',gap:3,textAlign:'left',padding:'12px 14px',minHeight:56,border:`1px solid ${C.border}`,borderRadius:12,background:C.card,color:C.text,cursor:'pointer',fontFamily:'inherit'}}>
+              {/* (30 oct.) La cause commune (extension à mettre à jour) se dit UNE fois en tête ;
+                  une entrée qu'on ne peut pas lancer est grisée avec sa raison, jamais cachée. */}
+              {(()=>{ const manque = ent.filter(e=>e.cap && extSait(e.cap)!=='ok').map(e=>EXT_CAPACITES[e.cap]).filter(Boolean).sort(cmpVersion); return manque.length ? <div data-actions-maj style={{fontSize:12.5,color:C.warn,lineHeight:1.4}}>Grisés : ils demandent l'extension VRM {manque[manque.length-1]} ou plus récente sur ton ordinateur.</div> : null; })()}
+              {ent.map(e=>{ const capOk = !e.cap || extSait(e.cap)==='ok'; const off = !capOk || !!e.vide; return (
+                <button key={e.k} type="button" data-action={e.k} data-action-ok={capOk?'oui':'non'} aria-disabled={off?'true':undefined} title={!capOk ? `Demande l'extension VRM ${EXT_CAPACITES[e.cap]} ou plus récente` : e.vide ? 'Aucun brouillon sur Vinted' : undefined}
+                  onClick={()=>{ if (off) return; setActionsOpen(false); if(e.k==='voir') setBrouillonsOpen(true); else if(e.k==='refaire') setRefaireOpen(true); else setRepubAction(e.k); }}
+                  style={{display:'flex',flexDirection:'column',alignItems:'flex-start',gap:3,textAlign:'left',padding:'12px 14px',minHeight:56,border:'none',borderRadius:12,background:'var(--vrm-b-teinte)',color:C.text,cursor:off?'default':'pointer',fontFamily:'inherit',opacity:off?.5:1}}>
                   <span style={{fontSize:14.5,fontWeight:700}}>{e.t}</span>
-                  <span style={{fontSize:12.5,color:C.muted,fontWeight:400,lineHeight:1.4}}>{e.d}{!capOk ? ` — demande l'extension VRM ${EXT_CAPACITES[e.cap]} ou plus récente dans ce navigateur.` : ''}</span>
+                  <span style={{fontSize:12.5,color:C.muted,fontWeight:400,lineHeight:1.4}}>{e.d}</span>
                 </button>
               ); })}
             </div>
@@ -51540,7 +51543,7 @@ function LeboncoinScreen() {
           )}
           {data.retirees > 0 && (
             <div style={{ fontSize: 11, color: C.muted, marginBottom: 8, lineHeight: 1.5 }}>
-              {data.retirees} annonce{data.retirees > 1 ? 's' : ''} en ligne {data.retirees > 1 ? 'ne sont' : "n'est"} pas dans cette file : tu {data.retirees > 1 ? 'les' : "l'"}as retirée{data.retirees > 1 ? 's' : ''} de Leboncoin. Ça se règle annonce par annonce sur l'écran <b>Annonces</b> (la puce « Aussi sur »).
+              {data.retirees} retirée{data.retirees > 1 ? 's' : ''} de Leboncoin par toi — réglable sur <b>Annonces</b> (puce « Aussi sur »).
             </div>
           )}
           {/* ⚠️ « Tout est publié 🎉 » se disait aussi quand la file était vide
@@ -52250,7 +52253,6 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       // Julien, 1er oct. : « les ventes masquées, je veux que ce soit dans les
       // paramètres, pas sous Factures ». L'écran reste monté, joignable ici.
       { id:'masques', type:'nav', ic:'eyeOff', lib:'Ventes et achats masqués', onClick:()=>setTab('masques') },
-      { id:'prixachat', type:'nav', ic:'cash', lib:"Compléter les prix d'achat", onClick:()=>{DEMANDE_SAISIE_PRIX.on=true;setTab('vinted_annonces');} },
 
     ]},
     { id:'affichage', titre:'Affichage', items:[
@@ -52849,7 +52851,7 @@ function FermerCompte() {
               <div style={txt}>
                 Seront effacés : <b style={{ color: C.text }}>tes données VRM</b> (ventes, annonces captées, numéros, compta, réglages), <b style={{ color: C.text }}>tes comptes Vinted liés</b> et <b style={{ color: C.text }}>ton compte de connexion</b>.
                 {(info.peutGerer && info.actif) ? ' Ton abonnement est résilié en même temps : aucun nouveau prélèvement ne part.' : ''}
-                {' '}C'est <b style={{ color: C.text }}>définitif</b> : fais d'abord une « Sauvegarde complète » (Réglages) si tu veux une copie.
+                {' '}C'est <b style={{ color: C.text }}>définitif</b> : fais d'abord une « Sauvegarde complète » (Réglages), puis retire l'extension VRM de Chrome.
               </div>
               {reglesEbayN === null && <div data-fermer-regles-ebay="pas-su" style={{ ...txt, marginTop: 8, color: C.warn }}>{texteReglesQuiRestent(null, 'fermer')}</div>}
               {reglesEbayN && (reglesEbayN.oui > 0 || reglesEbayN.peutEtre > 0) && <div data-fermer-regles-ebay={reglesEbayN.oui + reglesEbayN.peutEtre} data-fermer-regles-ebay-peut-etre={reglesEbayN.peutEtre} style={{ ...txt, marginTop: 8, color: C.warn }}>Après la fermeture, sur eBay : {texteReglesQuiRestent(reglesEbayN, 'fermer')}</div>}

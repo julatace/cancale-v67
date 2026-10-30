@@ -96,12 +96,7 @@ export default function VendusAilleurs({
               : "Vérifier mes plateformes"}
         </span>
       </summary>
-      <p>
-        Articles reliés par référence VRM ou lien explicite, jamais par titre.
-        Vérifie l’annonce et confirme son retrait sur la plateforme. Elle reste
-        ici tant qu’une nouvelle lecture ne confirme pas qu’elle n’est plus en
-        vente.
-      </p>
+      <p>Reliés par référence VRM, jamais par titre — retire-les sur leur plateforme.</p>
       <button type="button" disabled={v.charge} onClick={lire}>
         {v.charge ? "Lecture…" : "Revérifier les annonces"}
       </button>

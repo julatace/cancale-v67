@@ -131,3 +131,30 @@
 }
 
 .vrm-outils button:focus-visible,.vrm-outils summary:focus-visible,.vrm-historique button:focus-visible{outline:2px solid var(--vrm-accent,#42786e);outline-offset:3px}
+
+/* (30 oct.) Une forme de bouton, une forme de repli. Les boutons de ces outils
+   étaient une 4ᵉ forme (bordure grise, rayon 7, 30 px) : ils prennent celle du
+   secondaire de l'app (teinté, sans bordure, rayon 10, 44 px au doigt). Le repli
+   est une rangée de 44 px, chevron à droite, sans espace mort. */
+.vrm-outils button,
+.vrm-historique button,
+.vrm-bilan-sync button {
+  border: 0 !important; border-radius: 10px !important;
+  background: var(--vrm-b-teinte, rgba(36, 78, 84, .08)) !important;
+  color: var(--vrm-ink, #213B41) !important; font-weight: 600 !important;
+  min-height: 40px; min-width: 44px; padding: 0 14px !important;
+}
+@media (pointer: coarse) {
+  .vrm-outils button, .vrm-historique button, .vrm-bilan-sync button { min-height: 44px; }
+}
+.vrm-outils button[aria-pressed="true"] { box-shadow: inset 0 0 0 2px var(--vrm-accent, #244E54) !important; }
+.vrm-outils summary, .vrm-bilan-sync summary {
+  min-height: 44px; justify-content: space-between; list-style: none; position: relative; padding-right: 22px;
+}
+.vrm-outils summary::-webkit-details-marker, .vrm-bilan-sync summary::-webkit-details-marker { display: none; }
+.vrm-outils summary::after, .vrm-bilan-sync summary::after {
+  content: ""; position: absolute; right: 4px; top: 50%; width: 7px; height: 7px; margin-top: -5px;
+  border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; transform: rotate(-45deg); opacity: .5;
+  transition: transform .2s ease;
+}
+.vrm-outils[open] > summary::after, .vrm-bilan-sync[open] > summary::after { transform: rotate(45deg); }
