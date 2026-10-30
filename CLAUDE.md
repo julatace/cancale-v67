@@ -13,7 +13,9 @@
 > c'est le dernier). `updatePair` compte `fees` : un boost tapé sur une annonce sans N° est gardé. Calendrier sur tablette
 > tactile (`pointer: coarse`, fenêtre à deux mois) : jours, flèches, raccourcis, boutons à 44 px. Preuves : banc `vinted-ui`
 > (+ section T tablette, contrôle R du texte de l'app) **30 rouges sur fd505d59** (le code relu), 0 après ; mutations
-> « préparation sur chaque fiche », « `fees` ignoré », « CA hors plage » ⇒ rouges. ⚠️ Non mesuré : un vrai iPad.
+> « préparation sur chaque fiche », « `fees` ignoré », « CA hors plage » ⇒ rouges. 175 audits verts ; bancs voisins :
+> `chiffres-croises` vert, `annonces-carte` 3 · `perfv` 1 · `stats-premium` 3 · `feuilles-coque` 7 · `revue-20oct` 12 rouges, tous
+> présents (et plus nombreux) sur le build d'origin/main d1e76ab2. ⚠️ Non mesuré : un vrai iPad.
 
 > **29 octobre — ÉCRANS VINTED : grandes photos, état en jauge, calendrier « comme Airbnb », offres auto, pastille (app seule) :**
 > Julien : « augmente la taille des photos », « l'état plus original avec à côté la saisie du prix d'achat », « toutes les infos
