@@ -4077,22 +4077,22 @@ function FactureSousVente({ factures, compte }) {
   const inv=drafts.find(i=>i._id===choix);
   return <div className="vrm-sale-invoice" data-ouvert={ouvert ? "true" : undefined}>
     {queued?<span role="status">Facture mise en file d'envoi</span>:<>
-      <button type="button" onClick={()=>setOuvert(!ouvert)} style={{border:0,background:'transparent',color:C.accent,fontSize:11,fontWeight:600,padding:'5px 0',cursor:'pointer'}} aria-label="Envoyer une facture à l'acheteur"><span className="vrm-invoice-full">Envoyer une facture à l'acheteur</span><span className="vrm-invoice-short" aria-hidden="true">Facture</span></button>
+      <Bouton variante="discret" icone="receipt" onClick={()=>setOuvert(!ouvert)} aria-expanded={ouvert} aria-label="Envoyer une facture à l'acheteur"><span className="vrm-invoice-full">Envoyer une facture à l'acheteur</span><span className="vrm-invoice-short" aria-hidden="true">Facture</span></Bouton>
       {ouvert && <div style={{display:'grid',gap:6,padding:'6px 0'}}>
         <label style={{fontSize:11}}>Choisir la facture de cette vente
           <select aria-label="Facture de cette vente" value={choix} onChange={e=>setChoix(e.target.value)} style={{display:'block',width:'100%',padding:8,marginTop:4,color:C.text,background:C.card,border:`1px solid ${C.border}`,borderRadius:8}}>
             <option value="">Sélectionner un brouillon</option>{drafts.map(i=><option key={i._id} value={i._id}>{i.number} · {i.designation} · {i.prix} € · {i.buyerEmail}</option>)}
           </select>
         </label>
-        {!drafts.length && <span style={{fontSize:11,color:C.muted}}>Aucun brouillon à envoyer pour ce compte. Les reçus restent disponibles dans Factures.</span>}
+        {!drafts.length && <span style={{fontSize:11.5,color:C.muted}}>Aucun brouillon à envoyer pour ce compte (les reçus sont dans Factures).</span>}
         {inv && <span data-facture-retour={inv.retourNom ? 'oui' : 'non'} style={{fontSize:11,color:inv.retourNom?C.muted:C.warn,lineHeight:1.4}}>{inv.retourNom
-          ? 'Les 2 documents Vinted Pro partent ensemble : la facture + le formulaire de retour en pièce jointe.'
-          : 'Vinted Pro demande 2 documents : seule la facture part (le formulaire de retour n’a pas été reçu avec l’email de vente — joins-le toi-même à l’acheteur).'}</span>}
+          ? 'La facture et le formulaire de retour partent ensemble.'
+          : 'Seule la facture part : le formulaire de retour n’est pas arrivé avec l’email de vente — joins-le toi-même.'}</span>}
         {inv && <button type="button" disabled={busy} onClick={async()=>{
           if(!await askConfirm(`Mettre la facture ${inv.number} (${inv.prix} €) en file d'envoi à ${inv.buyerEmail} ?`))return;
           setBusy(true);const ok=await setProInvoiceStatus(inv,'queued');setBusy(false);
           if(ok)setQueued(true);else toast('La facture n’a pas été mise en file. Relis son état dans Factures.');
-        }} style={{padding:'7px 10px',border:0,borderRadius:8,background:C.accent,color:C.onAccent,cursor:'pointer'}}>{busy?'Vérification…':'Confirmer le destinataire'}</button>}
+        }} className="vrm-b vrm-b-secondaire">{busy?'Vérification…':'Confirmer le destinataire'}</button>}
       </div>}
     </>}
   </div>;
@@ -10596,7 +10596,6 @@ function CoutAchatVente({ onSaisir, onRelier }) {
     if (p === null) { setErr('Un montant en euros (ex : 25 ou 25,50).'); return; }
     onSaisir(p); setEdit(false); setTxt(''); setErr('');
   };
-  const bouton = { display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6, height: 44, padding: '0 13px', borderRadius: 10, fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' };
   return (
     <div data-cout-vente className="vrm-cout-vente" style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
       <div className="vrm-cout-rangee" style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
@@ -10609,14 +10608,12 @@ function CoutAchatVente({ onSaisir, onRelier }) {
                 style={{ width: '100%', boxSizing: 'border-box', height: 44, border: `1px solid ${C.border}`, borderRadius: 10, padding: '0 28px 0 12px', fontSize: 16, background: C.card, color: C.text, outline: 'none', fontFamily: 'inherit' }} />
               <span aria-hidden="true" style={{ position: 'absolute', right: 11, top: '50%', transform: 'translateY(-50%)', color: C.muted, pointerEvents: 'none' }}>€</span>
             </div>
-            <button type="submit" data-cout-vente-ok style={{ ...bouton, border: 'none', background: C.accent, color: '#fff' }}>OK</button>
+            <Bouton type="submit" variante="primaire" data-cout-vente-ok>OK</Bouton>
           </form>
         ) : (
           <>
-            <button type="button" data-cout-vente-saisir onClick={() => setEdit(true)} title="Taper le prix payé, sans relier d'achat"
-              style={{ ...bouton, border: `1px solid ${C.border}`, background: C.card, color: C.text }}><Icon name="pencil" size={14} /> Saisir le prix</button>
-            <button type="button" data-cout-vente-relier onClick={onRelier} title="Choisir l'achat Vinted correspondant : son prix remplit le coût"
-              style={{ ...bouton, border: `1px solid ${C.border}`, background: 'transparent', color: C.muted }}><Icon name="link" size={14} /> Relier un achat</button>
+            <Bouton variante="secondaire" icone="pencil" data-cout-vente-saisir onClick={() => setEdit(true)} title="Taper le prix payé, sans relier d'achat">Saisir le prix</Bouton>
+            <Bouton variante="secondaire" icone="link" data-cout-vente-relier onClick={onRelier} title="Choisir l'achat Vinted correspondant : son prix remplit le coût">Relier un achat</Bouton>
           </>
         )}
       </div>
@@ -15518,8 +15515,7 @@ function RaisonBordereauxGrises({ ventes }) {
       <span style={{ minWidth: 0 }}>
         <b>{n} bordereau{n > 1 ? 'x' : ''} à générer</b><span className={r.code === 'telephone' ? 'vrm-aide' : undefined}> — {r.texte}</span>
         {(r.geste === 'recharger' || r.geste === 'extensions') && (
-          <> <button type="button" data-recharger="1" onClick={() => { try { window.location.reload(); } catch (_) {} }}
-            style={{ marginLeft: 4, border: `1px solid ${C.accent}`, background: 'transparent', color: C.accent, borderRadius: 8, padding: '3px 9px', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>Recharger la page</button></>
+          <> <Bouton variante="secondaire" className="vrm-b-petit" icone="sync" data-recharger="1" onClick={() => { try { window.location.reload(); } catch (_) {} }} style={{ marginLeft: 4 }}>Recharger la page</Bouton></>
         )}
         {/* ⚠️ Le repli qui ne dépend PAS de l'extension de cette page : générer
             le bordereau sur Vinted. Le lien de CHAQUE vente est sur sa ligne
@@ -15527,7 +15523,9 @@ function RaisonBordereauxGrises({ ventes }) {
         {/* ⚠️ Aucune promesse sur le retour du PDF : il dépend de la réception
             des emails de chaque vendeur, que l'app ne peut pas vérifier d'ici
             (revue du 5 octobre). On donne le geste, pas la suite. */}
-        <details className="vrm-label-help" style={{ marginTop: 3, marginBottom: 0 }}><summary>Bordereaux et impression</summary><span className="vrm-aide" style={{ display: 'block', color: C.muted }}>Tu peux aussi le générer et l'imprimer directement sur Vinted (lien « sur Vinted » de chaque vente).</span></details>
+        {/* (30 oct.) Un repli « Bordereaux et impression › » ressemblait à un écran
+            à ouvrir et ne disait qu'une phrase : elle passe derrière ⓘ. */}
+        {' '}<Pourquoi label="Autre solution">Tu peux aussi générer et imprimer le bordereau directement sur Vinted (lien « sur Vinted » de chaque vente).</Pourquoi>
       </span>
     </div>
   );
@@ -17158,10 +17156,10 @@ function RetirerArgent({ liveStats }) {
                 <div style={{ fontSize: 13, fontWeight: 600, color: C.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{x.login || `compte ${x.uid}`}</div>
                 <div style={{ fontSize: 11.5, color: C.muted }}>{fmt(x.dispo || 0)} disponible{x.jours != null && x.jours > 0 ? ` · lu il y a ${x.jours} j` : ''}</div>
               </div>
-              {x.dispo > 0 && <a href={PORTE_MONNAIE_VINTED} target="_blank" rel="noreferrer" style={{ flexShrink: 0, display: 'inline-flex', alignItems: 'center', minHeight: 44, padding: '0 12px', border: `1px solid ${C.border}`, borderRadius: 10, color: C.text, fontSize: 13, fontWeight: 600, textDecoration: 'none' }}>Retirer sur Vinted ↗</a>}
+              {x.dispo > 0 && <Bouton variante="secondaire" href={PORTE_MONNAIE_VINTED} target="_blank" rel="noreferrer" style={{ flexShrink: 0 }}>Retirer sur Vinted ↗</Bouton>}
             </div>
           ))}
-          <div style={{ fontSize: 11.5, color: C.muted, lineHeight: 1.45, paddingTop: 6, borderTop: `1px solid ${C.border}` }}>Le virement se fait dans ton porte-monnaie Vinted, sur le compte <b>connecté dans ton navigateur</b> — connecte-toi d'abord sur le bon compte. VRM ne déplace jamais ton argent lui-même.</div>
+          <div style={{ fontSize: 11.5, color: C.muted, lineHeight: 1.45, paddingTop: 6, borderTop: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', gap: 6 }}>Connecte-toi d'abord sur le bon compte dans ton navigateur.<Pourquoi label="Pourquoi sur Vinted ?">Le virement se fait dans ton porte-monnaie Vinted, sur le compte connecté dans ton navigateur. VRM ne déplace jamais ton argent lui-même.</Pourquoi></div>
         </div>
       )}
     </div>
@@ -17658,10 +17656,10 @@ function LigneVenteCompacte({ photo, photoNoeud = null, titre, sous = '', etat, 
     {ouvert && <FermeAuRetour fermer={close}/>}
     {createPortal(<div className="vrm-app-shell vrm-ledger-drawer-host" hidden={!ouvert}>
       <section className="vrm-ledger-drawer" role="dialog" aria-modal="false" aria-labelledby={panneau+'-titre'} id={panneau} onKeyDown={e=>{if(e.target.matches('input,textarea,select,[contenteditable=true]'))return;if(e.key==='Escape'&&!e.defaultPrevented){e.preventDefault();e.stopPropagation();close();}}}>
-        <header className="vrm-ledger-drawer-head"><div><span>VENTE · DÉTAILS ET ACTIONS</span><h2 id={panneau+'-titre'}>{titre || 'Vente'}</h2><p>{etat}{etat&&montant?' · ':''}{montant}</p></div><button ref={fermer} type="button" aria-label="Fermer les détails de la vente" onClick={close}><Icon name="close" size={18}/></button></header>
+        <header className="vrm-ledger-drawer-head"><div><span>VENTE</span><h2 id={panneau+'-titre'}>{titre || 'Vente'}</h2><p>{etat}{etat&&montant?' · ':''}{montant}</p></div><button ref={fermer} type="button" aria-label="Fermer les détails de la vente" onClick={close}><Icon name="close" size={18}/></button></header>
         <div className="vrm-main vrm-ledger-drawer-body">
           <div className="vrm-fiche-vente-acces"><span>{plateforme?plateforme[0].toUpperCase()+plateforme.slice(1):'Vente'} · {sous||'Compte et date dans les détails'}</span>
-          {numerosFiche.length?numerosFiche.map(n=><button type="button" key={n} onClick={()=>{close();window.dispatchEvent(new CustomEvent('vrm:fiche-article',{detail:n}));}}>Fiche article N°{n} →</button>):<small>Pas de numéro VRM confirmé : aucune fiche n’est choisie au hasard.</small>}</div>
+          {numerosFiche.length?numerosFiche.map(n=><Bouton variante="discret" key={n} onClick={()=>{close();window.dispatchEvent(new CustomEvent('vrm:fiche-article',{detail:n}));}}>Fiche N°{n} →</Bouton>):<small title="Pas de numéro VRM confirmé pour cette vente : aucune fiche n’est choisie au hasard.">Sans N° VRM</small>}</div>
           <div className="vrm-ventes-liste"><div className={props.className} data-ligne-ouverte="true"><div className="vrm-ledger-sale-content">{children}</div></div></div></div>
       </section>
     </div>,document.body)}
@@ -42962,7 +42960,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const menuOutilsVentes = (sousBarre) => (
     <>
       <div onClick={()=>setToolsOpen(false)} style={{position:'fixed',inset:0,zIndex:70}}/>
-      <div data-outils-ventes={sousBarre?'sous-barre':'bouton'} style={{position:'absolute',zIndex:71,background:C.card,border:`1px solid ${C.border}`,borderRadius:10,boxShadow:C.shadowLg||'0 8px 24px rgba(0,0,0,.2)',padding:6,display:'flex',flexDirection:'column',gap:2,...(sousBarre?{left:8,right:8,top:'calc(100% - 4px)'}:{right:0,top:'calc(100% + 6px)',minWidth:220})}}>
+      <div data-outils-ventes={sousBarre?'sous-barre':'bouton'} style={{position:'absolute',zIndex:71,background:C.card,border:`1px solid ${C.border}`,borderRadius:10,boxShadow:C.shadowLg||'0 8px 24px rgba(0,0,0,.2)',padding:6,display:'flex',flexDirection:'column',gap:2,...(sousBarre?{left:8,right:8,top:'calc(100% - 4px)'}:{right:0,top:'calc(100% + 6px)',minWidth:270})}}>
         {(
           <div className="vrm-outils-reglages" style={{padding:'4px 6px 8px',borderBottom:`1px solid ${C.border}`,marginBottom:2}}>
             <BordereauxAuto key={AUTH.user?.id} owner={AUTH.user?.id} lire={lireBordereauxAuto} sauver={sauverBordereauxAuto}/>
@@ -42970,15 +42968,18 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           </div>
         )}
         {[
-          {k:'rep', icon:'📊', lab:'Rapport comptable', desc:'CA, bénéfice, cotisations du mois', on:()=>{ setToolsOpen(false); openReport(); }},
-          {k:'ann', icon:'📚', lab:'Registre annuel', desc:'Ventes + achats ligne par ligne', on:()=>{ setToolsOpen(false); openAnnual(); }},
+          {k:'rep', icon:'doc', lab:'Rapport comptable', desc:'CA, bénéfice, cotisations du mois', on:()=>{ setToolsOpen(false); openReport(); }},
+          {k:'ann', icon:'receipt', lab:'Registre annuel', desc:'Ventes et achats, ligne par ligne', on:()=>{ setToolsOpen(false); openAnnual(); }},
           /* « Litiges » retiré des Outils le 30 septembre (Julien : « ce n'est
              pas un problème, je reçois les articles après ; ils sont déjà
              dans Annulées »). La modale reste, plus rien n'y mène d'ici. */
-          ...((sales.items&&sales.items.length>0)?[{k:'csv', icon:'⬇️', lab:'Exporter (CSV · Excel · Numbers)', desc:'Toutes tes ventes, lisible dans Excel et Numbers', on:()=>{ setToolsOpen(false); exportCsv(); }}]:[]),
+          ...((sales.items&&sales.items.length>0)?[{k:'csv', icon:'save', lab:'Exporter en tableur', desc:'CSV, lisible dans Excel et Numbers', on:()=>{ setToolsOpen(false); exportCsv(); }}]:[]),
+          /* (30 oct.) La rétrospective est un geste RARE : elle quitte la page
+             (un bouton pleine largeur sous l'analyse) pour ce menu. */
+          ...((sales.items&&sales.items.some(o=>classifyOrderStatus(o.status)==='completed'))?[{k:'wrap', icon:'spark', lab:`Rétrospective ${new Date().getFullYear()}`, desc:'Ton année en quelques chiffres', on:()=>{ setToolsOpen(false); setWrapStep(0); setShowWrapped(true); }}]:[]),
         ].map(t=>(
           <button type="button" key={t.k} onClick={t.on} style={{display:'flex',alignItems:'center',gap:10,textAlign:'left',border:'none',background:'transparent',borderRadius:8,padding:'9px 10px',cursor:'pointer',fontFamily:'inherit'}}>
-            <span style={{fontSize:17,flexShrink:0}}>{t.icon}</span>
+            <span aria-hidden="true" style={{flexShrink:0,display:'flex',color:C.muted}}><Icon name={t.icon} size={18}/></span>
             <span style={{minWidth:0}}>
               <span style={{display:'block',fontSize:13,fontWeight:600,color:t.danger?C.danger:C.text}}>{t.lab}</span>
               <span style={{display:'block',fontSize:11,color:C.muted,marginTop:1}}>{t.desc}</span>
@@ -44194,13 +44195,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               style={{width:'100%',boxSizing:'border-box',border:`1px solid ${C.border}`,borderRadius:10,padding:'10px 13px',fontSize:13.5,background:C.card,color:C.text,outline:'none'}}/>
             {ordSearch && <button className="vrm-icon-control" type="button" aria-label="Effacer la recherche de ventes" onClick={()=>setOrdSearch('')}><Icon name="close" size={17}/></button>}</div>
             {(ordSearch || periode || vFilter!=='all') && <div className="vrm-filter-recap">
-              <span>Filtres actifs</span><button type="button" onClick={()=>{setOrdSearch('');setPeriode(null);setVFilter('all');}}>Réinitialiser les ventes</button>
+              <span>Filtres actifs</span><Bouton variante="discret" onClick={()=>{setOrdSearch('');setPeriode(null);setVFilter('all');}}>Réinitialiser les ventes</Bouton>
             </div>}
           </div>
         )}
         <div className="vrm-rangee vrm-filtres" style={{display:'flex',gap:6,marginBottom:12,alignItems:'center',WebkitOverflowScrolling:'touch',scrollbarWidth:'none',msOverflowStyle:'none',paddingBottom:2}}>
           {[['all','Toutes'],['aexpedier','À expédier'],['transit','En transit'],['finalisees','Finalisées'],['annulees','Annulées']].map(([id,label])=>(
-            <button type="button" key={id} onClick={()=>setVFilter(id)} aria-pressed={vFilter===id} style={{flexShrink:0,whiteSpace:'nowrap',padding:'7px 14px',borderRadius:8,border:`1px solid ${vFilter===id?C.accent:C.border}`,background:vFilter===id?C.accent:'transparent',color:vFilter===id?'#fff':C.muted,fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit',boxShadow:vFilter===id?`0 2px 8px ${C.accent}44`:'none',transition:'all .18s ease'}}>{label}</button>
+            <button type="button" key={id} onClick={()=>setVFilter(id)} aria-pressed={vFilter===id} style={{flexShrink:0,whiteSpace:'nowrap',padding:'7px 14px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit',transition:'background-color .15s ease, color .15s ease'}}>{label}</button>
           ))}
           {/* OUTILS regroupés : la barre mélangeait filtres et outils (10 boutons
               sur une ligne). Les filtres restent visibles — c'est le réglage du
@@ -44209,10 +44210,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               vues »). Les litiges gardent une pastille d'alerte : de l'argent. */}
           {accounts.length>0 && (
             <div className="vrm-outils-ventes" style={{position:outilsOrdinateur?'relative':undefined,flexShrink:0}}>
-              <button type="button" onClick={()=>setToolsOpen(v=>!v)} aria-expanded={toolsOpen} title="Outils : compta, registre annuel, export"
-                style={{padding:'5px 12px',borderRadius:8,border:`1px solid ${toolsOpen?C.accent:C.border}`,background:toolsOpen?`${C.accent}12`:'transparent',color:toolsOpen?C.accent:C.text,fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit',display:'flex',alignItems:'center',gap:5,whiteSpace:'nowrap'}}>
-                ⋯ Outils {(disputes.salesLost.length>0 || disputes.buysBack.length>0) && <span style={{width:7,height:7,borderRadius:8,background:C.danger,display:'inline-block'}}/>}
-              </button>
+              {/* (30 oct.) Plus de point ROUGE : il signalait les litiges, retirés de ce
+                  menu le 30 sept. — il ne menait plus à rien (§7 : le rouge, c'est le
+                  doublon de N°). */}
+              <Bouton variante="secondaire" className="vrm-b-petit" icone="more" onClick={()=>setToolsOpen(v=>!v)} aria-expanded={toolsOpen} title="Rapport comptable, registre annuel, export, rétrospective">Outils</Bouton>
               {toolsOpen && outilsOrdinateur && menuOutilsVentes(false)}
             </div>
           )}
@@ -44246,9 +44247,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         {Array.isArray(boostsDetected) && boostsDetected.length>0 && (()=>{
           const tot = boostsDetected.reduce((s,b)=>s+(b.amount||0),0);
           return (
-            <div style={{border:`1px solid ${C.warn}55`,background:`${C.warn}10`,borderRadius:10,padding:'10px 13px',marginBottom:10}}>
-              <div style={{fontSize:13,fontWeight:700,color:C.text}}>💡 {tot.toFixed(2)} € de boosts détectés sur Vinted <span style={{color:C.muted,fontWeight:500}}>· {boostsDetected.length} mise{boostsDetected.length>1?'s':''} en avant</span></div>
-              <div className="vrm-aide" style={{fontSize:11,color:C.muted,marginTop:4,lineHeight:1.4}}>Capté automatiquement depuis ta facturation Vinted (via l'extension). Reporte ces montants dans le champ « 💡 boost » de chaque annonce concernée pour un bénéfice net exact — l'app ne les inscrit pas toute seule pour ne pas écraser tes saisies.</div>
+            <div style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:10,padding:'10px 13px',marginBottom:10}}>
+              <div style={{fontSize:13,fontWeight:700,color:C.text,display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>{tot.toFixed(2).replace('.',',')} € de boosts sur Vinted <span style={{color:C.muted,fontWeight:500}}>· {boostsDetected.length} mise{boostsDetected.length>1?'s':''} en avant</span>
+                <Pourquoi label="D'où vient ce montant ?">Capté dans ta facturation Vinted par l'extension. Reporte chaque montant dans le champ « Boost » de son annonce pour un bénéfice net exact — l'app ne l'inscrit pas toute seule, pour ne pas écraser tes saisies.</Pourquoi></div>
             </div>
           );
         })()}
@@ -44269,7 +44270,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             nommés au rendu — y compris quand la liste vient du cache. */}
         {nomsVentesKO.length>0 && (
           <div data-ventes-ko={nomsVentesKO.length} style={{fontSize:12,fontWeight:500,color:C.warn,background:`${C.warn}12`,border:`1px solid ${C.warn}55`,borderRadius:8,padding:'8px 12px',marginBottom:12,lineHeight:1.4}}>
-            ⚠️ {nomsVentesKO.length} compte{nomsVentesKO.length>1?'s':''} non chargé{nomsVentesKO.length>1?'s':''} ({nomsVentesKO.join(', ')}) — lecture non confirmée. Ouvre ce compte sur vinted.fr (l'extension le recapte) ou reconnecte-le, puis « Synchroniser ».
+            {nomsVentesKO.length} compte{nomsVentesKO.length>1?'s':''} non chargé{nomsVentesKO.length>1?'s':''} : {nomsVentesKO.join(', ')}. Ouvre {nomsVentesKO.length>1?'ces comptes':'ce compte'} sur vinted.fr, puis « Synchroniser ».
           </div>
         )}
         {sales.loading && !sales.items && <Skeleton variant="row" count={5}/>}
@@ -44338,25 +44339,26 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   <div className="vrm-sale-title" style={{fontSize:15,fontWeight:600,color:C.text,letterSpacing:-0.2,
                     display:'-webkit-box',WebkitLineClamp:2,WebkitBoxOrient:'vertical',overflow:'hidden',lineHeight:1.3}} title={o.title}>{num?`N°${num} · `:''}{o.title}</div>
                   <div className="vrm-sale-meta" style={{fontSize:12.5,color:C.muted,marginTop:4,display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
-                    {(()=>{ const vs=venteStage(o); return <span className="vrm-statut" data-statut-vente={vs.label} title={vs.aide||undefined} style={{color:C.text,fontWeight:600,display:'inline-flex',alignItems:'center',gap:5,flexShrink:0}}><span aria-hidden="true" style={{width:7,height:7,borderRadius:999,background:vs.color,display:'inline-block'}}/>{vs.label}</span>; })()}
-                    {o._acc && !ventesUnCompte && <AcctTag acc={o._acc} name={accNameOf(o._acc)}/>}
+                    {(()=>{ const vs=venteStage(o); return <span className="vrm-statut vrm-vente-redit" data-statut-vente={vs.label} title={vs.aide||undefined} style={{color:C.text,fontWeight:600,display:'inline-flex',alignItems:'center',gap:5,flexShrink:0}}><span aria-hidden="true" style={{width:7,height:7,borderRadius:999,background:vs.color,display:'inline-block'}}/>{vs.label}</span>; })()}
+                    {o._acc && !ventesUnCompte && <span className="vrm-vente-redit"><AcctTag acc={o._acc} name={accNameOf(o._acc)}/></span>}
                     {o._fromEmail && <span title="Reconstituée depuis l'email — pas encore confirmée par Vinted" style={{flexShrink:0,fontSize:10,fontWeight:600,color:C.muted,border:`1px solid ${C.border}`,borderRadius:8,padding:'1px 6px'}}>email</span>}
-                    <span style={{flexShrink:0}}>{o.date?new Date(o.date).toLocaleDateString('fr-FR',{day:'numeric',month:'short'}):''}</span>
+                    <span className="vrm-vente-redit" style={{flexShrink:0}}>{o.date?new Date(o.date).toLocaleDateString('fr-FR',{day:'numeric',month:'short'}):''}</span>
                     {num && aExpedier(o) && (()=>{ const cell=garageCellOf(garageGrid,num); return cell ? <span onClick={()=>onLocate&&onLocate(num)} title="Voir la paire au stock" style={{color:C.blue||C.accent,fontWeight:600,cursor:'pointer'}}>{garageCellLabel(cell)}</span> : (garageUtilise ? <span style={{color:C.muted,fontWeight:500}} title="Cette paire n'est pas rangée au garage">pas au garage</span> : null); })()}
                     {st==='cancelled' && num && (()=>{
                       const out = saleOutcome(o);
-                      if (isPairLost(num)) return <span style={{color:C.danger,fontWeight:600,background:`${C.danger}18`,border:`1px solid ${C.danger}55`,borderRadius:8,padding:'1px 8px',flexShrink:0}} title="Article déclaré perdu : son numéro est libéré et sa case au garage vidée.">❌ N°{num} perdue</span>;
+                      const pastille = {color:C.text,fontWeight:600,background:C.card2||C.bg,border:`1px solid ${C.border}`,borderRadius:8,padding:'1px 8px',flexShrink:0};
+                      if (isPairLost(num)) return <span style={pastille} title="Article déclaré perdu : son numéro est libéré et sa case au garage vidée.">N°{num} perdue</span>;
                       // ⚠️ (relecture du 11 octobre) Un numéro d'ARCHIVE (« B198 ») ne
                       //    se redonne jamais : l'app le refuse dans le champ N°. Dire
                       //    « garde le N°B198 » envoyait faire le geste qu'elle refuse.
                       const arch = !numeroReprenable(num);
                       if (out === 'retour') return arch
-                        ? <span data-retour-archive="retour" style={{color:INV_STATUS.online.color,fontWeight:600,background:`${INV_STATUS.online.color}18`,border:`1px solid ${INV_STATUS.online.color}55`,borderRadius:8,padding:'1px 8px',flexShrink:0}} title={`Retour initié : la paire te revient. Le N°${num} est un ancien numéro — elle prendra un numéro NEUF à sa republication : écris-le sur son étiquette.`}>↩️ revient → numéro neuf</span>
-                        : <span style={{color:INV_STATUS.online.color,fontWeight:600,background:`${INV_STATUS.online.color}18`,border:`1px solid ${INV_STATUS.online.color}55`,borderRadius:8,padding:'1px 8px',flexShrink:0}} title="Retour initié : la paire te revient. Elle garde son numéro — republie-la avec le même.">↩️ revient → garde le N°{num}</span>;
-                      if (out === 'suspendue') return <span style={{color:C.muted,fontWeight:600,background:`${C.muted}18`,border:`1px solid ${C.muted}55`,borderRadius:8,padding:'1px 8px',flexShrink:0}} title="Transaction suspendue par Vinted : rien n'est tranché, on ne touche pas au numéro.">⏸ en attente → N°{num} conservé</span>;
+                        ? <span data-retour-archive="retour" style={pastille} title={`Retour initié : la paire te revient. Le N°${num} est un ancien numéro — elle prendra un numéro NEUF à sa republication : écris-le sur son étiquette.`}>Revient · numéro neuf</span>
+                        : <span style={pastille} title="Retour initié : la paire te revient. Elle garde son numéro — republie-la avec le même.">Revient · garde le N°{num}</span>;
+                      if (out === 'suspendue') return <span style={{...pastille,color:C.muted}} title="Transaction suspendue par Vinted : rien n'est tranché, on ne touche pas au numéro.">Suspendue · N°{num} conservé</span>;
                       return arch
-                        ? <span data-retour-archive="renvoi" style={{color:C.warn,fontWeight:600,background:`${C.warn}18`,border:`1px solid ${C.warn}55`,borderRadius:8,padding:'1px 8px',flexShrink:0}} title={`Vente annulée : si la paire t'est renvoyée, elle prendra un numéro NEUF à sa republication (le N°${num} est un ancien numéro) — écris-le sur son étiquette.`}>🔁 renvoi → numéro neuf</span>
-                        : <span style={{color:C.warn,fontWeight:600,background:`${C.warn}18`,border:`1px solid ${C.warn}55`,borderRadius:8,padding:'1px 8px',flexShrink:0}} title="Vente annulée : si la paire t'est renvoyée, republie-la avec CE numéro (l'app le réutilise automatiquement).">🔁 renvoi → garde le N°{num}</span>;
+                        ? <span data-retour-archive="renvoi" style={pastille} title={`Vente annulée : si la paire t'est renvoyée, elle prendra un numéro NEUF à sa republication (le N°${num} est un ancien numéro) — écris-le sur son étiquette.`}>Si renvoyée · numéro neuf</span>
+                        : <span style={pastille} title="Vente annulée : si la paire t'est renvoyée, republie-la avec CE numéro (l'app le réutilise automatiquement).">Si renvoyée · garde le N°{num}</span>;
                     })()}
                     {/* « ⚠️ à identifier » RETIRÉ (30 sept.) : écrit en orange sur
                         chaque vente sans N°, c'était la même alerte ×N (§7). Le
@@ -44365,7 +44367,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 </div>
                 <div className="vrm-sale-price" style={{textAlign:'right',flexShrink:0}}>
                   <div className="vrm-display" data-prix-vente={sell!=null?Math.round(sell*100):undefined} style={{fontSize:17,fontWeight:700,color:C.text}}>{sell!=null?`${Number.isInteger(sell)?sell:sell.toFixed(2).replace('.',',')} ${cur(o.price?.currency_code)}`:''}</div>
-                  {benef!=null && <div data-benef-vente={benef.toFixed(2)} style={{fontSize:12,fontWeight:600,color:benef>=0?INV_STATUS.online.color:C.danger}}>{benef>=0?'+':''}{prixCourt(benef)}{!bilan.complet && <small style={{display:'block',fontSize:9,color:C.muted}}>estimé</small>}</div>}
+                  {benef!=null && <div data-benef-vente={benef.toFixed(2)} style={{fontSize:12,fontWeight:600,color:benef>=0?C.text:C.warn}}>{benef>=0?'+':''}{prixCourt(benef)}{!bilan.complet && <small style={{display:'block',fontSize:9,color:C.muted}}>estimé</small>}</div>}
                   {benef!=null && fees>0 && <div className="vrm-sale-frais" style={{fontSize:9,color:C.muted}}>frais −{prixCourt(fees)}</div>}
                   {/* LE BORDEREAU, SOUS LE PRIX (E1, puis 2 octobre). Un seul
                       bouton : il imprime si le PDF est là (capté par l'extension,
@@ -44392,7 +44394,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                    onRelier={()=>{ const idf = identiteAnnonce(o); openPicker(idf ? { id: idf, title: o.title, photo: photo, price: sell, _acc: o._acc } : { id: '_v'+o.transaction_id, _saleTx: String(o.transaction_id), title: o.title, photo: photo, price: sell, _acc: o._acc }); }}/>
                )}
                <div className="vrm-sale-footer"><FactureSousVente factures={facturesVentes} compte={o._acc?.login}/>
-               <details className="vrm-sale-details"><summary title="Numéro, coût d’achat et autres actions">Modifier</summary>
+               <details className="vrm-sale-details"><summary title="Numéro, coût d’achat, frais et autres actions">N° et frais</summary>
                {!hidden && <CoutsVente entry={e} onSave={patch=>setSaleOverride(o.transaction_id,patch)} theme={C}/>}
                <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
                 {/* Saisie N° + prix d'achat SUR LA MÊME LIGNE que les actions
@@ -44403,25 +44405,28 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       <span style={{fontSize:11,color:C.muted,fontWeight:500}}>N°</span>
                       <ChampSaisie value={ov.numero ?? ''} onCommit={v=>setSaleOverride(o.transaction_id,{numero:v})} placeholder={baseNum||'?'} inputMode={clavierNum()} style={{width:'100%',minWidth:0,border:'none',background:'transparent',color:C.text,fontSize:13,fontWeight:500,outline:'none'}}/>
                     </div>
-                    <div style={{flex:1,minWidth:0,display:'flex',alignItems:'center',gap:3,border:`1px solid ${C.border}`,borderRadius:8,padding:'5px 8px',background:C.bg}}>
+                    {/* (30 oct.) Tant que « Saisir le prix » est visible au-dessus, ce champ
+                        faisait la même chose une seconde fois (même écriture) : il ne
+                        revient qu'une fois le coût connu, pour le CORRIGER. */}
+                    {!(!hidden && st!=='cancelled' && buy==null && !(e && e.buyFromId)) && <div style={{flex:1,minWidth:0,display:'flex',alignItems:'center',gap:3,border:`1px solid ${C.border}`,borderRadius:8,padding:'5px 8px',background:C.bg}}>
                       <ChampSaisie value={ov.buyPrice ?? ''} onCommit={v=>setSaleOverride(o.transaction_id,{buyPrice:v})} placeholder={baseBuy?`achat ${baseBuy}€ (auto)`:"prix d'achat"} inputMode="decimal" style={{width:'100%',minWidth:0,border:'none',background:'transparent',color:C.text,fontSize:13,fontWeight:500,outline:'none'}}/>
                       <span style={{fontSize:11,color:C.muted}}>€</span>
-                    </div>
+                    </div>}
                     {(ov.numero!=null||ov.buyPrice!=null) && <span style={{fontSize:10,color:C.muted,flexShrink:0}} title="Valeurs saisies à la main pour cette vente (priment sur l'auto)">✎</span>}
                   </div>
                 )}
                 <div style={{display:'flex',alignItems:'center',gap:6,flexShrink:0,marginLeft:'auto'}}>
                 {num && aExpedier(o) && !hidden && inGarage(num) && (
-                  <button className="vrm-icon-control" type="button" onClick={()=>onLocate&&onLocate(num)} title={`Voir l'article N°${num} au stock`} aria-label="Voir au stock" style={{flexShrink:0,border:`1px solid ${C.border}`,borderRadius:8,background:'transparent',color:C.blue||C.accent,cursor:'pointer',fontSize:15,padding:'6px 8px'}}><Icon name="pin" size={15}/></button>
+                  <Bouton variante="secondaire" icone="pin" onClick={()=>onLocate&&onLocate(num)} title={`Voir l'article N°${num} au stock`} aria-label="Voir au stock" style={{flexShrink:0}}/>
                 )}
                 {st==='cancelled' && num && saleOutcome(o)==='rembourse' && !isPairLost(num) && (
-                  <button type="button" onClick={()=>markPairLost(num,o)} title={`Tu as remboursé l'acheteur. Si l'article ne revient PAS, déclare-le perdu : le N°${num} sera libéré et sa case au garage vidée.`} aria-label="Déclarer l'article perdu" style={{flexShrink:0,border:`1px solid ${C.danger}`,borderRadius:8,background:'transparent',color:C.danger,cursor:'pointer',fontSize:11,fontWeight:600,padding:'6px 9px',fontFamily:'inherit'}}>Article perdu ?</button>
+                  <Bouton variante="secondaire" className="vrm-b-petit" onClick={()=>markPairLost(num,o)} title={`Tu as remboursé l'acheteur. Si l'article ne revient PAS, déclare-le perdu : le N°${num} sera libéré et sa case au garage vidée.`} aria-label="Déclarer l'article perdu" style={{flexShrink:0}}>Article perdu ?</Bouton>
                 )}
                 {num && isPairLost(num) && (
-                  <button type="button" onClick={()=>unmarkPairLost(num)} title={`Annuler : l'article N°${num} est finalement revenu.`} aria-label="Annuler article perdu" style={{flexShrink:0,border:`1px solid ${C.border}`,borderRadius:8,background:'transparent',color:C.muted,cursor:'pointer',fontSize:11,fontWeight:500,padding:'6px 9px',fontFamily:'inherit'}}>↩︎ revenu</button>
+                  <Bouton variante="discret" onClick={()=>unmarkPairLost(num)} title={`Annuler : l'article N°${num} est finalement revenu.`} aria-label="Annuler article perdu" style={{flexShrink:0}}>Il est revenu</Bouton>
                 )}
                 {isLotTitle(o.title) && (
-                  <button className="vrm-icon-control" type="button" onClick={async(ev)=>{ lotOrigineRef.current = ev.currentTarget; setLotView({loading:true,order:o,items:[]}); const items=await fetchLotItems(o._acc,o.transaction_id); setLotView({loading:false,order:o,items}); }} title="Voir les paires du lot" aria-label="Voir les paires du lot" style={{flexShrink:0,border:'none',background:C.purple||C.blue||C.accent,color:'#fff',borderRadius:8,padding:'8px 10px',cursor:'pointer',fontSize:15}}><Icon name="box" size={16}/></button>
+                  <button className="vrm-b vrm-b-secondaire vrm-b-petit" type="button" onClick={async(ev)=>{ lotOrigineRef.current = ev.currentTarget; setLotView({loading:true,order:o,items:[]}); const items=await fetchLotItems(o._acc,o.transaction_id); setLotView({loading:false,order:o,items}); }} title="Voir les paires du lot" aria-label="Voir les paires du lot" style={{flexShrink:0}}><Icon name="box" size={18}/>Paires du lot</button>
                 )}
                 </div>
                </div>
@@ -44450,7 +44455,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                  if (e && e.buyFromId) return (
                    <div style={{display:'flex',alignItems:'center',gap:8}}>
                      <div style={{flex:1,minWidth:0}}><AchatRelie entry={e} numero={num}/></div>
-                     <button type="button" onClick={()=>openPicker(saleItem)} title="Relier un autre achat à cette vente" style={{flexShrink:0,border:`1px solid ${C.border}`,borderRadius:8,background:'transparent',color:C.muted,cursor:'pointer',fontSize:11,fontWeight:600,padding:'5px 9px',fontFamily:'inherit'}}>changer</button>
+                     <Bouton variante="discret" onClick={()=>openPicker(saleItem)} title="Relier un autre achat à cette vente" style={{flexShrink:0}}>Changer</Bouton>
                    </div>
                  );
                  // (coût inconnu : « Saisir le prix » et « Relier un achat » sont
@@ -44469,10 +44474,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             une longueur qu'on peut parcourir. Les totaux du haut, eux, portent
             TOUJOURS sur l'ensemble : ils ne dépendent pas de cette tranche. */}
         {ventesAffichees.length > ventesMax && (
-          <button type="button" onClick={()=>setVentesMax(n=>n+120)}
-            style={{width:'100%',marginTop:10,border:`1px solid ${C.border}`,background:C.card,color:C.text,borderRadius:10,padding:'12px',cursor:'pointer',fontSize:13,fontWeight:600,fontFamily:'inherit',boxShadow:C.shadow||'none'}}>
+          <Bouton variante="secondaire" plein onClick={()=>setVentesMax(n=>n+120)} style={{marginTop:10}}>
             Voir plus — {ventesMax} affichées sur {ventesAffichees.length}
-          </button>
+          </Bouton>
         )}
         {/* (29 oct., « un peu moche ») Les contrôles passent SOUS la liste : avant la
             première vente il y avait huit blocs empilés. Ils restent tous là, repliés. */}
@@ -44497,8 +44501,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         )}
         {analyseOpen && (<>
         {(totals.nb>0 || totals.bN>0 || totals.nbAttente>0) && (<>
-          /* 30 sept. — une seule carte, trois colonnes séparées d'un filet :
-             quatre gros blocs empilés prenaient un écran entier sur téléphone. */
+          {/* 30 sept. — une seule carte, trois colonnes séparées d'un filet.
+              ⚠️ (30 oct.) Ce commentaire était écrit sans accolades : il
+              s'AFFICHAIT tel quel au-dessus des chiffres (vu au rendu). */}
           <div className="vrm-summary-strip" data-ventes-benef-n={String(totals.bN)} data-ventes-benef-ncout={String(totals.nbCout)}
             data-ventes-benef-brut={totals.nbCout>0?String(Math.round(totals.benefBrut*100)/100):''} data-ventes-benef-net={totals.nbCout>0&&totals.benefConnu!=null?String(Math.round(totals.benefConnu*100)/100):''}
             data-ventes-benef-couverture={totals.couverture} data-ventes-benef-autres={totals.autresKO?'passu':'lu'}
@@ -44560,21 +44565,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               une vente Leboncoin ou eBay n'a un prix d'achat que si elle est
               reliée à sa paire par IDENTITÉ (SKU, référence, lien posé). */}
           {totals.bN>0 && <div data-ventes-benef-note="" style={{fontSize:11.5,color:C.muted,margin:'-6px 2px 12px',lineHeight:1.45}}>
-            Prix d'achat connus : {totals.couverture || '—'}{totals.autresKO ? ' · Leboncoin et eBay pas encore lus : ce bénéfice ne porte que sur Vinted' : ' · une vente Leboncoin ou eBay se relie à sa paire par son SKU VRM, sa référence ou un lien posé, jamais par son titre'}.
+            Prix d'achat connus : {totals.couverture || '—'}{totals.autresKO ? ' · Leboncoin et eBay pas encore lus : bénéfice Vinted seul' : null}{!totals.autresKO && <> <Pourquoi label="Leboncoin et eBay">Une vente Leboncoin ou eBay se relie à sa paire par son SKU VRM, sa référence ou un lien posé, jamais par son titre.</Pourquoi></>}
           </div>}
         </>)}
 
-        {(totals.nb>0) && (
-          <button type="button" onClick={()=>{ setWrapStep(0); setShowWrapped(true); }}
-            style={{width:'100%',display:'flex',alignItems:'center',gap:9,border:`1px solid ${C.border}`,
-              background:C.card,borderRadius:10,padding:'11px 13px',marginBottom:10,cursor:'pointer',fontFamily:'inherit'}}>
-            <span aria-hidden="true" style={{color:C.accent,display:'flex'}}><Icon name="spark" size={17}/></span>
-            <span style={{flex:1,textAlign:'left',fontSize:13,fontWeight:600,color:C.text}}>
-              Rétrospective {new Date().getFullYear()}
-            </span>
-            <span style={{fontSize:11,color:C.muted,fontWeight:500}}>voir</span>
-          </button>
-        )}
+        {/* (30 oct.) « Rétrospective » est passée dans « ⋯ Outils » : un geste rare. */}
         {/* Ce qui n'est ni un filtre, ni un chiffre, ni une vente vit ici :
             colis à expédier (il a son écran), argent en attente et son détail,
             vente repérée via bordereau, ventes par jour. */}
@@ -44606,11 +44601,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 return t||n ? `Le plus pressé : ${n}${t}${q?` · ${q}`:''}` : (q?`Le plus pressé : ${q}`:null); })() : null}
               detail={`Vinted laisse environ ${SHIP_DAYS} jours après la vente pour expédier. À temps, ta note vendeur est préservée. L'échéance vient de l'email du bordereau (avec son heure) ; sans lui, elle est estimée. Le bordereau se génère depuis l'onglet Colis.`}
               action={onNav && (
-                <button type="button" onClick={()=>onNav('cat_bord')}
-                  style={{flexShrink:0,alignSelf:'center',border:`1px solid ${C.border}`,background:C.surface,color:C.text,
-                    borderRadius:8,padding:'7px 11px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>
-                  Expédier
-                </button>
+                <Bouton variante="secondaire" className="vrm-b-petit" icone="truck" onClick={()=>onNav('cat_bord')} style={{flexShrink:0,alignSelf:'center'}}>Colis</Bouton>
               )}/>
           );
         })()}
@@ -44725,9 +44716,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   </div>
                 );
               })()}
-              <div style={{fontSize:11,color:C.muted,marginTop:6,lineHeight:1.4}}>{reel
-                ? <>Ce que Vinted retient <b>en attente</b> (pas encore virable), lu sur {reel.accounts} porte-monnaie.{reel.dispo>0?<> À côté, tu as <b>{reel.dispo.toFixed(2).replace('.',',')} €</b> déjà <b>disponibles</b> à virer — les deux ne se confondent pas.</>:null}</>
-                : <>Estimation calculée sur tes ventes en cours — le montant exact arrive dès que l'extension a lu les porte-monnaie.</>}</div>
+              <div style={{fontSize:11.5,color:C.muted,marginTop:6,lineHeight:1.4}}>{reel
+                ? <>Retenu par Vinted, pas encore virable · {reel.accounts} porte-monnaie lu{reel.accounts>1?'s':''}{reel.dispo>0?<> · <b>{reel.dispo.toFixed(2).replace('.',',')} €</b> disponibles à virer</>:null}</>
+                : <>Estimation sur tes ventes en cours, en attendant que l'extension lise les porte-monnaie.</>}</div>
               {/* ⚠️ CE TOTAL EST PARTIEL TANT QUE TOUS LES PORTE-MONNAIE N'ONT PAS
                   ÉTÉ LUS. Julien : « j'ai 323 € en attente sur un seul compte, ce
                   n'est pas possible que le total soit 504 € avec sept comptes » —
@@ -44740,14 +44731,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 const manquants = (accounts||[]).filter(a=>{ const u=String(a.vinted_user_id||''); return u && !lus.has(u) && !acctOff(u); });
                 if (!manquants.length) return null;
                 return (
-                  <div style={{marginTop:8,padding:'8px 10px',border:`1px solid ${C.warn}`,background:`${C.warn}12`,borderRadius:8,fontSize:11,color:C.text,lineHeight:1.45}}>
-                    ⚠️ <b>Total incomplet</b> — {manquants.length} compte{manquants.length>1?'s':''} sur {(accounts||[]).length} n'{manquants.length>1?'ont':'a'} pas encore de porte-monnaie lu, donc leur argent en attente n'est <b>pas</b> dans ce chiffre :{' '}
-                    <span style={{opacity:0.9}}>{manquants.map(a=>accName(a)).join(", ")}</span>.
+                  <div data-attente-incomplet={manquants.length} style={{marginTop:8,padding:'8px 10px',borderLeft:`3px solid ${C.warn}`,background:`${C.warn}10`,borderRadius:8,fontSize:11.5,color:C.text,lineHeight:1.45}}>
+                    <b>Total incomplet</b> — sans {manquants.length} compte{manquants.length>1?'s':''} sur {(accounts||[]).length} : <span style={{opacity:0.9}}>{manquants.map(a=>accName(a)).join(", ")}</span>.
                     {/* ⚠️ NE PAS redire « ouvre ton porte-monnaie » : depuis la 5.20 la
                         moisson active lit `payouts` toute seule pour le compte CONNECTÉ
                         (vérifié : 6 soldes captés en 2 minutes sans ouvrir un seul
                         porte-monnaie). Le seul geste utile est de se connecter au compte. */}
-                    <div style={{marginTop:4,opacity:0.85}}>Connecte-toi une fois à ces comptes sur Vinted : l'extension lit leur solde toute seule, tu n'as pas à ouvrir le porte-monnaie.</div>
+                    <div style={{marginTop:2,opacity:0.85}}>Connecte-toi une fois à {manquants.length>1?'chacun':'ce compte'} sur Vinted : l'extension lit le solde toute seule.</div>
                   </div>
                 );
               })()}
@@ -44808,8 +44798,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           <div style={{display:'flex',flexWrap:'wrap',gap:10,marginBottom:8}}>
             {perf.joursMoy!=null && <StatBox label="Temps de vente" value={`${perf.joursMoy.toFixed(0)} j`} sub={`moyenne sur ${perf.joursNb}`}/>}
             {perf.ecoul!=null && <StatBox label="Écoulement" value={`${perf.ecoul.toFixed(0)} %`} sub={`${perf.vendues} vendu / ${perf.online} en ligne`}/>}
-            {perf.bestBrand && <StatBox label="Top marque" value={perf.bestBrand.brand} color={INV_STATUS.online.color} sub={`+${perf.bestBrand.moy.toFixed(0)} €/paire`}/>}
-            {perf.bestAccount && <StatBox label="Compte qui vend le mieux" value={perf.bestAccount.nom} color={INV_STATUS.online.color} sub={`${perf.bestAccount.n} vente${perf.bestAccount.n>1?'s':''} · ${fmtE(perf.bestAccount.ca)}`}/>}
+            {perf.bestBrand && <StatBox label="Top marque" value={perf.bestBrand.brand} sub={`+${perf.bestBrand.moy.toFixed(0)} €/paire`}/>}
+            {perf.bestAccount && <StatBox label="Compte qui vend le mieux" value={perf.bestAccount.nom} sub={`${perf.bestAccount.n} vente${perf.bestAccount.n>1?'s':''} · ${fmtE(perf.bestAccount.ca)}`}/>}
           </div>
         )}
         {/* VENTES PAR COMPTE (G24) : le classement complet, pour un revendeur à
@@ -44862,18 +44852,19 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         {/* Saisonnalité : meilleurs mois de vente → acheter avant les pics */}
         {seasonality && seasonality.top.length>0 && (
           <div style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:10,padding:'9px 13px',marginBottom:8}}>
-            <span style={{fontSize:12,fontWeight:600,color:C.text}}>📈 Tes meilleurs mois de vente : </span>
-            <span style={{fontSize:12,fontWeight:700,color:C.accent}}>{seasonality.top.map(t=>t.m).join(' · ')}</span>
-            <span style={{fontSize:11,color:C.muted,display:'block',marginTop:3}}>Sur {seasonality.total} ventes. Achète un peu avant ces mois pour avoir le stock au bon moment.</span>
+            <span style={{fontSize:12,fontWeight:600,color:C.text}}>Tes meilleurs mois : </span>
+            <span style={{fontSize:12,fontWeight:700,color:C.text}}>{seasonality.top.map(t=>t.m).join(' · ')}</span>
+            <span style={{fontSize:11.5,color:C.muted,display:'block',marginTop:3}}>Sur {seasonality.total} ventes — achète un peu avant.</span>
           </div>
         )}
 
         {/* Litiges / annulations : manque à gagner */}
         {litiges.nb>0 && (
-          <div style={{border:`1px solid ${C.danger}44`,background:`${C.danger}0e`,borderRadius:10,padding:'9px 13px',marginBottom:8}}>
-            <span style={{fontSize:12,fontWeight:600,color:C.danger}}>⚖️ {litiges.nb} vente{litiges.nb>1?'s':''} annulée{litiges.nb>1?'s':''}</span>
-            <span style={{fontSize:12,color:C.text,fontWeight:500}}> · {fmtE(litiges.montant)} de manque à gagner</span>
-            <span className="vrm-aide" style={{fontSize:11,color:C.muted,display:'block',marginTop:3}}>Filtre « Annulées » ci-dessous pour le détail. Un taux d'annulation élevé peut venir de prix/photos à revoir.</span>
+          <div data-ventes-annulees={litiges.nb} style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:10,padding:'6px 13px',marginBottom:8,display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
+            {/* (30 oct.) Plus de rouge (§7) ; la consigne « filtre Annulées
+                ci-dessous » devient le geste lui-même. */}
+            <span style={{flex:'1 1 200px',minWidth:0,fontSize:12.5,color:C.text}}><b>{litiges.nb} vente{litiges.nb>1?'s':''} annulée{litiges.nb>1?'s':''}</b> · {fmtE(litiges.montant)} de manque à gagner</span>
+            <Bouton variante="discret" onClick={()=>{ setVFilter('annulees'); try { document.querySelector('.vrm-sales-workbar')?.scrollIntoView({block:'start',behavior:'smooth'}); } catch(_) {} }}>Voir les annulées</Bouton>
           </div>
         )}
         {/* Objectif de CA mensuel */}
@@ -44884,7 +44875,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         {accounts.length>0 && (()=>{ const caM = (liveStats && liveStats.caMois!=null) ? liveStats.caMois : perf.caMois; const pct = goal>0 ? Math.min(100, (caM/goal)*100) : 0; return (
           <div style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:10,padding:'11px 13px',marginBottom:12}}>
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:goal>0?8:0,flexWrap:'wrap',gap:6}}>
-              <div style={{fontSize:12,fontWeight:600,color:C.text}}>🎯 Objectif du mois</div>
+              <div style={{fontSize:12.5,fontWeight:600,color:C.text}}>Objectif du mois</div>
               {goalEdit ? (
                 <div style={{display:'flex',gap:6,alignItems:'center'}}>
                   <input autoFocus type="number" defaultValue={goal||''} placeholder="0" onKeyDown={e=>{ if(e.key==='Enter'){ saveGoal(e.target.value); setGoalEdit(false);} if(e.key==='Escape') setGoalEdit(false); }}
@@ -44892,9 +44883,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   <span style={{fontSize:12,color:C.muted}}>€</span>
                 </div>
               ) : (
-                <button type="button" onClick={()=>setGoalEdit(true)} style={{background:'transparent',border:`1px solid ${C.border}`,borderRadius:8,padding:'3px 10px',cursor:'pointer',fontSize:11,fontWeight:500,color:C.text}}>
+                <Bouton variante="secondaire" className="vrm-b-petit" onClick={()=>setGoalEdit(true)} title={goal>0?'Changer l\'objectif':undefined}>
                   {goal>0 ? `${caM.toFixed(0)} / ${goal} €` : 'Fixer un objectif'}
-                </button>
+                </Bouton>
               )}
             </div>
             {/* ⚠️ UN OBJECTIF QU'IL FAUT INVENTER NE SE FIXE JAMAIS (mesuré le
@@ -44919,19 +44910,17 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   <div style={{flex:'1 1 150px',minWidth:0,fontSize:11,color:C.muted,lineHeight:1.4}}>
                     Tes {complets.length} derniers mois complets : <b style={{color:C.text}}>{Math.round(moy)} €</b> en moyenne.
                   </div>
-                  <button type="button" onClick={()=>saveGoal(prop)} style={{flexShrink:0,border:'none',background:C.accent,color:'#fff',borderRadius:8,padding:'5px 12px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>
-                    🎯 Viser {prop} €
-                  </button>
+                  <Bouton variante="secondaire" className="vrm-b-petit" icone="target" onClick={()=>saveGoal(prop)} style={{flexShrink:0}}>Viser {prop} €</Bouton>
                 </div>
               );
             })()}
             {goal>0 && (
               <div style={{height:8,borderRadius:8,background:C.border,overflow:'hidden'}}>
-                <div style={{height:'100%',width:`${pct}%`,background:pct>=100?INV_STATUS.online.color:C.accent,borderRadius:8,transition:'width .4s'}}/>
+                <div style={{height:'100%',width:`${pct}%`,background:C.accent,borderRadius:8,transition:'width .4s'}}/>
               </div>
             )}
             {goal>0 && (()=>{
-              if(pct>=100) return <div style={{fontSize:11,color:INV_STATUS.online.color,fontWeight:600,marginTop:5}}>🎉 Objectif atteint !</div>;
+              if(pct>=100) return <div style={{fontSize:11.5,color:C.text,fontWeight:600,marginTop:5}}>Objectif atteint</div>;
               const reste=goal-caM;
               const avg=totals.nb>0?totals.ca/totals.nb:null; // prix de vente moyen finalisé
               const nb=avg&&avg>0?Math.ceil(reste/avg):null;
@@ -44963,7 +44952,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 <span style={{display:'inline-flex',alignItems:'center',gap:5}}><span style={{width:9,height:9,borderRadius:5,background:s2,display:'inline-block'}}/>Bénéfice net</span>
               </div>
             </div>
-            <div style={{width:'100%',overflowX:'auto'}}>
+            {/* (30 oct.) Le dessin fait 320 unités de large : étiré sur 1 300 px, ses
+                mois s'écrivaient en 40 px (vu au rendu). Il garde une taille lisible. */}
+            <div style={{width:'100%',maxWidth:560,margin:'0 auto',overflowX:'auto'}}>
               <svg viewBox={`0 0 ${W} ${H+22}`} style={{width:'100%',minWidth:280,height:'auto',display:'block'}} role="img" aria-label={`Chiffre d'affaires et bénéfice net sur 6 mois. ${monthlyChart.months.map(m=>`${m.label} : CA ${Math.round(m.ca)} euros, bénéfice ${Math.round(m.benef)} euros`).join('. ')}`}>
                 {/* Repères horizontaux : discrets, sous les données. */}
                 {[0.5,1].map((f,i)=>(
@@ -48844,7 +48835,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               <div style={{marginBottom:14}}>
                 <div style={{display:'flex',alignItems:'center',gap:8}}>
                   <span style={{fontSize:12,fontWeight:500,color:C.text}}>Mois</span>
-                  <button type="button" onClick={()=>setMoisOuvert(v=>!v)} style={{border:`1px solid ${C.border}`,borderRadius:8,padding:'6px 12px',fontSize:13,fontWeight:600,background:C.card,color:C.text,cursor:'pointer',textTransform:'capitalize',fontFamily:'inherit'}}>
+                  <button type="button" className="vrm-b vrm-b-secondaire vrm-b-petit" aria-expanded={moisOuvert} onClick={()=>setMoisOuvert(v=>!v)} style={{textTransform:'capitalize'}}>
                     {report.monthLabel} ▾
                   </button>
                 </div>
@@ -48995,19 +48986,19 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                         </label>
                         {(report.incomplet || (declForm.refus && !declarables)) && <RaisonDeclBloquee manque={report.incomplet || declForm.refus} refus={!!declForm.refus}/>}
                         <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
-                          <button type="button" data-decl-enregistrer onClick={()=>declarerMois(declForm.regle, declForm.montant, declForm.paye)} style={{border:'none',borderRadius:8,background:C.accent,color:C.onAccent,cursor:'pointer',fontSize:13,fontWeight:600,padding:'8px 14px'}}>Enregistrer</button>
+                          <Bouton variante="primaire" data-decl-enregistrer onClick={()=>declarerMois(declForm.regle, declForm.montant, declForm.paye)}>Enregistrer</Bouton>
                           {serieDeclActive() && SERIE_DECLARATION.liste.includes(reportMonth) ? (<>
-                            <button type="button" data-decl-passer onClick={()=>{ setDeclForm(null); allerMoisSuivantSerie(reportMonth); }} style={{border:`1px solid ${C.border}`,borderRadius:8,background:'transparent',color:C.text,cursor:'pointer',fontSize:13,padding:'8px 14px'}}>Pas encore déclaré — mois suivant</button>
-                            <button type="button" data-decl-serie-stop onClick={()=>{ finirSerieDecl(); setDeclForm(null); }} style={{border:`1px solid ${C.border}`,borderRadius:8,background:'transparent',color:C.text,cursor:'pointer',fontSize:13,padding:'8px 14px'}}>Arrêter</button>
+                            <Bouton variante="secondaire" data-decl-passer onClick={()=>{ setDeclForm(null); allerMoisSuivantSerie(reportMonth); }}>Pas encore déclaré — mois suivant</Bouton>
+                            <Bouton variante="discret" data-decl-serie-stop onClick={()=>{ finirSerieDecl(); setDeclForm(null); }}>Arrêter</Bouton>
                           </>) : (
-                          <button className="vrm-b vrm-b-discret" type="button" onClick={()=>setDeclForm(null)} style={{border:`1px solid ${C.border}`,borderRadius:8,background:'transparent',color:C.text,cursor:'pointer',fontSize:13,padding:'8px 14px'}}>Annuler</button>)}
+                          <Bouton variante="discret" onClick={()=>setDeclForm(null)}>Annuler</Bouton>)}
                         </div>
                       </div>
                     ) : (
                       <div style={{display:'flex',flexDirection:'column',gap:6}}>
                         <div style={{display:'flex',gap:10,alignItems:'center',flexWrap:'wrap'}}>
-                          <span style={{flex:'1 1 220px',color:C.muted,fontSize:12}}>Note-le quand tu l'as déclaré : ses ventes ne seront plus recomptées dans un autre mois.</span>
-                          <button type="button" data-decl-ouvrir disabled={!!report.incomplet} onClick={()=>{ if (!report.incomplet) setDeclForm({ regle:'versement', montant:'', paye:'' }); }} style={{border:`1px solid ${C.border}`,borderRadius:8,background:'transparent',color:C.text,cursor:report.incomplet?'default':'pointer',fontSize:12.5,fontWeight:600,padding:'7px 12px',opacity:report.incomplet?0.5:1}}>J'ai déclaré ce mois</button>
+                          <span style={{flex:'1 1 220px',color:C.muted,fontSize:12}}>Note-le une fois déclaré : ces ventes ne compteront plus ailleurs.</span>
+                          <Bouton variante="secondaire" className="vrm-b-petit" data-decl-ouvrir disabled={!!report.incomplet} onClick={()=>{ if (!report.incomplet) setDeclForm({ regle:'versement', montant:'', paye:'' }); }}>J'ai déclaré ce mois</Bouton>
                         </div>
                         {report.incomplet && <RaisonDeclBloquee manque={report.incomplet}/>}
                       </div>
@@ -49110,8 +49101,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               </div>
             </div>
             <div style={{display:'flex',gap:8,padding:'12px 16px',borderTop:`1px solid ${C.border}`,flexShrink:0}}>
-              <button type="button" onClick={exportReportCsv} style={{flex:1,border:`1px solid ${C.border}`,borderRadius:8,background:'transparent',color:C.text,cursor:'pointer',fontSize:13,fontWeight:500,padding:'10px'}}>⬇️ CSV</button>
-              <button type="button" onClick={exportReportPdf} style={{flex:1,border:'none',borderRadius:8,background:C.accent,color:C.onAccent,cursor:'pointer',fontSize:13,fontWeight:600,padding:'10px'}}>📄 PDF</button>
+              <Bouton variante="secondaire" icone="save" data-rapport-csv onClick={exportReportCsv} style={{flex:1}}>CSV</Bouton>
+              <Bouton variante="primaire" icone="doc" data-rapport-pdf onClick={exportReportPdf} style={{flex:1}}>PDF</Bouton>
             </div>
           </div>
         </div>
