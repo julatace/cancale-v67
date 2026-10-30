@@ -60,7 +60,7 @@ summary.vrm-sidebar-label { cursor:pointer; min-height:32px; }
 
 /* Téléphone et tablette : dimensions réelles, commandes accessibles au doigt.
    Ces règles restent dans la coque de l'app, hors de la page publique. */
-@media (max-width: 1023px) {
+@media (max-width: 767px), (max-width: 1023px) and (hover: none), (max-width: 1023px) and (pointer: coarse), (max-width: 1023px) and (pointer: none) {
   .vrm-app-shell { height:calc(100dvh / var(--vrm-zoom, 1)) !important; min-height:0; }
   .vrm-main { scroll-padding-block:16px; }
   .vrm-main button:not([role="switch"]) { min-height:44px !important; }
@@ -1147,7 +1147,7 @@ summary.vrm-sidebar-label { cursor:pointer; min-height:32px; }
   .vrm-day-recent .vrm-carrousel > button > div:first-child { aspect-ratio:auto !important; min-height:82px; }
   .vrm-day-recent .vrm-carrousel > button > div + div { padding:8px !important; min-width:0; }
 }
-@media(max-width:1023px) {
+@media (max-width: 767px), (max-width: 1023px) and (hover: none), (max-width: 1023px) and (pointer: coarse), (max-width: 1023px) and (pointer: none) {
   .vrm-app-shell .vrm-tabbar {
     background:var(--vrm-nav-bg,#21343E); border-top:1px solid rgba(255,255,255,.12);
     backdrop-filter:none; -webkit-backdrop-filter:none;
@@ -1239,7 +1239,7 @@ summary.vrm-sidebar-label { cursor:pointer; min-height:32px; }
 }
 
 /* Même identité de plateforme que le rail ordinateur, sur fond ardoise. */
-@media(max-width:1023px) {
+@media (max-width: 767px), (max-width: 1023px) and (hover: none), (max-width: 1023px) and (pointer: coarse), (max-width: 1023px) and (pointer: none) {
   .vrm-tabbar .vrm-brand-icon { filter:invert(1); opacity:.78; }
   .vrm-tabbar [aria-current="page"] .vrm-brand-icon { opacity:1; }
 }
@@ -1272,7 +1272,7 @@ summary.vrm-sidebar-label { cursor:pointer; min-height:32px; }
 .vrm-app-shell .vrm-header-logo { cursor:default; }
 .vrm-atelier-rail .vrm-sidebar-brand .vrm-logo { object-fit:contain; flex-shrink:0; }
 
-@media(max-width:1023px) {
+@media (max-width: 767px), (max-width: 1023px) and (hover: none), (max-width: 1023px) and (pointer: coarse), (max-width: 1023px) and (pointer: none) {
   .vrm-app-shell .vrm-header-logo { width:44px; height:44px; }
   .vrm-app-shell .vrm-header-logo > img.vrm-logo { width:40px !important; height:40px !important; border-radius:0; object-fit:contain; }
 }

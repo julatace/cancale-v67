@@ -12,7 +12,15 @@
 .vrm-widgets { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; align-items:stretch; margin-bottom:12px; }
 .vrm-widget { position:relative; min-width:0; grid-column:span 2; touch-action:manipulation; }
 .vrm-widget[data-taille="petit"] { grid-column:span 1; }
-@media (min-width:1024px) {
+/* (30 oct., Edge) Six colonnes dès 1024 px donnaient des cartes de 246 px
+   (« VENDU EN OCTOBRE » sur deux lignes, « En attente » sur cinq). Six colonnes
+   seulement à partir de 1280 ; entre 1024 et 1279, deux colonnes : petit et
+   moyen côte à côte, grand et pleine sur toute la largeur. */
+@media (min-width:1024px) and (max-width:1279px) {
+  .vrm-widgets { gap:12px; }
+  .vrm-widget[data-taille="moyen"] { grid-column:span 1; }
+}
+@media (min-width:1280px) {
   .vrm-widgets { grid-template-columns:repeat(6,minmax(0,1fr)); gap:12px; }
   .vrm-widget[data-taille="grand"] { grid-column:span 4; }
   .vrm-widget[data-taille="pleine"] { grid-column:1 / -1; }
@@ -92,7 +100,7 @@
 .vrm-w-taille { position:relative; align-self:flex-end; margin-top:8px; z-index:3; min-height:44px; padding:0 12px; border-radius:999px; font:inherit; font-size:12px; font-weight:600; cursor:pointer; flex-shrink:0; box-shadow:0 1px 2px rgba(0,0,0,.08), 0 4px 10px rgba(0,0,0,.06); }
 /* Sous 1024 px, moyen et grand ont la même largeur : un bouton qui ne change
    rien à l'écran ne se propose pas. */
-@media (max-width:1023px) { .vrm-w-taille { display:none; } }
+@media (max-width:1279px) { .vrm-w-taille { display:none; } }
 @media (max-width:767px) {
   :root body .vrm-main .vrm-w-retirer { top:-18px; left:-18px; }
 }

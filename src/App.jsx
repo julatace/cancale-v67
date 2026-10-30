@@ -14049,12 +14049,19 @@ function TopProgress() {
 // Aucune retouche de teinte ne corrige ça : c'est la FORME qui est mobile.
 // ➡️ Au-dessus de 1024 px : barre latérale à gauche, largeur de lecture bornée,
 //    barre du bas retirée. En dessous : rien ne change, le mobile est intact.
+// (30 oct., Edge sous Windows) La largeur seule ne suffit pas : Edge avec sa
+// barre latérale, ou une fenêtre en demi-écran, fait 768 à 1023 px de large, et
+// l'app passait en coque TÉLÉPHONE (barre du bas, commandes de 44 px) sous une
+// souris. La coque ordinateur se décide sur la SOURIS autant que sur la
+// largeur ; une tablette au doigt garde la coque téléphone. La même requête vit
+// dans les CSS de la coque (`MQ_ORDINATEUR`, styles-*.css) : une notion, une règle.
+const MQ_ORDINATEUR = '(min-width: 1024px), (min-width: 768px) and (hover: hover) and (pointer: fine)';
 const useOrdinateur = () => {
   const [ord, setOrd] = React.useState(() => {
-    try { return window.matchMedia('(min-width: 1024px)').matches; } catch (_) { return false; }
+    try { return window.matchMedia(MQ_ORDINATEUR).matches; } catch (_) { return false; }
   });
   React.useEffect(() => {
-    let mq; try { mq = window.matchMedia('(min-width: 1024px)'); } catch (_) { return; }
+    let mq; try { mq = window.matchMedia(MQ_ORDINATEUR); } catch (_) { return; }
     const on = () => setOrd(mq.matches);
     try { mq.addEventListener('change', on); } catch (_) { mq.addListener(on); }
     return () => { try { mq.removeEventListener('change', on); } catch (_) { mq.removeListener(on); } };
@@ -14070,9 +14077,34 @@ function SideBar({ tab, setTab, entreprise }) {
   const outils = [...NAV_GESTION, ...NAV_OUTILS];
   const actif = BAR_GROUPE[tab] || tab;
   const bouton=t=><button key={t.id} type="button" className="vrm-rail-button" aria-label={t.label} title={t.bientot?`${t.label} — bientôt`:t.label} onClick={()=>setTab(t.id)} aria-current={actif===t.id?'page':undefined}><NavigationIcon item={t} size={25}/></button>;
+  // (30 oct., Edge sous Windows) Une fenêtre basse (1366×768 → 630 px utiles)
+  // coupait le bas du rail — Statistiques, Comptabilité, Communauté — et la zone
+  // défile SANS barre visible : rien ne disait qu'il y avait une suite. La zone
+  // dit maintenant de quel côté il en reste (`data-rail-suite`, un fondu en CSS),
+  // et l'entrée de l'écran ouvert est ramenée dans la vue à chaque changement.
+  const zoneRef = React.useRef(null);
+  React.useEffect(() => {
+    const el = zoneRef.current; if (!el) return undefined;
+    const poser = () => {
+      const reste = el.scrollHeight - el.clientHeight;
+      const haut = reste > 1 && el.scrollTop > 1, bas = reste > 1 && el.scrollTop < reste - 1;
+      const v = haut && bas ? 'les-deux' : bas ? 'bas' : haut ? 'haut' : '';
+      if (v) el.setAttribute('data-rail-suite', v); else el.removeAttribute('data-rail-suite');
+    };
+    poser();
+    el.addEventListener('scroll', poser, { passive: true });
+    let ro = null; try { ro = new ResizeObserver(poser); ro.observe(el); } catch (_) {}
+    window.addEventListener('resize', poser);
+    return () => { el.removeEventListener('scroll', poser); window.removeEventListener('resize', poser); try { ro && ro.disconnect(); } catch (_) {} };
+  }, []);
+  React.useEffect(() => {
+    const el = zoneRef.current; if (!el) return;
+    const b = el.querySelector('.vrm-rail-button[aria-current="page"]');
+    try { if (b) b.scrollIntoView({ block: 'nearest', inline: 'nearest' }); } catch (_) {}
+  }, [actif]);
   return <nav className="vrm-sidebar vrm-atelier-rail" aria-label="Navigation principale" style={{width:NAV_LARGEUR,background:C.sidebar||C.chrome,borderRight:`1px solid ${C.chromeLine}`,color:C.onChrome}}>
     <div className="vrm-sidebar-brand"><VrmLogo size={68} anim={false}/><NomEntreprise entreprise={entreprise} className="vrm-sidebar-entreprise"/></div>
-    <div className="vrm-rail-scroll">
+    <div className="vrm-rail-scroll" ref={zoneRef}>
       <div className="vrm-rail-platforms">{BOTTOM_TABS.map(bouton)}</div>
       <section className="vrm-rail-management-group" aria-label="Gestion"><div className="vrm-rail-section-label">Gestion</div><div className="vrm-rail-management">{outils.map(bouton)}</div></section>
     </div>

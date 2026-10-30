@@ -302,7 +302,7 @@
 .vrm-toast-icon{display:flex;align-items:center;justify-content:center;flex-shrink:0;width:24px;height:24px;}
 .vrm-toast:focus-visible{outline:2px solid var(--message-ink);outline-offset:3px;}
 /* Ordinateur : en bas à droite, même feuille ouverte (elle est centrée et ne va pas jusque-là). */
-@media(min-width:1024px){.vrm-toasts{left:auto!important;width:380px;right:24px!important;bottom:24px!important;top:auto!important;padding:0!important;}}
+@media (min-width: 1024px), (min-width: 768px) and (hover: hover) and (pointer: fine){.vrm-toasts{left:auto!important;width:380px;right:24px!important;bottom:24px!important;top:auto!important;padding:0!important;}}
 @media(prefers-reduced-motion:reduce){.vrm-toast{animation:none!important;}}
 .vrm-main .vrm-set-panneau :is(p,small){line-height:1.6;}
 .vrm-main :is(.vrm-reception,.vrm-recus-email){
@@ -318,7 +318,7 @@
 /* (22 oct.) « ⋯ Outils » des Ventes : sous 1 024 px la rangée des filtres défile
    au doigt — le bouton reste collé à son bord droit (il était hors de l'écran,
    au bout de la rangée) ; son menu s'ouvre sous la barre (App.jsx). */
-@media(max-width:1023px){
+@media (max-width: 767px), (max-width: 1023px) and (hover: none), (max-width: 1023px) and (pointer: coarse), (max-width: 1023px) and (pointer: none){
  .vrm-sales-workbar>.vrm-rangee>.vrm-outils-ventes{position:sticky;right:0;z-index:1;padding-left:8px;background:var(--vrm-surface);box-shadow:-10px 0 10px -6px var(--vrm-surface);}
  .vrm-sales-workbar>.vrm-rangee>.vrm-outils-ventes>button{min-height:36px;}
 }
