@@ -114,6 +114,12 @@ const dit = (c, m, d) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m +
     await pg.goto('http://localhost:'+PORT_BANC+'/?tab=settings', { waitUntil: 'domcontentloaded' });
     await pg.waitForTimeout(5200);
     const bloc = await pg.evaluate(() => {
+      // (30 oct.) Le panneau par son ATTRIBUT (sous-écran « securite ») : une
+      // recherche « le premier div de moins de 2 600 caractères qui contient le
+      // titre » tombait sur la LISTE des réglages dès que leurs descriptions ont
+      // raccourci. Panneau replié (sous-écran fermé) : son texte, pas son rendu.
+      const p = document.querySelector('[data-sous-ecran="securite"]');
+      if (p) return p.innerText || p.textContent || '';
       const t = [...document.querySelectorAll('div')].find((d) => /Sécurité des données/.test(d.textContent || '') && (d.textContent || '').length < 2600);
       if (t) return t.innerText || '';
       return '';
@@ -123,7 +129,7 @@ const dit = (c, m, d) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m +
     //    du premier écran ne montrait que l'en-tête des Paramètres.
     try {
       const el = await pg.evaluateHandle(() => {
-        const d = [...document.querySelectorAll('div')].find((x) => /Sécurité des données/.test(x.textContent || '') && (x.textContent || '').length < 2600);
+        const d = document.querySelector('[data-sous-ecran="securite"]:not([hidden])') || [...document.querySelectorAll('div')].find((x) => /Sécurité des données/.test(x.textContent || '') && (x.textContent || '').length < 2600);
         return d || document.body;
       });
       await el.asElement().scrollIntoViewIfNeeded();

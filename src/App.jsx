@@ -52158,11 +52158,11 @@ function PushPrefsSetting({ comptes, onMuets }) {
           <div style={{fontSize:12,color:C.muted,marginTop:2,lineHeight:1.4}}>
             {enCours ? 'Chargement…'
               : pasLu ? <span style={{display:'inline-block',fontSize:11,fontWeight:600,color:C.muted,background:C.bg,border:`1px solid ${C.border}`,borderRadius:999,padding:'2px 9px'}}>{REGLAGE_PAS_LU}</span>
-              : `${n} type${n>1?'s':''} de notification sur ${PUSH_CATS.length}. Par défaut, on ne sonne que pour l'argent et ce qu'il y a à faire.`}
+              : `${n} sur ${PUSH_CATS.length} activée${n>1?'s':''}.`}
             {/* §7 (revue du 11 oct.) : déplié, le bloc dessous dit tout — le résumé se tait. */}
             {muets && muets.length > 0 && !ouvert && (
               <div style={{color:C.warn,fontWeight:600,marginTop:3}} data-resume-muets={muets.length}>
-                ⚠ {muets.length} compte{muets.length>1?'s':''} n’envoie{muets.length>1?'nt':''} aucun email à VRM&nbsp;: ni {muets.length>1?'leurs':'ses'} ventes ni {muets.length>1?'leurs':'ses'} messages ne te préviendront — déplie pour savoir lesquels.
+                ⚠ {muets.length} compte{muets.length>1?'s':''} sans email&nbsp;: pas de notification pour {muets.length>1?'eux':'lui'} — déplie.
               </div>
             )}
           </div>
@@ -52408,7 +52408,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
   // ── TES DONNÉES ET LES CONDITIONS
   const donnees = (
     <div style={{fontSize:13,color:C.muted,lineHeight:1.55}}>
-      Tu peux <b style={{color:C.text}}>exporter tes données</b> avec « Sauvegarde complète » {ongletsCompte ? '(onglet Réglages)' : 'ci-dessous'}{AUTH.user ? <>, et <b style={{color:C.text}}>fermer ton compte</b> avec « Fermer mon compte »</> : null}. Pour tes autres droits (accès, rectification), voir la <a href="/legal/confidentialite.html" target="_blank" rel="noopener" style={{color:C.accent}}>politique de confidentialité</a>.
+      <b style={{color:C.text}}>Exporter</b> : « Sauvegarde complète » {ongletsCompte ? '(Réglages)' : 'ci-dessous'}{AUTH.user ? <> · <b style={{color:C.text}}>Fermer ton compte</b> : « Fermer mon compte »</> : null}. Tes autres droits : <a href="/legal/confidentialite.html" target="_blank" rel="noopener" style={{color:C.accent}}>politique de confidentialité</a>.
       <LigneContact/>
       <div style={{display:'flex',flexWrap:'wrap',gap:'4px 16px',marginTop:10}}>
         {DOCS_LEGAUX.map(([h,t]) => <a key={h} href={h} target="_blank" rel="noopener" style={{color:C.accent,fontWeight:500,textDecoration:'none',minHeight:44,minWidth:44,display:'inline-flex',alignItems:'center'}}>{t}</a>)}
@@ -54131,7 +54131,7 @@ function ZoomSetting({ nu = false }) {
     <div style={nu ? {} : {background:C.card,border:`1px solid ${C.border}`,borderRadius:10,padding:'13px 14px',marginBottom:8,boxShadow:C.shadow||'none'}}>
       {!nu && <div style={{fontSize:14,fontWeight:600,color:C.text}}>Taille de l'affichage</div>}
       <div style={{fontSize:12.5,color:C.muted,marginTop:nu?0:3,lineHeight:1.45}}>
-        {telephone ? 'Une taille lisible et des boutons faciles à toucher. Réglage propre à cet appareil.' : "Ajuste la taille de l'app. Réglage propre à cet appareil."}
+        Réglage propre à cet appareil.
       </div>
       <Segmente label="Taille de l'affichage" plein value={selection} onChange={choisir} style={{marginTop:11}}
         options={choix.map(([v, label]) => ({ v, l: label }))}/>
@@ -55590,10 +55590,10 @@ function RegimeSetting({ nu = false }) {
             <span style={{fontSize:12,color:C.muted}}>% du CA</span>
           </div>
           <div style={{fontSize:11,color:C.muted,marginTop:6,lineHeight:1.5}}>
-            Sert au rapport mensuel et annuel. Il se compose des <b>cotisations sociales</b>, de la <b>contribution à la formation</b>, et du <b>versement libératoire de l'impôt</b> si tu l'as choisi — donc il dépend de ta situation et il change d'une année à l'autre.
-            {' '}Vérifie le tien et déclare sur{' '}
+            Le tien, vérifié sur{' '}
             <a href="https://www.autoentrepreneur.urssaf.fr" target="_blank" rel="noopener noreferrer" style={{color:C.accent,fontWeight:700,textDecoration:'none'}}>autoentrepreneur.urssaf.fr →</a>
-            {' '}: l'app ne le devine pas, elle applique celui que tu poses ici.
+            {' '}: l'app applique celui que tu poses ici.{' '}
+            <Pourquoi label="De quoi se compose ce taux">Cotisations sociales, contribution à la formation, et versement libératoire de l'impôt si tu l'as choisi. Il dépend de ta situation et change d'une année à l'autre ; il sert au rapport mensuel et annuel.</Pourquoi>
           </div>
         </div>
       )}
