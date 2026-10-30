@@ -412,7 +412,7 @@ const MK = { version: 2, coupure: T, appliqueLe: '2026-10-10T08:00:00.000Z', arc
     // `empty*` qui s'ajoutent devant (min, refuse… sont devenus porteurs de
     // valeur). Reste ROUGE si quelqu'un retire la garde — le vrai défaut.
     dit(/if \(emptyNum && emptyBuy && emptyMp(?: && empty\w+)* && !\(etaitNumerotee && archiveNumeros\(\)\)\) delete u\[item\.id\];/.test(A), 'effacer un N° à la main GARDE la fiche (la base refuse qu\'une fiche numérotée disparaisse)');
-    dit(/const arch = !numeroReprenable\(num\);/.test(A) && /↩️ revient → numéro neuf/.test(A) && /🔁 renvoi → numéro neuf/.test(A), 'une vente revenue qui portait un ancien N° (B…) dit « numéro neuf », jamais « garde le N°B… »');
+    dit(/const arch = !numeroReprenable\(num\);/.test(A) && /data-retour-archive="retour"[^>]*>[^<{]*numéro neuf/.test(A) && /data-retour-archive="renvoi"[^>]*>[^<{]*numéro neuf/.test(A), 'une vente revenue qui portait un ancien N° (B…) dit « numéro neuf », jamais « garde le N°B… »');
     // (21 octobre) Les retours se suivent dans Colis (« Retours en cours ») : la remise en
     // stock dit « retape-le » pour un N° qui se redonne, « numéro NEUF » pour un ancien.
     // On suit la RÈGLE, pas le genre : « paire »→« article » a mis « Elle portait »

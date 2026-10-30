@@ -179,7 +179,7 @@ const brancher = async (pg, etat = {}) => {
       // Le PDF : il doit se générer (emoji dans un titre) et porter les deux registres.
       let pdfTxt = '';
       try {
-        const [dl] = await Promise.all([pg.waitForEvent('download', { timeout: 15000 }), pg.getByText('📄 PDF').click()]);
+        const [dl] = await Promise.all([pg.waitForEvent('download', { timeout: 15000 }), pg.locator('[data-rapport-pdf]').first().click()]);
         const buf = fs.readFileSync(await dl.path());
         pdfTxt = buf.toString('latin1');
         dit(buf.slice(0, 4).toString() === '%PDF', 'le PDF se génère malgré un emoji dans un titre', `${buf.length} octets`);

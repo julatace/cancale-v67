@@ -186,6 +186,9 @@
 .vrm-ledger-drawer-body .vrm-sale-title{display:none!important;}
 .vrm-ledger-drawer-body .vrm-sale-price>.vrm-display{display:none!important;}
 .vrm-ledger-drawer-body .vrm-sale-meta{margin-top:0!important;}
+/* (30 oct.) État, compte et date sont DÉJÀ dans l'en-tête du tiroir et sa ligne d'accès : la méta du détail ne les redit pas (§7). */
+.vrm-ledger-drawer-body .vrm-sale-meta .vrm-vente-redit{display:none!important;}
+.vrm-ledger-drawer-body .vrm-sale-meta:not(:has(> :not(.vrm-vente-redit))){display:none!important;}
 .vrm-ledger-drawer-body .vrm-cout-rangee{display:grid!important;grid-template-columns:1fr 1fr;gap:8px!important;width:100%;}
 :root body .vrm-ledger-drawer-body .vrm-cout-rangee>button{min-height:44px!important;border:1px solid var(--gestion-line)!important;border-radius:6px!important;background:var(--gestion-soft)!important;font-size:12px!important;justify-content:center!important;padding:8px!important;}
 .vrm-ledger-drawer-body .vrm-sale-details>summary{border:1px solid var(--gestion-line);border-radius:6px;background:var(--gestion-soft);padding:12px!important;font-size:12px!important;}
