@@ -941,7 +941,7 @@ let _authRefreshEchecAt = 0;
 const authRefresh = (opt) => {
   if (_authRefreshEnVol) return _authRefreshEnVol;
   if (opt && opt.discret && Date.now() - _authRefreshEchecAt < 15000) return Promise.resolve(null);
-  _authRefreshEnVol = (async () => {
+  _authRefreshEnVol = Promise.resolve().then(async () => {
     try {
       const s = AUTH.session;
       if (!s || !s.refresh_token) return false;
@@ -949,14 +949,22 @@ const authRefresh = (opt) => {
       // Trois états : true (renouvelé) · false (REFUSÉ par le service : jeton
       // révoqué, compte supprimé) · null (pas su : réseau coupé, service qui ne
       // répond pas). Seul un refus déconnecte — une coupure, jamais.
-      if (!r.ok) { _authRefreshEchecAt = Date.now(); return (r.status >= 400 && r.status < 500) ? false : null; }
-      // La session a pu changer pendant la demande (déconnexion, autre compte) :
-      // on ne range pas un jeton renouvelé par-dessus.
-      if (!AUTH.session || AUTH.session.refresh_token !== s.refresh_token) return false;
-      writeSession(sessionFrom(r.json));
+      // Une réponse de l’ancienne session, même refusée, ne doit ni remplacer
+      // ni faire effacer la nouvelle session par authBoot.
+      if (!AUTH.session || AUTH.session.refresh_token!==s.refresh_token || AUTH.session.access_token!==s.access_token) return null;
+      if (!r.ok) { _authRefreshEchecAt=Date.now(); return (r.status>=400&&r.status<500&&![408,425,429].includes(r.status))?false:null; }
+      const j=r.json;
+      if(typeof j?.access_token!=='string'||!j.access_token.trim()
+        ||typeof j.refresh_token!=='string'||!j.refresh_token.trim()
+        ||typeof j.user?.id!=='string'||!j.user.id.trim()
+        ||(s.user?.id&&j.user.id!==s.user.id)
+        ||(j.expires_in!==undefined&&(!Number.isFinite(Number(j.expires_in))||Number(j.expires_in)<=0))){_authRefreshEchecAt=Date.now();return null;}
+      writeSession(sessionFrom(j));
+      _authRefreshEchecAt=0;
       return true;
-    } finally { _authRefreshEnVol = null; }
-  })();
+    } catch (_) {_authRefreshEchecAt=Date.now();return null;}
+    finally { _authRefreshEnVol = null; }
+  });
   return _authRefreshEnVol;
 };
 const sessionFrom = (j) => ({
@@ -1447,14 +1455,17 @@ const consumeAuthRedirect = async () => {
 
 // Le jeton ne dit pas l'email en clair : on demande à Supabase qui il désigne.
 const fetchMe = async (token) => {
+  const controle=new AbortController(),delai=setTimeout(()=>controle.abort(),20000);
   try {
-    const res = await fetch(`${SUPABASE_URL}/auth/v1/user`, { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${token}` } });
+    const res = await fetch(`${SUPABASE_URL}/auth/v1/user`, { signal:controle.signal, headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${token}` } });
     if (!res.ok) return null;
     const j = await res.json();
+    if(typeof j?.id!=='string'||!j.id.trim())return null;
     // `_totp` : les facteurs TOTP vérifiés (double vérification), rangés à part
     // dans la session par l'appelant — jamais dans `user`.
     return { id: j.id, email: j.email, _totp: totpVerifies(j), _totpNoms: totpNoms(j) };
   } catch (_) { return null; }
+  finally{clearTimeout(delai);}
 };
 
 // Changer son adresse email. Supabase envoie une confirmation aux DEUX adresses
