@@ -85,11 +85,15 @@ const codeConfirmation =
     source.indexOf("// Renvoyer l'email de confirmation"),
   ) + ";globalThis.confirmer=authConfirmFromLink;";
 function confirmerAvec(json) {
-  let session = null;
+  let session = null,
+    appels = 0;
   const c = vm.createContext({
     URL,
     URLSearchParams,
-    authCall: async () => ({ ok: true, json }),
+    authCall: async () => {
+      appels++;
+      return { ok: true, json };
+    },
     writeSession: (s) => {
       session = s;
     },
@@ -97,11 +101,12 @@ function confirmerAvec(json) {
   });
   vm.runInContext(codeConfirmation, c);
   return {
-    confirmer: () =>
-      c.confirmer(
-        "https://projet.supabase.co/auth/v1/verify?type=signup&token_hash=abcdef",
-        "client@exemple.test",
-      ),
+    get appels() {
+      return appels;
+    },
+    confirmer: (
+      raw = "https://projet.supabase.co/auth/v1/verify?type=signup&token_hash=abcdef",
+    ) => c.confirmer(raw, "client@exemple.test"),
     get session() {
       return session;
     },
@@ -140,7 +145,8 @@ const codeRetour =
   ) + ";globalThis.retour=consumeAuthRedirect;";
 function retourAvec({ search = "", hash = "", json = {}, me = null } = {}) {
   let session = null,
-    nettoyee = false;
+    nettoyee = false,
+    recuperationAuRangement = false;
   const ancienne = {
     session: { access_token: "ancienne", user: { id: "ancien" } },
   };
@@ -162,12 +168,16 @@ function retourAvec({ search = "", hash = "", json = {}, me = null } = {}) {
     fetchMe: async () => me,
     sessionFrom: (j) => j,
     writeSession: (s) => {
+      recuperationAuRangement = c.RECOVERY_PENDING;
       session = s;
     },
   });
   vm.runInContext(codeRetour, c);
   return {
     retour: () => c.retour(),
+    get recuperationAuRangement() {
+      return recuperationAuRangement;
+    },
     get session() {
       return session;
     },
@@ -282,4 +292,93 @@ test("mot de passe : requête bloquée interrompue et résultat annoncé comme n
   assert.equal(b.signal.aborted, true);
   assert.match((await r).error, /pas pu être confirmé/);
   assert.equal(b.nettoye, true);
+});
+
+test("lien de récupération : le mode de changement est activé avant la publication de session", async () => {
+  for (const opts of [
+    { hash: "#access_token=fictif&type=recovery", me: { id: "nouveau" } },
+    {
+      search: "?code=fictif&type=recovery",
+      json: { access_token: "fictif", user: { id: "nouveau" } },
+    },
+  ]) {
+    const b = retourAvec(opts);
+    assert.equal((await b.retour()).recovery, true);
+    assert.equal(b.recuperationAuRangement, true);
+  }
+});
+test("lien de connexion : une durée vide, négative ou non numérique ne crée pas de session", async () => {
+  for (const valeur of [
+    "",
+    "0",
+    "-1",
+    "incorrect",
+    "3600abc",
+    "1e309",
+    "1e308",
+  ]) {
+    const b = retourAvec({
+      hash: "#access_token=fictif&expires_in=" + valeur,
+      me: { id: "nouveau" },
+    });
+    assert.match((await b.retour()).error, /pas utilisable/);
+    assert.equal(b.session, null);
+    assert.equal(b.nettoyee, true);
+  }
+  const b = retourAvec({
+    hash: "#access_token=fictif&expires_in=3600",
+    me: { id: "nouveau" },
+  });
+  assert.equal((await b.retour()).ok, true);
+  assert.ok(Number.isFinite(b.session.expires_at));
+});
+test("confirmation manuelle : un lien de récupération est orienté sans consommer son jeton", async () => {
+  for (const raw of [
+    "https://projet.supabase.co/auth/v1/verify?type=recovery&token=fictif",
+    "https://vrm.center/recuperation.html#type=recovery&token_hash=fictif",
+    "?type=recovery&token_hash=fictif",
+  ]) {
+    const b = confirmerAvec({ access_token: "fictif", user: { id: "client" } });
+    const r = await b.confirmer(raw);
+    assert.equal(r.ok, false);
+    assert.equal(r.recovery, true);
+    assert.equal(b.appels, 0);
+    assert.equal(b.session, null);
+  }
+});
+const codeNettoyage =
+  source.slice(
+    source.indexOf("const cleanAuthUrl ="),
+    source.indexOf("const consumeAuthRedirect ="),
+  ) + ";globalThis.nettoyer=cleanAuthUrl;";
+test("retour de connexion : paramètres sensibles encodés et dupliqués effacés sans perdre les filtres", () => {
+  let u = new URL(
+    "https://vrm.center/?%63ode=fictif&code=autre&tab=achats&recherche=air+max&%72efresh_token=fictif&error_description=e&type=recovery&state=fictif#access_token=fictif",
+  );
+  const c = vm.createContext({
+    URLSearchParams,
+    window: {
+      get location() {
+        return u;
+      },
+      history: {
+        replaceState: (_a, _b, path) => {
+          u = new URL(path, u);
+        },
+      },
+    },
+  });
+  vm.runInContext(codeNettoyage, c);
+  c.nettoyer();
+  assert.equal(u.hash, "");
+  assert.deepEqual(
+    [...u.searchParams],
+    [
+      ["tab", "achats"],
+      ["recherche", "air max"],
+    ],
+  );
+  const premiere = u.href;
+  c.nettoyer();
+  assert.equal(u.href, premiere);
 });
