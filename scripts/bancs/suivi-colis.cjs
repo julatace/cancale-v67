@@ -250,7 +250,7 @@ async function navigateur() {
         // (24 oct.) Vinted Go a une page de suivi publique (`vintedgo.com/fr/tracking/{n}`,
         // mesurée en 200) : le lien y mène. Un transporteur sans page connue reste
         // une RECHERCHE dite comme telle (audit-suivi-colis, `lienSuivi('dpd')`).
-        dit(bv && bv.site === 'transporteur' && bv.href === 'https://vintedgo.com/fr/tracking/VGS12345678061' && /Suivre sur le site du transporteur/.test(bv.t), `${nom} : Vinted Go : « Suivre sur le site du transporteur ↗ », sa page de suivi, n° pré-rempli`, bv && bv.href);
+        dit(bv && bv.site === 'transporteur' && bv.href === 'https://vintedgo.com/fr/tracking/VGS12345678061' && /Suivre chez le transporteur/.test(bv.t), `${nom} : Vinted Go : « Suivre sur le site du transporteur ↗ », sa page de suivi, n° pré-rempli`, bv && bv.href);
         const ba1 = a1 && a1.suivre[0];
         dit(ba1 && /numeroExpedition=30000057$/.test(ba1.href), `${nom} : l'achat suivi par Vinted a son bouton, sans code postal (aucun lieu lu)`, ba1 && ba1.href);
         dit(v2 && v2.suivre === 0 && !/30000057|30000058/.test(v2.t), `${nom} : l'achat au même titre n'emprunte pas le n° d'un autre`);

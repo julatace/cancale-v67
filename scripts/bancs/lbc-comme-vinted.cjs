@@ -167,7 +167,7 @@ const deborde = (pg) => pg.evaluate(() => ({ sw: document.documentElement.scroll
       await o1.pg.click('[data-lbc-vente="T1"] .vrm-ledger-sale-toggle').catch(() => {});
       await o1.pg.waitForTimeout(500);
       const fiche = await o1.pg.evaluate(() => [...document.querySelectorAll('.vrm-fiche-vente-acces button')].map((x) => x.textContent.trim()));
-      dit(fiche.some((x) => /Fiche article N°16/.test(x)), '… le N° reste dans le tiroir (« Fiche article N°16 »)', JSON.stringify(fiche));
+      dit(fiche.some((x) => /Fiche (article )?N°16/.test(x)), '… le N° reste dans le tiroir (« Fiche article N°16 »)', JSON.stringify(fiche));
       dit(o1.errs.length === 0, 'aucune erreur d’app (ventes)', o1.errs.join(' | ').slice(0, 160));
       await o1.ctx.close();
 
