@@ -459,6 +459,8 @@ const pageTexte = (pg) => pg.evaluate(() => document.body.innerText);
         p = await pont(pg);
         const doublons = p ? Object.values(p.parUrl).filter((n) => n > 1).length : -1;
         dit(!!p && p.total === avant && doublons === 0, `A ${L} : l'écran redessiné ne redemande rien (cache par photo)`, p ? `${avant} → ${p.total} demande(s), ${doublons} photo(s) demandée(s) deux fois` : 'pont muet');
+        // (29 oct.) Au téléphone la 1ʳᵉ annonce est sous le pli (bilans au-dessus) : on descend jusqu'aux photos.
+        await versPhotos(pg, 1500);
         m = await mesurer(pg);
         dit(m.affichees === m.ecran && m.ecran > 0, `A ${L} : après le retour, les photos sont toujours là`, JSON.stringify({ ecran: m.ecran, affichees: m.affichees }));
         // On fait défiler : les photos suivantes sont demandées, jamais plus de 3 à la fois.
@@ -820,7 +822,8 @@ const pageTexte = (pg) => pg.evaluate(() => document.body.innerText);
     await essaie('E390', async () => {
       const { ctx, pg, errs } = await preparer(b, { width: 390, height: 844 }, { pont: false });
       await ouvrir(pg, 'plat_vinted', 3000);
-      await section(pg, 'annonces', 12000);
+      await section(pg, 'annonces', 4000);
+      await versPhotos(pg, 9000);   // (29 oct.) les photos sont sous le pli au téléphone
       const m = await mesurer(pg);
       dit(m.phrases === 1 && m.sonde === 'reponse', 'E390 : le scénario est réel (sonde « le serveur a répondu », la phrase est là)', `${m.phrases} phrase(s), sonde ${m.sonde}`);
       dit(m.phrases === 1 && m.geste === 'reponse' && !/les r[ée]cup[èe]re|va les chercher/i.test(m.texte), 'E390 : sur téléphone non plus, aucune promesse que l’extension les récupérera', `${m.geste} · ${m.texte.slice(0, 220)}`);
@@ -1017,7 +1020,8 @@ const pageTexte = (pg) => pg.evaluate(() => document.body.innerText);
       const stock = { data: null };
       const { ctx, pg, ecrits } = await preparer(b, V390, { pont: false, diagStock: stock });
       await ouvrir(pg, 'plat_vinted', 3000);
-      await section(pg, 'annonces', 16000);
+      await section(pg, 'annonces', 4000);
+      await versPhotos(pg, 12000);   // (29 oct.) le témoin ne garde qu'une photo À L'ÉCRAN : on y descend comme lui
       const nav = await pg.evaluate(() => { const u = navigator.userAgent || ''; return (/iPhone|iPad/.test(u) ? 'iOS ' : /Android/.test(u) ? 'Android ' : /Mac/.test(u) ? 'Mac ' : /Windows/.test(u) ? 'Windows ' : '') + (/Edg\//.test(u) ? 'Edge' : /Chrome\//.test(u) ? 'Chrome' : /Firefox\//.test(u) ? 'Firefox' : /Safari\//.test(u) ? 'Safari' : 'autre'); });
       const d1 = stock.data && stock.data.parNavigateur && stock.data.parNavigateur[nav];
       dit(!!d1 && d1.ko > 0 && d1.ok === 0, 'Y : le scénario est réel (pendant la coupure, le bilan rangé dit l’échec)', JSON.stringify(d1).slice(0, 200));
