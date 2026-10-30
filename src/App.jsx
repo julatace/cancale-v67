@@ -13886,8 +13886,8 @@ function ReceptionEmails({ tracking, comptes, colisParTransporteur }) {
 // composant et sa règle vivent dans ChoixPeriode.jsx / periodeCalendrier.js ;
 // ce nom reste pour les écrans qui l'appelaient (Ventes, Achats). La VALEUR ne
 // change pas de forme : `{from, to, label?}` ou `null` (§11).
-function PeriodePicker({ value, onChange, titre = 'Période' }) {
-  return <ChoixPeriode value={value} onChange={onChange} Retour={FermeAuRetour} Icon={Icon} titre={titre}/>;
+function PeriodePicker({ value, onChange, titre = 'Période', vide }) {
+  return <ChoixPeriode value={value} onChange={onChange} Retour={FermeAuRetour} Icon={Icon} titre={titre} vide={vide}/>;
 }
 
 function EmptyState({ icon, title, desc, action }) {
@@ -17752,8 +17752,10 @@ function TeteTransporteurs({ transp, colis, relire }) {
   const phrasesCp = texteCodePostalMr(cpMr);
   if (transp !== null && !montrerMr && !mrRefus && !nonLus.length && !phrasesCp.length) return null;
   const st = {fontSize:12,color:C.muted,lineHeight:1.45,margin:'0 0 10px'};
-  const geste = sansSouris || sait === 'absente'
+  const geste = sansSouris
     ? <>ouvre VRM sur l'ordinateur où l'extension VRM est installée — c'est elle qui lit Mondial Relay.</>
+    : sait === 'absente'
+    ? <>installe ou allume l'extension VRM sur cet ordinateur — c'est elle qui lit Mondial Relay.</>
     : <>mets à jour l'extension VRM (version {EXT_CAPACITES.transp} ou plus récente) : elle lira Mondial Relay depuis ce Chrome.</>;
   return <>
     {transp === null && <div data-transp-passu="" style={{...st,display:'flex',alignItems:'center',gap:10,flexWrap:'wrap'}}>
@@ -17770,8 +17772,12 @@ function TeteTransporteurs({ transp, colis, relire }) {
           : navTransp === 'passu'
             ? <>l'extension VRM de ce navigateur pourrait les lire à la place, mais elle ne sait pas dire si elle en a la permission — ouvre la fenêtre de l'icône VRM pour vérifier.</>
             : <>l'extension VRM de ce Chrome les lit à la place, depuis ton ordinateur.</>)
-        : sansSouris || sait === 'absente'
+        : sansSouris
           ? <>l'extension VRM peut les lire à la place — ouvre VRM sur l'ordinateur où elle est installée.</>
+          : sait === 'absente'
+          // (30 oct.) Sur un ORDINATEUR sans l'extension, « ouvre VRM sur l'ordinateur » ne
+          // voulait rien dire : on y est déjà. Le geste est ici.
+          ? <>installe ou allume l'extension VRM sur cet ordinateur : elle les lira à la place.</>
           : <>mets à jour l'extension VRM (version {EXT_CAPACITES.transp} ou plus récente) pour qu'elle les lise depuis ce Chrome.</>}
     </div>}
     {phrasesCp.map((p, i) => <div key={i} data-transp-cp={/cherche/.test(p) ? 'cherche' : 'inconnu'} data-transp-cp-n={String(/cherche/.test(p) ? cpMr.cherche : cpMr.inconnu)} style={st}>{p}</div>)}
@@ -17855,6 +17861,18 @@ async function retirerSuiviManuel(id) {
 }
 // La raison d'un colis « à vérifier », dite sur sa ligne ET pour un n° ajouté à
 // la main (une phrase, §11).
+// (30 oct.) Le compte (et la raison) d'un groupe « à vérifier » UNIFORME se dit une
+// fois en tête du groupe ; sur chaque ligne seulement quand le groupe est mixte (§7).
+const compteAVCommun = (liste, cptEmail, nomAcc) => {
+  if (!Array.isArray(liste) || liste.length < 2) return '';
+  const c = liste.map((x) => x.kind === 'email' ? (cptEmail(x.t) || '') : (x.o && x.o._acc ? nomAcc(x.o._acc) : ''));
+  return c[0] && c.every((v) => v === c[0]) ? c[0] : '';
+};
+const raisonAVCommune = (liste) => {
+  if (!Array.isArray(liste) || liste.length < 2) return '';
+  const r = liste.map(raisonAVerifier);
+  return r[0] && r.every((v) => v === r[0]) ? r[0] : '';
+};
 const raisonAVerifier = (x) => {
   if (!x || !x.e) return 'à voir';
   // (24 oct.) Ce que dit le TRANSPORTEUR (son libellé recopié tel quel).
@@ -26032,7 +26050,8 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
               {comptes.length
                 ? comptes.map(([lg,v]) => <Ligne key={lg} label={lg} val={v} part={comptes.length>1 && totCpt>0 ? v/totCpt : null}/>)
                 : <div style={{fontSize:13,color:C.muted,padding:'10px 0',borderTop:`1px solid ${C.border}`}}>Le détail par compte apparaît dès que tes ventes sont chargées.</div>}
-              {comptes.length>0 && caVinted!=null && <Ligne label="Total Vinted" val={caVinted} fort/>}
+              {/* (30 oct.) Plus de « Total Vinted » : c'est « Finalisé sur Vinted · tous comptes »,
+                  en tête du même écran (§7, un chiffre une fois). */}
             </div>
           </div>
         );
@@ -26152,7 +26171,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
         <div style={{fontSize:13,fontWeight:600,color:C.text,marginBottom:2}}>CA entre deux dates</div>
         <div style={{fontSize:11,color:C.muted,marginBottom:10}}>Ventes finalisées, à leur date de vente</div>
         {/* (29 oct.) Le même calendrier « comme Airbnb » que Ventes et Achats (§11). */}
-        <PeriodePicker titre="Période du chiffre d'affaires" value={(caDu||caAu)?{from:caDu?new Date(caDu+'T00:00:00'):null,to:caAu?new Date(caAu+'T00:00:00'):null,...(caLabel?{label:caLabel}:{})}:null}
+        <PeriodePicker titre="Période du chiffre d'affaires" vide="Choisir une période" value={(caDu||caAu)?{from:caDu?new Date(caDu+'T00:00:00'):null,to:caAu?new Date(caAu+'T00:00:00'):null,...(caLabel?{label:caLabel}:{})}:null}
           onChange={v=>{ const k=(d)=>{ if(!d) return ''; const t=d instanceof Date?d:new Date(d); return isNaN(t.getTime())?'':`${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,'0')}-${String(t.getDate()).padStart(2,'0')}`; }; setCaDu(v?k(v.from):''); setCaAu(v?k(v.to):''); setCaLabel(v&&v.label?String(v.label):''); }}/>
         {caRange ? (
           <div style={{marginTop:14}}>
@@ -26163,9 +26182,9 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
                 : `${caRange.count} vente${caRange.count>1?'s':''} finalisée${caRange.count>1?'s':''} ${phrasePlage(caDu?new Date(caDu+'T00:00:00'):null, caAu?new Date(caAu+'T00:00:00'):null)} · Vinted, tous comptes`}
             </div>
           </div>
-        ) : (
-          <div className="vrm-aide" style={{fontSize:13,color:C.muted,marginTop:12,lineHeight:1.5}}>Choisis une période dans le calendrier (ou un raccourci : 7 jours, ce mois…) pour voir le CA.</div>
-        )}
+        ) : null /* (30 oct.) Rien de choisi : le bouton dit « Choisir une période » (il disait
+                  « Toute la période » au-dessus d'une phrase « choisis une période ») ; le
+                  total de toute la période est déjà « Finalisé sur Vinted », en tête. */}
       </Card>
 
       {/* (30 oct.) L'anneau « Répartition du CA par plateforme » redisait « Finalisé par plateforme »
@@ -33350,6 +33369,11 @@ function CaParPeriodeCarte({ lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, acc
   // Les périodes d'avant, sans les plus anciennes toutes vides (même règle qu'avant).
   const lignesPassees = (() => { if (!lignes) return []; const L = lignes.slice(1); let n = L.length; while (n > 0 && ['vendu', 'finalise', 'recu'].every((k) => L[n - 1][k] && L[n - 1][k].n === 0)) n--; return L.slice(0, n); })();
   const partiel = calc.etat === 'lu' && (calc.manque.length > 0 || calc.attente);
+  // (30 oct.) Des ventes finalisées SANS date de versement ne sont dans aucune
+  // période « reçu » : chaque « reçu » est alors un minimum, comme la prochaine
+  // déclaration le dit (« au moins »), jamais un « 0,00 € » présenté comme vrai
+  // (§5, une règle pour le « reçu pas su »).
+  const recuMin = calc.etat === 'lu' && calc.aDater.length > 0;
   const montant = (x) => x == null ? '—' : fmt(x.eur);
   const nb = (x) => x == null ? '' : `${x.n} vente${x.n > 1 ? 's' : ''}`;
   const COLS = [
@@ -33384,9 +33408,9 @@ function CaParPeriodeCarte({ lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, acc
         ) : (<>
           <div className="vrm-ca-periode-tuiles" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', borderBottom: `1px solid ${C.border}` }}>
             {COLS.map(([k, l, s], i) => (
-              <div key={k} data-ca-cur={k} data-ca-eur={cur[k] == null ? '' : String(cur[k].eur)} style={{ padding: '14px 16px', borderLeft: i ? `1px solid ${C.border}` : 'none' }}>
+              <div key={k} data-ca-cur={k} data-ca-eur={cur[k] == null ? '' : String(cur[k].eur)} data-ca-min={((partiel || (k === 'recu' && recuMin)) && cur[k] != null) ? '1' : undefined} style={{ padding: '14px 16px', borderLeft: i ? `1px solid ${C.border}` : 'none' }}>
                 <div style={{ fontSize: 11, color: C.muted, fontWeight: 500 }}>{l} · {cur.libelle}</div>
-                <div className="vrm-display" style={{ fontSize: 20, fontWeight: 750, color: cur[k] == null ? C.muted : C.text, marginTop: 4, letterSpacing: -0.5 }}>{partiel && cur[k] != null ? <span style={{ fontSize: 13, fontWeight: 600, color: C.muted }}>au moins </span> : null}{montant(cur[k])}</div>
+                <div className="vrm-display" style={{ fontSize: 20, fontWeight: 750, color: cur[k] == null ? C.muted : C.text, marginTop: 4, letterSpacing: -0.5 }}>{(partiel || (k === 'recu' && recuMin)) && cur[k] != null ? <span style={{ fontSize: 13, fontWeight: 600, color: C.muted }}>au moins </span> : null}{montant(cur[k])}</div>
                 <div style={{ fontSize: 11, color: C.muted, marginTop: 2 }}>{cur[k] == null ? s : `${nb(cur[k])} · ${s}`}</div>
               </div>
             ))}
@@ -33405,7 +33429,7 @@ function CaParPeriodeCarte({ lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, acc
                 {lignesPassees.map((r) => (
                   <tr key={r.cle} data-ca-ligne={r.libelle} style={{ borderTop: `1px solid ${C.border}` }}>
                     <td style={{ padding: '9px 16px', color: C.text, whiteSpace: 'nowrap' }}>{r.libelle}</td>
-                    {COLS.map(([k]) => <td key={k} style={{ padding: '9px 16px 9px 8px', textAlign: 'right', color: r[k] == null ? C.muted : C.text, whiteSpace: 'nowrap' }}>{montant(r[k])}</td>)}
+                    {COLS.map(([k]) => <td key={k} data-ca-cellule={k} data-ca-min={((partiel || (k === 'recu' && recuMin)) && r[k] != null) ? '1' : undefined} style={{ padding: '9px 16px 9px 8px', textAlign: 'right', color: r[k] == null ? C.muted : C.text, whiteSpace: 'nowrap' }}>{(partiel || (k === 'recu' && recuMin)) && r[k] != null ? <span style={{ color: C.muted, fontSize: 11.5 }}>au moins </span> : null}{montant(r[k])}</td>)}
                   </tr>
                 ))}
               </tbody>
@@ -34253,7 +34277,7 @@ function SuiviUrssaf({ onNav }) {
             : a.periodes === 1 ? <>{a.annee} : {freq === 'mensuel' ? '1 mois noté « déclaré »' : '1 période notée « déclarée »'} — son détail est juste en dessous.</>
             : <>{a.annee} : <b style={{ color: C.text }}>{eur(a.ca)}</b> déclarés sur {a.n} mois · {a.paye != null ? <>cotisations payées <b style={{ color: C.text }}>{eur(a.paye)}</b></> : <>cotisations ≈ <b style={{ color: C.text }}>{eur(a.estime)}</b> (estimées : note ce que tu as payé avec « Compléter »)</>}</>}
         </div>
-        {suivi.enRetard > 0 ? <div data-suivi-retard-texte="" style={{ fontSize: 13, color: C.text, marginTop: 8, lineHeight: 1.5 }}>{suivi.enRetard === 1 ? '1 période passée n\'est' : `${suivi.enRetard} périodes passées ne sont`} pas notée{suivi.enRetard > 1 ? 's' : ''} « déclarée ». Si tu l'as déjà déclarée sur l'URSSAF, touche « Noter ma déclaration » ; sinon, déclare-la vite (une déclaration en retard peut coûter une pénalité).</div> : null}
+        {suivi.enRetard > 0 ? <div data-suivi-retard-texte="" style={{ fontSize: 13, color: C.text, marginTop: 8, lineHeight: 1.5 }}>{suivi.enRetard === 1 ? '1 période passée n\'est' : `${suivi.enRetard} périodes passées ne sont`} pas notée{suivi.enRetard > 1 ? 's' : ''} « déclarée »{(() => { const n = suivi.lignes.filter((l) => l.etat === 'a_declarer').length; return n ? <span data-suivi-a-declarer={n}> (et {n === 1 ? '1 autre est' : `${n} autres sont`} à déclarer maintenant)</span> : null; })()}. Si tu l'as déjà déclarée sur l'URSSAF, touche « Noter ma déclaration » ; sinon, déclare-la vite (une déclaration en retard peut coûter une pénalité).</div> : null}
         {(() => {
           const aNoter = suivi.lignes.filter((l) => l.etat === 'en_retard' || l.etat === 'a_declarer').flatMap((l) => l.aNoter);
           return aNoter.length >= 2 ? (
@@ -46502,6 +46526,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             return j != null ? { a, j } : null;
           }).filter(x => x && x.j >= FRAICHEUR_ACHATS_J).sort((x, y) => y.j - x.j);
           if (!vieux.length) return null;
+          // (30 oct.) La tête de Vinted (`VintedResume` → `FraicheurDonnees`) nomme
+          // déjà ces comptes, avec le MÊME geste (repasser sur Vinted connecté sur
+          // chacun : ventes ET achats sont relus) : une cause, une phrase (§7). On
+          // ne redit que si un compte d'achats anciens n'y est pas.
+          const tete = liveStats && Number(liveStats.dataAgeJours) > 1 && Array.isArray(liveStats.dataAgeComptes) ? new Set(liveStats.dataAgeComptes.filter(x => x && x.login).map(x => String(x.login))) : null;
+          if (tete && tete.size > 1 && vieux.every(x => tete.has(String(accName(x.a))))) return null;
           // (29 oct.) Une ligne : les comptes de même âge sont groupés (« il y a
           // 25 j sur a, b, c »), le pourquoi est replié derrière ⓘ.
           const parAge = []; for (const x of vieux) { const g = parAge.find(y => y.j === x.j); if (g) g.l.push(x.a); else parAge.push({ j: x.j, l: [x.a] }); }
@@ -47211,9 +47241,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               {(()=>{ const n=pickupUnion.aVerifier.filter(aEncoreCode).length;
                 return n ? <><br/>{n>1?`${n} ont encore leur code ou leur QR`:'1 a encore son code ou son QR'} : peut-être encore au relais.</> : null; })()}
             </div>
+            {(()=>{ const c=compteAVCommun(pickupUnion.aVerifier, compteDuColisEmail, accName), r=raisonAVCommune(pickupUnion.aVerifier); return (c||r) ? (
+              <div data-a-verifier-commun={c||''} style={{fontSize:11.5,color:C.muted,marginTop:4,lineHeight:1.45}}>
+                {c ? <>Tous sur <b style={{color:C.text,fontWeight:600}}>{c}</b></> : null}{c&&r ? ' · ' : ''}{r ? <b style={{color:C.warn,fontWeight:600}}>{r}</b> : null}
+              </div>) : null; })()}
             <div style={{marginTop:10,display:'flex',flexDirection:'column',gap:7}}>
               {pickupUnion.aVerifier.map((x,i)=>{
-                const raison = raisonAVerifier(x);
+                // (30 oct.) Compte et raison communs à tout le groupe : dits UNE fois au-dessus.
+                const raisonC = raisonAVCommune(pickupUnion.aVerifier), compteC = compteAVCommun(pickupUnion.aVerifier, compteDuColisEmail, accName);
+                const raison = raisonC ? '' : raisonAVerifier(x);
                 if (x.kind==='email') {
                   const t=x.t; const cl=cleanLieu(t.lieu); const code=codeRetrait(t.code);
                   const arr=arriveeColisEmail(t); const cpt=compteDuColisEmail(t);
@@ -47225,7 +47261,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                           {cl.nom || carrierName(t.carrier)}
                         </div>
                         <div data-oublie-info="" style={{fontSize:11,color:C.muted,overflowWrap:'anywhere'}}>
-                          n° {t.suivi||'?'}{cpt?` · ${cpt}`:''} · <b style={{color:C.warn,fontWeight:600}}>{raison}</b> · {texteArrivee(arr)}
+                          n° {t.suivi||'?'}{cpt&&!compteC?` · ${cpt}`:''}{raison ? <> · <b style={{color:C.warn,fontWeight:600}}>{raison}</b></> : null} · {texteArrivee(arr)}
                         </div>
                         <LigneNouvelleVinted nv={nouvelleDe(x.o)}/>
                         <LigneTransporteur transp={transpMap} suivi={suiviDeLigne(t)} carrier={t.carrier}/>
@@ -47251,9 +47287,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     <div style={{flex:'1 1 150px',minWidth:0}}>
                       <div style={{fontSize:12.5,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{o.title||'Colis'}</div>
                       <div style={{fontSize:11,color:C.muted,overflowWrap:'anywhere'}}>
-                        {o._acc?`${accName(o._acc)} · `:''}<b style={{color:C.warn,fontWeight:600}}>{raison}</b>
-                        {/* (revue du 23 oct.) Un compte déjà nommé par la ligne de fraîcheur ne se redit pas ici. */}
-                        {jCap!=null && jCap>=1 && jCap<FRAICHEUR_ACHATS_J ? ` · « déposé en point relais » lu il y a ${jCap} j` : ''}
+                        {[o._acc && !compteC ? accName(o._acc) : '', raison ? <b key="r" style={{color:C.warn,fontWeight:600}}>{raison}</b> : '',
+                          /* (revue du 23 oct.) Un compte déjà nommé par la ligne de fraîcheur ne se redit pas ici. */
+                          jCap!=null && jCap>=1 && jCap<FRAICHEUR_ACHATS_J ? `« déposé en point relais » lu il y a ${jCap} j` : ''].filter(Boolean).map((x,k)=><React.Fragment key={k}>{k?' · ':''}{x}</React.Fragment>)}
                       </div>
                       <LigneNouvelleVinted nv={nouvelleDe(o)}/>
                       {(()=>{ const e=entreeSuiviAchat(o); const su=suivisAchat(o, indexSuivisAchats)[0]; return su ? <LigneTransporteur transp={transpMap} suivi={su} carrier={(e&&e.transporteur)||transporteurDeForme(su)||''}/> : null; })()}
@@ -48390,7 +48426,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                             : on ? `Elle est dans la file ${pl.nom}. Clique pour l'en retirer.`
                                  : `Elle n'ira pas sur ${pl.nom}. Clique pour l'y mettre.`}
                           style={{...geste,color:on?C.text:C.muted}}>
-                          {on ? '✓ ' : ''}À publier sur {pl.nom}
+                          {/* (30 oct.) Le libellé dit l'ÉTAT, pas un ordre : coché, « À publier sur X »
+                              se lisait comme un statut et ne changeait que d'une coche. */}
+                          {on ? <>Dans la file {pl.nom} ✓</> : <>Ajouter à la file {pl.nom}</>}
                         </button>
                       );
                     })}
@@ -60207,7 +60245,7 @@ function AppCoeur() {
         {tab==='organisation'&&<Suspense fallback={<p style={{padding:20}}>Chargement de l’organisation…</p>}><Operations sombre={C===THEMES.dark} headers={enTeteSession}/></Suspense>}
         {tab==='garage'   &&<Garage    catalog={catalog} garageGrid={garageGrid} setGarageGrid={setGarageGrid} blockedCells={blockedCells} setBlockedCells={setBlockedCells} extraCols={extraCols} setExtraCols={setExtraCols} cellColors={cellColors} setCellColors={setCellColors} locate={garageLocate} onLocateConsumed={()=>setGarageLocate(null)} placeNum={garagePlace} onPlaced={()=>setGaragePlace(null)}/>}
         {tab==='comptabilite'&&<Comptabilite accounts={vintedAccounts} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}}/>}
-        {tab==='compta'&&<div className="vrm-rubriques" style={{padding:'12px 16px 0'}}><PlatSubNav sub={platSub==='factures'?'factures':'compta'} setSub={setPlatSub} sections={[['compta','Comptabilité'],['factures','Factures']]}/></div>}
+        {tab==='compta'&&<div className="vrm-rubriques" style={{padding:'12px 16px 0'}}><PlatSubNav sub={platSub==='factures'?'factures':'compta'} setSub={setPlatSub} sections={/* (30 oct.) « Comptabilité » était écrit deux fois en tête (segment + titre) : « Vue d’ensemble », comme Statistiques */ [['compta','Vue d’ensemble'],['factures','Factures']]}/></div>}
         {tab==='compta'&&platSub!=='factures'&&<ComptaPro liveStats={liveStatsVus} onNav={setTab} lbcVentes={lbcVentes} lbcCoqueLu={lbcCoqueLu} ebayCommandes={ebayCommandes} panelOff={panelOffCoque} accounts={vintedAccounts}/>}
         {(()=>{ const map={cat_annonces:'annonces',cat_ventes:'ventes',cat_achats:'achats',cat_bord:'bordereaux',cat_expedition:'bordereaux'}; return map[tab] ? <Comptabilite key={tab} accounts={vintedAccounts} only={map[tab]} liveStats={liveStatsVus} accountsReady={accountsLoaded} baseKO={baseKO} onNav={setTab} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}} onFreeNum={freeGarageNum}/> : null; })()}
         {tab==='vintedaccounts'&&<VintedAccounts accounts={vintedAccounts} setAccounts={setVintedAccounts} baseKO={baseKO} onRetour={()=>setTab('settings')}/>}

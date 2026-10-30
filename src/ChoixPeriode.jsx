@@ -27,7 +27,10 @@ const majuscule = (s) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s);
 // on la relit, et une date illisible vaut « pas de borne » (jamais un jour inventé).
 const versDate = (x) => { if (!x) return null; const d = x instanceof Date ? x : new Date(x); return isNaN(d.getTime()) ? null : d; };
 const normaliser = (v) => (v ? { ...v, from: versDate(v.from), to: versDate(v.to) } : null);
-export const libelleValeur = (brut) => { const v = normaliser(brut); return (!v || (!v.from && !v.to)) ? 'Toute la période' : majuscule(v.label || libellePlage(v.from, v.to)); };
+// (30 oct.) `vide` : ce que dit le bouton quand RIEN n'est choisi. « Toute la période »
+// par défaut (Ventes, Achats : la liste montre tout) ; un écran qui n'affiche rien
+// sans période (le CA entre deux dates) dit « Choisir une période ».
+export const libelleValeur = (brut, vide = 'Toute la période') => { const v = normaliser(brut); return (!v || (!v.from && !v.to)) ? vide : majuscule(v.label || libellePlage(v.from, v.to)); };
 
 function useEtroit() {
   const q = '(max-width: 767px)';
@@ -75,7 +78,7 @@ function Mois({ annee, mois, sel, survol, setSurvol, toucher, max, auj, entete =
   );
 }
 
-export default function ChoixPeriode({ value: brut, onChange, Retour, Icon, titre = 'Période', data = {} }) {
+export default function ChoixPeriode({ value: brut, onChange, Retour, Icon, titre = 'Période', data = {}, vide = 'Toute la période' }) {
   const value = normaliser(brut);
   const etroit = useEtroit();
   // Au doigt : 18 mois d'abord ; « Voir les mois d'avant » en ajoute 12 (ses
@@ -179,7 +182,7 @@ export default function ChoixPeriode({ value: brut, onChange, Retour, Icon, titr
       <div className="vrm-rangee" style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
         <button type="button" className="vrm-cal-declencheur" data-periode-ouvrir onClick={(ev) => (ouvert ? fermer() : ouvrir(ev))}
           aria-expanded={ouvert} aria-haspopup="dialog" data-periode-valeur={value && value.from ? `${cleJour(value.from)}..${cleJour(value.to || value.from)}` : ''}>
-          {Icon ? <Icon name="calendar" size={15}/> : null}<span data-periode-libelle>{libelleValeur(value)}</span>
+          {Icon ? <Icon name="calendar" size={15}/> : null}<span data-periode-libelle>{libelleValeur(value, vide)}</span>
         </button>
         {value && (value.from || value.to) ? <button type="button" className="vrm-icon-control vrm-cal-croix" aria-label="Effacer la période" onClick={() => { onChange(null); fermer(); }}>{Icon ? <Icon name="close" size={14}/> : '×'}</button> : null}
       </div>

@@ -44,7 +44,7 @@ const MUTATIONS = {
   'forme-inconnue-introuvable': ['api/_lib/transporteurs.js', "if (!j || typeof j !== 'object' || typeof j.Success !== 'boolean') return rendu('forme',", "if (!j || typeof j !== 'object' || typeof j.Success !== 'boolean') return rendu('introuvable',"],
   'libelle-livraison-inconnu': ['api/_lib/transporteurs.js', "[/^colis en route vers le point de (?:retrait|livraison)\\b/, 'route'],", "[/^colis en route vers le point de retrait\\b/, 'route'],"],
   'retire-sans-arrivee': ['api/_lib/transporteurs.js', "etat: (k >= 4 || arr) ? 'retire' : 'livre'", "etat: 'retire'"],
-  'refus-carte-muet': ['api/_lib/transporteurs.js', "  if (t.essaiRes === 'bloque') return { etatAffiche: 'passu', texte: `${nom} refuse la lecture depuis le serveur pour l'instant — VRM réessaie plus tard`, consequence: '', ambre: false, age: null };\n", ''],
+  'refus-carte-muet': ['api/_lib/transporteurs.js', "  if (t.essaiRes === 'bloque') return { etatAffiche: 'passu', texte: `Lecture refusée par ${nom} pour l'instant`, consequence: '', ambre: false, age: null };\n", ''],
   // (fusion) C4 ACCEPTE `mr-fr-mvc` (l'extension 5.290 la lit depuis le navigateur) :
   // la retirer de `VOIES`, juger son corps comme du .be, ou accepter n'importe
   // quelle voie, doit rendre ROUGE.
@@ -275,7 +275,7 @@ const ligneDe = (n) => base.get(`${A}|transp_mondialrelay_${n}`) || null;
     dit(T.lireReponse('mondialrelay', 200, 'application/json', reponse(fragment({ n: '30000099', k: 4, jours: [J21] })), { suivi: N1, cp: CP1, voie: 'mr-fr-mvc' }).res === 'forme', 'par `lireReponse` (l’entrée de C4) aussi, `mr-fr-mvc` exige l’écho : un autre n° ⇒ rejeté');
     dit(T.VOIE_SERVEUR && T.VOIE_SERVEUR.mondialrelay === 'mr-fr-mvc' && T.VOIE_DE.mondialrelay === 'mr-fr-mvc' && T.VOIES['mr-fr-mvc'] === 'mondialrelay' && T.VOIES['mr-be'] === 'mondialrelay', 'contrat : le serveur range `mr-fr-mvc` ; l’extension reçoit `mr-fr-mvc` (C3, la même route depuis le navigateur) ; C4 connaît `mr-fr-mvc` ET `mr-be`');
     const lb = T.ligneTransporteur({ suivi: N1, carrier: 'mondialrelay', essaiRes: 'bloque', essai: new Date().toISOString() }, 'mondialrelay');
-    dit(/refuse/.test(lb.texte) && !/n'a pas répondu/.test(lb.texte), 'la carte d’un colis refusé au serveur dit « refuse », pas « n’a pas répondu »', lb.texte);
+    dit(/refus/.test(lb.texte) && !/n'a pas répondu/.test(lb.texte), 'la carte d’un colis refusé au serveur dit « refuse », pas « n’a pas répondu »', lb.texte);
   });
 
   // ══ 2. LA VRAIE ROUTE (C5, C3, C4) ════════════════════════════════════════

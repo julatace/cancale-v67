@@ -325,6 +325,12 @@ async function navigateur() {
         dit(r.mr && r.mr.n === '1' && r.nMr === 1 && /refuse en ce moment la lecture du serveur VRM \(1 colis\)/.test(r.mr.t), `${nom} A : « Mondial Relay refuse en ce moment la lecture du serveur » — UNE fois, pour la seule ligne bloquée (pas le code postal inconnu, pas les lues)`, r.mr ? `${r.mr.n} · ${r.mr.t.slice(0, 140)}` : 'absente');
         dit(!r.mrOrdi, `${nom} A : le serveur lit Mondial Relay ⇒ jamais « Mondial Relay ne se lit que depuis ton ordinateur »`, r.mrOrdi && r.mrOrdi.slice(0, 120));
         dit(bl && bl.transp && bl.transp.etat === 'passu', `${nom} A : la ligne bloquée dit « pas su » sur sa carte (jamais un statut inventé)`, bl && bl.transp && bl.transp.etat);
+        // (30 oct., intégration) UNE cause, UN geste (§7) : la carte ne redit pas la cause
+        // de la tête (« depuis le serveur », « VRM réessaie »), et le geste suit CE navigateur :
+        // sur un ordinateur sans l'extension, jamais « ouvre VRM sur l'ordinateur ».
+        dit(bl && bl.transp && /refusée par Mondial Relay/.test(bl.transp.t) && !/depuis le serveur|réessaie/.test(bl.transp.t), `${nom} A : la carte bloquée ne garde que « lecture refusée par Mondial Relay »`, bl && bl.transp && bl.transp.t);
+        if (vp.width >= 1000) dit(r.mr && /installe ou allume l'extension VRM sur cet ordinateur/.test(r.mr.t) && !/ouvre VRM sur l'ordinateur/.test(r.mr.t), `${nom} A : sur un ordinateur sans l'extension, le geste est « installe ou allume l'extension sur cet ordinateur »`, r.mr && r.mr.t.slice(0, 200));
+        else dit(r.mr && /sur l'ordinateur où elle est installée/.test(r.mr.t), `${nom} A : au téléphone, le geste reste « sur l'ordinateur »`, r.mr && r.mr.t.slice(0, 200));
         dit(r.nPassu === 0, `${nom} A : notre base a répondu : aucune phrase « pas pu être relu »`);
         dit(!r.rougesVus.length, `${nom} A : aucun rouge sur les colis, « à vérifier », « repartis » ni les phrases du transporteur (§7)`, r.rougesVus.slice(0, 4).join(' | '));
         dit(r.suivre.length >= 4 && r.suivre.every((x) => x >= 43.5), `${nom} A : chaque « Suivre ↗ » fait 44 px`, r.suivre.map(Math.round).join(','));

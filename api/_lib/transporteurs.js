@@ -1116,7 +1116,9 @@ export function ligneTransporteur(t, carrier, maintenant = Date.now()) {
   if (t.essaiRes === 'expire') return { etatAffiche: 'expire', texte: `${nom} ne garde plus ce suivi`, consequence: '', ambre: false, age: null };
   if (t.essaiRes === 'introuvable') return { etatAffiche: 'introuvable', texte: `${nom} ne trouve pas ce n° (pas encore enregistré ?)`, consequence: '', ambre: false, age: null };
   // Un REFUS (403, défi, HTML) n'est pas « n'a pas répondu » : on le dit tel quel.
-  if (t.essaiRes === 'bloque') return { etatAffiche: 'passu', texte: `${nom} refuse la lecture depuis le serveur pour l'instant — VRM réessaie plus tard`, consequence: '', ambre: false, age: null };
+  // (30 oct.) La cause et le geste sont dits UNE fois en tête de liste (`TeteTransporteurs`) :
+  // la carte ne garde que l'état (§7).
+  if (t.essaiRes === 'bloque') return { etatAffiche: 'passu', texte: `Lecture refusée par ${nom} pour l'instant`, consequence: '', ambre: false, age: null };
   if (t.essaiRes) return { etatAffiche: 'passu', texte: `${nom} n'a pas répondu — VRM réessaie plus tard`, consequence: '', ambre: false, age: null };
   return { etatAffiche: 'jamais', texte: `${nom} : pas encore lu chez le transporteur`, consequence: '', ambre: false, age: null };
 }
