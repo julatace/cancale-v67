@@ -12294,22 +12294,29 @@ function DetailEtapes({ p, liste, issue, now }) {
     </ol>
   );
 }
-function BarreGeste({ p, liste, attrs, label, issue = null, detail = true }) {
+function BarreGeste({ p, liste, attrs, label, issue = null, detail = true, barre = true, replie = true }) {
   const [now, setNow] = useState(() => Date.now());
   const enPause = !!(p && p.pause && p.pause.jusqua > now);
   useEffect(() => { if (!enPause) return undefined; const t = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(t); }, [enPause, p && p.pause && p.pause.jusqua]);
   useEffect(() => { setNow(Date.now()); }, [p]);
   const pe = progressionRepub(p, null, null, liste);
   const att = texteAttente(p, now);
+  // (30 oct., « la barre de progression est incompréhensible ») UNE ligne dit
+  // l'étape en cours (ou là où ça s'est arrêté) ; la liste des étapes (✓ ● ○ ✗)
+  // reste à portée, repliée. L'attente au hasard est dite sur cette ligne, une fois.
+  const e = p && p.etape;
+  const iArret = Array.isArray(liste) ? ((e === 'secours-photos' || e === 'secours-taille') ? liste.findIndex((x) => x[0] === 'en-ligne') : liste.findIndex((x) => x[0] === e)) : -1;
+  const ligne = issue === 'echec' ? (iArret >= 0 ? `Arrêté à l'étape « ${liste[iArret][1]} »` : 'Arrêté') : pe.texte;
+  const visibleDetail = detail && !replie;
   return (
     <div {...(attrs || {})} data-geste-etape={pe.etape || 'attente'} data-geste-pause={att ? 'oui' : 'non'}>
-      <div role="progressbar" aria-label={`${label ? label + ' : ' : ''}${pe.texte}`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(pe.part * 100)} style={{ height: 6, borderRadius: 3, background: C.border, overflow: 'hidden' }}>
+      {barre && <div role="progressbar" aria-label={`${label ? label + ' : ' : ''}${pe.texte}`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(pe.part * 100)} style={{ height: 6, borderRadius: 3, background: C.border, overflow: 'hidden', marginBottom: 4 }}>
         <div style={{ width: `${Math.max(4, Math.round(pe.part * 100))}%`, height: '100%', background: C.accent, transition: 'width .3s ease' }} />
-      </div>
-      {/* (29 oct.) L'attente est dite UNE fois : sur l'étape en cours du détail
-          quand il est affiché, sinon ici. */}
-      <div style={{ fontSize: 12, color: C.muted, marginTop: 4 }}>{issue === 'echec' ? 'Arrêté — voir l’étape en ✗ ci-dessous' : pe.texte}{att && issue !== 'echec' && !detail ? ` · ${att}` : ''}</div>
-      {detail && <DetailEtapes p={p} liste={liste} issue={issue} now={now} />}
+      </div>}
+      <div style={{ fontSize: 12.5, color: issue === 'echec' ? C.warn : C.text }}>{ligne}{att && issue !== 'echec' && !visibleDetail ? ` · ${att}` : ''}</div>
+      {detail && (replie
+        ? <details className="vrm-repli vrm-etapes-repli"><summary>{issue === 'echec' ? 'Voir les étapes' : `Voir les ${Array.isArray(liste) ? liste.length : ''} étapes`}</summary><DetailEtapes p={p} liste={liste} issue={issue} now={now} /></details>
+        : <DetailEtapes p={p} liste={liste} issue={issue} now={now} />)}
     </div>
   );
 }
@@ -12551,8 +12558,11 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
   const fermer = () => { if (mode === 'run') return; onClose(); };
   const champ = { border: `1px solid ${C.border}`, borderRadius: 8, padding: '9px 10px', fontSize: 14, background: C.card, color: C.text, outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box', minHeight: 44 };
   const maj = { display: 'block', fontSize: 11, color: C.muted, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 600, marginBottom: 5 };
-  const btn = (plein, actif = true) => ({ border: `1px solid ${plein ? C.accent : C.border}`, background: plein ? C.accent : 'transparent', color: plein ? (C.onAccent || '#fff') : C.text, borderRadius: 10, padding: '0 16px', minHeight: 44, fontSize: 14, fontWeight: 700, cursor: actif ? 'pointer' : 'default', opacity: actif ? 1 : 0.45, fontFamily: 'inherit' });
+  const summ = { display: 'flex', alignItems: 'center', minHeight: 44, cursor: 'pointer', fontSize: 13.5, fontWeight: 600, color: C.text };
+  const pageOk = extSait('republierpage') === 'ok';
   const ETAPES = A.etapes;
+  const iEtape = Math.max(0, ETAPES.findIndex((x) => x[0] === etape));
+  const s2 = (n, mot, pl) => `${n} ${n > 1 ? (pl || mot + 's') : mot}`;
   return (
     <div onClick={fermer} data-noswipe="1" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
       <FermeAuRetour fermer={fermer} />
@@ -12560,43 +12570,55 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
         <div style={{ display: 'flex', gap: 10, alignItems: 'center', padding: '12px 16px', borderBottom: `1px solid ${C.border}`, flexShrink: 0 }}>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: 16, fontWeight: 700, color: C.text }}>{A.titre}</div>
-            <div style={{ display: 'flex', gap: 10, marginTop: 4, fontSize: 12 }}>{ETAPES.map(([k, l]) => <span key={k} style={{ color: etape === k ? C.text : C.muted, fontWeight: etape === k ? 700 : 500 }}>{l}</span>)}</div>
+            {/* (30 oct.) Où j'en suis, en un coup d'œil : l'étape en cours pleine,
+                les étapes faites cochées, la suivante en attente. */}
+            <ol aria-label={`Étape ${iEtape + 1} sur ${ETAPES.length}`} style={{ display: 'flex', flexWrap: 'wrap', gap: '4px 6px', margin: '6px 0 0', padding: 0, listStyle: 'none', fontSize: 12.5 }}>
+              {ETAPES.map(([k, l], i) => { const cur = i === iEtape, fait = i < iEtape; return (
+                <li key={k} aria-current={cur ? 'step' : undefined} style={{ display: 'flex', alignItems: 'center', gap: 5, color: cur ? C.text : C.muted, fontWeight: cur ? 700 : 500 }}>
+                  <span aria-hidden="true" style={{ width: 18, height: 18, borderRadius: 99, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, background: cur ? 'var(--vrm-accent)' : fait ? 'var(--vrm-b-teinte-f)' : 'transparent', border: cur || fait ? 'none' : `1px solid ${C.border}`, color: cur ? 'var(--vrm-on-accent)' : C.text }}>{fait ? '✓' : i + 1}</span>
+                  {l.replace(/^\d+\.\s*/, '')}
+                  {i < ETAPES.length - 1 && <span aria-hidden="true" style={{ color: C.muted, opacity: .6, marginLeft: 2 }}>›</span>}
+                </li>
+              ); })}
+            </ol>
           </div>
-          <button type="button" onClick={fermer} aria-label="Fermer" disabled={mode === 'run'} style={{ border: 'none', background: 'transparent', fontSize: 24, color: C.muted, cursor: mode === 'run' ? 'default' : 'pointer', minWidth: 44, minHeight: 44 }}>×</button>
+          <button type="button" onClick={fermer} aria-label="Fermer" disabled={mode === 'run'} title={mode === 'run' ? 'Mets en pause pour fermer' : undefined} style={{ border: 'none', background: 'transparent', fontSize: 24, color: C.muted, cursor: mode === 'run' ? 'default' : 'pointer', minWidth: 44, minHeight: 44 }}>×</button>
         </div>
         <div style={{ overflowY: 'auto', padding: '12px 16px 16px', display: 'flex', flexDirection: 'column', gap: 12, flex: 1 }}>
           {etape === 'choix' && <>
             <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-              <input value={q} onChange={(ev) => setQ(ev.target.value)} placeholder="Chercher un titre, un N°, un compte" style={{ ...champ, flex: 1, minWidth: 0 }} />
-              <button type="button" data-republier-tout onClick={() => setSel(new Set(liste.filter((a) => !a.bloque).map((a) => a.id)))} style={btn(false)}>Tout</button>
-              <button type="button" data-republier-rien onClick={() => setSel(new Set())} style={btn(false)}>Aucune</button>
+              <input value={q} onChange={(ev) => setQ(ev.target.value)} placeholder="Chercher un titre, un N°" aria-label="Chercher une paire" style={{ ...champ, flex: 1, minWidth: 0 }} />
+              {/* (30 oct.) « Tout » et « Aucune » faisaient deux boutons pour un geste : un seul, qui bascule. */}
+              {(() => { const dispo = liste.filter((a) => !a.bloque); const tous = dispo.length > 0 && dispo.every((a) => sel.has(a.id));
+                return tous
+                  ? <Bouton data-republier-rien onClick={() => setSel(new Set())} style={{ minHeight: 44 }}>Tout décocher</Bouton>
+                  : <Bouton data-republier-tout disabled={!dispo.length} onClick={() => setSel(new Set(dispo.map((a) => a.id)))} style={{ minHeight: 44 }}>Tout cocher</Bouton>; })()}
             </div>
-            {action !== 'enLigne' && <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-              <select data-republier-tri value={tri} onChange={(ev) => setTri(ev.target.value)} style={{ ...champ, flex: '1 1 180px' }}>
-                <option value="anciennes">Les plus anciennes d'abord</option>
-                <option value="vues">Les moins vues d'abord</option>
-                <option value="favoris">Les moins de favoris d'abord</option>
-              </select>
-            </div>}
+            {action !== 'enLigne' && <select data-republier-tri value={tri} onChange={(ev) => setTri(ev.target.value)} aria-label="Ordre de la liste" style={champ}>
+              <option value="anciennes">Les plus anciennes d'abord</option>
+              <option value="vues">Les moins vues d'abord</option>
+              <option value="favoris">Les moins de favoris d'abord</option>
+            </select>}
             <div data-republier-compte={compteUid || (compteVinted === null ? 'aucun' : 'passu')} style={{ fontSize: 12.5, color: compteUid ? C.muted : C.warn, lineHeight: 1.45 }}>
               {compteUid
-                ? <>Compte ouvert dans Chrome : <b style={{ color: C.text }}>{nomCompte}</b>{horsCompte > 0 ? ` · ${horsCompte} ${action === 'enLigne' ? 'autre' + (horsCompte > 1 ? 's' : '') : 'paire' + (horsCompte > 1 ? 's' : '')} sur tes autres comptes : ouvre vinted.fr sur l'un d'eux dans Chrome pour ${horsCompte > 1 ? 'les' : 'la'} voir ici.` : ''}</>
+                ? <>Compte <b style={{ color: C.text }}>{nomCompte}</b> (ouvert dans Chrome){horsCompte > 0 ? <> · {horsCompte} {action === 'enLigne' ? 'autre' + (horsCompte > 1 ? 's' : '') : 'paire' + (horsCompte > 1 ? 's' : '')} sur tes autres comptes <Pourquoi label="Et mes autres comptes ?">Ouvre vinted.fr sur l'un d'eux dans Chrome pour {horsCompte > 1 ? 'les' : 'la'} voir ici : seul le compte ouvert dans Chrome peut être republié.</Pourquoi></> : null}</>
                 : compteVinted === null
-                  ? "Aucun compte Vinted n'est ouvert dans Chrome : ouvre vinted.fr connecté sur le compte à republier, puis rouvre cette fenêtre."
-                  : "VRM ne sait pas encore quel compte Vinted est ouvert dans Chrome (extension pas encore interrogée ou qui ne répond pas) : ouvre vinted.fr sur le compte à republier, puis rouvre cette fenêtre."}
+                  ? "Aucun compte Vinted ouvert dans Chrome : ouvre vinted.fr sur le bon compte, puis rouvre."
+                  : <>Compte ouvert dans Chrome pas encore connu : ouvre vinted.fr sur le bon compte, puis rouvre. <Pourquoi label="Pourquoi ?">L'extension VRM n'a pas encore été interrogée, ou elle ne répond pas.</Pourquoi></>}
             </div>
-            <div style={{ fontSize: 12.5, color: C.muted }}>{action === 'enLigne' ? `${annonces.length} brouillon${annonces.length > 1 ? 's' : ''} sur Vinted` : `${annonces.length} paire${annonces.length > 1 ? 's' : ''} en ligne sur Vinted`} · <b style={{ color: C.text }}>{sel.size} choisi{action === 'enLigne' ? '' : 'e'}{sel.size > 1 ? 's' : ''}</b></div>
-            {action === 'modifier' && <div style={{ fontSize: 12.5, color: C.muted }}>Chaque annonce reste la même sur Vinted (même N°, favoris et vues gardés) : seuls le prix et le titre changent.</div>}
-            {action === 'versBrouillon' && <div style={{ fontSize: 12.5, color: C.muted }}>Chaque annonce est d'abord enregistrée dans VRM (photos, description, recette), puis retirée de la vente, puis recréée en brouillon sur Vinted. Si Vinted refuse de la retirer, rien d'autre n'est fait. Favoris et vues ne suivent pas.</div>}
+            <div style={{ fontSize: 12.5, color: C.muted }}>{action === 'enLigne' ? `${s2(annonces.length, 'brouillon')} sur Vinted` : `${s2(annonces.length, 'paire')} en ligne sur Vinted`} · <b style={{ color: C.text }}>{sel.size} choisi{action === 'enLigne' ? '' : 'e'}{sel.size > 1 ? 's' : ''}</b></div>
+            {action === 'modifier' && <div style={{ fontSize: 12.5, color: C.muted }}>Modifiées sur place : même annonce, favoris et vues gardés.</div>}
+            {action === 'versBrouillon' && <div style={{ fontSize: 12.5, color: C.muted }}>Chaque annonce repasse en brouillon : favoris et vues ne suivent pas. <Pourquoi label="Comment ça marche">Chaque annonce est d'abord enregistrée dans VRM (photos, description, recette), puis retirée de la vente, puis recréée en brouillon sur Vinted. Si Vinted refuse de la retirer, rien d'autre n'est fait.</Pourquoi></div>}
             <div style={{ display: 'flex', flexDirection: 'column', border: `1px solid ${C.border}`, borderRadius: 10, overflow: 'hidden' }}>
               {liste.length === 0 && <div style={{ padding: 14, fontSize: 13, color: C.muted }}>{annonces.length ? 'Aucune ne correspond.' : !compteUid ? 'Le compte ouvert dans Chrome n’est pas encore connu.' : action === 'enLigne' ? "Aucun brouillon sur ce compte d'après tes dressings lus par VRM." : "Aucune paire en ligne sur ce compte n'a été lue pour l'instant."}</div>}
               {liste.map((a) => (
-                <label key={a.id} data-republier-paire={a.id} data-republier-bloque={a.bloque ? 'oui' : undefined} style={{ display: 'flex', gap: 10, alignItems: 'center', padding: '8px 10px', minHeight: 56, borderBottom: `1px solid ${C.border}`, cursor: a.bloque ? 'default' : 'pointer', background: sel.has(a.id) ? `${C.accent}0d` : 'transparent', opacity: a.bloque ? 0.6 : 1 }}>
+                <label key={a.id} data-republier-paire={a.id} data-republier-bloque={a.bloque ? 'oui' : undefined} style={{ display: 'flex', gap: 10, alignItems: 'center', padding: '8px 10px', minHeight: 56, borderBottom: `1px solid ${C.border}`, cursor: a.bloque ? 'default' : 'pointer', background: sel.has(a.id) ? 'var(--vrm-b-teinte)' : 'transparent', opacity: a.bloque ? 0.6 : 1 }}>
                   <input type="checkbox" disabled={!!a.bloque} checked={sel.has(a.id) && !a.bloque} onChange={() => toggle(a.id)} style={{ width: 20, height: 20, accentColor: C.accent, flexShrink: 0 }} />
                   <span style={{ width: 40, height: 50, borderRadius: 6, background: C.border, overflow: 'hidden', flexShrink: 0 }}>{a.photo ? <PhotoVinted src={a.photo} alt="" loading="lazy" decoding="async" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : null}</span>
                   <span style={{ flex: 1, minWidth: 0 }}>
                     <span style={{ display: 'block', fontSize: 13.5, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{a.numero ? <b>N°{a.numero} · </b> : null}{a.titre || '—'}</span>
-                    <span style={{ display: 'block', fontSize: 12, color: C.muted }}>{prixCourt(a.prix)}{a.age != null ? ` · en ligne depuis ${a.age} j` : ''}{a.vues != null ? ` · ${a.vues} vue${a.vues > 1 ? 's' : ''}` : ''}{a.favoris != null ? ` · ${a.favoris} favori${a.favoris > 1 ? 's' : ''}` : ''}{a.compte ? ` · ${a.compte}` : ''}</span>
+                    {/* Le compte n'est plus redit sur chaque ligne : ce sont toutes celles du compte ouvert dans Chrome (§7). */}
+                    <span style={{ display: 'block', fontSize: 12, color: C.muted }}>{prixCourt(a.prix)}{a.age != null ? ` · en ligne depuis ${a.age} j` : ''}{a.vues != null ? ` · ${s2(a.vues, 'vue')}` : ''}{a.favoris != null ? ` · ${s2(a.favoris, 'favori')}` : ''}</span>
                     {recree && recente(a) && <span data-republier-recente={a.id} style={{ display: 'block', fontSize: 12, color: C.warn }}>déjà recréée il y a {ilYa(a.recreeAt)} — attends 2 jours</span>}
                     {a.note && <span data-republier-note={a.id} style={{ display: 'block', fontSize: 12, color: C.muted }}>{a.note}</span>}
                     {a.bloque && <span data-republier-bloque-raison={a.id} style={{ display: 'block', fontSize: 12, color: C.muted }}>{a.bloque}</span>}
@@ -12616,51 +12638,62 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
                   </div>
                 ); })}
               </div>
-              {curseur('Redresser', 'rot', -15, 15, 0.5)}
-              {curseur('Luminosité', 'bright', 0.5, 1.5, 0.01)}
-              {curseur('Contraste', 'contrast', 0.5, 1.5, 0.01)}
-              {curseur('Saturation', 'sat', 0, 2, 0.01)}
-              {curseur('Zoom', 'zoom', 1, 2, 0.01)}
-              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
-                {presets.map((p) => <button key={p.nom} type="button" data-republier-preset={p.nom} onClick={() => setReg({ ...REPUB_REG_DEF, ...p.r })} style={btn(false)}>{p.nom}</button>)}
-                {!regNeutre && <button type="button" data-republier-reglage-zero onClick={() => setReg({ ...REPUB_REG_DEF })} style={btn(false)}>Photos d'origine</button>}
-              </div>
-              <div style={{ fontSize: 12, color: C.muted }}>{regNeutre ? 'Les photos partent telles quelles.' : 'Ce réglage s’applique à TOUTES les photos de chaque annonce choisie, refaites à partir de l’original au moment de republier. Ici, une photo par annonce pour l’aperçu.'}</div>
+              {/* (30 oct.) Cinq curseurs toujours dépliés pour un réglage rare : repliés. */}
+              <details className="vrm-repli" data-republier-retouche={regNeutre ? 'non' : 'oui'}>
+                <summary style={summ}>{regNeutre ? 'Photos telles quelles · retoucher' : 'Photos retouchées · modifier'}</summary>
+                {curseur('Redresser', 'rot', -15, 15, 0.5)}
+                {curseur('Luminosité', 'bright', 0.5, 1.5, 0.01)}
+                {curseur('Contraste', 'contrast', 0.5, 1.5, 0.01)}
+                {curseur('Saturation', 'sat', 0, 2, 0.01)}
+                {curseur('Zoom', 'zoom', 1, 2, 0.01)}
+                {(presets.length > 0 || !regNeutre) && <div className="vrm-b-rangee" style={{ justifyContent: 'flex-start', marginTop: 4 }}>
+                  {presets.map((p) => <Bouton key={p.nom} className="vrm-b-petit" data-republier-preset={p.nom} onClick={() => setReg({ ...REPUB_REG_DEF, ...p.r })}>{p.nom}</Bouton>)}
+                  {!regNeutre && <Bouton variante="discret" data-republier-reglage-zero onClick={() => setReg({ ...REPUB_REG_DEF })}>Photos d'origine</Bouton>}
+                </div>}
+                <div style={{ fontSize: 12, color: C.muted, marginTop: 4 }}>Vaut pour toutes les photos de chaque annonce choisie.</div>
+              </details>
             </div>}
             {recree && <div data-republier-description={lettreOn ? 'lettre' : 'telle'} style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
-              <span style={maj}>Description</span>
-              <div style={{ fontSize: 12.5, color: C.muted }}>La description de chaque annonce est reprise telle quelle, mot pour mot.</div>
+              <span style={maj}>Description — reprise mot pour mot</span>
               <label style={{ display: 'flex', gap: 10, alignItems: 'center', fontSize: 13.5, color: lettreOk ? C.text : C.muted, minHeight: 44, cursor: lettreOk ? 'pointer' : 'default' }}>
                 <input type="checkbox" data-republier-lettre disabled={!lettreOk} checked={lettreOn && lettreOk} onChange={(ev) => { setLettreOn(ev.target.checked); if (ev.target.checked) tirerLettres(choisies.map((a) => a.id)); }} style={{ width: 20, height: 20, accentColor: C.accent, flexShrink: 0 }} />
-                <span>Ajouter une lettre au hasard tout en bas de chaque description</span>
+                <span>Ajouter une lettre au hasard en bas de chaque description</span>
               </label>
               {!lettreOk && <div data-republier-lettre-maj style={{ fontSize: 12, color: C.muted }}>Demande l'extension VRM {EXT_CAPACITES.lettre} ou plus récente dans ce navigateur.</div>}
               {lettreOn && lettreOk && <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', fontSize: 12.5, color: C.muted }}>
-                <span style={{ flex: '1 1 200px' }}>Une lettre différente pour chaque annonce, sur la dernière ligne (la lettre d'une recréation précédente est retirée d'abord).</span>
-                <button type="button" data-republier-lettres-retirer onClick={() => tirerLettres(choisies.map((a) => a.id))} style={btn(false)}>Tirer d'autres lettres</button>
+                <span style={{ flex: '1 1 200px' }}>Une lettre différente par annonce, visible dans l'aperçu.</span>
+                <Bouton variante="discret" data-republier-lettres-retirer onClick={() => tirerLettres(choisies.map((a) => a.id))}>Tirer d'autres lettres</Bouton>
               </div>}
             </div>}
             {action === 'recreer' && <div data-republier-brouillon={viaBrouillon && brouillonOk ? 'oui' : 'non'} style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
               <span style={maj}>Publication</span>
-              <label style={{ display: 'flex', gap: 10, alignItems: 'center', fontSize: 13.5, color: brouillonOk ? C.text : C.muted, minHeight: 44, cursor: brouillonOk ? 'pointer' : 'default' }}>
-                <input type="checkbox" data-republier-via-brouillon disabled={!brouillonOk || extSait('republierpage') === 'ok'} checked={viaBrouillon && !!brouillonOk} onChange={(ev) => setViaBrouillon(ev.target.checked)} style={{ width: 20, height: 20, accentColor: C.accent, flexShrink: 0 }} />
+              {/* (30 oct.) Avec la 5.277, le passage par un brouillon est imposé : une case
+                  cochée et grisée ne servait à rien. Elle ne reste que là où on peut choisir. */}
+              {brouillonOk && !pageOk && <label style={{ display: 'flex', gap: 10, alignItems: 'center', fontSize: 13.5, color: C.text, minHeight: 44, cursor: 'pointer' }}>
+                <input type="checkbox" data-republier-via-brouillon checked={viaBrouillon && !!brouillonOk} onChange={(ev) => setViaBrouillon(ev.target.checked)} style={{ width: 20, height: 20, accentColor: C.accent, flexShrink: 0 }} />
                 <span>Passer par un brouillon Vinted, puis le mettre en ligne</span>
-              </label>
-              <div style={{ fontSize: 12, color: C.muted }}>{brouillonOk ? (viaBrouillon ? (extSait('republierpage') === 'ok' ? 'Comme Vintex : tout passe par l’onglet vinted.fr ouvert dans ce Chrome (laisse-le ouvert, connecté sur le bon compte). Chaque annonce est enregistrée dans VRM, rangée en brouillon sur Vinted, PUIS l’ancienne est supprimée, et le brouillon est mis en ligne 1 à 3 min plus tard.' + (extSait('republierfile') === 'ok' ? ' À la suite, comme Vintex : pendant cette attente la paire suivante est déjà préparée (l’extension met chaque brouillon en ligne à son heure, même si tu fermes cette fenêtre).' : '') + ' Aucun essai en rafale : un refus s’arrête et le dit. Au plus 10 paires par jour et par compte. Si Vinted ne répond pas clairement, VRM s’arrête (jamais deux fois en ligne) ; rien n’est perdu, tout est enregistré dans VRM.' : `L’extension VRM installée ici fait encore l’ancienne republication (depuis son fond, avec des renvois automatiques) — mets-la à jour en ${EXT_CAPACITES.republierpage} : elle passera par l’onglet vinted.fr, comme le site.`) : 'L’annonce est créée directement en ligne.') : `Demande l'extension VRM ${EXT_CAPACITES.republierbrouillon} ou plus récente dans ce navigateur.`}</div>
+              </label>}
+              <div style={{ fontSize: 12.5, color: pageOk ? C.text : C.muted, lineHeight: 1.45 }}>{brouillonOk
+                ? (viaBrouillon
+                  ? (pageOk
+                    ? <>Brouillon d'abord, puis en ligne 1 à 3 min après. Garde un onglet vinted.fr ouvert. <Pourquoi label="Comment ça marche">Comme Vintex : tout passe par l’onglet vinted.fr ouvert dans ce Chrome, connecté sur le bon compte. Chaque annonce est enregistrée dans VRM, rangée en brouillon sur Vinted, PUIS l’ancienne est supprimée, et le brouillon est mis en ligne 1 à 3 min plus tard.{extSait('republierfile') === 'ok' ? ' Pendant cette attente la paire suivante est déjà préparée (l’extension met chaque brouillon en ligne à son heure, même si tu fermes cette fenêtre).' : ''} Aucun essai en rafale : un refus s’arrête et le dit. Au plus 10 paires par jour et par compte. Si Vinted ne répond pas clairement, VRM s’arrête (jamais deux fois en ligne) ; rien n’est perdu, tout est enregistré dans VRM.</Pourquoi></>
+                    : <>Mets l’extension VRM à jour en {EXT_CAPACITES.republierpage} : elle passera par l’onglet vinted.fr. <Pourquoi label="Pourquoi ?">L’extension installée ici fait encore l’ancienne republication, depuis son fond, avec des renvois automatiques.</Pourquoi></>)
+                  : 'L’annonce est créée directement en ligne.')
+                : `Demande l'extension VRM ${EXT_CAPACITES.republierbrouillon} ou plus récente dans ce navigateur.`}</div>
             </div>}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
               <span style={maj}>Prix</span>
               {/* (29 oct., « les réductions je ne comprends rien du tout ») Un geste
                   par bouton : garder le prix, ou baisser de 5, 10, 15, 20 %. Le reste
                   (autre %, en €, même prix pour toutes) est replié dans « Autre ». */}
-              <div data-republier-reductions style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+              <div data-republier-reductions className="vrm-filtres" style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                 {[['aucun', 'Garder le prix'], ['-5', '−5 %'], ['-10', '−10 %'], ['-15', '−15 %'], ['-20', '−20 %'], ['autre', 'Autre…']].map(([v, l]) => {
                   const actif = v === 'aucun' ? pBase === 'aucun' : v === 'autre' ? (pBase === 'fixe' || pBase === 'commun' || (pBase === 'pct' && !['-5', '-10', '-15', '-20'].includes(String(pDelta).trim()))) : (pBase === 'pct' && String(pDelta).trim() === v);
-                  return <button key={v} type="button" data-republier-reduc={v} aria-pressed={actif} onClick={() => { if (v === 'aucun') setPBase('aucun'); else if (v === 'autre') { if (pBase === 'aucun' || ['-5', '-10', '-15', '-20'].includes(String(pDelta).trim())) { setPBase('pct'); setPDelta(''); } } else { setPBase('pct'); setPDelta(v); } }} style={{ minHeight: 44, padding: '0 14px', borderRadius: 10, fontSize: 14, fontWeight: 600, cursor: 'pointer', border: `1px solid ${actif ? C.text : C.border}`, background: actif ? C.text : C.card, color: actif ? C.card : C.text }}>{l}</button>;
+                  return <button key={v} type="button" data-republier-reduc={v} aria-pressed={actif} onClick={() => { if (v === 'aucun') setPBase('aucun'); else if (v === 'autre') { if (pBase === 'aucun' || ['-5', '-10', '-15', '-20'].includes(String(pDelta).trim())) { setPBase('pct'); setPDelta(''); } } else { setPBase('pct'); setPDelta(v); } }} style={{ minHeight: 44, padding: '0 14px', fontSize: 14, cursor: 'pointer', fontFamily: 'inherit' }}>{l}</button>;
                 })}
               </div>
               {pBase !== 'aucun' && !(pBase === 'pct' && ['-5', '-10', '-15', '-20'].includes(String(pDelta).trim())) && <div data-republier-autre style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-                <select data-republier-prix value={pBase} onChange={(ev) => setPBase(ev.target.value)} style={{ ...champ, flex: '1 1 200px' }}>
+                <select data-republier-prix value={pBase} onChange={(ev) => setPBase(ev.target.value)} aria-label="Type de baisse" style={{ ...champ, flex: '1 1 200px' }}>
                   <option value="pct">Baisser d'un pourcentage</option>
                   <option value="fixe">Baisser d'un montant en €</option>
                   <option value="commun">Mettre toutes au même prix</option>
@@ -12673,12 +12706,11 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
                 <span>Arrondir à l'euro (ex. 44,10 € → 44 €)</span>
               </label>}
               {(() => { const a = choisies[0]; if (!a || a.prix == null) return null; const x = apercu(a);
-                return <div data-republier-exemple style={{ fontSize: 13, color: C.text }}>{pBase === 'aucun' ? <>Les prix ne changent pas. Exemple : {a.numero ? `N°${a.numero}` : 'la première'} reste à {prixCourt(a.prix)}.</> : <>Exemple : {a.numero ? `N°${a.numero}` : 'la première'} passe de {prixCourt(a.prix)} à <b>{prixCourt(x.prix != null ? x.prix : a.prix)}</b>{x.plancher ? ' (ramené au prix d\u2019achat)' : ''}. Le nouveau prix de chaque paire est écrit dans la liste juste en dessous.</>}</div>; })()}
-              <div style={{ fontSize: 12, color: C.muted }}>Jamais sous le prix d'achat de la paire.</div>
+                return <div data-republier-exemple style={{ fontSize: 13, color: pBase === 'aucun' ? C.muted : C.text }}>{pBase === 'aucun' ? 'Les prix ne changent pas.' : <>Exemple : {a.numero ? `N°${a.numero}` : 'la première'} passe de {prixCourt(a.prix)} à <b>{prixCourt(x.prix != null ? x.prix : a.prix)}</b>{x.plancher ? ' (ramené au prix d’achat)' : ''} · jamais sous le prix d'achat.</>}</div>; })()}
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
               <span style={maj}>Titre</span>
-              <select data-republier-titre value={tMode} onChange={(ev) => setTMode(ev.target.value)} style={champ}>
+              <select data-republier-titre value={tMode} onChange={(ev) => setTMode(ev.target.value)} aria-label="Changer le titre" style={champ}>
                 <option value="aucun">Ne pas changer le titre</option>
                 <option value="prefixe">Ajouter au début</option>
                 <option value="suffixe">Ajouter à la fin</option>
@@ -12688,7 +12720,8 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
               {(tMode === 'remplacer' || tMode === 'supprimer') && <input value={tChe} onChange={(ev) => setTChe(ev.target.value)} placeholder="Texte à trouver" style={champ} />}
               {(tMode === 'prefixe' || tMode === 'suffixe' || tMode === 'remplacer') && <input value={tVal} onChange={(ev) => setTVal(ev.target.value)} placeholder={tMode === 'remplacer' ? 'Par' : 'Texte à ajouter'} style={champ} />}
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 0, border: `1px solid ${C.border}`, borderRadius: 10, overflow: 'hidden' }}>
+            <span style={maj}>Aperçu ({choisies.length})</span>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 0, border: `1px solid ${C.border}`, borderRadius: 10, overflow: 'hidden', marginTop: -5 }}>
               {choisies.map((a) => { const x = apercu(a); const rien = !x.titre && !x.prix; return (
                 <div key={a.id} data-republier-apercu={a.id} data-republier-nouveau-prix={x.prix != null ? Math.round(x.prix * 100) : ''} style={{ padding: '8px 10px', borderBottom: `1px solid ${C.border}`, fontSize: 13 }}>
                   <div style={{ color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{a.numero ? <b>N°{a.numero} · </b> : null}{a.titre}</div>
@@ -12703,31 +12736,33 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
           {etape === 'envoi' && <>
             {/* (28 oct.) Après un passage, les anciennes annonces sont supprimées de Vinted :
                 elles sortent de la liste et la phrase disait « 0 annonce à supprimer ». */}
-            {!aFaire.length && <div data-republier-vide style={{ fontSize: 13.5, color: C.text, lineHeight: 1.5 }}>{mode === 'idle' ? <>Plus aucune des annonces choisies n'est en ligne sur Vinted (déjà republiées ou retirées). Le compte rendu de chacune est ci-dessous ; reviens à « 1. Choisir » pour en prendre d'autres.</> : <>Le passage est en cours : son avancée est ci-dessous.</>}</div>}
-            {action === 'recreer' && !!aFaire.length && mode === 'idle' && <div data-republier-explique style={{ fontSize: 13.5, color: C.text, lineHeight: 1.5 }}><b>{aFaire.length} annonce{aFaire.length > 1 ? 's' : ''}</b> à supprimer et recréer sur Vinted, une par une. Pour chacune : ses photos sont renvoyées{regNeutre ? '' : ' avec tes réglages'}, {viaBrouillon && brouillonOk ? <>l'annonce est enregistrée dans VRM, retirée de Vinted, recréée en brouillon, puis mise en ligne. Si la mise en ligne échoue, le brouillon reste dans tes brouillons Vinted et rien n'est perdu.</> : <>la nouvelle annonce est créée, et <b>seulement si elle est bien en ligne</b> l'ancienne est supprimée.</>} Le N° VRM passe sur la nouvelle.</div>}
-            {action === 'modifier'  && !!aFaire.length && mode === 'idle' && <div data-republier-explique style={{ fontSize: 13.5, color: C.text, lineHeight: 1.5 }}><b>{aFaire.length} annonce{aFaire.length > 1 ? 's' : ''}</b> à modifier sur Vinted, une par une, sur place : même annonce, même N°, favoris et vues gardés. Rien n'est supprimé ni créé.</div>}
-            {action === 'versBrouillon'  && !!aFaire.length && mode === 'idle' && <div data-republier-explique style={{ fontSize: 13.5, color: C.text, lineHeight: 1.5 }}><b>{aFaire.length} annonce{aFaire.length > 1 ? 's' : ''}</b> à repasser en brouillon, une par une. Pour chacune : elle est <b>enregistrée dans VRM</b>, ses photos sont renvoyées{regNeutre ? '' : ' avec tes réglages'}, l'annonce en ligne est <b>retirée</b>, puis le <b>brouillon est créé</b> sur Vinted. Un brouillon n'est jamais en ligne : rien ne peut se vendre deux fois. Tu la remettras en ligne depuis « Actions → Brouillons → en ligne ».</div>}
-            {action === 'enLigne'  && !!aFaire.length && mode === 'idle' && <div data-republier-explique style={{ fontSize: 13.5, color: C.text, lineHeight: 1.5 }}><b>{aFaire.length} brouillon{aFaire.length > 1 ? 's' : ''}</b> à mettre en ligne sur Vinted, un par un, tels que tu les as enregistrés.</div>}
+            {!aFaire.length && <div data-republier-vide style={{ fontSize: 13.5, color: C.text, lineHeight: 1.5 }}>{mode === 'idle' ? "Aucune des annonces choisies n'est encore en ligne (déjà republiées ou retirées) : reviens à « Choisir »." : 'En cours : l’avancée est ci-dessous.'}</div>}
+            {/* (30 oct.) Avant de lancer : UNE phrase par fait, le détail derrière ⓘ. */}
+            {action === 'recreer' && !!aFaire.length && mode === 'idle' && <div data-republier-explique style={{ fontSize: 13.5, color: C.text, lineHeight: 1.5 }}><b>{s2(aFaire.length, 'annonce')}</b> à recréer sur Vinted, une par une. Le N° VRM passe sur la nouvelle. <Pourquoi label="Comment ça marche">Pour chacune : ses photos sont renvoyées{regNeutre ? '' : ' avec tes réglages'}, {viaBrouillon && brouillonOk ? "l'annonce est enregistrée dans VRM, retirée de Vinted, recréée en brouillon, puis mise en ligne. Si la mise en ligne échoue, le brouillon reste dans tes brouillons Vinted et rien n'est perdu." : 'la nouvelle annonce est créée, et seulement si elle est bien en ligne l’ancienne est supprimée.'}</Pourquoi></div>}
+            {action === 'modifier' && !!aFaire.length && mode === 'idle' && <div data-republier-explique style={{ fontSize: 13.5, color: C.text, lineHeight: 1.5 }}><b>{s2(aFaire.length, 'annonce')}</b> à modifier sur place, une par une : même annonce, favoris et vues gardés.</div>}
+            {action === 'versBrouillon' && !!aFaire.length && mode === 'idle' && <div data-republier-explique style={{ fontSize: 13.5, color: C.text, lineHeight: 1.5 }}><b>{s2(aFaire.length, 'annonce')}</b> à repasser en brouillon, une par une. <Pourquoi label="Comment ça marche">Pour chacune : elle est enregistrée dans VRM, ses photos sont renvoyées{regNeutre ? '' : ' avec tes réglages'}, l'annonce en ligne est retirée, puis le brouillon est créé sur Vinted. Un brouillon n'est jamais en ligne : rien ne peut se vendre deux fois. Tu la remettras en ligne depuis « Actions → Brouillons → en ligne ».</Pourquoi></div>}
+            {action === 'enLigne' && !!aFaire.length && mode === 'idle' && <div data-republier-explique style={{ fontSize: 13.5, color: C.text, lineHeight: 1.5 }}><b>{s2(aFaire.length, 'brouillon')}</b> à mettre en ligne, un par un, tels que tu les as enregistrés.</div>}
             {recree && (() => { const fav = aFaire.reduce((n, a) => n + (a.favoris || 0), 0); const nFav = aFaire.filter((a) => a.favoris > 0).length; const nRec = aFaire.filter(recente).length; return mode === 'idle' && <>
-              {fav > 0 && <div data-republier-favoris={fav} style={{ fontSize: 12.5, color: C.warn }}>{fav} favori{fav > 1 ? 's' : ''} sur {nFav} de ces paires {fav > 1 ? 'seront perdus' : 'sera perdu'} : une annonce recréée repart de zéro (favoris, vues, ancienneté). Pour une paire qui a des favoris, baisser le prix de l'annonce actuelle les prévient — c'est souvent mieux que la recréer.</div>}
-              {nRec > 0 && <div data-republier-recentes={nRec} style={{ fontSize: 12.5, color: C.warn }}>{nRec} de ces paires {nRec > 1 ? 'ont déjà été recréées' : 'a déjà été recréée'} il y a moins de 2 jours : Vinted peut la traiter comme un doublon. Mieux vaut la retirer de la sélection.</div>}
+              {fav > 0 && <div data-republier-favoris={fav} style={{ fontSize: 12.5, color: C.warn }}>{s2(fav, 'favori')} {fav > 1 ? 'seront perdus' : 'sera perdu'} ({s2(nFav, 'paire')}). <Pourquoi label="Pourquoi ?">Une annonce recréée repart de zéro (favoris, vues, ancienneté). Pour une paire qui a des favoris, baisser le prix de l'annonce actuelle les prévient — c'est souvent mieux que la recréer.</Pourquoi></div>}
+              {nRec > 0 && <div data-republier-recentes={nRec} style={{ fontSize: 12.5, color: C.warn }}>{nRec > 1 ? `${nRec} paires déjà recréées` : '1 paire déjà recréée'} il y a moins de 2 jours : risque de doublon, retire-{nRec > 1 ? 'les' : 'la'}.</div>}
             </>; })()}
-            {arret && mode === 'pause' && <div data-republier-arret style={{ fontSize: 12.5, color: C.warn }}>File arrêtée (la raison est sur la ligne de la paire) : rien d'autre n'est parti. Reprends plus tard.</div>}
-            {majExt && <div data-republier-maj style={{ fontSize: 12.5, color: C.warn }}>L'extension VRM de ce navigateur doit être à jour ({EXT_ATTENDUE}) et connectée — sinon chaque annonce ressortira « pas faite », rien ne sera touché.</div>}
-            {autresComptes > 0 && <div data-republier-autres-comptes style={{ fontSize: 12.5, color: C.warn }}>{autresComptes} sont sur un autre compte que celui ouvert dans Chrome : ouvre Vinted sur ce compte-là, sinon elles ressortiront « pas faites ».</div>}
+            {majExt && <div data-republier-maj style={{ fontSize: 12.5, color: C.warn }}>Extension VRM à mettre à jour ({EXT_ATTENDUE}) et à connecter : sinon rien ne partira.</div>}
+            {autresComptes > 0 && <div data-republier-autres-comptes style={{ fontSize: 12.5, color: C.warn }}>{autresComptes} sur un autre compte que celui de Chrome : {autresComptes > 1 ? 'elles ne partiront' : 'elle ne partira'} pas.</div>}
             {mode === 'idle' && <>
               <div data-republier-esp={espMode} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 <span style={maj}>Temps entre deux paires</span>
                 <Segmente plein label="Temps entre deux paires" value={espMode} onChange={setEspMode} options={[{ v: 'vintex', l: 'Comme Vintex', data: { 'data-republier-esp-choix': 'vintex' } }, { v: 'fixe', l: 'Fixe', data: { 'data-republier-esp-choix': 'fixe' } }, { v: 'aleatoire', l: 'Aléatoire', data: { 'data-republier-esp-choix': 'aleatoire' } }]} />
-                {espMode === 'vintex' && <div data-republier-esp-vintex style={{ fontSize: 13, color: C.muted }}>Entre 8 et 16 secondes entre deux paires, tiré au hasard : le rythme mesuré chez Vintex.</div>}
+                {espMode === 'vintex' && <div data-republier-esp-vintex style={{ fontSize: 12.5, color: C.muted }}>8 à 16 secondes, tirées au hasard.</div>}
                 {espMode === 'fixe' && <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13.5, color: C.text }}>Une annonce toutes les <input data-republier-esp-fixe value={esp} onChange={(ev) => setEsp(fileClamp(ev.target.value))} inputMode="numeric" style={{ ...champ, width: 70 }} /> secondes</label>}
                 {espMode === 'aleatoire' && <>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13.5, color: C.text, flexWrap: 'wrap' }}>
                     <span>Entre</span><input data-republier-esp-min value={espMin} onChange={(ev) => setEspMin(ev.target.value)} onBlur={() => setEspMin(minutesOk(espMin))} inputMode="decimal" aria-label="Minimum en minutes" style={{ ...champ, width: 64 }} />
                     <span>et</span><input data-republier-esp-max value={espMax} onChange={(ev) => setEspMax(ev.target.value)} onBlur={() => setEspMax(minutesOk(espMax))} inputMode="decimal" aria-label="Maximum en minutes" style={{ ...champ, width: 64 }} /><span>minutes</span>
                   </div>
-                  <div style={{ fontSize: 12, color: C.muted }}>Un temps différent est tiré au hasard pour chaque paire, entre ces deux bornes (60 min au plus) : tu le vois sur chaque ligne ci-dessous. La première part tout de suite.</div>
-                  <button type="button" data-republier-retirer onClick={refaitPlan} style={{ ...btn(false), alignSelf: 'flex-start' }}>Tirer d'autres temps</button>
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', fontSize: 12.5, color: C.muted }}>
+                    <span style={{ flex: '1 1 200px' }}>Un temps par paire (60 min au plus), écrit sur sa ligne.</span>
+                    <Bouton variante="discret" data-republier-retirer onClick={refaitPlan}>Tirer d'autres temps</Bouton>
+                  </div>
                 </>}
               </div>
               <label style={{ display: 'flex', gap: 10, alignItems: 'flex-start', fontSize: 13.5, color: C.text, cursor: 'pointer' }}>
@@ -12735,70 +12770,88 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
                 <span>Je confirme : ces {aFaire.length} {action === 'enLigne' ? `brouillon${aFaire.length > 1 ? 's' : ''}` : `annonce${aFaire.length > 1 ? 's' : ''}`} {A.confirme(aFaire.length)}</span>
               </label>
             </>}
-            {/* (29 oct.) Julien : « la barre de progression est incompréhensible ».
-                Avant : une barre par paire, une barre d'ensemble SOUS la liste, et
-                une ligne de bilan encore en dessous — trois indicateurs. Un seul
-                bloc, EN HAUT : où j'en suis, ce qui se passe, combien sont faites,
-                ce qui a raté. Le détail de chaque paire reste sur sa ligne. */}
+            {/* (29 oct., puis 30 oct.) Julien : « la barre de progression est incompréhensible ».
+                Un seul bloc, EN HAUT, une seule barre : où j'en suis (« Paire 2 sur 5 »),
+                la paire en cours et SON étape en une ligne (la liste des étapes repliée),
+                combien sont faites / restent, ce qui a raté. Plus de seconde barre par
+                ligne : la ligne ne dit que son état. */}
             {mode !== 'idle' && aFaire.length > 0 && (() => {
               const finies = aFaire.filter((a) => { const e = (st[a.id] || {}).etat; return e && e !== 'encours' && e !== 'planifiee'; }).length;
               const enCours = aFaire.find((a) => (st[a.id] || {}).etat === 'encours');
+              const nPlanif = aFaire.filter((a) => (st[a.id] || {}).etat === 'planifiee').length;
+              const pasCommencees = aFaire.filter((a) => !st[a.id]).length;
               const peEnCours = enCours && recree ? progressionRepub(prog[String(enCours.id)], action, viaBrouillon && !!brouillonOk) : null;
               const part = Math.min(1, (finies + (peEnCours ? peEnCours.part : 0)) / aFaire.length);
               const ratees = nEchec + nRefaire + nDouble;
-              const titre = mode === 'fini' ? 'Terminé' : mode === 'pause' ? 'En pause' : enCours ? `Paire ${aFaire.indexOf(enCours) + 1} sur ${aFaire.length}` : `${finies} sur ${aFaire.length}`;
+              const prochN = Math.min(aFaire.length, aFaire.length - pasCommencees + 1);
+              const titre = mode === 'fini' ? 'Terminé' : mode === 'pause' ? (arret ? 'Arrêté' : 'En pause') : enCours ? `Paire ${aFaire.indexOf(enCours) + 1} sur ${aFaire.length}` : `Paire ${prochN} sur ${aFaire.length}`;
               const r = mode === 'run' && prochaine ? Math.max(0, Math.round((prochaine.at - Date.now()) / 1000)) : null;
               const phrase = mode === 'run'
-                ? <>{enCours ? <>{enCours.numero ? `N°${enCours.numero} · ` : ''}{peEnCours ? peEnCours.texte : 'en cours…'}</> : r != null ? <span data-republier-prochaine={prochaine.s}>Prochaine paire dans {r >= 60 ? `${Math.floor(r / 60)} min ${String(r % 60).padStart(2, '0')} s` : `${r} s`}</span> : 'Je prépare la suite…'} — garde cette fenêtre ouverte.</>
-                : mode === 'pause' ? 'Rien ne part tant que tu ne reprends pas.' : null;
-              const erreur = ratees ? <>{[nEchec ? `${nEchec} pas faite${nEchec > 1 ? 's' : ''}` : null, nRefaire ? `${nRefaire} brouillon${nRefaire > 1 ? 's' : ''} à refaire` : null, nDouble ? `${nDouble} à vérifier sur Vinted` : null].filter(Boolean).join(' · ')} : la raison et le geste sont sur sa ligne ci-dessous.</> : null;
+                ? (enCours ? <b>{enCours.numero ? `N°${enCours.numero} · ` : ''}{enCours.titre}</b> : r != null ? <span data-republier-prochaine={prochaine.s}>Prochaine paire dans {r >= 60 ? `${Math.floor(r / 60)} min ${String(r % 60).padStart(2, '0')} s` : `${r} s`}</span> : 'Préparation de la suite…')
+                : mode === 'pause' ? (arret ? <span data-republier-arret>{String(arret).replace(/[.\s]+$/, '')}. Rien d'autre n'est parti.</span> : 'Rien ne part tant que tu ne reprends pas.')
+                : (!ratees ? 'Tout est fait.' : null);
+              const erreur = ratees ? <>{[nEchec ? `${nEchec} pas faite${nEchec > 1 ? 's' : ''}` : null, nRefaire ? `${nRefaire} brouillon${nRefaire > 1 ? 's' : ''} à refaire` : null, nDouble ? `${nDouble} à vérifier sur Vinted` : null].filter(Boolean).join(' · ')} — la raison et le geste sont sur sa ligne.</> : null;
+              const lstEnCours = action === 'versBrouillon' ? ETAPES_REPUB.versBrouillon : ((viaBrouillon && !!brouillonOk) ? ETAPES_REPUB.brouillon : ETAPES_REPUB.direct);
               return <Avancement titre={titre} phrase={phrase} part={part} label={`${finies} sur ${aFaire.length} terminées`} erreur={erreur}
-                data={{ 'data-republier-total': `${finies}/${aFaire.length}` }}
-                compte={<span data-republier-bilan="">{compteAvancement({ faites: nFait, ratees: nEchec + nDouble, restent: aFaire.length - finies, motFait: A.faits, motFaits: A.faits.replace(/^(\S+)/, '$1s') })}{nRefaire ? ` · ${nRefaire} brouillon${nRefaire > 1 ? 's' : ''} à refaire` : ''}</span>} />;
+                data={{ 'data-republier-total': `${finies}/${aFaire.length}`, 'data-republier-bilan': '' }}
+                compte={<span>{compteAvancement({ faites: nFait, ratees, restent: pasCommencees, motFait: A.faits, motFaits: A.faits.replace(/^(\S+)/, '$1s') })}{nPlanif ? ` · ${nPlanif} prévue${nPlanif > 1 ? 's' : ''}` : ''}</span>}>
+                {peEnCours && <div data-republier-progression={enCours.id} data-republier-etape={peEnCours.etape || 'attente'}>
+                  <BarreGeste p={prog[String(enCours.id)]} liste={lstEnCours} label={`Paire ${aFaire.indexOf(enCours) + 1}`} barre={false} />
+                </div>}
+              </Avancement>;
             })()}
             <div style={{ display: 'flex', flexDirection: 'column', border: `1px solid ${C.border}`, borderRadius: 10, overflow: 'hidden' }}>
-              {mode === 'idle' && aFaire.length > 1 && <div data-republier-ordre={ordre ? 'regle' : 'selection'} style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', padding: '8px 10px', borderBottom: `1px solid ${C.border}`, fontSize: 12.5, color: C.muted }}>
-                <span style={{ flex: '1 1 200px' }}>Ordre de passage{ordre ? ' (réglé)' : ' : celui de ta sélection'}.{action === 'recreer' ? ' Chaque paire passe en brouillon, puis l’ancienne est supprimée, dans cet ordre.' : ''}</span>
-                <button type="button" data-republier-melanger onClick={melanger} style={btn(false)}>Mélanger</button>
-                {ordre && <button type="button" data-republier-ordre-selection onClick={() => setOrdre(null)} style={btn(false)}>Ordre de ma sélection</button>}
+              {mode === 'idle' && aFaire.length > 1 && <div data-republier-ordre={ordre ? 'regle' : 'selection'} style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', padding: '6px 10px', borderBottom: `1px solid ${C.border}`, fontSize: 12.5, color: C.muted }}>
+                <span style={{ flex: '1 1 160px' }}>{ordre ? 'Ordre réglé à la main' : 'Ordre : celui de ta sélection'}</span>
+                {ordre && <Bouton variante="discret" data-republier-ordre-selection onClick={() => setOrdre(null)}>Revenir à ma sélection</Bouton>}
+                <Bouton className="vrm-b-petit" data-republier-melanger onClick={melanger} style={{ minHeight: 44 }}>Mélanger</Bouton>
               </div>}
-              {aFaire.map((a, i) => { const s = st[a.id] || {}; return (<React.Fragment key={a.id}>
-                <div data-republier-ligne={a.id} data-republier-statut={s.etat || 'attente'} style={{ display: 'flex', gap: 8, alignItems: 'center', padding: '8px 10px', borderBottom: `1px solid ${C.border}`, fontSize: 13 }}>
-                  <span style={{ flexShrink: 0, width: 18, color: C.muted, fontVariantNumeric: 'tabular-nums' }}>{i + 1}.</span>
-                  <span style={{ flex: 1, minWidth: 0, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{a.numero ? <b>N°{a.numero} · </b> : null}{a.titre}</span>
-                  {!s.etat && <span data-republier-attente={i === 0 ? 0 : (plan[a.id] || '')} style={{ flexShrink: 0, fontSize: 12, color: C.muted, fontVariantNumeric: 'tabular-nums' }}>{i === 0 ? 'tout de suite' : Number.isFinite(plan[a.id]) ? `+${duree(plan[a.id])}` : ''}</span>}
-                  {mode === 'idle' && aFaire.length > 1 && <span style={{ display: 'flex', flexShrink: 0 }}>
-                    <button type="button" aria-label="Monter" data-republier-monter={a.id} disabled={i === 0} onClick={() => bouger(a.id, -1)} style={{ border: 'none', background: 'transparent', color: i === 0 ? C.border : C.text, minWidth: 44, minHeight: 44, fontSize: 16, cursor: i === 0 ? 'default' : 'pointer' }}>↑</button>
-                    <button type="button" aria-label="Descendre" data-republier-descendre={a.id} disabled={i === aFaire.length - 1} onClick={() => bouger(a.id, 1)} style={{ border: 'none', background: 'transparent', color: i === aFaire.length - 1 ? C.border : C.text, minWidth: 44, minHeight: 44, fontSize: 16, cursor: i === aFaire.length - 1 ? 'default' : 'pointer' }}>↓</button>
-                  </span>}
-                  <span style={{ flexShrink: 0, maxWidth: '55%', textAlign: 'right', color: (s.etat === 'echec' || s.etat === 'double' || s.etat === 'incertain' || s.etat === 'a-refaire') ? C.warn : s.etat === 'fait' ? C.text : C.muted, fontWeight: s.etat ? 600 : 400 }} data-republier-prevue={s.etat === 'planifiee' ? (s.jusqua || 0) : undefined}>{s.etat === 'fait' ? (s.refait ? `brouillon refait${s.raison ? ' · ' + s.raison : ''}` : A.fait) : s.etat === 'encours' ? 'en cours…' : s.etat === 'planifiee' ? `brouillon prêt · mise en ligne vers ${s.jusqua ? new Date(s.jusqua).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : '…'}` : s.etat === 'echec' ? `pas faite · ${s.raison}` : s.etat ? `⚠ ${s.raison}` : (mode === 'idle' ? '' : 'en attente')}</span>
-                  {s.etat === 'a-refaire' && refaire && mode !== 'run' && <button type="button" data-republier-refaire={a.id} onClick={() => refaireLigne(a)} style={{ ...btn(true), flexShrink: 0 }}>Refaire le brouillon</button>}
-                </div>
-                {recree && (s.etat === 'encours' || (['echec', 'a-refaire', 'incertain', 'double'].includes(s.etat) && prog[String(a.id)] && prog[String(a.id)].etape)) && (() => { const lst = action === 'versBrouillon' ? ETAPES_REPUB.versBrouillon : ((viaBrouillon && !!brouillonOk) ? ETAPES_REPUB.brouillon : ETAPES_REPUB.direct); const pe = progressionRepub(prog[String(a.id)], action, viaBrouillon && !!brouillonOk); return (
-                  <div data-republier-progression={a.id} data-republier-etape={pe.etape || 'attente'} style={{ padding: '0 10px 10px 36px', borderBottom: `1px solid ${C.border}` }}>
-                    <BarreGeste p={prog[String(a.id)]} liste={lst} label={`Paire ${i + 1}`} issue={s.etat === 'encours' ? null : 'echec'} />
+              {aFaire.map((a, i) => { const s = st[a.id] || {};
+                const pb = s.etat === 'echec' || s.etat === 'double' || s.etat === 'incertain' || s.etat === 'a-refaire';
+                const statut = s.etat === 'fait' ? (s.refait ? 'brouillon refait' : A.fait) : s.etat === 'encours' ? 'en cours…' : s.etat === 'planifiee' ? `brouillon prêt · en ligne vers ${s.jusqua ? new Date(s.jusqua).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : '…'}` : s.etat === 'echec' ? 'pas faite' : s.etat === 'a-refaire' ? 'brouillon à refaire' : s.etat ? '⚠ à vérifier' : (mode === 'idle' ? '' : 'en attente');
+                const raison = s.raison && (pb || s.refait) ? s.raison : '';
+                return (
+                <div key={a.id} data-republier-ligne={a.id} data-republier-statut={s.etat || 'attente'} style={{ padding: '6px 10px', borderBottom: `1px solid ${C.border}`, fontSize: 13 }}>
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'center', minHeight: 32 }}>
+                    <span style={{ flexShrink: 0, width: 18, color: C.muted, fontVariantNumeric: 'tabular-nums' }}>{i + 1}.</span>
+                    <span style={{ flex: 1, minWidth: 0, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{a.numero ? <b>N°{a.numero} · </b> : null}{a.titre}</span>
+                    {!s.etat && <span data-republier-attente={i === 0 ? 0 : (plan[a.id] || '')} style={{ flexShrink: 0, fontSize: 12, color: C.muted, fontVariantNumeric: 'tabular-nums' }}>{i === 0 ? 'tout de suite' : Number.isFinite(plan[a.id]) && plan[a.id] > 0 ? `+${duree(plan[a.id])}` : ''}</span>}
+                    {mode === 'idle' && aFaire.length > 1 && <span style={{ display: 'flex', flexShrink: 0 }}>
+                      <button type="button" aria-label="Monter" data-republier-monter={a.id} disabled={i === 0} onClick={() => bouger(a.id, -1)} style={{ border: 'none', background: 'transparent', color: i === 0 ? C.border : C.text, minWidth: 44, minHeight: 44, fontSize: 16, cursor: i === 0 ? 'default' : 'pointer' }}>↑</button>
+                      <button type="button" aria-label="Descendre" data-republier-descendre={a.id} disabled={i === aFaire.length - 1} onClick={() => bouger(a.id, 1)} style={{ border: 'none', background: 'transparent', color: i === aFaire.length - 1 ? C.border : C.text, minWidth: 44, minHeight: 44, fontSize: 16, cursor: i === aFaire.length - 1 ? 'default' : 'pointer' }}>↓</button>
+                    </span>}
+                    {statut && <span data-republier-prevue={s.etat === 'planifiee' ? (s.jusqua || 0) : undefined} style={{ flexShrink: 0, fontSize: 12, fontWeight: 600, padding: '3px 8px', borderRadius: 99, background: pb ? 'transparent' : s.etat === 'fait' ? 'var(--vrm-b-teinte)' : 'transparent', border: pb ? `1px solid ${C.warn}` : 'none', color: pb ? C.warn : s.etat === 'fait' ? C.text : C.muted, whiteSpace: 'nowrap' }}>{statut}</span>}
                   </div>
-                ); })()}
-              </React.Fragment>); })}
+                  {raison && <div style={{ fontSize: 12.5, color: pb ? C.warn : C.muted, padding: '0 0 4px 26px', lineHeight: 1.45 }}>{raison}</div>}
+                  {s.etat === 'a-refaire' && refaire && mode !== 'run' && <div className="vrm-b-rangee" style={{ padding: '2px 0 4px 26px' }}><Bouton data-republier-refaire={a.id} onClick={() => refaireLigne(a)}>Refaire le brouillon</Bouton></div>}
+                  {recree && pb && prog[String(a.id)] && prog[String(a.id)].etape && (() => { const lst = action === 'versBrouillon' ? ETAPES_REPUB.versBrouillon : ((viaBrouillon && !!brouillonOk) ? ETAPES_REPUB.brouillon : ETAPES_REPUB.direct); const pe = progressionRepub(prog[String(a.id)], action, viaBrouillon && !!brouillonOk); return (
+                    <div data-republier-progression={a.id} data-republier-etape={pe.etape || 'attente'} style={{ padding: '0 0 4px 26px' }}>
+                      <BarreGeste p={prog[String(a.id)]} liste={lst} label={`Paire ${i + 1}`} issue="echec" barre={false} />
+                    </div>
+                  ); })()}
+                </div>); })}
             </div>
           </>}
         </div>
-        <div style={{ display: 'flex', gap: 8, padding: '10px 16px 12px', borderTop: `1px solid ${C.border}`, flexShrink: 0, flexWrap: 'wrap' }}>
-          {etape === 'choix' && <button type="button" data-republier-suivant disabled={!sel.size} onClick={() => setEtape(action === 'enLigne' ? 'envoi' : 'modif')} style={{ ...btn(true, !!sel.size), marginLeft: 'auto' }}>Continuer ({sel.size})</button>}
+        <div className="vrm-b-rangee" style={{ padding: '10px 16px 12px', borderTop: `1px solid ${C.border}`, flexShrink: 0, flexWrap: 'nowrap' }}>
+          {etape === 'choix' && <Bouton variante="primaire" data-republier-suivant disabled={!sel.size} title={!sel.size ? 'Choisis au moins une paire' : undefined} onClick={() => setEtape(action === 'enLigne' ? 'envoi' : 'modif')}>Continuer ({sel.size})</Bouton>}
           {etape === 'modif' && <>
-            <button type="button" onClick={() => setEtape('choix')} style={btn(false)}>Retour</button>
-            <button type="button" data-republier-suivant disabled={!aFaire.length} onClick={() => setEtape('envoi')} style={{ ...btn(true, !!aFaire.length), marginLeft: 'auto' }}>Continuer ({aFaire.length})</button>
+            <Bouton variante="discret" onClick={() => setEtape('choix')}>Retour</Bouton>
+            <Bouton variante="primaire" data-republier-suivant disabled={!aFaire.length} title={!aFaire.length ? 'Rien à changer sur ces paires' : undefined} onClick={() => setEtape('envoi')}>Continuer ({aFaire.length})</Bouton>
           </>}
           {etape === 'envoi' && mode === 'idle' && <>
-            <button type="button" onClick={() => setEtape(action === 'enLigne' ? 'choix' : 'modif')} style={btn(false)}>Retour</button>
-            <button type="button" data-republier-lancer disabled={!ok || !aFaire.length} onClick={() => setMode('run')} style={{ ...btn(true, ok && !!aFaire.length), marginLeft: 'auto' }}>{A.lancer} ({aFaire.length})</button>
+            <Bouton variante="discret" onClick={() => setEtape(action === 'enLigne' ? 'choix' : 'modif')}>Retour</Bouton>
+            <Bouton variante="primaire" data-republier-lancer disabled={!ok || !aFaire.length} title={!aFaire.length ? 'Aucune paire à envoyer' : !ok ? 'Coche « Je confirme » d’abord' : undefined} onClick={() => setMode('run')}>{A.lancer} ({aFaire.length})</Bouton>
           </>}
-          {mode === 'run' && <button type="button" data-republier-pause onClick={() => setMode('pause')} style={{ ...btn(false), marginLeft: 'auto' }}>Pause</button>}
+          {mode === 'run' && <>
+            <span style={{ flex: 1, minWidth: 0, fontSize: 12.5, color: C.muted }}>Garde cette fenêtre ouverte.</span>
+            <Bouton data-republier-pause onClick={() => setMode('pause')} style={{ flex: '0 0 auto' }}>Pause</Bouton>
+          </>}
           {mode === 'pause' && <>
-            <button type="button" onClick={() => setMode('fini')} style={btn(false)}>Arrêter</button>
-            <button type="button" onClick={() => setMode('run')} style={{ ...btn(true), marginLeft: 'auto' }}>Reprendre</button>
+            <Bouton onClick={() => setMode('fini')}>Arrêter</Bouton>
+            <Bouton variante="primaire" onClick={() => setMode('run')}>Reprendre</Bouton>
           </>}
-          {mode === 'fini' && <button type="button" data-republier-fermer onClick={onClose} style={{ ...btn(true), marginLeft: 'auto' }}>Terminé</button>}
+          {mode === 'fini' && <Bouton variante="primaire" data-republier-fermer onClick={onClose}>Terminé</Bouton>}
         </div>
       </div>
     </div>
