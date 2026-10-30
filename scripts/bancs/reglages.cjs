@@ -154,6 +154,8 @@ const MENSONGES = [
       if (!(await o.count())) continue;
       try {
         await o.first().click({ timeout: 2500 }); await pg.waitForTimeout(700);
+        // (29 oct.) L'espace emails range les adresses sous « Comptes et transfert » (réception affichée d'abord).
+        if (id === 'adresses') { const r = pg.locator('[aria-label="Comptes et transfert"]'); if (await r.count()) { await r.first().click({ timeout: 2500 }).catch(() => {}); await pg.waitForTimeout(600); } }
         const ch = await pg.evaluate(() => Array.from(document.querySelectorAll('input,textarea,select')).filter((e) => e.offsetParent).map((e) => String(e.value == null ? '' : e.value)).filter(Boolean));
         sousTxt += '\n' + (await pg.evaluate(() => document.body.innerText || '')) + '\n' + ch.join('\n');
         await pg.locator('[data-sous-retour]').first().click({ timeout: 2500 }); await pg.waitForTimeout(400);

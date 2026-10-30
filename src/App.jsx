@@ -9201,8 +9201,15 @@ function VisionneusePdf() {
   const cadre = React.useRef(null);
   React.useEffect(() => {
     if (!v) return;
-    const k = (e) => { if (e.key === 'Escape') _poserVisionneuse(null); };
-    document.addEventListener('keydown', k); return () => document.removeEventListener('keydown', k);
+    // La visionneuse est la couche du DESSUS (elle s'ouvre par-dessus la feuille
+    // du reçu d'achat) : Échap la ferme ELLE, et elle seule — écoutée en capture
+    // sur la fenêtre, avant l'écoute de la feuille posée sur le document.
+    const k = (e) => { if (e.key === 'Escape') { e.preventDefault(); e.stopImmediatePropagation(); _poserVisionneuse(null); } };
+    window.addEventListener('keydown', k, true);
+    // Le focus sur « Fermer » : sans lui il reste dans la feuille d'en dessous
+    // (ou part dans le PDF), et le clavier n'atteint plus la visionneuse.
+    const t = setTimeout(() => { try { const f = document.querySelector('[data-visionneuse-fermer]'); if (f) f.focus({ preventScroll: true }); } catch (_) {} }, 0);
+    return () => { clearTimeout(t); window.removeEventListener('keydown', k, true); };
   }, [v]);
   if (!v || typeof document === 'undefined') return null;
   const fermer = () => _poserVisionneuse(null);

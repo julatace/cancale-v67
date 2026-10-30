@@ -134,7 +134,7 @@ srv.listen(PORT);
 
 let ko = 0, ok = 0;
 const dit = (c, m, d) => { if (c) ok++; else ko++; console.log((c ? '  ✅ ' : '  ❌ ') + m + (d ? ' — ' + d : '')); };
-const essaie = async (nom, f) => { try { await f(); } catch (e) { dit(false, nom + ' — le contrôle a pu s’exécuter', String(e && e.message).split('\n')[0].slice(0, 180)); } };
+const essaie = async (nom, f) => { try { await f(); } catch (e) { dit(false, nom + ' — le contrôle a pu s’exécuter', String(e && e.message).split('\n').filter((l) => /intercepts|Timeout|not visible|outside/.test(l)).slice(-2).join(' ⏎ ').slice(0, 400)); } };
 
 async function preparer(b, V) {
   const mobile = V.vp.width < 600;
@@ -324,7 +324,10 @@ const chip = (pg, tx) => pg.evaluate((tx) => {
         } else {
           const v = await pg.evaluate(() => { const d = document.querySelector('[data-visionneuse-pdf]'); return d ? { etat: d.getAttribute('data-visionneuse-pdf'), titre: d.getAttribute('aria-label') } : null; });
           dit(v && v.etat === 'pret' && v.titre === "Reçu d'achat", 'F. sur ordinateur, le PDF s’ouvre dans la visionneuse de VRM, titrée du même nom (« Reçu d’achat »)', JSON.stringify(v));
-          await pg.keyboard.press('Escape'); await pg.waitForTimeout(300);
+          // Le lecteur PDF de Chrome prend le focus dans son cadre : Échap n'atteint plus la page.
+          // On ferme comme lui, par « Fermer » (la visionneuse est au-dessus de la feuille du reçu).
+          await pg.locator('[data-visionneuse-fermer]').click(); await pg.waitForTimeout(300);
+          dit(await pg.locator('[data-visionneuse-pdf]').count() === 0, 'F. « Fermer » referme la visionneuse');
         }
         if (await pg.locator(DIALOG).count()) { await pg.keyboard.press('Escape'); await pg.waitForTimeout(400); }
       });
