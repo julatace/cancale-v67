@@ -101,7 +101,7 @@ const ecouter = () => new Promise((res, rej) => {
 
 async function rendre(nav, { largeur, pdfs, pdfjs, panne = false, vide = false, sansLecteur = false, nom }) {
   const doigt = largeur < 600;
-  const ctx = await nav.newContext({ viewport: { width: largeur, height: doigt ? 844 : 1100 }, isMobile: doigt, hasTouch: doigt, deviceScaleFactor: 1 });
+  const ctx = await nav.newContext({ viewport: { width: largeur, height: doigt ? 844 : 1100 }, isMobile: doigt, hasTouch: doigt, deviceScaleFactor: 1, serviceWorkers: 'block' });
   await cspBanc(ctx, `http://localhost:${PORT}`, 'imprimante ' + nom);
   const pg = await ctx.newPage();
   await pg.addInitScript((s) => {
@@ -133,6 +133,8 @@ async function rendre(nav, { largeur, pdfs, pdfjs, panne = false, vide = false, 
     return json([]);
   });
   await pg.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{}' }));
+  // (29 oct.) pdf.js est servi par VRM (`/pdfjs-<v>/`) et plus par jsDelivr : « lecteur injoignable » coupe les deux.
+  await pg.route(/\/pdfjs-[0-9.]+\//, (r) => (sansLecteur ? r.abort() : r.continue()));
   await pg.route('**://cdn.jsdelivr.net/npm/pdfjs-dist@*/**', (r) => {
     if (sansLecteur) return r.abort();
     const f = path.join(pdfjs, path.basename(new URL(r.request().url()).pathname));
@@ -224,7 +226,9 @@ async function rendre(nav, { largeur, pdfs, pdfjs, panne = false, vide = false, 
     dit(v.etat === 'vide' && /prochaine vente/.test(v.texte), 'aucun PDF ⇒ la phrase du vide', v.etat);
     const s = await rendre(nav, { largeur: 1512, pdfs, pdfjs, sansLecteur: true, nom: 'sanslecteur' });
     const tous = (s.types || []).flatMap((t) => t.apercus);
-    dit(s.etat === 'lu' && tous.length > 0 && tous.every((a) => a.etat === 'ko') && /Ouvrir le PDF/.test(s.texte), 'lecteur PDF injoignable ⇒ « Ouvrir le PDF », pas un cadre vide', `${tous.filter((a) => a.etat === 'ko').length}/${tous.length}`);
+    // (28 oct., décision de Julien) Le numéro ne se pose que dans un espace blanc VÉRIFIÉ par pdf.js :
+    // sans lecteur, l'aperçu n'est pas fabriqué du tout et l'écran DIT pourquoi — jamais un cadre vide.
+    dit(s.etat === 'lu' && tous.every((a) => a.etat === 'ko') && (tous.length ? /Ouvrir le PDF/.test(s.texte) : /non vérifié/.test(s.texte)), 'lecteur PDF injoignable ⇒ aucun cadre vide, la raison est dite', `${tous.filter((a) => a.etat === 'ko').length}/${tous.length} · ${/non vérifié/.test(s.texte) ? 'raison dite' : 'raison absente'}`);
   } finally { await nav.close(); srv.close(); }
   console.log(`\n${ko ? `${ko} contrôle(s) au rouge.` : 'Le réglage d’imprimante dit et montre ce qui sortira.'}`);
   ko += bilanCsp();
