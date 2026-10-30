@@ -54,6 +54,10 @@ jobs:
         run: node scripts/tests/favoris-automatisation-interface.cjs
       - name: Vérifier l’inscription
         run: node scripts/bancs/inscription-fiable.cjs
+      - name: Vérifier la connexion
+        run: |
+          node --test scripts/tests/connexion-session.test.mjs
+          node scripts/bancs/connexion-claire.cjs
       - name: Vérifier les captures de messagerie
         run: VRM_MESSAGES_LIVE_ONLY=1 node scripts/bancs/messagerie.cjs
       - name: Vérifier la recherche des messages
