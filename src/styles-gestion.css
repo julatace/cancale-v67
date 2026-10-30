@@ -456,3 +456,8 @@
 @keyframes vrm-pulse-vendu{0%,100%{box-shadow:0 0 0 1px var(--halo,#3D7BFF);}50%{box-shadow:0 0 0 5px var(--halo,#3D7BFF);}}
 .vrm-stock-vendu{animation:vrm-pulse-vendu 1.5s ease-in-out infinite;}
 @media(prefers-reduced-motion:reduce){.vrm-stock-vendu{animation:none;box-shadow:0 0 0 3px var(--halo,#3D7BFF);}}
+
+/* (30 oct.) Statistiques garde son échelle 28 / 20 / 15 / 13 / 11 (banc stats-premium) :
+   le ⓘ et le petit bouton s'y alignent sur 13 px. */
+.vrm-statistiques-premium .vrm-pourquoi > summary { font-size: 13px; }
+.vrm-app-shell .vrm-main .vrm-statistiques-premium .vrm-b.vrm-b-petit, .vrm-statistiques-premium .vrm-b.vrm-b-petit { font-size: 13px; }
