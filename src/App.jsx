@@ -1455,13 +1455,31 @@ const cleanAuthUrl = () => {
     window.history.replaceState({},'',window.location.pathname+(reste?'?'+reste:''));
   }catch(_){}
 };
+// Un compte que Supabase vient de créer par Discord ou Google, sans email ni mot
+// de passe : rend le fournisseur, sinon ''. « Pas su » (date illisible) ⇒ ''.
+const compteOAuthNeuf=(u)=>{
+  try{
+    const ids=Array.isArray(u?.identities)?u.identities.map(i=>i?.provider).filter(Boolean):[];
+    if(!ids.length||ids.includes('email'))return'';
+    const fourn=ids.find(p=>p==='discord'||p==='google');if(!fourn)return'';
+    const cree=Date.parse(u?.created_at||'');if(!Number.isFinite(cree))return'';
+    return Date.now()-cree<10*60*1000?fourn:'';
+  }catch(_){return'';}
+};
+// Les refus de Supabase au retour, en français, avec le geste.
+const erreurRetourOAuth=(err,provider)=>{
+  const t=String(err||'');const nom=provider==='google'?'Google':'Discord';
+  if(/already.*link|identity.*(exists|already)|identity_already_exists/i.test(t))return `Ce compte ${nom} a déjà son propre compte VRM, il ne peut pas être relié à celui-ci. Connecte-toi avec ${nom}, choisis « J'ai déjà un compte VRM » pour supprimer ce compte vide, puis reviens ici le relier.`;
+  if(/manual.*link.*disabled|manual_linking/i.test(t))return `La liaison de comptes n'est pas encore activée sur le serveur de VRM. Ton compte reste inchangé.`;
+  return t;
+};
 const consumeAuthRedirect = async () => {
   if (!MULTI_USER) return null;
   const q = new URLSearchParams(window.location.search);
   const hash = new URLSearchParams((window.location.hash || '').replace(/^#/, ''));
 
   const err = q.get('error_description') || q.get('error') || hash.get('error_description') || hash.get('error');
-  if (err) { lireLiaisonOAuth(sessionStorage,localStorage); cleanAuthUrl(); return { error: String(err) }; }
+  if (err) { const li=lireLiaisonOAuth(sessionStorage,localStorage); cleanAuthUrl(); return { error: erreurRetourOAuth(err, li?.provider) }; }
 
   const code = q.get('code');
   if (code) {
@@ -1482,7 +1500,12 @@ const consumeAuthRedirect = async () => {
     const recovery=q.get('type')==='recovery';
     if(recovery)RECOVERY_PENDING=true;
     writeSession(sessionFrom(r.json));
-    return { ok: true, liaison:liaison?.provider, recovery };
+    // (30 oct.) « Se connecter avec Discord » sur un compte Discord qui n'est
+    // relié à AUCUN compte VRM : Supabase en CRÉE un, sans rien dire. On le
+    // repère (créé il y a moins de 10 min, aucune identité email) pour le dire
+    // AVANT d'ouvrir l'app — sinon il croit être sur sa boutique, vide.
+    const nouveauOAuth=!liaison&&!recovery?compteOAuthNeuf(r.json.user):'';
+    return { ok: true, liaison:liaison?.provider, recovery, nouveauOAuth };
   }
 
   const at = hash.get('access_token');
@@ -14560,6 +14583,69 @@ function LiensLegaux() {
 // (rangée avant cette fonction, ou arrivée par un lien email) — on demande à
 // GoTrue. 'code' : on demande le code. Dans les deux cas, « pas su » (GoTrue
 // injoignable) se DIT, avec « Réessayer » ; on ne déconnecte jamais tout seul.
+// ── Compte créé par Discord/Google sans le savoir (30 octobre) ──────────────
+// Julien avait relié Discord à son compte (pseudo seulement), puis « Se
+// connecter avec Discord » a créé un SECOND compte VRM, vide. On le dit avant
+// d'ouvrir l'app, et on propose de supprimer ce compte vide (la route « Fermer
+// mon compte », confirmée ici) pour pouvoir relier Discord au vrai compte.
+function PorteNouveauOAuth({ fournisseur, email, onContinuer }) {
+  const nom = fournisseur === 'google' ? 'Google' : 'Discord';
+  const [etape, setEtape] = React.useState('choix');
+  const [busy, setBusy] = React.useState(false);
+  const [err, setErr] = React.useState('');
+  // Ce Discord est-il celui déjà affiché (vérifié) sur un AUTRE compte VRM ?
+  // { email, pseudo } si oui · null sinon ou « pas su » (rien n'est dit).
+  const [deja, setDeja] = React.useState(null);
+  React.useEffect(() => {
+    if (fournisseur !== 'discord') return;
+    let fini = false;
+    fetch('/api/compte?mode=discord-deja', { headers: { ...enTeteSession() } })
+      .then(r => r.ok ? r.json() : null)
+      .then(j => { if (!fini && j && j.trouve === true && j.email) setDeja({ email: String(j.email), pseudo: String(j.pseudo || '') }); })
+      .catch(() => {});
+    return () => { fini = true; };
+  }, [fournisseur]);
+  const supprimer = async () => {
+    setBusy(true); setErr('');
+    try {
+      const r = await fetch('/api/compte?mode=fermer', { method: 'POST', headers: { 'Content-Type': 'application/json', ...enTeteSession() }, body: JSON.stringify({ confirmation: email }) });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) { setErr(j?.message || 'Le compte n’a pas pu être supprimé. Réessaie.'); setBusy(false); return; }
+      setEtape('fait');
+      setTimeout(() => { authSignOut(); }, 6000);
+    } catch (_) { setErr('Le serveur ne répond pas. Rien n’a été supprimé, réessaie.'); setBusy(false); }
+  };
+  const boite = { maxWidth: 460, margin: '10vh auto 0', padding: 24, borderRadius: 16, background: C.card, color: C.text, border: `1px solid ${C.border}` };
+  return <div data-porte-nouveau-oauth={etape} style={{ minHeight: '100vh', background: C.bg, padding: 16, boxSizing: 'border-box' }}>
+    <div style={boite} role="dialog" aria-modal="true" aria-labelledby="vrm-nouveau-oauth-titre">
+      {etape === 'choix' && <>
+        <h1 id="vrm-nouveau-oauth-titre" style={{ fontSize: 20, margin: '0 0 10px' }}>{deja ? 'Ce Discord est déjà sur ton compte VRM' : 'Nouveau compte VRM ?'}</h1>
+        {deja
+          ? <p data-nouveau-oauth-deja={deja.email} style={{ fontSize: 14, lineHeight: 1.5, margin: '0 0 18px', color: C.muted }}>{deja.pseudo ? `« ${deja.pseudo} »` : 'Ce compte Discord'} est affiché sur ton compte VRM <strong style={{ color: C.text }}>{deja.email}</strong>, mais seulement comme pseudo pour la carte — pas pour te connecter. VRM vient donc de créer un second compte, vide.</p>
+          : <p style={{ fontSize: 14, lineHeight: 1.5, margin: '0 0 18px', color: C.muted }}>Ce compte {nom} n’était relié à aucun compte VRM : VRM vient d’en créer un nouveau, vide.</p>}
+        <div style={{ display: 'grid', gap: 10 }}>
+          {deja && <button type="button" className="vrm-b vrm-b-primaire vrm-b-plein" data-nouveau-oauth="existant" onClick={() => setEtape('confirmer')}>Supprimer ce compte vide et revenir au mien</button>}
+          <button type="button" className={`vrm-b ${deja ? 'vrm-b-discret' : 'vrm-b-primaire'} vrm-b-plein`} data-nouveau-oauth="continuer" onClick={onContinuer}>Oui, c’est un nouveau compte</button>
+          {!deja && <button type="button" className="vrm-b vrm-b-secondaire vrm-b-plein" data-nouveau-oauth="existant" onClick={() => setEtape('confirmer')}>J’ai déjà un compte VRM</button>}
+        </div>
+      </>}
+      {etape === 'confirmer' && <>
+        <h1 id="vrm-nouveau-oauth-titre" style={{ fontSize: 20, margin: '0 0 10px' }}>Supprimer ce compte vide ?</h1>
+        <p style={{ fontSize: 14, lineHeight: 1.5, margin: '0 0 18px', color: C.muted }}>Ton vrai compte n’est pas touché. Ensuite : connecte-toi {deja ? <>avec <strong>{deja.email}</strong></> : 'avec ton email'}, puis Réglages → Mon compte → Comptes associés → « Connecter {nom} ». La prochaine fois, « Se connecter avec {nom} » ouvrira ton vrai compte.</p>
+        {err && <p role="alert" style={{ fontSize: 13, color: C.warn || C.text, margin: '0 0 12px' }}>{err}</p>}
+        <div style={{ display: 'grid', gap: 10 }}>
+          <button type="button" className="vrm-b vrm-b-primaire vrm-b-plein" data-nouveau-oauth="supprimer" disabled={busy || !email} onClick={supprimer}>{busy ? 'Suppression…' : 'Supprimer ce compte vide'}</button>
+          <button type="button" className="vrm-b vrm-b-discret vrm-b-plein" onClick={() => setEtape('choix')} disabled={busy}>Annuler</button>
+        </div>
+      </>}
+      {etape === 'fait' && <>
+        <h1 id="vrm-nouveau-oauth-titre" style={{ fontSize: 20, margin: '0 0 10px' }}>C’est fait</h1>
+        <p style={{ fontSize: 14, lineHeight: 1.5, margin: '0 0 18px', color: C.muted }}>Le compte vide est supprimé. Connecte-toi avec ton email, puis Réglages → Mon compte → Comptes associés → « Connecter {nom} ».</p>
+        <button type="button" className="vrm-b vrm-b-primaire vrm-b-plein" onClick={() => authSignOut()}>Aller à la connexion</button>
+      </>}
+    </div>
+  </div>;
+}
 function PorteMfa({ session }) {
   const etat = etatMfa(session);
   const [passu, setPassu] = React.useState(false);
@@ -54556,7 +54642,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
     // Discord relié au COMPTE (20 oct.), sans être sur la carte de la communauté.
 
     AUTH.user && {id:'connexions-rapides',titre:'Comptes associés',items:[
-      {id:'google',type:'el',el:<ConnexionsCompte theme={C} providers={OAUTH_PROVIDERS.filter(p=>p.id==='google')} enabled={providerEnabled} relier={oauthRelier} lire={lireConnexionsOAuth} retour={AUTH_REDIRECT?.error||(AUTH_REDIRECT?.liaison==='google'?'Ton compte Google est associé à VRM.':'')} icone={id=><BrandMark id={id}/>}/>},
+      {id:'google',type:'el',el:<ConnexionsCompte theme={C} providers={OAUTH_PROVIDERS} enabled={providerEnabled} relier={oauthRelier} lire={lireConnexionsOAuth} retour={AUTH_REDIRECT?.error||(AUTH_REDIRECT?.liaison==='google'?'Ton compte Google est associé à VRM.':AUTH_REDIRECT?.liaison==='discord'?'Ton compte Discord est associé à VRM : « Se connecter avec Discord » ouvrira désormais ce compte-ci.':'')} icone={id=><BrandMark id={id}/>}/>},
       {id:'discord',type:'el',el:<DiscordCompte key="discord"/>},
     ]},
     // (29 oct., revue) PAS de carte Photoroom ici : le 17 oct. Julien a dit du
@@ -57698,6 +57784,7 @@ export default function App() {
   // code AVANT que le cœur ne monte — aucune donnée n'est lue d'ici là.
   if (MULTI_USER && authState.session && etatMfa(authState.session) !== 'ok') return <PorteMfa session={authState.session}/>;
   if(MULTI_USER&&!authState.user?.id)return <AuthScreen/>;
+  if(MULTI_USER&&AUTH_REDIRECT?.nouveauOAuth)return <PorteNouveauOAuth fournisseur={AUTH_REDIRECT.nouveauOAuth} email={authState.user?.email||''} onContinuer={()=>{AUTH_REDIRECT={...AUTH_REDIRECT,nouveauOAuth:''};setAuthState({...AUTH});}}/>;
   const coeur = <AppCoeur key={(authState.user && authState.user.id) || 'local'}/>;
   // L'équipe AVANT l'abonnement : un aide ne paie pas (c'est l'abonnement du
   // vendeur que la base vérifie). Sans invitation acceptée, rien ne change.

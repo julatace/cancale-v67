@@ -30,12 +30,40 @@ export const DEMO_BIENVENUE = [
 ];
 
 const voixDisponible = () => { try { return typeof window !== 'undefined' && 'speechSynthesis' in window && typeof window.SpeechSynthesisUtterance === 'function'; } catch (_) { return false; } };
-const voixFr = () => { try { return (window.speechSynthesis.getVoices() || []).find((v) => /^fr(-|_|$)/i.test(v.lang)) || null; } catch (_) { return null; } };
+// (30 oct., « la voix est horrible ») : le PREMIÈRE voix française venue est
+// souvent la voix « compacte » du système, robotique. On classe : voix
+// naturelles / neuronales (Edge, Google), puis « améliorée » / « premium »
+// (Apple, à télécharger), puis les voix connues correctes. Aucune voix de
+// cette qualité ⇒ AUCUN bouton : mieux vaut pas de voix qu'une mauvaise.
+const noteVoix = (v) => {
+  const n = `${v.name || ''} ${v.voiceURI || ''}`;
+  if (/natural|neural|online/i.test(n)) return 4;
+  if (/premium|enhanced|am[ée]lior/i.test(n)) return 3;
+  if (/google/i.test(n)) return 2;
+  return 0;
+};
+const voixFr = () => {
+  try {
+    const fr = (window.speechSynthesis.getVoices() || []).filter((v) => /^fr(-|_|$)/i.test(v.lang));
+    let best = null, nb = 0;
+    for (const v of fr) { const k = noteVoix(v) + (/fr-FR/i.test(v.lang) ? 0.5 : 0); if (noteVoix(v) > 0 && k > nb) { best = v; nb = k; } }
+    return best;
+  } catch (_) { return null; }
+};
 
 export default function Bienvenue({ prenom = '', dark = false, onTheme, onTerminer }) {
   const [etape, setEtape] = useState(0); // 0 univers · 1..5 démonstration · 6 première étape
   const [voix, setVoix] = useState(false);
-  const peutParler = useMemo(voixDisponible, []);
+  // Les voix arrivent après le chargement (Chrome) : on attend `voiceschanged`.
+  const [bonneVoix, setBonneVoix] = useState(() => (voixDisponible() ? voixFr() : null));
+  useEffect(() => {
+    if (!voixDisponible()) return undefined;
+    const maj = () => setBonneVoix(voixFr());
+    try { window.speechSynthesis.addEventListener('voiceschanged', maj); } catch (_) {}
+    maj();
+    return () => { try { window.speechSynthesis.removeEventListener('voiceschanged', maj); } catch (_) {} };
+  }, []);
+  const peutParler = !!bonneVoix;
   const dialogue = useRef(null);
   const n = DEMO_BIENVENUE.length;
   const slide = etape >= 1 && etape <= n ? DEMO_BIENVENUE[etape - 1] : null;
@@ -51,8 +79,7 @@ export default function Bienvenue({ prenom = '', dark = false, onTheme, onTermin
     try {
       taire();
       const u = new window.SpeechSynthesisUtterance(texte);
-      u.lang = 'fr-FR'; u.rate = 1.03;
-      const v = voixFr(); if (v) u.voice = v;
+      u.voice = bonneVoix; u.lang = bonneVoix.lang || 'fr-FR'; u.rate = 1; u.pitch = 1;
       u.onend = () => { if (!fini && slide) setEtape((e) => Math.min(e + 1, n + 1)); };
       window.speechSynthesis.speak(u);
     } catch (_) { setVoix(false); }
