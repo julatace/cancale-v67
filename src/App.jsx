@@ -9044,7 +9044,7 @@ const placementThermique = (r, sens, avecNum) => {
 const poserEtiquettesThermiques = async (PL, out, page, z, numero, bold) => {
   const n = numero != null ? String(numero).trim() : '';
   const rects = z.etiquettes && z.etiquettes.length ? z.etiquettes : [z];
-  let k = 0;
+  let k = 0, sansNumero = 0;
   for (const r of rects) {
     const temp=await PL.PDFDocument.create();
     const emb = await temp.embedPage(page, { left:r.x,bottom:r.y,right:r.x+r.w,top:r.y+r.h });
@@ -9052,12 +9052,19 @@ const poserEtiquettesThermiques = async (PL, out, page, z, numero, bold) => {
     const p=temp.addPage([ETIQ_TH.w,ETIQ_TH.h]);
     p.drawPage(emb,{x:pl.x,y:pl.y,xScale:pl.s,yScale:pl.s,rotate:PL.degrees(pl.angle)});
     if(n) {
-      const position=await espaceBlancBordereau(temp);
-      drawBordereauStamp(temp,PL.rgb,await temp.embedFont(PL.StandardFonts.HelveticaBold),await temp.embedFont(PL.StandardFonts.Helvetica),n,'',position);
+      // (30 oct.) Une étiquette qui remplit tout le 10×15 n'a pas d'espace blanc :
+      // elle part SANS numéro (jamais posé sur un code-barres) et c'est dit —
+      // avant, l'étiquette entière n'était pas imprimée. Un lecteur PDF absent,
+      // lui, bloque toujours (rien ne peut être vérifié).
+      let position=null;
+      try { position=await espaceBlancBordereau(temp); }
+      catch(e) { if(!/aucun espace blanc suffisant/.test(String(e&&e.message))) throw e; sansNumero++; }
+      if(position) drawBordereauStamp(temp,PL.rgb,await temp.embedFont(PL.StandardFonts.HelveticaBold),await temp.embedFont(PL.StandardFonts.Helvetica),n,'',position);
     }
     (await out.copyPages(temp,[0])).forEach(p=>out.addPage(p));
     k++;
   }
+  if (sansNumero) toast(`N°${n} : l'étiquette n'a aucun espace blanc — imprimée sans le numéro, écris-le au feutre sur le colis.`);
   return k;
 };
 // LE réglage d'imprimante, lu au moment d'imprimer (§11 : un seul réglage
