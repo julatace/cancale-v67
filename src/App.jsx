@@ -12031,10 +12031,10 @@ function useBrouillonsARefaire(actif, presentes) {
 }
 // Ce que dit chaque ligne, et ce que fait le bouton (une phrase par état).
 const TEXTE_REFAIRE = {
-  'a-refaire': (b) => `Le brouillon n'a pas pu être créé.${b.supprime ? ' L’annonce est retirée de la vente.' : ''}${b.peutExister ? ' Vinted n’a pas répondu clairement : regarde d’abord tes brouillons Vinted, il y est peut-être déjà.' : ''}`,
-  'a-publier': () => 'Le brouillon est rangé sur Vinted, mais sa mise en ligne n’est pas passée.',
-  'a-verifier': () => 'La mise en ligne est partie sans réponse claire : l’annonce est peut-être en ligne. Regarde ton dressing ; si elle n’y est pas, « Voir mes brouillons » la remet en ligne.',
-  interrompu: (b) => `Le passage s’est interrompu en route (Chrome fermé ou extension arrêtée).${b.supprime ? ' L’annonce est retirée de la vente.' : ' Regarde si l’annonce est encore en ligne sur Vinted.'}`,
+  'a-refaire': (b) => `Brouillon pas créé.${b.supprime ? ' L’annonce est retirée de la vente.' : ''}${b.peutExister ? ' Regarde d’abord tes brouillons Vinted : il y est peut-être déjà.' : ''}`,
+  'a-publier': () => 'Brouillon rangé sur Vinted, mise en ligne pas passée.',
+  'a-verifier': () => 'Peut-être déjà en ligne : regarde ton dressing, sinon « Voir mes brouillons ».',
+  interrompu: (b) => `Interrompu en route (Chrome fermé ou extension arrêtée).${b.supprime ? ' L’annonce est retirée de la vente.' : ' Regarde si elle est encore en ligne.'}`,
 };
 const BOUTON_REFAIRE = { 'a-refaire': 'Refaire le brouillon', 'a-publier': 'Mettre le brouillon en ligne', interrompu: 'Refaire le brouillon' };
 function BrouillonsARefaire({ br, refaire, onClose, onVoirBrouillons, peutAgir, raisonAgir }) {
@@ -12056,16 +12056,16 @@ function BrouillonsARefaire({ br, refaire, onClose, onVoirBrouillons, peutAgir, 
     <SheetShell onClose={onClose} maxWidth={520}>
       <div data-refaire-liste={Array.isArray(liste) ? liste.length : liste === null ? 'passu' : 'lecture'} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: C.text, flex: 1 }}>Brouillons à refaire</h2>
+          <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: C.text, flex: 1 }}>Brouillons à refaire <Pourquoi label="C'est quoi ?">Les republications par brouillon qui ne sont pas allées au bout. Chaque geste demande ta confirmation ; rien ne part tout seul.</Pourquoi></h2>
           <button type="button" onClick={onClose} aria-label="Fermer" style={{ border: 'none', background: 'transparent', color: C.muted, fontSize: 22, minWidth: 44, minHeight: 44, cursor: 'pointer' }}>✕</button>
         </div>
         {liste === undefined && <div style={{ fontSize: 13, color: C.muted }}>Lecture…</div>}
         {liste === null && <div data-refaire-passu style={{ fontSize: 13, color: C.muted }}>VRM n'a pas pu lire ce qui reste à refaire — rien n'est perdu, réessaie dans un moment.</div>}
-        {Array.isArray(liste) && !liste.length && <div style={{ fontSize: 13, color: C.muted }}>{regles.length ? 'Rien d’autre à refaire.' : 'Rien à refaire : chaque passage par brouillon est allé au bout.'}</div>}
-        {Array.isArray(liste) && Array.isArray(liste.enLigne) && liste.enLigne.length > 0 && <div data-refaire-en-ligne={liste.enLigne.length} style={{ fontSize: 13, color: C.muted }}>{liste.enLigne.length === 1 ? `« ${liste.enLigne[0].titre || 'Une annonce'} » est déjà en ligne sur Vinted (mise en ligne à la main ou par un autre brouillon) : plus rien à refaire.` : `${liste.enLigne.length} annonces sont déjà en ligne sur Vinted (mises en ligne à la main ou par un autre brouillon) : plus rien à refaire.`}</div>}
+        {Array.isArray(liste) && !liste.length && <div style={{ fontSize: 13, color: C.muted }}>{regles.length ? 'Rien d’autre à refaire.' : 'Rien à refaire : tout est allé au bout.'}</div>}
+        {Array.isArray(liste) && Array.isArray(liste.enLigne) && liste.enLigne.length > 0 && <div data-refaire-en-ligne={liste.enLigne.length} style={{ fontSize: 13, color: C.muted }}>{liste.enLigne.length === 1 ? `« ${liste.enLigne[0].titre || 'Une annonce'} » est déjà en ligne sur Vinted : plus rien à refaire.` : `${liste.enLigne.length} annonces sont déjà en ligne sur Vinted : plus rien à refaire.`}</div>}
         {regles.length > 0 && <div data-refaire-regles={regles.length} style={{ fontSize: 13, color: C.muted, display: 'flex', flexDirection: 'column', gap: 6 }}>
-          <div>{regles.length === 1 ? 'Tu as marqué un passage « C’est réglé » :' : `Tu as marqué ${regles.length} passages « C’est réglé » :`}</div>
-          {regles.map((b) => <button key={b.cle} type="button" data-refaire-revoir={b.id} onClick={() => revoir && revoir(b.cle)} style={{ textAlign: 'left', border: `1px solid ${C.border}`, borderRadius: 8, padding: '8px 12px', minHeight: 44, fontSize: 13, fontWeight: 600, background: 'transparent', color: C.text, cursor: 'pointer', fontFamily: 'inherit' }}>Le remettre dans la liste : {b.titre}</button>)}
+          <div>{regles.length === 1 ? 'Marqué « C’est réglé » :' : `${regles.length} marqués « C’est réglé » :`}</div>
+          {regles.map((b) => <div key={b.cle} style={{ display: 'flex', alignItems: 'center', gap: 8 }}><span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: C.text }}>{b.titre}</span><Bouton variante="discret" data-refaire-revoir={b.id} onClick={() => revoir && revoir(b.cle)}>Remettre dans la liste</Bouton></div>)}
         </div>}
         {Array.isArray(liste) && liste.length > 0 && !peutAgir && <div data-refaire-bloque style={{ fontSize: 12.5, color: C.muted }}>{raisonAgir || "L'extension VRM à jour est nécessaire dans ce navigateur."}</div>}
         {Array.isArray(liste) && liste.map((b) => { const s = etat[b.cle] || {}; const fini = s.etape === 'fait'; const geste = BOUTON_REFAIRE[b.quoi]; return (
@@ -12075,10 +12075,10 @@ function BrouillonsARefaire({ br, refaire, onClose, onVoirBrouillons, peutAgir, 
               <div style={{ fontSize: 14, fontWeight: 600, color: C.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{b.titre}{b.prix ? ` · ${prixCourt(b.prix)}` : ''}</div>
               <div style={{ fontSize: 12.5, color: C.muted, lineHeight: 1.45 }}>{fini ? (s.raison || 'Fait.') : s.etape && s.etape !== 'envoi' ? s.raison : TEXTE_REFAIRE[b.quoi](b)}</div>
               {s.etape === 'envoi' && <SuiviGeste ids={[b.id, b.draftId]} liste={b.quoi === 'a-publier' ? ETAPES_REPUB.publier : ETAPES_REPUB.refaire} label={b.titre} />}
-              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                {geste && !fini && s.etape !== 'incertain' && <button type="button" data-refaire-bouton={b.id} disabled={!peutAgir || s.etape === 'envoi'} onClick={() => lancer(b)} style={{ border: 'none', borderRadius: 8, padding: '8px 12px', minHeight: 44, fontSize: 13, fontWeight: 700, background: peutAgir ? C.accent : C.border, color: peutAgir ? '#fff' : C.muted, cursor: peutAgir ? 'pointer' : 'default', fontFamily: 'inherit' }}>{s.etape === 'envoi' ? 'En cours…' : s.etape && s.etape !== 'fait' ? 'Réessayer' : geste}</button>}
-                {b.quoi === 'a-verifier' && <button type="button" onClick={onVoirBrouillons} style={{ border: `1px solid ${C.border}`, borderRadius: 8, padding: '8px 12px', minHeight: 44, fontSize: 13, fontWeight: 600, background: 'transparent', color: C.text, cursor: 'pointer', fontFamily: 'inherit' }}>Voir mes brouillons</button>}
-                {!fini && <button type="button" data-refaire-regle={b.id} onClick={() => ecarter(b.cle)} style={{ border: `1px solid ${C.border}`, borderRadius: 8, padding: '8px 12px', minHeight: 44, fontSize: 13, fontWeight: 600, background: 'transparent', color: C.text, cursor: 'pointer', fontFamily: 'inherit' }}>C'est réglé</button>}
+              <div className="vrm-b-rangee">
+                {!fini && <Bouton variante="discret" data-refaire-regle={b.id} onClick={() => ecarter(b.cle)} title="Le retirer de la liste (il reste joignable plus bas)">C'est réglé</Bouton>}
+                {b.quoi === 'a-verifier' && <Bouton onClick={onVoirBrouillons} style={{ minHeight: 44 }}>Voir mes brouillons</Bouton>}
+                {geste && !fini && s.etape !== 'incertain' && <Bouton data-refaire-bouton={b.id} disabled={!peutAgir || s.etape === 'envoi'} title={!peutAgir ? (raisonAgir || "L'extension VRM à jour est nécessaire dans ce navigateur.") : undefined} onClick={() => lancer(b)} style={{ minHeight: 44 }}>{s.etape === 'envoi' ? 'En cours…' : s.etape && s.etape !== 'fait' ? 'Réessayer' : geste}</Bouton>}
               </div>
             </div>
           </div>
@@ -12110,15 +12110,15 @@ function BrouillonsVinted({ br, publier, brouillonOk, onClose, onFile }) {
     <SheetShell onClose={onClose} maxWidth={560}>
       <div data-brouillons-vinted style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: C.text, flex: 1 }}>Tes brouillons Vinted</h2>
+          <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: C.text, flex: 1 }}>Tes brouillons Vinted <Pourquoi label="D'où vient cette liste ?">Ceux que ton dressing Vinted montre à sa dernière lecture, et ceux enregistrés depuis, vus par l'extension. Un brouillon supprimé sur Vinted disparaît à la prochaine lecture de ce dressing.</Pourquoi></h2>
           <button type="button" onClick={onClose} aria-label="Fermer" style={{ ...lien, border: 'none' }}>✕</button>
         </div>
         {liste === null && <div style={{ fontSize: 13.5, color: C.muted }}>Lecture de tes annonces…</div>}
-        {liste && <div style={{ fontSize: 12.5, color: C.muted }}>Ceux que ton dressing Vinted montre à sa dernière lecture (et ceux enregistrés depuis, vus par l'extension). Un brouillon supprimé sur Vinted disparaît à la prochaine lecture de ce dressing.</div>}
+
         {liste && !liste.length && <div data-brouillons-vide style={{ fontSize: 13.5, color: C.muted }}>Aucun brouillon sur Vinted d'après tes dressings lus par VRM.</div>}
-        {infos === null && liste && liste.length > 0 && <div data-brouillons-passu style={{ fontSize: 12.5, color: C.muted }}>VRM n'a pas pu lire ce qu'il sait de tes brouillons — « Mettre en ligne » attend ; « Ouvrir sur Vinted » marche.</div>}
-        {!brouillonOk && liste && liste.length > 0 && <div data-brouillons-maj style={{ fontSize: 12.5, color: C.muted }}>Mettre un brouillon en ligne d'ici demande l'extension VRM {EXT_CAPACITES.brouillon} ou plus récente dans ce navigateur.</div>}
-        {brouillonOk && nPrets > 1 && onFile && <button type="button" data-brouillons-file onClick={onFile} style={{ ...lien, alignSelf: 'flex-start', border: 'none', background: C.accent, color: '#fff' }}>En mettre plusieurs en ligne, à la suite…</button>}
+        {infos === null && liste && liste.length > 0 && <div data-brouillons-passu style={{ fontSize: 12.5, color: C.muted }}>VRM n'a pas pu lire tes brouillons enregistrés : « Mettre en ligne » attend, « Ouvrir sur Vinted » marche.</div>}
+        {!brouillonOk && liste && liste.length > 0 && <div data-brouillons-maj style={{ fontSize: 12.5, color: C.muted }}>Mettre en ligne d'ici demande l'extension VRM {EXT_CAPACITES.brouillon} ou plus récente.</div>}
+        {brouillonOk && nPrets > 1 && onFile && <Bouton variante="primaire" data-brouillons-file onClick={onFile} style={{ alignSelf: 'flex-start', minHeight: 44 }}>En mettre plusieurs en ligne…</Bouton>}
         {liste && liste.map((it) => {
           const e = etat[it.id]; const i = it._info;
           const publie = it._etat === 'publie', complet = it._etat === 'pret';
@@ -12136,19 +12136,19 @@ function BrouillonsVinted({ br, publier, brouillonOk, onClose, onFile }) {
                 {e && e.etape && e.etape !== 'envoi' && e.etape !== 'fait' && <div data-brouillon-raison style={{ fontSize: 12.5, color: C.warn || C.muted }}>{e.raison || 'pas fait'}</div>}
                 {!e && publie && <div style={{ fontSize: 12.5, color: C.muted }}>Mis en ligne par VRM — ton dressing le montrera à la prochaine lecture.</div>}
                 {!e && it._etat === 'incomplet' && <div style={{ fontSize: 12.5, color: C.muted }}>Il lui manque {[!String((i && i.titre) || '').trim() && 'un titre', !(Number(i && i.prix) > 0) && 'un prix', !(Number(i && i.nph) > 0) && 'des photos'].filter(Boolean).join(', ')} — finis-le sur Vinted.</div>}
-                {!e && it._etat === 'inconnu' && <div data-brouillon-capter style={{ fontSize: 12.5, color: C.text, lineHeight: 1.5 }}>L'extension n'a pas encore vu ce brouillon (il a été fait avant elle, ou ailleurs). Pour qu'elle le capte : <b>1.</b> « Ouvrir sur Vinted » ci-dessous, <b>2.</b> sur Vinted, « Enregistrer le brouillon » sans rien changer. Il arrive ici tout de suite, prêt à mettre en ligne.</div>}
+                {!e && it._etat === 'inconnu' && <div data-brouillon-capter style={{ fontSize: 12.5, color: C.text, lineHeight: 1.5 }}>Pas encore vu par l'extension : ouvre-le sur Vinted et fais « Enregistrer le brouillon » sans rien changer. <Pourquoi label="Pourquoi ?">Il a été fait avant l'extension, ou ailleurs. Une fois enregistré sur Vinted, il arrive ici tout de suite, prêt à mettre en ligne.</Pourquoi></div>}
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6, flexShrink: 0 }}>
-                {complet && brouillonOk && (!e || (e.etape !== 'fait' && e.etape !== 'incertain')) && <button type="button" data-brouillon-publier disabled={e && e.etape === 'envoi'} onClick={() => mettre(it)} style={{ ...lien, border: 'none', background: C.accent, color: '#fff' }}>Mettre en ligne</button>}
-                <a data-brouillon-ouvrir href={`https://${domaine(it)}/items/${it.id}/edit`} target="_blank" rel="noopener noreferrer" style={lien}>Ouvrir sur Vinted ↗</a>
-                {!e && <button type="button" data-brouillon-ecarter onClick={() => ecarter(it.id)} title="Il n'est plus sur Vinted : le retirer de cette liste" style={{ ...lien, border: 'none', color: C.muted, fontWeight: 500 }}>Plus sur Vinted</button>}
+                {complet && brouillonOk && (!e || (e.etape !== 'fait' && e.etape !== 'incertain')) && <Bouton data-brouillon-publier disabled={e && e.etape === 'envoi'} onClick={() => mettre(it)} style={{ minHeight: 44 }}>Mettre en ligne</Bouton>}
+                <Bouton variante={complet && brouillonOk ? 'discret' : 'secondaire'} data-brouillon-ouvrir href={`https://${domaine(it)}/items/${it.id}/edit`} target="_blank" rel="noopener noreferrer" style={{ minHeight: 44 }}>Ouvrir sur Vinted ↗</Bouton>
+                {!e && <Bouton variante="discret" data-brouillon-ecarter onClick={() => ecarter(it.id)} title="Il n'est plus sur Vinted : le retirer de cette liste">Plus sur Vinted</Bouton>}
               </div>
             </div>
           );
         })}
         {nEcartes > 0 && <div data-brouillons-ecartes={nEcartes} style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', fontSize: 12.5, color: C.muted }}>
-          <span style={{ flex: '1 1 200px' }}>{nEcartes} brouillon{nEcartes > 1 ? 's' : ''} retiré{nEcartes > 1 ? 's' : ''} de la liste (tu as dit qu'il{nEcartes > 1 ? 's ne sont' : " n'est"} plus sur Vinted). Si ton dressing le montre encore à une prochaine lecture, il revient.</span>
-          <button type="button" data-brouillons-remettre onClick={remettre} style={lien}>Les remettre</button>
+          <span style={{ flex: '1 1 200px' }}>{nEcartes} brouillon{nEcartes > 1 ? 's' : ''} retiré{nEcartes > 1 ? 's' : ''} de la liste (« Plus sur Vinted »).</span>
+          <Bouton variante="discret" data-brouillons-remettre onClick={remettre}>Les remettre</Bouton>
         </div>}
       </div>
     </SheetShell>
@@ -12194,16 +12194,24 @@ function CompteRenduOperation({ onReprendre, onRefaire }) {
   const quand = (t) => { const d = new Date(t); return isNaN(d) ? '' : d.toLocaleString('fr-FR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }); };
   const etapeNom = (e) => { for (const l of Object.values(ETAPES_REPUB)) { const x = l.find((k) => k[0] === e); if (x) return x[1]; } return ''; };
   const lien = { background: 'none', border: 'none', padding: 0, color: C.accent, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', fontSize: 'inherit' };
+  // (30 oct.) « Tout doit être plus clair » : un titre qui dit ce qui s'est passé,
+  // le compte en une ligne, la paire en cours (le point qui demande de regarder),
+  // et le détail des noms replié. Deux gestes : reprendre, effacer.
+  const resume = [faits.length ? `${faits.length} ${A.faits}${faits.length > 1 ? 's' : ''}` : null, enCours.length ? `${enCours.length} en cours` : null, ratees.length ? `${ratees.length} pas faite${ratees.length > 1 ? 's' : ''}` : null, restent.length ? `${restent.length} pas commencée${restent.length > 1 ? 's' : ''}` : null].filter(Boolean).join(' · ');
   return (
-    <div data-compte-rendu={j.action} style={{ border: `1px solid ${C.warn}`, borderRadius: 12, padding: '12px 14px', margin: '10px 0', background: C.card, fontSize: 13, color: C.text, lineHeight: 1.5 }}>
-      <div style={{ fontWeight: 700 }}>« {A.titre} » s’est arrêtée{j.majAt ? ` (${quand(j.majAt)})` : ''} — l’app a été rechargée ou fermée.</div>
-      <div data-cr-faits={faits.length}>{faits.length ? `${faits.length} ${A.faits}${faits.length > 1 ? 's' : ''} : ${faits.map(nom).join(', ')}.` : `Aucune annonce ${A.faits} avant l’arrêt.`}</div>
-      {enCours.map((p) => <div key={p.id} data-cr-encours={p.id}>En cours au moment de l’arrêt : <b>{nom(p)}</b>{p.etape ? ` — étape « ${etapeNom(p.etape) || p.etape} »` : ''}. L’extension a pu continuer seule : regarde ton dressing Vinted{onRefaire ? <>, ou <button type="button" style={lien} onClick={onRefaire}>Brouillons à refaire</button></> : ''}.</div>)}
-      {ratees.length > 0 && <div data-cr-ratees={ratees.length}>Pas faites : {ratees.map((p) => `${nom(p)}${p.raison ? ` (${String(p.raison).slice(0, 90)})` : ''}`).join(' · ')}.</div>}
-      <div data-cr-restent={restent.length}>{restent.length ? `Pas commencées : ${restent.map(nom).join(', ')}.` : 'Toutes les annonces choisies avaient commencé.'}</div>
-      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8 }}>
-        {restent.length > 0 && onReprendre && <button type="button" data-cr-reprendre onClick={() => onReprendre(j.action, restent.map((p) => p.id))} style={{ border: `1px solid ${C.border}`, borderRadius: 8, padding: '8px 12px', minHeight: 44, fontWeight: 600, background: 'transparent', color: C.text, cursor: 'pointer', fontFamily: 'inherit' }}>Reprendre les {restent.length} pas commencée{restent.length > 1 ? 's' : ''}</button>}
-        <button type="button" data-cr-effacer onClick={() => ecrireJournalRepub(null)} style={{ border: `1px solid ${C.border}`, borderRadius: 8, padding: '8px 12px', minHeight: 44, fontWeight: 600, background: 'transparent', color: C.muted, cursor: 'pointer', fontFamily: 'inherit' }}>J’ai vu, effacer</button>
+    <div data-compte-rendu={j.action} style={{ border: `1px solid ${C.warn}`, borderRadius: 12, padding: '12px 14px', margin: '10px 0', background: C.card, fontSize: 13, color: C.text, lineHeight: 1.5, display: 'flex', flexDirection: 'column', gap: 4 }}>
+      <div style={{ fontWeight: 700 }}>« {A.titre} » s’est arrêtée{j.majAt ? ` (${quand(j.majAt)})` : ''} <Pourquoi label="Pourquoi ?">L’app a été rechargée ou fermée pendant l’opération : elle ne tourne que tant que la fenêtre est ouverte.</Pourquoi></div>
+      <div style={{ color: C.muted }}>{resume}</div>
+      {enCours.map((p) => <div key={p.id} data-cr-encours={p.id}>En cours à l’arrêt : <b>{nom(p)}</b>{p.etape ? ` — « ${etapeNom(p.etape) || p.etape} »` : ''}. Regarde ton dressing Vinted{onRefaire ? <>, ou <button type="button" style={lien} onClick={onRefaire}>Brouillons à refaire</button></> : ''}.</div>)}
+      <details className="vrm-repli">
+        <summary style={{ display: 'flex', alignItems: 'center', minHeight: 44, cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>Voir le détail</summary>
+        <div data-cr-faits={faits.length}>{faits.length ? `${faits.length} ${A.faits}${faits.length > 1 ? 's' : ''} : ${faits.map(nom).join(', ')}.` : `Aucune annonce ${A.faits} avant l’arrêt.`}</div>
+        {ratees.length > 0 && <div data-cr-ratees={ratees.length}>Pas faites : {ratees.map((p) => `${nom(p)}${p.raison ? ` (${String(p.raison).slice(0, 90)})` : ''}`).join(' · ')}.</div>}
+        <div data-cr-restent={restent.length}>{restent.length ? `Pas commencées : ${restent.map(nom).join(', ')}.` : 'Toutes les annonces choisies avaient commencé.'}</div>
+      </details>
+      <div className="vrm-b-rangee" style={{ justifyContent: 'flex-start' }}>
+        {restent.length > 0 && onReprendre && <Bouton data-cr-reprendre onClick={() => onReprendre(j.action, restent.map((p) => p.id))} style={{ minHeight: 44 }}>Reprendre les {restent.length} pas commencée{restent.length > 1 ? 's' : ''}</Bouton>}
+        <Bouton variante="discret" data-cr-effacer onClick={() => ecrireJournalRepub(null)}>J’ai vu, effacer</Bouton>
       </div>
     </div>
   );
@@ -41853,6 +41861,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fillBuyAchats.items, accounts]);
   useEffect(() => { if (fillBuyOpen) chargerAchats(); }, [fillBuyOpen, chargerAchats]);
+  // (30 oct.) Combien il en restait à l'ouverture : la saisie en série dit
+  // combien sont faites depuis, avec UNE barre (« où j'en suis »).
+  const fillBuyN0 = useRef(0);
   const fillBuyRows = useMemo(() => {
     // Ce que chaque paire pèse dans la compta : ses ventes, résolues par
     // IDENTITÉ (id d'annonce Vinted, sinon photo) — jamais par titre (§5.34).
@@ -48727,6 +48738,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           Une liste, un champ par ligne, Entrée passe au suivant. Les paires
           vendues au CA le plus élevé d'abord : ce sont elles qui faussent le
           plus la compta tant que leur coût manque. */}
+      {!fillBuyOpen && fillBuyN0.current ? ((fillBuyN0.current = 0), null) : null}
       {fillBuyOpen && (
         <div className="vrm-feuille-fond" onClick={()=>setFillBuyOpen(false)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:1000,display:'flex',alignItems:'flex-end',justifyContent:'center'}} data-noswipe="1" data-fillbuy-feuille="">
           <FermeAuRetour fermer={()=>setFillBuyOpen(false)}/>
@@ -48736,20 +48748,19 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             <div style={{padding:'12px 16px',borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
               <div style={{display:'flex',alignItems:'center',gap:10}}>
                 <div style={{flex:1,minWidth:0}}>
-                  <div style={{fontSize:20,fontWeight:600,color:C.text,letterSpacing:'-0.02em'}}>Prix d'achat à compléter</div>
-                  <div style={{fontSize:11,color:C.muted,marginTop:2}}>
-                    {fillBuyRows.length} article{fillBuyRows.length>1?'s':''} sans coût · tape le prix, <b>Entrée</b> passe au suivant
-                    {fillBuyAchats.loading && <> · <span style={{color:C.accent}}>recherche de tes achats…</span></>}
-                    {!fillBuyAchats.loading && Object.keys(fillBuySugg).length>0 && <> · <b style={{color:C.accent}}>{Object.keys(fillBuySugg).length} article{Object.keys(fillBuySugg).length>1?'s':''} avec une piste</b> — tape « C'est ça » ou vérifie</>}
-                  </div>
+                  <div style={{fontSize:20,fontWeight:600,color:C.text,letterSpacing:'-0.02em'}}>Prix d'achat à compléter {fillBuyRows.length>0 && <Pourquoi label="Pourquoi c'est important">Tant qu'un coût manque, la vente compte comme 100 % de marge : ton bénéfice et ton rapport comptable sont faussés.</Pourquoi>}</div>
                 </div>
                 <button className="vrm-icon-control" type="button" onClick={()=>setFillBuyOpen(false)} aria-label="Fermer" style={{flexShrink:0,border:'none',background:'transparent',color:C.muted,cursor:'pointer',padding:4}}><Icon name="close" size={18}/></button>
               </div>
-              {fillBuyRows.length>0 && (
-                <div style={{fontSize:11,color:C.warn,marginTop:6,lineHeight:1.4}}>
-                  Tant qu'un coût manque, la vente compte comme <b>100 % de marge</b> : ton bénéfice et ton rapport comptable sont sous-estimés.
-                </div>
-              )}
+              {(()=>{ if (fillBuyN0.current < fillBuyRows.length) fillBuyN0.current = fillBuyRows.length;
+                const n0 = fillBuyN0.current, faits = Math.max(0, n0 - fillBuyRows.length), nPiste = Object.keys(fillBuySugg).length;
+                if (!n0) return null;
+                return <div style={{marginTop:8}}><Avancement data={{'data-fillbuy-avancement': `${faits}/${n0}`}}
+                  titre={`${fillBuyRows.length} article${fillBuyRows.length>1?'s':''} sans coût`}
+                  compte={faits ? `${faits} saisi${faits>1?'s':''}` : null}
+                  part={n0 ? faits / n0 : 0}
+                  label={`${faits} sur ${n0} saisis`}
+                  phrase={<>Tape le prix, <b>Entrée</b> passe au suivant.{fillBuyAchats.loading ? <> · recherche de tes achats…</> : nPiste > 0 ? <> · <b>{nPiste} article{nPiste>1?'s':''} avec une piste</b> : « C'est ça » le relie.</> : null}</>}/></div>; })()}
             </div>
             <div style={{overflowY:'auto',padding:'10px 12px 16px'}}>
               {fillBuyRows.length===0 && (

@@ -170,19 +170,20 @@ export default function StudioPhoto({ C, paires, base, onClose }) {
   };
 
   const fermer = () => { couper(); onClose && onClose(); };
-  const btn = { border: `1px solid ${C.border}`, borderRadius: 8, padding: '9px 14px', fontSize: 13, fontWeight: 600, background: 'transparent', color: C.text, cursor: 'pointer', fontFamily: 'inherit' };
-  const btnFort = { ...btn, border: 'none', background: C.accent, color: C.onAccent || '#fff' };
+  // (30 oct.) Les trois formes de bouton de l'app (src/styles-boutons.css) :
+  // un primaire (l'action du moment), des secondaires, des gestes discrets.
+  const B = { p: 'vrm-b vrm-b-primaire', s: 'vrm-b vrm-b-secondaire', sp: 'vrm-b vrm-b-secondaire vrm-b-petit', d: 'vrm-b vrm-b-discret' };
 
   return (
     <div data-studio onClick={fermer} data-noswipe style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.6)', zIndex: 130, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
       <div onClick={(e) => e.stopPropagation()} style={{ background: C.bg, borderRadius: '18px 18px 0 0', width: '100%', maxWidth: 620, maxHeight: '92vh', overflowY: 'auto', padding: '16px 14px calc(20px + env(safe-area-inset-bottom))' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
           <span style={{ flex: 1, fontSize: 17, fontWeight: 700, color: C.text }}>Studio photo{sel ? ` · N°${sel.num}` : ''}</span>
-          {sel && <button type="button" style={btn} onClick={() => { couper(); setSel(null); setMode('choix'); setMsg(''); }}>Changer de paire</button>}
-          <button type="button" aria-label="Fermer le studio photo" onClick={fermer} style={{ ...btn, padding: '6px 10px' }}>✕</button>
+          {sel && <button type="button" className={B.d} onClick={() => { couper(); setSel(null); setMode('choix'); setMsg(''); }}>Changer de paire</button>}
+          <button type="button" aria-label="Fermer le studio photo" onClick={fermer} style={{ border: 'none', background: 'transparent', color: C.muted, fontSize: 20, minWidth: 44, minHeight: 44, cursor: 'pointer' }}>✕</button>
         </div>
-        <div style={{ fontSize: 12, color: C.muted, lineHeight: 1.5, marginBottom: 12 }}>
-          Un cadre fixe pour photographier toutes tes paires pareil. VRM ne publie rien sur Vinted : enregistre la photo sur ton appareil et ajoute-la toi-même dans l’app Vinted.
+        <div style={{ fontSize: 12.5, color: C.muted, lineHeight: 1.5, marginBottom: 12 }}>
+          Le même cadre pour toutes tes paires. Enregistre la photo, puis ajoute-la toi-même sur Vinted.
         </div>
 
         {!sel && (
@@ -210,18 +211,18 @@ export default function StudioPhoto({ C, paires, base, onClose }) {
           {mode === 'fichier' && (
             <div data-studio-repli={camRaison || 'fichier'} style={{ fontSize: 12.5, color: C.text, lineHeight: 1.5, border: `1px solid ${C.border}`, borderRadius: 10, padding: '10px 12px', marginBottom: 10 }}>
               {camRaison === 'refusee'
-                ? 'La caméra a été refusée pour VRM : le cadre ne peut pas s’afficher. Prends la photo avec l’appareil photo du téléphone — elle sera recadrée au même format que le cadre. Pour retrouver le cadre, autorise la caméra dans les réglages du navigateur.'
-                : 'Pas de caméra accessible ici : prends ou choisis une photo — elle sera recadrée au même format que le cadre.'}
+                ? 'Caméra refusée : prends la photo avec l’appareil photo du téléphone, elle sera recadrée au format du cadre. Pour revoir le cadre, autorise la caméra dans le navigateur.'
+                : 'Pas de caméra ici : prends ou choisis une photo, elle sera recadrée au format du cadre.'}
             </div>
           )}
           <input ref={fichierRef} type="file" accept="image/*" capture="environment" data-studio-fichier onChange={surFichier} style={{ display: 'none' }} />
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'center', marginBottom: 10 }}>
             {mode === 'camera'
-              ? <button type="button" data-studio-declencher style={btnFort} disabled={!!occupe} onClick={declencher}>{occupe === 'rangement' ? 'Rangement…' : 'Prendre la photo'}</button>
+              ? <button type="button" data-studio-declencher className={B.p} disabled={!!occupe} onClick={declencher}>{occupe === 'rangement' ? 'Rangement…' : 'Prendre la photo'}</button>
               : mode === 'fichier'
-                ? <button type="button" data-studio-ouvrir-fichier style={btnFort} disabled={!!occupe} onClick={() => fichierRef.current && fichierRef.current.click()}>Prendre ou choisir une photo</button>
-                : <button type="button" data-studio-ouvrir style={btnFort} onClick={ouvrirCamera}>Ouvrir la caméra</button>}
-            {mode === 'camera' && <button type="button" style={btn} onClick={() => { couper(); setMode('choix'); }}>Fermer la caméra</button>}
+                ? <button type="button" data-studio-ouvrir-fichier className={B.p} disabled={!!occupe} onClick={() => fichierRef.current && fichierRef.current.click()}>Prendre ou choisir une photo</button>
+                : <button type="button" data-studio-ouvrir className={B.p} onClick={ouvrirCamera}>Ouvrir la caméra</button>}
+            {mode === 'camera' && <button type="button" className={B.d} onClick={() => { couper(); setMode('choix'); }}>Fermer la caméra</button>}
           </div>
           {msg && <div data-studio-msg style={{ fontSize: 12.5, color: C.text, lineHeight: 1.5, marginBottom: 10 }}>{msg}</div>}
 
@@ -238,17 +239,17 @@ export default function StudioPhoto({ C, paires, base, onClose }) {
                       {ph.detoure && <img src={ph.detoure} data-studio-detoure alt="Détourée" style={{ width: '50%', aspectRatio: `${RATIO_CADRE}`, objectFit: 'contain', borderRadius: 6, background: damier }} />}
                     </div>
                     <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 6 }}>
-                      {!ph.detoure && <button type="button" data-studio-detourer={ph.id} style={{ ...btn, padding: '6px 8px', fontSize: 11.5 }} disabled={!!occupe} onClick={() => detourer(ph)}>{occupe === 'detour:' + ph.id ? 'Détourage…' : 'Détourer ici'}</button>}
-                      {!ph.detoure && avecPhotoroom && <button type="button" data-studio-photoroom={ph.id} style={{ ...btn, padding: '6px 8px', fontSize: 11.5 }} disabled={!!occupe} onClick={() => detourerPhotoroom(ph)}>{occupe === 'photoroom:' + ph.id ? 'Photoroom…' : 'Détourer avec Photoroom'}</button>}
-                      <a href={ph.detoure || ph.img} download={`VRM-${sel.cle}-${i + 1}${ph.detoure ? (/^data:image\/jpe?g/.test(ph.detoure) ? '.jpg' : /webp/.test(ph.detoure.slice(0, 20)) ? '.webp' : '.png') : '.jpg'}`} style={{ ...btn, padding: '6px 8px', fontSize: 11.5, textDecoration: 'none' }}>Enregistrer</a>
-                      <button type="button" style={{ ...btn, padding: '6px 8px', fontSize: 11.5, color: C.muted }} disabled={!!occupe} onClick={() => retirer(ph)}>Retirer</button>
+                      {!ph.detoure && <button type="button" data-studio-detourer={ph.id} className={B.sp} disabled={!!occupe} onClick={() => detourer(ph)}>{occupe === 'detour:' + ph.id ? 'Détourage…' : 'Détourer ici'}</button>}
+                      {!ph.detoure && avecPhotoroom && <button type="button" data-studio-photoroom={ph.id} className={B.sp} disabled={!!occupe} onClick={() => detourerPhotoroom(ph)}>{occupe === 'photoroom:' + ph.id ? 'Photoroom…' : 'Détourer avec Photoroom'}</button>}
+                      <a href={ph.detoure || ph.img} download={`VRM-${sel.cle}-${i + 1}${ph.detoure ? (/^data:image\/jpe?g/.test(ph.detoure) ? '.jpg' : /webp/.test(ph.detoure.slice(0, 20)) ? '.webp' : '.png') : '.jpg'}`} className={B.sp}>Enregistrer</a>
+                      <button type="button" className={B.d} disabled={!!occupe} onClick={() => retirer(ph)}>Retirer</button>
                     </div>
                   </div>
                 ))}
               </div>
             )}
           <div style={{ fontSize: 11.5, color: C.muted, lineHeight: 1.5, marginTop: 10 }}>
-            « Détourer ici » tourne dans ce navigateur, sans envoyer la photo nulle part et sans clé (modèle libre U²-Net). Détourage automatique : vérifie les bords avant de t’en servir.
+            « Détourer ici » reste dans ce navigateur, sans envoi ni clé : vérifie les bords avant de t’en servir.
             {avecPhotoroom && <span data-studio-photoroom-note="" style={{ display: 'block', marginTop: 4 }}>« Détourer avec Photoroom » envoie la photo à Photoroom avec <b>ta</b> clé (se termine par {(cleP && cleP.fin) || '····'}) : c’est ton compte Photoroom qui paie, à la photo, sur fond blanc.</span>}
             {sansPhotoroom && <span data-studio-photoroom-indispo={cleP.verif} style={{ display: 'block', marginTop: 4 }}>{sansPhotoroom}</span>}
           </div>
