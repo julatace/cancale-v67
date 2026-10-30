@@ -212,10 +212,7 @@ function chargeApp(lignes, ko = () => false) {
     return rep(200, rows.map((r) => projette(r, sel)));
   };
   const ctx = { console: { log() {}, warn() {}, error() {} }, Date, JSON, Set, Map, Array, Object, String, Number, isFinite, isNaN, Promise, RegExp,
-    SUPABASE_URL: 'https://base.test', sbAuth: (h) => ({ ...(h || {}) }), fetch,
-    // (29 oct.) lireTout passe par le filtre des comptes supprimés pour de bon
-    // (src/comptesSupprimes.js) : aucun ici, il rend la liste telle quelle.
-    sansComptesSupprimes: (rows) => rows };
+    SUPABASE_URL: 'https://base.test', sbAuth: (h) => ({ ...(h || {}) }), sansComptesSupprimes: (r) => r, fetch };
   vm.createContext(ctx);
   let src = ['PAGE_SB', 'lireTout', 'PAS_UNE_VENTE'].map((n) => extraire(APP, n)).join('\n');
   const bloc = BLOC_RE.exec(APP);

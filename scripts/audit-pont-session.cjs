@@ -465,7 +465,9 @@ const quiRepond = (r, t) => (t.vivante(r) ? String(t.vivante(r)) : 'vide/erreur'
   //    Mesuré : `vrm-photos` réveille le service worker chaque minute, et chaque
   //    réveil RECRÉAIT `vrm-session` (40 min) — qui ne partait donc jamais.
   await essaie('m · alarmes', async () => {
-    const b = faireBg({ alarmes: { 'vrm-session': { name: 'vrm-session' }, 'cancale-sync': { name: 'cancale-sync' }, 'cancale-active': { name: 'cancale-active' }, 'vrm-photos': { name: 'vrm-photos' }, 'vrm-relais': { name: 'vrm-relais' }, 'vrm-lbc': { name: 'vrm-lbc' }, 'vrm-offres': { name: 'vrm-offres' } } });
+    // Toutes les alarmes de PERIODES (lues dans le fond : une alarme ajoutée plus tard y est comptée).
+    const noms = [...String((/const PERIODES = \{([^}]*)\}/.exec(require('fs').readFileSync(require('path').join(__dirname, '..', 'vinted-sync-extension', 'background.js'), 'utf8')) || [])[1] || '').matchAll(/'([^']+)'\s*:/g)].map((m) => m[1]);
+    const b = faireBg({ alarmes: Object.fromEntries(noms.map((n) => [n, { name: n }])) });
     await attendre(20);
     dit(b.j.alarmesCreees.length === 0, 'm · les alarmes existent déjà : AUCUNE n\'est recréée (elles partent enfin)', JSON.stringify(b.j.alarmesCreees));
     const b2 = faireBg({});

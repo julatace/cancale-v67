@@ -3,7 +3,7 @@ import {spawnSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
 const root=fileURLToPath(new URL('../',import.meta.url));
 const tests=[
- 'bilan-synchronisation','bilan-synchronisation-adaptateur','outils-articles-vinted','isolation-comptes','confidentialite','securite-reception-push','capacite-securite',
+ 'lectures-partagees-bornes','numeros-vinted-perimetre','preuves-email-pagination','offres-fusion','conversation-relecture','lectures-vinted','relectures-interface-source','actions-offres-vinted','bilan-synchronisation','bilan-synchronisation-adaptateur','outils-articles-vinted','isolation-comptes','confidentialite','securite-reception-push','capacite-securite',
  'inscription-parcours','recuperation-auth','liaison-oauth','collecte-email',
  'reception-email','suivi-donnees','parcours-vendeur','favoris-progression','favoris-automatisation','gmail-facture-retour','lbc-photos','lbc-identite-transaction',
  'lbc-attribution-historique','favoris-preuves','favoris-historique','favoris-contexte','offres-vinted','messages-offres-historique','reponse-vinted','vinted-suivi-interface','recherche-messages-vinted',

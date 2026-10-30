@@ -144,11 +144,14 @@ async function appeler({ methode = 'POST', qui = PROPRIO, corps = {}, query = {}
     base({ clesUser: { [PROPRIO]: 'pr_cle_du_proprio' } });
     r = await appeler({ qui: PROPRIO, corps: { sha: h1, b64: p1.toString('base64') } });
     dit(r.code === 200 && (etat.photoroom[0].headers || {})['x-api-key'] === 'pr_cle_du_proprio', 'la clé du vendeur passe devant la clé du serveur', JSON.stringify((etat.photoroom[0] || {}).headers && etat.photoroom[0].headers['x-api-key']));
-    // Clé du vendeur illisible ⇒ on retombe sur la clé serveur (le verrou
-    // propriétaire protège alors Julien) : le PROPRIO passe, pas un AUTRE.
+    // (29 oct., revue) Clé du vendeur PAS LUE (la base n'a pas répondu) : « pas
+    // su » ne vaut pas « aucune clé ». Avant, on retombait sur la clé du
+    // serveur : AUTRE recevait « réservé au propriétaire » alors que SA clé est
+    // rangée, et avec PHOTOROOM_POUR=tous le hoquet dépensait la clé de Julien
+    // (§2.9). Désormais 503 `cle-pas-su`, et RIEN ne part chez Photoroom.
     base({ clesUserKO: true });
     r = await appeler({ qui: AUTRE, corps: { sha: h1, b64: p1.toString('base64') } });
-    dit(r.code === 403 && etat.photoroom.length === 0, 'lecture de la clé vendeur ratée : on retombe sur la clé serveur (AUTRE reste bloqué, Julien protégé)', String(r.code));
+    dit(r.code === 503 && r.corps.reason === 'cle-pas-su' && etat.photoroom.length === 0, 'lecture de la clé vendeur ratée : 503 « pas su », jamais un repli sur la clé du serveur (aucun appel à Photoroom)', `${r.code} ${r.corps && r.corps.reason} ${etat.photoroom.length} appel(s)`);
 
     // ── L'argent : ce qui ne se repaie pas, ce qui ne se rend pas ─────────
     base({ cacheKO: true });

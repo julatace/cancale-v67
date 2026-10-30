@@ -370,23 +370,71 @@ const nok = (nom, d) => { ko++; console.log(`❌ ${nom}${d ? ' — ' + d : ''}`)
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 12) LE REÇU D'ACHAT (facture Vinted reçue par email) NE SE DEVINE PAS
-//     Mesuré le 23 août sur les 48 reçus réels : AUCUN ne porte de n° de
-//     transaction, l'`article` extrait est souvent un morceau de phrase
-//     (« est conforme à sa » revient 16 fois), et **22 reçus sur 48** ont un
-//     titre « contenu » dans celui d'un autre. Le repli `.includes` pouvait
-//     donc coller le reçu d'un AUTRE achat — une erreur comptable.
+// 12) LE REÇU D'ACHAT (reçu Vinted reçu par email) NE SE DEVINE PAS
+//     Mesuré le 23 août sur les 48 reçus réels : l'`article` extrait est souvent
+//     un morceau de phrase, et **22 reçus sur 48** ont un titre « contenu » dans
+//     celui d'un autre. (29 oct.) Mesuré : les 81 vrais reçus portent TOUS leur
+//     n° de transaction — un reçu se relie à SON achat par ce n° et RIEN
+//     d'autre. ⚠️ Ce contrôle juge la RÈGLE, pas son orthographe : le premier
+//     jet exigeait la ligne `n === 1 ? seul : null` et passait au rouge le jour
+//     où `receiptFor` est devenu un appel à la règle partagée — mieux tenue.
+//     On EXÉCUTE donc la règle (`api/_lib/recu-achat.js`) sur 50 reçus au titre
+//     rigoureusement identique, et on exige que `receiptFor` ne fasse que
+//     l'appeler, sans lire aucun titre.
 {
-  const i = SRC.indexOf('const receiptFor = (o) =>');
-  const bloc = i < 0 ? '' : SRC.slice(i, i + 1400);
-  /\.includes\(ot\)|ot\.includes\(at\)/.test(bloc)
-    ? nok('le reçu d\'achat ne se rapproche jamais par « titre contenu »',
-          'le repli `.includes` est encore là : il touche 22 reçus sur 48')
-    : ok('le reçu d\'achat ne se rapproche jamais par « titre contenu »');
-  /n === 1 \? seul : null/.test(bloc)
-    ? ok('le reçu d\'achat exige un candidat UNIQUE (titre comme transaction)')
-    : nok('le reçu d\'achat exige un candidat unique',
-          'il prend encore le premier titre égal sans vérifier qu\'il est seul');
+  // a) receiptFor : le corps de l'expression, jusqu'à la fin de l'instruction.
+  const corpsDe = (src, debut) => {
+    const i = src.indexOf(debut); if (i < 0) return null;
+    let j = src.indexOf('=>', i) + 2, prof = 0, chaine = null;
+    for (; j < src.length; j++) {
+      const c = src[j];
+      if (chaine) { if (c === '\\') { j++; continue; } if (c === chaine) chaine = null; continue; }
+      if (c === '"' || c === "'" || c === '`') { chaine = c; continue; }
+      if ('([{'.includes(c)) prof++;
+      else if (')]}'.includes(c)) prof--;
+      else if (c === ';' && prof === 0) break;
+    }
+    return src.slice(src.indexOf('=>', i) + 2, j).trim();
+  };
+  const rf = corpsDe(SRC, 'const receiptFor = (o) =>');
+  if (rf == null) nok('le reçu d\'achat se relie par une règle nommée', '`receiptFor` introuvable');
+  else {
+    /\brecuDeLAchat\(/.test(rf)
+      ? ok('le reçu d\'achat passe par la règle partagée (`recuDeLAchat`, api/_lib/recu-achat.js)')
+      : nok('le reçu d\'achat passe par la règle partagée', '`receiptFor` ne l\'appelle pas : ' + rf.slice(0, 160));
+    /normTitle|\.title\b|\.article\b|\.subject\b|\.includes\(|\.find\(|\|\|/.test(rf)
+      ? nok('le reçu d\'achat ne se rapproche JAMAIS par le titre', 'un repli lit autre chose que la règle : ' + rf.slice(0, 200))
+      : ok('le reçu d\'achat ne se rapproche JAMAIS par le titre (receiptFor ne lit rien d\'autre que la règle)');
+  }
+  /const indexRecusAchat = useMemo\(\(\) => indexRecusParTransaction\(/.test(SRC)
+    ? ok('l\'index des reçus est celui de la règle partagée (par n° de transaction)')
+    : nok('l\'index des reçus est celui de la règle partagée', '`indexRecusAchat` ne passe pas par `indexRecusParTransaction`');
+  // b) la règle elle-même, EXÉCUTÉE.
+  let F = null;
+  try {
+    const vm = require('vm');
+    const regle = fs.readFileSync(path.join(__dirname, '..', 'api', '_lib', 'recu-achat.js'), 'utf8');
+    const ctx = vm.createContext({});
+    vm.runInContext(regle.replace(/^export\s+/gm, '') + '\n;this.__F = { indexRecusParTransaction, recuDeLAchat };', ctx);
+    F = ctx.__F;
+  } catch (e) { nok('la règle du reçu d\'achat se charge', String(e && e.message).slice(0, 160)); }
+  if (F) {
+    const sansNo = Array.from({ length: N }, (_, k) => ({ id: 's' + k, article: TITRE, subject: `Ton reçu pour la commande « ${TITRE} »`, texte: `${TITRE}\n*Montant payé* 40,00 €\n`, transaction: '' }));
+    const avecNo = Array.from({ length: N }, (_, k) => ({ id: 'n' + k, article: TITRE, subject: `Ton reçu pour la commande « ${TITRE} »`, texte: `${TITRE}\n*N° de transaction* ${90000000 + k}\n`, transaction: '' }));
+    const ix = F.indexRecusParTransaction([...sansNo, ...avecNo], () => false);
+    const r1 = F.recuDeLAchat({ transaction_id: '77777777', title: TITRE }, ix);
+    r1 === null
+      ? ok(`${2 * N} reçus « ${TITRE} » et un achat au même titre mais à un AUTRE n° : aucun reçu`)
+      : nok(`${2 * N} reçus au même titre et un achat à un autre n° : aucun reçu`, 'la règle en désigne un : ' + r1.id);
+    const r2 = F.recuDeLAchat({ transaction_id: 90000017, title: TITRE }, ix);
+    r2 && r2.id === 'n17'
+      ? ok('… et l\'achat dont le n° est porté par UN reçu reçoit CE reçu-là, parmi 100 identiques')
+      : nok('l\'achat dont le n° est porté par un reçu reçoit ce reçu-là', r2 ? r2.id : 'aucun');
+    const r3 = F.recuDeLAchat({ transaction_id: '', title: TITRE }, ix);
+    r3 === null
+      ? ok('un achat SANS n° de transaction ne reçoit aucun reçu, même au titre identique')
+      : nok('un achat sans n° ne reçoit aucun reçu', 'la règle en désigne un : ' + r3.id);
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

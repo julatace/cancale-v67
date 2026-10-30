@@ -293,7 +293,13 @@ const nouvelles = (vues, depuis) => vues.slice(depuis);
     // `openReceipt` aujourd'hui. L'ancien `parseReceiptFields` a été retiré —
     // l'extraire laissait ce bloc entier SAUTÉ (rouge « le code du reçu se
     // retrouve », mais aucun contrôle de la fenêtre ne tournait plus).
-    const codeRecu = [extrait('const COULEUR_PLATEFORME =', ';\n'), extrait('// <recu-achat-regle>', '// </recu-achat-regle>\n'),
+    // (29 oct.) Le bloc lit le n° de transaction par la règle PARTAGÉE avec le
+    // serveur (`api/_lib/recu-achat.js`, importée par l'app) : sans elle, le
+    // bloc extrait levait « transactionDeLaLigne is not defined » et TOUTE la
+    // section reçu/facture/bordereau ne tournait plus. Elle est injectée
+    // AVANT le bloc, sans `export` (absente sur un code d'avant : rien).
+    const regleRecuPartagee = (() => { try { return fs.readFileSync(path.join(RACINE, 'api', '_lib', 'recu-achat.js'), 'utf8').replace(/^export\s+/gm, ''); } catch (_) { return ''; } })();
+    const codeRecu = [extrait('const COULEUR_PLATEFORME =', ';\n'), regleRecuPartagee, extrait('// <recu-achat-regle>', '// </recu-achat-regle>\n'),
       extrait('const modePaiementRecu = (texte, paye) => {'), extrait('const phraseSommeRecu = (v) => {'), extrait('const champsRecuAchat = (a) => {'),
       extrait('const b64ToBytes = (b64) => {'), extrait('const openReceipt = (a) => {')];
     // Le journal des fenêtres (22 oct.) : présent sur le code d'après, absent avant.

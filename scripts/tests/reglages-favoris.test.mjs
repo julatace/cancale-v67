@@ -6,15 +6,12 @@ const owner='owner-test',id='vrm_favoris_reglages_123';
 const opts=()=>({uid:'123',owner,ownerActuel:()=>owner,base:'https://base.invalid',headers:{Authorization:'Bearer test'}});
 const rep=rows=>({ok:true,json:async()=>rows});
 test('le pourcentage produit un texte, sans inventer de prix ou modifier le message de base',()=>{
- const r=preparerMessageFavori('Bonjour !','15');assert.equal(r.pourcentage,15);// (5.281) Plus de phrase de réduction ajoutée au texte : la vraie offre Vinted suit le message.
- assert.equal(r.message,'Bonjour !');
+ const r=preparerMessageFavori('Bonjour !','15');assert.equal(r.pourcentage,15);assert.equal(r.message,'Bonjour !','(5.281) la remise ne s’écrit plus dans le texte : la vraie offre Vinted suit le message');
  assert.equal(preparerMessageFavori('Bonjour !','').message,'Bonjour !');
  assert.equal(preparerMessageFavori('','05').pourcentage,5);
- // (29 oct., d31e716e) un message vide n'est plus rempli ici : le texte par défaut est posé à l'envoi.
- assert.equal(preparerMessageFavori('','10').message,'');assert.equal(preparerMessageFavori('','10').erreur,'');
+ assert.equal(preparerMessageFavori('','10').message,'','le texte par défaut est posé à l’enregistrement, pas ici');
  for(const p of ['0','100','-5','1.5','10 %','abc','Infinity'])assert.ok(preparerMessageFavori('Bonjour',p).erreur,p);
- // (5.281) Rien n'est ajouté au texte : 2000 caractères + une offre restent 2000 caractères, sans erreur.
- assert.equal(preparerMessageFavori('a'.repeat(2000),'10').message.length,2000);assert.equal(preparerMessageFavori('a'.repeat(2000),'').message.length,2000);
+ assert.ok(preparerMessageFavori('a'.repeat(2001),'10').erreur);assert.equal(preparerMessageFavori('a'.repeat(2000),'10').erreur,'');assert.equal(preparerMessageFavori('a'.repeat(2000),'').message.length,2000);
 });
 test('cadence entière bornée et aucune activation cachée',()=>{
  for(const intervalleMinutes of [1,6,1440])assert.equal(validerReglagesFavoris({...reg,intervalleMinutes,envoisActifs:true}).envoisActifs,false);
@@ -34,8 +31,7 @@ test('sauvegarde et relecture conservent le message, le taux et la cadence sans 
  let row,posts=0;const fetcher=async(url,o)=>{if(o.method==='POST'){posts++;row=JSON.parse(o.body);assert.ok(url.endsWith('on_conflict=owner,id'));assert.equal(row.owner,owner);assert.equal(row.id,id);assert.equal(row.data.envoisActifs,false);return rep([row]);}return rep(row?[row]:[]);};
  await sauverReglagesFavoris({...opts(),fetcher},reg);await sauverReglagesFavoris({...opts(),fetcher},reg);
  const lu=await lireReglagesFavoris({...opts(),fetcher});assert.equal(lu.message,reg.message);assert.equal(lu.pourcentage,10);assert.equal(lu.intervalleMinutes,7);assert.equal(lu.enregistres,true);assert.equal(posts,2);
- // (5.281) Le message n'est jamais allongé d'une remise : aucune « 10 % » ajoutée, donc jamais deux.
- assert.equal((preparerMessageFavori(lu.message,lu.pourcentage).message.match(/10 %/g)||[]).length,0);
+ assert.equal(preparerMessageFavori(lu.message,lu.pourcentage).message,reg.message,'la remise ne double jamais le texte');
 });
 test('autre propriétaire, autre identifiant ou format inconnu : refus, pas de défaut prêt à écraser',async()=>{
  const data=validerReglagesFavoris(reg);

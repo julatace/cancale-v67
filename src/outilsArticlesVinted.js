@@ -58,7 +58,11 @@ export function bilanAnnonce(it, draft) {
   const titre = d?.title ?? it.title;
   if (!String(titre || "").trim()) manque.push("Titre");
   const prix =
-    d?.price ?? (typeof it.price === "object" ? it.price?.amount : it.price);
+    d && Object.prototype.hasOwnProperty.call(d, "price")
+      ? d.price
+      : typeof it.price === "object"
+        ? it.price?.amount
+        : it.price;
   if (centimes(prix) == null || centimes(prix) <= 0) manque.push("Prix");
   const photos =
     d?.photos?.length ??

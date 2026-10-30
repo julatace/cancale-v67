@@ -2,7 +2,7 @@ const fs=require('fs'),path=require('path'),assert=require('assert/strict'),{chr
 (async()=>{
  const b=await chromium.launch({executablePath:process.env.VRM_CHROMIUM_PATH||'/usr/bin/chromium',args:['--no-sandbox']});
  try{
- const s=fs.readFileSync('src/App.jsx','utf8');const component=s.slice(s.indexOf('function LigneVenteCompacte('),s.indexOf('function LigneVente(',s.indexOf('function LigneVenteCompacte(')));
+ const s=fs.readFileSync('src/App.jsx','utf8');const component=s.slice(s.indexOf('function LigneVenteCompacte('),s.indexOf('\nfunction ',s.indexOf('function LigneVenteCompacte(')+10));
  for(const width of [390,1512]){
  const p=await b.newPage({viewport:{width,height:950}});const errors=[];p.on('pageerror',e=>errors.push(e.message));await p.route('http://vrm.test/**',r=>r.fulfill({contentType:'text/html',body:'<div id="root"></div>'}));await p.goto('http://vrm.test/');
  for(const file of ['react/umd/react.development.js','react-dom/umd/react-dom.development.js'])await p.addScriptTag({path:path.resolve('node_modules',file)});

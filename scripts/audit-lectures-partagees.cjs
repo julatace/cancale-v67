@@ -167,7 +167,7 @@ async function verifier(mod) {
       'echec-garde': [/if \(!r \|\| !r\.ok \|\| monGen !== gen\) \{ cache\.delete\(cle\); return; \}/, 'if (monGen !== gen) { cache.delete(cle); return; }'],
       'sans-session': [/const cle = url \+ '\\n' \+ ENTETES_CLE\.map\(\(n\) => lireEntete\(h, n\)\)\.join\('\\n'\);/, "const cle = url;"],
       'route-ignoree': [/const versRoute = [^;]+;/, 'const versRoute = false;'],
-      'vol-sans-fin': [/e\.fin == null \? maintenant\(\) - e\.debut < volMax : /, 'e.fin == null || '],
+      'vol-sans-fin': [/date - v\.debut >= volMax|maintenant\(\) - e\.debut < volMax/g, m => m.startsWith('date') ? 'false' : 'true'],
       'ecriture-ignoree': [/      invalider\(\);\n      const p = fetchOrig\(input, init\);\n      Promise\.resolve\(p\)\.then\(invalider, invalider\);\n      return p;/, '      return fetchOrig(input, init);'],
     };
     for (const [nom, [re, rep]] of Object.entries(MUT)) {

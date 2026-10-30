@@ -93,14 +93,23 @@ async function ouvrir(nav, { registre, vues = [], etats = {}, installation = fal
   });
   await pg.goto(`http://localhost:${PORT}${url}`, { waitUntil: 'domcontentloaded' });
   await pg.waitForTimeout(3500);
+  await ouvrirAdresses(pg);
   return { ctx, pg, erreurs, appels, etat };
 }
 // Au téléphone, « Adresses de réception » est un sous-écran de Réglages.
-const ouvrirAdresses = async (pg) => { const s = pg.locator('[data-sous-ouvrir="adresses"]').first(); if (await s.isVisible().catch(() => false)) { await s.click(); await pg.waitForTimeout(700); } };
+const ouvrirAdresses = async (pg) => {
+  const s = pg.locator('[data-sous-ouvrir="adresses"]').first();
+  if (await s.isVisible().catch(() => false)) { await s.click(); await pg.waitForTimeout(700); }
+  const nav = pg.getByRole('navigation',{name:'Rubriques des emails'});
+  if (!await nav.isVisible().catch(()=>false)) return;
+  await nav.getByRole('button',{name:/Comptes et transfert/}).click();
+  const aide=pg.locator('.vrm-email-aide-adresses');
+  if(await aide.getAttribute('open')===null)await aide.locator('summary').first().click();
+};
 const lignes = (pg) => pg.evaluate(() => Object.fromEntries([...document.querySelectorAll('[data-reglage-adresses] [data-adresse]')].map((x) => [x.getAttribute('data-adresse'), {
   etat: x.getAttribute('data-adresse-etat'), texte: x.innerText.replace(/\s+/g, ' ').trim(), bouton: (x.querySelector('[data-confirmer-adresse]') || {}).innerText || null,
   alerte: (() => { const p = x.querySelector('[data-adresse-preuve]'); return p ? getComputedStyle(p).color : null; })() }])));
-const panneau = (pg) => pg.evaluate(() => { const t = document.querySelector('[data-reglage-adresses]'); return t ? { texte: t.innerText, expl: [...t.querySelectorAll('[data-preuve-explication]')].map((x) => x.getAttribute('data-preuve-explication')), boite: (t.querySelector('[data-preuve-boite]') || {}).getAttribute?.('data-preuve-boite') || null, pasSu: t.querySelectorAll('[data-preuves="pas-su"]').length,
+const panneau = (pg) => pg.evaluate(() => { const t = document.querySelector('[data-reglage-adresses]'); return t ? { texte: t.innerText, preuveTexte:(t.querySelector('[data-preuve-explication]')||{}).innerText||'', expl: [...t.querySelectorAll('[data-preuve-explication]')].map((x) => x.getAttribute('data-preuve-explication')), boite: (t.querySelector('[data-preuve-boite]') || {}).getAttribute?.('data-preuve-boite') || null, pasSu: t.querySelectorAll('[data-preuves="pas-su"]').length,
   promesse: (t.querySelector('[data-adresses-promesse]') || {}).getAttribute?.('data-adresses-promesse') || null, promesseTexte: (t.querySelector('[data-adresses-promesse]') || {}).innerText || '' } : null; });
 
 (async () => {
@@ -150,7 +159,7 @@ const panneau = (pg) => pg.evaluate(() => { const t = document.querySelector('[d
       const l = await lignes(pg); const p = await panneau(pg);
       dit(l['julien@exemple.test'] && l['julien@exemple.test'].etat === 'transition' && /reçue — à confirmer/.test(l['julien@exemple.test'].texte) && l['julien@exemple.test'].bouton === 'Confirmer', 'à confirmer : reçue en attendant, et « Confirmer »', JSON.stringify(l['julien@exemple.test']));
       dit(l['relais@privaterelay.appleid.com'] && l['relais@privaterelay.appleid.com'].etat === 'transition' && !l['relais@privaterelay.appleid.com'].bouton && /relais Apple/.test(l['relais@privaterelay.appleid.com'].texte), 'un relais Apple : aucun bouton qui ne pourrait pas marcher, et pourquoi', JSON.stringify(l['relais@privaterelay.appleid.com']));
-      dit(p && p.expl[0] === 'installation' && /Les tiennes restent reçues/.test(p.texte) && !/sont mis de côté/.test(p.texte.split('Chaque adresse')[1] || ''), 'la règle lui dit que ses adresses restent reçues — aucune alerte', p && p.texte.replace(/\n/g, ' ').slice(0, 300));
+      dit(p && p.expl[0] === 'installation' && /Les tiennes restent reçues/.test(p.texte) && !/sont mis de côté/.test(p.preuveTexte), 'la règle lui dit que ses adresses restent reçues — aucune alerte', p && p.texte.replace(/\n/g, ' ').slice(0, 300));
       const couleurs = Object.values(l).map((x) => x.alerte);
       dit(new Set(couleurs).size === 1, 'aucune ligne en couleur d’alerte (rien ne lui est retiré)', JSON.stringify(couleurs));
       dit(p && p.promesse === 'directe', 'l’explication en tête lui garde « dès que tu l’ajoutes » (ses adresses restent reçues)', p && p.promesseTexte);

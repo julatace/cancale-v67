@@ -38,6 +38,7 @@ import { limiteRetraitDepuisTexte, lieuDepuisExtrait, LIEU_AU_FUTUR } from './_l
 import { codeRetraitTournure } from './_lib/code-retrait-email.js';
 import { decoderEntitesHtml } from './_lib/entites-html.js';
 import { suiviDuSujet, finsDesLignes, sortiParSuivis } from './_lib/suivi-colis.js';
+import { transactionDuRecu } from './_lib/recu-achat.js';
 
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://lgonxzrzjcqthjtbdpzo.supabase.co';
 // ⚠️ CLÉ DE SERVICE QUAND ELLE EXISTE. Ces routes tournent sur le serveur, sans
@@ -1252,22 +1253,46 @@ let registreEmailsEnVol=null;
 // Lues sous le propriétaire NEUTRE (aucune session ne peut les écrire), toutes
 // pages comprises. Une page ratée ⇒ `null` : « pas su », et l'email est
 // renvoyé (503) plutôt qu'attribué ou mis de côté sur une lecture partielle.
-async function lirePreuvesProuvees() {
+async function lirePreuvesProuvees(signal) {
   const preuves = new Map(), taille = 500;
-  for (let debut = 0; debut < 100 * taille; debut += taille) {
-    let r;
+  let debut = 0;
+  for (let page = 0; page < 500; page++) {
     try {
-      r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?owner=eq.${PROPRIETAIRE_NEUTRE}&id=like.${PREFIXE_PREUVE}*&data->>etat=eq.prouvee&select=id,owner:data->>owner,adresse:data->>adresse,etat:data->>etat&order=id.asc`, {
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?owner=eq.${PROPRIETAIRE_NEUTRE}&id=like.${PREFIXE_PREUVE}*&data->>etat=eq.prouvee&select=id,owner:data->>owner,adresse:data->>adresse,etat:data->>etat&order=id.asc`, {
         headers: { ...sbCle(SUPABASE_KEY), Range: `${debut}-${debut + taille - 1}`, 'Range-Unit': 'items' },
-        signal: AbortSignal.timeout(10000),
+        signal: AbortSignal.any([signal, AbortSignal.timeout(10000)]),
       });
-    } catch (_) { return null; }
-    if (r.status === 416) return preuves;
-    if (!r.ok) return null;
-    let j; try { j = await r.json(); } catch (_) { return null; }
-    if (!Array.isArray(j)) return null;
-    for (const l of j) if (l && l.id) preuves.set(String(l.id), { owner: String(l.owner || ''), adresse: String(l.adresse || ''), etat: String(l.etat || '') });
-    if (j.length < taille) return preuves;
+      if (r.status === 416) {
+        const fin = /^\*\/(\d+)$/.exec(r.headers?.get?.('content-range') || '');
+        return debut > 0 && fin && Number(fin[1]) === debut ? preuves : null;
+      }
+      if (!r.ok) return null;
+      const j = await r.json();
+      if (!Array.isArray(j) || preuves.size + j.length > 50000) return null;
+      for (const l of j) {
+        if (!l?.id || preuves.has(String(l.id))) return null;
+        preuves.set(String(l.id), { owner: String(l.owner || ''), adresse: String(l.adresse || ''), etat: String(l.etat || '') });
+      }
+      // La limite réelle peut être inférieure à 500 : avancer de ce qui a été lu.
+      const plage = r.headers?.get?.('content-range');
+      const cr = plage && /^(\d+)-(\d+)\/(\d+|\*)$/.exec(plage);
+      if (cr) {
+        if (Number(cr[1]) !== debut || Number(cr[2]) - debut + 1 !== j.length) return null;
+        debut += j.length;
+        if (cr[3] !== '*') {
+          if (debut > Number(cr[3])) return null;
+          if (debut === Number(cr[3])) return preuves;
+        }
+      } else {
+        if (plage) {
+          const fin = /^\*\/(\d+|\*)$/.exec(plage);
+          if (!fin || j.length !== 0 || (fin[1] !== '*' && Number(fin[1]) !== debut)) return null;
+        }
+        if (j.length < taille) return preuves;
+        debut += j.length;
+      }
+      if (j.length === 0) return preuves;
+    } catch { return null; }
   }
   return null;
 }
@@ -1281,7 +1306,8 @@ export async function lireRegistreEmails(cloisonnee) {
 async function chargerRegistreEmails() {
   // (22 oct.) Les preuves d'abord : sans elles, aucune adresse d'un vendeur ne
   // peut être retenue — on ne décide rien (« pas su »).
-  const preuves=await lirePreuvesProuvees();
+  const signal=AbortSignal.timeout(20000);
+  const preuves=await lirePreuvesProuvees(signal);
   if(preuves===null)return null;
   const garde={retenue:(adresse,owner)=>retenue(adresse,owner,{preuves,installation:process.env.VRM_OWNER_UID||''})};
   const fusionnerRegistres=(l,c)=>fusionnerRegistresLib(l,c,garde);
@@ -1292,7 +1318,7 @@ async function chargerRegistreEmails() {
     try {
       const r=await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vrm_email_owners&select=owner,data&order=owner.asc`,{
         headers:{...sbCle(SUPABASE_KEY),Range:`${debut}-${debut+taille-1}`,'Range-Unit':'items'},
-        signal:AbortSignal.timeout(10000),
+        signal:AbortSignal.any([signal,AbortSignal.timeout(10000)]),
       });
       // À une frontière exacte, PostgREST peut répondre 416 plutôt qu'une
       // page vide. Seul son total confirmé égal au nombre déjà lu conclut.
@@ -2120,9 +2146,29 @@ export async function traiterEmail(req, res) {
       const article = ((achText.match(/commande\s*[«"“]\s*([^»"”\n]{2,70})\s*[»"”]/i)
         || achText.match(/(?:article|articles?\s+achet[ée]e?s?|achat)\s*:\s*[«"“']?([^«»"”'\n]{4,70})/i)
         || [])[1] || '').trim();
-      const transaction = (achText.match(/transaction\s*:?\s*#?(\d{6,})/i) || [])[1] || '';
+      // (29 oct.) LE N° DE TRANSACTION, UNE IDENTITÉ (§5), lu par LA règle de
+      // l'app (`api/_lib/recu-achat.js`, §11). L'ancien motif
+      // `transaction\s*:?\s*#?(\d{6,})` ne passait pas l'astérisque du gras
+      // (« *N° de transaction* 12345678901 ») : mesuré, `transaction` était VIDE
+      // sur les 117 reçus rangés, et un nombre au milieu d'une phrase (« ta
+      // transaction 123456789 est en cours ») l'aurait été pris. Le texte entier
+      // est lu, pas les 2 000 premiers caractères du tri (mesuré : le n° tombe
+      // entre le 490e et le 768e — rien ne le garantit pour un reçu plus long).
+      const transaction = transactionDuRecu(corpsTexte);
       const pdfA = (mail.attachments || []).find(a => /application\/pdf/i.test(a.contentType || '') || /\.pdf$/i.test(a.filename || ''));
-      const key = transaction || shortHash(subject + corpsTexte.slice(0, 300));
+      // ⚠️⚠️ (29 oct., revue) LA CLÉ EST CELLE DE L'EMAIL, JAMAIS LE N° SEUL.
+      // Premier jet : `email_achat_{n°}`. Or l'écriture remplace `data` en
+      // entier : un second email du MÊME n° (la copie « TR: » d'un reçu, le
+      // geste même qu'on lui conseille pour ses autres comptes) ÉCRASAIT le
+      // premier — son PDF joint compris (§5 « on ne jette aucun email »).
+      // ⇒ Une ligne par email : sujet + début du texte (la clé d'avant, stable
+      // pour un même email rejoué), le n° (deux achats AU MÊME TITRE chez le
+      // même vendeur au même prix ont les mêmes 300 premiers caractères — le n°
+      // tombe plus loin) et la présence d'un PDF (un email avec sa pièce jointe
+      // ne partage jamais sa ligne avec son jumeau sans). Le n° reste dans
+      // `transaction` : c'est l'app qui regroupe les lignes d'un même n°
+      // (`indexRecusParTransaction`, PDF d'abord).
+      const key = shortHash(subject + corpsTexte.slice(0, 300) + (transaction ? `|tx${transaction}` : '') + (pdfA ? '|pdf' : ''));
       await supabaseUpsert([{ id: `email_achat_${key}`, data: {
         type: 'achat', subject, article, prix, transaction,
         account: acc.login || '', uid: acc.uid || '',
@@ -2133,7 +2179,9 @@ export async function traiterEmail(req, res) {
       try { await pushOnce({
         title: '🛍 Achat confirmé',
         body: `${article || 'Commande Vinted'}${prix ? ` — ${prix} €` : ''}${acc.login ? ` (${acc.login})` : ''} — justificatif archivé.`,
-        tag: `achat-${key}`, url: '/?tab=cat_achats',
+        // Une notification par ACHAT (son n°), pas par email : la copie
+        // transférée d'un reçu déjà reçu ne sonne pas une seconde fois.
+        tag: transaction ? `achat-tx${transaction}` : `achat-${key}`, url: '/?tab=cat_achats',
         _cat: 'achat',
       }); } catch (_) {}
       await logEmail({ type: 'achat', subject, from: mail.from, prix, article, pdf: !!pdfA, account: acc.login || '' });
