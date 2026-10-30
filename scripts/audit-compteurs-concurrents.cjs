@@ -57,6 +57,21 @@ const rep = (c) => ({ uid: '111', method: 'POST', endpoint: `/api/v2/conversatio
     dit(notes === 20, 'et le compteur de lectures porte bien 20', `notées=${notes}`);
   });
 
+  console.log('── 4. Les gestes AUTOMATIQUES (garde : moteur d\'offres, bordereau de la visite) laissent la réserve aux clics');
+  await essaie('reserve', async () => {
+    const t = Date.now();
+    const store = { vrmActions: { '111': Array.from({ length: 45 }, (_, i) => t - 20 * 60000 - i * 1000) } };
+    const f = faireFond({ src: SRC, connecte: '111', store, vinted: () => ({ status: 200, body: { ok: true } }) });
+    const g = await f.ctx.garde('111', { domain: 'www.vinted.fr' });
+    dit(!!g && g.code === 'trop-d-actions', 'à 45 actions, un geste automatique est refusé (les 5 dernières sont gardées)', JSON.stringify(g));
+    const notes = ((f.store.vrmActions || {})['111'] || []).length;
+    dit(notes === 45, 'et le refus ne consomme rien', `notées=${notes}`);
+    const r = await f.ctx.executerPourApp(rep(9), S);
+    dit(r.ok, 'une réponse à un acheteur sur clic passe encore à 45', JSON.stringify(r.code || r.error || 'ok'));
+    const f2 = faireFond({ src: SRC, connecte: '111', store: { vrmActions: { '111': Array.from({ length: 44 }, (_, i) => t - 20 * 60000 - i * 1000) } } });
+    dit((await f2.ctx.garde('111', { domain: 'www.vinted.fr' })) === null, 'l\'autre sens : à 44, le geste automatique part');
+  });
+
   console.log(`\n${ok} contrôle(s) conforme(s), ${ko} non conforme(s).`);
   process.exit(ko ? 1 : 0);
 })();

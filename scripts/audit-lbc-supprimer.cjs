@@ -300,6 +300,16 @@ function fond(seed, local0, opts = {}) {
     dit(/confirme: true/.test(corpsF.slice(iEnvoi)), 'l’envoi porte la confirmation (l’extension la revérifie)');
   });
 
+  console.log('── Une notion, deux constantes : le plafond de suppressions par heure');
+  {
+    // (30 oct., intégration) L'écran Republier promet « au plus N par passage (la
+    // limite de suppressions de l'extension par heure) » : N doit ÊTRE cette
+    // limite. Rien ne les liait — l'extension baissée, la phrase devenait fausse.
+    const mApp = APP.match(/const REPUB_LBC_MAX\s*=\s*(\d+)/), mExt = SRC.match(/const LBC_SUPPRIME_MAX_HEURE\s*=\s*(\d+)/);
+    dit(!!mApp && !!mExt, 'les deux constantes sont trouvées', `app=${mApp && mApp[1]} ext=${mExt && mExt[1]}`);
+    dit(!!mApp && !!mExt && mApp[1] === mExt[1], 'REPUB_LBC_MAX (app) = LBC_SUPPRIME_MAX_HEURE (extension)', `app=${mApp && mApp[1]} ext=${mExt && mExt[1]}`);
+  }
+
   console.log(ko ? `\n❌ ${ko} contrôle(s) rouge(s)` : '\n✅ tout est vert');
   process.exit(ko ? 1 : 0);
 })();

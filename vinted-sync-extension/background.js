@@ -7959,23 +7959,23 @@ async function issueVisite(uid, marque, r) {
 //    `vanessa5723` (« enlève-toi ça de la tête »). On ne fait donc plus porter
 //    cette théorie au code, et l'espacement entre deux acceptations est
 //    ALÉATOIRE, comme il l'a demandé (« ça peut être aléatoire ») : un simple
-//    étalement. Le vrai rate-limiting vient d'ailleurs — plafond 20/h et « une
+//    étalement. Le vrai rate-limiting vient d'ailleurs — plafond 50/h et « une
 //    requête à la fois » — et ne bouge pas.
 // GARDE-FOUS, jamais retirés : compte connecté dans l'onglet seulement (`garde`
-// → `compteConnecte` + `compterAction` = plafond 20/h), une requête à la fois
+// → `compteConnecte` + `compterAction` = plafond 45/h, les 5 dernières gardées pour ses clics), une requête à la fois
 // (`vintedSend`/la file), arrêt net sur une pause Vinted (429/403), volume borné
 // par visite, et chaque offre traitée UNE fois (mémo `vrmOffresFaites`, 7 j).
 const OFFRE_EN_ATTENTE = 10;
 const OFFRES_MAX_PAR_VISITE = 3;          // limite de VOLUME
 const ESPACE_ACCEPT_MIN_MS = 15000;       // étalement ALÉATOIRE entre deux acceptations (demandé par Julien)…
-const ESPACE_ACCEPT_MAX_MS = 45000;       // …le rate-limit réel reste le plafond 20/h + « une requête à la fois »
+const ESPACE_ACCEPT_MAX_MS = 45000;       // …le rate-limit réel reste le plafond 50/h + « une requête à la fois »
 // (29 oct., « accepter les offres automatiquement avec un délai aléatoire ») Une
 // offre qui passe la règle n'est plus acceptée dès que VRM la voit : un délai TIRÉ
 // AU HASARD (3 à 20 min) est posé à la première fois où elle est vue
 // (`vrmOffresPrevues[oid] = heure prévue`, chrome.storage.local — §4.9), puis
 // une alarme d'1 min regarde CE stockage seulement (zéro lecture de base, zéro
 // requête Vinted) et ne relance le moteur que quand une heure prévue est passée.
-// Le moteur garde TOUS ses garde-fous (compte de l'onglet, plafond 20/h, pause,
+// Le moteur garde TOUS ses garde-fous (compte de l'onglet, plafond 45/h, pause,
 // une fois par offre). Une offre déjà acceptée/refusée entre-temps sur Vinted ⇒
 // Vinted refuse le geste, rien d'autre.
 const DELAI_OFFRE_MIN_MS = 3 * 60000;
@@ -9258,7 +9258,7 @@ const DESCRIPTION_MIN = 5;   // mesuré : « Le champ Description doit comprendr
 // Entre deux gestes d'une même republication, une pause TIRÉE AU HASARD dans une
 // plage, jamais deux fois la même : entre deux photos 3–9 s, avant le brouillon
 // 6–15 s, avant la mise en ligne 15–40 s, avant de retenter 8–20 s. C'est lui qui
-// lance (atelier §3) ; les garde-fous (20 actions/h, file, pause Vinted) restent.
+// lance (atelier §3) ; les garde-fous (50 actions/h, file, pause Vinted) restent.
 // Mesuré sur Vintex (29 oct., 2 articles) : lecture → 1re photo 1,6–4,2 s ; entre deux photos 2,1–4,4 s ;
 // dernière photo → brouillon ~1 s ; brouillon → suppression 0,4–0,7 s ; brouillon → mise en ligne 65–163 s.
 const PAUSES_REPUB = { lecture: [1500, 4000], photo: [2000, 4500], brouillon: [800, 2000], suppression: [400, 800], enLigne: [60000, 180000], reessai: [8000, 20000] };
@@ -10175,7 +10175,7 @@ async function compteConnecte(domain) {
   try { return await activeAccountId(domain || 'www.vinted.fr'); } catch (_) { return null; }
 }
 
-// `plafond` : la part des 20 actions que CE geste a le droit d'atteindre (les
+// `plafond` : la part des 50 actions que CE geste a le droit d'atteindre (les
 // bordereaux commandés par l'app s'arrêtent avant la réserve des gestes sur
 // clic, voir `RESERVE_GESTES`). `resteMs` dit quand une place se libère : la
 // raison d'un refus donne une heure, pas « plus tard ».
@@ -11390,7 +11390,7 @@ function sousAdmission(fn) {
 // d'une commande venue de l'app sur l'ordinateur : `executerCommande`
 // (bordereau), `executerPourApp` (répondre, trancher ou faire une offre),
 // `publierDepuisApp` (Leboncoin) — donc `gardeStricte` (le compte du cookie
-// Vinted doit être celui visé), 20 actions/heure, la file `avecVinted` (une
+// Vinted doit être celui visé), 50 actions/heure, la file `avecVinted` (une
 // requête Vinted à la fois), la pause quand Vinted freine.
 // L'extension REVÉRIFIE tout ce que le téléphone envoie :
 //   · liste blanche (rien d'autre que ces trois commandes ; `exec` passe par
@@ -11647,10 +11647,15 @@ async function garde(uid, acc) {
     return { ok: false, code: 'autre-compte',
              error: "ton navigateur est connecté à un autre compte — bascule sur celui-ci sur Vinted avant d'agir (sinon Vinted voit deux comptes depuis la même session)" };
   }
-  const c = await compterAction(String(uid));
+  // (30 oct., intégration) `garde` ne sert qu'aux gestes AUTOMATIQUES (moteur
+  // des offres, bordereau de la visite) : ils s'arrêtent avant la réserve, les
+  // `RESERVE_GESTES` dernières actions de l'heure restent à SES clics (répondre
+  // à un acheteur, trancher une offre). Avant, à 45 le moteur prenait les 5
+  // dernières et la réponse sur clic était refusée « plafond ».
+  const c = await compterAction(String(uid), ACTIONS_MAX_HEURE - RESERVE_GESTES);
   if (!c.ok) {
     return { ok: false, code: 'trop-d-actions',
-             error: `${ACTIONS_MAX_HEURE} actions sur ce compte dans l'heure — on s'arrête là pour ne pas attirer l'attention. Réessaie plus tard.` };
+             error: `${ACTIONS_MAX_HEURE - RESERVE_GESTES} actions automatiques sur ce compte dans l'heure — les ${RESERVE_GESTES} dernières sont gardées pour tes gestes. Réessaie plus tard.` };
   }
   return null;
 }
@@ -11659,7 +11664,7 @@ async function garde(uid, acc) {
 // Elle avait été retirée les 4-5 octobre. Le 27 octobre Julien la REDEMANDE et
 // choisit « Moteur auto (accepte seul) », le risque de blocage rappelé. Le
 // moteur vit plus haut (`autoAccepterOffres`, sous `garde` : compte connecté,
-// plafond 20/h, pause 429/403, volume borné, chaque offre une fois) ; il est
+// plafond 50/h, pause 429/403, volume borné, chaque offre une fois) ; il est
 // éteint par défaut (`vinted_offres_auto`). `scripts/audit-moteur-offres.cjs`
 // l'EXÉCUTE (§4.10). L'acceptation MANUELLE depuis la messagerie de l'app passe,
 // elle, par `executerPourApp` / EXEC_PERMIS, sur son clic.
@@ -12061,7 +12066,7 @@ async function genererBordereau(uid, tx, opts = {}) {
 // LES GARDE-FOUS, TOUS DÉJÀ EN PLACE (§48) :
 //  • UNIQUEMENT le compte connecté dans cet onglet (`garde`) — agir au nom d'un
 //    autre compte est LE signal multi-comptes que Vinted sanctionne (§5) ;
-//  • plafond de 20 actions/heure par compte (`compterAction`) ;
+//  • plafond de 50 actions/heure par compte (`compterAction`) ;
 //  • ⚠️ AU PLUS 3 PAR VISITE. Ce n'est pas un « rythme faussement humain »
 //    (toujours refusé, §32) : c'est une limite de volume, comme le plafond
 //    horaire. Le reste part à la visite suivante. Mesuré sur les vraies
@@ -12069,7 +12074,7 @@ async function genererBordereau(uid, tx, opts = {}) {
 //  • on ne réessaie pas une vente refusée avant 6 h (mémo local, aucun égress).
 // ⚠️ 3 → 6 (Julien, 3 septembre : « améliore encore la rapidité »). Ce n'est
 // PAS le garde-fou anti-blocage : le vrai plafond reste `ACTIONS_MAX_HEURE`
-// (20 actions/h par compte, §48), et il est vérifié AVANT chaque requête. Ce
+// (50 actions/h par compte, §48), et il est vérifié AVANT chaque requête. Ce
 // nombre-ci ne fait que borner une seule visite pour ne pas tout envoyer d'un
 // coup ; à 3, une journée à 8 ventes demandait trois passages sur Vinted.
 // Les requêtes restent envoyées UNE PAR UNE, jamais en rafale (§5.36).
