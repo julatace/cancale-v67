@@ -26958,13 +26958,19 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       setReservesNum((v) => (memes(v, n) ? v : n));
     } catch (_) { setReservesNum((v) => (v === undefined ? null : v)); }
   };
+  // (30 oct.) Relue quand l'ENSEMBLE des annonces change, pas à chaque nouvelle
+  // liste identique (relecture des annonces d'un autre compte, signal de
+  // l'extension) : deux lectures de moins au démarrage de Ma journée (banc `vitesse`).
+  // Rien n'est lu tant que les annonces ne sont pas lues (elles seules s'en servent).
+  const cleAnnoncesNum = useMemo(() => Array.isArray(listings.items) ? listings.items.map((i) => i && i.id).sort().join(',') : null, [listings.items]);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { relireReservesNum(); }, [listings.items]);
+  useEffect(() => { if (cleAnnoncesNum !== null) relireReservesNum(); }, [cleAnnoncesNum]);
   // (28 oct.) Qui remplace qui après une republication : `vinted_brouillon_*`
   // (ancienId, itemId) et `coffre_*_*` (recreeDe), écrits par l'extension. Trois
   // états : undefined pas encore lu (on attend) · null pas su (comme avant) · objet.
   const [recreesNum, setRecreesNum] = useState(undefined);
   useEffect(() => {
+    if (cleAnnoncesNum === null) return undefined;
     let vivant = true;
     (async () => {
       try {
@@ -26978,7 +26984,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       } catch (_) { if (vivant) setRecreesNum((v) => (v === undefined ? null : v)); }
     })();
     return () => { vivant = false; };
-  }, [listings.items]);
+  }, [cleAnnoncesNum]);
   const takenNums = useMemo(() => {
     const taken = new Set();
     usedNumeros.forEach(x=>{const n=parseInt(String(x),10);if(!isNaN(n))taken.add(n);});

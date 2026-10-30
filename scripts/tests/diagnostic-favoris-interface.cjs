@@ -42,7 +42,7 @@ const racine=path.resolve(__dirname,'../..');
   await p.evaluate(()=>window.lecture='erreur');await verifier.click();await p.getByRole('alert').waitFor();
   check(await p.locator('pre').count()===0,'une erreur ne réutilise pas le précédent résultat');
   await p.evaluate(()=>window.afficher(''));
-  await verifier.waitFor();check(await verifier.isDisabled(),'compte non sélectionné : bouton inactif');
+  await p.getByText('Choisis le compte Vinted à vérifier',{exact:false}).waitFor();/* root.render de React 18 est asynchrone : on attend le rendu sans compte */check(await verifier.isDisabled(),'compte non sélectionné : bouton inactif');
   await p.evaluate(()=>{window.afficher('123');window.lecture='attente';});await verifier.waitFor();await verifier.click();
   await p.waitForFunction(()=>typeof window.liberer==='function');
   await p.evaluate(()=>{window.owner='autre-vendeur';window.afficher('123','autre-vendeur');window.liberer();});
