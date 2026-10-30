@@ -161,6 +161,73 @@
 > (« Passeport » dans les gestes), `revue-20oct` (gestes 44 px). Rouges déjà sur origin/main (mêmes lignes, prouvé sur son build) : `stats-premium` 3, `revue-20oct` 12, `capacites` 38, `feuilles-coque`
 > 7 (Tout imprimer, Passeport). ⚠️ Non mesuré : sa vraie base, un vrai iPhone/Safari. Extension inchangée. Julien : rien.
 
+> **29 octobre (revue 3) — Comptabilité, suivi URSSAF en trimestriel :** un seul trimestre noté (T3 = juillet, août,
+> septembre) était encore dit deux fois — l'en-tête « 300,00 € déclarés sur 3 mois · cotisations ≈ 37,20 € » au-dessus de la
+> ligne T3 qui dit la même chose. La revue 2 ne retirait le total que pour UN MOIS (`a.n === 1`) ; `suiviUrssaf` rend maintenant
+> `annee.periodes` (périodes déclarées de l'année selon le rythme, un trimestre = trois mois) et l'en-tête dit « 1 période notée
+> « déclarée » — son détail est juste en dessous ». Aucun chiffre ne change (`data-suivi-annee-ca` inchangé). Preuves : banc
+> `compta-simple.cjs` scénario F (390 tactile clair, 1512 sombre) **4 rouges sur la branche d'avant (93824bf7)**, 0 après ;
+> mutation « périodes comptées en mois » ⇒ 4 rouges ; banc entier 176 verts. Geste de Julien : aucun.
+
+> **29 octobre (revue 2) — Comptabilité : cinq défauts des relecteurs, corrigés :** (1) la carte URSSAF renvoyait une vente
+> Leboncoin à dater vers « Chiffre d'affaires par période », carte renommée « Vendu et reçu » : une source (`TITRE_CARTE_CA`) pour
+> le titre, le sommaire et la phrase, singulier accordé ; (2) **une période déjà notée « déclarée »** gardait « dans 4 j · à payer
+> 37,20 € » (37,20 € écrit 3 fois, deux « prochaines échéances » sur l'écran) : la carte ne lui donne plus ni montant ni compte à
+> rebours, elle nomme la SUIVANTE (`nextUrssafDeadline` au lendemain de l'échéance faite, jours comptés depuis aujourd'hui) et dit
+> « septembre : déclaration notée ✓ » ; son montant reste dans la ligne du suivi ; l'en-tête du suivi ne garde son total que sur
+> plusieurs mois ; (3) **« Tes dépenses » se démontait à l'arrivée du nuage** (une dépense en cours de saisie perdait le focus et les
+> touches suivantes — régression de la revue 1) : `StatutFiscal` rend six places fixes, les dépenses toujours à la 4ᵉ ; (4)
+> Organisation ouverte depuis Réglages disait « GESTION » et son ancienne accroche : surtitre « Réglages », la phrase de Réglages
+> sous le titre (`src/operations/description.js`, une source), roue du rail mise en avant ; (5) le banc partait de Ventes au bout
+> de 3,5 s : il attend la publication du bénéfice. En plus : « Comment c'est calculé » du bénéfice replié (la couverture reste sur
+> la ligne « brut »). Laissé, décision de l'autre session : « Ta micro-entreprise » s'ouvre tant que le versement libératoire n'est
+> pas tranché. Preuves : `compta-simple.cjs` **164 contrôles, 25 rouges sur la branche d'avant**, 0 après ; mutation (dépenses à la
+> racine + ancien nom) ⇒ 4 rouges (D et E). Aucun chiffre ne change. ⚠️ Non mesuré : sa vraie base. Geste de Julien : aucun.
+
+> **29 octobre (revue) — Comptabilité simple sur SA configuration :** mesuré (lecture seule) : sa ligne `main` est en micro,
+> mensuel, **sans `vrm_micro_options`** — « Ta micro-entreprise » s'ouvre donc d'elle-même (règle de l'autre session, gardée) et
+> poussait « Tes dépenses » à 3 768 px du haut au téléphone (plus loin qu'avant). **Les dépenses passent juste après la carte URSSAF
+> du mois**, avant le suivi et la micro-entreprise (`StatutFiscal` prend `apresMois`, rendu dans TOUS ses états) : 1 741 px au
+> téléphone, 1 367 à l'ordinateur. La carte CA s'appelle « Vendu et reçu », dit que sa période ne vaut que pour elle (le bénéfice a la
+> sienne, deux libellés distincts) et ne montre plus d'en-tête de tableau vide (« Année »). URSSAF, une phrase une fois (§7) : le
+> suivi ne redonne plus l'« à payer » du mois EN COURS (la carte du mois le dit), le calendrier marque d'une coche (sans redire
+> « notée déclarée ») ; le titre replié de la micro-entreprise GARDE l'échéance (`suivi-urssaf.cjs` R l'exige : décision de l'autre
+> session, pas défaite). « connu pour 1 vente » ; la facturation
+> électronique renvoie à « Ton entreprise (Comptabilité → Avancé) » (« Profil fiscal » n'existait plus) ; le « ⓘ » du résultat ne
+> dit plus que le bénéfice est « juste en dessous » (il est en haut). Réglages → Organisation dit à quoi sert l'écran. Aucun chiffre
+> ne change. Preuves : `compta-simple.cjs` (131 contrôles) **24 rouges sur le code d'avant** (la branche avant cette revue), 0 après ;
+> mutation (dépenses après la micro + tableau vide + « juste en dessous ») ⇒ 8 rouges ; `facturx.cjs` suit le nouveau geste.
+> ⚠️ Non mesuré : sa vraie base dans l'app. Geste de Julien : aucun (répondre une fois « versement libératoire » referme le bloc).
+
+> **29 octobre — COMPTABILITÉ SIMPLE :** Julien : « pour la compta, améliore tout, mets de côté la facturation électronique et
+> fais quelque chose de simple ». **Aucune règle de calcul ne change (§11) : seul l'ordre change.** En haut, ce qu'il regarde :
+> Vendu et reçu (`CaParPeriodeCarte`) → Bénéfice (`BeneficeCompta`) → URSSAF (`StatutFiscal` : carte du mois et prochaine
+> échéance, « Suivi de tes déclarations URSSAF », puis « Ta micro-entreprise » repliée — le repli et son ouverture d'office sont
+> ceux de l'autre session (« Comptabilité allégée », gardés tels quels à la fusion ; mon repli à moi est retiré : une règle pour une
+> notion) → **Tes dépenses** (les montants, « Ajouter une dépense », les abonnements). En bas, **« Avancé », replié**
+> (`data-compta-avance`) : résultat de l'année, récap mensuel (replié lui aussi, par l'autre session), packs, ton entreprise,
+> factures, facturation électronique (Super PDP) — rien n'est supprimé, le sommaire (Vendu et reçu · Bénéfice · URSSAF · Dépenses ·
+> Avancé) y mène et l'ouvre. La tuile « Bénéfice — · saisis tes prix d'achat » de la carte URSSAF est retirée : le bénéfice a sa
+> carte juste au-dessus (§7, une notion une fois). Preuves : banc `compta-simple.cjs` (port 9311, données inventées, 390 tactile
+> clair + 1512 sombre ; 107 contrôles ; `SHOTS=dossier` capture tout l'écran) — **38 rouges sur origin/main (cadafd4)**, et les
+> mêmes chiffres sur les deux codes (vendu 60 €, reçu 60 €, bénéfice net −2,93 €, à payer 37,20 €, dépenses du mois 25,49 €,
+> résultat 321,52 €) ; 3 mutations rouges sur le code fusionné (« Avancé » ouvert d'office : 12 · Organisation remise au menu : 2 ·
+> « Bénéfice — » redit : 2). Les bancs qui lisent les cartes rangées (chiffres-croises, compta-abonnements, compta-stock-ui,
+> entreprise-stream, facturx, stats-compta, superpdp) ouvrent « Avancé » d'un toucher, comme lui (`scripts/bancs/_compta.cjs`,
+> sans effet sur un code d'avant). ⚠️ Non mesuré : sa vraie base. Geste de Julien : aucun.
+
+> **29 octobre — ORGANISATION RETIRÉE DU MENU :** Julien : « on ne comprend pas à quoi ça sert, ça doit être utile sinon ça n'a
+> rien à faire ici ». **Mesuré (lecture seule, `vrm_operations_v1`)** : en dix jours, UN élément — une recherche eBay préparée,
+> jamais lancée (elle reste dans eBay → Achats) — et zéro mission, réservation, lot, consommable, réception ou dossier ; les
+> missions supposent une équipe, et la migration 016 n'est pas appliquée. Ce qui l'attend aujourd'hui est Ma journée, ses retours
+> sont dans Colis : un écran qui les redirait serait une seconde règle (§11). **Décision : hors du menu** (Gestion au téléphone,
+> rail à l'ordinateur) ; l'écran, ses données, `?tab=organisation` et « Mes missions » de l'équipe restent ; on y entre par
+> **Réglages → Stock et rangement → Organisation** (`data-reglage-organisation`). Preuves : banc `compta-simple.cjs` section C ;
+> `scripts/tests/operations-navigation.cjs` suit le nouveau chemin (rouge sur origin/main). ⚠️ `revendeurs.cjs`, qui porte ce
+> test, meurt déjà sur origin/main (« actions quotidiennes en haut », filtres eBay) : le bloc a été prouvé posé au début du banc.
+> Geste de Julien : aucun — s'il veut l'écran, Réglages → Stock et rangement → Organisation.
+
+
 > **29 octobre — 5.287, numéros sur les profils visités :** Julien a précisé que
 > l’affichage semble seulement sur Vinted, l’import dans VRM n’est pas confirmé.
 > `/member/{id}` : aucun numéro renvoyé sans égalité avec le PROFIL du compte
