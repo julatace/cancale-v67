@@ -2180,8 +2180,8 @@ function RangerSheet({ paires, cellNom, onPick, onLibre, onClose, apercu }) {
         ))}
       </div>
       <div style={{display:'flex',gap:8,marginTop:12}}>
-        <button type="button" onClick={onLibre} style={{flex:1,padding:'10px 12px',borderRadius:10,border:`1px solid ${C.border}`,background:'transparent',color:C.text,fontSize:12.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Autre numéro…</button>
-        <button type="button" onClick={onClose} style={{flex:1,padding:'10px 12px',borderRadius:10,border:'none',background:C.card2,color:C.muted,fontSize:12.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Annuler</button>
+        <Bouton variante="discret" onClick={onClose} style={{flex:1}}>Annuler</Bouton>
+        <Bouton variante="secondaire" onClick={onLibre} style={{flex:1}}>Autre numéro…</Bouton>
       </div>
     </SheetShell>
   );
@@ -2207,14 +2207,12 @@ function AskTextSheet({ q, close }) {
           inputMode={q.numeric ? 'numeric' : undefined}
           style={{width:'100%',boxSizing:'border-box',marginTop:14,border:`1px solid ${C.border}`,borderRadius:10,background:C.surface,color:C.text,fontSize:16,fontWeight:600,padding:'12px 13px',fontFamily:'inherit',outline:'none'}}/>
         <div style={{display:'flex',gap:9,marginTop:12}}>
-          <button type="button" onClick={() => close(null)}
-            style={{flex:1,border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:10,padding:'12px',fontSize:13.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>
+          <Bouton variante="discret" onClick={() => close(null)} style={{flex:1}}>
             {q.cancel || 'Annuler'}
-          </button>
-          <button type="submit"
-            style={{flex:2,border:'none',background:C.accent,color:'#fff',borderRadius:10,padding:'12px',fontSize:13.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>
+          </Bouton>
+          <Bouton variante="primaire" type="submit" style={{flex:2}}>
             {q.ok || 'Valider'}
-          </button>
+          </Bouton>
         </div>
       </form>
     </SheetShell>
@@ -2236,12 +2234,10 @@ function ConfirmHost() {
         {cc.length > 0 && <div style={{fontSize:12.5,color:C.muted,marginTop:6,lineHeight:1.55,whiteSpace:'pre-wrap'}}>{cc.join('\n')}</div>}
         <div data-ask-choix style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(120px,1fr))',gap:8,marginTop:14}}>
           {(q.options || []).map(([val, lib]) => (
-            <button type="button" key={val} data-choix={val} onClick={() => close(val)}
-              style={{minHeight:44,border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:10,padding:'10px',fontSize:13.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>{lib}</button>
+            <Bouton variante="secondaire" key={val} data-choix={val} onClick={() => close(val)} className="vrm-b-court" style={{minHeight:44}}>{lib}</Bouton>
           ))}
         </div>
-        <button type="button" onClick={() => close(null)}
-          style={{width:'100%',minHeight:44,marginTop:12,border:'none',background:'transparent',color:C.muted,fontSize:13.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>{q.cancel || 'Annuler'}</button>
+        <Bouton variante="discret" plein onClick={() => close(null)} style={{marginTop:12}}>{q.cancel || 'Annuler'}</Bouton>
       </SheetShell>, document.body);
   }
   // Le premier paragraphe du message sert de titre : les anciens messages
@@ -2249,19 +2245,19 @@ function ConfirmHost() {
   const { titre, corps } = sheetTexte(q, 'Confirmer ?');
   return createPortal(
     <SheetShell onClose={() => close(false)} z={Z_CONFIRMATION}>
-      <div style={{fontSize:17,fontWeight:700,color:q.danger?C.danger:C.text,letterSpacing:'-0.02em',lineHeight:1.35}}>{titre}</div>
+      {/* (29 oct.) Plus de rouge sur une confirmation (§7 : le rouge, c'est deux
+          paires sous un même N°) : la conséquence est dite par le texte. */}
+      <div style={{fontSize:17,fontWeight:700,color:C.text,letterSpacing:'-0.02em',lineHeight:1.35}}>{titre}</div>
       {corps.length > 0 && (
         <div style={{fontSize:12.5,color:C.muted,marginTop:6,lineHeight:1.55,whiteSpace:'pre-wrap'}}>{corps.join('\n')}</div>
       )}
       <div style={{display:'flex',gap:9,marginTop:16}}>
-        <button type="button" onClick={() => close(false)}
-          style={{flex:1,border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:10,padding:'12px',fontSize:13.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>
+        <Bouton variante="discret" onClick={() => close(false)} style={{flex:1}}>
           {q.cancel || 'Annuler'}
-        </button>
-        <button type="button" autoFocus onClick={() => close(true)}
-          style={{flex:2,border:'none',background:q.danger?C.danger:C.accent,color:'#fff',borderRadius:10,padding:'12px',fontSize:13.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>
+        </Bouton>
+        <Bouton variante="primaire" autoFocus onClick={() => close(true)} style={{flex:2}}>
           {q.ok || 'Confirmer'}
-        </button>
+        </Bouton>
       </div>
     </SheetShell>, document.body
   );
@@ -2301,9 +2297,9 @@ function BoutonSync({ ouvert, onBasculer }) {
               syncStatus==='error'?'La base n\u2019a pas répondu — la sauvegarde sera retentée':'En attente'
             }>
               {/* Icône au trait : neutre quand tout est synchronisé (l'état normal
-                  ne réclame pas l'œil — §7, l'accent est rare) ; ambre en cours,
-                  rouge seulement si la base refuse ou ne répond pas. */}
-              <span style={{display:'flex',color:(syncStatus==='error'||syncStatus==='refus')?C.danger:syncStatus==='synced'?C.muted:C.warn}}>
+                  ne réclame pas l'œil — §7, l'accent est rare) ; ambre sinon —
+                  l'icône barrée dit l'échec (29 oct. : plus de rouge, §7). */}
+              <span style={{display:'flex',color:syncStatus==='synced'?C.muted:C.warn}}>
                 <Icon name={(syncStatus==='error'||syncStatus==='refus')?'cloudOff':syncStatus==='synced'?'cloud':'sync'} size={20}/>
               </span>
               {/* ⚠️ L'HEURE DE SYNCHRO EST RETIRÉE. Sur un iPhone, l'en-tête
@@ -4230,22 +4226,22 @@ function FactureSousVente({ factures, compte }) {
   const inv=drafts.find(i=>i._id===choix);
   return <div className="vrm-sale-invoice" data-ouvert={ouvert ? "true" : undefined}>
     {queued?<span role="status">Facture mise en file d'envoi</span>:<>
-      <button type="button" onClick={()=>setOuvert(!ouvert)} style={{border:0,background:'transparent',color:C.accent,fontSize:11,fontWeight:600,padding:'5px 0',cursor:'pointer'}} aria-label="Envoyer une facture à l'acheteur"><span className="vrm-invoice-full">Envoyer une facture à l'acheteur</span><span className="vrm-invoice-short" aria-hidden="true">Facture</span></button>
+      <Bouton variante="discret" icone="receipt" onClick={()=>setOuvert(!ouvert)} aria-expanded={ouvert} aria-label="Envoyer une facture à l'acheteur"><span className="vrm-invoice-full">Envoyer une facture à l'acheteur</span><span className="vrm-invoice-short" aria-hidden="true">Facture</span></Bouton>
       {ouvert && <div style={{display:'grid',gap:6,padding:'6px 0'}}>
         <label style={{fontSize:11}}>Choisir la facture de cette vente
           <select aria-label="Facture de cette vente" value={choix} onChange={e=>setChoix(e.target.value)} style={{display:'block',width:'100%',padding:8,marginTop:4,color:C.text,background:C.card,border:`1px solid ${C.border}`,borderRadius:8}}>
             <option value="">Sélectionner un brouillon</option>{drafts.map(i=><option key={i._id} value={i._id}>{i.number} · {i.designation} · {i.prix} € · {i.buyerEmail}</option>)}
           </select>
         </label>
-        {!drafts.length && <span style={{fontSize:11,color:C.muted}}>Aucun brouillon à envoyer pour ce compte. Les reçus restent disponibles dans Factures.</span>}
+        {!drafts.length && <span style={{fontSize:11.5,color:C.muted}}>Aucun brouillon à envoyer pour ce compte (les reçus sont dans Factures).</span>}
         {inv && <span data-facture-retour={inv.retourNom ? 'oui' : 'non'} style={{fontSize:11,color:inv.retourNom?C.muted:C.warn,lineHeight:1.4}}>{inv.retourNom
-          ? 'Les 2 documents Vinted Pro partent ensemble : la facture + le formulaire de retour en pièce jointe.'
-          : 'Vinted Pro demande 2 documents : seule la facture part (le formulaire de retour n’a pas été reçu avec l’email de vente — joins-le toi-même à l’acheteur).'}</span>}
+          ? 'La facture et le formulaire de retour partent ensemble.'
+          : 'Seule la facture part : le formulaire de retour n’est pas arrivé avec l’email de vente — joins-le toi-même.'}</span>}
         {inv && <button type="button" disabled={busy} onClick={async()=>{
           if(!await askConfirm(`Mettre la facture ${inv.number} (${inv.prix} €) en file d'envoi à ${inv.buyerEmail} ?`))return;
           setBusy(true);const ok=await setProInvoiceStatus(inv,'queued');setBusy(false);
           if(ok)setQueued(true);else toast('La facture n’a pas été mise en file. Relis son état dans Factures.');
-        }} style={{padding:'7px 10px',border:0,borderRadius:8,background:C.accent,color:C.onAccent,cursor:'pointer'}}>{busy?'Vérification…':'Confirmer le destinataire'}</button>}
+        }} className="vrm-b vrm-b-secondaire">{busy?'Vérification…':'Confirmer le destinataire'}</button>}
       </div>}
     </>}
   </div>;
@@ -9703,8 +9699,8 @@ const ImprimanteSetting = ({ nu = false }) => {
       ]}/>
       <div data-imprimante-phrase style={{fontSize:12.5,color:C.muted,marginTop:10,lineHeight:1.5}}>
         {mode === 'thermique'
-          ? <>Chaque étiquette sort <b style={{color:C.text}}>seule, au format 10 × 15 cm</b>, tournée à l’endroit et entière (sans la fiche destinataire ni la pub), ton N° dans un espace blanc vérifié sur l’étiquette. Quand l’app ne sait pas repérer l’étiquette sur un bordereau, la page part <b style={{color:C.text}}>entière</b> et l’écran le dit — jamais un code-barres coupé. Dans la fenêtre d’impression, choisis le papier <b style={{color:C.text}}>100 × 150 mm</b> et l’échelle <b style={{color:C.text}}>100 %</b> (ou « taille réelle »).</>
-          : <>La page complète, <b style={{color:C.text}}>une feuille A4 par bordereau</b>, ton N° dans un espace blanc vérifié sur ce PDF, sans réduire le document. Si ton imprimante sort du recto-verso, décoche-le dans sa fenêtre d’impression : le PDF le demande, le pilote peut passer outre.</>}
+          ? <>Une étiquette par page, <b style={{color:C.text}}>10 × 15 cm</b>, ton N° dessus ; étiquette pas repérée ⇒ page <b style={{color:C.text}}>entière</b>. <Pourquoi label="Détail">Chaque étiquette sort seule, tournée à l’endroit et entière (sans la fiche destinataire ni la pub), ton N° dans un espace blanc vérifié. Quand l’app ne sait pas repérer l’étiquette sur un bordereau, la page part entière et l’écran le dit — jamais un code-barres coupé.</Pourquoi></>
+          : <>A4, <b style={{color:C.text}}>une feuille par bordereau</b>, ton N° dans un blanc du PDF. <Pourquoi label="Recto-verso ?">Le document n’est pas réduit. Si ton imprimante sort du recto-verso, décoche-le dans sa fenêtre d’impression : le PDF le demande, le pilote peut passer outre.</Pourquoi></>}
       </div>
       <div style={{marginTop:14,paddingTop:12,borderTop:`1px solid ${C.border}`}}>
         <div style={{fontSize:13,fontWeight:600,color:C.text}}>Tes types de bordereaux</div>
@@ -10428,17 +10424,18 @@ function Cell({value, onChange, align="left", mono=false}) {
 }
 
 /* ── UI ──────────────────────────────────────────────── */
-function Btn({children,onClick,color,small,danger,outline,disabled,style={}}) {
-  const tonal = danger ? C.danger : (color || C.accent);
+// (29 oct.) L'ancien bouton générique passe par LES TROIS FORMES (styles-boutons.css).
+// Avant : `color={C.border}` donnait un texte BLANC sur un fond gris clair
+// (illisible), `danger` un fond rouge (§7 : le rouge, c'est deux paires sous un
+// même N°), et `title`/`aria-*` étaient perdus. Plein + accent (ou sans couleur)
+// ⇒ primaire ; tout le reste ⇒ secondaire. `data-vrm-tone` reste (lecture seule).
+function Btn({children,onClick,color,small,danger,outline,disabled,primaire:primaireDemande=false,style={},className='',...rest}) {
+  // (30 oct.) Secondaire par défaut : une couleur d'accent ne fait plus un primaire (une
+  // barre en avait quatre). Le primaire se DEMANDE (`primaire`), un par écran.
+  const primaire = !!primaireDemande && !outline && !danger;
   return (
-    <button data-vrm-tone={danger ? 'danger' : color ? 'custom' : 'brand'} className={`vrm-button${outline ? ' vrm-button--secondary' : ''}${small ? ' vrm-button--small' : ''}`} type="button" onClick={onClick} disabled={!!disabled} style={{
-      background:outline ? 'transparent' : tonal,
-      color:outline ? (danger || color ? tonal : C.text) : (color || danger ? '#fff' : C.onAccent),
-      border:`1px solid ${outline ? C.border : tonal}`,
-      fontSize:small?12.5:13,
-      cursor:disabled?'not-allowed':'pointer',
-      ...style,
-    }}>{children}</button>
+    <button data-vrm-tone={danger ? 'danger' : color ? 'custom' : 'brand'} type="button" onClick={onClick} disabled={!!disabled} {...rest}
+      className={`vrm-b vrm-b-${primaire ? 'primaire' : 'secondaire'}${small ? ' vrm-b-petit' : ''}${className ? ' ' + className : ''}`} style={style}>{children}</button>
   );
 }
 function Input({label,...p}) {
@@ -10682,7 +10679,7 @@ function AchatsHorsPlateforme({ achats, ouvert, onBasculer, onAjouter, onModifie
   return (
     <div data-achats-hors style={{ border: `1px solid ${C.border}`, background: C.card, borderRadius: 12, marginBottom: 12, boxShadow: C.shadow || 'none', overflow: 'hidden' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 6px 6px 14px', minHeight: 58 }}>
-        <button type="button" data-achats-hors-entete onClick={() => onBasculer(!ouvert)} aria-expanded={ouvert}
+        <button type="button" data-achats-hors-entete onClick={() => (liste.length ? onBasculer(!ouvert) : ouvrirAjout())} aria-expanded={liste.length ? ouvert : undefined}
           style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 10, border: 'none', background: 'transparent', padding: '6px 0', minHeight: 44, cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left', color: C.text }}>
           <span aria-hidden="true" style={{ flexShrink: 0, color: C.muted, display: 'flex' }}><Icon name="tag" size={18} /></span>
           <span style={{ flex: 1, minWidth: 0 }}>
@@ -10691,10 +10688,7 @@ function AchatsHorsPlateforme({ achats, ouvert, onBasculer, onAjouter, onModifie
           </span>
           {liste.length > 0 && <span aria-hidden="true" style={{ fontSize: 16, color: C.muted, transform: ouvert ? 'rotate(90deg)' : 'none', transition: 'transform .2s ease', flexShrink: 0, padding: '0 4px' }}>›</span>}
         </button>
-        <button type="button" data-achat-hors-ajouter onClick={ouvrirAjout} aria-label="Ajouter un achat hors plateforme"
-          style={{ flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 6, height: 44, padding: '0 14px', border: `1px solid ${C.border}`, borderRadius: 10, background: C.card2 || C.bg, color: C.text, fontSize: 13.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
-          <span aria-hidden="true" style={{ fontSize: 18, lineHeight: 1, color: C.accent, fontWeight: 500 }}>+</span> Ajouter
-        </button>
+        <Bouton variante="secondaire" data-achat-hors-ajouter onClick={ouvrirAjout} aria-label="Ajouter un achat hors plateforme" style={{ flexShrink: 0, minHeight: 44 }}>+ Ajouter</Bouton>
       </div>
       {form && (
         <div style={{ borderTop: `1px solid ${C.border}`, background: C.bg }}><div data-achat-hors-form style={{ padding: '14px 14px 16px', display: 'flex', flexDirection: 'column', gap: 13, maxWidth: 640 }}>
@@ -10716,11 +10710,10 @@ function AchatsHorsPlateforme({ achats, ouvert, onBasculer, onAjouter, onModifie
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
             {photoForm ? <img data-achat-hors-apercu src={photoForm} alt="" style={{ width: 56, height: 56, borderRadius: 10, objectFit: 'cover', flexShrink: 0, border: `1px solid ${C.border}` }} /> : null}
-            <button type="button" data-achat-hors-photo onClick={() => fichierRef.current && fichierRef.current.click()}
-              style={{ display: 'inline-flex', alignItems: 'center', gap: 8, height: 44, padding: '0 14px', border: `1px dashed ${C.border}`, borderRadius: 10, background: C.card, color: C.text, fontSize: 13, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }}>
-              <Icon name="camera" size={17} /> {form.photo || form.photoAvant ? 'Changer la photo' : 'Photo (facultatif)'}
-            </button>
-            {form.photo && <button type="button" onClick={() => setForm(d => ({ ...d, photo: null }))} style={{ height: 44, padding: '0 8px', border: 'none', background: 'transparent', color: C.muted, fontSize: 12.5, cursor: 'pointer', fontFamily: 'inherit' }}>retirer</button>}
+            <Bouton variante="secondaire" icone="camera" data-achat-hors-photo onClick={() => fichierRef.current && fichierRef.current.click()} style={{ minHeight: 44 }}>
+              {form.photo || form.photoAvant ? 'Changer la photo' : 'Photo (facultatif)'}
+            </Bouton>
+            {form.photo && <Bouton variante="discret" onClick={() => setForm(d => ({ ...d, photo: null }))}>Retirer la photo</Bouton>}
             <input data-achat-hors-fichier ref={fichierRef} type="file" accept="image/*" onChange={choisirPhoto} style={{ display: 'none' }} />
           </div>
           <details data-achat-hors-relier style={{ fontSize: 13, color: C.text }} open={!!(editId && form.numero) || undefined}>
@@ -10732,21 +10725,21 @@ function AchatsHorsPlateforme({ achats, ouvert, onBasculer, onAjouter, onModifie
                   {paires.map(p => <option key={p.id} value={String(p.id)}>N°{p.num} · {(p.title || '').slice(0, 40)}</option>)}
                 </select>)}
               {champ('N° de l\'article', <input data-champ="numero" value={form.numero} onChange={e => setForm(d => ({ ...d, numero: e.target.value.toUpperCase().replace(/[^0-9A-Z]/g, '').slice(0, 9) }))} inputMode={clavierNum()} placeholder={prochainNumero != null ? String(prochainNumero) : ''} style={inp} />)}
-              <div className="vrm-aide" style={{ fontSize: 11.5, color: C.muted, lineHeight: 1.45 }}>Avec un N°, ce prix devient le coût de l'article : quand il se vend, son bénéfice le reprend tout seul. Sans N°, l'achat compte quand même dans ce que tu as dépensé.</div>
+              <div className="vrm-aide" style={{ fontSize: 11.5, color: C.muted, lineHeight: 1.45 }}>Avec un N°, ce prix devient le coût de l'article dans son bénéfice.</div>
             </div>
           </details>
           {erreur && <div role="alert" data-achat-hors-erreur style={{ fontSize: 12.5, color: C.warn, lineHeight: 1.4 }}>{erreur}</div>}
           <div style={{ display: 'flex', gap: 8 }}>
-            <button type="button" data-achat-hors-enregistrer disabled={envoi} onClick={enregistrer}
-              style={{ flex: 1, minWidth: 0, height: 48, border: 'none', borderRadius: 10, background: C.accent, color: '#fff', fontSize: 14.5, fontWeight: 600, cursor: envoi ? 'default' : 'pointer', fontFamily: 'inherit', opacity: envoi ? 0.7 : 1 }}>{envoi ? 'Enregistrement…' : (editId ? 'Enregistrer' : "Ajouter l'achat")}</button>
-            <button type="button" onClick={fermer} style={{ flexShrink: 0, height: 48, padding: '0 16px', border: `1px solid ${C.border}`, borderRadius: 10, background: C.card, color: C.text, fontSize: 14, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }}>Annuler</button>
+            <Bouton variante="primaire" data-achat-hors-enregistrer disabled={envoi} onClick={enregistrer}
+              style={{ flex: 1, minWidth: 0, minHeight: 48, opacity: envoi ? 0.7 : 1 }}>{envoi ? 'Enregistrement…' : (editId ? 'Enregistrer' : "Ajouter l'achat")}</Bouton>
+            <Bouton variante="discret" onClick={fermer} style={{ flexShrink: 0, padding: '0 12px' }}>Annuler</Bouton>
           </div>
-          {editId && <button type="button" data-achat-hors-supprimer onClick={supprimer} style={{ alignSelf: 'flex-start', height: 44, padding: '0 4px', border: 'none', background: 'transparent', color: C.danger, fontSize: 13, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit', display: 'inline-flex', alignItems: 'center', gap: 6 }}><Icon name="trash" size={15} /> Supprimer cet achat</button>}
+          {editId && <Bouton variante="discret" icone="trash" data-achat-hors-supprimer onClick={supprimer} style={{ alignSelf: 'flex-start' }}>Supprimer cet achat</Bouton>}
         </div></div>
       )}
       {ouvert && liste.length > 0 && (
         <div data-achats-hors-liste style={{ borderTop: `1px solid ${C.border}` }}>
-          {photos === null && avecPhoto && <div style={{ fontSize: 11.5, color: C.muted, padding: '8px 14px 0' }}>Les photos n'ont pas pu être lues (la base n'a pas répondu) — elles reviendront à la prochaine ouverture.</div>}
+          {photos === null && avecPhoto && <div style={{ fontSize: 11.5, color: C.muted, padding: '8px 14px 0' }}>Photos pas lues (la base n'a pas répondu) — elles reviendront.</div>}
           {liste.map((b, i) => {
             const src = b.photo && photos ? photos[idPhotoAchatHors(b.id)] : null;
             const p = prixAchatHorsNombre(b);
@@ -10792,7 +10785,6 @@ function CoutAchatVente({ onSaisir, onRelier }) {
     if (p === null) { setErr('Un montant en euros (ex : 25 ou 25,50).'); return; }
     onSaisir(p); setEdit(false); setTxt(''); setErr('');
   };
-  const bouton = { display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6, height: 44, padding: '0 13px', borderRadius: 10, fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' };
   return (
     <div data-cout-vente className="vrm-cout-vente" style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
       <div className="vrm-cout-rangee" style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
@@ -10805,14 +10797,12 @@ function CoutAchatVente({ onSaisir, onRelier }) {
                 style={{ width: '100%', boxSizing: 'border-box', height: 44, border: `1px solid ${C.border}`, borderRadius: 10, padding: '0 28px 0 12px', fontSize: 16, background: C.card, color: C.text, outline: 'none', fontFamily: 'inherit' }} />
               <span aria-hidden="true" style={{ position: 'absolute', right: 11, top: '50%', transform: 'translateY(-50%)', color: C.muted, pointerEvents: 'none' }}>€</span>
             </div>
-            <button type="submit" data-cout-vente-ok style={{ ...bouton, border: 'none', background: C.accent, color: '#fff' }}>OK</button>
+            <Bouton type="submit" variante="primaire" data-cout-vente-ok>OK</Bouton>
           </form>
         ) : (
           <>
-            <button type="button" data-cout-vente-saisir onClick={() => setEdit(true)} title="Taper le prix payé, sans relier d'achat"
-              style={{ ...bouton, border: `1px solid ${C.border}`, background: C.card, color: C.text }}><Icon name="pencil" size={14} /> Saisir le prix</button>
-            <button type="button" data-cout-vente-relier onClick={onRelier} title="Choisir l'achat Vinted correspondant : son prix remplit le coût"
-              style={{ ...bouton, border: `1px solid ${C.border}`, background: 'transparent', color: C.muted }}><Icon name="link" size={14} /> Relier un achat</button>
+            <Bouton variante="secondaire" icone="pencil" data-cout-vente-saisir onClick={() => setEdit(true)} title="Taper le prix payé, sans relier d'achat">Prix d’achat</Bouton>
+            <Bouton variante="secondaire" icone="link" data-cout-vente-relier onClick={onRelier} title="Choisir l'achat Vinted correspondant : son prix remplit le coût">Relier un achat</Bouton>
           </>
         )}
       </div>
@@ -10851,15 +10841,12 @@ function NotifsMuettes({ onNav }) {
   }, []);
   if (!etat || etat.pret) return null;
   return (
-    <Notice tone="danger" icon="alert"
+    <Notice tone="warn" icon="alert"
       title="Ton téléphone ne recevra aucune notification"
       value={etat.devices ? `${etat.devices} appareil${etat.devices>1?'s':''} abonné${etat.devices>1?'s':''}` : null}
-      desc="Le serveur n'a pas sa clé d'envoi : ni vente, ni colis, ni offre ne feront sonner ton téléphone tant qu'elle manque."
+      desc="Le serveur n'a pas sa clé d'envoi : ni vente, ni colis, ni offre ne sonneront."
       detail={"Vercel → projet cancale-v67 → Settings → Environment Variables → ajouter VAPID_PRIVATE_KEY, puis redéployer. Rouvre ensuite l'app une fois sur chaque téléphone : il se réabonne tout seul."}
-      action={onNav && <button type="button" onClick={()=>onNav('settings')}
-        style={{border:'none',background:C.danger,color:'#fff',borderRadius:8,padding:'8px 14px',fontSize:12.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit',whiteSpace:'nowrap'}}>
-        Voir les réglages
-      </button>}
+      action={onNav && <Bouton variante="secondaire" icone="gear" className="vrm-b-petit" onClick={()=>onNav('settings')}>Réglages</Bouton>}
       style={{marginBottom:14}}/>
   );
 }
@@ -12227,10 +12214,10 @@ function useBrouillonsARefaire(actif, presentes) {
 }
 // Ce que dit chaque ligne, et ce que fait le bouton (une phrase par état).
 const TEXTE_REFAIRE = {
-  'a-refaire': (b) => `Le brouillon n'a pas pu être créé.${b.supprime ? ' L’annonce est retirée de la vente.' : ''}${b.peutExister ? ' Vinted n’a pas répondu clairement : regarde d’abord tes brouillons Vinted, il y est peut-être déjà.' : ''}`,
-  'a-publier': () => 'Le brouillon est rangé sur Vinted, mais sa mise en ligne n’est pas passée.',
-  'a-verifier': () => 'La mise en ligne est partie sans réponse claire : l’annonce est peut-être en ligne. Regarde ton dressing ; si elle n’y est pas, « Voir mes brouillons » la remet en ligne.',
-  interrompu: (b) => `Le passage s’est interrompu en route (Chrome fermé ou extension arrêtée).${b.supprime ? ' L’annonce est retirée de la vente.' : ' Regarde si l’annonce est encore en ligne sur Vinted.'}`,
+  'a-refaire': (b) => `Brouillon pas créé.${b.supprime ? ' L’annonce est retirée de la vente.' : ''}${b.peutExister ? ' Regarde d’abord tes brouillons Vinted : il y est peut-être déjà.' : ''}`,
+  'a-publier': () => 'Brouillon rangé sur Vinted, mise en ligne pas passée.',
+  'a-verifier': () => 'Peut-être déjà en ligne : regarde ton dressing, sinon « Voir mes brouillons ».',
+  interrompu: (b) => `Interrompu en route (Chrome fermé ou extension arrêtée).${b.supprime ? ' L’annonce est retirée de la vente.' : ' Regarde si elle est encore en ligne.'}`,
 };
 const BOUTON_REFAIRE = { 'a-refaire': 'Refaire le brouillon', 'a-publier': 'Mettre le brouillon en ligne', interrompu: 'Refaire le brouillon' };
 function BrouillonsARefaire({ br, refaire, onClose, onVoirBrouillons, peutAgir, raisonAgir }) {
@@ -12252,16 +12239,16 @@ function BrouillonsARefaire({ br, refaire, onClose, onVoirBrouillons, peutAgir, 
     <SheetShell onClose={onClose} maxWidth={520}>
       <div data-refaire-liste={Array.isArray(liste) ? liste.length : liste === null ? 'passu' : 'lecture'} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: C.text, flex: 1 }}>Brouillons à refaire</h2>
+          <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: C.text, flex: 1 }}>Brouillons à refaire <Pourquoi label="C'est quoi ?">Les republications par brouillon qui ne sont pas allées au bout. Chaque geste demande ta confirmation ; rien ne part tout seul.</Pourquoi></h2>
           <button type="button" onClick={onClose} aria-label="Fermer" style={{ border: 'none', background: 'transparent', color: C.muted, fontSize: 22, minWidth: 44, minHeight: 44, cursor: 'pointer' }}>✕</button>
         </div>
         {liste === undefined && <div style={{ fontSize: 13, color: C.muted }}>Lecture…</div>}
         {liste === null && <div data-refaire-passu style={{ fontSize: 13, color: C.muted }}>VRM n'a pas pu lire ce qui reste à refaire — rien n'est perdu, réessaie dans un moment.</div>}
-        {Array.isArray(liste) && !liste.length && <div style={{ fontSize: 13, color: C.muted }}>{regles.length ? 'Rien d’autre à refaire.' : 'Rien à refaire : chaque passage par brouillon est allé au bout.'}</div>}
-        {Array.isArray(liste) && Array.isArray(liste.enLigne) && liste.enLigne.length > 0 && <div data-refaire-en-ligne={liste.enLigne.length} style={{ fontSize: 13, color: C.muted }}>{liste.enLigne.length === 1 ? `« ${liste.enLigne[0].titre || 'Une annonce'} » est déjà en ligne sur Vinted (mise en ligne à la main ou par un autre brouillon) : plus rien à refaire.` : `${liste.enLigne.length} annonces sont déjà en ligne sur Vinted (mises en ligne à la main ou par un autre brouillon) : plus rien à refaire.`}</div>}
+        {Array.isArray(liste) && !liste.length && <div style={{ fontSize: 13, color: C.muted }}>{regles.length ? 'Rien d’autre à refaire.' : 'Rien à refaire : tout est allé au bout.'}</div>}
+        {Array.isArray(liste) && Array.isArray(liste.enLigne) && liste.enLigne.length > 0 && <div data-refaire-en-ligne={liste.enLigne.length} style={{ fontSize: 13, color: C.muted }}>{liste.enLigne.length === 1 ? `« ${liste.enLigne[0].titre || 'Une annonce'} » est déjà en ligne sur Vinted : plus rien à refaire.` : `${liste.enLigne.length} annonces sont déjà en ligne sur Vinted : plus rien à refaire.`}</div>}
         {regles.length > 0 && <div data-refaire-regles={regles.length} style={{ fontSize: 13, color: C.muted, display: 'flex', flexDirection: 'column', gap: 6 }}>
-          <div>{regles.length === 1 ? 'Tu as marqué un passage « C’est réglé » :' : `Tu as marqué ${regles.length} passages « C’est réglé » :`}</div>
-          {regles.map((b) => <button key={b.cle} type="button" data-refaire-revoir={b.id} onClick={() => revoir && revoir(b.cle)} style={{ textAlign: 'left', border: `1px solid ${C.border}`, borderRadius: 8, padding: '8px 12px', minHeight: 44, fontSize: 13, fontWeight: 600, background: 'transparent', color: C.text, cursor: 'pointer', fontFamily: 'inherit' }}>Le remettre dans la liste : {b.titre}</button>)}
+          <div>{regles.length === 1 ? 'Marqué « C’est réglé » :' : `${regles.length} marqués « C’est réglé » :`}</div>
+          {regles.map((b) => <div key={b.cle} style={{ display: 'flex', alignItems: 'center', gap: 8 }}><span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: C.text }}>{b.titre}</span><Bouton variante="discret" data-refaire-revoir={b.id} onClick={() => revoir && revoir(b.cle)}>Remettre dans la liste</Bouton></div>)}
         </div>}
         {Array.isArray(liste) && liste.length > 0 && !peutAgir && <div data-refaire-bloque style={{ fontSize: 12.5, color: C.muted }}>{raisonAgir || "L'extension VRM à jour est nécessaire dans ce navigateur."}</div>}
         {Array.isArray(liste) && liste.map((b) => { const s = etat[b.cle] || {}; const fini = s.etape === 'fait'; const geste = BOUTON_REFAIRE[b.quoi]; return (
@@ -12271,10 +12258,10 @@ function BrouillonsARefaire({ br, refaire, onClose, onVoirBrouillons, peutAgir, 
               <div style={{ fontSize: 14, fontWeight: 600, color: C.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{b.titre}{b.prix ? ` · ${prixCourt(b.prix)}` : ''}</div>
               <div style={{ fontSize: 12.5, color: C.muted, lineHeight: 1.45 }}>{fini ? (s.raison || 'Fait.') : s.etape && s.etape !== 'envoi' ? s.raison : TEXTE_REFAIRE[b.quoi](b)}</div>
               {s.etape === 'envoi' && <SuiviGeste ids={[b.id, b.draftId]} liste={b.quoi === 'a-publier' ? ETAPES_REPUB.publier : ETAPES_REPUB.refaire} label={b.titre} />}
-              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                {geste && !fini && s.etape !== 'incertain' && <button type="button" data-refaire-bouton={b.id} disabled={!peutAgir || s.etape === 'envoi'} onClick={() => lancer(b)} style={{ border: 'none', borderRadius: 8, padding: '8px 12px', minHeight: 44, fontSize: 13, fontWeight: 700, background: peutAgir ? C.accent : C.border, color: peutAgir ? '#fff' : C.muted, cursor: peutAgir ? 'pointer' : 'default', fontFamily: 'inherit' }}>{s.etape === 'envoi' ? 'En cours…' : s.etape && s.etape !== 'fait' ? 'Réessayer' : geste}</button>}
-                {b.quoi === 'a-verifier' && <button type="button" onClick={onVoirBrouillons} style={{ border: `1px solid ${C.border}`, borderRadius: 8, padding: '8px 12px', minHeight: 44, fontSize: 13, fontWeight: 600, background: 'transparent', color: C.text, cursor: 'pointer', fontFamily: 'inherit' }}>Voir mes brouillons</button>}
-                {!fini && <button type="button" data-refaire-regle={b.id} onClick={() => ecarter(b.cle)} style={{ border: `1px solid ${C.border}`, borderRadius: 8, padding: '8px 12px', minHeight: 44, fontSize: 13, fontWeight: 600, background: 'transparent', color: C.text, cursor: 'pointer', fontFamily: 'inherit' }}>C'est réglé</button>}
+              <div className="vrm-b-rangee">
+                {!fini && <Bouton variante="discret" data-refaire-regle={b.id} onClick={() => ecarter(b.cle)} title="Le retirer de la liste (il reste joignable plus bas)">C'est réglé</Bouton>}
+                {b.quoi === 'a-verifier' && <Bouton onClick={onVoirBrouillons} style={{ minHeight: 44 }}>Voir mes brouillons</Bouton>}
+                {geste && !fini && s.etape !== 'incertain' && <Bouton data-refaire-bouton={b.id} disabled={!peutAgir || s.etape === 'envoi'} title={!peutAgir ? (raisonAgir || "L'extension VRM à jour est nécessaire dans ce navigateur.") : undefined} onClick={() => lancer(b)} style={{ minHeight: 44 }}>{s.etape === 'envoi' ? 'En cours…' : s.etape && s.etape !== 'fait' ? 'Réessayer' : geste}</Bouton>}
               </div>
             </div>
           </div>
@@ -12306,15 +12293,15 @@ function BrouillonsVinted({ br, publier, brouillonOk, onClose, onFile }) {
     <SheetShell onClose={onClose} maxWidth={560}>
       <div data-brouillons-vinted style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: C.text, flex: 1 }}>Tes brouillons Vinted</h2>
+          <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: C.text, flex: 1 }}>Tes brouillons Vinted <Pourquoi label="D'où vient cette liste ?">Ceux que ton dressing Vinted montre à sa dernière lecture, et ceux enregistrés depuis, vus par l'extension. Un brouillon supprimé sur Vinted disparaît à la prochaine lecture de ce dressing.</Pourquoi></h2>
           <button type="button" onClick={onClose} aria-label="Fermer" style={{ ...lien, border: 'none' }}>✕</button>
         </div>
         {liste === null && <div style={{ fontSize: 13.5, color: C.muted }}>Lecture de tes annonces…</div>}
-        {liste && <div style={{ fontSize: 12.5, color: C.muted }}>Ceux que ton dressing Vinted montre à sa dernière lecture (et ceux enregistrés depuis, vus par l'extension). Un brouillon supprimé sur Vinted disparaît à la prochaine lecture de ce dressing.</div>}
+
         {liste && !liste.length && <div data-brouillons-vide style={{ fontSize: 13.5, color: C.muted }}>Aucun brouillon sur Vinted d'après tes dressings lus par VRM.</div>}
-        {infos === null && liste && liste.length > 0 && <div data-brouillons-passu style={{ fontSize: 12.5, color: C.muted }}>VRM n'a pas pu lire ce qu'il sait de tes brouillons — « Mettre en ligne » attend ; « Ouvrir sur Vinted » marche.</div>}
-        {!brouillonOk && liste && liste.length > 0 && <div data-brouillons-maj style={{ fontSize: 12.5, color: C.muted }}>Mettre un brouillon en ligne d'ici demande l'extension VRM {EXT_CAPACITES.brouillon} ou plus récente dans ce navigateur.</div>}
-        {brouillonOk && nPrets > 1 && onFile && <button type="button" data-brouillons-file onClick={onFile} style={{ ...lien, alignSelf: 'flex-start', border: 'none', background: C.accent, color: '#fff' }}>En mettre plusieurs en ligne, à la suite…</button>}
+        {infos === null && liste && liste.length > 0 && <div data-brouillons-passu style={{ fontSize: 12.5, color: C.muted }}>VRM n'a pas pu lire tes brouillons enregistrés : « Mettre en ligne » attend, « Ouvrir sur Vinted » marche.</div>}
+        {!brouillonOk && liste && liste.length > 0 && <div data-brouillons-maj style={{ fontSize: 12.5, color: C.muted }}>Mettre en ligne d'ici demande l'extension VRM {EXT_CAPACITES.brouillon} ou plus récente.</div>}
+        {brouillonOk && nPrets > 1 && onFile && <Bouton variante="primaire" data-brouillons-file onClick={onFile} style={{ alignSelf: 'flex-start', minHeight: 44 }}>En mettre plusieurs en ligne…</Bouton>}
         {liste && liste.map((it) => {
           const e = etat[it.id]; const i = it._info;
           const publie = it._etat === 'publie', complet = it._etat === 'pret';
@@ -12332,19 +12319,19 @@ function BrouillonsVinted({ br, publier, brouillonOk, onClose, onFile }) {
                 {e && e.etape && e.etape !== 'envoi' && e.etape !== 'fait' && <div data-brouillon-raison style={{ fontSize: 12.5, color: C.warn || C.muted }}>{e.raison || 'pas fait'}</div>}
                 {!e && publie && <div style={{ fontSize: 12.5, color: C.muted }}>Mis en ligne par VRM — ton dressing le montrera à la prochaine lecture.</div>}
                 {!e && it._etat === 'incomplet' && <div style={{ fontSize: 12.5, color: C.muted }}>Il lui manque {[!String((i && i.titre) || '').trim() && 'un titre', !(Number(i && i.prix) > 0) && 'un prix', !(Number(i && i.nph) > 0) && 'des photos'].filter(Boolean).join(', ')} — finis-le sur Vinted.</div>}
-                {!e && it._etat === 'inconnu' && <div data-brouillon-capter style={{ fontSize: 12.5, color: C.text, lineHeight: 1.5 }}>L'extension n'a pas encore vu ce brouillon (il a été fait avant elle, ou ailleurs). Pour qu'elle le capte : <b>1.</b> « Ouvrir sur Vinted » ci-dessous, <b>2.</b> sur Vinted, « Enregistrer le brouillon » sans rien changer. Il arrive ici tout de suite, prêt à mettre en ligne.</div>}
+                {!e && it._etat === 'inconnu' && <div data-brouillon-capter style={{ fontSize: 12.5, color: C.text, lineHeight: 1.5 }}>Pas encore vu par l'extension : ouvre-le sur Vinted et fais « Enregistrer le brouillon » sans rien changer. <Pourquoi label="Pourquoi ?">Il a été fait avant l'extension, ou ailleurs. Une fois enregistré sur Vinted, il arrive ici tout de suite, prêt à mettre en ligne.</Pourquoi></div>}
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6, flexShrink: 0 }}>
-                {complet && brouillonOk && (!e || (e.etape !== 'fait' && e.etape !== 'incertain')) && <button type="button" data-brouillon-publier disabled={e && e.etape === 'envoi'} onClick={() => mettre(it)} style={{ ...lien, border: 'none', background: C.accent, color: '#fff' }}>Mettre en ligne</button>}
-                <a data-brouillon-ouvrir href={`https://${domaine(it)}/items/${it.id}/edit`} target="_blank" rel="noopener noreferrer" style={lien}>Ouvrir sur Vinted ↗</a>
-                {!e && <button type="button" data-brouillon-ecarter onClick={() => ecarter(it.id)} title="Il n'est plus sur Vinted : le retirer de cette liste" style={{ ...lien, border: 'none', color: C.muted, fontWeight: 500 }}>Plus sur Vinted</button>}
+                {complet && brouillonOk && (!e || (e.etape !== 'fait' && e.etape !== 'incertain')) && <Bouton data-brouillon-publier disabled={e && e.etape === 'envoi'} onClick={() => mettre(it)} style={{ minHeight: 44 }}>Mettre en ligne</Bouton>}
+                <Bouton variante={complet && brouillonOk ? 'discret' : 'secondaire'} data-brouillon-ouvrir href={`https://${domaine(it)}/items/${it.id}/edit`} target="_blank" rel="noopener noreferrer" style={{ minHeight: 44 }}>Ouvrir sur Vinted ↗</Bouton>
+                {!e && <Bouton variante="discret" data-brouillon-ecarter onClick={() => ecarter(it.id)} title="Il n'est plus sur Vinted : le retirer de cette liste">Plus sur Vinted</Bouton>}
               </div>
             </div>
           );
         })}
         {nEcartes > 0 && <div data-brouillons-ecartes={nEcartes} style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', fontSize: 12.5, color: C.muted }}>
-          <span style={{ flex: '1 1 200px' }}>{nEcartes} brouillon{nEcartes > 1 ? 's' : ''} retiré{nEcartes > 1 ? 's' : ''} de la liste (tu as dit qu'il{nEcartes > 1 ? 's ne sont' : " n'est"} plus sur Vinted). Si ton dressing le montre encore à une prochaine lecture, il revient.</span>
-          <button type="button" data-brouillons-remettre onClick={remettre} style={lien}>Les remettre</button>
+          <span style={{ flex: '1 1 200px' }}>{nEcartes} brouillon{nEcartes > 1 ? 's' : ''} retiré{nEcartes > 1 ? 's' : ''} de la liste (« Plus sur Vinted »).</span>
+          <Bouton variante="discret" data-brouillons-remettre onClick={remettre}>Les remettre</Bouton>
         </div>}
       </div>
     </SheetShell>
@@ -12390,16 +12377,24 @@ function CompteRenduOperation({ onReprendre, onRefaire }) {
   const quand = (t) => { const d = new Date(t); return isNaN(d) ? '' : d.toLocaleString('fr-FR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }); };
   const etapeNom = (e) => { for (const l of Object.values(ETAPES_REPUB)) { const x = l.find((k) => k[0] === e); if (x) return x[1]; } return ''; };
   const lien = { background: 'none', border: 'none', padding: 0, color: C.accent, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', fontSize: 'inherit' };
+  // (30 oct.) « Tout doit être plus clair » : un titre qui dit ce qui s'est passé,
+  // le compte en une ligne, la paire en cours (le point qui demande de regarder),
+  // et le détail des noms replié. Deux gestes : reprendre, effacer.
+  const resume = [faits.length ? `${faits.length} ${A.faits}${faits.length > 1 ? 's' : ''}` : null, enCours.length ? `${enCours.length} en cours` : null, ratees.length ? `${ratees.length} pas faite${ratees.length > 1 ? 's' : ''}` : null, restent.length ? `${restent.length} pas commencée${restent.length > 1 ? 's' : ''}` : null].filter(Boolean).join(' · ');
   return (
-    <div data-compte-rendu={j.action} style={{ border: `1px solid ${C.warn}`, borderRadius: 12, padding: '12px 14px', margin: '10px 0', background: C.card, fontSize: 13, color: C.text, lineHeight: 1.5 }}>
-      <div style={{ fontWeight: 700 }}>« {A.titre} » s’est arrêtée{j.majAt ? ` (${quand(j.majAt)})` : ''} — l’app a été rechargée ou fermée.</div>
-      <div data-cr-faits={faits.length}>{faits.length ? `${faits.length} ${A.faits}${faits.length > 1 ? 's' : ''} : ${faits.map(nom).join(', ')}.` : `Aucune annonce ${A.faits} avant l’arrêt.`}</div>
-      {enCours.map((p) => <div key={p.id} data-cr-encours={p.id}>En cours au moment de l’arrêt : <b>{nom(p)}</b>{p.etape ? ` — étape « ${etapeNom(p.etape) || p.etape} »` : ''}. L’extension a pu continuer seule : regarde ton dressing Vinted{onRefaire ? <>, ou <button type="button" style={lien} onClick={onRefaire}>Brouillons à refaire</button></> : ''}.</div>)}
-      {ratees.length > 0 && <div data-cr-ratees={ratees.length}>Pas faites : {ratees.map((p) => `${nom(p)}${p.raison ? ` (${String(p.raison).slice(0, 90)})` : ''}`).join(' · ')}.</div>}
-      <div data-cr-restent={restent.length}>{restent.length ? `Pas commencées : ${restent.map(nom).join(', ')}.` : 'Toutes les annonces choisies avaient commencé.'}</div>
-      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8 }}>
-        {restent.length > 0 && onReprendre && <button type="button" data-cr-reprendre onClick={() => onReprendre(j.action, restent.map((p) => p.id))} style={{ border: `1px solid ${C.border}`, borderRadius: 8, padding: '8px 12px', minHeight: 44, fontWeight: 600, background: 'transparent', color: C.text, cursor: 'pointer', fontFamily: 'inherit' }}>Reprendre les {restent.length} pas commencée{restent.length > 1 ? 's' : ''}</button>}
-        <button type="button" data-cr-effacer onClick={() => ecrireJournalRepub(null)} style={{ border: `1px solid ${C.border}`, borderRadius: 8, padding: '8px 12px', minHeight: 44, fontWeight: 600, background: 'transparent', color: C.muted, cursor: 'pointer', fontFamily: 'inherit' }}>J’ai vu, effacer</button>
+    <div data-compte-rendu={j.action} style={{ border: `1px solid ${C.warn}`, borderRadius: 12, padding: '12px 14px', margin: '10px 0', background: C.card, fontSize: 13, color: C.text, lineHeight: 1.5, display: 'flex', flexDirection: 'column', gap: 4 }}>
+      <div style={{ fontWeight: 700 }}>« {A.titre} » s’est arrêtée{j.majAt ? ` (${quand(j.majAt)})` : ''} <Pourquoi label="Pourquoi ?">L’app a été rechargée ou fermée pendant l’opération : elle ne tourne que tant que la fenêtre est ouverte.</Pourquoi></div>
+      <div style={{ color: C.muted }}>{resume}</div>
+      {enCours.map((p) => <div key={p.id} data-cr-encours={p.id}>En cours à l’arrêt : <b>{nom(p)}</b>{p.etape ? ` — « ${etapeNom(p.etape) || p.etape} »` : ''}. Regarde ton dressing Vinted{onRefaire ? <>, ou <button type="button" style={lien} onClick={onRefaire}>Brouillons à refaire</button></> : ''}.</div>)}
+      <details className="vrm-repli">
+        <summary style={{ display: 'flex', alignItems: 'center', minHeight: 44, cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>Voir le détail</summary>
+        <div data-cr-faits={faits.length}>{faits.length ? `${faits.length} ${A.faits}${faits.length > 1 ? 's' : ''} : ${faits.map(nom).join(', ')}.` : `Aucune annonce ${A.faits} avant l’arrêt.`}</div>
+        {ratees.length > 0 && <div data-cr-ratees={ratees.length}>Pas faites : {ratees.map((p) => `${nom(p)}${p.raison ? ` (${String(p.raison).slice(0, 90)})` : ''}`).join(' · ')}.</div>}
+        <div data-cr-restent={restent.length}>{restent.length ? `Pas commencées : ${restent.map(nom).join(', ')}.` : 'Toutes les annonces choisies avaient commencé.'}</div>
+      </details>
+      <div className="vrm-b-rangee" style={{ justifyContent: 'flex-start' }}>
+        {restent.length > 0 && onReprendre && <Bouton data-cr-reprendre onClick={() => onReprendre(j.action, restent.map((p) => p.id))} style={{ minHeight: 44 }}>Reprendre les {restent.length} pas commencée{restent.length > 1 ? 's' : ''}</Bouton>}
+        <Bouton variante="discret" data-cr-effacer onClick={() => ecrireJournalRepub(null)}>J’ai vu, effacer</Bouton>
       </div>
     </div>
   );
@@ -12490,20 +12485,29 @@ function DetailEtapes({ p, liste, issue, now }) {
     </ol>
   );
 }
-function BarreGeste({ p, liste, attrs, label, issue = null, detail = true }) {
+function BarreGeste({ p, liste, attrs, label, issue = null, detail = true, barre = true, replie = true }) {
   const [now, setNow] = useState(() => Date.now());
   const enPause = !!(p && p.pause && p.pause.jusqua > now);
   useEffect(() => { if (!enPause) return undefined; const t = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(t); }, [enPause, p && p.pause && p.pause.jusqua]);
   useEffect(() => { setNow(Date.now()); }, [p]);
   const pe = progressionRepub(p, null, null, liste);
   const att = texteAttente(p, now);
+  // (30 oct., « la barre de progression est incompréhensible ») UNE ligne dit
+  // l'étape en cours (ou là où ça s'est arrêté) ; la liste des étapes (✓ ● ○ ✗)
+  // reste à portée, repliée. L'attente au hasard est dite sur cette ligne, une fois.
+  const e = p && p.etape;
+  const iArret = Array.isArray(liste) ? ((e === 'secours-photos' || e === 'secours-taille') ? liste.findIndex((x) => x[0] === 'en-ligne') : liste.findIndex((x) => x[0] === e)) : -1;
+  const ligne = issue === 'echec' ? (iArret >= 0 ? `Arrêté à l'étape « ${liste[iArret][1]} »` : 'Arrêté') : pe.texte;
+  const visibleDetail = detail && !replie;
   return (
     <div {...(attrs || {})} data-geste-etape={pe.etape || 'attente'} data-geste-pause={att ? 'oui' : 'non'}>
-      <div role="progressbar" aria-label={`${label ? label + ' : ' : ''}${pe.texte}`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(pe.part * 100)} style={{ height: 6, borderRadius: 3, background: C.border, overflow: 'hidden' }}>
+      {barre && <div role="progressbar" aria-label={`${label ? label + ' : ' : ''}${pe.texte}`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(pe.part * 100)} style={{ height: 6, borderRadius: 3, background: C.border, overflow: 'hidden', marginBottom: 4 }}>
         <div style={{ width: `${Math.max(4, Math.round(pe.part * 100))}%`, height: '100%', background: C.accent, transition: 'width .3s ease' }} />
-      </div>
-      <div style={{ fontSize: 12, color: C.muted, marginTop: 4 }}>{issue === 'echec' ? 'Arrêté — voir l’étape en ✗ ci-dessous' : pe.texte}{att && issue !== 'echec' ? ` · ${att}` : ''}</div>
-      {detail && <DetailEtapes p={p} liste={liste} issue={issue} now={now} />}
+      </div>}
+      <div style={{ fontSize: 12.5, color: issue === 'echec' ? C.warn : C.text }}>{ligne}{att && issue !== 'echec' && !visibleDetail ? ` · ${att}` : ''}</div>
+      {detail && (replie
+        ? <details className="vrm-repli vrm-etapes-repli"><summary>{issue === 'echec' ? 'Voir les étapes' : `Voir les ${Array.isArray(liste) ? liste.length : ''} étapes`}</summary><DetailEtapes p={p} liste={liste} issue={issue} now={now} /></details>
+        : <DetailEtapes p={p} liste={liste} issue={issue} now={now} />)}
     </div>
   );
 }
@@ -12557,7 +12561,7 @@ async function avecCouleurBrouillon(envoyer, titre) {
   }
   return r;
 }
-function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChrome, compteVinted, majExt, lettreOk, brouillonOk, onClose, action = 'recreer', reprise = null }) {
+function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChrome, compteVinted, majExt, lettreOk, brouillonOk, onClose, onReessayer = null, action = 'recreer', reprise = null }) {
   const A = ACTIONS_REPUB[action] || ACTIONS_REPUB.recreer;
   // (28 oct., sa demande) Seules les paires du compte Vinted OUVERT DANS CHROME
   // (cookie lu par l'extension, `vintedDeChrome`) : c'est le seul au nom duquel
@@ -12609,6 +12613,10 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
   }, []);
   const [tri, setTri] = useState('anciennes');       // anciennes | vues | favoris
   const [arret, setArret] = useState('');            // un refus qui vaut pour toute la file
+  // (30 oct.) Vinted a dit « réessaie dans N min » : « Reprendre » attend jusque-là
+  // (relancer tout de suite se ferait refuser à son tour). Le délai vient du message.
+  const [arretJusqua, setArretJusqua] = useState(0);
+  React.useEffect(() => { if (!(arretJusqua > Date.now())) return undefined; const t = setInterval(() => setTic((n) => n + 1), 15000); return () => clearInterval(t); }, [arretJusqua]);
   const [ordre, setOrdre] = useState(null);          // null = l'ordre de sa sélection
   // (28 oct.) Réglages photo, communs à la sélection : les VALEURS de l'aperçu
   // (CSS), refaites en pixels par l'extension à partir de l'ORIGINAL.
@@ -12699,14 +12707,17 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
       let r; try { r = await publier(suiv, { prix: x.prix != null ? x.prix : suiv.prix, titre: x.titre || suiv.titre, reglages: { ...reg }, lettre: lettreOn && lettreOk ? (lettres[suiv.id] || '') : '', viaBrouillon: viaBrouillon && !!brouillonOk }); } catch (_) { r = { etat: 'echec', raison: 'erreur' }; }
       busy.current = false;
       const etat = r && ['fait', 'double', 'incertain', 'a-refaire', 'planifiee'].includes(r.etat) ? r.etat : 'echec';
-      setSt((p) => ({ ...p, [suiv.id]: { etat, raison: (r && r.raison) || (etat === 'echec' ? "l'extension n'a pas répondu" : ''), nouveau: r && r.nouveau, jusqua: r && r.jusqua } }));
+      setSt((p) => ({ ...p, [suiv.id]: { etat, code: (r && r.code) || '', raison: (r && r.raison) || (etat === 'echec' ? "l'extension n'a pas répondu" : ''), nouveau: r && r.nouveau, jusqua: r && r.jusqua } }));
+      // (30 oct.) Plus aucune paire à tenter : l'arrêt est l'état FINAL (rien à reprendre).
+      const resteApres = aFaire.some((a) => a.id !== suiv.id && !st[a.id]);
+      const arreter = (raison) => { setArret(raison || ''); const m = /dans (\d+) ?min/.exec(String(raison || '')); setArretJusqua(m ? Date.now() + Number(m[1]) * 60000 : 0); setMode(resteApres ? 'pause' : 'fini'); };
       // Un refus qui vaut pour TOUTE la file (Vinted demande de ralentir, plafond
       // de l'heure atteint) : on s'arrête au lieu d'enchaîner les refus.
-      if (r && (r.code === 'vinted-pause' || r.code === 'plafond')) { setArret(r.raison || ''); setMode('pause'); }
+      if (r && (r.code === 'vinted-pause' || r.code === 'plafond')) arreter(r.raison);
       // (28 oct.) L'extension n'a pas répondu à temps : elle travaille peut-être
       // encore sur CETTE paire. Enchaîner empilerait la suivante derrière elle et
       // laisserait croire à un échec : la file s'arrête, la ligne dit « pas su ».
-      else if (r && r.code === 'sans-reponse') { setArret(r.raison || ''); setMode('pause'); }
+      else if (r && r.code === 'sans-reponse') arreter(r.raison);
     }, delai * 1000);
     return () => { annule = true; clearTimeout(t); setProchaine(null); };
   }, [mode, st, esp, espMode, espMin, espMax, plan]);   // eslint-disable-line react-hooks/exhaustive-deps
@@ -12745,8 +12756,11 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
   const fermer = () => { if (mode === 'run') return; onClose(); };
   const champ = { border: `1px solid ${C.border}`, borderRadius: 8, padding: '9px 10px', fontSize: 14, background: C.card, color: C.text, outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box', minHeight: 44 };
   const maj = { display: 'block', fontSize: 11, color: C.muted, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 600, marginBottom: 5 };
-  const btn = (plein, actif = true) => ({ border: `1px solid ${plein ? C.accent : C.border}`, background: plein ? C.accent : 'transparent', color: plein ? (C.onAccent || '#fff') : C.text, borderRadius: 10, padding: '0 16px', minHeight: 44, fontSize: 14, fontWeight: 700, cursor: actif ? 'pointer' : 'default', opacity: actif ? 1 : 0.45, fontFamily: 'inherit' });
+  const summ = { display: 'flex', alignItems: 'center', minHeight: 44, cursor: 'pointer', fontSize: 13.5, fontWeight: 600, color: C.text };
+  const pageOk = extSait('republierpage') === 'ok';
   const ETAPES = A.etapes;
+  const iEtape = Math.max(0, ETAPES.findIndex((x) => x[0] === etape));
+  const s2 = (n, mot, pl) => `${n} ${n > 1 ? (pl || mot + 's') : mot}`;
   return (
     <div onClick={fermer} data-noswipe="1" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
       <FermeAuRetour fermer={fermer} />
@@ -12754,43 +12768,55 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
         <div style={{ display: 'flex', gap: 10, alignItems: 'center', padding: '12px 16px', borderBottom: `1px solid ${C.border}`, flexShrink: 0 }}>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: 16, fontWeight: 700, color: C.text }}>{A.titre}</div>
-            <div style={{ display: 'flex', gap: 10, marginTop: 4, fontSize: 12 }}>{ETAPES.map(([k, l]) => <span key={k} style={{ color: etape === k ? C.text : C.muted, fontWeight: etape === k ? 700 : 500 }}>{l}</span>)}</div>
+            {/* (30 oct.) Où j'en suis, en un coup d'œil : l'étape en cours pleine,
+                les étapes faites cochées, la suivante en attente. */}
+            <ol aria-label={`Étape ${iEtape + 1} sur ${ETAPES.length}`} style={{ display: 'flex', flexWrap: 'wrap', gap: '4px 6px', margin: '6px 0 0', padding: 0, listStyle: 'none', fontSize: 12.5 }}>
+              {ETAPES.map(([k, l], i) => { const cur = i === iEtape, fait = i < iEtape; return (
+                <li key={k} aria-current={cur ? 'step' : undefined} style={{ display: 'flex', alignItems: 'center', gap: 5, color: cur ? C.text : C.muted, fontWeight: cur ? 700 : 500 }}>
+                  <span aria-hidden="true" style={{ width: 18, height: 18, borderRadius: 99, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, background: cur ? 'var(--vrm-accent)' : fait ? 'var(--vrm-b-teinte-f)' : 'transparent', border: cur || fait ? 'none' : `1px solid ${C.border}`, color: cur ? 'var(--vrm-on-accent)' : C.text }}>{fait ? '✓' : i + 1}</span>
+                  {l.replace(/^\d+\.\s*/, '')}
+                  {i < ETAPES.length - 1 && <span aria-hidden="true" style={{ color: C.muted, opacity: .6, marginLeft: 2 }}>›</span>}
+                </li>
+              ); })}
+            </ol>
           </div>
-          <button type="button" onClick={fermer} aria-label="Fermer" disabled={mode === 'run'} style={{ border: 'none', background: 'transparent', fontSize: 24, color: C.muted, cursor: mode === 'run' ? 'default' : 'pointer', minWidth: 44, minHeight: 44 }}>×</button>
+          <button type="button" onClick={fermer} aria-label="Fermer" disabled={mode === 'run'} title={mode === 'run' ? 'Mets en pause pour fermer' : undefined} style={{ border: 'none', background: 'transparent', fontSize: 24, color: C.muted, cursor: mode === 'run' ? 'default' : 'pointer', minWidth: 44, minHeight: 44 }}>×</button>
         </div>
         <div style={{ overflowY: 'auto', padding: '12px 16px 16px', display: 'flex', flexDirection: 'column', gap: 12, flex: 1 }}>
           {etape === 'choix' && <>
             <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-              <input value={q} onChange={(ev) => setQ(ev.target.value)} placeholder="Chercher un titre, un N°, un compte" style={{ ...champ, flex: 1, minWidth: 0 }} />
-              <button type="button" data-republier-tout onClick={() => setSel(new Set(liste.filter((a) => !a.bloque).map((a) => a.id)))} style={btn(false)}>Tout</button>
-              <button type="button" data-republier-rien onClick={() => setSel(new Set())} style={btn(false)}>Aucune</button>
+              <input value={q} onChange={(ev) => setQ(ev.target.value)} placeholder="Chercher un titre, un N°" aria-label="Chercher une paire" style={{ ...champ, flex: 1, minWidth: 0 }} />
+              {/* (30 oct.) « Tout » et « Aucune » faisaient deux boutons pour un geste : un seul, qui bascule. */}
+              {(() => { const dispo = liste.filter((a) => !a.bloque); const tous = dispo.length > 0 && dispo.every((a) => sel.has(a.id));
+                return tous
+                  ? <Bouton data-republier-rien onClick={() => setSel(new Set())} style={{ minHeight: 44 }}>Tout décocher</Bouton>
+                  : <Bouton data-republier-tout disabled={!dispo.length} onClick={() => setSel(new Set(dispo.map((a) => a.id)))} style={{ minHeight: 44 }}>Tout cocher</Bouton>; })()}
             </div>
-            {action !== 'enLigne' && <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-              <select data-republier-tri value={tri} onChange={(ev) => setTri(ev.target.value)} style={{ ...champ, flex: '1 1 180px' }}>
-                <option value="anciennes">Les plus anciennes d'abord</option>
-                <option value="vues">Les moins vues d'abord</option>
-                <option value="favoris">Les moins de favoris d'abord</option>
-              </select>
-            </div>}
+            {action !== 'enLigne' && <select data-republier-tri value={tri} onChange={(ev) => setTri(ev.target.value)} aria-label="Ordre de la liste" style={champ}>
+              <option value="anciennes">Les plus anciennes d'abord</option>
+              <option value="vues">Les moins vues d'abord</option>
+              <option value="favoris">Les moins de favoris d'abord</option>
+            </select>}
             <div data-republier-compte={compteUid || (compteVinted === null ? 'aucun' : 'passu')} style={{ fontSize: 12.5, color: compteUid ? C.muted : C.warn, lineHeight: 1.45 }}>
               {compteUid
-                ? <>Compte ouvert dans Chrome : <b style={{ color: C.text }}>{nomCompte}</b>{horsCompte > 0 ? ` · ${horsCompte} ${action === 'enLigne' ? 'autre' + (horsCompte > 1 ? 's' : '') : 'paire' + (horsCompte > 1 ? 's' : '')} sur tes autres comptes : ouvre vinted.fr sur l'un d'eux dans Chrome pour ${horsCompte > 1 ? 'les' : 'la'} voir ici.` : ''}</>
+                ? <>Compte <b style={{ color: C.text }}>{nomCompte}</b> (ouvert dans Chrome){horsCompte > 0 ? <> · {horsCompte} {action === 'enLigne' ? 'autre' + (horsCompte > 1 ? 's' : '') : 'paire' + (horsCompte > 1 ? 's' : '')} sur tes autres comptes <Pourquoi label="Et mes autres comptes ?">Ouvre vinted.fr sur l'un d'eux dans Chrome pour {horsCompte > 1 ? 'les' : 'la'} voir ici : seul le compte ouvert dans Chrome peut être republié.</Pourquoi></> : null}</>
                 : compteVinted === null
-                  ? "Aucun compte Vinted n'est ouvert dans Chrome : ouvre vinted.fr connecté sur le compte à republier, puis rouvre cette fenêtre."
-                  : "VRM ne sait pas encore quel compte Vinted est ouvert dans Chrome (extension pas encore interrogée ou qui ne répond pas) : ouvre vinted.fr sur le compte à republier, puis rouvre cette fenêtre."}
+                  ? "Aucun compte Vinted ouvert dans Chrome : ouvre vinted.fr sur le bon compte, puis rouvre."
+                  : <>Compte ouvert dans Chrome pas encore connu : ouvre vinted.fr sur le bon compte, puis rouvre. <Pourquoi label="Pourquoi ?">L'extension VRM n'a pas encore été interrogée, ou elle ne répond pas.</Pourquoi></>}
             </div>
-            <div style={{ fontSize: 12.5, color: C.muted }}>{action === 'enLigne' ? `${annonces.length} brouillon${annonces.length > 1 ? 's' : ''} sur Vinted` : `${annonces.length} paire${annonces.length > 1 ? 's' : ''} en ligne sur Vinted`} · <b style={{ color: C.text }}>{sel.size} choisi{action === 'enLigne' ? '' : 'e'}{sel.size > 1 ? 's' : ''}</b></div>
-            {action === 'modifier' && <div style={{ fontSize: 12.5, color: C.muted }}>Chaque annonce reste la même sur Vinted (même N°, favoris et vues gardés) : seuls le prix et le titre changent.</div>}
-            {action === 'versBrouillon' && <div style={{ fontSize: 12.5, color: C.muted }}>Chaque annonce est d'abord enregistrée dans VRM (photos, description, recette), puis retirée de la vente, puis recréée en brouillon sur Vinted. Si Vinted refuse de la retirer, rien d'autre n'est fait. Favoris et vues ne suivent pas.</div>}
+            <div style={{ fontSize: 12.5, color: C.muted }}>{action === 'enLigne' ? `${s2(annonces.length, 'brouillon')} sur Vinted` : `${s2(annonces.length, 'paire')} en ligne sur Vinted`} · <b style={{ color: C.text }}>{sel.size} choisi{action === 'enLigne' ? '' : 'e'}{sel.size > 1 ? 's' : ''}</b></div>
+            {action === 'modifier' && <div style={{ fontSize: 12.5, color: C.muted }}>Modifiées sur place : même annonce, favoris et vues gardés.</div>}
+            {action === 'versBrouillon' && <div style={{ fontSize: 12.5, color: C.muted }}>Chaque annonce repasse en brouillon : favoris et vues ne suivent pas. <Pourquoi label="Comment ça marche">Chaque annonce est d'abord enregistrée dans VRM (photos, description, recette), puis retirée de la vente, puis recréée en brouillon sur Vinted. Si Vinted refuse de la retirer, rien d'autre n'est fait.</Pourquoi></div>}
             <div style={{ display: 'flex', flexDirection: 'column', border: `1px solid ${C.border}`, borderRadius: 10, overflow: 'hidden' }}>
               {liste.length === 0 && <div style={{ padding: 14, fontSize: 13, color: C.muted }}>{annonces.length ? 'Aucune ne correspond.' : !compteUid ? 'Le compte ouvert dans Chrome n’est pas encore connu.' : action === 'enLigne' ? "Aucun brouillon sur ce compte d'après tes dressings lus par VRM." : "Aucune paire en ligne sur ce compte n'a été lue pour l'instant."}</div>}
               {liste.map((a) => (
-                <label key={a.id} data-republier-paire={a.id} data-republier-bloque={a.bloque ? 'oui' : undefined} style={{ display: 'flex', gap: 10, alignItems: 'center', padding: '8px 10px', minHeight: 56, borderBottom: `1px solid ${C.border}`, cursor: a.bloque ? 'default' : 'pointer', background: sel.has(a.id) ? `${C.accent}0d` : 'transparent', opacity: a.bloque ? 0.6 : 1 }}>
+                <label key={a.id} data-republier-paire={a.id} data-republier-bloque={a.bloque ? 'oui' : undefined} style={{ display: 'flex', gap: 10, alignItems: 'center', padding: '8px 10px', minHeight: 56, borderBottom: `1px solid ${C.border}`, cursor: a.bloque ? 'default' : 'pointer', background: sel.has(a.id) ? 'var(--vrm-b-teinte)' : 'transparent', opacity: a.bloque ? 0.6 : 1 }}>
                   <input type="checkbox" disabled={!!a.bloque} checked={sel.has(a.id) && !a.bloque} onChange={() => toggle(a.id)} style={{ width: 20, height: 20, accentColor: C.accent, flexShrink: 0 }} />
                   <span style={{ width: 40, height: 50, borderRadius: 6, background: C.border, overflow: 'hidden', flexShrink: 0 }}>{a.photo ? <PhotoVinted src={a.photo} alt="" loading="lazy" decoding="async" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : null}</span>
                   <span style={{ flex: 1, minWidth: 0 }}>
                     <span style={{ display: 'block', fontSize: 13.5, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{a.numero ? <b>N°{a.numero} · </b> : null}{a.titre || '—'}</span>
-                    <span style={{ display: 'block', fontSize: 12, color: C.muted }}>{prixCourt(a.prix)}{a.age != null ? ` · en ligne depuis ${a.age} j` : ''}{a.vues != null ? ` · ${a.vues} vue${a.vues > 1 ? 's' : ''}` : ''}{a.favoris != null ? ` · ${a.favoris} favori${a.favoris > 1 ? 's' : ''}` : ''}{a.compte ? ` · ${a.compte}` : ''}</span>
+                    {/* Le compte n'est plus redit sur chaque ligne : ce sont toutes celles du compte ouvert dans Chrome (§7). */}
+                    <span style={{ display: 'block', fontSize: 12, color: C.muted }}>{prixCourt(a.prix)}{a.age != null ? ` · en ligne depuis ${a.age} j` : ''}{a.vues != null ? ` · ${s2(a.vues, 'vue')}` : ''}{a.favoris != null ? ` · ${s2(a.favoris, 'favori')}` : ''}</span>
                     {recree && recente(a) && <span data-republier-recente={a.id} style={{ display: 'block', fontSize: 12, color: C.warn }}>déjà recréée il y a {ilYa(a.recreeAt)} — attends 2 jours</span>}
                     {a.note && <span data-republier-note={a.id} style={{ display: 'block', fontSize: 12, color: C.muted }}>{a.note}</span>}
                     {a.bloque && <span data-republier-bloque-raison={a.id} style={{ display: 'block', fontSize: 12, color: C.muted }}>{a.bloque}</span>}
@@ -12810,51 +12836,62 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
                   </div>
                 ); })}
               </div>
-              {curseur('Redresser', 'rot', -15, 15, 0.5)}
-              {curseur('Luminosité', 'bright', 0.5, 1.5, 0.01)}
-              {curseur('Contraste', 'contrast', 0.5, 1.5, 0.01)}
-              {curseur('Saturation', 'sat', 0, 2, 0.01)}
-              {curseur('Zoom', 'zoom', 1, 2, 0.01)}
-              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
-                {presets.map((p) => <button key={p.nom} type="button" data-republier-preset={p.nom} onClick={() => setReg({ ...REPUB_REG_DEF, ...p.r })} style={btn(false)}>{p.nom}</button>)}
-                {!regNeutre && <button type="button" data-republier-reglage-zero onClick={() => setReg({ ...REPUB_REG_DEF })} style={btn(false)}>Photos d'origine</button>}
-              </div>
-              <div style={{ fontSize: 12, color: C.muted }}>{regNeutre ? 'Les photos partent telles quelles.' : 'Ce réglage s’applique à TOUTES les photos de chaque annonce choisie, refaites à partir de l’original au moment de republier. Ici, une photo par annonce pour l’aperçu.'}</div>
+              {/* (30 oct.) Cinq curseurs toujours dépliés pour un réglage rare : repliés. */}
+              <details className="vrm-repli" data-republier-retouche={regNeutre ? 'non' : 'oui'}>
+                <summary style={summ}>{regNeutre ? 'Photos telles quelles · retoucher' : 'Photos retouchées · modifier'}</summary>
+                {curseur('Redresser', 'rot', -15, 15, 0.5)}
+                {curseur('Luminosité', 'bright', 0.5, 1.5, 0.01)}
+                {curseur('Contraste', 'contrast', 0.5, 1.5, 0.01)}
+                {curseur('Saturation', 'sat', 0, 2, 0.01)}
+                {curseur('Zoom', 'zoom', 1, 2, 0.01)}
+                {(presets.length > 0 || !regNeutre) && <div className="vrm-b-rangee" style={{ justifyContent: 'flex-start', marginTop: 4 }}>
+                  {presets.map((p) => <Bouton key={p.nom} className="vrm-b-petit" data-republier-preset={p.nom} onClick={() => setReg({ ...REPUB_REG_DEF, ...p.r })}>{p.nom}</Bouton>)}
+                  {!regNeutre && <Bouton variante="discret" data-republier-reglage-zero onClick={() => setReg({ ...REPUB_REG_DEF })}>Photos d'origine</Bouton>}
+                </div>}
+                <div style={{ fontSize: 12, color: C.muted, marginTop: 4 }}>Vaut pour toutes les photos de chaque annonce choisie.</div>
+              </details>
             </div>}
             {recree && <div data-republier-description={lettreOn ? 'lettre' : 'telle'} style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
-              <span style={maj}>Description</span>
-              <div style={{ fontSize: 12.5, color: C.muted }}>La description de chaque annonce est reprise telle quelle, mot pour mot.</div>
+              <span style={maj}>Description — reprise mot pour mot</span>
               <label style={{ display: 'flex', gap: 10, alignItems: 'center', fontSize: 13.5, color: lettreOk ? C.text : C.muted, minHeight: 44, cursor: lettreOk ? 'pointer' : 'default' }}>
                 <input type="checkbox" data-republier-lettre disabled={!lettreOk} checked={lettreOn && lettreOk} onChange={(ev) => { setLettreOn(ev.target.checked); if (ev.target.checked) tirerLettres(choisies.map((a) => a.id)); }} style={{ width: 20, height: 20, accentColor: C.accent, flexShrink: 0 }} />
-                <span>Ajouter une lettre au hasard tout en bas de chaque description</span>
+                <span>Ajouter une lettre au hasard en bas de chaque description</span>
               </label>
               {!lettreOk && <div data-republier-lettre-maj style={{ fontSize: 12, color: C.muted }}>Demande l'extension VRM {EXT_CAPACITES.lettre} ou plus récente dans ce navigateur.</div>}
               {lettreOn && lettreOk && <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', fontSize: 12.5, color: C.muted }}>
-                <span style={{ flex: '1 1 200px' }}>Une lettre différente pour chaque annonce, sur la dernière ligne (la lettre d'une recréation précédente est retirée d'abord).</span>
-                <button type="button" data-republier-lettres-retirer onClick={() => tirerLettres(choisies.map((a) => a.id))} style={btn(false)}>Tirer d'autres lettres</button>
+                <span style={{ flex: '1 1 200px' }}>Une lettre différente par annonce, visible dans l'aperçu.</span>
+                <Bouton variante="discret" data-republier-lettres-retirer onClick={() => tirerLettres(choisies.map((a) => a.id))}>Tirer d'autres lettres</Bouton>
               </div>}
             </div>}
             {action === 'recreer' && <div data-republier-brouillon={viaBrouillon && brouillonOk ? 'oui' : 'non'} style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
               <span style={maj}>Publication</span>
-              <label style={{ display: 'flex', gap: 10, alignItems: 'center', fontSize: 13.5, color: brouillonOk ? C.text : C.muted, minHeight: 44, cursor: brouillonOk ? 'pointer' : 'default' }}>
-                <input type="checkbox" data-republier-via-brouillon disabled={!brouillonOk || extSait('republierpage') === 'ok'} checked={viaBrouillon && !!brouillonOk} onChange={(ev) => setViaBrouillon(ev.target.checked)} style={{ width: 20, height: 20, accentColor: C.accent, flexShrink: 0 }} />
+              {/* (30 oct.) Avec la 5.277, le passage par un brouillon est imposé : une case
+                  cochée et grisée ne servait à rien. Elle ne reste que là où on peut choisir. */}
+              {brouillonOk && !pageOk && <label style={{ display: 'flex', gap: 10, alignItems: 'center', fontSize: 13.5, color: C.text, minHeight: 44, cursor: 'pointer' }}>
+                <input type="checkbox" data-republier-via-brouillon checked={viaBrouillon && !!brouillonOk} onChange={(ev) => setViaBrouillon(ev.target.checked)} style={{ width: 20, height: 20, accentColor: C.accent, flexShrink: 0 }} />
                 <span>Passer par un brouillon Vinted, puis le mettre en ligne</span>
-              </label>
-              <div style={{ fontSize: 12, color: C.muted }}>{brouillonOk ? (viaBrouillon ? (extSait('republierpage') === 'ok' ? 'Comme Vintex : tout passe par l’onglet vinted.fr ouvert dans ce Chrome (laisse-le ouvert, connecté sur le bon compte). Chaque annonce est enregistrée dans VRM, rangée en brouillon sur Vinted, PUIS l’ancienne est supprimée, et le brouillon est mis en ligne 1 à 3 min plus tard.' + (extSait('republierfile') === 'ok' ? ' À la suite, comme Vintex : pendant cette attente la paire suivante est déjà préparée (l’extension met chaque brouillon en ligne à son heure, même si tu fermes cette fenêtre).' : '') + ' Aucun essai en rafale : un refus s’arrête et le dit. Au plus 10 paires par jour et par compte. Si Vinted ne répond pas clairement, VRM s’arrête (jamais deux fois en ligne) ; rien n’est perdu, tout est enregistré dans VRM.' : `L’extension VRM installée ici fait encore l’ancienne republication (depuis son fond, avec des renvois automatiques) — mets-la à jour en ${EXT_CAPACITES.republierpage} : elle passera par l’onglet vinted.fr, comme le site.`) : 'L’annonce est créée directement en ligne.') : `Demande l'extension VRM ${EXT_CAPACITES.republierbrouillon} ou plus récente dans ce navigateur.`}</div>
+              </label>}
+              <div style={{ fontSize: 12.5, color: pageOk ? C.text : C.muted, lineHeight: 1.45 }}>{brouillonOk
+                ? (viaBrouillon
+                  ? (pageOk
+                    ? <>Brouillon d'abord, puis en ligne 1 à 3 min après. Garde un onglet vinted.fr ouvert. <Pourquoi label="Comment ça marche">Comme Vintex : tout passe par l’onglet vinted.fr ouvert dans ce Chrome, connecté sur le bon compte. Chaque annonce est enregistrée dans VRM, rangée en brouillon sur Vinted, PUIS l’ancienne est supprimée, et le brouillon est mis en ligne 1 à 3 min plus tard.{extSait('republierfile') === 'ok' ? ' Pendant cette attente la paire suivante est déjà préparée (l’extension met chaque brouillon en ligne à son heure, même si tu fermes cette fenêtre).' : ''} Aucun essai en rafale : un refus s’arrête et le dit. Au plus 10 paires par jour et par compte. Si Vinted ne répond pas clairement, VRM s’arrête (jamais deux fois en ligne) ; rien n’est perdu, tout est enregistré dans VRM.</Pourquoi></>
+                    : <>Mets l’extension VRM à jour en {EXT_CAPACITES.republierpage} : elle passera par l’onglet vinted.fr. <Pourquoi label="Pourquoi ?">L’extension installée ici fait encore l’ancienne republication, depuis son fond, avec des renvois automatiques.</Pourquoi></>)
+                  : 'L’annonce est créée directement en ligne.')
+                : `Demande l'extension VRM ${EXT_CAPACITES.republierbrouillon} ou plus récente dans ce navigateur.`}</div>
             </div>}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
               <span style={maj}>Prix</span>
               {/* (29 oct., « les réductions je ne comprends rien du tout ») Un geste
                   par bouton : garder le prix, ou baisser de 5, 10, 15, 20 %. Le reste
                   (autre %, en €, même prix pour toutes) est replié dans « Autre ». */}
-              <div data-republier-reductions style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+              <div data-republier-reductions className="vrm-filtres" style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                 {[['aucun', 'Garder le prix'], ['-5', '−5 %'], ['-10', '−10 %'], ['-15', '−15 %'], ['-20', '−20 %'], ['autre', 'Autre…']].map(([v, l]) => {
                   const actif = v === 'aucun' ? pBase === 'aucun' : v === 'autre' ? (pBase === 'fixe' || pBase === 'commun' || (pBase === 'pct' && !['-5', '-10', '-15', '-20'].includes(String(pDelta).trim()))) : (pBase === 'pct' && String(pDelta).trim() === v);
-                  return <button key={v} type="button" data-republier-reduc={v} aria-pressed={actif} onClick={() => { if (v === 'aucun') setPBase('aucun'); else if (v === 'autre') { if (pBase === 'aucun' || ['-5', '-10', '-15', '-20'].includes(String(pDelta).trim())) { setPBase('pct'); setPDelta(''); } } else { setPBase('pct'); setPDelta(v); } }} style={{ minHeight: 44, padding: '0 14px', borderRadius: 10, fontSize: 14, fontWeight: 600, cursor: 'pointer', border: `1px solid ${actif ? C.text : C.border}`, background: actif ? C.text : C.card, color: actif ? C.card : C.text }}>{l}</button>;
+                  return <button key={v} type="button" data-republier-reduc={v} aria-pressed={actif} onClick={() => { if (v === 'aucun') setPBase('aucun'); else if (v === 'autre') { if (pBase === 'aucun' || ['-5', '-10', '-15', '-20'].includes(String(pDelta).trim())) { setPBase('pct'); setPDelta(''); } } else { setPBase('pct'); setPDelta(v); } }} style={{ minHeight: 44, padding: '0 14px', fontSize: 14, cursor: 'pointer', fontFamily: 'inherit' }}>{l}</button>;
                 })}
               </div>
               {pBase !== 'aucun' && !(pBase === 'pct' && ['-5', '-10', '-15', '-20'].includes(String(pDelta).trim())) && <div data-republier-autre style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-                <select data-republier-prix value={pBase} onChange={(ev) => setPBase(ev.target.value)} style={{ ...champ, flex: '1 1 200px' }}>
+                <select data-republier-prix value={pBase} onChange={(ev) => setPBase(ev.target.value)} aria-label="Type de baisse" style={{ ...champ, flex: '1 1 200px' }}>
                   <option value="pct">Baisser d'un pourcentage</option>
                   <option value="fixe">Baisser d'un montant en €</option>
                   <option value="commun">Mettre toutes au même prix</option>
@@ -12867,12 +12904,11 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
                 <span>Arrondir à l'euro (ex. 44,10 € → 44 €)</span>
               </label>}
               {(() => { const a = choisies[0]; if (!a || a.prix == null) return null; const x = apercu(a);
-                return <div data-republier-exemple style={{ fontSize: 13, color: C.text }}>{pBase === 'aucun' ? <>Les prix ne changent pas. Exemple : {a.numero ? `N°${a.numero}` : 'la première'} reste à {prixCourt(a.prix)}.</> : <>Exemple : {a.numero ? `N°${a.numero}` : 'la première'} passe de {prixCourt(a.prix)} à <b>{prixCourt(x.prix != null ? x.prix : a.prix)}</b>{x.plancher ? ' (ramené au prix d\u2019achat)' : ''}. Le nouveau prix de chaque paire est écrit dans la liste juste en dessous.</>}</div>; })()}
-              <div style={{ fontSize: 12, color: C.muted }}>Jamais sous le prix d'achat de la paire.</div>
+                return <div data-republier-exemple style={{ fontSize: 13, color: pBase === 'aucun' ? C.muted : C.text }}>{pBase === 'aucun' ? 'Les prix ne changent pas.' : <>Exemple : {a.numero ? `N°${a.numero}` : 'la première'} passe de {prixCourt(a.prix)} à <b>{prixCourt(x.prix != null ? x.prix : a.prix)}</b>{x.plancher ? ' (ramené au prix d’achat)' : ''} · jamais sous le prix d'achat.</>}</div>; })()}
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
               <span style={maj}>Titre</span>
-              <select data-republier-titre value={tMode} onChange={(ev) => setTMode(ev.target.value)} style={champ}>
+              <select data-republier-titre value={tMode} onChange={(ev) => setTMode(ev.target.value)} aria-label="Changer le titre" style={champ}>
                 <option value="aucun">Ne pas changer le titre</option>
                 <option value="prefixe">Ajouter au début</option>
                 <option value="suffixe">Ajouter à la fin</option>
@@ -12882,7 +12918,8 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
               {(tMode === 'remplacer' || tMode === 'supprimer') && <input value={tChe} onChange={(ev) => setTChe(ev.target.value)} placeholder="Texte à trouver" style={champ} />}
               {(tMode === 'prefixe' || tMode === 'suffixe' || tMode === 'remplacer') && <input value={tVal} onChange={(ev) => setTVal(ev.target.value)} placeholder={tMode === 'remplacer' ? 'Par' : 'Texte à ajouter'} style={champ} />}
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 0, border: `1px solid ${C.border}`, borderRadius: 10, overflow: 'hidden' }}>
+            <span style={maj}>Aperçu ({choisies.length})</span>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 0, border: `1px solid ${C.border}`, borderRadius: 10, overflow: 'hidden', marginTop: -5 }}>
               {choisies.map((a) => { const x = apercu(a); const rien = !x.titre && !x.prix; return (
                 <div key={a.id} data-republier-apercu={a.id} data-republier-nouveau-prix={x.prix != null ? Math.round(x.prix * 100) : ''} style={{ padding: '8px 10px', borderBottom: `1px solid ${C.border}`, fontSize: 13 }}>
                   <div style={{ color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{a.numero ? <b>N°{a.numero} · </b> : null}{a.titre}</div>
@@ -12897,31 +12934,33 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
           {etape === 'envoi' && <>
             {/* (28 oct.) Après un passage, les anciennes annonces sont supprimées de Vinted :
                 elles sortent de la liste et la phrase disait « 0 annonce à supprimer ». */}
-            {!aFaire.length && <div data-republier-vide style={{ fontSize: 13.5, color: C.text, lineHeight: 1.5 }}>{mode === 'idle' ? <>Plus aucune des annonces choisies n'est en ligne sur Vinted (déjà republiées ou retirées). Le compte rendu de chacune est ci-dessous ; reviens à « 1. Choisir » pour en prendre d'autres.</> : <>Le passage est en cours : son avancée est ci-dessous.</>}</div>}
-            {action === 'recreer' && !!aFaire.length && <div data-republier-explique style={{ fontSize: 13.5, color: C.text, lineHeight: 1.5 }}><b>{aFaire.length} annonce{aFaire.length > 1 ? 's' : ''}</b> à supprimer et recréer sur Vinted, une par une. Pour chacune : ses photos sont renvoyées{regNeutre ? '' : ' avec tes réglages'}, {viaBrouillon && brouillonOk ? <>l'annonce est enregistrée dans VRM, retirée de Vinted, recréée en brouillon, puis mise en ligne. Si la mise en ligne échoue, le brouillon reste dans tes brouillons Vinted et rien n'est perdu.</> : <>la nouvelle annonce est créée, et <b>seulement si elle est bien en ligne</b> l'ancienne est supprimée.</>} Le N° VRM passe sur la nouvelle.</div>}
-            {action === 'modifier'  && !!aFaire.length && <div data-republier-explique style={{ fontSize: 13.5, color: C.text, lineHeight: 1.5 }}><b>{aFaire.length} annonce{aFaire.length > 1 ? 's' : ''}</b> à modifier sur Vinted, une par une, sur place : même annonce, même N°, favoris et vues gardés. Rien n'est supprimé ni créé.</div>}
-            {action === 'versBrouillon'  && !!aFaire.length && <div data-republier-explique style={{ fontSize: 13.5, color: C.text, lineHeight: 1.5 }}><b>{aFaire.length} annonce{aFaire.length > 1 ? 's' : ''}</b> à repasser en brouillon, une par une. Pour chacune : elle est <b>enregistrée dans VRM</b>, ses photos sont renvoyées{regNeutre ? '' : ' avec tes réglages'}, l'annonce en ligne est <b>retirée</b>, puis le <b>brouillon est créé</b> sur Vinted. Un brouillon n'est jamais en ligne : rien ne peut se vendre deux fois. Tu la remettras en ligne depuis « Actions → Brouillons → en ligne ».</div>}
-            {action === 'enLigne'  && !!aFaire.length && <div data-republier-explique style={{ fontSize: 13.5, color: C.text, lineHeight: 1.5 }}><b>{aFaire.length} brouillon{aFaire.length > 1 ? 's' : ''}</b> à mettre en ligne sur Vinted, un par un, tels que tu les as enregistrés.</div>}
+            {!aFaire.length && <div data-republier-vide style={{ fontSize: 13.5, color: C.text, lineHeight: 1.5 }}>{mode === 'idle' ? "Aucune des annonces choisies n'est encore en ligne (déjà republiées ou retirées) : reviens à « Choisir »." : 'En cours : l’avancée est ci-dessous.'}</div>}
+            {/* (30 oct.) Avant de lancer : UNE phrase par fait, le détail derrière ⓘ. */}
+            {action === 'recreer' && !!aFaire.length && mode === 'idle' && <div data-republier-explique style={{ fontSize: 13.5, color: C.text, lineHeight: 1.5 }}><b>{s2(aFaire.length, 'annonce')}</b> à recréer sur Vinted, une par une. Le N° VRM passe sur la nouvelle. <Pourquoi label="Comment ça marche">Pour chacune : ses photos sont renvoyées{regNeutre ? '' : ' avec tes réglages'}, {viaBrouillon && brouillonOk ? "l'annonce est enregistrée dans VRM, retirée de Vinted, recréée en brouillon, puis mise en ligne. Si la mise en ligne échoue, le brouillon reste dans tes brouillons Vinted et rien n'est perdu." : 'la nouvelle annonce est créée, et seulement si elle est bien en ligne l’ancienne est supprimée.'}</Pourquoi></div>}
+            {action === 'modifier' && !!aFaire.length && mode === 'idle' && <div data-republier-explique style={{ fontSize: 13.5, color: C.text, lineHeight: 1.5 }}><b>{s2(aFaire.length, 'annonce')}</b> à modifier sur place, une par une : même annonce, favoris et vues gardés.</div>}
+            {action === 'versBrouillon' && !!aFaire.length && mode === 'idle' && <div data-republier-explique style={{ fontSize: 13.5, color: C.text, lineHeight: 1.5 }}><b>{s2(aFaire.length, 'annonce')}</b> à repasser en brouillon, une par une. <Pourquoi label="Comment ça marche">Pour chacune : elle est enregistrée dans VRM, ses photos sont renvoyées{regNeutre ? '' : ' avec tes réglages'}, l'annonce en ligne est retirée, puis le brouillon est créé sur Vinted. Un brouillon n'est jamais en ligne : rien ne peut se vendre deux fois. Tu la remettras en ligne depuis « Actions → Brouillons → en ligne ».</Pourquoi></div>}
+            {action === 'enLigne' && !!aFaire.length && mode === 'idle' && <div data-republier-explique style={{ fontSize: 13.5, color: C.text, lineHeight: 1.5 }}><b>{s2(aFaire.length, 'brouillon')}</b> à mettre en ligne, un par un, tels que tu les as enregistrés.</div>}
             {recree && (() => { const fav = aFaire.reduce((n, a) => n + (a.favoris || 0), 0); const nFav = aFaire.filter((a) => a.favoris > 0).length; const nRec = aFaire.filter(recente).length; return mode === 'idle' && <>
-              {fav > 0 && <div data-republier-favoris={fav} style={{ fontSize: 12.5, color: C.warn }}>{fav} favori{fav > 1 ? 's' : ''} sur {nFav} de ces paires {fav > 1 ? 'seront perdus' : 'sera perdu'} : une annonce recréée repart de zéro (favoris, vues, ancienneté). Pour une paire qui a des favoris, baisser le prix de l'annonce actuelle les prévient — c'est souvent mieux que la recréer.</div>}
-              {nRec > 0 && <div data-republier-recentes={nRec} style={{ fontSize: 12.5, color: C.warn }}>{nRec} de ces paires {nRec > 1 ? 'ont déjà été recréées' : 'a déjà été recréée'} il y a moins de 2 jours : Vinted peut la traiter comme un doublon. Mieux vaut la retirer de la sélection.</div>}
+              {fav > 0 && <div data-republier-favoris={fav} style={{ fontSize: 12.5, color: C.warn }}>{s2(fav, 'favori')} {fav > 1 ? 'seront perdus' : 'sera perdu'} ({s2(nFav, 'paire')}). <Pourquoi label="Pourquoi ?">Une annonce recréée repart de zéro (favoris, vues, ancienneté). Pour une paire qui a des favoris, baisser le prix de l'annonce actuelle les prévient — c'est souvent mieux que la recréer.</Pourquoi></div>}
+              {nRec > 0 && <div data-republier-recentes={nRec} style={{ fontSize: 12.5, color: C.warn }}>{nRec > 1 ? `${nRec} paires déjà recréées` : '1 paire déjà recréée'} il y a moins de 2 jours : risque de doublon, retire-{nRec > 1 ? 'les' : 'la'}.</div>}
             </>; })()}
-            {arret && mode === 'pause' && <div data-republier-arret style={{ fontSize: 12.5, color: C.warn }}>File arrêtée (la raison est sur la ligne de la paire) : rien d'autre n'est parti. Reprends plus tard.</div>}
-            {majExt && <div data-republier-maj style={{ fontSize: 12.5, color: C.warn }}>L'extension VRM de ce navigateur doit être à jour ({EXT_ATTENDUE}) et connectée — sinon chaque annonce ressortira « pas faite », rien ne sera touché.</div>}
-            {autresComptes > 0 && <div data-republier-autres-comptes style={{ fontSize: 12.5, color: C.warn }}>{autresComptes} sont sur un autre compte que celui ouvert dans Chrome : ouvre Vinted sur ce compte-là, sinon elles ressortiront « pas faites ».</div>}
+            {majExt && <div data-republier-maj style={{ fontSize: 12.5, color: C.warn }}>Extension VRM à mettre à jour ({EXT_ATTENDUE}) et à connecter : sinon rien ne partira.</div>}
+            {autresComptes > 0 && <div data-republier-autres-comptes style={{ fontSize: 12.5, color: C.warn }}>{autresComptes} sur un autre compte : ouvre Vinted sur ce compte dans Chrome, sinon {autresComptes > 1 ? 'elles ne partiront' : 'elle ne partira'} pas.</div>}
             {mode === 'idle' && <>
               <div data-republier-esp={espMode} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 <span style={maj}>Temps entre deux paires</span>
-                <Segmente plein label="Temps entre deux paires" value={espMode} onChange={setEspMode} options={[{ v: 'vintex', l: 'Comme Vintex', data: { 'data-republier-esp-choix': 'vintex' } }, { v: 'fixe', l: 'Fixe', data: { 'data-republier-esp-choix': 'fixe' } }, { v: 'aleatoire', l: 'Aléatoire', data: { 'data-republier-esp-choix': 'aleatoire' } }]} />
-                {espMode === 'vintex' && <div data-republier-esp-vintex style={{ fontSize: 13, color: C.muted }}>Entre 8 et 16 secondes entre deux paires, tiré au hasard : le rythme mesuré chez Vintex.</div>}
+                <Segmente plein label="Temps entre deux paires" value={espMode} onChange={setEspMode} options={[{ v: 'vintex', l: 'Rapide (8–16 s)', data: { 'data-republier-esp-choix': 'vintex' } }, { v: 'aleatoire', l: `Lent (${minutesOk(espMin)}–${minutesOk(espMax)} min)`, data: { 'data-republier-esp-choix': 'aleatoire' } }, { v: 'fixe', l: 'Fixe', data: { 'data-republier-esp-choix': 'fixe' } }]} />
+                {(() => { const n = aFaire.length; if (n < 2) return null; const moy = espMode === 'vintex' ? 12 : espMode === 'fixe' ? fileClamp(esp) : (bornesAlea()[0] + bornesAlea()[1]) / 2; const sec = Math.round(moy * (n - 1)); const txt = sec < 60 ? `${sec} s` : sec < 3600 ? `${Math.round(sec / 60)} min` : `${Math.floor(sec / 3600)} h ${String(Math.round((sec % 3600) / 60)).padStart(2, '0')}`; return <div data-republier-esp-vintex={espMode === 'vintex' ? '' : undefined} data-republier-duree={sec} style={{ fontSize: 12.5, color: C.muted }}>Attente entre les {n} paires : environ {txt} en tout.</div>; })()}
                 {espMode === 'fixe' && <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13.5, color: C.text }}>Une annonce toutes les <input data-republier-esp-fixe value={esp} onChange={(ev) => setEsp(fileClamp(ev.target.value))} inputMode="numeric" style={{ ...champ, width: 70 }} /> secondes</label>}
                 {espMode === 'aleatoire' && <>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13.5, color: C.text, flexWrap: 'wrap' }}>
                     <span>Entre</span><input data-republier-esp-min value={espMin} onChange={(ev) => setEspMin(ev.target.value)} onBlur={() => setEspMin(minutesOk(espMin))} inputMode="decimal" aria-label="Minimum en minutes" style={{ ...champ, width: 64 }} />
                     <span>et</span><input data-republier-esp-max value={espMax} onChange={(ev) => setEspMax(ev.target.value)} onBlur={() => setEspMax(minutesOk(espMax))} inputMode="decimal" aria-label="Maximum en minutes" style={{ ...champ, width: 64 }} /><span>minutes</span>
                   </div>
-                  <div style={{ fontSize: 12, color: C.muted }}>Un temps différent est tiré au hasard pour chaque paire, entre ces deux bornes (60 min au plus) : tu le vois sur chaque ligne ci-dessous. La première part tout de suite.</div>
-                  <button type="button" data-republier-retirer onClick={refaitPlan} style={{ ...btn(false), alignSelf: 'flex-start' }}>Tirer d'autres temps</button>
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', fontSize: 12.5, color: C.muted }}>
+                    <span style={{ flex: '1 1 200px' }}>Un temps par paire (60 min au plus), écrit sur sa ligne.</span>
+                    <Bouton variante="discret" data-republier-retirer onClick={refaitPlan}>Tirer d'autres temps</Bouton>
+                  </div>
                 </>}
               </div>
               <label style={{ display: 'flex', gap: 10, alignItems: 'flex-start', fontSize: 13.5, color: C.text, cursor: 'pointer' }}>
@@ -12929,64 +12968,107 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
                 <span>Je confirme : ces {aFaire.length} {action === 'enLigne' ? `brouillon${aFaire.length > 1 ? 's' : ''}` : `annonce${aFaire.length > 1 ? 's' : ''}`} {A.confirme(aFaire.length)}</span>
               </label>
             </>}
-            <div style={{ display: 'flex', flexDirection: 'column', border: `1px solid ${C.border}`, borderRadius: 10, overflow: 'hidden' }}>
-              {mode === 'idle' && aFaire.length > 1 && <div data-republier-ordre={ordre ? 'regle' : 'selection'} style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', padding: '8px 10px', borderBottom: `1px solid ${C.border}`, fontSize: 12.5, color: C.muted }}>
-                <span style={{ flex: '1 1 200px' }}>Ordre de passage{ordre ? ' (réglé)' : ' : celui de ta sélection'}.{action === 'recreer' ? ' Chaque paire passe en brouillon, puis l’ancienne est supprimée, dans cet ordre.' : ''}</span>
-                <button type="button" data-republier-melanger onClick={melanger} style={btn(false)}>Mélanger</button>
-                {ordre && <button type="button" data-republier-ordre-selection onClick={() => setOrdre(null)} style={btn(false)}>Ordre de ma sélection</button>}
-              </div>}
-              {aFaire.map((a, i) => { const s = st[a.id] || {}; return (<React.Fragment key={a.id}>
-                <div data-republier-ligne={a.id} data-republier-statut={s.etat || 'attente'} style={{ display: 'flex', gap: 8, alignItems: 'center', padding: '8px 10px', borderBottom: `1px solid ${C.border}`, fontSize: 13 }}>
-                  <span style={{ flexShrink: 0, width: 18, color: C.muted, fontVariantNumeric: 'tabular-nums' }}>{i + 1}.</span>
-                  <span style={{ flex: 1, minWidth: 0, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{a.numero ? <b>N°{a.numero} · </b> : null}{a.titre}</span>
-                  {!s.etat && <span data-republier-attente={i === 0 ? 0 : (plan[a.id] || '')} style={{ flexShrink: 0, fontSize: 12, color: C.muted, fontVariantNumeric: 'tabular-nums' }}>{i === 0 ? 'tout de suite' : Number.isFinite(plan[a.id]) ? `+${duree(plan[a.id])}` : ''}</span>}
-                  {mode === 'idle' && aFaire.length > 1 && <span style={{ display: 'flex', flexShrink: 0 }}>
-                    <button type="button" aria-label="Monter" data-republier-monter={a.id} disabled={i === 0} onClick={() => bouger(a.id, -1)} style={{ border: 'none', background: 'transparent', color: i === 0 ? C.border : C.text, minWidth: 44, minHeight: 44, fontSize: 16, cursor: i === 0 ? 'default' : 'pointer' }}>↑</button>
-                    <button type="button" aria-label="Descendre" data-republier-descendre={a.id} disabled={i === aFaire.length - 1} onClick={() => bouger(a.id, 1)} style={{ border: 'none', background: 'transparent', color: i === aFaire.length - 1 ? C.border : C.text, minWidth: 44, minHeight: 44, fontSize: 16, cursor: i === aFaire.length - 1 ? 'default' : 'pointer' }}>↓</button>
-                  </span>}
-                  <span style={{ flexShrink: 0, maxWidth: '55%', textAlign: 'right', color: (s.etat === 'echec' || s.etat === 'double' || s.etat === 'incertain' || s.etat === 'a-refaire') ? C.warn : s.etat === 'fait' ? C.text : C.muted, fontWeight: s.etat ? 600 : 400 }} data-republier-prevue={s.etat === 'planifiee' ? (s.jusqua || 0) : undefined}>{s.etat === 'fait' ? (s.refait ? `brouillon refait${s.raison ? ' · ' + s.raison : ''}` : A.fait) : s.etat === 'encours' ? 'en cours…' : s.etat === 'planifiee' ? `brouillon prêt · mise en ligne vers ${s.jusqua ? new Date(s.jusqua).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : '…'}` : s.etat === 'echec' ? `pas faite · ${s.raison}` : s.etat ? `⚠ ${s.raison}` : (mode === 'idle' ? '' : 'en attente')}</span>
-                  {s.etat === 'a-refaire' && refaire && mode !== 'run' && <button type="button" data-republier-refaire={a.id} onClick={() => refaireLigne(a)} style={{ ...btn(true), flexShrink: 0 }}>Refaire le brouillon</button>}
-                </div>
-                {recree && (s.etat === 'encours' || (['echec', 'a-refaire', 'incertain', 'double'].includes(s.etat) && prog[String(a.id)] && prog[String(a.id)].etape)) && (() => { const lst = action === 'versBrouillon' ? ETAPES_REPUB.versBrouillon : ((viaBrouillon && !!brouillonOk) ? ETAPES_REPUB.brouillon : ETAPES_REPUB.direct); const pe = progressionRepub(prog[String(a.id)], action, viaBrouillon && !!brouillonOk); return (
-                  <div data-republier-progression={a.id} data-republier-etape={pe.etape || 'attente'} style={{ padding: '0 10px 10px 36px', borderBottom: `1px solid ${C.border}` }}>
-                    <BarreGeste p={prog[String(a.id)]} liste={lst} label={`Paire ${i + 1}`} issue={s.etat === 'encours' ? null : 'echec'} />
-                  </div>
-                ); })()}
-              </React.Fragment>); })}
-            </div>
+            {/* (29 oct., puis 30 oct.) Julien : « la barre de progression est incompréhensible ».
+                Un seul bloc, EN HAUT, une seule barre : où j'en suis (« Paire 2 sur 5 »),
+                la paire en cours et SON étape en une ligne (la liste des étapes repliée),
+                combien sont faites / restent, ce qui a raté. Plus de seconde barre par
+                ligne : la ligne ne dit que son état. */}
             {mode !== 'idle' && aFaire.length > 0 && (() => {
               const finies = aFaire.filter((a) => { const e = (st[a.id] || {}).etat; return e && e !== 'encours' && e !== 'planifiee'; }).length;
               const enCours = aFaire.find((a) => (st[a.id] || {}).etat === 'encours');
-              const partEnCours = enCours && recree ? progressionRepub(prog[String(enCours.id)], action, viaBrouillon && !!brouillonOk).part : 0;
-              const part = Math.min(1, (finies + partEnCours) / aFaire.length);
-              return (
-                <div data-republier-total={`${finies}/${aFaire.length}`} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                  <div role="progressbar" aria-label={`${finies} sur ${aFaire.length} terminées`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(part * 100)} style={{ height: 10, borderRadius: 5, background: C.border, overflow: 'hidden' }}>
-                    <div style={{ width: `${Math.round(part * 100)}%`, height: '100%', background: C.accent, transition: 'width .4s ease' }} />
-                  </div>
-                  <div style={{ fontSize: 12.5, color: C.muted, fontVariantNumeric: 'tabular-nums' }}>{finies} sur {aFaire.length} terminée{finies > 1 ? 's' : ''}{enCours ? ` · paire ${aFaire.indexOf(enCours) + 1} en cours` : ''}</div>
-                </div>
-              );
+              const nPlanif = aFaire.filter((a) => (st[a.id] || {}).etat === 'planifiee').length;
+              const pasCommencees = aFaire.filter((a) => !st[a.id]).length;
+              const peEnCours = enCours && recree ? progressionRepub(prog[String(enCours.id)], action, viaBrouillon && !!brouillonOk) : null;
+              // (30 oct., « la barre est incompréhensible ») La barre mesure ce qui est
+              // RÉUSSI : jamais pleine quand 3 paires sur 4 ont raté. Ce qui demande un
+              // regard (pas faite, à vérifier) se lit en ambre à la suite.
+              const nPasFaites = nEchec + nRefaire;
+              const total = aFaire.length;
+              const part = Math.min(1, (nFait + (peEnCours ? peEnCours.part : 0)) / total);
+              const partRate = Math.min(1 - part, (nPasFaites + nDouble) / total);
+              const prochN = Math.min(total, total - pasCommencees + 1);
+              const pl = (n, s1, s2x) => `${n} ${n > 1 ? (s2x || s1 + 's') : s1}`;
+              const motF = (n) => (n > 1 ? A.faits.replace(/^(\S+)/, '$1s') : A.faits);
+              const bilan = `${nFait} sur ${total} ${motF(nFait)}`;
+              const titre = mode === 'fini' ? (arret ? 'Arrêté' : (nPasFaites || nDouble) ? 'Fini' : 'Terminé') : mode === 'pause' ? (arret ? 'Arrêté' : 'En pause') : enCours ? `Paire ${aFaire.indexOf(enCours) + 1} sur ${total}` : `Paire ${prochN} sur ${total}`;
+              const r = mode === 'run' && prochaine ? Math.max(0, Math.round((prochaine.at - Date.now()) / 1000)) : null;
+              const phrase = mode === 'run'
+                ? (enCours ? <b>{enCours.numero ? `N°${enCours.numero} · ` : ''}{enCours.titre}</b> : r != null ? <span data-republier-prochaine={prochaine.s}>Prochaine paire dans {r >= 60 ? `${Math.floor(r / 60)} min ${String(r % 60).padStart(2, '0')} s` : `${r} s`}</span> : 'Préparation de la suite…')
+                : arret ? <span data-republier-arret>{String(arret).replace(/[.\s]+$/, '')}. Rien d'autre n'est parti.</span>
+                : mode === 'pause' ? 'Rien ne part tant que tu ne reprends pas.'
+                : (!(nPasFaites || nDouble) ? 'Tout est fait.' : null);
+              // Deux mots seulement : « pas faite » (rien n'a changé sur Vinted) et
+              // « à vérifier » (la nouvelle annonce est en ligne, l'ancienne est restée).
+              const erreur = (nPasFaites || nDouble) ? <>{[nPasFaites ? `${pl(nPasFaites, 'pas faite', 'pas faites')}${nRefaire ? ` (dont ${pl(nRefaire, 'brouillon à refaire', 'brouillons à refaire')} : bouton sur sa ligne)` : ''} : rien n'a changé sur Vinted${onReessayer && nEchec ? ' — « Réessayer » en bas' : ''}` : null, nDouble ? `${pl(nDouble, 'à vérifier', 'à vérifier')} : ouvre l'ancienne annonce sur Vinted (lien sur sa ligne)` : null].filter(Boolean).join(' · ')}.</> : null;
+              const compte = [bilan, enCours ? '1 en cours' : null, nPasFaites ? pl(nPasFaites, 'pas faite', 'pas faites') : null, nDouble ? pl(nDouble, 'à vérifier', 'à vérifier') : null, nPlanif ? pl(nPlanif, 'prévue') : null, pasCommencees ? pl(pasCommencees, 'restante') : null].filter(Boolean).join(' · ');
+              const lstEnCours = action === 'versBrouillon' ? ETAPES_REPUB.versBrouillon : ((viaBrouillon && !!brouillonOk) ? ETAPES_REPUB.brouillon : ETAPES_REPUB.direct);
+              return <Avancement titre={titre} phrase={phrase} part={part} partRate={partRate} label={`${nFait} sur ${total} ${motF(nFait)}`} erreur={erreur}
+                data={{ 'data-republier-total': `${finies}/${total}`, 'data-republier-reussies': `${nFait}/${total}`, 'data-republier-bilan': '' }}
+                compte={<span>{compte}</span>}>
+                {peEnCours && <div data-republier-progression={enCours.id} data-republier-etape={peEnCours.etape || 'attente'}>
+                  <BarreGeste p={prog[String(enCours.id)]} liste={lstEnCours} label={`Paire ${aFaire.indexOf(enCours) + 1}`} barre={false} />
+                </div>}
+              </Avancement>;
             })()}
-            {mode !== 'idle' && <div data-republier-bilan style={{ fontSize: 13, color: C.muted }}>{nFait} {A.faits}{nFait > 1 ? 's' : ''}{nEchec ? ` · ${nEchec} pas faite${nEchec > 1 ? 's' : ''}` : ''}{nRefaire ? ` · ${nRefaire} brouillon${nRefaire > 1 ? 's' : ''} à refaire` : ''}{nDouble ? ` · ${nDouble} à vérifier sur Vinted` : ''}{mode === 'run' ? ' — garde cette fenêtre ouverte' : ''}{mode === 'run' && prochaine ? (() => { const r = Math.max(0, Math.round((prochaine.at - Date.now()) / 1000)); return <span data-republier-prochaine={prochaine.s}> · prochaine paire dans {r >= 60 ? `${Math.floor(r / 60)} min ${String(r % 60).padStart(2, '0')} s` : `${r} s`}</span>; })() : ''}</div>}
+            <div style={{ display: 'flex', flexDirection: 'column', border: `1px solid ${C.border}`, borderRadius: 10, overflow: 'hidden' }}>
+              {mode === 'idle' && aFaire.length > 1 && <div data-republier-ordre={ordre ? 'regle' : 'selection'} style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', padding: '6px 10px', borderBottom: `1px solid ${C.border}`, fontSize: 12.5, color: C.muted }}>
+                <span style={{ flex: '1 1 160px' }}>{ordre ? 'Ordre réglé à la main' : 'Ordre : celui de ta sélection'}</span>
+                {ordre && <Bouton variante="discret" data-republier-ordre-selection onClick={() => setOrdre(null)}>Revenir à ma sélection</Bouton>}
+                <Bouton className="vrm-b-petit" data-republier-melanger onClick={melanger} style={{ minHeight: 44 }}>Mélanger</Bouton>
+              </div>}
+              {aFaire.map((a, i) => { const s = st[a.id] || {};
+                const pb = s.etat === 'echec' || s.etat === 'double' || s.etat === 'incertain' || s.etat === 'a-refaire';
+                const statut = s.etat === 'fait' ? (s.refait ? 'brouillon refait' : A.fait) : s.etat === 'encours' ? 'en cours…' : s.etat === 'planifiee' ? `brouillon prêt · en ligne vers ${s.jusqua ? new Date(s.jusqua).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : '…'}` : s.etat === 'echec' ? 'pas faite' : s.etat === 'a-refaire' ? 'brouillon à refaire' : s.etat ? '⚠ à vérifier' : (mode === 'idle' ? '' : 'en attente');
+                // (30 oct.) La pause de Vinted est dite UNE fois, dans le bloc du haut :
+                // la ligne dit seulement que la paire n'est pas partie à cause d'elle.
+                const raison = s.code === 'vinted-pause' || s.code === 'plafond' ? 'pas partie : arrêt demandé par Vinted (voir en haut)' : s.raison && (pb || s.refait) ? s.raison : '';
+                const urlAncienne = action !== 'enLigne' && /^\d+$/.test(String(a.id || '')) ? `https://www.vinted.fr/items/${a.id}` : '';
+                return (
+                <div key={a.id} data-republier-ligne={a.id} data-republier-statut={s.etat || 'attente'} style={{ padding: '6px 10px', borderBottom: `1px solid ${C.border}`, fontSize: 13 }}>
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'center', minHeight: 32 }}>
+                    <span style={{ flexShrink: 0, width: 18, color: C.muted, fontVariantNumeric: 'tabular-nums' }}>{i + 1}.</span>
+                    <span style={{ flex: 1, minWidth: 0, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{a.numero ? <b>N°{a.numero} · </b> : null}{a.titre}</span>
+                    {!s.etat && <span data-republier-attente={i === 0 ? 0 : (plan[a.id] || '')} style={{ flexShrink: 0, fontSize: 12, color: C.muted, fontVariantNumeric: 'tabular-nums' }}>{i === 0 ? 'tout de suite' : Number.isFinite(plan[a.id]) && plan[a.id] > 0 ? `+${duree(plan[a.id])}` : ''}</span>}
+                    {mode === 'idle' && aFaire.length > 1 && <span style={{ display: 'flex', flexShrink: 0 }}>
+                      <button type="button" aria-label="Monter" data-republier-monter={a.id} disabled={i === 0} onClick={() => bouger(a.id, -1)} style={{ border: 'none', background: 'transparent', color: i === 0 ? C.border : C.text, minWidth: 44, minHeight: 44, fontSize: 16, cursor: i === 0 ? 'default' : 'pointer' }}>↑</button>
+                      <button type="button" aria-label="Descendre" data-republier-descendre={a.id} disabled={i === aFaire.length - 1} onClick={() => bouger(a.id, 1)} style={{ border: 'none', background: 'transparent', color: i === aFaire.length - 1 ? C.border : C.text, minWidth: 44, minHeight: 44, fontSize: 16, cursor: i === aFaire.length - 1 ? 'default' : 'pointer' }}>↓</button>
+                    </span>}
+                    {statut && <span data-republier-prevue={s.etat === 'planifiee' ? (s.jusqua || 0) : undefined} style={{ flexShrink: 0, fontSize: 12, fontWeight: 600, padding: '3px 8px', borderRadius: 99, background: pb ? 'transparent' : s.etat === 'fait' ? 'var(--vrm-b-teinte)' : 'transparent', border: pb ? `1px solid ${C.warn}` : 'none', color: pb ? C.warn : s.etat === 'fait' ? C.text : C.muted, whiteSpace: 'nowrap' }}>{statut}</span>}
+                  </div>
+                  {raison && <div style={{ fontSize: 12.5, color: pb ? C.warn : C.muted, padding: '0 0 4px 26px', lineHeight: 1.45 }}>{raison}</div>}
+                  {s.etat === 'a-refaire' && refaire && mode !== 'run' && <div className="vrm-b-rangee" style={{ padding: '2px 0 4px 26px' }}><Bouton data-republier-refaire={a.id} onClick={() => refaireLigne(a)}>Refaire le brouillon</Bouton></div>}
+                  {(s.etat === 'double' || s.etat === 'incertain') && urlAncienne && <div style={{ padding: '0 0 4px 26px' }}><Bouton variante="discret" href={urlAncienne} target="_blank" rel="noopener noreferrer" data-republier-voir-ancienne={a.id}>{s.etat === 'double' ? "Supprimer l'ancienne sur Vinted ↗" : 'Vérifier sur Vinted ↗'}</Bouton></div>}
+                  {recree && pb && prog[String(a.id)] && prog[String(a.id)].etape && (() => { const lst = action === 'versBrouillon' ? ETAPES_REPUB.versBrouillon : ((viaBrouillon && !!brouillonOk) ? ETAPES_REPUB.brouillon : ETAPES_REPUB.direct); const pe = progressionRepub(prog[String(a.id)], action, viaBrouillon && !!brouillonOk); return (
+                    <div data-republier-progression={a.id} data-republier-etape={pe.etape || 'attente'} style={{ padding: '0 0 4px 26px' }}>
+                      <BarreGeste p={prog[String(a.id)]} liste={lst} label={`Paire ${i + 1}`} issue="echec" barre={false} />
+                    </div>
+                  ); })()}
+                </div>); })}
+            </div>
           </>}
         </div>
-        <div style={{ display: 'flex', gap: 8, padding: '10px 16px 12px', borderTop: `1px solid ${C.border}`, flexShrink: 0, flexWrap: 'wrap' }}>
-          {etape === 'choix' && <button type="button" data-republier-suivant disabled={!sel.size} onClick={() => setEtape(action === 'enLigne' ? 'envoi' : 'modif')} style={{ ...btn(true, !!sel.size), marginLeft: 'auto' }}>Continuer ({sel.size})</button>}
+        <div className="vrm-b-rangee" style={{ padding: '10px 16px 12px', borderTop: `1px solid ${C.border}`, flexShrink: 0, flexWrap: 'nowrap' }}>
+          {etape === 'choix' && <Bouton variante="primaire" data-republier-suivant disabled={!sel.size} title={!sel.size ? 'Choisis au moins une paire' : undefined} onClick={() => setEtape(action === 'enLigne' ? 'envoi' : 'modif')}>Continuer ({sel.size})</Bouton>}
           {etape === 'modif' && <>
-            <button type="button" onClick={() => setEtape('choix')} style={btn(false)}>Retour</button>
-            <button type="button" data-republier-suivant disabled={!aFaire.length} onClick={() => setEtape('envoi')} style={{ ...btn(true, !!aFaire.length), marginLeft: 'auto' }}>Continuer ({aFaire.length})</button>
+            <Bouton variante="discret" onClick={() => setEtape('choix')}>Retour</Bouton>
+            <Bouton variante="primaire" data-republier-suivant disabled={!aFaire.length} title={!aFaire.length ? 'Rien à changer sur ces paires' : undefined} onClick={() => setEtape('envoi')}>Continuer ({aFaire.length})</Bouton>
           </>}
           {etape === 'envoi' && mode === 'idle' && <>
-            <button type="button" onClick={() => setEtape(action === 'enLigne' ? 'choix' : 'modif')} style={btn(false)}>Retour</button>
-            <button type="button" data-republier-lancer disabled={!ok || !aFaire.length} onClick={() => setMode('run')} style={{ ...btn(true, ok && !!aFaire.length), marginLeft: 'auto' }}>{A.lancer} ({aFaire.length})</button>
+            <Bouton variante="discret" onClick={() => setEtape(action === 'enLigne' ? 'choix' : 'modif')}>Retour</Bouton>
+            <Bouton variante="primaire" data-republier-lancer disabled={!ok || !aFaire.length} title={!aFaire.length ? 'Aucune paire à envoyer' : !ok ? 'Coche « Je confirme » d’abord' : undefined} onClick={() => setMode('run')}>{A.lancer} ({aFaire.length})</Bouton>
           </>}
-          {mode === 'run' && <button type="button" data-republier-pause onClick={() => setMode('pause')} style={{ ...btn(false), marginLeft: 'auto' }}>Pause</button>}
-          {mode === 'pause' && <>
-            <button type="button" onClick={() => setMode('fini')} style={btn(false)}>Arrêter</button>
-            <button type="button" onClick={() => setMode('run')} style={{ ...btn(true), marginLeft: 'auto' }}>Reprendre</button>
+          {mode === 'run' && <>
+            <span style={{ flex: 1, minWidth: 0, fontSize: 12.5, color: C.muted }}>Garde cette fenêtre ouverte.</span>
+            <Bouton data-republier-pause onClick={() => setMode('pause')} style={{ flex: '0 0 auto' }}>Pause</Bouton>
           </>}
-          {mode === 'fini' && <button type="button" data-republier-fermer onClick={onClose} style={{ ...btn(true), marginLeft: 'auto' }}>Terminé</button>}
+          {mode === 'pause' && (() => { const resteMin = arretJusqua > Date.now() ? Math.ceil((arretJusqua - Date.now()) / 60000) : 0; return <>
+            <Bouton data-republier-arreter onClick={() => setMode('fini')}>Arrêter</Bouton>
+            <Bouton variante="primaire" data-republier-reprendre disabled={resteMin > 0} title={resteMin > 0 ? `Vinted demande d'attendre : possible dans ${resteMin} min` : undefined} onClick={() => setMode('run')}>{resteMin > 0 ? `Reprendre (dans ${resteMin} min)` : 'Reprendre'}</Bouton>
+          </>; })()}
+          {mode === 'fini' && (() => { const ids = aFaire.filter((a) => { const x = st[a.id] || {}; return x.etat === 'echec' || !x.etat; }).map((a) => a.id); return <>
+            {onReessayer && ids.length > 0 && <Bouton data-republier-reessayer={ids.length} onClick={() => onReessayer(ids)}>{ids.length > 1 ? `Réessayer les ${ids.length} pas faites` : 'Réessayer la pas faite'}</Bouton>}
+            <Bouton variante="primaire" data-republier-fermer onClick={onClose}>Fermer</Bouton>
+          </>; })()}
         </div>
       </div>
     </div>
@@ -13933,7 +14015,10 @@ function ToutSurLeNumero({ q, numData, comptes, onNav, onStock, onChercher }) {
 // rendu : un grand titre d'écran IDENTIQUE se tait sur téléphone (§7, un mot écrit
 // deux fois à 60 px d'écart). Un titre différent (sous-écran de Réglages…) reste.
 let TITRE_BARRE = '';
-function ScreenHead({ icon, title, desc, right }) {
+// (29 oct.) `principal` : L'action principale de l'écran (UN <Bouton
+// variante="primaire">). En haut à droite sur ordinateur ; sur téléphone, une
+// barre fixe au-dessus de la navigation du bas (.vrm-b-principal, styles-boutons.css).
+function ScreenHead({ icon, title, desc, right, principal }) {
   const line = typeof icon === 'string' && ICON_PATHS[icon];
   // ⚠️ UNE MANCHETTE, PAS UN EN-TÊTE DE TABLEAU DE BORD. Le titre était une
   // ligne de 23 px avec une pastille ronde teintée devant — le gabarit de tous
@@ -13972,7 +14057,7 @@ function ScreenHead({ icon, title, desc, right }) {
         {/* ⚠️ `maxWidth:100%` : sans lui, une rangée de boutons ne pouvait pas
             revenir à la ligne sur téléphone (Factures débordait de 300 px sur
             le côté — mesuré le 30 sept.). */}
-        {right && <div style={{flexShrink:0,maxWidth:'100%'}}>{right}</div>}
+        {(right || principal) && <div style={{flexShrink:0,maxWidth:'100%',display:'flex',flexWrap:'wrap',alignItems:'center',justifyContent:'flex-end',gap:8}}>{right}{principal && <div className="vrm-b-principal">{principal}</div>}</div>}
       </div>
     </div>
   );
@@ -14117,12 +14202,19 @@ function TopProgress() {
 // Aucune retouche de teinte ne corrige ça : c'est la FORME qui est mobile.
 // ➡️ Au-dessus de 1024 px : barre latérale à gauche, largeur de lecture bornée,
 //    barre du bas retirée. En dessous : rien ne change, le mobile est intact.
+// (30 oct., Edge sous Windows) La largeur seule ne suffit pas : Edge avec sa
+// barre latérale, ou une fenêtre en demi-écran, fait 768 à 1023 px de large, et
+// l'app passait en coque TÉLÉPHONE (barre du bas, commandes de 44 px) sous une
+// souris. La coque ordinateur se décide sur la SOURIS autant que sur la
+// largeur ; une tablette au doigt garde la coque téléphone. La même requête vit
+// dans les CSS de la coque (`MQ_ORDINATEUR`, styles-*.css) : une notion, une règle.
+const MQ_ORDINATEUR = '(min-width: 1024px), (min-width: 768px) and (hover: hover) and (pointer: fine)';
 const useOrdinateur = () => {
   const [ord, setOrd] = React.useState(() => {
-    try { return window.matchMedia('(min-width: 1024px)').matches; } catch (_) { return false; }
+    try { return window.matchMedia(MQ_ORDINATEUR).matches; } catch (_) { return false; }
   });
   React.useEffect(() => {
-    let mq; try { mq = window.matchMedia('(min-width: 1024px)'); } catch (_) { return; }
+    let mq; try { mq = window.matchMedia(MQ_ORDINATEUR); } catch (_) { return; }
     const on = () => setOrd(mq.matches);
     try { mq.addEventListener('change', on); } catch (_) { mq.addListener(on); }
     return () => { try { mq.removeEventListener('change', on); } catch (_) { mq.removeListener(on); } };
@@ -14138,9 +14230,34 @@ function SideBar({ tab, setTab, entreprise }) {
   const outils = [...NAV_GESTION, ...NAV_OUTILS];
   const actif = BAR_GROUPE[tab] || tab;
   const bouton=t=><button key={t.id} type="button" className="vrm-rail-button" aria-label={t.label} title={t.bientot?`${t.label} — bientôt`:t.label} onClick={()=>setTab(t.id)} aria-current={actif===t.id?'page':undefined}><NavigationIcon item={t} size={25}/></button>;
+  // (30 oct., Edge sous Windows) Une fenêtre basse (1366×768 → 630 px utiles)
+  // coupait le bas du rail — Statistiques, Comptabilité, Communauté — et la zone
+  // défile SANS barre visible : rien ne disait qu'il y avait une suite. La zone
+  // dit maintenant de quel côté il en reste (`data-rail-suite`, un fondu en CSS),
+  // et l'entrée de l'écran ouvert est ramenée dans la vue à chaque changement.
+  const zoneRef = React.useRef(null);
+  React.useEffect(() => {
+    const el = zoneRef.current; if (!el) return undefined;
+    const poser = () => {
+      const reste = el.scrollHeight - el.clientHeight;
+      const haut = reste > 1 && el.scrollTop > 1, bas = reste > 1 && el.scrollTop < reste - 1;
+      const v = haut && bas ? 'les-deux' : bas ? 'bas' : haut ? 'haut' : '';
+      if (v) el.setAttribute('data-rail-suite', v); else el.removeAttribute('data-rail-suite');
+    };
+    poser();
+    el.addEventListener('scroll', poser, { passive: true });
+    let ro = null; try { ro = new ResizeObserver(poser); ro.observe(el); } catch (_) {}
+    window.addEventListener('resize', poser);
+    return () => { el.removeEventListener('scroll', poser); window.removeEventListener('resize', poser); try { ro && ro.disconnect(); } catch (_) {} };
+  }, []);
+  React.useEffect(() => {
+    const el = zoneRef.current; if (!el) return;
+    const b = el.querySelector('.vrm-rail-button[aria-current="page"]');
+    try { if (b) b.scrollIntoView({ block: 'nearest', inline: 'nearest' }); } catch (_) {}
+  }, [actif]);
   return <nav className="vrm-sidebar vrm-atelier-rail" aria-label="Navigation principale" style={{width:NAV_LARGEUR,background:C.sidebar||C.chrome,borderRight:`1px solid ${C.chromeLine}`,color:C.onChrome}}>
     <div className="vrm-sidebar-brand"><VrmLogo size={68} anim={false}/><NomEntreprise entreprise={entreprise} className="vrm-sidebar-entreprise"/></div>
-    <div className="vrm-rail-scroll">
+    <div className="vrm-rail-scroll" ref={zoneRef}>
       <div className="vrm-rail-platforms">{BOTTOM_TABS.map(bouton)}</div>
       <section className="vrm-rail-management-group" aria-label="Gestion"><div className="vrm-rail-section-label">Gestion</div><div className="vrm-rail-management">{outils.map(bouton)}</div></section>
     </div>
@@ -15351,10 +15468,7 @@ function BaseInjoignable() {
             Vérifie ta connexion, puis recharge la page. Si ça dure plus d'une heure, l'app te dira quoi faire.
           </>}
         </div>
-        <button type="button" onClick={()=>window.location.reload()}
-          style={{marginTop:14,border:'none',background:C.warn,color:'#fff',borderRadius:10,padding:'10px 17px',fontSize:13,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>
-          Recharger
-        </button>
+        <Bouton variante="primaire" icone="sync" onClick={()=>window.location.reload()} style={{marginTop:14}}>Recharger</Bouton>
       </div>
       {/* CODES DE RETRAIT HORS LIGNE (G9) : s'affichent MÊME quand la base ne
           répond pas — c'est au point relais, réseau faible, qu'il en a besoin.
@@ -15440,7 +15554,7 @@ function LigneRetraitHorsLigne({ r, i, quand, grise, maintenant, verifier = fals
         {r.code
           ? <div data-hl-code={r.code} style={{display:'inline-block',marginTop:8,fontSize:19,fontWeight:800,letterSpacing:1.2,color:C.text,background:C.card2 || C.bg,border:`1px solid ${C.border}`,borderRadius:8,padding:'5px 12px'}}>{r.code}</div>
           : !r.qr && <div style={{marginTop:6,fontSize:12,color:C.muted}}>Code pas lu à {quand}.</div>}
-        <div style={{marginTop:8}}><button type="button" disabled aria-disabled="true" data-hl-geste="" style={grise}>{verifier ? "Je l'ai eu" : "Je l'ai retiré"}</button></div>
+        <div style={{marginTop:8}}><Bouton variante="secondaire" className="vrm-b-petit" disabled aria-disabled="true" data-hl-geste="" title="Hors ligne : rien ne peut être envoyé" style={{flexShrink:0}}>{verifier ? "Je l'ai eu" : "Je l'ai retiré"}</Bouton></div>
       </div>
       <QrHorsLigne qr={r.qr} code={r.code}/>
     </div>
@@ -15506,7 +15620,7 @@ function JourneeHorsLigne({ uid, tab }) {
                 <div style={{fontSize:14,fontWeight:600,color:C.text,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{e.numero ? `N°${e.numero} · ` : ''}{e.titre || '(sans titre)'}</div>
                 <div style={{fontSize:12,color:C.muted,marginTop:2}}>{[e.plateforme === 'ebay' ? 'eBay' : 'Vinted', e.compte, limiteTxt(e)].filter(Boolean).join(' · ')}</div>
               </div>
-              <button type="button" disabled aria-disabled="true" data-hl-geste="" style={grise}>Colis fait</button>
+              <Bouton variante="secondaire" className="vrm-b-petit" disabled aria-disabled="true" data-hl-geste="" title="Hors ligne : rien ne peut être envoyé" style={{flexShrink:0}}>Colis fait</Bouton>
             </div>
           ))}
         {photo.nEnvoyer > photo.envoyer.length && <div style={{fontSize:12,color:C.muted,padding:'6px 0 10px'}}>… et {photo.nEnvoyer - photo.envoyer.length} autres.</div>}
@@ -15740,8 +15854,7 @@ function RaisonBordereauxGrises({ ventes }) {
       <span style={{ minWidth: 0 }}>
         <b>{n} bordereau{n > 1 ? 'x' : ''} à générer</b><span className={r.code === 'telephone' ? 'vrm-aide' : undefined}> — {r.texte}</span>
         {(r.geste === 'recharger' || r.geste === 'extensions') && (
-          <> <button type="button" data-recharger="1" onClick={() => { try { window.location.reload(); } catch (_) {} }}
-            style={{ marginLeft: 4, border: `1px solid ${C.accent}`, background: 'transparent', color: C.accent, borderRadius: 8, padding: '3px 9px', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>Recharger la page</button></>
+          <> <Bouton variante="secondaire" className="vrm-b-petit" icone="sync" data-recharger="1" onClick={() => { try { window.location.reload(); } catch (_) {} }} style={{ marginLeft: 4 }}>Recharger la page</Bouton></>
         )}
         {/* ⚠️ Le repli qui ne dépend PAS de l'extension de cette page : générer
             le bordereau sur Vinted. Le lien de CHAQUE vente est sur sa ligne
@@ -15749,7 +15862,9 @@ function RaisonBordereauxGrises({ ventes }) {
         {/* ⚠️ Aucune promesse sur le retour du PDF : il dépend de la réception
             des emails de chaque vendeur, que l'app ne peut pas vérifier d'ici
             (revue du 5 octobre). On donne le geste, pas la suite. */}
-        <details className="vrm-label-help" style={{ marginTop: 3, marginBottom: 0 }}><summary>Bordereaux et impression</summary><span className="vrm-aide" style={{ display: 'block', color: C.muted }}>Tu peux aussi le générer et l'imprimer directement sur Vinted (lien « sur Vinted » de chaque vente).</span></details>
+        {/* (30 oct.) Un repli « Bordereaux et impression › » ressemblait à un écran
+            à ouvrir et ne disait qu'une phrase : elle passe derrière ⓘ. */}
+        {' '}<Pourquoi label="Autre solution">Tu peux aussi générer et imprimer le bordereau directement sur Vinted (lien « sur Vinted » de chaque vente).</Pourquoi>
       </span>
     </div>
   );
@@ -16307,7 +16422,7 @@ function FicheLbc({ q, compteLbc, onClose, onMarquer }) {
             <div style={{ fontSize: 13, color: C.text, lineHeight: 1.45 }}><b>Relancer le dépôt ?</b> VRM n'a pas vu la fin du précédent. Si tu l'as publiée toi-même sur Leboncoin, un nouveau dépôt la publierait une seconde fois.</div>
             <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
               <button type="button" data-fiche-relancer="" onClick={() => publier(true)} style={{ flex: 1, padding: '10px 12px', borderRadius: 10, border: 'none', background: C.accent, color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>Relancer le dépôt</button>
-              <button type="button" onClick={() => setAConfirmer(false)} style={{ flex: 1, padding: '10px 12px', borderRadius: 10, border: `1px solid ${C.border}`, background: 'transparent', color: C.text, fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>Annuler</button>
+              <button className="vrm-b vrm-b-discret" type="button" onClick={() => setAConfirmer(false)} style={{ flex: 1, padding: '10px 12px', borderRadius: 10, border: `1px solid ${C.border}`, background: 'transparent', color: C.text, fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>Annuler</button>
             </div>
           </div>
         )}
@@ -16469,7 +16584,7 @@ function EtatActions({ onNav, ordi, sombre }) {
     : code === 'telephone' && rl.niveau === 'perime' ? { s: 'non', t: `sur ton ordinateur — pas de signe de vie depuis ${dureeRelais(rl.age)}` }
     : code === 'telephone' && rl.niveau === 'retard' ? { s: 'non', t: `sur ton ordinateur — version ${rl.ver || '?'}, trop ancienne pour agir pour ton téléphone` }
     : code === 'telephone' && rl.niveau === 'passu' ? { s: '…', t: "sur ton ordinateur — pas su (la base n'a pas répondu)" }
-    : code === 'telephone' ? { s: '—', t: "s'utilise sur l'ordinateur où elle est installée" }
+    : code === 'telephone' ? { s: '—', t: 'sur ton ordinateur' }
     : code === 'absente' ? { s: 'non', t: 'pas détectée dans ce navigateur' }
     : code === 'muette' ? { s: 'non', t: 'ne répond pas' }
     : code === 'plusieurs' ? { s: 'non', t: `deux extensions VRM répondent${(__vmrPlusieurs || []).filter((x) => x && x !== '?').length >= 2 ? ' (' + __vmrPlusieurs.join(' et ') + ')' : ''}` }
@@ -16495,19 +16610,20 @@ function EtatActions({ onNav, ordi, sombre }) {
     : { s: 'non', t: 'aucun compte ouvert' };
 
   // ── LE geste qui débloque (un seul) ─────────────────────────────────────────
-  const btn = { border: 'none', background: C.accent, color: C.onAccent || '#fff', borderRadius: 8, padding: '8px 12px', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', textDecoration: 'none', display: 'inline-block' };
   let geste = null;
   if (code === 'telephone' && rl.niveau === 'perime') geste = <span data-etat-geste="ordinateur">Ouvre Chrome sur ton ordinateur (l'extension VRM s'y réveille toute seule) : dès qu'elle donne signe de vie, les actions reviennent ici.</span>;
   else if (code === 'telephone' && rl.niveau === 'retard') geste = <span data-etat-geste="maj-ordinateur">Sur ton ordinateur : installe la {EXT_ATTENDUE} (Réglages → Extension), puis ⟳ dans chrome://extensions.</span>;
-  else if (code === 'telephone') geste = <span>Ouvre VRM sur l'ordinateur où l'extension est installée pour générer un bordereau, répondre ou publier{rl.niveau === 'absent' ? ' — avec l’extension à jour, tu pourras aussi le faire d’ici' : ''}.</span>;
-  else if (code === 'absente' || code === 'retard') geste = <button type="button" data-etat-geste="maj" style={btn} onClick={() => { setOuvert(false); onNav && onNav('settings'); }}>{code === 'absente' ? "Installer l'extension (Réglages)" : `Mettre à jour en ${EXT_ATTENDUE} (Réglages)`}</button>;
-  else if (code === 'muette') geste = <button type="button" data-etat-geste="recharger" style={btn} onClick={() => { try { window.location.reload(); } catch (_) {} }}>Recharger la page</button>;
+  // (29 oct.) Une ligne : le geste, sans la liste de ce qu'il débloque (le titre
+  // « Lecture seule » et la ligne « Extension » le disent déjà, §7).
+  else if (code === 'telephone') geste = <span data-etat-geste="telephone">Pour agir, ouvre VRM sur ton ordinateur.{rl.niveau === 'absent' ? <>{' '}<Pourquoi label="Et d'ici ?">Avec l’extension à jour sur ton ordinateur, tes demandes partiront aussi d’ici : elle les exécute pour toi.</Pourquoi></> : null}</span>;
+  else if (code === 'absente' || code === 'retard') geste = <button type="button" data-etat-geste="maj" className="vrm-b vrm-b-primaire" onClick={() => { setOuvert(false); onNav && onNav('settings'); }}>{code === 'absente' ? "Installer l'extension (Réglages)" : `Mettre à jour en ${EXT_ATTENDUE} (Réglages)`}</button>;
+  else if (code === 'muette') geste = <button type="button" data-etat-geste="recharger" className="vrm-b vrm-b-primaire" onClick={() => { try { window.location.reload(); } catch (_) {} }}>Recharger la page</button>;
   // Code périmé : le geste se fait DANS CHROME (une page web ne peut pas ouvrir
   // chrome://extensions) — on le dit tel quel, puis on recharge la page.
-  else if (code === 'perime') geste = <span data-etat-geste="recharger-extension">Dans ce Chrome : tape <b>chrome://extensions</b> dans la barre d'adresse, clique ⟳ (la flèche ronde) sur VRM, puis <button type="button" data-etat-geste-recharger="1" style={{ ...btn, padding: '4px 9px', fontSize: 12 }} onClick={() => { try { window.location.reload(); } catch (_) {} }}>Recharger la page</button></span>;
+  else if (code === 'perime') geste = <span data-etat-geste="recharger-extension">Dans ce Chrome : tape <b>chrome://extensions</b> dans la barre d'adresse, clique ⟳ (la flèche ronde) sur VRM, puis <button type="button" data-etat-geste-recharger="1" className="vrm-b vrm-b-discret" onClick={() => { try { window.location.reload(); } catch (_) {} }}>Recharger la page</button></span>;
   // Deux extensions : le geste se fait dans Chrome (une page web ne peut pas
   // ouvrir chrome://extensions) — on le DIT, puis on recharge.
-  else if (code === 'plusieurs') geste = <span data-etat-geste="extensions">Tape <b>chrome://extensions</b> dans la barre d'adresse, supprime l'ancienne VRM, puis <button type="button" data-etat-geste-recharger="1" style={{ ...btn, padding: '4px 9px', fontSize: 12 }} onClick={() => { try { window.location.reload(); } catch (_) {} }}>Recharger la page</button></span>;
+  else if (code === 'plusieurs') geste = <span data-etat-geste="extensions">Tape <b>chrome://extensions</b> dans la barre d'adresse, supprime l'ancienne VRM, puis <button type="button" data-etat-geste-recharger="1" className="vrm-b vrm-b-discret" onClick={() => { try { window.location.reload(); } catch (_) {} }}>Recharger la page</button></span>;
   // Non connectée : son icône ouvre SA fenêtre de connexion (une extension
   // connectée, elle, ouvre VRM) — c'est le repli si la reconnexion automatique
   // n'aboutit pas.
@@ -16538,14 +16654,14 @@ function EtatActions({ onNav, ordi, sombre }) {
   // passe VRM dans sa fenêtre — ou la mettre à jour.
   else if (code === 'autre-vrm') { const voie = voieConnexionExt(); geste = __sessExtEnVol ? <span>Un instant…</span>
     : voie === 'retard'
-      ? <span data-etat-geste="deconnecter">Cette extension ({vmrExtVersion() || 'version ?'}) ne sait pas recevoir la connexion de VRM. <button type="button" data-etat-geste-deconnecter="1" style={{ ...btn, padding: '4px 9px', fontSize: 12 }} onClick={() => { deconnecterExtensionAncienne(); }}>Déconnecter l'extension de ce Chrome</button>, puis clique l'icône VRM en haut de Chrome et connecte-toi avec ton mot de passe VRM (<b>{monMail || 'ton email VRM'}</b>) — ou mets-la à jour en {EXT_ATTENDUE} (Réglages).</span>
+      ? <span data-etat-geste="deconnecter">Cette extension ({vmrExtVersion() || 'version ?'}) ne sait pas recevoir la connexion de VRM. <button type="button" data-etat-geste-deconnecter="1" className="vrm-b vrm-b-discret" onClick={() => { deconnecterExtensionAncienne(); }}>Déconnecter l'extension de ce Chrome</button>, puis clique l'icône VRM en haut de Chrome et connecte-toi avec ton mot de passe VRM (<b>{monMail || 'ton email VRM'}</b>) — ou mets-la à jour en {EXT_ATTENDUE} (Réglages).</span>
       : voie === 'serveur'
         ? <span data-etat-geste="attendre-serveur">Le serveur n'a pas pu préparer sa connexion{__sessExtErreur.message ? ` (${__sessExtErreur.message})` : ''} : je réessaie dans {minutesAvantReessai()} min, cette page ouverte.</span>
-        : <button type="button" data-etat-geste="recharger" style={btn} onClick={() => { try { window.location.reload(); } catch (_) {} }}>Recharger la page</button>; }
+        : <button type="button" data-etat-geste="recharger" className="vrm-b vrm-b-primaire" onClick={() => { try { window.location.reload(); } catch (_) {} }}>Recharger la page</button>; }
   else if (code === 'vrm-passu') geste = __sessExtEnVol ? <span>Un instant…</span>
-    : <button type="button" data-etat-geste="recharger" style={btn} onClick={() => { try { window.location.reload(); } catch (_) {} }}>Recharger la page</button>;
+    : <button type="button" data-etat-geste="recharger" className="vrm-b vrm-b-primaire" onClick={() => { try { window.location.reload(); } catch (_) {} }}>Recharger la page</button>;
   else if (code === 'vinted' && st.relais) geste = <span data-etat-geste="vinted-ordinateur">Sur ton ordinateur, ouvre vinted.fr connecté sur le compte des colis.</span>;
-  else if (code === 'vinted') geste = <a data-etat-geste="vinted" href="https://www.vinted.fr" target="_blank" rel="noreferrer" style={btn}>Ouvrir vinted.fr et me connecter</a>;
+  else if (code === 'vinted') geste = <a data-etat-geste="vinted" href="https://www.vinted.fr" target="_blank" rel="noreferrer" className="vrm-b vrm-b-primaire">Ouvrir vinted.fr et me connecter</a>;
   // 'pause' : aucun geste — la phrase du panneau dit que ça repart seul.
 
   const poserPanneau = ordi ? (x) => x : (x) => createPortal(x, document.body);
@@ -16592,23 +16708,27 @@ function EtatActions({ onNav, ordi, sombre }) {
               {st.niveau === 'ok' ? (st.relais ? 'Tu peux agir sur Vinted d’ici, via ton ordinateur' : 'Tu peux agir sur Vinted depuis VRM') : st.niveau === 'verif' ? "Je vérifie l'extension…" : 'Lecture seule pour l’instant'}
             </div>
           </div>
+          {/* (29 oct.) UNE ligne courte ; le détail derrière ⓘ (Julien : « arrête
+              les messages écrits dans tous les sens »). Ce qui distingue (le
+              compte qui agit, l'exception de publication) reste visible. */}
           {st.niveau === 'ok' && st.relais ? (
             <div data-etat-relais-texte="" className="vrm-etat-texte" style={{ color: C.muted }}>
-              Générer un bordereau, répondre, faire une offre, publier sur Leboncoin : ta demande part dans ta base, l'extension du Chrome de ton ordinateur la prend (en général dans la demi-minute) et l'exécute au nom de <b style={{ color: C.text }}>{loginVinted}</b>, avec les mêmes garde-fous que là-bas. Rien n'est dit « fait » avant qu'elle l'ait écrit.
+              Tes demandes partent à ton ordinateur, qui agit au nom de <b style={{ color: C.text }}>{loginVinted}</b>.{' '}
+              <Pourquoi label="Comment ça marche">La demande part dans ta base ; l'extension du Chrome de ton ordinateur la prend (en général dans la demi-minute) et l'exécute avec les mêmes garde-fous. Rien n'est dit « fait » avant qu'elle l'ait écrit.</Pourquoi>
             </div>
           ) : st.niveau === 'ok' ? (
             <div className="vrm-etat-texte" style={{ color: C.muted }}>
               {/* On ne promet que ce que l'extension INSTALLÉE sait faire (revue
                   du 5 octobre) : chaque geste suit sa capacité. */}
-              {['Générer un bordereau', extSait('messagerie') === 'ok' ? 'répondre, faire une offre' : null].filter(Boolean).join(', ')} : ça part au nom de <b style={{ color: C.text }}>{loginVinted}</b>, le compte Vinted ouvert dans ce Chrome. Pour un autre de tes comptes : connecte-toi avec lui sur vinted.fr dans ce Chrome, ou ouvre VRM dans le Chrome (le profil) où il est connecté.
-              {!st.exception && extSait('publication') === 'ok' ? ' Publier sur Leboncoin passe aussi par l’extension.' : ''}
+              {['Bordereaux', extSait('messagerie') === 'ok' ? 'réponses et offres' : null].filter(Boolean).join(', ')} : au nom de <b style={{ color: C.text }}>{loginVinted}</b>.{' '}
+              <Pourquoi label="Un autre compte ?">C'est le compte Vinted ouvert dans ce Chrome. Pour un autre de tes comptes : connecte-toi avec lui sur vinted.fr dans ce Chrome, ou ouvre VRM dans le Chrome (le profil) où il est connecté.{!st.exception && extSait('publication') === 'ok' ? ' Publier sur Leboncoin passe aussi par l’extension.' : ''}</Pourquoi>
               {st.exception ? <span data-etat-exception-texte="publication"><br/><b style={{ color: C.text }}>Sauf publier sur Leboncoin</b> : {st.exception.texte}</span> : null}
             </div>
           ) : (
             <div className="vrm-etat-texte" style={{ color: C.muted }}>
-              Tout ce qui est déjà dans VRM marche : tes ventes, achats, annonces et messages, les colis à retirer et leurs codes, l'impression des bordereaux déjà reçus.
-              {' '}{code === 'pause' || code === 'plusieurs' ? st.glob.texte
-                : <>Générer un bordereau ou répondre demande l'extension allumée, connectée à ton compte VRM, avec un compte Vinted ouvert dans Chrome ; publier sur Leboncoin demande {extSait('publication') === 'retard' ? 'une extension à jour' : "l'extension allumée"}.</>}
+              Tes ventes, colis à retirer, codes et bordereaux déjà reçus restent là.
+              {code === 'pause' || code === 'plusieurs' ? <> {st.glob.texte}</>
+                : <>{' '}<Pourquoi label="Ce qui manque">Générer un bordereau ou répondre demande l'extension allumée, connectée à ton compte VRM, avec un compte Vinted ouvert dans Chrome ; publier sur Leboncoin demande {extSait('publication') === 'retard' ? 'une extension à jour' : "l'extension allumée"}.</Pourquoi></>}
             </div>
           )}
           <div className="vrm-etat-chaine" data-etat-chaine>
@@ -16630,7 +16750,7 @@ function EtatActions({ onNav, ordi, sombre }) {
             className="vrm-etat-pied" style={{ color: C.muted }}>
             {derniere === undefined ? 'Dernière capture reçue : je regarde…'
               : derniere === null ? 'Dernière capture reçue : pas su (la base n’a pas répondu).'
-              : derniere === 'aucune' ? 'Aucune capture reçue de ton extension pour l’instant.'
+              : derniere === 'aucune' ? 'Aucune capture reçue pour l’instant.'
               // ⚠️⚠️ LA MISE À JOUR N'EST DITE ICI QUE LÀ OÙ LE PONT NE PARLE PAS
               //    (revue du 9 octobre). Sur l'ordinateur, la ligne « Extension »
               //    juste au-dessus vient du pont, qui a mesuré CE navigateur : la
@@ -16892,26 +17012,26 @@ function PremiersPas({ onNav, titreNeuf, introNeuf }) {
   // de la déconnecter d'ici (son icône, connectée, ouvre VRM : pas sa fenêtre).
   const majLiaison = fait.ext && !fait.lien && voie === 'retard' && (etape === 'pasconnectee' || etape === 'autrecompte');
   const bouton = (!fait.ext && mobile==='ios-orion')
-    ? <a href={`${LIEN_ORION_FICHIER}?v=${EXT_ATTENDUE}`} download data-premiers-geste="orion-fichier" style={{textDecoration:'none',background:C.accent,color:C.onAccent||'#fff',borderRadius:10,padding:'12px 18px',fontSize:14,fontWeight:600}}>Télécharger pour Orion</a>
+    ? <a href={`${LIEN_ORION_FICHIER}?v=${EXT_ATTENDUE}`} download data-premiers-geste="orion-fichier" className="vrm-b vrm-b-primaire">Télécharger pour Orion</a>
     : (!fait.ext && boutique.lien && (!sansSouris || (boutique.nav === 'firefox' && estAndroid())))
-    ? <a href={boutique.lien} target="_blank" rel="noreferrer" data-premiers-geste="boutique" style={{textDecoration:'none',background:C.accent,color:C.onAccent||'#fff',borderRadius:10,padding:'12px 18px',fontSize:14,fontWeight:600}}>Installer depuis la boutique</a>
+    ? <a href={boutique.lien} target="_blank" rel="noreferrer" data-premiers-geste="boutique" className="vrm-b vrm-b-primaire">Installer depuis la boutique</a>
     : (!fait.ext && orion && (boutique.nav === 'safari' || boutique.nav === 'orion') && !(sansSouris && estAndroid()))
-    ? <a href={orion} target="_blank" rel="noreferrer" data-premiers-geste="orion" style={{textDecoration:'none',background:C.accent,color:C.onAccent||'#fff',borderRadius:10,padding:'12px 18px',fontSize:14,fontWeight:600}}>Installer dans Orion</a>
+    ? <a href={orion} target="_blank" rel="noreferrer" data-premiers-geste="orion" className="vrm-b vrm-b-primaire">Installer dans Orion</a>
     : (!fait.ext && sansSouris && LIENS_BOUTIQUES.firefox && (mobile === 'samsung' || mobile === 'android' || mobile === 'duckduckgo'))
-    ? <a href={LIEN_FIREFOX_ANDROID} target="_blank" rel="noreferrer" data-premiers-geste="firefox-android" style={{textDecoration:'none',background:C.accent,color:C.onAccent||'#fff',borderRadius:10,padding:'12px 18px',fontSize:14,fontWeight:600}}>Installer Firefox pour Android</a>
+    ? <a href={LIEN_FIREFOX_ANDROID} target="_blank" rel="noreferrer" data-premiers-geste="firefox-android" className="vrm-b vrm-b-primaire">Installer Firefox pour Android</a>
     : (!fait.ext && sansSouris)
     ? null   // un zip sur un téléphone est du poids mort, pas un geste
     : (!fait.ext && (boutique.nav === 'firefox' || boutique.nav === 'safari' || boutique.nav === 'samsung' || boutique.nav === 'duckduckgo' || boutique.nav === 'orion'))
     ? null   // le zip est un paquet Chromium : rien à proposer ici
     : !fait.ext
-    ? <a href="/VRM-extension.zip" download style={{textDecoration:'none',background:C.accent,color:C.onAccent||'#fff',borderRadius:10,padding:'12px 18px',fontSize:14,fontWeight:600}}>Télécharger l’extension</a>
+    ? <a href="/VRM-extension.zip" download className="vrm-b vrm-b-primaire">Télécharger l’extension</a>
     : majLiaison
       ? <>
-          <a href="/VRM-extension.zip" download data-premiers-geste="maj" style={{textDecoration:'none',background:C.accent,color:C.onAccent||'#fff',borderRadius:10,padding:'12px 18px',fontSize:14,fontWeight:600}}>Télécharger la mise à jour ({EXT_ATTENDUE})</a>
-          {etape === 'autrecompte' && <button type="button" data-premiers-geste="deconnecter" disabled={deconnectee} onClick={deconnecter} style={{border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:10,padding:'12px 18px',fontSize:14,fontWeight:600,cursor:deconnectee?'default':'pointer',fontFamily:'inherit'}}>{deconnectee ? 'Déconnectée — connecte-la avec ton mot de passe VRM' : 'Déconnecter l’extension de ce Chrome'}</button>}
+          <a href="/VRM-extension.zip" download data-premiers-geste="maj" className="vrm-b vrm-b-primaire">Télécharger la mise à jour ({EXT_ATTENDUE})</a>
+          {etape === 'autrecompte' && <button type="button" className="vrm-b vrm-b-secondaire vrm-b-court" data-premiers-geste="deconnecter" disabled={deconnectee} onClick={deconnecter}>{deconnectee ? 'Déconnectée — connecte-la avec ton mot de passe VRM' : 'Déconnecter l’extension de ce Chrome'}</button>}
         </>
     : etape === 'connectee'
-      ? <a href="https://www.vinted.fr" target="_blank" rel="noreferrer" style={{textDecoration:'none',background:C.accent,color:C.onAccent||'#fff',borderRadius:10,padding:'12px 18px',fontSize:14,fontWeight:600}}>Ouvrir vinted.fr</a>
+      ? <a href="https://www.vinted.fr" target="_blank" rel="noreferrer" className="vrm-b vrm-b-primaire">Ouvrir vinted.fr</a>
       : null;
 
   return (
@@ -16924,7 +17044,7 @@ function PremiersPas({ onNav, titreNeuf, introNeuf }) {
       {/* Où on en est — trois pastilles, lisibles d'un coup d'œil. */}
       <div style={{display:'flex',gap:6,marginBottom:14}}>
         {ETAPES.map((e,k)=>(
-          <span key={e.c} style={{flex:1,height:4,borderRadius:999,background:(k+1)<n?(INV_STATUS.online.color):(k+1)===n?C.accent:C.border}}/>
+          <span key={e.c} style={{flex:1,height:4,borderRadius:999,background:(k+1)<=n?C.accent:C.border,opacity:(k+1)===n?.55:1}}/>
         ))}
       </div>
       {/* Mini-tuto illustré de l'étape courante — sur le parcours normal (3 étapes),
@@ -16936,7 +17056,7 @@ function PremiersPas({ onNav, titreNeuf, introNeuf }) {
       {(bouton || onNav) && (
         <div style={{display:'flex',gap:8,flexWrap:'wrap',marginTop:16,alignItems:'center'}}>
           {bouton}
-          <button type="button" onClick={()=>onNav&&onNav('vintedaccounts')} style={{border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:10,padding:'12px 18px',fontSize:14,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Voir mes comptes liés</button>
+          <Bouton variante="discret" onClick={()=>onNav&&onNav('vintedaccounts')}>Mes comptes liés ›</Bouton>
         </div>
       )}
 
@@ -17176,7 +17296,8 @@ function FraicheurDonnees({ jours, compte, comptes = null, siAJour = true }) {
     const noms = liste.map((x, i) => <React.Fragment key={x.login}>{i ? (i === liste.length - 1 ? ' et ' : ', ') : ''}<b>{x.login}</b> ({x.jours} j)</React.Fragment>);
     return (
       <div data-fraicheur-comptes={liste.map((x) => x.login + ':' + x.jours).join(',')} style={{fontSize:12,color:C.warn,background:`${C.warn}12`,border:`1px solid ${C.warn}55`,borderRadius:10,padding:'9px 12px',lineHeight:1.5}}>
-        Les données de {noms} ne sont plus à jour : une de leurs ventes récentes peut manquer, et un colis déjà expédié peut encore apparaître. Repasse sur Vinted connecté sur chacun de ces comptes pour les rafraîchir.
+        {/* (30 oct.) Une ligne (le « pas à jour » reste dit) ; les comptes, leur âge et la conséquence derrière ⓘ. */}
+        <span style={{display:'inline-flex',alignItems:'center',gap:4,flexWrap:'wrap'}}>{liste.length} comptes pas relus depuis {Math.min(...liste.map((x) => Number(x.jours) || 0))} j ou plus — repasse sur Vinted connecté sur chacun. <Pourquoi label="Quels comptes">{noms}. Une de leurs ventes récentes peut manquer, et un colis déjà expédié peut encore apparaître.</Pourquoi></span>
       </div>
     );
   }
@@ -17246,6 +17367,50 @@ function KpiVentes({ tuiles, note, plateforme }) {
 // segment actif en surface. Pour un CHOIX d'écran on pose aria-pressed ; les
 // sous-onglets gardent aria-current (PlatSubNav). `data` passe les attributs
 // que les bancs lisent (data-ca-choix, data-detourage-choix…).
+// (29 oct.) LES TROIS BOUTONS — Julien : « ça fait encore de faible qualité,
+// améliore les boutons ». Une forme par rôle, et seulement trois :
+//   · primaire   — l'action principale de l'écran (UNE par écran), fond accent ;
+//   · secondaire — tout autre geste : fond teinté, AUCUNE bordure ;
+//   · discret    — un lien-action, texte seul, zone de toucher 44 px.
+// Le dessin vit dans src/styles-boutons.css (.vrm-b-*) ; ce composant ne fait
+// que poser la classe et l'icône (18 px, ICON_PATHS). `href` ⇒ un <a>. Tout le
+// reste (data-*, title, disabled, aria-*) passe tel quel : un bouton grisé garde
+// sa raison dans `title`, il n'est jamais caché.
+function Bouton({ variante = 'secondaire', icone, plein = false, className = '', children, type = 'button', href, ...rest }) {
+  const cls = `vrm-b vrm-b-${variante}${plein ? ' vrm-b-plein' : ''}${!children && icone ? ' vrm-b-icone' : ''}${className ? ' ' + className : ''}`;
+  const contenu = <>{icone && ICON_PATHS[icone] ? <Icon name={icone} size={18}/> : null}{children}</>;
+  if (href) return <a href={href} className={cls} {...rest}>{contenu}</a>;
+  // Type écrit en clair (audit-commandes) : « submit » seulement quand on le
+  // demande, sinon « button » — jamais un envoi de formulaire par défaut.
+  if (type === 'submit') return <button type="submit" className={cls} {...rest}>{contenu}</button>;
+  return <button type="button" className={cls} {...rest}>{contenu}</button>;
+}
+// (29 oct.) UN PARCOURS EN PLUSIEURS ÉTAPES se lit toujours pareil — Julien :
+// « pour les republications la barre de progression est incompréhensible ».
+// Quatre choses, dans cet ordre, et une seule barre :
+//   · `titre`  — où j'en suis, en mots (« Paire 2 sur 5 », « En pause », « Terminé ») ;
+//   · `phrase` — ce qui se passe maintenant (une phrase) ;
+//   · `part`   — 0 à 1, la barre (une seule par parcours) ;
+//   · `compte` — combien sont faites / ratées / restent (`compteAvancement`) ;
+//   · `erreur` — ce qui a raté et quoi faire (vide si rien n'a raté).
+// Pas de jargon (« passage », « file », « job »). `data` passe les data-* des bancs.
+function compteAvancement({ faites = 0, ratees = 0, restent = 0, motFait = 'faite', motFaits }) {
+  const pl = (n, s, p) => `${n} ${n > 1 ? (p || s + 's') : s}`;
+  return [pl(faites, motFait, motFaits), ratees ? pl(ratees, 'ratée') : null, restent ? pl(restent, 'restante') : null].filter(Boolean).join(' · ');
+}
+function Avancement({ titre, phrase, part = 0, partRate = 0, compte, erreur, label, data, children }) {
+  const pct = Math.max(0, Math.min(100, Math.round((Number(part) || 0) * 100)));
+  const pctR = Math.max(0, Math.min(100 - pct, Math.round((Number(partRate) || 0) * 100)));
+  return (
+    <div className="vrm-avancement" {...(data || {})}>
+      <div className="vrm-avancement-tete"><b>{titre}</b>{compte ? <span className="vrm-avancement-compte">{compte}</span> : null}</div>
+      <div className="vrm-avancement-barre" role="progressbar" aria-label={label || (typeof titre === 'string' ? titre : 'Avancement')} aria-valuemin={0} aria-valuemax={100} aria-valuenow={pct}><span style={{ width: `${Math.max(pct ? 3 : 0, pct)}%` }}/>{pctR ? <span className="vrm-avancement-rate" style={{ width: `${pctR}%` }}/> : null}</div>
+      {phrase ? <div className="vrm-avancement-phrase">{phrase}</div> : null}
+      {erreur ? <div className="vrm-avancement-erreur" role="status">{erreur}</div> : null}
+      {children}
+    </div>
+  );
+}
 function Segmente({ label, options, value, onChange, plein = false, disabled = false, className = '', style }) {
   return (
     <div role="group" aria-label={label} className={`vrm-seg${plein ? ' vrm-seg-plein' : ''}${className ? ' ' + className : ''}`} style={style}>
@@ -17348,10 +17513,10 @@ function RetirerArgent({ liveStats }) {
                 <div style={{ fontSize: 13, fontWeight: 600, color: C.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{x.login || `compte ${x.uid}`}</div>
                 <div style={{ fontSize: 11.5, color: C.muted }}>{fmt(x.dispo || 0)} disponible{x.jours != null && x.jours > 0 ? ` · lu il y a ${x.jours} j` : ''}</div>
               </div>
-              {x.dispo > 0 && <a href={PORTE_MONNAIE_VINTED} target="_blank" rel="noreferrer" style={{ flexShrink: 0, display: 'inline-flex', alignItems: 'center', minHeight: 44, padding: '0 12px', border: `1px solid ${C.border}`, borderRadius: 10, color: C.text, fontSize: 13, fontWeight: 600, textDecoration: 'none' }}>Retirer sur Vinted ↗</a>}
+              {x.dispo > 0 && <Bouton variante="secondaire" href={PORTE_MONNAIE_VINTED} target="_blank" rel="noreferrer" style={{ flexShrink: 0 }}>Retirer sur Vinted ↗</Bouton>}
             </div>
           ))}
-          <div style={{ fontSize: 11.5, color: C.muted, lineHeight: 1.45, paddingTop: 6, borderTop: `1px solid ${C.border}` }}>Le virement se fait dans ton porte-monnaie Vinted, sur le compte <b>connecté dans ton navigateur</b> — connecte-toi d'abord sur le bon compte. VRM ne déplace jamais ton argent lui-même.</div>
+          <div style={{ fontSize: 11.5, color: C.muted, lineHeight: 1.45, paddingTop: 6, borderTop: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', gap: 6 }}>Connecte-toi d'abord sur le bon compte dans ton navigateur.<Pourquoi label="Pourquoi sur Vinted ?">Le virement se fait dans ton porte-monnaie Vinted, sur le compte connecté dans ton navigateur. VRM ne déplace jamais ton argent lui-même.</Pourquoi></div>
         </div>
       )}
     </div>
@@ -17486,12 +17651,12 @@ function LigneArrivee({arr, style}) {
 function BoutonSuivreColis({transporteur, suivi, codePostal = '', attrs, enLigne, court = false}) {
   const l = lienSuivi(transporteur, suivi, codePostal);
   if (!l) return null;
-  const long = l.site ? 'Suivre sur le site du transporteur ↗' : 'Chercher ce n° de suivi ↗';
-  return <a className="vrm-suivre-colis" href={l.url} target="_blank" rel="noreferrer"
+  const long = l.site ? 'Suivre chez le transporteur ↗' : 'Chercher ce n° de suivi ↗';
+  return <a className="vrm-suivre-colis vrm-b vrm-b-secondaire" href={l.url} target="_blank" rel="noreferrer"
     data-suivre-colis={normaliserSuivi(suivi)} data-suivre-site={l.site ? 'transporteur' : 'recherche'} data-suivre-cp={l.codePostal || ''} data-suivre-court={court ? '' : undefined}
     {...(court ? { 'aria-label': `${long.replace(/ ↗$/, '')} (n° ${normaliserSuivi(suivi)})`, title: long.replace(/ ↗$/, '') } : {})} {...(attrs || {})}
-    style={{display:'inline-flex',alignItems:'center',gap:6,minHeight:44,boxSizing:'border-box',padding:court?'0 10px':'0 12px',marginTop:enLigne?0:6,flexShrink:0,border:`1px solid ${C.border}`,borderRadius:10,color:C.text,background:'transparent',fontSize:12.5,fontWeight:600,textDecoration:'none',maxWidth:'100%',whiteSpace:'nowrap'}}>
-    <Icon name="truck" size={14} style={{color:C.muted,flexShrink:0}}/>{court ? (l.site ? 'Suivre ↗' : 'Chercher ↗') : long}
+    style={{minHeight:44,padding:court?'0 10px':'0 12px',marginTop:enLigne?0:6,flexShrink:0,fontSize:12.5,maxWidth:'100%'}}>
+    <Icon name="truck" size={16} style={{flexShrink:0}}/>{court ? (l.site ? 'Suivre ↗' : 'Chercher ↗') : long}
   </a>;
 }
 // ── (24 oct.) CE QUE DIT LE TRANSPORTEUR, SUR SON SITE PUBLIC ─────────────────
@@ -17775,7 +17940,7 @@ function EtatSuiviVinted({ achats, suivisVinted, etatDe, accName, relire }) {
   React.useEffect(() => { if (!aLire) return; let stop = false; lireFormesSuivi().then((f) => { if (!stop) setFormes(f); }); return () => { stop = true; }; }, [aLire, suivisVinted]);
   if (!Array.isArray(achats) || !achats.length || suivisVinted === undefined) return null;
   const bouton = { border: 'none', background: 'transparent', color: C.accent, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', padding: 0, minHeight: 44 };
-  if (suivisVinted === null) return <div data-suivi-vinted-etat="passu" style={{fontSize:12,color:C.muted,margin:'0 0 10px',lineHeight:1.45}}>Le suivi Vinted de tes achats n'a pas pu être lu — la base n'a pas répondu ; rien n'est perdu. <button type="button" onClick={relire} style={bouton}>Réessayer</button></div>;
+  if (suivisVinted === null) return <div data-suivi-vinted-etat="passu" style={{fontSize:12,color:C.muted,margin:'0 0 10px',lineHeight:1.45}}>Le suivi Vinted de tes achats n'a pas pu être lu — la base n'a pas répondu ; rien n'est perdu. <Bouton variante="discret" onClick={relire}>Réessayer</Bouton></div>;
   const aucune = achats.filter((o) => etatDe(o) === 'aucune');
   const sansDate = achats.filter((o) => etatDe(o) === 'sans-date');
   if (!aucune.length && !sansDate.length) return null;
@@ -17794,13 +17959,13 @@ function EtatSuiviVinted({ achats, suivisVinted, etatDe, accName, relire }) {
   const geste = 'touche « Suivre le colis » dans la commande sur vinted.fr';
   let phrase = null;
   if (aucune.length) {
-    const tete = `${un ? '1 colis vu par Vinted n’a' : `${aucune.length} colis vus par Vinted n'ont`} pas encore de suivi Vinted relevé${parCompte.size === 1 && noms[0] ? ` (${noms[0]})` : ''}.`;
+    const tete = `${un ? '1 colis' : `${aucune.length} colis`} sans suivi Vinted relevé${parCompte.size === 1 && noms[0] ? ` (${noms[0]})` : ''}.`;
     const suite = promet
       ? (formeJ === 'inconnue'
         ? `L'extension a vu la page de suivi de Vinted mais ne sait pas encore la lire — ${geste}.`
-        : `L'extension de ce navigateur le relève toute seule sur vinted.fr, connecté sur ${ce} — ${SUIVI_PAR_VISITE} par visite, donc ${quand}.`)
+        : `L'extension le relève toute seule sur vinted.fr connecté sur ${ce} — ${SUIVI_PAR_VISITE} par visite, donc ${quand}.`)
       : ailleurs
-        ? `Il se relève avec l'extension VRM, sur l'ordinateur où elle est installée, connecté sur ${ce} — ou ${geste}.`
+        ? `Il se relève avec l'extension VRM sur ton ordinateur, connecté sur ${ce} — ou ${geste}.`
         : cap === 'retard'
           ? `L'extension installée ici ne le relève pas encore : mets-la à jour (${EXT_CAPACITES.suivivinted} ou plus). En attendant, ${geste}.`
           : `${blocage ? blocage.texte : "Je vérifie que l'extension de ce navigateur est connectée à ton compte VRM."} Tant que ce n'est pas réglé, elle ne relève rien : ${geste}.`;
@@ -17844,10 +18009,10 @@ function SuivisManuels({ liste, tracking, achats, accName, relire, etapeDe, tran
   return (
     <div className="vrm-achats-bloc" data-suivis-manuels={Array.isArray(liste) ? liste.length : (liste === null ? 'pas-su' : 'en-cours')} style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 10, padding: '12px 14px', marginBottom: 10 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-        <div style={{ flex: '1 1 180px', fontSize: 14, fontWeight: 700, color: C.text }}>N° de suivi ajoutés{Array.isArray(liste) && liste.length ? ` · ${liste.length}` : ''}</div>
-        <button type="button" data-suivi-ajouter="" onClick={() => { setOuvert(o => !o); setMsg(''); }} style={bouton}>{ouvert ? 'Fermer' : '+ Ajouter un n° de suivi'}</button>
+        <div style={{ flex: '1 1 180px', fontSize: 14, fontWeight: 700, color: C.text }}>{Array.isArray(liste) && liste.length ? `N° de suivi ajoutés · ${liste.length}` : 'Suivre un colis par son n°'}</div>
+        <Bouton variante={ouvert ? 'discret' : 'secondaire'} data-suivi-ajouter="" onClick={() => { setOuvert(o => !o); setMsg(''); }} style={{ minHeight: 44 }}>{ouvert ? 'Fermer' : '+ Ajouter un n° de suivi'}</Bouton>
       </div>
-      {liste === null && <div data-suivis-manuels-pas-su="" style={{ fontSize: 12, color: C.muted, marginTop: 6 }}>Les n° ajoutés n'ont pas pu être lus — la base n'a pas répondu. Rien n'est perdu. <button type="button" onClick={relire} style={{ ...bouton, minHeight: 44, border: 'none', padding: 0, color: C.accent }}>Réessayer</button></div>}
+      {liste === null && <div data-suivis-manuels-pas-su="" style={{ fontSize: 12, color: C.muted, marginTop: 6 }}>Les n° ajoutés n'ont pas pu être lus — la base n'a pas répondu. Rien n'est perdu. <Bouton variante="discret" onClick={relire}>Réessayer</Bouton></div>}
       {ouvert && (
         <div data-suivi-form="" style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 8 }}>
           <input aria-label="N° de suivi" data-suivi-saisie="" value={n} onChange={e => { setN(e.target.value); setTr(''); setMsg(''); }} placeholder="N° de suivi (ex. 8 chiffres pour Mondial Relay)" autoCapitalize="characters" autoComplete="off" style={champ}/>
@@ -17870,7 +18035,7 @@ function SuivisManuels({ liste, tracking, achats, accName, relire, etapeDe, tran
           )}
           {choisi === 'mondialrelay' && <input aria-label="Code postal (facultatif)" data-suivi-cp="" value={cp} onChange={e => setCp(e.target.value)} inputMode="numeric" placeholder="Code postal du point relais (facultatif)" style={champ}/>}
           <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-            <button type="button" data-suivi-enregistrer="" disabled={envoi} onClick={enregistrer} style={{ ...bouton, borderColor: C.accent, color: C.accent, opacity: envoi ? .5 : 1 }}>{envoi ? 'Enregistrement…' : 'Enregistrer ce suivi'}</button>
+            <Bouton variante="primaire" data-suivi-enregistrer="" disabled={envoi} onClick={enregistrer} style={{ minHeight: 44, opacity: envoi ? .5 : 1 }}>{envoi ? 'Enregistrement…' : 'Enregistrer ce suivi'}</Bouton>
             <span className="vrm-aide" data-suivi-promesse="" style={{ fontSize: 11.5, color: C.muted }}>Il devient « à retirer » quand l'e-mail du transporteur arrive, ou quand VRM lit sur son site qu'il est disponible {LECTURE_SERVEUR_TRANSP.mondialrelay ? '(Mondial Relay : avec le code postal du point relais).' : '(Mondial Relay : depuis ton ordinateur, avec l\'extension).'}</span>
           </div>
           {msg && <div data-suivi-msg="" style={{ fontSize: 12.5, color: C.warn }}>{msg}</div>}
@@ -17890,11 +18055,11 @@ function SuivisManuels({ liste, tracking, achats, accName, relire, etapeDe, tran
                 {m.tx && <div data-suivi-lie={m.tx} style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>Relié à : {lie ? `${lie.title || 'Achat'}${lie._acc ? ` (${accName(lie._acc)})` : ''}` : `l'achat ${m.tx}`}</div>}
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 4, alignItems: 'center' }}>
                   <BoutonSuivreColis transporteur={m.transporteur} suivi={m.suivi} codePostal={m.cp} enLigne/>
-                  {!m.tx && <button type="button" data-suivi-relier={m.suivi} onClick={() => setRelierPour(p => p === m.id ? '' : m.id)} style={bouton}>Relier à un achat</button>}
-                  {m.tx && <button type="button" data-suivi-delier={m.suivi} onClick={async () => { const r = await ecrireSuiviManuel(m.id, { tx: null, uid: null }); if (!r.ok) setMsg(r.msg); relire(); }} style={bouton}>Délier</button>}
+                  {!m.tx && <Bouton variante="secondaire" data-suivi-relier={m.suivi} onClick={() => setRelierPour(p => p === m.id ? '' : m.id)} style={{ minHeight: 44 }}>Relier à un achat</Bouton>}
+                  {m.tx && <Bouton variante="discret" data-suivi-delier={m.suivi} onClick={async () => { const r = await ecrireSuiviManuel(m.id, { tx: null, uid: null }); if (!r.ok) setMsg(r.msg); relire(); }}>Délier</Bouton>}
                   {/* (revue du 24 oct.) « Retirer », dans l'onglet « À retirer », se lisait
                       « je l'ai retiré » : le bouton efface le SUIVI, il le dit. */}
-                  <button type="button" data-suivi-retirer={m.suivi} onClick={async () => { if (!window.confirm(`Ne plus suivre le n° ${m.suivi} ? Le suivi ajouté est effacé ; les e-mails déjà reçus ne changent pas.`)) return; if (!(await retirerSuiviManuel(m.id))) setMsg("Le suivi n'a pas pu être effacé — la base n'a pas répondu."); relire(); }} style={{ ...bouton, color: C.muted }}>Ne plus suivre ce n°</button>
+                  <button type="button" data-suivi-retirer={m.suivi} onClick={async () => { if (!window.confirm(`Ne plus suivre le n° ${m.suivi} ? Le suivi ajouté est effacé ; les e-mails déjà reçus ne changent pas.`)) return; if (!(await retirerSuiviManuel(m.id))) setMsg("Le suivi n'a pas pu être effacé — la base n'a pas répondu."); relire(); }} style={{ ...bouton, border: 'none', background: 'transparent', color: C.muted, padding: '0 6px' }}>Ne plus suivre ce n°</button>
                 </div>
                 {relierPour === m.id && (
                   <div data-suivi-choix-achat="" style={{ marginTop: 6, display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -17987,10 +18152,10 @@ function LigneVenteCompacte({ photo, photoNoeud = null, titre, sous = '', etat, 
     {ouvert && <FermeAuRetour fermer={close}/>}
     {createPortal(<div className="vrm-app-shell vrm-ledger-drawer-host" hidden={!ouvert}>
       <section className="vrm-ledger-drawer" role="dialog" aria-modal="false" aria-labelledby={panneau+'-titre'} id={panneau} onKeyDown={e=>{if(e.target.matches('input,textarea,select,[contenteditable=true]'))return;if(e.key==='Escape'&&!e.defaultPrevented){e.preventDefault();e.stopPropagation();close();}}}>
-        <header className="vrm-ledger-drawer-head"><div><span>VENTE · DÉTAILS ET ACTIONS</span><h2 id={panneau+'-titre'}>{titre || 'Vente'}</h2><p>{etat}{etat&&montant?' · ':''}{montant}</p></div><button ref={fermer} type="button" aria-label="Fermer les détails de la vente" onClick={close}><Icon name="close" size={18}/></button></header>
+        <header className="vrm-ledger-drawer-head"><div><span>VENTE</span><h2 id={panneau+'-titre'}>{titre || 'Vente'}</h2><p>{etat}{etat&&montant?' · ':''}{montant}</p></div><button ref={fermer} type="button" aria-label="Fermer les détails de la vente" onClick={close}><Icon name="close" size={18}/></button></header>
         <div className="vrm-main vrm-ledger-drawer-body">
           <div className="vrm-fiche-vente-acces"><span>{plateforme?plateforme[0].toUpperCase()+plateforme.slice(1):'Vente'} · {sous||'Compte et date dans les détails'}</span>
-          {numerosFiche.length?numerosFiche.map(n=><button type="button" key={n} onClick={()=>{close();window.dispatchEvent(new CustomEvent('vrm:fiche-article',{detail:n}));}}>Fiche article N°{n} →</button>):<small>Pas de numéro VRM confirmé : aucune fiche n’est choisie au hasard.</small>}</div>
+          {numerosFiche.length?numerosFiche.map(n=><Bouton variante="discret" key={n} onClick={()=>{close();window.dispatchEvent(new CustomEvent('vrm:fiche-article',{detail:n}));}}>Fiche N°{n} ›</Bouton>):<small title="Pas de numéro VRM confirmé pour cette vente : aucune fiche n’est choisie au hasard.">Sans N° VRM</small>}</div>
           <div className="vrm-ventes-liste"><div className={props.className} data-ligne-ouverte="true"><div className="vrm-ledger-sale-content">{children}</div></div></div></div>
       </section>
     </div>,document.body)}
@@ -21440,7 +21605,7 @@ function EbayAnnonceCard({ it, first, onSaved, numero = '', eligible, paires = [
           {et.offresFaites > 0 && <div data-regle-offres-faites={et.offresFaites} style={{ fontSize: 11.5, color: E.muted, marginTop: 6, lineHeight: 1.45 }}>eBay compte {et.offresFaites} offre{et.offresFaites > 1 ? 's' : ''} déjà faite{et.offresFaites > 1 ? 's' : ''} sur cette annonce : si l'une attend encore ta réponse et atteint le montant, eBay peut l'accepter dès que la règle est posée.</div>}
           <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
             <button type="button" data-regle-enregistrer={it.itemId} disabled={!peutEnregistrer} onClick={enregistrerRegle} style={{ ...btnE, border: 'none', background: E.accent, color: '#fff', opacity: peutEnregistrer ? 1 : 0.45, cursor: peutEnregistrer ? 'pointer' : 'default' }}>{envoiRegle === 'pose' ? 'Envoi…' : 'Enregistrer la règle'}</button>
-            <button type="button" data-regle-annuler={it.itemId} onClick={() => { setRegleOuverte(false); setRegleSignal(''); }} style={{ ...btnE, color: E.muted }}>Annuler</button>
+            <button className="vrm-b vrm-b-discret" type="button" data-regle-annuler={it.itemId} onClick={() => { setRegleOuverte(false); setRegleSignal(''); }} style={{ ...btnE, color: E.muted }}>Annuler</button>
             {et.lu && (et.lu.accepte != null || et.lu.refuse != null) && <button type="button" data-regle-retirer={it.itemId} disabled={!!envoiRegle || enLot} onClick={retirerRegle} style={{ ...btnE, opacity: (envoiRegle || enLot) ? 0.45 : 1 }}>{envoiRegle === 'retrait' ? 'Envoi…' : 'Retirer la règle'}</button>}
           </div>
         </div>
@@ -21481,7 +21646,7 @@ function EbayAnnonceCard({ it, first, onSaved, numero = '', eligible, paires = [
             style={{ ...inpE, width: '100%', marginTop: 9, resize: 'vertical', lineHeight: 1.45 }} />
           <div style={{ display: 'flex', gap: 8, marginTop: 9, flexWrap: 'wrap' }}>
             <button type="button" data-offre-envoyer={it.itemId} disabled={!!geste || !remiseOk} onClick={envoyerOffre} style={{ ...btnE, border: 'none', background: E.accent, color: '#fff', opacity: (geste || !remiseOk) ? 0.5 : 1 }}>{geste === 'offre' ? 'Envoi…' : 'Envoyer l\'offre'}</button>
-            <button type="button" onClick={() => setOffreOuverte(false)} style={{ ...btnE, color: E.muted }}>Annuler</button>
+            <button className="vrm-b vrm-b-discret" type="button" onClick={() => setOffreOuverte(false)} style={{ ...btnE, color: E.muted }}>Annuler</button>
           </div>
         </div>
       )}
@@ -21518,7 +21683,7 @@ function EbayAnnonceCard({ it, first, onSaved, numero = '', eligible, paires = [
               <label style={{fontSize:11.5,color:E.muted,flex:'1 1 100%'}}>Titre<input aria-label="Titre de l’annonce eBay" maxLength={80} value={titreEdite} onChange={e=>setTitreEdite(e.target.value)} style={{...inpE,width:'100%',marginTop:4}}/></label>
               <label style={{fontSize:11.5,color:E.muted,flex:'1 1 100%'}}>Description<textarea aria-label="Description de l’annonce eBay" value={descEditee} onChange={e=>setDescEditee(e.target.value)} rows={4} style={{...inpE,width:'100%',marginTop:4}}/></label>
               <button type="button" onClick={enregistrerTexte} disabled={saving} style={btnE}>Enregistrer le texte</button>
-              <button type="button" onClick={() => { setEdit(false); setMsg(''); }} style={{ border: `1px solid ${E.border}`, background: 'transparent', color: E.muted, borderRadius: 8, padding: '10px 12px', fontSize: 12.5, cursor: 'pointer', fontFamily: 'inherit' }}>Annuler</button>
+              <button className="vrm-b vrm-b-discret" type="button" onClick={() => { setEdit(false); setMsg(''); }} style={{ border: `1px solid ${E.border}`, background: 'transparent', color: E.muted, borderRadius: 8, padding: '10px 12px', fontSize: 12.5, cursor: 'pointer', fontFamily: 'inherit' }}>Annuler</button>
             </div>
           )}
           {/* (9 octobre) Une règle d'offre connue : le nouveau prix la touche peut-être. */}
@@ -24687,7 +24852,7 @@ function ClePhotoroom({ cadre = true }) {
               placeholder="Ta clé Photoroom" aria-label="Clé API Photoroom"
               style={{ flex: '1 1 200px', minWidth: 0, minHeight: 44, boxSizing: 'border-box', padding: '0 12px', borderRadius: 10, border: `1px solid ${C.border}`, background: C.bg, color: C.text, fontSize: 16, fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }}/>
             <button type="submit" data-photoroom-enregistrer="" disabled={!!occupe || !val.trim()} style={{ ...bouton(true), opacity: (occupe || !val.trim()) ? 0.55 : 1 }}>{occupe === 'poser' ? 'Vérification…' : 'Vérifier et ranger'}</button>
-            {remplacer && <button type="button" onClick={() => { setRemplacer(false); setVal(''); }} style={bouton(false)}>Annuler</button>}
+            {remplacer && <button className="vrm-b vrm-b-discret" type="button" onClick={() => { setRemplacer(false); setVal(''); }} style={bouton(false)}>Annuler</button>}
           </div>
           <div style={ligneFine}>VRM la vérifie chez Photoroom (sans dépenser d'image), puis la range chiffrée. Tu n'en reverras que les 4 derniers caractères.</div>
         </form>
@@ -25674,7 +25839,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
             noire, plus de filet vertical parasite à gauche de chaque texte
             (l'ombre « -1px » de StatBox compact). */}
         <div className="vrm-display" style={{...sHero,fontSize:28,marginTop:6}}>{fmt(liveStats&&liveStats.caEncaisse!=null?liveStats.caEncaisse:ca)}</div>
-        <div className="vrm-aide" style={{...sNote,marginTop:6}}>Ventes finalisées, Vinted seul (tous comptes) · au jour de la vente · Leboncoin et eBay sont dans « Finalisé par plateforme »</div>
+        <div style={{...sNote,marginTop:6,display:'flex',alignItems:'center',gap:4,flexWrap:'wrap'}}>Vinted seul · tous comptes · au jour de la vente <Pourquoi label="Et Leboncoin, eBay ?">Ce chiffre ne compte que les ventes finalisées sur Vinted. Leboncoin et eBay sont dans « Finalisé par plateforme », plus bas.</Pourquoi></div>
         {liveStats && liveStats.nMasque > 0 && liveStats.caEncaisse != null && (
           <div data-finalise-masquees={liveStats.nMasque} data-finalise-masquees-eur={Math.round(liveStats.caMasque*100)} style={{...sNote,marginTop:4}}>
             {liveStats.nMasque>1 ? `Sans tes ${liveStats.nMasque} ventes masquées (${fmt(liveStats.caMasque)}) — elles restent dans ton CA déclaré (Comptabilité).` : `Sans ta vente masquée (${fmt(liveStats.caMasque)}) — elle reste dans ton CA déclaré (Comptabilité).`}
@@ -25701,15 +25866,15 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
       <div className="vrm-finance-goal"><Card>
         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8,marginBottom:objectif>0&&!objEdit?8:2}}>
           <div style={{fontSize:13,fontWeight:600,color:C.text}}>Objectif du mois</div>
-          <button type="button" onClick={()=>{ setObjTmp(objectif>0?String(objectif):''); setObjEdit(e=>!e); }} style={{border:`1px solid ${C.border}`,background:'transparent',color:C.muted,borderRadius:8,padding:'6px 11px',fontSize:13,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>{objEdit?'Annuler':(objectif>0?'Modifier':'Fixer')}</button>
+          <Bouton variante={objEdit?'discret':'secondaire'} className="vrm-b-petit" onClick={()=>{ setObjTmp(objectif>0?String(objectif):''); setObjEdit(e=>!e); }}>{objEdit?'Annuler':(objectif>0?'Modifier':'Fixer')}</Bouton>
         </div>
         {objEdit ? (
           <div style={{display:'flex',gap:8,alignItems:'center',marginTop:8}}>
             <input aria-label="Objectif de chiffre d’affaires du mois" type="number" min="0" step="0.01" inputMode="decimal" value={objTmp} onChange={e=>setObjTmp(e.target.value)} placeholder="ex. 2000" style={{flex:1,minWidth:0,border:`1px solid ${C.border}`,background:C.card,color:C.text,borderRadius:10,padding:'11px 12px',fontSize:15,fontFamily:'inherit',outline:'none'}}/>
-            <button type="button" onClick={()=>{ const n=Number(objTmp); if(!Number.isFinite(n)||n<0){toast('Indique un objectif valide.');return;} setObjectif(n); save('vrm_ca_objectif',n); setObjEdit(false); }} style={{border:'none',background:C.accent,color:'#fff',borderRadius:10,padding:'11px 16px',fontSize:13,fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>OK</button>
+            <Bouton variante="primaire" onClick={()=>{ const n=Number(objTmp); if(!Number.isFinite(n)||n<0){toast('Indique un objectif valide.');return;} setObjectif(n); save('vrm_ca_objectif',n); setObjEdit(false); }}>OK</Bouton>
           </div>
         ) : objectif>0 && caMoisCourant==null ? (
-          <div style={{fontSize:13,color:C.muted,marginTop:6,lineHeight:1.5}}>— · tes ventes n'ont pas pu être lues, la jauge revient dès qu'elles le sont.</div>
+          <div style={{fontSize:13,color:C.muted,marginTop:6,lineHeight:1.5}}>— · ventes pas pu être lues, la jauge revient dès qu'elles le sont.</div>
         ) : objectif>0 ? (()=>{ const pct=Math.min(100,Math.round(caMoisCourant/objectif*100)); const done=caMoisCourant>=objectif; return (
           <>
             <div style={{display:'flex',alignItems:'baseline',gap:8}}>
@@ -25720,7 +25885,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
             <div style={{fontSize:13,color:C.muted,marginTop:6}}>{done?'Objectif atteint':`${pct}% de ton objectif`} · vendu ce mois, toutes plateformes, ventes en cours comprises</div>
           </>
         ); })() : (
-          <div className="vrm-aide" style={{fontSize:13,color:C.muted,marginTop:6,lineHeight:1.5}}>Fixe un objectif de CA pour ce mois et suis ta progression au fil de tes ventes.</div>
+          <div style={{fontSize:13,color:C.muted,marginTop:6,lineHeight:1.5}}>Fixe un montant à atteindre ce mois-ci.</div>
         )}
       </Card></div>
 
@@ -25790,9 +25955,8 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
         return (
           <div data-stats-carte="courbe" data-stats-courbe data-notion="vendu" style={{...sCarte,marginTop:4}}>
             <div style={sLib}>Vendu · 12 derniers mois</div>
-            <div className="vrm-aide" style={{fontSize:11,color:C.muted,marginTop:4}}>Toutes plateformes · ventes en cours comprises</div>
+            <div style={{fontSize:11,color:C.muted,marginTop:4,display:'flex',alignItems:'center',gap:4}}>Toutes plateformes · ventes en cours comprises <Pourquoi label="Pourquoi plus que le finalisé ?">Au jour de la vente, ventes en cours comprises : ce n'est pas le finalisé, c'est pourquoi ce total peut dépasser celui du dessus.</Pourquoi></div>
             <div className="vrm-display" style={{...sHero,fontSize:28,letterSpacing:-0.8,marginTop:6}}>{fmt(tot)}</div>
-            <DayWeekNote label="Comprendre ce graphique"><div style={{...sNote,marginTop:6}}>Toutes plateformes, ventes en cours comprises, au jour de la vente — ce n'est pas le finalisé, c'est pourquoi ce total peut dépasser celui du dessus.</div></DayWeekNote>
             <div style={{marginTop:14}}><CourbeMois mois={mois.map((m,i)=>({...m,enCours:i===mois.length-1}))} attr="data-courbe-vendu" presentation="ligne" legende={false}/></div>
             <div style={{display:'flex',flexDirection:'column',gap:6,marginTop:12}}>
               <div style={{display:'flex',alignItems:'center',gap:8,fontSize:13,color:C.muted}}>
@@ -25874,27 +26038,8 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
         );
       })()}
 
-      {/* Barre de progression du garage */}
-      <div data-stats-carte="garage" style={sCarte}>
-        <div style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',marginBottom:10}}>
-          <span style={{...sTitre,display:'inline-flex',alignItems:'center',gap:6}}><Icon name="home" size={14}/>Remplissage du stock</span>
-          <span className="vrm-display" style={{fontSize:15,fontWeight:700,color:C.text,fontVariantNumeric:'tabular-nums'}}>{fillRate}%</span>
-        </div>
-        <div style={{height:6,background:C.card2||C.surface,borderRadius:999,overflow:'hidden'}}>
-          <div style={{
-            height:'100%',
-            width:`${fillRate}%`,
-            background:C.accent,
-            borderRadius:999,
-            transition:'width 0.4s ease',
-          }}/>
-        </div>
-        <div style={{display:'flex',justifyContent:'space-between',gap:8,marginTop:9,fontSize:13,color:C.muted}}>
-          <span><b style={{color:C.text,fontWeight:600}}>{stockCount}</b> boîtes occupées</span>
-          <span><b style={{color:C.text,fontWeight:600}}>{freeSlots}</b> libres / {TOTAL_SLOTS} total</span>
-        </div>
-      </div>
-
+      {/* (30 oct.) « Remplissage du stock » lisait l'ancienne grille de zones, que plus aucun
+          écran ne remplit (le Stock range dans Mes meubles / Ma pièce) : 0 % à vie. Retiré. */}
       {/* Stats secondaires */}
       {/* Ces cartes venaient du vieux catalogue (vide) → toutes à 0 (plainte de
           Julien). « Vente moyenne » se calcule sur la moisson (CA encaissé /
@@ -25932,7 +26077,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
                 </div>
               ))}
             </div>
-            {hv && <div style={{marginTop:6}}><LignePrixAchat quoi="Le multiplicateur et le bénéfice moyen" dans/></div>}
+            {hv && !manquePrix && <div style={{marginTop:6}}><LignePrixAchat quoi="Le multiplicateur et le bénéfice moyen" dans/></div>}
           </div>
         );
       })()}
@@ -25972,14 +26117,10 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
           <Card>
             <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap',marginBottom:6}}>
               <span style={{fontSize:13,fontWeight:600,color:C.text,flex:1,minWidth:120}}>Évolution — ventes finalisées</span>
-              <div style={{display:'flex',gap:4,background:C.surface,borderRadius:8,padding:2,border:`1px solid ${C.border}`}}>
-                {[['ca','CA €'],['ventes','Ventes']].map(([v,l])=>(
-                  <button type="button" key={v} onClick={()=>setCaMode(v)} style={{border:'none',borderRadius:8,padding:'3px 10px',fontSize:11,fontWeight:600,cursor:'pointer',fontFamily:'inherit',background:caMode===v?C.accent:'transparent',color:caMode===v?'#fff':C.muted}}>{l}</button>
-                ))}
-              </div>
+              <Segmente label="Montrer" value={caMode} onChange={setCaMode} options={[{v:'ca',l:'CA €'},{v:'ventes',l:'Ventes'}]}/>
             </div>
             <div style={{fontSize:11,color:C.muted,marginBottom:14}}>
-              {moisMoisson.length} mois · même source que le récap comptable (Comptabilité) — touche un point pour le détail.
+              {moisMoisson.length} mois · touche un point pour le détail
             </div>
             <CourbeMois mois={moisMoisson.map(h=>({cle:h.key,long:h.nomComplet,n:h.ventes,ca:h.ca,ventes:h.ventes,enCours:h.enCours}))} valeur={(m)=>caMode==='ca'?m.ca:m.ventes} format={(v)=>caMode==='ca'?`${Math.round(v).toLocaleString('fr-FR')} €`:String(Math.round(v))} choisi={selMois} onChoisir={setSelMois} attr="data-courbe-finalise"/>
             {sel&&(
@@ -25998,7 +26139,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
         const sel=caHistory.find(h=>h.key===selMonthEnc);
         return (
           <Card>
-            <div style={{fontSize:13,fontWeight:600,color:C.text,marginBottom:6}}>💰 Évolution du CA (ventes finalisées, 12 derniers mois)</div>
+            <div style={{fontSize:13,fontWeight:600,color:C.text,marginBottom:6}}>Évolution du CA (ventes finalisées, 12 derniers mois)</div>
             <div className="vrm-aide" style={{fontSize:11,color:C.muted,marginBottom:14}}>Touche un point pour voir le détail des ventes du mois.</div>
             <CourbeMois mois={caHistory.map(h=>({cle:h.key,long:h.nomComplet,ca:h.ca,n:h.ventes.length}))} valeur={(m)=>m.ca} format={(v)=>`${Math.round(v).toLocaleString('fr-FR')} €`} choisi={selMonthEnc} onChoisir={setSelMonthEnc} attr="data-courbe-encaisse"/>
             {sel&&<MonthDetail mois={sel} type="encaisse" C={C} fmt={fmt} catMap={catMap} catalog={catalog} onClose={()=>setSelMonthEnc(null)}/>}
@@ -26008,8 +26149,8 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
 
       {/* CA SUR MESURE : d'une date à une autre (Julien, 28 sept.). */}
       <Card>
-        <div style={{fontSize:13,fontWeight:600,color:C.text,marginBottom:2}}>📅 Chiffre d'affaires entre deux dates</div>
-        <div className="vrm-aide" style={{fontSize:11,color:C.muted,marginBottom:10}}>Choisis une période — le total porte sur tes ventes finalisées Vinted (comme « Finalisé sur Vinted »), à leur date de vente.</div>
+        <div style={{fontSize:13,fontWeight:600,color:C.text,marginBottom:2}}>CA entre deux dates</div>
+        <div style={{fontSize:11,color:C.muted,marginBottom:10}}>Ventes finalisées, à leur date de vente</div>
         {/* (29 oct.) Le même calendrier « comme Airbnb » que Ventes et Achats (§11). */}
         <PeriodePicker titre="Période du chiffre d'affaires" value={(caDu||caAu)?{from:caDu?new Date(caDu+'T00:00:00'):null,to:caAu?new Date(caAu+'T00:00:00'):null,...(caLabel?{label:caLabel}:{})}:null}
           onChange={v=>{ const k=(d)=>{ if(!d) return ''; const t=d instanceof Date?d:new Date(d); return isNaN(t.getTime())?'':`${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,'0')}-${String(t.getDate()).padStart(2,'0')}`; }; setCaDu(v?k(v.from):''); setCaAu(v?k(v.to):''); setCaLabel(v&&v.label?String(v.label):''); }}/>
@@ -26027,44 +26168,8 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
         )}
       </Card>
 
-      {/* 🍩 ANNEAU PAR PLATEFORME — une seule teinte (accent), variée par opacité
-          FIXE par plateforme (§7) ; identité portée par la légende, pas la couleur. */}
-      {platParts.total>0 && (()=>{
-        const op={'Vinted':1,'Leboncoin':0.6,'eBay':0.4,'Vestiaire Collective':0.24};
-        const cx=66,cy=66,r=52,CIRC=2*Math.PI*r; let acc=0;
-        return (
-          <Card>
-            <div style={{fontSize:13,fontWeight:600,color:C.text,marginBottom:2}}>Répartition du CA par plateforme</div>
-            <div className="vrm-aide" style={{fontSize:11,color:C.muted,marginBottom:12}}>La part de chaque plateforme dans ton chiffre d'affaires.</div>
-            <div style={{display:'flex',gap:18,alignItems:'center',flexWrap:'wrap'}}>
-              <svg width="132" height="132" viewBox="0 0 132 132" style={{flexShrink:0}} role="img" aria-label="Répartition du CA par plateforme">
-                <circle cx={cx} cy={cy} r={r} fill="none" stroke={C.card2||C.border} strokeWidth="14"/>
-                {platParts.arr.map((p)=>{ const len=p.ca/platParts.total*CIRC; const el=(
-                  <circle key={p.nom} cx={cx} cy={cy} r={r} fill="none" stroke={C.accent} strokeOpacity={op[p.nom]!=null?op[p.nom]:0.3} strokeWidth="14"
-                    strokeDasharray={`${len} ${CIRC-len}`} strokeDashoffset={-acc} transform={`rotate(-90 ${cx} ${cy})`} strokeLinecap="butt"/>);
-                  acc+=len; return el; })}
-                {/* (20 oct., revue) Le centre disait « 6984 € » à côté de « 6983,57 € » dans la
-                    légende : le même total, arrondi deux fois (§7). Le montant exact. */}
-                <text x="66" y="62" textAnchor="middle" className="vrm-display" data-anneau-total={Math.round(platParts.total*100)} style={{fontSize:'13px',fontWeight:800,fill:C.text}}>{fmt(platParts.total)}</text>
-                <text x="66" y="79" textAnchor="middle" style={{fontSize:'11px',fill:C.muted}}>CA total</text>
-              </svg>
-              {/* 220 px : sur téléphone la légende passe SOUS l'anneau — à 150 px elle
-                  tenait à côté et le nom de la plateforme tombait à « Vin… ». */}
-              <div data-anneau-legende="" style={{flex:'1 1 220px',minWidth:0,display:'flex',flexDirection:'column',gap:8}}>
-                {platParts.arr.map((p)=>(
-                  <div key={p.nom} style={{display:'flex',alignItems:'center',gap:8,fontSize:13}}>
-                    <span style={{width:11,height:11,borderRadius:999,background:C.accent,opacity:op[p.nom]!=null?op[p.nom]:0.3,flexShrink:0}}/>
-                    <span style={{flex:1,color:C.text,minWidth:0,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{p.court}</span>
-                    <span style={{color:C.text,fontWeight:700}}>{fmt(p.ca)}</span>
-                    <span style={{color:C.muted,width:40,textAlign:'right'}}>{Math.round(p.ca/platParts.total*100)}%</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </Card>
-        );
-      })()}
-
+      {/* (30 oct.) L'anneau « Répartition du CA par plateforme » redisait « Finalisé par plateforme »
+          (mêmes montants, mêmes parts) : une notion, un bloc (§7). */}
       {/* Ce qui se vend : marque, taille, modèle, pays, temps de vente (17 oct.). */}
       <AnalysesStatistiques panelOff={panelOff}/>
 
@@ -26077,7 +26182,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
         const sel=caHistoryVente.find(h=>h.key===selMonthVente);
         return (
           <Card>
-            <div style={{fontSize:13,fontWeight:600,color:C.text,marginBottom:6}}>🛒 Évolution du CA par date de vente (12 derniers mois)</div>
+            <div style={{fontSize:13,fontWeight:600,color:C.text,marginBottom:6}}>Évolution du CA par date de vente (12 derniers mois)</div>
             <div className="vrm-aide" style={{fontSize:11,color:C.muted,marginBottom:14}}>Touche un point pour voir le détail des ventes du mois.</div>
             <CourbeMois mois={caHistoryVente.map(h=>({cle:h.key,long:h.nomComplet,ca:h.ca,n:h.ventes.length}))} valeur={(m)=>m.ca} format={(v)=>`${Math.round(v).toLocaleString('fr-FR')} €`} choisi={selMonthVente} onChoisir={setSelMonthVente} attr="data-courbe-vente"/>
             {sel&&<MonthDetail mois={sel} type="vente" C={C} fmt={fmt} catMap={catMap} catalog={catalog} onClose={()=>setSelMonthVente(null)}/>}
@@ -26092,7 +26197,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
         const moyenne=(totalAjouts/ajoutsParJour.length);
         return (
           <Card>
-            <div style={{fontSize:13,fontWeight:600,color:C.text,marginBottom:6}}>📦 Articles ajoutés par jour</div>
+            <div style={{fontSize:13,fontWeight:600,color:C.text,marginBottom:6}}>Articles ajoutés par jour</div>
             <div style={{fontSize:11,color:C.muted,marginBottom:14}}>
               {totalAjouts} article{totalAjouts>1?'s':''} sur {ajoutsParJour.length} jour{ajoutsParJour.length>1?'s':''} d'activité — moyenne {moyenne.toFixed(1)}/jour.
             </div>
@@ -26114,17 +26219,17 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
 
       {/* Récap hebdomadaire */}
       {showWeekly&&weeklyRecapData.count>0&&(
-        <Card style={{borderLeft:`4px solid ${C.blue}`,background:`${C.blue}11`}}>
+        <Card>
           <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:8}}>
             <div>
-              <div style={{fontSize:13,fontWeight:600,color:C.blue,marginBottom:6}}>📅 Récap semaine dernière ({weeklyRecapData.from} → {weeklyRecapData.to})</div>
+              <div style={{fontSize:13,fontWeight:600,color:C.text,marginBottom:6}}>Semaine dernière ({weeklyRecapData.from} → {weeklyRecapData.to})</div>
               <div style={{display:'flex',gap:16,flexWrap:'wrap',fontSize:13}}>
                 <span><b style={{color:C.text}}>{weeklyRecapData.count}</b> <span style={{color:C.muted}}>vente{weeklyRecapData.count>1?'s':''}</span></span>
                 <span><b style={{color:C.accent}}>{fmt(weeklyRecapData.ca)}</b> <span style={{color:C.muted}}>vendu</span></span>
                 <span><b style={{color:C.accent}}>{fmt(weeklyRecapData.profit)}</b> <span style={{color:C.muted}}>bénéfice</span></span>
               </div>
               {(()=>{ const pc=weeklyRecapData.prevCa||0, c=weeklyRecapData.ca; if(pc<=0&&c<=0) return null; const diff=c-pc; const pct=pc>0?Math.round(diff/pc*100):null; const up=diff>=0; return (
-                <div style={{fontSize:11,color:up?C.accent:C.danger,fontWeight:600,marginTop:6}}>{up?'▲':'▼'} {up?'+':''}{fmt(diff)} vs semaine précédente{pct!=null?` (${up?'+':''}${pct} %)`:''} <span style={{color:C.muted,fontWeight:600}}>— {fmt(pc)} vendus</span></div>
+                <div style={{fontSize:11,color:up?C.accent:C.muted,fontWeight:600,marginTop:6}}>{up?'▲':'▼'} {up?'+':''}{fmt(diff)} vs semaine précédente{pct!=null?` (${up?'+':''}${pct} %)`:''} <span style={{color:C.muted,fontWeight:600}}>— {fmt(pc)} vendus</span></div>
               ); })()}
             </div>
             <button className="vrm-icon-control" aria-label="Fermer le bilan de la semaine" type="button" onClick={()=>{localStorage.setItem('vinted_last_weekly_recap',isoWeek);setShowWeekly(false);}}
@@ -26135,10 +26240,10 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
 
       {/* Récap mensuel */}
       {showMonthly&&monthlyRecapData.count>0&&(
-        <Card style={{borderLeft:`4px solid ${C.purple}`,background:`${C.purple}11`}}>
+        <Card>
           <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:8}}>
             <div>
-              <div style={{fontSize:13,fontWeight:600,color:C.purple,marginBottom:6}}>📆 Récap {monthlyRecapData.nom}</div>
+              <div style={{fontSize:13,fontWeight:600,color:C.text,marginBottom:6}}>Récap {monthlyRecapData.nom}</div>
               <div style={{display:'flex',gap:16,flexWrap:'wrap',fontSize:13}}>
                 <span><b style={{color:C.text}}>{monthlyRecapData.count}</b> <span style={{color:C.muted}}>vente{monthlyRecapData.count>1?'s':''}</span></span>
                 <span><b style={{color:C.accent}}>{fmt(monthlyRecapData.ca)}</b> <span style={{color:C.muted}}>vendu</span></span>
@@ -26262,7 +26367,7 @@ function Catalog({catalog,setCatalog,onDeleteId}) {
           {search&&<Btn small onClick={clearSearch} color={C.border}>✕</Btn>}
         </div>
         {['all','stock','vendu'].map(f=>(
-          <Btn key={f} small onClick={()=>setFilter(f)} color={filter===f?C.accent:C.border} style={{color:filter===f?'#fff':C.muted}}>
+          <Btn key={f} small onClick={()=>setFilter(f)} aria-pressed={filter===f} color={C.border} style={{color:filter===f?C.text:C.muted,fontWeight:filter===f?700:500,boxShadow:filter===f?`inset 0 0 0 2px ${C.accent}`:'none'}}>
             {f==='all'?'Tous':f==='stock'?'Stock':'Vendus'}
           </Btn>
         ))}
@@ -26340,7 +26445,7 @@ function Catalog({catalog,setCatalog,onDeleteId}) {
           Page <b style={{color:C.text}}>{currentPage+1}</b> / {totalPages} <span style={{color:C.muted,fontSize:11}}>({fullList.length} résultats)</span>
         </span>
         <Btn small onClick={()=>setPage(p=>Math.min(totalPages-1,(p===null?totalPages-1:p)+1))} color={C.border} style={{opacity:currentPage>=totalPages-1?0.4:1}}>Suivant →</Btn>
-        <Btn small onClick={()=>setShowAll(true)} color={C.warn} style={{color:'#fff',marginLeft:8}}>📋 Voir tout</Btn>
+        <Btn small onClick={()=>setShowAll(true)} color={C.border} style={{marginLeft:8}}>Voir tout</Btn>
       </div>}
       {showAll&&<div style={{display:'flex',justifyContent:'center',alignItems:'center',gap:8,fontSize:12,padding:'4px 0'}}>
         <span style={{color:C.warn}}>📋 Affichage complet — {fullList.length} articles</span>
@@ -26668,7 +26773,7 @@ function Sales({catalog,setCatalog,sales,setSales,invoices,invoiceSettings,entre
           Page <b style={{color:C.text}}>{currentPage+1}</b> / {totalPages} <span style={{color:C.muted,fontSize:11}}>({fullFiltered.length} résultats)</span>
         </span>
         <Btn small onClick={()=>setPage(p=>Math.min(totalPages-1,(p===null?totalPages-1:p)+1))} color={C.border} style={{opacity:currentPage>=totalPages-1?0.4:1}}>Suivant →</Btn>
-        <Btn small onClick={()=>setShowAll(true)} color={C.warn} style={{color:'#fff',marginLeft:8}}>📋 Voir tout</Btn>
+        <Btn small onClick={()=>setShowAll(true)} color={C.border} style={{marginLeft:8}}>Voir tout</Btn>
       </div>}
       {showAll&&<div style={{display:'flex',justifyContent:'center',alignItems:'center',gap:8,fontSize:12,padding:'4px 0'}}>
         <span style={{color:C.warn}}>📋 Affichage complet — {fullFiltered.length} ventes</span>
@@ -26678,7 +26783,7 @@ function Sales({catalog,setCatalog,sales,setSales,invoices,invoiceSettings,entre
       {/* Barre flottante en bas : bouton sélection + somme */}
       <div style={{position:'sticky',bottom:0,zIndex:20,padding:'8px 0',background:`linear-gradient(180deg, transparent 0%, ${C.bg} 30%)`}}>
         <Card style={{padding:'10px 14px',display:'flex',gap:12,flexWrap:'wrap',alignItems:'center',background:selectMode?`${C.accent}15`:C.card,borderColor:selectMode?`${C.accent}66`:C.border}}>
-          <Btn small onClick={()=>{setSelectMode(!selectMode);if(selectMode)setSelectedIds(new Set());}} color={selectMode?C.accent:C.border} style={{color:selectMode?'#fff':C.muted}}>
+          <Btn small onClick={()=>{setSelectMode(!selectMode);if(selectMode)setSelectedIds(new Set());}} aria-pressed={selectMode} color={C.border} style={{color:selectMode?C.text:C.muted,boxShadow:selectMode?`inset 0 0 0 2px ${C.accent}`:'none'}}>
             {selectMode?'✓ Mode sélection actif':'☑️ Activer la sélection'}
           </Btn>
           {selectMode&&<>
@@ -26916,7 +27021,7 @@ function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoice
       <div>
         <ScreenHead icon="receipt" title="Factures" desc="Les justificatifs de tes ventes, importés depuis tes emails Vinted."
           right={<div style={{display:'flex',gap:6,flexWrap:'wrap',alignItems:'center'}}>
-          <Btn small onClick={()=>setShowForm(true)} color={C.accent}>+ Nouvelle facture</Btn>
+          <Btn small primaire onClick={()=>setShowForm(true)}>+ Nouvelle facture</Btn>
           {/* ⚠️ « Récupérer Vinted » appelait l'Apps Script mort : le bouton ne
               pouvait QUE échouer. Il relit maintenant les reçus arrivés par
               email — la source qui remplit vraiment cet écran. */}
@@ -27055,7 +27160,7 @@ function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoice
                   <td style={{padding:'8px',textAlign:'right',color:C.accent,fontWeight:500}}>{fmt(+inv.sellPrice||0)}</td>
                   <td style={{padding:'8px',color:C.muted,fontSize:11}}>{inv.buyerName||'—'}</td>
                   <td style={{padding:'8px',textAlign:'right',whiteSpace:'nowrap'}}>
-                    <Btn small onClick={()=>generatePDF(inv,entForInvoice(inv,entreprises,activeEnt,invoiceSettings))} color={C.blue} style={{marginRight:4}}>📄</Btn>
+                    <Btn small onClick={()=>generatePDF(inv,entForInvoice(inv,entreprises,activeEnt,invoiceSettings))} color={C.blue} style={{marginRight:4}} aria-label="Imprimer la facture" title="Imprimer la facture"><Icon name="printer" size={15}/></Btn>
                     <Btn small onClick={()=>generateFacturXPdf(inv,entForInvoice(inv,entreprises,activeEnt,invoiceSettings))} color={C.muted} style={{marginRight:4}} title="Facture électronique Factur-X (PDF + XML EN16931 embarqué)">🧾</Btn>
                     <Btn small onClick={()=>deleteInvoice(inv.id)} color={C.danger}>🗑</Btn>
                   </td>
@@ -27073,7 +27178,7 @@ function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoice
           Page <b style={{color:C.text}}>{currentPage+1}</b> / {totalPages} <span style={{color:C.muted,fontSize:11}}>({fullList.length} résultats)</span>
         </span>
         <Btn small onClick={()=>setPage(p=>Math.min(totalPages-1,(p===null?0:p)+1))} color={C.border} style={{opacity:currentPage>=totalPages-1?0.4:1}}>Suivant →</Btn>
-        <Btn small onClick={()=>setShowAll(true)} color={C.warn} style={{color:'#fff',marginLeft:8}}>📋 Voir tout</Btn>
+        <Btn small onClick={()=>setShowAll(true)} color={C.border} style={{marginLeft:8}}>Voir tout</Btn>
       </div>}
       {showAll&&<div style={{display:'flex',justifyContent:'center',alignItems:'center',gap:8,fontSize:12,padding:'4px 0'}}>
         <span style={{color:C.warn}}>📋 Affichage complet — {fullList.length} factures</span>
@@ -27153,8 +27258,8 @@ function InvoiceForm({onClose,onSave,nextNumber,catalog}) {
           {err&&<div style={{color:C.danger,fontSize:12}}>⚠ {err}</div>}
 
           <div style={{display:'flex',gap:8,marginTop:6}}>
-            <Btn onClick={submit} color={C.accent} style={{flex:1}}>✓ Créer la facture</Btn>
-            <Btn onClick={onClose} color={C.border}>Annuler</Btn>
+            <Btn primaire onClick={submit} style={{flex:1}}>Créer la facture</Btn>
+            <Bouton variante="discret" onClick={onClose}>Annuler</Bouton>
           </div>
         </div>
       </div>
@@ -27208,11 +27313,11 @@ function InvoiceSettings({settings,setSettings,entreprises,setEntreprises,active
           <Field label="SIRET"><Input value={data.siret||''} onChange={e=>setData(d=>({...d,siret:e.target.value}))}/></Field>
           <Field label="Mention TVA (bas de facture)"><Input value={data.tvaMention!=null?data.tvaMention:'TVA non applicable, art. 293 B du CGI'} onChange={e=>setData(d=>({...d,tvaMention:e.target.value}))}/></Field>
           <Field label="Message de bas de page"><Input value={data.footer||''} onChange={e=>setData(d=>({...d,footer:e.target.value}))}/></Field>
-          {sel!==activeEnt&&<Btn onClick={makeActive} color={C.blue} style={{fontSize:12}}>⭐ Utiliser cette entité pour les nouvelles factures</Btn>}
+          {sel!==activeEnt&&<Btn onClick={makeActive} color={C.blue} style={{fontSize:12}}>Utiliser pour les nouvelles factures</Btn>}
           <div style={{display:'flex',gap:8,marginTop:6}}>
-            <Btn onClick={saveCur} color={C.accent} style={{flex:1}}>✓ Enregistrer</Btn>
+            <Btn primaire onClick={saveCur} style={{flex:1}}>Enregistrer</Btn>
             {list.length>1&&<Btn onClick={delEnt} color={C.red||'#c0392b'}>🗑 Supprimer</Btn>}
-            <Btn onClick={onClose} color={C.border}>Annuler</Btn>
+            <Bouton variante="discret" onClick={onClose}>Annuler</Bouton>
           </div>
         </div>
       </div>
@@ -27934,7 +28039,7 @@ function SortisDuStock({ plan, planLu, ecrire }) {
             <b>N°{x.num}</b>{x.titre ? ` · ${x.titre}` : ''}
             <span style={{ display: 'block', color: C.muted, fontSize: 11.5 }}>sortie de « {x.itemName} »{x.nom ? ` · ${x.nom}` : ''} le {jour(x.at)} — {x.plateforme || 'Vinted'} : {x.statut || 'colis parti'}</span>
           </span>
-          <button type="button" data-stock-remettre={x.num} onClick={() => remettre(x)} style={{ border: `1px solid ${C.border}`, borderRadius: 10, background: 'transparent', color: C.text, fontSize: 12.5, fontWeight: 600, padding: '0 14px', minHeight: 44, cursor: 'pointer', fontFamily: 'inherit' }}>Remettre</button>
+          <button className="vrm-b vrm-b-secondaire" type="button" data-stock-remettre={x.num} onClick={() => remettre(x)} style={{ minHeight: 44 }}>Remettre</button>
         </div>
       ))}
     </div>
@@ -28100,8 +28205,8 @@ function FeuilleToutRanger({ plan, numeros, plusieursPieces, onValider, onClose 
           </div>
         )}
         <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
-          <button type="button" onClick={onClose} style={{ border: `1px solid ${C.border}`, borderRadius: 10, background: 'transparent', color: C.text, fontSize: 14, fontWeight: 600, padding: '0 16px', minHeight: 44, cursor: 'pointer', fontFamily: 'inherit' }}>{n > 0 ? 'Annuler' : 'Fermer'}</button>
-          {n > 0 && <button type="button" data-tout-ranger-ok="" onClick={() => onValider(prop)} style={{ border: 'none', borderRadius: 10, background: C.accent, color: C.onAccent || '#fff', fontSize: 14, fontWeight: 650, padding: '0 18px', minHeight: 44, cursor: 'pointer', fontFamily: 'inherit' }}>Ranger les {n}</button>}
+          <button className="vrm-b vrm-b-discret" type="button" onClick={onClose}>{n > 0 ? 'Annuler' : 'Fermer'}</button>
+          {n > 0 && <button className="vrm-b vrm-b-primaire" type="button" data-tout-ranger-ok="" onClick={() => onValider(prop)}>Ranger les {n}</button>}
         </div>
       </div>
     </SheetShell>, document.body
@@ -28181,8 +28286,8 @@ function AssistantPiece({ room, vide, nbArticles, onCreer, onClose }) {
           </div>
         )}
         <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
-          <button type="button" onClick={onClose} style={{ border: `1px solid ${C.border}`, borderRadius: 10, background: 'transparent', color: C.text, fontSize: 14, fontWeight: 600, padding: '0 16px', minHeight: 44, cursor: 'pointer', fontFamily: 'inherit' }}>Annuler</button>
-          <button type="button" data-piece-creer="" disabled={!prop || !prop.meubles.length} onClick={creer} style={{ border: 'none', borderRadius: 10, background: C.accent, color: C.onAccent || '#fff', fontSize: 14, fontWeight: 650, padding: '0 18px', minHeight: 44, cursor: prop && prop.meubles.length ? 'pointer' : 'default', opacity: prop && prop.meubles.length ? 1 : 0.5, fontFamily: 'inherit' }}>Créer cette pièce</button>
+          <button className="vrm-b vrm-b-discret" type="button" onClick={onClose}>Annuler</button>
+          <button className="vrm-b vrm-b-primaire" type="button" data-piece-creer="" disabled={!prop || !prop.meubles.length} onClick={creer} style={{ opacity: prop && prop.meubles.length ? 1 : 0.5 }}>Créer cette pièce</button>
         </div>
       </div>
     </SheetShell>, document.body
@@ -29194,12 +29299,12 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
       <div data-stock-barre="" style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
         <Segmente label="Ce que je fais" className="vrm-seg-stock" value={edition ? 'amenager' : 'ranger'} onChange={(v) => setEdition(v === 'amenager')}
           options={[{ v: 'ranger', l: 'Ranger', icone: 'box', data: { 'data-mode-stock': 'ranger' } }, { v: 'amenager', l: 'Aménager', icone: 'pencil', data: { 'data-mode-stock': 'amenager' } }]} />
-        {edition && items.length > 0 && <button type="button" data-piece-assistant="" onClick={() => setAssistPiece(true)} style={{ border: `1px solid ${C.border}`, borderRadius: 10, background: 'transparent', color: C.text, fontSize: 13.5, fontWeight: 600, padding: '0 12px', minHeight: 40, cursor: 'pointer', fontFamily: 'inherit' }}>Nouvelle pièce en 3 questions</button>}
+        {edition && items.length > 0 && <button className="vrm-b vrm-b-secondaire vrm-b-petit" type="button" data-piece-assistant="" onClick={() => setAssistPiece(true)}>Nouvelle pièce en 3 questions</button>}
         <div style={{ flex: '1 1 200px', display: 'flex', gap: 6, minWidth: 0 }}>
           <input ref={refRecherche} data-stock-saisie="" aria-label="Numéro : Entrée pour le trouver ou le ranger" value={search} onChange={e => { setSearch(e.target.value); doSearch(e.target.value); if (rangeClavier && !rangeClavier.numero) setRangeClavier(null); }}
             onKeyDown={e => { const ch = !/^[0-9]$/.test(e.key) && chiffreTouche(e); if (ch) { e.preventDefault(); const v = search + ch; setSearch(v); doSearch(v); return; } if (e.key === 'Enter') { e.preventDefault(); entreeClavier(); } else if (e.key === 'Escape') { e.preventDefault(); if (search) { setSearch(''); setHi(null); } else if (rangeClavier && rangeClavier.numero) annulerClavier(); } }}
             placeholder={sansSourisStock ? 'Cherche un N° → le meuble + la case' : 'Tape un N° puis Entrée : trouver ou ranger'} inputMode="numeric" style={{ flex: 1, minWidth: 0, border: `1px solid ${C.border}`, borderRadius: 10, padding: '9px 12px', fontSize: 14, background: C.card, color: C.text, outline: 'none', fontFamily: 'inherit' }} />
-          {search && <button className="vrm-icon-control" type="button" aria-label="Effacer la recherche de rangement" onClick={() => { setSearch(''); setHi(null); }} style={{ border: `1px solid ${C.border}`, borderRadius: 10, background: 'transparent', color: C.muted, cursor: 'pointer', fontSize: 13, padding: '0 12px' }}><Icon name="close" size={15}/></button>}
+          {search && <button className="vrm-icon-control vrm-b vrm-b-discret vrm-b-icone" type="button" aria-label="Effacer la recherche de rangement" onClick={() => { setSearch(''); setHi(null); }}><Icon name="close" size={15}/></button>}
         </div>
       </div>
       <GuideReglage titre={edition ? 'Aménager ton espace' : 'Retrouver et ranger tes articles'} etapes={edition ? [
@@ -29214,7 +29319,7 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
       {rangeClavier && (
         <div data-stock-clavier={rangeClavier.numero ? 'range' : 'info'} style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', fontSize: 13, color: C.text, lineHeight: 1.45, border: `1px solid ${C.border}`, borderRadius: 10, background: C.card, padding: '8px 10px' }}>
           <span style={{ flex: '1 1 220px', minWidth: 0 }}>{rangeClavier.numero ? <><b>N°{rangeClavier.numero}</b> rangée : {rangeClavier.itemName} · {rangeClavier.nom}. Tape le N° suivant.</> : rangeClavier.info}</span>
-          {rangeClavier.numero && <button type="button" data-stock-clavier-annuler="" onClick={annulerClavier} style={{ border: `1px solid ${C.border}`, borderRadius: 10, background: 'transparent', color: C.text, fontSize: 13, fontWeight: 600, padding: '0 12px', minHeight: 40, cursor: 'pointer', fontFamily: 'inherit' }}>Annuler{sansSourisStock ? '' : ' (Échap)'}</button>}
+          {rangeClavier.numero && <button className="vrm-b vrm-b-discret" type="button" data-stock-clavier-annuler="" onClick={annulerClavier}>Annuler{sansSourisStock ? '' : ' (Échap)'}</button>}
         </div>
       )}
       {hi && hi.itemId && (()=>{
@@ -29234,7 +29339,7 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
             <div style={{ display: 'flex', alignItems: 'baseline', gap: '2px 8px', flexWrap: 'wrap' }}>
               <span style={{ fontSize: 14, fontWeight: 650, color: C.text, whiteSpace: 'nowrap' }}>À ranger</span>
               <span style={{ fontSize: 12.5, color: C.muted, flex: '1 1 160px' }}>{aRanger.length} article{aRanger.length > 1 ? 's' : ''} · touche-en un, ou glisse-le dans la pièce</span>
-              <button type="button" data-tout-ranger-ouvrir={aRanger.length} onClick={() => setToutRanger(true)} style={{ border: 'none', borderRadius: 10, background: C.accent, color: C.onAccent || '#fff', fontSize: 13.5, fontWeight: 650, padding: '0 14px', minHeight: 40, cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0 }}>Tout ranger</button>
+              <button className="vrm-b vrm-b-primaire" type="button" data-tout-ranger-ouvrir={aRanger.length} onClick={() => setToutRanger(true)} style={{ flexShrink: 0 }}>Tout ranger</button>
             </div>
             <div className="vrm-rangee" style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 2 }}>
               {aRanger.slice(0, 60).map(p => {
@@ -29254,8 +29359,8 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
                 <span style={{ flex: '1 1 220px', minWidth: 0 }}>
                   <b>N°{pairePrete}</b> : touche une place libre dans la pièce{pp ? <> — ou range-la à la prochaine place : <b>{pp.nom}</b></> : <> — aucune place libre dans la pièce, ajoute un meuble.</>}
                 </span>
-                {pp && <button type="button" data-ranger-prochaine="" onClick={() => rangerPaire(pairePrete, pp.itemId, pp.cellKey)} style={{ border: 'none', borderRadius: 10, background: C.accent, color: C.onAccent || '#fff', fontSize: 13.5, fontWeight: 600, padding: '0 14px', minHeight: 38, cursor: 'pointer', fontFamily: 'inherit' }}>Ranger ici</button>}
-                <button type="button" onClick={() => setPairePrete(null)} style={{ border: `1px solid ${C.border}`, borderRadius: 10, background: 'transparent', color: C.muted, fontSize: 13, padding: '0 12px', minHeight: 38, cursor: 'pointer', fontFamily: 'inherit' }}>Annuler</button>
+                {pp && <button className="vrm-b vrm-b-secondaire" type="button" data-ranger-prochaine="" onClick={() => rangerPaire(pairePrete, pp.itemId, pp.cellKey)}>Ranger ici</button>}
+                <button className="vrm-b vrm-b-discret" type="button" onClick={() => setPairePrete(null)}>Annuler</button>
               </div>
             )}
             <div ref={refFantome} aria-hidden="true" style={{ display: 'none', position: 'fixed', left: 0, top: 0, zIndex: 3000, pointerEvents: 'none', padding: '6px 12px', borderRadius: 999, background: C.text, color: C.card, fontSize: 13, fontWeight: 700, boxShadow: '0 6px 18px rgba(0,0,0,0.28)' }} />
@@ -29269,11 +29374,11 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
         <div data-piece-vide="" style={{ border: `1px solid ${C.border}`, borderRadius: 12, background: C.card, padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
           <span style={{ flex: '1 1 220px', minWidth: 0 }}>
             <span style={{ display: 'block', fontSize: 15, fontWeight: 600, color: C.text }}>Ta pièce est vide</span>
-            <span className="vrm-aide" style={{ display: 'block', fontSize: 13, color: C.muted, marginTop: 2, lineHeight: 1.45 }}>Dis-moi sa taille, ton meuble et combien d'articles tu ranges : je te propose une pièce prête, tu valides. VRM retrouve ensuite chaque article par son numéro.</span>
+            <span className="vrm-aide" style={{ display: 'block', fontSize: 13, color: C.muted, marginTop: 2, lineHeight: 1.45 }}>Trois questions et VRM te propose une pièce prête à ranger.</span>
           </span>
           <span data-piece-vide-gestes="" style={{ display: 'flex', gap: 8, flexWrap: 'wrap', flex: '1 1 auto', minWidth: 0 }}>
-            <button type="button" data-piece-assistant="" onClick={() => setAssistPiece(true)} style={{ border: 'none', background: C.accent, color: C.onAccent || '#fff', borderRadius: 10, padding: '0 16px', minHeight: 44, fontSize: 15, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>Créer ma pièce en 3 questions</button>
-            <button type="button" data-piece-vide-geste="" onClick={() => { setEdition(true); const d = refAmenager.current; if (d) { d.open = true; try { setTimeout(() => d.scrollIntoView({ behavior: 'smooth', block: 'start' }), 60); } catch (_) {} } }} style={{ border: `1px solid ${C.border}`, background: 'transparent', color: C.text, borderRadius: 10, padding: '0 16px', minHeight: 44, fontSize: 15, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>Ajouter un meuble à la main</button>
+            <button className="vrm-b vrm-b-primaire" type="button" data-piece-assistant="" onClick={() => setAssistPiece(true)}>Créer ma pièce en 3 questions</button>
+            <button className="vrm-b vrm-b-secondaire" type="button" data-piece-vide-geste="" onClick={() => { setEdition(true); const d = refAmenager.current; if (d) { d.open = true; try { setTimeout(() => d.scrollIntoView({ behavior: 'smooth', block: 'start' }), 60); } catch (_) {} } }}>Ajouter un meuble à la main</button>
           </span>
         </div>
       )}
@@ -29288,13 +29393,13 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
               {chercheLoc.length} article{chercheLoc.length > 1 ? 's' : ''} à aller chercher
               <span style={{ fontWeight: 500, color: C.muted }}> · en couleur dans la pièce</span>
             </span>
-            <button className="vrm-icon-control" type="button" aria-label="Ne plus colorer les articles à aller chercher" onClick={() => setAChercher(null)} style={{ border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.muted, padding: '0 10px', minHeight: 32, cursor: 'pointer' }}><Icon name="close" size={14}/></button>
+            <button className="vrm-icon-control vrm-b vrm-b-discret vrm-b-icone" type="button" aria-label="Ne plus colorer les articles à aller chercher" onClick={() => setAChercher(null)}><Icon name="close" size={14}/></button>
           </div>
           {chercheLoc.map(x => (
             <div key={x.numero} data-cherche={x.numero} data-trouve={x.ou ? '1' : '0'} style={{ fontSize: 13, color: x.ou ? C.text : C.muted, lineHeight: 1.45 }}>
               <b>N°{x.numero}</b>{' '}
               {x.ou
-                ? <>→ {x.ou.itemName}{plan.rooms.length > 1 ? ` (${x.ou.roomName})` : ''} · {x.ou.nom}{x.ou.roomId !== activeRoom.id ? <> — <button type="button" onClick={() => switchRoom(x.ou.roomId)} style={{ border: 'none', background: 'transparent', color: C.accent, padding: 0, cursor: 'pointer', fontFamily: 'inherit', fontSize: 13, fontWeight: 600 }}>ouvrir cette pièce</button></> : null}</>
+                ? <>→ {x.ou.itemName}{plan.rooms.length > 1 ? ` (${x.ou.roomName})` : ''} · {x.ou.nom}{x.ou.roomId !== activeRoom.id ? <> — <button className="vrm-b vrm-b-discret" type="button" onClick={() => switchRoom(x.ou.roomId)}>ouvrir cette pièce</button></> : null}</>
                 : <>— rangée nulle part dans le stock</>}
             </div>
           ))}
@@ -29329,9 +29434,9 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
             </button>
           );
         })}
-        <button type="button" onClick={addRoom} title="Ajouter une pièce" style={{ border: `1px dashed ${C.border}`, borderRadius: 999, background: 'transparent', color: C.text, fontSize: 13, fontWeight: 600, padding: '6px 12px', cursor: 'pointer', fontFamily: 'inherit' }}>＋ {plan.rooms.length > 1 ? 'Pièce' : 'Ajouter une pièce'}</button>
-        <button className="vrm-icon-control" type="button" aria-label="Renommer la pièce" onClick={renameRoom} title="Renommer la pièce" style={{ border: `1px solid ${C.border}`, borderRadius: 999, background: 'transparent', color: C.muted, fontSize: 12, padding: '6px 9px', cursor: 'pointer' }}><Icon name="pencil" size={15}/></button>
-        {plan.rooms.length > 1 && <button className="vrm-icon-control" type="button" aria-label="Supprimer la pièce" onClick={removeRoom} title="Supprimer la pièce" style={{ border: `1px solid ${C.border}`, borderRadius: 999, background: 'transparent', color: C.warn, fontSize: 12, padding: '6px 9px', cursor: 'pointer' }}><Icon name="trash" size={16}/></button>}
+        <button className="vrm-b vrm-b-secondaire vrm-b-petit" type="button" onClick={addRoom} title="Ajouter une pièce">＋ {plan.rooms.length > 1 ? 'Pièce' : 'Ajouter une pièce'}</button>
+        <button className="vrm-icon-control vrm-b vrm-b-secondaire vrm-b-petit" type="button" aria-label="Renommer la pièce" onClick={renameRoom} title="Renommer la pièce"><Icon name="pencil" size={15}/></button>
+        {plan.rooms.length > 1 && <button className="vrm-icon-control vrm-b vrm-b-secondaire vrm-b-petit" type="button" aria-label="Supprimer la pièce" onClick={removeRoom} title="Supprimer la pièce"><Icon name="trash" size={16}/></button>}
       </div>
       {/* ⚠️ UTILISER AVANT AMÉNAGER. Julien : « mets-toi à la place d'un
           revendeur pour son rangement, ça doit être plus facile à prendre en
@@ -29367,7 +29472,7 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
             <div key={titre} style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
               <span title={aide} style={{ fontSize: 11.5, color: C.muted, fontWeight: 700, alignSelf: 'center', minWidth: 74 }}>{titre}</span>
               {liste.map(([k, t]) => (
-                <button type="button" key={k} onClick={() => addFurn(k)} title={aide} style={{ border: `1px solid ${C.border}`, borderRadius: 999, background: C.card, color: C.text, fontSize: 12, fontWeight: 600, padding: '6px 11px', cursor: 'pointer', fontFamily: 'inherit' }}>{t.emoji} {k === 'autre' ? 'Autre…' : t.label}</button>
+                <button className="vrm-b vrm-b-secondaire vrm-b-petit" type="button" key={k} onClick={() => addFurn(k)} title={aide}>{t.emoji} {k === 'autre' ? 'Autre…' : t.label}</button>
               ))}
             </div>
           ) : null);
@@ -29392,13 +29497,13 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
         {/* Taille de la pièce */}
         <div style={{ display: 'flex', gap: 5, alignItems: 'center', flexWrap: 'wrap', fontSize: 11.5, color: C.muted }}>
           <span style={{ fontWeight: 800 }}>Pièce {room.w}×{room.h} :</span>
-          <button type="button" onClick={() => setRoom(1, 0)} style={{ border: `1px solid ${C.border}`, borderRadius: 6, background: 'transparent', color: C.text, fontWeight: 700, padding: '3px 8px', cursor: 'pointer' }}>largeur +</button>
-          <button className="vrm-icon-control" type="button" aria-label="Réduire la largeur de la pièce" onClick={() => setRoom(-1, 0)} style={{ border: `1px solid ${C.border}`, borderRadius: 6, background: 'transparent', color: C.text, fontWeight: 700, padding: '3px 8px', cursor: 'pointer' }}>−</button>
-          <button type="button" onClick={() => setRoom(0, 1)} style={{ border: `1px solid ${C.border}`, borderRadius: 6, background: 'transparent', color: C.text, fontWeight: 700, padding: '3px 8px', cursor: 'pointer' }}>profondeur +</button>
-          <button className="vrm-icon-control" type="button" aria-label="Réduire la profondeur de la pièce" onClick={() => setRoom(0, -1)} style={{ border: `1px solid ${C.border}`, borderRadius: 6, background: 'transparent', color: C.text, fontWeight: 700, padding: '3px 8px', cursor: 'pointer' }}>−</button>
+          <button className="vrm-b vrm-b-secondaire vrm-b-petit" type="button" onClick={() => setRoom(1, 0)}>largeur +</button>
+          <button className="vrm-icon-control vrm-b vrm-b-secondaire vrm-b-petit" type="button" aria-label="Réduire la largeur de la pièce" onClick={() => setRoom(-1, 0)}>−</button>
+          <button className="vrm-b vrm-b-secondaire vrm-b-petit" type="button" onClick={() => setRoom(0, 1)}>profondeur +</button>
+          <button className="vrm-icon-control vrm-b vrm-b-secondaire vrm-b-petit" type="button" aria-label="Réduire la profondeur de la pièce" onClick={() => setRoom(0, -1)}>−</button>
           <span style={{ fontWeight: 800, marginLeft: 8 }}>Plafond :</span>
-          <button className="vrm-icon-control" type="button" aria-label="Augmenter la hauteur du plafond" onClick={() => patchRoom(r => ({ room: { ...r.room, wallH: Math.min(6, Math.round(((r.room.wallH || 3.4) + 0.4) * 10) / 10) } }))} style={{ border: `1px solid ${C.border}`, borderRadius: 6, background: 'transparent', color: C.text, fontWeight: 700, padding: '3px 8px', cursor: 'pointer' }}>+</button>
-          <button className="vrm-icon-control" type="button" aria-label="Réduire la hauteur du plafond" onClick={() => patchRoom(r => ({ room: { ...r.room, wallH: Math.max(2.4, Math.round(((r.room.wallH || 3.4) - 0.4) * 10) / 10) } }))} style={{ border: `1px solid ${C.border}`, borderRadius: 6, background: 'transparent', color: C.text, fontWeight: 700, padding: '3px 8px', cursor: 'pointer' }}>−</button>
+          <button className="vrm-icon-control vrm-b vrm-b-secondaire vrm-b-petit" type="button" aria-label="Augmenter la hauteur du plafond" onClick={() => patchRoom(r => ({ room: { ...r.room, wallH: Math.min(6, Math.round(((r.room.wallH || 3.4) + 0.4) * 10) / 10) } }))}>+</button>
+          <button className="vrm-icon-control vrm-b vrm-b-secondaire vrm-b-petit" type="button" aria-label="Réduire la hauteur du plafond" onClick={() => patchRoom(r => ({ room: { ...r.room, wallH: Math.max(2.4, Math.round(((r.room.wallH || 3.4) - 0.4) * 10) / 10) } }))}>−</button>
           <span style={{ fontWeight: 800, marginLeft: 8 }}>Murs :</span>
           {['#e4e8ee', '#dfe7d8', '#efe4d6', '#e2dced', '#d6e6ec', '#f0dede', '#d8dde3', '#2b2f36'].map(c => (
             <button type="button" aria-label={`Couleur de mur ${['#e4e8ee', '#dfe7d8', '#efe4d6', '#e2dced', '#d6e6ec', '#f0dede', '#d8dde3', '#2b2f36'].indexOf(c)+1}`} aria-pressed={(room.wallColor || '#e4e8ee')===c} key={c} onClick={() => patchRoom(r => ({ room: { ...r.room, wallColor: c } }))} title="Couleur des murs" style={{ width: 18, height: 18, borderRadius: 4, background: c, border: (room.wallColor || '#e4e8ee') === c ? `2px solid ${C.accent}` : '1px solid rgba(0,0,0,0.2)', cursor: 'pointer', padding: 0 }} />
@@ -29410,10 +29515,10 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
 
         {/* Mode déplacement — les meubles ne bougent QUE si ce mode est activé */}
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-          <button type="button" onClick={() => setMoveMode(m => !m)} style={{ border: `1.5px solid ${moveMode ? C.accent : C.border}`, borderRadius: 999, background: moveMode ? C.accent : C.card, color: moveMode ? '#fff' : C.text, fontSize: 12.5, fontWeight: 800, padding: '7px 14px', cursor: 'pointer', fontFamily: 'inherit' }}>
-            {moveMode ? '✋ Mode déplacement ACTIVÉ' : '🔒 Déplacer les meubles'}
+          <button type="button" aria-pressed={moveMode} onClick={() => setMoveMode(m => !m)} className={'vrm-b vrm-b-petit vrm-b-' + (moveMode ? 'primaire' : 'secondaire')}>
+            {moveMode ? 'Verrouiller les meubles' : 'Déplacer les meubles'}
           </button>
-          <span style={{ fontSize: 11.5, color: C.muted }}>{moveMode ? 'Glisse un meuble pour le déplacer. Re-clique pour verrouiller.' : 'Les meubles sont verrouillés — glisse pour tourner la vue.'}</span>
+          <span style={{ fontSize: 11.5, color: C.muted }}>{moveMode ? 'Glisse un meuble pour le déplacer.' : 'Glisser tourne la vue.'}</span>
         </div>
         </div>
       </details>
@@ -29421,23 +29526,23 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
       {/* Bandeau « poser une pile sur un meuble » actif */}
       {putOnSrc && (
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', padding: '8px 11px', border: `1.5px solid ${C.accent}`, borderRadius: 10, background: `${C.accent}14` }}>
-          <span style={{ fontSize: 12.5, fontWeight: 800, color: C.text }}>👆 Touche le <b>meuble</b> (table, commode…) sur lequel poser la pile — elle se posera dessus, centrée.</span>
-          <button type="button" onClick={() => setPutOnSrc(null)} style={{ marginLeft: 'auto', border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.muted, fontSize: 12, fontWeight: 700, padding: '5px 10px', cursor: 'pointer' }}>Annuler</button>
+          <span style={{ fontSize: 12.5, fontWeight: 800, color: C.text }}>Touche le <b>meuble</b> (table, commode…) sur lequel poser la pile — elle se posera dessus, centrée.</span>
+          <button className="vrm-b vrm-b-discret" type="button" onClick={() => setPutOnSrc(null)} style={{ marginLeft: 'auto' }}>Annuler</button>
         </div>
       )}
       {/* Bandeau « empiler par toucher » actif */}
       {stackSrc && (()=>{ const s = items.find(o => o.id === stackSrc); return (
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', padding: '8px 11px', border: `1.5px solid ${C.accent}`, borderRadius: 10, background: `${C.accent}14` }}>
-          <span style={{ fontSize: 12.5, fontWeight: 800, color: C.text }}>👆 Touche la boîte sur laquelle poser <b>N°{(s && s.num) || '?'}</b> (elle montera dessus).</span>
-          <button type="button" onClick={() => setStackSrc(null)} style={{ marginLeft: 'auto', border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.muted, fontSize: 12, fontWeight: 700, padding: '5px 10px', cursor: 'pointer' }}>Annuler</button>
+          <span style={{ fontSize: 12.5, fontWeight: 800, color: C.text }}>Touche la boîte sur laquelle poser <b>N°{(s && s.num) || '?'}</b> (elle montera dessus).</span>
+          <button className="vrm-b vrm-b-discret" type="button" onClick={() => setStackSrc(null)} style={{ marginLeft: 'auto' }}>Annuler</button>
         </div>
       ); })()}
 
       {/* Tableau de bord d'occupation de la pièce */}
       {items.length > 0 && (
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', padding: '8px 12px', border: `1px solid ${C.border}`, borderRadius: 12, background: C.card, fontSize: 12.5 }}>
-          <span style={{ fontWeight: 900, color: C.text }}>📊 {activeRoom.name}</span>
-          <span style={{ fontWeight: 800, color: INV_STATUS.online.color }}>📦 {capacity.boxes} boîte{capacity.boxes > 1 ? 's' : ''} rangée{capacity.boxes > 1 ? 's' : ''}</span>
+          <span style={{ fontWeight: 900, color: C.text }}>{activeRoom.name}</span>
+          <span style={{ fontWeight: 800, color: C.text }}>{capacity.boxes} boîte{capacity.boxes > 1 ? 's' : ''} rangée{capacity.boxes > 1 ? 's' : ''}</span>
           {capacity.freeCells > 0 && <span style={{ fontWeight: 700, color: C.muted }}>· {capacity.freeCells} place{capacity.freeCells > 1 ? 's' : ''} libre{capacity.freeCells > 1 ? 's' : ''}</span>}
           <span style={{ fontWeight: 700, color: C.muted }}>· {capacity.furn} meuble{capacity.furn > 1 ? 's' : ''}</span>
         </div>
@@ -29472,8 +29577,8 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
                           {p.ambigu ? '⚠️ N° porté par plusieurs articles' : (p.title || '—')}
                         </span>
                       </span>
-                      <button type="button" onClick={() => sortirDeCase(selItem.id, p.cell, p.numero)} title="Sortir cet article du stock"
-                        style={{ flexShrink: 0, border: `1px solid ${C.border}`, borderRadius: 9, background: 'transparent', color: C.muted, fontSize: 11.5, fontWeight: 600, padding: '6px 9px', cursor: 'pointer', fontFamily: 'inherit' }}>Sortir</button>
+                      <button className="vrm-b vrm-b-secondaire vrm-b-petit" type="button" onClick={() => sortirDeCase(selItem.id, p.cell, p.numero)} title="Sortir cet article du stock"
+                        style={{ flexShrink: 0 }}>Sortir</button>
                     </div>
                   ))}
                 </div>
@@ -29483,9 +29588,9 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
           {/* Boîte à empiler : empiler (par toucher), reposer au sol, changer le N° */}
           {(FURN_TYPES[selItem.type] || {}).box && (
             <div style={{ flex: '1 1 100%', display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 4 }}>
-              <button type="button" onClick={() => setStackSrc(selItem.id)} style={{ flex: '1 1 auto', border: 'none', borderRadius: 8, background: C.accent, color: '#fff', fontSize: 12.5, fontWeight: 900, padding: '9px 12px', cursor: 'pointer' }}>⬆️ Poser sur une autre boîte</button>
-              {(selItem.lvl || 0) > 0 && <button type="button" onClick={() => boxToFloor(selItem)} style={{ flex: '0 0 auto', border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.text, fontSize: 12, fontWeight: 800, padding: '9px 11px', cursor: 'pointer' }}>⬇️ Au sol</button>}
-              <button type="button" onClick={async ()=>{ const n = (await askText({ numeric: clavierNum() === 'numeric', desc: 'Numéro de cette boîte :', value: selItem.num || '' }) || '').trim(); if (n) updateItem(selItem.id, { num: n }); }} style={{ flex: '0 0 auto', border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.text, fontSize: 12, fontWeight: 800, padding: '9px 11px', cursor: 'pointer' }}>✏️ N°{selItem.num || '?'}</button>
+              <button className="vrm-b vrm-b-secondaire vrm-b-petit" type="button" onClick={() => setStackSrc(selItem.id)} style={{ flex: '1 1 auto' }}>Poser sur une autre boîte</button>
+              {(selItem.lvl || 0) > 0 && <button className="vrm-b vrm-b-secondaire vrm-b-petit" type="button" onClick={() => boxToFloor(selItem)} style={{ flex: '0 0 auto' }}>Au sol</button>}
+              <button className="vrm-b vrm-b-secondaire vrm-b-petit" type="button" onClick={async ()=>{ const n = (await askText({ numeric: clavierNum() === 'numeric', desc: 'Numéro de cette boîte :', value: selItem.num || '' }) || '').trim(); if (n) updateItem(selItem.id, { num: n }); }} style={{ flex: '0 0 auto' }}><Icon name="pencil" size={15}/>N°{selItem.num || '?'}</button>
             </div>
           )}
           {!edition && (()=>{
@@ -29494,10 +29599,10 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
             return (
               <div style={{ flex: '1 1 100%', display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
                 {ft.cases && <span style={{ fontSize: 12.5, color: C.muted, flex: '1 1 200px' }}>{p ? <>Prochaine place libre : <b style={{ color: C.text }}>{nomCase(Math.max(1, selItem.rows || 1), p.cell, modeCase(ft), selItem)}</b></> : 'Ce meuble est plein.'} Touche une place libre (en transparence) pour y ranger ; une boîte pour la changer ou la sortir.</span>}
-                {ft.cases && p && <button type="button" data-ranger-dans-meuble="" onClick={() => { if (pairePrete) rangerPaire(pairePrete, selItem.id, p.cell); else fillCell(selItem.id, p.cell, { ghost: true }); }} style={{ border: 'none', borderRadius: 10, background: C.accent, color: C.onAccent || '#fff', fontSize: 13, fontWeight: 600, padding: '0 14px', minHeight: 36, cursor: 'pointer', fontFamily: 'inherit' }}>{pairePrete ? `Ranger N°${pairePrete} ici` : 'Ranger une paire ici'}</button>}
+                {ft.cases && p && <button className="vrm-b vrm-b-secondaire" type="button" data-ranger-dans-meuble="" onClick={() => { if (pairePrete) rangerPaire(pairePrete, selItem.id, p.cell); else fillCell(selItem.id, p.cell, { ghost: true }); }}>{pairePrete ? `Ranger N°${pairePrete} ici` : 'Ranger une paire ici'}</button>}
                 {ft.build === 'pile' && <span className="vrm-aide" style={{ fontSize: 12.5, color: C.muted }}>Touche une boîte pour changer son numéro ou le retirer — ceux du dessus descendent d'un cran.</span>}
-                {!ft.cases && ft.build !== 'pile' && !ft.box && !ft.deco && <button type="button" onClick={() => setOpenItem(selItem.id)} style={{ border: 'none', borderRadius: 10, background: C.accent, color: C.onAccent || '#fff', fontSize: 13, fontWeight: 600, padding: '0 14px', minHeight: 36, cursor: 'pointer', fontFamily: 'inherit' }}>Ranger dedans ({storedCount(selItem)})</button>}
-                <button type="button" onClick={() => setEdition(true)} style={{ marginLeft: 'auto', border: `1px solid ${C.border}`, borderRadius: 10, background: 'transparent', color: C.text, fontSize: 12.5, fontWeight: 600, padding: '0 12px', minHeight: 34, cursor: 'pointer', fontFamily: 'inherit' }}>Régler ce meuble</button>
+                {!ft.cases && ft.build !== 'pile' && !ft.box && !ft.deco && <button className="vrm-b vrm-b-secondaire vrm-b-petit" type="button" onClick={() => setOpenItem(selItem.id)}>Ranger dedans ({storedCount(selItem)})</button>}
+                <button className="vrm-b vrm-b-secondaire vrm-b-petit" type="button" onClick={() => setEdition(true)} style={{ marginLeft: 'auto' }}>Régler ce meuble</button>
               </div>
             );
           })()}
@@ -29509,22 +29614,22 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
             <label title="Couleur libre" style={{ width: 22, height: 22, borderRadius: 5, overflow: 'hidden', border: `1px solid ${C.border}`, cursor: 'pointer', position: 'relative', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, background: `conic-gradient(red,orange,yellow,lime,cyan,blue,magenta,red)` }}>
               <input type="color" value={colorOf(selItem)} onChange={e => updateItem(selItem.id, { color: e.target.value })} style={{ position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer' }} />🎨
             </label>
-            {!(FURN_TYPES[selItem.type] || {}).box && <button type="button" onClick={async ()=>{ const e = (await askText({ desc: 'Emoji du meuble :', value: emojiOf(selItem) }) || '').trim(); if (e) updateItem(selItem.id, { emoji: e }); }} title="Changer l'emoji" style={{ border: `1px solid ${C.border}`, borderRadius: 6, background: 'transparent', fontSize: 13, padding: '2px 7px', cursor: 'pointer' }}>{emojiOf(selItem)}</button>}
+            {!(FURN_TYPES[selItem.type] || {}).box && <button className="vrm-b vrm-b-secondaire vrm-b-petit" type="button" onClick={async ()=>{ const e = (await askText({ desc: 'Emoji du meuble :', value: emojiOf(selItem) }) || '').trim(); if (e) updateItem(selItem.id, { emoji: e }); }} title="Changer l'emoji">{emojiOf(selItem)}</button>}
             {(FURN_TYPES[selItem.type] || {}).build !== 'grille' && !(FURN_TYPES[selItem.type] || {}).box && !(FURN_TYPES[selItem.type] || {}).cases && <>
               <span style={{ fontSize: 10.5, color: C.muted, fontWeight: 700, marginLeft: 6 }}>Hauteur</span>
-              {[['Bas', 0.5], ['Moyen', 1.0], ['Haut', 1.8]].map(([l, v]) => (<button type="button" key={l} onClick={() => updateItem(selItem.id, { h3d: v })} style={{ border: `1px solid ${Math.abs(h3dOf(selItem) - v) < 0.01 ? C.accent : C.border}`, borderRadius: 6, background: Math.abs(h3dOf(selItem) - v) < 0.01 ? `${C.accent}18` : 'transparent', color: C.text, fontSize: 10.5, fontWeight: 700, padding: '3px 8px', cursor: 'pointer' }}>{l}</button>))}
+              <Segmente label="Hauteur du meuble" value={[0.5, 1.0, 1.8].find(v => Math.abs(h3dOf(selItem) - v) < 0.01) ?? null} onChange={(v) => updateItem(selItem.id, { h3d: v })} options={[{ v: 0.5, l: 'Bas' }, { v: 1.0, l: 'Moyen' }, { v: 1.8, l: 'Haut' }]} />
             </>}
           </div>
           {/* (17 oct.) ÉTAGÈRE, TABLE, PORTANT : combien de cases, de plateaux, de cintres. */}
           {(FURN_TYPES[selItem.type] || {}).cases && (()=>{
             const ft = FURN_TYPES[selItem.type]; const { nr, nc } = dimsMeuble(selItem); const cz = casesDe(selItem, room.wallH);
-            const stepBtn = { border: `1px solid ${C.border}`, borderRadius: 8, background: C.card, color: C.text, fontSize: 15, fontWeight: 700, minWidth: 36, minHeight: 36, cursor: 'pointer', lineHeight: 1 };
+            const stepBtn = { minWidth: 36, padding: 0, fontSize: 15, lineHeight: 1 };
             const pas = (lib, val, moins, plus, cle) => (
               <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }} data-reglage={cle}>
                 <span style={{ fontSize: 12, color: C.muted, fontWeight: 600 }}>{lib}</span>
-                <button className="vrm-icon-control" type="button" aria-label={`${lib} : moins`} onClick={moins} style={stepBtn}>−</button>
+                <button className="vrm-icon-control vrm-b vrm-b-secondaire vrm-b-petit" type="button" aria-label={`${lib} : moins`} onClick={moins} style={stepBtn}>−</button>
                 <b style={{ fontSize: 14, minWidth: 18, textAlign: 'center' }}>{val}</b>
-                <button className="vrm-icon-control" type="button" aria-label={`${lib} : plus`} onClick={plus} style={stepBtn}>+</button>
+                <button className="vrm-icon-control vrm-b vrm-b-secondaire vrm-b-petit" type="button" aria-label={`${lib} : plus`} onClick={plus} style={stepBtn}>+</button>
               </span>);
             return (
               <div style={{ flex: '1 1 100%', display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap', marginBottom: 4, padding: '8px 10px', border: `1px solid ${C.border}`, borderRadius: 10 }}>
@@ -29550,60 +29655,60 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
           })()}
           {/* GRILLE personnalisable : nb de colonnes, de rangées, taille des cases */}
           {(FURN_TYPES[selItem.type] || {}).build === 'grille' && (()=>{
-            const stepBtn = { border: `1px solid ${C.border}`, borderRadius: 6, background: C.card, color: C.text, fontSize: 13, fontWeight: 800, width: 26, height: 26, cursor: 'pointer', lineHeight: 1 };
+            const stepBtn = { minWidth: 34, padding: 0, fontSize: 14, lineHeight: 1 };
             const cellCm = Math.round((selItem.cell || 0.5) * 100);
             return (
               <div style={{ flex: '1 1 100%', display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', marginBottom: 4, padding: '7px 9px', border: `1px dashed ${C.border}`, borderRadius: 9 }}>
-                <span style={{ fontSize: 11, color: C.text, fontWeight: 900 }}>🔳 Grille</span>
-                <span style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}><span style={{ fontSize: 10.5, color: C.muted, fontWeight: 700 }}>↔ Boîtes en largeur</span><button className="vrm-icon-control" type="button" aria-label="Réduire les colonnes" onClick={() => gridCols(selItem, -1)} style={stepBtn}>−</button><b style={{ fontSize: 13, minWidth: 16, textAlign: 'center' }}>{selItem.cols || 4}</b><button className="vrm-icon-control" type="button" aria-label="Augmenter les colonnes" onClick={() => gridCols(selItem, 1)} style={stepBtn}>+</button></span>
-                <span style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}><span style={{ fontSize: 10.5, color: C.muted, fontWeight: 700 }}>↕ Boîtes en hauteur</span><button className="vrm-icon-control" type="button" aria-label="Réduire les rangées" onClick={() => gridRows(selItem, -1)} style={stepBtn}>−</button><b style={{ fontSize: 13, minWidth: 16, textAlign: 'center' }}>{selItem.rows || 3}</b><button className="vrm-icon-control" type="button" aria-label="Augmenter les rangées" onClick={() => gridRows(selItem, 1)} style={stepBtn}>+</button><button type="button" onClick={() => gridToCeiling(selItem)} title="Empiler jusqu'au plafond" style={{ border: `1px solid ${C.border}`, borderRadius: 6, background: 'transparent', color: C.text, fontSize: 10.5, fontWeight: 800, padding: '3px 7px', cursor: 'pointer' }}>⬆️ Plafond</button></span>
-                <span style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}><span style={{ fontSize: 10.5, color: C.muted, fontWeight: 700 }}>Taille case</span><button className="vrm-icon-control" type="button" aria-label="Réduire la taille des cases" onClick={() => gridCell(selItem, -0.06)} style={stepBtn}>−</button><b style={{ fontSize: 12, minWidth: 34, textAlign: 'center' }}>{cellCm} cm</b><button className="vrm-icon-control" type="button" aria-label="Augmenter la taille des cases" onClick={() => gridCell(selItem, 0.06)} style={stepBtn}>+</button></span>
+                <span style={{ fontSize: 11, color: C.text, fontWeight: 900 }}>Grille</span>
+                <span style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}><span style={{ fontSize: 10.5, color: C.muted, fontWeight: 700 }}>↔ Boîtes en largeur</span><button className="vrm-icon-control vrm-b vrm-b-secondaire vrm-b-petit" type="button" aria-label="Réduire les colonnes" onClick={() => gridCols(selItem, -1)} style={stepBtn}>−</button><b style={{ fontSize: 13, minWidth: 16, textAlign: 'center' }}>{selItem.cols || 4}</b><button className="vrm-icon-control vrm-b vrm-b-secondaire vrm-b-petit" type="button" aria-label="Augmenter les colonnes" onClick={() => gridCols(selItem, 1)} style={stepBtn}>+</button></span>
+                <span style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}><span style={{ fontSize: 10.5, color: C.muted, fontWeight: 700 }}>↕ Boîtes en hauteur</span><button className="vrm-icon-control vrm-b vrm-b-secondaire vrm-b-petit" type="button" aria-label="Réduire les rangées" onClick={() => gridRows(selItem, -1)} style={stepBtn}>−</button><b style={{ fontSize: 13, minWidth: 16, textAlign: 'center' }}>{selItem.rows || 3}</b><button className="vrm-icon-control vrm-b vrm-b-secondaire vrm-b-petit" type="button" aria-label="Augmenter les rangées" onClick={() => gridRows(selItem, 1)} style={stepBtn}>+</button><button className="vrm-b vrm-b-secondaire vrm-b-petit" type="button" onClick={() => gridToCeiling(selItem)} title="Empiler jusqu'au plafond">Jusqu'au plafond</button></span>
+                <span style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}><span style={{ fontSize: 10.5, color: C.muted, fontWeight: 700 }}>Taille case</span><button className="vrm-icon-control vrm-b vrm-b-secondaire vrm-b-petit" type="button" aria-label="Réduire la taille des cases" onClick={() => gridCell(selItem, -0.06)} style={stepBtn}>−</button><b style={{ fontSize: 12, minWidth: 34, textAlign: 'center' }}>{cellCm} cm</b><button className="vrm-icon-control vrm-b vrm-b-secondaire vrm-b-petit" type="button" aria-label="Augmenter la taille des cases" onClick={() => gridCell(selItem, 0.06)} style={stepBtn}>+</button></span>
                 <span style={{ fontSize: 10.5, color: C.muted, fontWeight: 700 }}>= {(selItem.cols || 4) * (selItem.rows || 3)} places</span>
-                <button type="button" onClick={() => addBoxToGrid(selItem)} title="Pose une boîte à la prochaine place libre (repère bleu)" style={{ border: 'none', borderRadius: 7, background: C.accent, color: '#fff', fontSize: 11.5, fontWeight: 900, padding: '6px 11px', cursor: 'pointer' }}>➕ Ajouter une boîte</button>
-                <button type="button" onClick={() => fillGridSeries(selItem)} title="Remplir toutes les places vides en croissant" style={{ border: `1px solid ${C.accent}`, borderRadius: 7, background: `${C.accent}14`, color: C.text, fontSize: 11, fontWeight: 800, padding: '5px 9px', cursor: 'pointer' }}>🔢 Remplir en série</button>
-                <button type="button" onClick={() => clearGrid(selItem)} title="Vider toutes les cases" style={{ border: `1px solid ${C.border}`, borderRadius: 7, background: 'transparent', color: C.muted, fontSize: 11, fontWeight: 700, padding: '5px 9px', cursor: 'pointer' }}>🧹 Vider</button>
+                <button className="vrm-b vrm-b-secondaire vrm-b-petit" type="button" onClick={() => addBoxToGrid(selItem)} title="Pose une boîte à la prochaine place libre (repère bleu)">Ajouter une boîte</button>
+                <button className="vrm-b vrm-b-secondaire vrm-b-petit" type="button" onClick={() => fillGridSeries(selItem)} title="Remplir toutes les places vides en croissant">Remplir en série</button>
+                <button className="vrm-b vrm-b-secondaire vrm-b-petit" type="button" onClick={() => clearGrid(selItem)} title="Vider toutes les cases">Vider</button>
               </div>
             );
           })()}
           {/* PILE de boîtes : nb de boîtes (±) + hauteur par colonne + renuméroter */}
           {(FURN_TYPES[selItem.type] || {}).build === 'pile' && (()=>{
-            const stepBtn = { border: `1px solid ${C.border}`, borderRadius: 6, background: C.card, color: C.text, fontSize: 13, fontWeight: 800, width: 26, height: 26, cursor: 'pointer', lineHeight: 1 };
+            const stepBtn = { minWidth: 34, padding: 0, fontSize: 14, lineHeight: 1 };
             const nums = pileNums(selItem), total = cartonsDePile(nums).length, rows = Math.max(1, selItem.rows || 5), cols = Math.max(1, Math.ceil(nums.length / rows));
             return (
               <div style={{ flex: '1 1 100%', display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', marginBottom: 4, padding: '7px 9px', border: `1px dashed ${C.border}`, borderRadius: 9 }}>
-                <span style={{ fontSize: 11, color: C.text, fontWeight: 900 }}>📦 Pile</span>
-                <span style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}><span style={{ fontSize: 10.5, color: C.muted, fontWeight: 700 }}>Nombre de boîtes</span><button className="vrm-icon-control" type="button" aria-label="Retirer la dernière boîte de la pile" onClick={() => pileRemoveLast(selItem)} style={stepBtn}>−</button><b style={{ fontSize: 14, minWidth: 24, textAlign: 'center' }}>{total}</b><button className="vrm-icon-control" type="button" aria-label="Ajouter une boîte à la pile" onClick={() => pileAdd(selItem)} style={stepBtn}>+</button></span>
-                <span style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}><span style={{ fontSize: 10.5, color: C.muted, fontWeight: 700 }}>{cols > 1 ? 'Boîtes de haut (toutes les piles)' : 'Boîtes de haut'}</span><button className="vrm-icon-control" type="button" aria-label="Réduire la hauteur de la pile" onClick={() => pileHeight(selItem, -1)} style={stepBtn}>−</button><b style={{ fontSize: 12, minWidth: 14, textAlign: 'center' }}>{rows}</b><button className="vrm-icon-control" type="button" aria-label="Augmenter la hauteur de la pile" onClick={() => pileHeight(selItem, 1)} style={stepBtn}>+</button></span>
+                <span style={{ fontSize: 11, color: C.text, fontWeight: 900 }}>Pile</span>
+                <span style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}><span style={{ fontSize: 10.5, color: C.muted, fontWeight: 700 }}>Nombre de boîtes</span><button className="vrm-icon-control vrm-b vrm-b-secondaire vrm-b-petit" type="button" aria-label="Retirer la dernière boîte de la pile" onClick={() => pileRemoveLast(selItem)} style={stepBtn}>−</button><b style={{ fontSize: 14, minWidth: 24, textAlign: 'center' }}>{total}</b><button className="vrm-icon-control vrm-b vrm-b-secondaire vrm-b-petit" type="button" aria-label="Ajouter une boîte à la pile" onClick={() => pileAdd(selItem)} style={stepBtn}>+</button></span>
+                <span style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}><span style={{ fontSize: 10.5, color: C.muted, fontWeight: 700 }}>{cols > 1 ? 'Boîtes de haut (toutes les piles)' : 'Boîtes de haut'}</span><button className="vrm-icon-control vrm-b vrm-b-secondaire vrm-b-petit" type="button" aria-label="Réduire la hauteur de la pile" onClick={() => pileHeight(selItem, -1)} style={stepBtn}>−</button><b style={{ fontSize: 12, minWidth: 14, textAlign: 'center' }}>{rows}</b><button className="vrm-icon-control vrm-b vrm-b-secondaire vrm-b-petit" type="button" aria-label="Augmenter la hauteur de la pile" onClick={() => pileHeight(selItem, 1)} style={stepBtn}>+</button></span>
                 {cols > 1 && <span data-pile-hauteurs style={{ flex: '1 1 100%', display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
                   <span style={{ fontSize: 10.5, color: C.muted, fontWeight: 700 }}>Hauteur de chaque pile (depuis la gauche)</span>
                   {Array.from({ length: cols }, (_, c) => { const h = hauteurPile(rows, selItem.hauteurs, c); return (
                     <span key={c} data-pile-col={c + 1} data-pile-h={h} style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}>
                       <span style={{ fontSize: 10.5, color: C.muted, fontWeight: 700 }}>Pile {c + 1}</span>
-                      <button className="vrm-icon-control" type="button" aria-label={`Réduire la pile ${c + 1}`} onClick={() => pileHauteurCol(selItem, c, -1)} style={stepBtn}>−</button>
+                      <button className="vrm-icon-control vrm-b vrm-b-secondaire vrm-b-petit" type="button" aria-label={`Réduire la pile ${c + 1}`} onClick={() => pileHauteurCol(selItem, c, -1)} style={stepBtn}>−</button>
                       <b style={{ fontSize: 12, minWidth: 14, textAlign: 'center' }}>{h}</b>
-                      <button className="vrm-icon-control" type="button" aria-label={`Agrandir la pile ${c + 1}`} onClick={() => pileHauteurCol(selItem, c, 1)} style={stepBtn}>+</button>
+                      <button className="vrm-icon-control vrm-b vrm-b-secondaire vrm-b-petit" type="button" aria-label={`Agrandir la pile ${c + 1}`} onClick={() => pileHauteurCol(selItem, c, 1)} style={stepBtn}>+</button>
                     </span>); })}
                 </span>}
-                <button type="button" onClick={() => pileRestart(selItem)} style={{ border: `1px solid ${C.accent}`, borderRadius: 7, background: `${C.accent}14`, color: C.text, fontSize: 11, fontWeight: 800, padding: '5px 9px', cursor: 'pointer' }}>🔢 Renuméroter</button>
-                <button type="button" onClick={() => setPutOnSrc(selItem.id)} title="Poser cette pile sur un meuble (table, commode…)" style={{ border: 'none', borderRadius: 7, background: C.accent, color: '#fff', fontSize: 11, fontWeight: 900, padding: '6px 10px', cursor: 'pointer' }}>🪑 Poser sur un meuble</button>
-                {(selItem.lift || 0) > 0 && <button type="button" onClick={() => updateItem(selItem.id, { lift: 0 })} title="Reposer la pile au sol" style={{ border: `1px solid ${C.border}`, borderRadius: 7, background: 'transparent', color: C.text, fontSize: 11, fontWeight: 800, padding: '5px 9px', cursor: 'pointer' }}>⬇️ Au sol</button>}
-                <span style={{ fontSize: 10.5, color: C.muted, fontWeight: 700 }}>{cols} colonne{cols > 1 ? 's' : ''} · touche une boîte pour changer son N° ✏️ (ou la retirer)</span>
+                <button className="vrm-b vrm-b-secondaire vrm-b-petit" type="button" onClick={() => pileRestart(selItem)}>Renuméroter</button>
+                <button className="vrm-b vrm-b-secondaire vrm-b-petit" type="button" onClick={() => setPutOnSrc(selItem.id)} title="Poser cette pile sur un meuble (table, commode…)">Poser sur un meuble</button>
+                {(selItem.lift || 0) > 0 && <button className="vrm-b vrm-b-secondaire vrm-b-petit" type="button" onClick={() => updateItem(selItem.id, { lift: 0 })} title="Reposer la pile au sol">Au sol</button>}
+                <span style={{ fontSize: 10.5, color: C.muted, fontWeight: 700 }}>{cols} colonne{cols > 1 ? 's' : ''} · touche une boîte pour changer son N° (ou la retirer)</span>
               </div>
             );
           })()}
-          {!(FURN_TYPES[selItem.type] || {}).box && (FURN_TYPES[selItem.type] || {}).build !== 'pile' && !(FURN_TYPES[selItem.type] || {}).cases && <button type="button" onClick={() => setOpenItem(selItem.id)} style={{ border: 'none', borderRadius: 8, background: C.accent, color: '#fff', fontSize: 12, fontWeight: 800, padding: '7px 12px', cursor: 'pointer', fontFamily: 'inherit' }}>📂 Ranger dedans ({storedCount(selItem)})</button>}
-          {!(FURN_TYPES[selItem.type] || {}).box && <button type="button" onClick={() => stickToWall(selItem)} title="Coller au mur suivant" style={{ border: `1px solid ${C.accent}`, borderRadius: 8, background: `${C.accent}14`, color: C.text, fontSize: 12, fontWeight: 800, padding: '7px 10px', cursor: 'pointer' }}>📌 Coller au mur</button>}
+          {!(FURN_TYPES[selItem.type] || {}).box && (FURN_TYPES[selItem.type] || {}).build !== 'pile' && !(FURN_TYPES[selItem.type] || {}).cases && <button className="vrm-b vrm-b-secondaire vrm-b-petit" type="button" onClick={() => setOpenItem(selItem.id)}>Ranger dedans ({storedCount(selItem)})</button>}
+          {!(FURN_TYPES[selItem.type] || {}).box && <button className="vrm-b vrm-b-secondaire vrm-b-petit" type="button" onClick={() => stickToWall(selItem)} title="Coller au mur suivant">Coller au mur</button>}
           {(FURN_TYPES[selItem.type] || {}).build !== 'grille' && (FURN_TYPES[selItem.type] || {}).build !== 'pile' && !(FURN_TYPES[selItem.type] || {}).box && <>
-            <button className="vrm-icon-control" type="button" aria-label="Pivoter" onClick={() => changerDimensions(selItem, { rot: ((selItem.rot || 0) + Math.PI / 2) % (2 * Math.PI) })} title="Pivoter" style={{ border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.text, fontSize: 12, fontWeight: 700, padding: '7px 10px', cursor: 'pointer' }}>🔄</button>
-            {!(FURN_TYPES[selItem.type] || {}).cases && <><button className="vrm-icon-control" type="button" aria-label="Élargir le meuble" onClick={() => changerDimensions(selItem, { w: Math.min(room.w, selItem.w + 0.5) })} style={{ border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.text, fontSize: 12, fontWeight: 700, padding: '7px 10px', cursor: 'pointer' }}>↔️+</button>
-            <button className="vrm-icon-control" type="button" aria-label="Réduire la largeur du meuble" onClick={() => changerDimensions(selItem, { w: Math.max(0.5, selItem.w - 0.5) })} style={{ border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.text, fontSize: 12, fontWeight: 700, padding: '7px 10px', cursor: 'pointer' }}>↔️−</button>
+            <button className="vrm-icon-control vrm-b vrm-b-secondaire vrm-b-petit" type="button" aria-label="Pivoter" onClick={() => changerDimensions(selItem, { rot: ((selItem.rot || 0) + Math.PI / 2) % (2 * Math.PI) })} title="Pivoter">↻</button>
+            {!(FURN_TYPES[selItem.type] || {}).cases && <><button className="vrm-icon-control vrm-b vrm-b-secondaire vrm-b-petit" type="button" aria-label="Élargir le meuble" onClick={() => changerDimensions(selItem, { w: Math.min(room.w, selItem.w + 0.5) })}>↔️+</button>
+            <button className="vrm-icon-control vrm-b vrm-b-secondaire vrm-b-petit" type="button" aria-label="Réduire la largeur du meuble" onClick={() => changerDimensions(selItem, { w: Math.max(0.5, selItem.w - 0.5) })}>↔️−</button>
             </>}
-            {!(FURN_TYPES[selItem.type] || {}).cases && <><button className="vrm-icon-control" type="button" aria-label="Augmenter la profondeur du meuble" onClick={() => changerDimensions(selItem, { h: Math.min(room.h, selItem.h + 0.25) })} style={{ border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.text, fontSize: 12, fontWeight: 700, padding: '7px 10px', cursor: 'pointer' }}>↕️+</button>
-            <button className="vrm-icon-control" type="button" aria-label="Réduire la profondeur du meuble" onClick={() => changerDimensions(selItem, { h: Math.max(0.3, selItem.h - 0.25) })} style={{ border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.text, fontSize: 12, fontWeight: 700, padding: '7px 10px', cursor: 'pointer' }}>↕️−</button></>}
+            {!(FURN_TYPES[selItem.type] || {}).cases && <><button className="vrm-icon-control vrm-b vrm-b-secondaire vrm-b-petit" type="button" aria-label="Augmenter la profondeur du meuble" onClick={() => changerDimensions(selItem, { h: Math.min(room.h, selItem.h + 0.25) })}>↕️+</button>
+            <button className="vrm-icon-control vrm-b vrm-b-secondaire vrm-b-petit" type="button" aria-label="Réduire la profondeur du meuble" onClick={() => changerDimensions(selItem, { h: Math.max(0.3, selItem.h - 0.25) })}>↕️−</button></>}
           </>}
-          <button className="vrm-icon-control" type="button" aria-label="Renommer le meuble" onClick={async ()=>{ const n = await askText({ desc: 'Nom du meuble :', value: selItem.name }); if (n != null && n.trim()) updateItem(selItem.id, { name: n.trim() }); }} style={{ border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.text, fontSize: 12, fontWeight: 700, padding: '7px 10px', cursor: 'pointer' }}><Icon name="pencil" size={15}/></button>
-          <button className="vrm-icon-control" type="button" aria-label="Dupliquer" onClick={() => dupItem(selItem)} title="Dupliquer" style={{ border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.text, fontSize: 12, fontWeight: 700, padding: '7px 10px', cursor: 'pointer' }}>⧉</button>
-          <button className="vrm-icon-control" type="button" aria-label="Supprimer le meuble" onClick={() => removeItem(selItem.id)} style={{ marginLeft: 'auto', border: `1px solid ${C.danger}66`, borderRadius: 8, background: `${C.danger}12`, color: C.danger, fontSize: 12, fontWeight: 800, padding: '7px 10px', cursor: 'pointer' }}><Icon name="trash" size={16}/></button>
+          <button className="vrm-icon-control vrm-b vrm-b-secondaire vrm-b-petit" type="button" aria-label="Renommer le meuble" onClick={async ()=>{ const n = await askText({ desc: 'Nom du meuble :', value: selItem.name }); if (n != null && n.trim()) updateItem(selItem.id, { name: n.trim() }); }}><Icon name="pencil" size={15}/></button>
+          <button className="vrm-icon-control vrm-b vrm-b-secondaire vrm-b-petit" type="button" aria-label="Dupliquer" onClick={() => dupItem(selItem)} title="Dupliquer">⧉</button>
+          <button className="vrm-icon-control vrm-b vrm-b-secondaire vrm-b-petit" type="button" aria-label="Supprimer le meuble" onClick={() => removeItem(selItem.id)} style={{ marginLeft: 'auto' }}><Icon name="trash" size={16}/></button>
           </>)}
         </div>
       )}
@@ -29621,12 +29726,12 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
           <div onClick={e => e.stopPropagation()} style={{ background: C.bg, borderRadius: 16, maxWidth: 460, width: '100%', maxHeight: '92vh', overflow: 'auto', padding: 16 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
               <span style={{ fontSize: 15, fontWeight: 900, color: C.text, flex: 1 }}>{emojiOf(opened)} {opened.name}</span>
-              <button className="vrm-icon-control" type="button" aria-label="Fermer le contenu du meuble" onClick={() => setOpenItem(null)} style={{ border: 'none', background: 'transparent', color: C.muted, fontSize: 20, cursor: 'pointer', lineHeight: 1 }}><Icon name="close" size={15}/></button>
+              <button className="vrm-icon-control vrm-b vrm-b-discret vrm-b-icone" type="button" aria-label="Fermer le contenu du meuble" onClick={() => setOpenItem(null)}><Icon name="close" size={15}/></button>
             </div>
             <div style={{ fontSize: 11.5, color: C.muted, marginBottom: 10 }}>Vue de face — touche une case pour y ranger un N° (empilable).
               <span style={{ display: 'inline-flex', gap: 4, marginLeft: 8 }}>
-                <button type="button" onClick={() => setGrid(opened, opened.rows + 1, opened.cols)} style={{ border: `1px solid ${C.border}`, borderRadius: 6, background: 'transparent', color: C.text, fontSize: 11, fontWeight: 700, padding: '2px 7px', cursor: 'pointer' }}>+ rangée</button>
-                <button type="button" onClick={() => setGrid(opened, opened.rows, opened.cols + 1)} style={{ border: `1px solid ${C.border}`, borderRadius: 6, background: 'transparent', color: C.text, fontSize: 11, fontWeight: 700, padding: '2px 7px', cursor: 'pointer' }}>+ colonne</button>
+                <button className="vrm-b vrm-b-secondaire vrm-b-petit" type="button" onClick={() => setGrid(opened, opened.rows + 1, opened.cols)}>+ rangée</button>
+                <button className="vrm-b vrm-b-secondaire vrm-b-petit" type="button" onClick={() => setGrid(opened, opened.rows, opened.cols + 1)}>+ colonne</button>
               </span>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6, background: colorOf(opened) + '22', border: `2px solid ${colorOf(opened)}`, borderRadius: 8, padding: 8 }}>
@@ -29718,9 +29823,8 @@ function AssistantRangement({ plan, planLu, ecrire, ficheParNum }) {
   };
 
   const raisonPasSu = planLu === undefined ? 'Je relis le plan de ton stock…'
-    : planLu === false ? "Le plan de ton stock n'a pas pu être relu (la base n'a pas répondu) : je ne propose rien tant que je ne l'ai pas — rouvre cet écran dans un instant."
-    : presents == null ? "Je ne sais pas encore quels articles sont chez toi : ouvre une fois l'écran Annonces sur cet appareil, puis reviens ici. D'ici là je ne propose rien — ranger d'après une liste devinée mettrait un article parti dans une case." : null;
-  const btn = (primaire) => ({ border: primaire ? 'none' : `1px solid ${C.border}`, borderRadius: 8, background: primaire ? C.accent : 'transparent', color: primaire ? (C.onAccent || '#fff') : C.text, fontSize: 12.5, fontWeight: 600, padding: '8px 12px', cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap', minHeight: 36 });
+    : planLu === false ? "Le plan de ton stock n'a pas pu être relu : rien n'est proposé. Rouvre l'écran dans un instant."
+    : presents == null ? "Articles en stock pas encore lus : ouvre une fois Annonces sur cet appareil, puis reviens." : null;
   const carte = { border: `1px solid ${C.border}`, borderRadius: 12, background: C.card, boxShadow: C.shadow, padding: 14, minWidth: 0 };
   const titreBloc = (t, n) => <div className="vrm-label" style={{ color: C.muted, marginBottom: 10, display: 'flex', justifyContent: 'space-between', gap: 8 }}><span>{t}</span>{n != null ? <span style={{ color: C.text }}>{n}</span> : null}</div>;
 
@@ -29747,7 +29851,7 @@ function AssistantRangement({ plan, planLu, ecrire, ficheParNum }) {
       <div style={{ display: 'flex', gap: 8 }}>
         <input value={q} onChange={e => setQ(e.target.value)} onKeyDown={e => { if (e.key !== 'Enter') return; e.preventDefault(); const v = q.trim(); if (!v || ouEstNumero(plan, v)) return; const p = aRanger.find(x => cleNum(x.numero) === cleNum(v)); if (p && prochaine) { ranger(p.numero, prochaine.itemId, prochaine.key); setQ(''); } else toast(p ? 'Plus aucune case libre.' : `N°${v} n'est pas parmi tes articles en stock — rien n'est rangé.`); }} placeholder="Où est la N° … ? (Entrée : la ranger)" inputMode={clavierNum()} aria-label="Chercher un numéro dans le stock" data-rgt-cherche=""
           style={{ flex: 1, minWidth: 0, border: `1px solid ${C.border}`, borderRadius: 10, padding: '10px 12px', fontSize: 16, background: C.card, color: C.text, outline: 'none', fontFamily: 'inherit' }} />
-        {q && <button className="vrm-icon-control" type="button" aria-label="Effacer la recherche" onClick={() => setQ('')} style={{ ...btn(false), padding: '0 12px' }}><Icon name="close" size={15} /></button>}
+        {q && <Bouton variante="discret" icone="close" aria-label="Effacer la recherche" onClick={() => setQ('')} />}
       </div>
       {q.trim() && <div data-rgt-trouve={hit ? '1' : '0'} style={{ fontSize: 12.5, color: hit ? C.text : C.muted, lineHeight: 1.45, marginTop: -4 }}>
         {hit ? <>N°{q.trim()} → <b>{hit.itemName}</b>{plusieursPieces ? ` (${hit.roomName})` : ''} · {hit.nom}</> : <>Aucune case ne porte la N°{q.trim()}.</>}
@@ -29759,7 +29863,7 @@ function AssistantRangement({ plan, planLu, ecrire, ficheParNum }) {
           {sur && (
             <div style={carte} data-rgt-liste="">
               {titreBloc('À ranger', aRanger.length)}
-              {aRanger.length > 0 && prochaine && <button type="button" data-tout-ranger-ouvrir={aRanger.length} onClick={() => setToutRanger(true)} style={{ ...btn(true), width: '100%', minHeight: 44, marginBottom: 10 }}>Tout ranger d'un geste</button>}
+              {aRanger.length > 0 && prochaine && <Bouton variante="primaire" plein data-tout-ranger-ouvrir={aRanger.length} onClick={() => setToutRanger(true)} style={{ marginBottom: 10 }}>Tout ranger d'un geste</Bouton>}
               {toutRanger && <FeuilleToutRanger plan={plan} numeros={aRanger.map(p => p.numero)} plusieursPieces={plusieursPieces} onClose={() => setToutRanger(false)} onValider={(prop) => { setToutRanger(false); if (!prop || !prop.poses.length) return; ecrire(prop.plan); toast(`${prop.poses.length} article${prop.poses.length > 1 ? 's' : ''} rangé${prop.poses.length > 1 ? 's' : ''}.`); }} />}
               {aRanger.length === 0
                 ? <div style={{ fontSize: 12.5, color: C.muted, lineHeight: 1.5 }}>Tout ce qui est chez toi est déjà posé dans une case.</div>
@@ -29771,7 +29875,7 @@ function AssistantRangement({ plan, planLu, ecrire, ficheParNum }) {
                     : <div data-prochaine="" style={{ fontSize: 12.5, color: C.text, lineHeight: 1.45, marginBottom: 10 }}>Plus aucune case libre : agrandis une grille ou ajoute un meuble (Ma pièce → Aménager la pièce).</div>}
                   {placer && <div data-rgt-placer={placer} style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 12.5, color: C.text, marginBottom: 10, padding: '8px 10px', borderRadius: 9, border: `1.5px solid ${C.accent}` }}>
                     <span style={{ flex: 1, minWidth: 0 }}>Touche une case entourée pour y ranger la <b>N°{placer}</b>.</span>
-                    <button type="button" onClick={() => setPlacer(null)} style={btn(false)}>Annuler</button>
+                    <Bouton variante="discret" onClick={() => setPlacer(null)}>Annuler</Bouton>
                   </div>}
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 460, overflowY: 'auto' }}>
                     {aRanger.map(p => (
@@ -29784,8 +29888,8 @@ function AssistantRangement({ plan, planLu, ecrire, ficheParNum }) {
                           <span style={{ display: 'block', fontSize: 11.5, color: C.muted, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.title || 'article présent'}</span>
                         </span>
                         <span style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
-                          {prochaine && <button type="button" data-ranger-ici={p.numero} onClick={() => ranger(p.numero, prochaine.itemId, prochaine.key)} style={btn(true)}>Ranger ici</button>}
-                          {casesLibres > 0 && <button type="button" data-autre-case={p.numero} aria-label={`Choisir une autre case pour la N°${p.numero}`} title="Choisir une autre case" onClick={() => setPlacer(placer === p.numero ? null : p.numero)} style={{ ...btn(false), padding: '8px 10px' }}>Autre</button>}
+                          {prochaine && <Bouton variante="secondaire" className="vrm-b-petit" data-ranger-ici={p.numero} onClick={() => ranger(p.numero, prochaine.itemId, prochaine.key)}>Ranger ici</Bouton>}
+                          {casesLibres > 0 && <Bouton variante="discret" data-autre-case={p.numero} aria-label={`Choisir une autre case pour la N°${p.numero}`} title="Choisir une autre case" onClick={() => setPlacer(placer === p.numero ? null : p.numero)}>Autre</Bouton>}
                         </span>
                       </div>
                     ))}
@@ -29796,16 +29900,16 @@ function AssistantRangement({ plan, planLu, ecrire, ficheParNum }) {
           {sur && aLiberer.length > 0 && (
             <div style={carte} data-rgt-liberer="">
               {titreBloc('À libérer', aLiberer.length)}
-              <div style={{ fontSize: 12, color: C.muted, lineHeight: 1.5, marginBottom: 8 }}>Ces cases portent le N° d'un article qui n'est plus en stock (vendu ou parti). Libère-la quand la place est vide.</div>
+              <div style={{ fontSize: 12, color: C.muted, lineHeight: 1.5, marginBottom: 8 }}>Articles partis (vendus ou retirés) : libère la case quand elle est vide.</div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                 {(voirLiberer ? aLiberer : aLiberer.slice(0, 5)).map(x => (
                   <div key={x.itemId + x.key + x.numero} data-a-liberer={x.numero} style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 12.5, color: C.text }}>
                     <span style={{ flex: 1, minWidth: 0 }}><b>N°{x.numero}</b> <span style={{ color: C.muted }}>· {x.itemName} · {x.nom}</span></span>
-                    <button type="button" onClick={() => liberer(x)} style={btn(false)}>Libérer</button>
+                    <Bouton variante="secondaire" className="vrm-b-petit" onClick={() => liberer(x)}>Libérer</Bouton>
                   </div>
                 ))}
               </div>
-              {aLiberer.length > 5 && <button type="button" onClick={() => setVoirLiberer(v => !v)} style={{ ...btn(false), marginTop: 8, border: 'none', padding: '4px 0', color: C.muted }}>{voirLiberer ? 'Réduire' : `Voir les ${aLiberer.length}`}</button>}
+              {aLiberer.length > 5 && <Bouton variante="discret" onClick={() => setVoirLiberer(v => !v)} style={{ marginTop: 8 }}>{voirLiberer ? 'Réduire' : `Voir les ${aLiberer.length}`}</Bouton>}
             </div>
           )}
         </div>
@@ -29864,7 +29968,7 @@ function AssistantRangement({ plan, planLu, ecrire, ficheParNum }) {
               </React.Fragment>
             );
           })}
-          {meubles.length > 0 && <div className="vrm-aide" style={{ fontSize: 11.5, color: C.muted, lineHeight: 1.5 }}>Vu de face, comme dans la 3D : sur une étagère ou une table les boîtes s'empilent dans leur case ; dans un mur de boîtes elles tombent en bas de la colonne. Touche une case pleine pour la retrouver.</div>}
+          {meubles.length > 0 && <div style={{ fontSize: 11.5, color: C.muted, lineHeight: 1.5, display: 'flex', alignItems: 'center', gap: 4 }}>Vu de face · touche une case pleine pour la retrouver <Pourquoi label="Comment les boîtes se rangent">Comme dans la 3D : sur une étagère ou une table les boîtes s'empilent dans leur case ; dans un mur de boîtes elles tombent en bas de la colonne.</Pourquoi></div>}
         </div>
       </div>
     </div>
@@ -29934,7 +30038,7 @@ function StockPhotos() {
       <div data-stock-resume="" style={{ fontSize: 13, color: C.muted }}>{fiches.length} paire{fiches.length > 1 ? 's' : ''} en stock{nVendus > 0 ? <> · <b style={{ color: C.accent }}>{nVendus} vendue{nVendus > 1 ? 's' : ''} à sortir</b></> : (venduSu ? '' : ' · ventes pas encore lues')}</div>
       <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="N° ou titre" aria-label="Chercher une paire" style={{ marginLeft: 'auto', padding: '7px 11px', borderRadius: 8, border: `1px solid ${C.line}`, background: C.card, color: C.text, fontSize: 13, maxWidth: 180 }} />
     </div>
-    {nVendus > 0 && <div style={{ fontSize: 12.5, color: C.muted, lineHeight: 1.5 }}>Les paires qui clignotent sont vendues : touche <b style={{ color: C.text }}>Sortie du stock</b> une fois sortie de ton carton. Une vente annulée qui repart en ligne s'éteint toute seule et reste.</div>}
+    {nVendus > 0 && <div style={{ fontSize: 12.5, color: C.muted, lineHeight: 1.5, display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>Celles qui clignotent sont vendues : touche <b style={{ color: C.text }}>Sortie du stock</b> une fois sortie. <Pourquoi label="Et si la vente est annulée ?">Une vente annulée qui repart en ligne s'éteint toute seule et la paire reste en stock.</Pourquoi></div>}
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(118px,1fr))', gap: 12 }}>
       {vus.map((f) => {
         const sold = estVendu(f);
@@ -29948,13 +30052,13 @@ function StockPhotos() {
             </div>
             <div style={{ padding: '7px 9px', display: 'flex', flexDirection: 'column', gap: 6 }}>
               <div style={{ fontSize: 12, color: C.text, lineHeight: 1.3, minHeight: 31, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{f.title || '—'}</div>
-              {sold && <button type="button" onClick={() => sortir(f)} style={{ background: C.accent, color: C.onAccent, border: 'none', borderRadius: 8, padding: '7px 8px', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>Sortie du stock</button>}
+              {sold && <button className="vrm-b vrm-b-secondaire vrm-b-petit" type="button" onClick={() => sortir(f)}>Sortie du stock</button>}
             </div>
           </div>
         );
       })}
     </div>
-    {liste.length > max && <button type="button" onClick={() => setMax((m) => m + 60)} style={{ alignSelf: 'center', background: 'transparent', border: `1px solid ${C.line}`, borderRadius: 8, color: C.text, padding: '8px 14px', fontSize: 13, cursor: 'pointer' }}>Voir plus — {Math.min(max, liste.length)} sur {liste.length}</button>}
+    {liste.length > max && <button className="vrm-b vrm-b-discret" type="button" onClick={() => setMax((m) => m + 60)} style={{ alignSelf: 'center' }}>Voir plus — {Math.min(max, liste.length)} sur {liste.length}</button>}
   </>);
 }
 
@@ -30174,7 +30278,7 @@ function StockMeubles() {
           <span style={{ fontSize: 12, color: C.muted, fontWeight: 600 }}>{m.cols}×{m.rows} · {filled}/{total(m)}{m.gravite ? ' · empilé' : ''}</span>
           {cherche && <span style={{ fontSize: 12, fontWeight: 800, color: nIci ? C.onAccent : C.muted, background: nIci ? C.accent : 'transparent', borderRadius: 999, padding: '1px 8px' }}>{nIci ? `${nIci} ici` : 'rien ici'}</span>}
           <span style={{ flex: 1 }} />
-          <button type="button" onClick={() => setModal({ type: 'meuble', id: m.id, name: m.name, cols: m.cols, rows: m.rows, planches: planchesDe(m), gravite: !!m.gravite })} aria-label="Modifier le meuble" style={{ background: 'transparent', border: `1px solid ${C.line}`, color: C.muted, borderRadius: 9, width: 36, height: 36, cursor: 'pointer', display: 'grid', placeItems: 'center' }}><Icon name="pencil" size={15} /></button>
+          <button className="vrm-b vrm-b-secondaire vrm-b-petit vrm-b-icone" type="button" onClick={() => setModal({ type: 'meuble', id: m.id, name: m.name, cols: m.cols, rows: m.rows, planches: planchesDe(m), gravite: !!m.gravite })} aria-label="Modifier le meuble" style={{ width: 36, height: 36, display: 'grid', placeItems: 'center' }}><Icon name="pencil" size={15} /></button>
         </div>
         {!replie && (
         <div data-meuble-grille="" data-zoom={zoom} style={{ display: 'grid', gridTemplateColumns: `16px repeat(${m.cols},1fr)`, gap: zoom === 'loin' ? 4 : 6, background: C.line, padding: '6px 8px 8px 4px', borderRadius: 12, boxShadow: 'inset 0 2px 7px rgba(0,0,0,0.25)', maxWidth: `min(100%, ${m.cols * (caseMax + (zoom === 'loin' ? 4 : 6)) + 28}px)` }}>
@@ -30260,15 +30364,15 @@ function StockMeubles() {
           {m && (() => { const p = placeDansMeubles(s.i, m); return <div data-fiche-place="" style={{ fontSize: 15, fontWeight: 700, color: C.text, marginTop: 4 }}>Rangée {p.rangee} <span style={{ color: C.muted, fontWeight: 500 }}>(en partant du haut)</span> · colonne {p.colonne} <span style={{ color: C.muted, fontWeight: 500 }}>(depuis la gauche)</span></div>; })()}
         </div>
         <div style={{ display: 'flex', gap: 9 }}>
-          <button type="button" onClick={() => { setPlace(modal.cle); fermerModal(); }} style={btnSec}>Déplacer</button>
-          <button type="button" onClick={() => { retirerCase(modal.cle); fermerModal(); }} style={btnSec}>Retirer de la case</button>
+          <button className="vrm-b vrm-b-secondaire" type="button" onClick={() => { setPlace(modal.cle); fermerModal(); }} style={btnSec}>Déplacer</button>
+          <button className="vrm-b vrm-b-secondaire" type="button" onClick={() => { retirerCase(modal.cle); fermerModal(); }} style={btnSec}>Retirer de la case</button>
         </div>
-        {sold && <button type="button" onClick={() => { sortir(f); fermerModal(); }} style={{ ...btnPri, width: '100%', marginTop: 9 }}>✓ Je l'ai sorti du stock</button>}
+        {sold && <button className="vrm-b vrm-b-primaire" type="button" onClick={() => { sortir(f); fermerModal(); }} style={{ ...btnPri, width: '100%', marginTop: 9 }}>✓ Je l'ai sorti du stock</button>}
       </>);
     }
     return (
       <div data-stock-modale="" onClick={fermerModal} style={{ position: 'fixed', inset: 0, background: 'rgba(2,5,10,0.55)', zIndex: 9400, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
-        <div onClick={(e) => e.stopPropagation()} style={{ width: 'min(540px,100%)', maxHeight: '86vh', overflowY: 'auto', background: C.card, border: `1px solid ${C.line}`, borderRadius: '20px 20px 0 0', padding: '18px 18px calc(20px + env(safe-area-inset-bottom,0px))' }}>
+        <div className="vrm-feuille-surface" onClick={(e) => e.stopPropagation()} style={{ width: 'min(540px,100%)', maxHeight: '86vh', overflowY: 'auto', background: C.card, border: `1px solid ${C.line}`, borderRadius: '20px 20px 0 0', padding: '18px 18px calc(20px + env(safe-area-inset-bottom,0px))' }}>
           <div style={{ display: 'flex', justifyContent: 'flex-end' }}><button type="button" onClick={fermerModal} aria-label="Fermer" style={{ background: 'transparent', border: 'none', color: C.muted, fontSize: 22, cursor: 'pointer', lineHeight: 1 }}>×</button></div>
           {corps}
         </div>
@@ -30276,8 +30380,8 @@ function StockMeubles() {
     );
   };
 
-  const btnSec = { flex: 1, border: `1px solid ${C.line}`, background: C.card2, color: C.text, borderRadius: 12, padding: '12px', fontSize: 14, fontWeight: 700, cursor: 'pointer', minHeight: 46 };
-  const btnPri = { border: 'none', background: C.accent, color: C.onAccent, borderRadius: 12, padding: '12px', fontSize: 14, fontWeight: 700, cursor: 'pointer', minHeight: 46 };
+  const btnSec = { flex: 1 };
+  const btnPri = {};
 
   if (!fiches.length) return <Card style={{ fontSize: 13, color: C.muted, lineHeight: 1.5 }}>Aucune paire numérotée en stock. Donne un numéro à tes annonces dans l'onglet <b style={{ color: C.text }}>Annonces</b> et tu pourras les ranger dans tes meubles ici.</Card>;
 
@@ -30316,7 +30420,7 @@ function StockMeubles() {
                   <span style={{ color: C.accent, fontSize: 13, fontWeight: 700, flexShrink: 0 }}>{ou ? 'Voir ›' : 'Ranger ›'}</span>
                 </button>
               ); })}
-          {resultats.length > 1 && <button type="button" data-stock-tout-montrer={resultats.length} onClick={() => { setCibles(resultats.map(cleDeFiche)); setQ(''); }} style={{ width: '100%', minHeight: 46, background: 'transparent', border: 'none', color: C.accent, fontWeight: 700, fontSize: 14, cursor: 'pointer' }}>Les montrer toutes dans les meubles ({resultats.length})</button>}
+          {resultats.length > 1 && <button className="vrm-b vrm-b-discret" type="button" data-stock-tout-montrer={resultats.length} onClick={() => { setCibles(resultats.map(cleDeFiche)); setQ(''); }} style={{ width: '100%' }}>Les montrer toutes dans les meubles ({resultats.length})</button>}
           {resultats.length > MAX_RES && <div style={{ padding: '9px 12px', fontSize: 12, color: C.muted }}>{resultats.length} trouvées — {MAX_RES} affichées, précise ta recherche.</div>}
         </div>
       )}
@@ -30329,7 +30433,7 @@ function StockMeubles() {
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
             <b>À aller chercher{cibles.length > 1 ? ` · ${cibles.length}` : ''}</b>
             <span style={{ flex: 1 }} />
-            <button type="button" onClick={() => setCibles([])} style={{ background: 'transparent', border: 'none', color: C.muted, fontSize: 13, cursor: 'pointer', minHeight: 36 }}>Fermer</button>
+            <button className="vrm-b vrm-b-discret" type="button" onClick={() => setCibles([])}>Fermer</button>
           </div>
           {tri.map((k) => { const f = ficheParCle[k]; const ou = f && ouEst(f);
             return (
@@ -30356,7 +30460,7 @@ function StockMeubles() {
         <div style={{ display: 'flex', gap: 9, overflowX: 'auto', paddingBottom: 3 }}>
           {aRanger.map((f) => { const sold = estVendu(f); const sel = place === cleDeFiche(f);
             return (
-              <button type="button" key={f.id} onClick={() => setPlace(sel ? null : cleDeFiche(f))} aria-pressed={sel} aria-label={`Ranger la paire N°${f.numero}${f.title ? ' · ' + f.title : ''}${sold ? ' (vendue)' : ''}`} style={{ position: 'relative', flex: 'none', width: 70, height: 88, borderRadius: 10, overflow: 'hidden', cursor: 'pointer', padding: 0, background: C.card2, border: sel ? `2px solid ${C.accent}` : (sold ? `2px solid ${C.accent}` : `1px solid ${C.line}`), opacity: filtre && !correspond(f) ? 0.3 : 1 }}>
+              <button type="button" key={f.id} onClick={() => setPlace(sel ? null : cleDeFiche(f))} aria-pressed={sel} aria-label={`Ranger la paire N°${f.numero}${f.title ? ' · ' + f.title : ''}${sold ? ' (vendue)' : ''}`} style={{ position: 'relative', flex: 'none', width: 70, height: 88, borderRadius: 10, overflow: 'hidden', cursor: 'pointer', padding: 0, background: C.card2, border: sel ? `2px solid ${C.accent}` : (sold ? `2px solid ${C.accent}` : `1px solid ${C.border}`), opacity: filtre && !correspond(f) ? 0.3 : 1 }}>
                 <Vignette f={f} sold={sold} />
               </button>
             );
@@ -30372,18 +30476,20 @@ function StockMeubles() {
       </div>
     )}
 
-    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-      <div data-meubles-zoom={zoom}><Segmente label="Taille des cases" value={zoom} onChange={setZoom} options={[{ v: 'loin', l: 'De loin', data: { 'data-zoom-choix': 'loin' } }, { v: 'normal', l: 'Normale', data: { 'data-zoom-choix': 'normal' } }, { v: 'pres', l: 'De près', data: { 'data-zoom-choix': 'pres' } }]} /></div>
-    </div>
     {nEcartes > 0 && <div data-stock-ecartes={nEcartes} style={{ fontSize: 12, color: C.muted }}>{nEcartes} paire{nEcartes > 1 ? 's' : ''} d'un compte retiré ou masqué {nEcartes > 1 ? 'ne sont' : "n'est"} pas montrée{nEcartes > 1 ? 's' : ''} ici.</div>}
-    <div style={{ fontSize: 13, color: C.muted }}>{fiches.length} paire{fiches.length > 1 ? 's' : ''} en stock{nVendus > 0 ? <> · <button type="button" data-vendues-chercher={nVendus} onClick={() => { setQ(''); setCibles(fiches.filter(estVendu).map(cleDeFiche)); try { window.scrollTo({ top: 0, behavior: 'smooth' }); } catch (_) {} }} style={{ background: 'transparent', border: 'none', padding: '0 2px', minHeight: 36, color: C.accent, fontWeight: 800, fontSize: 13, cursor: 'pointer', textDecoration: 'underline' }}>{nVendus} vendue{nVendus > 1 ? 's' : ''} à sortir — où sont-elles ?</button></> : (venduSig ? '' : ' · ventes pas encore lues')}</div>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', justifyContent: 'space-between' }}>
+      <div style={{ fontSize: 13, color: C.muted, flex: '1 1 200px', minWidth: 0 }}>{fiches.length} paire{fiches.length > 1 ? 's' : ''} en stock{nVendus > 0 ? <> · <button className="vrm-b vrm-b-discret" type="button" data-vendues-chercher={nVendus} onClick={() => { setQ(''); setCibles(fiches.filter(estVendu).map(cleDeFiche)); try { window.scrollTo({ top: 0, behavior: 'smooth' }); } catch (_) {} }} style={{ textDecoration: 'underline' }}>{nVendus} vendue{nVendus > 1 ? 's' : ''} à sortir — où sont-elles ?</button></> : (venduSig ? '' : ' · ventes pas encore lues')}</div>
+      {/* (30 oct.) Sans meuble, « De loin / De près » ne montrait rien : le choix attend le premier meuble. */}
+      {meubles.length > 0 && <div data-meubles-zoom={zoom}><Segmente label="Taille des cases" value={zoom} onChange={setZoom} options={[{ v: 'loin', l: 'De loin', data: { 'data-zoom-choix': 'loin' } }, { v: 'normal', l: 'Normale', data: { 'data-zoom-choix': 'normal' } }, { v: 'pres', l: 'De près', data: { 'data-zoom-choix': 'pres' } }]} /></div>}
+    </div>
 
     {/* De loin, les meubles se rangent côte à côte : toute la pièce d'un coup d'œil. */}
     <div data-meubles-liste="" style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-start', columnGap: zoom === 'pres' ? 0 : 28 }}>
       {meubles.map((m) => <div key={m.id} style={{ flex: zoom === 'pres' ? '1 1 100%' : '0 1 auto', minWidth: 0, maxWidth: '100%' }}>{cadreMeuble(m)}</div>)}
     </div>
 
-    <button type="button" onClick={() => setModal({ type: 'meuble' })} style={{ width: '100%', background: 'transparent', border: `1.5px dashed ${C.line}`, color: C.accent, borderRadius: 14, padding: 15, fontWeight: 700, fontSize: 15, cursor: 'pointer' }}>+ Créer un meuble</button>
+    {/* (30 oct.) Pièce vide : créer un meuble est LE geste de l'écran (primaire) ; ensuite il redevient secondaire. */}
+    <button className={`vrm-b ${meubles.length ? 'vrm-b-secondaire' : 'vrm-b-primaire'}`} type="button" data-creer-meuble="" onClick={() => setModal({ type: 'meuble' })} style={{ alignSelf: meubles.length ? 'stretch' : 'flex-start' }}>+ Créer un meuble</button>
 
     {Modale()}
   </>);
@@ -30441,8 +30547,8 @@ function ChoixPlanches({ cols, rows, planches, setPlanches, plateau = false, fix
         </div>
       </div>
       {rows > 1 && <div style={{ display: 'flex', gap: 8, justifyContent: 'center', marginTop: 10 }}>
-        <button type="button" data-planches-toutes="" onClick={() => setPlanches(Array.from({ length: rows - 1 }, (_, i) => i + 1))} style={{ border: `1px solid ${C.line}`, background: 'transparent', color: C.text, borderRadius: 9, padding: '8px 12px', fontSize: 13, cursor: 'pointer', minHeight: 40 }}>Une à chaque rangée</button>
-        <button type="button" onClick={() => setPlanches([])} style={{ border: `1px solid ${C.line}`, background: 'transparent', color: C.text, borderRadius: 9, padding: '8px 12px', fontSize: 13, cursor: 'pointer', minHeight: 40 }}>Aucune</button>
+        <button className="vrm-b vrm-b-secondaire vrm-b-petit" type="button" data-planches-toutes="" onClick={() => setPlanches(Array.from({ length: rows - 1 }, (_, i) => i + 1))}>Une à chaque rangée</button>
+        <button className="vrm-b vrm-b-secondaire vrm-b-petit" type="button" onClick={() => setPlanches([])}>Aucune</button>
       </div>}
   </>);
 }
@@ -30484,8 +30590,8 @@ function EditeurMeuble({ modal, onSave, onDelete }) {
     <div style={{ background: C.card2, border: `1px solid ${C.line}`, borderRadius: 14, padding: 13, margin: '8px 0 4px', textAlign: 'center' }}>
       <ChoixPlanches cols={cols} rows={rows} planches={planches} setPlanches={setPlanches} />
     </div>
-    <button type="button" data-meuble-enregistrer="" onClick={() => onSave((name || '').trim() || 'Meuble', cols, rows, { planches: pl, gravite })} style={{ width: '100%', border: 'none', background: C.accent, color: C.onAccent, borderRadius: 12, padding: 13, fontSize: 15, fontWeight: 800, cursor: 'pointer', marginTop: 9 }}>{modal.id ? 'Enregistrer' : 'Créer le meuble'}</button>
-    {onDelete && <button type="button" onClick={onDelete} style={{ width: '100%', border: `1px solid ${C.line}`, background: 'transparent', color: C.danger, borderRadius: 12, padding: 12, fontSize: 14, fontWeight: 700, cursor: 'pointer', marginTop: 9 }}>Supprimer ce meuble</button>}
+    <button className="vrm-b vrm-b-primaire" type="button" data-meuble-enregistrer="" onClick={() => onSave((name || '').trim() || 'Meuble', cols, rows, { planches: pl, gravite })} style={{ width: '100%', marginTop: 9 }}>{modal.id ? 'Enregistrer' : 'Créer le meuble'}</button>
+    {onDelete && <button className="vrm-b vrm-b-secondaire" type="button" onClick={onDelete} style={{ width: '100%', marginTop: 9 }}>Supprimer ce meuble</button>}
   </>);
 }
 
@@ -30714,7 +30820,8 @@ function Garage({catalog,garageGrid,setGarageGrid,blockedCells,setBlockedCells,e
       {/* (16 oct.) Le contrôle segmenté PARTAGÉ (`.vrm-seg`, celui des sous-onglets
           de plateforme) : plus de segment rempli d'accent, plus de boîte bordée. */}
       <nav role="group" aria-label="Vue du stock" className="vrm-seg" data-segment="" data-stock-vues="" style={{'--seg-ink':C.text,'--seg-muted':C.muted,'--seg-point':C.accent,margin:0}}>
-        {[['meubles','box','Mes meubles'],['plan','home','Ma pièce'],['ranger','grid','Liste des cases'],['photos','image','En photos']].map(([v,ic,l])=>(
+        {/* (30 oct.) Des mots courts : à 390 px le 4ᵉ onglet était coupé (« En photos » à moitié). */}
+        {[['meubles','box','Meubles'],['plan','home','Ma pièce'],['ranger','grid','Cases'],['photos','image','Photos']].map(([v,ic,l])=>(
           <button type="button" key={v} onClick={()=>{setGarageView(v);save('vinted_garage_view',v);}} aria-current={garageView===v?'page':undefined} aria-pressed={garageView===v} data-stock-vue={v} className="vrm-seg-btn">
             <Icon name={ic} size={15}/>{l}
           </button>
@@ -30726,225 +30833,8 @@ function Garage({catalog,garageGrid,setGarageGrid,blockedCells,setBlockedCells,e
       {garageView==='ranger' && <RoomPlan mode="2d"/>}
       {garageView==='photos' && <StockPhotos/>}
 
-      {garageView==='grid' && (<>
-      {placing && (
-        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:10,padding:'12px 14px',borderRadius:10,background:C.accent,color:C.onAccent,fontSize:13,fontWeight:600,position:'sticky',top:8,zIndex:20,boxShadow:'0 3px 12px rgba(0,0,0,0.18)'}}>
-          <span>📦 Range l'article <b>N°{placing}</b> — touche une boîte pour l'y mettre.</span>
-          <button type="button" onClick={clearPlacing} style={{background:'transparent',border:`1px solid ${C.onAccent}`,borderRadius:8,color:C.onAccent,cursor:'pointer',fontSize:11,fontWeight:500,padding:'4px 11px',flexShrink:0}}>Annuler</button>
-        </div>
-      )}
-
-      {/* Compteurs */}
-      <div style={{display:'flex',gap:12,flexWrap:'wrap'}}>
-        {duplicates.length>0&&<Card style={{flex:'none',padding:'10px 16px',background:`${C.danger}22`,borderColor:`${C.danger}66`}}>
-          <div style={{fontSize:9,color:C.danger,textTransform:'uppercase',letterSpacing:1,fontWeight:500}}>⚠ Doublons</div>
-          <div style={{fontSize:20,fontWeight:600,color:C.danger,marginTop:4}}>{duplicates.length}</div>
-        </Card>}
-      </div>
-      
-      {/* Liste des doublons */}
-      {duplicates.length>0&&<Card style={{padding:12,background:`${C.danger}11`,borderColor:`${C.danger}44`}}>
-        <div style={{fontSize:11,color:C.danger,fontWeight:500,marginBottom:6,textTransform:'uppercase',letterSpacing:1}}>⚠ Numéros en doublon</div>
-        <div style={{display:'flex',flexWrap:'wrap',gap:8,fontSize:11}}>
-          {duplicates.map(d=>(
-            <span key={d.num} onClick={()=>{setSearchInput(d.num);setGarageSearch(d.num);}}
-              style={{background:C.bg,padding:'4px 10px',borderRadius:5,cursor:'pointer',color:C.text,border:`1px solid ${C.danger}66`}}>
-              <b style={{color:C.danger}}>#{d.num}</b> <span style={{color:C.muted}}>×{d.count}</span>
-            </span>
-          ))}
-        </div>
-      </Card>}
-      
-      {/* Cohérence : paires numérotées vs garage */}
-      {(numberedNotStored.length>0||storedUnknown.length>0)&&(
-        <div style={{display:'flex',flexDirection:'column',gap:8}}>
-          {numberedNotStored.length>0&&(
-            <Card style={{padding:12,background:`${C.warn}11`,borderColor:`${C.warn}44`}}>
-              <div style={{fontSize:11,color:C.warn,fontWeight:500,marginBottom:6,textTransform:'uppercase',letterSpacing:1}}>📦 À ranger ({numberedNotStored.length})</div>
-              <div style={{fontSize:11,color:C.muted,marginBottom:8}}>Ces articles ont un numéro mais ne sont dans aucune boîte. <b>Touche-en une</b>, puis touche la boîte où tu la ranges.</div>
-              <div style={{display:'flex',flexWrap:'wrap',gap:8,fontSize:11}}>
-                {numberedNotStored.map(n=>(
-                  <button key={n} type="button" onClick={()=>{ setLocalPlace(n); try{window.scrollTo({top:document.body.scrollHeight,behavior:'smooth'});}catch(_){} }}
-                    style={{background:placing===n?C.warn:C.bg,color:placing===n?'#fff':C.text,padding:'5px 11px',borderRadius:8,border:`1px solid ${C.warn}66`,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>📦 N°{n}</button>
-                ))}
-              </div>
-            </Card>
-          )}
-          {storedUnknown.length>0&&(
-            <Card style={{padding:12,background:`${C.blue||C.accent}11`,borderColor:`${C.blue||C.accent}44`}}>
-              <div style={{fontSize:11,color:C.blue||C.accent,fontWeight:500,marginBottom:6,textTransform:'uppercase',letterSpacing:1}}>❓ Au stock mais numéro inconnu ({storedUnknown.length})</div>
-              <div className="vrm-aide" style={{fontSize:11,color:C.muted,marginBottom:6}}>Numéros présents au stock sans article numéroté correspondant (ancien numéro, faute de frappe, ou vendu).</div>
-              <div style={{display:'flex',flexWrap:'wrap',gap:8,fontSize:11}}>
-                {storedUnknown.map(n=>(<span key={n} onClick={()=>{setSearchInput(n);setGarageSearch(n);}} style={{background:C.bg,padding:'4px 10px',borderRadius:5,cursor:'pointer',color:C.text,border:`1px solid ${(C.blue||C.accent)}66`,fontWeight:500}}>#{n}</span>))}
-              </div>
-            </Card>
-          )}
-        </div>
-      )}
-
-      {/* Recherche avec bouton + Entrée */}
-      <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
-        <div style={{flex:1,minWidth:200,display:'flex',gap:6}}>
-          <Input value={searchInput}
-            onChange={e=>setSearchInput(e.target.value)}
-            onKeyDown={e=>{if(e.key==='Enter')triggerSearch();}}
-            placeholder="Numéro à chercher (puis Entrée)..."
-          />
-          <Btn small onClick={triggerSearch} color={C.accent}>Chercher</Btn>
-          {garageSearch&&<Btn small onClick={clearSearch} color={C.border}>✕</Btn>}
-        </div>
-      </div>
-      {searchTrim&&<div style={{fontSize:12,color:C.muted}}>
-        {allValsSet.has(searchTrim)
-          ?<span style={{color:C.warn}}>✓ Numéro #{garageSearch} trouvé — case en surbrillance</span>
-          :<span style={{color:C.danger}}>✗ Numéro #{garageSearch} non trouvé dans le stock</span>}
-      </div>}
-      
-      {/* Réglages avancés repliés par défaut : le vendeur n'a besoin que de
-          « À ranger » + recherche + les boîtes. Le reste (blocage, couleurs,
-          colonnes) est là pour qui veut, mais ne pollue plus l'écran. */}
-      <button type="button" onClick={()=>{ const v=!advanced; setAdvanced(v); if(!v){setAddMode(false);setBlockMode(false);setColorMode(false);} }}
-        style={{alignSelf:'flex-start',border:`1px solid ${C.border}`,background:'transparent',color:C.muted,borderRadius:8,padding:'5px 13px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>
-        ⚙️ {advanced?'Masquer les réglages':'Réglages (couleurs, blocage, colonnes)'}
-      </button>
-      {advanced && (<>
-      {/* Modes & boutons */}
-      <div style={{display:'flex',gap:10,alignItems:'center',flexWrap:'wrap'}}>
-        <Btn small onClick={()=>{setAddMode(!addMode);setBlockMode(false);setColorMode(false);}} color={addMode?C.accent:C.border} style={{color:addMode?'#fff':C.muted}}>
-          {addMode?'✓ Mode ajout actif':'➕ Mode ajout'}
-        </Btn>
-        <Btn small onClick={()=>{setBlockMode(!blockMode);setColorMode(false);setAddMode(false);}} color={blockMode?C.danger:C.border} style={{color:blockMode?'#fff':C.muted}}>
-          {blockMode?'✓ Mode blocage':'🔒 Mode blocage'}
-        </Btn>
-        <Btn small onClick={()=>{setColorMode(!colorMode);setBlockMode(false);setAddMode(false);}} color={colorMode?activeColor:C.border} style={{color:colorMode?'#fff':C.muted}}>
-          {colorMode?'✓ Mode couleur':'🎨 Mode couleur'}
-        </Btn>
-        {colorMode&&<div style={{display:'flex',gap:4,alignItems:'center'}}>
-          {COLORS.map(col=>(
-            <button type="button" aria-label={col} key={col} onClick={()=>setActiveColor(col)}
-              style={{width:22,height:22,borderRadius:'50%',background:col,border:activeColor===col?'2px solid #fff':'2px solid transparent',cursor:'pointer'}}
-              title={col}/>
-          ))}
-          <button className="vrm-icon-control" type="button" aria-label="Effacer" onClick={()=>setActiveColor(null)}
-            style={{width:22,height:22,borderRadius:'50%',background:'transparent',border:'2px dashed #555',cursor:'pointer',fontSize:11,color:'#666'}}
-            title="Effacer"><Icon name="close" size={15}/></button>
-        </div>}
-      </div>
-      {allValsSet.size===0&&!addMode&&<div style={{fontSize:12,color:C.text,background:`${C.accent}0e`,border:`1px solid ${C.accent}44`,borderRadius:10,padding:'10px 13px',marginBottom:10,lineHeight:1.45}}>
-        🗄️ <b>Ton stock est vide.</b> Clique une case pour y poser un numéro de boîte, ou va sur une annonce et utilise « Ranger » pour la placer d'un tap.
-      </div>}
-      {(blockMode||colorMode||addMode)&&<div style={{fontSize:11,color:C.muted}}>
-        {addMode&&'Toutes les cases sont visibles. Tu peux ajouter des articles dans les cases vides.'}
-        {blockMode&&'Clique sur une case vide pour la bloquer/débloquer (zone non utilisable). '}
-        {colorMode&&(activeColor?'Clique sur une case pour la colorier. Re-clique pour effacer la couleur.':'Sélectionne une couleur, ou ✕ pour effacer la couleur d\'une case.')}
-      </div>}
-      {/* Boutons d'ajout de colonnes */}
-      <Card style={{padding:10}}>
-        <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,marginBottom:6,fontWeight:500}}>Colonnes</div>
-        <div style={{display:'flex',gap:8,flexWrap:'wrap',alignItems:'center'}}>
-          {LAYOUT.map(z=>(
-            <div key={z.id} style={{display:'flex',alignItems:'center',gap:4,fontSize:11,background:C.bg,padding:'4px 8px',borderRadius:5}}>
-              <span style={{color:C.muted}}>Colonnes :</span>
-              <button className="vrm-icon-control" type="button" aria-label="Retirer une colonne de rangement" onClick={()=>removeColumn(z.id)} style={{background:'transparent',border:`1px solid ${C.border}`,color:C.danger,borderRadius:5,padding:'2px 8px',cursor:'pointer',fontSize:11,fontFamily:'inherit'}}>−</button>
-              <span style={{color:C.accent,fontWeight:500,minWidth:24,textAlign:'center'}}>{z.cols.length+(extraCols[z.id]||0)}</span>
-              <button className="vrm-icon-control" type="button" aria-label="Ajouter une colonne de rangement" onClick={()=>addColumn(z.id)} style={{background:'transparent',border:`1px solid ${C.border}`,color:C.accent,borderRadius:5,padding:'2px 8px',cursor:'pointer',fontSize:11,fontFamily:'inherit'}}>+</button>
-            </div>
-          ))}
-        </div>
-      </Card>
-      
-      </>)}
-
-      {/* Garage visuel */}
-      <Card style={{overflowX:'auto',padding:'14px 10px'}}>
-        <div style={{display:'flex',gap:GAP,marginBottom:6}}>
-          {effectiveLayout.flatMap((z,zi)=>{
-            const labels=z.cols.map((_,ci)=>(
-              <div key={`l${zi}_${ci}`} style={{width:CW,flexShrink:0,fontSize:7,fontWeight:600,color:ci===0?C.accent:'transparent',textTransform:'uppercase',letterSpacing:0.5}}>
-                {ci===0?z.name:''}
-              </div>
-            ));
-            return labels;
-          })}
-        </div>
-        <div style={{display:'flex',alignItems:'flex-end',gap:GAP}}>
-          {effectiveLayout.flatMap((z,zi)=>{
-            const cols=z.cols.map((maxBoxes,ci)=>{
-              const spacerTop=globalMax-(maxBoxes+z.elev);
-              const arr=getCol(z.id,ci,maxBoxes);
-              const cn=++colN;
-              return (
-                <div key={`c${zi}_${ci}`} style={{display:'flex',flexDirection:'column',alignItems:'flex-start',gap:GAP}}>
-                  {Array.from({length:spacerTop},(_,i)=><div key={`sp${i}`} style={{width:CW,height:CH}}/>)}
-                  {Array.from({length:z.elev},(_,i)=><div key={`ev${i}`} style={{width:CW,height:CH}}/>)}
-                  {arr.map((val,si)=>{
-                    const t=val?val.trim():'';
-                    const isSold=t!==''&&soldIds.has(t);
-                    const highlight=searchTrim!==''&&t.toLowerCase()===searchTrim;
-                    const blocked=isBlocked(z.id,ci,si);
-                    const cellColor=getColor(z.id,ci,si);
-                    
-                    // Masquer les cases vides (non bloquées, sans couleur) sauf en mode ajout/blocage/couleur/rangement
-                    // ⚠️ GARAGE VIDE = ÉCRAN VIDE. Les cases vides sont masquées par
-                    // défaut ; quand AUCUNE case n'est remplie, l'écran ne montrait
-                    // donc plus rien du tout — « le garage ne marche plus ». Tant
-                    // qu'il n'y a rien à ranger, on montre l'étagère.
-                    const showAllCells=addMode||blockMode||colorMode||!!placing||allValsSet.size===0;
-                    if(!showAllCells&&!blocked&&t===''&&!cellColor){
-                      // Case invisible : on rend juste un placeholder vide pour garder l'alignement
-                      return <div key={si} style={{width:CW,height:CH}}/>;
-                    }
-                    
-                    if(blocked) return (
-                      <div key={si} onClick={()=>{if(blockMode)toggleBlock(z.id,ci,si);}}
-                        style={{position:'relative',width:CW,height:CH,
-                          cursor:blockMode?'pointer':'default',
-                          opacity:0.5}}>
-                        <svg width={BW+SW} height={BH+TH} style={{display:'block',overflow:'visible'}}>
-                          <rect x={0} y={TH} width={BW} height={BH} rx={2} fill='transparent' stroke='#444' strokeWidth='1' strokeDasharray='3,2'/>
-                          <line x1={4} y1={TH+4} x2={BW-4} y2={TH+BH-4} stroke='#666' strokeWidth='1.5'/>
-                          <line x1={BW-4} y1={TH+4} x2={4} y2={TH+BH-4} stroke='#666' strokeWidth='1.5'/>
-                        </svg>
-                      </div>
-                    );
-                    
-                    return (
-                      <div key={si} ref={highlight?highlightRef:null} onClick={()=>{
-                        if(blockMode&&!t) toggleBlock(z.id,ci,si);
-                        else if(colorMode) setColor(z.id,ci,si,activeColor);
-                      }}
-                        style={{position:'relative',width:CW,height:CH,
-                          cursor:(blockMode&&!t)||colorMode?'pointer':'auto'}}>
-                        {cellColor&&<div style={{position:'absolute',inset:0,top:TH,background:cellColor,opacity:0.35,borderRadius:5,zIndex:1,pointerEvents:'none'}}/>}
-                        <Box val={val} isSold={isSold} highlight={highlight}/>
-                        {!blockMode&&!colorMode&&<input value={val}
-                          data-cell={`${z.id}_${ci}_${si}`}
-                          onChange={e=>onChange(z.id,ci,si,e.target.value,maxBoxes)}
-                          onClick={()=>{ if(placing&&!t){ onChange(z.id,ci,si,String(placing),maxBoxes); onBlur(z.id,ci,maxBoxes); clearPlacing(); } }}
-                          onBlur={()=>onBlur(z.id,ci,maxBoxes)}
-                          onKeyDown={e=>{
-                            if(e.key==='ArrowUp'){e.preventDefault();navigateFromCell(z.id,ci,si,'up');}
-                            else if(e.key==='ArrowDown'){e.preventDefault();navigateFromCell(z.id,ci,si,'down');}
-                            else if(e.key==='ArrowLeft'&&e.target.selectionStart===0){e.preventDefault();navigateFromCell(z.id,ci,si,'left');}
-                            else if(e.key==='ArrowRight'&&e.target.selectionStart===e.target.value.length){e.preventDefault();navigateFromCell(z.id,ci,si,'right');}
-                            else if(e.key==='Enter'){e.preventDefault();navigateFromCell(z.id,ci,si,'down');}
-                          }}
-                          style={{position:'absolute',left:0,top:TH,width:BW,height:BH,background:'transparent',border:'none',outline:'none',textAlign:'center',fontSize:8,fontWeight:600,color:'transparent',caretColor:C.warn,fontFamily:'inherit',cursor:'text',zIndex:3,boxSizing:'border-box'}}
-                          onFocus={e=>{e.target.parentElement.style.filter='brightness(1.35)';}}
-                          onBlurCapture={e=>{e.target.parentElement.style.filter='';}}
-                        />}
-                      </div>
-                    );
-                  })}
-                  <div style={{fontSize:7,color:'#333',textAlign:'center',width:CW}}>{cn}</div>
-                </div>
-              );
-            });
-            return cols;
-          })}
-        </div>
-      </Card>
-      </>)}
+      {/* (30 oct.) L'ancienne grille de zones (cases bloquées, couleurs, colonnes) n'était plus
+          joignable depuis le 17 oct. (aucune vue « grid ») : ses ~20 boutons sont retirés. */}
     </div>
   );
 }
@@ -31017,7 +30907,7 @@ function BackupModal({catalog,sales,garageGrid,blockedCells,onClose,onImport}) {
             <div style={{fontSize:12,color:C.text,marginBottom:10}}>
               <b>{catalog.length}</b> articles ·<b>{sales.length}</b> ventes
             </div>
-            <Btn small onClick={exportData} color={C.accent}>💾 Télécharger sauvegarde</Btn>
+            <Btn small onClick={exportData}>Télécharger la sauvegarde</Btn>
           </div>
 
           <div style={{background:`${C.warn}11`,border:`1px solid ${C.warn}44`,borderRadius:8,padding:14}}>
@@ -31701,7 +31591,7 @@ function VintedAccounts({ accounts, setAccounts, baseKO, onRetour }) {
 
   return (
     <div style={{padding:'16px 14px 40px'}}>
-      {onRetour && <button type="button" className="vrm-settings-back" onClick={onRetour} style={{color:C.accent,borderColor:C.border}}>← Retour aux paramètres</button>}
+      {onRetour && <Bouton variante="discret" className="vrm-settings-back" onClick={onRetour}>‹ Réglages</Bouton>}
       <GuideReglage titre="Relier et vérifier un compte" etapes={[
         ['Connecte ton compte', 'Ouvre Vinted avec l’extension VRM active, puis actualise cette liste.'],
         ['Vérifie son identité', 'Contrôle le pseudo et associe l’adresse qui reçoit les emails de ce compte.'],
@@ -31727,17 +31617,12 @@ function VintedAccounts({ accounts, setAccounts, baseKO, onRetour }) {
             {(retires && retires.logins && retires.logins.length)
               ? ` Retiré${retires.logins.length>1?'s':''} : ${retires.logins.join(', ')}.` : ''}
           </div>
-          <button type="button" onClick={toutAfficher} disabled={remise}
-            style={{width:'100%',border:'none',background:C.accent,color:C.onAccent||'#fff',borderRadius:10,padding:'11px',fontSize:13,fontWeight:600,cursor:remise?'default':'pointer',fontFamily:'inherit'}}>
-            {remise ? '…' : 'Tout réafficher'}
-          </button>
+          <Bouton data-tout-reafficher onClick={toutAfficher} disabled={remise}>{remise ? '…' : 'Tout réafficher'}</Bouton>
         </div>
       )}
       <ScreenHead icon="link" title="Comptes Vinted liés"
         desc="Ceux que l'extension Chrome capte quand tu navigues sur Vinted. Annonces, ventes, achats et messages se consultent dans leurs onglets."
-        right={<button type="button" onClick={refreshAccounts} title="Recharge la liste des comptes captés par l'extension" style={{background:'transparent',border:`1px solid ${C.border}`,borderRadius:8,padding:'6px 12px',cursor:'pointer',fontSize:12,fontWeight:500,color:C.text}}>
-          {loading ? '…' : '↻ Actualiser'}
-        </button>}/>
+        right={<Bouton icone="sync" className="vrm-b-petit" onClick={refreshAccounts} title="Recharge la liste des comptes captés par l'extension">{loading ? '…' : 'Actualiser'}</Bouton>}/>
 
       {/* ⚠️ « Aucun compte détecté · installe l'extension » à quelqu'un qui en a
           NEUF : c'est ce que cet écran affichait quand la base ne répondait pas.
@@ -31762,14 +31647,15 @@ function VintedAccounts({ accounts, setAccounts, baseKO, onRetour }) {
         //    panne », ils sont ailleurs. Les mêler aux autres, c'était annoncer
         //    « 2 en panne » pour une panne réelle et un choix assumé.
         const ok    = st.filter(s=>s.etat==='ok').length;
-        const warn  = st.filter(s=>s.etat==='warn').length;
+        const warn  = st.filter(s=>s.etat==='warn'||s.etat==='inconnu').length;
         const bad   = st.filter(s=>s.etat==='bad').length;
         const exclu = st.filter(s=>s.etat==='exclu').length;
         return (
           <div style={{display:'flex',gap:8,flexWrap:'wrap',alignItems:'center',padding:'9px 12px',border:`1px solid ${C.border}`,borderRadius:10,background:C.card,marginBottom:14,fontSize:13,fontWeight:600}}>
             <span style={{color:C.text}}>Tes comptes :</span>
-            <span data-comptes-actifs={ok} style={{display:'inline-flex',alignItems:'center',gap:4,color:C.text}}><Icon name="check" size={13}/>{ok} actif{ok>1?'s':''}</span>
-            {bad>0 && <span data-comptes-bannis={bad} style={{display:'inline-flex',alignItems:'center',gap:4,color:C.danger}}><Icon name="alert" size={13}/>{bad} banni{bad>1?'s':''} par Vinted</span>}
+            <span data-comptes-actifs={ok} style={{display:'inline-flex',alignItems:'center',gap:4,color:C.text}}>{ok>0 && <Icon name="check" size={13}/>}{ok} actif{ok>1?'s':''}</span>
+            {warn>0 && <span data-comptes-non-verifies={warn} style={{display:'inline-flex',alignItems:'center',gap:4,color:C.muted,fontWeight:500}}>· {warn} pas encore vérifié{warn>1?'s':''}</span>}
+            {bad>0 && <span data-comptes-bannis={bad} style={{display:'inline-flex',alignItems:'center',gap:4,color:C.warn}}><Icon name="alert" size={13}/>{bad} banni{bad>1?'s':''} par Vinted</span>}
             {exclu>0 && <span style={{display:'inline-flex',alignItems:'center',gap:4,color:C.muted}}><Icon name="eyeOff" size={13}/>{exclu} masqué{exclu>1?'s':''} — ton choix</span>}
           </div>
         );
@@ -31884,10 +31770,7 @@ function VintedAccounts({ accounts, setAccounts, baseKO, onRetour }) {
                       <button type="button" className="vrm-lien-action" onClick={()=>remettreMessages(acc)} style={{border:'none',background:'transparent',color:C.accent,fontSize:11,fontWeight:600,cursor:'pointer',padding:0,fontFamily:'inherit'}}>Les remettre</button>
                     </span>
                   )}
-                  <button type="button" onClick={()=>ouvrirSuppression(acc)} title="Supprimer les données de ce compte — tu choisis quoi effacer (annonces, ventes, achats, messages, le compte). Récupérable en reconnectant l'extension."
-                    style={{background:'transparent',border:`1px solid ${C.danger}`,borderRadius:8,padding:'5px 12px',cursor:'pointer',fontSize:11,fontWeight:500,color:C.danger}}>
-                    <span style={{display:'inline-flex',alignItems:'center',gap:4}}><Icon name="trash" size={12}/>Supprimer des données…</span>
-                  </button>
+                  <Bouton variante="discret" icone="trash" onClick={()=>ouvrirSuppression(acc)} title="Supprimer les données de ce compte — tu choisis quoi effacer (annonces, ventes, achats, messages, le compte). Récupérable en reconnectant l'extension.">Supprimer des données…</Bouton>
                 </div>
                   </div>
                   </div>
@@ -31941,7 +31824,7 @@ function VintedAccounts({ accounts, setAccounts, baseKO, onRetour }) {
             </div>
             <div style={{borderTop:`1px solid ${C.border}`,padding:'12px 16px',display:'flex',flexDirection:'column',gap:8}}>
               <div style={{display:'flex',gap:8}}>
-                <button type="button" onClick={()=>!delBusy&&setDelCible(null)} style={{flex:1,border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:10,padding:'12px',fontSize:14,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Annuler</button>
+                <button className="vrm-b vrm-b-discret" type="button" onClick={()=>!delBusy&&setDelCible(null)} style={{flex:1,border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:10,padding:'12px',fontSize:14,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Annuler</button>
                 <button type="button" onClick={confirmerSuppression} disabled={delBusy||rienCoche} style={{flex:2,border:'none',background:rienCoche?C.border:C.danger,color:'#fff',borderRadius:10,padding:'12px',fontSize:14,fontWeight:700,cursor:(delBusy||rienCoche)?'default':'pointer',fontFamily:'inherit',opacity:delBusy?0.6:1}}>{delBusy?'…':rienCoche?'Coche au moins une case':'Supprimer'}</button>
               </div>
               {/* ── POUR DE BON : par catégorie (26 oct., demande de Julien) ──────
@@ -33169,7 +33052,7 @@ function Inventory({ inventory, setInventory, accounts, garageGrid, labels, onLo
               <option value="sold">💸 Vendu</option>
             </select>
             <div style={{display:'flex',gap:8,justifyContent:'flex-end'}}>
-              <button type="button" onClick={()=>{setEditing(null);setEditDraft(null);}} style={{...btn('transparent',C.text),border:`1px solid ${C.border}`}}>Annuler</button>
+              <button className="vrm-b vrm-b-discret" type="button" onClick={()=>{setEditing(null);setEditDraft(null);}} style={{...btn('transparent',C.text),border:`1px solid ${C.border}`}}>Annuler</button>
               <button type="button" onClick={commitEdit} style={btn(C.accent)}>Enregistrer</button>
             </div>
           </div>
@@ -34228,7 +34111,7 @@ function MicroEntreprise({ taux, poserTaux, officiel, vlTaux, acreTaux }) {
   let seuils;
   if (!s) seuils = null;
   else if (!jauge) seuils = (
-    <Card style={sCarte}><div data-micro-seuils="passu"><div style={sTitre}>Tes seuils {now.getFullYear()}</div><div style={{ fontSize: 13, color: C.muted, marginTop: 6 }}>Ton chiffre d'affaires de l'année se calcule dans l'écran Ventes : ouvre-le une fois sur cet appareil.</div></div></Card>
+    <Card style={sCarte}><div data-micro-seuils="passu"><div style={sTitre}>Tes seuils {now.getFullYear()}</div><div style={{ fontSize: 13, color: C.muted, marginTop: 6 }}>— pas encore calculé</div></div></Card>
   );
   else {
     const j = jauge, am = j.partiel ? 'au moins ' : '';
@@ -34291,7 +34174,7 @@ function MicroEntreprise({ taux, poserTaux, officiel, vlTaux, acreTaux }) {
     <Card style={sCarte}>
       <div data-micro-impots={dr ? 'lu' : 'passu'} data-micro-impots-annee={dr ? String(dr.annee) : ''} data-micro-impots-ca={dr ? String(dr.ca) : ''} data-micro-impots-cases={dr ? dr.cases.join(',') : ''}>
         <div style={sTitre}>Ta déclaration de revenus</div>
-        {!dr ? <div style={{ fontSize: 13, color: C.muted, marginTop: 6 }}>Le montant se calcule dans l'écran Ventes : ouvre-le une fois sur cet appareil.</div> : (<>
+        {!dr ? <div style={{ fontSize: 13, color: C.muted, marginTop: 6 }}>— pas encore calculé</div> : (<>
           <div style={{ fontSize: 13, color: C.muted, marginTop: 6, lineHeight: 1.5 }}>
             {dr.enCours ? <>Revenus {dr.annee}, à déclarer au printemps {dr.annee + 1} — pour l'instant :</> : <>Revenus {dr.annee}, à déclarer ce printemps (déclaration 2042-C-PRO) :</>}
           </div>
@@ -34366,11 +34249,11 @@ function SuiviUrssaf({ onNav }) {
           {suivi.lignes.length ? <button type="button" className="vrm-lien-action" data-suivi-export="" onClick={exporter} style={{ background: 'none', border: 'none', color: C.accent, fontSize: 13, fontWeight: 600, padding: 0, minHeight: 44, cursor: 'pointer', fontFamily: 'inherit' }}>Exporter (CSV)</button> : null}
         </div>
         <div data-suivi-annee={a.annee} data-suivi-annee-ca={String(a.ca)} data-suivi-annee-paye={a.paye == null ? '' : String(a.paye)} style={{ fontSize: 13, color: C.muted, marginTop: 2, lineHeight: 1.5 }}>
-          {a.n === 0 ? <>Aucune déclaration notée en {a.annee}. Après chaque déclaration sur l'URSSAF, touche « C'est déclaré » : VRM garde ce que tu as déclaré et payé.</>
+          {a.n === 0 ? <>Aucune déclaration notée en {a.annee}. Après chaque déclaration sur l'URSSAF, touche « Noter ma déclaration » : VRM garde ce que tu as déclaré et payé.</>
             : a.periodes === 1 ? <>{a.annee} : {freq === 'mensuel' ? '1 mois noté « déclaré »' : '1 période notée « déclarée »'} — son détail est juste en dessous.</>
             : <>{a.annee} : <b style={{ color: C.text }}>{eur(a.ca)}</b> déclarés sur {a.n} mois · {a.paye != null ? <>cotisations payées <b style={{ color: C.text }}>{eur(a.paye)}</b></> : <>cotisations ≈ <b style={{ color: C.text }}>{eur(a.estime)}</b> (estimées : note ce que tu as payé avec « Compléter »)</>}</>}
         </div>
-        {suivi.enRetard > 0 ? <div data-suivi-retard-texte="" style={{ fontSize: 13, color: C.text, marginTop: 8, lineHeight: 1.5 }}>{suivi.enRetard === 1 ? '1 période passée n\'est' : `${suivi.enRetard} périodes passées ne sont`} pas notée{suivi.enRetard > 1 ? 's' : ''} « déclarée ». Si tu l'as déjà déclarée sur l'URSSAF, touche « C'est déclaré » pour la noter ; sinon, déclare-la vite (une déclaration en retard peut coûter une pénalité).</div> : null}
+        {suivi.enRetard > 0 ? <div data-suivi-retard-texte="" style={{ fontSize: 13, color: C.text, marginTop: 8, lineHeight: 1.5 }}>{suivi.enRetard === 1 ? '1 période passée n\'est' : `${suivi.enRetard} périodes passées ne sont`} pas notée{suivi.enRetard > 1 ? 's' : ''} « déclarée ». Si tu l'as déjà déclarée sur l'URSSAF, touche « Noter ma déclaration » ; sinon, déclare-la vite (une déclaration en retard peut coûter une pénalité).</div> : null}
         {(() => {
           const aNoter = suivi.lignes.filter((l) => l.etat === 'en_retard' || l.etat === 'a_declarer').flatMap((l) => l.aNoter);
           return aNoter.length >= 2 ? (
@@ -34409,7 +34292,7 @@ function SuiviUrssaf({ onNav }) {
                       {/* (29 oct., revue) Le mois EN COURS : son « à payer » est déjà dans
                           « Ta déclaration URSSAF » juste au-dessus (§7, une phrase une fois) ;
                           ici, seulement ce qui est reçu jusqu'ici. */}
-                      {l.caCalc == null ? 'Le montant se calcule dans Ventes (ouvre-le une fois).' : l.etat === 'en_cours' ? <>Reçu jusqu'ici {l.partiel ? 'au moins ' : ''}<b style={{ color: C.text }}>{eur(l.caCalc)}</b></> : <>Reçu {l.partiel ? 'au moins ' : ''}<b style={{ color: C.text }}>{eur(l.caCalc)}</b> · à payer ≈ {l.partiel ? 'au moins ' : ''}<b style={{ color: C.text }}>{eur(l.aPayerCalc)}</b></>}
+                      {l.caCalc == null ? '— pas encore calculé' : l.etat === 'en_cours' ? <>Reçu jusqu'ici {l.partiel ? 'au moins ' : ''}<b style={{ color: C.text }}>{eur(l.caCalc)}</b></> : <>Reçu {l.partiel ? 'au moins ' : ''}<b style={{ color: C.text }}>{eur(l.caCalc)}</b> · à payer ≈ {l.partiel ? 'au moins ' : ''}<b style={{ color: C.text }}>{eur(l.aPayerCalc)}</b></>}
                       {l.yms.length > 1 && l.aNoter.length < l.yms.length ? <> · noté : {l.yms.length - l.aNoter.length} mois sur {l.yms.length}</> : null}
                     </div>
                   )}
@@ -34423,7 +34306,7 @@ function SuiviUrssaf({ onNav }) {
                       {edit.erreur ? <div role="alert" style={{ fontSize: 12.5, color: ambre }}>{edit.erreur}</div> : null}
                       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                         <button type="button" data-suivi-edit-ok="" onClick={enregistrer} style={{ ...btn, background: C.accent, color: C.onAccent || '#fff', border: 'none' }}>Enregistrer</button>
-                        <button type="button" onClick={() => setEdit(null)} style={btn}>Annuler</button>
+                        <button className="vrm-b vrm-b-discret" type="button" onClick={() => setEdit(null)} style={btn}>Annuler</button>
                       </div>
                       <div style={{ fontSize: 12, color: C.muted }}>Les ventes de la déclaration ne bougent pas : seuls ces deux chiffres sont gardés. Vide = pas noté.</div>
                     </div>
@@ -34432,7 +34315,7 @@ function SuiviUrssaf({ onNav }) {
                     <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 2 }}>
                       {(l.etat === 'a_declarer' || l.etat === 'en_retard') && l.aNoter.length > 0 ? (
                         <button type="button" data-suivi-noter={l.aNoter[0]} onClick={() => demanderDeclaration(l.aNoter[0], onNav)} style={btn}>
-                          {l.yms.length > 1 ? `C'est déclaré — noter ${nomMois(l.aNoter[0])}` : "C'est déclaré"}
+                          {l.yms.length > 1 ? `Noter ma déclaration — ${nomMois(l.aNoter[0])}` : 'Noter ma déclaration'}
                         </button>) : null}
                       {l.aCompleter.length > 0 ? (
                         <button type="button" data-suivi-completer={l.aCompleter[0]} onClick={() => ouvrirEdit(l.aCompleter[0])} style={btn}>
@@ -34577,7 +34460,7 @@ function CarteUrssafMois({ liveStats, onNav }) {
             dit aussi quand le registre n'était pas encore lu (`declare`). */}
         <div style={{...sNote,fontSize:13,marginTop:10,paddingTop:14,borderTop:`1px solid ${C.border}`,lineHeight:1.55}}>
           {moisCourantCA==null
-            ? <>Ce chiffre se calcule sur l'écran <b>Ventes</b> : ouvre-le une fois sur cet appareil et il s'affichera ici.</>
+            ? <>— pas encore calculé</>
             : <span data-urssaf-declare={decl}>Calculé sur le CA des ventes finalisées en {moisCourant.nom}, toutes plateformes (<b style={{color:C.text,fontWeight:600}}><Mt v={moisCourantCA}/></b>)
                 {nA > 0 && <span data-urssaf-ailleurs={Math.round(caA*100)} data-urssaf-ailleurs-n={nA}>, hors {nA} vente{nA>1?'s':''} (<Mt v={caA}/>) déjà dans ta déclaration{ou ? <> de {ou}</> : null}</span>}
                 .
@@ -34664,7 +34547,7 @@ function CarteUrssafMois({ liveStats, onNav }) {
                   {finie && aNoter.length > 0 && (
                     <button type="button" data-urssaf-cest-declare={aNoter[0]} onClick={() => demanderDeclaration(aNoter[0], onNav)}
                       style={{fontSize:13,fontWeight:600,color:C.text,background:'transparent',border:`1px solid ${C.border}`,borderRadius:10,padding:'8px 14px',minHeight:44,cursor:'pointer',fontFamily:'inherit'}}>
-                      {ymsDue.length > 1 ? `C'est déclaré — noter ${nomYm(aNoter[0])}` : "C'est déclaré"}
+                      {ymsDue.length > 1 ? `Noter ma déclaration — ${nomYm(aNoter[0])}` : 'Noter ma déclaration'}
                     </button>
                   )}
                   <span style={{fontSize:11,color:C.muted,lineHeight:1.4,flex:'1 1 160px'}}>Estimation ({String(tauxUrssaf()).replace('.',',')} %) — le chiffre officiel se saisit là‑bas.{finie && aNoter.length > 0 ? <> Une fois déclaré, note-le ici : ses ventes ne seront plus recomptées le mois suivant.</> : null}{finie && ymsDue.length > 1 && aNoter.length > 0 && aNoter.length < ymsDue.length ? <> {ymsDue.length - aNoter.length} mois sur {ymsDue.length} déjà noté{ymsDue.length - aNoter.length > 1 ? 's' : ''}.</> : null}</span>
@@ -34863,7 +34746,7 @@ function AnalysesStatistiques({panelOff}) {
 }
 function PerformanceJournee({panelOff,onNav,moisN,moisEur,partiel}) {
  return <section className="vrm-day-performance vrm-day-card" aria-label="Performance des ventes" style={{background:C.card,border:`1px solid ${C.border}`,color:C.text}}>
-  <div className="vrm-day-head"><h3>Analyses des ventes</h3><button type="button" onClick={()=>onNav?.('dashboard')}>Statistiques ›</button></div>
+  <div className="vrm-day-head"><h3>Analyses des ventes</h3><Bouton variante="discret" onClick={()=>onNav?.('dashboard')}>Statistiques ›</Bouton></div>
   <RepartitionsVentes panelOff={panelOff} apercu/>
   <div className="vrm-performance-chiffres"><div><span>Ventes ce mois</span><b>{partiel?'—':moisN}</b></div><div><span>Prix de vente moyen</span><b>{!partiel&&moisN?fmt(moisEur/moisN):'—'}</b></div></div>
   {partiel&&<p style={{fontSize:11,color:C.muted}}>Lecture partielle : les indicateurs attendent les ventes manquantes.</p>}
@@ -34885,7 +34768,7 @@ function RepartitionsVentes({ panelOff, apercu = false }) {
   const sNote = {fontSize:13,color:C.muted,lineHeight:1.5};
   const titre = <div style={{fontSize:15,fontWeight:600,color:C.text,letterSpacing:-0.15}}>Ce qui se vend</div>;
   if (ventes === undefined) return <div data-stats-carte="repartitions" data-repart-etat="encours" style={sCarte}>{titre}<div style={{...sNote,marginTop:8}}>Je lis tes ventes…</div></div>;
-  if (!R) return <div data-stats-carte="repartitions" data-repart-etat="passu" style={sCarte}>{titre}<div style={{...sNote,marginTop:8}}>Tes ventes n'ont pas pu être lues : aucune répartition plutôt qu'une répartition fausse. Rouvre l'écran dans un moment.</div></div>;
+  if (!R) return <div data-stats-carte="repartitions" data-repart-etat="passu" style={sCarte}>{titre}<div style={{...sNote,marginTop:8}}>Tes ventes n'ont pas pu être lues : rien n'est réparti. Rouvre l'écran dans un moment.</div></div>;
   if (apercu) return <section className="vrm-analyses-ventes" aria-label="Analyses des ventes">
     <p className="vrm-analyses-perimetre">Vinted · toutes périodes · données reçues</p>
     <div className="vrm-analyses-duo">{[['marques','Marques vendues'],['pays','Pays des acheteurs']].map(([cle,titre])=>{
@@ -34944,7 +34827,7 @@ function RepartitionsVentes({ panelOff, apercu = false }) {
       <div className="vrm-repartition-visuel">
       {bloc?.n>0 && <RepartitionAnneau elements={top.map(e=>({...e,k:lib(e.k)}))} total={bloc.n}/>}
       <div data-repart-liste={mode} style={{marginTop:12}}>
-        {mode === 'pays' && extrasPasSu ? <div style={sNote}>Le détail de tes transactions n'a pas pu être lu : le pays de tes clients n'est pas affiché plutôt qu'un pays faux.</div>
+        {mode === 'pays' && extrasPasSu ? <div style={sNote}>Le détail des transactions n'a pas pu être lu : pays non affiché.</div>
           : mode === 'pays' && extras === undefined ? <div style={sNote}>Je lis le pays de tes clients…</div>
           : !top.length ? <div style={sNote}>Rien à répartir pour l'instant.</div>
           : <div style={{display:'flex',flexDirection:'column',gap:9}}>
@@ -35000,7 +34883,7 @@ function BoostRentable({ panelOff }) {
   const sNote = {fontSize:13,color:C.muted,lineHeight:1.5};
   const titre = <div style={{fontSize:15,fontWeight:600,color:C.text,letterSpacing:-0.15}}>Le boost est-il rentable ?</div>;
   if (ventes === undefined || extras === undefined || !nuage) return <div data-stats-carte="boost" data-boost-etat="encours" style={sCarte}>{titre}<div style={{...sNote,marginTop:8}}>Je lis tes ventes et tes annonces…</div></div>;
-  if (!R || R.etat !== 'lu') return <div data-stats-carte="boost" data-boost-etat="passu" style={sCarte}>{titre}<div style={{...sNote,marginTop:8}}>Tes ventes ou tes annonces n'ont pas pu être lues : rien n'est comparé plutôt qu'une comparaison fausse. Rouvre l'écran dans un moment.</div></div>;
+  if (!R || R.etat !== 'lu') return <div data-stats-carte="boost" data-boost-etat="passu" style={sCarte}>{titre}<div style={{...sNote,marginTop:8}}>Ventes ou annonces pas pu être lues : rien n'est comparé. Rouvre l'écran dans un moment.</div></div>;
   const jFmt = (j) => (j == null ? '—' : j < 1 ? 'moins d’un jour' : `${Math.round(j)} j`);
   const nFmt = (v) => (v == null ? '—' : String(Math.round(v * 10) / 10).replace('.', ','));
   const eFmt = (v) => (v == null ? '—' : fmt(v));
@@ -35014,12 +34897,13 @@ function BoostRentable({ panelOff }) {
   return (
     <div data-stats-carte="boost" data-boost-etat="lu" data-boost-assez={R.assez ? 'oui' : 'non'} data-boost-b={R.boostees} data-boost-montant={R.avecMontant} data-boost-nb={R.nonBoostees} data-boost-comp={`${R.comparables.b}/${R.comparables.nb}`} style={sCarte}>
       {titre}
-      <div data-boost-couverture="" style={{...sNote,fontSize:11,marginTop:6}}>
-        Sur {s(R.boostees, 'paire')} boostée{R.boostees > 1 ? 's' : ''} vendue{R.boostees > 1 ? 's' : ''} dont {R.avecMontant} avec montant saisi · {R.nonBoostees} non boostée{R.nonBoostees > 1 ? 's' : ''} · comparées dans une même tranche de prix : {R.comparables.b} contre {R.comparables.nb}.
-        {(R.inconnues > 0 || R.sansAnnonce > 0) ? <> Pas comptées : {[R.inconnues > 0 ? `${R.inconnues} sans information de boost` : '', R.sansAnnonce > 0 ? `${R.sansAnnonce} pas reliée${R.sansAnnonce > 1 ? 's' : ''} à leur annonce` : ''].filter(Boolean).join(' · ')}.</> : null}
+      {/* (30 oct.) Une ligne, en mots ; le détail (montants saisis, ventes pas reliées) derrière ⓘ. */}
+      <div data-boost-couverture="" data-boost-sans-annonce={R.sansAnnonce || 0} data-boost-inconnues={R.inconnues || 0} style={{...sNote,fontSize:11.5,marginTop:6,display:'flex',alignItems:'center',gap:4,flexWrap:'wrap'}}>
+        {s(R.comparables.b, 'boostée')} · {R.comparables.nb} non boostée{R.comparables.nb > 1 ? 's' : ''} comparées (même tranche de prix)
+        <Pourquoi label="Détail">{s(R.boostees, 'boostée')} vendue{R.boostees > 1 ? 's' : ''}, dont {R.avecMontant} avec le montant du boost saisi · {R.nonBoostees} non boostée{R.nonBoostees > 1 ? 's' : ''}.{(R.inconnues > 0 || R.sansAnnonce > 0) ? ` Pas comptées : ${[R.inconnues > 0 ? `${R.inconnues} sans information de boost` : '', R.sansAnnonce > 0 ? `${R.sansAnnonce} pas reliée${R.sansAnnonce > 1 ? 's' : ''} à leur annonce` : ''].filter(Boolean).join(', ')}.` : ''}</Pourquoi>
       </div>
-      {!R.assez && <div data-boost-verdict="pas-assez" style={{...sNote,marginTop:10,color:C.text}}>Pas assez de ventes pour juger : il en faut au moins {SEUIL_BOOST} boostées et {SEUIL_BOOST} non boostées dans une même tranche de prix.</div>}
-      <div style={{display:'grid',gridTemplateColumns:'minmax(0,1fr) auto auto',gap:'8px 14px',marginTop:12,paddingTop:12,borderTop:`1px solid ${C.border}`,alignItems:'baseline'}}>
+      {!R.assez && <div data-boost-verdict="pas-assez" style={{...sNote,marginTop:10,color:C.text}}>Pas assez de ventes pour juger — il en faut {SEUIL_BOOST} boostées et {SEUIL_BOOST} autres.</div>}
+      {R.assez && <div style={{display:'grid',gridTemplateColumns:'minmax(0,1fr) auto auto',gap:'8px 14px',marginTop:12,paddingTop:12,borderTop:`1px solid ${C.border}`,alignItems:'baseline'}}>
         <span/>
         <span style={{fontSize:11,color:C.muted,fontWeight:600,textAlign:'right'}}>Boostées</span>
         <span style={{fontSize:11,color:C.muted,fontWeight:600,textAlign:'right'}}>Les autres</span>
@@ -35030,9 +34914,9 @@ function BoostRentable({ panelOff }) {
             <span data-boost-val={`${l.k}-nb`} className="vrm-display" style={{fontSize:15,fontWeight:600,color:l.m.nonb == null ? C.muted : C.text,textAlign:'right',fontVariantNumeric:'tabular-nums',whiteSpace:'nowrap'}}>{l.f(l.m.nonb)}</span>
           </React.Fragment>
         ))}
-      </div>
-      <div style={{...sNote,fontSize:11,marginTop:10}}>
-        Un repère, pas de la comptabilité : rien ici n'entre dans un total. Chaque vente est reliée à son annonce par la transaction, jamais par le titre. Vinted ne dit « boostée » que pendant le boost : une paire boostée puis vendue après la fin du boost compte parmi « les autres » si tu n'as pas saisi son boost payé (la case « boost » de sa fiche, écran Annonces). La marge d'une boostée demande ce montant et son prix d'achat. « — » = moins de {SEUIL_BOOST} ventes connues d'un côté.
+      </div>}
+      <div style={{...sNote,fontSize:11,marginTop:10,display:'flex',alignItems:'center',gap:4,flexWrap:'wrap'}}>
+        Un repère : rien ici n'entre dans un total. <Pourquoi label="Comment c'est compté">Chaque vente est reliée à son annonce par la transaction, jamais par le titre. Vinted ne dit « boostée » que pendant le boost : une paire boostée puis vendue après la fin du boost compte parmi « les autres » si tu n'as pas saisi son boost payé (la case « boost » de sa fiche, écran Annonces). La marge d'une boostée demande ce montant et son prix d'achat. « — » = moins de {SEUIL_BOOST} ventes connues d'un côté.</Pourquoi>
       </div>
     </div>
   );
@@ -35205,8 +35089,9 @@ function BeneficeCompta({ compta, onNav, onSansDepenses, onAjouterDepense }) {
       data-benef-depenses={B ? (nuagePret ? B.depenses : 'passu') : ''}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', margin: '0 16px 8px' }}>
         <h3 className="vrm-titre-compta" data-titre-section="" style={{ fontSize:15,fontWeight:600,color:C.text,letterSpacing:-0.15, margin: 0, flex: '1 1 auto' }}>Ton bénéfice{B ? ` · ${B.libelle}` : ''}</h3>
-        <Segmente label="Période du bénéfice" plein value={periode} onChange={choisir} style={{ margin: 0, flex: '0 1 300px' }}
-          options={PERIODES_BENEF.map(([k, l]) => ({ v: k, l, data: { 'data-benef-choix': k } }))} />
+        {/* (30 oct.) Sans bénéfice publié, changer de période ne changeait rien : le choix attend. */}
+        {B && <Segmente label="Période du bénéfice" plein value={periode} onChange={choisir} style={{ margin: 0, flex: '0 1 300px' }}
+          options={PERIODES_BENEF.map(([k, l]) => ({ v: k, l, data: { 'data-benef-choix': k } }))} />}
       </div>
       <div className="vrm-set-liste" style={{ background: C.card, border: `1px solid ${C.border}`, '--vrm-set-filet': C.border }}>
         {!B ? (
@@ -35292,10 +35177,7 @@ function BeneficeJournee({ onNav, place }) {
     if (on) return null;
     return (
       <div style={{ marginTop: 14, textAlign: 'center' }}>
-        <button type="button" className="vrm-lien-action" data-journee-benef-activer="" onClick={() => poser(true)}
-          style={{ background: 'none', border: 0, padding: 0, color: C.muted, fontSize: 12.5, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }}>
-          + Afficher ton bénéfice dans Ma journée
-        </button>
+        <Bouton variante="discret" data-journee-benef-activer="" onClick={() => poser(true)}>+ Afficher mon bénéfice</Bouton>
       </div>
     );
   }
@@ -35332,11 +35214,11 @@ function BeneficeJournee({ onNav, place }) {
       style={place === 'integre' ? {borderTop:`1px solid ${C.border}`} : { border: `1px solid ${C.border}`, background: C.card, boxShadow: C.shadow || 'none' }}>
       <div className="vrm-day-head">
         <span className="vrm-day-k" style={{ color: C.muted }}>Ton bénéfice{B ? ` · ${B.libelle}` : ''}</span>
-        <a href="?tab=compta" className="vrm-day-lien" data-journee-benef-detail="" onClick={allerCompta} style={{ color: C.accent, textDecoration: 'none' }}>Détail ›</a>
+        <Bouton variante="discret" href="?tab=compta" className="vrm-day-lien" data-journee-benef-detail="" onClick={allerCompta}>Détail ›</Bouton>
       </div>
       {!B ? (
         <div className="vrm-day-note" style={{ color: C.muted, marginTop: 6, lineHeight: 1.5 }}>
-          {etat === 'encours' ? 'Je lis ton bénéfice…' : <>Ton bénéfice se calcule dans l'écran Ventes, à partir de tes prix d'achat : ouvre-le une fois (<a href="?tab=cat_ventes" onClick={(ev) => { ev.preventDefault(); if (onNav) onNav('cat_ventes'); }} style={{ color: C.accent, fontWeight: 600, textDecoration: 'none' }}>Ventes</a>), il arrivera ici.</>}
+          {etat === 'encours' ? 'Je lis ton bénéfice…' : <>Il se calcule dans l'écran Ventes : ouvre-le une fois. <Bouton variante="discret" href="?tab=cat_ventes" onClick={(ev) => { ev.preventDefault(); if (onNav) onNav('cat_ventes'); }}>Ventes ›</Bouton></>}
         </div>
       ) : (<>
         <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(0,1fr)', gap: 12, marginTop: 8 }}>
@@ -35350,17 +35232,17 @@ function BeneficeJournee({ onNav, place }) {
         )}
         {B.nCout < B.n && (
           <div className="vrm-day-note" style={{ marginTop: 6 }}>
-            <button type="button" className="vrm-lien-action" data-journee-benef-porte="" onClick={versSaisiePrix} style={{ background: 'none', border: 0, padding: 0, color: C.accent, fontWeight: 600, cursor: 'pointer', fontSize: 'inherit', fontFamily: 'inherit' }}>Compléter les prix d'achat</button>
+            <Bouton variante="discret" data-journee-benef-porte="" onClick={versSaisiePrix}>Compléter les prix d'achat ›</Bouton>
           </div>
         )}
         <div className="vrm-day-note" data-journee-benef-ligne="jour" style={{ color: C.muted, marginTop: 10, paddingTop: 10, borderTop: `1px solid ${C.border}`, lineHeight: 1.5 }}>
           {J && J.n > 0
-            ? <>Aujourd'hui : <b style={{ color: C.text, fontWeight: 600 }}>{val(brutDe(J))}</b> brut{J.nCout > 0 ? <> · <b style={{ color: C.text, fontWeight: 600 }}>{val(J.net)}</b> net des ventes</> : null}{J.nCout < J.n ? ` (prix d'achat connus pour ${J.nCout} sur ${J.n})` : ''} — charges et cotisations se comptent au mois.</>
+            ? <>Aujourd'hui : <b style={{ color: C.text, fontWeight: 600 }}>{val(brutDe(J))}</b> brut{J.nCout > 0 ? <> · <b style={{ color: C.text, fontWeight: 600 }}>{val(J.net)}</b> net des ventes</> : null}{J.nCout < J.n ? ` (prix d'achat connus pour ${J.nCout} sur ${J.n})` : ''}</>
             : null}
         </div>
       </>)}
       <div style={{ marginTop: 6 }}>
-        <button type="button" className="vrm-lien-action" data-journee-benef-masquer="" onClick={() => poser(false)} style={{ background: 'none', border: 0, padding: 0, color: C.muted, cursor: 'pointer', fontSize: 12, fontWeight: 400, fontFamily: 'inherit' }}>Masquer de Ma journée</button>
+        <Bouton variante="discret" data-journee-benef-masquer="" onClick={() => poser(false)}>Masquer de Ma journée</Bouton>
       </div>
     </div>
   );
@@ -35420,15 +35302,15 @@ function FeuilleAjoutWidget({ dispo, onAjout, onDefaut, onClose }) {
             <div style={{ fontSize: 16, fontWeight: 700 }}>Ajouter un widget</div>
             <div className="vrm-aide" style={{ fontSize: 12.5, color: C.muted }}>Il se place à la fin — glisse-le ensuite où tu veux.</div>
           </div>
-          <button type="button" className="vrm-w-btn" data-widgets-fermer="" onClick={onClose} style={{ color: C.text, background: C.card, border: `1px solid ${C.border}` }}>Fermer</button>
+          <Bouton variante="secondaire" data-widgets-fermer="" onClick={onClose} style={{ flexShrink: 0 }}>Fermer</Bouton>
         </div>
         <div className="vrm-w-feuille-corps">
           {libres.length === 0 && <div style={{ fontSize: 13, color: C.muted, padding: '6px 2px 12px' }}>Tous les widgets sont déjà sur ta journée.</div>}
           {retenu && (
             <div data-widgets-retenu={retenu} style={{ fontSize: 12.5, color: C.muted, lineHeight: 1.45, padding: '0 2px 4px' }}>
               {retenu === 'tuiles'
-                ? <>Les petites cases (à envoyer, à retirer, messages, prix) redisent la barre « Les quatre gestes » : retire la barre pour les choisir une par une.</>
-                : <>« Les quatre gestes » redirait tes petites cases : retire-les pour remettre la barre.</>}
+                ? <>Les petites cases redisent la barre « Les quatre gestes » : retire-la pour les choisir.</>
+                : <>La barre redirait tes petites cases : retire-les pour la remettre.</>}
             </div>
           )}
           {libres.map((id) => {
@@ -35444,7 +35326,7 @@ function FeuilleAjoutWidget({ dispo, onAjout, onDefaut, onClose }) {
               </button>
             );
           })}
-          <button type="button" data-widgets-defaut="" onClick={onDefaut} className="vrm-w-lien" style={{ color: C.muted }}>Remettre la disposition d'origine</button>
+          <Bouton variante="discret" data-widgets-defaut="" onClick={onDefaut} style={{ alignSelf: 'center', marginTop: 8 }}>Remettre la disposition d'origine</Bouton>
         </div>
       </div>
     </div>,
@@ -35651,8 +35533,8 @@ function GrilleJournee({ dispo, poser, rendus, edition, setEdition, peutModifier
       {edition && (
         <div className="vrm-w-outils" data-widgets-outils="" data-noswipe="1" style={{ background: C.card, border: `1px solid ${C.border}`, boxShadow: C.shadow || 'none' }}>
           <span style={{ flex: 1, minWidth: 0, fontSize: 12.5, color: C.muted, lineHeight: 1.35 }}>Glisse pour déplacer · − pour retirer</span>
-          <button type="button" className="vrm-w-btn" data-widgets-ajouter="" onClick={() => setAjout(true)} style={{ color: C.text, background: C.card, border: `1px solid ${C.border}` }}>+ Ajouter</button>
-          <button type="button" className="vrm-w-btn" data-widgets-ok="" onClick={() => { finirTire(false); setEdition(false); }} style={{ color: '#fff', background: C.accent, border: `1px solid ${C.accent}` }}>OK</button>
+          <Bouton variante="secondaire" data-widgets-ajouter="" onClick={() => setAjout(true)} style={{ flexShrink: 0 }}>+ Ajouter</Bouton>
+          <Bouton variante="primaire" data-widgets-ok="" onClick={() => { finirTire(false); setEdition(false); }} style={{ flexShrink: 0 }}>OK</Bouton>
         </div>
       )}
       <div ref={grilleRef} className="vrm-widgets" data-widgets={liste.map((w) => w.id).join(',')} data-edition={edition ? '' : undefined} data-noswipe={edition ? '1' : undefined}
@@ -35697,8 +35579,7 @@ function GrilleJournee({ dispo, poser, rendus, edition, setEdition, peutModifier
           l'iPhone. Un seul des deux se voit à une largeur donnée. */}
       {!edition && peutModifier && (
         <div className="vrm-w-modifier-bas">
-          <button type="button" className="vrm-w-btn" data-widgets-modifier="" data-widgets-modifier-bas="" aria-label="Modifier les widgets de Ma journée" onClick={() => setEdition(true)}
-            style={{ color: C.text, background: C.card, border: `1px solid ${C.border}` }}>Modifier l'écran</button>
+          <Bouton variante="discret" data-widgets-modifier="" data-widgets-modifier-bas="" aria-label="Modifier les widgets de Ma journée" onClick={() => setEdition(true)}>Modifier l'écran</Bouton>
         </div>
       )}
       {ajout && (
@@ -35891,9 +35772,16 @@ function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, pan
   // interligne de ~2 dans le paragraphe du résultat.
   const lienBtn = (txt, tab, fs = 13) => <a href={`?tab=${tab}`} onClick={(e) => { e.preventDefault(); if (onNav) onNav(tab); }} style={{ color: C.accent, fontWeight: 600, cursor: 'pointer', fontSize: fs, textDecoration: 'none' }}>{txt}</a>;
 
+  // (30 oct.) « Se calcule dans Ventes » était écrit ~9 fois sur cet écran : la cause
+  // se dit UNE fois ici, avec le geste ; les cartes ne gardent que « — ».
+  const ligneComptaPub = useLigneUrssaf();
   return (
     <div className="vrm-finance-page" style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 16 }}>
       <ScreenHead icon="euro" title="Comptabilité" desc="Ce que tu as vendu et reçu, ton bénéfice, ton URSSAF et tes dépenses." />
+      {!ligneComptaPub && <div data-compta-pas-calcule="" style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', padding: '10px 14px', borderRadius: 12, background: 'var(--vrm-b-teinte)', fontSize: 13, color: C.text }}>
+        <span style={{ flex: '1 1 220px' }}>Pas encore calculé : ouvre <b>Ventes</b> une fois sur cet appareil.</span>
+        <Bouton className="vrm-b-petit" onClick={() => onNav && onNav('cat_ventes')}>Ouvrir Ventes</Bouton>
+      </div>}
       {/* (29 octobre) Julien : « pour la compta, améliore tout, mets de côté la
           facturation électronique et fais quelque chose de simple ». En haut, ce
           qu'il regarde : vendu et reçu, bénéfice, URSSAF à payer et prochaine
@@ -36213,7 +36101,7 @@ function RetoursEnCoursBloc({ res, nomCompte, plusieursComptes, onRecu, onRemett
           <a data-geste="republier" href="https://www.vinted.fr/items/new" target="_blank" rel="noreferrer" style={{...btn,display:'inline-flex',alignItems:'center',textDecoration:'none'}}>Republier ↗</a>
           <button type="button" data-geste="annuler-remise" onClick={()=>onAnnulerRemise(l.cle)} style={{...btn,color:C.muted}}>Annuler la remise</button>
         </> : <>
-          <button type="button" data-geste="recu" aria-pressed={l.recu} onClick={()=>onRecu(l.cle)} style={{...btn,color:l.recu?C.text:C.muted}}>{l.recu ? '✓ Reçu chez moi' : 'Reçu chez moi ?'}</button>
+          <button type="button" data-geste="recu" aria-pressed={l.recu} onClick={()=>onRecu(l.cle)} style={{...btn,color:l.recu?C.text:C.muted}}>{l.recu ? '✓ Reçu' : 'Reçu'}</button>
           {l.recu && l.num && <button type="button" data-geste="remise-en-stock" onClick={()=>onRemettre(l)} style={{...btn,background:C.text,color:C.bg,border:`1px solid ${C.text}`}}>Remise en stock</button>}
           <button type="button" className="vrm-icon-control" data-geste="masquer-retour" onClick={()=>onMasquer(l.cle)} title="Masquer cette ligne (déjà réglé)" aria-label="Masquer" style={{...btn,minWidth:44,padding:0,color:C.muted}}><Icon name="close" size={15}/></button>
         </>}
@@ -36225,7 +36113,7 @@ function RetoursEnCoursBloc({ res, nomCompte, plusieursComptes, onRecu, onRemett
         <span aria-hidden="true" style={{color:C.muted,flexShrink:0,marginTop:1}}><Icon name="truck" size={18}/></span>
         <div style={{minWidth:0}}>
           <div style={{fontSize:13.5,fontWeight:700,color:C.text}}>Retours en cours{lignes.length ? ` · ${lignes.length}` : ''}</div>
-          <div style={{fontSize:11.5,color:C.muted,marginTop:3,lineHeight:1.45}}>Coche « Reçu chez moi » quand le colis est là, puis « Remise en stock » : l'article garde son N°. Rien ne change tout seul — la vente remboursée sort déjà de ton CA.{manques.length ? <span data-retours-pas-su> Je n'ai pas pu lire {manques.join(', ')} : un retour peut manquer.</span> : null}</div>
+          <div style={{fontSize:11.5,color:C.muted,marginTop:3,lineHeight:1.45}}>« Reçu » à l'arrivée, puis « Remise en stock » (le N° reste). <Pourquoi label="Pourquoi">Rien ne change tout seul : c'est toi qui dis que le colis est revenu. La vente remboursée sort déjà de ton CA.</Pourquoi>{manques.length ? <span data-retours-pas-su> Je n'ai pas pu lire {manques.join(', ')} : un retour peut manquer.</span> : null}</div>
         </div>
       </div>
       <div style={{display:'grid',gap:6,marginTop:9}}>
@@ -36880,6 +36768,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const [refaireOpen, setRefaireOpen] = useState(false);
   const [repubAction, setRepubAction] = useState(null); // null | 'recreer' | 'modifier' | 'versBrouillon' | 'enLigne'
   const [repubReprise, setRepubReprise] = useState(null); // ids des paires pas commencées (compte rendu)
+  const [repubCle, setRepubCle] = useState(0);          // (30 oct.) « Réessayer » rouvre Republier à neuf
   const [photoEdit, setPhotoEdit] = useState(null); // { refPhoto, refTitle } → éditeur de photo (recadrer/zoomer)
   const [auditOpen, setAuditOpen] = useState(false); // modale « Audit d'inventaire »
   const [inventOpen, setInventOpen] = useState(false); // modale « Inventaire physique » (déménagement)
@@ -43168,6 +43057,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fillBuyAchats.items, accounts]);
   useEffect(() => { if (fillBuyOpen) chargerAchats(); }, [fillBuyOpen, chargerAchats]);
+  // (30 oct.) Combien il en restait à l'ouverture : la saisie en série dit
+  // combien sont faites depuis, avec UNE barre (« où j'en suis »).
+  const fillBuyN0 = useRef(0);
   const fillBuyRows = useMemo(() => {
     // Ce que chaque paire pèse dans la compta : ses ventes, résolues par
     // IDENTITÉ (id d'annonce Vinted, sinon photo) — jamais par titre (§5.34).
@@ -44329,8 +44221,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // tête « Bordereaux auto » et « Mes vues », sortis de la barre (22 oct.).
   const menuOutilsVentes = (sousBarre) => (
     <>
-      <div onClick={()=>setToolsOpen(false)} style={{position:'fixed',inset:0,zIndex:70}}/>
-      <div data-outils-ventes={sousBarre?'sous-barre':'bouton'} style={{position:'absolute',zIndex:71,background:C.card,border:`1px solid ${C.border}`,borderRadius:10,boxShadow:C.shadowLg||'0 8px 24px rgba(0,0,0,.2)',padding:6,display:'flex',flexDirection:'column',gap:2,...(sousBarre?{left:8,right:8,top:'calc(100% - 4px)'}:{right:0,top:'calc(100% + 6px)',minWidth:220})}}>
+      <div className="vrm-menu-voile" onClick={()=>setToolsOpen(false)} style={{position:'fixed',inset:0,zIndex:70}}/>
+      <div className="vrm-menu-flottant" data-outils-ventes={sousBarre?'sous-barre':'bouton'} style={{position:'absolute',zIndex:71,background:C.card,border:`1px solid ${C.border}`,borderRadius:10,boxShadow:C.shadowLg||'0 8px 24px rgba(0,0,0,.2)',padding:6,display:'flex',flexDirection:'column',gap:2,...(sousBarre?{left:8,right:8,top:'calc(100% - 4px)'}:{right:0,top:'calc(100% + 6px)',minWidth:270})}}>
         {(
           <div className="vrm-outils-reglages" style={{padding:'4px 6px 8px',borderBottom:`1px solid ${C.border}`,marginBottom:2}}>
             <BordereauxAuto key={AUTH.user?.id} owner={AUTH.user?.id} lire={lireBordereauxAuto} sauver={sauverBordereauxAuto}/>
@@ -44338,15 +44230,18 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           </div>
         )}
         {[
-          {k:'rep', icon:'📊', lab:'Rapport comptable', desc:'CA, bénéfice, cotisations du mois', on:()=>{ setToolsOpen(false); openReport(); }},
-          {k:'ann', icon:'📚', lab:'Registre annuel', desc:'Ventes + achats ligne par ligne', on:()=>{ setToolsOpen(false); openAnnual(); }},
+          {k:'rep', icon:'doc', lab:'Rapport comptable', desc:'CA, bénéfice, cotisations du mois', on:()=>{ setToolsOpen(false); openReport(); }},
+          {k:'ann', icon:'receipt', lab:'Registre annuel', desc:'Ventes et achats, ligne par ligne', on:()=>{ setToolsOpen(false); openAnnual(); }},
           /* « Litiges » retiré des Outils le 30 septembre (Julien : « ce n'est
              pas un problème, je reçois les articles après ; ils sont déjà
              dans Annulées »). La modale reste, plus rien n'y mène d'ici. */
-          ...((sales.items&&sales.items.length>0)?[{k:'csv', icon:'⬇️', lab:'Exporter (CSV · Excel · Numbers)', desc:'Toutes tes ventes, lisible dans Excel et Numbers', on:()=>{ setToolsOpen(false); exportCsv(); }}]:[]),
+          ...((sales.items&&sales.items.length>0)?[{k:'csv', icon:'save', lab:'Exporter en tableur', desc:'CSV, lisible dans Excel et Numbers', on:()=>{ setToolsOpen(false); exportCsv(); }}]:[]),
+          /* (30 oct.) La rétrospective est un geste RARE : elle quitte la page
+             (un bouton pleine largeur sous l'analyse) pour ce menu. */
+          ...((sales.items&&sales.items.some(o=>classifyOrderStatus(o.status)==='completed'))?[{k:'wrap', icon:'spark', lab:`Rétrospective ${new Date().getFullYear()}`, desc:'Ton année en quelques chiffres', on:()=>{ setToolsOpen(false); setWrapStep(0); setShowWrapped(true); }}]:[]),
         ].map(t=>(
           <button type="button" key={t.k} onClick={t.on} style={{display:'flex',alignItems:'center',gap:10,textAlign:'left',border:'none',background:'transparent',borderRadius:8,padding:'9px 10px',cursor:'pointer',fontFamily:'inherit'}}>
-            <span style={{fontSize:17,flexShrink:0}}>{t.icon}</span>
+            <span aria-hidden="true" style={{flexShrink:0,display:'flex',color:C.muted}}><Icon name={t.icon} size={18}/></span>
             <span style={{minWidth:0}}>
               <span style={{display:'block',fontSize:13,fontWeight:600,color:t.danger?C.danger:C.text}}>{t.lab}</span>
               <span style={{display:'block',fontSize:11,color:C.muted,marginTop:1}}>{t.desc}</span>
@@ -44828,8 +44723,6 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   ];
   return (
     <div style={{padding:'16px 14px 40px'}}>
-      {['annonces','messages'].includes(curSub)&&<BilanSynchronisation owner={AUTH.user?.id||''} sources={sourcesBilan} onNav={onNav}/>}
-      {curSub==='annonces'&&<VendusAilleurs owner={AUTH.user?.id||''} ownerActuel={()=>AUTH.user?.id||''} charger={chargerRetraitsMulti} onNav={onNav} PhotoVinted={PhotoVinted}/>}
       <input ref={bordRef} type="file" accept="application/pdf,.pdf" onChange={onBordFile} style={{display:'none'}}/>
       {/* Le titre de l'écran est porté par <ScreenHead> plus bas, dans chaque
           section : ce <h2> le répétait juste au-dessus (« Annonces » puis
@@ -44922,7 +44815,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           const nb = colisEb.nePasPoster.length;
           jobs.push({ id:'ebay-ne-pas-poster', n:nb, icon:'alert', color:C.warn, urgent:true,
             title:`Ne poste pas ${nb>1?`ces ${nb} colis eBay`:'ce colis eBay'}`,
-            sub:`${nb>1?'Les acheteurs ont':"L'acheteur a"} demandé l'annulation — accepte ou refuse dans eBay → À traiter`,
+            sub:`Annulation demandée — réponds dans eBay → À traiter`,
             tab:'cat_bord', prio:0.1 });
         }
         // ── (22 oct.) L'HEURE LIMITE DU COLIS LE PLUS PRESSÉ, SUR SA LIGNE ──
@@ -44948,7 +44841,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             const verif = p.depasse && !p.retard;
             jobs.push({ id:'colis-limite', n:presses.length, icon:'truck', color:C.warn, urgent:!!p.depasse,
               title: presses.length===1 ? `1 colis${verif?' :':''} ${quand}` : `${presses.length} colis pressés — le plus urgent${verif?' :':''} ${quand}`,
-              sub: `${num}${o.title||''}${qui?` · ${qui}`:''}${p.limite==='estimee'?(verif?' · vente + 7 j, pas de bordereau reçu par email':' · date estimée (vente + 7 j, pas de bordereau reçu par email)'):''}`,
+              sub: `${num}${o.title||''}${qui?` · ${qui}`:''}${p.limite==='estimee'?' · date estimée (vente + 7 j)':''}`,
               tab:'cat_bord', prio:p.depasse?0.15:0.6, limiteHeure:p.heure||'' });
           }
         }
@@ -44959,9 +44852,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         if(cochesNonPartis.length){
           const nb=cochesNonPartis.length, pl=nb>1?'s':'';
           const limite=cochesNonPartis.some(x=>x.limiteDepassee);
-          jobs.push({id:'poste-sans-depart',n:nb,icon:'truck',color:limite?C.danger:C.warn,urgent:limite,
+          jobs.push({id:'poste-sans-depart',n:nb,icon:'truck',color:C.warn,urgent:limite,  // ambre : le rouge est pour deux paires sous un N° (§7)
             title:`Vérifier ${nb} colis coché${pl} « posté »`,
-            sub:`${nb>1?'Vinted ne les a pas vus partir':"Vinted ne l'a pas vu partir"}${limite?' et la date limite est passée':''} — vérifie le dépôt`,
+            sub:`${nb>1?'Vinted ne les a pas vus':"Vinted ne l'a pas vu"} partir${limite?', date limite passée':''} — vérifie le dépôt`,
             tab:'cat_bord',prio:limite?0.2:1.5,
             photos:cochesNonPartis.map(x=>orderPhoto(x.o)).filter(ph=>ph && !imgMortes.has(ph)).slice(0,3)});
         }
@@ -44974,7 +44867,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           const nb=conflitsNum.length;
           jobs.push({id:'numeros-en-double',n:nb,icon:'alert',color:C.danger,urgent:true,
             title:`${nb} numéro${nb>1?'s':''} porté${nb>1?'s':''} par deux paires`,
-            sub:`N°${conflitsNum.slice(0,4).map(c=>c.numero).join(', N°')}${nb>4?'…':''} — corrige-en un avant d'expédier, sinon le mauvais article part`,
+            sub:`N°${conflitsNum.slice(0,4).map(c=>c.numero).join(', N°')}${nb>4?'…':''} — corrige avant d'expédier`,
             tab:'cat_bord',prio:0.05});
         }
         const pickupCount=pickupUnion.total; // UNION email + statut Vinted — EXACTEMENT le compte de l'onglet Achats
@@ -45024,7 +44917,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         { const ar = (buysBase||[]).filter(o=>ACHAT_A_RENVOYER.test(String(o.status||'')));
           if (ar.length) { const cs=[...new Set(ar.map(o=>o._acc?accNameOf(o._acc):'').filter(Boolean))];
             jobs.push({id:'a-renvoyer',n:ar.length,icon:'box',color:C.warn,title:`Renvoyer ${ar.length} article${ar.length>1?'s':''} (litige)`,
-              sub:`Génère l'étiquette de retour sur Vinted${cs.length===1?` — compte ${cs[0]}`:cs.length>1?` — comptes ${cs.slice(0,3).join(', ')}`:''}`,tab:'cat_achats',prio:0.8}); } }
+              sub:`Étiquette de retour sur Vinted${cs.length===1?` — compte ${cs[0]}`:cs.length>1?` — comptes ${cs.slice(0,3).join(', ')}`:''}`,tab:'cat_achats',prio:0.8}); } }
         // (21 oct., 5.204) « Tout est OK » à confirmer sur Vinted avant la date
         //    limite — sinon Vinted conclut sans lui. Même liste qu'Achats
         //    (`aConfirmer`, §11). « Pas su » ⇒ aucune ligne (on n'affirme rien).
@@ -45035,7 +44928,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           jobs.push({id:'a-confirmer',n:nb,icon:'check',color:C.warn,urgent:proche,  // ambre : le rouge est pour deux paires sous un N° (§7)
            
             title:`${nb} ${motAConfirmer(l)} à confirmer avant le ${texteLimite(prem)}`,
-            sub:`Ouvre la conversation sur Vinted et appuie sur « Tout est OK » (ou signale un problème)${cs.length===1?` — compte ${cs[0]}`:cs.length>1?` — comptes ${cs.slice(0,3).join(', ')}`:''}`,
+            sub:`Sur Vinted : « Tout est OK » dans la conversation${cs.length===1?` — compte ${cs[0]}`:cs.length>1?` — comptes ${cs.slice(0,3).join(', ')}`:''}`,
             tab:'cat_achats',prio:proche?0.15:0.7});
         }
         tuiles.messages = { n: unread, sub: unread ? `${unread} conversation${unread>1?'s':''} non lue${unread>1?'s':''} de moins de 7 jours` : 'Aucun message récent non lu' };
@@ -45053,7 +44946,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             const seul = avecMsg.length === 1 ? avecMsg[0].ref : null;
             jobs.push({ id:'messages-ebay', n:nE, icon:'chat', color:C.text,
               title:`${ebayMsg.auMoins ? 'Au moins ' : ''}${nE} message${nE>1?'s':''} eBay sans réponse`,
-              sub: ebayMsg.plusieurs && avecMsg.length ? `Sur ${avecMsg.map(c => `${c.nom} (${c.n})`).join(', ')} — réponds dans eBay → Messages` : 'Réponds dans eBay → Messages',
+              sub: ebayMsg.plusieurs && avecMsg.length ? `${avecMsg.map(c => `${c.nom} (${c.n})`).join(', ')} — réponds dans eBay` : 'Réponds dans eBay → Messages',
               tab:'ebay_messages', avant:()=>{ DEMANDE_EBAY_MSG.compte = seul; DEMANDE_EBAY_MSG.at = Date.now(); }, prio:2 });
           }
         } else if (ebayMsg === null || (ebayMsg && ebayMsg.illisibles.length)) {
@@ -45067,7 +44960,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             const presse = j.length && Math.min(...j) <= 1;
             jobs.push({ id: 'vestiaire-envoyer', n, icon: 'box', color: presse ? C.warn : C.text, urgent: !!presse,
               title: `${n} vente${n > 1 ? 's' : ''} Vestiaire à envoyer`,
-              sub: presse ? (Math.min(...j) < 0 ? 'Une date limite est passée — prends le bordereau sur Vestiaire' : 'À envoyer d’ici demain — le bordereau est sur Vestiaire') : 'Le bordereau se prend sur Vestiaire',
+              sub: presse ? (Math.min(...j) < 0 ? 'Date limite passée — bordereau sur Vestiaire' : 'À envoyer d’ici demain — bordereau sur Vestiaire') : 'Le bordereau se prend sur Vestiaire',
               tab: 'cat_bord', prio: presse ? 0.3 : 1.2 });
           }
           if (vc && vc.messages > 0) jobs.push({ id: 'vestiaire-messages', n: vc.messages, icon: 'chat', color: C.text,
@@ -45113,14 +45006,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           const nl = lateV + lateE;
           if (nl > 0) jobs.push({ id:'colis-en-retard', n:nl, icon:'truck', color:C.warn, urgent:true,
             title: lateV ? `${nl} colis en retard` : `${nl} colis eBay en retard`,
-            sub:`La date limite d'envoi est passée${lateV && lateE ? ` (dont ${lateE} eBay)` : ''} — à poster en priorité`,
+            sub:`Date limite passée${lateV && lateE ? ` (dont ${lateE} eBay)` : ''} — à poster en priorité`,
             tab:'cat_bord', prio:0.15 });
         }
         if (!caseVisible(dispoJournee, 'retirer') && pickupCount && pickupUnion.urgents && tracking !== null) {
           const hd = pickupUnion.urgents, lx = pickupUnion.lieux || [];
           jobs.push({ id:'retrait-dernier-jour', n:hd, icon:'box', color:C.warn, urgent:true,
             title:`${hd} colis à retirer aujourd'hui ou demain`,
-            sub:`Dernier délai : non retiré, un colis repart chez l'expéditeur — va ${hd>1?'les':'le'} chercher${lx.length===1?` chez ${lx[0]}`:''}`,
+            sub:`Dernier délai, sinon il repart — va ${hd>1?'les':'le'} chercher${lx.length===1?` chez ${lx[0]}`:''}`,
             tab:'cat_achats', prio:0.15 });
         }
         // (23 oct.) « À VÉRIFIER » : délai de retrait dépassé, ou arrivé depuis
@@ -45136,7 +45029,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             title:`${nv} colis à vérifier`,
             // (revue du 23 oct.) Plus de « 7 jours » écrit pour tous : chaque
             // transporteur a SA garde (`gardeDe`), dite dans Achats, colis par colis.
-            sub:`Délai de retrait dépassé, ou gardé plus longtemps que ne le fait son point relais${pickupUnion.aVerifier.some(x=>x.e&&x.e.etat==='transporteur')?', ou le transporteur signale un problème':''} : ${nv>1?'regarde-les':'regarde-le'} dans Achats (coche « Je l'ai eu » si c'est le cas)`,
+            sub:`Délai de retrait dépassé${pickupUnion.aVerifier.some(x=>x.e&&x.e.etat==='transporteur')?', ou le transporteur signale un problème':''} : ${nv>1?'regarde-les':'regarde-le'} dans Achats`,
             tab:'cat_achats', prio:0.6 });
         }
         // (29 oct.) LES ACHATS « AU POINT RELAIS » EN COURS DE VÉRIFICATION (ni
@@ -45177,6 +45070,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         const anIci = String(new Date().getFullYear());
         const caAnnee = declarables ? declarables.lignes.reduce((x, l) => (l && String(l.ym || '').startsWith(anIci)) ? x + l.eur : x, 0) : null;
         const adVinted = declarables ? declarables.aDater.filter(l => l.plateforme === 'Vinted').length : 0;
+        // (30 oct.) Des ventes finalisées sans date de versement ne sont dans aucun mois :
+        // « Reçu » et le CA de l'année sont alors des MINIMUMS — la couverture se dit à côté (§5).
+        const adTous = declarables && Array.isArray(declarables.aDater) ? declarables.aDater.length : 0;
         // Ce qui a été versé ce mois-ci mais DÉCLARÉ dans un autre mois : c'est
         // de l'argent reçu, ce n'est pas le CA déclaré de ce mois. La phrase sous
         // le chiffre le dit, des MÊMES lignes (§5).
@@ -45270,19 +45166,18 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         // la ligne devient un groupe de deux, même surface, mêmes attributs.
         const tache = (j, i) => (j.urssaf && Array.isArray(j.urssaf.aNoter) && j.urssaf.aNoter.length > 0) ? (
           <div className="vrm-day-task" key={(j.id||'j')+i} role="group" data-job={j.id||undefined} data-n={j.n!=null?j.n:undefined} data-urssaf-echeance={j.urssaf.dueIso} data-urssaf-apayer={j.urssaf.apayer==null?'':String(j.urssaf.apayer)} data-urssaf-partiel={j.urssaf.partiel?'1':undefined}
-            style={{display:'flex',alignItems:'center',gap:13,padding:'14px 15px',borderRadius:10,border:`1px solid ${C.border}`,background:C.card,boxShadow:C.shadow||'none',textAlign:'left',width:'100%',minWidth:0,boxSizing:'border-box',flexWrap:'wrap'}}>
+            style={{display:'flex',alignItems:'center',gap:13,padding:'14px 15px',borderRadius:10,border:`1px solid ${C.border}`,background:C.card,boxShadow:C.shadow||'none',textAlign:'left',width:'100%',minWidth:0,boxSizing:'border-box',flexWrap:'wrap',gridColumn:'1 / -1'}}>
             <button type="button" title={j.sub} onClick={()=>{ if (j.avant) j.avant(); if (onNav) onNav(j.tab); }} style={{display:'flex',alignItems:'center',gap:13,flex:'1 1 220px',minWidth:0,background:'transparent',border:0,padding:0,margin:0,cursor:'pointer',textAlign:'left',fontFamily:'inherit',color:'inherit'}}>
               <div style={{width:42,height:42,borderRadius:8,background:C.bg,border:`1px solid ${C.border}`,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,color:j.color}}><Icon name={j.icon} size={20}/></div>
               <div style={{flex:1,minWidth:0}}>
                 <div className="vrm-day-task-title" style={{fontSize:15,fontWeight:700,color:C.text}}>{j.title}</div>
                 <div className="vrm-day-task-note" style={{fontSize:12,color:C.muted,fontWeight:400,marginTop:2,lineHeight:1.35}}>{j.sub}</div>
               </div>
-              <span className="vrm-day-task-action" style={{fontSize:12,color:j.color,fontWeight:600,flexShrink:0}}>Voir <span aria-hidden="true">›</span></span>
+              <span className="vrm-day-task-action" aria-hidden="true" style={{fontSize:16,color:j.color,fontWeight:600,flexShrink:0}}>›</span>
             </button>
-            <button type="button" data-urssaf-cest-declare={j.urssaf.aNoter[0]} onClick={()=>demanderDeclaration(j.urssaf.aNoter[0], onNav)}
-              style={{flexShrink:0,fontSize:12.5,fontWeight:600,color:C.text,background:'transparent',border:`1px solid ${C.border}`,borderRadius:8,padding:'7px 12px',cursor:'pointer',fontFamily:'inherit'}}>
-              {j.urssaf.mois && j.urssaf.mois.length > 1 ? `C'est déclaré — ${(() => { const [y, m] = j.urssaf.aNoter[0].split('-'); return new Date(Number(y), Number(m) - 1, 1).toLocaleDateString('fr-FR', { month: 'long' }); })()}` : "C'est déclaré"}
-            </button>
+            <Bouton variante="secondaire" icone="check" className="vrm-b-petit" data-urssaf-cest-declare={j.urssaf.aNoter[0]} onClick={()=>demanderDeclaration(j.urssaf.aNoter[0], onNav)} style={{flexShrink:0}}>
+              {j.urssaf.mois && j.urssaf.mois.length > 1 ? `Noter ma déclaration — ${(() => { const [y, m] = j.urssaf.aNoter[0].split('-'); return new Date(Number(y), Number(m) - 1, 1).toLocaleDateString('fr-FR', { month: 'long' }); })()}` : 'Noter ma déclaration'}
+            </Bouton>
           </div>
         ) : tacheSimple(j, i);
         const listeTaches = (liste, attr) => (
@@ -45318,7 +45213,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           <div className="vrm-day-money vrm-day-card" style={{border:`1px solid ${C.border}`,background:C.card,boxShadow:C.shadow||'none'}}>
             <div className="vrm-day-head">
               <span className="vrm-day-k" style={{color:C.muted}}>Vendu en {moisNom}</span>
-              <button type="button" className="vrm-day-lien" onClick={()=>onNav&&onNav('cat_ventes')} style={{color:C.accent}}>Mes ventes ›</button>
+              <Bouton variante="discret" className="vrm-day-lien" onClick={()=>onNav&&onNav('cat_ventes')}>Mes ventes ›</Bouton>
             </div>
             {/* (16 oct.) « Rien lu » ne vaut pas « 0 € » (§5) : si AUCUN compte
                 n'a pu être lu, le chiffre est « — » ; si une partie seulement,
@@ -45337,6 +45232,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             <div data-recu-mois={recuMois==null?'':Math.round(recuMois*100)} data-recu-sans={recuSans ? nomsVentesKO.join(',') : ''} className="vrm-day-recu" style={{borderTop:`1px solid ${C.border}`}}>
               <div style={{minWidth:0}}>
                 <div className="vrm-day-k" style={{color:C.muted}}>Reçu en {moisNom}</div>
+                {adTous > 0 && <div data-recu-adater={adTous} className="vrm-day-note" style={{color:C.muted}}>au moins · {adTous} vente{adTous>1?'s':''} à dater</div>}
                 {declarables === null && <div className="vrm-day-note" style={{color:C.muted}}>dates de versement illisibles pour l'instant</div>}
                 {cotisMois != null && <div data-cotis-mois={Math.round(cotisMois*100)} data-cotis-aumoins={cotisAuMoins?'1':''} className="vrm-day-note" style={{color:C.muted}}>≈ {cotisAuMoins ? 'au moins ' : ''}{cotisMois.toLocaleString('fr-FR',{minimumFractionDigits:2,maximumFractionDigits:2})} € de cotisations<span className="vrm-cotis-long"> à mettre de côté ({load('vinted_urssaf_freq','trimestriel')==='mensuel' ? 'à payer le mois prochain' : 'à payer après la fin du trimestre'})</span></div>}
               </div>
@@ -45345,7 +45241,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             <div data-ca-annee={caAnnee==null?'':Math.round(caAnnee*100)} className="vrm-day-recu" style={{borderTop:`1px solid ${C.border}`}}>
               <div style={{minWidth:0}}>
                 <div className="vrm-day-k" style={{color:C.muted}}>Chiffre d'affaires {anIci}</div>
-                {declarables === null && <div className="vrm-day-note" style={{color:C.muted}}>dates de versement illisibles pour l'instant</div>}
+                {adTous > 0 && <div data-ca-adater={adTous} className="vrm-day-note" style={{color:C.muted}}>au moins · {adTous} vente{adTous>1?'s':''} à dater</div>}
               </div>
               <span className="vrm-display vrm-day-recu-n" style={{color:C.text}}>{declarables === undefined ? '…' : caAnnee == null ? '—' : `${Math.round(caAnnee).toLocaleString('fr-FR')} €`}</span>
             </div>
@@ -45379,9 +45275,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             <div className="vrm-day-week-n" style={{color:C.text}}><span className="vrm-display" data-total-semaine={Math.round(totSem*100)}>{Math.round(totSem).toLocaleString('fr-FR')} €</span> <span style={{fontSize:13,fontWeight:500,color:C.muted}}>vendus</span></div>
             <CourbeSemaine jours={semaine}/>
             <DayWeekNote><div className="vrm-day-note" style={{color:C.muted,marginTop:8}}>
-              Vendu : au jour de la vente · Reçu : au jour du versement.
-              {declarables === null && <> Dates de versement illisibles : « reçu » n'est pas dessiné — ce n'est pas zéro.</>}
-              {adVinted > 0 && <span data-a-dater={adVinted}> {adVinted} vente{adVinted>1?'s':''} finalisée{adVinted>1?'s':''} sans date de versement, pas encore dans « reçu » — {geste==='ok' ? <>l'extension {adVinted>1?'les':'la'} cherche à tes prochaines visites sur Vinted.</> : geste==='retard' ? <>mets l'extension à jour ({EXT_CAPACITES.versement}) pour {adVinted>1?'les':'la'} récupérer.</> : <>l'extension, sur ton ordinateur, {adVinted>1?'les':'la'} récupère.</>}</span>}
+              Vendu : jour de la vente · Reçu : jour du versement.
+              {declarables === null && <> « Reçu » pas lu — ce n'est pas zéro.</>}
+              {adVinted > 0 && <span data-a-dater={adVinted}> {adVinted} vente{adVinted>1?'s':''} sans date de versement, pas encore dans « reçu ».{' '}
+                <Pourquoi label="Et ensuite ?">{geste==='ok' ? <>L'extension {adVinted>1?'les':'la'} cherche à tes prochaines visites sur Vinted.</> : geste==='retard' ? <>Mets l'extension à jour ({EXT_CAPACITES.versement}) pour {adVinted>1?'les':'la'} récupérer.</> : <>L'extension, sur ton ordinateur, {adVinted>1?'les':'la'} récupère.</>}</Pourquoi></span>}
             </div></DayWeekNote>
           </div>
           );
@@ -45412,8 +45309,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             <div className="vrm-day-recent">
               <div className="vrm-w-etiquette" style={{display:'flex',alignItems:'baseline',gap:8,marginBottom:10,paddingLeft:2}}>
                 <div className="vrm-label" style={{color:C.muted,flex:1}}>Dernières ventes</div>
-                <button type="button" onClick={()=>onNav&&onNav('cat_ventes')}
-                  style={{border:'none',background:'transparent',color:C.accent,fontSize:12.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit',padding:0}}>tout voir ›</button>
+                <Bouton variante="discret" onClick={()=>onNav&&onNav('cat_ventes')}>Tout voir ›</Bouton>
               </div>
               <div className="vrm-carrousel">
                 {dernieresVentes.map((o,i)=>{
@@ -45459,10 +45355,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             {stock ? <>
               <div className="vrm-day-stock-meter" role="img" aria-label={`${stock.renseignes} annonces sur ${stock.total} avec un prix d’achat`}><span style={{width:(stock.total?stock.renseignes/stock.total*100:0)+'%',background:C.accent}}/></div>
               <div className="vrm-day-stock-prices"><span>Coût d’achat renseigné</span><b>{stock.renseignes?stock.cout.toLocaleString('fr-FR',{style:'currency',currency:'EUR'}):'—'}</b></div>
-              <p>{stock.renseignes} prix d’achat renseigné{stock.renseignes>1?'s':''}{stock.manquants>0?` · ${stock.manquants} à compléter`:''}</p>
-            </> : <p>{baseKO || listings.error?'Lecture du stock indisponible.':'En attente de lecture des annonces.'}</p>}
-            {stock && listings.incomplet && <p role="status">Lecture partielle : certains comptes n’ont pas pu être lus.</p>}
-            <div className="vrm-day-stock-links"><button type="button" onClick={()=>onNav&&onNav('cat_annonces')}>Voir les annonces</button><button type="button" onClick={()=>onNav&&onNav('garage')}>Ouvrir le stock</button></div>
+              <p>{stock.renseignes} sur {stock.total} avec un prix d’achat{stock.manquants>0 ? <> · <Bouton variante="discret" data-stock-completer="" onClick={()=>{ DEMANDE_SAISIE_PRIX.on = true; if (onNav) onNav('vinted_annonces'); }}>{stock.manquants} à compléter ›</Bouton></> : null}</p>
+            </> : <p>{listings.error?'Annonces pas lues pour l’instant.':'Lecture des annonces…'}</p>}
+            {stock && listings.incomplet && <p role="status">Lecture partielle : des comptes n’ont pas pu être lus.</p>}
+            <div className="vrm-day-stock-links vrm-b-rangee"><Bouton variante="secondaire" icone="tag" className="vrm-b-petit" onClick={()=>onNav&&onNav('cat_annonces')}>Voir les annonces</Bouton><Bouton variante="secondaire" icone="box" className="vrm-b-petit" onClick={()=>onNav&&onNav('garage')}>Ouvrir le stock</Bouton></div>
           </section>;
         })() : null;
         // Les widgets AJOUTABLES (absents de la disposition d'origine) : ils
@@ -45502,7 +45398,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 <div className="vrm-day-date" style={{color:C.muted}}>{dateStr}</div>
                 {!loading && jobs.length>0 && <div className="vrm-day-todo" style={{color:C.muted}}><b style={{color:C.text,fontWeight:600}}>{jobs.length} chose{jobs.length>1?'s':''}</b> à faire aujourd'hui</div>}
                 {!premierJour && !editJournee && (
-                  <button type="button" className="vrm-w-modifier" data-widgets-modifier="" aria-label="Modifier les widgets de Ma journée" onClick={()=>setEditJournee(true)} style={{color:C.muted}}>Modifier</button>
+                  <button type="button" className="vrm-w-modifier" data-widgets-modifier="" aria-label="Modifier les widgets de Ma journée" onClick={()=>setEditJournee(true)} style={{color:'var(--vrm-b-lien)',fontWeight:600}}>Modifier</button>
                 )}
               </div>
             )}
@@ -45516,13 +45412,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 fois ou un colis qui ne part pas. */}
             {!loading && alertesArgent.length>0 && listeTaches(alertesArgent, {'data-alertes-argent': ''})}
             {editJournee && !loading && alertesArgent.length>0 && (
-              <div className="vrm-aide" data-alertes-fixes="" style={{fontSize:12,color:C.muted,margin:'-4px 2px 12px'}}>Ces alertes restent toujours en tête : elles peuvent te coûter de l'argent.</div>
+              <div className="vrm-aide" data-alertes-fixes="" style={{fontSize:12,color:C.muted,margin:'-4px 2px 12px'}}>Ces alertes restent en tête : elles peuvent te coûter de l'argent.</div>
             )}
 
             {/* (21 octobre) Les messages eBay n'ont pas pu être lus : dit UNE fois,
                 sans chiffre — la case « Messages » ne compte alors que Vinted. */}
             {!baseKO && !premierJour && !loading && tuiles.messages && tuiles.messages.ebay === null && (
-              <div data-ebay-msg-passu="" style={{fontSize:12.5,color:C.muted,margin:'-4px 2px 12px'}}>Messages eBay : je n'ai pas pu les lire — rien n'est perdu, la case « Messages » ne compte pour l'instant que Vinted.</div>
+              <div data-ebay-msg-passu="" style={{fontSize:12.5,color:C.muted,margin:'-4px 2px 12px'}}>Messages eBay pas lus — la case « Messages » ne compte que Vinted pour l'instant.</div>
             )}
 
             {/* ⚠️ La grille est rendue AUSSI le premier jour : ses widgets s'y
@@ -45540,7 +45436,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 l'app le matin, lit ça, et ne poste pas ses colis.
                 « Rien à faire » ne se dit QUE si on a pu regarder. */}
             {!loading && jobs.length===0 && (baseKO
-              ? <LignePanne>Je n'ai pas pu lire tes données — cette liste est vide parce que la lecture a échoué, pas parce qu'il n'y a rien à expédier ni à retirer.</LignePanne>
+              ? <LignePanne>Je n'ai pas pu lire tes données — liste vide pour ça, pas parce qu'il n'y a rien à faire.</LignePanne>
               /* ⚠️⚠️ LA FÊTE SUR UNE BOUTIQUE QUI N'EXISTE PAS ENCORE. Mesuré au
                  rendu le 16 septembre, sur une installation neuve : « 🎉 Tout
                  est à jour ! Rien à expédier, rien à retirer » — à quelqu'un
@@ -45555,7 +45451,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                  au rendu le 16 septembre. */
               ? <PremiersPas onNav={onNav}
                   titreNeuf="Bienvenue — il reste une chose à brancher"
-                  introNeuf={<>Ta journée est vide parce qu'aucun compte Vinted n'est encore relié, pas parce qu'il n'y a rien à faire. VRM ne va rien chercher tout seul&nbsp;: c'est l'extension, dans ton navigateur Chrome, qui range ce que Vinted t'envoie déjà.</>}/>
+                  introNeuf={<>Aucun compte Vinted n'est encore relié&nbsp;: c'est l'extension, dans Chrome, qui range tes ventes.</>}/>
               : (tuiles.envoyer && tuiles.envoyer.n === 0 && colisEb != null && tuiles.retirer && tuiles.retirer.n === 0 && tracking !== null && !(tuiles.messages && tuiles.messages.n > 0)
                   ? <div data-tout-a-jour="" style={{fontSize:12.5,color:C.muted,margin:'-4px 2px 14px'}}><span style={{fontWeight:600,color:C.text}}>Tout est à jour.</span> Rien à expédier ni à retirer.</div>
                   : null)
@@ -45569,17 +45465,20 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 des actions sans aucun compte lié (des colis repérés par email,
                 par exemple) — là seulement elle apprend quelque chose. */}
             {accounts.length===0 && !baseKO && !(jobs.length===0 && !loading && premierJour) && (
-              <div style={{marginTop:16,fontSize:13,color:C.muted,textAlign:'center',lineHeight:1.5,padding:'0 10px'}}>Lie un compte Vinted (⚙️ → Comptes liés) pour que ta journée se remplisse automatiquement.</div>
+              <div style={{marginTop:16,fontSize:13,color:C.muted,textAlign:'center',lineHeight:1.5,padding:'0 10px'}}>Lie un compte Vinted (Réglages → Comptes liés) pour remplir ta journée.</div>
             )}
             {/* Le bénéfice vit dans « Vendu et reçu » ; si cette carte n'est pas
                 sur l'écran (retirée), il garde sa propre carte ici : allumé dans
                 Réglages ⇒ toujours visible (un seul propriétaire, §11). */}
             {!baseKO && !premierJour && !aWidget('vendu') && <BeneficeJournee onNav={onNav} place="carte"/>}
             {!baseKO && !premierJour && <BeneficeJournee onNav={onNav} place="lien"/>}
-            {/* (29 oct.) Les deux résumés de contrôle passent SOUS la journée : au-dessus du
-                bonjour ils repoussaient les compteurs du jour. Les vraies doubles ventes
-                restent en tête (alertes qui coûtent de l'argent). */}
-            <BilanSynchronisation owner={AUTH.user?.id||''} sources={sourcesBilan} onNav={onNav}/>
+            {/* (29 oct.) Le contrôle « vendus ailleurs » passe SOUS la journée : au-dessus du
+                bonjour il repoussait les compteurs du jour. Les vraies doubles ventes
+                restent en tête (alertes qui coûtent de l'argent).
+                (30 oct., revue des boutons) « Bilan des données lues » n'est plus ici :
+                c'est un diagnostic de lecture (ajouts/modifications depuis la lecture
+                précédente de la session), sans geste pour la journée — il reste sur
+                Ventes, Annonces et Messages, là où les données qu'il compare s'affichent. */}
             <VendusAilleurs owner={AUTH.user?.id||''} ownerActuel={()=>AUTH.user?.id||''} charger={chargerRetraitsMulti} onNav={onNav} PhotoVinted={PhotoVinted}/>
           </div>
         );      })()}
@@ -45610,14 +45509,19 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               style={{width:'100%',boxSizing:'border-box',border:`1px solid ${C.border}`,borderRadius:10,padding:'10px 13px',fontSize:13.5,background:C.card,color:C.text,outline:'none'}}/>
             {ordSearch && <button className="vrm-icon-control" type="button" aria-label="Effacer la recherche de ventes" onClick={()=>setOrdSearch('')}><Icon name="close" size={17}/></button>}</div>
             {(ordSearch || periode || vFilter!=='all') && <div className="vrm-filter-recap">
-              <span>Filtres actifs</span><button type="button" onClick={()=>{setOrdSearch('');setPeriode(null);setVFilter('all');}}>Réinitialiser les ventes</button>
+              <span>Filtres actifs</span><Bouton variante="discret" onClick={()=>{setOrdSearch('');setPeriode(null);setVFilter('all');}}>Réinitialiser les ventes</Bouton>
             </div>}
           </div>
         )}
-        <div className="vrm-rangee vrm-filtres" style={{display:'flex',gap:6,marginBottom:12,alignItems:'center',WebkitOverflowScrolling:'touch',scrollbarWidth:'none',msOverflowStyle:'none',paddingBottom:2}}>
+        {/* (30 oct.) Les OUTILS sortent de la rangée des filtres : collés au bout, ils
+            couvraient « Finalisées » (coupé en « Finalis… ») et cachaient « Annulées ».
+            Les filtres défilent seuls, « Outils » reste à droite, à part. */}
+        <div className="vrm-filtres-et-outils" style={{display:'flex',gap:8,alignItems:'center',marginBottom:12,minWidth:0}}>
+        <div className="vrm-rangee vrm-filtres" style={{display:'flex',gap:6,alignItems:'center',WebkitOverflowScrolling:'touch',scrollbarWidth:'none',msOverflowStyle:'none',paddingBottom:2,flex:'1 1 auto',minWidth:0}}>
           {[['all','Toutes'],['aexpedier','À expédier'],['transit','En transit'],['finalisees','Finalisées'],['annulees','Annulées']].map(([id,label])=>(
-            <button type="button" key={id} onClick={()=>setVFilter(id)} aria-pressed={vFilter===id} style={{flexShrink:0,whiteSpace:'nowrap',padding:'7px 14px',borderRadius:8,border:`1px solid ${vFilter===id?C.accent:C.border}`,background:vFilter===id?C.accent:'transparent',color:vFilter===id?'#fff':C.muted,fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit',boxShadow:vFilter===id?`0 2px 8px ${C.accent}44`:'none',transition:'all .18s ease'}}>{label}</button>
+            <button type="button" key={id} onClick={()=>setVFilter(id)} aria-pressed={vFilter===id} style={{flexShrink:0,whiteSpace:'nowrap',padding:'7px 14px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit',transition:'background-color .15s ease, color .15s ease'}}>{label}</button>
           ))}
+        </div>
           {/* OUTILS regroupés : la barre mélangeait filtres et outils (10 boutons
               sur une ligne). Les filtres restent visibles — c'est le réglage du
               quotidien — et Compta / Registre / CSV passent derrière un seul
@@ -45625,10 +45529,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               vues »). Les litiges gardent une pastille d'alerte : de l'argent. */}
           {accounts.length>0 && (
             <div className="vrm-outils-ventes" style={{position:outilsOrdinateur?'relative':undefined,flexShrink:0}}>
-              <button type="button" onClick={()=>setToolsOpen(v=>!v)} aria-expanded={toolsOpen} title="Outils : compta, registre annuel, export"
-                style={{padding:'5px 12px',borderRadius:8,border:`1px solid ${toolsOpen?C.accent:C.border}`,background:toolsOpen?`${C.accent}12`:'transparent',color:toolsOpen?C.accent:C.text,fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit',display:'flex',alignItems:'center',gap:5,whiteSpace:'nowrap'}}>
-                ⋯ Outils {(disputes.salesLost.length>0 || disputes.buysBack.length>0) && <span style={{width:7,height:7,borderRadius:8,background:C.danger,display:'inline-block'}}/>}
-              </button>
+              {/* (30 oct.) Plus de point ROUGE : il signalait les litiges, retirés de ce
+                  menu le 30 sept. — il ne menait plus à rien (§7 : le rouge, c'est le
+                  doublon de N°). */}
+              <Bouton variante="secondaire" className="vrm-b-petit" icone="more" onClick={()=>setToolsOpen(v=>!v)} aria-expanded={toolsOpen} title="Rapport comptable, registre annuel, export, rétrospective">Outils</Bouton>
               {toolsOpen && outilsOrdinateur && menuOutilsVentes(false)}
             </div>
           )}
@@ -45662,9 +45566,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         {Array.isArray(boostsDetected) && boostsDetected.length>0 && (()=>{
           const tot = boostsDetected.reduce((s,b)=>s+(b.amount||0),0);
           return (
-            <div style={{border:`1px solid ${C.warn}55`,background:`${C.warn}10`,borderRadius:10,padding:'10px 13px',marginBottom:10}}>
-              <div style={{fontSize:13,fontWeight:700,color:C.text}}>💡 {tot.toFixed(2)} € de boosts détectés sur Vinted <span style={{color:C.muted,fontWeight:500}}>· {boostsDetected.length} mise{boostsDetected.length>1?'s':''} en avant</span></div>
-              <div className="vrm-aide" style={{fontSize:11,color:C.muted,marginTop:4,lineHeight:1.4}}>Capté automatiquement depuis ta facturation Vinted (via l'extension). Reporte ces montants dans le champ « 💡 boost » de chaque annonce concernée pour un bénéfice net exact — l'app ne les inscrit pas toute seule pour ne pas écraser tes saisies.</div>
+            <div style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:10,padding:'10px 13px',marginBottom:10}}>
+              <div style={{fontSize:13,fontWeight:700,color:C.text,display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>{tot.toFixed(2).replace('.',',')} € de boosts sur Vinted <span style={{color:C.muted,fontWeight:500}}>· {boostsDetected.length} mise{boostsDetected.length>1?'s':''} en avant</span>
+                <Pourquoi label="D'où vient ce montant ?">Capté dans ta facturation Vinted par l'extension. Reporte chaque montant dans le champ « Boost » de son annonce pour un bénéfice net exact — l'app ne l'inscrit pas toute seule, pour ne pas écraser tes saisies.</Pourquoi></div>
             </div>
           );
         })()}
@@ -45685,7 +45589,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             nommés au rendu — y compris quand la liste vient du cache. */}
         {nomsVentesKO.length>0 && (
           <div data-ventes-ko={nomsVentesKO.length} style={{fontSize:12,fontWeight:500,color:C.warn,background:`${C.warn}12`,border:`1px solid ${C.warn}55`,borderRadius:8,padding:'8px 12px',marginBottom:12,lineHeight:1.4}}>
-            ⚠️ {nomsVentesKO.length} compte{nomsVentesKO.length>1?'s':''} non chargé{nomsVentesKO.length>1?'s':''} ({nomsVentesKO.join(', ')}) — lecture non confirmée. Ouvre ce compte sur vinted.fr (l'extension le recapte) ou reconnecte-le, puis « Synchroniser ».
+            {nomsVentesKO.length} compte{nomsVentesKO.length>1?'s':''} non chargé{nomsVentesKO.length>1?'s':''} : {nomsVentesKO.join(', ')}. Ouvre {nomsVentesKO.length>1?'ces comptes':'ce compte'} sur vinted.fr, puis « Synchroniser ».
           </div>
         )}
         {sales.loading && !sales.items && <Skeleton variant="row" count={5}/>}
@@ -45754,25 +45658,26 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   <div className="vrm-sale-title" style={{fontSize:15,fontWeight:600,color:C.text,letterSpacing:-0.2,
                     display:'-webkit-box',WebkitLineClamp:2,WebkitBoxOrient:'vertical',overflow:'hidden',lineHeight:1.3}} title={o.title}>{num?`N°${num} · `:''}{o.title}</div>
                   <div className="vrm-sale-meta" style={{fontSize:12.5,color:C.muted,marginTop:4,display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
-                    {(()=>{ const vs=venteStage(o); return <span className="vrm-statut" data-statut-vente={vs.label} title={vs.aide||undefined} style={{color:C.text,fontWeight:600,display:'inline-flex',alignItems:'center',gap:5,flexShrink:0}}><span aria-hidden="true" style={{width:7,height:7,borderRadius:999,background:vs.color,display:'inline-block'}}/>{vs.label}</span>; })()}
-                    {o._acc && !ventesUnCompte && <AcctTag acc={o._acc} name={accNameOf(o._acc)}/>}
+                    {(()=>{ const vs=venteStage(o); return <span className="vrm-statut vrm-vente-redit" data-statut-vente={vs.label} title={vs.aide||undefined} style={{color:C.text,fontWeight:600,display:'inline-flex',alignItems:'center',gap:5,flexShrink:0}}><span aria-hidden="true" style={{width:7,height:7,borderRadius:999,background:vs.color,display:'inline-block'}}/>{vs.label}</span>; })()}
+                    {o._acc && !ventesUnCompte && <span className="vrm-vente-redit"><AcctTag acc={o._acc} name={accNameOf(o._acc)}/></span>}
                     {o._fromEmail && <span title="Reconstituée depuis l'email — pas encore confirmée par Vinted" style={{flexShrink:0,fontSize:10,fontWeight:600,color:C.muted,border:`1px solid ${C.border}`,borderRadius:8,padding:'1px 6px'}}>email</span>}
-                    <span style={{flexShrink:0}}>{o.date?new Date(o.date).toLocaleDateString('fr-FR',{day:'numeric',month:'short'}):''}</span>
+                    <span className="vrm-vente-redit" style={{flexShrink:0}}>{o.date?new Date(o.date).toLocaleDateString('fr-FR',{day:'numeric',month:'short'}):''}</span>
                     {num && aExpedier(o) && (()=>{ const cell=garageCellOf(garageGrid,num); return cell ? <span onClick={()=>onLocate&&onLocate(num)} title="Voir la paire au stock" style={{color:C.blue||C.accent,fontWeight:600,cursor:'pointer'}}>{garageCellLabel(cell)}</span> : (garageUtilise ? <span style={{color:C.muted,fontWeight:500}} title="Cette paire n'est pas rangée au garage">pas au garage</span> : null); })()}
                     {st==='cancelled' && num && (()=>{
                       const out = saleOutcome(o);
-                      if (isPairLost(num)) return <span style={{color:C.danger,fontWeight:600,background:`${C.danger}18`,border:`1px solid ${C.danger}55`,borderRadius:8,padding:'1px 8px',flexShrink:0}} title="Article déclaré perdu : son numéro est libéré et sa case au garage vidée.">❌ N°{num} perdue</span>;
+                      const pastille = {color:C.text,fontWeight:600,background:C.card2||C.bg,border:`1px solid ${C.border}`,borderRadius:8,padding:'1px 8px',flexShrink:0};
+                      if (isPairLost(num)) return <span style={pastille} title="Article déclaré perdu : son numéro est libéré et sa case au garage vidée.">N°{num} perdue</span>;
                       // ⚠️ (relecture du 11 octobre) Un numéro d'ARCHIVE (« B198 ») ne
                       //    se redonne jamais : l'app le refuse dans le champ N°. Dire
                       //    « garde le N°B198 » envoyait faire le geste qu'elle refuse.
                       const arch = !numeroReprenable(num);
                       if (out === 'retour') return arch
-                        ? <span data-retour-archive="retour" style={{color:INV_STATUS.online.color,fontWeight:600,background:`${INV_STATUS.online.color}18`,border:`1px solid ${INV_STATUS.online.color}55`,borderRadius:8,padding:'1px 8px',flexShrink:0}} title={`Retour initié : la paire te revient. Le N°${num} est un ancien numéro — elle prendra un numéro NEUF à sa republication : écris-le sur son étiquette.`}>↩️ revient → numéro neuf</span>
-                        : <span style={{color:INV_STATUS.online.color,fontWeight:600,background:`${INV_STATUS.online.color}18`,border:`1px solid ${INV_STATUS.online.color}55`,borderRadius:8,padding:'1px 8px',flexShrink:0}} title="Retour initié : la paire te revient. Elle garde son numéro — republie-la avec le même.">↩️ revient → garde le N°{num}</span>;
-                      if (out === 'suspendue') return <span style={{color:C.muted,fontWeight:600,background:`${C.muted}18`,border:`1px solid ${C.muted}55`,borderRadius:8,padding:'1px 8px',flexShrink:0}} title="Transaction suspendue par Vinted : rien n'est tranché, on ne touche pas au numéro.">⏸ en attente → N°{num} conservé</span>;
+                        ? <span data-retour-archive="retour" style={pastille} title={`Retour initié : la paire te revient. Le N°${num} est un ancien numéro — elle prendra un numéro NEUF à sa republication : écris-le sur son étiquette.`}>Revient · numéro neuf</span>
+                        : <span style={pastille} title="Retour initié : la paire te revient. Elle garde son numéro — republie-la avec le même.">Revient · garde le N°{num}</span>;
+                      if (out === 'suspendue') return <span style={{...pastille,color:C.muted}} title="Transaction suspendue par Vinted : rien n'est tranché, on ne touche pas au numéro.">Suspendue · N°{num} conservé</span>;
                       return arch
-                        ? <span data-retour-archive="renvoi" style={{color:C.warn,fontWeight:600,background:`${C.warn}18`,border:`1px solid ${C.warn}55`,borderRadius:8,padding:'1px 8px',flexShrink:0}} title={`Vente annulée : si la paire t'est renvoyée, elle prendra un numéro NEUF à sa republication (le N°${num} est un ancien numéro) — écris-le sur son étiquette.`}>🔁 renvoi → numéro neuf</span>
-                        : <span style={{color:C.warn,fontWeight:600,background:`${C.warn}18`,border:`1px solid ${C.warn}55`,borderRadius:8,padding:'1px 8px',flexShrink:0}} title="Vente annulée : si la paire t'est renvoyée, republie-la avec CE numéro (l'app le réutilise automatiquement).">🔁 renvoi → garde le N°{num}</span>;
+                        ? <span data-retour-archive="renvoi" style={pastille} title={`Vente annulée : si la paire t'est renvoyée, elle prendra un numéro NEUF à sa republication (le N°${num} est un ancien numéro) — écris-le sur son étiquette.`}>Si renvoyée · numéro neuf</span>
+                        : <span style={pastille} title="Vente annulée : si la paire t'est renvoyée, republie-la avec CE numéro (l'app le réutilise automatiquement).">Si renvoyée · garde le N°{num}</span>;
                     })()}
                     {/* « ⚠️ à identifier » RETIRÉ (30 sept.) : écrit en orange sur
                         chaque vente sans N°, c'était la même alerte ×N (§7). Le
@@ -45781,7 +45686,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 </div>
                 <div className="vrm-sale-price" style={{textAlign:'right',flexShrink:0}}>
                   <div className="vrm-display" data-prix-vente={sell!=null?Math.round(sell*100):undefined} style={{fontSize:17,fontWeight:700,color:C.text}}>{sell!=null?`${Number.isInteger(sell)?sell:sell.toFixed(2).replace('.',',')} ${cur(o.price?.currency_code)}`:''}</div>
-                  {benef!=null && <div data-benef-vente={benef.toFixed(2)} style={{fontSize:12,fontWeight:600,color:benef>=0?INV_STATUS.online.color:C.danger}}>{benef>=0?'+':''}{prixCourt(benef)}{!bilan.complet && <small style={{display:'block',fontSize:9,color:C.muted}}>estimé</small>}</div>}
+                  {benef!=null && <div data-benef-vente={benef.toFixed(2)} style={{fontSize:12,fontWeight:600,color:benef>=0?C.text:C.warn}}>{benef>=0?'+':''}{prixCourt(benef)}{!bilan.complet && <small style={{display:'block',fontSize:9,color:C.muted}}>estimé</small>}</div>}
                   {benef!=null && fees>0 && <div className="vrm-sale-frais" style={{fontSize:9,color:C.muted}}>frais −{prixCourt(fees)}</div>}
                   {/* LE BORDEREAU, SOUS LE PRIX (E1, puis 2 octobre). Un seul
                       bouton : il imprime si le PDF est là (capté par l'extension,
@@ -45808,7 +45713,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                    onRelier={()=>{ const idf = identiteAnnonce(o); openPicker(idf ? { id: idf, title: o.title, photo: photo, price: sell, _acc: o._acc } : { id: '_v'+o.transaction_id, _saleTx: String(o.transaction_id), title: o.title, photo: photo, price: sell, _acc: o._acc }); }}/>
                )}
                <div className="vrm-sale-footer"><FactureSousVente factures={facturesVentes} compte={o._acc?.login}/>
-               <details className="vrm-sale-details"><summary title="Numéro, coût d’achat et autres actions">Modifier</summary>
+               <details className="vrm-sale-details"><summary title="Numéro, coût d’achat, frais et autres actions">N° et frais</summary>
                {!hidden && <CoutsVente entry={e} onSave={patch=>setSaleOverride(o.transaction_id,patch)} theme={C}/>}
                <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
                 {/* Saisie N° + prix d'achat SUR LA MÊME LIGNE que les actions
@@ -45819,25 +45724,28 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       <span style={{fontSize:11,color:C.muted,fontWeight:500}}>N°</span>
                       <ChampSaisie value={ov.numero ?? ''} onCommit={v=>setSaleOverride(o.transaction_id,{numero:v})} placeholder={baseNum||'?'} inputMode={clavierNum()} style={{width:'100%',minWidth:0,border:'none',background:'transparent',color:C.text,fontSize:13,fontWeight:500,outline:'none'}}/>
                     </div>
-                    <div style={{flex:1,minWidth:0,display:'flex',alignItems:'center',gap:3,border:`1px solid ${C.border}`,borderRadius:8,padding:'5px 8px',background:C.bg}}>
+                    {/* (30 oct.) Tant que « Saisir le prix » est visible au-dessus, ce champ
+                        faisait la même chose une seconde fois (même écriture) : il ne
+                        revient qu'une fois le coût connu, pour le CORRIGER. */}
+                    {!(!hidden && st!=='cancelled' && buy==null && !(e && e.buyFromId)) && <div style={{flex:1,minWidth:0,display:'flex',alignItems:'center',gap:3,border:`1px solid ${C.border}`,borderRadius:8,padding:'5px 8px',background:C.bg}}>
                       <ChampSaisie value={ov.buyPrice ?? ''} onCommit={v=>setSaleOverride(o.transaction_id,{buyPrice:v})} placeholder={baseBuy?`achat ${baseBuy}€ (auto)`:"prix d'achat"} inputMode="decimal" style={{width:'100%',minWidth:0,border:'none',background:'transparent',color:C.text,fontSize:13,fontWeight:500,outline:'none'}}/>
                       <span style={{fontSize:11,color:C.muted}}>€</span>
-                    </div>
+                    </div>}
                     {(ov.numero!=null||ov.buyPrice!=null) && <span style={{fontSize:10,color:C.muted,flexShrink:0}} title="Valeurs saisies à la main pour cette vente (priment sur l'auto)">✎</span>}
                   </div>
                 )}
                 <div style={{display:'flex',alignItems:'center',gap:6,flexShrink:0,marginLeft:'auto'}}>
                 {num && aExpedier(o) && !hidden && inGarage(num) && (
-                  <button className="vrm-icon-control" type="button" onClick={()=>onLocate&&onLocate(num)} title={`Voir l'article N°${num} au stock`} aria-label="Voir au stock" style={{flexShrink:0,border:`1px solid ${C.border}`,borderRadius:8,background:'transparent',color:C.blue||C.accent,cursor:'pointer',fontSize:15,padding:'6px 8px'}}><Icon name="pin" size={15}/></button>
+                  <Bouton variante="secondaire" icone="pin" onClick={()=>onLocate&&onLocate(num)} title={`Voir l'article N°${num} au stock`} aria-label="Voir au stock" style={{flexShrink:0}}/>
                 )}
                 {st==='cancelled' && num && saleOutcome(o)==='rembourse' && !isPairLost(num) && (
-                  <button type="button" onClick={()=>markPairLost(num,o)} title={`Tu as remboursé l'acheteur. Si l'article ne revient PAS, déclare-le perdu : le N°${num} sera libéré et sa case au garage vidée.`} aria-label="Déclarer l'article perdu" style={{flexShrink:0,border:`1px solid ${C.danger}`,borderRadius:8,background:'transparent',color:C.danger,cursor:'pointer',fontSize:11,fontWeight:600,padding:'6px 9px',fontFamily:'inherit'}}>Article perdu ?</button>
+                  <Bouton variante="secondaire" className="vrm-b-petit" onClick={()=>markPairLost(num,o)} title={`Tu as remboursé l'acheteur. Si l'article ne revient PAS, déclare-le perdu : le N°${num} sera libéré et sa case au garage vidée.`} aria-label="Déclarer l'article perdu" style={{flexShrink:0}}>Article perdu ?</Bouton>
                 )}
                 {num && isPairLost(num) && (
-                  <button type="button" onClick={()=>unmarkPairLost(num)} title={`Annuler : l'article N°${num} est finalement revenu.`} aria-label="Annuler article perdu" style={{flexShrink:0,border:`1px solid ${C.border}`,borderRadius:8,background:'transparent',color:C.muted,cursor:'pointer',fontSize:11,fontWeight:500,padding:'6px 9px',fontFamily:'inherit'}}>↩︎ revenu</button>
+                  <Bouton variante="discret" onClick={()=>unmarkPairLost(num)} title={`Annuler : l'article N°${num} est finalement revenu.`} aria-label="Annuler article perdu" style={{flexShrink:0}}>Il est revenu</Bouton>
                 )}
                 {isLotTitle(o.title) && (
-                  <button className="vrm-icon-control" type="button" onClick={async(ev)=>{ lotOrigineRef.current = ev.currentTarget; setLotView({loading:true,order:o,items:[]}); const items=await fetchLotItems(o._acc,o.transaction_id); setLotView({loading:false,order:o,items}); }} title="Voir les paires du lot" aria-label="Voir les paires du lot" style={{flexShrink:0,border:'none',background:C.purple||C.blue||C.accent,color:'#fff',borderRadius:8,padding:'8px 10px',cursor:'pointer',fontSize:15}}><Icon name="box" size={16}/></button>
+                  <button className="vrm-b vrm-b-secondaire vrm-b-petit" type="button" onClick={async(ev)=>{ lotOrigineRef.current = ev.currentTarget; setLotView({loading:true,order:o,items:[]}); const items=await fetchLotItems(o._acc,o.transaction_id); setLotView({loading:false,order:o,items}); }} title="Voir les paires du lot" aria-label="Voir les paires du lot" style={{flexShrink:0}}><Icon name="box" size={18}/>Voir le lot</button>
                 )}
                 </div>
                </div>
@@ -45866,7 +45774,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                  if (e && e.buyFromId) return (
                    <div style={{display:'flex',alignItems:'center',gap:8}}>
                      <div style={{flex:1,minWidth:0}}><AchatRelie entry={e} numero={num}/></div>
-                     <button type="button" onClick={()=>openPicker(saleItem)} title="Relier un autre achat à cette vente" style={{flexShrink:0,border:`1px solid ${C.border}`,borderRadius:8,background:'transparent',color:C.muted,cursor:'pointer',fontSize:11,fontWeight:600,padding:'5px 9px',fontFamily:'inherit'}}>changer</button>
+                     <Bouton variante="discret" onClick={()=>openPicker(saleItem)} title="Relier un autre achat à cette vente" style={{flexShrink:0}}>Changer</Bouton>
                    </div>
                  );
                  // (coût inconnu : « Saisir le prix » et « Relier un achat » sont
@@ -45885,10 +45793,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             une longueur qu'on peut parcourir. Les totaux du haut, eux, portent
             TOUJOURS sur l'ensemble : ils ne dépendent pas de cette tranche. */}
         {ventesAffichees.length > ventesMax && (
-          <button type="button" onClick={()=>setVentesMax(n=>n+120)}
-            style={{width:'100%',marginTop:10,border:`1px solid ${C.border}`,background:C.card,color:C.text,borderRadius:10,padding:'12px',cursor:'pointer',fontSize:13,fontWeight:600,fontFamily:'inherit',boxShadow:C.shadow||'none'}}>
+          <Bouton variante="secondaire" plein onClick={()=>setVentesMax(n=>n+120)} style={{marginTop:10}}>
             Voir plus — {ventesMax} affichées sur {ventesAffichees.length}
-          </button>
+          </Bouton>
         )}
         {/* (29 oct., « un peu moche ») Les contrôles passent SOUS la liste : avant la
             première vente il y avait huit blocs empilés. Ils restent tous là, repliés. */}
@@ -45913,8 +45820,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         )}
         {analyseOpen && (<>
         {(totals.nb>0 || totals.bN>0 || totals.nbAttente>0) && (<>
-          /* 30 sept. — une seule carte, trois colonnes séparées d'un filet :
-             quatre gros blocs empilés prenaient un écran entier sur téléphone. */
+          {/* 30 sept. — une seule carte, trois colonnes séparées d'un filet.
+              ⚠️ (30 oct.) Ce commentaire était écrit sans accolades : il
+              s'AFFICHAIT tel quel au-dessus des chiffres (vu au rendu). */}
           <div className="vrm-summary-strip" data-ventes-benef-n={String(totals.bN)} data-ventes-benef-ncout={String(totals.nbCout)}
             data-ventes-benef-brut={totals.nbCout>0?String(Math.round(totals.benefBrut*100)/100):''} data-ventes-benef-net={totals.nbCout>0&&totals.benefConnu!=null?String(Math.round(totals.benefConnu*100)/100):''}
             data-ventes-benef-couverture={totals.couverture} data-ventes-benef-autres={totals.autresKO?'passu':'lu'}
@@ -45976,21 +45884,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               une vente Leboncoin ou eBay n'a un prix d'achat que si elle est
               reliée à sa paire par IDENTITÉ (SKU, référence, lien posé). */}
           {totals.bN>0 && <div data-ventes-benef-note="" style={{fontSize:11.5,color:C.muted,margin:'-6px 2px 12px',lineHeight:1.45}}>
-            Prix d'achat connus : {totals.couverture || '—'}{totals.autresKO ? ' · Leboncoin et eBay pas encore lus : ce bénéfice ne porte que sur Vinted' : ' · une vente Leboncoin ou eBay se relie à sa paire par son SKU VRM, sa référence ou un lien posé, jamais par son titre'}.
+            Prix d'achat connus : {totals.couverture || '—'}{totals.autresKO ? ' · Leboncoin et eBay pas encore lus : bénéfice Vinted seul' : null}{!totals.autresKO && <> <Pourquoi label="Leboncoin et eBay">Une vente Leboncoin ou eBay se relie à sa paire par son SKU VRM, sa référence ou un lien posé, jamais par son titre.</Pourquoi></>}
           </div>}
         </>)}
 
-        {(totals.nb>0) && (
-          <button type="button" onClick={()=>{ setWrapStep(0); setShowWrapped(true); }}
-            style={{width:'100%',display:'flex',alignItems:'center',gap:9,border:`1px solid ${C.border}`,
-              background:C.card,borderRadius:10,padding:'11px 13px',marginBottom:10,cursor:'pointer',fontFamily:'inherit'}}>
-            <span aria-hidden="true" style={{color:C.accent,display:'flex'}}><Icon name="spark" size={17}/></span>
-            <span style={{flex:1,textAlign:'left',fontSize:13,fontWeight:600,color:C.text}}>
-              Rétrospective {new Date().getFullYear()}
-            </span>
-            <span style={{fontSize:11,color:C.muted,fontWeight:500}}>voir</span>
-          </button>
-        )}
+        {/* (30 oct.) « Rétrospective » est passée dans « ⋯ Outils » : un geste rare. */}
         {/* Ce qui n'est ni un filtre, ni un chiffre, ni une vente vit ici :
             colis à expédier (il a son écran), argent en attente et son détail,
             vente repérée via bordereau, ventes par jour. */}
@@ -46022,11 +45920,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 return t||n ? `Le plus pressé : ${n}${t}${q?` · ${q}`:''}` : (q?`Le plus pressé : ${q}`:null); })() : null}
               detail={`Vinted laisse environ ${SHIP_DAYS} jours après la vente pour expédier. À temps, ta note vendeur est préservée. L'échéance vient de l'email du bordereau (avec son heure) ; sans lui, elle est estimée. Le bordereau se génère depuis l'onglet Colis.`}
               action={onNav && (
-                <button type="button" onClick={()=>onNav('cat_bord')}
-                  style={{flexShrink:0,alignSelf:'center',border:`1px solid ${C.border}`,background:C.surface,color:C.text,
-                    borderRadius:8,padding:'7px 11px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>
-                  Expédier
-                </button>
+                <Bouton variante="secondaire" className="vrm-b-petit" icone="truck" onClick={()=>onNav('cat_bord')} style={{flexShrink:0,alignSelf:'center'}}>Colis</Bouton>
               )}/>
           );
         })()}
@@ -46141,9 +46035,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   </div>
                 );
               })()}
-              <div style={{fontSize:11,color:C.muted,marginTop:6,lineHeight:1.4}}>{reel
-                ? <>Ce que Vinted retient <b>en attente</b> (pas encore virable), lu sur {reel.accounts} porte-monnaie.{reel.dispo>0?<> À côté, tu as <b>{reel.dispo.toFixed(2).replace('.',',')} €</b> déjà <b>disponibles</b> à virer — les deux ne se confondent pas.</>:null}</>
-                : <>Estimation calculée sur tes ventes en cours — le montant exact arrive dès que l'extension a lu les porte-monnaie.</>}</div>
+              <div style={{fontSize:11.5,color:C.muted,marginTop:6,lineHeight:1.4}}>{reel
+                ? <>Retenu par Vinted, pas encore virable · {reel.accounts} porte-monnaie lu{reel.accounts>1?'s':''}{reel.dispo>0?<> · <b>{reel.dispo.toFixed(2).replace('.',',')} €</b> disponibles à virer</>:null}</>
+                : <>Estimation sur tes ventes en cours, en attendant que l'extension lise les porte-monnaie.</>}</div>
               {/* ⚠️ CE TOTAL EST PARTIEL TANT QUE TOUS LES PORTE-MONNAIE N'ONT PAS
                   ÉTÉ LUS. Julien : « j'ai 323 € en attente sur un seul compte, ce
                   n'est pas possible que le total soit 504 € avec sept comptes » —
@@ -46156,14 +46050,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 const manquants = (accounts||[]).filter(a=>{ const u=String(a.vinted_user_id||''); return u && !lus.has(u) && !acctOff(u); });
                 if (!manquants.length) return null;
                 return (
-                  <div style={{marginTop:8,padding:'8px 10px',border:`1px solid ${C.warn}`,background:`${C.warn}12`,borderRadius:8,fontSize:11,color:C.text,lineHeight:1.45}}>
-                    ⚠️ <b>Total incomplet</b> — {manquants.length} compte{manquants.length>1?'s':''} sur {(accounts||[]).length} n'{manquants.length>1?'ont':'a'} pas encore de porte-monnaie lu, donc leur argent en attente n'est <b>pas</b> dans ce chiffre :{' '}
-                    <span style={{opacity:0.9}}>{manquants.map(a=>accName(a)).join(", ")}</span>.
+                  <div data-attente-incomplet={manquants.length} style={{marginTop:8,padding:'8px 10px',borderLeft:`3px solid ${C.warn}`,background:`${C.warn}10`,borderRadius:8,fontSize:11.5,color:C.text,lineHeight:1.45}}>
+                    <b>Total incomplet</b> — sans {manquants.length} compte{manquants.length>1?'s':''} sur {(accounts||[]).length} : <span style={{opacity:0.9}}>{manquants.map(a=>accName(a)).join(", ")}</span>.
                     {/* ⚠️ NE PAS redire « ouvre ton porte-monnaie » : depuis la 5.20 la
                         moisson active lit `payouts` toute seule pour le compte CONNECTÉ
                         (vérifié : 6 soldes captés en 2 minutes sans ouvrir un seul
                         porte-monnaie). Le seul geste utile est de se connecter au compte. */}
-                    <div style={{marginTop:4,opacity:0.85}}>Connecte-toi une fois à ces comptes sur Vinted : l'extension lit leur solde toute seule, tu n'as pas à ouvrir le porte-monnaie.</div>
+                    <div style={{marginTop:2,opacity:0.85}}>Connecte-toi une fois à {manquants.length>1?'chacun':'ce compte'} sur Vinted : l'extension lit le solde toute seule.</div>
                   </div>
                 );
               })()}
@@ -46224,8 +46117,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           <div style={{display:'flex',flexWrap:'wrap',gap:10,marginBottom:8}}>
             {perf.joursMoy!=null && <StatBox label="Temps de vente" value={`${perf.joursMoy.toFixed(0)} j`} sub={`moyenne sur ${perf.joursNb}`}/>}
             {perf.ecoul!=null && <StatBox label="Écoulement" value={`${perf.ecoul.toFixed(0)} %`} sub={`${perf.vendues} vendu / ${perf.online} en ligne`}/>}
-            {perf.bestBrand && <StatBox label="Top marque" value={perf.bestBrand.brand} color={INV_STATUS.online.color} sub={`+${perf.bestBrand.moy.toFixed(0)} €/paire`}/>}
-            {perf.bestAccount && <StatBox label="Compte qui vend le mieux" value={perf.bestAccount.nom} color={INV_STATUS.online.color} sub={`${perf.bestAccount.n} vente${perf.bestAccount.n>1?'s':''} · ${fmtE(perf.bestAccount.ca)}`}/>}
+            {perf.bestBrand && <StatBox label="Top marque" value={perf.bestBrand.brand} sub={`+${perf.bestBrand.moy.toFixed(0)} €/paire`}/>}
+            {perf.bestAccount && <StatBox label="Compte qui vend le mieux" value={perf.bestAccount.nom} sub={`${perf.bestAccount.n} vente${perf.bestAccount.n>1?'s':''} · ${fmtE(perf.bestAccount.ca)}`}/>}
           </div>
         )}
         {/* VENTES PAR COMPTE (G24) : le classement complet, pour un revendeur à
@@ -46278,18 +46171,19 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         {/* Saisonnalité : meilleurs mois de vente → acheter avant les pics */}
         {seasonality && seasonality.top.length>0 && (
           <div style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:10,padding:'9px 13px',marginBottom:8}}>
-            <span style={{fontSize:12,fontWeight:600,color:C.text}}>📈 Tes meilleurs mois de vente : </span>
-            <span style={{fontSize:12,fontWeight:700,color:C.accent}}>{seasonality.top.map(t=>t.m).join(' · ')}</span>
-            <span style={{fontSize:11,color:C.muted,display:'block',marginTop:3}}>Sur {seasonality.total} ventes. Achète un peu avant ces mois pour avoir le stock au bon moment.</span>
+            <span style={{fontSize:12,fontWeight:600,color:C.text}}>Tes meilleurs mois : </span>
+            <span style={{fontSize:12,fontWeight:700,color:C.text}}>{seasonality.top.map(t=>t.m).join(' · ')}</span>
+            <span style={{fontSize:11.5,color:C.muted,display:'block',marginTop:3}}>Sur {seasonality.total} ventes — achète un peu avant.</span>
           </div>
         )}
 
         {/* Litiges / annulations : manque à gagner */}
         {litiges.nb>0 && (
-          <div style={{border:`1px solid ${C.danger}44`,background:`${C.danger}0e`,borderRadius:10,padding:'9px 13px',marginBottom:8}}>
-            <span style={{fontSize:12,fontWeight:600,color:C.danger}}>⚖️ {litiges.nb} vente{litiges.nb>1?'s':''} annulée{litiges.nb>1?'s':''}</span>
-            <span style={{fontSize:12,color:C.text,fontWeight:500}}> · {fmtE(litiges.montant)} de manque à gagner</span>
-            <span className="vrm-aide" style={{fontSize:11,color:C.muted,display:'block',marginTop:3}}>Filtre « Annulées » ci-dessous pour le détail. Un taux d'annulation élevé peut venir de prix/photos à revoir.</span>
+          <div data-ventes-annulees={litiges.nb} style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:10,padding:'6px 13px',marginBottom:8,display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
+            {/* (30 oct.) Plus de rouge (§7) ; la consigne « filtre Annulées
+                ci-dessous » devient le geste lui-même. */}
+            <span style={{flex:'1 1 200px',minWidth:0,fontSize:12.5,color:C.text}}><b>{litiges.nb} vente{litiges.nb>1?'s':''} annulée{litiges.nb>1?'s':''}</b> · {fmtE(litiges.montant)} de manque à gagner</span>
+            <Bouton variante="discret" onClick={()=>{ setVFilter('annulees'); try { document.querySelector('.vrm-sales-workbar')?.scrollIntoView({block:'start',behavior:'smooth'}); } catch(_) {} }}>Voir les annulées</Bouton>
           </div>
         )}
         {/* Objectif de CA mensuel */}
@@ -46300,7 +46194,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         {accounts.length>0 && (()=>{ const caM = (liveStats && liveStats.caMois!=null) ? liveStats.caMois : perf.caMois; const pct = goal>0 ? Math.min(100, (caM/goal)*100) : 0; return (
           <div style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:10,padding:'11px 13px',marginBottom:12}}>
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:goal>0?8:0,flexWrap:'wrap',gap:6}}>
-              <div style={{fontSize:12,fontWeight:600,color:C.text}}>🎯 Objectif du mois</div>
+              <div style={{fontSize:12.5,fontWeight:600,color:C.text}}>Objectif du mois</div>
               {goalEdit ? (
                 <div style={{display:'flex',gap:6,alignItems:'center'}}>
                   <input autoFocus type="number" defaultValue={goal||''} placeholder="0" onKeyDown={e=>{ if(e.key==='Enter'){ saveGoal(e.target.value); setGoalEdit(false);} if(e.key==='Escape') setGoalEdit(false); }}
@@ -46308,9 +46202,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   <span style={{fontSize:12,color:C.muted}}>€</span>
                 </div>
               ) : (
-                <button type="button" onClick={()=>setGoalEdit(true)} style={{background:'transparent',border:`1px solid ${C.border}`,borderRadius:8,padding:'3px 10px',cursor:'pointer',fontSize:11,fontWeight:500,color:C.text}}>
+                <Bouton variante="secondaire" className="vrm-b-petit" onClick={()=>setGoalEdit(true)} title={goal>0?'Changer l\'objectif':undefined}>
                   {goal>0 ? `${caM.toFixed(0)} / ${goal} €` : 'Fixer un objectif'}
-                </button>
+                </Bouton>
               )}
             </div>
             {/* ⚠️ UN OBJECTIF QU'IL FAUT INVENTER NE SE FIXE JAMAIS (mesuré le
@@ -46335,19 +46229,17 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   <div style={{flex:'1 1 150px',minWidth:0,fontSize:11,color:C.muted,lineHeight:1.4}}>
                     Tes {complets.length} derniers mois complets : <b style={{color:C.text}}>{Math.round(moy)} €</b> en moyenne.
                   </div>
-                  <button type="button" onClick={()=>saveGoal(prop)} style={{flexShrink:0,border:'none',background:C.accent,color:'#fff',borderRadius:8,padding:'5px 12px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>
-                    🎯 Viser {prop} €
-                  </button>
+                  <Bouton variante="secondaire" className="vrm-b-petit" icone="target" onClick={()=>saveGoal(prop)} style={{flexShrink:0}}>Viser {prop} €</Bouton>
                 </div>
               );
             })()}
             {goal>0 && (
               <div style={{height:8,borderRadius:8,background:C.border,overflow:'hidden'}}>
-                <div style={{height:'100%',width:`${pct}%`,background:pct>=100?INV_STATUS.online.color:C.accent,borderRadius:8,transition:'width .4s'}}/>
+                <div style={{height:'100%',width:`${pct}%`,background:C.accent,borderRadius:8,transition:'width .4s'}}/>
               </div>
             )}
             {goal>0 && (()=>{
-              if(pct>=100) return <div style={{fontSize:11,color:INV_STATUS.online.color,fontWeight:600,marginTop:5}}>🎉 Objectif atteint !</div>;
+              if(pct>=100) return <div style={{fontSize:11.5,color:C.text,fontWeight:600,marginTop:5}}>Objectif atteint</div>;
               const reste=goal-caM;
               const avg=totals.nb>0?totals.ca/totals.nb:null; // prix de vente moyen finalisé
               const nb=avg&&avg>0?Math.ceil(reste/avg):null;
@@ -46379,7 +46271,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 <span style={{display:'inline-flex',alignItems:'center',gap:5}}><span style={{width:9,height:9,borderRadius:5,background:s2,display:'inline-block'}}/>Bénéfice net</span>
               </div>
             </div>
-            <div style={{width:'100%',overflowX:'auto'}}>
+            {/* (30 oct.) Le dessin fait 320 unités de large : étiré sur 1 300 px, ses
+                mois s'écrivaient en 40 px (vu au rendu). Il garde une taille lisible. */}
+            <div style={{width:'100%',maxWidth:560,margin:'0 auto',overflowX:'auto'}}>
               <svg viewBox={`0 0 ${W} ${H+22}`} style={{width:'100%',minWidth:280,height:'auto',display:'block'}} role="img" aria-label={`Chiffre d'affaires et bénéfice net sur 6 mois. ${monthlyChart.months.map(m=>`${m.label} : CA ${Math.round(m.ca)} euros, bénéfice ${Math.round(m.benef)} euros`).join('. ')}`}>
                 {/* Repères horizontaux : discrets, sous les données. */}
                 {[0.5,1].map((f,i)=>(
@@ -46411,7 +46305,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
 
       {curSub==='achats' && (<div className="vrm-achats">
         {/* (26 oct.) Dans l'espace Vinted, l'onglet « Achats » sélectionné dit déjà le titre : pas deux fois (§7). */}
-        {!dansPlateforme && <ScreenHead icon="bag" title="Achats" desc="Tes achats Vinted : ce qui est en route, ce qui t'attend en point relais avec son code de retrait, et le prix payé pour chaque article."/>}
+        {!dansPlateforme && <ScreenHead icon="bag" title="Achats" desc="En route, à retirer avec leur code, et le prix payé."/>}
         <NoAcc/>
         {/* ⚠️ LE BANDEAU DE L'EXTENSION VIT AUSSI ICI, PAS SEULEMENT SUR MA
             JOURNÉE. C'est sur CET écran que Julien compte les codes qui
@@ -46457,7 +46351,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             sur Vinted. Une ligne, le compte nommé une fois quand il est le même
             (§7), le lien vers SA conversation. « Pas su » se dit, jamais un
             « rien à confirmer ». */}
-        {aConfirmer.etat==='passu' && !baseKO && <div data-a-confirmer="passu" style={{fontSize:12.5,color:C.muted,margin:'4px 0 10px'}}>Je n'ai pas pu lire les colis à confirmer sur Vinted — rien n'est perdu, réessaie dans un moment.</div>}
+        {aConfirmer.etat==='passu' && !baseKO && <div data-a-confirmer="passu" style={{fontSize:12.5,color:C.muted,margin:'4px 0 10px'}}>Colis à confirmer : pas pu lire — rien n'est perdu, réessaie dans un moment.</div>}
         {aConfirmer.etat==='lu' && aConfirmer.liste.length>0 && (()=>{
           const l = aConfirmer.liste;
           const nomDe = (e)=>{ const a=(accounts||[]).find(x=>String(x.vinted_user_id)===String(e.uid)); return a?accNameOf(a):''; };
@@ -46465,8 +46359,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           const unSeul = comptes.length===1;
           return (
             <div className="vrm-achats-bloc" data-a-confirmer={l.length} data-a-confirmer-limite={l[0].limite||''} style={{background:C.card,border:`1px solid ${C.border}`}}>
-              <div className="vrm-achats-bloc-t" style={{color:C.text}}><span style={{color:C.warn}}>✓</span> {l.length} {motAConfirmer(l)} à confirmer avant le {texteLimite(l[0])}{unSeul?<span style={{fontWeight:500,color:C.muted}}> · compte {comptes[0]}</span>:null}</div>
-              <div className="vrm-achats-bloc-p" style={{color:C.muted}}>Vérifie l'article puis appuie sur « Tout est OK » dans la conversation Vinted (ou « J'ai un problème »). Passé la date, Vinted conclut sans toi.</div>
+              <div className="vrm-achats-bloc-t" style={{color:C.text}}><span style={{color:C.warn}}>✓</span> {l.length} {motAConfirmer(l)} à confirmer avant le {texteLimite(l[0])}{unSeul?<span style={{fontWeight:500,color:C.muted}}> · compte {comptes[0]}</span>:null} <Pourquoi label="Comment confirmer">Vérifie l'article puis appuie sur « Tout est OK » dans la conversation Vinted (ou « J'ai un problème »). Passé la date, Vinted conclut sans toi.</Pourquoi></div>
               {l.map(e=>(
                 <div key={e.tx} data-confirmer-tx={e.tx} data-confirmer-sur={e.limiteMs!=null?'oui':'texte'} style={{display:'flex',alignItems:'center',gap:10,marginTop:9,flexWrap:'wrap'}}>
                   {e.photo && !imgMortes.has(e.photo) ? <PhotoVinted src={e.photo} alt="" loading="lazy" onError={()=>noterImgMorte(e.photo)} style={{width:38,height:38,borderRadius:8,objectFit:'cover',flexShrink:0,border:`1px solid ${C.border}`}}/> : null}
@@ -46474,8 +46367,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     <div style={{fontSize:13,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}} title={e.titre}>{e.titre||'Commande'}</div>
                     <div style={{fontSize:11.5,color:C.muted}}>{e.quoi==='retour'?'Retour qui te revient':'Achat'} · avant le {texteLimite(e)}{!unSeul && nomDe(e)?` · compte ${nomDe(e)}`:''}</div>
                   </div>
-                  {e.url ? <a data-confirmer-lien={e.tx} href={e.url} target="_blank" rel="noreferrer"
-                    style={{display:'inline-flex',alignItems:'center',gap:6,minHeight:44,boxSizing:'border-box',border:`1.5px solid ${C.warn}`,background:`${C.warn}14`,color:C.warn,borderRadius:8,padding:'7px 12px',fontSize:12.5,fontWeight:700,textDecoration:'none',flexShrink:0}}>Ouvrir la conversation ↗</a> : null}
+                  {e.url ? <Bouton variante="secondaire" data-confirmer-lien={e.tx} href={e.url} target="_blank" rel="noreferrer" style={{flexShrink:0,minHeight:44}}>Ouvrir la conversation ↗</Bouton> : null}
                 </div>
               ))}
             </div>
@@ -46488,8 +46380,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           const unSeul = comptes.length===1;
           return (
             <div className="vrm-achats-bloc" data-a-renvoyer={l.length} style={{background:C.card,border:`1px solid ${C.border}`}}>
-              <div className="vrm-achats-bloc-t" style={{color:C.text}}><span style={{color:C.warn}}>↩</span> {l.length} article{l.length>1?'s':''} à renvoyer (litige){unSeul?<span style={{fontWeight:500,color:C.muted}}> · compte {comptes[0]}</span>:null}</div>
-              <div className="vrm-achats-bloc-p" style={{color:C.muted}}>L'étiquette de retour se génère sur Vinted — VRM ne l'envoie pas à ta place (compte en litige).</div>
+              <div className="vrm-achats-bloc-t" style={{color:C.text}}><span style={{color:C.warn}}>↩</span> {l.length} article{l.length>1?'s':''} à renvoyer (litige){unSeul?<span style={{fontWeight:500,color:C.muted}}> · compte {comptes[0]}</span>:null} <Pourquoi label="Pourquoi sur Vinted">L'étiquette de retour se génère sur Vinted — VRM ne l'envoie pas à ta place (compte en litige).</Pourquoi></div>
               {l.map(o=>{ const ph=orderPhoto(o); return (
                 <div key={o.transaction_id} style={{display:'flex',alignItems:'center',gap:10,marginTop:9,flexWrap:'wrap'}}>
                   {ph && !imgMortes.has(ph) ? <PhotoVinted src={ph} alt="" loading="lazy" onError={()=>noterImgMorte(ph)} style={{width:38,height:38,borderRadius:8,objectFit:'cover',flexShrink:0,border:`1px solid ${C.border}`}}/> : null}
@@ -46497,8 +46388,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     <div style={{fontSize:13,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}} title={o.title}>{o.title}</div>
                     {!unSeul && o._acc && <div style={{fontSize:11.5,color:C.muted}}>compte {accNameOf(o._acc)}</div>}
                   </div>
-                  <a data-retour-tx={o.transaction_id} href={`https://www.vinted.fr/member/transactions/${encodeURIComponent(o.transaction_id)}`} target="_blank" rel="noreferrer"
-                    style={{display:'inline-flex',alignItems:'center',gap:6,border:`1.5px solid ${C.warn}`,background:`${C.warn}14`,color:C.warn,borderRadius:8,padding:'7px 12px',fontSize:12.5,fontWeight:700,textDecoration:'none',flexShrink:0}}>↩ Bordereau de retour sur Vinted</a>
+                  <Bouton variante="secondaire" data-retour-tx={o.transaction_id} href={`https://www.vinted.fr/member/transactions/${encodeURIComponent(o.transaction_id)}`} target="_blank" rel="noreferrer" style={{flexShrink:0,minHeight:44}}>↩ Bordereau de retour ↗</Bouton>
                 </div>
               ); })}
             </div>
@@ -46516,7 +46406,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         {buysBase.length>0 && aFilter!=='attente' && <PeriodePicker value={periode} onChange={setPeriode} titre="Période des achats"/>}
         {buysBase.length>0 && aFilter!=='attente' && (
           <label className="vrm-msg-search vrm-achats-search" style={{color:C.muted}}><Icon name="search" size={16}/><input type="search" aria-label="Rechercher un achat" value={ordSearch} onChange={e=>setOrdSearch(e.target.value)} placeholder="Titre, N°, vendeur"
-            style={{color:C.text}}/></label>
+            style={{color:C.text,background:'transparent',border:0,boxShadow:'none'}}/></label>
         )}
         {/* ── LES CHIFFRES DE L'ACHAT (l'écran n'en avait AUCUN) ─────────────────
             « C'est mon métier, fais ça comme un pro. » L'écran Ventes porte
@@ -46552,7 +46442,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 ['Dépensé', fmtE0(somme(vrais)), `${vrais.length} article${vrais.length>1?'s':''}`, null],
                 ['Prix médian', fmtE0(med), 'par article', null],
                 ['En route', fmtE0(somme(rte)), `${rte.length} article${rte.length>1?'s':''}`, null],
-                ['Annulés', fmtE0(somme(ann)), `${ann.length} sur ${dans.length} · ${tauxAnn} %`, tauxAnn>=20?C.danger:null],
+                ['Annulés', fmtE0(somme(ann)), `${ann.length} sur ${dans.length} · ${tauxAnn} %`, tauxAnn>=20?C.warn:null],
               ].map(([k,v,sub,col])=>(
                 <div key={k} className="vrm-achats-kpi" style={{borderColor:C.border}}>
                   <div className="vrm-achats-kpi-k" style={{color:C.muted}}>{k}</div>
@@ -46587,9 +46477,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         {aFilter==='attente' && trackingKO && (
           <div data-suivis-ko={tracking===null?'jamais':'ancienne'} style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap',fontSize:12,color:C.text,border:`1px solid ${C.warn}`,background:`${C.warn}0e`,borderRadius:10,padding:'8px 12px',marginBottom:10,lineHeight:1.45}}>
             <span style={{flex:'1 1 220px'}}>{tracking===null
-              ? <>Les e-mails de suivi n'ont pas pu être lus : les colis arrivés par e-mail (codes, lieux, dates limites) ne sont pas affichés ici. Rien n'est perdu.</>
-              : <>La dernière lecture des e-mails de suivi a échoué : ce que tu vois vient de la lecture d'avant.</>}</span>
-            <button type="button" data-suivis-reessayer="" onClick={()=>lireSuivis({ force:true })} style={{flexShrink:0,border:`1px solid ${C.border}`,background:C.card,color:C.text,borderRadius:10,padding:'6px 12px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit',minHeight:44}}>Réessayer</button>
+              ? <>Les e-mails de suivi n'ont pas pu être lus : leurs colis (codes, lieux) manquent ici. Rien n'est perdu.</>
+              : <>Dernière lecture des e-mails de suivi ratée : tu vois la lecture d'avant.</>}</span>
+            <Bouton variante="secondaire" icone="sync" data-suivis-reessayer="" onClick={()=>lireSuivis({ force:true })} style={{flexShrink:0,minHeight:44}}>Réessayer</Bouton>
           </div>
         )}
         {/* (24 oct.) Ce que le statut chez les transporteurs ne peut pas dire ici,
@@ -46612,9 +46502,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             return j != null ? { a, j } : null;
           }).filter(x => x && x.j >= FRAICHEUR_ACHATS_J).sort((x, y) => y.j - x.j);
           if (!vieux.length) return null;
+          // (29 oct.) Une ligne : les comptes de même âge sont groupés (« il y a
+          // 25 j sur a, b, c »), le pourquoi est replié derrière ⓘ.
+          const parAge = []; for (const x of vieux) { const g = parAge.find(y => y.j === x.j); if (g) g.l.push(x.a); else parAge.push({ j: x.j, l: [x.a] }); }
           return (
             <div data-fraicheur-achats={vieux.map(x => `${x.a.vinted_user_id}:${x.j}`).join(',')} style={{fontSize:12,color:C.muted,lineHeight:1.45,margin:'0 0 10px'}}>
-              Achats relus il y a {vieux.map((x, i) => <span key={x.a.vinted_user_id}>{i ? (i === vieux.length - 1 ? ' et ' : ', ') : ''}{x.j} j sur <b style={{color:C.text,fontWeight:600}}>{accName(x.a)}</b></span>)} — un colis arrivé depuis sur {vieux.length > 1 ? 'ces comptes' : 'ce compte'} n'est pas encore ici. Ouvre Vinted connecté sur {vieux.length > 1 ? 'chacun' : 'ce compte'}, dans le Chrome où l'extension VRM est installée.
+              {vieux.length <= 2
+                ? <>Achats relus {parAge.map((g, i) => <span key={g.j}>{i ? ' et ' : ''}il y a {g.j} j sur {g.l.map((a, k) => <React.Fragment key={a.vinted_user_id}>{k ? ', ' : ''}<b style={{color:C.text,fontWeight:600}}>{accName(a)}</b></React.Fragment>)}</span>)} — ouvre Vinted sur {vieux.length > 1 ? 'chacun' : 'ce compte'}. </>
+                : <>Achats de {vieux.length} comptes pas relus depuis {vieux[vieux.length - 1].j} j ou plus — ouvre Vinted sur chacun. </>}
+              <Pourquoi label="Quels comptes">{vieux.length > 2 ? <>{parAge.map((g, i) => <span key={g.j}>{i ? ' · ' : ''}il y a {g.j} j : {g.l.map((a) => accName(a)).join(', ')}</span>)}. </> : null}Un colis arrivé depuis sur {vieux.length > 1 ? 'ces comptes' : 'ce compte'} n'est pas encore ici : les achats d'un compte ne sont relus que quand Chrome est connecté dessus, avec l'extension VRM.</Pourquoi>
             </div>
           );
         })()}
@@ -46708,7 +46604,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                             compte <b style={{color:C.text,fontWeight:600}}>{accName(o._acc)}</b>
                           </div>
                         )}
-                        {!cd && !(rel && rel.qr) && rel && rel.lieu && <div data-colis-sans-code-conv="" style={{fontSize:11,color:C.muted,marginTop:2,lineHeight:1.35}}>La conversation Vinted ne donne pas de code pour ce colis : il arrive par l’e-mail du transporteur (« Votre colis … est disponible ») sur l’adresse de ce compte. Si cette boîte fait suivre ses e-mails à VRM, il s’affichera ici.</div>}
+                        {!cd && !(rel && rel.qr) && rel && rel.lieu && <div data-colis-sans-code-conv="" style={{fontSize:11,color:C.muted,marginTop:2,lineHeight:1.35}}>Code par l’e-mail du transporteur <Pourquoi label="Où est le code">La conversation Vinted ne donne pas de code pour ce colis : il arrive par l’e-mail du transporteur (« Votre colis … est disponible ») sur l’adresse de ce compte. Si cette boîte fait suivre ses e-mails à VRM, il s’affichera ici.</Pourquoi></div>}
                         {/* ⚠️ LE QR VIT DANS LA CONVERSATION, on n'en fabrique pas
                             (§17). Si le message porte le lien direct du code, on
                             l'ouvre ; sinon on ouvre le fil, où il est affiché. */}
@@ -46740,13 +46636,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                             : (cd || luSansCode) ? 'Ouvrir la conversation ↗'
                             : 'Voir mon code de retrait ↗';
                           return primaire ? (
-                            <a className="vrm-pickup-cta" href={href} target="_blank" rel="noreferrer" style={{display:'inline-flex',alignItems:'center',marginTop:8,border:`1px solid ${C.accent}`,background:'transparent',color:C.accent,borderRadius:10,padding:'0 14px',fontSize:13,fontWeight:600,textDecoration:'none'}}>
-                              {quoi}
-                            </a>
+                            <Bouton variante="secondaire" className="vrm-pickup-cta" href={href} target="_blank" rel="noreferrer" style={{marginTop:8}}>{quoi}</Bouton>
                           ) : (
-                            <a className="vrm-pickup-lien" href={href} target="_blank" rel="noreferrer" style={{fontSize:12.5,color:C.accent,fontWeight:600,textDecoration:'none'}}>
-                              {quoi}
-                            </a>
+                            <Bouton variante="discret" className="vrm-pickup-lien" href={href} target="_blank" rel="noreferrer">{quoi}</Bouton>
                           );
                         })()}
                       </div>
@@ -46754,7 +46646,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                         <CodeRetraitCopiable label="Code de retrait" code={cd}/>
                       )}
                       {(()=>{ const e=entreeSuiviAchat(o); const su=suivisAchat(o, indexSuivisAchats)[0]; return su ? <BoutonSuivreColis transporteur={(e&&e.transporteur)||transporteurDeForme(su)||''} suivi={su} codePostal={codePostalLu({lieu: rel && rel.lieu})} enLigne/> : null; })()}
-                      <button className="vrm-pickup-collect" type="button" onClick={()=>markPickupDone(o)} title="J'ai retiré ce colis" aria-label="J’ai retiré ce colis" data-pickup-sans-code={cd?undefined:''} style={{flexShrink:0,marginLeft:cd?undefined:'auto',border:`1px solid ${C.border}`,background:C.card,color:C.text,borderRadius:10,fontWeight:600,cursor:'pointer',fontFamily:'inherit',whiteSpace:'nowrap'}}><span aria-hidden="true">✓</span><span className="vrm-pickup-collect-label"> J’ai retiré</span></button>
+                      <button className="vrm-pickup-collect" type="button" onClick={()=>markPickupDone(o)} title="J'ai retiré ce colis" aria-label="J’ai retiré ce colis" data-pickup-sans-code={cd?undefined:''} style={{flexShrink:0,marginLeft:cd?undefined:'auto',whiteSpace:'nowrap'}}><span aria-hidden="true">✓</span><span className="vrm-pickup-collect-label"> J’ai retiré</span></button>
                     </div>
                     );
           };
@@ -46830,7 +46722,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       laquelle c'était — elle a pu être reliée depuis). */}
                   {(()=>{ const sans = avail.filter(t => !compteDuColisEmail(t)); const n = sans.length;
                     const adresseLibre = sans.some(t => Array.isArray(t.recuSur) && t.recuSur.length);
-                    return n ? <div data-pickup-sans-compte={n} style={{fontSize:11.5,color:C.muted,marginTop:3,lineHeight:1.4}}>{n>1?`${n} colis : compte non reconnu`:'1 colis : compte non reconnu'} — l'e-mail est arrivé sur une adresse qui n'était alors reliée à aucun de tes comptes Vinted.{adresseLibre?' Relie-la dans Réglages → Comptes liés (e-mail du compte).':''}</div> : null; })()}
+                    return n ? <div data-pickup-sans-compte={n} style={{fontSize:11.5,color:C.muted,marginTop:3,lineHeight:1.4}}>{n>1?`${n} colis : compte non reconnu`:'1 colis : compte non reconnu'}{adresseLibre?' — Relie-la dans Réglages → Comptes liés.':''} <Pourquoi label="Pourquoi">L'e-mail est arrivé sur une adresse qui n'était alors reliée à aucun de tes comptes Vinted (e-mail du compte, dans Réglages → Comptes liés).</Pourquoi></div> : null; })()}
                   {/* ⚠️ « À chaque fois on doit voir le nombre de paires que l'on
                       reçoit » (Julien). On compte les colis dont on SAIT nommer
                       la paire — jamais un total gonflé : quand il en manque, ça
@@ -46844,7 +46736,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   <details className="vrm-pickup-help"><summary>Comment retirer un colis ?</summary><div style={{display:'flex',flexWrap:'wrap',gap:6,marginTop:10}}>
                     {[['1','Va au point relais indiqué'],['2','Donne le code ou montre le QR'],['3','Coche ✓ « récupéré »']].map(([n,txt])=>(
                       <span key={n} style={{display:'inline-flex',alignItems:'center',gap:6,background:C.card,border:`1px solid ${C.border}`,borderRadius:999,padding:'4px 10px 4px 4px',fontSize:11.5,color:C.text,fontWeight:600}}>
-                        <span style={{flexShrink:0,width:18,height:18,borderRadius:999,background:C.accent,color:'#fff',fontSize:11,fontWeight:700,display:'inline-flex',alignItems:'center',justifyContent:'center'}}>{n}</span>
+                        <span style={{flexShrink:0,width:18,height:18,borderRadius:999,background:C.accent,color:'var(--vrm-on-accent)',fontSize:11,fontWeight:700,display:'inline-flex',alignItems:'center',justifyContent:'center'}}>{n}</span>
                         {txt}
                       </span>
                     ))}
@@ -46999,7 +46891,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                               Relay du 21 octobre la portait (« RETRAIT JUSQU'AU 26/10 »),
                               c'est la route qui ne savait pas la lire. */}
                           {jours==null && t.limiteVers && <div data-colis-limite="vers" data-colis-limite-vers={String(t.limiteVers)} style={{fontSize:11,color:C.text,marginTop:1}}>À retirer vers le {new Date(String(t.limiteVers).slice(0,10)+'T00:00:00').toLocaleDateString('fr-FR',{day:'2-digit',month:'2-digit'})} (estimé : le transporteur ne donne pas la date)</div>}
-                          {jours==null && !t.limiteVers && <div data-colis-limite="inconnue" style={{fontSize:11,color:C.muted,marginTop:1}}>Date limite de retrait inconnue — un point relais garde un colis 4 à 7 jours</div>}
+                          {jours==null && !t.limiteVers && <div data-colis-limite="inconnue" style={{fontSize:11,color:C.muted,marginTop:1}} title="Un point relais garde un colis 4 à 7 jours">Date limite de retrait inconnue (4 à 7 j en général)</div>}
                           {jours!=null && (
                             /* ⚠️ CETTE LIGNE-LÀ NE SE COUPE PAS. Elle était en
                                `nowrap + ellipsis` comme ses voisines : à 430 px
@@ -47062,7 +46954,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                             )}
                           </div>
                         )}
-                        <button className="vrm-pickup-collect" type="button" onClick={()=>markCollected(t)} title="J'ai retiré ce colis" aria-label="J’ai retiré ce colis" style={{flexShrink:0,border:`1px solid ${C.border}`,background:C.card,color:C.text,borderRadius:10,fontWeight:600,cursor:'pointer',fontFamily:'inherit',whiteSpace:'nowrap'}}><span aria-hidden="true">✓</span><span className="vrm-pickup-collect-label"> J’ai retiré</span></button>
+                        <button className="vrm-pickup-collect" type="button" onClick={()=>markCollected(t)} title="J'ai retiré ce colis" aria-label="J’ai retiré ce colis" style={{flexShrink:0,whiteSpace:'nowrap'}}><span aria-hidden="true">✓</span><span className="vrm-pickup-collect-label"> J’ai retiré</span></button>
                       </div>
                     );
                   })}
@@ -47152,15 +47044,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       {avecCode
                         ? 'Donne le code de retrait, ou scanne le QR depuis la conversation Vinted'
                         : (()=>{ const e = extSaitLireCodes();
-                            if (e === 'retard') return "Ton extension est en retard : cette version-là ne sait pas encore aller lire les codes. Mets-la à jour (Réglages), puis passe sur Vinted avec le compte indiqué. En attendant, ouvre la conversation : le code y est.";
-                            if (e === 'absente') return "Sur téléphone il n'y a pas d'extension : ouvre la conversation Vinted du colis, le code et le QR y sont.";
+                            if (e === 'retard') return "Extension en retard : elle ne lit pas encore les codes. Mets-la à jour (Réglages) ; en attendant, ouvre la conversation, le code y est.";
+                            if (e === 'absente') return "Ouvre la conversation Vinted du colis : le code et le QR y sont.";
                             // ⚠️ Le chemin SÛR en premier : le code est dans la
                             //    conversation (bouton sous chaque colis), et il y
                             //    est tout de suite. L'extension la lit aussi toute
                             //    seule, mais pour les casiers Vinted Go il faut une
                             //    version récente — ne pas en faire la promesse
                             //    principale, sinon « j'ai attendu et rien n'est venu ».
-                            return `Le code (et le QR) est dans la conversation Vinted de chaque colis — ouvre-la avec le bouton sous le colis, il y est tout de suite. L'extension la lit aussi toute seule quand tu passes sur Vinted connecté ${memeCompte ? `sur ${memeCompte}` : 'avec le compte indiqué sur chaque ligne'}.`; })()}
+                            return `Le code et le QR sont dans la conversation Vinted (bouton sous le colis). L'extension la lit aussi toute seule quand tu passes sur Vinted connecté ${memeCompte ? `sur ${memeCompte}` : 'avec le compte indiqué sur chaque ligne'}.`; })()}
                       {memeCompte && !avecCode && extSaitLireCodes() !== 'ok' && <> Ils sont tous sur <b style={{color:C.text,fontWeight:600}}>{memeCompte}</b>.</>}
                     </span>
                   </div></details>
@@ -47190,7 +47082,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       <span style={{opacity:.45,display:'flex',flexShrink:0}}>{thumb(photoColis(t))}</span>
                       <div style={{flex:'1 1 150px',minWidth:0,opacity:.6}}>
                         <div style={{fontSize:13,fontWeight:500,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',textDecoration:'line-through'}}>{t.artTitle||`Colis${t.suivi?' n°'+t.suivi:''}`}</div>
-                        <div style={{fontSize:11,color:C.muted,marginTop:1}}>Tu l'as coché récupéré · en attente de confirmation — son QR reste dispo</div>
+                        <div style={{fontSize:11,color:C.muted,marginTop:1}}>Coché récupéré · son QR reste là en cas de souci</div>
                         <LigneArrivee arr={arriveeColisEmail(t)}/>
                         {t.suivi&&<div style={{fontSize:11,color:C.muted,fontFamily:'monospace',letterSpacing:.5,marginTop:1,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>n° {t.suivi}</div>}
                       </div>
@@ -47206,7 +47098,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                           {cd && <div style={{textAlign:'center',border:`1px solid ${C.border}`,borderRadius:8,padding:'3px 8px'}}><div style={{fontSize:7.5,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:600}}>{id2?'Ouverture':'Code'}</div><div style={{fontSize:15,fontWeight:700,color:C.text,fontFamily:'monospace',letterSpacing:1}}>{cd}</div></div>}
                         </div>
                       )}
-                      <button type="button" onClick={()=>unmarkCollected(t)} title="Annuler : je ne l'ai pas encore récupéré" aria-label="Annuler" style={{flexShrink:0,border:`1px solid ${C.border}`,background:'transparent',color:C.muted,borderRadius:8,padding:'7px 10px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>↺ Remettre</button>
+                      <Bouton variante="discret" onClick={()=>unmarkCollected(t)} title="Annuler : je ne l'ai pas encore récupéré" aria-label="Annuler : je ne l'ai pas encore récupéré" style={{flexShrink:0,marginLeft:'auto'}}>↺ Remettre</Bouton>
                     </div>
                     );
                   })}
@@ -47232,7 +47124,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       <span style={{opacity:.45,display:'flex',flexShrink:0}}>{thumb(orderPhoto(o))}</span>
                       <div style={{flex:'1 1 150px',minWidth:0,opacity:.6}}>
                         <div style={{fontSize:13,fontWeight:500,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',textDecoration:'line-through'}}>{o.title||'Colis'}</div>
-                        <div style={{fontSize:11,color:C.muted,marginTop:1}}>Tu l'as coché récupéré · Vinted dit encore « déposé » — ça se règle tout seul</div>
+                        <div style={{fontSize:11,color:C.muted,marginTop:1}}>Coché récupéré · Vinted dit encore « déposé », ça se règle seul</div>
                         <LigneArrivee arr={tk ? arriveeColisEmail(tk) : arriveeColisVinted(relaisDe(o))}/>
                         {tk&&tk.suivi&&<div style={{fontSize:11,color:C.muted,fontFamily:'monospace',letterSpacing:.5,marginTop:1,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>n° {tk.suivi}</div>}
                       </div>
@@ -47248,13 +47140,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                           {cd && <div style={{textAlign:'center',border:`1px solid ${C.border}`,borderRadius:8,padding:'3px 8px'}}><div style={{fontSize:7.5,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:600}}>{id2?"Ouverture":'Code'}</div><div style={{fontSize:15,fontWeight:700,color:C.text,fontFamily:'monospace',letterSpacing:1}}>{cd}</div></div>}
                         </div>
                       )}
-                      <button type="button" onClick={()=>unmarkPickupDone(o)} title="Annuler : je ne l'ai pas encore récupéré" aria-label="Annuler" style={{flexShrink:0,border:`1px solid ${C.border}`,background:'transparent',color:C.muted,borderRadius:8,padding:'7px 10px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>↺ Remettre</button>
+                      <Bouton variante="discret" onClick={()=>unmarkPickupDone(o)} title="Annuler : je ne l'ai pas encore récupéré" aria-label="Annuler : je ne l'ai pas encore récupéré" style={{flexShrink:0,marginLeft:'auto'}}>↺ Remettre</Bouton>
                     </div>
                     );
                   })}
                 </div>
               )}
-              <div className="vrm-pickup-foot" style={{color:C.muted}}>Coche <b>✓</b> quand tu l'as récupéré : il reste en gris, avec son code, jusqu'à ce que Vinted confirme.</div>
+              <div className="vrm-pickup-foot" style={{color:C.muted}}>Coche ✓ quand tu l'as récupéré : il reste en gris jusqu'à ce que Vinted confirme.</div>
             </div>
           );
         })()}
@@ -47312,13 +47204,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               <Icon name="alert" size={16} color={C.warn}/>{pickupUnion.aVerifier.length} colis à vérifier
             </div>
             <div style={{fontSize:11.5,color:C.muted,marginTop:4,lineHeight:1.45}}>
-              Délai de retrait dépassé, ou au point relais depuis plus longtemps que son transporteur ne garde un colis (mesuré sur tes e-mails : Chronopost 4 jours, Mondial Relay 5, Vinted Go 6 ; {GARDE_MAX_J} pour les autres){pickupUnion.aVerifier.some(x=>x.e&&x.e.etat==='transporteur')?', ou le transporteur signale un problème (son message est recopié sur la ligne)':''}.
-              Ils ne comptent plus dans « à retirer » : rien ne dit encore s'ils ont été retirés ou s'ils sont repartis. <b>Si tu l'as eu, coche « Je l'ai eu »</b> ; sinon, le suivi du transporteur et la conversation Vinted de la commande disent s'il est encore là ou reparti.
+              Si tu l'as eu, coche « Je l'ai eu » ; sinon le suivi du transporteur et la conversation Vinted disent s'il est encore là ou reparti. <Pourquoi label="Pourquoi « à vérifier »">Délai de retrait dépassé, ou au point relais depuis plus longtemps que son transporteur ne garde un colis (mesuré sur tes e-mails : Chronopost 4 jours, Mondial Relay 5, Vinted Go 6 ; {GARDE_MAX_J} pour les autres){pickupUnion.aVerifier.some(x=>x.e&&x.e.etat==='transporteur')?', ou le transporteur signale un problème (son message est recopié sur la ligne)':''}. Ils ne comptent plus dans « à retirer » : rien ne dit encore s'ils ont été retirés ou s'ils sont repartis.</Pourquoi>
               {/* (revue du 23 oct.) Le compte suit la MÊME règle que les lignes
                   (`aEncoreCode`) : un colis vu par Vinted dont la conversation
                   porte le code compte aussi — avant, seuls les e-mails comptaient. */}
               {(()=>{ const n=pickupUnion.aVerifier.filter(aEncoreCode).length;
-                return n ? <> {n>1?`${n} ont encore leur code ou leur QR`:'1 a encore son code ou son QR'} ci-dessous : il est peut-être encore au relais.</> : null; })()}
+                return n ? <><br/>{n>1?`${n} ont encore leur code ou leur QR`:'1 a encore son code ou son QR'} : peut-être encore au relais.</> : null; })()}
             </div>
             <div style={{marginTop:10,display:'flex',flexDirection:'column',gap:7}}>
               {pickupUnion.aVerifier.map((x,i)=>{
@@ -47348,7 +47239,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                         </button>
                       ) : null; })()}
                       <BoutonSuivreColis transporteur={t.carrier} suivi={t.suivi} codePostal={codePostalLu(t)} enLigne court attrs={{'data-oublie-verifier':''}}/>
-                      <button type="button" title="Je l'avais récupéré" data-oublie-eu="" onClick={()=>markCollected(t)} style={{flexShrink:0,border:`1px solid ${C.accent}`,background:`${C.accent}14`,color:C.accent,borderRadius:8,padding:'5px 10px',fontSize:11.5,fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>✓ Je l'ai eu</button>
+                      <Bouton variante="secondaire" title="Je l'avais récupéré" data-oublie-eu="" onClick={()=>markCollected(t)} style={{flexShrink:0}}>✓ Je l'ai eu</Bouton>
                       </div>
                     </div>
                   );
@@ -47362,7 +47253,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       <div style={{fontSize:11,color:C.muted,overflowWrap:'anywhere'}}>
                         {o._acc?`${accName(o._acc)} · `:''}<b style={{color:C.warn,fontWeight:600}}>{raison}</b>
                         {/* (revue du 23 oct.) Un compte déjà nommé par la ligne de fraîcheur ne se redit pas ici. */}
-                        {jCap!=null && jCap>=1 && jCap<FRAICHEUR_ACHATS_J ? ` · Vinted disait « déposé en point relais » il y a ${jCap} j (dernière lecture de ce compte)` : ''}
+                        {jCap!=null && jCap>=1 && jCap<FRAICHEUR_ACHATS_J ? ` · « déposé en point relais » lu il y a ${jCap} j` : ''}
                       </div>
                       <LigneNouvelleVinted nv={nouvelleDe(o)}/>
                       {(()=>{ const e=entreeSuiviAchat(o); const su=suivisAchat(o, indexSuivisAchats)[0]; return su ? <LigneTransporteur transp={transpMap} suivi={su} carrier={(e&&e.transporteur)||transporteurDeForme(su)||''}/> : null; })()}
@@ -47370,8 +47261,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     <div className="vrm-oublie-gestes">
                       {(()=>{ const e=entreeSuiviAchat(o); const su=suivisAchat(o, indexSuivisAchats)[0]; return su ? <BoutonSuivreColis transporteur={(e&&e.transporteur)||transporteurDeForme(su)||''} suivi={su} enLigne court/> : null; })()}
                       {cd && <span style={{flexShrink:0,fontSize:12,fontWeight:700,color:C.text,fontFamily:'ui-monospace,monospace',border:`1px solid ${C.border}`,borderRadius:8,padding:'2px 7px'}}>{cd}</span>}
-                      {href && <a href={href} target="_blank" rel="noreferrer" style={{flexShrink:0,textDecoration:'none',border:`1px solid ${C.border}`,color:C.muted,borderRadius:8,padding:'5px 9px',fontSize:11.5,fontWeight:600,minHeight:44,boxSizing:'border-box',display:'inline-flex',alignItems:'center'}}>Conversation ↗</a>}
-                      <button type="button" title="Je l'avais récupéré" onClick={()=>markPickupDone(o)} style={{flexShrink:0,border:`1px solid ${C.accent}`,background:`${C.accent}14`,color:C.accent,borderRadius:8,padding:'5px 10px',fontSize:11.5,fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>✓ Je l'ai eu</button>
+                      {href && <Bouton variante="secondaire" href={href} target="_blank" rel="noreferrer" style={{flexShrink:0}}>Conversation ↗</Bouton>}
+                      <Bouton variante="secondaire" title="Je l'avais récupéré" onClick={()=>markPickupDone(o)} style={{flexShrink:0}}>✓ Je l'ai eu</Bouton>
                     </div>
                   </div>
                 );
@@ -47447,7 +47338,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                           <div style={{fontSize:12,color:C.muted,marginTop:2}}>{r.statut==='transporteur'?"Le transporteur dit sur son site qu'il repart chez l'expéditeur":"Le transporteur écrit qu'il repart chez l'expéditeur"}{compteDuColisEmail(t)?` · ${compteDuColisEmail(t)}`:''}</div>
                           <LigneTransporteur transp={transpMap} suivi={suiviDeLigne(t)} carrier={t.carrier}/>
                         </div>
-                        {t.suivi && <a className="vrm-pickup-lien" href={trackUrl(t.carrier||'', String(t.suivi))} target="_blank" rel="noreferrer" style={{flexShrink:0,fontSize:12.5,fontWeight:600,color:C.accent,textDecoration:'none'}}>Suivi ↗</a>}
+                        {t.suivi && <Bouton variante="discret" className="vrm-pickup-lien" href={trackUrl(t.carrier||'', String(t.suivi))} target="_blank" rel="noreferrer" style={{flexShrink:0}}>Suivi ↗</Bouton>}
                       </div>
                     );
                   }
@@ -47464,7 +47355,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                         </div>
                         {(()=>{ const su = r.t ? suiviDeLigne(r.t) : suivisAchat(o, indexSuivisAchats)[0]; const e = entreeSuiviAchat(o); return su ? <LigneTransporteur transp={transpMap} suivi={su} carrier={(r.t && r.t.carrier) || (e && e.transporteur) || transporteurDeForme(su) || ''}/> : null; })()}
                       </div>
-                      {href && <a className="vrm-pickup-lien" href={href} target="_blank" rel="noreferrer" style={{flexShrink:0,fontSize:12.5,fontWeight:600,color:C.accent,textDecoration:'none'}}>Ouvrir la conversation ↗</a>}
+                      {href && <Bouton variante="discret" className="vrm-pickup-lien" href={href} target="_blank" rel="noreferrer" style={{flexShrink:0}}>Ouvrir la conversation ↗</Bouton>}
                     </div>
                   );
                 })}
@@ -47532,7 +47423,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   <span style={{whiteSpace:'nowrap'}}>{o.date?new Date(o.date).toLocaleDateString('fr-FR',{day:'numeric',month:'short'}):''}
                   {/* DEPUIS COMBIEN DE TEMPS : « dois-je m'inquiéter ? ». Au-delà de
                       trois semaines, en rouge — le moment de relancer le vendeur. */}
-                  {!cancelled && !st.retour && st.step>=1 && st.step<4 && (()=>{ const t=tsCommande(o); if(!t) return null; const j=Math.floor((Date.now()-t)/86400000); if(j<2) return null; const tard=j>ACHAT_RETARD_J; return <span style={{fontWeight:tard?700:500,color:tard?C.danger:C.muted,whiteSpace:'normal'}}> · depuis {j} j{tard?' — relance le vendeur':''}</span>; })()}</span>
+                  {!cancelled && !st.retour && st.step>=1 && st.step<4 && (()=>{ const t=tsCommande(o); if(!t) return null; const j=Math.floor((Date.now()-t)/86400000); if(j<2) return null; const tard=j>ACHAT_RETARD_J; return <span style={{fontWeight:tard?700:500,color:tard?C.warn:C.muted,whiteSpace:'normal'}}> · depuis {j} j{tard?' — relance le vendeur':''}</span>; })()}</span>
                   {tk && tk.lieu && st.step===3 && <span style={{color:C.text}}>· {tk.lieu}</span>}
                   {numA!=null && <span title="Numéro de l'article (lien avec l'annonce / la vente)" style={{fontWeight:600,color:C.text}}>N°{numA}</span>}
                   {o._fromEmail && <span title="Reconstituée depuis l'email — pas encore confirmée par Vinted" style={{fontSize:11,fontWeight:600,color:C.muted,border:`1px solid ${C.border}`,borderRadius:8,padding:'0 6px'}}>email</span>}
@@ -47564,13 +47455,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     de commande est celui déjà utilisé par le bouton bordereau. */}
                 {st.retour && (
                   <div className="vrm-buy-retour">
-                    <a href={`https://www.vinted.fr/member/transactions/${encodeURIComponent(o.transaction_id)}`} target="_blank" rel="noreferrer"
-                      style={{display:'inline-flex',alignItems:'center',gap:6,border:`1px solid ${C.warn}`,background:'transparent',color:C.warn,borderRadius:10,padding:'0 14px',fontSize:13,fontWeight:600,textDecoration:'none'}}>
-                      ↩ Bordereau de retour sur Vinted
-                    </a>
-                    <div style={{fontSize:12,color:C.muted,marginTop:4,lineHeight:1.4}}>
-                      Litige : l'article doit repartir. L'étiquette se génère sur Vinted — VRM ne l'envoie pas à ta place.
-                    </div>
+                    <Bouton variante="secondaire" href={`https://www.vinted.fr/member/transactions/${encodeURIComponent(o.transaction_id)}`} target="_blank" rel="noreferrer">↩ Bordereau de retour ↗</Bouton>
+                    <div style={{fontSize:12,color:C.muted,marginTop:4,lineHeight:1.4}}>Litige : l'étiquette de retour se génère sur Vinted.</div>
                   </div>
                 )}
               </div>
@@ -47628,10 +47514,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             porte le TOTAL, rien n'est caché. Mesuré : l'onglet « Tous »
             faisait 72 880 px sur iPhone — quatre-vingt-six écrans. */}
         {achatsAffiches.length > achatsMax && (
-          <button type="button" onClick={()=>setAchatsMax(n=>n+120)}
-            style={{width:'100%',marginTop:10,border:`1px solid ${C.border}`,background:C.card,color:C.text,borderRadius:10,padding:'12px',cursor:'pointer',fontSize:13,fontWeight:600,fontFamily:'inherit',boxShadow:C.shadow||'none'}}>
+          <Bouton variante="secondaire" plein onClick={()=>setAchatsMax(n=>n+120)} style={{marginTop:10}}>
             Voir plus — {achatsMax} affichés sur {achatsAffiches.length}
-          </button>
+          </Bouton>
         )}
         {/* (26 oct.) Les reçus par email sont une archive, pas le geste du jour :
             sous la liste, plus en tête (une carte « · 0 » poussait les colis vers le bas). */}
@@ -47646,10 +47531,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         <NoAcc/>
         <AnnoncesACompleter items={annBase} numeros={numeros} drafts={drafts} ouvrir={setAtelier} charger={()=>loadListings(true)} charge={listings.loading} PhotoVinted={PhotoVinted} incomplet={!Array.isArray(listings.items)||!!listings.error||!!listings.incomplet}/>
         {astuceNum && listings.items?.length>0 && (
-          <div data-astuce-numeros style={{display:'flex',gap:10,alignItems:'flex-start',background:`${C.accent}0e`,border:`1px solid ${C.border}`,borderRadius:10,padding:'10px 12px',margin:'0 0 12px',fontSize:12.5,lineHeight:1.5,color:C.muted}}>
-            <span aria-hidden="true" style={{fontSize:15,lineHeight:1.3}}>🔢</span>
-            <div style={{flex:1,minWidth:0}}>Chaque article reçoit un <b style={{color:C.text,fontWeight:600}}>numéro</b> dans l’ordre de mise en ligne, pour le retrouver sur ton étagère, Leboncoin et eBay. Il se change d’un clic et n’est jamais redonné.</div>
-            <button type="button" aria-label="J’ai compris, masquer cette astuce" onClick={()=>{ save('vrm_astuce_numeros', false); setAstuceNum(false); }} style={{flexShrink:0,border:'none',background:'transparent',color:C.muted,cursor:'pointer',fontSize:16,lineHeight:1,padding:2,fontFamily:'inherit'}}>✕</button>
+          <div data-astuce-numeros style={{display:'flex',gap:8,alignItems:'center',background:'var(--vrm-b-teinte)',borderRadius:10,padding:'0 4px 0 12px',margin:'0 0 12px',fontSize:12.5,lineHeight:1.45,color:C.muted}}>
+            <span aria-hidden="true" style={{display:'flex',color:C.muted}}><Icon name="tag" size={16}/></span>
+            <div style={{flex:1,minWidth:0,display:'flex',alignItems:'center',gap:4,flexWrap:'wrap'}}>Chaque article a un <b style={{color:C.text,fontWeight:600}}>numéro</b>, jamais redonné. <Pourquoi label="À quoi il sert">Il suit l’ordre de mise en ligne : il sert à retrouver la paire sur ton étagère, sur Leboncoin et sur eBay. Il se change d’un clic sur la carte et n’est jamais donné à une autre paire.</Pourquoi></div>
+            <button type="button" aria-label="J’ai compris, masquer cette astuce" onClick={()=>{ save('vrm_astuce_numeros', false); setAstuceNum(false); }} style={{flexShrink:0,border:'none',background:'transparent',color:C.muted,cursor:'pointer',fontSize:16,lineHeight:1,minWidth:44,minHeight:44,padding:0,fontFamily:'inherit'}}>✕</button>
           </div>
         )}
         {/* (27 oct.) Acceptation automatique des offres — interrupteur, éteint par
@@ -47732,8 +47617,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             <div className="vrm-ann-actions" style={{display:'flex',gap:8,flexWrap:'wrap'}}>
             {/* (28 oct., 5.252) UN bouton « Actions » (sa demande) : le menu porte
                 republier, modifier sur place, brouillon → en ligne, en ligne → brouillon. */}
-            <button type="button" data-actions-ouvrir aria-haspopup="dialog" onClick={()=>setActionsOpen(true)}
-              style={{border:`1px solid ${C.border}`,borderRadius:8,padding:'8px 12px',minHeight:40,fontSize:13,fontWeight:600,background:'transparent',color:C.text,cursor:'pointer',fontFamily:'inherit',whiteSpace:'nowrap'}}>Actions{brVinted.liste && brVinted.liste.length ? ` · ${brVinted.liste.length} brouillon${brVinted.liste.length>1?'s':''}` : ''} ▾</button>
+            <Bouton icone="sync" data-actions-ouvrir aria-haspopup="dialog" onClick={()=>setActionsOpen(true)} style={{whiteSpace:'nowrap'}}>Republier…{brVinted.liste && brVinted.liste.length ? ` · ${brVinted.liste.length} brouillon${brVinted.liste.length>1?'s':''}` : ''}</Bouton>
             {nRefaire > 0 && <button type="button" data-refaire-ouvrir={nRefaire} onClick={()=>setRefaireOpen(true)}
               style={{border:`1px solid ${C.warn}`,borderRadius:8,padding:'8px 12px',minHeight:40,fontSize:13,fontWeight:600,background:'transparent',color:C.text,cursor:'pointer',fontFamily:'inherit',whiteSpace:'nowrap'}}>{nRefaire} brouillon{nRefaire>1?'s':''} à refaire</button>}
             </div>
@@ -47742,19 +47626,19 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               <button type="button" aria-label="Outils" onClick={(e)=>{ try { const r=e.currentTarget.getBoundingClientRect(); setAnnToolsCote(r.right>=246?'droite':'gauche'); } catch(_){} setAnnToolsOpen(v=>!v); }} aria-expanded={annToolsOpen} title="Outils : répartir un lot, audit du stock"
                 style={{border:`1px solid ${annToolsOpen?C.accent:C.border}`,borderRadius:8,padding:'8px 12px',fontSize:13,fontWeight:600,background:annToolsOpen?`${C.accent}12`:'transparent',color:annToolsOpen?C.accent:C.text,cursor:'pointer',fontFamily:'inherit'}}>⋯<span className="vrm-ann-outils-mot"> Outils</span></button>
               {annToolsOpen && (<>
-                <div onClick={()=>setAnnToolsOpen(false)} style={{position:'fixed',inset:0,zIndex:70}}/>
+                <div className="vrm-menu-voile" onClick={()=>setAnnToolsOpen(false)} style={{position:'fixed',inset:0,zIndex:70}}/>
                 {/* Le menu s'ancrait à GAUCHE du bouton, posé au bord droit de la ligne :
                     ses quatre outils sortaient de l'écran (1512 px : 1332→1562 pour une zone
                     visible jusqu'à 1452 ; 390 px : 274→504), leurs noms coupés, sans erreur.
                     Il s'ancre à droite comme le menu de l'écran Ventes — sauf si le bouton,
                     passé à la ligne, est trop près du bord gauche pour cela. */}
-                <div style={{position:'absolute',...(annToolsCote==='gauche'?{left:0}:{right:0}),top:'calc(100% + 6px)',zIndex:71,minWidth:230,maxWidth:'calc(100vw - 32px)',background:C.card,border:`1px solid ${C.border}`,borderRadius:10,boxShadow:C.shadowLg||'0 8px 24px rgba(0,0,0,.2)',padding:6,display:'flex',flexDirection:'column',gap:2}}>
+                <div className="vrm-menu-flottant" data-outils-annonces="" style={{position:'absolute',...(annToolsCote==='gauche'?{left:0}:{right:0}),top:'calc(100% + 6px)',zIndex:71,minWidth:230,maxWidth:'calc(100vw - 32px)',background:C.card,border:`1px solid ${C.border}`,borderRadius:10,boxShadow:C.shadowLg||'0 8px 24px rgba(0,0,0,.2)',padding:6,display:'flex',flexDirection:'column',gap:2}}>
                   {[
-                    {k:'lot', icon:'🧮', lab:'Répartir un lot', desc:"Ventiler le prix d'un achat groupé", on:()=>{ setAnnToolsOpen(false); setLotSel(new Set()); setLotTotal(''); setLotSearch(''); setLotMode('equal'); setLotOpen(true); }},
-                    {k:'studio', icon:'📷', lab:'Studio photo', desc:'Cadre guide à la prise de vue, détourage sans envoi', on:()=>{ setAnnToolsOpen(false); setStudioOpen(true); }},
-                    {k:'inv', icon:'📋', lab:'Inventaire physique', desc:'Les paires qui doivent être chez toi, par numéro', on:()=>{ setAnnToolsOpen(false); setInventOpen(true); }},
-                    {k:'aud', icon:'🔎', lab:'Audit du stock', desc:'Retrouver les paires mal rangées', on:()=>{ setAnnToolsOpen(false); setAuditOpen(true); }},
-                    {k:'fillbuy', icon:'💶', lab:"Compléter les prix d'achat", desc:`${fillBuyRows.length} article${fillBuyRows.length>1?'s':''} sans coût — le bénéfice est faux sans eux`, on:()=>{ setAnnToolsOpen(false); setFillBuyOpen(true); }},
+                    {k:'lot', icon:'grid', lab:'Répartir un lot', desc:"Ventiler le prix d'un achat groupé", on:()=>{ setAnnToolsOpen(false); setLotSel(new Set()); setLotTotal(''); setLotSearch(''); setLotMode('equal'); setLotOpen(true); }},
+                    {k:'studio', icon:'camera', lab:'Studio photo', desc:'Cadre guide à la prise de vue, détourage sans envoi', on:()=>{ setAnnToolsOpen(false); setStudioOpen(true); }},
+                    {k:'inv', icon:'box', lab:'Inventaire physique', desc:'Les paires qui doivent être chez toi, par numéro', on:()=>{ setAnnToolsOpen(false); setInventOpen(true); }},
+                    {k:'aud', icon:'search', lab:'Audit du stock', desc:'Retrouver les paires mal rangées', on:()=>{ setAnnToolsOpen(false); setAuditOpen(true); }},
+                    {k:'fillbuy', icon:'euro', lab:"Compléter les prix d'achat", desc:`${fillBuyRows.length} article${fillBuyRows.length>1?'s':''} sans coût — le bénéfice est faux sans eux`, on:()=>{ setAnnToolsOpen(false); setFillBuyOpen(true); }},
                     /* « Rédiger une annonce (IA) » retiré le 30 septembre (Julien : « ça ne
                        va pas servir »). */
                     /* ⚠️ « Renuméroter à la suite » A ÉTÉ RETIRÉ DU MENU (23 août 2026).
@@ -47764,7 +47648,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                        Ne pas le remettre sans son accord explicite. */
                   ].map(t=>(
                     <button key={t.k} type="button" onClick={t.on} style={{display:'flex',alignItems:'center',gap:10,textAlign:'left',border:'none',background:'transparent',borderRadius:8,padding:'9px 10px',cursor:'pointer',fontFamily:'inherit'}}>
-                      <span style={{fontSize:17,flexShrink:0}}>{t.icon}</span>
+                      <span aria-hidden="true" style={{flexShrink:0,display:'flex',color:C.muted}}><Icon name={t.icon} size={18}/></span>
                       <span style={{minWidth:0}}>
                         <span style={{display:'block',fontSize:13,fontWeight:600,color:C.text}}>{t.lab}</span>
                         <span style={{display:'block',fontSize:11,color:C.muted,marginTop:1}}>{t.desc}</span>
@@ -48530,6 +48414,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           })}
         </div>
       </>)}
+      {curSub==='annonces' && <section className="vrm-ventes-controles" data-annonces-controles="" style={{display:'flex',flexDirection:'column',gap:8,margin:'16px 0 12px'}}>
+        <h3 data-titre-section="" style={{fontSize:15,fontWeight:600,color:C.text,letterSpacing:-0.15,margin:'0 2px'}}>Vérifications</h3>
+        <BilanSynchronisation owner={AUTH.user?.id||''} sources={sourcesBilan} onNav={onNav}/>
+        <VendusAilleurs owner={AUTH.user?.id||''} ownerActuel={()=>AUTH.user?.id||''} charger={chargerRetraitsMulti} onNav={onNav} PhotoVinted={PhotoVinted}/>
+      </section>}
 
       {/* ── ONGLET « REPUBLIER » RETIRÉ (demande de Julien, août 2026) ───────────
           « L'onglet republier sur l'application ça sert à rien, tu peux
@@ -48852,6 +48741,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         </div>
         </details>}
       </>)}
+      {/* (30 oct.) Les vérifications passent SOUS la liste, comme sur Ventes : avant, on ne voyait
+          aucune annonce au premier écran. Rien n'est retiré, tout reste replié. */}
+      {curSub==='messages' && <section data-verifications-messages="" style={{marginTop:16}}><BilanSynchronisation owner={AUTH.user?.id||''} sources={sourcesBilan} onNav={onNav}/></section>}
 
       {/* ── Bordereaux (ventes non annulées avec un numéro, à imprimer) ── */}
       {curSub==='bordereaux' && (<>
@@ -48947,7 +48839,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       s'il désigne un SOUS-ENSEMBLE strict ; sinon l'urgence
                       tient sur cette ligne. */}
                   {(()=>{ const u=urgenceColis(); if(!u.total || u.total<aPoster.length) return null;
-                    return <div style={{fontSize:11.5,color:u.danger?C.danger:C.warn,fontWeight:600,marginTop:3}}>{u.parts.join(' · ')} — {ouSontLesPresses(u)}</div>; })()}
+                    return <div data-colis-urgence-ligne="" style={{fontSize:11.5,color:C.warn,fontWeight:600,marginTop:3}}>{u.parts.join(' · ')}{u.presseAttente ? <> — {ouSontLesPresses(u)}</> : null}</div>; })()}
                 </div>
                 {avecPdf.length>0 && (
                   <button type="button" data-lot-ouvrir="1" onClick={ouvrirLot} disabled={batchBusy}
@@ -49067,7 +48959,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 <span aria-hidden="true" style={{color:C.warn,flexShrink:0,marginTop:1}}><Icon name="truck" size={18}/></span>
                 <div style={{minWidth:0}}>
                   <div style={{fontSize:13.5,fontWeight:700,color:C.text}}>{nb} colis coché{pl} « posté » que Vinted n'a pas vu{pl} partir</div>
-                  <div style={{fontSize:11.5,color:C.muted,marginTop:3,lineHeight:1.45}}>Vinted dit toujours qu'il{nb>1?'s attendent':' attend'} ton envoi — un statut lu après ta coche. Vérifie que le colis a bien été déposé (garde le reçu du point relais) ; s'il est encore chez toi, dépose-le ou remets-le dans « à envoyer ». Passé la date limite, Vinted peut annuler la vente.</div>
+                  <div style={{fontSize:11.5,color:C.muted,marginTop:3,lineHeight:1.45,display:'flex',alignItems:'center',gap:4,flexWrap:'wrap'}}>Vérifie le dépôt, ou remets-le dans « à envoyer ». <Pourquoi label="Pourquoi">Vinted dit toujours qu'il{nb>1?'s attendent':' attend'} ton envoi — un statut lu après ta coche. Vérifie que le colis a bien été déposé (garde le reçu du point relais) ; s'il est encore chez toi, dépose-le ou remets-le dans « à envoyer ». Passé la date limite, Vinted peut annuler la vente.</Pourquoi></div>
                 </div>
               </div>
               <div style={{display:'grid',gap:6,marginTop:9}}>
@@ -49088,7 +48980,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                         <div style={{fontSize:11,color:C.muted,marginTop:2,display:'flex',gap:8,flexWrap:'wrap'}}>
                           <span>coché il y a {depuis}</span>
                           {limiteDepassee
-                            ? <span style={{color:C.danger,fontWeight:600}}>date limite dépassée</span>
+                            ? <span style={{color:C.warn,fontWeight:600}}>date limite dépassée</span>
                             : joursLimite!=null && <span>{joursLimite===0 ? 'limite aujourd’hui' : `limite dans ${joursLimite} j`}</span>}
                           {prix && <span>{prix}</span>}
                           {plusieursComptes && o._acc && <span>· {accNameOf(o._acc)}</span>}
@@ -49274,9 +49166,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           const estPosteT = (x) => !!(x.o ? isShipDone(x.o) : isBordShippedManual(x.b));
           const nbMasquesPostes = exTout.filter(estPosteT).length;
           const lignePostes = nbMasquesPostes > 0 ? (
-            <button type="button" onClick={()=>setVoirPostes(v=>!v)}
+            <button type="button" data-voir-postes={nbMasquesPostes} onClick={()=>setVoirPostes(v=>!v)}
               style={{alignSelf:'flex-start',border:'none',background:'transparent',padding:'2px 2px',color:C.muted,fontSize:12,cursor:'pointer',fontFamily:'inherit',textAlign:'left'}}>
-              {voirPostes ? 'Cacher' : 'Afficher'} les {nbMasquesPostes} colis marqué{nbMasquesPostes>1?'s':''} « posté{nbMasquesPostes>1?'s':''} » — ils disparaissent seuls quand Vinted confirme l'envoi
+              {voirPostes ? 'Cacher' : 'Voir'} {nbMasquesPostes>1 ? `les ${nbMasquesPostes} colis postés` : 'le colis posté'}
             </button>) : null;
           const ex = voirPostes ? exTout : exTout.filter(x => !estPosteT(x));
           if (!ex.length && colisEb && colisEb.aPoster.length) return lignePostes;
@@ -49516,7 +49408,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       {b && <button type="button" onClick={()=>toggleBordPrinted(b)}
                         title={isBordPrinted(b)?'Remettre en « à imprimer »':'Marquer comme imprimé'} data-geste="imprime"
                         className="vrm-colis-sec vrm-colis-ter" style={{...sec,border:`1px solid ${C.border}`,background:isBordPrinted(b)?C.bg:'transparent',color:isBordPrinted(b)?C.text:C.muted}}>
-                        {isBordPrinted(b)?'✓ Imprimé':'Imprimé ?'}
+                        {isBordPrinted(b)?'✓ Imprimé':'Marquer imprimé'}
                       </button>}
                       {/* « Colis fait » marque LES DEUX (la vente et le bordereau) :
                           deux marqueurs pour un même carton, c'était deux chiffres
@@ -50208,6 +50100,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           Une liste, un champ par ligne, Entrée passe au suivant. Les paires
           vendues au CA le plus élevé d'abord : ce sont elles qui faussent le
           plus la compta tant que leur coût manque. */}
+      {!fillBuyOpen && fillBuyN0.current ? ((fillBuyN0.current = 0), null) : null}
       {fillBuyOpen && (
         <div className="vrm-feuille-fond" onClick={()=>setFillBuyOpen(false)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:1000,display:'flex',alignItems:'flex-end',justifyContent:'center'}} data-noswipe="1" data-fillbuy-feuille="">
           <FermeAuRetour fermer={()=>setFillBuyOpen(false)}/>
@@ -50217,20 +50110,19 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             <div style={{padding:'12px 16px',borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
               <div style={{display:'flex',alignItems:'center',gap:10}}>
                 <div style={{flex:1,minWidth:0}}>
-                  <div style={{fontSize:20,fontWeight:600,color:C.text,letterSpacing:'-0.02em'}}>Prix d'achat à compléter</div>
-                  <div style={{fontSize:11,color:C.muted,marginTop:2}}>
-                    {fillBuyRows.length} article{fillBuyRows.length>1?'s':''} sans coût · tape le prix, <b>Entrée</b> passe au suivant
-                    {fillBuyAchats.loading && <> · <span style={{color:C.accent}}>recherche de tes achats…</span></>}
-                    {!fillBuyAchats.loading && Object.keys(fillBuySugg).length>0 && <> · <b style={{color:C.accent}}>{Object.keys(fillBuySugg).length} article{Object.keys(fillBuySugg).length>1?'s':''} avec une piste</b> — tape « C'est ça » ou vérifie</>}
-                  </div>
+                  <div style={{fontSize:20,fontWeight:600,color:C.text,letterSpacing:'-0.02em'}}>Prix d'achat à compléter {fillBuyRows.length>0 && <Pourquoi label="Pourquoi c'est important">Tant qu'un coût manque, la vente compte comme 100 % de marge : ton bénéfice et ton rapport comptable sont faussés.</Pourquoi>}</div>
                 </div>
                 <button className="vrm-icon-control" type="button" onClick={()=>setFillBuyOpen(false)} aria-label="Fermer" style={{flexShrink:0,border:'none',background:'transparent',color:C.muted,cursor:'pointer',padding:4}}><Icon name="close" size={18}/></button>
               </div>
-              {fillBuyRows.length>0 && (
-                <div style={{fontSize:11,color:C.warn,marginTop:6,lineHeight:1.4}}>
-                  Tant qu'un coût manque, la vente compte comme <b>100 % de marge</b> : ton bénéfice et ton rapport comptable sont sous-estimés.
-                </div>
-              )}
+              {(()=>{ if (fillBuyN0.current < fillBuyRows.length) fillBuyN0.current = fillBuyRows.length;
+                const n0 = fillBuyN0.current, faits = Math.max(0, n0 - fillBuyRows.length), nPiste = Object.keys(fillBuySugg).length;
+                if (!n0) return null;
+                return <div style={{marginTop:8}}><Avancement data={{'data-fillbuy-avancement': `${faits}/${n0}`}}
+                  titre={`${fillBuyRows.length} article${fillBuyRows.length>1?'s':''} sans coût`}
+                  compte={faits ? `${faits} saisi${faits>1?'s':''}` : null}
+                  part={n0 ? faits / n0 : 0}
+                  label={`${faits} sur ${n0} saisis`}
+                  phrase={<>Tape le prix, <b>Entrée</b> passe au suivant.{fillBuyAchats.loading ? <> · recherche de tes achats…</> : nPiste > 0 ? <> · <b>{nPiste} article{nPiste>1?'s':''} avec une piste</b> : « C'est ça » le relie.</> : null}</>}/></div>; })()}
             </div>
             <div style={{overflowY:'auto',padding:'10px 12px 16px'}}>
               {fillBuyRows.length===0 && (
@@ -50269,9 +50161,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   </div>
                  </div>
                  {(()=>{ const cs=fillBuySugg[r.key]; if(!cs||!cs.length) return null;
-                   return (
-                     <div style={{marginTop:6,display:'flex',flexDirection:'column',gap:4}}>
-                       {cs.map((cand,ci)=>{ const p=cand.o, sur=cand.sur;
+                   // (30 oct.) Seules les pistes sûres (« C'est ça ») restent en clair ; les
+                   // « à vérifier » se replient (« N pistes ») : l'œil va au champ, pas aux pistes.
+                   // Le barème ne change pas (§5.23).
+                   const rendre = (cand,ci)=>{ const p=cand.o, sur=cand.sur;
                          const pr=p.price?.amount!=null?Number(p.price.amount):null;
                          const d=p.date?new Date(p.date):null;
                          return (
@@ -50288,7 +50181,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                              </span>
                              <span style={{flexShrink:0,fontSize:11,fontWeight:700,color:sur?C.accent:C.muted,border:`1px solid ${sur?C.accent:C.border}`,borderRadius:8,padding:'3px 9px'}}>{sur?"C'est ça":'à vérifier'}</span>
                            </button>
-                         ); })}
+                         ); };
+                   const sures = cs.filter(c=>c.sur), autres = cs.filter(c=>!c.sur);
+                   return (
+                     <div style={{marginTop:6,display:'flex',flexDirection:'column',gap:4}}>
+                       {sures.map(rendre)}
+                       {autres.length>0 && <details className="vrm-repli" data-pistes-a-verifier={autres.length}><summary style={{fontSize:12,minHeight:36}}>{autres.length} piste{autres.length>1?'s':''} à vérifier</summary>
+                         <div style={{display:'flex',flexDirection:'column',gap:2,marginTop:4}}>{autres.map((c,ci)=>rendre(c,ci+sures.length))}</div>
+                       </details>}
                      </div>
                    ); })()}
                 </div>
@@ -50366,8 +50266,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           <div onClick={e=>e.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:560,maxHeight:'88vh',borderRadius:'14px 14px 0 0',display:'flex',flexDirection:'column',overflow:'hidden',paddingBottom:'env(safe-area-inset-bottom)',}}>
             <div style={{display:'flex',gap:10,alignItems:'center',padding:'12px 16px',borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
               <div style={{flex:1,minWidth:0}}>
-                <div style={{fontSize:15,fontWeight:700,color:C.text}}>📊 Rapport comptable</div>
-                <div style={{fontSize:11,color:C.muted}}>{libelleRegime(report.regime)} · <span style={{opacity:0.8}}>régime modifiable dans ⚙️ Paramètres</span></div>
+                <div style={{fontSize:15,fontWeight:700,color:C.text,display:'flex',alignItems:'center',gap:8}}><Icon name="doc" size={17}/>Rapport comptable</div>
+                <div style={{fontSize:11,color:C.muted}}>{libelleRegime(report.regime)} · <span style={{opacity:0.8}}>régime modifiable dans Réglages</span></div>
               </div>
               <button type="button" onClick={()=>setShowReport(false)} aria-label="Fermer" style={{border:'none',background:'transparent',fontSize:22,color:C.muted,cursor:'pointer',lineHeight:1}}>×</button>
             </div>
@@ -50378,7 +50278,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               <div style={{marginBottom:14}}>
                 <div style={{display:'flex',alignItems:'center',gap:8}}>
                   <span style={{fontSize:12,fontWeight:500,color:C.text}}>Mois</span>
-                  <button type="button" onClick={()=>setMoisOuvert(v=>!v)} style={{border:`1px solid ${C.border}`,borderRadius:8,padding:'6px 12px',fontSize:13,fontWeight:600,background:C.card,color:C.text,cursor:'pointer',textTransform:'capitalize',fontFamily:'inherit'}}>
+                  <button type="button" className="vrm-b vrm-b-secondaire vrm-b-petit" aria-expanded={moisOuvert} onClick={()=>setMoisOuvert(v=>!v)} style={{textTransform:'capitalize'}}>
                     {report.monthLabel} ▾
                   </button>
                 </div>
@@ -50529,19 +50429,19 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                         </label>
                         {(report.incomplet || (declForm.refus && !declarables)) && <RaisonDeclBloquee manque={report.incomplet || declForm.refus} refus={!!declForm.refus}/>}
                         <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
-                          <button type="button" data-decl-enregistrer onClick={()=>declarerMois(declForm.regle, declForm.montant, declForm.paye)} style={{border:'none',borderRadius:8,background:C.accent,color:C.onAccent,cursor:'pointer',fontSize:13,fontWeight:600,padding:'8px 14px'}}>Enregistrer</button>
+                          <Bouton variante="primaire" data-decl-enregistrer onClick={()=>declarerMois(declForm.regle, declForm.montant, declForm.paye)}>Enregistrer</Bouton>
                           {serieDeclActive() && SERIE_DECLARATION.liste.includes(reportMonth) ? (<>
-                            <button type="button" data-decl-passer onClick={()=>{ setDeclForm(null); allerMoisSuivantSerie(reportMonth); }} style={{border:`1px solid ${C.border}`,borderRadius:8,background:'transparent',color:C.text,cursor:'pointer',fontSize:13,padding:'8px 14px'}}>Pas encore déclaré — mois suivant</button>
-                            <button type="button" data-decl-serie-stop onClick={()=>{ finirSerieDecl(); setDeclForm(null); }} style={{border:`1px solid ${C.border}`,borderRadius:8,background:'transparent',color:C.text,cursor:'pointer',fontSize:13,padding:'8px 14px'}}>Arrêter</button>
+                            <Bouton variante="secondaire" data-decl-passer onClick={()=>{ setDeclForm(null); allerMoisSuivantSerie(reportMonth); }}>Pas encore déclaré — mois suivant</Bouton>
+                            <Bouton variante="discret" data-decl-serie-stop onClick={()=>{ finirSerieDecl(); setDeclForm(null); }}>Arrêter</Bouton>
                           </>) : (
-                          <button type="button" onClick={()=>setDeclForm(null)} style={{border:`1px solid ${C.border}`,borderRadius:8,background:'transparent',color:C.text,cursor:'pointer',fontSize:13,padding:'8px 14px'}}>Annuler</button>)}
+                          <Bouton variante="discret" onClick={()=>setDeclForm(null)}>Annuler</Bouton>)}
                         </div>
                       </div>
                     ) : (
                       <div style={{display:'flex',flexDirection:'column',gap:6}}>
                         <div style={{display:'flex',gap:10,alignItems:'center',flexWrap:'wrap'}}>
-                          <span style={{flex:'1 1 220px',color:C.muted,fontSize:12}}>Note-le quand tu l'as déclaré : ses ventes ne seront plus recomptées dans un autre mois.</span>
-                          <button type="button" data-decl-ouvrir disabled={!!report.incomplet} onClick={()=>{ if (!report.incomplet) setDeclForm({ regle:'versement', montant:'', paye:'' }); }} style={{border:`1px solid ${C.border}`,borderRadius:8,background:'transparent',color:C.text,cursor:report.incomplet?'default':'pointer',fontSize:12.5,fontWeight:600,padding:'7px 12px',opacity:report.incomplet?0.5:1}}>J'ai déclaré ce mois</button>
+                          <span style={{flex:'1 1 220px',color:C.muted,fontSize:12}}>Note-le une fois déclaré : ces ventes ne compteront plus ailleurs.</span>
+                          <Bouton variante="secondaire" className="vrm-b-petit" data-decl-ouvrir disabled={!!report.incomplet} onClick={()=>{ if (!report.incomplet) setDeclForm({ regle:'versement', montant:'', paye:'' }); }}>J'ai déclaré ce mois</Bouton>
                         </div>
                         {report.incomplet && <RaisonDeclBloquee manque={report.incomplet}/>}
                       </div>
@@ -50644,8 +50544,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               </div>
             </div>
             <div style={{display:'flex',gap:8,padding:'12px 16px',borderTop:`1px solid ${C.border}`,flexShrink:0}}>
-              <button type="button" onClick={exportReportCsv} style={{flex:1,border:`1px solid ${C.border}`,borderRadius:8,background:'transparent',color:C.text,cursor:'pointer',fontSize:13,fontWeight:500,padding:'10px'}}>⬇️ CSV</button>
-              <button type="button" onClick={exportReportPdf} style={{flex:1,border:'none',borderRadius:8,background:C.accent,color:C.onAccent,cursor:'pointer',fontSize:13,fontWeight:600,padding:'10px'}}>📄 PDF</button>
+              <Bouton variante="secondaire" icone="save" data-rapport-csv onClick={exportReportCsv} style={{flex:1}}>CSV</Bouton>
+              <Bouton icone="doc" data-rapport-pdf onClick={exportReportPdf} style={{flex:1}}>PDF</Bouton>
             </div>
           </div>
         </div>
@@ -51011,7 +50911,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               ))}
             </div>
             <div style={{padding:'12px 18px calc(16px + env(safe-area-inset-bottom))',borderTop:`1px solid ${C.border}`,display:'flex',gap:9,flexShrink:0,background:C.bg}}>
-              <button type="button" onClick={()=>setRenumOpen(false)} style={{flex:1,border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:10,padding:'12px',fontSize:13,fontWeight:500,cursor:'pointer',fontFamily:'inherit'}}>Annuler</button>
+              <button className="vrm-b vrm-b-discret" type="button" onClick={()=>setRenumOpen(false)} style={{flex:1,border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:10,padding:'12px',fontSize:13,fontWeight:500,cursor:'pointer',fontFamily:'inherit'}}>Annuler</button>
               {moves.length>0 && <button type="button" onClick={applyRenum} style={{flex:2,border:'none',background:C.accent,color:C.onAccent||'#fff',borderRadius:10,padding:'12px',fontSize:13,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Renuméroter {moves.length} article{moves.length>1?'s':''}</button>}
             </div>
           </div>
@@ -51226,11 +51126,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         const nPret = brVinted.liste ? brVinted.liste.filter(b=>b._etat==='pret').length : 0;
         const ent = [
           ...(nRefaire ? [{ k:'refaire', t:`Brouillons à refaire · ${nRefaire}`, d:'Un passage par brouillon n’est pas allé au bout : le refaire depuis ce qui est enregistré dans VRM.', cap:'refaire' }] : []),
-          { k:'recreer', t:'Republier', d:'Supprimer et recréer des annonces en ligne (photos réglées, temps aléatoire). Favoris et vues repartent de zéro.', cap:'recreer' },
-          { k:'modifier', t:'Modifier prix ou titre', d:'Sur place : même annonce, même N°, favoris et vues gardés.', cap:'republiermodif' },
-          { k:'enLigne', t:'Brouillons → en ligne', d: nBr ? `${nBr} brouillon${nBr>1?'s':''} sur Vinted, dont ${nPret} prêt${nPret>1?'s':''} à mettre en ligne d'ici, à la suite.` : 'Aucun brouillon sur Vinted pour l’instant.', cap:'brouillon' },
-          { k:'versBrouillon', t:'En ligne → brouillon', d:'Retirer des annonces de la vente en les gardant en brouillon sur Vinted (favoris et vues perdus).', cap:'versbrouillon' },
-          { k:'voir', t:`Voir mes brouillons${nBr?` · ${nBr}`:''}`, d:'La liste, un par un : ouvrir sur Vinted, mettre en ligne, retirer un brouillon qui n’y est plus.' },
+          { k:'recreer', t:'Republier', d:'Supprimer et recréer : favoris et vues repartent de zéro.', cap:'recreer' },
+          { k:'modifier', t:'Modifier prix ou titre', d:'Sur place : favoris et vues gardés.', cap:'republiermodif' },
+          { k:'enLigne', t:'Brouillons → en ligne', d: nBr ? `${nPret} prêt${nPret>1?'s':''} sur ${nBr} brouillon${nBr>1?'s':''}.` : 'Aucun brouillon sur Vinted.', cap:'brouillon', vide: !nBr },
+          { k:'versBrouillon', t:'En ligne → brouillon', d:'Retirer de la vente, gardé en brouillon (favoris et vues perdus).', cap:'versbrouillon' },
+          { k:'voir', t:`Voir mes brouillons${nBr?` · ${nBr}`:''}`, d:'Ouvrir, mettre en ligne ou retirer un brouillon.' },
         ];
         return (
           <SheetShell onClose={()=>setActionsOpen(false)} maxWidth={460}>
@@ -51239,11 +51139,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 <h2 style={{margin:0,fontSize:18,fontWeight:700,color:C.text,flex:1}}>Actions sur Vinted</h2>
                 <button type="button" onClick={()=>setActionsOpen(false)} aria-label="Fermer" style={{border:'none',background:'transparent',color:C.muted,fontSize:22,minWidth:44,minHeight:44,cursor:'pointer'}}>✕</button>
               </div>
-              {ent.map(e=>{ const capOk = !e.cap || extSait(e.cap)==='ok'; return (
-                <button key={e.k} type="button" data-action={e.k} data-action-ok={capOk?'oui':'non'} onClick={()=>{ setActionsOpen(false); if(e.k==='voir') setBrouillonsOpen(true); else if(e.k==='refaire') setRefaireOpen(true); else setRepubAction(e.k); }}
-                  style={{display:'flex',flexDirection:'column',alignItems:'flex-start',gap:3,textAlign:'left',padding:'12px 14px',minHeight:56,border:`1px solid ${C.border}`,borderRadius:12,background:C.card,color:C.text,cursor:'pointer',fontFamily:'inherit'}}>
+              {/* (30 oct.) La cause commune (extension à mettre à jour) se dit UNE fois en tête ;
+                  une entrée qu'on ne peut pas lancer est grisée avec sa raison, jamais cachée. */}
+              {(()=>{ const manque = ent.filter(e=>e.cap && extSait(e.cap)!=='ok').map(e=>EXT_CAPACITES[e.cap]).filter(Boolean).sort(cmpVersion); return manque.length ? <div data-actions-maj style={{fontSize:12.5,color:C.warn,lineHeight:1.4}}>Grisés : ils demandent l'extension VRM {manque[manque.length-1]} ou plus récente sur ton ordinateur.</div> : null; })()}
+              {ent.map(e=>{ const capOk = !e.cap || extSait(e.cap)==='ok'; const off = !capOk || !!e.vide; return (
+                <button key={e.k} type="button" data-action={e.k} data-action-ok={capOk?'oui':'non'} aria-disabled={off?'true':undefined} title={!capOk ? `Demande l'extension VRM ${EXT_CAPACITES[e.cap]} ou plus récente` : e.vide ? 'Aucun brouillon sur Vinted' : undefined}
+                  onClick={()=>{ if (off) return; setActionsOpen(false); if(e.k==='voir') setBrouillonsOpen(true); else if(e.k==='refaire') setRefaireOpen(true); else setRepubAction(e.k); }}
+                  style={{display:'flex',flexDirection:'column',alignItems:'flex-start',gap:3,textAlign:'left',padding:'12px 14px',minHeight:56,border:'none',borderRadius:12,background:'var(--vrm-b-teinte)',color:C.text,cursor:off?'default':'pointer',fontFamily:'inherit',opacity:off?.5:1}}>
                   <span style={{fontSize:14.5,fontWeight:700}}>{e.t}</span>
-                  <span style={{fontSize:12.5,color:C.muted,fontWeight:400,lineHeight:1.4}}>{e.d}{!capOk ? ` — demande l'extension VRM ${EXT_CAPACITES[e.cap]} ou plus récente dans ce navigateur.` : ''}</span>
+                  <span style={{fontSize:12.5,color:C.muted,fontWeight:400,lineHeight:1.4}}>{e.d}</span>
                 </button>
               ); })}
             </div>
@@ -51335,14 +51239,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             note: b._source==='extension' ? `enregistré il y a ${ilYaBr(b._enregistre)}` : Number.isFinite(b._vu) ? `vu sur Vinted il y a ${ilYaBr(b._vu)}` : '',
             bloque: b._etat==='pret' ? '' : (RAISON_BR[b._etat]||'pas prêt') }; });
         const fermer = ()=>{ setRepubAction(null); setRepubReprise(null); };
+        const reessayer = (ids)=>{ setRepubReprise(ids.map(String)); setRepubCle(c=>c+1); };
         // (28 oct.) « Refaire le brouillon » sur la ligne ratée : la même commande que
         // la liste « Brouillons à refaire » (§11), l'annonce désignée par son identité.
         const refaireOk = extSait('refaire')==='ok';
         const refaireLigne = refaireOk ? async (a) => { const r = await refaireBrouillon({ uid:a.uid, id:a.id }); return r.etape==='fait' ? { etat:'fait', raison:r.raison||'' } : r.etape==='incertain' ? { etat:'incertain', raison:r.raison||'' } : r.refaire ? { etat:'a-refaire', raison:r.raison||'' } : { etat:'echec', raison:r.raison||'' }; } : null;
-        if (repubAction==='enLigne') return <RepublierVinted key="enLigne" action="enLigne" reprise={repubReprise} annonces={annoncesBr} publier={publierEnLigne} compteChrome={etatX} compteVinted={vc} majExt={extSait('brouillon')!=='ok'} lettreOk={false} brouillonOk={extSait('brouillon')==='ok'} onClose={fermer} />;
-        if (repubAction==='modifier') return <RepublierVinted key="modifier" action="modifier" reprise={repubReprise} annonces={annoncesR} publier={publierModif} compteChrome={etatX} compteVinted={vc} majExt={extSait('republiermodif')!=='ok'} lettreOk={false} brouillonOk={false} onClose={fermer} />;
-        if (repubAction==='versBrouillon') return <RepublierVinted key="versBrouillon" action="versBrouillon" reprise={repubReprise} annonces={annoncesR} publier={publierVersB} refaire={refaireLigne} compteChrome={etatX} compteVinted={vc} majExt={extSait('versbrouillon')!=='ok'} lettreOk={extSait('lettre')==='ok'} brouillonOk={extSait('versbrouillon')==='ok'} onClose={fermer} />;
-        return <RepublierVinted key="recreer" reprise={repubReprise} annonces={annoncesR} publier={publierR} refaire={refaireLigne} compteChrome={etatX} compteVinted={vc} majExt={extSait('recreer')!=='ok'} lettreOk={extSait('lettre')==='ok'} brouillonOk={extSait('republierbrouillon')==='ok'} onClose={fermer} />;
+        if (repubAction==='enLigne') return <RepublierVinted key={"enLigne"+repubCle} action="enLigne" onReessayer={reessayer} reprise={repubReprise} annonces={annoncesBr} publier={publierEnLigne} compteChrome={etatX} compteVinted={vc} majExt={extSait('brouillon')!=='ok'} lettreOk={false} brouillonOk={extSait('brouillon')==='ok'} onClose={fermer} />;
+        if (repubAction==='modifier') return <RepublierVinted key={"modifier"+repubCle} action="modifier" onReessayer={reessayer} reprise={repubReprise} annonces={annoncesR} publier={publierModif} compteChrome={etatX} compteVinted={vc} majExt={extSait('republiermodif')!=='ok'} lettreOk={false} brouillonOk={false} onClose={fermer} />;
+        if (repubAction==='versBrouillon') return <RepublierVinted key={"versBrouillon"+repubCle} action="versBrouillon" onReessayer={reessayer} reprise={repubReprise} annonces={annoncesR} publier={publierVersB} refaire={refaireLigne} compteChrome={etatX} compteVinted={vc} majExt={extSait('versbrouillon')!=='ok'} lettreOk={extSait('lettre')==='ok'} brouillonOk={extSait('versbrouillon')==='ok'} onClose={fermer} />;
+        return <RepublierVinted key={"recreer"+repubCle} onReessayer={reessayer} reprise={repubReprise} annonces={annoncesR} publier={publierR} refaire={refaireLigne} compteChrome={etatX} compteVinted={vc} majExt={extSait('recreer')!=='ok'} lettreOk={extSait('lettre')==='ok'} brouillonOk={extSait('republierbrouillon')==='ok'} onClose={fermer} />;
       })()}
       {fileOpen && (()=>{
         // Candidats = brouillons PRÊTS (titre + prix > 0 + au moins une photo) dont
@@ -51380,7 +51285,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             <textarea autoFocus value={noteEdit.val} onChange={e=>setNoteEdit(n=>({...n,val:e.target.value}))} placeholder="ex : à retoucher · reçu demandé · pour un client…" rows={4}
               style={{width:'100%',boxSizing:'border-box',border:`1px solid ${C.border}`,borderRadius:10,padding:'10px 12px',fontSize:14,background:C.bg,color:C.text,outline:'none',fontFamily:'inherit',resize:'vertical'}}/>
             <div style={{display:'flex',gap:8,justifyContent:'flex-end',marginTop:12}}>
-              <button type="button" onClick={()=>setNoteEdit(null)} style={{border:`1px solid ${C.border}`,background:'transparent',color:C.muted,borderRadius:10,padding:'9px 14px',fontSize:13,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Annuler</button>
+              <button className="vrm-b vrm-b-discret" type="button" onClick={()=>setNoteEdit(null)} style={{border:`1px solid ${C.border}`,background:'transparent',color:C.muted,borderRadius:10,padding:'9px 14px',fontSize:13,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Annuler</button>
               <button type="button" onClick={()=>{ saveAchatNote(noteEdit.tid, noteEdit.val); setNoteEdit(null); }} style={{border:'none',background:C.accent,color:C.onAccent||'#fff',borderRadius:10,padding:'9px 16px',fontSize:13,fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>Enregistrer</button>
             </div>
           </div>
@@ -53854,7 +53759,7 @@ function LeboncoinScreen() {
               fait ». On dit combien, et où c'est réglé. */}
           {data.vendues > 0 && (
             <div style={{ fontSize: 11, color: C.muted, marginBottom: 8, lineHeight: 1.5 }}>
-              {data.vendues} article{data.vendues > 1 ? 's' : ''} {data.vendues > 1 ? 'sont' : 'est'} <b>déjà vendu{data.vendues > 1 ? 's' : ''} sur Vinted</b> — {data.vendues > 1 ? 'ils ne sont' : "il n'est"} pas dans cette file. (Vinted laisse parfois l'annonce ouverte après la vente ; c'est la transaction qui fait foi.)
+              {data.vendues} <b>déjà vendu{data.vendues > 1 ? 's' : ''} sur Vinted</b>, hors de cette file. <Pourquoi label="Pourquoi">Vinted laisse parfois l'annonce ouverte après la vente ; c'est la transaction qui fait foi.</Pourquoi>
             </div>
           )}
           {/* ⚠️ Revue de la 5.167 : les annonces « à confirmer » (compte pas relu
@@ -53863,12 +53768,12 @@ function LeboncoinScreen() {
               La cause est connue : on la dit, une fois, au-dessus de la file. */}
           {data.aConfirmer > 0 && !data.echecLecture && (
             <div data-lbc-a-confirmer={data.aConfirmer} style={{ fontSize: 11, color: C.muted, marginBottom: 8, lineHeight: 1.5 }}>
-              {data.aConfirmer} annonce{data.aConfirmer > 1 ? 's' : ''} {data.aConfirmer > 1 ? 'ne sont' : "n'est"} pas dans cette file : {data.aConfirmer > 1 ? 'leurs comptes n’ont' : 'son compte n’a'} pas été relu{data.aConfirmer > 1 ? 's' : ''} depuis plus de 24 h — <b>à confirmer</b> (le détail est sur l'écran <b>Annonces</b>). Rien n'est supprimé.
+              {data.aConfirmer} à confirmer (compte{data.aConfirmer > 1 ? 's' : ''} pas relu{data.aConfirmer > 1 ? 's' : ''} depuis 24 h) — rien n'est supprimé, détail sur <b>Annonces</b>.
             </div>
           )}
           {data.retirees > 0 && (
             <div style={{ fontSize: 11, color: C.muted, marginBottom: 8, lineHeight: 1.5 }}>
-              {data.retirees} annonce{data.retirees > 1 ? 's' : ''} en ligne {data.retirees > 1 ? 'ne sont' : "n'est"} pas dans cette file : tu {data.retirees > 1 ? 'les' : "l'"}as retirée{data.retirees > 1 ? 's' : ''} de Leboncoin. Ça se règle annonce par annonce sur l'écran <b>Annonces</b> (la puce « Aussi sur »).
+              {data.retirees} retirée{data.retirees > 1 ? 's' : ''} de Leboncoin par toi — réglable sur <b>Annonces</b> (puce « Aussi sur »).
             </div>
           )}
           {/* ⚠️ « Tout est publié 🎉 » se disait aussi quand la file était vide
@@ -53990,7 +53895,7 @@ function LeboncoinScreen() {
               return (<>
                 {nues.length > 0 && <Groupe titre="Aucune photo" ton liste={nues} note={<>Leboncoin <b>refuse une annonce sans photo</b>. Ouvre l'annonce sur Vinted, sur ton ordinateur : ses photos arrivent ici au passage.</>} />}
                 {pretes.length > 0 && <Groupe titre="Prêtes" liste={pretes} />}
-                {maigres.length > 0 && <Groupe titre="Une seule photo" liste={maigres} note={<>Une annonce Leboncoin avec une seule photo se vend mal. <b>Vinted ne donne les autres que sur la page de l'annonce</b> : ouvre-la une fois sur ton ordinateur et elles arrivent ici toutes seules.</>} />}
+                {maigres.length > 0 && <Groupe titre="Une seule photo" liste={maigres} note={<>Ouvre l'annonce Vinted une fois sur ton ordinateur : les autres photos arrivent seules. <Pourquoi label="Pourquoi">Une annonce Leboncoin avec une seule photo se vend mal. Vinted ne donne les autres photos que sur la page de l'annonce.</Pourquoi></>} />}
               </>);
             })()}
           </>)}
@@ -54272,11 +54177,11 @@ function PushPrefsSetting({ comptes, onMuets }) {
           <div style={{fontSize:12,color:C.muted,marginTop:2,lineHeight:1.4}}>
             {enCours ? 'Chargement…'
               : pasLu ? <span style={{display:'inline-block',fontSize:11,fontWeight:600,color:C.muted,background:C.bg,border:`1px solid ${C.border}`,borderRadius:999,padding:'2px 9px'}}>{REGLAGE_PAS_LU}</span>
-              : `${n} type${n>1?'s':''} de notification sur ${PUSH_CATS.length}. Par défaut, on ne sonne que pour l'argent et ce qu'il y a à faire.`}
+              : `${n} sur ${PUSH_CATS.length} activée${n>1?'s':''}.`}
             {/* §7 (revue du 11 oct.) : déplié, le bloc dessous dit tout — le résumé se tait. */}
             {muets && muets.length > 0 && !ouvert && (
               <div style={{color:C.warn,fontWeight:600,marginTop:3}} data-resume-muets={muets.length}>
-                ⚠ {muets.length} compte{muets.length>1?'s':''} n’envoie{muets.length>1?'nt':''} aucun email à VRM&nbsp;: ni {muets.length>1?'leurs':'ses'} ventes ni {muets.length>1?'leurs':'ses'} messages ne te préviendront — déplie pour savoir lesquels.
+                ⚠ {muets.length} compte{muets.length>1?'s':''} sans email&nbsp;: ni {muets.length>1?'leurs':'ses'} ventes ni {muets.length>1?'leurs':'ses'} messages ne sonneront.
               </div>
             )}
           </div>
@@ -54317,15 +54222,18 @@ function StatutSauvegardeReglages() {
     window.addEventListener('vrm:reglage-attente',f);window.addEventListener('vrm:save',f);
     return ()=>{stop();window.removeEventListener('vrm:reglage-attente',f);window.removeEventListener('vrm:save',f);};
   },[]);
-  if(!AUTH.user || !CLOISONNE) return <div className="vrm-settings-status" style={{color:C.muted}}>Sans synchronisation de boutique active, les réglages locaux restent sur cet appareil.</div>;
+  // (30 oct.) Une ligne, et seulement quand il y a quelque chose à dire : tout
+  // va bien ⇒ rien (« synchronisées » écrit en permanence sur deux lignes, en
+  // tête de chaque écran de réglage, était du bruit). En cours, raté, refusé :
+  // dit, avec le geste. Sans synchronisation : dit une fois, en court.
+  if(!AUTH.user || !CLOISONNE) return <div className="vrm-settings-status" style={{color:C.muted}}>Réglages gardés sur cet appareil seulement (pas de synchronisation).</div>;
   const attente=_settingsRevision>_settingsConfirmed;
   const stockage=[..._failedLocalSaves.values()].some(v=>v.owner===AUTH.user?.id);
   const echec=stockage||(attente&&['error','refus'].includes(_syncInfo.etat));
-  return <div className="vrm-settings-status" role="status" style={{color:echec?C.warn:C.muted}}>
-    {stockage?'Modification non enregistrée sur cet appareil.':attente ? echec?'Modifications non synchronisées.':'Enregistrement dans ta boutique en cours…' : _settingsConfirmed>0?'Modifications synchronisées avec ta boutique.':'Les réglages de boutique sont synchronisés entre tes appareils.'}
-    {stockage&&<span> Le stockage de cet appareil a refusé une modification.</span>}
-    {echec&&<button type="button" onClick={()=>{for(const [k,d] of _failedLocalSaves)if(d.owner===AUTH.user?.id&&!_saveTimers[k])save(k,d.v);cloudPush();}}>Réessayer</button>}
-    <small>Les réglages de cet appareil restent locaux. Chaque formulaire indique aussi son propre résultat.</small>
+  if(!attente&&!stockage) return null;
+  return <div className="vrm-settings-status" role="status" data-statut-reglages={echec?'echec':'encours'} style={{color:echec?C.warn:C.muted}}>
+    {stockage?'Modification refusée par le stockage de cet appareil.':echec?'Modifications pas encore synchronisées.':'Enregistrement en cours…'}
+    {echec&&<Bouton variante="discret" onClick={()=>{for(const [k,d] of _failedLocalSaves)if(d.owner===AUTH.user?.id&&!_saveTimers[k])save(k,d.v);cloudPush();}}>Réessayer</Bouton>}
   </div>;
 }
 function ActionsReglages({comptes,onOuvrir}) {
@@ -54339,7 +54247,7 @@ function ActionsReglages({comptes,onOuvrir}) {
   const actions=actionsReglages({comptes:comptes.filter(c=>!masques.has(String(c.vinted_user_id))),emails,preuves});
   if(!actions.length)return null;
   return <section className="vrm-settings-todo" style={{background:C.card,borderColor:C.border}} aria-label="À terminer">
-    <h3>À terminer</h3>{actions.map(a=><div key={a.id}><span><b>{a.titre}</b><small style={{color:C.muted}}>{a.texte}</small></span><button type="button" onClick={()=>onOuvrir(a.cible)} style={{color:C.accent,borderColor:C.border}}>{a.geste}</button></div>)}
+    <h3>À terminer</h3>{actions.map(a=><div key={a.id}><span><b>{a.titre}</b><small style={{color:C.muted}}>{a.texte}</small></span><Bouton variante="secondaire" className="vrm-b-petit" onClick={()=>onOuvrir(a.cible)}>{a.geste}</Bouton></div>)}
   </section>;
 }
 
@@ -54385,11 +54293,11 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
         <FermeAuRetour fermer={close}/>
         <div onClick={e=>e.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:460,borderRadius:'20px 20px 0 0',padding:'16px 18px calc(22px + env(safe-area-inset-bottom))'}}>
           <div style={{width:36,height:4,borderRadius:8,background:C.border,margin:'0 auto 14px'}}/>
-          <div style={{fontSize:17,fontWeight:700,color:M==='out'?C.danger:C.text,letterSpacing:'-0.02em'}}>{titre}</div>
+          <div style={{fontSize:17,fontWeight:700,color:C.text,letterSpacing:'-0.02em'}}>{titre}</div>
           <div style={{fontSize:12.5,color:C.muted,marginTop:4,lineHeight:1.5}}>
-            {M==='email' ? <>Tu recevras un lien de validation. <b style={{color:C.text}}>Tant qu'il n'est pas ouvert, ton adresse actuelle reste celle qui fonctionne</b> — tu ne peux pas te retrouver enfermé dehors.</>
-             : M==='pw'  ? <>8 caractères minimum, lettres et chiffres mélangés. Tu restes connecté après le changement.</>
-             : <>Tes données restent en ligne et reviendront à la prochaine connexion. On efface seulement ce qui est stocké dans <b style={{color:C.text}}>ce navigateur</b>, pour qu'une autre personne qui se connecte derrière toi n'hérite pas de tes numéros.</>}
+            {M==='email' ? <>Un lien de validation t’est envoyé. <b style={{color:C.text}}>Ton adresse actuelle marche tant qu’il n’est pas ouvert.</b></>
+             : M==='pw'  ? <>8 caractères minimum, lettres et chiffres. Tu restes connecté.</>
+             : <>Tes données restent dans ton compte. Seul <b style={{color:C.text}}>ce navigateur</b> est vidé.</>}
           </div>
           {M!=='out' && (
             <input autoFocus type={M==='pw'?'password':'email'} inputMode={M==='email'?'email':undefined}
@@ -54402,12 +54310,11 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
           {acct.err && <div style={{fontSize:12.5,color:C.danger,marginTop:8,lineHeight:1.4}}>{acct.err}</div>}
           {M==='email' && resteEmail > 0 && <div role="status" data-auth-attente={resteEmail} style={{fontSize:12.5,color:C.text,marginTop:8,lineHeight:1.4}}>{TEXTE_DELAI_EMAIL_BOUTON}</div>}
           <div style={{display:'flex',gap:9,marginTop:14}}>
-            <button type="button" onClick={close} style={{flex:1,border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:10,padding:'12px',fontSize:13.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Annuler</button>
-            <button type="button" onClick={valider} disabled={acct.busy || (M!=='out' && !acct.val.trim()) || (M==='email' && resteEmail > 0)}
-              style={{flex:2,border:'none',background:M==='out'?C.danger:C.accent,color:'#fff',borderRadius:10,padding:'12px',fontSize:13.5,fontWeight:600,
-                cursor:(acct.busy||(M!=='out'&&!acct.val.trim())||(M==='email'&&resteEmail>0))?'default':'pointer',opacity:(acct.busy||(M!=='out'&&!acct.val.trim())||(M==='email'&&resteEmail>0))?0.5:1,fontFamily:'inherit'}}>
+            <Bouton variante="discret" onClick={close} style={{flex:1}}>Annuler</Bouton>
+            <Bouton variante="primaire" onClick={valider} disabled={acct.busy || (M!=='out' && !acct.val.trim()) || (M==='email' && resteEmail > 0)}
+              style={{flex:2,opacity:(acct.busy||(M!=='out'&&!acct.val.trim())||(M==='email'&&resteEmail>0))?0.5:1}}>
               {acct.busy ? '…' : M==='out' ? 'Se déconnecter' : (M==='email' && resteEmail > 0) ? `Réessaie dans ${resteEmail} s` : 'Enregistrer'}
-            </button>
+            </Bouton>
           </div>
         </div>
       </div>,
@@ -54474,7 +54381,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
     const corps = (<>
       {it.ic && <IconeReglage name={it.ic}/>}
       <span className="vrm-set-lib">
-        <b style={{color: it.danger ? C.danger : C.text}}>{it.lib}</b>
+        <b style={{color:C.text}}>{it.lib}</b>
         {it.desc && <small style={{color:C.muted}}>{it.desc}</small>}
       </span>
       {it.val != null && it.val !== '' && <span className="vrm-set-val" style={{color:C.muted}}>{it.val}</span>}
@@ -54517,30 +54424,10 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
     );
   };
 
-  // ── MOYENS DE CONNEXION — l'état RÉEL de chacun, pas une liste décorative.
-  //    Un bouton Google qui mène à une page d'erreur ne rend service à
-  //    personne : tant que le fournisseur n'est pas branché dans Supabase, on
-  //    le dit.
-  const moyensConnexion = (
-    <div>
-      <div className="vrm-set-liste" style={{background:C.card,border:`1px solid ${C.border}`}}>
-        <div className="vrm-set-ligne">
-          <IconeReglage name="mail"/>
-          <span className="vrm-set-lib"><b style={{color:C.text}}>Email et mot de passe</b></span>
-          <span className="vrm-set-val" style={{color:C.muted}}>Actif</span>
-        </div>
-
-      </div>
-      <div className="vrm-set-pied" style={{color:C.muted}}>
-        Ton accès par email reste disponible après l’association d’un compte.
-      </div>
-    </div>
-  );
-
   // ── TES DONNÉES ET LES CONDITIONS
   const donnees = (
     <div style={{fontSize:13,color:C.muted,lineHeight:1.55}}>
-      Tu peux <b style={{color:C.text}}>exporter tes données</b> avec « Sauvegarde complète » {ongletsCompte ? '(onglet Réglages)' : 'ci-dessous'}{AUTH.user ? <>, et <b style={{color:C.text}}>fermer ton compte</b> avec « Fermer mon compte »</> : null}. Pour tes autres droits (accès, rectification), voir la <a href="/legal/confidentialite.html" target="_blank" rel="noopener" style={{color:C.accent}}>politique de confidentialité</a>.
+      <b style={{color:C.text}}>Exporter</b> : « Sauvegarde complète » {ongletsCompte ? '(Réglages)' : 'ci-dessous'}{AUTH.user ? <> · <b style={{color:C.text}}>Fermer ton compte</b> : « Fermer mon compte »</> : null}. Tes autres droits : <a href="/legal/confidentialite.html" target="_blank" rel="noopener" style={{color:C.accent}}>politique de confidentialité</a>.
       <LigneContact/>
       <div style={{display:'flex',flexWrap:'wrap',gap:'4px 16px',marginTop:10}}>
         {DOCS_LEGAUX.map(([h,t]) => <a key={h} href={h} target="_blank" rel="noopener" style={{color:C.accent,fontWeight:500,textDecoration:'none',minHeight:44,minWidth:44,display:'inline-flex',alignItems:'center'}}>{t}</a>)}
@@ -54549,21 +54436,19 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
   );
 
   // Boutons communs au widget et à l'installation de l'application.
-  const bouton = (primaire) => ({border: primaire ? 'none' : `1px solid ${C.border}`, background: primaire ? C.accent : 'transparent', color: primaire ? (C.onAccent || '#fff') : C.text,
-    borderRadius:10, padding:'0 16px', minHeight:44, fontSize:14, fontWeight:600, cursor:'pointer', fontFamily:'inherit'});
   // ── WIDGET IPHONE — l'adresse contient ta clé personnelle. Avant, cette
   //    adresse était publique : n'importe qui pouvait lire ton chiffre
   //    d'affaires en la connaissant. Recopie la nouvelle dans Scriptable.
   const widget = urlWidget ? (
     <div>
       <div style={{fontSize:12.5,color:C.muted,marginBottom:10,lineHeight:1.45}}>
-        Elle contient <b>ta clé</b> : ne la partage pas. Colle-la dans Scriptable à la place de l'ancienne — l'ancienne, sans clé, ne répond plus.
+        Contient <b>ta clé</b> : ne la partage pas. Colle-la dans Scriptable.
       </div>
       <div style={{fontSize:11.5,fontFamily:'ui-monospace,SFMono-Regular,Menlo,monospace',color:C.text,background:C.bg,
         border:`1px solid ${C.border}`,borderRadius:8,padding:'10px 12px',wordBreak:'break-all',lineHeight:1.5,marginBottom:12}}>{urlWidget}</div>
-      <button type="button" onClick={()=>{ try{navigator.clipboard.writeText(urlWidget); toast('✓ Adresse copiée');}catch(_){ toast('Copie impossible','error'); } }} style={bouton(true)}>
+      <Bouton variante="primaire" icone="copy" onClick={()=>{ try{navigator.clipboard.writeText(urlWidget); toast('✓ Adresse copiée');}catch(_){ toast('Copie impossible','error'); } }}>
         Copier l'adresse
-      </button>
+      </Bouton>
     </div>
   ) : null;
 
@@ -54571,13 +54456,13 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
   // Réglages de l'APP.
   const GROUPES_REGLAGES = [
     { id:'comptes', titre:'Comptes Vinted', items:[
-      { id:'liens', type:'nav', ic:'link', lib:'Comptes liés', desc:'Vérifier les pseudos et les adresses email de tes comptes Vinted.', onClick:()=>setTab('vintedaccounts') },
-      { id:'connexions', type:'panneau', ic:'sync', lib:'État des connexions', desc:'Comprendre ce qui est connecté et ce qui demande une action.', titreInterne:true, el:<ConnexionsSetting key={AUTH.user?.id||'sans-session'} comptes={comptes||[]} onComptes={()=>setTab('vintedaccounts')} onPlateforme={onPlateforme}/> },
-      { id:'adresses', type:'panneau', ic:'mail', lib:'Réception des emails', desc:'Configurer le transfert et suivre les emails reçus par VRM.', titreInterne:true, el:<EmailsSetting onComptes={()=>setTab('vintedaccounts')}/> },
-      { id:'securite', type:'panneau', ic:'key', lib:'Sécurité des données', desc:'Consulter les vérifications d’accès et les éventuels problèmes.', el:<SecuriteSetting/> },
+      { id:'liens', type:'nav', ic:'link', lib:'Comptes liés', desc:'Pseudos et adresses de tes comptes', onClick:()=>setTab('vintedaccounts') },
+      { id:'connexions', type:'panneau', ic:'sync', lib:'État des connexions', desc:'Ce qui marche, ce qui attend un geste', titreInterne:true, el:<ConnexionsSetting key={AUTH.user?.id||'sans-session'} comptes={comptes||[]} onComptes={()=>setTab('vintedaccounts')} onPlateforme={onPlateforme}/> },
+      { id:'adresses', type:'panneau', ic:'mail', lib:'Réception des emails', desc:'Transfert et emails reçus', titreInterne:true, el:<EmailsSetting onComptes={()=>setTab('vintedaccounts')}/> },
+      { id:'securite', type:'panneau', ic:'key', lib:'Sécurité des données', desc:'Qui peut lire et écrire tes données', el:<SecuriteSetting/> },
     ]},
     MULTI_USER && { id:'stock', titre:'Stock et rangement', items:[
-      { id:'numeros', type:'panneau', nu:true, ic:'tag', lib:'Numéros de rangement', desc:'Choisir le format des prochains numéros, sans changer les anciens.', val:valNumeros, el:<NumerosSetting nu onStock={()=>setTab('garage')}/> },
+      { id:'numeros', type:'panneau', nu:true, ic:'tag', lib:'Numéros de rangement', desc:'Format des prochains numéros', val:valNumeros, el:<NumerosSetting nu onStock={()=>setTab('garage')}/> },
       // (29 oct.) Organisation n'est plus dans le menu : rangée ici, jamais perdue.
       { id:'organisation', type:'nav', ic:'check', lib:'Organisation', desc:DESCRIPTION_ORGANISATION, onClick:()=>setTab('organisation'), data:{ 'data-reglage-organisation':'' } },
       // ⛔ Réponse automatique aux messages Vinted retirée (16 oct., sa décision).
@@ -54593,16 +54478,14 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       { id:'alertes', type:'switch', ic:'info', lib:"Alertes dans l'app", desc:'Ventes et factures, quand l’app est ouverte.', on:!!notifEnabled, onClick:onToggleNotif, data:{ 'data-reglage-alertes': notifEnabled ? 'on' : 'off' } },
     ]},
     { id:'impression', titre:'Impression', items:[
-      { id:'imprimante', type:'panneau', nu:true, ic:'printer', lib:'Imprimante et bordereaux', desc:'Choisir le format du papier et prévisualiser le résultat.', val: imprimanteChoisie() === 'thermique' ? 'Thermique · 10×15' : 'Normale · A4', el:<ImprimanteSetting nu/> },
-      { id:'tampons', type:'panneau', nu:true, ic:'doc', lib:'Placement du numéro sur les bordereaux', desc:'Un espace blanc recherché sur chaque PDF, sans modifier la page.', el:<div style={{fontSize:13,color:C.muted,lineHeight:1.6}}>VRM analyse le rendu de chaque page complète pour chercher une zone blanche avec une marge autour du numéro. Le document garde sa taille et sa disposition. Si l’analyse échoue ou qu’aucun espace suffisant n’est trouvé, le tamponnage est refusé plutôt que placé au hasard. Les anciennes positions restent conservées, sans être réutilisées automatiquement.<p>Vérifie le résultat dans « Imprimante et bordereaux », puis « Voir les aperçus ».</p></div> },
-    ]},
+      { id:'imprimante', type:'panneau', nu:true, ic:'printer', lib:'Imprimante et bordereaux', desc:'Papier et aperçus', val: imprimanteChoisie() === 'thermique' ? 'Thermique · 10×15' : 'Normale · A4', el:<ImprimanteSetting nu/> },
+    ], pied: <>Le N° se pose dans un espace blanc du PDF, jamais au hasard. <Pourquoi label="Comment le N° est placé">VRM cherche sur chaque page une zone blanche avec une marge autour du numéro ; le document garde sa taille. Sans espace suffisant, le tamponnage est refusé plutôt que placé au hasard. Vérifie dans « Imprimante et bordereaux » → « Voir les aperçus ».</Pourquoi></> },
     { id:'compta', titre:'Comptabilité', items:[
-      { id:'regime', type:'panneau', nu:true, ic:'receipt', lib:'Régime fiscal', desc:'Régler le statut et les taux utilisés dans les rapports.', el:<RegimeSetting nu/> },
-      { id:'import', type:'panneau', nu:true, ic:'calendar', lib:'Import des emails Vinted', desc:'Choisir la date de début de l’historique à intégrer.', el:<EmailStartSetting key={AUTH.user?.id||'sans-session'} nu/> },
+      { id:'regime', type:'panneau', nu:true, ic:'receipt', lib:'Régime fiscal', desc:'Statut et taux des rapports', el:<RegimeSetting nu/> },
+      { id:'import', type:'panneau', nu:true, ic:'calendar', lib:'Import des emails Vinted', desc:'Début de l’historique', el:<EmailStartSetting key={AUTH.user?.id||'sans-session'} nu/> },
       // Julien, 1er oct. : « les ventes masquées, je veux que ce soit dans les
       // paramètres, pas sous Factures ». L'écran reste monté, joignable ici.
       { id:'masques', type:'nav', ic:'eyeOff', lib:'Ventes et achats masqués', onClick:()=>setTab('masques') },
-      { id:'prixachat', type:'nav', ic:'cash', lib:"Compléter les prix d'achat", onClick:()=>{DEMANDE_SAISIE_PRIX.on=true;setTab('vinted_annonces');} },
 
     ]},
     { id:'affichage', titre:'Affichage', items:[
@@ -54610,7 +54493,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       { id:'stream', type:'el', el:<StreamSetting key="stream"/> },
       { id:'benefjournee', type:'el', el:<BeneficeJourneeSetting key="benefjournee"/> },
       { id:'zoom', type:'panneau', nu:true, ic:'grid', lib:"Taille de l'affichage", val:valZoom, el:<ZoomSetting nu/> },
-      urlWidget && { id:'widget', type:'panneau', nu:true, ic:'chart', lib:'Widget iPhone', desc:'Configurer l’affichage dans Scriptable avec ton lien privé.', el:widget },
+      urlWidget && { id:'widget', type:'panneau', nu:true, ic:'chart', lib:'Widget iPhone', desc:'Ton lien privé pour Scriptable', el:widget },
     ]},
     { id:'sauvegarde', titre:'Sauvegarde', items:[
       { id:'export', type:'action', ic:'save', lib:'Sauvegarde complète', desc:'Réglages, numéros et données captées.', onClick:onExport, data:{ 'data-reglage-sauvegarde':'' } },
@@ -54621,17 +54504,17 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
         {' '}<span className="vrm-aide" style={{color:C.muted,fontWeight:400}}>Sans les PDF de bordereau ni tes connexions Vinted.</span>
       </span>
     )},
-    {id:'aide',titre:'Besoin d’aide ?',items:[{id:'depannage',type:'panneau',nu:true,ic:'info',lib:'Résoudre un problème',desc:'Emails, comptes ou impression : trouver la bonne vérification.',el:<div className="vrm-settings-help">
-      <details><summary>Je ne reçois pas mes emails</summary><p>Vérifie l’adresse associée au compte Vinted, sa confirmation, puis le transfert depuis ta messagerie. L’historique reçu permet de distinguer un email absent d’un email à vérifier.</p><button type="button" onClick={()=>ouvrirSous('adresses')}>Ouvrir la réception des emails</button></details>
-      <details><summary>Mon compte Vinted n’apparaît pas</summary><p>Connecte le compte attendu sur Vinted et vérifie que l’extension utilise ton compte VRM. Actualise ensuite les comptes liés et contrôle le pseudo. N’ajoute pas les données d’un autre vendeur.</p><button type="button" onClick={()=>setTab('vintedaccounts')}>Voir mes comptes liés</button></details>
-      <details><summary>Mon bordereau s’imprime mal</summary><p>Choisis le papier correspondant à ton imprimante, ouvre un aperçu puis contrôle l’échelle d’impression. Le numéro doit rester dans un espace blanc. En cas d’échec d’un lot, relance uniquement les fichiers refusés.</p><button type="button" onClick={()=>ouvrirSous('imprimante')}>Vérifier l’impression</button></details>
+    {id:'aide',titre:'Besoin d’aide ?',items:[{id:'depannage',type:'panneau',nu:true,ic:'info',lib:'Résoudre un problème',desc:'Emails, comptes, impression',el:<div className="vrm-settings-help">
+      <details><summary>Je ne reçois pas mes emails</summary><p>Vérifie l’adresse associée au compte Vinted, sa confirmation, puis le transfert depuis ta messagerie. L’historique reçu permet de distinguer un email absent d’un email à vérifier.</p><Bouton variante="secondaire" onClick={()=>ouvrirSous('adresses')}>Ouvrir la réception des emails</Bouton></details>
+      <details><summary>Mon compte Vinted n’apparaît pas</summary><p>Connecte le compte attendu sur Vinted et vérifie que l’extension utilise ton compte VRM. Actualise ensuite les comptes liés et contrôle le pseudo. N’ajoute pas les données d’un autre vendeur.</p><Bouton variante="secondaire" onClick={()=>setTab('vintedaccounts')}>Voir mes comptes liés</Bouton></details>
+      <details><summary>Mon bordereau s’imprime mal</summary><p>Choisis le papier correspondant à ton imprimante, ouvre un aperçu puis contrôle l’échelle d’impression. Le numéro doit rester dans un espace blanc. En cas d’échec d’un lot, relance uniquement les fichiers refusés.</p><Bouton variante="secondaire" onClick={()=>ouvrirSous('imprimante')}>Vérifier l’impression</Bouton></details>
     </div>}]},
   ];
   // « Mon compte » : la PERSONNE.
   const GROUPES_COMPTE = MULTI_USER ? [
     { id:'profil', titre:null, items:[
       { id:'prenom', type:'el', el:<PrenomSetting key="prenom"/> },
-    ], pied:'Ton prénom sert seulement à te dire bonjour sur l’accueil. Vide, l’app dit « Bonjour ».' },
+    ], pied:'Pour te dire bonjour sur l’accueil. Vide : « Bonjour ».' },
     // Discord relié au COMPTE (20 oct.), sans être sur la carte de la communauté.
 
     AUTH.user && {id:'connexions-rapides',titre:'Comptes associés',items:[
@@ -54642,15 +54525,12 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
     // détourage « ne le mets pas dans les paramètres ». Elle vit sur l'écran
     // Vestiaire Collective (le banc detourage-reglage refuse la carte ici).
     AUTH.user && {id:'photo-profil',titre:'Photo de profil',items:[{id:'photo-profil',type:'el',el:<PhotoProfil key={AUTH.user.id} owner={AUTH.user.id} headers={enTeteSession} theme={C}/>} ]},
-    AUTH.user && { id:'equipe', titre:'Équipe', items:[
-      { id:'equipe', type:'panneau', ic:'link', lib:'Équipe', el:<EquipeSetting/> },
-    ]},
     // (17 oct.) L'abonnement a SON onglet (« Abonnement ») ; ici, un renvoi.
-    AUTH.user && { id:'abonnement', titre:'Abonnement', items:[
-      { id:'abonnement-lien', type:'nav', ic:'wallet', lib:'Abonnement et factures', desc:'Statut, prix, carte, factures, résiliation', onClick:()=>setVue('abonnement') },
+    AUTH.user && { id:'boutique', titre:'Ta boutique', items:[
+      // (30 oct.) « Abonnement et factures » retiré : l'onglet « Abonnement » du haut fait la même chose.
+      { id:'equipe', type:'panneau', ic:'link', lib:'Équipe', desc:'Inviter un aide pour les colis', el:<EquipeSetting/> },
     ]},
     { id:'connexion', titre:'Connexion', items:[
-      { id:'moyens', type:'panneau', ic:'link', lib:'Moyens de connexion', el:moyensConnexion },
       AUTH.user && { id:'email', type:'nav', ic:'mail', lib:'Changer mon email', onClick:()=>{ setAcct({ mode:'email', val:'', err:'', busy:false }); } },
       AUTH.user && { id:'motdepasse', type:'nav', ic:'key', lib:'Changer mon mot de passe', onClick:()=>{ setAcct({ mode:'pw', val:'', err:'', busy:false }); } },
       // Double vérification (TOTP) — facultative, sur SON clic (16 octobre).
@@ -54658,7 +54538,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
     ]},
     AUTH.user && { id:'sortir', titre:null, items:[
       { id:'deconnexion', type:'action', ic:'door', lib:'Se déconnecter', danger:true, onClick:()=>{ setAcct({ mode:'out', val:'', err:'', busy:false }); } },
-    ], pied:'Efface aussi les données de ce navigateur — elles restent dans ton compte.' },
+    ], pied:'Vide ce navigateur ; tes données restent dans ton compte.' },
     { id:'donnees', titre:'Tes données', items:[
       { id:'conditions', type:'panneau', nu:true, ic:'doc', lib:'Données et conditions', el:donnees },
       AUTH.user && { id:'fermer', type:'panneau', ic:'trash', lib:'Fermer mon compte', el:<FermerCompte/> },
@@ -54697,13 +54577,13 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
     <div className="vrm-set-carte" style={{border:`1px solid ${C.warn}55`,background:`${C.warn}0d`,marginBottom:32}}>
       <div style={{fontSize:16,fontWeight:600,color:C.text}}>Tu n'es pas connecté</div>
       <div style={{fontSize:13,color:C.muted,marginTop:4,lineHeight:1.5}}>
-        Tu es entré par l'accès temporaire. Tes données sont bien là, mais elles ne sont rattachées à aucun compte.
+        Accès temporaire : tes données sont là, mais rattachées à aucun compte.
       </div>
-      <button type="button"
+      <Bouton variante="primaire"
         className="vrm-set-connect" onClick={()=>{ try{ localStorage.removeItem('vrm_acces_direct'); }catch(_){} location.reload(); }}
-        style={{...bouton(true),marginTop:12}}>
+        style={{marginTop:12}}>
         Aller à l'écran de connexion
-      </button>
+      </Bouton>
     </div>
   ));
 
@@ -54722,7 +54602,6 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
         </div>
       ) : (<>
         <div className="vrm-set-tete"><h2 className="vrm-set-h1" style={{color:C.text}}>Paramètres</h2></div>
-        <p className="vrm-settings-intro" style={{color:C.muted}}>Tes comptes, ton rangement et les préférences de VRM, regroupés par usage.</p>
         <ReglagesPasLus/>
         {ongletsCompte && (
           <div role="tablist" aria-label="Paramètres" data-onglets-reglages="" className="vrm-set-seg" style={{background:`${C.text}0f`}}>
@@ -54736,24 +54615,22 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
         )}
       </>)}
 
-      {ouvert && <div className="vrm-settings-scope" style={{color:C.muted}}>Portée : {['zoom','widget'].includes(ouvert.id)?'cet appareil':ouvert.id==='push'?'cet appareil et préférences par compte':ouvert.id==='imprimante'?'toute la boutique · impression':vue==='compte'?'ton compte VRM':'ta boutique VRM'}</div>}
       {ouvert && <h2 className="vrm-set-sous-h" style={{color:C.text}}>{ouvert.lib}</h2>}
 
       {!ouvert && <>
         {profil}
         {voirReglages && <ActionsReglages comptes={comptes||[]} onOuvrir={id=>id==='comptes'?setTab('vintedaccounts'):ouvrirSous(id)}/>}
-        <label className="vrm-settings-search" style={{background:C.card,borderColor:C.border,color:C.muted}}>
+        {voirReglages && <label className="vrm-settings-search" style={{background:C.card,borderColor:C.border,color:C.muted}}>
           <Icon name="search" size={16}/>
           <input type="search" value={rechercheReglage} onChange={e=>setRechercheReglage(e.target.value)} placeholder={`Rechercher dans ${titreRetour}…`} aria-label="Rechercher dans les paramètres" style={{color:C.text}}/>
           {rechercheReglage&&<button type="button" aria-label="Effacer la recherche des paramètres" onClick={e=>{setRechercheReglage('');e.currentTarget.parentElement.querySelector('input')?.focus();}} style={{color:C.muted}}>Effacer</button>}
-        </label>
+        </label>}
         {(() => {
-          const filtres=filtrerReglages(groupes,rechercheReglage);
-          return filtres.length ? <>{rechercheReglage.trim()&&<p className="vrm-settings-search-info" role="status" style={{color:C.muted}}>{filtres.reduce((n,g)=>n+g.items.length,0)} réglage(s) trouvé(s) dans {titreRetour}.</p>}{filtres.map(groupe)}</> : <p role="status" style={{color:C.muted,fontSize:13}}>Aucun réglage trouvé dans cet onglet. Essaie « email », « numéro » ou « impression », ou change d’onglet.</p>;
+          const filtres=filtrerReglages(groupes,voirReglages?rechercheReglage:'');
+          return filtres.length ? <>{rechercheReglage.trim()&&<p className="vrm-settings-search-info" role="status" style={{color:C.muted}}>{(n=>`${n} réglage${n>1?'s':''} trouvé${n>1?'s':''}`)(filtres.reduce((n,g)=>n+g.items.length,0))}</p>}{filtres.map(groupe)}</> : <p role="status" style={{color:C.muted,fontSize:13}}>Aucun réglage trouvé. Essaie « email », « numéro » ou « impression ».</p>;
         })()}
       </>}
       {panneaux.map(it=><div key={it.id} hidden={!ouvert || ouvert.id!==it.id} data-sous-ecran={it.id} className={it.titreInterne?'vrm-set-sans-titre':undefined}>
-        {ouvert?.id===it.id && it.desc && <p className="vrm-settings-intro" style={{color:C.muted}}>{it.desc}</p>}
         {contenuPanneau(it,false)}
       </div>)}
     </div>
@@ -54944,8 +54821,6 @@ function DoubleVerification({ onEtat } = {}) {
   const actif = verifies.length ? verifies[0] : null;
   const seul = verifies.length === 1;
   const relire = () => setEssai((n) => n + 1);
-  const btn = (primaire, off) => ({ border: primaire ? 'none' : `1px solid ${C.border}`, background: primaire ? C.accent : 'transparent', color: primaire ? (C.onAccent || '#fff') : C.text,
-    borderRadius:10, padding:'0 16px', minHeight:44, fontSize:14, fontWeight:600, cursor: off ? 'default' : 'pointer', opacity: off ? 0.55 : 1, fontFamily:'inherit' });
   const champ = { width:150, boxSizing:'border-box', border:`1px solid ${C.border}`, borderRadius:10, padding:'10px 12px', fontSize:18, letterSpacing:4, textAlign:'center', background:C.bg, color:C.text, outline:'none', fontFamily:'inherit', fontVariantNumeric:'tabular-nums' };
   const champNom = { width:'100%', maxWidth:260, boxSizing:'border-box', border:`1px solid ${C.border}`, borderRadius:10, padding:'10px 12px', fontSize:16, background:C.bg, color:C.text, outline:'none', fontFamily:'inherit', minHeight:44 };
   const txt = { fontSize:12.5, color:C.muted, lineHeight:1.55 };
@@ -55068,7 +54943,7 @@ function DoubleVerification({ onEtat } = {}) {
   React.useEffect(() => { if (onEtat) onEtat(etatDit); }, [etatDit]);
   const champDuNom = (
     <label style={{display:'block',marginTop:10}}>
-      <span style={{...txt,display:'block',marginBottom:4}}>Nom de l'appareil (pour le reconnaître dans la liste)</span>
+      <span style={{...txt,display:'block',marginBottom:4}}>Nom de l'appareil</span>
       <input data-mfa-nom="" type="text" maxLength={NOM_APPAREIL_MAX} autoComplete="off" value={nom} onChange={(e) => setNom(e.target.value)} placeholder="ex. iPhone, iPad, ancien téléphone" style={champNom}/>
     </label>
   );
@@ -55077,14 +54952,15 @@ function DoubleVerification({ onEtat } = {}) {
       {f === undefined && <div style={txt}>Lecture de l'état de la double vérification…</div>}
       {f === null && (<>
         <div style={txt}>Je n'ai pas pu lire l'état de ta double vérification : le service de connexion ne répond pas. Rien n'a changé.</div>
-        <button type="button" data-mfa-relire="" onClick={relire} style={{...btn(false),marginTop:10}}>Réessayer</button>
+        <button type="button" data-mfa-relire="" onClick={relire} className="vrm-b vrm-b-secondaire" style={{marginTop:10}}>Réessayer</button>
       </>)}
       {f && !actif && !cours && (<>
         <div style={txt}>
-          <b style={{color:C.text}}>Désactivée.</b> Facultatif et gratuit : une fois activée, VRM te demande, après ton mot de passe, un code à 6 chiffres affiché par une app d'authentification sur ton téléphone (les mots de passe de l'iPhone, Google Authenticator, Microsoft Authenticator, Authy). Quelqu'un qui connaîtrait ton mot de passe ne pourrait pas entrer sans ton téléphone.
+          <b style={{color:C.text}}>Désactivée.</b> Un code à 6 chiffres de ton téléphone, en plus du mot de passe. Gratuit.{' '}
+          <Pourquoi label="Comment ça marche">Après ton mot de passe, VRM demande le code affiché par une app d'authentification (Mots de passe de l'iPhone, Google Authenticator, Microsoft Authenticator, Authy). Quelqu'un qui connaîtrait ton mot de passe ne pourrait pas entrer sans ton téléphone.</Pourquoi>
         </div>
         {champDuNom}
-        <button type="button" data-mfa-activer="" disabled={busy} onClick={creer} style={{...btn(true, busy),marginTop:10}}>{busy ? 'Préparation…' : 'Activer'}</button>
+        <button type="button" data-mfa-activer="" disabled={busy} onClick={creer} className="vrm-b vrm-b-primaire" style={{marginTop:10}}>{busy ? 'Préparation…' : 'Activer'}</button>
       </>)}
       {cours && cours.etape === 'qr' && (<>
         {cours.ajout && <div data-mfa-ajout-consigne="" style={{...txt,marginBottom:6}}>Prends <b style={{color:C.text}}>l'autre appareil</b> (« {cours.nom} ») — pas celui qui te donne déjà les codes : s'il était perdu, les deux codes partiraient avec lui.</div>}
@@ -55096,20 +54972,20 @@ function DoubleVerification({ onEtat } = {}) {
           <p>Dans ton app d’authentification, choisis « saisir une clé ». Garde cette clé privée : ne la partage pas et ne l’envoie pas en capture.</p>
           <div data-mfa-cle="" style={{fontFamily:'ui-monospace,Menlo,monospace',fontSize:14,color:C.text,wordBreak:'break-all',userSelect:'all'}}>{cours.secret.replace(/(.{4})/g, '$1 ').trim()}</div>
         </details>
-        <button type="button" data-mfa-recommencer="" disabled={busy} onClick={recommencerActivation} style={{...btn(false,busy),marginBottom:10}}>Remplacer cette configuration</button>
+        <button type="button" data-mfa-recommencer="" disabled={busy} onClick={recommencerActivation} className="vrm-b vrm-b-secondaire" style={{marginBottom:10}}>Remplacer cette configuration</button>
         <div style={txt}><b style={{color:C.text}}>2.</b> Tape le code à 6 chiffres que {cours.ajout ? 'ce nouvel appareil' : "l'app"} affiche pour VRM :</div>
         <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap',marginTop:8}}>
           <input data-mfa-code-activer="" type="text" inputMode="numeric" autoComplete="one-time-code" maxLength={6} placeholder="000000" value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))} style={champ}/>
-          <button type="button" data-mfa-confirmer="" disabled={busy || code.length !== 6} onClick={confirmerActivation} style={btn(true, busy || code.length !== 6)}>{busy ? 'Vérification…' : 'Confirmer'}</button>
-          <button type="button" data-mfa-annuler="" disabled={busy} onClick={annulerActivation} style={btn(false, busy)}>Annuler</button>
+          <button type="button" data-mfa-confirmer="" disabled={busy || code.length !== 6} onClick={confirmerActivation} className="vrm-b vrm-b-primaire">{busy ? 'Vérification…' : 'Confirmer'}</button>
+          <button className="vrm-b vrm-b-discret" type="button" data-mfa-annuler="" disabled={busy} onClick={annulerActivation}>Annuler</button>
         </div>
       </>)}
       {actif && cours && cours.etape === 'nom' && (<>
-        <div style={txt}>Un appareil de secours : un autre téléphone, une tablette, l'ancien téléphone que tu gardes à la maison. Son code fera entrer exactement comme celui de ton appareil actuel.</div>
+        <div style={txt}>Un autre téléphone ou une tablette : son code fera entrer comme celui de ton appareil actuel.</div>
         {champDuNom}
         <div style={{display:'flex',gap:8,flexWrap:'wrap',marginTop:10}}>
-          <button type="button" data-mfa-ajouter-continuer="" disabled={busy} onClick={creer} style={btn(true, busy)}>{busy ? 'Préparation…' : 'Afficher le code QR'}</button>
-          <button type="button" disabled={busy} onClick={() => { setCours(null); setMsg(null); }} style={btn(false, busy)}>Annuler</button>
+          <button type="button" data-mfa-ajouter-continuer="" disabled={busy} onClick={creer} className="vrm-b vrm-b-primaire">{busy ? 'Préparation…' : 'Afficher le code QR'}</button>
+          <button className="vrm-b vrm-b-discret" type="button" disabled={busy} onClick={() => { setCours(null); setMsg(null); }}>Annuler</button>
         </div>
       </>)}
       {actif && !cours && (<>
@@ -55124,13 +55000,13 @@ function DoubleVerification({ onEtat } = {}) {
                 {x.created_at && <div style={{fontSize:12,color:C.muted}}>ajouté le {new Date(x.created_at).toLocaleDateString('fr-FR')}</div>}
               </div>
               {seul
-                ? <button type="button" data-mfa-desactiver="" onClick={() => ouvrirRetrait(x)} style={btn(false)}>Désactiver…</button>
-                : <button type="button" data-mfa-retirer={String(x.id)} onClick={() => ouvrirRetrait(x)} style={btn(false)}>Retirer…</button>}
+                ? <button type="button" data-mfa-desactiver="" onClick={() => ouvrirRetrait(x)} className="vrm-b vrm-b-secondaire">Désactiver…</button>
+                : <button type="button" data-mfa-retirer={String(x.id)} onClick={() => ouvrirRetrait(x)} className="vrm-b vrm-b-secondaire">Retirer…</button>}
             </div>
           ))}
         </div>
-        {seul && <div data-mfa-conseil-secours="" style={{...txt,marginTop:10}}>Un seul appareil : s'il est perdu ou changé, tu ne pourras plus entrer seul. Ajoute un appareil de secours — son code marchera aussi — ou désactive la double vérification AVANT de changer de téléphone.</div>}
-        <button type="button" data-mfa-ajouter="" onClick={() => { setNom(nomParDefaut(verifies, true)); setCours({ etape: 'nom' }); setMsg(null); }} style={{...btn(false),marginTop:10}}>{seul ? 'Ajouter un appareil de secours' : 'Ajouter un autre appareil'}</button>
+        {seul && <div data-mfa-conseil-secours="" style={{...txt,marginTop:10}}>Un seul appareil : perdu, tu ne pourras plus entrer. Ajoute un appareil de secours, ou désactive avant de changer de téléphone.</div>}
+        <button type="button" data-mfa-ajouter="" onClick={() => { setNom(nomParDefaut(verifies, true)); setCours({ etape: 'nom' }); setMsg(null); }} className="vrm-b vrm-b-secondaire" style={{marginTop:10}}>{seul ? 'Ajouter un appareil de secours' : 'Ajouter un autre appareil'}</button>
       </>)}
       {actif && cours && cours.etape === 'off' && (<>
         <div style={txt}>{seul
@@ -55138,8 +55014,8 @@ function DoubleVerification({ onEtat } = {}) {
           : <>Pour retirer <b style={{color:C.text}}>« {cours.nom} »</b>, tape le code actuel de <b style={{color:C.text}}>l'un</b> de tes appareils — celui d'un autre si « {cours.nom} » est perdu. Les autres restent actifs.</>}</div>
         <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap',marginTop:8}}>
           <input data-mfa-code-desactiver="" type="text" inputMode="numeric" autoComplete="one-time-code" maxLength={6} placeholder="000000" value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))} style={champ}/>
-          <button type="button" data-mfa-confirmer-off="" disabled={busy || code.length !== 6} onClick={retirer} style={btn(false, busy || code.length !== 6)}>{busy ? 'Vérification…' : seul ? 'Désactiver' : 'Retirer'}</button>
-          <button type="button" disabled={busy} onClick={() => { setCours(null); setCode(''); setMsg(null); }} style={btn(false, busy)}>Garder</button>
+          <button type="button" data-mfa-confirmer-off="" disabled={busy || code.length !== 6} onClick={retirer} className="vrm-b vrm-b-primaire">{busy ? 'Vérification…' : seul ? 'Désactiver' : 'Retirer'}</button>
+          <button type="button" disabled={busy} onClick={() => { setCours(null); setCode(''); setMsg(null); }} className="vrm-b vrm-b-discret">Garder</button>
         </div>
       </>)}
       {bandeau}
@@ -55198,17 +55074,17 @@ function FermerCompte() {
           ) : info === undefined ? (
             <div style={txt}>Vérification de ton compte…</div>
           ) : info === null ? (
-            <div data-fermer-etat="pas-su" style={txt}>Je n'ai pas pu vérifier ton compte : rien n'est proposé tant que je ne sais pas. Rouvre cet écran dans un instant.</div>
+            <div data-fermer-etat="pas-su" style={txt}>Compte pas vérifié : rien n'est proposé. Rouvre cet écran dans un instant.</div>
           ) : info.proprietaire ? (
             <div data-fermer-etat="proprietaire" style={txt}>
-              <b style={{ color: C.text }}>Tu es le propriétaire de cette installation VRM.</b> Fermer ce compte effacerait toute la boutique : c'est désactivé ici exprès, pour qu'un clic de travers ne puisse pas le faire.
+              <b style={{ color: C.text }}>Tu es le propriétaire de cette installation VRM.</b> Fermer ce compte effacerait toute la boutique : désactivé ici, exprès.
             </div>
           ) : (
             <div data-fermer-etat="possible">
               <div style={txt}>
                 Seront effacés : <b style={{ color: C.text }}>tes données VRM</b> (ventes, annonces captées, numéros, compta, réglages), <b style={{ color: C.text }}>tes comptes Vinted liés</b> et <b style={{ color: C.text }}>ton compte de connexion</b>.
                 {(info.peutGerer && info.actif) ? ' Ton abonnement est résilié en même temps : aucun nouveau prélèvement ne part.' : ''}
-                {' '}C'est <b style={{ color: C.text }}>définitif</b> : pour garder une copie, fais d'abord une « Sauvegarde complète » (onglet Réglages). Ensuite, retire l'extension VRM de Chrome.
+                {' '}C'est <b style={{ color: C.text }}>définitif</b> : fais d'abord une « Sauvegarde complète » (Réglages), puis retire l'extension VRM de Chrome.
               </div>
               {reglesEbayN === null && <div data-fermer-regles-ebay="pas-su" style={{ ...txt, marginTop: 8, color: C.warn }}>{texteReglesQuiRestent(null, 'fermer')}</div>}
               {reglesEbayN && (reglesEbayN.oui > 0 || reglesEbayN.peutEtre > 0) && <div data-fermer-regles-ebay={reglesEbayN.oui + reglesEbayN.peutEtre} data-fermer-regles-ebay-peut-etre={reglesEbayN.peutEtre} style={{ ...txt, marginTop: 8, color: C.warn }}>Après la fermeture, sur eBay : {texteReglesQuiRestent(reglesEbayN, 'fermer')}</div>}
@@ -55218,8 +55094,8 @@ function FermerCompte() {
                   data-fermer-confirmation=""
                   style={{ width: '100%', boxSizing: 'border-box', marginTop: 6, border: `1px solid ${C.border}`, borderRadius: 10, padding: '11px 12px', fontSize: 15, background: C.bg, color: C.text, outline: 'none', fontFamily: 'inherit' }} />
               </label>
-              <button type="button" onClick={valider} disabled={!pareil || occupe} data-fermer-bouton=""
-                style={{ marginTop: 10, border: 'none', background: C.danger, color: '#fff', borderRadius: 10, padding: '11px 14px', fontSize: 13, fontWeight: 600, cursor: (!pareil || occupe) ? 'default' : 'pointer', opacity: (!pareil || occupe) ? 0.45 : 1, fontFamily: 'inherit' }}>
+              <button type="button" className="vrm-b vrm-b-primaire" onClick={valider} disabled={!pareil || occupe} data-fermer-bouton=""
+                style={{ marginTop: 10 }}>
                 {occupe ? 'Fermeture en cours…' : 'Fermer définitivement mon compte'}
               </button>
             </div>
@@ -55316,11 +55192,9 @@ function MonAbonnement() {
     toast(r.annuleFinPeriode ? `✓ Abonnement résilié — VRM reste ouvert jusqu'au ${dateLisible(r.finPeriode || e.finPeriode)}` : '✓ Abonnement repris — rien ne change pour toi');
   };
   const carte = { padding: '15px 16px', borderRadius: 10, border: `1px solid ${C.border}`, background: C.card, marginBottom: 8 };
-  const bouton = (plein) => ({ marginTop: 10, border: plein ? 'none' : `1px solid ${C.border}`, background: plein ? C.accent : 'transparent', color: plein ? (C.onAccent || '#fff') : C.text,
-    borderRadius: 10, padding: '11px 16px', fontSize: 13.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', maxWidth: 320 });
   const titre = <div style={{ fontSize: 15, fontWeight: 600, color: C.text }}>Ton abonnement</div>;
   if (e === undefined) return <div style={carte} data-abonnement="chargement">{titre}<div style={{ fontSize: 12, color: C.muted, marginTop: 3 }}>Je regarde…</div></div>;
-  if (e === null) return <div style={carte} data-abonnement="pas-su">{titre}<div style={{ fontSize: 12, color: C.muted, marginTop: 3, lineHeight: 1.5 }}>Je n'ai pas pu lire ton abonnement. Rouvre cet écran dans un instant — rien n'a changé de ton côté.</div></div>;
+  if (e === null) return <div style={carte} data-abonnement="pas-su">{titre}<div style={{ fontSize: 12, color: C.muted, marginTop: 3, lineHeight: 1.5 }}>Abonnement pas lu. Rouvre cet écran dans un instant — rien n'a changé.</div></div>;
   // ⚠️ LE PRIX CHEZ STRIPE ≠ CELUI DES CGV (11 octobre : 12,99 €, et le prix
   //    rangé chez Stripe sous `vrm_mensuel` est un réglage de SON tableau de
   //    bord). Le serveur refuse alors d'ouvrir le paiement ; c'est au
@@ -55387,12 +55261,12 @@ function MonAbonnement() {
         )}
         {ligneCarte}
         {test}
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        <div className="vrm-b-rangee" style={{ marginTop: 12 }}>
           {annule
-            ? <button type="button" disabled={!!occupe} onClick={() => resilierOuReprendre(true)} style={bouton(true)}>{occupe === 'reprendre' ? 'Un instant…' : 'Reprendre mon abonnement'}</button>
+            ? <button type="button" disabled={!!occupe} onClick={() => resilierOuReprendre(true)} className="vrm-b vrm-b-primaire">{occupe === 'reprendre' ? 'Un instant…' : 'Reprendre mon abonnement'}</button>
             : <>
-                <button type="button" disabled={!!occupe} onClick={() => agir('portail')} style={bouton(false)}>{occupe === 'portail' ? 'Ouverture…' : 'Changer de carte'}</button>
-                <button type="button" disabled={!!occupe} onClick={() => resilierOuReprendre(false)} style={bouton(false)}>{occupe === 'resilier' ? 'Un instant…' : 'Résilier'}</button>
+                <button type="button" disabled={!!occupe} onClick={() => agir('portail')} className="vrm-b vrm-b-secondaire">{occupe === 'portail' ? 'Ouverture…' : 'Changer de carte'}</button>
+                <button type="button" disabled={!!occupe} onClick={() => resilierOuReprendre(false)} className="vrm-b vrm-b-discret">{occupe === 'resilier' ? 'Un instant…' : 'Résilier'}</button>
               </>}
         </div>
         {msg && <div style={{ fontSize: 12, color: C.warn, marginTop: 6 }}>{msg}</div>}
@@ -55404,10 +55278,10 @@ function MonAbonnement() {
     return (<>
       <div style={{ ...carte, border: `1px solid ${C.warn}55` }} data-abonnement="impaye">
         {titre}
-        <div style={{ fontSize: 12.5, color: C.text, marginTop: 4, lineHeight: 1.5 }}>Le dernier prélèvement n'est pas passé. Mets à jour ta carte pour garder VRM : au bout de 14 jours sans paiement, l'app se met en pause et les notifications s'arrêtent (tes données restent intactes).</div>
+        <div style={{ fontSize: 12.5, color: C.text, marginTop: 4, lineHeight: 1.5 }}>Le dernier prélèvement n'est pas passé. Mets à jour ta carte : au bout de 14 jours, l'app se met en pause (tes données restent intactes).</div>
         {ligneCarte}
         {test}
-        <button type="button" disabled={!!occupe} onClick={() => agir('portail')} style={bouton(true)}>{occupe ? 'Ouverture…' : 'Mettre à jour ma carte'}</button>
+        <button type="button" disabled={!!occupe} onClick={() => agir('portail')} className="vrm-b vrm-b-primaire" style={{ marginTop: 12 }}>{occupe ? 'Ouverture…' : 'Mettre à jour ma carte'}</button>
         {msg && <div style={{ fontSize: 12, color: C.warn, marginTop: 6 }}>{msg}</div>}
       </div>
       {listeFactures}
@@ -55434,7 +55308,7 @@ function MonAbonnement() {
       {RETOUR_ABONNEMENT === 'merci' && <div style={{ fontSize: 12, color: C.muted, marginTop: 6 }}>Paiement reçu par Stripe — ton abonnement apparaîtra ici dans quelques secondes. Rouvre l'écran si besoin.</div>}
       {test}
       <CaseCgv cases={cases} onChange={setCases}/>
-      <button type="button" disabled={!!occupe || !cgv} data-sabonner="" data-essai={e.essaiDispo ? '' : undefined} onClick={() => agir('checkout')} style={{ ...bouton(true), opacity: cgv ? 1 : 0.5 }}>{occupe ? 'Ouverture…' : e.essaiDispo ? `Commencer l'essai gratuit de ${e.essaiJours || 7} jours` : "S'abonner"}</button>
+      <button type="button" disabled={!!occupe || !cgv} data-sabonner="" data-essai={e.essaiDispo ? '' : undefined} onClick={() => agir('checkout')} className="vrm-b vrm-b-primaire" style={{ marginTop: 10 }} title={cgv ? undefined : 'Coche d’abord les conditions de vente'}>{occupe ? 'Ouverture…' : e.essaiDispo ? `Commencer l'essai gratuit de ${e.essaiJours || 7} jours` : "S'abonner"}</button>
       {e.essaiDispo && <div className="vrm-aide" style={{ fontSize: 11, color: C.muted, marginTop: 6, lineHeight: 1.5 }}>Essai gratuit <b>une seule fois</b> — par adresse e-mail et par compte Vinted. Ta carte n'est débitée qu'après {e.essaiJours || 7} jours ; tu peux résilier avant sans rien payer.</div>}
       <div className="vrm-aide" style={{ fontSize: 11, color: C.muted, marginTop: 6 }}>Paiement sécurisé par Stripe — VRM ne voit jamais ta carte.</div>
       {msg && <div style={{ fontSize: 12, color: C.warn, marginTop: 6 }}>{msg}</div>}
@@ -55450,7 +55324,7 @@ function FacturesAbonnement({ fx }) {
   const carte = { padding: '13px 16px', borderRadius: 10, border: `1px solid ${C.border}`, background: C.card, marginBottom: 8 };
   const titre = <div style={{ fontSize: 15, fontWeight: 600, color: C.text }}>Tes factures</div>;
   if (fx === undefined) return <div style={carte} data-factures="chargement">{titre}<div style={{ fontSize: 12, color: C.muted, marginTop: 3 }}>Je regarde…</div></div>;
-  if (fx === null) return <div style={carte} data-factures="pas-su">{titre}<div style={{ fontSize: 12, color: C.muted, marginTop: 3, lineHeight: 1.5 }}>Je n'ai pas pu lire tes factures chez Stripe. Rouvre cet écran dans un instant — elles sont bien gardées.</div></div>;
+  if (fx === null) return <div style={carte} data-factures="pas-su">{titre}<div style={{ fontSize: 12, color: C.muted, marginTop: 3, lineHeight: 1.5 }}>Factures pas lues chez Stripe. Rouvre cet écran dans un instant — elles sont gardées.</div></div>;
   if (!fx.factures.length) return <div style={carte} data-factures="vide">{titre}<div style={{ fontSize: 12, color: C.muted, marginTop: 3, lineHeight: 1.5 }}>Aucune facture pour l'instant : la première arrive avec ton premier prélèvement.</div></div>;
   return (
     <div style={carte} data-factures={String(fx.factures.length)}>
@@ -55568,14 +55442,14 @@ function AbonnementRequis({ info }) {
         {!paiementFerme && info && info.modeTest && <div style={{ fontSize: 12, color: C.muted, marginTop: 8 }}>Mode test : aucune vraie carte n'est débitée.</div>}
         {!impaye && !paiementFerme && <CaseCgv cases={cases} onChange={setCases}/>}
         {!paiementFerme && (
-          <button type="button" disabled={occupe || (!impaye && !cgv)} data-sabonner="" onClick={agir} style={{ marginTop: 18, width: '100%', border: 'none', background: C.accent, color: C.onAccent || '#fff', borderRadius: 10, padding: '13px 16px', fontSize: 15, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', opacity: (!impaye && !cgv) ? 0.5 : 1 }}>
+          <button type="button" disabled={occupe || (!impaye && !cgv)} data-sabonner="" onClick={agir} className="vrm-b vrm-b-primaire vrm-b-plein" style={{ marginTop: 18 }} title={!impaye && !cgv ? 'Coche d’abord les conditions de vente' : undefined}>
             {occupe ? 'Ouverture du paiement…' : (impaye ? 'Mettre à jour ma carte' : "S'abonner")}
           </button>
         )}
         {msg && !paiementFerme && <div style={{ fontSize: 12.5, color: C.warn, marginTop: 8 }}>{msg}</div>}
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 14, fontSize: 12.5 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 14, fontSize: 12.5 }}>
           <a href="/legal/cgv.html" target="_blank" rel="noopener noreferrer" style={{ color: C.muted }}>Conditions de vente</a>
-          <button type="button" onClick={() => { authSignOut(); }} style={{ border: 'none', background: 'transparent', color: C.muted, cursor: 'pointer', fontFamily: 'inherit', fontSize: 12.5, padding: 0, minHeight: 0 }}>Se déconnecter</button>
+          <button type="button" onClick={() => { authSignOut(); }} className="vrm-b vrm-b-discret">Se déconnecter</button>
         </div>
       </div>
     </div>
@@ -56012,22 +55886,21 @@ function DiscordCompte() {
     setMsg('Ton Discord est retiré de ton compte.');
     relire();
   };
-  const bouton = (plein) => ({ border: plein ? 'none' : `1px solid ${C.border}`, background: plein ? '#5865F2' : 'transparent', color: plein ? (C.onAccent || '#fff') : C.text, borderRadius: 8, padding: '8px 12px', minHeight: 38, fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' });
   const note = msg && <div data-discord-compte-msg="" role="status" style={{ fontSize: 13, color: C.text, marginTop: 8, lineHeight: 1.45,flexBasis:'100%' }}>{msg}</div>;
   if (lu === undefined) return <div data-discord-compte="chargement" style={{ fontSize: 13, color: C.muted, padding: '4px 0' }}>Lecture de ton Discord…{note}</div>;
   if (lu === null) return (
     <div data-discord-compte="pas-su" style={{ fontSize: 13, color: C.text, lineHeight: 1.5, padding: '4px 0' }}>
-      Je n'ai pas pu lire ton Discord — la base n'a pas répondu. <button type="button" onClick={relire} style={{ ...bouton(false), marginLeft: 6 }}>Réessayer</button>{note}
+      Je n'ai pas pu lire ton Discord — la base n'a pas répondu. <button type="button" onClick={relire} className="vrm-b vrm-b-secondaire" style={{ marginLeft: 6 }}>Réessayer</button>{note}
     </div>
   );
   return (
     <div data-discord-compte={lu.discord ? 'relie' : 'aucun'} style={{ fontSize: 13, color: C.text, padding:'14px',border:`1px solid ${C.border}`,borderRadius:12,background:C.card,display:'flex',alignItems:'center',justifyContent:'space-between',gap:12,flexWrap:'wrap' }}>
       <div style={{display:'flex',alignItems:'center',gap:10,minWidth:0}}><span aria-hidden="true" style={{width:32,height:32,display:'grid',placeItems:'center',borderRadius:8,background:'#5865F218'}}><BrandMark id="discord"/></span><span>{lu.discord ? <>Discord relié : <b data-discord-compte-pseudo={lu.discord}>{lu.discord}</b></> : <><b>Discord</b><span style={{display:'block',fontSize:11,color:C.muted,marginTop:2}}>Associe ton profil et son avatar à VRM</span></>}</span></div>
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-        {lu.connexion && <button type="button" data-discord-compte-connecter="" disabled={occupe} onClick={connecter} style={bouton(true)}>{occupe ? 'Un instant…' : lu.discord ? 'Changer de compte' : 'Connecter Discord'}</button>}
-        {lu.discord && <button type="button" data-discord-compte-retirer="" disabled={occupe} onClick={retirer} style={bouton(false)}>Retirer</button>}
+        {lu.connexion && <button type="button" data-discord-compte-connecter="" disabled={occupe} onClick={connecter} className="vrm-b vrm-b-secondaire">{occupe ? 'Un instant…' : lu.discord ? 'Changer de compte' : 'Connecter Discord'}</button>}
+        {lu.discord && <button type="button" data-discord-compte-retirer="" disabled={occupe} onClick={retirer} className="vrm-b vrm-b-discret">Retirer</button>}
       </div>
-      {!lu.connexion && !lu.discord && <div style={{ fontSize: 12.5, color: C.muted, marginTop: 4 }}>{DISCORD_ERREURS['non-configure']}</div>}
+      {!lu.connexion && !lu.discord && <span data-discord-compte-indispo="" title={DISCORD_ERREURS['non-configure']} style={{ fontSize: 12, color: C.muted, fontWeight: 600 }}>Bientôt</span>}
       {note}
     </div>
   );
@@ -56050,12 +55923,11 @@ function EquipeSetting() {
     relire();
     try { window.dispatchEvent(new Event('vrm-equipe')); } catch (_) {}
   };
-  const bouton = (plein) => ({ border: plein ? 'none' : `1px solid ${C.border}`, background: plein ? C.accent : 'transparent', color: plein ? (C.onAccent || '#fff') : C.text, borderRadius: 8, padding: '8px 12px', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' });
   const ligne = { display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', padding: '10px 0', borderTop: `1px solid ${C.border}` };
   if (lu === undefined) return <div data-equipe-reglage="chargement" style={{ fontSize: 13, color: C.muted }}>Lecture de ton équipe…</div>;
   if (lu === null) return (
     <div data-equipe-reglage="pas-su" style={{ fontSize: 13, color: C.text, lineHeight: 1.5 }}>
-      Je n'ai pas pu lire ton équipe — la base n'a pas répondu. <button type="button" onClick={relire} style={{ ...bouton(false), marginLeft: 6 }}>Réessayer</button>
+      Je n'ai pas pu lire ton équipe — la base n'a pas répondu. <button type="button" onClick={relire} className="vrm-b vrm-b-secondaire" style={{ marginLeft: 6 }}>Réessayer</button>
     </div>
   );
   if (lu.nonInstalle) return <div data-equipe-reglage="non-installe" style={{ fontSize: 13, color: C.text, lineHeight: 1.5 }}>{EQUIPE_NON_INSTALLE_TXT}</div>;
@@ -56071,15 +55943,15 @@ function EquipeSetting() {
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
         <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="email de la personne" aria-label="Email à inviter" data-equipe-email=""
           style={{ flex: '1 1 200px', minWidth: 0, border: `1px solid ${C.border}`, borderRadius: 8, padding: '8px 10px', fontSize: 14, background: C.bg, color: C.text, outline: 'none', fontFamily: 'inherit' }}/>
-        <button type="button" data-equipe-inviter="" disabled={!!occupe} onClick={inviter} style={bouton(true)}>{occupe === 'inviter' ? 'Invitation…' : 'Inviter'}</button>
+        <button type="button" data-equipe-inviter="" disabled={!!occupe} onClick={inviter} className="vrm-b vrm-b-primaire">{occupe === 'inviter' ? 'Invitation…' : 'Inviter'}</button>
       </div>
-      <div style={{ color: C.muted, fontSize: 12, marginTop: 6, lineHeight: 1.45 }}>Aucun email n'est envoyé : préviens-la. Elle crée son compte VRM avec cette adresse, la confirme, et l'invitation l'attend à l'ouverture.</div>
+      <div style={{ color: C.muted, fontSize: 12, marginTop: 6, lineHeight: 1.45 }}>Aucun email n'est envoyé : préviens-la. Elle crée son compte VRM avec cette adresse.</div>
       {msg && <div data-equipe-msg="" style={{ color: C.warn, marginTop: 8 }}>{msg}</div>}
       {vivants.length > 0 && <div style={{ marginTop: 12 }}>
         {vivants.map((x) => (
           <div key={x.id} data-equipe-membre={x.statut} style={ligne}>
             <span style={{ flex: '1 1 180px', minWidth: 0, overflowWrap: 'anywhere' }}><b>{x.email}</b> <span style={{ color: C.muted }}>· {x.statut === 'actif' ? 'membre' : 'invitée, pas encore acceptée'}</span></span>
-            <button type="button" data-equipe-revoquer={x.id} disabled={!!occupe} onClick={async () => { if (await askConfirm({ title: 'Retirer cette personne ?', desc: `${x.email} ne verra plus tes colis, tout de suite.`, ok: 'Retirer', cancel: 'Annuler', danger: true })) agir(x.id, 'revoquer', { id: x.id }); }} style={bouton(false)}>Retirer</button>
+            <button type="button" data-equipe-revoquer={x.id} disabled={!!occupe} onClick={async () => { if (await askConfirm({ title: 'Retirer cette personne ?', desc: `${x.email} ne verra plus tes colis, tout de suite.`, ok: 'Retirer', cancel: 'Annuler', danger: true })) agir(x.id, 'revoquer', { id: x.id }); }} className="vrm-b vrm-b-discret">Retirer</button>
           </div>
         ))}
       </div>}
@@ -56087,14 +55959,14 @@ function EquipeSetting() {
         {lu.invitations.map((inv) => (
           <div key={inv.id} data-invitation={inv.id} style={ligne}>
             <span style={{ flex: '1 1 180px', minWidth: 0, overflowWrap: 'anywhere' }}><b>{inv.de || 'Un vendeur'}</b> t'invite à préparer ses colis</span>
-            <button type="button" data-accepter={inv.id} disabled={!!occupe} onClick={() => agir(inv.id, 'accepter', { id: inv.id })} style={bouton(true)}>Accepter</button>
+            <button type="button" data-accepter={inv.id} disabled={!!occupe} onClick={() => agir(inv.id, 'accepter', { id: inv.id })} className="vrm-b vrm-b-primaire">Accepter</button>
           </div>
         ))}
         {lu.membreDe.map((m) => (
           <div key={m.id} data-membre-de={m.vendeur} style={ligne}>
             <span style={{ flex: '1 1 180px', minWidth: 0, overflowWrap: 'anywhere' }}>Tu prépares les colis de <b>{m.de || 'un vendeur'}</b>{m.acces === false ? <span style={{ color: C.muted }}> · son abonnement n'est plus actif</span> : null}</span>
-            <button type="button" data-ouvrir-equipe={m.vendeur} onClick={() => { if (uid) choisirVueEquipe(uid, m.vendeur); }} style={bouton(true)}>Ouvrir ses colis</button>
-            <button type="button" data-quitter={m.id} disabled={!!occupe} onClick={async () => { if (await askConfirm({ title: "Quitter l'équipe ?", desc: `Tu ne verras plus les colis de ${m.de || 'ce vendeur'}.`, ok: 'Quitter', cancel: 'Annuler', danger: true })) agir(m.id, 'quitter', { id: m.id }); }} style={bouton(false)}>Quitter</button>
+            <button type="button" data-ouvrir-equipe={m.vendeur} onClick={() => { if (uid) choisirVueEquipe(uid, m.vendeur); }} className="vrm-b vrm-b-primaire">Ouvrir ses colis</button>
+            <button type="button" data-quitter={m.id} disabled={!!occupe} onClick={async () => { if (await askConfirm({ title: "Quitter l'équipe ?", desc: `Tu ne verras plus les colis de ${m.de || 'ce vendeur'}.`, ok: 'Quitter', cancel: 'Annuler', danger: true })) agir(m.id, 'quitter', { id: m.id }); }} className="vrm-b vrm-b-discret">Quitter</button>
           </div>
         ))}
       </div>}
@@ -56166,7 +56038,6 @@ function NumerosSetting({ nu = false, onStock }) {
   const defaut = arch === 'B' ? 'C' : 'B';
   // « Avec une lettre » n'enregistre rien tout seul : la lettre se TAPE.
   const choix = (m) => { setMode(m); setRefusee(''); if (m === 'chiffres') poser(''); };
-  const pill = (on) => ({ border: `1px solid ${on ? C.accent : C.border}`, background: on ? C.accent : C.card, color: on ? (C.onAccent || '#fff') : C.text, borderRadius: 999, padding: '7px 14px', fontSize: 13, fontWeight: on ? 700 : 600, cursor: 'pointer', fontFamily: 'inherit' });
   const ex = p && p !== arch ? p : defaut;
   const enregistree = prefixeNumeros();
   // Les exemples ne citent JAMAIS la lettre des anciens numéros (l'app la refuse).
@@ -56176,22 +56047,16 @@ function NumerosSetting({ nu = false, onStock }) {
     <div data-numeros-reglage={mode} style={nu ? {} : {padding:'13px 16px',borderRadius:10,border:`1px solid ${C.border}`,background:C.card,marginBottom:8}}>
       {!nu && <div style={{fontSize:13,fontWeight:600,color:C.text}}>Tes numéros de rangement</div>}
       <div style={{fontSize:12.5,color:C.muted,marginTop:nu?0:3,lineHeight:1.5}}>
-        Chaque article reçoit un repère que tu peux écrire sur son étiquette, sa boîte ou son sachet. Choisis ici le format des <b>prochains</b> numéros : ceux déjà attribués restent identiques.
-      </div>
-      <GuideReglage titre="Du numéro à l’emplacement" etapes={[
-        ['Choisis un format', 'Chiffres seuls ou lettres suivies de chiffres. Les exemples montrent un format, pas le prochain numéro disponible.'],
-        ['Identifie ton article', 'Reporte le numéro attribué par VRM sur son support physique pour le retrouver sans hésiter.'],
-        ['Indique où il est rangé', 'Exemple : l’article N° C125 est dans Étagère A, case 3. Dans Stock 3D, choisis son numéro puis sa place libre. Le numéro identifie l’article ; la case indique où le trouver.']
-      ]}/>
-      <div className="vrm-numeros-recap" style={{borderColor:C.border,background:C.bg}}>
-        <span style={{color:C.muted}}>Format appliqué sur cet appareil</span><b>{enregistree?`${enregistree} + chiffres`:'Chiffres seuls'}</b>
-        <span style={{color:C.muted}}>Exemples de lecture</span><strong>{enregistree?`${enregistree}125 · ${enregistree}126`:'125 · 126'}</strong>
-        <small style={{color:C.muted}}>Exemples uniquement : cet écran n’attribue aucun numéro et ne renumérote aucun article.</small>
+        Le format des <b>prochains</b> numéros. Ceux déjà donnés ne changent pas.
       </div>
       {erreurLocal&&<p role="alert" style={{fontSize:12,color:C.warn}}>{erreurLocal}</p>}
-      <div style={{display:'flex',gap:8,flexWrap:'wrap',marginTop:10}}>
-        <button type="button" aria-pressed={mode==='chiffres'} onClick={() => choix('chiffres')} style={pill(mode === 'chiffres')}>Chiffres · 1, 2, 3…</button>
-        <button type="button" aria-pressed={mode==='lettre'} onClick={() => choix('lettre')} style={pill(mode === 'lettre')}>Avec une lettre · {ex}1, {ex}2…</button>
+      <Segmente label="Format des prochains numéros" value={mode} onChange={choix} style={{marginTop:10}}
+        options={[{ v:'chiffres', l:'Chiffres · 1, 2, 3…' }, { v:'lettre', l:`Avec une lettre · ${ex}1, ${ex}2…` }]}/>
+      {/* (30 oct.) Le format ENREGISTRÉ, en une ligne (une carte à quatre cases
+          redisait le choix du dessus). Il peut différer du choix tant qu'aucune
+          lettre n'est tapée : c'est lui qui fait foi. */}
+      <div data-numeros-applique={enregistree || 'chiffres'} style={{fontSize:12.5,color:C.muted,marginTop:10}}>
+        Format enregistré : <b style={{color:C.text,fontVariantNumeric:'tabular-nums'}}>{enregistree?`${enregistree} + chiffres (ex. ${enregistree}125)`:'chiffres seuls (ex. 125)'}</b>
       </div>
       {mode === 'lettre' && (
         <label style={{display:'flex',alignItems:'center',gap:8,marginTop:10,fontSize:12.5,color:C.text}}>
@@ -56211,10 +56076,16 @@ function NumerosSetting({ nu = false, onStock }) {
         </div>
       )}
       <div style={{fontSize:11.5,color:C.muted,marginTop:8,lineHeight:1.5}}>
-        Tu peux toujours taper un numéro à la main, dans n'importe quelle forme : 125, {lettreEx}125, {lettreEx2}40. « {lettreEx.toLowerCase()}125 » et « {lettreEx}125 » sont le même numéro.
+        Un numéro tapé à la main peut prendre n'importe quelle forme.{' '}
+        <Pourquoi label="Numéros tapés à la main">Exemples : 125, {lettreEx}125, {lettreEx2}40. « {lettreEx.toLowerCase()}125 » et « {lettreEx}125 » sont le même numéro.</Pourquoi>
         {arch && <> Les anciens numéros (<b>{arch}…</b>) ne se redonnent pas.</>}
       </div>
-      {onStock&&<div className="vrm-settings-next" style={{borderColor:C.border}}><b>Ensuite : indiquer l’emplacement</b><p style={{color:C.muted}}>Une fois le numéro sur l’article, choisis sa place dans le stock. Tu pourras le retrouver en recherchant ce même numéro.</p><button type="button" onClick={onStock} style={{color:C.accent,borderColor:C.border}}>Ouvrir mon stock</button></div>}
+      <GuideReglage titre="Du numéro à l’emplacement" etapes={[
+        ['Choisis un format', 'Chiffres seuls ou lettres suivies de chiffres. Les exemples montrent un format, pas le prochain numéro disponible.'],
+        ['Identifie ton article', 'Reporte le numéro attribué par VRM sur son support physique pour le retrouver sans hésiter.'],
+        ['Indique où il est rangé', 'Exemple : l’article N° C125 est dans Étagère A, case 3. Dans Stock 3D, choisis son numéro puis sa place libre. Le numéro identifie l’article ; la case indique où le trouver.']
+      ]}/>
+      {onStock&&<div className="vrm-settings-next" style={{borderColor:C.border}}><b>Ensuite : indiquer l’emplacement</b><p style={{color:C.muted}}>Choisis la place de l’article dans le stock.</p><Bouton variante="secondaire" onClick={onStock}>Ouvrir mon stock</Bouton></div>}
     </div>
   );
 }
@@ -56280,7 +56151,7 @@ function ZoomSetting({ nu = false }) {
     <div style={nu ? {} : {background:C.card,border:`1px solid ${C.border}`,borderRadius:10,padding:'13px 14px',marginBottom:8,boxShadow:C.shadow||'none'}}>
       {!nu && <div style={{fontSize:14,fontWeight:600,color:C.text}}>Taille de l'affichage</div>}
       <div style={{fontSize:12.5,color:C.muted,marginTop:nu?0:3,lineHeight:1.45}}>
-        {telephone ? 'Une taille lisible et des boutons faciles à toucher. Réglage propre à cet appareil.' : "Ajuste la taille de l'app. Réglage propre à cet appareil."}
+        Réglage propre à cet appareil.
       </div>
       <Segmente label="Taille de l'affichage" plein value={selection} onChange={choisir} style={{marginTop:11}}
         options={choix.map(([v, label]) => ({ v, l: label }))}/>
@@ -56509,7 +56380,7 @@ function EmailStartSetting({ nu = false }) {
     <div style={nu ? {} : {border:`1px solid ${C.border}`,background:C.card,borderRadius:10,padding:'12px 14px'}}>
       {!nu && <div style={{fontSize:13,fontWeight:600,color:C.text,marginBottom:4}}>Import des emails</div>}
       <div style={{fontSize:12.5,color:C.muted,marginBottom:12,lineHeight:1.45}}>
-        Les emails Vinted (ventes, bordereaux, paiements) ne sont pris en compte qu'à partir de cette date. Change-la ici, c'est appliqué à la prochaine synchro (≤ 5 min).
+        Les emails Vinted sont pris en compte à partir de cette date (appliqué en 5 min au plus).
       </div>
       {reprise&&<p role="status" className="vrm-settings-draft" style={{color:C.warn}}>Une modification non enregistrée a été reprise pour ce compte. La date en ligne reste {base?base.split('-').reverse().join('/'):'non définie'} tant que tu ne valides pas.</p>}
       <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap'}}>
@@ -56520,8 +56391,8 @@ function EmailStartSetting({ nu = false }) {
           {status==='load'?'chargement…':status==='saving'?'enregistrement…':status==='err'?'⚠ échec — réessaie':status==='pasLu'?'':status==='modifie'?'Modification non enregistrée':status==='saved'?'✓ enregistré':date?'Date actuelle':'Aucune date définie'}
         </span>
       </div>
-      {(status==='modifie'||status==='err'||status==='saving') && <button type="button" disabled={!dateImportValide(date)||status==='saving'} onClick={()=>saveDate(date)} style={{marginTop:10,minHeight:44,padding:'8px 14px',borderRadius:10,border:`1px solid ${C.border}`,background:C.accent,color:C.onAccent||'#fff',font:'inherit',cursor:'pointer'}}>{status==='saving'?'Enregistrement…':status==='err'?'Réessayer l’enregistrement':'Enregistrer la date'}</button>}
-      {['modifie','err'].includes(status)&&<button type="button" onClick={annuler} style={{margin:'10px 0 0 8px',minHeight:44,padding:'8px 12px',background:'transparent',border:`1px solid ${C.border}`,borderRadius:10,color:C.text,font:'inherit',cursor:'pointer'}}>Revenir à la date en ligne</button>}
+      {(status==='modifie'||status==='err'||status==='saving') && <Bouton variante="primaire" disabled={!dateImportValide(date)||status==='saving'} onClick={()=>saveDate(date)} style={{marginTop:10}}>{status==='saving'?'Enregistrement…':status==='err'?'Réessayer l’enregistrement':'Enregistrer la date'}</Bouton>}
+      {['modifie','err'].includes(status)&&<Bouton variante="discret" onClick={annuler} style={{margin:'10px 0 0 12px'}}>Annuler</Bouton>}
       {date&&!dateImportValide(date)&&<p role="alert" style={{color:C.warn,fontSize:12}}>Choisis une date valide avant d’enregistrer.</p>}
       {status==='pasLu' && <div style={{marginTop:9}}><span style={{display:'inline-block',fontSize:11,fontWeight:600,color:C.muted,background:C.bg,border:`1px solid ${C.border}`,borderRadius:999,padding:'2px 9px'}}>{REGLAGE_PAS_LU}</span></div>}
     </div>
@@ -56661,20 +56532,19 @@ function PushSetting() {
           aucun appareil abonné, ou le serveur sans sa clé. On les sépare ici,
           au lieu de laisser deviner. */}
       {srv && !srv.pret && (
-        <div style={{display:'flex',gap:8,alignItems:'flex-start',padding:'9px 11px',borderRadius:8,border:`1px solid ${C.danger}55`,background:`${C.danger}12`,marginBottom:10}}>
-          <Icon name="alert" size={16} style={{color:C.danger,flexShrink:0,marginTop:1}}/>
+        <div data-push-serveur="pas-pret" style={{display:'flex',gap:8,alignItems:'flex-start',padding:'9px 11px',borderRadius:8,border:`1px solid ${C.warn}55`,background:`${C.warn}12`,marginBottom:10}}>
+          <Icon name="alert" size={16} style={{color:C.warn,flexShrink:0,marginTop:1}}/>
           <div style={{fontSize:11.5,color:C.text,lineHeight:1.45,minWidth:0}}>
-            <b style={{color:C.danger}}>Le serveur ne peut envoyer aucune notification.</b> Tant que c'est le cas, activer les notifications ici ne changera rien : l'interrupteur serait un mensonge.
+            <b>Le serveur ne peut envoyer aucune notification</b> : sa clé manque. Activer ici ne changerait rien.
             {/* ⚠️ UNE ALERTE QUI NE DIT PAS QUOI FAIRE NE SERT À RIEN. Julien n'est
                 pas développeur : la marche à suivre doit être exacte, dans l'ordre,
                 avec le nom du réglage à taper. */}
-            <div style={{marginTop:7,paddingTop:7,borderTop:`1px solid ${C.danger}33`}}>
-              <div style={{fontWeight:700,marginBottom:3}}>Ce qu'il faut faire, une seule fois :</div>
+            <details className="vrm-repli" style={{marginTop:7}}><summary>Ce qu'il faut faire, une seule fois</summary>
               <div>1. Ouvrir <a href="https://vercel.com/shopcancale35-7638s-projects/cancale-v67/settings/environment-variables" target="_blank" rel="noreferrer" style={{color:C.accent,fontWeight:600}}>Vercel → Settings → Environment Variables</a></div>
               <div>2. Ajouter la variable <code style={{fontSize:10.5}}>VAPID_PRIVATE_KEY</code> avec la clé privée que je t'ai donnée</div>
               <div>3. Redéployer (Deployments → ⋯ → Redeploy)</div>
               <div style={{marginTop:4,color:C.muted}}>La clé privée ne peut pas vivre dans le code : le dépôt est public, n'importe qui pourrait envoyer des notifications sur ton téléphone.</div>
-            </div>
+            </details>
           </div>
         </div>
       )}
@@ -56684,14 +56554,14 @@ function PushSetting() {
         </div>
       )}
       {state!=='unsupported' && (
-        <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+        <div className="vrm-b-rangee" style={{justifyContent:'flex-start'}}>
           {state!=='on' ? (
-            <button type="button" onClick={enable} disabled={state==='busy'||state==='checking'} style={{flex:1,minWidth:130,padding:'9px 12px',borderRadius:8,border:`1px solid ${C.accent}`,background:`${C.accent}12`,color:C.accent,fontSize:13,fontWeight:600,cursor:'pointer',fontFamily:'inherit',opacity:state==='busy'?0.6:1}}>
+            <Bouton variante="primaire" icone="bell2" onClick={enable} disabled={state==='busy'||state==='checking'}>
               {state==='busy'?'…':'Activer sur cet appareil'}
-            </button>
+            </Bouton>
           ) : (<>
-            <button type="button" onClick={test} style={{flex:1,minWidth:100,padding:'9px 12px',borderRadius:8,border:`1px solid ${C.border}`,background:C.card,color:C.text,fontSize:13,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Tester</button>
-            <button type="button" onClick={disable} style={{flex:1,minWidth:100,padding:'9px 12px',borderRadius:8,border:`1px solid ${C.danger}66`,background:'transparent',color:C.danger,fontSize:13,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Désactiver</button>
+            <Bouton variante="secondaire" onClick={test}>Envoyer un essai</Bouton>
+            <Bouton variante="discret" onClick={disable}>Désactiver</Bouton>
           </>)}
         </div>
       )}
@@ -56869,17 +56739,16 @@ function SecuriteSetting() {
         </span>
       </div>
       <div style={{fontSize:12,color:C.muted,marginBottom:4,lineHeight:1.45}}>
-        Sondé en direct sur ta base, à chaque ouverture de cet écran.
+        Vérifié en direct sur ta base, à chaque ouverture.
       </div>
       <Ligne t="Propriétaire des lignes" ok={s.colonne}
         etat={s.colonne == null ? 'pas encore vérifié' : s.colonne ? 'colonne présente' : 'colonne absente'}
         d={s.colonne == null ? PAS_SU : s.colonne ? "Chaque ligne peut être attribuée à un vendeur."
-          : "Sans elle, toutes les données vivent dans la même ligne : un deuxième compte ouvrirait TA boutique. C'est la migration SQL à passer dans Supabase → SQL Editor."}
+          : "Sans elle, un deuxième compte ouvrirait TA boutique. À corriger par la migration SQL (Supabase → SQL Editor)."}
         action={s.colonne === false && (
-          <button type="button" onClick={()=>copier(MIGRATION_SQL, 'sql')}
-            style={{marginTop:7,border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:8,padding:'6px 10px',fontSize:11.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>
-            {copie==='sql' ? '✓ Copié — colle-le dans Supabase → SQL Editor' : <span style={{display:'inline-flex',alignItems:'center',gap:5}}><Icon name="doc" size={12}/>Copier la migration SQL</span>}
-          </button>)}/>
+          <Bouton variante="secondaire" icone={copie==='sql' ? undefined : 'doc'} className="vrm-b-petit" onClick={()=>copier(MIGRATION_SQL, 'sql')} style={{marginTop:7}}>
+            {copie==='sql' ? '✓ Copié — colle-le dans Supabase → SQL Editor' : 'Copier la migration SQL'}
+          </Bouton>)}/>
       {/* ⚠️ UNE CAUSE, UNE LIGNE (§7). Lire, écrire et les jetons Vinted, c'est
           le MÊME verrou manquant (RLS) : trois lignes d'alerte pour un seul
           geste se liraient comme trois problèmes. Mais les trois faits sont
@@ -56909,13 +56778,13 @@ function SecuriteSetting() {
               ? `${PAS_SU} (${pasSus.join(' · ')})`
               : ouverts.length === 0
                 ? "La clé publique ne ramène plus rien et n'écrit plus rien : seule une session identifiée touche tes données."
-                : <>La clé publique — celle qui est <b>visible dans le code de la page</b> — permet encore de <b>{ouverts.join(', ')}</b>. C'est le verrou qui compte vraiment (RLS) : la colonne seule ne protège rien.{s.jetonsLisibles === true ? <> Un jeton Vinted vaut le compte lui-même : pas besoin de ton mot de passe.</> : null}</>}/>
+                : <>La clé publique — celle qui est <b>visible dans le code de la page</b> — permet encore de <b>{ouverts.join(', ')}</b>. Le verrou qui manque : RLS.{s.jetonsLisibles === true ? <> Un jeton Vinted vaut le compte lui-même.</> : null}</>}/>
         );
       })()}
       <Ligne t="Création de compte" ok={s.mailAuto == null ? null : s.mailAuto === true}
         etat={s.mailAuto == null ? 'pas encore vérifié' : s.mailAuto ? 'immédiate' : 'email de confirmation exigé'}
         d={s.mailAuto == null ? PAS_SU : s.mailAuto ? "Un nouveau compte est utilisable tout de suite."
-          : "Un lien de confirmation est nécessaire pour activer le compte. Si tu ne le reçois pas, vérifie les indésirables puis demande un nouveau lien depuis la connexion."}/>
+          : "Lien de confirmation exigé. Pas reçu ? Vérifie les indésirables, puis redemande-le depuis la connexion."}/>
       {/* ⚠️ LA MOITIÉ SERVEUR DU CLOISONNEMENT. Les emails, les rappels
           d'expédition et les notifications sont écrits par des routes qui
           tournent SANS vendeur connecté : sans clé de service elles ne
@@ -56927,12 +56796,12 @@ function SecuriteSetting() {
         etat={srv == null ? 'pas encore vérifié' : srv.serviceKey && srv.owner ? 'prêtes' : srv.serviceKey ? 'propriétaire manquant' : 'clé de service manquante'}
         d={srv == null ? PAS_SU : srv.serviceKey && srv.owner
           ? "Elles écriront sous ton compte une fois la base cloisonnée."
-          : "À régler dans Vercel → Settings → Environment Variables AVANT la migration : SUPABASE_SERVICE_KEY (Supabase → Settings → API → service_role) et VRM_OWNER_UID (ton identifiant de compte). Sans ça, les emails et rappels cesseront d'être enregistrés dès que la séparation sera activée."}/>
+          : "AVANT la migration, dans Vercel → Settings → Environment Variables : SUPABASE_SERVICE_KEY (Supabase → Settings → API → service_role) et VRM_OWNER_UID. Sans ça, emails et rappels ne seront plus enregistrés."}/>
       <Ligne t="Extension identifiée" ok={ext === undefined ? null : !!(ext && ext.connecte)}
         etat={ext === undefined ? '…' : !ext ? 'extension absente ici' : ext.connecte ? (ext.email || 'connectée') : 'pas connectée'}
-        d={!ext ? "Sur téléphone c'est normal. Sur l'ordinateur, ouvre l'app dans le Chrome où l'extension est installée."
-          : ext.connecte ? "Elle écrira sous ce compte dès que la base saura séparer les vendeurs."
-          : "Ouvre la fenêtre de l'extension (son icône dans Chrome) → Compte VRM → entre ton email et ton mot de passe."}/>
+        d={!ext ? "Normal sur téléphone. Sur l'ordinateur, ouvre l'app dans le Chrome de l'extension."
+          : ext.connecte ? "Elle écrira sous ce compte."
+          : "Icône de l'extension dans Chrome → Compte VRM → ton email et ton mot de passe."}/>
     </div>
   );
 }
@@ -57366,10 +57235,10 @@ function EmailsSetting({onComptes}) {
           <button type="button" className="vrm-email-configurer" aria-label={`Configurer le transfert de ${adr}`} onClick={()=>configurerAdresse(adr)}>Configurer</button>
           {geste && (
             <button type="button" data-confirmer-adresse={normAdresse(adr)} disabled={preuveBusy === adr} onClick={()=>confirmerAdresse(adr, false)} aria-label={`${geste} ${adr}`}
-              style={{flexShrink:0,border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:8,padding:'5px 9px',fontSize:11.5,fontWeight:600,cursor:preuveBusy===adr?'default':'pointer',fontFamily:'inherit',opacity:preuveBusy===adr?0.5:1}}>{preuveBusy === adr ? '…' : geste}</button>
+              className="vrm-b vrm-b-secondaire vrm-b-petit" style={{flexShrink:0}}>{preuveBusy === adr ? '…' : geste}</button>
           )}
           <button type="button" onClick={()=>retirer(adr)} aria-label={`Retirer ${adr}`}
-            style={{flexShrink:0,border:`1px solid ${C.border}`,background:'transparent',color:C.muted,borderRadius:8,padding:'5px 9px',fontSize:11.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Retirer</button>
+            className="vrm-b vrm-b-discret" style={{flexShrink:0}}>Retirer</button>
         </div>
       ); })}
       </>)}
@@ -57398,7 +57267,7 @@ function EmailsSetting({onComptes}) {
       {reg && sugg.length > 0 && (
         <div data-suggestions={sugg.length} style={{marginTop:10,borderTop:`1px solid ${C.border}`,paddingTop:10}}>
           <div style={{fontSize:12.5,fontWeight:600,color:C.text}}>Adresses où arrivent déjà tes emails</div>
-          <div style={{fontSize:11.5,color:C.muted,lineHeight:1.45,margin:'2px 0 4px'}}>Lues sur les emails déjà rangés chez toi, et pas encore dans ta liste. Ajoute celles qui sont à toi.</div>
+          <div style={{fontSize:11.5,color:C.muted,lineHeight:1.45,margin:'2px 0 4px'}}>Vues sur tes emails rangés. Ajoute celles qui sont à toi.</div>
           {sugg.slice(0, 8).map((v) => (
             <div key={v.adresse} data-suggestion={v.adresse} style={{display:'flex',alignItems:'center',gap:8,padding:'7px 0',borderTop:`1px solid ${C.border}`}}>
               <span style={{flex:'1 1 140px',minWidth:0}}>
@@ -57408,19 +57277,18 @@ function EmailsSetting({onComptes}) {
                 </span>
               </span>
               <button type="button" onClick={()=>ajouterAdresses([v.adresse])} aria-label={`Ajouter ${v.adresse}`}
-                style={{flexShrink:0,border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:8,padding:'5px 10px',fontSize:11.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>+ Ajouter</button>
+                className="vrm-b vrm-b-secondaire vrm-b-petit" style={{flexShrink:0}}>Ajouter</button>
             </div>
           ))}
           {sugg.length > 1 && (
-            <button type="button" onClick={toutesSugg}
-              style={{marginTop:6,border:'none',background:'transparent',color:C.accent,padding:'4px 0',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>
+            <button type="button" onClick={toutesSugg} className="vrm-b vrm-b-discret" style={{marginTop:6}}>
               Les ajouter toutes ({sugg.length})
             </button>
           )}
         </div>
       )}
       <button type="button" onClick={ajouter} disabled={reg === null || reg === undefined}
-        style={{marginTop:10,border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:8,padding:'8px 12px',fontSize:12.5,fontWeight:600,cursor:reg?'pointer':'default',fontFamily:'inherit',opacity:reg?1:0.45}}>
+        className="vrm-b vrm-b-secondaire" style={{marginTop:10}} title={reg ? undefined : 'Tes adresses ne sont pas encore lues'}>
         + Ajouter une adresse
       </button>
       <details className="vrm-email-aide-adresses"><summary>Comprendre les adresses et le transfert</summary>
@@ -57437,7 +57305,7 @@ function EmailsSetting({onComptes}) {
               ? "Une adresse manque ? Ses emails sont mis de côté, gardés entiers — ils te sont proposés ici dès que tu l'ajoutes."
               : "Une adresse manque ? Ses emails sont mis de côté, gardés entiers — rien n'est perdu."}</span>
         </div>
-        <div data-adresse-transfert-vrm="" style={{display:'flex',alignItems:'center',flexWrap:'wrap',gap:8,marginTop:10,fontSize:12}}><span>Adresse de transfert : <b style={{overflowWrap:'anywhere'}}>{ADRESSE_COLLECTRICE}</b></span><button type="button" onClick={async()=>{try{await navigator.clipboard.writeText(ADRESSE_COLLECTRICE);toast('Adresse de transfert copiée.');}catch(_){toast('Sélectionne l’adresse affichée pour la copier.');}}} style={{font:'inherit',color:C.text,background:'transparent',border:`1px solid ${C.border}`,borderRadius:8,padding:'7px 10px',cursor:'pointer'}}>Copier l’adresse</button></div>
+        <div data-adresse-transfert-vrm="" style={{display:'flex',alignItems:'center',flexWrap:'wrap',gap:8,marginTop:10,fontSize:12}}><span>Adresse de transfert : <b style={{overflowWrap:'anywhere'}}>{ADRESSE_COLLECTRICE}</b></span><button type="button" onClick={async()=>{try{await navigator.clipboard.writeText(ADRESSE_COLLECTRICE);toast('Adresse de transfert copiée.');}catch(_){toast('Sélectionne l’adresse affichée pour la copier.');}}} className="vrm-b vrm-b-secondaire vrm-b-petit">Copier l’adresse</button></div>
         <details style={{marginTop:8}}>
           <summary style={{cursor:'pointer',fontSize:12.5,fontWeight:600,color:C.accent,padding:'13px 0',minHeight:44,boxSizing:'border-box'}}>Comment faire suivre mes emails Vinted vers VRM&nbsp;?</summary>
           <ol style={{margin:'8px 0 0',paddingLeft:18,fontSize:12,color:C.text,lineHeight:1.5,display:'grid',gap:5}}>
@@ -57474,20 +57342,24 @@ function EmailsSetting({onComptes}) {
       {enAttente.length > 0 && (
         <div data-emails-mis-de-cote="" style={{marginTop:12,borderTop:`1px solid ${C.border}`,paddingTop:10}}>
           <div style={{fontSize:12.5,fontWeight:600,color:C.text,marginBottom:6}}>{enAttente.length} email{enAttente.length>1?'s':''} conservé{enAttente.length>1?'s':''}</div>
-          <div className="vrm-aide" style={{fontSize:11.5,color:C.muted,marginBottom:8,lineHeight:1.45}}>Arrivés avant que leur adresse soit déclarée. Ils sont conservés entiers — rien n'est perdu.</div>
+          <div className="vrm-aide" style={{fontSize:11.5,color:C.muted,marginBottom:8,lineHeight:1.45}}>Arrivés avant que leur adresse soit déclarée. Gardés entiers.</div>
           <label className="vrm-email-recherche">Rechercher dans les emails à rattacher<input type="search" value={rechercheRattachement} onChange={e=>{setRechercheRattachement(e.target.value);setLimiteRattachement(10);}} placeholder="Sujet ou motif"/></label>
           <p className="vrm-email-resultats">{rattachementsVisibles.length} sur {enAttente.length} emails{motsRattachement?' · recherche appliquée':''}</p>
-          <button type="button" disabled={!!lot} onClick={toutRejouer}
-            style={{width:'100%',marginBottom:10,border:'none',background:lot?C.border:C.accent,color:lot?C.muted:(C.onAccent||'#fff'),borderRadius:8,padding:'10px 12px',fontSize:12.5,fontWeight:700,cursor:lot?'default':'pointer',fontFamily:'inherit'}}>
-            {lot ? `Traitement… ${lot.fait}/${lot.total}` : `Réessayer les ${enAttente.length} emails`}
-          </button>
+          {/* (30 oct.) Un parcours : où j'en suis, une barre, combien. */}
+          {lot ? <Avancement titre={`Email ${Math.min(lot.fait + 1, lot.total)} sur ${lot.total}`} part={lot.total ? lot.fait / lot.total : 0}
+              phrase="Chaque email repasse dans le traitement normal. Rien n'est supprimé avant la fin."
+              compte={compteAvancement({ faites: lot.ok, ratees: lot.fait - lot.ok, restent: lot.total - lot.fait, motFait: 'traité' })}
+              data={{ 'data-rejeu-lot': `${lot.fait}/${lot.total}` }}/>
+            : <button type="button" onClick={toutRejouer} className="vrm-b vrm-b-primaire vrm-b-plein" style={{marginBottom:10}}>
+              {`Réessayer les ${enAttente.length} emails`}
+            </button>}
           {rattachementsVisibles.slice(0,limiteRattachement).map(q => (
             <div key={q.id} style={{display:'flex',alignItems:'center',gap:8,padding:'7px 0',borderTop:`1px solid ${C.border}`}}>
               <span style={{flex:'1 1 130px',minWidth:0,fontSize:12,color:C.text,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
                 {q.sujet || '(sans sujet)'} <span style={{color:C.muted}}>· {q.raison || ''}</span>
               </span>
-              <button type="button" disabled={busy===q.id} onClick={()=>rattacher(q.id)}
-                style={{flexShrink:0,border:'none',background:C.accent,color:C.onAccent||'#fff',borderRadius:8,padding:'6px 11px',fontSize:11.5,fontWeight:600,cursor:busy===q.id?'default':'pointer',fontFamily:'inherit',opacity:busy===q.id?0.6:1}}>
+              <button type="button" disabled={busy===q.id || !!lot} onClick={()=>rattacher(q.id)}
+                className="vrm-b vrm-b-secondaire vrm-b-petit" style={{flexShrink:0}}>
                 {busy===q.id ? '…' : "C'est à moi"}
               </button>
             </div>
@@ -57589,7 +57461,7 @@ function ConnexionsSetting({comptes=[],onComptes,onPlateforme}) {
   const dateLisible=d=>{const t=Date.parse(d||'');return Number.isFinite(t)&&t<=Date.now()+300000?new Date(t).toLocaleString('fr-FR',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}):'date non vérifiée';};
   return <div data-connexions-panneau="" style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:12,padding:14}}>
     <div className="vrm-titre-panneau" style={{fontSize:14,fontWeight:600,color:C.text}}>État des connexions</div>
-    <div className="vrm-connexions-entete"><p style={{color:C.muted}}>Chaque source a son propre état. Une donnée ancienne ou absente ne prouve pas qu’un compte est déconnecté.</p><button type="button" onClick={actualiser} disabled={lecture}>{lecture?'Vérification…':'Actualiser les états'}</button></div>
+    <div className="vrm-connexions-entete"><p style={{color:C.muted}}>Une donnée ancienne ne veut pas dire « déconnecté ».</p><Bouton variante="secondaire" icone="sync" onClick={actualiser} disabled={lecture}>{lecture?'Vérification…':'Actualiser les états'}</Bouton></div>
     <section className="vrm-connexion-source" data-connexion="extension" style={{borderColor:C.border}}>
       <h3>Extension · ce navigateur</h3><strong style={{color:extension.etat==='action'?C.warn:C.text}}>{extension.titre}</strong><p style={{color:C.muted}}>{extension.detail}</p>
       {ext.on&&codePerime()&&<p style={{color:C.warn}}>{textePerime()}</p>}
@@ -57599,17 +57471,17 @@ function ConnexionsSetting({comptes=[],onComptes,onPlateforme}) {
         <p>Dans Orion : autorise les extensions Firefox, puis installe le fichier XPI depuis Extensions → + → depuis un fichier. Autorise ensuite VRM sur les sites utilisés.</p>
         <a href="/VRM-Orion-installation.txt" target="_blank" rel="noopener noreferrer">Voir les instructions Orion</a>
       </details>
-      <details><summary>Dernière version observée dans ma boutique</summary><p>{derniereExt===undefined?'Lecture en cours…':derniereExt===null?'Cette information n’a pas pu être lue.':derniereExt==='aucune'?'Aucune version enregistrée.':`Version ${derniereExt.v} · ${dateLisible(derniereExt.at)}.`} C’est la version de la dernière capture enregistrée : elle peut venir d’un autre navigateur. Elle ne confirme pas la version utilisée ici.</p></details>
+      <details><summary>Dernière version observée dans ma boutique</summary><p>{derniereExt===undefined?'Lecture en cours…':derniereExt===null?'Cette information n’a pas pu être lue.':derniereExt==='aucune'?'Aucune version enregistrée.':`Version ${derniereExt.v} · ${dateLisible(derniereExt.at)}.`} Celle de la dernière capture, peut-être faite ailleurs : elle ne confirme pas la version utilisée ici.</p></details>
     </section>
-    <section className="vrm-connexion-source" data-connexion="capture" style={{borderColor:C.border}}><h3>Données de l’extension</h3><strong>{capture.titre}</strong>{capture.date&&<time dateTime={capture.date}>{dateLisible(capture.date)}</time>}<p style={{color:C.muted}}>Dernière mise à jour enregistrée pour cette source. Pour actualiser un compte, ouvre-le sur sa plateforme avec l’extension active ; vérifie ensuite ses annonces, ventes et messages.</p></section>
+    <section className="vrm-connexion-source" data-connexion="capture" style={{borderColor:C.border}}><h3>Données de l’extension</h3><strong>{capture.titre}</strong>{capture.date&&<time dateTime={capture.date}>{dateLisible(capture.date)}</time>}<p style={{color:C.muted}}>Pour la rafraîchir : ouvre le compte sur sa plateforme, extension active.</p></section>
     <SuiviComptes comptes={comptes} lignes={capt?.lignes||null} onComptes={onComptes}/>
-    {onPlateforme&&<div className="vrm-connexions-actions"><button type="button" onClick={()=>onPlateforme('plat_leboncoin')}>Leboncoin · comptes et diagnostic</button><button type="button" onClick={()=>onPlateforme('plat_ebay')}>eBay · comptes et synchronisation</button></div>}
-    <section className="vrm-connexion-source" data-connexion="emails" style={{borderColor:C.border}}><h3>Données des emails</h3><strong>{emails.titre}</strong>{emails.date&&<time dateTime={emails.date}>{dateLisible(emails.date)}</time>}<p style={{color:C.muted}}>Cette date est celle des données enregistrées, pas une preuve que chaque transfert fonctionne. Le suivi détaillé est dans « Réception des emails ».</p></section>
+    {onPlateforme&&<div className="vrm-connexions-actions"><Bouton variante="secondaire" onClick={()=>onPlateforme('plat_leboncoin')}>Comptes Leboncoin</Bouton><Bouton variante="secondaire" onClick={()=>onPlateforme('plat_ebay')}>Comptes eBay</Bouton></div>}
+    <section className="vrm-connexion-source" data-connexion="emails" style={{borderColor:C.border}}><h3>Données des emails</h3><strong>{emails.titre}</strong>{emails.date&&<time dateTime={emails.date}>{dateLisible(emails.date)}</time>}<p style={{color:C.muted}}>Date des données reçues, pas une preuve que chaque transfert marche. Détail : « Réception des emails ».</p></section>
     {((Array.isArray(drift)&&drift.length>0)||(Array.isArray(plantages)&&plantages.length>0))&&<details className="vrm-connexion-source" style={{borderColor:C.border}}><summary>Incidents et détails pour l’assistance</summary>
       {Array.isArray(drift)&&drift.length>0&&<p>Le format de certaines réponses est à vérifier : {[...new Set(drift.map(x=>nomFamille(x.type)))].join(', ')}.</p>}
       {Array.isArray(plantages)&&plantages.length>0&&<p>{plantages.length} incident(s) observé(s) ces 7 derniers jours. Dernier : {plantages[0].message} · {dateLisible(plantages[0].at)}.</p>}
     </details>}
-    <details className="vrm-connexion-source" style={{borderColor:C.border}}><summary>Version de l’application</summary><p>{BUILD_ID==='inconnue'?'Version non vérifiée.':`Compilation du ${BUILD_ID}.`}</p><button type="button" onClick={()=>{if(window.__vrmForceUpdate)window.__vrmForceUpdate();else window.location.reload();}}>Recharger la dernière version</button></details>
+    <details className="vrm-connexion-source" style={{borderColor:C.border}}><summary>Version de l’application</summary><p>{BUILD_ID==='inconnue'?'Version non vérifiée.':`Compilation du ${BUILD_ID}.`}</p><Bouton variante="secondaire" onClick={()=>{if(window.__vrmForceUpdate)window.__vrmForceUpdate();else window.location.reload();}}>Recharger la dernière version</Bouton></details>
   </div>;
 }
 
@@ -57653,19 +57525,16 @@ function EcranMasques({ comptes, ordi }) {
   return (
     <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 14 }}>
       <ScreenHead icon="eyeOff" title="Masqués" desc="Les achats que tu as retirés de la compta — réaffiche-les d'un clic."/>
-      <div className="vrm-rangee" style={{ display: 'flex', gap: 6 }}>
-        {[['achats', `Achats masqués (${aMasq.length})`]].map(([k, lib]) => (
-          <button key={k} type="button" onClick={() => setOnglet(k)} aria-pressed={onglet === k}
-            style={{ border: `1px solid ${onglet === k ? C.text : C.border}`, borderRadius: 999, padding: '6px 13px', background: onglet === k ? C.text : 'transparent', color: onglet === k ? C.bg : C.muted, cursor: 'pointer', fontSize: 13, fontWeight: 600, fontFamily: 'inherit', flexShrink: 0 }}>{lib}</button>
-        ))}
-      </div>
+      {/* (30 oct.) Une pastille seule (« Achats masqués ») ne filtrait rien : un
+          seul onglet n'est pas un choix. Le nombre reste dit, en clair. */}
+      <div data-masques-n={aMasq.length} style={{ fontSize: 13, color: C.muted }}>{aMasq.length} achat{aMasq.length > 1 ? 's' : ''} masqué{aMasq.length > 1 ? 's' : ''}</div>
       {!liste.length ? (
         <div style={{ border: `1px solid ${C.border}`, background: C.card, borderRadius: 12, padding: '18px 16px', fontSize: 13, color: C.muted, lineHeight: 1.5 }}>
           {onglet === 'ventes' ? "Aucune vente masquée. Le ✕ d'une vente, sur l'écran Ventes, la range ici." : "Aucun achat masqué. L'icône « œil barré » d'un achat, sur l'écran Achats, le range ici."}
         </div>
       ) : (
         <>
-          {det === null && <div style={{ fontSize: 12, color: C.muted }}>Je n'ai pas pu relire le détail de ces {onglet} — la liste reste juste, seuls photos, titres et montants manquent.</div>}
+          {det === null && <div style={{ fontSize: 12, color: C.muted }}>Détail pas relu : la liste est juste, seuls photos, titres et montants manquent.</div>}
           <div style={{ display: 'grid', gridTemplateColumns: ordi ? 'repeat(2, minmax(0, 1fr))' : 'minmax(0, 1fr)', gap: 10 }}>
             {liste.map((tx) => { const o = det && det[tx]; const ph = o ? orderPhoto(o) : null;
               return (
@@ -57678,7 +57547,7 @@ function EcranMasques({ comptes, ordi }) {
                     <div style={{ fontSize: 13.5, fontWeight: 600, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{o ? o.title : (det === undefined ? 'Lecture…' : `Transaction ${tx}`)}</div>
                     {o && <div style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>{[o.date ? new Date(o.date).toLocaleDateString('fr-FR') : '', o._login, eur(o)].filter(Boolean).join(' · ')}</div>}
                   </div>
-                  <button type="button" onClick={() => reafficher(tx)} style={{ flexShrink: 0, border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.text, padding: '7px 11px', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>Réafficher</button>
+                  <Bouton variante="secondaire" className="vrm-b-petit" onClick={() => reafficher(tx)} style={{ flexShrink: 0 }}>Réafficher</Bouton>
                 </div>
               ); })}
           </div>
@@ -57741,10 +57610,10 @@ function RegimeSetting({ nu = false }) {
             <span style={{fontSize:12,color:C.muted}}>% du CA</span>
           </div>
           <div style={{fontSize:11,color:C.muted,marginTop:6,lineHeight:1.5}}>
-            Sert au rapport mensuel et annuel. Il se compose des <b>cotisations sociales</b>, de la <b>contribution à la formation</b>, et du <b>versement libératoire de l'impôt</b> si tu l'as choisi — donc il dépend de ta situation et il change d'une année à l'autre.
-            {' '}Vérifie le tien et déclare sur{' '}
+            Le tien, vérifié sur{' '}
             <a href="https://www.autoentrepreneur.urssaf.fr" target="_blank" rel="noopener noreferrer" style={{color:C.accent,fontWeight:700,textDecoration:'none'}}>autoentrepreneur.urssaf.fr →</a>
-            {' '}: l'app ne le devine pas, elle applique celui que tu poses ici.
+            {' '}: l'app applique celui que tu poses ici.{' '}
+            <Pourquoi label="De quoi se compose ce taux">Cotisations sociales, contribution à la formation, et versement libératoire de l'impôt si tu l'as choisi. Il dépend de ta situation et change d'une année à l'autre ; il sert au rapport mensuel et annuel.</Pourquoi>
           </div>
         </div>
       )}
@@ -57833,7 +57702,7 @@ function DemandeCodeDiscord() {
             style={{ width:'100%', boxSizing:'border-box', minHeight:50, fontSize:22, letterSpacing:4, textAlign:'center', borderRadius:8, border:`1px solid ${C.border}`, background:C.bg, color:C.text, marginBottom:10 }}/>
           {e.erreur && <div data-discord-code-erreur="" style={{ fontSize:14, color:C.warn || C.text, marginBottom:10 }}>{e.erreur}</div>}
           <div style={{ display:'flex', gap:8 }}>
-            <button type="button" onClick={fermer} style={{ minHeight:44, flex:1, borderRadius:8, border:`1px solid ${C.border}`, background:'transparent', color:C.text }}>Annuler</button>
+            <button className="vrm-b vrm-b-discret" type="button" onClick={fermer} style={{ minHeight:44, flex:1, borderRadius:8, border:`1px solid ${C.border}`, background:'transparent', color:C.text }}>Annuler</button>
             <button type="button" data-discord-code-valider="" disabled={chiffres.length !== 6 || envoi} onClick={valider} style={{ minHeight:44, flex:1, borderRadius:8, border:'none', background:C.accent, color:'#fff', fontWeight:600, opacity:(chiffres.length !== 6 || envoi) ? .5 : 1 }}>{envoi ? 'Vérification…' : 'Relier Discord'}</button>
           </div>
         </>)}

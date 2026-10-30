@@ -84,6 +84,9 @@ import './styles-telephone.css';
 import './styles-epure.css';
 import './styles-annonces-fiche.css';
 import './styles-etat-actions.css';
+// (29 oct.) Les trois boutons (primaire · secondaire · discret) — EN DERNIER :
+// la normalisation des boutons écrits en ligne doit passer après toutes les autres.
+import './styles-boutons.css';
 import { suivreRangeesDefilantes } from './rangeesDefilantes.js';
 if (typeof document !== 'undefined') { if (document.body) suivreRangeesDefilantes(); else document.addEventListener('DOMContentLoaded', suivreRangeesDefilantes); }
 

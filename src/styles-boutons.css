@@ -1,0 +1,249 @@
+/* ══ LES TROIS BOUTONS (29 octobre) ═════════════════════════════════════════
+   Julien : « ça fait encore de faible qualité, améliore les boutons ». Mesuré
+   avant : ~830 <button> dans App.jsx, styles en ligne disparates — bordure
+   grise carrée, rayons 6/8/10/22, graisses 500/600/700, et un bouton principal
+   au texte BLANC sur l'accent menthe du thème sombre (illisible).
+   ⇒ TROIS formes, et seulement trois :
+     · .vrm-b-primaire   — fond accent plein, texte « sur accent ». UN par écran.
+     · .vrm-b-secondaire — fond teinté (accent ~8 %), texte encre, AUCUNE bordure.
+     · .vrm-b-discret    — texte seul (couleur d'accent), zone de toucher 44 px.
+   Les couleurs viennent des variables posées par la coque (`variablesTheme`,
+   src/themeMineral.js) : --vrm-accent, --vrm-ink, --vrm-bg. Pas de rouge (§7 :
+   il est réservé à deux paires sous un même N°), pas de vert en dur.
+   Composant React : <Bouton variante="primaire|secondaire|discret" icone="…">
+   (src/App.jsx, à côté de Segmente). Ce fichier est chargé EN DERNIER.
+
+   ⚠️ Rien ici ne touche `display` des <button> en général (§7, index.html) :
+   seules les classes .vrm-b-* posent inline-flex, sur des boutons qui les
+   portent EXPRÈS. Le rail, la barre du bas, les pastilles, les onglets,
+   Segmente et les interrupteurs ne changent pas. */
+
+:root {
+  --vrm-on-accent: #FFFFFF;
+  --vrm-b-teinte: rgba(36, 78, 84, .08);
+  --vrm-b-teinte-f: rgba(36, 78, 84, .14);
+  --vrm-b-encre: var(--vrm-ink, #213B41);
+  --vrm-b-lien: var(--vrm-accent, #244E54);
+  --vrm-b-h: 40px;
+}
+:root[data-theme="dark"] {
+  --vrm-on-accent: #173A40;
+  --vrm-b-teinte: rgba(183, 214, 200, .11);
+  --vrm-b-teinte-f: rgba(183, 214, 200, .18);
+}
+@supports (color: color-mix(in srgb, red 10%, transparent)) {
+  :root { --vrm-b-teinte: color-mix(in srgb, var(--vrm-accent, #244E54) 8%, transparent); --vrm-b-teinte-f: color-mix(in srgb, var(--vrm-accent, #244E54) 14%, transparent); }
+  :root[data-theme="dark"] { --vrm-b-teinte: color-mix(in srgb, var(--vrm-accent, #B7D6C8) 11%, transparent); --vrm-b-teinte-f: color-mix(in srgb, var(--vrm-accent, #B7D6C8) 18%, transparent); }
+}
+/* Au doigt (aucune souris), la cible fait 44 px. Le contenu du téléphone est à
+   l'échelle 1 (styles-iphone.css annule l'ancien zoom de 80 %) : 44 px CSS =
+   44 px affichés. */
+@media (pointer: coarse), (max-width: 767px) { :root { --vrm-b-h: 44px; } }
+
+/* ── 1. LES CLASSES (opt-in explicite) ──────────────────────────────────── */
+/* Chaque règle est doublée sous `.vrm-app-shell .vrm-main` : sur téléphone,
+   styles-epure.css et styles-iphone.css visent les <button> par leur style en
+   ligne avec une spécificité de (0,3,1) et !important. Sans ce doublon, un
+   « Annuler » discret y prenait la pastille teintée (vu au rendu, 29 oct.). */
+.vrm-b,
+.vrm-app-shell .vrm-main .vrm-b.vrm-b {
+  display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+  box-sizing: border-box; min-height: var(--vrm-b-h); max-width: 100%;
+  padding: 0 14px; margin: 0;
+  border: 0 !important; border-radius: 10px !important; box-shadow: none !important;
+  font-family: inherit !important; font-size: 13px; font-weight: 600 !important; line-height: 1.2;
+  letter-spacing: -.005em; text-decoration: none !important; text-align: center;
+  cursor: pointer; -webkit-tap-highlight-color: transparent; white-space: nowrap;
+  transition: background-color .12s ease, color .12s ease, opacity .12s ease, transform .1s ease;
+}
+.vrm-b > svg,
+.vrm-app-shell .vrm-main .vrm-b > svg { width: 18px; height: 18px; flex-shrink: 0; }
+.vrm-b-plein,
+.vrm-app-shell .vrm-main .vrm-b.vrm-b-plein { width: 100%; }
+.vrm-b-court,
+.vrm-app-shell .vrm-main .vrm-b.vrm-b-court { white-space: normal; }
+.vrm-b-icone,
+.vrm-app-shell .vrm-main .vrm-b.vrm-b-icone { padding: 0 !important; width: var(--vrm-b-h); min-width: var(--vrm-b-h); }
+
+.vrm-b-primaire,
+.vrm-app-shell .vrm-main .vrm-b.vrm-b-primaire { background: var(--vrm-accent, #244E54) !important; color: var(--vrm-on-accent) !important; }
+.vrm-b-secondaire,
+.vrm-app-shell .vrm-main .vrm-b.vrm-b-secondaire { background: var(--vrm-b-teinte) !important; color: var(--vrm-b-encre) !important; }
+.vrm-b-discret,
+.vrm-app-shell .vrm-main .vrm-b.vrm-b-discret {
+  background: transparent !important; color: var(--vrm-b-lien) !important;
+  padding: 0 4px; min-height: 44px !important; margin-block: -6px;
+}
+/* Au doigt, la boîte du bouton discret garde ses 44 px mais ne gonfle pas sa
+   ligne (même marge que `vrm-lien-action`) : « Tout voir › » de Ma journée
+   faisait une ligne de 32 px (banc formes-communes). */
+@media (pointer: coarse), (max-width: 767px) {
+.vrm-app-shell .vrm-main .vrm-b.vrm-b-discret { margin-block: -12px; }
+}
+
+@media (hover: hover) and (pointer: fine) {
+.vrm-b-primaire:not(:disabled):hover,
+.vrm-app-shell .vrm-main .vrm-b.vrm-b-primaire:not(:disabled):hover { filter: brightness(1.08); }
+.vrm-b-secondaire:not(:disabled):hover,
+.vrm-app-shell .vrm-main .vrm-b.vrm-b-secondaire:not(:disabled):hover { background: var(--vrm-b-teinte-f) !important; filter: none; }
+.vrm-b-discret:not(:disabled):hover,
+.vrm-app-shell .vrm-main .vrm-b.vrm-b-discret:not(:disabled):hover { text-decoration: underline !important; text-underline-offset: 3px; filter: none; }
+}
+.vrm-b:not(:disabled):active,
+.vrm-app-shell .vrm-main .vrm-b:not(:disabled):active { transform: scale(.97); }
+.vrm-b-secondaire:not(:disabled):active,
+.vrm-app-shell .vrm-main .vrm-b.vrm-b-secondaire:not(:disabled):active { background: var(--vrm-b-teinte-f) !important; }
+/* Grisé : visible, jamais caché ; la raison est dans `title` ou sur la ligne. */
+.vrm-b:disabled,
+.vrm-app-shell .vrm-main .vrm-b:disabled,
+.vrm-b[aria-disabled="true"],
+.vrm-app-shell .vrm-main .vrm-b.vrm-b[aria-disabled="true"] { opacity: .45; cursor: not-allowed; transform: none; filter: none; }
+.vrm-b:focus-visible,
+.vrm-app-shell .vrm-main .vrm-b:focus-visible { outline: 2px solid var(--vrm-accent, #244E54) !important; outline-offset: 2px; }
+
+/* Une rangée de gestes : à droite sur ordinateur, pleine largeur en bas de la
+   carte sur téléphone. */
+.vrm-b-rangee { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px; }
+@media (max-width: 767px) {
+.vrm-b-rangee{ justify-content: stretch; }
+.vrm-b-rangee > .vrm-b:not(.vrm-b-discret){ flex: 1 1 0; min-width: 0; }
+}
+/* L'action principale d'un écran : dans l'en-tête sur ordinateur (slot `right`
+   de ScreenHead), dans une barre posée au-dessus de la navigation sur téléphone. */
+@media (max-width: 767px) {
+.vrm-b-barre{
+    position: fixed; left: 12px; right: 12px; z-index: 45;
+    bottom: calc(76px + env(safe-area-inset-bottom));
+    display: flex; gap: 8px; padding: 0; pointer-events: none;
+  }
+.vrm-b-barre > .vrm-b{ flex: 1; pointer-events: auto; box-shadow: 0 6px 18px rgba(16, 32, 36, .18) !important; }
+}
+
+/* ── 2. LA NORMALISATION GLOBALE (prudente) ─────────────────────────────── */
+/* Les boutons SANS classe, écrits en ligne avant cette passe, prennent les
+   mêmes formes. Ciblage vérifié au rendu (29 oct.) sur l'attribut style que
+   React écrit : la bordure C.border (clair rgb(220, 228, 223), sombre
+   rgb(56, 82, 88)), le fond C.card2, le contour accent sur fond vide.
+   Exclus : ce qui porte un état (pastilles, onglets, interrupteurs), un rôle,
+   une carte-bouton (texte aligné à gauche, ombre, contenu en blocs ou photo),
+   les pastilles arrondies, la navigation (rail, en-tête, barre du bas). */
+:is(.vrm-app-shell, body > :not(#root)) :is(button, a[href]):not([class]):not([aria-pressed]):not([aria-selected]):not([aria-checked]):not([aria-current]):not([role]):not([style*="text-align: left"]):not([style*="box-shadow"]):not([style*="border-radius: 99"]):not([style*="border-radius: 50%"]):not(:has(div, img, picture, canvas, input)):not(:is(.vrm-sidebar, .vrm-tabbar, .vrm-mobile-nav, .vrm-app-header, .vrm-seg, .vrm-filtres, .vrm-rangee, [role="tablist"], [role="radiogroup"]) *):is(
+    [style*="solid rgb(220, 228, 223)"], [style*="solid rgb(56, 82, 88)"],
+    [style*="background: rgb(234, 240, 236)"], [style*="background: rgb(39, 65, 71)"],
+    [style*="solid rgb(36, 78, 84)"]:not([style*="background: rgb(36, 78, 84)"]),
+    [style*="solid rgb(183, 214, 200)"]:not([style*="background: rgb(183, 214, 200)"])
+  ) {
+  background: var(--vrm-b-teinte) !important; border-color: transparent !important;
+  border-radius: 10px !important; box-shadow: none !important;
+  color: var(--vrm-b-encre) !important; font-weight: 600 !important; font-family: inherit !important;
+  min-height: var(--vrm-b-h); text-decoration: none !important;
+}
+@media (hover: hover) and (pointer: fine) {
+  :is(.vrm-app-shell, body > :not(#root)) :is(button, a[href]):not([class]):not([aria-pressed]):not([role]):not(:disabled):is([style*="solid rgb(220, 228, 223)"], [style*="solid rgb(56, 82, 88)"], [style*="background: rgb(234, 240, 236)"], [style*="background: rgb(39, 65, 71)"]):not(:has(div, img)):not([style*="text-align: left"]):not([style*="box-shadow"]):hover { background: var(--vrm-b-teinte-f) !important; filter: none; }
+}
+
+/* Le bouton plein de l'accent (C.accent), avec ou sans classe : même rayon,
+   pas de bordure, et le texte « sur accent » du thème. En sombre l'accent est
+   une menthe claire : un texte blanc écrit en dur y était illisible (vu au
+   rendu sur « Tout imprimer »). */
+:is(.vrm-app-shell, body > :not(#root)) :is(button, a[href]):not([aria-pressed]):not([aria-selected]):not([aria-checked]):not([aria-current]):not([role]):not(:is(.vrm-sidebar, .vrm-tabbar, .vrm-mobile-nav, .vrm-seg, .vrm-filtres) *):is([style*="background: rgb(36, 78, 84)"], [style*="background: rgb(183, 214, 200)"]) {
+  border-color: transparent !important; border-radius: 10px !important; box-shadow: none !important;
+  color: var(--vrm-on-accent) !important; font-weight: 600 !important; font-family: inherit !important;
+}
+/* Le lien-texte (sans fond, sans bordure, sans marge intérieure) : la couleur
+   du bouton discret, partout la même. */
+:is(.vrm-app-shell, body > :not(#root)) button.vrm-lien-action,
+:is(.vrm-app-shell, body > :not(#root)) button:not([class]):not([aria-label]):not([role]):not(:has(div, img, svg:only-child)):is([style*="background: transparent"], [style*="background: none"]):is([style*="border: none"], [style*="border-style: none"], [style*="border: 0px"]):is([style*="padding: 0px;"]) {
+  color: var(--vrm-b-lien) !important; font-weight: 600 !important;
+}
+
+/* ── 3. LA CROIX D'UNE FEUILLE ──────────────────────────────────────────── */
+/* Toute croix « Fermer… » (aria-label) : zone de toucher 44 × 44, centrée, la
+   couleur secondaire du texte. Elle garde son dessin (× ou icône) ; seule la
+   cible grandit. La marge négative rend la place à la ligne (une croix dans un
+   bandeau ne gonfle plus le bandeau). Le bouton « Fermer » écrit en mots de la
+   visionneuse et le retour de conversation (classe) ne sont pas concernés. */
+:is(.vrm-app-shell, body > :not(#root)) button[aria-label^="Fermer"]:not([data-visionneuse-fermer]):not(.vrm-chat-back):not(.vrm-b) {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 44px !important; min-height: 44px !important; margin: -8px !important;
+  border-radius: 10px !important;
+}
+@media (hover: hover) and (pointer: fine) {
+  :is(.vrm-app-shell, body > :not(#root)) button[aria-label^="Fermer"]:not([data-visionneuse-fermer]):not(.vrm-chat-back):not(.vrm-b):not([style*="rgba(255, 255, 255"]):hover { background: var(--vrm-b-teinte) !important; }
+}
+
+/* Le petit (tables denses, barres d'outils) : 34 px à la souris, 44 au doigt. */
+.vrm-b.vrm-b-petit, .vrm-app-shell .vrm-main .vrm-b.vrm-b-petit { --vrm-b-h: 34px; font-size: 12.5px; padding: 0 11px; }
+@media (pointer: coarse), (max-width: 767px) { .vrm-b.vrm-b-petit, .vrm-app-shell .vrm-main .vrm-b.vrm-b-petit { --vrm-b-h: 44px; } }
+
+/* L'action principale posée par ScreenHead (`principal`). Ordinateur : dans
+   l'en-tête, à droite. Téléphone : une barre fixe au-dessus de la navigation
+   du bas, pleine largeur ; la page garde la place dessous. */
+@media (max-width: 767px) {
+  .vrm-b-principal {
+    position: fixed; left: 12px; right: 12px; z-index: 45;
+    bottom: calc(76px + env(safe-area-inset-bottom));
+    display: flex; gap: 8px; pointer-events: none;
+  }
+  .vrm-b-principal > .vrm-b { flex: 1; pointer-events: auto; box-shadow: 0 6px 18px rgba(16, 32, 36, .18) !important; }
+  .vrm-main:has(.vrm-b-principal)::after, .vrm-main:has(.vrm-b-barre)::after { content: ''; display: block; height: 64px; }
+}
+
+/* ── 4. UN PARCOURS : <Avancement> (App.jsx) ─────────────────────────────── */
+/* Où j'en suis (titre, gras) et combien (à droite), UNE barre, ce qui se passe,
+   ce qui a raté. Couleurs du thème ; l'erreur en ambre (jamais rouge, §7). */
+.vrm-avancement { display: flex; flex-direction: column; gap: 6px; padding: 12px 14px; border-radius: 12px; background: var(--vrm-b-teinte); }
+.vrm-avancement-tete { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 12px; font-size: 14px; color: var(--vrm-ink, #213B41); }
+.vrm-avancement-compte { font-size: 12.5px; color: var(--vrm-muted, #53696D); font-variant-numeric: tabular-nums; }
+.vrm-avancement-barre { height: 8px; border-radius: 99px; background: var(--vrm-b-teinte-f); overflow: hidden; }
+.vrm-avancement-barre > span { display: block; height: 100%; border-radius: 99px; background: var(--vrm-accent, #244E54); transition: width .4s cubic-bezier(.23, 1, .32, 1); }
+.vrm-avancement-phrase { font-size: 13px; color: var(--vrm-ink, #213B41); line-height: 1.45; }
+.vrm-avancement-erreur { font-size: 12.5px; color: #965900; line-height: 1.45; }
+:root[data-theme="dark"] .vrm-avancement-erreur { color: #EBC080; }
+@media (prefers-reduced-motion: reduce) { .vrm-avancement-barre > span { transition: none; } }
+
+/* ── Achats (30 oct.) : « J'ai retiré » à la forme secondaire ────────────────
+   Le bouton garde sa place (grille de la carte, styles-captures.css) ; seul son
+   dessin passe aux trois formes : fond teinté, aucune bordure, texte encre —
+   plus de vert pâle écrit en dur (styles-mobile-studio.css) ni de bordure grise.
+   Spécificité (0,5,0) : au-dessus de `:root[data-theme=dark] .vrm-main :is(…)`. */
+:root .vrm-app-shell .vrm-main .vrm-achats .vrm-pickup-collect,
+:root .vrm-app-shell .vrm-main .vrm-achats .vrm-pickup-collect.vrm-pickup-collect {
+  background: var(--vrm-b-teinte) !important; color: var(--vrm-b-encre) !important;
+  border: 0 !important; box-shadow: none !important; border-radius: 10px !important; font-weight: 600 !important;
+}
+@media (hover: hover) and (pointer: fine) {
+  :root .vrm-app-shell .vrm-main .vrm-achats .vrm-pickup-collect:hover { background: var(--vrm-b-teinte-f) !important; }
+}
+/* Les liens-gestes d'un colis ne coupent pas leur flèche seule sur une ligne. */
+.vrm-app-shell .vrm-main .vrm-achats .vrm-b.vrm-pickup-lien,
+.vrm-app-shell .vrm-main .vrm-achats .vrm-b.vrm-pickup-cta { white-space: nowrap; }
+.vrm-app-shell .vrm-main .vrm-b.vrm-suivre-colis { white-space: normal; text-align: left; }
+/* La recherche des achats : le champ vit DANS sa pastille (plus de second
+   cadre gris à l'intérieur, vu au rendu à 390 px). Spécificité au-dessus des
+   règles génériques des champs (styles-iphone / styles-mineral). */
+:root body .vrm-app-shell .vrm-main .vrm-achats-search input[type=search]:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=file]):not([type=hidden]) {
+  background: transparent !important; border: 0 !important; box-shadow: none !important; padding: 0 !important;
+}
+/* (30 oct.) La barre d'un parcours : ce qui est réussi à l'accent, ce qui demande
+   un regard (pas faite, à vérifier) en ambre hachuré à la suite, le reste vide. */
+.vrm-avancement-barre { display: flex; }
+.vrm-avancement-barre > span { flex: 0 0 auto; }
+.vrm-avancement-barre > span.vrm-avancement-rate { border-radius: 0 99px 99px 0; background: repeating-linear-gradient(135deg, #C98A14 0 4px, rgba(201, 138, 20, .45) 4px 8px); }
+/* (30 oct.) Les réductions de Republier : un CHOIX, pas une action. L'actif se lit
+   en surface élevée cernée d'accent — jamais plein comme le bouton principal. */
+.vrm-app-shell [data-republier-reductions].vrm-filtres > button[aria-pressed="true"],
+.vrm-app-shell .vrm-main [data-republier-reductions].vrm-filtres button[aria-pressed="true"] {
+  background: var(--vrm-surface, #FDFEFC) !important; color: var(--vrm-accent, #244E54) !important;
+  box-shadow: inset 0 0 0 2px var(--vrm-accent, #244E54) !important; font-weight: 700 !important;
+}
+/* (30 oct.) « Voir › » sur une carte « À faire » : la carte entière est déjà le
+   bouton. Plus de pastille verte (4ᵉ forme) : un chevron discret, à la couleur
+   des liens-actions. Une action nommée (« Imprimer », « Répondre ») garde son mot. */
+.vrm-app-shell .vrm-day-task .vrm-day-task-action { background: transparent !important; padding: 0 2px !important; color: var(--vrm-muted, #53696D) !important; font-weight: 600 !important; }
+:root[data-theme="dark"] .vrm-app-shell .vrm-day-task .vrm-day-task-action { background: transparent !important; color: var(--vrm-muted, #98A2B3) !important; }
+/* (30 oct.) La recherche de Réglages : même dessin que celle des achats — le champ vit
+   DANS sa pastille, plus de second cadre gris à l'intérieur. */
+:root body .vrm-app-shell .vrm-main .vrm-settings-search input[type=search]:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=file]):not([type=hidden]) {
+  background: transparent !important; border: 0 !important; box-shadow: none !important; padding: 0 !important; min-width: 0; flex: 1 1 auto;
+}

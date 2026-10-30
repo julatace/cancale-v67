@@ -336,7 +336,7 @@ const attendre = async (pg, fn, arg, ms = 8000) => { const t0 = Date.now(); whil
   //  sont pas piégées : la conversation est gardée ici comme témoin.)
   const clic = async (pg, sel, attente = 1200) => { await pg.locator(sel).first().click({ timeout: 6000 }); await pg.waitForTimeout(attente); };
   const outil = (texte) => async (pg) => { await clic(pg, 'button:text-is("⋯")', 700); await clic(pg, `button:has-text("${texte}")`); };
-  const outilVentes = (texte) => async (pg) => { await clic(pg, 'button:text-is("⋯ Outils")', 700); await clic(pg, `button:has-text("${texte}")`); };
+  const outilVentes = (texte) => async (pg) => { await clic(pg, 'button[aria-expanded]:text-is("Outils")', 700); await clic(pg, `button:has-text("${texte}")`); };
   // Comme Julien : le tiroir de la vente, puis « Modifier » (le bouton du lot
   // vit dans ce repli — fermé, il n'est ni visible ni joignable au clavier),
   // puis le bouton. Le bouton est cliqué SANS lui donner le focus, comme

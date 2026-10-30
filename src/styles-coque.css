@@ -109,7 +109,7 @@
    passe à la ligne au lieu de déborder sur son voisin (revue visuelle du 17 oct.). */
 .vrm-seg-plein > .vrm-seg-btn { white-space: normal; text-align: center; line-height: 1.2; overflow-wrap: anywhere; }
 .vrm-seg > .vrm-seg-btn { min-height: 34px; }
-@media (max-width: 1023px) { .vrm-main .vrm-seg > .vrm-seg-btn { min-height: 44px !important; padding-block: 0 !important; } }
+@media (max-width: 767px), (max-width: 1023px) and (hover: none), (max-width: 1023px) and (pointer: coarse), (max-width: 1023px) and (pointer: none) { .vrm-main .vrm-seg > .vrm-seg-btn { min-height: 44px !important; padding-block: 0 !important; } }
 
 /* ── LES FILTRES : une seule pastille (revue du 16 oct.) ────────────────────
    Pastille neutre ; l'active est à l'encre pleine en clair, une surface élevée
@@ -133,7 +133,7 @@
    net (« Finalisée », « Annulées »). Un fondu sur le bord dit qu'il y a une
    suite ; il disparaît une fois la rangée défilée jusqu'au bout. C'est
    src/rangeesDefilantes.js qui MESURE (data-defile) : sans débordement, rien. */
-@media (max-width: 1023px) {
+@media (max-width: 767px), (max-width: 1023px) and (hover: none), (max-width: 1023px) and (pointer: coarse), (max-width: 1023px) and (pointer: none) {
   :is(.vrm-rangee, .vrm-defile, .vrm-carrousel)[data-defile="suite"] {
     -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent);
             mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent);
@@ -209,8 +209,10 @@
 .vrm-compte-chevron { position: absolute; right: 12px; top: 50%; transform: translateY(-50%) rotate(90deg); display: flex; pointer-events: none; }
 .vrm-compte-note { display: block; margin: 6px 2px 0; font-size: 12px; line-height: 1.4; }
 
-/* ════ TÉLÉPHONE & TABLETTE ═════════════════════════════════════════════ */
-@media (max-width: 1023px) {
+/* ════ TÉLÉPHONE & TABLETTE AU DOIGT ══════════════════════════════════════
+   (30 oct.) La coque téléphone, c'est l'écran étroit OU le doigt sous 1024 px :
+   à la souris dès 768 px, c'est la coque ordinateur (useOrdinateur, MQ_ORDINATEUR). */
+@media (max-width: 767px), (max-width: 1023px) and (hover: none), (max-width: 1023px) and (pointer: coarse), (max-width: 1023px) and (pointer: none) {
   /* ── EN-TÊTE : transparent en haut de page, verre + filet au défilement ──
      Trois colonnes : gauche (menu, logo) · titre court centré · actions. */
   .vrm-app-header {
@@ -292,10 +294,16 @@
 }
 
 /* ════ ORDINATEUR : l'île d'actions, discrète ═══════════════════════════ */
-@media (min-width: 1024px) {
+@media (min-width: 1024px), (min-width: 768px) and (hover: hover) and (pointer: fine) {
+  /* (30 oct., Edge) L'île était DANS le flux (`relative`) : une rangée de ~66 px
+     perdue au-dessus de chaque écran, la moitié d'une fenêtre de 600 px. Elle
+     flotte en haut à droite ; la ligne de titre lui réserve sa place
+     (`--vrm-ile`, mesurée par l'app) et verif_visuel vérifie que rien ne passe
+     dessous. */
+  .vrm-app-shell:not(.vrm-ledger-drawer-host) { position: relative; }
   .vrm-app-header {
-    position: relative !important; top: auto !important; right: auto !important;
-    align-self: flex-end; flex-shrink: 0; margin: 10px 24px 0 272px;
+    position: absolute !important; top: 10px !important; right: 24px !important; left: auto !important;
+    align-self: flex-end; flex-shrink: 0; margin: 0;
     display: flex; align-items: center; gap: 2px; padding: 4px;
     background: transparent; border: 0; box-shadow: none;
   }
@@ -308,7 +316,7 @@
   .vrm-hbtn[aria-pressed="true"], .vrm-hbtn[aria-expanded="true"] { background: var(--vrm-card2); color: var(--vrm-ink); }
   .vrm-app-header [data-etat-actions] { border: 0 !important; background: var(--vrm-card2) !important; border-radius: 999px !important; padding: 7px 12px !important; }
 }
-@media (min-width: 1024px) and (hover: hover) and (pointer: fine) {
+@media (min-width: 768px) and (hover: hover) and (pointer: fine) {
   .vrm-hbtn:hover { background: var(--vrm-card2); color: var(--vrm-ink); filter: none; }
 }
 
@@ -385,7 +393,7 @@
 .vrm-sidebar-brand { flex-direction: column; align-items: center; gap: 7px; }
 .vrm-sidebar-entreprise { display: block; max-width: 136px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11.5px; font-weight: 600; letter-spacing: -.01em; opacity: .72; text-align: center; }
 .vrm-hdr-entreprise { display: none; }
-@media (max-width: 1023px) {
+@media (max-width: 767px), (max-width: 1023px) and (hover: none), (max-width: 1023px) and (pointer: coarse), (max-width: 1023px) and (pointer: none) {
   .vrm-hdr-entreprise { display: block; min-width: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; font-weight: 650; letter-spacing: -.015em; color: var(--vrm-ink); padding-left: 2px; transition: opacity .2s ease; }
   /* Au défilement, le titre de l'écran prend le centre : le nom s'efface. */
   .vrm-app-header.is-defile .vrm-hdr-entreprise { opacity: 0; }
@@ -394,3 +402,11 @@
 /* (21 oct.) Le bandeau « données plus à jour » d'une plateforme touchait la rangée
    des sections (ordinateur) et la carte « Compte » (téléphone) : un espace après lui. */
 .vrm-fraicheur-plat:has(> *) { padding-bottom: 10px !important; }
+
+/* (30 oct., Edge) Fenêtre basse à la souris : le grand titre et sa marge
+   prennent moins de hauteur (le premier contenu utile commençait à mi-écran). */
+@media (min-width: 768px) and (max-height: 760px) and (hover: hover) and (pointer: fine) {
+  html:root { --vrm-t-title: 26px; }
+  .vrm-main .vrm-screen-head { margin: 2px 0 12px; }
+  .vrm-market-heading { padding-top: 4px; padding-bottom: 8px; }
+}

@@ -245,7 +245,7 @@ async function navigateur() {
         dit(e64 && e64.nv.length === 1 && e64.nv[0] === NV_9604 && r.nNouvelles.filter((x) => x === NV_9604).length === 1, `${nom} : l'e-mail relié à la commande 9604 par le CODE de retrait porte SA nouvelle, une fois`, e64 && e64.nv.join(' | '));
         const s51 = parSuivi('30000051')[0];
         const b51 = s51 && s51.suivre[0];
-        dit(b51 && b51.site === 'transporteur' && /mondialrelay\.fr\/suivi-de-colis\/\?numeroExpedition=30000051&codePostal=35260$/.test(b51.href) && /Suivre sur le site du transporteur/.test(b51.t), `${nom} : « Suivre sur le site du transporteur ↗ », n° pré-rempli, code postal LU dans le lieu`, b51 && b51.href);
+        dit(b51 && b51.site === 'transporteur' && /mondialrelay\.fr\/suivi-de-colis\/\?numeroExpedition=30000051&codePostal=35260$/.test(b51.href) && /Suivre chez le transporteur/.test(b51.t), `${nom} : « Suivre chez le transporteur ↗ », n° pré-rempli, code postal LU dans le lieu`, b51 && b51.href);
         const bv = vgo && vgo.suivre[0];
         // (24 oct.) Vinted Go a une page de suivi publique (`vintedgo.com/fr/tracking/{n}`,
         // mesurée en 200) : le lien y mène. Un transporteur sans page connue reste

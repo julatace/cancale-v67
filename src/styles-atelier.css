@@ -41,14 +41,27 @@
 .vrm-day-stock-prices span { color:var(--vrm-muted); }
 .vrm-day-stock-links { display:flex; gap:12px; border-top:1px solid var(--vrm-line); padding-top:10px; margin-top:14px; flex-wrap:wrap; }
 .vrm-day-stock-links button { border:0; background:transparent; color:var(--vrm-ink); cursor:pointer; padding:8px 0; font-family:inherit; font-size:12px; font-weight:500; }
-@media(min-width:1024px) {
+/* (30 oct.) À la souris dès 768 px (coque ordinateur), le bonjour est le grand
+   titre : « Ma journée » au-dessus le redisait (Edge en demi-écran). */
+@media (min-width: 1024px), (min-width: 768px) and (hover: hover) and (pointer: fine) {
  .vrm-day-layout>.vrm-screen-head { display:none; }
+ /* Le bonjour est la ligne de titre : il réserve la place de l'île qui flotte
+    au-dessus (« Modifier » passait dessous, revue Edge du 30 oct.). */
+ .vrm-day-layout>.vrm-w-tete { padding-right:calc(var(--vrm-ile, 208px) + 96px); }
+ .vrm-day-layout>.vrm-w-tete .vrm-w-modifier { right:var(--vrm-ile, 208px); }
+}
+/* Tablette au doigt (768–1023) : le carrousel débordait de 2 px de <main> (sa
+   marge négative de téléphone ne correspond pas à la marge de la tablette). */
+@media (min-width: 768px) and (max-width: 1023px) {
+ .vrm-main .vrm-carrousel { margin-inline:0; padding-inline:0; scroll-padding-inline:0; }
+}
+@media(min-width:1024px) {
  .vrm-day-layout .vrm-day-greeting { margin:0 0 12px; gap:4px 12px; }
  .vrm-day-greeting .vrm-day-todo { grid-column:auto; margin-left:auto; }
  .vrm-day-layout .vrm-day-hello { font-size:20px; }
  .vrm-day-layout .vrm-day-bar { margin-bottom:12px; }
  .vrm-day-layout .vrm-day-bar>button { padding:10px 8px; }
- .vrm-day-layout .vrm-day-task-list { grid-template-columns:repeat(auto-fit,minmax(300px,1fr))!important; margin-bottom:12px; }
+ .vrm-day-layout .vrm-day-task-list { grid-template-columns:repeat(auto-fit,minmax(260px,1fr))!important; margin-bottom:12px; }
  .vrm-day-layout .vrm-day-task { padding:9px 12px!important; }
  .vrm-day-layout .vrm-day-top { gap:12px; grid-template-columns:minmax(0,1.1fr) minmax(0,1.2fr) minmax(0,.8fr); grid-template-rows:auto; margin-bottom:16px; align-items:stretch; }
  .vrm-day-top>.vrm-day-money,.vrm-day-top>.vrm-day-jour { grid-column:1; grid-row:1; }
@@ -62,4 +75,52 @@
  .vrm-day-recent .vrm-carrousel>button { display:grid!important; grid-template-columns:66px minmax(0,1fr); }
  .vrm-day-recent .vrm-carrousel>button>div:first-child { aspect-ratio:auto!important; min-height:100px; }
  .vrm-day-recent .vrm-carrousel>button>div+div { padding:10px!important; min-width:0; }
+}
+
+/* (30 oct., Edge sous Windows) FENÊTRE BASSE. 1366×768 laisse ~630 px utiles,
+   1920×1080 à 150 % en laisse 600 : le bas du rail (Statistiques, Comptabilité,
+   Communauté) disparaissait, et la zone défile sans barre visible. Le rail se
+   resserre (≈ 120 px gagnés : tout tient jusqu'à ~650 px), et quand il défile
+   quand même, un fondu dit de quel côté il en reste (`data-rail-suite`, posé
+   par SideBar, qui ramène aussi l'entrée active dans la vue). */
+@media (min-width: 768px) and (max-height: 800px) {
+  .vrm-atelier-rail { padding-top: 12px; padding-bottom: 10px; }
+  .vrm-atelier-rail .vrm-sidebar-brand { padding: 0 0 10px; gap: 4px; }
+  .vrm-atelier-rail .vrm-sidebar-brand img.vrm-logo { width: 40px !important; height: 40px !important; }
+  .vrm-atelier-rail .vrm-rail-button { min-height: 38px; padding-block: 5px; }
+  .vrm-atelier-rail .vrm-rail-platforms { gap: 2px; }
+  .vrm-atelier-rail .vrm-rail-management { gap: 2px; padding-top: 2px; }
+  .vrm-atelier-rail .vrm-rail-management-group { margin-top: 8px; padding-top: 8px; }
+  .vrm-atelier-rail .vrm-rail-bottom { padding-top: 8px; gap: 4px; }
+}
+.vrm-rail-scroll[data-rail-suite="bas"] {
+  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 36px), transparent);
+          mask-image: linear-gradient(to bottom, #000 calc(100% - 36px), transparent);
+}
+.vrm-rail-scroll[data-rail-suite="haut"] {
+  -webkit-mask-image: linear-gradient(to top, #000 calc(100% - 36px), transparent);
+          mask-image: linear-gradient(to top, #000 calc(100% - 36px), transparent);
+}
+.vrm-rail-scroll[data-rail-suite="les-deux"] {
+  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 36px, #000 calc(100% - 36px), transparent);
+          mask-image: linear-gradient(to bottom, transparent, #000 36px, #000 calc(100% - 36px), transparent);
+}
+
+/* (30 oct., Edge) 1024–1279 px : « À faire » passait en 2 colonnes pour 3 tâches,
+   et la 3ᵉ laissait une case grise vide à côté d'elle. Deux colonnes franches, et
+   une tâche seule sur sa ligne prend toute la largeur. */
+@media (min-width:1024px) and (max-width:1279px) {
+ .vrm-day-layout .vrm-day-task-list { grid-template-columns:repeat(2,minmax(0,1fr))!important; }
+ .vrm-day-layout .vrm-day-task-list > .vrm-day-task:last-child:nth-child(odd) { grid-column:1 / -1; }
+}
+/* Le rappel URSSAF prend toujours toute la largeur (`gridColumn: 1 / -1` en
+   ligne) : avec lui, les colonnes vides de la grille ne se replient plus, et une
+   tâche seule restait sur un tiers de sa ligne (revue Edge du 30 oct.). Une ou
+   deux tâches avant lui ⇒ autant de colonnes, pas plus. */
+@media (min-width:1024px) {
+ .vrm-day-layout .vrm-day-task-list:has(> .vrm-day-task:first-child + [data-urssaf-echeance]:last-child) { grid-template-columns:minmax(0,1fr)!important; }
+ .vrm-day-layout .vrm-day-task-list:has(> .vrm-day-task:first-child + .vrm-day-task:not([data-urssaf-echeance]) + [data-urssaf-echeance]:last-child) { grid-template-columns:repeat(2,minmax(0,1fr))!important; }
+}
+@media (min-width:1024px) and (max-width:1279px) {
+ .vrm-day-layout .vrm-day-task-list > .vrm-day-task:nth-child(odd):has(+ [data-urssaf-echeance]:last-child) { grid-column:1 / -1; }
 }

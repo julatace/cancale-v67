@@ -1712,6 +1712,37 @@
 > Voir `docs/passation/2026-10-24-offres-messages.md`.
 
 
+> 🔴🔴 **PASSATION DU 30 OCTOBRE — LIS D'ABORD `docs/passation/2026-10-30.md`** : sept branches v29-* construites
+> et relues mais PAS en ligne (leur contenu est dans `docs/passation/branches-2026-10-30.bundle`), l'ordre de
+> mise en ligne (une seule intégration, un seul numéro d'extension), la refonte des boutons en cours, Vestiaire.
+
+> **30 octobre — refonte visuelle en ligne (première passe, `v29-refonte` sur #911/#912) :** trois formes de
+> bouton seulement — `vrm-b-primaire` · `vrm-b-secondaire` · `vrm-b-discret` (`src/styles-boutons.css`, composant
+> `Bouton` ; `Btn` est secondaire par défaut, un primaire se DEMANDE ; plus de rouge hors doublon de N°, Annuler
+> en discret). `Avancement` (une barre : où j'en suis, combien, ce qui a raté) pour Republier. Une ligne de texte
+> par bloc, le détail derrière ⓘ ; menus « Outils » en feuille du bas sur téléphone. Écrans traités : coque, Ma
+> journée, Ventes, Achats, Republier, Stock, Statistiques, Communauté, Réglages (et une première touche sur
+> Annonces, Colis, Compta). L'écran de connexion/inscription est celui de #911/#912, non retouché. **Reste (seconde
+> passe)** : Annonces, Messages, Leboncoin, eBay, Colis, Compta ; et UN primaire par écran, par le slot principal
+> de `ScreenHead`.
+> **Même passe — la mise en page sur Edge sous Windows** (mesuré : `scratchpad/edge/rapport.md`, Chromium à barres de
+> défilement classiques) : (1) fenêtre basse, le bas du rail (Stats, Compta, Communauté) disparaissait sans indice →
+> rail resserré `(min-width:768px) and (max-height:800px)` (logo 40 px, entrées 38 px), fondu `data-rail-suite` posé
+> par `SideBar`, entrée active ramenée dans la vue ; (2) Messages faisait défiler la PAGE en plus de la liste (un
+> `.vrm-sr` repéré sur <body>) → `.vrm-main{position:relative}` et `html{overflow:hidden}` à TOUTES les largeurs
+> (styles-epure) ; (3) 768–1023 px à la SOURIS = coque ordinateur : `MQ_ORDINATEUR` = `(min-width:1024px),
+> (min-width:768px) and (hover:hover) and (pointer:fine)` dans `useOrdinateur` ET les media queries de COQUE
+> (île, en-tête, barre du bas, 44 px, fondus des rangées, `.vrm-rangee`/carrousel) — leur complément au doigt ; les
+> règles de CONTENU restent à la largeur ; une tablette au doigt garde la coque téléphone ; (4) colonne des
+> conversations `minmax(340px,36%)`, filtres qui reviennent à la ligne ; (5) une seule hauteur `--vrm-msg-h` pour liste
+> et panneau ; (6) l'île FLOTTE (`absolute`, plus de rangée de 66 px) — chaque première ligne qui n'est pas un
+> `ScreenHead` lui réserve `--vrm-ile` (résumé de plateforme, Organisation, Communauté, Réglages, « Modifier » de Ma
+> journée) ; titres à 26 px si `max-height:760px` ; (7) Ma journée 1024–1279 : « À faire » en 2 colonnes, une tâche
+> seule (ou à côté du rappel URSSAF pleine largeur) prend la ligne ; widgets à 6 colonnes seulement dès 1280. Banc
+> `scripts/bancs/edge-tailles.cjs` (8 tailles, souris/doigt, rail, double défilement, coque, débordement, île
+> mesurée sur les LETTRES, case vide) : 73 rouges sur un build d'origin/main, 0 après. ⚠️ Non mesuré : un vrai Edge
+> sous Windows (polices ClearType, barres « Fluent »).
+
 > ⛔⛔ **DÉCISION DE JULIEN, 22 OCTOBRE : PAS DE DOUBLE VÉRIFICATION PAR SMS — C'EST PAYANT.**
 > Mesuré dans la doc Supabase (« Advanced MFA Phone ») : **75 $/mois** pour le premier projet,
 > hors plafond de dépenses, **plus** chaque SMS facturé par Twilio/MessageBird. Julien : « si c'est
@@ -14203,6 +14234,71 @@ Une fonction, une forme. Avant d'écrire un contrôle, **réutiliser** celui-ci 
   paire**. Une annonce rangée dans sa case allumait le bloc rouge sur Colis
   (« 5 numérox portés par deux paires », la coquille comprise) pour chaque paire
   rangée. `audit-conflits-numeros.cjs` : 3 rouges sur l'avant.
+
+### Les trois boutons (29 octobre) — `src/styles-boutons.css`, composant `Bouton`
+Julien : « ça fait encore de faible qualité, améliore les boutons, arrête les
+messages écrits dans tous les sens ». TROIS formes, et seulement trois :
+- **`.vrm-b-primaire`** — fond `--vrm-accent`, texte `--vrm-on-accent` (#fff clair,
+  #173A40 sombre : l'accent sombre est une menthe claire, un texte blanc y était
+  illisible — vu sur « Tout imprimer »). **UN par écran** : l'action principale,
+  en haut à droite (slot `right` de `ScreenHead`) sur ordinateur, dans
+  `.vrm-b-barre` (fixe au-dessus de la barre du bas) sur téléphone.
+- **`.vrm-b-secondaire`** — fond teinté (accent ~8 %, `--vrm-b-teinte`), texte
+  encre, **aucune bordure**, rayon 10, 40 px souris / 44 px doigt.
+- **`.vrm-b-discret`** — texte seul couleur d'accent (`--vrm-b-lien`), zone 44 px.
+  « Annuler » d'une feuille est TOUJOURS discret, son geste principal primaire.
+- Classe de base `.vrm-b` (+ `.vrm-b-plein`, `.vrm-b-icone`, `.vrm-b-court` pour
+  revenir à la ligne), rangée de gestes `.vrm-b-rangee` (à droite sur ordinateur,
+  pleine largeur en bas de carte sur téléphone). En React :
+  `<Bouton variante="primaire|secondaire|discret" icone="…" plein href=…>` (à côté
+  de `Segmente`) ; tout le reste (`data-*`, `title`, `disabled`, `style`) passe.
+- **Normalisation globale** (même fichier, section 2) : un `<button>`/`<a>` SANS
+  classe dont le style en ligne porte la bordure `C.border`, le fond `C.card2` ou
+  un contour accent prend l'apparence secondaire ; un fond `C.accent` prend le
+  rayon et le texte « sur accent ». Exclus : `aria-pressed|selected|checked|current`,
+  `role`, carte-bouton (`text-align: left`, ombre, contenu `div`/`img`), pastille
+  arrondie, navigation, `.vrm-seg`, `.vrm-filtres`, `.vrm-rangee`. ⚠️ Un style en
+  ligne qui change de couleur de bordure sort de la règle : utiliser `Bouton`.
+- Un geste rare va dans « ⋯ » ; deux boutons qui font la même chose, c'est un de
+  trop ; un bouton grisé garde sa raison (`title` ou une ligne) et n'est jamais
+  caché ; pas de rouge (sauf le doublon de N°), pas de vert en dur.
+- **L'action principale d'un écran** : `<ScreenHead … principal={<Bouton
+  variante="primaire">…</Bouton>}>` — en haut à droite sur ordinateur, barre fixe
+  au-dessus de la navigation du bas sur téléphone (`.vrm-b-principal`, la page
+  garde 64 px dessous). Jamais deux primaires sur un écran.
+- **L'ancien `Btn`** passe par les mêmes formes : plein + accent (ou sans couleur)
+  ⇒ primaire, tout le reste (`outline`, `color={C.border}`, `danger`) ⇒ secondaire,
+  `small` ⇒ `.vrm-b-petit` (34 px souris, 44 doigt). Il transmet désormais
+  `title`/`aria-*`. (Avant : `color={C.border}` = texte BLANC sur gris clair.)
+- `--vrm-on-accent` vient du thème (`variablesTheme`, `t.onAccent`) : #FFF en
+  clair, #173A40 en sombre (l'accent sombre est clair).
+- ⚠️ **Spécificité** : sur téléphone `styles-epure.css`/`styles-iphone.css` visent
+  les `<button>` par leur style en ligne à (0,3,1) + `!important`. Chaque règle
+  `.vrm-b-*` est doublée sous `.vrm-app-shell .vrm-main .vrm-b.vrm-b…` (0,4,0) ;
+  une règle ajoutée ici doit suivre ce motif. `min-height` n'est PAS `!important`
+  (un `style={{minHeight:44}}` en ligne doit gagner — banc `republier`, les choix
+  de couleur à 44 px).
+- **Un parcours en plusieurs étapes** (republier, publier, générer en lot, saisie
+  en série) : `<Avancement titre="Paire 2 sur 5" phrase="…" part={0.4}
+  compte={compteAvancement({faites, ratees, restent})} erreur="…">` — UNE barre,
+  où j'en suis en mots, ce qui se passe, combien, ce qui a raté (en ambre). Posé
+  EN HAUT du parcours. Premier appliqué : le total de Republier (il remplace la
+  barre d'ensemble sous la liste ET la ligne de bilan ; `data-republier-total`,
+  `data-republier-bilan`, `data-republier-prochaine` gardés).
+
+### Le texte : une ligne, le reste derrière ⓘ
+Sur chaque bloc, **au plus UNE ligne visible** (≈ 90 caractères). L'explication
+passe derrière `<Pourquoi label="…">` (ⓘ, replié) ou un `<details className=
+"vrm-repli">`, ou disparaît si un autre élément de l'écran la dit déjà (§7). Les
+libellés sont des mots, les états des pastilles courtes (« À expédier », « Pas
+lu »). ⚠️ NE DISPARAÎT JAMAIS (on raccourcit) : un « pas su / pas pu lire », la
+couverture d'un total partiel (« au moins », « sur X »), le geste d'une alerte,
+le rouge du doublon de N°, les confirmations d'argent (« une offre acceptée vend
+la paire »), le panneau Sécurité des données. ⚠️ `innerText` ne lit pas le
+contenu d'un `<details>` fermé : un banc qui jugeait une phrase déplacée derrière
+ⓘ doit juger la RÈGLE (`data-*`, présence de l'information), jamais être retiré.
+Appliqué d'abord à la coque (panneau « Actions possibles / Lecture seule »,
+confirmations `askConfirm`/`askText`/choix, feuille « Ranger »).
 
 - Une couleur en dur qui n'est pas dans `THEMES` ne suivra pas un changement de
   palette : `grep -oE '#[0-9a-fA-F]{6}' src/App.jsx` après chaque passe.

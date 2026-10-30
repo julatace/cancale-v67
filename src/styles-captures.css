@@ -28,11 +28,19 @@
 }
 /* Une seule surface pour l'inbox et le fil, comme dans la référence. */
 @media(min-width:1000px){
- .vrm-message-workspace{display:grid!important;grid-template-columns:minmax(280px,34%) minmax(0,1fr)!important;align-items:stretch;gap:0!important;}
+ /* (30 oct., Edge) À 1024–1300 px la colonne faisait 280 px : ses filtres (340 px)
+    la faisaient défiler en largeur, « À répondre » sur deux lignes. Et la liste
+    (100dvh − 200) et le panneau (au moins 480/560 px) n'avaient pas la même
+    hauteur : un vide blanc sous la liste dans une fenêtre basse. UNE hauteur
+    pour les deux colonnes (`--vrm-msg-h`), plus aucun min-height fixe. */
+ .vrm-message-workspace{--vrm-msg-h:max(360px,min(740px,calc(100dvh - 200px)));display:grid!important;grid-template-columns:minmax(340px,36%) minmax(0,1fr)!important;align-items:stretch;gap:0!important;}
+ .vrm-message-workspace .vrm-inbox-filters{flex-wrap:wrap;}
+ .vrm-message-workspace .vrm-inbox-column{height:var(--vrm-msg-h);max-height:none!important;overflow-y:auto;box-sizing:border-box;}
+ .vrm-message-workspace .vrm-chat-empty{height:var(--vrm-msg-h)!important;min-height:0!important;box-sizing:border-box;}
  .vrm-message-workspace .vrm-inbox-column{min-width:0;}
  .vrm-message-workspace .vrm-chat-column{padding:0!important;min-width:0;}
  .vrm-message-workspace .vrm-chat-inline{position:sticky;top:12px;}
- .vrm-message-workspace .vrm-chat-panel{height:min(740px,calc(100dvh - 150px))!important;min-height:480px;}
+ .vrm-message-workspace .vrm-chat-panel{height:var(--vrm-msg-h)!important;min-height:0!important;max-height:none!important;}
  .vrm-message-workspace .vrm-chat-head{min-height:52px;padding:8px 14px;}
  .vrm-message-workspace .vrm-msg-ph{width:36px!important;height:36px!important;border-radius:50%!important;}
  .vrm-message-workspace .vrm-msg-ph img{border-radius:50%!important;}
