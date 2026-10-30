@@ -58,6 +58,7 @@ jobs:
         run: |
           node --test scripts/tests/connexion-session.test.mjs
           node scripts/bancs/connexion-claire.cjs
+          node scripts/tests/connexion-actions-interface.cjs
       - name: Vérifier les captures de messagerie
         run: VRM_MESSAGES_LIVE_ONLY=1 node scripts/bancs/messagerie.cjs
       - name: Vérifier la recherche des messages

@@ -12,3 +12,5 @@ test('inscription : anti-robot sans requête et refus explicite sans création i
 test('inscription : une requête bloquée est interrompue et le résultat reste incertain',async()=>{const b=banc((_,opt)=>new Promise((_,reject)=>opt.signal.addEventListener('abort',()=>reject(Object.assign(Error('délai'),{name:'AbortError'})))));const attente=b.inscrire();b.expirer();const r=await attente;assert.equal(r.ok,false);assert.equal(r.incertain,true);assert.equal(b.session,null);});
 
 test('inscription : le délai réel du serveur est traduit et conservé',async()=>{const b=banc(retour({msg:'For security purposes, you can only request this after 57 seconds'},429));const r=await b.inscrire();assert.equal(r.ok,false);assert.equal(r.attente,57);assert.match(r.error,/57 secondes/);assert.equal(b.session,null);});
+
+test('inscription : jeton sans utilisateur et identité mal formée ne créent pas de session',async()=>{for(const json of [{access_token:'jeton'},{access_token:'jeton',user:{}},{id:42},{id:' '},{access_token:42,user:{id:'nouveau'}}]){const b=banc(retour(json)),r=await b.inscrire();assert.equal(r.ok,false);assert.equal(r.incertain,true);assert.equal(b.session,null);}});

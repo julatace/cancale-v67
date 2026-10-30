@@ -1191,6 +1191,8 @@ const authSignIn  = async (email, password) => {
     // qui se règle, pas une erreur de saisie — on le dit, et on propose de
     // renvoyer l'email plutôt que de laisser l'utilisateur devant un mur.
     if (/not confirmed/i.test(r.error)) return { ok: false, needsConfirm: true, error: "Ton compte existe, mais l'email n'est pas encore confirmé." };
+    if (r.status>=500) return {ok:false,error:'Le service de connexion est momentanément indisponible. Réessaie dans un instant.'};
+    if (r.status===429) return {ok:false,error:'Trop de tentatives de connexion. Patiente un moment avant de réessayer.'};
     if (/invalid|credential/i.test(r.error)) return { ok: false, error: 'Email ou mot de passe incorrect.' };
     return { ok: false, error: r.error };
   }
@@ -1239,8 +1241,11 @@ const authConfirmFromLink = async (raw, email) => {
     if (/expired|invalid/i.test(r.error)) return { ok: false, error: 'Lien expiré ou déjà utilisé. Redemande un email, et colle le PLUS RÉCENT.' };
     return { ok: false, error: r.error };
   }
-  if (r.json && r.json.access_token) { writeSession(sessionFrom(r.json)); return { ok: true, connected: true }; }
-  return { ok: true };
+  const j=r.json;
+  if (typeof j?.access_token==='string' && j.access_token.trim() && typeof j.user?.id==='string' && j.user.id.trim()) { writeSession(sessionFrom(j)); return {ok:true,connected:true}; }
+  const u=j?.user||j;
+  if (!j?.access_token && typeof u?.id==='string' && u.id.trim() && typeof u.email_confirmed_at==='string' && u.email_confirmed_at.trim()) return {ok:true,connected:false};
+  return {ok:false,error:'La confirmation n’a pas pu être vérifiée. Réessaie avec le lien le plus récent.'};
 };
 
 // Renvoyer l'email de confirmation (le premier peut s'être perdu, ou avoir été
@@ -1325,7 +1330,8 @@ const authSignUp  = async (email, password) => {
     else if (/signups? not allowed|disabled/i.test(r.error)) msg = 'Les inscriptions sont fermées pour le moment.';
     return { ok: false, incertain:r.status===0 || r.status>=500, error: r.status===0 || r.status>=500 ? 'Je ne peux pas confirmer le résultat de la création. Si tu as reçu un email VRM, ton compte peut déjà être créé : confirme-le, puis utilise « Se connecter » ici.' : msg };
   }
-  if(!r.json?.access_token && !r.json?.id && !r.json?.user?.id)return {ok:false,incertain:true,error:'La réponse du serveur est incomplète. Si tu as reçu un email, confirme-le puis connecte-toi ici ; sinon réessaie dans un instant.'};
+  const j=r.json,uid=j?.user?.id||j?.id;
+  if(typeof uid!=='string'||!uid.trim()||(j?.access_token&&(typeof j.access_token!=='string'||!j.access_token.trim()||typeof j.user?.id!=='string'||!j.user.id.trim())))return {ok:false,incertain:true,error:'La réponse du serveur est incomplète. Si tu as reçu un email, confirme-le puis connecte-toi ici ; sinon réessaie dans un instant.'};
   // Si la confirmation par email est activée côté Supabase, il n'y a pas encore
   // de jeton : le compte n'existe vraiment qu'une fois le lien cliqué.
   if (r.json && r.json.access_token) { writeSession(sessionFrom(r.json)); return { ok: true }; }
@@ -1419,7 +1425,7 @@ const consumeAuthRedirect = async () => {
   const hash = new URLSearchParams((window.location.hash || '').replace(/^#/, ''));
 
   const err = q.get('error_description') || q.get('error') || hash.get('error_description') || hash.get('error');
-  if (err) { lireLiaisonOAuth(sessionStorage,localStorage); cleanAuthUrl(); return { error: decodeURIComponent(String(err).replace(/\+/g, ' ')) }; }
+  if (err) { lireLiaisonOAuth(sessionStorage,localStorage); cleanAuthUrl(); return { error: String(err) }; }
 
   const code = q.get('code');
   if (code) {
@@ -1435,6 +1441,7 @@ const consumeAuthRedirect = async () => {
     if (!verifier) return { error: 'Connexion expirée, réessaie depuis cet appareil.' };
     const r = await authCall('token?grant_type=pkce', { auth_code: code, code_verifier: verifier });
     if (!r.ok) return { error: r.error };
+    if(typeof r.json?.access_token!=='string'||!r.json.access_token.trim()||typeof r.json?.user?.id!=='string'||!r.json.user.id.trim())return{error:'La connexion n’a pas pu être vérifiée. Recommence depuis VRM.'};
     if(!resultatLiaisonPermis(liaison,r.json))return{error:'La liaison ne correspond pas à ton compte VRM. Ta session a été conservée.'};
     writeSession(sessionFrom(r.json));
     return { ok: true, liaison:liaison?.provider };
@@ -1450,8 +1457,8 @@ const consumeAuthRedirect = async () => {
       user: null,
     };
     cleanAuthUrl();
-    AUTH = { ...AUTH, session: sess };
     const me = await fetchMe(at);                        // qui es-tu ?
+    if(typeof me?.id!=='string'||!me.id.trim())return{error:'La connexion n’a pas pu être vérifiée. Recommence depuis VRM.'};
     writeSession({ ...sess, user: me ? { id: me.id, email: me.email } : null, ...(me ? { totp: me._totp, totpNoms: me._totpNoms } : {}) });
     if (type === 'recovery') RECOVERY_PENDING = true;
     return { ok: true, recovery: type === 'recovery' };
@@ -1492,18 +1499,21 @@ const authSetEmail = async (email) => {
 
 // Choisir un nouveau mot de passe (après le lien « mot de passe oublié »).
 const authSetPassword = async (password) => {
-  const tok = AUTH.session && AUTH.session.access_token;
-  if (!tok) return { ok: false, error: 'Lien expiré, redemande un email.' };
+  const tok=AUTH.session?.access_token,uid=AUTH.session?.user?.id;
+  if(!tok||!uid)return{ok:false,error:'Lien expiré, redemande un email.'};
+  const controle=new AbortController(),delai=setTimeout(()=>controle.abort(),20000);
   try {
-    const res = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
-      method: 'PUT',
-      headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${tok}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ password }),
+    const res=await fetch(`${SUPABASE_URL}/auth/v1/user`,{
+      method:'PUT',signal:controle.signal,
+      headers:{apikey:SUPABASE_KEY,Authorization:`Bearer ${tok}`,'Content-Type':'application/json'},
+      body:JSON.stringify({password}),
     });
-    const j = await res.json().catch(() => ({}));
-    if (!res.ok) return { ok: false, error: j.msg || j.message || 'Mot de passe refusé.' };
-    return { ok: true };
-  } catch (_) { return { ok: false, error: 'Pas de connexion internet.' }; }
+    const j=await res.json().catch(()=>({}));
+    if(!res.ok)return{ok:false,error:res.status>=500?'Le changement n’a pas pu être confirmé. Réessaie dans un instant.':j?.msg||j?.message||'Mot de passe refusé.'};
+    if(j?.id!==uid||AUTH.session?.access_token!==tok)return{ok:false,error:'Le changement n’a pas pu être confirmé pour ce compte. Reconnecte-toi avant de continuer.'};
+    return{ok:true};
+  }catch(_){return{ok:false,error:'Le changement n’a pas pu être confirmé. Vérifie ta connexion avant de réessayer.'};}
+  finally{clearTimeout(delai);}
 };
 // « Se déconnecter » (un GESTE) déconnecte aussi l'extension de ce Chrome —
 // adressé, et seulement si elle écrit sous CE compte. Une session qui meurt
@@ -14540,6 +14550,7 @@ function AuthScreen() {
   const [motDePasseVisible, setMotDePasseVisible] = React.useState(false);
   React.useEffect(()=>setMotDePasseVisible(false),[mode]);
   const [busy, setBusy] = React.useState(false);
+  const [fournisseurEnCours,setFournisseurEnCours]=React.useState('');
   const demandeEnCours=React.useRef(false);
   const [err, setErr] = React.useState(() => (AUTH_REDIRECT && AUTH_REDIRECT.error) || '');
   const [info, setInfo] = React.useState('');
@@ -14561,7 +14572,7 @@ function AuthScreen() {
   // bouton « Se connecter » reste bloqué sur « ... ». `pageshow`+`persisted` est
   // le seul signal d'une restauration bfcache : on débloque le bouton.
   React.useEffect(() => {
-    const onShow = (e) => { if (e && e.persisted) setBusy(false); };
+    const onShow = (e) => { if (e && e.persisted) {demandeEnCours.current=false;setBusy(false);setFournisseurEnCours('');} };
     window.addEventListener('pageshow', onShow);
     return () => window.removeEventListener('pageshow', onShow);
   }, []);
@@ -14573,10 +14584,29 @@ function AuthScreen() {
 
   const oauth = async (p) => {
     if(busy||demandeEnCours.current)return;
-    setErr(''); setBusy(true);
-    const r = await oauthStart(p);
-    if (!r.ok) { setErr(r.error); setBusy(false); }
-    // Si ça marche, la page part chez le fournisseur : rien d'autre à faire.
+    demandeEnCours.current=true;setErr('');setInfo('');setBusy(true);setFournisseurEnCours(p);
+    try {
+      const r=await oauthStart(p);
+      if (!r.ok) {demandeEnCours.current=false;setErr(r.error);setBusy(false);setFournisseurEnCours('');}
+    } catch (_) {demandeEnCours.current=false;setErr('Impossible d’ouvrir cette connexion. Réessaie.');setBusy(false);setFournisseurEnCours('');}
+    // Le verrou reste pris pendant le départ chez le fournisseur ; pageshow
+    // le libère si l’utilisateur revient en arrière avec le cache du navigateur.
+  };
+
+  const actionConfirmation = async (action) => {
+    if(busy||demandeEnCours.current||(action!=='confirmer'&&enAttenteEmail))return;
+    demandeEnCours.current=true;setBusy(true);setErr('');setInfo('');
+    try {
+      const r=await (action==='confirmer'?authConfirmFromLink(confirmLink,email):action==='renvoyer'?authResendConfirm(email):authMagicLink(email));
+      if(!r.ok){if(!attendreEmail(r))setErr(r.error);return;}
+      if(action==='confirmer'){
+        setNeedConfirm(false);setConfirmLink('');
+        setInfo(r.connected?'Compte confirmé. Connexion en cours…':'Adresse confirmée. Tu peux maintenant te connecter avec ton mot de passe.');
+        if(r.connected)setTimeout(()=>location.reload(),800);
+      } else if(action==='renvoyer')setInfo('Nouvel email envoyé — utilise le plus récent.');
+      else setInfo('Lien de connexion envoyé. Ouvre le lien du mail pour continuer. S’il ne s’ouvre pas, utilise l’aide « Le lien de confirmation ne s’ouvre pas ? ».');
+    } catch (_) {setErr('La demande n’a pas pu être confirmée. Réessaie dans un instant.');}
+    finally {demandeEnCours.current=false;setBusy(false);}
   };
 
   const submit = async (e) => {
@@ -14585,7 +14615,8 @@ function AuthScreen() {
     if (enAttenteEmail && (mode === 'up' || mode === 'reset')) return;
     setErr(''); setInfo('');
     if (mode !== 'newpw' && !email.trim()) { setErr('Indique ton email.'); return; }
-    if (mode !== 'reset' && pw.length < 8) { setErr('Le mot de passe doit faire au moins 8 caractères.'); return; }
+    if (mode !== 'reset' && !pw) {setErr('Indique ton mot de passe.');return;}
+    if ((mode === 'up' || mode === 'newpw') && pw.length < 8) { setErr('Le mot de passe doit faire au moins 8 caractères.'); return; }
     // Un mot de passe qui protège une comptabilité mérite mieux que « 12345678 ».
     if ((mode === 'up' || mode === 'newpw') && /^(\d+|[a-z]+)$/i.test(pw)) { setErr('Mélange lettres et chiffres — ce mot de passe protège ta compta.'); return; }
     demandeEnCours.current=true;setBusy(true);
@@ -14619,7 +14650,8 @@ function AuthScreen() {
         // pourrait garder en mémoire les données du vendeur précédent.
         else location.reload();
       }
-    } finally { demandeEnCours.current=false;setBusy(false); }
+    } catch (_) {setErr('La demande n’a pas pu être confirmée. Réessaie dans un instant.');}
+    finally { demandeEnCours.current=false;setBusy(false); }
   };
 
   // 16 px : sous 16 px, Safari iPhone ZOOME la page au toucher d'un champ.
@@ -14773,7 +14805,7 @@ function AuthScreen() {
                   style={{width:'100%',display:'flex',alignItems:'center',justifyContent:'center',gap:10,
                     border:`1px solid ${C.border}`,background:C.bg,color:C.text,borderRadius:10,padding:'12px',
                     fontSize:14,fontWeight:600,cursor:busy?'default':'pointer',marginBottom:9,fontFamily:'inherit'}}>
-                  <BrandMark id={p.id}/> {mode==='up' ? `Créer mon compte avec ${p.label}` : `Continuer avec ${p.label}`}
+                  <BrandMark id={p.id}/> {fournisseurEnCours===p.id ? `Ouverture de ${p.label}…` : mode==='up' ? `Créer mon compte avec ${p.label}` : `Continuer avec ${p.label}`}
                 </button>
               ))}
               <div style={{display:'flex',alignItems:'center',gap:10,margin:'4px 0 12px'}}>
@@ -14839,15 +14871,13 @@ function AuthScreen() {
               Ton compte <b>{email}</b> attend sa confirmation.
               <div style={{display:'flex',gap:7,marginTop:8,flexWrap:'wrap'}}>
                 <button type="button" data-auth-renvoyer="" disabled={busy||enAttenteEmail}
-                  onClick={async()=>{ setBusy(true); const r=await authResendConfirm(email); setBusy(false);
-                    if(r.ok){ setErr(''); setInfo('Nouvel email envoyé — utilise le plus récent.'); } else if(!attendreEmail(r)) setErr(r.error); }}
+                  onClick={()=>actionConfirmation('renvoyer')}
                   style={{border:`1px solid ${C.warn}`,background:'transparent',color:C.warn,
                     borderRadius:8,padding:'9px 13px',fontSize:12,fontWeight:600,cursor:(busy||enAttenteEmail)?'default':'pointer',opacity:enAttenteEmail?0.5:1,fontFamily:'inherit'}}>
                   {enAttenteEmail ? `Renvoyer dans ${resteAttente} s` : "Renvoyer l'email"}
                 </button>
                 <button type="button" data-auth-lien-connexion="" disabled={busy||enAttenteEmail}
-                  onClick={async()=>{ setBusy(true); const r=await authMagicLink(email); setBusy(false);
-                    if(r.ok){ setErr(''); setInfo("Lien de connexion envoyé. Ouvre le lien du mail pour continuer. S’il ne s’ouvre pas, utilise l’aide « Le lien de confirmation ne s’ouvre pas ? »."); } else if(!attendreEmail(r)) setErr(r.error); }}
+                  onClick={()=>actionConfirmation('lien')}
                   style={{border:`1px solid ${C.border}`,background:'transparent',color:C.text,
                     borderRadius:8,padding:'9px 13px',fontSize:12,fontWeight:600,cursor:(busy||enAttenteEmail)?'default':'pointer',opacity:enAttenteEmail?0.5:1,fontFamily:'inherit'}}>
                   Recevoir un lien de connexion
@@ -14867,8 +14897,7 @@ function AuthScreen() {
                 style={{width:'100%',boxSizing:'border-box',marginTop:8,border:`1px solid ${C.border}`,borderRadius:8,
                   padding:'10px 11px',fontSize:16,background:C.card,color:C.text,outline:'none',fontFamily:'inherit'}}/>
                 <button type="button" disabled={busy||!confirmLink.trim()}
-                  onClick={async()=>{ setBusy(true); setErr(''); const r=await authConfirmFromLink(confirmLink, email); setBusy(false);
-                    if(r.ok){ setNeedConfirm(false); setInfo('Compte confirmé !'); setTimeout(()=>location.reload(), 800); } else setErr(r.error); }}
+                  onClick={()=>actionConfirmation('confirmer')}
                   style={{border:'none',background:C.accent,color:C.onAccent||'#fff',borderRadius:8,padding:'9px 13px',
                     fontSize:12,fontWeight:600,cursor:(busy||!confirmLink.trim())?'default':'pointer',opacity:(busy||!confirmLink.trim())?0.5:1,fontFamily:'inherit'}}>
                   Confirmer avec ce lien
@@ -14884,7 +14913,7 @@ function AuthScreen() {
           {(()=>{ const bloque = busy || attendCaptcha || (enAttenteEmail && (mode==='up'||mode==='reset')); return (
           <button type="submit" data-auth-valider="" disabled={bloque} style={{width:'100%',border:'none',background:C.accent,color:C.onAccent||'#fff',
             borderRadius:10,padding:'13px',fontSize:15,fontWeight:600,cursor:bloque?'default':'pointer',opacity:bloque?0.6:1,fontFamily:'inherit'}}>
-            {busy ? (mode==='up'?'Création du compte…':mode==='reset'?'Envoi du lien…':mode==='newpw'?'Enregistrement…':'Connexion…') : (enAttenteEmail && (mode==='up'||mode==='reset')) ? `Réessaie dans ${resteAttente} s` : attendCaptcha ? (captcha.statut==='erreur' ? 'Vérification anti-robot indisponible' : captcha.statut==='interactif' ? 'Coche la vérification ci-dessus' : 'Vérification anti-robot…') : mode==='up' ? 'Créer mon compte' : mode==='reset' ? 'Envoyer le lien' : mode==='newpw' ? 'Enregistrer' : 'Se connecter'}
+            {busy ? (fournisseurEnCours?'Ouverture de la connexion…':mode==='up'?'Création du compte…':mode==='reset'?'Envoi du lien…':mode==='newpw'?'Enregistrement…':'Connexion…') : (enAttenteEmail && (mode==='up'||mode==='reset')) ? `Réessaie dans ${resteAttente} s` : attendCaptcha ? (captcha.statut==='erreur' ? 'Vérification anti-robot indisponible' : captcha.statut==='interactif' ? 'Coche la vérification ci-dessus' : 'Vérification anti-robot…') : mode==='up' ? 'Créer mon compte' : mode==='reset' ? 'Envoyer le lien' : mode==='newpw' ? 'Enregistrer' : 'Se connecter'}
           </button>);})()}
           {/* Acceptation des conditions AVANT la création du compte (art. 1127-1
               C. civ., RGPD art. 13 : l'information est donnée au moment de la
