@@ -1152,7 +1152,13 @@ const authSignIn  = async (email, password) => {
     if (/invalid|credential/i.test(r.error)) return { ok: false, error: 'Email ou mot de passe incorrect.' };
     return { ok: false, error: r.error };
   }
-  writeSession(sessionFrom(r.json));
+  // Un HTTP 200 ne suffit pas : ne jamais recharger vers une session vide.
+  const j=r.json;
+  if (!j || typeof j.access_token!=='string' || !j.access_token.trim()
+      || typeof j.user?.id!=='string' || !j.user.id.trim()) {
+    return {ok:false,error:'La connexion n’a pas pu être confirmée. Réessaie : tes identifiants sont conservés.'};
+  }
+  writeSession(sessionFrom(j));
   return { ok: true };
 };
 // ── CONFIRMER EN COLLANT LE LIEN REÇU ─────────────────────────────────────
@@ -14499,7 +14505,7 @@ function CaptchaConnexion({ etat }) {
         <div data-captcha-erreur="" style={{fontSize:12.5,color:C.text,background:`${C.warn}12`,border:`1px solid ${C.warn}44`,borderRadius:8,padding:'9px 11px',lineHeight:1.45}}>
           {MSG_CAPTCHA_ERREUR}
           <div><button type="button" data-captcha-reessayer="" onClick={() => setEssai((n) => n + 1)}
-            style={{marginTop:8,minHeight:44,border:`1px solid ${C.border}`,background:C.bg,color:C.text,borderRadius:8,padding:'0 14px',fontSize:13,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Réessayer</button></div>
+            style={{marginTop:8,minHeight:46,border:`1px solid ${C.border}`,background:C.bg,color:C.text,borderRadius:8,padding:'0 14px',fontSize:13,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Réessayer</button></div>
         </div>
       )}
     </div>
@@ -14527,6 +14533,8 @@ function AuthScreen() {
   // (§11) — un seul propriétaire, `vrm_prenom`.
   const [prenom, setPrenom] = React.useState('');
   const [pw, setPw] = React.useState('');
+  const [motDePasseVisible, setMotDePasseVisible] = React.useState(false);
+  React.useEffect(()=>setMotDePasseVisible(false),[mode]);
   const [busy, setBusy] = React.useState(false);
   const demandeEnCours=React.useRef(false);
   const [err, setErr] = React.useState(() => (AUTH_REDIRECT && AUTH_REDIRECT.error) || '');
@@ -14554,7 +14562,13 @@ function AuthScreen() {
     return () => window.removeEventListener('pageshow', onShow);
   }, []);
 
+  const changerMode = (suivant) => {
+    if(busy||demandeEnCours.current)return;
+    setMode(suivant);setErr('');setInfo('');setNeedConfirm(false);setConfirmLink('');
+  };
+
   const oauth = async (p) => {
+    if(busy||demandeEnCours.current)return;
     setErr(''); setBusy(true);
     const r = await oauthStart(p);
     if (!r.ok) { setErr(r.error); setBusy(false); }
@@ -14595,7 +14609,7 @@ function AuthScreen() {
         else location.reload();
       } else {
         const r = await authSignIn(email, pw);
-        if (!r.ok) { setErr(r.error); setNeedConfirm(!!r.needsConfirm); }
+        if (!r.ok) { setErr(r.needsConfirm?'':r.error); setNeedConfirm(!!r.needsConfirm); }
         // Rechargement volontaire après connexion : l'app relit alors le cloud
         // du bon vendeur depuis un état propre. Sans ça, un composant déjà monté
         // pourrait garder en mémoire les données du vendeur précédent.
@@ -14615,7 +14629,7 @@ function AuthScreen() {
   return (
     <div className="vrm-cx" data-connexion="">
       <style>{`
-.vrm-cx{min-height:100vh;min-height:100dvh;display:grid;grid-template-columns:minmax(0,1fr);background:${C.bg}}
+.vrm-cx{min-height:100vh;min-height:100dvh;display:grid;grid-template-columns:minmax(0,1fr);grid-template-rows:auto 1fr;background:${C.bg}}
 .vrm-cx-marque{position:relative;overflow:hidden;background:linear-gradient(160deg,#243D43 0%,#192C34 70%,#14242B 100%);color:#F0F5F2;padding:calc(18px + env(safe-area-inset-top)) 20px 64px}
 .vrm-cx-marque:before{content:"";position:absolute;right:-30%;top:-40%;width:90%;aspect-ratio:1;border-radius:50%;background:radial-gradient(closest-side,rgba(190,209,201,.18),transparent);pointer-events:none}
 .vrm-cx-haut{position:relative;display:flex;align-items:center;justify-content:space-between;gap:12px}
@@ -14633,8 +14647,22 @@ function AuthScreen() {
 .vrm-cx-form button[type=submit]{min-height:50px;transition:transform 140ms cubic-bezier(0.23,1,0.32,1),opacity 140ms ease}
 .vrm-cx-form button[type=submit]:active{transform:scale(.98)}
 .vrm-cx-liens button{min-height:44px}
+.vrm-cx-oublie{border:0;background:transparent;color:${C.accent};padding:4px 0;font:inherit;font-size:12px;font-weight:500;min-height:32px;cursor:pointer}
+.vrm-cx-aide-confirmation{margin-top:12px;border-top:1px solid ${C.border};padding-top:10px}
+.vrm-cx-aide-confirmation summary{min-height:32px;cursor:pointer;font-weight:600;color:${C.accent}}
+.vrm-cx-form button:disabled{cursor:default}
+.vrm-cx-champ{display:block;margin-bottom:12px;font-size:12.5px;font-weight:600;color:${C.text}}
+.vrm-cx-champ>span:first-child{display:block;margin-bottom:6px}
+.vrm-cx-secret{position:relative;display:block}
+.vrm-cx-secret button{position:absolute;right:4px;top:3px;min-height:44px;padding:0 10px;border:0;border-radius:7px;background:transparent;color:${C.accent};font-size:12px;font-weight:600;font-family:inherit;cursor:pointer}
+.vrm-cx-form button:focus-visible,.vrm-cx-form a:focus-visible{outline:2px solid ${C.accent};outline-offset:3px}
+.vrm-cx-regles{display:flex;flex-wrap:wrap;gap:5px 12px;margin:0 0 14px;padding:0;list-style:none;font-size:12px;line-height:1.5;color:${C.muted}}
+.vrm-cx-regles [data-valide=true]{color:${C.accent}}
+.vrm-cx-regles li:before{content:'○ ';font-weight:700}
+.vrm-cx-regles [data-valide=true]:before{content:'✓ '}
+.vrm-cx-form [role=status],.vrm-cx-form [role=alert]{overflow-wrap:anywhere}
 @media (min-width:900px){
- .vrm-cx{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+ .vrm-cx{grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-template-rows:1fr}
  .vrm-cx-marque{display:flex;flex-direction:column;padding:40px 56px}
  .vrm-cx-titre{font-size:clamp(34px,3.2vw,46px);margin-top:auto}
  .vrm-cx-points{display:grid;gap:14px;margin:28px 0 auto;padding:0;list-style:none;max-width:420px;position:relative}
@@ -14703,10 +14731,10 @@ function AuthScreen() {
       </aside>
       <main className="vrm-cx-main">
       <div className="vrm-cx-boite">
-        <form onSubmit={submit} className="vrm-cx-form">
-          <div style={{fontSize:19,fontWeight:700,color:C.text,letterSpacing:-0.4,marginBottom:4}}>
+        <form onSubmit={submit} className="vrm-cx-form" aria-busy={busy} aria-labelledby="vrm-cx-titre-formulaire">
+          <h2 id="vrm-cx-titre-formulaire" style={{fontSize:19,fontWeight:700,color:C.text,letterSpacing:-0.4,margin:'0 0 4px'}}>
             {mode==='up' ? 'Créer ton compte' : mode==='reset' ? 'Mot de passe oublié' : mode==='newpw' ? 'Nouveau mot de passe' : 'Se connecter'}
-          </div>
+          </h2>
           <div style={{fontSize:14,color:C.muted,marginBottom:mode==='in'?14:18,lineHeight:1.5}}>
             {/* ⚠️ Ne PAS promettre l'isolation tant que la base ne la fait pas :
                 sans la colonne `owner` (§12), un compte créé ici tombe dans les
@@ -14755,8 +14783,8 @@ function AuthScreen() {
           {/* Création de compte alors que la confirmation par email est active :
               on prévient AVANT, sinon on tape son mot de passe pour rien. */}
           {mode==='up' && confirmRequired() && (
-            <div style={{fontSize:11.5,color:C.warn,background:`${C.warn}12`,border:`1px solid ${C.warn}44`,borderRadius:8,padding:'9px 11px',marginBottom:10,lineHeight:1.45}}>
-              Un <b>email de confirmation</b> va t'être envoyé : ouvre-le et clique le lien avant de te connecter. Rien reçu au bout de quelques minutes ? Regarde dans les indésirables.
+            <div style={{fontSize:12,color:C.text,background:`${C.accent}08`,border:`1px solid ${C.border}`,borderRadius:8,padding:'9px 11px',marginBottom:14,lineHeight:1.5}}>
+              Après l’inscription, <b>confirme ton adresse</b> avec le lien reçu par email.
             </div>
           )}
 
@@ -14767,18 +14795,35 @@ function AuthScreen() {
               du monde. Facultatif : un champ obligatoire de plus pour un
               bonjour serait un péage. */}
           {mode==='up' && (
-            <input type="text" autoComplete="given-name" placeholder="Ton prénom (facultatif)"
-              disabled={busy} value={prenom} onChange={e=>setPrenom(e.target.value.slice(0,24))} style={{...field, marginBottom:9}}/>
+            <label className="vrm-cx-champ"><span>Prénom <span style={{fontWeight:400,color:C.muted}}>(facultatif)</span></span>
+              <input type="text" autoComplete="given-name" placeholder="Ton prénom (facultatif)"
+                disabled={busy} value={prenom} onChange={e=>setPrenom(e.target.value.slice(0,24))} style={field}/>
+            </label>
           )}
           {mode!=='newpw' && (
-            <input type="email" inputMode="email" autoComplete="email" autoCapitalize="none" placeholder="Email"
-              disabled={busy} value={email} onChange={e=>{setEmail(e.target.value);setNeedConfirm(false);setConfirmLink('');setInfo('');setErr('');setFinAttente(0);}} style={{...field, marginBottom:9}}/>
+            <label className="vrm-cx-champ"><span>Adresse email</span>
+              <input type="email" inputMode="email" autoComplete="email" autoCapitalize="none" autoCorrect="off" spellCheck={false} placeholder="Email" required
+                disabled={busy} value={email} onChange={e=>{setEmail(e.target.value);setNeedConfirm(false);setConfirmLink('');setInfo('');setErr('');setFinAttente(0);}} style={field}/>
+            </label>
           )}
           {mode!=='reset' && (
-            <input type="password" autoComplete={(mode==='up'||mode==='newpw')?'new-password':'current-password'}
-              placeholder={mode==='newpw'?'Nouveau mot de passe (8 caractères min.)':'Mot de passe'}
-              disabled={busy} value={pw} onChange={e=>setPw(e.target.value)} style={{...field, marginBottom:9}}/>
+            <div className="vrm-cx-champ"><div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8,marginBottom:6}}>
+                <label htmlFor="vrm-cx-password">{mode==='newpw'?'Nouveau mot de passe':'Mot de passe'}</label>
+                {mode==='in' && <button type="button" disabled={busy} onClick={()=>changerMode('reset')} className="vrm-cx-oublie">Mot de passe oublié ?</button>}
+              </div>
+              <span className="vrm-cx-secret">
+                <input id="vrm-cx-password" type={motDePasseVisible?'text':'password'} autoComplete={(mode==='up'||mode==='newpw')?'new-password':'current-password'} required
+                  aria-describedby={(mode==='up'||mode==='newpw')?'vrm-cx-regles':undefined}
+                  placeholder={mode==='newpw'?'Nouveau mot de passe (8 caractères min.)':'Mot de passe'}
+                  disabled={busy} value={pw} onChange={e=>{setPw(e.target.value);setErr('');}} style={{...field,paddingRight:88}}/>
+                <button type="button" disabled={busy} aria-label={motDePasseVisible?'Masquer le mot de passe':'Afficher le mot de passe'} aria-pressed={motDePasseVisible} onClick={()=>setMotDePasseVisible(v=>!v)}>{motDePasseVisible?'Masquer':'Afficher'}</button>
+              </span>
+            </div>
           )}
+          {(mode==='up'||mode==='newpw') && <ul id="vrm-cx-regles" className="vrm-cx-regles" aria-label="Conditions du mot de passe">
+            <li data-valide={pw.length>=8}>8 caractères minimum</li>
+            <li data-valide={pw.length>0&&!/^(\d+|[a-z]+)$/i.test(pw)}>Mélange de caractères</li>
+          </ul>}
 
           {mode!=='newpw' && <CaptchaConnexion etat={captcha}/>}
           {err  && <div role="alert" style={{fontSize:12.5,color:C.danger,background:`${C.danger}12`,border:`1px solid ${C.danger}44`,borderRadius:8,padding:'9px 11px',marginBottom:10,lineHeight:1.4}}>{err}</div>}
@@ -14788,25 +14833,7 @@ function AuthScreen() {
           {needConfirm && mode==='in' && (
             <div style={{fontSize:12,color:C.text,background:`${C.warn}10`,border:`1px solid ${C.warn}44`,borderRadius:8,padding:'10px 11px',marginBottom:10,lineHeight:1.5}}>
               Ton compte <b>{email}</b> attend sa confirmation.
-              <div style={{marginTop:8,fontSize:11.5,color:C.muted,lineHeight:1.5}}>
-                {/* « il renvoie vers une adresse de test » : vrai le 5 octobre (Site URL
-                    resté sur localhost:3000, mesuré dans les journaux), faux dès que
-                    Julien règle Supabase. La phrase ne dit plus que ce qui reste vrai
-                    dans les deux cas. */}
-                Si le lien du mail affiche « <i>impossible d'accéder au site</i> »,
-                <b style={{color:C.text}}> copie le lien</b> (appui long → Copier le lien) et colle-le ici — on s'occupe du reste.
-              </div>
-              <input value={confirmLink} onChange={e=>setConfirmLink(e.target.value)} placeholder="Colle le lien du mail ici"
-                style={{width:'100%',boxSizing:'border-box',marginTop:8,border:`1px solid ${C.border}`,borderRadius:8,
-                  padding:'10px 11px',fontSize:12,background:C.card,color:C.text,outline:'none',fontFamily:'inherit'}}/>
               <div style={{display:'flex',gap:7,marginTop:8,flexWrap:'wrap'}}>
-                <button type="button" disabled={busy||!confirmLink.trim()}
-                  onClick={async()=>{ setBusy(true); setErr(''); const r=await authConfirmFromLink(confirmLink, email); setBusy(false);
-                    if(r.ok){ setNeedConfirm(false); setInfo('Compte confirmé !'); setTimeout(()=>location.reload(), 800); } else setErr(r.error); }}
-                  style={{border:'none',background:C.accent,color:C.onAccent||'#fff',borderRadius:8,padding:'9px 13px',
-                    fontSize:12,fontWeight:600,cursor:(busy||!confirmLink.trim())?'default':'pointer',opacity:(busy||!confirmLink.trim())?0.5:1,fontFamily:'inherit'}}>
-                  Confirmer avec ce lien
-                </button>
                 <button type="button" data-auth-renvoyer="" disabled={busy||enAttenteEmail}
                   onClick={async()=>{ setBusy(true); const r=await authResendConfirm(email); setBusy(false);
                     if(r.ok){ setErr(''); setInfo('Nouvel email envoyé — utilise le plus récent.'); } else if(!attendreEmail(r)) setErr(r.error); }}
@@ -14816,12 +14843,33 @@ function AuthScreen() {
                 </button>
                 <button type="button" data-auth-lien-connexion="" disabled={busy||enAttenteEmail}
                   onClick={async()=>{ setBusy(true); const r=await authMagicLink(email); setBusy(false);
-                    if(r.ok){ setErr(''); setInfo("Lien de connexion envoyé. Ouvre le mail, copie le lien, colle-le ci-dessus : ça confirme ton compte ET te connecte."); } else if(!attendreEmail(r)) setErr(r.error); }}
+                    if(r.ok){ setErr(''); setInfo("Lien de connexion envoyé. Ouvre le lien du mail pour continuer. S’il ne s’ouvre pas, utilise l’aide « Le lien de confirmation ne s’ouvre pas ? »."); } else if(!attendreEmail(r)) setErr(r.error); }}
                   style={{border:`1px solid ${C.border}`,background:'transparent',color:C.text,
                     borderRadius:8,padding:'9px 13px',fontSize:12,fontWeight:600,cursor:(busy||enAttenteEmail)?'default':'pointer',opacity:enAttenteEmail?0.5:1,fontFamily:'inherit'}}>
                   Recevoir un lien de connexion
                 </button>
               </div>
+              <details className="vrm-cx-aide-confirmation">
+                <summary>Le lien de confirmation ne s’ouvre pas ?</summary>
+              <div style={{marginTop:8,fontSize:11.5,color:C.muted,lineHeight:1.5}}>
+                {/* « il renvoie vers une adresse de test » : vrai le 5 octobre (Site URL
+                    resté sur localhost:3000, mesuré dans les journaux), faux dès que
+                    Julien règle Supabase. La phrase ne dit plus que ce qui reste vrai
+                    dans les deux cas. */}
+                Si le lien du mail affiche « <i>impossible d'accéder au site</i> »,
+                <b style={{color:C.text}}> copie le lien</b> (appui long → Copier le lien) et colle-le ici — on s'occupe du reste.
+              </div>
+              <input aria-label="Lien de confirmation reçu par email" value={confirmLink} onChange={e=>setConfirmLink(e.target.value)} placeholder="Colle le lien du mail ici"
+                style={{width:'100%',boxSizing:'border-box',marginTop:8,border:`1px solid ${C.border}`,borderRadius:8,
+                  padding:'10px 11px',fontSize:16,background:C.card,color:C.text,outline:'none',fontFamily:'inherit'}}/>
+                <button type="button" disabled={busy||!confirmLink.trim()}
+                  onClick={async()=>{ setBusy(true); setErr(''); const r=await authConfirmFromLink(confirmLink, email); setBusy(false);
+                    if(r.ok){ setNeedConfirm(false); setInfo('Compte confirmé !'); setTimeout(()=>location.reload(), 800); } else setErr(r.error); }}
+                  style={{border:'none',background:C.accent,color:C.onAccent||'#fff',borderRadius:8,padding:'9px 13px',
+                    fontSize:12,fontWeight:600,cursor:(busy||!confirmLink.trim())?'default':'pointer',opacity:(busy||!confirmLink.trim())?0.5:1,fontFamily:'inherit'}}>
+                  Confirmer avec ce lien
+                </button>
+              </details>
             </div>
           )}
           {info && <div role="status" aria-live="polite" style={{fontSize:12.5,color:C.accent,background:`${C.accent}12`,border:`1px solid ${C.accent}44`,borderRadius:8,padding:'9px 11px',marginBottom:10,lineHeight:1.4}}>{info}</div>}
@@ -14832,7 +14880,7 @@ function AuthScreen() {
           {(()=>{ const bloque = busy || attendCaptcha || (enAttenteEmail && (mode==='up'||mode==='reset')); return (
           <button type="submit" data-auth-valider="" disabled={bloque} style={{width:'100%',border:'none',background:C.accent,color:C.onAccent||'#fff',
             borderRadius:10,padding:'13px',fontSize:15,fontWeight:600,cursor:bloque?'default':'pointer',opacity:bloque?0.6:1,fontFamily:'inherit'}}>
-            {busy ? '…' : (enAttenteEmail && (mode==='up'||mode==='reset')) ? `Réessaie dans ${resteAttente} s` : attendCaptcha ? (captcha.statut==='erreur' ? 'Vérification anti-robot indisponible' : captcha.statut==='interactif' ? 'Coche la vérification ci-dessus' : 'Vérification anti-robot…') : mode==='up' ? 'Créer mon compte' : mode==='reset' ? 'Envoyer le lien' : mode==='newpw' ? 'Enregistrer' : 'Se connecter'}
+            {busy ? (mode==='up'?'Création du compte…':mode==='reset'?'Envoi du lien…':mode==='newpw'?'Enregistrement…':'Connexion…') : (enAttenteEmail && (mode==='up'||mode==='reset')) ? `Réessaie dans ${resteAttente} s` : attendCaptcha ? (captcha.statut==='erreur' ? 'Vérification anti-robot indisponible' : captcha.statut==='interactif' ? 'Coche la vérification ci-dessus' : 'Vérification anti-robot…') : mode==='up' ? 'Créer mon compte' : mode==='reset' ? 'Envoyer le lien' : mode==='newpw' ? 'Enregistrer' : 'Se connecter'}
           </button>);})()}
           {/* Acceptation des conditions AVANT la création du compte (art. 1127-1
               C. civ., RGPD art. 13 : l'information est donnée au moment de la
@@ -14849,22 +14897,16 @@ function AuthScreen() {
                 vendeurs. Sinon la première personne qui crée un compte tombe
                 directement dans les données de Julien : son garage, ses ventes,
                 sa comptabilité. Le lien réapparaît seul après la migration. */}
-            {(CLOISONNE || mode==='up') ? (
-              <button type="button" onClick={()=>{ setMode(mode==='up'?'in':'up'); setErr(''); setInfo(''); }}
+            {mode!=='reset' && ((CLOISONNE || mode==='up') ? (
+              <button type="button" disabled={busy} onClick={()=>changerMode(mode==='up'?'in':'up')}
                 style={{border:'none',background:'transparent',color:C.accent,fontSize:14,fontWeight:600,cursor:'pointer',padding:0,fontFamily:'inherit'}}>
                 {mode==='up' ? 'J\'ai déjà un compte' : 'Créer un compte'}
               </button>
             ) : (
               <span style={{fontSize:14,color:C.muted,fontWeight:500}}>Inscriptions bientôt ouvertes</span>
-            )}
-            {mode!=='reset' && (
-              <button type="button" onClick={()=>{ setMode('reset'); setErr(''); setInfo(''); }}
-                style={{border:'none',background:'transparent',color:C.muted,fontSize:14,fontWeight:500,cursor:'pointer',padding:0,fontFamily:'inherit'}}>
-                Mot de passe oublié ?
-              </button>
-            )}
+            ))}
             {mode==='reset' && (
-              <button type="button" onClick={()=>{ setMode('in'); setErr(''); setInfo(''); }}
+              <button type="button" disabled={busy} onClick={()=>changerMode('in')}
                 style={{border:'none',background:'transparent',color:C.muted,fontSize:14,fontWeight:500,cursor:'pointer',padding:0,fontFamily:'inherit'}}>
                 Retour
               </button>
