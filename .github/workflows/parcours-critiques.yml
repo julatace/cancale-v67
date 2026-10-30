@@ -30,6 +30,10 @@ jobs:
           node scripts/bancs/recuperation-auth.cjs
           node scripts/tests/recuperation-pannes-interface.cjs
           node scripts/bancs/confidentialite.cjs
+      - name: Vérifier le renouvellement des sessions
+        run: |
+          node --test scripts/tests/session-renouvellement.test.mjs
+          node scripts/bancs/session-reveil.cjs
       - name: Vérifier le périmètre des numéros Vinted
         run: node scripts/tests/numeros-vinted-perimetre-interface.cjs
       - name: Vérifier l’espace emails
