@@ -364,8 +364,8 @@ async function renvoyerPhoto(url, uid) {
   rien : Vinted relie les comptes par appareil, navigateur, adresse et paiement,
   pas par les images.
 - ⚠️ Chaque envoi de photo compte comme une écriture : une annonce à 12 photos
-  = 12 envois + 1 création + 1 suppression. Avec un plafond de 20 par heure, **une
-  annonce par heure au plus**, ou relève le plafond en connaissance de cause.
+  = 12 envois + 1 création + 1 suppression. Avec un plafond de 50 par heure (20 jusqu'au 29 octobre),
+  **trois annonces par heure au plus**.
 - ❓ Piste à tester : réutiliser directement les `photos[].id` de l'ancienne annonce
   dans `assigned_photos` (sans renvoi). Les modifications d'annonce le font
   (`PUT`) ; pour une création, jamais vu. À tester sur **une** annonce, en
@@ -473,7 +473,7 @@ async function relancerFavori(fav, texte, prix, uid) {
   return 'envoyé';
 }
 ```
-⚠️ Chaque relance = 2 à 4 écritures. Le plafond de 20/h en permet ~5 par heure.
+⚠️ Chaque relance = 2 à 4 écritures. Le plafond de 50/h (20 jusqu'au 29 octobre) en permet ~12 par heure.
 
 ---
 

@@ -56,7 +56,7 @@ Relie tes comptes Vinted, Leboncoin et eBay à VRM : annonces, ventes, colis et 
 > • tu publies une annonce sur Leboncoin ou eBay depuis VRM, sans recopier.
 >
 > Tout se pilote dans l'app VRM. L'extension n'agit que pour le compte connecté
-> dans l'onglet, au plus 20 actions par heure, une requête à la fois, et
+> dans l'onglet, au plus 50 actions par heure, une requête à la fois, et
 > n'accepte jamais une offre ni ne supprime une annonce toute seule.
 >
 > Un compte VRM est nécessaire. VRM est un outil indépendant, ni affilié ni

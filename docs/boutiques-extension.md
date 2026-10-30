@@ -140,7 +140,7 @@ nouveau module** → envoyer `VRM-firefox.zip`.
   lit les pages Vinted, Leboncoin et eBay que tu ouvres toi-même, et range dans
   TON compte VRM tes annonces, ventes, achats, messages, colis et bordereaux.
   Elle ne publie rien et n'accepte aucune offre toute seule ; elle agit
-  seulement au nom du compte ouvert dans l'onglet, au plus 20 actions par heure,
+  seulement au nom du compte ouvert dans l'onglet, au plus 50 actions par heure,
   une requête à la fois. Ton mot de passe Vinted n'est jamais lu. »
 - **Catégorie** : « Boutiques et achats » (Shopping) ; secondaire « Productivité ».
 - **Étiquettes** : vinted, leboncoin, ebay, revente, colis.
