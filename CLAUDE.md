@@ -1,11 +1,21 @@
 # VRM — dossier de passation
 
-> **30 octobre — intégration des chantiers du 29 oct., extension 5.291.0 :** `v29-colis` (+ `v29-colis-ext`, fusionnée
-> dedans), `v29-lbc`, `v29-msg-ecrase` (revue 3 de `v29-msg` reprise dessus), `v29-vinted-ui`, `v29-compta`,
-> `v29-ebay-agent`, par vrais merges sur `origin/main` (5.287.0). UN numéro pour l'ensemble : **5.291.0** (5.288 et
-> 5.290 étaient des numéros de branche, jamais servis) — manifeste, `CODE_VERSION`, `CAPTEUR_VERSION`, `relaisVersion`,
-> `EXT_ATTENDUE`, notice Orion, zips, et `EXT_CAPACITES.transp` · `.lbcsupprime` · `.lbcstats` (aucune version publiée
-> ne porte ces fonctions). `v29-ebay-achats` n'est PAS dans ce lot. `audit-extension-zip` et `audit-coherence` verts.
+> 🔴 **30 octobre — intégration v30 (branche `v30-integ`, poussée sur `claude/project-review-nsk5su`), extension 5.291.0 :**
+> réunis par VRAIS merges : `v29-colis` (+ `v29-colis-ext`), `v29-lbc`, `v29-msg-ecrase`, `v29-vinted-ui`, `v29-compta`,
+> `v29-ebay-agent`, `v29-ebay-achats`, puis `origin/main` (refonte #917 : trois boutons, textes courts — elle gagne sur la
+> forme, les intentions des chantiers sont gardées) et la passation. UN numéro : **5.291.0** (5.288 et 5.290 étaient des
+> numéros de branche, jamais servis) — manifeste, `CODE_VERSION`, `EXT_ATTENDUE`, zips, `EXT_CAPACITES.transp` ·
+> `.lbcsupprime` · `.lbcstats` (table du §5 complétée). Relecture de l'intégration, corrigé : les gestes AUTOMATIQUES
+> (`garde` : moteur d'offres, bordereau de la visite) s'arrêtent à 45 actions, les 5 dernières restent aux clics
+> (`audit-compteurs-concurrents` §4) ; `REPUB_LBC_MAX` lié à `LBC_SUPPRIME_MAX_HEURE` (`audit-lbc-supprimer`) ; Mondial
+> Relay refusé dit une fois en tête, le bon geste sur un ordinateur sans extension (`transporteurs.cjs`) ; Compta « reçu
+> au moins » quand des ventes n'ont pas de date de versement, compteur des déclarations accordé, « Comptabilité » une
+> fois ; Stats « Choisir une période », plus de « Total Vinted » ; la case Leboncoin d'Annonces dit son état ; Achats :
+> fraîcheur dite une fois, compte d'un groupe uniforme une fois (banc `revue-30oct.cjs` : 16 rouges sur l'avant).
+> Rouges connus, présents à l'identique AVANT la fusion : voir `docs/passation/2026-10-30.md`.
+> **Gestes de Julien** : installer l'extension **5.291.0** (remplacer le dossier, puis ⟳ dans CHAQUE Chrome) ; sur
+> leboncoin.fr, ouvrir « Mes annonces » sur CHACUN de ses comptes Leboncoin (la liste complète fait sortir les annonces
+> disparues).
 
 > ⚠️⚠️ **29 octobre — LEBONCOIN COMME VINTED : capture juste, « à retirer » visible, Supprimer, Republier, favoris (5.288) :**
 > Julien : « il n'y a plus que 2 annonces et VRM en a encore 8 », « j'ai vendu une paire sur Vinted et VRM ne m'a pas dit de
@@ -496,7 +506,7 @@
 > `transporteurs` vert (49 rouges sur le build de `main`) ; bancs colis, widget, rappels, notifications, popup, badge, pont,
 > premierjour verts.
 
-> **29 octobre — `v29-colis-ext` : l'extension (5.281, version inchangée) suit le serveur, et mesure la route des messages :**
+> **29 octobre — `v29-colis-ext` : l'extension (5.281, version inchangée ; numéro de branche, remplacé par 5.291.0 à l'intégration du 30 oct.) suit le serveur, et mesure la route des messages :**
 > (1) **Transporteurs (secours)** : `TRANSP_FORME` reprend la forme du serveur (`FORME_SUIVI` : Chronopost
 > `XX123456789XX` ou `\d{14}[0-9A-Z]?`) et la liste blanche d'adresses en dérive ; un refus de `mr-fr-mvc` bascule sur
 > `mr-be` (page puis API), même budget, une requête à la fois, pause posée sur la voie refusée seule ; le corps Mondial
@@ -571,7 +581,7 @@
 > l'app (15/h) — l'ancienne annonce déjà supprimée, il ne restait qu'un brouillon. Désormais la paire RÉSERVE ses 3 gestes
 > (2 pour « En ligne → brouillon ») d'un coup avant le premier (`gardeStricte({actions})`, `compterAction(…, n)`) ; plus
 > de place ⇒ rien ne part, l'annonce reste en ligne, c'est dit ; la mise en ligne ne revérifie que le compte et la pause.
-> Le plafond (20/h, 15 pour l'app) n'a PAS bougé (§3) : 5 republications par heure et par compte au plus. Preuve :
+> Le plafond (20/h, 15 pour l'app — avant la 5.283 : aujourd'hui 50/h, 45 pour l'app) n'a PAS bougé (§3) : 5 republications par heure et par compte au plus (aujourd'hui 15). Preuve :
 > `audit-recreer.cjs` §Q (147 ; 2 rouges sur origin/main : « brouillon-a-refaire … 15 actions »).
 
 > ⚠️⚠️ **29 octobre — REPUBLIER « COMME VINTEX » (5.277), après la restriction de 24 h d'angeled92 :** Vinted a écrit
@@ -11654,7 +11664,27 @@ arrivée** — vérifiée commit par commit sur `manifest.json`, pas devinée.
 | `lbcfiche` | `appliquerAnnonceLbc` | **5.182.0** (16 oct.) | publier sur Leboncoin l'annonce CORRIGÉE dans la fiche de VRM (titre, prix, état, photos, description) |
 | `confirmer` | `capterConfirmations` | **5.204.0** (21 oct.) | « relever les colis à confirmer (« Tout est OK ») avant leur date limite » |
 | `retraitnotif` | `envoyerNotifsRetrait` | **5.204.0** (21 oct.) | « te prévenir quand elle lit un code de retrait dans une conversation » |
-| `suivivinted` | `capterSuivisAchats` | **5.216.0** (24 oct. — ni la 5.214.0 ni la 5.215.0 publiées par `main` ne l'ont) | « l'extension relève le suivi Vinted de tes achats » — seulement connectée à CE compte VRM, seule, au code à jour (revue du 24 oct.) |
+| `suivivinted` | `capterSuivisAchats` | **5.217.0** (24 oct. — ni la 5.214.0, ni la 5.215.0, ni la 5.216.0 publiées par `main` ne l'ont ; la table disait 5.216.0, le code dit 5.217.0) | « l'extension relève le suivi Vinted de tes achats » — seulement connectée à CE compte VRM, seule, au code à jour (revue du 24 oct.) |
+| `transp` | `transpTick` | **5.291.0** (30 oct. — aucune version publiée ne l'a ; 5.290 était un numéro de branche) | « l'extension lit le statut chez le transporteur à la place du serveur quand celui-ci est refusé » |
+| `lbcsupprime` | `supprimeLbcDepuisApp` | **5.291.0** (30 oct. — 5.288 était un numéro de branche) | « Supprimer de Leboncoin » depuis VRM, sur son clic et confirmé |
+| `lbcstats` | `noterStatsAnnonceLbc` | **5.291.0** (30 oct.) | « favoris, vues et messages relevés sur tes annonces Leboncoin » |
+| `favorisouvrir` | `ouvrirFavoriNatif` | **5.225.0** | (ligne ajoutée le 30 oct. : la table ne la portait pas — voir la section du jour de son arrivée, et `audit-coherence`) |
+| `favorisliste` | `lirePageFavoris` | **5.218.0** | (ligne ajoutée le 30 oct. : la table ne la portait pas — voir la section du jour de son arrivée, et `audit-coherence`) |
+| `favoris` | `executerMessageFavori` | **5.217.0** | (ligne ajoutée le 30 oct. : la table ne la portait pas — voir la section du jour de son arrivée, et `audit-coherence`) |
+| `offresauto` | `autoAccepterOffres` | **5.234.0** | (ligne ajoutée le 30 oct. : la table ne la portait pas — voir la section du jour de son arrivée, et `audit-coherence`) |
+| `vcauto` | `rangerVcAnnonces` | **5.236.0** | (ligne ajoutée le 30 oct. : la table ne la portait pas — voir la section du jour de son arrivée, et `audit-coherence`) |
+| `vcventes` | `rangerVcVentes` | **5.237.0** | (ligne ajoutée le 30 oct. : la table ne la portait pas — voir la section du jour de son arrivée, et `audit-coherence`) |
+| `republier` | `republierVinted` | **5.240.0** | (ligne ajoutée le 30 oct. : la table ne la portait pas — voir la section du jour de son arrivée, et `audit-coherence`) |
+| `republiermodif` | `corpsAvecPrixBaisse` | **5.247.0** | (ligne ajoutée le 30 oct. : la table ne la portait pas — voir la section du jour de son arrivée, et `audit-coherence`) |
+| `recreer` | `recreerVinted` | **5.248.0** | (ligne ajoutée le 30 oct. : la table ne la portait pas — voir la section du jour de son arrivée, et `audit-coherence`) |
+| `lettre` | `recreerVinted` | **5.250.0** | (ligne ajoutée le 30 oct. : la table ne la portait pas — voir la section du jour de son arrivée, et `audit-coherence`) |
+| `brouillon` | `publierBrouillon` | **5.251.0** | (ligne ajoutée le 30 oct. : la table ne la portait pas — voir la section du jour de son arrivée, et `audit-coherence`) |
+| `versbrouillon` | `recreerVinted` | **5.253.0** | (ligne ajoutée le 30 oct. : la table ne la portait pas — voir la section du jour de son arrivée, et `audit-coherence`) |
+| `republierbrouillon` | `recreerVinted` | **5.254.0** | (ligne ajoutée le 30 oct. : la table ne la portait pas — voir la section du jour de son arrivée, et `audit-coherence`) |
+| `refaire` | `refaireBrouillon` | **5.255.0** | (ligne ajoutée le 30 oct. : la table ne la portait pas — voir la section du jour de son arrivée, et `audit-coherence`) |
+| `republierpage` | `vintedPage` | **5.277.0** | (ligne ajoutée le 30 oct. : la table ne la portait pas — voir la section du jour de son arrivée, et `audit-coherence`) |
+| `republierfile` | `miseEnLigneTick` | **5.279.0** | (ligne ajoutée le 30 oct. : la table ne la portait pas — voir la section du jour de son arrivée, et `audit-coherence`) |
+| `favorisperso` | `erreurVariablesFavori` | **5.281.0** | (ligne ajoutée le 30 oct. : la table ne la portait pas — voir la section du jour de son arrivée, et `audit-coherence`) |
 
 ⚠️ **DEUX SEUILS POUR UNE MÊME NOTION, EXPRÈS.** Les photos s'attachent côté
 Leboncoin depuis la 5.58 et côté eBay depuis la 5.59 : un seul seuil aurait
@@ -15586,7 +15616,7 @@ Les dix défauts de notification reproduits le 24 octobre, chacun REPRODUIT d'ab
   passage ne relit (vendeur sans app ni cron) attend le cron suivant (matin ou soir).
 
 
-### Statut chez le transporteur, tour 2 : les 19 défauts des relecteurs (29 octobre, 5.290)
+### Statut chez le transporteur, tour 2 : les 19 défauts des relecteurs (29 octobre, 5.290 — numéro de branche, remplacé par 5.291.0 à l'intégration du 30 oct.)
 Relecture du chantier remis sur `main` (94f4d515) sur SA base (copie lecture seule) et
 de bout en bout (vraies routes, vrai fond). Chaque défaut REPRODUIT, corrigé à la
 racine, rouge sur 94f4d515 (§6.1 : audits et banc copiés dans l'arbre d'avant, build
