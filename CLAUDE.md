@@ -1,5 +1,13 @@
 # VRM — dossier de passation
 
+> **29 octobre — revue des écrans Vinted, dernier tour (deux défauts) :** « il lui faut un N° pour aller sur Leboncoin »
+> était écrit en ambre sur CHAQUE fiche sans N° (§7) — retiré de la fiche (« + N° » y suffit) ; la pastille de l'en-tête
+> dit une fois « N sans N° — il leur en faut un pour Leboncoin » (`data-sans-num`). Statistiques gardait seulement deux
+> dates (`caDu`/`caAu`) et réécrivait « 7 jours » en « Du 24 au 30 oct. » quand Ventes disait « 7 derniers jours » : le
+> libellé du raccourci est gardé (`caLabel`), le même choix s'écrit pareil partout. Preuves : banc `vinted-ui` (9205 et 9206
+> sans N°, libellé Ventes = Statistiques) **6 rouges sur e314e0ee**, 0 après ; mutation (ligne remise sur la fiche +
+> libellé jeté) ⇒ 6 rouges. ⚠️ Non mesuré : sa vraie base (une annonce en ligne sans N° aujourd'hui, hors shop_cancale).
+
 > **29 octobre — revue des écrans Vinted : neuf défauts reproduits, corrigés (app seule) :** la préparation Leboncoin
 > (`etatPrepaLbc`, une règle pour la fiche et l'en-tête) dit l'état COMMUN une fois au-dessus de la grille (« N à recapturer
 > pour Leboncoin ») — la fiche ne garde que ce qui la distingue (« 2/5 photos captées ») ; chez lui ~125 fiches sur 179

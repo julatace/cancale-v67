@@ -24274,6 +24274,10 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
   const [selMois,setSelMois]=useState(null);           // mois sélectionné dans le graphique d'évolution moisson
   const [caDu,setCaDu]=useState('');                   // CA sur mesure : borne de début (YYYY-MM-DD)
   const [caAu,setCaAu]=useState('');                   // CA sur mesure : borne de fin
+  // (29 oct., revue) Le LIBELLÉ du raccourci choisi (« 30 derniers jours ») : sans
+  // lui, Statistiques réécrivait « Du 1er au 30 oct. » là où Ventes et Achats
+  // disent « 30 derniers jours » — le même choix, deux écritures (§11).
+  const [caLabel,setCaLabel]=useState('');
 
   const [objectif,setObjectif]=useState(()=>+(load('vrm_ca_objectif',0))||0); // objectif de CA du mois
   const [objEdit,setObjEdit]=useState(false);
@@ -24957,8 +24961,8 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
         <div style={{fontSize:13,fontWeight:600,color:C.text,marginBottom:2}}>📅 Chiffre d'affaires entre deux dates</div>
         <div className="vrm-aide" style={{fontSize:11,color:C.muted,marginBottom:10}}>Choisis une période — le total porte sur tes ventes finalisées Vinted (comme « Finalisé sur Vinted »), à leur date de vente.</div>
         {/* (29 oct.) Le même calendrier « comme Airbnb » que Ventes et Achats (§11). */}
-        <PeriodePicker titre="Période du chiffre d'affaires" value={(caDu||caAu)?{from:caDu?new Date(caDu+'T00:00:00'):null,to:caAu?new Date(caAu+'T00:00:00'):null}:null}
-          onChange={v=>{ const k=(d)=>{ if(!d) return ''; const t=d instanceof Date?d:new Date(d); return isNaN(t.getTime())?'':`${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,'0')}-${String(t.getDate()).padStart(2,'0')}`; }; setCaDu(v?k(v.from):''); setCaAu(v?k(v.to):''); }}/>
+        <PeriodePicker titre="Période du chiffre d'affaires" value={(caDu||caAu)?{from:caDu?new Date(caDu+'T00:00:00'):null,to:caAu?new Date(caAu+'T00:00:00'):null,...(caLabel?{label:caLabel}:{})}:null}
+          onChange={v=>{ const k=(d)=>{ if(!d) return ''; const t=d instanceof Date?d:new Date(d); return isNaN(t.getTime())?'':`${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,'0')}-${String(t.getDate()).padStart(2,'0')}`; }; setCaDu(v?k(v.from):''); setCaAu(v?k(v.to):''); setCaLabel(v&&v.label?String(v.label):''); }}/>
         {caRange ? (
           <div style={{marginTop:14}}>
             <div className="vrm-display" data-ca-plage={caRange.passu?'':String(Math.round(caRange.ca*100))} style={{fontSize:28,fontWeight:800,color:C.text}}>{caRange.passu?'—':fmt(caRange.ca)}</div>
@@ -46486,7 +46490,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             {annStats.pretLbc>0 && (annStats.aRecapturer===0 || annStats.prepaCommun==='prete') ? <span data-prepa-pretes={annStats.pretLbc}>{` · ✓ ${annStats.pretLbc} prêtes pour Leboncoin`}</span> : ''}
           </div>
           <div className="vrm-rangee" style={{display:'flex',gap:8,marginBottom:10,alignItems:'center',WebkitOverflowScrolling:'touch',scrollbarWidth:'none',msOverflowStyle:'none',paddingBottom:2}}>
-            {annStats.sansNum>0 && <span style={{flexShrink:0,whiteSpace:'nowrap',fontSize:12,fontWeight:600,color:C.warn,background:`${C.warn}14`,border:`1px solid ${C.warn}55`,borderRadius:8,padding:'4px 11px'}}>{annStats.sansNum} sans N°</span>}
+            {annStats.sansNum>0 && <span data-sans-num={annStats.sansNum} title="Le N° est la référence qui retrouve la paire sur Leboncoin : touche « + N° » sur sa fiche." style={{flexShrink:0,whiteSpace:'nowrap',fontSize:12,fontWeight:600,color:C.warn,background:`${C.warn}14`,border:`1px solid ${C.warn}55`,borderRadius:8,padding:'4px 11px'}}>{annStats.sansNum} sans N° — il {annStats.sansNum>1?'leur':'lui'} en faut un pour Leboncoin</span>}
             {/* ⚠️ « Toute l'annonce captée ? » — même base que la grille (§11). */}
             {annStats.aRecapturer>0 && <span data-prepa-resume={annStats.aRecapturer} data-prepa-commun={annStats.prepaCommun||''} title={`${annStats.pretLbc} article(s) ont TOUTES leurs photos + une description captées — prêts pour Leboncoin. ${annStats.aRecapturer} n'ont pas encore toutes leurs photos : tu n'as rien à rouvrir — passe simplement sur Vinted connecté sur leurs comptes (extension à jour) et l'extension les complète toute seule, quelques annonces par visite. Si l'une reste incomplète après plusieurs passages, rouvre-la pour forcer.`} style={{flexShrink:0,whiteSpace:'nowrap',fontSize:12,fontWeight:600,color:C.warn,background:`${C.warn}14`,border:`1px solid ${C.warn}55`,borderRadius:8,padding:'4px 11px'}}>{annStats.aRecapturer} à recapturer pour Leboncoin</span>}
             {/* Une paire qui dort se rattrape : de l'ambre, jamais du rouge (§5.56). */}
@@ -47005,9 +47009,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     <button type="button" className="vrm-fiche-geste" onClick={async ()=>{ if(await askConfirm('Marquer cet article VENDU et le retirer des annonces ?')) markSold(it.id); }} title="Marquer vendue : la retire des annonces tout de suite (sans attendre la synchro Vinted)" style={geste}>Marquer vendue</button>
                     {sugg!=null && sugg < Number(it.price) && <a className="vrm-fiche-geste" href={it.url||undefined} target="_blank" rel="noreferrer" title="Ouvrir l'annonce sur Vinted pour baisser le prix" style={{...geste,border:`1px solid ${C.accent}`,background:`${C.accent}14`,color:C.accent}}>Baisser à {sugg} {cur(it.currency)} ↗</a>}
                   </div>
-                  {(!num || prepa) && (
+                  {/* (29 oct., revue) « il lui faut un N° pour aller sur Leboncoin »
+                      était écrit sur CHAQUE fiche sans N° (§7) : la pastille « + N° »
+                      de la fiche le montre déjà, et la raison se dit UNE fois
+                      au-dessus de la grille (`data-sans-num`). */}
+                  {prepa && (
                     <div data-fiche-infos style={{fontSize:12,color:C.muted,lineHeight:1.35}}>
-                      {!num && <span style={{color:C.warn}}>il lui faut un N° pour aller sur Leboncoin</span>}
                       {prepa && <span data-prepa={prepaEtat.code} title={/prête/.test(prepa) ? 'Photos et description captées : elle peut partir sur Leboncoin.' : 'Passe sur Vinted, connecté sur ce compte : l’extension capte les photos et la description.'}>Leboncoin : {prepa}</span>}
                     </div>
                   )}

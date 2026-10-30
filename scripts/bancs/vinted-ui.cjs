@@ -50,7 +50,8 @@ const MAIN = { vinted_annonce_numeros: {
   '9202': { numero: '202' },
   '9203': { numero: '203', min: '40' },
   '9204': { numero: '204' },
-  '9205': { numero: '205' },
+  // (revue 2) 9205 et 9206 SANS N° : « il faut un N° pour Leboncoin » se dit
+  // UNE fois au-dessus de la grille (`data-sans-num`), jamais sur chaque fiche.
   // (revue) 9206 SANS N° (la réservation de numéros est illisible : « pas su » ⇒
   // pas de numéro automatique) — sa case « boost » doit quand même enregistrer.
 } };
@@ -176,6 +177,8 @@ async function sectionAnnonces(b, vp, sombre) {
         plusVisible: !!(c1 && c1.querySelector('[data-fiche-plus]') && c1.querySelector('[data-fiche-plus]').offsetParent !== null),
         prepa: [...document.querySelectorAll('[data-carte-annonce] [data-prepa]')].map((e) => ({ id: e.closest('[data-carte-annonce]').getAttribute('data-carte-annonce'), code: e.getAttribute('data-prepa'), t: e.textContent.trim() })),
         prepaResume: (document.querySelector('[data-prepa-resume]') || { getAttribute: () => null }).getAttribute('data-prepa-resume'),
+        infos: [...document.querySelectorAll('[data-carte-annonce] [data-fiche-infos]')].map((e) => ({ id: e.closest('[data-carte-annonce]').getAttribute('data-carte-annonce'), t: e.textContent.trim() })),
+        sansNumResume: (document.querySelector('[data-sans-num]') || { getAttribute: () => null }).getAttribute('data-sans-num'),
         place9201: !!(carte('9201') && carte('9201').querySelector('[data-fiche-place]')),
         place9202: (() => { const c = carte('9202'); const b = c && c.querySelector('[data-fiche-place="lbc"]'); const t = c && [...c.querySelectorAll('.vrm-fiche-geste')].find((x) => /Passeport/.test(x.textContent)); return b && t ? { etat: b.getAttribute('data-fiche-place-etat'), couleur: getComputedStyle(b).color, bord: getComputedStyle(b).borderTopColor, fond: getComputedStyle(b).backgroundColor, voisinCouleur: getComputedStyle(t).color, voisinBord: getComputedStyle(t).borderTopColor, voisinFond: getComputedStyle(t).backgroundColor } : null; })(),
         nbCartes: document.querySelectorAll('[data-carte-annonce]').length,
@@ -198,7 +201,11 @@ async function sectionAnnonces(b, vp, sombre) {
     // (revue) La préparation Leboncoin : l'état COMMUN (« photos pas encore captées »,
     // 4 paires sur 5) se dit UNE fois au-dessus ; sur la fiche, seul ce qui distingue.
     const textes = r.prepa.map((x) => x.t); const doublon = textes.find((t, i) => textes.indexOf(t) !== i);
-    dit(!doublon && r.prepa.length === 1 && r.prepa[0].id === '9203' && r.prepa[0].code === 'partielle' && /2\/5/.test(r.prepa[0].t) && r.prepaResume === '5', `A ${nom} · préparation Leboncoin : l'état commun dit UNE fois au-dessus (5), seule la 9203 (2/5 photos) le porte sur sa fiche`, `${JSON.stringify(r.prepa)} · résumé ${r.prepaResume}${doublon ? ' · répété : ' + doublon : ''}`);
+    dit(!doublon && r.prepa.length === 1 && r.prepa[0].id === '9203' && r.prepa[0].code === 'partielle' && /2\/5/.test(r.prepa[0].t) && r.prepaResume === '4', `A ${nom} · préparation Leboncoin : l'état commun dit UNE fois au-dessus (4 numérotées), seule la 9203 (2/5 photos) le porte sur sa fiche`, `${JSON.stringify(r.prepa)} · résumé ${r.prepaResume}${doublon ? ' · répété : ' + doublon : ''}`);
+    // (revue 2) Deux fiches sans N° (9205, 9206) : aucune ligne d'infos répétée, aucune
+    // ne parle du N° (la pastille « + N° » de la fiche suffit) ; le compte est dit UNE fois.
+    const ti = r.infos.map((x) => x.t); const dupI = ti.find((t, i) => ti.indexOf(t) !== i);
+    dit(!dupI && !r.infos.some((x) => /N°/.test(x.t)) && r.sansNumResume === '2', `A ${nom} · deux fiches sans N° : « il faut un N° » dit UNE fois au-dessus (2), rien de répété sur les fiches`, `${JSON.stringify(r.infos)} · résumé ${r.sansNumResume}${dupI ? ' · répété : ' + dupI : ''}`);
     dit(!r.place9201, `A ${nom} · une paire PROUVÉE sur Leboncoin (9201) n'a pas de « À publier sur Leboncoin »`, r.place9201);
     // « Neutre » = habillé comme les AUTRES gestes de la fiche (Passeport) : au
     // téléphone le style « épuré » teinte tous les gestes pareil ; à l'ordinateur
@@ -355,6 +362,7 @@ async function sectionCalendrier(b, vp, sombre) {
       const v7 = await pg.evaluate(() => ({ val: (document.querySelector('[data-periode-ouvrir]') || {}).getAttribute('data-periode-valeur'), lib: (document.querySelector('[data-periode-libelle]') || {}).textContent, ouvert: !!document.querySelector('[data-periode-panneau]') }));
       const n7 = await lignes();
       const debut7 = cle(jours(6)), fin7 = cle(maintenant);
+      const libVentes7 = v7.lib;
       dit(!v7.ouvert && v7.val === `${debut7}..${fin7}` && n7 === 2, `C ${nom} · « 7 jours » applique : ${debut7} → ${fin7}, deux ventes`, `${v7.val} · ${n7} vente(s) · « ${v7.lib} »`);
       // Deux touchers + Appliquer : du 25e au 15e jour avant aujourd'hui → la vente du 20e jour.
       await ouvrirCalendrier(pg, '');
@@ -400,6 +408,9 @@ async function sectionCalendrier(b, vp, sombre) {
         await pg.click('[data-periode-panneau] [data-periode-raccourci="j7"]');
         await pg.waitForFunction(() => { const e = document.querySelector('[data-ca-plage]'); return e && e.getAttribute('data-ca-plage') !== ''; }, null, { timeout: 8000 }).catch(() => {});
         const ca7 = await pg.evaluate(() => ({ v: (document.querySelector('[data-ca-plage]') || { getAttribute: () => null }).getAttribute('data-ca-plage'), t: (document.querySelector('[data-ca-plage-phrase]') || {}).textContent || '' }));
+        // (revue 2) Le même raccourci s'écrit pareil sur Ventes et sur Statistiques.
+        const libStats7 = await pg.evaluate(() => (document.querySelector('[data-periode-libelle]') || {}).textContent || '');
+        dit(libStats7 && libStats7 === libVentes7, `C ${nom} · « 7 jours » s'écrit pareil sur Ventes et Statistiques`, `Ventes « ${libVentes7} » · Statistiques « ${libStats7} »`);
         dit(ca7.v === '7100' && /^2 ventes finalisées du /.test(ca7.t), `C ${nom} · Statistiques : 7 jours = 71,00 € sur 2 ventes finalisées (les ventes lues, pas l'archive vide)`, JSON.stringify(ca7));
         await ouvrirCalendrier(pg, '');
         await pg.click('[data-periode-panneau] [data-periode-raccourci="annee"]');
