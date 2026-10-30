@@ -11,13 +11,13 @@
 > sans Accepter). « Pas su » la GARDE : annonce à confirmer, masquée, brouillon, compte pas lu, lecture partielle ou antérieure
 > à l'offre, offre sans date (`Number(null)` valait 0 : trouvé par l'audit). Mesuré : ses 12 dressings portent leur total.
 > ⇒ Le geste « Retirer » dans le fil (`src/conversationsRetirees.js`, `vrm_conversations_retirees` synchronisée, identité compte
-> + conversation) : elle sort de la liste et des non-lus de VRM, rien ne change sur Vinted, elle REVIENT dès qu'un message plus
-> récent arrive ; « Les remettre » sous la liste. ⇒ **Plafond d'actions : ce chantier l'avait monté à 30/h ; une autre session
+> + conversation) : elle sort de la liste et des non-lus de VRM, rien ne change sur Vinted, elle REVIENT dès qu'il s'y passe du
+> nouveau (message, offre acceptée ou refusée — revue 3) ; « Les remettre » sous la liste. ⇒ **Plafond d'actions : ce chantier l'avait monté à 30/h ; une autre session
 > l'a monté le même jour à 50/h sur la demande EXPLICITE de Julien (« comme Vintex », 5.283, voir plus bas) — cette décision
 > gagne, le 30 est abandonné à la fusion, l'extension n'est pas touchée ici.** ⚠️ **angeled92 a été restreint 24 h le 29 oct.
 > pour « activité automatisée » après une republication** : le plafond haut est SON choix, en connaissance de cause.
 > Preuves : `audit-offre-annonce-partie.cjs` (28 ; `--prouve` 9/9), banc `messagerie.cjs` (XT-6, « pas su » des deux sortes,
-> Retirer → remettre → revient sur un nouveau message, 390/1512) ; `audit-supprimees` charge `lectureDressingComplete`.
+> Retirer → remettre → revient sur une date plus récente, 390/1512) ; `audit-supprimees` charge `lectureDressingComplete`.
 > ⚠️ Non mesuré : sa vraie conversation XT-6 dans l'app (données inventées à sa forme). **Geste de Julien** : une conversation
 > dont il ne veut plus : l'ouvrir → « Retirer ».
 > **Revue (29 oct., plus tard) — neuf constats, tous reproduits puis corrigés :** la règle ne juge QUE ses ventes
@@ -48,6 +48,18 @@
 > quelle que soit son ancienneté (aucune expiration mesurée chez Vinted) — c'est « Retirer » qui la sort. Plafond :
 > **50/h** (décision de main, « comme Vintex »), pas 30. **Geste de l'intégrateur : fusion en squash** (f7214427 porte
 > deux identifiants réels dans son historique).
+> **Revue 3 (30 oct.) — « elle revient dès qu'un nouveau message arrive » était FAUX :** MESURÉ (lecture seule) : la date
+> de la boîte n'est pas celle du dernier message — Vinted la déplace quand une offre est acceptée ou refusée, ou sur un
+> évènement du suivi, sans ajouter de message (224 conversations sur 871 dont la boîte est plus récente que le dernier
+> message d'un fil capté APRÈS elle ; 149 où ce dernier message est l'offre, statut 20 ou 30) ; et la boîte ne porte aucun
+> aperçu de message (`description` = le titre de l'annonce). Rien, à la seule lecture de la boîte, ne prouve qu'un message
+> est arrivé ⇒ **décidé : la règle reste** (le sens sûr — une conversation retirée revient sur un doute, jamais un acheteur
+> caché) et l'écran dit la vérité, d'une seule phrase (`RETOUR_CONVERSATION` / `phraseRetour`, §11) : « elle revient dès
+> qu'il s'y passe du nouveau (un message, une offre acceptée ou refusée) » — titre du bouton, ligne sous la liste,
+> recherche. L'XT-6 n'est pas touchée (son offre ne changera plus d'état). Preuves : `audit-offre-annonce-partie.cjs` 46
+> (le cas mesuré : offre 22:34, Retirer 23:00, boîte relue à 23:10 sans message ⇒ elle revient ; la phrase le dit),
+> **3 rouges sur la branche d'avant**, `--prouve` 13/13 (`phrase-message-seul`). **Geste de Julien** : si une conversation
+> retirée revient après qu'il a accepté ou refusé l'offre sur Vinted, la retirer encore une fois.
 
 > **29 octobre — 5.287, numéros sur les profils visités :** Julien a précisé que
 > l’affichage semble seulement sur Vinted, l’import dans VRM n’est pas confirmé.

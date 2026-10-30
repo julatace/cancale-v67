@@ -44,6 +44,7 @@ const MUTATIONS = {
   'acheteur-juge': ['src/offresVinted.js', " if (off.side !== 'seller') return null;", ""],
   'remettre-vide-tout': ['src/conversationsRetirees.js', "(Array.isArray(cles) ? cles : Object.keys(suivant))", "((Array.isArray(cles) && cles.length) ? cles : Object.keys(suivant))"],
   'boite-seule': ['src/conversationsRetirees.js', "  for (const m of (Array.isArray(messages) ? messages : [])) {", "  for (const m of []) {"],
+  'phrase-message-seul': ['src/conversationsRetirees.js', "export const RETOUR_CONVERSATION = \"dès qu'il s'y passe du nouveau (un message, une offre acceptée ou refusée)\";", "export const RETOUR_CONVERSATION = \"dès qu'un nouveau message arrive\";"],
   'futur-retenu': ['src/conversationsRetirees.js', "if (t != null && t <= maintenant + 60000 && (max == null || t > max)) max = t;", "if (t != null && (max == null || t > max)) max = t;"],
 };
 
@@ -125,6 +126,19 @@ async function lancer(mutation) {
     dit(R.conversationRetiree(tf, '111', { id: 6001, updated_at: '2026-10-29T18:00:00+01:00' }) === true, 'retirée après un fil plus récent que la boîte ⇒ elle RESTE retirée à la relecture de la boîte', String(maj));
     dit(R.conversationRetiree(tf, '111', { id: 6001, updated_at: '2026-10-29T20:00:00+01:00' }) === false, '… et un message arrivé APRÈS le geste la fait revenir');
     dit(R.majAuGeste('2026-10-20T09:00:00+02:00', [{ ts: Date.parse('2099-01-01T00:00:00Z') }], geste) === new Date('2026-10-20T07:00:00Z').toISOString(), 'une date de message dans le futur (horloge décalée) n\'est pas retenue');
+    // (30 oct., MESURÉ) Vinted déplace la date de la boîte quand une offre est
+    // acceptée ou refusée, SANS ajouter de message (149 conversations). Offre à
+    // 22:34, « Retirer » à 23:00, boîte relue à 23:10 (offre refusée, aucun
+    // message) : la règle la fait revenir — le sens sûr, la boîte ne prouve
+    // rien — et la phrase de l'écran doit le DIRE, pas promettre « un message ».
+    const tOff = Date.parse('2026-10-28T22:34:00+01:00');
+    const tr = R.retirerConversation({}, '111', { id: 7001, updated_at: R.majAuGeste('2026-10-28T22:34:00+01:00', [{ ts: tOff }], Date.parse('2026-10-28T23:00:00+01:00')) }, Date.parse('2026-10-28T23:00:00+01:00'));
+    dit(R.conversationRetiree(tr, '111', { id: 7001, updated_at: '2026-10-28T22:34:00+01:00' }) === true, 'juste après le geste ⇒ retirée');
+    const revient = R.conversationRetiree(tr, '111', { id: 7001, updated_at: '2026-10-28T23:10:00+01:00' }) === false;
+    dit(revient, 'boîte relue plus récente sans nouveau message (offre refusée sur Vinted) ⇒ elle revient (rien ne prouve que rien n\'est arrivé)');
+    dit(typeof R.RETOUR_CONVERSATION === 'string' && /offre/i.test(R.RETOUR_CONVERSATION) && /accept/i.test(R.RETOUR_CONVERSATION) && /refus/i.test(R.RETOUR_CONVERSATION) && !/nouveau message arrive/i.test(R.RETOUR_CONVERSATION),
+      "la phrase dit qu'elle revient aussi sur une offre acceptée ou refusée — jamais « dès qu'un nouveau message arrive » seul", String(R.RETOUR_CONVERSATION));
+    dit(typeof R.phraseRetour === 'function' && R.phraseRetour(1).startsWith('elle revient ') && R.phraseRetour(2).startsWith('elles reviennent ') && R.phraseRetour(1).includes(R.RETOUR_CONVERSATION), 'une phrase, au singulier et au pluriel');
     dit(R.majAuGeste(null, [], geste) === null && R.majAuGeste('2026-10-20T09:00:00+02:00', null, geste) === new Date('2026-10-20T07:00:00Z').toISOString(), 'sans fil, la date de la boîte ; sans rien, aucune date');
   });
 
@@ -142,6 +156,7 @@ async function lancer(mutation) {
     dit(/data-offre-retirer/.test(APP) && !/« Retirer », en haut/.test(APP), 'le bloc porte LE geste, sans renvoyer à un bouton sans texte');
     dit(/const reponseAttendue=c=>!derniereOffreClose\(c\)&&/.test(APP), "« À répondre » laisse une offre close de côté");
     dit(/\['messages','Messages', msgNonLus > 0\]/.test(APP) && /e\.detail\.k===CONVERSATIONS_RETIREES/.test(APP), 'le point « nouveau » suit le geste sans recharger');
+    dit(!/dès qu.un nouveau message arrive/.test(APP) && (APP.match(/phraseRetour\(/g) || []).length >= 3, "l'écran dit QUAND elle revient par `phraseRetour` (titre du bouton, ligne sous la liste, recherche) — plus « dès qu'un nouveau message arrive »");
     dit(/'vrm_conversations_retirees'/.test(APP.slice(APP.indexOf('const SYNC_KEYS'), APP.indexOf('const SYNC_KEYS') + 20000)), 'le choix est synchronisé entre ses appareils (SYNC_KEYS)');
   });
   return { ok, ko };

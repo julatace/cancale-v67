@@ -4,15 +4,27 @@
 // CE cas tout seul ; ce geste-ci est le sien, pour tout le reste : une
 // conversation qu'il ne veut plus voir sort de la liste de VRM — rien n'est
 // supprimé ni marqué sur Vinted.
-// ⚠️ Elle REVIENT dès qu'un nouveau message arrive : on garde, au moment du
-//    geste, la date du dernier message que la boîte montrait (`maj`) ; une boîte
-//    relue avec une date plus récente la remet dans la liste. Un acheteur qui
-//    réécrit n'est jamais caché (une offre cachée fait rater une vente).
+// ⚠️ Elle REVIENT dès qu'il s'y passe du nouveau : on garde, au moment du geste,
+//    la date que la boîte montrait (`maj`) ; une boîte relue avec une date plus
+//    récente la remet dans la liste. Un acheteur qui réécrit n'est jamais caché
+//    (une offre cachée fait rater une vente).
+// ⚠️⚠️ (30 oct., MESURÉ) cette date n'est PAS celle du dernier message : Vinted la
+//    déplace aussi quand une offre est acceptée ou refusée, ou sur un évènement
+//    du suivi, SANS ajouter de message (224 conversations sur 871 dont la boîte
+//    est plus récente que le dernier message d'un fil capté après elle ; 149 où
+//    ce dernier message est l'offre, acceptée ou refusée). Et la boîte ne porte
+//    aucun aperçu du message (`description` = le titre de l'annonce) : rien ne
+//    prouve, à la seule lecture de la boîte, qu'un message est arrivé. On garde
+//    donc la règle (le sens sûr : rien n'est caché sur un doute) et on DIT la
+//    vérité : `RETOUR_CONVERSATION`, une phrase pour l'écran et le dossier (§11).
 // Identité : le compte + le numéro de la conversation (jamais un titre, §5).
 // `vrm_conversations_retirees` = { [`${uid}_${conv}`]: { at, maj } }, synchronisée,
 // posée SEULEMENT sur son clic, remise d'un clic. Bornée (les plus anciennes
 // partent) : une liste qui grandit pour toujours finirait par peser sur `main`.
 export const CONVERSATIONS_RETIREES = 'vrm_conversations_retirees';
+// La phrase qui dit QUAND une conversation retirée revient — la même partout (§11).
+export const RETOUR_CONVERSATION = "dès qu'il s'y passe du nouveau (un message, une offre acceptée ou refusée)";
+export const phraseRetour = (n = 1) => `${n > 1 ? 'elles reviennent' : 'elle revient'} ${RETOUR_CONVERSATION}`;
 export const RETIREES_MAX = 400;
 export const cleConversation = (uid, id) => `${String(uid == null ? '' : uid)}_${String(id == null ? '' : id)}`;
 const instant = (v) => {

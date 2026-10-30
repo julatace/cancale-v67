@@ -9,7 +9,7 @@ import SynchronisationVinted from './SynchronisationVinted.jsx';
 import {auteurDernierConfirme,suiviNegociationVinted,reponseAttendueVinted,instantVinted} from './suiviMessagerieVinted.js';
 import {retourReponseVinted,cleReponseVinted,creerBrouillonsReponses,etatActionVinted,cleActionOffreVinted} from './reponseVinted.js';
 import {etatOffreVinted,offreVintedEnAttente,cleOffreVinted,appliquerOffresConfirmees,annonceOffreEnVente,offreOuverte} from './offresVinted.js';
-import {CONVERSATIONS_RETIREES,cleConversation,conversationRetiree,retirerConversation,remettreConversations,majAuGeste} from './conversationsRetirees.js';
+import {CONVERSATIONS_RETIREES,cleConversation,conversationRetiree,retirerConversation,remettreConversations,majAuGeste,phraseRetour} from './conversationsRetirees.js';
 import {etatSourceMemoire} from './suiviComptes.js';
 import {empreinteColis,controlePreparation} from './preparationColis.js';
 import FiabiliteVentes from './FiabiliteVentes.jsx';
@@ -1801,8 +1801,8 @@ const SYNC_KEYS = [
   // du compte dans les Réglages.
   'vrm_messages_retires',
   // (29 octobre) Les CONVERSATIONS qu'il a retirées de la liste des messages, une
-  // par une (« Retirer de la liste »). Elles reviennent dès qu'un nouveau message
-  // arrive (`conversationRetiree`). Un CHOIX, synchronisé, remis d'un clic.
+  // par une (« Retirer de la liste »). Elles reviennent dès qu'il s'y passe du
+  // nouveau — message, offre acceptée ou refusée (`conversationRetiree`). Un CHOIX, synchronisé, remis d'un clic.
   'vrm_conversations_retirees',
   // (21 octobre) La disposition des widgets de Ma journée (quels blocs, dans
   // quel ordre, à quelle taille) : un CHOIX, absent par défaut (= la
@@ -37603,8 +37603,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     return off && !offreDuFil(oc) ? off : null;
   };
   // « Retirer de la liste » (29 oct.) : sur SON clic, depuis le fil ouvert. La date
-  // du dernier message que la boîte montre est gardée : un message plus récent
-  // la remet dans la liste (`conversationRetiree`). Rien n'est touché sur Vinted.
+  // que la boîte montre est gardée : une date plus récente (message, offre
+  // acceptée ou refusée) la remet dans la liste (`conversationRetiree`). Rien n'est touché sur Vinted.
   const retirerConvDeLaListe = (oc) => {
     if (!oc || !oc.acc || oc.convId == null) return;
     const uid = String(oc.acc.vinted_user_id);
@@ -43092,7 +43092,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               </div>
               {/* (revue) Une offre dont l'annonce est partie : LE geste est dans le
                   bloc de l'offre (« Retirer de la liste ») — pas deux fois (§7). */}
-              {!offrePartieDuFil(openConv)&&<button className="vrm-chat-retirer" type="button" data-conv-retirer={String(openConv.convId)} aria-label="Retirer cette conversation de la liste" title="Retirer de la liste — elle revient dès qu’un nouveau message arrive. Rien ne change sur Vinted." onClick={()=>retirerConvDeLaListe(openConv)} style={{color:C.text,borderColor:C.border}}><Icon name="eyeOff" size={15}/><span>Retirer</span></button>}
+              {!offrePartieDuFil(openConv)&&<button className="vrm-chat-retirer" type="button" data-conv-retirer={String(openConv.convId)} aria-label="Retirer cette conversation de la liste" title={`Retirer de la liste — ${phraseRetour(1)}. Rien ne change sur Vinted.`} onClick={()=>retirerConvDeLaListe(openConv)} style={{color:C.text,borderColor:C.border}}><Icon name="eyeOff" size={15}/><span>Retirer</span></button>}
               <button className="vrm-icon-control vrm-chat-sync" type="button" aria-label={openConv.refreshing?"Actualisation en cours":"Actualiser la conversation"} disabled={openConv.loading||openConv.refreshing} aria-busy={!!openConv.refreshing} onClick={actualiserConversation} style={{color:C.muted}}><Icon name="sync" size={17}/></button>
             </div>
             {openConv.refreshing&&<div className="vrm-chat-note vrm-chat-read" role="status" data-fil-actualisation style={{color:C.muted}}>Actualisation de la conversation…</div>}
@@ -47152,8 +47152,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           const prioMsg = !filtreMsg && msgCompteActif ? msgCompteActif : '';
           const listeBrute=(convs.items||[]).filter(c=>accountUids.has(uidC(c))&&!acctOffOf(c)&&(!filtreMsg||uidC(c)===filtreMsg)&&(!rechercheMessages||correspondRechercheMessage(c,paireDeConv(uidC(c),c.id,null),rechercheMessages)));
           // (29 oct.) « Retirer de la liste » : une conversation qu'il a retirée sort
-          // de la liste ET de ses compteurs, jusqu'à ce qu'un nouveau message arrive
-          // (`conversationRetiree`). Elles sont dites UNE fois sous la liste, avec
+          // de la liste ET de ses compteurs, jusqu'à ce qu'il s'y passe du nouveau
+          // (`conversationRetiree`, `phraseRetour`). Elles sont dites UNE fois sous la liste, avec
           // « Les remettre » (§7 : jamais cachées sans un mot).
           const retireesIci=listeBrute.filter(c=>conversationRetiree(convRetirees,uidC(c),c));
           const liste=retireesIci.length?listeBrute.filter(c=>!conversationRetiree(convRetirees,uidC(c),c)):listeBrute;
@@ -47376,8 +47376,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   {/* (revue) Pendant une recherche, une conversation retirée qui
                       correspond n'est pas « aucun résultat » : c'est dit ici, une fois. */}
                   <span>{messageSearch.trim()
-                    ? <>{retireesIci.length} conversation{retireesIci.length>1?'s':''} correspond{retireesIci.length>1?'ent':''} à ta recherche, mais tu {retireesIci.length>1?'les as retirées':'l’as retirée'} de la liste — {retireesIci.length>1?'elles reviennent':'elle revient'} dès qu'un nouveau message arrive.</>
-                    : <>{retireesIci.length} conversation{retireesIci.length>1?'s':''} retirée{retireesIci.length>1?'s':''} de la liste — {retireesIci.length>1?'elles reviennent':'elle revient'} dès qu'un nouveau message arrive.</>}</span>
+                    ? <>{retireesIci.length} conversation{retireesIci.length>1?'s':''} correspond{retireesIci.length>1?'ent':''} à ta recherche, mais tu {retireesIci.length>1?'les as retirées':'l’as retirée'} de la liste — {phraseRetour(retireesIci.length)}.</>
+                    : <>{retireesIci.length} conversation{retireesIci.length>1?'s':''} retirée{retireesIci.length>1?'s':''} de la liste — {phraseRetour(retireesIci.length)}.</>}</span>
                   <button type="button" data-conv-remettre="" onClick={()=>{const suivant=remettreConversations(convRetirees,retireesIci.map(c=>cleConversation(uidC(c),c.id)));setConvRetirees(suivant);save(CONVERSATIONS_RETIREES,suivant);}} style={{color:C.text,borderColor:C.border}}>{retireesIci.length>1?'Les remettre':'La remettre'}</button>
                 </p>
               )}
