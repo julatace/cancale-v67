@@ -6,9 +6,10 @@ import {AnnoncesACompleter,ComparaisonComptesVinted,HistoriqueArticle} from './O
 import {comparerComptes,diagnosticConnexion} from './outilsArticlesVinted.js';
 import {correspondRechercheMessage} from './rechercheMessagesVinted.js';
 import SynchronisationVinted from './SynchronisationVinted.jsx';
-import {auteurDernierConfirme,suiviNegociationVinted,reponseAttendueVinted} from './suiviMessagerieVinted.js';
+import {auteurDernierConfirme,suiviNegociationVinted,reponseAttendueVinted,instantVinted} from './suiviMessagerieVinted.js';
 import {retourReponseVinted,cleReponseVinted,creerBrouillonsReponses,etatActionVinted,cleActionOffreVinted} from './reponseVinted.js';
-import {etatOffreVinted,offreVintedEnAttente,cleOffreVinted,appliquerOffresConfirmees} from './offresVinted.js';
+import {etatOffreVinted,offreVintedEnAttente,cleOffreVinted,appliquerOffresConfirmees,annonceOffreEnVente,offreOuverte} from './offresVinted.js';
+import {CONVERSATIONS_RETIREES,cleConversation,conversationRetiree,retirerConversation,remettreConversations,majAuGeste,phraseRetour} from './conversationsRetirees.js';
 import {etatSourceMemoire} from './suiviComptes.js';
 import {empreinteColis,controlePreparation} from './preparationColis.js';
 import FiabiliteVentes from './FiabiliteVentes.jsx';
@@ -1811,6 +1812,10 @@ const SYNC_KEYS = [
   // `vrm_annonces_retirees`) : un CHOIX, synchronisé, réactivable depuis la carte
   // du compte dans les Réglages.
   'vrm_messages_retires',
+  // (29 octobre) Les CONVERSATIONS qu'il a retirées de la liste des messages, une
+  // par une (« Retirer de la liste »). Elles reviennent dès qu'il s'y passe du
+  // nouveau — message, offre acceptée ou refusée (`conversationRetiree`). Un CHOIX, synchronisé, remis d'un clic.
+  'vrm_conversations_retirees',
   // (21 octobre) La disposition des widgets de Ma journée (quels blocs, dans
   // quel ordre, à quelle taille) : un CHOIX, absent par défaut (= la
   // disposition d'aujourd'hui), rattrapé par `onCloudReady` seulement s'il est
@@ -3499,6 +3504,19 @@ const fetchHarvestBrut = async (uid, type, opts = {}) => {
 // absentes d'une lecture plus récente rendues fermées, et celles EN LIGNE ;
 // `_vrmAConfirmer` = celles qu'on ne peut pas dater (jamais comptées) ;
 // `_vrmLu` = l'heure de la lecture qui fait foi. `null` = rien à lire du tout.
+// (29 oct.) La lecture qui fait foi est-elle COMPLÈTE ? Une lecture publique
+// n'est retenue par la règle que complète ; un dressing l'est quand il porte
+// tous les articles que Vinted annonce (`total_entries`). Sans total : pas su.
+// Sert la règle de l'offre (`annonceOffreEnVente`) : une annonce absente d'une
+// lecture PARTIELLE ne prouve rien (mesuré le 29 oct. : ses 12 dressings
+// portent tous leur total, rien ne change aujourd'hui).
+const lectureDressingComplete = (res, payload) => {
+  if (!res || !isFinite(res.lu)) return false;
+  if (res.source === 'public') return true;
+  if (res.source !== 'dressing' || !payload || !Array.isArray(payload.items)) return false;
+  const pg = payload.pagination || {}, t = Number(pg.total_entries);
+  return pg.total_entries != null && pg.total_entries !== '' && isFinite(t) && payload.items.length >= t;
+};
 const dressingEnLigne = async (uid, row, opts = {}) => {
   const payload = (row && row.data && row.data.payload) || null;
   // Toutes les lectures publiques en UNE requête partagée (une ligne par compte :
@@ -3525,6 +3543,7 @@ const dressingEnLigne = async (uid, row, opts = {}) => {
   return { ...(payload || {}), items,
     _vrmSupprimees: res.supprimees.map((it) => String(it.id)), _vrmAbsentes: res.absentes.map((it) => String(it.id)),
     _vrmAConfirmer: res.aConfirmer, _vrmLu: isFinite(res.lu) ? res.lu : null, _vrmSource: res.source,
+    _vrmComplet: lectureDressingComplete(res, payload),
     // 22 oct. : les annonces MASQUÉES par Vinted (paires présentes, jamais « en
     // ligne ») et l'heure de la lecture qui les a vues masquées.
     _vrmMasquees: masqueesDuCompte(res.fermees, supp, ts), _vrmMasqueesLu: isFinite(ts) ? ts : null,
@@ -5304,7 +5323,7 @@ const fetchResumesConversations = async (uid=null) => {
 const OFFRES_CONV_FILTRE = 'data->payload->conversation->messages=cs.' + encodeURIComponent(JSON.stringify([{ entity_type: 'offer_request_message', entity: { status: 10 } }]));
 // (22 oct.) + le titre de la PAIRE (transaction), pour `memeOffre` : la
 // `description` d'une conversation de la boîte est le dernier message, pas la paire.
-const OFFRES_CONV_SELECT = 'select=id,opp:data->payload->conversation->opposite_user->>id,titre:data->payload->conversation->transaction->>item_title,item:data->payload->conversation->transaction->>item_id,msgs:data->payload->conversation->messages';
+const OFFRES_CONV_SELECT = 'select=id,opp:data->payload->conversation->opposite_user->>id,side:data->payload->conversation->transaction->>current_user_side,titre:data->payload->conversation->transaction->>item_title,item:data->payload->conversation->transaction->>item_id,msgs:data->payload->conversation->messages';
 const fetchOffresConversations = async (uid=null) => {
   try {
     if(uid!=null&&!/^\d+$/.test(String(uid)))return null;
@@ -5317,7 +5336,7 @@ const fetchOffresConversations = async (uid=null) => {
       const m = /^harvest_(\d+)_conv_(\d+)$/.exec(String(r && r.id || ''));
       if (!m || (uid!=null&&m[1]!==String(uid)) || mr.has(m[1])) continue;
       const off = offreEnAttenteDe({ opposite_user: r.opp != null ? { id: r.opp } : null, messages: r.msgs });
-      if (off) out.set(`${m[1]}_${m[2]}`, { ...off, titre: typeof r.titre === 'string' ? r.titre : '', item: r.item != null && r.item !== '' ? String(r.item) : null });
+      if (off) out.set(`${m[1]}_${m[2]}`, { ...off, titre: typeof r.titre === 'string' ? r.titre : '', item: r.item != null && r.item !== '' ? String(r.item) : null, side: typeof r.side === 'string' ? r.side : null });
     }
     return out;
   } catch (_) { return null; }
@@ -6810,7 +6829,7 @@ const normalizeConversationMessages = (conversation) => {
         const devise=typeof deviseBrute==='string'&&/^[A-Z]{3}$/.test(deviseBrute)?deviseBrute:null;
         const sens=e.user_id!=null&&oppId!=null?(String(e.user_id)===String(oppId)?'recue':'envoyee'):'inconnu';
         const statut=etatOffreVinted(e).libelle;
-        return {kind:'offer',body:'',offre:{montant,devise,sens,statut},ts,links};
+        return {kind:'offer',body:'',offre:{montant,devise,sens,statut,oid:e.offer_request_id!=null?String(e.offer_request_id):null},ts,links};
       }
     }
     // Évènements système (offre, statut, expédition, retrait…) : on montre TOUT,
@@ -6842,7 +6861,7 @@ const onVmrExt = (fn) => { __vmrExtSubs.add(fn); return () => __vmrExtSubs.delet
 // Mesuré le 9 octobre (Chromium réel, vraies extensions) : avec une 5.143 ou une
 // 5.77 restée installée À CÔTÉ de la 5.164, CHAQUE commande et CHAQUE envoi de
 // l'app étaient exécutés par LES DEUX (« cmd:bordereau ×2 », « exec …/replies
-// ×2 ») — deux files « une requête à la fois », deux budgets de 20 actions/h,
+// ×2 ») — deux files « une requête à la fois », deux budgets d'actions par heure,
 // une réponse à un acheteur envoyée deux fois (§3). Et l'app affichait la
 // version du DERNIER « ready » reçu : « mets l'extension à jour » à quelqu'un
 // qui venait de le faire. Rien ne le disait.
@@ -7179,7 +7198,7 @@ async function vmrCmdSuivi(p, timeoutMs) {
 // Sur le téléphone il n'y a pas d'extension. Le téléphone DÉPOSE la commande
 // dans sa base (une ligne `cmd_relais_{id}` à lui, RLS) ; l'extension du Chrome
 // de l'ordinateur la prend, l'exécute avec EXACTEMENT les gardes d'un clic sur
-// l'ordinateur (compte du cookie = compte visé, 20 actions/heure, une requête
+// l'ordinateur (compte du cookie = compte visé, plafond d'actions par heure, une requête
 // Vinted à la fois, pause quand Vinted freine) et écrit le résultat dans la
 // même ligne. Le téléphone suit la ligne : « envoyé à ton ordinateur… »,
 // « en cours… », puis le résultat — JAMAIS « fait » avant que l'extension
@@ -8379,7 +8398,7 @@ const fetchVintedListings = async (account, page = 1, opts = {}) => {
                masquees: (h._vrmMasquees || []).map((it) => ({ ...mapWardrobeItem(it), _vrmMasquee: true, _vrmVueMasqueeLe: h._vrmMasqueesLu || null })),
                // 28 oct. : ses BROUILLONS Vinted (`is_draft`), lus dans le même dressing.
                brouillons: (Array.isArray(h._vrmBrouillons) ? h._vrmBrouillons : h.items.filter((x) => x && x.is_draft && !x.is_closed)).map((x) => ({ ...mapWardrobeItem(x), _vrmBrLu: x._vrmBrLu != null ? x._vrmBrLu : null })),
-               lu: Number.isFinite(h._vrmLu) ? h._vrmLu : null,
+               lu: Number.isFinite(h._vrmLu) ? h._vrmLu : null, complet: h._vrmComplet === true,
                pagination: h.pagination || null, source: 'harvest' };
     }
   }
@@ -37861,6 +37880,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // Les offres en attente des conversations captées (`fetchOffresConversations`) :
   // `undefined` en cours · `null` pas su · Map lue.
   const [offresConv, setOffresConv] = useState(undefined);
+  // (29 oct.) Les conversations qu'il a retirées de la liste, une par une
+  // (« Retirer de la liste », `conversationRetiree`) : synchronisée, lue au
+  // montage puis rattrapée à l'arrivée du nuage si elle est restée vide (§5.49).
+  const [convRetirees, setConvRetirees] = useState(() => load(CONVERSATIONS_RETIREES, {}));
+  useEffect(() => onCloudReady(() => setConvRetirees((v) => (Object.keys(v || {}).length ? v : load(CONVERSATIONS_RETIREES, {})))), []);
   const [openConv,setOpenConv]=useState(null);
   const conversationRequest=React.useRef(0),lectureConversationRequest=React.useRef(0);
   const conversationOrigin=React.useRef(null);
@@ -38024,6 +38048,53 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     return out;
   }, [listings.items, listings.aConfirmer, masqueesSurEtagere]);
   const presentesAnnonceIds = useMemo(() => new Set(annoncesPresentes.map(it => String(it.id))), [annoncesPresentes]);
+  // (29 oct.) La lecture des annonces telle que la règle de l'offre la juge
+  // (`annonceOffreEnVente`) : la MÊME que l'écran Annonces (§11) — en ligne, à
+  // confirmer, masquées, brouillons, l'heure de la lecture qui fait foi par compte
+  // et les comptes pas lus. `null` = pas encore lue pour ces comptes : rien n'est
+  // jugé, aucune offre n'est écartée (« pas su » ne cache rien).
+  const lectureOffres = useMemo(() => {
+    if (!Array.isArray(listings.items) || listings.loading || listings.comptes !== cleComptes) return null;
+    const ids = (l) => new Set((l || []).map(it => String(it && it.id)));
+    return { enLigne: onlineAnnonceIds, aConfirmer: ids(listings.aConfirmer), masquees: ids(listings.masquees), brouillons: ids(listings.brouillons),
+      // Seule une lecture COMPLÈTE juge (une page manquante ne prouve rien).
+      lues: Object.fromEntries(Object.entries(listings.lues || {}).filter(([u]) => listings.complets && listings.complets[u])),
+      ko: new Set((listings.ko || []).map(String)) };
+  }, [listings, onlineAnnonceIds, cleComptes]);
+  // L'offre en attente d'un fil OUVERT : la règle du fil (`offreEnAttenteDe`),
+  // puis celle de son annonce (`offreOuverte`) — la même que sur la liste (§11).
+  const offreDuFil = (oc) => {
+    if (!oc || !oc.conversation) return null;
+    const off = offreEnAttenteDe(oc.conversation);
+    if (!off) return null;
+    const tr = oc.conversation.transaction || {}, it = tr.item_id;
+    return offreOuverte({ ...off, item: it != null ? String(it) : null, side: typeof tr.current_user_side === 'string' ? tr.current_user_side : null }, String((oc.acc && oc.acc.vinted_user_id) || ''), lectureOffres);
+  };
+  // L'offre CAPTÉE « en attente » d'un fil dont l'annonce est prouvée partie
+  // (`offreDuFil` la ferme) — une source pour la bande d'état, la bulle, le bloc
+  // de l'offre et les réponses rapides (§11). `null` sinon.
+  const offrePartieDuFil = (oc) => {
+    if (!oc || !oc.conversation) return null;
+    const off = offreEnAttenteDe(oc.conversation);
+    return off && !offreDuFil(oc) ? off : null;
+  };
+  // « Retirer de la liste » (29 oct.) : sur SON clic, depuis le fil ouvert. La date
+  // que la boîte montre est gardée : une date plus récente (message, offre
+  // acceptée ou refusée) la remet dans la liste (`conversationRetiree`). Rien n'est touché sur Vinted.
+  const retirerConvDeLaListe = (oc) => {
+    if (!oc || !oc.acc || oc.convId == null) return;
+    const uid = String(oc.acc.vinted_user_id);
+    const boite = (convs.items || []).find(c => String(c.id) === String(oc.convId) && String(c._acc && c._acc.vinted_user_id) === uid);
+    // (revue) La plus récente de la boîte et du fil ouvert (`majAuGeste`) : un fil
+    // plus récent que la boîte (sa propre réponse, une lecture en direct) ne doit
+    // pas la faire revenir à la relecture de la boîte, sans nouveau message.
+    const suivant = retirerConversation(convRetirees, uid, { id: oc.convId, updated_at: majAuGeste(boite ? boite.updated_at : (oc.inboxUpdatedAt || null), oc.messages) });
+    setConvRetirees(suivant); save(CONVERSATIONS_RETIREES, suivant);
+    // (revue) Pas de toast : il couvrait « La remettre » sur téléphone et redisait
+    // la phrase de la ligne sous la liste (§7). La conversation qui disparaît de
+    // la liste, et cette ligne, sont le retour du geste.
+    setOpenConv(null);
+  };
   // Clé (id d'annonce) d'une entrée numéro, par référence — pour le verrouillage.
   // ⚠️ UNE SEULE RÈGLE D'IDENTITÉ (§11) : « quelle annonce est cette vente ? ».
   // Deux voies, toutes deux certaines, et RIEN d'autre :
@@ -40419,7 +40490,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const courante=gardesLectures.current.annonces();if(!courante())return;
     const cached0 = !force && !parSignal && entreeCache('listings');
     const cached = cached0 && Array.isArray(cached0.masquees) ? cached0 : null;
-    if (cached) { setListings({ loading:false, items:cached.items, comptes:cached.comptes, lues:cached.lues||{}, supprimees:cached.supprimees||{}, aConfirmer:cached.aConfirmer||[], masquees:cached.masquees, brouillons:cached.brouillons||null, ko:cached.failedUids, ...(cached.failedUids.length ? { incomplet: true } : {}) }); return; }
+    if (cached) { setListings({ loading:false, items:cached.items, comptes:cached.comptes, lues:cached.lues||{}, complets:cached.complets||{}, supprimees:cached.supprimees||{}, aConfirmer:cached.aConfirmer||[], masquees:cached.masquees, brouillons:cached.brouillons||null, ko:cached.failedUids, ...(cached.failedUids.length ? { incomplet: true } : {}) }); return; }
     // `silencieux` (5.165, relecture sur signal de l'extension) : on garde ce qui
     // est affiché pendant la lecture, et un échec ne remplace rien.
     if (!silencieux && !parSignal) setListings({ loading:true, items:null, error:false });
@@ -40442,12 +40513,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // dressing, ou sa lecture publique relue depuis un autre compte) ; les
     // annonces « à confirmer » (compte pas relu depuis 24 h) vivent à part —
     // jamais dans `items`, donc jamais comptées en ligne.
-    const lues = {}, supprimees = {}, aConfirmer = [], masquees = [], brouillons = [];
+    const lues = {}, complets = {}, supprimees = {}, aConfirmer = [], masquees = [], brouillons = [];
     for (const { acc, r } of results) {
       const uid = String(acc.vinted_user_id);
       if (r === null) {                                    // relecture sur signal : ce compte garde ce qu'on montrait
         (avant.items || []).forEach(it => { if (String(it._acc && it._acc.vinted_user_id) === uid) { out.push(it); anyOk = true; } });
         if (avant.lues && avant.lues[uid]) lues[uid] = avant.lues[uid];
+        if (avant.complets && avant.complets[uid]) complets[uid] = true;
         if (avant.supprimees && avant.supprimees[uid]) supprimees[uid] = avant.supprimees[uid];
         (avant.aConfirmer || []).forEach(it => { if (String(it._acc && it._acc.vinted_user_id) === uid) aConfirmer.push(it); });
         (avant.masquees || []).forEach(it => { if (String(it._acc && it._acc.vinted_user_id) === uid) masquees.push(it); });
@@ -40456,7 +40528,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         continue;
       }
       if (r.ok) { anyOk=true; r.items.forEach(it => out.push({ ...it, _acc:acc })); (r.soldIds || []).forEach(id => vendues.add(String(id)));
-        if (Number.isFinite(r.lu)) lues[uid] = r.lu;
+        if (Number.isFinite(r.lu)) { lues[uid] = r.lu; if (r.complet === true) complets[uid] = true; }
         else if (r.source === 'harvest' && _harvestSeen[`${uid}_listings`]) lues[uid] = _harvestSeen[`${uid}_listings`];
         if (r.supprimees) supprimees[uid] = r.supprimees;
         (r.aConfirmer || []).forEach(it => aConfirmer.push({ ...it, _acc:acc }));
@@ -40480,13 +40552,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       }
     } catch (_) { /* sans ce complément, le critère reste simplement inconnu */ }
     if(!courante())return;
-    if (!error) putCache('listings', out, { failedUids }, demandes, { lues, supprimees, aConfirmer, masquees, brouillons });
+    if (!error) putCache('listings', out, { failedUids }, demandes, { lues, complets, supprimees, aConfirmer, masquees, brouillons });
     // Annonces que VINTED a marquées vendues (identité, jamais un titre). Sur
     // signal, seuls quelques comptes sont relus : on AJOUTE, on n'efface rien.
     if (vendues.size) setVenduesVinted(parSignal ? (p) => new Set([...p, ...vendues]) : vendues);
     // `incomplet` : au moins un compte n'a pas répondu. Les chiffres tirés de
     // cette liste sont alors des minorants (le bilan de la semaine le dit).
-    setListings({ loading:false, items: out, error, incomplet: anyErr, comptes: demandes, lues, supprimees, aConfirmer, masquees, brouillons, ko: failedUids });
+    setListings({ loading:false, items: out, error, incomplet: anyErr, comptes: demandes, lues, complets, supprimees, aConfirmer, masquees, brouillons, ko: failedUids });
     if (!parSignal && signalPendantLecture.current) { signalPendantLecture.current = false; setTimeout(() => loadListings(false, true, null), 200); }
   };
   const loadConvs = async (force) => {
@@ -41294,7 +41366,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // ── LES GESTES D'OFFRE, DEPUIS L'APP (5.135) ────────────────────────────────
   // Julien, 3 octobre : « la messagerie intégrée avec la possibilité de
   // répondre et de faire l'offre ». Toujours sur SON clic, par l'extension, au
-  // nom du compte connecté dans Chrome (garde stricte, 20 actions/heure, une
+  // nom du compte connecté dans Chrome (garde stricte, plafond d'actions par heure, une
   // requête à la fois). Accepter fixe le prix, sans confirmer le paiement.
   const actionOffre = async (quoi, off) => {
     const oc = openConv;
@@ -43496,13 +43568,19 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               {openConv.header?.photo?<PhotoVinted src={openConv.header.photo} alt="" style={{width:36,height:36,borderRadius:10,objectFit:'cover',flexShrink:0}}/>:<span className="vrm-chat-head-ph" style={{background:C.card2||C.bg,color:C.muted}}><Icon name="chat" size={17}/></span>}
               <div className="vrm-chat-head-t">
                 <div className="vrm-chat-head-n" style={{color:C.text}}><span className="vrm-sensible">{openConv.header?.login||'Conversation'}</span></div>
-                <div className="vrm-chat-head-s" style={{color:C.muted}}>{[openConv.conversation?.transaction?.item_title||openConv.conversation?.transaction?.item?.title||openConv.header?.title, accName(openConv.acc)].filter(Boolean).join(' · ')}</div>
+                {/* (revue) Le compte a sa propre place, jamais coupé : sur téléphone le
+                    titre de la paire se coupe, le nom du compte reste lisible — il en a
+                    plusieurs, c'est lui qui dit sur quel compte il répond. */}
+                {(()=>{const tit=openConv.conversation?.transaction?.item_title||openConv.conversation?.transaction?.item?.title||openConv.header?.title;const cpt=accName(openConv.acc);return <div className="vrm-chat-head-s" style={{color:C.muted}}>{tit&&<span className="vrm-chat-head-titre">{tit}</span>}{tit&&cpt&&<span aria-hidden="true" className="vrm-chat-head-sep"> · </span>}{cpt&&<span className="vrm-chat-head-compte" data-fil-compte="">{cpt}</span>}</div>;})()}
               </div>
+              {/* (revue) Une offre dont l'annonce est partie : LE geste est dans le
+                  bloc de l'offre (« Retirer de la liste ») — pas deux fois (§7). */}
+              {!offrePartieDuFil(openConv)&&<button className="vrm-chat-retirer" type="button" data-conv-retirer={String(openConv.convId)} aria-label="Retirer cette conversation de la liste" title={`Retirer de la liste — ${phraseRetour(1)}. Rien ne change sur Vinted.`} onClick={()=>retirerConvDeLaListe(openConv)} style={{color:C.text,borderColor:C.border}}><Icon name="eyeOff" size={15}/><span>Retirer</span></button>}
               <button className="vrm-icon-control vrm-chat-sync" type="button" aria-label={openConv.refreshing?"Actualisation en cours":"Actualiser la conversation"} disabled={openConv.loading||openConv.refreshing} aria-busy={!!openConv.refreshing} onClick={actualiserConversation} style={{color:C.muted}}><Icon name="sync" size={17}/></button>
             </div>
             {openConv.refreshing&&<div className="vrm-chat-note vrm-chat-read" role="status" data-fil-actualisation style={{color:C.muted}}>Actualisation de la conversation…</div>}
             {openConv.refreshError&&<div className="vrm-chat-note vrm-chat-read" role="alert" data-fil-actualisation-erreur style={{color:C.text}}><span>{openConv.refreshError} <a href={`https://www.vinted.fr/inbox/${openConv.convId}`} target="_blank" rel="noreferrer">Ouvrir sur Vinted ↗</a></span></div>}
-            {!openConv.loading&&!openConv.error&&(()=>{const suivi=suiviNegociationVinted(openConv.conversation,openConv.acc?.vinted_user_id,etatOffreVinted);return suivi?<div className="vrm-chat-negociation-etat" role="status" title={suivi.detail}><b>{suivi.libelle}</b>{suivi.libelle==='Prix accepté'&&<small>{suivi.detail}</small>}</div>:null;})()}
+            {!openConv.loading&&!openConv.error&&(()=>{const suivi0=suiviNegociationVinted(openConv.conversation,openConv.acc?.vinted_user_id,etatOffreVinted);const suivi=suivi0&&suivi0.libelle==='Offre reçue'&&offrePartieDuFil(openConv)?{libelle:'Annonce plus en vente',detail:'Elle n’est plus dans ton dressing : cette offre ne peut plus être acceptée.'}:suivi0;return suivi?<div className="vrm-chat-negociation-etat" role="status" title={suivi.detail}><b>{suivi.libelle}</b>{suivi.libelle==='Prix accepté'&&<small>{suivi.detail}</small>}</div>:null;})()}
             {!openConv.loading && !openConv.error && openConv.messages.some(m=>m.kind==='event' && /code|retrait|pickup|pin|suivi|tracking|colis|r[ée]cup[ée]rer|point relais/i.test(m.body)) && <div className="vrm-chat-shortcuts" style={{borderBottom:`1px solid ${C.border}`}}><button type="button" style={{color:C.accent}} onClick={()=>chatScroll.current?.querySelector('.vrm-chat-event-colis')?.scrollIntoView({block:'center',behavior:window.matchMedia('(prefers-reduced-motion:reduce)').matches?'auto':'smooth'})}>Retrait et suivi ↓</button></div>}
             <div ref={chatScroll} className="vrm-chat-history" style={{flex:1,overflow:'auto',padding:16,display:'flex',flexDirection:'column',gap:8}}>
               {openConv.loading && <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'20px 0'}}>Chargement…</div>}
@@ -43545,10 +43623,17 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 const sep = j && j!==jPrec ? <div className="vrm-chat-jour" data-jour-sep={j} style={{color:C.muted,background:C.card2||C.card}}>{libelleJour(m.ts)}</div> : null;
                 return <React.Fragment key={i}>{sep}{(
                 m.kind==='offer'
-                  ? <div className="vrm-chat-offer-event" data-offer-status={/accept/i.test(m.offre.statut)?"acceptee":/refus/i.test(m.offre.statut)?"refusee":"autre"} data-offer-side={m.offre.sens}>
+                  ? (()=>{
+                    // (29 oct., revue) L'offre « en attente » d'une annonce prouvée
+                    // partie : la bulle suit la règle du fil (`offrePartieDuFil`), pas
+                    // le statut 10 brut — « Plus acceptable », jamais « En attente ».
+                    const offP=m.offre.sens==='recue'&&m.offre.oid!=null?offrePartieDuFil(openConv):null;
+                    const close=!!(offP&&String(offP.oid)===m.offre.oid);
+                    const statutVu=close?'Plus acceptable':m.offre.statut;
+                    return <div className="vrm-chat-offer-event" data-offer-status={close?"close":/accept/i.test(m.offre.statut)?"acceptee":/refus/i.test(m.offre.statut)?"refusee":"autre"} data-offer-side={m.offre.sens}>
                       <div><span>{m.offre.sens==='recue'?'Offre reçue':m.offre.sens==='envoyee'?'Offre envoyée':'Offre'}</span><strong>{m.offre.devise?new Intl.NumberFormat('fr-FR',{style:'currency',currency:m.offre.devise}).format(m.offre.montant):m.offre.montant.toLocaleString('fr-FR',{minimumFractionDigits:2,maximumFractionDigits:2})}</strong></div>
-                      <div><small>{m.offre.statut}</small>{m.ts&&<time dateTime={new Date(m.ts).toISOString()}>{new Date(m.ts).toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})}</time>}</div>
-                    </div>
+                      <div><small>{statutVu}</small>{m.ts&&<time dateTime={new Date(m.ts).toISOString()}>{new Date(m.ts).toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})}</time>}</div>
+                    </div>;})()
                   : m.kind==='event'
                   // Un évènement sans aucun texte lisible ne donne que son type
                   // technique (« offer_request_message ») : ce n'est pas un message
@@ -43590,7 +43675,21 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 {/* ── L'OFFRE (5.135) : trancher celle de l'acheteur, ou en faire
                     une. Par l'extension, sur le compte connecté dans Chrome. */}
                 {(()=>{
-                  const off = offreEnAttenteDe(openConv.conversation);
+                  // (29 oct.) Une offre dont l'annonce est PROUVÉE partie (une lecture
+                  // complète du dressing, faite après l'offre, ne la montre plus) :
+                  // plus d'Accepter / Refuser — dit, avec la raison (`offreDuFil`).
+                  // (revue) UNE voix : « Annonce plus en vente » est dit par la bande
+                  // d'état en haut ; ce bloc porte la raison et LE geste (le bouton
+                  // de l'en-tête n'a qu'une icône sur téléphone).
+                  const offCapturee = offrePartieDuFil(openConv);
+                  const off = offCapturee ? null : offreDuFil(openConv);
+                  if (offCapturee) return (
+                    <div className="vrm-chat-offre vrm-chat-offre-info" data-offre="annonce-partie" style={{background:C.bg,border:`1px solid ${C.border}`}}>
+                      <div className="vrm-chat-offre-t" style={{color:C.text}}>Offre de <b data-montant="">{fmtE(offCapturee.prix)}</b></div>
+                      <div className="vrm-chat-offre-p" style={{color:C.muted}}>Ton dressing, lu après cette offre, ne montre plus cette annonce : l’offre ne peut plus être acceptée.</div>
+                      <button type="button" className="vrm-chat-offre-retirer" data-offre-retirer="" onClick={()=>retirerConvDeLaListe(openConv)} style={{color:C.text,borderColor:C.border}}>Retirer de la liste</button>
+                    </div>
+                  );
                   const tx = openConv.conversation && openConv.conversation.transaction && openConv.conversation.transaction.id;
                   if (!off && !tx) return null;
                   // (27 oct.) Prix mini posé sur CETTE annonce (par identité, l'item_id,
@@ -43644,15 +43743,17 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 {sansExt ? (
                   <a className="vrm-chat-vinted" href={lienVinted} target="_blank" rel="noreferrer" style={{background:C.accent,color:C.onAccent||'#fff'}}>Répondre sur Vinted ↗</a>
                 ) : (<>
-                {/* Réponses rapides : remplissent la zone (tu ajustes puis envoies) */}
-                <div className="vrm-chat-rapides" style={{opacity:ro?0.5:1}}>
+                {/* Réponses rapides : remplissent la zone (tu ajustes puis envoies).
+                    (29 oct., revue) Pas sur une offre dont l'annonce est prouvée
+                    partie : la première dit « l'article est toujours disponible ». */}
+                {!offrePartieDuFil(openConv) && <div className="vrm-chat-rapides" style={{opacity:ro?0.5:1}}>
                   {(quickReplies&&quickReplies.length?quickReplies.map(t=>({e:'',t})):QUICK_REPLIES).map((q,i)=>(
                     <button key={i} type="button" disabled={ro} onClick={()=>modifierReponse(q.t)} title={q.t}
                       style={{border:`1px solid ${C.border}`,background:C.card,color:C.text}}>
                       {q.e} {q.t.length>24?q.t.slice(0,24)+'…':q.t}
                     </button>
                   ))}
-                </div>
+                </div>}
                 <div className="vrm-chat-compose">
                   <textarea aria-label="Réponse à la conversation" disabled={ro} value={replyText} onChange={e=>modifierReponse(e.target.value)} rows={1} placeholder={ro?'Lecture seule sur ce compte':'Écrire une réponse…'} onKeyDown={e=>{ if(e.key==='Enter'&&!e.shiftKey){ e.preventDefault(); sendReply(); } }} style={{border:`1px solid ${C.border}`,background:C.bg,color:C.text}}/>
                   <button type="button" className="vrm-chat-send" onClick={sendReply} disabled={!!reponsesIncertaines[cleReponseVinted(openConv.acc?.vinted_user_id,openConv.convId)]||ro||replyBusy||!replyText.trim()||!msgPeutAgir||openConv.conversation?.allow_reply===false} style={{background:(ro||replyBusy||!replyText.trim())?C.border:C.accent,color:(ro||replyBusy||!replyText.trim())?C.muted:(C.onAccent||'#fff')}}>{replyBusy?'Envoi…':'Envoyer'}</button>
@@ -43890,7 +43991,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         //    attend VRAIMENT une réponse : non lu, de moins de 7 jours, compte
         //    pas écarté.
         const MSG_RECENT_MS = 7 * 864e5;
-        const unread = (convs.items||[]).filter(c=>!acctOffOf(c) && c.unread && (Date.now() - (Date.parse(c.updated_at) || 0)) < MSG_RECENT_MS).length;
+        // (29 oct.) Une conversation qu'il a retirée de la liste ne compte plus ici
+        // non plus (la même règle que la liste, §11) — jusqu'au message suivant.
+        const unread = (convs.items||[]).filter(c=>!acctOffOf(c) && c.unread && (Date.now() - (Date.parse(c.updated_at) || 0)) < MSG_RECENT_MS && !conversationRetiree(convRetirees, String((c._acc&&c._acc.vinted_user_id)||''), c)).length;
         // « en retard » = une limite LUE (email du bordereau) et dépassée ; une
         // date ESTIMÉE dépassée n'en est pas une (revue du 22 oct., `retard`
         // de api/_lib/limite-envoi.js) — la ligne « colis-limite » la dit.
@@ -47614,7 +47717,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           const rechercheMessages=messageSearch.trim();
           const filtreMsg = rechercheMessages?'':choixExplicite ? selEff : (msgCompteActif ? '' : selEff);
           const prioMsg = !filtreMsg && msgCompteActif ? msgCompteActif : '';
-          const liste=(convs.items||[]).filter(c=>accountUids.has(uidC(c))&&!acctOffOf(c)&&(!filtreMsg||uidC(c)===filtreMsg)&&(!rechercheMessages||correspondRechercheMessage(c,paireDeConv(uidC(c),c.id,null),rechercheMessages)));
+          const listeBrute=(convs.items||[]).filter(c=>accountUids.has(uidC(c))&&!acctOffOf(c)&&(!filtreMsg||uidC(c)===filtreMsg)&&(!rechercheMessages||correspondRechercheMessage(c,paireDeConv(uidC(c),c.id,null),rechercheMessages)));
+          // (29 oct.) « Retirer de la liste » : une conversation qu'il a retirée sort
+          // de la liste ET de ses compteurs, jusqu'à ce qu'il s'y passe du nouveau
+          // (`conversationRetiree`, `phraseRetour`). Elles sont dites UNE fois sous la liste, avec
+          // « Les remettre » (§7 : jamais cachées sans un mot).
+          const retireesIci=listeBrute.filter(c=>conversationRetiree(convRetirees,uidC(c),c));
+          const liste=retireesIci.length?listeBrute.filter(c=>!conversationRetiree(convRetirees,uidC(c),c)):listeBrute;
           // ⚠️⚠️ LE NOMBRE VIENT DE LA LISTE AFFICHÉE (§5, §11 — revue du
           //    8 octobre). Depuis que les autres comptes sont estompés au lieu
           //    d'être retirés, `liste` les contient tous ; or ce compte ne
@@ -47629,13 +47738,34 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           // (`offreEnAttenteDe`, §11), sur le fil ouvert s'il est chargé (plus
           // frais), sinon sur la lecture ciblée des conversations captées. Pas su
           // ⇒ `null` : aucune pastille.
+          // (29 oct.) Et une offre dont l'annonce est PROUVÉE partie (une lecture
+          // complète du dressing, faite après l'offre, ne la montre plus) n'attend
+          // plus rien : ni pastille, ni filtre « Offres », ni place en tête
+          // (`offreOuverte`, la règle du fil aussi — §11). L'XT-6 de Julien.
           const offreDeConv = (c) => {
-            if (openConv && openConv.conversation && openConv.convId===c.id && String(openConv.acc?.vinted_user_id||'')===uidC(c)) return offreEnAttenteDe(openConv.conversation);
+            if (openConv && openConv.conversation && openConv.convId===c.id && String(openConv.acc?.vinted_user_id||'')===uidC(c)) return offreDuFil(openConv);
             const offre=offresConv instanceof Map ? (offresConv.get(`${uidC(c)}_${c.id}`) || null) : null;
-            return offre&&offresConfirmees.current.has(cleOffreVinted(uidC(c),offre))?null:offre;
+            return offre&&offresConfirmees.current.has(cleOffreVinted(uidC(c),offre))?null:offreOuverte(offre,uidC(c),lectureOffres);
           };
           const nOffres = liste.filter(c=>offreDeConv(c)).length;
-          const reponseAttendue=c=>reponseAttendueVinted(c,paireDeConv(uidC(c),c.id,null)?.r,capturesRepondues[(AUTH.user?.id||'')+':'+cleReponseVinted(uidC(c),c.id)]);
+          // (29 oct., revue) Une conversation dont le DERNIER message est une offre
+          // que la règle ferme (annonce prouvée partie, `annonceOffreEnVente`) n'attend
+          // plus de réponse : elle sort de « À répondre » comme de « Offres » (§11).
+          // L'offre captée brute (avant la règle), sur le fil ouvert ou la lecture ciblée.
+          const offreBrute = (c) => {
+            if (openConv && openConv.conversation && openConv.convId===c.id && String(openConv.acc?.vinted_user_id||'')===uidC(c)) {
+              const o=offreEnAttenteDe(openConv.conversation), tr=openConv.conversation.transaction||{};
+              return o?{...o,item:tr.item_id!=null?String(tr.item_id):null,side:typeof tr.current_user_side==='string'?tr.current_user_side:null}:null;
+            }
+            return offresConv instanceof Map ? (offresConv.get(`${uidC(c)}_${c.id}`) || null) : null;
+          };
+          const derniereOffreClose = (c) => {
+            const o=offreBrute(c);
+            if(!o||annonceOffreEnVente(o,uidC(c),lectureOffres)!=='non') return false;
+            const t=instantVinted(c.updated_at);
+            return o.ts!=null && t!=null && Math.abs(t-o.ts)<=120000;
+          };
+          const reponseAttendue=c=>!derniereOffreClose(c)&&reponseAttendueVinted(c,paireDeConv(uidC(c),c.id,null)?.r,capturesRepondues[(AUTH.user?.id||'')+':'+cleReponseVinted(uidC(c),c.id)]);
           const aRepondre=liste.filter(reponseAttendue);
           const offresARepondre=aRepondre.filter(c=>offreDeConv(c)).length;
           // (27 oct.) Offres ≥ au prix mini posé sur l'annonce (par identité, l'item_id,
@@ -47649,7 +47779,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           //    lu » au-dessus de non-lus cachés — le défaut du 8 octobre, revenu
           //    par le filtre. On compte donc sur les conversations AVANT le
           //    filtre de compte (comptes écartés exclus) : cachés, ils sont dits.
-          const nonLusAilleurs = filtreMsg ? (convs.items||[]).filter(c=>!acctOffOf(c) && c.unread && uidC(c)!==filtreMsg).length : 0;
+          const nonLusAilleurs = filtreMsg ? (convs.items||[]).filter(c=>!acctOffOf(c) && c.unread && uidC(c)!==filtreMsg && !conversationRetiree(convRetirees,uidC(c),c)).length : 0;
           // Les boîtes qui n'ont pas pu être lues (comptes qu'il n'a pas
           // écartés) : tant qu'il y en a une, « Tout est lu » serait un total
           // partiel présenté comme complet (§5).
@@ -47681,7 +47811,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               const k = String(o._acc.vinted_user_id), t = Date.parse(o.date||'');
               if (t && (!derVente.has(k) || t > derVente.get(k).t)) derVente.set(k, { t, acc: o._acc });
             }
-            for (const c of liste) {
+            for (const c of listeBrute) {
               const k = String((c._acc && c._acc.vinted_user_id) || ''), t = Date.parse(c.updated_at||'');
               if (k && t && (!derConv.has(k) || t > derConv.get(k))) derConv.set(k, t);
             }
@@ -47702,7 +47832,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   <button type="button" aria-pressed={messageFilter==='unread'} onClick={()=>{setMessageFilter('unread');setConvMax(40);}}>Non lues <span>{nonLus}</span></button>
                   {(nOffres>0 || messageFilter==='offres') && <button type="button" data-filtre-offres={nOffres} aria-pressed={messageFilter==='offres'} onClick={()=>{setMessageFilter('offres');setConvMax(40);}}>Offres reçues <span>{nOffres}</span></button>}
                 </div>
-                <div className="vrm-sr" data-messagerie-tete={nonLus>0 ? 'nonlus' : nonLusAilleurs>0 ? 'ailleurs' : boitesKO.length ? 'passu' : liste.length ? 'toutlu' : 'vide'} data-nonlus={nonLus}>
+                <div className="vrm-sr" data-messagerie-tete={nonLus>0 ? 'nonlus' : nonLusAilleurs>0 ? 'ailleurs' : boitesKO.length ? 'passu' : listeBrute.length ? 'toutlu' : 'vide'} data-nonlus={nonLus}>
                   {liste.length} conversation{liste.length>1?'s':''}
                 </div>
                 <button type="button" className="vrm-msg-refresh" onClick={()=>loadConvs(true)} aria-label="Actualiser les conversations" title="Actualiser"><Icon name="sync" size={17}/></button>
@@ -47741,8 +47871,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   </span>
                 </div>
               )}
-              {liste.length===0 && messageSearch.trim() && <p style={{fontSize:12,color:C.muted}}>Aucun résultat parmi les conversations reçues. Essaie un pseudo, des mots de l’article ou le numéro précédé de N°.</p>}
-              {liste.length===0 && !messageSearch.trim() && !boitesKO.length && <div style={{fontSize:13,color:C.muted,padding:'14px 0'}}>Aucune conversation captée pour l'instant — elles arrivent quand l'extension passe sur la messagerie Vinted de chaque compte.</div>}
+              {liste.length===0 && messageSearch.trim() && retireesIci.length===0 && <p style={{fontSize:12,color:C.muted}}>Aucun résultat parmi les conversations reçues. Essaie un pseudo, des mots de l’article ou le numéro précédé de N°.</p>}
+              {listeBrute.length===0 && !messageSearch.trim() && !boitesKO.length && <div style={{fontSize:13,color:C.muted,padding:'14px 0'}}>Aucune conversation captée pour l'instant — elles arrivent quand l'extension passe sur la messagerie Vinted de chaque compte.</div>}
               <div className="vrm-msg-list" style={{border:liste.length?`1px solid ${C.border}`:'none',background:C.card}}>
                 {affiches.map((c,i)=>{
                   const paire = paireDeConv(uidC(c), c.id, null);
@@ -47808,6 +47938,16 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 })}
               </div>
               {tri.length>convMax && <button type="button" className="vrm-msg-more" onClick={()=>setConvMax(m=>m+40)} style={{color:C.text}}>Voir plus — {convMax} affichées sur {tri.length}</button>}
+              {retireesIci.length>0 && (
+                <p className="vrm-msg-retirees" data-conv-retirees={retireesIci.length} style={{color:C.muted}}>
+                  {/* (revue) Pendant une recherche, une conversation retirée qui
+                      correspond n'est pas « aucun résultat » : c'est dit ici, une fois. */}
+                  <span>{messageSearch.trim()
+                    ? <>{retireesIci.length} conversation{retireesIci.length>1?'s':''} correspond{retireesIci.length>1?'ent':''} à ta recherche, mais tu {retireesIci.length>1?'les as retirées':'l’as retirée'} de la liste — {phraseRetour(retireesIci.length)}.</>
+                    : <>{retireesIci.length} conversation{retireesIci.length>1?'s':''} retirée{retireesIci.length>1?'s':''} de la liste — {phraseRetour(retireesIci.length)}.</>}</span>
+                  <button type="button" data-conv-remettre="" onClick={()=>{const suivant=remettreConversations(convRetirees,retireesIci.map(c=>cleConversation(uidC(c),c.id)));setConvRetirees(suivant);save(CONVERSATIONS_RETIREES,suivant);}} style={{color:C.text,borderColor:C.border}}>{retireesIci.length>1?'Les remettre':'La remettre'}</button>
+                </p>
+              )}
             </div>
           );
         })()}
@@ -57402,6 +57542,18 @@ function AppCoeur() {
   },[premierJour]);
   useEffect(()=>{ const o=()=>setBienvenue(true); window.addEventListener('vrm:bienvenue',o); return ()=>window.removeEventListener('vrm:bienvenue',o); },[]);
   const [liveStats,setLiveStats]=useState(null); // résumé Vinted en direct pour l'accueil
+  // (29 oct., revue) Le point « nouveau » de l'onglet Messages suit le geste
+  // « Retirer » / « Les remettre » TOUT DE SUITE (il ne bougeait qu'au prochain
+  // calcul de `liveStats`) : même règle que la liste (`conversationRetiree`, §11),
+  // relue à chaque écriture de la clé (`vrm:save`) et à l'arrivée du nuage.
+  const [retireesTick,setRetireesTick]=useState(0);
+  useEffect(()=>{ const f=(e)=>{ if(e&&e.detail&&e.detail.k===CONVERSATIONS_RETIREES) setRetireesTick(t=>t+1); }; window.addEventListener('vrm:save',f); const stop=onCloudReady(()=>setRetireesTick(t=>t+1)); return ()=>{ window.removeEventListener('vrm:save',f); if(typeof stop==='function') stop(); }; },[]);
+  const msgNonLus=useMemo(()=>{
+    if(!liveStats) return 0;
+    if(!Array.isArray(liveStats.unreadConvs)) return liveStats.unread||0;
+    const ret=load(CONVERSATIONS_RETIREES,{});
+    return liveStats.unreadConvs.filter(x=>!conversationRetiree(ret,x.uid,x)).length;
+  },[liveStats,retireesTick]);
   // Les ventes Vinted de TOUS les comptes liés, telles que l'écran Ventes les lit
   // (`_acc` posé) : `undefined` pas encore lu · `null` aucune lecture n'a abouti.
   const [ventesCoque,setVentesCoque]=useState(undefined);
@@ -57860,6 +58012,7 @@ function AppCoeur() {
       // confondus (total de tous les comptes). stockValue = Σ des prix d'achat des
       // annonces réellement en ligne. online = nb d'annonces en ligne.
       let caMois=0, caEncaisse=0, enCours=0, ventesMois=0, enAttente=0, online=0, unread=0, stockValue=0, soldTotal=0, ok=false;
+      const unreadConvs=[]; // (29 oct., revue) les non lues, pour suivre « Retirer » sans relire
       let nMasque=0, caMasque=0;
       // VENTES DU JOUR : nombre de paires vendues aujourd'hui + leur montant.
       // ⚠️ C'est bien la VENTE (le moment où ça part), pas l'argent viré sur ton
@@ -58018,7 +58171,9 @@ function AppCoeur() {
           for(const it of (list.aConfirmer||[])){ if(!soldIds.has(String(it.id))) annAConfirmer.push({ ...it, _acc:a }); }
           annNoms[uidL]=(load('vinted_account_labels',{})||{})[uidL]||a.login||`#${uidL}`;
         }
-        if(conv.ok){ ok=true; unread+=conv.items.filter(c=>c.unread).length; }
+        // (29 oct.) Les conversations retirées de la liste ne font plus le point
+        // « nouveau » de l'onglet Messages (la même règle que la liste, §11).
+        if(conv.ok){ ok=true; const ret=load(CONVERSATIONS_RETIREES,{}); for(const c of conv.items){ if(!c.unread) continue; unreadConvs.push({uid:String(a.vinted_user_id),id:c.id,updated_at:c.updated_at}); if(!conversationRetiree(ret,String(a.vinted_user_id),c)) unread++; } }
       }
       // Paires en stock = nb de numéros réellement étiquetés dans le garage (3D).
       // Un numéro peut être posé sur une boîte seule (it.num), dans une case de
@@ -58088,7 +58243,7 @@ function AppCoeur() {
         }
       }catch(_){/* pas su ⇒ null ⇒ rien d'affiché */}
       if(!stop && ok){
-      setLiveStats({caMois,caEncaisse,nMasque,caMasque:Math.round(caMasque*100)/100,enCours,online,unread,stockValue,pairesStock,ventesJour,caJour,ventesMois,soldTotal,joursVente:joursVenteSet.size,caParCompte,caParMois,ventesParMois,dataAgeJours,dataAgeCompte,dataAgeComptes,
+      setLiveStats({caMois,caEncaisse,nMasque,caMasque:Math.round(caMasque*100)/100,enCours,online,unread,unreadConvs,stockValue,pairesStock,ventesJour,caJour,ventesMois,soldTotal,joursVente:joursVenteSet.size,caParCompte,caParMois,ventesParMois,dataAgeJours,dataAgeCompte,dataAgeComptes,
         annLues,annEnLigne,annSuppr,annNoms,annActivite,annAConfirmer,
         walletDispo:(walletEsc&&walletEsc.accounts>0)?walletEsc.dispo:null,
         walletAttente:(walletEsc&&walletEsc.accounts>0)?walletEsc.total:null,
@@ -58343,8 +58498,11 @@ function AppCoeur() {
         const acctName = acctLabels[a.vinted_user_id] || a.login || 'compte';
         const [inbox, sold, listH] = lusParCompte.get(String(a.vinted_user_id)) || [null, null, null];
         if(inbox && Array.isArray(inbox.conversations)){
+          // (29 oct.) Une conversation retirée de la liste (« Retirer ») ne compte
+          // plus comme non lue — tant qu'aucun nouveau message n'est arrivé (§11).
+          const retirees=load(CONVERSATIONS_RETIREES,{});
           for(const c of inbox.conversations){
-            if(!c.unread) continue;
+            if(!c.unread || conversationRetiree(retirees, String(a.vinted_user_id), c)) continue;
             unreadTotal+=1;
             unreadByAcct[acctName]=(unreadByAcct[acctName]||0)+1;
             const cid=String(c.id);
@@ -59184,7 +59342,7 @@ function AppCoeur() {
           {/* ⚠️ 4 octobre — Julien : « dans Vinted […] il y ait les messages ».
               L'écran complet existait (liste tous comptes, fil, réponse, offres)
               mais n'avait plus AUCUNE porte dans Vinted : seulement la cloche. */}
-          <PlatSubNav sub={platSub} setSub={setPlatSub} sections={[['ventes','Ventes'],['achats','Achats'],['annonces','Annonces'],['messages','Messages', !!(liveStats && liveStats.unread > 0)]]}/>
+          <PlatSubNav sub={platSub} setSub={setPlatSub} sections={[['ventes','Ventes'],['achats','Achats'],['annonces','Annonces'],['messages','Messages', msgNonLus > 0]]}/>
           {/* Filtre par compte (Julien, 6 oct.) — Ventes / Annonces / Achats /
               Messages. Les Colis ne sont pas filtrés (« pour les colis pas
               forcément »). Un seul compte ⇒ la rangée ne s'affiche pas. */}

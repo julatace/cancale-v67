@@ -52,6 +52,68 @@
 > (« retire-la toi-même », `data-lbc-ebay-sans-ident`) ; avant, l'écran la faisait disparaître pendant que Ma journée la
 > comptait (« Voir » menait à un écran vide). Banc `lbc-supprimer` : 4 rouges sur la branche d'avant, 4 sous mutation
 > (lignes sans identité retirées de l'écran).
+
+> **29 octobre — MESSAGES : l'XT-6 qui « ne voulait pas s'enlever », « Retirer de la liste » ; plafond d'actions laissé à 50 :**
+> Julien : « un message d'une XT-6 qui ne veut pas s'enlever, je veux que ça dégage » et « mets plus d'actions par heure sur
+> chaque compte ». MESURÉ (lecture seule) : une conversation captée il y a six semaines porte une offre au statut 10 (« en
+> attente ») sur une annonce qui n'est PLUS dans son dressing (lu en entier depuis) — la pastille et le tri « une offre passe
+> devant » la gardaient en tête pour toujours. ⇒ Une RÈGLE, pas une exception : `annonceOffreEnVente` / `offreOuverte`
+> (`src/offresVinted.js`, la même pour la liste et le fil, §11) — annonce absente d'une lecture COMPLÈTE (`total_entries`
+> atteint, ou relecture publique complète, `lectureDressingComplete`) du dressing de CE compte, faite APRÈS l'offre ⇒ l'offre
+> n'est plus « en attente » (ni pastille, ni filtre « Offres », ni tri en tête ; le fil dit « l'annonce n'est plus en vente »,
+> sans Accepter). « Pas su » la GARDE : annonce à confirmer, masquée, brouillon, compte pas lu, lecture partielle ou antérieure
+> à l'offre, offre sans date (`Number(null)` valait 0 : trouvé par l'audit). Mesuré : ses 12 dressings portent leur total.
+> ⇒ Le geste « Retirer » dans le fil (`src/conversationsRetirees.js`, `vrm_conversations_retirees` synchronisée, identité compte
+> + conversation) : elle sort de la liste et des non-lus de VRM, rien ne change sur Vinted, elle REVIENT dès qu'il s'y passe du
+> nouveau (message, offre acceptée ou refusée — revue 3) ; « Les remettre » sous la liste. ⇒ **Plafond d'actions : ce chantier l'avait monté à 30/h ; une autre session
+> l'a monté le même jour à 50/h sur la demande EXPLICITE de Julien (« comme Vintex », 5.283, voir plus bas) — cette décision
+> gagne, le 30 est abandonné à la fusion, l'extension n'est pas touchée ici.** ⚠️ **angeled92 a été restreint 24 h le 29 oct.
+> pour « activité automatisée » après une republication** : le plafond haut est SON choix, en connaissance de cause.
+> Preuves : `audit-offre-annonce-partie.cjs` (28 ; `--prouve` 9/9), banc `messagerie.cjs` (XT-6, « pas su » des deux sortes,
+> Retirer → remettre → revient sur une date plus récente, 390/1512) ; `audit-supprimees` charge `lectureDressingComplete`.
+> ⚠️ Non mesuré : sa vraie conversation XT-6 dans l'app (données inventées à sa forme). **Geste de Julien** : une conversation
+> dont il ne veut plus : l'ouvrir → « Retirer ».
+> **Revue (29 oct., plus tard) — neuf constats, tous reproduits puis corrigés :** la règle ne juge QUE ses ventes
+> (`side === 'seller'`, projeté dans `OFFRES_CONV_SELECT`) — une contre-offre reçue quand il ACHÈTE porte l'annonce du
+> vendeur, elle était dite « plus en vente » et perdait Accepter (mesuré : `current_user_side` présent sur toutes les
+> conversations à offre, 9 côté acheteur) ; la bulle de l'offre suit la règle (`offrePartieDuFil` : « Plus acceptable »,
+> plus « En attente ») et « plus en vente » n'est dit qu'une fois (la bande d'état) ; le bloc porte le bouton « Retirer de
+> la liste » (44 px) et l'en-tête garde le MOT « Retirer » sur téléphone ; pas de réponse rapide « toujours disponible »
+> sous une annonce partie ; une conversation dont le dernier message est une offre close sort de « À répondre » ; le
+> point « nouveau » de Messages suit le geste sans recharger (`msgNonLus`, `vrm:save`) ; plus de toast (il couvrait « La
+> remettre » et redisait la ligne). Preuves : `audit-offre-annonce-partie.cjs` 36 (8 rouges sur la branche d'avant,
+> `--prouve` 10/10), banc `messagerie.cjs` (contre-offre 311, bulle, une voix, bouton du bloc, À répondre, point).
+> ⚠️ **Mesuré, pas corrigé** : aucune durée de vie d'une offre Vinted n'existe dans ses données (aucun champ d'expiration ;
+> statuts vus : 10, 20, 30, 40) — une autre offre « en attente » du 12 août, sur une annonce TOUJOURS en ligne, reste en
+> tête : à retirer à la main (« Retirer »). ⚠️ Le premier commit du chantier (f7214427) citait des identifiants réels dans
+> un commentaire (retirés depuis) : **fusionner en squash**.
+> **Revue 2 (29 oct., soir) — cinq défauts d'écran et de règle, reproduits puis corrigés :** (1) une recherche qui ne
+> trouvait QUE la conversation retirée disait « Aucun résultat » ⇒ la ligne sous la liste dit « 1 conversation correspond
+> à ta recherche, mais tu l'as retirée », avec « La remettre » ; (2) à 390 px « Retirer » coupait le nom du COMPTE dans
+> l'en-tête du fil ⇒ le titre de la paire se coupe, le compte jamais (`.vrm-chat-head-compte`, `data-fil-compte`) ;
+> (3) un fil d'offre dont l'annonce est partie portait deux fois le même geste ⇒ seul « Retirer de la liste » du bloc
+> reste ; (4) la ligne « conversation retirée » était collée au bord du panneau ⇒ même marge que les lignes ; (5) une
+> conversation retirée REVENAIT sans nouveau message quand le fil ouvert était plus récent que la boîte (sa propre
+> réponse) ⇒ le geste garde la plus récente des deux dates (`majAuGeste`, une date future ignorée). Preuves :
+> `audit-offre-annonce-partie.cjs` 41 (`--prouve` 12/12, dont `boite-seule` et `futur-retenu`), banc `messagerie.cjs`
+> (recherche, compte lisible mesuré par une Range, un seul geste, marge) : rouges sur la branche d'avant, verts après.
+> **Décidé pour lui** : une offre « en attente » sur une annonce TOUJOURS en ligne garde sa pastille et sa place en tête,
+> quelle que soit son ancienneté (aucune expiration mesurée chez Vinted) — c'est « Retirer » qui la sort. Plafond :
+> **50/h** (décision de main, « comme Vintex »), pas 30. **Geste de l'intégrateur : fusion en squash** (f7214427 porte
+> deux identifiants réels dans son historique).
+> **Revue 3 (30 oct.) — « elle revient dès qu'un nouveau message arrive » était FAUX :** MESURÉ (lecture seule) : la date
+> de la boîte n'est pas celle du dernier message — Vinted la déplace quand une offre est acceptée ou refusée, ou sur un
+> évènement du suivi, sans ajouter de message (224 conversations sur 871 dont la boîte est plus récente que le dernier
+> message d'un fil capté APRÈS elle ; 149 où ce dernier message est l'offre, statut 20 ou 30) ; et la boîte ne porte aucun
+> aperçu de message (`description` = le titre de l'annonce). Rien, à la seule lecture de la boîte, ne prouve qu'un message
+> est arrivé ⇒ **décidé : la règle reste** (le sens sûr — une conversation retirée revient sur un doute, jamais un acheteur
+> caché) et l'écran dit la vérité, d'une seule phrase (`RETOUR_CONVERSATION` / `phraseRetour`, §11) : « elle revient dès
+> qu'il s'y passe du nouveau (un message, une offre acceptée ou refusée) » — titre du bouton, ligne sous la liste,
+> recherche. L'XT-6 n'est pas touchée (son offre ne changera plus d'état). Preuves : `audit-offre-annonce-partie.cjs` 46
+> (le cas mesuré : offre 22:34, Retirer 23:00, boîte relue à 23:10 sans message ⇒ elle revient ; la phrase le dit),
+> **3 rouges sur la branche d'avant**, `--prouve` 13/13 (`phrase-message-seul`). **Geste de Julien** : si une conversation
+> retirée revient après qu'il a accepté ou refusé l'offre sur Vinted, la retirer encore une fois.
+
 > **29 octobre — 5.287, numéros sur les profils visités :** Julien a précisé que
 > l’affichage semble seulement sur Vinted, l’import dans VRM n’est pas confirmé.
 > `/member/{id}` : aucun numéro renvoyé sans égalité avec le PROFIL du compte
