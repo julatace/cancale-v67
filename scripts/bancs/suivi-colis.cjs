@@ -478,14 +478,18 @@ async function revue24(b) {
     });
   }
   // ── K. La publication pour le rappel du matin ne dit pas « aucun fini » sur
-  // une lecture ratée (n° 3) : `panel_colis_relais` illisible ⇒ `finis: null` ──
+  // une lecture ratée (n° 3) : `panel_colis_relais` illisible ⇒ rien n'est publié ──
   await essaie('K', async () => {
     for (const [nom, o] of [['lu', {}], ['relais illisible', { relaisKo: true }]]) {
       const { ctx, pg, errs } = await preparer(b, { width: 1512, height: 950 }, false, o);
       await ouvrir(pg, errs); await pg.waitForTimeout(1500);
       const pub = await pg.evaluate(() => { try { return JSON.parse(localStorage.getItem('vrm_colis_retirer') || 'null'); } catch (_) { return 'illisible'; } });
       if (nom === 'lu') dit(pub && Array.isArray(pub.finis) && pub.finis.includes('e:30000054'), 'K : tout lu ⇒ la publication porte les colis finis (30000054 retiré sous une autre clé)', pub && JSON.stringify(pub.finis));
-      else dit(pub && pub.finis === null && Number.isFinite(pub.total), 'K : `panel_colis_relais` illisible ⇒ `finis: null` (« pas su »), jamais une liste qui passerait pour complète', pub && JSON.stringify(pub.finis));
+      // (29 oct., tour 2 n° 1) Plus strict qu'avant : sans les codes des
+      // conversations, la règle « en vérification » et la fusion par n° ne
+      // tiennent pas — on ne publie RIEN (la dernière photo complète reste ;
+      // ici, un appareil neuf : aucune). Avant : une publication à `finis: null`.
+      else dit(pub === null, 'K : `panel_colis_relais` illisible ⇒ aucune publication (jamais une liste qui passerait pour complète)', JSON.stringify(pub));
       await ctx.close();
     }
   });
