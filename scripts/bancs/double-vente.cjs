@@ -232,7 +232,10 @@ const projette = (row, sel) => {
         const row = [...document.querySelectorAll('.vrm-sale-row, [data-lbc-vente]')].find((e) => /Nike Air Max/.test(e.textContent));
         const t = row && row.querySelector('.vrm-ledger-sale-toggle'); if (t) t.click();
         await new Promise((r) => setTimeout(r, 500));
-        return [...document.querySelectorAll('.vrm-fiche-vente-acces button')].map((x) => x.textContent.trim());
+        const lu = [...document.querySelectorAll('.vrm-fiche-vente-acces button')].map((x) => x.textContent.trim());
+        if (t) t.click();   // (31 oct.) on referme le tiroir, comme une personne, avant de changer de section
+        await new Promise((r) => setTimeout(r, 400));
+        return lu;
       });
       dit(tiroir.some((x) => /N°12/.test(x)), '… le N° de la paire reste dans le tiroir de la vente', JSON.stringify(tiroir));
       dit(ven.benefs.length === 1 && ven.benefs[0] === '55.00', 'son bénéfice (85 € − 30 € d’achat saisi) = 55,00 €, et la vente NON reliée n’en a aucun', JSON.stringify(ven.benefs));
