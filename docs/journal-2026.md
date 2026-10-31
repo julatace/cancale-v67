@@ -7733,3 +7733,10 @@ sens** · `verif_visuel.cjs` : 10 écrans × 2 tailles, 0 écran vide, 0 débord
   le dira, et il faudra chercher l'URL réelle dans les requêtes captées.
 - **0 prix d'achat sur 278 paires** (§22) : inchangé, c'est de la frappe et
   Julien s'en charge (outils : §5.47 en série, §5.64 en un tap).
+
+
+---
+
+## 31 octobre 2026 — CLAUDE.md allégé
+
+`CLAUDE.md` pesait 1,36 Mo et étouffait chaque session. Tout son texte a été déplacé TEL QUEL (vérifié par script : chaque ligne et chaque paragraphe retrouvés mot pour mot) dans `docs/passation/historique-*.md`, par thème : ebay, leboncoin, vestiaire, vinted-extension, favoris-messages, colis-retraits, compta-urssaf-abonnement, numeros, securite-base-serveur, interface-stock, communaute-equipe, divers, regles-de-base. `CLAUDE.md` ne garde que les règles, les décisions et l'état actuel (une ligne par chantier).
