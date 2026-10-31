@@ -324,9 +324,29 @@ const chip = (pg, tx) => pg.evaluate((tx) => {
         } else {
           const v = await pg.evaluate(() => { const d = document.querySelector('[data-visionneuse-pdf]'); return d ? { etat: d.getAttribute('data-visionneuse-pdf'), titre: d.getAttribute('aria-label') } : null; });
           dit(v && v.etat === 'pret' && v.titre === "Reçu d'achat", 'F. sur ordinateur, le PDF s’ouvre dans la visionneuse de VRM, titrée du même nom (« Reçu d’achat »)', JSON.stringify(v));
-          // Fermer la visionneuse par SON bouton : quand le PDF de l'iframe a pris
-          // le focus, Échap part dans l'iframe et ne la referme pas (vu une fois
-          // sur quatre : la visionneuse restait par-dessus H et L).
+          // (31 oct.) Échap ferme la visionneuse, et SEULEMENT elle : le reçu dessous reste.
+          const focusFermer = await pg.evaluate(() => document.activeElement && document.activeElement.hasAttribute('data-visionneuse-fermer'));
+          dit(focusFermer, 'F. à l’ouverture, le focus est sur « Fermer » de la visionneuse (pas dans le PDF)');
+          await pg.keyboard.press('Tab'); await pg.waitForTimeout(150);
+          const focusDedans = await pg.evaluate(() => { const a = document.activeElement; return !!(a && a.closest('[data-visionneuse-pdf]')); });
+          dit(focusDedans, 'F. Tab reste dans la visionneuse (le reçu dessous ne reprend pas le focus)');
+          await pg.keyboard.press('Escape');
+          await pg.locator('[data-visionneuse-pdf]').waitFor({ state: 'detached', timeout: 3000 }).catch(() => {});
+          const apres = await pg.evaluate((sel) => ({ vis: !!document.querySelector('[data-visionneuse-pdf]'), recu: !!document.querySelector(sel), dansRecu: !!(document.activeElement && document.activeElement.closest(sel)) }), DIALOG);
+          dit(!apres.vis && apres.recu, 'F. un seul Échap ferme la visionneuse, le reçu reste ouvert', JSON.stringify(apres));
+          dit(apres.dansRecu, 'F. le focus revient dans le reçu', JSON.stringify(apres));
+          // Le PDF a pris le focus (clic dedans) : en ressortant la souris, Échap refonctionne.
+          await bouton.click(); await pg.waitForTimeout(900);
+          const cadre = pg.locator('[data-visionneuse-cadre]');
+          if (await cadre.count()) {
+            await cadre.evaluate((e) => e.focus());
+            const bb = await cadre.boundingBox();
+            if (bb) { await pg.mouse.move(bb.x + bb.width / 2, bb.y + bb.height / 2); await pg.mouse.move(bb.x + bb.width / 2, Math.max(2, bb.y - 30)); }
+            await pg.waitForTimeout(150);
+            await pg.keyboard.press('Escape');
+            await pg.locator('[data-visionneuse-pdf]').waitFor({ state: 'detached', timeout: 3000 }).catch(() => {});
+            dit(!(await pg.locator('[data-visionneuse-pdf]').count()), 'F. le PDF avait le focus : la souris ressortie, Échap ferme la visionneuse');
+          }
           const ferme = pg.locator('[data-visionneuse-fermer]');
           if (await ferme.count()) await ferme.first().click();
           await pg.locator('[data-visionneuse-pdf]').waitFor({ state: 'detached', timeout: 5000 }).catch(() => {});

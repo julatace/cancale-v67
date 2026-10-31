@@ -4640,6 +4640,9 @@ function FeuilleRecuAchat({ recu, fermer }) {
     try { (defile.current || boite.current).focus({ preventScroll: true }); } catch (_) {}
     const clavier = (e) => {
       const d = boite.current; if (!d) return;
+      // La visionneuse du PDF ouverte par-dessus garde ses touches (31 oct.) :
+      // sinon Tab ramenait le focus dans le reçu, derrière elle.
+      if (document.querySelector('[data-visionneuse-pdf]')) return;
       if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); fermerRef.current(); return; }
       if (e.key !== 'Tab') return;
       const cibles = [...d.querySelectorAll('button:not([disabled]), a[href], input:not([disabled]), select, textarea, [tabindex]:not([tabindex="-1"])')]
@@ -9811,11 +9814,52 @@ function VisionneusePdf() {
   const [v, setV] = React.useState(_visionneuse);
   React.useEffect(() => { _ecoutesVisionneuse.add(setV); setV(_visionneuse); return () => { _ecoutesVisionneuse.delete(setV); }; }, []);
   const cadre = React.useRef(null);
+  const boutonFermer = React.useRef(null);
+  // Échap (31 oct.) : (1) écouté sur `window` en CAPTURE et arrêté là — sinon le
+  // reçu d'achat ouvert dessous (qui écoute aussi le document) se fermait avec la
+  // visionneuse, d'un seul Échap ; (2) le focus part sur « Fermer » à l'ouverture
+  // et y revient quand la souris quitte le PDF : une touche frappée DANS le PDF
+  // reste dans son lecteur (le navigateur ne la rend pas à la page), c'était là
+  // qu'Échap ne fermait rien. Un document lisible du cadre (même origine) est
+  // aussi écouté.
+  const kRef = React.useRef(null);
   React.useEffect(() => {
     if (!v) return;
-    const k = (e) => { if (e.key === 'Escape') _poserVisionneuse(null); };
-    document.addEventListener('keydown', k); return () => document.removeEventListener('keydown', k);
+    const k = (e) => { if (e.key !== 'Escape') return; e.preventDefault(); e.stopImmediatePropagation(); _poserVisionneuse(null); };
+    kRef.current = k;
+    window.addEventListener('keydown', k, true);
+    return () => { window.removeEventListener('keydown', k, true); kRef.current = null; };
   }, [v]);
+  const ouvreurRef = React.useRef(null);
+  React.useEffect(() => { if (v && !v.prep) { try { if (!ouvreurRef.current) ouvreurRef.current = document.activeElement; boutonFermer.current && boutonFermer.current.focus({ preventScroll: true }); } catch (_) {} } }, [v && v.url, v && v.prep]);
+  // Fermée : le focus revient d'où il venait (le reçu, son bouton « PDF »).
+  React.useEffect(() => { if (v) return; const o = ouvreurRef.current; ouvreurRef.current = null; try {
+    if (o && o !== document.body && o.isConnected && typeof o.focus === 'function') { o.focus({ preventScroll: true }); return; }
+    // L'élément d'avant a été redessiné : on rend le focus à la feuille encore ouverte dessous.
+    const d = [...document.querySelectorAll('[role="dialog"]')].filter((x) => !x.hasAttribute('data-visionneuse-pdf')).pop();
+    const z = d && (d.querySelector('[data-recu-defile]') || d.querySelector('button, a[href], [tabindex]:not([tabindex="-1"])'));
+    if (z) z.focus({ preventScroll: true });
+  } catch (_) {} }, [v]);
+  const reprendreFocus = () => { try { if (document.activeElement === cadre.current && boutonFermer.current) boutonFermer.current.focus({ preventScroll: true }); } catch (_) {} };
+  // Le lecteur PDF du navigateur prend le focus en se chargeant (mesuré : l'iframe
+  // devenait l'élément actif) : on le rend à « Fermer » au chargement, puis une
+  // fois encore juste après (le lecteur le reprend parfois un instant plus tard).
+  const cadreCharge = () => {
+    try { const w = cadre.current && cadre.current.contentWindow; if (w && kRef.current) w.addEventListener('keydown', kRef.current, true); } catch (_) { /* autre origine : rien à écouter */ }
+    reprendreFocus(); setTimeout(reprendreFocus, 300);
+  };
+  // Le chargement du lecteur n'émet pas toujours `load` (lecteur intégré) : les
+  // 2 premières secondes, on rend le focus à « Fermer » s'il est parti dans le PDF
+  // (le lecteur le prend tout seul ; la souris peut déjà se trouver au-dessus).
+  // Ensuite, un clic DANS le PDF y laisse le focus, et la souris qui en ressort le rend.
+  const sourisDansPdf = React.useRef(false);
+  React.useEffect(() => {
+    if (!v || v.prep) return undefined;
+    sourisDansPdf.current = false;
+    const t0 = Date.now();
+    const id = setInterval(() => { if (Date.now() - t0 > 2000) { clearInterval(id); return; } reprendreFocus(); }, 120);
+    return () => clearInterval(id);
+  }, [v && v.url, v && v.prep]);
   if (!v || typeof document === 'undefined') return null;
   const fermer = () => _poserVisionneuse(null);
   const imprimer = () => { try { const w = cadre.current && cadre.current.contentWindow; w.focus(); w.print(); } catch (_) { try { window.open(v.url, '_blank'); } catch (_) {} } };
@@ -9830,11 +9874,11 @@ function VisionneusePdf() {
           {!v.prep && <button type="button" data-visionneuse-imprimer="" onClick={imprimer} style={{ ...btn, border:'none', background:C.accent, color:C.onAccent || '#fff' }}>🖨 Imprimer</button>}
           {!v.prep && <a data-visionneuse-onglet="" href={v.url} target="_blank" rel="noopener" style={btn}>Ouvrir dans un onglet</a>}
           {!v.prep && <a data-visionneuse-telecharger="" href={v.url} download={v.nom} style={btn}>Télécharger</a>}
-          <button type="button" data-visionneuse-fermer="" onClick={fermer} aria-label="Fermer" style={btn}>Fermer</button>
+          <button type="button" ref={boutonFermer} data-visionneuse-fermer="" onClick={fermer} aria-label="Fermer" style={btn}>Fermer</button>
         </div>
         {v.prep
           ? <div style={{ flex:1, display:'flex', alignItems:'center', justifyContent:'center', color:C.muted, fontSize:15 }}>Préparation du bordereau…</div>
-          : <iframe ref={cadre} data-visionneuse-cadre="" title={v.titre || 'Bordereau'} src={v.url} style={{ flex:1, width:'100%', border:0, background:'#fff' }}/>}
+          : <iframe ref={cadre} data-visionneuse-cadre="" title={v.titre || 'Bordereau'} src={v.url} onLoad={cadreCharge} onMouseEnter={() => { sourisDansPdf.current = true; }} onMouseLeave={() => { sourisDansPdf.current = false; reprendreFocus(); }} style={{ flex:1, width:'100%', border:0, background:'#fff' }}/>}
       </div>
     </div>, document.body);
 }
