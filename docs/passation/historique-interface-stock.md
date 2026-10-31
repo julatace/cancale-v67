@@ -2078,7 +2078,7 @@ le retour rejoue. Aucun espace de site n'est plus monté (`plat_vinted/leboncoin
 | eBay · Compte | Paramètres → Réglages → Comptes Vinted → **Comptes eBay** (panneau, skin eBay) ; « Comptes eBay » de « État des connexions » l'ouvre |
 | Leboncoin · Ventes / Annonces / Messages | Ventes / Annonces / Messages · Leboncoin |
 | Leboncoin · Achats | Achats · Leboncoin |
-| Leboncoin · Colis | Colis → sous-rangée **Vinted et eBay · Leboncoin** (`LeboncoinColis`) |
+| Leboncoin · Colis | Colis → pastille **Leboncoin** de la rangée de sites (barre du haut) : `LeboncoinColis` (bordereau, QR) ; les autres pastilles ramènent aux 4 colonnes filtrées |
 | Vestiaire · Ventes / Messages | Ventes / Messages · Vestiaire |
 | Vestiaire · Publier | Annonces · Vestiaire |
 | Vestiaire · Achats | Achats · Vestiaire |
@@ -2108,6 +2108,28 @@ Vestiaire : aucune source ne publie ce nombre hors de leur écran ⇒ pas de pas
 `plat_vestiaire` ; + `achats`) ; table `Comptabilite` : `cat_achats` → `retraits` (5 entrées des deux côtés) ; Colis
 gagne la variante Leboncoin. Rien ne disparaît : chaque section ci-dessus a son chemin.
 
+**Après fusion avec la branche Colis 4 colonnes / barre du haut** : les filtres de site passent dans la barre du
+haut (ordinateur), les sous-onglets du site restent sous le titre de la tâche ; Colis · Leboncoin passe par la
+pastille de la rangée de sites (plus de sous-rangée à part) ; un colis Vestiaire ouvre Ventes · Vestiaire
+(`vestiaire_ventes`) ; « Leboncoin » (colonne) pose la cible « à retirer de Leboncoin » comme la cloche ; la
+pastille N° des fiches Annonces fait 44 px de haut au téléphone (§7, `plateformes-premium` vert) ; la porte
+« Compléter les prix d'achat » revient dans Paramètres → Stock et rangement (retirée par la refonte du 31 oct. ;
+même destination, `compta-stock-ui`).
+
 **Preuve** : `scripts/bancs/navigation-tache.cjs` (J : pas de Plateformes dans « Plus », Plateformes dans la colonne,
 Expédier = retraits|achats, compteurs publiés, 900 px ; K : écrans distincts ; L : chaque section joignable depuis sa
 tâche ; F : anciens liens). Rouge sur le code d'avant, vert après, rouge sous mutation (voir le rapport de la session).
+
+**Décision suivante (31 oct., soir, Julien : « l'onglet Colis à retirer sert à rien si dans Colis on a les codes
+de retrait ; en plus il y a les colis à retirer dans Achats, règle ce souci »)** — remplace « deux écrans
+distincts » : plus d'entrée « Colis à retirer » ni de groupe « Expédier » ; **Achats** passe dans « Gérer »
+(Stock, Achats). Les colis à retirer vivent dans **Colis** : la colonne « À retirer » (branche Colis 4 colonnes)
+et, dessous, leur **détail** (`data-colis-retraits`) — l'ancienne vue « À retirer », mêmes composants et mêmes
+lectures : codes et QR, dates limites, points relais et carte, « J'ai retiré », « Tout est OK » à confirmer,
+à vérifier, suivi Vinted, n° de suivi à la main, réception des e-mails, colis repartis. Il se monte à la demande
+(bouton « Codes, QR et points relais des colis à retirer », une carte « À retirer », un ancien lien
+`cat_achats`/`retraits`, une notification, une ligne de Ma journée) et défile jusqu'à lui (`AncreDefilement`) :
+la relecture des achats n'est payée que quand il sert. **Achats** ne montre plus aucun bloc « à retirer » : au
+plus la ligne « N colis à retirer → Colis » (`data-achats-vers-colis`, `pickupUnion.total`, seulement e-mails
+lus). Banc `navigation-tache.cjs` (K) mis à jour : 163 verts ; mutations (entrée remise, étape « À retirer »
+remise dans Achats, `cat_achats` qui ne mène plus au détail) ⇒ rouges.

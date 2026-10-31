@@ -191,7 +191,7 @@ const lire = (pg) => pg.evaluate(() => {
   return {
     total: at('[data-pickup-total]', 'data-pickup-total'), aVerifier: at('[data-pickup-a-verifier]', 'data-pickup-a-verifier'),
     sansCompte: at('[data-pickup-sans-compte]', 'data-pickup-sans-compte'), nSansCompte: document.querySelectorAll('[data-pickup-sans-compte]').length,
-    blocAVerifier: at('[data-a-verifier]', 'data-a-verifier'), fraicheur: at('[data-fraicheur-achats]', 'data-fraicheur-achats'), nFraicheur: document.querySelectorAll('[data-fraicheur-achats]').length,
+    blocAVerifier: at('[data-oublies][data-a-verifier]', 'data-a-verifier'), fraicheur: at('[data-fraicheur-achats]', 'data-fraicheur-achats'), nFraicheur: document.querySelectorAll('[data-fraicheur-achats]').length,
     cartes, aVerif, repartis, texte: document.body.innerText, deborde: document.documentElement.scrollWidth > window.innerWidth + 1,
     // L'ordre des points relais : la liste des n° de suivi de chaque bloc, dans l'ordre affiché.
     blocs: [...document.querySelectorAll('.vrm-pickup-point')].map((b) => [...b.querySelectorAll('[data-colis-suivi]')].map((x) => x.getAttribute('data-colis-suivi'))),

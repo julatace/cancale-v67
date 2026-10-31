@@ -135,8 +135,14 @@ async function brancher(p){
   //  (ses sections propres : Achats, À traiter…), où l'on va le juger.
   for(const [tab,nom] of [['plat_vinted','Vinted'],['plat_leboncoin','Leboncoin'],['plat_ebay','eBay']]){
    const site=tab.replace('plat_','');
-   await p.goto(base+'/?tab='+tab+'&section='+(site==='ebay'?'agent':'achats'));await p.getByRole('heading',{name:nom,exact:true}).waitFor();
-   {const masque=await p.locator('.vrm-market-heading .vrm-plat-marque').evaluate(e=>{const m=getComputedStyle(e).maskImage||getComputedStyle(e).webkitMaskImage||'';const u=(m.match(/url\("?([^")]+)"?\)/)||[])[1]||'';return u;}).catch(()=>'');const ok=!!masque && /\/brands\//.test(masque) && await p.evaluate(u=>fetch(u).then(r=>r.ok&&/svg/.test(r.headers.get('content-type')||'')),masque).catch(()=>false);check(ok,'logo local chargé '+nom);}
+   // (31 oct., soir) Plus d'espace de site à part (ni en-tête au logo) : ses sections sont
+   //  des sous-onglets de la tâche. On juge que l'ancien lien mène à la tâche du site, son
+   //  filtre allumé (À traiter eBay : Ventes · eBay · À traiter ; Achats : Achats · site).
+   {const t=site==='ebay'?'ventes':'achats';await p.goto(base+'/?tab='+tab+'&section='+(site==='ebay'?'agent':'achats'));
+    await p.locator(`[data-tache="${t}"][data-tache-site="${site}"]`).waitFor();
+    const pr=await p.evaluate(()=>{const b=document.querySelector('[data-filtre-site] button[aria-pressed="true"]');return b?b.getAttribute('data-site'):'';});
+    const sec=await p.locator('[data-tache]').getAttribute('data-tache-section');
+    check(pr===site && (site!=='ebay'||sec==='agent'),'ancien lien de section '+nom+' : la tâche du site, son filtre allumé');}
    await p.goto(base+'/?tab='+tab);await p.locator(`[data-tache="ventes"][data-tache-site="${site}"]`).waitFor();
    // La tâche est montée avant ses chiffres : on attend qu'ils soient RENDUS (résumé ou cases), borné.
    await p.locator('[data-tache="ventes"] .vrm-platform-summary, [data-tache="ventes"] [data-ventes-kpi]').first().waitFor({timeout:15000}).catch(()=>{});

@@ -198,26 +198,26 @@ const choisir = async (pg, site) => { const b = pg.locator(`[data-filtre-site] b
           await pg.waitForTimeout(500);
           const f = await pg.evaluate(() => { const m = document.querySelector('.vrm-sheet'); if (!m) return null; return { groupes: [...m.querySelectorAll('[data-nav-groupe]')].map((g) => ({ t: g.getAttribute('data-nav-groupe'), n: g.querySelectorAll('[data-nav-entree]').length })), entrees: [...m.querySelectorAll('[data-nav-entree]')].map((e) => e.getAttribute('data-nav-entree')), petits: [...m.querySelectorAll('[data-nav-entree]')].filter((e) => e.getBoundingClientRect().height < 44).length }; });
           await capture(pg, 'plus-telephone');
-          dit(!!f && f.groupes.map((g) => g.t).join('|') === 'Vendre|Expédier|Gérer|Argent|Moi', 'J. « Plus » groupé par tâche, SANS « Plateformes » : Vendre · Expédier · Gérer · Argent · Moi', JSON.stringify(f && f.groupes));
-          const exp = await pg.evaluate(() => [...document.querySelectorAll('.vrm-sheet [data-nav-groupe="Expédier"] [data-nav-entree]')].map((e) => e.getAttribute('data-nav-entree')));
-          dit(exp.join('|') === 'retraits|achats', 'J. « Expédier » : Colis à retirer puis Achats, l’un sous l’autre', exp.join('|'));
+          dit(!!f && f.groupes.map((g) => g.t).join('|') === 'Vendre|Gérer|Argent|Moi', 'J. « Plus » groupé par tâche, SANS « Plateformes » ni « Expédier » : Vendre · Gérer · Argent · Moi', JSON.stringify(f && f.groupes));
+          const exp = await pg.evaluate(() => [...document.querySelectorAll('.vrm-sheet [data-nav-groupe="Gérer"] [data-nav-entree]')].map((e) => e.getAttribute('data-nav-entree')));
+          dit(exp.join('|') === 'garage|achats', 'J. « Gérer » : Stock puis Achats ; plus d’entrée « Colis à retirer » (ils vivent dans Colis)', exp.join('|'));
           dit(!!f && !f.entrees.some((x) => /^plat_|^ebay_|^leboncoin$/.test(x)), 'J. aucune entrée de site dans « Plus »', JSON.stringify(f && f.entrees));
           dit(!!f && f.groupes.every((g) => g.n > 0), 'I. aucun groupe vide', JSON.stringify(f && f.groupes));
           dit(!!f && !['journee', 'annonces', 'ventes', 'cat_bord'].some((x) => f.entrees.includes(x)), 'I. rien de la barre du bas en double dans « Plus »', JSON.stringify(f && f.entrees));
           dit(!!f && new Set(f.entrees).size === f.entrees.length, 'I. aucune entrée deux fois', JSON.stringify(f && f.entrees));
-          dit(!!f && ['messages', 'republier', 'favoris', 'retraits', 'achats', 'garage', 'dashboard', 'compta', 'communaute', 'settings'].every((x) => f.entrees.includes(x)), 'I. « Plus » porte Messages, Republier, Favoris, Colis à retirer, Achats, Stock, Statistiques, Comptabilité, Communauté, Paramètres', JSON.stringify(f && f.entrees));
+          dit(!!f && ['messages', 'republier', 'favoris', 'achats', 'garage', 'dashboard', 'compta', 'communaute', 'settings'].every((x) => f.entrees.includes(x)), 'I. « Plus » porte Messages, Republier, Favoris, Colis à retirer, Achats, Stock, Statistiques, Comptabilité, Communauté, Paramètres', JSON.stringify(f && f.entrees));
           dit(!!f && f.petits === 0, 'I. rangées ≥ 44 px', String(f && f.petits));
         } else {
           const col = await pg.evaluate(() => ({ taches: [...document.querySelectorAll('.vrm-sidebar [data-nav-taches] [data-nav-entree]')].map((e) => e.getAttribute('data-nav-entree')), groupes: [...document.querySelectorAll('.vrm-sidebar [data-nav-groupe]')].map((g) => g.getAttribute('data-nav-groupe')), toutes: [...document.querySelectorAll('.vrm-sidebar [data-nav-entree]')].map((e) => e.getAttribute('data-nav-entree')), badge: (document.querySelector('.vrm-sidebar [data-badge-nav="cat_bord"]') || { getAttribute: () => '' }).getAttribute('data-badge-n'), pub: (() => { try { return JSON.parse(localStorage.getItem('vrm_colis_aposter')).total; } catch (_) { return null; } })() }));
           await capture(pg, 'colonne-ordinateur');
           dit(col.taches.join('|') === 'journee|annonces|ventes|messages|cat_bord', 'A. la colonne : Ma journée · Annonces · Ventes · Messages · Colis', col.taches.join('|'));
-          dit(col.groupes.join('|') === 'Vendre|Expédier|Gérer|Argent|Plateformes|Moi', 'A/J. puis les groupes par tâche — « Plateformes » gardé dans la colonne (sa maquette)', col.groupes.join('|'));
-          const exp = await pg.evaluate(() => [...document.querySelectorAll('.vrm-sidebar [data-nav-groupe="Expédier"] [data-nav-entree]')].map((e) => e.getAttribute('data-nav-entree')));
-          dit(exp.join('|') === 'retraits|achats', 'J. colonne, « Expédier » : Colis à retirer puis Achats', exp.join('|'));
+          dit(col.groupes.join('|') === 'Vendre|Gérer|Argent|Plateformes|Moi', 'A/J. puis les groupes par tâche — « Plateformes » gardé dans la colonne (sa maquette)', col.groupes.join('|'));
+          const exp = await pg.evaluate(() => [...document.querySelectorAll('.vrm-sidebar [data-nav-groupe="Gérer"] [data-nav-entree]')].map((e) => e.getAttribute('data-nav-entree')));
+          dit(exp.join('|') === 'garage|achats' && !col.toutes.includes('retraits'), 'J. colonne, « Gérer » : Stock puis Achats ; aucune entrée « Colis à retirer »', exp.join('|'));
           const plat = await pg.evaluate(() => [...document.querySelectorAll('.vrm-sidebar [data-nav-groupe="Plateformes"] [data-nav-entree]')].map((e) => e.getAttribute('data-nav-entree')));
           dit(plat.join('|') === 'plat_ebay|plat_leboncoin|plat_vestiaire', 'J. colonne, « Plateformes » : eBay · Leboncoin · Vestiaire', plat.join('|'));
           const cpt = await pg.evaluate(() => { const o = Object.fromEntries([...document.querySelectorAll('.vrm-sidebar [data-badge-nav]')].map((b) => [b.getAttribute('data-badge-nav'), b.getAttribute('data-badge-n')])); try { o.pubR = String(JSON.parse(localStorage.getItem('vrm_colis_retirer')).total); } catch (_) {} return o; });
-          dit(!!cpt.retraits && cpt.retraits === cpt.pubR && cpt.ventes === String(col.pub) && cpt.cat_bord === String(col.pub), 'J. compteurs de la colonne = les nombres PUBLIÉS (colis à retirer, à poster)', JSON.stringify(cpt));
+          dit(cpt.ventes === String(col.pub) && cpt.cat_bord === String(col.pub) && cpt.annonces === '4', 'J. compteurs de la colonne = les nombres PUBLIÉS (à poster ; annonces : les 4 sans numéro de la cloche)', JSON.stringify(cpt));
           dit(!cpt.plat_ebay && !cpt.plat_leboncoin && !cpt.messages, 'J. aucun compteur sans nombre connu (eBay, Leboncoin, Messages)', JSON.stringify(cpt));
           dit(new Set(col.toutes).size === col.toutes.length, 'A. aucune entrée deux fois dans la colonne', col.toutes.join('|'));
           dit(col.toutes[col.toutes.length - 1] === 'settings', 'A. Paramètres en bas', col.toutes.join('|'));
@@ -313,17 +313,22 @@ const choisir = async (pg, site) => { const b = pg.locator(`[data-filtre-site] b
         await ctx.close();
       });
 
-      console.log(`── ${qui} : K. « Colis à retirer » et « Achats » : deux écrans distincts`);
-      await essaie(`${qui} : retraits`, async () => {
-        const { ctx, pg, errs } = await ouvrir(b, tel, 'retraits');
-        await pg.waitForTimeout(800);
+      // (31 oct., soir — Julien : « l'onglet Colis à retirer sert à rien si dans Colis on a
+      //  les codes de retrait ») Les colis à retirer vivent dans COLIS : la colonne, et
+      //  leur détail dessous ; Achats ne les montre plus.
+      console.log(`── ${qui} : K. les colis à retirer dans Colis, Achats sans eux`);
+      await essaie(`${qui} : colis à retirer`, async () => {
+        const { ctx, pg, errs } = await ouvrir(b, tel, 'cat_bord');
+        const f = await pg.evaluate(() => ({ col: !!document.querySelector('[data-cc-colonne="retirer"]'), ferme: !!document.querySelector('[data-colis-retraits="ferme"]'), ouvert: !!document.querySelector('[data-colis-retraits="ouvert"]') }));
+        dit(f.col && f.ferme && !f.ouvert, 'K. Colis : la colonne « À retirer », et la porte du détail (fermée tant qu’on ne la demande pas)', JSON.stringify(f));
+        await pg.locator('[data-colis-retraits-ouvrir]').first().click(); await pg.waitForTimeout(1500);
         await capture(pg, `retraits-${tel ? 'tel' : 'ordi'}`);
-        const r = await pg.evaluate(() => ({ ecran: (document.querySelector('[data-ecran-achats]') || { getAttribute: () => '' }).getAttribute('data-ecran-achats'),
-          onglets: document.querySelectorAll('[data-achats-onglet]').length, kpis: document.querySelectorAll('.vrm-achats-kpis, .vrm-achats-search, .vrm-achats-recus-bas').length,
-          relais: document.querySelectorAll('.vrm-pickup-card, [data-pickup-total]').length, tache: !!document.querySelector('[data-tache]') }));
-        dit(r.ecran === 'retraits' && !r.tache, 'K. ?tab=retraits ouvre « Colis à retirer »', JSON.stringify(r));
-        dit(r.onglets === 0 && r.kpis === 0, 'K. « Colis à retirer » : ni onglets d’étapes, ni recherche, ni chiffres, ni reçus d’achat', JSON.stringify(r));
-        dit(r.relais > 0, 'K. « Colis à retirer » montre le colis au point relais (l’achat 8002)', JSON.stringify(r));
+        const r = await pg.evaluate(() => { const z = document.querySelector('[data-colis-retraits="ouvert"]'); return { z: !!z, ecran: z && z.querySelector('[data-ecran-achats]') ? z.querySelector('[data-ecran-achats]').getAttribute('data-ecran-achats') : '',
+          onglets: z ? z.querySelectorAll('[data-achats-onglet]').length : -1, kpis: z ? z.querySelectorAll('.vrm-achats-kpis, .vrm-achats-search, .vrm-achats-recus-bas').length : -1,
+          relais: z ? z.querySelectorAll('.vrm-pickup-card, [data-pickup-total]').length : 0, tache: !!document.querySelector('[data-tache]') }; });
+        dit(r.z && r.ecran === 'retraits' && !r.tache, 'K. Colis : le détail des colis à retirer s’ouvre DANS Colis', JSON.stringify(r));
+        dit(r.onglets === 0 && r.kpis === 0, 'K. le détail : ni onglets d’étapes, ni recherche, ni chiffres, ni reçus d’achat', JSON.stringify(r));
+        dit(r.relais > 0, 'K. le détail montre le colis au point relais (l’achat 8002)', JSON.stringify(r));
         dit(errs.length === 0, `${qui} : aucune erreur`, errs.join(' | '));
         await ctx.close();
       });
@@ -334,11 +339,19 @@ const choisir = async (pg, site) => { const b = pg.locator(`[data-filtre-site] b
         const a = await pg.evaluate(() => ({ ecran: (document.querySelector('[data-ecran-achats]') || { getAttribute: () => '' }).getAttribute('data-ecran-achats'),
           onglets: [...document.querySelectorAll('[data-achats-onglet]')].map((x) => x.getAttribute('data-achats-onglet')),
           kpis: document.querySelectorAll('.vrm-achats-kpis').length,
-          relais: document.querySelectorAll('.vrm-pickup-card, [data-pickup-total], [data-retraits-vide], [data-a-confirmer]').length }));
+          relais: document.querySelectorAll('.vrm-pickup-card, [data-pickup-total], [data-retraits-vide], [data-a-confirmer], [data-colis-retraits]').length,
+          versColis: (document.querySelector('[data-achats-vers-colis]') || { getAttribute: () => '' }).getAttribute('data-achats-vers-colis') }));
         const e = await etat(pg);
         dit(e.tache === 'achats' && e.site === 'vinted' && a.ecran === 'achats', 'K. ?tab=achats ouvre Achats · Vinted', JSON.stringify({ e, a }));
         dit(a.onglets.join('|') === 'route|recus|all', 'K. Achats : En route · Reçus · Tous — pas d’« À retirer »', a.onglets.join('|'));
         dit(a.kpis === 1 && a.relais === 0, 'K. Achats : ses chiffres, et aucun bloc de colis à retirer', JSON.stringify(a));
+        if (a.versColis) {
+          await pg.locator('[data-achats-vers-colis]').first().click(); await pg.waitForTimeout(1500);
+          const v = await pg.evaluate(() => ({ ouvert: !!document.querySelector('[data-colis-retraits="ouvert"]'), tache: !!document.querySelector('[data-tache]') }));
+          dit(v.ouvert && !v.tache, 'K. « N colis à retirer → Colis » ouvre Colis sur le détail des colis à retirer', JSON.stringify(v));
+          await pg.goBack().catch(() => {}); await pg.waitForTimeout(900);
+          await pg.evaluate(() => window.dispatchEvent(new CustomEvent('vrm:aller', { detail: 'achats' }))); await pg.waitForTimeout(900);
+        } else dit(false, 'K. Achats : la ligne « N colis à retirer → Colis » (l’achat 8002 est au relais)', JSON.stringify(a));
         dit(e.filtres.join('|') === 'vinted|leboncoin|ebay|vestiaire', 'L. Achats : un filtre par site (Vinted · Leboncoin · eBay · Vestiaire)', e.filtres.join('|'));
         for (const [site, sel] of [['leboncoin', '[data-lbc-achats-vide], [data-lbc-achat]'], ['ebay', '[data-ebay-achats-onglet], [data-ebay-achats-gagnes]'], ['vestiaire', '[data-vc-achats]']]) {
           await choisir(pg, site);
@@ -413,7 +426,7 @@ const choisir = async (pg, site) => { const b = pg.locator(`[data-filtre-site] b
         ['plat_ebay&section=promo', { tache: 'annonces', site: 'ebay', section: 'promo' }], ['plat_ebay&section=achats', { tache: 'achats', site: 'ebay' }],
         ['plat_ebay&section=compte', { reglage: 'ebay' }], ['plat_leboncoin&section=colis', { colis: 'leboncoin' }],
         ['plat_leboncoin&section=achats', { tache: 'achats', site: 'leboncoin' }], ['plat_vinted&section=achats', { tache: 'achats', site: 'vinted' }],
-        ['cat_achats', { achats: 'retraits' }], ['retraits', { achats: 'retraits' }], ['achats', { tache: 'achats', site: 'vinted' }], ['cat_bord', { ecran: true }],
+        ['cat_achats', { retraitsColis: true }], ['retraits', { retraitsColis: true }], ['achats', { tache: 'achats', site: 'vinted' }], ['cat_bord', { ecran: true }],
       ];
       for (const [id, attendu] of LIENS) {
         await essaie(`${qui} : ?tab=${id}`, async () => {
@@ -423,7 +436,7 @@ const choisir = async (pg, site) => { const b = pg.locator(`[data-filtre-site] b
           if (attendu.tache) bon = e.tache === attendu.tache && e.site === attendu.site && e.presse === attendu.site && (!attendu.section || (e.section === attendu.section && e.sousActif === attendu.section));
           else if (attendu.reglage) bon = !e.tache && e.reglageOuvert === attendu.reglage && await pg.evaluate(() => { const x = document.querySelector('[data-sous-ecran="ebay"]'); return !!(x && !x.hidden && x.querySelector('[data-ebay-compte-section]')); });
           else if (attendu.colis) bon = !e.tache && e.colisSite === attendu.colis && await pg.evaluate(() => !!document.querySelector('[data-colis-leboncoin] [data-lbc-colis-vide], [data-colis-leboncoin] [data-bord-card]'));
-          else if (attendu.achats) bon = !e.tache && e.ecranAchats === attendu.achats;
+          else if (attendu.retraitsColis) bon = !e.tache && await pg.evaluate(() => !!document.querySelector('[data-colis-retraits="ouvert"] [data-ecran-achats="retraits"]') && !!document.querySelector('[data-cc-colonne="retirer"]'));
           else bon = !e.blanc && !e.tache;
           bon = bon && !e.espace;
           dit(bon && !e.blanc && !e.tombe && errs.length === 0, `F. ?tab=${id} → ${JSON.stringify(attendu)}`, JSON.stringify({ ...e, errs }));

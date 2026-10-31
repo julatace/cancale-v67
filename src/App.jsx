@@ -13608,12 +13608,13 @@ const GROUPES_PLUS=[
     {id:'cat_annonces', icon:'sync', cle:'republier', vue:'republier', label:'Republier'},
     {id:'cat_msg', icon:'heart', cle:'favoris', vue:'favoris', label:'Favoris & offres'},
   ]},
-  { titre:'Expédier', items:[
-    {id:'retraits', icon:'qr',  label:'Colis à retirer'},
-    {id:'achats',   icon:'bag', label:'Achats'},
-  ]},
+  // (31 oct., soir — Julien : « l'onglet Colis à retirer sert à rien si dans Colis
+  // on a les codes de retrait ») Plus d'entrée « Colis à retirer » ni de groupe
+  // « Expédier » : les colis à retirer vivent dans Colis (colonne « À retirer »,
+  // et leur détail — codes, QR, dates limites, relais — juste dessous).
   { titre:'Gérer', items:[
     {id:'garage',     icon:'home', label:'Stock'},
+    {id:'achats',     icon:'bag',  label:'Achats'},
   ]},
   { titre:'Argent', items:[
     {id:'dashboard', icon:'chart', label:'Statistiques'},
@@ -13654,13 +13655,14 @@ function titreEcran(tab) {
 // résolus par `redirigerOnglet` (selon la section demandée).
 // (31 oct., soir) `cat_achats` était UN écran à deux vues (« À retirer » par
 // défaut, « Tous ») : ses liens (notifications de code de retrait, colis livré,
-// rappel du soir…) parlent tous de colis à aller chercher ⇒ « Colis à retirer ».
-// Ce qui parle d'un ACHAT (reçu, litige) vise `achats` directement.
+// rappel du soir…) parlent tous de colis à aller chercher ⇒ Colis, sur la
+// colonne « À retirer » et son détail (`retirer`). Ce qui parle d'un ACHAT
+// (reçu, litige) vise `achats` directement.
 const ONGLETS_DEPLACES = {
   prixmarche: ['dashboard', 'prix'], invoices: ['compta', 'factures'], collectif: ['dashboard', null],
   cat_ventes: ['ventes', 'vinted'], cat_annonces: ['annonces', 'vinted'], vinted_annonces: ['annonces', 'vinted'],
   cat_msg: ['messages', 'vinted'], leboncoin: ['annonces', 'leboncoin'], ebay_annonces: ['annonces', 'ebay'],
-  cat_achats: ['retraits', null], ebay_agent: ['ventes', 'ebay.agent'], vestiaire_ventes: ['ventes', 'vestiaire'],
+  cat_achats: ['cat_bord', 'retirer'], retraits: ['cat_bord', 'retirer'], ebay_agent: ['ventes', 'ebay.agent'], vestiaire_ventes: ['ventes', 'vestiaire'],
 };
 // La vue demandée par une entrée de « Plus » (Republier, Favoris…),
 // consommée UNE fois par l'écran qui s'ouvre (même motif que DEMANDE_EBAY_CIBLE).
@@ -46227,7 +46229,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             title:`${nv} colis à vérifier`,
             // (revue du 23 oct.) Plus de « 7 jours » écrit pour tous : chaque
             // transporteur a SA garde (`gardeDe`), dite dans Achats, colis par colis.
-            sub:`Délai de retrait dépassé${pickupUnion.aVerifier.some(x=>x.e&&x.e.etat==='transporteur')?', ou le transporteur signale un problème':''} : ${nv>1?'regarde-les':'regarde-le'} dans Colis à retirer`,
+            sub:`Délai de retrait dépassé${pickupUnion.aVerifier.some(x=>x.e&&x.e.etat==='transporteur')?', ou le transporteur signale un problème':''} : ${nv>1?'regarde-les':'regarde-le'} dans Colis`,
             tab:'retraits', prio:0.6 });
         }
         // (29 oct.) LES ACHATS « AU POINT RELAIS » EN COURS DE VÉRIFICATION (ni
@@ -46239,7 +46241,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           const nc = pickupUnion.aConfirmer.length;
           jobs.push({ id:'retrait-en-verification', n:nc, icon:'box', color:C.muted,
             title:`${nc} achat${nc>1?'s':''} au point relais en cours de vérification`,
-            sub:`Vinted ${nc>1?'les dit':'le dit'} « déposé${nc>1?'s':''} en point relais », mais rien ne ${nc>1?'les':'le'} relie encore à un colis (ni code de retrait, ni n° de suivi) : ${nc>1?'ils ne comptent':'il ne compte'} pas dans « à retirer ». ${nc>1?'Regarde-les':'Regarde-le'} dans Colis à retirer.`,
+            sub:`Vinted ${nc>1?'les dit':'le dit'} « déposé${nc>1?'s':''} en point relais », mais rien ne ${nc>1?'les':'le'} relie encore à un colis (ni code de retrait, ni n° de suivi) : ${nc>1?'ils ne comptent':'il ne compte'} pas dans « à retirer ». ${nc>1?'Regarde-les':'Regarde-le'} dans Colis.`,
             tab:'retraits', prio:0.65 });
         }
         jobs.sort((a,b)=>a.prio-b.prio);
@@ -46322,7 +46324,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           { id:'envoyer', ic:'truck', l:'À envoyer', t:tuiles.envoyer, tab:'cat_bord', pasSu: loading || pasLuComptes || (accounts.length>0 && sales.items==null) || ((ko || colisEb === null) && !(tuiles.envoyer && tuiles.envoyer.n)) },
           // (revue du 23 oct.) E-mails de suivi pas encore lus (ou lecture ratée)
           // ⇒ « — » : un total fait des seuls colis vus par Vinted est partiel.
-          { id:'retirer', ic:'box', l:'À retirer', t:tuiles.retirer, tab:'retraits', titrePasSu: trackingKO ? "E-mails de suivi pas lus — ouvre Colis à retirer pour réessayer" : null, pasSu: loading || pasLuComptes || tracking === null || (accounts.length>0 && (buys.items==null || achatsKO) && !(tuiles.retirer && tuiles.retirer.n)) },
+          { id:'retirer', ic:'box', l:'À retirer', t:tuiles.retirer, tab:'retraits', titrePasSu: trackingKO ? "E-mails de suivi pas lus — ouvre Colis pour réessayer" : null, pasSu: loading || pasLuComptes || tracking === null || (accounts.length>0 && (buys.items==null || achatsKO) && !(tuiles.retirer && tuiles.retirer.n)) },
           { id:'messages', ic:'chat', l:'Messages', t:tuiles.messages, tab:tuiles.messages && tuiles.messages.versEbay ? 'ebay_messages' : 'cat_msg', pasSu: loading || convs.items == null },
           { id:'prix', ic:'tag', l:'Prix à baisser', t:tuiles.prix, tab:'cat_annonces', pasSu: loading || listings.items == null },
         ];
@@ -47589,6 +47591,17 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             <button type="button" key={id} className="vrm-seg-btn" data-achats-onglet={id} data-n={cnt==null?undefined:String(cnt)} onClick={()=>setAFilter(id)} aria-pressed={aFilter===id} aria-label={cnt?`${label} ${cnt}`:undefined} style={{whiteSpace:'nowrap'}}>{label}{cnt?<span className="vrm-seg-n" title={String(cnt)}> {cnt>=1000?`${(Math.floor(cnt/100)/10).toLocaleString('fr-FR')} k`:cnt}</span>:null}</button>
           )); })()}
         </div>}
+        {/* (31 oct., soir) Achats ne montre plus les colis à retirer : une ligne mène
+            à Colis (colonne « À retirer » et son détail). Le nombre est celui de la
+            règle (`pickupUnion.total`), seulement quand les e-mails de suivi sont lus. */}
+        {modeListeAchats && tracking!==null && pickupUnion.total>0 && (
+          <div style={{margin:'0 0 12px'}}>
+            <button type="button" className="vrm-lien-action" data-achats-vers-colis={pickupUnion.total} onClick={()=>onNav&&onNav('cat_achats')}
+              style={{minHeight:44,background:'transparent',border:0,padding:0,color:C.text,fontSize:13.5,fontWeight:600,fontFamily:'inherit',cursor:'pointer'}}>
+              {pickupUnion.total} colis à retirer → Colis
+            </button>
+          </div>
+        )}
         {/* ⚠️⚠️ UN ACHAT EN LITIGE NE SE CACHE PAS DERRIÈRE « TOUS » (revue du
             9 octobre). « Retour initié » range l'achat en « annulé » pour
             l'argent (aucune livraison à attendre) : il sortait donc de « En
@@ -47776,7 +47789,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             </div>
           );
         })()}
-        {aFilter==='attente' && <CarteRelaisColis donnees={groupesRelais} C={C}/>}
+        {/* (31 oct., soir) Dans Colis, la colonne « À retirer » porte déjà la carte des
+            points relais (une carte, pas deux, §7) : le détail ne la redessine pas. */}
+        {aFilter==='attente' && !modeRetraits && <CarteRelaisColis donnees={groupesRelais} C={C}/>}
         {/* (31 oct., soir) « Colis à retirer » sans rien à aller chercher le DIT —
             seulement quand tout est lu (e-mails de suivi, achats) : pas su ≠ rien. */}
         {modeRetraits && !baseKO && tracking!==null && !trackingKO && Array.isArray(buys.items) && !buys.error && pickupUnion.total===0
@@ -47981,7 +47996,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     // au-dessus : ce titre porte le nombre, visible. E-mails de suivi pas lus ⇒
                     // un total PARTIEL, dit « au moins » (§5), et `data-pickup-total` vaut « — ».
                     const partiel = tracking===null;
-                    return (<div className={'vrm-pickup-title'+(!modeRetraits&&hd===0&&sc===0?' vrm-sr':'')} style={{color:C.text}} data-pickup-total={partiel?'—':pickupUnion.total} data-pickup-au-moins={partiel?String(pickupUnion.total):undefined} data-pickup-a-verifier={hd}>
+                    // Dans Colis, la colonne « À retirer » porte déjà le nombre : le titre
+                    // reste pour un lecteur d'écran quand il n'a rien d'autre à dire (§7).
+                    return (<div className={'vrm-pickup-title'+(hd===0&&sc===0&&!partiel?' vrm-sr':'')} style={{color:C.text}} data-pickup-total={partiel?'—':pickupUnion.total} data-pickup-au-moins={partiel?String(pickupUnion.total):undefined} data-pickup-a-verifier={hd}>
                       {partiel?'Au moins ':''}{pickupUnion.total} colis à retirer
                       {hd>0 && <span style={{color:C.warn,fontWeight:700}}> · {hd} à vérifier plus bas</span>}
                       {sc>0 && <span style={{color:C.muted,fontWeight:600}}> · {sc} en attente de leur code</span>}
@@ -59139,6 +59156,13 @@ function DemandeCodeDiscord() {
   );
 }
 
+// (31 oct., soir) Défile jusqu'à soi au montage (le détail des colis à retirer,
+// ouvert par un ancien lien ou une carte « À retirer »).
+function AncreDefilement() {
+  const ref = React.useRef(null);
+  React.useEffect(() => { const t = setTimeout(() => { try { ref.current && ref.current.scrollIntoView({ block: 'start', behavior: 'smooth' }); } catch (_) {} }, 350); return () => clearTimeout(t); }, []);
+  return <span ref={ref} aria-hidden="true" data-ancre-retraits=""/>;
+}
 // ── LA RANGÉE DE FILTRES DE SITE (31 oct., navigation par tâche) ────────────
 // En tête d'Annonces, Ventes et Messages : « Toutes » (Ventes seulement) puis
 // les sites où il a un compte (`sites` : Set, ou `null` = pas su ⇒ tous). Le
@@ -61754,7 +61778,7 @@ function AppCoeur() {
             sur la coque, pour tous les écrans (src/photosVinted.js). */}
         {!baseKO && <PhotosBloquees/>}
         <BlocNumerosPerimes/>
-        {tab==='settings'&&<SettingsScreen setTab={setTab} onPlateforme={plat=>{subVoulue.current=plat==='plat_leboncoin'?'annonces':'compte';setTab(plat);}} ebayCompte={sitesPresents.has('ebay')?ebayCompteReglage:null} ouvrir={platSub==='ebay'?'ebay':null} onOuvert={()=>setPlatSub('reglages')} comptes={vintedAccounts}
+        {tab==='settings'&&<SettingsScreen setTab={setTab} onPlateforme={plat=>{subVoulue.current=plat==='plat_leboncoin'?'annonces':'compte';setTab(plat);}} ebayCompte={ebayCompteReglage} ouvrir={platSub==='ebay'?'ebay':null} onOuvert={()=>setPlatSub('reglages')} comptes={vintedAccounts}
 
           notifEnabled={notifEnabled}
           onToggleNotif={async()=>{
@@ -61989,11 +62013,28 @@ function AppCoeur() {
           </DansBarreHaut>
           {baseKO?<div style={{padding:16}}><LignePanne>Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui a échoué.</LignePanne></div>:<div data-colis-leboncoin=""><LeboncoinColis lbcVentes={lbcVentes}/></div>}
         </>}
-        {/* (31 oct., soir) « Colis à retirer » (`retraits`) : l'écran des achats
-            réduit aux colis à aller chercher ; « Achats » est la tâche `achats`. */}
-        {(()=>{ const map={cat_annonces:'annonces',cat_ventes:'ventes',retraits:'achats',cat_bord:'bordereaux',cat_expedition:'bordereaux'}; if(tab==='cat_bord'&&platSub==='leboncoin') return null; return map[tab] ? <Comptabilite key={tab} accounts={vintedAccounts} only={map[tab]} liveStats={liveStatsVus} accountsReady={accountsLoaded} baseKO={baseKO} onNav={setTab} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}} onFreeNum={freeGarageNum} vueAchats={tab==='retraits'?'retraits':undefined}
+        {(()=>{ const map={cat_annonces:'annonces',cat_ventes:'ventes',cat_bord:'bordereaux',cat_expedition:'bordereaux'}; if(tab==='cat_bord'&&platSub==='leboncoin') return null; return map[tab] ? <Comptabilite key={tab} accounts={vintedAccounts} only={map[tab]} liveStats={liveStatsVus} accountsReady={accountsLoaded} baseKO={baseKO} onNav={setTab} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}} onFreeNum={freeGarageNum}
           siteColisDemande={tab==='cat_bord'&&typeof platSub==='string'&&platSub.startsWith('site:')?platSub.slice(5):null}
           onColisLeboncoin={tab==='cat_bord'&&(!sitesPresents||sitesPresents.has('leboncoin'))?()=>setPlatSub('leboncoin'):null}/> : null; })()}
+        {/* (31 oct., soir) LES COLIS À RETIRER VIVENT DANS COLIS. Sous les quatre
+            colonnes, leur DÉTAIL — l'ancienne vue « À retirer » d'Achats, mêmes
+            composants et mêmes lectures (§11) : codes et QR, dates limites, points
+            relais et carte, « J'ai retiré », à confirmer (« Tout est OK »), à
+            vérifier, suivi Vinted, n° de suivi à la main, réception des e-mails.
+            Monté à la demande (une carte « À retirer », un ancien lien, une
+            notification, ou « Codes, QR et points relais ») : il relit les achats,
+            on ne paie cette lecture que quand il sert. */}
+        {tab==='cat_bord'&&platSub!=='leboncoin'&&(
+          platSub==='retirer'
+            ? <section id="colis-a-retirer" data-colis-retraits="ouvert" style={{padding:'8px 0 0'}}>
+                <AncreDefilement/>
+                <h2 className="vrm-colis-detail-titre" style={{fontSize:'var(--vrm-t-section, 22px)',margin:'8px 18px 4px',color:C.text}}>À retirer — codes et points relais</h2>
+                <Comptabilite key="cat_bord_retraits" accounts={vintedAccounts} only="achats" vueAchats="retraits" dansPlateforme liveStats={liveStatsVus} accountsReady={accountsLoaded} baseKO={baseKO} onNav={setTab} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}} onFreeNum={freeGarageNum}/>
+              </section>
+            : <div data-colis-retraits="ferme" style={{padding:'4px 16px 24px'}}>
+                <Bouton variante="secondaire" icone="qr" data-colis-retraits-ouvrir="" onClick={()=>setPlatSub('retirer')} style={{minHeight:44}}>Codes, QR et points relais des colis à retirer</Bouton>
+              </div>
+        )}
         {tab==='vintedaccounts'&&<VintedAccounts accounts={vintedAccounts} setAccounts={setVintedAccounts} baseKO={baseKO} onRetour={()=>setTab('settings')}/>}
         </>)}
         </EcranGardeFou>
