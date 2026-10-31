@@ -524,6 +524,7 @@ vérifier par `curl https://vrm.center/api/sante`.
   (ALLUMÉ chez lui) ; libellés de la barre du bas à 9 px.
 
 ### Décisions et chantiers (octobre 2026)
+- **31 oct.** — Compétence **taste** (Leonxlnx/taste-skill, MIT) installée dans `.claude/skills/taste-skill/` à sa demande : tout changement de style passe par elle (`references/app-screens.md` pour les écrans de l'app) ; §7 et ses refus priment. → `.claude/skills/README.md`.
 - **31 oct. (soir)** — Vinted/extension **5.293.0** (intégrée avec Leboncoin en 5.293.0) : le pont photo relaie le `statut` du CDN (lien mort 404/410 plus redemandé avant 30 min, refus passagers en tête du témoin) ; détourage Vestiaire : `cle-pas-su` arrête la série et se dit en français. → historique vinted-extension. Geste : installer la 5.293.0 une fois fusionnée.
 - **31 oct.** — Tournée de tous les bancs et audits : 5 défauts corrigés (purge d'un
   compte supprimé, cartes Leboncoin remontées, table de reprise lue deux fois…). Les

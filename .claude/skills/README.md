@@ -37,3 +37,17 @@ Ces compétences sont des conseils de goût. Quand l'un d'eux contredit
   bibliothèque d'interface sans raison mesurée (la taille du bundle compte,
   §« vitesse ») ;
 - « réduire les animations » est toujours respecté (`prefers-reduced-motion`).
+
+## Compétence « taste » — Leonxlnx/taste-skill
+
+Ajoutée le 31 octobre 2026 à la demande de Julien (« pour le changement de style…
+afin que tu t'éloignes de ce que tu fais que je n'aime pas trop »). Copiée depuis
+`github.com/Leonxlnx/taste-skill` (commit `12af471`, 25 octobre 2026), licence MIT
+(`taste-skill/LICENSE`). Contenu relu : règles de direction artistique, bibliothèque
+JSON, scripts Node locaux (`draw.mjs`, `inspect.mjs` : Chromium du banc ;
+`assets.mjs` ne cherche que des images libres — Openverse, Wikimedia, NASA, musées —
+sans clé). Ses fichiers de travail vont dans `.taste-skill/` (hors du dépôt).
+
+| compétence | quand elle sert dans VRM |
+|---|---|
+| `design-taste-frontend` (`taste-skill/`) | tout changement de style. VRM est une app : suivre **`references/app-screens.md`** (`draw.mjs --app`, `inspect.mjs --app`), pas la partie « page ». Le site public (accueil, CGV) suit la partie « page ». Les décisions de Julien du §7 de CLAUDE.md priment (palette violette refusée, rouge réservé aux deux paires sous un N°). |
