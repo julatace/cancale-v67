@@ -51,3 +51,21 @@ sans clé). Ses fichiers de travail vont dans `.taste-skill/` (hors du dépôt).
 | compétence | quand elle sert dans VRM |
 |---|---|
 | `design-taste-frontend` (`taste-skill/`) | tout changement de style. VRM est une app : suivre **`references/app-screens.md`** (`draw.mjs --app`, `inspect.mjs --app`), pas la partie « page ». Le site public (accueil, CGV) suit la partie « page ». Les décisions de Julien du §7 de CLAUDE.md priment (palette violette refusée, rouge réservé aux deux paires sous un N°). |
+
+## Compétence « frontend-design » — anthropics/skills
+
+Ajoutée le 31 octobre 2026 à la demande de Julien (« n'hésite pas à télécharger de
+nouveaux skills de mise en page et de graphisme »). Copiée depuis
+`github.com/anthropics/skills`, dossier `skills/frontend-design` (commit `ca45fc4`,
+28 octobre 2026), licence Apache 2.0 (`frontend-design/LICENSE.txt`). Contenu relu :
+un seul fichier d'instructions (`SKILL.md`, ~9 Ko) — direction visuelle, typographie,
+écriture de l'interface, liste des « tics » des pages générées ; aucun script, aucune
+commande d'installation, aucun appel externe, aucune clé.
+
+| compétence | quand elle sert dans VRM |
+|---|---|
+| `frontend-design` | en complément de `taste-skill` pour un changement de style : partir du métier (sneakers, cartons, colis), poser un plan de tokens (4-6 couleurs, polices, mise en page) et le relire contre les choix « par défaut » avant de coder ; règles d'écriture des boutons et des messages d'erreur. Les décisions de Julien du §7 de CLAUDE.md priment. |
+
+Relus et **non repris** du même dépôt : `theme-factory` (dix thèmes génériques pour
+diapositives, dont un violet), `canvas-design` (affiches PNG/PDF, 5,6 Mo de polices :
+hors sujet pour l'app).
