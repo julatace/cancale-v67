@@ -14391,11 +14391,12 @@ function MenuEcrans({ tab, setTab, dark = false, bottom = false }) {
   }, [open]);
   const groupes = [
     { titre: bottom?'Autres plateformes':'Plateformes', items: BOTTOM_TABS.filter(t => bottom?t.id==='plat_vestiaire':t.id !== 'journee') },
-    { titre: 'Gestion', items: NAV_GESTION },
     // (17 oct., Julien) Plus de « Dans Vinted » (Annonces, Ventes, Achats sont
     // déjà dans l'onglet Vinted) ni d'« Autres outils » : ce qu'ils portaient
-    // est rangé dans Statistiques et Comptabilité.
-    ...(NAV_OUTILS.length ? [{ titre: 'Autres outils', items: NAV_OUTILS }] : []),
+    // est rangé dans Statistiques et Comptabilité. (31 oct.) La Communauté
+    // (20 oct.) recréait ce groupe : elle rejoint « Gestion », comme dans la
+    // colonne de l'ordinateur.
+    { titre: 'Gestion', items: [...NAV_GESTION, ...NAV_OUTILS] },
   ];
   // (16 oct.) LISTE GROUPÉE FAÇON iOS : des groupes en cartes arrondies, une
   // rangée par écran (icône neutre · libellé · chevron), filets fins en retrait.

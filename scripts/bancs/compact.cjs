@@ -117,11 +117,22 @@ const ouvrirVente=async(p)=>{const t=p.locator('.vrm-sale-row .vrm-ledger-sale-t
   check((await p.locator('.vrm-sale-invoice').count())>0,'facture proposée au compte avec reçu Pro');
   await p.getByRole('button',{name:"Envoyer une facture à l'acheteur"}).first().click();
   check(await p.getByLabel('Facture de cette vente').isVisible(),'choix explicite facture, aucun envoi à ouverture');
-  await p.getByRole('button',{name:'Toute la période',exact:true}).click();await p.getByRole('button',{name:'Deux dates',exact:true}).click();
-  await p.getByLabel('Début de la période').fill('2026-10-20');await p.getByLabel('Fin de la période').fill('2026-10-10');await p.getByRole('button',{name:'Appliquer',exact:true}).click();
-  check(await p.getByRole('alert').isVisible(),'intervalle inversé refusé');
-  await p.getByLabel('Début de la période').fill('2020-01-01');await p.getByLabel('Fin de la période').fill('2020-01-31');await p.getByRole('button',{name:'Appliquer',exact:true}).click();
-  check((await p.locator('.vrm-sale-row').count())===0,'dates filtrent réellement les ventes');
+  // (31 oct.) La période se choisit au calendrier (ChoixPeriode, 29-30 oct.) : plus de « Deux dates » ni de champs.
+  //    Même règle jugée : un intervalle touché à l'envers n'est jamais appliqué à l'envers, et les dates filtrent vraiment.
+  const jours = async () => p.evaluate(() => [...document.querySelectorAll('[data-periode-panneau] [data-jour]')].filter((b) => !b.disabled).map((b) => b.getAttribute('data-jour')));
+  await p.goto(base+'/?tab=cat_ventes');await p.locator('.vrm-sale-row').first().waitFor(); // tiroir de la vente refermé
+  await p.locator('[data-periode-ouvrir]').first().click();await p.locator('[data-periode-panneau]').waitFor({timeout:5000});
+  let js = await jours(); const fin = js[Math.min(19, js.length-1)], debut = js[Math.min(9, js.length-1)];
+  await p.locator(`[data-periode-panneau] [data-jour="${fin}"]`).first().click();await p.locator(`[data-periode-panneau] [data-jour="${debut}"]`).first().click();
+  await p.locator('[data-periode-appliquer]').click();
+  const val = await p.locator('[data-periode-ouvrir]').first().getAttribute('data-periode-valeur');
+  check(!!val && val.split('..')[0] <= val.split('..')[1], 'intervalle touché à l\'envers : jamais appliqué à l\'envers ('+val+')');
+  await p.locator('[data-periode-ouvrir]').first().click();await p.locator('[data-periode-panneau]').waitFor({timeout:5000});
+  // Au téléphone, le panneau déroule les mois (ni « Mois précédent » ni « Un an plus tôt ») : on prend les deux
+  // PREMIERS jours qu'il montre, des mois avant toute vente de la base du banc.
+  js = await jours(); await p.locator(`[data-periode-panneau] [data-jour="${js[0]}"]`).first().click();await p.locator(`[data-periode-panneau] [data-jour="${js[1]}"]`).first().click();
+  await p.locator('[data-periode-appliquer]').click();await p.locator('.vrm-sale-row').first().waitFor({state:'detached',timeout:5000}).catch(()=>{});
+  check((await p.locator('.vrm-sale-row').count())===0,'dates filtrent réellement les ventes ('+js[0]+')');
   // ⚠️ Sur téléphone, la croix « Effacer la période » est masquée depuis le 14 octobre (156c95c, la période tient
   //    dans une case de 140 px) : le geste visible est « Réinitialiser les ventes » (période, recherche et filtre).
   //    On clique ce que la personne VOIT ; la croix cachée n'est pas un geste.
