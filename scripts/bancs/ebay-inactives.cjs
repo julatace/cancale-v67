@@ -214,13 +214,13 @@ async function ouvrir(b, vp, opts = {}) {
 //  qu'un délai fixe : sur une machine chargée, 1,5 s + 8 s ne suffisaient pas et
 //  chaque scénario tombait en « a levé » sans rien juger (§6.5).
 async function espaceEbayMonte(pg) {
-  await pg.waitForSelector('nav.vrm-platform-tabs [data-section="annonces"]', { timeout: 30000 }).catch(() => {});
+  // (31 oct., navigation par tâche) eBay → Annonces est Annonces filtré sur eBay.
+  await pg.waitForSelector('[data-tache-site="ebay"]', { timeout: 30000 }).catch(() => {});
   await pg.waitForTimeout(500);
 }
 async function versAnnonces(pg) {
-  await pg.goto(`http://localhost:${PORT}/?tab=plat_ebay`, { waitUntil: 'domcontentloaded' });
+  await pg.goto(`http://localhost:${PORT}/?tab=annonces&site=ebay`, { waitUntil: 'domcontentloaded' });
   await espaceEbayMonte(pg);
-  await pg.getByRole('button', { name: 'Annonces', exact: true }).first().click({ timeout: 8000 });
   await pg.waitForSelector('[data-ebay-inactives]:not([data-ebay-inactives="charge"])', { timeout: 15000 }).catch(() => {});
   await pg.waitForTimeout(800);
 }
@@ -303,9 +303,8 @@ const ligne = (s, id) => s.lignes.find((l) => l.id === id) || {};
         const voir = async (inactives) => {
           remettre(inactives ? { inactives } : {});
           const { ctx, pg } = await ouvrir(b, vp, { connected: false });
-          await pg.goto(`http://localhost:${PORT}/?tab=plat_ebay`, { waitUntil: 'domcontentloaded' });
+          await pg.goto(`http://localhost:${PORT}/?tab=annonces&site=ebay`, { waitUntil: 'domcontentloaded' });
           await espaceEbayMonte(pg);
-          await pg.getByRole('button', { name: 'Annonces', exact: true }).first().click({ timeout: 8000 });
           await pg.waitForSelector('[data-ebay-annonce]', { timeout: 15000 }).catch(() => {});
           await pg.waitForTimeout(2500);
           const s = await lire(pg); const annonce = !!(await pg.$('[data-ebay-annonce]'));
@@ -385,7 +384,8 @@ const ligne = (s, id) => s.lignes.find((l) => l.id === id) || {};
         dit(!a.retraitAuto && !!a.relancer, `${T} l'autre sens : une inactive absente du journal garde son lien`, JSON.stringify({ ra: a.retraitAuto, relancer: a.relancer }));
         // (28 oct.) Ventes : compte relié, ventes LUES, aucune ⇒ ne plus lui
         // demander de « relier ton compte » (geste déjà fait).
-        await pg.getByRole('button', { name: 'Ventes', exact: true }).first().click({ timeout: 8000 });
+        await pg.locator('.vrm-mobile-nav [data-nav-entree="ventes"], .vrm-sidebar [data-nav-entree="ventes"]').first().click({ timeout: 8000 });
+        await pg.locator('[data-filtre-site] button[data-site="ebay"]').first().click({ timeout: 8000 });
         await pg.waitForTimeout(1200);
         const tv = await pg.evaluate(() => document.body.innerText);
         dit(/Aucune vente eBay pour l'instant/.test(tv) && !/Relie ton compte/i.test(tv),

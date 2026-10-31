@@ -99,9 +99,9 @@ async function page(b, l, vp, { sombre = false } = {}) {
 
 async function selecteurEbay(b, l, vp) {
   const { ctx, pg, errs } = await page(b, l, vp);
-  await pg.goto(`http://localhost:${PORT}/?tab=plat_ebay`, { waitUntil: 'domcontentloaded' });
+  // (31 oct., navigation par tâche) eBay → Annonces est l'onglet Annonces filtré sur eBay.
+  await pg.goto(`http://localhost:${PORT}/?tab=annonces&site=ebay`, { waitUntil: 'domcontentloaded' });
   await pg.waitForTimeout(2500);
-  try { await pg.getByRole('button', { name: 'Annonces', exact: true }).first().click({ timeout: 5000 }); } catch (_) {}
   await pg.waitForTimeout(1500);
   const btn = await pg.$('text=Vendre un article sur eBay'); if (btn) await btn.click();
   await pg.waitForFunction(() => document.querySelectorAll('[data-choix-paire]').length > 0, null, { timeout: 12000 }).catch(() => {});
