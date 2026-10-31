@@ -220,10 +220,15 @@ const ast = parser.parse(app, { sourceType: 'module', plugins: ['jsx'], errorRec
       vm.runInContext(remplace ? remplace(src) : src, ctx);
       return els;
     };
-    const els = executer();
-    const mauvais = els.filter((e) => !(e.className === 'todo' && /^à compléter : /.test(e.textContent)) || /null|undefined/.test(e.textContent));
-    dit(mauvais.length === 0, `editeur.js exécuté : les ${els.length} champs vides s’affichent « à compléter … », surlignés — jamais « null », jamais inventés`, mauvais.map((e) => `${e.k}=${e.textContent}`).join(', '));
-    const rempli = executer((s) => s.replace(/\bemail:\s*null/, "email: 'contact@exemple.test'"));
+    // (31 oct.) Julien a posé son adresse : un champ REMPLI s'affiche, un champ VIDE dit « à compléter ».
+    //    La règle se juge sur chaque champ selon ce que le fichier porte (jamais « null », jamais inventé).
+    const vides = executer((s) => s.replace(/^(\s*\w+):\s*'[^']*',/gm, '$1: null,'));
+    const mauvais = vides.filter((e) => !(e.className === 'todo' && /^à compléter : /.test(e.textContent)) || /null|undefined/.test(e.textContent));
+    dit(mauvais.length === 0, `editeur.js exécuté : les ${vides.length} champs vides s’affichent « à compléter … », surlignés — jamais « null », jamais inventés`, mauvais.map((e) => `${e.k}=${e.textContent}`).join(', '));
+    const tel = executer();
+    const faux = tel.filter((e) => /null|undefined/.test(e.textContent) || (e.className !== 'todo' && !e.textContent && !(e.enfants[0] && e.enfants[0].href)));
+    dit(faux.length === 0, 'editeur.js tel qu’il est : chaque champ dit sa valeur ou « à compléter »', faux.map((e) => e.k).join(', '));
+    const rempli = executer((s) => s.replace(/\bemail:\s*(null|'[^']*')/, "email: 'contact@exemple.test'"));
     const e = rempli.find((x) => x.k === 'email');
     dit(e && e.enfants[0] && e.enfants[0].href === 'mailto:contact@exemple.test' && e.className !== 'todo', '… et le jour où l’adresse est posée, elle devient un lien mailto');
   });

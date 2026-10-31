@@ -17,7 +17,7 @@
   siret: null,          // 14 chiffres
   rcs: null,            // ex. « RCS Saint-Malo 123 456 789 » ou « non inscrit au RCS »
   tva: null,            // n° de TVA intracommunautaire, ou « TVA non applicable, art. 293 B du CGI »
-  email: null,          // adresse de contact (aussi point de contact DSA et demandes RGPD)
+  email: 'vrm.vinted35+contact@gmail.com',          // adresse de contact (aussi point de contact DSA et demandes RGPD)
   telephone: null,      // obligatoire pour une activité commerciale (LCEN art. 6-III)
   directeur: null,      // directeur de la publication (souvent le représentant légal)
   mediateur: null,      // médiateur de la consommation : nom + site web (art. L612-1 C. conso)

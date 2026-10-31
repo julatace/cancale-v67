@@ -113,7 +113,9 @@ function forwardVintedEmails() {
   compteVerifie=true;signalerPassageVRM('debut');
   const traite=labelVRM(LABEL),preuve=labelVRM(LABEL_PREUVE),erreur=labelVRM('vrm-a-reessayer');
   confirmationTransfertVRM();
-  const query='{from:(vinted OR mondialrelay OR chronopost OR privaterelay OR icloudmail OR leboncoin OR ebay OR colissimo OR laposte OR dpd OR gls OR ups OR relaiscolis) subject:(vinted OR vendu OR bordereau OR colis OR offre OR message OR achat OR commande OR facture)} -label:'+LABEL+' -label:vrm-configuration -in:spam -in:trash -in:sent after:'+getStartDate();
+  // (31 oct.) L'adresse de CONTACT de VRM (vrm.vinted35+contact@gmail.com, pages légales,
+  // Réglages) n'entre jamais dans la réception des colis : ce sont des clients qui écrivent.
+  const query='{from:(vinted OR mondialrelay OR chronopost OR privaterelay OR icloudmail OR leboncoin OR ebay OR colissimo OR laposte OR dpd OR gls OR ups OR relaiscolis) subject:(vinted OR vendu OR bordereau OR colis OR offre OR message OR achat OR commande OR facture)} -label:'+LABEL+' -label:vrm-configuration -to:(vrm.vinted35+contact@gmail.com) -in:spam -in:trash -in:sent after:'+getStartDate();
   // (22 oct.) `-in:sent` : ce que CETTE boîte envoie (factures, liens de
   // confirmation d'adresse — l'expéditeur contient « vinted ») n'est pas un
   // email reçu, il ne repart pas vers VRM.

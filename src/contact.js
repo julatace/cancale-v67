@@ -13,7 +13,7 @@
 //    ce fichier). `scripts/audit-lancement.cjs` exige que les deux disent la
 //    même chose : une adresse sur les pages légales et une autre dans l'app
 //    serait deux réponses à « comment vous joindre ? ».
-export const CONTACT_EMAIL = '';
+export const CONTACT_EMAIL = 'vrm.vinted35+contact@gmail.com';
 
 export const CONTACT_A_VENIR = 'adresse de contact à venir';
 const FORME = /^[^@\s<>"']+@[^@\s<>"']+\.[^@\s<>"']+$/;
