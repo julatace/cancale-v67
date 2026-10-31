@@ -137,7 +137,8 @@ const capture = async (pg, nom) => { if (!CAPTURES) return; try { fs.mkdirSync(C
 // Ce que l'écran courant dit de lui-même (attributs, jamais un libellé).
 const etat = (pg) => pg.evaluate(() => {
   const t = document.querySelector('[data-tache]');
-  const f = t ? t.querySelector('[data-filtre-site]') : null;
+  // (31 oct.) Sur ordinateur la rangée monte dans la barre du haut (`DansBarreHaut`, maquette de Julien).
+  const f = t ? (t.querySelector('[data-filtre-site]') || document.querySelector('[data-barre-haut] [data-filtre-site]')) : null;
   return {
     tache: t ? t.getAttribute('data-tache') : '',
     site: t ? t.getAttribute('data-tache-site') : '',

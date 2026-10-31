@@ -32,7 +32,7 @@ import {preparerLiaisonOAuth,lireLiaisonOAuth,resultatLiaisonPermis} from './aut
 import ConnexionsCompte from './auth/ConnexionsCompte.jsx';
 import {etatColisDepuisTexte,normaliserSuivi} from '../api/_lib/etat-colis-email.js';
 import {achatDuColis,suivisAchat,entreeIndexAchat} from './liensColis.js';
-import {avecSuiviDuSujet,finsDesLignes,sortiParSuivis,sortiParSuivi,suiviDeLigne,lienSuivi,codePostalLu,nouvelleVinted,transporteurDeForme,suiviValide,TRANSPORTEURS_SAISIE,normaliserCodePostal,idSuiviManuel,relireLigneSuivi,finDeCommandeAchat,fusionTransporteur,ligneDuTransporteur,ligneDeSuiviTransporteur,leverGarde,SELECT_TRANSP_META,ligneTranspDeMeta,sensDeLigne,incidentDeSuivis,incidentDeLigne,repartiAffichable} from '../api/_lib/suivi-colis.js';
+import {avecSuiviDuSujet,finsDesLignes,sortiParSuivis,sortiParSuivi,suiviDeLigne,lienSuivi,codePostalLu,nouvelleVinted,transporteurDeForme,suiviValide,TRANSPORTEURS_SAISIE,normaliserCodePostal,idSuiviManuel,relireLigneSuivi,finDeCommandeAchat,fusionTransporteur,ligneDuTransporteur,ligneDeSuiviTransporteur,leverGarde,SELECT_TRANSP_META,ligneTranspDeMeta,sensDeLigne,incidentDeSuivis,incidentDeLigne,repartiAffichable,nomTransporteurSuivi} from '../api/_lib/suivi-colis.js';
 import {ligneTransporteur,texteCodePostalMr,carrierLisible,carrierNonLu,nomTransporteur,LECTURE_SERVEUR_TRANSP,heureParis} from '../api/_lib/transporteurs.js';
 import PhotoProfil,{AvatarCompte} from './profil/AvatarPersonnel.jsx';
 import PorteConfidentialite from './PorteConfidentialite.jsx';
@@ -107,6 +107,9 @@ import { DESCRIPTION_ORGANISATION } from "./operations/description.js";
 // (31 oct.) Colis → « À retirer » : la carte des points relais (règle pure + carte).
 import { regrouperRelais } from "./relaisColis.js";
 import CarteRelaisColis from "./CarteRelais.jsx";
+import ColisColonnes from "./ColisColonnes.jsx";
+import "./styles-barre-haut.css";
+import { colonnesColis, SITES_COLIS } from "./colisColonnes.js";
 import { SITES_TACHE, TACHES_SITE, estTacheSite, siteDeTache, redirigerOnglet, filtreRetenu, retenirFiltre } from "./navigationTache.js";
 // La migration qui cloisonne les vendeurs, lue depuis LE fichier (pas recopiée) :
 // deux copies finiraient par diverger, et c'est le genre de texte qu'on colle
@@ -14133,7 +14136,31 @@ const DansEspacePlateforme = React.createContext(false);
 function EspacePlateforme({ nom, children }) {
   return <section className="vrm-market-space" aria-label={nom}><DansEspacePlateforme.Provider value={true}>{children}</DansEspacePlateforme.Provider></section>;
 }
-function ScreenHead({ icon, title, desc, right, principal }) {
+// (31 oct., maquette Colis) LA BARRE DU HAUT SUR ORDINATEUR : la recherche à
+// gauche, et à droite la rangée de filtres de site de l'écran quand il en a une.
+// Un écran y pose sa rangée par `DansBarreHaut` (un portail vers la place que
+// la coque réserve) ; sur téléphone il n'y a pas de barre : la rangée reste où
+// l'écran l'a écrite.
+const BarreHautSlot = React.createContext(null);
+function DansBarreHaut({ children }) {
+  const el = React.useContext(BarreHautSlot);
+  return el ? createPortal(children, el) : children;
+}
+function BarreHaut({ onChercher, poserSlot }) {
+  return (
+    <div className="vrm-barre-haut" data-barre-haut="">
+      <button type="button" className="vrm-barre-recherche" data-barre-recherche="" onClick={onChercher} aria-label="Rechercher une paire" title="Rechercher : un N°, un modèle, une marque (touche /)" aria-keyshortcuts="/">
+        <Icon name="search" size={18}/>
+        {/* La recherche existante cherche le N°, le modèle et la marque — pas
+            l'acheteur : la phrase ne le promet pas. */}
+        <span className="vrm-barre-recherche-txt">Tape un N°, un modèle, une marque…</span>
+        <kbd className="vrm-barre-kbd">/</kbd>
+      </button>
+      <div className="vrm-barre-haut-droite" ref={poserSlot}/>
+    </div>
+  );
+}
+function ScreenHead({ icon, title, desc, right, principal, sous }) {
   const line = typeof icon === 'string' && ICON_PATHS[icon];
   const Titre = React.useContext(DansEspacePlateforme) ? 'h2' : 'h1';
   // ⚠️ UNE MANCHETTE, PAS UN EN-TÊTE DE TABLEAU DE BORD. Le titre était une
@@ -14163,6 +14190,7 @@ function ScreenHead({ icon, title, desc, right, principal }) {
             ? <span aria-hidden="true" style={{display:'flex',color:C.muted,flexShrink:0}}><Icon name={icon} size={20}/></span>
             : (icon ? <span aria-hidden="true" style={{fontSize:18}}>{icon}</span> : null)}
           <Titre className="vrm-display" style={{color:C.text}}>{title}</Titre>
+          {sous ? <div className="vrm-screen-head-sous" data-sous-titre="">{sous}</div> : null}
           {/* ⚠️ LA DESCRIPTION D'ÉCRAN N'EST PLUS AFFICHÉE. Julien : « il y a trop
               d'informations partout, c'est horrible ». Ce paragraphe explique ce
               que fait l'écran — on le lit UNE fois, puis c'est du bruit tous les
@@ -41893,7 +41921,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // ou retiré relit (le cache ne sert plus une liste qui ne le couvre pas).
   useEffect(() => { if (accounts.length) loadOrders('sold', setSales); /* eslint-disable-next-line */ }, [cleComptes]);
   useEffect(() => { buysCharges.current = Array.isArray(buys.items); }, [buys.items]);
-  useEffect(() => { if ((curSub==='achats'||curSub==='journee') && accounts.length && (buys.items===null || (buys.comptes && buys.comptes!==cleComptes))) loadOrders('purchased', setBuys); /* eslint-disable-next-line */ }, [sub, cleComptes]);
+  // (31 oct.) Colis lit aussi les achats : sa colonne « À retirer » est la liste de `pickupUnion`.
+  useEffect(() => { if ((curSub==='achats'||curSub==='journee'||curSub==='bordereaux') && accounts.length && (buys.items===null || (buys.comptes && buys.comptes!==cleComptes))) loadOrders('purchased', setBuys); /* eslint-disable-next-line */ }, [sub, cleComptes]);
 
   // AUTO-LOCK : dès qu'une vente finalisée correspond à UNE SEULE annonce
   // numérotée (titre non ambigu), on verrouille le lien vente↔paire par n° de
@@ -42436,7 +42465,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       viderCacheLignes();                                          // vide le cache de lignes (relit la moisson fraîche)
       try { Object.keys(_acctCache).forEach(k => delete _acctCache[k]); _persistAcctCache(); } catch (_) {}
       if (curSub === 'ventes' || curSub === 'journee' || curSub === 'messages') loadOrders('sold', setSales, false, { silencieux: true });
-      if (curSub === 'achats' || curSub === 'journee') { loadOrders('purchased', setBuys, false, { silencieux: true }); lireSuivis(); }
+      if (curSub === 'achats' || curSub === 'journee' || curSub === 'bordereaux') { loadOrders('purchased', setBuys, false, { silencieux: true }); lireSuivis(); }
       if (curSub === 'annonces' || curSub === 'journee' || curSub === 'messages') loadListings();
       if (curSub === 'messages' || curSub === 'journee') loadConvs();
     };
@@ -44923,6 +44952,73 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const signatureColis = e => empreinteColis({owner:AUTH.user?.id||'',compte:e.o?._acc?.vinted_user_id||e.b?.uid||'',transaction:e.txn||e.key,numero:(e.b?numForBord(e.b):'')||(e.o?effEntry(e.o)?.numero:'')||''});
   const [progressionLot,setProgressionLot]=useState(null);
   const lotActuel=React.useRef(null);lotActuel.current={expeditions,signatureColis,pdf:e=>(e.b&&e.b.hasPdf)||(e.txn&&labelsCaptes[e.txn])};
+  // ── (31 oct.) LES CARTES DES QUATRE COLONNES DE COLIS ──────────────────
+  // Chaque carte porte le groupe que lui donne une règle EXISTANTE (aucune règle
+  // de classement neuve) : `expeditions()` + `pret` + `isShipDone` pour les
+  // ventes Vinted, `colisEbay`, `colisVestiaire`, `pickupUnion` pour les
+  // retraits, `venteStage` pour les partis. `colonnesColis` les range.
+  const [siteColis, setSiteColis] = useState('toutes');
+  const cartesColis = () => {
+    const L = [];
+    const nomAvecTaille = (titre, o) => { const t = String(titre || '').trim(); const e = o ? effEntry(o) : null; const tl = e && e.taille ? String(e.taille) : ''; return tl && !tailleDansTitre(t, tl) ? `${t} · ${tl}` : t; };
+    const lectureFinie = labelsPrets && emailBords !== null;
+    for (const e of expeditions()) {
+      const o = e.o, b = e.b;
+      const poste = o ? isShipDone(o) : (b ? isBordShippedManual(b) : false);
+      const num = (b ? numForBord(b) : '') || (o ? (effEntry(o)?.numero || '') : '');
+      const lim = texteLimiteEnvoi(e.lim) || '';
+      const groupe = poste ? 'fait' : (e.pret ? 'pret' : 'attente');
+      const etat = groupe === 'fait' ? 'Coché posté · Vinted ne l’a pas encore vu partir'
+        : groupe === 'pret' ? (lim || 'bordereau prêt')
+        : [lectureFinie ? 'bordereau pas encore là' : 'bordereau pas encore lu', lim].filter(Boolean).join(' · ');
+      L.push({ cle: 'v:' + (e.txn || e.key), groupe, site: 'vinted', nom: nomAvecTaille(o ? o.title : (b && (b.modele || b.article)) || 'Bordereau', o), photo: o ? orderPhoto(o) : bordPhoto(b),
+        num, etat, ambre: groupe !== 'fait' && e.dl != null && e.dl <= 1, ouvrir: groupe !== 'fait', tx: e.txn || '' });
+    }
+    if (colisEb) {
+      const numEb = (x) => x.ordre ? (numLigneEbay(x.ordre, (x.ordre.lineItems || [])[0]) || '') : '';
+      for (const x of (colisEb.nePasPoster || [])) L.push({ cle: 'e:' + x.compte + ':' + x.orderId, groupe: 'ebay', site: 'ebay', nom: x.titre || `Commande ${x.orderId}`, num: numEb(x), etat: 'eBay · ne poste pas : annulation demandée', ambre: true, ouvrir: true, ebay: x });
+      for (const x of (colisEb.aVerifier || [])) L.push({ cle: 'e:' + x.compte + ':' + x.orderId, groupe: 'ebay', site: 'ebay', nom: x.titre || `Commande ${x.orderId}`, num: numEb(x), etat: 'eBay · à vérifier avant de poster', aVerifier: true, ouvrir: true, ebay: x });
+      for (const x of (colisEb.aPoster || [])) { const dl = x.jours;
+        const urg = dl == null ? '' : dl < 0 ? `${-dl} j de retard` : dl === 0 ? "à poster aujourd'hui" : dl === 1 ? 'à poster demain' : `${dl} j pour poster`;
+        L.push({ cle: 'e:' + x.compte + ':' + x.orderId, groupe: 'ebay', site: 'ebay', nom: x.titre || `Commande ${x.orderId}`, num: numEb(x), etat: ['eBay · étiquette à prendre dans eBay', urg].filter(Boolean).join(' · '), ambre: dl != null && dl <= 1, ouvrir: true, ebay: x }); }
+    }
+    const vc = colisVestiaire(vcEtat);
+    for (const v of ((vc && vc.aEnvoyer) || [])) { const j = joursAvantVc(v.limite);
+      L.push({ cle: 'vc:' + v.id, groupe: 'vestiaire', site: 'vestiaire', nom: 'Vente Vestiaire', num: v.num || '', etat: ['Vestiaire · ' + (v.etiquette === true ? 'bordereau sur Vestiaire' : 'pas encore de bordereau'), j == null ? '' : j < 0 ? 'date limite passée' : j === 0 ? "à poster aujourd'hui" : j === 1 ? 'à poster demain' : ''].filter(Boolean).join(' · '), ambre: j != null && j <= 1, ouvrir: true }); }
+    const maintenant = Date.now();
+    const photoAchat = (o) => (o ? (orderPhoto(o) || (indexSuivisAchats[String(o.transaction_id)] || {}).photo || null) : null);
+    const tpmC = transpMap;
+    const dernierJour = (j) => (Number.isFinite(j) && j <= 1 ? (j <= 0 ? "dernier jour aujourd'hui" : 'dernier jour demain') : '');
+    for (const t of (pickupUnion.emailList || [])) {
+      const a = achatDuColis(t, buysBase, indexSuivisAchats); const cl = cleanLieu(t.lieu); const code = codeRetrait(t.code); const ej = etatColisEmail(t, maintenant).jours;
+      L.push({ cle: 'r:e:' + (suiviDeLigne(t) || t.id || ''), groupe: 'retirer', site: 'vinted', nom: nomAvecTaille(a ? a.title : (nomTransporteurSuivi(t.carrier) !== 'Colis' ? `Colis ${nomTransporteurSuivi(t.carrier)}` : 'Colis à retirer'), a), photo: a ? photoAchat(a) : (t.photo || null),
+        etat: [cl.nom || (nomTransporteurSuivi(t.carrier) !== 'Colis' ? nomTransporteurSuivi(t.carrier) : ''), dernierJour(ej) || (code ? code : (qrImage(t) ? 'QR code' : 'code pas encore lu'))].filter(Boolean).join(' · '), ambre: Number.isFinite(ej) && ej <= 1, ouvrir: true });
+    }
+    for (const o of (pickupUnion.extra || [])) {
+      const r = relaisDe(o); const cl = cleanLieu(r && r.lieu); const code = r ? codeRetrait(r.code) : ''; const ej = etatColisVinted(o, maintenant, tpmC).jours;
+      L.push({ cle: 'r:v:' + o.transaction_id, groupe: 'retirer', site: 'vinted', nom: nomAvecTaille(o.title || 'Achat', o), photo: photoAchat(o), num: '',
+        etat: [cl.nom || 'au point relais', dernierJour(ej) || (code || 'code pas encore lu')].filter(Boolean).join(' · '), ambre: Number.isFinite(ej) && ej <= 1, ouvrir: true });
+    }
+    for (const x of (pickupUnion.aVerifier || [])) {
+      const o = x.kind === 'email' ? (x.o || achatDuColis(x.t, buysBase, indexSuivisAchats)) : x.o;
+      const lieu = x.kind === 'email' ? (cleanLieu(x.t && x.t.lieu).nom || (x.t && x.t.carrier) || '') : (cleanLieu((relaisDe(x.o) || {}).lieu).nom || '');
+      L.push({ cle: x.kind === 'email' ? 'r:e:' + (suiviDeLigne(x.t) || (x.t && x.t.id) || '') : 'r:v:' + (x.o && x.o.transaction_id), groupe: 'retirer', site: 'vinted', nom: nomAvecTaille(o ? o.title : (x.t && nomTransporteurSuivi(x.t.carrier) !== 'Colis' ? 'Colis ' + nomTransporteurSuivi(x.t.carrier) : 'Colis à retirer'), o), photo: o ? photoAchat(o) : ((x.t && x.t.photo) || null),
+        etat: [lieu, 'à vérifier : délai dépassé ou incident'].filter(Boolean).join(' · '), aVerifier: true, ouvrir: true });
+    }
+    for (const o of (pickupUnion.aConfirmer || [])) L.push({ cle: 'r:c:' + o.transaction_id, groupe: 'retirer', site: 'vinted', nom: nomAvecTaille(o.title || 'Achat', o), photo: photoAchat(o), etat: 'au point relais · à vérifier (compte pas relu)', aVerifier: true, ouvrir: true });
+    // Partis : la règle de la section « Partis » plus bas (même filtre, même ordre).
+    if (Array.isArray(sales.items)) {
+      const ordre = { 'Retournée': 0, 'Retour en cours': 0, 'Au relais': 1, 'En transit': 2, 'Livrée': 3 };
+      const TXT = { 'Retournée': 'Retour à vérifier', 'Retour en cours': 'Retour en cours', 'Au relais': 'Au relais de l’acheteur', 'En transit': 'En transit', 'Livrée': 'Livré' };
+      sales.items
+        .filter(o => o && !hiddenSales.has(String(o.transaction_id)) && !aExpedier(o))
+        .map(o => ({ o, st: venteStage(o), j: o.date ? Math.floor((Date.now() - new Date(o.date).getTime()) / 86400000) : null }))
+        .filter(x => ordre[x.st.label] != null && (x.j == null || x.j <= 45))
+        .sort((a, b) => (ordre[a.st.label] - ordre[b.st.label]) || ((b.j ?? 0) - (a.j ?? 0)))
+        .forEach(({ o, st }) => L.push({ cle: 'p:' + o.transaction_id, groupe: 'parti', site: 'vinted', nom: nomAvecTaille(o.title || 'Vente', o), photo: orderPhoto(o), num: effEntry(o)?.numero || '', etat: TXT[st.label] || st.label, ambre: ordre[st.label] === 0, ouvrir: false }));
+    }
+    return L;
+  };
   const ouvrirLot = () => {
     const L = lignesLot();
     if (!L.length) { toast('Aucun bordereau prêt à imprimer pour l\'instant.'); return; }
@@ -49752,7 +49848,48 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
 
       {/* ── Bordereaux (ventes non annulées avec un numéro, à imprimer) ── */}
       {curSub==='bordereaux' && (<>
-        <ScreenHead icon="doc" title="Colis" desc="Ce que Vinted attend de toi, capté par l'extension. Le bordereau manquant est généré tout seul quand tu passes sur Vinted, puis déposé ici. Un colis parti disparaît sans rien cocher."/>
+        {(()=>{
+          // ── (31 oct.) LA MAQUETTE DE JULIEN : QUATRE COLONNES ─────────────
+          // « Prêts à imprimer » · « En attente » · « À retirer » · « Partis ».
+          // Le bouton « Imprimer les N prêts » est l'ancien « Tout imprimer » :
+          // la même action (`ouvrirLot`), le même compte (`lignesLot`, §11).
+          const cartes = cartesColis();
+          const vue = colonnesColis(cartes, siteColis);
+          const nPrets = lignesLot().length;
+          const sitesVus = SITES_COLIS.filter(x => vue.parSite[x]);
+          const nomSite = { vinted: 'Vinted', leboncoin: 'Leboncoin', ebay: 'eBay', vestiaire: 'Vestiaire' };
+          const ouvrir = (x) => {
+            if (x.ebay) { DEMANDE_EBAY_CIBLE.compte = x.ebay.compte; DEMANDE_EBAY_CIBLE.id = x.ebay.orderId; DEMANDE_EBAY_CIBLE.at = Date.now(); onNav && onNav('ebay_ventes'); return; }
+            if (x.site === 'vestiaire') { onNav && onNav('plat_vestiaire'); return; }
+            if (x.groupe === 'retirer') { onNav && onNav('cat_achats'); return; }
+            const el = x.tx ? document.querySelector(`[data-bord-card][data-tx-colis="${CSS.escape(String(x.tx))}"]`) : null;
+            if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); el.classList.add('vrm-cc-cible'); setTimeout(() => el.classList.remove('vrm-cc-cible'), 1600); }
+          };
+          // « Pas su » se DIT dans la colonne concernée, jamais un 0 muet (§5).
+          const notes = {
+            prets: (sales.loading && !sales.items) ? 'Je lis tes ventes…' : (sales.error && !(sales.items||[]).length) ? 'Tes ventes Vinted n’ont pas pu être lues.' : (!labelsPrets || emailBords===null) ? 'Je lis encore tes bordereaux : il y en a peut-être plus.' : null,
+            attente: colisEb === null ? 'Ventes eBay pas lues pour l’instant.' : null,
+            retirer: tracking===null ? 'E-mails de suivi pas encore lus.' : (buys.items===null && buys.loading) ? 'Je lis tes achats…' : null,
+          };
+          return (<>
+            <ScreenHead icon="doc" title="Colis" sous="Rangés sur ce que tu peux faire maintenant"
+              desc="Ce que Vinted attend de toi, capté par l'extension. Le bordereau manquant est généré tout seul quand tu passes sur Vinted, puis déposé ici. Un colis parti disparaît sans rien cocher."
+              right={nPrets>0 && (siteColis==='toutes'||siteColis==='vinted') ? <Bouton variante="primaire" icone="printer" data-lot-ouvrir="1" data-imprimer-prets={nPrets} onClick={ouvrirLot} disabled={batchBusy}
+                title="Tamponne tous les bordereaux reçus (numéro + titre) et les met à la suite dans un seul PDF">{batchBusy?'Préparation…':`Imprimer ${nPrets===1?'le prêt':`les ${nPrets} prêts`}`}</Bouton> : null}/>
+            {sitesVus.length > 1 && (
+              <DansBarreHaut>
+                <div className="vrm-rangee vrm-filtres vrm-filtre-site" role="group" aria-label="Filtrer les colis par site" data-filtre-site="colis">
+                  {['toutes', ...sitesVus].map(x => <button key={x} type="button" aria-pressed={siteColis===x} data-site={x} onClick={()=>setSiteColis(x)}>{x==='toutes'?'Tous les sites':nomSite[x]}</button>)}
+                </div>
+              </DansBarreHaut>
+            )}
+            {siteColis!=='toutes' && <div data-colis-filtre-note="" style={{fontSize:12,color:C.muted,margin:'0 2px 6px'}}>{vue.colonnes.reduce((t,c)=>t+c.cartes.length,0)} colis {nomSite[siteColis]} sur {vue.total} · <button type="button" className="vrm-lien-action" onClick={()=>setSiteColis('toutes')} style={{border:0,background:'transparent',padding:0,color:C.text,fontWeight:600,cursor:'pointer',fontFamily:'inherit',fontSize:12,minHeight:44}}>tout voir</button></div>}
+            <ColisColonnes colonnes={vue.colonnes} total={vue.total} onOuvrir={ouvrir} notes={notes}
+              Photo={(src) => imgMortes.has(src) ? null : <PhotoVinted src={src} alt="" loading="lazy" decoding="async" onError={()=>noterImgMorte(src)}/>}
+              pieds={{ retirer: groupesRelais && groupesRelais.groupes && (groupesRelais.groupes.length || groupesRelais.enRouteSansRelais) ? <CarteRelaisColis donnees={groupesRelais} C={C} compacte/> : null }}/>
+            <h2 className="vrm-colis-detail-titre" data-colis-detail="" style={{fontSize:'var(--vrm-t-section, 22px)',margin:'8px 2px 12px',color:C.text}}>Colis par colis</h2>
+          </>);
+        })()}
         {/* ⚠️ Un colis déjà expédié qui traîne ici vient presque toujours d'une
             capture ancienne (statut figé), pas d'un défaut. On le dit (§11, même
             message partout). */}
@@ -49846,13 +49983,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   {(()=>{ const u=urgenceColis(); if(!u.total || u.total<aPoster.length) return null;
                     return <div data-colis-urgence-ligne="" style={{fontSize:11.5,color:C.warn,fontWeight:600,marginTop:3}}>{u.parts.join(' · ')}{u.presseAttente ? <> — {ouSontLesPresses(u)}</> : null}</div>; })()}
                 </div>
-                {avecPdf.length>0 && (
-                  <button type="button" data-lot-ouvrir="1" onClick={ouvrirLot} disabled={batchBusy}
-                    title="Tamponne tous les bordereaux reçus (numéro + titre) et les met à la suite dans un seul PDF"
-                    className="vrm-colis-lot" style={{flexShrink:0,display:'inline-flex',alignItems:'center',justifyContent:'center',gap:8,border:'none',borderRadius:10,background:C.accent,color:'#fff',padding:'0 18px',minHeight:44,cursor:batchBusy?'default':'pointer',fontSize:14,fontWeight:600,fontFamily:'inherit',opacity:batchBusy?0.6:1}}>
-                    <Icon name="printer" size={16}/>{batchBusy?'Préparation…':avecPdf.length===1?'Imprimer':`Tout imprimer (${avecPdf.length})`}
-                  </button>
-                )}
+                {/* (31 oct.) « Tout imprimer » est monté dans l'en-tête : « Imprimer les N prêts » (même action, même compte). */}
                 {aGenItems.length>0 && <BoutonToutGenerer items={aGenItems}/>}
                 {lot && (()=>{
                   const L = lot.lignes || lignesLot();
@@ -59489,6 +59620,19 @@ function AppCoeur() {
   // masse », « Réglages » repassaient DESSOUS (verif_visuel). On publie sa
   // largeur réelle dans `--vrm-ile`, que la règle de index.html lit.
   const ileRef = React.useRef(null);
+  // (31 oct.) La place des filtres de site dans la barre du haut (ordinateur).
+  const [slotBarre, setSlotBarre] = React.useState(null);
+  // « / » ouvre la recherche (hors d'un champ de saisie), comme la maquette.
+  React.useEffect(() => {
+    const k = (e) => {
+      if (e.key !== '/' || e.ctrlKey || e.metaKey || e.altKey || e.defaultPrevented) return;
+      const t = e.target; const tag = t && t.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || (t && t.isContentEditable)) return;
+      e.preventDefault(); setGsOpen(true);
+    };
+    window.addEventListener('keydown', k);
+    return () => window.removeEventListener('keydown', k);
+  }, []);
   React.useEffect(() => {
     const el = ileRef.current;
     if (!ordi || !el || typeof ResizeObserver === 'undefined') { try { document.documentElement.style.removeProperty('--vrm-ile'); } catch (_) {} return undefined; }
@@ -60968,7 +61112,7 @@ function AppCoeur() {
           <h1>{TITRES_TACHE[t]}</h1>
         </header>
         <div className="vrm-tache-filtres" style={{padding:'0 16px'}}>
-          <FiltreSites tache={t} site={site} sites={sitesPresents} onSite={(s)=>setPlatSub(s)}/>
+          <DansBarreHaut><FiltreSites tache={t} site={site} sites={sitesPresents} onSite={(s)=>setPlatSub(s)}/></DansBarreHaut>
         </div>
         {site==='toutes'
           ? (baseKO ? <div style={{padding:16}}><LignePanne>Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui a échoué.</LignePanne></div>
@@ -61201,9 +61345,9 @@ function AppCoeur() {
                 écrans (Julien, 5 octobre). Voir `EtatActions`. */}
             {MULTI_USER && <EtatActions onNav={setTab} ordi={ordi} sombre={eD}/>}
             <PastilleStream/>
-            <button className="vrm-hbtn" type="button" onClick={()=>{setGsOpen(true);}} title="Rechercher" aria-label="Rechercher une paire" aria-pressed={gsOpen}>
+            {!ordi && <button className="vrm-hbtn" type="button" onClick={()=>{setGsOpen(true);}} title="Rechercher" aria-label="Rechercher une paire" aria-pressed={gsOpen}>
               <Icon name="search" size={21}/>
-            </button>
+            </button>}
             {/* Messages et Paramètres retirés de l'en-tête (Julien, 16 oct.) : ils sont
                 dans la navigation (rail, menu « Ton espace ») — deux portes de trop. */}
             </>); })()}
@@ -61348,6 +61492,10 @@ function AppCoeur() {
         // réserver sa hauteur : juste une marge pour ne pas coller la dernière
         // carte à la barre.
         paddingBottom: ordi ? 40 : 'calc(20px + env(safe-area-inset-bottom))'}}>
+        {/* (31 oct., maquette Colis) Sur ordinateur, la barre du haut : la
+            recherche (touche « / ») et la place des filtres de site de l'écran. */}
+        {ordi && <BarreHaut onChercher={()=>setGsOpen(true)} poserSlot={setSlotBarre}/>}
+        <BarreHautSlot.Provider value={ordi ? slotBarre : null}>
         <EcranGardeFou resetKey={tab}>
         {/* ⚠️⚠️ UN SEUL ENDROIT POUR « JE N'ARRIVE PAS À LIRE TES DONNÉES ».
             Mon premier correctif posait la garde ÉCRAN PAR ÉCRAN : j'en avais
@@ -61602,6 +61750,7 @@ function AppCoeur() {
         {tab==='vintedaccounts'&&<VintedAccounts accounts={vintedAccounts} setAccounts={setVintedAccounts} baseKO={baseKO} onRetour={()=>setTab('settings')}/>}
         </>)}
         </EcranGardeFou>
+        </BarreHautSlot.Provider>
       </main>
       {bienvenue && <Bienvenue prenom={String(load('vrm_prenom','')||'').trim()} dark={!!dark}
         onTheme={(d)=>{ if(!!d!==!!dark) toggleDark(); }}

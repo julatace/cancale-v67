@@ -529,6 +529,7 @@ vérifier par `curl https://vrm.center/api/sante`.
   (ALLUMÉ chez lui) ; libellés de la barre du bas à 9 px.
 
 ### Décisions et chantiers (octobre 2026)
+- **31 oct. (soir)** — Colis en 4 colonnes (Prêts · En attente · À retirer · Partis, sa maquette) + barre du haut ordinateur (recherche « / », filtres de site à droite) ; aucune règle neuve, la liste d'avant reste sous « Colis par colis ». → historique colis-retraits. Geste : regarder Colis sur ordinateur.
 - **31 oct.** — **Prix 16,99 €/mois** (sa décision ; 14,99 € depuis le 27 oct., CGV version 2026-10-31, essai 7 j inchangé) ; adresse de contact **vrm.vinted35+contact@gmail.com** (sa décision), tenue hors de la réception des colis (`gmail-forwarder.gs`, à recoller). Geste : prix Stripe à 16,99 €.
 - **31 oct.** — Emails : journal « Tes emails, ce que VRM en a fait » (Paramètres → Emails → Journal, et depuis Colis) : une phrase par email, raison et geste ; résumé court écrit au classement (`api/_lib/resume-email.js`), texte à part (`email_texte_*`), `mode=journal` paginé (≈ 11 Ko/page). → historique sécurité-base-serveur. Geste : aucun.
 - **31 oct.** — Extension **5.295.0** (intégrée avec la 5.294.0) : Vestiaire — compte ouvert, conversations lues, réponse sur son clic par recette APPRISE, favoris en nombre ; Colis → « À retirer » par point relais sur une carte, arrivées estimées (suivi Vinted). → historique vestiaire / colis-retraits. Geste : installer, envoyer UNE réponse soi-même sur Vestiaire, toucher « Suivre le colis » d'un achat en route.
