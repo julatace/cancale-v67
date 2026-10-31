@@ -106,8 +106,9 @@
      dans Comptabilité et dans Ventes ; un total partiel garde son « au moins ». */
   .vrm-app-shell .vrm-day-layout .vrm-day-note,
   .vrm-app-shell .vrm-day-layout [data-vendu-manque],
-  .vrm-app-shell .vrm-day-layout [data-depenses-choix],
-  .vrm-app-shell .vrm-day-layout [data-journee-benef-masquer] { display: none !important; }
+  .vrm-app-shell .vrm-day-layout [data-depenses-choix] { display: none !important; }
+  /* (31 oct.) « Masquer le bénéfice » n'est plus caché ici : il n'existe plus
+     qu'en mode « Modifier » (c'est là qu'il se range, plus dans Réglages). */
 }
 @media (max-width: 767px) {
   /* … sauf quand le bénéfice ne se calcule pas : la note dit où il se calcule. */
@@ -124,7 +125,7 @@
   .vrm-app-shell .vrm-day-layout .vrm-day-recent .vrm-carrousel > button > div + div { padding: 9px 11px 11px !important; }
 }
 @media (max-width: 767px) {
-  :root[data-theme="dark"] .vrm-app-shell .vrm-day-layout .vrm-day-recent .vrm-carrousel > button > div:first-child { background: #1C3339 !important; }
+  :root[data-theme="dark"] .vrm-app-shell .vrm-day-layout .vrm-day-recent .vrm-carrousel > button > div:first-child { background: var(--vrm-photo, #252522) !important; }
 }
 /* Le défilement vit dans <main>, jamais dans la page (Julien, 27 oct. : « quand
    je défile, ça descend tout en bas »). Un titre caché en position absolue

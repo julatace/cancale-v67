@@ -34,6 +34,7 @@
 // Ce qui est jugé : des `data-*` et ce que les ponts ont REÇU — pas une formulation.
 const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
 const { metaVersData } = require('./_meta.cjs');
+const { monterTiroirs } = require('./_tiroirs.cjs');
 const fs = require('fs'), http = require('http'), path = require('path'), os = require('os');
 const DIST = path.join(__dirname, '..', '..', 'dist');
 const PORT = Number(process.env.BANC_PORT) || 4793;
@@ -169,7 +170,10 @@ async function rendre(b, { ponts, onglet = 'cat_ventes', tel = false, vrm = null
   // Machine chargée : la liste des ventes peut arriver après 4,5 s (10 rouges
   // sur un écran intact le 20 oct.). On attend l'ÉTAT — les ventes rendues —,
   // borné ; les contrôles restent exacts.
-  if (onglet === 'cat_ventes') await pg.waitForSelector('[data-bouton-bord]', { state: 'attached', timeout: 15000 }).catch(() => {});
+  if (onglet === 'cat_ventes') await pg.waitForSelector('.vrm-sale-row[data-tx]', { state: 'attached', timeout: 15000 }).catch(() => {});
+  // (31 oct.) Le tiroir d'une vente n'est monté qu'à sa première ouverture :
+  // on ouvre chaque vente, comme une personne, avant de lire ses boutons (`_tiroirs.cjs`).
+  if (onglet === 'cat_ventes') await monterTiroirs(pg);
   const lire = () => pg.evaluate(() => ({
     boutons: [...document.querySelectorAll('[data-bouton-bord]')].map((x) => ({ etat: x.getAttribute('data-bouton-bord'), tx: x.getAttribute('data-tx'), txt: x.innerText })),
     raisons: [...document.querySelectorAll('[data-raison-bord]')].map((x) => ({ code: x.getAttribute('data-raison-bord'), txt: x.innerText })),

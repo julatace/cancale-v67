@@ -1,6 +1,6 @@
 import './_lib/sans-bruit.js';
 import crypto from 'node:crypto';
-import {lireReceptionEmail} from './_lib/reception-email.js';
+import {lireReceptionEmail,lireJournalEmail,lireTexteEmail} from './_lib/reception-email.js';
 // ── /api/email-rattacher ──────────────────────────────────────────────────────
 // Rejoue un email mis en QUARANTAINE (adresse de réception inconnue, ou
 // plusieurs vendeurs destinataires) au profit du vendeur qui le réclame.
@@ -466,6 +466,21 @@ export default async function handler(req, res) {
     if (await sondeCloisonnee() !== true) {indispo(res);return;}
     try {res.status(200).json(await lireReceptionEmail({owner,url:SUPABASE_URL,headers:HEADERS}));}
     catch (_) {indispo(res);}return;
+  }
+  // (31 oct.) LE JOURNAL « Tes emails, ce que VRM en a fait » : une page de 20
+  // en scalaires projetés, les compteurs seuls (`compte=1`, pour Colis), ou le
+  // texte d'UN email (`texte=<id de sa ligne>`). Même garde que la réception :
+  // session prouvée, base cloisonnée, filtre par SON owner ; pas su ⇒ 503.
+  if (req.method === 'GET' && mode === 'journal') {
+    const owner = await vendeurDuJeton(jetonDe(req));
+    if (!owner) {res.status(401).json({ok:false,error:'connexion requise'});return;}
+    if (await sondeCloisonnee() !== true) {indispo(res);return;}
+    const q = req.query || {};
+    try {
+      if (q.texte) {res.status(200).json(await lireTexteEmail({owner,url:SUPABASE_URL,headers:HEADERS,id:String(q.texte)}));return;}
+      res.status(200).json(await lireJournalEmail({owner,url:SUPABASE_URL,headers:HEADERS,page:q.page,etat:String(q.etat||''),type:String(q.type||''),adresse:String(q.adresse||''),compteSeul:String(q.compte||'')==='1'}));
+    } catch (e) { if (e && e.message === 'identifiant') res.status(400).json({ok:false,error:'identifiant'}); else indispo(res); }
+    return;
   }
   if (req.method === 'GET' && mode === 'liste') return lister(req, res);
   if (req.method !== 'POST') { res.status(405).json({ error: 'POST only' }); return; }

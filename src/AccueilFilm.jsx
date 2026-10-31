@@ -34,7 +34,7 @@ import { CarteJourEcran } from './accueil-carte.jsx';
 import { EcranColis, EcranAilleurs, EcranMois } from './accueil-scenes.jsx';
 
 const V = DEMO.vente, R = DEMO.reste;
-const POLICE_TITRE = "'Space Grotesk','Inter',system-ui,sans-serif";
+const POLICE_TITRE = "'Bricolage Grotesque','Inter',system-ui,sans-serif";
 
 // ── Les plans ──────────────────────────────────────────────────────────────
 const PLANS_LONG = [
@@ -124,10 +124,10 @@ export default function Film() {
   const W = portrait ? 1080 : 1920, H = portrait ? 1920 : 1080;
   const echelle = Math.min(vue.w / W, vue.h / H);
   return (
-    <div data-film-plan={plan} style={{ position: 'fixed', inset: 0, overflow: 'hidden', background: K.bg, fontFamily: "'Inter',system-ui,sans-serif" }}>
+    <div data-film-plan={plan} style={{ position: 'fixed', inset: 0, overflow: 'hidden', background: K.bg, fontFamily: "'Bricolage Grotesque','Inter',system-ui,sans-serif" }}>
       <style>{'[data-film-plan] *{box-sizing:border-box}'}</style>
       <div style={{ position: 'absolute', left: (vue.w - W * echelle) / 2, top: (vue.h - H * echelle) / 2, width: W, height: H, transform: `scale(${echelle})`, transformOrigin: '0 0', overflow: 'hidden',
-        background: `radial-gradient(${portrait ? '1100px 1300px at 50% 46%' : '1300px 800px at 50% 50%'}, rgba(61,123,255,0.14), transparent 70%), ${K.bg}` }}>
+        background: K.bg }}>
         <Plateau t={t} W={W} H={H} portrait={portrait} court={court} />
       </div>
     </div>
@@ -407,7 +407,7 @@ function Plateau({ t, W, H, portrait, court }) {
     const hFin = cibles.ident ? cibles.ident.h * cam.s : 37;
     const sc = mix(mix(0.5, 1, nait), hFin / 72, sortie(pose));
     libres.push(<div key="n128" style={{ position: 'absolute', left: x, top: y, height: 72, padding: '0 26px', display: 'flex', alignItems: 'center', borderRadius: 14,
-      background: 'rgba(61,123,255,.16)', border: `2px solid ${K.accent}`, color: K.text, fontSize: 38, fontWeight: 600, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap',
+      background: 'rgba(36,66,184,.16)', border: `2px solid ${K.accent}`, color: K.text, fontSize: 38, fontWeight: 600, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap',
       opacity: Math.min(1, nait * 1.6), transform: `translate(-50%, -50%) scale(${sc.toFixed(4)})` }}>N°{V.n}</div>);
   }
 
@@ -513,7 +513,7 @@ function PrixVole({ t, cibles, versEcran, W, H, portrait, k, mois, compact }) {
         color: K.text, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap', opacity: 1 - fondA, filter: fondA > 0 && fondA < 1 ? `blur(${(2 * fondA).toFixed(2)}px)` : undefined }}>{euros(V.prix)}</span>
       {devient > 0 && (
         <span style={{ position: 'absolute', left: pL, top: pY - 13 * k, height: 26 * k, padding: `0 ${10 * k}px`, display: 'inline-flex', alignItems: 'center', borderRadius: 8 * k,
-          background: 'rgba(61,123,255,.12)', border: `1px solid ${K.accent}`, fontSize: 12 * k, fontWeight: 600, color: K.text, whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums',
+          background: 'rgba(36,66,184,.12)', border: `1px solid ${K.accent}`, fontSize: 12 * k, fontWeight: 600, color: K.text, whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums',
           clipPath: `inset(0 ${(100 * (1 - ouvre)).toFixed(2)}% 0 0 round ${8 * k}px)`, opacity: Math.min(1, devient * 2) }}>{texte}</span>
       )}
     </>

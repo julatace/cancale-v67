@@ -3,7 +3,7 @@
 .vrm-emails-entete h2{font-size:22px;letter-spacing:-.5px;line-height:1.2;margin:0 0 5px;font-weight:650;}
 .vrm-emails-entete p{font-size:12px;color:var(--email-secondaire,#637477);margin:0;line-height:1.5;}
 .vrm-emails-embleme{width:44px;height:44px;display:grid;place-items:center;border-radius:14px;background:var(--email-accent,#315c60);color:var(--email-sur-accent,#fff);flex-shrink:0;}
-.vrm-emails-rubriques{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;padding:5px;border:1px solid var(--email-ligne,#dae3df);border-radius:14px;background:var(--email-fond,#f2f5f1);margin-bottom:18px;}
+.vrm-emails-rubriques{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;padding:5px;border:1px solid var(--email-ligne,#dae3df);border-radius:14px;background:var(--email-fond,#f2f5f1);margin-bottom:18px;}
 .vrm-emails-rubriques>button{appearance:none;min-width:0;min-height:60px;padding:11px 12px!important;border:1px solid transparent!important;border-radius:10px!important;background:transparent!important;color:var(--email-secondaire,#637477)!important;text-align:left;cursor:pointer;font-family:inherit;white-space:normal!important;}
 .vrm-emails-rubriques>button[aria-pressed=true]{background:var(--email-surface,#fff)!important;color:var(--email-encre,#223d41)!important;border-color:var(--email-ligne,#dae3df)!important;box-shadow:0 2px 4px #183c3e06;}
 .vrm-emails-rubriques button>span{display:flex;align-items:center;gap:7px;min-width:0;}

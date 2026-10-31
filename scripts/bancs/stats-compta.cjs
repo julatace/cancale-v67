@@ -252,10 +252,10 @@ const ouvrir = async (b, vp, tab, opts = {}) => {
         await pg.waitForSelector('[data-abo-courant="VRM"]', { timeout: 3000 });
         await pg.click('[data-abo-courant="VRM"]');
         const abo = await pg.evaluate(() => ({ nom: document.querySelector('[data-abo-libelle]').value, prix: document.querySelector('[data-abo-montant]').value, labels: [...document.querySelectorAll('[data-abo-form] label')].map((l) => l.innerText.split('\n')[0].trim()) }));
-        dit(abo.nom === 'VRM' && abo.prix === '14,99' && abo.labels.some((l) => /^Jusqu'au/.test(l)), 'abonnement : « VRM » en un clic remplit le nom et le prix des CGV ; « jusqu’au » est expliqué', JSON.stringify(abo));
+        dit(abo.nom === 'VRM' && abo.prix === '16,99' && abo.labels.some((l) => /^Jusqu'au/.test(l)), 'abonnement : « VRM » en un clic remplit le nom et le prix des CGV ; « jusqu’au » est expliqué', JSON.stringify(abo));
         await pg.click('[data-abo-courant="Canva"]');
         const prixCanva = await pg.inputValue('[data-abo-montant]');
-        dit(prixCanva === '14,99' || prixCanva === '', 'aucun prix inventé pour un autre abonnement (le champ garde ce qui était tapé)', prixCanva);
+        dit(prixCanva === '16,99' || prixCanva === '', 'aucun prix inventé pour un autre abonnement (le champ garde ce qui était tapé)', prixCanva);
         // Pack Leboncoin absent : rien d'affirmé
         dit(!(await pg.$('[data-pack-lbc]')) && /facultatif/.test(await pg.evaluate(() => document.querySelector('[data-compta-section="packs"]').innerText)), 'pack Leboncoin : facultatif, rien d’affirmé sans relevé de l’extension');
         await ctx.close();

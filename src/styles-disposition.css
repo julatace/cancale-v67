@@ -8,8 +8,8 @@
 /* Titres d'écran : plus grands, plus serrés. */
 :root { --vrm-t-title: 30px; }
 @media (min-width: 1024px) { :root { --vrm-t-title: 36px; } }
-.vrm-screen-head h2 { font-weight: 800; letter-spacing: -.045em; line-height: 1.04; }
-.vrm-market-space .vrm-screen-head h2 { font-weight: 750; letter-spacing: -.03em; }
+.vrm-screen-head :is(h1, h2) { font-weight: 800; letter-spacing: -.045em; line-height: 1.04; }
+.vrm-market-space .vrm-screen-head :is(h1, h2) { font-weight: 750; letter-spacing: -.03em; }
 .vrm-day-hello { font-size: clamp(26px, 3vw, 40px) !important; font-weight: 800 !important; letter-spacing: -.045em !important; line-height: 1.05; }
 
 /* Cartes : plus rondes, posées. */

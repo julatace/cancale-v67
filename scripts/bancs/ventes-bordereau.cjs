@@ -36,6 +36,7 @@
 //      qu'il contienne bien les deux registres.
 const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
 const { metaVersData } = require('./_meta.cjs');
+const { monterTiroirs } = require('./_tiroirs.cjs');
 const fs = require('fs'), http = require('http'), path = require('path');
 const DIST = path.join(__dirname, '..', '..', 'dist');
 const PORT = Number(process.env.BANC_PORT || process.env.PORT) || 4333;
@@ -150,6 +151,9 @@ async function ouvrirVente(pg, tx) {
       await pg.waitForTimeout(3500);
       // L'onglet « Toutes » : les ventes finalisées comme celles en cours.
       try { await pg.getByText('Toutes', { exact: true }).first().click({ timeout: 3000 }); await pg.waitForTimeout(800); } catch (_) {}
+      // (31 oct.) Le tiroir d'une vente n'est monté qu'à sa première ouverture :
+      // on ouvre chaque vente, comme une personne, avant de lire ses boutons (`_tiroirs.cjs`).
+      await monterTiroirs(pg);
       const bb = await pg.evaluate(() => [...document.querySelectorAll('[data-bouton-bord]')].map((x) => x.getAttribute('data-bouton-bord') + ':' + x.getAttribute('data-tx')));
       dit(bb.includes('pdf:9001'), 'la vente 9001 a son bouton « Bordereau » (relié par sa transaction)', JSON.stringify(bb));
       dit(!bb.includes('pdf:9002'), 'la vente 9002 n’a PAS d’impression : un bordereau au même titre, sans transaction, ne relie rien (§5)', JSON.stringify(bb));
@@ -222,6 +226,9 @@ async function ouvrirVente(pg, tx) {
       await pg.goto(`http://localhost:${PORT}/?tab=cat_ventes`, { waitUntil: 'domcontentloaded' });
       await pg.waitForTimeout(3500);
       try { await pg.getByText('Toutes', { exact: true }).first().click({ timeout: 3000 }); await pg.waitForTimeout(800); } catch (_) {}
+      // (31 oct.) Le tiroir d'une vente n'est monté qu'à sa première ouverture :
+      // on ouvre chaque vente, comme une personne, avant de lire ses boutons (`_tiroirs.cjs`).
+      await monterTiroirs(pg);
       // (20 oct.) Vente « une ligne » (#596-#598) : le bouton vit dans la vente ouverte.
       await ouvrirVente(pg, '9001'); 
       try { await pg.locator('[data-bouton-bord="pdf"][data-tx="9001"]:visible').first().click({ timeout: 5000 }); } catch (e) { dit(false, mode + ' : le bouton se clique', String(e.message).slice(0, 90)); }

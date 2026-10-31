@@ -487,6 +487,11 @@ sans la fonction.
 | `republierpage` | `vintedPage` | **5.277.0** | (ajoutée à la table le 30 oct.) |
 | `republierfile` | `miseEnLigneTick` | **5.279.0** | (ajoutée à la table le 30 oct.) |
 | `favorisperso` | `erreurVariablesFavori` | **5.281.0** | (ajoutée à la table le 30 oct.) |
+| `vcsession` | `noterSessionVc` | **5.295.0** (31 oct.) | le compte Vestiaire ouvert dans l'onglet (`vc_session`) — si Vestiaire charge `/users/me` |
+| `vcfil` | `rangerVcFil` | **5.295.0** | « lire tes conversations Vestiaire » (texte, date, « de toi », jamais un nom) |
+| `vcrepondre` | `repondreVestiaire` | **5.295.0** | « Envoyer sur Vestiaire » sur son clic — seulement après une recette APPRISE de son propre envoi (`vc_envoi.appris`) |
+| `vcfavoris` | `rangerVcAnnonces` | **5.295.0** | le NOMBRE de favoris par annonce Vestiaire (jamais qui) |
+| `relaisdest` | `relaisDestination` | **5.295.0** | « le point relais où arrivent tes achats (quand le suivi Vinted le donne) » |
 
 
 ---
@@ -496,11 +501,11 @@ sans la fonction.
 Une ligne par chantier ou décision, le plus récent d'abord. Détail : le fichier
 d'historique du thème (cherche le titre ou la date).
 
-**Extension servie : 5.291.0** (30 oct.). **Production** : https://vrm.center,
+**Extension servie : 5.293.0** (31 oct.). **Production** : https://vrm.center,
 vérifier par `curl https://vrm.center/api/sante`.
 
 ### Gestes encore attendus de Julien
-- Installer l'extension **5.291.0** (remplacer le dossier, puis ⟳ dans CHAQUE Chrome).
+- Installer l'extension **5.293.0** (remplacer le dossier, puis ⟳ dans CHAQUE Chrome).
 - Sur leboncoin.fr, ouvrir « Mes annonces » sur CHACUN de ses comptes Leboncoin.
 - Recoller `scripts/gmail-forwarder.gs` (avec sa clé) dans la boîte qui fait tourner le
   script, puis poser `EMAIL_INBOUND_SECRET` sur Vercel (l'ancien script lit encore la
@@ -508,7 +513,7 @@ vérifier par `curl https://vrm.center/api/sante`.
 - Recoller le Worker Cloudflare de `docs/email-pipeline.md` (Message-ID, rejeu sur 503).
 - Remplir `public/legal/editeur.js` (10 champs) ET `src/contact.js` : **tant qu'ils sont
   vides, personne ne peut payer** ; faire relire CGV et formulaire de rétractation.
-- Stripe : recréer le prix `vrm_mensuel` à **12,99 €** (sinon le paiement reste fermé),
+- Stripe : recréer le prix `vrm_mensuel` à **16,99 €** (sinon le paiement reste fermé),
   poser `STRIPE_SECRET_KEY`, régler l'adresse des CGV ; passer en mode réel.
 - Supabase : Site URL `https://vrm.center` et Redirect URLs, SMTP personnalisé,
   confirmation d'email obligatoire ; (pour Discord) activer le fournisseur Discord.
@@ -524,6 +529,11 @@ vérifier par `curl https://vrm.center/api/sante`.
   (ALLUMÉ chez lui) ; libellés de la barre du bas à 9 px.
 
 ### Décisions et chantiers (octobre 2026)
+- **31 oct.** — **Prix 16,99 €/mois** (sa décision ; 14,99 € depuis le 27 oct., CGV version 2026-10-31, essai 7 j inchangé) ; adresse de contact **vrm.vinted35+contact@gmail.com** (sa décision), tenue hors de la réception des colis (`gmail-forwarder.gs`, à recoller). Geste : prix Stripe à 16,99 €.
+- **31 oct.** — Emails : journal « Tes emails, ce que VRM en a fait » (Paramètres → Emails → Journal, et depuis Colis) : une phrase par email, raison et geste ; résumé court écrit au classement (`api/_lib/resume-email.js`), texte à part (`email_texte_*`), `mode=journal` paginé (≈ 11 Ko/page). → historique sécurité-base-serveur. Geste : aucun.
+- **31 oct.** — Extension **5.295.0** (intégrée avec la 5.294.0) : Vestiaire — compte ouvert, conversations lues, réponse sur son clic par recette APPRISE, favoris en nombre ; Colis → « À retirer » par point relais sur une carte, arrivées estimées (suivi Vinted). → historique vestiaire / colis-retraits. Geste : installer, envoyer UNE réponse soi-même sur Vestiaire, toucher « Suivre le colis » d'un achat en route.
+- **31 oct.** — Statistiques détaillées (rythme, marges par marque/modèle/taille/plateforme/compte, temps de vente, jours/heures, stock qui dort, rotation, annulations) + widget « Tendances » ; le bénéfice de Ma journée est là par défaut et se masque/remet en mode « Modifier » (interrupteur de Réglages retiré) ; une carte nouvelle arrive d'elle-même (`connus`). → historiques interface-stock et compta (« 31 octobre »). Geste : regarder Statistiques et Ma journée.
+- **31 oct.** — Extension **5.293.0 soumise à addons.mozilla.org** par Julien (fiche `vrm-outil-du-revendeur`, compte vrm.vinted35@gmail.com) : Orion iPhone refuse l'installation par fichier (essais du 31 oct.) mais installe depuis la boutique (Dark Reader OK). Geste : à l'acceptation, donner le lien → `LIENS_BOUTIQUES.firefox` ; Chrome Web Store : `docs/publier-extension-pas-a-pas.md`.
 - **31 oct.** — Compétence **taste** (Leonxlnx/taste-skill, MIT) installée dans `.claude/skills/taste-skill/` à sa demande : tout changement de style passe par elle (`references/app-screens.md` pour les écrans de l'app) ; §7 et ses refus priment. → `.claude/skills/README.md`.
 - **31 oct. (soir)** — Vinted/extension **5.293.0** (intégrée avec Leboncoin en 5.293.0) : le pont photo relaie le `statut` du CDN (lien mort 404/410 plus redemandé avant 30 min, refus passagers en tête du témoin) ; détourage Vestiaire : `cle-pas-su` arrête la série et se dit en français. → historique vinted-extension. Geste : installer la 5.293.0 une fois fusionnée.
 - **31 oct.** — Tournée de tous les bancs et audits : 5 défauts corrigés (purge d'un

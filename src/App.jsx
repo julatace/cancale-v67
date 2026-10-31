@@ -39,6 +39,7 @@ import {qrMfa} from './qrMfa.js';
 import {conflitAdresseCompte} from './receptionEmail.js';
 import SuiviReceptionEmails from './ReceptionEmails.jsx';
 import EspaceEmails from './EspaceEmails.jsx';
+import JournalEmails, {EntreeJournalEmails} from './JournalEmails.jsx';
 import RecusEmail from "./RecusEmail.jsx";
 import { cheminMonotone } from "./courbeMonotone.js";
 import VuesVentes from "./VuesVentes.jsx";
@@ -53,7 +54,8 @@ import {cibleEbay} from "./ebayParcours.js";
 import {centimes,coutsVente,beneficePaire,champsCharges} from "./beneficePaire.js";
 import CoutsVente from "./CoutsVente.jsx";
 import { boostRentable, SEUIL_BOOST } from "./boostRentable.js";
-import { CLE_WIDGETS_JOURNEE, WIDGETS_JOURNEE, NOM_TAILLE, DISPO_JOURNEE_DEFAUT, normaliserDispoJournee, deplacerWidget, retirerWidget, widgetFixe, tailleSuivante, tailleDefautWidget, caseVisible, widgetsAjoutables } from "./journeeWidgets.js";
+import { CLE_WIDGETS_JOURNEE, WIDGETS_JOURNEE, NOM_TAILLE, DISPO_JOURNEE_DEFAUT, normaliserDispoJournee, deplacerWidget, retirerWidget, widgetFixe, tailleSuivante, tailleDefautWidget, caseVisible, widgetsAjoutables, dispoAEnregistrer } from "./journeeWidgets.js";
+import { rythmeVendu, ecartPct, quandTuVends, margesPar, delaisPar, tranchePrix, TRANCHES_PRIX, stockQuiDort, SEUILS_DORT, rotationStock, tauxVenteMois, tauxAnnulation } from "./statsVentes.js";
 import {appelerFavorisDirect} from './favorisTransport.js';
 import React, { useState, useMemo, useEffect, useRef, lazy, Suspense } from "react";
 const Operations = lazy(() => import("./operations/Operations.jsx"));
@@ -101,6 +103,9 @@ import { jetonsStream, demarrerStream } from "./streamFlou.js";
 import { DISCORD_ERREURS } from "./communaute/discordErreurs.js";
 import { noterTicketDiscord, ecouterDiscord, suivreCodeDiscord, etatCodeDiscord, reprendreDiscord, oublierTicketDiscord } from "./communaute/discordAttente.js";
 import { DESCRIPTION_ORGANISATION } from "./operations/description.js";
+// (31 oct.) Colis → « À retirer » : la carte des points relais (règle pure + carte).
+import { regrouperRelais } from "./relaisColis.js";
+import CarteRelaisColis from "./CarteRelais.jsx";
 // La migration qui cloisonne les vendeurs, lue depuis LE fichier (pas recopiée) :
 // deux copies finiraient par diverger, et c'est le genre de texte qu'on colle
 // dans une base de production sans le relire.
@@ -136,7 +141,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.293.0';
+const EXT_ATTENDUE = '5.295.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -561,7 +566,7 @@ const extEnRetard = (v) => !!v && cmpVersion(v, EXT_ATTENDUE) < 0;
 // ⚠️ (30 oct., intégration) `transp`, `lbcsupprime` et `lbcstats` arrivent tous
 //    en 5.291.0 : 5.288 (Leboncoin) et 5.290 (colis) étaient des numéros de
 //    branche, jamais servis ; aucune version publiée ne porte ces fonctions.
-const EXT_CAPACITES = { transp: '5.291.0', favorisouvrir:'5.225.0', favorisliste:'5.218.0', suivivinted: '5.217.0', favoris: '5.217.0', liaison: '5.171.0', supprimees: '5.165.0', enligne: '5.170.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', preuves: '5.172.0', etatcompte: '5.181.0', lbcfiche: '5.182.0', relais: '5.183.0', lbcpack: '5.185.0', annulee: '5.185.0', confirmer: '5.206.0', retraitnotif: '5.206.0', offresauto: '5.234.0', vcpublier: '5.235.0', vcauto: '5.236.0', vcventes: '5.237.0', vcmessages: '5.238.0', vcachats: '5.239.0', republier: '5.240.0', republiermodif: '5.247.0', recreer: '5.248.0', lettre: '5.250.0', brouillon: '5.251.0', versbrouillon: '5.253.0', republierbrouillon: '5.254.0', refaire: '5.255.0', republierpage: '5.277.0', republierfile: '5.279.0', favorisperso: '5.281.0', lbcsupprime: '5.291.0', lbcstats: '5.291.0' };
+const EXT_CAPACITES = { transp: '5.291.0', favorisouvrir:'5.225.0', favorisliste:'5.218.0', suivivinted: '5.217.0', favoris: '5.217.0', liaison: '5.171.0', supprimees: '5.165.0', enligne: '5.170.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', preuves: '5.172.0', etatcompte: '5.181.0', lbcfiche: '5.182.0', relais: '5.183.0', lbcpack: '5.185.0', annulee: '5.185.0', confirmer: '5.206.0', retraitnotif: '5.206.0', offresauto: '5.234.0', vcpublier: '5.235.0', vcauto: '5.236.0', vcventes: '5.237.0', vcmessages: '5.238.0', vcachats: '5.239.0', republier: '5.240.0', republiermodif: '5.247.0', recreer: '5.248.0', lettre: '5.250.0', brouillon: '5.251.0', versbrouillon: '5.253.0', republierbrouillon: '5.254.0', refaire: '5.255.0', republierpage: '5.277.0', republierfile: '5.279.0', favorisperso: '5.281.0', lbcsupprime: '5.291.0', lbcstats: '5.291.0', vcsession: '5.295.0', vcfil: '5.295.0', vcrepondre: '5.295.0', vcfavoris: '5.295.0', relaisdest: '5.295.0' };
 // Trois états, jamais un seul : pas d'extension ici · en retard · à jour.
 const extSait = (quoi) => {
   if (!vmrExtPresent()) return 'absente';                    // téléphone, autre navigateur
@@ -610,6 +615,11 @@ const CAPACITES_DITES = [
   ['preuves', 'aller chercher toute seule la preuve des ventes qui n\'ont pas encore de bordereau (anti double vente)'],
   ['lbcsupprime', 'supprimer ou republier une annonce Leboncoin depuis VRM'],
   ['lbcstats', 'relever les favoris et les vues de tes annonces Leboncoin'],
+  // (31 oct., 5.295) Vestiaire : lire tes conversations, y répondre sur ton clic ;
+  // et le point relais où arrivent tes achats Vinted (s'il est dans leur suivi).
+  ['vcfil', 'lire tes conversations Vestiaire'],
+  ['vcrepondre', 'répondre sur Vestiaire depuis VRM'],
+  ['relaisdest', 'relever le point relais où arrivent tes achats (quand Vinted le donne)'],
 ];
 const capacitesManquantes = (v) => (v ? CAPACITES_DITES.filter(([k]) => cmpVersion(v, EXT_CAPACITES[k]) < 0).map(([, t]) => t) : []);
 const listeFr = (l) => (l.length <= 1 ? (l[0] || '') : `${l.slice(0, -1).join(', ')} ni ${l[l.length - 1]}`);
@@ -1843,6 +1853,10 @@ const ENTREPRISE_VIDE = {
 const VENTES_MASQUEES_AUCUNE = () => [];
 const SYNC_KEYS = [
   'vrm_vc_etiquettes','vrm_lbc_dates',
+  // (31 oct.) Les reçus d'achat qu'IL a déliés depuis le journal des emails
+  // (« Ce n'est pas ça ») : { [id de la ligne du reçu]: { tx, at } }. Rien n'est
+  // supprimé ; « Relier à nouveau » retire la clé.
+  'vrm_recus_delies',
   // (29 oct.) L'agent eBay qui demande : ses réglages, le résumé lu par Ma journée
   // et la notification du matin, ce qu'il a publié aujourd'hui (et « pas maintenant »).
   'vrm_agent_ebay_regles','vrm_agent_ebay_resume','vrm_agent_ebay_jour','vrm_agent_ebay_incertains',
@@ -1929,9 +1943,10 @@ const SYNC_KEYS = [
   // par l'écran Ventes (`totals`, son propriétaire, §11), CONSOMMÉ par
   // Comptabilité (« Ton bénéfice »). Tableaux compacts, deux années au plus.
   'vrm_benefice_jours',
-  // (20 octobre) Afficher la carte « Ton bénéfice » dans Ma journée : un CHOIX,
-  // éteint par défaut, rattrapé par `onCloudReady` seulement s'il est resté au
-  // défaut (`useBeneficeJournee`).
+  // (20 octobre) Afficher la carte « Ton bénéfice » dans Ma journée : un CHOIX
+  // (31 oct. : absent = montré dès qu'il y a un bénéfice publié ; `false` =
+  // masqué depuis Ma journée), rattrapé par `onCloudReady` seulement s'il est
+  // resté au défaut (`useBeneficeJournee`).
   'vrm_journee_benefice',
   'vrm_annonces_retirees',
   // (26 octobre) Les messages retirés POUR DE BON d'un compte (même famille que
@@ -3918,10 +3933,15 @@ const fetchEmailsParCompte = async () => {
       const e = (parCompte[a] = parCompte[a] || { n: 0, last: '' });
       e.n += 1; if (d > e.last) e.last = d;
     };
-    for (const f of FAMILLES_EMAILS_COMPTE) {
-      const rows = await lireTout(`id=like.${f}*&select=acc:meta->>account,at:meta->>receivedAt`, { strict: true });
-      if (rows === null) return null;                 // une famille illisible : on n'accuse personne
-      for (const row of rows) ajoute(row.acc, row.at);
+    // ⚠️ (31 oct., banc vitesse) UNE lecture pour les six familles et les
+    //    bordereaux : c'étaient sept lectures À LA SUITE (sept allers-retours)
+    //    des mêmes lignes, famille par famille. Mêmes lignes (le préfixe trie),
+    //    mêmes scalaires ; illisible ⇒ `null`, on n'accuse personne, comme avant.
+    const tous = await lireTout('id=like.email_*&select=id,acc:meta->>account,at:meta->>receivedAt', { strict: true });
+    if (tous === null) return null;
+    for (const row of tous) {
+      const id = String((row && row.id) || '');
+      if (FAMILLES_EMAILS_COMPTE.some((f) => id.startsWith(f))) ajoute(row.acc, row.at);
     }
     // Le JOURNAL porte les messages et les favoris (aucune ligne à eux) : sans
     // lui, un compte dont les messages arrivent était dit « aucun email ».
@@ -3931,9 +3951,7 @@ const fetchEmailsParCompte = async () => {
     if (!Array.isArray(j)) return null;
     for (const e of ((j[0] && j[0].entries) || [])) if (e) ajoute(e.account, e.at);
     // Les bordereaux reçus par email, par TRANSACTION (identité, jamais le compte deviné).
-    const bords = await lireTout('id=like.email_bord_*&select=id', { strict: true });
-    if (bords === null) return null;
-    const bordTx = new Set(bords.map((b) => String(b.id || '').replace(/^email_bord_/, '')).filter(Boolean));
+    const bordTx = new Set(tous.map((b) => String((b && b.id) || '')).filter((id) => id.startsWith('email_bord_')).map((id) => id.replace(/^email_bord_/, '')).filter(Boolean));
     return { parCompte, bordTx, debut: debut || null };
   } catch (_) { return null; }
 };
@@ -7965,7 +7983,11 @@ function photoViaServeur(url) {
       let data=null;
       try {
         if(AUTH.user?.id!==uid)return;
-        const r=await fetch('/api/compte?mode=photo',{method:'POST',headers:{'Content-Type':'application/json',...enTeteSession()},body:JSON.stringify({url}),signal:ctrl.signal});
+        // (31 oct., banc vitesse) `mode=photo` LIT une photo du CDN pour la page,
+        // il n'écrit rien en base (api/compte.js `photo`) : il le déclare, sinon
+        // chacun de ces POST vidait le partage des lectures (src/lecturesPartagees.js)
+        // — douze sur l'écran Ventes, et la cloche relisait tout derrière.
+        const r=await fetch('/api/compte?mode=photo',{method:'POST',headers:{'Content-Type':'application/json',...enTeteSession()},body:JSON.stringify({url}),signal:ctrl.signal,vrmInvalideSiChange:true});
         if(!r.ok || !/^image\/(jpeg|png|webp|avif|gif)(?:;|$)/i.test(r.headers.get('content-type') || ''))return;
         const blob=await r.blob();
         if(blob.size>6*1024*1024)return;
@@ -10857,7 +10879,7 @@ function AchatsHorsPlateforme({ achats, ouvert, onBasculer, onAjouter, onModifie
 // manque : « Saisir le prix » écrit `saleOv[tx].buyPrice` — la MÊME écriture
 // que le champ de « Modifier », déjà lue par `effEntry` → `beneficePaire` (§11).
 // Un montant illisible n'est jamais enregistré : on le dit (§2.5, on ne devine pas).
-function CoutAchatVente({ onSaisir, onRelier }) {
+function CoutAchatVente({ onSaisir, onRelier, surLigne = false }) {
   const [edit, setEdit] = useState(false);
   const [txt, setTxt] = useState('');
   const [err, setErr] = useState('');
@@ -10868,7 +10890,7 @@ function CoutAchatVente({ onSaisir, onRelier }) {
     onSaisir(p); setEdit(false); setTxt(''); setErr('');
   };
   return (
-    <div data-cout-vente className="vrm-cout-vente" style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+    <div data-cout-vente={surLigne ? 'ligne' : ''} className="vrm-cout-vente" style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
       <div className="vrm-cout-rangee" style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
         <span className="vrm-cout-label" style={{ fontSize: 12, color: C.muted, flex: '0 0 auto' }}>Coût d'achat ?</span>
         {edit ? (
@@ -10884,7 +10906,7 @@ function CoutAchatVente({ onSaisir, onRelier }) {
         ) : (
           <>
             <Bouton variante="secondaire" icone="pencil" data-cout-vente-saisir onClick={() => setEdit(true)} title="Taper le prix payé, sans relier d'achat">Prix d’achat</Bouton>
-            <Bouton variante="secondaire" icone="link" data-cout-vente-relier onClick={onRelier} title="Choisir l'achat Vinted correspondant : son prix remplit le coût">Relier un achat</Bouton>
+            {onRelier && <Bouton variante="secondaire" icone="link" data-cout-vente-relier onClick={onRelier} title="Choisir l'achat Vinted correspondant : son prix remplit le coût">Relier un achat</Bouton>}
           </>
         )}
       </div>
@@ -14099,8 +14121,16 @@ let TITRE_BARRE = '';
 // (29 oct.) `principal` : L'action principale de l'écran (UN <Bouton
 // variante="primaire">). En haut à droite sur ordinateur ; sur téléphone, une
 // barre fixe au-dessus de la navigation du bas (.vrm-b-principal, styles-boutons.css).
+// (31 oct., Vitrine) Le titre d'un écran est son `h1` — sauf dans un espace de
+// plateforme (Vinted, Leboncoin, eBay), où le `h1` est le nom de la plateforme
+// (`EntetePlateforme`) et l'écran une SECTION de cet espace : son titre est un `h2`.
+const DansEspacePlateforme = React.createContext(false);
+function EspacePlateforme({ nom, children }) {
+  return <section className="vrm-market-space" aria-label={nom}><DansEspacePlateforme.Provider value={true}>{children}</DansEspacePlateforme.Provider></section>;
+}
 function ScreenHead({ icon, title, desc, right, principal }) {
   const line = typeof icon === 'string' && ICON_PATHS[icon];
+  const Titre = React.useContext(DansEspacePlateforme) ? 'h2' : 'h1';
   // ⚠️ UNE MANCHETTE, PAS UN EN-TÊTE DE TABLEAU DE BORD. Le titre était une
   // ligne de 23 px avec une pastille ronde teintée devant — le gabarit de tous
   // les outils SaaS. Ici : un surtitre en capitales espacées, un titre large et
@@ -14127,7 +14157,7 @@ function ScreenHead({ icon, title, desc, right, principal }) {
           {line
             ? <span aria-hidden="true" style={{display:'flex',color:C.muted,flexShrink:0}}><Icon name={icon} size={20}/></span>
             : (icon ? <span aria-hidden="true" style={{fontSize:18}}>{icon}</span> : null)}
-          <h2 className="vrm-display" style={{color:C.text}}>{title}</h2>
+          <Titre className="vrm-display" style={{color:C.text}}>{title}</Titre>
           {/* ⚠️ LA DESCRIPTION D'ÉCRAN N'EST PLUS AFFICHÉE. Julien : « il y a trop
               d'informations partout, c'est horrible ». Ce paragraphe explique ce
               que fait l'écran — on le lit UNE fois, puis c'est du bruit tous les
@@ -14264,8 +14294,7 @@ function TopProgress() {
     <div aria-hidden="true" style={{position:'fixed',top:0,left:0,right:0,height:3,zIndex:200,pointerEvents:'none',background:'transparent'}}>
       <div style={{
         height:'100%', width:`${pct}%`,
-        background:`linear-gradient(90deg, ${C.accent}, ${C.blue||C.accent})`,
-        boxShadow:`0 0 8px ${C.accent}88`,
+        background:C.accent,
         borderRadius:'0 999px 999px 0',
         transition:'width .22s ease, opacity .3s ease',
         opacity: pct>=100 ? 0 : 1,
@@ -14989,19 +15018,19 @@ function AuthScreen() {
     <div className="vrm-cx" data-connexion="">
       <style>{`
 .vrm-cx{min-height:100vh;min-height:100dvh;display:grid;grid-template-columns:minmax(0,1fr);grid-template-rows:auto 1fr;background:${C.bg}}
-.vrm-cx-marque{position:relative;overflow:hidden;background:linear-gradient(160deg,#243D43 0%,#192C34 70%,#14242B 100%);color:#F0F5F2;padding:calc(18px + env(safe-area-inset-top)) 20px 64px}
-.vrm-cx-marque:before{content:"";position:absolute;right:-30%;top:-40%;width:90%;aspect-ratio:1;border-radius:50%;background:radial-gradient(closest-side,rgba(190,209,201,.18),transparent);pointer-events:none}
+.vrm-cx-marque{position:relative;overflow:hidden;background:#0F0F0E;color:#F2F2EE;padding:calc(18px + env(safe-area-inset-top)) 20px 64px}
+.vrm-cx-marque:before{content:none}
 .vrm-cx-haut{position:relative;display:flex;align-items:center;justify-content:space-between;gap:12px}
 .vrm-cx-logo{display:flex;align-items:center;gap:10px;text-decoration:none;color:inherit}
 .vrm-cx-logo img{width:36px;height:36px;border-radius:9px;box-shadow:0 0 0 1px rgba(255,255,255,.12)}
 .vrm-cx-logo b{font-size:20px;letter-spacing:-.04em;font-weight:700}
-.vrm-cx-retour{display:inline-flex;align-items:center;min-height:44px;font-size:14px;color:#C7D6CF;text-decoration:none;font-weight:500}
+.vrm-cx-retour{display:inline-flex;align-items:center;min-height:44px;font-size:14px;color:#B0B0A8;text-decoration:none;font-weight:500}
 .vrm-cx-titre{position:relative;font-size:26px;line-height:1.15;letter-spacing:-.04em;font-weight:700;margin:22px 0 0}
-.vrm-cx-titre span{display:block;color:#B0C5BC}
+.vrm-cx-titre span{display:block;color:#B0B0A8}
 .vrm-cx-points{display:none}
 .vrm-cx-main{display:flex;justify-content:center;padding:0 16px 32px}
 .vrm-cx-boite{width:100%;max-width:400px;margin-top:-44px;position:relative}
-.vrm-cx-form{background:${C.card};border:1px solid ${C.border};border-radius:12px;padding:22px 20px;box-shadow:0 1px 2px rgba(18,27,44,.06),0 18px 44px rgba(18,27,44,.12)}
+.vrm-cx-form{background:${C.card};border:1px solid ${C.border};border-radius:14px;padding:22px 20px;box-shadow:none;border-color:transparent}
 .vrm-cx-form input:focus{border-color:${C.accent}!important;box-shadow:0 0 0 3px ${C.accent}26}
 .vrm-cx-form button[type=submit]{min-height:50px;transition:transform 140ms cubic-bezier(0.23,1,0.32,1),opacity 140ms ease}
 .vrm-cx-form button[type=submit]:active{transform:scale(.98)}
@@ -15025,10 +15054,10 @@ function AuthScreen() {
  .vrm-cx-marque{display:flex;flex-direction:column;padding:40px 56px}
  .vrm-cx-titre{font-size:clamp(34px,3.2vw,46px);margin-top:auto}
  .vrm-cx-points{display:grid;gap:14px;margin:28px 0 auto;padding:0;list-style:none;max-width:420px;position:relative}
- .vrm-cx-points li{display:grid;grid-template-columns:28px 1fr;gap:10px;font-size:15px;line-height:1.5;color:#D6E3DD}
- .vrm-cx-points li b{color:#F0F5F2;font-weight:600}
- .vrm-cx-points i{width:28px;height:28px;border-radius:8px;background:rgba(255,255,255,.08);display:flex;align-items:center;justify-content:center;font-style:normal;font-size:13px;color:#F0F5F2}
- .vrm-cx-pied{position:relative;font-size:13px;color:#9FB5AC}
+ .vrm-cx-points li{display:grid;grid-template-columns:28px 1fr;gap:10px;font-size:15px;line-height:1.5;color:#D6D6D0}
+ .vrm-cx-points li b{color:#F2F2EE;font-weight:600}
+ .vrm-cx-points i{width:28px;height:28px;border-radius:8px;background:rgba(255,255,255,.08);display:flex;align-items:center;justify-content:center;font-style:normal;font-size:13px;color:#F2F2EE}
+ .vrm-cx-pied{position:relative;font-size:13px;color:#B0B0A8}
  .vrm-cx-main{align-items:center;padding:40px}
  .vrm-cx-boite{margin-top:0}
 }
@@ -15039,9 +15068,9 @@ function AuthScreen() {
    Rien si « réduire les animations ». */
 .vrm-cx-aurore{position:absolute;inset:0;pointer-events:none;overflow:hidden}
 .vrm-cx-aurore i{position:absolute;border-radius:50%;filter:blur(50px);will-change:transform}
-.vrm-cx-aurore i:nth-child(1){width:62%;aspect-ratio:1;left:-18%;top:-22%;background:#4E8A80;opacity:.45;animation:vrmCxDerive1 19s ease-in-out infinite alternate}
-.vrm-cx-aurore i:nth-child(2){width:48%;aspect-ratio:1;right:-14%;top:18%;background:#8FB8A6;opacity:.22;animation:vrmCxDerive2 23s ease-in-out infinite alternate}
-.vrm-cx-aurore i:nth-child(3){width:56%;aspect-ratio:1;left:22%;bottom:-30%;background:#2F6670;opacity:.5;animation:vrmCxDerive3 27s ease-in-out infinite alternate}
+.vrm-cx-aurore i:nth-child(1){width:62%;aspect-ratio:1;left:-18%;top:-22%;background:#2442B8;opacity:.32;animation:vrmCxDerive1 19s ease-in-out infinite alternate}
+.vrm-cx-aurore i:nth-child(2){width:48%;aspect-ratio:1;right:-14%;top:18%;background:#56564F;opacity:.26;animation:vrmCxDerive2 23s ease-in-out infinite alternate}
+.vrm-cx-aurore i:nth-child(3){width:56%;aspect-ratio:1;left:22%;bottom:-30%;background:#252522;opacity:.6;animation:vrmCxDerive3 27s ease-in-out infinite alternate}
 @keyframes vrmCxDerive1{to{transform:translate3d(18%,14%,0) scale(1.12)}}
 @keyframes vrmCxDerive2{to{transform:translate3d(-22%,10%,0) scale(.9)}}
 @keyframes vrmCxDerive3{to{transform:translate3d(-12%,-18%,0) scale(1.15)}}
@@ -15056,8 +15085,8 @@ function AuthScreen() {
 @keyframes vrmCxMonte{from{opacity:0;transform:translate3d(0,18px,0) scale(.98)}to{opacity:1;transform:none}}
 @media (min-width:1200px){
  .vrm-cx-etiquettes{display:block;position:absolute;inset:0;pointer-events:none}
- .vrm-cx-etiquettes span{position:absolute;display:inline-flex;align-items:center;gap:8px;padding:9px 14px;border-radius:999px;font-size:13px;font-weight:600;color:#F0F5F2;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.14);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);animation:vrmCxFlotte 7s ease-in-out infinite alternate,vrmCxEntre .7s cubic-bezier(.23,1,.32,1) both}
- .vrm-cx-etiquettes span:before{content:"";width:7px;height:7px;border-radius:50%;background:#B7D6C8;box-shadow:0 0 0 4px rgba(183,214,200,.18)}
+ .vrm-cx-etiquettes span{position:absolute;display:inline-flex;align-items:center;gap:8px;padding:9px 14px;border-radius:999px;font-size:13px;font-weight:600;color:#F2F2EE;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.14);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);animation:vrmCxFlotte 7s ease-in-out infinite alternate,vrmCxEntre .7s cubic-bezier(.23,1,.32,1) both}
+ .vrm-cx-etiquettes span:before{content:"";width:7px;height:7px;border-radius:50%;background:#F2F2EE;box-shadow:0 0 0 4px rgba(242,242,238,.14)}
  .vrm-cx-etiquettes span:nth-child(1){right:8%;top:13%;animation-delay:0s,.45s}
  .vrm-cx-etiquettes span:nth-child(2){right:36%;top:17%;animation-duration:8.5s,.7s;animation-delay:-2s,.55s}
  .vrm-cx-etiquettes span:nth-child(3){right:8%;bottom:22%;animation-duration:9s,.7s;animation-delay:-4s,.65s}
@@ -18317,7 +18346,12 @@ function FiltresVentes({ value, onChange, search, onSearch, cancelled = false, d
 // COMPTE (`sous`, une seconde ligne discrète), et l'état qui demande un geste
 // (`ton="action"` : à expédier) se distingue des autres — sans autre couleur
 // que l'ambre des choses à faire (§7).
-function LigneVenteCompacte({ photo, photoNoeud = null, titre, sous = '', etat, etatNoeud = null, ton = '', montant, children, numerosArticle = [], plateforme = '', initialOuvert = false, ...props }) {
+// (31 oct., Julien : « on est obligé d'appuyer sur les points pour remplir le
+// prix d'achat ou relier un achat ») `gestes` : ce qui MANQUE à la vente se fait
+// sur la ligne elle-même, sous le titre — les MÊMES composants et les MÊMES
+// écritures que dans le tiroir (`CoutAchatVente`), rien de neuf. Le tiroir ne
+// change pas.
+function LigneVenteCompacte({ photo, photoNoeud = null, titre, sous = '', etat, etatNoeud = null, ton = '', montant, children, numerosArticle = [], plateforme = '', initialOuvert = false, gestes = null, montantCentimes, ...props }) {
   const [ouvert, setOuvert] = React.useState(initialOuvert);
   const panneau = React.useId();
   const declencheur = React.useRef(null);
@@ -18334,18 +18368,29 @@ function LigneVenteCompacte({ photo, photoNoeud = null, titre, sous = '', etat, 
     fermer.current?.focus({preventScroll:true});
   },[ouvert,panneau]);
   const close=()=>{setOuvert(false);declencheur.current?.focus({preventScroll:true});};
+  // ⚠️ LE TIROIR N'EST MONTÉ QU'À SA PREMIÈRE OUVERTURE, PUIS GARDÉ (31 oct.).
+  //    Depuis le 21 oct., chaque ligne montait d'avance son tiroir complet
+  //    (photo, coûts, bordereau, facture…), même fermé : c'était l'essentiel du
+  //    coût d'une lettre tapée dans Ventes (banc `ventes-frappe`). Fermé, il
+  //    n'existait que caché (`hidden`) : rien de visible ne change. Une fois
+  //    ouvert il reste monté (une saisie en cours survit à « Fermer »). Ce que
+  //    les bancs lisaient dans un tiroir fermé, ils le lisent après l'avoir
+  //    ouvert — ou sur la ligne quand la donnée y a sa place.
+  const dejaOuvert = React.useRef(false);
+  if (ouvert) dejaOuvert.current = true;
   const numerosFiche=[...new Set(numerosArticle.map(n=>String(n||'').trim()).filter(Boolean))];
   return <div {...props} data-ligne-ouverte={ouvert} data-plateforme-vente={plateforme||undefined}>
     <button ref={declencheur} type="button" className="vrm-ledger-sale-toggle" aria-expanded={ouvert} aria-controls={panneau} aria-haspopup="dialog" aria-label={`Ouvrir les actions : ${titre || 'vente'}`} onClick={()=>setOuvert(v=>!v)}>
       <span className="vrm-ledger-photo-empty">{photoNoeud || <PhotoVente src={photo} size={46} portrait/>}</span>
       <span className="vrm-ledger-sale-title" title={titre}><span className="vrm-ledger-sale-nom">{titre || '(sans titre)'}</span>{sous ? <span className="vrm-ledger-sale-sous" data-vente-sous="">{sous}</span> : null}</span>
       <span className="vrm-ledger-sale-state" title={etat} data-ton={ton || undefined}>{etatNoeud || etat}</span>
-      <span className="vrm-ledger-sale-amount">{montant}</span>
-      <span aria-hidden="true">{ouvert?'−':'⋯'}</span>
+      <span className="vrm-ledger-sale-amount" data-prix-vente={montantCentimes ?? undefined}>{montant}</span>
+      <span className="vrm-ledger-sale-plus" aria-hidden="true">{ouvert?'−':'⋯'}</span>
     </button>
+    {gestes ? <div className="vrm-ledger-gestes" data-gestes-ligne="">{gestes}</div> : null}
     {/* « Retour » (geste du téléphone, ← du navigateur) ferme d'abord le tiroir. */}
     {ouvert && <FermeAuRetour fermer={close}/>}
-    {createPortal(<div className="vrm-app-shell vrm-ledger-drawer-host" hidden={!ouvert}>
+    {dejaOuvert.current && createPortal(<div className="vrm-app-shell vrm-ledger-drawer-host" hidden={!ouvert}>
       <section className="vrm-ledger-drawer" role="dialog" aria-modal="false" aria-labelledby={panneau+'-titre'} id={panneau} onKeyDown={e=>{if(e.target.matches('input,textarea,select,[contenteditable=true]'))return;if(e.key==='Escape'&&!e.defaultPrevented){e.preventDefault();e.stopPropagation();close();}}}>
         <header className="vrm-ledger-drawer-head"><div><span>VENTE</span><h2 id={panneau+'-titre'}>{titre || 'Vente'}</h2><p>{etat}{etat&&montant?' · ':''}{montant}</p></div><button ref={fermer} type="button" aria-label="Fermer les détails de la vente" onClick={close}><Icon name="close" size={18}/></button></header>
         <div className="vrm-main vrm-ledger-drawer-body">
@@ -18356,8 +18401,8 @@ function LigneVenteCompacte({ photo, photoNoeud = null, titre, sous = '', etat, 
     </div>,document.body)}
   </div>;
 }
-function LigneVente({ photo, titre, meta, montant, actions, etat, etatNoeud = null, details, sous = '', ton = '', data = null, numerosArticle = [], plateforme = '', floute = false }) {
-  return <LigneVenteCompacte {...(data || {})} numerosArticle={numerosArticle} plateforme={plateforme} photo={photo} titre={titre} sous={sous} ton={ton} etat={etat} etatNoeud={etatNoeud} montant={montant} initialOuvert={!!details?.props.ouvrir} className="vrm-sale-row vrm-shared-sale" style={{padding:'12px 14px',borderBottom:`1px solid ${C.border}`,...(floute?STYLE_FLOU:null)}}>
+function LigneVente({ photo, titre, meta, montant, actions, etat, etatNoeud = null, details, sous = '', ton = '', data = null, numerosArticle = [], plateforme = '', floute = false, gestes = null }) {
+  return <LigneVenteCompacte {...(data || {})} gestes={gestes} numerosArticle={numerosArticle} plateforme={plateforme} photo={photo} titre={titre} sous={sous} ton={ton} etat={etat} etatNoeud={etatNoeud} montant={montant} initialOuvert={!!details?.props.ouvrir} className="vrm-sale-row vrm-shared-sale" style={{padding:'12px 14px',borderBottom:`1px solid ${C.border}`,...(floute?STYLE_FLOU:null)}}>
     <div className="vrm-sale-overview" style={{display:'flex',gap:12,alignItems:'flex-start'}}>
       <div className="vrm-sale-photo"><PhotoArticleAgrandissable src={photo} titre={titre}><PhotoVente src={photo} size={64} portrait/></PhotoArticleAgrandissable></div>
       <div className="vrm-sale-info" style={{flex:1,minWidth:0}}>
@@ -19522,16 +19567,27 @@ function useRelectureTransporteurs() {
     return () => { clearInterval(t); document.removeEventListener('visibilitychange', tic); window.removeEventListener('focus', tic); };
   }, []);
 }
+// ⚠️ UNE PROJECTION PAR LIGNE eBay, PARTAGÉE (31 oct., banc vitesse). Au
+//    démarrage, `ebay_orders` partait sous QUATRE projections (Ma journée, la
+//    cloche, l'agent en fond, eBay → Ventes), `ebay_listings` sous trois,
+//    `ebay_programmees` sous deux : autant de lectures que le partage
+//    (`lecturesPartagees`) ne peut pas réunir. Mêmes champs pour tous (la date de
+//    capture est un scalaire) ⇒ une adresse, une lecture.
+const SEL_EBAY_COMMANDES = 'orders:data->orders,capturedAt:data->>capturedAt';
+const SEL_EBAY_ANNONCES = 'items:data->items,capturedAt:data->>capturedAt';
+const SEL_EBAY_PROGRAMMEES = 'items:data->items,enLigne:data->enLigne,capturedAt:data->>capturedAt';
 // Lit la ligne `base` (projetée par `select`, §4.4) de CHAQUE compte actif —
 // une requête par compte, exactement la requête d'avant pour le principal.
 // Rend `{ comptes, lignes: [{compte, ligne}] }` (ligne : objet · null absente ·
 // undefined illisible), ou `null` si le registre lui-même est illisible.
-async function lireEbayParCompte(base, select, comptesDonnes) {
+// `fond` : un passage de FOND (la cloche, l'agent) accepte une réponse partagée
+// plus ancienne (`vrmFond`, src/lecturesPartagees.js).
+async function lireEbayParCompte(base, select, comptesDonnes, fond = false) {
   const comptes = comptesDonnes || await lireComptesEbay();
   if (!Array.isArray(comptes)) return null;
   const lignes = await Promise.all(comptes.map(async (compte) => {
     try {
-      const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${base}${compte.suffixe}&select=${select}`, { headers: sbAuth() });
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${base}${compte.suffixe}&select=${select}`, fond ? { headers: sbAuth(), vrmFond: true } : { headers: sbAuth() });
       if (!r.ok) return { compte, ligne: undefined };
       const rows = await r.json();
       if (!Array.isArray(rows)) return { compte, ligne: undefined };
@@ -19546,8 +19602,8 @@ const marquerEbay = (arr, c) => (Array.isArray(arr) ? arr : []).map((x) => (x &&
 // La liste `champ` de tous les comptes : `{ items, illisibles }` (comptes dont
 // la lecture a échoué : nommés, jamais comptés « vides »), ou null (registre
 // illisible).
-async function lireEbayTous(base, select, champ, comptesDonnes) {
-  const r = await lireEbayParCompte(base, select, comptesDonnes);
+async function lireEbayTous(base, select, champ, comptesDonnes, fond = false) {
+  const r = await lireEbayParCompte(base, select, comptesDonnes, fond);
   if (!r) return null;
   const items = [], illisibles = [];
   for (const { compte, ligne } of r.lignes) {
@@ -19584,7 +19640,7 @@ const DEMANDE_EBAY_MSG = { compte: null, at: 0 };
 // « ventes payées ») : un seul compte illisible ⇒ `null` (« pas su ») — jamais
 // un total partiel présenté comme complet (§5).
 async function commandesEbayTous() {
-  const r = await lireEbayTous('ebay_orders', 'orders:data->orders', 'orders');
+  const r = await lireEbayTous('ebay_orders', SEL_EBAY_COMMANDES, 'orders');
   return (!r || r.illisibles.length) ? null : r.items;
 }
 // Une ligne est-elle dans la vue choisie ? (`*` ou vide = tous les comptes)
@@ -21309,8 +21365,8 @@ function EbayVentes({ baseKO,vue='*',comptesEbay,cible,onClearCible }) {
   const [lu,setLu]=React.useState(undefined);
   React.useEffect(()=>{if(comptesEbay===undefined)return;let stop=false;(async()=>{
     if(comptesEbay===null){if(!stop)setLu(null);return;}
-    const r=await lireEbayTous('ebay_orders','orders:data->orders','orders',comptesEbay);
-    const photos=await lireEbayTous('ebay_listings','items:data->items','items',comptesEbay);
+    const r=await lireEbayTous('ebay_orders',SEL_EBAY_COMMANDES,'orders',comptesEbay);
+    const photos=await lireEbayTous('ebay_listings',SEL_EBAY_ANNONCES,'items',comptesEbay);
     if(!stop){setLu(r);setAnnonces(photos?.items || []);setLectureAnnonces(photos);}
   })();return()=>{stop=true;};},[comptesEbay]);
   const illisibles=lu?lu.illisibles.filter(c=>dansVueEbay({_compte:c.ref},vue)):[];
@@ -21369,7 +21425,13 @@ function EbayVentes({ baseKO,vue='*',comptesEbay,cible,onClearCible }) {
         const etat=etatCommandeEbay(o);
         const statut=etat.label;
 
-        return <div className="vrm-ebay-order" data-ebay-vente={o.orderId} data-ebay-compte={o._compte || 'principal'} key={(o._compte || 'principal')+':'+(o.orderId || i)}><LigneVente numerosArticle={(o.lineItems||[]).map(l=>numLigneEbay(o,l)).filter(Boolean)} plateforme="ebay" photo={img} titre={(li.title||'Commande')+(o.lineItems?.length>1?` · ${o.lineItems.length} articles`:'')} etat={statut} ton={etat.peutExpedier ? 'action' : ''}
+        const coutsO = couts[JSON.stringify([o._compte || 'principal',String(o.orderId)])] || {};
+        const bilanO = bilanCommandeEbay(o, coutsO);
+        // (31 oct.) Prix d'achat inconnu : il se tape SUR la ligne (même écriture
+        // que « Bénéfice de l'article » du détail : `costs.buyPrice`). eBay n'a
+        // pas de liaison à un achat : seul le prix est proposé.
+        const gestesEbay = bilanO.entry && bilanO.achat == null ? <CoutAchatVente surLigne onSaisir={p=>sauverCouts(o._compte || 'principal',o.orderId,{buyPrice:p})}/> : null;
+        return <div className="vrm-ebay-order" data-ebay-vente={o.orderId} data-ebay-compte={o._compte || 'principal'} key={(o._compte || 'principal')+':'+(o.orderId || i)}><LigneVente gestes={gestesEbay} numerosArticle={(o.lineItems||[]).map(l=>numLigneEbay(o,l)).filter(Boolean)} plateforme="ebay" photo={img} titre={(li.title||'Commande')+(o.lineItems?.length>1?` · ${o.lineItems.length} articles`:'')} etat={statut} ton={etat.peutExpedier ? 'action' : ''}
           sous={[o.creationDate && !isNaN(Date.parse(o.creationDate)) ? new Date(o.creationDate).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }) : '', comptesEbay?.length > 1 ? (o._pseudo || nomCompteEbay(comptesEbay.find(c => c.ref === o._compte) || {})) : ''].filter(Boolean).join(' · ')}
           etatNoeud={<><span className="vrm-ebay-sale-status" data-state={etat.peutExpedier?'pending':etat.expedie?'shipped':'neutral'} style={{display:'inline-flex',alignItems:'center',gap:5,padding:0,background:'transparent',boxShadow:'none',borderRadius:0,fontSize:'inherit',color:C.text,fontWeight:600}}><span aria-hidden="true" style={{width:7,height:7,borderRadius:999,flexShrink:0,display:'inline-block',background:etat.peutExpedier?C.warn:etat.expedie?(C.blue||C.accent):C.muted}}/>{statut}</span></>}
           meta={<>{statut}{o.buyer?.username ? ` · ${o.buyer.username}` : ''}{o.lineItems?.length>1?` · ${o.lineItems.length} articles`:''}{comptesEbay?.length>1?` · ${o._pseudo || nomCompteEbay(comptesEbay.find(c=>c.ref===o._compte) || {})}`:''}</>}
@@ -23210,7 +23272,9 @@ function numerosEnBrouillon(brouillons, paires) {
 // La demande d'ouvrir un brouillon dans le formulaire d'eBay → Annonces
 // (« Compléter » de l'agent) : lue au montage de l'écran Annonces.
 const DEMANDE_EBAY_BROUILLON = { id: null, at: 0 };
-function useEtatPublicationEbay(comptes, comptesEbay) {
+// `fond` : l'agent en FOND (pas l'écran) — ses lectures acceptent une réponse
+// partagée de quelques secondes (`vrmFond`, src/lecturesPartagees.js).
+function useEtatPublicationEbay(comptes, comptesEbay, fond = false) {
   const { paires, enLigne: enLigne0, pret, doubles } = useEbayPaires(Array.isArray(comptes) ? comptes : null);
   const [tick, setTick] = React.useState(0);
   const [items, setItems] = React.useState(undefined);
@@ -23229,9 +23293,9 @@ function useEtatPublicationEbay(comptes, comptesEbay) {
     (async () => {
       if (comptesEbay === null) { setItems(null); setCommandes(null); setProg(null); setLuesA(null); setBrouillons(await lireBrouillonsEbay()); return; }
       const [L, O, P, B] = await Promise.all([
-        lireEbayTous('ebay_listings', 'items:data->items,capturedAt:data->>capturedAt', 'items', comptesEbay),
-        lireEbayTous('ebay_orders', 'orders:data->orders', 'orders', comptesEbay),
-        lireEbayParCompte('ebay_programmees', 'items:data->items,enLigne:data->enLigne,capturedAt:data->>capturedAt', comptesEbay),
+        lireEbayTous('ebay_listings', SEL_EBAY_ANNONCES, 'items', comptesEbay, fond),
+        lireEbayTous('ebay_orders', SEL_EBAY_COMMANDES, 'orders', comptesEbay, fond),
+        lireEbayParCompte('ebay_programmees', SEL_EBAY_PROGRAMMEES, comptesEbay, fond),
         lireBrouillonsEbay(),
       ]);
       if (stop) return;
@@ -23257,11 +23321,14 @@ function useEtatPublicationEbay(comptes, comptesEbay) {
     lirePreuvesVenteVinted({ comptes: comptesPreuve }).then((p) => { if (!stop) setVendus(p ? p.vendus : null); });
     (async () => {
       try {
-        const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.lbc_ventes&select=ventes:data->ventes`, { headers: sbAuth() });
+        // (31 oct.) `select=data` comme la cloche et la réception Leboncoin :
+        // une adresse, une lecture partagée (la ligne ne porte que `ventes` et
+        // sa date).
+        const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.lbc_ventes&select=data`, fond ? { headers: sbAuth(), vrmFond: true } : { headers: sbAuth() });
         const rows = r.ok ? await r.json() : null;
         if (stop) return;
         if (!Array.isArray(rows)) { setVentesLbc(null); return; }
-        const v = rows[0] && rows[0].ventes;
+        const v = rows[0] && rows[0].data && rows[0].data.ventes;
         setVentesLbc(v && typeof v === 'object' && !Array.isArray(v) ? v : {});
       } catch (_) { if (!stop) setVentesLbc(null); }
     })();
@@ -23677,9 +23744,19 @@ function AgentEbay({ comptes, comptesEbay, onAnnonces }) {
 // proposition (aucun appel à eBay — seulement nos lectures) et publie le résumé
 // que lisent Ma journée et la notification du matin. Il ne prépare ni ne
 // publie rien.
-function AgentEbayFond({ comptes, comptesEbay }) {
+// ⚠️ (31 oct., banc vitesse) LE RÉSUMÉ SE RELIT APRÈS LE NUAGE. La porte
+//    (`agentEbayFondUtile`) regardait le navigateur au montage de la coque :
+//    un résumé frais posé par un AUTRE appareil (synchronisé) n'y était pas
+//    encore, et l'agent relisait tout (une douzaine de lectures, ~1 Mo) pour
+//    refaire le même résumé. On attend le nuage, puis on regarde à nouveau.
+function AgentEbayFond(props) {
+  const [utile, setUtile] = React.useState(() => (isCloudReady() ? agentEbayFondUtile() : undefined));
+  React.useEffect(() => onCloudReady(() => setUtile((u) => (u === undefined ? agentEbayFondUtile() : u))), []);
+  return utile ? <AgentEbayFondCalcul {...props}/> : null;
+}
+function AgentEbayFondCalcul({ comptes, comptesEbay }) {
   const [regles] = useReglesAgentEbay();
-  const etat = useEtatPublicationEbay(comptes, comptesEbay);
+  const etat = useEtatPublicationEbay(comptes, comptesEbay, true);
   const fait = React.useRef(false);
   React.useEffect(() => {
     if (fait.current || !regles) return;
@@ -23865,11 +23942,11 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
     chargerProgrammees();
     if (comptesEbay === null) { setItems(null); setCommandes(null); setRegles({ map: new Map(), illisibles: new Set(['*']) }); setVentesEbayLues(null); return; }
     const [L, O, RG] = await Promise.all([
-      lireEbayTous('ebay_listings', 'items:data->items,capturedAt:data->>capturedAt', 'items', comptesEbay),
+      lireEbayTous('ebay_listings', SEL_EBAY_ANNONCES, 'items', comptesEbay),
       // Les commandes eBay : seulement la liste (§4.4), pour « vendue sur eBay » —
       // et (9 octobre) QUAND elles ont été relues (la fenêtre où eBay vend
       // sans que VRM le voie, dite à côté des règles d'offre).
-      lireEbayTous('ebay_orders', 'orders:data->orders,capturedAt:data->>capturedAt', 'orders', comptesEbay),
+      lireEbayTous('ebay_orders', SEL_EBAY_COMMANDES, 'orders', comptesEbay),
       lireReglesEbay(comptesEbay),
     ]);
     setRegles(RG); setReglesLocales(new Map()); setPrixLocaux(new Map());
@@ -23956,11 +24033,11 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
     lirePreuvesVenteVinted({ comptes: avecSku ? comptesPreuve : null }).then((p) => { if (!stop) { setVendusVinted(p ? p.vendus : null); setSansPreuve(p ? p.sansPreuve : null); setSansPreuveKO(p && Array.isArray(p.sansPreuveKO) ? p.sansPreuveKO : []); } });
     (async () => {
       try {
-        const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.lbc_ventes&select=ventes:data->ventes`, { headers: sbAuth() });
+        const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.lbc_ventes&select=data`, { headers: sbAuth() });
         if (!r.ok) { if (!stop) setVentesLbc(null); return; }
         const rows = await r.json();
         if (!Array.isArray(rows)) { if (!stop) setVentesLbc(null); return; }
-        const v = rows[0] && rows[0].ventes;
+        const v = rows[0] && rows[0].data && rows[0].data.ventes;
         if (!stop) setVentesLbc(v && typeof v === 'object' && !Array.isArray(v) ? v : {});
       } catch (_) { if (!stop) setVentesLbc(null); }
     })();
@@ -25161,6 +25238,22 @@ function PublierVestiaire({ comptes }) {
     const sansN = b - items.filter((x, i) => x && x.boost === true && cleNum(((vcAnn.liens || {})[Object.keys(vcAnn.items)[i]]) || x.ref || '')).length;
     return { code: 'lu', b, texte: `${n} annonce${n > 1 ? 's' : ''} sur Vestiaire${total}, lue${n > 1 ? 's' : ''} ${quand} : ${b} boostée${b > 1 ? 's' : ''}${nums.length ? ` (${nums.join(', ')}${sansN > 0 ? ` et ${sansN} pas reliée${sansN > 1 ? 's' : ''} à une paire` : ''})` : ''}${inc ? ` · ${inc} dont Vestiaire ne dit pas le boost` : ''}.` };
   })();
+  // 5.295 — LES FAVORIS VESTIAIRE : combien de personnes ont mis chaque annonce
+  // en favori (un NOMBRE lu par l'extension, jamais qui). Par identité seulement
+  // (lien posé à la création ou référence VRM). Une capture d'avant la 5.295 ne
+  // porte pas le champ : on ne dit rien ; `null` = Vestiaire ne le dit pas.
+  const resumeFavoris = (() => {
+    if (!vcAnn || !vcAnn.items) return null;
+    const items = Object.entries(vcAnn.items).filter(([, it]) => it && Object.prototype.hasOwnProperty.call(it, 'favoris'));
+    if (!items.length) return null;
+    const liens = vcAnn.liens || {};
+    const sus = items.filter(([, it]) => typeof it.favoris === 'number');
+    const inc = items.length - sus.length;
+    if (!sus.length) return { code: 'pas-dit', texte: "Vestiaire ne dit pas, dans la liste de tes articles, combien de personnes les ont mis en favori." };
+    const total = sus.reduce((t, [, it]) => t + it.favoris, 0);
+    const parN = sus.filter(([, it]) => it.favoris > 0).map(([id, it]) => [cleNum(liens[id] || it.ref || ''), it.favoris]).filter(([n]) => n).sort((a, z) => z[1] - a[1]);
+    return { code: 'lu', total, texte: `${total} favori${total > 1 ? 's' : ''} sur ${sus.length} annonce${sus.length > 1 ? 's' : ''}${parN.length ? ` (${parN.slice(0, 8).map(([n, f]) => `N°${n} · ${f}`).join(', ')})` : ''}${inc ? ` · ${inc} dont Vestiaire ne dit pas le nombre` : ''}. Qui les a mis en favori, Vestiaire ne l'a jamais montré à l'extension : VRM n'écrit donc à personne.` };
+  })();
   const liste = (paires || []).filter((p) => !(publiees && publiees.has(String(p.id))));
   const visibles = tout ? liste : liste.slice(0, 12);
   const preparer = async (p) => {
@@ -25249,6 +25342,7 @@ function PublierVestiaire({ comptes }) {
           : <span data-vc-auto="non">L'extension ouvre Vestiaire (clique « Vendre un article » si besoin), remplit la description, le prix et ce qu'elle reconnaît, et attache les photos{' '}— détourées si ta clé Photoroom est posée, sinon elle te propose de les attacher sans détourage. <b style={{ color: C.text }}>C'est toi qui choisis la catégorie et le modèle, puis qui publies</b>{extSait('vcauto') === 'retard' ? <> — pour qu'elle publie toute seule, sans booster, mets l'extension à jour ({EXT_CAPACITES.vcauto}).</> : '.'}</span>}
         {glob ? <div data-vc-raison={glob.code} style={{ color: C.warn, marginTop: 6 }}>{glob.texte}</div> : null}
         {resumeBoost ? <div data-vc-boost-resume={resumeBoost.code} style={{ marginTop: 6 }}>{resumeBoost.texte}</div> : null}
+        {resumeFavoris ? <div data-vc-favoris-resume={resumeFavoris.code} data-vc-favoris-total={resumeFavoris.total == null ? undefined : String(resumeFavoris.total)} style={{ marginTop: 6 }}>{resumeFavoris.texte}</div> : null}
       </div>
       {corps}
     </Card>
@@ -25298,7 +25392,8 @@ function VentesVestiaire({ comptes }) {
     const liste = Object.entries(d.ventes).map(([id, v]) => {
       const num = cleNum((v.productId && d.liens[v.productId]) || v.ref || '');
       return { id, ...v, num };
-    }).sort((a, z) => String(z.date || z.premiereVue || '').localeCompare(String(a.date || a.premiereVue || '')));
+    // (31 oct.) Les ventes À EXPÉDIER d'abord (la date limite la plus proche en tête), puis les autres, la plus récente d'abord.
+    }).sort((a, z) => (z.aExpedier === true) - (a.aExpedier === true) || (a.aExpedier && z.aExpedier ? String(a.limite || '9999').localeCompare(String(z.limite || '9999')) : 0) || String(z.date || z.premiereVue || '').localeCompare(String(a.date || a.premiereVue || '')));
     const aExp = liste.filter((v) => v.aExpedier);
     const lue = d.lectures && d.lectures['a-expedier'];
     if (!liste.length) corps = <div data-vc-ventes="vide" style={style}>Aucune vente Vestiaire à la dernière lecture.</div>;
@@ -25317,6 +25412,14 @@ function VentesVestiaire({ comptes }) {
                 {v.etat ? `Vestiaire : « ${v.etat} »` : 'état non dit'}{v.date ? ` · ${new Date(v.date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}` : ''}
                 {v.montant ? ` · ${fmt(v.montant.valeur)}${v.montant.devise && v.montant.devise !== 'EUR' ? ' ' + v.montant.devise : ''} (« ${v.montant.cle} »)` : ''}
               </div>
+              {/* (31 oct.) Le colis de la vente, tel que Vestiaire l'écrit (rangé depuis la 5.240) : la date limite d'envoi,
+                  le transporteur et le n° de suivi ; « plus à expédier » quand la liste lue EN ENTIER ne la porte plus
+                  (expédiée ou annulée — on ne dit pas laquelle). */}
+              {(v.aExpedier && v.limite) || v.suivi || v.plusAExpedierDepuis ? <div data-vc-vente-colis="" style={{ fontSize: 11.5, color: C.muted }}>
+                {[v.aExpedier && v.limite ? `à envoyer avant le ${new Date(v.limite).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}` : '',
+                  v.suivi ? `${v.transporteur ? v.transporteur + ' ' : ''}n° ${v.suivi}` : '',
+                  !v.aExpedier && v.plusAExpedierDepuis ? `plus dans « à expédier » depuis le ${new Date(v.plusAExpedierDepuis).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}` : ''].filter(Boolean).join(' · ')}
+              </div> : null}
               {!v.num ? <div style={{ fontSize: 11, color: C.muted }}>Aucune référence VRM-n° lue sur l'article : VRM ne devine pas la paire.</div> : null}
               {enV ? <div data-vc-vente-vinted="" style={{ fontSize: 11.5, color: C.warn, marginTop: 2 }}>Encore en ligne sur Vinted — retire-la de Vinted pour ne pas la vendre deux fois. <a href={`https://www.vinted.fr/items/${enV.id}`} target="_blank" rel="noreferrer" style={{ color: C.accent, fontWeight: 600 }}>Ouvrir l'annonce ↗</a></div> : null}
             </div>
@@ -25400,26 +25503,128 @@ function ColisVestiaireBloc({ vc }) {
   );
 }
 // ══════════════════════════════════════════════════════════════════════════════
-// VESTIAIRE COLLECTIVE : TES MESSAGES (27 octobre, 5.238)
+// VESTIAIRE COLLECTIVE : TES MESSAGES (27 octobre, 5.238 — lus et répondus le 31 octobre, 5.295)
 // ══════════════════════════════════════════════════════════════════════════════
-// Julien : « fais pareil pour les messages Vestiaire ». L'extension relève ce
-// que la page charge déjà (`vc_messages`) : le NOMBRE de non-lus (compteur de
-// Vestiaire, mesuré) et, le jour où il ouvre sa messagerie, les conversations —
-// sans aucun texte ni nom. La paire se relie par IDENTITÉ seulement (référence
-// VRM-{n°} de l'article ou annonce créée par VRM), jamais le titre (§5). On y
-// répond sur Vestiaire : VRM n'écrit rien. Trois états, jamais « 0 » sur un « pas su ».
-function MessagesVestiaire() {
-  const [d, setD] = React.useState(undefined);   // undefined en cours · null pas su · objet
+// Julien (27 oct.) : « fais pareil pour les messages Vestiaire » ; (31 oct.) :
+// « au moins pouvoir lire les messages et écrire aux personnes, sans forcément
+// automatiser ». L'extension relève ce que la page charge déjà : le NOMBRE de
+// non-lus (`vc_messages.compteur`, mesuré), la liste des conversations
+// (`vc_messages.conversations`, avec l'aperçu du dernier message depuis la
+// 5.295) et, conversation par conversation, son FIL (`vc_fil_{id}` : le texte
+// des messages, leur date, « de toi » — jamais le nom de la personne).
+// La paire se relie par IDENTITÉ seulement (référence VRM-{n°} de l'article ou
+// annonce créée par VRM), jamais le titre (§5).
+// Répondre : sur SON clic (« Envoyer »), depuis l'onglet vestiairecollective.com
+// ouvert dans ce Chrome, par l'extension (`vcRepondre`) — une à la fois, dans le
+// plafond d'actions de l'heure, jamais pendant une pause de Vestiaire. Tant que
+// l'extension n'a pas VU comment Vestiaire envoie un message (`vc_envoi.appris`),
+// rien ne part : on le dit, avec le geste. Trois états, jamais « 0 » sur un « pas su ».
+const etiquetteResultatVc = (r) => {
+  if (!r) return { ton: 'muet', texte: "L'extension n'a pas répondu — je ne sais pas si le message est parti. Regarde la conversation sur Vestiaire avant de renvoyer." };
+  if (r.accepte === true && r.etape === 'fait') return { ton: 'ok', texte: 'Envoyé sur Vestiaire.' };
+  if (r.accepte === true && r.etape === 'incertain') return { ton: 'muet', texte: r.raison || "Je ne sais pas si le message est parti — regarde sur Vestiaire avant de renvoyer." };
+  if (r.accepte === true && r.etape === 'refuse') return { ton: 'ko', texte: r.raison || "Vestiaire a refusé : le message n'est pas parti." };
+  return { ton: 'ko', texte: (r.raison ? r.raison.charAt(0).toUpperCase() + r.raison.slice(1) : "Rien n'est parti.") + (/[.!]$/.test(r.raison || '') ? '' : '.') };
+};
+function FilVestiaire({ conv, num, envoi, onFerme }) {
+  const [fil, setFil] = React.useState(undefined);   // undefined en cours · null pas su · objet
+  const [texte, setTexte] = React.useState('');
+  const [enCours, setEnCours] = React.useState(false);
+  const [res, setRes] = React.useState(null);
   const relire = React.useCallback(async () => {
     try {
-      const [rm, rl] = await Promise.all([
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vc_fil_${encodeURIComponent(conv)}&select=messages:data->messages,page:data->>page,at:data->>capturedAt`, { headers: sbAuth() });
+      if (!r.ok) throw new Error('lecture');
+      const j = await r.json();
+      setFil(j && j[0] ? { messages: Array.isArray(j[0].messages) ? j[0].messages : [], page: j[0].page || '', at: j[0].at || '' } : { messages: null });
+    } catch (_) { setFil(null); }
+  }, [conv]);
+  React.useEffect(() => { relire(); }, [relire]);
+  React.useEffect(() => {
+    const f = (e) => { const x = e && e.detail; if (x && x.type === 'maj' && x.quoi === 'vestiaire') relire(); };
+    window.addEventListener('vrm:ext', f); return () => window.removeEventListener('vrm:ext', f);
+  }, [relire]);
+  const cap = extSait('vcrepondre');
+  const peut = cap === 'ok' && envoi && envoi.appris === true;
+  const envoyer = async () => {
+    const t = texte.trim();
+    if (!t || enCours || !peut) return;
+    setEnCours(true); setRes(null);
+    let r = null; try { r = await vmrCmd({ cmd: 'vcRepondre', conv, texte: t }, 45000); } catch (_) { r = null; }
+    setEnCours(false); setRes(etiquetteResultatVc(r));
+    if (r && r.accepte === true && r.etape === 'fait') { setTexte(''); relire(); }
+  };
+  const style = { fontSize: 12.5, color: C.muted, lineHeight: 1.55 };
+  const heure = (iso) => { const t = Date.parse(iso || ''); return isFinite(t) ? new Date(t).toLocaleString('fr-FR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : 'date non dite'; };
+  let corps;
+  if (fil === undefined) corps = <div data-vc-fil="charge" style={style}>Lecture de la conversation…</div>;
+  else if (fil === null) corps = <div data-vc-fil="pas-su" style={style}>Je n'ai pas pu lire cette conversation — rien n'est perdu, réessaie dans un moment.</div>;
+  else if (!fil.messages) corps = <div data-vc-fil="jamais" style={style}>Le texte de cette conversation n'a pas encore été lu : ouvre-la une fois sur Vestiaire, dans le Chrome où l'extension est installée{cap === 'retard' ? <> (mise à jour en <b>{EXT_CAPACITES.vcfil}</b> d'abord)</> : ''}.</div>;
+  else if (!fil.messages.length) corps = <div data-vc-fil="vide" style={style}>Conversation lue, mais Vestiaire n'y a rendu aucun message lisible.</div>;
+  else corps = (
+    <div data-vc-fil="lu" data-vc-fil-n={fil.messages.length} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      {fil.messages.slice(-80).map((m, i) => (
+        <div key={m.id || i} data-vc-msg={m.deMoi === true ? 'moi' : m.deMoi === false ? 'autre' : 'passu'} style={{ alignSelf: m.deMoi === true ? 'flex-end' : 'flex-start', maxWidth: '86%', background: m.deMoi === true ? C.card : 'transparent', border: `1px solid ${C.border}`, borderRadius: 10, padding: '8px 10px' }}>
+          <div style={{ fontSize: 13.5, color: C.text, whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', lineHeight: 1.45 }}>{m.t}</div>
+          <div style={{ fontSize: 11, color: C.muted, marginTop: 3 }}>{m.deMoi === true ? 'Toi' : m.deMoi === false ? "L'autre personne" : 'Auteur non dit par Vestiaire'} · {heure(m.at)}{m.envoyeParVrm ? ' · envoyé depuis VRM' : ''}</div>
+          {m.deMoi !== true && <BoutonTraduire texte={m.t}/>}
+        </div>
+      ))}
+    </div>
+  );
+  const page = fil && /^\/[\w/.-]*$/.test(fil.page || '') ? fil.page : '';
+  return (
+    <div data-vc-fil-ouvert={conv} style={{ display: 'flex', flexDirection: 'column', gap: 10, borderTop: `1px solid ${C.border}`, paddingTop: 10 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <div style={{ flex: 1, minWidth: 0, fontSize: 13.5, fontWeight: 700, color: C.text }}>{num ? `N°${num}` : 'Conversation pas reliée à une paire'}</div>
+        <button type="button" className="vrm-lien-action" onClick={onFerme} style={{ minHeight: 44, border: 'none', background: 'transparent', color: C.accent, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>Fermer</button>
+      </div>
+      {corps}
+      {fil && fil.messages && (
+        <div data-vc-repondre={peut ? 'pret' : (cap !== 'ok' ? 'ext-' + cap : 'pas-appris')} style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          {peut ? (<>
+            <textarea value={texte} onChange={(e) => setTexte(e.target.value.slice(0, 2000))} rows={3} placeholder="Ta réponse…" aria-label="Ta réponse sur Vestiaire"
+              style={{ width: '100%', boxSizing: 'border-box', fontSize: 16, fontFamily: 'inherit', color: C.text, background: C.bg, border: `1px solid ${C.border}`, borderRadius: 10, padding: 10, resize: 'vertical' }}/>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+              <Bouton variante="primaire" onClick={envoyer} disabled={!texte.trim() || enCours} data-vc-envoyer="">{enCours ? 'Envoi…' : 'Envoyer sur Vestiaire'}</Bouton>
+              <span style={{ fontSize: 11.5, color: C.muted }}>Part de l'onglet Vestiaire ouvert dans ce Chrome, à ton nom, un message à la fois.</span>
+            </div>
+          </>) : cap !== 'ok' ? (
+            <div style={style}>{cap === 'absente' ? <>Pour répondre d'ici, ouvre VRM dans le Chrome où l'extension est installée — sinon réponds sur Vestiaire.</> : <>Pour répondre d'ici, il faut l'extension <b>{EXT_CAPACITES.vcrepondre}</b> — mets-la à jour depuis <b>Réglages</b>.</>}</div>
+          ) : (
+            <div data-vc-pas-appris={envoi && envoi.raison ? envoi.raison : ''} style={style}>
+              Pour répondre d'ici, l'extension doit d'abord VOIR comment Vestiaire envoie un message : envoie <b>une</b> réponse toi-même sur Vestiaire, dans ce Chrome. Ensuite, VRM pourra répondre — toujours sur ton clic.
+              {envoi && envoi.raison ? <> (Dernier essai vu : pas encore sûr à refaire — {envoi.raison}.)</> : null}
+            </div>
+          )}
+          {res && <div role="status" data-vc-resultat={res.ton} style={{ fontSize: 12.5, color: res.ton === 'ko' ? C.warn : res.ton === 'ok' ? C.text : C.muted, lineHeight: 1.5 }}>{res.texte}</div>}
+          <a href={`https://fr.vestiairecollective.com${page || '/'}`} target="_blank" rel="noreferrer" className="vrm-lien-action" style={{ color: C.accent, fontWeight: 600, display: 'inline-flex', alignItems: 'center', minHeight: 44, fontSize: 12.5 }}>Ouvrir sur Vestiaire ↗</a>
+        </div>
+      )}
+    </div>
+  );
+}
+function MessagesVestiaire() {
+  const [d, setD] = React.useState(undefined);   // undefined en cours · null pas su · objet
+  const [ouvert, setOuvert] = React.useState('');
+  const relire = React.useCallback(async () => {
+    try {
+      const [rm, rl, rf, re] = await Promise.all([
         fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vc_messages&select=compteur:data->compteur,conversations:data->conversations,lecture:data->lecture`, { headers: sbAuth() }),
         fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vc_listings&select=liens:data->liens`, { headers: sbAuth() }),
+        // 5.295 : les fils lus, en SCALAIRES (§4.4 : jamais le texte de tous les fils d'un coup).
+        fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.vc_fil_*&select=id,n:meta->>n,da:meta->>dernierAt,ap:meta->>apercu,dm:meta->>dernierDeMoi,pid:meta->>productId,ref:meta->>ref`, { headers: sbAuth() }),
+        fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vc_envoi&select=appris:data->appris,raison:data->>raison,at:data->>at`, { headers: sbAuth() }),
       ]);
       if (!rm.ok || !rl.ok) throw new Error('lecture');
       const [jm, jl] = await Promise.all([rm.json(), rl.json()]);
+      const jf = rf.ok ? await rf.json().catch(() => null) : null;
+      const je = re.ok ? await re.json().catch(() => null) : null;
       const r = (jm && jm[0]) || {};
-      setD({ compteur: r.compteur || null, conversations: r.conversations || null, lecture: r.lecture || null, liens: (jl && jl[0] && jl[0].liens) || {} });
+      const fils = {};
+      for (const x of (Array.isArray(jf) ? jf : [])) { const id = String(x.id || '').replace(/^vc_fil_/, ''); if (id) fils[id] = x; }
+      setD({ compteur: r.compteur || null, conversations: r.conversations || null, lecture: r.lecture || null, liens: (jl && jl[0] && jl[0].liens) || {},
+        fils: Array.isArray(jf) ? fils : null, envoi: Array.isArray(je) ? (je[0] ? { appris: je[0].appris === true, raison: je[0].raison || '', at: je[0].at || '' } : { appris: false, raison: '' }) : null });
     } catch (_) { setD(null); }
   }, []);
   React.useEffect(() => { relire(); }, [relire]);
@@ -25435,11 +25640,17 @@ function MessagesVestiaire() {
   let corps;
   if (d === undefined) corps = <div data-vc-messages="charge" style={style}>Lecture de tes messages Vestiaire…</div>;
   else if (d === null) corps = <div data-vc-messages="pas-su" style={style}>Je n'ai pas pu lire tes messages Vestiaire — rien n'est perdu, réessaie dans un moment.</div>;
-  else if (!d.compteur && !d.conversations) corps = <div data-vc-messages="jamais" style={style}>Pas encore relevés. Ouvre Vestiaire dans le Chrome où l'extension VRM est installée{extSait('vcmessages') === 'retard' ? <> — mise à jour en <b>{EXT_CAPACITES.vcmessages}</b> d'abord</> : ''} : elle relève le nombre de messages non lus en passant, et tes conversations quand tu ouvres ta messagerie.</div>;
+  else if (!d.compteur && !d.conversations && !(d.fils && Object.keys(d.fils).length)) corps = <div data-vc-messages="jamais" style={style}>Pas encore relevés. Ouvre Vestiaire dans le Chrome où l'extension VRM est installée{extSait('vcmessages') === 'retard' ? <> — mise à jour en <b>{EXT_CAPACITES.vcmessages}</b> d'abord</> : ''} : elle relève le nombre de messages non lus en passant, et tes conversations quand tu ouvres ta messagerie.</div>;
   else {
     const n = d.compteur && typeof d.compteur.messages === 'number' ? d.compteur.messages : null;
-    const liste = Object.entries(d.conversations || {}).map(([id, v]) => ({ id, ...v, num: cleNum((v.productId && d.liens[v.productId]) || v.ref || '') }))
-      .sort((a, z) => (z.nonLu === true) - (a.nonLu === true) || String(z.date || z.vuAt || '').localeCompare(String(a.date || a.vuAt || '')));
+    const ids = new Set([...Object.keys(d.conversations || {}), ...Object.keys(d.fils || {})]);
+    const liste = [...ids].map((id) => {
+      const v = (d.conversations || {})[id] || {}; const f = (d.fils || {})[id] || null;
+      const pid = v.productId || (f && f.pid) || ''; const ref = v.ref || (f && f.ref) || '';
+      const apercu = (f && f.ap) || v.apercu || '';
+      const date = (f && f.da) || v.date || v.vuAt || '';
+      return { id, nonLu: v.nonLu, apercu, date, lu: !!(f && Number(f.n) > 0), num: cleNum((pid && d.liens[pid]) || ref || '') };
+    }).sort((a, z) => (z.nonLu === true) - (a.nonLu === true) || String(z.date || '').localeCompare(String(a.date || '')));
     corps = (
       <div data-vc-messages="lu" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         <div data-vc-messages-nonlus={n == null ? 'passu' : String(n)} style={style}>
@@ -25448,16 +25659,21 @@ function MessagesVestiaire() {
           {' '}<a data-vc-messages-ouvrir="" href={lien} target="_blank" rel="noreferrer" className="vrm-lien-action" style={{ color: C.accent, fontWeight: 600, display: 'inline-flex', alignItems: 'center', minHeight: 44 }}>{page ? 'Ouvrir ta messagerie Vestiaire ↗' : 'Ouvrir Vestiaire ↗'}</a>
           {!page ? <> (la messagerie est dans le menu de ton compte)</> : null}
         </div>
-        {d.conversations ? (liste.length ? <>
-          <div style={style}>{liste.length} conversation{liste.length > 1 ? 's' : ''} vue{liste.length > 1 ? 's' : ''}{d.lecture && !d.lecture.complet ? ' (au moins)' : ''} — VRM n'en garde ni le texte ni le nom de la personne ; on y répond sur Vestiaire.</div>
-          {liste.slice(0, 30).map((v) => (
-            <div key={v.id} data-vc-conv={v.id} data-vc-conv-num={v.num || ''} data-vc-conv-nonlu={v.nonLu === true ? 'oui' : v.nonLu === false ? 'non' : 'passu'} style={{ borderTop: `1px solid ${C.border}`, paddingTop: 8 }}>
-              <div style={{ fontSize: 13, color: C.text, fontWeight: v.nonLu === true ? 700 : 600 }}>{v.num ? `N°${v.num}` : 'Pas reliée à une paire'}{v.nonLu === true ? <span style={{ marginLeft: 8, color: C.accent }}>· non lue</span> : null}</div>
-              <div style={{ fontSize: 11.5, color: C.muted }}>{v.date ? new Date(v.date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }) : 'date non dite'}{v.nonLu == null ? ' · Vestiaire ne dit pas si elle est lue' : ''}</div>
+        {liste.length ? <>
+          <div style={style}>{liste.length} conversation{liste.length > 1 ? 's' : ''} vue{liste.length > 1 ? 's' : ''}{d.lecture && !d.lecture.complet ? ' (au moins)' : ''}. Touche-en une pour la lire{extSait('vcrepondre') === 'ok' ? ' et y répondre' : ''} — VRM n'en garde jamais le nom de la personne.</div>
+          {liste.slice(0, 40).map((v) => (
+            <div key={v.id} data-vc-conv={v.id} data-vc-conv-num={v.num || ''} data-vc-conv-nonlu={v.nonLu === true ? 'oui' : v.nonLu === false ? 'non' : 'passu'} data-vc-conv-lu={v.lu ? 'oui' : 'non'} style={{ borderTop: `1px solid ${C.border}`, paddingTop: 8 }}>
+              {ouvert === v.id ? <FilVestiaire conv={v.id} num={v.num} envoi={d.envoi} onFerme={() => setOuvert('')}/> : (
+                <button type="button" onClick={() => setOuvert(v.id)} aria-label={`Ouvrir la conversation ${v.num ? 'du N°' + v.num : ''}`} style={{ display: 'block', width: '100%', textAlign: 'left', background: 'transparent', border: 'none', padding: '4px 0', minHeight: 44, cursor: 'pointer', fontFamily: 'inherit' }}>
+                  <div style={{ fontSize: 13, color: C.text, fontWeight: v.nonLu === true ? 700 : 600 }}>{v.num ? `N°${v.num}` : 'Pas reliée à une paire'}{v.nonLu === true ? <span style={{ marginLeft: 8, color: C.accent }}>· non lue</span> : null}</div>
+                  {v.apercu ? <div style={{ fontSize: 12.5, color: C.text, marginTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{v.apercu}</div> : null}
+                  <div style={{ fontSize: 11.5, color: C.muted }}>{v.date ? new Date(v.date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }) : 'date non dite'}{v.nonLu == null ? ' · Vestiaire ne dit pas si elle est lue' : ''}{v.lu ? '' : ' · texte pas encore lu'}</div>
+                </button>
+              )}
             </div>
           ))}
-        </> : <div data-vc-conv-vide="" style={style}>Aucune conversation à la dernière lecture.</div>)
-          : <div data-vc-conv-jamais="" style={style}>Le détail des conversations arrive quand tu ouvres ta messagerie sur Vestiaire dans ce Chrome.</div>}
+        </> : (d.conversations ? <div data-vc-conv-vide="" style={style}>Aucune conversation à la dernière lecture.</div>
+          : <div data-vc-conv-jamais="" style={style}>Le détail des conversations arrive quand tu ouvres ta messagerie sur Vestiaire dans ce Chrome.</div>)}
       </div>
     );
   }
@@ -26372,6 +26588,9 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
       {/* (30 oct.) L'anneau « Répartition du CA par plateforme » redisait « Finalisé par plateforme »
           (mêmes montants, mêmes parts) : une notion, un bloc (§7). */}
       {/* Ce qui se vend : marque, taille, modèle, pays, temps de vente (17 oct.). */}
+      {/* (31 oct.) Rythme, marges par groupe, temps de vente, jours et heures,
+          stock qui dort, rotation, annulations — chacun avec sa couverture. */}
+      <StatsDetaillees liveStats={liveStats} panelOff={panelOff}/>
       <AnalysesStatistiques panelOff={panelOff}/>
 
       {/* Le boost est-il rentable ? (21 oct.) — un repère, n'entre dans aucun total. */}
@@ -31001,7 +31220,6 @@ function Garage({catalog,garageGrid,setGarageGrid,blockedCells,setBlockedCells,e
     },10);
   };
   
-  const COLORS=['#ffb830','#ff4d6d','#4da6ff','#a78bfa','#00e5a0','#ff8c42','#ec4899'];
   
   const addColumn=(zid)=>{
     const u={...extraCols, [zid]:(extraCols[zid]||0)+1};
@@ -34927,10 +35145,12 @@ const repartitionsVentes = ({ ventes, txn, items, dates, ecarte }) => {
     const tx = String(o.transaction_id || '');
     const t = (txn && tx && txn[tx]) || null;
     const it = (t && t.item && items && items[t.item]) || null;
-    ajoute(R.marques, (it && it.brand) || extractBrand(o.title) || '', eur);
-    const taille = String((it && it.size) || extractSize(o.title) || '').replace(/^T(?=\d)/i, '').replace('.', ',').trim();
-    ajoute(R.tailles, taille, eur);
-    ajoute(R.modeles, extractModel(o.title) || '', eur);
+    // (31 oct.) La clé vient de `clesVenteStats` — la même pour les marges de
+    // « Bénéfice et marge » (§11).
+    const cles = clesVenteStats(o.title, it);
+    ajoute(R.marques, cles.marque, eur);
+    ajoute(R.tailles, cles.taille, eur);
+    ajoute(R.modeles, cles.modele, eur);
     if (R.pays && t && t.cc) ajoute(R.pays, t.cc, eur);
     if (it) {
       const enLigne = dateMiseEnLigneMs(it, dates || null);
@@ -34949,6 +35169,249 @@ const repartitionsVentes = ({ ventes, txn, items, dates, ecarte }) => {
   }
   return R;
 };
+// ══════════════════════════════════════════════════════════════════════════════
+// STATISTIQUES DÉTAILLÉES (31 octobre) — Julien : « beaucoup plus de
+// statistiques, de la vraie data ». Les règles sont PURES (src/statsVentes.js,
+// exécutées par scripts/audit-stats-ventes.cjs) ; ici on leur donne ce que les
+// propriétaires ont déjà lu ou publié (§11) :
+//   · le rythme, les semaines, les jours, les heures : `liveStats.venduLignes`
+//     (la coque, `ventesFaites` — la population de « Vendu » de Ma journée) ;
+//   · le bénéfice par groupe : `vrm_stats_ventes` (le relevé de l'écran Ventes,
+//     les ventes et prix d'achat de `vrm_benefice_jours`) ;
+//   · marque, taille, modèle et délai : les clés de « Ce qui se vend »
+//     (`clesVenteStats`, transaction → annonce, sinon le titre de LA vente) ;
+//   · le stock qui dort : `vrm_stats_stock` (l'écran Annonces) ;
+//   · les annulations : les ventes Vinted de la coque (`useVentesCoque`).
+// Chaque chiffre dit sa couverture ; « pas su » s'écrit « — » avec la raison.
+// Aucune couleur d'alerte : une seule teinte d'accent pour les barres (§7).
+const lireReleveVentes = () => { try { const v = load('vrm_stats_ventes', null); return v && Array.isArray(v.l) ? v : null; } catch (_) { return null; } };
+const lireStatsStock = () => { try { const v = load('vrm_stats_stock', null); return v && v.dort && typeof v.dort === 'object' ? v : null; } catch (_) { return null; } };
+// LA clé d'une vente (marque, modèle, taille) — une règle pour « Ce qui se
+// vend » et les marges (§11) : l'annonce reliée par la transaction, sinon le
+// titre de LA vente elle-même (pas un rapprochement entre deux paires, §5).
+const clesVenteStats = (titre, it) => ({
+  marque: (it && it.brand) || extractBrand(titre || '') || '',
+  taille: String((it && it.size) || extractSize(titre || '') || '').replace(/^T(?=\d)/i, '').replace('.', ',').trim(),
+  modele: extractModel(titre || '') || '',
+});
+const eurStat = (v) => v == null ? '—' : fmt(v);
+const pctStat = (v) => v == null ? '—' : `${v > 0 ? '+' : ''}${v} %`;
+const minuitLocalStats = (k = 0) => { const d = new Date(); return new Date(d.getFullYear(), d.getMonth(), d.getDate() + k).getTime(); };
+// Barres verticales, une série (une teinte), survol natif (<title>) sur une
+// cible de toute la hauteur (plus large que la barre).
+function BarresStats({ valeurs, titres, hauteur = 96, attenue = [], data }) {
+  const n = valeurs.length, max = Math.max(1, ...valeurs.map((v) => Number(v) || 0));
+  const W = 100 / n;
+  return (
+    <svg viewBox={`0 0 100 ${hauteur}`} preserveAspectRatio="none" role="img" style={{ width: '100%', height: hauteur, display: 'block' }} {...(data || {})}>
+      <line x1="0" x2="100" y1={hauteur - 0.5} y2={hauteur - 0.5} stroke={C.border} strokeWidth="1" vectorEffect="non-scaling-stroke"/>
+      {valeurs.map((v, i) => {
+        const h = (Number(v) || 0) / max * (hauteur - 4);
+        return (
+          <g key={i}>
+            <rect x={i * W} y={0} width={W} height={hauteur} fill="transparent"><title>{titres ? titres[i] : String(v)}</title></rect>
+            {h > 0 && <rect x={i * W + W * 0.18} y={hauteur - h} width={W * 0.64} height={h} rx="0.8" fill={C.accent} opacity={attenue.includes(i) ? 0.45 : 1} pointerEvents="none"/>}
+          </g>
+        );
+      })}
+    </svg>
+  );
+}
+function LegendeBarres({ libelles }) {
+  return <div style={{ display: 'grid', gridTemplateColumns: `repeat(${libelles.length}, minmax(0,1fr))`, fontSize: 11, color: C.muted, textAlign: 'center', marginTop: 4, fontVariantNumeric: 'tabular-nums' }}>{libelles.map((l, i) => <span key={i} style={{ overflow: 'visible', whiteSpace: 'nowrap' }}>{l}</span>)}</div>;
+}
+function StatsDetaillees({ liveStats, panelOff }) {
+  const sCarte = { padding: 18, background: C.card, border: `1px solid ${C.border}`, borderRadius: 12, boxShadow: C.shadow };
+  const sTitre = { fontSize: 15, fontWeight: 600, color: C.text, letterSpacing: -0.15 };
+  const sLib = { fontSize: 13, color: C.muted, fontWeight: 500 };
+  const sNote = { fontSize: 11, color: C.muted, lineHeight: 1.5 };
+  // Un montant dans une phrase ne se coupe jamais en deux (« 31,07 » / « € »).
+  const mt = (v) => <span style={{ whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{fmt(v)}</span>;
+  const sChiffre = { fontSize: 20, fontWeight: 700, letterSpacing: -0.4, marginTop: 4, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' };
+  const [releve, setReleve] = React.useState(lireReleveVentes);
+  const [stock, setStock] = React.useState(lireStatsStock);
+  React.useEffect(() => {
+    const f = (e) => { const k = e && e.detail && e.detail.k; if (k === 'vrm_stats_ventes') setReleve(lireReleveVentes()); if (k === 'vrm_stats_stock') setStock(lireStatsStock()); };
+    window.addEventListener('vrm:save', f); return () => window.removeEventListener('vrm:save', f);
+  }, []);
+  const [extras, setExtras] = React.useState(undefined);
+  React.useEffect(() => { let mort = false; lireExtrasRepartition().then((x) => { if (!mort) setExtras(x); }).catch(() => { if (!mort) setExtras({ txn: null, items: null, dates: null }); }); return () => { mort = true; }; }, []);
+  const { ventes: ventesCoque } = useVentesCoque();
+  const [axeMarge, setAxeMarge] = React.useState('marque');
+  const [axeDelai, setAxeDelai] = React.useState('marque');
+
+  const vendu = liveStats ? liveStats.venduLignes : undefined;
+  const R = React.useMemo(() => (Array.isArray(vendu) ? rythmeVendu(vendu) : null), [vendu]);
+  const Q = React.useMemo(() => (Array.isArray(vendu) ? quandTuVends(vendu) : null), [vendu]);
+  const manque = (liveStats && liveStats.venduManque) || [];
+  // Le relevé, avec ses clés (marque, modèle, taille) et la date de mise en
+  // ligne de l'annonce reliée par la transaction (Vinted seulement).
+  const lignes = React.useMemo(() => {
+    if (!releve) return null;
+    const x = extras || {};
+    return releve.l.map((r) => {
+      const [plateforme, compte, id, ts, eur, achat, frais, titre] = r;
+      const t = plateforme === 'Vinted' && x.txn && id ? x.txn[String(id)] : null;
+      const it = t && t.item && x.items ? x.items[t.item] : null;
+      return { plateforme, compte, id, ts, eur, achat, frais, ...clesVenteStats(titre, it), enLigne: it ? dateMiseEnLigneMs(it, x.dates || null) : null };
+    });
+  }, [releve, extras]);
+  const AXES_MARGE = { marque: 'Marque', modele: 'Modèle', taille: 'Taille', plateforme: 'Plateforme', compte: 'Compte' };
+  const M = React.useMemo(() => lignes ? margesPar(lignes, (l) => axeMarge === 'compte' ? (l.plateforme === 'Vinted' ? l.compte : l.plateforme) : axeMarge === 'taille' ? (/^\d/.test(l.taille) ? `T${l.taille}` : l.taille) : l[axeMarge]) : null, [lignes, axeMarge]);
+  const AXES_DELAI = { marque: 'Marque', prix: 'Prix', compte: 'Compte' };
+  const Dl = React.useMemo(() => {
+    if (!lignes || extras === undefined) return null;
+    if (!extras || extras.items == null || extras.txn == null) return 'passu';
+    return delaisPar(lignes.filter((l) => l.plateforme === 'Vinted'), (l) => axeDelai === 'prix' ? tranchePrix(l.eur) : axeDelai === 'compte' ? l.compte : l.marque);
+  }, [lignes, extras, axeDelai]);
+  const annul = React.useMemo(() => {
+    if (!Array.isArray(ventesCoque)) return null;
+    const hAcc = new Set((load('vinted_accounts_hidden', []) || []).map(String));
+    return tauxAnnulation(ventesCoque.filter((o) => o && !compteEcarte(o._acc && o._acc.vinted_user_id, hAcc, panelOff || {})).map((o) => classifyOrderStatus(o.status)));
+  }, [ventesCoque, panelOff]);
+  const vint30 = Array.isArray(vendu) ? vendu.filter((l) => l.plateforme === 'Vinted' && l.ts >= minuitLocalStats(-29)).length : null;
+  const vintMois = Array.isArray(vendu) ? (() => { const d = new Date(); const de = new Date(d.getFullYear(), d.getMonth(), 1).getTime(); return vendu.filter((l) => l.plateforme === 'Vinted' && l.ts >= de).length; })() : null;
+  const enLigne = stock ? stock.dort.total : null;
+  const rot = rotationStock(enLigne, vint30), tauxV = tauxVenteMois(vintMois, enLigne);
+  const quand = (at) => at ? new Date(at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' }) : '';
+  const jFmt = (j) => j == null ? '—' : j < 1 ? '< 1 j' : `${Math.round(j)} j`;
+  const pl = (n, s, p) => `${n} ${n > 1 ? (p || s + 's') : s}`;
+  const fig = (lib, val, sous, attr) => (
+    <div style={{ minWidth: 0 }} {...(attr || {})}>
+      <div style={sLib}>{lib}</div>
+      <div className="vrm-display" style={{ ...sChiffre, color: val === '—' ? C.muted : C.text }}>{val}</div>
+      {sous ? <div style={{ ...sNote, marginTop: 2 }}>{sous}</div> : null}
+    </div>
+  );
+  const grille = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(150px, 100%), 1fr))', gap: '14px 18px', marginTop: 12 };
+  const JOURS_C = ['lun', 'mar', 'mer', 'jeu', 'ven', 'sam', 'dim'];
+  const ligneTab = { display: 'grid', gridTemplateColumns: 'minmax(0,1.5fr) repeat(4, minmax(0,1fr))', gap: 8 };
+
+  return (<>
+    {/* ── 1. LE RYTHME ─────────────────────────────────────────────────── */}
+    <section data-stats-carte="rythme" data-stats-rythme={R ? 'lu' : vendu === null ? 'passu' : 'encours'} style={sCarte}>
+      <div style={sTitre}>Ton rythme de vente</div>
+      {!R ? <div style={{ ...sNote, marginTop: 8 }}>{vendu === null ? "Tes ventes n'ont pas pu être lues : le rythme n'est pas calculé." : 'Je lis tes ventes…'}</div> : (<>
+        <div style={grille}>
+          {fig("Aujourd'hui", fmt(R.jour.eur), R.moyenne ? <>{pl(R.jour.n, 'vente')} · moyenne {mt(R.moyenne.eur)}/j{R.moyenne.depuisPremiere ? ` (sur ${R.moyenne.jours} j)` : ''}{ecartPct(R.jour.eur, R.moyenne.eur) != null ? ` · ${pctStat(ecartPct(R.jour.eur, R.moyenne.eur))}` : ''}</> : `${pl(R.jour.n, 'vente')} · pas encore de moyenne`, { 'data-stat-jour': Math.round(R.jour.eur * 100), 'data-stat-moyenne': R.moyenne ? Math.round(R.moyenne.eur * 100) : '' })}
+          {fig('7 derniers jours', fmt(R.j7.eur), <>{pl(R.j7.n, 'vente')} · les 7 d'avant {mt(R.j7av.eur)}{ecartPct(R.j7.eur, R.j7av.eur) != null ? ` · ${pctStat(ecartPct(R.j7.eur, R.j7av.eur))}` : ''}</>, { 'data-stat-j7': Math.round(R.j7.eur * 100), 'data-stat-j7av': Math.round(R.j7av.eur * 100) })}
+          {fig('Panier moyen', eurStat(R.panier30.moyen), R.panier30.n ? `sur ${pl(R.panier30.n, 'vente')} en 30 jours` : 'aucune vente en 30 jours', { 'data-stat-panier': R.panier30.moyen == null ? '' : Math.round(R.panier30.moyen * 100) })}
+          {fig('Ventes par jour', R.panier30.n ? String(Math.round(R.panier30.n / 30 * 10) / 10).replace('.', ',') : '—', 'moyenne des 30 derniers jours')}
+        </div>
+        <div style={{ ...sLib, marginTop: 18 }}>12 dernières semaines</div>
+        <div style={{ marginTop: 8 }}>
+          <BarresStats valeurs={R.semaines.map((s) => s.eur)} attenue={[11]} data={{ 'data-stats-semaines': R.semaines.map((s) => Math.round(s.eur)).join(','), 'aria-label': 'Vendu par semaine, 12 semaines' }}
+            titres={R.semaines.map((s) => `Semaine du ${new Date(s.debut).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })} : ${fmt(s.eur)} · ${pl(s.n, 'vente')}${s.enCours ? ' (en cours)' : ''}`)}/>
+          <LegendeBarres libelles={R.semaines.map((s, i) => i % 3 === 2 ? new Date(s.debut).toLocaleDateString('fr-FR', { day: 'numeric', month: 'numeric' }) : '')}/>
+        </div>
+        <div style={{ ...sNote, marginTop: 10 }}>Vendu, toutes plateformes, au jour de la vente (la règle de « Vendu » dans Ma journée). La dernière barre, plus claire, est la semaine en cours.{manque.length ? ` Sans ${manque.join(', ')} (lecture ratée) : les montants sont « au moins ».` : ''}{liveStats && liveStats.venduSansDate ? ` ${pl(liveStats.venduSansDate, 'vente')} Leboncoin sans date : dans aucune semaine.` : ''}</div>
+      </>)}
+    </section>
+
+    {/* ── 2. BÉNÉFICE ET MARGE PAR GROUPE ──────────────────────────────── */}
+    <section data-stats-carte="marges" data-stats-marges={M ? 'lu' : 'passu'} data-stats-marges-n={M ? M.n : ''} data-stats-marges-ncout={M ? M.nCout : ''} style={sCarte}>
+      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
+        <div style={sTitre}>Bénéfice et marge</div>
+        {M && <span style={{ fontSize: 13, color: C.muted }} data-stats-marges-couverture={`${M.nCout}/${M.n}`}>sur {pl(M.nCout, 'vente')} avec prix d'achat (sur {M.n})</span>}
+      </div>
+      {!M ? <div style={{ ...sNote, marginTop: 8 }}>Le relevé de tes ventes n'est pas encore sur cet appareil : il se calcule quand Ma journée ou Ventes a lu toutes tes ventes (Vinted, Leboncoin, eBay). Ouvre Ventes une fois.</div> : (<>
+        <Segmente label="Bénéfice par" value={axeMarge} onChange={setAxeMarge} options={Object.entries(AXES_MARGE).map(([v, l]) => ({ v, l, data: { 'data-stats-marge-axe': v } }))} style={{ marginTop: 12 }}/>
+        {M.groupes.length === 0 ? <div style={{ ...sNote, marginTop: 10 }}>Aucune vente finalisée à répartir.</div> : (
+          <div role="table" aria-label={`Bénéfice par ${AXES_MARGE[axeMarge].toLowerCase()}`} style={{ marginTop: 12, display: 'flex', flexDirection: 'column' }}>
+            <div role="row" style={{ ...ligneTab, fontSize: 11, color: C.muted, paddingBottom: 6, borderBottom: `1px solid ${C.border}` }}>
+              <span role="columnheader">{AXES_MARGE[axeMarge]}</span><span role="columnheader" style={{ textAlign: 'right' }}>Ventes</span><span role="columnheader" style={{ textAlign: 'right' }}>Brut</span><span role="columnheader" style={{ textAlign: 'right' }}>Marge</span><span role="columnheader" style={{ textAlign: 'right' }}>Par paire</span>
+            </div>
+            {M.groupes.slice(0, 8).map((g) => (
+              <div role="row" key={g.k} data-stats-marge-ligne={g.k} data-n={g.n} data-ncout={g.nCout} data-brut={g.brut == null ? '' : Math.round(g.brut * 100)} data-marge={g.marge == null ? '' : g.marge}
+                style={{ ...ligneTab, fontSize: 13, padding: '8px 0', borderBottom: `1px solid ${C.border}`, fontVariantNumeric: 'tabular-nums', alignItems: 'baseline' }}>
+                <span role="cell" title={g.k} style={{ color: C.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{g.k}</span>
+                <span role="cell" style={{ textAlign: 'right', color: C.muted }}>{g.nCout < g.n ? `${g.nCout}/${g.n}` : g.n}</span>
+                <span role="cell" style={{ textAlign: 'right', color: g.brut == null ? C.muted : C.text, whiteSpace: 'nowrap' }}>{eurStat(g.brut)}</span>
+                <span role="cell" style={{ textAlign: 'right', color: g.marge == null ? C.muted : C.text, whiteSpace: 'nowrap' }}>{g.marge == null ? '—' : `${String(g.marge).replace('.', ',')} %`}</span>
+                <span role="cell" style={{ textAlign: 'right', color: g.parPaire == null ? C.muted : C.text, whiteSpace: 'nowrap' }}>{eurStat(g.parPaire)}</span>
+              </div>
+            ))}
+            {M.groupes.length > 8 && <div style={{ ...sNote, marginTop: 6 }}>+ {pl(M.groupes.length - 8, 'autre')}</div>}
+          </div>
+        )}
+        <div style={{ ...sNote, marginTop: 10 }}>
+          Ventes finalisées, au jour de la vente — les mêmes que « Ton bénéfice » de Comptabilité. Brut = vente − prix d'achat, sur les seules ventes au prix d'achat connu (« 3/5 » : 3 sur 5) ; « — » quand aucun n'est connu. Frais, boosts et charges : dans Comptabilité.{M.sansCle ? ` ${pl(M.sansCle, 'vente')} sans ${AXES_MARGE[axeMarge].toLowerCase()} connu${axeMarge === 'marque' || axeMarge === 'taille' || axeMarge === 'plateforme' ? 'e' : ''}.` : ''}{releve && releve.at ? ` Relevé du ${quand(releve.at)}.` : ''}
+        </div>
+      </>)}
+    </section>
+
+    {/* ── 3. LE TEMPS DE VENTE ─────────────────────────────────────────── */}
+    <section data-stats-carte="delais" data-stats-delais={Dl && Dl !== 'passu' ? 'lu' : Dl === 'passu' ? 'passu' : 'encours'} data-stats-delai-n={Dl && Dl !== 'passu' ? `${Dl.nDelai}/${Dl.n}` : ''} style={sCarte}>
+      <div style={sTitre}>Temps de vente</div>
+      {!Dl ? <div style={{ ...sNote, marginTop: 8 }}>{!releve ? 'Il se calcule avec le relevé de tes ventes (ouvre Ventes une fois).' : 'Je lis les dates de mise en ligne…'}</div>
+        : Dl === 'passu' ? <div style={{ ...sNote, marginTop: 8 }}>Tes annonces n'ont pas pu être lues : le temps de vente n'est pas calculé.</div> : (<>
+        <div style={grille}>
+          {fig('La moitié part en', jFmt(Dl.mediane), `médiane, sur ${pl(Dl.nDelai, 'vente datée', 'ventes datées')} (sur ${Dl.n})`, { 'data-stat-delai-mediane': Dl.mediane == null ? '' : Dl.mediane })}
+          {fig('En moyenne', jFmt(Dl.moyenne), 'de la mise en ligne à la vente')}
+        </div>
+        <Segmente label="Temps de vente par" value={axeDelai} onChange={setAxeDelai} options={Object.entries(AXES_DELAI).map(([v, l]) => ({ v, l, data: { 'data-stats-delai-axe': v } }))} style={{ marginTop: 14 }}/>
+        <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {(axeDelai === 'prix' ? TRANCHES_PRIX.map(([, , k]) => Dl.groupes.find((g) => g.k === k)).filter(Boolean) : Dl.groupes.slice(0, 8)).map((g) => {
+            const maxJ = Math.max(1, ...Dl.groupes.map((x) => x.mediane || 0));
+            return (
+              <div key={g.k} data-stats-delai-ligne={g.k} data-mediane={g.mediane == null ? '' : g.mediane} style={{ display: 'grid', gridTemplateColumns: 'minmax(70px, 34%) 1fr auto', alignItems: 'center', gap: 10 }}>
+                <span style={{ fontSize: 13, color: C.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={g.k}>{g.k}</span>
+                <div style={{ height: 8, background: C.card2 || C.bg, borderRadius: 4, overflow: 'hidden' }}>{g.mediane != null && <div style={{ width: `${Math.max(4, g.mediane / maxJ * 100)}%`, height: '100%', background: C.accent, borderRadius: 4 }}/>}</div>
+                <span style={{ fontSize: 13, color: C.muted, whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums', textAlign: 'right' }}><b style={{ color: g.mediane == null ? C.muted : C.text, fontWeight: 600 }}>{jFmt(g.mediane)}</b> · {g.nDelai}/{g.n}</span>
+              </div>
+            );
+          })}
+        </div>
+        <div style={{ ...sNote, marginTop: 10 }}>Vinted seulement (Leboncoin et eBay ne donnent pas la date de mise en ligne). Médiane par groupe ; « 4/6 » = 4 ventes datées sur 6. Une annonce republiée après la vente n'est pas comptée.</div>
+      </>)}
+    </section>
+
+    {/* ── 4. QUAND TU VENDS ────────────────────────────────────────────── */}
+    {Q && Q.n > 0 && (
+      <section data-stats-carte="quand" data-stats-jours={Q.jours.map((j) => j.n).join(',')} data-stats-heures-n={Q.avecHeure} style={sCarte}>
+        <div style={sTitre}>Quand tu vends</div>
+        <div style={{ ...sLib, marginTop: 12 }}>Par jour de la semaine</div>
+        <div style={{ marginTop: 8 }}>
+          <BarresStats valeurs={Q.jours.map((j) => j.n)} hauteur={72} titres={Q.jours.map((j, i) => `${JOURS_C[i]} : ${pl(j.n, 'vente')} · ${fmt(j.eur)}`)} data={{ 'aria-label': 'Ventes par jour de la semaine' }}/>
+          <LegendeBarres libelles={JOURS_C}/>
+        </div>
+        {Q.avecHeure > 0 && <>
+          <div style={{ ...sLib, marginTop: 16 }}>Par heure</div>
+          <div style={{ marginTop: 8 }}>
+            <BarresStats valeurs={Q.heures.map((h) => h.n)} hauteur={60} titres={Q.heures.map((h) => `${h.h} h : ${pl(h.n, 'vente')}`)} data={{ 'aria-label': 'Ventes par heure' }}/>
+            <LegendeBarres libelles={Q.heures.map((h) => h.h % 6 === 0 ? `${h.h} h` : '')}/>
+          </div>
+        </>}
+        <div style={{ ...sNote, marginTop: 10 }}>Sur {pl(Q.n, 'vente')} des 12 derniers mois, toutes plateformes{Q.sansHeure ? ` · l'heure est connue pour ${Q.avecHeure} sur ${Q.n} (une date sans heure n'est dans aucune heure)` : ''}.</div>
+      </section>
+    )}
+
+    {/* ── 5. LE STOCK ──────────────────────────────────────────────────── */}
+    <section data-stats-carte="dort" data-stats-dort={stock ? 'lu' : 'passu'} style={sCarte}>
+      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
+        <div style={sTitre}>Les paires qui dorment</div>
+        {stock && <span style={{ fontSize: 13, color: C.muted }}>{pl(stock.dort.total, 'annonce')} Vinted en ligne</span>}
+      </div>
+      {!stock ? <div style={{ ...sNote, marginTop: 8 }}>Pas encore calculé sur cet appareil : ouvre Annonces une fois (il faut toutes tes annonces lues, avec leurs dates).</div> : (<>
+        <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column' }}>
+          {SEUILS_DORT.map((s) => { const b = stock.dort.seuils[s] || { n: 0, valeur: 0, nCout: 0, cout: 0 }; return (
+            <div key={s} data-stats-dort-seuil={s} data-n={b.n} data-valeur={Math.round(b.valeur * 100)} style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1.3fr) minmax(0,0.8fr) minmax(0,1.4fr)', gap: 8, padding: '9px 0', borderBottom: `1px solid ${C.border}`, fontSize: 13, fontVariantNumeric: 'tabular-nums', alignItems: 'baseline' }}>
+              <span style={{ color: C.text }}>En ligne depuis {s} j et plus</span>
+              <span style={{ textAlign: 'right', color: C.text, fontWeight: 600 }}>{pl(b.n, 'paire')}</span>
+              <span style={{ textAlign: 'right', color: C.muted }}>{mt(b.valeur)} affichés{b.n ? <> · achat {b.nCout ? <>{b.nCout < b.n ? 'au moins ' : ''}{mt(b.cout)}</> : '—'}{b.nCout < b.n ? ` (${b.nCout}/${b.n})` : ''}</> : null}</span>
+            </div>
+          ); })}
+        </div>
+        <div style={grille}>
+          {fig('Rotation', rot == null ? '—' : `${rot} j`, vint30 ? `au rythme de ${pl(vint30, 'vente')} Vinted en 30 jours — un repère, pas une prévision` : 'aucune vente Vinted en 30 jours', { 'data-stat-rotation': rot == null ? '' : rot })}
+          {fig('Taux de vente du mois', tauxV == null ? '—' : `${tauxV} %`, vintMois != null && enLigne != null ? `${vintMois} vendue${vintMois > 1 ? 's' : ''} ce mois sur ${vintMois + enLigne} (vendues + encore en ligne), Vinted` : 'ventes pas lues', { 'data-stat-taux-vente': tauxV == null ? '' : tauxV })}
+          {fig('Annulations', annul && annul.taux != null ? `${String(annul.taux).replace('.', ',')} %` : '—', annul ? `${annul.annulees} sur ${pl(annul.n, 'commande')} Vinted lue${annul.n > 1 ? 's' : ''}` : 'ventes pas lues', { 'data-stat-annulation': annul && annul.taux != null ? annul.taux : '' })}
+        </div>
+        <div style={{ ...sNote, marginTop: 10 }}>Âge = date de mise en ligne lue sur l'annonce, connue pour {stock.dort.datesConnues} sur {stock.dort.total}{stock.dort.datesConnues < stock.dort.total ? ' — les autres ne sont dans aucune ligne' : ''}. Valeur = prix affichés ; coût = prix d'achat connus seulement. Calculé le {quand(stock.at)}.</div>
+      </>)}
+    </section>
+  </>);
+}
 function AnalysesStatistiques({panelOff}) {
  const [detail,setDetail]=React.useState(false);
  return <section className="vrm-stats-analyses" data-stats-carte="repartitions" style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:10,padding:18}}>
@@ -35110,7 +35573,7 @@ function BoostRentable({ panelOff }) {
     <div data-stats-carte="boost" data-boost-etat="lu" data-boost-assez={R.assez ? 'oui' : 'non'} data-boost-b={R.boostees} data-boost-montant={R.avecMontant} data-boost-nb={R.nonBoostees} data-boost-comp={`${R.comparables.b}/${R.comparables.nb}`} style={sCarte}>
       {titre}
       {/* (30 oct.) Une ligne, en mots ; le détail (montants saisis, ventes pas reliées) derrière ⓘ. */}
-      <div data-boost-couverture="" data-boost-sans-annonce={R.sansAnnonce || 0} data-boost-inconnues={R.inconnues || 0} style={{...sNote,fontSize:11.5,marginTop:6,display:'flex',alignItems:'center',gap:4,flexWrap:'wrap'}}>
+      <div data-boost-couverture="" data-boost-sans-annonce={R.sansAnnonce || 0} data-boost-inconnues={R.inconnues || 0} style={{...sNote,fontSize:11,marginTop:6,display:'flex',alignItems:'center',gap:4,flexWrap:'wrap'}}>
         {s(R.comparables.b, 'boostée')} · {R.comparables.nb} non boostée{R.comparables.nb > 1 ? 's' : ''} comparées (même tranche de prix)
         <Pourquoi label="Détail">{s(R.boostees, 'boostée')} vendue{R.boostees > 1 ? 's' : ''}, dont {R.avecMontant} avec le montant du boost saisi · {R.nonBoostees} non boostée{R.nonBoostees > 1 ? 's' : ''}.{(R.inconnues > 0 || R.sansAnnonce > 0) ? ` Pas comptées : ${[R.inconnues > 0 ? `${R.inconnues} sans information de boost` : '', R.sansAnnonce > 0 ? `${R.sansAnnonce} pas reliée${R.sansAnnonce > 1 ? 's' : ''} à leur annonce` : ''].filter(Boolean).join(', ')}.` : ''}</Pourquoi>
       </div>
@@ -35350,19 +35813,27 @@ function BeneficeCompta({ compta, onNav, onSansDepenses, onAjouterDepense }) {
 }
 // ── TON BÉNÉFICE DANS MA JOURNÉE (20 octobre, Julien : « la possibilité de
 //    mettre le bénéfice dans Ma journée ») ────────────────────────────────────
-// FACULTATIF : `vrm_journee_benefice` (synchronisé, défaut ÉTEINT). Les chiffres
+// (31 oct.) LÀ PAR DÉFAUT, RANGÉ DANS MA JOURNÉE — Julien : « pour cette case je
+// ne pense pas qu'il soit nécessaire de faire un bouton de validation dans les
+// paramètres ». L'interrupteur de Réglages → Affichage est RETIRÉ ; le choix
+// `vrm_journee_benefice` (synchronisé) a trois états : absent = PAR DÉFAUT (la
+// carte se montre dès que le bénéfice est publié, rien sinon — jamais une case
+// vide), `false` = masqué par lui (bouton « Masquer » en mode « Modifier »),
+// `true` = remis par lui (feuille « Ajouter » du mode « Modifier »).
+// (Avant : FACULTATIF, défaut ÉTEINT, allumé dans Réglages.) Les chiffres
 // ne sont PAS recalculés ici (§11) : le mois passe par `useBeneficeCalcul` — le
 // crochet de la carte de Comptabilité, mêmes entrées, même `beneficePeriode` ;
 // aujourd'hui = `beneficeDesJours` sur la même publication (`vrm_benefice_jours`).
 // Pas su ⇒ « — » et la raison ; jamais publié ⇒ « se calcule dans Ventes ».
 // Aucune couleur sur un bénéfice (§7).
 const BENEF_JOURNEE = 'vrm_journee_benefice';
-const lireBenefJournee = () => { try { return load(BENEF_JOURNEE, false) === true; } catch (_) { return false; } };
+// `null` = jamais choisi (le défaut) · `true` · `false`.
+const lireBenefJournee = () => { try { const v = load(BENEF_JOURNEE, null); return v === true ? true : v === false ? false : null; } catch (_) { return null; } };
 const lireComptaSynchro = () => { try { const d = load('vrm_compta', null); return d && typeof d === 'object' ? { ...COMPTA_DEFAUT, ...d } : { ...COMPTA_DEFAUT }; } catch (_) { return { ...COMPTA_DEFAUT }; } };
 function useBeneficeJournee() {
-  const [on, setOn] = React.useState(lireBenefJournee);
+  const [choix, setOn] = React.useState(lireBenefJournee);
   // Rattrapage nuage : seulement s'il est resté au défaut (§5.49).
-  React.useEffect(() => onCloudReady(() => setOn((v) => v === false ? lireBenefJournee() : v)), []);
+  React.useEffect(() => onCloudReady(() => setOn((v) => v === null ? lireBenefJournee() : v)), []);
   React.useEffect(() => {
     const f = (e) => { const d = e && e.detail; if (d && d.k === BENEF_JOURNEE) setOn(d.v != null ? !!d.v : lireBenefJournee()); };
     const g = (e) => { if (e && e.key === BENEF_JOURNEE) setOn(lireBenefJournee()); };
@@ -35374,10 +35845,11 @@ function useBeneficeJournee() {
     // Tout de suite pour les autres lecteurs de la page (`save` attend 500 ms).
     try { window.dispatchEvent(new CustomEvent('vrm:benef-journee', { detail: { k: BENEF_JOURNEE, v: !!v } })); } catch (_) {}
   };
-  return [on, poser];
+  // `on` : montré (tout sauf « masqué par lui ») ; `choix` : les trois états.
+  return [choix !== false, poser, choix];
 }
-function BeneficeJournee({ onNav, place }) {
-  const [on, poser] = useBeneficeJournee();
+function BeneficeJournee({ onNav, place, edition = false }) {
+  const [on, poser, choix] = useBeneficeJournee();
   const [compta, comptaPret] = useLigneSynchro('vrm_compta', lireComptaSynchro);
   const { pub, etat, B } = useBeneficeCalcul(compta, 'mois');
   // (22 oct.) Rien n'a jamais été noté : « net avant tes dépenses », et le choix
@@ -35385,15 +35857,11 @@ function BeneficeJournee({ onNav, place }) {
   const depenses = B ? (comptaPret ? B.depenses : 'passu') : '';
   const sansDepenses = () => repondreSansDepenses(lireComptaSynchro(), (v) => save('vrm_compta', v));
   const ajouterDepense = () => { DEMANDE_DEPENSE.on = true; DEMANDE_DEPENSE.at = Date.now(); if (onNav) onNav('compta'); };
-  if (place === 'lien') {
-    if (on) return null;
-    return (
-      <div style={{ marginTop: 14, textAlign: 'center' }}>
-        <Bouton variante="discret" data-journee-benef-activer="" onClick={() => poser(true)}>+ Afficher mon bénéfice</Bouton>
-      </div>
-    );
-  }
   if (!on) return null;
+  // Par défaut (jamais choisi) : seulement s'il y a un bénéfice à montrer — une
+  // publication ET au moins une vente du mois au prix d'achat connu. Jamais une
+  // case de « — » ou « se calcule ailleurs » qu'il n'a pas demandée.
+  if (choix === null && !(B && B.nCout > 0)) return null;
   const minuit = new Date(); minuit.setHours(0, 0, 0, 0);
   const demain = new Date(minuit); demain.setDate(demain.getDate() + 1);
   const J = pub ? beneficeDesJours(pub.jours, minuit, demain) : null;
@@ -35433,7 +35901,7 @@ function BeneficeJournee({ onNav, place }) {
           {etat === 'encours' ? 'Je lis ton bénéfice…' : <>Il se calcule dans l'écran Ventes : ouvre-le une fois. <Bouton variante="discret" href="?tab=cat_ventes" onClick={(ev) => { ev.preventDefault(); if (onNav) onNav('cat_ventes'); }}>Ventes ›</Bouton></>}
         </div>
       ) : (<>
-        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(0,1fr)', gap: 12, marginTop: 8 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(0,1fr)', gap: 12, marginTop: place === 'integre' ? 2 : 8 }}>
           {chiffre('Brut ce mois', brutDe(B), B.n === 0 ? 'aucune vente finalisée' : '', 'brut')}
           {chiffre(B.depenses === 'jamais' ? 'Net avant tes dépenses' : 'Net ce mois', B.netFinal, raisonNet, 'net')}
         </div>
@@ -35447,32 +35915,26 @@ function BeneficeJournee({ onNav, place }) {
             <Bouton variante="discret" data-journee-benef-porte="" onClick={versSaisiePrix}>Compléter les prix d'achat ›</Bouton>
           </div>
         )}
-        <div className="vrm-day-note" data-journee-benef-ligne="jour" style={{ color: C.muted, marginTop: 10, paddingTop: 10, borderTop: `1px solid ${C.border}`, lineHeight: 1.5 }}>
+        {/* (31 oct.) La ligne du jour n'est dessinée que s'il y a une vente
+            aujourd'hui : vide, elle ajoutait un filet et 20 px sous la carte. */}
+        {J && J.n > 0 && <div className="vrm-day-note" data-journee-benef-ligne="jour" style={{ color: C.muted, marginTop: 10, paddingTop: 10, borderTop: `1px solid ${C.border}`, lineHeight: 1.5 }}>
           {J && J.n > 0
             ? <>Aujourd'hui : <b style={{ color: C.text, fontWeight: 600 }}>{val(brutDe(J))}</b> brut{J.nCout > 0 ? <> · <b style={{ color: C.text, fontWeight: 600 }}>{val(J.net)}</b> net des ventes</> : null}{J.nCout < J.n ? ` (prix d'achat connus pour ${J.nCout} sur ${J.n})` : ''}</>
             : null}
-        </div>
+        </div>}
       </>)}
-      <div style={{ marginTop: 6 }}>
-        <Bouton variante="discret" data-journee-benef-masquer="" onClick={() => poser(false)}>Masquer de Ma journée</Bouton>
-      </div>
+      {/* (31 oct.) « Masquer » vit dans le mode « Modifier », comme le − des
+          widgets ; on le remet par « + Ajouter » (feuille des widgets). */}
+      {edition && (
+        <div style={{ marginTop: 6 }}>
+          <Bouton variante="secondaire" className="vrm-b-petit" data-journee-benef-masquer="" onClick={() => poser(false)}>Masquer le bénéfice</Bouton>
+        </div>
+      )}
     </div>
   );
 }
-// Le même choix, dans Réglages → Affichage (là où vivent les choix de l'écran).
-function BeneficeJourneeSetting() {
-  const [on, poser] = useBeneficeJournee();
-  return (
-    <div className="vrm-set-ligne" data-reglage-benef-journee={on ? 'on' : 'off'}>
-      <IconeReglage name="chart"/>
-      <span className="vrm-set-lib">
-        <b style={{color:C.text}}>Bénéfice dans Ma journée</b>
-        <small className="vrm-aide" style={{color:C.muted}}>Brut et net du mois, et d'aujourd'hui — les mêmes chiffres que Comptabilité.</small>
-      </span>
-      <Interrupteur on={on} label="Bénéfice dans Ma journée" onClick={() => poser(!on)}/>
-    </div>
-  );
-}
+// (31 oct.) Plus d'interrupteur dans Réglages → Affichage (sa décision) : le
+// bénéfice se masque et se remet DANS Ma journée, en mode « Modifier ».
 // ══════════════════════════════════════════════════════════════════════════════
 // MA JOURNÉE EN WIDGETS (21 octobre) — Julien : « organiser le premier onglet
 // comme l'écran d'accueil d'Apple, avec des widgets ».
@@ -35492,8 +35954,11 @@ function useDispositionJournee() {
     return () => window.removeEventListener('storage', g);
   }, []);
   const poser = React.useCallback((liste) => {
-    const n = normaliserDispoJournee({ w: liste }) || [];
-    setV(n); save(CLE_WIDGETS_JOURNEE, { v: 1, w: n });
+    // `connus` : le catalogue d'aujourd'hui — un widget qu'il retire ne revient
+    // pas tout seul ; un widget créé APRÈS ce rangement arrivera (journeeWidgets.js).
+    const e = dispoAEnregistrer(liste);
+    const n = normaliserDispoJournee(e) || [];
+    setV(n); save(CLE_WIDGETS_JOURNEE, { ...e, w: n });
   }, []);
   return [v || DISPO_JOURNEE_DEFAUT, poser, v === null];
 }
@@ -35505,6 +35970,9 @@ const EASE_WIDGET = 'cubic-bezier(0.23,1,0.32,1)';
 // une petite case est là (le même nombre deux fois, §7 ; revue du 22 oct.).
 function FeuilleAjoutWidget({ dispo, onAjout, onDefaut, onClose }) {
   const { ids: libres, retenu } = widgetsAjoutables(dispo);
+  // (31 oct.) Le bénéfice masqué se remet ICI (plus dans Réglages) : il vit dans
+  // la carte « Vendu et reçu », sinon sa propre carte — un choix, pas un widget.
+  const [benefOn, poserBenef] = useBeneficeJournee();
   return createPortal(
     <div data-noswipe data-widgets-feuille="" onClick={onClose} className="vrm-w-voile">
       <FermeAuRetour fermer={onClose}/>
@@ -35517,7 +35985,17 @@ function FeuilleAjoutWidget({ dispo, onAjout, onDefaut, onClose }) {
           <Bouton variante="secondaire" data-widgets-fermer="" onClick={onClose} style={{ flexShrink: 0 }}>Fermer</Bouton>
         </div>
         <div className="vrm-w-feuille-corps">
-          {libres.length === 0 && <div style={{ fontSize: 13, color: C.muted, padding: '6px 2px 12px' }}>Tous les widgets sont déjà sur ta journée.</div>}
+          {libres.length === 0 && benefOn && <div style={{ fontSize: 13, color: C.muted, padding: '6px 2px 12px' }}>Tous les widgets sont déjà sur ta journée.</div>}
+          {!benefOn && (
+            <button type="button" data-widget-ajout="benefice" data-journee-benef-activer="" onClick={() => { poserBenef(true); onClose(); }} className="vrm-w-ajout"
+              style={{ background: C.card, border: `1px solid ${C.border}`, color: C.text }}>
+              <span className="vrm-w-ajout-plus" aria-hidden="true" style={{ color: C.accent }}>+</span>
+              <span style={{ flex: 1, minWidth: 0, textAlign: 'left' }}>
+                <span style={{ display: 'block', fontWeight: 600, fontSize: 14 }}>Ton bénéfice</span>
+                <span style={{ display: 'block', fontSize: 12, color: C.muted, lineHeight: 1.4 }}>Brut et net du mois et d’aujourd’hui, dans « Vendu et reçu » — les chiffres de Comptabilité</span>
+              </span>
+            </button>
+          )}
           {retenu && (
             <div data-widgets-retenu={retenu} style={{ fontSize: 12.5, color: C.muted, lineHeight: 1.45, padding: '0 2px 4px' }}>
               {retenu === 'tuiles'
@@ -35654,7 +36132,7 @@ function GrilleJournee({ dispo, poser, rendus, edition, setEdition, peutModifier
       return;
     }
     if (e.button != null && e.button > 0) return;
-    if (e.target && e.target.closest && e.target.closest('[data-widget-retirer],[data-widget-taille-btn]')) return;
+    if (e.target && e.target.closest && e.target.closest('[data-widget-retirer],[data-widget-taille-btn],[data-journee-benef-masquer]')) return;
     const d = { id, pid: e.pointerId, type: e.pointerType, x0: e.clientX, y0: e.clientY, x: e.clientX, y: e.clientY, actif: false, arme: e.pointerType !== 'touch', tx: 0, ty: 0, gx: 0, gy: 0 };
     if (e.pointerType === 'touch') d.timer = setTimeout(() => { if (drag.current === d) d.arme = true; }, 220);
     drag.current = d;
@@ -36638,10 +37116,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     try {
       const items = await lbcAnnoncesSession();
       if (!items || stop) return;
-      const vr = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.lbc_ventes&select=ventes:data->ventes`, { headers: sbAuth() });
+      const vr = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.lbc_ventes&select=data`, { headers: sbAuth() });
       if (!vr.ok) return;
       const vrows = await vr.json(); if (!Array.isArray(vrows) || stop) return;
-      const vendues = annoncesLbcVendues((vrows[0] && vrows[0].ventes) || {});
+      const vendues = annoncesLbcVendues((vrows[0] && vrows[0].data && vrows[0].data.ventes) || {});
       const liens = { ...(load('vrm_lbc_liens', {}) || {}) };
       const liste = [];
       for (const ad of Object.values(items || {})) {
@@ -36655,7 +37133,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   })(); return () => { stop = true; }; }, []);
   useEffect(() => { let stop = false; (async () => {
     try {
-      const lu = await lireEbayTous('ebay_listings', 'items:data->items', 'items');
+      const lu = await lireEbayTous('ebay_listings', SEL_EBAY_ANNONCES, 'items');
       if (!lu || stop) return;
       const set = new Set(); const liste = [];
       for (const x of lu.items) { const c = numEbayLu(x && x.sku, x && x.itemId, null, x && x.depuis); if (c) set.add(cleNum(c)); liste.push({ numero: c || '', title: (x && x.title) || '', photo: (x && x.photo) || null }); }
@@ -36672,11 +37150,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       const postedDepuis = (rows && rows[0] && rows[0].data && rows[0].data.updatedAt) || '';
       if (Array.isArray(ids)) setLbcPosted(new Set(ids.map(String)));
       if (!Array.isArray(ids) || !ids.length) return;
-      const vr = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.lbc_ventes&select=ventes:data->ventes`, { headers: sbAuth() });
+      const vr = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.lbc_ventes&select=data`, { headers: sbAuth() });
       if (!vr.ok) return;
       const vrows = await vr.json();
       if (!Array.isArray(vrows)) return;
-      const ventes = (vrows[0] && vrows[0].ventes) || {};
+      const ventes = (vrows[0] && vrows[0].data && vrows[0].data.ventes) || {};
       setLbcVentesAnn(ventes);
       // Les annonces Leboncoin : la lecture de SESSION (déjà faite pour le Stock,
       // gardée 10 min — aucun octet de plus), puis la MÊME preuve que l'écran
@@ -36756,7 +37234,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // TEMPS et sont posés dans le même rendu (un rendu de plus au démarrage
     // coûtait au téléphone — banc `vitesse.cjs`).
     const [r, rm, rv] = await Promise.all([
-      lireEbayTous('ebay_orders', 'orders:data->orders,capturedAt:data->>capturedAt', 'orders'),
+      lireEbayTous('ebay_orders', SEL_EBAY_COMMANDES, 'orders'),
       only === 'journee' ? lireEbayParCompte('ebay_messages', 'n:data->>nonLus,complet:data->>complet,capturedAt:data->>capturedAt') : Promise.resolve(undefined),
       (only === 'journee' || only === 'bordereaux') ? lireVestiaireColis() : Promise.resolve(undefined),
     ]);
@@ -37131,7 +37609,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // (29 oct.) LE REÇU (« facture ») DE CHAQUE ACHAT, PAR SON N° DE TRANSACTION
   // SEULEMENT (`api/_lib/recu-achat.js`, une règle, §5/§11). Index vide tant que
   // les reçus ne sont pas lus (« pas su » ne relie rien).
-  const indexRecusAchat = useMemo(() => indexRecusParTransaction(recusAchat, (r) => ventilationRecuAchat(r && r.texte).trouve), [recusAchat]);
+  // (31 oct.) Un reçu qu'IL a délié depuis le journal des emails (« Ce n'est pas
+  // ça ») ne désigne plus son achat ; rien n'est supprimé (`vrm_recus_delies`).
+  const [recusDelies, setRecusDelies] = useState(() => load('vrm_recus_delies', {}) || {});
+  useEffect(() => { const relire = () => setRecusDelies(load('vrm_recus_delies', {}) || {}); const off = onCloudReady(relire); const f = (e) => { if (e && e.detail && e.detail.k === 'vrm_recus_delies') relire(); }; window.addEventListener('vrm:save', f); return () => { off(); window.removeEventListener('vrm:save', f); }; }, []);
+  const indexRecusAchat = useMemo(() => indexRecusParTransaction(Array.isArray(recusAchat) ? recusAchat.filter((r) => !(r && r.id && recusDelies[r.id])) : recusAchat, (r) => ventilationRecuAchat(r && r.texte).trouve), [recusAchat, recusDelies]);
   const [receiptView, setReceiptView] = useState(null); // reçu affiché dans une modale in-app
   const [lotView, setLotView] = useState(null); // détail d'un lot : { loading, order, items }
   // (23 oct.) « Paires du lot » s'ouvre PAR-DESSUS le tiroir d'une vente : elle
@@ -37882,7 +38364,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       const e = out[`${v.uid}:${v.tx}`] || (out[`${v.uid}:${v.tx}`] = { uid: v.uid });
       // (revue du 24 oct.) `ligne` : la ligne EXISTE (l'extension l'a relevée),
       // même sans étape datée — « relevé, sans date » n'est pas « pas relevé ».
-      Object.assign(e, { suivi: v.suivi || '', transporteur: v.transporteur || '', nv: v.nv || null, nvSansDate: v.nvSansDate || null, ligne: true });
+      Object.assign(e, { suivi: v.suivi || '', transporteur: v.transporteur || '', nv: v.nv || null, nvSansDate: v.nvSansDate || null, ligne: true, relais: v.relais || null, estimee: v.estimee || null });
     }
     // Un n° ajouté à la main et relié à CET achat (son clic), sous le même compte.
     for (const m of (Array.isArray(suivisManuels) ? suivisManuels : [])) {
@@ -37900,7 +38382,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     try {
       // `de` : le libellé de l'étape la plus RÉCENTE (`etapes[0]`, contrat du
       // 23 oct.) — recopié, présenté « sans date », quand Vinted ne date rien.
-      const rows = await lireTout(`id=like.harvest_*_suivi_*&select=id,tx:meta->>tx,suivi:meta->>suivi,transporteur:meta->>transporteur,cap:meta->>capturedAt,dt:data->dernier->>t,dat:data->dernier->>at,de:data->etapes->0->>t`, { strict: true });
+      // (31 oct., 5.295) + le point relais où il ARRIVE et l'arrivée estimée, en scalaires (`meta`).
+      const rows = await lireTout(`id=like.harvest_*_suivi_*&select=id,tx:meta->>tx,suivi:meta->>suivi,transporteur:meta->>transporteur,cap:meta->>capturedAt,dt:data->dernier->>t,dat:data->dernier->>at,de:data->etapes->0->>t,rn:meta->>relaisNom,rr:meta->>relaisRue,rc:meta->>relaisCp,rv:meta->>relaisVille,ae:meta->>arriveeEstimee`, { strict: true });
       if (!Array.isArray(rows)) return null;
       const m = {};
       for (const r of rows) {
@@ -37910,7 +38393,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         const nv = nouvelleVinted({ dernier: { t: r.dt, at: r.dat }, cap: r.cap });
         const nd = nv ? null : nouvelleVinted({ dernier: { t: r.de, at: null }, cap: r.cap });
         m[`${uid}:${txId}`] = { uid, tx: txId, suivi: normaliserSuivi(r.suivi) || '', transporteur: String(r.transporteur || ''),
-          nv, nvSansDate: nd ? { t: nd.t, at: null, cap: nd.cap, sansDate: true } : null };
+          nv, nvSansDate: nd ? { t: nd.t, at: null, cap: nd.cap, sansDate: true } : null,
+          relais: r.rn ? { nom: String(r.rn), rue: String(r.rr || ''), cp: /^\d{5}$/.test(String(r.rc || '')) ? String(r.rc) : '', ville: String(r.rv || '') } : null,
+          estimee: /^\d{4}-\d{2}-\d{2}$/.test(String(r.ae || '')) ? String(r.ae) : null };
       }
       return m;
     } catch (_) { return null; }
@@ -38509,6 +38994,37 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
              total: emailList.length + extra.length };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tracking, transp, collected, collectedAt, vintedToPickup, buysBase, pickupDone, colisRelais, indexSuivisAchats, suivisVinted, suivisEnvoyes, txSuivisColis, suivisManuels]);
+  // ── (31 oct.) LES COLIS À ALLER CHERCHER, PAR POINT RELAIS ───────────────
+  // Julien : « une carte avec les colis à aller chercher par point relais, et
+  // des prévisions ». Les colis DÉJÀ là : les listes de `pickupUnion` (§11 : le
+  // même compte que l'onglet). Ceux qui y VONT : les achats Vinted en route dont
+  // le suivi de CETTE transaction donne la destination (relevée par l'extension
+  // 5.295, `relaisNom`…) — par identité seulement, jamais par le titre ni par le
+  // relais « habituel » (§5). Leboncoin, eBay et Vestiaire ne donnent pas (encore)
+  // de destination lisible : ils ne sont pas devinés.
+  const groupesRelais = useMemo(() => {
+    try {
+      const arrives = [];
+      for (const t of (pickupUnion.emailList || [])) {
+        const cl = cleanLieu(t && t.lieu); if (!cl.nom) continue;
+        arrives.push({ id: 'e:' + (suiviDeLigne(t) || (t && t.id) || ''), nom: cl.nom, adresse: cl.adresse, transporteur: (t && t.carrier) || '', aCode: !!(codeRetrait(t && t.code) || qrImage(t)) });
+      }
+      for (const o of (pickupUnion.extra || [])) {
+        const r = relaisDe(o); const cl = cleanLieu(r && r.lieu); if (!cl.nom) continue;
+        arrives.push({ id: 'v:' + String(o.transaction_id), nom: cl.nom, adresse: cl.adresse, transporteur: (r && r.transporteur) || '', aCode: !!(r && (codeRetrait(r.code) || r.qr)), titre: o.title || '' });
+      }
+      const attendus = []; let enRoute = 0;
+      for (const o of (buysBase || [])) {
+        if (phaseReception(o) !== 'route') continue;
+        enRoute++;
+        const e = entreeSuiviAchat(o);
+        if (!e || !e.relais || !e.relais.nom) continue;
+        attendus.push({ id: 'v:' + String(o.transaction_id), nom: e.relais.nom, rue: e.relais.rue, cp: e.relais.cp, ville: e.relais.ville, transporteur: e.transporteur || '', estimee: e.estimee || null, titre: o.title || '' });
+      }
+      return { groupes: regrouperRelais({ arrives, attendus }), enRouteSansRelais: enRoute - attendus.length };
+    } catch (_) { return null; }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pickupUnion, buysBase, indexSuivisAchats]);
   // Les fins par n° de suivi (la règle de `pickupUnion`), pour dire où en est un
   // n° ajouté à la main (`etapeDuSuiviManuel`).
   const finsSuivis = useMemo(() => finsColis(tracking, suivisEnvoyes, transp), [tracking, suivisEnvoyes, transp]);
@@ -39170,8 +39686,19 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       setReservesNum((v) => (memes(v, n) ? v : n));
     } catch (_) { setReservesNum((v) => (v === undefined ? null : v)); }
   };
+  // (31 oct., banc vitesse) Relue quand l'ENSEMBLE des annonces change, pas à
+  // chaque nouvelle référence de la liste (la liste du cache puis la lecture
+  // fraîche rendent les mêmes annonces : deux lectures par ouverture d'écran) —
+  // la même règle que la table « qui remplace qui » juste en dessous.
+  const cleAnnoncesReserves = useMemo(() => (Array.isArray(listings.items) ? listings.items.map((i) => String(i && i.id)).sort().join(',') : null), [listings.items]);
+  const cleReservesLue = useRef(undefined);
+  useEffect(() => {
+    const avant = cleReservesLue.current; cleReservesLue.current = cleAnnoncesReserves;
+    if (avant === null && cleAnnoncesReserves != null) return;
+    if (avant !== undefined && avant === cleAnnoncesReserves) return;
+    relireReservesNum();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { relireReservesNum(); }, [listings.items]);
+  }, [cleAnnoncesReserves]);
   // (28 oct.) Qui remplace qui après une republication : `vinted_brouillon_*`
   // (ancienId, itemId) et `coffre_*_*` (recreeDe), écrits par l'extension. Trois
   // états : undefined pas encore lu (on attend) · null pas su (comme avant) · objet.
@@ -40558,7 +41085,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       if (c.v !== undefined && Date.now() - c.at < 10 * 60 * 1000) { if (vivant) setRetoursEbayLus(c.v); return; }
       let v;
       try {
-        const r = await lireEbayTous('ebay_orders', 'orders:data->orders', 'orders');
+        const r = await lireEbayTous('ebay_orders', SEL_EBAY_COMMANDES, 'orders');
         if (!r) v = null;
         else {
           const relies = (r.lignes || []).filter(l => l && l.ligne);
@@ -40845,6 +41372,31 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     } catch (_) {}
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [annStats, listings, listingDatesLu]);
+  // ── LE STOCK QUI DORT, PAR SEUIL (31 oct.) — Statistiques et Ma journée ──
+  // La MÊME base que la grille (`annBase`) et le même âge (`listedAgeDays`) que
+  // « les paires qui dorment » ci-dessus ; les seuils 30/60/90 j, la valeur
+  // AFFICHÉE et le coût d'achat CONNU (avec sa couverture) par la règle pure
+  // `stockQuiDort` (src/statsVentes.js). Publié sur CET appareil seulement
+  // (`vrm_stats_stock`), et seulement COMPLET (mêmes gardes que ci-dessus).
+  const stockDort = useMemo(() => {
+    try {
+      return stockQuiDort(annBase.map((it) => {
+        const f = numeros[it.id];
+        return { age: listedAgeDays(it), prix: it.price != null && isFinite(Number(it.price)) ? Number(it.price) : null, achat: f ? achatDe(withBuyByNum(f)) : null };
+      }));
+    } catch (_) { return null; }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [annBase, numeros, listingDates, buyByNum]);
+  useEffect(() => {
+    if (!stockDort || !Array.isArray(listings.items) || listings.loading || listings.incomplet !== false || listingDatesLu !== true) return;
+    try {
+      const v = { v: 1, dort: stockDort, at: Date.now() };
+      const avant = load('vrm_stats_stock', null);
+      if (avant && JSON.stringify(avant.dort) === JSON.stringify(stockDort) && Date.now() - (Number(avant.at) || 0) < 6 * 3600000) return;
+      save('vrm_stats_stock', v);
+    } catch (_) {}
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stockDort, listings, listingDatesLu]);
   // ── RENUMÉROTER À LA SUITE ────────────────────────────────────────────────
   // Le numéro sert à retrouver un carton sur l'étagère : avec 116 paires en ligne
   // il ne devrait pas monter à 172. Au fil des ventes, la séquence se troue et
@@ -41940,7 +42492,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const sonde = async () => {
       if (document.hidden || !ecrans.includes(curSub)) return;
       try {
-        const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.harvest_%25_orders_sold&select=id,cap:meta->>capturedAt`, { headers: sbAuth() });
+        // (31 oct.) Même orthographe (`*`) que l'âge des ventes lu par la coque :
+        // une adresse, donc une lecture partagée (`lecturesPartagees`).
+        const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.harvest_*_orders_sold&select=id,cap:meta->>capturedAt`, { headers: sbAuth() });
         if (!r.ok) return;
         const rows = await r.json(); if (!Array.isArray(rows)) return;
         let bouge = null;
@@ -42598,6 +43152,36 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       for (const k of Object.keys(jours).sort()) charge[k] = jourBeneficeEnTableau(jours[k]);
       const avant = load('vrm_benefice_jours', null);
       if (!(avant && JSON.stringify(avant.jours) === JSON.stringify(charge))) save('vrm_benefice_jours', { v: 2, plateformes: ['Vinted', 'Leboncoin', 'eBay'], jours: charge, at: Date.now() });
+      // (31 oct.) LE RELEVÉ VENTE PAR VENTE, pour les marges par marque, modèle,
+      // taille, plateforme et compte de Statistiques : les MÊMES ventes et le
+      // même prix d'achat que les jours ci-dessus (finalisées, hors masquées,
+      // prix d'achat par `effEntry`/`achatDe`, Leboncoin et eBay par identité
+      // seulement) — Statistiques le CONSOMME, il ne relit aucun prix d'achat
+      // (§11). Rangé sur CET appareil seulement (pas dans `main`, qui est lu
+      // partout) : Ma journée et Ventes le reposent à chaque lecture complète.
+      // Une ligne : [plateforme, compte, tx|id, ts, vente €, achat € | null,
+      // frais € | null, titre].
+      const releve = [];
+      for (const o of sales.items) {
+        if (isHidden(o) || classifyOrderStatus(o.status) !== 'completed') continue;
+        const t = o.date ? Date.parse(o.date) : NaN;
+        if (isNaN(t) || new Date(t).getFullYear() < an0) continue;
+        const e = effEntry(o);
+        const v = montantCommande(o);
+        releve.push(['Vinted', String((o._acc && (o._acc.login || o._acc.vinted_user_id)) || ''), String(o.transaction_id || ''), t, v, achatDe(e), chargesVente(e), String(o.title || '').slice(0, 90)]);
+      }
+      // Le titre d'une vente Leboncoin ou eBay : celui de LA vente, retrouvée par
+      // SON identifiant (transaction, commande) — jamais pour relier une paire,
+      // seulement pour en lire la marque, le modèle et la taille.
+      const titreDe = {};
+      for (const v of ((lbcVentes && lbcVentes.ventes) || [])) if (v && v.txId) titreDe['lbc:' + v.txId] = v.title || '';
+      for (const c of (ebayCmd || [])) if (c && c.orderId) titreDe['ebay:' + c.orderId] = (Array.isArray(c.lineItems) && c.lineItems[0] && c.lineItems[0].title) || '';
+      for (const x of autresBenefice) {
+        if (!isFinite(x.ts) || new Date(x.ts).getFullYear() < an0) continue;
+        releve.push([x.plateforme, '', x.id, x.ts, x.eur, x.achat, x.frais, String(titreDe[x.id] || '').slice(0, 90)]);
+      }
+      const r0 = load('vrm_stats_ventes', null);
+      if (!(r0 && JSON.stringify(r0.l) === JSON.stringify(releve))) save('vrm_stats_ventes', { v: 1, l: releve, at: Date.now() });
     } catch (_) {}
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sales.items, sales.failedUids, numeros, saleOv, buyByNum, hiddenSales, hiddenAccts, autresBenefice]);
@@ -45498,7 +46082,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               </div>
               <span className="vrm-display vrm-day-recu-n" style={{color:C.text}}>{declarables === undefined ? '…' : caAnnee == null ? '—' : `${Math.round(caAnnee).toLocaleString('fr-FR')} €`}</span>
             </div>
-            <BeneficeJournee onNav={onNav} place="integre"/>
+            <BeneficeJournee onNav={onNav} place="integre" edition={editJournee}/>
           </div>
         ) : (jourN>0 || (!baseKO && !premierJour && benefJourneeOn)) ? (<>
           {/* Le jour seul, quand le héros n'est pas là (lecture en cours d'un
@@ -45511,7 +46095,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               <span style={{fontSize:13,color:C.muted}}>{jourN} vente{jourN>1?'s':''}</span>
             </button>
           )}
-          {!baseKO && !premierJour && <BeneficeJournee onNav={onNav} place="carte"/>}
+          {!baseKO && !premierJour && <BeneficeJournee onNav={onNav} place="carte" edition={editJournee}/>}
         </>) : null;
         W.semaine = vuHero ? (()=>{
           const totSem = semaine.filter(j=>!j.futur).reduce((a,j)=>a+j.vendu.eur,0);
@@ -45536,9 +46120,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           </div>
           );
         })() : null;
+        // L'argent en attente : UNE lecture, pour sa carte et pour la tendance
+        // « En attente » (qui ne le redit que si la carte n'est pas là, §7).
+        const escrowJ=(walletEscrow&&walletEscrow.total>0)?walletEscrow:null;
+        const valAttente=escrowJ?escrowJ.total:inRouteSum;
         W.attente = (!baseKO && !premierJour) ? (()=>{
-          const escrow=(walletEscrow&&walletEscrow.total>0)?walletEscrow:null;
-          const val=escrow?escrow.total:inRouteSum;
+          const escrow=escrowJ;
+          const val=valAttente;
           if(loading||val<=0) return null;
           const avecDispo = !!(escrow && escrow.dispo > 0);
           return (
@@ -45628,6 +46216,48 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           </div>
         ) : null;
         W.urssaf = (!loading && urssafJob) ? listeTaches([urssafJob], {}) : null;
+        // (31 oct.) TENDANCES — quatre cases qui ouvrent Statistiques. Le vendu
+        // vient de `vendus` (la règle de « Vendu aujourd'hui »), le calcul de
+        // `rythmeVendu` (src/statsVentes.js) ; les paires qui dorment du même
+        // âge que l'écran Annonces (`stockDort`, seuil `SLEEP_DAYS`). Les
+        // montants déjà écrits ailleurs sur l'écran (vendu du jour) ne sont pas
+        // redits : la case dit l'ÉCART à la moyenne, pas le montant (§7).
+        W.tendances = vuHero ? (()=>{
+          const R = rythmeVendu(vendus.lignes);
+          if (!R) return null;
+          const eJ = R.moyenne ? ecartPct(R.jour.eur, R.moyenne.eur) : null;
+          const e7 = ecartPct(R.j7.eur, R.j7av.eur);
+          const datesOk = listingDatesLu === true && Array.isArray(listings.items) && !listings.error;
+          // Aucune date de mise en ligne connue : « — », jamais « 0 paire ».
+          const dort = datesOk && stockDort && stockDort.datesConnues > 0 ? stockDort.seuils[SLEEP_DAYS] || null : null;
+          const avecAttente = aWidget('attente');
+          const cases = [
+            { id: 'jour', l: "Aujourd'hui", n: eJ == null ? '—' : pctStat(eJ), sous: R.moyenne ? `contre ${fmt(R.moyenne.eur)}/j en moyenne${R.moyenne.depuisPremiere ? ` (${R.moyenne.jours} j)` : ' (28 j)'}` : 'pas encore de moyenne', v: eJ },
+            { id: 'semaine', l: '7 derniers jours', n: e7 == null ? '—' : pctStat(e7), sous: `${fmt(R.j7.eur)} contre ${fmt(R.j7av.eur)} les 7 d'avant`, v: e7 },
+            { id: 'dort', l: `En ligne depuis ${SLEEP_DAYS} j et plus`, n: dort ? String(dort.n) : '—', sous: dort ? `${fmt(dort.valeur)} affichés${stockDort.datesConnues < stockDort.total ? ` · ${stockDort.datesConnues}/${stockDort.total} datées` : ''}` : (listingDatesLu === null || listings.error ? 'dates de mise en ligne pas lues' : datesOk && stockDort ? 'aucune date de mise en ligne connue' : 'je lis tes annonces…'), v: dort ? dort.n : null },
+            avecAttente
+              ? { id: 'panier', l: 'Panier moyen (30 j)', n: eurStat(R.panier30.moyen), sous: R.panier30.n ? `sur ${R.panier30.n} vente${R.panier30.n > 1 ? 's' : ''}` : 'aucune vente en 30 jours', v: R.panier30.moyen }
+              : { id: 'attente', l: 'En attente', n: loading ? '—' : `${escrowJ ? '' : '≈ '}${Math.round(valAttente).toLocaleString('fr-FR')} €`, sous: escrowJ ? 'chez Vinted' : `${inRoute.length} vente${inRoute.length > 1 ? 's' : ''} en cours · estimation`, v: valAttente },
+          ];
+          return (
+            <div className="vrm-day-card vrm-day-tendances" data-widget-tendances="" style={{border:`1px solid ${C.border}`,background:C.card,boxShadow:C.shadow||'none'}}>
+              <div className="vrm-day-head">
+                <span className="vrm-day-k" style={{color:C.muted}}>Tendances</span>
+                <Bouton variante="discret" className="vrm-day-lien" data-tendances-stats="" href="?tab=dashboard" onClick={(ev)=>{ ev.preventDefault(); if (onNav) onNav('dashboard'); }}>Statistiques ›</Bouton>
+              </div>
+              <div className="vrm-tendances-grille">
+                {cases.map((c) => (
+                  <button key={c.id} type="button" className="vrm-tendance" data-tendance={c.id} data-v={c.v == null ? '' : String(c.v)} onClick={()=>onNav&&onNav('dashboard')}
+                    style={{borderColor:C.border,color:C.text}}>
+                    <span className="vrm-tendance-l" style={{color:C.muted}}>{c.l}</span>
+                    <span className="vrm-display vrm-tendance-n" style={{color:c.n === '—' ? C.muted : C.text}}>{c.n}</span>
+                    <span className="vrm-tendance-sous" style={{color:C.muted}}>{c.sous}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          );
+        })() : null;
         for (const x of T) {
           const n = x.t ? x.t.n : 0, vif = !x.pasSu && n > 0;
           W[x.id] = (!baseKO && !premierJour) ? (
@@ -45723,8 +46353,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             {/* Le bénéfice vit dans « Vendu et reçu » ; si cette carte n'est pas
                 sur l'écran (retirée), il garde sa propre carte ici : allumé dans
                 Réglages ⇒ toujours visible (un seul propriétaire, §11). */}
-            {!baseKO && !premierJour && !aWidget('vendu') && <BeneficeJournee onNav={onNav} place="carte"/>}
-            {!baseKO && !premierJour && <BeneficeJournee onNav={onNav} place="lien"/>}
+            {!baseKO && !premierJour && !aWidget('vendu') && <BeneficeJournee onNav={onNav} place="carte" edition={editJournee}/>}
             {/* (29 oct.) Le contrôle « vendus ailleurs » passe SOUS la journée : au-dessus du
                 bonjour il repoussait les compteurs du jour. Les vraies doubles ventes
                 restent en tête (alertes qui coûtent de l'argent).
@@ -45901,7 +46530,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             return (
               // Ligne de vente dans la liste groupée (filet fin entre les lignes,
               // pas de carte encadrée séparée — style démo, comme Achats).
-              <LigneVenteCompacte numerosArticle={num?[num]:[]} plateforme="vinted" photo={photo} photoNoeud={photo?<PhotoVenteSources {...photoSourcesProps} data-photo-vente="ligne" style={{width:28,height:36,borderRadius:8,objectFit:'cover',flexShrink:0}}/>:null} titre={num?`N°${num} · ${o.title}`:o.title} sous={[o.date?new Date(o.date).toLocaleDateString('fr-FR',{day:'numeric',month:'short'}):'', (o._acc && !ventesUnCompte) ? accNameOf(o._acc) : ''].filter(Boolean).join(' · ')} etat={venteStage(o).label} ton={st!=='cancelled' && aExpedier(o) && !isShipDone(o) ? 'action' : (st==='cancelled' ? 'annule' : '')} montant={sell!=null?`${Number.isInteger(sell)?sell:sell.toFixed(2).replace('.',',')} ${cur(o.price?.currency_code)}`:'—'} className="vrm-sale-row" key={o.transaction_id} data-tx={String(o.transaction_id)} style={{borderTop:i>0?`1px solid ${C.border}`:'none',opacity:hidden?0.5:(st==='cancelled'?0.6:1),padding:'12px 14px',display:'flex',flexDirection:'column',gap:10,...(estFloute(o)?STYLE_FLOU:null)}}>
+              <LigneVenteCompacte montantCentimes={sell!=null?Math.round(sell*100):undefined} numerosArticle={num?[num]:[]} plateforme="vinted" photo={photo} photoNoeud={photo?<PhotoVenteSources {...photoSourcesProps} data-photo-vente="ligne" style={{width:28,height:36,borderRadius:8,objectFit:'cover',flexShrink:0}}/>:null} titre={(()=>{ const t=String((e&&e.size)||o.size||'').trim(); const nom=t&&!tailleDansTitre(o.title,t)?`${o.title} · taille ${t}`:o.title; return num?`N°${num} · ${nom}`:nom; })()}
+                gestes={(!hidden && st!=='cancelled' && buy==null && !(e && e.buyFromId)) ? <CoutAchatVente surLigne onSaisir={p=>setSaleOverride(o.transaction_id,{buyPrice:p})}
+                  onRelier={()=>{ const idf = identiteAnnonce(o); openPicker(idf ? { id: idf, title: o.title, photo: photo, price: sell, _acc: o._acc } : { id: '_v'+o.transaction_id, _saleTx: String(o.transaction_id), title: o.title, photo: photo, price: sell, _acc: o._acc }); }}/> : null} sous={[o.date?new Date(o.date).toLocaleDateString('fr-FR',{day:'numeric',month:'short'}):'', (o._acc && !ventesUnCompte) ? accNameOf(o._acc) : ''].filter(Boolean).join(' · ')} etat={venteStage(o).label} ton={st!=='cancelled' && aExpedier(o) && !isShipDone(o) ? 'action' : (st==='cancelled' ? 'annule' : '')} montant={sell!=null?`${Number.isInteger(sell)?sell:sell.toFixed(2).replace('.',',')} ${cur(o.price?.currency_code)}`:'—'} className="vrm-sale-row" key={o.transaction_id} data-tx={String(o.transaction_id)} style={{borderTop:i>0?`1px solid ${C.border}`:'none',opacity:hidden?0.5:(st==='cancelled'?0.6:1),padding:'12px 14px',display:'flex',flexDirection:'column',gap:10,...(estFloute(o)?STYLE_FLOU:null)}}>
                {/* ── Haut : photo · titre + méta · prix ─────────────────────── */}
                <div className="vrm-sale-overview" style={{display:'flex',gap:12,alignItems:'flex-start'}}>
                 <div className="vrm-sale-photo" style={{width:72,height:72,borderRadius:10,background:C.card2||C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
@@ -46775,6 +47406,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             </div>
           );
         })()}
+        {aFilter==='attente' && <CarteRelaisColis donnees={groupesRelais} C={C}/>}
         {(()=>{
           const avail = pickupUnion.emailList;   // colis avec CODE/lieu (email transporteur)
           const extra = pickupUnion.extra;       // colis « déposé » (statut Vinted) sans code encore
@@ -48564,20 +49196,25 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             const tailleHorsTitre = it.size && !tailleDansTitre(it.title, it.size) ? it.size : '';
             return (
               <div className="vrm-ann-card vrm-fiche" key={it._acc.vinted_user_id+'_'+it.id} data-carte-annonce={it.id} data-fiche="29oct" style={{borderRadius:12,background:C.card,border:`1px solid ${soldBord?C.warn:C.border}`,boxShadow:C.shadow||'none',display:'flex',flexDirection:'column',overflow:'hidden',...(estFloute(it)?STYLE_FLOU:null)}}>
-                <div className="vrm-ann-overview" style={{display:'flex',flexDirection:'column'}}>
+                <div className="vrm-ann-overview" style={{display:'flex',flexDirection:'column',position:'relative'}}>
                   <a className="vrm-fiche-photo" data-fiche-photo href={it.url||undefined} target="_blank" rel="noreferrer" title="Ouvrir l'annonce sur Vinted" style={{display:'flex',alignItems:'center',justifyContent:'center',position:'relative',background:C.bg}}>
                     {it.photo?<PhotoVinted src={it.photo} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<Icon name="image" size={28} style={{color:C.muted,opacity:.55}}/>}
                     {it._vrmAConfirmer && <span data-ann-a-confirmer="" title="Ce compte n'a pas été relu depuis plus de 24 h : cette annonce était en ligne à la dernière lecture. Ouvre vinted.fr sur ce compte pour le vérifier." style={{position:'absolute',right:10,top:10,fontSize:11,fontWeight:650,whiteSpace:'nowrap',color:C.text,background:C.card,border:`1px solid ${C.warn || C.border}`,borderRadius:999,padding:'4px 9px'}}>À confirmer{it._vrmAConfirmerLu ? ` · lu ${new Date(it._vrmAConfirmerLu).toLocaleDateString('fr-FR',{day:'numeric',month:'short'})}` : ''}</span>}
-                    {it.promoted===true && <span data-boostee title="Vinted dit que cette annonce est boostée en ce moment" style={{position:'absolute',left:10,top:10,fontSize:11,fontWeight:650,whiteSpace:'nowrap',color:C.text,background:C.card,border:`1px solid ${C.border}`,borderRadius:999,padding:'4px 9px'}}>Boostée</span>}
+                    {it.promoted===true && <span data-boostee title="Vinted dit que cette annonce est boostée en ce moment" style={{position:'absolute',left:10,bottom:10,fontSize:11,fontWeight:650,whiteSpace:'nowrap',color:C.text,background:C.card,border:`1px solid ${C.border}`,borderRadius:999,padding:'4px 9px'}}>Boostée</span>}
                   </a>
+                  {/* (31 oct., Vitrine) Le N° de rangement SUR la photo, en haut à
+                      gauche, comme l'étiquette du carton : une pastille à chasse
+                      fixe. HORS du lien de la photo (un bouton dans un lien ne se
+                      touche pas) ; la MÊME édition en place qu'avant (`EnLigne`,
+                      `poserNumero`) — un tap sur la pastille, on tape, Entrée. */}
+                  <span className="vrm-fiche-num" data-fiche-num={num||''} style={{position:'absolute',left:10,top:10,zIndex:1,display:'flex',alignItems:'center',minHeight:28,boxSizing:'border-box',fontSize:14,fontWeight:500,color:num?C.text:C.muted,background:C.bg,borderRadius:999,padding:'0 11px'}}>
+                    <EnLigne data="numero" value={num} onCommit={(v,avant)=>poserNumero(item,v,avant)} inputMode={clavierNum()} placeholder={String(nextNumero)} largeur={46}
+                      titre="Numéro de rangement (écrit sur la boîte) — cliquer pour le changer" rendu={num?`N°${num}`:'+ N°'}/>
+                  </span>
                   <div className="vrm-ann-ledger-info" style={{display:'flex',flexDirection:'column',gap:8}}>
-                    <div data-titre style={{fontSize:14.5,fontWeight:600,color:C.text,lineHeight:1.35,display:'-webkit-box',WebkitLineClamp:2,WebkitBoxOrient:'vertical',overflow:'hidden'}}>{it.title||it.brand||'—'}</div>
+                    <div data-titre style={{fontSize:14.5,fontWeight:600,color:C.text,lineHeight:1.35,overflowWrap:'anywhere'}}>{it.title||it.brand||'—'}{tailleHorsTitre ? <span data-titre-taille=""> · {tailleHorsTitre}</span> : null}</div>
                     <div className="vrm-ann-price-line" style={{display:'flex',alignItems:'center',gap:10}}>
                       <span data-prix style={{fontSize:22,fontWeight:750,color:C.text,fontVariantNumeric:'tabular-nums',letterSpacing:'-.02em'}}>{prix(it.price,it.currency)||'—'}</span>
-                      <span style={{marginLeft:'auto',flexShrink:0,fontSize:13,fontWeight:700,color:num?C.text:C.muted,background:C.bg,border:`1px solid ${C.border}`,borderRadius:999,padding:'3px 10px'}}>
-                        <EnLigne data="numero" value={num} onCommit={(v,avant)=>poserNumero(item,v,avant)} inputMode={clavierNum()} placeholder={String(nextNumero)} largeur={46}
-                          titre="Numéro de rangement (écrit sur la boîte) — cliquer pour le changer" rendu={num?`N°${num}`:'+ N°'}/>
-                      </span>
                     </div>
                     {/* L'ÉTAT EN JAUGE, et JUSTE À CÔTÉ le prix d'achat qu'on tape en place. */}
                     <div className="vrm-fiche-duo" data-fiche-duo style={{display:'grid',gridTemplateColumns:'minmax(0,1fr) minmax(0,1fr)',gap:8}}>
@@ -48617,7 +49254,6 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                         {it.views!=null && <span style={{display:'inline-flex',alignItems:'center',gap:4}}><Icon name="eye" size={13}/>{it.views}</span>}
                         {it.favourites!=null && <span style={{display:'inline-flex',alignItems:'center',gap:4}}><Icon name="heart" size={13}/>{it.favourites}</span>}
                         {age!=null && <span title={`En ligne depuis ${age} jours`} style={{color:sleeps?C.warn:C.muted,fontWeight:sleeps?600:400}}>{age} j{sleeps?' · dort':''}</span>}
-                        {tailleHorsTitre && <span>taille {tailleHorsTitre}</span>}
                         {!annUnCompte && <span style={{whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',maxWidth:140}}>{accNameOf(it._acc)}</span>}
                       </span>
                       {/* La présence AILLEURS, prouvée seulement (Vinted : l'en-tête le dit une fois). */}
@@ -49385,6 +50021,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             commune est dite UNE fois (§7) ; la ligne ne garde que ce qui la
             distingue. */}
         {only === 'bordereaux' ? <ColisVestiaireBloc vc={colisVestiaire(vcEtat)}/> : null}
+        {/* (31 oct.) Les emails reçus et ce que VRM en a fait — l'ambre quand un
+            email attend un geste (bordereau au N° deviné, reçu sans n°…). */}
+        {only === 'bordereaux' ? <EntreeJournalEmails headers={sbAuth} onOuvrir={(f)=>{demanderJournalEmails(f); onNav && onNav('settings');}}/> : null}
         {colisEb === null && <div data-colis-ebay="passu" style={{marginBottom:10}}><LignePanne>Les ventes eBay n'ont pas pu être lues pour l'instant — un colis eBay à poster n'est peut-être pas dans ce compte. Rien n'est perdu : rouvre Colis dans un moment.</LignePanne></div>}
         {colisEb && colisEb.aPoster.length>0 && (()=>{
           const L = colisEb.aPoster, n = L.length;
@@ -50915,75 +51554,71 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         const w = wrapped;
         const eur0 = n => `${Math.round(n).toLocaleString('fr-FR')} €`;
         // On ne garde QUE les cartes qui ont une donnée réelle (pas d'invention).
+        // (31 oct., Vitrine) Plus de dégradés multicolores ni de violet : chaque
+        // carte est un APLAT — l'encre de Vitrine, et le cobalt (la seule couleur
+        // d'accent) pour l'ouverture et la fin. Texte blanc (≥ 8:1 sur les deux).
+        const FOND_ENCRE = MINERAL.text, FOND_ACCENT = MINERAL.accent;
         const cards = [];
-        cards.push({ bg:'linear-gradient(160deg,#6a3cff 0%,#a936ff 50%,#ff4fa3 100%)', body:(
+        cards.push({ bg:FOND_ACCENT, body:(
           <div style={{textAlign:'center'}}>
-            <div style={{fontSize:64,lineHeight:1,marginBottom:14}}>🎉</div>
             <div style={{fontSize:15,color:'rgba(255,255,255,0.85)',fontWeight:600,letterSpacing:2,textTransform:'uppercase'}}>{w.mode==='month'?'Ton mois':'Ton année'}</div>
-            <div style={{fontSize:w.mode==='month'?52:76,fontWeight:800,color:'#fff',letterSpacing:-2,lineHeight:1.05}}>{w.mode==='month'?w.moisNoms[w.mo]:w.yr}</div>
+            <div style={{fontSize:w.mode==='month'?52:76,fontWeight:800,color:'#fff',letterSpacing:'-.03em',lineHeight:1.05}}>{w.mode==='month'?w.moisNoms[w.mo]:w.yr}</div>
             {w.mode==='month' && <div style={{fontSize:20,fontWeight:700,color:'rgba(255,255,255,0.9)'}}>{w.yr}</div>}
             <div style={{fontSize:14,color:'rgba(255,255,255,0.9)',fontWeight:500,marginTop:14}}>Prêt à revivre {w.mode==='month'?'ton mois':'ta saison'} ? 👉</div>
           </div>
         )});
-        if(w.nb>0) cards.push({ bg:'linear-gradient(160deg,#0f6bff 0%,#22c1e0 100%)', body:(
+        if(w.nb>0) cards.push({ bg:FOND_ENCRE, body:(
           <div style={{textAlign:'center'}}>
-            <div style={{marginBottom:6,color:C.muted,opacity:.5,display:'flex',justifyContent:'center'}}><Icon name="image" size={44}/></div>
-            <CountUp value={w.nb} style={{fontSize:96,fontWeight:800,color:'#fff',letterSpacing:-3,lineHeight:1,display:'block'}}/>
+            <CountUp value={w.nb} style={{fontSize:96,fontWeight:800,color:'#fff',letterSpacing:'-.03em',lineHeight:1,display:'block'}}/>
             <div style={{fontSize:20,color:'#fff',fontWeight:600,marginTop:6}}>articles vendus</div>
             <div style={{fontSize:13,color:'rgba(255,255,255,0.85)',marginTop:10}}>Chaque article, une petite victoire. 💪</div>
           </div>
         )});
-        cards.push({ bg:'linear-gradient(160deg,#0a8f5b 0%,#3ad07f 100%)', body:(
+        cards.push({ bg:FOND_ENCRE, body:(
           <div style={{textAlign:'center'}}>
-            <div style={{fontSize:48,marginBottom:6}}>💰</div>
-            <CountUp value={w.ca} format={eur0} style={{fontSize:72,fontWeight:800,color:'#fff',letterSpacing:-2,lineHeight:1,display:'block'}}/>
+            <CountUp value={w.ca} format={eur0} style={{fontSize:72,fontWeight:800,color:'#fff',letterSpacing:'-.03em',lineHeight:1,display:'block'}}/>
             <div style={{fontSize:20,color:'#fff',fontWeight:600,marginTop:8}}>de chiffre d'affaires</div>
             <div style={{fontSize:13,color:'rgba(255,255,255,0.85)',marginTop:10}}>Prix de vente moyen : <b>{eur0(w.avg)}</b></div>
           </div>
         )});
-        if(w.topBrand) cards.push({ bg:'linear-gradient(160deg,#ff7a00 0%,#ff3d54 100%)', body:(
+        if(w.topBrand) cards.push({ bg:FOND_ENCRE, body:(
           <div style={{textAlign:'center'}}>
-            <div style={{fontSize:48,marginBottom:6}}>⭐</div>
             <div style={{fontSize:14,color:'rgba(255,255,255,0.85)',fontWeight:600,letterSpacing:1,textTransform:'uppercase'}}>Ta marque star</div>
             <div style={{fontSize:52,fontWeight:800,color:'#fff',letterSpacing:-1,lineHeight:1.05,marginTop:6}}>{w.topBrand[0]}</div>
             <div style={{fontSize:16,color:'#fff',fontWeight:600,marginTop:10}}><CountUp value={w.topBrand[1]}/> articles vendus</div>
           </div>
         )});
-        if(w.bestMonth) cards.push({ bg:'linear-gradient(160deg,#c2179c 0%,#7a3cff 100%)', body:(
+        if(w.bestMonth) cards.push({ bg:FOND_ENCRE, body:(
           <div style={{textAlign:'center'}}>
-            <div style={{fontSize:48,marginBottom:6}}>📅</div>
             <div style={{fontSize:14,color:'rgba(255,255,255,0.85)',fontWeight:600,letterSpacing:1,textTransform:'uppercase'}}>Ton mois record</div>
             <div style={{fontSize:56,fontWeight:800,color:'#fff',letterSpacing:-1,lineHeight:1,marginTop:6}}>{w.bestMonth.nom}</div>
             <div style={{fontSize:20,color:'#fff',fontWeight:700,marginTop:10}}>{eur0(w.bestMonth.v)}</div>
           </div>
         )});
-        if(w.bestPair) cards.push({ bg:'linear-gradient(160deg,#b8860b 0%,#ffbf3d 100%)', body:(
+        if(w.bestPair) cards.push({ bg:FOND_ENCRE, body:(
           <div style={{textAlign:'center'}}>
-            <div style={{fontSize:14,color:'rgba(0,0,0,0.55)',fontWeight:700,letterSpacing:1,textTransform:'uppercase'}}>👑 Article de l'année</div>
-            <div style={{width:130,height:130,borderRadius:12,overflow:'hidden',margin:'14px auto',background:'rgba(0,0,0,0.15)',display:'flex',alignItems:'center',justifyContent:'center',boxShadow:'0 10px 30px rgba(0,0,0,0.3)'}}>{w.bestPair.photo?<PhotoVinted src={w.bestPair.photo} alt="" loading="lazy" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:44}}>👑</span>}</div>
+            <div style={{fontSize:14,color:'rgba(255,255,255,0.85)',fontWeight:700,letterSpacing:1,textTransform:'uppercase'}}>Article de l'année</div>
+            <div style={{width:130,height:130,borderRadius:12,overflow:'hidden',margin:'14px auto',background:'rgba(255,255,255,0.10)',display:'flex',alignItems:'center',justifyContent:'center'}}>{w.bestPair.photo?<PhotoVinted src={w.bestPair.photo} alt="" loading="lazy" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<Icon name="image" size={40} style={{color:'rgba(255,255,255,0.6)'}}/>}</div>
             <div style={{fontSize:17,fontWeight:700,color:'#fff',padding:'0 20px',lineHeight:1.2}}>{w.bestPair.num?`N°${w.bestPair.num} · `:''}{w.bestPair.title}</div>
             <div style={{fontSize:22,fontWeight:800,color:'#fff',marginTop:8}}>+{eur0(w.bestPair.m)} de bénéfice</div>
           </div>
         )});
-        if(w.fastest) cards.push({ bg:'linear-gradient(160deg,#00b4d8 0%,#0a6bff 100%)', body:(
+        if(w.fastest) cards.push({ bg:FOND_ENCRE, body:(
           <div style={{textAlign:'center'}}>
-            <div style={{fontSize:48,marginBottom:6}}>⚡</div>
             <div style={{fontSize:14,color:'rgba(255,255,255,0.85)',fontWeight:600,letterSpacing:1,textTransform:'uppercase'}}>Vente éclair</div>
-            <div style={{fontSize:76,fontWeight:800,color:'#fff',letterSpacing:-2,lineHeight:1,marginTop:6}}><CountUp value={w.fastest.j}/> j</div>
+            <div style={{fontSize:76,fontWeight:800,color:'#fff',letterSpacing:'-.03em',lineHeight:1,marginTop:6}}><CountUp value={w.fastest.j}/> j</div>
             <div style={{fontSize:15,color:'#fff',fontWeight:500,marginTop:10,padding:'0 24px'}}>entre la mise en ligne et la vente{w.fastest.num?` · N°${w.fastest.num}`:''}</div>
           </div>
         )});
-        if(w.streak>1) cards.push({ bg:'linear-gradient(160deg,#ff3d54 0%,#ff8a00 100%)', body:(
+        if(w.streak>1) cards.push({ bg:FOND_ENCRE, body:(
           <div style={{textAlign:'center'}}>
-            <div style={{fontSize:48,marginBottom:6}}>🔥</div>
             <div style={{fontSize:14,color:'rgba(255,255,255,0.85)',fontWeight:600,letterSpacing:1,textTransform:'uppercase'}}>Ta plus longue série</div>
-            <div style={{fontSize:88,fontWeight:800,color:'#fff',letterSpacing:-3,lineHeight:1,marginTop:6}}><CountUp value={w.streak}/></div>
+            <div style={{fontSize:88,fontWeight:800,color:'#fff',letterSpacing:'-.03em',lineHeight:1,marginTop:6}}><CountUp value={w.streak}/></div>
             <div style={{fontSize:18,color:'#fff',fontWeight:600}}>jours d'affilée avec une vente</div>
           </div>
         )});
-        cards.push({ bg:'linear-gradient(160deg,#6a3cff 0%,#a936ff 50%,#ff4fa3 100%)', last:true, body:(
+        cards.push({ bg:FOND_ACCENT, last:true, body:(
           <div style={{textAlign:'center',width:'100%'}}>
-            <div style={{fontSize:52,marginBottom:10}}>🚀</div>
             <div style={{fontSize:26,fontWeight:800,color:'#fff',letterSpacing:-0.5}}>{w.mode==='month'?'Quel mois, Julien !':'Quelle année, Julien !'}</div>
             <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,margin:'18px 6px 0'}}>
               <div style={{background:'rgba(255,255,255,0.15)',borderRadius:10,padding:'12px 8px'}}><div style={{fontSize:24,fontWeight:800,color:'#fff'}}>{w.nb}</div><div style={{fontSize:11,color:'rgba(255,255,255,0.85)'}}>articles vendus</div></div>
@@ -51003,8 +51638,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           // dans le contexte d'empilement de <main> et la barre du haut / du bas
           // passent PAR-DESSUS (peu importe le z-index). Le portail l'en sort.
           return createPortal(
-            <div onClick={()=>setShowWrapped(false)} style={{position:"fixed",inset:0,zIndex:5000,background:"linear-gradient(160deg,#6a3cff,#ff4fa3)",display:'flex',alignItems:'center',justifyContent:'center',padding:24}}>
-              <div style={{textAlign:'center',color:'#fff'}}><div style={{fontSize:48}}>🎉</div><div style={{fontSize:18,fontWeight:600,marginTop:10}}>Aucune vente finalisée · {w.periodLabel}.</div><div style={{fontSize:13,opacity:0.85,marginTop:6}}>{w.mode==='month'?'Choisis un autre mois en haut.':'Reviens plus tard pour ta rétrospective !'}</div></div>
+            <div onClick={()=>setShowWrapped(false)} style={{position:"fixed",inset:0,zIndex:5000,background:FOND_ACCENT,display:'flex',alignItems:'center',justifyContent:'center',padding:24}}>
+              <div style={{textAlign:'center',color:'#fff'}}><div style={{fontSize:18,fontWeight:600,marginTop:10}}>Aucune vente finalisée · {w.periodLabel}.</div><div style={{fontSize:13,opacity:0.85,marginTop:6}}>{w.mode==='month'?'Choisis un autre mois en haut.':'Reviens plus tard pour ta rétrospective !'}</div></div>
             </div>, document.body);
         }
         return createPortal(
@@ -51014,13 +51649,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             {cards.map((c,i)=>(<div key={i} style={{flex:1,height:3,borderRadius:8,background:'rgba(255,255,255,0.3)',overflow:'hidden'}}><div style={{height:'100%',width:i<step?'100%':i===step?'100%':'0%',background:'#fff',transformOrigin:'left',animation:i===step?'wrapBar 0.5s ease both':'none'}}/></div>))}
           </div>
           <div style={{display:'flex',alignItems:'center',gap:8,padding:'2px 16px 0'}}>
-            <div style={{flex:1,fontSize:12,color:'rgba(255,255,255,0.9)',fontWeight:600}}>🎉 Wrapped · {w.periodLabel}</div>
+            <div style={{flex:1,fontSize:12,color:'rgba(255,255,255,0.9)',fontWeight:600}}>Rétrospective · {w.periodLabel}</div>
             {step===0 && (<>
               {/* Bascule Mois / Année (sur la carte d'intro). stopPropagation
                   pour ne pas déclencher le « touche pour continuer ». */}
               <div onClick={e=>e.stopPropagation()} style={{display:'flex',background:'rgba(255,255,255,0.2)',borderRadius:8,padding:2}}>
                 {[['month','Mois'],['year','Année']].map(([m,lbl])=>(
-                  <button key={m} type="button" onClick={()=>setWrappedMode(m)} style={{border:'none',borderRadius:8,padding:'5px 11px',fontSize:12,fontWeight:700,cursor:'pointer',background:w.mode===m?'#fff':'transparent',color:w.mode===m?'#7a3cff':'#fff'}}>{lbl}</button>
+                  <button key={m} type="button" onClick={()=>setWrappedMode(m)} style={{border:'none',borderRadius:8,padding:'5px 11px',fontSize:12,fontWeight:700,cursor:'pointer',background:w.mode===m?'#fff':'transparent',color:w.mode===m?FOND_ENCRE:'#fff'}}>{lbl}</button>
                 ))}
               </div>
               {w.mode==='month' && (
@@ -52147,11 +52782,12 @@ async function lbcAnnoncesSession() {
 async function lbcListingsSession() {
   if (_lbcAnnoncesSession && Date.now() - _lbcAnnoncesSession.t < 10 * 60000) return _lbcAnnoncesSession;
   try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.lbc_listings&select=data`, { headers: sbAuth() });
+    // (31 oct.) Projetée (§4.4) : les deux champs lus, jamais `select=data`.
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.lbc_listings&select=items:data->items,lectures:data->lectures`, { headers: sbAuth() });
     if (!r.ok) return null;
     const rows = await r.json();
     if (!Array.isArray(rows)) return null;
-    const d = (rows[0] && rows[0].data) || {};
+    const d = rows[0] || {};
     _lbcAnnoncesSession = { t: Date.now(), items: d.items || {}, lectures: d.lectures || {} };
     return _lbcAnnoncesSession;
   } catch (_) { return null; }
@@ -53325,14 +53961,15 @@ function LeboncoinScreen() {
     // reconnaître TOUT SEUL ce qui est déjà en ligne là-bas, via la référence
     // pro (CustomRef) ou le « nXXXX » du titre — même logique que l'extension,
     // pour que les deux écrans racontent la même chose.
-    const lbcRows = await sbGet('app_data?id=eq.lbc_listings&select=data');
+    // (31 oct.) Projetée (§4.4) : les annonces et les dates des listes complètes.
+    const lbcRows = await sbGet('app_data?id=eq.lbc_listings&select=items:data->items,lectures:data->lectures');
     // ⚠️ « jamais capté » n'est pas « zéro annonce » : sans cette ligne, le
     //    rapprochement par référence est impossible, donc « vendue sur Vinted →
     //    à retirer » ne peut RIEN trouver. L'écran doit le dire, pas afficher 0.
     // « jamais capté » = aucune annonce QUI SOIT À LUI (la ligne peut exister et
     // ne contenir que des annonces d'autres).
     const lbcJamaisLu = lbcRows !== null && !(lbcRows && lbcRows[0]);
-    const lbcItems = (lbcRows && lbcRows[0] && lbcRows[0].data && lbcRows[0].data.items) || {};
+    const lbcItems = (lbcRows && lbcRows[0] && lbcRows[0].items) || {};
     const lbcAds = Object.values(lbcItems).filter(Boolean);
     // Ses ventes Leboncoin PROUVÉES (il est le vendeur) : elles disent quels
     // comptes Leboncoin sont les siens, et quelles paires sont déjà parties.
@@ -53369,7 +54006,7 @@ function LeboncoinScreen() {
     // l'écran le dit, une fois. Et les N° dont l'annonce est sortie : plus rien
     // à retirer pour eux (même règle que le tableau de bord, §11).
     const sortiesLbc = lbcAds.filter((ad) => aLui(ad) && !vendusLbc.has(String(ad.id)) && lbcSortieDe(ad));
-    const lecturesLbc = (lbcRows && lbcRows[0] && lbcRows[0].data && lbcRows[0].data.lectures) || {};
+    const lecturesLbc = (lbcRows && lbcRows[0] && lbcRows[0].lectures) || {};
     // La preuve qu'aucune autre annonce de la paire n'est en ligne : une liste
     // complète de chacun de ses comptes, postérieure à la marque « publiée ».
     // Comptes, ventes ou annonces illisibles ⇒ pas de preuve (pas su ≠ sorti).
@@ -54836,7 +55473,6 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
     { id:'affichage', titre:'Affichage', items:[
       { id:'sombre', type:'switch', ic:'moon', lib:'Mode sombre', on:!!dark, onClick:toggleDark, data:{ 'data-reglage-sombre': dark ? 'on' : 'off' } },
       { id:'stream', type:'el', el:<StreamSetting key="stream"/> },
-      { id:'benefjournee', type:'el', el:<BeneficeJourneeSetting key="benefjournee"/> },
       { id:'zoom', type:'panneau', nu:true, ic:'grid', lib:"Taille de l'affichage", val:valZoom, el:<ZoomSetting nu/> },
       urlWidget && { id:'widget', type:'panneau', nu:true, ic:'chart', lib:'Widget iPhone', desc:'Ton lien privé pour Scriptable', el:widget },
     ]},
@@ -55078,7 +55714,7 @@ async function ouvrirStripe(mode, extra) {
 // des CGV (le serveur ne le relaie alors pas, api/compte.js `prixConforme`).
 // audit-lancement.cjs exige que ce soit la même valeur que les CGV et que le
 // serveur (`PRIX_CGV`) : 12,99 € depuis le 11 octobre (décision de Julien).
-const PRIX_CGV_LISIBLE = '14,99 € / mois';
+const PRIX_CGV_LISIBLE = '16,99 € / mois';
 const prixLisible = (p) => p ? `${Number(p.montant).toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} € / ${p.intervalle === 'year' ? 'an' : 'mois'}` : PRIX_CGV_LISIBLE;
 const dateLisible = (iso) => { try { return new Date(iso).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }); } catch (_) { return ''; } };
 
@@ -57224,8 +57860,11 @@ function phrasePersonne(p) {
 }
 // Le panneau des adresses se fait défiler jusqu'à lui quand on y arrive par le
 // geste de Ma journée (au moment du clic, Réglages n'est pas monté).
-const DEMANDE_ADRESSES = { on: false };
-function demanderAdresses(){DEMANDE_ADRESSES.on=true;window.dispatchEvent(new Event('vrm:ouvrir-adresses'));}
+const DEMANDE_ADRESSES = { on: false, vers: '', filtre: '' };
+function demanderAdresses(){DEMANDE_ADRESSES.on=true;DEMANDE_ADRESSES.vers='';window.dispatchEvent(new Event('vrm:ouvrir-adresses'));}
+// (31 oct.) Le journal « Tes emails, ce que VRM en a fait », ouvert depuis Colis
+// (filtré « à vérifier » quand il y a quelque chose à vérifier).
+function demanderJournalEmails(filtre){DEMANDE_ADRESSES.on=true;DEMANDE_ADRESSES.vers='journal';DEMANDE_ADRESSES.filtre=filtre||'';try{localStorage.setItem('vrm_reglages_vue','reglages');}catch(_){}window.dispatchEvent(new Event('vrm:ouvrir-adresses'));}
 // La forme acceptée pour une adresse de réception (saisie à la main OU
 // suggérée) : une seule règle.
 const ADRESSE_RECEPTION_OK = /^[^@\s]+@[^@\s.]+\.[^@\s]+$/;
@@ -57318,12 +57957,18 @@ function EmailsSetting({onComptes}) {
   const [vues, setVues] = useState(null);
   const [busy, setBusy] = useState('');
   const [versionReception,setVersionReception]=useState(0);
-  const [rubriqueEmail,setRubriqueEmail]=useState(()=>DEMANDE_ADRESSES.on?'adresses':'reception');
+  const [rubriqueEmail,setRubriqueEmail]=useState(()=>DEMANDE_ADRESSES.on?(DEMANDE_ADRESSES.vers||'adresses'):'reception');
+  const [journalFiltre,setJournalFiltre]=useState(()=>DEMANDE_ADRESSES.vers==='journal'?DEMANDE_ADRESSES.filtre:'');
+  // Les reçus d'achat qu'il a déliés (« Ce n'est pas ça ») — réversible, rien n'est supprimé.
+  const [recusDelies,setRecusDelies]=useState(()=>load('vrm_recus_delies',{})||{});
+  useEffect(()=>{const relire=()=>setRecusDelies(load('vrm_recus_delies',{})||{});const off=onCloudReady(relire);const f=e=>{if(e&&e.detail&&e.detail.k==='vrm_recus_delies')relire();};window.addEventListener('vrm:save',f);return()=>{off();window.removeEventListener('vrm:save',f);};},[]);
+  const delierRecu=(id,tx)=>{const n={...recusDelies,[id]:{tx:String(tx||''),at:new Date().toISOString()}};setRecusDelies(n);save('vrm_recus_delies',n);};
+  const relierRecu=(id)=>{const n={...recusDelies};delete n[id];setRecusDelies(n);save('vrm_recus_delies',n);};
   const espaceId=React.useId();
   const [adresseGuide,setAdresseGuide]=useState(''),[guideOuvert,setGuideOuvert]=useState(false);
   const configurerAdresse=adr=>{setAdresseGuide(adr);setGuideOuvert(true);requestAnimationFrame(()=>racine.current?.querySelector('.vrm-reception-parcours')?.scrollIntoView({block:'start',behavior:'smooth'}));};
   const [rechercheRattachement,setRechercheRattachement]=useState(''),[limiteRattachement,setLimiteRattachement]=useState(10);
-  useEffect(()=>{const ouvrir=()=>setRubriqueEmail('adresses');window.addEventListener('vrm:ouvrir-adresses',ouvrir);return()=>window.removeEventListener('vrm:ouvrir-adresses',ouvrir);},[]);
+  useEffect(()=>{const ouvrir=()=>{const v=DEMANDE_ADRESSES.vers;setRubriqueEmail(v||'adresses');if(v==='journal')setJournalFiltre(DEMANDE_ADRESSES.filtre||'');};window.addEventListener('vrm:ouvrir-adresses',ouvrir);return()=>window.removeEventListener('vrm:ouvrir-adresses',ouvrir);},[]);
   const [suiviAdresses,setSuiviAdresses]=useState(null);
   const [preuves, setPreuves] = useState(undefined);
   const [preuveBusy, setPreuveBusy] = useState('');
@@ -57670,7 +58315,14 @@ function EmailsSetting({onComptes}) {
       </details>
     </div>
     </div>
-    <div id={espaceId+'-reception'} data-email-panneau="reception" hidden={rubriqueEmail==='a-traiter'}>
+    {/* (31 oct.) Monté seulement quand on le regarde : aucune lecture pour un
+        onglet caché (« sauf si c'est trop lourd en données »). */}
+    <div id={espaceId+'-journal'} data-email-panneau="journal" hidden={rubriqueEmail!=='journal'}>
+      {rubriqueEmail==='journal'&&<JournalEmails headers={sbAuth} filtreInitial={journalFiltre} delies={recusDelies} onDelier={delierRecu} onRelier={relierRecu}
+        onNav={(t)=>{try{window.dispatchEvent(new CustomEvent('vrm:aller',{detail:t}));}catch(_){}}}
+        onNum={(n)=>{try{window.dispatchEvent(new CustomEvent('vrm:fiche-article',{detail:String(n)}));}catch(_){}}}/>}
+    </div>
+    <div id={espaceId+'-reception'} data-email-panneau="reception" hidden={rubriqueEmail==='a-traiter'||rubriqueEmail==='journal'}>
       <SuiviReceptionEmails onAdresseGuide={setAdresseGuide} adresseGuide={adresseGuide} guideOuvert={guideOuvert} onFermerGuide={()=>setGuideOuvert(false)} onVoirReception={()=>setRubriqueEmail('reception')} section={rubriqueEmail==='adresses'?'configuration':'reception'} key={uid} owner={uid} headers={sbAuth} theme={C} version={versionReception} onAdresses={setSuiviAdresses} onComptes={onComptes} onDeclarer={ajouterAdresses} preuves={preuves} onConfirmer={adr=>confirmerAdresse(adr,false)} quarantaine={quarantaine} onVerifier={()=>{setRubriqueEmail('a-traiter');requestAnimationFrame(()=>racine.current?.querySelector('[data-emails-mis-de-cote]')?.scrollIntoView({block:'center',behavior:'smooth'}));}}/>
     </div>
     <div id={espaceId+'-a-traiter'} data-email-panneau="a-traiter" hidden={rubriqueEmail!=='a-traiter'} className="vrm-email-rattachement">
@@ -58325,7 +58977,11 @@ function AppCoeur() {
     goto(window.location.search);
     const onMsg=(e)=>{ if(e.data&&e.data.type==='open-url'&&e.data.url){ try{ goto(new URL(e.data.url,window.location.origin).search); }catch(_){}} };
     if(navigator.serviceWorker) navigator.serviceWorker.addEventListener('message',onMsg);
-    return ()=>{ if(navigator.serviceWorker) navigator.serviceWorker.removeEventListener('message',onMsg); };
+    // (31 oct.) Un écran qui n'a pas `setTab` (le journal des emails) y mène par
+    // un événement — seulement vers un onglet connu.
+    const onAller=(e)=>{ const t=e&&e.detail; if(typeof t==='string'&&TABS_OK.includes(t)) setTab(t); };
+    window.addEventListener('vrm:aller',onAller);
+    return ()=>{ window.removeEventListener('vrm:aller',onAller); if(navigator.serviceWorker) navigator.serviceWorker.removeEventListener('message',onMsg); };
   },[]);
   const [dark,setDark]=useState(()=>load('vinted_dark',false));
   // Applique le thème (clair/sombre) en réassignant C avant chaque rendu
@@ -58458,7 +59114,7 @@ function AppCoeur() {
       const liens=load('vrm_lbc_liens',{})||{}; if(lbcVentes.some(x=>x.itemId!=null&&!liens[String(x.itemId)])) lbcItems=await lbcAnnoncesSession(); }
     let ebayCommandes=null, ebayAnnonces=null;
     if(Array.isArray(cE)){ const tous=async(base,sel,champ)=>{ const r=await lireEbayTous(base,sel,champ,cE); return (!r||r.illisibles.length)?null:r.items; };
-      [ebayCommandes, ebayAnnonces]=await Promise.all([tous('ebay_orders','orders:data->orders','orders'), tous('ebay_listings','items:data->items','items')]); }
+      [ebayCommandes, ebayAnnonces]=await Promise.all([tous('ebay_orders',SEL_EBAY_COMMANDES,'orders'), tous('ebay_listings',SEL_EBAY_ANNONCES,'items')]); }
     if(vivant) setNumData({enLigne,aConfirmer,masquees,ventes,txnItem,bordereaux,lbcVentes,lbcItems,ebayCommandes,ebayAnnonces,plan});
   })(); return ()=>{ vivant=false; }; /* eslint-disable-next-line */ },[gsOpen,revisionFiche]);
   const swipeStart=React.useRef(null); // pour le swipe entre onglets du bas
@@ -58773,7 +59429,7 @@ function AppCoeur() {
   const [ebayCmdTous,setEbayCmdTous]=useState(undefined);
   useEffect(()=>{ if (comptesEbay === undefined) return; let stop=false; (async()=>{
     if (comptesEbay === null) { setEbayCmdTous(null); setEbayCommandes(null); return; }
-    const r = await lireEbayTous('ebay_orders', 'orders:data->orders', 'orders', comptesEbay);
+    const r = await lireEbayTous('ebay_orders', SEL_EBAY_COMMANDES, 'orders', comptesEbay);
     if (stop) return;
     setEbayCmdTous(r);
     const orders = (!r || r.illisibles.length) ? null : r.items;
@@ -59441,7 +60097,7 @@ function AppCoeur() {
   //    Et un total PARTIEL (un compte, Leboncoin ou eBay illisibles) NOMME ce
   //    qui manque (`venduManque`) — jamais présenté comme complet (§5).
   const VENDU_PAS_SU = { caJour: null, ventesJour: null, caMois: null, ventesMois: null, caParMois: null, ventesParMois: null,
-    caEncaisse: null, caFinaliseParJour: null, enCours: null, soldTotal: null, joursVente: null, caParCompte: null, venduPasSu: true };
+    caEncaisse: null, caFinaliseParJour: null, enCours: null, soldTotal: null, joursVente: null, caParCompte: null, venduLignes: null, venduPasSu: true };
   const liveStatsVus = useMemo(() => {
     if (!liveStats) return liveStats;
     if (ventesCoque === null) return { ...liveStats, ...VENDU_PAS_SU };
@@ -59461,6 +60117,10 @@ function AppCoeur() {
       ];
       return { ...liveStats, caJour: r.jour.eur, ventesJour: r.jour.n, caMois: r.mois.eur, ventesMois: r.mois.n,
         caParMois: r.caParMois, ventesParMois: r.ventesParMois, venduSansDate: v.sansDate,
+        // (31 oct.) Les lignes elles-mêmes (plateforme, date, montant), pour le
+        // rythme de Statistiques : la même population que « vendu », jamais une
+        // seconde règle (§11).
+        venduLignes: v.lignes,
         venduManque, venduEnAttente: lbcCoqueLu === undefined || ebayCommandes === undefined };
     } catch (_) { return liveStats; }
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -59657,7 +60317,9 @@ function AppCoeur() {
       let sortisN=new Set();         // N° dont l'annonce LBC est SORTIE (plus en ligne) — partagé par les deux comptes « à retirer »
       let postedDepuis='';
       try{
-        const r=await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vinted_lbc_posted&select=data`,{headers:sbAuth()});
+        // (31 oct.) La cloche est un passage de FOND : elle accepte la réponse
+        // partagée d'il y a quelques secondes (`vrmFond`, src/lecturesPartagees.js).
+        const r=await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vinted_lbc_posted&select=data`,{headers:sbAuth(),vrmFond:true});
         if(r.ok){ const rows=await r.json(); const posted=(rows&&rows[0]&&rows[0].data&&rows[0].data.ids)||[]; postedIds=posted; postedDepuis=(Array.isArray(rows)&&rows[0]&&rows[0].data&&rows[0].data.updatedAt)||''; }
       }catch(_){}
       // ── ET L'AUTRE SENS : VENDUE SUR LEBONCOIN, ENCORE EN VENTE SUR VINTED ──
@@ -59671,7 +60333,7 @@ function AppCoeur() {
       // `undefined` = pas lu · `null` = pas su · objet = lu.
       let ventesLbcLu=null, lbcItemsLu=undefined;
       try{
-        const r=await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.lbc_ventes&select=data`,{headers:sbAuth()});
+        const r=await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.lbc_ventes&select=data`,{headers:sbAuth(),vrmFond:true});
         if(r.ok){
           const rows=await r.json();
           const ventesL=(rows&&rows[0]&&rows[0].data&&rows[0].data.ventes)||{};
@@ -59705,7 +60367,7 @@ function AppCoeur() {
           // vente prouvée), la date de chaque liste complète, la marque
           // « publiée ». Comptes ou ventes illisibles ⇒ pas de preuve.
           let preuve=null;
-          if(ventesLbcLu){ try{ const ra=await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.lbc_accounts&select=data`,{headers:sbAuth()}); if(ra.ok){ const rows=await ra.json(); if(Array.isArray(rows)){ const accs=(rows[0]&&rows[0].data&&rows[0].data.accounts)||{}; preuve={lectures:ls.lectures||{}, comptes:new Set([...comptesLbcProuves(ventesLbcLu,items),...comptesLbcSession(accs)]), depuis:postedDepuis}; } } }catch(_){} }
+          if(ventesLbcLu){ try{ const ra=await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.lbc_accounts&select=data`,{headers:sbAuth(),vrmFond:true}); if(ra.ok){ const rows=await ra.json(); if(Array.isArray(rows)){ const accs=(rows[0]&&rows[0].data&&rows[0].data.accounts)||{}; preuve={lectures:ls.lectures||{}, comptes:new Set([...comptesLbcProuves(ventesLbcLu,items),...comptesLbcSession(accs)]), depuis:postedDepuis}; } } }catch(_){} }
           sortis=numerosLbcSortis(items, liensR, ventesLbcLu?annoncesLbcVendues(ventesLbcLu):null, preuve).prouves;
           sortisN=sortis;
         }
@@ -59741,11 +60403,11 @@ function AppCoeur() {
         // dépend pas du compte affiché. Un compte illisible ⇒ cette source vaut
         // « pas su » (aucune alerte inventée, aucune manquée en silence).
         const cE=await lireComptesEbay();
-        const tousE=async(base,sel,champ)=>{ const r=await lireEbayTous(base,sel,champ,cE||undefined); return (!r||r.illisibles.length)?null:r.items; };
+        const tousE=async(base,sel,champ)=>{ const r=await lireEbayTous(base,sel,champ,cE||undefined,true); return (!r||r.illisibles.length)?null:r.items; };
         const [ords, annE, progE]=Array.isArray(cE)?await Promise.all([
-          tousE('ebay_orders','orders:data->orders','orders'),
-          tousE('ebay_listings','items:data->items','items'),
-          tousE('ebay_programmees','items:data->items','items'),
+          tousE('ebay_orders',SEL_EBAY_COMMANDES,'orders'),
+          tousE('ebay_listings',SEL_EBAY_ANNONCES,'items'),
+          tousE('ebay_programmees',SEL_EBAY_PROGRAMMEES,'items'),
         ]):[null,null,null];
         if(ords) ebayShipCount=ords.filter(o=>String((o&&o.orderPaymentStatus)||'').toUpperCase()==='PAID' && String((o&&o.orderFulfillmentStatus)||'').toUpperCase()!=='FULFILLED').length;
         // ── ET L'ANTI DOUBLE VENTE eBay (5 octobre) : la MÊME règle que l'écran
@@ -60423,7 +61085,7 @@ function AppCoeur() {
             cartes de l'aperçu changent la section (onSub) au lieu d'envoyer
             ailleurs. Les écrans détaillés restent aussi joignables seuls (menu
             « Dans Vinted »), donc rien n'est perdu (§4.11). */}
-        {tab==='plat_vinted'&&(<section className="vrm-market-space" aria-label="Vinted"><EntetePlateforme nom="Vinted" plateforme="vinted"/>
+        {tab==='plat_vinted'&&(<EspacePlateforme nom="Vinted"><EntetePlateforme nom="Vinted" plateforme="vinted"/>
           {/* Résumé CA/argent TOUJOURS visible en haut, puis la liste (ventes par
               défaut) directement — plus d'écran « Aperçu » intermédiaire. Les
               sections restent les mêmes écrans (§11), juste à un tap. */}
@@ -60456,8 +61118,8 @@ function AppCoeur() {
           {/* Sous la navigation, pas entre le résumé et elle (revue du 17 oct.). */}
           {platSub==='ventes' && !baseKO && <div className="vrm-retirer-hote" style={{padding:'10px 16px 0'}}><RetirerArgent liveStats={liveStatsVus}/></div>}
           <Comptabilite key={'pv_'+platSub} accounts={vintedAccounts} only={platSub==='apercu'?'ventes':platSub} liveStats={liveStatsVus} accountsReady={accountsLoaded} baseKO={baseKO} onNav={setTab} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}} onFreeNum={freeGarageNum} compteSel={compteSel} compteConnecte={compteConnecte} dansPlateforme/>
-        </section>)}
-        {tab==='plat_leboncoin'&&(<section className="vrm-market-space" aria-label="Leboncoin"><EntetePlateforme nom="Leboncoin" plateforme="leboncoin"/>
+        </EspacePlateforme>)}
+        {tab==='plat_leboncoin'&&(<EspacePlateforme nom="Leboncoin"><EntetePlateforme nom="Leboncoin" plateforme="leboncoin"/>
           {/* Julien : « Leboncoin, la même mise en page que Vinted ». Vinted a
               Ventes / Achats / Annonces ; côté Leboncoin on a maintenant les
               VENTES et les ACHATS (les deux prouvés par `isSeller`, cf.
@@ -60496,8 +61158,8 @@ function AppCoeur() {
           {/* (27 oct.) Le diagnostic est une aide en cas de souci : en bas de
               l'espace, plus une ligne en tête de chaque section. */}
           <div data-diag-lbc="" style={{padding:'0 16px'}}><DiagnosticLeboncoin key={AUTH.user?.id||'sans-session'} lire={q=>lireReceptionLeboncoin(`${SUPABASE_URL}/rest/v1/${q}`,sbAuth())} couleurs={C}/></div>
-        </section>)}
-        {tab==='plat_ebay'&&(<section className="vrm-market-space" aria-label="eBay"><EntetePlateforme nom="eBay" plateforme="ebay"/>
+        </EspacePlateforme>)}
+        {tab==='plat_ebay'&&(<EspacePlateforme nom="eBay"><EntetePlateforme nom="eBay" plateforme="ebay"/>
           {/* Julien : « eBay, je veux tout pareil que Vinted — les onglets achats,
               ventes ». Même structure, dans le skin eBay (noir). Aperçu garde la
               connexion + la publication ; Ventes liste les commandes captées ;
@@ -60535,7 +61197,7 @@ function AppCoeur() {
           {platSub==='offres'&&<div style={{padding:16}}><EbayActionCompte vue={ebayVueEff} comptes={comptesEbay} onCompte={setEbayVue}>{ref=><EbayOffres key={ref} cible={ebayCible?.compte===ref && ebayCible.section==='offres'?ebayCible:null} onClearCible={()=>setEbayCible(null)} headers={enTeteSession} confirm={askConfirm} theme={C} compte={ref} onAnnonces={()=>setPlatSub('annonces')}/>}</EbayActionCompte></div>}
           {platSub==='annonces'&&<EbayAnnonces baseKO={baseKO} comptes={vintedAccounts} vue={ebayVueEff} comptesEbay={comptesEbay}/>}
           {platSub==='compte'&&<div data-ebay-compte-section="" style={{ padding: 16 }}>{baseKO?<div style={{ color: EBAY_SKIN.muted, fontSize: 13 }}>Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui a échoué.</div>:<EbayConnexion onAnnonces={()=>setPlatSub('annonces')} vue={ebayVueEff} comptesEbay={comptesEbay}/>}</div>}
-        </section>)}
+        </EspacePlateforme>)}
         {agentFond&&accountsLoaded&&!baseKO&&Array.isArray(comptesEbay)&&comptesEbay.length>0&&!(tab==='plat_ebay'&&platSub==='agent')&&<AgentEbayFond comptes={vintedAccounts} comptesEbay={comptesEbay}/>}
         {tab==='plat_vestiaire'&&<Plateforme plat="Vestiaire Collective" liveStats={liveStatsVus} lbcVentes={lbcVentes} onGo={setTab} baseKO={baseKO} comptes={vintedAccounts}/>}
         {tab==='inventory'&&<Inventory inventory={inventory} setInventory={setInventory} accounts={vintedAccounts} garageGrid={garageGrid} labels={accountLabels} onLocate={(numero)=>{ setGarageLocate(String(numero)); setTab('garage'); }}/>}

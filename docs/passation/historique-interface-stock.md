@@ -1721,3 +1721,201 @@ dégradés multicolores ; la page d'accueil publique (`Accueil.jsx`) n'est pas t
 **Captures** (base inventée, aucune donnée réelle) : `docs/style-2026-10-31/avant/` et
 `docs/style-2026-10-31/apres/` — Ma journée, Annonces, Ventes, Colis, Stock, Réglages, à
 390 et 1512 px, clair et sombre.
+
+## 31 octobre 2026 (soir) — Vitrine, les finitions ; Ventes et Annonces plus lisibles
+
+Suite du premier passage « Vitrine » (ci-dessus). Tout est de la FORME : aucune règle
+métier, aucune donnée, rien dans `vinted-sync-extension/` ni `api/`.
+
+**Ce qui restait du premier passage**
+- **Le N° sur la photo** (fiche d'annonce Vinted) : une pastille blanche à chasse fixe
+  (Geist Mono) en haut à gauche de la photo, comme la maquette. Elle est HORS du lien de
+  la photo (un bouton dans un lien ne se touche pas) et c'est la MÊME édition en place
+  qu'avant (`EnLigne data="numero"` → `poserNumero`) : un tap sur la pastille, on tape,
+  Entrée. Cible étendue à 44 px affichés (pseudo-élément). En sombre, la pastille reste
+  claire (l'encre claire du thème) : sur une photo, c'est l'étiquette qui se lit.
+  « Boostée » descend en bas à gauche de la photo. Le prix reste seul sur sa ligne —
+  la pastille que `styles-annonces-pro` posait sur le DERNIER élément de la ligne (le
+  N°) ne l'habille pas (`span[data-prix]` remis à plat, `styles-vitrine.css`).
+- **Ventes au téléphone sans cadre** : le conteneur `.vrm-ventes-liste` gardait l'aplat
+  « surface » et un cadre de 8 px de rayon ; il est retiré (à toutes les largeurs) — les
+  lignes sont sur le blanc, séparées d'un filet, comme Colis. La vignette « photo vide »
+  était BLANCHE (invisible sur le blanc) : elle prend `--vrm-photo`.
+- **`ScreenHead` rend un `h1`** — sauf dans un espace de plateforme (Vinted, Leboncoin,
+  eBay), où le `h1` est le nom de la plateforme (`EntetePlateforme`) et l'écran une
+  section : `h2`. Un contexte (`DansEspacePlateforme`, posé par `EspacePlateforme`, qui
+  remplace les trois `<section className="vrm-market-space">`) le dit. Les feuilles
+  visent `.vrm-screen-head :is(h1, h2)` ; aucun banc ne cherchait `h2` comme titre
+  d'écran (vérifié : `revendeurs.cjs` passe par `getByRole('heading')`, sans niveau).
+- **Page d'accueil publique en Vitrine** : jetons de `src/accueil-jetons.js` (blanc,
+  encre, cobalt sur le bouton principal SEUL), Bricolage Grotesque partout (plus de Space
+  Grotesk ni d'Inter dans la page, la carte, les écrans dessinés et le film), plus de
+  halos en dégradé, de reflet balayé sur le bouton, de verre dépoli sous la barre, de
+  héros ardoise à grain, de pastilles de couleur devant « Vinted · Leboncoin · eBay ».
+  Une feuille `src/styles-accueil-vitrine.css`, chargée APRÈS `styles-accueil-studio.css`,
+  a le dernier mot (même principe que l'app). Le banc `accueil.cjs` compte désormais le
+  cobalt dans son budget d'accent (`BLEUS`) : il est plus strict, pas moins.
+- **Rétrospective « Wrapped »** : plus de dégradés multicolores ni de violet (la bascule
+  Mois/Année écrivait en `#7a3cff`) — chaque carte est un aplat d'encre, l'ouverture et
+  la fin en cobalt ; les grands emojis décoratifs sont retirés ; l'en-tête dit
+  « Rétrospective · … ».
+- **Passe de cohérence** : l'écran de connexion (ardoise pétrole en dégradé, halos
+  sauge) passe sur l'encre — l'« aurore » qu'il a demandée le 27 oct. reste, ses halos
+  en neutres + cobalt ; la barre de chargement est un aplat d'accent ; le vieux bloc
+  « Matières mobiles » de `styles-iphone.css` (pétrole, grain, dégradés) et le bandeau
+  pétrole de `styles-telephone.css` renvoient aux jetons ; le fil de conversation en
+  sombre n'est plus vert pétrole (`styles-mobile-studio.css`) ; les replis de `var()`
+  pétrole (`#244E54`, `#2b4548`, `#21343e`) deviennent cobalt/encre ; une constante de
+  sept couleurs inutilisée (dont un violet) est retirée du Stock. Restent, assumés : les
+  dégradés FONCTIONNELS (masque de défilement, fondu sous une barre collante, squelette
+  de chargement, voile du film), la pièce 3D du Stock, et `styles-accueil-studio.css`
+  (entièrement recouverte par la feuille Vitrine de l'accueil).
+
+**Demande du soir (Julien)** : « il faut vraiment améliorer la mise en page des ventes…
+les icônes devant sont beaucoup trop petites, on voit même pas ce que c'est, il n'y a
+même pas le nom de la paire en entier avec la taille ; on est obligé d'appuyer sur les
+points pour remplir le prix d'achat ou relier un achat — améliore ça, pour eBay aussi ;
+les annonces sont moches ».
+- **Une ligne de vente** (Vinted, Leboncoin, eBay, Vestiaire : la même
+  `LigneVenteCompacte`) : photo 64 × 80 au téléphone, 80 × 100 sur ordinateur (elle
+  faisait 28 × 36) ; le nom EN ENTIER sur autant de lignes qu'il faut (il était coupé à
+  une ligne), date · compte dessous ; montant fort, état dessous (téléphone) ou en
+  colonne (ordinateur) ; « ⋯ » à 24 px. Vinted : la taille de la fiche est ajoutée au
+  nom quand le titre ne la dit pas (`tailleDansTitre`).
+- **Prix d'achat et « Relier un achat » SUR la ligne** quand le coût manque : nouvelle
+  prop `gestes` de `LigneVenteCompacte`, rendue sous le bouton de la ligne (un champ ne
+  vit pas dans un bouton). Ce sont les MÊMES composants et les MÊMES écritures que dans
+  le tiroir (`CoutAchatVente` → `setSaleOverride(tx,{buyPrice})` ; `openPicker` pour
+  relier — c'est SON clic qui choisit l'achat, rien par ressemblance). Le tiroir n'est
+  pas touché (un autre chantier le rend paresseux). eBay : le prix d'achat se tape sur la
+  ligne quand `bilanCommandeEbay` dit « achat inconnu » (même écriture que « Bénéfice de
+  l'article » : `costs.buyPrice` via `sauverCouts`) ; eBay n'a AUCUNE liaison à un achat
+  dans VRM, donc seul le prix est proposé (`onRelier` devient facultatif).
+- **Annonces** : Vinted — le titre en entier, la taille au bout (elle était perdue dans la
+  ligne des statistiques), prix 22 px (18 au téléphone), N° sur la photo. Leboncoin
+  (« Mes annonces ») — les lignes à vignette de 36 px deviennent des FICHES (grille, photo
+  4:5, titre entier, prix fort, état discret, gestes dessous) ; eBay — photo 80 × 100,
+  titre entier, prix 18 px (ses cartes gardent leurs réglages).
+
+**Vérifié** : `npm run build` ; audits icones, tdz, variables, boutons, csp ; les bancs
+et leur état sont dans le rapport de la session (journal `b1/`). Captures (base
+INVENTÉE `_base-volume.cjs`, aucune donnée réelle) : `docs/style-2026-10-31/finitions/`.
+### Statistiques détaillées, Tendances dans Ma journée, cartes rangées dans Ma journée (31 octobre)
+
+**Demandes de Julien** : « je veux que tu proposes beaucoup plus de statistiques dans Ma
+journée et même dans Statistiques, de la vraie data » ; et, de la carte « Bénéfice dans Ma
+journée » : « pour cette case je ne pense pas qu'il soit nécessaire de faire un bouton de
+validation dans les paramètres… pourquoi pas les autres ? ».
+
+**Mesuré avant de coder** : la seule carte de Ma journée qui s'allumait par une case des
+Paramètres était le bénéfice (`BeneficeJourneeSetting`, Réglages → Affichage,
+`vrm_journee_benefice`, défaut éteint) ; les widgets, eux, se rangeaient déjà dans Ma journée
+(« Modifier » : retirer, glisser, « + Ajouter », 21-22 oct.).
+
+**Ce qui change pour les cartes** :
+- L'interrupteur « Bénéfice dans Ma journée » est **retiré** de Réglages → Affichage.
+  `vrm_journee_benefice` a trois états : absent = **par défaut**, la carte se montre dès
+  qu'un bénéfice est publié avec au moins une vente du mois au prix d'achat connu (sinon
+  rien — jamais une case de « — » non demandée) ; `false` = masqué par lui, bouton
+  « Masquer le bénéfice » **en mode « Modifier » seulement** (touchable malgré le
+  `pointer-events:none` du corps des widgets, ignoré par le glisser) ; `true` = remis par
+  « + Ajouter » → « Ton bénéfice » (feuille des widgets). Le lien « + Afficher mon
+  bénéfice » sous la grille est retiré. La règle de `styles-epure.css` qui cachait
+  « Masquer » sur téléphone est retirée (il n'existe plus qu'en mode « Modifier »).
+  La ligne « Aujourd'hui » du bénéfice n'est dessinée que s'il y a une vente aujourd'hui
+  (vide, elle ajoutait un filet).
+- **Une carte nouvelle arrive d'elle-même, une carte retirée ne revient pas** : la
+  disposition enregistrée porte `connus` (le catalogue au moment du rangement,
+  `dispoAEnregistrer`) ; un widget de la disposition d'origine absent de `connus` est ajouté
+  à la fin (`normaliserDispoJournee`). Une disposition d'avant ce champ connaît
+  `CATALOGUE_AVANT_31_OCT`.
+- Nouveau widget **« Tendances »** (dans la disposition d'origine, pleine largeur, en
+  dernier — le banc `journee-widgets` garde « toute la journée visible sans défiler » à
+  1512 px) : 4 cases qui ouvrent Statistiques — aujourd'hui contre la moyenne des 28 jours
+  d'avant (l'ÉCART, pas le montant : « +X € aujourd'hui » est déjà dans « Vendu », §7),
+  7 jours contre les 7 d'avant, paires en ligne depuis 30 j et plus (« — » sans aucune date
+  de mise en ligne), et « En attente » — remplacé par le panier moyen 30 j quand la carte
+  « Argent en attente » est sur l'écran (le même nombre ne s'écrit pas deux fois).
+
+**Statistiques** : nouvelle section (`StatsDetaillees`) entre « CA sur mesure » et « Ce qui
+se vend » — rythme (aujourd'hui, moyenne, 7 j/7 j, panier, ventes/jour, 12 semaines en
+barres), bénéfice et marge par marque/modèle/taille/plateforme/compte, temps de vente
+(médiane/moyenne par marque, tranche de prix, compte), quand tu vends (jour, heure), paires
+qui dorment 30/60/90 j avec valeur affichée et coût connu, rotation, taux de vente du mois,
+annulations. Sources et règles : historique compta (même date). Graphiques en SVG maison,
+une seule teinte d'accent, survol natif (`<title>`), échelle de texte 28/20/15/13/11 du
+banc `stats-premium` (le 11,5 px de la couverture du boost ramené à 11).
+
+**Preuves** : `scripts/audit-stats-ventes.cjs --prouve` (29 contrôles à la main, 10/10
+mutations) ; `scripts/bancs/stats-detail.cjs` (44 verts, 1512 et 390 tactile ; chiffres
+calculés à la main dans l'en-tête ; cas partiel « 3/4 », cas « pas su » ; mutation « prix
+d'achat inconnu = 0 € » dans le relevé ⇒ 3 rouges) ; `benefice-journee` réécrit (A défaut
+sans publication = rien, Réglages sans interrupteur ; B défaut avec publication = carte ;
+D masquer/remettre dans Ma journée) 62 verts ; `journee-widgets` (K mis à jour, disposition
+par défaut avec « tendances ») 167 verts ; `journee-premium`, `stats-premium`,
+`stats-compta`, `benefice-brut-net`, `reglages-premium`, `chiffres-croises` verts.
+Captures regardées (390/1512, clair/sombre).
+## 31 octobre 2026 — Vitesse : le tiroir des ventes à l'ouverture, les lectures en double du démarrage
+
+**1. Le tiroir d'une vente n'est monté qu'à sa première ouverture, puis gardé**
+(`LigneVenteCompacte`). Depuis le 21 oct. chaque ligne (Vinted, Leboncoin, eBay)
+montait d'avance son tiroir complet, caché (photo, coûts, bordereau, facture,
+`EbayCommande`) : l'essentiel du rendu différé d'une lettre tapée dans Ventes.
+Fermé, il n'existait que `hidden` : rien de visible ne change. Le montant de la
+ligne porte aussi `data-prix-vente` (centimes) : il y était déjà affiché.
+Banc `ventes-frappe` (lancé seul, machine partagée) : processeur « tout compris »
+des 21 lettres 6,4 s → 4,8 s (−25 %), éléments `.vrm-sale-row` recréés par frappe
+78/106/120 → 39/53/60 (deux par vente avant : la ligne et la copie du tiroir).
+Le temps jusqu'à l'image de la frappe (rendu URGENT, plancher 90 ms) ne bouge pas
+(60 → 58 ms) : depuis le 16 oct. le rendu urgent ne recrée aucune ligne ; le tiroir
+pesait sur le rendu DIFFÉRÉ qui suit. Les « ~80 ms » vus avant venaient de la charge
+de la machine (75 ms mesuré pendant qu'un autre banc tournait). Les bancs qui lisaient un tiroir FERMÉ l'ouvrent d'abord, comme une
+personne : `scripts/bancs/_tiroirs.cjs` (`monterTiroirs` : clic, attente de l'état,
+second clic) — `ventes-bordereau`, `deux-extensions`, `pont`, `statuts-colis`,
+`double-vente`. Aucun contrôle affaibli : ce qui était jugé « absent d'un tiroir »
+(pas de bordereau sur 9002, pas de bénéfice sur la vente non reliée) l'est sur un
+tiroir réellement monté.
+
+**2. Banc `vitesse` : ce que chaque lecture coûtait, et ce qui a été retiré.**
+Mesuré lecture par lecture (pile d'appel sur un build non minifié) :
+- `lecturesPartagees` : une écriture de LIGNES NOMMÉES de `app_data` (upsert avec
+  `id`, PATCH/DELETE `id=eq.`/`in.`) ne vide plus que les lectures qui peuvent les
+  porter (`idsEcrits`, `lecturePeutPorter`) ; `main`, un `like`, une autre table, un
+  corps illisible vident tout comme avant. Les publications `widget_stats` et
+  `lbc_a_retirer` du démarrage faisaient relire `lbc_ventes`, `ebay_*`…
+- Un passage de FOND déclaré (`vrmFond: true` : la cloche, l'agent eBay en fond)
+  accepte une réponse réussie de moins de 15 s (`FENETRE_FOND_MS`), jamais d'avant
+  une écriture de la ligne ni un signal de l'extension. Un écran garde 2 s.
+- `POST /api/compte?mode=photo` (lecture d'une photo du CDN, n'écrit rien) le déclare
+  (`vrmInvalideSiChange`) : ses douze appels sur Ventes vidaient le partage.
+- Une projection par ligne eBay (`SEL_EBAY_COMMANDES/ANNONCES/PROGRAMMEES`) :
+  `ebay_orders` partait sous quatre projections, `ebay_listings` trois.
+- `lbc_ventes` en `select=data` partout (la ligne ne porte que `ventes` et sa date).
+- `harvest_*_orders_sold` : une orthographe (`*`), plus `%` d'un côté.
+- « Comptes sans email » : UNE lecture `email_*` au lieu de sept à la suite.
+- `panel_num_reserves` relue quand l'ENSEMBLE des annonces change (comme la table
+  « qui remplace qui »), plus à chaque référence neuve de la liste.
+- L'agent eBay en fond relit la fraîcheur de son résumé APRÈS le nuage.
+- `lbc_listings` projetée (`items`, `lectures`) au lieu de `select=data` (§4.4) ;
+  `api/email-inbound.js` la projetait déjà.
+Contrôle : `audit-lectures-partagees.cjs` §11-12 (+5 mutations, rouge sur l'ancien
+`lecturesPartagees.js`).
+
+**Avant → après** (lectures de la base, 390 / 1512 px ; plafonds inchangés) :
+Ma journée 73/71 → 63/61 (plafond 62) · Ventes 87/90 → 76/74 (82) · Colis 88/86 →
+78/76 (82) · Annonces 75/72 → 68/65 (66) · Achats 89/85 → 75/73 (78) · Messages
+77/75 → 69/67 (68) · Statistiques 71/70 → 65/63 (60) ; identiques refaites 3-8 → 0-1.
+Restent rouges : Ma journée 390, Annonces 390, Messages 390, Statistiques (et ses
+3 balayages), « brouillons eBay lus sur Ma journée » — tous par l'agent en fond
+ci-dessous.
+
+**Reste au-dessus, à trancher par Julien** : l'agent eBay en FOND
+(`AgentEbayFond`, une fois toutes les 20 h, sur tout écran sauf l'agent ; son résumé
+sert la cloche et la notification du matin) lit ~8 lignes que personne d'autre ne lit
+à l'ouverture : `ebay_brouillons`, `ebay_programmees` (complet), la famille des
+transactions une 2ᵉ fois (preuve de vente, 2 pages — le 3ᵉ balayage de Statistiques
+avec le pays des acheteurs), `harvest_*_label_*`, `harvest_*_orders_sold` (216 Ko),
+`vinted_item_details` (103 Ko), `coffre_*` (668 Ko). Sans lui (résumé de moins de
+20 h, le cas courant), Ma journée, Annonces, Messages et Statistiques passent sous
+leurs plafonds. Ses lectures sont utiles (anti double vente de la proposition) : on
+ne les a pas retirées. `relais_ext` ×2 : le battement du relais (voulu).

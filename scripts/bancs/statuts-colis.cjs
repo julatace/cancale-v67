@@ -57,6 +57,7 @@
 // que là où le libellé EST la chose vérifiée (l'étape affichée d'une vente).
 const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
 const { metaVersData } = require('./_meta.cjs');
+const { monterTiroirs } = require('./_tiroirs.cjs');
 const fs = require('fs'), http = require('http'), path = require('path'), os = require('os');
 const DIST = path.join(__dirname, '..', '..', 'dist');
 const PORT = Number(process.env.BANC_PORT) || 4351;
@@ -265,6 +266,10 @@ async function filtre(pg, nom) {
         for (const f of ['À expédier', 'En transit', 'Finalisées', 'Annulées', 'Toutes']) {
           await essaie('filtre « ' + f + ' »', async () => {
             await filtre(pg, f);
+            // (31 oct.) Le détail d'une vente (titre, étape, bouton du bordereau)
+            // vit dans son tiroir, monté à la première ouverture : on ouvre chaque
+            // vente rendue, comme une personne, avant de lire (`_tiroirs.cjs`).
+            await monterTiroirs(pg);
             const lignes = await lireLignes(pg, TITRES);
             vu[f] = Object.keys(lignes).map(txDeTitre);
             parFiltre[f] = Object.entries(lignes).map(([t, lib]) => [txDeTitre(t), lib]);

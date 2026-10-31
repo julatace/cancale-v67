@@ -1,0 +1,94 @@
+/* ════════════════════════════════════════════════════════════════════════════
+   LA PAGE D'ACCUEIL PUBLIQUE EN « VITRINE » — 31 octobre 2026
+   Le style que Julien a choisi pour l'app (src/styles-vitrine.css) gagne la
+   page publique : blanc franc, encre, Bricolage Grotesque, des aplats sans
+   ombre ni cadre appuyé, et UNE couleur d'accent — le cobalt, sur le bouton
+   principal seulement. Plus de héros ardoise, de grain, de halos en dégradé,
+   de reflet balayé ni de pastilles de couleur devant les plateformes.
+   Chargée APRÈS styles-accueil-studio.css (Accueil.jsx) : elle a le dernier
+   mot sans réécrire les couches d'avant. Les jetons : src/accueil-jetons.js.
+   ════════════════════════════════════════════════════════════════════════════ */
+
+.acc { --acc-bg: #FFFFFF; --acc-surface: #F5F5F3; --acc-surface2: #ECECE8; --acc-encre: #0F0F0E; --acc-doux: #56564F; --acc-filet: #E4E4DF; --acc-accent: #2442B8; --acc-accent-f: #1C3594; }
+.acc, .acc :is(h1, h2, h3, b, strong, .acc-btn, .acc-lien, .acc-revoir) {
+  font-family: 'Bricolage Grotesque', 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+}
+.acc :focus-visible, .acc .acc-hero .acc-actions :focus-visible, .acc .acc-prix :focus-visible, .acc .acc-preview .acc-revoir:focus-visible { outline-color: var(--acc-accent); }
+
+/* La barre du haut : blanche, un filet quand on défile. */
+.acc .acc-nav { background: var(--acc-bg); border-bottom-color: transparent; }
+.acc .acc-nav.defile { border-bottom-color: var(--acc-filet); }
+.acc img.vrm-brand-asset, .acc .acc-marque img { background: var(--acc-encre); }
+.acc .acc-marque b { font-weight: 800; letter-spacing: -.03em; }
+
+/* Le haut de page : sur le blanc, plus d'ardoise ni de grain. */
+.acc .acc-hero {
+  background: var(--acc-bg); background-image: none; color: var(--acc-encre); border-bottom: 1px solid var(--acc-filet);
+}
+.acc .acc-hero:before { content: none; display: none; }
+.acc .acc-hero .acc-def { color: var(--acc-doux); }
+.acc .acc-hero .acc-def-dot, .acc .acc-def-dot { background: var(--acc-encre); }
+.acc .acc-hero .acc-plateformes > span, .acc .acc-plateformes > span { color: var(--acc-doux); background: transparent; }
+.acc .acc-plateformes > span:before, .acc .acc-plateformes > span:nth-child(n):before { background: var(--acc-encre); }
+.acc .acc-hero .acc-h1, .acc .acc-h1 { color: var(--acc-encre); font-weight: 800; letter-spacing: -.035em; }
+.acc .acc-hero .acc-h1 .attenue, .acc .acc-h1 .attenue { color: var(--acc-doux); }
+.acc .acc-hero .acc-sous { color: var(--acc-encre); }
+.acc .acc-hero .acc-sous em { color: var(--acc-doux); }
+.acc .acc-hero .acc-actions .acc-p, .acc .acc-actions .acc-p {
+  color: #FFFFFF; background: var(--acc-accent); border: 1px solid var(--acc-accent); border-radius: 14px; box-shadow: none;
+}
+.acc .acc-hero .acc-actions .acc-lien, .acc .acc-hero .acc-actions .acc-lien b { color: var(--acc-encre); }
+.acc .acc-hero .acc-lignes, .acc .acc-hero .acc-lignes .sep { color: var(--acc-doux); }
+.acc .acc-hero .acc-lignes b { color: var(--acc-encre); }
+
+/* La démonstration : un aplat « surface », sans cadre ardoise ni ombre portée. */
+.acc .acc-preview, .acc .acc-hero .acc-preview {
+  background: var(--acc-surface); border: 0; border-radius: 14px; box-shadow: none;
+}
+.acc .acc-preview-head { color: var(--acc-encre); letter-spacing: 0; font-weight: 700; }
+.acc .acc-preview-example { color: var(--acc-doux); border-color: var(--acc-filet); background: var(--acc-bg); border-radius: 999px; padding: 3px 10px; }
+.acc .acc-preview-note { color: var(--acc-doux); }
+.acc .acc-preview .acc-revoir { color: var(--acc-doux); }
+.acc .acc-preview .acc-flotte { box-shadow: none; }
+
+/* Les trois raccourcis sous le haut de page : des aplats. */
+.acc .acc-benefices > a { background: var(--acc-surface); border: 0; border-radius: 14px; box-shadow: none; }
+.acc .acc-benefice-icon { background: var(--acc-bg); border: 0; border-radius: 10px; color: var(--acc-encre); }
+.acc .acc-benefices small { color: var(--acc-doux); }
+.acc .acc-benefices .acc-chev { color: var(--acc-doux); }
+
+/* Les sections : des aplats neutres, des pastilles rondes. */
+.acc .acc-sec .acc-quand { background: var(--acc-surface); border: 0; border-radius: 999px; padding: 4px 10px; letter-spacing: 0; }
+.acc .acc-sec .acc-emplacement:before { background: var(--acc-surface); border-radius: 14px; }
+.acc #ailleurs { background: var(--acc-surface); border-block: 0; }
+.acc #ailleurs .acc-emplacement:before { background: var(--acc-surface2); }
+.acc .acc-roles { border-left-color: var(--acc-filet); }
+.acc .acc-h2, .acc .acc-h2b, .acc .acc-faq h2 { font-weight: 800; letter-spacing: -.03em; }
+.acc .acc-q { background: var(--acc-surface); border: 0; border-radius: 14px; box-shadow: none; }
+@media (hover: hover) and (pointer: fine) { .acc .acc-q:hover { transform: none; box-shadow: none; background: var(--acc-surface2); } }
+.acc .acc-bande { background: var(--acc-bg); border-color: var(--acc-filet); }
+.acc .acc-etapes .n { background: var(--acc-encre); border-color: var(--acc-encre); color: #FFFFFF; font-family: 'Geist Mono', ui-monospace, monospace; }
+.acc .acc-conf { background: var(--acc-surface); border: 0; border-radius: 14px; }
+
+/* Le prix : un aplat clair ; le bouton principal en cobalt. */
+.acc .acc-prix { background: var(--acc-surface); border: 0; border-radius: 14px; box-shadow: none; color: var(--acc-encre); }
+.acc .acc-prix :is(h2, .acc-gros b) { color: var(--acc-encre); }
+.acc .acc-prix :is(li, p, .acc-gros span) { color: var(--acc-doux); }
+.acc .acc-prix .petit a { color: var(--acc-encre); }
+.acc .acc-prix .acc-offert { color: var(--acc-encre); background: var(--acc-bg); border: 0; border-radius: 999px; }
+.acc .acc-prix .acc-p { color: #FFFFFF; background: var(--acc-accent); border-color: var(--acc-accent); border-radius: 14px; }
+.acc .acc-faq details[open] { background: var(--acc-surface); border-radius: 14px; }
+.acc .acc-fin { background: var(--acc-surface); border-block: 0; }
+
+@media (hover: hover) {
+  .acc .acc-hero .acc-actions .acc-p:hover, .acc .acc-actions .acc-p:hover, .acc .acc-prix .acc-p:hover {
+    background: var(--acc-accent-f); border-color: var(--acc-accent-f); box-shadow: none;
+  }
+  .acc .acc-benefices > a:hover { background: var(--acc-surface2); border-color: transparent; }
+  .acc .acc-preview .acc-revoir:hover { color: var(--acc-encre) !important; }
+}
+@media (max-width: 759px) {
+  .acc .acc-q { background: none; border-radius: 0; border-bottom: 1px solid var(--acc-filet); }
+  .acc .acc-hero .acc-preview { box-shadow: none; }
+  .acc .acc-conf { background: transparent; }
+}

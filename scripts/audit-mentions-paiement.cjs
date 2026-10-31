@@ -68,7 +68,7 @@ global.fetch = async (url, o = {}) => {
   if (u.startsWith('https://api.stripe.com/v1/')) {
     const chemin = u.slice('https://api.stripe.com/v1/'.length).split('?')[0];
     appelsStripe.push({ chemin, corps: decodeURIComponent(String(o.body || '')) });
-    if (chemin === 'prices') return rep({ data: [{ id: 'price_banc', unit_amount: 1499, currency: 'eur', recurring: { interval: 'month' } }] });
+    if (chemin === 'prices') return rep({ data: [{ id: 'price_banc', unit_amount: 1699, currency: 'eur', recurring: { interval: 'month' } }] });
     if (chemin === 'checkout/sessions') return rep({ id: 'cs_banc', url: 'https://checkout.stripe.com/c/pay/cs_banc' });
   }
   return rep({}, 404);
@@ -174,7 +174,7 @@ global.fetch = async (url, o = {}) => {
     dit(v.code === 200 && v.corps && v.corps.mentionsCompletes === false && v.corps.mentionsManquantes === undefined,
       'un vendeur sait que le paiement est fermé (mentionsCompletes: false), SANS la liste', JSON.stringify({ c: v.corps && v.corps.mentionsCompletes, l: v.corps && v.corps.mentionsManquantes }));
     const l = p.corps && p.corps.mentionsManquantes;
-    dit(p.code === 200 && Array.isArray(l) && l.length === (globalThis.VRM_EDITEUR_OBLIGATOIRES || []).length && l.includes('SIRET') && l.includes('médiateur de la consommation'),
+    dit(p.code === 200 && Array.isArray(l) && l.length === (globalThis.VRM_EDITEUR_OBLIGATOIRES || []).filter((k) => !globalThis.VRM_EDITEUR[k]).length && /* (31 oct.) l'e-mail est posé : la liste dit ce qui MANQUE */ l.includes('SIRET') && l.includes('médiateur de la consommation'),
       'le propriétaire lit la liste, en libellés', Array.isArray(l) ? l.join(', ') : String(l));
     remplir();
     const c = await appeler('abonnement', 'A');

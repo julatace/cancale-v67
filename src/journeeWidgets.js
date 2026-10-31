@@ -47,7 +47,21 @@ export const WIDGETS_JOURNEE = {
   retirer:  { nom: 'À retirer', desc: 'Petite case : le nombre de colis à aller chercher', tailles: ['petit'] },
   messages: { nom: 'Messages', desc: 'Petite case : les messages récents sans réponse', tailles: ['petit'] },
   prix:     { nom: 'Prix à baisser', desc: 'Petite case : les paires vues qui ne partent pas', tailles: ['petit'] },
+  // (31 oct.) Quatre tendances compactes qui ouvrent Statistiques : aujourd'hui
+  // contre ta moyenne, 7 jours contre les 7 d'avant, les paires qui dorment, et
+  // l'argent en attente (ou le panier moyen quand « Argent en attente » est déjà
+  // sur l'écran : le même nombre ne s'écrit pas deux fois, §7).
+  tendances: { nom: 'Tendances', desc: 'Aujourd’hui contre ta moyenne, la semaine contre la précédente, les paires qui dorment', tailles: ['pleine', 'grand', 'moyen'] },
 };
+
+// ⚠️ UNE CARTE NOUVELLE ARRIVE D'ELLE-MÊME, UNE CARTE RETIRÉE NE REVIENT PAS
+// (31 oct., Julien : pas de case à cocher dans les Paramètres pour faire
+// apparaître une carte de Ma journée). Une disposition rangée porte la liste des
+// widgets qui EXISTAIENT quand il l'a rangée (`connus`) ; un widget de la
+// disposition d'origine qui n'y figure pas est arrivé depuis : il s'ajoute à la
+// fin. Une disposition d'avant ce champ connaissait `CATALOGUE_AVANT_31_OCT`.
+// Un widget qu'il retire ensuite est dans `connus` : il ne revient jamais seul.
+export const CATALOGUE_AVANT_31_OCT = ['barre', 'afaire', 'vendu', 'semaine', 'attente', 'recentes', 'stock', 'jours14', 'performance', 'urssaf', 'envoyer', 'retirer', 'messages', 'prix'];
 
 // ⚠️ PAS DE WIDGET « TON BÉNÉFICE » (revue du 22 oct.) : le bénéfice dans Ma
 // journée a déjà UN propriétaire, le réglage `vrm_journee_benefice` (Réglages →
@@ -89,7 +103,7 @@ export const widgetFixe = (id) => !!(WIDGETS_JOURNEE[id] && WIDGETS_JOURNEE[id].
 // de la grille — donc au-dessus de la barre — et ne bougent pas avec elle :
 // aucune disposition ne peut les pousser en bas de l'écran. Le banc
 // `journee-widgets` (A2) vérifie cet ordre-là, pas « le même qu'avant ».
-export const DISPO_JOURNEE_DEFAUT = ['barre', 'afaire', 'vendu', 'semaine', 'attente', 'recentes', 'stock']
+export const DISPO_JOURNEE_DEFAUT = ['barre', 'afaire', 'vendu', 'semaine', 'attente', 'recentes', 'stock', 'tendances']
   .map((id) => ({ id, t: tailleDefautWidget(id) }));
 
 // `null` = rien de rangé (ou illisible) ⇒ l'appelant prend le défaut.
@@ -98,6 +112,7 @@ export const DISPO_JOURNEE_DEFAUT = ['barre', 'afaire', 'vendu', 'semaine', 'att
 export const normaliserDispoJournee = (v) => {
   const w = v && typeof v === 'object' && Array.isArray(v.w) ? v.w : (Array.isArray(v) ? v : null);
   if (!w) return null;
+  const connus = new Set(v && typeof v === 'object' && Array.isArray(v.connus) ? v.connus : CATALOGUE_AVANT_31_OCT);
   const vus = new Set(), out = [];
   for (const x of w) {
     const id = x && typeof x === 'object' ? x.id : x;
@@ -113,8 +128,12 @@ export const normaliserDispoJournee = (v) => {
     const apres = out.findIndex((x) => x.id === 'barre');
     out.splice(apres >= 0 ? apres + 1 : 0, 0, { id, t: tailleDefautWidget(id) });
   }
+  // Les widgets arrivés depuis qu'il a rangé (voir `CATALOGUE_AVANT_31_OCT`).
+  for (const x of DISPO_JOURNEE_DEFAUT) if (!connus.has(x.id) && !vus.has(x.id)) { vus.add(x.id); out.push({ id: x.id, t: x.t }); }
   return out;
 };
+// Ce qui s'enregistre : la disposition ET le catalogue d'aujourd'hui (`connus`).
+export const dispoAEnregistrer = (liste) => ({ v: 1, w: liste, connus: Object.keys(WIDGETS_JOURNEE) });
 
 // Déplacer un widget à la place d'un autre (dans les deux sens).
 export const deplacerWidget = (liste, de, vers) => {

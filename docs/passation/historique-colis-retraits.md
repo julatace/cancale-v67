@@ -2068,3 +2068,69 @@ sans code s'affichait à côté de son propre e-mail. Règles (une, un propriét
   relevés ; une vraie séquence Mondial Relay « re-livré » ; aucun appel réel aux
   transporteurs n'a été fait pour ces corrections (formes de `mesures.json`).
 
+
+## 31 octobre — Colis → « À retirer » : par point relais, sur une carte, avec les arrivées estimées (extension 5.295.0)
+
+Demande de Julien : « l'extension peut essayer de capter le nom des points relais où les
+colis vont arriver, pour prévoir ; objectif : une carte avec les colis à aller chercher par
+point relais, et des prévisions ». (Elle lève, sur sa demande, le choix du 20 sept. « plus
+d'adresse, d'itinéraire ni de carte » sur les blocs « Va à » : la carte est un bloc À PART,
+replié, les blocs « Va à » ne changent pas.)
+
+**Ce qui existait** : les colis DÉJÀ au point relais ont leur lieu (e-mail du transporteur,
+`extraitLieu`/`lieuDepuisExtrait` ; conversation Vinted, `panel_colis_relais` ; lecture du
+transporteur, `lieuNom/lieuCp/lieuVille` — seulement à l'arrivée). Pour un achat EN ROUTE,
+**aucune source mesurée ne donne la destination** : la transaction Vinted (`shipment: {}`
+sur 284 lignes), les e-mails « en transit » (le lieu au futur est refusé : « dans votre
+Relais Pickup », sans nom), les transporteurs (le lieu n'arrive qu'avec « disponible »).
+La seule voie plausible est le suivi Vinted (`journey_summary`), dont la forme réelle est
+dans `panel_formes_suivi` chez lui — pas lisible d'ici.
+
+**Extension 5.295.0** (`<suivi-regle>`, même texte dans inject.js et background.js) :
+- `relaisDestination(réponse brute)` : UN objet sous une clé qui dit le point de RETRAIT
+  (pickup, relay, relais, pudo, locker, parcel_shop, service_point…), jamais le DÉPÔT ni un
+  relais du vendeur ou d'un retour (drop_off, depot, origin, sender, seller, return…) ni une
+  personne (contact, recipient…) ; nom exigé ; rue + code postal + ville gardés seulement sous
+  cet objet (l'adresse d'un commerce) ; un texte avec e-mail/téléphone n'est pas une adresse ;
+  deux points différents ⇒ `null`.
+- `arriveeEstimeeSuivi` : une date sous une clé d'ESTIMATION (estimated/expected/eta/
+  planned/promised/prévue), jamais une date limite (deadline/expires/until/retrait), jamais
+  sous le point de dépôt ; deux dates ⇒ `null`.
+- Rangées dans `harvest_{uid}_suivi_{tx}` en scalaires (`relaisNom`, `relaisRue`,
+  `relaisCp`, `relaisVille`, `arriveeEstimee`, `lieuLuAt` — lus en `meta`) ; un relais lu
+  remplace l'ancien s'il est AUTRE, complète seulement s'il est le même (une lecture plus
+  pauvre ne vide pas la rue) ; « pas lu » n'efface rien ; ils suffisent à réécrire la ligne
+  (les étapes restent celles d'avant). Voie passive : la page envoie `relais` à côté du
+  contenu allégé, le fond le REFAIT par la règle (`nettoyerRelaisSuivi`).
+- `audit-suivi-vinted` : le destinataire de la fixture habite désormais Brest (ses mots
+  restent des fuites), l'adresse du point relais est gardée exprès ; +2 contrôles.
+
+**App** (`src/relaisColis.js`, règle pure ; `src/CarteRelais.jsx`) : en tête de Achats →
+« À retirer », un bloc replié « Par point relais » : N points · arrivés · attendus. Les
+arrivés = les listes de `pickupUnion` (le même compte que l'onglet, §11) ; les attendus =
+les achats Vinted en route dont le suivi de CETTE transaction donne la destination (par
+identité, jamais le titre ni le relais habituel). Des LIEUX regroupés (nom normalisé sans
+accents/ponctuation + code postal ; un lieu sans code postal rejoint le SEUL point du même
+nom), jamais des colis rapprochés ; un colis compte une fois (son identité). Par point :
+« N déjà arrivés (dont sans code) », chaque achat attendu avec « arrivée estimée le … » ou
+« date d'arrivée pas encore dite ». Carte : OpenFreeMap + MapLibre (src/fondCarte.js, la
+carte de la communauté, rien ne charge avant le clic) ; une épingle par point au nombre de
+colis (accent seulement si des colis ATTENDENT) ; le repère vient de la Base Adresse
+Nationale (déjà dans la CSP) sur la RUE + le code postal lus, gardé seulement si sûr (adresse,
+score ≥ 0,6, même code postal — `repereDepuisBan`) ; sinon « Pas sur la carte : … » ;
+cache `vrm_geo_relais_v1` (commodité, échec relancé après 24 h). Les achats en route sans
+destination sont comptés à part. Leboncoin, eBay, Vestiaire : aucune destination lisible
+aujourd'hui, rien n'est deviné.
+
+Preuves : `scripts/audit-relais-carte.cjs` (24 : la règle de l'extension exécutée depuis le
+vrai background.js, et src/relaisColis.js) — sur l'avant 0 ✅ · 2 ❌ ; mutations rouges
+(dépôt, date limite, code postal ignoré dans la clé, code postal BAN ignoré). Banc
+`scripts/bancs/retrait-relais-carte.cjs` (390/1512 : un point Kusmi Tea e-mail + conversation
++ attendu, un point sans rue « pas sur la carte », une seule recherche d'adresse avec code
+postal, une épingle). ⚠️ Le fond de carte réel n'a pas été dessiné au banc (tuiles hors ligne) :
+la carte dit alors « indisponible ici », la liste reste.
+
+**Geste de Julien** : installer la 5.295.0, puis sur Vinted toucher « Suivre le colis » d'un
+achat en route (ou laisser la relecture active faire) : si `journey_summary` porte le point
+de retrait, il apparaît dans « Par point relais ». Sinon, relire `panel_formes_suivi.journey.forme`
+(lecture seule) : la règle se règle sur la vraie forme, sans deviner.

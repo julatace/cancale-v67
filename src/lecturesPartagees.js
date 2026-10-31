@@ -44,6 +44,16 @@ export const FENETRE_MS = 2000;
 // fait après une lecture pendue part sur le réseau au lieu de la rejoindre.
 export const VOL_MAX_MS = 8000;
 export const MAX_ENTREES = 256;
+// (31 oct., banc vitesse) Un passage de FOND — la cloche, l'agent eBay — n'est
+// pas un geste : il recalcule ce qu'il y a à faire, une réponse de quelques
+// secondes lui va aussi bien qu'une neuve. Il le DÉCLARE (`vrmFond: true`) et
+// reçoit alors une réponse réussie de moins de `FENETRE_FOND_MS` — jamais
+// d'avant une écriture de la ligne ni d'avant un signal de l'extension, qui
+// vident le partage comme pour tout le monde. Mesuré au téléphone (processeur
+// ×4) : la cloche arrivait 2 à 4 s après Ma journée et relisait `lbc_ventes`,
+// `vinted_lbc_posted`, `ebay_orders`, `ebay_listings`, `ebay_programmees`. Une
+// lecture sans le drapeau (un écran, « ↻ Actualiser ») garde la fenêtre courte.
+export const FENETRE_FOND_MS = 15000;
 const ENTETES_CLE = ['authorization', 'apikey', 'range', 'range-unit', 'prefer', 'accept', 'accept-profile', 'x-vrm-equipe'];
 
 const lireEntete = (h, nom) => {
@@ -56,10 +66,71 @@ const lireEntete = (h, nom) => {
   return '';
 };
 
+// ── QUELLES LIGNES UNE ÉCRITURE TOUCHE-T-ELLE ? (31 oct.) ───────────────────
+// `chemin` : ce qui suit `/rest/v1/`. Rend la liste des `id` écrits dans
+// `app_data`, ou `null` quand on ne sait pas le dire (autre table, `rpc/`,
+// filtre `like`, corps illisible, aucun id, la ligne `main`) ⇒ tout est vidé.
+const PAS_PRECIS = new Set(['main']);
+function filtresId(requete) {
+  const out = [];
+  for (const morceau of String(requete || '').split('&')) {
+    const i = morceau.indexOf('=');
+    if (i < 0) continue;
+    let k, v;
+    try { k = decodeURIComponent(morceau.slice(0, i)); v = decodeURIComponent(morceau.slice(i + 1)); } catch (_) { return null; }
+    if (k === 'or' || k === 'and' || k === 'not.or' || k === 'not.and') return null;
+    if (k === 'id') out.push(v);
+  }
+  return out;
+}
+export function idsEcrits(chemin, methode, corps) {
+  const c = String(chemin || '');
+  const q = c.indexOf('?');
+  const table = q < 0 ? c : c.slice(0, q);
+  if (table !== 'app_data') return null;
+  let ids = [];
+  if (methode === 'POST') {
+    if (typeof corps !== 'string') return null;
+    let j; try { j = JSON.parse(corps); } catch (_) { return null; }
+    const lignes = Array.isArray(j) ? j : [j];
+    for (const l of lignes) { if (!l || typeof l !== 'object' || typeof l.id !== 'string' || !l.id) return null; ids.push(l.id); }
+  } else if (methode === 'PATCH' || methode === 'DELETE') {
+    const f = filtresId(q < 0 ? '' : c.slice(q + 1));
+    if (!f || f.length !== 1) return null;
+    const v = f[0];
+    if (v.startsWith('eq.')) ids = [v.slice(3)];
+    else if (/^in\.\(.*\)$/.test(v)) ids = v.slice(4, -1).split(',').map((x) => x.replace(/^"|"$/g, ''));
+    else return null;
+  } else return null;
+  if (!ids.length || ids.some((x) => !x || PAS_PRECIS.has(x))) return null;
+  return ids;
+}
+// Une lecture `GET {chemin}` peut-elle porter l'une de ces lignes ? Dans le
+// doute : oui (elle est retirée du partage).
+export function lecturePeutPorter(chemin, ids) {
+  const c = String(chemin || '');
+  const q = c.indexOf('?');
+  const table = q < 0 ? c : c.slice(0, q);
+  if (table !== 'app_data') return table.startsWith('rpc/');
+  const f = filtresId(q < 0 ? '' : c.slice(q + 1));
+  if (!f || !f.length) return true;
+  return f.every((v) => {
+    if (v.startsWith('eq.')) return ids.includes(v.slice(3));
+    if (/^in\.\(.*\)$/.test(v)) { const l = v.slice(4, -1).split(',').map((x) => x.replace(/^"|"$/g, '')); return ids.some((x) => l.includes(x)); }
+    if (v.startsWith('like.')) {
+      const motif = v.slice(5);
+      const re = new RegExp('^' + motif.split('').map((ch) => (ch === '*' || ch === '%') ? '.*' : ch === '_' ? '.' : ch.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('') + '$');
+      return ids.some((x) => re.test(x));
+    }
+    return true;
+  });
+}
+
 // `fetchOrig` : la vraie fonction (injectable pour l'audit). Rend la fonction
 // qui la remplace, et `invalider`.
 export function creerLecturesPartagees(fetchOrig, base, opts = {}) {
   const fenetre = opts.fenetre != null ? opts.fenetre : FENETRE_MS;
+  const fenetreFond = Math.max(fenetre, opts.fenetreFond != null ? opts.fenetreFond : FENETRE_FOND_MS);
   const volMax = opts.volMax != null ? opts.volMax : VOL_MAX_MS;
   const maxEntrees = Number.isInteger(opts.maxEntrees) && opts.maxEntrees > 0 ? Math.min(opts.maxEntrees, MAX_ENTREES) : MAX_ENTREES;
   const maintenant = opts.maintenant || (() => Date.now());
@@ -68,6 +139,9 @@ export function creerLecturesPartagees(fetchOrig, base, opts = {}) {
   let gen = 0;
   const stats = { partagees: 0, parties: 0, get retenues() { return cache.size; } };
   const invalider = () => { gen++; cache.clear(); };
+  // Ne retire que les lectures qui peuvent porter l'une de ces lignes (une
+  // lecture EN COURS retirée n'est plus resservie : `cache.get(cle) !== ent`).
+  const invaliderLignes = (ids) => { for (const k of [...cache.keys()]) if (lecturePeutPorter(k.slice(0, k.indexOf('\n')).slice(prefixe.length), ids)) cache.delete(k); };
   const origine = opts.origine != null ? opts.origine : (typeof location !== 'undefined' && location.origin ? location.origin : '');
   const estRouteApp = (u) => u.indexOf('/api/') === 0 || (!!origine && u.indexOf(origine + '/api/') === 0);
   const f = function (input, init) {
@@ -97,20 +171,31 @@ export function creerLecturesPartagees(fetchOrig, base, opts = {}) {
       // (+8 lectures par écran, les ventes au 3ᵉ aller-retour). Une écriture
       // vers la BASE vide toujours, drapeau ou pas.
       if (versRoute && init && init.vrmInvalideSiChange === true) return fetchOrig(input, init);
-      invalider();
+      // (31 oct., banc vitesse) Une écriture de LIGNES NOMMÉES de `app_data`
+      // (upsert dont le corps porte les `id`, ou PATCH/DELETE `id=eq.`/`in.`)
+      // ne vide que les lectures qui peuvent porter ces lignes — elle seule.
+      // Mesuré : la publication de `widget_stats` et de `lbc_a_retirer` au
+      // démarrage vidait TOUT, et `lbc_ventes`, `ebay_orders`, `ebay_listings`…
+      // repartaient sur le réseau une seconde plus tard. Aucun déclencheur de la
+      // base n'écrit une AUTRE ligne (004 : `meta` de la même ligne ; 013/017 :
+      // des gardes qui refusent). Tout ce qui n'est pas sûr vide tout, comme avant.
+      const ids = versBase && !requete ? idsEcrits(url.slice(prefixe.length), methode, init && init.body) : null;
+      const vider = ids ? () => invaliderLignes(ids) : invalider;
+      vider();
       const p = fetchOrig(input, init);
-      Promise.resolve(p).then(invalider, invalider);
+      Promise.resolve(p).then(vider, vider);
       return p;
     }
     if (requete || init && (init.signal || init.body != null || (init.cache && init.cache !== 'default'))) return fetchOrig(input, init);
     // Une requête pendue ne doit pas retenir sa réponse et ses en-têtes à vie.
     const date = maintenant();
     for (const [k, v] of cache)
-      if (v.fin == null ? date - v.debut >= volMax : date - v.fin >= fenetre) cache.delete(k);
+      if (v.fin == null ? date - v.debut >= volMax : date - v.fin >= fenetreFond) cache.delete(k);
     const h = init && init.headers;
     const cle = url + '\n' + ENTETES_CLE.map((n) => lireEntete(h, n)).join('\n');
     const e = cache.get(cle);
-    if (e && e.gen === gen && (e.fin == null ? maintenant() - e.debut < volMax : maintenant() - e.fin < fenetre)) {
+    const accepte = init && init.vrmFond === true ? fenetreFond : fenetre;
+    if (e && e.gen === gen && (e.fin == null ? maintenant() - e.debut < volMax : maintenant() - e.fin < accepte)) {
       stats.partagees++;
       return e.p.then((r) => r.clone());
     }
@@ -126,7 +211,7 @@ export function creerLecturesPartagees(fetchOrig, base, opts = {}) {
       // Un échec n'est JAMAIS gardé : la lecture suivante réessaie.
       if (!r || !r.ok || monGen !== gen) { cache.delete(cle); return; }
       ent.fin = maintenant();
-      setTimeout(() => { if (cache.get(cle) === ent) cache.delete(cle); }, fenetre + 50);
+      setTimeout(() => { if (cache.get(cle) === ent) cache.delete(cle); }, fenetreFond + 50);
     }, () => { if (cache.get(cle) === ent) cache.delete(cle); });
     return p.then((r) => r.clone());
   };

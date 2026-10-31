@@ -76,8 +76,11 @@ const ouvrirVente=async(p)=>{const t=p.locator('.vrm-sale-row .vrm-ledger-sale-t
     //    chaque vente est REPLIÉE : la ligne compacte est le bouton `.vrm-ledger-sale-toggle` (vignette,
     //    titre, statut, montant) et le détail s'ouvre au toucher. On juge la ligne repliée, puis on OUVRE
     //    la vente (le geste de la personne) pour juger sa photo, à gauche des informations.
-    const plie=await p.locator('.vrm-sale-row .vrm-ledger-sale-toggle').first().evaluate(e=>{const r=e.getBoundingClientRect();return {h:r.height,visible:r.width>0&&r.height>0};}).catch(()=>null);
-    if(plie){check(plie.visible && plie.h<=64,'ligne repliée compacte '+tab+' ('+Math.round(plie.h)+' px)');
+    // (31 oct.) Julien : « tu peux grossir, les icônes devant sont beaucoup trop petites, on voit même pas ce
+    //    que c'est, il n'y a même pas le nom de la paire en entier ». La ligne repliée porte une photo de 64 × 80
+    //    au moins et le nom EN ENTIER (jamais coupé) ; elle reste une ligne (≤ 120 px, une seule photo de haut).
+    const plie=await p.locator('.vrm-sale-row .vrm-ledger-sale-toggle').first().evaluate(e=>{const r=e.getBoundingClientRect(),ph=e.querySelector('.vrm-ledger-photo-empty'),pr=ph?ph.getBoundingClientRect():null,nom=e.querySelector('.vrm-ledger-sale-nom');const cs=nom?getComputedStyle(nom):null;return {h:r.height,visible:r.width>0&&r.height>0,pw:pr?pr.width:0,ph:pr?pr.height:0,coupe:!nom||nom.scrollWidth>nom.clientWidth+1||(cs.textOverflow==='ellipsis'&&cs.whiteSpace==='nowrap')};}).catch(()=>null);
+    if(plie){check(plie.visible && plie.h<=120 && plie.pw>=64 && plie.ph>=80 && !plie.coupe,'ligne repliée '+tab+' : photo '+Math.round(plie.pw)+'×'+Math.round(plie.ph)+', nom entier '+(!plie.coupe)+', '+Math.round(plie.h)+' px');
       await p.locator('.vrm-sale-row .vrm-ledger-sale-toggle').first().click();await p.locator('.vrm-sale-row[data-ligne-ouverte=true]').first().waitFor({timeout:5000});}
     // (21 oct.) La vente ouverte se détaille dans un TIROIR (portail, `aria-controls` du bouton de la ligne) : on y mesure.
     const idT=await p.locator('.vrm-sale-row .vrm-ledger-sale-toggle').first().getAttribute('aria-controls').catch(()=>null);

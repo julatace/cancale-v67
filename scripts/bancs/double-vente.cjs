@@ -15,6 +15,7 @@
 //   · le tableau de bord dit la même chose (même règle, §11) ;
 //   · aucun débordement, aucune erreur.
 const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
+const { monterTiroirs } = require('./_tiroirs.cjs');
 const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http'), path = require('path');
 const DIST = path.join(__dirname, '..', '..', 'dist');
@@ -217,6 +218,9 @@ const projette = (row, sel) => {
       await pg.waitForTimeout(400);
       // Le N° est sur la carte compacte (titre) ; le bénéfice vit dans le tiroir
       // de détail (portail), comme pour une vente Vinted — même composant partagé.
+      // (31 oct.) Ce tiroir n'est monté qu'à la première ouverture : on ouvre
+      // chaque vente, comme une personne, avant de lire (`_tiroirs.cjs`).
+      await monterTiroirs(pg, '[data-lbc-vente]');
       const ven = await pg.evaluate(() => ({
         titres: [...document.querySelectorAll('.vrm-ledger-sale-title')].map((e) => e.textContent.trim()),
         benefs: [...document.querySelectorAll('[data-lbc-benef]')].map((e) => e.getAttribute('data-lbc-benef')),
@@ -228,7 +232,10 @@ const projette = (row, sel) => {
         const row = [...document.querySelectorAll('.vrm-sale-row, [data-lbc-vente]')].find((e) => /Nike Air Max/.test(e.textContent));
         const t = row && row.querySelector('.vrm-ledger-sale-toggle'); if (t) t.click();
         await new Promise((r) => setTimeout(r, 500));
-        return [...document.querySelectorAll('.vrm-fiche-vente-acces button')].map((x) => x.textContent.trim());
+        const lu = [...document.querySelectorAll('.vrm-fiche-vente-acces button')].map((x) => x.textContent.trim());
+        if (t) t.click();   // (31 oct.) on referme le tiroir, comme une personne, avant de changer de section
+        await new Promise((r) => setTimeout(r, 400));
+        return lu;
       });
       dit(tiroir.some((x) => /N°12/.test(x)), '… le N° de la paire reste dans le tiroir de la vente', JSON.stringify(tiroir));
       dit(ven.benefs.length === 1 && ven.benefs[0] === '55.00', 'son bénéfice (85 € − 30 € d’achat saisi) = 55,00 €, et la vente NON reliée n’en a aucun', JSON.stringify(ven.benefs));

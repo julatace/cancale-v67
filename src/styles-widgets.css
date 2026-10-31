@@ -77,6 +77,9 @@
 .vrm-widgets[data-edition] .vrm-widget-in { animation:vrm-w-tremble 280ms ease-in-out infinite; }
 .vrm-widgets[data-edition] .vrm-widget:nth-child(2n) .vrm-widget-in { animation-duration:300ms; }
 .vrm-widgets[data-edition] .vrm-widget-corps { pointer-events:none; }
+/* (31 oct.) « Masquer le bénéfice » vit DANS la carte « Vendu et reçu » : seul
+   geste du corps d'un widget qui reste touchable en mode « Modifier ». */
+.vrm-widgets[data-edition] .vrm-widget-corps [data-journee-benef-masquer] { pointer-events:auto; }
 .vrm-widgets[data-edition] .vrm-widget:focus-visible { outline:2px solid var(--vrm-accent, currentColor); outline-offset:3px; border-radius:12px; }
 /* Un bloc sans cadre à lui (« À faire », « Dernières ventes ») : en mode
    « Modifier », on dessine son contour pour voir ce qu'on tient, et son titre
@@ -117,3 +120,13 @@
 @keyframes vrm-w-voile { from { opacity:0; } to { opacity:1; } }
 @keyframes vrm-w-monte { from { transform:translateY(24px); opacity:0; } to { transform:none; opacity:1; } }
 @media (prefers-reduced-motion: reduce) { .vrm-w-voile, .vrm-w-feuille { animation:none; } }
+
+/* (31 oct.) Tendances : quatre cases compactes qui ouvrent Statistiques.
+   Neutres (pas de couleur d'accent sur un écart : un repère se lit, il ne juge
+   pas, §7) ; 2 colonnes sur téléphone, 4 sur une carte pleine largeur. */
+.vrm-tendances-grille { display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:8px; margin-top:10px; }
+@media (min-width: 900px) { .vrm-widget[data-taille="pleine"] .vrm-tendances-grille { grid-template-columns:repeat(4, minmax(0,1fr)); } }
+.vrm-tendance { display:flex; flex-direction:column; align-items:flex-start; gap:3px; min-height:44px; min-width:0; padding:10px 12px; border:1px solid; border-radius:10px; background:transparent; text-align:left; cursor:pointer; font-family:inherit; }
+.vrm-tendance-l { font-size:12px; font-weight:500; line-height:1.3; }
+.vrm-tendance-n { font-size:22px; font-weight:700; line-height:1.1; font-variant-numeric:tabular-nums; white-space:nowrap; }
+.vrm-tendance-sous { font-size:11.5px; line-height:1.35; overflow-wrap:anywhere; }

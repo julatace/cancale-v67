@@ -88,7 +88,7 @@ button.vrm-set-ligne:active { background:var(--vrm-set-appui, rgba(15,23,42,.05)
 .vrm-main [data-photo-profil] button{min-height:44px;}
 .vrm-main [data-photo-profil]>div{flex-wrap:wrap;}
 
-.vrm-main .vrm-switch[aria-checked="true"]::before{background:var(--gestion-accent,#2b4548);}
+.vrm-main .vrm-switch[aria-checked="true"]::before{background:var(--gestion-accent,#2442B8);}
 @media(max-width:767px){.vrm-main .vrm-set-seg>button{font-size:12px!important;min-width:0;padding-inline:4px!important;}}
 
 /* Aide commune aux paramètres et au rangement : repliable, sans masquer les actions. */

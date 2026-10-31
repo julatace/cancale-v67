@@ -85,6 +85,8 @@ function distAvant() {
   } catch (e) { console.log('  ⚠️ build d’avant impossible : ' + String(e.message).slice(0, 120)); return null; }
 }
 
+// (31 oct.) La disposition par défaut finit par « Tendances » ; une disposition
+// rangée avant elle (sans `connus`) la reçoit à la fin (journeeWidgets.js).
 // ── Données inventées ───────────────────────────────────────────────────────
 const SESSION = { access_token: 'jeton-de-banc', refresh_token: 'r', expires_at: Date.now() + 3600e3, totp: [], user: { id: '33333333-3333-3333-3333-333333333333', email: 'vendeuse@exemple.test', factors: [] } };
 const maintenant = new Date();
@@ -305,8 +307,8 @@ if (require.main === module) (async () => {
         if (SHOTS) { await pg.setViewportSize({ width: T.vp.width, height: 2200 }); await pg.waitForTimeout(400); await pg.screenshot({ path: path.join(SHOTS, `widgets-${tag}-defaut.png`) }); await pg.setViewportSize(T.vp); }
         dit(!l.tombe && errs.length === 0, 'l’écran s’affiche, sans erreur', errs.join(' | ').slice(0, 160));
         dit(l.deb <= 1, 'aucun débordement horizontal', `${l.deb} px`);
-        dit(l.dispo === 'barre,afaire,vendu,semaine,attente,recentes,stock', 'la grille porte la disposition par défaut', String(l.dispo));
-        dit(l.rendus === 'barre,afaire,vendu,semaine,attente,recentes,stock', 'chaque widget par défaut est rendu dans la grille', l.rendus);
+        dit(l.dispo === 'barre,afaire,vendu,semaine,attente,recentes,stock,tendances', 'la grille porte la disposition par défaut', String(l.dispo));
+        dit(l.rendus === 'barre,afaire,vendu,semaine,attente,recentes,stock,tendances', 'chaque widget par défaut est rendu dans la grille', l.rendus);
         dit(l.vides === 0, 'aucune case vide dans la grille', `${l.vides}`);
         dit(l.modifierVisibles === 1, 'UN bouton « Modifier », et on le voit', `${l.modifierVisibles} visible(s)`);
         dit(l.tailleVisibles === 0, 'aucun bouton de largeur hors du mode « Modifier »', `${l.tailleVisibles}`);
@@ -340,7 +342,7 @@ if (require.main === module) (async () => {
         const l = await lire(pg);
         dit(/numeros-en-double/.test(l.alertesJobs) && l.alertesHorsGrille, 'l’alerte « deux paires sous un N° » est en tête, hors grille', l.alertesJobs || '(aucune)');
         dit(l.alertesBas != null && l.grilleTop != null && l.alertesBas <= l.grilleTop + 1 && !!(l.R.barre && l.alertesBas <= l.R.barre.top + 1), 'elle est AU-DESSUS de la grille, donc de la barre', JSON.stringify([l.alertesBas, l.grilleTop, l.R.barre && l.R.barre.top]));
-        dit(l.dispo === 'barre,afaire,vendu,semaine,attente,recentes,stock', 'la grille garde la disposition par défaut', String(l.dispo));
+        dit(l.dispo === 'barre,afaire,vendu,semaine,attente,recentes,stock,tendances', 'la grille garde la disposition par défaut', String(l.dispo));
         if (refA2) dit(sansRetard(l.jobs) === sansRetard(refA2.jobs) && /numeros-en-double/.test(refA2.jobs), 'exactement les mêmes actions qu’avant (l’alerte comprise)', `${l.jobs} | avant ${refA2.jobs}`);
         dit(errs.length === 0 && !l.tombe, 'aucune erreur d’app', errs.join(' | ').slice(0, 160));
         await ctx.close();
@@ -523,21 +525,19 @@ if (require.main === module) (async () => {
         const etatK = { main: { vrm_journee_widgets: { v: 1, w: [{ id: 'barre', t: 'pleine' }, { id: 'afaire', t: 'pleine' }, { id: 'vendu', t: 'moyen' }, { id: 'benefice', t: 'moyen' }] }, vrm_journee_benefice: false } };
         let s1 = await page(b, T, PORT, { etat: etatK });
         let l = await lire(s1.pg);
-        dit(!(l.dispo || '').split(',').includes('benefice') && l.benef === 0 && l.benefActiver === 1, 'réglage éteint : aucun bénéfice affiché (un widget « benefice » est ignoré), le geste pour l’afficher est là', `${l.dispo} · bénéfice ${l.benef} · geste ${l.benefActiver}`);
+        // (31 oct.) Le geste pour le remettre vit dans « + Ajouter » du mode
+        // « Modifier », plus sous la grille ni dans Réglages.
+        dit(!(l.dispo || '').split(',').includes('benefice') && l.benef === 0 && l.benefActiver === 0, 'masqué : aucun bénéfice affiché (un widget « benefice » est ignoré), aucun bouton hors du mode « Modifier »', `${l.dispo} · bénéfice ${l.benef} · geste ${l.benefActiver}`);
         await s1.ctx.close();
-        // Réglages l'allume ⇒ il apparaît dans Ma journée.
-        const etatK2 = { main: { ...etatK.main } };
-        s1 = await page(b, T, PORT, { etat: etatK2, tab: 'settings' });
-        await s1.pg.waitForFunction(() => document.querySelector('[data-reglage-benef-journee]'), null, { timeout: 15000 }).catch(() => {});
-        const avantR = await s1.pg.evaluate(() => { const e = document.querySelector('[data-reglage-benef-journee]'); return e ? e.getAttribute('data-reglage-benef-journee') : null; });
-        if (avantR === 'off') await appuyer(s1.pg, T, '[data-reglage-benef-journee] button');
-        await s1.pg.waitForTimeout(1500);
-        const apresR = await s1.pg.evaluate(() => { const e = document.querySelector('[data-reglage-benef-journee]'); return e ? e.getAttribute('data-reglage-benef-journee') : null; });
+        // (31 oct.) Réglages n'a plus d'interrupteur ; un choix « remis » venu du
+        // nuage ⇒ le bénéfice est dans Ma journée, une fois.
+        s1 = await page(b, T, PORT, { etat: { main: { ...etatK.main, vrm_journee_benefice: true } }, tab: 'settings' });
+        const regl = await s1.pg.evaluate(() => document.querySelectorAll('[data-reglage-benef-journee]').length);
         await s1.pg.goto(`http://localhost:${PORT}/?tab=journee`, { waitUntil: 'domcontentloaded' });
         await s1.pg.waitForFunction(() => document.querySelector('[data-vendu-mois]'), null, { timeout: 20000 }).catch(() => {});
         await s1.pg.waitForTimeout(1500);
         l = await lire(s1.pg);
-        dit(avantR === 'off' && apresR === 'on' && l.benef === 1, 'Réglages dit « éteint », l’allume ⇒ le bénéfice est dans Ma journée, une fois', `${avantR} → ${apresR} · bénéfice ${l.benef}`);
+        dit(regl === 0 && l.benef === 1, 'Réglages sans interrupteur ; choix « remis » ⇒ le bénéfice est dans Ma journée, une fois', `réglage ${regl} · bénéfice ${l.benef}`);
         await s1.ctx.close();
         // Allumé, carte « Vendu » retirée : il garde sa propre carte.
         s1 = await page(b, T, PORT, { etat: { main: { vrm_journee_widgets: { v: 1, w: [{ id: 'barre', t: 'pleine' }, { id: 'afaire', t: 'pleine' }, { id: 'stock', t: 'moyen' }] }, vrm_journee_benefice: true } } });
@@ -550,7 +550,7 @@ if (require.main === module) (async () => {
       await essaie('G' + tag, async () => {
         const { ctx, pg, errs } = await page(b, T, PORT, { etat: { main: { vrm_journee_widgets: { v: 1, w: [{ id: 'inconnu', t: 'grand' }, { id: 'vendu', t: 'moyen' }, { id: 'vendu', t: 'grand' }, { id: 'stock', t: 'enorme' }, { id: 'barre', t: 'petit' }] } } } });
         const l = await lire(pg);
-        dit(!l.inconnu && l.dispo === 'vendu,stock,barre,afaire', 'inconnu et doublon ignorés, « À faire » (fixe) remis après la barre', String(l.dispo));
+        dit(!l.inconnu && l.dispo === 'vendu,stock,barre,afaire,tendances', 'inconnu et doublon ignorés, « À faire » (fixe) remis après la barre, « Tendances » (arrivée le 31 oct.) ajoutée à la fin', String(l.dispo));
         dit(errs.length === 0 && !l.tombe, 'aucune erreur d’app', errs.join(' | ').slice(0, 160));
         await ctx.close();
       });
