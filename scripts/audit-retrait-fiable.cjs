@@ -300,7 +300,12 @@ const MR_TEXTE = ['Bonjour,', 'Votre colis 12345678 est disponible.', '', 'POINT
     tr('30000011', { receivedAt: '2026-10-23T06:00:00Z', limite: '2020-01-01' });                                // délai écrit déjà dépassé
     const w = await importer('api/widget.js');
     const res = faireRes();
-    await w.default({ method: 'GET', headers: {}, query: {} }, res);
+    // Horloge FIXÉE au lendemain de la publication (23 oct., 12 h UTC) : sans elle,
+    // l'achat Vinted 7002 (sans date limite) passait la garde de 7 jours le 30 oct.
+    // et le contrôle tombait tout seul avec le calendrier (vu le 31 oct.).
+    const VraieDate = Date, FIXE = Date.parse('2026-10-23T12:00:00Z');
+    global.Date = class extends VraieDate { constructor(...a) { if (a.length) super(...a); else super(FIXE); } static now() { return FIXE; } };
+    try { await w.default({ method: 'GET', headers: {}, query: {} }, res); } finally { global.Date = VraieDate; }
     const c = res.corps || {};
     dit(res.code === 200, 'le widget répond', `HTTP ${res.code}`);
     dit(c.pickup === 3, 'widget : la liste de l\'app relue (1 dans le délai, 1 limite passée ⇒ sortie) + le colis e-mail ET l\'achat Vinted arrivés APRÈS la publication = 3', `pickup=${c.pickup} · nouveaux=${c.pickupNouveaux}`);
