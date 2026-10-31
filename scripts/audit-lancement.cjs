@@ -104,7 +104,7 @@ const ast = parser.parse(app, { sourceType: 'module', plugins: ['jsx'], errorRec
       if (u.startsWith('https://api.stripe.com/v1/')) {
         const chemin = u.slice('https://api.stripe.com/v1/'.length).split('?')[0];
         appelsStripe.push({ chemin, corps: decodeURIComponent(String(o.body || '')) });
-        if (chemin === 'prices') return rep({ data: [{ id: 'price_banc', unit_amount: 1499, currency: 'eur', recurring: { interval: 'month' } }] });
+        if (chemin === 'prices') return rep({ data: [{ id: 'price_banc', unit_amount: 1699, currency: 'eur', recurring: { interval: 'month' } }] });
         if (chemin === 'checkout/sessions') return (refusCgv && /consent_collection/.test(decodeURIComponent(String(o.body || ''))))
           ? rep({ error: { message: 'You cannot collect consent to your terms of service unless a URL is set in the Stripe Dashboard.' } }, 400)
           : rep({ id: 'cs_banc', url: 'https://checkout.stripe.com/c/pay/cs_banc' });

@@ -46,7 +46,7 @@ let vintedIds, essaiConsomme, essaisEcrits, panneEssais;
 let vintedParId, panneVintedPris;
 // Le prix rangé chez Stripe sous `vrm_mensuel`, tel que Stripe le rend (centimes
 // entiers). Par défaut : celui des CGV (12,99 € par mois).
-const PRIX_STRIPE_CGV = { id: 'price_banc', unit_amount: 1499, currency: 'eur', recurring: { interval: 'month', interval_count: 1 } };
+const PRIX_STRIPE_CGV = { id: 'price_banc', unit_amount: 1699, currency: 'eur', recurring: { interval: 'month', interval_count: 1 } };
 const reset = () => {
   base = {}; ecritures = []; appelsStripe = []; panneEcriture = false; fkInconnue = false; prixStripe = PRIX_STRIPE_CGV;
   subsStripe = {}; facturesStripe = []; panneFactures = false;
@@ -332,18 +332,18 @@ const SUB = (owner, status = 'active', extra = {}) => ({ id: 'sub_' + owner.slic
     ['par an', { ...PRIX_STRIPE_CGV, recurring: { interval: 'year', interval_count: 1 } }],
     ['tous les 3 mois', { ...PRIX_STRIPE_CGV, recurring: { interval: 'month', interval_count: 3 } }],
     ['sans montant unitaire (prix par paliers)', { ...PRIX_STRIPE_CGV, unit_amount: null, billing_scheme: 'tiered' }],
-    ['ponctuel (pas un abonnement)', { id: 'price_banc', unit_amount: 1499, currency: 'eur', type: 'one_time' }],
+    ['ponctuel (pas un abonnement)', { id: 'price_banc', unit_amount: 1699, currency: 'eur', type: 'one_time' }],
   ]) {
     await essaie('prix ' + nom, async () => {
       reset(); prixStripe = prix;
       const { r, session } = await payer();
-      dit(r.code === 503 && r.corps && r.corps.erreur === 'prix-cgv' && !session, `14,99 ${nom} : pas le prix des CGV → paiement fermé`, `HTTP ${r.code} · session ${session}`);
+      dit(r.code === 503 && r.corps && r.corps.erreur === 'prix-cgv' && !session, `16,99 ${nom} : pas le prix des CGV → paiement fermé`, `HTTP ${r.code} · session ${session}`);
     });
   }
   await essaie('prix conforme', async () => {
     reset();
     const { r, session } = await payer();
-    dit(r.code === 200 && session && /checkout\.stripe\.com/.test((r.corps && r.corps.url) || ''), 'l’autre sens : 14,99 € par mois en euros → le paiement s’ouvre', `HTTP ${r.code}`);
+    dit(r.code === 200 && session && /checkout\.stripe\.com/.test((r.corps && r.corps.url) || ''), 'l’autre sens : 16,99 € par mois en euros → le paiement s’ouvre', `HTTP ${r.code}`);
   });
 
   // ── Essai gratuit : 7 jours, UNE seule fois par e-mail ET par compte Vinted ─
@@ -420,8 +420,8 @@ const SUB = (owner, status = 'active', extra = {}) => ({ id: 'sub_' + owner.slic
       '  le propriétaire, lui, reçoit le montant réglé chez Stripe (c’est lui qui le corrige)', JSON.stringify(rp.corps.prixStripe));
     reset();
     const rb = faireRes(); await compte(req({ mode: 'abonnement', headers: { authorization: 'Bearer aa.bb.A' } }), rb);
-    dit(rb.code === 200 && rb.corps.prix && rb.corps.prix.montant === 14.99 && rb.corps.prixConforme === true && rb.corps.prixStripe === null,
-      '  Stripe à 14,99 € : le prix est relayé, « conforme »', JSON.stringify({ prix: rb.corps.prix, prixConforme: rb.corps.prixConforme }));
+    dit(rb.code === 200 && rb.corps.prix && rb.corps.prix.montant === 16.99 && rb.corps.prixConforme === true && rb.corps.prixStripe === null,
+      '  Stripe à 16,99 € : le prix est relayé, « conforme »', JSON.stringify({ prix: rb.corps.prix, prixConforme: rb.corps.prixConforme }));
     reset(); prixStripe = 'panne';
     const rn = faireRes(); await compte(req({ mode: 'abonnement', headers: { authorization: 'Bearer aa.bb.P' } }), rn);
     dit(rn.code === 200 && rn.corps.prix === null && rn.corps.prixConforme === null && rn.corps.prixStripe === null,
@@ -472,8 +472,8 @@ const SUB = (owner, status = 'active', extra = {}) => ({ id: 'sub_' + owner.slic
     reset(); base[A] = { owner: A, statut: 'active', client_stripe: 'cus_A', abonnement_stripe: 'sub_A' };
     subsStripe.sub_A = SUB_A({ id: 'price_ancien', unit_amount: 999, currency: 'eur', recurring: { interval: 'month', interval_count: 1 } });
     const r = await aboDe('aa.bb.A');
-    dit(r.code === 200 && r.corps.prixAbonnement && r.corps.prixAbonnement.texte === '9,99 € / mois' && r.corps.prix && r.corps.prix.montant === 14.99,
-      'abonné à 9,99 € quand l’offre est à 14,99 € : `prixAbonnement` dit 9,99 € (le prix qu’il paie), `prix` reste celui de l’offre', JSON.stringify({ prixAbonnement: r.corps.prixAbonnement, prix: r.corps.prix }));
+    dit(r.code === 200 && r.corps.prixAbonnement && r.corps.prixAbonnement.texte === '9,99 € / mois' && r.corps.prix && r.corps.prix.montant === 16.99,
+      'abonné à 9,99 € quand l’offre est à 16,99 € : `prixAbonnement` dit 9,99 € (le prix qu’il paie), `prix` reste celui de l’offre', JSON.stringify({ prixAbonnement: r.corps.prixAbonnement, prix: r.corps.prix }));
     reset(); base[A] = { owner: A, statut: 'active', client_stripe: 'cus_A', abonnement_stripe: 'sub_A' };
     subsStripe.sub_A = SUB_A({ id: 'price_ancien', unit_amount: 999, currency: 'eur', recurring: { interval: 'month', interval_count: 1 } });
     prixStripe = { ...PRIX_STRIPE_CGV, unit_amount: 999 };

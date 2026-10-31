@@ -168,7 +168,7 @@ async function prixDeLAbonnement(ligne) {
 //    plus (`lirePrix` rend null ⇒ refus existant).
 //    audit-lancement.cjs exige que cette valeur soit celle écrite dans les CGV
 //    (et dans le repli de l'app) : une seule valeur (§11).
-export const PRIX_CGV = { centimes: 1499, devise: 'eur', intervalle: 'month' };
+export const PRIX_CGV = { centimes: 1699, devise: 'eur', intervalle: 'month' };
 export const prixConforme = (p) => !!(p
   && p.centimes === PRIX_CGV.centimes
   && String(p.devise || '').toLowerCase() === PRIX_CGV.devise
@@ -475,9 +475,10 @@ async function abonnement(req, res) {
 // public/legal/cgv.html (audit-lancement vérifie qu'elles concordent).
 // 11 octobre : prix passé à 12,99 € (version précédente : 2026-10-04, 9,99 €).
 // 22 octobre : case « accès immédiat » et formulaire de rétractation (art. 5).
-// 27 octobre : prix 14,99 €, et essai gratuit de 7 jours (une seule fois par
+// 27 octobre : prix 16,99 €, et essai gratuit de 7 jours (une seule fois par
 //   adresse e-mail ET par compte Vinted).
-const CGV_VERSION = '2026-10-27';
+// 31 octobre : prix 16,99 € (sa décision), essai de 7 jours inchangé.
+const CGV_VERSION = '2026-10-31';
 async function checkout(req, res) {
   const u = await utilisateurDe(req);
   if (!u) return repondre(res, 401, { erreur: 'session' });
