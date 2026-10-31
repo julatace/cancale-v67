@@ -332,19 +332,25 @@ const capturer = async (pg, nom, vp) => {
         await ctx.close();
       });
       if(!tel) await essaie('sélection souris sans navigation',async()=>{
+        // (31 oct., navigation par tâche) `plat_vinted` ouvre « Ventes · Vinted » : c'est
+        // l'onglet Ventes de la colonne qui est allumé, et le filtre de site dit Vinted.
         const {ctx,pg}=await ouvrir(b,vp,'plat_vinted');
-        const actif=pg.locator('.vrm-rail-button[aria-label="Vinted"]');await actif.waitFor();
-        await pg.waitForFunction(()=>document.querySelector('.vrm-rail-button[aria-label="Vinted"]')?.getAttribute('aria-current')==='page');
+        const actif=pg.locator('.vrm-rail-button[aria-label="Ventes"]');await actif.waitFor();
+        await pg.waitForFunction(()=>document.querySelector('.vrm-rail-button[aria-label="Ventes"]')?.getAttribute('aria-current')==='page' && document.querySelector('[data-tache]')?.getAttribute('data-tache-site')==='vinted');
+        const surVinted=()=>pg.evaluate(()=>document.querySelector('[data-tache]')?.getAttribute('data-tache-site')==='vinted');
         const box=await pg.evaluate(()=>{const e=document.createElement('div');e.id='banc-selection';e.style.cssText='position:absolute;z-index:900;left:400px;top:230px;width:650px;height:60px;padding-left:120px;background:white;color:black;user-select:text';e.textContent='Texte de démonstration à sélectionner sans changer de plateforme';document.querySelector('.vrm-app-shell').append(e);const r=e.getBoundingClientRect();return{x:r.x,y:r.y};});
         await pg.mouse.move(box.x+5,box.y+15);await pg.mouse.down();await pg.mouse.move(box.x+550,box.y+15,{steps:15});await pg.mouse.up();
-        dit(await actif.getAttribute('aria-current')==='page','glisser depuis une marge ne quitte pas Vinted');
+        dit(await actif.getAttribute('aria-current')==='page' && await surVinted(),'glisser depuis une marge ne quitte pas Vinted');
         dit(await pg.evaluate(()=>document.body.style.userSelect!=='none'),'le geste ne désactive pas la sélection du navigateur');
         await pg.evaluate(()=>{const e=document.getElementById('banc-selection'),r=document.createRange();r.selectNodeContents(e);window.getSelection().removeAllRanges();window.getSelection().addRange(r);});
         await pg.mouse.move(box.x+10,box.y+45);await pg.mouse.down();await pg.mouse.move(box.x+500,box.y+45,{steps:12});await pg.mouse.up();
-        dit(await actif.getAttribute('aria-current')==='page','relâcher un deuxième glissement reste sur le même compte');
+        dit(await actif.getAttribute('aria-current')==='page' && await surVinted(),'relâcher un deuxième glissement reste sur le même compte');
         await pg.evaluate(()=>document.getElementById('banc-selection').remove());
-        await pg.locator('.vrm-rail-button[aria-label="Leboncoin"]').click();
-        dit(await pg.locator('.vrm-rail-button[aria-label="Leboncoin"]').getAttribute('aria-current')==='page','le clic explicite sur Leboncoin fonctionne toujours');
+        // Le clic explicite change toujours d'écran : le filtre « Tous les sites », puis l'onglet Annonces.
+        await pg.locator('[data-filtre-site] button[data-site="toutes"]').click();
+        dit(await pg.waitForFunction(()=>document.querySelector('[data-tache]')?.getAttribute('data-tache-site')==='toutes',null,{timeout:5000}).then(()=>true,()=>false),'le clic explicite sur un autre filtre de site fonctionne toujours');
+        await pg.locator('.vrm-rail-button[aria-label="Annonces"]').click();
+        dit(await pg.waitForFunction(()=>document.querySelector('.vrm-rail-button[aria-label="Annonces"]')?.getAttribute('aria-current')==='page',null,{timeout:5000}).then(()=>true,()=>false),'le clic explicite sur un onglet de la colonne fonctionne toujours');
         await ctx.close();
       });
     }

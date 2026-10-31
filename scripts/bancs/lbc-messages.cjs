@@ -37,6 +37,10 @@ srv.listen(PORT);
         const u = decodeURIComponent(metaVersData(route.request().url()));
         const j = (d) => route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(d) });
         if (/select=owner/.test(u)) return route.fulfill({ status: 400, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: '{"m":1}' });
+        // (31 oct.) La rangée de filtres ne montre que les sites où il a un compte
+        // (sonde `select=id`) : ce banc joue un vendeur Leboncoin, une ligne de
+        // l'extension existe.
+        if (/id=in\.\(lbc_listings/.test(u) && /select=id(&|$)/.test(u)) return j([{ id: 'lbc_accounts' }]);
         if (/id=eq\.lbc_messages/.test(u)) {
           if (etat === 'panne') return route.fulfill({ status: 522, contentType: 'text/html', headers: { 'access-control-allow-origin': '*' }, body: '<html>522</html>' });
           if (etat === 'session') return j([{ data: { compteurs: { abc: { unread: 2, at: auj.toISOString() } }, comptes: {} } }]);
@@ -48,9 +52,11 @@ srv.listen(PORT);
         return j([]);
       });
       await pg.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"pret":true}' }));
-      await pg.goto(`http://localhost:${PORT}/?tab=plat_leboncoin`, { waitUntil: 'domcontentloaded' });
+      // (31 oct., navigation par tâche) Messages est une TÂCHE de la barre du bas :
+      // les messages Leboncoin sont « Messages · Leboncoin », par son filtre de site.
+      await pg.goto(`http://localhost:${PORT}/?tab=messages`, { waitUntil: 'domcontentloaded' });
       await pg.waitForTimeout(2000);
-      try { await pg.click('[data-section="messages"]', { timeout: 5000 }); } catch (e) { dit(false, 'la section « Messages » existe dans Leboncoin', String(e.message).slice(0, 80)); await ctx.close(); continue; }
+      try { await pg.click('[data-filtre-site="messages"] [data-site="leboncoin"]', { timeout: 5000 }); } catch (e) { dit(false, 'Messages · Leboncoin est joignable par le filtre de site', String(e.message).slice(0, 80)); await ctx.close(); continue; }
       await pg.waitForSelector('[data-messages-lbc]', { timeout: 8000 }).catch(() => {});
       const v = await pg.evaluate(() => { const e = document.querySelector('[data-messages-lbc]'); return e ? { etat: e.getAttribute('data-messages-lbc'), t: e.innerText, comptes: [...e.querySelectorAll('[data-compte-lbc]')].map((x) => ({ id: x.getAttribute('data-compte-lbc'), t: x.innerText })), lien: (e.querySelector('[data-ouvrir-messages-lbc]') || {}).href || '' } : null; });
       if (etat === 'lu') {

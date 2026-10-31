@@ -76,7 +76,7 @@ const unBouton = (pg) => pg.evaluate(() => {
   for (const b of document.querySelectorAll('button')) {
     // (31 oct.) Depuis la navigation par tâche, l'écran eBay est « Ventes · eBay » : ses
     // pastilles de filtre de site sont les boutons sûrs d'exister.
-    if (b.closest('.vrm-sidebar') || b.closest('.vrm-mobile-nav') || !/^(Annonces|Compte|Toutes)$/.test(b.innerText.trim())) continue;
+    if (b.closest('.vrm-sidebar') || b.closest('.vrm-mobile-nav') || !/^(Annonces|Compte|Tous les sites)$/.test(b.innerText.trim())) continue;
     const r = b.getBoundingClientRect();
     if (r.width > 20 && r.height > 14 && r.top > 40 && r.bottom < innerHeight - 70) return { x: r.left + r.width / 2, y: r.top + r.height / 2, t: b.innerText.trim() };
   }
