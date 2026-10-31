@@ -269,14 +269,11 @@ const projette = (row, sel) => {
         await pg.getByLabel('Trier les annonces',{exact:true}).selectOption('price_desc');
         await pg.getByLabel('Rechercher une annonce',{exact:true}).evaluate(e=>e.blur());
         const nav=pg.getByRole('navigation',{name:'Navigation principale'});
-        if(vp.width<1024){await nav.getByRole('button',{name:'Gestion',exact:true}).click();await pg.getByRole('menuitem',{name:'Stock',exact:true}).click();}else await nav.getByRole('button',{name:'Stock',exact:true}).click();
-        if(vp.width<1024){
-          await nav.getByRole('button',{name:'Vinted',exact:true}).click();
-          await pg.locator('.vrm-platform-tabs').getByRole('button',{name:'Annonces',exact:true}).click();
-        } else {
-          await nav.getByRole('button',{name:'Vinted',exact:true}).click();
-          await pg.locator('.vrm-platform-tabs').getByRole('button',{name:'Annonces',exact:true}).click();
-        }
+        // (31 oct., navigation par tâche) Stock est dans « Plus » au téléphone, dans la
+        // colonne à l'ordinateur ; on revient par l'onglet Annonces (filtre Vinted retenu).
+        if(vp.width<1024){await nav.getByRole('button',{name:'Plus',exact:true}).click();await pg.getByRole('menuitem',{name:'Stock',exact:true}).click();}else await nav.getByRole('button',{name:'Stock',exact:true}).click();
+        await nav.getByRole('button',{name:'Annonces',exact:true}).click();
+        await pg.waitForSelector('[data-tache="annonces"][data-tache-site="vinted"]',{timeout:10000}).catch(()=>{});
         dit(await pg.getByLabel('Rechercher une annonce',{exact:true}).inputValue()==='aucun-modele-impossible-123456', 'recherche d’annonces conservée après le stock');
         dit(await pg.getByLabel('Trier les annonces',{exact:true}).inputValue()==='price_desc', 'tri d’annonces conservé après le stock');
 

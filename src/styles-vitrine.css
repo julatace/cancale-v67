@@ -577,3 +577,32 @@ html body .vrm-app-shell .vrm-ebay-carte-tete [data-ebay-prix] { font-size: 18px
 @media (max-width: 600px) {
   html body .vrm-app-shell .vrm-ebay-carte-tete > :first-child { width: 64px !important; height: 80px !important; }
 }
+/* ── NAVIGATION PAR TÂCHE (31 oct.) ─────────────────────────────────────────
+   Badges des onglets (ambre discret : un geste à faire, §7), la rangée de
+   filtres de site (les pastilles de l'app, en défilement si elles débordent),
+   le titre des tâches, la ligne d'aide des « Plateformes » dans « Plus ». */
+html .vrm-app-shell .vrm-nav-badge { pointer-events: none; display: inline-flex; align-items: center; justify-content: center; font-family: inherit; }
+html .vrm-app-shell .vrm-nav-badge-n { min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px; font-size: 11px; font-weight: 700; line-height: 1; color: var(--vrm-warn); background: var(--vrm-warn-soft, transparent); border: 1px solid var(--vrm-warn); font-variant-numeric: tabular-nums; }
+html .vrm-app-shell .vrm-nav-badge-point { width: 8px; height: 8px; border-radius: 50%; background: var(--vrm-warn); }
+html .vrm-app-shell .vrm-nav-badge-barre { position: absolute; top: -6px; left: calc(100% - 6px); }
+html .vrm-app-shell .vrm-nav-badge-barre.vrm-nav-badge-point { top: -1px; left: calc(100% - 3px); box-shadow: 0 0 0 2px var(--vrm-nav-bg, var(--vrm-bg)); }
+html .vrm-app-shell .vrm-atelier-rail .vrm-rail-button .vrm-nav-badge-rail { margin-left: auto; }
+html .vrm-app-shell .vrm-sheet-row .vrm-nav-badge-feuille { margin-right: 4px; }
+html .vrm-app-shell .vrm-sheet-lib .vrm-sheet-desc { display: block; font-size: 12px; font-weight: 400; color: var(--vrm-muted); margin-top: 1px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+html .vrm-app-shell .vrm-tache .vrm-tache-tete { padding: 18px 16px 6px; }
+html .vrm-app-shell .vrm-tache .vrm-tache-tete h1 { margin: 0; font-size: 32px; line-height: 1.05; color: var(--vrm-ink); }
+html .vrm-app-shell .vrm-filtre-site { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; padding: 6px 0 10px; margin: 0; }
+html .vrm-app-shell .vrm-filtre-site::-webkit-scrollbar { display: none; }
+html .vrm-app-shell .vrm-filtre-site > button[aria-pressed] { flex-shrink: 0; min-height: 44px; padding: 0 18px; font-size: 14px; font-weight: 500; white-space: nowrap; border-radius: 999px !important; }
+html .vrm-app-shell .vrm-main .vrm-filtre-site > button[aria-pressed="true"] { background: var(--vrm-ink) !important; border-color: var(--vrm-ink) !important; color: var(--vrm-bg) !important; }
+@media (min-width: 1024px), (min-width: 768px) and (hover: hover) and (pointer: fine) {
+  html .vrm-app-shell .vrm-tache .vrm-tache-tete h1 { font-size: 40px; }
+  html .vrm-app-shell .vrm-filtre-site > button[aria-pressed] { min-height: 36px; padding: 0 14px; font-size: 13px; }
+}
+:root[data-theme="dark"] body .vrm-app-shell .vrm-main .vrm-filtre-site > button[aria-pressed="true"] { background: var(--vrm-ink) !important; color: var(--vrm-bg) !important; }
+/* La colonne porte maintenant les groupes de « Plus » : les tâches gardent
+   44 px, les groupes se resserrent (souris, pas de doigt) pour que tout tienne
+   sur un écran de 950 px sans défiler. */
+html .vrm-app-shell .vrm-atelier-rail [data-nav-groupe].vrm-rail-management-group { margin-top: 14px; }
+html .vrm-app-shell .vrm-atelier-rail [data-nav-groupe] .vrm-rail-section-label { font-size: 12px; padding-bottom: 3px; }
+html .vrm-app-shell .vrm-atelier-rail [data-nav-groupe] .vrm-rail-button { min-height: 34px; font-size: 14px; padding-top: 2px; padding-bottom: 2px; }

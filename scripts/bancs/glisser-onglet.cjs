@@ -51,7 +51,9 @@ async function page(nav, telephone, tab) {
 // L'écran affiché : le lien de navigation marqué « page courante ».
 const ecran = (pg) => pg.evaluate(() => {
   const el = document.querySelector('.vrm-sidebar-link[aria-current="page"]') || [...document.querySelectorAll('nav [aria-current="page"], .vrm-bottom-nav [aria-current="page"]')].pop();
-  return el ? (el.innerText || el.getAttribute('aria-label') || '').trim() : '';
+  // (31 oct., navigation par tâche) l'onglet ET le site filtré (Ventes · eBay).
+  const t = document.querySelector('[data-tache]');
+  return ((el ? (el.innerText || el.getAttribute('aria-label') || '').trim() : '') + (t ? ' · ' + t.getAttribute('data-tache-site') : '')).trim();
 });
 async function glisserSouris(pg, x, y, dx) {
   await pg.mouse.move(x, y); await pg.mouse.down();
@@ -72,7 +74,9 @@ async function glisserDoigt(pg, x, y, dx, appuiMs = 0) {
 // seuls boutons sûrs d'exister.
 const unBouton = (pg) => pg.evaluate(() => {
   for (const b of document.querySelectorAll('button')) {
-    if (b.closest('.vrm-sidebar') || !/^(Annonces|Compte)$/.test(b.innerText.trim())) continue;
+    // (31 oct.) Depuis la navigation par tâche, l'écran eBay est « Ventes · eBay » : ses
+    // pastilles de filtre de site sont les boutons sûrs d'exister.
+    if (b.closest('.vrm-sidebar') || b.closest('.vrm-mobile-nav') || !/^(Annonces|Compte|Toutes)$/.test(b.innerText.trim())) continue;
     const r = b.getBoundingClientRect();
     if (r.width > 20 && r.height > 14 && r.top > 40 && r.bottom < innerHeight - 70) return { x: r.left + r.width / 2, y: r.top + r.height / 2, t: b.innerText.trim() };
   }
@@ -128,7 +132,8 @@ const unBouton = (pg) => pg.evaluate(() => {
       const { ctx, pg } = await page(nav, true, 'plat_vinted');
       await glisserDoigt(pg, 300, 700, -220);
       const e = await ecran(pg);
-      dit(/leboncoin/i.test(e), 'l’autre sens : au doigt, balayer sur une zone vide passe toujours de Vinted à Leboncoin', `→ ${e}`);
+      // (31 oct.) `?tab=plat_vinted` ouvre Ventes · Vinted ; l'onglet voisin de Ventes est Colis.
+      dit(/colis/i.test(e), 'l’autre sens : au doigt, balayer sur une zone vide passe toujours de Ventes à Colis', `→ ${e}`);
       await ctx.close();
     }
     // (17 oct., Julien : « quand je sélectionne Bon après-midi Shopcancale et
@@ -161,7 +166,7 @@ const unBouton = (pg) => pg.evaluate(() => {
       // (même point de départ, mais un geste franc et rapide : c'est un balayage)
       if (b) await glisserDoigt(pg, Math.min(370, b.x1 + 40), b.y, -260);
       const e2 = await ecran(pg);
-      dit(/vinted/i.test(e2), 'l’autre sens : un balayage rapide depuis Ma journée mène toujours à Vinted', `→ ${e2}`);
+      dit(/annonces/i.test(e2), 'l’autre sens : un balayage rapide depuis Ma journée mène toujours à Annonces (l’onglet voisin)', `→ ${e2}`);
       await ctx.close();
     }
   } catch (e) { dit(false, 'le banc a tourné jusqu’au bout', String(e && e.message).slice(0, 160)); }

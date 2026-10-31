@@ -82,7 +82,11 @@ const projette = (row, sel) => {
       const ctx = await b.newContext({ viewport: vp, acceptDownloads: true, ...(vp.width < 600 ? { isMobile: true, hasTouch: true } : {}) });
       const pg = await ctx.newPage();
       const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
-      await pg.addInitScript(() => { try { localStorage.setItem('vrm_acces_direct', '1'); } catch (_) {} });
+      // (31 oct., navigation par tâche) `?tab=cat_annonces` mène à Annonces · Vinted —
+      // l'écran Vinted, où le sélecteur « Compte » est juste au-dessus : la ligne des
+      // comptes n'y reste que si elle demande un geste (décision du 26 oct.). Un
+      // compte à la connexion refusée (222) la fait donc apparaître, porte comprise.
+      await pg.addInitScript(() => { try { localStorage.setItem('vrm_acces_direct', '1'); localStorage.setItem('vinted_accounts_blocked', JSON.stringify(['222'])); } catch (_) {} });
       await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) ? r.abort() : r.continue()));
       await pg.route('**/rest/v1/**', (route) => {
         const u = decodeURIComponent(metaVersData(route.request().url()));

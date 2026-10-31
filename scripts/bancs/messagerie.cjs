@@ -302,8 +302,10 @@ async function rendre(b, { version, tel = false, lignes = rows, offresKO = false
       const r = await rendre(b, { version: '5.135.0', tel });
       // 4 octobre : les messages vivent DANS l'onglet Vinted (4ᵉ section) ; l'ancien
       // lien `?tab=cat_msg` (cloche, bandeau) doit y mener.
-      const porte = await r.pg.evaluate(() => { const b = document.querySelector('[data-section="messages"]'); return b ? b.getAttribute('aria-current') : 'absente'; });
-      dit(porte === 'page', 'l’ancien lien mène aux Messages DANS l’onglet Vinted (section active)', String(porte));
+      // (31 oct., navigation par tâche) Messages est une tâche ; l'ancien lien y mène,
+      // filtré sur Vinted.
+      const porte = await r.pg.evaluate(() => { const t = document.querySelector('[data-tache="messages"]'); return t ? t.getAttribute('data-tache-site') : 'absente'; });
+      dit(porte === 'vinted', 'l’ancien lien mène aux Messages, filtre Vinted', String(porte));
       const liste = await r.pg.evaluate(() => [...document.querySelectorAll('[data-messagerie] [data-conv]')].map((x) => ({ id: x.getAttribute('data-conv'), txt: x.innerText })));
       dit(liste.length === 3, 'les conversations des DEUX comptes sont listées', JSON.stringify(liste.map((x) => x.id)));
       // ⚠️ (16 octobre) L'ordre est : le compte ouvert dans Chrome d'abord (là
@@ -594,16 +596,18 @@ async function rendre(b, { version, tel = false, lignes = rows, offresKO = false
       console.log('── le point « nouveau » de Messages suit « Retirer » sans recharger · 390 px');
       const r = await rendre(b, { version: '5.135.0', tel: true, lignes: rowsDe() });
       await r.pg.waitForTimeout(1200);
-      const point = () => r.pg.evaluate(() => document.querySelectorAll('[data-section="messages"] [data-point]').length);
-      await r.pg.click('[data-section="ventes"]'); await r.pg.waitForTimeout(1500);
+      // (31 oct.) Le point vit sur la navigation : « Plus » au téléphone (Messages y est).
+      const point = () => r.pg.evaluate(() => document.querySelectorAll('.vrm-mobile-nav [data-badge-nav="plus"][data-badge-n="point"]').length);
+      await r.pg.click('.vrm-mobile-nav [data-nav-entree="ventes"]'); await r.pg.waitForTimeout(1500);
       const avant = await point();
-      await r.pg.click('[data-section="messages"]'); await r.pg.waitForTimeout(900);
+      await r.pg.click('.vrm-mobile-nav button[aria-label="Plus"]'); await r.pg.waitForTimeout(500);
+      await r.pg.click('.vrm-sheet [data-nav-entree="messages"]'); await r.pg.waitForTimeout(900);
       for (const id of ['301', '402']) {
         if (!(await r.pg.$(`[data-conv="${id}"]`))) continue;
         await r.pg.click(`[data-conv="${id}"]`); await r.pg.waitForTimeout(900);
         if (await r.pg.$('[data-conv-retirer]')) { await r.pg.click('[data-conv-retirer]'); await r.pg.waitForTimeout(500); }
       }
-      await r.pg.click('[data-section="ventes"]'); await r.pg.waitForTimeout(1500);
+      await r.pg.click('.vrm-mobile-nav [data-nav-entree="ventes"]'); await r.pg.waitForTimeout(1500);
       const apres = await point();
       dit(avant === 1 && apres === 0, 'toutes les non lues retirées : le point disparaît tout de suite', JSON.stringify({ avant, apres }));
       dit(r.errs.length === 0, 'aucune erreur d’app', r.errs.join(' | ').slice(0, 160));

@@ -86,7 +86,9 @@ const envoisEbay = []; let avertir = false;
   // (31 oct.) Attendre que l'espace eBay soit MONTÉ (sa rangée de sections), pas
   //  un délai fixe : la porte de session et le chargement prennent parfois plus
   //  de 2,5 s, et « Ventes », cherché le premier, tombait dans ce trou (§6.5).
-  await pg.waitForSelector('nav.vrm-platform-tabs [data-section="ventes"]', { timeout: 30000 }).catch(() => {});
+  // (31 oct., navigation par tâche) Ventes, Annonces, Messages d'eBay sont les tâches
+  //  filtrées sur eBay : on attend l'écran monté (sa rangée de filtres).
+  await pg.waitForSelector('[data-tache]', { timeout: 30000 }).catch(() => {});
   await pg.waitForTimeout(1000);
   // ⚠️ 4 octobre — Julien : « il y a deux fois le bouton pour poster les
   //    paires ». Le publieur était monté dans « Annonces » ET dans « Compte
@@ -100,7 +102,10 @@ const envoisEbay = []; let avertir = false;
   //  Un onglet introuvable est maintenant un contrôle rouge, pas un silence.
   const introuvables = [];
   for (const nom of ['Ventes', 'Annonces', 'Messages', 'Offres', 'Compte']) {
-    try { await pg.getByRole('button', { name: nom, exact: true }).first().click({ timeout: 15000 }); await pg.waitForTimeout(1500); } catch (e) { introuvables.push(nom + ' (' + String(e && e.message).split('\n')[0].slice(0, 90) + ')'); }
+    // (31 oct.) Chaque « sous-onglet » d'hier a son adresse : la tâche filtrée sur eBay
+    //  (Ventes, Annonces, Messages) ou l'espace eBay sur sa section (Offres, Compte).
+    const URLS = { Ventes: '?tab=ventes&site=ebay', Annonces: '?tab=annonces&site=ebay', Messages: '?tab=messages&site=ebay', Offres: '?tab=plat_ebay&section=offres', Compte: '?tab=plat_ebay&section=compte' };
+    try { await pg.goto(`http://localhost:${PORT}/${URLS[nom]}`, { waitUntil: 'domcontentloaded' }); await pg.waitForSelector(nom === 'Offres' || nom === 'Compte' ? `nav.vrm-platform-tabs [data-section][aria-current="page"]` : `[data-tache-site="ebay"]`, { timeout: 15000 }); await pg.waitForTimeout(1500); } catch (e) { introuvables.push(nom + ' (' + String(e && e.message).split('\n')[0].slice(0, 90) + ')'); }
     parOnglet[nom] = { n: (await pg.$$('[data-poster="ebay"]')).length, vendre: (await pg.$$('text=Vendre un article sur eBay')).length,
       titre: await pg.evaluate(() => /Publier sur eBay · connexion/.test(document.body.innerText)) };
   }
@@ -108,7 +113,7 @@ const envoisEbay = []; let avertir = false;
   dit(!introuvables.length, 'le banc trouve chaque sous-onglet eBay', introuvables.join(', '));
   dit(total === 1 && parOnglet['Annonces'].n === 1, 'UN seul bouton pour mettre un article en vente, dans « Annonces »', JSON.stringify(Object.fromEntries(Object.entries(parOnglet).map(([k, v]) => [k, v.vendre]))));
   dit(parOnglet['Compte'].vendre === 0 && !parOnglet['Compte'].titre, '« Compte eBay » ne porte plus ni le bouton ni le titre « Publier sur eBay »');
-  try { await pg.getByRole('button', { name: 'Annonces', exact: true }).first().click({ timeout: 5000 }); await pg.waitForTimeout(1500); } catch (_) {}
+  try { await pg.goto(`http://localhost:${PORT}/?tab=annonces&site=ebay`, { waitUntil: 'domcontentloaded' }); await pg.waitForSelector('[data-tache-site="ebay"]', { timeout: 15000 }); await pg.waitForTimeout(1500); } catch (_) {}
   const T = async () => (await pg.evaluate(()=>document.body.innerText));
 
   const openBtn = await pg.$('text=Vendre un article sur eBay');

@@ -1919,3 +1919,56 @@ avec le pays des acheteurs), `harvest_*_label_*`, `harvest_*_orders_sold` (216 K
 20 h, le cas courant), Ma journée, Annonces, Messages et Statistiques passent sous
 leurs plafonds. Ses lectures sont utiles (anti double vente de la proposition) : on
 ne les a pas retirées. `relais_ext` ×2 : le battement du relais (voulu).
+## 31 octobre 2026 — Navigation par tâche (« A · par tâche, en améliorant encore »)
+
+**Décision de Julien** (maquettes A validées : téléphone, ordinateur, Ventes · Vinted), puis « pour l'espace, il
+faut totalement réorganiser les onglets différemment… tout peut être amélioré ». La barre ne range plus les
+écrans par SITE (Accueil · Vinted · Leboncoin · eBay · Gestion) mais par CE QU'IL FAIT.
+
+**La carte** (règle : `src/navigationTache.js` ; listes : `BOTTOM_TABS`, `NAV_TACHES`, `GROUPES_PLUS` dans `App.jsx`)
+- Téléphone, barre du bas : **Journée · Annonces · Ventes · Colis · Plus** (icône cobalt + libellé encre à l'actif, 52 px).
+- Ordinateur, colonne : **Ma journée · Annonces · Ventes · Messages · Colis**, puis les groupes, **Paramètres** en bas.
+- « Plus » (feuille « Ton espace ») et colonne, groupés par tâche, rien en double avec la barre, aucun groupe vide,
+  aucune entrée d'un site sans compte (pas su ⇒ montrée) :
+  - **Vendre** : Messages (téléphone), Republier (ouvre Annonces · Vinted sur l'atelier), Favoris & offres (Messages · Vinted, zone favoris) ;
+  - **Expédier** : Retraits (Achats sur « À retirer ») ;
+  - **Gérer** : Stock, Achats (Achats sur « Tous ») ;
+  - **Argent** : Statistiques, Comptabilité ;
+  - **Plateformes** : eBay (à traiter, offres, promotion, achats, compte), Leboncoin (achats, colis), Vestiaire (sa page) ;
+  - **Moi** : Communauté, Paramètres (en bas de la colonne sur ordinateur).
+- **Annonces, Ventes, Messages** portent une rangée de filtres de site (pastilles `vrm-filtres`) : Toutes (Ventes
+  seulement) · Vinted · Leboncoin · eBay · Vestiaire, seulement les sites où il a un compte, le dernier filtre retenu
+  par écran (`vrm_filtre_site`, localStorage, commodité de l'appareil). Filtre « Vinted » = l'ancien écran Vinted
+  (les MÊMES fonctions `rendreVinted/rendreLeboncoin/rendreEbay` rendent l'espace du site et la tâche filtrée :
+  comptes, flou, états, période, bordereaux, tiroir). Sous la tâche filtrée, une porte « Aussi sur eBay : à traiter… ».
+- **Liens profonds** : `ONGLETS_DEPLACES` + `redirigerOnglet` — `plat_vinted`/`cat_ventes` → Ventes · Vinted ;
+  `cat_annonces`/`vinted_annonces` → Annonces · Vinted ; `plat_leboncoin` → Ventes · Leboncoin ; `leboncoin` →
+  Annonces · Leboncoin ; `plat_ebay`/`ebay_ventes` → Ventes · eBay ; `ebay_annonces` → Annonces · eBay ;
+  `cat_msg` → Messages · Vinted ; `ebay_messages` → Messages · eBay ; `ebay_agent` → espace eBay, À traiter ;
+  `plat_vestiaire` → la page Vestiaire ; `?tab=ventes&site=leboncoin` accepté. La redirection est calculée HORS de la
+  fonction de mise à jour (mode strict de React : rejouée deux fois).
+- **Badges** : Colis = le nombre PUBLIÉ `vrm_colis_aposter` (< 12 h, sinon rien : pas su ≠ 0), ambre ; Messages =
+  un POINT (trois règles de comptage des non-lus coexistent, un chiffre pourrait contredire l'écran) — et sur « Plus ».
+
+**« Toutes » (Ventes) — mesuré avant de coder.** Sources déjà lues par la coque, avec leurs trois états :
+Vinted `ventesCoque` (+ `ventesKO`, comptes écartés par `compteEcarte`), Leboncoin `lbcVentes`/`lbcCoqueLu`
+(`isSeller===true`, annulées exclues), eBay `ebayCmdTous` (+ `illisibles`), Vestiaire `vc_ventes` (lu par la vue).
+Chaque ligne = UNE vente sous SON identité (transaction Vinted, `txId` Leboncoin, `orderId` eBay, clé Vestiaire) :
+rien n'est fusionné, deux paires au même titre sur deux sites = deux lignes. N° seulement par identité (SKU eBay,
+lien/référence Leboncoin, référence Vestiaire) ; Vinted sans N° (il faudrait la transaction : un blanc plutôt qu'un
+faux). Montants Vestiaire non écrits (prix ou versement : pas su). Un site illisible est nommé en tête. La ligne ouvre
+SON site (eBay : sa commande, `DEMANDE_EBAY_CIBLE`).
+**Pas de « Toutes » pour Annonces ni Messages** : chaque site a sa règle « en ligne » (Vinted <enligne-regle>,
+Leboncoin listes complètes et disparues, eBay statut, Vestiaire lecture complète) — une liste mélangée devrait les
+recopier hors de leur écran (§11) ou dire « en ligne » ce que l'écran du site dit « à confirmer ». Messages : pas de
+boîte unique fiable (Vinted, Leboncoin, eBay par compte, Vestiaire n'ont ni la même forme ni le même « non lu »).
+
+**Rien ne disparaît** : écrans montés `tab==='…'&&` 14 → 17 (+ `ventes`, `annonces`, `messages`), ceux de la table (`cat_achats`, `cat_bord`, `cat_expedition`…) inchangés ; `audit-bancs`
+vert (verif_visuel/verif_dark rendent les 3 nouveaux). Les espaces de site restent montés (`plat_*`), leurs sections
+propres derrière « Plateformes ». Décisions tenues : ni « Autres outils » ni « Dans Vinted », Organisation hors du
+menu (Réglages), pas de « N° + Entrée ».
+
+**Preuve** : `scripts/bancs/navigation-tache.cjs` (390 et 1512 px, données inventées). Bancs adaptés sans affaiblir la
+règle : `menu-range` (« Plus », `?tab=plat_ebay` → Ventes · eBay, « eBay » écrit une fois), `coque-mobile` (onglets
+attendus), `glisser-onglet` (voisins de la nouvelle barre, jamais Vestiaire), `retour-historique` (« retour » rend le
+filtre de site d'avant).

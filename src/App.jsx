@@ -106,6 +106,7 @@ import { DESCRIPTION_ORGANISATION } from "./operations/description.js";
 // (31 oct.) Colis → « À retirer » : la carte des points relais (règle pure + carte).
 import { regrouperRelais } from "./relaisColis.js";
 import CarteRelaisColis from "./CarteRelais.jsx";
+import { SITES_TACHE, TACHES_SITE, estTacheSite, siteDeTache, redirigerOnglet, filtreRetenu, retenirFiltre } from "./navigationTache.js";
 // La migration qui cloisonne les vendeurs, lue depuis LE fichier (pas recopiée) :
 // deux copies finiraient par diverger, et c'est le genre de texte qu'on colle
 // dans une base de production sans le relire.
@@ -13552,108 +13553,110 @@ function BoutonTraduire({ texte }) {
   if (etat === 'ko') return <div style={{marginTop:3,fontSize:11,color:C.muted}}>traduction indisponible sur cet appareil</div>;
   return <button type="button" data-traduire onClick={lancer} style={{marginTop:3,fontSize:11,fontWeight:600,color:C.accent,background:'transparent',border:'none',padding:0,cursor:etat==='charge'?'default':'pointer',fontFamily:'inherit'}}>{etat === 'charge' ? 'traduction…' : '🌐 Traduire'}</button>;
 }
-// ── LA BARRE DU BAS NE DÉFILE PLUS ───────────────────────────────────────────
-// ⚠️ Plainte de Julien : « je dois glisser de gauche à droite en bas pour voir
-// toutes les interfaces ». C'était exact : la barre portait NEUF onglets dans un
-// conteneur `overflow-x: auto`, donc sur un téléphone la moitié était hors
-// écran — Garage et Factures n'étaient atteignables qu'en faisant défiler une
-// barre dont rien n'indiquait qu'elle défilait.
-// Une barre d'onglets qui défile, c'est le signe qu'il y a trop d'onglets. On
-// garde donc les CINQ écrans du travail quotidien, et le reste passe derrière
-// « Plus » — c'est le motif standard des applications mobiles, et il fait
-// tenir la barre sur n'importe quel écran sans jamais rien couper.
-// ⚠️ SÉPARATION TOTALE PAR SITE (Julien, 24-25 sept. : « enlève l'onglet ventes,
-// fais la même chose pour chaque site… chaque info par site… fais la séparation
-// totale »). La barre du bas n'est plus organisée par FONCTION (annonces /
-// ventes / achats, qui étaient toutes des données Vinted) mais par SITE :
-//   Ma journée · Vinted · Leboncoin · Colis.
-// Annonces, Ventes et Achats sont devenus des SECTIONS du hub Vinted — leurs
-// écrans détaillés ne sont PAS supprimés, ils restent montés et joignables
-// depuis les cartes du hub (et depuis Ma journée / le Tableau de bord). §4.11 :
-// une coupe se vérifie sur ce qui RESTE — `cat_annonces`, `cat_ventes`,
-// `cat_achats` gardent toutes leurs cibles de navigation, ils passent
-// simplement d'un accès en 1 tap à un accès depuis le hub Vinted.
-// ⚠️ BARRE DU BAS = LES APPLICATIONS (demande de Julien, 27 sept. : « vinted
-// leboncoin vestiaire et ebay… les applications, le reste est dans l'onglet en
-// haut déroulant »). Ma journée (l'accueil) reste en tête, puis les quatre
-// plateformes. Colis, Annonces, Ventes… partent dans le menu ☰ — Colis reste à
-// un tap depuis Ma journée (carte « Expédier N colis »), il n'est pas perdu.
+// ⚠️⚠️ NAVIGATION PAR TÂCHE (31 octobre, décision de Julien : « A · par tâche,
+// en améliorant encore », puis « pour l'espace, il faut totalement réorganiser
+// les onglets… tout peut être amélioré »). La barre ne range plus les écrans par
+// SITE mais par CE QU'IL FAIT :
+//   téléphone, barre du bas : Journée · Annonces · Ventes · Colis · Plus ;
+//   ordinateur, colonne     : Ma journée · Annonces · Ventes · Messages · Colis,
+//                             puis les groupes de « Plus », Paramètres en bas.
+// Annonces, Ventes et Messages portent une rangée de filtres de site (Toutes ·
+// Vinted · Leboncoin · eBay · Vestiaire) : le filtre « Vinted » rend EXACTEMENT
+// l'ancien écran Vinted (src/navigationTache.js). Les espaces de site gardent ce
+// qui leur est propre (eBay : À traiter, offres, promotion, achats, compte ;
+// Leboncoin : achats, colis ; Vestiaire : sa page) sous « Plateformes ».
+// §4.11 : rien ne disparaît — chaque écran d'hier a son chemin (récit :
+// docs/passation/historique-interface-stock.md, « Navigation par tâche »), et
+// les anciens identifiants (`plat_vinted`, `cat_ventes`, `leboncoin`…) mènent au
+// bon onglet ET au bon filtre (`redirigerOnglet`). Décisions qui tiennent : pas
+// de groupe « Autres outils » ni « Dans Vinted » (17 oct.), Organisation hors du
+// menu (29 oct.), pas de saisie « N° + Entrée » (29 oct.).
 const BOTTOM_TABS=[
-  {id:'journee',        icon:'sun',   emoji:'☀️',label:'Ma journée'},
-  {id:'plat_vinted',    icon:'shop',  emoji:'🟢',label:'Vinted'},
-  {id:'plat_leboncoin', icon:'tag',   emoji:'🟠',label:'Leboncoin'},
-  {id:'plat_vestiaire', icon:'heart', emoji:'👗',label:'Vestiaire Co', bientot:true},
-  {id:'plat_ebay',      icon:'grid',  emoji:'🔵',label:'eBay'},
+  {id:'journee',  icon:'sun',  label:'Ma journée', court:'Journée'},
+  {id:'annonces', icon:'grid', label:'Annonces'},
+  {id:'ventes',   icon:'bag',  label:'Ventes'},
+  {id:'cat_bord', icon:'box',  label:'Colis'},
 ];
-// Les écrans DÉTAILLÉS de Vinted. Ils ne sont plus des onglets de la barre
-// (séparation par site) : on y arrive par les cartes du hub Vinted. Mais ils
-// restent listés dans la navigation, sous « Vinted », pour rester DÉCOUVRABLES
-// (§4.11 : une coupe se vérifie sur ce qui RESTE — sans ça ils sortiraient du
-// menu et du rail alors qu'ils existent toujours).
-const VINTED_TABS=[
-  {id:'cat_annonces', icon:'image', emoji:'🟢',label:'Annonces'},   // icône distincte de Leboncoin (tag)
-  {id:'cat_ventes',   icon:'cash', emoji:'💸',label:'Ventes'},
-  {id:'cat_achats',   icon:'bag',  emoji:'🛍️',label:'Achats'},
+// Messages : dans la colonne de l'ordinateur ; sur téléphone, dans « Plus »
+// (cinq places dans la barre, la cinquième est « Plus »).
+const ONGLET_MESSAGES={id:'messages', icon:'chat', label:'Messages'};
+const NAV_TACHES=[BOTTOM_TABS[0],BOTTOM_TABS[1],BOTTOM_TABS[2],ONGLET_MESSAGES,BOTTOM_TABS[3]];
+// Les entrées de « Plus » (et de la colonne, sous les tâches), GROUPÉES PAR CE
+// QU'IL FAIT. Une entrée = un écran (`id`), parfois ouvert sur une vue précise
+// (`vue` : Achats sur « À retirer » ou « Tous », Annonces sur Republier,
+// Messages sur les favoris). `site` : l'entrée n'existe que s'il a un compte
+// sur ce site (« aucune entrée vide ») ; pas su ⇒ montrée.
+const GROUPES_PLUS=[
+  { titre:'Vendre', items:[
+    {...ONGLET_MESSAGES, tel:true},
+    {id:'cat_annonces', icon:'sync', cle:'republier', vue:'republier', label:'Republier'},
+    {id:'cat_msg', icon:'heart', cle:'favoris', vue:'favoris', label:'Favoris & offres'},
+  ]},
+  { titre:'Expédier', items:[
+    {id:'cat_achats', icon:'qr', cle:'retraits', vue:'attente', label:'Retraits'},
+  ]},
+  { titre:'Gérer', items:[
+    {id:'garage',     icon:'home', label:'Stock'},
+    {id:'cat_achats', icon:'bag', cle:'achats', vue:'all', label:'Achats'},
+  ]},
+  { titre:'Argent', items:[
+    {id:'dashboard', icon:'chart', label:'Statistiques'},
+    {id:'compta',    icon:'euro',  label:'Comptabilité'},
+  ]},
+  { titre:'Plateformes', items:[
+    {id:'plat_ebay', icon:'grid', site:'ebay', label:'eBay',      desc:'À traiter, offres, promotion, achats, compte'},
+    {id:'plat_leboncoin', icon:'tag', site:'leboncoin', label:'Leboncoin', desc:'Achats, colis'},
+    {id:'plat_vestiaire', icon:'shop', site:'vestiaire', label:'Vestiaire', desc:'Publier, ventes, messages, achats'},
+  ]},
+  { titre:'Moi', items:[
+    {id:'communaute', icon:'pin',  label:'Communauté'},
+    {id:'settings',   icon:'gear', label:'Paramètres', tel:true},
+  ]},
 ];
-// Quand on est DANS une section d'un site (Annonces, Ventes… sont des sections
-// de Vinted ; « À publier » est une section de Leboncoin), l'onglet du SITE
-// reste allumé dans la barre — sinon aucun onglet n'est actif et on ne sait
-// plus dans quel espace on se trouve. Une notion, une source (§11).
+const cleEntree=(t)=>t.cle||t.id;
+// Les écrans qu'on ouvre ponctuellement — la liste à plat (titres, glisser,
+// audits) : chaque écran une fois.
+const PLUS_TABS=GROUPES_PLUS.flatMap(g=>g.items).filter((t,i,a)=>a.findIndex(x=>x.id===t.id)===i);
+// Les sections propres à chaque espace de site (les autres sont des tâches).
+const SECTIONS_SITE={
+  vinted:[['achats','Achats']],
+  leboncoin:[['achats','Achats'],['colis','Colis']],
+  ebay:[['agent','À traiter'],['offres','Offres'],['promo','Promotion'],['achats','Achats'],['compte','Compte']],
+};
+const sectionsSite=(site)=>SECTIONS_SITE[site]||[];
+// Quand on est DANS un écran que la barre ne porte pas, quel onglet reste
+// allumé. Une notion, une source (§11).
 const BAR_GROUPE={
-  cat_annonces:'plat_vinted', cat_ventes:'plat_vinted', cat_achats:'plat_vinted',
-  cat_msg:'plat_vinted', cat_expedition:'cat_bord',
-  leboncoin:'plat_leboncoin',
-  // (29 oct., revue) Organisation s'ouvre depuis Réglages : la roue du rail est mise en avant.
+  cat_expedition:'cat_bord',
+  // (29 oct., revue) Organisation s'ouvre depuis Réglages : la roue est mise en avant.
   organisation:'settings',
 };
 // Le nom COURT d'un écran, pour l'en-tête de la coque (titre qui apparaît au
 // défilement). Une source : les listes de navigation elles-mêmes (§11).
 function titreEcran(tab) {
   if (tab === 'journee') return 'Ma journée';
-  if (tab === 'settings') return 'Paramètres';   // le grand titre de l'écran (le menu, lui, dit « Réglages »)
-  const t = [...BOTTOM_TABS, ...PLUS_TABS, ...VINTED_TABS].find(x => x.id === tab);
+  if (tab === 'cat_achats') return 'Achats';
+  const t = [...NAV_TACHES, ...PLUS_TABS].find(x => x.id === tab && !x.vue);
   if (t) return t.label;
-  return { cat_msg: 'Messages', cat_expedition: 'Colis', leboncoin: 'Leboncoin', masques: 'Masqués', organisation: 'Organisation', catalog: 'Catalogue', stockvinted: 'Stock Vinted', vintedaccounts: 'Comptes liés', sales: 'Ventes', inventory: 'Inventaire' }[tab] || 'VRM';
+  return { plat_vinted: 'Vinted', cat_expedition: 'Colis', masques: 'Masqués', organisation: 'Organisation', catalog: 'Catalogue', stockvinted: 'Stock Vinted', vintedaccounts: 'Comptes liés', sales: 'Ventes', inventory: 'Inventaire' }[tab] || 'VRM';
 }
-// Les écrans qu'on ouvre ponctuellement — jamais perdus, juste rangés.
-const PLUS_TABS=[
-  /* ⚠️ « Organisation » RETIRÉ du menu (29 octobre). Julien : « on ne comprend
-     pas à quoi ça sert, ça doit être utile sinon ça n'a rien à faire ici ».
-     MESURÉ dans sa base (lecture seule) : en dix jours, UN élément saisi — une
-     recherche eBay préparée, jamais lancée (elle reste dans eBay → Achats) — et
-     zéro mission, réservation, lot, consommable, réception ou dossier ; les
-     missions supposent une équipe, et la migration 016 n'est pas appliquée. Ce
-     qui l'attend aujourd'hui est Ma journée, ses retours sont dans Colis : un
-     écran qui les redirait serait une seconde règle (§11). L'écran, ses données
-     et `?tab=organisation` restent ; on y entre par Réglages → Stock et
-     rangement → Organisation. */
-  /* ⚠️ Colis descend ici (barre du bas = les plateformes, demande du 27 sept.).
-     Il reste en tête du menu — c'est le geste quotidien le plus fréquent après
-     l'accueil — et à un tap depuis la carte « Expédier N colis » de Ma journée. */
-  {id:'cat_bord',       icon:'box',  emoji:'📄',label:'Colis',       desc:'Bordereaux à imprimer, colis à retirer'},
-  /* ⚠️ `plat_vinted`, `plat_leboncoin`, `plat_vestiaire` ET `plat_ebay` sont
-     tous dans la BARRE DU BAS — retirés d'ici pour ne pas les montrer deux fois. */
-  {id:'dashboard',    icon:'chart',   emoji:'📊',label:'Statistiques',  desc:'Chiffre d\'affaires, ce qui se vend, prix qui marche'},
-  {id:'compta',       icon:'euro',    emoji:'🧮',label:'Comptabilité',   desc:'Déclarations, dépenses, factures'},
-  /* ⚠️ « À publier » RETIRÉ du menu (4 octobre) : c'était une seconde porte —
-     avec un autre nom — vers l'écran Leboncoin → Annonces. Les liens qui
-     visent encore `leboncoin` (cloche, notifications) y mènent tout seuls. */
-  /* ⚠️ « Messages » RETIRÉ du menu (demande de Julien, 24 sept. : « pas en
-     onglet, mets les messages reçus dans les notifications »). Les non-lus
-     restent dans le centre de notifications (job « Répondre à N messages »), qui
-     ouvre l'écran Messages au clic — l'écran reste monté et joignable par là,
-     simplement plus dans le menu. */
-  {id:'garage',       icon:'home',    emoji:'🏠',label:'Stock',        desc:'Où est rangé chaque article'},
-  /* La carte de la communauté (20 oct., migration 018) : opt-in, la ville seule, messages entre revendeurs. */
-  {id:'communaute',   icon:'pin',     emoji:'📍',label:'Communauté',   desc:'La carte des revendeurs VRM, et leur messagerie'},
-  /* ⚠️ « Masqués » RETIRÉ du menu le 1er oct. (demande de Julien : « dans les
-     paramètres, ça prend de la place pour rien »). L'écran reste monté et
-     joignable par Réglages → Comptabilité → « Ventes et achats masqués ». */
-];
-const NAV_GESTION = ['cat_bord', 'garage', 'dashboard', 'compta'].map(id => PLUS_TABS.find(t => t.id===id));
-// Les onglets d'hier → leur place d'aujourd'hui : [onglet, rubrique].
-const ONGLETS_DEPLACES = { prixmarche: ['dashboard', 'prix'], invoices: ['compta', 'factures'], collectif: ['dashboard', null] };
-const NAV_OUTILS = PLUS_TABS.filter(t => !NAV_GESTION.includes(t));
+// Les onglets d'hier → leur place d'aujourd'hui : [onglet, rubrique ou filtre].
+// (31 oct.) Les écrans « par site » mènent à la tâche filtrée sur leur site ;
+// `plat_vinted` / `plat_leboncoin` / `plat_ebay` sont résolus par
+// `redirigerOnglet` (selon la section demandée).
+const ONGLETS_DEPLACES = {
+  prixmarche: ['dashboard', 'prix'], invoices: ['compta', 'factures'], collectif: ['dashboard', null],
+  cat_ventes: ['ventes', 'vinted'], cat_annonces: ['annonces', 'vinted'], vinted_annonces: ['annonces', 'vinted'],
+  cat_msg: ['messages', 'vinted'], leboncoin: ['annonces', 'leboncoin'], ebay_annonces: ['annonces', 'ebay'],
+};
+// La vue demandée par une entrée de « Plus » (Republier, Favoris, Retraits…),
+// consommée UNE fois par l'écran qui s'ouvre (même motif que DEMANDE_EBAY_CIBLE).
+const DEMANDE_VUE={ quoi:null, at:0 };
+const demanderVue=(quoi)=>{ DEMANDE_VUE.quoi=quoi; DEMANDE_VUE.at=Date.now(); };
+const prendreVue=(quoi)=>{ if(DEMANDE_VUE.quoi===quoi && Date.now()-DEMANDE_VUE.at<30000){ DEMANDE_VUE.quoi=null; return true; } return false; };
+// L'entrée allumée pour une vue de l'écran Achats (Retraits ou Achats) : la
+// dernière choisie ; au départ, l'écran s'ouvre sur « À retirer ».
+let VUE_ACHATS_NAV='attente';
 // Barre de chargement fine en haut de l'écran (façon navigateur). Elle avance
 // vite au début puis ralentit — on ne peut pas connaître l'avancement réel de
 // requêtes multiples, donc on donne une progression PLAUSIBLE plutôt qu'un
@@ -14334,19 +14337,54 @@ const useOrdinateur = () => {
 
 const NAV_LARGEUR = 200;   // (31 oct., Vitrine) colonne blanche avec les libellés
 
-// Navigation compacte par plateforme. Les outils partagés restent dans le
-// panneau Gestion à gauche ; les sections Vinted sont dans leur plateforme.
-function SideBar({ tab, setTab, entreprise }) {
-  const outils = [...NAV_GESTION, ...NAV_OUTILS];
+// (31 oct.) Ouvrir une entrée de navigation : son écran, et la vue qu'elle
+// demande (Republier, Favoris, Retraits…). L'écran déjà ouvert l'apprend par
+// l'évènement `vrm:vue` ; un écran qui monte la lit dans DEMANDE_VUE.
+function ouvrirEntree(t, setTab) {
+  if (t.vue) {
+    if (t.id === 'cat_achats') VUE_ACHATS_NAV = t.vue;
+    demanderVue(t.cle || t.vue);
+    try { window.dispatchEvent(new CustomEvent('vrm:vue', { detail: t.cle || t.vue })); } catch (_) {}
+  }
+  setTab(t.id);
+}
+// L'entrée est-elle « l'écran où l'on est » ? Une entrée qui ouvre une VUE d'un
+// écran que la navigation porte déjà (Republier dans Annonces, Favoris dans
+// Messages) ne s'allume jamais : c'est l'onglet de l'écran qui reste allumé.
+// Retraits / Achats (le même écran, deux vues) : la dernière choisie.
+function entreeActive(t, tab) {
   const actif = BAR_GROUPE[tab] || tab;
-  // (31 oct., direction « Vitrine ») Chaque entrée porte son NOM à côté de
-  // l'icône : un rail d'icônes seules obligeait à les reconnaître de mémoire.
-  const bouton=t=><button key={t.id} type="button" className="vrm-rail-button" aria-label={t.label} title={t.bientot?`${t.label} — bientôt`:t.label} onClick={()=>setTab(t.id)} aria-current={actif===t.id?'page':undefined}><NavigationIcon item={t} size={18}/><span className="vrm-rail-lib" aria-hidden="true">{t.label}</span></button>;
+  if (t.id !== actif) return false;
+  if (!t.vue) return true;
+  return t.id === 'cat_achats' && VUE_ACHATS_NAV === t.vue;
+}
+// Les groupes de « Plus », sans les entrées d'un site où il n'a aucun compte
+// (`sites` : Set des sites présents, `null` = pas su ⇒ tout est montré) ni un
+// groupe vide.
+function groupesVisibles(sites, filtre) {
+  return GROUPES_PLUS.map(g => ({ ...g, items: g.items.filter(t => (!t.site || !sites || sites.has(t.site)) && filtre(t)) })).filter(g => g.items.length > 0);
+}
+// Badge d'une entrée : un NOMBRE pour Colis (le nombre PUBLIÉ par l'écran qui a
+// toutes les sources, `vrm_colis_aposter`, §11) ; un POINT pour Messages (trois
+// règles de comptage des non-lus coexistent : un chiffre ici pourrait contredire
+// celui de l'écran, cf. PlatSubNav). Ambre discret : un geste à faire (§7).
+function BadgeNav({ t, badges, place }) {
+  if (!badges || t.vue) return null;
+  const v = badges[t.id];
+  if (typeof v === 'number' && v > 0) return <span className={'vrm-nav-badge vrm-nav-badge-n vrm-nav-badge-' + place} data-badge-nav={t.id} data-badge-n={String(v)} aria-label={`${v} à faire`}>{v > 99 ? '99+' : v}</span>;
+  if (v === true) return <span className={'vrm-nav-badge vrm-nav-badge-point vrm-nav-badge-' + place} data-badge-nav={t.id} data-badge-n="point" aria-label="nouveau"/>;
+  return null;
+}
+
+// LA COLONNE DE L'ORDINATEUR : les cinq tâches, puis les groupes de « Plus »
+// (sans Messages ni Paramètres, déjà là), Paramètres en bas.
+function SideBar({ tab, setTab, entreprise, sites, badges }) {
+  const groupes = groupesVisibles(sites, t => !t.tel);
+  const bouton=(t)=>{ const on=entreeActive(t, tab); return <button key={cleEntree(t)} type="button" className="vrm-rail-button" aria-label={t.label} title={t.desc?`${t.label} — ${t.desc}`:t.label} data-nav-entree={cleEntree(t)} onClick={()=>ouvrirEntree(t,setTab)} aria-current={on?'page':undefined}><NavigationIcon item={t} size={18}/><span className="vrm-rail-lib" aria-hidden="true">{t.label}</span><BadgeNav t={t} badges={badges} place="rail"/></button>; };
   // (30 oct., Edge sous Windows) Une fenêtre basse (1366×768 → 630 px utiles)
-  // coupait le bas du rail — Statistiques, Comptabilité, Communauté — et la zone
-  // défile SANS barre visible : rien ne disait qu'il y avait une suite. La zone
-  // dit maintenant de quel côté il en reste (`data-rail-suite`, un fondu en CSS),
-  // et l'entrée de l'écran ouvert est ramenée dans la vue à chaque changement.
+  // coupe le bas de la colonne, et la zone défile SANS barre visible : elle dit
+  // de quel côté il en reste (`data-rail-suite`, un fondu en CSS), et l'entrée
+  // de l'écran ouvert est ramenée dans la vue à chaque changement.
   const zoneRef = React.useRef(null);
   React.useEffect(() => {
     const el = zoneRef.current; if (!el) return undefined;
@@ -14366,36 +14404,27 @@ function SideBar({ tab, setTab, entreprise }) {
     const el = zoneRef.current; if (!el) return;
     const b = el.querySelector('.vrm-rail-button[aria-current="page"]');
     try { if (b) b.scrollIntoView({ block: 'nearest', inline: 'nearest' }); } catch (_) {}
-  }, [actif]);
+  }, [tab]);
+  const parametres = { id:'settings', icon:'gear', label:'Paramètres' };
   return <nav className="vrm-sidebar vrm-atelier-rail" aria-label="Navigation principale" style={{width:NAV_LARGEUR,background:C.sidebar||C.chrome,borderRight:`1px solid ${C.chromeLine}`,color:C.onChrome}}>
     <div className="vrm-sidebar-brand"><VrmLogo size={32} anim={false}/><NomEntreprise entreprise={entreprise} className="vrm-sidebar-entreprise"/></div>
     <div className="vrm-rail-scroll" ref={zoneRef}>
-      <div className="vrm-rail-platforms">{BOTTOM_TABS.map(bouton)}</div>
-      <section className="vrm-rail-management-group" aria-label="Gestion"><div className="vrm-rail-section-label">Gestion</div><div className="vrm-rail-management">{outils.map(bouton)}</div></section>
+      <div className="vrm-rail-platforms" data-nav-taches="">{NAV_TACHES.map(bouton)}</div>
+      {groupes.map(g => <section key={g.titre} className="vrm-rail-management-group" aria-label={g.titre} data-nav-groupe={g.titre}><div className="vrm-rail-section-label">{g.titre}</div><div className="vrm-rail-management">{g.items.map(bouton)}</div></section>)}
     </div>
-    <div className="vrm-rail-bottom"><button type="button" className="vrm-rail-button" aria-label="Paramètres" title="Paramètres" onClick={()=>setTab('settings')} aria-current={(BAR_GROUPE[tab]||tab)==='settings'?'page':undefined}><Icon name="gear" size={18}/><span className="vrm-rail-lib" aria-hidden="true">Paramètres</span></button></div>
+    <div className="vrm-rail-bottom">{bouton(parametres)}</div>
   </nav>;
 }
 
-// ── MENU DES ÉCRANS, EN HAUT À GAUCHE (téléphone) ──────────────────────────
-// Julien : « je peux peut-être mettre un menu déroulant à gauche, en haut,
-// plutôt que de faire en bas avec le plus ».
-// Il a raison sur le fond : « Plus » était un SIXIÈME bouton dans une barre de
-// cinq, d'un genre différent des autres (il n'ouvre pas un écran, il ouvre une
-// liste) — et il changeait de libellé selon l'écran affiché, donc la barre du
-// bas n'avait pas toujours la même tête. Ici : la barre du bas porte les cinq
-// écrans du quotidien, un point c'est tout, et LE menu donne accès à tout.
-// ⚠️ Sur ordinateur il n'existe pas : la barre latérale montre déjà les neuf
-//    écrans d'un coup, un bouton de plus ne ferait que dupliquer.
-// ⚠️⚠️ IL NE RÉPÈTE PAS LA BARRE DU BAS. Julien, 21 sept. : « tu mets deux fois
-//    Ma journée, Annonces et Ventes ». C'était vrai — le menu déroulait les
-//    CINQ onglets du quotidien (`BOTTOM_TABS`) alors qu'ils sont déjà, à un
-//    tap, dans la barre du bas juste en dessous. Un menu « Plus » ne porte que
-//    ce que la barre ne porte PAS (le motif iOS standard) : les écrans
-//    ponctuels (`PLUS_TABS`) et Réglages. Zéro doublon, et tout reste joignable
-//    (les cinq du quotidien par la barre, le reste par ici). §7 : on ne dit pas
-//    deux fois la même chose sur le même écran.
-function MenuEcrans({ tab, setTab, dark = false, bottom = false }) {
+// ── « PLUS » : LA FEUILLE DE TOUT CE QUE LA BARRE NE PORTE PAS (téléphone) ──
+// (31 oct.) Rangée PAR TÂCHE : Vendre · Expédier · Gérer · Argent · Plateformes
+// · Moi. ⚠️ Elle NE RÉPÈTE PAS la barre du bas (Julien, 21 sept. : « tu mets
+// deux fois Ma journée, Annonces et Ventes ») : Journée, Annonces, Ventes et
+// Colis n'y sont pas. Aucun groupe vide, aucune entrée d'un site sans compte.
+// ⚠️ Sur ordinateur elle n'existe pas : la colonne montre déjà tout.
+// Le bouton de l'en-tête (« Tous les écrans », caché sur téléphone depuis la
+// coque iPhone) ouvre la même feuille, depuis le haut.
+function MenuEcrans({ tab, setTab, dark = false, bottom = false, sites = null, badges = null }) {
   const [open, setOpen] = React.useState(false);
   const declencheur = React.useRef(null);
   const panneau = React.useRef(null);
@@ -14418,63 +14447,50 @@ function MenuEcrans({ tab, setTab, dark = false, bottom = false }) {
       declencheur.current?.focus();
     };
   }, [open]);
-  const groupes = [
-    { titre: bottom?'Autres plateformes':'Plateformes', items: BOTTOM_TABS.filter(t => bottom?t.id==='plat_vestiaire':t.id !== 'journee') },
-    // (17 oct., Julien) Plus de « Dans Vinted » (Annonces, Ventes, Achats sont
-    // déjà dans l'onglet Vinted) ni d'« Autres outils » : ce qu'ils portaient
-    // est rangé dans Statistiques et Comptabilité. (31 oct.) La Communauté
-    // (20 oct.) recréait ce groupe : elle rejoint « Gestion », comme dans la
-    // colonne de l'ordinateur.
-    { titre: 'Gestion', items: [...NAV_GESTION, ...NAV_OUTILS] },
-  ];
-  // (16 oct.) LISTE GROUPÉE FAÇON iOS : des groupes en cartes arrondies, une
-  // rangée par écran (icône neutre · libellé · chevron), filets fins en retrait.
-  // L'écran courant porte la teinte d'accent et une coche — plus d'aplat bleu.
-  // Le dessin vit dans `.vrm-sheet` (styles-coque.css).
-  // L'en-tête pose sa feuille dans document.body (voir plus bas) ; celle de la
-  // barre du bas reste où elle est.
+  const groupes = groupesVisibles(sites, () => true);
+  const dansBarre = BOTTOM_TABS.some(t => t.id === (BAR_GROUPE[tab] || tab));
+  const pointPlus = !!(badges && badges.messages === true);
+  // L'en-tête pose sa feuille dans document.body ; celle de la barre du bas
+  // reste où elle est (même étage que la barre).
   const poserFeuille = bottom ? (x) => x : (x) => createPortal(x, document.body);
-  const rangee = (t, on, onClick) => (
-    <button key={t.id} type="button" role="menuitem" className="vrm-sheet-row" onClick={onClick} aria-current={on?'page':undefined}>
-      <span className="vrm-sheet-ic"><NavigationIcon item={t} size={19}/></span>
-      <span className="vrm-sheet-lib">{t.label}</span>
-      {t.bientot && <span data-bientot="" className="vrm-sheet-badge">Bientôt</span>}
-      <span aria-hidden="true" className="vrm-sheet-fin"><Icon name={on?'check':'chevron'} size={on?17:16}/></span>
-    </button>
-  );
+  const rangee = (t) => {
+    const on = entreeActive(t, tab);
+    return (
+      <button key={cleEntree(t)} type="button" role="menuitem" className="vrm-sheet-row" data-nav-entree={cleEntree(t)} onClick={()=>{ ouvrirEntree(t, setTab); setOpen(false); }} aria-current={on?'page':undefined}>
+        <span className="vrm-sheet-ic"><NavigationIcon item={t} size={19}/></span>
+        <span className="vrm-sheet-lib">{t.label}{t.desc ? <span className="vrm-sheet-desc">{t.desc}</span> : null}</span>
+        <BadgeNav t={t} badges={badges} place="feuille"/>
+        <span aria-hidden="true" className="vrm-sheet-fin"><Icon name={on?'check':'chevron'} size={on?17:16}/></span>
+      </button>
+    );
+  };
   return (
     <>
-      <button ref={declencheur} type="button" onClick={()=>setOpen(o=>!o)} className={bottom?"vrm-tab vrm-nav-more":"vrm-hbtn"} aria-label={bottom?"Gestion":"Tous les écrans"} aria-expanded={open} aria-current={bottom&&! ['journee','plat_vinted','plat_leboncoin','plat_ebay'].includes(BAR_GROUPE[tab]||tab)?'page':undefined}>
-        <span aria-hidden="true" className={bottom?"vrm-tab-ic":undefined} style={{display:'flex'}}><Icon name={open&&!bottom?'close':'menu'} size={bottom?24:22} style={{strokeWidth:1.6}}/></span>{bottom && <span className="vrm-nav-label">Gestion</span>}
+      <button ref={declencheur} type="button" onClick={()=>setOpen(o=>!o)} className={bottom?"vrm-tab vrm-nav-more":"vrm-hbtn"} aria-label={bottom?"Plus":"Tous les écrans"} aria-expanded={open} aria-current={bottom&&!dansBarre?'page':undefined}>
+        <span aria-hidden="true" className={bottom?"vrm-tab-ic":undefined} style={{display:'flex',position:'relative'}}><Icon name={bottom?'more':(open?'close':'menu')} size={bottom?24:22} style={{strokeWidth:1.6}}/>{bottom && pointPlus ? <span className="vrm-nav-badge vrm-nav-badge-point vrm-nav-badge-barre" data-badge-nav="plus" data-badge-n="point" aria-hidden="true"/> : null}</span>{bottom && <span className="vrm-nav-label">Plus</span>}
       </button>
       {/* (23 oct.) La feuille d'en-tête part dans document.body : rendue DANS
-          l'en-tête (sticky, z-index 50 — un contexte d'empilement), elle restait
-          SOUS la barre du bas (z-index 60) en paysage et sur iPad — ses dernières
-          entrées cachées, la barre non assombrie et touchable. Celle de la barre
-          du bas vit déjà au bon étage. Banc `feuilles-coque.cjs`. */}
+          l'en-tête (sticky, z-index 50), elle restait SOUS la barre du bas
+          (z-index 60) en paysage et sur iPad. Banc `feuilles-coque.cjs`. */}
       {open && poserFeuille(
         <div data-noswipe className="vrm-sheet-voile" onClick={()=>setOpen(false)}>
-          {/* Depuis la barre du bas, la feuille MONTE du bas ; depuis l'en-tête,
-              elle descend du haut : le geste et le mouvement vont dans le même sens. */}
           <div ref={panneau} className={bottom?"vrm-mobile-menu vrm-sheet vrm-sheet-bas vrm-menu-bottom":"vrm-mobile-menu vrm-sheet vrm-sheet-haut"} onClick={e=>e.stopPropagation()} role="menu" aria-label="Tous les écrans">
             {bottom && <div aria-hidden="true" className="vrm-sheet-poignee"/>}
             <div className="vrm-sheet-tete">
               <span className="vrm-sheet-titre">Ton espace</span>
               <button className="vrm-icon-control vrm-sheet-fermer" type="button" aria-label="Fermer le menu" onClick={()=>setOpen(false)}><Icon name="close" size={18}/></button>
             </div>
+            {!bottom && (
+              <div className="vrm-menu-group vrm-sheet-groupe" data-nav-groupe="Tâches">
+                <div className="vrm-sheet-carte">{NAV_TACHES.map(rangee)}</div>
+              </div>
+            )}
             {groupes.map(g => (
-              <div className="vrm-menu-group vrm-sheet-groupe" key={g.titre}>
+              <div className="vrm-menu-group vrm-sheet-groupe" key={g.titre} data-nav-groupe={g.titre}>
                 <div className="vrm-sheet-label">{g.titre}</div>
-                <div className="vrm-sheet-carte">
-                  {g.items.map(t => rangee(t, tab === t.id, ()=>{ setTab(t.id); setOpen(false); }))}
-                </div>
+                <div className="vrm-sheet-carte">{g.items.map(rangee)}</div>
               </div>
             ))}
-            <div className="vrm-sheet-groupe">
-              <div className="vrm-sheet-carte">
-                {rangee({id:'settings',icon:'gear',label:'Réglages'}, tab==='settings', ()=>{ setTab('settings'); setOpen(false); })}
-              </div>
-            </div>
           </div>
         </div>
       )}
@@ -14517,7 +14533,7 @@ function MemoireDefilement({ ecran }) {
   return null;
 }
 
-function BottomBar({tab,setTab}) {
+function BottomBar({tab,setTab,sites,badges}) {
   // Se cache quand le clavier est ouvert (saisie dans un champ) : sinon iOS la
   // pousse au milieu de l'écran au-dessus du clavier et la mise en page saute.
   const [kbOpen,setKbOpen]=React.useState(false);
@@ -14546,15 +14562,15 @@ function BottomBar({tab,setTab}) {
        seule couleur, rare). Fond en verre, filet fin. Tout le dessin vit dans
        `.vrm-tabbar` (styles-coque.css) : ici seulement la structure. */}
     <nav className="vrm-mobile-nav vrm-tabbar" aria-label="Navigation principale" style={{display:kbOpen?'none':'flex','--vrm-nav-bg':C.sidebar||C.chrome}}>
-      {(()=>{ const actif=BAR_GROUPE[tab]||tab;
-        const items=BOTTOM_TABS.filter(t=>t.id!=='plat_vestiaire').map(t=>t.id==='journee'?{...t,label:'Accueil'}:t);
-        return items.map(t=>{ const on=actif===t.id; return (
-        <button key={t.id} type="button" className="vrm-tab" onClick={()=>setTab(t.id)} aria-label={t.label} aria-current={on?'page':undefined}>
-          <span aria-hidden="true" className="vrm-tab-ic"><NavigationIcon item={t} size={22} style={{strokeWidth:on?2:1.6}}/></span>
-          <span className="vrm-nav-label">{t.label}</span>
+      {/* (31 oct.) PAR TÂCHE : Journée · Annonces · Ventes · Colis · Plus. Icône
+          d'accent et libellé d'encre à l'actif (styles-vitrine.css), 52 px. */}
+      {BOTTOM_TABS.map(t=>{ const on=(BAR_GROUPE[tab]||tab)===t.id; const lib=t.court||t.label; return (
+        <button key={t.id} type="button" className="vrm-tab" data-nav-entree={t.id} onClick={()=>setTab(t.id)} aria-label={lib+((badges&&typeof badges[t.id]==='number'&&badges[t.id]>0)?` · ${badges[t.id]} à expédier`:'')} aria-current={on?'page':undefined}>
+          <span aria-hidden="true" className="vrm-tab-ic" style={{position:'relative'}}><NavigationIcon item={t} size={22} style={{strokeWidth:on?2:1.6}}/><BadgeNav t={t} badges={badges} place="barre"/></span>
+          <span className="vrm-nav-label">{lib}</span>
         </button>
-      );}); })()}
-      <MenuEcrans tab={tab} setTab={setTab} bottom/>
+      );})}
+      <MenuEcrans tab={tab} setTab={setTab} bottom sites={sites} badges={badges}/>
     </nav>
     </>
   );
@@ -45142,6 +45158,22 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const favorisUid = String(compteSel && compteSel!=='*' ? compteSel : msgCompteActif || '');
   const favorisCompte = accounts.find(a=>String(a.vinted_user_id)===favorisUid);
   const [zoneMessages,setZoneMessages]=React.useState('conversations');
+  // (31 oct., navigation par tâche) Les entrées « Republier », « Favoris &
+  // offres », « Retraits » et « Achats » ouvrent CET écran sur la bonne vue : la
+  // demande est consommée une fois (DEMANDE_VUE), à l'ouverture ou, l'écran déjà
+  // ouvert, à l'évènement `vrm:vue`.
+  React.useEffect(()=>{
+    const appliquer=()=>{
+      if(only==='annonces' && prendreVue('republier')) setActionsOpen(true);
+      if(only==='messages' && prendreVue('favoris')) setZoneMessages('favoris');
+      if(only==='achats'){ if(prendreVue('retraits')) setAFilter('attente'); else if(prendreVue('achats')) setAFilter('all'); }
+    };
+    appliquer();
+    const f=()=>setTimeout(appliquer,0);
+    window.addEventListener('vrm:vue',f);
+    return ()=>window.removeEventListener('vrm:vue',f);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[only]);
 
   const msgPeutAgir = msgRelais || (vmrExtPresent() && extSait('messagerie')==='ok' && !__vmrPlusieurs);
   const msgLectureSeule = (acc) => (msgRelais && !msgCompteActif) || (!!msgCompteActif && String((acc && acc.vinted_user_id) || '') !== msgCompteActif);
@@ -58710,6 +58742,179 @@ function DemandeCodeDiscord() {
   );
 }
 
+// ── LA RANGÉE DE FILTRES DE SITE (31 oct., navigation par tâche) ────────────
+// En tête d'Annonces, Ventes et Messages : « Toutes » (Ventes seulement) puis
+// les sites où il a un compte (`sites` : Set, ou `null` = pas su ⇒ tous). Le
+// site choisi reste toujours montré, même si son compte n'est plus lu. La forme
+// est celle des pastilles de filtre de l'app (`vrm-filtres`, §7).
+function FiltreSites({ tache, site, sites, onSite }) {
+  const t = TACHES_SITE[tache] || {};
+  const options = [
+    ...(t.toutes ? [{ id: 'toutes', label: 'Tous les sites' }] : []),
+    ...SITES_TACHE.filter((s) => !sites || sites.has(s.id) || s.id === site),
+  ];
+  if (options.length < 2) return null;
+  return (
+    <div className="vrm-rangee vrm-filtres vrm-filtre-site" role="group" aria-label="Filtrer par site" data-filtre-site={tache}>
+      {options.map((o) => (
+        <button key={o.id} type="button" aria-pressed={site === o.id} data-site={o.id} onClick={() => onSite(o.id)}>{o.label}</button>
+      ))}
+    </div>
+  );
+}
+
+// ── VENTES · « TOUTES » : LA LISTE MÉLANGÉE, SANS RIEN FUSIONNER ────────────
+// Chaque ligne est UNE vente lue sur SON site, sous SON identité : la
+// transaction Vinted (`transaction_id`), la transaction Leboncoin (`txId`), la
+// commande eBay (`orderId`), la vente Vestiaire (sa clé). Deux paires au même
+// titre sur deux sites = deux lignes (§5 : jamais par ressemblance). Le N° n'est
+// écrit que quand une IDENTITÉ le donne (SKU eBay, lien ou référence Leboncoin,
+// référence Vestiaire) — un blanc plutôt qu'un faux.
+// Les sources sont celles que la coque lit déjà, avec leurs trois états
+// (`undefined` en cours · `null` pas su · lu) : un site illisible est NOMMÉ
+// (« rien lu » ≠ « rien »), un compte Vinted écarté par son choix n'y entre pas
+// (`compteEcarte`, la même règle que l'écran Ventes). Les montants Vestiaire ne
+// sont pas écrits : on ne sait pas si c'est le prix ou ce que Vestiaire verse.
+// Une ligne ouvre l'écran de SON site (une vente eBay : sa commande).
+function VentesToutes({ sites, ventesVinted, ventesKO, comptes, panelOff, lbcVentes, lbcLu, ebayTous, onOuvrir }) {
+  const voit = (s) => !sites || sites.has(s);
+  const [vc, setVc] = React.useState(undefined);   // undefined en cours · null pas su · objet
+  React.useEffect(() => {
+    if (!voit('vestiaire')) return undefined;
+    let vivant = true;
+    const lire = async () => {
+      try {
+        const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=in.(vc_ventes,vc_listings)&select=id,ventes:data->ventes,liens:data->liens,lectures:data->lectures`, { headers: sbAuth() });
+        if (!r.ok) throw new Error('lecture');
+        const j = await r.json();
+        if (!Array.isArray(j)) throw new Error('forme');
+        const par = Object.fromEntries(j.map((x) => [x.id, x]));
+        if (vivant) setVc({ ventes: (par.vc_ventes && par.vc_ventes.ventes) || null, liens: (par.vc_listings && par.vc_listings.liens) || {}, lectures: (par.vc_ventes && par.vc_ventes.lectures) || {} });
+      } catch (_) { if (vivant) setVc(null); }
+    };
+    lire();
+    const f = (e) => { const x = e && e.detail; if (x && x.type === 'maj' && x.quoi === 'vestiaire') lire(); };
+    window.addEventListener('vrm:ext', f);
+    return () => { vivant = false; window.removeEventListener('vrm:ext', f); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sites && sites.has('vestiaire')]);
+  const lignes = React.useMemo(() => {
+    const out = [];
+    const ts = (d) => { const t = Date.parse(d || ''); return Number.isFinite(t) ? t : null; };
+    const euro = (n) => (n == null || !isFinite(Number(n))) ? null : Number(n);
+    if (voit('vinted') && Array.isArray(ventesVinted)) {
+      const masques = new Set((load('vinted_accounts_hidden', []) || []).map(String));
+      const labels = load('vinted_account_labels', {}) || {};
+      const shipDone = load('vinted_ship_done', {}) || {};
+      for (const o of ventesVinted) {
+        const uid = String((o && o._acc && o._acc.vinted_user_id) || '');
+        if (!o || compteEcarte(uid, masques, panelOff)) continue;
+        const tx = String(o.transaction_id != null ? o.transaction_id : o.id);
+        out.push({ cle: 'vinted:' + tx, site: 'vinted', id: tx, titre: o.title || '(sans titre)', t: ts(o.date),
+          prix: euro(o.price && typeof o.price === 'object' ? o.price.amount : o.price), devise: (o.price && o.price.currency_code) || 'EUR',
+          etat: etapeVente(o, { poste: (x) => !!shipDone[String(x.transaction_id)] }).label,
+          compte: labels[uid] || (o._acc && o._acc.login) || '', num: '' });
+      }
+    }
+    if (voit('leboncoin') && lbcLu === true) {
+      const liens = load('vrm_lbc_liens', {}) || {};
+      const dates = lireDatesLbc();
+      for (const v of ((lbcVentes && lbcVentes.ventes) || [])) {
+        if (!v || v.isSeller !== true || lbcAnnulee(v)) continue;
+        const id = String(v.txId || v.id || v.itemId || '');
+        if (!id) continue;
+        out.push({ cle: 'leboncoin:' + id, site: 'leboncoin', id, titre: v.title || '(sans titre)', t: ts(v.dateVente) ?? ts(v.txId ? dates[v.txId] : null),
+          prix: v.price != null ? euro(Number(v.price) / 100) : null, devise: 'EUR',
+          etat: lbcFinalisee(v) ? 'Finalisée' : 'En cours', compte: '', num: numeroLbcIdentite(v, null, liens) });
+      }
+    }
+    if (voit('ebay') && ebayTous && Array.isArray(ebayTous.items)) {
+      for (const c of ebayTous.items) {
+        if (!c || !c.orderId) continue;
+        const li = (c.lineItems || [])[0] || {};
+        const st = c.pricingSummary && c.pricingSummary.priceSubtotal;
+        out.push({ cle: 'ebay:' + c.orderId, site: 'ebay', id: String(c.orderId), compteRef: c._compte, titre: li.title || 'Commande eBay', t: ts(c.creationDate),
+          prix: st && st.value != null ? euro(st.value) : null, devise: (st && st.currency) || 'EUR',
+          etat: commandeEbayEngagee(c) ? 'Payée' : 'Annulée ou remboursée', compte: c._pseudo || '', num: numLigneEbay(c, li) || '' });
+      }
+    }
+    if (voit('vestiaire') && vc && vc.ventes) {
+      for (const [id, v] of Object.entries(vc.ventes)) {
+        if (!v) continue;
+        out.push({ cle: 'vestiaire:' + id, site: 'vestiaire', id, titre: v.titre || v.title || 'Vente Vestiaire', t: ts(v.date) ?? ts(v.premiereVue),
+          prix: null, devise: 'EUR', etat: v.aExpedier ? 'À expédier' : (v.etat || ''), compte: '',
+          num: cleNum((v.productId && vc.liens[v.productId]) || v.ref || '') });
+      }
+    }
+    // La plus récente d'abord ; une vente sans date lue va à la fin (jamais datée au hasard).
+    return out.sort((a, z) => (z.t ?? -Infinity) - (a.t ?? -Infinity));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sites, ventesVinted, panelOff, lbcVentes, lbcLu, ebayTous, vc]);
+  const [n, setN] = React.useState(60);
+  const NOM = { vinted: 'Vinted', leboncoin: 'Leboncoin', ebay: 'eBay', vestiaire: 'Vestiaire' };
+  // Ce que chaque site a pu lire : dit UNE fois, en tête (jamais un « 0 » inventé).
+  const etats = [];
+  if (voit('vinted')) {
+    if (ventesVinted === undefined) etats.push(['vinted', 'lecture', 'Vinted : lecture en cours…']);
+    else if (ventesVinted === null) etats.push(['vinted', 'pas-su', 'Vinted : ventes pas lues — rien n’est perdu, réessaie dans un moment.']);
+    else if (ventesKO && ventesKO.length) {
+      const labels = load('vinted_account_labels', {}) || {};
+      const noms = ventesKO.map((u) => labels[u] || ((comptes || []).find((a) => String(a.vinted_user_id) === String(u)) || {}).login || ('#' + u));
+      etats.push(['vinted', 'partiel', `Vinted : ventes de ${noms.join(', ')} pas lues — elles manquent ici.`]);
+    }
+  }
+  if (voit('leboncoin')) {
+    if (lbcLu === undefined) etats.push(['leboncoin', 'lecture', 'Leboncoin : lecture en cours…']);
+    else if (lbcLu === null) etats.push(['leboncoin', 'pas-su', 'Leboncoin : ventes pas lues — rien n’est perdu, réessaie dans un moment.']);
+    else if (lbcVentes && lbcVentes.maj) etats.push(['leboncoin', 'lu', `Leboncoin : lu ${ilYaCourt(lbcVentes.maj)}.`]);
+    else etats.push(['leboncoin', 'jamais', 'Leboncoin : jamais lu — ouvre « Mes transactions » sur leboncoin.fr avec l’extension.']);
+  }
+  if (voit('ebay')) {
+    if (ebayTous === undefined) etats.push(['ebay', 'lecture', 'eBay : lecture en cours…']);
+    else if (ebayTous === null) etats.push(['ebay', 'pas-su', 'eBay : commandes pas lues — rien n’est perdu, réessaie dans un moment.']);
+    else if (ebayTous.illisibles && ebayTous.illisibles.length) etats.push(['ebay', 'partiel', `eBay : commandes de ${ebayTous.illisibles.map(nomCompteEbay).join(', ')} pas lues — elles manquent ici.`]);
+  }
+  if (voit('vestiaire')) {
+    if (vc === undefined) etats.push(['vestiaire', 'lecture', 'Vestiaire : lecture en cours…']);
+    else if (vc === null) etats.push(['vestiaire', 'pas-su', 'Vestiaire : ventes pas lues — rien n’est perdu, réessaie dans un moment.']);
+    else if (!vc.ventes) etats.push(['vestiaire', 'jamais', 'Vestiaire : jamais lu — ouvre tes ventes sur Vestiaire avec l’extension.']);
+  }
+  const jour = (t) => t == null ? 'date pas lue' : new Date(t).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
+  const prix = (l) => l.prix == null ? '' : (l.devise && l.devise !== 'EUR' ? `${String(l.prix).replace('.', ',')} ${l.devise}` : prixCourt(l.prix));
+  const enCours = etats.some((e) => e[1] === 'lecture');
+  return (
+    <div className="vrm-ventes-toutes" data-ventes-toutes={enCours ? 'lecture' : 'lu'} data-n={String(lignes.length)} style={{ padding: '4px 16px 16px' }}>
+      {etats.length > 0 && (
+        <div className="vrm-toutes-etats" style={{ display: 'flex', flexDirection: 'column', gap: 2, margin: '4px 0 10px', fontSize: 12, color: C.muted, lineHeight: 1.45 }}>
+          {etats.map(([s, k, txt]) => <div key={s} data-toutes-etat-site={s} data-etat={k} style={{ color: (k === 'pas-su' || k === 'partiel') ? C.warn : C.muted }}>{txt}</div>)}
+        </div>
+      )}
+      {lignes.length === 0
+        ? <div data-toutes-vide="" style={{ fontSize: 13, color: C.muted, padding: '18px 2px' }}>{enCours ? 'Lecture de tes ventes…' : etats.some((e) => e[1] === 'pas-su' || e[1] === 'partiel') ? 'Aucune vente lue — certaines lectures ont échoué (ci-dessus).' : 'Aucune vente lue pour l’instant.'}</div>
+        : (
+          <div className="vrm-toutes-liste" role="list">
+            {lignes.slice(0, n).map((l) => (
+              <button key={l.cle} type="button" role="listitem" className="vrm-toutes-ligne" data-toutes-vente={l.site} data-toutes-id={l.id} onClick={() => onOuvrir(l)}
+                style={{ width: '100%', minHeight: 56, display: 'flex', alignItems: 'center', gap: 12, padding: '10px 2px', background: 'transparent', border: 0, borderBottom: `1px solid ${C.border}`, cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left', color: C.text }}>
+                <span style={{ flex: 1, minWidth: 0 }}>
+                  <span style={{ display: 'block', fontSize: 14, fontWeight: 650, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{l.titre}</span>
+                  <span style={{ display: 'block', fontSize: 12.5, color: C.muted, marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    <span data-toutes-site="">{NOM[l.site]}</span> · {jour(l.t)}{l.etat ? ' · ' + l.etat : ''}{l.compte ? ' · ' + l.compte : ''}
+                  </span>
+                </span>
+                <span style={{ flexShrink: 0, textAlign: 'right' }}>
+                  {l.prix != null && <span data-toutes-prix="" style={{ display: 'block', fontSize: 14, fontWeight: 700 }}>{prix(l)}</span>}
+                  {l.num ? <span data-toutes-num={l.num} style={{ display: 'block', fontSize: 12, color: C.muted, fontFamily: 'var(--vrm-mono, ui-monospace, monospace)', marginTop: 2 }}>N°{l.num}</span> : null}
+                </span>
+              </button>
+            ))}
+            {lignes.length > n && <Bouton variante="discret" data-toutes-plus="" onClick={() => setN((x) => x + 60)} style={{ marginTop: 10 }}>Voir plus ({lignes.length - n})</Bouton>}
+          </div>
+        )}
+    </div>
+  );
+}
+
 function AppCoeur() {
   // En mode solo (MULTI_USER=false) `authState.ready` est vrai d'emblée et
   // l'app démarre directement : rien ne change pour un usage à un seul vendeur.
@@ -58804,13 +59009,22 @@ function AppCoeur() {
   // liens qui visent encore ces onglets (notifications, ?tab=, Réglages) mènent
   // à leur nouvelle place : la redirection vit ICI, une fois (§11), pas chez
   // chaque appelant.
-  const setTab=React.useCallback((v)=>setTabBrut((t)=>{
-    const n=typeof v==='function'?v(t):v;
-    const r=ONGLETS_DEPLACES[n];
-    if(!r) return n;
-    if(r[1]){ subVoulue.current=r[1]; if(r[0]===t) setTimeout(()=>setPlatSub(r[1]),0); }
-    return r[0];
-  }),[]);
+  // (31 oct., navigation par tâche) La redirection est calculée HORS de la
+  // fonction de mise à jour (React la rejoue deux fois en mode strict : un
+  // `subVoulue` posé au premier passage fausserait le second). Les écrans d'un
+  // site (`plat_vinted` + « ventes »…) mènent à la tâche filtrée sur ce site
+  // (`redirigerOnglet`, src/navigationTache.js). Même onglet ⇒ seule la section
+  // (ou le filtre) change.
+  const tabCourant=React.useRef(tab); tabCourant.current=tab;
+  const setTab=React.useCallback((v)=>{
+    if(typeof v==='function'){ setTabBrut(v); return; }
+    const r=redirigerOnglet(v, subVoulue.current, ONGLETS_DEPLACES);
+    if(r.sub!=null){
+      if(r.tab===tabCourant.current){ const sub=r.sub; subVoulue.current=null; setTimeout(()=>setPlatSub(sub),0); }
+      else subVoulue.current=r.sub;
+    }
+    setTabBrut(r.tab);
+  },[]);
   // L'écran où une photo Vinted a échoué en premier (le bilan `diag_photos`).
   React.useEffect(()=>{ photosVinted.ecranActuel(tab); },[tab]);
   // ⚠️ UN SEUL ONGLET PAR PLATEFORME QUI CONTIENT TOUT (Julien, 25 sept. : « tu
@@ -58832,7 +59046,9 @@ function AppCoeur() {
     const precedent=dernierePlateforme.current;
     if(precedent!==tab){
       sectionsPlateformes.current[precedent]=platSub;
-      setPlatSub(subVoulue.current||sectionsPlateformes.current[tab]||'ventes');
+      // Une tâche (Ventes, Annonces, Messages) rouvre sur le dernier filtre de
+      // site choisi (mémorisé sur l'appareil), sinon son défaut.
+      setPlatSub(subVoulue.current||sectionsPlateformes.current[tab]||(estTacheSite(tab)?(filtreRetenu(tab)||siteDeTache(tab,null)):'ventes'));
       dernierePlateforme.current=tab;
     }
     subVoulue.current=null;
@@ -58897,7 +59113,12 @@ function AppCoeur() {
   // l'autre d'une même plateforme (choisir le compte une fois, le voir sur
   // Annonces PUIS Ventes PUIS Messages).
   const [compteSel,setCompteSel]=useState('');
-  React.useEffect(()=>{ setCompteSel(''); },[tab]);
+  // (31 oct.) Le compte choisi suit le SITE, pas l'onglet : choisi dans Ventes ·
+  // Vinted, il reste choisi dans Annonces · Vinted (comme d'une section à
+  // l'autre de l'ancien onglet Vinted) ; il revient à « tous » sur un autre site.
+  const siteCourant=estTacheSite(tab)?siteDeTache(tab,platSub):({plat_vinted:'vinted',plat_leboncoin:'leboncoin',plat_ebay:'ebay',plat_vestiaire:'vestiaire'}[tab]||tab);
+  React.useEffect(()=>{ setCompteSel(''); },[siteCourant]);
+  React.useEffect(()=>{ if(estTacheSite(tab)) retenirFiltre(tab, siteDeTache(tab,platSub)); },[tab,platSub]);
   // Le compte Vinted ouvert dans CE Chrome (l'extension le lit dans son cookie) :
   // c'est celui qu'il est en train de traiter, il est choisi d'office (📍, ses
   // lignes nettes et en tête, les autres estompées — Julien, 7 octobre).
@@ -58972,8 +59193,8 @@ function AppCoeur() {
     // banc, qui navigue par `?tab=`, croyait rendre Leboncoin alors qu'il
     // mesurait l'accueil (un faux vert dans ma propre couverture d'hier).
     // `journee` manquait aussi : invisible parce que c'est l'état de départ.
-    const TABS_OK=['journee','collectif','plat_vinted','plat_leboncoin','plat_ebay','plat_vestiaire','prixmarche','dashboard','compta','cat_annonces','cat_ventes','cat_achats','cat_bord','cat_msg','cat_expedition','garage','organisation','communaute','invoices','masques','settings','vintedaccounts','catalog','sales','stockvinted','leboncoin','ebay_annonces','ebay_ventes','ebay_agent','ebay_messages','vinted_annonces'];
-    const goto=(search)=>{ try{ const p=new URLSearchParams(search); const t=p.get('tab'); if(p.get('print')==='bord') _pendingBordPrint=true; if(t&&TABS_OK.includes(t)){ setTab(t); window.history.replaceState(window.history.state,'',window.location.pathname); } }catch(_){}};
+    const TABS_OK=['ventes','annonces','messages','journee','collectif','plat_vinted','plat_leboncoin','plat_ebay','plat_vestiaire','prixmarche','dashboard','compta','cat_annonces','cat_ventes','cat_achats','cat_bord','cat_msg','cat_expedition','garage','organisation','communaute','invoices','masques','settings','vintedaccounts','catalog','sales','stockvinted','leboncoin','ebay_annonces','ebay_ventes','ebay_agent','ebay_messages','vinted_annonces'];
+    const goto=(search)=>{ try{ const p=new URLSearchParams(search); const t=p.get('tab'); if(p.get('print')==='bord') _pendingBordPrint=true; if(t&&TABS_OK.includes(t)){ const site=p.get('site'), section=p.get('section'); if(site&&estTacheSite(t)&&siteDeTache(t,site)===site) subVoulue.current=site; else if(section&&/^[a-z]{2,12}$/.test(section)&&t.startsWith('plat_')) subVoulue.current=section; setTab(t); window.history.replaceState(window.history.state,'',window.location.pathname); } }catch(_){}};
     goto(window.location.search);
     const onMsg=(e)=>{ if(e.data&&e.data.type==='open-url'&&e.data.url){ try{ goto(new URL(e.data.url,window.location.origin).search); }catch(_){}} };
     if(navigator.serviceWorker) navigator.serviceWorker.addEventListener('message',onMsg);
@@ -59131,7 +59352,7 @@ function AppCoeur() {
   const slideTab=React.useCallback((dx,dy,seuil)=>{
     if(Math.abs(dx)<=seuil || Math.abs(dx)<=Math.abs(dy)*2) return;
     setTab(t=>{
-      const ordre=BOTTOM_TABS.filter(x=>x.id!=='plat_vestiaire');
+      const ordre=BOTTOM_TABS;
       const i=ordre.findIndex(x=>x.id===t); if(i<0) return t;
       const ni=dx<0?Math.min(ordre.length-1,i+1):Math.max(0,i-1);
       return ordre[ni].id;
@@ -59402,6 +59623,36 @@ function AppCoeur() {
   const comptesEbay = useComptesEbay();
   useRelectureEbay();
   useRelectureTransporteurs();
+  // ── (31 oct.) LES SITES OÙ IL A UN COMPTE : la rangée de filtres de Ventes,
+  // Annonces, Messages et les entrées « Plateformes » ne montrent que ceux-là
+  // (« aucune entrée vide »). Leboncoin et Vestiaire : une ligne rangée par
+  // l'extension existe (`select=id`, aucune donnée lue). Pas su (lecture en
+  // cours ou ratée) ⇒ le site est montré : « pas su » ne cache rien.
+  const [sitesLus,setSitesLus]=useState(undefined);
+  useEffect(()=>{ let vivant=true; (async()=>{
+    try{ const r=await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=in.(lbc_listings,lbc_ventes,lbc_accounts,vc_listings,vc_ventes,ebay_orders,ebay_listings)&select=id`,{headers:sbAuth()});
+      if(!r.ok) throw new Error('lecture'); const j=await r.json(); if(!Array.isArray(j)) throw new Error('forme');
+      const ids=new Set(j.map(x=>String(x&&x.id))); if(vivant) setSitesLus({ leboncoin:['lbc_listings','lbc_ventes','lbc_accounts'].some(k=>ids.has(k)), vestiaire:['vc_listings','vc_ventes'].some(k=>ids.has(k)), ebay:['ebay_orders','ebay_listings'].some(k=>ids.has(k)) });
+    }catch(_){ if(vivant) setSitesLus(null); }
+  })(); return ()=>{ vivant=false; }; },[]);
+  const sitesPresents=useMemo(()=>{
+    const s=new Set();
+    if(!accountsLoaded || (vintedAccounts||[]).length>0) s.add('vinted');
+    if(!sitesLus || sitesLus.leboncoin) s.add('leboncoin');
+    // eBay : un compte relié au registre, ou des lignes du compte principal
+    // d'avant le registre (le compte « implicite » seul ne prouve rien).
+    if(!Array.isArray(comptesEbay) || !sitesLus || comptesEbay.some(c=>!c.implicite) || sitesLus.ebay) s.add('ebay');
+    if(!sitesLus || sitesLus.vestiaire) s.add('vestiaire');
+    return s;
+  },[accountsLoaded,vintedAccounts,sitesLus,comptesEbay]);
+  // Le badge de Colis : le nombre PUBLIÉ par l'écran qui a toutes les sources
+  // (`vrm_colis_aposter`, §11), s'il a moins de 12 h — sinon AUCUN badge (pas
+  // su ≠ 0, et jamais un nombre recalculé ici qui contredirait Colis).
+  const lireColisBadge=()=>{ const pub=load('vrm_colis_aposter',null); return (pub && Number.isFinite(pub.total) && Date.now()-(Number(pub.at)||0)<12*3600000) ? pub.total : null; };
+  const [colisBadge,setColisBadge]=useState(lireColisBadge);
+  useEffect(()=>{ const f=(e)=>{ if(e && e.type==='vrm:save' && !(e.detail && e.detail.k==='vrm_colis_aposter')) return; setColisBadge(lireColisBadge()); };
+    window.addEventListener('vrm:colis',f); window.addEventListener('vrm:save',f); const stop=onCloudReady(()=>setColisBadge(lireColisBadge()));
+    return ()=>{ window.removeEventListener('vrm:colis',f); window.removeEventListener('vrm:save',f); if(typeof stop==='function') stop(); }; },[]);
   // (29 oct.) L'agent eBay qui demande refait sa proposition une fois par
   // ouverture si le résumé a plus de 20 h (Ma journée, notification du matin).
   const [agentFond] = useState(() => agentEbayFondUtile());
@@ -60617,6 +60868,176 @@ function AppCoeur() {
   // code AVANT que le cœur ne monte — aucune donnée n'est lue d'ici là.
   if (MULTI_USER && authState.session && etatMfa(authState.session) !== 'ok') return <PorteMfa session={authState.session}/>;
 
+  // ── LES ÉCRANS DE CHAQUE SITE, RENDUS PAR UNE SEULE FONCTION (31 oct.) ──────
+  // Vinted, Leboncoin et eBay sont rendus ICI, une fois : dans l'espace du site
+  // (`tab==='plat_…'`, ses sections propres) ET dans les tâches Ventes, Annonces,
+  // Messages filtrées sur ce site (`tache` vrai : ni en-tête de site ni sections,
+  // la rangée de filtres les remplace). Mêmes composants, mêmes props : le filtre
+  // « Vinted » EST l'écran Vinted d'avant (§11, aucune copie).
+  // Aller à une section d'un espace de site : une section devenue tâche
+  // (Ventes, Annonces, Messages) mène à la tâche filtrée sur ce site ; les
+  // autres restent dans l'espace du site (`setTab` → `redirigerOnglet`).
+  const allerSection=(onglet,x)=>{ subVoulue.current=x; setTab(onglet); };
+  const badgesNav={ cat_bord: colisBadge, messages: msgNonLus>0 };
+  // Vestiaire n'a qu'une page (Plateforme) : dans une tâche, son morceau.
+  const rendreVestiaire=(t)=>(
+    <section className="vrm-market-space" aria-label="Vestiaire" data-tache-vestiaire={t} style={{padding:16}}>
+      {baseKO ? <LignePanne>Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui a échoué.</LignePanne>
+        : t==='ventes' ? <VentesVestiaire comptes={vintedAccounts}/>
+        : t==='annonces' ? <PublierVestiaire comptes={vintedAccounts}/>
+        : <MessagesVestiaire/>}
+    </section>
+  );
+  // Ce que l'espace d'un site garde en propre, dit sous la tâche filtrée : une
+  // porte, pas un second écran (sur ordinateur comme sur téléphone).
+  // Vinted : ses achats sont l'écran Achats (entrée « Achats » de la navigation).
+  const PROPRE_SITE={ vinted:['cat_achats',null,'Tes achats Vinted'], leboncoin:['plat_leboncoin','achats','Aussi sur Leboncoin : achats, colis'], ebay:['plat_ebay','agent','Aussi sur eBay : à traiter, offres, promotion, achats, compte'], vestiaire:['plat_vestiaire',null,'Toute la page Vestiaire : publier, ventes, messages, achats, ta clé Photoroom'] };
+  const TITRES_TACHE={ ventes:'Ventes', annonces:'Annonces', messages:'Messages' };
+  const rendreTache=(t)=>{
+    const site=siteDeTache(t,platSub);
+    const propre=PROPRE_SITE[site];
+    return (
+      <section className="vrm-tache" data-tache={t} data-tache-site={site} aria-label={TITRES_TACHE[t]}>
+        <header className="vrm-market-heading vrm-tache-tete" data-tache-tete={t}>
+          <h1>{TITRES_TACHE[t]}</h1>
+        </header>
+        <div className="vrm-tache-filtres" style={{padding:'0 16px'}}>
+          <FiltreSites tache={t} site={site} sites={sitesPresents} onSite={(s)=>setPlatSub(s)}/>
+        </div>
+        {site==='toutes'
+          ? (baseKO ? <div style={{padding:16}}><LignePanne>Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui a échoué.</LignePanne></div>
+            : <VentesToutes sites={sitesPresents} ventesVinted={ventesCoque} ventesKO={ventesKO} comptes={vintedAccounts} panelOff={panelOffCoque} lbcVentes={lbcVentes} lbcLu={lbcCoqueLu} ebayTous={ebayCmdTous}
+                onOuvrir={(l)=>{ if(l.site==='ebay'){ DEMANDE_EBAY_CIBLE.compte=l.compteRef||null; DEMANDE_EBAY_CIBLE.id=l.id; DEMANDE_EBAY_CIBLE.at=Date.now(); setTab('ebay_ventes'); return; } setPlatSub(l.site); }}/>)
+          : site==='vinted' ? rendreVinted(t,true)
+          : site==='leboncoin' ? rendreLeboncoin(t,true)
+          : site==='ebay' ? rendreEbay(t,true)
+          : rendreVestiaire(t)}
+        {site!=='toutes' && propre && (
+          <div style={{padding:'4px 16px 20px'}}>
+            <button type="button" className="vrm-lien-action" data-espace-site={site} onClick={()=>{ if(propre[0]==='cat_achats'){ VUE_ACHATS_NAV='all'; demanderVue('achats'); } if(propre[1]) subVoulue.current=propre[1]; setTab(propre[0]); }}
+              style={{minHeight:44,background:'transparent',border:0,padding:0,color:C.muted,fontSize:13,fontFamily:'inherit',cursor:'pointer',textAlign:'left'}}>
+              {propre[2]} ›
+            </button>
+          </div>
+        )}
+      </section>
+    );
+  };
+  const rendreVinted=(sec,tache)=>{ const allerSec=(x)=>allerSection('plat_vinted',x); return (<section className="vrm-market-space" aria-label="Vinted"><DansEspacePlateforme.Provider value={!tache}>{!tache&&<EntetePlateforme nom="Vinted" plateforme="vinted"/>}
+          {/* Résumé CA/argent TOUJOURS visible en haut, puis la liste (ventes par
+              défaut) directement — plus d'écran « Aperçu » intermédiaire. Les
+              sections restent les mêmes écrans (§11), juste à un tap. */}
+          <VintedResume liveStats={liveStatsVus} baseKO={baseKO} siAJour={sec!=='annonces'} sauf={(sec || 'ventes') === 'ventes' ? (liveStatsVus && liveStatsVus.venduManque) : null}/>
+          {/* PARITÉ (26 oct.) : eBay et Leboncoin portent une to-do rangée « À
+              faire » en tête de leur espace ; la to-do de Vinted, c'est « Ma
+              journée » — mais depuis l'espace Vinted elle n'était joignable
+              nulle part. Une entrée, pas un second calcul : « Ma journée » est
+              cross-plateforme et reste l'unique propriétaire de la liste (§11,
+              aucun compteur dupliqué ici qui pourrait diverger). */}
+          {!baseKO && !premierJour && (
+            <div style={{ padding: '10px 16px 0' }}>
+              {/* (26 oct., « trop brouillon ») Une ligne, pas une carte de deux lignes :
+                  l'explication est dans Ma journée elle-même. */}
+              <button type="button" data-vinted-majournee="" title="Ma journée : colis à poster et à retirer, messages et offres, sur tous tes comptes" onClick={() => setTab('journee')} style={{ width: '100%', textAlign: 'left', display: 'flex', alignItems: 'center', gap: 10, border: `1px solid ${C.border}`, background: C.card, borderRadius: 10, padding: '0 14px', minHeight: 44, cursor: 'pointer', fontFamily: 'inherit' }}>
+                <Icon name="check" size={16} style={{ color: C.muted, flexShrink: 0 }}/>
+                <span style={{ flex: 1, minWidth: 0, fontSize: 13.5, fontWeight: 600, color: C.text }}>À faire aujourd'hui</span>
+                <span aria-hidden="true" style={{ fontSize: 16, color: C.muted, flexShrink: 0 }}>›</span>
+              </button>
+            </div>
+          )}
+          {/* ⚠️ 4 octobre — Julien : « dans Vinted […] il y ait les messages ».
+              L'écran complet existait (liste tous comptes, fil, réponse, offres)
+              mais n'avait plus AUCUNE porte dans Vinted : seulement la cloche. */}
+          {/* (31 oct., navigation par tâche) Ventes, Annonces et Messages sont des TÂCHES (barre du bas) : l'espace Vinted ne garde que ce qui lui est propre. */}
+          {!tache&&sectionsSite('vinted').length>1&&<PlatSubNav sub={sec} setSub={allerSec} sections={sectionsSite('vinted')}/>}
+          {/* Filtre par compte (Julien, 6 oct.) — Ventes / Annonces / Achats /
+              Messages. Les Colis ne sont pas filtrés (« pour les colis pas
+              forcément »). Un seul compte ⇒ la rangée ne s'affiche pas. */}
+          {(sec==='ventes'||sec==='annonces'||sec==='achats'||sec==='messages') && <SelecteurCompte accounts={comptesChoisissables} sel={compteSel} setSel={setCompteSel} connecte={compteConnecte} messages={sec==='messages'}/>}
+          {/* Sous la navigation, pas entre le résumé et elle (revue du 17 oct.). */}
+          {sec==='ventes' && !baseKO && <div className="vrm-retirer-hote" style={{padding:'10px 16px 0'}}><RetirerArgent liveStats={liveStatsVus}/></div>}
+          <Comptabilite key={'pv_'+sec} accounts={vintedAccounts} only={sec==='apercu'?'ventes':sec} liveStats={liveStatsVus} accountsReady={accountsLoaded} baseKO={baseKO} onNav={setTab} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}} onFreeNum={freeGarageNum} compteSel={compteSel} compteConnecte={compteConnecte} dansPlateforme/>
+        </DansEspacePlateforme.Provider></section>); };
+  const rendreLeboncoin=(sec,tache)=>{ const allerSec=(x)=>allerSection('plat_leboncoin',x); return (<section className="vrm-market-space" aria-label="Leboncoin"><DansEspacePlateforme.Provider value={!tache}>{!tache&&<EntetePlateforme nom="Leboncoin" plateforme="leboncoin"/>}
+          {/* Julien : « Leboncoin, la même mise en page que Vinted ». Vinted a
+              Ventes / Achats / Annonces ; côté Leboncoin on a maintenant les
+              VENTES et les ACHATS (les deux prouvés par `isSeller`, cf.
+              VentesLeboncoin/AchatsLeboncoin), les Colis, et « À publier ».
+              L'onglet Achats est toujours là : sans achat capté, il dit pourquoi
+              (jamais lu ≠ lu et vide), il ne reste jamais blanc. */}
+          {(() => { const ar = lbcArgent(lbcVentes); const e2 = (n) => n.toFixed(2).replace('.', ',') + ' €';
+            const note = (ar.actives && lbcVentes.maj)
+              ? `Montants à jour de ta dernière lecture Leboncoin (${ilYaCourt(lbcVentes.maj)}). Pour les rafraîchir, ouvre « Mes transactions » sur leboncoin.fr avec l'extension à jour.`
+              : null;
+            // Sur « Ventes », les trois cases disent déjà ces montants : le résumé
+            // du haut se tait (le même nombre deux fois sur un écran, §7).
+            if (sec === 'ventes') return null;
+            return (
+            <PlatResume baseKO={baseKO} note={note} cases={[[`CA finalisé${ar.nRecu ? ' · ' + ar.nRecu : ''}`, ar.actives ? e2(ar.recu) : null], [`En attente${ar.nAttente ? ' · ' + ar.nAttente : ''}`, ar.actives ? e2(ar.attente) : null, true]]}/>
+          ); })()}
+          {!tache&&<PlatSubNav sub={sec} setSub={allerSec} sections={sectionsSite('leboncoin')}/>}
+          {sec==='messages'&&<div style={{padding:16}}>{baseKO?<LignePanne>Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui a échoué.</LignePanne>:<MessagesLeboncoin/>}</div>}
+          {sec==='ventes'&&<div style={{padding:16}}>{baseKO?<LignePanne>Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui a échoué.</LignePanne>:<>
+            {(() => { const ar = lbcArgent(lbcVentes); const vide = !(lbcVentes.ventes||[]).length && !lbcVentes.inconnues; const lu = !!lbcVentes.maj;
+              // Jamais lu (aucune visite de « Mes transactions ») : « — », pas 0.
+              const v = (n) => (vide && !lu) ? null : n;
+              return <KpiVentes plateforme="leboncoin" tuiles={[
+                { cle: 'encours', lib: 'En cours', val: v(ar.nAttente), sub: (vide && !lu) ? null : fmt(ar.attente) },
+                { cle: 'finalisees', lib: 'Finalisées', val: v(ar.nRecu) },
+                { cle: 'ca', lib: 'CA finalisé', val: (vide && !lu) ? null : fmt(ar.recu), brut: (vide && !lu) ? null : ar.recu },
+              ]} note={vide ? "Tes ventes Leboncoin arrivent quand l'extension passe sur leboncoin.fr (« Mes transactions »). Seules les ventes où tu es bien le vendeur sont comptées." : (lbcVentes.maj ? <span data-lbc-lu="">Lu sur Leboncoin {ilYaCourt(lbcVentes.maj)} <Pourquoi label="Rafraîchir">Ouvre « Mes transactions » sur leboncoin.fr, avec l'extension à jour : tes ventes sont relues.</Pourquoi></span> : null)}/>; })()}
+            {((lbcVentes.ventes||[]).length>0||lbcVentes.inconnues>0) && <VentesLeboncoin lbcVentes={lbcVentes} sansTotaux/>}
+          </>}</div>}
+          {sec==='achats'&&<div style={{padding:16}}>{baseKO?<LignePanne>Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui a échoué.</LignePanne>:<AchatsLeboncoin lbcVentes={lbcVentes}/>}</div>}
+          {sec==='colis'&&(baseKO?<div style={{padding:16}}><LignePanne>Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui a échoué.</LignePanne></div>:<LeboncoinColis lbcVentes={lbcVentes}/>)}
+          {/* ⚠️ Les quatre sous-onglets voisins se gardaient de la panne, celui-ci
+              non : pendant une panne il disait sa lecture ratée en quatre
+              messages, plus « ouvre leboncoin.fr » — le mauvais geste (§7). */}
+          {sec==='annonces'&&(baseKO?<div style={{padding:16}}><LignePanne>Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui a échoué.</LignePanne></div>:<LeboncoinScreen/>)}
+          {/* (27 oct.) Le diagnostic est une aide en cas de souci : en bas de
+              l'espace, plus une ligne en tête de chaque section. */}
+          <div data-diag-lbc="" style={{padding:'0 16px'}}><DiagnosticLeboncoin key={AUTH.user?.id||'sans-session'} lire={q=>lireReceptionLeboncoin(`${SUPABASE_URL}/rest/v1/${q}`,sbAuth())} couleurs={C}/></div>
+        </DansEspacePlateforme.Provider></section>); };
+  const rendreEbay=(sec,tache)=>{ const allerSec=(x)=>allerSection('plat_ebay',x); return (<section className="vrm-market-space" aria-label="eBay"><DansEspacePlateforme.Provider value={!tache}>{!tache&&<EntetePlateforme nom="eBay" plateforme="ebay"/>}
+          {/* Julien : « eBay, je veux tout pareil que Vinted — les onglets achats,
+              ventes ». Même structure, dans le skin eBay (noir). Aperçu garde la
+              connexion + la publication ; Ventes liste les commandes captées ;
+              Achats dit honnêtement qu'ils ne sont pas encore récupérés. */}
+          {/* (9 octobre) PLUSIEURS COMPTES eBAY : le résumé porte sur le compte
+              choisi, ou sur TOUS — et dit alors sur combien. Un compte illisible
+              est NOMMÉ, jamais un total partiel présenté comme complet (§5). */}
+          {(() => {
+            const plusieurs = Array.isArray(comptesEbay) && comptesEbay.length >= 2;
+            const tous = ebayCmdTous && Array.isArray(ebayCmdTous.items);
+            const illVue = ebayCmdTous ? ebayCmdTous.illisibles.filter((c) => ebayVueEff === '*' || c.ref === ebayVueEff) : [];
+            const cmdVue = tous ? ebayCmdTous.items.filter((o) => dansVueEbay(o, ebayVueEff)) : null;
+            const ca = (!tous || illVue.length) ? null : caEbayPayees(cmdVue);
+            const nomVue = plusieurs && ebayVueEff !== '*' ? nomCompteEbay(comptesEbay.find((c) => c.ref === ebayVueEff)) : '';
+            const lib = 'Ventes payées' + (plusieurs ? (ebayVueEff === '*' ? ` · ${comptesEbay.length} comptes` : ` · ${nomVue}`) : '');
+            const note = illVue.length ? `Je n'ai pas pu lire les ventes ${illVue.length > 1 ? 'des comptes eBay' : 'du compte eBay'} ${illVue.map(nomCompteEbay).join(', ')} — rien n'est perdu, réessaie dans un moment.` : null;
+            if (sec === 'ventes') return null;   // les trois cases de « Ventes » le disent (§7)
+            return <PlatResume dark baseKO={baseKO} note={note} cases={[[lib, ca != null ? fmt(ca) : null]]}/>;
+          })()}
+          {!tache&&<div><PlatSubNav sub={sec} setSub={sub=>{setEbayCible(null);allerSec(sub);}} sections={sectionsSite('ebay')} dark/></div>}
+          {/* Le SÉLECTEUR DE COMPTE : seulement à partir de deux comptes reliés
+              (un seul compte : rien ne change). La même forme que la liste des
+              comptes Vinted (§11). Il ne change que ce qu'on VOIT. */}
+          {Array.isArray(comptesEbay) && comptesEbay.length >= 2 && (
+            <ListeComptes id="vrm-sel-compte-ebay" skin={EBAY_SKIN} valeur={ebayVueEff} onChange={setEbayVue}
+              attrs={{ 'data-ebay-vue': ebayVueEff }}
+              options={comptesEbay.map((c) => ({ val: c.ref, nom: nomCompteEbay(c) + (typeCompteEbayTexte(c) ? ` · ${typeCompteEbayTexte(c)}` : '') + (siteCompteEbayTexte(c) ? ` · ${siteCompteEbayTexte(c)}` : '') }))} />
+          )}
+          {sec==='ventes'&&<EbayVentes baseKO={baseKO} vue={ebayVueEff} comptesEbay={comptesEbay} cible={ebayCible?.section==='ventes'?ebayCible:null} onClearCible={()=>setEbayCible(null)}/>}
+          {sec==='messages'&&<div style={{padding:16}}><EbayActionCompte vue={ebayVueEff} comptes={comptesEbay} onCompte={setEbayVue}>{ref=><EbayMessages key={ref} owner={AUTH.user?.id || 'installation'} cible={ebayCible?.compte===ref && ebayCible.section==='messages'?ebayCible:null} onClearCible={()=>setEbayCible(null)} headers={enTeteSession} confirm={askConfirm} theme={C} compte={ref}/>}</EbayActionCompte></div>}
+          {sec==='agent'&&!baseKO&&<div style={{padding:'16px 16px 0'}}><AgentEbay comptes={accountsLoaded?vintedAccounts:undefined} comptesEbay={comptesEbay} onAnnonces={()=>allerSec('annonces')}/></div>}
+          {sec==='agent'&&<div style={{padding:16}}><EbayActionCompte vue={ebayVueEff} comptes={comptesEbay} onCompte={setEbayVue}>{ref=><><EbayRetours key={'rt-'+ref} headers={enTeteSession} confirm={askConfirm} theme={C} compte={ref}/><EbayAgent key={ref} headers={enTeteSession} theme={C} compte={ref} onSection={(section,t)=>{setEbayVue(ref);setEbayCible(cibleEbay(ref,{...t,section}));allerSec(section);}}/><EbayEvaluations key={'ev-'+ref} headers={enTeteSession} confirm={askConfirm} theme={C} compte={ref}/></>}</EbayActionCompte></div>}
+          {sec==='promo'&&<div style={{padding:16}}><EbayActionCompte vue={ebayVueEff} comptes={comptesEbay} onCompte={setEbayVue}>{ref=><EbayPromotion key={'pr-'+ref} headers={enTeteSession} confirm={askConfirm} theme={C} compte={ref}/>}</EbayActionCompte></div>}
+          {sec==='achats'&&<EbayAchatsOnglet headers={enTeteSession} panelOff={panelOffCoque} vue={ebayVueEff} comptes={comptesEbay} onCompte={setEbayVue}/>}
+          {sec==='offres'&&<div style={{padding:16}}><EbayActionCompte vue={ebayVueEff} comptes={comptesEbay} onCompte={setEbayVue}>{ref=><EbayOffres key={ref} cible={ebayCible?.compte===ref && ebayCible.section==='offres'?ebayCible:null} onClearCible={()=>setEbayCible(null)} headers={enTeteSession} confirm={askConfirm} theme={C} compte={ref} onAnnonces={()=>allerSec('annonces')}/>}</EbayActionCompte></div>}
+          {sec==='annonces'&&<EbayAnnonces baseKO={baseKO} comptes={vintedAccounts} vue={ebayVueEff} comptesEbay={comptesEbay}/>}
+          {sec==='compte'&&<div data-ebay-compte-section="" style={{ padding: 16 }}>{baseKO?<div style={{ color: EBAY_SKIN.muted, fontSize: 13 }}>Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui a échoué.</div>:<EbayConnexion onAnnonces={()=>allerSec('annonces')} vue={ebayVueEff} comptesEbay={comptesEbay}/>}</div>}
+        </DansEspacePlateforme.Provider></section>); };
+
   return (
     <div className="vrm-app-shell" style={{...variablesTheme(C,dark),height:'100%',width:'100%',display:'flex',flexDirection:'column',overflowX:'clip',background:C.bg,color:C.text,fontFamily:'inherit',transition:'background .3s,color .3s',boxSizing:'border-box'}}
       onTouchStart={e=>{
@@ -60668,7 +61089,7 @@ function AppCoeur() {
         <div className="vrm-header-brand" style={{display: ordi ? 'none' : undefined}}>
           {/* Tous les écrans, en haut à gauche. Sur ordinateur la barre latérale
               les montre déjà tous : ce bouton n'y existe pas. */}
-          {!ordi && <MenuEcrans tab={tab} setTab={setTab} dark={dark}/>}
+          {!ordi && <MenuEcrans tab={tab} setTab={setTab} dark={dark} sites={sitesPresents} badges={badgesNav}/>}
           <div className="vrm-header-logo" aria-label="VRM">
             <VrmLogo size={36} anim={false}/>
           </div>
@@ -60885,7 +61306,7 @@ function AppCoeur() {
             sur la coque, pour tous les écrans (src/photosVinted.js). */}
         {!baseKO && <PhotosBloquees/>}
         <BlocNumerosPerimes/>
-        {tab==='settings'&&<SettingsScreen setTab={setTab} onPlateforme={plat=>{subVoulue.current='compte';setTab(plat);}} comptes={vintedAccounts}
+        {tab==='settings'&&<SettingsScreen setTab={setTab} onPlateforme={plat=>{subVoulue.current=plat==='plat_leboncoin'?'annonces':'compte';setTab(plat);}} comptes={vintedAccounts}
 
           notifEnabled={notifEnabled}
           onToggleNotif={async()=>{
@@ -61085,119 +61506,12 @@ function AppCoeur() {
             cartes de l'aperçu changent la section (onSub) au lieu d'envoyer
             ailleurs. Les écrans détaillés restent aussi joignables seuls (menu
             « Dans Vinted »), donc rien n'est perdu (§4.11). */}
-        {tab==='plat_vinted'&&(<EspacePlateforme nom="Vinted"><EntetePlateforme nom="Vinted" plateforme="vinted"/>
-          {/* Résumé CA/argent TOUJOURS visible en haut, puis la liste (ventes par
-              défaut) directement — plus d'écran « Aperçu » intermédiaire. Les
-              sections restent les mêmes écrans (§11), juste à un tap. */}
-          <VintedResume liveStats={liveStatsVus} baseKO={baseKO} siAJour={platSub!=='annonces'} sauf={(platSub || 'ventes') === 'ventes' ? (liveStatsVus && liveStatsVus.venduManque) : null}/>
-          {/* PARITÉ (26 oct.) : eBay et Leboncoin portent une to-do rangée « À
-              faire » en tête de leur espace ; la to-do de Vinted, c'est « Ma
-              journée » — mais depuis l'espace Vinted elle n'était joignable
-              nulle part. Une entrée, pas un second calcul : « Ma journée » est
-              cross-plateforme et reste l'unique propriétaire de la liste (§11,
-              aucun compteur dupliqué ici qui pourrait diverger). */}
-          {!baseKO && !premierJour && (
-            <div style={{ padding: '10px 16px 0' }}>
-              {/* (26 oct., « trop brouillon ») Une ligne, pas une carte de deux lignes :
-                  l'explication est dans Ma journée elle-même. */}
-              <button type="button" data-vinted-majournee="" title="Ma journée : colis à poster et à retirer, messages et offres, sur tous tes comptes" onClick={() => setTab('journee')} style={{ width: '100%', textAlign: 'left', display: 'flex', alignItems: 'center', gap: 10, border: `1px solid ${C.border}`, background: C.card, borderRadius: 10, padding: '0 14px', minHeight: 44, cursor: 'pointer', fontFamily: 'inherit' }}>
-                <Icon name="check" size={16} style={{ color: C.muted, flexShrink: 0 }}/>
-                <span style={{ flex: 1, minWidth: 0, fontSize: 13.5, fontWeight: 600, color: C.text }}>À faire aujourd'hui</span>
-                <span aria-hidden="true" style={{ fontSize: 16, color: C.muted, flexShrink: 0 }}>›</span>
-              </button>
-            </div>
-          )}
-          {/* ⚠️ 4 octobre — Julien : « dans Vinted […] il y ait les messages ».
-              L'écran complet existait (liste tous comptes, fil, réponse, offres)
-              mais n'avait plus AUCUNE porte dans Vinted : seulement la cloche. */}
-          <PlatSubNav sub={platSub} setSub={setPlatSub} sections={[['ventes','Ventes'],['achats','Achats'],['annonces','Annonces'],['messages','Messages', msgNonLus > 0]]}/>
-          {/* Filtre par compte (Julien, 6 oct.) — Ventes / Annonces / Achats /
-              Messages. Les Colis ne sont pas filtrés (« pour les colis pas
-              forcément »). Un seul compte ⇒ la rangée ne s'affiche pas. */}
-          {(platSub==='ventes'||platSub==='annonces'||platSub==='achats'||platSub==='messages') && <SelecteurCompte accounts={comptesChoisissables} sel={compteSel} setSel={setCompteSel} connecte={compteConnecte} messages={platSub==='messages'}/>}
-          {/* Sous la navigation, pas entre le résumé et elle (revue du 17 oct.). */}
-          {platSub==='ventes' && !baseKO && <div className="vrm-retirer-hote" style={{padding:'10px 16px 0'}}><RetirerArgent liveStats={liveStatsVus}/></div>}
-          <Comptabilite key={'pv_'+platSub} accounts={vintedAccounts} only={platSub==='apercu'?'ventes':platSub} liveStats={liveStatsVus} accountsReady={accountsLoaded} baseKO={baseKO} onNav={setTab} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}} onFreeNum={freeGarageNum} compteSel={compteSel} compteConnecte={compteConnecte} dansPlateforme/>
-        </EspacePlateforme>)}
-        {tab==='plat_leboncoin'&&(<EspacePlateforme nom="Leboncoin"><EntetePlateforme nom="Leboncoin" plateforme="leboncoin"/>
-          {/* Julien : « Leboncoin, la même mise en page que Vinted ». Vinted a
-              Ventes / Achats / Annonces ; côté Leboncoin on a maintenant les
-              VENTES et les ACHATS (les deux prouvés par `isSeller`, cf.
-              VentesLeboncoin/AchatsLeboncoin), les Colis, et « À publier ».
-              L'onglet Achats est toujours là : sans achat capté, il dit pourquoi
-              (jamais lu ≠ lu et vide), il ne reste jamais blanc. */}
-          {(() => { const ar = lbcArgent(lbcVentes); const e2 = (n) => n.toFixed(2).replace('.', ',') + ' €';
-            const note = (ar.actives && lbcVentes.maj)
-              ? `Montants à jour de ta dernière lecture Leboncoin (${ilYaCourt(lbcVentes.maj)}). Pour les rafraîchir, ouvre « Mes transactions » sur leboncoin.fr avec l'extension à jour.`
-              : null;
-            // Sur « Ventes », les trois cases disent déjà ces montants : le résumé
-            // du haut se tait (le même nombre deux fois sur un écran, §7).
-            if (platSub === 'ventes') return null;
-            return (
-            <PlatResume baseKO={baseKO} note={note} cases={[[`CA finalisé${ar.nRecu ? ' · ' + ar.nRecu : ''}`, ar.actives ? e2(ar.recu) : null], [`En attente${ar.nAttente ? ' · ' + ar.nAttente : ''}`, ar.actives ? e2(ar.attente) : null, true]]}/>
-          ); })()}
-          <PlatSubNav sub={platSub} setSub={setPlatSub} sections={[['ventes','Ventes'],['achats','Achats'],['annonces','Annonces'],['messages','Messages'],['colis','Colis']]}/>
-          {platSub==='messages'&&<div style={{padding:16}}>{baseKO?<LignePanne>Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui a échoué.</LignePanne>:<MessagesLeboncoin/>}</div>}
-          {platSub==='ventes'&&<div style={{padding:16}}>{baseKO?<LignePanne>Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui a échoué.</LignePanne>:<>
-            {(() => { const ar = lbcArgent(lbcVentes); const vide = !(lbcVentes.ventes||[]).length && !lbcVentes.inconnues; const lu = !!lbcVentes.maj;
-              // Jamais lu (aucune visite de « Mes transactions ») : « — », pas 0.
-              const v = (n) => (vide && !lu) ? null : n;
-              return <KpiVentes plateforme="leboncoin" tuiles={[
-                { cle: 'encours', lib: 'En cours', val: v(ar.nAttente), sub: (vide && !lu) ? null : fmt(ar.attente) },
-                { cle: 'finalisees', lib: 'Finalisées', val: v(ar.nRecu) },
-                { cle: 'ca', lib: 'CA finalisé', val: (vide && !lu) ? null : fmt(ar.recu), brut: (vide && !lu) ? null : ar.recu },
-              ]} note={vide ? "Tes ventes Leboncoin arrivent quand l'extension passe sur leboncoin.fr (« Mes transactions »). Seules les ventes où tu es bien le vendeur sont comptées." : (lbcVentes.maj ? <span data-lbc-lu="">Lu sur Leboncoin {ilYaCourt(lbcVentes.maj)} <Pourquoi label="Rafraîchir">Ouvre « Mes transactions » sur leboncoin.fr, avec l'extension à jour : tes ventes sont relues.</Pourquoi></span> : null)}/>; })()}
-            {((lbcVentes.ventes||[]).length>0||lbcVentes.inconnues>0) && <VentesLeboncoin lbcVentes={lbcVentes} sansTotaux/>}
-          </>}</div>}
-          {platSub==='achats'&&<div style={{padding:16}}>{baseKO?<LignePanne>Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui a échoué.</LignePanne>:<AchatsLeboncoin lbcVentes={lbcVentes}/>}</div>}
-          {platSub==='colis'&&(baseKO?<div style={{padding:16}}><LignePanne>Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui a échoué.</LignePanne></div>:<LeboncoinColis lbcVentes={lbcVentes}/>)}
-          {/* ⚠️ Les quatre sous-onglets voisins se gardaient de la panne, celui-ci
-              non : pendant une panne il disait sa lecture ratée en quatre
-              messages, plus « ouvre leboncoin.fr » — le mauvais geste (§7). */}
-          {platSub==='annonces'&&(baseKO?<div style={{padding:16}}><LignePanne>Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui a échoué.</LignePanne></div>:<LeboncoinScreen/>)}
-          {/* (27 oct.) Le diagnostic est une aide en cas de souci : en bas de
-              l'espace, plus une ligne en tête de chaque section. */}
-          <div data-diag-lbc="" style={{padding:'0 16px'}}><DiagnosticLeboncoin key={AUTH.user?.id||'sans-session'} lire={q=>lireReceptionLeboncoin(`${SUPABASE_URL}/rest/v1/${q}`,sbAuth())} couleurs={C}/></div>
-        </EspacePlateforme>)}
-        {tab==='plat_ebay'&&(<EspacePlateforme nom="eBay"><EntetePlateforme nom="eBay" plateforme="ebay"/>
-          {/* Julien : « eBay, je veux tout pareil que Vinted — les onglets achats,
-              ventes ». Même structure, dans le skin eBay (noir). Aperçu garde la
-              connexion + la publication ; Ventes liste les commandes captées ;
-              Achats dit honnêtement qu'ils ne sont pas encore récupérés. */}
-          {/* (9 octobre) PLUSIEURS COMPTES eBAY : le résumé porte sur le compte
-              choisi, ou sur TOUS — et dit alors sur combien. Un compte illisible
-              est NOMMÉ, jamais un total partiel présenté comme complet (§5). */}
-          {(() => {
-            const plusieurs = Array.isArray(comptesEbay) && comptesEbay.length >= 2;
-            const tous = ebayCmdTous && Array.isArray(ebayCmdTous.items);
-            const illVue = ebayCmdTous ? ebayCmdTous.illisibles.filter((c) => ebayVueEff === '*' || c.ref === ebayVueEff) : [];
-            const cmdVue = tous ? ebayCmdTous.items.filter((o) => dansVueEbay(o, ebayVueEff)) : null;
-            const ca = (!tous || illVue.length) ? null : caEbayPayees(cmdVue);
-            const nomVue = plusieurs && ebayVueEff !== '*' ? nomCompteEbay(comptesEbay.find((c) => c.ref === ebayVueEff)) : '';
-            const lib = 'Ventes payées' + (plusieurs ? (ebayVueEff === '*' ? ` · ${comptesEbay.length} comptes` : ` · ${nomVue}`) : '');
-            const note = illVue.length ? `Je n'ai pas pu lire les ventes ${illVue.length > 1 ? 'des comptes eBay' : 'du compte eBay'} ${illVue.map(nomCompteEbay).join(', ')} — rien n'est perdu, réessaie dans un moment.` : null;
-            if (platSub === 'ventes') return null;   // les trois cases de « Ventes » le disent (§7)
-            return <PlatResume dark baseKO={baseKO} note={note} cases={[[lib, ca != null ? fmt(ca) : null]]}/>;
-          })()}
-          <div><PlatSubNav sub={platSub} setSub={sub=>{setEbayCible(null);setPlatSub(sub);}} sections={[['ventes','Ventes'],['annonces','Annonces'],['messages','Messages'],['offres','Offres'],['agent','À traiter'],['promo','Promotion'],['achats','Achats'],['compte','Compte']]} dark/></div>
-          {/* Le SÉLECTEUR DE COMPTE : seulement à partir de deux comptes reliés
-              (un seul compte : rien ne change). La même forme que la liste des
-              comptes Vinted (§11). Il ne change que ce qu'on VOIT. */}
-          {Array.isArray(comptesEbay) && comptesEbay.length >= 2 && (
-            <ListeComptes id="vrm-sel-compte-ebay" skin={EBAY_SKIN} valeur={ebayVueEff} onChange={setEbayVue}
-              attrs={{ 'data-ebay-vue': ebayVueEff }}
-              options={comptesEbay.map((c) => ({ val: c.ref, nom: nomCompteEbay(c) + (typeCompteEbayTexte(c) ? ` · ${typeCompteEbayTexte(c)}` : '') + (siteCompteEbayTexte(c) ? ` · ${siteCompteEbayTexte(c)}` : '') }))} />
-          )}
-          {platSub==='ventes'&&<EbayVentes baseKO={baseKO} vue={ebayVueEff} comptesEbay={comptesEbay} cible={ebayCible?.section==='ventes'?ebayCible:null} onClearCible={()=>setEbayCible(null)}/>}
-          {platSub==='messages'&&<div style={{padding:16}}><EbayActionCompte vue={ebayVueEff} comptes={comptesEbay} onCompte={setEbayVue}>{ref=><EbayMessages key={ref} owner={AUTH.user?.id || 'installation'} cible={ebayCible?.compte===ref && ebayCible.section==='messages'?ebayCible:null} onClearCible={()=>setEbayCible(null)} headers={enTeteSession} confirm={askConfirm} theme={C} compte={ref}/>}</EbayActionCompte></div>}
-          {platSub==='agent'&&!baseKO&&<div style={{padding:'16px 16px 0'}}><AgentEbay comptes={accountsLoaded?vintedAccounts:undefined} comptesEbay={comptesEbay} onAnnonces={()=>setPlatSub('annonces')}/></div>}
-          {platSub==='agent'&&<div style={{padding:16}}><EbayActionCompte vue={ebayVueEff} comptes={comptesEbay} onCompte={setEbayVue}>{ref=><><EbayRetours key={'rt-'+ref} headers={enTeteSession} confirm={askConfirm} theme={C} compte={ref}/><EbayAgent key={ref} headers={enTeteSession} theme={C} compte={ref} onSection={(section,t)=>{setEbayVue(ref);setEbayCible(cibleEbay(ref,{...t,section}));setPlatSub(section);}}/><EbayEvaluations key={'ev-'+ref} headers={enTeteSession} confirm={askConfirm} theme={C} compte={ref}/></>}</EbayActionCompte></div>}
-          {platSub==='promo'&&<div style={{padding:16}}><EbayActionCompte vue={ebayVueEff} comptes={comptesEbay} onCompte={setEbayVue}>{ref=><EbayPromotion key={'pr-'+ref} headers={enTeteSession} confirm={askConfirm} theme={C} compte={ref}/>}</EbayActionCompte></div>}
-          {platSub==='achats'&&<EbayAchatsOnglet headers={enTeteSession} panelOff={panelOffCoque} vue={ebayVueEff} comptes={comptesEbay} onCompte={setEbayVue}/>}
-          {platSub==='offres'&&<div style={{padding:16}}><EbayActionCompte vue={ebayVueEff} comptes={comptesEbay} onCompte={setEbayVue}>{ref=><EbayOffres key={ref} cible={ebayCible?.compte===ref && ebayCible.section==='offres'?ebayCible:null} onClearCible={()=>setEbayCible(null)} headers={enTeteSession} confirm={askConfirm} theme={C} compte={ref} onAnnonces={()=>setPlatSub('annonces')}/>}</EbayActionCompte></div>}
-          {platSub==='annonces'&&<EbayAnnonces baseKO={baseKO} comptes={vintedAccounts} vue={ebayVueEff} comptesEbay={comptesEbay}/>}
-          {platSub==='compte'&&<div data-ebay-compte-section="" style={{ padding: 16 }}>{baseKO?<div style={{ color: EBAY_SKIN.muted, fontSize: 13 }}>Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui a échoué.</div>:<EbayConnexion onAnnonces={()=>setPlatSub('annonces')} vue={ebayVueEff} comptesEbay={comptesEbay}/>}</div>}
-        </EspacePlateforme>)}
+        {tab==='ventes'&&rendreTache('ventes')}
+        {tab==='annonces'&&rendreTache('annonces')}
+        {tab==='messages'&&rendreTache('messages')}
+        {tab==='plat_vinted'&&rendreVinted(platSub,false)}
+        {tab==='plat_leboncoin'&&rendreLeboncoin(platSub,false)}
+        {tab==='plat_ebay'&&rendreEbay(platSub,false)}
         {agentFond&&accountsLoaded&&!baseKO&&Array.isArray(comptesEbay)&&comptesEbay.length>0&&!(tab==='plat_ebay'&&platSub==='agent')&&<AgentEbayFond comptes={vintedAccounts} comptesEbay={comptesEbay}/>}
         {tab==='plat_vestiaire'&&<Plateforme plat="Vestiaire Collective" liveStats={liveStatsVus} lbcVentes={lbcVentes} onGo={setTab} baseKO={baseKO} comptes={vintedAccounts}/>}
         {tab==='inventory'&&<Inventory inventory={inventory} setInventory={setInventory} accounts={vintedAccounts} garageGrid={garageGrid} labels={accountLabels} onLocate={(numero)=>{ setGarageLocate(String(numero)); setTab('garage'); }}/>}
@@ -61226,10 +61540,10 @@ function AppCoeur() {
       {bienvenue && <Bienvenue prenom={String(load('vrm_prenom','')||'').trim()} dark={!!dark}
         onTheme={(d)=>{ if(!!d!==!!dark) toggleDark(); }}
         onTerminer={()=>{ save('vrm_bienvenue_vue',{at:new Date().toISOString()}); setBienvenue(false); if(tab!=='journee') setTab('journee'); }}/>}
-      <MemoireDefilement ecran={`${tab}:${tab.startsWith('plat_')?platSub:''}`}/>
+      <MemoireDefilement ecran={`${tab}:${(tab.startsWith('plat_')||estTacheSite(tab))?platSub:''}`}/>
       {/* Une seule navigation à la fois : latérale sur ordinateur, en bas sur
           téléphone. Jamais les deux — c'est la même liste d'écrans. */}
-      {ordi ? <SideBar tab={tab} setTab={setTab} entreprise={entreprise}/> : <BottomBar tab={tab} setTab={setTab}/>}
+      {ordi ? <SideBar tab={tab} setTab={setTab} entreprise={entreprise} sites={sitesPresents} badges={badgesNav}/> : <BottomBar tab={tab} setTab={setTab} sites={sitesPresents} badges={badgesNav}/>}
       {showBackup&&<BackupModal
         catalog={catalog} sales={sales} garageGrid={garageGrid} blockedCells={blockedCells}
         onClose={()=>setShowBackup(false)}
