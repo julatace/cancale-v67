@@ -1721,3 +1721,82 @@ dégradés multicolores ; la page d'accueil publique (`Accueil.jsx`) n'est pas t
 **Captures** (base inventée, aucune donnée réelle) : `docs/style-2026-10-31/avant/` et
 `docs/style-2026-10-31/apres/` — Ma journée, Annonces, Ventes, Colis, Stock, Réglages, à
 390 et 1512 px, clair et sombre.
+
+## 31 octobre 2026 (soir) — Vitrine, les finitions ; Ventes et Annonces plus lisibles
+
+Suite du premier passage « Vitrine » (ci-dessus). Tout est de la FORME : aucune règle
+métier, aucune donnée, rien dans `vinted-sync-extension/` ni `api/`.
+
+**Ce qui restait du premier passage**
+- **Le N° sur la photo** (fiche d'annonce Vinted) : une pastille blanche à chasse fixe
+  (Geist Mono) en haut à gauche de la photo, comme la maquette. Elle est HORS du lien de
+  la photo (un bouton dans un lien ne se touche pas) et c'est la MÊME édition en place
+  qu'avant (`EnLigne data="numero"` → `poserNumero`) : un tap sur la pastille, on tape,
+  Entrée. Cible étendue à 44 px affichés (pseudo-élément). En sombre, la pastille reste
+  claire (l'encre claire du thème) : sur une photo, c'est l'étiquette qui se lit.
+  « Boostée » descend en bas à gauche de la photo. Le prix reste seul sur sa ligne —
+  la pastille que `styles-annonces-pro` posait sur le DERNIER élément de la ligne (le
+  N°) ne l'habille pas (`span[data-prix]` remis à plat, `styles-vitrine.css`).
+- **Ventes au téléphone sans cadre** : le conteneur `.vrm-ventes-liste` gardait l'aplat
+  « surface » et un cadre de 8 px de rayon ; il est retiré (à toutes les largeurs) — les
+  lignes sont sur le blanc, séparées d'un filet, comme Colis. La vignette « photo vide »
+  était BLANCHE (invisible sur le blanc) : elle prend `--vrm-photo`.
+- **`ScreenHead` rend un `h1`** — sauf dans un espace de plateforme (Vinted, Leboncoin,
+  eBay), où le `h1` est le nom de la plateforme (`EntetePlateforme`) et l'écran une
+  section : `h2`. Un contexte (`DansEspacePlateforme`, posé par `EspacePlateforme`, qui
+  remplace les trois `<section className="vrm-market-space">`) le dit. Les feuilles
+  visent `.vrm-screen-head :is(h1, h2)` ; aucun banc ne cherchait `h2` comme titre
+  d'écran (vérifié : `revendeurs.cjs` passe par `getByRole('heading')`, sans niveau).
+- **Page d'accueil publique en Vitrine** : jetons de `src/accueil-jetons.js` (blanc,
+  encre, cobalt sur le bouton principal SEUL), Bricolage Grotesque partout (plus de Space
+  Grotesk ni d'Inter dans la page, la carte, les écrans dessinés et le film), plus de
+  halos en dégradé, de reflet balayé sur le bouton, de verre dépoli sous la barre, de
+  héros ardoise à grain, de pastilles de couleur devant « Vinted · Leboncoin · eBay ».
+  Une feuille `src/styles-accueil-vitrine.css`, chargée APRÈS `styles-accueil-studio.css`,
+  a le dernier mot (même principe que l'app). Le banc `accueil.cjs` compte désormais le
+  cobalt dans son budget d'accent (`BLEUS`) : il est plus strict, pas moins.
+- **Rétrospective « Wrapped »** : plus de dégradés multicolores ni de violet (la bascule
+  Mois/Année écrivait en `#7a3cff`) — chaque carte est un aplat d'encre, l'ouverture et
+  la fin en cobalt ; les grands emojis décoratifs sont retirés ; l'en-tête dit
+  « Rétrospective · … ».
+- **Passe de cohérence** : l'écran de connexion (ardoise pétrole en dégradé, halos
+  sauge) passe sur l'encre — l'« aurore » qu'il a demandée le 27 oct. reste, ses halos
+  en neutres + cobalt ; la barre de chargement est un aplat d'accent ; le vieux bloc
+  « Matières mobiles » de `styles-iphone.css` (pétrole, grain, dégradés) et le bandeau
+  pétrole de `styles-telephone.css` renvoient aux jetons ; le fil de conversation en
+  sombre n'est plus vert pétrole (`styles-mobile-studio.css`) ; les replis de `var()`
+  pétrole (`#244E54`, `#2b4548`, `#21343e`) deviennent cobalt/encre ; une constante de
+  sept couleurs inutilisée (dont un violet) est retirée du Stock. Restent, assumés : les
+  dégradés FONCTIONNELS (masque de défilement, fondu sous une barre collante, squelette
+  de chargement, voile du film), la pièce 3D du Stock, et `styles-accueil-studio.css`
+  (entièrement recouverte par la feuille Vitrine de l'accueil).
+
+**Demande du soir (Julien)** : « il faut vraiment améliorer la mise en page des ventes…
+les icônes devant sont beaucoup trop petites, on voit même pas ce que c'est, il n'y a
+même pas le nom de la paire en entier avec la taille ; on est obligé d'appuyer sur les
+points pour remplir le prix d'achat ou relier un achat — améliore ça, pour eBay aussi ;
+les annonces sont moches ».
+- **Une ligne de vente** (Vinted, Leboncoin, eBay, Vestiaire : la même
+  `LigneVenteCompacte`) : photo 64 × 80 au téléphone, 80 × 100 sur ordinateur (elle
+  faisait 28 × 36) ; le nom EN ENTIER sur autant de lignes qu'il faut (il était coupé à
+  une ligne), date · compte dessous ; montant fort, état dessous (téléphone) ou en
+  colonne (ordinateur) ; « ⋯ » à 24 px. Vinted : la taille de la fiche est ajoutée au
+  nom quand le titre ne la dit pas (`tailleDansTitre`).
+- **Prix d'achat et « Relier un achat » SUR la ligne** quand le coût manque : nouvelle
+  prop `gestes` de `LigneVenteCompacte`, rendue sous le bouton de la ligne (un champ ne
+  vit pas dans un bouton). Ce sont les MÊMES composants et les MÊMES écritures que dans
+  le tiroir (`CoutAchatVente` → `setSaleOverride(tx,{buyPrice})` ; `openPicker` pour
+  relier — c'est SON clic qui choisit l'achat, rien par ressemblance). Le tiroir n'est
+  pas touché (un autre chantier le rend paresseux). eBay : le prix d'achat se tape sur la
+  ligne quand `bilanCommandeEbay` dit « achat inconnu » (même écriture que « Bénéfice de
+  l'article » : `costs.buyPrice` via `sauverCouts`) ; eBay n'a AUCUNE liaison à un achat
+  dans VRM, donc seul le prix est proposé (`onRelier` devient facultatif).
+- **Annonces** : Vinted — le titre en entier, la taille au bout (elle était perdue dans la
+  ligne des statistiques), prix 22 px (18 au téléphone), N° sur la photo. Leboncoin
+  (« Mes annonces ») — les lignes à vignette de 36 px deviennent des FICHES (grille, photo
+  4:5, titre entier, prix fort, état discret, gestes dessous) ; eBay — photo 80 × 100,
+  titre entier, prix 18 px (ses cartes gardent leurs réglages).
+
+**Vérifié** : `npm run build` ; audits icones, tdz, variables, boutons, csp ; les bancs
+et leur état sont dans le rapport de la session (journal `b1/`). Captures (base
+INVENTÉE `_base-volume.cjs`, aucune donnée réelle) : `docs/style-2026-10-31/finitions/`.

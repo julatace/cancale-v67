@@ -10862,7 +10862,7 @@ function AchatsHorsPlateforme({ achats, ouvert, onBasculer, onAjouter, onModifie
 // manque : « Saisir le prix » écrit `saleOv[tx].buyPrice` — la MÊME écriture
 // que le champ de « Modifier », déjà lue par `effEntry` → `beneficePaire` (§11).
 // Un montant illisible n'est jamais enregistré : on le dit (§2.5, on ne devine pas).
-function CoutAchatVente({ onSaisir, onRelier }) {
+function CoutAchatVente({ onSaisir, onRelier, surLigne = false }) {
   const [edit, setEdit] = useState(false);
   const [txt, setTxt] = useState('');
   const [err, setErr] = useState('');
@@ -10873,7 +10873,7 @@ function CoutAchatVente({ onSaisir, onRelier }) {
     onSaisir(p); setEdit(false); setTxt(''); setErr('');
   };
   return (
-    <div data-cout-vente className="vrm-cout-vente" style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+    <div data-cout-vente={surLigne ? 'ligne' : ''} className="vrm-cout-vente" style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
       <div className="vrm-cout-rangee" style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
         <span className="vrm-cout-label" style={{ fontSize: 12, color: C.muted, flex: '0 0 auto' }}>Coût d'achat ?</span>
         {edit ? (
@@ -10889,7 +10889,7 @@ function CoutAchatVente({ onSaisir, onRelier }) {
         ) : (
           <>
             <Bouton variante="secondaire" icone="pencil" data-cout-vente-saisir onClick={() => setEdit(true)} title="Taper le prix payé, sans relier d'achat">Prix d’achat</Bouton>
-            <Bouton variante="secondaire" icone="link" data-cout-vente-relier onClick={onRelier} title="Choisir l'achat Vinted correspondant : son prix remplit le coût">Relier un achat</Bouton>
+            {onRelier && <Bouton variante="secondaire" icone="link" data-cout-vente-relier onClick={onRelier} title="Choisir l'achat Vinted correspondant : son prix remplit le coût">Relier un achat</Bouton>}
           </>
         )}
       </div>
@@ -18329,7 +18329,12 @@ function FiltresVentes({ value, onChange, search, onSearch, cancelled = false, d
 // COMPTE (`sous`, une seconde ligne discrète), et l'état qui demande un geste
 // (`ton="action"` : à expédier) se distingue des autres — sans autre couleur
 // que l'ambre des choses à faire (§7).
-function LigneVenteCompacte({ photo, photoNoeud = null, titre, sous = '', etat, etatNoeud = null, ton = '', montant, children, numerosArticle = [], plateforme = '', initialOuvert = false, ...props }) {
+// (31 oct., Julien : « on est obligé d'appuyer sur les points pour remplir le
+// prix d'achat ou relier un achat ») `gestes` : ce qui MANQUE à la vente se fait
+// sur la ligne elle-même, sous le titre — les MÊMES composants et les MÊMES
+// écritures que dans le tiroir (`CoutAchatVente`), rien de neuf. Le tiroir ne
+// change pas.
+function LigneVenteCompacte({ photo, photoNoeud = null, titre, sous = '', etat, etatNoeud = null, ton = '', montant, children, numerosArticle = [], plateforme = '', initialOuvert = false, gestes = null, ...props }) {
   const [ouvert, setOuvert] = React.useState(initialOuvert);
   const panneau = React.useId();
   const declencheur = React.useRef(null);
@@ -18353,8 +18358,9 @@ function LigneVenteCompacte({ photo, photoNoeud = null, titre, sous = '', etat, 
       <span className="vrm-ledger-sale-title" title={titre}><span className="vrm-ledger-sale-nom">{titre || '(sans titre)'}</span>{sous ? <span className="vrm-ledger-sale-sous" data-vente-sous="">{sous}</span> : null}</span>
       <span className="vrm-ledger-sale-state" title={etat} data-ton={ton || undefined}>{etatNoeud || etat}</span>
       <span className="vrm-ledger-sale-amount">{montant}</span>
-      <span aria-hidden="true">{ouvert?'−':'⋯'}</span>
+      <span className="vrm-ledger-sale-plus" aria-hidden="true">{ouvert?'−':'⋯'}</span>
     </button>
+    {gestes ? <div className="vrm-ledger-gestes" data-gestes-ligne="">{gestes}</div> : null}
     {/* « Retour » (geste du téléphone, ← du navigateur) ferme d'abord le tiroir. */}
     {ouvert && <FermeAuRetour fermer={close}/>}
     {createPortal(<div className="vrm-app-shell vrm-ledger-drawer-host" hidden={!ouvert}>
@@ -18368,8 +18374,8 @@ function LigneVenteCompacte({ photo, photoNoeud = null, titre, sous = '', etat, 
     </div>,document.body)}
   </div>;
 }
-function LigneVente({ photo, titre, meta, montant, actions, etat, etatNoeud = null, details, sous = '', ton = '', data = null, numerosArticle = [], plateforme = '', floute = false }) {
-  return <LigneVenteCompacte {...(data || {})} numerosArticle={numerosArticle} plateforme={plateforme} photo={photo} titre={titre} sous={sous} ton={ton} etat={etat} etatNoeud={etatNoeud} montant={montant} initialOuvert={!!details?.props.ouvrir} className="vrm-sale-row vrm-shared-sale" style={{padding:'12px 14px',borderBottom:`1px solid ${C.border}`,...(floute?STYLE_FLOU:null)}}>
+function LigneVente({ photo, titre, meta, montant, actions, etat, etatNoeud = null, details, sous = '', ton = '', data = null, numerosArticle = [], plateforme = '', floute = false, gestes = null }) {
+  return <LigneVenteCompacte {...(data || {})} gestes={gestes} numerosArticle={numerosArticle} plateforme={plateforme} photo={photo} titre={titre} sous={sous} ton={ton} etat={etat} etatNoeud={etatNoeud} montant={montant} initialOuvert={!!details?.props.ouvrir} className="vrm-sale-row vrm-shared-sale" style={{padding:'12px 14px',borderBottom:`1px solid ${C.border}`,...(floute?STYLE_FLOU:null)}}>
     <div className="vrm-sale-overview" style={{display:'flex',gap:12,alignItems:'flex-start'}}>
       <div className="vrm-sale-photo"><PhotoArticleAgrandissable src={photo} titre={titre}><PhotoVente src={photo} size={64} portrait/></PhotoArticleAgrandissable></div>
       <div className="vrm-sale-info" style={{flex:1,minWidth:0}}>
@@ -21381,7 +21387,13 @@ function EbayVentes({ baseKO,vue='*',comptesEbay,cible,onClearCible }) {
         const etat=etatCommandeEbay(o);
         const statut=etat.label;
 
-        return <div className="vrm-ebay-order" data-ebay-vente={o.orderId} data-ebay-compte={o._compte || 'principal'} key={(o._compte || 'principal')+':'+(o.orderId || i)}><LigneVente numerosArticle={(o.lineItems||[]).map(l=>numLigneEbay(o,l)).filter(Boolean)} plateforme="ebay" photo={img} titre={(li.title||'Commande')+(o.lineItems?.length>1?` · ${o.lineItems.length} articles`:'')} etat={statut} ton={etat.peutExpedier ? 'action' : ''}
+        const coutsO = couts[JSON.stringify([o._compte || 'principal',String(o.orderId)])] || {};
+        const bilanO = bilanCommandeEbay(o, coutsO);
+        // (31 oct.) Prix d'achat inconnu : il se tape SUR la ligne (même écriture
+        // que « Bénéfice de l'article » du détail : `costs.buyPrice`). eBay n'a
+        // pas de liaison à un achat : seul le prix est proposé.
+        const gestesEbay = bilanO.entry && bilanO.achat == null ? <CoutAchatVente surLigne onSaisir={p=>sauverCouts(o._compte || 'principal',o.orderId,{buyPrice:p})}/> : null;
+        return <div className="vrm-ebay-order" data-ebay-vente={o.orderId} data-ebay-compte={o._compte || 'principal'} key={(o._compte || 'principal')+':'+(o.orderId || i)}><LigneVente gestes={gestesEbay} numerosArticle={(o.lineItems||[]).map(l=>numLigneEbay(o,l)).filter(Boolean)} plateforme="ebay" photo={img} titre={(li.title||'Commande')+(o.lineItems?.length>1?` · ${o.lineItems.length} articles`:'')} etat={statut} ton={etat.peutExpedier ? 'action' : ''}
           sous={[o.creationDate && !isNaN(Date.parse(o.creationDate)) ? new Date(o.creationDate).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }) : '', comptesEbay?.length > 1 ? (o._pseudo || nomCompteEbay(comptesEbay.find(c => c.ref === o._compte) || {})) : ''].filter(Boolean).join(' · ')}
           etatNoeud={<><span className="vrm-ebay-sale-status" data-state={etat.peutExpedier?'pending':etat.expedie?'shipped':'neutral'} style={{display:'inline-flex',alignItems:'center',gap:5,padding:0,background:'transparent',boxShadow:'none',borderRadius:0,fontSize:'inherit',color:C.text,fontWeight:600}}><span aria-hidden="true" style={{width:7,height:7,borderRadius:999,flexShrink:0,display:'inline-block',background:etat.peutExpedier?C.warn:etat.expedie?(C.blue||C.accent):C.muted}}/>{statut}</span></>}
           meta={<>{statut}{o.buyer?.username ? ` · ${o.buyer.username}` : ''}{o.lineItems?.length>1?` · ${o.lineItems.length} articles`:''}{comptesEbay?.length>1?` · ${o._pseudo || nomCompteEbay(comptesEbay.find(c=>c.ref===o._compte) || {})}`:''}</>}
@@ -45916,7 +45928,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             return (
               // Ligne de vente dans la liste groupée (filet fin entre les lignes,
               // pas de carte encadrée séparée — style démo, comme Achats).
-              <LigneVenteCompacte numerosArticle={num?[num]:[]} plateforme="vinted" photo={photo} photoNoeud={photo?<PhotoVenteSources {...photoSourcesProps} data-photo-vente="ligne" style={{width:28,height:36,borderRadius:8,objectFit:'cover',flexShrink:0}}/>:null} titre={num?`N°${num} · ${o.title}`:o.title} sous={[o.date?new Date(o.date).toLocaleDateString('fr-FR',{day:'numeric',month:'short'}):'', (o._acc && !ventesUnCompte) ? accNameOf(o._acc) : ''].filter(Boolean).join(' · ')} etat={venteStage(o).label} ton={st!=='cancelled' && aExpedier(o) && !isShipDone(o) ? 'action' : (st==='cancelled' ? 'annule' : '')} montant={sell!=null?`${Number.isInteger(sell)?sell:sell.toFixed(2).replace('.',',')} ${cur(o.price?.currency_code)}`:'—'} className="vrm-sale-row" key={o.transaction_id} data-tx={String(o.transaction_id)} style={{borderTop:i>0?`1px solid ${C.border}`:'none',opacity:hidden?0.5:(st==='cancelled'?0.6:1),padding:'12px 14px',display:'flex',flexDirection:'column',gap:10,...(estFloute(o)?STYLE_FLOU:null)}}>
+              <LigneVenteCompacte numerosArticle={num?[num]:[]} plateforme="vinted" photo={photo} photoNoeud={photo?<PhotoVenteSources {...photoSourcesProps} data-photo-vente="ligne" style={{width:28,height:36,borderRadius:8,objectFit:'cover',flexShrink:0}}/>:null} titre={(()=>{ const t=String((e&&e.size)||o.size||'').trim(); const nom=t&&!tailleDansTitre(o.title,t)?`${o.title} · taille ${t}`:o.title; return num?`N°${num} · ${nom}`:nom; })()}
+                gestes={(!hidden && st!=='cancelled' && buy==null && !(e && e.buyFromId)) ? <CoutAchatVente surLigne onSaisir={p=>setSaleOverride(o.transaction_id,{buyPrice:p})}
+                  onRelier={()=>{ const idf = identiteAnnonce(o); openPicker(idf ? { id: idf, title: o.title, photo: photo, price: sell, _acc: o._acc } : { id: '_v'+o.transaction_id, _saleTx: String(o.transaction_id), title: o.title, photo: photo, price: sell, _acc: o._acc }); }}/> : null} sous={[o.date?new Date(o.date).toLocaleDateString('fr-FR',{day:'numeric',month:'short'}):'', (o._acc && !ventesUnCompte) ? accNameOf(o._acc) : ''].filter(Boolean).join(' · ')} etat={venteStage(o).label} ton={st!=='cancelled' && aExpedier(o) && !isShipDone(o) ? 'action' : (st==='cancelled' ? 'annule' : '')} montant={sell!=null?`${Number.isInteger(sell)?sell:sell.toFixed(2).replace('.',',')} ${cur(o.price?.currency_code)}`:'—'} className="vrm-sale-row" key={o.transaction_id} data-tx={String(o.transaction_id)} style={{borderTop:i>0?`1px solid ${C.border}`:'none',opacity:hidden?0.5:(st==='cancelled'?0.6:1),padding:'12px 14px',display:'flex',flexDirection:'column',gap:10,...(estFloute(o)?STYLE_FLOU:null)}}>
                {/* ── Haut : photo · titre + méta · prix ─────────────────────── */}
                <div className="vrm-sale-overview" style={{display:'flex',gap:12,alignItems:'flex-start'}}>
                 <div className="vrm-sale-photo" style={{width:72,height:72,borderRadius:10,background:C.card2||C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
@@ -48595,7 +48609,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       titre="Numéro de rangement (écrit sur la boîte) — cliquer pour le changer" rendu={num?`N°${num}`:'+ N°'}/>
                   </span>
                   <div className="vrm-ann-ledger-info" style={{display:'flex',flexDirection:'column',gap:8}}>
-                    <div data-titre style={{fontSize:14.5,fontWeight:600,color:C.text,lineHeight:1.35,display:'-webkit-box',WebkitLineClamp:2,WebkitBoxOrient:'vertical',overflow:'hidden'}}>{it.title||it.brand||'—'}</div>
+                    <div data-titre style={{fontSize:14.5,fontWeight:600,color:C.text,lineHeight:1.35,overflowWrap:'anywhere'}}>{it.title||it.brand||'—'}{tailleHorsTitre ? <span data-titre-taille=""> · {tailleHorsTitre}</span> : null}</div>
                     <div className="vrm-ann-price-line" style={{display:'flex',alignItems:'center',gap:10}}>
                       <span data-prix style={{fontSize:22,fontWeight:750,color:C.text,fontVariantNumeric:'tabular-nums',letterSpacing:'-.02em'}}>{prix(it.price,it.currency)||'—'}</span>
                     </div>
@@ -48637,7 +48651,6 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                         {it.views!=null && <span style={{display:'inline-flex',alignItems:'center',gap:4}}><Icon name="eye" size={13}/>{it.views}</span>}
                         {it.favourites!=null && <span style={{display:'inline-flex',alignItems:'center',gap:4}}><Icon name="heart" size={13}/>{it.favourites}</span>}
                         {age!=null && <span title={`En ligne depuis ${age} jours`} style={{color:sleeps?C.warn:C.muted,fontWeight:sleeps?600:400}}>{age} j{sleeps?' · dort':''}</span>}
-                        {tailleHorsTitre && <span>taille {tailleHorsTitre}</span>}
                         {!annUnCompte && <span style={{whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',maxWidth:140}}>{accNameOf(it._acc)}</span>}
                       </span>
                       {/* La présence AILLEURS, prouvée seulement (Vinted : l'en-tête le dit une fois). */}

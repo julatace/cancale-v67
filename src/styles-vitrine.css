@@ -266,7 +266,9 @@ html .vrm-app-shell .vrm-day-layout .vrm-day-recu-n { font-weight: 800 !importan
 :root[data-theme="dark"] body .vrm-app-shell .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche .vrm-fiche-num {
   background: var(--vrm-ink) !important; color: var(--vrm-bg) !important;
 }
-:root body .vrm-app-shell .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche .vrm-fiche-num.vrm-fiche-num.vrm-fiche-num button[data-edition] {
+:root body .vrm-app-shell .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche .vrm-fiche-num.vrm-fiche-num.vrm-fiche-num button[data-edition]:not(#vrm-aucun) {
+  /* `:not(#…)` : la règle des liens-textes de styles-boutons porte un `#root` (via :is) et
+     teignait le N° en cobalt ; une pastille d'étiquette s'écrit à l'encre. */
   position: relative; display: flex; align-items: center; min-height: 28px !important; height: 28px; margin: 0 !important; padding: 0 !important;
   background: transparent !important; border: 0 !important; color: inherit !important;
   font-family: var(--vrm-police-mono) !important; font-size: 14px !important; font-weight: 500 !important; letter-spacing: 0 !important; cursor: pointer;
@@ -438,4 +440,140 @@ html .vrm-app-shell .vrm-main .vrm-market-space::before { display: none !importa
 :root[data-theme="dark"] body .vrm-app-shell .vrm-main :is(.vrm-sales-workbar > .vrm-rangee, .vrm-sales-workbar > .vrm-filtres-et-outils > .vrm-rangee, .vrm-sales-filters, .vrm-stock-views, .vrm-filtres) > button[aria-pressed="true"],
 :root[data-theme="dark"] body .vrm-app-shell .vrm-filtres > button[aria-pressed="true"] {
   background: var(--vrm-card2) !important; border-color: var(--vrm-ink) !important; color: var(--vrm-ink) !important;
+}
+
+/* ── 16. LES LIGNES DE VENTE (31 oct., Julien : « grossir ; les icônes devant
+   sont beaucoup trop petites, on voit même pas ce que c'est ; il n'y a même pas
+   le nom de la paire en entier avec la taille ») ───────────────────────────────
+   Vinted, Leboncoin, eBay, Vestiaire : la MÊME ligne (`LigneVenteCompacte`).
+   · la photo : 64 px au téléphone (64 × 80), 80 px sur ordinateur (80 × 100) ;
+   · le nom EN ENTIER (N°, titre, taille), sur autant de lignes qu'il faut —
+     plus jamais coupé par des points de suspension ; date · compte dessous ;
+   · le montant fort, l'état dessous ; le « ⋯ » à 24 px ;
+   · ce qui manque (prix d'achat, relier un achat) se fait sur la ligne
+     (`.vrm-ledger-gestes`, sous le titre, aligné sur lui). */
+html body .vrm-app-shell .vrm-main .vrm-sale-row > button.vrm-ledger-sale-toggle {
+  display: grid !important; grid-template-columns: 64px minmax(0, 1fr) auto 28px !important;
+  grid-template-rows: auto auto; column-gap: 12px !important; row-gap: 2px !important; align-items: center !important;
+  min-height: 92px !important; padding: 14px 0 !important; width: 100%;
+}
+html body .vrm-app-shell .vrm-main .vrm-sale-row > button.vrm-ledger-sale-toggle > .vrm-ledger-photo-empty {
+  grid-column: 1; grid-row: 1 / span 2; align-self: start;
+  width: 64px !important; height: 80px !important; border-radius: 12px !important; overflow: hidden;
+  background: var(--vrm-photo, var(--vrm-card2)) !important; display: grid !important; place-items: center;
+}
+html body .vrm-app-shell .vrm-main .vrm-sale-row > button.vrm-ledger-sale-toggle > .vrm-ledger-photo-empty > *,
+html body .vrm-app-shell .vrm-main .vrm-sale-row > button.vrm-ledger-sale-toggle > .vrm-ledger-photo-empty img {
+  width: 100% !important; height: 100% !important; max-width: none !important; max-height: none !important; object-fit: cover; border-radius: 0 !important; background: transparent !important;
+}
+html body .vrm-app-shell .vrm-main .vrm-sale-row > button.vrm-ledger-sale-toggle > .vrm-ledger-photo-empty svg { width: 24px !important; height: 24px !important; }
+html body .vrm-app-shell .vrm-main .vrm-sale-row > button.vrm-ledger-sale-toggle > .vrm-ledger-sale-title {
+  grid-column: 2; grid-row: 1 / span 2; display: flex !important; flex-direction: column; gap: 4px !important;
+  white-space: normal !important; overflow: visible !important; text-overflow: clip !important; min-width: 0;
+}
+html body .vrm-app-shell .vrm-main .vrm-sale-row .vrm-ledger-sale-nom {
+  white-space: normal !important; overflow: visible !important; text-overflow: clip !important; overflow-wrap: anywhere;
+  font-size: 15px !important; font-weight: 650 !important; line-height: 1.3 !important; color: var(--vrm-ink) !important; letter-spacing: -.005em;
+}
+html body .vrm-app-shell .vrm-main .vrm-sale-row .vrm-ledger-sale-sous {
+  white-space: normal !important; overflow: visible !important; font-size: 13px !important; color: var(--vrm-muted) !important; font-weight: 500 !important;
+}
+html body .vrm-app-shell .vrm-main .vrm-sale-row > button.vrm-ledger-sale-toggle > .vrm-ledger-sale-amount {
+  grid-column: 3; grid-row: 1; align-self: end; text-align: right; white-space: nowrap;
+  font-size: 17px !important; font-weight: 800 !important; letter-spacing: -.015em; color: var(--vrm-ink) !important;
+}
+html body .vrm-app-shell .vrm-main .vrm-sale-row > button.vrm-ledger-sale-toggle > .vrm-ledger-sale-state {
+  grid-column: 3; grid-row: 2; align-self: start; text-align: right; display: block !important;
+  font-size: 13px !important; max-width: 128px !important; white-space: normal !important; overflow: visible !important; color: var(--vrm-muted);
+}
+html body .vrm-app-shell .vrm-main .vrm-sale-row > button.vrm-ledger-sale-toggle > .vrm-ledger-sale-plus {
+  grid-column: 4; grid-row: 1 / span 2; font-size: 24px; line-height: 1; color: var(--vrm-ink); text-align: center; font-weight: 700;
+}
+html body .vrm-app-shell .vrm-main .vrm-sale-row > .vrm-ledger-gestes {
+  padding: 0 0 14px 76px; margin-top: -4px;
+}
+html body .vrm-app-shell .vrm-main .vrm-sale-row > .vrm-ledger-gestes .vrm-cout-label { font-size: 13px !important; color: var(--vrm-muted) !important; }
+html body .vrm-app-shell .vrm-main .vrm-sale-row > .vrm-ledger-gestes .vrm-cout-rangee { gap: 8px !important; }
+html body .vrm-app-shell .vrm-main .vrm-sale-row > .vrm-ledger-gestes .vrm-cout-rangee > button {
+  min-height: 44px !important; height: auto !important; font-size: 14px !important; padding: 0 14px !important;
+}
+html body .vrm-app-shell .vrm-main .vrm-sale-row > .vrm-ledger-gestes .vrm-cout-rangee > button svg { width: 20px !important; height: 20px !important; }
+@media (min-width: 768px) {
+  html body .vrm-app-shell .vrm-main .vrm-sale-row > button.vrm-ledger-sale-toggle {
+    grid-template-columns: 80px minmax(0, 1fr) minmax(110px, 170px) minmax(80px, 120px) 32px !important;
+    grid-template-rows: auto; column-gap: 16px !important; min-height: 112px !important; padding: 12px 0 !important;
+  }
+  html body .vrm-app-shell .vrm-main .vrm-sale-row > button.vrm-ledger-sale-toggle > .vrm-ledger-photo-empty { grid-row: 1; width: 80px !important; height: 100px !important; }
+  html body .vrm-app-shell .vrm-main .vrm-sale-row > button.vrm-ledger-sale-toggle > .vrm-ledger-sale-title { grid-row: 1; }
+  html body .vrm-app-shell .vrm-main .vrm-sale-row > button.vrm-ledger-sale-toggle > .vrm-ledger-sale-state { grid-column: 3; grid-row: 1; align-self: center; text-align: left; max-width: none !important; font-size: 14px !important; }
+  html body .vrm-app-shell .vrm-main .vrm-sale-row > button.vrm-ledger-sale-toggle > .vrm-ledger-sale-amount { grid-column: 4; grid-row: 1; align-self: center; font-size: 18px !important; }
+  html body .vrm-app-shell .vrm-main .vrm-sale-row > button.vrm-ledger-sale-toggle > .vrm-ledger-sale-plus { grid-column: 5; grid-row: 1; }
+  html body .vrm-app-shell .vrm-main .vrm-sale-row > .vrm-ledger-gestes { padding-left: 96px; }
+  html body .vrm-app-shell .vrm-main .vrm-sale-row .vrm-ledger-sale-nom { font-size: 16px !important; }
+  html body .vrm-app-shell .vrm-main .vrm-ventes-liste > .vrm-ledger-heading { display: none !important; }
+}
+/* Sur ordinateur aussi, les ventes sont des lignes posées sur le blanc (plus
+   d'aplat gris encadré autour de la liste ni de rangée d'en-têtes). */
+html body .vrm-app-shell .vrm-main .vrm-ventes-liste {
+  background: transparent !important; border: 0 !important; border-radius: 0 !important; box-shadow: none !important; overflow: visible !important;
+}
+html body .vrm-app-shell .vrm-main .vrm-ventes-liste > .vrm-sale-row {
+  background: transparent !important; border: 0 !important; border-bottom: 1px solid var(--vrm-line) !important; border-radius: 0 !important; padding-inline: 0 !important;
+}
+/* Le titre d'une fiche d'annonce EN ENTIER, la taille au bout (plus de coupe à
+   deux lignes) ; l'état reste dans sa case, discret. */
+:root body .vrm-app-shell .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche [data-titre] {
+  display: block !important; -webkit-line-clamp: unset !important; overflow: visible !important; min-height: 0 !important;
+}
+:root body .vrm-app-shell .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche [data-titre-taille] { white-space: nowrap; }
+
+/* ── 17. LES ANNONCES DES AUTRES PLATEFORMES, en fiches Vitrine (31 oct.) ────
+   Julien : « les annonces sont moches ». Leboncoin (« Mes annonces ») passe de
+   lignes à vignettes de 36 px à des FICHES : grande photo, titre en entier,
+   prix fort, l'état discret dessous, les gestes en bas. eBay garde ses cartes
+   (beaucoup de réglages dedans) avec une photo plus grande et le titre entier.
+   Aucune donnée ni aucun geste ne change : seulement la forme. */
+html body .vrm-app-shell .vrm-lbc-catalog {
+  background: transparent; border: 0; border-radius: 0; color: var(--vrm-ink); font-size: 13px;
+}
+html body .vrm-app-shell .vrm-lbc-catalog header, html body .vrm-app-shell .vrm-lbc-catalog-filtres { padding-inline: 0; }
+html body .vrm-app-shell .vrm-lbc-catalog > input { margin-inline: 0; width: 100%; background: var(--vrm-surface); border-color: transparent; border-radius: 14px; }
+html body .vrm-app-shell .vrm-lbc-catalog-filtres button { border-radius: 999px; }
+html body .vrm-app-shell .vrm-lbc-catalog-filtres button[aria-pressed=true] { background: var(--vrm-ink); border-color: var(--vrm-ink); color: var(--vrm-bg); }
+:root[data-theme="dark"] body .vrm-app-shell .vrm-lbc-catalog-filtres button[aria-pressed=true] { background: var(--vrm-card2); border-color: var(--vrm-ink); color: var(--vrm-ink); }
+html body .vrm-app-shell .vrm-lbc-catalog ul {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 24px 16px;
+}
+html body .vrm-app-shell .vrm-lbc-catalog li {
+  grid-template-columns: minmax(0, 1fr) auto; grid-template-rows: auto auto auto; align-items: start;
+  gap: 10px 10px; padding: 0; border-top: 0;
+}
+html body .vrm-app-shell .vrm-lbc-catalog li > img,
+html body .vrm-app-shell .vrm-lbc-catalog li > .vrm-lbc-catalog-photo-empty {
+  grid-column: 1 / -1; width: 100%; height: auto; aspect-ratio: 4 / 5; border-radius: 14px; background: var(--vrm-photo, var(--vrm-card2)); object-fit: cover;
+}
+html body .vrm-app-shell .vrm-lbc-catalog-info { grid-column: 1; }
+html body .vrm-app-shell .vrm-lbc-catalog-info > strong {
+  white-space: normal; overflow: visible; text-overflow: clip; overflow-wrap: anywhere; font-size: 15px; font-weight: 700; line-height: 1.3; letter-spacing: -.005em;
+}
+html body .vrm-app-shell .vrm-lbc-catalog-info small { font-size: 12.5px; color: var(--vrm-muted); }
+html body .vrm-app-shell .vrm-lbc-catalog-info [data-etat] { font-size: 12px; background: transparent; padding: 0; color: var(--vrm-muted); font-weight: 600; }
+html body .vrm-app-shell .vrm-lbc-catalog-info [data-etat=active]::before { background: var(--vrm-ink); }
+html body .vrm-app-shell .vrm-lbc-catalog li > b { grid-column: 2; grid-row: 2; font-size: 18px; font-weight: 800; letter-spacing: -.02em; }
+html body .vrm-app-shell .vrm-lbc-catalog-gestes { grid-column: 1 / -1; flex-wrap: wrap; gap: 6px; }
+html body .vrm-app-shell .vrm-lbc-catalog-gestes :is(a, button) { background: var(--vrm-b-teinte); border-radius: 12px; padding: 0 12px; font-size: 13px; font-weight: 600; }
+@media (max-width: 600px) {
+  html body .vrm-app-shell .vrm-lbc-catalog ul { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 22px 12px; }
+  html body .vrm-app-shell .vrm-lbc-catalog li > b { grid-column: 1 / -1; grid-row: auto; font-size: 17px; }
+  html body .vrm-app-shell .vrm-lbc-catalog-info > strong { font-size: 14px; }
+}
+/* eBay : la photo de la carte plus grande, le titre en entier. */
+html body .vrm-app-shell .vrm-ebay-carte-tete > :first-child { width: 80px !important; height: 100px !important; border-radius: 12px !important; }
+html body .vrm-app-shell .vrm-ebay-carte-tete > div:nth-child(2) > div:first-child {
+  display: block !important; -webkit-line-clamp: unset !important; overflow: visible !important; font-size: 15px !important; line-height: 1.3 !important; overflow-wrap: anywhere;
+}
+html body .vrm-app-shell .vrm-ebay-carte-tete > div:nth-child(2) > div:nth-child(2) { font-size: 12.5px !important; }
+html body .vrm-app-shell .vrm-ebay-carte-tete [data-ebay-prix] { font-size: 18px !important; }
+@media (max-width: 600px) {
+  html body .vrm-app-shell .vrm-ebay-carte-tete > :first-child { width: 64px !important; height: 80px !important; }
 }
