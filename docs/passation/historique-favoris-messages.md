@@ -1905,3 +1905,10 @@ connexion Vercel de la session, elle, ne voyait pas l'équipe du projet (404 sur
 `list_deployments`/`web_fetch_vercel_url`) — vérifier d'abord par `curl` l'endpoint
 public `/api/sante`, sans supposer l'un ou l'autre.
 
+
+> **31 octobre — Vestiaire : lire et répondre (5.295.0)** : conversations en clair
+> (`vc_fil_{conv}`, texte + date + « de toi », jamais un nom), réponse sur SON clic depuis
+> VRM → Vestiaire → Messages, par l'onglet vestiairecollective.com, avec une recette
+> APPRISE de son propre envoi (rien à l'aveugle), plafond 50/h, pause sur 429/403. Favoris :
+> un NOMBRE par annonce ; « écrire aux favoris » pas construit (qui : jamais vu). Détail :
+> `historique-vestiaire.md` (31 octobre).

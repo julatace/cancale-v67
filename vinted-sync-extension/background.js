@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.294.0';
+const CODE_VERSION = '5.295.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -2712,7 +2712,9 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         try {
           let hote = ''; try { hote = new URL((sender && sender.tab && sender.tab.url) || '').hostname; } catch (_) {}
           if (!/(^|\.)vestiairecollective\.com$/i.test(hote)) { sendResponse({ ok: false }); return; }
-          const ok = await rangerVcMessages(msg.action === 'vcCompteur' ? { compteur: msg.messages } : msg);
+          // 5.295 : le compte est celui que l'ONGLET a lu sur `/users/me`, jamais celui que dirait le message.
+          const compteOnglet = await compteVcOnglet(sender && sender.tab && sender.tab.id);
+          const ok = await rangerVcMessages(msg.action === 'vcCompteur' ? { compteur: msg.messages } : Object.assign({}, msg, { compte: compteOnglet }));
           await noterVcCapte('messages', ok === true, msg.action === 'vcCompteur' ? Number(msg.messages) || 0 : (Array.isArray(msg.conversations) ? msg.conversations.length : 0));
           sendResponse({ ok: ok === true });
         } catch (e) { sendResponse({ ok: false, error: String(e) }); }
@@ -2727,6 +2729,23 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           if (!/(^|\.)vestiairecollective\.com$/i.test(hote)) { sendResponse({ ok: false }); return; }
           const ok = await rangerVcAchats(msg);
           await noterVcCapte('achats', ok === true, Array.isArray(msg.achats) ? msg.achats.length : 0);
+          sendResponse({ ok: ok === true });
+        } catch (e) { sendResponse({ ok: false, error: String(e) }); }
+      })();
+      return true;
+    }
+    // 5.295 : le compte Vestiaire ouvert dans cet onglet, un fil de conversation,
+    // et la recette d'un envoi fait par lui sur la page.
+    if (msg && msg.from === 'cancale-vc' && (msg.action === 'vcMoi' || msg.action === 'vcFil' || msg.action === 'vcEnvoiAppris')) {
+      (async () => {
+        try {
+          let hote = ''; try { hote = new URL((sender && sender.tab && sender.tab.url) || '').hostname; } catch (_) {}
+          if (!/(^|\.)vestiairecollective\.com$/i.test(hote)) { sendResponse({ ok: false }); return; }
+          const tabId = sender && sender.tab ? sender.tab.id : null;
+          let ok = false;
+          if (msg.action === 'vcMoi') ok = await noterSessionVc(msg.id, tabId, msg.forme);
+          else if (msg.action === 'vcFil') { ok = await rangerVcFil(msg, await compteVcOnglet(tabId)); await noterVcCapte('fils', ok === true, Array.isArray(msg.messages) ? msg.messages.length : 0); }
+          else ok = await noterRecetteVc(msg.recette);
           sendResponse({ ok: ok === true });
         } catch (e) { sendResponse({ ok: false, error: String(e) }); }
       })();
@@ -6061,6 +6080,102 @@ function contratSuivi(a) {
   }
   return { etapes: toutes, dernier: datees.length ? datees[0] : null, transporteur, suivi };
 }
+// (31 oct., 5.295) LE POINT RELAIS OÙ LE COLIS VA ARRIVER, ET SON ARRIVÉE
+// ESTIMÉE. Julien : « l'extension peut essayer de capter le nom des points
+// relais où les colis vont arriver, pour prévoir ». Lus sur la réponse BRUTE du
+// suivi (la page l'a déjà reçue ; le fond la relit pour SES achats), jamais sur
+// un texte libre :
+//  · `relaisDestination` — UN objet sous une clé qui dit le point de RETRAIT
+//    (pickup, relay, relais, pudo, locker, parcel_shop, service_point…), jamais
+//    le point de DÉPÔT du vendeur (drop_off, depot, origin, sender, seller) ni
+//    une PERSONNE (contact, recipient, destinataire…). Son nom (name/title/
+//    label) est exigé ; l'adresse (une rue, un code postal à 5 chiffres, une
+//    ville) n'est gardée que sous CET objet — c'est l'adresse d'un commerce,
+//    pas celle d'une personne. Deux points de retrait différents ⇒ `null`
+//    (pas su : on ne choisit pas). Un texte qui porte un e-mail ou un
+//    téléphone n'est pas une adresse.
+//  · `arriveeEstimeeSuivi` — une date sous une clé qui dit l'ESTIMATION
+//    (estimated, expected, eta, planned, promised, prevue…) d'une livraison ou
+//    d'une arrivée. Deux dates différentes ⇒ `null`. Ce n'est qu'une
+//    estimation de Vinted ou du transporteur : l'app l'écrit « estimée ».
+// ⚠️ La forme réelle de `journey_summary` n'a jamais été vue ici (la base de
+//    Julien la garde dans `panel_formes_suivi`) : rien de ce bloc ne devine —
+//    une réponse sans ces clés rend `null`, et l'app dit « pas encore su ».
+const SUIVI_PARENT_DESTINATION = /(?:pickup|relay|relais|pudo|locker|parcel_?shop|service_?point|point_?(?:de_?)?retrait|collection_?point|delivery_?point)/i;
+const SUIVI_PARENT_DEPOT = /(?:drop_?off|depot|origin|sender|seller|expediteur|shipper|return)/i;
+const SUIVI_ESTIMEE = /(?:^|_)(?:estimated|expected|eta|planned|promised|prevue?|prevision(?:nelle)?)(?:_|$)/i;
+const suiviSnake = (k) => String(k == null ? '' : k).replace(/([a-z0-9])([A-Z])/g, '$1_$2').toLowerCase();
+function suiviTexteLieu(v, max) {
+  if (typeof v !== 'string' && typeof v !== 'number') return '';
+  const s = String(v).replace(/<[^>]*>/g, ' ').replace(/[\u0000-\u001f\u007f]+/g, ' ').replace(/\s+/g, ' ').trim();
+  if (!s || s.length > (max || 120) || /@|(?:\+\d{2}\s?|\b0)[1-9](?:[\s.-]?\d{2}){4}\b/.test(s)) return '';
+  return s;
+}
+function suiviLieuDe(o) {
+  if (!o || typeof o !== 'object' || Array.isArray(o)) return null;
+  const val = (re) => { for (const k of Object.keys(o)) if (re.test(suiviSnake(k))) { const t = suiviTexteLieu(o[k]); if (t) return t; } return ''; };
+  let nom = '';
+  for (const k of ['name', 'title', 'label', 'shop_name', 'point_name', 'business_name']) { const t = suiviTexteLieu(suiviVal(o, k), 80); if (t && !/^\d+$/.test(t)) { nom = t; break; } }
+  if (!nom) return null;
+  let rue = val(/^(?:address_?line_?1|line_?1|street|street_?address|address1|rue)$/);
+  let cp = val(/^(?:postal_?code|post_?code|zip|zip_?code|code_?postal|postcode)$/).replace(/\s+/g, '');
+  let ville = val(/^(?:city|town|ville|locality|municipality)$/);
+  const adr = suiviVal(o, 'address');
+  if (adr && typeof adr === 'object' && !Array.isArray(adr)) {
+    const d = suiviLieuDe(Object.assign({}, adr, { name: nom }));
+    if (d) { rue = rue || d.rue; cp = cp || d.cp; ville = ville || d.ville; }
+  } else if (typeof adr === 'string') {
+    const t = suiviTexteLieu(adr, 160);
+    const m = /^(.*?)[,\s]+(\d{5})\s+([A-Za-zÀ-ÿ'’ -]{2,40})$/.exec(t);
+    if (m) { rue = rue || m[1].replace(/[,\s]+$/, ''); cp = cp || m[2]; ville = ville || m[3].trim(); }
+    else if (t && !rue) rue = t;
+  }
+  if (!/^\d{5}$/.test(cp)) cp = '';
+  if (rue && !/^\d{1,4}\s*(?:bis|ter)?[\s,]+\S/i.test(rue) && !/\b(?:rue|avenue|av\.?|bd|boulevard|chemin|place|all[ée]e|impasse|route|quai|cours|zone|centre|za|zi)\b/i.test(rue)) rue = '';
+  return { nom: nom.slice(0, 80), rue: rue.slice(0, 100), cp, ville: ville.slice(0, 60) };
+}
+function relaisDestination(racine) {
+  const vus = [];
+  const marche = (v, prof, interdit) => {
+    if (prof > 8 || !v || typeof v !== 'object') return;
+    if (Array.isArray(v)) { for (const x of v.slice(0, 40)) marche(x, prof + 1, interdit); return; }
+    for (const k of Object.keys(v).slice(0, 80)) {
+      const x = v[k];
+      if (!x || typeof x !== 'object') continue;
+      const kl = suiviSnake(k);
+      const bloque = interdit || SUIVI_PARENT_DEPOT.test(kl) || SUIVI_PARENT_PERSONNE.test(kl);
+      if (!bloque && SUIVI_PARENT_DESTINATION.test(kl) && !Array.isArray(x)) { const l = suiviLieuDe(x); if (l) { vus.push(l); continue; } }
+      marche(x, prof + 1, bloque);
+    }
+  };
+  marche(racine, 0, false);
+  const cle = (l) => `${l.nom.toLowerCase().replace(/[^a-z0-9]+/g, '')}|${l.cp}`;
+  const uniques = new Map();
+  for (const l of vus) { const c = cle(l); const p = uniques.get(c); uniques.set(c, p ? { nom: p.nom, rue: p.rue || l.rue, cp: p.cp || l.cp, ville: p.ville || l.ville } : l); }
+  return uniques.size === 1 ? [...uniques.values()][0] : null;
+}
+function arriveeEstimeeSuivi(racine) {
+  const vues = new Set();
+  const marche = (v, prof) => {
+    if (prof > 8 || !v || typeof v !== 'object') return;
+    if (Array.isArray(v)) { for (const x of v.slice(0, 40)) marche(x, prof + 1); return; }
+    for (const k of Object.keys(v).slice(0, 80)) {
+      const x = v[k], kl = suiviSnake(k);
+      if (x && typeof x === 'object') { if (!SUIVI_PARENT_DEPOT.test(kl)) marche(x, prof + 1); continue; }
+      if (!SUIVI_ESTIMEE.test(kl) || /(?:deadline|expir|limit|until|retrait)/.test(kl)) continue;
+      const d = suiviDateIso(x);
+      if (d) vues.add(d.slice(0, 10));
+    }
+  };
+  marche(racine, 0);
+  return vues.size === 1 ? [...vues][0] : null;
+}
+// Le point relais reçu d'une page (ou d'un message forgé) : ses quatre textes
+// bornés, refaits par la même règle — rien d'autre ne passe.
+function nettoyerRelaisSuivi(r) {
+  if (!r || typeof r !== 'object' || Array.isArray(r)) return null;
+  return suiviLieuDe({ name: r.nom, address_line1: r.rue, postal_code: r.cp, city: r.ville });
+}
 // </suivi-regle>
 
 const SUIVI_QUOI = ['journey', 'escrow', 'code'];
@@ -6223,17 +6338,37 @@ async function rangerSuiviUn(uid, tx, contrat, source, forme) {
   try {
     if (!uid || !/^\d{4,20}$/.test(String(tx || '')) || !contrat) return false;
     const id = `harvest_${uid}_suivi_${tx}`;
-    const rows = await sbGet(`app_data?id=eq.${id}&select=d:data->dernier,e:data->etapes,s:data->>source,tr:data->>transporteur,nu:data->>suivi`);
+    const rows = await sbGet(`app_data?id=eq.${id}&select=d:data->dernier,e:data->etapes,s:data->>source,tr:data->>transporteur,nu:data->>suivi,cap:data->>capturedAt,rn:data->>relaisNom,rr:data->>relaisRue,rc:data->>relaisCp,rv:data->>relaisVille,ae:data->>arriveeEstimee`);
     if (rows === null) { noterDiag('suivi_lecture_ratee'); return null; }       // pas su : on n'écrase rien
     const r0 = rows[0];
     const avant = r0 ? { dernier: (r0.d && typeof r0.d === 'object') ? r0.d : null, etapes: Array.isArray(r0.e) ? r0.e : [], source: r0.s || '' } : null;
     const neuf = { etapes: contrat.etapes || [], dernier: contrat.dernier || null, source };
     const dec = decisionSuivi(avant, neuf);
-    if (!dec.ecrire) { noterDiag(`suivi_${dec.raison}`); return false; }
-    const data = { v: 1, tx: String(tx), source: dec.source, capturedAt: new Date().toISOString(),
-      etapes: dec.etapes, dernier: dec.dernier, n: dec.etapes.length,
+    // (31 oct., 5.295) Le point relais de destination et l'arrivée estimée :
+    // un relais lu remplace l'ancien (Vinted peut le changer), un « pas lu »
+    // n'efface jamais un relais déjà rangé. Ils suffisent à réécrire la ligne
+    // (les étapes, elles, restent celles d'avant si rien n'a changé).
+    const rel = nettoyerRelaisSuivi(contrat.relais);
+    const est = typeof contrat.estimee === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(contrat.estimee) ? contrat.estimee : null;
+    // Le MÊME point (même nom, même code postal) : une lecture plus pauvre ne
+    // vide pas une rue ou une ville déjà lue ; un AUTRE point remplace tout.
+    const memePoint = !!(rel && r0 && r0.rn && String(r0.rn).toLowerCase().replace(/[^a-z0-9]+/g, '') === rel.nom.toLowerCase().replace(/[^a-z0-9]+/g, '') && (!rel.cp || !r0.rc || rel.cp === r0.rc));
+    const garder = (neuf, ancien) => neuf || (memePoint ? (ancien || null) : null);
+    const lieu = {
+      relaisNom: rel ? rel.nom : ((r0 && r0.rn) || null), relaisRue: rel ? garder(rel.rue, r0 && r0.rr) : ((r0 && r0.rr) || null),
+      relaisCp: rel ? garder(rel.cp, r0 && r0.rc) : ((r0 && r0.rc) || null), relaisVille: rel ? garder(rel.ville, r0 && r0.rv) : ((r0 && r0.rv) || null),
+      arriveeEstimee: est || (r0 && r0.ae) || null,
+    };
+    const lieuChange = !!r0 && ['relaisNom', 'relaisRue', 'relaisCp', 'relaisVille', 'arriveeEstimee'].some((k) => (lieu[k] || null) !== ((r0 && r0[{ relaisNom: 'rn', relaisRue: 'rr', relaisCp: 'rc', relaisVille: 'rv', arriveeEstimee: 'ae' }[k]]) || null));
+    if (!dec.ecrire && !(lieuChange && avant && (avant.etapes.length || avant.dernier))) { noterDiag(`suivi_${dec.raison}`); return false; }
+    const garde = !dec.ecrire;
+    const etapesE = garde ? avant.etapes : dec.etapes, dernierE = garde ? avant.dernier : dec.dernier;
+    const data = { v: 1, tx: String(tx), source: garde ? (avant.source || source) : dec.source, capturedAt: garde ? ((r0 && r0.cap) || new Date().toISOString()) : new Date().toISOString(),
+      etapes: etapesE, dernier: dernierE, n: etapesE.length,
       transporteur: contrat.transporteur || (r0 && r0.tr) || null, suivi: contrat.suivi || (r0 && r0.nu) || null,
+      ...lieu, lieuLuAt: rel || est ? new Date().toISOString() : undefined,
       forme: nettoyerFormeSuivi(forme) };
+    if (data.lieuLuAt === undefined) delete data.lieuLuAt;
     const ok = await supabaseUpsert('app_data', [{ id, data }], 'id');
     if (ok === false) { noterDiag('suivi_ecriture_ratee'); return null; }
     noterDiag(`suivi_ecrit_${source}`);
@@ -6272,6 +6407,10 @@ async function noterSuiviPage(domain, msg) {
     const forme = nettoyerFormeSuivi(msg.forme);
     if (quoi === 'code') { await rangerFormeSuivi('code', forme, 'forme'); return false; }   // le code de retrait : sa FORME seulement
     const contrat = contratSuivi(allegerSuivi(msg.allege));
+    // (31 oct., 5.295) le point relais de destination (relu par la règle, rien
+    // d'autre ne passe) et l'arrivée estimée (sur le contenu allégé : ses dates
+    // gardent leur nom de clé).
+    if (contrat) { contrat.relais = nettoyerRelaisSuivi(msg.relais); contrat.estimee = arriveeEstimeeSuivi(allegerSuivi(msg.allege)); }
     await rangerFormeSuivi(quoi, forme, contrat ? 'reconnue' : 'inconnue');
     if (!contrat) { noterDiag(`suivi_forme_inattendue_${quoi}`); return false; }
     const achats = await achatsDuCompte(uid);
@@ -10957,7 +11096,7 @@ async function etatPourApp() {
   //    présence comme `pause` et `vivant`).
   // 29 oct. : `lbcSupprime` — elle sait aussi SUPPRIMER une annonce Leboncoin
   //    sur commande confirmée (même règle : le bouton n'apparaît qu'à elle).
-  return Object.assign({ ok: true, version, code: CODE_VERSION, ext, vrm, vinted: uid && !vintedPasSu ? { uid: String(uid), login: login || '' } : null, cmds: cmdsVus, lbcPause: true, lbcSupprime: true },
+  return Object.assign({ ok: true, version, code: CODE_VERSION, ext, vrm, vinted: uid && !vintedPasSu ? { uid: String(uid), login: login || '' } : null, cmds: cmdsVus, lbcPause: true, lbcSupprime: true, vcRepondre: true },
     vintedPasSu ? { vintedPasSu: true } : {},
     pause && pause !== PAUSE_PAS_SUE ? { pause: { jusqua: Number(pause.jusqua) || 0 } } : {},
     nav ? { nav } : {});
@@ -11292,6 +11431,8 @@ async function executerCommande(msg) {
   if (msg && msg.cmd === 'lbcSupprime') return await supprimeLbcDepuisApp(msg);
   if (msg && /^(lbcPublier|lbcMarque|lbcQuota|ebayPreparer|ebayMarque)$/.test(String(msg.cmd || ''))) return await publierDepuisApp(msg);
   if (msg && /^(vcPreparer|vcMarque)$/.test(String(msg.cmd || ''))) return await publierVestiaire(msg);
+  // 31 oct. (5.295) : répondre dans UNE conversation Vestiaire, sur son clic (voir `repondreVestiaire`).
+  if (msg && msg.cmd === 'vcRepondre') return await repondreVestiaire(msg);
   if (!msg || msg.cmd !== 'bordereau') return { accepte: false, code: 'inconnue', raison: 'commande inconnue' };
   const uid = String(msg.uid || ''), tx = String(msg.tx || '');
   if (!/^\d+$/.test(uid) || !/^\d+$/.test(tx)) return { accepte: false, code: 'invalide', raison: 'vente incomplète' };
@@ -12398,6 +12539,8 @@ async function capterSuivisAchats(uid) {
       if (estErreurVinted(rep.json)) { noterDiag('suivi_erreur_vinted'); continue; }
       const forme = formeSuivi(rep.json);
       const contrat = contratSuivi(allegerSuivi(rep.json));
+      // (31 oct., 5.295) le point relais où il arrive et l'arrivée estimée, sur la réponse brute.
+      if (contrat) { contrat.relais = relaisDestination(rep.json); contrat.estimee = arriveeEstimeeSuivi(rep.json); }
       await rangerFormeSuivi('journey', forme, contrat ? 'reconnue' : 'inconnue');
       if (!contrat) {
         // La forme est gardée, le contenu non (pas su) : cette réponse n'est pas
@@ -14408,6 +14551,10 @@ async function rangerVcMessagesMaintenant(m) {
         productId: x.productId || prev.productId || '', ref: x.ref || prev.ref || '',
         nonLu: x.nonLu === true || x.nonLu === false ? x.nonLu : (prev.nonLu === true || prev.nonLu === false ? prev.nonLu : null),
         date: x.date || prev.date || '', vuAt: iso, premiereVue: prev.premiereVue || iso,
+        // 5.295 : l'aperçu du dernier message (texte borné) et le compte Vestiaire de l'onglet qui l'a lue.
+        apercu: String(x.apercu || prev.apercu || '').slice(0, 160),
+        apercuDeMoi: x.apercu ? (x.apercuDeMoi === true || x.apercuDeMoi === false ? x.apercuDeMoi : null) : (prev.apercuDeMoi === true || prev.apercuDeMoi === false ? prev.apercuDeMoi : null),
+        compte: (m.compte && /^[\w-]{1,40}$/.test(String(m.compte))) ? String(m.compte) : (prev.compte || ''),
       };
     }
     const offset = Number(m.offset) || 0; const total = typeof m.total === 'number' ? m.total : null;
@@ -14488,7 +14635,9 @@ async function rangerVcAnnoncesMaintenant(patch) {
     for (const x of patch.items.slice(0, 200)) {
       const id = String((x && x.id) || '');
       if (!/^[\w-]{1,40}$/.test(id)) continue;
-      lus[id] = { boost: x.boost === true || x.boost === false ? x.boost : null, cles: (x.cles || []).slice(0, 6).map(String), ref: String(x.ref || '').slice(0, 12), vuAt: maintenant };
+      lus[id] = { boost: x.boost === true || x.boost === false ? x.boost : null, cles: (x.cles || []).slice(0, 6).map(String), ref: String(x.ref || '').slice(0, 12), vuAt: maintenant,
+        // 5.295 : combien de personnes l'ont mise en favori — un nombre, `null` = pas su.
+        favoris: typeof x.favoris === 'number' && isFinite(x.favoris) && x.favoris >= 0 ? Math.floor(x.favoris) : null, cleFavoris: String(x.cleFavoris || '').slice(0, 40) };
     }
     const offset = Number(patch.offset) || 0; const total = typeof patch.total === 'number' ? patch.total : null;
     const entier = offset === 0 && total != null && Object.keys(lus).length >= total && Number(patch.lus || 0) >= total;
@@ -14499,6 +14648,227 @@ async function rangerVcAnnoncesMaintenant(patch) {
   const ok = await supabaseUpsert('app_data', [{ id: 'vc_listings', data }], 'id');
   if (ok === true && Array.isArray(patch.items)) notifierApp({ type: 'maj', quoi: 'vestiaire' });
   return ok === true;
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// VESTIAIRE : LE COMPTE OUVERT, TES FILS DE CONVERSATION, RÉPONDRE (31 oct., 5.295)
+// ══════════════════════════════════════════════════════════════════════════
+// Julien : « au moins pouvoir lire les messages et écrire aux personnes, sans
+// forcément automatiser ». Trois choses, chacune lue par `vc-inject.js` sur ce
+// que la page charge DÉJÀ (aucune requête de plus, §3) :
+//  · le COMPTE Vestiaire ouvert dans un onglet (`/users/me` → son identifiant) :
+//    tenu PAR ONGLET (`vrmVcOnglets`, chrome.storage.local §4.9) et rangé dans
+//    `vc_session = { id, at, source, forme, comptes }` pour l'app (flou par
+//    compte, même règle de fraîcheur que Leboncoin) ;
+//  · UN FIL par conversation (`vc_fil_{conv}` : le texte des messages, leur
+//    date, « de toi » — jamais un nom), lire-fusionner-réécrire, une écriture à
+//    la fois, lecture ratée ⇒ rien, un message n'est jamais effacé ;
+//  · la RECETTE d'un envoi (apprise quand TU envoies un message sur la page,
+//    voir vc-inject.js) : `vrmVcRecette` + `vc_envoi` (aucune donnée de
+//    personne : une méthode, un chemin à trou, des noms de clés et d'en-têtes).
+// Répondre (`repondreVestiaire`) : sur SON clic seulement, UNE à la fois, dans
+// le plafond d'actions de l'heure (`compterAction`, compte `vc:{id}`), jamais
+// pendant une pause posée par un 429/403 de Vestiaire, jamais au nom d'un autre
+// compte que celui de l'onglet, jamais sans recette apprise, jamais sur une
+// conversation que l'extension n'a pas lue.
+const VC_ONGLETS = 'vrmVcOnglets';
+const VC_RECETTE = 'vrmVcRecette';
+const VC_PAUSE = 'vrmPauseVc';
+const VC_PAUSE_MS = 30 * 60000;
+const VC_SESSION_REECRIRE_MS = 6 * 3600 * 1000;
+const VC_FIL_MAX = 300;
+let VC_REPONSE_EN_VOL = false;
+async function compteVcOnglet(tabId) {
+  if (tabId == null) return '';
+  try { const m = (await chrome.storage.local.get(VC_ONGLETS))[VC_ONGLETS] || {}; const e = m[String(tabId)]; return e && /^[\w-]{1,40}$/.test(String(e.compte || '')) ? String(e.compte) : ''; } catch (_) { return ''; }
+}
+let _vcSessionChaine = Promise.resolve();
+function noterSessionVc(id, tabId, forme) {
+  const run = _vcSessionChaine.then(() => noterSessionVcMaintenant(id, tabId, forme)).catch(() => false);
+  _vcSessionChaine = run.then(() => {}, () => {});
+  return run;
+}
+async function noterSessionVcMaintenant(id, tabId, forme) {
+  if (!/^[\w-]{1,40}$/.test(String(id || ''))) return false;
+  const now = Date.now();
+  try {
+    const m = (await chrome.storage.local.get(VC_ONGLETS))[VC_ONGLETS] || {};
+    if (tabId != null) m[String(tabId)] = { compte: String(id), at: now };
+    const garde = Object.fromEntries(Object.entries(m).sort((a, b) => Number(b[1].at) - Number(a[1].at)).slice(0, 32));
+    await chrome.storage.local.set({ [VC_ONGLETS]: garde });
+  } catch (_) {}
+  const rows = await sbGet('app_data?id=eq.vc_session&select=data');
+  if (rows === null) return false;                                   // pas su : on n'écrase rien
+  const cur = (rows && rows[0] && rows[0].data) || {};
+  if (cur.id === String(id) && cur.at && now - Date.parse(cur.at) < VC_SESSION_REECRIRE_MS) return true;
+  const comptes = Object.assign({}, cur.comptes || {});
+  comptes[String(id)] = new Date(now).toISOString();
+  const data = { id: String(id), at: new Date(now).toISOString(), source: 'users/me', forme: (Array.isArray(forme) ? forme : []).slice(0, 80).map(String), comptes: Object.fromEntries(Object.entries(comptes).slice(-10)) };
+  const ok = await supabaseUpsert('app_data', [{ id: 'vc_session', data }], 'id');
+  if (ok === true) notifierApp({ type: 'maj', quoi: 'vestiaire' });
+  return ok === true;
+}
+const _vcFilChaines = new Map();
+// `deVrm` : le message que VRM vient d'envoyer (jamais posé par une page).
+function rangerVcFil(m, compte, deVrm) {
+  const cle = String((m && m.conv) || '');
+  const avant = _vcFilChaines.get(cle) || Promise.resolve();
+  const run = avant.then(() => rangerVcFilMaintenant(m, compte, deVrm), () => rangerVcFilMaintenant(m, compte, deVrm)).catch(() => false);
+  const fin = run.then(() => {}, () => {});
+  _vcFilChaines.set(cle, fin);
+  fin.then(() => { if (_vcFilChaines.get(cle) === fin) _vcFilChaines.delete(cle); });
+  return run;
+}
+// La fusion de deux listes de messages : par identifiant de message, sinon par
+// (texte, date). Un message déjà rangé n'est jamais effacé ; un « de toi » lu
+// ne redevient jamais « pas su ». Triés du plus ancien au plus récent.
+function fusionMessagesVc(avant, neufs) {
+  const cle = (x) => (x.id ? 'i:' + x.id : 't:' + String(x.t).slice(0, 200) + '|' + String(x.at || ''));
+  const par = new Map();
+  for (const x of (Array.isArray(avant) ? avant : [])) if (x && x.t) par.set(cle(x), x);
+  let change = false;
+  for (const x of (Array.isArray(neufs) ? neufs : [])) {
+    if (!x || !x.t) continue;
+    const k = cle(x); const p = par.get(k);
+    // Le message envoyé depuis VRM (sans identifiant) se retrouve dans la page par son texte.
+    if (!p && x.id) {
+      const envoye = [...par.entries()].find(([, v]) => v.envoyeParVrm && !v.id && v.t === x.t);
+      if (envoye) { par.delete(envoye[0]); par.set(k, Object.assign({}, envoye[1], x, { deMoi: true, envoyeParVrm: true })); change = true; continue; }
+    }
+    if (!p) { par.set(k, x); change = true; continue; }
+    const fusion = Object.assign({}, p, { at: p.at || x.at, deMoi: p.deMoi === true || p.deMoi === false ? p.deMoi : x.deMoi });
+    if (JSON.stringify(fusion) !== JSON.stringify(p)) { par.set(k, fusion); change = true; }
+  }
+  const liste = [...par.values()].sort((a, b) => (Date.parse(a.at || '') || 0) - (Date.parse(b.at || '') || 0)).slice(-VC_FIL_MAX);
+  return { liste, change };
+}
+async function rangerVcFilMaintenant(m, compte, deVrm) {
+  const conv = String((m && m.conv) || '');
+  if (!/^[\w-]{3,40}$/.test(conv)) return false;
+  const id = `vc_fil_${conv}`;
+  const rows = await sbGet(`app_data?id=eq.${encodeURIComponent(id)}&select=data`);
+  if (rows === null) return false;                                   // lecture ratée ⇒ rien
+  const cur = (rows && rows[0] && rows[0].data) || null;
+  const neufs = (Array.isArray(m.messages) ? m.messages : []).slice(0, 200).map((x) => ({
+    id: /^[\w-]{1,40}$/.test(String((x && x.id) || '')) ? String(x.id) : '', t: String((x && x.t) || '').slice(0, 2000),
+    deMoi: deVrm === true ? true : (x && (x.deMoi === true || x.deMoi === false) ? x.deMoi : null), at: /^\d{4}-\d{2}-\d{2}T/.test(String((x && x.at) || '')) ? String(x.at).slice(0, 30) : '',
+    ...(deVrm === true ? { envoyeParVrm: true } : {}) })).filter((x) => x.t);
+  const { liste, change } = fusionMessagesVc(cur && cur.messages, neufs);
+  const compteFil = compte || (cur && cur.compte) || '';
+  if (cur && !change && (cur.compte || '') === compteFil && (!m.productId || cur.productId === m.productId)) return true;
+  const dernier = liste[liste.length - 1] || null;
+  const now = new Date().toISOString();
+  const data = { v: 1, conv, compte: compteFil, productId: m.productId || (cur && cur.productId) || '', ref: m.ref || (cur && cur.ref) || '',
+    messages: liste, n: liste.length, dernierAt: (dernier && dernier.at) || '', apercu: dernier ? String(dernier.t).slice(0, 160) : '', dernierDeMoi: dernier ? dernier.deMoi : null,
+    page: /^[\w/{}.-]{1,160}$/.test(String(m.page || '')) ? String(m.page) : ((cur && cur.page) || ''), forme: Array.isArray(m.forme) && m.forme.length ? m.forme.slice(0, 80) : ((cur && cur.forme) || []), capturedAt: now };
+  const ok = await supabaseUpsert('app_data', [{ id, data }], 'id');
+  if (ok === true) notifierApp({ type: 'maj', quoi: 'vestiaire' });
+  return ok === true;
+}
+// La recette reçue d'une page : refaite champ par champ (rien d'autre ne passe).
+function nettoyerRecetteVc(r) {
+  if (!r || typeof r !== 'object') return null;
+  const base = { methode: /^(POST|PUT)$/.test(String(r.methode)) ? String(r.methode) : '', hote: /^([a-z0-9-]+\.)*vestiairecollective\.com$/i.test(String(r.hote || '')) ? String(r.hote) : '', chemin: String(r.chemin || '').slice(0, 160) };
+  if (!base.methode || !base.hote) return null;
+  if (r.rejouable !== true) return { ...base, rejouable: false, raison: String(r.raison || 'inconnue').slice(0, 40) };
+  const cleOk = (k) => /^[A-Za-z_][\w-]{0,40}$/.test(String(k));
+  const modele = String(r.modele || '');
+  if (!/^\/[\w\-/{}.]*$/.test(modele) || (modele.split('{conv}').length - 1) > 1 || /\d{3,}/.test(modele.replace('{conv}', ''))) return { ...base, rejouable: false, raison: 'modele' };
+  const cleTexte = Array.isArray(r.cleTexte) ? r.cleTexte.map(String) : [];
+  if (!cleTexte.length || cleTexte.length > 5 || !cleTexte.every(cleOk)) return { ...base, rejouable: false, raison: 'cle-texte' };
+  const fixes = [];
+  for (const f of (Array.isArray(r.fixes) ? r.fixes.slice(0, 20) : [])) {
+    if (!Array.isArray(f) || !Array.isArray(f[0]) || !f[0].length || !f[0].every(cleOk)) return { ...base, rejouable: false, raison: 'fixes' };
+    const v = f[1];
+    if (!(v === '{conv}' || v === null || typeof v === 'boolean' || (typeof v === 'string' && /^[A-Za-z_.:-]{1,40}$/.test(v)))) return { ...base, rejouable: false, raison: 'fixes' };
+    fixes.push([f[0].map(String), v, ['string', 'number', 'boolean', 'object'].includes(f[2]) ? f[2] : 'string']);
+  }
+  if (!modele.includes('{conv}') && !fixes.some((f) => f[1] === '{conv}')) return { ...base, rejouable: false, raison: 'sans-conversation' };
+  const entetes = (Array.isArray(r.entetes) ? r.entetes : []).map((x) => String(x).toLowerCase()).filter((x) => /^[a-z0-9-]{1,60}$/.test(x) && !/^(cookie|content-length|host|connection|origin|referer|user-agent|accept-encoding|content-type)$/.test(x)).slice(0, 20);
+  const recherche = /^\?[\w=&.%-]{0,200}$/.test(String(r.recherche || '')) && !/\d{3,}/.test(String(r.recherche || '')) ? String(r.recherche) : '';
+  return { ...base, rejouable: true, raison: '', modele, recherche, cleTexte, fixes, entetes };
+}
+async function noterRecetteVc(brute) {
+  const r = nettoyerRecetteVc(brute);
+  if (!r) return false;
+  const at = new Date().toISOString();
+  let avant = null;
+  try { avant = (await chrome.storage.local.get(VC_RECETTE))[VC_RECETTE] || null; } catch (_) { return false; }
+  // Une recette rejouable n'est jamais remplacée par un essai qui ne l'est pas
+  // (un « marquer comme lu » ou un envoi d'une autre forme) : il est NOTÉ à côté.
+  const garde = r.rejouable ? r : (avant && avant.recette && avant.recette.rejouable ? avant.recette : r);
+  const data = { recette: garde, at: r.rejouable ? at : ((avant && avant.at) || at), dernierEssai: { at, rejouable: r.rejouable, raison: r.raison || '', chemin: r.chemin }, ver: CODE_VERSION };
+  try { await chrome.storage.local.set({ [VC_RECETTE]: data }); } catch (_) { return false; }
+  const ok = await supabaseUpsert('app_data', [{ id: 'vc_envoi', data: { appris: !!garde.rejouable, raison: garde.rejouable ? '' : garde.raison, chemin: garde.chemin, methode: garde.methode, at: data.at, dernierEssai: data.dernierEssai, ver: CODE_VERSION } }], 'id');
+  if (ok === true) notifierApp({ type: 'maj', quoi: 'vestiaire' });
+  return ok === true;
+}
+async function pauseVc() {
+  try { const p = (await chrome.storage.local.get(VC_PAUSE))[VC_PAUSE]; return p && Number(p.jusqua) > Date.now() ? p : null; } catch (_) { return null; }
+}
+async function poserPauseVc(statut) {
+  try { await chrome.storage.local.set({ [VC_PAUSE]: { jusqua: Date.now() + VC_PAUSE_MS, statut: Number(statut) || 0, depuis: Date.now() } }); } catch (_) {}
+}
+async function ongletVestiaire(compteFil) {
+  let tabs = [];
+  try { tabs = await chrome.tabs.query({ url: ['https://*.vestiairecollective.com/*', 'https://vestiairecollective.com/*'] }); } catch (_) { tabs = []; }
+  if (!tabs.length) return { ok: false, code: 'vc-absent', raison: "ouvre vestiairecollective.com dans ce Chrome (connecté sur ton compte), puis réessaie — l'envoi part de cet onglet" };
+  const avec = [];
+  for (const t of tabs) avec.push({ t, compte: await compteVcOnglet(t.id) });
+  const bons = compteFil ? avec.filter((x) => x.compte === compteFil) : avec.filter((x) => x.compte);
+  if (bons.length) return { ok: true, tabId: bons.sort((a, b) => Number(!!b.t.active) - Number(!!a.t.active))[0].t.id, compte: bons[0].compte };
+  if (compteFil && avec.some((x) => x.compte && x.compte !== compteFil)) return { ok: false, code: 'autre-compte', raison: "Vestiaire est ouvert sur un autre compte que celui de cette conversation dans ce Chrome — connecte-toi sur le bon compte, puis réessaie" };
+  // Aucun onglet dont on SAIT le compte : on ne parle pas au nom d'un compte inconnu.
+  return { ok: false, code: 'session', raison: "je ne sais pas encore quel compte Vestiaire est ouvert dans ce Chrome — recharge la page Vestiaire (ta messagerie), puis réessaie" };
+}
+async function repondreVestiaire(msg) {
+  const conv = String((msg && msg.conv) || '');
+  const texte = typeof (msg && msg.texte) === 'string' ? msg.texte.replace(/\r\n?/g, '\n').trim() : '';
+  if (!/^[\w-]{3,40}$/.test(conv)) return { accepte: false, code: 'invalide', raison: 'conversation inconnue' };
+  if (!texte || texte.length > 2000) return { accepte: false, code: 'invalide', raison: texte ? 'message trop long (2 000 caractères au plus)' : 'message vide' };
+  if (VC_REPONSE_EN_VOL) return { accepte: false, code: 'en-cours', raison: 'un autre message Vestiaire part en ce moment — un à la fois' };
+  VC_REPONSE_EN_VOL = true;
+  try {
+    const pause = await pauseVc();
+    if (pause) return { accepte: false, code: 'vc-pause', raison: `Vestiaire a demandé de ralentir (${pause.statut || 'refus'}) — rien n'est parti, réessaie après ${new Date(pause.jusqua).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}` };
+    let rec;
+    try { rec = (await chrome.storage.local.get(VC_RECETTE))[VC_RECETTE] || null; } catch (_) { return { accepte: false, code: 'lecture', raison: "le stockage de l'extension n'a pas répondu — rien n'est parti" }; }
+    const recette = rec && rec.recette;
+    if (!recette) return { accepte: false, code: 'pas-appris', raison: "l'extension n'a encore jamais vu comment Vestiaire envoie un message — envoie UNE réponse toi-même sur vestiairecollective.com, dans ce Chrome : elle apprend la forme, et VRM pourra ensuite répondre" };
+    if (recette.rejouable !== true) return { accepte: false, code: 'pas-rejouable', raison: `la façon dont Vestiaire envoie un message n'est pas encore sûre à refaire (${recette.raison || 'forme inconnue'}) — réponds sur Vestiaire, rien n'est parti` };
+    const rows = await sbGet(`app_data?id=eq.vc_fil_${encodeURIComponent(conv)}&select=compte:data->>compte`);
+    if (rows === null) return { accepte: false, code: 'lecture', raison: "la base VRM n'a pas répondu — rien n'est parti" };
+    if (!rows.length) return { accepte: false, code: 'inconnue', raison: "l'extension n'a pas encore lu cette conversation — ouvre-la une fois sur Vestiaire, rien n'est parti" };
+    const compteFil = String((rows[0] && rows[0].compte) || '');
+    const o = await ongletVestiaire(compteFil);
+    if (!o.ok) return { accepte: false, code: o.code, raison: o.raison };
+    const cpt = await compterAction('vc:' + o.compte, ACTIONS_MAX_HEURE);
+    if (!cpt.ok) return { accepte: false, code: 'plafond', raison: `déjà ${ACTIONS_MAX_HEURE} actions sur ce compte Vestiaire cette heure-ci — réessaie dans ${Math.max(1, Math.ceil((cpt.resteMs || 0) / 60000))} min` };
+    const depuis = Date.now() - 5;
+    let rep = null;
+    try { rep = await avecDelai(chrome.tabs.sendMessage(o.tabId, { from: 'vrm-fond', action: 'vcRepondre', conv, texte, recette }, { frameId: 0 }), 25000, null); } catch (_) { rep = null; }
+    const statut = (rep && Number(rep.statut)) || 0;
+    if (!rep || rep.ok !== true) {
+      if (rep && rep.code === 'invalide') { await rendreActions('vc:' + o.compte, depuis, 1); return { accepte: false, code: 'invalide', raison: 'message refusé par la page — rien n’est parti' }; }
+      noterDiag('vc_repondre_muet');
+      return { accepte: true, etape: 'incertain', raison: "l'onglet Vestiaire n'a pas répondu — je ne sais pas si le message est parti : regarde la conversation sur Vestiaire avant de renvoyer" };
+    }
+    if (!statut) {
+      // Arrêté AVANT de partir (en-têtes absents, recette refusée, déjà un envoi) : rien n'est parti.
+      await rendreActions('vc:' + o.compte, depuis, 1);
+      const e = String(rep.erreur || '');
+      if (e === 'entetes') return { accepte: false, code: 'entetes', raison: "la page Vestiaire n'a pas encore parlé à son serveur depuis son ouverture — recharge ta messagerie Vestiaire, puis réessaie (rien n'est parti)" };
+      if (e && e !== 'reseau') return { accepte: false, code: 'arrete', raison: `rien n'est parti (${e})` };
+      return { accepte: true, etape: 'incertain', raison: "le réseau a coupé pendant l'envoi — regarde la conversation sur Vestiaire avant de renvoyer" };
+    }
+    noterDiag('vc_repondre_' + statut);
+    if (statut === 429 || statut === 403) { await poserPauseVc(statut); return { accepte: true, etape: 'refuse', statut, raison: `Vestiaire a refusé (${statut}) — VRM se met en pause 30 min sur Vestiaire` }; }
+    if (statut >= 200 && statut < 300) {
+      await rangerVcFil({ conv, messages: [{ id: rep.idMsg || '', t: texte, deMoi: true, at: new Date().toISOString() }] }, o.compte, true);
+      return { accepte: true, etape: 'fait', statut };
+    }
+    return { accepte: true, etape: 'refuse', statut, raison: `Vestiaire a répondu ${statut} — le message n'est pas parti` };
+  } finally { VC_REPONSE_EN_VOL = false; }
 }
 
 async function buildLbcData() {

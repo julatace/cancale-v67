@@ -175,6 +175,26 @@
     visite(obj, 0);
     return cands.sort((a, b) => b.length - a.length)[0] || null;
   }
+  // 5.295 — LES FAVORIS d'une annonce : un NOMBRE, lu sur une clé dont le nom le
+  // dit (likes, favorites, wishlist…) ; une LISTE de personnes n'en donne que la
+  // longueur (jamais qui). Aucune clé ⇒ `null` (« pas su »), jamais 0.
+  const CLE_FAVORIS = /^(likes|likesCount|likes_count|likeCount|like_count|nbLikes|nb_likes|numberOfLikes|favorites|favoritesCount|favorites_count|favouritesCount|favourites_count|favourites|wishlistCount|wishlist_count|wishCount|wishes|followers|followersCount)$/i;
+  function favorisDe(o) {
+    let n = null, cle = '';
+    const visite = (x, prof) => {
+      if (n != null || !x || typeof x !== 'object' || Array.isArray(x) || prof > 2) return;
+      for (const k of Object.keys(x).slice(0, 80)) {
+        const v = x[k];
+        if (CLE_FAVORIS.test(k)) {
+          if (typeof v === 'number' && isFinite(v) && v >= 0) { n = Math.floor(v); cle = k; return; }
+          if (Array.isArray(v)) { n = v.length; cle = k + '[]'; return; }
+          if (v && typeof v === 'object' && typeof v.count === 'number') { n = Math.floor(v.count); cle = k + '.count'; return; }
+        } else if (v && typeof v === 'object' && !Array.isArray(v)) visite(v, prof + 1);
+      }
+    };
+    visite(o, 0);
+    return { n, cle };
+  }
   const idDe = (e) => String(e.id != null ? e.id : (e.productId != null ? e.productId : e.product_id)).slice(0, 40);
   // ⚠️ (31 oct., 5.294) UNE LISTE FILTRÉE N'EST PAS LA LISTE. Le fond tient une
   // liste pour ENTIÈRE quand la page 0 rend autant d'éléments que le `total`
@@ -199,7 +219,7 @@
       const arr = tableauAnnonces(obj) || [];
       const offset = Number(u.searchParams.get('offset') || (obj.meta && obj.meta.offset) || 0) || 0;
       const total = obj.meta && typeof obj.meta.count === 'number' && sansFiltre(u) ? obj.meta.count : null;
-      const items = arr.slice(0, 200).map((e) => { const b = boostDe(e); return { id: idDe(e), boost: b.boost, cles: b.cles, ref: refDe(e) }; }).filter((x) => /^[\w-]{1,40}$/.test(x.id));
+      const items = arr.slice(0, 200).map((e) => { const b = boostDe(e); const f = favorisDe(e); return { id: idDe(e), boost: b.boost, cles: b.cles, ref: refDe(e), favoris: f.n, cleFavoris: f.cle }; }).filter((x) => /^[\w-]{1,40}$/.test(x.id));
       post({ kind: 'vcannonces', items, offset, total, lus: arr.length });
     } catch (_) {}
   }
@@ -387,6 +407,8 @@
       const ch = u.pathname;
       if (/zendesk|partners|notification|support|help/i.test(ch)) return;
       if (!/\/(conversations?|messages|messaging|inbox|threads?|chats?)\/?$/i.test(ch)) return;
+      // 5.295 : `…/conversations/{id}/messages` est UN fil (`noteFil`), pas la liste.
+      if (/\/(?:conversations?|threads?|chats?)\/[\w-]*\d[\w-]*\/messages\/?$/i.test(ch)) return;
       let obj; try { obj = JSON.parse(texte); } catch (_) { return; }
       if (!obj || typeof obj !== 'object') return;
       const arr = tableauAnnonces(obj) || [];
@@ -395,10 +417,13 @@
       const conversations = arr.slice(0, 200).map((e) => {
         const prod = e.product && typeof e.product === 'object' ? e.product : (e.item && typeof e.item === 'object' ? e.item : null);
         const pid = prod && prod.id != null ? String(prod.id) : (e.productId != null ? String(e.productId) : (e.product_id != null ? String(e.product_id) : ''));
-        return { id: String(e.id != null ? e.id : '').slice(0, 40), productId: /^[\w-]{1,40}$/.test(pid) ? pid : '', ref: refVente(e), nonLu: nonLuDe(e), date: scalairesVente(e).date };
+        // 5.295 : l'aperçu du dernier message (son TEXTE seulement, jamais son auteur nommé).
+        const ap = apercuConv(e);
+        return { id: String(e.id != null ? e.id : '').slice(0, 40), productId: /^[\w-]{1,40}$/.test(pid) ? pid : '', ref: refVente(e), nonLu: nonLuDe(e), date: scalairesVente(e).date, apercu: ap ? ap.t : '', apercuDeMoi: ap ? ap.deMoi : null };
       }).filter((x) => /^[\w-]{1,40}$/.test(x.id));
+      for (const c of conversations) if (ID_CONV.test(c.id)) convsVues.add(c.id);
       const forme = arr.length ? cheminsDeCles(arr[0]).map(sansId).filter((c) => !PAS_ACHETEUR.test(c.split(':')[0])).slice(0, 120) : [];
-      post({ kind: 'vcmessages', conversations, offset, total, lus: arr.length, forme, page: normChemin(sansId(location.pathname)) });
+      post({ kind: 'vcmessages', conversations, offset, total, lus: arr.length, forme, page: normChemin(sansId(location.pathname)), moi: moiId });
     } catch (_) {}
   }
 
@@ -468,18 +493,268 @@
     } catch (_) {}
   }
 
+  // ══════════════════════════════════════════════════════════════════════════
+  // LE COMPTE OUVERT, TES CONVERSATIONS EN CLAIR, ET RÉPONDRE SUR SON CLIC
+  // (31 octobre, 5.295)
+  // ══════════════════════════════════════════════════════════════════════════
+  // Julien : « au moins pouvoir lire les messages et écrire aux personnes, sans
+  // forcément automatiser ». Toujours la même méthode : ce que la page charge
+  // DÉJÀ, aucune requête de plus (§3). ⚠️ Aucune de ces réponses n'a jamais été
+  // vue d'ici (seuls `notification-feed-counter/v2`, `users/me/product-listings`,
+  // `users/me/awaiting-shipping-items`, `orders/current-light`, `deposit/*` et
+  // le support `partners/zendesk/conversations` l'ont été) : chacune est
+  // reconnue à son CHEMIN et à des noms de clés qui disent ce qu'ils portent ;
+  // autre chose ⇒ rien (« pas su »), et sa FORME (clés + types) part avec pour
+  // viser juste ensuite.
+  //   · LE COMPTE (`/users/me`) : son identifiant seulement — `data.id` (la
+  //     forme des réponses de l'API v2, `{meta, data}`) ou `id` à la racine.
+  //     Il dit QUEL compte Vestiaire est ouvert dans CET onglet (le fond le
+  //     tient par onglet) et qui a écrit un message (`deMoi`).
+  //   · UN FIL (`…/conversations/{id}` ou `…/conversations/{id}/messages`) : le
+  //     TEXTE des messages (une clé body/text/content/message), leur date, et
+  //     s'ils sont DE TOI (une clé booléenne qui le dit, ou l'auteur = le
+  //     compte ouvert ; sinon `null`). ⚠️ JAMAIS le nom, le pseudo, la photo
+  //     ni l'adresse de l'autre personne.
+  //   · LA LISTE (5.238, `noteMessages`) gagne l'aperçu du dernier message.
+  //   · RÉPONDRE : rien ne part à l'aveugle. L'adresse et la forme du corps
+  //     s'APPRENNENT quand TU envoies un message toi-même sur la page (une
+  //     écriture 2xx sur un chemin de conversation) : la « recette » garde la
+  //     méthode, l'hôte, le chemin avec l'identifiant de la conversation remis
+  //     en `{conv}`, la clé du texte, les autres clés et leurs valeurs SI ce
+  //     sont des mots (`"type": "message"`), et les NOMS des en-têtes — jamais
+  //     une valeur d'en-tête, jamais ton texte. Une recette qui demanderait de
+  //     deviner (deux identifiants, une valeur inconnue, une conversation jamais
+  //     vue dans cet onglet) est notée « pas rejouable », avec sa raison.
+  //     VRM ne la rejoue que sur TON clic, depuis cet onglet, avec les en-têtes
+  //     que la page elle-même vient d'envoyer (gardés en MÉMOIRE ici, jamais
+  //     transmis) — exactement la requête qu'aurait faite la page.
+  let moiId = '';
+  const convsVues = new Set();
+  let entetesApi = null;
+  const ID_CONV = /^(?=[\w-]*\d)[\w-]{3,40}$/;
+  const PAS_FIL = /zendesk|partners|notification|support|help|report|block|signal/i;
+  function noteMoi(url, texte) {
+    try {
+      let u; try { u = new URL(url, location.origin); } catch (_) { return; }
+      if (!DE_VC(url) || !/^\/(?:v\d+\/)?users\/me\/?$/i.test(u.pathname)) return;
+      let obj; try { obj = JSON.parse(texte); } catch (_) { return; }
+      if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return;
+      const d = obj.data && typeof obj.data === 'object' && !Array.isArray(obj.data) ? obj.data : null;
+      if (d && d.type != null && !/user|member|account|profile/i.test(String(d.type))) return;
+      const brut = d ? d.id : obj.id;
+      if (!(typeof brut === 'string' || typeof brut === 'number')) return;
+      const id = String(brut);
+      if (!/^[\w-]{1,40}$/.test(id)) return;
+      moiId = id;
+      post({ kind: 'vcmoi', id, forme: cheminsDeCles(obj).map(sansId).slice(0, 80) });
+    } catch (_) {}
+  }
+  const CLE_TEXTE_MSG = /^(body|text|content|message|messageText|message_text|msg)$/i;
+  const CLE_MOI_MSG = /^(isMine|is_mine|mine|fromMe|from_me|isOwn|is_own|own|sentByMe|sent_by_me|isSender|is_sender|outgoing|isOutgoing|is_outgoing)$/i;
+  const CLE_AUTEUR_ID = /^(senderId|sender_id|authorId|author_id|fromId|from_id|userId|user_id|ownerId|owner_id)$/i;
+  const CLE_AUTEUR = /^(sender|author|from|user|owner|createdBy|created_by)$/i;
+  const CLE_DATE_MSG = /^(createdAt|created_at|sentAt|sent_at|date|timestamp|time|updatedAt|updated_at)$/i;
+  const propreTexte = (s, max) => String(s).replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]+/g, ' ').replace(/[ \t]+/g, ' ').trim().slice(0, max || 2000);
+  function texteMsg(e, prof) {
+    if (!e || typeof e !== 'object' || Array.isArray(e) || (prof || 0) > 1) return '';
+    for (const k of Object.keys(e).slice(0, 60)) {
+      if (!CLE_TEXTE_MSG.test(k)) continue;
+      const v = e[k];
+      if (typeof v === 'string' && v.trim()) return propreTexte(v);
+      if (v && typeof v === 'object') { const t = texteMsg(v, (prof || 0) + 1); if (t) return t; }
+    }
+    return '';
+  }
+  function deMoiMsg(e) {
+    for (const k of Object.keys(e || {}).slice(0, 60)) {
+      if (CLE_MOI_MSG.test(k) && typeof e[k] === 'boolean') return e[k];
+      if (/^direction$/i.test(k) && typeof e[k] === 'string') { if (/^(out|outgoing|sent)$/i.test(e[k])) return true; if (/^(in|incoming|received)$/i.test(e[k])) return false; }
+    }
+    if (!moiId) return null;
+    let auteur = null;
+    for (const k of Object.keys(e || {}).slice(0, 60)) {
+      const v = e[k];
+      if (CLE_AUTEUR_ID.test(k) && (typeof v === 'string' || typeof v === 'number')) { auteur = String(v); break; }
+      if (CLE_AUTEUR.test(k) && v && typeof v === 'object' && (typeof v.id === 'string' || typeof v.id === 'number')) { auteur = String(v.id); break; }
+    }
+    return auteur == null ? null : auteur === moiId;
+  }
+  function dateMsg(e) {
+    for (const k of Object.keys(e || {}).slice(0, 60)) {
+      if (!CLE_DATE_MSG.test(k)) continue;
+      const v = e[k];
+      if (typeof v === 'string' && /\d{4}-\d{2}-\d{2}/.test(v) && isFinite(Date.parse(v))) return new Date(Date.parse(v)).toISOString();
+      if (typeof v === 'number' && v > 1.5e9) { const ms = v < 1e12 ? v * 1000 : v; if (ms < Date.now() + 86400000) return new Date(ms).toISOString(); }
+    }
+    return '';
+  }
+  function tableauMessages(obj) {
+    const cands = [];
+    const visite = (x, prof) => {
+      if (!x || typeof x !== 'object' || prof > 4) return;
+      if (Array.isArray(x)) { const n = x.filter((e) => texteMsg(e)).length; if (n) cands.push([n, x]); for (const e of x.slice(0, 5)) visite(e, prof + 1); return; }
+      for (const k of Object.keys(x).slice(0, 60)) visite(x[k], prof + 1);
+    };
+    visite(obj, 0);
+    return (cands.sort((a, b) => b[0] - a[0])[0] || [0, null])[1];
+  }
+  function noteFil(url, texte) {
+    try {
+      let u; try { u = new URL(url, location.origin); } catch (_) { return; }
+      if (!DE_VC(url) || PAS_FIL.test(u.pathname)) return;
+      const m = /\/(?:conversations?|threads?|chats?)\/([\w-]{3,40})(?:\/messages)?\/?$/i.exec(u.pathname);
+      if (!m || !ID_CONV.test(m[1])) return;
+      const conv = m[1];
+      let obj; try { obj = JSON.parse(texte); } catch (_) { return; }
+      if (!obj || typeof obj !== 'object') return;
+      const arr = tableauMessages(obj) || [];
+      const messages = arr.slice(0, 200).map((e) => {
+        const id = e && (typeof e.id === 'string' || typeof e.id === 'number') && /^[\w-]{1,40}$/.test(String(e.id)) ? String(e.id) : '';
+        return { id, t: texteMsg(e), deMoi: deMoiMsg(e), at: dateMsg(e) };
+      }).filter((x) => x.t);
+      const racine = obj.data && typeof obj.data === 'object' && !Array.isArray(obj.data) ? obj.data : obj;
+      const prod = racine.product && typeof racine.product === 'object' ? racine.product : (racine.item && typeof racine.item === 'object' ? racine.item : null);
+      const pid = prod && prod.id != null ? String(prod.id) : (racine.productId != null ? String(racine.productId) : '');
+      convsVues.add(conv);
+      const forme = arr.length ? cheminsDeCles(arr[0]).map(sansId).filter((c) => !/name|pseudo|avatar|picture|photo|email|phone|address/i.test(c.split(':')[0])).slice(0, 80) : [];
+      post({ kind: 'vcfil', conv, productId: /^[\w-]{1,40}$/.test(pid) ? pid : '', ref: refVente(racine), messages, lus: arr.length, forme, moi: moiId, page: normChemin(sansId(location.pathname)) });
+    } catch (_) {}
+  }
+  const CLE_APERCU = /^(lastMessage|last_message|latestMessage|latest_message|preview|lastMessagePreview|last_message_preview|snippet)$/i;
+  function apercuConv(e) {
+    for (const k of Object.keys(e || {}).slice(0, 80)) {
+      if (!CLE_APERCU.test(k)) continue;
+      const v = e[k];
+      if (typeof v === 'string' && v.trim()) return { t: propreTexte(v, 160), deMoi: null };
+      if (v && typeof v === 'object' && !Array.isArray(v)) { const t = texteMsg(v); if (t) return { t: t.slice(0, 160), deMoi: deMoiMsg(v) }; }
+    }
+    return null;
+  }
+
+  // ── APPRENDRE COMMENT LA PAGE ENVOIE UN MESSAGE ─────────────────────────
+  const CHEMIN_ENVOI = /(conversation|message|thread|chat|inbox)/i;
+  const PAS_ENVOI = /zendesk|partners|support|notification|help|report|block|signal|read|seen|typing|archive|delete|mark/i;
+  const ENTETES_INTERDITS = /^(cookie|content-length|host|connection|origin|referer|user-agent|accept-encoding|content-type)$/i;
+  const nomsEntetes = (h) => {
+    const out = {};
+    try {
+      if (!h) return out;
+      if (typeof h.forEach === 'function' && !Array.isArray(h)) h.forEach((v, k) => { out[String(k).toLowerCase()] = String(v); });
+      else if (Array.isArray(h)) for (const [k, v] of h) out[String(k).toLowerCase()] = String(v);
+      else if (typeof h === 'object') for (const k of Object.keys(h)) out[String(k).toLowerCase()] = String(h[k]);
+    } catch (_) {}
+    return out;
+  };
+  const noterEntetesPage = (url, h) => { try { if (!DE_VC(url) || !/^apiv2\./i.test(hoteDe(url))) return; const e = nomsEntetes(h); if (Object.keys(e).length) entetesApi = e; } catch (_) {} };
+  function recetteEnvoi(url, methode, corps, entetes) {
+    let u; try { u = new URL(url, location.origin); } catch (_) { return null; }
+    if (!DE_VC(url) || !/^(POST|PUT)$/i.test(String(methode || ''))) return null;
+    if (!CHEMIN_ENVOI.test(u.pathname) || PAS_ENVOI.test(u.pathname)) return null;
+    const base = { methode: String(methode).toUpperCase(), hote: u.hostname, chemin: normChemin(sansId(u.pathname)) };
+    const non = (raison) => ({ ...base, rejouable: false, raison });
+    if (typeof corps !== 'string') return non('corps-illisible');
+    let obj; try { obj = JSON.parse(corps); } catch (_) { return non('corps-pas-json'); }
+    if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return non('corps-pas-objet');
+    const feuilles = []; let tableau = false;
+    const marche = (v, ch) => {
+      if (ch.length > 4) { tableau = true; return; }
+      if (Array.isArray(v)) { tableau = true; return; }
+      if (v && typeof v === 'object') { for (const k of Object.keys(v).slice(0, 30)) marche(v[k], ch.concat(k)); return; }
+      feuilles.push([ch, v]);
+    };
+    marche(obj, []);
+    if (tableau) return non('corps-tableau');
+    const textes = feuilles.filter(([ch, v]) => CLE_TEXTE_MSG.test(ch[ch.length - 1]) && typeof v === 'string');
+    if (textes.length !== 1) return non('texte-introuvable');
+    const segs = u.pathname.split('/');
+    const idSegs = segs.map((s, i) => (ID_CONV.test(s) && /\d/.test(s) ? i : -1)).filter((i) => i >= 0);
+    if (idSegs.length > 1) return non('chemin-ambigu');
+    let conv = idSegs.length === 1 ? segs[idSegs[0]] : '';
+    const fixes = [];
+    for (const [ch, v] of feuilles) {
+      if (ch === textes[0][0]) continue;
+      if (!conv && (typeof v === 'string' || typeof v === 'number') && convsVues.has(String(v))) conv = String(v);
+      if (conv && (typeof v === 'string' || typeof v === 'number') && String(v) === conv) { fixes.push([ch.map((k) => cleSure(k)), '{conv}', typeof v]); continue; }
+      if (typeof v === 'boolean' || v === null) { fixes.push([ch.map((k) => cleSure(k)), v, typeof v]); continue; }
+      if (typeof v === 'string' && /^[A-Za-z_.:-]{1,40}$/.test(v)) { fixes.push([ch.map((k) => cleSure(k)), v, 'string']); continue; }
+      return non('valeur-inconnue');
+    }
+    if (fixes.some(([ch]) => ch.includes('{k}')) || textes[0][0].some((k) => cleSure(k) === '{k}')) return non('cle-illisible');
+    if (!conv) return non('conversation-introuvable');
+    if (!convsVues.has(conv)) return non('conversation-non-vue');
+    if (u.search && /\d{3,}|@/.test(u.search)) return non('adresse-a-parametres');
+    const modele = segs.map((s, i) => (idSegs.length === 1 && i === idSegs[0] ? '{conv}' : s)).join('/');
+    const noms = Object.keys(nomsEntetes(entetes)).filter((k) => !ENTETES_INTERDITS.test(k)).slice(0, 20);
+    return { ...base, rejouable: true, raison: '', modele, recherche: u.search || '', cleTexte: textes[0][0], fixes, entetes: noms };
+  }
+  function noteEnvoi(url, methode, statut, corps, entetes) {
+    try {
+      if (!(statut >= 200 && statut < 300)) return;
+      const r = recetteEnvoi(url, methode, corps, entetes);
+      if (r) post({ kind: 'vcenvoiappris', recette: r });
+    } catch (_) {}
+  }
+  // ── L'ENVOI, SUR SON CLIC (l'ordre vient du fond de l'extension par vc.js) ──
+  let envoiEnCours = false;
+  const poser = (o, ch, v) => { let x = o; for (let i = 0; i < ch.length - 1; i++) { if (!x[ch[i]] || typeof x[ch[i]] !== 'object') x[ch[i]] = {}; x = x[ch[i]]; } x[ch[ch.length - 1]] = v; };
+  try { window.addEventListener('message', async (event) => {
+    const d = event && event.data;
+    if (event.source !== window || !d || d.__tag !== 'CANCALE_VC_ORDRE' || d.kind !== 'repondre') return;
+    const jeton = String(d.jeton || ''), conv = String(d.conv || ''), texte = typeof d.texte === 'string' ? d.texte : '';
+    const r = d.recette;
+    if (!/^[a-z0-9-]{8,64}$/i.test(jeton)) return;
+    const fin = (o) => post(Object.assign({ kind: 'vcenvoiresultat', jeton }, o));
+    if (window.top !== window || !/(^|\.)vestiairecollective\.com$/i.test(location.hostname)) return fin({ statut: 0, erreur: 'pas-vestiaire' });
+    if (!ID_CONV.test(conv) || !texte.trim() || texte.length > 2000) return fin({ statut: 0, erreur: 'invalide' });
+    if (!r || r.rejouable !== true || !/^(POST|PUT)$/.test(String(r.methode)) || !/(^|\.)vestiairecollective\.com$/i.test(String(r.hote || ''))
+      || typeof r.modele !== 'string' || !/^\/[\w\-/{}.]*$/.test(r.modele) || (r.modele.split('{conv}').length - 1) > 1
+      || !Array.isArray(r.cleTexte) || !r.cleTexte.length || !Array.isArray(r.fixes)) return fin({ statut: 0, erreur: 'recette' });
+    if (envoiEnCours) return fin({ statut: 0, erreur: 'en-cours' });
+    const h = {};
+    for (const n of (Array.isArray(r.entetes) ? r.entetes : [])) {
+      const k = String(n).toLowerCase();
+      if (ENTETES_INTERDITS.test(k)) continue;
+      if (!entetesApi || entetesApi[k] == null) return fin({ statut: 0, erreur: 'entetes' });
+      h[k] = entetesApi[k];
+    }
+    h['content-type'] = 'application/json'; h.accept = h.accept || 'application/json';
+    const corps = {};
+    try {
+      for (const [ch, v, t] of r.fixes) poser(corps, ch.map(String), v === '{conv}' ? (t === 'number' ? Number(conv) : conv) : v);
+      poser(corps, r.cleTexte.map(String), texte);
+    } catch (_) { return fin({ statut: 0, erreur: 'recette' }); }
+    const adresse = 'https://' + r.hote + r.modele.replace('{conv}', encodeURIComponent(conv)) + (/^\?[\w=&.%-]*$/.test(String(r.recherche || '')) ? r.recherche : '');
+    envoiEnCours = true;
+    try {
+      let statut = 0, rep = '', erreur = '';
+      try {
+        const res = await origFetch.call(window, adresse, { method: r.methode, credentials: 'include', headers: h, body: JSON.stringify(corps) });
+        statut = Number(res.status) || 0;
+        try { rep = String(await res.text()).slice(0, 4000); } catch (_) {}
+      } catch (e) { erreur = String((e && e.message) || e).slice(0, 80) || 'reseau'; }
+      let cles = [], idMsg = '';
+      try { const j = JSON.parse(rep); cles = cheminsDeCles(j).map(sansId).slice(0, 60); const dd = j && (j.data && typeof j.data === 'object' ? j.data : j); if (dd && (typeof dd.id === 'string' || typeof dd.id === 'number') && /^[\w-]{1,40}$/.test(String(dd.id))) idMsg = String(dd.id); } catch (_) {}
+      fin({ statut, cles, idMsg, erreur });
+    } finally { envoiEnCours = false; }
+  }); } catch (_) {}
+
+
   const origFetch = window.fetch;
   if (origFetch) {
     window.fetch = function (input, init) {
       const url = (typeof input === 'string') ? input : (input && input.url) || '';
       const meth = (init && init.method) || (typeof input === 'object' && input && input.method) || 'GET';
+      const ent = (init && init.headers) || (typeof input === 'object' && input && input.headers) || null;
+      const corpsEnvoye = init && typeof init.body === 'string' ? init.body : null;
+      try { noterEntetesPage(url, ent); } catch (_) {}
       const p = origFetch.apply(this, arguments);
       try {
         p.then((res) => {
           try {
             const ct = res.headers && res.headers.get && res.headers.get('content-type');
             noteVu(url, meth, res.status, ct);
-            if (DE_VC(url) && /json/i.test(String(ct || ''))) res.clone().text().then((t) => { noteSchema(url, t); noteCatalogue(url, t); noteAnnonces(url, t); noteVentes(url, t); noteCompteur(url, t); noteMessages(url, t); noteAchats(url, t); notePublication(url, meth, res.status, t); }).catch(() => {});
+            if (DE_VC(url) && /^(POST|PUT)$/i.test(String(meth))) noteEnvoi(url, meth, res.status, corpsEnvoye, ent);
+            if (DE_VC(url) && /json/i.test(String(ct || ''))) res.clone().text().then((t) => { noteSchema(url, t); noteCatalogue(url, t); noteMoi(url, t); noteAnnonces(url, t); noteVentes(url, t); noteCompteur(url, t); noteMessages(url, t); noteFil(url, t); noteAchats(url, t); notePublication(url, meth, res.status, t); }).catch(() => {});
           } catch (_) {}
         }).catch(() => {});
       } catch (_) {}
@@ -488,9 +763,11 @@
   }
   const OX = window.XMLHttpRequest;
   if (OX) {
-    const origOpen = OX.prototype.open, origSend = OX.prototype.send;
-    OX.prototype.open = function (method, url) { this.__vcUrl = url; this.__vcMeth = method; return origOpen.apply(this, arguments); };
-    OX.prototype.send = function () {
+    const origOpen = OX.prototype.open, origSend = OX.prototype.send, origSetH = OX.prototype.setRequestHeader;
+    OX.prototype.open = function (method, url) { this.__vcUrl = url; this.__vcMeth = method; this.__vcH = null; return origOpen.apply(this, arguments); };
+    if (origSetH) OX.prototype.setRequestHeader = function (k, v) { try { (this.__vcH = this.__vcH || {})[String(k)] = String(v); } catch (_) {} return origSetH.apply(this, arguments); };
+    OX.prototype.send = function (corpsXhr) {
+      try { noterEntetesPage(this.__vcUrl || '', this.__vcH); this.__vcCorps = typeof corpsXhr === 'string' ? corpsXhr : null; } catch (_) {}
       try {
         this.addEventListener('load', function () {
           try {
@@ -498,7 +775,8 @@
             const ct = this.getResponseHeader && this.getResponseHeader('content-type');
             noteVu(url, this.__vcMeth, this.status, ct);
             const t = (this.responseType === '' || this.responseType === 'text') ? this.responseText : null;
-            if (t && /json/i.test(String(ct || ''))) { noteSchema(url, t); noteCatalogue(url, t); noteAnnonces(url, t); noteVentes(url, t); noteCompteur(url, t); noteMessages(url, t); noteAchats(url, t); notePublication(url, this.__vcMeth, this.status, t); }
+            if (DE_VC(url) && /^(POST|PUT)$/i.test(String(this.__vcMeth || ''))) noteEnvoi(url, this.__vcMeth, this.status, this.__vcCorps, this.__vcH);
+            if (t && /json/i.test(String(ct || ''))) { noteSchema(url, t); noteCatalogue(url, t); noteMoi(url, t); noteAnnonces(url, t); noteVentes(url, t); noteCompteur(url, t); noteMessages(url, t); noteFil(url, t); noteAchats(url, t); notePublication(url, this.__vcMeth, this.status, t); }
           } catch (_) {}
         });
       } catch (_) {}

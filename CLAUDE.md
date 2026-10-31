@@ -487,6 +487,11 @@ sans la fonction.
 | `republierpage` | `vintedPage` | **5.277.0** | (ajoutée à la table le 30 oct.) |
 | `republierfile` | `miseEnLigneTick` | **5.279.0** | (ajoutée à la table le 30 oct.) |
 | `favorisperso` | `erreurVariablesFavori` | **5.281.0** | (ajoutée à la table le 30 oct.) |
+| `vcsession` | `noterSessionVc` | **5.295.0** (31 oct.) | le compte Vestiaire ouvert dans l'onglet (`vc_session`) — si Vestiaire charge `/users/me` |
+| `vcfil` | `rangerVcFil` | **5.295.0** | « lire tes conversations Vestiaire » (texte, date, « de toi », jamais un nom) |
+| `vcrepondre` | `repondreVestiaire` | **5.295.0** | « Envoyer sur Vestiaire » sur son clic — seulement après une recette APPRISE de son propre envoi (`vc_envoi.appris`) |
+| `vcfavoris` | `rangerVcAnnonces` | **5.295.0** | le NOMBRE de favoris par annonce Vestiaire (jamais qui) |
+| `relaisdest` | `relaisDestination` | **5.295.0** | « le point relais où arrivent tes achats (quand le suivi Vinted le donne) » |
 
 
 ---
@@ -526,6 +531,7 @@ vérifier par `curl https://vrm.center/api/sante`.
 ### Décisions et chantiers (octobre 2026)
 - **31 oct.** — **Prix 16,99 €/mois** (sa décision ; 14,99 € depuis le 27 oct., CGV version 2026-10-31, essai 7 j inchangé) ; adresse de contact **vrm.vinted35+contact@gmail.com** (sa décision), tenue hors de la réception des colis (`gmail-forwarder.gs`, à recoller). Geste : prix Stripe à 16,99 €.
 - **31 oct.** — Emails : journal « Tes emails, ce que VRM en a fait » (Paramètres → Emails → Journal, et depuis Colis) : une phrase par email, raison et geste ; résumé court écrit au classement (`api/_lib/resume-email.js`), texte à part (`email_texte_*`), `mode=journal` paginé (≈ 11 Ko/page). → historique sécurité-base-serveur. Geste : aucun.
+- **31 oct.** — Extension **5.295.0** (intégrée avec la 5.294.0) : Vestiaire — compte ouvert, conversations lues, réponse sur son clic par recette APPRISE, favoris en nombre ; Colis → « À retirer » par point relais sur une carte, arrivées estimées (suivi Vinted). → historique vestiaire / colis-retraits. Geste : installer, envoyer UNE réponse soi-même sur Vestiaire, toucher « Suivre le colis » d'un achat en route.
 - **31 oct.** — Extension **5.293.0 soumise à addons.mozilla.org** par Julien (fiche `vrm-outil-du-revendeur`, compte vrm.vinted35@gmail.com) : Orion iPhone refuse l'installation par fichier (essais du 31 oct.) mais installe depuis la boutique (Dark Reader OK). Geste : à l'acceptation, donner le lien → `LIENS_BOUTIQUES.firefox` ; Chrome Web Store : `docs/publier-extension-pas-a-pas.md`.
 - **31 oct.** — Compétence **taste** (Leonxlnx/taste-skill, MIT) installée dans `.claude/skills/taste-skill/` à sa demande : tout changement de style passe par elle (`references/app-screens.md` pour les écrans de l'app) ; §7 et ses refus priment. → `.claude/skills/README.md`.
 - **31 oct. (soir)** — Vinted/extension **5.293.0** (intégrée avec Leboncoin en 5.293.0) : le pont photo relaie le `statut` du CDN (lien mort 404/410 plus redemandé avant 30 min, refus passagers en tête du témoin) ; détourage Vestiaire : `cle-pas-su` arrête la série et se dit en français. → historique vinted-extension. Geste : installer la 5.293.0 une fois fusionnée.

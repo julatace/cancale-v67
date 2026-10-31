@@ -171,7 +171,11 @@ const pause = (ms) => new Promise((r) => setTimeout(r, ms));
 
 // ── Les données INVENTÉES ───────────────────────────────────────────────────
 // Ce qui ne doit JAMAIS sortir de la page ni être rangé.
-const PERSO = ['Jeanne', 'Inventée', 'Lilas', 'Tilleuls', '35000', 'Rennes', 'exemple.test', '06 12 34 56 78', 'C48291', 'qr-banc', '12 rue'];
+// (31 oct., 5.295) Le DESTINATAIRE habite Brest ; le point relais (un commerce,
+// « 3 avenue des Tilleuls, 35000 Rennes ») est gardé exprès : c'est la
+// destination du colis (`relaisDestination`). Ses mots ne sont donc plus des
+// fuites — ceux du destinataire, si.
+const PERSO = ['Jeanne', 'Inventée', 'Lilas', '29200', 'Brest', 'exemple.test', '06 12 34 56 78', 'C48291', 'qr-banc', '12 rue'];
 const fuite = (o) => { const s = JSON.stringify(o == null ? null : o); return PERSO.filter((x) => s.includes(x)); };
 // Un instant fixe pour tout l'audit : une même réponse relue rend les MÊMES dates
 // (Vinted ne réécrit pas l'heure d'une étape passée).
@@ -184,7 +188,7 @@ const corpsSuivi = (tx, etapes) => ({
     carrier: { name: 'Transporteur Banc', code: 'TB' },
     tracking_number: 'TB12345678FR',
     recipient: { full_name: 'Jeanne Inventée', email: 'jeanne@exemple.test', phone_number: '06 12 34 56 78',
-      address: { line1: '12 rue des Lilas', postal_code: '35000', city: 'Rennes' } },
+      address: { line1: '12 rue des Lilas', postal_code: '29200', city: 'Brest' } },
     pickup_point: { name: 'Relais Banc', address: '3 avenue des Tilleuls, 35000 Rennes', code: 'C48291', qr_code: 'https://qr.exemple.test/qr-banc-C48291' },
     journey: etapes.map(([h, title, code]) => ({ title, date: H(h), status_code: code })),
     summary: 'Bonjour Jeanne Inventée : ton colis t’attend au Relais Banc, 3 avenue des Tilleuls, 35000 Rennes. Ton code de retrait est C48291. Une question ? jeanne@exemple.test',
@@ -369,7 +373,9 @@ const ecrits = (f, id) => f.j.posts.filter((ids) => ids.includes(id)).length;
         dit(formePropre(l.forme), 'la forme rangée : des types seulement', JSON.stringify(l.forme).slice(0, 160));
         dit(fuite(l).length === 0, 'la ligne rangée ne porte aucune donnée personnelle', fuite(l).join(', '));
         const cles = Object.keys(l).sort().join();
-        dit(cles === 'capturedAt,dernier,etapes,forme,n,source,suivi,transporteur,tx,v', 'aucune autre clé que celles du CONTRAT (et `n`, le nombre d’étapes)', cles);
+        dit(cles === 'arriveeEstimee,capturedAt,dernier,etapes,forme,lieuLuAt,n,relaisCp,relaisNom,relaisRue,relaisVille,source,suivi,transporteur,tx,v', 'aucune autre clé que celles du CONTRAT (et `n`, le nombre d’étapes ; 5.295 : le point relais de destination et l’arrivée estimée)', cles);
+        dit(l.relaisNom === 'Relais Banc' && l.relaisRue === '3 avenue des Tilleuls' && l.relaisCp === '35000' && l.relaisVille === 'Rennes', '5.295 : le point relais OÙ le colis arrive (nom, rue, code postal, ville), lu sous `pickup_point` — jamais l’adresse du destinataire', JSON.stringify({ n: l.relaisNom, r: l.relaisRue, c: l.relaisCp, v: l.relaisVille }));
+        dit(l.arriveeEstimee === null, '5.295 : aucune clé d’ESTIMATION dans la réponse ⇒ arrivée estimée `null` (jamais devinée)', String(l.arriveeEstimee));
         dit(l.n === l.etapes.length, '`n` = le nombre d’étapes rangées (un scalaire, lu par l’app sans les décompresser)', `${l.n} ${l.etapes.length}`);
       }
       const pf = lignes.panel_formes_suivi || {};
@@ -384,7 +390,8 @@ const ecrits = (f, id) => f.j.posts.filter((ids) => ids.includes(id)).length;
       // une étape PLUS RÉCENTE, dans un message FORGÉ qui porte des données brutes : le fond relave
       const forge = { from: 'cancale-content', domain: 'www.vinted.fr', kind: 'suivi', quoi: 'journey', id: TXA,
         forme: { 'shipment.journey[].title': 'string', 'shipment.recipient.full_name': 'Jeanne Inventée', 'jeanne@exemple.test': 'string' },
-        allege: corpsSuivi(TXA, [...ETAPES, [1, 'Colis livré — Jeanne Inventée, 12 rue des Lilas 35000 Rennes', 'delivered']]) };
+        allege: corpsSuivi(TXA, [...ETAPES, [1, 'Colis livré — Jeanne Inventée, 12 rue des Lilas 29200 Brest', 'delivered']]),
+        relais: { nom: 'Relais Banc', rue: 'jeanne@exemple.test', cp: '35000', ville: 'Rennes', autre: 'Jeanne Inventée' } };
       await pagesVers(f, [forge]);
       const l2 = lignes[`harvest_111_suivi_${TXA}`] || {};
       dit(l2.dernier && /Colis livr/.test(l2.dernier.t) && fuite(l2).length === 0, 'un message forgé (contenu brut) est relavé par le fond : l’étape gardée, pas la personne', `${JSON.stringify(l2.dernier)} ${fuite(l2).join(',')}`);
