@@ -971,9 +971,27 @@ export function parseCarrierEmail(mail, carrier, recuLe = new Date().toISOString
       const parts = [];
       // 4 lignes : nom, rue, code postal + ville (la consigne Vinted Go en a 3
       // après son en-tête « Adresse » : « Consigne Vinted Go », l'enseigne, la rue).
-      for (let i = idx + 1; i < lines.length && parts.length < 4; i++) {
+      // (1er nov.) Le code postal et la ville se perdaient : la consigne Vinted Go
+      // écrit QUATRE lignes après « Adresse » (« Consigne Vinted Go », l'enseigne,
+      // la rue, « 56000 Vannes ») et la 4e coupait à la ville ; une ligne vide
+      // entre la rue et « CP Ville » (version HTML) coupait aussi. Le lieu rangé
+      // (« Consigne Vinted Go, Kusmi Tea, 13 Rue Saint-Vincent ») n'avait alors
+      // ni code postal ni ville : pas sur la carte, et un second point « Kusmi
+      // Tea » à côté de celui de la conversation. On va jusqu'à la ligne
+      // « CP Ville » (5 lignes au plus), une ligne vide franchie seulement si la
+      // suivante EST cette ligne.
+      const cpVille = (l) => /^\d{5}\s+[A-Za-zÀ-ÿ'’\- ]{2,40}$/.test(String(l || '').replace(/[*_]+/g, ' ').replace(/\s+/g, ' ').trim());
+      for (let i = idx + 1; i < lines.length && parts.length < 5; i++) {
         const l = lines[i];
-        if (!l) { if (parts.length) break; else continue; }
+        if (!l) {
+          if (!parts.length) continue;
+          if (parts.some(cpVille)) break;
+          let j = i + 1; while (j < lines.length && !lines[j]) j++;
+          if (j < lines.length && cpVille(lines[j])) { i = j - 1; continue; }
+          break;
+        }
+        if (parts.some(cpVille)) break;
+        if (parts.length >= 4 && !cpVille(l)) break;
         // (23 oct.) La date limite (« RETRAIT JUSQU'AU 26/10 ») et le pied de
         // l'e-mail (« Avec 19 000 points de proximité… », l'adresse du siège
         // MONDIAL RELAY) ne sont pas le lieu : on s'arrête là.

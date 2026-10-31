@@ -148,6 +148,46 @@ async function main() {
         dit(!errs.length, `${T} aucune erreur d'app`, errs[0]);
         await ctx.close();
       });
+      // ── (1er nov.) LA COLONNE « À RETIRER » DE COLIS, PAR POINT ──────────────
+      // Les mêmes données : le point Kusmi Tea (2 colis + l'achat en route) placé
+      // par la Base Adresse Nationale (une recherche, avec le code postal), le
+      // point « Tabac Inconnu » (achat en route, sans rue) listé avec la raison,
+      // l'achat sans destination dit à part. Numéro du point = numéro de l'épingle ;
+      // un clic sur l'épingle fait défiler jusqu'au point.
+      await essaie(T + ' Colis', async () => {
+        const { ctx, pg, errs, ban } = await preparer(b, vp);
+        await pg.goto(`http://localhost:${PORT}/?tab=cat_bord`, { waitUntil: 'domcontentloaded' });
+        await pg.locator('[data-cc-colonne="retirer"] [data-relais-point]').first().waitFor({ timeout: 25000 });
+        await pg.waitForSelector('[data-cc-colonne="retirer"] [data-relais-point="kusmitea|56000"][data-relais-repere="oui"]', { timeout: 10000 }).catch(() => {});
+        await pg.waitForTimeout(800);
+        const pts = await pg.evaluate(() => [...document.querySelectorAll('[data-cc-colonne="retirer"] [data-relais-point]')].map((e) => ({ cle: e.getAttribute('data-relais-point'), n: e.getAttribute('data-relais-numero'), c: e.getAttribute('data-relais-point-comptes'), t: e.getAttribute('data-relais-point-attendus'), rp: e.getAttribute('data-relais-repere'), txt: e.innerText })));
+        const k = pts.find((p) => p.cle === 'kusmitea|56000');
+        dit(!!k && k.c === '2' && k.t === '1' && k.rp === 'oui' && k.n === '1', `${T} Colis : Kusmi Tea, point n° 1, 2 colis + 1 en route, placé sur la carte`, JSON.stringify(pts.map((p) => [p.cle, p.n, p.c, p.t, p.rp])));
+        const ti = pts.find((p) => p.cle === 'tabacinconnu|29200');
+        dit(!!ti && ti.rp === 'non' && /Pas sur la carte : la rue du point n’a pas été donnée/.test(ti.txt) && /date d’arrivée pas encore dite/.test(ti.txt), `${T} Colis : le point sans rue est listé, la raison dite`, ti && ti.txt.slice(0, 220));
+        const miens = ban.filter((u) => /[?&]postcode=/.test(u));
+        dit(miens.length === 1 && /postcode=56000/.test(miens[0]) && !ban.some((u) => /Brest|29200/.test(decodeURIComponent(u))), `${T} Colis : une seule recherche d'adresse, avec le code postal ; aucune pour l'adresse incomplète`, JSON.stringify(ban));
+        const note = await pg.evaluate(() => (document.querySelector('[data-retirer-en-route-sans]') || {}).innerText || '');
+        dit(/1 achat en route dont Vinted ne dit pas encore le point/.test(note), `${T} Colis : l'achat sans destination est dit à part`, note);
+        const tot = await pg.evaluate(() => { const c = document.querySelector('[data-cc-colonne="retirer"]'); let pub = null; try { pub = JSON.parse(localStorage.getItem('vrm_colis_retirer') || 'null'); } catch (_) {} return { n: Number(c.getAttribute('data-cc-n')), pub: pub && pub.total }; });
+        dit(tot.n === 2 && tot.pub === 2, `${T} Colis : le compteur « À retirer » = Ma journée (2)`, JSON.stringify(tot));
+        const ep = await pg.evaluate(() => [...document.querySelectorAll('[data-relais-epingle]')].map((e) => [e.getAttribute('data-relais-epingle'), e.getAttribute('data-relais-numero'), e.textContent]));
+        if (ep.length) {
+          dit(ep.length === 1 && ep[0][0] === 'kusmitea|56000' && ep[0][2] === '1', `${T} Colis : l'épingle porte le numéro du point (1)`, JSON.stringify(ep));
+          await pg.evaluate(() => { const m = document.querySelector('.vrm-main'); if (m) m.scrollTop = 0; window.scrollTo(0, 0); });
+          await pg.evaluate(() => document.querySelector('[data-relais-epingle]').click());
+          await pg.waitForTimeout(900);
+          const choisi = await pg.evaluate(() => !!document.querySelector('[data-relais-point="kusmitea|56000"].is-choisi'));
+          dit(choisi, `${T} Colis : un clic sur l'épingle désigne le point dans la liste`, String(choisi));
+        } else console.log(`INFO ${T} Colis : pas d'épingle dessinée ici (navigateur du banc sans WebGL) — la liste porte le contrôle`);
+        if (process.env.SHOTS) {
+          await pg.evaluate(() => { const c = document.querySelector('[data-cc-colonne="retirer"]'); if (c) c.scrollIntoView({ block: 'start' }); });
+          await pg.waitForTimeout(300);
+          await pg.screenshot({ path: path.join(process.env.SHOTS, `retrait-relais-colis-${vp.width}.png`), fullPage: false });
+        }
+        dit(!errs.length, `${T} Colis : aucune erreur d'app`, errs[0]);
+        await ctx.close();
+      });
     }
   } finally { if (b) await b.close(); srv.close(); }
   console.log(ko ? `\n❌ carte des points relais : ${ko} rouge(s).` : `\n✅ carte des points relais : tout est vert`);

@@ -2181,3 +2181,97 @@ le lot, ambre du dernier jour, « à vérifier » visible, 44 px au téléphone,
 Sur l'arbre d'avant (origin/main) : 20 rouges. Mutations : `fait → attente` ⇒ rouge ;
 `aVerifier` non rangé ⇒ rouge (rien de perdu, colis douteux).
 Non vu au banc : les épingles de la mini-carte (géocodage hors ligne).
+
+## 1er nov. — « À retirer » : tous les points relais, sans erreur, plus clair
+
+Julien (31 oct., capture) : « je crois qu'il n'y a pas tous les points relais, il ne doit pas y
+avoir d'erreur et ça doit être un peu plus clair ». Au banc comme sur sa capture : des points
+« pas sur la carte », des colis sans point ou sous un point mal nommé, et une colonne qui ne
+disait pas le même nombre que Ma journée.
+
+**Mesure (lecture seule du code et des formes rangées — la base de VRM n'était pas joignable
+d'ici : le seul projet Supabase accessible n'est pas celui de VRM).** Les sources d'un colis à
+retirer et ce qu'elles disent du point :
+- e-mail **Mondial Relay** : « POINT RELAIS® / nom / rue / CP Ville » (nom, rue, CP, ville) ;
+  sinon `extraitLieu` (« NOM | rue | CP Ville », relu par `lieuDepuisExtrait`) ;
+- e-mail **Vinted Go** : « Adresse / Consigne Vinted Go / enseigne / rue / CP Ville » — rangé
+  « Consigne Vinted Go, Kusmi Tea, 13 Rue Saint-Vincent » : **sans code postal ni ville** ;
+- e-mail **Chronopost / Relais Pickup** : « TERRA CBD | 11 RUE HOCHE | 56000 VANNES » (extrait)
+  ou une phrase « disponible dans votre Relais Pickup X » (le TYPE devenait le nom) ; parfois
+  aucun lieu (seulement un code ou un QR) ;
+- **Colissimo / La Poste, Relais Colis** : reconnus comme transporteurs, lieu par les mêmes
+  motifs génériques (« chez X », « point relais : X ») — souvent rien ;
+- **conversation Vinted** (`panel_colis_relais`) : « Kusmi Tea, 13 Rue Saint-Vincent, 56000
+  Vannes » ou « point relais TABAVAP, TABAVAP, 29 RUE HOCHE » ;
+- **lecture chez le transporteur** (`lieuTransp`) : « NOM, CP VILLE » — **jamais la rue** ;
+- **suivi Vinted** (`relaisDestination`, 5.295) : nom, rue, CP, ville — achats EN ROUTE seulement ;
+- **liste des points de Vinted** (`harvest_{uid}_pickup_points`) : nom, adresse, **latitude et
+  longitude** — jamais utilisée pour la carte ;
+- **eBay, Leboncoin, Vestiaire** : aucun point lisible (inchangé, rien deviné).
+Aucune source ne donne un identifiant de relais commun (le `code` de la liste Vinted n'apparaît
+nulle part ailleurs) : l'identité d'un point reste nom propre + code postal.
+
+**Causes trouvées** :
+1. `groupesRelais` **écartait** tout colis dont le lieu n'avait pas de nom (`if (!cl.nom) continue`)
+   — les colis d'e-mail sans lieu n'étaient sous AUCUN point ; les « à vérifier » et « en cours de
+   vérification » n'y entraient jamais.
+2. **Deux nombres pour la même colonne** : la colonne comptait les « à vérifier » (Ma journée non),
+   et un même n° de suivi écrit par Vinted ET par Chronopost (deux lignes « disponible ») comptait
+   DEUX fois dans `pickupUnion` (Ma journée) et une fois dans la colonne (même identité).
+3. **Colis ne lisait pas les suivis Vinted ni les n° ajoutés à la main** (`suivisVinted`,
+   `suivisManuels` : seulement sur Achats et Ma journée) : sur Colis, les achats « en cours de
+   vérification » passaient dans le compte, les achats en route n'avaient pas de destination, et
+   `vrm_colis_retirer` n'était jamais publié depuis Colis.
+4. **Nom mal pris** : le type (« Votre Relais Pickup TERRA CBD », « Consigne Vinted Go »), un
+   transporteur (« chez Mondial Relay »), ou la ville (`cleanLieu` nomme le point « Cancale »
+   quand l'e-mail ne donne que l'adresse).
+5. **Le même relais en deux points** : Vinted Go sans code postal (la 4e ligne « CP Ville » était
+   coupée par la limite de 4 lignes, ou par une ligne vide) et « Speed Queen - Vannes » contre
+   « Speed Queen ».
+6. **Adresse fausse** : « 35260 CANCALE » (lecture transporteur, sans rue) passait pour la RUE
+   (`decouperAdresse`) : adresse « 35260 CANCALE, 35260 ».
+7. **Géocodage** : une seule requête ; un point de la liste Vinted (position exacte) jamais utilisé.
+8. `lieuDepuisExtrait` ne lisait que le PREMIER triplet « NOM | rue | CP Ville » de l'extrait.
+
+**Corrections** :
+- `src/relaisColis.js` : `nomRelaisPropre` (sans type, transporteur ni ville) ; clé = nom propre +
+  CP, sinon RUE + CP (« adr:… »), sinon **`__inconnu` « Point pas encore connu »** — rien n'est
+  écarté ; un lieu sans CP rejoint le seul point du même nom (dans sa ville, à sa rue, ou « A - Ville ») ;
+  `decouperAdresse` (« CP Ville » seul) ; `repereDepuisPointsVinted` (même nom propre ET même CP,
+  ou même rue sans CP ; plusieurs positions ⇒ rien ; jamais le nom seul) ; `pointsARetirer`
+  (numéro par point, raison « pas sur la carte » : rue pas donnée / CP et ville manquants) ;
+  `requetesBan` (adresse + CP filtré, puis rue + ville, le CP lu toujours exigé).
+- `src/App.jsx` : `pickupUnion` **fond deux lignes au même n° de suivi** (la plus complète, le
+  lieu/code/limite de l'autre reportés) ; Colis lit `suivisVinted`/`suivisManuels` et lance le
+  rattrapage comme Achats ; les cartes « À retirer » portent leur lieu, code, jours et, sans lieu,
+  la raison et le geste (« L'e-mail de Chronopost ne nomme pas le point. Ton code est là… » /
+  « Passe sur Vinted connecté sur X ») ; les « à vérifier » et « en cours de vérification » sont
+  `horsCompte`. Note de colonne « Je relie encore tes achats à leurs colis » tant que ce n'est pas lu.
+- `src/colisColonnes.js` / `ColisColonnes.jsx` : compteur = cartes comptées (= `pickupUnion.total`
+  = `vrm_colis_retirer.total` = Ma journée), « + N à vérifier » à côté ; une colonne peut ranger
+  ses cartes (`corps`).
+- `src/CarteRelais.jsx` : `ColonneRetirer` — la carte (épingle = numéro du point, un clic défile
+  jusqu'au point et l'entoure), puis chaque point : numéro, **nom en gras**, adresse courte,
+  « N colis · dernier jour demain » (ambre aujourd'hui/demain), « Pas sur la carte : raison » ;
+  ses colis (photo, nom + taille, **code en grand, mono**, N°) ; les achats en route sous leur
+  point ; « Point pas encore connu » à la fin ; carte injoignable ⇒ une phrase, la liste reste.
+- `api/_lib/retrait-colis.js` `lieuDepuisExtrait` : tous les triplets, UN seul point distinct
+  (deux points ⇒ rien). `api/email-inbound.js` : l'en-tête lit jusqu'à « CP Ville » (5 lignes,
+  une ligne vide franchie seulement si la suivante EST « CP Ville »), et s'arrête là.
+
+**Preuves** : `audit-relais-carte` +17 (C : formes réelles des 5 transporteurs, même relais écrit
+deux fois, enseigne dans deux villes, relais sans CP, colis sans point, position Vinted) —
+mutations rouges : sans-lieu écarté, nom seul pour la position Vinted, type gardé, transporteur
+pris pour un lieu, ville prise pour un nom, « A - Ville », CP ignoré dans la clé, « à vérifier »
+compté. `audit-retrait-fiable` +5 (extrait à plusieurs triplets, Vinted Go 4 lignes + ligne vide) :
+3 rouges sur l'avant. Bancs `colis-colonnes` (18 colis, 7 points, 1 inconnu ; compteur =
+`vrm_colis_retirer`) : 26 rouges sur l'avant ; mutations rouges (fusion par n° retirée ⇒
+« colonne 9 · publié 10 » ; « à vérifier » compté ⇒ « colonne 10 · publié 9 »).
+`retrait-relais-carte` + section Colis (épingle n° 1 dessinée au banc, clic ⇒ point désigné, une
+recherche d'adresse avec CP) : 12 rouges sur l'avant ; mutation « suivis pas lus sur Colis » ⇒ rouge.
+Non vu : le fond de carte réel (tuiles hors ligne au banc : « La carte ne s'affiche pas ici »).
+
+**Geste de Julien** : aucun. Ouvrir Colis : chaque colis « À retirer » est sous son point ; un
+colis sous « Point pas encore connu » dit quoi faire. Les e-mails Vinted Go DÉJÀ rangés sans code
+postal le restent (pas de rejeu) : ils rejoignent le point de la conversation, ou se placent par la
+liste de points de Vinted.
