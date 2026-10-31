@@ -96,10 +96,11 @@ async function ouvrir(nav, { registre, vues = [], etats = {}, installation = fal
   await ouvrirAdresses(pg);
   return { ctx, pg, erreurs, appels, etat };
 }
-// Au téléphone, « Adresses de réception » est un sous-écran de Réglages.
+// « Adresses de réception » est un sous-écran de Réglages (au téléphone, et
+// sur ordinateur depuis le 28 oct.) : l'ouvrir avant de toucher un geste.
 const ouvrirAdresses = async (pg) => {
   const s = pg.locator('[data-sous-ouvrir="adresses"]').first();
-  if (await s.isVisible().catch(() => false)) { await s.click(); await pg.waitForTimeout(700); }
+  if (await s.isVisible().catch(() => false)) { await s.click(); await pg.locator('[data-reglage-adresses]').first().waitFor({ state: 'visible', timeout: 8000 }).catch(() => {}); }
   const nav = pg.getByRole('navigation',{name:'Rubriques des emails'});
   if (!await nav.isVisible().catch(()=>false)) return;
   await nav.getByRole('button',{name:/Comptes et transfert/}).click();
@@ -155,6 +156,7 @@ const panneau = (pg) => pg.evaluate(() => { const t = document.querySelector('[d
     await essaie('B', async () => {
       const reg = { 'julien@exemple.test': { owner: SESSION.user.id }, 'relais@privaterelay.appleid.com': { owner: SESSION.user.id } };
       const { ctx, pg, erreurs } = await ouvrir(nav, { registre: reg, installation: true });
+      await ouvrirAdresses(pg); // (28 oct.) sous-écran aussi sur ordinateur
       const l = await lignes(pg); const p = await panneau(pg);
       dit(l['julien@exemple.test'] && l['julien@exemple.test'].etat === 'transition' && /reçue — à confirmer/.test(l['julien@exemple.test'].texte) && l['julien@exemple.test'].bouton === 'Confirmer', 'à confirmer : reçue en attendant, et « Confirmer »', JSON.stringify(l['julien@exemple.test']));
       dit(l['relais@privaterelay.appleid.com'] && l['relais@privaterelay.appleid.com'].etat === 'transition' && !l['relais@privaterelay.appleid.com'].bouton && /relais Apple/.test(l['relais@privaterelay.appleid.com'].texte), 'un relais Apple : aucun bouton qui ne pourrait pas marcher, et pourquoi', JSON.stringify(l['relais@privaterelay.appleid.com']));
@@ -178,6 +180,7 @@ const panneau = (pg) => pg.evaluate(() => { const t = document.querySelector('[d
     await essaie('C', async () => {
       const reg = { 'a@exemple.test': { owner: SESSION.user.id }, 'b@exemple.test': { owner: SESSION.user.id } };
       const { ctx, pg } = await ouvrir(nav, { registre: reg, preuves: 'panne' });
+      await ouvrirAdresses(pg); // (28 oct.) sous-écran aussi sur ordinateur
       const l = await lignes(pg); const p = await panneau(pg);
       dit(p && p.pasSu === 1 && Object.values(l).every((x) => x.etat === 'pas-su' && !/confirmée|pas confirmée/.test(x.texte)), 'une phrase « pas pu vérifier », UNE fois — aucun état deviné sur les lignes', JSON.stringify({ pasSu: p && p.pasSu, l }));
       dit(p && p.promesse === 'passu' && !/te sont proposés/.test(p.promesseTexte), 'pas su : l’explication ne promet rien (« rien n’est perdu »)', p && p.promesseTexte);
@@ -204,6 +207,7 @@ const panneau = (pg) => pg.evaluate(() => { const t = document.querySelector('[d
     console.log('\n── E. La boîte d’envoi n’a jamais tourné : on le dit, sans promettre');
     await essaie('E', async () => {
       const { ctx, pg } = await ouvrir(nav, { registre: { 'a@exemple.test': { owner: SESSION.user.id } }, etats: { 'a@exemple.test': { etat: 'envoi', demandeLe: vieux } }, collecteur: { at: null } });
+      await ouvrirAdresses(pg); // (28 oct.) sous-écran aussi sur ordinateur
       const p = await panneau(pg);
       dit(p && p.boite === 'jamais' && /n'a pas encore tourné/.test(p.texte) && !/dans les prochaines minutes/.test(p.texte), 'la boîte n’a jamais tourné : le lien partira dès qu’elle sera en marche — aucune promesse de délai', p && p.boite);
       await ctx.close();
@@ -212,6 +216,7 @@ const panneau = (pg) => pg.evaluate(() => { const t = document.querySelector('[d
     console.log('\n── F. Une seule boutique : aucune preuve n’est demandée');
     await essaie('F', async () => {
       const { ctx, pg } = await ouvrir(nav, { registre: { 'a@exemple.test': { owner: SESSION.user.id } }, preuves: 'unique' });
+      await ouvrirAdresses(pg); // (28 oct.) sous-écran aussi sur ordinateur
       const l = await lignes(pg); const p = await panneau(pg);
       dit(p && !p.expl.length && !p.pasSu && l['a@exemple.test'] && l['a@exemple.test'].etat === 'sans-preuve' && !l['a@exemple.test'].bouton, 'base à une boutique : ni état, ni règle, ni bouton', JSON.stringify(l));
       await ctx.close();

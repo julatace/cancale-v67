@@ -281,6 +281,9 @@ const capturer = async (pg, nom, vp) => {
           await pg.getByRole('button',{name:'← Retour',exact:true}).click();await pg.getByRole('button',{name:'← Retour',exact:true}).click();
           await pg.getByRole('button',{name:'Vérifier le premier sélectionné',exact:true}).click();
           await pg.getByRole('alert').filter({hasText:'Vérification interrompue'}).waitFor();
+          // (29 oct., 3c42f7a) « Copier le contrôle » vit dans le repli « Assistance
+          // technique · favoris » (fermé au départ) : on l'ouvre, comme lui.
+          if(await pg.locator('.vrm-favoris-diagnostic').first().evaluate(e=>!e.open))await pg.getByText('Assistance technique · favoris',{exact:true}).first().click();
           await pg.getByRole('button',{name:'Copier le contrôle',exact:true}).click();
           const avantMaj=await pg.evaluate(()=>JSON.parse(window.controleOuverture));
           dit(avantMaj.extension==='5.216.0'&&avantMaj.etape==='connexion'&&avantMaj.code==='extension_a_actualiser',`${T} refus avant ouverture : version mesurée et cause conservées`);

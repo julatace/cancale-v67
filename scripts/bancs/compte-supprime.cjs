@@ -99,7 +99,11 @@ async function main() {
         const { ctx, pg, errs } = await preparer(b, vp);
         await pg.goto(`http://localhost:${PORT}/?tab=vintedaccounts`, { waitUntil: 'domcontentloaded' });
         await pg.getByText('compte_vivant').first().waitFor({ timeout: 12000 });
-        await pg.waitForTimeout(1500);
+        // La purge part à l'arrivée du nuage (onCloudReady) : on attend qu'elle ait
+        // ÉCRIT (jusqu'à 12 s), jamais un délai fixe — il était trop court depuis
+        // que le démarrage lit davantage (vu le 29 oct. : écriture à ~2 s).
+        for (let t = 0; t < 40 && !ECRITS.some((e) => e && /^harvest_199082413_/.test(e.id)); t++) await pg.waitForTimeout(300);
+        await pg.waitForTimeout(300);
         const vides = ECRITS.filter((e) => e && /^harvest_199082413_/.test(e.id) && e.data && e.data.supprime === true).map((e) => e.id).sort();
         dit(vides.join(',') === 'harvest_199082413_listings,harvest_199082413_orders_sold', `${T} les lignes du compte supprimé sont VIDÉES (préfixe exact)`, vides.join(','));
         dit(!ECRITS.some((e) => e && /^harvest_111_/.test(e.id) && e.data && e.data.supprime), `${T} et jamais celles du compte vivant`);

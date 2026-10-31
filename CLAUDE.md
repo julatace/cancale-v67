@@ -1,5 +1,21 @@
 # VRM — dossier de passation
 
+> **31 octobre — tournée de TOUS les bancs (183) et audits (160), après les chantiers du 27-29 :** 5 défauts de l'app
+> corrigés : (1) la purge d'un compte supprimé pour de bon ne vidait plus rien — le filtre `fetch` du 29 oct.
+> (`src/comptesSupprimes.js`) lui cachait ses lignes ; une lecture qui doit les voir passe `{ vrmVoirSupprimes: true }`
+> dans `init` (jamais un en-tête) ; (2) Leboncoin : `Card/Titre/Sous/Groupe` définis DANS le rendu de `LeboncoinScreen`
+> remontaient les cartes à chaque rendu (le bouton « Publier » remplacé sous le doigt) ⇒ sortis du composant ;
+> (3) la table « qui remplace qui » (reprise du N°) lue deux fois par ouverture d'écran ⇒ une fois ; (4) « Annonces à
+> compléter » se tait à 0 (lecture complète) ; (5) `data-plantages` posé. ~25 bancs remis à la forme actuelle SANS
+> retirer de contrôle — causes récurrentes à connaître : **les panneaux des Paramètres s'ouvrent en sous-écran AUSSI sur
+> ordinateur depuis 77633d9 (28 oct.)** (`[data-sous-ouvrir="<id>"]` à cliquer à toutes les tailles) ; le tampon des
+> bordereaux exige pdf.js (servi en local par les bancs, comme `imprimante.cjs`) ; le « téléphone épuré » (27 oct.) cache
+> `vrm-aide` sous 768 px (juger `textContent`) ; délais fixes remplacés par l'attente d'un état ; `audit-retrait-fiable`
+> fixe son horloge (il tombait avec le calendrier). Rouges laissés : `session` G/P (limite Chrome 153, connue) ;
+> `mobile`, `profil-avatar` instables sous charge. `audit-preuve-vente` exige l'historique complet (`git fetch --unshallow`).
+> `ebay-regle-offre` prend ~18 min (délai ≥ 25 min). ⚠️ Non corrigé, noté : la visionneuse du reçu ne se ferme pas à
+> Échap quand le PDF a le focus, et un seul Échap ferme visionneuse ET reçu.
+
 > 🔴 **30 octobre — intégration v30 (branche `v30-integ`, poussée sur `claude/project-review-nsk5su`), extension 5.291.0 :**
 > réunis par VRAIS merges : `v29-colis` (+ `v29-colis-ext`), `v29-lbc`, `v29-msg-ecrase`, `v29-vinted-ui`, `v29-compta`,
 > `v29-ebay-agent`, `v29-ebay-achats`, puis `origin/main` (refonte #917 : trois boutons, textes courts — elle gagne sur la

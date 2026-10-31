@@ -242,7 +242,14 @@ const DOUBLONS_MAX = 8;
 // à froid) : 14 à 19 avant le 17 octobre, 11 à 12 après (`BoutonSync`, lectures de la fin
 // lancées avec les ventes). Le plafond ne bloque que le retour du défaut.
 const RENDUS_JOURNEE_MAX = 13;
-const PLAFONDS = { journee: 62, cat_ventes: 82, cat_bord: 82, cat_annonces: 66, cat_achats: 78, cat_msg: 66, dashboard: 60 };
+// 29 oct. : Messages lit UNE fois de plus trois sources voulues (28-29 oct.) —
+// la relecture fiable des conversations (`inbox`/`notifications`/`favoris_archive`
+// en une lecture, l'âge des ventes `orders_sold`) et la table « qui remplace qui »
+// (`vinted_brouillon_*`, `coffre_*`, reprise du N°) — mesuré 65 (1512) et 67
+// (390) contre 59 et 61 le 27 oct., chaque lecture UNE fois (aucun doublon neuf).
+// La table était lue DEUX fois (relue à chaque référence neuve de la liste
+// d'annonces) : corrigé dans l'app, Ma journée revient à 61.
+const PLAFONDS = { journee: 62, cat_ventes: 82, cat_bord: 82, cat_annonces: 66, cat_achats: 78, cat_msg: 68, dashboard: 60 };
 const ECRANS = [
   ['journee', () => !!document.querySelector('[data-vendu-mois],[data-vendu-pas-su]') || /pas pu s'afficher/.test(document.body.innerText)],
   ['cat_ventes', () => document.querySelectorAll('[data-vente],[data-tx]').length > 0 || /\d+ ventes/.test(document.body.innerText), 'input[aria-label="Rechercher dans les ventes Vinted"]'],

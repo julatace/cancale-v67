@@ -79,10 +79,10 @@ const m=await pg.evaluate(()=>{const top=(e)=>e?Math.round(e.getBoundingClientRe
     titreAch:[...document.querySelectorAll('.vrm-main h1,.vrm-main h2')].some(h=>/^Achats$/.test(h.textContent.trim())&&vis(h)),
     titreMsg:[...document.querySelectorAll('.vrm-main h1,.vrm-main h2')].some(h=>/^Messages$/.test(h.textContent.trim())&&vis(h)),
     recusTop:top(document.querySelector('[data-recus-email]')),ongletsTop:top(document.querySelector('[data-achats-onglet]')),
-    colis0:top(document.querySelector('[data-achats-onglet]')),convTop:top(document.querySelector('.vrm-msg-search')),
+    colis0:top(document.querySelector('[data-achats-onglet]')),convTop:top(document.querySelector('.vrm-msg-search')),convEcart:(()=>{const a=document.querySelector('.vrm-messages-sections'),b=document.querySelector('.vrm-msg-search');return a&&b?Math.round(b.getBoundingClientRect().top-a.getBoundingClientRect().bottom):null;})(),
     chev:(()=>{const a=document.querySelector('.vrm-day-money [data-recu-mois]'),c=document.querySelector('.vrm-day-money [data-ca-annee]');if(!a||!c)return null;const r1=a.getBoundingClientRect(),r2=c.getBoundingClientRect();return !(r1.bottom<=r2.top+1||r2.bottom<=r1.top+1||r1.right<=r2.left+1||r2.right<=r1.left+1);})(),
     dateCap:(()=>{const d=document.querySelector('.vrm-day-greeting .vrm-day-date');return d&&d.getBoundingClientRect().height>0?getComputedStyle(d).textTransform:null;})(),
-    tete:(()=>{const h=document.querySelector('.vrm-day-greeting .vrm-day-hello'),t=document.querySelector('.vrm-day-greeting .vrm-day-todo');return h&&t?Math.abs(top(h)-top(t)):null;})(),
+    tete:(()=>{const h=document.querySelector('.vrm-day-greeting .vrm-day-hello'),t=document.querySelector('.vrm-day-greeting .vrm-day-todo');if(!h||!t)return null;const a=h.getBoundingClientRect(),b=t.getBoundingClientRect();const mil=(b.top+b.bottom)/2;return mil>=a.top&&mil<=a.bottom?0:Math.round(Math.min(Math.abs(mil-a.top),Math.abs(mil-a.bottom)));})(),
     limites:[...document.querySelectorAll('[data-bord-card]')].map(c=>{const s=c.querySelector('[data-colis-limite-texte]');if(!s)return null;const rc=c.getBoundingClientRect(),rs=s.getBoundingClientRect();const m=/rgba?\((\d+), ?(\d+), ?(\d+)/.exec(getComputedStyle(s).color)||[];return {deborde:rs.right>rc.right+1,rouge:+m[1]>170&&+m[2]<80&&+m[3]<80,t:s.textContent.trim().slice(0,40)};}).filter(Boolean),
     fraiche:vis(document.querySelector('[data-fraicheur-ventes]')),
     titreEcran:(()=>{const b=document.querySelector('.vrm-mobile-titre,[data-titre-barre]');const t=[...document.querySelectorAll('.vrm-main h2')].filter(h=>vis(h)&&/^(Statistiques|Comptabilité|Colis|Paramètres|Organisation)$/.test(h.textContent.trim()));return t.map(h=>h.textContent.trim());})(),
@@ -90,7 +90,7 @@ const m=await pg.evaluate(()=>{const top=(e)=>e?Math.round(e.getBoundingClientRe
     lignesZero:[...document.querySelectorAll('[data-ca-ligne]')].filter(tr=>[...tr.querySelectorAll('td')].slice(1).every(td=>/^0,00/.test(td.textContent.trim()))).length,
     nLignesCa:document.querySelectorAll('[data-ca-ligne]').length,
     pictoSeuls:[...document.querySelectorAll('[data-compta-section] .vrm-pourquoi > summary')].filter(x=>x.textContent.trim().length<3).length,
-    v0:top(ventes[0]),a0:top(cartes[0]),hA:cartes.length?Math.round(cartes[0].getBoundingClientRect().height):null,pA:(()=>{const a=cartes[0]&&cartes[0].querySelector('.vrm-ann-overview > a');return a?Math.round(a.getBoundingClientRect().height):null;})(),nA:cartes.length,
+    v0:top(ventes[0]),a0:top(cartes[0]),a0Barre:(()=>{const w=document.querySelector('.vrm-ann-workbar');return w&&cartes[0]?Math.round(cartes[0].getBoundingClientRect().top-w.getBoundingClientRect().bottom):null;})(),hA:cartes.length?Math.round(cartes[0].getBoundingClientRect().height):null,pA:(()=>{const a=cartes[0]&&cartes[0].querySelector('.vrm-ann-overview > a');return a?Math.round(a.getBoundingClientRect().height):null;})(),nA:cartes.length,
     deborde:document.documentElement.scrollWidth>document.documentElement.clientWidth+1};});
 if(sub==='ventes'){
   dit(m.nVentes>=10,`[${W}] les ventes sont rendues`,String(m.nVentes));
@@ -106,11 +106,18 @@ if(sub==='ventes'){
   dit(m.colis0!=null&&m.colis0<=(W<600?360:420),`[${W}] les étapes des achats arrivent plus haut`,String(m.colis0));
 } else if(sub==='messages'){
   dit(!m.titreMsg,`[${W}] pas de second titre « Messages » sous l'onglet Messages`);
-  dit(m.convTop!=null&&m.convTop<=(W<600?380:470),`[${W}] la recherche des conversations arrive plus haut`,String(m.convTop));
+  // Mesuré depuis le choix Conversations / Favoris (et plus depuis le haut de
+  // page) : au-dessus vivent les blocs de suivi posés par Julien le 29 oct.
+  // (bilan des données lues, synchronisation par compte). Rien ne doit se
+  // glisser entre ce choix et la recherche (second titre, reçus…). Mesuré : 28 px.
+  dit(m.convEcart!=null&&m.convEcart>=0&&m.convEcart<=48,`[${W}] la recherche des conversations arrive plus haut`,`${m.convEcart} px sous Conversations/Favoris (haut ${m.convTop})`);
 } else if(v==='journee'){
   dit(m.chev===false,`[${W}] « Reçu » et « Chiffre d'affaires » ne se chevauchent pas dans la carte Vendu`,String(m.chev));
   dit(m.dateCap!=='capitalize',`[${W}] la date s'écrit « lundi 26 octobre », pas « Lundi 26 Octobre »`,String(m.dateCap));
-  if(W>=768)dit(m.tete!=null&&m.tete<=12,`[${W}] bonjour et « N choses à faire » sur la même ligne`,String(m.tete));
+  // Même ligne = le milieu de « N choses à faire » tombe dans la boîte du bonjour
+  // (alignés sur la ligne de base : le haut des deux diffère de la taille du
+  // titre, 40 px depuis styles-disposition du 27 oct.). Sur deux lignes ⇒ rouge.
+  if(W>=768)dit(m.tete!=null&&m.tete===0,`[${W}] bonjour et « N choses à faire » sur la même ligne`,String(m.tete));
 } else if(v==='dashboard'){
   dit(W<600?m.titreEcran.length===0:m.titreEcran.includes('Statistiques'),`[${W}] « Statistiques » : une fois sur téléphone (la barre du haut), présent sur ordinateur`,JSON.stringify(m.titreEcran));
   dit(m.courbeDoublons===0,`[${W}] « Vendu · 12 mois » ne réécrit pas ses mois arrondis autrement`,String(m.courbeDoublons));
@@ -135,7 +142,11 @@ if(sub==='ventes'){
   // beaucoup trop petites, on ne voit même pas la première photo ». La fiche montre
   // la première photo EN GRAND ; elle arrive quand même plus haut qu'avant (685/707 px).
   dit(m.pA!=null&&m.pA>=180,`[${W}] la première photo d'une annonce est en grand`,`${m.pA} px (fiche ${m.hA} px)`);
-  dit(m.a0!=null&&m.a0<=680,`[${W}] la première annonce arrive plus haut`,String(m.a0));
+  // Mesuré depuis la barre d'outils (recherche, tri, Actions) : au-dessus vivent
+  // les blocs posés par Julien (bilan, vendus ailleurs, à compléter, offres auto,
+  // 27-29 oct.). Entre la barre et la première fiche, rien que « Stock et
+  // ajustements · Publier aussi ailleurs ». Mesuré : 65 px (390), 76 px (1512).
+  dit(m.a0Barre!=null&&m.a0Barre>=0&&m.a0Barre<=110,`[${W}] la première annonce arrive plus haut`,`${m.a0Barre} px sous la barre d'outils (haut ${m.a0})`);
 }
 dit(!m.deborde,`[${W}] aucun débordement horizontal (${nom})`);
 dit(!errs.length,`[${W}] aucune erreur (${nom})`,errs[0]);

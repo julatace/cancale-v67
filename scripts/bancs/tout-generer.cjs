@@ -137,6 +137,13 @@ async function rendre(b, { tab = 'cat_bord', tel = false, pont = { absente: true
       etat: et ? { niveau: et.getAttribute('data-etat-actions'), code: et.getAttribute('data-etat-code'), titre: et.getAttribute('title') || '' } : null,
       cmds: window.__cmds || [],
       corps: document.body.innerText,
+      // 27 oct. (« téléphone épuré », demande de Julien) : sur téléphone, la
+      // phrase d'EXPLICATION du bandeau porte `vrm-aide` et se tait ; le
+      // bandeau, lui (« N bordereaux à générer », `data-raison-bord`), reste
+      // visible. On compte donc aussi le texte du DOM (caché compris) : une
+      // copie de plus, visible ou non, reste rouge.
+      corpsTout: document.body.textContent,
+      bandeauVu: (() => { const x = document.querySelector('[data-raison-bord]'); if (!x) return null; const r = x.getBoundingClientRect(); return { code: x.getAttribute('data-raison-bord'), vu: r.width > 0 && r.height > 0, txt: x.innerText.trim() }; })(),
       sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth,
     };
   });
@@ -160,7 +167,11 @@ const compte = (t, s) => String(t || '').split(s).length - 1;
       const r = await rendre(b, { tel }); const v = await r.lire();
       const phrase = tel ? "Depuis ton ordinateur : c'est là que tourne l'extension qui génère les bordereaux." : "Extension VRM pas détectée dans ce navigateur — c'est elle qui génère les bordereaux.";
       dit(v.tg && v.tg.etat === 'grise', `${tel ? 'téléphone' : 'ordinateur sans extension'} : « Tout générer » reste visible, grisé`, JSON.stringify(v.tg));
-      dit(compte(v.corps, phrase) === 1, `${tel ? 'téléphone' : 'ordinateur sans extension'} : la raison est écrite une seule fois sur l'écran`, `${compte(v.corps, phrase)} fois`);
+      if (tel) {
+        dit(compte(v.corpsTout, phrase) === 1, "téléphone : la raison est dans la page une seule fois (repliée, « téléphone épuré » du 27 oct.)", `${compte(v.corpsTout, phrase)} fois`);
+        dit(compte(v.corps, phrase) === 0, 'téléphone : l’explication se tait (vrm-aide)', `${compte(v.corps, phrase)} fois visible`);
+        dit(!!(v.bandeauVu && v.bandeauVu.code === 'telephone' && v.bandeauVu.vu && /bordereaux? à générer/.test(v.bandeauVu.txt)), 'téléphone : le bandeau « N bordereaux à générer » reste visible (grisé, jamais muet)', JSON.stringify(v.bandeauVu));
+      } else dit(compte(v.corps, phrase) === 1, "ordinateur sans extension : la raison est écrite une seule fois sur l'écran", `${compte(v.corps, phrase)} fois`);
       dit(v.sw <= v.cw + 1, 'aucun débordement horizontal', `${v.sw} > ${v.cw}`);
       dit(r.errs.length === 0, 'aucune erreur d\'app', r.errs.join(' | ').slice(0, 140));
       await r.ctx.close();

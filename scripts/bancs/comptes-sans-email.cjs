@@ -119,6 +119,15 @@ const projette = (row, sel) => {
   return out;
 };
 
+// Les notifications vivent dans un SOUS-ÉCRAN de Réglages (au téléphone depuis
+// le 16 oct., sur ordinateur aussi depuis le 28 oct.) : on l'ouvre, comme lui,
+// puis on attend que son repli soit VISIBLE (pas un délai fixe).
+async function ouvrirPush(pg) {
+  const sousPush = pg.locator('[data-sous-ouvrir="push"]').first();
+  await sousPush.waitFor({ state: 'visible', timeout: 8000 }).catch(() => {});
+  if (await sousPush.isVisible().catch(() => false)) await sousPush.click();
+  await pg.locator('summary', { hasText: 'Ce que tu reçois sur ton téléphone' }).first().waitFor({ state: 'visible', timeout: 8000 }).catch(() => {});
+}
 async function preparer(b, vp, opts = {}) {
   const ctx = await b.newContext({ viewport: vp, ...(vp.width < 600 ? { isMobile: true, hasTouch: true } : {}) });
   const pg = await ctx.newPage();
@@ -163,8 +172,7 @@ const PAS_MUETS = ['jujuf38', 'compte_neuf', 'llloollllaa', 'dormant', 'une_vent
       await pg.waitForTimeout(5500);
       // Au téléphone (16 octobre), les notifications vivent dans un SOUS-ÉCRAN
       // (Réglages → Notifications du téléphone) : on l'ouvre, comme lui.
-      const sousPush = pg.locator('[data-sous-ouvrir="push"]').first();
-      if (await sousPush.isVisible().catch(() => false)) { await sousPush.click(); await pg.waitForTimeout(600); }
+      await ouvrirPush(pg);
       const sum = pg.locator('summary', { hasText: 'Ce que tu reçois sur ton téléphone' }).first();
       await sum.scrollIntoViewIfNeeded({ timeout: 5000 });
       const resume = (await sum.innerText()).replace(/\s+/g, ' ');
@@ -263,6 +271,8 @@ const PAS_MUETS = ['jujuf38', 'compte_neuf', 'llloollllaa', 'dormant', 'une_vent
     const { ctx, pg, errs } = await preparer(b, { width: 1512, height: 982 }, { exclus: [ACC.tomj606, ACC.arthuror2] });
     await pg.goto(`http://localhost:${PORT}/?tab=settings`, { waitUntil: 'domcontentloaded' });
     await pg.waitForTimeout(5500);
+    // (28 oct.) Le sous-écran « Notifications » s'ouvre aussi sur ordinateur.
+    await ouvrirPush(pg);
     const sum = pg.locator('summary', { hasText: 'Ce que tu reçois sur ton téléphone' }).first();
     await sum.scrollIntoViewIfNeeded({ timeout: 5000 });
     await sum.click(); await pg.waitForTimeout(500);

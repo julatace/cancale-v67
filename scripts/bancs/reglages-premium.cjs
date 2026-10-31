@@ -161,14 +161,14 @@ async function interrupteurs(pg, T) {
           dit(m.disposition === (mobile ? 'telephone' : 'ordinateur'), `${T} : disposition ${mobile ? 'téléphone (sous-écrans)' : 'ordinateur (tout déplié)'}`, String(m.disposition));
           if (mobile) {
             dit(m.petites.length === 0, `${T} : aucune cible tactile de moins de 44 px`, m.petites.slice(0, 6).join(' · '));
-            dit(m.sous.length >= 3 && m.panneauxVisibles === 0, `${T} : les panneaux longs sont derrière un chevron (rien de déplié sur la liste)`, `${m.sous.length} sous-écrans · ${m.panneauxVisibles} panneau(x) visible(s)`);
-          } else {
-            dit(m.sous.length === 0, `${T} : sur ordinateur, rien n’est caché derrière un chevron`, m.sous.join(','));
           }
+          // Depuis le 28 oct. (77633d9, « Clarifier les paramètres ») les panneaux longs
+          // s'ouvrent dans un écran dédié AUSSI sur ordinateur : la liste reste courte.
+          dit(m.sous.length >= 3 && m.panneauxVisibles === 0, `${T} : les panneaux longs sont derrière un chevron (rien de déplié sur la liste)`, `${m.sous.length} sous-écrans · ${m.panneauxVisibles} panneau(x) visible(s)`);
           const n = await interrupteurs(pg, T);
           if (vue === 'reglages') dit(n >= 3, `${T} : les interrupteurs de la page sont là (sombre, stream, alertes)`, `${n} vu(s)`);
-          // Chaque sous-écran du téléphone : rendu, sans débordement ni petite cible, puis retour.
-          if (mobile) {
+          // Chaque sous-écran : rendu, sans débordement (ni petite cible au doigt), puis retour.
+          {
             for (const id of m.sous) {
               await pg.locator(`[data-sous-ouvrir="${id}"]`).first().click();
               await pg.waitForTimeout(700);
@@ -181,7 +181,7 @@ async function interrupteurs(pg, T) {
                 await pg.setViewportSize(vp); await pg.waitForTimeout(200);
               }
               dit(!s.tombe && s.deb <= 1 && s.panneauxVisibles === 1 && !!titre, `${T} › « ${titre} » : un seul panneau, sans débordement`, `déb ${s.deb} · ${s.panneauxVisibles} panneau(x)`);
-              dit(s.petites.length === 0, `${T} › « ${titre} » : aucune cible de moins de 44 px`, s.petites.slice(0, 6).join(' · '));
+              if (mobile) dit(s.petites.length === 0, `${T} › « ${titre} » : aucune cible de moins de 44 px`, s.petites.slice(0, 6).join(' · '));
               // §7 : le titre du sous-écran ne se redit pas juste dessous (« Sécurité des
               // données » ×2, revue du 17 oct.). On compte les TITRES RENDUS égaux au titre :
               // éléments visibles (un titre caché par CSS ne compte pas), le plus profond qui

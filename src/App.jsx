@@ -2692,7 +2692,7 @@ const deleteVintedAccount = async (vintedUserId, login) => {
     // base, dont 96 annonces de shop_cancale). On VIDE les lignes à la place :
     // un upsert, lui, passe. La donnée part vraiment, et l'égress avec (§34).
     try {
-      const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?or=(id.like.harvest_${uid}_*,id.like.coffre_${uid}_*)&select=id`, { headers: sbAuth() });
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?or=(id.like.harvest_${uid}_*,id.like.coffre_${uid}_*)&select=id`, { headers: sbAuth(), vrmVoirSupprimes: true });
       const rows = r.ok ? await r.json() : [];
       if (rows.length) {
         await fetch(`${SUPABASE_URL}/rest/v1/app_data`, {
@@ -2728,7 +2728,7 @@ const purgerComptesSupprimes = async () => {
     const uids = (noirs.uids || []).map(String).filter((u) => /^\d+$/.test(u) && off[u] !== false);
     let n = 0;
     for (const uid of uids) {
-      const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?or=(id.like.harvest_${uid}_*,id.like.coffre_${uid}_*)&select=id,sup:data->>supprime`, { headers: sbAuth() });
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?or=(id.like.harvest_${uid}_*,id.like.coffre_${uid}_*)&select=id,sup:data->>supprime`, { headers: sbAuth(), vrmVoirSupprimes: true });
       if (!r.ok) continue;
       const rows = await r.json(); if (!Array.isArray(rows)) continue;
       const cibles = rows.filter((x) => (String(x.id).startsWith(`harvest_${uid}_`) || String(x.id).startsWith(`coffre_${uid}_`)) && String(x.sup) !== 'true');
@@ -2777,7 +2777,7 @@ const supprimerDonneesCompte = async (uid0, login, scopes) => {
   if (!uid) return { ok: false, n: 0 };
   let n = 0;
   try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?or=(id.like.harvest_${uid}_*,id.like.coffre_${uid}_*)&select=id`, { headers: sbAuth() });
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?or=(id.like.harvest_${uid}_*,id.like.coffre_${uid}_*)&select=id`, { headers: sbAuth(), vrmVoirSupprimes: true });
     if (!r.ok) return { ok: false, n: 0 };               // « pas su » : on n'efface rien à l'aveugle
     const rows = await r.json();
     if (!Array.isArray(rows)) return { ok: false, n: 0 };
@@ -39056,7 +39056,18 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // (ancienId, itemId) et `coffre_*_*` (recreeDe), écrits par l'extension. Trois
   // états : undefined pas encore lu (on attend) · null pas su (comme avant) · objet.
   const [recreesNum, setRecreesNum] = useState(undefined);
+  // (29 oct.) Relue quand l'ENSEMBLE des annonces change (une republication
+  // apporte un identifiant neuf), pas à chaque nouvelle référence de la liste :
+  // le cache puis la lecture fraîche rendent les mêmes annonces, et la table
+  // était lue deux fois par ouverture d'écran (banc `vitesse.cjs`).
+  // Lue dès l'ouverture (avec les autres lectures : pas un rendu de plus), puis
+  // seulement quand l'ensemble change APRÈS la première liste reçue — l'arrivée
+  // de la première liste ne dit rien de neuf sur les republications.
+  const cleAnnoncesRecrees = useMemo(() => (Array.isArray(listings.items) ? listings.items.map((i) => String(i && i.id)).sort().join(',') : null), [listings.items]);
+  const cleRecreesLue = useRef(undefined);
   useEffect(() => {
+    const avant = cleRecreesLue.current; cleRecreesLue.current = cleAnnoncesRecrees;
+    if (avant === null && cleAnnoncesRecrees != null) return undefined;
     let vivant = true;
     (async () => {
       try {
@@ -39070,7 +39081,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       } catch (_) { if (vivant) setRecreesNum((v) => (v === undefined ? null : v)); }
     })();
     return () => { vivant = false; };
-  }, [listings.items]);
+  }, [cleAnnoncesRecrees]);
   const takenNums = useMemo(() => {
     const taken = new Set();
     usedNumeros.forEach(x=>{const n=parseInt(String(x),10);if(!isNaN(n))taken.add(n);});
@@ -52966,6 +52977,9 @@ function FavorisLeboncoin() {
   );
 }
 
+const CarteEcranLbc = ({ children, style, className }) => <div className={className} style={{ border: `1px solid ${C.border}`, background: C.card, borderRadius: 12, padding: '16px 18px', marginBottom: 14, boxShadow: C.shadow, ...style }}>{children}</div>;
+const SousEcranLbc = ({ children }) => <div style={{ fontSize: 12.5, color: C.muted, lineHeight: 1.5, marginBottom: 4 }}>{children}</div>;
+const TitreEcranLbc = ({ children, ...p }) => <div {...p} style={{ fontSize: 15, fontWeight: 700, color: C.text, marginBottom: 3, letterSpacing: '-.01em' }}>{children}</div>;
 function LeboncoinScreen() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -53508,9 +53522,14 @@ function LeboncoinScreen() {
   // (16 oct.) Mise en page dans l'identité de l'app : cartes blanches à ombre
   // douce, titres courts, une colonne plus large sur ordinateur (elle faisait
   // 600 px et tout s'empilait en pavés).
-  const Card = ({ children, style, className }) => <div className={className} style={{ border: `1px solid ${C.border}`, background: C.card, borderRadius: 12, padding: '16px 18px', marginBottom: 14, boxShadow: C.shadow, ...style }}>{children}</div>;
-  const Titre = ({ children, ...p }) => <div {...p} style={{ fontSize: 15, fontWeight: 700, color: C.text, marginBottom: 3, letterSpacing: '-.01em' }}>{children}</div>;
-  const Sous = ({ children }) => <div style={{ fontSize: 12.5, color: C.muted, lineHeight: 1.5, marginBottom: 4 }}>{children}</div>;
+  // ⚠️ (29 oct.) Ces deux formes vivent HORS du composant : définies ici, chaque
+  //    rendu de l'écran en faisait un NOUVEAU type, et React REMONTAIT toutes les
+  //    cartes — un défilement suffisait (mesuré au banc : le bouton « Publier »
+  //    remplacé sous le doigt, sa raison « depuis ton ordinateur » effacée, le N°
+  //    tapé dans « Relier » perdu). Même leçon que la fenêtre du Stock (§ planches).
+  const Card = CarteEcranLbc;
+  const Titre = TitreEcranLbc;
+  const Sous = SousEcranLbc;
   // ── L'AGENT QUI CONSEILLE (26 oct., parité avec eBay — Julien : « une vraie
   //    expérience ») : « À faire sur Leboncoin » range les actions du plus
   //    urgent au moins, sur les signaux DÉJÀ calculés dans `data` (§11, aucun
@@ -54010,6 +54029,9 @@ function LeboncoinScreen() {
                 </div>
                 );
               };
+              // Appelé comme une FONCTION (pas `<Groupe/>`) : un composant défini
+              // dans le rendu est un type neuf à chaque fois, React remontait les
+              // cartes à chaque rafraîchissement (29 oct., banc lbc-publier-app H).
               const Groupe = ({ titre, liste, note, ton }) => (<>
                 {groupes > 1 && <div className="vrm-apub-groupe"><span className="vrm-apub-groupe-titre" style={ton ? { color: C.warn } : undefined}>{titre}</span><span className="vrm-apub-groupe-n">{liste.length}</span></div>}
                 {note ? <div className="vrm-apub-groupe-note">{note}</div> : null}
@@ -54017,9 +54039,9 @@ function LeboncoinScreen() {
                 {liste.length > 40 && <div style={{ fontSize: 11, color: C.muted, marginTop: 6 }}>+ {liste.length - 40} autres…</div>}
               </>);
               return (<>
-                {nues.length > 0 && <Groupe titre="Aucune photo" ton liste={nues} note={<>Leboncoin <b>refuse une annonce sans photo</b>. Ouvre l'annonce sur Vinted, sur ton ordinateur : ses photos arrivent ici au passage.</>} />}
-                {pretes.length > 0 && <Groupe titre="Prêtes" liste={pretes} />}
-                {maigres.length > 0 && <Groupe titre="Une seule photo" liste={maigres} note={<>Ouvre l'annonce Vinted une fois sur ton ordinateur : les autres photos arrivent seules. <Pourquoi label="Pourquoi">Une annonce Leboncoin avec une seule photo se vend mal. Vinted ne donne les autres photos que sur la page de l'annonce.</Pourquoi></>} />}
+                {nues.length > 0 && Groupe({ titre: "Aucune photo", ton: true, liste: nues, note: <>Leboncoin <b>refuse une annonce sans photo</b>. Ouvre l'annonce sur Vinted, sur ton ordinateur : ses photos arrivent ici au passage.</> })}
+                {pretes.length > 0 && Groupe({ titre: "Prêtes", liste: pretes })}
+                {maigres.length > 0 && Groupe({ titre: "Une seule photo", liste: maigres, note: <>Ouvre l'annonce Vinted une fois sur ton ordinateur : les autres photos arrivent seules. <Pourquoi label="Pourquoi">Une annonce Leboncoin avec une seule photo se vend mal. Vinted ne donne les autres photos que sur la page de l'annonce.</Pourquoi></> })}
               </>);
             })()}
           </>)}
@@ -57603,7 +57625,7 @@ function ConnexionsSetting({comptes=[],onComptes,onPlateforme}) {
     <section className="vrm-connexion-source" data-connexion="emails" style={{borderColor:C.border}}><h3>Données des emails</h3><strong>{emails.titre}</strong>{emails.date&&<time dateTime={emails.date}>{dateLisible(emails.date)}</time>}<p style={{color:C.muted}}>Date des données reçues, pas une preuve que chaque transfert marche. Détail : « Réception des emails ».</p></section>
     {((Array.isArray(drift)&&drift.length>0)||(Array.isArray(plantages)&&plantages.length>0))&&<details className="vrm-connexion-source" style={{borderColor:C.border}}><summary>Incidents et détails pour l’assistance</summary>
       {Array.isArray(drift)&&drift.length>0&&<p>Le format de certaines réponses est à vérifier : {[...new Set(drift.map(x=>nomFamille(x.type)))].join(', ')}.</p>}
-      {Array.isArray(plantages)&&plantages.length>0&&<p>{plantages.length} incident(s) observé(s) ces 7 derniers jours. Dernier : {plantages[0].message} · {dateLisible(plantages[0].at)}.</p>}
+      {Array.isArray(plantages)&&plantages.length>0&&<p data-plantages={plantages.length}>{plantages.length} incident(s) observé(s) ces 7 derniers jours. Dernier : {plantages[0].message} · {dateLisible(plantages[0].at)}.</p>}
     </details>}
     <details className="vrm-connexion-source" style={{borderColor:C.border}}><summary>Version de l’application</summary><p>{BUILD_ID==='inconnue'?'Version non vérifiée.':`Compilation du ${BUILD_ID}.`}</p><Bouton variante="secondaire" onClick={()=>{if(window.__vrmForceUpdate)window.__vrmForceUpdate();else window.location.reload();}}>Recharger la dernière version</Bouton></details>
   </div>;

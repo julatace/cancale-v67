@@ -206,7 +206,7 @@ const lit = (pg) => pg.evaluate(() => {
   const bt = document.body.innerText;
   const iCA = bt.search(/CA des ventes finalis/i);
   return {
-    annee: carte ? carte.dataset.seuilsVinted : null, aCeJour: carte ? carte.dataset.aCeJour : null, txt: carte ? carte.innerText : '', lignes,
+    annee: carte ? carte.dataset.seuilsVinted : null, aCeJour: carte ? carte.dataset.aCeJour : null, txt: carte ? carte.innerText : '', tc: carte ? carte.textContent : '', lignes,
     total: tot ? ligne(tot) : null,
     reg: regParUid, regN: reg ? reg.dataset.registreVintedN : null, regEur: reg ? reg.dataset.registreVintedEur : null,
     caRegistre: iCA >= 0 ? bt.slice(iCA, iCA + 110).replace(/\n/g, ' | ') : '',
@@ -287,7 +287,9 @@ const communs = (r, errs, quoi) => {
           `${q} compte_panne : « — » sur la ligne, aucun nombre, aucun verdict`, pa ? `${pa.etat} · «${pa.txt.replace(/\n/g, ' | ')}»` : 'absent');
         dit(r.nPanne === 1 && compte(r.txt, "n'ont pas pu être lues") === 1 && r.relire, `${q} la panne dite UNE fois au-dessus des lignes, avec « Relire mes ventes »`, `${r.nPanne} bloc · ${compte(r.txt, "n'ont pas pu être lues")} phrase · bouton ${r.relire}`);
         dit(/ventes de compte_panne pas lues/.test(r.caRegistre), `${q} le CA du registre dit que les ventes de compte_panne n'ont pas été lues`, r.caRegistre);
-        dit(/exclus de l'app/.test(r.txt), `${q} la carte dit, une fois et sans les nommer, que les comptes exclus ne sont pas comptés`);
+        // (27 oct., « téléphone épuré », sa demande) sur téléphone la phrase porte
+        // `vrm-aide` et se tait : elle reste dans la carte (textContent), dite à l'ordinateur.
+        dit(compte(vp.width < 768 ? r.tc : r.txt, "exclus de l'app") === 1, `${q} la carte dit, une fois et sans les nommer, que les comptes exclus ne sont pas comptés`);
         communs(r, errs, q);
         try { await pg.locator('[data-seuils-vinted]').first().screenshot({ path: path.join(require('os').tmpdir(), 'seuils-vinted-' + vp.width + '.png') }); } catch (_) {}
         // E. Une année passée : ni « à ce jour », ni reste avant le seuil.
@@ -519,7 +521,9 @@ const communs = (r, errs, quoi) => {
         let z = null;
         for (let i = 0; i < 20; i++) { await pg.waitForTimeout(400); z = await recu(); if (z && z.c !== (a && a.c)) break; }
         dit(!!(a && z && a.c !== '' && Number(a.c) - Number(z.c) === alphaMois && alphaMois > 0), `${q} « Reçu » ne compte plus compte_alpha une fois sa lecture ratée (−${(alphaMois / 100).toFixed(2)} €)`, `${a && a.c} → ${z && z.c} (attendu −${alphaMois})`);
-        dit(!!(z && /compte_alpha/.test(z.sans || '') && /sans compte_alpha/.test(z.txt)), `${q} …et le dit à côté du chiffre (« sans compte_alpha »)`, z ? `sans «${z.sans}» · ${z.txt.replace(/\n/g, ' | ')}` : 'absent');
+        // (28 oct., #798, choix de Julien) Ma journée n'écrit plus « sans X » à l'écran :
+        // le compte manquant reste porté par `data-recu-sans` (le chiffre l'exclut, ci-dessus).
+        dit(!!(z && /compte_alpha/.test(z.sans || '')), `${q} …et le porte à côté du chiffre (data-recu-sans « compte_alpha »)`, z ? `sans «${z.sans}» · ${z.txt.replace(/\n/g, ' | ')}` : 'absent');
         dit(errs.length === 0, `${q} aucune erreur d'app`, errs.join(' | ').slice(0, 160));
       } catch (e) { dit(false, `${q} le scénario a tourné jusqu'au bout`, String(e && e.message).slice(0, 160)); }
       await ctx.close();
