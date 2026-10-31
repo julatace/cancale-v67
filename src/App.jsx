@@ -14104,8 +14104,16 @@ let TITRE_BARRE = '';
 // (29 oct.) `principal` : L'action principale de l'écran (UN <Bouton
 // variante="primaire">). En haut à droite sur ordinateur ; sur téléphone, une
 // barre fixe au-dessus de la navigation du bas (.vrm-b-principal, styles-boutons.css).
+// (31 oct., Vitrine) Le titre d'un écran est son `h1` — sauf dans un espace de
+// plateforme (Vinted, Leboncoin, eBay), où le `h1` est le nom de la plateforme
+// (`EntetePlateforme`) et l'écran une SECTION de cet espace : son titre est un `h2`.
+const DansEspacePlateforme = React.createContext(false);
+function EspacePlateforme({ nom, children }) {
+  return <section className="vrm-market-space" aria-label={nom}><DansEspacePlateforme.Provider value={true}>{children}</DansEspacePlateforme.Provider></section>;
+}
 function ScreenHead({ icon, title, desc, right, principal }) {
   const line = typeof icon === 'string' && ICON_PATHS[icon];
+  const Titre = React.useContext(DansEspacePlateforme) ? 'h2' : 'h1';
   // ⚠️ UNE MANCHETTE, PAS UN EN-TÊTE DE TABLEAU DE BORD. Le titre était une
   // ligne de 23 px avec une pastille ronde teintée devant — le gabarit de tous
   // les outils SaaS. Ici : un surtitre en capitales espacées, un titre large et
@@ -14132,7 +14140,7 @@ function ScreenHead({ icon, title, desc, right, principal }) {
           {line
             ? <span aria-hidden="true" style={{display:'flex',color:C.muted,flexShrink:0}}><Icon name={icon} size={20}/></span>
             : (icon ? <span aria-hidden="true" style={{fontSize:18}}>{icon}</span> : null)}
-          <h2 className="vrm-display" style={{color:C.text}}>{title}</h2>
+          <Titre className="vrm-display" style={{color:C.text}}>{title}</Titre>
           {/* ⚠️ LA DESCRIPTION D'ÉCRAN N'EST PLUS AFFICHÉE. Julien : « il y a trop
               d'informations partout, c'est horrible ». Ce paragraphe explique ce
               que fait l'écran — on le lit UNE fois, puis c'est du bruit tous les
@@ -14269,8 +14277,7 @@ function TopProgress() {
     <div aria-hidden="true" style={{position:'fixed',top:0,left:0,right:0,height:3,zIndex:200,pointerEvents:'none',background:'transparent'}}>
       <div style={{
         height:'100%', width:`${pct}%`,
-        background:`linear-gradient(90deg, ${C.accent}, ${C.blue||C.accent})`,
-        boxShadow:`0 0 8px ${C.accent}88`,
+        background:C.accent,
         borderRadius:'0 999px 999px 0',
         transition:'width .22s ease, opacity .3s ease',
         opacity: pct>=100 ? 0 : 1,
@@ -14994,19 +15001,19 @@ function AuthScreen() {
     <div className="vrm-cx" data-connexion="">
       <style>{`
 .vrm-cx{min-height:100vh;min-height:100dvh;display:grid;grid-template-columns:minmax(0,1fr);grid-template-rows:auto 1fr;background:${C.bg}}
-.vrm-cx-marque{position:relative;overflow:hidden;background:linear-gradient(160deg,#243D43 0%,#192C34 70%,#14242B 100%);color:#F0F5F2;padding:calc(18px + env(safe-area-inset-top)) 20px 64px}
-.vrm-cx-marque:before{content:"";position:absolute;right:-30%;top:-40%;width:90%;aspect-ratio:1;border-radius:50%;background:radial-gradient(closest-side,rgba(190,209,201,.18),transparent);pointer-events:none}
+.vrm-cx-marque{position:relative;overflow:hidden;background:#0F0F0E;color:#F2F2EE;padding:calc(18px + env(safe-area-inset-top)) 20px 64px}
+.vrm-cx-marque:before{content:none}
 .vrm-cx-haut{position:relative;display:flex;align-items:center;justify-content:space-between;gap:12px}
 .vrm-cx-logo{display:flex;align-items:center;gap:10px;text-decoration:none;color:inherit}
 .vrm-cx-logo img{width:36px;height:36px;border-radius:9px;box-shadow:0 0 0 1px rgba(255,255,255,.12)}
 .vrm-cx-logo b{font-size:20px;letter-spacing:-.04em;font-weight:700}
-.vrm-cx-retour{display:inline-flex;align-items:center;min-height:44px;font-size:14px;color:#C7D6CF;text-decoration:none;font-weight:500}
+.vrm-cx-retour{display:inline-flex;align-items:center;min-height:44px;font-size:14px;color:#B0B0A8;text-decoration:none;font-weight:500}
 .vrm-cx-titre{position:relative;font-size:26px;line-height:1.15;letter-spacing:-.04em;font-weight:700;margin:22px 0 0}
-.vrm-cx-titre span{display:block;color:#B0C5BC}
+.vrm-cx-titre span{display:block;color:#B0B0A8}
 .vrm-cx-points{display:none}
 .vrm-cx-main{display:flex;justify-content:center;padding:0 16px 32px}
 .vrm-cx-boite{width:100%;max-width:400px;margin-top:-44px;position:relative}
-.vrm-cx-form{background:${C.card};border:1px solid ${C.border};border-radius:12px;padding:22px 20px;box-shadow:0 1px 2px rgba(18,27,44,.06),0 18px 44px rgba(18,27,44,.12)}
+.vrm-cx-form{background:${C.card};border:1px solid ${C.border};border-radius:14px;padding:22px 20px;box-shadow:none;border-color:transparent}
 .vrm-cx-form input:focus{border-color:${C.accent}!important;box-shadow:0 0 0 3px ${C.accent}26}
 .vrm-cx-form button[type=submit]{min-height:50px;transition:transform 140ms cubic-bezier(0.23,1,0.32,1),opacity 140ms ease}
 .vrm-cx-form button[type=submit]:active{transform:scale(.98)}
@@ -15030,10 +15037,10 @@ function AuthScreen() {
  .vrm-cx-marque{display:flex;flex-direction:column;padding:40px 56px}
  .vrm-cx-titre{font-size:clamp(34px,3.2vw,46px);margin-top:auto}
  .vrm-cx-points{display:grid;gap:14px;margin:28px 0 auto;padding:0;list-style:none;max-width:420px;position:relative}
- .vrm-cx-points li{display:grid;grid-template-columns:28px 1fr;gap:10px;font-size:15px;line-height:1.5;color:#D6E3DD}
- .vrm-cx-points li b{color:#F0F5F2;font-weight:600}
- .vrm-cx-points i{width:28px;height:28px;border-radius:8px;background:rgba(255,255,255,.08);display:flex;align-items:center;justify-content:center;font-style:normal;font-size:13px;color:#F0F5F2}
- .vrm-cx-pied{position:relative;font-size:13px;color:#9FB5AC}
+ .vrm-cx-points li{display:grid;grid-template-columns:28px 1fr;gap:10px;font-size:15px;line-height:1.5;color:#D6D6D0}
+ .vrm-cx-points li b{color:#F2F2EE;font-weight:600}
+ .vrm-cx-points i{width:28px;height:28px;border-radius:8px;background:rgba(255,255,255,.08);display:flex;align-items:center;justify-content:center;font-style:normal;font-size:13px;color:#F2F2EE}
+ .vrm-cx-pied{position:relative;font-size:13px;color:#B0B0A8}
  .vrm-cx-main{align-items:center;padding:40px}
  .vrm-cx-boite{margin-top:0}
 }
@@ -15044,9 +15051,9 @@ function AuthScreen() {
    Rien si « réduire les animations ». */
 .vrm-cx-aurore{position:absolute;inset:0;pointer-events:none;overflow:hidden}
 .vrm-cx-aurore i{position:absolute;border-radius:50%;filter:blur(50px);will-change:transform}
-.vrm-cx-aurore i:nth-child(1){width:62%;aspect-ratio:1;left:-18%;top:-22%;background:#4E8A80;opacity:.45;animation:vrmCxDerive1 19s ease-in-out infinite alternate}
-.vrm-cx-aurore i:nth-child(2){width:48%;aspect-ratio:1;right:-14%;top:18%;background:#8FB8A6;opacity:.22;animation:vrmCxDerive2 23s ease-in-out infinite alternate}
-.vrm-cx-aurore i:nth-child(3){width:56%;aspect-ratio:1;left:22%;bottom:-30%;background:#2F6670;opacity:.5;animation:vrmCxDerive3 27s ease-in-out infinite alternate}
+.vrm-cx-aurore i:nth-child(1){width:62%;aspect-ratio:1;left:-18%;top:-22%;background:#2442B8;opacity:.32;animation:vrmCxDerive1 19s ease-in-out infinite alternate}
+.vrm-cx-aurore i:nth-child(2){width:48%;aspect-ratio:1;right:-14%;top:18%;background:#56564F;opacity:.26;animation:vrmCxDerive2 23s ease-in-out infinite alternate}
+.vrm-cx-aurore i:nth-child(3){width:56%;aspect-ratio:1;left:22%;bottom:-30%;background:#252522;opacity:.6;animation:vrmCxDerive3 27s ease-in-out infinite alternate}
 @keyframes vrmCxDerive1{to{transform:translate3d(18%,14%,0) scale(1.12)}}
 @keyframes vrmCxDerive2{to{transform:translate3d(-22%,10%,0) scale(.9)}}
 @keyframes vrmCxDerive3{to{transform:translate3d(-12%,-18%,0) scale(1.15)}}
@@ -15061,8 +15068,8 @@ function AuthScreen() {
 @keyframes vrmCxMonte{from{opacity:0;transform:translate3d(0,18px,0) scale(.98)}to{opacity:1;transform:none}}
 @media (min-width:1200px){
  .vrm-cx-etiquettes{display:block;position:absolute;inset:0;pointer-events:none}
- .vrm-cx-etiquettes span{position:absolute;display:inline-flex;align-items:center;gap:8px;padding:9px 14px;border-radius:999px;font-size:13px;font-weight:600;color:#F0F5F2;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.14);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);animation:vrmCxFlotte 7s ease-in-out infinite alternate,vrmCxEntre .7s cubic-bezier(.23,1,.32,1) both}
- .vrm-cx-etiquettes span:before{content:"";width:7px;height:7px;border-radius:50%;background:#B7D6C8;box-shadow:0 0 0 4px rgba(183,214,200,.18)}
+ .vrm-cx-etiquettes span{position:absolute;display:inline-flex;align-items:center;gap:8px;padding:9px 14px;border-radius:999px;font-size:13px;font-weight:600;color:#F2F2EE;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.14);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);animation:vrmCxFlotte 7s ease-in-out infinite alternate,vrmCxEntre .7s cubic-bezier(.23,1,.32,1) both}
+ .vrm-cx-etiquettes span:before{content:"";width:7px;height:7px;border-radius:50%;background:#F2F2EE;box-shadow:0 0 0 4px rgba(242,242,238,.14)}
  .vrm-cx-etiquettes span:nth-child(1){right:8%;top:13%;animation-delay:0s,.45s}
  .vrm-cx-etiquettes span:nth-child(2){right:36%;top:17%;animation-duration:8.5s,.7s;animation-delay:-2s,.55s}
  .vrm-cx-etiquettes span:nth-child(3){right:8%;bottom:22%;animation-duration:9s,.7s;animation-delay:-4s,.65s}
@@ -31006,7 +31013,6 @@ function Garage({catalog,garageGrid,setGarageGrid,blockedCells,setBlockedCells,e
     },10);
   };
   
-  const COLORS=['#ffb830','#ff4d6d','#4da6ff','#a78bfa','#00e5a0','#ff8c42','#ec4899'];
   
   const addColumn=(zid)=>{
     const u={...extraCols, [zid]:(extraCols[zid]||0)+1};
@@ -48573,20 +48579,25 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             const tailleHorsTitre = it.size && !tailleDansTitre(it.title, it.size) ? it.size : '';
             return (
               <div className="vrm-ann-card vrm-fiche" key={it._acc.vinted_user_id+'_'+it.id} data-carte-annonce={it.id} data-fiche="29oct" style={{borderRadius:12,background:C.card,border:`1px solid ${soldBord?C.warn:C.border}`,boxShadow:C.shadow||'none',display:'flex',flexDirection:'column',overflow:'hidden',...(estFloute(it)?STYLE_FLOU:null)}}>
-                <div className="vrm-ann-overview" style={{display:'flex',flexDirection:'column'}}>
+                <div className="vrm-ann-overview" style={{display:'flex',flexDirection:'column',position:'relative'}}>
                   <a className="vrm-fiche-photo" data-fiche-photo href={it.url||undefined} target="_blank" rel="noreferrer" title="Ouvrir l'annonce sur Vinted" style={{display:'flex',alignItems:'center',justifyContent:'center',position:'relative',background:C.bg}}>
                     {it.photo?<PhotoVinted src={it.photo} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<Icon name="image" size={28} style={{color:C.muted,opacity:.55}}/>}
                     {it._vrmAConfirmer && <span data-ann-a-confirmer="" title="Ce compte n'a pas été relu depuis plus de 24 h : cette annonce était en ligne à la dernière lecture. Ouvre vinted.fr sur ce compte pour le vérifier." style={{position:'absolute',right:10,top:10,fontSize:11,fontWeight:650,whiteSpace:'nowrap',color:C.text,background:C.card,border:`1px solid ${C.warn || C.border}`,borderRadius:999,padding:'4px 9px'}}>À confirmer{it._vrmAConfirmerLu ? ` · lu ${new Date(it._vrmAConfirmerLu).toLocaleDateString('fr-FR',{day:'numeric',month:'short'})}` : ''}</span>}
-                    {it.promoted===true && <span data-boostee title="Vinted dit que cette annonce est boostée en ce moment" style={{position:'absolute',left:10,top:10,fontSize:11,fontWeight:650,whiteSpace:'nowrap',color:C.text,background:C.card,border:`1px solid ${C.border}`,borderRadius:999,padding:'4px 9px'}}>Boostée</span>}
+                    {it.promoted===true && <span data-boostee title="Vinted dit que cette annonce est boostée en ce moment" style={{position:'absolute',left:10,bottom:10,fontSize:11,fontWeight:650,whiteSpace:'nowrap',color:C.text,background:C.card,border:`1px solid ${C.border}`,borderRadius:999,padding:'4px 9px'}}>Boostée</span>}
                   </a>
+                  {/* (31 oct., Vitrine) Le N° de rangement SUR la photo, en haut à
+                      gauche, comme l'étiquette du carton : une pastille à chasse
+                      fixe. HORS du lien de la photo (un bouton dans un lien ne se
+                      touche pas) ; la MÊME édition en place qu'avant (`EnLigne`,
+                      `poserNumero`) — un tap sur la pastille, on tape, Entrée. */}
+                  <span className="vrm-fiche-num" data-fiche-num={num||''} style={{position:'absolute',left:10,top:10,zIndex:1,display:'flex',alignItems:'center',minHeight:28,boxSizing:'border-box',fontSize:14,fontWeight:500,color:num?C.text:C.muted,background:C.bg,borderRadius:999,padding:'0 11px'}}>
+                    <EnLigne data="numero" value={num} onCommit={(v,avant)=>poserNumero(item,v,avant)} inputMode={clavierNum()} placeholder={String(nextNumero)} largeur={46}
+                      titre="Numéro de rangement (écrit sur la boîte) — cliquer pour le changer" rendu={num?`N°${num}`:'+ N°'}/>
+                  </span>
                   <div className="vrm-ann-ledger-info" style={{display:'flex',flexDirection:'column',gap:8}}>
                     <div data-titre style={{fontSize:14.5,fontWeight:600,color:C.text,lineHeight:1.35,display:'-webkit-box',WebkitLineClamp:2,WebkitBoxOrient:'vertical',overflow:'hidden'}}>{it.title||it.brand||'—'}</div>
                     <div className="vrm-ann-price-line" style={{display:'flex',alignItems:'center',gap:10}}>
                       <span data-prix style={{fontSize:22,fontWeight:750,color:C.text,fontVariantNumeric:'tabular-nums',letterSpacing:'-.02em'}}>{prix(it.price,it.currency)||'—'}</span>
-                      <span style={{marginLeft:'auto',flexShrink:0,fontSize:13,fontWeight:700,color:num?C.text:C.muted,background:C.bg,border:`1px solid ${C.border}`,borderRadius:999,padding:'3px 10px'}}>
-                        <EnLigne data="numero" value={num} onCommit={(v,avant)=>poserNumero(item,v,avant)} inputMode={clavierNum()} placeholder={String(nextNumero)} largeur={46}
-                          titre="Numéro de rangement (écrit sur la boîte) — cliquer pour le changer" rendu={num?`N°${num}`:'+ N°'}/>
-                      </span>
                     </div>
                     {/* L'ÉTAT EN JAUGE, et JUSTE À CÔTÉ le prix d'achat qu'on tape en place. */}
                     <div className="vrm-fiche-duo" data-fiche-duo style={{display:'grid',gridTemplateColumns:'minmax(0,1fr) minmax(0,1fr)',gap:8}}>
@@ -50927,75 +50938,71 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         const w = wrapped;
         const eur0 = n => `${Math.round(n).toLocaleString('fr-FR')} €`;
         // On ne garde QUE les cartes qui ont une donnée réelle (pas d'invention).
+        // (31 oct., Vitrine) Plus de dégradés multicolores ni de violet : chaque
+        // carte est un APLAT — l'encre de Vitrine, et le cobalt (la seule couleur
+        // d'accent) pour l'ouverture et la fin. Texte blanc (≥ 8:1 sur les deux).
+        const FOND_ENCRE = MINERAL.text, FOND_ACCENT = MINERAL.accent;
         const cards = [];
-        cards.push({ bg:'linear-gradient(160deg,#6a3cff 0%,#a936ff 50%,#ff4fa3 100%)', body:(
+        cards.push({ bg:FOND_ACCENT, body:(
           <div style={{textAlign:'center'}}>
-            <div style={{fontSize:64,lineHeight:1,marginBottom:14}}>🎉</div>
             <div style={{fontSize:15,color:'rgba(255,255,255,0.85)',fontWeight:600,letterSpacing:2,textTransform:'uppercase'}}>{w.mode==='month'?'Ton mois':'Ton année'}</div>
-            <div style={{fontSize:w.mode==='month'?52:76,fontWeight:800,color:'#fff',letterSpacing:-2,lineHeight:1.05}}>{w.mode==='month'?w.moisNoms[w.mo]:w.yr}</div>
+            <div style={{fontSize:w.mode==='month'?52:76,fontWeight:800,color:'#fff',letterSpacing:'-.03em',lineHeight:1.05}}>{w.mode==='month'?w.moisNoms[w.mo]:w.yr}</div>
             {w.mode==='month' && <div style={{fontSize:20,fontWeight:700,color:'rgba(255,255,255,0.9)'}}>{w.yr}</div>}
             <div style={{fontSize:14,color:'rgba(255,255,255,0.9)',fontWeight:500,marginTop:14}}>Prêt à revivre {w.mode==='month'?'ton mois':'ta saison'} ? 👉</div>
           </div>
         )});
-        if(w.nb>0) cards.push({ bg:'linear-gradient(160deg,#0f6bff 0%,#22c1e0 100%)', body:(
+        if(w.nb>0) cards.push({ bg:FOND_ENCRE, body:(
           <div style={{textAlign:'center'}}>
-            <div style={{marginBottom:6,color:C.muted,opacity:.5,display:'flex',justifyContent:'center'}}><Icon name="image" size={44}/></div>
-            <CountUp value={w.nb} style={{fontSize:96,fontWeight:800,color:'#fff',letterSpacing:-3,lineHeight:1,display:'block'}}/>
+            <CountUp value={w.nb} style={{fontSize:96,fontWeight:800,color:'#fff',letterSpacing:'-.03em',lineHeight:1,display:'block'}}/>
             <div style={{fontSize:20,color:'#fff',fontWeight:600,marginTop:6}}>articles vendus</div>
             <div style={{fontSize:13,color:'rgba(255,255,255,0.85)',marginTop:10}}>Chaque article, une petite victoire. 💪</div>
           </div>
         )});
-        cards.push({ bg:'linear-gradient(160deg,#0a8f5b 0%,#3ad07f 100%)', body:(
+        cards.push({ bg:FOND_ENCRE, body:(
           <div style={{textAlign:'center'}}>
-            <div style={{fontSize:48,marginBottom:6}}>💰</div>
-            <CountUp value={w.ca} format={eur0} style={{fontSize:72,fontWeight:800,color:'#fff',letterSpacing:-2,lineHeight:1,display:'block'}}/>
+            <CountUp value={w.ca} format={eur0} style={{fontSize:72,fontWeight:800,color:'#fff',letterSpacing:'-.03em',lineHeight:1,display:'block'}}/>
             <div style={{fontSize:20,color:'#fff',fontWeight:600,marginTop:8}}>de chiffre d'affaires</div>
             <div style={{fontSize:13,color:'rgba(255,255,255,0.85)',marginTop:10}}>Prix de vente moyen : <b>{eur0(w.avg)}</b></div>
           </div>
         )});
-        if(w.topBrand) cards.push({ bg:'linear-gradient(160deg,#ff7a00 0%,#ff3d54 100%)', body:(
+        if(w.topBrand) cards.push({ bg:FOND_ENCRE, body:(
           <div style={{textAlign:'center'}}>
-            <div style={{fontSize:48,marginBottom:6}}>⭐</div>
             <div style={{fontSize:14,color:'rgba(255,255,255,0.85)',fontWeight:600,letterSpacing:1,textTransform:'uppercase'}}>Ta marque star</div>
             <div style={{fontSize:52,fontWeight:800,color:'#fff',letterSpacing:-1,lineHeight:1.05,marginTop:6}}>{w.topBrand[0]}</div>
             <div style={{fontSize:16,color:'#fff',fontWeight:600,marginTop:10}}><CountUp value={w.topBrand[1]}/> articles vendus</div>
           </div>
         )});
-        if(w.bestMonth) cards.push({ bg:'linear-gradient(160deg,#c2179c 0%,#7a3cff 100%)', body:(
+        if(w.bestMonth) cards.push({ bg:FOND_ENCRE, body:(
           <div style={{textAlign:'center'}}>
-            <div style={{fontSize:48,marginBottom:6}}>📅</div>
             <div style={{fontSize:14,color:'rgba(255,255,255,0.85)',fontWeight:600,letterSpacing:1,textTransform:'uppercase'}}>Ton mois record</div>
             <div style={{fontSize:56,fontWeight:800,color:'#fff',letterSpacing:-1,lineHeight:1,marginTop:6}}>{w.bestMonth.nom}</div>
             <div style={{fontSize:20,color:'#fff',fontWeight:700,marginTop:10}}>{eur0(w.bestMonth.v)}</div>
           </div>
         )});
-        if(w.bestPair) cards.push({ bg:'linear-gradient(160deg,#b8860b 0%,#ffbf3d 100%)', body:(
+        if(w.bestPair) cards.push({ bg:FOND_ENCRE, body:(
           <div style={{textAlign:'center'}}>
-            <div style={{fontSize:14,color:'rgba(0,0,0,0.55)',fontWeight:700,letterSpacing:1,textTransform:'uppercase'}}>👑 Article de l'année</div>
-            <div style={{width:130,height:130,borderRadius:12,overflow:'hidden',margin:'14px auto',background:'rgba(0,0,0,0.15)',display:'flex',alignItems:'center',justifyContent:'center',boxShadow:'0 10px 30px rgba(0,0,0,0.3)'}}>{w.bestPair.photo?<PhotoVinted src={w.bestPair.photo} alt="" loading="lazy" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:44}}>👑</span>}</div>
+            <div style={{fontSize:14,color:'rgba(255,255,255,0.85)',fontWeight:700,letterSpacing:1,textTransform:'uppercase'}}>Article de l'année</div>
+            <div style={{width:130,height:130,borderRadius:12,overflow:'hidden',margin:'14px auto',background:'rgba(255,255,255,0.10)',display:'flex',alignItems:'center',justifyContent:'center'}}>{w.bestPair.photo?<PhotoVinted src={w.bestPair.photo} alt="" loading="lazy" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<Icon name="image" size={40} style={{color:'rgba(255,255,255,0.6)'}}/>}</div>
             <div style={{fontSize:17,fontWeight:700,color:'#fff',padding:'0 20px',lineHeight:1.2}}>{w.bestPair.num?`N°${w.bestPair.num} · `:''}{w.bestPair.title}</div>
             <div style={{fontSize:22,fontWeight:800,color:'#fff',marginTop:8}}>+{eur0(w.bestPair.m)} de bénéfice</div>
           </div>
         )});
-        if(w.fastest) cards.push({ bg:'linear-gradient(160deg,#00b4d8 0%,#0a6bff 100%)', body:(
+        if(w.fastest) cards.push({ bg:FOND_ENCRE, body:(
           <div style={{textAlign:'center'}}>
-            <div style={{fontSize:48,marginBottom:6}}>⚡</div>
             <div style={{fontSize:14,color:'rgba(255,255,255,0.85)',fontWeight:600,letterSpacing:1,textTransform:'uppercase'}}>Vente éclair</div>
-            <div style={{fontSize:76,fontWeight:800,color:'#fff',letterSpacing:-2,lineHeight:1,marginTop:6}}><CountUp value={w.fastest.j}/> j</div>
+            <div style={{fontSize:76,fontWeight:800,color:'#fff',letterSpacing:'-.03em',lineHeight:1,marginTop:6}}><CountUp value={w.fastest.j}/> j</div>
             <div style={{fontSize:15,color:'#fff',fontWeight:500,marginTop:10,padding:'0 24px'}}>entre la mise en ligne et la vente{w.fastest.num?` · N°${w.fastest.num}`:''}</div>
           </div>
         )});
-        if(w.streak>1) cards.push({ bg:'linear-gradient(160deg,#ff3d54 0%,#ff8a00 100%)', body:(
+        if(w.streak>1) cards.push({ bg:FOND_ENCRE, body:(
           <div style={{textAlign:'center'}}>
-            <div style={{fontSize:48,marginBottom:6}}>🔥</div>
             <div style={{fontSize:14,color:'rgba(255,255,255,0.85)',fontWeight:600,letterSpacing:1,textTransform:'uppercase'}}>Ta plus longue série</div>
-            <div style={{fontSize:88,fontWeight:800,color:'#fff',letterSpacing:-3,lineHeight:1,marginTop:6}}><CountUp value={w.streak}/></div>
+            <div style={{fontSize:88,fontWeight:800,color:'#fff',letterSpacing:'-.03em',lineHeight:1,marginTop:6}}><CountUp value={w.streak}/></div>
             <div style={{fontSize:18,color:'#fff',fontWeight:600}}>jours d'affilée avec une vente</div>
           </div>
         )});
-        cards.push({ bg:'linear-gradient(160deg,#6a3cff 0%,#a936ff 50%,#ff4fa3 100%)', last:true, body:(
+        cards.push({ bg:FOND_ACCENT, last:true, body:(
           <div style={{textAlign:'center',width:'100%'}}>
-            <div style={{fontSize:52,marginBottom:10}}>🚀</div>
             <div style={{fontSize:26,fontWeight:800,color:'#fff',letterSpacing:-0.5}}>{w.mode==='month'?'Quel mois, Julien !':'Quelle année, Julien !'}</div>
             <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,margin:'18px 6px 0'}}>
               <div style={{background:'rgba(255,255,255,0.15)',borderRadius:10,padding:'12px 8px'}}><div style={{fontSize:24,fontWeight:800,color:'#fff'}}>{w.nb}</div><div style={{fontSize:11,color:'rgba(255,255,255,0.85)'}}>articles vendus</div></div>
@@ -51015,8 +51022,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           // dans le contexte d'empilement de <main> et la barre du haut / du bas
           // passent PAR-DESSUS (peu importe le z-index). Le portail l'en sort.
           return createPortal(
-            <div onClick={()=>setShowWrapped(false)} style={{position:"fixed",inset:0,zIndex:5000,background:"linear-gradient(160deg,#6a3cff,#ff4fa3)",display:'flex',alignItems:'center',justifyContent:'center',padding:24}}>
-              <div style={{textAlign:'center',color:'#fff'}}><div style={{fontSize:48}}>🎉</div><div style={{fontSize:18,fontWeight:600,marginTop:10}}>Aucune vente finalisée · {w.periodLabel}.</div><div style={{fontSize:13,opacity:0.85,marginTop:6}}>{w.mode==='month'?'Choisis un autre mois en haut.':'Reviens plus tard pour ta rétrospective !'}</div></div>
+            <div onClick={()=>setShowWrapped(false)} style={{position:"fixed",inset:0,zIndex:5000,background:FOND_ACCENT,display:'flex',alignItems:'center',justifyContent:'center',padding:24}}>
+              <div style={{textAlign:'center',color:'#fff'}}><div style={{fontSize:18,fontWeight:600,marginTop:10}}>Aucune vente finalisée · {w.periodLabel}.</div><div style={{fontSize:13,opacity:0.85,marginTop:6}}>{w.mode==='month'?'Choisis un autre mois en haut.':'Reviens plus tard pour ta rétrospective !'}</div></div>
             </div>, document.body);
         }
         return createPortal(
@@ -51026,13 +51033,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             {cards.map((c,i)=>(<div key={i} style={{flex:1,height:3,borderRadius:8,background:'rgba(255,255,255,0.3)',overflow:'hidden'}}><div style={{height:'100%',width:i<step?'100%':i===step?'100%':'0%',background:'#fff',transformOrigin:'left',animation:i===step?'wrapBar 0.5s ease both':'none'}}/></div>))}
           </div>
           <div style={{display:'flex',alignItems:'center',gap:8,padding:'2px 16px 0'}}>
-            <div style={{flex:1,fontSize:12,color:'rgba(255,255,255,0.9)',fontWeight:600}}>🎉 Wrapped · {w.periodLabel}</div>
+            <div style={{flex:1,fontSize:12,color:'rgba(255,255,255,0.9)',fontWeight:600}}>Rétrospective · {w.periodLabel}</div>
             {step===0 && (<>
               {/* Bascule Mois / Année (sur la carte d'intro). stopPropagation
                   pour ne pas déclencher le « touche pour continuer ». */}
               <div onClick={e=>e.stopPropagation()} style={{display:'flex',background:'rgba(255,255,255,0.2)',borderRadius:8,padding:2}}>
                 {[['month','Mois'],['year','Année']].map(([m,lbl])=>(
-                  <button key={m} type="button" onClick={()=>setWrappedMode(m)} style={{border:'none',borderRadius:8,padding:'5px 11px',fontSize:12,fontWeight:700,cursor:'pointer',background:w.mode===m?'#fff':'transparent',color:w.mode===m?'#7a3cff':'#fff'}}>{lbl}</button>
+                  <button key={m} type="button" onClick={()=>setWrappedMode(m)} style={{border:'none',borderRadius:8,padding:'5px 11px',fontSize:12,fontWeight:700,cursor:'pointer',background:w.mode===m?'#fff':'transparent',color:w.mode===m?FOND_ENCRE:'#fff'}}>{lbl}</button>
                 ))}
               </div>
               {w.mode==='month' && (
@@ -60455,7 +60462,7 @@ function AppCoeur() {
             cartes de l'aperçu changent la section (onSub) au lieu d'envoyer
             ailleurs. Les écrans détaillés restent aussi joignables seuls (menu
             « Dans Vinted »), donc rien n'est perdu (§4.11). */}
-        {tab==='plat_vinted'&&(<section className="vrm-market-space" aria-label="Vinted"><EntetePlateforme nom="Vinted" plateforme="vinted"/>
+        {tab==='plat_vinted'&&(<EspacePlateforme nom="Vinted"><EntetePlateforme nom="Vinted" plateforme="vinted"/>
           {/* Résumé CA/argent TOUJOURS visible en haut, puis la liste (ventes par
               défaut) directement — plus d'écran « Aperçu » intermédiaire. Les
               sections restent les mêmes écrans (§11), juste à un tap. */}
@@ -60488,8 +60495,8 @@ function AppCoeur() {
           {/* Sous la navigation, pas entre le résumé et elle (revue du 17 oct.). */}
           {platSub==='ventes' && !baseKO && <div className="vrm-retirer-hote" style={{padding:'10px 16px 0'}}><RetirerArgent liveStats={liveStatsVus}/></div>}
           <Comptabilite key={'pv_'+platSub} accounts={vintedAccounts} only={platSub==='apercu'?'ventes':platSub} liveStats={liveStatsVus} accountsReady={accountsLoaded} baseKO={baseKO} onNav={setTab} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}} onFreeNum={freeGarageNum} compteSel={compteSel} compteConnecte={compteConnecte} dansPlateforme/>
-        </section>)}
-        {tab==='plat_leboncoin'&&(<section className="vrm-market-space" aria-label="Leboncoin"><EntetePlateforme nom="Leboncoin" plateforme="leboncoin"/>
+        </EspacePlateforme>)}
+        {tab==='plat_leboncoin'&&(<EspacePlateforme nom="Leboncoin"><EntetePlateforme nom="Leboncoin" plateforme="leboncoin"/>
           {/* Julien : « Leboncoin, la même mise en page que Vinted ». Vinted a
               Ventes / Achats / Annonces ; côté Leboncoin on a maintenant les
               VENTES et les ACHATS (les deux prouvés par `isSeller`, cf.
@@ -60528,8 +60535,8 @@ function AppCoeur() {
           {/* (27 oct.) Le diagnostic est une aide en cas de souci : en bas de
               l'espace, plus une ligne en tête de chaque section. */}
           <div data-diag-lbc="" style={{padding:'0 16px'}}><DiagnosticLeboncoin key={AUTH.user?.id||'sans-session'} lire={q=>lireReceptionLeboncoin(`${SUPABASE_URL}/rest/v1/${q}`,sbAuth())} couleurs={C}/></div>
-        </section>)}
-        {tab==='plat_ebay'&&(<section className="vrm-market-space" aria-label="eBay"><EntetePlateforme nom="eBay" plateforme="ebay"/>
+        </EspacePlateforme>)}
+        {tab==='plat_ebay'&&(<EspacePlateforme nom="eBay"><EntetePlateforme nom="eBay" plateforme="ebay"/>
           {/* Julien : « eBay, je veux tout pareil que Vinted — les onglets achats,
               ventes ». Même structure, dans le skin eBay (noir). Aperçu garde la
               connexion + la publication ; Ventes liste les commandes captées ;
@@ -60567,7 +60574,7 @@ function AppCoeur() {
           {platSub==='offres'&&<div style={{padding:16}}><EbayActionCompte vue={ebayVueEff} comptes={comptesEbay} onCompte={setEbayVue}>{ref=><EbayOffres key={ref} cible={ebayCible?.compte===ref && ebayCible.section==='offres'?ebayCible:null} onClearCible={()=>setEbayCible(null)} headers={enTeteSession} confirm={askConfirm} theme={C} compte={ref} onAnnonces={()=>setPlatSub('annonces')}/>}</EbayActionCompte></div>}
           {platSub==='annonces'&&<EbayAnnonces baseKO={baseKO} comptes={vintedAccounts} vue={ebayVueEff} comptesEbay={comptesEbay}/>}
           {platSub==='compte'&&<div data-ebay-compte-section="" style={{ padding: 16 }}>{baseKO?<div style={{ color: EBAY_SKIN.muted, fontSize: 13 }}>Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui a échoué.</div>:<EbayConnexion onAnnonces={()=>setPlatSub('annonces')} vue={ebayVueEff} comptesEbay={comptesEbay}/>}</div>}
-        </section>)}
+        </EspacePlateforme>)}
         {agentFond&&accountsLoaded&&!baseKO&&Array.isArray(comptesEbay)&&comptesEbay.length>0&&!(tab==='plat_ebay'&&platSub==='agent')&&<AgentEbayFond comptes={vintedAccounts} comptesEbay={comptesEbay}/>}
         {tab==='plat_vestiaire'&&<Plateforme plat="Vestiaire Collective" liveStats={liveStatsVus} lbcVentes={lbcVentes} onGo={setTab} baseKO={baseKO} comptes={vintedAccounts}/>}
         {tab==='inventory'&&<Inventory inventory={inventory} setInventory={setInventory} accounts={vintedAccounts} garageGrid={garageGrid} labels={accountLabels} onLocate={(numero)=>{ setGarageLocate(String(numero)); setTab('garage'); }}/>}

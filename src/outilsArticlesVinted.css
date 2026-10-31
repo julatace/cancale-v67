@@ -147,7 +147,7 @@
 @media (pointer: coarse) {
   .vrm-outils button, .vrm-historique button, .vrm-bilan-sync button { min-height: 44px; }
 }
-.vrm-outils button[aria-pressed="true"] { box-shadow: inset 0 0 0 2px var(--vrm-accent, #244E54) !important; }
+.vrm-outils button[aria-pressed="true"] { box-shadow: inset 0 0 0 2px var(--vrm-accent, #2442B8) !important; }
 .vrm-outils summary, .vrm-bilan-sync summary {
   min-height: 44px; justify-content: space-between; list-style: none; position: relative; padding-right: 22px;
 }

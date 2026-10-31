@@ -34,7 +34,7 @@
 /* Ma journée : sur téléphone, le bonjour EST le grand titre — « Ma journée »
    au-dessus disait la même chose une ligne plus haut. */
 @media (max-width: 767px) { .vrm-day-layout > .vrm-screen-head { display: none; } }
-.vrm-screen-head h2 {
+.vrm-screen-head :is(h1, h2) {
   margin: 0; font-size: var(--vrm-t-title); font-weight: 700;
   line-height: 1.12; letter-spacing: -.025em;
 }
@@ -43,7 +43,7 @@
    dit déjà « Ventes » (un mot écrit deux fois à 40 px d'écart, §7). Les
    actions de la ligne (`right`) restent. */
 .vrm-market-space .vrm-screen-head { margin: 8px 0 12px; }
-.vrm-market-space .vrm-screen-head h2 { font-size: var(--vrm-t-section); letter-spacing: -.015em; }
+.vrm-market-space .vrm-screen-head :is(h1, h2) { font-size: var(--vrm-t-section); letter-spacing: -.015em; }
 @media (max-width: 767px) {
   .vrm-market-space .vrm-screen-head-titre { display: none; }
   .vrm-market-space .vrm-screen-head:not(:has(.vrm-tete-row > :nth-child(2))) { display: none; }

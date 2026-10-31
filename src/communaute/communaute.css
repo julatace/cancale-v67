@@ -190,7 +190,7 @@ form.vrm-cm-discord-moi { display: block !important; }
    cartes sans bordure ni ombre, comme le reste. Les variables du thème manquent
    ⇒ les valeurs d'avant restent (repli). */
 .vrm-communaute, .vrm-communaute[data-dark="true"] {
-  --cm-accent: var(--vrm-accent, #244E54);
+  --cm-accent: var(--vrm-accent, #2442B8);
   --cm-accent-fond: var(--vrm-b-teinte, rgba(36, 78, 84, .08));
   --cm-encre: var(--vrm-ink, #213B41);
   --cm-doux: var(--vrm-muted, #53696D);

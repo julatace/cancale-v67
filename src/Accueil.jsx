@@ -25,6 +25,8 @@
 //    (src/AccueilFilm.jsx) seulement avec `?film`.
 import React from 'react';
 import './styles-accueil-studio.css';
+// (31 oct.) Vitrine, chargée APRÈS la couche « studio » : elle a le dernier mot.
+import './styles-accueil-vitrine.css';
 import { contactEmail, CONTACT_A_VENIR } from './contact.js';
 import { K, COURBE_SORTIE, OMBRE_CARTE, REFLET, HAUTEURS_SCENES, LARGEUR_COMPACTE } from './accueil-jetons.js';
 import { ACCES_OFFERT, EXTENSION_SUR_LE_STORE, DETOURAGE_POUR_TOUS, VESTIAIRE_BRANCHE, PRIX_MOIS } from './accueil-reglages.js';
@@ -106,43 +108,43 @@ const LEGAL = [
 const ANCRES = [['colis', 'Colis'], ['ailleurs', 'Vendu ailleurs'], ['urssaf', 'URSSAF'], ['prix', 'Prix'], ['faq', 'Questions']];
 
 const CSS = `
-.acc{position:relative;background:${K.bg};color:${K.text};min-height:100vh;font-family:'Inter',system-ui,-apple-system,'Segoe UI',sans-serif;overflow-x:clip;-webkit-font-smoothing:antialiased;font-variant-numeric:normal;font-feature-settings:normal}
+.acc{position:relative;background:${K.bg};color:${K.text};min-height:100vh;font-family:'Bricolage Grotesque','Inter',system-ui,-apple-system,'Segoe UI',sans-serif;overflow-x:clip;-webkit-font-smoothing:antialiased;font-variant-numeric:normal;font-feature-settings:normal}
 @supports not (overflow-x:clip){.acc{overflow-x:hidden}}
 .acc *{box-sizing:border-box}
 .acc a{color:inherit}
 .acc :focus-visible{outline:2px solid ${K.accent};outline-offset:2px;border-radius:8px}
 .acc button,.acc a{-webkit-tap-highlight-color:transparent;touch-action:manipulation}
-:where(.acc) h1,:where(.acc) h2,:where(.acc) h3{font-family:'Space Grotesk','Inter',system-ui,sans-serif;margin:0;color:${K.text}}
+:where(.acc) h1,:where(.acc) h2,:where(.acc) h3{font-family:'Bricolage Grotesque','Inter',system-ui,sans-serif;margin:0;color:${K.text}}
 :where(.acc) p{margin:0}
 .acc-in{max-width:1180px;margin:0 auto;padding:0 20px}
 .acc-sentinelle{position:absolute;top:8px;left:0;width:1px;height:1px;pointer-events:none}
 
 /* La barre : transparente en haut, matière dès qu'on défile. */
-.acc-nav{position:sticky;top:0;z-index:30;padding-top:env(safe-area-inset-top);background:rgba(242,245,243,0);border-bottom:1px solid transparent;transition:background-color 200ms ease,border-color 200ms ease}
-.acc-nav.defile{background:rgba(242,245,243,.82);-webkit-backdrop-filter:saturate(1.4) blur(14px);backdrop-filter:saturate(1.4) blur(14px);border-bottom-color:${K.line}}
+.acc-nav{position:sticky;top:0;z-index:30;padding-top:env(safe-area-inset-top);background:rgba(255,255,255,0);border-bottom:1px solid transparent;transition:background-color 200ms ease,border-color 200ms ease}
+.acc-nav.defile{background:${K.bg};border-bottom-color:${K.line}}
 @media (prefers-reduced-transparency:reduce){.acc-nav.defile{background:${K.bg};-webkit-backdrop-filter:none;backdrop-filter:none}}
 .acc-nav .acc-in{display:flex;align-items:center;gap:12px;height:64px}
-.acc img.vrm-brand-asset{background:#21343e;padding:2px;object-fit:contain;box-sizing:border-box}
+.acc img.vrm-brand-asset{background:${K.ink};padding:2px;object-fit:contain;box-sizing:border-box}
 .acc .cj-lib img.vrm-brand-asset{padding:0;border-radius:3px}
 .acc-marque{display:flex;align-items:center;gap:10px;flex-shrink:0;text-decoration:none}
-.acc-marque img{width:36px;height:36px;border-radius:9px;display:block;object-fit:contain;background:#21343e;padding:2px;box-sizing:border-box}
-.acc-marque b{font-family:'Space Grotesk','Inter',sans-serif;font-size:19px;font-weight:700;letter-spacing:.04em}
+.acc-marque img{width:36px;height:36px;border-radius:9px;display:block;object-fit:contain;background:${K.ink};padding:2px;box-sizing:border-box}
+.acc-marque b{font-family:'Bricolage Grotesque','Inter',sans-serif;font-size:19px;font-weight:700;letter-spacing:.04em}
 .acc-ancres{display:flex;gap:2px;margin-left:22px}
 .acc-ancres a{color:${K.muted};font-size:14px;font-weight:500;padding:8px 10px;border-radius:8px;text-decoration:none;transition:color 160ms ease}
 @media (hover:hover) and (pointer:fine){.acc-ancres a:hover{color:${K.text}}}
 .acc-nav-droite{margin-left:auto;display:flex;align-items:center;gap:6px}
 
 /* Les boutons : une forme, trois poids. */
-.acc .acc-btn{position:relative;display:inline-flex;align-items:center;justify-content:center;gap:10px;height:48px;min-height:0;padding:0 20px;border-radius:10px;border:none;cursor:pointer;font-family:'Inter',system-ui,sans-serif;font-size:15px;font-weight:600;letter-spacing:-.005em;white-space:nowrap;text-decoration:none;filter:none;transition:transform 120ms ${COURBE_SORTIE},box-shadow 160ms ${COURBE_SORTIE},opacity 180ms ${COURBE_SORTIE}}
-.acc .acc-p{background:${K.cta};color:#FFFFFF;box-shadow:inset 0 1px 0 rgba(255,255,255,.25),0 1px 2px rgba(18,27,44,.12),0 8px 22px rgba(43,69,72,.30)}
+.acc .acc-btn{position:relative;display:inline-flex;align-items:center;justify-content:center;gap:10px;height:48px;min-height:0;padding:0 20px;border-radius:10px;border:none;cursor:pointer;font-family:'Bricolage Grotesque','Inter',system-ui,sans-serif;font-size:15px;font-weight:600;letter-spacing:-.005em;white-space:nowrap;text-decoration:none;filter:none;transition:transform 120ms ${COURBE_SORTIE},box-shadow 160ms ${COURBE_SORTIE},opacity 180ms ${COURBE_SORTIE}}
+.acc .acc-p{background:${K.cta};color:#FFFFFF;box-shadow:none}
 .acc .acc-btn:active:not(:disabled){transform:scale(.97);filter:none}
 .acc .acc-btn:hover{filter:none}
 .acc-chev{display:inline-block;font-size:19px;line-height:1;margin-right:-4px;transition:transform 160ms ${COURBE_SORTIE}}
 @media (hover:hover) and (pointer:fine){
-  .acc .acc-p:hover{box-shadow:inset 0 1px 0 rgba(255,255,255,.25),0 1px 2px rgba(18,27,44,.12),0 10px 26px rgba(43,69,72,.38)}
+  .acc .acc-p:hover{box-shadow:none;background:#1C3594}
   .acc .acc-btn:hover .acc-chev{transform:translateX(2px)}
 }
-.acc .acc-lien{display:inline-flex;align-items:center;min-height:44px;padding:0 6px;border:none;background:none;cursor:pointer;font-family:'Inter',system-ui,sans-serif;font-size:14px;font-weight:500;color:${K.muted};text-decoration:none;filter:none}
+.acc .acc-lien{display:inline-flex;align-items:center;min-height:44px;padding:0 6px;border:none;background:none;cursor:pointer;font-family:'Bricolage Grotesque','Inter',system-ui,sans-serif;font-size:14px;font-weight:500;color:${K.muted};text-decoration:none;filter:none}
 .acc .acc-lien b{font-weight:600;color:${K.text};margin-left:4px}
 @media (hover:hover) and (pointer:fine){.acc .acc-lien:hover b,.acc .acc-lien:hover{text-decoration:underline;text-underline-offset:3px;text-decoration-thickness:1px}}
 .acc .acc-lien:active:not(:disabled){transform:none}
@@ -153,7 +155,7 @@ const CSS = `
 
 /* Le haut de page. */
 .acc-hero{position:relative;padding:56px 0 64px}
-.acc-hero:before{content:"";position:absolute;right:max(0px,calc(50% - 640px));top:-40px;width:820px;height:740px;background:radial-gradient(closest-side,rgba(61,123,255,.17),transparent);pointer-events:none}
+.acc-hero:before{content:none}
 .acc-hero .acc-in{position:relative;display:grid;grid-template-columns:minmax(0,580px) minmax(0,500px);gap:60px;align-items:start}
 .acc-def{display:inline-flex;align-items:center;font-size:14px;font-weight:600;color:${K.text};background:${K.card2};border:1px solid ${K.line2};border-radius:8px;padding:6px 12px;line-height:1.3;text-wrap:balance}
 .acc-h1{font-size:56px;line-height:1.04;letter-spacing:-.03em;font-weight:700;margin:22px 0 0}
@@ -168,7 +170,7 @@ const CSS = `
 .acc-lignes .sep{padding-left:6px;color:${K.faint}}
 .acc-lignes .nw{white-space:nowrap}
 .acc-carte-jour{position:relative}
-.acc-carte-jour:before{content:"";position:absolute;inset:-110px -80px;background:radial-gradient(closest-side,rgba(61,123,255,.22),transparent);pointer-events:none;z-index:0;filter:blur(2px)}
+.acc-carte-jour:before{content:none}
 .acc-carte-jour > *{position:relative;z-index:1}
 /* PROFONDEUR 3D DE LA CARTE DÉMO (vitrine marketing — JAMAIS sur les écrans de
    données de l'app). Trois couches, transform/opacity seuls :
@@ -194,7 +196,7 @@ const CSS = `
 @keyframes accCarte3D{from{transform:rotateX(14deg) translateY(10px)}to{transform:rotateX(0) translateY(0)}}
 @media (prefers-reduced-motion:reduce){.acc-tilt{animation:none!important;transition:none!important;transform:none!important}}
 .acc-carte-jour > .acc-revoir-l{position:absolute;left:0;right:0;top:100%;height:34px;display:flex;justify-content:flex-end;align-items:center;max-width:500px}
-.acc .acc-revoir{display:inline-flex;align-items:center;gap:6px;min-height:32px;padding:0 4px;border:none;background:none;cursor:pointer;font-family:'Inter',system-ui,sans-serif;font-size:13px;font-weight:500;color:${K.muted};animation:accApparait 200ms ${COURBE_SORTIE} both}
+.acc .acc-revoir{display:inline-flex;align-items:center;gap:6px;min-height:32px;padding:0 4px;border:none;background:none;cursor:pointer;font-family:'Bricolage Grotesque','Inter',system-ui,sans-serif;font-size:13px;font-weight:500;color:${K.muted};animation:accApparait 200ms ${COURBE_SORTIE} both}
 @media (hover:hover) and (pointer:fine){.acc .acc-revoir:hover{color:${K.text}}}
 @keyframes accApparait{from{opacity:0}to{opacity:1}}
 
@@ -220,7 +222,7 @@ const CSS = `
    apparaît : l'œil va à l'action. Invisible avant et après (hors écran), coupé
    en mouvement réduit (le pseudo reste hors champ, aucune animation posée). */
 .acc-actions .acc-p{overflow:hidden}
-.acc-actions .acc-p:after{content:"";position:absolute;top:0;bottom:0;left:0;width:55%;background:linear-gradient(100deg,transparent,rgba(255,255,255,.38),transparent);transform:translateX(-185%) skewX(-12deg);pointer-events:none}
+.acc-actions .acc-p:after{content:none}
 @keyframes accLustre{from{transform:translateX(-185%) skewX(-12deg)}to{transform:translateX(230%) skewX(-12deg)}}
 @media (prefers-reduced-motion:no-preference){
   .acc-actions .acc-p:after{animation:accLustre 1050ms ${COURBE_SORTIE} 820ms 1 both}
@@ -273,7 +275,7 @@ const CSS = `
 .acc-qs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-top:16px}
 .acc-q{background:${K.card};border:1px solid ${K.line};border-radius:12px;padding:18px;box-shadow:${REFLET}}
 .acc-q .acc-icone{color:${K.muted};flex-shrink:0;margin-top:1px}
-.acc-q h3{display:flex;align-items:flex-start;gap:10px;font-family:'Inter',system-ui,sans-serif;font-size:15px;font-weight:600;line-height:1.35;letter-spacing:-.005em}
+.acc-q h3{display:flex;align-items:flex-start;gap:10px;font-family:'Bricolage Grotesque','Inter',system-ui,sans-serif;font-size:15px;font-weight:600;line-height:1.35;letter-spacing:-.005em}
 .acc-q p{font-size:14px;line-height:1.45;color:${K.muted};margin-top:6px}
 /* Les cartes répondent sous le curseur (sur SOURIS seulement — sur mobile un
    survol reste collé après un tap, et la carte-question y est de toute façon
@@ -295,7 +297,7 @@ const CSS = `
 .acc-etapes{list-style:none;margin:24px 0 0;padding:0;display:flex;flex-direction:column;gap:18px}
 .acc-etapes li{display:flex;gap:14px;align-items:flex-start}
 .acc-etapes .n{width:28px;height:28px;border-radius:8px;background:${K.card2};border:1px solid ${K.line2};display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;color:${K.text};flex-shrink:0}
-.acc-etapes h3{font-family:'Inter',system-ui,sans-serif;font-size:16px;font-weight:600;line-height:1.35;letter-spacing:0;margin-top:3px}
+.acc-etapes h3{font-family:'Bricolage Grotesque','Inter',system-ui,sans-serif;font-size:16px;font-weight:600;line-height:1.35;letter-spacing:0;margin-top:3px}
 .acc-etapes p{font-size:15px;line-height:1.55;color:${K.muted};margin-top:3px}
 .acc-conf p{font-size:15px;line-height:1.6;color:${K.muted};margin-top:14px}
 .acc-conf p:first-of-type{margin-top:24px;color:${K.text}}
@@ -306,7 +308,7 @@ const CSS = `
 .acc-prix{background:${K.card};border:1px solid ${K.line2};border-radius:12px;padding:28px;box-shadow:${REFLET},${OMBRE_CARTE}}
 .acc-offert{display:inline-flex;font-size:13px;font-weight:600;color:${K.text};background:${K.card2};border:1px solid ${K.line2};border-radius:8px;padding:4px 10px;margin-top:16px}
 .acc-gros{display:flex;align-items:baseline;gap:10px;margin-top:12px}
-.acc-gros b{font-family:'Space Grotesk','Inter',sans-serif;font-size:52px;font-weight:700;letter-spacing:-.02em;line-height:1;font-variant-numeric:tabular-nums}
+.acc-gros b{font-family:'Bricolage Grotesque','Inter',sans-serif;font-size:52px;font-weight:700;letter-spacing:-.02em;line-height:1;font-variant-numeric:tabular-nums}
 .acc-gros span{font-size:16px;color:${K.muted}}
 .acc-prix ul{list-style:none;margin:16px 0 0;padding:0;display:flex;flex-direction:column;gap:4px;font-size:15px;line-height:1.5;color:${K.text}}
 .acc-prix .petit{font-size:14px;line-height:1.5;color:${K.muted};margin-top:14px}
@@ -324,7 +326,7 @@ const CSS = `
 
 /* La fin. */
 .acc-fin{position:relative;text-align:center;padding:64px 0}
-.acc-fin:before{content:"";position:absolute;left:50%;top:0;width:900px;height:420px;transform:translateX(-50%);background:radial-gradient(closest-side,rgba(61,123,255,.08),transparent);pointer-events:none}
+.acc-fin:before{content:none}
 .acc-fin .acc-in{position:relative;display:flex;flex-direction:column;align-items:center}
 .acc-fin-feuille{display:flex;flex-direction:column;align-items:center}
 .acc-fin-texte{display:flex;flex-direction:column;align-items:center}

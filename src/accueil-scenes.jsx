@@ -24,12 +24,12 @@ const V = DEMO.vente, M = DEMO.mois;
 const MARGE = '0px 0px -25% 0px';
 
 const CSS = `
-.sc{position:relative;width:100%;color:${K.text};font-variant-numeric:normal;font-feature-settings:normal;font-family:'Inter',system-ui,sans-serif;text-align:left;-webkit-user-select:none;user-select:none}
+.sc{position:relative;width:100%;color:${K.text};font-variant-numeric:normal;font-feature-settings:normal;font-family:'Bricolage Grotesque','Inter',system-ui,sans-serif;text-align:left;-webkit-user-select:none;user-select:none}
 .sc *{box-sizing:border-box}
 .sc-tuile{position:absolute;background:${K.card};border:1px solid ${K.line2};border-radius:12px;box-shadow:${REFLET},${OMBRE_CARTE};overflow:hidden}
 .sc-tete{display:flex;align-items:center;justify-content:space-between;gap:10px;height:44px;padding:0 14px 0 16px;border-bottom:1px solid ${K.line}}
-.sc-tete b{font-family:'Space Grotesk','Inter',sans-serif;font-size:15px;font-weight:600;letter-spacing:-.01em;white-space:nowrap}
-.sc-tete b span{font-family:'Inter',system-ui,sans-serif;color:${K.muted};font-weight:500}
+.sc-tete b{font-family:'Bricolage Grotesque','Inter',sans-serif;font-size:15px;font-weight:600;letter-spacing:-.01em;white-space:nowrap}
+.sc-tete b span{font-family:'Bricolage Grotesque','Inter',system-ui,sans-serif;color:${K.muted};font-weight:500}
 .sc-bp{display:inline-flex;align-items:center;gap:7px;height:32px;padding:0 12px;border-radius:8px;background:${K.cta};color:#FFF;font-size:13px;font-weight:600;white-space:nowrap;box-shadow:inset 0 1px 0 rgba(255,255,255,.18),0 1px 2px rgba(0,0,0,.4)}
 .sc-bs{display:inline-flex;align-items:center;justify-content:center;height:30px;padding:0 11px;border-radius:8px;border:1px solid ${K.line2};background:${K.card2};color:${K.text};font-size:12px;font-weight:600;white-space:nowrap}
 .sc-groupe{height:26px;display:flex;align-items:flex-end;padding:0 16px 5px;font-size:12px;font-weight:600;color:${K.muted}}
@@ -59,12 +59,12 @@ const CSS = `
 .sc-etiq{position:absolute;font-size:12px;font-weight:500;color:${K.text};white-space:nowrap;line-height:16px}
 .sc-curseur{position:absolute;left:0;top:0;width:18px;height:22px;z-index:20;pointer-events:none;transform-origin:2px 2px}
 .sc-anneau{position:absolute;width:14px;height:14px;margin:-7px 0 0 -7px;border-radius:50%;border:1.5px solid rgba(255,255,255,.85);z-index:19;pointer-events:none}
-.sc-vol{position:absolute;left:0;top:0;z-index:15;pointer-events:none;display:inline-flex;align-items:center;height:22px;padding:0 8px;border-radius:8px;background:rgba(61,123,255,.18);border:1px solid ${K.accent};font-size:12px;font-weight:600;color:${K.text};font-variant-numeric:tabular-nums;white-space:nowrap}
+.sc-vol{position:absolute;left:0;top:0;z-index:15;pointer-events:none;display:inline-flex;align-items:center;height:22px;padding:0 8px;border-radius:8px;background:rgba(36,66,184,.18);border:1px solid ${K.accent};font-size:12px;font-weight:600;color:${K.text};font-variant-numeric:tabular-nums;white-space:nowrap}
 .sc-plat{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:12px;color:${K.muted};line-height:16px}
 .sc-plat i{display:inline-block;width:7px;height:7px;border-radius:2px;margin-right:7px;vertical-align:1px}
-.sc-plat strong{font-family:'Space Grotesk','Inter',sans-serif;font-size:15px;font-weight:600;color:${K.text};font-variant-numeric:tabular-nums}
+.sc-plat strong{font-family:'Bricolage Grotesque','Inter',sans-serif;font-size:15px;font-weight:600;color:${K.text};font-variant-numeric:tabular-nums}
 .sc-ident{position:relative;display:inline-flex;align-items:center;height:22px;padding:0 8px;border-radius:8px;background:${K.card2};border:1px solid ${K.line2};font-size:12px;font-weight:600;color:${K.text};font-variant-numeric:tabular-nums;white-space:nowrap}
-.sc-ident .lum{position:absolute;inset:-1px;border-radius:8px;background:${K.accentSoft};border:1px solid rgba(61,123,255,.6)}
+.sc-ident .lum{position:absolute;inset:-1px;border-radius:8px;background:${K.accentSoft};border:1px solid rgba(36,66,184,.6)}
 .sc-ident span{position:relative}
 .sc-etat{position:relative;height:22px;flex:1;min-width:0}
 .sc-etat > span{position:absolute;right:0;top:0;height:22px;display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;white-space:nowrap}
@@ -76,8 +76,8 @@ const CSS = `
 .sc-bulle .acts{display:flex;justify-content:flex-end;gap:8px;margin-top:12px}
 .sc-mois{position:absolute;left:0;top:0;right:0;background:${K.card};border:1px solid ${K.line2};border-radius:12px;box-shadow:${REFLET},${OMBRE_CARTE};padding:22px 24px 24px}
 .sc-mois .t1{font-size:13px;font-weight:600;color:${K.muted}}
-.sc-pastille{position:absolute;display:inline-flex;align-items:center;height:26px;padding:0 10px;border-radius:8px;background:rgba(61,123,255,.12);border:1px solid ${K.accent};font-size:12px;font-weight:600;color:${K.text};white-space:nowrap;font-variant-numeric:tabular-nums}
-.sc-total{font-family:'Space Grotesk','Inter',sans-serif;font-size:40px;font-weight:700;letter-spacing:-.02em;line-height:1.05;font-variant-numeric:tabular-nums;white-space:nowrap}
+.sc-pastille{position:absolute;display:inline-flex;align-items:center;height:26px;padding:0 10px;border-radius:8px;background:rgba(36,66,184,.12);border:1px solid ${K.accent};font-size:12px;font-weight:600;color:${K.text};white-space:nowrap;font-variant-numeric:tabular-nums}
+.sc-total{font-family:'Bricolage Grotesque','Inter',sans-serif;font-size:40px;font-weight:700;letter-spacing:-.02em;line-height:1.05;font-variant-numeric:tabular-nums;white-space:nowrap}
 .sc-n{position:relative;height:20px;font-size:14px;color:${K.muted};margin-top:6px}
 .sc-n span{position:absolute;left:0;top:0;white-space:nowrap}
 .sc-barre{position:relative;display:flex;gap:2px;height:10px;border-radius:5px;overflow:hidden;margin-top:20px}
@@ -132,7 +132,7 @@ export function Vignette({ n, taille = 32 }) {
   const [a, b] = TONS[n] || TONS['128'];
   const veste = n === '97';
   return (
-    <span className="sc-vign" style={{ width: taille, height: taille, background: `linear-gradient(135deg, ${a}, ${b})` }} aria-hidden="true">
+    <span className="sc-vign" style={{ width: taille, height: taille, background: a }} aria-hidden="true">
       <svg width={taille * 0.74} height={taille * 0.74} viewBox="0 0 32 32">
         {veste
           ? <path d="M11 6l5 3 5-3 6 4-2 6h-3v11H10V16H7l-2-6zM16 9v18" fill="#FFFFFF" fillOpacity="0.08" stroke="#FFFFFF" strokeOpacity="0.36" strokeWidth="1.5" strokeLinejoin="round" />
@@ -421,7 +421,7 @@ export function EcranAilleurs({ s, etat = 'joue', compact, libelle, cible, ident
                   <Vignette n={V.n} taille={40} />
                   <div style={{ minWidth: 0 }}>
                     <div style={{ fontSize: 14, fontWeight: 600, lineHeight: '18px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{t.titre}</div>
-                    <div data-cible={i === 0 && cible ? 'prix' : undefined} style={{ display: 'inline-block', fontFamily: "'Space Grotesk','Inter',sans-serif", fontSize: 15, fontWeight: 600, marginTop: 2, fontVariantNumeric: 'tabular-nums' }}>{euros(t.prix)}</div>
+                    <div data-cible={i === 0 && cible ? 'prix' : undefined} style={{ display: 'inline-block', fontFamily: "'Bricolage Grotesque','Inter',sans-serif", fontSize: 15, fontWeight: 600, marginTop: 2, fontVariantNumeric: 'tabular-nums' }}>{euros(t.prix)}</div>
                   </div>
                 </div>
                 <div style={{ display: 'flex', marginTop: 14 }}>{ident}</div>

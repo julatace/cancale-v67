@@ -59,7 +59,7 @@ html body { font-feature-settings: "tnum" 1; }
 html :is(h1, h2, h3, .vrm-display) { font-family: var(--vrm-police) !important; font-weight: 800; letter-spacing: -.02em; }
 /* Les N° et les codes : la police à chasse fixe, comme une étiquette de carton. */
 html .vrm-app-shell :is(.vrm-colis-num, .vrm-apub-num, .vrm-tout-num-ligne, [data-edition="numero"], .vrm-pickup-code, .vrm-code-retrait),
-html .vrm-app-shell .vrm-ann-price-line > span:last-child {
+html .vrm-app-shell .vrm-fiche-num {
   font-family: var(--vrm-police-mono) !important; font-weight: 500 !important; letter-spacing: 0 !important;
 }
 
@@ -172,7 +172,16 @@ html .vrm-app-shell .vrm-atelier-rail .vrm-rail-button:focus-visible { outline: 
   html .vrm-app-shell .vrm-main .vrm-market-space .vrm-platform-tabs > button[aria-current="page"]::after { background: var(--vrm-accent) !important; height: 2px !important; }
 
   /* Les listes au téléphone : des LIGNES aérées séparées d'un filet, pas des
-     cartes (Ventes, Colis). */
+     cartes (Ventes, Colis). Le conteneur de la liste perd aussi son aplat
+     « surface » et son cadre arrondi (31 oct., finitions) : les lignes sont
+     posées sur le blanc de la page, comme dans Colis. */
+  html .vrm-app-shell .vrm-main .vrm-ventes-liste {
+    background: transparent !important; border: 0 !important; border-radius: 0 !important; box-shadow: none !important; overflow: visible !important;
+  }
+  html .vrm-app-shell .vrm-main .vrm-ventes-liste > .vrm-ledger-heading { background: transparent !important; }
+  /* Sans photo, la vignette garde son aplat « photo vide » (elle était blanche :
+     sur le blanc de la page, elle disparaissait). */
+  html .vrm-app-shell .vrm-main .vrm-ventes-liste .vrm-ledger-photo-empty { background: var(--vrm-photo, var(--vrm-card2)) !important; border-radius: 8px !important; }
   html .vrm-app-shell .vrm-main .vrm-ventes-liste .vrm-sale-row {
     background: transparent !important; border: 0 !important; border-bottom: 1px solid var(--vrm-line) !important;
     border-radius: 0 !important; margin-bottom: 0 !important; padding-inline: 0 !important;
@@ -194,8 +203,8 @@ html .vrm-app-shell .vrm-atelier-rail .vrm-rail-button:focus-visible { outline: 
 }
 
 /* ── 4. LES TITRES D'ÉCRAN : grands, serrés ──────────────────────────────── */
-html .vrm-screen-head h2 { font-size: var(--vrm-t-title) !important; font-weight: 800 !important; letter-spacing: -.025em !important; line-height: 1.04 !important; }
-html .vrm-market-space .vrm-screen-head h2 { font-size: var(--vrm-t-section) !important; font-weight: 750 !important; letter-spacing: -.018em !important; }
+html .vrm-screen-head :is(h1, h2) { font-size: var(--vrm-t-title) !important; font-weight: 800 !important; letter-spacing: -.025em !important; line-height: 1.04 !important; }
+html .vrm-market-space .vrm-screen-head :is(h1, h2) { font-size: var(--vrm-t-section) !important; font-weight: 750 !important; letter-spacing: -.018em !important; }
 html .vrm-market-heading h1 { font-weight: 800 !important; letter-spacing: -.025em !important; }
 @media (min-width: 768px) {
   html .vrm-app-shell .vrm-day-layout .vrm-day-hello { font-size: 44px !important; font-weight: 800 !important; letter-spacing: -.025em !important; line-height: 1.02 !important; }
@@ -245,12 +254,35 @@ html .vrm-app-shell .vrm-day-layout .vrm-day-recu-n { font-weight: 800 !importan
 :root body .vrm-app-shell .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche [data-prix] { font-weight: 800 !important; letter-spacing: -.02em; }
 :root body .vrm-app-shell .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche .vrm-fiche-cell { background: var(--vrm-surface) !important; border-color: transparent !important; border-radius: 10px !important; }
 :root body .vrm-app-shell .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche .vrm-ann-actions { border-top: 0 !important; padding-inline: 0 !important; background: transparent !important; }
-/* Le N° de la fiche : une pastille à chasse fixe, à l'encre (le lien bleu de
-   l'édition en place n'y est plus) ; le prix reste devant. */
-:root body .vrm-app-shell .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche .vrm-ann-price-line > span:last-child {
-  background: var(--vrm-surface) !important; border-color: transparent !important; color: var(--vrm-ink) !important;
+/* Le N° de la fiche : une pastille blanche à chasse fixe POSÉE SUR LA PHOTO, en
+   haut à gauche (la maquette « Vitrine ») — l'étiquette du carton. En sombre,
+   la même pastille claire (l'encre claire du thème) : sur une photo, c'est
+   l'étiquette qui se lit, pas le fond de l'app. Le pointillé d'édition n'y est
+   pas : toute la pastille se touche (cible étendue à 44 px affichés au moins,
+   la zone principale du téléphone étant à 80 %). */
+:root body .vrm-app-shell .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche .vrm-fiche-num {
+  background: var(--vrm-bg) !important; color: var(--vrm-ink) !important; box-shadow: 0 1px 2px rgba(15,15,14,.12);
 }
-:root body .vrm-app-shell .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche .vrm-ann-price-line > span:last-child :is(button, span, a) { color: var(--vrm-ink) !important; font-family: var(--vrm-police-mono) !important; font-weight: 500 !important; }
+:root[data-theme="dark"] body .vrm-app-shell .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche .vrm-fiche-num {
+  background: var(--vrm-ink) !important; color: var(--vrm-bg) !important;
+}
+:root body .vrm-app-shell .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche .vrm-fiche-num.vrm-fiche-num.vrm-fiche-num button[data-edition] {
+  position: relative; display: flex; align-items: center; min-height: 28px !important; height: 28px; margin: 0 !important; padding: 0 !important;
+  background: transparent !important; border: 0 !important; color: inherit !important;
+  font-family: var(--vrm-police-mono) !important; font-size: 14px !important; font-weight: 500 !important; letter-spacing: 0 !important; cursor: pointer;
+}
+/* Le prix est désormais seul sur sa ligne : la pastille que les couches d'avant
+   posaient sur le DERNIER élément de la ligne (le N°, styles-annonces-pro) ne
+   doit pas habiller le prix. */
+:root body .vrm-app-shell .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche .vrm-ann-price-line > span[data-prix][data-prix] {
+  font-size: 22px !important; font-weight: 800 !important;
+  border: 0 !important; background: transparent !important; padding: 0 !important; margin: 0 !important; border-radius: 0 !important;
+}
+:root body .vrm-app-shell .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche .vrm-fiche-num [data-edition] > span { border-bottom: 0 !important; }
+:root body .vrm-app-shell .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche .vrm-fiche-num [data-edition]::after {
+  content: ''; position: absolute; inset: -14px -12px;
+}
+:root body .vrm-app-shell .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche .vrm-fiche-num input { color: inherit !important; font-family: var(--vrm-police-mono) !important; }
 /* « À confirmer » : un contour ambre. */
 html .vrm-app-shell [data-ann-a-confirmer] {
   color: var(--vrm-warn) !important; border: 1px solid var(--vrm-warn) !important; background: var(--vrm-bg) !important; border-radius: 8px !important;
@@ -261,6 +293,7 @@ html .vrm-app-shell [data-ann-a-confirmer] {
   :root body .vrm-app-shell .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche .vrm-ann-overview > a.vrm-fiche-photo { aspect-ratio: auto !important; height: 190px !important; }
   :root body .vrm-app-shell .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche [data-titre] { font-size: 14px !important; }
   :root body .vrm-app-shell .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche [data-prix] { font-size: 18px !important; }
+  :root body .vrm-app-shell .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche .vrm-ann-price-line > span[data-prix][data-prix] { font-size: 18px !important; }
   :root body .vrm-app-shell .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche .vrm-ann-price-line { flex-wrap: wrap; gap: 6px !important; }
   :root body .vrm-app-shell .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche .vrm-fiche-duo { grid-template-columns: minmax(0, 1fr) !important; }
   :root body .vrm-app-shell .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche .vrm-fiche-chiffres { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
