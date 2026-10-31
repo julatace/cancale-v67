@@ -13593,7 +13593,7 @@ const GROUPES_PLUS=[
     {id:'cat_msg', icon:'heart', cle:'favoris', vue:'favoris', label:'Favoris & offres'},
   ]},
   { titre:'Expédier', items:[
-    {id:'cat_achats', icon:'qr', cle:'retraits', vue:'attente', label:'Retraits'},
+    {id:'cat_achats', icon:'qr', cle:'retraits', vue:'attente', label:'Colis à retirer'},
   ]},
   { titre:'Gérer', items:[
     {id:'garage',     icon:'home', label:'Stock'},
@@ -58813,7 +58813,7 @@ function VentesToutes({ sites, ventesVinted, ventesKO, comptes, panelOff, lbcVen
         out.push({ cle: 'vinted:' + tx, site: 'vinted', id: tx, titre: o.title || '(sans titre)', t: ts(o.date),
           prix: euro(o.price && typeof o.price === 'object' ? o.price.amount : o.price), devise: (o.price && o.price.currency_code) || 'EUR',
           etat: etapeVente(o, { poste: (x) => !!shipDone[String(x.transaction_id)] }).label,
-          compte: labels[uid] || (o._acc && o._acc.login) || '', num: '' });
+          compte: labels[uid] || (o._acc && o._acc.login) || '', num: '', photo: photosVenteVintedCandidates(o)[0] || null });
       }
     }
     if (voit('leboncoin') && lbcLu === true) {
@@ -58825,7 +58825,7 @@ function VentesToutes({ sites, ventesVinted, ventesKO, comptes, panelOff, lbcVen
         if (!id) continue;
         out.push({ cle: 'leboncoin:' + id, site: 'leboncoin', id, titre: v.title || '(sans titre)', t: ts(v.dateVente) ?? ts(v.txId ? dates[v.txId] : null),
           prix: v.price != null ? euro(Number(v.price) / 100) : null, devise: 'EUR',
-          etat: lbcFinalisee(v) ? 'Finalisée' : 'En cours', compte: '', num: numeroLbcIdentite(v, null, liens) });
+          etat: lbcFinalisee(v) ? 'Finalisée' : 'En cours', compte: '', num: numeroLbcIdentite(v, null, liens), photo: photoArticle(v) || null });
       }
     }
     if (voit('ebay') && ebayTous && Array.isArray(ebayTous.items)) {
@@ -58835,7 +58835,7 @@ function VentesToutes({ sites, ventesVinted, ventesKO, comptes, panelOff, lbcVen
         const st = c.pricingSummary && c.pricingSummary.priceSubtotal;
         out.push({ cle: 'ebay:' + c.orderId, site: 'ebay', id: String(c.orderId), compteRef: c._compte, titre: li.title || 'Commande eBay', t: ts(c.creationDate),
           prix: st && st.value != null ? euro(st.value) : null, devise: (st && st.currency) || 'EUR',
-          etat: commandeEbayEngagee(c) ? 'Payée' : 'Annulée ou remboursée', compte: c._pseudo || '', num: numLigneEbay(c, li) || '' });
+          etat: commandeEbayEngagee(c) ? 'Payée' : 'Annulée ou remboursée', compte: c._pseudo || '', num: numLigneEbay(c, li) || '', photo: photoArticle(li) || photoArticle(c) || null });
       }
     }
     if (voit('vestiaire') && vc && vc.ventes) {
@@ -58843,7 +58843,7 @@ function VentesToutes({ sites, ventesVinted, ventesKO, comptes, panelOff, lbcVen
         if (!v) continue;
         out.push({ cle: 'vestiaire:' + id, site: 'vestiaire', id, titre: v.titre || v.title || 'Vente Vestiaire', t: ts(v.date) ?? ts(v.premiereVue),
           prix: null, devise: 'EUR', etat: v.aExpedier ? 'À expédier' : (v.etat || ''), compte: '',
-          num: cleNum((v.productId && vc.liens[v.productId]) || v.ref || '') });
+          num: cleNum((v.productId && vc.liens[v.productId]) || v.ref || ''), photo: photoArticle(v) || null });
       }
     }
     // La plus récente d'abord ; une vente sans date lue va à la fin (jamais datée au hasard).
@@ -58896,8 +58896,12 @@ function VentesToutes({ sites, ventesVinted, ventesKO, comptes, panelOff, lbcVen
             {lignes.slice(0, n).map((l) => (
               <button key={l.cle} type="button" role="listitem" className="vrm-toutes-ligne" data-toutes-vente={l.site} data-toutes-id={l.id} onClick={() => onOuvrir(l)}
                 style={{ width: '100%', minHeight: 56, display: 'flex', alignItems: 'center', gap: 12, padding: '10px 2px', background: 'transparent', border: 0, borderBottom: `1px solid ${C.border}`, cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left', color: C.text }}>
+                {/* (31 oct., Julien : « pas de photos partout ») La photo de la vente, comme sur l'écran de son site. */}
+                <span className="vrm-toutes-photo" data-toutes-photo={l.photo ? '1' : '0'} style={{ width: 64, height: 80, flexShrink: 0, borderRadius: 12, overflow: 'hidden', background: 'var(--vrm-photo, ' + (C.card2 || C.border) + ')', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  {l.photo ? <PhotoVinted src={l.photo} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }}/> : <Icon name="image" size={22} style={{ color: C.muted, opacity: .55 }}/>}
+                </span>
                 <span style={{ flex: 1, minWidth: 0 }}>
-                  <span style={{ display: 'block', fontSize: 14, fontWeight: 650, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{l.titre}</span>
+                  <span style={{ display: 'block', fontSize: 15, fontWeight: 650, lineHeight: 1.3, overflowWrap: 'anywhere' }}>{l.titre}</span>
                   <span style={{ display: 'block', fontSize: 12.5, color: C.muted, marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     <span data-toutes-site="">{NOM[l.site]}</span> · {jour(l.t)}{l.etat ? ' · ' + l.etat : ''}{l.compte ? ' · ' + l.compte : ''}
                   </span>
