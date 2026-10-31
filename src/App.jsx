@@ -3933,10 +3933,15 @@ const fetchEmailsParCompte = async () => {
       const e = (parCompte[a] = parCompte[a] || { n: 0, last: '' });
       e.n += 1; if (d > e.last) e.last = d;
     };
-    for (const f of FAMILLES_EMAILS_COMPTE) {
-      const rows = await lireTout(`id=like.${f}*&select=acc:meta->>account,at:meta->>receivedAt`, { strict: true });
-      if (rows === null) return null;                 // une famille illisible : on n'accuse personne
-      for (const row of rows) ajoute(row.acc, row.at);
+    // ⚠️ (31 oct., banc vitesse) UNE lecture pour les six familles et les
+    //    bordereaux : c'étaient sept lectures À LA SUITE (sept allers-retours)
+    //    des mêmes lignes, famille par famille. Mêmes lignes (le préfixe trie),
+    //    mêmes scalaires ; illisible ⇒ `null`, on n'accuse personne, comme avant.
+    const tous = await lireTout('id=like.email_*&select=id,acc:meta->>account,at:meta->>receivedAt', { strict: true });
+    if (tous === null) return null;
+    for (const row of tous) {
+      const id = String((row && row.id) || '');
+      if (FAMILLES_EMAILS_COMPTE.some((f) => id.startsWith(f))) ajoute(row.acc, row.at);
     }
     // Le JOURNAL porte les messages et les favoris (aucune ligne à eux) : sans
     // lui, un compte dont les messages arrivent était dit « aucun email ».
@@ -3946,9 +3951,7 @@ const fetchEmailsParCompte = async () => {
     if (!Array.isArray(j)) return null;
     for (const e of ((j[0] && j[0].entries) || [])) if (e) ajoute(e.account, e.at);
     // Les bordereaux reçus par email, par TRANSACTION (identité, jamais le compte deviné).
-    const bords = await lireTout('id=like.email_bord_*&select=id', { strict: true });
-    if (bords === null) return null;
-    const bordTx = new Set(bords.map((b) => String(b.id || '').replace(/^email_bord_/, '')).filter(Boolean));
+    const bordTx = new Set(tous.map((b) => String((b && b.id) || '')).filter((id) => id.startsWith('email_bord_')).map((id) => id.replace(/^email_bord_/, '')).filter(Boolean));
     return { parCompte, bordTx, debut: debut || null };
   } catch (_) { return null; }
 };
@@ -7980,7 +7983,11 @@ function photoViaServeur(url) {
       let data=null;
       try {
         if(AUTH.user?.id!==uid)return;
-        const r=await fetch('/api/compte?mode=photo',{method:'POST',headers:{'Content-Type':'application/json',...enTeteSession()},body:JSON.stringify({url}),signal:ctrl.signal});
+        // (31 oct., banc vitesse) `mode=photo` LIT une photo du CDN pour la page,
+        // il n'écrit rien en base (api/compte.js `photo`) : il le déclare, sinon
+        // chacun de ces POST vidait le partage des lectures (src/lecturesPartagees.js)
+        // — douze sur l'écran Ventes, et la cloche relisait tout derrière.
+        const r=await fetch('/api/compte?mode=photo',{method:'POST',headers:{'Content-Type':'application/json',...enTeteSession()},body:JSON.stringify({url}),signal:ctrl.signal,vrmInvalideSiChange:true});
         if(!r.ok || !/^image\/(jpeg|png|webp|avif|gif)(?:;|$)/i.test(r.headers.get('content-type') || ''))return;
         const blob=await r.blob();
         if(blob.size>6*1024*1024)return;
@@ -18344,7 +18351,7 @@ function FiltresVentes({ value, onChange, search, onSearch, cancelled = false, d
 // sur la ligne elle-même, sous le titre — les MÊMES composants et les MÊMES
 // écritures que dans le tiroir (`CoutAchatVente`), rien de neuf. Le tiroir ne
 // change pas.
-function LigneVenteCompacte({ photo, photoNoeud = null, titre, sous = '', etat, etatNoeud = null, ton = '', montant, children, numerosArticle = [], plateforme = '', initialOuvert = false, gestes = null, ...props }) {
+function LigneVenteCompacte({ photo, photoNoeud = null, titre, sous = '', etat, etatNoeud = null, ton = '', montant, children, numerosArticle = [], plateforme = '', initialOuvert = false, gestes = null, montantCentimes, ...props }) {
   const [ouvert, setOuvert] = React.useState(initialOuvert);
   const panneau = React.useId();
   const declencheur = React.useRef(null);
@@ -18361,19 +18368,29 @@ function LigneVenteCompacte({ photo, photoNoeud = null, titre, sous = '', etat, 
     fermer.current?.focus({preventScroll:true});
   },[ouvert,panneau]);
   const close=()=>{setOuvert(false);declencheur.current?.focus({preventScroll:true});};
+  // ⚠️ LE TIROIR N'EST MONTÉ QU'À SA PREMIÈRE OUVERTURE, PUIS GARDÉ (31 oct.).
+  //    Depuis le 21 oct., chaque ligne montait d'avance son tiroir complet
+  //    (photo, coûts, bordereau, facture…), même fermé : c'était l'essentiel du
+  //    coût d'une lettre tapée dans Ventes (banc `ventes-frappe`). Fermé, il
+  //    n'existait que caché (`hidden`) : rien de visible ne change. Une fois
+  //    ouvert il reste monté (une saisie en cours survit à « Fermer »). Ce que
+  //    les bancs lisaient dans un tiroir fermé, ils le lisent après l'avoir
+  //    ouvert — ou sur la ligne quand la donnée y a sa place.
+  const dejaOuvert = React.useRef(false);
+  if (ouvert) dejaOuvert.current = true;
   const numerosFiche=[...new Set(numerosArticle.map(n=>String(n||'').trim()).filter(Boolean))];
   return <div {...props} data-ligne-ouverte={ouvert} data-plateforme-vente={plateforme||undefined}>
     <button ref={declencheur} type="button" className="vrm-ledger-sale-toggle" aria-expanded={ouvert} aria-controls={panneau} aria-haspopup="dialog" aria-label={`Ouvrir les actions : ${titre || 'vente'}`} onClick={()=>setOuvert(v=>!v)}>
       <span className="vrm-ledger-photo-empty">{photoNoeud || <PhotoVente src={photo} size={46} portrait/>}</span>
       <span className="vrm-ledger-sale-title" title={titre}><span className="vrm-ledger-sale-nom">{titre || '(sans titre)'}</span>{sous ? <span className="vrm-ledger-sale-sous" data-vente-sous="">{sous}</span> : null}</span>
       <span className="vrm-ledger-sale-state" title={etat} data-ton={ton || undefined}>{etatNoeud || etat}</span>
-      <span className="vrm-ledger-sale-amount">{montant}</span>
+      <span className="vrm-ledger-sale-amount" data-prix-vente={montantCentimes ?? undefined}>{montant}</span>
       <span className="vrm-ledger-sale-plus" aria-hidden="true">{ouvert?'−':'⋯'}</span>
     </button>
     {gestes ? <div className="vrm-ledger-gestes" data-gestes-ligne="">{gestes}</div> : null}
     {/* « Retour » (geste du téléphone, ← du navigateur) ferme d'abord le tiroir. */}
     {ouvert && <FermeAuRetour fermer={close}/>}
-    {createPortal(<div className="vrm-app-shell vrm-ledger-drawer-host" hidden={!ouvert}>
+    {dejaOuvert.current && createPortal(<div className="vrm-app-shell vrm-ledger-drawer-host" hidden={!ouvert}>
       <section className="vrm-ledger-drawer" role="dialog" aria-modal="false" aria-labelledby={panneau+'-titre'} id={panneau} onKeyDown={e=>{if(e.target.matches('input,textarea,select,[contenteditable=true]'))return;if(e.key==='Escape'&&!e.defaultPrevented){e.preventDefault();e.stopPropagation();close();}}}>
         <header className="vrm-ledger-drawer-head"><div><span>VENTE</span><h2 id={panneau+'-titre'}>{titre || 'Vente'}</h2><p>{etat}{etat&&montant?' · ':''}{montant}</p></div><button ref={fermer} type="button" aria-label="Fermer les détails de la vente" onClick={close}><Icon name="close" size={18}/></button></header>
         <div className="vrm-main vrm-ledger-drawer-body">
@@ -19550,16 +19567,27 @@ function useRelectureTransporteurs() {
     return () => { clearInterval(t); document.removeEventListener('visibilitychange', tic); window.removeEventListener('focus', tic); };
   }, []);
 }
+// ⚠️ UNE PROJECTION PAR LIGNE eBay, PARTAGÉE (31 oct., banc vitesse). Au
+//    démarrage, `ebay_orders` partait sous QUATRE projections (Ma journée, la
+//    cloche, l'agent en fond, eBay → Ventes), `ebay_listings` sous trois,
+//    `ebay_programmees` sous deux : autant de lectures que le partage
+//    (`lecturesPartagees`) ne peut pas réunir. Mêmes champs pour tous (la date de
+//    capture est un scalaire) ⇒ une adresse, une lecture.
+const SEL_EBAY_COMMANDES = 'orders:data->orders,capturedAt:data->>capturedAt';
+const SEL_EBAY_ANNONCES = 'items:data->items,capturedAt:data->>capturedAt';
+const SEL_EBAY_PROGRAMMEES = 'items:data->items,enLigne:data->enLigne,capturedAt:data->>capturedAt';
 // Lit la ligne `base` (projetée par `select`, §4.4) de CHAQUE compte actif —
 // une requête par compte, exactement la requête d'avant pour le principal.
 // Rend `{ comptes, lignes: [{compte, ligne}] }` (ligne : objet · null absente ·
 // undefined illisible), ou `null` si le registre lui-même est illisible.
-async function lireEbayParCompte(base, select, comptesDonnes) {
+// `fond` : un passage de FOND (la cloche, l'agent) accepte une réponse partagée
+// plus ancienne (`vrmFond`, src/lecturesPartagees.js).
+async function lireEbayParCompte(base, select, comptesDonnes, fond = false) {
   const comptes = comptesDonnes || await lireComptesEbay();
   if (!Array.isArray(comptes)) return null;
   const lignes = await Promise.all(comptes.map(async (compte) => {
     try {
-      const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${base}${compte.suffixe}&select=${select}`, { headers: sbAuth() });
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${base}${compte.suffixe}&select=${select}`, fond ? { headers: sbAuth(), vrmFond: true } : { headers: sbAuth() });
       if (!r.ok) return { compte, ligne: undefined };
       const rows = await r.json();
       if (!Array.isArray(rows)) return { compte, ligne: undefined };
@@ -19574,8 +19602,8 @@ const marquerEbay = (arr, c) => (Array.isArray(arr) ? arr : []).map((x) => (x &&
 // La liste `champ` de tous les comptes : `{ items, illisibles }` (comptes dont
 // la lecture a échoué : nommés, jamais comptés « vides »), ou null (registre
 // illisible).
-async function lireEbayTous(base, select, champ, comptesDonnes) {
-  const r = await lireEbayParCompte(base, select, comptesDonnes);
+async function lireEbayTous(base, select, champ, comptesDonnes, fond = false) {
+  const r = await lireEbayParCompte(base, select, comptesDonnes, fond);
   if (!r) return null;
   const items = [], illisibles = [];
   for (const { compte, ligne } of r.lignes) {
@@ -19612,7 +19640,7 @@ const DEMANDE_EBAY_MSG = { compte: null, at: 0 };
 // « ventes payées ») : un seul compte illisible ⇒ `null` (« pas su ») — jamais
 // un total partiel présenté comme complet (§5).
 async function commandesEbayTous() {
-  const r = await lireEbayTous('ebay_orders', 'orders:data->orders', 'orders');
+  const r = await lireEbayTous('ebay_orders', SEL_EBAY_COMMANDES, 'orders');
   return (!r || r.illisibles.length) ? null : r.items;
 }
 // Une ligne est-elle dans la vue choisie ? (`*` ou vide = tous les comptes)
@@ -21337,8 +21365,8 @@ function EbayVentes({ baseKO,vue='*',comptesEbay,cible,onClearCible }) {
   const [lu,setLu]=React.useState(undefined);
   React.useEffect(()=>{if(comptesEbay===undefined)return;let stop=false;(async()=>{
     if(comptesEbay===null){if(!stop)setLu(null);return;}
-    const r=await lireEbayTous('ebay_orders','orders:data->orders','orders',comptesEbay);
-    const photos=await lireEbayTous('ebay_listings','items:data->items','items',comptesEbay);
+    const r=await lireEbayTous('ebay_orders',SEL_EBAY_COMMANDES,'orders',comptesEbay);
+    const photos=await lireEbayTous('ebay_listings',SEL_EBAY_ANNONCES,'items',comptesEbay);
     if(!stop){setLu(r);setAnnonces(photos?.items || []);setLectureAnnonces(photos);}
   })();return()=>{stop=true;};},[comptesEbay]);
   const illisibles=lu?lu.illisibles.filter(c=>dansVueEbay({_compte:c.ref},vue)):[];
@@ -23244,7 +23272,9 @@ function numerosEnBrouillon(brouillons, paires) {
 // La demande d'ouvrir un brouillon dans le formulaire d'eBay → Annonces
 // (« Compléter » de l'agent) : lue au montage de l'écran Annonces.
 const DEMANDE_EBAY_BROUILLON = { id: null, at: 0 };
-function useEtatPublicationEbay(comptes, comptesEbay) {
+// `fond` : l'agent en FOND (pas l'écran) — ses lectures acceptent une réponse
+// partagée de quelques secondes (`vrmFond`, src/lecturesPartagees.js).
+function useEtatPublicationEbay(comptes, comptesEbay, fond = false) {
   const { paires, enLigne: enLigne0, pret, doubles } = useEbayPaires(Array.isArray(comptes) ? comptes : null);
   const [tick, setTick] = React.useState(0);
   const [items, setItems] = React.useState(undefined);
@@ -23263,9 +23293,9 @@ function useEtatPublicationEbay(comptes, comptesEbay) {
     (async () => {
       if (comptesEbay === null) { setItems(null); setCommandes(null); setProg(null); setLuesA(null); setBrouillons(await lireBrouillonsEbay()); return; }
       const [L, O, P, B] = await Promise.all([
-        lireEbayTous('ebay_listings', 'items:data->items,capturedAt:data->>capturedAt', 'items', comptesEbay),
-        lireEbayTous('ebay_orders', 'orders:data->orders', 'orders', comptesEbay),
-        lireEbayParCompte('ebay_programmees', 'items:data->items,enLigne:data->enLigne,capturedAt:data->>capturedAt', comptesEbay),
+        lireEbayTous('ebay_listings', SEL_EBAY_ANNONCES, 'items', comptesEbay, fond),
+        lireEbayTous('ebay_orders', SEL_EBAY_COMMANDES, 'orders', comptesEbay, fond),
+        lireEbayParCompte('ebay_programmees', SEL_EBAY_PROGRAMMEES, comptesEbay, fond),
         lireBrouillonsEbay(),
       ]);
       if (stop) return;
@@ -23291,11 +23321,14 @@ function useEtatPublicationEbay(comptes, comptesEbay) {
     lirePreuvesVenteVinted({ comptes: comptesPreuve }).then((p) => { if (!stop) setVendus(p ? p.vendus : null); });
     (async () => {
       try {
-        const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.lbc_ventes&select=ventes:data->ventes`, { headers: sbAuth() });
+        // (31 oct.) `select=data` comme la cloche et la réception Leboncoin :
+        // une adresse, une lecture partagée (la ligne ne porte que `ventes` et
+        // sa date).
+        const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.lbc_ventes&select=data`, fond ? { headers: sbAuth(), vrmFond: true } : { headers: sbAuth() });
         const rows = r.ok ? await r.json() : null;
         if (stop) return;
         if (!Array.isArray(rows)) { setVentesLbc(null); return; }
-        const v = rows[0] && rows[0].ventes;
+        const v = rows[0] && rows[0].data && rows[0].data.ventes;
         setVentesLbc(v && typeof v === 'object' && !Array.isArray(v) ? v : {});
       } catch (_) { if (!stop) setVentesLbc(null); }
     })();
@@ -23711,9 +23744,19 @@ function AgentEbay({ comptes, comptesEbay, onAnnonces }) {
 // proposition (aucun appel à eBay — seulement nos lectures) et publie le résumé
 // que lisent Ma journée et la notification du matin. Il ne prépare ni ne
 // publie rien.
-function AgentEbayFond({ comptes, comptesEbay }) {
+// ⚠️ (31 oct., banc vitesse) LE RÉSUMÉ SE RELIT APRÈS LE NUAGE. La porte
+//    (`agentEbayFondUtile`) regardait le navigateur au montage de la coque :
+//    un résumé frais posé par un AUTRE appareil (synchronisé) n'y était pas
+//    encore, et l'agent relisait tout (une douzaine de lectures, ~1 Mo) pour
+//    refaire le même résumé. On attend le nuage, puis on regarde à nouveau.
+function AgentEbayFond(props) {
+  const [utile, setUtile] = React.useState(() => (isCloudReady() ? agentEbayFondUtile() : undefined));
+  React.useEffect(() => onCloudReady(() => setUtile((u) => (u === undefined ? agentEbayFondUtile() : u))), []);
+  return utile ? <AgentEbayFondCalcul {...props}/> : null;
+}
+function AgentEbayFondCalcul({ comptes, comptesEbay }) {
   const [regles] = useReglesAgentEbay();
-  const etat = useEtatPublicationEbay(comptes, comptesEbay);
+  const etat = useEtatPublicationEbay(comptes, comptesEbay, true);
   const fait = React.useRef(false);
   React.useEffect(() => {
     if (fait.current || !regles) return;
@@ -23899,11 +23942,11 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
     chargerProgrammees();
     if (comptesEbay === null) { setItems(null); setCommandes(null); setRegles({ map: new Map(), illisibles: new Set(['*']) }); setVentesEbayLues(null); return; }
     const [L, O, RG] = await Promise.all([
-      lireEbayTous('ebay_listings', 'items:data->items,capturedAt:data->>capturedAt', 'items', comptesEbay),
+      lireEbayTous('ebay_listings', SEL_EBAY_ANNONCES, 'items', comptesEbay),
       // Les commandes eBay : seulement la liste (§4.4), pour « vendue sur eBay » —
       // et (9 octobre) QUAND elles ont été relues (la fenêtre où eBay vend
       // sans que VRM le voie, dite à côté des règles d'offre).
-      lireEbayTous('ebay_orders', 'orders:data->orders,capturedAt:data->>capturedAt', 'orders', comptesEbay),
+      lireEbayTous('ebay_orders', SEL_EBAY_COMMANDES, 'orders', comptesEbay),
       lireReglesEbay(comptesEbay),
     ]);
     setRegles(RG); setReglesLocales(new Map()); setPrixLocaux(new Map());
@@ -23990,11 +24033,11 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
     lirePreuvesVenteVinted({ comptes: avecSku ? comptesPreuve : null }).then((p) => { if (!stop) { setVendusVinted(p ? p.vendus : null); setSansPreuve(p ? p.sansPreuve : null); setSansPreuveKO(p && Array.isArray(p.sansPreuveKO) ? p.sansPreuveKO : []); } });
     (async () => {
       try {
-        const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.lbc_ventes&select=ventes:data->ventes`, { headers: sbAuth() });
+        const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.lbc_ventes&select=data`, { headers: sbAuth() });
         if (!r.ok) { if (!stop) setVentesLbc(null); return; }
         const rows = await r.json();
         if (!Array.isArray(rows)) { if (!stop) setVentesLbc(null); return; }
-        const v = rows[0] && rows[0].ventes;
+        const v = rows[0] && rows[0].data && rows[0].data.ventes;
         if (!stop) setVentesLbc(v && typeof v === 'object' && !Array.isArray(v) ? v : {});
       } catch (_) { if (!stop) setVentesLbc(null); }
     })();
@@ -37073,10 +37116,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     try {
       const items = await lbcAnnoncesSession();
       if (!items || stop) return;
-      const vr = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.lbc_ventes&select=ventes:data->ventes`, { headers: sbAuth() });
+      const vr = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.lbc_ventes&select=data`, { headers: sbAuth() });
       if (!vr.ok) return;
       const vrows = await vr.json(); if (!Array.isArray(vrows) || stop) return;
-      const vendues = annoncesLbcVendues((vrows[0] && vrows[0].ventes) || {});
+      const vendues = annoncesLbcVendues((vrows[0] && vrows[0].data && vrows[0].data.ventes) || {});
       const liens = { ...(load('vrm_lbc_liens', {}) || {}) };
       const liste = [];
       for (const ad of Object.values(items || {})) {
@@ -37090,7 +37133,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   })(); return () => { stop = true; }; }, []);
   useEffect(() => { let stop = false; (async () => {
     try {
-      const lu = await lireEbayTous('ebay_listings', 'items:data->items', 'items');
+      const lu = await lireEbayTous('ebay_listings', SEL_EBAY_ANNONCES, 'items');
       if (!lu || stop) return;
       const set = new Set(); const liste = [];
       for (const x of lu.items) { const c = numEbayLu(x && x.sku, x && x.itemId, null, x && x.depuis); if (c) set.add(cleNum(c)); liste.push({ numero: c || '', title: (x && x.title) || '', photo: (x && x.photo) || null }); }
@@ -37107,11 +37150,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       const postedDepuis = (rows && rows[0] && rows[0].data && rows[0].data.updatedAt) || '';
       if (Array.isArray(ids)) setLbcPosted(new Set(ids.map(String)));
       if (!Array.isArray(ids) || !ids.length) return;
-      const vr = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.lbc_ventes&select=ventes:data->ventes`, { headers: sbAuth() });
+      const vr = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.lbc_ventes&select=data`, { headers: sbAuth() });
       if (!vr.ok) return;
       const vrows = await vr.json();
       if (!Array.isArray(vrows)) return;
-      const ventes = (vrows[0] && vrows[0].ventes) || {};
+      const ventes = (vrows[0] && vrows[0].data && vrows[0].data.ventes) || {};
       setLbcVentesAnn(ventes);
       // Les annonces Leboncoin : la lecture de SESSION (déjà faite pour le Stock,
       // gardée 10 min — aucun octet de plus), puis la MÊME preuve que l'écran
@@ -37191,7 +37234,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // TEMPS et sont posés dans le même rendu (un rendu de plus au démarrage
     // coûtait au téléphone — banc `vitesse.cjs`).
     const [r, rm, rv] = await Promise.all([
-      lireEbayTous('ebay_orders', 'orders:data->orders,capturedAt:data->>capturedAt', 'orders'),
+      lireEbayTous('ebay_orders', SEL_EBAY_COMMANDES, 'orders'),
       only === 'journee' ? lireEbayParCompte('ebay_messages', 'n:data->>nonLus,complet:data->>complet,capturedAt:data->>capturedAt') : Promise.resolve(undefined),
       (only === 'journee' || only === 'bordereaux') ? lireVestiaireColis() : Promise.resolve(undefined),
     ]);
@@ -39643,8 +39686,19 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       setReservesNum((v) => (memes(v, n) ? v : n));
     } catch (_) { setReservesNum((v) => (v === undefined ? null : v)); }
   };
+  // (31 oct., banc vitesse) Relue quand l'ENSEMBLE des annonces change, pas à
+  // chaque nouvelle référence de la liste (la liste du cache puis la lecture
+  // fraîche rendent les mêmes annonces : deux lectures par ouverture d'écran) —
+  // la même règle que la table « qui remplace qui » juste en dessous.
+  const cleAnnoncesReserves = useMemo(() => (Array.isArray(listings.items) ? listings.items.map((i) => String(i && i.id)).sort().join(',') : null), [listings.items]);
+  const cleReservesLue = useRef(undefined);
+  useEffect(() => {
+    const avant = cleReservesLue.current; cleReservesLue.current = cleAnnoncesReserves;
+    if (avant === null && cleAnnoncesReserves != null) return;
+    if (avant !== undefined && avant === cleAnnoncesReserves) return;
+    relireReservesNum();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { relireReservesNum(); }, [listings.items]);
+  }, [cleAnnoncesReserves]);
   // (28 oct.) Qui remplace qui après une republication : `vinted_brouillon_*`
   // (ancienId, itemId) et `coffre_*_*` (recreeDe), écrits par l'extension. Trois
   // états : undefined pas encore lu (on attend) · null pas su (comme avant) · objet.
@@ -41031,7 +41085,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       if (c.v !== undefined && Date.now() - c.at < 10 * 60 * 1000) { if (vivant) setRetoursEbayLus(c.v); return; }
       let v;
       try {
-        const r = await lireEbayTous('ebay_orders', 'orders:data->orders', 'orders');
+        const r = await lireEbayTous('ebay_orders', SEL_EBAY_COMMANDES, 'orders');
         if (!r) v = null;
         else {
           const relies = (r.lignes || []).filter(l => l && l.ligne);
@@ -42438,7 +42492,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const sonde = async () => {
       if (document.hidden || !ecrans.includes(curSub)) return;
       try {
-        const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.harvest_%25_orders_sold&select=id,cap:meta->>capturedAt`, { headers: sbAuth() });
+        // (31 oct.) Même orthographe (`*`) que l'âge des ventes lu par la coque :
+        // une adresse, donc une lecture partagée (`lecturesPartagees`).
+        const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.harvest_*_orders_sold&select=id,cap:meta->>capturedAt`, { headers: sbAuth() });
         if (!r.ok) return;
         const rows = await r.json(); if (!Array.isArray(rows)) return;
         let bouge = null;
@@ -46474,7 +46530,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             return (
               // Ligne de vente dans la liste groupée (filet fin entre les lignes,
               // pas de carte encadrée séparée — style démo, comme Achats).
-              <LigneVenteCompacte numerosArticle={num?[num]:[]} plateforme="vinted" photo={photo} photoNoeud={photo?<PhotoVenteSources {...photoSourcesProps} data-photo-vente="ligne" style={{width:28,height:36,borderRadius:8,objectFit:'cover',flexShrink:0}}/>:null} titre={(()=>{ const t=String((e&&e.size)||o.size||'').trim(); const nom=t&&!tailleDansTitre(o.title,t)?`${o.title} · taille ${t}`:o.title; return num?`N°${num} · ${nom}`:nom; })()}
+              <LigneVenteCompacte montantCentimes={sell!=null?Math.round(sell*100):undefined} numerosArticle={num?[num]:[]} plateforme="vinted" photo={photo} photoNoeud={photo?<PhotoVenteSources {...photoSourcesProps} data-photo-vente="ligne" style={{width:28,height:36,borderRadius:8,objectFit:'cover',flexShrink:0}}/>:null} titre={(()=>{ const t=String((e&&e.size)||o.size||'').trim(); const nom=t&&!tailleDansTitre(o.title,t)?`${o.title} · taille ${t}`:o.title; return num?`N°${num} · ${nom}`:nom; })()}
                 gestes={(!hidden && st!=='cancelled' && buy==null && !(e && e.buyFromId)) ? <CoutAchatVente surLigne onSaisir={p=>setSaleOverride(o.transaction_id,{buyPrice:p})}
                   onRelier={()=>{ const idf = identiteAnnonce(o); openPicker(idf ? { id: idf, title: o.title, photo: photo, price: sell, _acc: o._acc } : { id: '_v'+o.transaction_id, _saleTx: String(o.transaction_id), title: o.title, photo: photo, price: sell, _acc: o._acc }); }}/> : null} sous={[o.date?new Date(o.date).toLocaleDateString('fr-FR',{day:'numeric',month:'short'}):'', (o._acc && !ventesUnCompte) ? accNameOf(o._acc) : ''].filter(Boolean).join(' · ')} etat={venteStage(o).label} ton={st!=='cancelled' && aExpedier(o) && !isShipDone(o) ? 'action' : (st==='cancelled' ? 'annule' : '')} montant={sell!=null?`${Number.isInteger(sell)?sell:sell.toFixed(2).replace('.',',')} ${cur(o.price?.currency_code)}`:'—'} className="vrm-sale-row" key={o.transaction_id} data-tx={String(o.transaction_id)} style={{borderTop:i>0?`1px solid ${C.border}`:'none',opacity:hidden?0.5:(st==='cancelled'?0.6:1),padding:'12px 14px',display:'flex',flexDirection:'column',gap:10,...(estFloute(o)?STYLE_FLOU:null)}}>
                {/* ── Haut : photo · titre + méta · prix ─────────────────────── */}
@@ -52726,11 +52782,12 @@ async function lbcAnnoncesSession() {
 async function lbcListingsSession() {
   if (_lbcAnnoncesSession && Date.now() - _lbcAnnoncesSession.t < 10 * 60000) return _lbcAnnoncesSession;
   try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.lbc_listings&select=data`, { headers: sbAuth() });
+    // (31 oct.) Projetée (§4.4) : les deux champs lus, jamais `select=data`.
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.lbc_listings&select=items:data->items,lectures:data->lectures`, { headers: sbAuth() });
     if (!r.ok) return null;
     const rows = await r.json();
     if (!Array.isArray(rows)) return null;
-    const d = (rows[0] && rows[0].data) || {};
+    const d = rows[0] || {};
     _lbcAnnoncesSession = { t: Date.now(), items: d.items || {}, lectures: d.lectures || {} };
     return _lbcAnnoncesSession;
   } catch (_) { return null; }
@@ -53904,14 +53961,15 @@ function LeboncoinScreen() {
     // reconnaître TOUT SEUL ce qui est déjà en ligne là-bas, via la référence
     // pro (CustomRef) ou le « nXXXX » du titre — même logique que l'extension,
     // pour que les deux écrans racontent la même chose.
-    const lbcRows = await sbGet('app_data?id=eq.lbc_listings&select=data');
+    // (31 oct.) Projetée (§4.4) : les annonces et les dates des listes complètes.
+    const lbcRows = await sbGet('app_data?id=eq.lbc_listings&select=items:data->items,lectures:data->lectures');
     // ⚠️ « jamais capté » n'est pas « zéro annonce » : sans cette ligne, le
     //    rapprochement par référence est impossible, donc « vendue sur Vinted →
     //    à retirer » ne peut RIEN trouver. L'écran doit le dire, pas afficher 0.
     // « jamais capté » = aucune annonce QUI SOIT À LUI (la ligne peut exister et
     // ne contenir que des annonces d'autres).
     const lbcJamaisLu = lbcRows !== null && !(lbcRows && lbcRows[0]);
-    const lbcItems = (lbcRows && lbcRows[0] && lbcRows[0].data && lbcRows[0].data.items) || {};
+    const lbcItems = (lbcRows && lbcRows[0] && lbcRows[0].items) || {};
     const lbcAds = Object.values(lbcItems).filter(Boolean);
     // Ses ventes Leboncoin PROUVÉES (il est le vendeur) : elles disent quels
     // comptes Leboncoin sont les siens, et quelles paires sont déjà parties.
@@ -53948,7 +54006,7 @@ function LeboncoinScreen() {
     // l'écran le dit, une fois. Et les N° dont l'annonce est sortie : plus rien
     // à retirer pour eux (même règle que le tableau de bord, §11).
     const sortiesLbc = lbcAds.filter((ad) => aLui(ad) && !vendusLbc.has(String(ad.id)) && lbcSortieDe(ad));
-    const lecturesLbc = (lbcRows && lbcRows[0] && lbcRows[0].data && lbcRows[0].data.lectures) || {};
+    const lecturesLbc = (lbcRows && lbcRows[0] && lbcRows[0].lectures) || {};
     // La preuve qu'aucune autre annonce de la paire n'est en ligne : une liste
     // complète de chacun de ses comptes, postérieure à la marque « publiée ».
     // Comptes, ventes ou annonces illisibles ⇒ pas de preuve (pas su ≠ sorti).
@@ -59056,7 +59114,7 @@ function AppCoeur() {
       const liens=load('vrm_lbc_liens',{})||{}; if(lbcVentes.some(x=>x.itemId!=null&&!liens[String(x.itemId)])) lbcItems=await lbcAnnoncesSession(); }
     let ebayCommandes=null, ebayAnnonces=null;
     if(Array.isArray(cE)){ const tous=async(base,sel,champ)=>{ const r=await lireEbayTous(base,sel,champ,cE); return (!r||r.illisibles.length)?null:r.items; };
-      [ebayCommandes, ebayAnnonces]=await Promise.all([tous('ebay_orders','orders:data->orders','orders'), tous('ebay_listings','items:data->items','items')]); }
+      [ebayCommandes, ebayAnnonces]=await Promise.all([tous('ebay_orders',SEL_EBAY_COMMANDES,'orders'), tous('ebay_listings',SEL_EBAY_ANNONCES,'items')]); }
     if(vivant) setNumData({enLigne,aConfirmer,masquees,ventes,txnItem,bordereaux,lbcVentes,lbcItems,ebayCommandes,ebayAnnonces,plan});
   })(); return ()=>{ vivant=false; }; /* eslint-disable-next-line */ },[gsOpen,revisionFiche]);
   const swipeStart=React.useRef(null); // pour le swipe entre onglets du bas
@@ -59371,7 +59429,7 @@ function AppCoeur() {
   const [ebayCmdTous,setEbayCmdTous]=useState(undefined);
   useEffect(()=>{ if (comptesEbay === undefined) return; let stop=false; (async()=>{
     if (comptesEbay === null) { setEbayCmdTous(null); setEbayCommandes(null); return; }
-    const r = await lireEbayTous('ebay_orders', 'orders:data->orders', 'orders', comptesEbay);
+    const r = await lireEbayTous('ebay_orders', SEL_EBAY_COMMANDES, 'orders', comptesEbay);
     if (stop) return;
     setEbayCmdTous(r);
     const orders = (!r || r.illisibles.length) ? null : r.items;
@@ -60259,7 +60317,9 @@ function AppCoeur() {
       let sortisN=new Set();         // N° dont l'annonce LBC est SORTIE (plus en ligne) — partagé par les deux comptes « à retirer »
       let postedDepuis='';
       try{
-        const r=await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vinted_lbc_posted&select=data`,{headers:sbAuth()});
+        // (31 oct.) La cloche est un passage de FOND : elle accepte la réponse
+        // partagée d'il y a quelques secondes (`vrmFond`, src/lecturesPartagees.js).
+        const r=await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vinted_lbc_posted&select=data`,{headers:sbAuth(),vrmFond:true});
         if(r.ok){ const rows=await r.json(); const posted=(rows&&rows[0]&&rows[0].data&&rows[0].data.ids)||[]; postedIds=posted; postedDepuis=(Array.isArray(rows)&&rows[0]&&rows[0].data&&rows[0].data.updatedAt)||''; }
       }catch(_){}
       // ── ET L'AUTRE SENS : VENDUE SUR LEBONCOIN, ENCORE EN VENTE SUR VINTED ──
@@ -60273,7 +60333,7 @@ function AppCoeur() {
       // `undefined` = pas lu · `null` = pas su · objet = lu.
       let ventesLbcLu=null, lbcItemsLu=undefined;
       try{
-        const r=await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.lbc_ventes&select=data`,{headers:sbAuth()});
+        const r=await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.lbc_ventes&select=data`,{headers:sbAuth(),vrmFond:true});
         if(r.ok){
           const rows=await r.json();
           const ventesL=(rows&&rows[0]&&rows[0].data&&rows[0].data.ventes)||{};
@@ -60307,7 +60367,7 @@ function AppCoeur() {
           // vente prouvée), la date de chaque liste complète, la marque
           // « publiée ». Comptes ou ventes illisibles ⇒ pas de preuve.
           let preuve=null;
-          if(ventesLbcLu){ try{ const ra=await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.lbc_accounts&select=data`,{headers:sbAuth()}); if(ra.ok){ const rows=await ra.json(); if(Array.isArray(rows)){ const accs=(rows[0]&&rows[0].data&&rows[0].data.accounts)||{}; preuve={lectures:ls.lectures||{}, comptes:new Set([...comptesLbcProuves(ventesLbcLu,items),...comptesLbcSession(accs)]), depuis:postedDepuis}; } } }catch(_){} }
+          if(ventesLbcLu){ try{ const ra=await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.lbc_accounts&select=data`,{headers:sbAuth(),vrmFond:true}); if(ra.ok){ const rows=await ra.json(); if(Array.isArray(rows)){ const accs=(rows[0]&&rows[0].data&&rows[0].data.accounts)||{}; preuve={lectures:ls.lectures||{}, comptes:new Set([...comptesLbcProuves(ventesLbcLu,items),...comptesLbcSession(accs)]), depuis:postedDepuis}; } } }catch(_){} }
           sortis=numerosLbcSortis(items, liensR, ventesLbcLu?annoncesLbcVendues(ventesLbcLu):null, preuve).prouves;
           sortisN=sortis;
         }
@@ -60343,11 +60403,11 @@ function AppCoeur() {
         // dépend pas du compte affiché. Un compte illisible ⇒ cette source vaut
         // « pas su » (aucune alerte inventée, aucune manquée en silence).
         const cE=await lireComptesEbay();
-        const tousE=async(base,sel,champ)=>{ const r=await lireEbayTous(base,sel,champ,cE||undefined); return (!r||r.illisibles.length)?null:r.items; };
+        const tousE=async(base,sel,champ)=>{ const r=await lireEbayTous(base,sel,champ,cE||undefined,true); return (!r||r.illisibles.length)?null:r.items; };
         const [ords, annE, progE]=Array.isArray(cE)?await Promise.all([
-          tousE('ebay_orders','orders:data->orders','orders'),
-          tousE('ebay_listings','items:data->items','items'),
-          tousE('ebay_programmees','items:data->items','items'),
+          tousE('ebay_orders',SEL_EBAY_COMMANDES,'orders'),
+          tousE('ebay_listings',SEL_EBAY_ANNONCES,'items'),
+          tousE('ebay_programmees',SEL_EBAY_PROGRAMMEES,'items'),
         ]):[null,null,null];
         if(ords) ebayShipCount=ords.filter(o=>String((o&&o.orderPaymentStatus)||'').toUpperCase()==='PAID' && String((o&&o.orderFulfillmentStatus)||'').toUpperCase()!=='FULFILLED').length;
         // ── ET L'ANTI DOUBLE VENTE eBay (5 octobre) : la MÊME règle que l'écran

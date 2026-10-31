@@ -15,6 +15,7 @@
 //   · le tableau de bord dit la même chose (même règle, §11) ;
 //   · aucun débordement, aucune erreur.
 const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
+const { monterTiroirs } = require('./_tiroirs.cjs');
 const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http'), path = require('path');
 const DIST = path.join(__dirname, '..', '..', 'dist');
@@ -217,6 +218,9 @@ const projette = (row, sel) => {
       await pg.waitForTimeout(400);
       // Le N° est sur la carte compacte (titre) ; le bénéfice vit dans le tiroir
       // de détail (portail), comme pour une vente Vinted — même composant partagé.
+      // (31 oct.) Ce tiroir n'est monté qu'à la première ouverture : on ouvre
+      // chaque vente, comme une personne, avant de lire (`_tiroirs.cjs`).
+      await monterTiroirs(pg, '[data-lbc-vente]');
       const ven = await pg.evaluate(() => ({
         titres: [...document.querySelectorAll('.vrm-ledger-sale-title')].map((e) => e.textContent.trim()),
         benefs: [...document.querySelectorAll('[data-lbc-benef]')].map((e) => e.getAttribute('data-lbc-benef')),

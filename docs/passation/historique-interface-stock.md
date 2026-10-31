@@ -1855,3 +1855,67 @@ D masquer/remettre dans Ma journée) 62 verts ; `journee-widgets` (K mis à jour
 par défaut avec « tendances ») 167 verts ; `journee-premium`, `stats-premium`,
 `stats-compta`, `benefice-brut-net`, `reglages-premium`, `chiffres-croises` verts.
 Captures regardées (390/1512, clair/sombre).
+## 31 octobre 2026 — Vitesse : le tiroir des ventes à l'ouverture, les lectures en double du démarrage
+
+**1. Le tiroir d'une vente n'est monté qu'à sa première ouverture, puis gardé**
+(`LigneVenteCompacte`). Depuis le 21 oct. chaque ligne (Vinted, Leboncoin, eBay)
+montait d'avance son tiroir complet, caché (photo, coûts, bordereau, facture,
+`EbayCommande`) : l'essentiel du rendu différé d'une lettre tapée dans Ventes.
+Fermé, il n'existait que `hidden` : rien de visible ne change. Le montant de la
+ligne porte aussi `data-prix-vente` (centimes) : il y était déjà affiché.
+Banc `ventes-frappe` (lancé seul, machine partagée) : processeur « tout compris »
+des 21 lettres 6,4 s → 4,8 s (−25 %), éléments `.vrm-sale-row` recréés par frappe
+78/106/120 → 39/53/60 (deux par vente avant : la ligne et la copie du tiroir).
+Le temps jusqu'à l'image de la frappe (rendu URGENT, plancher 90 ms) ne bouge pas
+(60 → 58 ms) : depuis le 16 oct. le rendu urgent ne recrée aucune ligne ; le tiroir
+pesait sur le rendu DIFFÉRÉ qui suit. Les « ~80 ms » vus avant venaient de la charge
+de la machine (75 ms mesuré pendant qu'un autre banc tournait). Les bancs qui lisaient un tiroir FERMÉ l'ouvrent d'abord, comme une
+personne : `scripts/bancs/_tiroirs.cjs` (`monterTiroirs` : clic, attente de l'état,
+second clic) — `ventes-bordereau`, `deux-extensions`, `pont`, `statuts-colis`,
+`double-vente`. Aucun contrôle affaibli : ce qui était jugé « absent d'un tiroir »
+(pas de bordereau sur 9002, pas de bénéfice sur la vente non reliée) l'est sur un
+tiroir réellement monté.
+
+**2. Banc `vitesse` : ce que chaque lecture coûtait, et ce qui a été retiré.**
+Mesuré lecture par lecture (pile d'appel sur un build non minifié) :
+- `lecturesPartagees` : une écriture de LIGNES NOMMÉES de `app_data` (upsert avec
+  `id`, PATCH/DELETE `id=eq.`/`in.`) ne vide plus que les lectures qui peuvent les
+  porter (`idsEcrits`, `lecturePeutPorter`) ; `main`, un `like`, une autre table, un
+  corps illisible vident tout comme avant. Les publications `widget_stats` et
+  `lbc_a_retirer` du démarrage faisaient relire `lbc_ventes`, `ebay_*`…
+- Un passage de FOND déclaré (`vrmFond: true` : la cloche, l'agent eBay en fond)
+  accepte une réponse réussie de moins de 15 s (`FENETRE_FOND_MS`), jamais d'avant
+  une écriture de la ligne ni un signal de l'extension. Un écran garde 2 s.
+- `POST /api/compte?mode=photo` (lecture d'une photo du CDN, n'écrit rien) le déclare
+  (`vrmInvalideSiChange`) : ses douze appels sur Ventes vidaient le partage.
+- Une projection par ligne eBay (`SEL_EBAY_COMMANDES/ANNONCES/PROGRAMMEES`) :
+  `ebay_orders` partait sous quatre projections, `ebay_listings` trois.
+- `lbc_ventes` en `select=data` partout (la ligne ne porte que `ventes` et sa date).
+- `harvest_*_orders_sold` : une orthographe (`*`), plus `%` d'un côté.
+- « Comptes sans email » : UNE lecture `email_*` au lieu de sept à la suite.
+- `panel_num_reserves` relue quand l'ENSEMBLE des annonces change (comme la table
+  « qui remplace qui »), plus à chaque référence neuve de la liste.
+- L'agent eBay en fond relit la fraîcheur de son résumé APRÈS le nuage.
+- `lbc_listings` projetée (`items`, `lectures`) au lieu de `select=data` (§4.4) ;
+  `api/email-inbound.js` la projetait déjà.
+Contrôle : `audit-lectures-partagees.cjs` §11-12 (+5 mutations, rouge sur l'ancien
+`lecturesPartagees.js`).
+
+**Avant → après** (lectures de la base, 390 / 1512 px ; plafonds inchangés) :
+Ma journée 73/71 → 63/61 (plafond 62) · Ventes 87/90 → 76/74 (82) · Colis 88/86 →
+78/76 (82) · Annonces 75/72 → 68/65 (66) · Achats 89/85 → 75/73 (78) · Messages
+77/75 → 69/67 (68) · Statistiques 71/70 → 65/63 (60) ; identiques refaites 3-8 → 0-1.
+Restent rouges : Ma journée 390, Annonces 390, Messages 390, Statistiques (et ses
+3 balayages), « brouillons eBay lus sur Ma journée » — tous par l'agent en fond
+ci-dessous.
+
+**Reste au-dessus, à trancher par Julien** : l'agent eBay en FOND
+(`AgentEbayFond`, une fois toutes les 20 h, sur tout écran sauf l'agent ; son résumé
+sert la cloche et la notification du matin) lit ~8 lignes que personne d'autre ne lit
+à l'ouverture : `ebay_brouillons`, `ebay_programmees` (complet), la famille des
+transactions une 2ᵉ fois (preuve de vente, 2 pages — le 3ᵉ balayage de Statistiques
+avec le pays des acheteurs), `harvest_*_label_*`, `harvest_*_orders_sold` (216 Ko),
+`vinted_item_details` (103 Ko), `coffre_*` (668 Ko). Sans lui (résumé de moins de
+20 h, le cas courant), Ma journée, Annonces, Messages et Statistiques passent sous
+leurs plafonds. Ses lectures sont utiles (anti double vente de la proposition) : on
+ne les a pas retirées. `relais_ext` ×2 : le battement du relais (voulu).

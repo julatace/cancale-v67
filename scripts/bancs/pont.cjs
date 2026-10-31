@@ -52,6 +52,7 @@
 //     déconnecter » puis reconnexion à VRM → reconnectée.
 const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
 const { metaVersData } = require('./_meta.cjs');
+const { monterTiroirs } = require('./_tiroirs.cjs');
 const { execFileSync } = require('child_process');
 const fs = require('fs'), http = require('http'), path = require('path');
 const DIST = path.join(__dirname, '..', '..', 'dist');
@@ -290,6 +291,9 @@ async function rendre(b, { mode, connecte, tel = false, vrm = null, session = fa
   });
   await pg.goto(`http://localhost:${PORT}${url}`, { waitUntil: 'domcontentloaded' });
   await pg.waitForTimeout(attente != null ? attente : mode === 'muette' ? 17000 : mode === 'orphelin' ? 9000 : mode === 'lent' ? 6000 : 3500);
+  // (31 oct.) Le tiroir d'une vente n'est monté qu'à sa première ouverture :
+  // on ouvre chaque vente, comme une personne, avant de lire ses boutons (`_tiroirs.cjs`).
+  if (/[?&]tab=cat_ventes\b/.test(url)) { await pg.waitForSelector('.vrm-sale-row[data-tx]', { state: 'attached', timeout: 15000 }).catch(() => {}); await monterTiroirs(pg); }
   const lire = () => pg.evaluate(() => ({
     boutons: [...document.querySelectorAll('[data-bouton-bord]')].map((x) => ({ etat: x.getAttribute('data-bouton-bord'), tx: x.getAttribute('data-tx'), txt: x.innerText })),
     raisons: [...document.querySelectorAll('[data-raison-bord]')].map((x) => x.getAttribute('data-raison-bord') + ' | ' + x.innerText),
