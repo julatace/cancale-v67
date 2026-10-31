@@ -13,7 +13,7 @@ node scripts/zip-extension.cjs --store VRM-chromium.zip --firefox VRM-firefox.zi
 | **Brave**, **Arc**, **Vivaldi** | ✅ | ❌ | `VRM-chromium.zip` | ils installent depuis le Chrome Web Store |
 | **Opera** | ✅ | ❌ | `VRM-chromium.zip` | Opera Add-ons |
 | **Yandex Browser** | ✅ (Chromium) | ⚠️ « Alpha », expérimental | `VRM-chromium.zip` | Chrome Web Store |
-| **Firefox** | ✅ | ✅ **Android** (Firefox 128+) | `VRM-firefox.zip` | addons.mozilla.org |
+| **Firefox** | ✅ | ✅ **Android** (Firefox 140+, Android 142+ — 31 oct., validateur de Mozilla 10.15 : 0 erreur, 0 avertissement) | `VRM-firefox.zip` | addons.mozilla.org |
 | **Orion** (Kagi) | ⚠️ non essayé | ⚠️ **iPhone**, non essayé — voir plus bas | `VRM-firefox.zip` (conseillé) ou `VRM-chromium.zip` | addons.mozilla.org ou Chrome Web Store |
 | **Safari** | ⚠️ app conteneur | ⚠️ app conteneur | `VRM-safari.zip` (dossier à convertir) | App Store, après Xcode + compte Apple |
 | **Samsung Internet** | — | ❌ programme d'extensions fermé | — | — |
