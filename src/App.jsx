@@ -17758,6 +17758,16 @@ const LigneVenteVinted = React.memo(function LigneVenteVinted({ o, i, pre, rendr
     return true;
   });
 
+// (31 oct., banc ventes-frappe) Un bloc de l'écran qui ne dépend PAS de la
+// lettre tapée (les « Vérifications » sous la liste : bilan de synchro, comptes
+// comparés, fiabilité). Au rendu URGENT d'une frappe (`gel` : la recherche a
+// changé, la liste affichée est encore l'ancienne), il garde sa sortie : ses
+// calculs sur toutes les ventes (`comparerComptes`…) doublaient le processeur
+// d'une lettre (49 → 92 ms, ×4, même charge). Le rendu différé qui suit
+// (`gel` faux) le redessine avec tout — la même règle que `LigneVenteVinted`.
+const GelPendantFrappe = React.memo(function GelPendantFrappe({ rendre }) { return rendre(); },
+  (avant, apres) => apres.gel === true);
+
 function PhotoArticleAgrandissable({src,titre,children}) {
   const url=photoArticle({photo:src});
   const [ouverte,setOuverte]=useState(false);
@@ -46026,10 +46036,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             première vente il y avait huit blocs empilés. Ils restent tous là, repliés. */}
         <section className="vrm-ventes-controles" data-ventes-controles="" style={{display:'flex',flexDirection:'column',gap:8,margin:'16px 0 12px'}}>
           <h3 data-titre-section="" style={{fontSize:15,fontWeight:600,color:C.text,letterSpacing:-0.15,margin:'0 2px'}}>Vérifications</h3>
+  <GelPendantFrappe gel={ordSearch!==ordSearchDiff} rendre={()=><>
   <BilanSynchronisation owner={AUTH.user?.id||''} sources={sourcesBilan} onNav={onNav}/>
   <VendusAilleurs owner={AUTH.user?.id||''} ownerActuel={()=>AUTH.user?.id||''} charger={chargerRetraitsMulti} onNav={onNav} PhotoVinted={PhotoVinted}/>
         <ComparaisonComptesVinted rows={comparerComptes({comptes:accounts.filter(a=>!acctOff(a.vinted_user_id)).map(a=>({uid:String(a.vinted_user_id),nom:accName(a)})),ventes:sales.items||[],stock:(listings.items||[]).filter(it=>!acctOffOf(it)&&!blockedAccts.has(String(it._acc?.vinted_user_id))&&!soldManual.has(String(it.id))&&!annoncesVendues.has(String(it.id))),dansPeriode:o=>dansPeriode(o,periode),finalisee:o=>classifyOrderStatus(o.status)==='completed',masquee:isHidden,meta:effEntry,aFaire:o=>aExpedier(o)&&!isShipDone(o)})} periode={libellePeriode(periode)} disponible={Array.isArray(sales.items)&&!sales.loading&&!sales.error&&!(sales.failedUids||[]).some(u=>!acctOff(u))} stockDisponible={Array.isArray(listings.items)&&!listings.loading&&!listings.error&&!listings.incomplet} charger={()=>{loadOrders('sold',setSales,true);loadListings(true);}}/>
         <FiabiliteVentes partiel={nomsVentesKO.length>0} perimetre="Vinted · ventes finalisées, hors ventes masquées" lignes={ventesAffichees.map(o=>{const e=effEntry(o),b=beneficePaire(o.price?.amount,e);return {incluse:!isHidden(o)&&venteFinalisee(o),supporte:o.price?.currency_code==='EUR',achatConnu:b.achat!=null,prixConnu:b.vente!=null,valide:b.valid,fraisConfirmes:b.complet};})}/>
+  </>}/>
         </section>
         <div className="vrm-sales-analysis">
         {(totals.nb>0) && (

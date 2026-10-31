@@ -141,8 +141,14 @@ const estAccent = (s) => { const r = lireRgb(s); return !!r && r.a > 0.5 && ACCE
 const lum = (s) => { const r = lireRgb(s); if (!r) return null; const f = (v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; }; return 0.2126 * f(r.c[0] * r.a) + 0.7152 * f(r.c[1] * r.a) + 0.0722 * f(r.c[2] * r.a); };
 
 // Les groupes segmentés visés : leur bouton actif, son fond, et la classe du groupe.
+// (31 oct.) Un groupe se trouve par son NOM, ou par un attribut machine de ses
+// boutons (`{ sel }`) : le nom de la période de Compta a changé le 29 oct.
+// (« Période du chiffre d'affaires », une période par carte) — la règle jugée
+// (le contrôle segmenté commun, sans fond d'accent) n'a pas bougé.
 const segments = (pg, label) => pg.evaluate((label) => {
-  const g = [...document.querySelectorAll('[role="group"]')].find((e) => e.getAttribute('aria-label') === label);
+  const g = typeof label === 'object' && label
+    ? (() => { const b = document.querySelector(label.sel); return b ? b.closest('[role="group"]') : null; })()
+    : [...document.querySelectorAll('[role="group"]')].find((e) => e.getAttribute('aria-label') === label);
   if (!g) return null;
   const on = g.querySelector('button[aria-pressed="true"]');
   return { classe: g.className, fond: on ? getComputedStyle(on).backgroundColor : null, n: g.querySelectorAll('button').length };
@@ -150,6 +156,7 @@ const segments = (pg, label) => pg.evaluate((label) => {
 
 const jugerSegment = async (pg, label, ecran) => {
   const s = await segments(pg, label);
+  if (typeof label === 'object') label = label.nom;
   dit(!!s, `${ecran} : le choix « ${label} » est rendu`);
   if (!s) return;
   dit(!estAccent(s.fond), `${ecran} : le segment actif de « ${label} » n'est pas bleu plein (§7)`, s.fond);
@@ -226,6 +233,10 @@ const jugerSegment = async (pg, label, ecran) => {
       const { ctx, pg } = await ouvrir(b, TEL, 'journee');
       await pg.waitForFunction(() => /Dernières ventes/i.test(document.body.innerText), null, { timeout: 15000 });
       await pg.waitForTimeout(1200);
+      // (31 oct.) Mesurer un écran POSÉ : les entrées animées (`vrm-fx-monte`…) d'un
+      // écran qui vient d'arriver rendent une hauteur en cours de transformation
+      // (43 px lus sur une machine chargée). On attend la fin des animations finies.
+      await pg.waitForFunction(() => document.getAnimations().every((a) => a.playState !== 'running' || !Number.isFinite(a.effect && a.effect.getComputedTiming().endTime)), null, { timeout: 8000 }).catch(() => {});
       const m = await pg.evaluate(() => {
         const lab = [...document.querySelectorAll('.vrm-label')].find((e) => /Dernières ventes/i.test(e.textContent));
         const ligne = lab && lab.parentElement; const bt = ligne && ligne.querySelector('button');
@@ -250,7 +261,7 @@ const jugerSegment = async (pg, label, ecran) => {
     await essaie('Compta 1512', async () => {
       const { ctx, pg } = await ouvrir(b, PC, 'compta');
       await pg.waitForFunction(() => !!document.querySelector('[data-ca-choix]'), null, { timeout: 15000 });
-      await jugerSegment(pg, 'Période', 'Compta');
+      await jugerSegment(pg, { sel: '[data-ca-choix]', nom: 'Période' }, 'Compta');
       await ctx.close();
     });
     await essaie('Réglages 1512', async () => {
@@ -276,7 +287,11 @@ const jugerSegment = async (pg, label, ecran) => {
     await essaie('Sombre Colis', async () => {
       const { ctx, pg } = await ouvrir(b, TEL, 'cat_bord', true);
       await pg.waitForFunction(() => document.querySelectorAll('.vrm-colis-carte').length > 0, null, { timeout: 15000 });
-      await pg.waitForTimeout(1200);
+      // (31 oct.) « Tout générer » n'apparaît qu'une fois la lecture des bordereaux
+      // COMPLÈTE (labelsPrets) : on attend le bouton, pas un délai fixe (§6.5) —
+      // sur une machine chargée, 1,2 s ne suffisait pas et le contrôle lisait `null`.
+      await pg.waitForFunction(() => !!document.querySelector('[data-tout-generer]'), null, { timeout: 15000 }).catch(() => {});
+      await pg.waitForTimeout(400);
       const m = await pg.evaluate(() => {
         const logo = document.querySelector('.vrm-header-logo > img, img[alt="VRM"]');
         const tg = document.querySelector('[data-tout-generer="grise"]');

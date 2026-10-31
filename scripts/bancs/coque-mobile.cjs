@@ -140,7 +140,16 @@ const finDePage = (pg) => pg.evaluate(async () => {
   const main = document.querySelector('.vrm-main');
   const nav = document.querySelector('.vrm-mobile-nav');
   if (!main || !nav) return { ok: true, det: 'pas de barre' };
-  main.scrollTop = main.scrollHeight; await new Promise((r) => setTimeout(r, 400));
+  // (31 oct.) Le bout de la zone, une fois POSÉ : sur une machine chargée, des
+  // photos et des cartes arrivent encore après le premier défilement et allongent
+  // la page — on mesurait alors un contenu qui venait de pousser sous la barre
+  // sans qu'on ait défilé jusqu'à lui. On redéfile jusqu'à ce que la hauteur tienne.
+  let h0 = -1;
+  for (let k = 0; k < 15; k++) {
+    main.scrollTop = main.scrollHeight; await new Promise((r) => setTimeout(r, 400));
+    if (main.scrollHeight === h0 && Math.abs(main.scrollTop + main.clientHeight - main.scrollHeight) <= 1) break;
+    h0 = main.scrollHeight;
+  }
   const haut = nav.getBoundingClientRect().top;
   // Le bas VISIBLE d'un élément : on retranche ce que ses ancêtres coupent
   // (un repli fermé, une rangée qui défile, une carte `overflow:hidden`).
