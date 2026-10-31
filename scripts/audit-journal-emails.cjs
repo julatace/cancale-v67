@@ -255,11 +255,11 @@ const LIGNE_J = { owner: J, data: { adresses: { 'recu@vrm.center': { owner: J } 
     const c = L({ v: 1, t: 'suivi', s: '12345678', st: 'available', code: '418205', lieu: 'Relais Tabac du Port' });
     dit(c.quoi === 'Code de retrait 418 205 chez Relais Tabac du Port' && c.fait === 'Rangé avec le colis n° 12345678' && c.lien.tab === 'cat_bord' && c.de === 'Vinted', 'code de retrait : « Code de retrait 418 205 chez … »', JSON.stringify(c));
     const lv = L({ v: 1, t: 'suivi', s: 'XX1', st: 'delivered' }, { from: 'Chronopost <x@chronopost.fr>' });
-    dit(lv.quoi === 'Colis livré' && lv.de === 'Chronopost' && lv.lien.tab === 'cat_achats', 'colis livré : de Chronopost, lien Achats', JSON.stringify(lv));
+    dit(lv.quoi === 'Colis livré' && lv.de === 'Chronopost' && lv.lien.tab === 'achats', 'colis livré : de Chronopost, lien Achats', JSON.stringify(lv));
     const ss = L({ v: 1, t: 'suivi', st: 'available', av: 'sans-suivi' });
     dit(ss.etat === 'verifier' && /n° de suivi/.test(ss.raison) && !ss.cible, 'colis sans n° : « à vérifier », relié à rien');
     const a = L({ v: 1, t: 'achat', tx: '98765432101', a: 'Nike Air Force 1', px: '45,00', id: 'email_achat_abc' });
-    dit(a.etat === 'range' && a.quoi === 'Reçu d’achat · Nike Air Force 1 (45,00 €)' && a.fait === 'Reçu rangé avec ton achat n° 98765432101' && a.delier.offert && a.lien.tab === 'cat_achats', 'reçu : phrase, lien Achats, « Ce n’est pas ça » proposé', JSON.stringify(a));
+    dit(a.etat === 'range' && a.quoi === 'Reçu d’achat · Nike Air Force 1 (45,00 €)' && a.fait === 'Reçu rangé avec ton achat n° 98765432101' && a.delier.offert && a.lien.tab === 'achats', 'reçu : phrase, lien Achats, « Ce n’est pas ça » proposé', JSON.stringify(a));
     const ad = lectureEmail({ id: 'x', from: '', subject: 's', etat: 'integre', resume: { v: 1, t: 'achat', tx: '98765432101', id: 'email_achat_abc' } }, { email_achat_abc: { tx: '98765432101' } });
     dit(ad.etat === 'delie' && ad.delier.delie && /Délié par toi/.test(ad.fait), 'reçu délié par lui : dit, et réversible (« Relier à nouveau »)');
     const st = L({ v: 1, t: 'achat', a: 'Nike Air Force 1', av: 'sans-tx' });

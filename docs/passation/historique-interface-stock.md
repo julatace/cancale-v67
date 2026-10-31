@@ -1972,3 +1972,79 @@ menu (Réglages), pas de « N° + Entrée ».
 règle : `menu-range` (« Plus », `?tab=plat_ebay` → Ventes · eBay, « eBay » écrit une fois), `coque-mobile` (onglets
 attendus), `glisser-onglet` (voisins de la nouvelle barre, jamais Vestiaire), `retour-historique` (« retour » rend le
 filtre de site d'avant).
+
+## 31 octobre 2026 (soir) — Achats à côté de « Colis à retirer », deux écrans distincts, « Plateformes » réparti
+
+**Ses trois demandes, mot pour mot** : « je veux qu'il y ait Achats à côté de À retirer » ; « et que dans les deux
+onglets il n'y ait pas la même chose » ; « il faut que tu réfléchisses comment enlever Plateforme en bas des onglets
+glissants, ils doivent être répartis avec les onglets du haut si possible ». Puis, sur ses maquettes ordinateur
+(« fais exactement cette mise en page ») et une capture (« plus de mini-notifications jaunes comme le 10 »).
+
+**1. « Expédier » = Colis à retirer + Achats, l'un sous l'autre** (colonne ET « Plus »). « Gérer » ne garde que Stock.
+
+**2. Deux écrans** (mêmes lectures, aucune copie — `Comptabilite only="achats"` avec `vueAchats`) :
+- **Colis à retirer** (`?tab=retraits`, `data-ecran-achats="retraits"`) : l'étape « À retirer » seule — codes de
+  retrait, dates limites, points relais et carte (`CarteRelaisColis`/`regrouperRelais`), colis attendus, « à
+  confirmer » (« Tout est OK » avant la date limite), « à vérifier », suivi Vinted, suivis manuels, réception des
+  emails, colis repartis ; une phrase « Aucun colis à aller chercher » quand TOUT est lu (pas su ≠ rien). Ni onglets
+  d'étapes, ni période, ni recherche, ni chiffres, ni liste, ni reçus, ni achats hors plateforme.
+- **Achats** (`?tab=achats`) : une TÂCHE avec la rangée de filtres de site (Vinted · Leboncoin · eBay · Vestiaire, pas
+  de « Toutes » : chaque site lit ses achats à sa façon). Vinted = En route · Reçus · Tous (Tous par défaut), période,
+  recherche, chiffres, liste (prix, reçus, liaison au stock), litiges « à renvoyer » (en tête, Tous compris), achats
+  hors plateforme, reçus d'achat par email, sélecteur de compte ; Leboncoin = `AchatsLeboncoin` ; eBay =
+  `EbayAchatsOnglet` ; Vestiaire = `AchatsVestiaire`. Ni le résumé CA/argent (des montants de ventes), ni « À retirer ».
+- `cat_achats` (notifications de code de retrait, colis livré, rappel du soir — toutes parlent d'un colis à aller
+  chercher) ⇒ « Colis à retirer ». Ce qui parle d'un ACHAT vise `achats` : le litige de Ma journée, le reçu d'achat
+  (journal des emails, retour de la page du reçu), la recherche. Les liens des `api/*.js` (`/?tab=cat_achats`) ne
+  sont pas touchés : ils mènent à « Colis à retirer », ce dont ils parlent (un nouvel achat, `email-inbound` l.2206,
+  y mène aussi — à trancher).
+
+**3. « Plateformes » réparti dans les tâches** (src/navigationTache.js : `SOUS_SECTIONS`, `sectionDeTache`,
+`redirigerOnglet`). La valeur d'écran s'écrit « site » ou « site.section » (« ebay.agent ») : un seul état, que
+le retour rejoue. Aucun espace de site n'est plus monté (`plat_vinted/leboncoin/ebay/vestiaire` ⇒ redirections).
+
+| section d'hier | nouveau chemin |
+|---|---|
+| eBay · Ventes | Ventes · eBay · **Commandes** |
+| eBay · À traiter (agent, retours, évaluations) | Ventes · eBay · **À traiter** |
+| eBay · Offres | Ventes · eBay · **Offres** (une offre acceptée VEND la paire : c'est la vente qui se négocie) |
+| eBay · Annonces | Annonces · eBay · **Annonces** |
+| eBay · Promotion | Annonces · eBay · **Promotion** |
+| eBay · Messages | Messages · eBay |
+| eBay · Achats | Achats · eBay |
+| eBay · Compte | Paramètres → Réglages → Comptes Vinted → **Comptes eBay** (panneau, skin eBay) ; « Comptes eBay » de « État des connexions » l'ouvre |
+| Leboncoin · Ventes / Annonces / Messages | Ventes / Annonces / Messages · Leboncoin |
+| Leboncoin · Achats | Achats · Leboncoin |
+| Leboncoin · Colis | Colis → sous-rangée **Vinted et eBay · Leboncoin** (`LeboncoinColis`) |
+| Vestiaire · Ventes / Messages | Ventes / Messages · Vestiaire |
+| Vestiaire · Publier | Annonces · Vestiaire |
+| Vestiaire · Achats | Achats · Vestiaire |
+| Vestiaire · clé Photoroom, dernier passage de l'extension | Annonces · Vestiaire, sous Publier (⚠️ PAS dans Paramètres : sa décision du 17 oct., `detourage-reglage.cjs`) |
+| Vinted · Achats | Achats · Vinted |
+
+Liens profonds : `plat_ebay&section=agent|offres|promo|achats|compte`, `plat_leboncoin&section=colis|achats`,
+`plat_vestiaire` (⇒ Annonces · Vestiaire), `ebay_agent` (⇒ Ventes · eBay · À traiter), `plat_*` sans section (⇒ Ventes
+du site), `cat_achats` (⇒ Colis à retirer). Composants retirés parce que plus rendus nulle part (§4.11) : `Plateforme`
+(la page Vestiaire, ses morceaux sont dans les tâches) et `EntetePlateforme`.
+
+**Téléphone** : la feuille « Plus » n'a PLUS de groupe Plateformes (Vendre · Expédier · Gérer · Argent · Moi).
+**Ordinateur** (sa maquette) : la colonne garde « Plateformes » (eBay ⇒ Ventes · eBay · À traiter, Leboncoin ⇒
+Annonces · Leboncoin, Vestiaire ⇒ Annonces · Vestiaire) — les deux chemins coexistent. « VRM » écrit en haut,
+Paramètres en dernier dans « Moi », 236 px, entrées de 38 px : tout tient sans défiler à 900 px (au-dessous, la zone
+défile avec son fondu, rien ne se recouvre — le « Paramètres » collé en bas qui recouvrait « Comptabilité » n'existe
+plus).
+
+**Compteurs** (pastille ambre contour + chiffre, « comme le 10 », colonne, barre du bas, « Plus ») — seulement un
+nombre PUBLIÉ par son propriétaire (§11, les mêmes que Ma journée), jamais un 0 : Ventes et Colis = `vrm_colis_aposter` ;
+Colis à retirer = `vrm_colis_retirer` ; Annonces = lignes de la cloche qui visent une annonce (sans N°, N° porté deux
+fois, à retirer de Vinted car vendue ailleurs, marquées `annonces`) ; eBay = résumé de l'agent ; Leboncoin = « à retirer
+de Leboncoin » (`lbcRetirer`) ; Messages = un POINT (trois règles de non-lus coexistent). Favoris & offres, Republier,
+Vestiaire : aucune source ne publie ce nombre hors de leur écran ⇒ pas de pastille (à construire si voulu).
+
+**Écrans montés** (`{tab==='…'`) : 21 → 18 identifiants directs (− `plat_vinted`, `plat_leboncoin`, `plat_ebay`,
+`plat_vestiaire` ; + `achats`) ; table `Comptabilite` : `cat_achats` → `retraits` (5 entrées des deux côtés) ; Colis
+gagne la variante Leboncoin. Rien ne disparaît : chaque section ci-dessus a son chemin.
+
+**Preuve** : `scripts/bancs/navigation-tache.cjs` (J : pas de Plateformes dans « Plus », Plateformes dans la colonne,
+Expédier = retraits|achats, compteurs publiés, 900 px ; K : écrans distincts ; L : chaque section joignable depuis sa
+tâche ; F : anciens liens). Rouge sur le code d'avant, vert après, rouge sous mutation (voir le rapport de la session).

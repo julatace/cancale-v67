@@ -106,7 +106,7 @@ import { DESCRIPTION_ORGANISATION } from "./operations/description.js";
 // (31 oct.) Colis → « À retirer » : la carte des points relais (règle pure + carte).
 import { regrouperRelais } from "./relaisColis.js";
 import CarteRelaisColis from "./CarteRelais.jsx";
-import { SITES_TACHE, TACHES_SITE, estTacheSite, siteDeTache, redirigerOnglet, filtreRetenu, retenirFiltre } from "./navigationTache.js";
+import { SITES_TACHE, TACHES_SITE, estTacheSite, siteDeTache, sectionDeTache, sousSections, subDeTache, redirigerOnglet, filtreRetenu, retenirFiltre } from "./navigationTache.js";
 // La migration qui cloisonne les vendeurs, lue depuis LE fichier (pas recopiée) :
 // deux copies finiraient par diverger, et c'est le genre de texte qu'on colle
 // dans une base de production sans le relire.
@@ -4621,7 +4621,7 @@ const openReceipt = (a) => {
     if (fermer) fermer.addEventListener('click', () => {
       if (w.__vrmRecuBoutons) return;
       try { w.close(); } catch (_) {}
-      setTimeout(() => { try { if (w.closed) return; if (w.history.length > 1) w.history.back(); else w.location.href = '/?tab=cat_achats'; } catch (_) {} }, 120);
+      setTimeout(() => { try { if (w.closed) return; if (w.history.length > 1) w.history.back(); else w.location.href = '/?tab=achats'; } catch (_) {} }, 120);
     });
     const imprimer = w.document.getElementById('vrm-recu-imprimer');
     if (imprimer) imprimer.addEventListener('click', () => { if (w.__vrmRecuBoutons) return; try { w.focus(); w.print(); } catch (_) {} });
@@ -13560,11 +13560,14 @@ function BoutonTraduire({ texte }) {
 //   téléphone, barre du bas : Journée · Annonces · Ventes · Colis · Plus ;
 //   ordinateur, colonne     : Ma journée · Annonces · Ventes · Messages · Colis,
 //                             puis les groupes de « Plus », Paramètres en bas.
-// Annonces, Ventes et Messages portent une rangée de filtres de site (Toutes ·
-// Vinted · Leboncoin · eBay · Vestiaire) : le filtre « Vinted » rend EXACTEMENT
-// l'ancien écran Vinted (src/navigationTache.js). Les espaces de site gardent ce
-// qui leur est propre (eBay : À traiter, offres, promotion, achats, compte ;
-// Leboncoin : achats, colis ; Vestiaire : sa page) sous « Plateformes ».
+// Annonces, Ventes, Messages et Achats portent une rangée de filtres de site
+// (Toutes · Vinted · Leboncoin · eBay · Vestiaire) : le filtre « Vinted » rend
+// EXACTEMENT l'ancien écran Vinted (src/navigationTache.js). (31 oct., soir) Ce
+// qu'un site avait en propre est réparti dans les tâches (sous-onglets du
+// site : Ventes · eBay « Commandes · À traiter · Offres », Annonces · eBay
+// « Annonces · Promotion », Colis « Vinted et eBay · Leboncoin », Compte eBay
+// dans Paramètres) ; « Plateformes » ne reste que dans la colonne de
+// l'ordinateur (sa maquette), comme raccourci vers ces tâches.
 // §4.11 : rien ne disparaît — chaque écran d'hier a son chemin (récit :
 // docs/passation/historique-interface-stock.md, « Navigation par tâche »), et
 // les anciens identifiants (`plat_vinted`, `cat_ventes`, `leboncoin`…) mènent au
@@ -13581,11 +13584,17 @@ const BOTTOM_TABS=[
 // (cinq places dans la barre, la cinquième est « Plus »).
 const ONGLET_MESSAGES={id:'messages', icon:'chat', label:'Messages'};
 const NAV_TACHES=[BOTTOM_TABS[0],BOTTOM_TABS[1],BOTTOM_TABS[2],ONGLET_MESSAGES,BOTTOM_TABS[3]];
-// Les entrées de « Plus » (et de la colonne, sous les tâches), GROUPÉES PAR CE
-// QU'IL FAIT. Une entrée = un écran (`id`), parfois ouvert sur une vue précise
-// (`vue` : Achats sur « À retirer » ou « Tous », Annonces sur Republier,
-// Messages sur les favoris). `site` : l'entrée n'existe que s'il a un compte
-// sur ce site (« aucune entrée vide ») ; pas su ⇒ montrée.
+// (31 oct., soir — Julien, mot pour mot : « je veux qu'il y ait Achats à côté
+// de À retirer », « que dans les deux onglets il n'y ait pas la même chose »,
+// « enlever Plateforme en bas des onglets glissants… répartis avec les onglets
+// du haut »). « Colis à retirer » (`retraits`) et « Achats » (`achats`) sont
+// DEUX écrans, l'un sous l'autre dans « Expédier ». Le groupe « Plateformes »
+// n'existe plus dans « Plus » (téléphone) : chaque section d'un site vit dans
+// sa tâche, en sous-onglets (src/navigationTache.js). Sur ORDINATEUR, la
+// colonne le garde (sa maquette : « fais exactement cette mise en page ») —
+// ses entrées (`ordi`) mènent à la tâche filtrée sur le site, aucun espace de
+// site à part. `site` : l'entrée n'existe que s'il a un compte sur ce site
+// (« aucune entrée vide ») ; pas su ⇒ montrée.
 const GROUPES_PLUS=[
   { titre:'Vendre', items:[
     {...ONGLET_MESSAGES, tel:true},
@@ -13593,37 +13602,30 @@ const GROUPES_PLUS=[
     {id:'cat_msg', icon:'heart', cle:'favoris', vue:'favoris', label:'Favoris & offres'},
   ]},
   { titre:'Expédier', items:[
-    {id:'cat_achats', icon:'qr', cle:'retraits', vue:'attente', label:'Colis à retirer'},
+    {id:'retraits', icon:'qr',  label:'Colis à retirer'},
+    {id:'achats',   icon:'bag', label:'Achats'},
   ]},
   { titre:'Gérer', items:[
     {id:'garage',     icon:'home', label:'Stock'},
-    {id:'cat_achats', icon:'bag', cle:'achats', vue:'all', label:'Achats'},
   ]},
   { titre:'Argent', items:[
     {id:'dashboard', icon:'chart', label:'Statistiques'},
     {id:'compta',    icon:'euro',  label:'Comptabilité'},
   ]},
-  { titre:'Plateformes', items:[
-    {id:'plat_ebay', icon:'grid', site:'ebay', label:'eBay',      desc:'À traiter, offres, promotion, achats, compte'},
-    {id:'plat_leboncoin', icon:'tag', site:'leboncoin', label:'Leboncoin', desc:'Achats, colis'},
-    {id:'plat_vestiaire', icon:'shop', site:'vestiaire', label:'Vestiaire', desc:'Publier, ventes, messages, achats'},
+  { titre:'Plateformes', ordi:true, items:[
+    {id:'ebay_agent',     cle:'plat_ebay',      icon:'grid', site:'ebay',      label:'eBay',      desc:'Ventes · eBay : commandes, à traiter, offres'},
+    {id:'leboncoin',      cle:'plat_leboncoin', icon:'tag',  site:'leboncoin', label:'Leboncoin', desc:'Annonces · Leboncoin : à retirer, publier'},
+    {id:'plat_vestiaire', cle:'plat_vestiaire', icon:'shop', site:'vestiaire', label:'Vestiaire', desc:'Annonces · Vestiaire : publier, ta clé Photoroom'},
   ]},
   { titre:'Moi', items:[
     {id:'communaute', icon:'pin',  label:'Communauté'},
-    {id:'settings',   icon:'gear', label:'Paramètres', tel:true},
+    {id:'settings',   icon:'gear', label:'Paramètres'},
   ]},
 ];
 const cleEntree=(t)=>t.cle||t.id;
 // Les écrans qu'on ouvre ponctuellement — la liste à plat (titres, glisser,
 // audits) : chaque écran une fois.
-const PLUS_TABS=GROUPES_PLUS.flatMap(g=>g.items).filter((t,i,a)=>a.findIndex(x=>x.id===t.id)===i);
-// Les sections propres à chaque espace de site (les autres sont des tâches).
-const SECTIONS_SITE={
-  vinted:[['achats','Achats']],
-  leboncoin:[['achats','Achats'],['colis','Colis']],
-  ebay:[['agent','À traiter'],['offres','Offres'],['promo','Promotion'],['achats','Achats'],['compte','Compte']],
-};
-const sectionsSite=(site)=>SECTIONS_SITE[site]||[];
+const PLUS_TABS=GROUPES_PLUS.filter(g=>!g.ordi).flatMap(g=>g.items).filter((t,i,a)=>a.findIndex(x=>x.id===t.id)===i);
 // Quand on est DANS un écran que la barre ne porte pas, quel onglet reste
 // allumé. Une notion, une source (§11).
 const BAR_GROUPE={
@@ -13635,28 +13637,29 @@ const BAR_GROUPE={
 // défilement). Une source : les listes de navigation elles-mêmes (§11).
 function titreEcran(tab) {
   if (tab === 'journee') return 'Ma journée';
-  if (tab === 'cat_achats') return 'Achats';
   const t = [...NAV_TACHES, ...PLUS_TABS].find(x => x.id === tab && !x.vue);
   if (t) return t.label;
-  return { plat_vinted: 'Vinted', cat_expedition: 'Colis', masques: 'Masqués', organisation: 'Organisation', catalog: 'Catalogue', stockvinted: 'Stock Vinted', vintedaccounts: 'Comptes liés', sales: 'Ventes', inventory: 'Inventaire' }[tab] || 'VRM';
+  return { cat_expedition: 'Colis', masques: 'Masqués', organisation: 'Organisation', catalog: 'Catalogue', stockvinted: 'Stock Vinted', vintedaccounts: 'Comptes liés', sales: 'Ventes', inventory: 'Inventaire' }[tab] || 'VRM';
 }
 // Les onglets d'hier → leur place d'aujourd'hui : [onglet, rubrique ou filtre].
 // (31 oct.) Les écrans « par site » mènent à la tâche filtrée sur leur site ;
-// `plat_vinted` / `plat_leboncoin` / `plat_ebay` sont résolus par
-// `redirigerOnglet` (selon la section demandée).
+// `plat_vinted` / `plat_leboncoin` / `plat_ebay` / `plat_vestiaire` sont
+// résolus par `redirigerOnglet` (selon la section demandée).
+// (31 oct., soir) `cat_achats` était UN écran à deux vues (« À retirer » par
+// défaut, « Tous ») : ses liens (notifications de code de retrait, colis livré,
+// rappel du soir…) parlent tous de colis à aller chercher ⇒ « Colis à retirer ».
+// Ce qui parle d'un ACHAT (reçu, litige) vise `achats` directement.
 const ONGLETS_DEPLACES = {
   prixmarche: ['dashboard', 'prix'], invoices: ['compta', 'factures'], collectif: ['dashboard', null],
   cat_ventes: ['ventes', 'vinted'], cat_annonces: ['annonces', 'vinted'], vinted_annonces: ['annonces', 'vinted'],
   cat_msg: ['messages', 'vinted'], leboncoin: ['annonces', 'leboncoin'], ebay_annonces: ['annonces', 'ebay'],
+  cat_achats: ['retraits', null], ebay_agent: ['ventes', 'ebay.agent'],
 };
-// La vue demandée par une entrée de « Plus » (Republier, Favoris, Retraits…),
+// La vue demandée par une entrée de « Plus » (Republier, Favoris…),
 // consommée UNE fois par l'écran qui s'ouvre (même motif que DEMANDE_EBAY_CIBLE).
 const DEMANDE_VUE={ quoi:null, at:0 };
 const demanderVue=(quoi)=>{ DEMANDE_VUE.quoi=quoi; DEMANDE_VUE.at=Date.now(); };
 const prendreVue=(quoi)=>{ if(DEMANDE_VUE.quoi===quoi && Date.now()-DEMANDE_VUE.at<30000){ DEMANDE_VUE.quoi=null; return true; } return false; };
-// L'entrée allumée pour une vue de l'écran Achats (Retraits ou Achats) : la
-// dernière choisie ; au départ, l'écran s'ouvre sur « À retirer ».
-let VUE_ACHATS_NAV='attente';
 // Barre de chargement fine en haut de l'écran (façon navigateur). Elle avance
 // vite au début puis ralentit — on ne peut pas connaître l'avancement réel de
 // requêtes multiples, donc on donne une progression PLAUSIBLE plutôt qu'un
@@ -14335,14 +14338,13 @@ const useOrdinateur = () => {
   return ord;
 };
 
-const NAV_LARGEUR = 200;   // (31 oct., Vitrine) colonne blanche avec les libellés
+const NAV_LARGEUR = 236;   // (31 oct., Vitrine) colonne blanche avec les libellés (236 px : sa maquette)
 
 // (31 oct.) Ouvrir une entrée de navigation : son écran, et la vue qu'elle
-// demande (Republier, Favoris, Retraits…). L'écran déjà ouvert l'apprend par
+// demande (Republier, Favoris…). L'écran déjà ouvert l'apprend par
 // l'évènement `vrm:vue` ; un écran qui monte la lit dans DEMANDE_VUE.
 function ouvrirEntree(t, setTab) {
   if (t.vue) {
-    if (t.id === 'cat_achats') VUE_ACHATS_NAV = t.vue;
     demanderVue(t.cle || t.vue);
     try { window.dispatchEvent(new CustomEvent('vrm:vue', { detail: t.cle || t.vue })); } catch (_) {}
   }
@@ -14351,35 +14353,39 @@ function ouvrirEntree(t, setTab) {
 // L'entrée est-elle « l'écran où l'on est » ? Une entrée qui ouvre une VUE d'un
 // écran que la navigation porte déjà (Republier dans Annonces, Favoris dans
 // Messages) ne s'allume jamais : c'est l'onglet de l'écran qui reste allumé.
-// Retraits / Achats (le même écran, deux vues) : la dernière choisie.
+// Une entrée « Plateformes » (ordinateur) non plus : c'est la tâche qui s'allume.
 function entreeActive(t, tab) {
   const actif = BAR_GROUPE[tab] || tab;
   if (t.id !== actif) return false;
-  if (!t.vue) return true;
-  return t.id === 'cat_achats' && VUE_ACHATS_NAV === t.vue;
+  return !t.vue;
 }
 // Les groupes de « Plus », sans les entrées d'un site où il n'a aucun compte
 // (`sites` : Set des sites présents, `null` = pas su ⇒ tout est montré) ni un
-// groupe vide.
-function groupesVisibles(sites, filtre) {
-  return GROUPES_PLUS.map(g => ({ ...g, items: g.items.filter(t => (!t.site || !sites || sites.has(t.site)) && filtre(t)) })).filter(g => g.items.length > 0);
+// groupe vide. `ordi` : le groupe n'existe que dans la colonne de l'ordinateur.
+function groupesVisibles(sites, filtre, ordi = false) {
+  return GROUPES_PLUS.filter(g => ordi || !g.ordi).map(g => ({ ...g, items: g.items.filter(t => (!t.site || !sites || sites.has(t.site)) && filtre(t)) })).filter(g => g.items.length > 0);
 }
-// Badge d'une entrée : un NOMBRE pour Colis (le nombre PUBLIÉ par l'écran qui a
-// toutes les sources, `vrm_colis_aposter`, §11) ; un POINT pour Messages (trois
-// règles de comptage des non-lus coexistent : un chiffre ici pourrait contredire
-// celui de l'écran, cf. PlatSubNav). Ambre discret : un geste à faire (§7).
+// Badge d'une entrée : un NOMBRE quand il y a un geste à faire et que le nombre
+// est CONNU (publié par l'écran propriétaire, §11 : `vrm_colis_aposter`,
+// `vrm_colis_retirer`, le résumé de l'agent eBay, « à retirer de Leboncoin ») —
+// jamais un 0 deviné : pas su ⇒ aucun badge. Sur téléphone, Messages garde un
+// POINT (la barre est petite). Ambre discret : un geste à faire (§7).
 function BadgeNav({ t, badges, place }) {
   if (!badges || t.vue) return null;
-  const v = badges[t.id];
-  if (typeof v === 'number' && v > 0) return <span className={'vrm-nav-badge vrm-nav-badge-n vrm-nav-badge-' + place} data-badge-nav={t.id} data-badge-n={String(v)} aria-label={`${v} à faire`}>{v > 99 ? '99+' : v}</span>;
-  if (v === true) return <span className={'vrm-nav-badge vrm-nav-badge-point vrm-nav-badge-' + place} data-badge-nav={t.id} data-badge-n="point" aria-label="nouveau"/>;
+  const k = cleEntree(t);
+  const v = badges[k];
+  if (typeof v === 'number' && v > 0) return <span className={'vrm-nav-badge vrm-nav-badge-n vrm-nav-badge-' + place} data-badge-nav={k} data-badge-n={String(v)} aria-label={`${v} à faire`}>{v > 99 ? '99+' : v}</span>;
+  if (v === true) return <span className={'vrm-nav-badge vrm-nav-badge-point vrm-nav-badge-' + place} data-badge-nav={k} data-badge-n="point" aria-label="nouveau"/>;
   return null;
 }
 
-// LA COLONNE DE L'ORDINATEUR : les cinq tâches, puis les groupes de « Plus »
-// (sans Messages ni Paramètres, déjà là), Paramètres en bas.
+// LA COLONNE DE L'ORDINATEUR (31 oct., soir — sa maquette, « fais exactement
+// cette mise en page ») : « VRM » écrit en haut ; les cinq tâches ; puis
+// Vendre · Expédier · Gérer · Argent · Plateformes · Moi (Paramètres en
+// dernier) ; un compteur ambre à droite de chaque entrée qui a un geste à faire.
+// Tout tient sans défiler à 900 px de haut (styles-vitrine.css).
 function SideBar({ tab, setTab, entreprise, sites, badges }) {
-  const groupes = groupesVisibles(sites, t => !t.tel);
+  const groupes = groupesVisibles(sites, t => !t.tel, true);
   const bouton=(t)=>{ const on=entreeActive(t, tab); return <button key={cleEntree(t)} type="button" className="vrm-rail-button" aria-label={t.label} title={t.desc?`${t.label} — ${t.desc}`:t.label} data-nav-entree={cleEntree(t)} onClick={()=>ouvrirEntree(t,setTab)} aria-current={on?'page':undefined}><NavigationIcon item={t} size={18}/><span className="vrm-rail-lib" aria-hidden="true">{t.label}</span><BadgeNav t={t} badges={badges} place="rail"/></button>; };
   // (30 oct., Edge sous Windows) Une fenêtre basse (1366×768 → 630 px utiles)
   // coupe le bas de la colonne, et la zone défile SANS barre visible : elle dit
@@ -14405,20 +14411,19 @@ function SideBar({ tab, setTab, entreprise, sites, badges }) {
     const b = el.querySelector('.vrm-rail-button[aria-current="page"]');
     try { if (b) b.scrollIntoView({ block: 'nearest', inline: 'nearest' }); } catch (_) {}
   }, [tab]);
-  const parametres = { id:'settings', icon:'gear', label:'Paramètres' };
   return <nav className="vrm-sidebar vrm-atelier-rail" aria-label="Navigation principale" style={{width:NAV_LARGEUR,background:C.sidebar||C.chrome,borderRight:`1px solid ${C.chromeLine}`,color:C.onChrome}}>
-    <div className="vrm-sidebar-brand"><VrmLogo size={32} anim={false}/><NomEntreprise entreprise={entreprise} className="vrm-sidebar-entreprise"/></div>
+    <div className="vrm-sidebar-brand"><span className="vrm-sidebar-mot" role="img" aria-label="VRM">VRM</span><NomEntreprise entreprise={entreprise} className="vrm-sidebar-entreprise"/></div>
     <div className="vrm-rail-scroll" ref={zoneRef}>
       <div className="vrm-rail-platforms" data-nav-taches="">{NAV_TACHES.map(bouton)}</div>
       {groupes.map(g => <section key={g.titre} className="vrm-rail-management-group" aria-label={g.titre} data-nav-groupe={g.titre}><div className="vrm-rail-section-label">{g.titre}</div><div className="vrm-rail-management">{g.items.map(bouton)}</div></section>)}
     </div>
-    <div className="vrm-rail-bottom">{bouton(parametres)}</div>
   </nav>;
 }
 
 // ── « PLUS » : LA FEUILLE DE TOUT CE QUE LA BARRE NE PORTE PAS (téléphone) ──
-// (31 oct.) Rangée PAR TÂCHE : Vendre · Expédier · Gérer · Argent · Plateformes
-// · Moi. ⚠️ Elle NE RÉPÈTE PAS la barre du bas (Julien, 21 sept. : « tu mets
+// (31 oct.) Rangée PAR TÂCHE : Vendre · Expédier · Gérer · Argent · Moi (plus
+// de « Plateformes » ici depuis le 31 oct. au soir : ses sections sont dans les
+// sous-onglets des tâches). ⚠️ Elle NE RÉPÈTE PAS la barre du bas (Julien, 21 sept. : « tu mets
 // deux fois Ma journée, Annonces et Ventes ») : Journée, Annonces, Ventes et
 // Colis n'y sont pas. Aucun groupe vide, aucune entrée d'un site sans compte.
 // ⚠️ Sur ordinateur elle n'existe pas : la colonne montre déjà tout.
@@ -17535,14 +17540,6 @@ function FraicheurDonnees({ jours, compte, comptes = null, siAJour = true }) {
 // couleur de l'en-tête, petite (§7). eBay : le logo seul (le nom reste pour les
 // lecteurs d'écran).
 const COULEUR_PLATEFORME = { vinted: '#007782', leboncoin: '#EC5A13', ebay: '#0064D2' };
-function EntetePlateforme({nom,plateforme}) {
-  const mot = plateforme === 'ebay';
-  const src = {vinted:'/brands/vinted.svg',leboncoin:'/brands/leboncoin.svg',ebay:'/brands/ebay.svg'}[plateforme];
-  return <header className="vrm-market-heading" data-plat-entete={plateforme} data-entete-plateforme={plateforme} style={{ '--plat': COULEUR_PLATEFORME[plateforme] || 'currentColor' }}>
-    <span className={'vrm-plat-tuile' + (mot ? ' vrm-plat-tuile-mot' : '')} aria-hidden="true"><span className="vrm-plat-marque" style={src ? { WebkitMaskImage: `url(${src})`, maskImage: `url(${src})` } : undefined}/></span>
-    <h1 className={mot ? 'vrm-sr' : undefined}>{nom}</h1>
-  </header>;
-}
 // (17 oct.) Julien : « trop de texte, ça rend moche » (écran Annonces eBay). Une
 // explication qui ne change pas d'une fois à l'autre se replie derrière un « ⓘ »
 // au bout du titre : le titre et les gestes restent, le POURQUOI s'ouvre au clic.
@@ -25787,122 +25784,6 @@ function VestiaireMesure() {
       {cap === 'ok' ? <>Pour que VRM apprenne à le lire : ouvre <b>Vestiaire Co</b> dans ce Chrome, connecté à ton compte vendeur, et passe sur tes ventes, tes articles et tes paiements. L'extension relève la <b>forme</b> des pages — jamais leur contenu.</>
         : cap === 'retard' ? <>Pour que VRM apprenne à lire Vestiaire, l'extension doit passer en <b>{EXT_CAPACITES.vestiaire}</b> : celle installée ne sait pas encore l'observer. Mets-la à jour depuis <b>Réglages</b>.</>
         : <>C'est l'extension, dans le Chrome de ton ordinateur, qui lit Vestiaire quand tu y passes.</>}
-    </div>
-  );
-}
-
-function Plateforme({ plat, liveStats, lbcVentes = {ventes:[],inconnues:0}, ebayCa = null, comptes = [], onGo, onSub, baseKO }) {
-  const p = caParPlateforme(liveStats, lbcVentes, ebayCa).find(x => x.nom === plat) || { nom:plat, ca:null };
-  // Les cartes du hub ouvrent une SECTION dans l'onglet (onSub) si l'appelant le
-  // permet ; sinon (compat) elles naviguent vers l'écran séparé (onGo).
-  const aller = (section, tabId) => (onSub ? onSub(section) : (onGo && onGo(tabId)));
-  const estVinted = plat === 'Vinted';
-  const ventesVinted = liveStats && liveStats.soldTotal != null ? liveStats.soldTotal : null;
-  const enAttente = liveStats && liveStats.enCours != null ? liveStats.enCours : null;
-  // Argent Vinted : « disponible » et « en attente » sont DEUX montants qui ne
-  // se confondent jamais (§5.14). Consommés de liveStats (même source que Ma
-  // journée et Statistiques, §11) — jamais recalculés ici.
-  const wDispo   = liveStats && liveStats.walletDispo   != null ? liveStats.walletDispo   : null;
-  const wAttente = liveStats && liveStats.walletAttente != null ? liveStats.walletAttente : null;
-  const wComptes = (liveStats && liveStats.walletComptes) || 0;
-  const wAge     = liveStats && liveStats.walletAgeJours != null ? liveStats.walletAgeJours : null;
-  // Âge de la capture la plus ancienne : explique un colis déjà parti qui traîne.
-  const dAge     = liveStats && liveStats.dataAgeJours != null ? liveStats.dataAgeJours : null;
-  // Nom AFFICHÉ de la plateforme : « Vestiaire Collective » est la clé interne
-  // (comparaisons `plat===`), à l'écran on écrit « Vestiaire Co » (27 oct., §11).
-  const court = nomAffichePlat(plat);
-  const carte = {textAlign:'left',border:`1px solid ${C.border}`,background:C.card,borderRadius:10,padding:'13px 15px',cursor:'pointer',fontFamily:'inherit'};
-  const eti = {fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500};
-  const gros = {fontSize:24,fontWeight:700,color:C.text};
-  // ⚠️ TOUT L'ÉCRAN eBay AU LOOK eBay (Julien, 27 sept. : « je veux exactement le
-  // même visuel que dans eBay », « tout, rien ne va »). L'onglet eBay entier —
-  // fond noir, en-tête eBay, cartes eBay — pas seulement le sous-formulaire.
-  // Exception ASSUMÉE à §7, bornée à l'espace eBay, à la demande de l'owner.
-  // eBay et Leboncoin n'ont plus d'« Aperçu » (3 oct.) : résumé + sections,
-  // comme Vinted. Ce composant ne sert plus qu'aux plateformes non reliées.
-  return (
-    <div style={{padding:16,display:'flex',flexDirection:'column',gap:18}}>
-      <ScreenHead icon="tag" title={court} desc={estVinted ? 'Tes annonces, ventes et achats sur Vinted' : plat === 'Vestiaire Collective' ? 'Mets tes paires en vente sur Vestiaire Co depuis VRM' : `Ce que VRM sait de ${court}`}/>
-      {baseKO ? (
-        <LignePanne>Je n'ai pas pu lire tes données — les totaux seraient faux, on ne les affiche pas. Rien n'est perdu : c'est la lecture qui a échoué.</LignePanne>
-      ) : estVinted ? (<>
-        <FraicheurDonnees jours={dAge} compte={liveStats && liveStats.dataAgeCompte} comptes={liveStats && liveStats.dataAgeComptes}/>
-        <Card style={{padding:18}}>
-          <div style={{...eti,marginBottom:4}}>Vinted · chiffre d'affaires</div>
-          <div className="vrm-display" style={{fontSize:30,fontWeight:700,color:C.text}}>{p.ca==null?'—':fmt(p.ca)}</div>
-          <div style={{fontSize:11.5,color:C.muted,marginTop:2}}>{p.ca==null?'aucune vente finalisée captée pour l’instant':'ventes finalisées, tous comptes'}</div>
-        </Card>
-        {wComptes>0 && (
-          <Card style={{padding:16}}>
-            <div style={{...eti,marginBottom:8}}>Argent Vinted</div>
-            <div style={{display:'flex',gap:20,flexWrap:'wrap'}}>
-              <div>
-                <div className="vrm-display" style={{fontSize:22,fontWeight:700,color:C.text}}>{wDispo==null?'—':fmt(wDispo)}</div>
-                <div style={{fontSize:11,color:C.muted,marginTop:2}}>disponible à virer</div>
-              </div>
-              <div>
-                <div className="vrm-display" style={{fontSize:22,fontWeight:700,color:C.muted}}>{wAttente==null?'—':fmt(wAttente)}</div>
-                <div style={{fontSize:11,color:C.muted,marginTop:2}}>en attente (retenu par Vinted)</div>
-              </div>
-            </div>
-            <div style={{fontSize:11,color:C.muted,marginTop:8,lineHeight:1.5}}>
-              Lu sur {wComptes} porte-monnaie{wComptes>1?'s':''}. Ce sont les chiffres de Vinted, pas une estimation.{wAge!=null && wAge>7 ? ` Le plus ancien date de ${wAge} j — repasse sur ces comptes pour rafraîchir.` : ''}
-            </div>
-          </Card>
-        )}
-        <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit, minmax(150px,1fr))',gap:10}}>
-          <button type="button" onClick={()=>aller('annonces','cat_annonces')} style={carte}>
-            <div style={eti}>Annonces en ligne</div>
-            <div className="vrm-display" style={gros}>{texteEnLigne(liveStats)}</div>
-            <div style={{fontSize:11,color:C.muted,marginTop:2}}>Voir toutes les annonces ›</div>
-          </button>
-          <button type="button" onClick={()=>aller('ventes','cat_ventes')} style={carte}>
-            <div style={eti}>Ventes finalisées</div>
-            <div className="vrm-display" style={gros}>{ventesVinted==null?'—':ventesVinted}</div>
-            <div style={{fontSize:11,color:C.muted,marginTop:2}}>{enAttente==null?'Voir les ventes ›':`+ ${enAttente} en cours · voir les ventes ›`}</div>
-          </button>
-          <button type="button" onClick={()=>aller('achats','cat_achats')} style={carte}>
-            <div style={eti}>Achats</div>
-            <div className="vrm-display" style={{...gros,fontSize:18,color:C.muted}}>Voir ›</div>
-            <div style={{fontSize:11,color:C.muted,marginTop:2}}>Tes commandes et colis reçus</div>
-          </button>
-        </div>
-        <div style={{fontSize:11,color:C.muted,lineHeight:1.5}}>
-          Les chiffres viennent du Tableau de bord et des écrans Ventes/Annonces — c'est la même source, ils ne peuvent pas se contredire.
-        </div>
-      </>) : (<>
-        {/* Chaque site a son espace avec SES infos (Julien : « chaque info par
-            site »). Le CA vient de `caParPlateforme` (§11) : pour Leboncoin il
-            porte les ventes PROUVÉES par référence VRM (jamais un titre, §5) —
-            on l'affiche vraiment, au lieu d'un « — » systématique. */}
-        <Card style={{padding:18}}>
-          <div style={{...eti,marginBottom:4}}>{court} · chiffre d'affaires</div>
-          <div className="vrm-display" style={{fontSize:30,fontWeight:700,color:p.ca!=null?C.text:C.muted}}>{p.ca!=null?fmt(p.ca):'—'}</div>
-          <div style={{fontSize:11.5,color:C.muted,marginTop:2}}>{p.ca!=null?'ventes prouvées captées':'pas encore de vente captée'}</div>
-        </Card>
-        {plat==='Vestiaire Collective' && <PublierVestiaire comptes={comptes}/>}
-        {plat==='Vestiaire Collective' && <VentesVestiaire comptes={comptes}/>}
-        {plat==='Vestiaire Collective' && <MessagesVestiaire/>}
-        {plat==='Vestiaire Collective' && <AchatsVestiaire/>}
-        <Card style={{padding:16}}>
-          <div style={{fontSize:13.5,color:C.text,lineHeight:1.55}}>
-            {plat==='Vestiaire Collective'
-              // (28 oct.) « Tes ventes ne remontent pas encore… choisis-la ci-dessous »
-              // était faux depuis la 5.237 (les ventes sont lues) et la liste est
-              // AU-DESSUS ; chaque carte dit déjà ce qui est lu et le geste (§7).
-              ? <ClePhotoroom cadre={false}/>
-              : plat==='Leboncoin'
-              ? <>Ce que VRM sait de Leboncoin passe par l'extension (elle tourne sur leboncoin.fr). Prépare tes annonces depuis <b>À publier</b> ; une vente n'est comptée que si la <b>référence VRM</b> de l'annonce la relie à un article — jamais par ressemblance de titre. Rien n'est inventé tant qu'il n'y a pas de donnée.</>
-              : <>Aucune vente n'a encore été captée sur {court}. Tu prépares tes articles depuis l'écran <b>Annonces</b> (coche « aussi sur {court} ») ; dès qu'une vente y sera reconnue, son chiffre s'ajoutera ici et au total. Rien n'est inventé tant qu'il n'y a pas de donnée.</>}
-          </div>
-          {plat==='Vestiaire Collective' && <VestiaireMesure/>}
-          {plat!=='Vestiaire Collective' && plat!=='Leboncoin' && (
-            <button type="button" onClick={()=>onGo&&onGo('cat_annonces')} style={{marginTop:12,border:`1px solid ${C.border}`,background:C.card,borderRadius:10,padding:'10px 14px',cursor:'pointer',fontFamily:'inherit',fontSize:13,fontWeight:600,color:C.text}}>
-              Ouvrir l'écran Annonces →
-            </button>
-          )}
-        </Card>
-      </>)}
     </div>
   );
 }
@@ -37054,7 +36935,7 @@ function ListeComptes({ id, valeur, options, onChange, note, skin, attrs }) {
     </div>
   );
 }
-function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, onFreeNum, liveStats, accountsReady, baseKO, premierJour: premierJourProp, compteSel = '', compteConnecte = '', alertes = null, panelOff = null, dansPlateforme = false }) {
+function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, onFreeNum, liveStats, accountsReady, baseKO, premierJour: premierJourProp, compteSel = '', compteConnecte = '', alertes = null, panelOff = null, dansPlateforme = false, vueAchats }) {
   const [datesLbc] = useLigneSynchro('vrm_lbc_dates', lireDatesLbc);
   const [facturesVentes,setFacturesVentes]=useState([]);
   useEffect(()=>{if(only && only!=='ventes')return;let stop=false;fetchProInvoices({metadata:true}).then(rows=>{if(!stop)setFacturesVentes(rows);});return()=>{stop=true;};},[only]);
@@ -38278,7 +38159,18 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const [vFilter, setVFilter] = useVueSession('ventes-filtre', 'all'); // aexpedier | transit | finalisees | annulees | all (encours : ancien lien)
   // Par défaut : « En attente » = ce que je dois recevoir (les annulées sont
   // nombreuses et n'apparaissent que dans « Tous »).
-  const [aFilter, setAFilter] = useVueSession('achats-filtre', 'attente'); // attente | recus | all
+  const [aFilterBrut, setAFilter] = useVueSession('achats-filtre', 'attente'); // attente | route | recus | all
+  // (31 oct., soir — Julien : « que dans les deux onglets il n'y ait pas la même
+  // chose ») DEUX ÉCRANS sur les mêmes lectures (§11, aucune copie) :
+  //   · « Colis à retirer » (`vueAchats='retraits'`) : l'étape « À retirer »
+  //     seule — codes, dates limites, points relais, carte, colis attendus,
+  //     à confirmer, à vérifier ; aucune liste d'achats, aucun onglet d'étape ;
+  //   · « Achats » (`vueAchats='achats'`) : En route · Reçus · Tous — période,
+  //     recherche, chiffres, la liste (prix, reçus, liaison au stock), les
+  //     litiges ; jamais le bloc « à retirer ».
+  const modeRetraits = vueAchats === 'retraits';
+  const modeListeAchats = vueAchats === 'achats';
+  const aFilter = modeRetraits ? 'attente' : (modeListeAchats && aFilterBrut === 'attente') ? 'all' : aFilterBrut;
   // ⚠️ UNE IMAGE MORTE (QR OU PHOTO) DOIT LAISSER SA PLACE — et le repli doit vivre dans
   // l'ÉTAT, pas dans le DOM : poser `style.display='none'` sur le bouton était
   // effacé au premier re-render de React, donc le cadre vide restait à l'écran
@@ -45166,7 +45058,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const appliquer=()=>{
       if(only==='annonces' && prendreVue('republier')) setActionsOpen(true);
       if(only==='messages' && prendreVue('favoris')) setZoneMessages('favoris');
-      if(only==='achats'){ if(prendreVue('retraits')) setAFilter('attente'); else if(prendreVue('achats')) setAFilter('all'); }
+      if(only==='achats' && !modeRetraits && prendreVue('achats')) setAFilter('all');
     };
     appliquer();
     const f=()=>setTimeout(appliquer,0);
@@ -45786,7 +45678,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         { const ar = (buysBase||[]).filter(o=>ACHAT_A_RENVOYER.test(String(o.status||'')));
           if (ar.length) { const cs=[...new Set(ar.map(o=>o._acc?accNameOf(o._acc):'').filter(Boolean))];
             jobs.push({id:'a-renvoyer',n:ar.length,icon:'box',color:C.warn,title:`Renvoyer ${ar.length} article${ar.length>1?'s':''} (litige)`,
-              sub:`Étiquette de retour sur Vinted${cs.length===1?` — compte ${cs[0]}`:cs.length>1?` — comptes ${cs.slice(0,3).join(', ')}`:''}`,tab:'cat_achats',prio:0.8}); } }
+              sub:`Étiquette de retour sur Vinted${cs.length===1?` — compte ${cs[0]}`:cs.length>1?` — comptes ${cs.slice(0,3).join(', ')}`:''}`,tab:'achats',prio:0.8}); } }
         // (21 oct., 5.204) « Tout est OK » à confirmer sur Vinted avant la date
         //    limite — sinon Vinted conclut sans lui. Même liste qu'Achats
         //    (`aConfirmer`, §11). « Pas su » ⇒ aucune ligne (on n'affirme rien).
@@ -45798,7 +45690,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
            
             title:`${nb} ${motAConfirmer(l)} à confirmer avant le ${texteLimite(prem)}`,
             sub:`Sur Vinted : « Tout est OK » dans la conversation${cs.length===1?` — compte ${cs[0]}`:cs.length>1?` — comptes ${cs.slice(0,3).join(', ')}`:''}`,
-            tab:'cat_achats',prio:proche?0.15:0.7});
+            tab:'retraits',prio:proche?0.15:0.7});
         }
         tuiles.messages = { n: unread, sub: unread ? `${unread} conversation${unread>1?'s':''} non lue${unread>1?'s':''} de moins de 7 jours` : 'Aucun message récent non lu' };
         // (21 octobre) LES MESSAGES eBAY SANS RÉPONSE, à côté de ceux de Vinted —
@@ -45883,7 +45775,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           jobs.push({ id:'retrait-dernier-jour', n:hd, icon:'box', color:C.warn, urgent:true,
             title:`${hd} colis à retirer aujourd'hui ou demain`,
             sub:`Dernier délai, sinon il repart — va ${hd>1?'les':'le'} chercher${lx.length===1?` chez ${lx[0]}`:''}`,
-            tab:'cat_achats', prio:0.15 });
+            tab:'retraits', prio:0.15 });
         }
         // (23 oct.) « À VÉRIFIER » : délai de retrait dépassé, ou arrivé depuis
         // plus longtemps que ce qu'un point relais garde. Jamais compté « à
@@ -45898,8 +45790,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             title:`${nv} colis à vérifier`,
             // (revue du 23 oct.) Plus de « 7 jours » écrit pour tous : chaque
             // transporteur a SA garde (`gardeDe`), dite dans Achats, colis par colis.
-            sub:`Délai de retrait dépassé${pickupUnion.aVerifier.some(x=>x.e&&x.e.etat==='transporteur')?', ou le transporteur signale un problème':''} : ${nv>1?'regarde-les':'regarde-le'} dans Achats`,
-            tab:'cat_achats', prio:0.6 });
+            sub:`Délai de retrait dépassé${pickupUnion.aVerifier.some(x=>x.e&&x.e.etat==='transporteur')?', ou le transporteur signale un problème':''} : ${nv>1?'regarde-les':'regarde-le'} dans Colis à retirer`,
+            tab:'retraits', prio:0.6 });
         }
         // (29 oct.) LES ACHATS « AU POINT RELAIS » EN COURS DE VÉRIFICATION (ni
         // code ni n° de suivi : peut-être le même colis qu'un e-mail) — hors du
@@ -45910,8 +45802,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           const nc = pickupUnion.aConfirmer.length;
           jobs.push({ id:'retrait-en-verification', n:nc, icon:'box', color:C.muted,
             title:`${nc} achat${nc>1?'s':''} au point relais en cours de vérification`,
-            sub:`Vinted ${nc>1?'les dit':'le dit'} « déposé${nc>1?'s':''} en point relais », mais rien ne ${nc>1?'les':'le'} relie encore à un colis (ni code de retrait, ni n° de suivi) : ${nc>1?'ils ne comptent':'il ne compte'} pas dans « à retirer ». ${nc>1?'Regarde-les':'Regarde-le'} dans Achats.`,
-            tab:'cat_achats', prio:0.65 });
+            sub:`Vinted ${nc>1?'les dit':'le dit'} « déposé${nc>1?'s':''} en point relais », mais rien ne ${nc>1?'les':'le'} relie encore à un colis (ni code de retrait, ni n° de suivi) : ${nc>1?'ils ne comptent':'il ne compte'} pas dans « à retirer ». ${nc>1?'Regarde-les':'Regarde-le'} dans Colis à retirer.`,
+            tab:'retraits', prio:0.65 });
         }
         jobs.sort((a,b)=>a.prio-b.prio);
         // RÉSULTAT DU JOUR : les paires VENDUES aujourd'hui (pas l'argent viré,
@@ -45993,7 +45885,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           { id:'envoyer', ic:'truck', l:'À envoyer', t:tuiles.envoyer, tab:'cat_bord', pasSu: loading || pasLuComptes || (accounts.length>0 && sales.items==null) || ((ko || colisEb === null) && !(tuiles.envoyer && tuiles.envoyer.n)) },
           // (revue du 23 oct.) E-mails de suivi pas encore lus (ou lecture ratée)
           // ⇒ « — » : un total fait des seuls colis vus par Vinted est partiel.
-          { id:'retirer', ic:'box', l:'À retirer', t:tuiles.retirer, tab:'cat_achats', titrePasSu: trackingKO ? "E-mails de suivi pas lus — ouvre Achats pour réessayer" : null, pasSu: loading || pasLuComptes || tracking === null || (accounts.length>0 && (buys.items==null || achatsKO) && !(tuiles.retirer && tuiles.retirer.n)) },
+          { id:'retirer', ic:'box', l:'À retirer', t:tuiles.retirer, tab:'retraits', titrePasSu: trackingKO ? "E-mails de suivi pas lus — ouvre Colis à retirer pour réessayer" : null, pasSu: loading || pasLuComptes || tracking === null || (accounts.length>0 && (buys.items==null || achatsKO) && !(tuiles.retirer && tuiles.retirer.n)) },
           { id:'messages', ic:'chat', l:'Messages', t:tuiles.messages, tab:tuiles.messages && tuiles.messages.versEbay ? 'ebay_messages' : 'cat_msg', pasSu: loading || convs.items == null },
           { id:'prix', ic:'tag', l:'Prix à baisser', t:tuiles.prix, tab:'cat_annonces', pasSu: loading || listings.items == null },
         ];
@@ -47221,9 +47113,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       </>)}
 
 
-      {curSub==='achats' && (<div className="vrm-achats">
+      {curSub==='achats' && (<div className="vrm-achats" data-ecran-achats={modeRetraits?'retraits':'achats'}>
         {/* (26 oct.) Dans l'espace Vinted, l'onglet « Achats » sélectionné dit déjà le titre : pas deux fois (§7). */}
-        {!dansPlateforme && <ScreenHead icon="bag" title="Achats" desc="En route, à retirer avec leur code, et le prix payé."/>}
+        {!dansPlateforme && (modeRetraits
+          ? <ScreenHead icon="qr" title="Colis à retirer" desc="Les colis à aller chercher : code de retrait, date limite, point relais."/>
+          : <ScreenHead icon="bag" title="Achats" desc="En route, reçus, et le prix payé."/>)}
         <NoAcc/>
         {/* ⚠️ LE BANDEAU DE L'EXTENSION VIT AUSSI ICI, PAS SEULEMENT SUR MA
             JOURNÉE. C'est sur CET écran que Julien compte les codes qui
@@ -47238,7 +47132,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             après les cartes — alors qu'elle est en 1re sur Ventes. Deux écrans
             jumeaux organisés différemment, c'est ce qui rend la navigation
             hésitante : ce qu'on manipule tous les jours passe en premier. */}
-        <div className="vrm-seg vrm-seg-plein" role="group" aria-label="Étapes de tes achats" style={{marginBottom:16}}>
+        {!modeRetraits && <div className="vrm-seg vrm-seg-plein" role="group" aria-label="Étapes de tes achats" style={{marginBottom:16}}>
           {/* ⚠️ LES ONGLETS SONT LES ÉTAPES DU COLIS, pas des états de commande.
               C'est ça, un outil de réception : où en est chaque article entre
               « payée » et « dans le carton chez moi ». Le compte est affiché :
@@ -47252,10 +47146,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             // « 4 colis à retirer » en dessous, sur le même écran.
             // (revue du 23 oct.) E-mails de suivi pas lus ⇒ « — », jamais un total
             // partiel (les colis d'e-mail manqueraient) présenté comme complet.
-            return [['attente','À retirer',tracking===null?'—':pickupUnion.total],['route','En route',n.route],['recus','Reçus',n.recu],['all','Tous',null]].map(([id,label,cnt])=>(
+            // (31 oct., soir) Sur « Achats », plus d'étape « À retirer » : c'est
+            // l'écran voisin, « Colis à retirer » (pas deux fois la même chose).
+            return [...(modeListeAchats?[]:[['attente','À retirer',tracking===null?'—':pickupUnion.total]]),['route','En route',n.route],['recus','Reçus',n.recu],['all','Tous',null]].map(([id,label,cnt])=>(
             <button type="button" key={id} className="vrm-seg-btn" data-achats-onglet={id} data-n={cnt==null?undefined:String(cnt)} onClick={()=>setAFilter(id)} aria-pressed={aFilter===id} aria-label={cnt?`${label} ${cnt}`:undefined} style={{whiteSpace:'nowrap'}}>{label}{cnt?<span className="vrm-seg-n" title={String(cnt)}> {cnt>=1000?`${(Math.floor(cnt/100)/10).toLocaleString('fr-FR')} k`:cnt}</span>:null}</button>
           )); })()}
-        </div>
+        </div>}
         {/* ⚠️⚠️ UN ACHAT EN LITIGE NE SE CACHE PAS DERRIÈRE « TOUS » (revue du
             9 octobre). « Retour initié » range l'achat en « annulé » pour
             l'argent (aucune livraison à attendre) : il sortait donc de « En
@@ -47269,8 +47165,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             sur Vinted. Une ligne, le compte nommé une fois quand il est le même
             (§7), le lien vers SA conversation. « Pas su » se dit, jamais un
             « rien à confirmer ». */}
-        {aConfirmer.etat==='passu' && !baseKO && <div data-a-confirmer="passu" style={{fontSize:12.5,color:C.muted,margin:'4px 0 10px'}}>Colis à confirmer : pas pu lire — rien n'est perdu, réessaie dans un moment.</div>}
-        {aConfirmer.etat==='lu' && aConfirmer.liste.length>0 && (()=>{
+        {/* (31 oct., soir) « Tout est OK » avant la date limite : un geste sur le
+            colis qu'on vient de retirer — sur « Colis à retirer », pas sur « Achats ». */}
+        {!modeListeAchats && aConfirmer.etat==='passu' && !baseKO && <div data-a-confirmer="passu" style={{fontSize:12.5,color:C.muted,margin:'4px 0 10px'}}>Colis à confirmer : pas pu lire — rien n'est perdu, réessaie dans un moment.</div>}
+        {!modeListeAchats && aConfirmer.etat==='lu' && aConfirmer.liste.length>0 && (()=>{
           const l = aConfirmer.liste;
           const nomDe = (e)=>{ const a=(accounts||[]).find(x=>String(x.vinted_user_id)===String(e.uid)); return a?accNameOf(a):''; };
           const comptes = [...new Set(l.map(nomDe).filter(Boolean))];
@@ -47291,7 +47189,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             </div>
           );
         })()}
-        {aFilter!=='all' && (()=>{
+        {/* (31 oct., soir) Le litige est un ACHAT à renvoyer, pas un colis à aller
+            chercher : sur « Achats », en tête de chaque étape (Tous compris : c'est
+            désormais l'écran par défaut), jamais sur « Colis à retirer ». */}
+        {!modeRetraits && (aFilter!=='all' || modeListeAchats) && (()=>{
           const l = buysBase.filter(o=>ACHAT_A_RENVOYER.test(String(o.status||'')));
           if (!l.length) return null;
           const comptes = [...new Set(l.map(o=>o._acc?accNameOf(o._acc):"").filter(Boolean))];
@@ -47439,6 +47340,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           );
         })()}
         {aFilter==='attente' && <CarteRelaisColis donnees={groupesRelais} C={C}/>}
+        {/* (31 oct., soir) « Colis à retirer » sans rien à aller chercher le DIT —
+            seulement quand tout est lu (e-mails de suivi, achats) : pas su ≠ rien. */}
+        {modeRetraits && !baseKO && tracking!==null && !trackingKO && Array.isArray(buys.items) && !buys.error && pickupUnion.total===0
+          && !(pickupUnion.aVerifier||[]).length && !(pickupUnion.aConfirmer||[]).length && !(aConfirmer.etat==='lu' && aConfirmer.liste.length) && (
+          <div data-retraits-vide="" style={{fontSize:13.5,color:C.muted,padding:'18px 0',lineHeight:1.5}}>Aucun colis à aller chercher pour l'instant.</div>
+        )}
         {(()=>{
           const avail = pickupUnion.emailList;   // colis avec CODE/lieu (email transporteur)
           const extra = pickupUnion.extra;       // colis « déposé » (statut Vinted) sans code encore
@@ -47633,8 +47540,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                        il reste lu par un lecteur d'écran (§7, une fois).
                        (23 oct.) Les colis « à vérifier » ne sont PAS dans ce
                        nombre : ils ont leur bloc plus bas. */
-                    return (<div className={'vrm-pickup-title'+(hd===0&&sc===0?' vrm-sr':'')} style={{color:C.text}} data-pickup-total={pickupUnion.total} data-pickup-a-verifier={hd}>
-                      {pickupUnion.total} colis à retirer
+                    // (31 oct., soir) Sur « Colis à retirer », plus d'onglet « À retirer N »
+                    // au-dessus : ce titre porte le nombre, visible. E-mails de suivi pas lus ⇒
+                    // un total PARTIEL, dit « au moins » (§5), et `data-pickup-total` vaut « — ».
+                    const partiel = tracking===null;
+                    return (<div className={'vrm-pickup-title'+(!modeRetraits&&hd===0&&sc===0?' vrm-sr':'')} style={{color:C.text}} data-pickup-total={partiel?'—':pickupUnion.total} data-pickup-au-moins={partiel?String(pickupUnion.total):undefined} data-pickup-a-verifier={hd}>
+                      {partiel?'Au moins ':''}{pickupUnion.total} colis à retirer
                       {hd>0 && <span style={{color:C.warn,fontWeight:700}}> · {hd} à vérifier plus bas</span>}
                       {sc>0 && <span style={{color:C.muted,fontWeight:600}}> · {sc} en attente de leur code</span>}
                     </div>); })()}
@@ -48299,17 +48210,18 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             liste se replie (saisie occasionnelle, l'écran reste léger), mais
             « + Ajouter » est TOUJOURS là, en un tap. Le composant porte la
             règle ; ici on ne fait que brancher la clé synchronisée (§11). */}
-        <AchatsHorsPlateforme achats={offBuys} ouvert={offSecOpen} onBasculer={setOffSecOpen}
+        {/* (31 oct., soir) Un achat, pas un colis à aller chercher : sur « Achats » seulement. */}
+        {!modeRetraits && <AchatsHorsPlateforme achats={offBuys} ouvert={offSecOpen} onBasculer={setOffSecOpen}
           onAjouter={addOffBuy} onModifier={updOffBuy} onSupprimer={delOffBuy}
           paires={annBase.filter(it=>String((numeros[it.id]||{}).numero||'').trim()).map(it=>({ id: it.id, num: String((numeros[it.id]||{}).numero), title: it.title||'' })).sort((a,b)=>String(a.num).localeCompare(String(b.num),'fr',{numeric:true}))}
           prochainNumero={nextNumero}
-          onPrixParNumero={(nm,pr)=>setBuyByNum(prev=>{ const u={...prev,[nm]:pr}; save('vinted_buyprice_by_num',u); return u; })}/>
+          onPrixParNumero={(nm,pr)=>setBuyByNum(prev=>{ const u={...prev,[nm]:pr}; save('vinted_buyprice_by_num',u); return u; })}/>}
         {/* (Ancien bloc « Colis en route » retiré : le suivi est maintenant DANS
             chaque ligne d'achat ci-dessous — photo + statut + progression + Suivre.) */}
         {/* (la barre d'outils est remontée sous le titre, comme sur Ventes) */}
         {buys.loading && !buys.items && <Skeleton variant="row" count={5}/>}
         {buys.error && <LoadError onRetry={()=>loadOrders('purchased',setBuys,true)}/>}
-        {buys.items && !buys.error && buysBase.length===0 && (
+        {!modeRetraits && buys.items && !buys.error && buysBase.length===0 && (
           <EmptyState icon="🛍️" title="Aucun achat pour l'instant"
             desc="Tes achats Vinted arrivent ici tout seuls dès que l'extension a capté ton compte. Rien à faire."/>
         )}
@@ -48451,7 +48363,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         )}
         {/* (26 oct.) Les reçus par email sont une archive, pas le geste du jour :
             sous la liste, plus en tête (une carte « · 0 » poussait les colis vers le bas). */}
-        <div className="vrm-achats-recus-bas"><RecusEmail recus={recusAchat} autres={nonRecusAchat} relies={recusRelies && { ...recusRelies, nomsKo: recusRelies.ko.map((u) => { const a = (accounts || []).find((x) => String(x.vinted_user_id) === u); return a ? accNameOf(a) : `#${u}`; }) }} nom={NOM_RECU_ACHAT} onOuvrir={r=>setReceiptView(r)} onActualiser={()=>{setAchEmails(undefined);fetchEmailAchats().then(setAchEmails);}}/></div>
+        {/* (31 oct., soir) Les reçus d'achat : sur « Achats », pas sur « Colis à retirer ». */}
+        {!modeRetraits && <div className="vrm-achats-recus-bas"><RecusEmail recus={recusAchat} autres={nonRecusAchat} relies={recusRelies && { ...recusRelies, nomsKo: recusRelies.ko.map((u) => { const a = (accounts || []).find((x) => String(x.vinted_user_id) === u); return a ? accNameOf(a) : `#${u}`; }) }} nom={NOM_RECU_ACHAT} onOuvrir={r=>setReceiptView(r)} onActualiser={()=>{setAchEmails(undefined);fetchEmailAchats().then(setAchEmails);}}/></div>}
       </div>)}
 
       {/* ── Annonces (toutes en ligne, tous comptes) ── */}
@@ -55265,7 +55178,7 @@ function ActionsReglages({comptes,onOuvrir}) {
   </section>;
 }
 
-function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dark, toggleDark, notifEnabled, onToggleNotif }) {
+function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dark, toggleDark, notifEnabled, onToggleNotif, ebayCompte = null, ouvrir = null, onOuvert }) {
   // Actions sur le compte : une vraie fenêtre plutôt qu'un prompt du navigateur.
   // Un window.prompt ne se style pas, ne masque pas le mot de passe saisi, et
   // sur iPhone il s'affiche comme une alerte système au milieu de rien — c'est
@@ -55373,6 +55286,10 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
   const racine = React.useRef(null);
   const ouvrirSous = (id) => { setSous(id); try { racine.current && racine.current.scrollIntoView({ block: 'start' }); } catch (_) {} };
   React.useEffect(()=>{const ouvrir=()=>{DEMANDE_ADRESSES.on=false;setVueBrute('reglages');setSous('adresses');};window.addEventListener('vrm:ouvrir-adresses',ouvrir);return()=>window.removeEventListener('vrm:ouvrir-adresses',ouvrir);},[]);
+  // (31 oct., soir) Un lien vers l'ancien « eBay → Compte » (`?tab=plat_ebay&section=compte`)
+  // ouvre le panneau « Comptes eBay » — une fois, puis la demande est consommée.
+  React.useEffect(()=>{ if(ouvrir==='ebay'&&ebayCompte){ setVueBrute('reglages'); setSous('ebay'); if(onOuvert) onOuvert(); } /* eslint-disable-next-line */ },[ouvrir,!!ebayCompte]);
+  const versPlateforme=(p)=>{ if(p==='plat_ebay'&&ebayCompte){ setVueBrute('reglages'); ouvrirSous('ebay'); return; } if(onPlateforme) onPlateforme(p); };
   const fermerSous = () => { const id = sous; setSous(null); setTimeout(() => { try { const l = racine.current && racine.current.querySelector(`[data-sous-ouvrir="${id}"]`); if (l) { l.scrollIntoView({ block: 'center' }); l.focus({preventScroll:true}); } } catch (_) {} }, 0); };
   const setVue = (v) => { setVueBrute(v); setSous(null); try { localStorage.setItem('vrm_reglages_vue', v); } catch (_) {} };
 
@@ -55471,7 +55388,9 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
   const GROUPES_REGLAGES = [
     { id:'comptes', titre:'Comptes Vinted', items:[
       { id:'liens', type:'nav', ic:'link', lib:'Comptes liés', desc:'Pseudos et adresses de tes comptes', onClick:()=>setTab('vintedaccounts') },
-      { id:'connexions', type:'panneau', ic:'sync', lib:'État des connexions', desc:'Ce qui marche, ce qui attend un geste', titreInterne:true, el:<ConnexionsSetting key={AUTH.user?.id||'sans-session'} comptes={comptes||[]} onComptes={()=>setTab('vintedaccounts')} onPlateforme={onPlateforme}/> },
+      { id:'connexions', type:'panneau', ic:'sync', lib:'État des connexions', desc:'Ce qui marche, ce qui attend un geste', titreInterne:true, el:<ConnexionsSetting key={AUTH.user?.id||'sans-session'} comptes={comptes||[]} onComptes={()=>setTab('vintedaccounts')} onPlateforme={versPlateforme}/> },
+      // (31 oct., soir) L'ancien « eBay → Compte » : connexion et comptes eBay reliés.
+      ebayCompte && { id:'ebay', type:'panneau', ic:'link', lib:'Comptes eBay', desc:'Connexion à eBay, comptes reliés', titreInterne:true, el:ebayCompte },
       { id:'adresses', type:'panneau', ic:'mail', lib:'Réception des emails', desc:'Transfert et emails reçus', titreInterne:true, el:<EmailsSetting onComptes={()=>setTab('vintedaccounts')}/> },
       { id:'securite', type:'panneau', ic:'key', lib:'Sécurité des données', desc:'Qui peut lire et écrire tes données', el:<SecuriteSetting/> },
     ]},
@@ -59161,7 +59080,6 @@ function AppCoeur() {
   React.useEffect(()=>{ if(tab==='ebay_annonces'){ subVoulue.current='annonces'; setTab('plat_ebay'); } },[tab]);
   // (19 oct.) Colis mène à eBay → Ventes (la commande à poster) et à eBay → À
   // traiter (une annulation demandée).
-  React.useEffect(()=>{ if(tab==='ebay_agent'){ subVoulue.current='agent'; setTab('plat_ebay'); } },[tab]);
   // (21 oct.) Ma journée mène à eBay → Messages (sur le compte qui a des messages
   // quand il n'y en a qu'un).
   React.useEffect(()=>{ if(tab!=='ebay_messages')return; const d=DEMANDE_EBAY_MSG; if(d.compte && Date.now()-d.at<30000) setEbayVue(d.compte); d.compte=null; subVoulue.current='messages'; setTab('plat_ebay'); },[tab]);
@@ -59197,7 +59115,7 @@ function AppCoeur() {
     // banc, qui navigue par `?tab=`, croyait rendre Leboncoin alors qu'il
     // mesurait l'accueil (un faux vert dans ma propre couverture d'hier).
     // `journee` manquait aussi : invisible parce que c'est l'état de départ.
-    const TABS_OK=['ventes','annonces','messages','journee','collectif','plat_vinted','plat_leboncoin','plat_ebay','plat_vestiaire','prixmarche','dashboard','compta','cat_annonces','cat_ventes','cat_achats','cat_bord','cat_msg','cat_expedition','garage','organisation','communaute','invoices','masques','settings','vintedaccounts','catalog','sales','stockvinted','leboncoin','ebay_annonces','ebay_ventes','ebay_agent','ebay_messages','vinted_annonces'];
+    const TABS_OK=['ventes','annonces','messages','achats','retraits','journee','collectif','plat_vinted','plat_leboncoin','plat_ebay','plat_vestiaire','prixmarche','dashboard','compta','cat_annonces','cat_ventes','cat_achats','cat_bord','cat_msg','cat_expedition','garage','organisation','communaute','invoices','masques','settings','vintedaccounts','catalog','sales','stockvinted','leboncoin','ebay_annonces','ebay_ventes','ebay_agent','ebay_messages','vinted_annonces'];
     const goto=(search)=>{ try{ const p=new URLSearchParams(search); const t=p.get('tab'); if(p.get('print')==='bord') _pendingBordPrint=true; if(t&&TABS_OK.includes(t)){ const site=p.get('site'), section=p.get('section'); if(site&&estTacheSite(t)&&siteDeTache(t,site)===site) subVoulue.current=site; else if(section&&/^[a-z]{2,12}$/.test(section)&&t.startsWith('plat_')) subVoulue.current=section; setTab(t); window.history.replaceState(window.history.state,'',window.location.pathname); } }catch(_){}};
     goto(window.location.search);
     const onMsg=(e)=>{ if(e.data&&e.data.type==='open-url'&&e.data.url){ try{ goto(new URL(e.data.url,window.location.origin).search); }catch(_){}} };
@@ -59653,9 +59571,13 @@ function AppCoeur() {
   // (`vrm_colis_aposter`, §11), s'il a moins de 12 h — sinon AUCUN badge (pas
   // su ≠ 0, et jamais un nombre recalculé ici qui contredirait Colis).
   const lireColisBadge=()=>{ const pub=load('vrm_colis_aposter',null); return (pub && Number.isFinite(pub.total) && Date.now()-(Number(pub.at)||0)<12*3600000) ? pub.total : null; };
+  // (31 oct., soir) Le compteur de « Colis à retirer » : le nombre PUBLIÉ par
+  // l'écran des retraits (`vrm_colis_retirer`, §11), même règle de fraîcheur.
+  const lireRetraitsBadge=()=>{ const pub=load('vrm_colis_retirer',null); return (pub && Number.isFinite(pub.total) && Date.now()-(Number(pub.at)||0)<12*3600000) ? pub.total : null; };
   const [colisBadge,setColisBadge]=useState(lireColisBadge);
-  useEffect(()=>{ const f=(e)=>{ if(e && e.type==='vrm:save' && !(e.detail && e.detail.k==='vrm_colis_aposter')) return; setColisBadge(lireColisBadge()); };
-    window.addEventListener('vrm:colis',f); window.addEventListener('vrm:save',f); const stop=onCloudReady(()=>setColisBadge(lireColisBadge()));
+  const [retraitsBadge,setRetraitsBadge]=useState(lireRetraitsBadge);
+  useEffect(()=>{ const f=(e)=>{ if(e && e.type==='vrm:save' && !(e.detail && (e.detail.k==='vrm_colis_aposter'||e.detail.k==='vrm_colis_retirer'))) return; setColisBadge(lireColisBadge()); setRetraitsBadge(lireRetraitsBadge()); };
+    window.addEventListener('vrm:colis',f); window.addEventListener('vrm:save',f); const stop=onCloudReady(()=>{ setColisBadge(lireColisBadge()); setRetraitsBadge(lireRetraitsBadge()); });
     return ()=>{ window.removeEventListener('vrm:colis',f); window.removeEventListener('vrm:save',f); if(typeof stop==='function') stop(); }; },[]);
   // (29 oct.) L'agent eBay qui demande refait sa proposition une fois par
   // ouverture si le résumé a plus de 20 h (Ma journée, notification du matin).
@@ -60752,7 +60674,7 @@ function AppCoeur() {
               : extSaitLireCodes() === 'retard'
                 ? `${sans} colis à retirer — mets ton extension à jour pour qu'elle lise les codes`
                 : `${sans} colis à retirer — l'extension va chercher leur code`;
-          items.push({icon:'📦', ic:'box', text, n:total, tab:'cat_achats'});
+          items.push({icon:'📦', ic:'box', text, n:total, tab:'retraits'});
         }
       }
       // ⚠️ ON CONSOMME LE NOMBRE PUBLIÉ (§11), comme pour les colis à retirer.
@@ -60767,16 +60689,16 @@ function AppCoeur() {
       }
       if(toShipCount>0)  items.push({icon:'⏰', ic:'truck', text:`${toShipCount} vente${toShipCount>1?'s':''} à expédier`, n:toShipCount, tab:'cat_bord'});
       if(ebayShipCount>0) items.push({icon:'📮', ic:'truck', text:`${ebayShipCount} vente${ebayShipCount>1?'s':''} eBay à expédier`, n:ebayShipCount, tab:'plat_ebay', jr:true});
-      if(lbcDoubles>0) items.push({icon:'🟠', ic:'tag', text:`${lbcDoubles} article${lbcDoubles>1?'s':''} vendu${lbcDoubles>1?'s':''} sur Leboncoin, encore en vente sur Vinted — à retirer de Vinted`, n:lbcDoubles, tab:'leboncoin', dv:true});
-      if(lbcRemoveCount>0){ const noms=(lbcARetirer||[]).slice(0,3).map(r=>r.numero?`N°${r.numero}`:'').filter(Boolean); const reste=lbcRemoveCount-noms.length; items.push({icon:'🟠', ic:'tag', text: noms.length ? `${lbcRemoveCount} à retirer de Leboncoin — ${noms.join(', ')}${reste>0?` et ${reste} autre${reste>1?'s':''}`:''} vendue${lbcRemoveCount>1?'s':''} sur Vinted` : `${lbcRemoveCount} à retirer de Leboncoin (vendue${lbcRemoveCount>1?'s':''} sur Vinted)`, n:lbcRemoveCount, tab:'leboncoin', dv:true, avant:()=>{ DEMANDE_LBC_CIBLE.sel='[data-lbc-retirer]'; DEMANDE_LBC_CIBLE.at=Date.now(); }}); }
-      if(lbcRemoveEbayCount>0) items.push({icon:'🟠', ic:'tag', text:`${lbcRemoveEbayCount} à retirer de Leboncoin (vendue${lbcRemoveEbayCount>1?'s':''} sur eBay)`, n:lbcRemoveEbayCount, tab:'leboncoin', dv:true, avant:()=>{ DEMANDE_LBC_CIBLE.sel='[data-lbc-retirer-ebay]'; DEMANDE_LBC_CIBLE.at=Date.now(); }});
+      if(lbcDoubles>0) items.push({icon:'🟠', ic:'tag', text:`${lbcDoubles} article${lbcDoubles>1?'s':''} vendu${lbcDoubles>1?'s':''} sur Leboncoin, encore en vente sur Vinted — à retirer de Vinted`, n:lbcDoubles, tab:'leboncoin', dv:true, annonces:true});
+      if(lbcRemoveCount>0){ const noms=(lbcARetirer||[]).slice(0,3).map(r=>r.numero?`N°${r.numero}`:'').filter(Boolean); const reste=lbcRemoveCount-noms.length; items.push({icon:'🟠', ic:'tag', text: noms.length ? `${lbcRemoveCount} à retirer de Leboncoin — ${noms.join(', ')}${reste>0?` et ${reste} autre${reste>1?'s':''}`:''} vendue${lbcRemoveCount>1?'s':''} sur Vinted` : `${lbcRemoveCount} à retirer de Leboncoin (vendue${lbcRemoveCount>1?'s':''} sur Vinted)`, n:lbcRemoveCount, tab:'leboncoin', dv:true, lbcRetirer:true, avant:()=>{ DEMANDE_LBC_CIBLE.sel='[data-lbc-retirer]'; DEMANDE_LBC_CIBLE.at=Date.now(); }}); }
+      if(lbcRemoveEbayCount>0) items.push({icon:'🟠', ic:'tag', text:`${lbcRemoveEbayCount} à retirer de Leboncoin (vendue${lbcRemoveEbayCount>1?'s':''} sur eBay)`, n:lbcRemoveEbayCount, tab:'leboncoin', dv:true, lbcRetirer:true, avant:()=>{ DEMANDE_LBC_CIBLE.sel='[data-lbc-retirer-ebay]'; DEMANDE_LBC_CIBLE.at=Date.now(); }});
       // Une vente Leboncoin non reliée ne sonne plus (Julien, 16 oct. : « ça sert à
       // rien de relier une paire vendue ») : l'écran Leboncoin ne la demande que si
       // une paire qui y ressemble est encore en vente sur Vinted.
       if(ebayARetirer>0) items.push({icon:'🔵', ic:'tag', text:`${ebayARetirer} paire${ebayARetirer>1?'s':''} vendue${ebayARetirer>1?'s':''} sur Vinted, encore en vente sur eBay — à retirer d'eBay`, n:ebayARetirer, tab:'ebay_annonces', dv:true});
       if(ebayARetirerAilleurs>0) items.push({icon:'🔵', ic:'tag', text:`${ebayARetirerAilleurs} paire${ebayARetirerAilleurs>1?'s':''} vendue${ebayARetirerAilleurs>1?'s':''} sur Leboncoin, encore en vente sur eBay — à retirer d'eBay`, n:ebayARetirerAilleurs, tab:'ebay_annonces', dv:true});
       if(ebayAAnnuler>0) items.push({icon:'🔵', ic:'tag', text:`${ebayAAnnuler} paire${ebayAAnnuler>1?'s':''} vendue${ebayAAnnuler>1?'s':''} ${ebayAAnnulerOu}, programmée${ebayAAnnuler>1?'s':''} sur eBay — à annuler`, n:ebayAAnnuler, tab:'ebay_annonces', dv:true});
-      if(ebayARetirerVinted>0) items.push({icon:'🔵', ic:'tag', text:`${ebayARetirerVinted} paire${ebayARetirerVinted>1?'s':''} vendue${ebayARetirerVinted>1?'s':''} sur eBay, encore en vente sur Vinted — à retirer de Vinted`, n:ebayARetirerVinted, tab:'ebay_annonces', dv:true});
+      if(ebayARetirerVinted>0) items.push({icon:'🔵', ic:'tag', text:`${ebayARetirerVinted} paire${ebayARetirerVinted>1?'s':''} vendue${ebayARetirerVinted>1?'s':''} sur eBay, encore en vente sur Vinted — à retirer de Vinted`, n:ebayARetirerVinted, tab:'ebay_annonces', dv:true, annonces:true});
       // ⚠️ Retirés le 30 septembre, à la demande de Julien : « N messages non
       // lus » et « N offres reçues » ne sont pas intéressants ici — les offres
       // et les messages auront leur propre onglet (captation + envoi, comme
@@ -60786,8 +60708,8 @@ function AppCoeur() {
       // (29 oct.) L'AGENT eBAY QUI DEMANDE : le résumé PUBLIÉ par l'agent (§11) —
       // frais (48 h), non nul, et pas mis de côté aujourd'hui.
       { const l = ligneJourneeAgent(load('vrm_agent_ebay_resume', null), partsParis(Date.now()).date, Date.now(), load('vrm_agent_ebay_regles', null)); if (l) items.push({icon:'🛒', ic:'tag', text:l.text, n:l.n, tab:'ebay_agent', jr:true, job:'agent-ebay'}); }
-      if(numDbl.length>0) items.push({icon:'🚨', ic:'alert', text:`${numDbl.length} numéro${numDbl.length>1?'s':''} porté${numDbl.length>1?'s':''} par deux annonces (N°${numDbl.map(([n])=>n).slice(0,3).join(', N°')}) — la mauvaise paire peut partir`, n:numDbl.length, tab:'cat_annonces', dv:'num'});
-      if(noNumCount>0)   items.push({icon:'🔢', ic:'tag', text:`${noNumCount} annonce${noNumCount>1?'s':''} sans numéro`, n:noNumCount, tab:'cat_annonces', jr:true});
+      if(numDbl.length>0) items.push({icon:'🚨', ic:'alert', text:`${numDbl.length} numéro${numDbl.length>1?'s':''} porté${numDbl.length>1?'s':''} par deux annonces (N°${numDbl.map(([n])=>n).slice(0,3).join(', N°')}) — la mauvaise paire peut partir`, n:numDbl.length, tab:'cat_annonces', dv:'num', annonces:true});
+      if(noNumCount>0)   items.push({icon:'🔢', ic:'tag', text:`${noNumCount} annonce${noNumCount>1?'s':''} sans numéro`, n:noNumCount, tab:'cat_annonces', jr:true, annonces:true});
       if(sleepCount>0)   items.push({icon:'😴', ic:'sleep', text:`${sleepCount} annonce${sleepCount>1?'s':''} qui ${sleepCount>1?'dorment':'dort'} → baisser le prix`, n:sleepCount, tab:'cat_annonces'});
       // Rappel URSSAF : UNE notification, le 1er de chaque mois (et les deux
       // jours suivants, pour qui n'ouvre pas l'app le 1er). Julien, 30 sept. :
@@ -60873,72 +60795,99 @@ function AppCoeur() {
   if (MULTI_USER && authState.session && etatMfa(authState.session) !== 'ok') return <PorteMfa session={authState.session}/>;
 
   // ── LES ÉCRANS DE CHAQUE SITE, RENDUS PAR UNE SEULE FONCTION (31 oct.) ──────
-  // Vinted, Leboncoin et eBay sont rendus ICI, une fois : dans l'espace du site
-  // (`tab==='plat_…'`, ses sections propres) ET dans les tâches Ventes, Annonces,
-  // Messages filtrées sur ce site (`tache` vrai : ni en-tête de site ni sections,
-  // la rangée de filtres les remplace). Mêmes composants, mêmes props : le filtre
-  // « Vinted » EST l'écran Vinted d'avant (§11, aucune copie).
-  // Aller à une section d'un espace de site : une section devenue tâche
-  // (Ventes, Annonces, Messages) mène à la tâche filtrée sur ce site ; les
-  // autres restent dans l'espace du site (`setTab` → `redirigerOnglet`).
+  // Vinted, Leboncoin, eBay et Vestiaire sont rendus ICI, une fois : dans les
+  // tâches Ventes, Annonces, Messages, Achats filtrées sur ce site. Mêmes
+  // composants, mêmes props : le filtre « Vinted » EST l'écran Vinted d'avant
+  // (§11, aucune copie). (31 oct., soir) Les espaces de site à part
+  // (`plat_…`) ne sont plus montés : leurs sections propres sont des
+  // sous-onglets de la tâche (eBay : Commandes · À traiter · Offres, Annonces ·
+  // Promotion), Colis Leboncoin une sous-rangée de Colis, Compte eBay un
+  // panneau des Paramètres (`redirigerOnglet`, src/navigationTache.js).
+  // Aller à une section d'un site : `setTab` → `redirigerOnglet`.
   const allerSection=(onglet,x)=>{ subVoulue.current=x; setTab(onglet); };
-  const badgesNav={ cat_bord: colisBadge, messages: msgNonLus>0 };
-  // Vestiaire n'a qu'une page (Plateforme) : dans une tâche, son morceau.
+  // Les compteurs de la navigation (31 oct., soir — Julien : « plus de
+  // mini-notifications jaunes comme le 10 »). La MÊME pastille ambre partout
+  // (colonne, barre du bas, « Plus »), seulement quand le nombre de gestes est
+  // CONNU par la source qui le publie déjà (§11 : les mêmes nombres que Ma
+  // journée) — pas su ⇒ aucune pastille, jamais un « 0 » :
+  //  · Ventes et Colis : les colis à poster (`vrm_colis_aposter`) — « à
+  //    expédier » et « à poster » sont la même notion ;
+  //  · Colis à retirer : `vrm_colis_retirer` (le « À retirer » de Ma journée) ;
+  //  · Annonces : les lignes « à faire » de la cloche qui visent une annonce
+  //    (sans numéro, N° porté deux fois, à retirer de Vinted car vendue
+  //    ailleurs) ; eBay : le résumé de l'agent (« à traiter ») ; Leboncoin :
+  //    « à retirer de Leboncoin » — les lignes de `notifItems`, celles de Ma
+  //    journée ;
+  //  · Messages : un POINT (trois règles de comptage des non-lus coexistent ;
+  //    un chiffre ici pourrait contredire l'écran Messages).
+  // Favoris & offres, Republier, Vestiaire : aucune source ne publie ce nombre
+  // hors de leur écran — rien plutôt qu'un nombre recalculé ici.
+  const sommeNotif=(f)=>{ const l=(notifItems||[]).filter(x=>x&&f(x)); return l.length ? l.reduce((a,x)=>a+(Number(x.n)||0),0) : null; };
+  const nAgentEbay=sommeNotif(x=>x.job==='agent-ebay');
+  const nLbcRetirer=sommeNotif(x=>x.lbcRetirer);
+  const nAnnonces=sommeNotif(x=>x.annonces);
+  const badgesNav={ cat_bord: colisBadge, ventes: colisBadge, annonces: nAnnonces, retraits: retraitsBadge, messages: msgNonLus>0 };
+  const badgesRail={ ...badgesNav, plat_ebay: nAgentEbay, plat_leboncoin: nLbcRetirer };
+  // Vestiaire : ses morceaux, chacun dans SA tâche. Annonces · Vestiaire porte
+  // aussi ce qui servait à publier (ta clé Photoroom — sur l'écran Vestiaire,
+  // jamais dans les Paramètres, sa décision du 17 oct. — et le dernier passage
+  // de l'extension).
   const rendreVestiaire=(t)=>(
-    <section className="vrm-market-space" aria-label="Vestiaire" data-tache-vestiaire={t} style={{padding:16}}>
+    <section className="vrm-market-space" aria-label="Vestiaire" data-tache-vestiaire={t} style={{padding:16,display:'flex',flexDirection:'column',gap:18}}>
       {baseKO ? <LignePanne>Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui a échoué.</LignePanne>
         : t==='ventes' ? <VentesVestiaire comptes={vintedAccounts}/>
-        : t==='annonces' ? <PublierVestiaire comptes={vintedAccounts}/>
+        : t==='annonces' ? <>
+            <PublierVestiaire comptes={vintedAccounts}/>
+            <Card style={{padding:16}}>
+              <ClePhotoroom cadre={false}/>
+              <VestiaireMesure/>
+            </Card>
+          </>
+        : t==='achats' ? <AchatsVestiaire/>
         : <MessagesVestiaire/>}
     </section>
   );
-  // Ce que l'espace d'un site garde en propre, dit sous la tâche filtrée : une
-  // porte, pas un second écran (sur ordinateur comme sur téléphone).
-  // Vinted : ses achats sont l'écran Achats (entrée « Achats » de la navigation).
-  const PROPRE_SITE={ vinted:['cat_achats',null,'Tes achats Vinted'], leboncoin:['plat_leboncoin','achats','Aussi sur Leboncoin : achats, colis'], ebay:['plat_ebay','agent','Aussi sur eBay : à traiter, offres, promotion, achats, compte'], vestiaire:['plat_vestiaire',null,'Toute la page Vestiaire : publier, ventes, messages, achats, ta clé Photoroom'] };
-  const TITRES_TACHE={ ventes:'Ventes', annonces:'Annonces', messages:'Messages' };
+  const TITRES_TACHE={ ventes:'Ventes', annonces:'Annonces', messages:'Messages', achats:'Achats' };
   const rendreTache=(t)=>{
     const site=siteDeTache(t,platSub);
-    const propre=PROPRE_SITE[site];
+    const sec=sectionDeTache(t,platSub);
+    const sous=sousSections(t,site);
     return (
-      <section className="vrm-tache" data-tache={t} data-tache-site={site} aria-label={TITRES_TACHE[t]}>
+      <section className="vrm-tache" data-tache={t} data-tache-site={site} data-tache-section={sec} aria-label={TITRES_TACHE[t]}>
         <header className="vrm-market-heading vrm-tache-tete" data-tache-tete={t}>
           <h1>{TITRES_TACHE[t]}</h1>
         </header>
         <div className="vrm-tache-filtres" style={{padding:'0 16px'}}>
           <FiltreSites tache={t} site={site} sites={sitesPresents} onSite={(s)=>setPlatSub(s)}/>
+          {/* Les sections propres du site, sous son filtre (31 oct., soir) : la
+              même forme que les rubriques de l'app (`PlatSubNav`). */}
+          {sous && <div className="vrm-tache-sous" data-tache-sous={t+'.'+site}><PlatSubNav sub={sec} setSub={(x)=>{ setEbayCible(null); setPlatSub(subDeTache(site,x)); }} sections={sous}/></div>}
         </div>
         {site==='toutes'
           ? (baseKO ? <div style={{padding:16}}><LignePanne>Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui a échoué.</LignePanne></div>
             : <VentesToutes sites={sitesPresents} ventesVinted={ventesCoque} ventesKO={ventesKO} comptes={vintedAccounts} panelOff={panelOffCoque} lbcVentes={lbcVentes} lbcLu={lbcCoqueLu} ebayTous={ebayCmdTous}
                 onOuvrir={(l)=>{ if(l.site==='ebay'){ DEMANDE_EBAY_CIBLE.compte=l.compteRef||null; DEMANDE_EBAY_CIBLE.id=l.id; DEMANDE_EBAY_CIBLE.at=Date.now(); setTab('ebay_ventes'); return; } setPlatSub(l.site); }}/>)
-          : site==='vinted' ? rendreVinted(t,true)
-          : site==='leboncoin' ? rendreLeboncoin(t,true)
-          : site==='ebay' ? rendreEbay(t,true)
+          : site==='vinted' ? rendreVinted(sec)
+          : site==='leboncoin' ? rendreLeboncoin(sec)
+          : site==='ebay' ? rendreEbay(sec)
           : rendreVestiaire(t)}
-        {site!=='toutes' && propre && (
-          <div style={{padding:'4px 16px 20px'}}>
-            <button type="button" className="vrm-lien-action" data-espace-site={site} onClick={()=>{ if(propre[0]==='cat_achats'){ VUE_ACHATS_NAV='all'; demanderVue('achats'); } if(propre[1]) subVoulue.current=propre[1]; setTab(propre[0]); }}
-              style={{minHeight:44,background:'transparent',border:0,padding:0,color:C.muted,fontSize:13,fontFamily:'inherit',cursor:'pointer',textAlign:'left'}}>
-              {propre[2]} ›
-            </button>
-          </div>
-        )}
       </section>
     );
   };
-  const rendreVinted=(sec,tache)=>{ const allerSec=(x)=>allerSection('plat_vinted',x); return (<section className="vrm-market-space" aria-label="Vinted"><DansEspacePlateforme.Provider value={!tache}>{!tache&&<EntetePlateforme nom="Vinted" plateforme="vinted"/>}
+  const rendreVinted=(sec)=>{ const achats=sec==='achats'; return (<section className="vrm-market-space" aria-label="Vinted">
           {/* Résumé CA/argent TOUJOURS visible en haut, puis la liste (ventes par
               défaut) directement — plus d'écran « Aperçu » intermédiaire. Les
               sections restent les mêmes écrans (§11), juste à un tap. */}
-          <VintedResume liveStats={liveStatsVus} baseKO={baseKO} siAJour={sec!=='annonces'} sauf={(sec || 'ventes') === 'ventes' ? (liveStatsVus && liveStatsVus.venduManque) : null}/>
+          {/* (31 oct., soir) Pas sur Achats : le chiffre d'affaires et l'argent
+              Vinted ne disent rien de ce qu'il a acheté (comme l'ancien écran Achats). */}
+          {!achats && <VintedResume liveStats={liveStatsVus} baseKO={baseKO} siAJour={sec!=='annonces'} sauf={(sec || 'ventes') === 'ventes' ? (liveStatsVus && liveStatsVus.venduManque) : null}/>}
           {/* PARITÉ (26 oct.) : eBay et Leboncoin portent une to-do rangée « À
               faire » en tête de leur espace ; la to-do de Vinted, c'est « Ma
               journée » — mais depuis l'espace Vinted elle n'était joignable
               nulle part. Une entrée, pas un second calcul : « Ma journée » est
               cross-plateforme et reste l'unique propriétaire de la liste (§11,
               aucun compteur dupliqué ici qui pourrait diverger). */}
-          {!baseKO && !premierJour && (
+          {!baseKO && !premierJour && !achats && (
             <div style={{ padding: '10px 16px 0' }}>
               {/* (26 oct., « trop brouillon ») Une ligne, pas une carte de deux lignes :
                   l'explication est dans Ma journée elle-même. */}
@@ -60953,16 +60902,15 @@ function AppCoeur() {
               L'écran complet existait (liste tous comptes, fil, réponse, offres)
               mais n'avait plus AUCUNE porte dans Vinted : seulement la cloche. */}
           {/* (31 oct., navigation par tâche) Ventes, Annonces et Messages sont des TÂCHES (barre du bas) : l'espace Vinted ne garde que ce qui lui est propre. */}
-          {!tache&&sectionsSite('vinted').length>1&&<PlatSubNav sub={sec} setSub={allerSec} sections={sectionsSite('vinted')}/>}
           {/* Filtre par compte (Julien, 6 oct.) — Ventes / Annonces / Achats /
               Messages. Les Colis ne sont pas filtrés (« pour les colis pas
               forcément »). Un seul compte ⇒ la rangée ne s'affiche pas. */}
           {(sec==='ventes'||sec==='annonces'||sec==='achats'||sec==='messages') && <SelecteurCompte accounts={comptesChoisissables} sel={compteSel} setSel={setCompteSel} connecte={compteConnecte} messages={sec==='messages'}/>}
           {/* Sous la navigation, pas entre le résumé et elle (revue du 17 oct.). */}
           {sec==='ventes' && !baseKO && <div className="vrm-retirer-hote" style={{padding:'10px 16px 0'}}><RetirerArgent liveStats={liveStatsVus}/></div>}
-          <Comptabilite key={'pv_'+sec} accounts={vintedAccounts} only={sec==='apercu'?'ventes':sec} liveStats={liveStatsVus} accountsReady={accountsLoaded} baseKO={baseKO} onNav={setTab} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}} onFreeNum={freeGarageNum} compteSel={compteSel} compteConnecte={compteConnecte} dansPlateforme/>
-        </DansEspacePlateforme.Provider></section>); };
-  const rendreLeboncoin=(sec,tache)=>{ const allerSec=(x)=>allerSection('plat_leboncoin',x); return (<section className="vrm-market-space" aria-label="Leboncoin"><DansEspacePlateforme.Provider value={!tache}>{!tache&&<EntetePlateforme nom="Leboncoin" plateforme="leboncoin"/>}
+          <Comptabilite key={'pv_'+sec} accounts={vintedAccounts} only={sec==='apercu'?'ventes':sec} liveStats={liveStatsVus} accountsReady={accountsLoaded} baseKO={baseKO} onNav={setTab} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}} onFreeNum={freeGarageNum} compteSel={compteSel} compteConnecte={compteConnecte} dansPlateforme vueAchats={achats?'achats':undefined}/>
+        </section>); };
+  const rendreLeboncoin=(sec)=>{ return (<section className="vrm-market-space" aria-label="Leboncoin">
           {/* Julien : « Leboncoin, la même mise en page que Vinted ». Vinted a
               Ventes / Achats / Annonces ; côté Leboncoin on a maintenant les
               VENTES et les ACHATS (les deux prouvés par `isSeller`, cf.
@@ -60975,11 +60923,11 @@ function AppCoeur() {
               : null;
             // Sur « Ventes », les trois cases disent déjà ces montants : le résumé
             // du haut se tait (le même nombre deux fois sur un écran, §7).
-            if (sec === 'ventes') return null;
+            // (31 oct., soir) Sur Achats non plus : ce sont des montants de ventes.
+            if (sec === 'ventes' || sec === 'achats') return null;
             return (
             <PlatResume baseKO={baseKO} note={note} cases={[[`CA finalisé${ar.nRecu ? ' · ' + ar.nRecu : ''}`, ar.actives ? e2(ar.recu) : null], [`En attente${ar.nAttente ? ' · ' + ar.nAttente : ''}`, ar.actives ? e2(ar.attente) : null, true]]}/>
           ); })()}
-          {!tache&&<PlatSubNav sub={sec} setSub={allerSec} sections={sectionsSite('leboncoin')}/>}
           {sec==='messages'&&<div style={{padding:16}}>{baseKO?<LignePanne>Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui a échoué.</LignePanne>:<MessagesLeboncoin/>}</div>}
           {sec==='ventes'&&<div style={{padding:16}}>{baseKO?<LignePanne>Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui a échoué.</LignePanne>:<>
             {(() => { const ar = lbcArgent(lbcVentes); const vide = !(lbcVentes.ventes||[]).length && !lbcVentes.inconnues; const lu = !!lbcVentes.maj;
@@ -60993,7 +60941,6 @@ function AppCoeur() {
             {((lbcVentes.ventes||[]).length>0||lbcVentes.inconnues>0) && <VentesLeboncoin lbcVentes={lbcVentes} sansTotaux/>}
           </>}</div>}
           {sec==='achats'&&<div style={{padding:16}}>{baseKO?<LignePanne>Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui a échoué.</LignePanne>:<AchatsLeboncoin lbcVentes={lbcVentes}/>}</div>}
-          {sec==='colis'&&(baseKO?<div style={{padding:16}}><LignePanne>Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui a échoué.</LignePanne></div>:<LeboncoinColis lbcVentes={lbcVentes}/>)}
           {/* ⚠️ Les quatre sous-onglets voisins se gardaient de la panne, celui-ci
               non : pendant une panne il disait sa lecture ratée en quatre
               messages, plus « ouvre leboncoin.fr » — le mauvais geste (§7). */}
@@ -61001,8 +60948,8 @@ function AppCoeur() {
           {/* (27 oct.) Le diagnostic est une aide en cas de souci : en bas de
               l'espace, plus une ligne en tête de chaque section. */}
           <div data-diag-lbc="" style={{padding:'0 16px'}}><DiagnosticLeboncoin key={AUTH.user?.id||'sans-session'} lire={q=>lireReceptionLeboncoin(`${SUPABASE_URL}/rest/v1/${q}`,sbAuth())} couleurs={C}/></div>
-        </DansEspacePlateforme.Provider></section>); };
-  const rendreEbay=(sec,tache)=>{ const allerSec=(x)=>allerSection('plat_ebay',x); return (<section className="vrm-market-space" aria-label="eBay"><DansEspacePlateforme.Provider value={!tache}>{!tache&&<EntetePlateforme nom="eBay" plateforme="ebay"/>}
+        </section>); };
+  const rendreEbay=(sec)=>{ const allerSec=(x)=>allerSection('plat_ebay',x); return (<section className="vrm-market-space" aria-label="eBay">
           {/* Julien : « eBay, je veux tout pareil que Vinted — les onglets achats,
               ventes ». Même structure, dans le skin eBay (noir). Aperçu garde la
               connexion + la publication ; Ventes liste les commandes captées ;
@@ -61019,10 +60966,9 @@ function AppCoeur() {
             const nomVue = plusieurs && ebayVueEff !== '*' ? nomCompteEbay(comptesEbay.find((c) => c.ref === ebayVueEff)) : '';
             const lib = 'Ventes payées' + (plusieurs ? (ebayVueEff === '*' ? ` · ${comptesEbay.length} comptes` : ` · ${nomVue}`) : '');
             const note = illVue.length ? `Je n'ai pas pu lire les ventes ${illVue.length > 1 ? 'des comptes eBay' : 'du compte eBay'} ${illVue.map(nomCompteEbay).join(', ')} — rien n'est perdu, réessaie dans un moment.` : null;
-            if (sec === 'ventes') return null;   // les trois cases de « Ventes » le disent (§7)
+            if (sec === 'ventes' || sec === 'achats') return null;   // les trois cases de « Ventes » le disent (§7) ; Achats : des montants de ventes
             return <PlatResume dark baseKO={baseKO} note={note} cases={[[lib, ca != null ? fmt(ca) : null]]}/>;
           })()}
-          {!tache&&<div><PlatSubNav sub={sec} setSub={sub=>{setEbayCible(null);allerSec(sub);}} sections={sectionsSite('ebay')} dark/></div>}
           {/* Le SÉLECTEUR DE COMPTE : seulement à partir de deux comptes reliés
               (un seul compte : rien ne change). La même forme que la liste des
               comptes Vinted (§11). Il ne change que ce qu'on VOIT. */}
@@ -61039,8 +60985,11 @@ function AppCoeur() {
           {sec==='achats'&&<EbayAchatsOnglet headers={enTeteSession} panelOff={panelOffCoque} vue={ebayVueEff} comptes={comptesEbay} onCompte={setEbayVue}/>}
           {sec==='offres'&&<div style={{padding:16}}><EbayActionCompte vue={ebayVueEff} comptes={comptesEbay} onCompte={setEbayVue}>{ref=><EbayOffres key={ref} cible={ebayCible?.compte===ref && ebayCible.section==='offres'?ebayCible:null} onClearCible={()=>setEbayCible(null)} headers={enTeteSession} confirm={askConfirm} theme={C} compte={ref} onAnnonces={()=>allerSec('annonces')}/>}</EbayActionCompte></div>}
           {sec==='annonces'&&<EbayAnnonces baseKO={baseKO} comptes={vintedAccounts} vue={ebayVueEff} comptesEbay={comptesEbay}/>}
-          {sec==='compte'&&<div data-ebay-compte-section="" style={{ padding: 16 }}>{baseKO?<div style={{ color: EBAY_SKIN.muted, fontSize: 13 }}>Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui a échoué.</div>:<EbayConnexion onAnnonces={()=>allerSec('annonces')} vue={ebayVueEff} comptesEbay={comptesEbay}/>}</div>}
-        </DansEspacePlateforme.Provider></section>); };
+        </section>); };
+  // Compte eBay : un panneau des Paramètres (« Comptes eBay »), dans le skin eBay.
+  const ebayCompteReglage=(
+    <div data-ebay-compte-section="" style={{ padding: 16, background: EBAY_SKIN.bg, borderRadius: 12 }}>{baseKO?<div style={{ color: EBAY_SKIN.muted, fontSize: 13 }}>Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui a échoué.</div>:<EbayConnexion onAnnonces={()=>setTab('ebay_annonces')} vue={ebayVueEff} comptesEbay={comptesEbay}/>}</div>
+  );
 
   return (
     <div className="vrm-app-shell" style={{...variablesTheme(C,dark),height:'100%',width:'100%',display:'flex',flexDirection:'column',overflowX:'clip',background:C.bg,color:C.text,fontFamily:'inherit',transition:'background .3s,color .3s',boxSizing:'border-box'}}
@@ -61236,7 +61185,7 @@ function AppCoeur() {
             ))}
             {achats.length>0 && <div style={{fontSize:11,fontWeight:700,color:C.muted,textTransform:'uppercase',letterSpacing:0.4,margin:'14px 2px 6px'}}>Achats ({achats.length})</div>}
             {achats.map((o,i)=>(
-              <button key={'a'+(o.transaction_id||i)} type="button" onClick={()=>go('cat_achats')}
+              <button key={'a'+(o.transaction_id||i)} type="button" onClick={()=>go('achats')}
                 style={{width:'100%',display:'flex',alignItems:'center',gap:11,padding:'9px 10px',marginBottom:6,background:C.card,border:`1px solid ${C.border}`,borderRadius:10,cursor:'pointer',fontFamily:'inherit',textAlign:'left'}}>
                 {thumb(orderPhoto(o),'📦')}
                 <div style={{flex:1,minWidth:0}}>
@@ -61310,7 +61259,7 @@ function AppCoeur() {
             sur la coque, pour tous les écrans (src/photosVinted.js). */}
         {!baseKO && <PhotosBloquees/>}
         <BlocNumerosPerimes/>
-        {tab==='settings'&&<SettingsScreen setTab={setTab} onPlateforme={plat=>{subVoulue.current=plat==='plat_leboncoin'?'annonces':'compte';setTab(plat);}} comptes={vintedAccounts}
+        {tab==='settings'&&<SettingsScreen setTab={setTab} onPlateforme={plat=>{subVoulue.current=plat==='plat_leboncoin'?'annonces':'compte';setTab(plat);}} ebayCompte={sitesPresents.has('ebay')?ebayCompteReglage:null} ouvrir={platSub==='ebay'?'ebay':null} onOuvert={()=>setPlatSub('reglages')} comptes={vintedAccounts}
 
           notifEnabled={notifEnabled}
           onToggleNotif={async()=>{
@@ -61513,11 +61462,8 @@ function AppCoeur() {
         {tab==='ventes'&&rendreTache('ventes')}
         {tab==='annonces'&&rendreTache('annonces')}
         {tab==='messages'&&rendreTache('messages')}
-        {tab==='plat_vinted'&&rendreVinted(platSub,false)}
-        {tab==='plat_leboncoin'&&rendreLeboncoin(platSub,false)}
-        {tab==='plat_ebay'&&rendreEbay(platSub,false)}
-        {agentFond&&accountsLoaded&&!baseKO&&Array.isArray(comptesEbay)&&comptesEbay.length>0&&!(tab==='plat_ebay'&&platSub==='agent')&&<AgentEbayFond comptes={vintedAccounts} comptesEbay={comptesEbay}/>}
-        {tab==='plat_vestiaire'&&<Plateforme plat="Vestiaire Collective" liveStats={liveStatsVus} lbcVentes={lbcVentes} onGo={setTab} baseKO={baseKO} comptes={vintedAccounts}/>}
+        {tab==='achats'&&rendreTache('achats')}
+        {agentFond&&accountsLoaded&&!baseKO&&Array.isArray(comptesEbay)&&comptesEbay.length>0&&!(tab==='ventes'&&siteDeTache('ventes',platSub)==='ebay'&&sectionDeTache('ventes',platSub)==='agent')&&<AgentEbayFond comptes={vintedAccounts} comptesEbay={comptesEbay}/>}
         {tab==='inventory'&&<Inventory inventory={inventory} setInventory={setInventory} accounts={vintedAccounts} garageGrid={garageGrid} labels={accountLabels} onLocate={(numero)=>{ setGarageLocate(String(numero)); setTab('garage'); }}/>}
         {tab==='catalog'  &&<Catalog   catalog={catalog} setCatalog={setCatalog} onDeleteId={(id)=>{
           const norm=v=>String(v||'').trim();
@@ -61536,7 +61482,14 @@ function AppCoeur() {
         {tab==='comptabilite'&&<Comptabilite accounts={vintedAccounts} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}}/>}
         {tab==='compta'&&<div className="vrm-rubriques" style={{padding:'12px 16px 0'}}><PlatSubNav sub={platSub==='factures'?'factures':'compta'} setSub={setPlatSub} sections={/* (30 oct.) « Comptabilité » était écrit deux fois en tête (segment + titre) : « Vue d’ensemble », comme Statistiques */ [['compta','Vue d’ensemble'],['factures','Factures']]}/></div>}
         {tab==='compta'&&platSub!=='factures'&&<ComptaPro liveStats={liveStatsVus} onNav={setTab} lbcVentes={lbcVentes} lbcCoqueLu={lbcCoqueLu} ebayCommandes={ebayCommandes} panelOff={panelOffCoque} accounts={vintedAccounts}/>}
-        {(()=>{ const map={cat_annonces:'annonces',cat_ventes:'ventes',cat_achats:'achats',cat_bord:'bordereaux',cat_expedition:'bordereaux'}; return map[tab] ? <Comptabilite key={tab} accounts={vintedAccounts} only={map[tab]} liveStats={liveStatsVus} accountsReady={accountsLoaded} baseKO={baseKO} onNav={setTab} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}} onFreeNum={freeGarageNum}/> : null; })()}
+        {/* (31 oct., soir) Colis : une sous-rangée « Vinted et eBay · Leboncoin »
+            quand il a un compte Leboncoin — les colis Leboncoin (bordereau, QR)
+            ont leur écran (`LeboncoinColis`), l'ancien « Leboncoin → Colis ». */}
+        {tab==='cat_bord'&&(!sitesPresents||sitesPresents.has('leboncoin'))&&<div className="vrm-rubriques" data-colis-site="" style={{padding:'12px 16px 0'}}><PlatSubNav sub={platSub==='leboncoin'?'leboncoin':'tous'} setSub={(x)=>setPlatSub(x==='leboncoin'?'leboncoin':'tous')} sections={[['tous','Vinted et eBay'],['leboncoin','Leboncoin']]}/></div>}
+        {tab==='cat_bord'&&platSub==='leboncoin'&&(baseKO?<div style={{padding:16}}><LignePanne>Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui a échoué.</LignePanne></div>:<LeboncoinColis lbcVentes={lbcVentes}/>)}
+        {/* (31 oct., soir) « Colis à retirer » (`retraits`) : l'écran des achats
+            réduit aux colis à aller chercher ; « Achats » est la tâche `achats`. */}
+        {(()=>{ const map={cat_annonces:'annonces',cat_ventes:'ventes',retraits:'achats',cat_bord:'bordereaux',cat_expedition:'bordereaux'}; if(tab==='cat_bord'&&platSub==='leboncoin') return null; return map[tab] ? <Comptabilite key={tab} accounts={vintedAccounts} only={map[tab]} liveStats={liveStatsVus} accountsReady={accountsLoaded} baseKO={baseKO} onNav={setTab} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}} onFreeNum={freeGarageNum} vueAchats={tab==='retraits'?'retraits':undefined}/> : null; })()}
         {tab==='vintedaccounts'&&<VintedAccounts accounts={vintedAccounts} setAccounts={setVintedAccounts} baseKO={baseKO} onRetour={()=>setTab('settings')}/>}
         </>)}
         </EcranGardeFou>
@@ -61547,7 +61500,7 @@ function AppCoeur() {
       <MemoireDefilement ecran={`${tab}:${(tab.startsWith('plat_')||estTacheSite(tab))?platSub:''}`}/>
       {/* Une seule navigation à la fois : latérale sur ordinateur, en bas sur
           téléphone. Jamais les deux — c'est la même liste d'écrans. */}
-      {ordi ? <SideBar tab={tab} setTab={setTab} entreprise={entreprise} sites={sitesPresents} badges={badgesNav}/> : <BottomBar tab={tab} setTab={setTab} sites={sitesPresents} badges={badgesNav}/>}
+      {ordi ? <SideBar tab={tab} setTab={setTab} entreprise={entreprise} sites={sitesPresents} badges={badgesRail}/> : <BottomBar tab={tab} setTab={setTab} sites={sitesPresents} badges={badgesNav}/>}
       {showBackup&&<BackupModal
         catalog={catalog} sales={sales} garageGrid={garageGrid} blockedCells={blockedCells}
         onClose={()=>setShowBackup(false)}

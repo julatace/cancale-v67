@@ -75,7 +75,8 @@ async function ouvrir(b, vp, { version = '5.295.0', suite = 'fait', appris = tru
     return j([]);
   });
   await pg.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"pret":true}' }));
-  await pg.goto(`http://localhost:${PORT}/?tab=plat_vestiaire`, { waitUntil: 'domcontentloaded' });
+  // (31 oct., soir) Les messages Vestiaire vivent dans Messages · Vestiaire (plus de page Vestiaire à part).
+  await pg.goto(`http://localhost:${PORT}/?tab=messages&site=vestiaire`, { waitUntil: 'domcontentloaded' });
   await pg.waitForSelector('[data-vc-messages="lu"]', { timeout: 15000 }).catch(() => {});
   return { ctx, pg, errs };
 }

@@ -222,7 +222,7 @@ const capturer = async (pg, nom, vp) => {
       for (const [onglet, nomOnglet] of [['attente', 'a-retirer'], ['all', 'tous']]) {
         console.log(`\n── Achats · ${nomOnglet} · ${T}`);
         await essaie(`achats ${nomOnglet} ${T}`, async () => {
-          const { ctx, pg, errs } = await ouvrir(b, vp, 'cat_achats');
+          const { ctx, pg, errs } = await ouvrir(b, vp, onglet === 'all' ? 'achats' : 'cat_achats');   // (31 oct., soir) « Tous » vit sur Achats, « À retirer » sur Colis à retirer (`cat_achats` y mène)
           await pg.waitForFunction(() => document.querySelector('.vrm-pickup-code') || /pas pu s'afficher/.test(document.body.innerText), null, { timeout: 15000 }).catch(() => {});
           if (onglet === 'all') {
             await pg.evaluate(() => { const b = [...document.querySelectorAll('button[aria-pressed]')].find((x) => /^Tous/.test(x.innerText.trim())); if (b) b.click(); });
