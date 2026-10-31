@@ -1693,6 +1693,7 @@ const authBoot = async () => {
 // vendeur, dans les 30 s ; sinon AppCoeur relit.
 let _confidentialiteUid='';
 let _prechargeComptes = null;   // { at, qui, promesse }
+let _prechargeLancePour = '';   // le vendeur pour qui le préchargement est déjà parti
 const prechargerDemarrage = () => {
   try {
     if (typeof window === 'undefined' || _prechargeComptes) return;
@@ -1709,6 +1710,15 @@ const prechargerDemarrage = () => {
       }
     }
     const qui = (AUTH.user && AUTH.user.id) || 'local';
+    // ⚠️ (31 oct., banc vitesse) UNE fois par vendeur et par ouverture.
+    //    `PorteEquipe` appelle cette fonction À CHAQUE RENDU ; une fois le
+    //    préchargement repris par AppCoeur (`_prechargeComptes` remis à null),
+    //    le rendu suivant de la porte (la réponse de l'équipe qui arrive)
+    //    relançait TOUT : comptes, comptes supprimés, commandes de toute la
+    //    famille (447 Ko) — +20 à +30 lectures sur chaque écran, dont 12 à 29
+    //    identiques, pour rien (AppCoeur avait déjà les siennes).
+    if (_prechargeLancePour === qui) return;
+    _prechargeLancePour = qui;
     const promesse = fetchVintedAccounts();
     // Les commandes de TOUS les comptes en une lecture, EN MÊME TEMPS que la liste
     // des comptes (on ne connaît pas encore leurs identifiants). ⚠️ Au premier
@@ -19472,14 +19482,15 @@ function relireTransporteursSiVieux({ force = false } = {}) {
       ecrireLocalJson('vrm_transp_vol', { at: maintenant });
       let r = null, j = null;
       try {
-        // ⚠️ Un `Request`, pas une adresse : `lecturesPartagees` le laisse passer
-        // SANS vider ses lectures. Un POST vers /api/ y vaut une écriture et vide
+        // ⚠️ `vrmInvalideSiChange` : `lecturesPartagees` le laisse passer SANS
+        // vider ses lectures (un `Request` ne suffit plus depuis ea0b573, 29 oct. :
+        // toute écriture Request vide). Un POST vers /api/ y vaut une écriture et vide
         // tout — à l'ouverture, ce passage refaisait TOUTES les lectures du
         // démarrage en vol (mesuré au banc vitesse.cjs, Ma journée à 390 px :
         // 57 → 64 lectures, 6 → 12 en double, les ventes au 3ᵉ aller-retour au
         // lieu du 2ᵉ). Ce passage n'écrit que les lignes `transp_*` : quand il
         // rend un changement, on vide les lectures partagées AVANT de prévenir.
-        r = await fetch(new Request('/api/relais?mode=transp', { method: 'POST', headers: { 'content-type': 'application/json', ...enTeteSession() }, body: JSON.stringify({ v: 1 }) }));
+        r = await fetch('/api/relais?mode=transp', { method: 'POST', headers: { 'content-type': 'application/json', ...enTeteSession() }, body: JSON.stringify({ v: 1 }), vrmInvalideSiChange: true });
         j = await r.json().catch(() => null);
       } catch (_) { r = null; }
       if (!r || !r.ok || !j || j.ok !== true) {
@@ -52022,10 +52033,14 @@ async function publierLbcARetirer(liste) {
   const empreinte = JSON.stringify(propre);
   const memo = load('vrm_lbc_a_retirer_pub', null);
   if (memo && memo.e === empreinte && Date.now() - Number(memo.at || 0) < 6 * 3600e3) return;
+  // Deux rendus rapprochés lançaient la MÊME écriture avant que le mémo soit
+  // posé (trois POST identiques au chargement) : une seule en vol par empreinte.
+  if (publierLbcARetirer.enVol === empreinte) return;
+  publierLbcARetirer.enVol = empreinte;
   try {
     const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=${SB_CONFLICT}`, { method: 'POST', headers: sbAuth({ 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' }), body: JSON.stringify(withOwner({ id: 'lbc_a_retirer', data: { v: 1, at: new Date().toISOString(), liste: propre } })) });
     if (r.ok) save('vrm_lbc_a_retirer_pub', { e: empreinte, at: Date.now() });
-  } catch (_) {}
+  } catch (_) {} finally { if (publierLbcARetirer.enVol === empreinte) publierLbcARetirer.enVol = null; }
 }
 // <lbc-a-retirer-regle>
 // ── « AUSSI SUR LEBONCOIN » : LA PASTILLE SUIT LA PREUVE DE SORTIE (31 oct.) ──

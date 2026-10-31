@@ -365,6 +365,38 @@ const versPhotos = async (pg, ms = 4500) => {
   });
   await pg.waitForTimeout(ms);
 };
+// (31 oct.) Depuis les « grandes photos » des écrans Vinted (29 oct.), une
+// carte d'annonce occupe tout l'écran d'un téléphone : UNE photo à l'écran à la
+// fois (trois par rangée à 1512 px). Les règles jugées ne changent pas — « au
+// moins deux photos vues », « trois perdues ⇒ la phrase » — mais sur téléphone
+// elles se vérifient en PARCOURANT les cartes comme le ferait Julien : la photo
+// n°0, puis n°1, puis n°2 amenée en haut de l'écran, une mesure à chaque arrêt,
+// et la somme de ce qui a été VU (chaque photo comptée à son arrêt seulement).
+// Ce qui ne se somme pas (la phrase, sa cause, son geste) est lu au dernier arrêt.
+const versPhotoN = async (pg, n, ms) => {
+  await pg.evaluate((n) => {
+    const els = [...document.querySelectorAll('[data-photo-vinted], img[src*="images1.vinted.net"], img[src^="blob:"]')]
+      .filter((e, i, a) => !a.some((x, j) => j < i && x.contains(e)));
+    const el = els[n]; const m = document.querySelector('main[data-defile]');
+    if (el && m) { const r = el.getBoundingClientRect(), mr = m.getBoundingClientRect(); m.scrollTop += r.top - mr.top - 60; }
+  }, n);
+  await pg.waitForTimeout(ms);
+};
+const parcourir = async (pg, k = 3, ms = 2500) => {
+  let tot = null;
+  for (let n = 0; n < k; n++) {
+    await versPhotoN(pg, n, ms);
+    const m = await mesurer(pg);
+    if (!tot) { tot = { ...m, pasAffichees: [...m.pasAffichees] }; continue; }
+    for (const c of ['ecran', 'affichees', 'cassesEcran', 'pictoEcran']) tot[c] += m[c];
+    for (const c of ['cassees', 'secours', 'picto', 'perdues', 'total']) tot[c] = Math.max(tot[c], m[c]);
+    tot.pasAffichees.push(...m.pasAffichees);
+    for (const c of ['phrases', 'sonde', 'geste', 'texte', 'garde', 'sw', 'cw']) tot[c] = m[c];
+  }
+  return tot;
+};
+// Annonces : à 1512 px une rangée suffit ; sur téléphone, trois cartes parcourues.
+const photosAnnonces = async (pg, L, ms) => (L < 600 ? parcourir(pg, 3, Math.max(ms, 2500)) : (await versPhotos(pg, ms), mesurer(pg)));
 const detail = (m) => JSON.stringify({ ecran: m.ecran, affichees: m.affichees, cassees: m.cassesEcran, picto: m.pictoEcran, secours: m.secours, pasAffichees: m.pasAffichees.slice(0, 3) });
 const defiler = (pg, y) => pg.evaluate((y) => { const m = document.querySelector('main[data-defile]'); if (m) m.scrollTop = y === 'bas' ? m.scrollHeight : y; else window.scrollTo(0, y === 'bas' ? document.body.scrollHeight : y); }, y);
 const sain = (m, nom) => {
@@ -445,8 +477,7 @@ const pageTexte = (pg) => pg.evaluate(() => document.body.innerText);
           `A ${L} Ventes : les photos à l'écran s'affichent (par le secours)`, detail(m));
         sain(m, `A ${L} Ventes`);
         await section(pg, 'annonces', 6000);
-        await versPhotos(pg);
-        m = await mesurer(pg);
+        m = await photosAnnonces(pg, L, 4500);
         await capture(pg, `A-annonces-${L}`);
         let p = await pont(pg);
         dit(m.ecran >= 2 && m.affichees === m.ecran && m.cassesEcran === 0 && m.pictoEcran === 0,
@@ -514,8 +545,7 @@ const pageTexte = (pg) => pg.evaluate(() => document.body.innerText);
         await ouvrir(pg, 'plat_vinted', 3000);
         await section(pg, 'annonces', 9000);                       // > 7 s : l'extension ne s'est pas manifestée
         await capture(pg, `B-haut-${L}`);
-        await versPhotos(pg, 2500);
-        const m = await mesurer(pg);
+        const m = await photosAnnonces(pg, L, 2500);
         await capture(pg, `B-annonces-${L}`);
         dit(m.cassees === 0, `B ${L} Annonces : aucune image cassée — le pictogramme à la place`, `${m.cassees} cassée(s), ${m.picto} pictogramme(s)`);
         dit(m.pictoEcran >= 2, `B ${L} Annonces : les photos qui ne s'affichent pas gardent leur place (pictogramme)`, `${m.pictoEcran} à l'écran`);
@@ -555,8 +585,7 @@ const pageTexte = (pg) => pg.evaluate(() => document.body.innerText);
         const { ctx, pg, errs, ecrits } = await preparer(b, vp, { pont: true });
         await ouvrir(pg, 'plat_vinted', 3000);
         await section(pg, 'annonces', 5000);
-        await versPhotos(pg, 2500);
-        const m = await mesurer(pg); const p = await pont(pg);
+        const m = await photosAnnonces(pg, L, 2500); const p = await pont(pg);
         dit(m.ecran >= 2 && m.affichees === m.ecran, `C ${L} : les photos s'affichent directement`, JSON.stringify({ ecran: m.ecran, affichees: m.affichees }));
         dit(!!p && p.total === 0, `C ${L} : aucune demande à l'extension`, p ? `${p.total} demande(s)` : 'pont muet');
         dit(m.phrases === 0, `C ${L} : aucune phrase`, `${m.phrases}`);
@@ -576,8 +605,7 @@ const pageTexte = (pg) => pg.evaluate(() => document.body.innerText);
         const { ctx, pg, errs } = await preparer(b, vp, { pont: false });
         await ouvrir(pg, 'plat_vinted', 3000);
         await section(pg, 'annonces', 7000);
-        await versPhotos(pg, 3000);
-        const m = await mesurer(pg);
+        const m = await photosAnnonces(pg, L, 3000);
         const avecRef = cdnEtat.vues.filter((v) => v.ref).length;
         dit(m.ecran >= 2 && m.affichees === m.ecran && m.cassees === 0, `D ${L} : les photos s'affichent sans secours (aucun référent envoyé)`, JSON.stringify({ ecran: m.ecran, affichees: m.affichees, cassees: m.cassees, demandesAvecReferent: avecRef }));
         dit(m.phrases === 0, `D ${L} : aucune phrase`, `${m.phrases}`);
@@ -596,8 +624,10 @@ const pageTexte = (pg) => pg.evaluate(() => document.body.innerText);
         const { ctx, pg, errs } = await preparer(b, vp, { pont: false });
         await ouvrir(pg, 'plat_vinted', 3000);
         await section(pg, 'annonces', 10500);
-        await versPhotos(pg, 1500);
-        let m = await mesurer(pg);
+        // Téléphone : trois cartes parcourues VITE — la coupure doit finir avant
+        // le premier passage du témoin (20 s après le premier échec, qui peut
+        // dater de l'ouverture : la première carte affleure en bas de l'écran).
+        let m = L < 600 ? await parcourir(pg, 3, 1200) : await photosAnnonces(pg, L, 1500);
         await capture(pg, `H-coupe-${L}`);
         dit(m.pictoEcran >= 2 && m.cassees === 0, `H ${L} pendant la coupure : le pictogramme, aucune image cassée`, detail(m));
         dit(m.phrases <= 1 && (m.phrases === 0 || ['injoignable', 'passu'].includes(m.sonde)),
@@ -605,7 +635,9 @@ const pageTexte = (pg) => pg.evaluate(() => document.body.innerText);
         cdnEtat.mode = 'ok';
         // Sans rien toucher : le témoin réessaie (20 s après le premier constat).
         await pg.waitForTimeout(19000);
-        m = await mesurer(pg);
+        // Téléphone : on remonte les trois cartes vues pendant la coupure (défiler
+        // n'est ni recharger ni changer d'écran).
+        m = L < 600 ? await parcourir(pg, 3, 800) : await mesurer(pg);
         await capture(pg, `H-retour-${L}`);
         dit(m.ecran >= 2 && m.affichees === m.ecran && m.pictoEcran === 0, `H ${L} le CDN revenu : les photos d'Annonces s'affichent, sans recharger ni changer d'écran`, detail(m));
         dit(m.phrases === 0, `H ${L} le CDN revenu : plus de phrase`, `${m.phrases} : ${m.texte.slice(0, 120)}`);
@@ -630,8 +662,7 @@ const pageTexte = (pg) => pg.evaluate(() => document.body.innerText);
         let m = await mesurer(pg);
         dit(m.affichees >= 2 && m.phrases === 0, `M ${L} Ventes : les photos passent (le banc sert bien ce mélange), aucune phrase`, detail(m));
         await section(pg, 'annonces', 13500);
-        await versPhotos(pg, 2500);
-        m = await mesurer(pg);
+        m = await photosAnnonces(pg, L, 2500);
         await capture(pg, `M-annonces-${L}`);
         dit(m.pictoEcran >= 2 && m.phrases === 1, `M ${L} Annonces : toutes bloquées ⇒ la phrase, une fois (une photo vue sur Ventes ne la fait plus taire)`, `${m.phrases} phrase(s), ${m.pictoEcran} pictogramme(s) à l'écran`);
         dit(errs.length === 0, `M ${L} : aucune erreur d'app`, errs.join(' | ').slice(0, 160));
@@ -680,8 +711,19 @@ const pageTexte = (pg) => pg.evaluate(() => document.body.innerText);
       // Défile vers les photos : l’en-tête compact ne garantit pas que deux
       // photos récupérables soient dans le viewport initial (main aussi).
       await versPhotos(pg,2500);
+      // (31 oct.) Grandes photos : une rangée de trois cartes remplit l'écran, et
+      // ce sont justement les trois refusées. On descend jusqu'à voir le BAS de
+      // la première rangée et le HAUT de la deuxième (rendue par l'extension) :
+      // liens morts et photos récupérées à l'écran ensemble, comme avant.
+      await pg.evaluate(() => {
+        const els = [...document.querySelectorAll('[data-photo-vinted], img[src*="images1.vinted.net"], img[src^="blob:"]')].filter((e, i, a) => !a.some((x, j) => j < i && x.contains(e)));
+        const el = els[3], m = document.querySelector('main[data-defile]');
+        if (el && m) { const r = el.getBoundingClientRect(); m.scrollTop += r.top - (window.innerHeight - 300); }
+      });
+      await pg.waitForTimeout(4000);
       const m = await mesurer(pg); const p = await pont(pg);
       await capture(pg, 'G-annonces');
+      dit(m.pictoEcran >= 1 && m.affichees >= 1,'G : liens morts et photos récupérées à l’écran ensemble (le scénario est visible)', detail(m));
       dit(!!p && p.refusees >= 3 && m.secours >= 2, 'G : le scénario est réel (l’extension en refuse trois, en rend d’autres)', JSON.stringify({ refusees: p && p.refusees, secours: m.secours }));
       dit(m.phrases === 0, 'G : des liens morts à côté de photos que l’extension a récupérées ⇒ aucune phrase (« l’extension n’a pas pu les récupérer non plus » serait faux)', `${m.phrases} phrase(s) : ${m.texte.slice(0, 160)}`);
       dit(m.perdues >= 3 && m.cassees === 0, 'G : les photos introuvables gardent leur place (pictogramme), aucune image cassée', `${m.perdues} perdue(s), ${m.cassees} cassée(s)`);
@@ -762,7 +804,11 @@ const pageTexte = (pg) => pg.evaluate(() => document.body.innerText);
       //    bandeau visible (et alors la phrase ne le redit pas, §7).
       const visibleGeste=await pg.evaluate(()=>{const v=e=>!!e&&e.getClientRects().length>0&&getComputedStyle(e).visibility!=='hidden';const bd=document.querySelector('[data-raison-bord="muette"]');return v(bd)&&v(bd.querySelector('[data-recharger]'));});
       dit(repli.phrases===1 && ((repli.geste==='muette' && /recharge/i.test(repli.texte)) || (visibleGeste && !/recharge/i.test(repli.texte))),'U replié : une aide cachée ne prive pas les photos du geste utile',`${visibleGeste?'bandeau visible · ':''}${repli.geste} · ${repli.texte}`);
-      await pg.locator('.vrm-label-help > summary').click();
+      // L'aide repliée « sur Vinted » n'existe plus sur Ventes (il ne reste qu'une
+      // `.vrm-label-help`, celle de l'imprimante, sur Colis) : on la déplie
+      // seulement si elle est là — la règle jugée ensuite reste la même.
+      const aideRepliee = pg.locator('[data-raison-bord] .vrm-label-help > summary').first();
+      if (await aideRepliee.isVisible().catch(() => false)) await aideRepliee.click();
       await pg.waitForTimeout(500);
       let m = await mesurer(pg);
       await capture(pg, 'U-ventes');
@@ -827,8 +873,8 @@ const pageTexte = (pg) => pg.evaluate(() => document.body.innerText);
       await section(pg, 'annonces', 12000);
       // Les photos sont sous le pli du téléphone : la phrase ne parle que de
       // celles À L'ÉCRAN (décision du 11 oct.), on descend vers elles.
-      await versPhotos(pg, 6000);
-      const m = await mesurer(pg);
+      // (31 oct.) Une carte par écran : trois cartes parcourues (photosAnnonces).
+      const m = await photosAnnonces(pg, 390, 3000);
       dit(m.phrases === 1 && m.sonde === 'reponse', 'E390 : le scénario est réel (sonde « le serveur a répondu », la phrase est là)', `${m.phrases} phrase(s), sonde ${m.sonde}`);
       dit(m.phrases === 1 && m.geste === 'reponse' && !/les r[ée]cup[èe]re|va les chercher/i.test(m.texte), 'E390 : sur téléphone non plus, aucune promesse que l’extension les récupérera', `${m.geste} · ${m.texte.slice(0, 220)}`);
       dit(errs.length === 0, 'E390 : aucune erreur d’app', errs.join(' | ').slice(0, 160));
@@ -966,18 +1012,22 @@ const pageTexte = (pg) => pg.evaluate(() => document.body.innerText);
       await versPhotos(pg, 0);                    // plusieurs photos À L'ÉCRAN échouent pendant la coupure
       const t0 = Date.now();
       const journal = [];
-      let bascule = false, faux = '', maxPicto = 0;
+      let bascule = false, faux = '', maxPicto = 0, tour = 0;
+      // (31 oct.) Une carte par écran sur téléphone : pendant la coupure on
+      // passe d'une carte à l'autre (0, 1, 2…) et on additionne le plus de
+      // pictogrammes vus à CHAQUE arrêt — trois photos vues échouer, comme avant.
+      const parArret = [0, 0, 0];
       while (Date.now() - t0 < 30000) {
         if (!bascule && Date.now() - t0 > 3000) { cdnEtat.mode = 'ok'; bascule = true; journal.push(`${((Date.now() - t0) / 1000).toFixed(1)} s : réseau revenu`); }
+        if (!bascule) await versPhotoN(pg, tour % 3, 0);
         const m = await mesurer(pg);
-        if (!bascule) maxPicto = Math.max(maxPicto, m.pictoEcran);
+        if (!bascule) { parArret[tour % 3] = Math.max(parArret[tour % 3], m.pictoEcran); maxPicto = parArret.reduce((a, x) => a + x, 0); tour++; }
         const etat = `${m.phrases ? m.sonde + '/' + m.geste : '—'} · ${m.affichees} affichée(s) / ${m.pictoEcran} picto(s)`;
         if (!journal.length || !journal[journal.length - 1].endsWith(etat)) journal.push(`${((Date.now() - t0) / 1000).toFixed(1)} s : ${etat}`);
         if (m.phrases && /reponse|injoignable/.test(m.sonde || '') && !faux) faux = m.texte.slice(0, 160);
-        await pg.waitForTimeout(700);
+        await pg.waitForTimeout(bascule ? 700 : 300);
       }
-      await versPhotos(pg, 1500);
-      const m = await mesurer(pg);
+      const m = await parcourir(pg, 3, 1500);
       dit(maxPicto >= 3, 'W : le scénario est réel (au moins trois photos à l’écran échouent pendant la coupure)', `${maxPicto} pictogramme(s) au plus`);
       dit(!faux, 'W : réseau revenu en 3 s — aucune phrase « le serveur répond » ni « injoignable »', journal.join(' | ').slice(0, 400) + (faux ? ' · « ' + faux + ' »' : ''));
       dit(m.ecran >= 2 && m.affichees === m.ecran && m.phrases === 0, 'W : les photos sont là, sans phrase', detail(m));
@@ -1010,8 +1060,7 @@ const pageTexte = (pg) => pg.evaluate(() => document.body.innerText);
       await ctx.setOffline(false);
       await pg.waitForTimeout(3000);
       await section(pg, 'annonces', 6000);
-      await versPhotos(pg, 3000);
-      const m2 = await mesurer(pg);
+      const m2 = await parcourir(pg, 3, 3000);   // une carte par écran : trois parcourues
       dit(m2.ecran >= 2 && m2.affichees === m2.ecran && m2.phrases === 0, 'N de nouveau en ligne : les photos reviennent, plus de phrase', detail(m2));
       dit(errs.length === 0, 'N : aucune erreur d’app', errs.join(' | ').slice(0, 160));
       await ctx.close();
@@ -1033,8 +1082,7 @@ const pageTexte = (pg) => pg.evaluate(() => document.body.innerText);
       dit(!!d1 && d1.ko > 0 && d1.ok === 0, 'Y : le scénario est réel (pendant la coupure, le bilan rangé dit l’échec)', JSON.stringify(d1).slice(0, 200));
       cdnEtat.mode = 'ok';
       await pg.waitForTimeout(38000);
-      await versPhotos(pg, 2000);
-      const m = await mesurer(pg);
+      const m = await parcourir(pg, 3, 2000);    // une carte par écran : trois parcourues
       const d2 = stock.data && stock.data.parNavigateur && stock.data.parNavigateur[nav];
       dit(m.ecran >= 2 && m.affichees === m.ecran && m.phrases === 0, 'Y : les photos sont revenues (le témoin), plus de phrase', detail(m));
       dit(!!d2 && d2.retours > 0 && d2.ok > 0 && d2.enEchec === 0, 'Y : le bilan rangé dit le RETOUR (revenues, 0 en échec) — plus « bloquée, 0 affichée, 0 revenue »', JSON.stringify(d2).slice(0, 240));

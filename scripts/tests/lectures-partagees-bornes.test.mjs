@@ -104,3 +104,24 @@ test("les lectures Request restent non partagées et leurs corps indépendants",
   assert.deepEqual(await b.json(), [2]);
   assert.equal(lp.stats.retenues, 0);
 });
+test("(31 oct.) une route VRM qui DÉCLARE vider elle-même (vrmInvalideSiChange) garde les lectures ; vers la base, le drapeau ne vaut rien", async () => {
+  let appels = 0;
+  const lp = creerLecturesPartagees(
+    async (input, init) => {
+      if ((init?.method || input?.method) === "POST") return Response.json({ ok: true });
+      appels++;
+      return Response.json([appels]);
+    },
+    base,
+    { origine: "https://vrm.example.test", fenetre: 60000 },
+  );
+  await lp.fetch(url);
+  await lp.fetch("/api/relais?mode=transp", { method: "POST", body: "{}", vrmInvalideSiChange: true });
+  assert.deepEqual(await (await lp.fetch(url)).json(), [1], "la lecture est restée partagée");
+  // Sans le drapeau, la même route vide tout (la règle générale ne bouge pas).
+  await lp.fetch("/api/relais?mode=transp", { method: "POST", body: "{}" });
+  assert.deepEqual(await (await lp.fetch(url)).json(), [2]);
+  // Vers la BASE, le drapeau n'exempte jamais.
+  await lp.fetch(base + "/rest/v1/app_data", { method: "POST", body: "{}", vrmInvalideSiChange: true });
+  assert.deepEqual(await (await lp.fetch(url)).json(), [3]);
+});
