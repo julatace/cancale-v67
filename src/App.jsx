@@ -40263,8 +40263,19 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // Un numéro en double est trop grave pour rester derrière une barre repliée :
   // on déplie tout seul. Les autres signalements restent discrets.
 
+  // (31 oct., « il manque beaucoup de chaussures ») Les annonces d'un compte pas
+  // relu depuis 24 h (« à confirmer ») ne sortent plus de la GRILLE : elles y
+  // restent, en fin de liste, avec une étiquette « à confirmer » et l'âge de la
+  // lecture. Elles restent HORS des chiffres « en ligne » (« ≥ N ») et des files
+  // Leboncoin/eBay : seul l'affichage change — une paire peut-être encore en
+  // vente ne disparaît plus de l'écran. Une suppression VUE par l'extension
+  // l'en retire toujours (`supprimeeApres`).
   const annShown = useMemo(() => {
-    let arr = [...annBase];
+    const vus = new Set(annBase.map((it) => String(it.id)));
+    const lues = listings.lues || {};
+    const conf = annAConfirmer.filter((it) => it && !vus.has(String(it.id)))
+      .map((it) => ({ ...it, _vrmAConfirmerLu: Number(lues[String((it._acc && it._acc.vinted_user_id) || '')]) || null, _vrmAConfirmer: true }));
+    let arr = [...annBase, ...conf];
     const q = annSearch.trim().toLowerCase();
     if (q) arr = arr.filter(it => {
       const num = String(numeros[it.id]?.numero || '');
@@ -40320,7 +40331,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     if (c) arr = [...arr].sort((a,b) => { const ac = uidAnn(a)===c, bc = uidAnn(b)===c; return ac===bc ? 0 : (ac ? -1 : 1); });
     return arr;
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [annBase, annSearch, annSort, numeros, compteSel, compteConnecte, selEff]);
+  }, [annBase, annAConfirmer, listings.lues, annSearch, annSort, numeros, compteSel, compteConnecte, selEff]);
   // Un seul compte à l'écran ⇒ le nommer sur chaque carte ne distingue rien (§7).
   const annUnCompte = useMemo(() => new Set(annShown.map(x => String(x._acc && x._acc.vinted_user_id || ''))).size <= 1, [annShown]);
   // Comptes bloqués actuellement présents (pour le bandeau d'alerte).
@@ -48505,6 +48516,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 <div className="vrm-ann-overview" style={{display:'flex',flexDirection:'column'}}>
                   <a className="vrm-fiche-photo" data-fiche-photo href={it.url||undefined} target="_blank" rel="noreferrer" title="Ouvrir l'annonce sur Vinted" style={{display:'flex',alignItems:'center',justifyContent:'center',position:'relative',background:C.bg}}>
                     {it.photo?<PhotoVinted src={it.photo} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<Icon name="image" size={28} style={{color:C.muted,opacity:.55}}/>}
+                    {it._vrmAConfirmer && <span data-ann-a-confirmer="" title="Ce compte n'a pas été relu depuis plus de 24 h : cette annonce était en ligne à la dernière lecture. Ouvre vinted.fr sur ce compte pour le vérifier." style={{position:'absolute',right:10,top:10,fontSize:11,fontWeight:650,whiteSpace:'nowrap',color:C.text,background:C.card,border:`1px solid ${C.warn || C.border}`,borderRadius:999,padding:'4px 9px'}}>À confirmer{it._vrmAConfirmerLu ? ` · lu ${new Date(it._vrmAConfirmerLu).toLocaleDateString('fr-FR',{day:'numeric',month:'short'})}` : ''}</span>}
                     {it.promoted===true && <span data-boostee title="Vinted dit que cette annonce est boostée en ce moment" style={{position:'absolute',left:10,top:10,fontSize:11,fontWeight:650,whiteSpace:'nowrap',color:C.text,background:C.card,border:`1px solid ${C.border}`,borderRadius:999,padding:'4px 9px'}}>Boostée</span>}
                   </a>
                   <div className="vrm-ann-ledger-info" style={{display:'flex',flexDirection:'column',gap:8}}>

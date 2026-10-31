@@ -166,9 +166,14 @@ async function rendre(b, { lignes, tel = false, onglet = 'cat_annonces', enligne
 const lireAnnonces = (pg) => pg.evaluate((PAIRE) => {
   const f = [...document.querySelectorAll('[data-ann-fraicheur]')];
   const el = f[0];
-  const cartes = [...document.querySelectorAll('[data-carte-annonce]')];
+  // (31 oct.) Les annonces « à confirmer » restent dans la grille, ÉTIQUETÉES
+  // (`data-ann-a-confirmer`) : `cartes` = les annonces sûres, `cartesAC` = celles-là.
+  const toutes = [...document.querySelectorAll('[data-carte-annonce]')];
+  const cartes = toutes.filter((x) => !x.querySelector('[data-ann-a-confirmer]'));
   return {
     cartes: cartes.map((x) => x.getAttribute('data-carte-annonce')).sort(),
+    cartesAC: toutes.filter((x) => x.querySelector('[data-ann-a-confirmer]')).map((x) => x.getAttribute('data-carte-annonce')).sort(),
+    ordre: toutes.map((x) => x.getAttribute('data-carte-annonce')),
     paire: cartes.filter((x) => x.innerText.includes(PAIRE)).map((x) => x.getAttribute('data-carte-annonce')),
     nFraicheur: f.length,
     aConfirmer: el ? el.getAttribute('data-a-confirmer') : null,
@@ -200,7 +205,9 @@ const lireAnnonces = (pg) => pg.evaluate((PAIRE) => {
         dit(a.paire[0] === '7003', `${t} : et c'est la REPUBLIÉE (7003, connue par la lecture publique de ce matin)`, JSON.stringify(a.paire));
         dit(!a.cartes.includes('7001') && !a.cartes.includes('7002'), `${t} : les deux anciennes (absentes de la lecture la plus récente) ne sont plus là`, JSON.stringify(a.cartes));
         dit(a.cartes.includes('7011') && a.cartes.includes('7031'), `${t} : les autres paires en ligne restent`, JSON.stringify(a.cartes));
-        dit(!a.cartes.includes('7041') && !a.cartes.includes('7042'), `${t} : le compte figé depuis 3 jours n'est PAS dans la grille`, JSON.stringify(a.cartes));
+        dit(!a.cartes.includes('7041') && !a.cartes.includes('7042'), `${t} : le compte figé depuis 3 jours n'est PAS parmi les annonces sûres de la grille`, JSON.stringify(a.cartes));
+        dit(a.cartesAC.includes('7041') && a.cartesAC.includes('7042'), `${t} : mais ses annonces restent VISIBLES dans la grille, étiquetées « à confirmer » (il ne manque rien)`, JSON.stringify(a.cartesAC));
+        dit(a.cartesAC.every((id) => a.ordre.indexOf(id) > Math.max(...a.cartes.map((c) => a.ordre.indexOf(c)))), `${t} : et elles viennent après les annonces sûres`, JSON.stringify(a.ordre));
         dit(a.nFraicheur === 1, `${t} : une seule ligne au-dessus de la grille (§7)`, `${a.nFraicheur} bloc(s)`);
         dit(a.aConfirmer === '2' && a.comptesAC === '444' && /compte_444/.test(a.texte), `${t} : elle dit « 2 annonces de compte_444 à confirmer »`, JSON.stringify({ n: a.aConfirmer, c: a.comptesAC, t: a.texte }));
         dit(/3 j/.test(a.texte), `${t} : avec l'âge de la dernière lecture`, a.texte);
@@ -314,8 +321,8 @@ const lireAnnonces = (pg) => pg.evaluate((PAIRE) => {
       await r.pg.click('[data-carte-annonce="8001"] [data-edition="numero"]', { timeout: 8000 });
       await r.pg.keyboard.press('Control+A'); await r.pg.keyboard.type('7'); await r.pg.keyboard.press('Enter');
       await r.pg.waitForTimeout(1200);
-      const t = await r.pg.evaluate(() => document.body.innerText);
-      const i = t.indexOf('N°7');
+      const t = await r.pg.evaluate(() => { const d = [...document.querySelectorAll('[role="dialog"],[role="alertdialog"]')].filter((x) => /Annuler/.test(x.innerText) && !x.querySelector('[data-carte-annonce]')).pop(); return d ? d.innerText : document.body.innerText; });
+      const i = t.indexOf('peut-être') >= 0 ? t.lastIndexOf('N°7', t.indexOf('peut-être')) : t.lastIndexOf('N°7');
       const dialogue = i >= 0 ? t.slice(Math.max(0, i - 20), i + 260) : '';
       dit(!/n.est plus en ligne/.test(dialogue) && !/Oui, le même article revient/.test(t), 'taper le N° d’une paire « à confirmer » : jamais « elle n’est plus en ligne », jamais « le même article revient »', dialogue.replace(/\n+/g, ' | '));
       dit(/peut-être encore/.test(dialogue) && /Annuler/.test(t), 'le dialogue dit qu’une paire le porte PEUT-ÊTRE encore, avec Annuler / un numéro neuf', dialogue.replace(/\n+/g, ' | '));
