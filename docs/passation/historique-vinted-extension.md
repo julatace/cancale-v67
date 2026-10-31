@@ -840,3 +840,46 @@ de Vinted notifiés, `tout-generer`, `audit-politique-hotes`, `audit-preuve-vent
   « chaque raison d'arrêt a sa phrase » ; 1 rouge sur origin/main, mutation « phrase retirée » rouge).
   `tout-generer.cjs` lit `BANC_PORT`.
 - ⚠️ Non mesuré : ce que le CDN de Vinted répond vraiment au service worker pour un lien expiré (404 ? 403 ?).
+
+## 31 octobre (soir) — 5.294.0 : fiabilité des annonces Leboncoin et Vestiaire
+
+La 5.293.0 a été soumise à addons.mozilla.org : son contenu ne change plus. 5.294.0
+(manifeste, `CODE_VERSION`, `EXT_ATTENDUE`, `CAPTEUR_VERSION`, `relaisVersion`,
+zips régénérés) porte deux corrections de la loi §4.2 — détail dans
+`historique-leboncoin.md` et `historique-vestiaire.md` (31 octobre, soir) :
+une capture Leboncoin qui ne porte pas un champ (référence VRM, compte, prix) ne
+l'efface plus ; une liste Vestiaire filtrée ne passe plus pour la liste entière.
+Aucune capacité nouvelle (`EXT_CAPACITES` inchangée : l'app ne promet rien de neuf).
+Preuve : `scripts/audit-fiabilite-annonces.cjs` (+ `--prouve`).
+
+## 31 octobre (soir) — 5.294.0 : le rattrapage « quand je reviens sur Vinted »
+
+Julien (iPhone, Orion) : « fais le rattrapage quand je reviens sur Vinted ».
+- **Trou** : sans `alarms`, chaque message réveille `rattraperMinuteries()`, mais une
+  tâche ne repart que si elle est DUE (`PERIODES` : `cancale-sync` 10 min,
+  `cancale-active` 20 min). Revenir sur l'onglet Vinted après 5 à 9 min ne relisait
+  rien ; `inject.js` relance bien `activeHarvest` 3 s après, mais sous sa garde de
+  page (`ACTIVE_TTL`). Même trou sur Chrome après une veille.
+- **Fait** : `content.js` envoie `{from:'vrm-retour', action:'vintedVisible'}` au
+  `visibilitychange` visible (vinted.* seulement, 1,5 s après pour laisser passer
+  les cookies d'Orion). `retourSurVinted` (background.js) : onglet vinted.* (adresse
+  de l'ONGLET, cadre principal) ; au plus une fois par 3 min (`vrmRetourVinted`,
+  daté dans `chrome.storage.local` AVANT d'agir) ; seulement si la dernière lecture
+  COMPLÈTE du dressing du compte ouvert (`vrmCaptureComplete[uid]`, posée par
+  `storeHarvestRow` quand `dressingCompletFaitFoi` ET l'écriture a abouti) date de
+  plus de 3 min ; `gardeLecture(uid, …, 'enligne')` (compte connecté = compte lu,
+  pause 429/403, budget de LECTURE 20/h avec la réserve argent/colis) — refus ⇒
+  rien ne part, noté `retour_vinted_<code>`, la place des 3 min n'est pas prise ;
+  puis `captureDomain` + `runActive` une fois (tous leurs garde-fous : session VRM,
+  compte supprimé, recul de la base, file Vinted une requête à la fois). Chrome
+  aussi (même règle).
+- Preuve : `scripts/audit-retour-vinted.cjs` (vrai background.js + vrai
+  content.js) : retour après 5 min ⇒ une relecture ; 30 s après ⇒ rien ; trois
+  retours simultanés ⇒ une ; lecture complète d'il y a 1 min ⇒ rien ; budget épuisé
+  ⇒ rien, noté ; pause ⇒ rien ; autre site ou cadre ⇒ rien ; partielle ne date
+  pas, complète date. 9 rouges sur le code d'avant ; `--prouve` : 6 mutations
+  rouges. Aucune capacité nouvelle dans `EXT_CAPACITES` (l'app ne promet rien).
+- ⚠️ Non mesuré sur un vrai iPhone : qu'Orion livre bien `visibilitychange` au
+  script de contenu au retour sur l'onglet (c'est le standard ; à vérifier chez lui).
+- ⚠️ Le premier retour après l'installation de la 5.294 relit toujours (aucune
+  lecture complète encore datée) : une fois, puis la règle des 3 min.

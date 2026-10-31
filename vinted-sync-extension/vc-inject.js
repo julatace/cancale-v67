@@ -176,6 +176,20 @@
     return cands.sort((a, b) => b.length - a.length)[0] || null;
   }
   const idDe = (e) => String(e.id != null ? e.id : (e.productId != null ? e.productId : e.product_id)).slice(0, 40);
+  // ⚠️ (31 oct., 5.294) UNE LISTE FILTRÉE N'EST PAS LA LISTE. Le fond tient une
+  // liste pour ENTIÈRE quand la page 0 rend autant d'éléments que le `total`
+  // annoncé — et alors il REMPLACE (annonces) ou retire ce qui n'y est plus
+  // (« à expédier », « non lu »). Or ce total est celui de la REQUÊTE : un onglet
+  // ou une recherche (`?status=sold`, `?q=…`) rend le total du filtre, et une
+  // seule annonce « vendue » effaçait toutes les autres, un onglet vide disait
+  // « Aucune annonce sur Vestiaire », une vente « à expédier » cachée par un
+  // filtre ne l'était plus. Même règle que la liste complète Leboncoin (la
+  // requête ne filtre sur RIEN) : hors pagination, tri et langue, le total n'est
+  // pas transmis (`null` ⇒ la page ne fait que compléter, « au moins »). Les
+  // paramètres que Vestiaire met vraiment n'ont jamais été vus : liste blanche,
+  // le doute garde tout.
+  const PARAMS_NEUTRES = /^(offset|limit|page|per_?page|pagesize|page_?size|sort|sort_?by|sort_?order|order|order_?by|direction|lang|language|locale|iso_?country|country|currency|site_?id|_|t|ts)$/i;
+  const sansFiltre = (u) => { for (const k of u.searchParams.keys()) if (!PARAMS_NEUTRES.test(k)) return false; return true; };
   function noteAnnonces(url, texte) {
     try {
       let u; try { u = new URL(url, location.origin); } catch (_) { return; }
@@ -184,7 +198,7 @@
       if (!obj || typeof obj !== 'object') return;
       const arr = tableauAnnonces(obj) || [];
       const offset = Number(u.searchParams.get('offset') || (obj.meta && obj.meta.offset) || 0) || 0;
-      const total = obj.meta && typeof obj.meta.count === 'number' ? obj.meta.count : null;
+      const total = obj.meta && typeof obj.meta.count === 'number' && sansFiltre(u) ? obj.meta.count : null;
       const items = arr.slice(0, 200).map((e) => { const b = boostDe(e); return { id: idDe(e), boost: b.boost, cles: b.cles, ref: refDe(e) }; }).filter((x) => /^[\w-]{1,40}$/.test(x.id));
       post({ kind: 'vcannonces', items, offset, total, lus: arr.length });
     } catch (_) {}
@@ -316,7 +330,7 @@
       if (!obj || typeof obj !== 'object') return;
       const arr = tableauAnnonces(obj) || [];
       const offset = Number(u.searchParams.get('offset') || (obj.meta && obj.meta.offset) || 0) || 0;
-      const total = obj.meta && typeof obj.meta.count === 'number' ? obj.meta.count : null;
+      const total = obj.meta && typeof obj.meta.count === 'number' && sansFiltre(u) ? obj.meta.count : null;
       const ventes = arr.slice(0, 200).map((e) => {
         const prod = e.product && typeof e.product === 'object' ? e.product : (e.item && typeof e.item === 'object' ? e.item : null);
         const pid = prod && prod.id != null ? String(prod.id) : (e.productId != null ? String(e.productId) : (e.product_id != null ? String(e.product_id) : ''));
@@ -377,7 +391,7 @@
       if (!obj || typeof obj !== 'object') return;
       const arr = tableauAnnonces(obj) || [];
       const offset = Number(u.searchParams.get('offset') || (obj.meta && obj.meta.offset) || 0) || 0;
-      const total = obj.meta && typeof obj.meta.count === 'number' ? obj.meta.count : null;
+      const total = obj.meta && typeof obj.meta.count === 'number' && sansFiltre(u) ? obj.meta.count : null;
       const conversations = arr.slice(0, 200).map((e) => {
         const prod = e.product && typeof e.product === 'object' ? e.product : (e.item && typeof e.item === 'object' ? e.item : null);
         const pid = prod && prod.id != null ? String(prod.id) : (e.productId != null ? String(e.productId) : (e.product_id != null ? String(e.product_id) : ''));
@@ -442,7 +456,7 @@
       if (!obj || typeof obj !== 'object') return;
       const arr = tableauAnnonces(obj) || [];
       const offset = Number(u.searchParams.get('offset') || (obj.meta && obj.meta.offset) || 0) || 0;
-      const total = obj.meta && typeof obj.meta.count === 'number' ? obj.meta.count : null;
+      const total = obj.meta && typeof obj.meta.count === 'number' && sansFiltre(u) ? obj.meta.count : null;
       const achats = arr.slice(0, 200).map((e) => {
         const prod = e.product && typeof e.product === 'object' ? e.product : (e.item && typeof e.item === 'object' ? e.item : null);
         const pid = prod && prod.id != null ? String(prod.id) : (e.productId != null ? String(e.productId) : (e.product_id != null ? String(e.product_id) : ''));

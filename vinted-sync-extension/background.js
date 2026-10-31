@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.293.0';
+const CODE_VERSION = '5.294.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -2320,6 +2320,12 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg && msg.from === 'vrm-cookies') {
     if (msg.action === 'veux') { sendResponse({ ok: true, veux: !CAP.cookies }); return true; }
     recevoirCookiesPage(msg, sender).then(sendResponse, () => sendResponse({ ok: false }));
+    return true;
+  }
+  // 5.294 : un onglet Vinted redevient VISIBLE (content.js) — le rattrapage
+  // « quand je reviens sur Vinted » (voir `retourSurVinted`).
+  if (msg && msg.from === 'vrm-retour' && msg.action === 'vintedVisible') {
+    retourSurVinted(sender).then(sendResponse, () => sendResponse({ ok: false }));
     return true;
   }
   // 5.290 : une page de suivi d'un transporteur est ouverte (transp-page.js).
@@ -6583,6 +6589,7 @@ async function storeHarvestRow(uid, type, payload, domain, opts) {
   // pas `billing` aujourd'hui, mais un relevé ne doit pas dépendre de ça.
   if (type === 'billing') { try { await storeReleve(uid, brut, domain); } catch (_) {} }
   if (type === 'billing' && !estPorteMonnaie(payload)) return 'hors-sujet';
+  let capturePrevue = false;
   const maintenant = new Date().toISOString();
   const data = { type, uid, domain: domain || 'www.vinted.fr', capturedAt: maintenant, payload };
   // Même règle que la voie passive : un dressing partiel n'écrase pas un
@@ -6608,6 +6615,7 @@ async function storeHarvestRow(uid, type, payload, domain, opts) {
     //    affichait un aperçu ».
     const completFaitFoi = type === 'listings' && dressingCompletFaitFoi(payload, opts);
     if (completFaitFoi) noterDiag('dressing_complet_range');
+    if (completFaitFoi) capturePrevue = true;
     const riche = completFaitFoi || await listePlusRiche(`harvest_${uid}_${type}`, payload, CLE_LISTE[type]);
     // Compteur illisible : ce n'est pas « lu, plus pauvre » (qui vaut « rangé »
     // pour la moisson), c'est la base qui n'a pas répondu — compté comme un échec.
@@ -6624,6 +6632,9 @@ async function storeHarvestRow(uid, type, payload, domain, opts) {
   // heures pour une moisson de 25 jours. `capturedAt` reste la reference cote
   // app, mais autant que la colonne cesse de mentir aux autres lecteurs.
   const ecritRow = await supabaseUpsert('app_data', [{ id: `harvest_${uid}_${type}`, data, updated_at: maintenant }], 'id');
+  // 5.294 : la date de la dernière lecture COMPLÈTE du dressing de ce compte,
+  // RANGÉE (le rattrapage au retour sur Vinted la lit : `retourSurVinted`).
+  if (capturePrevue && ecritRow !== false) await noterCaptureComplete(uid);
   if (ecritRow !== false && type === 'orders_sold') notifierApp({ type: 'maj', quoi: 'ventes', uid: String(uid) });
   if (ecritRow !== false && type === 'orders_purchased') notifierApp({ type: 'maj', quoi: 'achats', uid: String(uid) });
   if (ecritRow !== false && type === 'listings') notifierApp({ type: 'maj', quoi: 'annonces', uid: String(uid) });   // 5.165 (voir storeHarvest)
@@ -7194,6 +7205,62 @@ function surAlarme(a) {
   // 29 oct. : une mise en ligne planifiée (republier « à la suite », comme Vintex)
   // dont l'heure est passée pendant que le service worker dormait repart ici.
   try { miseEnLigneTick(); } catch (_) {}
+}
+// ── LE RATTRAPAGE « QUAND JE REVIENS SUR VINTED » (31 octobre, 5.294) ───────
+// Julien (iPhone, Orion) : « fais le rattrapage quand je reviens sur Vinted ».
+// Sans `alarms`, une tâche ne repart que si elle est DUE (`PERIODES` : dressing
+// 10 min, moisson 20 min) : revenir sur l'onglet Vinted après 5 à 9 min ne
+// relisait rien, l'app montrait le dressing d'avant. Même trou sur Chrome après
+// une veille. ⇒ Quand un onglet vinted.* redevient visible (content.js), si la
+// dernière lecture COMPLÈTE du dressing du compte ouvert date de plus de 3 min,
+// on relit UNE fois tout de suite : `captureDomain` (ses jetons) puis
+// `runActive` (la moisson, qui garde TOUS ses garde-fous : pause 429/403,
+// session VRM, compte supprimé, recul de la base, file Vinted une requête à la
+// fois, compte de la page). En plus, ici :
+//   · seulement un message d'un onglet vinted.* (l'adresse de l'ONGLET, pas le
+//     message) ;
+//   · au plus une fois par 3 min, daté dans `chrome.storage.local` AVANT d'agir
+//     (le fond peut mourir à tout moment, §4.9) — jamais une rafale ;
+//   · `gardeLecture` (classe « enligne ») : compte connecté = compte lu, budget
+//     de LECTURE (20/h, la réserve de l'argent et des colis gardée). Budget
+//     épuisé ⇒ rien ne part, et c'est noté (`retour_vinted_<code>`) ;
+//   · stockage illisible ⇒ rien (« pas su » ne vaut pas « dû »).
+const RETOUR_VINTED_STORE = 'vrmRetourVinted';           // { at, uid }
+const CAPTURE_COMPLETE_STORE = 'vrmCaptureComplete';     // { [uid]: ms }
+const RETOUR_VINTED_MS = 3 * 60000;
+const RE_ONGLET_VINTED = /^https:\/\/([a-z0-9-]+\.)*vinted\.(fr|com|it|de|es|be|nl|pl|pt|lu|at|cz|sk|lt|co\.uk|ie|se|dk|fi|gr|hr|hu|ro)\//i;
+async function noterCaptureComplete(uid) {
+  try {
+    const m = (await chrome.storage.local.get(CAPTURE_COMPLETE_STORE))[CAPTURE_COMPLETE_STORE] || {};
+    m[String(uid)] = Date.now();
+    await chrome.storage.local.set({ [CAPTURE_COMPLETE_STORE]: m });
+  } catch (_) {}
+}
+let _retourVintedEnCours = false;
+async function retourSurVinted(sender) {
+  const url = String((sender && sender.tab && sender.tab.url) || '');
+  if (!RE_ONGLET_VINTED.test(url) || (sender && sender.frameId > 0)) return { ok: false, code: 'pas-vinted' };
+  if (_retourVintedEnCours) return { ok: true, fait: false, code: 'en-cours' };
+  _retourVintedEnCours = true;
+  try {
+    const domain = new URL(url).host;
+    let st;
+    try { st = await chrome.storage.local.get([RETOUR_VINTED_STORE, CAPTURE_COMPLETE_STORE]); } catch (_) { return { ok: false, code: 'stockage' }; }
+    const maintenant = Date.now();
+    const der = Number((st[RETOUR_VINTED_STORE] || {}).at) || 0;
+    if (maintenant - der < RETOUR_VINTED_MS) { noterDiag('retour_vinted_trop_tot'); return { ok: true, fait: false, code: 'trop-tot' }; }
+    const uid = await activeUidForDomain(domain);
+    if (!uid) { noterDiag('retour_vinted_sans_compte'); return { ok: true, fait: false, code: 'sans-compte' }; }
+    const cap = Number((st[CAPTURE_COMPLETE_STORE] || {})[String(uid)]) || 0;
+    if (maintenant - cap < RETOUR_VINTED_MS) { noterDiag('retour_vinted_frais'); return { ok: true, fait: false, code: 'frais' }; }
+    const g = await gardeLecture(uid, { domain }, 'enligne');
+    if (g) { noterDiag('retour_vinted_' + String(g.code || 'refus').replace(/[^a-z0-9_-]/gi, '_')); return { ok: true, fait: false, code: g.code }; }
+    try { await chrome.storage.local.set({ [RETOUR_VINTED_STORE]: { at: maintenant, uid: String(uid) } }); } catch (_) { return { ok: false, code: 'stockage' }; }
+    noterDiag('retour_vinted_relu');
+    try { await captureDomain(domain); } catch (_) {}
+    const r = await runActive();
+    return { ok: true, fait: true, range: r === true };
+  } finally { _retourVintedEnCours = false; }
 }
 // ── SANS `chrome.alarms` (Orion iPhone, 20 octobre) ─────────────────────────
 // Des minuteries tant que le fond est éveillé, ET la date du dernier passage de
@@ -14784,6 +14851,20 @@ async function storeLbcListingsUneFois(url, listings,owner) {
       const ancien=merged[String(l.id)]||{};
       const images=photosAnnonceLbc(l);
       const n=Object.assign({},ancien,l,{images:images.length?images:photosAnnonceLbc(ancien),seenAt:new Date().toISOString()});
+      // ⚠️ (31 oct., 5.294) UNE CAPTURE QUI NE PORTE PAS UN CHAMP NE L'EFFACE PAS.
+      //    Chaque endpoint ne rend pas tout : le tableau de bord pro n'a pas de
+      //    description (`body:''`), une liste peut ne pas porter le prix ni le
+      //    compte. `Object.assign` posait ces vides PAR-DESSUS ce qu'on savait :
+      //    la référence `VRM-{n°}` lue dans la description (une IDENTITÉ, §5 —
+      //    `numeroLbcIdentite`) disparaissait à la capture suivante d'une liste
+      //    sans description, et avec elle « vendue sur Vinted → à retirer de
+      //    Leboncoin » et l'alerte de double vente du serveur ; le prix passait à
+      //    vide. « Pas vu » ne vaut pas « absent » : un champ vide ne remplace
+      //    jamais un plein. La référence ne tombe que si une description LUE ne
+      //    la porte plus (il l'a retirée de son annonce).
+      const _vide=(v)=>v==null||v==='';
+      for(const k of ['account','accountName','accountType','price','url','category'])if(_vide(l[k])&&!_vide(ancien[k]))n[k]=ancien[k];
+      if(_vide(l.body)){if(!_vide(ancien.body))n.body=ancien.body;if(_vide(l.ref)&&!_vide(ancien.ref))n.ref=ancien.ref;}
       // ⚠️ (22 oct., revue) LA CAPTURE LA PLUS RÉCENTE GAGNE : revue maintenant,
       //    elle n'est plus « plus vue » ; une pause posée d'ici il y a plus d'une
       //    heure est levée (sa page la remontre). La MÊME borne que la règle

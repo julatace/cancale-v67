@@ -1143,3 +1143,37 @@ autres sont floutees comme pour vinted ».
   rouges sur le code d'avant, vert après ; rouge sous trois mutations (fraîcheur
   retirée, condition d'extension retirée, flou jamais posé). `filtre-compte`,
   `lbc-comme-vinted`, `lbc-messages` verts.
+
+## 31 octobre (soir) — Extension 5.294 : une capture qui ne porte pas un champ ne l'efface plus
+
+Julien : « améliore aussi la fiabilité des annonces et des infos Leboncoin etc. » (et
+plus tôt : « il manque beaucoup de chaussures… fais en sorte qu'il ne manque plus
+jamais rien »).
+
+- **Défaut (prouvé sur le vrai `background.js`)** : `storeLbcListingsUneFois`
+  fusionnait par `Object.assign(ancien, capture)`. Chaque endpoint ne rend pas tout :
+  le tableau de bord pro (`Ads[].Info`) pose `body:''`, `price:null` si `Info.Price`
+  manque, `account:null` sans compte détecté ; une liste (`owner_listing`, recherche)
+  n'a souvent pas de description. Ces vides passaient PAR-DESSUS ce qu'on savait :
+  · la référence `VRM-{n°}` lue dans la description (`ref`, une IDENTITÉ :
+    `numeroLbcIdentite`) tombait à la capture suivante d'une liste sans
+    description ⇒ « vendue sur Vinted → à retirer de Leboncoin », la sortie prouvée
+    et l'alerte de double vente du serveur (`annoncesLbcParNumero`) ne la voyaient
+    plus ;
+  · `account` passait à `null` ⇒ une annonce sans réf n'était plus « à lui »
+    (`annonceLbcALui`) : elle **disparaissait** de l'écran Leboncoin et du panneau ;
+  · le prix, le lien, la catégorie passaient à vide.
+- **Correction** : un champ VIDE de la capture (`null`/`''`) ne remplace jamais un
+  plein — `account`, `accountName`, `accountType`, `price`, `url`, `category`. La
+  description n'est remplacée que par une description lue ; la référence ne tombe
+  que si une description LUE ne la porte plus (il l'a retirée : pas de référence
+  collante, « mieux vaut un blanc qu'un faux »). Un champ LU gagne toujours (prix
+  changé, etc.). Le statut n'est pas concerné (un statut absent laisse l'annonce
+  « en vente », le sens sûr de la règle partagée).
+- Preuve : `scripts/audit-fiabilite-annonces.cjs` (A1-A4, réponses Leboncoin de la
+  forme mesurée, identifiants inventés) — 6 rouges sur le code d'avant (ref, compte,
+  prix, lien effacés), vert après ; `--prouve` : 3 mutations (champs vides qui
+  écrasent, référence écrasée, référence collante) toutes rouges.
+- Geste de Julien : installer l'extension 5.294.0 (la 5.293.0 soumise à Mozilla ne
+  change pas). Les références déjà effacées reviennent à la prochaine capture
+  d'une page qui montre la description (l'annonce elle-même).

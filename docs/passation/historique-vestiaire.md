@@ -131,3 +131,25 @@ lire l'id du compte connecté sur une route « moi » de Vestiaire, l'écrire
 (`vc_session = { id, at }`) et estampiller `compte` sur chaque ligne `vc_*` ; l'app
 appliquerait alors `STYLE_FLOU` (src/flouCompte.js) avec la même règle de
 fraîcheur que Leboncoin.
+
+## 31 octobre (soir) — Extension 5.294 : une liste filtrée n'est plus « la liste »
+
+- **Défaut (prouvé sur le vrai `vc-inject.js` + `background.js`)** : le fond tient
+  une liste Vestiaire pour ENTIÈRE quand la page 0 rend autant d'éléments que
+  `meta.count` — alors `rangerVcAnnonces` REMPLACE toutes les annonces, et
+  `rangerVcVentes` (« à expédier ») retire `aExpedier` à ce qui n'y est plus. Or
+  `meta.count` est le total de la REQUÊTE : un onglet ou une recherche
+  (`?status=sold`, `?q=…`) rend le total du filtre. Une annonce « vendue » effaçait
+  les autres (boosts perdus), une recherche vide disait « Aucune annonce sur
+  Vestiaire », une vente à expédier cachée par un filtre n'était plus à expédier
+  (un colis caché est un colis perdu).
+- **Correction** (`vc-inject.js`, `sansFiltre`) : hors pagination, tri et langue
+  (liste blanche `PARAMS_NEUTRES`), le total n'est pas transmis (`null` ⇒ la page
+  ne fait que compléter, l'écran dit « au moins »). Même règle que la liste
+  complète Leboncoin (la requête ne filtre sur rien). Annonces, ventes, messages,
+  achats. ⚠️ Non mesuré : les paramètres que Vestiaire met vraiment sur ces
+  requêtes (aucune n'a été vue pleine) — si une requête sans filtre porte un
+  paramètre hors liste, la liste ne fera jamais foi (le sens sûr) ; l'ajouter à
+  `PARAMS_NEUTRES` une fois MESURÉ.
+- Preuve : `scripts/audit-fiabilite-annonces.cjs` (B1-B2) — 5 rouges sur le code
+  d'avant, vert après, mutation « filtre ignoré » rouge.
