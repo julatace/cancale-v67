@@ -224,7 +224,16 @@ const ouvrir = async (b, taille, tab) => {
 
 let ok = 0, ko = 0;
 const dit = (c, m, d) => { if (c) { ok++; console.log('✅ ' + m); } else { ko++; console.log('❌ ' + m + (d !== undefined ? ' — ' + (typeof d === 'string' ? d : JSON.stringify(d)).slice(0, 300) : '')); } };
-const sec = (s) => async (pg) => { await pg.click(`[data-segment] [data-section="${s}"]`, { timeout: 6000 }); await pg.waitForTimeout(1600); };
+// (31 oct., navigation par tâche) Annonces, Ventes et Messages d'eBay sont les TÂCHES
+// filtrées sur eBay (`?tab=annonces&site=ebay`) ; Offres reste une section de
+// l'espace eBay (`?tab=plat_ebay&section=offres`). On ouvre l'écran par son lien
+// profond et on attend qu'il soit RENDU (le filtre ou la section allumés).
+const ECRAN_EBAY = { annonces: 'annonces&site=ebay', ventes: 'ventes&site=ebay', messages: 'messages&site=ebay', offres: 'plat_ebay&section=offres' };
+const sec = (s) => async (pg) => {
+  if (['annonces', 'ventes', 'messages'].includes(s)) await pg.waitForSelector(`[data-tache="${s}"][data-tache-site="ebay"]`, { timeout: 6000 });
+  else await pg.waitForSelector(`[data-section="${s}"][aria-current="page"], [data-section="${s}"][aria-pressed="true"], [data-section="${s}"][aria-selected="true"]`, { timeout: 6000 });
+  await pg.waitForTimeout(1600);
+};
 const essaie = async (nom, f) => { try { await f(); } catch (e) { dit(false, nom + ' : le bloc a levé', String(e.message || e).split('\n')[0]); } };
 
 (async () => {
@@ -236,7 +245,7 @@ const essaie = async (nom, f) => { try { await f(); } catch (e) { dit(false, nom
       const T = taille.startsWith('390') ? '390' : '1512', tel = T === '390';
       // ── Annonces ──
       await essaie(`[${T}] annonces`, async () => {
-        const { ctx, pg } = await ouvrir(b, taille, 'plat_ebay');
+        const { ctx, pg } = await ouvrir(b, taille, ECRAN_EBAY.annonces);
         await sec('annonces')(pg);
         const m = await pg.evaluate(() => {
           const top = (s) => { const e = document.querySelector(s); return e ? e.getBoundingClientRect().top : null; };
@@ -259,7 +268,7 @@ const essaie = async (nom, f) => { try { await f(); } catch (e) { dit(false, nom
       });
       // ── Brouillons (même écran, bas de page) ──
       await essaie(`[${T}] brouillons`, async () => {
-        const { ctx, pg } = await ouvrir(b, taille, 'plat_ebay');
+        const { ctx, pg } = await ouvrir(b, taille, ECRAN_EBAY.annonces);
         await sec('annonces')(pg);
         const m = await pg.evaluate(() => {
           const mod = document.querySelector('[data-brouillon-modifier]'), sup = document.querySelector('[data-brouillon-supprimer]'), cb = document.querySelector('[data-brouillon-choix]');
@@ -274,18 +283,20 @@ const essaie = async (nom, f) => { try { await f(); } catch (e) { dit(false, nom
       });
       // ── Ventes ──
       await essaie(`[${T}] ventes`, async () => {
-        const { ctx, pg } = await ouvrir(b, taille, 'plat_ebay');
+        const { ctx, pg } = await ouvrir(b, taille, ECRAN_EBAY.ventes);
         await sec('ventes')(pg);
         const m = await pg.evaluate(() => [...document.querySelectorAll('.vrm-ebay-sale-status')].map((e) => { const d = e.querySelector('span'); const bg = d ? getComputedStyle(d).backgroundColor : ''; return { t: e.innerText.trim(), point: !!d && bg !== 'rgba(0, 0, 0, 0)' && d.getBoundingClientRect().width >= 5, poids: getComputedStyle(e).fontWeight, ombre: getComputedStyle(e).boxShadow }; }));
         dit(m.length >= 2 && m.every((x) => x.point), `[${T}] Ventes : chaque statut porte un point de couleur (comme Vinted)`, m);
         dit(m.length >= 2 && new Set(m.map((x) => x.poids + x.ombre)).size === 1, `[${T}] « À expédier » et « Expédiée » ont la même forme`, m);
-        const nav = await pg.evaluate(() => { const n = document.querySelector('.vrm-platform-tabs'); const s = getComputedStyle(n); return { deborde: n.scrollWidth > n.clientWidth + 2, masque: (s.maskImage && s.maskImage !== 'none') || (s.webkitMaskImage && s.webkitMaskImage !== 'none') }; });
-        dit(!nav.deborde || nav.masque, `[${T}] sous-onglets : une piste qui déborde s'estompe au bord`, nav);
+        // (31 oct.) Les pistes de l'écran : les sous-onglets d'un espace de site, ou la
+        // rangée de filtres de site d'une tâche — chacune, si elle déborde, s'estompe.
+        const nav = await pg.evaluate(() => [...document.querySelectorAll('.vrm-platform-tabs, [data-filtre-site]')].map((n) => { const s = getComputedStyle(n); return { c: n.className, deborde: n.scrollWidth > n.clientWidth + 2, masque: (s.maskImage && s.maskImage !== 'none') || (s.webkitMaskImage && s.webkitMaskImage !== 'none') }; }));
+        dit(nav.length > 0 && nav.every((x) => !x.deborde || x.masque), `[${T}] sous-onglets : une piste qui déborde s'estompe au bord`, nav);
         await ctx.close();
       });
       // ── Messages ──
       await essaie(`[${T}] messages`, async () => {
-        const { ctx, pg } = await ouvrir(b, taille, 'plat_ebay');
+        const { ctx, pg } = await ouvrir(b, taille, ECRAN_EBAY.messages);
         await sec('messages')(pg);
         const m = await pg.evaluate(() => {
           const h = [...document.querySelectorAll('h2')].find((x) => x.textContent.trim() === 'Messages eBay');
@@ -301,7 +312,7 @@ const essaie = async (nom, f) => { try { await f(); } catch (e) { dit(false, nom
       });
       // ── Offres ──
       await essaie(`[${T}] offres`, async () => {
-        const { ctx, pg } = await ouvrir(b, taille, 'plat_ebay');
+        const { ctx, pg } = await ouvrir(b, taille, ECRAN_EBAY.offres);
         await sec('offres')(pg);
         const m = await pg.evaluate(() => {
           const bt = (t) => [...document.querySelectorAll('.vrm-ebay-offer-actions button')].find((x) => x.innerText.trim() === t);

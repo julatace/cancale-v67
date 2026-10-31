@@ -286,10 +286,15 @@ const lireDash = (pg) => pg.evaluate(() => {
       console.log(`── 8. ${t} — Vinted → Annonces : pas de « ✓ à jour » des ventes au-dessus d’un dressing d’hier`);
       await essaie('8 ' + t, async () => {
         const lignes = [...BASE(), ventes('111', 3), ventes('222', 3)];
-        const r = await rendre(b, { lignes, tel, mobile: false, onglet: 'plat_vinted', section: 'annonces' });
+        // (31 oct., navigation par tâche) « Vinted → Annonces » est « Annonces · Vinted »,
+        // « Vinted → Ventes » est « Ventes · Vinted » : l'onglet de la navigation, puis
+        // le filtre de site, comme une personne.
+        const r = await rendre(b, { lignes, tel, mobile: false, onglet: 'annonces&site=vinted' });
         const a = await lireAnnonces(r.pg);
         dit(a.nFraicheur === 1 && a.aJour === 0, `${t} : la date du dressing est dite, et AUCUNE coche « à jour » ne la contredit sur le même écran (§11, §5)`, JSON.stringify({ fraicheur: a.nFraicheur, aJour: a.aJour }));
-        await r.pg.click('[data-section="ventes"]'); await r.pg.waitForTimeout(2500);
+        await r.pg.locator('.vrm-mobile-nav [data-nav-entree="ventes"]:visible, .vrm-sidebar [data-nav-entree="ventes"]:visible').first().click();
+        await r.pg.click('[data-filtre-site="ventes"] button[data-site="vinted"]'); await r.pg.waitForTimeout(2500);
+        dit(await r.pg.evaluate(() => { const t = document.querySelector('[data-tache]'); return !!t && t.getAttribute('data-tache') === 'ventes' && t.getAttribute('data-tache-site') === 'vinted'; }), `${t} : Ventes · Vinted est ouvert`);
         const v = await lireAnnonces(r.pg);
         dit(v.aJour === 1, `${t} : l’autre sens — sur la section Ventes, la coche des ventes captées à l’instant reste`, JSON.stringify({ aJour: v.aJour }));
         dit(r.errs.length === 0, `${t} : aucune erreur d’app`, r.errs.join(' | ').slice(0, 160));
