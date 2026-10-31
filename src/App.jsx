@@ -135,7 +135,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.291.0';
+const EXT_ATTENDUE = '5.293.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -36580,14 +36580,18 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // Ventes illisibles ⇒ rien n'est retiré (pas su ≠ vendue).
   const [lbcVentesAnn, setLbcVentesAnn] = useState(null);
   const [lbcItemsAnn, setLbcItemsAnn] = useState(null);
+  // (31 oct.) Les N° dont l'annonce Leboncoin est SORTIE, prouvé (`numerosLbcSortis`).
+  // `null` = pas su : la pastille reste (rien n'est retiré sur une lecture ratée).
+  const [lbcSortisAnn, setLbcSortisAnn] = useState(null);
   const lbcAussi = React.useMemo(() => {
-    if (!lbcVentesAnn || !lbcPosted.size || !annoncesLbcVendues(lbcVentesAnn).size) return lbcPosted;
+    const posted = lbcPostesEncoreEnVente(lbcPosted, numeros, lbcSortisAnn);
+    if (!lbcVentesAnn || !posted.size || !annoncesLbcVendues(lbcVentesAnn).size) return posted;
     const liens = { ...(load('vrm_lbc_liens', {}) || {}) };
-    const { doublons } = doublesVenteLbc({ ventes: lbcVentesAnn, items: lbcItemsAnn || {}, liens, numeros, enLigne: lbcPosted });
+    const { doublons } = doublesVenteLbc({ ventes: lbcVentesAnn, items: lbcItemsAnn || {}, liens, numeros, enLigne: posted });
     const ici = new Set(doublons.flatMap((d) => d.surVinted || []));
-    if (!ici.size) return lbcPosted;
-    return new Set([...lbcPosted].filter((id) => !ici.has(id)));
-  }, [lbcPosted, lbcVentesAnn, lbcItemsAnn, numeros]);
+    if (!ici.size) return posted;
+    return new Set([...posted].filter((id) => !ici.has(id)));
+  }, [lbcPosted, lbcVentesAnn, lbcItemsAnn, lbcSortisAnn, numeros]);
   // (16 oct.) Les N° des paires EN LIGNE sur eBay — par le SKU « VRM-{n°} »
   // (identité, §5), lu une fois (la ligne est petite). Illisible ⇒ Set vide :
   // aucune pastille eBay, jamais une fausse.
@@ -36634,14 +36638,28 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       if (!r.ok) return;
       const rows = await r.json();
       const ids = (rows && rows[0] && rows[0].data && rows[0].data.ids) || [];
+      const postedDepuis = (rows && rows[0] && rows[0].data && rows[0].data.updatedAt) || '';
       if (Array.isArray(ids)) setLbcPosted(new Set(ids.map(String)));
       if (!Array.isArray(ids) || !ids.length) return;
       const vr = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.lbc_ventes&select=ventes:data->ventes`, { headers: sbAuth() });
       if (!vr.ok) return;
       const vrows = await vr.json();
-      const ventes = (Array.isArray(vrows) && vrows[0] && vrows[0].ventes) || {};
+      if (!Array.isArray(vrows)) return;
+      const ventes = (vrows[0] && vrows[0].ventes) || {};
       setLbcVentesAnn(ventes);
-      if (annoncesLbcVendues(ventes).size) { const it = await lbcAnnoncesSession(); if (it) setLbcItemsAnn(it); }
+      // Les annonces Leboncoin : la lecture de SESSION (déjà faite pour le Stock,
+      // gardée 10 min — aucun octet de plus), puis la MÊME preuve que l'écran
+      // Leboncoin : ses comptes (session vue ou vente prouvée), la date de chaque
+      // liste complète, la marque « publiée ». Comptes illisibles ⇒ pas de preuve.
+      const ls = await lbcListingsSession();
+      if (!ls) return;
+      setLbcItemsAnn(ls.items);
+      let preuve = null;
+      try {
+        const ra = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.lbc_accounts&select=data`, { headers: sbAuth() });
+        if (ra.ok) { const ar = await ra.json(); if (Array.isArray(ar)) { const accs = (ar[0] && ar[0].data && ar[0].data.accounts) || {}; preuve = { lectures: ls.lectures || {}, comptes: new Set([...comptesLbcProuves(ventes, ls.items), ...comptesLbcSession(accs)]), depuis: postedDepuis }; } }
+      } catch (_) {}
+      setLbcSortisAnn(numerosLbcSortis(ls.items, { ...(load('vrm_lbc_liens', {}) || {}) }, annoncesLbcVendues(ventes), preuve).prouves);
     } catch (_) { /* pas su ⇒ Set vide ⇒ aucune pastille, jamais un faux « publiée » */ }
   })(); }, []);
   // Ses VENTES Leboncoin — demande de Julien (21 sept.) : « je veux une partie
@@ -51960,6 +51978,19 @@ async function publierLbcARetirer(liste) {
   } catch (_) {}
 }
 // <lbc-a-retirer-regle>
+// ── « AUSSI SUR LEBONCOIN » : LA PASTILLE SUIT LA PREUVE DE SORTIE (31 oct.) ──
+// La pastille de l'écran Annonces lisait `vinted_lbc_posted` (sa marque
+// « publiée ») moins les ventes Leboncoin prouvées : une annonce Leboncoin
+// SUPPRIMÉE, mise en pause ou plus vue dans une liste complète de chacun de ses
+// comptes (`numerosLbcSortis`, la même preuve que l'écran Leboncoin, Ma journée
+// et le logo, §11) gardait « Aussi sur Leboncoin ». Par identité seulement : le
+// N° de la fiche de CETTE annonce Vinted. `sortis` illisible (`null`) ⇒ rien
+// n'est retiré (pas su ≠ sortie).
+function lbcPostesEncoreEnVente(posted, numeros, sortis) {
+  if (!(sortis && typeof sortis.has === 'function') || !sortis.size || !posted) return posted;
+  const nums = numeros || {};
+  return new Set([...posted].filter((id) => { const k = cleNum((nums[String(id)] || {}).numero); return !(k && sortis.has(k)); }));
+}
 function aRetirerDeLbcVinted({ posted, numeros, enLigne, vendus, itemsLbc, liens, vendusLbc, sortis }) {
   if (!(vendus && typeof vendus.has === 'function')) return null;
   const nums = numeros || {};
@@ -53237,7 +53268,6 @@ function LeboncoinScreen() {
     const ventesLbcKO = lbcVentesRows === null;
     const ventesLbc = (lbcVentesRows && lbcVentesRows[0] && lbcVentesRows[0].data && lbcVentesRows[0].data.ventes) || {};
     const prouves = new Set([...comptesLbcProuves(ventesLbc, lbcItems), ...comptesLbcSession(accsLbc)]);
-    const numFrom = numDeTitreLbc;
     // ⚠️ LE LIEN POSÉ À LA MAIN D'ABORD (C4) : « Relier » écrit annonce LBC →
     //    N° dans `vrm_lbc_liens`. C'est une identité qu'il pose lui-même — la
     //    même règle vit dans l'extension (`adRefKeys`), sinon l'app relie et le
@@ -53276,7 +53306,12 @@ function LeboncoinScreen() {
     const pasRevues = liveAds.filter(lbcPasRevue);
     const refToAd = new Map();
     liveAds.forEach(ad => adKeys(ad).forEach(k => { if (!refToAd.has(k)) refToAd.set(k, ad); }));
-    const vKeys = (id, title) => { const e = numeros[id] || {}; const ks = []; if (e.numero) ks.push(cleNum(e.numero)); const m = numFrom(title || e.title); if (m) ks.push(cleNum(m)); return ks; };
+    // (31 oct.) Le « nXXX » d'un TITRE Vinted n'est plus une clé (§5) : après la
+    // remise à zéro 013, « n230 » d'un titre peut être l'ancien numéro d'une AUTRE
+    // paire — il faisait sortir de la file (« déjà sur Leboncoin ») une paire jamais
+    // publiée. Seul le N° de la fiche compte, la même règle que l'extension
+    // (`vintedKeys`, §11). `id` et `title` gardés pour les appelants.
+    const vKeys = (id, _title) => { const e = numeros[id] || {}; return e.numero ? [cleNum(e.numero)].filter(Boolean) : []; };
 
     // ⚠️ CET ÉCRAN ET LE PANNEAU DE L'EXTENSION CALCULENT LA MÊME FILE, CHACUN
     //    DE SON CÔTÉ (le panneau tourne sur leboncoin.fr, où l'app n'est pas
@@ -53400,7 +53435,7 @@ function LeboncoinScreen() {
     // Vinted = vendue → à retirer. Uniquement si la paire est connue de VRM.
     // ⚠️ Une paire « à confirmer » n'est pas « plus en ligne » : on ne sait pas.
     const keysKnown = new Set();
-    for (const id in numeros) { const e = numeros[id] || {}; if (e.numero) keysKnown.add(cleNum(e.numero)); const m = numFrom(e.title); if (m) keysKnown.add(cleNum(m)); }
+    for (const id in numeros) { const e = numeros[id] || {}; if (e.numero) keysKnown.add(cleNum(e.numero)); }
     const unlinked = [];
     for (const ad of liveAds) {
       const ks = adKeys(ad);

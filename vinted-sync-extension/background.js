@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.291.0';
+const CODE_VERSION = '5.293.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -14570,10 +14570,11 @@ async function buildLbcData() {
   // présent dans son titre (les deux numérotations coexistent chez toi).
   const vintedKeys = (o, num) => {
     const keys = [];
-    if (num != null && String(num).trim() !== '') keys.push(cleNum(num));
-    const t = String((o.raw && o.raw.title) || '');
-    const m = /\bn\s*°?\s*(\d{1,5})\b/i.exec(t);
-    if (m) keys.push(cleNum(m[1]));
+    // (31 oct.) Le « nXXX » d'un TITRE Vinted n'est plus une clé (§5) : après la
+    // remise à zéro 013, il peut désigner l'ancienne paire du même chiffre et
+    // faisait sortir de la file une paire jamais publiée. Le N° seul — la même
+    // règle que l'app (`vKeys`, §11).
+    if (num != null && String(num).trim() !== '') { const k = cleNum(num); if (k) keys.push(k); }
     return keys;
   };
   const autoMatched = new Map(); // id d'annonce Vinted -> annonce LBC trouvée
@@ -14655,8 +14656,6 @@ async function buildLbcData() {
     for (const id in numeros) {
       const e = numeros[id] || {};
       if (e.numero != null && String(e.numero).trim() !== '') keysKnown.add(cleNum(e.numero));
-      const m = /\bn\s*°?\s*(\d{1,5})\b/i.exec(String(e.title || ''));
-      if (m) keysKnown.add(cleNum(m[1]));
     }
     for (const ad of lbcItems) {
       if (LBC_ANNONCE_MORTE.test(String(ad.status || ''))) continue;
