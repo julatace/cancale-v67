@@ -200,7 +200,10 @@ const attendTrouve = async (pg) => { for (let i = 0; i < 30; i++) { const e = aw
         dit(v === '7', 'un chiffre tapé dans la recherche y reste (c’est elle qui cherche un N°)', v);
         await pg.fill('input[aria-label="Rechercher une annonce"]', '');
       });
-      dit(!ECRITURES.filter((x) => !/^POST (widget_stats|vinted_urssaf_mois|vrm_colis_\w+|vrm_benefice_jours|plantage_\w+|main|relais_ext|diag_photos|vrm_hl_\w+|vrm_paires_dorment)(,|$)/.test(x)).length, 'aucune écriture en base venue du clavier', ECRITURES.join(' | ').slice(0, 300));
+      // Les lignes PUBLIÉES par un écran (§11 : widget_stats, vrm_colis_*, et
+      // depuis le 29 oct. `lbc_a_retirer`, le résumé pour le logo VRM sur
+      // leboncoin.fr) partent au chargement, pas du clavier.
+      dit(!ECRITURES.filter((x) => !/^POST (widget_stats|vinted_urssaf_mois|vrm_colis_\w+|vrm_benefice_jours|plantage_\w+|main|relais_ext|diag_photos|vrm_hl_\w+|vrm_paires_dorment|lbc_a_retirer)(,|$)/.test(x)).length, 'aucune écriture en base venue du clavier', ECRITURES.join(' | ').slice(0, 300));
       dit(!errs.length, 'aucune erreur de page', errs.join(' | ').slice(0, 200));
       await ctx.close();
     }

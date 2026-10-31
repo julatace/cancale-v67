@@ -231,7 +231,8 @@ const mesurer = (pg, tel) => pg.evaluate((tel) => {
 const ecrans = [
   { nom: 'annonces', tab: 'plat_vinted', section: 'annonces', attend: '[data-carte-annonce]', attrs: ['[data-ann-resume]', '.vrm-ann-grid', '[data-carte-annonce="9101"]'] },
   { nom: 'leboncoin-ventes', tab: 'plat_leboncoin', section: 'ventes', attend: '[data-ventes-kpi]', attrs: ['[data-ventes-kpi="leboncoin"]', '[data-section="annonces"]', '[data-lbc-vente="l1"][data-lbc-etat="Finalisée"]'] },
-  { nom: 'leboncoin-annonces', tab: 'plat_leboncoin', section: 'annonces', attend: null, attrs: ['[data-plat-resume]', '[data-lbc-catalog-id="lb3"] [data-lbc-catalog-num="B233"]'] },
+  { nom: 'leboncoin-annonces', tab: 'plat_leboncoin', section: 'annonces', attend: '[data-lbc-catalog-id="lb3"]',  // (31 oct.) la liste RENDUE avant de juger le N° (machine chargée)
+    attrs: ['[data-plat-resume]', '[data-lbc-catalog-id="lb3"] [data-lbc-catalog-num="B233"]'] },
   { nom: 'leboncoin-achats', tab: 'plat_leboncoin', section: 'achats', attend: '[data-lbc-achat]', attrs: ['.vrm-buy-row[data-lbc-achat="a1"]', '.vrm-buy-row[data-lbc-achat="a2"]', '[data-lbc-achat="a2"] a[href="https://suivi.test/a2"]', '[data-lbc-achat="a2"] [data-lbc-achat-qr]'] },
   { nom: 'leboncoin-messages', tab: 'plat_leboncoin', section: 'messages', attend: '[data-messages-lbc]', attrs: ['[data-messages-lbc]', '[data-compte-lbc="u1"]'] },
   { nom: 'ebay-ventes', tab: 'plat_ebay', section: 'ventes', attend: '[data-ventes-kpi]', attrs: ['[data-ventes-kpi="ebay"]'] },

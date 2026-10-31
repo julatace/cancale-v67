@@ -1648,3 +1648,76 @@ Les trois points « reste ouvert » de `docs/passation/2026-10-22.md`.
     `tout-generer`. ⚠️ `statuts-colis` sort rouge (tuile « À envoyer » lue 0) — **déjà rouge sur le build d'origin/main et de 8d164f1**, pas ce lot.
   - ⚠️ Non mesuré : le texte réel sur l'iPhone (le script du widget lit-il `estimeeDepassee` ? rien ne l'y oblige).
 
+
+## 31 octobre 2026 — Le style « Vitrine » (son choix), à l'échelle de l'app
+
+**Sa demande** : « installe le skill taste afin que tu t'éloignes de ce que tu fais que je
+n'aime pas trop », puis « lance le changement de style maintenant ». La compétence
+`taste-skill` (`.claude/skills/taste-skill/`, références `app-screens.md` et `tells.md`)
+a servi de grille. Une première direction (« Registre » : Perle gardée, achromatique) a
+été montée puis **abandonnée** : Julien a vu quatre maquettes (Perle, Registre, Entrepôt,
+Vitrine) et a choisi la quatrième — « j'aime énormément le 4, tu peux appliquer ça,
+améliore simplement pour le téléphone ». **Vitrine remplace Perle** (CLAUDE.md §3 et §7).
+
+**Ce qu'est Vitrine** : une boutique de sneakers — blanc franc, grandes photos,
+typographie serrée, la paire avant tout. Bricolage Grotesque (texte et titres, 500–800,
+axe optique) ; Geist Mono 500 pour les N° et les codes. Clair : fond `#FFFFFF`, surface
+`#F5F5F3`, encre `#0F0F0E`, atténué `#56564F`, filets `#E4E4DF`, accent cobalt `#2442B8`
+(texte blanc dessus), ambre `#8A5300`, photo vide `#ECECE8`. Sombre dérivé : fond
+`#0E0E0D`, surface `#1A1A18`, encre `#F2F2EE`, cobalt éclairci `#6F86E8` (texte FONCÉ
+dessus : 5,4:1 ; le blanc n'y tient que 3,5:1), ambre `#F0B44C`. Rayons 14 px (cartes,
+photos, boutons pleins), 999 px (pastilles). Une couleur d'accent, rare ; ambre = geste ;
+rouge = deux paires sous un N° ; le violet reste refusé (`blue` et `purple` du thème
+retombent sur l'atténué).
+
+**Comment c'est posé (pour pouvoir le relire ou le retirer d'un coup)**
+- `src/themeMineral.js` : les jetons (noms d'exports inchangés, App.jsx n'a rien à
+  changer pour les lire). `variablesTheme` publie en plus `--vrm-danger`, `--vrm-warn`,
+  `--vrm-warn-soft`, `--vrm-photo`.
+- `src/styles-vitrine.css`, **chargée en dernier** (`src/main.jsx`) : polices, coque,
+  navigation, surfaces, titres, étiquettes, boutons, filtres, fiches d'annonce, sombre.
+  Elle surpasse les couches d'avant (styles-iphone, -mobile-studio, -telephone,
+  -disposition, -annonces-fiche…) sans les réécrire.
+- Polices **auto-hébergées** dans `src/fonts/` (woff2 latin + licences OFL) : la CSP de
+  `vercel.json` n'autorise que `font-src 'self' data:` — Google Fonts aurait été bloqué.
+- Retouches ailleurs, toutes de forme : `index.html` (police, grain retiré, titres,
+  `.vrm-label` en minuscules, bouton principal à plat, plus de carte qui se soulève, plus
+  d'entrée en cascade, anneau de focus cobalt) ; `styles-mobile-studio.css` (14 aplats
+  pétrole en dur → l'encre) ; `styles-epure.css`, `styles-gestion.css`,
+  `styles-mineral.css` (restes pétrole/bleu en dur) ; `RepartitionAnneau.jsx` (sa
+  palette sauge → neutres + l'accent).
+- `src/App.jsx`, localisé : `SideBar` (chaque entrée porte son libellé, icônes 18 px, logo
+  32 px, `NAV_LARGEUR` 160 → 200) ; `Notice` (voile en dégradé retiré) ; la légende
+  « Vendu » de la courbe de la semaine (`#5d948b` en dur → `C.accent` : la pastille ne
+  correspondait plus au trait).
+
+**Les « tells » retirés** (relevés par `inspect.mjs --app` de la compétence sur une base
+inventée — `_base-volume.cjs`) : rail pétrole en dégradé et bandeau pétrole à halo flou
+du téléphone, Space Grotesk, ~80 étiquettes en capitales espacées (en ligne et par
+classe), ombres molles des cartes et des boutons, grain de papier, cartes qui se
+soulèvent au survol, entrée en cascade, pavés d'icônes teintés devant les tâches et les
+réglages, voile en dégradé des notices, flou de verre sous les feuilles. Mesuré sur Ma
+journée : 7 FAIL → 4 (restent : pas de `<h1>` — sémantique, `ScreenHead` rend un `h2` ;
+un texte de 9 px caché au téléphone ; deux défauts de mise en page d'avant).
+
+**Téléphone (sa demande d'amélioration)** : bonjour de Ma journée en titre 34 px (44 px
+sur ordinateur) ; barre du bas blanche, icône cobalt + libellé encre 700 à l'onglet
+actif, 52 px, zone sûre respectée ; Ventes et Colis en lignes aérées (filet, pas de
+cartes) ; N° d'un colis en pastille NOIRE pleine, Geist Mono 16 px ; « Tout imprimer »
+pleine largeur, 52 px, cobalt ; Annonces en 2 colonnes à photo de 190 px ; filtres et
+rangée de comptes en pastilles, la choisie noire pleine (en sombre : marche claire cernée
+d'encre — la règle du 16 oct. « pas de pastille blanche pleine », banc formes-communes).
+
+**Défaut trouvé au passage (existait avant)** : dans une carte de Colis, le bouton
+« Imprimer » était BLANC SUR BLANC (fond retiré par styles-gestion, texte « sur accent »
+forcé par styles-boutons) — corrigé dans `styles-vitrine.css` §12.
+
+**Pas fait (décision à lui)** : fixer « Tout imprimer » AU-DESSUS de la barre du bas
+(la maquette v2) — un bouton fixe couvre la dernière ligne (banc coque-mobile) ; le N°
+posé SUR la photo d'une fiche (il reste dans la ligne du prix : déplacer le champ
+d'édition en place touchait le JSX de la fiche) ; la rétrospective « Wrapped » garde ses
+dégradés multicolores ; la page d'accueil publique (`Accueil.jsx`) n'est pas touchée.
+
+**Captures** (base inventée, aucune donnée réelle) : `docs/style-2026-10-31/avant/` et
+`docs/style-2026-10-31/apres/` — Ma journée, Annonces, Ventes, Colis, Stock, Réglages, à
+390 et 1512 px, clair et sombre.

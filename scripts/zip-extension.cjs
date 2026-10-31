@@ -56,12 +56,14 @@ function manifesteFirefox(m) {
   f.browser_specific_settings = {
     gecko: {
       id: ID_FIREFOX,
-      strict_min_version: '128.0',
+      // 140 : la première qui lit `data_collection_permissions` (validateur
+      // de Mozilla 10.15, 31 oct.) ; Android : 142.
+      strict_min_version: '140.0',
       data_collection_permissions: {
         required: ['authenticationInfo', 'personallyIdentifyingInfo', 'personalCommunications', 'financialAndPaymentInfo', 'websiteContent', 'websiteActivity'],
       },
     },
-    gecko_android: { strict_min_version: '128.0' },
+    gecko_android: { strict_min_version: '142.0' },
   };
   for (const cs of f.content_scripts || []) {
     if (cs.world === 'MAIN') continue;

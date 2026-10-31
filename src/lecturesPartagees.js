@@ -88,6 +88,15 @@ export function creerLecturesPartagees(fetchOrig, base, opts = {}) {
     if (!versBase && !versRoute) return fetchOrig(input, init);
     if (methode !== 'GET') {
       if (methode === 'HEAD') return fetchOrig(input, init);
+      // (31 oct., banc vitesse) UNE seule exception, DÉCLARÉE par l'appelant et
+      // limitée aux routes de l'app : `vrmInvalideSiChange: true` dit « ce
+      // passage n'écrit que ses propres lignes, et c'est MOI qui vide les
+      // lectures quand il rend un changement » (`relireTransporteursSiVieux`,
+      // lignes `transp_*`). Depuis ea0b573 un `Request` ne suffisait plus à le
+      // dire : le passage du démarrage refaisait toutes les lectures en vol
+      // (+8 lectures par écran, les ventes au 3ᵉ aller-retour). Une écriture
+      // vers la BASE vide toujours, drapeau ou pas.
+      if (versRoute && init && init.vrmInvalideSiChange === true) return fetchOrig(input, init);
       invalider();
       const p = fetchOrig(input, init);
       Promise.resolve(p).then(invalider, invalider);

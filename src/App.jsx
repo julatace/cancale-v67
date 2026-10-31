@@ -25,6 +25,7 @@ import FavorisVinted from './FavorisVinted.jsx';
 import RepartitionAnneau from './RepartitionAnneau.jsx';
 import AnnoncesLeboncoin from './AnnoncesLeboncoin.jsx';
 import {suivreReceptionLeboncoin,lireReceptionLeboncoin} from './rafraichissementLeboncoin.js';
+import { STYLE_FLOU, compteLbcOuvert, lbcFloute } from './flouCompte.js';
 import DiagnosticLeboncoin from './DiagnosticLeboncoin.jsx';
 import {preparerLiaisonOAuth,lireLiaisonOAuth,resultatLiaisonPermis} from './auth/liaisonOAuth.js';
 import ConnexionsCompte from './auth/ConnexionsCompte.jsx';
@@ -1692,6 +1693,7 @@ const authBoot = async () => {
 // vendeur, dans les 30 s ; sinon AppCoeur relit.
 let _confidentialiteUid='';
 let _prechargeComptes = null;   // { at, qui, promesse }
+let _prechargeLancePour = '';   // le vendeur pour qui le préchargement est déjà parti
 const prechargerDemarrage = () => {
   try {
     if (typeof window === 'undefined' || _prechargeComptes) return;
@@ -1708,6 +1710,15 @@ const prechargerDemarrage = () => {
       }
     }
     const qui = (AUTH.user && AUTH.user.id) || 'local';
+    // ⚠️ (31 oct., banc vitesse) UNE fois par vendeur et par ouverture.
+    //    `PorteEquipe` appelle cette fonction À CHAQUE RENDU ; une fois le
+    //    préchargement repris par AppCoeur (`_prechargeComptes` remis à null),
+    //    le rendu suivant de la porte (la réponse de l'équipe qui arrive)
+    //    relançait TOUT : comptes, comptes supprimés, commandes de toute la
+    //    famille (447 Ko) — +20 à +30 lectures sur chaque écran, dont 12 à 29
+    //    identiques, pour rien (AppCoeur avait déjà les siennes).
+    if (_prechargeLancePour === qui) return;
+    _prechargeLancePour = qui;
     const promesse = fetchVintedAccounts();
     // Les commandes de TOUS les comptes en une lecture, EN MÊME TEMPS que la liste
     // des comptes (on ne connaît pas encore leurs identifiants). ⚠️ Au premier
@@ -10973,9 +10984,8 @@ function Notice({ tone='info', icon, title, value, desc, detail, action, style={
       background:C.card,border:`1px solid ${C.border}`,borderRadius:10,boxShadow:C.shadow,
       padding:'13px 15px 13px 17px',marginBottom:10,overflow:'hidden',...style}}>
       <span aria-hidden="true" style={{position:'absolute',left:0,top:0,bottom:0,width:3,background:col}}/>
-      {/* Un voile très pâle de la couleur : l'avertissement se teinte sans
-          devenir un bloc criard (la surface reste neutre). */}
-      <span aria-hidden="true" style={{position:'absolute',inset:0,background:`linear-gradient(100deg, ${col}0e, transparent 42%)`,pointerEvents:'none'}}/>
+      {/* (31 oct., « Vitrine ») Le voile en dégradé de la couleur est retiré :
+          le trait de 3 px à gauche dit déjà le ton, la surface reste neutre. */}
       {icon && <span aria-hidden="true" style={{flexShrink:0,color:col,marginTop:1}}><Icon name={icon} size={18}/></span>}
       <div style={{flex:'1 1 190px',minWidth:0}}>
         <div style={{display:'flex',alignItems:'baseline',gap:7,flexWrap:'wrap'}}>
@@ -14293,14 +14303,16 @@ const useOrdinateur = () => {
   return ord;
 };
 
-const NAV_LARGEUR = 160;
+const NAV_LARGEUR = 200;   // (31 oct., Vitrine) colonne blanche avec les libellés
 
 // Navigation compacte par plateforme. Les outils partagés restent dans le
 // panneau Gestion à gauche ; les sections Vinted sont dans leur plateforme.
 function SideBar({ tab, setTab, entreprise }) {
   const outils = [...NAV_GESTION, ...NAV_OUTILS];
   const actif = BAR_GROUPE[tab] || tab;
-  const bouton=t=><button key={t.id} type="button" className="vrm-rail-button" aria-label={t.label} title={t.bientot?`${t.label} — bientôt`:t.label} onClick={()=>setTab(t.id)} aria-current={actif===t.id?'page':undefined}><NavigationIcon item={t} size={25}/></button>;
+  // (31 oct., direction « Vitrine ») Chaque entrée porte son NOM à côté de
+  // l'icône : un rail d'icônes seules obligeait à les reconnaître de mémoire.
+  const bouton=t=><button key={t.id} type="button" className="vrm-rail-button" aria-label={t.label} title={t.bientot?`${t.label} — bientôt`:t.label} onClick={()=>setTab(t.id)} aria-current={actif===t.id?'page':undefined}><NavigationIcon item={t} size={18}/><span className="vrm-rail-lib" aria-hidden="true">{t.label}</span></button>;
   // (30 oct., Edge sous Windows) Une fenêtre basse (1366×768 → 630 px utiles)
   // coupait le bas du rail — Statistiques, Comptabilité, Communauté — et la zone
   // défile SANS barre visible : rien ne disait qu'il y avait une suite. La zone
@@ -14327,12 +14339,12 @@ function SideBar({ tab, setTab, entreprise }) {
     try { if (b) b.scrollIntoView({ block: 'nearest', inline: 'nearest' }); } catch (_) {}
   }, [actif]);
   return <nav className="vrm-sidebar vrm-atelier-rail" aria-label="Navigation principale" style={{width:NAV_LARGEUR,background:C.sidebar||C.chrome,borderRight:`1px solid ${C.chromeLine}`,color:C.onChrome}}>
-    <div className="vrm-sidebar-brand"><VrmLogo size={68} anim={false}/><NomEntreprise entreprise={entreprise} className="vrm-sidebar-entreprise"/></div>
+    <div className="vrm-sidebar-brand"><VrmLogo size={32} anim={false}/><NomEntreprise entreprise={entreprise} className="vrm-sidebar-entreprise"/></div>
     <div className="vrm-rail-scroll" ref={zoneRef}>
       <div className="vrm-rail-platforms">{BOTTOM_TABS.map(bouton)}</div>
       <section className="vrm-rail-management-group" aria-label="Gestion"><div className="vrm-rail-section-label">Gestion</div><div className="vrm-rail-management">{outils.map(bouton)}</div></section>
     </div>
-    <div className="vrm-rail-bottom"><button type="button" className="vrm-rail-button" aria-label="Paramètres" title="Paramètres" onClick={()=>setTab('settings')} aria-current={(BAR_GROUPE[tab]||tab)==='settings'?'page':undefined}><Icon name="gear" size={23}/></button></div>
+    <div className="vrm-rail-bottom"><button type="button" className="vrm-rail-button" aria-label="Paramètres" title="Paramètres" onClick={()=>setTab('settings')} aria-current={(BAR_GROUPE[tab]||tab)==='settings'?'page':undefined}><Icon name="gear" size={18}/><span className="vrm-rail-lib" aria-hidden="true">Paramètres</span></button></div>
   </nav>;
 }
 
@@ -14379,11 +14391,12 @@ function MenuEcrans({ tab, setTab, dark = false, bottom = false }) {
   }, [open]);
   const groupes = [
     { titre: bottom?'Autres plateformes':'Plateformes', items: BOTTOM_TABS.filter(t => bottom?t.id==='plat_vestiaire':t.id !== 'journee') },
-    { titre: 'Gestion', items: NAV_GESTION },
     // (17 oct., Julien) Plus de « Dans Vinted » (Annonces, Ventes, Achats sont
     // déjà dans l'onglet Vinted) ni d'« Autres outils » : ce qu'ils portaient
-    // est rangé dans Statistiques et Comptabilité.
-    ...(NAV_OUTILS.length ? [{ titre: 'Autres outils', items: NAV_OUTILS }] : []),
+    // est rangé dans Statistiques et Comptabilité. (31 oct.) La Communauté
+    // (20 oct.) recréait ce groupe : elle rejoint « Gestion », comme dans la
+    // colonne de l'ordinateur.
+    { titre: 'Gestion', items: [...NAV_GESTION, ...NAV_OUTILS] },
   ];
   // (16 oct.) LISTE GROUPÉE FAÇON iOS : des groupes en cartes arrondies, une
   // rangée par écran (icône neutre · libellé · chevron), filets fins en retrait.
@@ -17758,6 +17771,16 @@ const LigneVenteVinted = React.memo(function LigneVenteVinted({ o, i, pre, rendr
     return true;
   });
 
+// (31 oct., banc ventes-frappe) Un bloc de l'écran qui ne dépend PAS de la
+// lettre tapée (les « Vérifications » sous la liste : bilan de synchro, comptes
+// comparés, fiabilité). Au rendu URGENT d'une frappe (`gel` : la recherche a
+// changé, la liste affichée est encore l'ancienne), il garde sa sortie : ses
+// calculs sur toutes les ventes (`comparerComptes`…) doublaient le processeur
+// d'une lettre (49 → 92 ms, ×4, même charge). Le rendu différé qui suit
+// (`gel` faux) le redessine avec tout — la même règle que `LigneVenteVinted`.
+const GelPendantFrappe = React.memo(function GelPendantFrappe({ rendre }) { return rendre(); },
+  (avant, apres) => apres.gel === true);
+
 function PhotoArticleAgrandissable({src,titre,children}) {
   const url=photoArticle({photo:src});
   const [ouverte,setOuverte]=useState(false);
@@ -18333,8 +18356,8 @@ function LigneVenteCompacte({ photo, photoNoeud = null, titre, sous = '', etat, 
     </div>,document.body)}
   </div>;
 }
-function LigneVente({ photo, titre, meta, montant, actions, etat, etatNoeud = null, details, sous = '', ton = '', data = null, numerosArticle = [], plateforme = '' }) {
-  return <LigneVenteCompacte {...(data || {})} numerosArticle={numerosArticle} plateforme={plateforme} photo={photo} titre={titre} sous={sous} ton={ton} etat={etat} etatNoeud={etatNoeud} montant={montant} initialOuvert={!!details?.props.ouvrir} className="vrm-sale-row vrm-shared-sale" style={{padding:'12px 14px',borderBottom:`1px solid ${C.border}`}}>
+function LigneVente({ photo, titre, meta, montant, actions, etat, etatNoeud = null, details, sous = '', ton = '', data = null, numerosArticle = [], plateforme = '', floute = false }) {
+  return <LigneVenteCompacte {...(data || {})} numerosArticle={numerosArticle} plateforme={plateforme} photo={photo} titre={titre} sous={sous} ton={ton} etat={etat} etatNoeud={etatNoeud} montant={montant} initialOuvert={!!details?.props.ouvrir} className="vrm-sale-row vrm-shared-sale" style={{padding:'12px 14px',borderBottom:`1px solid ${C.border}`,...(floute?STYLE_FLOU:null)}}>
     <div className="vrm-sale-overview" style={{display:'flex',gap:12,alignItems:'flex-start'}}>
       <div className="vrm-sale-photo"><PhotoArticleAgrandissable src={photo} titre={titre}><PhotoVente src={photo} size={64} portrait/></PhotoArticleAgrandissable></div>
       <div className="vrm-sale-info" style={{flex:1,minWidth:0}}>
@@ -18562,7 +18585,7 @@ const lbcExpediee = o => {
 const lbcEuro = (p) => p == null ? '' : (Number(p) / 100).toFixed(2).replace('.', ',') + ' €';
 // Carte d'une transaction Leboncoin — comme Vinted : photo · titre · statut +
 // transporteur · prix. Partagée par Ventes ET Achats (§11 : une seule forme).
-function CarteLbc({ o, num = '', benef = null }) {
+function CarteLbc({ o, num = '', benef = null, floute = false }) {
   // (29 oct., Julien : « côté vente, fais les mêmes modifications que pour
   // Vinted ; enlève N° ») Le titre d'une vente est celui de l'annonce, sans N° :
   // le N° (identité stricte, §5) reste dans le tiroir (« Fiche article N°… »),
@@ -18582,7 +18605,7 @@ function CarteLbc({ o, num = '', benef = null }) {
   // 390 px — sur une vente que les totaux comptent finalisée. L'étape brute
   // reste dans le détail.
   const etatCourt = lbcAnnulee(o) ? 'Annulée' : lbcFinalisee(o) ? 'Finalisée' : ton === 'action' ? 'À envoyer' : lbcExpediee(o) ? 'En transit' : (o.stepLabel || o.stepStatus || '');
-  return <LigneVente numerosArticle={num?[num]:[]} plateforme="leboncoin" data={{ 'data-lbc-vente': String(o.txId), 'data-lbc-etat': etatCourt }} photo={photoArticle(o)} titre={titre} sous={sous} ton={ton} montant={lbcEuro(o.price)} etat={etatCourt}
+  return <LigneVente numerosArticle={num?[num]:[]} plateforme="leboncoin" data={{ 'data-lbc-vente': String(o.txId), 'data-lbc-etat': etatCourt, 'data-flou': floute ? '1' : '0' }} floute={floute} photo={photoArticle(o)} titre={titre} sous={sous} ton={ton} montant={lbcEuro(o.price)} etat={etatCourt}
     meta={<>{o.stepLabel || o.stepStatus || ''}{o.deliveryLabel ? ` · ${o.deliveryLabel}` : ''}{benef != null ? <span data-lbc-benef={benef.toFixed(2)} style={{ color: benef >= 0 ? C.text : C.warn, fontWeight: 600 }}> · marge avant frais {fmt(benef)}</span> : null}</>}/>;
 }
 // L'étape d'un ACHAT Leboncoin, dans les mêmes mots et les mêmes couleurs que
@@ -18599,9 +18622,9 @@ function etapeAchatLbc(o) {
 // titre + statut à pastille · prix · gestes). Partagée par les achats
 // Leboncoin (et la même structure est rendue par les achats eBay) — Julien :
 // « les achats Leboncoin et eBay doivent fonctionner exactement comme Vinted ».
-function LigneAchat({ photo, titre, statut, meta, montant, actions, sous, attenue, data }) {
+function LigneAchat({ photo, titre, statut, meta, montant, actions, sous, attenue, data, floute = false }) {
   return (
-    <div className="vrm-buy-row" {...(data || {})} style={{ opacity: attenue ? 0.55 : 1 }}>
+    <div className="vrm-buy-row" {...(data || {})} style={{ opacity: attenue ? 0.55 : 1, ...(floute ? STYLE_FLOU : null) }}>
       <div className="vrm-buy-ph" style={{ background: C.card2 || C.bg }}>
         {photo ? <PhotoVinted src={photo} alt="" loading="lazy" decoding="async" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <Icon name="image" size={18} style={{ color: C.muted, opacity: .55 }} />}
       </div>
@@ -18618,7 +18641,7 @@ function LigneAchat({ photo, titre, statut, meta, montant, actions, sous, attenu
     </div>
   );
 }
-function LigneAchatLbc({ o }) {
+function LigneAchatLbc({ o, floute = false }) {
   const [qr, setQr] = React.useState(false);
   const st = etapeAchatLbc(o);
   const lbl = o.label || {};
@@ -18626,7 +18649,7 @@ function LigneAchatLbc({ o }) {
   const qrUrl = enCours && /^https?:\/\//.test(String(lbl.qrUrl || '')) ? lbl.qrUrl : '';
   const suivi = enCours && /^https?:\/\//.test(String(lbl.trackingUrl || '')) ? lbl.trackingUrl : '';
   const date = o.dateVente ? new Date(o.dateVente) : null;
-  return <LigneAchat data={{ 'data-lbc-achat': String(o.txId || '') }} attenue={st.step === 0}
+  return <LigneAchat data={{ 'data-lbc-achat': String(o.txId || ''), 'data-flou': floute ? '1' : '0' }} floute={floute} attenue={st.step === 0}
     photo={photoArticle(o)} titre={o.title} statut={st} montant={lbcEuro(o.price)}
     meta={<>{date && !isNaN(date) && <span style={{ whiteSpace: 'nowrap' }}>{date.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', ...(date.getFullYear() !== new Date().getFullYear() ? { year: 'numeric' } : {}) })}</span>}{o.deliveryLabel && <span>· {o.deliveryLabel}</span>}</>}
     sous={qr && qrUrl ? <div style={{ marginTop: 8 }}><QrColis url={qrUrl} size={120} /></div> : null}
@@ -18669,6 +18692,8 @@ function VentesLeboncoin({ lbcVentes = {ventes:[],inconnues:0}, sansTotaux = fal
   const [filtre,setFiltre]=useVueSession('leboncoin-ventes-filtre','all');
   const [recherche,setRecherche]=useVueSession('leboncoin-ventes-recherche','');
   const ventes=lbcVentes.ventes || [];
+  // (31 oct.) Le compte Leboncoin OUVERT mis en avant, les autres estompés (§11).
+  const lbcOuvert = useCompteLbcOuvert();
   const visibles=ventes.filter(o=>(!recherche || String(o.title || '').toLowerCase().includes(recherche.toLowerCase()))
     && (filtre==='all' || (filtre==='cancelled'?lbcAnnulee(o):filtre==='done'?lbcFinalisee(o):!lbcAnnulee(o)&&!lbcFinalisee(o))));
   // ── BÉNÉFICE PAR VENTE (parité Vinted/eBay, 26 oct.) ──────────────────────
@@ -18704,7 +18729,7 @@ function VentesLeboncoin({ lbcVentes = {ventes:[],inconnues:0}, sansTotaux = fal
     <ScreenHead icon="cash" title="Ventes"/>
     <FiltresVentes plateforme="leboncoin" value={filtre} onChange={setFiltre} search={recherche} onSearch={setRecherche} count={visibles.length} cancelled/>
     <FiabiliteVentes perimetre="Leboncoin · ventes finalisées" lignes={visibles.map(o=>{const info=infoVente(o);return {incluse:lbcFinalisee(o)&&!lbcAnnulee(o),achatConnu:info.achat!=null,prixConnu:o.price!=null&&String(o.price).trim()!==''&&Number.isFinite(Number(o.price)),valide:info.benef!=null,fraisSuivis:false};})}/>
-    <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:10,overflow:'hidden'}}>{visibles.map(o=><CarteLbc key={o.txId} o={o} {...infoVente(o)}/>)}</div>
+    <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:10,overflow:'hidden'}}>{visibles.map(o=><CarteLbc key={o.txId} o={o} {...infoVente(o)} floute={lbcFloute(lbcOuvert, o.account)}/>)}</div>
     {!visibles.length && <p style={{fontSize:12,color:C.muted,padding:'12px 0'}}>Aucune vente dans cette sélection.</p>}
     {lbcVentes.inconnues>0 && <details style={{marginTop:12,fontSize:12,color:C.muted}}><summary>Transactions à confirmer ({lbcVentes.inconnues})</summary><p>Ouvre tes transactions sur Leboncoin pour lire leur côté acheteur ou vendeur.</p></details>}
   </div>;
@@ -18716,6 +18741,8 @@ function VentesLeboncoin({ lbcVentes = {ventes:[],inconnues:0}, sansTotaux = fal
 // ventes — côté achat « finalisé » = colis reçu. Photo + titre + statut + prix.
 function AchatsLeboncoin({ lbcVentes = { achats: [] } }) {
   const achats = (lbcVentes.achats || []);
+  // (31 oct.) Le compte Leboncoin OUVERT mis en avant, les autres estompés (§11).
+  const lbcOuvert = useCompteLbcOuvert();
   // (17 oct., revue) La section « Achats » est toujours dans la navigation :
   // rendre `null` laissait un écran BLANC sous le titre (vu au rendu). Une
   // liste vide a une cause, et une cause se dit — jamais lu (« — ») n'est pas
@@ -18739,7 +18766,7 @@ function AchatsLeboncoin({ lbcVentes = { achats: [] } }) {
   // (28 oct.) Le plus récent d'abord, comme les achats Vinted ; une date
   // illisible en dernier. L'année est dite quand ce n'est pas celle-ci.
   const tsAchat = (o) => { const t = o && o.dateVente ? Date.parse(o.dateVente) : NaN; return isNaN(t) ? -Infinity : t; };
-  const Liste = ({ arr }) => <div className="vrm-buy-list" style={{ background: C.card, border: `1px solid ${C.border}`, marginTop: 6 }}>{[...arr].sort((a, b) => tsAchat(b) - tsAchat(a)).map(o => <LigneAchatLbc key={o.txId} o={o} />)}</div>;
+  const Liste = ({ arr }) => <div className="vrm-buy-list" style={{ background: C.card, border: `1px solid ${C.border}`, marginTop: 6 }}>{[...arr].sort((a, b) => tsAchat(b) - tsAchat(a)).map(o => <LigneAchatLbc key={o.txId} o={o} floute={lbcFloute(lbcOuvert, o.account)} />)}</div>;
   return (
     <div style={{ marginBottom: 14, border: `1px solid ${C.border}`, borderRadius: 12, background: C.card, padding: '12px 14px' }}>
       {/* (27 oct., « pareil que Vinted ») Plus de second titre « Achats
@@ -19457,14 +19484,15 @@ function relireTransporteursSiVieux({ force = false } = {}) {
       ecrireLocalJson('vrm_transp_vol', { at: maintenant });
       let r = null, j = null;
       try {
-        // ⚠️ Un `Request`, pas une adresse : `lecturesPartagees` le laisse passer
-        // SANS vider ses lectures. Un POST vers /api/ y vaut une écriture et vide
+        // ⚠️ `vrmInvalideSiChange` : `lecturesPartagees` le laisse passer SANS
+        // vider ses lectures (un `Request` ne suffit plus depuis ea0b573, 29 oct. :
+        // toute écriture Request vide). Un POST vers /api/ y vaut une écriture et vide
         // tout — à l'ouverture, ce passage refaisait TOUTES les lectures du
         // démarrage en vol (mesuré au banc vitesse.cjs, Ma journée à 390 px :
         // 57 → 64 lectures, 6 → 12 en double, les ventes au 3ᵉ aller-retour au
         // lieu du 2ᵉ). Ce passage n'écrit que les lignes `transp_*` : quand il
         // rend un changement, on vide les lectures partagées AVANT de prévenir.
-        r = await fetch(new Request('/api/relais?mode=transp', { method: 'POST', headers: { 'content-type': 'application/json', ...enTeteSession() }, body: JSON.stringify({ v: 1 }) }));
+        r = await fetch('/api/relais?mode=transp', { method: 'POST', headers: { 'content-type': 'application/json', ...enTeteSession() }, body: JSON.stringify({ v: 1 }), vrmInvalideSiChange: true });
         j = await r.json().catch(() => null);
       } catch (_) { r = null; }
       if (!r || !r.ok || !j || j.ok !== true) {
@@ -39657,7 +39685,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   //    floutait TOUT l'écran. Même règle que la liste déroulante (§11).
   const selEff = compteEffectif(compteSel, compteConnecte, (u) => accountUids.has(u) && !acctOff(u));
   const estFloute = (o) => !!(selEff && uidLigne(o) !== selEff);
-  const STYLE_FLOU = { filter: 'blur(2px) grayscale(0.55)', opacity: 0.4, pointerEvents: 'none', transition: 'filter 160ms ease-out, opacity 160ms ease-out' };
+  // `STYLE_FLOU` : UNE définition, partagée avec Leboncoin (src/flouCompte.js, §11).
   const ventesAffichees = useMemo(() => {
     const uidV = o => String((o && o._acc && o._acc.vinted_user_id) || (o && o._uid) || '');
     let arr = (sales.items || [])
@@ -45493,7 +45521,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             <div className="vrm-day-head">
               <span className="vrm-day-k" style={{color:C.muted}}>Cette semaine</span>
               <span className="vrm-day-legende" style={{color:C.muted}}>
-                <span><i aria-hidden="true" style={{background:"#5d948b"}}/>Vendu</span>
+                <span><i aria-hidden="true" style={{background:C.accent}}/>Vendu</span>
                 <span><i aria-hidden="true" className="vrm-day-pointille" style={{borderColor:C.muted}}/>Reçu</span>
               </span>
             </div>
@@ -46026,10 +46054,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             première vente il y avait huit blocs empilés. Ils restent tous là, repliés. */}
         <section className="vrm-ventes-controles" data-ventes-controles="" style={{display:'flex',flexDirection:'column',gap:8,margin:'16px 0 12px'}}>
           <h3 data-titre-section="" style={{fontSize:15,fontWeight:600,color:C.text,letterSpacing:-0.15,margin:'0 2px'}}>Vérifications</h3>
+  <GelPendantFrappe gel={ordSearch!==ordSearchDiff} rendre={()=><>
   <BilanSynchronisation owner={AUTH.user?.id||''} sources={sourcesBilan} onNav={onNav}/>
   <VendusAilleurs owner={AUTH.user?.id||''} ownerActuel={()=>AUTH.user?.id||''} charger={chargerRetraitsMulti} onNav={onNav} PhotoVinted={PhotoVinted}/>
         <ComparaisonComptesVinted rows={comparerComptes({comptes:accounts.filter(a=>!acctOff(a.vinted_user_id)).map(a=>({uid:String(a.vinted_user_id),nom:accName(a)})),ventes:sales.items||[],stock:(listings.items||[]).filter(it=>!acctOffOf(it)&&!blockedAccts.has(String(it._acc?.vinted_user_id))&&!soldManual.has(String(it.id))&&!annoncesVendues.has(String(it.id))),dansPeriode:o=>dansPeriode(o,periode),finalisee:o=>classifyOrderStatus(o.status)==='completed',masquee:isHidden,meta:effEntry,aFaire:o=>aExpedier(o)&&!isShipDone(o)})} periode={libellePeriode(periode)} disponible={Array.isArray(sales.items)&&!sales.loading&&!sales.error&&!(sales.failedUids||[]).some(u=>!acctOff(u))} stockDisponible={Array.isArray(listings.items)&&!listings.loading&&!listings.error&&!listings.incomplet} charger={()=>{loadOrders('sold',setSales,true);loadListings(true);}}/>
         <FiabiliteVentes partiel={nomsVentesKO.length>0} perimetre="Vinted · ventes finalisées, hors ventes masquées" lignes={ventesAffichees.map(o=>{const e=effEntry(o),b=beneficePaire(o.price?.amount,e);return {incluse:!isHidden(o)&&venteFinalisee(o),supporte:o.price?.currency_code==='EUR',achatConnu:b.achat!=null,prixConnu:b.vente!=null,valide:b.valid,fraisConfirmes:b.complet};})}/>
+  </>}/>
         </section>
         <div className="vrm-sales-analysis">
         {(totals.nb>0) && (
@@ -51843,6 +51873,36 @@ function compteLbcConnecte(accounts) {
   l.sort((a, b) => String(b.sessionAt).localeCompare(String(a.sessionAt)));
   return l[0] || null;
 }
+// ── LE COMPTE LEBONCOIN OUVERT, MIS EN AVANT (31 oct., Julien : « pareil pour
+// Leboncoin… comme pour Vinted, les données du compte ouvert mises en avant, les
+// autres floutées »). La règle du compte ouvert vit dans src/flouCompte.js
+// (`compteLbcOuvert` : `sessionAt` le plus récent, de moins de 12 h). Comme sur
+// Vinted (13 oct.), le flou ne vaut que si l'extension de CE navigateur est là,
+// connectée à CE compte VRM, à jour (`raisonExtGlobale` muette ; la pause
+// demandée par VINTED ne change rien à Leboncoin) : en lecture seule (téléphone,
+// pas d'extension), TOUT reste net. Lecture ratée ou en cours ⇒ '' (aucun flou).
+// ⚠️ `sessionAt` est écrit par l'extension de N'IMPORTE LEQUEL de ses navigateurs
+//    (la ligne ne dit pas lequel) : c'est le compte vu en dernier, à moins de
+//    12 h — la meilleure preuve que l'extension donne aujourd'hui.
+const URL_LBC_COMPTES_FLOU = () => `${SUPABASE_URL}/rest/v1/app_data?id=eq.lbc_accounts&select=a:data->accounts`;
+function useCompteLbcOuvert() {
+  useExtVivante();
+  const sansSouris = useSansSouris();
+  const [accs, setAccs] = useState(undefined);
+  useEffect(() => {
+    const suivi = suivreReceptionLeboncoin({ fenetre: window, document, relire: async (estActif) => {
+      const rows = await lireReceptionLeboncoin(URL_LBC_COMPTES_FLOU(), sbAuth());
+      if (!estActif()) return;
+      setAccs(Array.isArray(rows) ? ((rows[0] && rows[0].a) || {}) : null);
+    } });
+    suivi.actualiser();
+    return () => suivi.arreter();
+  }, []);
+  if (!accs || !vmrExtPresent()) return '';
+  const g = raisonExtGlobale(sansSouris);
+  if (g && g.code !== 'pause') return '';
+  return compteLbcOuvert(accs);
+}
 function annonceLbcALui(ad, prouves) {
   return !!(ad && (ad.ref || ad.customRef || (ad.lbcUser && prouves && prouves.has(String(ad.lbcUser))) || (ad.account && prouves && prouves.has(String(ad.account)))));
 }
@@ -51975,10 +52035,14 @@ async function publierLbcARetirer(liste) {
   const empreinte = JSON.stringify(propre);
   const memo = load('vrm_lbc_a_retirer_pub', null);
   if (memo && memo.e === empreinte && Date.now() - Number(memo.at || 0) < 6 * 3600e3) return;
+  // Deux rendus rapprochés lançaient la MÊME écriture avant que le mémo soit
+  // posé (trois POST identiques au chargement) : une seule en vol par empreinte.
+  if (publierLbcARetirer.enVol === empreinte) return;
+  publierLbcARetirer.enVol = empreinte;
   try {
     const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=${SB_CONFLICT}`, { method: 'POST', headers: sbAuth({ 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' }), body: JSON.stringify(withOwner({ id: 'lbc_a_retirer', data: { v: 1, at: new Date().toISOString(), liste: propre } })) });
     if (r.ok) save('vrm_lbc_a_retirer_pub', { e: empreinte, at: Date.now() });
-  } catch (_) {}
+  } catch (_) {} finally { if (publierLbcARetirer.enVol === empreinte) publierLbcARetirer.enVol = null; }
 }
 // <lbc-a-retirer-regle>
 // ── « AUSSI SUR LEBONCOIN » : LA PASTILLE SUIT LA PREUVE DE SORTIE (31 oct.) ──
@@ -52962,6 +53026,8 @@ function ConversationsLeboncoin() {
     } catch (_) { if (!stop) setD(null); }
   })(); return () => { stop = true; }; }, []);
   const cap = extSait('lbcmsg');
+  // (31 oct.) Le compte Leboncoin OUVERT mis en avant, les autres estompés (§11).
+  const lbcOuvert = useCompteLbcOuvert();
   // (28 oct.) `8442c3e8…` (compteur de messagerie) et `lbc-account:8442c3e8…`
   // (session privée, qui porte le NOM) sont UNE identité (5.212).
   const nu = (id) => String(id || '').replace(/^lbc-account:/, '');
@@ -53003,7 +53069,7 @@ function ConversationsLeboncoin() {
       {[...releves, ...pasLus].map((l) => {
         const vieux = l.c && Date.now() - Date.parse(l.c.at || 0) > 24 * 3600e3;
         return (
-          <div key={l.id} data-compte-lbc={l.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 0', borderTop: `1px solid ${C.border}` }}>
+          <div key={l.id} data-compte-lbc={l.id} data-flou={lbcFloute(lbcOuvert, l.id) ? '1' : '0'} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 0', borderTop: `1px solid ${C.border}`, ...(lbcFloute(lbcOuvert, l.id) ? STYLE_FLOU : null) }}>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: 13.5, fontWeight: 600, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{l.nom}{l.type ? <span style={{ fontWeight: 400, color: C.muted }}>{' · ' + l.type}</span> : null}</div>
               {/* (29 oct., revue) Un compte pas encore lu : la ligne ne porte que
@@ -53033,6 +53099,8 @@ function ConversationsLeboncoin() {
 function FavorisLeboncoin() {
   const [d, setD] = useState(undefined);
   const capStats = extSait('lbcstats');
+  // (31 oct.) Le compte Leboncoin OUVERT mis en avant, les autres estompés (§11).
+  const lbcOuvert = useCompteLbcOuvert();
   useEffect(() => { let stop = false; (async () => {
     try {
       const [l, rv, ra] = await Promise.all([
@@ -53075,7 +53143,7 @@ function FavorisLeboncoin() {
           const lien = /^https:\/\/(?:www\.)?leboncoin\.fr\//i.test(String(ad.url || '')) ? ad.url : '';
           const ph = Array.isArray(ad.images) && ad.images[0];
           return (
-            <div key={ad.id} data-favoris-lbc-annonce={ad.id} data-favoris={f == null ? 'passu' : String(f)} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 0', borderTop: `1px solid ${C.border}` }}>
+            <div key={ad.id} data-favoris-lbc-annonce={ad.id} data-favoris={f == null ? 'passu' : String(f)} data-flou={lbcFloute(lbcOuvert, ad.account || ad.lbcUser) ? '1' : '0'} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 0', borderTop: `1px solid ${C.border}`, ...(lbcFloute(lbcOuvert, ad.account || ad.lbcUser) ? STYLE_FLOU : null) }}>
               <div style={{ width: 36, height: 48, borderRadius: 6, overflow: 'hidden', flexShrink: 0, background: C.card2 || C.border }}>{ph ? <PhotoVinted src={ph} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }}/> : null}</div>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 13, fontWeight: 600, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{ad.subject || 'Annonce'}</div>
@@ -53107,6 +53175,8 @@ const SousEcranLbc = ({ children }) => <div style={{ fontSize: 12.5, color: C.mu
 const TitreEcranLbc = ({ children, ...p }) => <div {...p} style={{ fontSize: 15, fontWeight: 700, color: C.text, marginBottom: 3, letterSpacing: '-.01em' }}>{children}</div>;
 function LeboncoinScreen() {
   const [data, setData] = useState(null);
+  // (31 oct.) Le compte Leboncoin OUVERT mis en avant, les autres estompés (§11).
+  const lbcOuvert = useCompteLbcOuvert();
   const [loading, setLoading] = useState(true);
   const [erreurReception,setErreurReception]=useState(false);
   const suiviReception=useRef(null);
@@ -53793,7 +53863,7 @@ function LeboncoinScreen() {
         </div>
       ) : null}
       {repubOuvert && data && Array.isArray(data.repub) && <RepublierLeboncoin liste={data.repub} exclues={data.repubKO || {}} onClose={() => setRepubOuvert(false)} onFini={reload}/>}
-      {data && <AnnoncesLeboncoin owner={AUTH.user?.id||''} annonces={data.catalogueAds} ventes={data.catalogueVentes} lectureKO={data.lbcKO} numeroDe={numeroAnnonceLbc} sortieDe={lbcSortieDe} onSupprimer={supprEtat() === 'ok' ? supprimerSurLbc : null} enVol={pauseEnVol ? String(pauseEnVol) : null}/>}
+      {data && <AnnoncesLeboncoin owner={AUTH.user?.id||''} floute={(ad) => lbcFloute(lbcOuvert, ad && (ad.account || ad.lbcUser))} annonces={data.catalogueAds} ventes={data.catalogueVentes} lectureKO={data.lbcKO} numeroDe={numeroAnnonceLbc} sortieDe={lbcSortieDe} onSupprimer={supprEtat() === 'ok' ? supprimerSurLbc : null} enVol={pauseEnVol ? String(pauseEnVol) : null}/>}
       {/* ⚠️ UNE LECTURE RATÉE SE DIT UNE FOIS (§7). L'écran la disait jusqu'à quatre
           fois (ventes Leboncoin, compteur, preuve de vente, file vide) et, sur une
           lecture ratée de ses annonces Leboncoin, il affirmait « je n'ai pas encore

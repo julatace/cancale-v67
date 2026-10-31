@@ -290,10 +290,13 @@ const projette = (row, sel) => {
         // photo sur toute la largeur (≈ 360 px au lieu de 174 à deux par rangée).
         {
           const premier=await pg.locator('.vrm-ann-card').nth(0).boundingBox(), suivant=await pg.locator('.vrm-ann-card').nth(1).boundingBox();
-          if (vp.width < 600) dit(Math.abs(premier.x-suivant.x)<2 && suivant.y>=premier.y+premier.height-1, 'au téléphone, une fiche par rangée (la photo prend toute la largeur)', JSON.stringify({premier,suivant}));
+          // (31 oct., style « Vitrine », son choix sur maquette) au téléphone, DEUX
+          // fiches par rangée, côte à côte, la photo de 190 px sur toute la largeur
+          // de la fiche — la règle « la photo en grand » tient, à sa nouvelle mesure.
+          if (vp.width < 600) dit(Math.abs(premier.y-suivant.y)<2 && suivant.x>premier.x+premier.width-1 && premier.width>=150, 'au téléphone, deux fiches par rangée (la photo prend toute la largeur de la fiche)', JSON.stringify({premier,suivant}));
           else dit(Math.abs(premier.y-suivant.y)<2 && suivant.x>premier.x+premier.width-1, 'les annonces sont des fiches côte à côte', JSON.stringify({premier,suivant}));
           const photo=await pg.locator('.vrm-ann-card').nth(0).locator('.vrm-ann-overview > a').boundingBox();
-          const plancher = vp.width < 600 ? 300 : 330;
+          const plancher = vp.width < 600 ? 180 : 330;
           dit(photo && photo.height>=plancher && photo.width>=premier.width-2, `la première photo occupe toute la largeur de la fiche, en grand (≥ ${plancher} px)`, photo && `${Math.round(photo.width)}×${Math.round(photo.height)} (fiche ${Math.round(premier.width)})`);
         }
 

@@ -1,0 +1,408 @@
+/* ════════════════════════════════════════════════════════════════════════════
+   DIRECTION « VITRINE » — 31 octobre 2026, le choix de Julien
+   Il a vu quatre maquettes : « j'aime énormément le 4, tu peux appliquer ça,
+   améliore simplement pour le téléphone ». Elle REMPLACE la palette Perle.
+   Une boutique de sneakers : blanc franc, grandes photos, typographie serrée,
+   la paire avant tout.
+
+   Chargée EN DERNIER (main.jsx) : elle a le dernier mot sur les couches d'avant
+   (styles-iphone, styles-mobile-studio, styles-telephone, styles-disposition…)
+   SANS les réécrire — une seule feuille à lire pour savoir à quoi ressemble
+   l'app, et une seule à retirer pour revenir en arrière. Les couleurs viennent
+   des jetons (src/themeMineral.js → variables --vrm-* posées sur la coque).
+
+     · Bricolage Grotesque pour le texte et les titres, Geist Mono pour les N°
+       et les codes (auto-hébergées, src/fonts/, licence OFL : la politique de
+       sécurité n'autorise que les polices du site) ;
+     · fond blanc ; les blocs sont des aplats « surface » sans cadre ni ombre ;
+       la photo porte la carte d'annonce ;
+     · titres d'écran 44 px (800) sur ordinateur, 34–36 px au téléphone ;
+     · rayons : 14 px (cartes, photos, boutons pleins), 999 px (pastilles) ;
+     · navigation sur le blanc, avec ses libellés ; l'onglet actif sur la
+       surface (ordinateur), en encre avec l'icône cobalt (téléphone) ;
+     · plus d'étiquettes en capitales espacées, de dégradés, de grain, de
+       halos, de cartes qui se soulèvent ni de pavés d'icônes teintés ;
+     · la couleur reste RARE (§7) : le cobalt pour l'action principale, l'ambre
+       pour un geste à faire, le rouge pour deux paires sous un même N°.
+   Rien ici ne touche une donnée, une règle ni un texte : seulement la forme.
+   ════════════════════════════════════════════════════════════════════════════ */
+
+/* ── 0. LES POLICES ──────────────────────────────────────────────────────── */
+@font-face {
+  font-family: 'Bricolage Grotesque'; font-style: normal; font-weight: 500 800; font-stretch: 100%; font-display: swap;
+  src: url('./fonts/bricolage-grotesque-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'Geist Mono'; font-style: normal; font-weight: 500; font-display: swap;
+  src: url('./fonts/geist-mono-500-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+:root {
+  --vrm-police: 'Bricolage Grotesque', 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --vrm-police-mono: 'Geist Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+  --vrm-r-sm: 10px; --vrm-r-md: 14px; --vrm-r-lg: 14px;
+  --vrm-ombre-flottante: 0 1px 2px rgba(15,15,14,.06), 0 10px 28px rgba(15,15,14,.12);
+  --vrm-t-title: 34px; --vrm-t-section: 22px;
+  --vrm-b-h: 44px;
+}
+@media (min-width: 1024px), (min-width: 768px) and (hover: hover) and (pointer: fine) { :root { --vrm-t-title: 44px; --vrm-t-section: 26px; } }
+:root[data-theme="dark"] { --vrm-ombre-flottante: 0 10px 28px rgba(0,0,0,.45); --vrm-focus: #6F86E8; }
+:root[data-theme="light"] { --vrm-focus: #2442B8; }
+
+html body, html body :is(button, input, select, textarea),
+html .vrm-app-shell, body > :not(#root) {
+  font-family: var(--vrm-police) !important;
+  font-optical-sizing: auto;
+}
+html body { font-feature-settings: "tnum" 1; }
+html :is(h1, h2, h3, .vrm-display) { font-family: var(--vrm-police) !important; font-weight: 800; letter-spacing: -.02em; }
+/* Les N° et les codes : la police à chasse fixe, comme une étiquette de carton. */
+html .vrm-app-shell :is(.vrm-colis-num, .vrm-apub-num, .vrm-tout-num-ligne, [data-edition="numero"], .vrm-pickup-code, .vrm-code-retrait),
+html .vrm-app-shell .vrm-ann-price-line > span:last-child {
+  font-family: var(--vrm-police-mono) !important; font-weight: 500 !important; letter-spacing: 0 !important;
+}
+
+/* ── 1. LE FOND : blanc franc, sans lueur ni grain ───────────────────────── */
+html .vrm-app-shell .vrm-main,
+html .vrm-app-shell .vrm-main .vrm-market-space { background-image: none !important; }
+html .vrm-app-shell .vrm-main { background-color: var(--vrm-bg) !important; }
+html .vrm-app-shell { --vrm-mobile-paper: var(--vrm-bg); --studio-paper: var(--vrm-bg); --studio-card: var(--vrm-surface); --studio-line: var(--vrm-line); --studio-soft: var(--vrm-card2); }
+
+/* ── 2. LA NAVIGATION SUR ORDINATEUR : une colonne blanche, avec ses libellés */
+/* La barre bleu nuit du 16 octobre redéfinissait l'encre et les filets SUR la
+   barre (styles-mineral) : ils reprennent ceux de la page. */
+:root[data-theme] .vrm-app-shell .vrm-sidebar {
+  --vrm-ink: inherit; --vrm-muted: inherit; --vrm-line: inherit; --vrm-surface: inherit;
+}
+html .vrm-app-shell .vrm-atelier-rail {
+  background: var(--vrm-bg) !important; background-image: none !important;
+  border-right: 1px solid var(--vrm-line) !important; color: var(--vrm-ink) !important;
+  padding: 24px 12px 14px; --vrm-brand-filter: inherit;
+}
+html .vrm-app-shell .vrm-atelier-rail .vrm-sidebar-brand {
+  flex-direction: row; align-items: center; justify-content: flex-start; gap: 10px; padding: 0 10px 24px;
+}
+html .vrm-app-shell .vrm-atelier-rail .vrm-sidebar-brand img.vrm-logo { width: 34px !important; height: 34px !important; }
+html .vrm-app-shell .vrm-atelier-rail .vrm-sidebar-entreprise { text-align: left; font-size: 13px; opacity: 1; color: var(--vrm-muted); }
+html .vrm-app-shell .vrm-atelier-rail :is(.vrm-rail-platforms, .vrm-rail-management, .vrm-rail-bottom) { align-items: stretch; gap: 2px; }
+html .vrm-app-shell .vrm-atelier-rail .vrm-rail-management-group { align-items: stretch; border-top: 0; margin-top: 22px; padding-top: 0; }
+html .vrm-app-shell .vrm-atelier-rail .vrm-rail-section-label {
+  text-transform: none; letter-spacing: 0; font-size: 13px; font-weight: 500;
+  color: var(--vrm-muted); opacity: 1; padding: 0 12px 6px;
+}
+html .vrm-app-shell .vrm-atelier-rail .vrm-rail-button {
+  width: 100%; min-height: 44px; justify-content: flex-start; gap: 10px; padding: 4px 12px;
+  border: 0; border-radius: 14px; background: transparent; color: var(--vrm-muted);
+  font-size: 15px; font-weight: 500; letter-spacing: -.005em; text-align: left;
+}
+html .vrm-app-shell .vrm-atelier-rail .vrm-rail-button > :first-child { flex-shrink: 0; width: 22px; display: flex; justify-content: center; }
+/* Un nom long (« Vestiaire Collective ») passe sur deux lignes plutôt que d'être coupé. */
+html .vrm-app-shell .vrm-atelier-rail .vrm-rail-lib { flex: 1; min-width: 0; line-height: 1.2; overflow-wrap: anywhere; }
+html .vrm-app-shell .vrm-atelier-rail .vrm-rail-button:is([aria-current="page"], [data-active], [aria-expanded="true"]) {
+  background: var(--vrm-surface); color: var(--vrm-ink); border-color: transparent; font-weight: 650;
+}
+html .vrm-app-shell .vrm-atelier-rail .vrm-rail-button::before { display: none !important; }
+html .vrm-app-shell .vrm-atelier-rail .vrm-rail-button:focus-visible { outline: 2px solid var(--vrm-accent); outline-offset: 1px; }
+@media (hover: hover) and (pointer: fine) {
+  html .vrm-app-shell .vrm-atelier-rail .vrm-rail-button:not([aria-current="page"]):hover {
+    background: var(--vrm-surface); color: var(--vrm-ink); border-color: transparent; filter: none;
+  }
+}
+@media (max-height: 720px) {
+  html .vrm-app-shell .vrm-atelier-rail .vrm-rail-button { min-height: 36px; }
+}
+
+/* ── 3. LA COQUE DU TÉLÉPHONE ────────────────────────────────────────────── */
+@media (max-width: 767px), (max-width: 1023px) and (hover: none), (max-width: 1023px) and (pointer: coarse), (max-width: 1023px) and (pointer: none) {
+  html .vrm-app-shell .vrm-app-header {
+    background: var(--vrm-bg) !important; background-image: none !important;
+    color: var(--vrm-ink) !important; border-bottom: 1px solid transparent !important;
+  }
+  html .vrm-app-shell .vrm-app-header.is-defile {
+    background: var(--vrm-bg) !important; border-bottom-color: var(--vrm-line) !important;
+    -webkit-backdrop-filter: none; backdrop-filter: none;
+  }
+  html .vrm-app-shell .vrm-app-header :is(button, .vrm-hdr-titre) { color: var(--vrm-ink) !important; }
+
+  /* La barre du bas : blanche, un filet au-dessus ; l'onglet actif = icône
+     cobalt et libellé en encre grasse. Cibles de 44 px au moins, zone sûre. */
+  html .vrm-app-shell .vrm-tabbar {
+    background: var(--vrm-bg) !important; background-image: none !important;
+    border-top: 1px solid var(--vrm-line) !important; border-radius: 0 !important; box-shadow: none !important;
+    -webkit-backdrop-filter: none; backdrop-filter: none;
+    padding-bottom: max(6px, env(safe-area-inset-bottom)) !important;
+  }
+  html .vrm-app-shell .vrm-tabbar > .vrm-tab { color: var(--vrm-muted); border-radius: 0; min-height: 52px; background: transparent !important; box-shadow: none !important; }
+  html .vrm-app-shell .vrm-tabbar > .vrm-tab .vrm-nav-label { font-size: 12px; font-weight: 500; letter-spacing: 0; }
+  html .vrm-app-shell .vrm-tabbar > .vrm-tab[aria-current="page"] { color: var(--vrm-ink); }
+  html .vrm-app-shell .vrm-tabbar > .vrm-tab[aria-current="page"] .vrm-tab-ic { color: var(--vrm-accent); }
+  html .vrm-app-shell .vrm-tabbar > .vrm-tab[aria-current="page"] .vrm-nav-label { font-weight: 700; }
+  html .vrm-app-shell .vrm-tabbar > .vrm-tab[aria-current="page"]::before { display: none !important; }
+  html .vrm-app-shell .vrm-tabbar > .vrm-tab:focus-visible { outline: 2px solid var(--vrm-accent); outline-offset: -4px; }
+  html .vrm-app-shell .vrm-tabbar .vrm-brand-icon { filter: var(--vrm-brand-filter, none); opacity: .72; }
+  html .vrm-app-shell .vrm-tabbar [aria-current="page"] .vrm-brand-icon { opacity: 1; }
+  html .vrm-app-shell .vrm-tab[aria-current="page"] .vrm-tab-ic { animation: none !important; }
+
+  /* Ma journée : le bonjour EST le titre de l'écran, 34 px, sur le blanc — plus
+     de bandeau pétrole arrondi ni de halo flou derrière lui. */
+  html .vrm-app-shell .vrm-day-layout .vrm-day-greeting {
+    margin: 4px 0 18px !important; padding: 0 !important; border-radius: 0 !important;
+    background: none !important; color: var(--vrm-ink) !important; overflow: visible;
+  }
+  html .vrm-app-shell .vrm-day-layout .vrm-day-greeting::before { display: none !important; }
+  html .vrm-app-shell .vrm-day-layout .vrm-day-greeting .vrm-day-hello {
+    font-size: 34px !important; font-weight: 800 !important; letter-spacing: -.025em !important; line-height: 1.05 !important; color: var(--vrm-ink) !important;
+  }
+  html .vrm-app-shell .vrm-day-layout .vrm-day-greeting .vrm-day-date { color: var(--vrm-muted) !important; font-weight: 500; font-size: 14px !important; }
+  html .vrm-app-shell .vrm-day-layout .vrm-day-greeting .vrm-day-todo { color: var(--vrm-muted) !important; font-size: 15px !important; }
+  html .vrm-app-shell .vrm-day-layout .vrm-day-greeting .vrm-day-todo b { color: var(--vrm-ink) !important; }
+
+  /* L'en-tête d'une plateforme (Vinted, eBay…) : plus de bande pétrole. */
+  html .vrm-app-shell .vrm-main .vrm-market-space > :is(.vrm-platform-summary, .vrm-seg-cadre),
+  html .vrm-app-shell .vrm-main .vrm-market-space > div:has(> [data-fraicheur-ventes]) {
+    background: transparent !important; box-shadow: none !important; border-radius: 0 !important;
+  }
+  html .vrm-app-shell .vrm-main .vrm-market-space .vrm-market-heading h1 { color: var(--vrm-ink) !important; }
+  html .vrm-app-shell .vrm-main .vrm-market-space .vrm-market-heading .vrm-plat-tuile { background: transparent !important; box-shadow: none !important; }
+  html .vrm-app-shell .vrm-main .vrm-market-space > .vrm-platform-summary > summary { color: var(--vrm-muted) !important; }
+  html .vrm-app-shell .vrm-main .vrm-market-space [data-fraicheur-ventes] { color: var(--vrm-muted) !important; font-size: 12px !important; }
+  html .vrm-app-shell .vrm-main .vrm-market-space .vrm-platform-tabs > button { color: var(--vrm-muted) !important; }
+  html .vrm-app-shell .vrm-main .vrm-market-space .vrm-platform-tabs > button[aria-current="page"] { color: var(--vrm-ink) !important; }
+  html .vrm-app-shell .vrm-main .vrm-market-space .vrm-platform-tabs > button[aria-current="page"]::after { background: var(--vrm-accent) !important; height: 2px !important; }
+
+  /* Les listes au téléphone : des LIGNES aérées séparées d'un filet, pas des
+     cartes (Ventes, Colis). */
+  html .vrm-app-shell .vrm-main .vrm-ventes-liste .vrm-sale-row {
+    background: transparent !important; border: 0 !important; border-bottom: 1px solid var(--vrm-line) !important;
+    border-radius: 0 !important; margin-bottom: 0 !important; padding-inline: 0 !important;
+  }
+  html .vrm-app-shell .vrm-main .vrm-ventes-liste .vrm-sale-invoice { margin-inline: 0 !important; padding-inline: 0 !important; }
+  html .vrm-app-shell .vrm-main .vrm-shared-sale {
+    background: transparent !important; border: 0 !important; border-bottom: 1px solid var(--vrm-line) !important; border-radius: 0 !important;
+  }
+  /* Le N° d'un colis, lisible téléphone en main pendant qu'on emballe : une
+     pastille noire pleine, en chiffres à chasse fixe de 15 px au moins. */
+  html .vrm-app-shell .vrm-main .vrm-colis-num:not([title]) {
+    font-size: 16px !important; padding: 4px 12px !important;
+    background: var(--vrm-ink) !important; color: var(--vrm-bg) !important; border-color: var(--vrm-ink) !important;
+  }
+  html .vrm-app-shell .vrm-main .vrm-colis-num[title] { font-size: 15px !important; }
+  /* Les vignettes de colis : 64 px. */
+  html .vrm-app-shell .vrm-main .vrm-colis-carte :is(img, [data-photo-vide]):first-child,
+  html .vrm-app-shell .vrm-main .vrm-colis-carte .vrm-colis-photo { width: 64px !important; height: 64px !important; border-radius: 14px !important; }
+}
+
+/* ── 4. LES TITRES D'ÉCRAN : grands, serrés ──────────────────────────────── */
+html .vrm-screen-head h2 { font-size: var(--vrm-t-title) !important; font-weight: 800 !important; letter-spacing: -.025em !important; line-height: 1.04 !important; }
+html .vrm-market-space .vrm-screen-head h2 { font-size: var(--vrm-t-section) !important; font-weight: 750 !important; letter-spacing: -.018em !important; }
+html .vrm-market-heading h1 { font-weight: 800 !important; letter-spacing: -.025em !important; }
+@media (min-width: 768px) {
+  html .vrm-app-shell .vrm-day-layout .vrm-day-hello { font-size: 44px !important; font-weight: 800 !important; letter-spacing: -.025em !important; line-height: 1.02 !important; }
+}
+
+/* ── 5. LES SURFACES : des aplats, sans cadre, sans ombre, sans dégradé ──── */
+html .vrm-app-shell :is(
+  .vrm-surface, .vrm-card, .vrm-notice, .vrm-ann-card, .vrm-day-card, .vrm-day-task, .vrm-day-bar,
+  .vrm-day-bar > button, .vrm-day-money, .vrm-day-week, .vrm-day-wallet, .vrm-day-stock,
+  .vrm-sale-row, .vrm-shared-sale, .vrm-finance-overview, .vrm-finance-metric, .vrm-w-tuile,
+  .vrm-ann-search, .vrm-list-search, .vrm-chat-panel, .vrm-chat-empty
+) { box-shadow: none !important; background-image: none !important; }
+html .vrm-app-shell .vrm-main :is(.vrm-surface, .vrm-day-card, .vrm-day-task, .vrm-w-tuile, .vrm-day-money, .vrm-day-week, .vrm-day-wallet, .vrm-day-stock) {
+  border-radius: 14px !important; border-color: transparent !important;
+}
+html .vrm-app-shell .vrm-main .vrm-day-layout .vrm-day-card { background-color: var(--vrm-surface) !important; }
+html .vrm-app-shell .vrm-main .vrm-ventes-liste .vrm-sale-photo,
+html .vrm-app-shell .vrm-main .vrm-shared-sale .vrm-sale-photo { background-image: none !important; background-color: var(--vrm-photo, var(--vrm-card2)) !important; box-shadow: none !important; border-radius: 12px !important; }
+/* La bande « à faire » (À envoyer, à retirer…) : des tuiles « surface ». */
+html .vrm-app-shell .vrm-day-layout .vrm-day-bar { background: transparent !important; border: 0 !important; }
+html .vrm-app-shell .vrm-day-layout .vrm-day-bar > button {
+  background: var(--vrm-surface) !important; border: 0 !important; border-radius: 14px !important; animation: none !important;
+}
+html .vrm-app-shell .vrm-day-layout .vrm-day-bar :is(.vrm-day-bar-n),
+html .vrm-app-shell .vrm-day-layout .vrm-day-bar > button { color: var(--vrm-ink) !important; }
+html .vrm-app-shell .vrm-day-layout .vrm-day-bar .vrm-day-bar-n { font-weight: 800 !important; }
+html .vrm-app-shell .vrm-day-layout .vrm-day-bar .vrm-day-bar-l { color: var(--vrm-muted) !important; }
+@media (hover: hover) and (pointer: fine) {
+  html .vrm-app-shell .vrm-day-layout .vrm-day-bar > button:hover { transform: none !important; background: var(--vrm-card2) !important; }
+  html .vrm-app-shell .vrm-day-task:hover { background: var(--vrm-card2) !important; }
+}
+html .vrm-app-shell .vrm-day-layout .vrm-day-hero-n,
+html .vrm-app-shell .vrm-day-layout .vrm-day-recu-n { font-weight: 800 !important; letter-spacing: -.025em !important; }
+
+/* La carte d'annonce : la PHOTO porte la carte — plus de cadre ni de fond
+   autour ; titre et prix (800) dessous, l'état en atténué. (Sélecteurs plus
+   forts que styles-annonces-fiche.css, qui pose la carte encadrée.) */
+:root body .vrm-app-shell .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche {
+  background: transparent !important; border: 0 !important; border-radius: 0 !important; box-shadow: none !important; overflow: visible !important;
+}
+:root body .vrm-app-shell .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche .vrm-ann-overview > a.vrm-fiche-photo {
+  background: var(--vrm-photo, var(--vrm-card2)) !important; border-radius: 14px !important; overflow: hidden;
+}
+:root body .vrm-app-shell .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche .vrm-ann-ledger-info { padding: 12px 0 8px !important; }
+:root body .vrm-app-shell .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche .vrm-fiche-plus { padding: 10px 0 4px !important; border-top: 0 !important; }
+:root body .vrm-app-shell .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche [data-titre] { font-weight: 700 !important; letter-spacing: -.01em; }
+:root body .vrm-app-shell .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche [data-prix] { font-weight: 800 !important; letter-spacing: -.02em; }
+:root body .vrm-app-shell .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche .vrm-fiche-cell { background: var(--vrm-surface) !important; border-color: transparent !important; border-radius: 10px !important; }
+:root body .vrm-app-shell .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche .vrm-ann-actions { border-top: 0 !important; padding-inline: 0 !important; background: transparent !important; }
+/* Le N° de la fiche : une pastille à chasse fixe, à l'encre (le lien bleu de
+   l'édition en place n'y est plus) ; le prix reste devant. */
+:root body .vrm-app-shell .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche .vrm-ann-price-line > span:last-child {
+  background: var(--vrm-surface) !important; border-color: transparent !important; color: var(--vrm-ink) !important;
+}
+:root body .vrm-app-shell .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche .vrm-ann-price-line > span:last-child :is(button, span, a) { color: var(--vrm-ink) !important; font-family: var(--vrm-police-mono) !important; font-weight: 500 !important; }
+/* « À confirmer » : un contour ambre. */
+html .vrm-app-shell [data-ann-a-confirmer] {
+  color: var(--vrm-warn) !important; border: 1px solid var(--vrm-warn) !important; background: var(--vrm-bg) !important; border-radius: 8px !important;
+}
+/* Annonces au téléphone : deux colonnes à grandes photos (190 px). */
+@media (max-width: 600px) {
+  :root body .vrm-app-shell .vrm-main .vrm-ann-grid.vrm-fiches.vrm-fiches { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 24px 12px !important; }
+  :root body .vrm-app-shell .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche .vrm-ann-overview > a.vrm-fiche-photo { aspect-ratio: auto !important; height: 190px !important; }
+  :root body .vrm-app-shell .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche [data-titre] { font-size: 14px !important; }
+  :root body .vrm-app-shell .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche [data-prix] { font-size: 18px !important; }
+  :root body .vrm-app-shell .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche .vrm-ann-price-line { flex-wrap: wrap; gap: 6px !important; }
+  :root body .vrm-app-shell .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche .vrm-fiche-duo { grid-template-columns: minmax(0, 1fr) !important; }
+  :root body .vrm-app-shell .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche .vrm-fiche-chiffres { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+  :root body .vrm-app-shell .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche .vrm-fiche-gestes > * { flex: 1 1 100%; justify-content: center; }
+  :root body .vrm-app-shell .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche:has(.vrm-ann-actions[open]) { grid-column: 1 / -1; }
+}
+
+/* ── 6. PLUS DE PAVÉS D'ICÔNES TEINTÉS DEVANT LES LIGNES ─────────────────── */
+html .vrm-app-shell .vrm-day-task > div:first-child:has(> svg) {
+  width: 22px !important; height: 22px !important; background: transparent !important; border: 0 !important;
+}
+html .vrm-app-shell .vrm-main .vrm-set-ic { background: transparent !important; width: 22px !important; height: 22px !important; color: var(--vrm-muted) !important; }
+html .vrm-app-shell .vrm-sheet-ic { background: transparent !important; }
+
+/* ── 7. LES ÉTIQUETTES : en minuscules, à une taille lisible ────────────── */
+/* Des dizaines d'étiquettes portent leurs capitales espacées EN LIGNE
+   (style={{textTransform:'uppercase', letterSpacing:1}}) : la règle les prend
+   toutes, sur toutes les largeurs (styles-epure le faisait déjà sur téléphone). */
+html .vrm-app-shell [style*="text-transform: uppercase"],
+body > :not(#root) [style*="text-transform: uppercase"] {
+  text-transform: none !important; letter-spacing: 0 !important;
+}
+html .vrm-app-shell .vrm-label,
+html .vrm-app-shell .vrm-day-k {
+  text-transform: none !important; letter-spacing: 0 !important; font-size: 13px !important; font-weight: 500 !important;
+  color: var(--vrm-muted);
+}
+html .vrm-app-shell .vrm-mobile-eyebrow { letter-spacing: 0; font-size: 12px; }
+/* … et celles qui les portent par leur classe. */
+html :is(.vrm-sheet-label, .vrm-sidebar-label, .vrm-achats-kpi-k, .vrm-msg-section, .vrm-chat-event-k,
+  .vrm-kpi-ventes-lib, .vrm-apub-groupe-titre, .vrm-reception-entete-liste strong) {
+  text-transform: none !important; letter-spacing: 0 !important;
+}
+html .vrm-app-shell .vrm-main .vrm-set-titre {
+  text-transform: none !important; letter-spacing: 0 !important; font-size: 14px !important; font-weight: 700; color: var(--vrm-ink) !important;
+}
+html .vrm-app-shell .vrm-achats .vrm-pickup-code > span { text-transform: none !important; letter-spacing: 0 !important; }
+/* Les graduations des courbes : 11 px au moins (elles étaient à 10). */
+html .vrm-app-shell svg[data-courbe-semaine] text,
+html .vrm-app-shell .vrm-chart-months svg text { font-size: 11px; }
+
+/* ── 8. LES BOUTONS : à plat, 14 px ; les pastilles rondes ─────────────────── */
+html .vrm-app-shell :is(.vrm-b, .vrm-button, .vrm-btn-primary, .vrm-w-btn) { box-shadow: none !important; background-image: none !important; }
+html .vrm-b, html .vrm-app-shell .vrm-main .vrm-b.vrm-b { border-radius: 14px !important; }
+html .vrm-app-shell .vrm-main .vrm-b.vrm-b-primaire { font-weight: 700 !important; }
+html .vrm-app-shell .vrm-seg { border-radius: 14px; }
+html .vrm-app-shell .vrm-seg-btn { border-radius: 11px; }
+html .vrm-app-shell .vrm-seg-btn:is([aria-current="page"], [aria-pressed="true"]),
+html .vrm-app-shell .vrm-seg > button:is([aria-current="page"], [aria-pressed="true"]) { box-shadow: none !important; }
+html .vrm-app-shell .vrm-main .vrm-sales-workbar > .vrm-rangee > button { box-shadow: none !important; }
+/* Une rangée de filtres (et la rangée des comptes) : des pastilles ; la
+   choisie (le compte ouvert) est noire pleine. */
+html .vrm-app-shell .vrm-filtres > button[aria-pressed] { border-radius: 999px !important; }
+html .vrm-app-shell .vrm-filtres > button[aria-pressed="true"],
+html .vrm-app-shell .vrm-main .vrm-sales-workbar > .vrm-rangee > button[aria-pressed="true"] {
+  background: var(--vrm-ink) !important; border-color: var(--vrm-ink) !important; color: var(--vrm-bg) !important;
+}
+
+/* Les champs : un aplat surface, 14 px. */
+html .vrm-app-shell .vrm-main :is(.vrm-ann-search, .vrm-list-search) { border-radius: 14px !important; background: var(--vrm-surface) !important; }
+
+/* ── 9. RIEN NE FAIT SON ENTRÉE ──────────────────────────────────────────── */
+html .vrm-app-shell .vrm-stagger > * { animation: none !important; }
+
+/* ── 10. LE SOMBRE : les mêmes marches, sans les teintes « bleu nuit » codées
+   en dur par les couches d'avant (#17262d, #21343e, #253b45…) ─────────────── */
+:root[data-theme="dark"] .vrm-app-shell .vrm-main { background-color: var(--vrm-bg) !important; }
+:root[data-theme="dark"] .vrm-app-shell :is(.vrm-day-card, .vrm-day-task, .vrm-day-money, .vrm-day-week) {
+  background-color: var(--vrm-surface) !important;
+}
+:root[data-theme="dark"] .vrm-app-shell .vrm-main .vrm-sales-workbar input { background: var(--vrm-surface) !important; border-color: var(--vrm-line) !important; }
+:root[data-theme="dark"] .vrm-app-shell .vrm-main .vrm-ventes-liste .vrm-statut { background: var(--vrm-card2); color: var(--vrm-ink) !important; }
+
+/* ── 11. LES RESTES DES PALETTES D'AVANT ─────────────────────────────────────
+   Le bleu de septembre (#2458E6, #3D7BFF) et le bleu nuit (#0E1A2B) survivaient
+   en valeurs de repli : la ligne de conversation ouverte, la case
+   « principale » des finances, la présentation d'arrivée. Ils prennent Vitrine. */
+html .vrm-app-shell .vrm-inbox-row.is-current { box-shadow: inset 3px 0 var(--vrm-ink) !important; }
+html .vrm-app-shell .vrm-finance-metric.is-primary { background: var(--vrm-surface) !important; border-color: transparent !important; }
+html .vrm-app-shell .vrm-finance-metric.is-primary * { color: var(--vrm-ink) !important; }
+.vrm-bienvenue {
+  --b-carte: #FFFFFF; --b-encre: #0F0F0E; --b-doux: #56564F; --b-filet: #E4E4DF; --b-sol: #F5F5F3; --b-accent: #2442B8;
+  backdrop-filter: none; -webkit-backdrop-filter: none;
+}
+:root[data-theme="dark"] .vrm-bienvenue {
+  --b-carte: #1A1A18; --b-encre: #F2F2EE; --b-doux: #B0B0A8; --b-filet: #2E2E2B; --b-sol: #0E0E0D; --b-accent: #6F86E8;
+}
+/* Le voile sous une feuille : une ombre de la page, sans flou de verre. */
+.vrm-sheet-voile { -webkit-backdrop-filter: none !important; backdrop-filter: none !important; }
+
+/* ── 12. « IMPRIMER » DANS UNE CARTE DE COLIS SE LIT ────────────────────────
+   Défaut vu au rendu (il existait avant ce changement) : dans une carte de
+   Colis, le bouton « Imprimer » perd son fond (bouton secondaire voulu,
+   styles-gestion) mais garde le texte BLANC « sur accent » (styles-boutons) :
+   blanc sur blanc, un bouton invisible. La règle des boutons d'accent est très
+   spécifique (une dizaine de :not()) : la classe est répétée pour passer devant. */
+html body .vrm-app-shell .vrm-colis-carte button.vrm-colis-primaire.vrm-colis-primaire.vrm-colis-primaire.vrm-colis-primaire.vrm-colis-primaire.vrm-colis-primaire.vrm-colis-primaire[data-imprime] {
+  color: var(--vrm-ink) !important;
+}
+
+/* ── 13. COLIS AU TÉLÉPHONE : le bouton principal en grand ──────────────────
+   « Tout imprimer » prend toute la largeur, 52 px de haut, cobalt plein. Il
+   reste à sa place (en tête de Colis) : un bouton FIXÉ au-dessus de la barre du
+   bas couvrirait la dernière ligne (banc coque-mobile) — choix laissé à Julien. */
+@media (max-width: 767px) {
+  html .vrm-app-shell .vrm-main .vrm-colis-lot { width: 100% !important; min-height: 52px !important; border-radius: 14px !important; font-size: 16px !important; font-weight: 700 !important; }
+}
+:root[data-theme] body { background: var(--vrm-bg, #FFFFFF); }
+
+/* ── 14. LES RANGÉES DE FILTRES : des pastilles ; la choisie, noire pleine ──
+   (Ventes, Annonces, Stock — styles-gestion les remplissait de l'accent.) */
+html body .vrm-app-shell .vrm-main :is(.vrm-sales-workbar > .vrm-rangee, .vrm-sales-workbar > .vrm-filtres-et-outils > .vrm-rangee, .vrm-sales-filters, .vrm-stock-views, .vrm-filtres) > button[aria-pressed] {
+  border-radius: 999px !important; border: 1px solid var(--vrm-line) !important;
+  background: var(--vrm-bg) !important; color: var(--vrm-ink) !important; font-weight: 600 !important;
+}
+html body .vrm-app-shell .vrm-main :is(.vrm-sales-workbar > .vrm-rangee, .vrm-sales-workbar > .vrm-filtres-et-outils > .vrm-rangee, .vrm-sales-filters, .vrm-stock-views, .vrm-filtres) > button[aria-pressed="true"] {
+  background: var(--vrm-ink) !important; border-color: var(--vrm-ink) !important; color: var(--vrm-bg) !important;
+}
+
+/* ── 15. LES BOUTONS SECONDAIRES : un aplat neutre, pas un voile de l'accent ─ */
+:root:root { --vrm-b-teinte: #F0F0EC; --vrm-b-teinte-f: #E6E6E0; --vrm-b-encre: var(--vrm-ink, #0F0F0E); }
+:root:root[data-theme="dark"] { --vrm-b-teinte: #252522; --vrm-b-teinte-f: #2E2E2B; }
+/* Les icônes des cases « à faire » : à l'encre atténuée — le cobalt reste rare. */
+html .vrm-app-shell .vrm-day-layout .vrm-day-bar .vrm-day-bar-ic { color: var(--vrm-muted) !important; }
+/* Les dernières ventes de Ma journée : des aplats, sans cadre. */
+html .vrm-app-shell .vrm-day-recent .vrm-carrousel > button { border: 0 !important; background: var(--vrm-surface) !important; border-radius: 14px !important; box-shadow: none !important; overflow: hidden; }
+/* La bande pétrole dessinée DERRIÈRE l'en-tête d'une plateforme (téléphone). */
+html .vrm-app-shell .vrm-main .vrm-market-space::before { display: none !important; }
+/* « Imprimer » d'une ligne de vente ou de colis au téléphone : l'aplat neutre
+   des boutons secondaires (le pétrole plein en dur des couches d'avant, puis
+   l'encre, en faisait un second bouton principal sur chaque ligne). */
+@media (max-width: 767px) {
+  html body .vrm-app-shell .vrm-main :is(.vrm-ventes-liste .vrm-sale-action, .vrm-colis-carte) button.vrm-colis-primaire.vrm-colis-primaire.vrm-colis-primaire.vrm-colis-primaire.vrm-colis-primaire.vrm-colis-primaire.vrm-colis-primaire[data-imprime],
+  html body .vrm-app-shell .vrm-main .vrm-ventes-liste .vrm-sale-action button:not(:disabled):not([aria-disabled=true]) {
+    background: var(--vrm-b-teinte) !important; color: var(--vrm-ink) !important; border-color: transparent !important;
+  }
+}
+
+/* En sombre, la pastille choisie n'est PAS une pastille blanche pleine (le point
+   le plus lumineux de l'écran — revue du 16 oct., banc formes-communes) : une
+   marche plus claire que le fond, cernée d'encre. */
+:root[data-theme="dark"] body .vrm-app-shell .vrm-main :is(.vrm-sales-workbar > .vrm-rangee, .vrm-sales-workbar > .vrm-filtres-et-outils > .vrm-rangee, .vrm-sales-filters, .vrm-stock-views, .vrm-filtres) > button[aria-pressed="true"],
+:root[data-theme="dark"] body .vrm-app-shell .vrm-filtres > button[aria-pressed="true"] {
+  background: var(--vrm-card2) !important; border-color: var(--vrm-ink) !important; color: var(--vrm-ink) !important;
+}

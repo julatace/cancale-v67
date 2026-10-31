@@ -2,6 +2,7 @@ import BilanSynchronisation from './BilanSynchronisation.jsx';
 import React,{useMemo,useState} from 'react';
 import {etatAnnonceLeboncoin,lienAnnonceLeboncoin} from './etatAnnonceLeboncoin.js';
 import './annonces-leboncoin.css';
+import {STYLE_FLOU} from './flouCompte.js';
 const euros = n => n != null && n !== '' && /^\d+(\.\d+)?$/.test(String(n)) && Number.isFinite(Number(n)) ? new Intl.NumberFormat('fr-FR',{style:'currency',currency:'EUR'}).format(Number(n)) : '—';
 function Photo({src}) {
  const [ko,setKo]=useState(false);
@@ -31,7 +32,10 @@ export function chiffresAnnonceLbc(ad) {
  if (Number.isFinite(s.messages)) out.push(pluriel(s.messages, 'message'));
  return out.join(' · ');
 }
-export default function AnnoncesLeboncoin({annonces=[],ventes={},lectureKO=false,numeroDe=null,owner='',sortieDe=null,onSupprimer=null,enVol=null}) {
+export default function AnnoncesLeboncoin({annonces=[],ventes={},lectureKO=false,numeroDe=null,owner='',sortieDe=null,onSupprimer=null,enVol=null,floute=null}) {
+ // (31 oct.) `floute(ad)` : l'annonce d'un AUTRE compte que le compte Leboncoin
+ // ouvert reste visible, estompée (le même STYLE_FLOU que Vinted, §11).
+ const estFloute=ad=>typeof floute==='function'&&!!floute(ad);
  const [recherche,setRecherche]=useState(''),[filtre,setFiltre]=useState('toutes');
  const lignes=useMemo(()=>annonces.map(ad=>({ad,num:(numeroDe&&numeroDe(ad))||'',...etatAnnonceLeboncoin(ad,ventes,sortieDe)})),[annonces,ventes,numeroDe,sortieDe]);
  const choix=[['toutes','Toutes'],['active','Actives'],['pause','En pause'],['vendue','Vendues'],['autres','Retirées et autres']];
@@ -47,7 +51,7 @@ export default function AnnoncesLeboncoin({annonces=[],ventes={},lectureKO=false
    <input type="search" aria-label="Rechercher une annonce Leboncoin" placeholder="Rechercher un article, un compte…" value={recherche} onChange={e=>setRecherche(e.target.value)}/>
    <div className="vrm-lbc-catalog-filtres" role="group" aria-label="État des annonces Leboncoin">{choix.map(([id,nom])=><button key={id} type="button" aria-pressed={filtre===id} onClick={()=>setFiltre(id)}>{nom}<span>{id==='toutes'?lignes.length:lignes.filter(l=>id==='autres'?!['active','pause','vendue'].includes(l.etat):l.etat===id).length}</span></button>)}</div>
    {!visibles.length?<p className="vrm-lbc-catalog-vide">{lignes.length?'Aucune annonce dans cette sélection.':'Aucune annonce reçue pour le moment. Ouvre « Mes annonces » sur Leboncoin avec l’extension.'}</p>:
-    <ul>{visibles.map(({ad,num,etat,label,livraison,suivi})=>{const lien=lienAnnonceLeboncoin(ad);return <li key={ad.id} data-lbc-catalog-id={ad.id} data-lbc-catalog-etat={etat}>
+    <ul>{visibles.map(({ad,num,etat,label,livraison,suivi})=>{const lien=lienAnnonceLeboncoin(ad);return <li key={ad.id} data-lbc-catalog-id={ad.id} data-lbc-catalog-etat={etat} data-flou={estFloute(ad)?'1':'0'} style={estFloute(ad)?STYLE_FLOU:undefined}>
      <Photo key={ad.images?.[0]||ad.id} src={ad.images?.[0]}/><div className="vrm-lbc-catalog-info"><strong>{ad.subject||ad.title||'Annonce sans titre'}</strong><small>{ad.accountName||'Compte sans nom'}{num?<span data-lbc-catalog-num={num}>{` · N°${num}`}</span>:''}{etat==='active'&&dateCourte(ad.publieeLe)?<span data-lbc-catalog-depuis="">{` · en ligne depuis le ${dateCourte(ad.publieeLe)}`}</span>:''}</small><div><span data-etat={etat}>{label}</span>{suivi&&<small>{livraison?'Livraison':'Vente'} · {suivi}</small>}{chiffresAnnonceLbc(ad)&&<small data-lbc-catalog-chiffres="">{chiffresAnnonceLbc(ad)}</small>}</div></div>
      <b>{euros(ad.price)}</b><div className="vrm-lbc-catalog-gestes">{lien&&<a href={lien} target="_blank" rel="noreferrer" aria-label={`Gérer l’annonce : ${ad.subject||ad.title||ad.id}`}>Gérer <svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M7 17 17 7M7 7h10v10"/></svg></a>}
      {typeof onSupprimer==='function'&&SUPPRIMABLE.has(etat)&&ad.status!=='deleted'&&<button type="button" data-lbc-supprimer={ad.id} disabled={!!enVol} onClick={()=>onSupprimer({id:String(ad.id),numero:num,title:ad.subject||ad.title||'',prix:ad.price})} aria-label={`Supprimer de Leboncoin : ${ad.subject||ad.title||ad.id}`}>{enVol===String(ad.id)?'Suppression…':'Supprimer'}</button>}</div>

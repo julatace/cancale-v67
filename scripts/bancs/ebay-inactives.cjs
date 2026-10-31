@@ -210,9 +210,16 @@ async function ouvrir(b, vp, opts = {}) {
   });
   return { ctx, pg, errs, envois };
 }
+// (31 oct.) Attendre que l'espace eBay soit MONTÉ (sa rangée de sections) plutôt
+//  qu'un délai fixe : sur une machine chargée, 1,5 s + 8 s ne suffisaient pas et
+//  chaque scénario tombait en « a levé » sans rien juger (§6.5).
+async function espaceEbayMonte(pg) {
+  await pg.waitForSelector('nav.vrm-platform-tabs [data-section="annonces"]', { timeout: 30000 }).catch(() => {});
+  await pg.waitForTimeout(500);
+}
 async function versAnnonces(pg) {
   await pg.goto(`http://localhost:${PORT}/?tab=plat_ebay`, { waitUntil: 'domcontentloaded' });
-  await pg.waitForTimeout(1500);
+  await espaceEbayMonte(pg);
   await pg.getByRole('button', { name: 'Annonces', exact: true }).first().click({ timeout: 8000 });
   await pg.waitForSelector('[data-ebay-inactives]:not([data-ebay-inactives="charge"])', { timeout: 15000 }).catch(() => {});
   await pg.waitForTimeout(800);
@@ -297,7 +304,7 @@ const ligne = (s, id) => s.lignes.find((l) => l.id === id) || {};
           remettre(inactives ? { inactives } : {});
           const { ctx, pg } = await ouvrir(b, vp, { connected: false });
           await pg.goto(`http://localhost:${PORT}/?tab=plat_ebay`, { waitUntil: 'domcontentloaded' });
-          await pg.waitForTimeout(1500);
+          await espaceEbayMonte(pg);
           await pg.getByRole('button', { name: 'Annonces', exact: true }).first().click({ timeout: 8000 });
           await pg.waitForSelector('[data-ebay-annonce]', { timeout: 15000 }).catch(() => {});
           await pg.waitForTimeout(2500);

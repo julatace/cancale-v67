@@ -228,7 +228,10 @@ const attendTrouve = async (pg) => { for (let i = 0; i < 30; i++) { const e = aw
         const apres = await pg.evaluate(() => ({ url: location.search, sec: (document.querySelector('[data-section][aria-current="page"],[data-section][aria-pressed="true"]') || { getAttribute: () => '' }).getAttribute('data-section'), focus: document.activeElement ? document.activeElement.tagName : '' }));
         dit(apres.url === avant.url && apres.sec === avant.sec && !/INPUT|TEXTAREA/.test(apres.focus), 'un N° tapé hors d’un champ ne fait rien (ni focus, ni onglet)', JSON.stringify({ avant, apres }));
       });
-      dit(!ECRITURES.filter((x) => !/^POST (widget_stats|vinted_urssaf_mois|vrm_colis_\w+|vrm_benefice_jours|plantage_\w+|main|relais_ext|diag_photos|vrm_hl_\w+|vrm_paires_dorment)(,|$)/.test(x)).length, 'aucune écriture en base venue du clavier', ECRITURES.join(' | ').slice(0, 300));
+      // (31 oct.) `lbc_a_retirer` : le résumé « à retirer de Leboncoin » que l'app
+      //  PUBLIE pour le logo VRM sur leboncoin.fr (`publierLbcARetirer`, 29 oct.) —
+      //  une publication de fond comme `widget_stats`, rien venu du clavier.
+      dit(!ECRITURES.filter((x) => !/^POST (widget_stats|vinted_urssaf_mois|vrm_colis_\w+|vrm_benefice_jours|plantage_\w+|main|relais_ext|diag_photos|vrm_hl_\w+|vrm_paires_dorment|lbc_a_retirer)(,|$)/.test(x)).length, 'aucune écriture en base venue du clavier', ECRITURES.join(' | ').slice(0, 300));
       dit(!errs.length, 'aucune erreur de page', errs.join(' | ').slice(0, 200));
       await ctx.close();
     }
