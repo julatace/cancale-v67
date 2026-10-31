@@ -31,6 +31,10 @@ const MUTATIONS = {
   delai_republiee: (s) => s.replace('if (l.enLigne == null || !isFinite(e) || e <= 0 || l.ts < e) continue;', 'if (l.enLigne == null || !isFinite(e) || e <= 0) continue;'),
   dort_non_cumule: (s) => s.replace('if (Number(a.age) < s) continue;', 'if (Number(a.age) < s || Number(a.age) >= s + 30) continue;'),
   dort_cout_complet: (s) => s.replace("if (a.achat != null && isFinite(Number(a.achat))) { b.nCout += 1;", "{ b.nCout += 1;"),
+  periode_entiere: (s) => s.replace('return { type: ty, de, a, prevDe, prevA: de, prevCoupe: Math.min(de, coupe) };', 'return { type: ty, de, a, prevDe, prevA: de, prevCoupe: de };'),
+  barre_en_cours_decalee: (s) => s.replace('enCours: maintenant >= de && maintenant < a,', 'enCours: maintenant >= de && maintenant <= a + J,'),
+  rapides_du_plus_lent: (s) => s.replace('.sort((a, b) => a.mediane - b.mediane ||', '.sort((a, b) => b.mediane - a.mediane ||'),
+  semaine_dimanche: (s) => s.replace("if (ty === 'semaine') { de = minuitLocal(m0, -((d.getDay() + 6) % 7));", "if (ty === 'semaine') { de = minuitLocal(m0, -d.getDay());"),
   passu_zero: (s) => s.replace("export const rythmeVendu = (lignes, maintenant = Date.now()) => {\n  if (!Array.isArray(lignes)) return null;", "export const rythmeVendu = (lignes, maintenant = Date.now()) => {\n  lignes = Array.isArray(lignes) ? lignes : [];"),
 };
 
@@ -125,6 +129,31 @@ async function audit(M, dire) {
   ok(M.tauxVenteMois(10, 40) === 20 && M.tauxVenteMois(null, 40) === null, 'taux de vente du mois : 10 ÷ (10 + 40) = 20 % ; pas su : null');
   const A = M.tauxAnnulation(['completed', 'completed', 'cancelled', 'pending']);
   ok(A && A.taux === 25 && A.n === 4 && A.annulees === 1, 'annulations : 1 sur 4 = 25 %', A);
+
+  // ── LA PÉRIODE DE LA PAGE (maquette du 31 oct.) — samedi 31 oct. 2026, 15 h ──
+  // Mois : octobre 40+60+50+30+10+80+20+70 = 360 € (8) ; septembre AU MÊME JOUR
+  //   (jusqu'au 1er oct. 0 h, borne de fin) : 100 € (1) ⇒ +260 %.
+  // Semaine : lundi 26 → 30+50+40+60 = 180 € (4) ; la précédente jusqu'au
+  //   samedi 24, 15 h : 20 + 80 = 100 € (2) — le 10 € du dimanche 25 n'y est PAS ⇒ +80 %.
+  // Année : 460 € (9) ; 2025 rien ⇒ pas d'écart (null).
+  const pm = M.venduPeriode(VENDU, M.bornesPeriode('mois', MAINTENANT));
+  ok(pm && pm.n === 8 && pm.eur === 360 && pm.prec.n === 1 && pm.prec.eur === 100 && pm.ecart === 260, 'période mois : 360 € (8), septembre 100 € ⇒ +260 %', pm);
+  const ps = M.venduPeriode(VENDU, M.bornesPeriode('semaine', MAINTENANT));
+  ok(ps && ps.n === 4 && ps.eur === 180 && ps.prec.n === 2 && ps.prec.eur === 100 && ps.ecart === 80, 'période semaine : 180 € (4) contre 100 € au même point (samedi 15 h) ⇒ +80 %', ps);
+  const pa = M.venduPeriode(VENDU, M.bornesPeriode('annee', MAINTENANT));
+  ok(pa && pa.n === 9 && pa.eur === 460 && pa.prec.n === 0 && pa.ecart === null, 'période année : 460 € (9), 2025 vide ⇒ pas d’écart', pa);
+  ok(M.bornesPeriode('n_importe', MAINTENANT).type === 'mois' && M.venduPeriode(null, M.bornesPeriode('mois', MAINTENANT)) === null, 'type inconnu ⇒ mois ; pas lu ⇒ null');
+  const bs = M.barresPeriode(VENDU, 'semaine', MAINTENANT);
+  ok(bs && bs.map((x) => x.eur).join(',') === '30,0,0,0,50,100,0' && bs.findIndex((x) => x.enCours) === 5 && bs[6].avenir && !bs[5].avenir, 'barres semaine : lun 30 · ven 50 · sam 100 (en cours) · dim à venir', bs && bs.map((x) => [x.eur, x.enCours, x.avenir]));
+  const bm = M.barresPeriode(VENDU, 'mois', MAINTENANT);
+  ok(bm && bm.length === 8 && bm.map((x) => x.eur).join(',') === '0,0,0,0,70,0,110,180' && bm[7].enCours && bm.filter((x) => x.enCours).length === 1 && bm.map((x) => x.semaine).join(',') === '37,38,39,40,41,42,43,44', 'barres mois : 8 semaines s37→s44, 70 · 110 (dont 0 h 30 du 25) · 180 en cours', bm && bm.map((x) => [x.semaine, x.eur]));
+  const ba = M.barresPeriode(VENDU, 'annee', MAINTENANT);
+  ok(ba && ba.length === 12 && ba[8].eur === 100 && ba[9].eur === 360 && ba[9].enCours && ba.filter((x) => x.enCours).length === 1 && ba[10].avenir && ba[11].avenir, 'barres année : sept. 100, oct. 360 (en cours), nov.-déc. à venir', ba && ba.map((x) => x.eur));
+  ok(M.semaineIso(new Date(2026, 0, 1).getTime()) === 1 && M.semaineIso(new Date(2026, 11, 31).getTime()) === 53 && M.semaineIso(new Date(2027, 0, 3).getTime()) === 53 && M.semaineIso(new Date(2027, 0, 4).getTime()) === 1, 'semaine ISO : 1er janv. 2026 = s1, 31 déc. 2026 et 3 janv. 2027 = s53, 4 janv. 2027 = s1');
+  const vp = M.ventesPar(VENDU, (l) => l.plateforme);
+  ok(vp && vp.groupes.map((g) => `${g.k}:${g.n}:${g.eur}`).join(' ') === 'Vinted:7:410 eBay:1:30 Leboncoin:1:20' && vp.groupes.reduce((a, g) => a + g.n, 0) === 9, 'par compte/plateforme : Vinted 7 (410 €), eBay 1, Leboncoin 1 — la somme = les 9 ventes datées', vp);
+  const rap = M.plusRapides(Dl, 5);
+  ok(rap && rap.map((g) => `${g.k}:${g.mediane}`).join(' | ') === '30 à 60 €:4 | moins de 30 €:10', 'ce qui part vite : 4 j puis 10 j ; un groupe sans date n’y est pas', rap);
 
   ok(M.rythmeVendu(null) === null && M.quandTuVends(null) === null && M.margesPar(null, (l) => l.marque) === null && M.delaisPar(null, () => '') === null && M.stockQuiDort(null) === null && M.tauxAnnulation(null) === null, '« pas su » : une liste illisible rend null partout, jamais 0');
   return ko;

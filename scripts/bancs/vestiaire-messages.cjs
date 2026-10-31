@@ -107,6 +107,10 @@ async function ouvrir(b, vp, { version = '5.295.0', suite = 'fait', appris = tru
       dit(cmds.length === 1 && cmds[0].conv === 'C7777' && cmds[0].texte === 'Je peux faire 115 €, envoi demain.', 'UNE commande `vcRepondre { conv, texte }` part, sur SON clic', JSON.stringify(cmds));
       dit(apres.res === 'ok' && /Envoyé sur Vestiaire/.test(apres.t), 'le résultat est dit : envoyé', apres.t);
       await pg.screenshot({ path: path.join(CAP, `vestiaire-messages-${L}.png`), fullPage: false });
+      // (31 oct., soir) Les favoris de ses annonces Vestiaire sont dits sous « Publier »,
+      // dans Annonces · Vestiaire (plus de page Vestiaire unique).
+      await pg.goto(`http://localhost:${PORT}/?tab=annonces&site=vestiaire`, { waitUntil: 'domcontentloaded' });
+      await pg.waitForSelector('[data-vc-favoris-resume]', { timeout: 15000 }).catch(() => {});
       const fav = await pg.evaluate(() => { const e = document.querySelector('[data-vc-favoris-resume]'); return e ? { etat: e.getAttribute('data-vc-favoris-resume'), total: e.getAttribute('data-vc-favoris-total'), t: e.textContent } : null; });
       dit(fav && fav.etat === 'lu' && fav.total === '3' && /N°12 · 3/.test(fav.t) && /dont Vestiaire ne dit pas le nombre/.test(fav.t), 'favoris : un nombre par annonce (N°12 · 3), le « pas su » dit à part, jamais « qui »', JSON.stringify(fav));
       const r = await pg.evaluate(() => ({ sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth }));

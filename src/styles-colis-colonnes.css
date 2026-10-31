@@ -1,0 +1,44 @@
+/* ── COLIS EN QUATRE COLONNES (31 oct., maquette de Julien) ───────────────────
+   Ordinateur : quatre colonnes « surface » côte à côte, cartes blanches dedans.
+   Téléphone : les mêmes groupes empilés, cartes au doigt (44 px).
+   Couleur rare (§7) : l'ambre seulement sur la ligne d'un geste dû. */
+.vrm-cc { display: grid; grid-template-columns: 1fr; gap: 14px; margin: 4px 0 22px; }
+.vrm-cc-col { background: var(--vrm-surface, #F5F5F3); border-radius: 16px; padding: 14px; min-width: 0; display: flex; flex-direction: column; }
+.vrm-cc-tete { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
+.vrm-cc-tete h2 { margin: 0; font-size: 17px !important; font-weight: 700 !important; letter-spacing: -.01em; line-height: 1.2; color: var(--vrm-ink, #0F0F0E); }
+.vrm-cc-compte { font-family: var(--vrm-police-mono, ui-monospace, monospace); font-weight: 500; font-size: 15px; color: var(--vrm-muted, #56564F); font-variant-numeric: tabular-nums; }
+.vrm-cc-liste { display: flex; flex-direction: column; gap: 8px; }
+.vrm-cc-carte {
+  display: block; width: 100%; box-sizing: border-box; text-align: left; font: inherit; color: inherit;
+  background: var(--vrm-bg, #FFFFFF); border: 0; border-radius: 12px; padding: 10px; min-height: 44px; margin: 0;
+}
+button.vrm-cc-carte { cursor: pointer; }
+button.vrm-cc-carte:hover { box-shadow: 0 0 0 1px var(--vrm-line, #E4E4DF); }
+button.vrm-cc-carte:focus-visible { outline: 2px solid var(--vrm-focus, #2442B8); outline-offset: 2px; }
+.vrm-cc-haut { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.vrm-cc-photo { width: 36px; height: 36px; border-radius: 8px; overflow: hidden; flex: none; background: var(--vrm-card2, #ECECE8); display: block; }
+.vrm-cc-photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.vrm-cc-photo-vide { display: block; width: 100%; height: 100%; }
+.vrm-cc-nom { flex: 1; min-width: 0; font-weight: 700; font-size: 14px; letter-spacing: -.01em; line-height: 1.25; color: var(--vrm-ink, #0F0F0E);
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
+.vrm-cc-bas { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 6px; }
+.vrm-cc-etat { font-size: 12px; line-height: 1.35; color: var(--vrm-muted, #56564F); min-width: 0; overflow-wrap: anywhere; }
+.vrm-cc-etat.is-ambre { color: var(--vrm-warn, #8A5300); font-weight: 700; }
+.vrm-cc-num { flex: none; font-family: var(--vrm-police-mono, ui-monospace, monospace); font-weight: 500; font-size: 12px; word-spacing: -.3em;
+  background: var(--vrm-surface, #F5F5F3); color: var(--vrm-ink, #0F0F0E); border-radius: 999px; padding: 3px 7px; white-space: nowrap; }
+.vrm-cc-note { font-size: 12px; line-height: 1.4; color: var(--vrm-muted, #56564F); margin: 0 0 8px; }
+.vrm-cc-vide { font-size: 12.5px; color: var(--vrm-muted, #56564F); margin: 4px 2px; }
+.vrm-cc-plus { min-height: 44px; border: 0; background: transparent; color: var(--vrm-ink, #0F0F0E); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; text-align: left; padding: 0 4px; }
+.vrm-cc-pied { margin-top: 8px; }
+.vrm-cc-pied .vrm-relais-carte { margin-bottom: 0 !important; border: 0 !important; border-radius: 12px !important; background: var(--vrm-bg, #FFFFFF) !important; }
+.vrm-cc-pied .vrm-relais-compacte { padding: 8px; }
+.vrm-cc-pied .vrm-relais-fond { height: 170px !important; }
+
+/* L'en-tête de Colis : sous-titre sous le grand titre, l'action à droite. */
+.vrm-screen-head-titre:has(> .vrm-screen-head-sous) { flex-wrap: wrap; row-gap: 0; }
+.vrm-screen-head-sous { flex-basis: 100%; font-size: 14px; color: var(--vrm-muted, #56564F); margin-top: 6px; line-height: 1.35; }
+
+@media (min-width: 1024px), (min-width: 768px) and (hover: hover) and (pointer: fine) {
+  .vrm-cc { grid-template-columns: repeat(4, minmax(0, 1fr)); align-items: stretch; margin-top: 8px; }
+  .vrm-cc-carte { min-height: 0; }
+}

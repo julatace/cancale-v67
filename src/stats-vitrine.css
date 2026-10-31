@@ -1,0 +1,94 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   STATISTIQUES — LA MAQUETTE CHOISIE PAR JULIEN (31 octobre, images/4.png)
+   4 tuiles · « Vendu par semaine » / « Ce qui part vite » / « Par compte » ·
+   « Par taille » / « Boost rentable ? ». Neutre partout ; le cobalt seulement
+   sur la barre en cours et la taille la plus vendue (§7). Échelle de texte
+   28 / 20 / 15 / 13 / 11 (banc stats-premium). Téléphone : même contenu empilé.
+   ═══════════════════════════════════════════════════════════════════════════ */
+.vrm-stats-vitrine { display: flex; flex-direction: column; gap: 14px; min-width: 0; margin-top: -12px; }
+.vrm-stats-vitrine .vrm-sv-sous-titre { font-size: 13px; color: var(--vrm-muted); margin: 0 0 6px; }
+.vrm-stats-vitrine .vrm-sv-note { font-size: 11px; color: var(--vrm-muted); line-height: 1.5; font-weight: 400; }
+.vrm-stats-vitrine .vrm-sv-sous-titre .vrm-sv-note { font-size: 13px; }
+
+/* Les 4 tuiles : un aplat neutre, sans bordure. */
+.vrm-stats-vitrine .vrm-sv-tuiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
+.vrm-stats-vitrine .vrm-sv-tuile,
+.vrm-stats-vitrine .vrm-sv-boost-case { background: var(--vrm-surface); border-radius: 12px; padding: 14px 14px 13px; min-width: 0; }
+.vrm-stats-vitrine .vrm-sv-tuile-lib { font-size: 11px; color: var(--vrm-muted); font-weight: 500; }
+.vrm-stats-vitrine .vrm-sv-tuile-val { font-size: 20px; font-weight: 700; letter-spacing: -.02em; color: var(--vrm-ink); margin-top: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums; line-height: 1.25; }
+.vrm-stats-vitrine .vrm-sv-tuile-val[data-vide] { color: var(--vrm-muted); }
+.vrm-stats-vitrine .vrm-sv-tuile-sous { font-size: 11px; color: var(--vrm-muted); margin-top: 4px; line-height: 1.4; }
+
+/* Les cartes : fond de page, filet fin. */
+.vrm-stats-vitrine .vrm-sv-rangee { display: grid; gap: 14px; align-items: stretch; }
+.vrm-stats-vitrine .vrm-sv-rangee-3 { grid-template-columns: minmax(0, 1.42fr) minmax(0, 1fr) minmax(0, 1fr); }
+.vrm-stats-vitrine .vrm-sv-rangee-2 { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+.vrm-stats-vitrine .vrm-sv-carte { background: var(--vrm-bg); border: 1px solid var(--vrm-line); border-radius: 14px; padding: 14px 14px 12px; min-width: 0; display: flex; flex-direction: column; }
+.vrm-stats-vitrine .vrm-sv-carte-tete { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
+.vrm-stats-vitrine .vrm-sv-carte-titre { font-size: 20px; font-weight: 700; letter-spacing: -.02em; color: var(--vrm-ink); margin: 0; line-height: 1.2; }
+.vrm-stats-vitrine .vrm-sv-carte-tete .vrm-sv-note { white-space: nowrap; }
+.vrm-stats-vitrine .vrm-sv-vide { font-size: 13px; color: var(--vrm-muted); line-height: 1.5; }
+
+/* Vendu par semaine : barres grises, celle en cours en cobalt. */
+.vrm-stats-vitrine .vrm-sv-barres { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 6px; align-items: end; padding: 0 2px; }
+.vrm-stats-vitrine .vrm-sv-barre-col { display: flex; flex-direction: column; align-items: center; min-width: 0; }
+.vrm-stats-vitrine .vrm-sv-barre-zone { width: 100%; display: flex; align-items: flex-end; justify-content: center; }
+.vrm-stats-vitrine .vrm-sv-barre { width: min(32px, 72%); border-radius: 2px 2px 0 0; background: color-mix(in srgb, var(--vrm-muted) 24%, var(--vrm-bg)); }
+.vrm-stats-vitrine .vrm-sv-barre[data-en-cours] { background: var(--vrm-accent); }
+.vrm-stats-vitrine .vrm-sv-barre-lib { font-size: 11px; color: var(--vrm-muted); margin-top: 6px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+/* Lignes : nom · piste · chiffre. */
+.vrm-stats-vitrine .vrm-sv-lignes { display: flex; flex-direction: column; }
+.vrm-stats-vitrine .vrm-sv-nom { font-size: 13px; font-weight: 600; color: var(--vrm-ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.vrm-stats-vitrine .vrm-sv-site { font-weight: 600; }
+.vrm-stats-vitrine .vrm-sv-chiffre, .vrm-stats-vitrine .vrm-sv-n { font-size: 13px; color: var(--vrm-ink); white-space: nowrap; text-align: right; font-variant-numeric: tabular-nums; }
+.vrm-stats-vitrine .vrm-sv-piste { display: block; height: 8px; background: var(--vrm-card2); border-radius: 2px; overflow: hidden; min-width: 0; }
+.vrm-stats-vitrine .vrm-sv-piste > span { display: block; height: 100%; background: var(--vrm-ink); border-radius: 2px; }
+.vrm-stats-vitrine .vrm-sv-piste > span[data-plus] { background: var(--vrm-accent); }
+.vrm-stats-vitrine .vrm-sv-piste-epaisse { height: 10px; }
+.vrm-stats-vitrine .vrm-sv-ligne-rapide { display: grid; grid-template-columns: minmax(0, 1fr) minmax(60px, 1fr) 40px; gap: 12px; align-items: center; padding: 5px 0; min-height: 22px; }
+.vrm-stats-vitrine .vrm-sv-ligne-compte { display: grid; grid-template-columns: minmax(0, 1.5fr) auto 34px; gap: 12px; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--vrm-line); }
+.vrm-stats-vitrine .vrm-sv-ligne-compte:first-child { padding-top: 2px; }
+.vrm-stats-vitrine .vrm-sv-ligne-compte:last-of-type { border-bottom: 0; }
+.vrm-stats-vitrine .vrm-sv-ligne-compte .vrm-sv-chiffre { color: var(--vrm-muted); font-size: 11px; }
+.vrm-stats-vitrine .vrm-sv-ligne-taille { display: grid; grid-template-columns: 34px minmax(0, 1fr) auto; gap: 16px; align-items: center; padding: 6px 0; }
+.vrm-stats-vitrine .vrm-sv-taille { font-size: 15px; font-weight: 600; color: var(--vrm-ink); font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.vrm-stats-vitrine .vrm-sv-ligne-taille .vrm-sv-chiffre { color: var(--vrm-muted); }
+
+/* Boost : trois cases neutres, la phrase de couverture dessous. */
+.vrm-stats-vitrine .vrm-sv-boost { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.vrm-stats-vitrine .vrm-sv-boost-note { font-size: 13px; margin-top: 14px; }
+.vrm-stats-vitrine .vrm-sv-pied { margin-top: -2px; }
+.vrm-stats-vitrine .vrm-sv-detail-titre { font-size: 20px; font-weight: 700; letter-spacing: -.02em; color: var(--vrm-ink); margin: 18px 0 0; }
+
+/* Le sélecteur de période, à droite du titre (la piste de `Segmente`). */
+.vrm-sv-periode { min-width: 240px; }
+.vrm-sv-periode .vrm-seg-btn { font-size: 13px; padding: 0 22px; min-height: 40px; flex: 1 1 0; }
+
+/* La grille 12 colonnes de Statistiques (≥ 1200 px, styles-gestion.css) : le bloc
+   de la maquette prend la 2ᵉ rangée, le reste descend d'une rangée. */
+@media (min-width: 1200px) {
+  html .vrm-statistiques-premium > .vrm-stats-vitrine { grid-column: 1 / -1; grid-row: 2; margin-top: -26px; }
+  html .vrm-statistiques-premium > [data-stats-carte=hero] { grid-row: 3; }
+  html .vrm-statistiques-premium > .vrm-finance-goal { grid-row: 3; }
+  html .vrm-statistiques-premium > [data-stats-carte=courbe] { grid-row: 4; }
+  html .vrm-statistiques-premium > .vrm-stats-comptes { grid-row: 4 / span 2; }
+  html .vrm-statistiques-premium > .vrm-stats-analyses { grid-row: 5; }
+}
+@media (max-width: 899px) {
+  .vrm-stats-vitrine .vrm-sv-rangee-3, .vrm-stats-vitrine .vrm-sv-rangee-2 { grid-template-columns: minmax(0, 1fr); }
+  .vrm-stats-vitrine .vrm-sv-tuiles { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+}
+@media (max-width: 767px) {
+  /* styles-captures.css range les cartes de Statistiques par `order` sur téléphone :
+     le bloc de la maquette vient juste sous le titre, comme sur ordinateur. */
+  html .vrm-statistiques-premium > .vrm-stats-vitrine { order: 0; }
+  .vrm-stats-vitrine { margin-top: 0; }
+  .vrm-stats-vitrine .vrm-sv-tuile-val { white-space: normal; overflow-wrap: anywhere; }
+  .vrm-sv-periode { min-width: 0; width: 100%; }
+  .vrm-sv-periode .vrm-seg-btn { min-height: 44px; }
+  .vrm-stats-vitrine .vrm-sv-boost { gap: 8px; }
+  .vrm-stats-vitrine .vrm-sv-boost-case { padding: 12px 10px; }
+  .vrm-stats-vitrine .vrm-sv-boost-case .vrm-sv-tuile-val { font-size: 15px; }
+  .vrm-stats-vitrine .vrm-sv-barre-zone { height: 140px !important; }
+}

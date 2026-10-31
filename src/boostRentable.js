@@ -60,7 +60,8 @@ const moyenne = (xs) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length :
 export function boostRentable({ ventes, txn, items, fiches, estAnnulee, ecarte, montantVente, dateMiseEnLigne, prixAchat }) {
   if (!Array.isArray(ventes) || txn == null || items == null || fiches == null) return { etat: 'passu' };
   const garde = ventes.filter((o) => o && !(estAnnulee && estAnnulee(o)) && !(ecarte && ecarte(o)));
-  const R = { etat: 'lu', total: garde.length, sansAnnonce: 0, inconnues: 0, boostees: 0, avecMontant: 0, nonBoostees: 0, horsTranche: 0 };
+  const R = { etat: 'lu', total: garde.length, sansAnnonce: 0, inconnues: 0, boostees: 0, avecMontant: 0, coutBoost: 0, nonBoostees: 0, horsTranche: 0 };
+  let coutC = 0;   // (31 oct.) la somme des boosts SAISIS des paires vendues, en centimes — couverture `avecMontant` sur `boostees`
   const lignes = [];
   for (const o of garde) {
     const tx = String(o.transaction_id || '');
@@ -71,7 +72,7 @@ export function boostRentable({ ventes, txn, items, fiches, estAnnulee, ecarte, 
     const boost = montantBoostSaisi(fiche && fiche.fees);
     const cote = (it.promoted === true || boost != null) ? 'b' : (it.promoted === false ? 'nb' : null);
     if (!cote) { R.inconnues += 1; continue; }
-    if (cote === 'b') { R.boostees += 1; if (boost != null) R.avecMontant += 1; } else R.nonBoostees += 1;
+    if (cote === 'b') { R.boostees += 1; if (boost != null) { R.avecMontant += 1; coutC += Math.round(boost * 100); } } else R.nonBoostees += 1;
     const prix = Number(montantVente(o));
     const t = trancheBoost(prix);
     if (!t) { R.horsTranche += 1; continue; }
@@ -83,6 +84,7 @@ export function boostRentable({ ventes, txn, items, fiches, estAnnulee, ecarte, 
     const marge = (achat != null && coutBoost != null) ? Math.round((prix - achat - coutBoost) * 100) / 100 : null;
     lignes.push({ cote, t: t.k, delai, vues: Number.isFinite(it.views) ? it.views : null, favoris: Number.isFinite(it.favourites) ? it.favourites : null, marge });
   }
+  R.coutBoost = coutC / 100;
   const parT = {};
   for (const l of lignes) { const e = parT[l.t] || (parT[l.t] = { b: 0, nb: 0 }); e[l.cote] += 1; }
   R.tranches = TRANCHES_BOOST.map((t) => ({ k: t.k, lib: t.lib, b: (parT[t.k] || {}).b || 0, nb: (parT[t.k] || {}).nb || 0 })).filter((t) => t.b || t.nb);

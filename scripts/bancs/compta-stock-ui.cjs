@@ -185,7 +185,8 @@ const photo = async (pg, nom) => { if (CAPT) { fs.mkdirSync(CAPT, { recursive: t
         await pg.waitForTimeout(800);
         await photo(pg, `prixachat-${L}`);
         const r = await pg.evaluate(() => {
-          const vinted = document.querySelector('[data-section="annonces"][aria-current="page"]');
+          // (31 oct., navigation par tâche) Vinted → Annonces est « Annonces · Vinted ».
+          const vinted = document.querySelector('[data-tache="annonces"][data-tache-site="vinted"]');
           const d = [...document.querySelectorAll('[data-fillbuy]')][0];
           let boite = d; while (boite && boite.parentElement && !(getComputedStyle(boite).overflow === 'hidden' && boite.getBoundingClientRect().width >= 300)) boite = boite.parentElement;
           const rc = boite ? boite.getBoundingClientRect() : null;

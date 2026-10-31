@@ -285,6 +285,14 @@ html .vrm-app-shell .vrm-day-layout .vrm-day-recu-n { font-weight: 800 !importan
   content: ''; position: absolute; inset: -14px -12px;
 }
 :root body .vrm-app-shell .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche .vrm-fiche-num input { color: inherit !important; font-family: var(--vrm-police-mono) !important; }
+/* (31 oct., soir) §7 : au doigt, 44 px AFFICHÉS — la zone étendue (`::after`) ne
+   compte pas pour l'œil ni pour la mesure. Au téléphone, la pastille du N° fait
+   44 px de haut (l'étiquette reste la même, juste plus haute). */
+@media (max-width: 767px), (hover: none), (pointer: coarse) {
+  :root body .vrm-app-shell .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche .vrm-fiche-num.vrm-fiche-num.vrm-fiche-num button[data-edition]:not(#vrm-aucun) {
+    min-height: 44px !important; height: 44px;
+  }
+}
 /* « À confirmer » : un contour ambre. */
 html .vrm-app-shell [data-ann-a-confirmer] {
   color: var(--vrm-warn) !important; border: 1px solid var(--vrm-warn) !important; background: var(--vrm-bg) !important; border-radius: 8px !important;

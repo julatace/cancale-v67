@@ -77,7 +77,21 @@ async function brancher(p){
   await new Promise(ok=>server.listen(0,'127.0.0.1',ok));const base='http://127.0.0.1:'+server.address().port;
   b=await chromium.launch({executablePath:process.env.BANC_CHROMIUM||'/opt/pw-browsers/chromium',args:['--use-angle=swiftshader','--no-sandbox','--no-proxy-server']});
   const ctx=await b.newContext({viewport:{width:390,height:844},isMobile:true,hasTouch:true});const p=await ctx.newPage();await brancher(p);
-  const errors=[];p.on('pageerror',e=>errors.push(e.message));let writes=[],commandeWrites=[],modeMessageCommande='refuse',modeReponse='refuse',lectureMessageFausse=false,messageCommandePret,libererMessageCommande;
+  const errors=[];p.on('pageerror',e=>errors.push(e.message));
+  // (31 oct., navigation par tâche) Les chemins d'aujourd'hui, comme une personne au téléphone :
+  //  la barre du bas (Journée · Annonces · Ventes · Colis · Plus), « Plus » pour le reste,
+  //  la rangée de filtres de site dans Ventes / Annonces / Messages, et l'espace eBay
+  //  (À traiter, Offres, Compte…) par sa porte « Aussi sur eBay » sous la tâche.
+  const ongletBas=async id=>{await p.locator(`.vrm-mobile-nav [data-nav-entree="${id}"]`).click();await p.waitForTimeout(300);};
+  const plusVers=async entree=>{await p.locator('.vrm-mobile-nav button[aria-label="Plus"]').click();await p.locator(`.vrm-sheet [data-nav-entree="${entree}"]`).click();await p.waitForTimeout(300);};
+  const filtreSite=async(tache,site)=>{await p.locator(`[data-tache="${tache}"]`).waitFor();const f=p.locator(`[data-filtre-site="${tache}"] button[data-site="${site}"]`);if(await f.count())await f.first().click();await p.locator(`[data-tache="${tache}"][data-tache-site="${site}"]`).waitFor();};
+  const ebaySection=async nom=>{
+   // Une commande ouverte depuis « À traiter » s'ouvre dans Ventes · eBay, en tiroir : on le referme d'abord, comme lui.
+   const fermer=p.locator('button[aria-label="Fermer les détails de la vente"]:visible');if(await fermer.count()){await fermer.first().click();await p.waitForTimeout(300);}
+   if(nom==='Messages'){await plusVers('messages');await filtreSite('messages','ebay');return;}
+   if(!(await p.locator('.vrm-platform-tabs:visible').count()))await p.locator('[data-espace-site="ebay"]:visible').first().click();
+   await p.locator('.vrm-platform-tabs').getByRole('button',{name:nom,exact:true}).click();
+  };let writes=[],commandeWrites=[],modeMessageCommande='refuse',modeReponse='refuse',lectureMessageFausse=false,messageCommandePret,libererMessageCommande;
   await p.route('**/api/ebay',async r=>{const body=r.request().method()==='POST'?r.request().postDataJSON():{};const a=body.action;let j={ok:true,connected:true,ready:true,canConsent:true};
    if(a==='status')j={ok:true,connected:true,comptes:[{cle:'',ref:'principal',principal:true,pseudo:'Compte de banc',relie:true}]};
    if(a==='commande')j={ok:true,order:{orderId:body.orderId,orderPaymentStatus:'PAID',orderFulfillmentStatus:'NOT_STARTED',buyer:{username:'Acheteur test'},pricingSummary:{total:{value:'115',currency:'EUR'}},lineItems:[{lineItemId:'111',legacyItemId:'12',title:'Paire eBay',quantity:1,lineItemCost:{value:'100',currency:'EUR'},total:{value:'115',currency:'EUR'}}],totalMarketplaceFee:{value:'12.50',currency:'EUR'}},fulfillments:[]};
@@ -116,11 +130,18 @@ async function brancher(p){
   check((await p.locator('.vrm-day-stock').innerText()).includes('1 à compléter'),'stock sans prix connu expliqué sans faux montant');
   await p.locator('.vrm-day-stock').getByRole('button',{name:'Ouvrir le stock'}).click();await p.getByRole('heading',{name:'Stock',exact:true}).waitFor();
   await p.setViewportSize({width:390,height:844});
+  // (31 oct., navigation par tâche) `plat_vinted` / `plat_leboncoin` / `plat_ebay` ouvrent
+  //  « Ventes » filtré sur le site ; l'en-tête au logo du site vit dans l'ESPACE du site
+  //  (ses sections propres : Achats, À traiter…), où l'on va le juger.
   for(const [tab,nom] of [['plat_vinted','Vinted'],['plat_leboncoin','Leboncoin'],['plat_ebay','eBay']]){
-   await p.goto(base+'/?tab='+tab);await p.getByRole('heading',{name:nom,exact:true}).waitFor();
+   const site=tab.replace('plat_','');
+   await p.goto(base+'/?tab='+tab+'&section='+(site==='ebay'?'agent':'achats'));await p.getByRole('heading',{name:nom,exact:true}).waitFor();
+   {const masque=await p.locator('.vrm-market-heading .vrm-plat-marque').evaluate(e=>{const m=getComputedStyle(e).maskImage||getComputedStyle(e).webkitMaskImage||'';const u=(m.match(/url\("?([^")]+)"?\)/)||[])[1]||'';return u;}).catch(()=>'');const ok=!!masque && /\/brands\//.test(masque) && await p.evaluate(u=>fetch(u).then(r=>r.ok&&/svg/.test(r.headers.get('content-type')||'')),masque).catch(()=>false);check(ok,'logo local chargé '+nom);}
+   await p.goto(base+'/?tab='+tab);await p.locator(`[data-tache="ventes"][data-tache-site="${site}"]`).waitFor();
+   // La tâche est montée avant ses chiffres : on attend qu'ils soient RENDUS (résumé ou cases), borné.
+   await p.locator('[data-tache="ventes"] .vrm-platform-summary, [data-tache="ventes"] [data-ventes-kpi]').first().waitFor({timeout:15000}).catch(()=>{});
    const sansNom=await p.locator('.vrm-app-shell button').evaluateAll(es=>es.filter(e=>{const r=e.getBoundingClientRect();return r.width&&r.height&&!e.getAttribute('aria-label')&&!e.getAttribute('title')&&!e.textContent.trim()&&!e.querySelector('img[alt]');}).length);
    check(sansNom===0,'boutons visibles nommés '+nom);
-   {const masque=await p.locator('.vrm-market-heading .vrm-plat-marque').evaluate(e=>{const m=getComputedStyle(e).maskImage||getComputedStyle(e).webkitMaskImage||'';const u=(m.match(/url\("?([^")]+)"?\)/)||[])[1]||'';return u;}).catch(()=>'');const ok=!!masque && /\/brands\//.test(masque) && await p.evaluate(u=>fetch(u).then(r=>r.ok&&/svg/.test(r.headers.get('content-type')||'')),masque).catch(()=>false);check(ok,'logo local chargé '+nom);}
    const summary=p.locator('.vrm-platform-summary');
    if(nom!=='Vinted' && await summary.count()===0){
     // (17 oct.) Leboncoin/eBay : sur « Ventes », le résumé se tait — les trois cases le disent (§7).
@@ -133,10 +154,11 @@ async function brancher(p){
     await p.setViewportSize({width,height:900});check(await p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'espace plateforme sans débordement '+nom+' '+width);
     if(width===1512 && nom==='Vinted'){
       const rail=p.locator('.vrm-atelier-rail');
-      check(await rail.evaluate(e=>parseFloat(getComputedStyle(e).width)===160),'bandeau bureau élargi à 160 pixels');
+      // (31 oct.) Vitrine a porté la colonne à 200 px : la règle est « élargie » (libellés lisibles), pas 160 exactement.
+      check(await rail.evaluate(e=>parseFloat(getComputedStyle(e).width)>=160),'bandeau bureau élargi (160 pixels au moins)');
       check(await rail.locator('details').count()===0,'aucun groupe Détails ou Autres outils dans le rail');
-      check(await rail.getByRole('button',{name:'Gestion',exact:true}).count()===0,'aucun bouton à déplier pour Gestion');
-      check(await rail.getByRole('region',{name:'Gestion',exact:true}).isVisible(),'gestion visible en permanence dans le rail');
+      check(await rail.getByRole('button',{name:'Gérer',exact:true}).count()===0,'aucun bouton à déplier pour Gérer (ex-« Gestion »)');
+      check(await rail.getByRole('region',{name:'Gérer',exact:true}).isVisible(),'gestion (« Gérer ») visible en permanence dans le rail');
       check(await rail.getByRole('button',{name:'Stock',exact:true}).isVisible() && await rail.getByRole('button',{name:'Comptabilité',exact:true}).isVisible(),'stock et comptabilité (factures comprises) toujours accessibles');
       check(await rail.getByRole('button',{name:'Stock',exact:true}).getAttribute('title')==='Stock','nom de l’accès au survol');
       check(await rail.getByRole('button',{name:'Paramètres',exact:true}).isVisible(),'paramètres directement accessibles dans le rail');
@@ -146,8 +168,15 @@ async function brancher(p){
       //    prise à l'instant du redimensionnement tombait sous charge (45) sur un code intact.
       check(await p.waitForFunction(()=>{const m=document.querySelector('.vrm-main');return !!m && innerWidth-m.getBoundingClientRect().right<60;},null,{timeout:5000}).then(()=>true,()=>false),'contenu utilise la largeur jusqu’au bord droit '+nom);
       if(nom==='eBay')check(await p.locator('.vrm-ebay-sales').evaluate(e=>document.querySelector('.vrm-main').getBoundingClientRect().right-e.getBoundingClientRect().right<60),'ventes eBay utilisent également la largeur disponible');
-      const header=await p.locator('.vrm-app-header').boundingBox(), titre=await p.locator('.vrm-market-heading').boundingBox();
-      check(header.y+header.height<=titre.y, 'en-tête séparé du contenu, sans recouvrir les chiffres '+nom);
+      // (31 oct., navigation par tâche) L'île d'en-tête flotte à droite de la ligne du titre
+      //  « Ventes » (qui occupe toute la largeur) : la règle est qu'elle ne RECOUVRE rien —
+      //  ni le titre, ni les filtres, ni les chiffres. On cherche tout élément visible du
+      //  contenu (texte ou bouton) dont la boîte croise celle de l'île.
+      const recouverts=await p.evaluate(()=>{const h=document.querySelector('.vrm-app-header').getBoundingClientRect();const out=[];
+        for(const e of document.querySelectorAll('.vrm-main *')){if(e.closest('.vrm-app-header'))continue;const feuille=!e.children.length||/^(BUTTON|INPUT|A|H1|H2)$/.test(e.tagName);if(!feuille)continue;const r=e.getBoundingClientRect();if(r.width<1||r.height<1||getComputedStyle(e).visibility==='hidden')continue;if(!(e.innerText||e.value||'').trim()&&e.tagName!=='INPUT')continue;
+          if(r.left<h.right&&h.left<r.right&&r.top<h.bottom&&h.top<r.bottom)out.push((e.innerText||e.tagName).trim().slice(0,30));}
+        return out;});
+      check(recouverts.length===0, 'en-tête séparé du contenu, sans recouvrir les chiffres '+nom+(recouverts.length?' — '+recouverts.join(' | '):''));
     }
     if(nom==='Vinted'){
       await p.locator('.vrm-sale-row').first().waitFor();
@@ -245,8 +274,8 @@ async function brancher(p){
   // (21 oct.) Le tiroir de la vente (feuille du bas sur téléphone) se ferme avant de naviguer, comme lui.
   await vente.locator('button[aria-label="Fermer les détails de la vente"]').click().catch(()=>{});
   const navigation=p.getByRole('navigation',{name:'Navigation principale'});
-  await navigation.getByRole('button',{name:'Gestion',exact:true}).click();await p.getByRole('menuitem',{name:'Stock',exact:true}).click();
-  await navigation.getByRole('button',{name:'Vinted',exact:true}).click();await p.locator('.vrm-platform-tabs').getByRole('button',{name:'Ventes',exact:true}).click();
+  await plusVers('garage');
+  await ongletBas('ventes');await filtreSite('ventes','vinted');
   check(await p.getByLabel('Rechercher dans les ventes Vinted').inputValue()==='Nike', 'recherche de ventes conservée après passage dans le stock');
   await p.getByRole('button',{name:'Réinitialiser les ventes',exact:true}).click();
   await p.waitForFunction(()=>[...document.querySelectorAll('.vrm-sale-row')].filter(e=>e.getClientRects().length>0).length===2);
@@ -269,22 +298,23 @@ async function brancher(p){
   rows.push({id:'harvest_111_inbox',data:{capturedAt:maintenant,payload:{conversations:[{id:71,opposite_user:{id:22,login:'Client Vinted'},description:'Paire de test',last_message:'Merci',last_message_at:maintenant}]}}},{id:'harvest_111_conv_71',data:{payload:{conversation:{id:71,opposite_user:{id:22},allow_reply:false,messages:[{entity_type:'message',created_at_ts:1700000000,entity:{user_id:22,body:'Bonjour depuis Vinted'}},{entity_type:'status_message',created_at_ts:1700000001,entity:{title:'Colis disponible',pickup:{pickup_code:456789}}},{entity_type:'message',created_at_ts:1700000002,entity:{user_id:111,body:'Merci pour votre achat'}}]}}}});
   await p.goto(base+'/?tab=plat_vinted');
   const nav=p.getByRole('navigation',{name:'Navigation principale'});
-  await nav.getByRole('button',{name:'Accueil',exact:true}).waitFor();
-  check(JSON.stringify(await nav.getByRole('button').allTextContents()).includes('Accueil'), 'accueil présent dans la navigation mobile');
+  // (31 oct.) Décision de Julien : la barre est rangée PAR TÂCHE (plus par plateforme).
+  await nav.locator('[data-nav-entree="journee"]').waitFor();
+  const libsBas=()=>p.evaluate(()=>[...document.querySelectorAll('.vrm-mobile-nav > button')].map(x=>(x.querySelector('.vrm-nav-label')||x).innerText.trim()));
+  check((await libsBas()).includes('Journée'), 'accueil (« Journée ») présent dans la navigation mobile');
   check(await nav.getByRole('button').count()===5, 'cinq accès mobiles stables');
-  check(JSON.stringify((await nav.getByRole('button').allTextContents()).map(t=>t.trim()))===JSON.stringify(['Accueil','Vinted','Leboncoin','eBay','Gestion']), 'navigation organisée par plateforme');
-  await p.locator('.vrm-platform-tabs').getByRole('button',{name:'Messages',exact:true}).click();
+  check(JSON.stringify(await libsBas())===JSON.stringify(['Journée','Annonces','Ventes','Colis','Plus']), 'navigation organisée par tâche');
+  await plusVers('messages');await filtreSite('messages','vinted');
   await p.locator('[data-conv="71"]').waitFor();
   await p.locator('.vrm-inbox-filters').getByRole('button',{name:/Non lues/}).click();
   check(await p.locator('[data-conv]').count()===0, 'filtre non lu masque la conversation déjà lue');
   check(await p.getByText('Aucune conversation non lue dans cette sélection.',{exact:true}).isVisible(), 'filtre vide expliqué');
   await p.locator('.vrm-inbox-filters').getByRole('button',{name:/Toutes/}).click();
   check(await p.locator('[data-conv="71"]').count()===1, 'toutes les conversations retrouvées');
-  await nav.getByRole('button',{name:'Leboncoin',exact:true}).click();
-  await p.getByRole('heading',{name:'Leboncoin',exact:true}).waitFor();
-  await nav.getByRole('button',{name:'Vinted',exact:true}).click();
-  check(await p.locator('.vrm-platform-tabs button[aria-current="page"]').innerText()==='Messages', 'section messages retrouvée en revenant sur Vinted');
-  await p.goto(base+'/?tab=plat_vinted');await p.locator('.vrm-platform-tabs').getByRole('button',{name:'Messages',exact:true}).click();await p.getByText('Client Vinted',{exact:true}).click();await p.getByText('Bonjour depuis Vinted',{exact:true}).waitFor();
+  await ongletBas('ventes');await filtreSite('ventes','leboncoin');
+  await plusVers('messages');
+  check(await p.locator('[data-tache="messages"]').getAttribute('data-tache-site')==='vinted' && await p.locator('[data-conv="71"]').count()===1, 'messages Vinted retrouvés en revenant sur Messages');
+  await p.goto(base+'/?tab=messages&site=vinted');await p.locator('[data-tache="messages"][data-tache-site="vinted"]').waitFor();await p.getByText('Client Vinted',{exact:true}).click();await p.getByText('Bonjour depuis Vinted',{exact:true}).waitFor();
   check(await p.getByText('Merci pour votre achat',{exact:true}).isVisible(),'historique Vinted complet capté');check((await p.locator('.vrm-chat-panel').innerText()).includes('456789'),'code de retrait numérique conservé');
   rows.find(x=>x.id==='harvest_111_conv_71').data.payload.conversation.messages=[{id:901,entity_type:'message',created_at_ts:1700000003,entity:{user_id:22,body:'Nouveau message capturé'}}];
   await p.evaluate(()=>window.dispatchEvent(new CustomEvent('vrm:ext',{detail:{type:'maj',quoi:'messages',uid:'111',conv:'71'}})));
@@ -309,17 +339,16 @@ async function brancher(p){
   if(process.env.BANC_CAPTURES)await p.screenshot({path:path.join(process.env.BANC_CAPTURES,'statistiques-390.png')});
   await p.locator('main').evaluate(e=>{e.scrollTop=250;});await p.waitForTimeout(150);
   const avant=await p.locator('main').evaluate(e=>e.scrollTop);
-  await nav.getByRole('button',{name:'Gestion',exact:true}).click();await p.getByRole('menuitem',{name:'Stock',exact:true}).click();
-  await nav.getByRole('button',{name:'Gestion',exact:true}).click();await p.getByRole('menuitem',{name:'Statistiques',exact:true}).click();
+  await plusVers('garage');
+  await plusVers('dashboard');
   await p.waitForTimeout(800);
   check(avant>100 && Math.abs(await p.locator('main').evaluate(e=>e.scrollTop)-avant)<3, 'position retrouvée après passage dans le stock'+' (avant='+avant+', après='+(await p.locator('main').evaluate(e=>e.scrollTop))+', hauteur='+(await p.locator('main').evaluate(e=>e.scrollHeight-e.clientHeight))+')');
 
-  await p.goto(base+'/?tab=plat_ebay');await p.locator('.vrm-platform-tabs').getByRole('button',{name:'Messages',exact:true}).click();await p.getByText('Acheteur test',{exact:true}).waitFor();
-  await nav.getByRole('button',{name:'Gestion',exact:true}).click();await p.getByRole('menuitem',{name:'Stock',exact:true}).click();
-  await nav.getByRole('button',{name:'eBay',exact:true}).click();
-  await p.getByRole('heading',{name:'eBay',exact:true}).waitFor();
+  await p.goto(base+'/?tab=messages&site=ebay');await p.getByText('Acheteur test',{exact:true}).waitFor();
+  await plusVers('garage');
+  await plusVers('messages');
   await p.getByText('Acheteur test',{exact:true}).waitFor();
-  check(await p.locator('.vrm-platform-tabs button[aria-current="page"]').innerText()==='Messages', 'messages revient à eBay après un passage dans le stock');
+  check(await p.locator('[data-tache="messages"]').getAttribute('data-tache-site')==='ebay', 'messages revient à eBay après un passage dans le stock');
   check(writes.length===0,'ouvrir les messages ne transmet rien');
   await p.getByRole('button',{name:/Acheteur test Question/}).click();check(await p.getByText('Oui, disponible.',{exact:true}).isVisible(),'historique de réponses visible');
   check(await p.getByRole('dialog',{name:'Conversation eBay',exact:true}).getAttribute('aria-modal')==='true','conversation mobile déclarée modale');
@@ -343,7 +372,7 @@ async function brancher(p){
 
   await p.getByLabel('Réponse au message eBay').fill('Merci pour votre message');await p.getByRole('button',{name:'Envoyer la réponse',exact:true}).click();await p.getByRole('button',{name:'Annuler',exact:true}).click();check(writes.length===0,'annuler la réponse ne transmet rien');
   await p.getByRole('button',{name:'Envoyer la réponse',exact:true}).click();await p.getByRole('button',{name:'Annuler',exact:true}).waitFor();await p.getByRole('button',{name:'Annuler',exact:true}).locator('..').getByRole('button',{name:'Envoyer la réponse',exact:true}).click();await p.waitForFunction(()=>document.body.textContent.includes('Refus simulé eBay'));check(writes.length===1 && writes[0].messageId==='m1','réponse associée au message exact');check(await p.getByLabel('Réponse au message eBay').inputValue()==='Merci pour votre message','refus conserve le brouillon');
-  await p.getByLabel('Fermer la conversation eBay').click();await p.getByRole('button',{name:'Offres',exact:true}).click();await p.getByText('Paire de test',{exact:true}).waitFor();check(writes.length===1,'lire les offres ne les accepte pas');
+  await p.getByLabel('Fermer la conversation eBay').click();await ebaySection('Offres');await p.getByText('Paire de test',{exact:true}).waitFor();check(writes.length===1,'lire les offres ne les accepte pas');
   check(await p.locator('article').filter({hasText:'Offre sans montant'}).getByRole('button',{name:'Accepter',exact:true}).isDisabled(),'offre sans prix ne permet pas d’accepter un montant inconnu');
 
   await p.getByLabel('Rechercher une offre eBay').fill('Autre acheteur');check(await p.getByText('Autre offre eBay',{exact:true}).isVisible() && await p.getByText('Paire de test',{exact:true}).count()===0,'offres filtrées par acheteur sans écriture');
@@ -375,7 +404,7 @@ async function brancher(p){
   await p.getByRole('button',{name:/Étudier l’offre/}).click();await p.getByRole('heading',{name:'Offres eBay',exact:true}).waitFor();
   check(await p.getByText('Autre offre eBay',{exact:true}).count()===0,'raccourci ouvre uniquement l’offre visée');
   await p.getByRole('button',{name:'Voir toutes les offres',exact:true}).click();check(await p.getByText('Autre offre eBay',{exact:true}).waitFor({timeout:5000}).then(()=>true,()=>false),'retour à toutes les offres');
-  await p.locator('.vrm-platform-tabs').getByRole('button',{name:'À traiter',exact:true}).click();
+  await ebaySection('À traiter');
   await p.getByRole('button',{name:/Message de la paire/}).click();await p.getByRole('dialog',{name:'Conversation eBay',exact:true}).waitFor();
   check(await p.getByLabel('Réponse au message eBay').inputValue()==='Merci pour votre message','raccourci ouvre le bon message et retrouve le brouillon refusé');
   await p.getByLabel('Réponse au message eBay').fill('Brouillon de la première paire');
@@ -388,33 +417,33 @@ async function brancher(p){
   await p.getByRole('button',{name:/Autre acheteur Autre échange/}).click();check(await p.getByLabel('Réponse au message eBay').inputValue()==='','brouillons séparés par échange');
   await p.getByLabel('Réponse au message eBay').fill('Brouillon de la seconde paire');await p.getByLabel('Fermer la conversation eBay').click();
   await p.getByRole('button',{name:/Acheteur test Question/}).click();check(await p.getByLabel('Réponse au message eBay').inputValue()==='Brouillon de la première paire','changer d’échange conserve le brouillon');
-  await p.getByLabel('Fermer la conversation eBay').click();await p.reload();await p.getByRole('navigation',{name:'Navigation principale'}).getByRole('button',{name:'eBay',exact:true}).click();await p.locator('.vrm-platform-tabs').getByRole('button',{name:'Messages',exact:true}).click();await p.getByRole('button',{name:/Acheteur test Question/}).click();check(await p.getByLabel('Réponse au message eBay').inputValue()==='Brouillon de la première paire','rechargement conserve le brouillon dans cet onglet');
-  await p.getByLabel('Fermer la conversation eBay').click();await p.locator('.vrm-platform-tabs').getByRole('button',{name:'À traiter',exact:true}).click();
+  await p.getByLabel('Fermer la conversation eBay').click();await p.reload();await ebaySection('Messages');await p.getByRole('button',{name:/Acheteur test Question/}).click();check(await p.getByLabel('Réponse au message eBay').inputValue()==='Brouillon de la première paire','rechargement conserve le brouillon dans cet onglet');
+  await p.getByLabel('Fermer la conversation eBay').click();await ebaySection('À traiter');
   await p.getByRole('button',{name:/Paire à expédier/}).click();await p.getByText('Commande 1',{exact:true}).first().waitFor();await p.getByText('Prix d’achat à renseigner.',{exact:true}).count();
   await p.getByText('Bénéfice de l’article : à compléter',{exact:true}).click();await p.getByLabel('Prix d’achat eBay').fill('40');await p.getByLabel('Prix d’achat eBay').press('Tab');
   check((await p.getByText(/Bénéfice de l’article :/).innerText()).includes('47,50'),'bénéfice eBay exclut le port acheteur et déduit la commission lue');
   await p.getByText('Détail des frais et du bénéfice',{exact:true}).click();check(await p.getByLabel('Commission plateforme',{exact:true}).getAttribute('readonly')!==null,'commission eBay lue protégée contre la saisie');
   await p.getByRole('checkbox',{name:/Tous les frais sont renseignés/}).check();check(!(await p.getByText(/Bénéfice de l’article :/).innerText()).includes('estimé'),'frais confirmés sur la commande eBay');
   for(const width of [320,390,1512]){await p.setViewportSize({width,height:900});check(await p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'commande ciblée sans débordement '+width);}await p.setViewportSize({width:390,height:844});
-  await p.locator('.vrm-platform-tabs').getByRole('button',{name:'Compte',exact:true}).click();await p.getByText('Synchronisation par compte',{exact:true}).click();
+  await ebaySection('Compte');await p.getByText('Synchronisation par compte',{exact:true}).click();
   await p.getByRole('button',{name:'Actualiser ce compte',exact:true}).click();await p.getByRole('button',{name:'Reprendre ce compte',exact:true}).waitFor();check((await p.locator('[data-ebay-sync-compte]').innerText()).includes('Non relu : commandes'),'synchronisation précise la source non relue');
   await p.getByRole('button',{name:'Lire davantage de commandes',exact:true}).click();await p.getByText('4 commandes lues sur 4 pour cette lecture eBay. Lecture terminée.',{exact:true}).waitFor();await p.getByRole('button',{name:'Lire davantage de commandes',exact:true}).waitFor({state:'hidden'});check(await p.getByRole('button',{name:'Lire davantage de commandes',exact:true}).count()===0,'pagination terminée retire le bouton de suite');
   for(const width of [320,390,1512]){await p.setViewportSize({width,height:900});check(await p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'synchronisation par compte sans débordement '+width);}await p.setViewportSize({width:390,height:844});
 
-  await p.locator('.vrm-platform-tabs').getByRole('button',{name:'À traiter',exact:true}).click();await p.getByRole('button',{name:/Ancien échange à retrouver/}).click();await p.getByText('Message hors de la première page',{exact:true}).waitFor();check(await p.getByRole('dialog',{name:'Conversation eBay',exact:true}).isVisible(),'message absent de la première page lu directement');
-  await p.getByLabel('Fermer la conversation eBay').click();await p.locator('.vrm-platform-tabs').getByRole('button',{name:'À traiter',exact:true}).click();await p.getByRole('button',{name:/Ancienne commande à retrouver/}).click();await p.getByText('Commande old-1',{exact:true}).first().waitFor();check(await p.getByText('Actualiser la commande',{exact:true}).isVisible(),'commande absente du cache lue directement sur eBay');
+  await ebaySection('À traiter');await p.getByRole('button',{name:/Ancien échange à retrouver/}).click();await p.getByText('Message hors de la première page',{exact:true}).waitFor();check(await p.getByRole('dialog',{name:'Conversation eBay',exact:true}).isVisible(),'message absent de la première page lu directement');
+  await p.getByLabel('Fermer la conversation eBay').click();await ebaySection('À traiter');await p.getByRole('button',{name:/Ancienne commande à retrouver/}).click();await p.getByText('Commande old-1',{exact:true}).first().waitFor();check(await p.getByText('Actualiser la commande',{exact:true}).isVisible(),'commande absente du cache lue directement sur eBay');
   const contenu=p.getByRole('region',{name:'Articles de la commande eBay'});check(await contenu.getByText('Chargeur USB-C',{exact:true}).isVisible() && (await contenu.innerText()).includes('Quantité : 2'),'tous les articles et quantités de la commande visibles');
   await p.evaluate(()=>{Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:async v=>{window.__adresseCopie=v;}}});});
   await p.getByRole('button',{name:'Copier l’adresse',exact:true}).click();check(await p.evaluate(()=>window.__adresseCopie)==='Acheteur de test\n12 rue Exemple\n35000 Rennes\nFR','adresse copiée sans reconstituer les champs manquants');
 
-  await p.locator('.vrm-platform-tabs').getByRole('button',{name:'À traiter',exact:true}).click();await p.getByRole('button',{name:/Ancienne offre à retrouver/}).click();await p.getByText('Offre hors de la première page',{exact:true}).waitFor();check(writes.length===1,'offre hors première page lue sans envoi aux observateurs');
+  await ebaySection('À traiter');await p.getByRole('button',{name:/Ancienne offre à retrouver/}).click();await p.getByText('Offre hors de la première page',{exact:true}).waitFor();check(writes.length===1,'offre hors première page lue sans envoi aux observateurs');
   check(writes.length===1,'accès directs, brouillons, bénéfices et synchronisation sans action commerciale');
 
   check(writes.length===1,'une tâche ouvre la section sans accepter l’offre');
-  await p.locator('.vrm-platform-tabs').getByRole('button',{name:'À traiter',exact:true}).click();await p.getByRole('button',{name:/Ancienne commande à retrouver/}).click();await p.getByText('Commande old-1',{exact:true}).first().waitFor();
+  await ebaySection('À traiter');await p.getByRole('button',{name:/Ancienne commande à retrouver/}).click();await p.getByText('Commande old-1',{exact:true}).first().waitFor();
   await p.getByText('Écrire à l’acheteur',{exact:true}).click();
   await p.getByLabel('Objet du message eBay').fill('Livraison ordinateur');await p.getByLabel('Message à l’acheteur eBay').fill('Votre commande sera préparée demain.');
-  await p.locator('.vrm-platform-tabs').getByRole('button',{name:'À traiter',exact:true}).click();await p.getByRole('button',{name:/Ancienne commande à retrouver/}).click();await p.getByText('Écrire à l’acheteur',{exact:true}).click();
+  await ebaySection('À traiter');await p.getByRole('button',{name:/Ancienne commande à retrouver/}).click();await p.getByText('Écrire à l’acheteur',{exact:true}).click();
   check(await p.getByLabel('Objet du message eBay').inputValue()==='Livraison ordinateur' && await p.getByLabel('Message à l’acheteur eBay').inputValue()==='Votre commande sera préparée demain.','objet et texte conservés en quittant la commande');
   await p.getByRole('button',{name:'Envoyer le message',exact:true}).click();await p.getByRole('button',{name:'Annuler',exact:true}).click();check(commandeWrites.length===0,'annuler le message commande ne transmet rien');
   await p.getByRole('button',{name:'Envoyer le message',exact:true}).click();await p.getByRole('button',{name:'Annuler',exact:true}).locator('..').getByRole('button',{name:'Envoyer le message',exact:true}).click();await p.getByText('Refus simulé du message commande',{exact:true}).waitFor();
@@ -425,22 +454,22 @@ async function brancher(p){
   await p.getByText('Message accepté par eBay.',{exact:true}).waitFor();
   check(await p.getByLabel('Message à l’acheteur eBay').inputValue()==='Nouvelle réponse écrite pendant l’envoi.' && await p.getByLabel('Objet du message eBay').inputValue()==='Nouvel objet','succès n’efface pas une rédaction plus récente');
   check(commandeWrites[1].orderId==='old-1' && commandeWrites[1].body==='Votre commande sera préparée demain.' && commandeWrites[1].subject==='Livraison ordinateur','envoi utilise la commande et le texte confirmés');
-  await p.locator('.vrm-platform-tabs').getByRole('button',{name:'À traiter',exact:true}).click();await p.getByRole('button',{name:/Paire à expédier/}).click();await p.getByText('Écrire à l’acheteur',{exact:true}).click();check(await p.getByLabel('Message à l’acheteur eBay').inputValue()==='','brouillons séparés par commande');
+  await ebaySection('À traiter');await p.getByRole('button',{name:/Paire à expédier/}).click();await p.getByText('Écrire à l’acheteur',{exact:true}).click();check(await p.getByLabel('Message à l’acheteur eBay').inputValue()==='','brouillons séparés par commande');
 
-  await p.locator('.vrm-platform-tabs').getByRole('button',{name:'Messages',exact:true}).click();await p.getByRole('button',{name:/Acheteur test Question/}).click();
+  await ebaySection('Messages');await p.getByRole('button',{name:/Acheteur test Question/}).click();
   modeReponse='html';await p.getByRole('button',{name:'Envoyer la réponse',exact:true}).click();await p.getByRole('button',{name:'Annuler',exact:true}).locator('..').getByRole('button',{name:'Envoyer la réponse',exact:true}).click();
   await p.getByRole('button',{name:'Relire l’échange',exact:true}).waitFor();check(await p.getByRole('button',{name:'Envoyer la réponse',exact:true}).isDisabled(),'réponse réseau illisible bloque un renvoi immédiat');
-  await p.getByLabel('Fermer la conversation eBay').click();await p.reload();await p.getByRole('navigation',{name:'Navigation principale'}).getByRole('button',{name:'eBay',exact:true}).click();await p.locator('.vrm-platform-tabs').getByRole('button',{name:'Messages',exact:true}).click();await p.getByRole('button',{name:/Acheteur test Question/}).click();
+  await p.getByLabel('Fermer la conversation eBay').click();await p.reload();await ebaySection('Messages');await p.getByRole('button',{name:/Acheteur test Question/}).click();
   check(await p.getByRole('button',{name:'Envoyer la réponse',exact:true}).isDisabled() && await p.getByRole('button',{name:'Relire l’échange',exact:true}).isVisible(),'état incertain conservé après rechargement de l’onglet');
   lectureMessageFausse=true;await p.getByRole('button',{name:'Relire l’échange',exact:true}).click();await p.waitForFunction(()=>document.body.textContent.includes('L’échange exact n’a pas pu être relu.'));check(await p.getByRole('button',{name:'Envoyer la réponse',exact:true}).isDisabled(),'lecture d’un autre échange ne débloque pas le renvoi');
   lectureMessageFausse=false;await p.getByRole('button',{name:'Relire l’échange',exact:true}).click();await p.getByText('Échange relu : vérifie les réponses avant de renvoyer.',{exact:true}).first().waitFor();
   check(await p.getByText('Message transmis (test)',{exact:true}).isVisible() && await p.getByRole('button',{name:'Envoyer la réponse',exact:true}).isEnabled(),'relecture exacte affiche les réponses et permet une nouvelle décision');
   await p.getByLabel('Fermer la conversation eBay').click();
-  await p.locator('.vrm-platform-tabs').getByRole('button',{name:'À traiter',exact:true}).click();await p.getByRole('button',{name:/Commande remboursée à vérifier/}).click();await p.getByText('Commande refund-1',{exact:true}).first().waitFor();
+  await ebaySection('À traiter');await p.getByRole('button',{name:/Commande remboursée à vérifier/}).click();await p.getByText('Commande refund-1',{exact:true}).first().waitFor();
   check(await p.getByText('Remboursement partiel à vérifier',{exact:true}).isVisible(),'remboursement partiel nommé dans la commande');
   check(await p.getByText(/Un remboursement figure sur cette commande/).isVisible() && await p.getByText(/Bénéfice de l’article/).count()===0,'bénéfice absent quand le remboursement ne peut pas être intégré');
   check(await p.getByText('Enregistrer l’expédition',{exact:true}).count()===0,'commande partiellement remboursée ne propose pas une nouvelle expédition');
-  await p.goto(base+'/?tab=plat_leboncoin');await p.getByRole('button',{name:'Colis',exact:true}).click();await p.getByText('Colis à préparer',{exact:true}).waitFor();
+  await p.goto(base+'/?tab=plat_leboncoin&section=colis');await p.locator('.vrm-platform-tabs').getByRole('button',{name:'Colis',exact:true}).click();await p.getByText('Colis à préparer',{exact:true}).waitFor();
   check(await p.getByText('Colis en route',{exact:true}).isVisible(),'colis expédié conservé au suivi');check(await p.getByText('Colis finalisé',{exact:true}).count()===0,'colis finalisé retiré des colis actifs');check(await p.locator('.vrm-lbc-package').count()===1,'seul le colis non expédié propose le bordereau');
   for(const width of [320,390,1440]){await p.setViewportSize({width,height:900});check(await p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'aucun débordement colis '+width);}
   rows.push({id:'email_track_pickup1',data:{id:'pickup1',carrier:'mondial',status:'available',lieu:'Relais Centre',artTitle:'Paire crème taille 42',code:'001234',suivi:'TRACK-01',receivedAt:maintenant,limite:new Date(Date.now()+3*86400000).toISOString().slice(0,10)}},

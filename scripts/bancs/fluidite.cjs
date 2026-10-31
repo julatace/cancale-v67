@@ -137,15 +137,22 @@ const texte = (pg) => pg.evaluate(() => document.body.innerText);
       {
         const etat = { ventes: [...BASE], cap: ilYa(2) };
         const { ctx, pg, errs } = await ouvrir(b, vp, etat);
-        await pg.goto(`http://localhost:${PORT}/?tab=plat_vinted`, { waitUntil: 'domcontentloaded' });
+        // (31 oct., navigation par tâche) Les achats Vinted restent une section de
+        // l'espace Vinted ; Ventes est un onglet de la navigation, filtré sur Vinted.
+        await pg.goto(`http://localhost:${PORT}/?tab=plat_vinted&section=achats`, { waitUntil: 'domcontentloaded' });
         await pg.waitForTimeout(3000);
-        try { await pg.click('[data-section="achats"]', { timeout: 4000 }); } catch (_) {}
+        // L'espace Vinted n'a plus qu'une section (Achats) : aucune barre de sections.
+        dit(await pg.evaluate(() => !document.querySelector('[data-tache]') && !!document.querySelector('[data-entete-plateforme="vinted"]')), 'il est bien sur Achats, dans l’espace Vinted (pas sur Ventes)');
         await pg.waitForTimeout(1500);
         etat.ventes = [NOUVELLE, ...BASE]; etat.cap = ilYa(0);
         await signal(pg, 'ventes');
         await pg.waitForTimeout(600);
         let bascule = false;
-        try { await pg.click('[data-section="ventes"]', { timeout: 4000 }); bascule = true; } catch (_) {}
+        try {
+          await pg.locator('.vrm-mobile-nav [data-nav-entree="ventes"]:visible, .vrm-sidebar [data-nav-entree="ventes"]:visible').first().click({ timeout: 4000 });
+          await pg.click('[data-filtre-site="ventes"] button[data-site="vinted"]', { timeout: 4000 });
+          bascule = await pg.evaluate(() => { const t = document.querySelector('[data-tache]'); return !!t && t.getAttribute('data-tache') === 'ventes' && t.getAttribute('data-tache-site') === 'vinted'; });
+        } catch (_) {}
         dit(bascule, 'on revient sur Ventes par son onglet');
         await pg.waitForTimeout(3000);
         try { await pg.getByText('Toutes', { exact: true }).first().click({ timeout: 3000 }); await pg.waitForTimeout(600); } catch (_) {}

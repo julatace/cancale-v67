@@ -88,8 +88,11 @@ function FondRelais({ points, selection, onChoisir, C }) {
   );
 }
 
-export default function CarteRelaisColis({ donnees, C }) {
-  const [ouverte, setOuverte] = React.useState(false);
+// `compacte` (31 oct.) : en bas de la colonne « À retirer » de Colis (la maquette
+// de Julien), la carte est posée ouverte, sans en-tête : le fond, puis une ligne
+// par point. Ailleurs elle reste repliée, comme avant.
+export default function CarteRelaisColis({ donnees, C, compacte = false }) {
+  const [ouverte, setOuverte] = React.useState(!!compacte);
   const [reperes, setReperes] = React.useState({});      // cle → {lat,lon} | null (cherché, pas sûr)
   const [choisi, setChoisi] = React.useState('');
   const groupes = (donnees && donnees.groupes) || [];
@@ -116,6 +119,22 @@ export default function CarteRelaisColis({ donnees, C }) {
   if (!groupes.length && !sansRelais) return null;
   const avecRepere = groupes.filter((g) => reperes[g.cle] && reperes[g.cle].lat != null).map((g) => ({ ...g, ...reperes[g.cle] }));
   const muted = { fontSize: 12, color: C.muted, lineHeight: 1.5 };
+  if (compacte) return (
+    <div className="vrm-relais-carte vrm-relais-compacte" data-relais-carte="ouverte" data-relais-points={groupes.length} data-relais-arrives={nArr} data-relais-attendus={nAtt} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      {avecRepere.length > 0 && <FondRelais points={avecRepere} selection={choisi} onChoisir={setChoisi} C={C}/>}
+      {groupes.map((g) => {
+        const rp = reperes[g.cle];
+        return (
+          <div key={g.cle} data-relais-point={g.cle} data-relais-point-arrives={g.nArrives} data-relais-point-attendus={g.nAttendus} data-relais-repere={rp && rp.lat != null ? 'oui' : (rp === null || !g.geocode ? 'non' : 'cherche')} style={{ ...muted, color: C.text }}>
+            <b>{g.nom}</b>{g.nArrives ? ` · ${g.nArrives} arrivé${g.nArrives > 1 ? 's' : ''}` : ''}{g.nAttendus ? ` · ${g.nAttendus} attendu${g.nAttendus > 1 ? 's' : ''}` : ''}
+            {(!g.geocode || rp === null) ? <span style={{ color: C.muted }}> · pas sur la carte</span> : null}
+          </div>
+        );
+      })}
+      {sansRelais > 0 && <div style={{ ...muted, fontSize: 11.5 }}>{sansRelais} achat{sansRelais > 1 ? 's' : ''} en route sans destination connue.</div>}
+      {avecRepere.length > 0 && <div data-relais-note="" style={{ ...muted, fontSize: 10.5 }}>Fond : OpenFreeMap · © OpenMapTiles · © OpenStreetMap ; adresses : Base Adresse Nationale.</div>}
+    </div>
+  );
   return (
     <div className="vrm-relais-carte" data-relais-carte={ouverte ? 'ouverte' : 'fermee'} data-relais-points={groupes.length} data-relais-arrives={nArr} data-relais-attendus={nAtt} style={{ marginBottom: 14, border: `1px solid ${C.border}`, borderRadius: 10, background: C.card, overflow: 'hidden' }}>
       <button type="button" onClick={() => setOuverte((o) => !o)} aria-expanded={ouverte} style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', minHeight: 44, padding: '10px 14px', background: 'transparent', border: 'none', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left' }}>

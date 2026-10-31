@@ -1,0 +1,125 @@
+/* (31 oct.) MESSAGES EN VOLETS — les maquettes choisies par Julien
+   (fil au téléphone, trois volets sur ordinateur). Chargée APRÈS
+   styles-vitrine.css : elle n'a le dernier mot que sur l'écran Messages
+   (Vinted, et les fils eBay qui partagent `.vrm-message-workspace`).
+   Rien de métier ici : une seule couleur d'accent (cobalt), réservée au
+   bouton Envoyer et au point « non lu » (§7). Encre pleine = LUI.
+   ⚠️ Le fil est posé dans un portail sur téléphone (hors `.vrm-app-shell`) :
+   les sélecteurs partent donc de `html body`, pas de la coque. */
+
+/* ── Volet de droite : caché tant qu'il n'y a pas la place ─────────── */
+html body .vrm-msg-fiche { display: none; }
+
+/* ── Ordinateur ≥ 1024 px : liste · fil · fiche ─────────────────────── */
+@media (min-width: 1024px) {
+  html body .vrm-message-workspace {
+    --vrm-msg-h: max(420px, min(760px, calc(100dvh - 190px)));
+    display: grid !important;
+    grid-template-columns: minmax(300px, 340px) minmax(0, 1fr) minmax(250px, 280px) !important;
+    align-items: stretch !important;
+    gap: 0 !important;
+    border: 1px solid var(--vrm-line) !important;
+    border-radius: var(--vrm-r-lg, 14px) !important;
+    background: var(--vrm-bg) !important;
+    overflow: hidden;
+  }
+  /* eBay partage la classe sans volet de fiche : deux colonnes. */
+  html body .vrm-message-workspace:not(:has(> .vrm-msg-fiche)) { grid-template-columns: minmax(300px, 340px) minmax(0, 1fr) !important; }
+  html body .vrm-message-workspace > .vrm-inbox-column {
+    height: var(--vrm-msg-h); max-height: none !important; overflow-y: auto;
+    padding: 12px 16px !important; border-right: 1px solid var(--vrm-line) !important; box-sizing: border-box; background: var(--vrm-bg) !important;
+  }
+  html body .vrm-message-workspace > .vrm-chat-column { padding: 0 !important; min-width: 0; border-left: 0 !important; }
+  html body .vrm-message-workspace .vrm-chat-inline { position: static !important; }
+  html body .vrm-message-workspace .vrm-chat-panel,
+  html body .vrm-message-workspace .vrm-chat-empty { height: var(--vrm-msg-h) !important; min-height: 0 !important; max-height: none !important; border: 0 !important; border-radius: 0 !important; background: var(--vrm-bg) !important; box-sizing: border-box; }
+  html body .vrm-message-workspace > .vrm-msg-fiche {
+    display: flex; flex-direction: column; gap: 8px; min-width: 0; box-sizing: border-box;
+    height: var(--vrm-msg-h); overflow-y: auto; padding: 16px;
+    border-left: 1px solid var(--vrm-line); background: var(--vrm-bg); color: var(--vrm-ink);
+  }
+  /* Sur ordinateur, la paire vit dans la fiche : la carte en tête du fil ne la redit pas (§7). */
+  html body .vrm-message-workspace .vrm-chat-panel .vrm-chat-paire { display: none !important; }
+}
+
+/* ── La liste (toutes tailles) : lignes séparées d'un filet, photo ronde ── */
+html body [data-messagerie] .vrm-msg-list { border: 0 !important; background: transparent !important; box-shadow: none !important; border-radius: 0 !important; }
+html body [data-messagerie] .vrm-msg-list .vrm-inbox-row { padding: 14px 0 !important; min-height: 76px !important; border: 0 !important; border-bottom: 1px solid var(--vrm-line) !important; background: transparent !important; border-radius: 0 !important; box-shadow: none !important; gap: 12px; }
+html body [data-messagerie] .vrm-msg-list .vrm-inbox-row.is-current { box-shadow: inset 3px 0 var(--vrm-ink) !important; padding-left: 10px !important; background: var(--vrm-card2, var(--vrm-surface)) !important; }
+html body [data-messagerie] .vrm-msg-av { width: 52px !important; height: 52px !important; border-radius: 50% !important; overflow: hidden; flex-shrink: 0; }
+html body [data-messagerie] .vrm-msg-av img { border-radius: 50% !important; }
+html body [data-messagerie] .vrm-msg-name { font-size: 15px !important; font-weight: 600 !important; }
+html body [data-messagerie] .vrm-msg-paire-t { font-size: 12px !important; color: var(--vrm-muted) !important; }
+html body [data-messagerie] .vrm-msg-extrait { font-size: 13.5px !important; }
+html body [data-messagerie] .vrm-msg-time { font-family: var(--vrm-police-mono) !important; font-size: 12px !important; color: var(--vrm-muted) !important; }
+html body [data-messagerie] .vrm-msg-dot { background: var(--vrm-accent, #2442B8) !important; }
+
+/* ── La fiche de la paire (volet de droite) ─────────────────────────── */
+html body .vrm-msg-fiche-ph { aspect-ratio: 5 / 4; width: 100%; border-radius: var(--vrm-r-md, 14px); background: var(--vrm-card2, var(--vrm-surface)); display: flex; align-items: center; justify-content: center; overflow: hidden; color: var(--vrm-muted); }
+html body .vrm-msg-fiche-ph img { width: 100%; height: 100%; object-fit: cover; }
+html body .vrm-msg-fiche-t { margin-top: 10px; font-size: 18px; font-weight: 700; line-height: 1.25; color: var(--vrm-ink); overflow-wrap: anywhere; }
+html body .vrm-msg-fiche-s { font-size: 13px; color: var(--vrm-muted); }
+html body .vrm-msg-fiche-num { align-self: flex-start; margin: 2px 0 6px; }
+html body .vrm-msg-fiche-bloc { display: flex; flex-direction: column; gap: 1px; padding: 10px 12px; border-radius: var(--vrm-r-sm, 10px); background: var(--vrm-card2, var(--vrm-surface)); }
+html body .vrm-msg-fiche-bloc small { font-size: 12px; color: var(--vrm-muted); }
+html body .vrm-msg-fiche-bloc b { font-size: 14px; font-weight: 700; color: var(--vrm-ink); }
+html body .vrm-msg-fiche-lien { margin-top: 4px; font-size: 13px; color: var(--vrm-muted) !important; text-decoration: none; min-height: 44px; display: flex; align-items: center; }
+html body .vrm-msg-fiche-vide { margin: 10px 0 0; font-size: 13px; line-height: 1.45; color: var(--vrm-muted); }
+html body .vrm-msg-fiche-vide b { color: var(--vrm-ink); }
+
+/* Le N° en pastille noire (encre pleine, chiffres mono). */
+html body .vrm-num-pastille { display: inline-flex; align-items: center; padding: 3px 10px; border-radius: 999px; background: var(--vrm-ink) !important; color: var(--vrm-bg) !important; font: 600 14px/1.3 var(--vrm-police-mono, ui-monospace, monospace) !important; white-space: nowrap; }
+
+/* ── Le fil (téléphone ET ordinateur) ───────────────────────────────── */
+html body .vrm-chat-panel { background: var(--vrm-bg) !important; }
+html body .vrm-chat-panel .vrm-chat-head { background: var(--vrm-bg) !important; border-bottom: 0 !important; }
+html body .vrm-chat-panel .vrm-chat-head :is(button, .vrm-chat-head-n) { color: var(--vrm-ink) !important; }
+html body .vrm-chat-panel .vrm-chat-head .vrm-chat-head-s { color: var(--vrm-muted) !important; }
+html body .vrm-chat-panel .vrm-chat-history { background: var(--vrm-bg) !important; }
+html body .vrm-chat-panel > .vrm-chat-paire { margin: 4px 16px 6px !important; flex-shrink: 0; }
+html body .vrm-chat-panel .vrm-chat-history { gap: 10px !important; padding: 12px 22px 16px !important; }
+
+/* La carte de la paire, en tête du fil (téléphone). */
+html body .vrm-chat-panel .vrm-chat-paire { display: flex !important; align-items: center; gap: 14px; padding: 12px !important; border-radius: var(--vrm-r-md, 14px) !important; border: 1px solid var(--vrm-line) !important; background: var(--vrm-bg) !important; margin-bottom: 6px; }
+html body .vrm-chat-panel .vrm-chat-paire-ph { width: 64px !important; height: 64px !important; flex-shrink: 0; border-radius: 10px !important; border: 0 !important; overflow: hidden; display: flex; align-items: center; justify-content: center; }
+html body .vrm-chat-panel .vrm-chat-paire-t { flex: 1; min-width: 0; }
+html body .vrm-chat-panel .vrm-chat-paire-n { font-size: 16px !important; font-weight: 700 !important; line-height: 1.25; }
+html body .vrm-chat-panel .vrm-chat-paire-l { display: block !important; font-size: 13.5px !important; line-height: 1.4; margin-top: 2px; }
+html body .vrm-chat-panel .vrm-chat-paire-l .vrm-msg-etat { display: none !important; } /* l'état est dit par la bande du fil */
+html body .vrm-chat-panel .vrm-chat-paire-num { flex-shrink: 0; background: var(--vrm-card2, var(--vrm-surface)) !important; color: var(--vrm-ink) !important; padding: 6px 12px; }
+
+/* Les bulles : lui = encre pleine, l'acheteur = surface ; l'heure DANS la bulle. */
+html body .vrm-chat-panel .vrm-bulle-l { max-width: min(78%, 520px) !important; }
+html body .vrm-chat-panel .vrm-bulle-l > .vrm-bulle.vrm-bulle { display: flex !important; flex-direction: column; gap: 4px; padding: 12px 16px !important; border: 0 !important; box-shadow: none !important; border-radius: 16px !important; font-size: 15px !important; line-height: 1.4 !important; background: var(--vrm-card2, var(--vrm-surface)) !important; color: var(--vrm-ink) !important; }
+html body .vrm-chat-panel .vrm-bulle-l.vrm-bulle-moi > .vrm-bulle.vrm-bulle { background: var(--vrm-ink) !important; color: var(--vrm-bg) !important; border-radius: 16px !important; }
+html body .vrm-chat-panel .vrm-bulle-h { align-self: flex-end; font: 400 11.5px/1 var(--vrm-police-mono, ui-monospace, monospace); opacity: .6; }
+html body .vrm-chat-panel .vrm-bulle-pied:empty { display: none; }
+
+/* La carte d'offre : « Offre de X € — ton mini : Y € », puis trois gestes. */
+html body .vrm-chat-panel .vrm-chat-offre { border: 0 !important; border-radius: var(--vrm-r-md, 14px) !important; background: var(--vrm-card2, var(--vrm-surface)) !important; padding: 14px 16px !important; }
+html body .vrm-chat-panel .vrm-chat-offre-traiter { display: block !important; }
+html body .vrm-chat-panel .vrm-chat-offre-tete { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
+html body .vrm-chat-panel .vrm-chat-offre-tete .vrm-chat-offre-t { font-size: 16px; font-weight: 700; }
+html body .vrm-chat-panel .vrm-chat-offre-tete .vrm-chat-offre-t b { font-weight: 700; }
+html body .vrm-chat-panel .vrm-chat-offre-mini { font-size: 13px; }
+html body .vrm-chat-panel .vrm-chat-offre-actions { display: grid !important; grid-template-columns: repeat(3, minmax(0, 1fr)) !important; gap: 8px !important; }
+html body .vrm-chat-panel .vrm-chat-offre-actions > .vrm-chat-btn { min-height: 44px !important; border-radius: 10px !important; border: 1px solid var(--vrm-line) !important; background: var(--vrm-bg) !important; color: var(--vrm-ink) !important; font: 600 14.5px/1 var(--vrm-police, inherit) !important; box-shadow: none !important; padding: 0 8px !important; white-space: nowrap; }
+html body .vrm-chat-panel .vrm-chat-offre-actions > .vrm-chat-btn-p { background: var(--vrm-ink) !important; color: var(--vrm-bg) !important; border-color: var(--vrm-ink) !important; }
+html body .vrm-chat-panel .vrm-chat-offre-actions > .vrm-chat-btn:disabled { opacity: .5; }
+
+/* Le pied : pastilles de réponses rapides, champ, micro, envoyer cobalt rond. */
+html body .vrm-chat-panel .vrm-chat-foot { background: var(--vrm-bg) !important; border-top: 0 !important; padding: 10px 22px 14px !important; }
+html body .vrm-chat-panel .vrm-chat-rapides { gap: 8px !important; padding-bottom: 12px !important; }
+html body .vrm-chat-panel .vrm-chat-rapides > button { min-height: 40px !important; padding: 0 16px !important; border-radius: 999px !important; border: 1px solid var(--vrm-line) !important; background: var(--vrm-bg) !important; color: var(--vrm-ink) !important; font: 500 14px/1 var(--vrm-police, inherit) !important; box-shadow: none !important; white-space: nowrap; }
+html body .vrm-chat-panel .vrm-chat-compose { display: flex !important; align-items: center !important; gap: 10px !important; border: 0 !important; background: transparent !important; padding: 0 !important; }
+html body .vrm-chat-panel .vrm-chat-compose > textarea { flex: 1; min-height: 46px !important; border-radius: 12px !important; border: 0 !important; background: var(--vrm-card2, var(--vrm-surface)) !important; padding: 13px 16px !important; font: 400 15px/1.35 var(--vrm-police, inherit) !important; resize: none !important; }
+html body .vrm-chat-panel .vrm-chat-compose > [data-mic-dictee] { width: 46px !important; height: 46px !important; min-height: 46px !important; border-radius: 50% !important; border: 0 !important; background: var(--vrm-card2, var(--vrm-surface)) !important; color: var(--vrm-ink) !important; }
+html body .vrm-chat-panel .vrm-chat-compose > [data-mic-dictee][aria-pressed="true"] { background: var(--vrm-ink) !important; color: var(--vrm-bg) !important; }
+html body .vrm-chat-panel .vrm-chat-send { width: 46px !important; height: 46px !important; min-height: 46px !important; padding: 0 !important; border-radius: 50% !important; border: 0 !important; display: inline-flex !important; align-items: center; justify-content: center; background: var(--vrm-accent, #2442B8) !important; color: #fff !important; flex-shrink: 0; }
+html body .vrm-chat-panel .vrm-chat-send:disabled { opacity: .45 !important; }
+
+@media (max-width: 767px) {
+  html body .vrm-chat-panel .vrm-chat-history { padding: 12px 16px 16px !important; }
+  html body .vrm-chat-panel .vrm-chat-foot { padding: 10px 16px calc(12px + env(safe-area-inset-bottom)) !important; border-top: 1px solid var(--vrm-line) !important; }
+  html body .vrm-chat-panel .vrm-chat-compose > textarea { font-size: 16px !important; }
+}

@@ -143,8 +143,9 @@ const lireListe = (pg) => pg.evaluate(() => {
     groupeActif: (document.querySelector('[data-msg-groupe-actif]') || { getAttribute: () => null }).getAttribute('data-msg-groupe-actif'),
   };
 });
+// (31 oct.) « Envoyer » est une icône nommée par son aria-label : le nom accessible compte.
 const lireFil = (pg) => pg.evaluate(() => {
-  const btn = (name) => { const b = [...document.querySelectorAll('.vrm-chat-panel button')].find((x) => (x.innerText || x.textContent).trim() === name || x.textContent.trim() === name); return b ? b.disabled : 'absent'; };
+  const btn = (name) => { const b = [...document.querySelectorAll('.vrm-chat-panel button')].find((x) => (x.innerText || x.textContent).trim() === name || x.textContent.trim() === name || (x.getAttribute('aria-label') || '').trim() === name); return b ? b.disabled : 'absent'; };
   const ta = document.querySelector('textarea[aria-label="Réponse à la conversation"]');
   const prix = document.querySelector('input[aria-label="Prix de l\'offre"]');
   const off = document.querySelector('[data-offre]');

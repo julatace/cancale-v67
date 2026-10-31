@@ -216,3 +216,82 @@ export const tauxAnnulation = (etats) => {
   for (const e of etats) { n += 1; if (e === 'cancelled') annulees += 1; else if (e === 'completed') finalisees += 1; else if (e === 'pending') enCours += 1; }
   return { n, annulees, finalisees, enCours, taux: n ? Math.round(annulees / n * 1000) / 10 : null };
 };
+
+// ── LA PÉRIODE CHOISIE : SEMAINE · MOIS · ANNÉE (31 octobre, maquette) ─────
+// UNE règle de période pour tout l'écran Statistiques (tuiles, barres, modèles,
+// comptes, tailles, boost) : [de, a[ en minuit LOCAL.
+//   semaine : du lundi au lundi suivant ; mois : du 1er au 1er suivant ;
+//   annee   : du 1er janvier au 1er janvier suivant.
+// La comparaison se fait avec la période d'avant AU MÊME POINT (`prevCoupe`) :
+// autant de jours écoulés et la même heure — un mois commencé ne se compare
+// pas à un mois entier (le 3 octobre, « −90 % » sur septembre serait faux).
+export const PERIODES = { semaine: 'Semaine', mois: 'Mois', annee: 'Année' };
+export const bornesPeriode = (type, maintenant = Date.now()) => {
+  const m0 = minuitLocal(maintenant), d = new Date(m0);
+  const ty = PERIODES[type] ? type : 'mois';
+  let de, a, prevDe;
+  if (ty === 'semaine') { de = minuitLocal(m0, -((d.getDay() + 6) % 7)); a = minuitLocal(de, 7); prevDe = minuitLocal(de, -7); }
+  else if (ty === 'annee') { de = new Date(d.getFullYear(), 0, 1).getTime(); a = new Date(d.getFullYear() + 1, 0, 1).getTime(); prevDe = new Date(d.getFullYear() - 1, 0, 1).getTime(); }
+  else { de = new Date(d.getFullYear(), d.getMonth(), 1).getTime(); a = new Date(d.getFullYear(), d.getMonth() + 1, 1).getTime(); prevDe = new Date(d.getFullYear(), d.getMonth() - 1, 1).getTime(); }
+  const jours = Math.round((m0 - de) / J), t = new Date(maintenant), p = new Date(prevDe);
+  const coupe = new Date(p.getFullYear(), p.getMonth(), p.getDate() + jours, t.getHours(), t.getMinutes(), t.getSeconds(), t.getMilliseconds()).getTime();
+  return { type: ty, de, a, prevDe, prevA: de, prevCoupe: Math.min(de, coupe) };
+};
+export const dansBornes = (ts, de, a) => isFinite(ts) && ts >= de && ts < a;
+
+// VENDU sur la période (les lignes de `ventesFaites`) et la période d'avant au
+// même point. `null` = pas lu. `ecart` : sur le montant, `null` sans référence.
+export const venduPeriode = (lignes, b) => {
+  if (!Array.isArray(lignes) || !b) return null;
+  const L = lignes.filter(valide).map((l) => ({ ...l, eur: Number(l.eur) }));
+  const cur = somme(L, b.de, b.a), prec = somme(L, b.prevDe, b.prevCoupe);
+  return { n: cur.n, eur: cur.eur, prec, ecart: ecartPct(cur.eur, prec.eur) };
+};
+
+// Numéro de semaine ISO 8601 (celle qui porte le jeudi).
+export const semaineIso = (ts) => {
+  const d = new Date(ts);
+  const jeudi = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 3 - ((d.getDay() + 6) % 7));
+  const premier = new Date(jeudi.getFullYear(), 0, 1);
+  return 1 + Math.floor(Math.round((jeudi.getTime() - premier.getTime()) / J) / 7);
+};
+
+// Les BARRES de la période : semaine ⇒ ses 7 jours ; mois ⇒ les 8 dernières
+// semaines (la maquette) ; année ⇒ ses 12 mois. `enCours` : la barre
+// d'aujourd'hui ; `avenir` : une barre pas encore commencée (vide, pas « 0 »).
+export const barresPeriode = (lignes, type, maintenant = Date.now()) => {
+  if (!Array.isArray(lignes)) return null;
+  const L = lignes.filter(valide).map((l) => ({ ...l, eur: Number(l.eur) }));
+  const b = bornesPeriode(type, maintenant), out = [];
+  const pousse = (de, a, extra) => { const s = somme(L, de, a); out.push({ debut: de, fin: a, n: s.n, eur: s.eur, enCours: maintenant >= de && maintenant < a, avenir: de > maintenant, ...(extra || {}) }); };
+  if (b.type === 'semaine') for (let k = 0; k < 7; k++) pousse(minuitLocal(b.de, k), minuitLocal(b.de, k + 1));
+  else if (b.type === 'annee') { const y = new Date(b.de).getFullYear(); for (let m = 0; m < 12; m++) pousse(new Date(y, m, 1).getTime(), new Date(y, m + 1, 1).getTime()); }
+  else {
+    const m0 = minuitLocal(maintenant), d = new Date(m0), lundi = minuitLocal(m0, -((d.getDay() + 6) % 7));
+    for (let k = 7; k >= 0; k--) { const de = minuitLocal(lundi, -7 * k); pousse(de, minuitLocal(de, 7), { semaine: semaineIso(de) }); }
+  }
+  return out;
+};
+
+// Combien de ventes (et quel montant) par groupe — pour « Par compte » : les
+// MÊMES lignes que la tuile « Vendu », donc la somme des comptes = la tuile.
+export const ventesPar = (lignes, cle) => {
+  if (!Array.isArray(lignes)) return null;
+  const par = {}; let sansCle = 0;
+  for (const l of lignes) {
+    if (!valide(l)) continue;
+    const k = String(cle(l) || '').trim();
+    if (!k) { sansCle += 1; continue; }
+    const g = par[k] || (par[k] = { k, n: 0, c: 0 });
+    g.n += 1; g.c += Math.round(Number(l.eur) * 100);
+  }
+  return { sansCle, groupes: Object.values(par).map((g) => ({ k: g.k, n: g.n, eur: g.c / 100 })).sort((a, b) => b.n - a.n || b.eur - a.eur || (a.k < b.k ? -1 : 1)) };
+};
+
+// « Ce qui part vite » : les groupes de `delaisPar` qui ont au moins une vente
+// datée, du plus court au plus long (médiane), à égalité le plus vendu d'abord.
+export const plusRapides = (D, max = 5) => {
+  if (!D || !Array.isArray(D.groupes)) return null;
+  return D.groupes.filter((g) => g.nDelai > 0 && g.mediane != null)
+    .sort((a, b) => a.mediane - b.mediane || b.nDelai - a.nDelai || (a.k < b.k ? -1 : 1)).slice(0, max);
+};

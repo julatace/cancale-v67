@@ -156,7 +156,8 @@ const capture = async (pg, nom) => { if (!CAPTURES) return; try { fs.mkdirSync(C
 // Ce que l'écran courant dit de lui-même (attributs, jamais un libellé).
 const etat = (pg) => pg.evaluate(() => {
   const t = document.querySelector('[data-tache]');
-  const f = t ? t.querySelector('[data-filtre-site]') : null;
+  // (31 oct.) Sur ordinateur la rangée monte dans la barre du haut (`DansBarreHaut`, maquette de Julien).
+  const f = t ? (t.querySelector('[data-filtre-site]') || document.querySelector('[data-barre-haut] [data-filtre-site]')) : null;
   return {
     tache: t ? t.getAttribute('data-tache') : '',
     site: t ? t.getAttribute('data-tache-site') : '',
@@ -171,7 +172,7 @@ const etat = (pg) => pg.evaluate(() => {
       .call(document.querySelector('[data-tache-sous] [aria-current="page"]'), 'data-section') || '',
     ecranAchats: (document.querySelector('[data-ecran-achats]') || { getAttribute: () => '' }).getAttribute('data-ecran-achats'),
     reglageOuvert: [...document.querySelectorAll('[data-sous-ecran]')].filter((x) => !x.hidden).map((x) => x.getAttribute('data-sous-ecran')).join(','),
-    colisSite: (document.querySelector('[data-colis-site] [aria-current="page"]') || { getAttribute: () => '' }).getAttribute('data-section'),
+    colisSite: (document.querySelector('[data-filtre-site="colis"] button[aria-pressed="true"]') || { getAttribute: () => '' }).getAttribute('data-site'),
   };
 });
 const choisir = async (pg, site) => { const b = pg.locator(`[data-filtre-site] button[data-site="${site}"]`); if (!(await b.count())) return false; await b.first().click(); await pg.waitForTimeout(900); return true; };
@@ -378,12 +379,17 @@ const choisir = async (pg, site) => { const b = pg.locator(`[data-filtre-site] b
       });
       await essaie(`${qui} : colis leboncoin`, async () => {
         const { ctx, pg, errs } = await ouvrir(b, tel, 'cat_bord');
-        const s1 = await pg.evaluate(() => [...document.querySelectorAll('[data-colis-site] [data-section]')].map((x) => x.getAttribute('data-section')));
-        dit(s1.join('|') === 'tous|leboncoin', 'L. Colis : sous-rangée Vinted et eBay · Leboncoin', s1.join('|'));
-        await pg.locator('[data-colis-site] [data-section="leboncoin"]').first().click(); await pg.waitForTimeout(700);
-        const e = await etat(pg);
-        const n = await pg.evaluate(() => document.querySelectorAll('[data-lbc-colis-vide], [data-bord-card]').length);
+        await pg.locator('[data-filtre-site="colis"] button[data-site="leboncoin"]').first().waitFor({ timeout: 10000 }).catch(() => {});
+        const s1 = await pg.evaluate(() => [...document.querySelectorAll('[data-filtre-site="colis"] button[data-site]')].map((x) => x.getAttribute('data-site')));
+        dit(s1.includes('toutes') && s1.includes('leboncoin'), 'L. Colis : la rangée de sites porte « Leboncoin »', s1.join('|'));
+        await pg.locator('[data-filtre-site="colis"] button[data-site="leboncoin"]').first().click(); await pg.waitForTimeout(900);
+        let e = await etat(pg);
+        const n = await pg.evaluate(() => document.querySelectorAll('[data-colis-leboncoin] [data-lbc-colis-vide], [data-colis-leboncoin] [data-bord-card]').length);
         dit(e.colisSite === 'leboncoin' && n > 0, 'L. Colis · Leboncoin rend les colis Leboncoin', JSON.stringify({ c: e.colisSite, n }));
+        await pg.locator('[data-filtre-site="colis"] button[data-site="vinted"]').first().click(); await pg.waitForTimeout(900);
+        e = await etat(pg);
+        const back = await pg.evaluate(() => ({ lbc: document.querySelectorAll('[data-colis-leboncoin]').length }));
+        dit(e.colisSite === 'vinted' && back.lbc === 0, 'L. Colis : une autre pastille ramène aux colonnes, filtrées sur son site', JSON.stringify({ c: e.colisSite, back }));
         dit(errs.length === 0, `${qui} : aucune erreur`, errs.join(' | '));
         await ctx.close();
       });
@@ -416,7 +422,7 @@ const choisir = async (pg, site) => { const b = pg.locator(`[data-filtre-site] b
           let bon;
           if (attendu.tache) bon = e.tache === attendu.tache && e.site === attendu.site && e.presse === attendu.site && (!attendu.section || (e.section === attendu.section && e.sousActif === attendu.section));
           else if (attendu.reglage) bon = !e.tache && e.reglageOuvert === attendu.reglage && await pg.evaluate(() => { const x = document.querySelector('[data-sous-ecran="ebay"]'); return !!(x && !x.hidden && x.querySelector('[data-ebay-compte-section]')); });
-          else if (attendu.colis) bon = !e.tache && e.colisSite === attendu.colis && await pg.evaluate(() => !!document.querySelector('[data-lbc-colis-vide], [data-bord-card]'));
+          else if (attendu.colis) bon = !e.tache && e.colisSite === attendu.colis && await pg.evaluate(() => !!document.querySelector('[data-colis-leboncoin] [data-lbc-colis-vide], [data-colis-leboncoin] [data-bord-card]'));
           else if (attendu.achats) bon = !e.tache && e.ecranAchats === attendu.achats;
           else bon = !e.blanc && !e.tache;
           bon = bon && !e.espace;

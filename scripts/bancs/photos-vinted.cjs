@@ -350,8 +350,22 @@ const mesurer = (pg) => pg.evaluate(() => {
 });
 const pont = (pg) => pg.evaluate(() => window.__pont ? { ...window.__pont, parUrl: { ...window.__pont.parUrl } } : null);
 const ouvrir = async (pg, onglet, ms = 6000) => { await pg.goto(`http://localhost:${PORT}/?tab=${onglet}`, { waitUntil: 'domcontentloaded' }); await pg.waitForTimeout(ms); };
+// (31 oct., navigation par tâche) Les « sections » de Vinted sont devenues des
+// TÂCHES : Ventes et Annonces sont des onglets de la navigation (barre du bas,
+// colonne), filtrés sur « Vinted » ; les achats Vinted s'ouvrent par la porte
+// « Tes achats Vinted › » sous la tâche. Toujours DANS la page (aucun
+// rechargement : le cache des photos et le pont restent ceux de la visite).
+const allerSection = async (pg, id) => {
+  if (id === 'achats') { await pg.locator('[data-espace-site="vinted"]:visible').first().click({ timeout: 8000 }); return; }
+  await pg.locator(`.vrm-mobile-nav [data-nav-entree="${id}"]:visible, .vrm-sidebar [data-nav-entree="${id}"]:visible`).first().click({ timeout: 8000 });
+  // Un seul site lu (Vinted) ⇒ pas de rangée de filtres : l'écran est déjà celui de Vinted.
+  await pg.waitForSelector(`[data-tache="${id}"]`, { timeout: 8000 });
+  const filtre = pg.locator(`[data-filtre-site="${id}"] button[data-site="vinted"]`);
+  if (await filtre.count()) await filtre.first().click({ timeout: 8000 });
+  await pg.waitForSelector(`[data-tache="${id}"][data-tache-site="vinted"]`, { timeout: 8000 });
+};
 const section = async (pg, id, ms = 4000) => {
-  try { await pg.click(`[data-section="${id}"]`, { timeout: 8000 }); }
+  try { await allerSection(pg, id); }
   catch (e) { await capture(pg, 'echec-section-' + id); console.error('Navigation photo :',e.message); throw e; }
   await pg.waitForTimeout(ms);
 };

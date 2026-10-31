@@ -116,6 +116,14 @@ const projette = (row, sel) => {
   return out;
 };
 
+// (31 oct.) Ouvrir une tâche (Ventes, Annonces…) par la navigation — la barre du
+// bas au téléphone, la colonne sur ordinateur — puis choisir le site au filtre.
+async function allerTache(pg, tache, site) {
+  await pg.locator(`.vrm-mobile-nav [data-nav-entree="${tache}"]:visible, .vrm-sidebar [data-nav-entree="${tache}"]:visible`).first().click({ timeout: 5000 }).catch(() => {});
+  await pg.waitForTimeout(500);
+  await pg.locator(`[data-filtre-site="${tache}"] button[data-site="${site}"]`).first().click({ timeout: 5000 }).catch(() => {});
+  await pg.waitForTimeout(500);
+}
 (async () => {
   let b;
   try {
@@ -155,6 +163,10 @@ const projette = (row, sel) => {
         if (eq) return j(rows.filter((r) => r.id === eq[1]).map(forme));
         const lk = /id=like\.([^&]*)/.exec(u);
         if (lk) { const re = new RegExp('^' + lk[1].replace(/[.]/g, '\\.').replace(/[*%]/g, '.*') + '$'); return j(rows.filter((r) => re.test(r.id)).map(forme)); }
+        // (31 oct.) La vraie forme d'une liste d'identifiants (`id=in.(a,b)`) : la
+        // navigation par tâche sonde ainsi les sites où il a un compte.
+        const dans = /id=in\.\(([^)]*)\)/.exec(u);
+        if (dans) { const ids = dans[1].split(','); return j(rows.filter((r) => ids.includes(r.id)).map(forme)); }
         return j([]);
       });
       await pg.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"pret":true}' }));
@@ -213,7 +225,9 @@ const projette = (row, sel) => {
       // ── BÉNÉFICE PAR VENTE (parité Vinted/eBay) : N° + bénéfice sur la carte,
       //    par identité seulement. t1 est reliée (lien → N°12, achat 30 €) → 55 € ;
       //    t2 n'est reliée à rien → ni N° ni bénéfice inventé (§5).
-      await pg.click('[data-section="ventes"]').catch(() => {});
+      // (31 oct., navigation par tâche) Les ventes Leboncoin sont « Ventes · Leboncoin » :
+      // l'onglet Ventes de la navigation, puis son filtre de site, comme une personne.
+      await allerTache(pg, 'ventes', 'leboncoin');
       await pg.waitForSelector('.vrm-sale-row', { timeout: 8000 }).catch(() => {});
       await pg.waitForTimeout(400);
       // Le N° est sur la carte compacte (titre) ; le bénéfice vit dans le tiroir
@@ -240,7 +254,7 @@ const projette = (row, sel) => {
       dit(tiroir.some((x) => /N°12/.test(x)), '… le N° de la paire reste dans le tiroir de la vente', JSON.stringify(tiroir));
       dit(ven.benefs.length === 1 && ven.benefs[0] === '55.00', 'son bénéfice (85 € − 30 € d’achat saisi) = 55,00 €, et la vente NON reliée n’en a aucun', JSON.stringify(ven.benefs));
       dit(ven.titres.some((t) => /Adidas Samba/.test(t) && !/N°/.test(t)), 'vente NON reliée : aucun N° inventé', JSON.stringify(ven.titres));
-      await pg.click('[data-section="annonces"]').catch(() => {});
+      await allerTache(pg, 'annonces', 'leboncoin');
       await pg.waitForSelector('[data-lbc-doublons], [data-lbc-ventes-a-relier]', { timeout: 8000 }).catch(() => {});
       await pg.waitForTimeout(300);
       try {
