@@ -133,7 +133,10 @@ const net = (x) => !!(x && x.attr === '0' && !x.flou && x.op > 0.9);
 const floue = (x) => !!(x && x.attr === '1' && x.flou && x.op < 0.6);
 const deborde = (pg) => pg.evaluate(() => ({ sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth }));
 const section = async (pg, k, attendre) => {
-  await pg.click(`[data-section="${k}"]`).catch(() => {});
+  // (31 oct., navigation par tâche) Annonces, Ventes, Messages sont des tâches filtrées
+  // sur Leboncoin ; Achats reste dans l'espace Leboncoin (« Plateformes »).
+  const url = k === 'achats' ? '?tab=plat_leboncoin&section=achats' : `?tab=${k}&site=leboncoin`;
+  await pg.goto(pg.url().split('?')[0] + url, { waitUntil: 'domcontentloaded' }).catch(() => {});
   await pg.waitForSelector(attendre, { timeout: 12000 }).catch(() => {});
   await pg.waitForTimeout(700);   // la lecture du compte ouvert (lbc_accounts) arrive à côté
 };

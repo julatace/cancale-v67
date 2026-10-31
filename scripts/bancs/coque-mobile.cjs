@@ -63,12 +63,16 @@ srv.on('error', (e) => { console.log('❌ le port ' + PORT + ' est pris (' + e.c
 const teintes = ['#d9d4cc', '#c9ced6', '#e2ddd4', '#cfd6cf', '#d8d0d6', '#d3d8de', '#ddd8cc', '#cdd2d8', '#d6d1c8'];
 const photoSvg = (k) => `<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400"><rect width="400" height="400" fill="${teintes[k % teintes.length]}"/><path d="M70 250 C90 190 150 180 190 200 C230 220 280 205 320 230 C345 245 340 280 300 282 L90 282 C70 282 62 268 70 250 Z" fill="rgba(30,34,40,.55)"/></svg>`;
 
+// (31 oct., navigation par tâche) La barre porte Journée · Annonces · Ventes ·
+// Colis · Plus. Les anciens liens (`plat_vinted`, `plat_ebay`) restent servis :
+// ils mènent à Ventes filtré sur leur site, la barre allume « Ventes ».
 const ECRANS = [
-  { tab: 'journee', bar: 'Accueil', titre: /journée|accueil|bonjour|bon après-midi|bonsoir/i },
-  { tab: 'plat_vinted', bar: 'Vinted', titre: /vinted/i },
-  { tab: 'plat_leboncoin', bar: 'Leboncoin', titre: /leboncoin/i },
-  { tab: 'settings', bar: 'Gestion', titre: /réglages|paramètres/i },
-  { tab: 'plat_ebay', bar: 'eBay', titre: /ebay/i },
+  { tab: 'journee', bar: 'Journée', titre: /journée|accueil|bonjour|bon après-midi|bonsoir/i },
+  { tab: 'plat_vinted', bar: 'Ventes', titre: /ventes/i },
+  { tab: 'annonces', bar: 'Annonces', titre: /annonces/i },
+  { tab: 'cat_bord', bar: 'Colis', titre: /colis/i },
+  { tab: 'settings', bar: 'Plus', titre: /réglages|paramètres/i },
+  { tab: 'plat_ebay', bar: 'Ventes', titre: /ventes/i },
 ];
 
 const ouvrir = async (b, vp, sombre, tab) => {
@@ -205,7 +209,7 @@ const finDePage = (pg) => pg.evaluate(async () => {
                 const t = await pg.evaluate(() => { const h = document.querySelector('.vrm-app-header'); const t = h && h.querySelector('[data-titre-ecran]'); return t ? Number(getComputedStyle(t).opacity) : -1; });
                 dit(t > 0.9, 'au défilement, le titre court apparaît dans l’en-tête', `opacité ${t}`);
                 if (SHOTS) await pg.screenshot({ path: path.join(SHOTS, `coque-${e.tab}-${vp.width}-${sombre ? 'sombre' : 'clair'}-defile.png`) });
-                await pg.locator('.vrm-mobile-nav').getByRole('button', { name: 'Gestion', exact: true }).tap();
+                await pg.locator('.vrm-mobile-nav').getByRole('button', { name: 'Plus', exact: true }).tap();
                 await pg.waitForTimeout(600);
                 const menu = await pg.evaluate(() => { const m = document.querySelector('[role="menu"]'); if (!m) return null; const r = m.getBoundingClientRect(); return { items: m.querySelectorAll('[role="menuitem"]').length, bas: Math.round(r.bottom), h: innerHeight, petits: [...m.querySelectorAll('[role="menuitem"]')].filter((b) => b.getBoundingClientRect().height < 43.5).length }; });
                 dit(menu && menu.items >= 5 && menu.petits === 0 && menu.bas <= menu.h + 1, 'la feuille « Ton espace » s’ouvre, rangées ≥ 44 px, dans l’écran', JSON.stringify(menu));

@@ -111,12 +111,13 @@ const INTERDITS = ['Collectif', 'Prix qui marche', 'Factures', 'Dans Vinted', 'A
       }
     }
     // (17 oct., Julien : « pourquoi il y a deux logos eBay quand on est dessus »)
-    // Le logo d'eBay est son nom écrit : devant le titre « eBay », le nom
-    // apparaissait deux fois. Une seule fois dans l'en-tête de l'onglet.
+    // (31 oct., navigation par tâche) `?tab=plat_ebay` mène à Ventes filtré sur
+    // eBay : le titre est la TÂCHE, eBay est écrit une fois (sa pastille), et
+    // aucun logo ne le répète.
     for (const tel of [true, false]) {
       const { ctx, pg } = await page(nav, tel, 'plat_ebay');
-      const e = await pg.evaluate(() => { const h = document.querySelector('[data-entete-plateforme="ebay"], .vrm-market-heading'); return h ? { logos: h.querySelectorAll('img[src*="ebay"]').length, titre: (h.querySelector('h1') || {}).innerText || '' } : null; });
-      dit(!!e && e.logos === 0 && e.titre === 'eBay', `${tel ? 'téléphone' : 'ordinateur'} : l’en-tête eBay écrit « eBay » une seule fois`, JSON.stringify(e));
+      const e = await pg.evaluate(() => { const s = document.querySelector('[data-tache]'); if (!s) return null; const h = s.querySelector('[data-tache-tete] h1'); const p = s.querySelector('[data-filtre-site] button[aria-pressed="true"]'); return { logos: s.querySelectorAll('[data-tache-tete] img[src*="ebay"], .vrm-market-heading img[src*="ebay"]').length, titre: h ? h.innerText.trim() : '', filtre: p ? p.innerText.trim() : '', entetes: s.querySelectorAll('[data-entete-plateforme]').length }; });
+      dit(!!e && e.logos === 0 && e.titre === 'Ventes' && e.filtre === 'eBay' && e.entetes === 0, `${tel ? 'téléphone' : 'ordinateur'} : ?tab=plat_ebay ouvre Ventes filtré sur eBay, « eBay » écrit une seule fois`, JSON.stringify(e));
       await ctx.close();
     }
     console.log('── téléphone : la feuille du menu');
@@ -124,10 +125,10 @@ const INTERDITS = ['Collectif', 'Prix qui marche', 'Factures', 'Dans Vinted', 'A
       const { ctx, pg } = await page(nav, true, 'journee');
       // (20 oct.) Depuis la coque iPhone (#596), l'en-tête garde un bouton
       // « Tous les écrans » CACHÉ sur téléphone : la feuille s'ouvre par
-      // « Gestion », dans la barre du bas. On vise le bouton VISIBLE, et on
+      // « Gestion », dans la barre du bas — « Plus » depuis le 31 octobre. On vise le bouton VISIBLE, et on
       // attend qu'il le soit (la porte de connexion peut prendre quelques secondes).
-      await pg.locator('button[aria-label="Gestion"]:visible, button[aria-label="Tous les écrans"]:visible').first().waitFor({ timeout: 12000 }).catch(() => {});
-      await clique(pg, 'button[aria-label="Gestion"]:visible, button[aria-label="Tous les écrans"]:visible', '');
+      await pg.locator('button[aria-label="Plus"]:visible, button[aria-label="Tous les écrans"]:visible').first().waitFor({ timeout: 12000 }).catch(() => {});
+      await clique(pg, 'button[aria-label="Plus"]:visible, button[aria-label="Tous les écrans"]:visible', '');
       const feuille = await pg.evaluate(() => { const m = document.querySelector('.vrm-sheet'); return m ? m.innerText : ''; });
       dit(!!feuille, 'la feuille du menu s’ouvre', '');
       for (const m of INTERDITS) dit(!feuille.includes(m), `la feuille ne porte plus « ${m} »`, feuille.replace(/\n+/g, ' · '));
