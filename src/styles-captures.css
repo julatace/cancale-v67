@@ -28,11 +28,19 @@
 }
 /* Une seule surface pour l'inbox et le fil, comme dans la référence. */
 @media(min-width:1000px){
- .vrm-message-workspace{display:grid!important;grid-template-columns:minmax(280px,34%) minmax(0,1fr)!important;align-items:stretch;gap:0!important;}
+ /* (30 oct., Edge) À 1024–1300 px la colonne faisait 280 px : ses filtres (340 px)
+    la faisaient défiler en largeur, « À répondre » sur deux lignes. Et la liste
+    (100dvh − 200) et le panneau (au moins 480/560 px) n'avaient pas la même
+    hauteur : un vide blanc sous la liste dans une fenêtre basse. UNE hauteur
+    pour les deux colonnes (`--vrm-msg-h`), plus aucun min-height fixe. */
+ .vrm-message-workspace{--vrm-msg-h:max(360px,min(740px,calc(100dvh - 200px)));display:grid!important;grid-template-columns:minmax(340px,36%) minmax(0,1fr)!important;align-items:stretch;gap:0!important;}
+ .vrm-message-workspace .vrm-inbox-filters{flex-wrap:wrap;}
+ .vrm-message-workspace .vrm-inbox-column{height:var(--vrm-msg-h);max-height:none!important;overflow-y:auto;box-sizing:border-box;}
+ .vrm-message-workspace .vrm-chat-empty{height:var(--vrm-msg-h)!important;min-height:0!important;box-sizing:border-box;}
  .vrm-message-workspace .vrm-inbox-column{min-width:0;}
  .vrm-message-workspace .vrm-chat-column{padding:0!important;min-width:0;}
  .vrm-message-workspace .vrm-chat-inline{position:sticky;top:12px;}
- .vrm-message-workspace .vrm-chat-panel{height:min(740px,calc(100dvh - 150px))!important;min-height:480px;}
+ .vrm-message-workspace .vrm-chat-panel{height:var(--vrm-msg-h)!important;min-height:0!important;max-height:none!important;}
  .vrm-message-workspace .vrm-chat-head{min-height:52px;padding:8px 14px;}
  .vrm-message-workspace .vrm-msg-ph{width:36px!important;height:36px!important;border-radius:50%!important;}
  .vrm-message-workspace .vrm-msg-ph img{border-radius:50%!important;}
@@ -245,6 +253,19 @@
 .vrm-chat-offre-traiter{display:block!important;}.vrm-chat-offre-actions{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;width:100%;margin-top:7px;}.vrm-chat-offre-actions button{min-width:0;max-width:100%;padding:7px 4px!important;font-size:11px!important;white-space:normal;overflow-wrap:anywhere;min-height:44px;}
 @media(max-width:600px){.vrm-sync-lignes article{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;}.vrm-sync-lignes article>strong{grid-column:1/-1;}.vrm-inbox-filters{flex-wrap:wrap;}}
 .vrm-msg-recherche-portee{font-size:11px;color:var(--vrm-muted);line-height:1.5;margin:0 0 9px;overflow-wrap:anywhere;}.vrm-msg-recherche-portee button{font:inherit;color:var(--vrm-ink);background:var(--vrm-surface);border:1px solid var(--vrm-line);border-radius:6px;min-height:32px;padding:4px 7px;}
+/* (29 oct.) « Retirer de la liste » : le geste dans l'en-tête du fil (44 px au doigt), et la ligne
+   unique sous la liste qui dit combien sont retirées, avec « Les remettre ». Sans couleur (§7). */
+.vrm-chat-retirer{display:inline-flex!important;align-items:center;gap:5px;height:44px!important;min-height:44px!important;max-height:none!important;min-width:44px;box-sizing:border-box;padding:0 10px!important;border:1px solid var(--vrm-line);border-radius:10px;background:transparent;font:600 12.5px Inter,system-ui,sans-serif;cursor:pointer;flex-shrink:0;white-space:nowrap;}
+/* (revue) Sur téléphone le mot « Retirer » RESTE : l'icône seule (un œil barré) se lisait « masquer ». */
+@media(max-width:420px){.vrm-chat-retirer{padding:0 8px!important;gap:4px;}.vrm-chat-retirer svg{display:none;}}
+.vrm-chat-offre-retirer,.vrm-chat-panel .vrm-chat-offre-retirer{display:block;width:100%;margin-top:8px;min-height:44px;padding:0 12px;border:1px solid var(--vrm-line);border-radius:10px;background:var(--vrm-surface);font:600 13px Inter,system-ui,sans-serif;cursor:pointer;}
+.vrm-msg-retirees{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;font-size:12px;line-height:1.45;margin:10px 0 0;padding:0 16px;box-sizing:border-box;overflow-wrap:anywhere;}
+/* (revue) Le sous-titre du fil : le titre de la paire se coupe, le compte jamais. */
+.vrm-chat-head-s{display:flex;min-width:0;}
+.vrm-chat-head-s .vrm-chat-head-titre{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.vrm-chat-head-s .vrm-chat-head-sep,.vrm-chat-head-s .vrm-chat-head-compte{flex-shrink:0;white-space:pre;}
+.vrm-chat-head-s .vrm-chat-head-compte{max-width:70%;overflow:hidden;text-overflow:ellipsis;}
+.vrm-msg-retirees button{font:600 12.5px Inter,system-ui,sans-serif;min-height:44px;padding:0 12px;border:1px solid var(--vrm-line);border-radius:10px;background:var(--vrm-surface);cursor:pointer;}
 /* 29 oct. — favoris : variables du message et offre « Diminuer / Fixer à » (comme Vintex). */
 .vrm-favoris-variables{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0 2px;}
 .vrm-favoris-variables button{min-height:44px;padding:6px 12px;border:1px solid var(--vrm-line);border-radius:6px;background:var(--vrm-surface);color:var(--vrm-ink);font:inherit;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:13px;}

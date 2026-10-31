@@ -218,8 +218,11 @@ async function brancher(p){
   // (21 oct.) Ouverte, elle se détaille dans un TIROIR (`aria-controls`).
   if((await ligneV.getAttribute('data-ligne-ouverte'))==='false') await ligneV.locator('.vrm-ledger-sale-toggle').click();
   const vente=p.locator(`[id="${await ligneV.locator('.vrm-ledger-sale-toggle').getAttribute('aria-controls')}"]`);
+  // (30 oct.) Coût inconnu : le champ « prix d'achat » de « Modifier » ne double
+  // plus « Saisir le prix » (même écriture, `saleOv[tx].buyPrice`) — on passe par lui.
+  await vente.locator('[data-cout-vente-saisir]').click();await vente.locator('[data-cout-vente-champ]').fill('40');await vente.locator('[data-cout-vente-ok]').click();
   await vente.locator('.vrm-sale-details > summary').click();
-  await vente.getByPlaceholder("prix d'achat",{exact:true}).fill('40');await vente.getByPlaceholder("prix d'achat",{exact:true}).press('Tab');
+  check(await vente.getByPlaceholder(/prix d'achat/).count()>0,'une fois le coût connu, « Modifier » propose de le corriger');
   await vente.getByText('Détail des frais et du bénéfice',{exact:true}).click();
   await vente.getByLabel('Commission plateforme',{exact:true}).fill('10,50');await vente.getByLabel('Commission plateforme',{exact:true}).press('Tab');
   await p.waitForFunction(()=>document.querySelector('.vrm-ledger-drawer-host:not([hidden]) .vrm-sale-price')?.textContent.includes('69,50'));

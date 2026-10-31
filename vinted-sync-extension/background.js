@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.285.0';
+const CODE_VERSION = '5.291.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -143,7 +143,7 @@ async function saveSession(sess) {
   VRM_SESSION = s;
   if (avant?.user_id !== s?.user_id) {
     try { _memoVisite.clear(); } catch (_) {}
-    try { await chrome.storage.local.remove(['vrmLogins','vrmCompteEcrit']); } catch (_) {}
+    try { await chrome.storage.local.remove(['vrmLogins','vrmCompteEcrit','vrmLbcARetirer']); } catch (_) {}
   }
   try {
     if (s) await chrome.storage.local.set({ [SESSION_STORE]: s });
@@ -1469,7 +1469,19 @@ function fusionnerConversation(avant, neuf) {
     if (!m || typeof m !== 'object') continue;
     const id = m.id ?? m.entity?.id;
     const cle = id == null || String(id).trim() === '' ? null : String(m.entity_type || '') + ':' + String(id);
-    if (cle != null && index.has(cle)) { const i = index.get(cle); messages[i] = { ...messages[i], ...m, ...(m.entity ? { entity: { ...(messages[i].entity || {}), ...m.entity } } : {}) }; }
+    if (cle != null && index.has(cle)) {
+      const i = index.get(cle), ancien = messages[i], entity = { ...(ancien.entity || {}), ...(m.entity || {}) };
+      if (m.entity_type === 'offer_request_message') {
+        // Identité immuable de l'offre : une contradiction ne se résout pas au hasard.
+        for (const k of ['transaction_id', 'offer_request_id'])
+          if (ancien.entity?.[k] != null && m.entity?.[k] != null && String(ancien.entity[k]) !== String(m.entity[k])) return null;
+        // Une copie en attente ne réouvre jamais la même offre déjà traitée/précédente.
+        if (entity.status === 10 && ([20,30].includes(ancien.entity?.status) || ancien.entity?.current === false || /expir|annul|cancel|retir/i.test(ancien.entity?.status_title || ''))) {
+          for (const k of ['status','status_title','current']) entity[k] = ancien.entity?.[k];
+        }
+      }
+      messages[i] = { ...ancien, ...m, ...(ancien.entity || m.entity ? {entity} : {}) };
+    }
     else { if (cle != null) index.set(cle, messages.length); messages.push(m); }
   }
   const ts = m => { const v = m.created_at_ts ?? m.entity?.created_at_ts ?? m.created_at ?? m.entity?.created_at; const num = Number(v); return v == null ? 0 : Number.isFinite(num) ? (num < 1e12 ? num * 1000 : num) : (Date.parse(v) || 0); };
@@ -1478,6 +1490,16 @@ function fusionnerConversation(avant, neuf) {
   return neuf.conversation ? { ...neuf, conversation } : conversation;
 }
 // END CONVERSATION PARTAGEE
+
+// L'id NUMÉRIQUE d'une réponse de conversation (`{conversation:{id}}` ou
+// `{id}`), sinon null.
+function idConversationReponse(parsed) {
+  const c = parsed && (parsed.conversation || parsed);
+  const v = c && c.id;
+  if (Number.isSafeInteger(v) && v > 0) return String(v);
+  if (typeof v === 'string' && /^[1-9]\d{0,19}$/.test(v)) return v;
+  return null;
+}
 
 async function conversationFusionnee(rowId, neuf) {
   const rows = await sbGet(`app_data?id=eq.${encodeURIComponent(rowId)}&select=p:data->payload`);
@@ -2069,6 +2091,22 @@ async function storeHarvest(domain, type, id, body, sourceUrl=null,tabId=null,so
     if (!pid || id == null || String(id) !== pid) { noterDiag('ignore_dressing_autre_membre'); return; }
   }
 
+  // (29 octobre) LA CONVERSATION EST RANGÉE SOUS SON ID NUMÉRIQUE. La page peut
+  // la charger par l'UUID que portent les commandes (`conversation_id`) ; l'app
+  // et la boîte de réception, elles, la connaissent par son id numérique
+  // (`harvest_{uid}_conv_{id}`). C'est la RÉPONSE qui le dit
+  // (`conversation.id`) — une identité, jamais une ressemblance (§5) :
+  //   · adresse par UUID ⇒ rangée sous l'id numérique de la réponse ; sans id
+  //     numérique lisible, rien n'est rangé (mieux vaut un blanc qu'un faux) ;
+  //   · adresse numérique et réponse qui porte un AUTRE id ⇒ rien (doute).
+  if (type === 'conversation') {
+    const idRep = idConversationReponse(parsed);
+    if (!/^\d{1,20}$/.test(String(id == null ? '' : id))) {
+      if (!idRep) { noterDiag('ignore_conversation_sans_id_numerique'); return; }
+      id = idRep;
+    } else if (idRep && idRep !== String(id)) { noterDiag('ignore_conversation_id_different'); return; }
+  }
+
   // Cle de ligne app_data selon le type de donnee.
   let rowId;
   if (type === 'conversation' && id) rowId = `harvest_${uid}_conv_${id}`;
@@ -2284,7 +2322,19 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     recevoirCookiesPage(msg, sender).then(sendResponse, () => sendResponse({ ok: false }));
     return true;
   }
+  // 5.290 : une page de suivi d'un transporteur est ouverte (transp-page.js).
+  // Le message ne porte AUCUN n° : le fond le tire de l'adresse de l'onglet.
+  if (msg && msg.from === 'vrm-transp' && msg.action === 'transpVu') {
+    transpVu(msg, sender).then(sendResponse, () => sendResponse({ ok: false }));
+    return true;
+  }
   if (!msg || msg.from !== 'cancale-content') {
+    // 5.290 : la fenêtre de l'icône demande si la lecture des transporteurs est
+    // permise ICI (Firefox peut ne pas l'accorder) — et les sites à demander.
+    if (msg && msg.from === 'cancale-popup' && msg.action === 'transpPermis') {
+      permisTransp().then((p) => sendResponse({ ok: true, permis: p === null ? null : transpTousPermis(p), origines: transpOrigines() }), () => sendResponse({ ok: false }));
+      return true;
+    }
     // FRAÎCHEUR : pour chaque compte, quand ses annonces ont-elles été captées
     // pour la dernière fois ? C'est LA question qui compte — un compte capté
     // mais dont le dressing date de trois semaines fait raconter n'importe quoi
@@ -2499,6 +2549,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           if (msg.action === 'saveDetail' && msg.id && msg.detail) { await saveItemDetail(msg.id, msg.detail); sendResponse({ ok: true }); return; }
           if (msg.action === 'numeroPourPublier') { sendResponse(await reserverNumeroPourOnglet(sender && sender.tab ? sender.tab.id : null, msg.domain || 'www.vinted.fr')); return; }
           if (msg.action === 'numeros') {
+            if (!await numerosPermisDansPage(sender)) { sendResponse({ok:true,items:{},convs:{},txs:{},portee:'hors_compte'}); return; }
             const m = await numerosPourAffichage();
             if (!m) { sendResponse({ ok: false }); return; }
             const pick = (src, ids) => { const o = {}; for (const id of (Array.isArray(ids) ? ids.slice(0, 400) : [])) if (src[String(id)]) o[String(id)] = src[String(id)]; return o; };
@@ -2802,7 +2853,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           }
           if (msg.action === 'lbcRaw' && msg.body) {
             if(/\/compte\/(?:part|pro)\/mes-annonces/i.test(String(msg.url))){try{const u=new URL(msg.url),t=new URL(sender.url||sender.tab?.url);if(sender.frameId>0||u.origin+u.pathname!==t.origin+t.pathname){sendResponse({ok:false});return;}}catch(_){sendResponse({ok:false});return;}}
-            const r=await handleLbcRaw(msg.url,msg.body,msg.session);if(r&&(r.etat==='enregistre'||/\/adfinder\/v\d+\/myads\b|\/classifieds\/analysis\/list|\/compte\/(?:part|pro)\/mes-annonces/i.test(String(msg.url))))await noterReceptionLbc('annonces',r,sender);sendResponse(r||{ok:true,etat:'sans-annonce'});return;
+            const r=await handleLbcRaw(msg.url,msg.body,msg.session);if(r&&(r.etat==='enregistre'||/\/adfinder\/v\d+\/myads\b|\/classifieds\/analysis\/list|\/dashboard\/v\d+\/search|\/compte\/(?:part|pro)\/mes-annonces/i.test(String(msg.url))))await noterReceptionLbc('annonces',r,sender);sendResponse(r||{ok:true,etat:'sans-annonce'});return;
           }
           // 22 oct. : une liste COMPLÈTE d'un vendeur (toutes les pages, total
           // atteint — prouvé par la page, voir lbc-inject.js). Seulement depuis le
@@ -2818,6 +2869,28 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
             if (!miens.has(owner) && !miens.has('lbc-account:' + owner)) { noterDiag('lbc_liste_complete_autrui'); sendResponse({ ok: true }); return; }
             await noterListeLbcComplete(owner, ids, total);
             sendResponse({ ok: true }); return;
+          }
+          // 29 oct. : une suppression / mise en pause faite par Julien SUR LA PAGE
+          // Leboncoin (réponse 2xx vue par lbc-inject.js). Seulement depuis le
+          // cadre principal d'un onglet leboncoin.fr ; seules SES annonces sont
+          // marquées (voir `noterRetraitVuLbc`).
+          if (msg.action === 'lbcRetraitVu') {
+            const tabUrl = (sender && sender.tab && sender.tab.url) || '';
+            const ids = Array.isArray(msg.ids) ? msg.ids.map(String) : null;
+            const statut = Number(msg.statut);
+            if ((sender && sender.frameId > 0) || !/^https:\/\/(?:[a-z0-9-]+\.)*leboncoin\.fr\//i.test(tabUrl) || !ids || !ids.length || ids.length > 50
+              || ids.some((x) => !/^\d{5,15}$/.test(x)) || !(msg.quoi === 'supprime' || msg.quoi === 'pause') || !(statut >= 200 && statut < 300)) { sendResponse({ ok: false }); return; }
+            const r = await noterRetraitVuLbc(ids, msg.quoi, statut);
+            sendResponse({ ok: !!(r && r.ok) }); return;
+          }
+          // 29 oct. : les statistiques d'UNE de SES annonces (page « Statistiques »
+          // de leboncoin.fr) — des nombres, jamais qui. Cadre principal d'un
+          // onglet leboncoin.fr seulement.
+          if (msg.action === 'lbcStatsAnnonce') {
+            const tabUrl = (sender && sender.tab && sender.tab.url) || '';
+            if ((sender && sender.frameId > 0) || !/^https:\/\/(?:[a-z0-9-]+\.)*leboncoin\.fr\//i.test(tabUrl) || !/^\d{5,15}$/.test(String(msg.id || ''))) { sendResponse({ ok: false }); return; }
+            const r = await noterStatsAnnonceLbc(String(msg.id), msg);
+            sendResponse({ ok: !!(r && r.ok) }); return;
           }
           // LA VENTE LEBONCOIN : détail transaction / commande / livraison. On
           // range un échantillon capé par famille d'endpoint, pour voir la FORME
@@ -2928,7 +3001,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     storeWriteReq(domain,msg.method,msg.url,msg.body,msg.contexteFavori,sender?.frameId>0?null:sender?.tab?.id).then(()=>sendResponse({ok:true}),()=>sendResponse({ok:false}));
     return true;
   } else if (msg.kind === 'seen_urls' && Array.isArray(msg.paths)) {
-    storeSeenUrls(domain, msg.paths, msg.reponses);
+    storeSeenUrls(domain, msg.paths, msg.reponses, msg.conversation);
   } else if (msg.kind === 'suppression' && msg.itemId) {
     noterSuppression(domain, msg.itemId, msg.status, msg.at);
   } else if (msg.kind === 'publication') {
@@ -3002,10 +3075,92 @@ async function noterStatutsOffres(parsed) {
   } catch (_) { /* purement diagnostique : ne doit jamais gêner la capture */ }
 }
 
+// <chemin-regle> (29 octobre) — la MÊME dans la page et dans le fond (§11).
+  // Mesuré en base : les pages d'une conversation appellent un contrôle
+  // anti-hameçonnage dont le chemin porte un UUID, qui passait EN CLAIR dans
+  // `seen_urls` (17 à 55 clés de ce genre par compte) — un identifiant réel, et
+  // une clé de plus par conversation ouverte. Un UUID devient `{uuid}`, une
+  // longue suite hexadécimale `{hex}`, un nombre de 3 chiffres ou plus `{id}`.
+  function cheminNormalise(p) {
+    return String(p == null ? '' : p)
+      .replace(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi, '{uuid}')
+      .replace(/\/(?=[0-9a-f]*\d)[0-9a-f]{20,}(?=\/|$)/gi, '/{hex}')
+      .replace(/\/\d{3,}/g, '/{id}');
+  }
+  // </chemin-regle>
+
+// La fusion du relevé (29 octobre) — une fonction pure.
+// ⚠️⚠️ ELLE GARDAIT LES 400 PREMIÈRES CLÉS, donc les PLUS ANCIENNES : mesuré
+//    en base, des comptes portent déjà plusieurs centaines de clés (dont une
+//    par conversation ouverte, l'UUID en clair) ; une fois le plafond atteint,
+//    un chemin vu pour la première fois — justement ce que ce relevé doit
+//    attraper — ne serait plus jamais rangé. Désormais :
+//    · chaque clé (ancienne ou neuve) passe par `cheminNormalise` : les UUID
+//      d'avant se fondent en une seule clé `{uuid}` ;
+//    · pour une même clé, l'entrée la plus RÉCENTE (`at`) gagne ;
+//    · on garde les 400 réponses les plus récentes, et les 600 chemins les plus
+//      récemment vus (ceux de ce passage d'abord).
+//    · `conversation` (le relevé de la page d'une conversation, `inject.js`) :
+//      fusionné par clé, le plus récent gagne, une forme déjà vue n'est jamais
+//      perdue, bornes par construction.
+const SEEN_REP_MAX = 400, SEEN_PATHS_MAX = 600;
+const SEEN_CONV_REQ_MAX = 80, SEEN_CONV_CANAUX_MAX = 20, SEEN_CONV_PAGES_MAX = 20;
+function fusionnerSeen(cur, paths, reponses, conversation) {
+  const ms = (e) => { const t = Date.parse((e && e.at) || ''); return Number.isFinite(t) ? t : 0; };
+  const cleRep = (k) => { const t = String(k == null ? '' : k); const i = t.indexOf(' '); return (i > 0 ? t.slice(0, i + 1) + cheminNormalise(t.slice(i + 1)) : cheminNormalise(t)).slice(0, 220); };
+  const plusRecent = (a, b) => (!a ? b : !b ? a : ms(b) >= ms(a) ? b : a);
+  // les réponses
+  const rep = {};
+  for (const src of [(cur && cur.reponses) || {}, reponses || {}]) {
+    if (!src || typeof src !== 'object') continue;
+    for (const [k, v] of Object.entries(src)) { if (!v || typeof v !== 'object') continue; const c = cleRep(k); rep[c] = plusRecent(rep[c], v); }
+  }
+  const reponsesOut = {};
+  for (const [k, v] of Object.entries(rep).sort((a, b) => ms(b[1]) - ms(a[1])).slice(0, SEEN_REP_MAX)) reponsesOut[k] = v;
+  // les chemins : ceux de ce passage (le plus récent d'abord), puis les anciens
+  const vus = new Set(), pathsOut = [];
+  const neufs = (Array.isArray(paths) ? paths : []).slice().reverse();
+  for (const p of [...neufs, ...(Array.isArray(cur && cur.paths) ? cur.paths : [])]) {
+    const n = cheminNormalise(p).slice(0, 300);
+    if (!n || vus.has(n)) continue;
+    vus.add(n); pathsOut.push(n);
+    if (pathsOut.length >= SEEN_PATHS_MAX) break;
+  }
+  // le relevé de la page d'une conversation
+  let conv = (cur && cur.conversation && typeof cur.conversation === 'object') ? cur.conversation : null;
+  if (conversation && typeof conversation === 'object' && JSON.stringify(conversation).length <= 200000) {
+    const fusion = (a, b, max) => {
+      const t = {};
+      for (const src of [a || {}, b || {}]) {
+        if (!src || typeof src !== 'object') continue;
+        for (const [k, v] of Object.entries(src)) {
+          if (!v || typeof v !== 'object') continue;
+          const c = cleRep(k);
+          const av = t[c], neuf = plusRecent(av, v);
+          // une forme déjà vue (messages, tête) n'est jamais perdue
+          t[c] = Object.assign({}, neuf, (!neuf.messages && av && av.messages) ? { messages: av.messages } : {}, (!neuf.tete && av && av.tete) ? { tete: av.tete } : {});
+        }
+      }
+      const o = {};
+      for (const [k, v] of Object.entries(t).sort((x, y) => ms(y[1]) - ms(x[1])).slice(0, max)) o[k] = v;
+      return o;
+    };
+    conv = {
+      req: fusion(conv && conv.req, conversation.req, SEEN_CONV_REQ_MAX),
+      canaux: fusion(conv && conv.canaux, conversation.canaux, SEEN_CONV_CANAUX_MAX),
+      pages: fusion(conv && conv.pages, conversation.pages, SEEN_CONV_PAGES_MAX),
+      next: (conversation.next && typeof conversation.next === 'object') ? conversation.next : ((conv && conv.next) || null),
+    };
+  }
+  const out = { paths: pathsOut, reponses: reponsesOut };
+  if (conv) out.conversation = conv;
+  return out;
+}
+
 // Diagnostic : liste des CHEMINS d'API que le site appelle réellement (aucun
 // contenu, aucun paramètre). Sert à repérer tout de suite quand Vinted déplace
 // un endpoint — c'est ce qui avait rendu la moisson muette pendant 18 jours.
-async function storeSeenUrls(domain, paths, reponses) {
+async function storeSeenUrls(domain, paths, reponses, conversation) {
   const uid = await activeAccountId(domain);
   if (!uid) return;
   if (await compteNonCapte(uid)) return;
@@ -3021,16 +3176,14 @@ async function storeSeenUrls(domain, paths, reponses) {
   const rows = await sbGet(`app_data?id=eq.harvest_${uid}_seen_urls&select=data`);
   if (rows === null) return;
   const cur = (rows[0] && rows[0].data) || {};
-  const tous = new Set([...(Array.isArray(cur.paths) ? cur.paths : []), ...paths]);
-  const rep = Object.assign({}, cur.reponses || {}, reponses || {});
-  // Bornes par construction : un diagnostic ne doit jamais grossir sans fin.
-  const repBorne = {};
-  for (const k of Object.keys(rep).slice(0, 400)) repBorne[k] = rep[k];
-  const data = { uid, paths: Array.from(tous).slice(0, 600), reponses: repBorne,
-    capturedAt: new Date().toISOString(), ver: EXT_VERSION };
+  // Bornes par construction : un diagnostic ne doit jamais grossir sans fin
+  // (`fusionnerSeen` : les plus RÉCENTS gardés, les clés normalisées).
+  const f = fusionnerSeen(cur, paths, reponses, conversation);
+  const data = Object.assign({ uid }, f, { capturedAt: new Date().toISOString(), ver: EXT_VERSION });
   // Rien de neuf → on ne repousse pas la même ligne.
-  if (JSON.stringify(data.paths) === JSON.stringify(cur.paths || [])
-      && JSON.stringify(repBorne) === JSON.stringify(cur.reponses || {})) return;
+  if (JSON.stringify(f.paths) === JSON.stringify(cur.paths || [])
+      && JSON.stringify(f.reponses) === JSON.stringify(cur.reponses || {})
+      && JSON.stringify(f.conversation || null) === JSON.stringify(cur.conversation || null)) return;
   await supabaseUpsert('app_data', [{ id: `harvest_${uid}_seen_urls`, data }], 'id');
 }
 
@@ -3343,10 +3496,23 @@ async function lierPublicationsEnAttente() {
   _numsAffichage = null;
   notifierApp({ type: 'maj', quoi: 'annonces' });
 }
+// Une visite d'un autre profil ne doit afficher aucun numéro de rangement.
+async function numerosPermisDansPage(sender) {
+  let u; try { u = new URL(sender?.tab?.url || sender?.url || ''); } catch { return false; }
+  if (u.protocol !== 'https:' || !/^(?:www\.)?vinted\.(?:fr|com|it|de)$/.test(u.hostname)) return false;
+  const membre = /^\/member\/(\d+)(?:[-/]|$)/.exec(u.pathname);
+  if (!membre) return !/^\/member(?:\/|$)/.test(u.pathname);
+  const uid = await activeAccountId(u.host);
+  if (!uid) return false;
+  const profil = await profilIdRange(uid);
+  return !!profil && String(profil) === membre[1];
+}
 // Les numéros à AFFICHER sur Vinted, par identité seulement (cache 2 min).
 let _numsAffichage = null;
 async function numerosPourAffichage() {
-  if (_numsAffichage && Date.now() - _numsAffichage.at < 120000) return _numsAffichage;
+  const owner = String((await loadSession())?.user_id || '');
+  if (!owner) return null;
+  if (_numsAffichage && _numsAffichage.owner === owner && Date.now() - _numsAffichage.at < 120000) return _numsAffichage;
   const main = await lireMain(['vinted_annonce_numeros', 'vinted_sale_overrides']);
   if (main === null) return null;
   const r = await lireResa();
@@ -3361,7 +3527,8 @@ async function numerosPourAffichage() {
     const tx = o && o.transaction_id != null ? String(o.transaction_id) : '', cv = o && o.conversation_id != null ? String(o.conversation_id) : '';
     if (tx && cv && parTx[tx]) parConv[cv] = parTx[tx];
   }
-  _numsAffichage = { at: Date.now(), parItem, parTx, parConv };
+  if (String((await loadSession())?.user_id || '') !== owner) return null;
+  _numsAffichage = { owner, at: Date.now(), parItem, parTx, parConv };
   return _numsAffichage;
 }
 // <supprimees-regle> — LA MÊME RÈGLE QUE L'APP (src/App.jsx), §11 ; comparées par
@@ -5851,6 +6018,41 @@ function contratSuivi(a) {
     }
   };
   cherche(a, '', 0);
+  // (29 oct.) LE TRANSPORTEUR COURANT. Le suivi d'un achat (`journey_summary`)
+  // nomme ses transporteurs par un CODE (`current_carrier.code`, `carriers[].code`,
+  // `is_current`) et jamais par un nom : `transporteur` restait `null` sur ses
+  // 7 suivis rangés (mesuré), et un n° Vinted Go sans e-mail n'était jamais lu
+  // chez le transporteur. On prend `current_carrier`, sinon l'UNIQUE entrée de
+  // `carriers[]` marquée `is_current: true` (deux ⇒ aucune : pas deviné), et SON
+  // n° (`tracking_code`) avec lui — un trajet à deux transporteurs ne mêle
+  // jamais le code de l'un au n° de l'autre. Le code n'est gardé que s'il a la
+  // forme d'un code machine (lettre d'abord, sans espace) ; s'il n'y a pas de n°
+  // dans cet objet, on garde le n° trouvé ailleurs et on ne nomme personne.
+  const courant = (v, prof) => {
+    if (prof > 8 || !v || typeof v !== 'object' || Array.isArray(v)) return null;
+    for (const k of Object.keys(v)) {
+      const x = v[k];
+      if (/^current_carrier$/i.test(k) && x && typeof x === 'object' && !Array.isArray(x)) return x;
+      if (/^carriers$/i.test(k) && Array.isArray(x)) {
+        const c = x.filter((e) => e && typeof e === 'object' && !Array.isArray(e) && e.is_current === true);
+        if (c.length === 1) return c[0];
+      }
+    }
+    for (const k of Object.keys(v)) {
+      const x = v[k];
+      if (Array.isArray(x)) { for (const y of x) { const r = courant(y, prof + 1); if (r) return r; } continue; }
+      const r = courant(x, prof + 1); if (r) return r;
+    }
+    return null;
+  };
+  const cc = courant(a, 0);
+  if (cc) {
+    let nom = null;
+    for (const k of ['name', 'title', 'label']) { const x = cc[k]; if (typeof x === 'string' && x.trim() && !/^\d+$/.test(x.trim())) { nom = x.trim().slice(0, 80); break; } }
+    const code = typeof cc.code === 'string' && /^[A-Za-z][A-Za-z0-9_.:-]{1,39}$/.test(cc.code.trim()) ? cc.code.trim() : null;
+    const n = suiviNumero(cc.tracking_code != null ? cc.tracking_code : cc.tracking_number);
+    if ((nom || code) && n) { transporteur = nom || code; suivi = n; }
+  }
   return { etapes: toutes, dernier: datees.length ? datees[0] : null, transporteur, suivi };
 }
 // </suivi-regle>
@@ -6968,7 +7170,7 @@ function alarmeSiAbsente(nom, opts) {
 // ouvert, on complète tout seul (Julien, 29 sept.). Voir `tickPhotos`.
 // 5.183 : le relais du téléphone (`vrm-relais`, 30 s, le minimum de Chrome).
 // Rien ne part sans session VRM (voir `relaisTick`).
-const PERIODES = { 'cancale-sync': 10, 'cancale-active': 20, 'vrm-session': 40, 'vrm-photos': 1, 'vrm-relais': 0.5, 'vrm-lbc': 30, 'vrm-offres': 1 };
+const PERIODES = { 'cancale-sync': 10, 'cancale-active': 20, 'vrm-session': 40, 'vrm-photos': 1, 'vrm-relais': 0.5, 'vrm-lbc': 30, 'vrm-offres': 1, 'vrm-transp': 30 };
 function surAlarme(a) {
   if (a.name === 'cancale-sync') captureAllAccounts();
   else if (a.name === 'cancale-active') runActive();
@@ -6977,6 +7179,8 @@ function surAlarme(a) {
   else if (a.name === 'vrm-relais') relaisTick('alarme');
   else if (a.name === 'vrm-lbc') relireLbcEnFond().catch(() => {});
   else if (a.name === 'vrm-offres') offresTick();
+  // 5.290 : le statut des colis chez le transporteur (voir `transpTick`).
+  else if (a.name === 'vrm-transp') transpTick('alarme');
   // Le tampon de diagnostic survit au worker (chrome.storage.local) ; encore
   // faut-il qu'il PARTE un jour. Sans ce réveil, un tampon posé juste avant
   // une longue période calme attendrait la prochaine capture pour être écrit.
@@ -7027,6 +7231,564 @@ if (CAP.alarms) {
   try { setInterval(() => { rattraperMinuteries(true); }, 30000); } catch (_) {}
   rattraperMinuteries(true);
 }
+
+// <transporteurs>
+// ══════════════════════════════════════════════════════════════════════════
+// LE STATUT DU COLIS CHEZ LE TRANSPORTEUR, LU DEPUIS CE NAVIGATEUR (5.290)
+// ══════════════════════════════════════════════════════════════════════════
+// Julien, 24 octobre : « tu as juste à regarder sur le site du transporteur, je
+// ne te demande pas le code de retrait mais juste de regarder le statut » (il
+// s'est déplacé pour un colis déjà reparti).
+// La RÈGLE vit au serveur (une seule, §11) : il dit QUELS n° lire (C3,
+// `transp-a-lire`), et c'est lui qui juge la réponse (C4, `transp-brut`). Ici on
+// ne fait que la LIRE, depuis le navigateur de Julien, et la RELAYER telle quelle.
+// L'extension n'interprète rien : ni « retiré », ni « disponible », ni « reparti ».
+//
+// ⚠️⚠️ CE NAVIGATEUR N'EST QU'UN SECOURS. Le SERVEUR lit lui-même Chronopost
+//    (`cp-ws2`), Vinted Go (`vg-v3`) et Mondial Relay par la route `_mvc` de
+//    mondialrelay.fr (`mr-fr-mvc`, n° + code postal du relais — mesuré le 24 et
+//    le 29 oct. depuis dub1, User-Agent honnête, 15 lectures sur 15 en 200).
+//    Ce que le transporteur REFUSE au serveur arrive ici par C3 ; ce navigateur
+//    le lit avec SON User-Agent (jamais changé) et SES cookies, puis relaie la
+//    réponse brute. Pour Mondial Relay, C3 annonce `mr-fr-mvc` : la `.be` (page
+//    puis API, `mr-be`) n'est que son REPLI — et réciproquement (29 oct.).
+//
+// LES GARDE-FOUS — aucun n'est celui de Vinted, et aucun ne le touche :
+//   · session VRM exigée, sinon AUCUNE requête (ni VRM, ni transporteur) ;
+//   · `permissions.contains` par site : non accordée ⇒ on se tait (Firefox peut
+//     les laisser non accordées en MV3 — la fenêtre de l'icône les demande) ;
+//     l'API absente ⇒ « pas su » ⇒ on se tait aussi ;
+//   · une LISTE BLANCHE d'adresses EXACTES (`TRANSP_URL_PERMISES`), relue au
+//     seul point d'appel réseau (`appelTransp`) ; une redirection n'est pas
+//     suivie (`redirect: 'error'`) : aucune autre adresse, jamais ;
+//   · une requête à la fois (`unTranspALaFois`), 2 s d'écart FIXE (jamais
+//     aléatoire), 10 s de délai, corps lu au plus sur ce que le SERVEUR lit
+//     lui-même (Mondial Relay 192 Ko, les autres 64 Ko — `corpsMaxTransp`) ;
+//   · un budget PROPRE : 12 requêtes par heure et par transporteur
+//     (`vrmTranspCompte`) — jamais `requeteVinted`, `gardeLecture`,
+//     `compterLecture` ni `compterAction` : un transporteur n'est pas Vinted, une
+//     pause de Vinted ne l'arrête pas, et un 403 d'un transporteur ne met JAMAIS
+//     Vinted en pause ;
+//   · une pause PAR VOIE (`vrmTranspPause`, `chrome.storage.local`, §4.9) sur
+//     403, 429, défi (`cf-mitigated`, « Just a moment »), HTML au lieu de JSON
+//     ou de XML, et 401 de Mondial Relay : 30 min, 1 h, 2 h, 6 h, 24 h (le palier
+//     monte si le transporteur refuse encore dans les 24 h qui suivent), ou
+//     `Retry-After` s'il est plus long ; elle tombe à la première lecture réussie.
+//     Chronopost et Vinted Go ont une voie chacun ; Mondial Relay en a deux
+//     (`mr-fr-mvc` et `mr-be`, chacune REPLI de l'autre — `TRANSP_REPLIS`),
+//     pour qu'un refus de l'une n'éteigne pas l'autre.
+// ⚠️ Le `Referer` de la page .be n'est PAS envoyé : c'est un en-tête interdit à
+//    `fetch`, et un `referrer` d'une autre origine est remplacé par le
+//    navigateur. On ne le fabrique pas (`declarativeNetRequest` demanderait une
+//    permission de plus pour maquiller un en-tête). Si l'API .be le refuse, le
+//    repli `/_mvc/…` de mondialrelay.fr (mesuré sans jeton ni Referer) prend la
+//    suite — et le serveur doit savoir le lire (sinon il répond 400 `voie`, et
+//    la voie n'est plus essayée pendant 24 h).
+const TRANSP_API = 'https://vrm.center/api/relais';
+const TRANSP_VOIES = {
+  'mr-be': { carrier: 'mondialrelay', origine: 'https://www.mondialrelay.be/*', attendu: 'json' },
+  'mr-fr-mvc': { carrier: 'mondialrelay', origine: 'https://www.mondialrelay.fr/*', attendu: 'json' },
+  'cp-ws2': { carrier: 'chronopost', origine: 'https://ws.chronopost.fr/*', attendu: 'xml' },
+  'vg-v3': { carrier: 'vinted', origine: 'https://carrier.vintedgo.com/*', attendu: 'json' },
+};
+const TRANSP_CARRIERS = ['mondialrelay', 'chronopost', 'vinted'];
+// La FORME d'un n° par transporteur (celles mesurées chez lui) — c'est elle qui
+// borne ce qui entre dans une adresse.
+// ⚠️⚠️ (29 octobre) LA MÊME QUE CELLE DU SERVEUR (`FORME_SUIVI`, api/_lib/
+//    transporteurs.js — §11) : le serveur annonce en C3 ce qu'il a lui-même jugé
+//    lisible. Chronopost acceptait ici `\d{14}[0-9A-Z]` (15 caractères exigés)
+//    quand le serveur dit `\d{14}[0-9A-Z]?` : un n° de 14 chiffres que le
+//    serveur confiait à ce navigateur était refusé en silence
+//    (`transp_item_refuse`), jamais lu. `audit-transp-ext` compare les SORTIES
+//    des deux règles sur les mêmes n° ; la liste blanche des adresses en DÉRIVE
+//    (une forme, un seul endroit).
+const TRANSP_FORME = {
+  mondialrelay: /^\d{8}$/,
+  chronopost: /^(?:[A-Z]{2}\d{9}[A-Z]{2}|\d{14}[0-9A-Z]?)$/,
+  // (29 oct.) + 12 chiffres, comme `FORME_SUIVI.vinted` du serveur (deux de ses
+  // e-mails Vinted Go en portent ; c'est l'exemple de la page de Vinted Go) :
+  // le serveur le confiait en C3 et ce navigateur le refusait en silence
+  // (`transp_item_refuse`) — un colis lu par personne. La page de suivi
+  // Vinted Go ouverte (`transpDeAdresse`) et la liste blanche en dérivent.
+  vinted: /^(?:\d{16}|VGS\d{13}|[0-9A-Z]{13}|\d{12})$/,
+};
+const TRANSP_CP = /^\d{5}$/;
+const MR_BE_PAGE = 'https://www.mondialrelay.be/fr-be/suivi-de-colis/';
+// Le corps d'une forme, sans ses ancres (`^…$`), pour l'insérer dans une adresse.
+const formeSansAncres = (re) => re.source.replace(/^\^/, '').replace(/\$$/, '');
+const TRANSP_URL_PERMISES = [
+  /^https:\/\/www\.mondialrelay\.be\/fr-be\/suivi-de-colis\/$/,
+  new RegExp(`^https:\\/\\/www\\.mondialrelay\\.be\\/api\\/tracking\\?shipment=(?:${formeSansAncres(TRANSP_FORME.mondialrelay)})&postcode=\\d{5}&brand=&codePays=$`),
+  new RegExp(`^https:\\/\\/www\\.mondialrelay\\.fr\\/_mvc\\/fr-FR\\/SuiviExpedition\\/RechercherJsonResponsive\\?NumeroExpedition=(?:${formeSansAncres(TRANSP_FORME.mondialrelay)})&CodePostal=\\d{5}$`),
+  new RegExp(`^https:\\/\\/ws\\.chronopost\\.fr\\/tracking-cxf\\/TrackingServiceWS\\/trackSkybillV2\\?language=fr_FR&skybillNumber=(?:${formeSansAncres(TRANSP_FORME.chronopost)})$`),
+  new RegExp(`^https:\\/\\/carrier\\.vintedgo\\.com\\/public\\/v3\\/tracking_events\\/(?:${formeSansAncres(TRANSP_FORME.vinted)})$`),
+];
+const urlTranspPermise = (u) => TRANSP_URL_PERMISES.some((re) => re.test(String(u || '')));
+const TRANSP_MAX_HEURE = 12;            // requêtes par heure ET par transporteur
+const TRANSP_MAX_PAR_PASSAGE = 6;       // le contrat C3 n'en donne pas plus
+const TRANSP_ECART_MS = 2000;           // écart FIXE entre deux requêtes
+const TRANSP_DELAI_MS = 10000;
+const TRANSP_CORPS_MAX = 65536;         // octets du corps relayé (Chronopost, Vinted Go : `CORPS_MAX` du serveur)
+const TRANSP_ENVOI_MAX = 80 * 1024;     // octets du POST vers VRM (C4, contrat d'origine : corps ≤ 64 Ko)
+// ⚠️⚠️ (29 octobre) MONDIAL RELAY : LE MÊME PLAFOND QUE LE SERVEUR. Le serveur
+//    lit la réponse `_mvc` sur 192 Ko (`CORPS_MAX_MR`, api/_lib/transporteurs-
+//    lecture.js : ~45 Ko pour 14 évènements). Ce navigateur la COUPAIT à 64 Ko :
+//    au-delà, un JSON tronqué, que le serveur ne peut que ranger « forme ».
+//    Lu et relayé sur 192 Ko ; le POST monte à 256 Ko pour Mondial Relay. Un
+//    serveur dont C4 est encore borné à 64 Ko répond 413 : le corps est alors
+//    renvoyé UNE fois, borné au contrat d'origine (comme avant, « forme »).
+//    `audit-transp-ext` compare ces valeurs à celles du serveur.
+const TRANSP_CORPS_MAX_MR = 196608;     // `CORPS_MAX_MR` du serveur (192 Ko)
+const TRANSP_ENVOI_MAX_MR = TRANSP_CORPS_MAX_MR + 64 * 1024;
+const corpsMaxTransp = (carrier) => (carrier === 'mondialrelay' ? TRANSP_CORPS_MAX_MR : TRANSP_CORPS_MAX);
+const envoiMaxTransp = (carrier) => (carrier === 'mondialrelay' ? TRANSP_ENVOI_MAX_MR : TRANSP_ENVOI_MAX);
+// Les REPLIS par voie : Mondial Relay a deux routes, chacune essayée quand
+// l'autre est refusée (403, 429, défi, HTML, 401), en pause, ou sans jeton —
+// dans le MÊME budget (12 par heure et par transporteur) et la MÊME file (une
+// requête à la fois). C3 annonce `mr-fr-mvc` (la route que le serveur lit) :
+// avant le 29 octobre, `mr-be` n'était tenté qu'en repli de… `mr-be`, donc
+// jamais, et un `_mvc` refusé à ce navigateur restait « bloqué » sans repli.
+const TRANSP_REPLIS = { 'mr-fr-mvc': ['mr-be'], 'mr-be': ['mr-fr-mvc'] };
+const TRANSP_TICK_MIN_MS = 5 * 60000;   // au plus un C3 toutes les 5 min
+const TRANSP_VU_MS = 5 * 60000;         // une page de suivi : un même n° au plus 1 fois / 5 min
+const TRANSP_ROUTE_ABSENTE_MS = 6 * 3600000;
+const TRANSP_VOIE_REFUSEE_MS = 24 * 3600000;
+const TRANSP_JETON_MS = 10 * 60000;
+const TRANSP_PAUSES_MS = [30, 60, 120, 360, 1440].map((m) => m * 60000);
+const TRANSP_PAUSE_OUBLI_MS = 24 * 3600000;
+const TRANSP_RETRY_MAX_MS = 48 * 3600000;
+const TRANSP_PAUSE_STORE = 'vrmTranspPause';
+const TRANSP_COMPTE_STORE = 'vrmTranspCompte';
+const TRANSP_TICK_STORE = 'vrmTranspTick';
+const TRANSP_VUS_STORE = 'vrmTranspVus';
+const TRANSP_VOIES_REFUSEES = 'vrmTranspVoiesRefusees';
+const normaliserSuiviTransp = (v) => String(v == null ? '' : v).toUpperCase().replace(/[\s -]+/g, '');
+
+// L'adresse d'une voie, fabriquée ICI seulement (et relue par la liste blanche).
+function urlTransp(voie, suivi, cp) {
+  const v = TRANSP_VOIES[voie];
+  const n = normaliserSuiviTransp(suivi), c = String(cp == null ? '' : cp);
+  if (!v || !TRANSP_FORME[v.carrier].test(n)) return null;
+  if (voie === 'mr-be') return TRANSP_CP.test(c) ? `https://www.mondialrelay.be/api/tracking?shipment=${n}&postcode=${c}&brand=&codePays=` : null;
+  if (voie === 'mr-fr-mvc') return TRANSP_CP.test(c) ? `https://www.mondialrelay.fr/_mvc/fr-FR/SuiviExpedition/RechercherJsonResponsive?NumeroExpedition=${n}&CodePostal=${c}` : null;
+  if (voie === 'cp-ws2') return `https://ws.chronopost.fr/tracking-cxf/TrackingServiceWS/trackSkybillV2?language=fr_FR&skybillNumber=${n}`;
+  if (voie === 'vg-v3') return `https://carrier.vintedgo.com/public/v3/tracking_events/${n}`;
+  return null;
+}
+// Un élément de C3 (ou de `besoinNavigateur`) : refusé en entier s'il ne tient
+// pas — voie inconnue, voie qui ne va pas avec le transporteur, n° hors forme,
+// Mondial Relay sans code postal (on n'essaie jamais un autre code).
+function itemTranspValide(x) {
+  if (!x || typeof x !== 'object') return null;
+  const carrier = String(x.carrier || ''), voie = String(x.voie || '');
+  const v = TRANSP_VOIES[voie];
+  if (!v || v.carrier !== carrier) return null;
+  const suivi = normaliserSuiviTransp(x.suivi);
+  if (!TRANSP_FORME[carrier].test(suivi)) return null;
+  const cp = x.cp == null ? '' : String(x.cp);
+  if (cp && !TRANSP_CP.test(cp)) return null;
+  if (carrier === 'mondialrelay' && !cp) return null;
+  return { carrier, voie, suivi, cp: carrier === 'mondialrelay' ? cp : '' };
+}
+
+// ── LA PERMISSION, MESURÉE PAR SITE ─────────────────────────────────────────
+// `true` · `false` · `null` (« pas su » : l'API manque, ou ne répond pas).
+function permisOrigine(origine) {
+  return new Promise((res) => {
+    let p = null; try { p = chrome.permissions; } catch (_) { p = null; }
+    if (!p || typeof p.contains !== 'function') { res(null); return; }
+    let fini = false;
+    const fin = (v) => { if (fini) return; fini = true; res(v === true ? true : v === false ? false : null); };
+    try {
+      const r = p.contains({ origins: [origine] }, (v) => { try { void chrome.runtime.lastError; } catch (_) {} fin(v); });
+      if (r && typeof r.then === 'function') r.then(fin, () => fin(null));
+    } catch (_) { fin(null); }
+  });
+}
+// { voie: true|false } pour les quatre voies, ou `null` si une seule n'a pas pu
+// être mesurée (on ne décide rien sur « pas su »).
+// Les quatre questions partent ENSEMBLE (1 s au plus en tout) : l'état que l'app
+// lit toutes les 20 s ne doit pas attendre une API qui se tait.
+async function permisTransp() {
+  const voies = Object.keys(TRANSP_VOIES);
+  const vals = await Promise.all(voies.map((voie) => avecDelai(permisOrigine(TRANSP_VOIES[voie].origine), 1000, null)));
+  if (vals.some((v) => v === null)) return null;
+  const out = {};
+  voies.forEach((voie, i) => { out[voie] = vals[i]; });
+  return out;
+}
+// Chaque transporteur a-t-il au moins une voie permise ?
+const transpTousPermis = (p) => !!p && TRANSP_CARRIERS.every((c) => Object.keys(TRANSP_VOIES).some((v) => TRANSP_VOIES[v].carrier === c && p[v] === true));
+const transpOrigines = () => [...new Set(Object.values(TRANSP_VOIES).map((v) => v.origine))];
+
+// ── UNE À LA FOIS, ÉCART FIXE ───────────────────────────────────────────────
+let _chaineTransp = Promise.resolve();
+function unTranspALaFois(fn) {
+  const suite = _chaineTransp.then(() => fn(), () => fn());
+  _chaineTransp = suite.then(() => {}, () => {});
+  return suite;
+}
+let _transpDernierA = 0;                 // fin de la dernière requête (simple repère d'écart)
+function dormirTransp(ms) { return new Promise((r) => setTimeout(r, ms)); }
+
+// ── LA PAUSE, PAR VOIE (chrome.storage.local, §4.9) ─────────────────────────
+async function lirePausesTransp() {
+  try { return (await chrome.storage.local.get(TRANSP_PAUSE_STORE))[TRANSP_PAUSE_STORE] || {}; } catch (_) { return null; }
+}
+// En pause, ou « pas su » (stockage illisible) : on ne lit pas.
+async function pauseTransp(voie) {
+  const p = await lirePausesTransp();
+  if (p === null) return true;
+  const e = p[voie];
+  return !!(e && Number(e.jusqua) > Date.now());
+}
+function retryAfterMs(v) {
+  const s = String(v == null ? '' : v).trim();
+  if (!s) return 0;
+  if (/^\d+$/.test(s)) return Math.min(Number(s) * 1000, TRANSP_RETRY_MAX_MS);
+  const t = Date.parse(s);
+  return isFinite(t) ? Math.max(0, Math.min(t - Date.now(), TRANSP_RETRY_MAX_MS)) : 0;
+}
+async function poserPauseTransp(voie, rep, raison) {
+  const p = await lirePausesTransp();
+  if (p === null) return;
+  const t = Date.now(), cur = p[voie] || {};
+  if (Number(cur.jusqua || 0) > t) return;                        // déjà en pause : rien ne monte
+  const recent = Number(cur.jusqua || 0) > 0 && t - Number(cur.jusqua) < TRANSP_PAUSE_OUBLI_MS;
+  const palier = recent ? Math.min(TRANSP_PAUSES_MS.length - 1, Number(cur.palier || 0) + 1) : 0;
+  const duree = Math.max(TRANSP_PAUSES_MS[palier], retryAfterMs(rep && rep.retryAfter));
+  const statut = Number(rep && rep.statut) || 0;
+  p[voie] = { jusqua: t + duree, palier, dernier: { statut, ctype: String((rep && rep.ctype) || '').slice(0, 60), raison: String(raison || ''), at: t } };
+  try { await chrome.storage.local.set({ [TRANSP_PAUSE_STORE]: p }); } catch (_) {}
+  noterDiag(`transp_bloque_${TRANSP_VOIES[voie].carrier}_${statut}`);
+}
+async function leverPauseTransp(voie) {
+  const p = await lirePausesTransp();
+  if (!p || !p[voie]) return;
+  delete p[voie];
+  try { await chrome.storage.local.set({ [TRANSP_PAUSE_STORE]: p }); } catch (_) {}
+}
+
+// ── LE BUDGET, PAR TRANSPORTEUR ─────────────────────────────────────────────
+// Toujours appelé DANS la chaîne : aucune course entre deux lectures.
+async function prendreBudgetTransp(carrier) {
+  let c;
+  try { c = (await chrome.storage.local.get(TRANSP_COMPTE_STORE))[TRANSP_COMPTE_STORE] || {}; } catch (_) { return false; }
+  const t = Date.now();
+  const l = (Array.isArray(c[carrier]) ? c[carrier] : []).filter((x) => t - Number(x) < 3600000);
+  if (l.length >= TRANSP_MAX_HEURE) { noterDiag(`transp_budget_${carrier}`); return false; }
+  l.push(t); c[carrier] = l;
+  try { await chrome.storage.local.set({ [TRANSP_COMPTE_STORE]: c }); } catch (_) { return false; }
+  return true;
+}
+
+// Le corps, lu sur `max` octets au plus (jamais tout un corps géant en mémoire).
+async function lireCorpsBorne(r, max) {
+  try {
+    if (r && r.body && typeof r.body.getReader === 'function') {
+      const lecteur = r.body.getReader(); const morceaux = []; let n = 0;
+      for (;;) {
+        const { done, value } = await lecteur.read();
+        if (done) break;
+        morceaux.push(value); n += value.byteLength;
+        if (n >= max) { try { await lecteur.cancel(); } catch (_) {} break; }
+      }
+      const tout = new Uint8Array(Math.min(n, max)); let o = 0;
+      for (const m of morceaux) { const k = Math.min(m.byteLength, tout.length - o); tout.set(m.subarray(0, k), o); o += k; if (o >= tout.length) break; }
+      return new TextDecoder('utf-8').decode(tout, { stream: true });
+    }
+  } catch (_) {}
+  const texte = await r.text();
+  const b = new TextEncoder().encode(texte);
+  return b.byteLength <= max ? texte : new TextDecoder('utf-8').decode(b.subarray(0, max), { stream: true });
+}
+
+// LE SEUL POINT D'APPEL RÉSEAU VERS UN TRANSPORTEUR. Rend la réponse brute
+// `{ statut, ctype, corps, cfMitigated, retryAfter }`, ou `{ echec }` : 'url'
+// (hors liste blanche) · 'pause' · 'budget' · 'reseau' (rien reçu).
+async function appelTransp(url, init, voie) {
+  if (!urlTranspPermise(url)) { noterDiag('transp_url_refusee'); return { echec: 'url' }; }
+  const v = TRANSP_VOIES[voie];
+  if (!v) return { echec: 'url' };
+  if (await pauseTransp(voie)) return { echec: 'pause' };
+  const reste = TRANSP_ECART_MS - (Date.now() - _transpDernierA);
+  if (_transpDernierA && reste > 0) await dormirTransp(reste);
+  if (!(await prendreBudgetTransp(v.carrier))) return { echec: 'budget' };
+  const ctrl = new AbortController();
+  const minuterie = setTimeout(() => { try { ctrl.abort(); } catch (_) {} }, TRANSP_DELAI_MS);
+  try {
+    const r = await fetch(url, Object.assign({}, init, { signal: ctrl.signal, redirect: 'error', cache: 'no-store' }));
+    const entete = (k) => { try { return (r.headers && r.headers.get(k)) || ''; } catch (_) { return ''; } };
+    const corps = await lireCorpsBorne(r, corpsMaxTransp(v.carrier));
+    return { statut: Number(r.status) || 0, ctype: entete('content-type'), corps: String(corps || ''), cfMitigated: entete('cf-mitigated'), retryAfter: entete('retry-after') };
+  } catch (_) {
+    noterDiag(`transp_reseau_${v.carrier}`);
+    return { echec: 'reseau' };
+  } finally { clearTimeout(minuterie); _transpDernierA = Date.now(); }
+}
+// UN REFUS DU TRANSPORTEUR (une page de blocage, pas un état du colis) :
+// 'statut' · 'defi' · 'html', ou `null`. C'est tout ce que l'extension juge.
+function refusTransp(rep, attendu, voie) {
+  const s = Number(rep && rep.statut) || 0;
+  if (s === 403 || s === 429) return 'statut';
+  if (s === 401 && TRANSP_VOIES[voie] && TRANSP_VOIES[voie].carrier === 'mondialrelay') return 'statut';
+  if (rep && rep.cfMitigated) return 'defi';
+  const debut = String((rep && rep.corps) || '').slice(0, 8000);
+  const html = /text\/html/i.test(String((rep && rep.ctype) || '')) || /^\s*<(?:!doctype\s+html|html)\b/i.test(debut);
+  if (html && /just a moment|challenge-platform|attention required|cf-chl|_cf_chl_opt|cf-error-details/i.test(debut)) return 'defi';
+  if (attendu !== 'html' && html && debut.trim()) return 'html';
+  return null;
+}
+
+// UNE VOIE, LUE. `{ rep }` (réponse à juger par le serveur), `{ rep, bloque }`
+// (refus : la voie est en pause), `{ rep, forme }` (page sans jeton), `{ echec }`.
+let _mrJeton = null;                     // { v, at } — un simple cache (10 min)
+async function lireMrBe(it) {
+  const deCache = !!(_mrJeton && Date.now() - _mrJeton.at < TRANSP_JETON_MS);
+  let jeton = deCache ? _mrJeton.v : '';
+  for (let essai = 0; essai < 2; essai++) {
+    if (!jeton) {
+      const p = await appelTransp(MR_BE_PAGE, { method: 'GET', credentials: 'include', headers: { Accept: 'text/html' } }, 'mr-be');
+      if (p.echec) return p;
+      const refus = refusTransp(p, 'html', 'mr-be');
+      if (refus) { await poserPauseTransp('mr-be', p, refus); return { rep: p, bloque: true }; }
+      const m = /id="tracking"[^>]*\btoken="([^"]+:[^"]+)"/.exec(p.corps || '');
+      const v = m ? m[1] : '';
+      if (!(p.statut === 200 && v && v.length <= 512 && /^[\w\-:+/=.]+$/.test(v))) { noterDiag('transp_forme_mondialrelay_page'); return { rep: p, forme: true }; }
+      jeton = v; _mrJeton = { v, at: Date.now() };
+    }
+    const url = urlTransp('mr-be', it.suivi, it.cp);
+    const a = await appelTransp(url, { method: 'GET', credentials: 'include', headers: { Accept: 'application/json', RequestVerificationToken: jeton } }, 'mr-be');
+    if (a.echec) return a;
+    // Un jeton GARDÉ qui ne vaut plus (cookies renouvelés) : une page neuve, une fois.
+    if (a.statut === 401 && deCache && essai === 0) { _mrJeton = null; jeton = ''; continue; }
+    const refus = refusTransp(a, 'json', 'mr-be');
+    if (refus) { _mrJeton = null; await poserPauseTransp('mr-be', a, refus); return { rep: a, bloque: true }; }
+    if (a.statut >= 200 && a.statut < 300) await leverPauseTransp('mr-be');
+    return { rep: a };
+  }
+  return { echec: 'jeton' };
+}
+const INIT_VOIE = {
+  'mr-fr-mvc': { method: 'GET', credentials: 'include', headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' } },
+  'cp-ws2': { method: 'GET', credentials: 'omit', headers: { Accept: 'text/xml, application/xml;q=0.9, */*;q=0.1' } },
+  'vg-v3': { method: 'GET', credentials: 'omit', headers: { Accept: 'application/json', 'Accept-Language': 'fr' } },
+};
+async function lireVoieTransp(voie, it) {
+  if (voie === 'mr-be') return lireMrBe(it);
+  const url = urlTransp(voie, it.suivi, it.cp);
+  if (!url || !INIT_VOIE[voie]) return { echec: 'url' };
+  const rep = await appelTransp(url, JSON.parse(JSON.stringify(INIT_VOIE[voie])), voie);
+  if (rep.echec) return rep;
+  const refus = refusTransp(rep, TRANSP_VOIES[voie].attendu, voie);
+  if (refus) { await poserPauseTransp(voie, rep, refus); return { rep, bloque: true }; }
+  if (rep.statut >= 200 && rep.statut < 300) await leverPauseTransp(voie);
+  return { rep };
+}
+
+// Les voies que le serveur a refusées (400 `voie`) : plus essayées 24 h.
+async function voiesRefusees() {
+  try { return (await chrome.storage.local.get(TRANSP_VOIES_REFUSEES))[TRANSP_VOIES_REFUSEES] || {}; } catch (_) { return null; }
+}
+async function noterVoieRefusee(voie) {
+  const v = (await voiesRefusees()) || {};
+  v[voie] = Date.now();
+  try { await chrome.storage.local.set({ [TRANSP_VOIES_REFUSEES]: v }); } catch (_) {}
+}
+
+// ── LES ÉCHANGES AVEC VRM (C3, C4, C5) — la session du vendeur, toujours ──
+async function appelVrmTransp(mode, jeton, corps) {
+  const ctrl = new AbortController();
+  const t = setTimeout(() => { try { ctrl.abort(); } catch (_) {} }, 12000);
+  try {
+    const r = await fetch(`${TRANSP_API}?mode=${mode}`, corps === undefined
+      ? { method: 'GET', signal: ctrl.signal, headers: { Authorization: `Bearer ${jeton}`, Accept: 'application/json' } }
+      : { method: 'POST', signal: ctrl.signal, headers: { Authorization: `Bearer ${jeton}`, 'Content-Type': 'application/json', Accept: 'application/json' }, body: corps });
+    let j = null; try { j = await r.json(); } catch (_) { j = null; }
+    return { status: Number(r.status) || 0, j };
+  } catch (_) { return { status: 0, j: null }; } finally { clearTimeout(t); }
+}
+// C4 : la réponse brute, telle quelle (bornée), au serveur qui la juge.
+// `corpsMax` / `envoiMax` : le plafond du corps relayé et du POST (celui du
+// transporteur, puis — sur un 413 d'un serveur encore borné — le contrat d'origine).
+function corpsC4(it, voie, rep, source, corpsMax, envoiMax) {
+  const enc = new TextEncoder();
+  const brut = String((rep && rep.corps) || '');
+  let corps = brut;
+  const corpsDe = (octets) => new TextDecoder('utf-8').decode(enc.encode(brut).subarray(0, octets), { stream: true });
+  if (enc.encode(corps).byteLength > corpsMax) corps = corpsDe(corpsMax);
+  const fabriquer = () => JSON.stringify(Object.assign({ v: 1, carrier: it.carrier, suivi: it.suivi },
+    it.carrier === 'mondialrelay' ? { cp: it.cp } : {},
+    { voie, statut: Number(rep && rep.statut) || 0, ctype: String((rep && rep.ctype) || '').slice(0, 120), corps, at: new Date().toISOString(), source }));
+  let body = fabriquer();
+  for (let i = 0; i < 6 && enc.encode(body).byteLength > envoiMax; i++) {
+    const trop = enc.encode(body).byteLength - envoiMax;
+    corps = corpsDe(Math.max(0, enc.encode(corps).byteLength - trop - 256));
+    body = fabriquer();
+  }
+  return { body, octetsCorps: enc.encode(corps).byteLength, octetsEnvoi: enc.encode(body).byteLength };
+}
+async function relayerTransp(it, voie, rep, source, jeton) {
+  const premier = corpsC4(it, voie, rep, source, corpsMaxTransp(it.carrier), envoiMaxTransp(it.carrier));
+  let { status, j } = await appelVrmTransp('transp-brut', jeton, premier.body);
+  // Un serveur dont C4 est encore borné au contrat d'origine (corps ≤ 64 Ko,
+  // POST ≤ 80 Ko) refuse un corps Mondial Relay plus gros (413) : renvoyé UNE
+  // fois, borné comme avant — jamais pour un envoi qui tenait déjà dans ce contrat.
+  if (status === 413 && (premier.octetsCorps > TRANSP_CORPS_MAX || premier.octetsEnvoi > TRANSP_ENVOI_MAX)) {
+    noterDiag('transp_envoi_413_borne');
+    ({ status, j } = await appelVrmTransp('transp-brut', jeton, corpsC4(it, voie, rep, source, TRANSP_CORPS_MAX, TRANSP_ENVOI_MAX).body));
+  }
+  if (status === 200 && j && j.ok) {
+    // (tour 2 n° 11) « Lu » seulement si le SERVEUR a pu juger la réponse (`ok`) :
+    // une réponse 2xx tronquée ou d'une forme inattendue (`forme`) n'est pas une
+    // lecture — elle est comptée à part, pour qu'on la voie.
+    if (j.res === 'ok') noterDiag(`transp_lu_${it.carrier}`);
+    else noterDiag(`transp_relaye_${String(j.res || 'inconnu').replace(/[^a-z-]/g, '').slice(0, 20) || 'inconnu'}_${it.carrier}`);
+    if (j.change === true) notifierApp({ type: 'maj', quoi: 'transp', carrier: it.carrier, suivi: it.suivi });
+    return { relaye: true, res: j.res || '', etat: j.etat || null, change: j.change === true };
+  }
+  if (status === 400 && j && j.error === 'voie') await noterVoieRefusee(voie);
+  noterDiag(`transp_envoi_ko_${status || 'reseau'}`);
+  return { relaye: false, status };
+}
+// UN N°, LU DEPUIS CE NAVIGATEUR puis relayé. Mondial Relay : la voie annoncée
+// par C3 (`mr-fr-mvc`), puis son repli (`mr-be`, page puis API) si elle est
+// refusée, en pause ou sans jeton (et seulement alors) — `TRANSP_REPLIS`. On ne
+// relaie QUE la dernière réponse obtenue.
+async function lireTransporteurNavigateur(item, source) {
+  const it = itemTranspValide(item);
+  if (!it) { noterDiag('transp_item_refuse'); return { lu: false, raison: 'item' }; }
+  const s0 = await loadSession();
+  if (!s0 || s0.mort || !(s0.access_token || s0.refresh_token)) return { lu: false, raison: 'session' };
+  const permis = await permisTransp();
+  if (permis === null) return { lu: false, raison: 'permission-passu' };
+  const tok = await authToken();
+  if (!tok || !tok.access_token) return { lu: false, raison: 'session' };
+  return unTranspALaFois(async () => {
+    const refusees = await voiesRefusees();
+    const voies = [it.voie].concat(TRANSP_REPLIS[it.voie] || [])
+      .filter((v) => permis[v] === true && !(refusees && Date.now() - Number(refusees[v] || 0) < TRANSP_VOIE_REFUSEE_MS));
+    if (!voies.length) { noterDiag(permis[it.voie] === true ? 'transp_voie_refusee' : 'transp_sans_permission'); return { lu: false, raison: 'voie' }; }
+    let dernier = null;
+    for (const voie of voies) {
+      const r = await lireVoieTransp(voie, it);
+      if (r.echec) { if (r.echec === 'budget') break; continue; }
+      dernier = { voie, rep: r.rep };
+      if (!r.bloque && !r.forme) break;                // une réponse à juger : pas de repli
+    }
+    if (!dernier) return { lu: false, raison: 'rien' };
+    const fin = await relayerTransp(it, dernier.voie, dernier.rep, source, tok.access_token);
+    return Object.assign({ lu: true, voie: dernier.voie, statut: dernier.rep.statut }, fin);
+  });
+}
+
+// ── LE PASSAGE : à chaque visite Vinted, et toutes les 30 min ────────────
+async function gardeTickTransp(force) {
+  let g;
+  try { g = (await chrome.storage.local.get(TRANSP_TICK_STORE))[TRANSP_TICK_STORE] || {}; } catch (_) { return false; }
+  const t = Date.now();
+  if (Number(g.routeAbsenteA || 0) && t - Number(g.routeAbsenteA) < TRANSP_ROUTE_ABSENTE_MS) return false;
+  if (!force && Number(g.at || 0) && t - Number(g.at) < TRANSP_TICK_MIN_MS) return false;
+  g.at = t;
+  try { await chrome.storage.local.set({ [TRANSP_TICK_STORE]: g }); } catch (_) { return false; }
+  return true;
+}
+async function noterRouteAbsente() {
+  try { await chrome.storage.local.set({ [TRANSP_TICK_STORE]: { at: Date.now(), routeAbsenteA: Date.now() } }); } catch (_) {}
+}
+let _transpTickEnVol = null;
+function transpTick(source, force) {
+  if (_transpTickEnVol) return _transpTickEnVol;
+  _transpTickEnVol = transpTickUn(source, force).catch(() => ({ erreur: true })).finally(() => { _transpTickEnVol = null; });
+  return _transpTickEnVol;
+}
+async function transpTickUn(source, force) {
+  // AUCUN réseau sans session : on regarde d'abord le stockage local.
+  const s0 = await loadSession();
+  if (!s0 || s0.mort || !(s0.access_token || s0.refresh_token)) return { saute: 'session' };
+  // `null` (l'API manque ou se tait) : « pas su », on se tait SANS le compter
+  // comme un refus ; faux partout : la permission n'est pas accordée (C8).
+  const permis = await permisTransp();
+  if (permis === null) return { saute: 'permission-passu' };
+  if (!Object.values(permis).some(Boolean)) { noterDiag('transp_sans_permission'); return { saute: 'permission' }; }
+  if (!(await gardeTickTransp(force))) return { saute: 'recent' };
+  const tok = await authToken();
+  if (!tok || !tok.access_token) return { saute: 'session' };
+  const { status, j } = await appelVrmTransp('transp-a-lire', tok.access_token);
+  if (status === 404 || status === 405) { await noterRouteAbsente(); return { saute: 'route' }; }
+  if (status !== 200 || !j || j.v !== 1 || !Array.isArray(j.items)) { noterDiag(`transp_a_lire_ko_${status || 'reseau'}`); return { saute: 'pas-su', status }; }
+  const issues = [];
+  for (const item of j.items.slice(0, TRANSP_MAX_PAR_PASSAGE)) issues.push(await lireTransporteurNavigateur(item, 'extension').catch(() => ({ lu: false, raison: 'erreur' })));
+  return { lu: true, n: issues.length, issues };
+}
+
+// ── LA PAGE DE SUIVI OUVERTE (transp-page.js) : la lire TOUT DE SUITE ───────
+// Le message ne porte AUCUN n° : on le tire de l'adresse de l'onglet, que
+// Chrome pose lui-même (`sender.url`), après avoir vérifié le site.
+function transpDeAdresse(adresse) {
+  let u; try { u = new URL(String(adresse || '')); } catch (_) { return null; }
+  if (u.protocol !== 'https:') return null;
+  const h = u.hostname.toLowerCase(), q = u.searchParams;
+  const prendre = (...noms) => { for (const n of noms) { const v = q.get(n); if (v != null && v !== '') return v; } return ''; };
+  if (h === 'www.mondialrelay.fr' || h === 'www.mondialrelay.be') {
+    const n = normaliserSuiviTransp(prendre('numeroExpedition', 'NumeroExpedition'));
+    const cp = String(prendre('codePostal', 'CodePostal')).replace(/\s+/g, '');
+    if (!TRANSP_FORME.mondialrelay.test(n)) return null;
+    return { carrier: 'mondialrelay', suivi: n, cp: TRANSP_CP.test(cp) ? cp : '' };
+  }
+  if (h === 'www.chronopost.fr' && /^\/tracking-no-cms\//.test(u.pathname)) {
+    const liste = String(prendre('listeNumerosLT')).split(/[,;\s]+/).map(normaliserSuiviTransp).filter(Boolean);
+    if (liste.length !== 1 || !TRANSP_FORME.chronopost.test(liste[0])) return null;
+    return { carrier: 'chronopost', suivi: liste[0], cp: '' };
+  }
+  if (h === 'vintedgo.com') {
+    const m = /^\/[a-z]{2}(?:-[a-z]{2})?\/tracking\/([^/?#]+)\/?$/i.exec(u.pathname);
+    let n = '';
+    try { n = normaliserSuiviTransp(m ? decodeURIComponent(m[1]) : prendre('trackingNumber')); } catch (_) { n = ''; }
+    if (!TRANSP_FORME.vinted.test(n)) return null;
+    return { carrier: 'vinted', suivi: n, cp: '' };
+  }
+  return null;
+}
+async function transpVu(msg, sender) {
+  if (!sender || !sender.tab || (sender.frameId != null && sender.frameId !== 0)) return { ok: false, raison: 'cadre' };
+  const vu = transpDeAdresse(sender.url || sender.tab.url);
+  // Pas une page de suivi (accueil, autre page du site) : rien, et rien de noté
+  // (le script tourne sur tout le site, ce serait du bruit à chaque page).
+  if (!vu) return { ok: false, raison: 'adresse' };
+  noterDiag(`transp_vu_${vu.carrier}`);
+  const s0 = await loadSession();
+  if (!s0 || s0.mort || !(s0.access_token || s0.refresh_token)) return { ok: false, raison: 'session' };
+  // Une fois par n° toutes les 5 min (une page qui se recharge ne relance rien).
+  let vus;
+  try { vus = (await chrome.storage.local.get(TRANSP_VUS_STORE))[TRANSP_VUS_STORE] || {}; } catch (_) { return { ok: false, raison: 'stockage' }; }
+  const cle = `${vu.carrier}:${vu.suivi}`, t = Date.now();
+  if (Number(vus[cle] || 0) && t - Number(vus[cle]) < TRANSP_VU_MS) return { ok: true, deja: true };
+  for (const k of Object.keys(vus)) if (t - Number(vus[k] || 0) > 86400000) delete vus[k];
+  vus[cle] = t;
+  const cles = Object.keys(vus);
+  if (cles.length > 200) for (const k of cles.sort((a, b) => vus[a] - vus[b]).slice(0, cles.length - 200)) delete vus[k];
+  try { await chrome.storage.local.set({ [TRANSP_VUS_STORE]: vus }); } catch (_) { return { ok: false, raison: 'stockage' }; }
+  const tok = await authToken();
+  if (!tok || !tok.access_token) return { ok: false, raison: 'session' };
+  const { status, j } = await appelVrmTransp('transp', tok.access_token, JSON.stringify(Object.assign({ v: 1, carrier: vu.carrier, suivi: vu.suivi }, vu.cp ? { cp: vu.cp } : {})));
+  if (status !== 200 || !j || !j.ok) { noterDiag(`transp_envoi_ko_${status || 'reseau'}`); return { ok: false, raison: 'vrm', status }; }
+  for (const l of Array.isArray(j.lus) ? j.lus : []) {
+    if (l && l.change === true && TRANSP_CARRIERS.includes(String(l.carrier)) && typeof l.suivi === 'string') notifierApp({ type: 'maj', quoi: 'transp', carrier: String(l.carrier), suivi: normaliserSuiviTransp(l.suivi) });
+  }
+  const besoin = (Array.isArray(j.besoinNavigateur) ? j.besoinNavigateur : [])
+    .find((x) => x && String(x.carrier) === vu.carrier && normaliserSuiviTransp(x.suivi) === vu.suivi);
+  if (!besoin) return { ok: true, lu: false };
+  const r = await lireTransporteurNavigateur(besoin, 'page');
+  return Object.assign({ ok: true }, r);
+}
+// La permission vient d'être accordée (bouton de la fenêtre) : on lit tout de suite.
+try {
+  if (chrome.permissions && chrome.permissions.onAdded && typeof chrome.permissions.onAdded.addListener === 'function') {
+    chrome.permissions.onAdded.addListener(() => { transpTick('permission', true).catch(() => {}); });
+  }
+} catch (_) {}
+// </transporteurs>
 
 // ── CAPTURE À CHAQUE VISITE SUR VINTED ──────────────────────────────────────
 // Demande de Julien : « à chaque fois que je vais sur Vinted, l'extension capte
@@ -7197,23 +7959,23 @@ async function issueVisite(uid, marque, r) {
 //    `vanessa5723` (« enlève-toi ça de la tête »). On ne fait donc plus porter
 //    cette théorie au code, et l'espacement entre deux acceptations est
 //    ALÉATOIRE, comme il l'a demandé (« ça peut être aléatoire ») : un simple
-//    étalement. Le vrai rate-limiting vient d'ailleurs — plafond 20/h et « une
+//    étalement. Le vrai rate-limiting vient d'ailleurs — plafond 50/h et « une
 //    requête à la fois » — et ne bouge pas.
 // GARDE-FOUS, jamais retirés : compte connecté dans l'onglet seulement (`garde`
-// → `compteConnecte` + `compterAction` = plafond 20/h), une requête à la fois
+// → `compteConnecte` + `compterAction` = plafond 45/h, les 5 dernières gardées pour ses clics), une requête à la fois
 // (`vintedSend`/la file), arrêt net sur une pause Vinted (429/403), volume borné
 // par visite, et chaque offre traitée UNE fois (mémo `vrmOffresFaites`, 7 j).
 const OFFRE_EN_ATTENTE = 10;
 const OFFRES_MAX_PAR_VISITE = 3;          // limite de VOLUME
 const ESPACE_ACCEPT_MIN_MS = 15000;       // étalement ALÉATOIRE entre deux acceptations (demandé par Julien)…
-const ESPACE_ACCEPT_MAX_MS = 45000;       // …le rate-limit réel reste le plafond 20/h + « une requête à la fois »
+const ESPACE_ACCEPT_MAX_MS = 45000;       // …le rate-limit réel reste le plafond 50/h + « une requête à la fois »
 // (29 oct., « accepter les offres automatiquement avec un délai aléatoire ») Une
 // offre qui passe la règle n'est plus acceptée dès que VRM la voit : un délai TIRÉ
 // AU HASARD (3 à 20 min) est posé à la première fois où elle est vue
 // (`vrmOffresPrevues[oid] = heure prévue`, chrome.storage.local — §4.9), puis
 // une alarme d'1 min regarde CE stockage seulement (zéro lecture de base, zéro
 // requête Vinted) et ne relance le moteur que quand une heure prévue est passée.
-// Le moteur garde TOUS ses garde-fous (compte de l'onglet, plafond 20/h, pause,
+// Le moteur garde TOUS ses garde-fous (compte de l'onglet, plafond 45/h, pause,
 // une fois par offre). Une offre déjà acceptée/refusée entre-temps sur Vinted ⇒
 // Vinted refuse le geste, rien d'autre.
 const DELAI_OFFRE_MIN_MS = 3 * 60000;
@@ -7361,6 +8123,10 @@ async function visiteVinted() {
     // 5.183 : une commande du téléphone attend peut-être — relevée à chaque
     // visite aussi (NOTRE base, pas Vinted ; ses propres gardes s'appliquent).
     relaisTick('visite').catch(() => {});
+    // 5.290 : les n° que le serveur ne peut pas lire chez le transporteur
+    // (Mondial Relay toujours) — un passage au plus toutes les 5 min, son
+    // propre budget : rien de la visite Vinted n'est consommé ni attendu.
+    transpTick('visite').catch(() => {});
     if (await compteNonCapte(uid)) { noterDiag('visite_compte_supprime'); return; }
     // ⚠️ 5.162 : Vinted a demandé de ralentir (429/403) — la visite ne lui
     // envoie RIEN tant que la pause court, et chaque étape revérifie (un frein
@@ -8492,7 +9258,7 @@ const DESCRIPTION_MIN = 5;   // mesuré : « Le champ Description doit comprendr
 // Entre deux gestes d'une même republication, une pause TIRÉE AU HASARD dans une
 // plage, jamais deux fois la même : entre deux photos 3–9 s, avant le brouillon
 // 6–15 s, avant la mise en ligne 15–40 s, avant de retenter 8–20 s. C'est lui qui
-// lance (atelier §3) ; les garde-fous (20 actions/h, file, pause Vinted) restent.
+// lance (atelier §3) ; les garde-fous (50 actions/h, file, pause Vinted) restent.
 // Mesuré sur Vintex (29 oct., 2 articles) : lecture → 1re photo 1,6–4,2 s ; entre deux photos 2,1–4,4 s ;
 // dernière photo → brouillon ~1 s ; brouillon → suppression 0,4–0,7 s ; brouillon → mise en ligne 65–163 s.
 const PAUSES_REPUB = { lecture: [1500, 4000], photo: [2000, 4500], brouillon: [800, 2000], suppression: [400, 800], enLigne: [60000, 180000], reessai: [8000, 20000] };
@@ -9409,7 +10175,7 @@ async function compteConnecte(domain) {
   try { return await activeAccountId(domain || 'www.vinted.fr'); } catch (_) { return null; }
 }
 
-// `plafond` : la part des 20 actions que CE geste a le droit d'atteindre (les
+// `plafond` : la part des 50 actions que CE geste a le droit d'atteindre (les
 // bordereaux commandés par l'app s'arrêtent avant la réserve des gestes sur
 // clic, voir `RESERVE_GESTES`). `resteMs` dit quand une place se libère : la
 // raison d'un refus donne une heure, pas « plus tard ».
@@ -10000,6 +10766,38 @@ async function loginDe(uid, opts) {
 // Trois états partout : une information qu'on n'a pas est `null` (« pas su »),
 // jamais un « oui » ni un « non » inventé.
 const BASCULE_VISIBLE_MS = 7 * 86400000;
+// ── « À RETIRER DE LEBONCOIN » SUR LE LOGO VRM (29 oct.) ─────────────────────
+// Julien : « VRM ne m'a pas dit de la supprimer ». L'app CALCULE (une règle :
+// vendue PROUVÉE sur Vinted, aucune autre annonce Vinted du N° en ligne, une de
+// SES annonces Leboncoin en vente qui le porte par identité) et PUBLIE
+// `lbc_a_retirer` ; la carte du logo sur leboncoin.fr le LIT (§11). Relu au plus
+// toutes les 5 min, jamais plus d'1,2 s d'attente pour la carte ; lecture ratée
+// ⇒ la dernière connue, sinon rien (pas su ≠ rien à retirer : la carte se tait).
+const LBC_A_RETIRER_RELU_MS = 5 * 60e3;
+async function lbcARetirerPourCarte() {
+  // (29 oct., revue) La copie est celle d'UN compte VRM : un autre compte connecté
+  // dans ce Chrome ne voit jamais la liste du précédent (`u`, et le changement de
+  // session l'efface aussi).
+  let u = '';
+  try { const s = await loadSession(); u = String((s && (s.user_id || subDuJwt(s.access_token))) || ''); } catch (_) { u = ''; }
+  if (!u) return null;
+  let c = null;
+  try { c = (await chrome.storage.local.get('vrmLbcARetirer')).vrmLbcARetirer || null; } catch (_) { c = null; }
+  if (c && c.u !== u) c = null;
+  if (!c || !(Date.now() - Number(c.lu || 0) < LBC_A_RETIRER_RELU_MS)) {
+    const lire = (async () => {
+      const rows = await sbGet('app_data?id=eq.lbc_a_retirer&select=a:data');
+      if (rows === null) return null;
+      const d = rows[0] && rows[0].a;
+      const v = { u, lu: Date.now(), data: d && typeof d === 'object' && Array.isArray(d.liste) ? { at: String(d.at || ''), liste: d.liste.slice(0, 30) } : null };
+      try { await chrome.storage.local.set({ vrmLbcARetirer: v }); } catch (_) {}
+      return v;
+    })();
+    const r = await avecDelai(lire, 1200, null).catch(() => null);
+    if (r) c = r;
+  }
+  return c && c.data ? c.data : null;
+}
 async function etatSite(url,tabId) {
   const plateforme = plateformeDe(url);
   let version = ''; try { version = chrome.runtime.getManifest().version; } catch (_) {}
@@ -10038,7 +10836,10 @@ async function etatSite(url,tabId) {
   const b = local.vrmBascule;
   const bascule = b && Date.now() - Number(b.at || 0) < BASCULE_VISIBLE_MS ? b : null;
   const transport=plateforme==='leboncoin'?(local.vrmLbcTransport?.[tabId]||null):null;
-  return { ok: true, plateforme, capte, mesure, version, code: CODE_VERSION, vrm, site, flux, bascule,transport, vcCapte };
+  // (29 oct.) Les paires vendues ailleurs, encore en ligne ici : ce que VRM a
+  // calculé et publié (`lbc_a_retirer`) — la carte le dit, sans rien recalculer.
+  const aRetirer = plateforme === 'leboncoin' && vrm && vrm.connecte ? await lbcARetirerPourCarte().catch(() => null) : null;
+  return { ok: true, plateforme, capte, mesure, version, code: CODE_VERSION, vrm, site, flux, bascule,transport, vcCapte, aRetirer };
 }
 
 // L'état que l'app interroge toutes les 20 s : ZÉRO requête Vinted (cookie,
@@ -10087,7 +10888,9 @@ async function etatPourApp() {
   // 22 oct. : `lbcPause` — cette extension sait mettre une annonce Leboncoin en
   //    pause sur commande (l'app ne montre le bouton qu'à elle, capacité par
   //    présence comme `pause` et `vivant`).
-  return Object.assign({ ok: true, version, code: CODE_VERSION, ext, vrm, vinted: uid && !vintedPasSu ? { uid: String(uid), login: login || '' } : null, cmds: cmdsVus, lbcPause: true },
+  // 29 oct. : `lbcSupprime` — elle sait aussi SUPPRIMER une annonce Leboncoin
+  //    sur commande confirmée (même règle : le bouton n'apparaît qu'à elle).
+  return Object.assign({ ok: true, version, code: CODE_VERSION, ext, vrm, vinted: uid && !vintedPasSu ? { uid: String(uid), login: login || '' } : null, cmds: cmdsVus, lbcPause: true, lbcSupprime: true },
     vintedPasSu ? { vintedPasSu: true } : {},
     pause && pause !== PAUSE_PAS_SUE ? { pause: { jusqua: Number(pause.jusqua) || 0 } } : {},
     nav ? { nav } : {});
@@ -10108,6 +10911,13 @@ async function etatNavigateur() {
   if (!CAP.scripting || CAP_MAIN_REFUSE) remplace.push('scripting');
   if (!CAP.downloads) remplace.push('downloads');
   if (!CAP.externe) remplace.push('externe');
+  // 5.290 : la lecture du suivi chez les transporteurs depuis CE navigateur.
+  //   · `transporteurs` : une permission de site n'est pas accordée (Firefox) —
+  //     la fenêtre de l'icône la demande ; le serveur, lui, lit ce qu'il peut ;
+  //   · `transporteurs-passu` : l'API des permissions manque ou ne répond pas.
+  const pt = await permisTransp().catch(() => null);
+  if (pt === null) indispo.push('transporteurs-passu');
+  else if (!transpTousPermis(pt)) indispo.push('transporteurs');
   return (remplace.length || indispo.length) ? { remplace, indispo } : null;
 }
 // Le bordereau de CETTE vente est-il déjà rangé (avec son PDF) ? Une lecture
@@ -10411,6 +11221,8 @@ async function executerCommande(msg) {
   if (msg && msg.cmd === 'publierBrouillon') return await publierBrouillon(msg);
   if (msg && msg.cmd === 'refaireBrouillon') return await refaireBrouillon(msg);
   if (msg && msg.cmd === 'lbcPause') return await pauseLbcDepuisApp(msg);
+  // 29 oct. : supprimer UNE annonce Leboncoin, sur son clic confirmé (voir `supprimeLbcDepuisApp`).
+  if (msg && msg.cmd === 'lbcSupprime') return await supprimeLbcDepuisApp(msg);
   if (msg && /^(lbcPublier|lbcMarque|lbcQuota|ebayPreparer|ebayMarque)$/.test(String(msg.cmd || ''))) return await publierDepuisApp(msg);
   if (msg && /^(vcPreparer|vcMarque)$/.test(String(msg.cmd || ''))) return await publierVestiaire(msg);
   if (!msg || msg.cmd !== 'bordereau') return { accepte: false, code: 'inconnue', raison: 'commande inconnue' };
@@ -10578,7 +11390,7 @@ function sousAdmission(fn) {
 // d'une commande venue de l'app sur l'ordinateur : `executerCommande`
 // (bordereau), `executerPourApp` (répondre, trancher ou faire une offre),
 // `publierDepuisApp` (Leboncoin) — donc `gardeStricte` (le compte du cookie
-// Vinted doit être celui visé), 20 actions/heure, la file `avecVinted` (une
+// Vinted doit être celui visé), 50 actions/heure, la file `avecVinted` (une
 // requête Vinted à la fois), la pause quand Vinted freine.
 // L'extension REVÉRIFIE tout ce que le téléphone envoie :
 //   · liste blanche (rien d'autre que ces trois commandes ; `exec` passe par
@@ -10835,10 +11647,15 @@ async function garde(uid, acc) {
     return { ok: false, code: 'autre-compte',
              error: "ton navigateur est connecté à un autre compte — bascule sur celui-ci sur Vinted avant d'agir (sinon Vinted voit deux comptes depuis la même session)" };
   }
-  const c = await compterAction(String(uid));
+  // (30 oct., intégration) `garde` ne sert qu'aux gestes AUTOMATIQUES (moteur
+  // des offres, bordereau de la visite) : ils s'arrêtent avant la réserve, les
+  // `RESERVE_GESTES` dernières actions de l'heure restent à SES clics (répondre
+  // à un acheteur, trancher une offre). Avant, à 45 le moteur prenait les 5
+  // dernières et la réponse sur clic était refusée « plafond ».
+  const c = await compterAction(String(uid), ACTIONS_MAX_HEURE - RESERVE_GESTES);
   if (!c.ok) {
     return { ok: false, code: 'trop-d-actions',
-             error: `${ACTIONS_MAX_HEURE} actions sur ce compte dans l'heure — on s'arrête là pour ne pas attirer l'attention. Réessaie plus tard.` };
+             error: `${ACTIONS_MAX_HEURE - RESERVE_GESTES} actions automatiques sur ce compte dans l'heure — les ${RESERVE_GESTES} dernières sont gardées pour tes gestes. Réessaie plus tard.` };
   }
   return null;
 }
@@ -10847,7 +11664,7 @@ async function garde(uid, acc) {
 // Elle avait été retirée les 4-5 octobre. Le 27 octobre Julien la REDEMANDE et
 // choisit « Moteur auto (accepte seul) », le risque de blocage rappelé. Le
 // moteur vit plus haut (`autoAccepterOffres`, sous `garde` : compte connecté,
-// plafond 20/h, pause 429/403, volume borné, chaque offre une fois) ; il est
+// plafond 50/h, pause 429/403, volume borné, chaque offre une fois) ; il est
 // éteint par défaut (`vinted_offres_auto`). `scripts/audit-moteur-offres.cjs`
 // l'EXÉCUTE (§4.10). L'acceptation MANUELLE depuis la messagerie de l'app passe,
 // elle, par `executerPourApp` / EXEC_PERMIS, sur son clic.
@@ -11249,7 +12066,7 @@ async function genererBordereau(uid, tx, opts = {}) {
 // LES GARDE-FOUS, TOUS DÉJÀ EN PLACE (§48) :
 //  • UNIQUEMENT le compte connecté dans cet onglet (`garde`) — agir au nom d'un
 //    autre compte est LE signal multi-comptes que Vinted sanctionne (§5) ;
-//  • plafond de 20 actions/heure par compte (`compterAction`) ;
+//  • plafond de 50 actions/heure par compte (`compterAction`) ;
 //  • ⚠️ AU PLUS 3 PAR VISITE. Ce n'est pas un « rythme faussement humain »
 //    (toujours refusé, §32) : c'est une limite de volume, comme le plafond
 //    horaire. Le reste part à la visite suivante. Mesuré sur les vraies
@@ -11257,7 +12074,7 @@ async function genererBordereau(uid, tx, opts = {}) {
 //  • on ne réessaie pas une vente refusée avant 6 h (mémo local, aucun égress).
 // ⚠️ 3 → 6 (Julien, 3 septembre : « améliore encore la rapidité »). Ce n'est
 // PAS le garde-fou anti-blocage : le vrai plafond reste `ACTIONS_MAX_HEURE`
-// (20 actions/h par compte, §48), et il est vérifié AVANT chaque requête. Ce
+// (50 actions/h par compte, §48), et il est vérifié AVANT chaque requête. Ce
 // nombre-ci ne fait que borner une seule visite pour ne pas tout envoyer d'un
 // coup ; à 3, une journée à 8 ventes demandait trois passages sur Vinted.
 // Les requêtes restent envoyées UNE PAR UNE, jamais en rafale (§5.36).
@@ -11428,6 +12245,19 @@ function achatASuivre(o, derniers, maintenant) {
   if (da && SUIVI_ARRIVE.test(da.t || '')) return false;
   return tus === 'needs_action' || AT_RELAY(st) || SUIVI_EN_ROUTE.test(st);
 }
+// L'ordre de lecture (29 octobre). Trié par date seule, un achat au point
+// relais (Vinted : « à retirer », `needs_action`) passait APRÈS les achats en
+// route les plus récents, relus toutes les 3 h : avec 3 lectures par visite et
+// 6 par heure, son suivi (l'étape « disponible », le point de retrait) n'était
+// pas lu. Rang : au point relais jamais lu · au point relais déjà lu · en
+// route jamais lu · en route déjà lu ; à rang égal, le plus récent d'abord.
+// « Déjà lu » = une ligne `harvest_{uid}_suivi_{tx}` existe (lecture active ou
+// passive). Les bornes (3 par visite, 6 par heure, mémo de 3 h) ne bougent pas.
+function rangSuivi(o, derniers) {
+  const relais = String(o.transaction_user_status || '') === 'needs_action' || AT_RELAY(String(o.status || ''));
+  const lu = derniers.has(String(o.transaction_id));
+  return (relais ? 0 : 2) + (lu ? 1 : 0);
+}
 // Les lectures du suivi dans l'heure, par compte (`chrome.storage.local`, §4.9) ;
 // dans la chaîne des compteurs (deux visites ne comptent pas la même place).
 function compterLectureSuivi(uid) {
@@ -11468,7 +12298,7 @@ async function capterSuivisAchats(uid) {
     }
     const maintenant = Date.now();
     const cibles = [...achats.values()].filter((o) => achatASuivre(o, derniers, maintenant))
-      .sort((a, b) => (Date.parse(b.date || '') || 0) - (Date.parse(a.date || '') || 0));
+      .sort((a, b) => (rangSuivi(a, derniers) - rangSuivi(b, derniers)) || ((Date.parse(b.date || '') || 0) - (Date.parse(a.date || '') || 0)));
     if (!cibles.length) return 0;
     // Une forme jamais reconnue : une seule lecture de mesure par jour et par compte.
     let max = SUIVI_MAX_PAR_VISITE;
@@ -13807,14 +14637,18 @@ async function buildLbcData() {
   // (sinon on alerterait sur des annonces Leboncoin sans rapport).
   {
     const keysOnline = new Set();
+    // (29 oct.) Une annonce PROUVÉE vendue ne garde pas son N° « en ligne » (la
+    // preuve prime sur l'état de l'annonce, 13 sept.) — la même règle que l'app
+    // (`aRetirerDeLbcVinted`, §11) : c'est ce qui cachait la N°18.
     for (const o of online) {
+      if (vendus.has(o.id)) continue;
       const e = numeros[o.id]; const num = e && e.numero;
       for (const k of vintedKeys(o, num)) keysOnline.add(k);
     }
     // Une paire « à confirmer » n'est pas « plus en ligne » : on ne sait pas.
     for (const [u, l] of enl.aConfirmer) {
       if (off.has(String(u))) continue;
-      for (const it of l) { const e = numeros[String(it.id)]; for (const k of vintedKeys({ raw: it }, e && e.numero)) keysOnline.add(k); }
+      for (const it of l) { if (vendus.has(String(it.id))) continue; const e = numeros[String(it.id)]; for (const k of vintedKeys({ raw: it }, e && e.numero)) keysOnline.add(k); }
     }
     // Numéros connus de VRM (toutes annonces numérotées, en ligne ou non).
     const keysKnown = new Set();
@@ -13957,6 +14791,19 @@ async function storeLbcListingsUneFois(url, listings,owner) {
       //    l'annonce, revue active, restait hors de « en vente ».
       delete n.plusVueAt;
       if(n.pauseAt&&!(Date.now()-Date.parse(n.pauseAt)<=LBC_PAUSE_INDEX_MS)){delete n.pauseAt;delete n.pauseStatut;}
+      // (29 oct.) Une suppression ACCEPTÉE par Leboncoin (réponse 2xx, vue sur la
+      // page ou demandée depuis VRM) est sans retour : une réponse en retard de
+      // l'index qui la montre encore « active » ne la remet pas en vente.
+      // ⚠️ (29 oct., revue) BORNÉE COMME LA PAUSE : la marque peut venir d'un
+      // message de la page (qu'un script du site peut forger), et la réponse de
+      // Leboncoin à la suppression n'est jamais relue. Au-delà de
+      // `LBC_PAUSE_INDEX_MS`, une capture qui montre l'annonce vivante la remet en
+      // vente : la donnée la plus récente gagne.
+      if(ancien.supprimeeAt){
+        const st=String(l.status||'');
+        if(st&&!LBC_ANNONCE_MORTE.test(st)&&!(Date.now()-Date.parse(ancien.supprimeeAt)<=LBC_PAUSE_INDEX_MS)){n.status=st;delete n.supprimeeAt;delete n.supprimeeStatut;delete n.supprimeePar;n.statutLbc=st;}
+        else{n.statutLbc=String(l.status||n.statutLbc||'');n.status='deleted';}
+      }
       merged[String(l.id)]=n;
     } }
     // (22 oct.) On garde les autres clés de la ligne — `lectures`, la date de la
@@ -14070,6 +14917,14 @@ async function noterListeLbcComplete(owner, ids, total) {
           const n = Object.assign({}, ad); let change = false;
           if (n.plusVueAt) { delete n.plusVueAt; change = true; }
           if (n.pauseAt && maintenant - Date.parse(n.pauseAt) > LBC_PAUSE_INDEX_MS) { delete n.pauseAt; delete n.pauseStatut; change = true; }
+          // (29 oct., revue) Une suppression marquée il y a plus d'une heure, et
+          // l'annonce TOUJOURS dans sa liste complète : elle n'est pas supprimée.
+          // Son dernier état connu de Leboncoin revient (`statutLbc`), sauf s'il
+          // dit lui-même qu'elle est morte.
+          if (n.supprimeeAt && maintenant - Date.parse(n.supprimeeAt) > LBC_PAUSE_INDEX_MS) {
+            const st = String(n.statutLbc || 'active');
+            if (!LBC_ANNONCE_MORTE.test(st)) { n.status = st; delete n.supprimeeAt; delete n.supprimeeStatut; delete n.supprimeePar; change = true; }
+          }
           if (change) { items[id] = n; reviennent++; }
         } else if (lbcSortieDe(ad) !== 'plusvue') {
           const vu = Date.parse(ad.seenAt || '');
@@ -14088,6 +14943,77 @@ async function noterListeLbcComplete(owner, ids, total) {
       if (ok !== false && (sortent || reviennent)) { try { notifierApp({ type: 'maj', quoi: 'lbc' }); } catch (_) {} }
       return { ok: ok !== false, sortent, reviennent, ecrit: ok !== false };
     } catch (_) { return { ok: false, code: 'erreur' }; }
+  });
+}
+// ── UNE SUPPRESSION / PAUSE FAITE SUR LA PAGE, OU DEPUIS VRM (29 oct.) ─────
+// Julien : « les 4 plus en ligne […] on passe à côté quand on va sur LBC ».
+// Mesuré : il a supprimé la N°18 sur leboncoin.fr le 28 oct. à 22:47
+// (`lbc_recon.envois` : `DELETE …/manual/delete/ads`) ; VRM la disait encore
+// « en ligne » le lendemain. Une réponse 2xx de Leboncoin est une PREUVE :
+//   · supprimée ⇒ `status: 'deleted'` (la règle partagée `<lbc-en-vente-regle>`
+//     la sort déjà de « en vente » : `LBC_ANNONCE_MORTE`), l'état d'avant gardé
+//     dans `statutLbc`, l'heure dans `supprimeeAt` ;
+//   · en pause ⇒ `pauseAt` (même règle que la pause demandée depuis VRM).
+// Seulement les annonces DÉJÀ rangées d'un de SES comptes (§5) ; rien n'est
+// créé, rien n'est effacé ; jamais « vendue ». Lecture ratée ⇒ rien n'est écrit.
+async function noterRetraitVuLbc(ids, quoi, statut) {
+  const vus = new Set((ids || []).map(String));
+  if (!vus.size || !(quoi === 'supprime' || quoi === 'pause')) return { ok: false, n: 0 };
+  const miens = new Set([...(await comptesMiens())].map(idCompteLbc).filter(Boolean));
+  return enChaineLbcListings(async () => {
+    try {
+      const rows = await sbGet('app_data?id=eq.lbc_listings&select=data');
+      if (rows === null) { noterDiag('lbc_retrait_vu_lecture_ratee'); return { ok: false, n: 0 }; }
+      const data = (rows[0] && rows[0].data) || {};
+      const items = Object.assign({}, data.items || {});
+      const nowIso = new Date().toISOString();
+      let n = 0;
+      for (const id of vus) {
+        const ad = items[id];
+        if (!ad || typeof ad !== 'object') continue;
+        if (!miens.has(idCompteLbc(ad.account || ad.lbcUser))) continue;
+        if (quoi === 'supprime') {
+          if (ad.supprimeeAt && ad.status === 'deleted') continue;
+          items[id] = Object.assign({}, ad, { statutLbc: ad.status || '', status: 'deleted', supprimeeAt: nowIso, supprimeeStatut: statut });
+        } else {
+          items[id] = Object.assign({}, ad, { pauseAt: nowIso, pauseStatut: statut });
+        }
+        n++;
+      }
+      noterDiag(n ? `lbc_${quoi}_vu` : `lbc_${quoi}_vu_rien`);
+      if (!n) return { ok: true, n: 0 };
+      const ok = await supabaseUpsert('app_data', [{ id: 'lbc_listings', data: Object.assign({}, data, { items, updatedAt: nowIso }) }], 'id');
+      if (ok !== false) { try { notifierApp({ type: 'maj', quoi: 'lbc' }); } catch (_) {} }
+      return { ok: ok !== false, n };
+    } catch (_) { return { ok: false, n: 0 }; }
+  });
+}
+// Les statistiques d'une annonce (29 oct.) : `stats` = { favoris, messages, vues,
+// du, au, jours, at } — les TOTAUX du dernier jour lu (favoris, messages) et les
+// vues sur la période lue. Seulement une annonce DÉJÀ rangée d'un de SES comptes
+// (§5) ; rien n'est créé. Lecture ratée ⇒ rien n'est écrit. Un chiffre absent de
+// la réponse reste absent (jamais 0).
+async function noterStatsAnnonceLbc(id, m) {
+  const nb = (v) => (typeof v === 'number' && Number.isFinite(v) && v >= 0 && v < 1e7 ? Math.round(v) : null);
+  const stats = { favoris: nb(m && m.favoris), messages: nb(m && m.messages), vues: nb(m && m.vues), jours: nb(m && m.jours) };
+  for (const k of ['du', 'au']) { const d = String((m && m[k]) || ''); if (/^\d{4}-\d{2}-\d{2}$/.test(d)) stats[k] = d; }
+  for (const k of Object.keys(stats)) if (stats[k] == null) delete stats[k];
+  if (stats.favoris == null && stats.messages == null && stats.vues == null) return { ok: false, n: 0 };
+  stats.at = new Date().toISOString();
+  const miens = new Set([...(await comptesMiens())].map(idCompteLbc).filter(Boolean));
+  return enChaineLbcListings(async () => {
+    try {
+      const rows = await sbGet('app_data?id=eq.lbc_listings&select=data');
+      if (rows === null) { noterDiag('lbc_stats_lecture_ratee'); return { ok: false, n: 0 }; }
+      const data = (rows[0] && rows[0].data) || {};
+      const ad = (data.items || {})[id];
+      if (!ad || typeof ad !== 'object' || !miens.has(idCompteLbc(ad.account || ad.lbcUser))) { noterDiag('lbc_stats_pas_a_lui'); return { ok: true, n: 0 }; }
+      const items = Object.assign({}, data.items, { [id]: Object.assign({}, ad, { stats }) });
+      const ok = await supabaseUpsert('app_data', [{ id: 'lbc_listings', data: Object.assign({}, data, { items, updatedAt: stats.at }) }], 'id');
+      noterDiag(ok !== false ? 'lbc_stats_ecrit' : 'lbc_stats_ecriture_ratee');
+      if (ok !== false) { try { notifierApp({ type: 'maj', quoi: 'lbc' }); } catch (_) {} }
+      return { ok: ok !== false, n: 1 };
+    } catch (_) { return { ok: false, n: 0 }; }
   });
 }
 // Après une mise en pause que Leboncoin a ACCEPTÉE (réponse 2xx) : l'état, sur
@@ -14202,6 +15128,101 @@ async function pauseLbcDepuisApp(msg) {
     noterDiag('lbc_pause_' + statut);
     if (statut >= 200 && statut < 300) {
       const note = await noterPauseLbc(id, statut);
+      try { notifierApp({ type: 'maj', quoi: 'lbc' }); } catch (_) {}
+      return { accepte: true, etape: 'fait', statut, reponse, note };
+    }
+    return { accepte: true, etape: 'refuse', statut, reponse };
+  } finally {
+    PAUSE_LBC_EN_VOL = false;
+    if (ouvert && ouvert.id != null) { try { await chrome.tabs.remove(ouvert.id); } catch (_) {} }
+  }
+}
+// ══════════════════════════════════════════════════════════════════════════
+// SUPPRIMER UNE ANNONCE LEBONCOIN, SUR SON CLIC (29 octobre)
+// ══════════════════════════════════════════════════════════════════════════
+// Julien : « J'ai vendu une paire sur Vinted et VRM ne m'a pas dit de la
+// supprimer, je veux pouvoir sur VRM supprimer une annonce de Leboncoin ».
+// ⚠️ La requête n'est PAS devinée : l'extension l'a VUE dans ses propres gestes
+//    (`lbc_recon.envois`, 28 octobre 22:47, 5.267) — `DELETE api.leboncoin.fr/
+//    api/pintad/v1/public/manual/delete/ads`, corps `{list_ids:[nombre]}`. Sa
+//    réponse n'a jamais été vue : elle est rendue telle quelle, un refus dit
+//    « pas fait », un silence dit « je ne sais pas ».
+// Garde-fous (ceux de la pause, plus un) : la CONFIRMATION de l'app est exigée
+// ici aussi (`confirme: true`, sinon rien ne part — c'est sans retour) · sur SON
+// clic, jamais automatique · l'annonce est relue EN BASE (l'app n'envoie qu'un
+// identifiant) et doit être sur le compte Leboncoin CONNECTÉ dans l'onglet ·
+// UNE action Leboncoin à la fois (même verrou que la pause) · 10 par heure ·
+// adresse exacte écrite en dur dans `lbc-inject.js`. Une 2xx est une preuve :
+// l'annonce est notée supprimée (`status: 'deleted'`, `supprimeeAt`), comme une
+// suppression faite sur la page (`noterRetraitVuLbc`).
+const LBC_SUPPRIME_MAX_HEURE = 10;
+async function noterSuppressionLbc(id, statut) {
+  return enChaineLbcListings(async () => {
+    try {
+      const rows = await sbGet('app_data?id=eq.lbc_listings&select=data');
+      if (rows === null) return false;
+      const data = (rows[0] && rows[0].data) || {};
+      const items = Object.assign({}, data.items || {});
+      const ad = items[id];
+      if (!ad) return false;
+      const nowIso = new Date().toISOString();
+      items[id] = Object.assign({}, ad, { statutLbc: ad.status === 'deleted' ? (ad.statutLbc || '') : (ad.status || ''), status: 'deleted', supprimeeAt: nowIso, supprimeeStatut: statut, supprimeePar: 'vrm' });
+      const ok = await supabaseUpsert('app_data', [{ id: 'lbc_listings', data: Object.assign({}, data, { items, updatedAt: nowIso }) }], 'id');
+      return ok !== false;
+    } catch (_) { return false; }
+  });
+}
+async function supprimeLbcDepuisApp(msg) {
+  const id = String((msg && msg.id) || '');
+  if (!/^\d{6,12}$/.test(id)) return { accepte: false, code: 'invalide', raison: 'annonce inconnue' };
+  if (!msg || msg.confirme !== true) return { accepte: false, code: 'confirmation', raison: "la suppression n'a pas été confirmée — rien n'est parti" };
+  if (PAUSE_LBC_EN_VOL) return { accepte: false, code: 'en-cours', raison: 'une autre action sur Leboncoin est en cours — une à la fois' };
+  PAUSE_LBC_EN_VOL = true;
+  let ouvert = null;
+  try {
+    let journal;
+    try { journal = ((await chrome.storage.local.get('vrmLbcSuppressions')).vrmLbcSuppressions || []).filter((t) => Date.now() - Number(t) < 3600e3); } catch (_) { return { accepte: false, code: 'lecture', raison: "le stockage de l'extension n'a pas répondu — rien n'est parti" }; }
+    if (journal.length >= LBC_SUPPRIME_MAX_HEURE) return { accepte: false, code: 'plafond', raison: `déjà ${LBC_SUPPRIME_MAX_HEURE} suppressions cette heure-ci — réessaie plus tard` };
+    // L'annonce, relue EN BASE juste avant (l'app n'envoie qu'un identifiant).
+    const [rows, accRows] = await Promise.all([
+      sbGet(`app_data?id=eq.lbc_listings&select=a:data->items->${id}`),
+      sbGet('app_data?id=eq.lbc_accounts&select=a:data->accounts'),
+    ]);
+    if (rows === null) return { accepte: false, code: 'lecture', raison: "la base VRM n'a pas répondu — rien n'est parti chez Leboncoin" };
+    const ad = rows[0] && rows[0].a;
+    if (!ad || typeof ad !== 'object') return { accepte: false, code: 'inconnue', raison: "cette annonce n'est pas parmi tes annonces Leboncoin captées — rien n'est parti" };
+    if (ad.status === 'deleted' && ad.supprimeeAt) return { accepte: false, code: 'deja', raison: "elle est déjà notée supprimée de Leboncoin — rien n'est reparti" };
+    const compte = idCompteLbc(ad.account || ad.lbcUser);
+    if (!/^[0-9a-f-]{8,64}$/i.test(compte)) return { accepte: false, code: 'compte', raison: "je ne sais pas sur quel compte Leboncoin est cette annonce — rien n'est parti" };
+    const accs = (accRows && accRows[0] && accRows[0].a) || {};
+    const nom = nomCompteLbc(accs, compte) || 'le compte de cette annonce';
+    const autreCompte = (autre) => ({ accepte: false, code: 'autre-compte', raison: `Leboncoin est connecté sur ${nomCompteLbc(accs, autre) || 'un autre compte'} dans ce Chrome, l'annonce est sur ${nom} — connecte-toi sur ${nom}, puis réessaie` });
+    let o = await ongletLbcDuCompte(compte);
+    if (!o.ok && o.code) return { accepte: false, code: o.code, raison: o.raison };
+    if (!o.ok && o.autres && o.autres.length) return autreCompte(o.autres[0]);
+    if (!o.ok) {
+      try { ouvert = await chrome.tabs.create({ url: 'https://www.leboncoin.fr/compte/part/mes-annonces', active: false }); } catch (_) { ouvert = null; }
+      if (!ouvert || ouvert.id == null) return { accepte: false, code: 'lbc-absent', raison: `ouvre leboncoin.fr dans ce Chrome, connecté sur ${nom}, puis réessaie` };
+      const c = await attendreSessionOnglet(ouvert.id, LBC_PAUSE_ATTENTE_SESSION_MS);
+      if (!c || c.ambigue || !c.compte) return { accepte: false, code: 'session', raison: `Leboncoin ne m'a pas dit quel compte est connecté — ouvre leboncoin.fr connecté sur ${nom}, puis réessaie` };
+      if (c.compte !== 'lbc-account:' + compte) return autreCompte(String(c.compte).replace(/^lbc-account:/, ''));
+      o = { ok: true, tabId: ouvert.id };
+    }
+    // L'ordre part : il compte dans le plafond, quoi qu'il arrive ensuite.
+    try { await chrome.storage.local.set({ vrmLbcSuppressions: [...journal, Date.now()] }); } catch (_) {}
+    let rep = null;
+    try { rep = await avecDelai(chrome.tabs.sendMessage(o.tabId, { from: 'vrm-fond', action: 'lbcSupprimeAnnonce', id }, { frameId: 0 }), 25000, null); } catch (_) { rep = null; }
+    const statut = (rep && Number(rep.statut)) || 0;
+    const reponse = rep && typeof rep.corps === 'string' ? rep.corps.slice(0, 300) : '';
+    try { await storeLbcRecon({ envoiOne: { cle: 'VRM DELETE api.leboncoin.fr/api/pintad/v1/public/manual/delete/ads', val: { at: new Date().toISOString(), ver: EXT_VERSION, methode: 'DELETE', cles: ['list_ids[]:number'], reponse: { statut, cles: (rep && Array.isArray(rep.cles)) ? rep.cles.slice(0, 60) : [], entetes: (rep && Number(rep.entetes)) || 0 } } } }); } catch (_) {}
+    if (rep && rep.ok === true && rep.erreur === 'en-cours') return { accepte: false, code: 'en-cours', raison: 'une autre action est en cours dans cet onglet Leboncoin' };
+    if (!rep || rep.ok !== true || !statut) {
+      noterDiag('lbc_supprime_incertain');
+      return { accepte: true, etape: 'incertain', statut, raison: "l'onglet Leboncoin n'a pas répondu — je ne sais pas si l'annonce est supprimée : regarde-la sur Leboncoin avant de recliquer" };
+    }
+    noterDiag('lbc_supprime_' + statut);
+    if (statut >= 200 && statut < 300) {
+      const note = await noterSuppressionLbc(id, statut);
       try { notifierApp({ type: 'maj', quoi: 'lbc' }); } catch (_) {}
       return { accepte: true, etape: 'fait', statut, reponse, note };
     }
@@ -15259,6 +16280,38 @@ async function sessionDeListe(sessionPage) {
   const meme = !!(c && c.v === 2 && String(c.id) === id);
   return { id, name: meme ? String(c.name || '') : '', type: meme ? String(c.type || '') : '' };
 }
+// ── LES CHIFFRES QUE LEBONCOIN DONNE PAR ANNONCE (29 oct.) ─────────────────
+// MESURÉ (`lbc_recon.schemas`, sa page « Mes annonces ») : `dashboard/v1/search`
+// porte, pour CHAQUE annonce, `stats.{Views, Favorites, Messages, Replies,
+// Leads, Phones}` et `first_publication_date` / `index_date`. C'est le NOMBRE de
+// favoris — jamais QUI (aucune réponse vue ne nomme une personne). On ne garde
+// que des entiers ≥ 0 et une date ISO lisible ; une clé absente n'est pas posée
+// (une capture sans chiffres n'efface jamais ceux d'avant : `Object.assign`).
+// (29 oct.) Ce que « Mes annonces » dit de CHAQUE annonce, sans rien deviner.
+// MESURÉ (schéma de `dashboard/v1/search` rangé dans `lbc_recon.schemas`) : une
+// annonce porte `first_publication_date`, `index_date` et `counters` — un objet
+// VIDE sur ses deux annonces du 29 octobre. On garde les compteurs tels que
+// Leboncoin les nomme (nombres seulement, jamais un texte), pour que l'écran
+// « Favoris » dise un chiffre quand il y en a un ; aucun nom de compteur n'est
+// supposé. Les dates : celles de Leboncoin, jamais l'heure de capture.
+function statsAnnonceLbc(node) {
+  const out = {};
+  const c = node && node.counters;
+  if (c && typeof c === 'object' && !Array.isArray(c)) {
+    const cpt = {};
+    for (const [k, v] of Object.entries(c)) {
+      const n = Number(v);
+      if (/^[A-Za-z_][A-Za-z0-9_]{0,39}$/.test(k) && typeof v !== 'boolean' && v !== '' && v !== null && Number.isFinite(n) && n >= 0 && n < 1e7) cpt[k] = Math.round(n);
+    }
+    if (Object.keys(cpt).length) { out.compteurs = cpt; out.compteursAt = new Date().toISOString(); }
+  }
+  for (const [k, cle] of [['first_publication_date', 'publieeLe'], ['index_date', 'indexeeLe']]) {
+    const brut = String((node && node[k]) || '');
+    // « 2026-10-17 18:36:52 » : heure de Paris (Leboncoin), gardée telle quelle.
+    if (/^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}(:\d{2})?/.test(brut)) out[cle] = brut.slice(0, 19);
+  }
+  return out;
+}
 async function handleLbcRaw(url, body, sessionPage,ownerAttendu=null) {
   const owner=ownerAttendu||(await loadSession())?.user_id;if(!owner)return {ok:false,etat:'ecriture-refusee'};
   let data = null;
@@ -15397,6 +16450,7 @@ async function handleLbcRaw(url, body, sessionPage,ownerAttendu=null) {
           account: aMoiParSession&&sessListe.prive?sessListe.id:ownerId || (aMoiParSession ? sessListe.id : null),
           accountName: aMoiParSession&&sessListe.prive?sessListe.name:String((node.owner && (node.owner.name || node.owner.pseudo)) || node.owner_name || '') || (aMoiParSession ? sessListe.name || null : null),
           platform: 'leboncoin',
+          ...statsAnnonceLbc(node),
         });
       }
     }

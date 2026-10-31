@@ -30,12 +30,12 @@
  border-color:var(--gestion-accent)!important;
  box-shadow:0 0 0 3px color-mix(in srgb,var(--gestion-accent) 14%,transparent);
 }
-.vrm-main :is(.vrm-sales-workbar>.vrm-rangee,.vrm-sales-filters,.vrm-stock-views)>button[aria-pressed]{
+.vrm-main :is(.vrm-sales-workbar>.vrm-rangee,.vrm-sales-workbar>.vrm-filtres-et-outils>.vrm-rangee,.vrm-sales-filters,.vrm-stock-views)>button[aria-pressed]{
  border-radius:8px!important;border:1px solid var(--gestion-line)!important;
  background:var(--gestion-surface)!important;color:var(--gestion-muted)!important;
  font-weight:600!important;box-shadow:none!important;
 }
-.vrm-main :is(.vrm-sales-workbar>.vrm-rangee,.vrm-sales-filters,.vrm-stock-views)>button[aria-pressed=true]{
+.vrm-main :is(.vrm-sales-workbar>.vrm-rangee,.vrm-sales-workbar>.vrm-filtres-et-outils>.vrm-rangee,.vrm-sales-filters,.vrm-stock-views)>button[aria-pressed=true]{
  background:var(--gestion-accent)!important;border-color:var(--gestion-accent)!important;
  color:var(--gestion-on-accent)!important;
 }
@@ -173,7 +173,7 @@
  .vrm-main .vrm-ventes-liste>.vrm-ledger-heading>span:last-child{text-align:right;}
  .vrm-main .vrm-sales-workbar{display:grid!important;grid-template-columns:minmax(180px,1fr) auto;gap:8px 12px!important;padding:12px!important;}
  .vrm-main .vrm-sales-workbar>.vrm-sales-search-group{margin-bottom:0!important;}
- .vrm-main .vrm-sales-workbar>.vrm-rangee{grid-column:1 / -1;}
+ .vrm-main .vrm-sales-workbar>.vrm-rangee,.vrm-main .vrm-sales-workbar>.vrm-filtres-et-outils{grid-column:1 / -1;}
  .vrm-main .vrm-ann-toolbar{padding:12px!important;border-radius:8px!important;background:var(--gestion-surface)!important;}
 }
 @media(max-width:767px){
@@ -186,6 +186,9 @@
 .vrm-ledger-drawer-body .vrm-sale-title{display:none!important;}
 .vrm-ledger-drawer-body .vrm-sale-price>.vrm-display{display:none!important;}
 .vrm-ledger-drawer-body .vrm-sale-meta{margin-top:0!important;}
+/* (30 oct.) État, compte et date sont DÉJÀ dans l'en-tête du tiroir et sa ligne d'accès : la méta du détail ne les redit pas (§7). */
+.vrm-ledger-drawer-body .vrm-sale-meta .vrm-vente-redit{display:none!important;}
+.vrm-ledger-drawer-body .vrm-sale-meta:not(:has(> :not(.vrm-vente-redit))){display:none!important;}
 .vrm-ledger-drawer-body .vrm-cout-rangee{display:grid!important;grid-template-columns:1fr 1fr;gap:8px!important;width:100%;}
 :root body .vrm-ledger-drawer-body .vrm-cout-rangee>button{min-height:44px!important;border:1px solid var(--gestion-line)!important;border-radius:6px!important;background:var(--gestion-soft)!important;font-size:12px!important;justify-content:center!important;padding:8px!important;}
 .vrm-ledger-drawer-body .vrm-sale-details>summary{border:1px solid var(--gestion-line);border-radius:6px;background:var(--gestion-soft);padding:12px!important;font-size:12px!important;}
@@ -299,7 +302,7 @@
 .vrm-toast-icon{display:flex;align-items:center;justify-content:center;flex-shrink:0;width:24px;height:24px;}
 .vrm-toast:focus-visible{outline:2px solid var(--message-ink);outline-offset:3px;}
 /* Ordinateur : en bas à droite, même feuille ouverte (elle est centrée et ne va pas jusque-là). */
-@media(min-width:1024px){.vrm-toasts{left:auto!important;width:380px;right:24px!important;bottom:24px!important;top:auto!important;padding:0!important;}}
+@media (min-width: 1024px), (min-width: 768px) and (hover: hover) and (pointer: fine){.vrm-toasts{left:auto!important;width:380px;right:24px!important;bottom:24px!important;top:auto!important;padding:0!important;}}
 @media(prefers-reduced-motion:reduce){.vrm-toast{animation:none!important;}}
 .vrm-main .vrm-set-panneau :is(p,small){line-height:1.6;}
 .vrm-main :is(.vrm-reception,.vrm-recus-email){
@@ -315,7 +318,7 @@
 /* (22 oct.) « ⋯ Outils » des Ventes : sous 1 024 px la rangée des filtres défile
    au doigt — le bouton reste collé à son bord droit (il était hors de l'écran,
    au bout de la rangée) ; son menu s'ouvre sous la barre (App.jsx). */
-@media(max-width:1023px){
+@media (max-width: 767px), (max-width: 1023px) and (hover: none), (max-width: 1023px) and (pointer: coarse), (max-width: 1023px) and (pointer: none){
  .vrm-sales-workbar>.vrm-rangee>.vrm-outils-ventes{position:sticky;right:0;z-index:1;padding-left:8px;background:var(--vrm-surface);box-shadow:-10px 0 10px -6px var(--vrm-surface);}
  .vrm-sales-workbar>.vrm-rangee>.vrm-outils-ventes>button{min-height:36px;}
 }
@@ -453,3 +456,17 @@
 @keyframes vrm-pulse-vendu{0%,100%{box-shadow:0 0 0 1px var(--halo,#3D7BFF);}50%{box-shadow:0 0 0 5px var(--halo,#3D7BFF);}}
 .vrm-stock-vendu{animation:vrm-pulse-vendu 1.5s ease-in-out infinite;}
 @media(prefers-reduced-motion:reduce){.vrm-stock-vendu{animation:none;box-shadow:0 0 0 3px var(--halo,#3D7BFF);}}
+
+/* (30 oct.) Statistiques garde son échelle 28 / 20 / 15 / 13 / 11 (banc stats-premium) :
+   le ⓘ et le petit bouton s'y alignent sur 13 px. */
+.vrm-statistiques-premium .vrm-pourquoi > summary { font-size: 13px; }
+.vrm-app-shell .vrm-main .vrm-statistiques-premium .vrm-b.vrm-b-petit, .vrm-statistiques-premium .vrm-b.vrm-b-petit { font-size: 13px; }
+
+/* (30 oct.) Les filtres et « Outils » côte à côte, chacun à sa place : les filtres
+   défilent, « Outils » reste au bout, hors de la rangée (il ne couvre plus rien). */
+.vrm-sales-workbar>.vrm-filtres-et-outils{grid-column:1 / -1;}
+.vrm-sales-workbar>.vrm-filtres-et-outils>.vrm-outils-ventes>button{min-height:40px;white-space:nowrap;}
+/* (30 oct.) « N° et frais » dans la feuille d'une vente : une rangée repliable comme
+   les autres (sans bordure grise, chevron à droite), pas une 4ᵉ forme. */
+.vrm-ledger-drawer-body .vrm-sale-details>summary{border:0!important;background:var(--vrm-b-teinte,rgba(36,78,84,.08))!important;border-radius:10px!important;display:flex!important;align-items:center;justify-content:space-between;gap:8px;}
+.vrm-ledger-drawer-body .vrm-sale-details>summary::after{margin-left:auto!important;}

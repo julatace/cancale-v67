@@ -23,6 +23,7 @@
 // Lancer : npm run build && BANC_PORT=… node scripts/bancs/compta-stock-ui.cjs
 const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
 const { metaVersData } = require('./_meta.cjs');
+const { ouvrirAvanceCompta } = require('./_compta.cjs');
 const fs = require('fs'), http = require('http'), path = require('path'), os = require('os');
 const DIST = path.join(__dirname, '..', '..', 'dist');
 const PORT = Number(process.env.BANC_PORT) || 4953;
@@ -102,6 +103,7 @@ const photo = async (pg, nom) => { if (CAPT) { fs.mkdirSync(CAPT, { recursive: t
       console.log(`\n── Comptabilité, ${L} px`);
       await essaie('comptabilité', async () => {
         const { ctx, pg, errs } = await ouvrir(b, L, 'compta');
+        await ouvrirAvanceCompta(pg); // (29 oct.) résultat, packs et entreprise vivent dans « Avancé », replié
         await pg.waitForSelector('[data-compta-resultat]', { timeout: 20000 });
         await pg.waitForTimeout(800);
         await photo(pg, `compta-${L}`);

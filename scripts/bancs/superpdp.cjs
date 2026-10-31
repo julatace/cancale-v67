@@ -22,6 +22,7 @@
 // On juge des `data-*`, des requêtes et du DOM, jamais un libellé (§6.5).
 const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
 const { metaVersData } = require('./_meta.cjs');
+const { ouvrirAvanceCompta } = require('./_compta.cjs');
 const fs = require('fs'), http = require('http'), path = require('path'), os = require('os');
 const DIST = path.join(__dirname, '..', '..', 'dist');
 const PORT = Number(process.env.BANC_PORT) || 4941;
@@ -155,6 +156,7 @@ const attendre = async (pg, f, ms = 9000) => { const t0 = Date.now(); for (;;) {
       await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) ? r.abort() : r.continue()));
       await brancher(pg, lignes({ profil: PROFIL_OK }));
       await pg.goto(`http://localhost:${PORT}/?tab=compta`, { waitUntil: 'domcontentloaded' });
+      await ouvrirAvanceCompta(pg); // (29 oct.) ces cartes vivent dans « Avancé », replié
       return { ctx, pg, errs };
     };
     for (const vp of [{ width: 390, height: 844 }, { width: 1512, height: 950 }]) {
@@ -202,7 +204,7 @@ const attendre = async (pg, f, ms = 9000) => { const t0 = Date.now(); for (;;) {
       dit(rf.sw <= rf.cw + 1, 'aucun débordement horizontal', `${rf.sw} > ${rf.cw}`);
       dit(errs.length === 0, 'aucune erreur d’app', errs.join(' | ').slice(0, 160));
       const carte = await pg.$('[data-fe-carte]');
-      if (carte) { await pg.setViewportSize({ width: vp.width, height: 2800 }); await pg.waitForTimeout(300); await carte.scrollIntoViewIfNeeded(); await carte.screenshot({ path: path.join(CAPT, `superpdp-${vp.width}.png`) }); }
+      if (carte) { await pg.setViewportSize({ width: vp.width, height: 2800 }); await pg.waitForTimeout(300); await carte.scrollIntoViewIfNeeded(); await carte.screenshot({ path: path.join(CAPT, `superpdp-${vp.width}.png`), timeout: 20000 }); } // capture seulement : 5 s ne suffit pas sur une machine chargée
       await ctx.close();
 
       console.log(`── ${vp.width} px · E : connexion pas lue`);

@@ -24,7 +24,8 @@
 //   · un signal de l'extension (`vrm:ext` — « ventes rangées », « bordereau
 //     rangé »…) vide tout : l'extension écrit en base sans passer par l'app, et
 //     son signal est justement ce qui fait relire ;
-//   · une lecture avec `signal` (annulable) ou un `Request` passent tels quels ;
+//   · une lecture avec `signal` (annulable) ou un `Request` passe telle quelle ;
+//     une ÉCRITURE Request invalide quand même les lectures, sans lire son corps ;
 //   · une lecture EN COURS ne se partage que `VOL_MAX_MS` (22 oct., revue) :
 //     une requête perdue (réseau qui change, iPhone qui se réveille) ne répond
 //     jamais, et elle captait toutes les lectures identiques jusqu'à une
@@ -42,6 +43,7 @@ export const FENETRE_MS = 2000;
 // Plus court que l'attente de `lireReceptionLeboncoin` (12 s) : un « Actualiser »
 // fait après une lecture pendue part sur le réseau au lieu de la rejoindre.
 export const VOL_MAX_MS = 8000;
+export const MAX_ENTREES = 256;
 const ENTETES_CLE = ['authorization', 'apikey', 'range', 'range-unit', 'prefer', 'accept', 'accept-profile', 'x-vrm-equipe'];
 
 const lireEntete = (h, nom) => {
@@ -59,19 +61,21 @@ const lireEntete = (h, nom) => {
 export function creerLecturesPartagees(fetchOrig, base, opts = {}) {
   const fenetre = opts.fenetre != null ? opts.fenetre : FENETRE_MS;
   const volMax = opts.volMax != null ? opts.volMax : VOL_MAX_MS;
+  const maxEntrees = Number.isInteger(opts.maxEntrees) && opts.maxEntrees > 0 ? Math.min(opts.maxEntrees, MAX_ENTREES) : MAX_ENTREES;
   const maintenant = opts.maintenant || (() => Date.now());
   const prefixe = String(base).replace(/\/+$/, '') + '/rest/v1/';
   const cache = new Map();   // clé -> { gen, p, debut, fin }
   let gen = 0;
-  const stats = { partagees: 0, parties: 0 };
+  const stats = { partagees: 0, parties: 0, get retenues() { return cache.size; } };
   const invalider = () => { gen++; cache.clear(); };
   const origine = opts.origine != null ? opts.origine : (typeof location !== 'undefined' && location.origin ? location.origin : '');
   const estRouteApp = (u) => u.indexOf('/api/') === 0 || (!!origine && u.indexOf(origine + '/api/') === 0);
   const f = function (input, init) {
     // Seules les adresses en chaîne (ou URL) sont regardées ; un `Request`
     // passe tel quel (ses en-têtes et son corps vivent dans l'objet).
-    const url = typeof input === 'string' ? input : (typeof URL !== 'undefined' && input instanceof URL ? input.href : null);
-    const methode = String((init && init.method) || 'GET').toUpperCase();
+    const requete = typeof Request !== 'undefined' && input instanceof Request;
+    const url = requete ? input.url : typeof input === 'string' ? input : (typeof URL !== 'undefined' && input instanceof URL ? input.href : null);
+    const methode = String((init && init.method) || (requete ? input.method : 'GET')).toUpperCase();
     // ⚠️ NOS ROUTES SERVEUR ÉCRIVENT AUSSI EN BASE (16 octobre, banc revendeurs) :
     //    `POST /api/ebay` (« Lire davantage de commandes », synchro, règle d'offre…)
     //    range la ligne `ebay_orders` côté serveur, puis l'écran la relit — dans
@@ -89,7 +93,11 @@ export function creerLecturesPartagees(fetchOrig, base, opts = {}) {
       Promise.resolve(p).then(invalider, invalider);
       return p;
     }
-    if (init && (init.signal || init.body != null || (init.cache && init.cache !== 'default'))) return fetchOrig(input, init);
+    if (requete || init && (init.signal || init.body != null || (init.cache && init.cache !== 'default'))) return fetchOrig(input, init);
+    // Une requête pendue ne doit pas retenir sa réponse et ses en-têtes à vie.
+    const date = maintenant();
+    for (const [k, v] of cache)
+      if (v.fin == null ? date - v.debut >= volMax : date - v.fin >= fenetre) cache.delete(k);
     const h = init && init.headers;
     const cle = url + '\n' + ENTETES_CLE.map((n) => lireEntete(h, n)).join('\n');
     const e = cache.get(cle);
@@ -100,6 +108,8 @@ export function creerLecturesPartagees(fetchOrig, base, opts = {}) {
     const monGen = gen;
     const p = Promise.resolve(fetchOrig(input, init));
     const ent = { gen: monGen, p, debut: maintenant(), fin: null };
+    cache.delete(cle);
+    while (cache.size >= maxEntrees) cache.delete(cache.keys().next().value);
     cache.set(cle, ent);
     stats.parties++;
     p.then((r) => {

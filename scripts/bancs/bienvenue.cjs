@@ -27,18 +27,23 @@ const srv = http.createServer((q, r) => {
   const p = path.join(DIST, f); if (!fs.existsSync(p)) { r.writeHead(404); return r.end(); }
   r.writeHead(200, { 'content-type': MIME[path.extname(p)] || 'application/octet-stream' }); r.end(fs.readFileSync(p));
 });
-async function page(nav, { telephone, comptes = [], reduit = false, tab = 'journee' }) {
+async function page(nav, { telephone, comptes = [], reduit = false, tab = 'journee', voixCompacte = false }) {
   const ctx = await nav.newContext({ ...(telephone ? { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2 } : { viewport: { width: 1512, height: 950 } }), reducedMotion: reduit ? 'reduce' : 'no-preference' });
   const pg = await ctx.newPage();
   await pg.addInitScript((s) => {
-    try { if (!sessionStorage.getItem('banc_init')) { localStorage.setItem('vrm_session', JSON.stringify(s)); localStorage.setItem('vrm_banc_bienvenue', '1'); localStorage.removeItem('vrm_bienvenue_vue'); localStorage.setItem('vrm_prenom', JSON.stringify('Léa')); sessionStorage.setItem('banc_init', '1'); } } catch (_) {}
+    try { if (!sessionStorage.getItem('banc_init')) { localStorage.setItem('vrm_session', JSON.stringify({ ...s, voixCompacte: undefined })); localStorage.setItem('vrm_banc_bienvenue', '1'); localStorage.removeItem('vrm_bienvenue_vue'); localStorage.setItem('vrm_prenom', JSON.stringify('Léa')); sessionStorage.setItem('banc_init', '1'); } } catch (_) {}
     // La voix du navigateur, observée : chaque phrase dite est notée, et sa fin arrive 300 ms après.
     window.__dit = [];
     try {
-      window.speechSynthesis.speak = (u) => { window.__dit.push({ texte: u.text, lang: u.lang }); setTimeout(() => { try { u.onend && u.onend(); } catch (_) {} }, 300); };
+      window.speechSynthesis.speak = (u) => { window.__dit.push({ texte: u.text, lang: u.lang, voix: u.voice && u.voice.name }); setTimeout(() => { try { u.onend && u.onend(); } catch (_) {} }, 300); };
       window.speechSynthesis.cancel = () => {};
+      // (30 oct.) VRM ne propose la voix que si une voix française de QUALITÉ existe.
+      const voix = (window.__voixBanc = window.__voixBanc || (s.voixCompacte ? [{ name: 'Thomas', voiceURI: 'com.apple.voice.compact.fr-FR.Thomas', lang: 'fr-FR' }] : [{ name: 'Thomas', voiceURI: 'com.apple.voice.compact.fr-FR.Thomas', lang: 'fr-FR' }, { name: 'Google français', voiceURI: 'Google français', lang: 'fr-FR' }]));
+      window.speechSynthesis.getVoices = () => voix;
+      // Une vraie voix ne se fabrique pas : l'énoncé du banc accepte la voix servie.
+      window.SpeechSynthesisUtterance = class { constructor(t) { this.text = t; } };
     } catch (_) {}
-  }, SESSION);
+  }, { ...SESSION, voixCompacte });
   let main = null;
   await pg.route('**/auth/v1/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ access_token: 'jeton-de-banc', refresh_token: 'r', expires_in: 3600, user: SESSION.user }) }));
   await pg.route('**/rest/v1/**', (r) => {
@@ -95,6 +100,7 @@ async function page(nav, { telephone, comptes = [], reduit = false, tab = 'journ
         await pg.waitForTimeout(1500);
         const dits = await pg.evaluate(() => window.__dit);
         dit(dits.length >= 2 && dits.every((d) => d.lang === 'fr-FR') && /Ma journée/.test(dits[0].texte), `[${W}] la voix lit l'écran, en français`, JSON.stringify(dits.slice(0, 2)));
+        dit(dits.length > 0 && dits.every((d) => d.voix === 'Google français'), `[${W}] la voix choisie est la meilleure (pas la voix compacte)`, JSON.stringify(dits.map((d) => d.voix)));
         const apres = await etat();
         dit(apres !== 'journee', `[${W}] la fin de la lecture passe à l'écran suivant`, apres);
         await voix.click().catch(() => {});
@@ -113,6 +119,13 @@ async function page(nav, { telephone, comptes = [], reduit = false, tab = 'journ
       await pg.goto(`http://localhost:${PORT}/?tab=settings`, { waitUntil: 'domcontentloaded' }); await pg.waitForTimeout(3000);
       dit(await pg.locator('[data-reglage-bienvenue]').count() === 0 && !/Présentation de VRM/.test(await pg.evaluate(() => document.body.innerText)), `[${W}] Réglages ne propose plus « Présentation de VRM »`);
       await ctx.close();
+      { // Seulement la voix « compacte » du système : aucun bouton de voix.
+        const { ctx: c2, pg: p2 } = await page(nav, { telephone, voixCompacte: true });
+        if (await p2.locator('[data-bienvenue-suivant]').count()) await p2.click('[data-bienvenue-suivant]');
+        await p2.waitForTimeout(400);
+        dit(await p2.locator('.vrm-bienvenue').count() === 1 && await p2.locator('[data-bienvenue-voix]').count() === 0, `[${W}] voix compacte seule : pas de « Écouter la visite »`);
+        await c2.close();
+      }
       // L'autre sens : un vendeur qui a déjà un compte Vinted.
       const b = await page(nav, { telephone, comptes: [{ vinted_user_id: '777', login: 'vendeuse', owner: SESSION.user.id }] });
       dit(await b.pg.locator('.vrm-bienvenue').count() === 0, `[${W}] l'autre sens : un vendeur déjà branché ne la voit pas`);

@@ -24,7 +24,7 @@
   } catch (_) {}
   if (window.__vrmLbcInjected) return; window.__vrmLbcInjected = true;
   const TAG = 'CANCALE_LBC';
-  const CAPTEUR_VERSION='5.285.0';
+  const CAPTEUR_VERSION='5.291.0';
   // Le monde MAIN peut précéder le relais isolé, même à document_start.
   // Rejouer uniquement en mémoire, borné, sans requête ni persistance locale.
   let relaisPret=false,sequence=0,octetsAttente=0;
@@ -442,9 +442,37 @@
     return { total: j.total, ids };
   };
   const lecturesProprio = new Map();          // cle → { ids:Set, t0, envoye } — en mémoire, ce document seulement
+  // ── « MES ANNONCES » (29 oct.) : LA MÊME PREUVE, SUR SA PAGE PRIVÉE ──────
+  // Julien : « il n'y a plus que 2 annonces et VRM en a encore 8 ». MESURÉ (sa
+  // base, lecture seule) : sa page « Mes annonces » ne charge plus `myads` mais
+  // `POST api.leboncoin.fr/api/dashboard/v1/search`, corps
+  // `{context, filters:{owner:{user_id}}, limit, offset, sort_by, sort_order,
+  //   include_inactive, include_draft}`, réponse
+  // `{total, account_stats, pivot, ads:[{list_id, status, owner:{user_id}, …}]}`.
+  // Ses annonces passaient (lbcraw) mais ne DÉCIDAIENT rien : une annonce
+  // supprimée ou expirée n'en sortait jamais (8 « en ligne » pour 2). On applique
+  // la règle de la liste publique : requête filtrée sur le SEUL vendeur, chaque
+  // annonce à lui, le total atteint par toutes les pages lues ⇒ elle décide ;
+  // une page partielle ne décide rien (§4.2).
+  const DASHBOARD = /^https:\/\/api\.leboncoin\.fr\/api\/dashboard\/v\d+\/search\/?(?:\?.*)?$/i;
+  const LISTE_VENDEUR = (u) => OWNER_LISTING.test(String(u || '')) || DASHBOARD.test(String(u || ''));
+  const requeteTableau = (corps) => {
+    let r; try { r = typeof corps === 'string' ? JSON.parse(corps) : null; } catch (_) { return null; }
+    if (!r || typeof r !== 'object' || Array.isArray(r)) return null;
+    for (const k of Object.keys(r)) if (!['context', 'filters', 'limit', 'offset', 'sort_by', 'sort_order', 'include_inactive', 'include_draft', 'pivot'].includes(k)) return null;
+    const f = r.filters;
+    if (!f || typeof f !== 'object' || Array.isArray(f) || Object.keys(f).length !== 1) return null;
+    const o = f.owner;
+    if (!o || typeof o !== 'object' || Object.keys(o).length !== 1 || typeof o.user_id !== 'string' || !/^[0-9a-f-]{8,64}$/i.test(o.user_id)) return null;
+    for (const k of ['include_inactive', 'include_draft']) if (r[k] !== undefined && typeof r[k] !== 'boolean') return null;
+    const offset = r.offset === undefined ? 0 : r.offset;
+    if (!Number.isInteger(offset) || offset < 0 || (r.limit !== undefined && (!Number.isInteger(r.limit) || r.limit <= 0))) return null;
+    return { owner: o.user_id, offset, tri: 'tableau/' + String(r.sort_by || '') + '/' + String(r.sort_order || '') + '/' + String(r.include_inactive === true) + '/' + String(r.include_draft === true) };
+  };
   const noterListeProprietaire = (url, texte, corpsReq) => {
-    if (!OWNER_LISTING.test(String(url || ''))) return;
-    const req = requeteProprietaire(corpsReq); if (!req) return;
+    const u = String(url || '');
+    if (!LISTE_VENDEUR(u)) return;
+    const req = DASHBOARD.test(u) ? requeteTableau(corpsReq) : requeteProprietaire(corpsReq); if (!req) return;
     const rep = reponseProprietaire(texte, req.owner); if (!rep) return;
     const cle = req.owner + '|' + req.tri + '|' + rep.total;
     // Un autre total pour ce vendeur : la liste a bougé, on repart.
@@ -476,6 +504,46 @@
     } catch (_) {}
   };
 
+  // ── UNE SUPPRESSION / MISE EN PAUSE FAITE SUR LA PAGE (29 oct.) ─────────
+  // MESURÉ (`lbc_recon.envois`) : le bouton « Supprimer » de Leboncoin envoie
+  // `DELETE api.leboncoin.fr/api/pintad/v1/public/manual/delete/ads`, corps
+  // `{list_ids:[nombre]}` (vu le 28 oct. à 22:47, après la vente de la N°18 sur
+  // Vinted), et « Mettre en pause » `PUT …/manual/pause/ads`, même corps. VRM
+  // n'en savait rien : l'annonce restait « en ligne » jusqu'à une liste complète.
+  // On relaie, SEULEMENT sur une réponse 2xx de Leboncoin, les identifiants et
+  // ce qui a été fait — jamais autre chose. Le fond ne marque que SES annonces.
+  const RETRAIT_PAGE = /^https:\/\/api\.leboncoin\.fr\/api\/pintad\/v\d+\/public\/manual\/(delete|pause)\/ads\/?(?:\?.*)?$/i;
+  const noterRetraitPage = (url, methode, corps, statut) => {
+    try {
+      const m = RETRAIT_PAGE.exec(String(url || ''));
+      if (!m || !(statut >= 200 && statut < 300)) return;
+      const quoi = m[1].toLowerCase() === 'delete' ? 'supprime' : 'pause';
+      if ((quoi === 'supprime' && !/^DELETE$/i.test(methode || '')) || (quoi === 'pause' && !/^PUT$/i.test(methode || ''))) return;
+      let j; try { j = typeof corps === 'string' ? JSON.parse(corps) : null; } catch (_) { return; }
+      const ids = (j && Array.isArray(j.list_ids) ? j.list_ids : []).map((x) => String(x)).filter((x) => /^\d{5,15}$/.test(x));
+      if (!ids.length || ids.length > 50) return;
+      post({ kind: 'lbcretraitvu', quoi, ids, statut });
+    } catch (_) {}
+  };
+
+  const STATS_JOUR = /^https:\/\/api\.leboncoin\.fr\/api\/stats\/proxy\/v\d+\/classified\/history\/daily\/?(?:\?|$)/i;
+  const noterStatsJour = (url, text) => {
+    try {
+      let u; try { u = new URL(url); } catch (_) { return; }
+      const ids = [...u.searchParams.entries()].filter(([, v]) => /^\d{5,15}$/.test(v)).map(([, v]) => v);
+      if (new Set(ids).size !== 1) return;
+      let j; try { j = JSON.parse(text); } catch (_) { return; }
+      if (!Array.isArray(j) || !j.length || j.length > 400) return;
+      const nb = (v) => (typeof v === 'number' && Number.isFinite(v) && v >= 0 && v < 1e7 ? Math.round(v) : null);
+      const jours = j.filter((x) => x && typeof x === 'object' && !Array.isArray(x) && typeof x.Date === 'string' && /^\d{4}-\d{2}-\d{2}/.test(x.Date));
+      if (!jours.length) return;
+      jours.sort((a, b) => (a.Date < b.Date ? -1 : a.Date > b.Date ? 1 : 0));
+      const der = jours[jours.length - 1];
+      let vues = 0, vuesConnues = 0;
+      for (const x of jours) { const v = nb(x.Views); if (v != null) { vues += v; vuesConnues++; } }
+      post({ kind: 'lbcstatsannonce', id: ids[0], favoris: nb(der.TotalFavorites), messages: nb(der.TotalMessages), vues: vuesConnues ? vues : null, du: jours[0].Date.slice(0, 10), au: der.Date.slice(0, 10), jours: jours.length });
+    } catch (_) {}
+  };
   const handle = (url, text, ctype, statut = 200, corpsReq = null) => {
     try {
       if (NOISE.test(url)||statut<200||statut>=300) return;
@@ -499,6 +567,15 @@
       if(text.length>1500000)return;
 
       noteSchema(url, text);                                // la structure, jamais les valeurs
+      // ── LES STATISTIQUES D'UNE ANNONCE (29 oct.) : DES NOMBRES, JAMAIS QUI ──
+      // Julien veut « les messages aux favoris, tout pareil » sur Leboncoin.
+      // MESURÉ (schéma rangé le 22 oct.) : la page « Statistiques » d'une annonce
+      // charge `GET …/stats/proxy/v2/classified/history/daily`, une liste par jour
+      // `[{Date, Favorites, TotalFavorites, Views, Messages, TotalMessages, …}]` —
+      // des COMPTES, aucun nom : Leboncoin ne dit pas QUI a mis en favori.
+      // L'annonce visée est dans la query (forme jamais vue) : on n'attribue que si
+      // UN SEUL paramètre porte un identifiant d'annonce ; sinon rien.
+      if (STATS_JOUR.test(url)) { noterStatsJour(url, text); return; }
       // ── LA MESSAGERIE (4 octobre) : SEULEMENT LE NOMBRE DE NON-LUS ─────────
       // Julien : « dans Leboncoin, il y ait les messages ». Mesuré : la page
       // recharge elle-même un compteur `{userId, unread, pollingTime}` — un
@@ -576,8 +653,10 @@
       try { if (MODIFIE.test(meth)) noteEnvoi(url, init && init.body, meth); } catch (_) {}
       // La liste d'un vendeur : son corps de requête dit si elle peut DÉCIDER (22 oct.).
       let corpsReq = null;
-      try { if (init && typeof init.body === 'string' && OWNER_LISTING.test(url)) corpsReq = init.body; } catch (_) {}
+      try { if (init && typeof init.body === 'string' && LISTE_VENDEUR(url)) corpsReq = init.body; } catch (_) {}
       try { noterEntetes(url, init && init.headers); } catch (_) {}
+      let corpsRetrait = null;
+      try { if (init && typeof init.body === 'string' && RETRAIT_PAGE.test(url)) corpsRetrait = init.body; } catch (_) {}
       // En-têtes d'une requête du SITE vers ses transactions : on les réutilise
       // tels quels pour lire le détail (restent dans la page, jamais envoyés ailleurs).
       try {
@@ -593,6 +672,7 @@
             const ct = res.headers && res.headers.get && res.headers.get('content-type');
             if (/vinted|supabase/i.test(url)) return; // ne touche pas aux autres domaines
             noteSeen(url, meth, res.status, ct);
+            if (corpsRetrait) noterRetraitPage(url, meth, corpsRetrait, res.status);
             res.clone().text().then((t) => handle(url, t, ct, res.status, corpsReq)).catch(() => {});
           } catch (_) {}
         }).catch(() => {});
@@ -608,7 +688,7 @@
     if (origSetH) OX.prototype.setRequestHeader = function (k, v) { try { (this.__lbcH = this.__lbcH || {})[String(k)] = String(v); } catch (_) {} return origSetH.apply(this, arguments); };
     OX.prototype.send = function (corps) {
       try { if (MODIFIE.test(this.__lbcMeth || '')) noteEnvoi(this.__lbcUrl || '', corps, this.__lbcMeth); } catch (_) {}
-      try { this.__lbcCorps = (typeof corps === 'string' && OWNER_LISTING.test(this.__lbcUrl || '')) ? corps : null; noterEntetes(this.__lbcUrl || '', this.__lbcH); } catch (_) {}
+      try { this.__lbcCorps = (typeof corps === 'string' && LISTE_VENDEUR(this.__lbcUrl || '')) ? corps : null; this.__lbcRetrait = (typeof corps === 'string' && RETRAIT_PAGE.test(this.__lbcUrl || '')) ? corps : null; noterEntetes(this.__lbcUrl || '', this.__lbcH); } catch (_) {}
       try {
         this.addEventListener('load', function () {
           try {
@@ -616,6 +696,7 @@
             if (/vinted|supabase/i.test(url)) return;
             const ct = this.getResponseHeader && this.getResponseHeader('content-type');
             noteSeen(url, this.__lbcMeth, this.status, ct);
+            if (this.__lbcRetrait) noterRetraitPage(url, this.__lbcMeth, this.__lbcRetrait, this.status);
             const t = this.responseType === 'json' ? JSON.stringify(this.response) : (this.responseType === '' || this.responseType === 'text') ? this.responseText : null;
             if (t) handle(url, t, ct, this.status, this.__lbcCorps || null);
           } catch (_) {}
@@ -634,10 +715,17 @@
   // suppression, jamais une autre adresse. La réponse de Leboncoin repart telle
   // quelle (statut + 300 premiers caractères + la FORME du corps).
   const URL_PAUSE_LBC = 'https://api.leboncoin.fr/api/pintad/v1/public/manual/pause/ads';
+  // 29 oct. : SUPPRIMER, sur son clic confirmé. UNE autre adresse, écrite en dur
+  // elle aussi, VUE dans ses gestes (`lbc_recon.envois`, 28 oct. 22:47) :
+  // `DELETE …/manual/delete/ads`, même corps. Elle ne part QUE sur un ordre
+  // `supprime` — jamais sur un ordre `pause`, quoi que contienne l'ordre.
+  const URL_SUPPRIME_LBC = 'https://api.leboncoin.fr/api/pintad/v1/public/manual/delete/ads';
+  const ORDRES_LBC = { pause: { url: URL_PAUSE_LBC, methode: 'PUT' }, supprime: { url: URL_SUPPRIME_LBC, methode: 'DELETE' } };
   let pauseEnCours = false;
   try { window.addEventListener('message', async (event) => {
     const d = event && event.data;
-    if (event.source !== window || !d || d.__tag !== 'CANCALE_LBC_ORDRE' || d.kind !== 'pause') return;
+    if (event.source !== window || !d || d.__tag !== 'CANCALE_LBC_ORDRE' || !Object.prototype.hasOwnProperty.call(ORDRES_LBC, d.kind)) return;
+    const ordre = ORDRES_LBC[d.kind];
     const id = String(d.id || ''), jeton = String(d.jeton || '');
     if (!/^\d{6,12}$/.test(id) || !/^[a-z0-9-]{8,64}$/i.test(jeton)) return;
     if (window.top !== window || !/(^|\.)leboncoin\.fr$/i.test(location.hostname)) return;
@@ -647,13 +735,13 @@
       const h = Object.assign({}, entetesPintad || entetesApi || {}, { 'Content-Type': 'application/json', Accept: 'application/json' });
       let statut = 0, corps = '', erreur = '';
       try {
-        const res = await origFetch.call(window, URL_PAUSE_LBC, { method: 'PUT', credentials: 'include', headers: h, body: JSON.stringify({ list_ids: [Number(id)] }) });
+        const res = await origFetch.call(window, ordre.url, { method: ordre.methode, credentials: 'include', headers: h, body: JSON.stringify({ list_ids: [Number(id)] }) });
         statut = Number(res.status) || 0;
         try { corps = String(await res.text()).slice(0, 2000); } catch (_) {}
       } catch (e) { erreur = String((e && e.message) || e).slice(0, 80) || 'reseau'; }
       let cles = [];
       try { cles = cheminsDeCles(JSON.parse(corps)).slice(0, 60); } catch (_) {}
-      post({ kind: 'lbcpauseresultat', jeton, id, statut, corps: corps.slice(0, 300), cles, erreur, entetes: Object.keys(h).length });
+      post({ kind: 'lbcpauseresultat', jeton, id, quoi: d.kind, statut, corps: corps.slice(0, 300), cles, erreur, entetes: Object.keys(h).length });
     } finally { pauseEnCours = false; }
   }); } catch (_) {}
 })();

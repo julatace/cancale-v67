@@ -1,0 +1,424 @@
+// Banc « Comptabilité simple » et « Organisation hors du menu » (29 octobre).
+//
+// Julien : « Pour la compta, améliore tout, mets de côté la facturation
+// électronique et fais quelque chose de simple. » — puis, pour Organisation :
+// « ça doit être utile sinon ça n'a rien à faire ici ».
+//
+// Ce que le banc exige, sur des données INVENTÉES (rien de réel, dépôt public) :
+//  A. Comptabilité, 390 tactile clair et 1512 sombre :
+//     • l'ordre de lecture : Vendu/Reçu → Bénéfice → URSSAF → Dépenses → Avancé ;
+//     • « Avancé » REPLIÉ par défaut, et c'est lui qui porte le résultat de
+//       l'année, le récap mensuel, les packs, l'entreprise, les factures et la
+//       facturation électronique (rien de supprimé : ils sont dans le DOM) ;
+//     • les chiffres n'ont pas bougé (les mêmes que le code d'avant) ;
+//     • la carte URSSAF ne redit plus « Bénéfice — » (il a sa carte au-dessus) ;
+//     • « Ta micro-entreprise » repliée… sauf s'il y a une question à
+//       trancher (versement libératoire pas dit) : alors ouverte, et elle ne
+//       se referme pas sous le doigt quand il répond ;
+//     • le sommaire mène à « Avancé » et l'ouvre ; cibles ≥ 44 px au doigt.
+//  A bis (revue du 29 oct.) — ce que l'écran DIT, jugé sur la page rendue :
+//     • « Tes dépenses » à moins de 2 400 px (téléphone) / 1 900 px (ordinateur)
+//       du haut, AVANT le suivi URSSAF et « Ta micro-entreprise » — même
+//       quand celle-ci s'ouvre d'elle-même (question pas tranchée) ;
+//     • « Année » sur la carte Vendu et reçu : jamais un en-tête de tableau
+//       sans ligne ; chaque carte nomme SA période (deux libellés distincts) ;
+//     • l'URSSAF du mois en cours ne se redit pas : « à payer » une fois (la
+//       carte), le suivi n'en redonne pas le montant, le calendrier ne redit
+//       pas « notée déclarée » ;
+//     • « connu pour 1 vente » (jamais « pour les 1 vente ») ; le geste de la
+//       facturation électronique nomme « Ton entreprise », jamais « Profil
+//       fiscal » ; le « ⓘ » du résultat ne dit pas « juste en dessous » d'un
+//       bénéfice qui est AU-DESSUS (la position est jugée, pas le mot seul).
+//  B. versement libératoire déjà dit ⇒ la micro-entreprise reste repliée.
+//  F (revue 3). Trimestriel, un seul trimestre noté : 37,20 € écrit une fois.
+//  C. Organisation n'est plus dans le menu (Gestion au téléphone, rail à
+//     l'ordinateur), mais on y entre par Réglages → Stock et rangement, et
+//     `?tab=organisation` marche toujours.
+//
+// Lancer : npm run build && node scripts/bancs/compta-simple.cjs
+//          (BANC_PORT pour changer de port ; CHROMIUM_PATH pour le navigateur)
+
+require('./_porte-banc.cjs');
+const { chromium } = require('playwright');
+const { metaVersData } = require('./_meta.cjs');
+const fs = require('fs'), http = require('http'), path = require('path');
+const DIST = path.join(__dirname, '..', '..', 'dist');
+const PORT = Number(process.env.BANC_PORT || process.env.PORT) || 9311;
+const MAINTENANT = '2026-10-27T10:00:00+01:00';
+const ACCOUNTS = [{ id: 1, vinted_user_id: '111', login: 'atelier_test', domain: 'www.vinted.fr', updated_at: '2026-10-27T08:00:00Z' }];
+const VENTES = [
+  [9301, 'Nike Air Max inventée taille 42', 100, '2026-09-10T12:00:00+02:00', '2026-09-15T08:00:00+02:00'],
+  [9302, 'Salomon XT-6 inventée taille 40', 80, '2026-09-12T12:00:00+02:00', '2026-09-20T08:00:00+02:00'],
+  [9303, 'Adidas Samba inventée taille 41', 120, '2026-09-25T12:00:00+02:00', '2026-09-29T08:00:00+02:00'],
+  [9304, 'Asics Gel inventée taille 43', 60, '2026-10-05T12:00:00+02:00', '2026-10-10T08:00:00+02:00'],
+];
+const LIGNE = { at: Date.parse('2026-10-27T07:00:00Z'), mois: [{ ym: '2026-10', ca: 60, n: 1, par: { Vinted: { n: 1, ca: 60 } } }, { ym: '2026-09', ca: 300, n: 3, par: { Vinted: { n: 3, ca: 300 } } }], aDater: { n: 0, ca: 0, par: {} }, sources: { Vinted: 'lu', Leboncoin: 'lu', eBay: 'lu', Vestiaire: 'nonRelie' } };
+const ROWS = [
+  { id: 'harvest_111_orders_sold', data: { capturedAt: '2026-10-27T07:30:00Z', payload: { my_orders: VENTES.map(([tx, t, p, d]) => ({ transaction_id: tx, title: t, price: { amount: String(p), currency_code: 'EUR' }, status: 'Commande finalisée', date: d })) } } },
+  ...VENTES.map(([tx, , , , v]) => ({ id: `harvest_111_txn_${tx}`, data: { capturedAt: '2026-10-27T07:30:00Z', payload: { transaction: { id: tx, item_id: tx + 500000, status: 450, status_title: 'Commande finalisée', status_updated_at: v } } } })),
+  { id: 'lbc_ventes', data: { ventes: {} } },
+  { id: 'ebay_orders', data: { orders: [] } },
+];
+const main = (sombre, avecVl, ligne = LIGNE) => ({
+  vinted_dark: sombre, vinted_regime: 'micro', vinted_urssaf_taux: 12.4, vinted_urssaf_freq: 'mensuel', vinted_urssaf_mois: ligne,
+  vinted_sale_overrides: { 9301: { buyPrice: '40' }, 9302: { buyPrice: '30' }, 9303: { buyPrice: '50' }, 9304: { buyPrice: '30' } },
+  vrm_compta: { depenses: [{ id: 'd1', date: '2026-10-03', libelle: 'cartons', cat: 'Emballage', montant: 12.5 }], abonnements: [{ id: 'a1', libelle: 'VRM', montant: 12.99, periode: 'mois', debut: '2026-09-01', fin: '' }], fixes: [], packs: [] },
+  vrm_urssaf_declare: { '2026-09': { ids: ['vinted:9301', 'vinted:9302', 'vinted:9303'], n: 3, ca: 300, montant: 300, regle: 'versement', at: Date.parse('2026-10-12T09:00:00Z') } },
+  ...(avecVl ? { vrm_micro_options: { liberatoire: 'non', acre: false, at: Date.parse('2026-10-20T09:00:00Z') } } : {}),
+});
+
+const types = { '.js': 'text/javascript', '.css': 'text/css', '.html': 'text/html', '.png': 'image/png', '.svg': 'image/svg+xml', '.json': 'application/json', '.webmanifest': 'application/json', '.woff2': 'font/woff2', '.onnx': 'application/octet-stream' };
+const srv = http.createServer((q, r) => { let f = q.url.split('?')[0]; if (f === '/' || !path.extname(f)) f = '/index.html'; const p = path.join(DIST, f); if (!fs.existsSync(p)) { r.writeHead(404); return r.end(); } r.writeHead(200, { 'content-type': types[path.extname(p)] || 'application/octet-stream' }); fs.createReadStream(p).pipe(r); });
+srv.on('error', (e) => { console.log(e.code === 'EADDRINUSE' ? `KO le port ${PORT} est pris — relance-le seul (BANC_PORT=…)` : `KO serveur : ${e.message}`); process.exit(1); });
+srv.listen(PORT);
+const projette = (row, sel) => { if (!sel || sel === '*') return row; const out = {}; for (const part of sel.split(',')) { const m = /^(?:([^:]+):)?(.+)$/.exec(part.trim()); if (!m) continue; const src = m[2], alias = m[1] || src.split(/->>|->/).pop(); if (src === 'id') { out[alias] = row.id; continue; } if (src === 'data') { out[alias] = row.data; continue; } let v = row.data; for (const seg of src.replace(/^data(->>|->)/, '').split(/->>|->/)) v = v == null ? null : v[seg]; if (/->>/.test(src) && v != null && typeof v !== 'object') v = String(v); out[alias] = v == null ? null : v; } return out; };
+
+let ko = 0, ok = 0;
+const check = (cond, msg) => { if (cond) { ok++; console.log('✅ ' + msg); } else { ko++; console.log('❌ ' + msg); } };
+const essaie = async (msg, fn) => { try { await fn(); } catch (e) { ko++; console.log(`❌ ${msg} — ${String(e.message || e).split('\n')[0].slice(0, 200)}`); } };
+
+async function page(b, vp, sombre, avecVl, errs, o = {}) {
+  const tel = vp.width < 600;
+  const ctx = await b.newContext({ viewport: vp, timezoneId: 'Europe/Paris', ...(tel ? { isMobile: true, hasTouch: true } : {}) });
+  const pg = await ctx.newPage();
+  pg.on('pageerror', (e) => errs.push(e.message));
+  await pg.clock.setFixedTime(new Date(MAINTENANT));
+  await pg.addInitScript((s) => { try { localStorage.setItem('vrm_acces_direct', '1'); localStorage.setItem('vinted_dark', s ? 'true' : 'false'); } catch (_) {} }, sombre);
+  await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) ? r.abort() : r.continue()));
+  // La ligne `main` GARDE ce que l'app y écrit (une relecture du nuage ne doit
+  // pas rendre l'ancienne valeur : un banc qui jette les écritures mesure une fiction).
+  let m = { ...main(sombre, avecVl, o.ligne), ...(o.extra || {}) };
+  await pg.route('**/rest/v1/**', (route) => {
+    const u = decodeURIComponent(metaVersData(route.request().url()));
+    const j = (d) => route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*', 'content-range': `0-${Math.max(0, d.length - 1)}/${d.length}` }, body: JSON.stringify(d) });
+    if (route.request().method() !== 'GET') {
+      try { const corps = JSON.parse(route.request().postData() || 'null'); for (const x of [].concat(corps || [])) if (x && x.id === 'main' && x.data && typeof x.data === 'object') m = x.data; } catch (_) {}
+      return route.fulfill({ status: 201, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: '[]' });
+    }
+    if (/select=owner&limit=1/.test(u)) return j([{ owner: 'x' }]);
+    if (/\/rest\/v1\/vinted_accounts/.test(u)) return j(ACCOUNTS);
+    const sel = (/[?&]select=([^&]*)/.exec(u) || [])[1] || null;
+    const forme = (r) => (sel && !/^id,data/.test(sel)) ? projette(r, sel) : ({ ...r, updated_at: '2026-10-27T08:00:00Z', cap: r.data.capturedAt });
+    const eq = /id=eq\.([^&]*)/.exec(u);
+    if (eq && eq[1] === 'main') { if (o.retenu) return o.retenu.then(() => j([forme({ id: 'main', data: m })])); return j([forme({ id: 'main', data: m })]); }
+    if (eq) return j(ROWS.filter((r) => r.id === eq[1]).map(forme));
+    const lk = /id=like\.([^&]*)/.exec(u);
+    if (lk) { const re = new RegExp('^' + lk[1].replace(/[.]/g, '\\.').replace(/[*%]/g, '.*') + '$'); return j(ROWS.filter((r) => re.test(r.id)).map(forme)); }
+    return j([]);
+  });
+  // Organisation lit sa route : servie à la forme de `api/_lib/operations.js`.
+  const { VIDE } = await import(path.join(__dirname, '..', '..', 'src', 'operations', 'metier.js'));
+  await pg.route('**/api/**', (r) => {
+    if (/mode=operations/.test(r.request().url())) return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, donnees: VIDE(), equipe: [], serveur: new Date(MAINTENANT).toISOString(), confirmees: [] }) });
+    return r.fulfill({ status: 200, contentType: 'application/json', body: '{"pret":true}' });
+  });
+  return { ctx, pg, tel };
+}
+
+async function ouvrir(pg, tab) {
+  await pg.goto(`http://localhost:${PORT}/?tab=${tab}`, { waitUntil: 'domcontentloaded' });
+}
+const mort = async (pg) => /n'a pas pu s'afficher|Cannot access|is not defined/.test(await pg.evaluate(() => document.body.innerText));
+const deborde = async (pg) => pg.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1);
+
+// L'ordre de deux éléments dans la page (le suivant est-il APRÈS ?).
+const avant = (pg, a, b) => pg.evaluate(([a, b]) => { const x = document.querySelector(a), y = document.querySelector(b); return !!(x && y && (x.compareDocumentPosition(y) & Node.DOCUMENT_POSITION_FOLLOWING)); }, [a, b]);
+const visible = (pg, sel) => pg.evaluate((sel) => { const e = document.querySelector(sel); return !!(e && e.checkVisibility && e.checkVisibility()); }, sel);
+const attr = (pg, sel, a) => pg.evaluate(([sel, a]) => { const e = document.querySelector(sel); return e ? e.getAttribute(a) : null; }, [sel, a]);
+// La position d'un élément dans la page qui défile (px depuis le haut du contenu).
+const topDe = (pg, sel) => pg.evaluate((sel) => { const e = document.querySelector(sel); if (!e) return null; const sc = document.querySelector('.vrm-main'); const t = e.getBoundingClientRect().top + (sc && sc.scrollHeight > sc.clientHeight ? sc.scrollTop : (document.scrollingElement || document.documentElement).scrollTop); return Math.round(t); }, sel);
+const texte = (pg, sel) => pg.evaluate((sel) => { const e = document.querySelector(sel); return e ? e.innerText : null; }, sel);
+const dansAvance = (pg, sel) => pg.evaluate((sel) => { const d = document.querySelector('[data-compta-avance]'); const e = document.querySelector(sel); return !!(d && e && d.contains(e)); }, sel);
+
+async function scenarioA(b, vp, sombre) {
+  const nom = `${vp.width}${sombre ? ' sombre' : ' clair'}`;
+  const errs = [];
+  const { ctx, pg, tel } = await page(b, vp, sombre, false, errs);
+  await essaie(`A ${nom} — l'écran se rend`, async () => {
+    await ouvrir(pg, 'cat_ventes');
+    // (revue) On attend l'ÉTAT, pas un délai : Ventes publie le bénéfice
+    // (`vrm_benefice_jours`) en 4 à 6 s sous charge ; parti trop tôt, le banc
+    // mesurait la machine (« se calcule dans l'écran Ventes »), pas l'app.
+    await pg.waitForFunction(() => !!localStorage.getItem('vrm_benefice_jours'), null, { timeout: 90000 });
+    await ouvrir(pg, 'compta');
+    await pg.locator('[data-ca-cur="vendu"]').first().waitFor({ timeout: 40000 });
+    await pg.locator('[data-benef-etat="lu"]').first().waitFor({ timeout: 40000 });
+    await pg.locator('[data-urssaf-declaree]').first().waitFor({ timeout: 40000 });
+    await pg.locator('[data-micro-repli]').first().waitFor({ timeout: 40000 });
+    await pg.waitForTimeout(800);
+  });
+  // SHOTS=dossier : capture de tout l'écran (à regarder : §6.2).
+  if (process.env.SHOTS) {
+    for (let i = 0; i < 8; i++) {
+      await pg.screenshot({ path: path.join(process.env.SHOTS, `compta-${vp.width}${sombre ? '-sombre' : ''}-${i}.png`) }).catch(() => {});
+      const fin = await pg.evaluate((h) => { const els = [document.scrollingElement, ...document.querySelectorAll('main, .vrm-main, [class*="scroll"]')].filter((e) => e && e.scrollHeight > e.clientHeight + 4); const e = els.find((x) => getComputedStyle(x).overflowY !== 'visible' || x === document.scrollingElement); if (!e) return true; const avant = e.scrollTop; e.scrollTop += h * 0.85; return e.scrollTop === avant; }, vp.height);
+      if (fin) break;
+      await pg.waitForTimeout(250);
+    }
+    await pg.evaluate(() => { for (const e of [document.scrollingElement, ...document.querySelectorAll('main, .vrm-main')]) if (e) e.scrollTop = 0; });
+  }
+  await essaie(`A ${nom}`, async () => {
+    check(!(await mort(pg)), `A ${nom} — aucun écran tombé sur le garde-fou`);
+    // ── l'ordre de lecture
+    check(await avant(pg, '[data-ca-periode]', '[data-benef-etat]'), `A ${nom} — « Vendu et reçu » avant le bénéfice`);
+    check(await avant(pg, '[data-benef-etat]', '[data-compta-urssaf]'), `A ${nom} — le bénéfice avant l'URSSAF`);
+    check(await avant(pg, '[data-compta-urssaf]', '[data-compta-depenses]'), `A ${nom} — l'URSSAF avant les dépenses`);
+    check(await avant(pg, '[data-compta-depenses]', '[data-compta-avance]'), `A ${nom} — les dépenses avant « Avancé »`);
+    // ── « Avancé » replié, et ce qui y vit
+    check((await attr(pg, '[data-compta-avance]', 'data-compta-avance')) === 'ferme', `A ${nom} — « Avancé » est replié par défaut`);
+    for (const [sel, lib] of [['[data-compta-resultat]', 'le résultat de l\'année'], ['[data-recap-regle]', 'le récap mensuel'], ['[data-compta-section="packs"]', 'les packs'], ['[data-profil-fiscal]', 'l\'entreprise'], ['#compta-factures', 'les factures'], ['[data-fe-etat]', 'la facturation électronique']]) {
+      check(await dansAvance(pg, sel), `A ${nom} — ${lib} vit dans « Avancé » (rien n'est supprimé)`);
+      check(!(await visible(pg, sel)), `A ${nom} — ${lib} n'est pas affiché tant qu'« Avancé » est replié`);
+    }
+    // ── l'essentiel, visible
+    for (const [sel, lib] of [['[data-ca-cur="vendu"]', 'Vendu'], ['[data-ca-cur="recu"]', 'Reçu'], ['[data-benef-net]', 'le bénéfice'], ['[data-echeance-suivante]', 'la prochaine déclaration'], ['[data-dep-ouvrir]', 'Ajouter une dépense'], ['[data-compta-kpi="mois"]', 'les dépenses du mois']]) {
+      check(await visible(pg, sel), `A ${nom} — ${lib} est visible sans rien ouvrir`);
+    }
+    // ── les chiffres n'ont pas bougé (mêmes valeurs que sur le code d'avant)
+    check((await attr(pg, '[data-ca-cur="vendu"]', 'data-ca-eur')) === '60', `A ${nom} — Vendu du mois 60 € (inchangé)`);
+    check((await attr(pg, '[data-ca-cur="recu"]', 'data-ca-eur')) === '60', `A ${nom} — Reçu du mois 60 € (inchangé)`);
+    check((await attr(pg, '[data-benef-net]', 'data-benef-net')) === '-2.93', `A ${nom} — bénéfice net −2,93 € (inchangé) : ${await attr(pg, '[data-benef-net]', 'data-benef-net')}`);
+    // (revue) Septembre est déjà noté « déclaré » : la carte ne lui redonne ni
+    // compte à rebours ni montant, et nomme la SUIVANTE (celle de « Ta
+    // micro-entreprise »). Son montant (37,20 €) reste dans la ligne du suivi.
+    check((await attr(pg, '[data-urssaf-declaree]', 'data-urssaf-declaree')) === '2026-09', `A ${nom} — septembre est dit noté « déclaré »`);
+    check((await attr(pg, '[data-echeance-suivante]', 'data-echeance-suivante')) === 'octobre 2026', `A ${nom} — la prochaine déclaration nommée est octobre 2026 : ${await attr(pg, '[data-echeance-suivante]', 'data-echeance-suivante')}`);
+    check((await attr(pg, '[data-echeance-suivante-jours]', 'data-echeance-suivante-jours')) === '34', `A ${nom} — compte à rebours depuis aujourd'hui (27 oct. → 30 nov. = 34 j) : ${await attr(pg, '[data-echeance-suivante-jours]', 'data-echeance-suivante-jours')}`);
+    check((await pg.locator('[data-echeance-apayer]').count()) === 0, `A ${nom} — aucun « à payer » pour une période déjà notée « déclarée »`);
+    check((await attr(pg, '[data-suivi-periode="septembre 2026"]', 'data-suivi-decl')) === '300', `A ${nom} — le suivi garde septembre déclaré 300 € (inchangé)`);
+    check((await attr(pg, '[data-compta-kpi="mois"]', 'data-eur')) === '25.49', `A ${nom} — dépenses du mois 25,49 € (inchangé)`);
+    check((await attr(pg, '[data-compta-resultat]', 'data-compta-resultat')) === '321.52', `A ${nom} — résultat de l'année 321,52 € (inchangé)`);
+    // ── la carte URSSAF ne redit pas un « Bénéfice — » : il a sa carte
+    const carteMois = await pg.evaluate(() => { const e = document.querySelector('[data-stats-carte="mois"]'); return e ? e.innerText : null; });
+    check(carteMois != null && !/Bénéfice/.test(carteMois), `A ${nom} — la carte URSSAF du mois ne redit pas « Bénéfice » (la carte Bénéfice est juste au-dessus)`);
+    // ── (revue du 29 oct.) les dépenses près du haut, même micro-entreprise ouverte
+    const dep = await topDe(pg, '#compta-charges'), suivi = await topDe(pg, '[data-suivi-urssaf]'), micro = await topDe(pg, '[data-micro-repli]');
+    const seuilDep = tel ? 2400 : 1900;
+    check(dep != null && dep < seuilDep, `A ${nom} — « Tes dépenses » à moins de ${seuilDep} px du haut : ${dep} px`);
+    check(dep != null && micro != null && dep < micro && (suivi == null || dep < suivi), `A ${nom} — les dépenses avant le suivi URSSAF et « Ta micro-entreprise » (dépenses ${dep}, suivi ${suivi}, micro ${micro})`);
+    // ── une phrase une fois : l'URSSAF du mois en cours
+    // (la carte Bénéfice retire aussi ces cotisations de son net : c'est un autre calcul, hors du compte)
+    const tout = await pg.evaluate(() => { const m = document.querySelector('.vrm-main'); if (!m) return ''; const c = m.cloneNode(true); for (const b of c.querySelectorAll('[data-benef-etat]')) b.remove(); document.body.appendChild(c); const t = c.innerText; c.remove(); return t; });
+    const nApayer = (tout.match(/7,44/g) || []).length;
+    const n3720 = (tout.match(/37,20/g) || []).length, nNotee = (tout.match(/notée « ?déclarée/gi) || []).length;
+    check(n3720 === 1, `A ${nom} — les cotisations de septembre (37,20 €), déjà déclaré, sont écrites une fois : ${n3720} fois`);
+    check(nNotee <= 1, `A ${nom} — « notée déclarée » est dit au plus une fois : ${nNotee} fois`);
+    check(nApayer === 1, `A ${nom} — l'« à payer » du mois en cours (7,44 €) est écrit une fois hors du bénéfice : ${nApayer} fois`);
+    const enCours = await texte(pg, '[data-suivi-etat="en_cours"]');
+    check(enCours != null && !/à payer/.test(enCours), `A ${nom} — le suivi ne redonne pas l'« à payer » du mois en cours : « ${(enCours || '').replace(/\s+/g, ' ').trim()} »`);
+    const cal = await texte(pg, '[data-micro-calendrier]');
+    check(cal != null && !/déclarée/.test(cal) && (await pg.locator('[data-micro-calendrier] [aria-label="notée déclarée"]').count()) === 1, `A ${nom} — le calendrier marque septembre d'une coche, sans redire « notée déclarée »`);
+    // (le titre replié de la micro-entreprise GARDE l'échéance : `suivi-urssaf.cjs` R l'exige — une décision de l'autre session.)
+    // ── accord : « connu pour 1 vente »
+    const benef = (await texte(pg, '[data-benef-etat]')) || '';
+    check(!/pour les 1 vente/.test(benef) && /connu pour 1 vente/.test(benef), `A ${nom} — « prix d'achat connu pour 1 vente » (jamais « pour les 1 vente »)`);
+    // (revue) l'explication du bénéfice se replie ; la couverture reste sur la ligne « brut »
+    const calc = await pg.evaluate(() => { const d = document.querySelector('[data-benef-etat] [data-benef-calcul]'); return d ? { open: d.open, txt: /au jour de la vente/.test(d.textContent) } : null; });
+    check(!!calc && calc.open === false && calc.txt, `A ${nom} — « Comment c'est calculé » du bénéfice est replié (rien n'est supprimé) : ${JSON.stringify(calc)}`);
+    check(!/au jour de la vente/.test(benef), `A ${nom} — l'explication du bénéfice n'occupe pas l'écran tant qu'on ne l'ouvre pas`);
+    // ── la micro-entreprise : une question à trancher ⇒ ouverte
+    check((await attr(pg, '[data-micro-repli]', 'data-micro-attention')) === '1', `A ${nom} — versement libératoire pas dit ⇒ « Ta micro-entreprise » signale une chose à trancher`);
+    check((await attr(pg, '[data-micro-repli]', 'data-micro-repli')) === 'ouvert', `A ${nom} — et elle est ouverte d'elle-même`);
+    check(await visible(pg, '[data-micro-vl-question]'), `A ${nom} — la question du versement libératoire est visible`);
+    const resume = await pg.evaluate(() => { const s = document.querySelector('[data-micro-repli] > summary'); return s ? s.innerText : ''; });
+    check(/à confirmer/i.test(resume), `A ${nom} — le titre replié dit ce qui reste à trancher : « ${resume.replace(/\s+/g, ' ').trim()} »`);
+    await pg.locator('[data-micro-vl-choix="non"]').first().click();
+    // Sous charge, React peut mettre plus d'une demi-seconde : on attend l'écriture (5 s au plus), sans juger dessus.
+    await pg.waitForFunction(() => /"liberatoire":"non"/.test(localStorage.getItem('vrm_micro_options') || ''), null, { timeout: 5000 }).catch(() => {});
+    await pg.waitForTimeout(300);
+    check((await attr(pg, '[data-micro-repli]', 'data-micro-repli')) === 'ouvert', `A ${nom} — il répond « Non » : le bloc ne se referme pas sous son doigt`);
+    const opts = await pg.evaluate(() => { try { return JSON.parse(localStorage.getItem('vrm_micro_options') || 'null'); } catch (_) { return null; } });
+    check(!!opts && opts.liberatoire === 'non', `A ${nom} — sa réponse est enregistrée (vrm_micro_options.liberatoire = non)`);
+    // ── cibles au doigt
+    if (tel) {
+      const hauteurs = await pg.evaluate(() => [...document.querySelectorAll('[data-compta-aller], [data-compta-avance] > summary, [data-micro-repli] > summary')].map((e) => Math.round(e.getBoundingClientRect().height)));
+      check(hauteurs.length >= 7 && hauteurs.every((h) => h >= 43), `A ${nom} — sommaire et replis ≥ 44 px au doigt : ${hauteurs.join(', ')}`);
+    }
+    // ── deux cartes, deux périodes : « Année » sur Vendu et reçu
+    await pg.locator('[data-ca-choix="annee"]').first().click();
+    await pg.waitForFunction(() => { const e = document.querySelector('[data-ca-periode]'); return e && e.getAttribute('data-ca-periode') === 'annee'; }, null, { timeout: 5000 }).catch(() => {});
+    await pg.waitForTimeout(300);
+    const tableVide = await pg.evaluate(() => { const t = document.querySelector('[data-ca-table]'); return !!t && t.querySelectorAll('[data-ca-ligne]').length === 0; });
+    check(!tableVide, `A ${nom} — « Année » : aucun en-tête de tableau sans ligne`);
+    const labels = await pg.evaluate(() => { const ca = document.querySelector('[data-ca-periode] [role="group"]'); const be = document.querySelector('[data-benef-etat] [role="group"], [data-benef-etat] [aria-label*="Période"]'); return [ca && ca.getAttribute('aria-label'), be && be.getAttribute('aria-label')]; });
+    check(!!labels[0] && !!labels[1] && labels[0] !== labels[1] && /chiffre|vendu/i.test(labels[0]) && /bénéfice/i.test(labels[1]), `A ${nom} — chaque carte nomme SA période : ${JSON.stringify(labels)}`);
+    check(/ne vaut que pour cette carte/.test((await texte(pg, '[data-ca-periode]')) || ''), `A ${nom} — la carte Vendu et reçu dit que sa période ne vaut que pour elle`);
+    await pg.locator('[data-ca-choix="mois"]').first().click();
+    await pg.waitForTimeout(300);
+    // ── le sommaire mène à « Avancé » et l'ouvre
+    await pg.locator('[data-compta-aller="compta-avance"]').first().click();
+    await pg.waitForTimeout(700);
+    check((await attr(pg, '[data-compta-avance]', 'data-compta-avance')) === 'ouvert', `A ${nom} — « Avancé » du sommaire ouvre le repli`);
+    check(await visible(pg, '[data-compta-resultat]'), `A ${nom} — le résultat de l'année apparaît une fois « Avancé » ouvert`);
+    check(await visible(pg, '[data-fe-etat]'), `A ${nom} — la facturation électronique est là, en bas`);
+    // ── le geste de la facturation électronique nomme une carte qui existe
+    const avanceTxt = (await texte(pg, '[data-compta-avance]')) || '';
+    check(!/Profil fiscal/.test(avanceTxt) && /dans « Ton entreprise »/.test(avanceTxt), `A ${nom} — « Avancé » renvoie à « Ton entreprise » (jamais à un « Profil fiscal » introuvable)`);
+    // ── le « ⓘ » du résultat ne place pas le bénéfice au mauvais endroit
+    await pg.locator('[data-compta-resultat] [data-pourquoi] > summary').first().click().catch(() => {});
+    await pg.waitForTimeout(200);
+    const benefAuDessus = await avant(pg, '[data-benef-etat]', '[data-compta-resultat]');
+    const pq = await pg.evaluate(() => { const d = document.querySelector('[data-compta-resultat] [data-pourquoi]'); return d ? { open: d.open, t: d.textContent } : null; });
+    check(!!pq && pq.open && /bénéfice/.test(pq.t) && !(benefAuDessus && /en dessous|ci-dessous/.test(pq.t)), `A ${nom} — le « ⓘ » du résultat dit où est le bénéfice sans le mettre « en dessous » (il est ${benefAuDessus ? 'au-dessus' : 'en dessous'})`);
+    check(!(await deborde(pg)), `A ${nom} — aucun débordement horizontal`);
+    check(!errs.length, `A ${nom} — aucune erreur JavaScript${errs.length ? ' : ' + errs[0].slice(0, 160) : ''}`);
+  });
+  await ctx.close();
+}
+
+async function scenarioB(b, vp, sombre) {
+  const nom = `${vp.width}${sombre ? ' sombre' : ' clair'}`;
+  const errs = [];
+  const { ctx, pg } = await page(b, vp, sombre, true, errs);
+  await essaie(`B ${nom}`, async () => {
+    await ouvrir(pg, 'compta');
+    await pg.locator('[data-micro-repli]').first().waitFor({ timeout: 40000 });
+    await pg.waitForTimeout(1500);
+    check((await attr(pg, '[data-micro-repli]', 'data-micro-attention')) !== '1', `B ${nom} — versement libératoire déjà dit : rien à trancher`);
+    check((await attr(pg, '[data-micro-repli]', 'data-micro-repli')) === 'ferme', `B ${nom} — « Ta micro-entreprise » reste repliée`);
+    check(!(await visible(pg, '[data-micro-profil]')), `B ${nom} — son profil URSSAF n'occupe pas l'écran`);
+    check(await visible(pg, '[data-echeance-suivante]'), `B ${nom} — la prochaine déclaration reste visible au-dessus`);
+    check(!errs.length, `B ${nom} — aucune erreur JavaScript${errs.length ? ' : ' + errs[0].slice(0, 160) : ''}`);
+  });
+  await ctx.close();
+}
+
+async function scenarioC(b, vp, sombre) {
+  const nom = `${vp.width}${sombre ? ' sombre' : ' clair'}`;
+  const errs = [];
+  const { ctx, pg, tel } = await page(b, vp, sombre, true, errs);
+  await essaie(`C ${nom}`, async () => {
+    await ouvrir(pg, 'journee');
+    await pg.waitForTimeout(2500);
+    if (tel) {
+      await pg.locator('.vrm-tabbar').getByRole('button', { name: 'Gestion', exact: true }).click();
+      await pg.getByRole('menuitem', { name: 'Comptabilité', exact: true }).waitFor({ timeout: 8000 });
+      check(await pg.getByRole('menuitem', { name: 'Comptabilité', exact: true }).isVisible(), `C ${nom} — le menu Gestion s'ouvre (Comptabilité y est)`);
+      check((await pg.getByRole('menuitem', { name: 'Organisation', exact: true }).count()) === 0, `C ${nom} — « Organisation » n'est plus dans le menu Gestion`);
+      await pg.keyboard.press('Escape');
+    } else {
+      check((await pg.locator('.vrm-sidebar').getByRole('button', { name: 'Comptabilité', exact: true }).count()) === 1, `C ${nom} — le rail porte Comptabilité`);
+      check((await pg.locator('.vrm-sidebar').getByRole('button', { name: 'Organisation', exact: true }).count()) === 0, `C ${nom} — « Organisation » n'est plus dans le rail`);
+    }
+    await ouvrir(pg, 'settings');
+    await pg.locator('[data-reglage-organisation]').first().waitFor({ timeout: 10000 });
+    const descOrga = (await pg.locator('[data-reglage-organisation]').first().innerText()).replace(/\s+/g, ' ');
+    check(/à plusieurs|mises de côté|à racheter/.test(descOrga) && !/Missions, réservations, lots et consommables/.test(descOrga), `C ${nom} — l'entrée de Réglages dit à quoi sert Organisation : « ${descOrga.trim().slice(0, 140)} »`);
+    await pg.locator('[data-reglage-organisation]').first().click();
+    // L'écran (au téléphone son titre est celui de l'en-tête de l'app : on vise la section).
+    const ecran = pg.locator('section.vrm-operations[aria-label="Organisation"]');
+    await ecran.waitFor({ timeout: 10000 });
+    check(await ecran.isVisible() && await pg.getByRole('button', { name: 'Réservations', exact: true }).isVisible(), `C ${nom} — Réglages → Stock et rangement → Organisation l'ouvre`);
+    // (revue) L'en-tête dit d'où l'on vient et à quoi ça sert — la MÊME phrase que Réglages.
+    const tete = await pg.evaluate(() => ({ sur: (document.querySelector('.vrm-operations .ops-surtitre') || {}).textContent || '', acc: ((document.querySelector('.vrm-operations .ops-entete p') || {}).textContent || '').trim() }));
+    check(!/gestion/i.test(tete.sur) && /réglages/i.test(tete.sur), `C ${nom} — le surtitre de l'écran dit « Réglages », plus « Gestion » : « ${tete.sur} »`);
+    check(!!tete.acc && descOrga.includes(tete.acc), `C ${nom} — sous le titre, la phrase de Réglages : « ${tete.acc} »`);
+    if (!tel) check((await pg.locator('.vrm-sidebar [aria-label="Paramètres"][aria-current="page"]').count()) === 1, `C ${nom} — la roue des Réglages est mise en avant dans le rail`);
+    await ouvrir(pg, 'organisation');
+    await ecran.waitFor({ timeout: 10000 });
+    check(await ecran.isVisible(), `C ${nom} — ?tab=organisation marche toujours`);
+    check(!(await deborde(pg)), `C ${nom} — aucun débordement horizontal`);
+    check(!errs.length, `C ${nom} — aucune erreur JavaScript${errs.length ? ' : ' + errs[0].slice(0, 160) : ''}`);
+  });
+  await ctx.close();
+}
+
+// D (revue) — une vente Leboncoin sans date : la carte URSSAF renvoie à une
+// carte qui EXISTE (son nom est un titre rendu), et au singulier.
+async function scenarioD(b, vp, sombre) {
+  const nom = `${vp.width}${sombre ? ' sombre' : ' clair'}`;
+  const errs = [];
+  const ligne = { ...LIGNE, aDater: { n: 1, ca: 50, par: { Leboncoin: { n: 1, ca: 50 } } } };
+  const { ctx, pg } = await page(b, vp, sombre, true, errs, { ligne });
+  await essaie(`D ${nom}`, async () => {
+    await ouvrir(pg, 'compta');
+    await pg.locator('[data-urssaf-couverture]').first().waitFor({ timeout: 40000 });
+    const r = await pg.evaluate(() => {
+      const c = document.querySelector('[data-urssaf-couverture]');
+      const t = c ? c.innerText : '';
+      const cite = (/dater dans « ([^»]+) »/.exec(t) || /saisir dans « ([^»]+) »/.exec(t) || [])[1] || null;
+      const titres = [...document.querySelectorAll('.vrm-main *')].filter((e) => e.children.length === 0 && e.checkVisibility && e.checkVisibility()).map((e) => (e.innerText || e.textContent || '').trim());
+      return { t, cite, existe: !!cite && titres.includes(cite.trim()) };
+    });
+    check(!!r.cite && r.existe, `D ${nom} — la vente Leboncoin à dater renvoie à une carte qui existe : « ${r.cite} »`);
+    check(/sa date/.test(r.t) && !/leur date/.test(r.t), `D ${nom} — une seule vente : « sa date », jamais « leur date »`);
+    check(!errs.length, `D ${nom} — aucune erreur JavaScript${errs.length ? ' : ' + errs[0].slice(0, 160) : ''}`);
+  });
+  await ctx.close();
+}
+
+// E (revue) — le nuage arrive PENDANT qu'il tape une dépense : le champ garde
+// sa valeur, son focus, et reste le même nœud (« Tes dépenses » ne se démonte
+// pas quand le statut fiscal arrive).
+async function scenarioE(b, vp, sombre) {
+  const nom = `${vp.width}${sombre ? ' sombre' : ' clair'}`;
+  const errs = [];
+  let lacher; const retenu = new Promise((r) => { lacher = r; });
+  const { ctx, pg } = await page(b, vp, sombre, true, errs, { retenu });
+  await essaie(`E ${nom}`, async () => {
+    await ouvrir(pg, 'compta');
+    await pg.locator('[data-dep-ouvrir]').first().waitFor({ timeout: 40000 });
+    check((await pg.locator('[data-stats-carte="mois"]').count()) === 0, `E ${nom} — le nuage est bien retenu (statut pas encore lu)`);
+    await pg.locator('[data-dep-ouvrir]').first().click();
+    await pg.locator('[data-dep-libelle]').first().click();
+    await pg.keyboard.type('car');
+    await pg.evaluate(() => { const e = document.querySelector('[data-dep-libelle]'); if (e) e.__marque = 1; });
+    lacher();
+    await pg.locator('[data-stats-carte="mois"]').first().waitFor({ timeout: 40000 });
+    await pg.waitForTimeout(400);
+    await pg.keyboard.type('tons');
+    const r = await pg.evaluate(() => { const e = document.querySelector('[data-dep-libelle]'); return { v: e && e.value, focus: document.activeElement === e, meme: !!(e && e.__marque) }; });
+    check(r.v === 'cartons' && r.focus && r.meme, `E ${nom} — la saisie continue après l'arrivée du nuage : ${JSON.stringify(r)}`);
+    check(!errs.length, `E ${nom} — aucune erreur JavaScript${errs.length ? ' : ' + errs[0].slice(0, 160) : ''}`);
+  });
+  await ctx.close();
+}
+
+// F (revue 3) — déclaration TRIMESTRIELLE, un seul trimestre noté (T3 :
+// juillet, août, septembre) : l'en-tête du suivi ne redit pas le trimestre que
+// sa ligne détaille juste dessous (le total annuel compte des PÉRIODES, pas des
+// mois). Le montant des cotisations de T3 (37,20 €) est écrit UNE fois.
+async function scenarioF(b, vp, sombre) {
+  const nom = `${vp.width}${sombre ? ' sombre' : ' clair'}`;
+  const errs = [];
+  const decl = (ym, ids) => ({ ids, n: ids.length, ca: 100, montant: 100, regle: 'versement', at: Date.parse('2026-10-12T09:00:00Z') });
+  const extra = { vinted_urssaf_freq: 'trimestriel', vrm_urssaf_declare: { '2026-07': decl('2026-07', ['vinted:9311']), '2026-08': decl('2026-08', ['vinted:9312']), '2026-09': decl('2026-09', ['vinted:9301']) } };
+  const { ctx, pg } = await page(b, vp, sombre, true, errs, { extra });
+  await essaie(`F ${nom}`, async () => {
+    await ouvrir(pg, 'compta');
+    await pg.locator('[data-suivi-urssaf="lu"]').first().waitFor({ timeout: 40000 });
+    await pg.locator('[data-suivi-periode="T3 2026"]').first().waitFor({ timeout: 40000 });
+    await pg.waitForTimeout(600);
+    check((await attr(pg, '[data-suivi-periode="T3 2026"]', 'data-suivi-etat')) === 'declaree', `F ${nom} — T3 2026 est noté « déclaré » (trois mois)`);
+    check((await attr(pg, '[data-suivi-periode="T3 2026"]', 'data-suivi-decl')) === '300', `F ${nom} — le suivi garde T3 déclaré 300 € (inchangé)`);
+    check((await attr(pg, '[data-suivi-annee]', 'data-suivi-annee-ca')) === '300', `F ${nom} — le total de l'année reste 300 € (attribut, chiffre inchangé)`);
+    const entete = (await texte(pg, '[data-suivi-annee]')) || '';
+    check(!/37,20|300,00/.test(entete), `F ${nom} — l'en-tête du suivi ne redit pas le trimestre détaillé dessous : « ${entete.replace(/\s+/g, ' ').trim()} »`);
+    const tout = await pg.evaluate(() => { const m = document.querySelector('.vrm-main'); if (!m) return ''; const c = m.cloneNode(true); for (const b of c.querySelectorAll('[data-benef-etat]')) b.remove(); document.body.appendChild(c); const t = c.innerText; c.remove(); return t; });
+    const n = (tout.match(/37,20/g) || []).length;
+    check(n === 1, `F ${nom} — les cotisations de T3 (37,20 €) sont écrites une fois : ${n} fois`);
+    check(!errs.length, `F ${nom} — aucune erreur JavaScript${errs.length ? ' : ' + errs[0].slice(0, 160) : ''}`);
+  });
+  await ctx.close();
+}
+
+(async () => {
+  const b = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || '/opt/pw-browsers/chromium', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
+  const TEL = { width: 390, height: 844 }, ORDI = { width: 1512, height: 950 };
+  try {
+    await scenarioA(b, TEL, false);
+    await scenarioA(b, ORDI, true);
+    await scenarioB(b, TEL, false);
+    await scenarioB(b, ORDI, true);
+    await scenarioC(b, TEL, false);
+    await scenarioC(b, ORDI, true);
+    await scenarioD(b, TEL, false);
+    await scenarioD(b, ORDI, true);
+    await scenarioE(b, TEL, false);
+    await scenarioE(b, ORDI, true);
+    await scenarioF(b, TEL, false);
+    await scenarioF(b, ORDI, true);
+  } finally { await b.close(); srv.close(); }
+  console.log(`\n${ok} vert(s), ${ko} rouge(s)`);
+  process.exit(ko ? 1 : 0);
+})();

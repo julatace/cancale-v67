@@ -28,18 +28,16 @@ export function AnnoncesACompleter({
     b: bilanAnnonce(it, drafts[String(numeros[it.id]?.numero || it.id)]),
   }));
   const n = lignes.filter((x) => x.b.manque.length).length;
-  // Rien à compléter ni à récupérer, lecture complète : le bloc se tait (§7,
-  // demande de Julien du 29 oct. — « 0 avec champs manquants » était du bruit).
-  if (!n && !charge && !incomplet && !lignes.some((x) => x.b.inconnu.length)) return null;
+  const nInconnu = lignes.filter((x) => x.b.inconnu.length).length;
+  // (30 oct.) Rien à compléter, rien d'illisible, lecture complète : le bloc se tait
+  // (« 0 avec champs manquants » était une ligne de plus avant la recherche).
+  if (!n && !nInconnu && !charge && !incomplet) return null;
   return (
     <details className="vrm-outils" data-annonces-completer>
       <summary>
-        Annonces à compléter <span>{n} avec champs manquants</span>
+        Annonces à compléter <span>{n ? `${n} avec champs manquants` : charge ? "lecture…" : `${nInconnu} à relire sur Vinted`}</span>
       </summary>
-      <p>
-        Prépare les informations ici dans un brouillon VRM. Elles ne modifient
-        pas l’annonce en ligne. Les dimensions dépendent de l’article.
-      </p>
+      <p>Un brouillon VRM : l’annonce en ligne ne change pas.</p>
       {incomplet && <p role="status">Lecture des annonces incomplète : ce bilan porte uniquement sur les données récupérées.</p>}
       <div className="vrm-outils-actions">
         <button
@@ -116,10 +114,7 @@ export function ComparaisonComptesVinted({
         Comparer mes comptes Vinted <span>{rows.length} comptes</span>
       </summary>
       <p>
-        <b>{periode}</b> · Ventes finalisées selon leur date de vente, avec le
-        filtre de période ci-dessus. Les ventes masquées sont exclues. Stock :
-        annonces récupérées non vendues des comptes inclus. Expéditions : tâches
-        actuelles.
+        <b>{periode}</b> · ventes finalisées, à leur date de vente (masquées exclues).
       </p>
       <button type="button" onClick={charger}>
         Actualiser tous les comptes

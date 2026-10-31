@@ -41,6 +41,12 @@ const ROWS = [
   track('email_track_mondialrelay_11110004', { carrier: 'mondialrelay', suivi: '11110004', subject: 'Votre colis 11110004 est disponible 📦', receivedAt: VIEUX, limite: null, code: '444444', lieu: 'Relais Delta, 4 rue D' }),
 ];
 
+// (29 oct.) Un achat « au point relais » sans code ni n° de suivi, à côté de
+// colis d'e-mail qu'aucune commande ne réclame, n'est montré « à retirer » que
+// si son n° a été CHERCHÉ (une ligne de suivi Vinted relevée, même sans n°) —
+// sinon il est « en cours de vérification » (peut-être le même colis). Ici la
+// ligne est relevée sans n° : sa carte reste, et c'est sa date qu'on juge.
+if (!process.env.BANC_RETRAITS) ROWS.push({ id: 'harvest_111_suivi_9502', data: { v: 1, tx: '9502', source: 'journey', capturedAt: new Date(MAINTENANT).toISOString(), transporteur: 'mondialrelay', suivi: null, etapes: [], dernier: null, forme: {} } });
 const SESSION={access_token:'session-colis-fictive',refresh_token:'r',totp:[],expires_at:Date.now()+3600000,user:{id:'11111111-1111-4111-8111-111111111111',email:'colis@example.test',totp:[]}};
 if(process.env.BANC_RETRAITS){
  ACHATS.forEach((a,i)=>{a.title='Article identique';a.photo='data:image/svg+xml,'+encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48"><rect width="48" height="48" fill="${i?'blue':'red'}"/></svg>`);});

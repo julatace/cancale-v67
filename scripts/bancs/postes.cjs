@@ -74,8 +74,9 @@ let ko=0; const dit=(c,m,d)=>{if(!c)ko++;console.log((c?'OK  ':'KO  ')+m+(d?' �
   const compte=()=>pg.evaluate(()=>{
     const t=document.body.innerText||'';
     const m=/(\d+)\s*\n?\s*colis à envoyer/.exec(t);
-    const lig=[...document.querySelectorAll('button')].find(x=>/colis marqué/.test(x.textContent));
-    const n=lig?/les (\d+) colis marqué/.exec(lig.textContent):null;
+    // (30 oct.) Le libellé est raccourci (« Voir les N colis postés ») : le nombre se lit sur `data-voir-postes`.
+    const lig=document.querySelector('button[data-voir-postes]');
+    const n=lig?[null,lig.getAttribute('data-voir-postes')]:null;
     const g=document.querySelector('[data-groupe="fait"]');
     const ns=g?/·\s*(\d+)/.exec(g.textContent):null;
     return {entete: m?+m[1]:(/Aucun colis à envoyer/.test(t)?0:null),
@@ -96,7 +97,7 @@ let ko=0; const dit=(c,m,d)=>{if(!c)ko++;console.log((c?'OK  ':'KO  ')+m+(d?' �
     return s;
   };
   const voirPostes=async(voulu)=>{
-    await pg.evaluate(v=>{const b=[...document.querySelectorAll('button')].find(x=>/colis marqué/.test(x.textContent));
+    await pg.evaluate(v=>{const b=document.querySelector('button[data-voir-postes]');
       if(b && /^\s*Cacher/.test(b.textContent)!==v) b.click();},voulu);
     return stable(false);
   };

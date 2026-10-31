@@ -189,6 +189,7 @@
     if (e.site && e.site.choix === 'non' && e.plateforme === 'vinted') return false;   // un CHOIX n'est pas une panne
     const f = e.flux;
     if (f && f.koAt && (!f.okAt || f.koAt > f.okAt)) return true;            // dernier envoi refusé
+    if (e.plateforme === 'leboncoin' && e.aRetirer && Array.isArray(e.aRetirer.liste) && e.aRetirer.liste.length) return true;   // une paire vendue ailleurs, encore en ligne ici
     return false;
   };
 
@@ -287,6 +288,20 @@
       }
     }
     const diagnosticLbc=e.plateforme==='leboncoin'&&(e.transport?.erreurCapture||!e.site?.id||e.transport?.capteurVersion!==e.code)?`<div class="pied">${e.transport?.capteur===true&&e.transport?.capteurVersion!==e.code?'Le capteur de cet onglet n’a pas confirmé la dernière version. Recharge cet onglet Leboncoin après la mise à jour.':e.transport?.erreurCapture==='identite'?'VRM n’a pas confirmé l’enregistrement du compte. Les annonces restent bloquées pour éviter une mauvaise attribution.':e.transport?.erreurCapture==='taille'?'La capture dépasse la taille autorisée. Aucun gros message n’a été envoyé.':e.transport?.ambigue===true?'Plusieurs comptes ont répondu dans cet onglet. Aucune session courante n’est choisie. Recharge Leboncoin sur le compte voulu.':e.transport?.capteur===true?'Capteur actif. Ouvre ton espace compte Leboncoin, puis « Mes annonces », pour lire ton identité et tes annonces.':e.transport?'Le relais fonctionne, mais le capteur de la page ne répond pas. Recharge Leboncoin et vérifie les autorisations de l’extension sur ce site.':'Aucune réponse du capteur sur cet onglet. Recharge la page après la mise à jour de l’extension.'}</div>`:'';
+    // (29 oct.) Les paires vendues sur Vinted, encore en ligne sur Leboncoin — ce
+    // que VRM a calculé (une règle, dans l'app) ; la carte ne recalcule rien.
+    let aRetirerLbc = '';
+    if (e.plateforme === 'leboncoin' && e.aRetirer && Array.isArray(e.aRetirer.liste) && e.aRetirer.liste.length) {
+      const ici = String(location.pathname || '');
+      const lignes = e.aRetirer.liste.slice(0, 6).map((r) => {
+        const cette = r.lbcId && ici.includes(String(r.lbcId));
+        const nom = (r.numero ? 'N°' + r.numero + ' · ' : '') + (r.titre || 'une paire');
+        return `<div class="val alerte" data-a-retirer="${esc(r.lbcId || r.numero || '')}">${cette ? '<b>C’est cette annonce</b> — ' : ''}${esc(nom)} — vendue sur Vinted${r.url && !cette ? ` · <a href="${esc(r.url)}" target="_top">voir l’annonce</a>` : ''}</div>`;
+      }).join('');
+      const plus = e.aRetirer.liste.length > 6 ? `<div class="val gris">et ${e.aRetirer.liste.length - 6} autre(s) — la liste complète est dans VRM → Leboncoin → Annonces</div>` : '';
+      const quand = e.aRetirer.at ? ` (relevé par VRM ${esc(depuis(e.aRetirer.at))})` : '';
+      aRetirerLbc = `<div class="ligne"><div class="lib">À retirer de Leboncoin${quand}</div>${lignes}${plus}<div class="val gris">Supprime-la ici (« Mes annonces »), ou depuis VRM → Leboncoin → Annonces.</div></div>`;
+    }
     let bascule = '';
     if (e.bascule) {
       const b = e.bascule;
@@ -312,6 +327,7 @@
       <div class="ligne"><div class="lib">Compte ${esc(nomSite)}</div>${compteSite}</div>
       ${e.capte ? `<div class="ligne"><div class="lib">Tes données</div>${flux}</div>` : ''}
       ${e.mesure ? `<div class="ligne"><div class="lib">Mesure</div><div class="val gris">VRM apprend à lire ${esc(nomSite)} : il relève la forme des pages, jamais leur contenu. Aucune vente ni annonce n'est encore captée.</div>${(() => { const f = e.flux || {}; return f.koAt && (!f.okAt || f.koAt > f.okAt) ? `<div class="val alerte">Dernier relevé refusé ${esc(depuis(f.koAt))}</div>` : f.okAt ? `<div class="val gris">Relevé envoyé ${esc(depuis(f.okAt))}</div>` : ''; })()}</div>` : ''}
+      ${aRetirerLbc}
       ${diagnosticLbc}
       ${bascule}
       ${pied ? `<div class="pied">${pied}</div>` : ''}

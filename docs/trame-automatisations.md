@@ -7,7 +7,7 @@ s'appuie sur `docs/guide-extension-vinted.md` (session, garde, appels, lectures,
 
 Rappels valables pour les 4 :
 - Tout part **du navigateur**, avec la session du compte ouvert dans l'onglet.
-- Toute écriture passe par `ecrire(...)` du guide (garde : 20/h, 3/visite, une à
+- Toute écriture passe par `ecrire(...)` du guide (garde : 50/h depuis le 29 oct., 3/visite, une à
   la fois, arrêt sur 401/403).
 - Rien ne part sur un compte autre que celui de l'onglet (`compteActif()`).
 - Les compteurs, mémos et files vivent dans `chrome.storage.local` (un service
@@ -48,7 +48,7 @@ republication sur le compte ouvert). Dire clairement le compte cible.
 
 **Garde-fous.** Copier les photos = un `fetch` par photo : borne à ~30 photos
 par visite pour ne pas marteler le CDN. C'est une **lecture**, pas une action
-Vinted : elle ne passe pas par la garde des 20/h (celle-ci ne protège que les
+Vinted : elle ne passe pas par la garde des 50/h (celle-ci ne protège que les
 écritures vers Vinted).
 
 ---
@@ -157,7 +157,7 @@ messages envoyés / à qui / quand ». Éteint par défaut.
 
 **⚠️ Le plus gros risque de blocage.** 60 messages/jour envoyés par un programme,
 c'est le signal robot exact de `vanessa5723`. Garder un **plafond quotidien** bas
-et réglable, en plus des 20/h.
+et réglable, en plus des 50/h.
 
 **Bench.** `audit-favoris.cjs` : sert des notifications de favori, vérifie le
 filtrage (jour/créneau/siAuMoins), l'anti-doublon `user_id+item_id`, l'ouverture
@@ -183,7 +183,7 @@ de conversation + message, borne, rien sans règle active.
 **En lot = une file, une action à la fois.** Pour N annonces cochées : traiter
 la première entièrement (avec ses photos), attendre, passer à la suivante.
 Chaque annonce compte pour la garde (une republication à 12 photos = 14
-écritures → ~1 annonce/heure au plafond de 20/h ; le dire à l'écran).
+écritures → ~3 annonces/heure au plafond de 50/h ; le dire à l'écran).
 
 **⚠️ Retouche photo : NON telle que Vintex la fait.** Vintex tourne/recadre/
 tamponne les photos pour que Vinted ne reconnaisse pas la republication — c'est

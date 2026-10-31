@@ -1,0 +1,63 @@
+/* ── « PUIS-JE AGIR SUR VINTED ? » : la pastille et son panneau (29 oct.) ──
+   Julien : « pour Action c'est plutôt pas mal, tu peux faire mieux ». Même
+   source de vérité (`etatActionsExt`, `raisonExtGlobale`) : seule la forme
+   change. La couleur de l'état arrive par `--etat-ton` (posée en ligne depuis
+   la palette : accent = tu peux agir, ambre = un geste à faire, gris = rien à
+   faire ici) — aucune teinte de plus (§7).
+   · La pastille (ordinateur) : un point avec un halo de sa couleur, le libellé,
+     le compte, un chevron qui dit « ça s'ouvre ».
+   · Le panneau : un en-tête (rond d'état + phrase), le texte, puis les trois
+     MAILLONS en chaîne (extension → compte VRM → compte Vinted), la dernière
+     capture, et LE geste en bas, sur toute la largeur. */
+
+.vrm-etat-pastille .vrm-etat-point { box-shadow: 0 0 0 3px color-mix(in srgb, var(--etat-ton) 22%, transparent); }
+.vrm-etat-pastille[data-etat-actions="verif"] .vrm-etat-point { animation: vrm-etat-souffle 1.6s ease-in-out infinite; }
+@keyframes vrm-etat-souffle { 50% { box-shadow: 0 0 0 5px color-mix(in srgb, var(--etat-ton) 10%, transparent); } }
+.vrm-etat-chevron { display: inline-flex; font-style: normal; color: var(--vrm-muted); transform: rotate(90deg); transition: transform .18s cubic-bezier(.23, 1, .32, 1); margin-left: -1px; }
+.vrm-etat-pastille[aria-expanded="true"] .vrm-etat-chevron { transform: rotate(-90deg); }
+@media (min-width: 1024px) {
+  .vrm-app-header .vrm-etat-pastille { min-height: 36px; }
+  .vrm-app-header .vrm-etat-pastille[aria-expanded="true"] { box-shadow: inset 0 0 0 1px var(--vrm-line); }
+}
+@media (min-width: 1024px) and (hover: hover) and (pointer: fine) {
+  .vrm-app-header .vrm-etat-pastille:hover { filter: none; box-shadow: inset 0 0 0 1px var(--vrm-line); }
+}
+/* Téléphone : l'en-tête ne montre que l'icône (styles-coque) — pas de chevron. */
+@media (max-width: 1023px) {
+  .vrm-app-header .vrm-etat-pastille > .vrm-etat-chevron { display: none !important; }
+}
+
+.vrm-etat-panneau { animation: vrm-etat-entre .16s cubic-bezier(.23, 1, .32, 1) both; }
+@keyframes vrm-etat-entre { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+.vrm-etat-tete { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+.vrm-etat-icone {
+  flex-shrink: 0; width: 34px; height: 34px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center;
+  color: var(--etat-ton); background: color-mix(in srgb, var(--etat-ton) 14%, transparent);
+}
+.vrm-etat-titre { font-weight: 750; font-size: 14.5px; line-height: 1.3; letter-spacing: -.01em; }
+.vrm-etat-texte { margin-bottom: 10px; }
+
+/* La chaîne : un rond par maillon, reliés par un trait vertical. */
+.vrm-etat-chaine { position: relative; display: flex; flex-direction: column; gap: 0; padding: 4px 0 2px; border-top: 1px solid var(--vrm-line); }
+.vrm-etat-maillon { position: relative; display: flex; gap: 10px; align-items: flex-start; padding: 7px 0; }
+.vrm-etat-maillon + .vrm-etat-maillon::before {
+  content: ''; position: absolute; left: 10px; top: -7px; height: 14px; width: 2px; border-radius: 1px;
+  background: var(--vrm-line);
+}
+.vrm-etat-rond {
+  flex-shrink: 0; width: 22px; height: 22px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center;
+  font-size: 11.5px; font-weight: 800; line-height: 1; color: var(--etat-ton);
+  background: color-mix(in srgb, var(--etat-ton) 15%, transparent); box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--etat-ton) 55%, transparent);
+}
+.vrm-etat-maillon-texte { min-width: 0; padding-top: 2px; overflow-wrap: anywhere; }
+.vrm-etat-maillon-detail { color: var(--vrm-muted); }
+.vrm-etat-pied { padding: 8px 0 0; margin-top: 2px; border-top: 1px solid var(--vrm-line); }
+.vrm-etat-geste { margin-top: 12px; }
+.vrm-etat-geste > button, .vrm-etat-geste > a { display: flex !important; width: 100%; justify-content: center; align-items: center; min-height: 40px; padding: 10px 14px !important; border-radius: 10px !important; box-sizing: border-box; text-align: center; font-size: 13px !important; }
+.vrm-etat-geste > span { display: block; padding: 10px 12px; border-radius: 10px; background: var(--vrm-card2); }
+@media (pointer: coarse) {
+  .vrm-etat-geste > button, .vrm-etat-geste > a { min-height: 44px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .vrm-etat-panneau, .vrm-etat-pastille .vrm-etat-point, .vrm-etat-chevron { animation: none !important; transition: none !important; }
+}

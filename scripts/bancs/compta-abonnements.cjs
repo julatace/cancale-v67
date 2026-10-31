@@ -18,6 +18,7 @@
 // On juge des `data-*` et des NOMBRES, jamais un libellé (§6.5).
 const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
 const { metaVersData } = require('./_meta.cjs');
+const { ouvrirAvanceCompta } = require('./_compta.cjs');
 const fs = require('fs'), http = require('http'), path = require('path'), os = require('os');
 const DIST = path.join(__dirname, '..', '..', 'dist');
 const PORT = Number(process.env.BANC_PORT) || 4571;
@@ -131,6 +132,7 @@ const attendre = async (pg, f, ms = 8000) => { const t0 = Date.now(); for (;;) {
       await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) ? r.abort() : r.continue()));
       await brancher(pg);
       await pg.goto(`http://localhost:${PORT}/?tab=compta`, { waitUntil: 'domcontentloaded' });
+      await ouvrirAvanceCompta(pg); // (29 oct.) ces cartes vivent dans « Avancé », replié
       const r0 = await attendre(pg, (r) => r.caEtat === 'lu' && r.ca.recu != null);
       dit(r0.caEtat === 'lu', 'le CA par période est lu', r0.caEtat);
       dit(r0.ca.vendu === 190, 'VENDU ce mois = 80 finalisée + 50 en cours + 60 eBay (l’annulée et la vente du mois dernier exclues)', JSON.stringify(r0.ca));

@@ -216,7 +216,7 @@ Le compte `vanessa5723` a été bloqué. Ce que l'extension s'impose, et pourquo
 - **agir seulement au nom du compte connecté dans l'onglet** — utiliser les
   jetons d'un autre compte depuis le même navigateur relie les comptes entre eux ;
 - **une requête à la fois**, en attendant la réponse ;
-- **plafond** : 20 actions par heure et par compte, 3 par visite ;
+- **plafond** : 50 actions par heure et par compte (20 jusqu'au 29 octobre), 3 par visite ;
 - **jamais deux fois la même personne** (repérer par l'id de la personne et
   l'id de l'annonce, pas par le texte) ;
 - un 401/403 → on s'arrête, on n'insiste pas.
@@ -247,7 +247,7 @@ vinted.fr (ton onglet Chrome)
               (annonces, ventes, achats, conversations, bordereaux)
             · agit quand c'est autorisé : bordereau, réponses auto, offres auto
               au-dessus du plancher — toujours via `garde` (compte de l'onglet,
-              20 actions/heure, une requête à la fois)
+              50 actions/heure, une requête à la fois)
 emails Vinted / transporteurs
   └─ Cloudflare Email Worker → api/email-inbound.js (Vercel) → app_data (email_*)
 vrm.center (l'app, src/App.jsx)

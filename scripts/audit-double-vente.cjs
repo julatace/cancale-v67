@@ -191,9 +191,13 @@ const memes = essaie('comparaison app ↔ extension', () => cas.every((ad) => !!
 dit(memes === true, 'l\'app et l\'extension attribuent EXACTEMENT les mêmes annonces (§11)', `${cas.length} cas`);
 
 // ── LE TABLEAU DE BORD NE DIT PLUS « VENDUE » SUR UNE ABSENCE ───────────────
-const blocDash = (/let lbcRemoveCount=0;[\s\S]*?catch\(_\)\{\}/.exec(APP) || [''])[0];
-dit(/soldIdsN\.has/.test(blocDash) && !/!lbcOnlineIds\.has/.test(blocDash),
-  'le tableau de bord ne compte « vendue sur Vinted » que sur une vente PROUVÉE', blocDash ? '' : 'bloc introuvable');
+// (29 oct., revue) La règle, pas son orthographe : le compte passe par LA règle
+// partagée (`aRetirerDeLbcVinted`) avec la preuve par transaction SEULE — ni une
+// absence (`!lbcOnlineIds.has`), ni les ventes rapprochées par titre (`soldIdsN`).
+const blocDash = (/let lbcRemoveCount=0;[\s\S]*?if\(!lbcARetirer\)\{[^}]*\}/.exec(APP) || [''])[0];
+const vendusR = (/const vendusR=([^;]*);/.exec(blocDash) || ['', ''])[1];
+dit(!!blocDash && /aRetirerDeLbcVinted\(\{[^}]*vendus:vendusR/.test(blocDash) && /preuveN\.vendus/.test(vendusR) && !/soldIdsN/.test(vendusR) && !/!lbcOnlineIds\.has/.test(blocDash),
+  'le tableau de bord ne compte « vendue sur Vinted » que sur une vente PROUVÉE', blocDash ? vendusR : 'bloc introuvable');
 dit(/doublesVenteLbc\(/.test((/let lbcDoubles=0[\s\S]*?catch\(_\)\{\}/.exec(APP) || [''])[0]),
   'et il signale l\'autre sens avec la MÊME règle que l\'écran Leboncoin (§11)');
 

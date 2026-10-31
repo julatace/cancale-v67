@@ -112,6 +112,8 @@ const lire = (pg) => pg.evaluate(() => {
   const o = {}; for (const a of e.getAttributeNames()) if (a.startsWith('data-boost-')) o[a.slice(11)] = e.getAttribute(a);
   o.vals = {}; for (const v of e.querySelectorAll('[data-boost-val]')) o.vals[v.getAttribute('data-boost-val')] = { t: v.textContent.trim(), c: getComputedStyle(v).color };
   o.verdict = !!e.querySelector('[data-boost-verdict="pas-assez"]');
+  // (30 oct.) Le détail « N pas reliées » passe derrière ⓘ : il se lit sur l'attribut de la couverture.
+  { const cv = e.querySelector('[data-boost-couverture]'); o.sansAnnonce = cv ? cv.getAttribute('data-boost-sans-annonce') : null; }
   o.texte = e.innerText;
   o.deborde = e.scrollWidth > e.clientWidth + 1;
   return o;
@@ -150,7 +152,7 @@ const sansCouleurJugement = (vals) => Object.values(vals).every((v) => { const m
         const { ctx, pg, errs } = await ouvrir(b, T, jeu({ nb: 3 }));
         const R = await lire(pg);
         dit(!!R && R.etat === 'lu' && R.assez === 'non' && R.verdict, '« pas assez de ventes pour juger »', JSON.stringify(R && [R.etat, R.assez, R.verdict]));
-        dit(!!R && Object.values(R.vals).length === 8 && Object.values(R.vals).every((v) => v.t === '—'), 'aucun chiffre comparé (que des « — »)', JSON.stringify(R && R.vals));
+        dit(!!R && Object.values(R.vals).every((v) => v.t === '—'), 'aucun chiffre comparé (tableau replié ou que des « — »)', JSON.stringify(R && R.vals));
         dit(errs.length === 0, 'aucune erreur d’app', errs.join(' | ').slice(0, 160));
         await ctx.close();
       });
@@ -165,7 +167,7 @@ const sansCouleurJugement = (vals) => Object.values(vals).every((v) => { const m
         console.log('── D. même titre, transaction non reliée');
         const { ctx, pg } = await ouvrir(b, T, jeu({ nb: 6, sansTx: 2 }));
         const R = await lire(pg);
-        dit(!!R && R.b === '4' && /2 pas reliées/.test(R.texte), 'les 2 boostées sans transaction reliée ne comptent pas (jamais par le titre)', JSON.stringify(R && [R.b, R.texte.slice(0, 200)]));
+        dit(!!R && R.b === '4' && R.sansAnnonce === '2', 'les 2 boostées sans transaction reliée ne comptent pas (jamais par le titre)', JSON.stringify(R && [R.b, R.texte.slice(0, 200)]));
         await ctx.close();
       });
     }

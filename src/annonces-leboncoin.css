@@ -16,9 +16,18 @@
 .vrm-lbc-catalog-info small{color:var(--gestion-muted,#52636b);font-size:11px;line-height:1.5;overflow-wrap:anywhere;}
 .vrm-lbc-catalog-info>div{display:flex;align-items:center;gap:6px 10px;flex-wrap:wrap;margin-top:3px;}
 .vrm-lbc-catalog-info [data-etat]{font-size:10px;font-weight:600;border-radius:4px;background:var(--gestion-soft,#edf2ef);padding:2px 5px;overflow-wrap:anywhere;}
+.vrm-lbc-catalog-info [data-etat]{display:inline-flex;align-items:center;gap:5px;}
+.vrm-lbc-catalog-info [data-etat]::before{content:'';width:7px;height:7px;border-radius:50%;flex-shrink:0;background:var(--gestion-muted,#52636b);}
+.vrm-lbc-catalog-info [data-etat=active]::before{background:var(--gestion-accent,#2b4548);}
+.vrm-lbc-catalog-info [data-etat=pause]::before,.vrm-lbc-catalog-info [data-etat=plusvue]::before{background:var(--vrm-warn,#a86a12);}
+.vrm-lbc-catalog-info [data-etat=vendue]::before{background:var(--gestion-ink,#243d43);}
+:root[data-theme=dark] .vrm-lbc-catalog-info [data-etat=active]::before{background:var(--vrm-accent,#3D7BFF);}
 .vrm-lbc-catalog li>b{font-size:12px;white-space:nowrap;font-variant-numeric:tabular-nums;}
-.vrm-lbc-catalog li>a{display:flex;align-items:center;justify-content:center;min-height:44px;min-width:44px;color:inherit;font-size:11px;text-decoration:none;}
+.vrm-lbc-catalog-gestes{display:flex;align-items:center;gap:4px;}
+.vrm-lbc-catalog-gestes a,.vrm-lbc-catalog-gestes button{display:flex;align-items:center;justify-content:center;gap:4px;min-height:44px;min-width:44px;color:inherit;font:inherit;font-size:11px;text-decoration:none;background:transparent;border:0;padding:0 6px;cursor:pointer;border-radius:8px;}
+/* (29 oct., revue) Les gestes de la ligne à l’encre neutre (§7) : le danger se dit dans la confirmation. */
+.vrm-lbc-catalog-gestes button:disabled{opacity:.5;cursor:default;}
 .vrm-lbc-catalog-note,.vrm-lbc-catalog-vide,.vrm-lbc-catalog>p{padding:12px 16px;margin:0;color:var(--gestion-muted,#52636b);line-height:1.6;}
 .vrm-lbc-catalog-note{font-size:11px;border-top:1px solid var(--gestion-line,#dce5e1);}
 .vrm-lbc-catalog :focus-visible{outline:2px solid var(--gestion-accent,#2b4548);outline-offset:-2px;}
-@media(max-width:767px){.vrm-lbc-catalog li{gap:8px;padding:8px 10px;}.vrm-lbc-catalog header{padding:12px;}.vrm-lbc-catalog header>span{white-space:normal;text-align:right;max-width:90px;}.vrm-lbc-catalog>input{font-size:16px;}.vrm-lbc-catalog li>a{font-size:10px;}.vrm-lbc-catalog-info>div small{flex-basis:100%;}}
+@media(max-width:767px){.vrm-lbc-catalog li{gap:8px;padding:8px 10px;}.vrm-lbc-catalog header{padding:12px;}.vrm-lbc-catalog header>span{white-space:normal;text-align:right;max-width:90px;}.vrm-lbc-catalog>input{font-size:16px;}.vrm-lbc-catalog-gestes a,.vrm-lbc-catalog-gestes button{font-size:10px;padding:0 4px;}.vrm-lbc-catalog-gestes{flex-direction:column;gap:0;}.vrm-lbc-catalog-info>div small{flex-basis:100%;}}

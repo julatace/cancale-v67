@@ -16,6 +16,350 @@
 > `ebay-regle-offre` prend ~18 min (délai ≥ 25 min). ⚠️ Non corrigé, noté : la visionneuse du reçu ne se ferme pas à
 > Échap quand le PDF a le focus, et un seul Échap ferme visionneuse ET reçu.
 
+> 🔴 **30 octobre — intégration v30 (branche `v30-integ`, poussée sur `claude/project-review-nsk5su`), extension 5.291.0 :**
+> réunis par VRAIS merges : `v29-colis` (+ `v29-colis-ext`), `v29-lbc`, `v29-msg-ecrase`, `v29-vinted-ui`, `v29-compta`,
+> `v29-ebay-agent`, `v29-ebay-achats`, puis `origin/main` (refonte #917 : trois boutons, textes courts — elle gagne sur la
+> forme, les intentions des chantiers sont gardées) et la passation. UN numéro : **5.291.0** (5.288 et 5.290 étaient des
+> numéros de branche, jamais servis) — manifeste, `CODE_VERSION`, `EXT_ATTENDUE`, zips, `EXT_CAPACITES.transp` ·
+> `.lbcsupprime` · `.lbcstats` (table du §5 complétée). Relecture de l'intégration, corrigé : les gestes AUTOMATIQUES
+> (`garde` : moteur d'offres, bordereau de la visite) s'arrêtent à 45 actions, les 5 dernières restent aux clics
+> (`audit-compteurs-concurrents` §4) ; `REPUB_LBC_MAX` lié à `LBC_SUPPRIME_MAX_HEURE` (`audit-lbc-supprimer`) ; Mondial
+> Relay refusé dit une fois en tête, le bon geste sur un ordinateur sans extension (`transporteurs.cjs`) ; Compta « reçu
+> au moins » quand des ventes n'ont pas de date de versement, compteur des déclarations accordé, « Comptabilité » une
+> fois ; Stats « Choisir une période », plus de « Total Vinted » ; la case Leboncoin d'Annonces dit son état ; Achats :
+> fraîcheur dite une fois, compte d'un groupe uniforme une fois (banc `revue-30oct.cjs` : 16 rouges sur l'avant).
+> Rouges connus, présents à l'identique AVANT la fusion : voir `docs/passation/2026-10-30.md`.
+> **Gestes de Julien** : installer l'extension **5.291.0** (remplacer le dossier, puis ⟳ dans CHAQUE Chrome) ; sur
+> leboncoin.fr, ouvrir « Mes annonces » sur CHACUN de ses comptes Leboncoin (la liste complète fait sortir les annonces
+> disparues).
+
+> ⚠️⚠️ **29 octobre — LEBONCOIN COMME VINTED : capture juste, « à retirer » visible, Supprimer, Republier, favoris (5.288) :**
+> Julien : « il n'y a plus que 2 annonces et VRM en a encore 8 », « j'ai vendu une paire sur Vinted et VRM ne m'a pas dit de
+> la supprimer », « je veux pouvoir supprimer une annonce de Leboncoin », « trop brouillon… mêmes méthodes d'affichage que
+> Vinted », « un outil de republication… exactement pareil », « les messages aux favoris » (Leboncoin SEULEMENT, rien côté
+> Vinted), « enlève N° », « regarde l'onglet Messages ». **Mesuré (lecture seule)** : sa page « Mes annonces » ne charge plus
+> `myads` mais `POST api/dashboard/v1/search` (filtre `owner.user_id`) — ses annonces passaient sans jamais DÉCIDER, une
+> annonce supprimée/expirée ne sortait jamais ; la N°18 vendue sur Vinted le 18 oct. restait « en vente » sur Leboncoin (Ma
+> journée ne comptait que les ventes marquées à la main, l'écran sautait un N° porté par une annonce Vinted encore
+> « ouverte ») ; le bouton « Supprimer » de Leboncoin envoie `DELETE …/pintad/v1/public/manual/delete/ads {list_ids:[n]}`
+> (vu dans `lbc_recon.envois` le 28 oct. 22:47). **Fait** : (1) une liste « Mes annonces » COMPLÈTE (requête sur lui seul,
+> chaque annonce à lui, total atteint) sort ce qu'elle ne montre plus (`plusVueAt`, jamais « vendue ») ; une page partielle
+> ne décide rien ; une suppression/pause faite sur leboncoin.fr (2xx) est vue et rangée. (2) `aRetirerDeLbcVinted` : vendue
+> sur Vinted (transaction → annonce, prime sur l'état de l'annonce) ⇒ « à retirer de Leboncoin », par identité seulement
+> (lien posé, réf VRM) ; écran Leboncoin + Ma journée ; l'app publie `lbc_a_retirer`, le logo VRM sur leboncoin.fr dit
+> « c'est cette annonce ». (3) « Supprimer de Leboncoin » (`supprimeLbcDepuisApp`) : son clic + confirmation « sans retour »
+> (rouge), confirmation exigée aussi par l'extension, compte Leboncoin de l'onglet vérifié, une à la fois, 10/h, adresse
+> écrite en dur dans `lbc-inject.js` ; 2xx ⇒ supprimée, refus ⇒ « pas fait », silence ⇒ « je ne sais pas ». Pas de relais
+> téléphone. (4) Ventes sans « N° » (il reste dans le tiroir), Mes annonces avec point d'état (en ligne · pause · plus vue ·
+> vendue), « en ligne depuis », chiffres relevés (favoris, vues, messages ; jamais 0 pour un chiffre pas relevé) ; Messages à
+> deux zones comme Vinted, une ligne par compte, le geste « connecte-toi une fois » dit UNE fois. Onglets : Ventes · Achats ·
+> Annonces · Messages · Colis. (5) Republier (Choisir · Modifier · Republier) : supprimer (confirmé) → retirer la marque
+> « publiée » → publier la fiche, attendre la confirmation de Leboncoin avant la suivante ; seulement quand la recréation
+> passe les règles de la file ; un refus ou un doute arrête tout. (6) **Favoris : Leboncoin ne dit PAS QUI** — mesuré : seuls
+> des NOMBRES (`stats/proxy/v2/classified/history/daily` : TotalFavorites, Views, TotalMessages ; `followme/v1/followers-number`
+> = un compte d'abonnés ; `followme/v1/follower-targeting/eligibility` = `{eligible, reasonCode}`, geste natif jamais vu
+> s'exécuter) ; aucune requête d'envoi aux favoris vue. ⇒ « ♡ Favoris reçus » montre le nombre par annonce en vente, « — »
+> sans relevé, et dit que VRM n'écrit à personne. L'extension relève déjà chemins, formes et envois (jamais les valeurs).
+> **Preuves** : `audit-lbc-mes-annonces` (14 rouges sur l'avant, 11 mutations), `audit-lbc-a-retirer` (9, 5/5),
+> `audit-lbc-supprimer` (19, 8/8), bancs `lbc-pause`, `badge`, `lbc-supprimer` (16 rouges sur l'avant), `lbc-comme-vinted`
+> (390/1512 ; 39 rouges sur l'avant, + « geste dit une fois » rouge sur l'avant). Extension **5.288.0** (5.282, 5.284, 5.285, 5.286 et 5.287 prises sur
+> main), `EXT_CAPACITES.lbcsupprime` / `.lbcstats`. **Non mesuré** : le vrai leboncoin.fr (403 d'ici) — réponse réelle d'une
+> suppression demandée par VRM, une liste « Mes annonces » de plusieurs pages, ce que fait le ciblage des abonnés.
+> **Gestes de Julien** : installer la 5.288 (remplacer le dossier, puis ⟳ dans chaque Chrome) ; ouvrir « Mes annonces » sur
+> CHACUN de ses comptes Leboncoin (la liste complète fait sortir les annonces disparues) ; pour un chiffre de favoris, ouvrir
+> « Statistiques » de l'annonce ; s'il veut que VRM sache écrire à ses abonnés, utiliser UNE fois à la main le geste de
+> Leboncoin qui cible les abonnés (s'il lui est proposé) : l'extension en relèvera la forme pour la passe suivante.
+> **Revue (29 oct., soir)** — 11 défauts de deux relecteurs, tous reproduits puis corrigés : « Supprimer » à l'encre
+> neutre (§7) ; la vente eBay ne désigne une annonce Leboncoin que par le lien ou la référence VRM (plus le « n15 » du
+> titre), et pause/suppression ne sont proposées que sur une ligne reliée par identité ; Ma journée et le logo VRM lisent
+> la MÊME preuve que l'écran (transaction seule — plus `vinted_annonces_email_sold`), rien avant l'arrivée des numéros,
+> aucune ligne vide publiée ; « Voir » de Ma journée amène la paire à l'écran ; une suppression marquée (forgeable par la
+> page) est levée au bout d'1 h par une capture ou une liste complète qui montre l'annonce vivante ; le cache du logo est
+> lié au compte VRM ; Republier sur ordinateur sans extension dit la vraie cause ; Messages et « relevé » sans date ;
+> identifiants réels retirés des audits. Preuves : banc `lbc-supprimer` **11 rouges** sur la branche d'avant, 6 sous
+> mutation ; `lbc-comme-vinted` 4 ; `audit-lbc-mes-annonces` +3 contrôles (3 mutations neuves), `audit-lbc-a-retirer` +1.
+> **Revue 2 (29 oct., nuit)** : (a) main a publié SA 5.287 (numéros des profils) — ce chantier passe en **5.288.0**
+> (`lbcsupprime`/`lbcstats` à 5.288 : une 5.287 de main ne sait ni supprimer ni relever les chiffres) ; (b) « vendue sur
+> eBay ⇒ à retirer de Leboncoin » : UNE règle (`aRetirerDeLbcEbay`, `numerosVendusEbay`) pour l'écran ET Ma journée —
+> l'annonce reliée par identité a ses gestes, celle reliée seulement par la marque « publiée » RESTE listée sans geste
+> (« retire-la toi-même », `data-lbc-ebay-sans-ident`) ; avant, l'écran la faisait disparaître pendant que Ma journée la
+> comptait (« Voir » menait à un écran vide). Banc `lbc-supprimer` : 4 rouges sur la branche d'avant, 4 sous mutation
+> (lignes sans identité retirées de l'écran).
+
+> **29 octobre — MESSAGES : l'XT-6 qui « ne voulait pas s'enlever », « Retirer de la liste » ; plafond d'actions laissé à 50 :**
+> Julien : « un message d'une XT-6 qui ne veut pas s'enlever, je veux que ça dégage » et « mets plus d'actions par heure sur
+> chaque compte ». MESURÉ (lecture seule) : une conversation captée il y a six semaines porte une offre au statut 10 (« en
+> attente ») sur une annonce qui n'est PLUS dans son dressing (lu en entier depuis) — la pastille et le tri « une offre passe
+> devant » la gardaient en tête pour toujours. ⇒ Une RÈGLE, pas une exception : `annonceOffreEnVente` / `offreOuverte`
+> (`src/offresVinted.js`, la même pour la liste et le fil, §11) — annonce absente d'une lecture COMPLÈTE (`total_entries`
+> atteint, ou relecture publique complète, `lectureDressingComplete`) du dressing de CE compte, faite APRÈS l'offre ⇒ l'offre
+> n'est plus « en attente » (ni pastille, ni filtre « Offres », ni tri en tête ; le fil dit « l'annonce n'est plus en vente »,
+> sans Accepter). « Pas su » la GARDE : annonce à confirmer, masquée, brouillon, compte pas lu, lecture partielle ou antérieure
+> à l'offre, offre sans date (`Number(null)` valait 0 : trouvé par l'audit). Mesuré : ses 12 dressings portent leur total.
+> ⇒ Le geste « Retirer » dans le fil (`src/conversationsRetirees.js`, `vrm_conversations_retirees` synchronisée, identité compte
+> + conversation) : elle sort de la liste et des non-lus de VRM, rien ne change sur Vinted, elle REVIENT dès qu'il s'y passe du
+> nouveau (message, offre acceptée ou refusée — revue 3) ; « Les remettre » sous la liste. ⇒ **Plafond d'actions : ce chantier l'avait monté à 30/h ; une autre session
+> l'a monté le même jour à 50/h sur la demande EXPLICITE de Julien (« comme Vintex », 5.283, voir plus bas) — cette décision
+> gagne, le 30 est abandonné à la fusion, l'extension n'est pas touchée ici.** ⚠️ **angeled92 a été restreint 24 h le 29 oct.
+> pour « activité automatisée » après une republication** : le plafond haut est SON choix, en connaissance de cause.
+> Preuves : `audit-offre-annonce-partie.cjs` (28 ; `--prouve` 9/9), banc `messagerie.cjs` (XT-6, « pas su » des deux sortes,
+> Retirer → remettre → revient sur une date plus récente, 390/1512) ; `audit-supprimees` charge `lectureDressingComplete`.
+> ⚠️ Non mesuré : sa vraie conversation XT-6 dans l'app (données inventées à sa forme). **Geste de Julien** : une conversation
+> dont il ne veut plus : l'ouvrir → « Retirer ».
+> **Revue (29 oct., plus tard) — neuf constats, tous reproduits puis corrigés :** la règle ne juge QUE ses ventes
+> (`side === 'seller'`, projeté dans `OFFRES_CONV_SELECT`) — une contre-offre reçue quand il ACHÈTE porte l'annonce du
+> vendeur, elle était dite « plus en vente » et perdait Accepter (mesuré : `current_user_side` présent sur toutes les
+> conversations à offre, 9 côté acheteur) ; la bulle de l'offre suit la règle (`offrePartieDuFil` : « Plus acceptable »,
+> plus « En attente ») et « plus en vente » n'est dit qu'une fois (la bande d'état) ; le bloc porte le bouton « Retirer de
+> la liste » (44 px) et l'en-tête garde le MOT « Retirer » sur téléphone ; pas de réponse rapide « toujours disponible »
+> sous une annonce partie ; une conversation dont le dernier message est une offre close sort de « À répondre » ; le
+> point « nouveau » de Messages suit le geste sans recharger (`msgNonLus`, `vrm:save`) ; plus de toast (il couvrait « La
+> remettre » et redisait la ligne). Preuves : `audit-offre-annonce-partie.cjs` 36 (8 rouges sur la branche d'avant,
+> `--prouve` 10/10), banc `messagerie.cjs` (contre-offre 311, bulle, une voix, bouton du bloc, À répondre, point).
+> ⚠️ **Mesuré, pas corrigé** : aucune durée de vie d'une offre Vinted n'existe dans ses données (aucun champ d'expiration ;
+> statuts vus : 10, 20, 30, 40) — une autre offre « en attente » du 12 août, sur une annonce TOUJOURS en ligne, reste en
+> tête : à retirer à la main (« Retirer »). ⚠️ Le premier commit du chantier (f7214427) citait des identifiants réels dans
+> un commentaire (retirés depuis) : **fusionner en squash**.
+> **Revue 2 (29 oct., soir) — cinq défauts d'écran et de règle, reproduits puis corrigés :** (1) une recherche qui ne
+> trouvait QUE la conversation retirée disait « Aucun résultat » ⇒ la ligne sous la liste dit « 1 conversation correspond
+> à ta recherche, mais tu l'as retirée », avec « La remettre » ; (2) à 390 px « Retirer » coupait le nom du COMPTE dans
+> l'en-tête du fil ⇒ le titre de la paire se coupe, le compte jamais (`.vrm-chat-head-compte`, `data-fil-compte`) ;
+> (3) un fil d'offre dont l'annonce est partie portait deux fois le même geste ⇒ seul « Retirer de la liste » du bloc
+> reste ; (4) la ligne « conversation retirée » était collée au bord du panneau ⇒ même marge que les lignes ; (5) une
+> conversation retirée REVENAIT sans nouveau message quand le fil ouvert était plus récent que la boîte (sa propre
+> réponse) ⇒ le geste garde la plus récente des deux dates (`majAuGeste`, une date future ignorée). Preuves :
+> `audit-offre-annonce-partie.cjs` 41 (`--prouve` 12/12, dont `boite-seule` et `futur-retenu`), banc `messagerie.cjs`
+> (recherche, compte lisible mesuré par une Range, un seul geste, marge) : rouges sur la branche d'avant, verts après.
+> **Décidé pour lui** : une offre « en attente » sur une annonce TOUJOURS en ligne garde sa pastille et sa place en tête,
+> quelle que soit son ancienneté (aucune expiration mesurée chez Vinted) — c'est « Retirer » qui la sort. Plafond :
+> **50/h** (décision de main, « comme Vintex »), pas 30. **Geste de l'intégrateur : fusion en squash** (f7214427 porte
+> deux identifiants réels dans son historique).
+> **Revue 3 (30 oct.) — « elle revient dès qu'un nouveau message arrive » était FAUX :** MESURÉ (lecture seule) : la date
+> de la boîte n'est pas celle du dernier message — Vinted la déplace quand une offre est acceptée ou refusée, ou sur un
+> évènement du suivi, sans ajouter de message (224 conversations sur 871 dont la boîte est plus récente que le dernier
+> message d'un fil capté APRÈS elle ; 149 où ce dernier message est l'offre, statut 20 ou 30) ; et la boîte ne porte aucun
+> aperçu de message (`description` = le titre de l'annonce). Rien, à la seule lecture de la boîte, ne prouve qu'un message
+> est arrivé ⇒ **décidé : la règle reste** (le sens sûr — une conversation retirée revient sur un doute, jamais un acheteur
+> caché) et l'écran dit la vérité, d'une seule phrase (`RETOUR_CONVERSATION` / `phraseRetour`, §11) : « elle revient dès
+> qu'il s'y passe du nouveau (un message, une offre acceptée ou refusée) » — titre du bouton, ligne sous la liste,
+> recherche. L'XT-6 n'est pas touchée (son offre ne changera plus d'état). Preuves : `audit-offre-annonce-partie.cjs` 46
+> (le cas mesuré : offre 22:34, Retirer 23:00, boîte relue à 23:10 sans message ⇒ elle revient ; la phrase le dit),
+> **3 rouges sur la branche d'avant**, `--prouve` 13/13 (`phrase-message-seul`). **Geste de Julien** : si une conversation
+> retirée revient après qu'il a accepté ou refusé l'offre sur Vinted, la retirer encore une fois.
+
+> **29 octobre — revue des écrans Vinted, dernier tour (deux défauts) :** « il lui faut un N° pour aller sur Leboncoin »
+> était écrit en ambre sur CHAQUE fiche sans N° (§7) — retiré de la fiche (« + N° » y suffit) ; la pastille de l'en-tête
+> dit une fois « N sans N° — il leur en faut un pour Leboncoin » (`data-sans-num`). Statistiques gardait seulement deux
+> dates (`caDu`/`caAu`) et réécrivait « 7 jours » en « Du 24 au 30 oct. » quand Ventes disait « 7 derniers jours » : le
+> libellé du raccourci est gardé (`caLabel`), le même choix s'écrit pareil partout. Preuves : banc `vinted-ui` (9205 et 9206
+> sans N°, libellé Ventes = Statistiques) **6 rouges sur e314e0ee**, 0 après ; mutation (ligne remise sur la fiche +
+> libellé jeté) ⇒ 6 rouges. ⚠️ Non mesuré : sa vraie base (une annonce en ligne sans N° aujourd'hui, hors shop_cancale).
+
+> **29 octobre — revue des écrans Vinted : neuf défauts reproduits, corrigés (app seule) :** la préparation Leboncoin
+> (`etatPrepaLbc`, une règle pour la fiche et l'en-tête) dit l'état COMMUN une fois au-dessus de la grille (« N à recapturer
+> pour Leboncoin ») — la fiche ne garde que ce qui la distingue (« 2/5 photos captées ») ; chez lui ~125 fiches sur 179
+> auraient porté « photos pas encore captées ». Statut des offres auto court et à la ligne (« Allumées · 2 annonces avec
+> mini »), jamais « … ». Plus aucun renvoi à « Gérer l'annonce » (Statistiques → « la case boost de sa fiche »). Raccourcis
+> du calendrier à la ligne dans la feuille (« Cette année » n'est plus hors de l'écran). « CA entre deux dates » somme le CA
+> finalisé PAR JOUR publié par la coque (`caFinaliseParJour`, la population de « Finalisé sur Vinted », §11) au lieu de
+> l'archive vide — « — » tant que pas lu, jamais 0,00 € ; la phrase passe par `phrasePlage` (« en octobre 2026 », « en 2026 »,
+> « du … au … »). « À publier sur Leboncoin » neutre (habillé comme les autres gestes) et absent d'une paire PROUVÉE sur
+> Leboncoin. Feuille du calendrier au doigt : le haut de la zone se cale sur le DÉBUT d'un mois (marge basse ajoutée quand
+> c'est le dernier). `updatePair` compte `fees` : un boost tapé sur une annonce sans N° est gardé. Calendrier sur tablette
+> tactile (`pointer: coarse`, fenêtre à deux mois) : jours, flèches, raccourcis, boutons à 44 px. Preuves : banc `vinted-ui`
+> (+ section T tablette, contrôle R du texte de l'app) **30 rouges sur fd505d59** (le code relu), 0 après ; mutations
+> « préparation sur chaque fiche », « `fees` ignoré », « CA hors plage » ⇒ rouges. 175 audits verts ; bancs voisins :
+> `chiffres-croises` vert, `annonces-carte` 3 · `perfv` 1 · `stats-premium` 3 · `feuilles-coque` 7 · `revue-20oct` 12 rouges, tous
+> présents (et plus nombreux) sur le build d'origin/main d1e76ab2. ⚠️ Non mesuré : un vrai iPad.
+
+> **29 octobre — ÉCRANS VINTED : grandes photos, état en jauge, calendrier « comme Airbnb », offres auto, pastille (app seule) :**
+> Julien : « augmente la taille des photos », « l'état plus original avec à côté la saisie du prix d'achat », « toutes les infos
+> des 3 petits points », « un calendrier comme Airbnb » pour les périodes, « accepter les offres automatiquement… c'est moche »,
+> « améliore la pastille Actions possibles / Lecture seule ». **Fiche d'annonce** : au téléphone UNE fiche par rangée (photo
+> ≈ 360 px), à l'ordinateur côte à côte (≥ 330 px) ; l'état en **jauge à cinq barres** (`src/carteAnnonce.js`, `etatVinted` :
+> les cinq libellés MESURÉS chez lui le 29 oct. — 131 « Très bon état », 18 « Bon état », 4/2/2 —, comparés EN ENTIER ; inconnu ⇒
+> affiché tel quel sans niveau ; aucun ⇒ « — ») et le prix d'achat saisi À CÔTÉ (`EnLigne data="achat"`, le même geste) ; le
+> « ⋯ Gérer l'annonce » est retiré : ses gestes (`data-fiche-gestes`, 44 px au doigt) et ses infos sont à la vue. **Calendrier**
+> (`src/ChoixPeriode.jsx` + règle pure `src/periodeCalendrier.js`) : deux mois côte à côte à l'ordinateur, un calendrier qui
+> défile au doigt (feuille), raccourcis 7 jours · 30 jours · ce mois · mois dernier · cette année, deux touchers puis Appliquer,
+> plage dite en clair ; UN composant pour Ventes, Achats et la période du CA (`PeriodePicker` n'est plus qu'un nom ; Compta « Semaine · Mois · Trimestre · Année » reste un segment : c'est la période de DÉCLARATION, pas une plage libre) ; la valeur
+> garde sa forme `{from, to, label?}` lue par `dansPeriodeDate` (§11, aucun filtre réécrit). **Offres automatiques** : une
+> ligne (statut + interrupteur), le texte derrière ⓘ ; comportement INCHANGÉ (éteindre sans question, allumer demande).
+> **Pastille Actions** : ton, chevron, panneau avec en-tête et la chaîne des maillons, même source (`etatActionsExt`, sur `raisonExtGlobale`). Rien sur
+> les favoris (sa demande). Preuves : banc `vinted-ui.cjs` (port `BANC_PORT`, données inventées, 390 tactile + 1512, clair et
+> sombre) **68 rouges sur le build d'origin/main (634932dd)**, 0 après ; mutations rouges : deux fiches par rangée au téléphone,
+> saisie d'achat non enregistrée, allumer sans confirmation, raccourcis écrasés dans la feuille, ton du panneau d'une autre
+> source. `audit-choix-periode.cjs` (règles exécutées, 32 contrôles ; 5 rouges sur origin/main ; `--prouve` 9/9). Bancs voisins
+> mis à la nouvelle fiche sans les affaiblir : `annonces-carte` (une fiche par rangée au téléphone), `feuilles-coque`
+> (« Passeport » dans les gestes), `revue-20oct` (gestes 44 px). Rouges déjà sur origin/main (mêmes lignes, prouvé sur son build) : `stats-premium` 3, `revue-20oct` 12, `capacites` 38, `feuilles-coque`
+> 7 (Tout imprimer, Passeport). ⚠️ Non mesuré : sa vraie base, un vrai iPhone/Safari. Extension inchangée. Julien : rien.
+
+> **29 octobre (revue 3) — Comptabilité, suivi URSSAF en trimestriel :** un seul trimestre noté (T3 = juillet, août,
+> septembre) était encore dit deux fois — l'en-tête « 300,00 € déclarés sur 3 mois · cotisations ≈ 37,20 € » au-dessus de la
+> ligne T3 qui dit la même chose. La revue 2 ne retirait le total que pour UN MOIS (`a.n === 1`) ; `suiviUrssaf` rend maintenant
+> `annee.periodes` (périodes déclarées de l'année selon le rythme, un trimestre = trois mois) et l'en-tête dit « 1 période notée
+> « déclarée » — son détail est juste en dessous ». Aucun chiffre ne change (`data-suivi-annee-ca` inchangé). Preuves : banc
+> `compta-simple.cjs` scénario F (390 tactile clair, 1512 sombre) **4 rouges sur la branche d'avant (93824bf7)**, 0 après ;
+> mutation « périodes comptées en mois » ⇒ 4 rouges ; banc entier 176 verts. Geste de Julien : aucun.
+
+> **29 octobre (revue 2) — Comptabilité : cinq défauts des relecteurs, corrigés :** (1) la carte URSSAF renvoyait une vente
+> Leboncoin à dater vers « Chiffre d'affaires par période », carte renommée « Vendu et reçu » : une source (`TITRE_CARTE_CA`) pour
+> le titre, le sommaire et la phrase, singulier accordé ; (2) **une période déjà notée « déclarée »** gardait « dans 4 j · à payer
+> 37,20 € » (37,20 € écrit 3 fois, deux « prochaines échéances » sur l'écran) : la carte ne lui donne plus ni montant ni compte à
+> rebours, elle nomme la SUIVANTE (`nextUrssafDeadline` au lendemain de l'échéance faite, jours comptés depuis aujourd'hui) et dit
+> « septembre : déclaration notée ✓ » ; son montant reste dans la ligne du suivi ; l'en-tête du suivi ne garde son total que sur
+> plusieurs mois ; (3) **« Tes dépenses » se démontait à l'arrivée du nuage** (une dépense en cours de saisie perdait le focus et les
+> touches suivantes — régression de la revue 1) : `StatutFiscal` rend six places fixes, les dépenses toujours à la 4ᵉ ; (4)
+> Organisation ouverte depuis Réglages disait « GESTION » et son ancienne accroche : surtitre « Réglages », la phrase de Réglages
+> sous le titre (`src/operations/description.js`, une source), roue du rail mise en avant ; (5) le banc partait de Ventes au bout
+> de 3,5 s : il attend la publication du bénéfice. En plus : « Comment c'est calculé » du bénéfice replié (la couverture reste sur
+> la ligne « brut »). Laissé, décision de l'autre session : « Ta micro-entreprise » s'ouvre tant que le versement libératoire n'est
+> pas tranché. Preuves : `compta-simple.cjs` **164 contrôles, 25 rouges sur la branche d'avant**, 0 après ; mutation (dépenses à la
+> racine + ancien nom) ⇒ 4 rouges (D et E). Aucun chiffre ne change. ⚠️ Non mesuré : sa vraie base. Geste de Julien : aucun.
+
+> **29 octobre (revue) — Comptabilité simple sur SA configuration :** mesuré (lecture seule) : sa ligne `main` est en micro,
+> mensuel, **sans `vrm_micro_options`** — « Ta micro-entreprise » s'ouvre donc d'elle-même (règle de l'autre session, gardée) et
+> poussait « Tes dépenses » à 3 768 px du haut au téléphone (plus loin qu'avant). **Les dépenses passent juste après la carte URSSAF
+> du mois**, avant le suivi et la micro-entreprise (`StatutFiscal` prend `apresMois`, rendu dans TOUS ses états) : 1 741 px au
+> téléphone, 1 367 à l'ordinateur. La carte CA s'appelle « Vendu et reçu », dit que sa période ne vaut que pour elle (le bénéfice a la
+> sienne, deux libellés distincts) et ne montre plus d'en-tête de tableau vide (« Année »). URSSAF, une phrase une fois (§7) : le
+> suivi ne redonne plus l'« à payer » du mois EN COURS (la carte du mois le dit), le calendrier marque d'une coche (sans redire
+> « notée déclarée ») ; le titre replié de la micro-entreprise GARDE l'échéance (`suivi-urssaf.cjs` R l'exige : décision de l'autre
+> session, pas défaite). « connu pour 1 vente » ; la facturation
+> électronique renvoie à « Ton entreprise (Comptabilité → Avancé) » (« Profil fiscal » n'existait plus) ; le « ⓘ » du résultat ne
+> dit plus que le bénéfice est « juste en dessous » (il est en haut). Réglages → Organisation dit à quoi sert l'écran. Aucun chiffre
+> ne change. Preuves : `compta-simple.cjs` (131 contrôles) **24 rouges sur le code d'avant** (la branche avant cette revue), 0 après ;
+> mutation (dépenses après la micro + tableau vide + « juste en dessous ») ⇒ 8 rouges ; `facturx.cjs` suit le nouveau geste.
+> ⚠️ Non mesuré : sa vraie base dans l'app. Geste de Julien : aucun (répondre une fois « versement libératoire » referme le bloc).
+
+> **29 octobre — COMPTABILITÉ SIMPLE :** Julien : « pour la compta, améliore tout, mets de côté la facturation électronique et
+> fais quelque chose de simple ». **Aucune règle de calcul ne change (§11) : seul l'ordre change.** En haut, ce qu'il regarde :
+> Vendu et reçu (`CaParPeriodeCarte`) → Bénéfice (`BeneficeCompta`) → URSSAF (`StatutFiscal` : carte du mois et prochaine
+> échéance, « Suivi de tes déclarations URSSAF », puis « Ta micro-entreprise » repliée — le repli et son ouverture d'office sont
+> ceux de l'autre session (« Comptabilité allégée », gardés tels quels à la fusion ; mon repli à moi est retiré : une règle pour une
+> notion) → **Tes dépenses** (les montants, « Ajouter une dépense », les abonnements). En bas, **« Avancé », replié**
+> (`data-compta-avance`) : résultat de l'année, récap mensuel (replié lui aussi, par l'autre session), packs, ton entreprise,
+> factures, facturation électronique (Super PDP) — rien n'est supprimé, le sommaire (Vendu et reçu · Bénéfice · URSSAF · Dépenses ·
+> Avancé) y mène et l'ouvre. La tuile « Bénéfice — · saisis tes prix d'achat » de la carte URSSAF est retirée : le bénéfice a sa
+> carte juste au-dessus (§7, une notion une fois). Preuves : banc `compta-simple.cjs` (port 9311, données inventées, 390 tactile
+> clair + 1512 sombre ; 107 contrôles ; `SHOTS=dossier` capture tout l'écran) — **38 rouges sur origin/main (cadafd4)**, et les
+> mêmes chiffres sur les deux codes (vendu 60 €, reçu 60 €, bénéfice net −2,93 €, à payer 37,20 €, dépenses du mois 25,49 €,
+> résultat 321,52 €) ; 3 mutations rouges sur le code fusionné (« Avancé » ouvert d'office : 12 · Organisation remise au menu : 2 ·
+> « Bénéfice — » redit : 2). Les bancs qui lisent les cartes rangées (chiffres-croises, compta-abonnements, compta-stock-ui,
+> entreprise-stream, facturx, stats-compta, superpdp) ouvrent « Avancé » d'un toucher, comme lui (`scripts/bancs/_compta.cjs`,
+> sans effet sur un code d'avant). ⚠️ Non mesuré : sa vraie base. Geste de Julien : aucun.
+
+> **29 octobre — ORGANISATION RETIRÉE DU MENU :** Julien : « on ne comprend pas à quoi ça sert, ça doit être utile sinon ça n'a
+> rien à faire ici ». **Mesuré (lecture seule, `vrm_operations_v1`)** : en dix jours, UN élément — une recherche eBay préparée,
+> jamais lancée (elle reste dans eBay → Achats) — et zéro mission, réservation, lot, consommable, réception ou dossier ; les
+> missions supposent une équipe, et la migration 016 n'est pas appliquée. Ce qui l'attend aujourd'hui est Ma journée, ses retours
+> sont dans Colis : un écran qui les redirait serait une seconde règle (§11). **Décision : hors du menu** (Gestion au téléphone,
+> rail à l'ordinateur) ; l'écran, ses données, `?tab=organisation` et « Mes missions » de l'équipe restent ; on y entre par
+> **Réglages → Stock et rangement → Organisation** (`data-reglage-organisation`). Preuves : banc `compta-simple.cjs` section C ;
+> `scripts/tests/operations-navigation.cjs` suit le nouveau chemin (rouge sur origin/main). ⚠️ `revendeurs.cjs`, qui porte ce
+> test, meurt déjà sur origin/main (« actions quotidiennes en haut », filtres eBay) : le bloc a été prouvé posé au début du banc.
+> Geste de Julien : aucun — s'il veut l'écran, Réglages → Stock et rangement → Organisation.
+
+> **29 octobre — L'AGENT eBAY QUI DEMANDE (eBay → « À traiter », section « Agent eBay ») :** Julien : « je veux un agent
+> autonome, c'est-à-dire que je veux juste qu'il demande s'il doit poster les articles, que tu puisses lui dire ce que tu veux
+> qu'il publie ». L'agent PRÉPARE et PROPOSE, Julien dit oui, il publie — **jamais sans son oui**. Règle pure
+> `src/agentEbay.js` (`propositionAgent`, §11) : en ligne, numérotée, pas vendue (toutes plateformes ; « pas su » ⇒ rien, dit),
+> pas déjà en vente/programmée sur eBay (SKU, tous comptes), pas déjà en brouillon, pas jumelle, pas « jamais », et **aucune
+> des deux paires d'un N° porté deux fois** ; réglages `vrm_agent_ebay_regles` (synchronisé) + une phrase comprise SANS IA,
+> montrée avant d'être gardée. La route exige `agent:true` + `confirme:true`, garde les contrôles de « Publier », journalise.
+> **Revue du même jour (16 défauts, tous reproduits puis corrigés)** : « N paires **prêtes** » n'est dit (écran, Ma journée,
+> notification) que pour des paires PRÉPARÉES chez eBay (`resume.pretes`, `phraseResumeAgent`) — sinon « N paires à
+> regarder » ; « **Compléter** » met la paire préparée en UN brouillon et l'ouvre dans le formulaire d'eBay → Annonces ; la
+> préparation repart par jeton (plus de lignes figées sur « Je prépare… »), frais gardés 30 min et **refaits chez eBay avant la
+> confirmation** s'ils sont plus vieux (écran resté ouvert) ; « par jour » et « + % / € »
+> s'enregistrent à la sortie du champ ; un 503 qui dit « rien n'a été envoyé » est un REFUS, jamais « incertaine » ; une
+> incertaine (`vrm_agent_ebay_incertains`, synchronisé) ne revient qu'après une relecture d'eBay ≥ 15 min plus tard, avec le
+> **même uuid** (la route `publish` accepte `uuid` et confirme un 488 par GetItem/SKU : jamais deux annonces) ; « Programmer
+> plutôt » crée des brouillons AVEC id, jamais en double, et la paire sort des propositions ; une négation (« pas »,
+> « sauf »…) n'est jamais appliquée à l'envers (rien n'est gardé, c'est dit), les nombres sans règle sont dits, « euros »
+> compris ; raisons accordées au nombre ; bilan avec le lien de chaque paire publiée. Décidé : pas d'onglet à part — l'agent est une
+> section titrée « Agent eBay » en tête d'« À traiter » (les consignes et la notification le disent).
+> **Dernier tour (4 défauts, rouges sur cf5f710b)** : « **Arrêter l'agent** » le fait TAIRE — résumé neutre `{n:0}` au geste
+> (aussi sans compte eBay relié ou hors euros, `ETATS_AGENT_MUET`), et Ma journée + la notification lisent les réglages
+> (`agentArrete`) : plus de « 3 prêtes » pendant 48 h ; phrase libre : « en 41 à 50 € » = pointure 41 et « 50 » dit non compris
+> (plus 19 pointures), « depuis moins de 10 jours » jamais un prix, « Nike, Adidas et Puma » / « les Adidas. » lus ; Réglages →
+> Notifications ne promet plus « prêtes ». « Pas su » ne réécrit toujours pas le résumé (un hoquet n'efface rien).
+> **Le matin** (`ship-reminders`, `rappelAgentEbay`) : « 🛒 N paires à regarder pour eBay » (ou « prêtes » si préparées),
+> préférence `agentebay` (défaut oui), une fois par jour (mémo AVANT), rien si > 48 h, pause du jour, illisible.
+> Preuves : `audit-agent-ebay.cjs` (77, **23/23 mutations**, 12 rouges sur cf5f710b ; 24 rouges sur le code relu, tout rouge sur origin/main) ;
+> `audit-ebay-route.cjs` [R-agent] (3 rouges sur le code relu : UUID, 488) ; banc `ebay-agent.cjs` (390 tactile + 1512 sombre,
+> faux eBay, scénarios A-N, 152 contrôles, 12 rouges sur le build de cf5f710b) ; banc `agent-ebay-push.cjs` (vraie route, 21). ⚠️ **Non mesuré** : aucun appel réel
+> à eBay (pubinfo, pubverify, publish, 488 : formes de la doc) ; le délai réel avant qu'eBay montre une annonce créée (15 min
+> est un choix). **Gestes de Julien** : eBay → À traiter, régler « Ce que je publie » (ou écrire ce qu'il VEUT), puis dire oui.
+
+> **29 octobre — eBay → Achats : CHERCHER, et un FIL (sa demande : « le côté achat ne sert à rien ; fais la recherche
+> comme pour Vinted, avec un feed ; tout dépend si ça utilise beaucoup de données ») :** action `chercher` d'`api/ebay.js`
+> (toujours 12 fonctions ; logique `api/_lib/ebay-recherche.js`) : API Browse `item_summary/search`, EBAY_FR, jeton
+> D'APPLICATION (`jetonApplication`, client_credentials — jamais celui du vendeur, aucun compte eBay relié nécessaire),
+> session exigée (401), 30 annonces, plus récentes d'abord, filtres achat immédiat · livrable en France · état · prix max ;
+> le budget se juge PORT COMPRIS (port « calculé » = inconnu, jamais gratuit), mots exclus, photo `i.ebayimg.com` seule.
+> Plafond VRM **200 recherches/jour/vendeur** (`ebay_tokens_recherches_jour`, compté AVANT l'appel, compare-et-échange ;
+> illisible ⇒ 503, rien ne part ; atteint ⇒ 429, le fil s'arrête et le dit). Plafond d'eBay : 5 000/jour pour TOUTE
+> l'application (doc d'eBay, non mesuré) — le restant réel est rendu si eBay le dit (`rate_limit`). Octets reçus
+> d'eBay / envoyés à l'appareil mesurés et affichés. eBay muet ou illisible ⇒ 502 « pas pu chercher », jamais « aucun
+> résultat ». **Le fil = les « veilles » de l'espace Organisation (§11, la même liste)**, 10 actives au plus (`metier.js`
+> refuse la 11ᵉ ; mesuré : 1 veille en base), + pointure / achat immédiat / livraison en France (défauts pour une
+> recherche d'avant). Relu à l'ouverture de l'onglet puis au plus toutes les 15 min, page visible, une à une ; « nouveau »
+> par itemId depuis la dernière visite (cet appareil). Repère du MODÈLE (`moyennesParModele` sur ses ventes, ≥ 3), dit
+> « le modèle, pas cette paire ». Rien n'est acheté : « Voir sur eBay ↗ ». Les achats gagnés (WonList) restent, repliés,
+> lus à l'ouverture seulement. Preuves : `audit-ebay-recherche.cjs` (43 ; **31 rouges sur origin/main** ; 7 mutations
+> rouges) · banc `ebay-achats-recherche.cjs` (390 tactile + 1512 sombre ; **18 rouges sur le build d'origin/main** ;
+> mutations « relecture sans borne » et « tout est nouveau » rouges). La borne des 15 min se juge sur l'horloge de
+> l'APPAREIL (heure d'arrivée de la réponse), jamais sur `lueA` du serveur : un téléphone en avance relisait à chaque
+> minute (banc : serveur à +2 h ⇒ rouge sur le code d'avant) ; le banc ne franchit plus minuit (heure de Paris). ⚠️ **Non mesuré** : aucun appel réel à eBay
+> (formes de la doc Browse/OAuth/Analytics) ; la pointure part dans les mots-clés (« 42.5 »). **Geste de Julien** : rien —
+> l'onglet marche avec les clés eBay déjà posées.
+> **Revue du 30 oct. (12 défauts reproduits, corrigés) :** un ÉCHEC attend comme une lecture — rien avant 15 min (le fil
+> relançait chaque minute et vidait les 200 du jour en ~20 min de panne d'eBay) ; une panne commune (eBay, session,
+> compteur) arrête tout le fil et se dit UNE fois ; critères refusés (400) jamais relancés avant une modification.
+> Le compteur vit sous `ebay_tokens…` : la garde de la base (`vrm_garde_ebay_tokens`, préfixe, lue en production) refuse
+> qu'un navigateur le crée, le réécrive ou l'efface (sous l'ancien id, un vendeur effaçait sa ligne et repartait de zéro).
+> Un appel parti chez eBay compte même raté (il compte aussi chez eBay) — décidé. Une règle de critères
+> (`erreurCriteresEbay`, metier.js) pour Organisation ET la route ; « Dans le fil » / « Hors du fil » par la même règle
+> que le fil (`veillesDuFil`). 390 px : grille propre (contenu 84 → 262 px). Repère : une fois au-dessus d'une liste
+> homogène, jamais sur une clé générique (air max, dunk, blazer, forum, chuck), un accessoire ou une taille enfant.
+> « Aucune annonce gardée : eBay en avait N » ; « Ajouter au fil » sans second appel ; espace illisible : une phrase,
+> un « Réessayer » ; pastille lisible en sombre ; total du jour en Ko sur cet appareil. Preuves : audit (49 ; 2 rouges
+> sur 773e7c6e, mutations id/critères rouges) · banc (**40 rouges sur le build de 773e7c6e** ; mutations recul, repère,
+> grille rouges). Sur origin/main la fonction n'existe pas (audit : 35 rouges). Bancs eBay voisins verts ; `ebay-form`
+> sort 1 rouge (« Julien ne paie jamais le port ») déjà sur origin/main. ⚠️ Non mesuré : aucun appel réel à eBay.
+> **Dernier tour (chantier du 29 oct., revue du 30) — six défauts reproduits, corrigés :** (1) le repère se décide sur les
+> SEULES lignes qui en ont un (`reperesDeListe`) : « Voir les 21 » avec des lacets le disait 20 fois ⇒ une fois au-dessus,
+> « pour les paires de ce modèle » ; sur la ligne seulement quand deux modèles se côtoient. (2) Un 401 isolé (jeton expiré
+> au réveil) ne fige plus le fil 15 min : la session est attendue/renouvelée (`SESSION_FIL_EBAY` : `authValid`,
+> `authRefresh`) puis UN nouvel essai ; « reconnecte-toi » seulement si le renouvellement est REFUSÉ ou qu'un second 401
+> suit un renouvellement réussi ; « pas su » ⇒ nouvel essai dans 1 min. (3) Une recherche enregistrée avant la règle
+> commune (catégorie « baskets ») se CORRIGE : `veille.modifier` ne revalide plus l'ancienne (instantané brut pour
+> l'historique) ; `veille.dupliquer` dit « modifie-la d'abord ». (4) Une PART du plafond est gardée pour la main : le fil
+> (`source:'fil'`) s'arrête à **150** relectures/jour (429 `plafond-fil`), les 50 restantes ne servent qu'à « Chercher »
+> (le fil vidait seul les 200 en ~5 h 30 et grisait « Chercher » jusqu'à minuit) ; l'écran dit « dont N par le fil ».
+> (5) `extractModel` : un modèle qui finit par un chiffre ne se lit plus dans un nombre plus long (« air max 1 » ≠
+> « air max 180 / 1000 », « xt 6 » ≠ « xt 60 ») — vaut aussi côté ventes. (6) Achats gagnés : titre dit une fois
+> (`EbayAchats sansTitre`). Preuves : audit (59 ; **8 rouges sur 7cd0cbec** ; mutations part du fil, ancienne revalidée,
+> sous-chaîne rouges) · banc (**20 rouges sur le build de 7cd0cbec**, 0 après ; mutations des quatre correctifs d'écran
+> rouges). ⚠️ Non mesuré : aucun appel réel à eBay ; le renouvellement réel au réveil d'un iPhone (formes du banc).
+
+> **29 octobre — 5.287, numéros sur les profils visités :** Julien a précisé que
+> l’affichage semble seulement sur Vinted, l’import dans VRM n’est pas confirmé.
+> `/member/{id}` : aucun numéro renvoyé sans égalité avec le PROFIL du compte
+> connecté ; aucun numéro créé par une visite. Les pastilles sont purgées après
+> navigation et les réponses tardives ignorées ; cache du fond séparé par owner VRM.
+> Huit contrôles UI + trois tests du fond ; ancien affichage reproduit. Pas de
+> nettoyage de stock ni de réattribution. `docs/numeros-profils-vinted.md`.
+
+> **29 octobre — offres, extension 5.286 :** la fusion partagée `src/conversations.js` /
+> worker garde un état accepté/refusé/expiré/précédent face à une ancienne copie en attente.
+> Deux identités d’offre contradictoires pour le même message font refuser la fusion.
+> `suiviNegociationVinted` exclut une offre d’une autre transaction explicitement identifiée ;
+> le sélecteur et le résumé ne réactivent plus « précédente » via un doublon.
+> `offres-fusion.test.mjs` exécute les deux versions. Archives 5.286 générées.
+> Rien n’a été envoyé à un compte marchand. Voir `docs/offres-etats-stables.md`.
+
 > **29 octobre (soir) — revue de la republication et des favoris (5.285) :** « tout doit être parfait ». Dix défauts
 > trouvés en relisant le code, tous corrigés : la file des mises en ligne planifiées s'écrit une à la fois (une
 > planification pendant un réveil effaçait une paire) ; un job resté « en cours » (Chrome a tué le service worker)
@@ -151,6 +495,75 @@
 > la carte sur un vrai iPhone. **Geste de Julien** : ouvrir l'écran Vestiaire Collective → « Ta clé Photoroom » (sa clé
 > d'avant se chiffre toute seule), puis « Vérifier chez Photoroom ».
 
+> ⚠️ **29 octobre — LE STATUT LU CHEZ LE TRANSPORTEUR remis sur `main` (extension 5.281), PAS FINI :** Julien : « tu as
+> juste à regarder sur le site du transporteur… le statut », « ça marche si je n'ai pas l'extension allumée ? ». Le chantier
+> du 24 octobre (`v24-transp` : serveur + app ; `v24-transp-ext` : extension, numérotée « 5.217 » sur sa branche) est
+> fusionné sur `main` (a0d43bd) dans `v29-colis`. Le SERVEUR lit seul Mondial Relay (`_mvc` de mondialrelay.fr, n° + code
+> postal du relais, voie `mr-fr-mvc`), Chronopost (`ws.chronopost.fr` trackSkybillV2, `cp-ws2`) et Vinted Go
+> (`carrier.vintedgo.com/public/v3/tracking_events`, `vg-v3`), User-Agent honnête `VRM-suivi/1.0 (+https://vrm.center)` —
+> sans l'extension (`api/_lib/transporteurs.js` règles pures, `transporteurs-lecture.js` réseau, `api/relais.js` modes
+> `transp` · `transp-a-lire` · `transp-brut`, matin et soir dans `ship-reminders`, widget, `email-inbound`). Lignes
+> `transp_{carrier}_{n°}` (serveur seul, compare-et-échange), règle des fins dans `suivi-colis.js` (`finsDesLignes`
+> + `transp`, `fusionTransporteur`, `sortiParSuivis` → `a_verifier`), app : `LigneTransporteur`, `TeteTransporteurs`,
+> `useRelectureTransporteurs`. L'extension n'est qu'un SECOURS (C3 : ce que le transporteur refuse au serveur ; C4 : la
+> réponse brute, jugée par la MÊME fonction serveur ; `transpTick`, `transp-page.js`). Version : la « 5.217 » du chantier
+> était déjà PUBLIÉE par `main` avec un autre contenu, et la 5.280 prise par `main` pendant la fusion ⇒ **5.281.0** (`EXT_ATTENDUE`, `EXT_CAPACITES.transp`,
+> `CODE_VERSION`, `CAPTEUR_VERSION`, `relaisVersion`, zips). ⚠️⚠️ **Le 29 oct. au soir, `main` a publié 5.281, 5.283 et
+> 5.284 sans ce code** : à l'intégration, monter l'extension (≥ 5.285, jamais servie) ET `EXT_CAPACITES.transp` ensemble
+> (`audit-coherence`, `audit-extension-zip` le disent rouge d'ici là) — **fait au tour 2 : 5.290.0**. **Les 19 défauts du tour 2 (relecture du 29 oct. au soir) sont corrigés** — « tour 2 » en fin de dossier. Des 21 défauts reproduits le 24 oct., **les n° 1 à 11
+> (règles, états, écran) sont corrigés** — « Statut chez le transporteur, tour 1 » en fin de dossier ; **les n° 12 à 21
+> (notifications) aussi** — « tour 1, les notifications », juste après (nouvelle arrivée, « pas su » qui ne consomme rien,
+> une notification pour suivi Vinted + transporteur + e-mail, pause globale par transporteur, bail, C4 daté, bornes, 72 h ;
+> `audit-transp-notif` 17/17). Côté extension (Chronopost 14 caractères,
+> `mr-be` en repli de `mr-fr-mvc`, corps 192 Ko, conversations UUID, achats au point relais lus d'abord) : branche
+> `v29-colis-ext`. Preuves de la fusion : 174 audits (sans les 5 Postgres), mêmes rouges que `main`
+> (`audit-politique-hotes` 1, `audit-preuve-vente` 18 — déjà là) ; `audit-statut-transporteurs` (`--prouve` 29/29),
+> `audit-mondialrelay-serveur` (24/24), `audit-transp-ext` (11/11) verts, rouges sur `main` (24 · 6 · 54) ; banc
+> `transporteurs` vert (49 rouges sur le build de `main`) ; bancs colis, widget, rappels, notifications, popup, badge, pont,
+> premierjour verts.
+
+> **29 octobre — `v29-colis-ext` : l'extension (5.281, version inchangée ; numéro de branche, remplacé par 5.291.0 à l'intégration du 30 oct.) suit le serveur, et mesure la route des messages :**
+> (1) **Transporteurs (secours)** : `TRANSP_FORME` reprend la forme du serveur (`FORME_SUIVI` : Chronopost
+> `XX123456789XX` ou `\d{14}[0-9A-Z]?`) et la liste blanche d'adresses en dérive ; un refus de `mr-fr-mvc` bascule sur
+> `mr-be` (page puis API), même budget, une requête à la fois, pause posée sur la voie refusée seule ; le corps Mondial
+> Relay est lu jusqu'à 192 Ko (`CORPS_MAX_MR`) et, sur un 413 du serveur, renvoyé UNE fois borné au contrat d'avant
+> (64 Ko / 80 Ko). ⚠️ **Pour le chantier A (serveur)** : C4 (`appliquerReponseBrute`, `CORPS_MAX`) et `api/relais.js`
+> (`ENVOI_MAX` 80 Ko) refusent encore plus de 64 Ko — les 192 Ko ne seront jugés qu'une fois ces deux bornes montées pour
+> Mondial Relay ; et les n° Vinted Go à 12 chiffres (mesure au serveur) relèvent de A. `audit-transp-ext` 113/113,
+> 12 rouges sur 8f62e6f2, `--prouve` 15/15. (2) **Suivi des achats** : `capterSuivisAchats` lit d'abord les achats AU
+> POINT RELAIS (`needs_action` / `AT_RELAY`), jamais lus puis déjà lus, avant les achats en route (`rangSuivi`) — triés
+> par date seule, un colis arrivé passait après 35 achats en route relus toutes les 3 h. `audit-suivi-vinted` section L
+> (2 rouges sur l'avant, mutation `priorite-relais`). Mesuré : aucun n° de suivi dans une conversation, une transaction
+> ou l'escrow (seul `journey_summary` le porte) — rien de neuf à ranger. (3) **Conversations** : la capture reconnaît une
+> conversation chargée par son UUID (le `conversation_id` des commandes), règle ANCRÉE (plus aucun sous-chemin
+> `…/replies`) ; le fond la range sous l'id NUMÉRIQUE de la réponse (sans id numérique, ou un autre id : rien).
+> `<chemin-regle>` partagée page/fond (UUID → `{uuid}`, hex → `{hex}`, nombre → `{id}`). `seen_urls` garde les 400
+> réponses et 600 chemins les plus RÉCENTS (elle gardait les 400 premières clés : un chemin neuf était perdu).
+> ⚠️⚠️ **MESURÉ : depuis le 18 oct., plus AUCUNE requête `/api/v2/conversations/…` ne part de la page d'une conversation**
+> (escrow, bannières, litiges, anti-hameçonnage seulement). On ne devine pas la nouvelle route : sur la page d'une
+> conversation l'extension relève chaque requête vers Vinted (hors `/api/` compris : chemin normalisé, statut, type),
+> la FORME d'une liste de messages (où, combien, clés et types — jamais une valeur), les sockets/flux (hôte, chemin,
+> trames, forme) et les données Next (oui/non), dans `harvest_{uid}_seen_urls.conversation`. **À lire en lecture seule
+> après sa prochaine conversation ouverte avec cette extension** : c'est elle qui dira par où passent les messages.
+> `audit-endpoints-vus` C1-C3 (46 contrôles, 23 rouges sur l'avant, 8 mutations rouges).
+> (4) **Tour 2 des relecteurs (29 oct., soir), côté extension** : `TRANSP_FORME.vinted` prend les **12 chiffres** du
+> serveur (A, `FORME_SUIVI`) — C3 les annonçait et l'extension les refusait (`transp_item_refuse`, lu par personne) ;
+> `contratSuivi` (bloc `<suivi-regle>`, même texte dans inject.js) nomme le transporteur par `current_carrier` ou
+> l'unique `carriers[]` `is_current`, avec SON `tracking_code` (code machine seulement ; deux « courants » ⇒ rien) —
+> `transporteur` était `null` sur ses 7 suivis rangés, et le n° pris était celui du PREMIER trajet. ⚠️ Le code réel
+> (« vinted_go » ?) n'est pas mesuré : le serveur le lit par `carrierLisible` (`/vinted/`, `/mondial/`…). Le reste du
+> défaut (une carte « vue par Vinted » sans ligne transporteur, trois états) est côté A. `audit-extension-zip` lit
+> l'historique par `VRM_GIT` puis la racine, et un historique illisible est ROUGE (il sortait vert « sans conclusion »
+> depuis une copie §6.1). `audit-transp-ext` §16 (C3 → `itemTranspValide` → lu → page C5) et §17 (transporteur
+> courant, et le serveur qui le lit) : 7 rouges sur 980ef927 dans la copie fusionnée avec A (94f4d515), `--prouve`
+> 18/18 (`vg12`, `courant`, `paire`). ⚠️ Dans ce worktree SEUL, §13 et §16 sont rouges : `api/` y est celui d'avant A
+> (sans `\d{12}`) — c'est l'écart qu'on veut voir, il disparaît à la fusion. ⚠️⚠️ **VERSION** : `main` est en
+> **5.287.0** (remesuré 29 oct. 23:45) et le worktree du chantier A (`v29-colis`) a déjà pris **5.290.0** ; la 5.281 de
+> ce chantier est PRISE avec un autre contenu ⇒ à la fusion, monter TOUT au numéro de A (un seul numéro pour A + B,
+> jamais servi ni réservé — vérifier les sessions en cours) : manifeste, `CODE_VERSION`,
+> `CAPTEUR_VERSION`, `relaisVersion`, `EXT_ATTENDUE`, `EXT_CAPACITES.transp`, notice Orion, zips. La double arrivée
+> Mondial Relay (`_mvc` puis `.be`) se corrige au serveur (A, `memeOccurrence`), pas ici.
+
 > **29 octobre — TA MICRO-ENTREPRISE : profil, calendrier, seuils (Comptabilité) :** Julien : « une jauge plafond + seuil de TVA,
 > vérifie les seuils officiels 2026 », « vois si la personne a choisi le versement libératoire », « mensuel : elle déclare août
 > mais paie en septembre », « plus pro ». **Vérifié sur service-public.gouv.fr le 29 oct.** : plafond vente de marchandises
@@ -184,7 +597,7 @@
 > l'app (15/h) — l'ancienne annonce déjà supprimée, il ne restait qu'un brouillon. Désormais la paire RÉSERVE ses 3 gestes
 > (2 pour « En ligne → brouillon ») d'un coup avant le premier (`gardeStricte({actions})`, `compterAction(…, n)`) ; plus
 > de place ⇒ rien ne part, l'annonce reste en ligne, c'est dit ; la mise en ligne ne revérifie que le compte et la pause.
-> Le plafond (20/h, 15 pour l'app) n'a PAS bougé (§3) : 5 republications par heure et par compte au plus. Preuve :
+> Le plafond (20/h, 15 pour l'app — avant la 5.283 : aujourd'hui 50/h, 45 pour l'app) n'a PAS bougé (§3) : 5 republications par heure et par compte au plus (aujourd'hui 15). Preuve :
 > `audit-recreer.cjs` §Q (147 ; 2 rouges sur origin/main : « brouillon-a-refaire … 15 actions »).
 
 > ⚠️⚠️ **29 octobre — REPUBLIER « COMME VINTEX » (5.277), après la restriction de 24 h d'angeled92 :** Vinted a écrit
@@ -1324,6 +1737,58 @@
 > rétablir ce bloc au nom des consignes du 22 octobre : elles sont remplacées.
 > Voir `docs/passation/2026-10-24-offres-messages.md`.
 
+
+> **30 octobre — Discord créait un second compte, et la voix de la démo :** mesuré (lecture seule) : « Se connecter avec
+> Discord » a créé le compte `99457424…` (vide, une ligne `main`) — l'email Discord n'est pas celui de son compte VRM, et le
+> « Discord relié » de Mon compte ne rangeait qu'un PSEUDO (`vrm_discord`), pas une méthode de connexion. Corrigé : Mon compte
+> → Comptes associés propose aussi « Connecter Discord » (liaison d'identité Supabase, `preparerLiaisonOAuth`) ; un compte
+> que Supabase vient de créer par Discord/Google sans email (`compteOAuthNeuf`, < 10 min) passe par `PorteNouveauOAuth` :
+> « nouveau compte » ou « j'ai déjà un compte » ⇒ suppression du compte vide par la route « Fermer mon compte », confirmée ;
+> « Identity is already linked » est traduit (`erreurRetourOAuth`). Banc `discord-nouveau-compte.cjs` (rouge sur l'avant).
+> Voix de la démo : plus la première voix française venue (la « compacte », robotique) — classement naturelle/neuronale ›
+> améliorée/premium › Google ; aucune voix de qualité ⇒ pas de bouton (`bienvenue.cjs` : 4 rouges sur l'avant).
+> ⚠️ Non mesuré : que « Manual linking » soit activé dans Supabase (sinon l'écran le dit). **Gestes de Julien** : supprimer le
+> compte vide (se connecter avec Discord ⇒ « J'ai déjà un compte VRM »), puis email ⇒ Mon compte ⇒ « Connecter Discord ».
+
+> **30 octobre (suite) — le Discord de la carte était le MÊME que celui de la connexion :** mesuré, `vrm.center`
+> (id Discord 1562201720438788168) est le pseudo VÉRIFIÉ de `vrm_discord` sur son compte (relié le 22 oct. pour la
+> carte) ET l'identité du compte vide créé à 10 h 55 (email Discord vrm.vinted35@gmail.com ≠ shopcancale35@…).
+> `GET /api/compte?mode=discord-deja` (session) : l'identifiant Discord du compte neuf (ou son pseudo, unique chez
+> Discord) comparé aux `vrm_discord` vérifiés d'AUTRES comptes ⇒ l'email MASQUÉ de ce compte, rien d'autre ; pas su ⇒
+> rien. `PorteNouveauOAuth` dit alors « Ce Discord est déjà sur ton compte VRM sh•••@gmail.com — seulement pour la
+> carte » et met « Supprimer ce compte vide et revenir au mien » en geste principal. Banc `discord-nouveau-compte.cjs`
+> (+3 par taille). ⚠️ Non mesuré : le vrai Discord. Geste de Julien inchangé (supprimer le vide, puis « Connecter Discord »).
+
+> 🔴🔴 **PASSATION DU 30 OCTOBRE — LIS D'ABORD `docs/passation/2026-10-30.md`** : sept branches v29-* construites
+> et relues mais PAS en ligne (leur contenu est dans `docs/passation/branches-2026-10-30.bundle`), l'ordre de
+> mise en ligne (une seule intégration, un seul numéro d'extension), la refonte des boutons en cours, Vestiaire.
+
+> **30 octobre — refonte visuelle en ligne (première passe, `v29-refonte` sur #911/#912) :** trois formes de
+> bouton seulement — `vrm-b-primaire` · `vrm-b-secondaire` · `vrm-b-discret` (`src/styles-boutons.css`, composant
+> `Bouton` ; `Btn` est secondaire par défaut, un primaire se DEMANDE ; plus de rouge hors doublon de N°, Annuler
+> en discret). `Avancement` (une barre : où j'en suis, combien, ce qui a raté) pour Republier. Une ligne de texte
+> par bloc, le détail derrière ⓘ ; menus « Outils » en feuille du bas sur téléphone. Écrans traités : coque, Ma
+> journée, Ventes, Achats, Republier, Stock, Statistiques, Communauté, Réglages (et une première touche sur
+> Annonces, Colis, Compta). L'écran de connexion/inscription est celui de #911/#912, non retouché. **Reste (seconde
+> passe)** : Annonces, Messages, Leboncoin, eBay, Colis, Compta ; et UN primaire par écran, par le slot principal
+> de `ScreenHead`.
+> **Même passe — la mise en page sur Edge sous Windows** (mesuré : `scratchpad/edge/rapport.md`, Chromium à barres de
+> défilement classiques) : (1) fenêtre basse, le bas du rail (Stats, Compta, Communauté) disparaissait sans indice →
+> rail resserré `(min-width:768px) and (max-height:800px)` (logo 40 px, entrées 38 px), fondu `data-rail-suite` posé
+> par `SideBar`, entrée active ramenée dans la vue ; (2) Messages faisait défiler la PAGE en plus de la liste (un
+> `.vrm-sr` repéré sur <body>) → `.vrm-main{position:relative}` et `html{overflow:hidden}` à TOUTES les largeurs
+> (styles-epure) ; (3) 768–1023 px à la SOURIS = coque ordinateur : `MQ_ORDINATEUR` = `(min-width:1024px),
+> (min-width:768px) and (hover:hover) and (pointer:fine)` dans `useOrdinateur` ET les media queries de COQUE
+> (île, en-tête, barre du bas, 44 px, fondus des rangées, `.vrm-rangee`/carrousel) — leur complément au doigt ; les
+> règles de CONTENU restent à la largeur ; une tablette au doigt garde la coque téléphone ; (4) colonne des
+> conversations `minmax(340px,36%)`, filtres qui reviennent à la ligne ; (5) une seule hauteur `--vrm-msg-h` pour liste
+> et panneau ; (6) l'île FLOTTE (`absolute`, plus de rangée de 66 px) — chaque première ligne qui n'est pas un
+> `ScreenHead` lui réserve `--vrm-ile` (résumé de plateforme, Organisation, Communauté, Réglages, « Modifier » de Ma
+> journée) ; titres à 26 px si `max-height:760px` ; (7) Ma journée 1024–1279 : « À faire » en 2 colonnes, une tâche
+> seule (ou à côté du rappel URSSAF pleine largeur) prend la ligne ; widgets à 6 colonnes seulement dès 1280. Banc
+> `scripts/bancs/edge-tailles.cjs` (8 tailles, souris/doigt, rail, double défilement, coque, débordement, île
+> mesurée sur les LETTRES, case vide) : 73 rouges sur un build d'origin/main, 0 après. ⚠️ Non mesuré : un vrai Edge
+> sous Windows (polices ClearType, barres « Fluent »).
 
 > ⛔⛔ **DÉCISION DE JULIEN, 22 OCTOBRE : PAS DE DOUBLE VÉRIFICATION PAR SMS — C'EST PAYANT.**
 > Mesuré dans la doc Supabase (« Advanced MFA Phone ») : **75 $/mois** pour le premier projet,
@@ -11236,7 +11701,27 @@ arrivée** — vérifiée commit par commit sur `manifest.json`, pas devinée.
 | `lbcfiche` | `appliquerAnnonceLbc` | **5.182.0** (16 oct.) | publier sur Leboncoin l'annonce CORRIGÉE dans la fiche de VRM (titre, prix, état, photos, description) |
 | `confirmer` | `capterConfirmations` | **5.204.0** (21 oct.) | « relever les colis à confirmer (« Tout est OK ») avant leur date limite » |
 | `retraitnotif` | `envoyerNotifsRetrait` | **5.204.0** (21 oct.) | « te prévenir quand elle lit un code de retrait dans une conversation » |
-| `suivivinted` | `capterSuivisAchats` | **5.216.0** (24 oct. — ni la 5.214.0 ni la 5.215.0 publiées par `main` ne l'ont) | « l'extension relève le suivi Vinted de tes achats » — seulement connectée à CE compte VRM, seule, au code à jour (revue du 24 oct.) |
+| `suivivinted` | `capterSuivisAchats` | **5.217.0** (24 oct. — ni la 5.214.0, ni la 5.215.0, ni la 5.216.0 publiées par `main` ne l'ont ; la table disait 5.216.0, le code dit 5.217.0) | « l'extension relève le suivi Vinted de tes achats » — seulement connectée à CE compte VRM, seule, au code à jour (revue du 24 oct.) |
+| `transp` | `transpTick` | **5.291.0** (30 oct. — aucune version publiée ne l'a ; 5.290 était un numéro de branche) | « l'extension lit le statut chez le transporteur à la place du serveur quand celui-ci est refusé » |
+| `lbcsupprime` | `supprimeLbcDepuisApp` | **5.291.0** (30 oct. — 5.288 était un numéro de branche) | « Supprimer de Leboncoin » depuis VRM, sur son clic et confirmé |
+| `lbcstats` | `noterStatsAnnonceLbc` | **5.291.0** (30 oct.) | « favoris, vues et messages relevés sur tes annonces Leboncoin » |
+| `favorisouvrir` | `ouvrirFavoriNatif` | **5.225.0** | (ligne ajoutée le 30 oct. : la table ne la portait pas — voir la section du jour de son arrivée, et `audit-coherence`) |
+| `favorisliste` | `lirePageFavoris` | **5.218.0** | (ligne ajoutée le 30 oct. : la table ne la portait pas — voir la section du jour de son arrivée, et `audit-coherence`) |
+| `favoris` | `executerMessageFavori` | **5.217.0** | (ligne ajoutée le 30 oct. : la table ne la portait pas — voir la section du jour de son arrivée, et `audit-coherence`) |
+| `offresauto` | `autoAccepterOffres` | **5.234.0** | (ligne ajoutée le 30 oct. : la table ne la portait pas — voir la section du jour de son arrivée, et `audit-coherence`) |
+| `vcauto` | `rangerVcAnnonces` | **5.236.0** | (ligne ajoutée le 30 oct. : la table ne la portait pas — voir la section du jour de son arrivée, et `audit-coherence`) |
+| `vcventes` | `rangerVcVentes` | **5.237.0** | (ligne ajoutée le 30 oct. : la table ne la portait pas — voir la section du jour de son arrivée, et `audit-coherence`) |
+| `republier` | `republierVinted` | **5.240.0** | (ligne ajoutée le 30 oct. : la table ne la portait pas — voir la section du jour de son arrivée, et `audit-coherence`) |
+| `republiermodif` | `corpsAvecPrixBaisse` | **5.247.0** | (ligne ajoutée le 30 oct. : la table ne la portait pas — voir la section du jour de son arrivée, et `audit-coherence`) |
+| `recreer` | `recreerVinted` | **5.248.0** | (ligne ajoutée le 30 oct. : la table ne la portait pas — voir la section du jour de son arrivée, et `audit-coherence`) |
+| `lettre` | `recreerVinted` | **5.250.0** | (ligne ajoutée le 30 oct. : la table ne la portait pas — voir la section du jour de son arrivée, et `audit-coherence`) |
+| `brouillon` | `publierBrouillon` | **5.251.0** | (ligne ajoutée le 30 oct. : la table ne la portait pas — voir la section du jour de son arrivée, et `audit-coherence`) |
+| `versbrouillon` | `recreerVinted` | **5.253.0** | (ligne ajoutée le 30 oct. : la table ne la portait pas — voir la section du jour de son arrivée, et `audit-coherence`) |
+| `republierbrouillon` | `recreerVinted` | **5.254.0** | (ligne ajoutée le 30 oct. : la table ne la portait pas — voir la section du jour de son arrivée, et `audit-coherence`) |
+| `refaire` | `refaireBrouillon` | **5.255.0** | (ligne ajoutée le 30 oct. : la table ne la portait pas — voir la section du jour de son arrivée, et `audit-coherence`) |
+| `republierpage` | `vintedPage` | **5.277.0** | (ligne ajoutée le 30 oct. : la table ne la portait pas — voir la section du jour de son arrivée, et `audit-coherence`) |
+| `republierfile` | `miseEnLigneTick` | **5.279.0** | (ligne ajoutée le 30 oct. : la table ne la portait pas — voir la section du jour de son arrivée, et `audit-coherence`) |
+| `favorisperso` | `erreurVariablesFavori` | **5.281.0** | (ligne ajoutée le 30 oct. : la table ne la portait pas — voir la section du jour de son arrivée, et `audit-coherence`) |
 
 ⚠️ **DEUX SEUILS POUR UNE MÊME NOTION, EXPRÈS.** Les photos s'attachent côté
 Leboncoin depuis la 5.58 et côté eBay depuis la 5.59 : un seul seuil aurait
@@ -13817,6 +14302,71 @@ Une fonction, une forme. Avant d'écrire un contrôle, **réutiliser** celui-ci 
   (« 5 numérox portés par deux paires », la coquille comprise) pour chaque paire
   rangée. `audit-conflits-numeros.cjs` : 3 rouges sur l'avant.
 
+### Les trois boutons (29 octobre) — `src/styles-boutons.css`, composant `Bouton`
+Julien : « ça fait encore de faible qualité, améliore les boutons, arrête les
+messages écrits dans tous les sens ». TROIS formes, et seulement trois :
+- **`.vrm-b-primaire`** — fond `--vrm-accent`, texte `--vrm-on-accent` (#fff clair,
+  #173A40 sombre : l'accent sombre est une menthe claire, un texte blanc y était
+  illisible — vu sur « Tout imprimer »). **UN par écran** : l'action principale,
+  en haut à droite (slot `right` de `ScreenHead`) sur ordinateur, dans
+  `.vrm-b-barre` (fixe au-dessus de la barre du bas) sur téléphone.
+- **`.vrm-b-secondaire`** — fond teinté (accent ~8 %, `--vrm-b-teinte`), texte
+  encre, **aucune bordure**, rayon 10, 40 px souris / 44 px doigt.
+- **`.vrm-b-discret`** — texte seul couleur d'accent (`--vrm-b-lien`), zone 44 px.
+  « Annuler » d'une feuille est TOUJOURS discret, son geste principal primaire.
+- Classe de base `.vrm-b` (+ `.vrm-b-plein`, `.vrm-b-icone`, `.vrm-b-court` pour
+  revenir à la ligne), rangée de gestes `.vrm-b-rangee` (à droite sur ordinateur,
+  pleine largeur en bas de carte sur téléphone). En React :
+  `<Bouton variante="primaire|secondaire|discret" icone="…" plein href=…>` (à côté
+  de `Segmente`) ; tout le reste (`data-*`, `title`, `disabled`, `style`) passe.
+- **Normalisation globale** (même fichier, section 2) : un `<button>`/`<a>` SANS
+  classe dont le style en ligne porte la bordure `C.border`, le fond `C.card2` ou
+  un contour accent prend l'apparence secondaire ; un fond `C.accent` prend le
+  rayon et le texte « sur accent ». Exclus : `aria-pressed|selected|checked|current`,
+  `role`, carte-bouton (`text-align: left`, ombre, contenu `div`/`img`), pastille
+  arrondie, navigation, `.vrm-seg`, `.vrm-filtres`, `.vrm-rangee`. ⚠️ Un style en
+  ligne qui change de couleur de bordure sort de la règle : utiliser `Bouton`.
+- Un geste rare va dans « ⋯ » ; deux boutons qui font la même chose, c'est un de
+  trop ; un bouton grisé garde sa raison (`title` ou une ligne) et n'est jamais
+  caché ; pas de rouge (sauf le doublon de N°), pas de vert en dur.
+- **L'action principale d'un écran** : `<ScreenHead … principal={<Bouton
+  variante="primaire">…</Bouton>}>` — en haut à droite sur ordinateur, barre fixe
+  au-dessus de la navigation du bas sur téléphone (`.vrm-b-principal`, la page
+  garde 64 px dessous). Jamais deux primaires sur un écran.
+- **L'ancien `Btn`** passe par les mêmes formes : plein + accent (ou sans couleur)
+  ⇒ primaire, tout le reste (`outline`, `color={C.border}`, `danger`) ⇒ secondaire,
+  `small` ⇒ `.vrm-b-petit` (34 px souris, 44 doigt). Il transmet désormais
+  `title`/`aria-*`. (Avant : `color={C.border}` = texte BLANC sur gris clair.)
+- `--vrm-on-accent` vient du thème (`variablesTheme`, `t.onAccent`) : #FFF en
+  clair, #173A40 en sombre (l'accent sombre est clair).
+- ⚠️ **Spécificité** : sur téléphone `styles-epure.css`/`styles-iphone.css` visent
+  les `<button>` par leur style en ligne à (0,3,1) + `!important`. Chaque règle
+  `.vrm-b-*` est doublée sous `.vrm-app-shell .vrm-main .vrm-b.vrm-b…` (0,4,0) ;
+  une règle ajoutée ici doit suivre ce motif. `min-height` n'est PAS `!important`
+  (un `style={{minHeight:44}}` en ligne doit gagner — banc `republier`, les choix
+  de couleur à 44 px).
+- **Un parcours en plusieurs étapes** (republier, publier, générer en lot, saisie
+  en série) : `<Avancement titre="Paire 2 sur 5" phrase="…" part={0.4}
+  compte={compteAvancement({faites, ratees, restent})} erreur="…">` — UNE barre,
+  où j'en suis en mots, ce qui se passe, combien, ce qui a raté (en ambre). Posé
+  EN HAUT du parcours. Premier appliqué : le total de Republier (il remplace la
+  barre d'ensemble sous la liste ET la ligne de bilan ; `data-republier-total`,
+  `data-republier-bilan`, `data-republier-prochaine` gardés).
+
+### Le texte : une ligne, le reste derrière ⓘ
+Sur chaque bloc, **au plus UNE ligne visible** (≈ 90 caractères). L'explication
+passe derrière `<Pourquoi label="…">` (ⓘ, replié) ou un `<details className=
+"vrm-repli">`, ou disparaît si un autre élément de l'écran la dit déjà (§7). Les
+libellés sont des mots, les états des pastilles courtes (« À expédier », « Pas
+lu »). ⚠️ NE DISPARAÎT JAMAIS (on raccourcit) : un « pas su / pas pu lire », la
+couverture d'un total partiel (« au moins », « sur X »), le geste d'une alerte,
+le rouge du doublon de N°, les confirmations d'argent (« une offre acceptée vend
+la paire »), le panneau Sécurité des données. ⚠️ `innerText` ne lit pas le
+contenu d'un `<details>` fermé : un banc qui jugeait une phrase déplacée derrière
+ⓘ doit juger la RÈGLE (`data-*`, présence de l'information), jamais être retiré.
+Appliqué d'abord à la coque (panneau « Actions possibles / Lecture seule »,
+confirmations `askConfirm`/`askText`/choix, feuille « Ranger »).
+
 - Une couleur en dur qui n'est pas dans `THEMES` ne suivra pas un changement de
   palette : `grep -oE '#[0-9a-fA-F]{6}' src/App.jsx` après chaque passe.
 - Un emoji utilisé **comme icône** devient une icône au trait (`ICON_PATHS`, qui
@@ -15003,3 +15553,192 @@ DEPUIS ce conteneur cette fois (curl 200), alors que §8 le disait bloqué : la
 connexion Vercel de la session, elle, ne voyait pas l'équipe du projet (404 sur
 `list_deployments`/`web_fetch_vercel_url`) — vérifier d'abord par `curl` l'endpoint
 public `/api/sante`, sans supposer l'un ou l'autre.
+
+### Statut chez le transporteur, tour 1 : un colis sorti l'est PARTOUT (29 octobre)
+Plainte de Julien : un colis que le transporteur dit retiré, livré ou reparti
+restait « à retirer » (Achats, Ma journée, widget, rappels), et un achat Vinted
+sans code s'affichait à côté de son propre e-mail. Règles (une, un propriétaire) :
+- **Arrivée SÛRE ≠ borne** (`etatColisVinted` : `arriveeSure`, `borneMs`) : la
+  capture des achats n'est jamais l'arrivée d'un retour ; `sortiParSuivis(…, {borne})`
+  (retour/incident comptent sans arrivée sûre ; un statut inconnu après la borne).
+  La publication `vrm_colis_retirer.colis` porte `[limite, arrivée, transporteur,
+  clé, sûre 1/0, n° d'un achat Vinted, limiteAt]` + `enVerification` ; le widget
+  relit avec la même règle (`issueDesFins` : incident ⇒ « à vérifier », jamais
+  « sorti » ; un n° que le transporteur seul dit disponible depuis la photo est
+  compté ; `pickupAuMoins` si des achats sont en vérification).
+- **Un colis qui sort de « à retirer » atterrit ailleurs** : e-mail resté « en
+  transit » ou n° ajouté à la main, que le transporteur dit reparti/incident ⇒
+  « repartis » / « à vérifier ». Repartis : 30 jours (`repartiAffichable`), toutes
+  sources. **Un n°, une carte** : un achat sans code au n° d'un e-mail connu ne
+  s'affiche pas deux fois. Achat sans code NI n° à côté d'un e-mail sans commande
+  ⇒ « en cours de vérification » (Achats + une ligne de Ma journée), hors total.
+- **Plus de fenêtre de 45 j** chez les lecteurs (app, widget, cron) : une ligne
+  finie se lit toujours. **Mondial Relay** : route/prise en charge APRÈS
+  « N jours restants » ⇒ `incident/quitte_relais` ; une limite « vers le » passée
+  ne lève jamais la garde ; `introuvable` à un code postal saisi non prouvé ⇒
+  `cp-inconnu` + `cpRefuse` (corrigé ⇒ relu tout de suite ; un n° fermé ainsi
+  sous l'ancienne règle se relit). **Vinted Go** : retour seulement sur les
+  valeurs relevées (`return_cancelled` n'est pas un retour), `limiteAt` (l'heure
+  d'`expiration_time`) jusqu'à la carte, `etatRetrait` (heure passée ⇒ délai
+  dépassé le jour même) et le rappel (« avant 10 h 34 ») ; n° à 12 chiffres lisible.
+- **Rappel du matin** : les n° que le transporteur seul dit disponibles (ligne
+  synthétique, comme l'app), sauf commande cochée « Je l'ai retiré »
+  (`vinted_pickup_done`, reliée par le n°). Plus jamais « sans doute reparti ».
+- **« Sans doute reparti » retiré partout** (Achats, Ma journée, notifications) : mesuré
+  le 29, les 5 colis ainsi nommés avaient TOUS été retirés ; « à vérifier », et seuls le
+  transporteur ou Vinted disent « reparti ».
+- Preuves : `audit-statut-transporteurs.cjs` §9 (**23 rouges sur 8f62e6f2**,
+  `--prouve` 49/49) ; banc `transporteurs.cjs` §E (390 + 1512, **29 rouges sur le
+  build de 8f62e6f2**, constat d compris) ; `node scripts/prouve-banc-transporteurs.cjs`
+  (9 mutations de l'app — borne d'arrivée, « nulle part », une carte, en vérification,
+  limite sur la carte et dans la publication, 30 jours, fenêtre de 45 j, « sans doute »
+  — chacune rouge sur SON contrôle, build et banc lancés dans une copie de l'arbre).
+- **À faire côté extension (v29-colis-ext) pour le constat c** : le n° de suivi d'un
+  achat au point relais (`journey_summary`, `harvest_{uid}_suivi_{tx}`) doit être lu
+  AVANT de relire les achats en route ; tant qu'il manque, l'app range l'achat « en
+  cours de vérification » (hors total) — jamais relié par lieu, date ou titre.
+- ⚠️ **Non mesuré** : la vraie forme d'un `return_*` Vinted Go autre que ceux
+  relevés ; une vraie séquence Mondial Relay « re-livré » ; aucun appel réel aux
+  transporteurs n'a été fait pour ces corrections (formes de `mesures.json`).
+
+### Statut chez le transporteur, tour 1 : les notifications (n° 12 à 21, 29 octobre)
+Les dix défauts de notification reproduits le 24 octobre, chacun REPRODUIT d'abord
+(faux PostgREST à état, faux Chronopost / Vinted Go / Web Push), corrigé à la racine.
+- **Nouvelle arrivée (12)** : une arrivée = le point relais (lieu normalisé) + l'heure
+  de l'évènement qui l'a créée (`occurrenceArrivee`) ; la ligne garde les 5 dernières
+  (`arrivees`). Un autre point relais, ou le retour au relais après « a quitté le
+  point relais », sonne sous `relais-{n°}-r{empreinte}` ; la PREMIÈRE arrivée garde
+  `relais-{n°}-sans` et se tait devant toute annonce (`relais-{n°}-*`, `relais-tx{tx}-*`,
+  le code de l'e-mail). Le même point relu ne re-sonne jamais (`clefEtat` porte le lieu
+  seulement pour « disponible »).
+- **« Pas su » ne consomme rien (13)** : `push_transp_{n°}` est RETIRÉ. Ce qui doit
+  sonner est écrit DANS la ligne `transp_` (`notif` + le scalaire `notifEnAttente`, lu
+  en `meta->>`) par le MÊME comparer-et-échanger que le changement ; la notification
+  l'efface une fois faite ou décidée (déjà annoncée, préférence, abonnement), jamais
+  sur un `push_dedup` illisible ou non écrit. Reprise en tête de passage
+  (`reprendreNotifs`, 6 au plus), seulement dans les 72 h et pour le même état.
+- **Une notification pour trois voies (14, 16)** : vérifier ET réserver en UN
+  comparer-et-échanger sur `push_dedup` (`envoyerNotifTransp` : le modificateur relit
+  les clés au moment d'écrire et abandonne si l'une est apparue). Clés partagées par
+  transaction (`clesEtapeTx`) : transporteur `{retire|retour|track}-tx{tx}[-jour]`,
+  suivi Vinted `vs-…` ; chacun vérifie celles de l'autre (`suivi-vinted.js`, étape 5 bis :
+  `transporteur-deja`) ; l'e-mail `relais-{n°}-*` et `retrait-code-{CODE}` restent la
+  frontière avec la route des e-mails.
+- **Pause globale (15)** : `transp_pause` au propriétaire NEUTRE
+  (`00000000-…`, `PROPRIETAIRE_NEUTRE`, clé de service) — un 403 de Chronopost arrête
+  les requêtes de TOUS les vendeurs depuis l'adresse de Vercel ; plus une mémoire
+  d'instance posée dans la file du transporteur au moment du refus et lue juste avant
+  chaque requête (`pauseEnCours`, une règle pour les deux points d'arrêt). Une pause en
+  cours ne monte pas d'un palier (`pauseApresRefus`).
+- **Deux passages (17)** : un bail de 30 s sur la ligne (`enVol`, comparer-et-échanger)
+  — un n° n'est lu que par un passage à la fois.
+- **C4 (18, 19)** : la réponse relayée porte son heure (`at`, bornée à 30 min) ; plus
+  vieille que la dernière lecture ⇒ 409 `perime`, rien n'est rangé ; un n° en
+  « fermeture » se tait (`raisonDu`, la règle du serveur). Un état final (retiré, livré,
+  rendu) ne redescend jamais sur une lecture plus ancienne (`ligneApresEssai`).
+- **Bornes (20)** : un n° n'est lancé que s'il tient dans le budget (délai + écart +
+  marge de rangement) ; `fin` et `signal` vont jusqu'à la requête ; le cron arrête le
+  passage dès qu'il répond (`AbortController`, `finally`) — plus aucune écriture ni
+  notification après la réponse « délai ».
+- **72 h (21)** : `etatAt` = l'évènement qui CRÉE l'état (Chronopost : premier retour,
+  ou rendu après lui ; Vinted Go : début de la phase de retour), `dernierAt` à part.
+- Preuves : `audit-transp-notif.cjs` (N1-N10, ~50 s) **24 rouges sur 87188ff4** (§6.1,
+  audit copié dans l'arbre d'avant), `--prouve` **17/17** ; `audit-statut-transporteurs`
+  (`--prouve`, dont `notif-sans-push-dedup`, `notif-sans-reservation`, `pause-ignoree`
+  réancrées) et `audit-mondialrelay-serveur` (`pause-ignoree`, `essai-compte-introuvable`
+  réancrées sur la règle actuelle) verts ; bancs serveur, colis, retrait, widget,
+  rappels, notifications verts.
+- ⚠️ **Non mesuré** : aucun appel réel aux transporteurs ; `Retry-After` réel de
+  Chronopost ; un vrai envoi Web Push. Une notification en attente d'un n° qu'aucun
+  passage ne relit (vendeur sans app ni cron) attend le cron suivant (matin ou soir).
+
+
+### Statut chez le transporteur, tour 2 : les 19 défauts des relecteurs (29 octobre, 5.290 — numéro de branche, remplacé par 5.291.0 à l'intégration du 30 oct.)
+Relecture du chantier remis sur `main` (94f4d515) sur SA base (copie lecture seule) et
+de bout en bout (vraies routes, vrai fond). Chaque défaut REPRODUIT, corrigé à la
+racine, rouge sur 94f4d515 (§6.1 : audits et banc copiés dans l'arbre d'avant, build
+refait là-bas), vert après, rouge sous mutation.
+- **Publication `vrm_colis_retirer` (1)** : elle n'est écrite que quand les codes des
+  conversations (`colisRelaisLu`), les n° des achats (`suivisVinted`) et les n° ajoutés
+  (`suivisManuels`) sont LUS. Rendue depuis Colis (qui ne les lit pas), elle passait de
+  22 à 38 « complet » : les achats « en vérification » et les colis fondus par n° y
+  revenaient. Pas lu ⇒ rien n'est écrit (la dernière photo complète reste).
+- **Code postal Mondial Relay (2)** : un code refusé par un ESSAI alors qu'il reste un
+  code prouvé à essayer ⇒ `cpCherche` (calculé au rangement par
+  `codePostalPourMondialRelay`, la règle du passage) ⇒ « VRM cherche le code postal du
+  point relais », sans geste. Le geste (« ajoute ce n° avec son code postal ») n'est dit
+  qu'une fois en tête (`texteCodePostalMr`), seulement quand plus rien n'est à essayer.
+- **Ordre de lecture (3)** : `ordreAInterroger` — page demandée, puis les DISPONIBLES
+  par limite la plus proche puis arrivée la plus ancienne, puis les autres actifs, puis
+  les anciens n° ; les places du passage se réservent PAR TRANSPORTEUR dans cet ordre
+  (`placesParTransporteur`) : le colis du « dernier jour » n'attend plus derrière de
+  vieux n° Chronopost.
+- **Une voix (4, 6)** : le bloc « en cours de vérification » ne promet plus rien de
+  l'extension (le geste vit dans « Suivi Vinted », gardé par `extSait`). Une carte « à
+  retirer » dont le transporteur confirme « disponible » (même limite) ne garde qu'une
+  marque courte (« Confirmé chez Chronopost il y a 3 min », `court`) ; une étape Vinted
+  plus ancienne que l'évènement du transporteur ne s'affiche plus sous lui
+  (`nouvelleDepassee`).
+- **N° sans transporteur (5)** : un n° du suivi Vinted sans transporteur rangé ⇒ la
+  carte dit « Transporteur pas encore connu » (jamais rien) ; avec « Vinted Go » rangé
+  (nom ou code), il est lu chez Vinted Go. Jamais deviné par la forme. (L'extension qui
+  range le transporteur courant de `journey_summary` : `v29-colis-ext`.)
+- **« À vérifier » relus par le widget (7)** : la publication porte `verif` (même forme
+  que `colis`) ; `retirerPublie` les relit par la même règle (`sorti`).
+- **Achats → « Reçus 1,7 k » (8)** : `nowrap`, et au-delà de 999 « 1,7 k » (le nombre
+  exact en infobulle et dans `data-n`).
+- **Version (9)** : 5.281 à 5.286 publiées par `main` avec un autre contenu ⇒ **5.290.0**
+  (5.287 à 5.289 prises ou réservées) : manifeste, `CODE_VERSION`, `CAPTEUR_VERSION`,
+  `relaisVersion`, `EXT_ATTENDUE`, `EXT_CAPACITES.transp`, notice Orion, zips.
+- **Une forme des deux côtés (10)** : Vinted Go à 12 chiffres et Chronopost à 14
+  caractères acceptés par l'extension comme par le serveur ; les adresses permises en
+  DÉRIVENT. `audit-transp-ext` : tout n° que C3 annonce est lu.
+- **C4 Mondial Relay de bout en bout (11)** : la route accepte un corps jusqu'à
+  `CORPS_MAX_MR` (192 Ko) pour Mondial Relay (`corpsMaxDe`), 64 Ko pour les autres ;
+  l'extension ne compte `transp_lu_*` que si le serveur a jugé `ok` (sinon
+  `transp_relaye_{res}_*`). La borne d'ENVOI de l'extension à 192 Ko : `v29-colis-ext`.
+- **L'extension dit ce qu'elle ne peut pas (12)** : `TeteTransporteurs` lit `nav.indispo`
+  de l'état du pont — `transporteurs` ⇒ le geste « Autoriser » ; `transporteurs-passu` ⇒
+  aucune promesse ; sinon « l'extension de ce Chrome les lit à la place ».
+- **`audit-extension-zip` (13)** : l'historique se lit par `VRM_GIT` puis la racine ;
+  illisible ⇒ ROUGE (il sortait vert « sans conclusion » depuis une copie §6.1).
+- **Une borne n'est pas une arrivée, partout (14)** : `arriveesDeLigne` (sûre ⇒ arrivée ;
+  « TR : », rappel, sujet inconnu ⇒ borne) dans `sortiParSuivi` / `incidentDeLigne`
+  (app : Achats, Ma journée, colis de l'équipe, compteur de la coque), le rappel du
+  matin et le widget — les trois disent le même nombre.
+- **E-mail et transporteur en même temps (15)** : `shouldNotify` (email-inbound) vérifie
+  ET réserve en un `modifierCas('push_dedup')` (garde `rev`, relit au moment d'écrire) :
+  plus de double « retiré », plus de clé du transporteur effacée.
+- **Suivi Vinted « disponible » (16)** : les alias `relais-tx{tx}-sans` / `relais-{n°}-sans`
+  vérifiés et posés en UN comparer-et-échanger AVANT l'envoi.
+- **Mondial Relay `_mvc` puis `.be` (17)** : une arrivée qui ne fait que s'enrichir (lieu
+  vide → connu) n'est pas un changement (`etatAChange`), et deux occurrences à la même
+  minute sont la même (`memeOccurrence`).
+- **Ancien n° dont la 1re lecture rate (18)** : relu à son recul tant qu'aucune lecture
+  n'a réussi (`jamaisLueAvecSucces`, 5 essais au plus), en silence (`raisonDu`).
+- **N° Chronopost dans un e-mail shipping@ (19)** : une forme Chronopost stricte n'est
+  jamais lue chez Vinted Go (`carrierLisible`) ; un transporteur NOMMÉ l'emporte sur le
+  « vinted » par défaut (`carrierPrefere`), quel que soit l'ordre des lignes.
+- Preuves : `audit-statut-transporteurs` §10 (**12 rouges sur 94f4d515**, `--prouve`
+  57/57) ; `audit-transp-notif` N11-N14 (**7 rouges**, `--prouve` 22/22 — `change-sans-lieu`
+  réancrée sur `etatAChange`) ; `audit-transp-ext` (**2 rouges**, 13/13, dont
+  `lu-sans-jugement`) ; `audit-extension-zip` (rouge depuis une copie ; l'ancien y était
+  vert « sans conclusion ») ; banc `transporteurs` §A + §F (**15 rouges sur le build de
+  94f4d515**) et `node scripts/prouve-banc-transporteurs.cjs` : 9 mutations de l'app de
+  plus (publication sans lecture, promesse, n° sans transporteur, carte qui redit tout,
+  étape Vinted dépassée, `verif` absent, onglet coupé, `nav` ignoré, geste du code
+  postal absent), chacune rouge sur SON contrôle.
+- ⚠️ **Deux faux PostgREST servaient une forme que le code ne lit plus (§6.3)** :
+  `audit-suivi-colis` et `audit-retrait-fiable` rendaient un POST
+  `return=representation` VIDE (et aucun PATCH conditionnel) — le comparer-et-échanger
+  de `shouldNotify` (n° 15) y lisait « créé entre-temps », relisait ses propres clés et
+  se taisait. Ils rendent les lignes vraiment écrites et honorent `data->>rev`.
+  `audit-retrait-fiable` et `audit-suivi-colis` : deux ancres de mutation périmées chacun
+  (déjà sur 94f4d515) suivies jusqu'au code actuel (`--prouve` 29/29 et 30/30). Banc `suivi-colis` K : `panel_colis_relais`
+  illisible ⇒ **aucune** publication (avant : une publication à `finis: null`).
+- Rouges restants, tous déjà rouges sur `main` ou sur 94f4d515 : `audit-politique-hotes`
+  (1), `audit-preuve-vente` (18), banc `journee-widgets` (8, mêmes contrôles sur le build
+  de 94f4d515).
+- ⚠️ **Non mesuré** : aucun appel réel aux transporteurs (formes de `mesures.json`) ;
+  rien lu en production pour ce tour ; la vraie forme de `nav.indispo` sur un Firefox
+  réel.

@@ -37,8 +37,9 @@ import { arriveLeAuRangement } from './_lib/arrivee-colis.js';
 import { limiteRetraitDepuisTexte, lieuDepuisExtrait, LIEU_AU_FUTUR } from './_lib/retrait-colis.js';
 import { codeRetraitTournure } from './_lib/code-retrait-email.js';
 import { decoderEntitesHtml } from './_lib/entites-html.js';
-import { suiviDuSujet, finsDesLignes, sortiParSuivis } from './_lib/suivi-colis.js';
 import { transactionDuRecu } from './_lib/recu-achat.js';
+import { suiviDuSujet, finsDesLignes, sortiParSuivis, SELECT_TRANSP_META, ligneTranspDeMeta } from './_lib/suivi-colis.js';
+import { modifierCas } from './_lib/suivi-vinted.js';
 
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://lgonxzrzjcqthjtbdpzo.supabase.co';
 // ⚠️ CLÉ DE SERVICE QUAND ELLE EXISTE. Ces routes tournent sur le serveur, sans
@@ -516,23 +517,29 @@ async function shouldNotify(key, aussi = []) {
   const ecrites = [cles[0], ...(aussi || []).filter(Boolean)];
   cles.push(...ecrites.slice(1));
   const attente = enAttente();
-  try {
-    let lu = await supabaseLireRow('push_dedup');
-    if (!lu.lu) lu = await supabaseLireRow('push_dedup');
-    if (!lu.lu) {
-      if (cles.some((k) => attente.has(k))) return false;
-      ecrites.forEach((k) => attente.add(k));
-      while (attente.size > 300) attente.delete(attente.values().next().value);
-      return true;
-    }
-    const keys = (lu.data && Array.isArray(lu.data.keys)) ? lu.data.keys : [];
-    if (cles.some((k) => keys.includes(k) || attente.has(k))) return false;
-    const enPlus = [...attente].filter((k) => !keys.includes(k));
-    const next = [...ecrites, ...enPlus.filter((k) => !ecrites.includes(k)), ...keys].slice(0, 300);
-    if (await supabaseUpsert([{ id: 'push_dedup', data: { keys: next } }])) attente.clear();
-    else ecrites.forEach((k) => attente.add(k));                      // pas rangé : l'instance s'en souvient (la route répondra 503)
-    return true;
-  } catch (_) { return true; }
+  if (cles.some((k) => attente.has(k))) return false;
+  // (29 oct., tour 2 n° 15) LA VÉRIFICATION ET LA RÉSERVATION EN UN SEUL
+  // comparer-et-échanger sur `push_dedup` (`modifierCas`, la règle du
+  // transporteur et du suivi Vinted) : le modificateur relit les clés AU MOMENT
+  // D'ÉCRIRE et abandonne si l'une est apparue ; `rev` est gardé. Avant : lire,
+  // puis réécrire la liste ENTIÈRE depuis cette lecture (sans version) — un
+  // passage du transporteur entre les deux sonnait aussi (deux « retiré »), et
+  // les clés qu'il venait de poser étaient EFFACÉES.
+  const modif = (d) => {
+    const ks = (d && Array.isArray(d.keys)) ? d.keys.filter((x) => typeof x === 'string') : [];
+    if (cles.some((k) => ks.includes(k))) return undefined;
+    const enPlus = [...attente].filter((k) => !ks.includes(k) && !ecrites.includes(k));
+    return { ...(d || {}), keys: [...ecrites.filter((k) => !ks.includes(k)), ...enPlus, ...ks].slice(0, 300) };
+  };
+  let r = null;
+  for (let i = 0; i < 2 && r === null; i++) { try { r = await modifierCas('push_dedup', modif); } catch (_) { r = null; } }   // un hoquet : relu une fois
+  if (r === true) { attente.clear(); return true; }
+  if (r === false) return false;
+  // « Pas su » (la base n'a pas répondu, ou l'écriture a été refusée) : on
+  // ENVOIE (un message manqué ne se rattrape pas) et l'instance retient la clé.
+  ecrites.forEach((k) => attente.add(k));
+  while (attente.size > 300) attente.delete(attente.values().next().value);
+  return true;
 }
 // ── CE QU'ON NOTIFIE, ET CE QU'ON NE NOTIFIE PAS ────────────────────────────
 // Julien : « des fois je reçois des choses complètement débiles ». Il a raison :
@@ -1249,22 +1256,46 @@ let registreEmailsEnVol=null;
 // Lues sous le propriétaire NEUTRE (aucune session ne peut les écrire), toutes
 // pages comprises. Une page ratée ⇒ `null` : « pas su », et l'email est
 // renvoyé (503) plutôt qu'attribué ou mis de côté sur une lecture partielle.
-async function lirePreuvesProuvees() {
+async function lirePreuvesProuvees(signal) {
   const preuves = new Map(), taille = 500;
-  for (let debut = 0; debut < 100 * taille; debut += taille) {
-    let r;
+  let debut = 0;
+  for (let page = 0; page < 500; page++) {
     try {
-      r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?owner=eq.${PROPRIETAIRE_NEUTRE}&id=like.${PREFIXE_PREUVE}*&data->>etat=eq.prouvee&select=id,owner:data->>owner,adresse:data->>adresse,etat:data->>etat&order=id.asc`, {
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?owner=eq.${PROPRIETAIRE_NEUTRE}&id=like.${PREFIXE_PREUVE}*&data->>etat=eq.prouvee&select=id,owner:data->>owner,adresse:data->>adresse,etat:data->>etat&order=id.asc`, {
         headers: { ...sbCle(SUPABASE_KEY), Range: `${debut}-${debut + taille - 1}`, 'Range-Unit': 'items' },
-        signal: AbortSignal.timeout(10000),
+        signal: AbortSignal.any([signal, AbortSignal.timeout(10000)]),
       });
-    } catch (_) { return null; }
-    if (r.status === 416) return preuves;
-    if (!r.ok) return null;
-    let j; try { j = await r.json(); } catch (_) { return null; }
-    if (!Array.isArray(j)) return null;
-    for (const l of j) if (l && l.id) preuves.set(String(l.id), { owner: String(l.owner || ''), adresse: String(l.adresse || ''), etat: String(l.etat || '') });
-    if (j.length < taille) return preuves;
+      if (r.status === 416) {
+        const fin = /^\*\/(\d+)$/.exec(r.headers?.get?.('content-range') || '');
+        return debut > 0 && fin && Number(fin[1]) === debut ? preuves : null;
+      }
+      if (!r.ok) return null;
+      const j = await r.json();
+      if (!Array.isArray(j) || preuves.size + j.length > 50000) return null;
+      for (const l of j) {
+        if (!l?.id || preuves.has(String(l.id))) return null;
+        preuves.set(String(l.id), { owner: String(l.owner || ''), adresse: String(l.adresse || ''), etat: String(l.etat || '') });
+      }
+      // La limite réelle peut être inférieure à 500 : avancer de ce qui a été lu.
+      const plage = r.headers?.get?.('content-range');
+      const cr = plage && /^(\d+)-(\d+)\/(\d+|\*)$/.exec(plage);
+      if (cr) {
+        if (Number(cr[1]) !== debut || Number(cr[2]) - debut + 1 !== j.length) return null;
+        debut += j.length;
+        if (cr[3] !== '*') {
+          if (debut > Number(cr[3])) return null;
+          if (debut === Number(cr[3])) return preuves;
+        }
+      } else {
+        if (plage) {
+          const fin = /^\*\/(\d+|\*)$/.exec(plage);
+          if (!fin || j.length !== 0 || (fin[1] !== '*' && Number(fin[1]) !== debut)) return null;
+        }
+        if (j.length < taille) return preuves;
+        debut += j.length;
+      }
+      if (j.length === 0) return preuves;
+    } catch { return null; }
   }
   return null;
 }
@@ -1278,7 +1309,8 @@ export async function lireRegistreEmails(cloisonnee) {
 async function chargerRegistreEmails() {
   // (22 oct.) Les preuves d'abord : sans elles, aucune adresse d'un vendeur ne
   // peut être retenue — on ne décide rien (« pas su »).
-  const preuves=await lirePreuvesProuvees();
+  const signal=AbortSignal.timeout(20000);
+  const preuves=await lirePreuvesProuvees(signal);
   if(preuves===null)return null;
   const garde={retenue:(adresse,owner)=>retenue(adresse,owner,{preuves,installation:process.env.VRM_OWNER_UID||''})};
   const fusionnerRegistres=(l,c)=>fusionnerRegistresLib(l,c,garde);
@@ -1289,7 +1321,7 @@ async function chargerRegistreEmails() {
     try {
       const r=await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vrm_email_owners&select=owner,data&order=owner.asc`,{
         headers:{...sbCle(SUPABASE_KEY),Range:`${debut}-${debut+taille-1}`,'Range-Unit':'items'},
-        signal:AbortSignal.timeout(10000),
+        signal:AbortSignal.any([signal,AbortSignal.timeout(10000)]),
       });
       // À une frontière exacte, PostgREST peut répondre 416 plutôt qu'une
       // page vide. Seul son total confirmé égal au nombre déjà lu conclut.
@@ -1985,8 +2017,12 @@ export async function traiterEmail(req, res) {
           // (revue du 23 oct., n° 4) L'arrivée datée par l'e-mail (comme la ligne
           // rangée) : un retour du même n° écrit APRÈS elle — même traité avant —
           // fait taire « 📍 ».
+          // (24 oct.) + le statut lu chez le TRANSPORTEUR (ses lignes `transp_`,
+          // par le n°, en scalaires) : retiré, ou reparti / incident depuis
+          // l'arrivée ⇒ « 📍 » se tait. Illisible ⇒ comme avant (les e-mails seuls).
           const a = arriveLeAuRangement(prevLigne, subject, 'available', emailAt || now);
-          sortiAilleurs = sortiParSuivis([k], finsDesLignes(autres, { estSortant: (l) => l.sens === 'sortant' }), Date.parse(a || emailAt || now) || null);
+          const tl = await lireLignes(`id=in.(transp_chronopost_${k},transp_mondialrelay_${k},transp_vinted_${k})&select=${SELECT_TRANSP_META}`);
+          sortiAilleurs = sortiParSuivis([k], finsDesLignes(autres, { estSortant: (l) => l.sens === 'sortant', transp: Array.isArray(tl) ? tl.map(ligneTranspDeMeta).filter(Boolean) : [] }), Date.parse(a || emailAt || now) || null);
         }
       }
       // Notif push selon l'étape du colis.

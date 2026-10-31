@@ -149,6 +149,9 @@ const deborde = (pg) => pg.evaluate(() => document.documentElement.scrollWidth -
       });
       await essaie('Achats', async () => {
         await sousOnglet(pg, 'Achats');
+        // (29 octobre) Les achats GAGNÉS sont repliés sous la recherche eBay :
+        // on les ouvre comme lui (ils ne sont lus qu'à l'ouverture).
+        await pg.click('[data-ebay-achats-gagnes] > summary', { timeout: 8000 });
         await pg.waitForSelector('[data-ebay-achat="4001"]', { timeout: 10000 });
         dit(/42,00\s*€/.test(await pg.$eval('[data-ebay-achat="4001"]', (e) => e.innerText)), 'achats eBay listés, avec leur prix');
         dit(await pg.$eval('[data-ebay-achat="4001"]', (e) => e.classList.contains('vrm-buy-row')), 'un achat eBay a la même ligne qu’un achat Vinted (vrm-buy-row)');

@@ -336,7 +336,7 @@ const attendre = async (pg, fn, arg, ms = 8000) => { const t0 = Date.now(); whil
   //  sont pas piégées : la conversation est gardée ici comme témoin.)
   const clic = async (pg, sel, attente = 1200) => { await pg.locator(sel).first().click({ timeout: 6000 }); await pg.waitForTimeout(attente); };
   const outil = (texte) => async (pg) => { await clic(pg, 'button:text-is("⋯")', 700); await clic(pg, `button:has-text("${texte}")`); };
-  const outilVentes = (texte) => async (pg) => { await clic(pg, 'button:text-is("⋯ Outils")', 700); await clic(pg, `button:has-text("${texte}")`); };
+  const outilVentes = (texte) => async (pg) => { await clic(pg, 'button[aria-expanded]:text-is("Outils")', 700); await clic(pg, `button:has-text("${texte}")`); };
   // Comme Julien : le tiroir de la vente, puis « Modifier » (le bouton du lot
   // vit dans ce repli — fermé, il n'est ni visible ni joignable au clavier),
   // puis le bouton. Le bouton est cliqué SANS lui donner le focus, comme
@@ -358,10 +358,9 @@ const attendre = async (pg, fn, arg, ms = 8000) => { const t0 = Date.now(); whil
     { nom: 'Annonces · Audit du stock', tab: 'plat_vinted', section: 'Annonces', etapes: outil('Audit du stock') },
     { nom: "Annonces · Compléter les prix d'achat", tab: 'plat_vinted', section: 'Annonces', etapes: outil("Compléter les prix d'achat") },
     { nom: 'Annonces · Studio photo', tab: 'plat_vinted', section: 'Annonces', etapes: outil('Studio photo') },
-    // ⚠️ Le bouton rend « Passeport de l'article » avec une apostrophe DROITE
-    //    (App.jsx) ; `has-text` ne normalise pas les apostrophes. On vise une
-    //    sous-chaîne sans apostrophe (§6.5, le texte rendu).
-    { nom: 'Annonces · Passeport de l’article', tab: 'plat_vinted', section: 'Annonces', etapes: async (pg) => { await clic(pg, 'summary:has-text("Gérer l’annonce")', 700); await clic(pg, 'button:has-text("Passeport de l")'); } },
+    // (29 oct.) « ⋯ Gérer l'annonce » n'existe plus : ses gestes sont à la vue
+    //    sur la fiche (`[data-fiche-gestes]`), le bouton dit « Passeport ».
+    { nom: 'Annonces · Passeport de l’article', tab: 'plat_vinted', section: 'Annonces', etapes: async (pg) => { await clic(pg, '[data-fiche-gestes] button:text-is("Passeport")'); } },
     { nom: 'Ventes · Rapport comptable', tab: 'plat_vinted', section: 'Ventes', etapes: outilVentes('Rapport comptable') },
     { nom: 'Ventes · Registre annuel', tab: 'plat_vinted', section: 'Ventes', etapes: outilVentes('Registre annuel') },
     { nom: 'Ventes · Paires du lot', tab: 'plat_vinted', section: 'Ventes', cible: 'Paires du lot', etapes: ouvrirLotDuTiroir },
