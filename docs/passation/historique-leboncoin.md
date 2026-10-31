@@ -1108,3 +1108,38 @@ Relecture adverse des chemins qui engagent de l'argent ou une vente. Chaque déf
   - le vrai leboncoin.fr (403 d'ici) : libellés réels des boutons et des interrupteurs, forme réelle du champ prix ;
   - une paire vendue entre la mise en file et le clic (fenêtre de quelques secondes).
 
+
+## 31 octobre — Le compte Leboncoin OUVERT mis en avant, les autres estompés
+
+Julien, mot pour mot : « pareil pour leboncoin et vestiaire je veux que comme pour
+vinted les données des comptes ouvert soit mis en avant si un compte est ouvert, les
+autres sont floutees comme pour vinted ».
+
+- **Comment l'app connaît le compte ouvert** (vérifié dans `background.js`, rien
+  changé à l'extension) : `lbc_accounts.accounts[id].sessionAt`, posé par
+  `noterSessionLbc` (compteur de messagerie, que Leboncoin ne relit que pour le
+  compte connecté ; jamais pour un compte lié, garde `vrmLbcLies`) et par
+  `lireSessionPriveeLbc` (`members/me/account`). Réécrit à CHAQUE changement de
+  compte, sinon au plus toutes les 6 h tant qu'il navigue. L'état que l'extension
+  rend à l'app (`etatPourApp`) ne porte PAS le compte Leboncoin : la ligne de base
+  est la seule source.
+- **Règle** (`src/flouCompte.js`, `compteLbcOuvert`) : le `sessionAt` le plus
+  récent, s'il date de moins de **12 h** (deux fois la cadence de réécriture ; borne
+  choisie, non mesurée). Égalité, date illisible, trop ancienne ⇒ `''` = pas su,
+  aucun flou. Identité : `8442…` = `lbc-account:8442…` (`idCompteLbcFlou`), jamais
+  un nom.
+- Comme Vinted (13 oct.) : le flou ne vaut que si l'extension de CE navigateur est
+  là, connectée à CE compte VRM, à jour (`raisonExtGlobale` muette ; la pause
+  VINTED ne compte pas). Lecture seule (téléphone) ⇒ tout net.
+  ⚠️ Limite : `sessionAt` vient de l'extension de n'importe lequel de ses
+  navigateurs (la ligne ne dit pas lequel).
+- **Estompé** (même `STYLE_FLOU` que Vinted, remonté en module — une définition,
+  §11 ; `data-flou="1"`) : Annonces (`AnnoncesLeboncoin`), Ventes (`CarteLbc`),
+  Achats (`LigneAchatLbc`), Messages → Conversations (ligne du compte) et Favoris
+  reçus (`ad.account`). Une ligne SANS compte relevé n'est jamais floutée. Les
+  alertes (« à retirer de Leboncoin », « à relier ») et Colis restent nettes. Pas de
+  sélecteur de compte Leboncoin : rien ne « prime ».
+- Preuve : `scripts/bancs/lbc-flou-compte.cjs` (390/1512, données inventées) — 18
+  rouges sur le code d'avant, vert après ; rouge sous trois mutations (fraîcheur
+  retirée, condition d'extension retirée, flou jamais posé). `filtre-compte`,
+  `lbc-comme-vinted`, `lbc-messages` verts.

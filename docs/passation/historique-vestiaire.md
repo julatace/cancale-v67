@@ -117,3 +117,17 @@ site par SON navigateur**.
   `EXT_CAPACITES.vestiaire`. Aucune permission d'hôte ajoutée : les scripts de
   contenu suffisent, le fond n'appelle jamais Vestiaire.
 
+
+## 31 octobre — Flou par compte : PAS livré sur Vestiaire (aucune identité de compte)
+
+Demande : « pareil pour leboncoin et vestiaire … les autres floutées comme pour
+vinted ». Vérifié dans l'extension (`vc.js`, `vc-inject.js`, `background.js`) :
+`vc_listings`, `vc_ventes`, `vc_achats`, `vc_messages` ne portent **aucun
+identifiant de compte Vestiaire** (une seule boîte supposée), et rien ne relève le
+compte connecté sur vestiairecollective.com (`etatSite` le dit : « Vestiaire n'est
+pas encore capté »). Flouter serait deviner : rien n'est fait côté app.
+Capacité d'extension à construire (pas livrée, autre chantier sur la version) :
+lire l'id du compte connecté sur une route « moi » de Vestiaire, l'écrire
+(`vc_session = { id, at }`) et estampiller `compte` sur chaque ligne `vc_*` ; l'app
+appliquerait alors `STYLE_FLOU` (src/flouCompte.js) avec la même règle de
+fraîcheur que Leboncoin.
