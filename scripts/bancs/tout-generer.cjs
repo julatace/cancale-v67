@@ -124,6 +124,10 @@ async function rendre(b, { tab = 'cat_bord', tel = false, pont = { absente: true
   });
   await pg.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"pret":true}' }));
   await pg.goto(`http://localhost:${PORT}/?tab=${tab}`, { waitUntil: 'domcontentloaded' });
+  // (31 oct.) Sur Colis, attendre que « Tout générer » soit RENDU avant de juger
+  //  (une machine chargée dépassait le délai fixe : tout lisait `null`, §6.5).
+  //  Le délai reste ensuite, pour laisser l'état de l'extension se poser.
+  if (tab === 'cat_bord') await pg.waitForSelector('[data-tout-generer]', { timeout: 25000 }).catch(() => {});
   await pg.waitForTimeout(attente);
   const lire = () => pg.evaluate(() => {
     const tg = document.querySelector('[data-tout-generer]');

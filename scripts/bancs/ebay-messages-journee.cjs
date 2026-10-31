@@ -118,7 +118,11 @@ const lireJour = (pg) => pg.evaluate(() => {
 async function ouvrirJour(pg) {
   await pg.goto(`http://localhost:${PORT}/?tab=journee`, { waitUntil: 'domcontentloaded' });
   await pg.waitForSelector('[data-tuile="messages"]', { timeout: 15000 });
-  await pg.waitForTimeout(3500);
+  // (31 oct.) Attendre que la case ait FINI de lire (Vinted lu : `data-n` posé),
+  //  pas seulement un délai : sur une machine chargée, 3,5 s ne suffisaient pas
+  //  et la case encore « en cours » passait pour un rouge (§6.5).
+  await pg.waitForFunction(() => { const t = document.querySelector('[data-tuile="messages"]'); return t && t.getAttribute('data-n') !== ''; }, null, { timeout: 20000 }).catch(() => {});
+  await pg.waitForTimeout(1500);
 }
 
 (async () => {

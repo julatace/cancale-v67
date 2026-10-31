@@ -83,7 +83,11 @@ const envoisEbay = []; let avertir = false;
     if(body.action==='finances') return j({ ok:false, reason:'scope', error:'x' });
     return j({ ok:true }); });
   await pg.goto(`http://localhost:${PORT}/?tab=plat_ebay`,{waitUntil:'domcontentloaded'});
-  await pg.waitForTimeout(2500);
+  // (31 oct.) Attendre que l'espace eBay soit MONTÉ (sa rangée de sections), pas
+  //  un délai fixe : la porte de session et le chargement prennent parfois plus
+  //  de 2,5 s, et « Ventes », cherché le premier, tombait dans ce trou (§6.5).
+  await pg.waitForSelector('nav.vrm-platform-tabs [data-section="ventes"]', { timeout: 30000 }).catch(() => {});
+  await pg.waitForTimeout(1000);
   // ⚠️ 4 octobre — Julien : « il y a deux fois le bouton pour poster les
   //    paires ». Le publieur était monté dans « Annonces » ET dans « Compte
   //    eBay ». On COMPTE les boutons qui portent `data-poster="ebay"` sur les
@@ -96,7 +100,7 @@ const envoisEbay = []; let avertir = false;
   //  Un onglet introuvable est maintenant un contrôle rouge, pas un silence.
   const introuvables = [];
   for (const nom of ['Ventes', 'Annonces', 'Messages', 'Offres', 'Compte']) {
-    try { await pg.getByRole('button', { name: nom, exact: true }).first().click({ timeout: 5000 }); await pg.waitForTimeout(1500); } catch (_) { introuvables.push(nom); }
+    try { await pg.getByRole('button', { name: nom, exact: true }).first().click({ timeout: 15000 }); await pg.waitForTimeout(1500); } catch (e) { introuvables.push(nom + ' (' + String(e && e.message).split('\n')[0].slice(0, 90) + ')'); }
     parOnglet[nom] = { n: (await pg.$$('[data-poster="ebay"]')).length, vendre: (await pg.$$('text=Vendre un article sur eBay')).length,
       titre: await pg.evaluate(() => /Publier sur eBay · connexion/.test(document.body.innerText)) };
   }

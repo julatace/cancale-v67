@@ -122,8 +122,13 @@ async function rendre(b, version) {
   });
   await pg.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"pret":true}' }));
   await pg.goto(`http://localhost:${PORT}/?tab=plat_leboncoin`, { waitUntil: 'domcontentloaded' });
-  await pg.waitForTimeout(3000);
+  // (31 oct.) Attendre l'espace MONTÉ (sa rangée de sections), puis la liste
+  //  des colis, plutôt qu'un délai fixe : sur une machine chargée, 3 s ne
+  //  suffisaient pas et le bouton « Imprimer » passait pour absent (§6.5).
+  await pg.waitForSelector('nav.vrm-platform-tabs [data-section="colis"]', { timeout: 30000 }).catch(() => {});
+  await pg.waitForTimeout(500);
   await pg.getByRole('button', { name: 'Colis', exact: true }).first().click();
+  await pg.waitForSelector('[data-imprime-lbc]', { timeout: 15000 }).catch(() => {});
   await pg.waitForTimeout(800);
   return { ctx, pg, errs, appels };
 }
