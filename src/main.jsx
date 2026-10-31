@@ -87,6 +87,9 @@ import './styles-etat-actions.css';
 // (29 oct.) Les trois boutons (primaire · secondaire · discret) — EN DERNIER :
 // la normalisation des boutons écrits en ligne doit passer après toutes les autres.
 import './styles-boutons.css';
+// (31 oct.) La direction « Vitrine » (son choix) : chargée EN DERNIER, elle a le dernier
+// mot sur la forme (fond, navigation, surfaces, étiquettes). Rien de métier.
+import './styles-vitrine.css';
 import { suivreRangeesDefilantes } from './rangeesDefilantes.js';
 if (typeof document !== 'undefined') { if (document.body) suivreRangeesDefilantes(); else document.addEventListener('DOMContentLoaded', suivreRangeesDefilantes); }
 

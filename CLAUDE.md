@@ -105,7 +105,7 @@ Chaque refus a une raison technique ou une décision de Julien. Détail complet 
 | **Téléphone (vérification par SMS à l'inscription)** | Pas fait exprès (§2.9, payant sur sa clé). |
 | **International** | ⛔ **28 oct. : VRM RESTE SUR LA FRANCE** (pas de traduction, dollars, compta étrangère, Depop/Poshmark/Mercari). Les comptes eBay.co.uk/.com déjà gérés restent, sans plus ; l'argent reste en euros (une commande en GBP/USD est écartée et dite, jamais convertie). |
 | **Détourage** | Vestiaire Collective SEUL (sa décision du 17 oct. : « pas du tout pour Leboncoin, ne le mets pas dans les paramètres »). La carte « Ta clé Photoroom » vit sur l'écran Vestiaire, **pas dans Paramètres** (`detourage-reglage.cjs` le refuse). Studio photo : détourage local gratuit (U²-Net, licences vérifiées). |
-| **Palette** | Une palette violette a été essayée puis **REFUSÉE** le 27 oct. : ne pas la reproposer ; la palette Perle (pétrole et sauge, `src/themeMineral.js`) reste. |
+| **Palette** | Le violet reste **REFUSÉ** (27 oct.) ; **Vitrine (31 oct., son choix) remplace Perle** : blanc, encre, accent cobalt rare, Bricolage Grotesque + Geist Mono (`src/themeMineral.js`, `src/styles-vitrine.css`). |
 | **Ventes masquées** | ⚠️ 29 oct. : **on ne peut plus masquer une vente** (« on ne doit plus pouvoir les masquer ») ; `vinted_sales_hidden` n'est plus lu nulle part. Les ACHATS masqués restent. |
 | **Saisie « N° + Entrée »** | Retirée de Ventes, Colis, Annonces, Leboncoin, eBay (29 oct.) ; la loupe « Tout sur le N° » et la saisie du Stock restent. |
 | **Bloc « offres à trancher » des emails dans Messages** | Retiré le 24 oct. sur sa demande (moyennes par modèle et liens génériques compris). Ne pas le rétablir. Les offres dans les conversations restent. |
@@ -405,7 +405,7 @@ déploient pas (`vercel.json`) ; ne jamais « promouvoir » une prévisualisatio
 > chiffre ne porte une couleur que s'il y a vraiment quelque chose à rattraper ;
 > **ambre** pour un geste à faire, **rouge** seulement pour deux paires sous un N°.
 
-- Palette Perle (pétrole et sauge, `src/themeMineral.js`), mode sombre CHOISI
+- Vitrine (31 oct., son choix) remplace Perle (`src/themeMineral.js`, `src/styles-vitrine.css` chargée en dernier), mode sombre CHOISI
   (`vinted_dark`, estampillé sur la racine avant le premier rendu).
 - Une forme par fonction : boutons (une règle de base, jamais `display:inline-flex`),
   `Segmente`, `vrm-filtres`, `vrm-repli`, `vrm-lien-action`, rangées défilantes.
@@ -531,6 +531,7 @@ vérifier par `curl https://vrm.center/api/sante`.
   panneaux des Paramètres s'ouvrent en sous-écran aussi sur ordinateur (`[data-sous-ouvrir]`).
   Rouges laissés : `session` G/P (Chrome 153), `mobile`, `profil-avatar` (instables).
   → historique divers / interface.
+- **31 oct.** — Style « Vitrine » (son choix parmi 4 maquettes) appliqué à toute l'app, clair et sombre → historique interface-stock (« Vitrine »). Geste : regarder l'app ; dire si « Tout imprimer » doit être fixé au-dessus de la barre du bas.
 - **31 oct.** — CLAUDE.md allégé (1,36 Mo → < 60 Ko), historique déplacé tel quel dans
   `docs/passation/historique-*.md`.
 - **30 oct.** — Intégration v30, extension **5.291.0** (5.288/5.290 étaient des numéros de

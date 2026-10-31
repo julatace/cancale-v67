@@ -7,13 +7,13 @@
  .vrm-app-shell .vrm-app-header{min-height:54px;background-image:var(--vrm-nav-gradient);}
  .vrm-main .vrm-market-space{background:transparent;}
  .vrm-main .vrm-market-space>.vrm-market-heading{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);padding:0;}
- .vrm-main .vrm-market-space>.vrm-platform-summary{grid-row:1;grid-column:2;align-self:stretch;padding:0 15px 0 5px;background:#24464b;}
+ .vrm-main .vrm-market-space>.vrm-platform-summary{grid-row:1;grid-column:2;align-self:stretch;padding:0 15px 0 5px;background:var(--vrm-ink);}
  .vrm-main .vrm-market-space>.vrm-platform-summary>summary{font-size:11px;min-height:30px!important;padding:5px 0!important;}
  .vrm-main .vrm-market-space>.vrm-platform-summary[open]{grid-column:1 / -1;}
  .vrm-main .vrm-market-space>.vrm-platform-summary[open]>div{background:var(--studio-paper);padding:12px!important;border-radius:12px;}
- .vrm-main .vrm-market-space>div:has(>[data-fraicheur-ventes]){grid-column:1;grid-row:1;padding:9px 12px!important;background:#24464b;align-self:stretch;}
+ .vrm-main .vrm-market-space>div:has(>[data-fraicheur-ventes]){grid-column:1;grid-row:1;padding:9px 12px!important;background:var(--vrm-ink);align-self:stretch;}
  .vrm-main .vrm-market-space>div:has(>[data-fraicheur-ventes]) [data-fraicheur-ventes]{font-size:11px!important;color:#d0dfd8!important;white-space:nowrap;}
- .vrm-main .vrm-market-space>.vrm-seg-cadre{grid-row:2;background:#24464b!important;border-radius:0 0 18px 18px;box-shadow:0 7px 12px #21343e0c;overflow:hidden;}
+ .vrm-main .vrm-market-space>.vrm-seg-cadre{grid-row:2;background:var(--vrm-ink)!important;border-radius:0 0 18px 18px;box-shadow:0 7px 12px #21343e0c;overflow:hidden;}
  .vrm-main .vrm-market-space .vrm-platform-tabs{padding:0 15px 7px;gap:20px;}
  .vrm-main .vrm-market-space .vrm-platform-tabs>button{font-size:12px!important;min-height:38px!important;}
  .vrm-mobile-sales-intro{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:0 0 12px;}
@@ -26,7 +26,7 @@
  .vrm-main .vrm-sales-workbar .vrm-list-search input{min-height:42px;padding-block:10px!important;border:1px solid #d9e1d8!important;background:transparent!important;}
  .vrm-main .vrm-sales-workbar>.vrm-rangee{grid-column:1 / -1;grid-row:2;}
  .vrm-main .vrm-sales-workbar>.vrm-rangee>button{border:0!important;background:#e3e8e1!important;color:#52665f!important;min-height:32px!important;font-size:10px!important;padding-inline:11px!important;border-radius:7px!important;}
- .vrm-main .vrm-sales-workbar>.vrm-rangee>button[aria-pressed=true]{background:#24464b!important;color:#fff!important;box-shadow:0 2px 4px #21343e14;}
+ .vrm-main .vrm-sales-workbar>.vrm-rangee>button[aria-pressed=true]{background:var(--vrm-ink)!important;color:var(--vrm-bg)!important;box-shadow:0 2px 4px #21343e14;}
  .vrm-main [data-raison-bord]{background:#e8eade!important;border-left:2px solid #ad9658!important;border-radius:0 8px 8px 0!important;padding:7px 9px!important;font-size:10px!important;line-height:1.4!important;}
  .vrm-main [data-raison-bord] .vrm-label-help>summary{min-height:24px!important;padding:4px 0 0!important;font-size:9px!important;}
  .vrm-app-shell .vrm-main .vrm-ventes-liste .vrm-sale-row{padding:12px 12px 0!important;border-radius:17px!important;background:linear-gradient(135deg,#fffefa,#ffffff)!important;border:1px solid var(--vrm-line)!important;box-shadow:0 5px 14px #21343e07,0 1px 1px #21343e05;gap:0!important;margin-bottom:12px;}
@@ -41,7 +41,7 @@
  .vrm-app-shell .vrm-main .vrm-ventes-liste .vrm-sale-action{grid-column:1 / -1;grid-row:4;margin:6px 0!important;justify-self:stretch;}
  .vrm-app-shell .vrm-main .vrm-ventes-liste .vrm-sale-action [data-bouton-bord]{flex-direction:row!important;gap:8px!important;}
  .vrm-app-shell .vrm-main .vrm-ventes-liste .vrm-sale-action button{border-radius:7px!important;min-height:34px!important;}
- .vrm-main .vrm-ventes-liste .vrm-sale-action button:not(:disabled):not([aria-disabled=true]){background:#24464b!important;color:#fff!important;border-color:#24464b!important;}
+ .vrm-main .vrm-ventes-liste .vrm-sale-action button:not(:disabled):not([aria-disabled=true]){background:var(--vrm-ink)!important;color:var(--vrm-bg)!important;border-color:var(--vrm-ink)!important;}
  .vrm-app-shell .vrm-main .vrm-ventes-liste .vrm-sale-bas{border-top:1px solid var(--studio-line);padding:3px 0 0;margin:1px 0 0;gap:0 3px;}
  .vrm-main .vrm-ventes-liste .vrm-cout-rangee>button{color:#5b6e68!important;}
  .vrm-main .vrm-ventes-liste .vrm-sale-invoice{margin:0 -12px;padding:1px 12px!important;background:#f4f6ef;border-radius:0 0 17px 17px;border-color:var(--studio-line)!important;}
@@ -133,7 +133,7 @@
 /* Continuité des écrans secondaires. */
 @media(max-width:767px){
  /* La première rangée existe aussi sans message de fraîcheur. */
- .vrm-main .vrm-market-space::before{content:'';grid-row:1;grid-column:1 / -1;align-self:stretch;background:#24464b;pointer-events:none;}
+ .vrm-main .vrm-market-space::before{content:'';grid-row:1;grid-column:1 / -1;align-self:stretch;background:var(--vrm-ink);pointer-events:none;}
  .vrm-main .vrm-ann-grid{gap:10px!important;}
  .vrm-main .vrm-ann-card{background:var(--vrm-surface)!important;border:1px solid var(--vrm-line)!important;border-radius:15px!important;box-shadow:0 3px 12px #21343e07!important;margin-bottom:8px;}
  .vrm-main .vrm-ann-card .vrm-ann-overview{padding:12px!important;gap:12px!important;}
@@ -146,9 +146,9 @@
  .vrm-main .vrm-inbox-row.is-current{background:#e7eee3!important;box-shadow:inset 3px 0 #678875!important;}
  .vrm-main .vrm-msg-name{font-size:13px;}
  .vrm-main .vrm-msg-extrait{font-size:12px;line-height:1.4;}
- .vrm-main .vrm-msg-bar>.vrm-inbox-filters button[aria-pressed=true]{background:#24464b!important;color:#fff!important;}
+ .vrm-main .vrm-msg-bar>.vrm-inbox-filters button[aria-pressed=true]{background:var(--vrm-ink)!important;color:var(--vrm-bg)!important;}
  .vrm-main .vrm-lbc-package{background:var(--vrm-surface)!important;border:1px solid var(--vrm-line)!important;border-radius:14px!important;box-shadow:0 3px 12px #21343e07;}
- .vrm-main .vrm-lbc-package [data-imprime-lbc]{background:#24464b!important;color:#fff!important;font-size:12px!important;min-height:40px!important;padding:9px!important;}
+ .vrm-main .vrm-lbc-package [data-imprime-lbc]{background:var(--vrm-ink)!important;color:var(--vrm-bg)!important;font-size:12px!important;min-height:40px!important;padding:9px!important;}
  .vrm-main .vrm-pickup-point{background:var(--vrm-surface)!important;border:1px solid var(--vrm-line)!important;border-radius:15px!important;box-shadow:0 3px 12px #21343e07;}
  .vrm-main .vrm-pickup-point>div:first-child{background:#e5ece0!important;border-color:#dce5d7!important;}
  .vrm-main .vrm-pickup-card{background:var(--vrm-surface)!important;}
@@ -159,15 +159,15 @@
  .vrm-main .vrm-set-val{font-size:11px;max-width:42%;overflow-wrap:anywhere;}
  .vrm-main .vrm-set-titre{font-size:10px;letter-spacing:.7px;text-transform:uppercase;color:#657774!important;}
  .vrm-chat-panel{background:#eff1ed!important;}
- .vrm-chat-panel .vrm-chat-head{background:#24464b!important;color:#fff!important;border-color:#ffffff15!important;}
+ .vrm-chat-panel .vrm-chat-head{background:var(--vrm-ink)!important;color:var(--vrm-bg)!important;border-color:#ffffff15!important;}
  .vrm-chat-panel .vrm-chat-head :is(button,.vrm-chat-head-n){color:#f4f8f3!important;}
  .vrm-chat-panel .vrm-chat-head-s{color:#cfddd3!important;}
  .vrm-chat-panel .vrm-chat-shortcuts{background:#e1e9db;border-color:#d2decd!important;}
  .vrm-chat-panel .vrm-chat-shortcuts button{color:#375846!important;font-size:12px;}
  .vrm-chat-panel .vrm-bulle{background:var(--vrm-surface)!important;border:1px solid #e2e8dc!important;font-size:14px;box-shadow:0 1px 2px #21343e04;}
- .vrm-chat-panel .vrm-bulle-moi>.vrm-bulle{background:#24464b!important;color:#fff!important;border-color:#24464b!important;}
+ .vrm-chat-panel .vrm-bulle-moi>.vrm-bulle{background:var(--vrm-ink)!important;color:var(--vrm-bg)!important;border-color:var(--vrm-ink)!important;}
  .vrm-chat-panel .vrm-chat-event-colis{background:#e5ecdf!important;border:1px solid #d6e0cf!important;border-radius:12px;}
- .vrm-chat-panel :is(.vrm-chat-send,.vrm-chat-vinted){background:#24464b!important;color:#fff!important;border-radius:10px;font-size:13px;}
+ .vrm-chat-panel :is(.vrm-chat-send,.vrm-chat-vinted){background:var(--vrm-ink)!important;color:var(--vrm-bg)!important;border-radius:10px;font-size:13px;}
  .vrm-chat-panel .vrm-chat-compose>textarea{background:var(--vrm-surface)!important;border-color:#d9e1d4!important;}
  :root[data-theme=dark] .vrm-main :is(.vrm-ann-card,.vrm-inbox-row,.vrm-lbc-package,.vrm-pickup-point,.vrm-pickup-card,.vrm-set-liste){background:var(--vrm-surface)!important;border-color:#ffffff12!important;}
  :root[data-theme=dark] .vrm-main :is(.vrm-ann-actions,.vrm-pickup-point>div:first-child,.vrm-pickup-collect){background:#344b40!important;color:#d4e5d8!important;}
@@ -188,8 +188,8 @@
 }
 
 @media(max-width:767px){
- .vrm-main .vrm-market-space .vrm-seg-cadre{background:#24464b!important;}
- .vrm-main :is([data-poster=ebay],.vrm-set-connect){background:#24464b!important;color:#fff!important;border-radius:10px!important;font-size:13px!important;min-height:42px!important;}
+ .vrm-main .vrm-market-space .vrm-seg-cadre{background:var(--vrm-ink)!important;}
+ .vrm-main :is([data-poster=ebay],.vrm-set-connect){background:var(--vrm-ink)!important;color:var(--vrm-bg)!important;border-radius:10px!important;font-size:13px!important;min-height:42px!important;}
 }
 @media(max-width:767px){
  .vrm-main .vrm-achats .vrm-pickup-collect{padding:0 9px!important;}
@@ -336,7 +336,7 @@
  .vrm-main .vrm-lbc-package-head>a{grid-column:3;grid-row:1 / span 2;}
  .vrm-main .vrm-lbc-package-actions{grid-column:2 / -1;grid-row:2;display:flex!important;flex-wrap:nowrap!important;gap:5px!important;margin-top:0!important;align-self:end;min-width:0;}
  .vrm-main .vrm-lbc-package .vrm-lbc-package-actions>*{min-height:32px!important;padding:6px 7px!important;font-size:10px!important;border-radius:7px!important;box-sizing:border-box;}
- .vrm-main .vrm-lbc-package .vrm-lbc-package-primary{flex:1 1 auto!important;min-width:0;max-width:none!important;background:#24464b!important;color:#fff!important;display:flex;align-items:center;justify-content:center;line-height:1.3;text-decoration:none;}
+ .vrm-main .vrm-lbc-package .vrm-lbc-package-primary{flex:1 1 auto!important;min-width:0;max-width:none!important;background:var(--vrm-ink)!important;color:var(--vrm-bg)!important;display:flex;align-items:center;justify-content:center;line-height:1.3;text-decoration:none;}
  .vrm-main .vrm-achats .vrm-pickup-details>summary{min-height:32px;margin:-5px 0 -7px;font-size:10px;}
  .vrm-main .vrm-pickup-point>div:first-child{padding-top:7px!important;padding-bottom:7px!important;}
  .vrm-main .vrm-achats .vrm-pickup-card{padding-block:8px!important;}

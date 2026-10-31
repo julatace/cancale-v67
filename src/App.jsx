@@ -10984,9 +10984,8 @@ function Notice({ tone='info', icon, title, value, desc, detail, action, style={
       background:C.card,border:`1px solid ${C.border}`,borderRadius:10,boxShadow:C.shadow,
       padding:'13px 15px 13px 17px',marginBottom:10,overflow:'hidden',...style}}>
       <span aria-hidden="true" style={{position:'absolute',left:0,top:0,bottom:0,width:3,background:col}}/>
-      {/* Un voile très pâle de la couleur : l'avertissement se teinte sans
-          devenir un bloc criard (la surface reste neutre). */}
-      <span aria-hidden="true" style={{position:'absolute',inset:0,background:`linear-gradient(100deg, ${col}0e, transparent 42%)`,pointerEvents:'none'}}/>
+      {/* (31 oct., « Vitrine ») Le voile en dégradé de la couleur est retiré :
+          le trait de 3 px à gauche dit déjà le ton, la surface reste neutre. */}
       {icon && <span aria-hidden="true" style={{flexShrink:0,color:col,marginTop:1}}><Icon name={icon} size={18}/></span>}
       <div style={{flex:'1 1 190px',minWidth:0}}>
         <div style={{display:'flex',alignItems:'baseline',gap:7,flexWrap:'wrap'}}>
@@ -14304,14 +14303,16 @@ const useOrdinateur = () => {
   return ord;
 };
 
-const NAV_LARGEUR = 160;
+const NAV_LARGEUR = 200;   // (31 oct., Vitrine) colonne blanche avec les libellés
 
 // Navigation compacte par plateforme. Les outils partagés restent dans le
 // panneau Gestion à gauche ; les sections Vinted sont dans leur plateforme.
 function SideBar({ tab, setTab, entreprise }) {
   const outils = [...NAV_GESTION, ...NAV_OUTILS];
   const actif = BAR_GROUPE[tab] || tab;
-  const bouton=t=><button key={t.id} type="button" className="vrm-rail-button" aria-label={t.label} title={t.bientot?`${t.label} — bientôt`:t.label} onClick={()=>setTab(t.id)} aria-current={actif===t.id?'page':undefined}><NavigationIcon item={t} size={25}/></button>;
+  // (31 oct., direction « Vitrine ») Chaque entrée porte son NOM à côté de
+  // l'icône : un rail d'icônes seules obligeait à les reconnaître de mémoire.
+  const bouton=t=><button key={t.id} type="button" className="vrm-rail-button" aria-label={t.label} title={t.bientot?`${t.label} — bientôt`:t.label} onClick={()=>setTab(t.id)} aria-current={actif===t.id?'page':undefined}><NavigationIcon item={t} size={18}/><span className="vrm-rail-lib" aria-hidden="true">{t.label}</span></button>;
   // (30 oct., Edge sous Windows) Une fenêtre basse (1366×768 → 630 px utiles)
   // coupait le bas du rail — Statistiques, Comptabilité, Communauté — et la zone
   // défile SANS barre visible : rien ne disait qu'il y avait une suite. La zone
@@ -14338,12 +14339,12 @@ function SideBar({ tab, setTab, entreprise }) {
     try { if (b) b.scrollIntoView({ block: 'nearest', inline: 'nearest' }); } catch (_) {}
   }, [actif]);
   return <nav className="vrm-sidebar vrm-atelier-rail" aria-label="Navigation principale" style={{width:NAV_LARGEUR,background:C.sidebar||C.chrome,borderRight:`1px solid ${C.chromeLine}`,color:C.onChrome}}>
-    <div className="vrm-sidebar-brand"><VrmLogo size={68} anim={false}/><NomEntreprise entreprise={entreprise} className="vrm-sidebar-entreprise"/></div>
+    <div className="vrm-sidebar-brand"><VrmLogo size={32} anim={false}/><NomEntreprise entreprise={entreprise} className="vrm-sidebar-entreprise"/></div>
     <div className="vrm-rail-scroll" ref={zoneRef}>
       <div className="vrm-rail-platforms">{BOTTOM_TABS.map(bouton)}</div>
       <section className="vrm-rail-management-group" aria-label="Gestion"><div className="vrm-rail-section-label">Gestion</div><div className="vrm-rail-management">{outils.map(bouton)}</div></section>
     </div>
-    <div className="vrm-rail-bottom"><button type="button" className="vrm-rail-button" aria-label="Paramètres" title="Paramètres" onClick={()=>setTab('settings')} aria-current={(BAR_GROUPE[tab]||tab)==='settings'?'page':undefined}><Icon name="gear" size={23}/></button></div>
+    <div className="vrm-rail-bottom"><button type="button" className="vrm-rail-button" aria-label="Paramètres" title="Paramètres" onClick={()=>setTab('settings')} aria-current={(BAR_GROUPE[tab]||tab)==='settings'?'page':undefined}><Icon name="gear" size={18}/><span className="vrm-rail-lib" aria-hidden="true">Paramètres</span></button></div>
   </nav>;
 }
 
@@ -45519,7 +45520,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             <div className="vrm-day-head">
               <span className="vrm-day-k" style={{color:C.muted}}>Cette semaine</span>
               <span className="vrm-day-legende" style={{color:C.muted}}>
-                <span><i aria-hidden="true" style={{background:"#5d948b"}}/>Vendu</span>
+                <span><i aria-hidden="true" style={{background:C.accent}}/>Vendu</span>
                 <span><i aria-hidden="true" className="vrm-day-pointille" style={{borderColor:C.muted}}/>Reçu</span>
               </span>
             </div>

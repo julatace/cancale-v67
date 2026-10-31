@@ -1,28 +1,42 @@
-// Palette Perle : mêmes jetons pour les composants React et les surfaces CSS.
-// Les statuts d'erreur et d'avertissement restent distincts de l'accent de marque.
+// ── PALETTE « VITRINE » (31 octobre 2026, son choix) — remplace Perle ─────────
+// Julien a vu quatre maquettes et choisi la quatrième : « j'aime énormément le 4,
+// tu peux appliquer ça, améliore simplement pour le téléphone ». Une boutique de
+// sneakers : blanc franc, grandes photos, typographie serrée, la paire avant tout.
+// Les noms des exports (MINERAL, MINERAL_DARK) restent : tout App.jsx les lit déjà.
+//   · fond blanc franc ; les blocs sont des aplats « surface » (#F5F5F3) SANS
+//     ombre ni cadre appuyé ; la photo porte la carte ;
+//   · encre presque noire, atténué chaud, filets #E4E4DF ;
+//   · UNE couleur d'accent, rare : le cobalt #2442B8 (action principale, trait
+//     de l'onglet actif) ; ambre = geste à faire ; rouge = deux paires sous un N°.
+//     Le violet reste refusé ; `blue` et `purple` (anciennes teintes secondaires)
+//     retombent sur l'atténué pour qu'aucune seconde couleur ne revienne.
+// Les ombres ne restent qu'à ce qui FLOTTE (menus, feuilles, fenêtres).
+// Détail : docs/passation/historique-interface-stock.md (« Vitrine »).
 export const MINERAL = Object.freeze({
- bg:'#F1F3F0',surface:'#FDFEFC',card:'#FDFEFC',card2:'#EAF0EC',
- border:'#DCE4DF',text:'#213B41',muted:'#53696D',faint:'#607578',
- accent:'#244E54',accentSoft:'#6E9989',onAccent:'#FFFFFF',
- danger:'#B43E35',warn:'#965900',gold:'#78663F',blue:'#426E7C',purple:'#706681',
- shadow:'0 1px 2px rgba(25,59,67,.025), 0 4px 14px rgba(25,59,67,.035)',
- shadowMd:'0 2px 5px rgba(25,59,67,.04), 0 10px 26px rgba(25,59,67,.06)',
- shadowLg:'0 6px 16px rgba(25,59,67,.06), 0 24px 56px rgba(25,59,67,.14)',
- ring:'rgba(36,78,84,.16)',glass:'rgba(253,254,252,.96)',bar:'rgba(253,254,252,.94)',hair:'rgba(33,59,65,.09)',
- sidebar:'#24464B',chrome:'#193B43',onChrome:'#F4F8F5',chromeMuted:'#C1D1CD',chromeLine:'rgba(255,255,255,.13)',
- chromeGradient:'linear-gradient(160deg,#193B43 0%,#2E5558 60%,#385C57 100%)',
- s1:'#244E54',s2:'#6E9989',selection:'#244E54'
+ bg:'#FFFFFF',surface:'#F5F5F3',card:'#F5F5F3',card2:'#ECECE8',
+ border:'#E4E4DF',text:'#0F0F0E',muted:'#56564F',faint:'#64645C',
+ accent:'#2442B8',accentSoft:'#5D74D6',onAccent:'#FFFFFF',
+ danger:'#B43E35',warn:'#8A5300',warnSoft:'#FFF1D6',gold:'#8A5300',blue:'#56564F',purple:'#56564F',
+ shadow:'none',
+ shadowMd:'0 1px 2px rgba(15,15,14,.06), 0 10px 28px rgba(15,15,14,.10)',
+ shadowLg:'0 6px 16px rgba(15,15,14,.08), 0 24px 56px rgba(15,15,14,.16)',
+ ring:'rgba(36,66,184,.20)',glass:'#FFFFFF',bar:'#FFFFFF',hair:'rgba(15,15,14,.09)',
+ sidebar:'#FFFFFF',chrome:'#FFFFFF',onChrome:'#0F0F0E',chromeMuted:'#56564F',chromeLine:'#E4E4DF',
+ chromeGradient:'#FFFFFF',photo:'#ECECE8',
+ s1:'#2442B8',s2:'#9AA6DB',selection:'#2442B8'
 });
+// Le sombre, dérivé : un noir chaud (pas de « bleu nuit »), trois marches de
+// clarté, le cobalt éclairci pour tenir 4,5:1 (texte FONCÉ dessus), l'ambre clair.
 export const MINERAL_DARK = Object.freeze({
- bg:'#122329',surface:'#1C3339',card:'#1C3339',card2:'#274147',
- border:'#385258',text:'#EDF5F1',muted:'#B4C7C3',faint:'#98B1AD',
- accent:'#B7D6C8',accentSoft:'#83B5A2',onAccent:'#173A40',
- danger:'#FF9188',warn:'#EBC080',gold:'#CFBE97',blue:'#A1C6D1',purple:'#BEB5D5',
- shadow:'0 2px 8px rgba(0,0,0,.12)',shadowMd:'0 8px 24px rgba(0,0,0,.18)',shadowLg:'0 16px 48px rgba(0,0,0,.30)',
- ring:'rgba(183,214,200,.20)',glass:'rgba(28,51,57,.96)',bar:'rgba(28,51,57,.94)',hair:'rgba(237,245,241,.10)',
- sidebar:'#19373F',chrome:'#102D35',onChrome:'#F4F8F5',chromeMuted:'#BECEC9',chromeLine:'rgba(255,255,255,.13)',
- chromeGradient:'linear-gradient(160deg,#102D35 0%,#1C4148 65%,#294E4B 100%)',
- s1:'#B7D6C8',s2:'#83B5A2',selection:'#B7D6C8'
+ bg:'#0E0E0D',surface:'#1A1A18',card:'#1A1A18',card2:'#252522',
+ border:'#2E2E2B',text:'#F2F2EE',muted:'#B0B0A8',faint:'#9A9A92',
+ accent:'#6F86E8',accentSoft:'#93A5EE',onAccent:'#0E0E0D',
+ danger:'#FF9188',warn:'#F0B44C',warnSoft:'#2E2412',gold:'#F0B44C',blue:'#B0B0A8',purple:'#B0B0A8',
+ shadow:'none',shadowMd:'0 10px 28px rgba(0,0,0,.40)',shadowLg:'0 16px 48px rgba(0,0,0,.50)',
+ ring:'rgba(111,134,232,.28)',glass:'#1A1A18',bar:'#1A1A18',hair:'rgba(242,242,238,.10)',
+ sidebar:'#0E0E0D',chrome:'#0E0E0D',onChrome:'#F2F2EE',chromeMuted:'#B0B0A8',chromeLine:'#2E2E2B',
+ chromeGradient:'#0E0E0D',photo:'#252522',
+ s1:'#6F86E8',s2:'#93A5EE',selection:'#6F86E8'
 });
 // Les portails (détails de vente, fenêtres) héritent du document : mêmes jetons
 // que la coque, sans seconde palette à entretenir dans les feuilles CSS.
@@ -30,4 +44,5 @@ export function variablesTheme(t,sombre=false){return {
  '--vrm-nav-gradient':t.chromeGradient,'--vrm-ink':t.text,'--vrm-brand-filter':sombre?'invert(1)':'none',
  '--vrm-muted':t.muted,'--vrm-faint':t.faint,'--vrm-hair':t.hair,'--vrm-bar':t.bar,
  '--vrm-accent':t.accent,'--vrm-on-accent':t.onAccent,'--vrm-card2':t.card2,'--vrm-line':t.border,'--vrm-surface':t.card,'--vrm-bg':t.bg,
+ '--vrm-danger':t.danger,'--vrm-warn':t.warn,'--vrm-warn-soft':t.warnSoft,'--vrm-photo':t.photo,
 };}

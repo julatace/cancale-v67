@@ -6,8 +6,8 @@
    pastille teintée, sans contour. Le bouton principal reste plein. Les
    couleurs restent celles de la palette Perle. Rien ne change sur ordinateur. */
 @media (max-width: 767px) {
-  .vrm-app-shell { --ep-fond: #FBFCFA; --ep-teinte: rgba(36, 78, 84, .075); --ep-teinte-f: rgba(36, 78, 84, .13); --ep-encre: #244E54; --ep-trait: rgba(33, 59, 65, .08); }
-  html[data-theme="dark"] .vrm-app-shell { --ep-fond: #16292F; --ep-teinte: rgba(183, 214, 200, .09); --ep-teinte-f: rgba(183, 214, 200, .16); --ep-encre: #B7D6C8; --ep-trait: rgba(237, 245, 241, .08); }
+  .vrm-app-shell { --ep-fond: var(--vrm-bg); --ep-teinte: rgba(15, 15, 14, .05); --ep-teinte-f: rgba(15, 15, 14, .09); --ep-encre: var(--vrm-ink); --ep-trait: rgba(15, 15, 14, .08); }
+  html[data-theme="dark"] .vrm-app-shell { --ep-fond: var(--vrm-bg); --ep-teinte: rgba(242, 242, 238, .07); --ep-teinte-f: rgba(242, 242, 238, .12); --ep-encre: var(--vrm-ink); --ep-trait: rgba(242, 242, 238, .08); }
 
   .vrm-app-shell .vrm-main { background: var(--ep-fond) !important; }
 
