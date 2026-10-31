@@ -106,8 +106,9 @@
      dans Comptabilité et dans Ventes ; un total partiel garde son « au moins ». */
   .vrm-app-shell .vrm-day-layout .vrm-day-note,
   .vrm-app-shell .vrm-day-layout [data-vendu-manque],
-  .vrm-app-shell .vrm-day-layout [data-depenses-choix],
-  .vrm-app-shell .vrm-day-layout [data-journee-benef-masquer] { display: none !important; }
+  .vrm-app-shell .vrm-day-layout [data-depenses-choix] { display: none !important; }
+  /* (31 oct.) « Masquer le bénéfice » n'est plus caché ici : il n'existe plus
+     qu'en mode « Modifier » (c'est là qu'il se range, plus dans Réglages). */
 }
 @media (max-width: 767px) {
   /* … sauf quand le bénéfice ne se calcule pas : la note dit où il se calcule. */

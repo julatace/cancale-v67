@@ -1800,3 +1800,58 @@ les annonces sont moches ».
 **Vérifié** : `npm run build` ; audits icones, tdz, variables, boutons, csp ; les bancs
 et leur état sont dans le rapport de la session (journal `b1/`). Captures (base
 INVENTÉE `_base-volume.cjs`, aucune donnée réelle) : `docs/style-2026-10-31/finitions/`.
+### Statistiques détaillées, Tendances dans Ma journée, cartes rangées dans Ma journée (31 octobre)
+
+**Demandes de Julien** : « je veux que tu proposes beaucoup plus de statistiques dans Ma
+journée et même dans Statistiques, de la vraie data » ; et, de la carte « Bénéfice dans Ma
+journée » : « pour cette case je ne pense pas qu'il soit nécessaire de faire un bouton de
+validation dans les paramètres… pourquoi pas les autres ? ».
+
+**Mesuré avant de coder** : la seule carte de Ma journée qui s'allumait par une case des
+Paramètres était le bénéfice (`BeneficeJourneeSetting`, Réglages → Affichage,
+`vrm_journee_benefice`, défaut éteint) ; les widgets, eux, se rangeaient déjà dans Ma journée
+(« Modifier » : retirer, glisser, « + Ajouter », 21-22 oct.).
+
+**Ce qui change pour les cartes** :
+- L'interrupteur « Bénéfice dans Ma journée » est **retiré** de Réglages → Affichage.
+  `vrm_journee_benefice` a trois états : absent = **par défaut**, la carte se montre dès
+  qu'un bénéfice est publié avec au moins une vente du mois au prix d'achat connu (sinon
+  rien — jamais une case de « — » non demandée) ; `false` = masqué par lui, bouton
+  « Masquer le bénéfice » **en mode « Modifier » seulement** (touchable malgré le
+  `pointer-events:none` du corps des widgets, ignoré par le glisser) ; `true` = remis par
+  « + Ajouter » → « Ton bénéfice » (feuille des widgets). Le lien « + Afficher mon
+  bénéfice » sous la grille est retiré. La règle de `styles-epure.css` qui cachait
+  « Masquer » sur téléphone est retirée (il n'existe plus qu'en mode « Modifier »).
+  La ligne « Aujourd'hui » du bénéfice n'est dessinée que s'il y a une vente aujourd'hui
+  (vide, elle ajoutait un filet).
+- **Une carte nouvelle arrive d'elle-même, une carte retirée ne revient pas** : la
+  disposition enregistrée porte `connus` (le catalogue au moment du rangement,
+  `dispoAEnregistrer`) ; un widget de la disposition d'origine absent de `connus` est ajouté
+  à la fin (`normaliserDispoJournee`). Une disposition d'avant ce champ connaît
+  `CATALOGUE_AVANT_31_OCT`.
+- Nouveau widget **« Tendances »** (dans la disposition d'origine, pleine largeur, en
+  dernier — le banc `journee-widgets` garde « toute la journée visible sans défiler » à
+  1512 px) : 4 cases qui ouvrent Statistiques — aujourd'hui contre la moyenne des 28 jours
+  d'avant (l'ÉCART, pas le montant : « +X € aujourd'hui » est déjà dans « Vendu », §7),
+  7 jours contre les 7 d'avant, paires en ligne depuis 30 j et plus (« — » sans aucune date
+  de mise en ligne), et « En attente » — remplacé par le panier moyen 30 j quand la carte
+  « Argent en attente » est sur l'écran (le même nombre ne s'écrit pas deux fois).
+
+**Statistiques** : nouvelle section (`StatsDetaillees`) entre « CA sur mesure » et « Ce qui
+se vend » — rythme (aujourd'hui, moyenne, 7 j/7 j, panier, ventes/jour, 12 semaines en
+barres), bénéfice et marge par marque/modèle/taille/plateforme/compte, temps de vente
+(médiane/moyenne par marque, tranche de prix, compte), quand tu vends (jour, heure), paires
+qui dorment 30/60/90 j avec valeur affichée et coût connu, rotation, taux de vente du mois,
+annulations. Sources et règles : historique compta (même date). Graphiques en SVG maison,
+une seule teinte d'accent, survol natif (`<title>`), échelle de texte 28/20/15/13/11 du
+banc `stats-premium` (le 11,5 px de la couverture du boost ramené à 11).
+
+**Preuves** : `scripts/audit-stats-ventes.cjs --prouve` (29 contrôles à la main, 10/10
+mutations) ; `scripts/bancs/stats-detail.cjs` (44 verts, 1512 et 390 tactile ; chiffres
+calculés à la main dans l'en-tête ; cas partiel « 3/4 », cas « pas su » ; mutation « prix
+d'achat inconnu = 0 € » dans le relevé ⇒ 3 rouges) ; `benefice-journee` réécrit (A défaut
+sans publication = rien, Réglages sans interrupteur ; B défaut avec publication = carte ;
+D masquer/remettre dans Ma journée) 62 verts ; `journee-widgets` (K mis à jour, disposition
+par défaut avec « tendances ») 167 verts ; `journee-premium`, `stats-premium`,
+`stats-compta`, `benefice-brut-net`, `reglages-premium`, `chiffres-croises` verts.
+Captures regardées (390/1512, clair/sombre).

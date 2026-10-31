@@ -3,20 +3,23 @@
 //        npm run build && node scripts/bancs/benefice-journee.cjs
 // ═══════════════════════════════════════════════════════════════════════════
 // Julien : « j'aimerais avoir la possibilité de mettre le bénéfice dans Ma
-// journée ». La carte est FACULTATIVE (`vrm_journee_benefice`, synchronisé,
-// défaut éteint) et ses nombres viennent du SEUL propriétaire (§11) : la
+// journée ». (31 oct.) La carte est LÀ PAR DÉFAUT dès qu'un bénéfice est publié,
+// et se range DANS Ma journée (« Modifier » → « Masquer le bénéfice », « + Ajouter »
+// → « Ton bénéfice ») — plus d'interrupteur dans Réglages (sa décision). Le choix
+// reste `vrm_journee_benefice` (synchronisé) et ses nombres viennent du SEUL propriétaire (§11) : la
 // publication `vrm_benefice_jours` de l'écran Ventes, lue par le même crochet
 // que la carte de Comptabilité. Ventes inventées (aucune donnée réelle : ce
 // banc vit dans le dépôt, qui est public), à 1512 px et à 390 px tactile :
-//   A. réglage jamais touché ⇒ AUCUNE carte, mais le geste pour l'afficher est
-//      dans Ma journée ; le toucher l'affiche ; ventes illisibles, donc aucune
-//      publication ⇒ « — » et « se calcule dans Ventes » (aucun montant) ;
-//   B. après Ventes (tous les prix d'achat connus, une charge fixe) : réglage
-//      venu du NUAGE ⇒ la carte est là, et brut, net, couverture et raison sont
+//   A. jamais choisi, ventes illisibles (aucune publication) ⇒ AUCUNE carte (pas
+//      de case vide) ; Réglages n'a plus d'interrupteur ; remise exprès par
+//      « + Ajouter » ⇒ « — » et « se calcule dans Ventes » (aucun montant) ;
+//   B. après Ventes (tous les prix d'achat connus, une charge fixe), JAMAIS
+//      choisi ⇒ la carte est là par défaut, et brut, net, couverture et raison sont
 //      IDENTIQUES à la carte « Ton bénéfice » de Comptabilité (mois) ;
 //   C. un prix d'achat manque ⇒ net « — » (raison « achats ») des deux côtés,
 //      même couverture, et la porte « Compléter les prix d'achat » ;
-//   D. Réglages → Affichage porte le même choix ; l'éteindre retire la carte.
+//   D. « Masquer » n'est montré qu'en mode « Modifier » ; il retire la carte
+//      (enregistré `false`) ; « + Ajouter » → « Ton bénéfice » la remet (`true`).
 // Jugé sur les attributs `data-journee-benef-*` / `data-benef-*`, jamais sur un
 // libellé (§6.5).
 const path=require('path');
@@ -137,6 +140,9 @@ const lireJournee=async(pg)=>{
   return attrs(pg,'[data-journee-benef]','data-journee-benef-');
 };
 const touche=async(pg,sel,T)=>{ const l=pg.locator(sel).first(); await l.scrollIntoViewIfNeeded(); if(T.hasTouch) await l.tap(); else await l.click(); };
+// En mode « Modifier » les widgets tremblent (animation sans fin) : on vise sans
+// attendre l'immobilité, comme `appuyer` du banc journee-widgets.
+const toucheForce=async(pg,sel,T)=>{ const l=pg.locator(sel).first(); await l.evaluate((e)=>e.scrollIntoView({block:'center'})); if(T.hasTouch) await l.tap({force:true}); else await l.click({force:true}); };
 
 (async()=>{
   let b;
@@ -145,39 +151,44 @@ const touche=async(pg,sel,T)=>{ const l=pg.locator(sel).first(); await l.scrollI
     for(const T of TAILLES){
       console.log(`\n══ ${T.nom} px${T.hasTouch?' (tactile)':''}`);
 
-      console.log('── A. Réglage jamais touché, aucune publication');
+      console.log('── A. Jamais choisi, aucune publication');
       await essaie('A'+T.nom,async()=>{
         // Ventes illisibles ⇒ l'app ne publie AUCUN bénéfice (Ma journée est
         // aussi un lecteur des ventes : avec des ventes lues, elle publierait).
         const { ctx, pg, errs }=await page(b,T,{ ventesKO:true });
         const j=await lireJournee(pg);
-        dit(j===null,'par défaut, AUCUNE carte « Ton bénéfice » dans Ma journée',JSON.stringify(j));
-        const lien=await pg.locator('[data-journee-benef-activer]').count();
-        dit(lien===1,'le geste pour l’afficher est dans Ma journée',`${lien}`);
-        if(lien){
-          await touche(pg,'[data-journee-benef-activer]',T);
-          await pg.waitForTimeout(800);
-          const j2=await attrs(pg,'[data-journee-benef]','data-journee-benef-');
-          dit(!!j2,'le toucher affiche la carte',JSON.stringify(j2));
-          dit(!!j2 && j2.etat==='passu' && !j2.brut && !j2.net,'sans publication : « pas su », aucun montant (jamais 0 €)',JSON.stringify(j2));
-          const txt=await pg.evaluate(()=>{ const e=document.querySelector('[data-journee-benef]'); return e?e.innerText:''; });
-          dit(/écran Ventes/.test(txt) && !/\d+,\d\d\s*€/.test(txt),'elle dit où ça se calcule, sans chiffre',txt.replace(/\n/g,' | ').slice(0,160));
-          const memo=await pg.evaluate(()=>new Promise(r=>setTimeout(()=>r(localStorage.getItem('vrm_journee_benefice')),900)));
-          dit(memo==='true','le choix est enregistré (clé synchronisée)',String(memo));
-          dit(await pg.locator('[data-journee-benef-activer]').count()===0,'le geste « afficher » disparaît une fois la carte là');
-        }
+        dit(j===null,'par défaut et sans bénéfice publié : AUCUNE carte (jamais une case vide)',JSON.stringify(j));
+        dit(await pg.locator('[data-journee-benef-activer]').count()===0,'aucun bouton « afficher » hors du mode « Modifier »');
+        await aller(pg,'settings','[data-reglage-sombre]',1500);
+        dit(await pg.locator('[data-reglage-sombre]').count()>0 && await pg.locator('[data-reglage-benef-journee]').count()===0,'Réglages n’a plus d’interrupteur « Bénéfice dans Ma journée »');
+        await aller(pg,'journee','[data-barre-jour]',1500);
+        await touche(pg,'[data-widgets-modifier]:visible',T); await pg.waitForTimeout(400);
+        await touche(pg,'[data-widgets-ajouter]',T); await pg.waitForTimeout(400);
+        const ent=await pg.locator('[data-widget-ajout="benefice"]').count();
+        dit(ent===0,'jamais masqué : « Ton bénéfice » n’est pas proposé dans « Ajouter » (il n’est pas retiré)',`${ent}`);
+        dit(errs.length===0,'aucune erreur d’app',errs.join(' | ').slice(0,160));
+        await ctx.close();
+      });
+      await essaie('A2'+T.nom,async()=>{
+        const { ctx, pg, errs }=await page(b,T,{ ventesKO:true, main:{ vrm_journee_benefice:true } });
+        const j2=await lireJournee(pg);
+        dit(!!j2,'remis exprès (choix venu du nuage) : la carte est là',JSON.stringify(j2));
+        dit(!!j2 && j2.etat==='passu' && !j2.brut && !j2.net,'sans publication : « pas su », aucun montant (jamais 0 €)',JSON.stringify(j2));
+        const txt=await pg.evaluate(()=>{ const e=document.querySelector('[data-journee-benef]'); return e?e.innerText:''; });
+        dit(/écran Ventes/.test(txt) && !/\d+,\d\d\s*€/.test(txt),'elle dit où ça se calcule, sans chiffre',txt.replace(/\n/g,' | ').slice(0,160));
         dit(errs.length===0,'aucune erreur d’app',errs.join(' | ').slice(0,160));
         await ctx.close();
       });
 
-      console.log('── B. Après Ventes, tous les prix connus, réglage venu du nuage');
+      console.log('── B. Après Ventes, tous les prix connus, jamais choisi (défaut)');
       await essaie('B'+T.nom,async()=>{
-        const { ctx, pg, errs }=await page(b,T,{ main:{ vinted_sale_overrides:OV_COMPLET, vrm_compta:COMPTA, vrm_journee_benefice:true } });
+        const { ctx, pg, errs }=await page(b,T,{ main:{ vinted_sale_overrides:OV_COMPLET, vrm_compta:COMPTA } });
         await publierBenefice(pg);
         const c=await lireCompta(pg);
         const j=await lireJournee(pg);
         console.log(`   Compta ${JSON.stringify(c)}\n   Journée ${JSON.stringify(j)}`);
-        dit(!!j,'réglage du nuage ⇒ la carte est dans Ma journée');
+        dit(!!j,'jamais choisi, bénéfice publié ⇒ la carte est dans Ma journée PAR DÉFAUT');
+        dit(await pg.locator('[data-journee-benef-masquer]').count()===0,'hors du mode « Modifier », aucun bouton « Masquer »');
         dit(await pg.locator('.vrm-day-money [data-journee-benef]').count()===1,'CA et bénéfice partagent la même carte');
         dit(await pg.locator('[data-style-courbe=monotone]').count()===1,'graphique hebdomadaire avec courbes monotones');
         dit(!!c && c.etat==='lu' && !!j && j.etat==='lu','les deux cartes lisent la publication',`${c&&c.etat} / ${j&&j.etat}`);
@@ -211,17 +222,21 @@ const touche=async(pg,sel,T)=>{ const l=pg.locator(sel).first(); await l.scrollI
         await ctx.close();
       });
 
-      console.log('── D. Réglages → Affichage porte le même choix');
+      console.log('── D. Masquer et remettre, DANS Ma journée');
       await essaie('D'+T.nom,async()=>{
-        const { ctx, pg, errs }=await page(b,T,{ main:{ vrm_journee_benefice:true } });
-        await aller(pg,'settings','[data-reglage-benef-journee]',1500);
-        const v=await pg.evaluate(()=>{ const e=document.querySelector('[data-reglage-benef-journee]'); return e?e.getAttribute('data-reglage-benef-journee'):null; });
-        dit(v==='on','Réglages dit « allumé » (venu du nuage)',String(v));
-        if(v){ await touche(pg,'[data-reglage-benef-journee] button',T); await pg.waitForTimeout(2200); }
-        const v2=await pg.evaluate(()=>{ const e=document.querySelector('[data-reglage-benef-journee]'); return e?e.getAttribute('data-reglage-benef-journee'):null; });
-        dit(v2==='off','l’interrupteur l’éteint',String(v2));
-        const j=await lireJournee(pg);
-        dit(j===null,'éteint ⇒ plus de carte dans Ma journée',JSON.stringify(j));
+        const { ctx, pg, errs }=await page(b,T,{ main:{ vinted_sale_overrides:OV_COMPLET, vrm_compta:COMPTA } });
+        await publierBenefice(pg);
+        await aller(pg,'journee','[data-journee-benef]',2000);
+        await touche(pg,'[data-widgets-modifier]:visible',T); await pg.waitForTimeout(500);
+        dit(await pg.locator('[data-journee-benef-masquer]').count()===1,'en mode « Modifier » : « Masquer le bénéfice » est là');
+        await toucheForce(pg,'[data-journee-benef-masquer]',T); await pg.waitForTimeout(1200);
+        const memo=await pg.evaluate(()=>localStorage.getItem('vrm_journee_benefice'));
+        dit(await pg.locator('[data-journee-benef]').count()===0 && memo==='false','masqué ⇒ plus de carte, choix enregistré (false)',`${memo}`);
+        await touche(pg,'[data-widgets-ajouter]',T); await pg.waitForTimeout(400);
+        dit(await pg.locator('[data-widget-ajout="benefice"]').count()===1,'« + Ajouter » propose « Ton bénéfice »');
+        await touche(pg,'[data-widget-ajout="benefice"]',T); await pg.waitForTimeout(1200);
+        const memo2=await pg.evaluate(()=>localStorage.getItem('vrm_journee_benefice'));
+        dit(await pg.locator('[data-journee-benef]').count()===1 && memo2==='true','remis ⇒ la carte revient, choix enregistré (true)',`${memo2}`);
         dit(errs.length===0,'aucune erreur d’app',errs.join(' | ').slice(0,160));
         await ctx.close();
       });

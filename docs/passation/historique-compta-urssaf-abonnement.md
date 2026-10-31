@@ -1587,3 +1587,40 @@ Le rappel du 30 septembre partait le 1er de chaque mois, sans date ni montant, q
 - ⚠️ **Non mesuré** : ce que fait Vinted après l'heure limite (rien n'est promis) ; l'heure réelle du cron chez Vercel ; la limite eBay garde ses jours
   calendaires (`colisEbay`, domaine eBay — une limite eBay d'aujourd'hui passée n'est pas encore « en retard ») ; le script iOS du widget (il peut lire
   `heureDemain`, rien ne l'y oblige).
+
+### Statistiques détaillées : d'où vient chaque chiffre (31 octobre)
+
+Julien : « beaucoup plus de statistiques… de la vraie data ». Aucune règle nouvelle pour
+une notion existante : les règles de calcul sont PURES dans `src/statsVentes.js`
+(`rythmeVendu`, `quandTuVends`, `margesPar`, `delaisPar`, `stockQuiDort`, `rotationStock`,
+`tauxVenteMois`, `tauxAnnulation`), exécutées par `scripts/audit-stats-ventes.cjs`.
+- **Vendu** (rythme, semaines, jours, heures, panier) : `liveStats.venduLignes`, les lignes
+  de `ventesFaites` publiées par la coque (la population de « Vendu » de Ma journée) ; Ma
+  journée (« Tendances ») passe `vendus.lignes`, la même règle. Bornes à minuit LOCAL
+  (`minuitLocal`, juste au passage à l'heure d'hiver). Une date sans heure (minuit pile)
+  n'est dans aucune heure. Moyenne = 28 jours pleins d'avant, aujourd'hui exclu ; première
+  vente plus récente ⇒ moyenne sur les jours depuis elle, et dite. Lecture ratée d'une
+  plateforme ⇒ nommée, montants « au moins ».
+- **Bénéfice et marge par groupe** : nouveau relevé `vrm_stats_ventes` publié par l'écran
+  Ventes dans le MÊME effet que `vrm_benefice_jours` (mêmes ventes finalisées, hors
+  masquées, mêmes gardes : rien si un compte, Leboncoin ou eBay n'est pas lu ; prix
+  d'achat par `effEntry`/`achatDe`, Leboncoin/eBay par identité via `ventesAutresBenefice`).
+  Rangé sur l'appareil seulement (pas dans `main`). Le titre d'une vente Leboncoin/eBay est
+  relu par SON identifiant (txId, orderId) pour la marque — `ventesAutresBenefice` ne lit
+  toujours aucun titre (`audit-benefice`). Brut = vente − achat sur les seules ventes au
+  prix connu ; un groupe sans prix connu n'a ni brut ni marge (« — »), un frais pas su rend
+  le net `null`. Couverture affichée « sur N ventes avec prix d'achat (sur M) » et « n/N »
+  par ligne. Marque/modèle/taille : `clesVenteStats`, la clé de « Ce qui se vend »
+  (`repartitionsVentes` l'utilise désormais aussi).
+- **Temps de vente** : Vinted seulement, date de mise en ligne de l'annonce reliée par la
+  TRANSACTION (`dateMiseEnLigneMs`) ; republiée après la vente ⇒ hors délai, dans la
+  couverture.
+- **Stock qui dort, rotation, taux de vente** : `vrm_stats_stock` publié par Annonces
+  (`annBase`, `listedAgeDays`, mêmes gardes que `vrm_paires_dorment`). Rotation = annonces
+  en ligne ÷ (ventes Vinted des 30 j ÷ 30), dite « un repère, pas une prévision » ; taux du
+  mois = vendues Vinted du mois ÷ (vendues + en ligne).
+- **Annulations** : commandes Vinted de la coque, `classifyOrderStatus`, comptes exclus
+  écartés.
+- **Non fait, dit ici** : délai d'expédition (aucune date d'envoi fiable par vente),
+  remise prix affiché → prix vendu (le prix affiché d'une annonce vendue n'est pas gardé),
+  rentabilité du boost (la carte « Le boost est-il rentable ? » existe déjà).

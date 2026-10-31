@@ -54,7 +54,8 @@ import {cibleEbay} from "./ebayParcours.js";
 import {centimes,coutsVente,beneficePaire,champsCharges} from "./beneficePaire.js";
 import CoutsVente from "./CoutsVente.jsx";
 import { boostRentable, SEUIL_BOOST } from "./boostRentable.js";
-import { CLE_WIDGETS_JOURNEE, WIDGETS_JOURNEE, NOM_TAILLE, DISPO_JOURNEE_DEFAUT, normaliserDispoJournee, deplacerWidget, retirerWidget, widgetFixe, tailleSuivante, tailleDefautWidget, caseVisible, widgetsAjoutables } from "./journeeWidgets.js";
+import { CLE_WIDGETS_JOURNEE, WIDGETS_JOURNEE, NOM_TAILLE, DISPO_JOURNEE_DEFAUT, normaliserDispoJournee, deplacerWidget, retirerWidget, widgetFixe, tailleSuivante, tailleDefautWidget, caseVisible, widgetsAjoutables, dispoAEnregistrer } from "./journeeWidgets.js";
+import { rythmeVendu, ecartPct, quandTuVends, margesPar, delaisPar, tranchePrix, TRANCHES_PRIX, stockQuiDort, SEUILS_DORT, rotationStock, tauxVenteMois, tauxAnnulation } from "./statsVentes.js";
 import {appelerFavorisDirect} from './favorisTransport.js';
 import React, { useState, useMemo, useEffect, useRef, lazy, Suspense } from "react";
 const Operations = lazy(() => import("./operations/Operations.jsx"));
@@ -1942,9 +1943,10 @@ const SYNC_KEYS = [
   // par l'écran Ventes (`totals`, son propriétaire, §11), CONSOMMÉ par
   // Comptabilité (« Ton bénéfice »). Tableaux compacts, deux années au plus.
   'vrm_benefice_jours',
-  // (20 octobre) Afficher la carte « Ton bénéfice » dans Ma journée : un CHOIX,
-  // éteint par défaut, rattrapé par `onCloudReady` seulement s'il est resté au
-  // défaut (`useBeneficeJournee`).
+  // (20 octobre) Afficher la carte « Ton bénéfice » dans Ma journée : un CHOIX
+  // (31 oct. : absent = montré dès qu'il y a un bénéfice publié ; `false` =
+  // masqué depuis Ma journée), rattrapé par `onCloudReady` seulement s'il est
+  // resté au défaut (`useBeneficeJournee`).
   'vrm_journee_benefice',
   'vrm_annonces_retirees',
   // (26 octobre) Les messages retirés POUR DE BON d'un compte (même famille que
@@ -26543,6 +26545,9 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
       {/* (30 oct.) L'anneau « Répartition du CA par plateforme » redisait « Finalisé par plateforme »
           (mêmes montants, mêmes parts) : une notion, un bloc (§7). */}
       {/* Ce qui se vend : marque, taille, modèle, pays, temps de vente (17 oct.). */}
+      {/* (31 oct.) Rythme, marges par groupe, temps de vente, jours et heures,
+          stock qui dort, rotation, annulations — chacun avec sa couverture. */}
+      <StatsDetaillees liveStats={liveStats} panelOff={panelOff}/>
       <AnalysesStatistiques panelOff={panelOff}/>
 
       {/* Le boost est-il rentable ? (21 oct.) — un repère, n'entre dans aucun total. */}
@@ -35097,10 +35102,12 @@ const repartitionsVentes = ({ ventes, txn, items, dates, ecarte }) => {
     const tx = String(o.transaction_id || '');
     const t = (txn && tx && txn[tx]) || null;
     const it = (t && t.item && items && items[t.item]) || null;
-    ajoute(R.marques, (it && it.brand) || extractBrand(o.title) || '', eur);
-    const taille = String((it && it.size) || extractSize(o.title) || '').replace(/^T(?=\d)/i, '').replace('.', ',').trim();
-    ajoute(R.tailles, taille, eur);
-    ajoute(R.modeles, extractModel(o.title) || '', eur);
+    // (31 oct.) La clé vient de `clesVenteStats` — la même pour les marges de
+    // « Bénéfice et marge » (§11).
+    const cles = clesVenteStats(o.title, it);
+    ajoute(R.marques, cles.marque, eur);
+    ajoute(R.tailles, cles.taille, eur);
+    ajoute(R.modeles, cles.modele, eur);
     if (R.pays && t && t.cc) ajoute(R.pays, t.cc, eur);
     if (it) {
       const enLigne = dateMiseEnLigneMs(it, dates || null);
@@ -35119,6 +35126,249 @@ const repartitionsVentes = ({ ventes, txn, items, dates, ecarte }) => {
   }
   return R;
 };
+// ══════════════════════════════════════════════════════════════════════════════
+// STATISTIQUES DÉTAILLÉES (31 octobre) — Julien : « beaucoup plus de
+// statistiques, de la vraie data ». Les règles sont PURES (src/statsVentes.js,
+// exécutées par scripts/audit-stats-ventes.cjs) ; ici on leur donne ce que les
+// propriétaires ont déjà lu ou publié (§11) :
+//   · le rythme, les semaines, les jours, les heures : `liveStats.venduLignes`
+//     (la coque, `ventesFaites` — la population de « Vendu » de Ma journée) ;
+//   · le bénéfice par groupe : `vrm_stats_ventes` (le relevé de l'écran Ventes,
+//     les ventes et prix d'achat de `vrm_benefice_jours`) ;
+//   · marque, taille, modèle et délai : les clés de « Ce qui se vend »
+//     (`clesVenteStats`, transaction → annonce, sinon le titre de LA vente) ;
+//   · le stock qui dort : `vrm_stats_stock` (l'écran Annonces) ;
+//   · les annulations : les ventes Vinted de la coque (`useVentesCoque`).
+// Chaque chiffre dit sa couverture ; « pas su » s'écrit « — » avec la raison.
+// Aucune couleur d'alerte : une seule teinte d'accent pour les barres (§7).
+const lireReleveVentes = () => { try { const v = load('vrm_stats_ventes', null); return v && Array.isArray(v.l) ? v : null; } catch (_) { return null; } };
+const lireStatsStock = () => { try { const v = load('vrm_stats_stock', null); return v && v.dort && typeof v.dort === 'object' ? v : null; } catch (_) { return null; } };
+// LA clé d'une vente (marque, modèle, taille) — une règle pour « Ce qui se
+// vend » et les marges (§11) : l'annonce reliée par la transaction, sinon le
+// titre de LA vente elle-même (pas un rapprochement entre deux paires, §5).
+const clesVenteStats = (titre, it) => ({
+  marque: (it && it.brand) || extractBrand(titre || '') || '',
+  taille: String((it && it.size) || extractSize(titre || '') || '').replace(/^T(?=\d)/i, '').replace('.', ',').trim(),
+  modele: extractModel(titre || '') || '',
+});
+const eurStat = (v) => v == null ? '—' : fmt(v);
+const pctStat = (v) => v == null ? '—' : `${v > 0 ? '+' : ''}${v} %`;
+const minuitLocalStats = (k = 0) => { const d = new Date(); return new Date(d.getFullYear(), d.getMonth(), d.getDate() + k).getTime(); };
+// Barres verticales, une série (une teinte), survol natif (<title>) sur une
+// cible de toute la hauteur (plus large que la barre).
+function BarresStats({ valeurs, titres, hauteur = 96, attenue = [], data }) {
+  const n = valeurs.length, max = Math.max(1, ...valeurs.map((v) => Number(v) || 0));
+  const W = 100 / n;
+  return (
+    <svg viewBox={`0 0 100 ${hauteur}`} preserveAspectRatio="none" role="img" style={{ width: '100%', height: hauteur, display: 'block' }} {...(data || {})}>
+      <line x1="0" x2="100" y1={hauteur - 0.5} y2={hauteur - 0.5} stroke={C.border} strokeWidth="1" vectorEffect="non-scaling-stroke"/>
+      {valeurs.map((v, i) => {
+        const h = (Number(v) || 0) / max * (hauteur - 4);
+        return (
+          <g key={i}>
+            <rect x={i * W} y={0} width={W} height={hauteur} fill="transparent"><title>{titres ? titres[i] : String(v)}</title></rect>
+            {h > 0 && <rect x={i * W + W * 0.18} y={hauteur - h} width={W * 0.64} height={h} rx="0.8" fill={C.accent} opacity={attenue.includes(i) ? 0.45 : 1} pointerEvents="none"/>}
+          </g>
+        );
+      })}
+    </svg>
+  );
+}
+function LegendeBarres({ libelles }) {
+  return <div style={{ display: 'grid', gridTemplateColumns: `repeat(${libelles.length}, minmax(0,1fr))`, fontSize: 11, color: C.muted, textAlign: 'center', marginTop: 4, fontVariantNumeric: 'tabular-nums' }}>{libelles.map((l, i) => <span key={i} style={{ overflow: 'visible', whiteSpace: 'nowrap' }}>{l}</span>)}</div>;
+}
+function StatsDetaillees({ liveStats, panelOff }) {
+  const sCarte = { padding: 18, background: C.card, border: `1px solid ${C.border}`, borderRadius: 12, boxShadow: C.shadow };
+  const sTitre = { fontSize: 15, fontWeight: 600, color: C.text, letterSpacing: -0.15 };
+  const sLib = { fontSize: 13, color: C.muted, fontWeight: 500 };
+  const sNote = { fontSize: 11, color: C.muted, lineHeight: 1.5 };
+  // Un montant dans une phrase ne se coupe jamais en deux (« 31,07 » / « € »).
+  const mt = (v) => <span style={{ whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{fmt(v)}</span>;
+  const sChiffre = { fontSize: 20, fontWeight: 700, letterSpacing: -0.4, marginTop: 4, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' };
+  const [releve, setReleve] = React.useState(lireReleveVentes);
+  const [stock, setStock] = React.useState(lireStatsStock);
+  React.useEffect(() => {
+    const f = (e) => { const k = e && e.detail && e.detail.k; if (k === 'vrm_stats_ventes') setReleve(lireReleveVentes()); if (k === 'vrm_stats_stock') setStock(lireStatsStock()); };
+    window.addEventListener('vrm:save', f); return () => window.removeEventListener('vrm:save', f);
+  }, []);
+  const [extras, setExtras] = React.useState(undefined);
+  React.useEffect(() => { let mort = false; lireExtrasRepartition().then((x) => { if (!mort) setExtras(x); }).catch(() => { if (!mort) setExtras({ txn: null, items: null, dates: null }); }); return () => { mort = true; }; }, []);
+  const { ventes: ventesCoque } = useVentesCoque();
+  const [axeMarge, setAxeMarge] = React.useState('marque');
+  const [axeDelai, setAxeDelai] = React.useState('marque');
+
+  const vendu = liveStats ? liveStats.venduLignes : undefined;
+  const R = React.useMemo(() => (Array.isArray(vendu) ? rythmeVendu(vendu) : null), [vendu]);
+  const Q = React.useMemo(() => (Array.isArray(vendu) ? quandTuVends(vendu) : null), [vendu]);
+  const manque = (liveStats && liveStats.venduManque) || [];
+  // Le relevé, avec ses clés (marque, modèle, taille) et la date de mise en
+  // ligne de l'annonce reliée par la transaction (Vinted seulement).
+  const lignes = React.useMemo(() => {
+    if (!releve) return null;
+    const x = extras || {};
+    return releve.l.map((r) => {
+      const [plateforme, compte, id, ts, eur, achat, frais, titre] = r;
+      const t = plateforme === 'Vinted' && x.txn && id ? x.txn[String(id)] : null;
+      const it = t && t.item && x.items ? x.items[t.item] : null;
+      return { plateforme, compte, id, ts, eur, achat, frais, ...clesVenteStats(titre, it), enLigne: it ? dateMiseEnLigneMs(it, x.dates || null) : null };
+    });
+  }, [releve, extras]);
+  const AXES_MARGE = { marque: 'Marque', modele: 'Modèle', taille: 'Taille', plateforme: 'Plateforme', compte: 'Compte' };
+  const M = React.useMemo(() => lignes ? margesPar(lignes, (l) => axeMarge === 'compte' ? (l.plateforme === 'Vinted' ? l.compte : l.plateforme) : axeMarge === 'taille' ? (/^\d/.test(l.taille) ? `T${l.taille}` : l.taille) : l[axeMarge]) : null, [lignes, axeMarge]);
+  const AXES_DELAI = { marque: 'Marque', prix: 'Prix', compte: 'Compte' };
+  const Dl = React.useMemo(() => {
+    if (!lignes || extras === undefined) return null;
+    if (!extras || extras.items == null || extras.txn == null) return 'passu';
+    return delaisPar(lignes.filter((l) => l.plateforme === 'Vinted'), (l) => axeDelai === 'prix' ? tranchePrix(l.eur) : axeDelai === 'compte' ? l.compte : l.marque);
+  }, [lignes, extras, axeDelai]);
+  const annul = React.useMemo(() => {
+    if (!Array.isArray(ventesCoque)) return null;
+    const hAcc = new Set((load('vinted_accounts_hidden', []) || []).map(String));
+    return tauxAnnulation(ventesCoque.filter((o) => o && !compteEcarte(o._acc && o._acc.vinted_user_id, hAcc, panelOff || {})).map((o) => classifyOrderStatus(o.status)));
+  }, [ventesCoque, panelOff]);
+  const vint30 = Array.isArray(vendu) ? vendu.filter((l) => l.plateforme === 'Vinted' && l.ts >= minuitLocalStats(-29)).length : null;
+  const vintMois = Array.isArray(vendu) ? (() => { const d = new Date(); const de = new Date(d.getFullYear(), d.getMonth(), 1).getTime(); return vendu.filter((l) => l.plateforme === 'Vinted' && l.ts >= de).length; })() : null;
+  const enLigne = stock ? stock.dort.total : null;
+  const rot = rotationStock(enLigne, vint30), tauxV = tauxVenteMois(vintMois, enLigne);
+  const quand = (at) => at ? new Date(at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' }) : '';
+  const jFmt = (j) => j == null ? '—' : j < 1 ? '< 1 j' : `${Math.round(j)} j`;
+  const pl = (n, s, p) => `${n} ${n > 1 ? (p || s + 's') : s}`;
+  const fig = (lib, val, sous, attr) => (
+    <div style={{ minWidth: 0 }} {...(attr || {})}>
+      <div style={sLib}>{lib}</div>
+      <div className="vrm-display" style={{ ...sChiffre, color: val === '—' ? C.muted : C.text }}>{val}</div>
+      {sous ? <div style={{ ...sNote, marginTop: 2 }}>{sous}</div> : null}
+    </div>
+  );
+  const grille = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(150px, 100%), 1fr))', gap: '14px 18px', marginTop: 12 };
+  const JOURS_C = ['lun', 'mar', 'mer', 'jeu', 'ven', 'sam', 'dim'];
+  const ligneTab = { display: 'grid', gridTemplateColumns: 'minmax(0,1.5fr) repeat(4, minmax(0,1fr))', gap: 8 };
+
+  return (<>
+    {/* ── 1. LE RYTHME ─────────────────────────────────────────────────── */}
+    <section data-stats-carte="rythme" data-stats-rythme={R ? 'lu' : vendu === null ? 'passu' : 'encours'} style={sCarte}>
+      <div style={sTitre}>Ton rythme de vente</div>
+      {!R ? <div style={{ ...sNote, marginTop: 8 }}>{vendu === null ? "Tes ventes n'ont pas pu être lues : le rythme n'est pas calculé." : 'Je lis tes ventes…'}</div> : (<>
+        <div style={grille}>
+          {fig("Aujourd'hui", fmt(R.jour.eur), R.moyenne ? <>{pl(R.jour.n, 'vente')} · moyenne {mt(R.moyenne.eur)}/j{R.moyenne.depuisPremiere ? ` (sur ${R.moyenne.jours} j)` : ''}{ecartPct(R.jour.eur, R.moyenne.eur) != null ? ` · ${pctStat(ecartPct(R.jour.eur, R.moyenne.eur))}` : ''}</> : `${pl(R.jour.n, 'vente')} · pas encore de moyenne`, { 'data-stat-jour': Math.round(R.jour.eur * 100), 'data-stat-moyenne': R.moyenne ? Math.round(R.moyenne.eur * 100) : '' })}
+          {fig('7 derniers jours', fmt(R.j7.eur), <>{pl(R.j7.n, 'vente')} · les 7 d'avant {mt(R.j7av.eur)}{ecartPct(R.j7.eur, R.j7av.eur) != null ? ` · ${pctStat(ecartPct(R.j7.eur, R.j7av.eur))}` : ''}</>, { 'data-stat-j7': Math.round(R.j7.eur * 100), 'data-stat-j7av': Math.round(R.j7av.eur * 100) })}
+          {fig('Panier moyen', eurStat(R.panier30.moyen), R.panier30.n ? `sur ${pl(R.panier30.n, 'vente')} en 30 jours` : 'aucune vente en 30 jours', { 'data-stat-panier': R.panier30.moyen == null ? '' : Math.round(R.panier30.moyen * 100) })}
+          {fig('Ventes par jour', R.panier30.n ? String(Math.round(R.panier30.n / 30 * 10) / 10).replace('.', ',') : '—', 'moyenne des 30 derniers jours')}
+        </div>
+        <div style={{ ...sLib, marginTop: 18 }}>12 dernières semaines</div>
+        <div style={{ marginTop: 8 }}>
+          <BarresStats valeurs={R.semaines.map((s) => s.eur)} attenue={[11]} data={{ 'data-stats-semaines': R.semaines.map((s) => Math.round(s.eur)).join(','), 'aria-label': 'Vendu par semaine, 12 semaines' }}
+            titres={R.semaines.map((s) => `Semaine du ${new Date(s.debut).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })} : ${fmt(s.eur)} · ${pl(s.n, 'vente')}${s.enCours ? ' (en cours)' : ''}`)}/>
+          <LegendeBarres libelles={R.semaines.map((s, i) => i % 3 === 2 ? new Date(s.debut).toLocaleDateString('fr-FR', { day: 'numeric', month: 'numeric' }) : '')}/>
+        </div>
+        <div style={{ ...sNote, marginTop: 10 }}>Vendu, toutes plateformes, au jour de la vente (la règle de « Vendu » dans Ma journée). La dernière barre, plus claire, est la semaine en cours.{manque.length ? ` Sans ${manque.join(', ')} (lecture ratée) : les montants sont « au moins ».` : ''}{liveStats && liveStats.venduSansDate ? ` ${pl(liveStats.venduSansDate, 'vente')} Leboncoin sans date : dans aucune semaine.` : ''}</div>
+      </>)}
+    </section>
+
+    {/* ── 2. BÉNÉFICE ET MARGE PAR GROUPE ──────────────────────────────── */}
+    <section data-stats-carte="marges" data-stats-marges={M ? 'lu' : 'passu'} data-stats-marges-n={M ? M.n : ''} data-stats-marges-ncout={M ? M.nCout : ''} style={sCarte}>
+      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
+        <div style={sTitre}>Bénéfice et marge</div>
+        {M && <span style={{ fontSize: 13, color: C.muted }} data-stats-marges-couverture={`${M.nCout}/${M.n}`}>sur {pl(M.nCout, 'vente')} avec prix d'achat (sur {M.n})</span>}
+      </div>
+      {!M ? <div style={{ ...sNote, marginTop: 8 }}>Le relevé de tes ventes n'est pas encore sur cet appareil : il se calcule quand Ma journée ou Ventes a lu toutes tes ventes (Vinted, Leboncoin, eBay). Ouvre Ventes une fois.</div> : (<>
+        <Segmente label="Bénéfice par" value={axeMarge} onChange={setAxeMarge} options={Object.entries(AXES_MARGE).map(([v, l]) => ({ v, l, data: { 'data-stats-marge-axe': v } }))} style={{ marginTop: 12 }}/>
+        {M.groupes.length === 0 ? <div style={{ ...sNote, marginTop: 10 }}>Aucune vente finalisée à répartir.</div> : (
+          <div role="table" aria-label={`Bénéfice par ${AXES_MARGE[axeMarge].toLowerCase()}`} style={{ marginTop: 12, display: 'flex', flexDirection: 'column' }}>
+            <div role="row" style={{ ...ligneTab, fontSize: 11, color: C.muted, paddingBottom: 6, borderBottom: `1px solid ${C.border}` }}>
+              <span role="columnheader">{AXES_MARGE[axeMarge]}</span><span role="columnheader" style={{ textAlign: 'right' }}>Ventes</span><span role="columnheader" style={{ textAlign: 'right' }}>Brut</span><span role="columnheader" style={{ textAlign: 'right' }}>Marge</span><span role="columnheader" style={{ textAlign: 'right' }}>Par paire</span>
+            </div>
+            {M.groupes.slice(0, 8).map((g) => (
+              <div role="row" key={g.k} data-stats-marge-ligne={g.k} data-n={g.n} data-ncout={g.nCout} data-brut={g.brut == null ? '' : Math.round(g.brut * 100)} data-marge={g.marge == null ? '' : g.marge}
+                style={{ ...ligneTab, fontSize: 13, padding: '8px 0', borderBottom: `1px solid ${C.border}`, fontVariantNumeric: 'tabular-nums', alignItems: 'baseline' }}>
+                <span role="cell" title={g.k} style={{ color: C.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{g.k}</span>
+                <span role="cell" style={{ textAlign: 'right', color: C.muted }}>{g.nCout < g.n ? `${g.nCout}/${g.n}` : g.n}</span>
+                <span role="cell" style={{ textAlign: 'right', color: g.brut == null ? C.muted : C.text, whiteSpace: 'nowrap' }}>{eurStat(g.brut)}</span>
+                <span role="cell" style={{ textAlign: 'right', color: g.marge == null ? C.muted : C.text, whiteSpace: 'nowrap' }}>{g.marge == null ? '—' : `${String(g.marge).replace('.', ',')} %`}</span>
+                <span role="cell" style={{ textAlign: 'right', color: g.parPaire == null ? C.muted : C.text, whiteSpace: 'nowrap' }}>{eurStat(g.parPaire)}</span>
+              </div>
+            ))}
+            {M.groupes.length > 8 && <div style={{ ...sNote, marginTop: 6 }}>+ {pl(M.groupes.length - 8, 'autre')}</div>}
+          </div>
+        )}
+        <div style={{ ...sNote, marginTop: 10 }}>
+          Ventes finalisées, au jour de la vente — les mêmes que « Ton bénéfice » de Comptabilité. Brut = vente − prix d'achat, sur les seules ventes au prix d'achat connu (« 3/5 » : 3 sur 5) ; « — » quand aucun n'est connu. Frais, boosts et charges : dans Comptabilité.{M.sansCle ? ` ${pl(M.sansCle, 'vente')} sans ${AXES_MARGE[axeMarge].toLowerCase()} connu${axeMarge === 'marque' || axeMarge === 'taille' || axeMarge === 'plateforme' ? 'e' : ''}.` : ''}{releve && releve.at ? ` Relevé du ${quand(releve.at)}.` : ''}
+        </div>
+      </>)}
+    </section>
+
+    {/* ── 3. LE TEMPS DE VENTE ─────────────────────────────────────────── */}
+    <section data-stats-carte="delais" data-stats-delais={Dl && Dl !== 'passu' ? 'lu' : Dl === 'passu' ? 'passu' : 'encours'} data-stats-delai-n={Dl && Dl !== 'passu' ? `${Dl.nDelai}/${Dl.n}` : ''} style={sCarte}>
+      <div style={sTitre}>Temps de vente</div>
+      {!Dl ? <div style={{ ...sNote, marginTop: 8 }}>{!releve ? 'Il se calcule avec le relevé de tes ventes (ouvre Ventes une fois).' : 'Je lis les dates de mise en ligne…'}</div>
+        : Dl === 'passu' ? <div style={{ ...sNote, marginTop: 8 }}>Tes annonces n'ont pas pu être lues : le temps de vente n'est pas calculé.</div> : (<>
+        <div style={grille}>
+          {fig('La moitié part en', jFmt(Dl.mediane), `médiane, sur ${pl(Dl.nDelai, 'vente datée', 'ventes datées')} (sur ${Dl.n})`, { 'data-stat-delai-mediane': Dl.mediane == null ? '' : Dl.mediane })}
+          {fig('En moyenne', jFmt(Dl.moyenne), 'de la mise en ligne à la vente')}
+        </div>
+        <Segmente label="Temps de vente par" value={axeDelai} onChange={setAxeDelai} options={Object.entries(AXES_DELAI).map(([v, l]) => ({ v, l, data: { 'data-stats-delai-axe': v } }))} style={{ marginTop: 14 }}/>
+        <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {(axeDelai === 'prix' ? TRANCHES_PRIX.map(([, , k]) => Dl.groupes.find((g) => g.k === k)).filter(Boolean) : Dl.groupes.slice(0, 8)).map((g) => {
+            const maxJ = Math.max(1, ...Dl.groupes.map((x) => x.mediane || 0));
+            return (
+              <div key={g.k} data-stats-delai-ligne={g.k} data-mediane={g.mediane == null ? '' : g.mediane} style={{ display: 'grid', gridTemplateColumns: 'minmax(70px, 34%) 1fr auto', alignItems: 'center', gap: 10 }}>
+                <span style={{ fontSize: 13, color: C.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={g.k}>{g.k}</span>
+                <div style={{ height: 8, background: C.card2 || C.bg, borderRadius: 4, overflow: 'hidden' }}>{g.mediane != null && <div style={{ width: `${Math.max(4, g.mediane / maxJ * 100)}%`, height: '100%', background: C.accent, borderRadius: 4 }}/>}</div>
+                <span style={{ fontSize: 13, color: C.muted, whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums', textAlign: 'right' }}><b style={{ color: g.mediane == null ? C.muted : C.text, fontWeight: 600 }}>{jFmt(g.mediane)}</b> · {g.nDelai}/{g.n}</span>
+              </div>
+            );
+          })}
+        </div>
+        <div style={{ ...sNote, marginTop: 10 }}>Vinted seulement (Leboncoin et eBay ne donnent pas la date de mise en ligne). Médiane par groupe ; « 4/6 » = 4 ventes datées sur 6. Une annonce republiée après la vente n'est pas comptée.</div>
+      </>)}
+    </section>
+
+    {/* ── 4. QUAND TU VENDS ────────────────────────────────────────────── */}
+    {Q && Q.n > 0 && (
+      <section data-stats-carte="quand" data-stats-jours={Q.jours.map((j) => j.n).join(',')} data-stats-heures-n={Q.avecHeure} style={sCarte}>
+        <div style={sTitre}>Quand tu vends</div>
+        <div style={{ ...sLib, marginTop: 12 }}>Par jour de la semaine</div>
+        <div style={{ marginTop: 8 }}>
+          <BarresStats valeurs={Q.jours.map((j) => j.n)} hauteur={72} titres={Q.jours.map((j, i) => `${JOURS_C[i]} : ${pl(j.n, 'vente')} · ${fmt(j.eur)}`)} data={{ 'aria-label': 'Ventes par jour de la semaine' }}/>
+          <LegendeBarres libelles={JOURS_C}/>
+        </div>
+        {Q.avecHeure > 0 && <>
+          <div style={{ ...sLib, marginTop: 16 }}>Par heure</div>
+          <div style={{ marginTop: 8 }}>
+            <BarresStats valeurs={Q.heures.map((h) => h.n)} hauteur={60} titres={Q.heures.map((h) => `${h.h} h : ${pl(h.n, 'vente')}`)} data={{ 'aria-label': 'Ventes par heure' }}/>
+            <LegendeBarres libelles={Q.heures.map((h) => h.h % 6 === 0 ? `${h.h} h` : '')}/>
+          </div>
+        </>}
+        <div style={{ ...sNote, marginTop: 10 }}>Sur {pl(Q.n, 'vente')} des 12 derniers mois, toutes plateformes{Q.sansHeure ? ` · l'heure est connue pour ${Q.avecHeure} sur ${Q.n} (une date sans heure n'est dans aucune heure)` : ''}.</div>
+      </section>
+    )}
+
+    {/* ── 5. LE STOCK ──────────────────────────────────────────────────── */}
+    <section data-stats-carte="dort" data-stats-dort={stock ? 'lu' : 'passu'} style={sCarte}>
+      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
+        <div style={sTitre}>Les paires qui dorment</div>
+        {stock && <span style={{ fontSize: 13, color: C.muted }}>{pl(stock.dort.total, 'annonce')} Vinted en ligne</span>}
+      </div>
+      {!stock ? <div style={{ ...sNote, marginTop: 8 }}>Pas encore calculé sur cet appareil : ouvre Annonces une fois (il faut toutes tes annonces lues, avec leurs dates).</div> : (<>
+        <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column' }}>
+          {SEUILS_DORT.map((s) => { const b = stock.dort.seuils[s] || { n: 0, valeur: 0, nCout: 0, cout: 0 }; return (
+            <div key={s} data-stats-dort-seuil={s} data-n={b.n} data-valeur={Math.round(b.valeur * 100)} style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1.3fr) minmax(0,0.8fr) minmax(0,1.4fr)', gap: 8, padding: '9px 0', borderBottom: `1px solid ${C.border}`, fontSize: 13, fontVariantNumeric: 'tabular-nums', alignItems: 'baseline' }}>
+              <span style={{ color: C.text }}>En ligne depuis {s} j et plus</span>
+              <span style={{ textAlign: 'right', color: C.text, fontWeight: 600 }}>{pl(b.n, 'paire')}</span>
+              <span style={{ textAlign: 'right', color: C.muted }}>{mt(b.valeur)} affichés{b.n ? <> · achat {b.nCout ? <>{b.nCout < b.n ? 'au moins ' : ''}{mt(b.cout)}</> : '—'}{b.nCout < b.n ? ` (${b.nCout}/${b.n})` : ''}</> : null}</span>
+            </div>
+          ); })}
+        </div>
+        <div style={grille}>
+          {fig('Rotation', rot == null ? '—' : `${rot} j`, vint30 ? `au rythme de ${pl(vint30, 'vente')} Vinted en 30 jours — un repère, pas une prévision` : 'aucune vente Vinted en 30 jours', { 'data-stat-rotation': rot == null ? '' : rot })}
+          {fig('Taux de vente du mois', tauxV == null ? '—' : `${tauxV} %`, vintMois != null && enLigne != null ? `${vintMois} vendue${vintMois > 1 ? 's' : ''} ce mois sur ${vintMois + enLigne} (vendues + encore en ligne), Vinted` : 'ventes pas lues', { 'data-stat-taux-vente': tauxV == null ? '' : tauxV })}
+          {fig('Annulations', annul && annul.taux != null ? `${String(annul.taux).replace('.', ',')} %` : '—', annul ? `${annul.annulees} sur ${pl(annul.n, 'commande')} Vinted lue${annul.n > 1 ? 's' : ''}` : 'ventes pas lues', { 'data-stat-annulation': annul && annul.taux != null ? annul.taux : '' })}
+        </div>
+        <div style={{ ...sNote, marginTop: 10 }}>Âge = date de mise en ligne lue sur l'annonce, connue pour {stock.dort.datesConnues} sur {stock.dort.total}{stock.dort.datesConnues < stock.dort.total ? ' — les autres ne sont dans aucune ligne' : ''}. Valeur = prix affichés ; coût = prix d'achat connus seulement. Calculé le {quand(stock.at)}.</div>
+      </>)}
+    </section>
+  </>);
+}
 function AnalysesStatistiques({panelOff}) {
  const [detail,setDetail]=React.useState(false);
  return <section className="vrm-stats-analyses" data-stats-carte="repartitions" style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:10,padding:18}}>
@@ -35280,7 +35530,7 @@ function BoostRentable({ panelOff }) {
     <div data-stats-carte="boost" data-boost-etat="lu" data-boost-assez={R.assez ? 'oui' : 'non'} data-boost-b={R.boostees} data-boost-montant={R.avecMontant} data-boost-nb={R.nonBoostees} data-boost-comp={`${R.comparables.b}/${R.comparables.nb}`} style={sCarte}>
       {titre}
       {/* (30 oct.) Une ligne, en mots ; le détail (montants saisis, ventes pas reliées) derrière ⓘ. */}
-      <div data-boost-couverture="" data-boost-sans-annonce={R.sansAnnonce || 0} data-boost-inconnues={R.inconnues || 0} style={{...sNote,fontSize:11.5,marginTop:6,display:'flex',alignItems:'center',gap:4,flexWrap:'wrap'}}>
+      <div data-boost-couverture="" data-boost-sans-annonce={R.sansAnnonce || 0} data-boost-inconnues={R.inconnues || 0} style={{...sNote,fontSize:11,marginTop:6,display:'flex',alignItems:'center',gap:4,flexWrap:'wrap'}}>
         {s(R.comparables.b, 'boostée')} · {R.comparables.nb} non boostée{R.comparables.nb > 1 ? 's' : ''} comparées (même tranche de prix)
         <Pourquoi label="Détail">{s(R.boostees, 'boostée')} vendue{R.boostees > 1 ? 's' : ''}, dont {R.avecMontant} avec le montant du boost saisi · {R.nonBoostees} non boostée{R.nonBoostees > 1 ? 's' : ''}.{(R.inconnues > 0 || R.sansAnnonce > 0) ? ` Pas comptées : ${[R.inconnues > 0 ? `${R.inconnues} sans information de boost` : '', R.sansAnnonce > 0 ? `${R.sansAnnonce} pas reliée${R.sansAnnonce > 1 ? 's' : ''} à leur annonce` : ''].filter(Boolean).join(', ')}.` : ''}</Pourquoi>
       </div>
@@ -35520,19 +35770,27 @@ function BeneficeCompta({ compta, onNav, onSansDepenses, onAjouterDepense }) {
 }
 // ── TON BÉNÉFICE DANS MA JOURNÉE (20 octobre, Julien : « la possibilité de
 //    mettre le bénéfice dans Ma journée ») ────────────────────────────────────
-// FACULTATIF : `vrm_journee_benefice` (synchronisé, défaut ÉTEINT). Les chiffres
+// (31 oct.) LÀ PAR DÉFAUT, RANGÉ DANS MA JOURNÉE — Julien : « pour cette case je
+// ne pense pas qu'il soit nécessaire de faire un bouton de validation dans les
+// paramètres ». L'interrupteur de Réglages → Affichage est RETIRÉ ; le choix
+// `vrm_journee_benefice` (synchronisé) a trois états : absent = PAR DÉFAUT (la
+// carte se montre dès que le bénéfice est publié, rien sinon — jamais une case
+// vide), `false` = masqué par lui (bouton « Masquer » en mode « Modifier »),
+// `true` = remis par lui (feuille « Ajouter » du mode « Modifier »).
+// (Avant : FACULTATIF, défaut ÉTEINT, allumé dans Réglages.) Les chiffres
 // ne sont PAS recalculés ici (§11) : le mois passe par `useBeneficeCalcul` — le
 // crochet de la carte de Comptabilité, mêmes entrées, même `beneficePeriode` ;
 // aujourd'hui = `beneficeDesJours` sur la même publication (`vrm_benefice_jours`).
 // Pas su ⇒ « — » et la raison ; jamais publié ⇒ « se calcule dans Ventes ».
 // Aucune couleur sur un bénéfice (§7).
 const BENEF_JOURNEE = 'vrm_journee_benefice';
-const lireBenefJournee = () => { try { return load(BENEF_JOURNEE, false) === true; } catch (_) { return false; } };
+// `null` = jamais choisi (le défaut) · `true` · `false`.
+const lireBenefJournee = () => { try { const v = load(BENEF_JOURNEE, null); return v === true ? true : v === false ? false : null; } catch (_) { return null; } };
 const lireComptaSynchro = () => { try { const d = load('vrm_compta', null); return d && typeof d === 'object' ? { ...COMPTA_DEFAUT, ...d } : { ...COMPTA_DEFAUT }; } catch (_) { return { ...COMPTA_DEFAUT }; } };
 function useBeneficeJournee() {
-  const [on, setOn] = React.useState(lireBenefJournee);
+  const [choix, setOn] = React.useState(lireBenefJournee);
   // Rattrapage nuage : seulement s'il est resté au défaut (§5.49).
-  React.useEffect(() => onCloudReady(() => setOn((v) => v === false ? lireBenefJournee() : v)), []);
+  React.useEffect(() => onCloudReady(() => setOn((v) => v === null ? lireBenefJournee() : v)), []);
   React.useEffect(() => {
     const f = (e) => { const d = e && e.detail; if (d && d.k === BENEF_JOURNEE) setOn(d.v != null ? !!d.v : lireBenefJournee()); };
     const g = (e) => { if (e && e.key === BENEF_JOURNEE) setOn(lireBenefJournee()); };
@@ -35544,10 +35802,11 @@ function useBeneficeJournee() {
     // Tout de suite pour les autres lecteurs de la page (`save` attend 500 ms).
     try { window.dispatchEvent(new CustomEvent('vrm:benef-journee', { detail: { k: BENEF_JOURNEE, v: !!v } })); } catch (_) {}
   };
-  return [on, poser];
+  // `on` : montré (tout sauf « masqué par lui ») ; `choix` : les trois états.
+  return [choix !== false, poser, choix];
 }
-function BeneficeJournee({ onNav, place }) {
-  const [on, poser] = useBeneficeJournee();
+function BeneficeJournee({ onNav, place, edition = false }) {
+  const [on, poser, choix] = useBeneficeJournee();
   const [compta, comptaPret] = useLigneSynchro('vrm_compta', lireComptaSynchro);
   const { pub, etat, B } = useBeneficeCalcul(compta, 'mois');
   // (22 oct.) Rien n'a jamais été noté : « net avant tes dépenses », et le choix
@@ -35555,15 +35814,11 @@ function BeneficeJournee({ onNav, place }) {
   const depenses = B ? (comptaPret ? B.depenses : 'passu') : '';
   const sansDepenses = () => repondreSansDepenses(lireComptaSynchro(), (v) => save('vrm_compta', v));
   const ajouterDepense = () => { DEMANDE_DEPENSE.on = true; DEMANDE_DEPENSE.at = Date.now(); if (onNav) onNav('compta'); };
-  if (place === 'lien') {
-    if (on) return null;
-    return (
-      <div style={{ marginTop: 14, textAlign: 'center' }}>
-        <Bouton variante="discret" data-journee-benef-activer="" onClick={() => poser(true)}>+ Afficher mon bénéfice</Bouton>
-      </div>
-    );
-  }
   if (!on) return null;
+  // Par défaut (jamais choisi) : seulement s'il y a un bénéfice à montrer — une
+  // publication ET au moins une vente du mois au prix d'achat connu. Jamais une
+  // case de « — » ou « se calcule ailleurs » qu'il n'a pas demandée.
+  if (choix === null && !(B && B.nCout > 0)) return null;
   const minuit = new Date(); minuit.setHours(0, 0, 0, 0);
   const demain = new Date(minuit); demain.setDate(demain.getDate() + 1);
   const J = pub ? beneficeDesJours(pub.jours, minuit, demain) : null;
@@ -35603,7 +35858,7 @@ function BeneficeJournee({ onNav, place }) {
           {etat === 'encours' ? 'Je lis ton bénéfice…' : <>Il se calcule dans l'écran Ventes : ouvre-le une fois. <Bouton variante="discret" href="?tab=cat_ventes" onClick={(ev) => { ev.preventDefault(); if (onNav) onNav('cat_ventes'); }}>Ventes ›</Bouton></>}
         </div>
       ) : (<>
-        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(0,1fr)', gap: 12, marginTop: 8 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(0,1fr)', gap: 12, marginTop: place === 'integre' ? 2 : 8 }}>
           {chiffre('Brut ce mois', brutDe(B), B.n === 0 ? 'aucune vente finalisée' : '', 'brut')}
           {chiffre(B.depenses === 'jamais' ? 'Net avant tes dépenses' : 'Net ce mois', B.netFinal, raisonNet, 'net')}
         </div>
@@ -35617,32 +35872,26 @@ function BeneficeJournee({ onNav, place }) {
             <Bouton variante="discret" data-journee-benef-porte="" onClick={versSaisiePrix}>Compléter les prix d'achat ›</Bouton>
           </div>
         )}
-        <div className="vrm-day-note" data-journee-benef-ligne="jour" style={{ color: C.muted, marginTop: 10, paddingTop: 10, borderTop: `1px solid ${C.border}`, lineHeight: 1.5 }}>
+        {/* (31 oct.) La ligne du jour n'est dessinée que s'il y a une vente
+            aujourd'hui : vide, elle ajoutait un filet et 20 px sous la carte. */}
+        {J && J.n > 0 && <div className="vrm-day-note" data-journee-benef-ligne="jour" style={{ color: C.muted, marginTop: 10, paddingTop: 10, borderTop: `1px solid ${C.border}`, lineHeight: 1.5 }}>
           {J && J.n > 0
             ? <>Aujourd'hui : <b style={{ color: C.text, fontWeight: 600 }}>{val(brutDe(J))}</b> brut{J.nCout > 0 ? <> · <b style={{ color: C.text, fontWeight: 600 }}>{val(J.net)}</b> net des ventes</> : null}{J.nCout < J.n ? ` (prix d'achat connus pour ${J.nCout} sur ${J.n})` : ''}</>
             : null}
-        </div>
+        </div>}
       </>)}
-      <div style={{ marginTop: 6 }}>
-        <Bouton variante="discret" data-journee-benef-masquer="" onClick={() => poser(false)}>Masquer de Ma journée</Bouton>
-      </div>
+      {/* (31 oct.) « Masquer » vit dans le mode « Modifier », comme le − des
+          widgets ; on le remet par « + Ajouter » (feuille des widgets). */}
+      {edition && (
+        <div style={{ marginTop: 6 }}>
+          <Bouton variante="secondaire" className="vrm-b-petit" data-journee-benef-masquer="" onClick={() => poser(false)}>Masquer le bénéfice</Bouton>
+        </div>
+      )}
     </div>
   );
 }
-// Le même choix, dans Réglages → Affichage (là où vivent les choix de l'écran).
-function BeneficeJourneeSetting() {
-  const [on, poser] = useBeneficeJournee();
-  return (
-    <div className="vrm-set-ligne" data-reglage-benef-journee={on ? 'on' : 'off'}>
-      <IconeReglage name="chart"/>
-      <span className="vrm-set-lib">
-        <b style={{color:C.text}}>Bénéfice dans Ma journée</b>
-        <small className="vrm-aide" style={{color:C.muted}}>Brut et net du mois, et d'aujourd'hui — les mêmes chiffres que Comptabilité.</small>
-      </span>
-      <Interrupteur on={on} label="Bénéfice dans Ma journée" onClick={() => poser(!on)}/>
-    </div>
-  );
-}
+// (31 oct.) Plus d'interrupteur dans Réglages → Affichage (sa décision) : le
+// bénéfice se masque et se remet DANS Ma journée, en mode « Modifier ».
 // ══════════════════════════════════════════════════════════════════════════════
 // MA JOURNÉE EN WIDGETS (21 octobre) — Julien : « organiser le premier onglet
 // comme l'écran d'accueil d'Apple, avec des widgets ».
@@ -35662,8 +35911,11 @@ function useDispositionJournee() {
     return () => window.removeEventListener('storage', g);
   }, []);
   const poser = React.useCallback((liste) => {
-    const n = normaliserDispoJournee({ w: liste }) || [];
-    setV(n); save(CLE_WIDGETS_JOURNEE, { v: 1, w: n });
+    // `connus` : le catalogue d'aujourd'hui — un widget qu'il retire ne revient
+    // pas tout seul ; un widget créé APRÈS ce rangement arrivera (journeeWidgets.js).
+    const e = dispoAEnregistrer(liste);
+    const n = normaliserDispoJournee(e) || [];
+    setV(n); save(CLE_WIDGETS_JOURNEE, { ...e, w: n });
   }, []);
   return [v || DISPO_JOURNEE_DEFAUT, poser, v === null];
 }
@@ -35675,6 +35927,9 @@ const EASE_WIDGET = 'cubic-bezier(0.23,1,0.32,1)';
 // une petite case est là (le même nombre deux fois, §7 ; revue du 22 oct.).
 function FeuilleAjoutWidget({ dispo, onAjout, onDefaut, onClose }) {
   const { ids: libres, retenu } = widgetsAjoutables(dispo);
+  // (31 oct.) Le bénéfice masqué se remet ICI (plus dans Réglages) : il vit dans
+  // la carte « Vendu et reçu », sinon sa propre carte — un choix, pas un widget.
+  const [benefOn, poserBenef] = useBeneficeJournee();
   return createPortal(
     <div data-noswipe data-widgets-feuille="" onClick={onClose} className="vrm-w-voile">
       <FermeAuRetour fermer={onClose}/>
@@ -35687,7 +35942,17 @@ function FeuilleAjoutWidget({ dispo, onAjout, onDefaut, onClose }) {
           <Bouton variante="secondaire" data-widgets-fermer="" onClick={onClose} style={{ flexShrink: 0 }}>Fermer</Bouton>
         </div>
         <div className="vrm-w-feuille-corps">
-          {libres.length === 0 && <div style={{ fontSize: 13, color: C.muted, padding: '6px 2px 12px' }}>Tous les widgets sont déjà sur ta journée.</div>}
+          {libres.length === 0 && benefOn && <div style={{ fontSize: 13, color: C.muted, padding: '6px 2px 12px' }}>Tous les widgets sont déjà sur ta journée.</div>}
+          {!benefOn && (
+            <button type="button" data-widget-ajout="benefice" data-journee-benef-activer="" onClick={() => { poserBenef(true); onClose(); }} className="vrm-w-ajout"
+              style={{ background: C.card, border: `1px solid ${C.border}`, color: C.text }}>
+              <span className="vrm-w-ajout-plus" aria-hidden="true" style={{ color: C.accent }}>+</span>
+              <span style={{ flex: 1, minWidth: 0, textAlign: 'left' }}>
+                <span style={{ display: 'block', fontWeight: 600, fontSize: 14 }}>Ton bénéfice</span>
+                <span style={{ display: 'block', fontSize: 12, color: C.muted, lineHeight: 1.4 }}>Brut et net du mois et d’aujourd’hui, dans « Vendu et reçu » — les chiffres de Comptabilité</span>
+              </span>
+            </button>
+          )}
           {retenu && (
             <div data-widgets-retenu={retenu} style={{ fontSize: 12.5, color: C.muted, lineHeight: 1.45, padding: '0 2px 4px' }}>
               {retenu === 'tuiles'
@@ -35824,7 +36089,7 @@ function GrilleJournee({ dispo, poser, rendus, edition, setEdition, peutModifier
       return;
     }
     if (e.button != null && e.button > 0) return;
-    if (e.target && e.target.closest && e.target.closest('[data-widget-retirer],[data-widget-taille-btn]')) return;
+    if (e.target && e.target.closest && e.target.closest('[data-widget-retirer],[data-widget-taille-btn],[data-journee-benef-masquer]')) return;
     const d = { id, pid: e.pointerId, type: e.pointerType, x0: e.clientX, y0: e.clientY, x: e.clientX, y: e.clientY, actif: false, arme: e.pointerType !== 'touch', tx: 0, ty: 0, gx: 0, gy: 0 };
     if (e.pointerType === 'touch') d.timer = setTimeout(() => { if (drag.current === d) d.arme = true; }, 220);
     drag.current = d;
@@ -41053,6 +41318,31 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     } catch (_) {}
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [annStats, listings, listingDatesLu]);
+  // ── LE STOCK QUI DORT, PAR SEUIL (31 oct.) — Statistiques et Ma journée ──
+  // La MÊME base que la grille (`annBase`) et le même âge (`listedAgeDays`) que
+  // « les paires qui dorment » ci-dessus ; les seuils 30/60/90 j, la valeur
+  // AFFICHÉE et le coût d'achat CONNU (avec sa couverture) par la règle pure
+  // `stockQuiDort` (src/statsVentes.js). Publié sur CET appareil seulement
+  // (`vrm_stats_stock`), et seulement COMPLET (mêmes gardes que ci-dessus).
+  const stockDort = useMemo(() => {
+    try {
+      return stockQuiDort(annBase.map((it) => {
+        const f = numeros[it.id];
+        return { age: listedAgeDays(it), prix: it.price != null && isFinite(Number(it.price)) ? Number(it.price) : null, achat: f ? achatDe(withBuyByNum(f)) : null };
+      }));
+    } catch (_) { return null; }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [annBase, numeros, listingDates, buyByNum]);
+  useEffect(() => {
+    if (!stockDort || !Array.isArray(listings.items) || listings.loading || listings.incomplet !== false || listingDatesLu !== true) return;
+    try {
+      const v = { v: 1, dort: stockDort, at: Date.now() };
+      const avant = load('vrm_stats_stock', null);
+      if (avant && JSON.stringify(avant.dort) === JSON.stringify(stockDort) && Date.now() - (Number(avant.at) || 0) < 6 * 3600000) return;
+      save('vrm_stats_stock', v);
+    } catch (_) {}
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stockDort, listings, listingDatesLu]);
   // ── RENUMÉROTER À LA SUITE ────────────────────────────────────────────────
   // Le numéro sert à retrouver un carton sur l'étagère : avec 116 paires en ligne
   // il ne devrait pas monter à 172. Au fil des ventes, la séquence se troue et
@@ -42806,6 +43096,36 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       for (const k of Object.keys(jours).sort()) charge[k] = jourBeneficeEnTableau(jours[k]);
       const avant = load('vrm_benefice_jours', null);
       if (!(avant && JSON.stringify(avant.jours) === JSON.stringify(charge))) save('vrm_benefice_jours', { v: 2, plateformes: ['Vinted', 'Leboncoin', 'eBay'], jours: charge, at: Date.now() });
+      // (31 oct.) LE RELEVÉ VENTE PAR VENTE, pour les marges par marque, modèle,
+      // taille, plateforme et compte de Statistiques : les MÊMES ventes et le
+      // même prix d'achat que les jours ci-dessus (finalisées, hors masquées,
+      // prix d'achat par `effEntry`/`achatDe`, Leboncoin et eBay par identité
+      // seulement) — Statistiques le CONSOMME, il ne relit aucun prix d'achat
+      // (§11). Rangé sur CET appareil seulement (pas dans `main`, qui est lu
+      // partout) : Ma journée et Ventes le reposent à chaque lecture complète.
+      // Une ligne : [plateforme, compte, tx|id, ts, vente €, achat € | null,
+      // frais € | null, titre].
+      const releve = [];
+      for (const o of sales.items) {
+        if (isHidden(o) || classifyOrderStatus(o.status) !== 'completed') continue;
+        const t = o.date ? Date.parse(o.date) : NaN;
+        if (isNaN(t) || new Date(t).getFullYear() < an0) continue;
+        const e = effEntry(o);
+        const v = montantCommande(o);
+        releve.push(['Vinted', String((o._acc && (o._acc.login || o._acc.vinted_user_id)) || ''), String(o.transaction_id || ''), t, v, achatDe(e), chargesVente(e), String(o.title || '').slice(0, 90)]);
+      }
+      // Le titre d'une vente Leboncoin ou eBay : celui de LA vente, retrouvée par
+      // SON identifiant (transaction, commande) — jamais pour relier une paire,
+      // seulement pour en lire la marque, le modèle et la taille.
+      const titreDe = {};
+      for (const v of ((lbcVentes && lbcVentes.ventes) || [])) if (v && v.txId) titreDe['lbc:' + v.txId] = v.title || '';
+      for (const c of (ebayCmd || [])) if (c && c.orderId) titreDe['ebay:' + c.orderId] = (Array.isArray(c.lineItems) && c.lineItems[0] && c.lineItems[0].title) || '';
+      for (const x of autresBenefice) {
+        if (!isFinite(x.ts) || new Date(x.ts).getFullYear() < an0) continue;
+        releve.push([x.plateforme, '', x.id, x.ts, x.eur, x.achat, x.frais, String(titreDe[x.id] || '').slice(0, 90)]);
+      }
+      const r0 = load('vrm_stats_ventes', null);
+      if (!(r0 && JSON.stringify(r0.l) === JSON.stringify(releve))) save('vrm_stats_ventes', { v: 1, l: releve, at: Date.now() });
     } catch (_) {}
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sales.items, sales.failedUids, numeros, saleOv, buyByNum, hiddenSales, hiddenAccts, autresBenefice]);
@@ -45706,7 +46026,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               </div>
               <span className="vrm-display vrm-day-recu-n" style={{color:C.text}}>{declarables === undefined ? '…' : caAnnee == null ? '—' : `${Math.round(caAnnee).toLocaleString('fr-FR')} €`}</span>
             </div>
-            <BeneficeJournee onNav={onNav} place="integre"/>
+            <BeneficeJournee onNav={onNav} place="integre" edition={editJournee}/>
           </div>
         ) : (jourN>0 || (!baseKO && !premierJour && benefJourneeOn)) ? (<>
           {/* Le jour seul, quand le héros n'est pas là (lecture en cours d'un
@@ -45719,7 +46039,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               <span style={{fontSize:13,color:C.muted}}>{jourN} vente{jourN>1?'s':''}</span>
             </button>
           )}
-          {!baseKO && !premierJour && <BeneficeJournee onNav={onNav} place="carte"/>}
+          {!baseKO && !premierJour && <BeneficeJournee onNav={onNav} place="carte" edition={editJournee}/>}
         </>) : null;
         W.semaine = vuHero ? (()=>{
           const totSem = semaine.filter(j=>!j.futur).reduce((a,j)=>a+j.vendu.eur,0);
@@ -45744,9 +46064,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           </div>
           );
         })() : null;
+        // L'argent en attente : UNE lecture, pour sa carte et pour la tendance
+        // « En attente » (qui ne le redit que si la carte n'est pas là, §7).
+        const escrowJ=(walletEscrow&&walletEscrow.total>0)?walletEscrow:null;
+        const valAttente=escrowJ?escrowJ.total:inRouteSum;
         W.attente = (!baseKO && !premierJour) ? (()=>{
-          const escrow=(walletEscrow&&walletEscrow.total>0)?walletEscrow:null;
-          const val=escrow?escrow.total:inRouteSum;
+          const escrow=escrowJ;
+          const val=valAttente;
           if(loading||val<=0) return null;
           const avecDispo = !!(escrow && escrow.dispo > 0);
           return (
@@ -45836,6 +46160,48 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           </div>
         ) : null;
         W.urssaf = (!loading && urssafJob) ? listeTaches([urssafJob], {}) : null;
+        // (31 oct.) TENDANCES — quatre cases qui ouvrent Statistiques. Le vendu
+        // vient de `vendus` (la règle de « Vendu aujourd'hui »), le calcul de
+        // `rythmeVendu` (src/statsVentes.js) ; les paires qui dorment du même
+        // âge que l'écran Annonces (`stockDort`, seuil `SLEEP_DAYS`). Les
+        // montants déjà écrits ailleurs sur l'écran (vendu du jour) ne sont pas
+        // redits : la case dit l'ÉCART à la moyenne, pas le montant (§7).
+        W.tendances = vuHero ? (()=>{
+          const R = rythmeVendu(vendus.lignes);
+          if (!R) return null;
+          const eJ = R.moyenne ? ecartPct(R.jour.eur, R.moyenne.eur) : null;
+          const e7 = ecartPct(R.j7.eur, R.j7av.eur);
+          const datesOk = listingDatesLu === true && Array.isArray(listings.items) && !listings.error;
+          // Aucune date de mise en ligne connue : « — », jamais « 0 paire ».
+          const dort = datesOk && stockDort && stockDort.datesConnues > 0 ? stockDort.seuils[SLEEP_DAYS] || null : null;
+          const avecAttente = aWidget('attente');
+          const cases = [
+            { id: 'jour', l: "Aujourd'hui", n: eJ == null ? '—' : pctStat(eJ), sous: R.moyenne ? `contre ${fmt(R.moyenne.eur)}/j en moyenne${R.moyenne.depuisPremiere ? ` (${R.moyenne.jours} j)` : ' (28 j)'}` : 'pas encore de moyenne', v: eJ },
+            { id: 'semaine', l: '7 derniers jours', n: e7 == null ? '—' : pctStat(e7), sous: `${fmt(R.j7.eur)} contre ${fmt(R.j7av.eur)} les 7 d'avant`, v: e7 },
+            { id: 'dort', l: `En ligne depuis ${SLEEP_DAYS} j et plus`, n: dort ? String(dort.n) : '—', sous: dort ? `${fmt(dort.valeur)} affichés${stockDort.datesConnues < stockDort.total ? ` · ${stockDort.datesConnues}/${stockDort.total} datées` : ''}` : (listingDatesLu === null || listings.error ? 'dates de mise en ligne pas lues' : datesOk && stockDort ? 'aucune date de mise en ligne connue' : 'je lis tes annonces…'), v: dort ? dort.n : null },
+            avecAttente
+              ? { id: 'panier', l: 'Panier moyen (30 j)', n: eurStat(R.panier30.moyen), sous: R.panier30.n ? `sur ${R.panier30.n} vente${R.panier30.n > 1 ? 's' : ''}` : 'aucune vente en 30 jours', v: R.panier30.moyen }
+              : { id: 'attente', l: 'En attente', n: loading ? '—' : `${escrowJ ? '' : '≈ '}${Math.round(valAttente).toLocaleString('fr-FR')} €`, sous: escrowJ ? 'chez Vinted' : `${inRoute.length} vente${inRoute.length > 1 ? 's' : ''} en cours · estimation`, v: valAttente },
+          ];
+          return (
+            <div className="vrm-day-card vrm-day-tendances" data-widget-tendances="" style={{border:`1px solid ${C.border}`,background:C.card,boxShadow:C.shadow||'none'}}>
+              <div className="vrm-day-head">
+                <span className="vrm-day-k" style={{color:C.muted}}>Tendances</span>
+                <Bouton variante="discret" className="vrm-day-lien" data-tendances-stats="" href="?tab=dashboard" onClick={(ev)=>{ ev.preventDefault(); if (onNav) onNav('dashboard'); }}>Statistiques ›</Bouton>
+              </div>
+              <div className="vrm-tendances-grille">
+                {cases.map((c) => (
+                  <button key={c.id} type="button" className="vrm-tendance" data-tendance={c.id} data-v={c.v == null ? '' : String(c.v)} onClick={()=>onNav&&onNav('dashboard')}
+                    style={{borderColor:C.border,color:C.text}}>
+                    <span className="vrm-tendance-l" style={{color:C.muted}}>{c.l}</span>
+                    <span className="vrm-display vrm-tendance-n" style={{color:c.n === '—' ? C.muted : C.text}}>{c.n}</span>
+                    <span className="vrm-tendance-sous" style={{color:C.muted}}>{c.sous}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          );
+        })() : null;
         for (const x of T) {
           const n = x.t ? x.t.n : 0, vif = !x.pasSu && n > 0;
           W[x.id] = (!baseKO && !premierJour) ? (
@@ -45931,8 +46297,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             {/* Le bénéfice vit dans « Vendu et reçu » ; si cette carte n'est pas
                 sur l'écran (retirée), il garde sa propre carte ici : allumé dans
                 Réglages ⇒ toujours visible (un seul propriétaire, §11). */}
-            {!baseKO && !premierJour && !aWidget('vendu') && <BeneficeJournee onNav={onNav} place="carte"/>}
-            {!baseKO && !premierJour && <BeneficeJournee onNav={onNav} place="lien"/>}
+            {!baseKO && !premierJour && !aWidget('vendu') && <BeneficeJournee onNav={onNav} place="carte" edition={editJournee}/>}
             {/* (29 oct.) Le contrôle « vendus ailleurs » passe SOUS la journée : au-dessus du
                 bonjour il repoussait les compteurs du jour. Les vraies doubles ventes
                 restent en tête (alertes qui coûtent de l'argent).
@@ -55050,7 +55415,6 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
     { id:'affichage', titre:'Affichage', items:[
       { id:'sombre', type:'switch', ic:'moon', lib:'Mode sombre', on:!!dark, onClick:toggleDark, data:{ 'data-reglage-sombre': dark ? 'on' : 'off' } },
       { id:'stream', type:'el', el:<StreamSetting key="stream"/> },
-      { id:'benefjournee', type:'el', el:<BeneficeJourneeSetting key="benefjournee"/> },
       { id:'zoom', type:'panneau', nu:true, ic:'grid', lib:"Taille de l'affichage", val:valZoom, el:<ZoomSetting nu/> },
       urlWidget && { id:'widget', type:'panneau', nu:true, ic:'chart', lib:'Widget iPhone', desc:'Ton lien privé pour Scriptable', el:widget },
     ]},
@@ -59675,7 +60039,7 @@ function AppCoeur() {
   //    Et un total PARTIEL (un compte, Leboncoin ou eBay illisibles) NOMME ce
   //    qui manque (`venduManque`) — jamais présenté comme complet (§5).
   const VENDU_PAS_SU = { caJour: null, ventesJour: null, caMois: null, ventesMois: null, caParMois: null, ventesParMois: null,
-    caEncaisse: null, caFinaliseParJour: null, enCours: null, soldTotal: null, joursVente: null, caParCompte: null, venduPasSu: true };
+    caEncaisse: null, caFinaliseParJour: null, enCours: null, soldTotal: null, joursVente: null, caParCompte: null, venduLignes: null, venduPasSu: true };
   const liveStatsVus = useMemo(() => {
     if (!liveStats) return liveStats;
     if (ventesCoque === null) return { ...liveStats, ...VENDU_PAS_SU };
@@ -59695,6 +60059,10 @@ function AppCoeur() {
       ];
       return { ...liveStats, caJour: r.jour.eur, ventesJour: r.jour.n, caMois: r.mois.eur, ventesMois: r.mois.n,
         caParMois: r.caParMois, ventesParMois: r.ventesParMois, venduSansDate: v.sansDate,
+        // (31 oct.) Les lignes elles-mêmes (plateforme, date, montant), pour le
+        // rythme de Statistiques : la même population que « vendu », jamais une
+        // seconde règle (§11).
+        venduLignes: v.lignes,
         venduManque, venduEnAttente: lbcCoqueLu === undefined || ebayCommandes === undefined };
     } catch (_) { return liveStats; }
   // eslint-disable-next-line react-hooks/exhaustive-deps
