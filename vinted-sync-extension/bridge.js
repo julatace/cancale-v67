@@ -220,10 +220,16 @@
     // Le CDN Vinted n'autorise pas la lecture cross-origin depuis la page :
     // l'extension, elle, en a le droit. Simple relais, aucun appel API Vinted.
     if (d.__vmr === 'photo' && d.reqId) {
-      relayer({ from: 'vmr-bridge', action: 'photo', url: d.url }, (resp, err) => poster({
-        __vmr: 'photo:result', reqId: d.reqId,
-        dataUrl: (!err && resp && resp.ok) ? (resp.dataUrl || resp.data || null) : null,
-      }));
+      // 31 oct. : le POURQUOI part aussi (`statut` numérique, `error`) — un lien
+      // mort (404/410) et un refus passager (429/5xx/0) ne se redemandent pas
+      // pareil. Jamais d'octet ni d'adresse dans `error` (le fond l'écrit court).
+      relayer({ from: 'vmr-bridge', action: 'photo', url: d.url }, (resp, err) => {
+        const ok = !err && resp && resp.ok;
+        const r = { __vmr: 'photo:result', reqId: d.reqId, dataUrl: ok ? (resp.dataUrl || resp.data || null) : null };
+        if (!ok && resp && typeof resp.statut === 'number') r.statut = resp.statut;
+        if (!ok) r.error = err ? String(err.message || err).slice(0, 80) : String((resp && resp.error) || '').slice(0, 80);
+        poster(r);
+      });
       return;
     }
 

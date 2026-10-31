@@ -7099,8 +7099,8 @@ function vmrAuthEtat(timeoutMs = 4000) {
 //    pont (bridge.js) ne relaie que `dataUrl`, jamais l'erreur — un lien mort
 //    (404), un 503 ou un 429 du CDN, une coupure du service worker arrivent ici
 //    IDENTIQUES. La règle le redemande donc plus tard (témoin, recul, réseau).
-//    Distinguer « lien mort » de « passager » demanderait que l'extension
-//    relaie `resp.error` — à faire côté extension, pas ici. `vmrPhoto` garde
+//    ✅ 31 oct. : l'extension ≥ 5.292 relaie le `statut` (404/410 = lien mort,
+//    429/5xx/0 = passager), rendu ici et jugé par `genreRefus`. `vmrPhoto` garde
 //    son contrat (les octets ou `null`) pour le reçu d'achat.
 function vmrPhotoIssue(url, timeoutMs = 8000) {
   return new Promise((resolve) => {
@@ -7112,6 +7112,9 @@ function vmrPhotoIssue(url, timeoutMs = 8000) {
     const onMsg = (e) => {
       if (!(e.source === window && e.data && e.data.__vmr === 'photo:result' && e.data.reqId === reqId)) return;
       if (e.data.dataUrl) { fin({ dataUrl: e.data.dataUrl, issue: 'ok' }); return; }
+      // 31 oct. : un pont VIVANT (≥ 5.292) dit pourquoi — un statut numérique ne
+      // vient jamais d'un pont orphelin (il se tait) : pas de grâce à attendre.
+      if (typeof e.data.statut === 'number') { fin({ dataUrl: null, issue: 'refus', statut: e.data.statut }); return; }
       if (!grace) grace = setTimeout(() => fin({ dataUrl: null, issue: 'refus' }), VMR_GRACE_VIDE_MS);
     };
     window.addEventListener('message', onMsg);

@@ -112,6 +112,26 @@ export const BILAN_URGENT_ECART_MS = 15000;
 // Le recul d'une photo que l'extension a rendue SANS octets, avant qu'un
 // remontage (ou une reprise) la lui redemande : 1, 2, 4, puis 5 min.
 export const reculRefus = (n) => Math.min(TEMOIN_MAX_MS, RELANCE_MONTAGE_MS * Math.pow(2, Math.max(0, (n | 0) - 1)));
+// ⚠️ 31 oct. — LA RAISON DU REFUS, DITE PAR L'EXTENSION (≥ 5.292). Le pont ne
+// relayait que les octets : un lien MORT (404/410 du CDN) et un refus PASSAGER
+// (429, 5xx, coupure du service worker) arrivaient identiques, et le témoin
+// redemandait les liens morts autant que les autres — dans une page mêlée, ils
+// prenaient ses trois places à chaque passage et les photos passagères
+// attendaient. Le statut numérique relayé (`statut`) les sépare :
+//   · 'mort'     (404, 410) : plus redemandé avant RECUL_MORT_MS (30 min), ni par
+//                le témoin, ni par un retour, ni par `online` — le CDN a DIT que
+//                ce lien n'existe pas ; un lien frais arrive avec la capture ;
+//   · 'passager' (429, 5xx, 0 = réseau) : passe AVANT les autres au témoin ;
+//   · ''         (aucun statut : une extension d'avant, ou la route serveur) :
+//                la règle d'avant, inchangée — « pas su, avec recul ».
+export const RECUL_MORT_MS = 30 * 60e3;
+export const genreRefus = (statut) => {
+  if (typeof statut !== 'number' || !isFinite(statut)) return '';
+  if (statut === 404 || statut === 410) return 'mort';
+  if (statut === 0 || statut === 429 || (statut >= 500 && statut < 600)) return 'passager';
+  return '';
+};
+const mortRecent = (e) => e.genre === 'mort' && maintenant() - e.refusAt < RECUL_MORT_MS;
 // « Le réseau est revenu » (seconde sonde) relance tout — au plus une fois par minute.
 export const REPRISE_RESEAU_MIN_MS = 60000;
 
@@ -189,7 +209,7 @@ function entree(url, creer) {
   let e = entrees.get(url);
   if (!e && creer) {
     e = { etat: 'natif', blob: null, refs: 0, visibles: new Set(), abonnes: new Set(), essaisBlob: 0,
-      echecAt: 0, refus: false, refusN: 0, refusAt: 0, delais: 0, rouvert: false, rouvertAt: 0, natifOk: false };
+      echecAt: 0, refus: false, refusN: 0, refusAt: 0, genre: '', delais: 0, rouvert: false, rouvertAt: 0, natifOk: false };
     entrees.set(url, e);
   }
   return e || null;
@@ -398,6 +418,7 @@ export function echecBlob(url) {
 // l'extension est redemandée (à l'écran seulement, 3 à la fois).
 function leverRefusSiMur(e, raison) {
   if (!e.refus) return;
+  if (mortRecent(e)) return;   // le CDN a dit « ce lien n'existe pas » : ni le réseau ni le temps court n'y changent rien
   if (raison === 'online' || raison === 'reseau' || maintenant() - e.refusAt >= reculRefus(e.refusN)) e.refus = false;
 }
 function relancer(e, raison) {
@@ -411,6 +432,7 @@ function relancer(e, raison) {
 // le témoin, le retour de l'extension, une photo refusée qui revient par elle.
 function rouvrir(e) {
   if (!(e.etat === 'ko' || (e.etat === 'attente' && !secourable(e)))) return false;
+  if (mortRecent(e)) return false;
   e.refus = false; e.delais = 0; e.rouvert = true; e.rouvertAt = maintenant(); e.etat = 'attente';
   nRedemandes++;
   return true;
@@ -517,7 +539,8 @@ async function lancerTemoin() {
   // rendait. Si l'une revient, toutes les autres suivent (`rouvrirTout`).
   if (deps.demander && secoursIci() === 'oui') {
     const l2 = [...entrees.values()].filter((x) => x.refs > 0 && x.visibles.size > 0 && (x.etat === 'ko' || (x.etat === 'attente' && !secourable(x))));
-    l2.sort((a, b2) => (a.refusN - b2.refusN) || (a.rouvertAt - b2.rouvertAt));
+    // Les refus PASSAGERS d'abord (ils reviennent), les liens morts récents jamais (`rouvrir`).
+    l2.sort((a, b2) => ((a.genre === 'passager' ? 0 : 1) - (b2.genre === 'passager' ? 0 : 1)) || (a.refusN - b2.refusN) || (a.rouvertAt - b2.rouvertAt));
     let n = 0;
     for (const x of l2) { if (n >= MAX_EN_VOL) break; if (rouvrir(x)) n++; }
     if (n) { toutNotifier(); pomper(); }
@@ -564,7 +587,7 @@ function normaliser(r) {
     if (dataUrl) return { dataUrl, issue: 'ok' };
     // « pas de réponse » ou « pas d'extension » : PAS SU, jamais un refus.
     if (r.issue === 'delai' || r.issue === 'absente') return { dataUrl: null, issue: 'delai' };
-    return { dataUrl: null, issue: 'refus' };
+    return { dataUrl: null, issue: 'refus', genre: genreRefus(r.statut) };
   }
   return { dataUrl: null, issue: 'refus' };
 }
@@ -594,12 +617,14 @@ function lancer(url) {
         // Une photo REDEMANDÉE (refusée, ou restée sans réponse) revient : l'extension
         // sait de nouveau faire — toutes les autres lui sont redemandées.
         const revenue = cur.refusN > 0 || cur.rouvert;
-        cur.etat = 'ok'; cur.refusN = 0; cur.rouvert = false; vus.secoursOk.add(k); vus.secoursKo.delete(k);
+        cur.etat = 'ok'; cur.refusN = 0; cur.genre = ''; cur.rouvert = false; vus.secoursOk.add(k); vus.secoursKo.delete(k);
         if (revenue) { vus.retours.add(k); rouvrirTout(true); planifierBilan(true); }
       } else {
-        // Réponse SANS octets : le pont ne dit pas pourquoi (lien mort, 503, coupure).
+        // Réponse SANS octets. Une extension ≥ 5.292 dit pourquoi (`statut` : lien
+        // mort, 503, coupure — `genre`) ; une plus ancienne ne le dit pas.
         // « Perdue » pour l'instant, JAMAIS définitive — redemandée plus tard.
         cur.etat = 'ko'; cur.refus = true; cur.refusN++; cur.refusAt = cur.echecAt = maintenant(); cur.rouvert = false;
+        cur.genre = r.genre || '';
         if (!vus.secoursOk.has(k)) vus.secoursKo.add(k);
       }
     }

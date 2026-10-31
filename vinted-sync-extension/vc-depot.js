@@ -152,6 +152,7 @@
     reserve: 'détourage réservé — colle ta clé Photoroom dans VRM → Vestiaire',
     plafond: 'plafond Photoroom du mois atteint', compteur: 'compteur Photoroom illisible',
     cache: 'serveur de détourage indisponible', acces: 'accès au détourage pas vérifié',
+    'cle-pas-su': 'ta clé Photoroom n\'a pas pu être lue (la base de VRM n\'a pas répondu) — réessaie dans un instant',
   };
   const raisonDetourageLisible = (r) => RAISONS_DETOURAGE[String(r || '')] || String(r || 'détourage pas fait');
   async function enJpeg(buf) {

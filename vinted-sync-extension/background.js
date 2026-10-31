@@ -11923,7 +11923,9 @@ async function photoBytes(url) {
   try {
     if (!/^https:/i.test(String(url || ''))) return { ok: false };
     const res = await fetch(url);
-    if (!res.ok) return { ok: false, error: `image ${res.status}` };
+    // 31 oct. : le STATUT part avec le refus (relayé par le pont) — l'app ne
+    // redemande plus un lien MORT (404/410) comme un refus passager (429/5xx).
+    if (!res.ok) return { ok: false, error: `image ${res.status}`, statut: res.status };
     const buf = await res.arrayBuffer();
     if (!buf.byteLength || buf.byteLength > 12000000) return { ok: false, error: 'image trop lourde' };
     const bytes = new Uint8Array(buf);
@@ -11931,7 +11933,7 @@ async function photoBytes(url) {
     for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
     const mime = res.headers.get('content-type') || 'image/jpeg';
     return { ok: true, dataUrl: `data:${mime};base64,${btoa(bin)}` };
-  } catch (e) { return { ok: false, error: String(e).slice(0, 60) }; }
+  } catch (e) { return { ok: false, error: String(e).slice(0, 60), statut: 0 }; }  // 0 = réseau (passager)
 }
 
 // ── GÉNÉRER LE BORDEREAU, À TA PLACE ────────────────────────────────────────
@@ -16534,7 +16536,10 @@ const PHOTO_VINTED_CDN = /^https:\/\/images\d*\.vinted\.net\/t\//;
 const DETOURAGE_MAX_B64 = 3000000;     // même borne que le serveur (api/_lib/detourage.js)
 const DETOURAGE_BUDGET_MS = 45000;
 // Une raison qui vaut pour TOUTES les photos suivantes : inutile d'insister.
-const DETOURAGE_ARRET = { session: 1, abonnement: 1, reserve: 1, 'no-key': 1, plafond: 1, compteur: 1, cache: 1, acces: 1 };
+// 31 oct. : `cle-pas-su` (503, la clé Photoroom du vendeur n'a pas pu être LUE —
+// la base a hoqueté) vaut aussi pour toute la série : chaque photo repartait
+// demander une clé que le serveur ne sait pas lire, 6 appels pour 6 photos.
+const DETOURAGE_ARRET = { session: 1, abonnement: 1, reserve: 1, 'no-key': 1, 'cle-pas-su': 1, plafond: 1, compteur: 1, cache: 1, acces: 1 };
 
 async function empreinteB64(b64) {
   const bin = atob(b64);
