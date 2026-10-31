@@ -145,15 +145,30 @@ export function limiteRetraitDepuisTexte(texte, recuLe) {
 // une rue qui commence par son numéro, un code postal suivi de la ville. Sinon
 // rien — c'est le texte de l'e-mail, jamais une déduction.
 const PAS_UN_NOM = /\b(?:mondial\s*relay|chronopost|vinted|pickup\s+services?|exp[ée]diteur|destinataire|avec\s+\d+|points?\s+de\s+proximit|prière|ne\s+pas\s+r[ée]pondre|code|retrait|jusqu)/i;
-export function lieuDepuisExtrait(extrait) {
-  const parts = decoderEntitesHtml(extrait || '').split('|').map((x) => x.replace(/[*_]+/g, ' ').replace(/®|™|©/g, ' ').replace(/\s+/g, ' ').trim()).filter(Boolean);
-  if (parts.length < 3) return null;
-  const [nom, rue, ville] = parts;
+// (1er nov.) TOUS les triplets « NOM | rue | CP Ville » de l'extrait sont lus,
+// plus seulement le premier : quand une autre ligne à code postal le précède
+// (le pied d'un e-mail, une ligne d'agence), le point relais qui suivait était
+// perdu et le colis restait « point pas connu ». Deux points DIFFÉRENTS dans le
+// même extrait (le relais et l'adresse de quelqu'un, par exemple) ⇒ rien :
+// on ne choisit pas.
+const tripletLieu = (nom, rue, ville) => {
   if (!nom || nom.length < 2 || nom.length > 60 || /\d{5}/.test(nom) || PAS_UN_NOM.test(nom)) return null;
   if (nom.replace(/[^a-zà-ÿ]/gi, '').length < 3) return null;
   if (!/^\d{1,4}(?:\s*(?:bis|ter))?[\s,]+[A-Za-zÀ-ÿ]/.test(rue) || rue.length > 80 || /\d{5}/.test(rue)) return null;
   if (!/^\d{5}\s+[A-Za-zÀ-ÿ'’\- ]{2,40}$/.test(ville)) return null;
   return `${nom}, ${rue}, ${ville}`;
+};
+export function lieuDepuisExtrait(extrait) {
+  const parts = decoderEntitesHtml(extrait || '').split('|').map((x) => x.replace(/[*_]+/g, ' ').replace(/®|™|©/g, ' ').replace(/\s+/g, ' ').trim()).filter(Boolean);
+  if (parts.length < 3) return null;
+  const vus = new Map();
+  for (let k = 2; k < parts.length; k++) {
+    const l = tripletLieu(parts[k - 2], parts[k - 1], parts[k]);
+    if (!l) continue;
+    const cle = l.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '');
+    if (!vus.has(cle)) vus.set(cle, l);   // le même point écrit deux fois : la 1re écriture
+  }
+  return vus.size === 1 ? [...vus.values()][0] : null;
 }
 
 // Un « lieu » qui annonce le FUTUR (« … sera disponible dans les prochains jours

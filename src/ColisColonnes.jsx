@@ -29,32 +29,48 @@ function Carte({ x, colonne, Photo, onOuvrir }) {
     : <div className="vrm-cc-carte" {...attrs}>{corps}</div>;
 }
 
-function Colonne({ col, Photo, onOuvrir, note, pied }) {
+// (1er nov.) `col.n` : ce que la règle de l'app COMPTE (une carte `horsCompte`
+// — un colis « à vérifier » — reste visible sans gonfler le nombre ; il est dit
+// à côté, « + N à vérifier »). `corps` : une colonne peut ranger ses cartes
+// elle-même (« À retirer » par point relais) — les mêmes cartes, rien de caché.
+function Colonne({ col, Photo, onOuvrir, note, pied, corps }) {
   const [tout, setTout] = React.useState(false);
-  const n = col.cartes.length;
+  const nCartes = col.cartes.length;
+  const n = Number.isFinite(col.n) ? col.n : nCartes;
+  const hors = nCartes - n;
   const montrees = tout ? col.cartes : col.cartes.slice(0, PLAFOND);
-  const reste = n - montrees.length;
+  const reste = nCartes - montrees.length;
   return (
-    <section className="vrm-cc-col" data-cc-colonne={col.cle} data-cc-n={n} aria-label={`${col.titre} : ${n}`}>
+    <section className="vrm-cc-col" data-cc-colonne={col.cle} data-cc-n={n} data-cc-cartes={nCartes} data-cc-hors={hors} aria-label={`${col.titre} : ${n}${hors ? `, et ${hors} à vérifier` : ''}`}>
       <header className="vrm-cc-tete">
         <h2>{col.titre}</h2>
-        <span className="vrm-cc-compte">{n}</span>
+        <span className="vrm-cc-compte-bloc">
+          {hors ? <span className="vrm-cc-hors" data-cc-hors-txt="">+ {hors} à vérifier</span> : null}
+          <span className="vrm-cc-compte">{n}</span>
+        </span>
       </header>
       {note ? <p className="vrm-cc-note" data-cc-note={col.cle}>{note}</p> : null}
-      <div className="vrm-cc-liste">
-        {montrees.map((x) => <Carte key={x.cle} x={x} colonne={col.cle} Photo={Photo} onOuvrir={onOuvrir}/>)}
-        {!n && !note ? <p className="vrm-cc-vide">Rien pour l'instant.</p> : null}
-        {reste > 0 && <button type="button" className="vrm-cc-plus" data-cc-plus={reste} onClick={() => setTout(true)}>Voir les {reste} autres</button>}
-      </div>
+      {corps ? (
+        <div className="vrm-cc-liste">
+          {nCartes ? corps : null}
+          {!nCartes && !note ? <p className="vrm-cc-vide">Rien pour l'instant.</p> : null}
+        </div>
+      ) : (
+        <div className="vrm-cc-liste">
+          {montrees.map((x) => <Carte key={x.cle} x={x} colonne={col.cle} Photo={Photo} onOuvrir={onOuvrir}/>)}
+          {!nCartes && !note ? <p className="vrm-cc-vide">Rien pour l'instant.</p> : null}
+          {reste > 0 && <button type="button" className="vrm-cc-plus" data-cc-plus={reste} onClick={() => setTout(true)}>Voir les {reste} autres</button>}
+        </div>
+      )}
       {pied ? <div className="vrm-cc-pied">{pied}</div> : null}
     </section>
   );
 }
 
-export default function ColisColonnes({ colonnes, total, Photo, onOuvrir, notes = {}, pieds = {} }) {
+export default function ColisColonnes({ colonnes, total, Photo, onOuvrir, notes = {}, pieds = {}, corps = {} }) {
   return (
     <div className="vrm-cc" data-colis-colonnes={total}>
-      {colonnes.map((col) => <Colonne key={col.cle} col={col} Photo={Photo} onOuvrir={onOuvrir} note={notes[col.cle]} pied={pieds[col.cle]}/>)}
+      {colonnes.map((col) => <Colonne key={col.cle} col={col} Photo={Photo} onOuvrir={onOuvrir} note={notes[col.cle]} pied={pieds[col.cle]} corps={corps[col.cle]}/>)}
     </div>
   );
 }

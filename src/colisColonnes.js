@@ -52,5 +52,10 @@ export function colonnesColis(cartes, site = 'toutes') {
     if (col) par[col].cartes.push(x);
     else par.attente.cartes.push({ ...x, aVerifier: true, etat: x.etat || 'à vérifier' });
   }
+  // (1er nov.) Le COMPTEUR d'une colonne ne compte que ce que la règle de l'app
+  // compte : une carte `horsCompte` (un colis « à vérifier », un achat « en cours
+  // de vérification ») reste VISIBLE dans sa colonne, à part, sans gonfler le
+  // nombre — sinon « À retirer » disait 17 quand Ma journée disait 15.
+  for (const c of colonnes) { c.nHors = c.cartes.filter((x) => x.horsCompte).length; c.n = c.cartes.length - c.nHors; }
   return { colonnes, total, parSite };
 }

@@ -93,6 +93,62 @@ const essaie = async (quoi, fn) => { try { return await fn(); } catch (e) { ko++
     dit(M.repereDepuisBan(ban({ postcode: '35400' }), '35260') === null && M.repereDepuisBan(ban({ score: 0.4 }), '35260') === null && M.repereDepuisBan(ban({ type: 'municipality' }), '35260') === null && M.repereDepuisBan({ features: [] }, '35260') === null, 'un autre code postal, un score faible, une commune, rien ⇒ PAS de repère (listé sans épingle)', '');
   });
 
+  // ── C. (1er nov.) « IL N'Y A PAS TOUS LES POINTS RELAIS » ──────────────────
+  // La colonne « À retirer » de Colis, par point : aucun colis écarté, un même
+  // relais écrit de deux façons regroupé PAR IDENTITÉ (jamais deux relais
+  // différents), le nom propre (pas le type, pas le transporteur, pas la ville),
+  // la position que Vinted donne pour SON point (nom + code postal).
+  await essaie('C. la colonne « À retirer » par point', async () => {
+    const src = fs.readFileSync(appPath, 'utf8').replace(/^export\s+(function|const)/gm, '$1');
+    const noms = ['pointsARetirer', 'nomRelaisPropre', 'repereDepuisPointsVinted', 'decouperAdresse', 'regrouperRelais', 'requetesBan', 'CLE_INCONNU'];
+    const M = vm.runInContext(src + '\n;({' + noms.map((k) => `${k}: typeof ${k} !== 'undefined' ? ${k} : null`).join(',') + '})', vm.createContext({}));
+    dit(!!M.pointsARetirer, 'src/relaisColis.js range la colonne « À retirer » par point (`pointsARetirer`)', '');
+    if (!M.pointsARetirer) return;
+    // Les formes RÉELLES des sources (historique colis-retraits), inventées pour le reste.
+    const colis = [
+      { id: 'e:MR1', nom: "TABA'VAP", adresse: '29 Rue Hoche, 56000 Vannes', transporteur: 'mondialrelay', jours: 3 },                // e-mail Mondial Relay
+      { id: 'v:1', nom: 'Tabavap', adresse: '29 Rue Hoche, 56000 Vannes', jours: null },                                            // conversation (cleanLieu « point relais TABAVAP, TABAVAP… »)
+      { id: 'e:VG1', nom: 'Kusmi Tea', adresse: '13 Rue Saint-Vincent', transporteur: 'vinted', jours: 4 },                        // Vinted Go sans code postal
+      { id: 'v:2', nom: 'Kusmi Tea', adresse: '13 Rue Saint-Vincent, 56000 Vannes' },
+      { id: 'e:VG2', nom: 'Speed Queen - Vannes', adresse: '24 Rue Hoche', transporteur: 'vinted', jours: 1 },                      // consigne « Speed Queen - Vannes »
+      { id: 'v:3', nom: 'Speed Queen', adresse: '24 Rue Hoche, 56000 Vannes' },
+      { id: 'e:CP1', nom: 'Votre Relais Pickup TERRA CBD', adresse: '11 Rue Hoche, 56000 Vannes', transporteur: 'chronopost' },   // phrase Chronopost
+      { id: 'e:CP2', nom: 'TERRA CBD', adresse: '11 RUE HOCHE, 56000 VANNES', transporteur: 'chronopost' },
+      { id: 'e:MR2', nom: 'Cancale', adresse: '40 Rue Du Port, 35260 Cancale', transporteur: 'mondialrelay' },                      // nom = la ville (cleanLieu)
+      { id: 'e:T1', nom: 'TABAC DU PORT', adresse: '35260 CANCALE', transporteur: 'mondialrelay' },                                 // lieu du transporteur sans rue
+      { id: 'e:CP3', nom: 'Chronopost', adresse: '', transporteur: 'chronopost', sansLieu: { raison: 'r', geste: 'g' } },           // « chez Chronopost »
+      { id: 'e:CP4', nom: '', adresse: '', transporteur: 'chronopost', sansLieu: { raison: 'r', geste: 'g' } },                      // aucun lieu
+      { id: 'e:LP1', nom: 'Carrefour City', adresse: '3 Rue de Brest, 35000 Rennes', transporteur: 'colissimo' },                   // même enseigne,
+      { id: 'e:LP2', nom: 'Carrefour City', adresse: '8 Rue Nationale, 29200 Brest', transporteur: 'colissimo' },                   // deux villes
+      { id: 'e:VX', nom: 'Super U', adresse: '1 Route de Rennes', horsCompte: true, aVerifier: true },
+    ];
+    const v = M.pointsARetirer({ colis, attendus: [{ id: 'v:9', nom: 'Tabavap', rue: '29 rue Hoche', cp: '56000', ville: 'Vannes', estimee: '2026-11-03' }],
+      pointsVinted: [{ nom: 'Kusmi Tea', adresse: '13 Rue Saint-Vincent, 56000 Vannes', lat: 47.6571, lon: -2.757 }, { nom: 'Kusmi Tea', adresse: '2 Rue Lafayette, 35000 Rennes', lat: 48.11, lon: -1.68 },
+        { nom: 'Carrefour City', adresse: '9 Rue Inconnue, 75011 Paris', lat: 48.86, lon: 2.37 }, { nom: 'Bar Vide', adresse: '1 Rue X, 56000 Vannes', lat: '', lon: '' }] });
+    const par = Object.fromEntries(v.points.map((p) => [p.cle, p]));
+    const ou = {}; for (const p of v.points) for (const c of p.arrives) ou[c.id] = p.cle;
+    dit(colis.every((c) => ou[c.id]), 'AUCUN colis écarté : chacun est sous un point, ou sous « pas encore connu »', JSON.stringify(colis.filter((c) => !ou[c.id]).map((c) => c.id)));
+    dit(v.nComptes === colis.filter((c) => !c.horsCompte).length && v.nHors === 1, 'le compte = les colis comptés ; le « à vérifier » est à part', `${v.nComptes} · ${v.nHors}`);
+    dit(ou['e:MR1'] === 'tabavap|56000' && ou['v:1'] === 'tabavap|56000' && par['tabavap|56000'].nAttendus === 1, "« TABA'VAP » et « Tabavap », même code postal : UN point (et l'achat en route y est)", JSON.stringify([ou['e:MR1'], ou['v:1']]));
+    dit(ou['e:VG1'] === 'kusmitea|56000' && ou['v:2'] === 'kusmitea|56000', 'Kusmi Tea SANS code postal (Vinted Go) rejoint le seul Kusmi Tea à code postal', JSON.stringify([ou['e:VG1'], ou['v:2']]));
+    dit(ou['e:VG2'] === 'speedqueen|56000', '« Speed Queen - Vannes » (sans code postal) = « Speed Queen » à Vannes', ou['e:VG2']);
+    dit(ou['e:CP1'] === 'terracbd|56000' && ou['e:CP2'] === 'terracbd|56000' && par['terracbd|56000'].nom === 'TERRA CBD', '« Votre Relais Pickup TERRA CBD » : le type n’est pas le nom — un point TERRA CBD', JSON.stringify([ou['e:CP1'], par['terracbd|56000'] && par['terracbd|56000'].nom]));
+    dit(ou['e:MR2'] === 'adr:40rueduport|35260' && par['adr:40rueduport|35260'].nom === '', 'un « nom » qui n’est que la ville n’est pas un nom : le point est désigné par son adresse', JSON.stringify([ou['e:MR2']]));
+    dit(ou['e:CP3'] === M.CLE_INCONNU && ou['e:CP4'] === M.CLE_INCONNU && par[M.CLE_INCONNU].arrives.every((c) => c.sansLieu), 'un transporteur n’est pas un lieu ; sans lieu ⇒ « pas encore connu », avec sa raison', JSON.stringify([ou['e:CP3'], ou['e:CP4']]));
+    dit(ou['e:LP1'] === 'carrefourcity|35000' && ou['e:LP2'] === 'carrefourcity|29200', 'la même enseigne dans deux villes : DEUX points (jamais fusionnés à la ressemblance)', JSON.stringify([ou['e:LP1'], ou['e:LP2']]));
+    dit(ou['e:VX'] === 'superu|' && par['superu|'].nComptes === 0, 'un « à vérifier » reste listé sous son point, sans compter', JSON.stringify(par['superu|'] && [par['superu|'].nArrives, par['superu|'].nComptes]));
+    const kus = par['kusmitea|56000'];
+    dit(!!kus && kus.repere && kus.repere.lat === 47.6571 && !kus.sansCarte, 'Kusmi Tea est placé par la position que Vinted donne pour CE point (même nom, même code postal) — pas l’homonyme de Rennes', JSON.stringify(kus && kus.repere));
+    dit(!par['carrefourcity|35000'].repere && !par['carrefourcity|29200'].repere, 'un « Carrefour City » de la liste Vinted à Paris ne place AUCUN Carrefour City d’ailleurs (le nom seul n’est pas une identité)', '');
+    dit(/rue du point n’a pas été donnée/.test(par['tabacduport|35260'].sansCarte || '') && par['tabacduport|35260'].adresse === '35260 Cancale', 'le lieu du transporteur sans rue : « 35260 Cancale », pas sur la carte, raison dite (plus « 35260 CANCALE, 35260 »)', JSON.stringify([par['tabacduport|35260'].adresse, par['tabacduport|35260'].sansCarte]));
+    dit(par['speedqueen|56000'].urgent && v.points[0].cle === 'speedqueen|56000', 'le point au dernier jour est en tête, marqué urgent', JSON.stringify(v.points.map((p) => p.cle)));
+    const connus = v.points.filter((p) => !p.inconnu);
+    dit(connus.every((p, i) => p.numero === i + 1) && v.points[v.points.length - 1].inconnu && v.points[v.points.length - 1].numero === null, 'les points sont numérotés 1…N (le même numéro sur l’épingle), « pas encore connu » à la fin, sans numéro', JSON.stringify(v.points.map((p) => [p.cle, p.numero])));
+    dit(M.nomRelaisPropre('Consigne Vinted Go') === '' && M.nomRelaisPropre('Point relais TABAVAP') === 'TABAVAP' && M.nomRelaisPropre('Mondial Relay') === '' && M.nomRelaisPropre('Bureau de Poste Cancale') === 'Bureau de Poste Cancale', 'le nom propre : sans le type ni le transporteur ; « Bureau de Poste » garde son nom', '');
+    const rq = M.requetesBan({ rue: '29 Rue Hoche', cp: '56000', ville: 'Vannes' });
+    dit(rq.length === 2 && rq[0].postcode === '56000' && /29 Rue Hoche, 56000 Vannes/.test(rq[0].q) && M.requetesBan({ rue: '', cp: '56000', ville: 'Vannes' }).length === 0, 'la recherche d’adresse : rue + code postal + ville, puis rue + ville ; jamais une ville seule', JSON.stringify(rq));
+  });
+
   console.log(`\n${ok} ✅ · ${ko} ❌`);
   process.exit(ko ? 1 : 0);
 })();

@@ -285,8 +285,10 @@ const feuille = (pg) => pg.locator('div[style*="z-index: 2000"]');
 // un envoi).
 const sousOnglet = async (pg, nom) => {
   if (nom === 'Compte') {
-    await pg.evaluate(() => window.dispatchEvent(new CustomEvent('vrm:aller', { detail: 'settings' })));
-    await pg.locator('[data-sous-ouvrir="ebay"]').first().click({ timeout: 8000 });
+    // L'ancien lien « eBay → Compte » : il ouvre le panneau des Paramètres (le seul
+    // geste de ce banc qui recharge, il ne juge rien « pendant » un envoi).
+    await pg.goto(`http://localhost:${PORT}/?tab=plat_ebay&section=compte`, { waitUntil: 'domcontentloaded' });
+    await pg.waitForSelector('[data-sous-ecran="ebay"]:not([hidden]) [data-ebay-compte-section]', { timeout: 15000 });
     await pg.waitForTimeout(900); return;
   }
   const t = nom === 'Annonces' ? 'annonces' : 'ventes';
