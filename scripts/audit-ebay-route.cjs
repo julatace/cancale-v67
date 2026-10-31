@@ -246,6 +246,7 @@ global.fetch = async (url, opts = {}) => {
         if (apres && mode.getitemApres === 'ko') return xml(XML_REFUS);
         if (mode.getitem === 'ko' || (mode.getitemKoPour && mode.getitemKoPour === id)) return xml(XML_REFUS);
         if (mode.getitem === 'reseau') throw new Error('ECONNRESET');
+        if (mode.getitem === 'sansdebut') { const o0 = ouEst(id); return xml(XML_OK(`<Item><ItemID>${id}</ItemID>${o0 && o0.a.sku ? `<SKU>${o0.a.sku}</SKU>` : ''}<Description>x</Description></Item>`)); }
         if (mode.getitem === 'tronque') return xml(XML_OK(`<Item><ItemID>${id}</ItemID><Description>x</Description></Item>`));
         const ou = ouEst(id);
         if (!ou) return xml(XML_OK('<Item><Description>x</Description></Item>'));
@@ -882,7 +883,7 @@ const RA = {};
   //    l'annonce est redemandé à eBay et doit être celui de la paire vendue.
   await essaie('retrait automatique', async () => {
     const fin = (o) => auCompte(o.journal).some((x) => x.appel === 'EndFixedPriceItem');
-    const AUTO = { action: 'retirer', itemId: '110000000001', confirme: true, auto: true, sku: 'VRM-22', titre: 'Adidas Gazelle bleu taille 40' };
+    const AUTO = { action: 'retirer', itemId: '110000000001', confirme: true, auto: true, sku: 'VRM-22', titre: 'Adidas Gazelle bleu taille 40', venduLe: '2026-10-01T10:00:00.000Z' };
     remettre(); remettreBase();
     let o = await app(JWT_J, AUTO);
     dit(o.code === 403 && o.corps.reason === 'auto-eteint' && !fin(o), 'automatique, interrupteur jamais allumé ⇒ 403, rien n\'est envoyé à eBay', `HTTP ${o.code} · ${appels(o.journal)}`);
@@ -908,6 +909,39 @@ const RA = {};
     o = await app(JWT_J, AUTO);
     const jr2 = lignes.find((r) => r.id === 'ebay_retraits_auto' && r.owner === J);
     dit(o.code === 200 && o.corps.journal === false && jr2.data.items.length === 1 && jr2.data.items[0].sku === 'VRM-1', 'journal illisible ⇒ il n\'est PAS réécrit depuis le vide (son historique reste)', JSON.stringify(jr2 && jr2.data));
+    // ── (31 octobre) La date de mise en ligne, relue CHEZ eBay : une annonce
+    //    publiée APRÈS la vente Vinted n'est pas la paire vendue.
+    remettre(); remettreBase(); lignes.push({ owner: J, id: 'main', data: { vrm_ebay_retrait_auto: true } });
+    o = await app(JWT_J, { ...AUTO, venduLe: '' });
+    dit(o.code === 400 && o.corps.reason === 'date-vente' && !fin(o) && !auCompte(o.journal).some((x) => x.appel === 'GetItem'), '[RA-date] automatique sans date de vente ⇒ 400, rien ne part chez eBay', `HTTP ${o.code} · ${appels(o.journal)}`);
+    remettre(); remettreBase(); lignes.push({ owner: J, id: 'main', data: { vrm_ebay_retrait_auto: true } });
+    o = await app(JWT_J, { ...AUTO, venduLe: '2026-09-15T10:00:00.000Z' });
+    dit(o.code === 409 && o.corps.reason === 'ebay-apres-vente' && !fin(o), '[RA-date] annonce eBay mise en ligne (20/09) APRÈS la vente Vinted (15/09) ⇒ 409, rien n\'est retiré', `HTTP ${o.code} · ${appels(o.journal)}`);
+    remettre(); remettreBase(); lignes.push({ owner: J, id: 'main', data: { vrm_ebay_retrait_auto: true } }); mode.getitem = 'sansdebut';
+    o = await app(JWT_J, AUTO);
+    dit(o.code === 503 && o.corps.reason === 'debut-pas-su' && !fin(o), '[RA-date] eBay ne dit pas la date de mise en ligne ⇒ « pas su », rien n\'est retiré', `HTTP ${o.code} · ${appels(o.journal)}`);
+    // ── (31 octobre) Deux retraits automatiques simultanés : le journal garde
+    //    les DEUX lignes (avant : lire-ajouter-réécrire, la seconde effaçait la première).
+    {
+      const f0 = global.fetch;
+      global.fetch = async (url, opts = {}) => { if (/ebay_retraits_auto/.test(decodeURIComponent(String(url)) + String(opts.body || ''))) await new Promise((r) => setTimeout(r, 120)); return f0(url, opts); };
+      const fautesJ = [];
+      try {
+        for (const ecart of [0, 60]) {
+          remettre(); remettreBase();
+          ebay['at-J'].actives[1].sku = 'VRM-23';
+          lignes.push({ owner: J, id: 'main', data: { vrm_ebay_retrait_auto: true } }, { owner: J, id: 'ebay_retraits_auto', data: { items: [{ itemId: '1', sku: 'VRM-1', at: 1 }] } });
+          const [a, c] = await Promise.all([
+            app(JWT_J, AUTO),
+            new Promise((r) => setTimeout(r, ecart)).then(() => app(JWT_J, { ...AUTO, itemId: '110000000002', sku: 'VRM-23' })),
+          ]);
+          const jj = lignes.find((x) => x.owner === J && x.id === 'ebay_retraits_auto');
+          const ids = jj && jj.data && Array.isArray(jj.data.items) ? jj.data.items.map((x) => x.itemId).sort().join(',') : '';
+          if (a.code !== 200 || c.code !== 200 || a.corps.journal !== true || c.corps.journal !== true || ids !== '1,110000000001,110000000002') fautesJ.push(`à ${ecart} ms : ${a.code}/${c.code} journal ${a.corps && a.corps.journal}/${c.corps && c.corps.journal} · ${ids}`);
+        }
+      } finally { global.fetch = f0; }
+      dit(fautesJ.length === 0, '[RA-journal] deux retraits automatiques simultanés : le journal garde les DEUX (et l\'ancien)', fautesJ.join(' ; '));
+    }
     remettre(); remettreBase();
     o = await app(JWT_B, AUTO);
     dit(!fin(o), 'un AUTRE vendeur ne retire rien chez Julien, même en « automatique »', `HTTP ${o.code}`);

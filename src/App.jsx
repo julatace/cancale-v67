@@ -52301,7 +52301,9 @@ function retraitsEbayAutoPermis({ aRetirerEbay, numeros, vendusVinted, toutesLue
     if (!(tEbay < tVente)) { ecarte('ebay-apres-vente'); continue; }
     const tFin = Date.parse(a.fin || '');
     if (Number.isFinite(tFin) && tFin <= maintenant) { ecarte('deja-terminee'); continue; }
-    permis.push(d);
+    // La date de la vente part avec la demande : la route revérifie, sur ce
+    // qu'eBay dit de l'annonce, qu'elle était en ligne AVANT (31 octobre).
+    permis.push({ ...d, venduLe: new Date(tVente).toISOString() });
   }
   return { permis, ecartes };
 }
@@ -52392,7 +52394,7 @@ const retirerEbayAuto = async (liste, continuer) => {
       };
       try {
         const r = await fetch('/api/ebay', { method: 'POST', headers: { 'content-type': 'application/json', ...enTeteSession() },
-          body: JSON.stringify({ action: 'retirer', itemId: id, confirme: true, auto: true, sku: skuEbayDe(d.numero) || a.sku, titre: a.title || '', ...corpsCompteEbay(a._compte) }) });
+          body: JSON.stringify({ action: 'retirer', itemId: id, confirme: true, auto: true, sku: skuEbayDe(d.numero) || a.sku, titre: a.title || '', venduLe: d.venduLe || '', ...corpsCompteEbay(a._compte) }) });
         const code = r && Number.isFinite(r.status) ? r.status : 0;
         const j = await r.json().catch(() => null);
         if (j && j.ok) {
