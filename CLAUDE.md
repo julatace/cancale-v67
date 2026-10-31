@@ -496,11 +496,11 @@ sans la fonction.
 Une ligne par chantier ou décision, le plus récent d'abord. Détail : le fichier
 d'historique du thème (cherche le titre ou la date).
 
-**Extension servie : 5.291.0** (30 oct.). **Production** : https://vrm.center,
+**Extension servie : 5.293.0** (31 oct.). **Production** : https://vrm.center,
 vérifier par `curl https://vrm.center/api/sante`.
 
 ### Gestes encore attendus de Julien
-- Installer l'extension **5.291.0** (remplacer le dossier, puis ⟳ dans CHAQUE Chrome).
+- Installer l'extension **5.293.0** (remplacer le dossier, puis ⟳ dans CHAQUE Chrome).
 - Sur leboncoin.fr, ouvrir « Mes annonces » sur CHACUN de ses comptes Leboncoin.
 - Recoller `scripts/gmail-forwarder.gs` (avec sa clé) dans la boîte qui fait tourner le
   script, puis poser `EMAIL_INBOUND_SECRET` sur Vercel (l'ancien script lit encore la
