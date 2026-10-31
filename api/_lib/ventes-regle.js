@@ -173,7 +173,8 @@ export const ventesFaites = ({ vinted, lbc, ebay, cachee } = {}) => {
     const t = tsCommande(o); if (!t) continue;
     const tx = o.transaction_id != null ? o.transaction_id : o.id;
     if (tx != null && !garde('vinted:' + tx)) continue;
-    lignes.push({ plateforme: 'Vinted', ts: t, eur: montantCommande(o) });
+    // (31 oct.) `compte` : le compte qui a vendu (Statistiques → « Par compte »), le même nom que le relevé des ventes.
+    lignes.push({ plateforme: 'Vinted', ts: t, eur: montantCommande(o), compte: String((o._acc && (o._acc.login || o._acc.vinted_user_id)) || '') });
   }
   for (const v of (lbc || [])) {
     if (!v || v.isSeller !== true || !v.txId || lbcAnnulee(v)) continue;
@@ -181,7 +182,7 @@ export const ventesFaites = ({ vinted, lbc, ebay, cachee } = {}) => {
     if (!isFinite(eur)) continue;
     const t = Date.parse(v.dateVente || '');
     if (!t) { if (garde('lbc:' + v.txId)) sansDate += 1; continue; }
-    if (garde('lbc:' + v.txId)) lignes.push({ plateforme: 'Leboncoin', ts: t, eur });
+    if (garde('lbc:' + v.txId)) lignes.push({ plateforme: 'Leboncoin', ts: t, eur, compte: String(v.account || '') });
   }
   for (const e of (ebay || [])) {
     if (!e || String(e.orderPaymentStatus || '').toUpperCase() !== 'PAID' || !e.orderId) continue;
@@ -189,7 +190,7 @@ export const ventesFaites = ({ vinted, lbc, ebay, cachee } = {}) => {
     const eur = montantRecuEbay(e).eur, t = Date.parse(e.creationDate || '');
     if (eur == null) { if (garde('ebay:' + e.orderId)) ecartees += 1; continue; }
     if (!t) continue;
-    if (garde('ebay:' + e.orderId)) lignes.push({ plateforme: 'eBay', ts: t, eur });
+    if (garde('ebay:' + e.orderId)) lignes.push({ plateforme: 'eBay', ts: t, eur, compte: String(e._pseudo || e._compte || '') });
   }
   return { lignes, sansDate, ecartees };
 };

@@ -56,7 +56,8 @@ import {centimes,coutsVente,beneficePaire,champsCharges} from "./beneficePaire.j
 import CoutsVente from "./CoutsVente.jsx";
 import { boostRentable, SEUIL_BOOST } from "./boostRentable.js";
 import { CLE_WIDGETS_JOURNEE, WIDGETS_JOURNEE, NOM_TAILLE, DISPO_JOURNEE_DEFAUT, normaliserDispoJournee, deplacerWidget, retirerWidget, widgetFixe, tailleSuivante, tailleDefautWidget, caseVisible, widgetsAjoutables, dispoAEnregistrer } from "./journeeWidgets.js";
-import { rythmeVendu, ecartPct, quandTuVends, margesPar, delaisPar, tranchePrix, TRANCHES_PRIX, stockQuiDort, SEUILS_DORT, rotationStock, tauxVenteMois, tauxAnnulation } from "./statsVentes.js";
+import { rythmeVendu, ecartPct, quandTuVends, margesPar, delaisPar, tranchePrix, TRANCHES_PRIX, stockQuiDort, SEUILS_DORT, rotationStock, tauxVenteMois, tauxAnnulation, PERIODES, bornesPeriode, dansBornes, venduPeriode, barresPeriode, ventesPar, plusRapides } from "./statsVentes.js";
+import "./stats-vitrine.css";
 import {appelerFavorisDirect} from './favorisTransport.js';
 import React, { useState, useMemo, useEffect, useRef, lazy, Suspense } from "react";
 const Operations = lazy(() => import("./operations/Operations.jsx"));
@@ -6317,7 +6318,8 @@ const ventesFaites = ({ vinted, lbc, ebay, cachee } = {}) => {
     const t = tsCommande(o); if (!t) continue;
     const tx = o.transaction_id != null ? o.transaction_id : o.id;
     if (tx != null && !garde('vinted:' + tx)) continue;
-    lignes.push({ plateforme: 'Vinted', ts: t, eur: montantCommande(o) });
+    // (31 oct.) `compte` : le compte qui a vendu (Statistiques → « Par compte »), le même nom que le relevé des ventes.
+    lignes.push({ plateforme: 'Vinted', ts: t, eur: montantCommande(o), compte: String((o._acc && (o._acc.login || o._acc.vinted_user_id)) || '') });
   }
   for (const v of (lbc || [])) {
     if (!v || v.isSeller !== true || !v.txId || lbcAnnulee(v)) continue;
@@ -6325,7 +6327,7 @@ const ventesFaites = ({ vinted, lbc, ebay, cachee } = {}) => {
     if (!isFinite(eur)) continue;
     const t = Date.parse(v.dateVente || '');
     if (!t) { if (garde('lbc:' + v.txId)) sansDate += 1; continue; }
-    if (garde('lbc:' + v.txId)) lignes.push({ plateforme: 'Leboncoin', ts: t, eur });
+    if (garde('lbc:' + v.txId)) lignes.push({ plateforme: 'Leboncoin', ts: t, eur, compte: String(v.account || '') });
   }
   for (const e of (ebay || [])) {
     if (!e || String(e.orderPaymentStatus || '').toUpperCase() !== 'PAID' || !e.orderId) continue;
@@ -6333,7 +6335,7 @@ const ventesFaites = ({ vinted, lbc, ebay, cachee } = {}) => {
     const eur = montantRecuEbay(e).eur, t = Date.parse(e.creationDate || '');
     if (eur == null) { if (garde('ebay:' + e.orderId)) ecartees += 1; continue; }
     if (!t) continue;
-    if (garde('ebay:' + e.orderId)) lignes.push({ plateforme: 'eBay', ts: t, eur });
+    if (garde('ebay:' + e.orderId)) lignes.push({ plateforme: 'eBay', ts: t, eur, compte: String(e._pseudo || e._compte || '') });
   }
   return { lignes, sansDate, ecartees };
 };
@@ -25955,6 +25957,8 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
   // lui, Statistiques réécrivait « Du 1er au 30 oct. » là où Ventes et Achats
   // disent « 30 derniers jours » — le même choix, deux écritures (§11).
   const [caLabel,setCaLabel]=useState('');
+  // (31 oct., maquette) La période de la page : Semaine · Mois · Année — une règle (`bornesPeriode`) pour tout le bloc du haut.
+  const [periodeStats,setPeriodeStats]=useState('mois');
 
   const [objectif,setObjectif]=useState(()=>+(load('vrm_ca_objectif',0))||0); // objectif de CA du mois
   const [objEdit,setObjEdit]=useState(false);
@@ -26279,7 +26283,8 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
 
   return (
     <div className="vrm-finance-page vrm-statistiques-premium" style={{padding:16,display:'flex',flexDirection:'column',gap:18}}>
-      <ScreenHead icon="chart" title="Statistiques"/>
+      <ScreenHead icon="chart" title="Statistiques" right={<Segmente label="Période" className="vrm-sv-periode" value={periodeStats} onChange={setPeriodeStats} options={Object.entries(PERIODES).map(([v,l])=>({v,l,data:{'data-sv-choix':v}}))}/>}/>
+      <StatsVitrine liveStats={liveStats} panelOff={panelOff} periode={periodeStats}/>
 
       {/* Stats principales — priorité aux valeurs Vinted en direct (liveStats) :
           Articles en stock = nb de numéros étiquetés au garage · Valeur du stock =
@@ -26369,7 +26374,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
           sont à confirmer) ; la ligne de fraîcheur est la MÊME que celle de
           l'écran Annonces (`FraicheurAnnonces`, §11), et se tait quand tout
           est frais. */}
-      <details className="vrm-finance-stock"><summary>Stock et volume de ventes{liveStats && <> · <span style={{whiteSpace:'nowrap'}} data-dash-stat="online">annonces en ligne <b style={{color:C.text,fontWeight:600,fontVariantNumeric:'tabular-nums'}}>{texteEnLigne(liveStats)}</b></span></>}</summary><div className="vrm-finance-stock-grid">
+      <details className="vrm-finance-stock"><summary>Stock et volume de ventes{/* (31 oct.) le nombre d'annonces en ligne vit dans la tuile « En ligne » du haut (écrit une fois, §7) */}</summary><div className="vrm-finance-stock-grid">
         {/* ⚠️ LE LIBELLÉ ÉTAIT FAUX. « Paires en stock : 0 » s'affichait en gros
             alors qu'il y a 50 annonces en ligne — parce que ce compteur mesure
             les numéros POSÉS AU GARAGE (le garage est vide), ce que seule la
@@ -35265,6 +35270,278 @@ function BarresStats({ valeurs, titres, hauteur = 96, attenue = [], data }) {
 }
 function LegendeBarres({ libelles }) {
   return <div style={{ display: 'grid', gridTemplateColumns: `repeat(${libelles.length}, minmax(0,1fr))`, fontSize: 11, color: C.muted, textAlign: 'center', marginTop: 4, fontVariantNumeric: 'tabular-nums' }}>{libelles.map((l, i) => <span key={i} style={{ overflow: 'visible', whiteSpace: 'nowrap' }}>{l}</span>)}</div>;
+}
+// ══════════════════════════════════════════════════════════════════════════════
+// STATISTIQUES — LA PAGE DE LA MAQUETTE (31 octobre, Julien : « applique ça »,
+// puis « fais exactement cette mise en page »). Une période choisie (Semaine ·
+// Mois · Année, `bornesPeriode`) gouverne TOUT ce bloc : 4 tuiles, « Vendu par
+// semaine », « Ce qui part vite », « Par compte », « Par taille », « Boost
+// rentable ? ». Aucune règle neuve sur l'argent ; chaque chiffre vient de son
+// propriétaire (§11) :
+//   · Vendu, Par compte, les barres : `liveStats.venduLignes` (`ventesFaites`,
+//     la population de « Vendu » de Ma journée) — la somme des comptes = la tuile ;
+//   · Bénéfice : `vrm_benefice_jours` (l'écran Ventes, la règle de « Ton
+//     bénéfice ») — brut des seules ventes au prix d'achat connu, « au moins »
+//     et « N sur M » dès qu'il en manque (§5) ;
+//   · Délai, Ce qui part vite, Par taille : le relevé `vrm_stats_ventes` et la
+//     date de mise en ligne de l'annonce reliée par SA transaction (Vinted) ;
+//   · En ligne : `texteEnLigne` (la coque) et `vrm_stats_stock` (l'écran Annonces) ;
+//   · Boost : `boostRentable` (src/boostRentable.js), ventes de la période.
+// « Pas su » s'écrit « — » avec la raison ; une seule couleur d'accent : la
+// barre en cours et la taille la plus vendue (§7). Banc : stats-vitrine.
+function useReleveStats() {
+  const [releve, setReleve] = React.useState(lireReleveVentes);
+  const [stock, setStock] = React.useState(lireStatsStock);
+  const [benef, setBenef] = React.useState(lireBeneficeJours);
+  React.useEffect(() => {
+    const f = (e) => { const k = e && e.detail && e.detail.k; if (k === 'vrm_stats_ventes') setReleve(lireReleveVentes()); if (k === 'vrm_stats_stock') setStock(lireStatsStock()); if (k === 'vrm_benefice_jours') setBenef(lireBeneficeJours()); };
+    window.addEventListener('vrm:save', f); return () => window.removeEventListener('vrm:save', f);
+  }, []);
+  const [extras, setExtras] = React.useState(undefined);
+  React.useEffect(() => { let mort = false; lireExtrasRepartition().then((x) => { if (!mort) setExtras(x); }).catch(() => { if (!mort) setExtras({ txn: null, items: null, dates: null }); }); return () => { mort = true; }; }, []);
+  const lignes = React.useMemo(() => {
+    if (!releve) return null;
+    const x = extras || {};
+    return releve.l.map((r) => {
+      const [plateforme, compte, id, ts, eur, achat, frais, titre] = r;
+      const t = plateforme === 'Vinted' && x.txn && id ? x.txn[String(id)] : null;
+      const it = t && t.item && x.items ? x.items[t.item] : null;
+      return { plateforme, compte, id, ts, eur, achat, frais, ...clesVenteStats(titre, it), enLigne: it ? dateMiseEnLigneMs(it, x.dates || null) : null };
+    });
+  }, [releve, extras]);
+  return { releve, stock, benef, extras, lignes };
+}
+const SITE_COURT = { Leboncoin: 'Leboncoin', eBay: 'eBay', Vestiaire: 'Vestiaire' };
+// Le titre de la période : « Octobre · comparé à septembre ».
+const titrePeriodeStats = (b) => {
+  const maj = (s) => s.charAt(0).toUpperCase() + s.slice(1);
+  if (b.type === 'semaine') return `Semaine du ${new Date(b.de).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' })} · comparée à la précédente`;
+  if (b.type === 'annee') return `${new Date(b.de).getFullYear()} · comparée à ${new Date(b.prevDe).getFullYear()}`;
+  return `${maj(new Date(b.de).toLocaleDateString('fr-FR', { month: 'long' }))} · comparé à ${new Date(b.prevDe).toLocaleDateString('fr-FR', { month: 'long' })}`;
+};
+function StatsVitrine({ liveStats, panelOff, periode }) {
+  const maintenant = React.useMemo(() => Date.now(), [periode, liveStats]); // eslint-disable-line react-hooks/exhaustive-deps
+  const b = React.useMemo(() => bornesPeriode(periode, maintenant), [periode, maintenant]);
+  const { releve, stock, benef, extras, lignes } = useReleveStats();
+  const { ventes: ventesCoque } = useVentesCoque();
+  const [nuage, setNuage] = React.useState(() => isCloudReady());
+  React.useEffect(() => onCloudReady(() => setNuage(true)), []);
+
+  const vendu = liveStats ? liveStats.venduLignes : undefined;
+  const manque = (liveStats && liveStats.venduManque) || [];
+  const partielVendu = manque.length > 0;
+  const V = React.useMemo(() => venduPeriode(vendu, b), [vendu, b]);
+  const barres = React.useMemo(() => barresPeriode(vendu, b.type, maintenant), [vendu, b, maintenant]);
+  // Bénéfice : les jours publiés compris dans la période (jusqu'à demain minuit).
+  const B = React.useMemo(() => benef ? beneficeDesJours(benef.jours, new Date(b.de), new Date(b.a)) : null, [benef, b]);
+  const dansP = (l) => l && dansBornes(l.ts, b.de, b.a);
+  const lp = React.useMemo(() => (lignes ? lignes.filter(dansP) : null), [lignes, b]); // eslint-disable-line react-hooks/exhaustive-deps
+  const datesPasSu = extras !== undefined && (!extras || extras.items == null || extras.txn == null);
+  const lv = lp && !datesPasSu && extras !== undefined ? lp.filter((l) => l.plateforme === 'Vinted') : null;
+  const Dl = React.useMemo(() => (lv ? delaisPar(lv, () => '') : null), [lv]);
+  const rapides = React.useMemo(() => (lv ? plusRapides(delaisPar(lv, (l) => l.modele), 5) : null), [lv]);
+  const tailles = React.useMemo(() => {
+    if (!lp || extras === undefined) return null;
+    const D = delaisPar(lp, (l) => l.taille);
+    const top = D.groupes.slice().sort((x, y) => y.n - x.n || (x.k < y.k ? -1 : 1)).slice(0, 6);
+    const num = (k) => { const n = parseFloat(String(k).replace(',', '.')); return isFinite(n) ? n : Infinity; };
+    return { n: D.n, sansTaille: D.n - D.groupes.reduce((s, g) => s + g.n, 0), plus: top.length ? top[0].k : null, groupes: top.sort((x, y) => num(x.k) - num(y.k) || (x.k < y.k ? -1 : 1)) };
+  }, [lp, extras, datesPasSu]);
+  // Par compte : les lignes du VENDU de la période (la tuile), compte et site.
+  const comptes = React.useMemo(() => {
+    if (!Array.isArray(vendu)) return null;
+    const P = ventesPar(vendu.filter(dansP), (l) => `${l.plateforme}|${l.compte || ''}`);
+    const dl = lp && lv ? delaisPar(lv, (l) => l.compte) : null;
+    const nbLbc = new Set(P.groupes.filter((g) => g.k.startsWith('Leboncoin|')).map((g) => g.k)).size;
+    return P.groupes.map((g) => {
+      const [plat, compte] = g.k.split('|');
+      const d = plat === 'Vinted' && dl ? dl.groupes.find((x) => x.k === compte) : null;
+      const nom = plat === 'Vinted' ? (compte || 'Vinted') : plat === 'Leboncoin' ? (nbLbc > 1 && compte ? `Leboncoin ${compte.slice(-4)}` : 'Leboncoin') : (compte || plat);
+      return { k: g.k, plat, nom, site: plat === 'Vinted' ? '' : (SITE_COURT[plat] || plat), n: g.n, eur: g.eur, mediane: d ? d.mediane : null, nDelai: d ? d.nDelai : 0 };
+    });
+  }, [vendu, b, lp, lv]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Boost : les ventes Vinted de la période seulement.
+  const boost = React.useMemo(() => {
+    if (!Array.isArray(ventesCoque) || !extras || !nuage) return null;
+    const hAcc = new Set((load('vinted_accounts_hidden', []) || []).map(String));
+    let fiches = null, buyByNum = {};
+    try { fiches = load('vinted_annonce_numeros', {}) || {}; buyByNum = load('vinted_buyprice_by_num', {}) || {}; } catch (_) { fiches = null; }
+    return boostRentable({
+      ventes: ventesCoque.filter((o) => { const t = Date.parse((o && o.date) || ''); return dansBornes(t, b.de, b.a); }),
+      txn: extras.txn, items: extras.items, fiches,
+      estAnnulee: (o) => classifyOrderStatus(o.status) === 'cancelled',
+      ecarte: (o) => compteEcarte(o && o._acc && o._acc.vinted_user_id, hAcc, panelOff || {}),
+      montantVente: montantCommande,
+      dateMiseEnLigne: (it) => dateMiseEnLigneMs(it, extras.dates || null),
+      prixAchat: (f) => prixAchatDe(f, buyByNum),
+    });
+  }, [ventesCoque, extras, nuage, panelOff, b]);
+
+  const pl = (n, s, p) => `${n} ${n > 1 ? (p || s + 's') : s}`;
+  // Un délai s'écrit à la demi-journée près (la médiane de 3 et 10 est 6,5 j, jamais « 7 »).
+  const j10 = (j) => Math.round(j * 10) / 10, jTxt = (j) => String(j10(j)).replace('.', ',');
+  const jours = (j) => (j == null ? '—' : j < 1 ? '< 1 j' : `${jTxt(j)} j`);
+  const joursLong = (j) => (j == null ? '—' : j < 1 ? 'moins d’un jour' : `${jTxt(j)} jour${j10(j) >= 2 ? 's' : ''}`);
+  const cents = (v) => (v == null ? '' : String(Math.round(v * 100)));
+  const nomPrec = b.type === 'semaine' ? 'la semaine d’avant' : b.type === 'annee' ? String(new Date(b.prevDe).getFullYear()) : new Date(b.prevDe).toLocaleDateString('fr-FR', { month: 'long' });
+  const auMemePoint = b.prevCoupe < b.prevA;
+
+  // ── Les 4 tuiles ──
+  const tuile = (k, lib, val, sous, attrs, titre) => (
+    <div className="vrm-sv-tuile" data-sv-tuile={k} title={titre || undefined} {...(attrs || {})}>
+      <div className="vrm-sv-tuile-lib">{lib}</div>
+      <div className="vrm-display vrm-sv-tuile-val" data-vide={val === '—' ? '1' : undefined}>{val}</div>
+      <div className="vrm-sv-tuile-sous">{sous}</div>
+    </div>
+  );
+  const tVendu = V == null
+    ? tuile('vendu', 'Vendu', '—', vendu === null ? 'ventes pas pu être lues' : 'je lis tes ventes…', { 'data-sv-etat': vendu === null ? 'passu' : 'encours' })
+    : tuile('vendu', 'Vendu', `${partielVendu ? 'au moins ' : ''}${fmt(V.eur)}`,
+      <>{pl(V.n, 'vente')}{V.ecart != null && !partielVendu ? <span title={`Comparé à ${nomPrec}${auMemePoint ? ', au même jour' : ''} : ${fmt(V.prec.eur)}`}>{` · ${V.ecart > 0 ? '+' : ''}${V.ecart} %`}</span> : null}{partielVendu ? ` · sans ${manque.join(', ')}` : ''}</>,
+      { 'data-sv-etat': 'lu', 'data-sv-n': V.n, 'data-sv-eur': cents(V.eur), 'data-sv-prec': cents(V.prec.eur), 'data-sv-ecart': V.ecart == null ? '' : V.ecart, 'data-sv-partiel': partielVendu ? '1' : '0' });
+  const tBenef = !B
+    ? tuile('benefice', 'Bénéfice', '—', 'ouvre Ventes une fois : il s’y calcule', { 'data-sv-etat': 'passu' })
+    : B.n === 0
+      ? tuile('benefice', 'Bénéfice', '—', 'aucune vente finalisée', { 'data-sv-etat': 'lu', 'data-sv-n': 0, 'data-sv-ncout': 0, 'data-sv-brut': '' })
+      : B.nCout === 0
+        ? tuile('benefice', 'Bénéfice', '—', `aucun prix d’achat sur ${pl(B.n, 'vente')}`, { 'data-sv-etat': 'lu', 'data-sv-n': B.n, 'data-sv-ncout': 0, 'data-sv-brut': '' })
+        : tuile('benefice', 'Bénéfice', `${B.nCout < B.n ? 'au moins ' : ''}${fmt(B.brut)}`, `${B.nCout} vente${B.nCout > 1 ? 's' : ''} sur ${B.n} avec prix d’achat`,
+          { 'data-sv-etat': 'lu', 'data-sv-n': B.n, 'data-sv-ncout': B.nCout, 'data-sv-brut': cents(B.brut) }, 'Brut : vente − prix d’achat, ventes finalisées, sur les seules ventes au prix d’achat connu.');
+  const tDelai = !releve
+    ? tuile('delai', 'Délai médian', '—', 'ouvre Ventes une fois : il s’y calcule', { 'data-sv-etat': 'passu' })
+    : extras === undefined ? tuile('delai', 'Délai médian', '—', 'je lis tes annonces…', { 'data-sv-etat': 'encours' })
+      : datesPasSu ? tuile('delai', 'Délai médian', '—', 'annonces pas pu être lues', { 'data-sv-etat': 'passu' })
+        : !Dl || Dl.nDelai === 0 ? tuile('delai', 'Délai médian', '—', Dl && Dl.n ? `aucune des ${pl(Dl.n, 'vente')} Vinted n’a de date de mise en ligne` : 'aucune vente Vinted finalisée', { 'data-sv-etat': 'lu', 'data-sv-mediane': '', 'data-sv-couv': Dl ? `0/${Dl.n}` : '0/0' })
+          : tuile('delai', 'Délai médian', joursLong(Dl.mediane), `entre mise en ligne et vente${Dl.nDelai < Dl.n ? ` · sur ${Dl.nDelai} ventes sur ${Dl.n}` : ''}`,
+            { 'data-sv-etat': 'lu', 'data-sv-mediane': Dl.mediane, 'data-sv-couv': `${Dl.nDelai}/${Dl.n}` }, 'Vinted seulement : Leboncoin et eBay ne donnent pas la date de mise en ligne.');
+  const enLigneTxt = texteEnLigne(liveStats);
+  const dort = stock && stock.dort && stock.dort.seuils ? (stock.dort.seuils[30] || { n: 0 }).n : null;
+  const tEnLigne = tuile('enligne', 'En ligne',
+    <span data-dash-stat="online">{enLigneTxt === '—' ? '—' : <><b style={{ fontWeight: 'inherit' }}>{enLigneTxt}</b> annonce{enLigneTxt === '1' ? '' : 's'}</>}</span>,
+    dort == null ? 'qui dorment : ouvre Annonces une fois' : `dont ${dort} qui dor${dort > 1 ? 'ment' : 't'} (30 j et plus)`,
+    { 'data-sv-etat': enLigneTxt === '—' ? 'passu' : 'lu', 'data-sv-dort': dort == null ? '' : dort }, 'Aujourd’hui, quelle que soit la période choisie.');
+
+  // ── Les barres ──
+  const maxB = barres ? Math.max(1, ...barres.map((x) => x.eur)) : 1;
+  const libBarre = (x) => b.type === 'semaine' ? new Date(x.debut).toLocaleDateString('fr-FR', { weekday: 'short' }).replace('.', '')
+    : b.type === 'annee' ? new Date(x.debut).toLocaleDateString('fr-FR', { month: 'short' }).replace('.', '') : `s${x.semaine}`;
+  const titreBarres = b.type === 'semaine' ? 'Vendu par jour' : b.type === 'annee' ? 'Vendu par mois' : 'Vendu par semaine';
+  const noteBarres = b.type === 'semaine' ? 'cette semaine' : b.type === 'annee' ? String(new Date(b.de).getFullYear()) : '8 dernières semaines';
+  const H = 190;
+
+  const carte = (k, titre, droite, corps, attrs, cls) => (
+    <section className={`vrm-sv-carte${cls ? ' ' + cls : ''}`} data-stats-carte={k} {...(attrs || {})}>
+      <div className="vrm-sv-carte-tete"><h2 className="vrm-display vrm-sv-carte-titre">{titre}</h2>{droite ? <span className="vrm-sv-note">{droite}</span> : null}</div>
+      {corps}
+    </section>
+  );
+  const vide = (txt, attrs) => <div className="vrm-sv-vide" {...(attrs || {})}>{txt}</div>;
+  const maxRapide = rapides && rapides.length ? Math.max(...rapides.map((g) => g.mediane), 1) : 1;
+  const maxTaille = tailles && tailles.groupes.length ? Math.max(...tailles.groupes.map((g) => g.n), 1) : 1;
+
+  return (
+    <div className="vrm-stats-vitrine" data-sv-periode={b.type} data-sv-de={b.de} data-sv-a={b.a}>
+      <div className="vrm-sv-sous-titre" data-sv-sous-titre="">{titrePeriodeStats(b)}{auMemePoint ? <span className="vrm-sv-note"> · au même jour</span> : null}</div>
+      <div className="vrm-sv-tuiles">{tVendu}{tBenef}{tDelai}{tEnLigne}</div>
+      <div className="vrm-sv-rangee vrm-sv-rangee-3">
+        {carte('sv-barres', titreBarres, noteBarres, !barres
+          ? vide(vendu === null ? 'Tes ventes n’ont pas pu être lues : aucune barre.' : 'Je lis tes ventes…')
+          : (
+            <div className="vrm-sv-barres" role="img" aria-label={`${titreBarres}, ${noteBarres}`} data-sv-barres={barres.map((x) => cents(x.eur)).join(',')} data-sv-barres-n={barres.map((x) => x.n).join(',')} data-sv-encours={barres.findIndex((x) => x.enCours)}>
+              {barres.map((x, i) => (
+                <div key={i} className="vrm-sv-barre-col" title={`${libBarre(x)} : ${x.avenir ? 'pas encore commencé' : `${fmt(x.eur)} · ${pl(x.n, 'vente')}`}${x.enCours ? ' (en cours)' : ''}`}>
+                  <div className="vrm-sv-barre-zone" style={{ height: H }}>
+                    {!x.avenir && x.eur > 0 && <div className="vrm-sv-barre" data-en-cours={x.enCours ? '1' : undefined} style={{ height: `${Math.max(2, x.eur / maxB * 100)}%` }}/>}
+                  </div>
+                  <div className="vrm-sv-barre-lib">{libBarre(x)}</div>
+                </div>
+              ))}
+            </div>
+          ), { 'data-sv-carte': 'barres' }, 'vrm-sv-large')}
+        {carte('sv-rapides', 'Ce qui part vite', rapides && rapides.length ? 'médiane' : null, !lignes
+          ? vide('Il se calcule avec le relevé de tes ventes : ouvre Ventes une fois.', { 'data-sv-etat': 'passu' })
+          : extras === undefined ? vide('Je lis les dates de mise en ligne…', { 'data-sv-etat': 'encours' })
+            : datesPasSu ? vide('Tes annonces n’ont pas pu être lues : aucun délai.', { 'data-sv-etat': 'passu' })
+              : !rapides.length ? vide('Aucune vente Vinted datée sur la période (il faut la date de mise en ligne de son annonce).', { 'data-sv-etat': 'lu' })
+                : (
+                  <div className="vrm-sv-lignes" data-sv-etat="lu">
+                    {rapides.map((g) => (
+                      <div key={g.k} className="vrm-sv-ligne-rapide" data-sv-rapide={g.k} data-mediane={g.mediane} data-ndelai={g.nDelai} title={`${g.k} : médiane ${jours(g.mediane)}, sur ${pl(g.nDelai, 'vente datée', 'ventes datées')}`}>
+                        <span className="vrm-sv-nom">{g.k.replace(/(^|\s)(\p{Ll})/gu, (m, e, c) => e + c.toUpperCase())}</span>
+                        <span className="vrm-sv-piste"><span style={{ width: `${Math.max(4, (1 - g.mediane / (maxRapide * 1.15)) * 100)}%` }}/></span>
+                        <span className="vrm-sv-chiffre">{jours(g.mediane)}</span>
+                      </div>
+                    ))}
+                  </div>
+                ), { 'data-sv-carte': 'rapides' })}
+        {carte('sv-comptes', 'Par compte', null, !comptes
+          ? vide(vendu === null ? 'Tes ventes n’ont pas pu être lues.' : 'Je lis tes ventes…', { 'data-sv-etat': vendu === null ? 'passu' : 'encours' })
+          : !comptes.length ? vide('Aucune vente sur la période.', { 'data-sv-etat': 'lu' })
+            : (
+              <div className="vrm-sv-lignes vrm-sv-comptes" data-sv-etat="lu">
+                {comptes.slice(0, 6).map((c) => (
+                  <div key={c.k} className="vrm-sv-ligne-compte" data-sv-compte={c.k} data-n={c.n} data-mediane={c.mediane == null ? '' : c.mediane}>
+                    <span className="vrm-sv-nom">{c.nom}{c.site ? <span className="vrm-sv-site"> ({c.site})</span> : null}</span>
+                    <span className="vrm-sv-n">{pl(c.n, 'vente')}</span>
+                    <span className="vrm-sv-chiffre" title={c.plat === 'Vinted' ? (c.mediane == null ? 'aucune vente datée' : `délai médian, sur ${pl(c.nDelai, 'vente datée', 'ventes datées')}`) : 'pas de date de mise en ligne sur cette plateforme'}>{jours(c.mediane)}</span>
+                  </div>
+                ))}
+                {comptes.length > 6 && <div className="vrm-sv-note">+ {pl(comptes.length - 6, 'autre compte', 'autres comptes')}</div>}
+              </div>
+            ), { 'data-sv-carte': 'comptes' })}
+      </div>
+      <div className="vrm-sv-rangee vrm-sv-rangee-2">
+        {carte('sv-tailles', 'Par taille', tailles && tailles.groupes.length ? 'médiane de vente' : null, !lignes
+          ? vide('Il se calcule avec le relevé de tes ventes : ouvre Ventes une fois.', { 'data-sv-etat': 'passu' })
+          : !tailles ? vide('Je lis tes annonces…', { 'data-sv-etat': 'encours' })
+            : !tailles.groupes.length ? vide(tailles.n ? `Aucune taille connue sur ${pl(tailles.n, 'vente finalisée', 'ventes finalisées')}.` : 'Aucune vente finalisée sur la période.', { 'data-sv-etat': 'lu' })
+              : (
+                <div className="vrm-sv-lignes" data-sv-etat="lu" data-sv-plus={tailles.plus}>
+                  {tailles.groupes.map((g) => (
+                    <div key={g.k} className="vrm-sv-ligne-taille" data-sv-taille={g.k} data-n={g.n} data-mediane={g.mediane == null ? '' : g.mediane}>
+                      <span className="vrm-display vrm-sv-taille">{g.k}</span>
+                      <span className="vrm-sv-piste vrm-sv-piste-epaisse"><span data-plus={g.k === tailles.plus ? '1' : undefined} style={{ width: `${Math.max(3, g.n / maxTaille * 100)}%` }}/></span>
+                      <span className="vrm-sv-chiffre">{pl(g.n, 'vente')} · {jours(g.mediane)}</span>
+                    </div>
+                  ))}
+                  {tailles.sansTaille > 0 && <div className="vrm-sv-note">{pl(tailles.sansTaille, 'vente')} sans taille connue.</div>}
+                </div>
+              ), { 'data-sv-carte': 'tailles' })}
+        {(() => {
+          const etat = boost == null ? (Array.isArray(ventesCoque) || ventesCoque === null || (extras && extras.items == null) ? 'passu' : 'encours') : boost.etat !== 'lu' ? 'passu' : boost.boostees === 0 ? 'aucun' : 'lu';
+          const droite = etat === 'lu' ? pl(boost.boostees, 'boost lu', 'boosts lus') : null;
+          const corps = etat === 'encours' ? vide('Je lis tes ventes et tes annonces…')
+            : etat === 'passu' ? vide('Ventes ou annonces pas pu être lues : rien n’est comparé.')
+              : etat === 'aucun' ? vide(`Aucune vente boostée connue sur la période. Vinted ne dit « boostée » que pendant le boost : pour la suite, saisis le boost payé dans la fiche de la paire (Annonces).`)
+                : (<>
+                  <div className="vrm-sv-boost">
+                    <div className="vrm-sv-boost-case" data-sv-boost="cout" data-v={boost.avecMontant ? cents(boost.coutBoost) : ''}>
+                      <div className="vrm-sv-tuile-lib">Coût</div>
+                      <div className="vrm-display vrm-sv-tuile-val">{boost.avecMontant ? `${boost.avecMontant < boost.boostees ? 'au moins ' : ''}${fmt(boost.coutBoost)}` : '—'}</div>
+                    </div>
+                    <div className="vrm-sv-boost-case" data-sv-boost="ventes" data-v={boost.boostees}>
+                      <div className="vrm-sv-tuile-lib">Ventes après</div>
+                      <div className="vrm-display vrm-sv-tuile-val">{boost.boostees}</div>
+                    </div>
+                    <div className="vrm-sv-boost-case" data-sv-boost="delai" data-v={boost.delai.b == null ? '' : `${boost.delai.b}/${boost.delai.nonb}`}>
+                      <div className="vrm-sv-tuile-lib">Vendues en</div>
+                      <div className="vrm-display vrm-sv-tuile-val">{boost.delai.b == null ? '—' : `${jours(boost.delai.b)} vs ${jours(boost.delai.nonb)}`}</div>
+                    </div>
+                  </div>
+                  <div className="vrm-sv-note vrm-sv-boost-note">
+                    {boost.avecMontant < boost.boostees ? `Coût saisi pour ${boost.avecMontant} sur ${boost.boostees}. ` : ''}
+                    {boost.delai.b == null ? `Sur ${pl(boost.boostees, 'boost')} seulement : il faut ${SEUIL_BOOST} ventes boostées et ${SEUIL_BOOST} autres de même tranche de prix pour comparer les délais.` : `Délai médian, boostées contre les autres de même tranche de prix (${boost.delai.nb} et ${boost.delai.nnb} ventes datées).`}
+                  </div>
+                </>);
+          return carte('sv-boost', 'Boost rentable ?', droite, corps, { 'data-sv-carte': 'boost', 'data-sv-etat': etat, 'data-sv-boostees': boost && boost.etat === 'lu' ? boost.boostees : '' });
+        })()}
+      </div>
+      <div className="vrm-sv-note vrm-sv-pied">
+        Vendu : toutes plateformes, au jour de la vente, ventes en cours comprises. Bénéfice, délai, modèles et tailles : ventes finalisées (délai : Vinted seulement).{liveStats && liveStats.venduSansDate ? ` ${pl(liveStats.venduSansDate, 'vente')} Leboncoin sans date : dans aucune période.` : ''}
+      </div>
+      <h2 className="vrm-sv-detail-titre">Tout le détail</h2>
+    </div>
+  );
 }
 function StatsDetaillees({ liveStats, panelOff }) {
   const sCarte = { padding: 18, background: C.card, border: `1px solid ${C.border}`, borderRadius: 12, boxShadow: C.shadow };
