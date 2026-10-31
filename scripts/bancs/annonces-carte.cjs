@@ -49,7 +49,15 @@ const rows = [
   { id: 'main', data: MAIN },
   { id: 'harvest_111_listings', data: { capturedAt: auj.toISOString(), payload: { items: ITEMS } } },
   { id: 'vinted_item_details', data: DETAILS },
-  { id: 'vinted_lbc_posted', data: { ids: ['9102'] } },
+  // (31 oct.) La N°43 (9103) est aussi marquée publiée, mais son annonce Leboncoin
+  // (référence VRM-43) n'est PLUS VUE dans une liste complète de son compte,
+  // postérieure à la marque : la preuve de sortie (`numerosLbcSortis`). La N°42
+  // (9102) n'a aucune annonce Leboncoin captée : rien ne prouve qu'elle est partie.
+  { id: 'vinted_lbc_posted', data: { ids: ['9102', '9103'], updatedAt: new Date(Date.now() - 3 * 86400000).toISOString() } },
+  { id: 'lbc_listings', data: { items: { '3000000043': { id: '3000000043', ref: '43', customRef: 'VRM-43', subject: 'Adidas Spezial noir T38', status: 'active', account: 'lbcA', seenAt: new Date(Date.now() - 2 * 86400000).toISOString(), plusVueAt: new Date(Date.now() - 86400000).toISOString() } },
+    lectures: { lbcA: { at: new Date(Date.now() - 86400000).toISOString() } } } },
+  { id: 'lbc_accounts', data: { accounts: { lbcA: { id: 'lbcA', name: 'Moi', sessionAt: new Date(Date.now() - 86400000).toISOString() } } } },
+  { id: 'lbc_ventes', data: { ventes: {} } },
   // Un bordereau pour la transaction 777, que Vinted relie à l'annonce 9104.
   { id: 'email_bord_777', data: { transaction: '777', modele: 'Adidas Spezial noir taille 38', receivedAt: auj.toISOString(), filename: 'b.pdf' } },
   { id: 'harvest_111_txn_777', data: { payload: { transaction: { id: 777, item_id: 9104, status_title: 'Commande finalisée' } } } },
@@ -156,6 +164,8 @@ const projette = (row, sel) => {
       dit(/achat\s*—/.test(c.b.t) && !/achat\s*0,00/.test(c.b.t), 'achat inconnu ⇒ « — », jamais 0');
       dit(c.a.boost && !c.b.boost, '« Boostée » quand Vinted le dit, et rien quand il ne dit rien');
       dit(c.b.aussi && !c.a.aussi, '« Aussi sur Leboncoin » seulement pour la paire PROUVÉE publiée');
+      dit(!c.c.aussi, '« Aussi sur Leboncoin » tombe quand son annonce Leboncoin est PROUVÉE sortie (plus vue dans une liste complète, après la marque)',
+        c.c.aussi ? 'la N°43 garde la pastille alors que Leboncoin ne la montre plus' : '');
       dit((c.a.t.match(/dort/g) || []).length === 1 && !/😴/.test(c.a.t), 'le sommeil n\'est dit qu\'UNE fois sur la carte', (c.a.t.match(/[^\n]*dort[^\n]*/g) || []).join(' | '));
       dit(/prête/.test(c.a.prepa) && /2\/6/.test(c.b.prepa), 'la préparation suit la DONNÉE (6/6 ⇒ prête, 2/6 ⇒ « 2/6 »)', `« ${c.a.prepa} » / « ${c.b.prepa} »`);
       dit(!/Vendue — bordereau/.test(c.c.t), 'et sa jumelle au même titre n\'est PAS marquée vendue');

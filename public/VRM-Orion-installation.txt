@@ -1,6 +1,6 @@
 VRM POUR ORION — IPHONE ET IPAD
 
-Version du moteur VRM : 5.291.0
+Version du moteur VRM : 5.293.0
 Paquet d’import WebExtension adapté à Orion, distinct du ZIP Chrome.
 Ni fiche de boutique ni application Safari signée par Apple.
 
@@ -18,7 +18,15 @@ INSTALLATION
 3. Dans Orion : ••• > Extensions > + > installation depuis un fichier.
    Choisir VRM-Orion.xpi dans Fichiers et accepter les permissions demandées.
    Si le sélecteur ne propose pas ce format, utiliser la copie VRM-Orion.zip.
-   Installer UNE seule des deux copies : leur contenu est identique.
+   Installer UNE seule des copies : leur contenu est identique.
+
+   SI ORION REFUSE LE FICHIER — la version EN DOSSIER :
+   a. Télécharger avec Orion : https://vrm.center/VRM-Orion-dossier.zip
+   b. Dans l'app Fichiers, toucher VRM-Orion-dossier.zip : iOS le dézippe
+      en UN dossier « VRM-Orion » (manifest.json est directement dedans).
+   c. Dans Orion : ••• > Extensions > + > installation depuis un fichier,
+      et choisir le DOSSIER « VRM-Orion » (si le sélecteur demande un
+      fichier, entrer dans le dossier et choisir manifest.json).
 
 4. Autoriser l’extension sur vrm.center et les plateformes utilisées.
    Le mode Compatibilité d’Orion peut désactiver les extensions : le vérifier

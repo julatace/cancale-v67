@@ -818,3 +818,25 @@ Quatre défauts, reproduits sur le vrai `background.js` (`audit-fiabilite-fond.c
   chaque Chrome) ; s'il voit « session VRM n'a pas pu être renouvelée » sur le
   logo, cliquer le logo pour se reconnecter.
 
+
+
+### 31 octobre (soir) — « terminer le site », côté Vinted et extension (5.292.0 → servie en 5.293.0 avec le chantier Leboncoin, branche `finir-vinted`)
+Recensé les points ouverts : la plupart étaient DÉJÀ réglés (visionneuse du reçu et Échap, e-mails d'action
+de Vinted notifiés, `tout-generer`, `audit-politique-hotes`, `audit-preuve-vente` — tous verts ; les lignes
+« non corrigé » qui les citent sont périmées).
+- **La raison d'un refus de photo voyage** (« à faire côté extension », revue du 11 oct.) : `photoBytes` rend
+  `statut` (404/410/429/5xx, 0 = réseau), `bridge.js` relaie `statut` et `error`, `vmrPhotoIssue` rend tout de
+  suite (un pont vivant qui dit pourquoi n'attend plus la grâce de 1,5 s des ponts orphelins), et la règle
+  (`genreRefus`, `src/photosVinted.js`) ne redemande plus un lien MORT (404/410) avant `RECUL_MORT_MS` = 30 min
+  (ni témoin, ni retour de l'extension, ni `online`), fait passer les refus PASSAGERS en tête du témoin. Sans
+  statut (extension d'avant, route serveur) : la règle d'avant, inchangée. Un 403 reste « pas su ».
+- **Détourage Vestiaire** : `cle-pas-su` (503, clé Photoroom du vendeur illisible chez VRM) arrête la série
+  (`DETOURAGE_ARRET` ; 6 photos = 6 appels avant, au plus les 3 en vol après) et se dit en français sur
+  Vestiaire (`RAISONS_DETOURAGE`, plus le code brut).
+- Preuves : `audit-photo-pont.cjs` (chaîne réelle photoBytes → bridge.js → vmrPhotoIssue, 18 contrôles ;
+  13 rouges sur origin/main, mutation « pont sans statut » 10 rouges) ; `audit-photos-vinted.cjs` section
+  « raison du pont » (4 rouges sur origin/main ; mutations `statut-ignore` 4, `temoin-sans-genre` 2,
+  `mort-online` 2) ; `audit-detourage-ext.cjs` (+ `cle-pas-su`, seuil « 3 photos en vol », contrôle
+  « chaque raison d'arrêt a sa phrase » ; 1 rouge sur origin/main, mutation « phrase retirée » rouge).
+  `tout-generer.cjs` lit `BANC_PORT`.
+- ⚠️ Non mesuré : ce que le CDN de Vinted répond vraiment au service worker pour un lien expiré (404 ? 403 ?).

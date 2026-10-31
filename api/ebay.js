@@ -1476,8 +1476,15 @@ async function handleRetirer(b, ctx) {
   const auto = b.auto === true;
   const skuAttendu = String(b.sku || '').trim();
   let marqueur = null;
+  let venduMs = NaN;
   if (auto) {
     if (!SKU_PAIRE.test(skuAttendu)) return { status: 400, body: { ok: false, reason: 'sku', error: 'Retrait automatique : la paire n\'est pas identifiée par son SKU (VRM-n°) — rien n\'a été envoyé à eBay.' } };
+    // (31 octobre) La date de la vente Vinted, que l'app a PROUVÉE (sa liste de
+    // ventes relue) : la route revérifie elle-même, sur ce qu'eBay dit de
+    // l'annonce, qu'elle a été mise en ligne AVANT cette vente (l'app ne juge
+    // que sur sa copie rangée de la liste eBay). Sans date ⇒ rien ne part.
+    venduMs = Date.parse(String(b.venduLe || ''));
+    if (!Number.isFinite(venduMs)) return { status: 400, body: { ok: false, reason: 'date-vente', error: 'Retrait automatique : la date de la vente Vinted manque — rien n\'a été envoyé à eBay.' } };
     const v = await lireReglageVendeur('vrm_ebay_retrait_auto', ctx.owner);
     if (v === undefined) return { status: 503, body: { ok: false, reason: 'reglage-pas-su', error: 'Je n\'ai pas pu relire ton réglage de retrait automatique — rien n\'a été envoyé à eBay.' } };
     if (v !== 'true') return { status: 403, body: { ok: false, reason: 'auto-eteint', error: 'Le retrait automatique est éteint — rien n\'a été envoyé à eBay.' } };
@@ -1498,6 +1505,12 @@ async function handleRetirer(b, ctx) {
     const skuEbay = lireBalise(String(g.xml || '').replace(/<Variations>[\s\S]*?<\/Variations>/g, ''), 'SKU');
     const lu = numeroExterne(numDeSku(skuEbay), itemId, 'ebayAnnonces', null, marqueur);
     if (!lu || lu !== numDeSku(skuAttendu)) return { status: 409, body: { ok: false, reason: 'sku-change', error: `L'annonce eBay ne porte plus ${skuAttendu} — rien n'a été retiré.` } };
+    // L'annonce eBay doit avoir été mise en ligne AVANT la vente Vinted : une
+    // annonce publiée APRÈS ne peut pas être la paire vendue (une paire revenue
+    // et republiée). Date de mise en ligne illisible ⇒ « pas su » ⇒ rien.
+    const debutMs = Date.parse(lireBalise(String(g.xml || '').replace(/<Variations>[\s\S]*?<\/Variations>/g, ''), 'StartTime') || '');
+    if (!Number.isFinite(debutMs)) return { status: 503, body: { ok: false, reason: 'debut-pas-su', error: 'eBay n\'a pas dit quand l\'annonce a été mise en ligne — rien n\'a été retiré.' } };
+    if (!(debutMs < venduMs)) return { status: 409, body: { ok: false, reason: 'ebay-apres-vente', error: 'L\'annonce eBay a été mise en ligne APRÈS la vente Vinted : ce n\'est pas la paire vendue — rien n\'a été retiré.' } };
   }
   const r = await tradingCall(at.token, 'EndFixedPriceItem', `<ItemID>${itemId}</ItemID><EndingReason>NotAvailable</EndingReason>`);
   if (sansAck(r)) return { status: 504, body: { ok: false, reason: 'incertain', error: 'eBay n\'a pas répondu — je ne sais pas si l\'annonce a été retirée. Regarde sur eBay avant de recommencer.' } };
@@ -1516,12 +1529,15 @@ async function handleRetirer(b, ctx) {
   if (auto) {
     // Le journal ne se réécrit QUE sur une lecture réussie (« rien lu » ne vaut
     // pas « rien », sinon un hoquet effacerait l'historique de ses retraits).
-    const j = await lireDonnee(ligneDe('ebay_retraits_auto', ctx), ctx.owner);
-    journal = false;
-    if (j !== undefined) {
-      const l = (j && Array.isArray(j.items)) ? j.items : [];
-      journal = await storeData(ligneDe('ebay_retraits_auto', ctx), { items: [{ itemId, sku: skuAttendu, titre: String(b.titre || '').slice(0, 140), at: Date.now() }, ...l].slice(0, 50) }, ctx.owner);
-    }
+    // (31 octobre) Comparer-et-échanger (`modifierDonnee`) : deux retraits
+    // automatiques simultanés relisaient la même liste et le second effaçait la
+    // ligne du premier. Lecture ratée ⇒ `null` ⇒ rien n'est écrit.
+    const entree = { itemId, sku: skuAttendu, titre: String(b.titre || '').slice(0, 140), at: Date.now() };
+    const w = await modifierDonnee(ligneDe('ebay_retraits_auto', ctx), ctx.owner, (d) => {
+      const l = (d && Array.isArray(d.items)) ? d.items : [];
+      return { ...(d || {}), items: [entree, ...l].slice(0, 50) };
+    });
+    journal = w === true;
   }
   return { status: 200, body: { ok: true, fin, listes, regles: regles === true, ...(auto ? { auto: true, journal } : {}) } };
 }

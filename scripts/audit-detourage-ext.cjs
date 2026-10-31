@@ -87,6 +87,7 @@ function faireCtx({ reglage = 'couverture', mainKO = false, session = true, serv
           if (serveur === 'rejette') throw new Error('AbortError');
           if (serveur === 'session') return rep({ ok: false, reason: 'session' }, 401);
           if (serveur === 'no-key') return rep({ ok: false, reason: 'no-key' }, 503);
+          if (serveur === 'cle-pas-su') return rep({ ok: false, reason: 'cle-pas-su' }, 503);
           if (serveur === 'plafond') return rep({ ok: false, reason: 'plafond', plafond: 150 }, 429);
           if (cache.has(corps.sha)) return rep({ ok: true, hit: true, b64: DETOUREE(corps.sha).toString('base64'), type: 'image/jpeg', bytes: 30 });
           if (corps.b64 == null) return rep({ ok: true, hit: false });
@@ -182,6 +183,7 @@ const vc = async (ctx, urls) => ctx.detourerPhotos(await ctx.photosEnOctets(urls
   await essaie('échecs', async () => {
     for (const [nom, opt, raison] of [
       ['clé Photoroom non posée (503)', { reglage: 'toutes', serveur: 'no-key' }, 'no-key'],
+      ['clé Photoroom illisible chez VRM (503 cle-pas-su)', { reglage: 'toutes', serveur: 'cle-pas-su' }, 'cle-pas-su'],
       ['plafond du mois atteint (429)', { reglage: 'toutes', serveur: 'plafond' }, 'plafond'],
       ['crédits Photoroom épuisés (402)', { reglage: 'toutes', serveur: 'p402' }, 'photoroom-402'],
       ['serveur injoignable', { reglage: 'toutes', serveur: 'rejette' }, 'delai'],
@@ -191,7 +193,9 @@ const vc = async (ctx, urls) => ctx.detourerPhotos(await ctx.photosEnOctets(urls
       const ph = await vc(ctx, six);
       dit(ph.length === 6 && ph.every((p, i) => p.b64 === origine(six[i]) && p.detoure === false && p.detourage === raison),
         `${nom} ⇒ les 6 photos d'origine partent, raison « ${raison} »`, ph.map((p) => p.detourage).join(','));
-      if (raison !== 'delai') dit(ctx.__j.appelsServeur <= 6, `${nom} ⇒ on n'insiste pas photo après photo`, `appels=${ctx.__j.appelsServeur}`);
+      // 31 oct. : au plus les 3 envois déjà en vol (3 ouvriers) — « ≤ 6 » pour 6 photos
+      // laissait passer une raison qui repartait demander photo après photo.
+      if (raison !== 'delai') dit(ctx.__j.sondes <= 3, `${nom} ⇒ on n'insiste pas photo après photo (au plus les 3 photos déjà en vol sont demandées)`, `photos demandées=${ctx.__j.sondes} · appels=${ctx.__j.appelsServeur}`);
     }
     const ctx = faireCtx({ reglage: 'couverture', session: false });
     const ph = await vc(ctx, cinq);
@@ -201,6 +205,18 @@ const vc = async (ctx, urls) => ctx.detourerPhotos(await ctx.photosEnOctets(urls
     const rate = phP.filter((p) => p.detoure === false);
     dit(rate.length === 1 && rate[0].b64 === origine(rate[0].url) && phP.filter((p) => p.detoure === true).length === 2,
       'Photoroom en panne sur UNE photo ⇒ elle part d\'origine, les deux autres détourées');
+  });
+
+  // ══ 6 bis. CHAQUE RAISON D'ARRÊT SE DIT EN FRANÇAIS SUR VESTIAIRE (§2.7) ══
+  await essaie('raisons lisibles', async () => {
+    const vcSrc = fs.readFileSync(path.join(racine, 'vinted-sync-extension', 'vc-depot.js'), 'utf8');
+    const mArret = SRC.match(/const DETOURAGE_ARRET = \{([^}]*)\}/);
+    const mTexte = vcSrc.match(/const RAISONS_DETOURAGE = \{([\s\S]*?)\n\s*\};/);
+    const cles = (txt) => [...String(txt || '').matchAll(/(?:^|[,{\s])'?([a-z][a-z-]*)'?\s*:/g)].map((m) => m[1]);
+    const arret = mArret ? cles(mArret[1]) : [];
+    const lisibles = new Set(mTexte ? cles(mTexte[1]) : []);
+    const manque = arret.filter((k) => !lisibles.has(k));
+    dit(arret.length > 0 && manque.length === 0, 'chaque raison qui arrête le détourage a sa phrase sur Vestiaire (jamais un code brut à l\'écran)', manque.join(',') || `${arret.length} raisons`);
   });
 
   // ══ 7. UNE PHOTO ILLISIBLE NE COÛTE RIEN ══

@@ -102,6 +102,12 @@ const MUTER_MODULE = {
   // chaque retour redemande TOUS les refus, même ceux déjà redemandés dans la vague (charge)
   'retour-sans-borne': (s) => s.replace("    if (parRetour && e.etat === 'ko' && e.rouvertAt && t - e.rouvertAt < reculRefus(e.refusN)) continue;\n", ''),
   // le refus ne tombe qu'au retour du réseau (le remontage ne redemande jamais)
+  // le statut du pont est ignoré (le lien mort redemandé comme les autres)
+  'statut-ignore': (s) => s.replace("return { dataUrl: null, issue: 'refus', genre: genreRefus(r.statut) };", "return { dataUrl: null, issue: 'refus' };"),
+  // les passagers ne passent plus devant au témoin
+  'temoin-sans-genre': (s) => s.replace("((a.genre === 'passager' ? 0 : 1) - (b2.genre === 'passager' ? 0 : 1)) || ", ''),
+  // le retour du réseau relève quand même un lien mort
+  'mort-online': (s) => s.replace("  if (mortRecent(e)) return;   // le CDN", "  if (false) return;   // le CDN"),
   'refus-colle': (s) => s.replace("if (raison === 'online' || raison === 'reseau' || maintenant() - e.refusAt >= reculRefus(e.refusN)) e.refus = false;", "if (raison === 'online') e.refus = false;"),
   // le témoin redemande TOUTES les photos refusées à chaque passage (charge)
   'temoin-tout': (s) => s.replace("for (const x of l2) { if (n >= MAX_EN_VOL) break; if (rouvrir(x)) n++; }", 'for (const x of entrees.values()) if (x.refs > 0 && rouvrir(x)) n++;'),
@@ -623,6 +629,64 @@ if (MUTATION && !MUTER_MODULE[MUTATION] && !MUTER_APP[MUTATION]) { console.log('
     dit(revenues === 15 && parMort.every((n) => n <= 2),
       'des liens morts mêlés à des refus passagers : les 15 passagers reviennent, et chaque lien mort n’est redemandé qu’UNE fois dans la vague (pas une fois par retour)',
       `${revenues}/15 revenues · demandes par lien mort ${JSON.stringify(parMort)}`);
+  });
+
+  await essaie('refus : la raison du pont (5.292)', async () => {
+    // 31 oct. — l'extension relaie le STATUT du CDN. Six liens MORTS (404) en tête
+    // de page, trois refus PASSAGERS (503 la première fois, puis les octets).
+    const w = monde({ sonde: () => 'erreur' });
+    const parUrl = {};
+    const morts = Array.from({ length: 6 }, (_, i) => U(200 + i));
+    const passagers = Array.from({ length: 3 }, (_, i) => U(210 + i));
+    w.m.configurer({ secours: () => 'oui', ext: () => 'presente', chargerImage: async () => false,
+      demander: async (u) => { parUrl[u] = (parUrl[u] || 0) + 1;
+        if (morts.includes(u)) return { dataUrl: null, issue: 'refus', statut: 404 };
+        return parUrl[u] === 1 ? { dataUrl: null, issue: 'refus', statut: 503 } : { dataUrl: PNG, issue: 'ok' }; } });
+    monterEchouer(w.m, [...morts, ...passagers]);
+    await w.avancer(10);
+    // Le premier passage du témoin (20 s) : ses trois places vont aux PASSAGERS.
+    await w.avancer(w.m.TEMOIN_PREMIER_MS + 500);
+    const revenues = passagers.filter((u) => w.m.etat(u) === 'ok').length;
+    dit(revenues === 3, 'page mêlée (6 liens morts en tête, 3 refus passagers) : au premier passage du témoin, les 3 passagers reviennent (les liens morts ne prennent pas ses places)',
+      `${revenues}/3 revenues · demandes ${JSON.stringify(Object.values(parUrl))}`);
+    // 29 min, le retour du réseau : un lien mort n'est jamais redemandé.
+    await w.avancer(29 * 60e3 - w.m.TEMOIN_PREMIER_MS - 1000);
+    w.emettre('online'); await w.avancer(10);
+    morts.forEach((u) => { if (w.m.etat(u) === 'natif') w.m.echecNatif(u); });
+    await w.avancer(10);
+    const parMort = morts.map((u) => parUrl[u] || 0);
+    dit(parMort.every((n) => n === 1), 'un lien MORT (404) n’est plus redemandé avant 30 min — ni par le témoin, ni par le retour du réseau', `demandes par lien mort ${JSON.stringify(parMort)}`);
+    dit(morts.every((u) => !w.m.estDefinitive(u)), '… jamais définitif pour autant (rien ne le retire d’une liste)');
+    // Passé 30 min : il retrouve sa chance (un lien a pu être recapturé entre-temps).
+    await w.avancer(2 * 60e3 + w.m.TEMOIN_MAX_MS);
+    const apres = morts.map((u) => parUrl[u] || 0);
+    dit(apres.some((n) => n >= 2), '… et passé 30 min, il est de nouveau redemandé', JSON.stringify(apres));
+    // L'autre sens : un refus SANS statut (extension d'avant, route serveur) garde la règle d'avant.
+    const w2 = monde({ sonde: () => 'erreur' });
+    const n2 = {};
+    w2.m.configurer({ secours: () => 'oui', ext: () => 'presente', chargerImage: async () => false,
+      demander: async (u) => { n2[u] = (n2[u] || 0) + 1; return { dataUrl: null, issue: 'refus' }; } });
+    monterEchouer(w2.m, [U(220), U(221)]);
+    await w2.avancer(10);
+    await w2.avancer(3 * w2.m.TEMOIN_PREMIER_MS + 2000);
+    dit(Object.values(n2).every((n) => n >= 2), 'l’autre sens : un refus SANS statut (extension d’avant) est encore redemandé par le témoin, comme avant', JSON.stringify(Object.values(n2)));
+    // Les passagers passent AVANT les refus sans raison (extension d'avant mêlée, route serveur).
+    const w3 = monde({ sonde: () => 'erreur' });
+    const n3 = {};
+    const sansRaison = Array.from({ length: 4 }, (_, i) => U(230 + i));
+    const pass3 = Array.from({ length: 3 }, (_, i) => U(240 + i));
+    w3.m.configurer({ secours: () => 'oui', ext: () => 'presente', chargerImage: async () => false,
+      demander: async (u) => { n3[u] = (n3[u] || 0) + 1;
+        if (sansRaison.includes(u)) return { dataUrl: null, issue: 'refus' };
+        return n3[u] === 1 ? { dataUrl: null, issue: 'refus', statut: 429 } : { dataUrl: PNG, issue: 'ok' }; } });
+    monterEchouer(w3.m, [...sansRaison, ...pass3]);
+    await w3.avancer(10);
+    await w3.avancer(w3.m.TEMOIN_PREMIER_MS + 500);
+    const rev3 = pass3.filter((u) => w3.m.etat(u) === 'ok').length;
+    dit(rev3 === 3, 'les refus PASSAGERS (429) passent avant les refus sans raison au témoin : ils reviennent au premier passage', `${rev3}/3 revenues`);
+    const g = w.m.genreRefus;
+    dit(typeof g === 'function' && g(404) === 'mort' && g(410) === 'mort' && g(429) === 'passager' && g(503) === 'passager' && g(0) === 'passager' && g(undefined) === '' && g(403) === '',
+      'genreRefus : 404/410 mort · 429/5xx/0 passager · sans statut ni 403 : pas su');
   });
 
   await essaie('bilan : le retour', async () => {

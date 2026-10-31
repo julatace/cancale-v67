@@ -106,7 +106,10 @@ function manifesteOrion(m){
  f.permissions=[...new Set([...(m.permissions||[]).filter(p=>!['scripting','downloads'].includes(p)),...(m.host_permissions||[])])];
  delete f.host_permissions;delete f.externally_connectable;
  f.browser_action=f.action;delete f.action;
- f.browser_specific_settings={gecko:{id:'vrm@vrm.center',data_collection_permissions:{required:['authenticationInfo','personalCommunications','websiteContent','websiteActivity','browsingActivity']}}};
+ // 31 oct. : Orion sur iPhone a refusé le paquet. On ne garde que ce qu'un
+ // lecteur WebExtension ancien connaît : l'identifiant, sans
+ // `data_collection_permissions` (clé de 2025 propre à addons.mozilla.org).
+ f.browser_specific_settings={gecko:{id:'vrm@vrm.center'}};
  f.web_accessible_resources=[...new Set((m.web_accessible_resources||[]).flatMap(x=>x.resources||[]))];
  f.content_scripts=(m.content_scripts||[]).filter(c=>!(c.world==='MAIN'&&(c.js||[]).includes('inject.js'))).map(c=>{
   const n={...c};delete n.world;n.js=['compat-orion.js',...(n.js||[])];return n;
@@ -174,6 +177,14 @@ try {
     fs.rmSync(orion,{force:true});execFileSync('zip',['-qrX',orion,...fs.readdirSync(o)],{cwd:o});
     if(orion===orionPublic){
       fs.copyFileSync(orion,path.join(racine,'public','VRM-Orion.zip'));
+      // 31 oct. : le MÊME contenu, mais qui se dézippe en UN dossier
+      // `VRM-Orion/` (manifest.json à sa racine) : dans Fichiers, toucher le zip
+      // donne le dossier, qu'Orion installe comme une extension « depuis des
+      // fichiers locaux ».
+      const od=path.join(tmp,'VRM-Orion');fs.cpSync(o,od,{recursive:true});
+      const dz=path.join(racine,'public','VRM-Orion-dossier.zip');
+      fs.rmSync(dz,{force:true});execFileSync('zip',['-qrX',dz,'VRM-Orion'],{cwd:tmp});
+      console.log('✓',path.relative(racine,dz),'(Orion iPhone/iPad : un dossier VRM-Orion)');
       const notice=path.join(racine,'public','VRM-Orion-installation.txt');
       if(fs.existsSync(notice))fs.writeFileSync(notice,fs.readFileSync(notice,'utf8').replace(/^Version du moteur VRM : .*$/m,'Version du moteur VRM : '+m.version));
     }
