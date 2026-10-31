@@ -642,6 +642,29 @@ async function rendre(b, { version, tel = false, lignes = rows, offresKO = false
       dit(r.errs.length === 0, 'aucune erreur d’app', r.errs.join(' | ').slice(0, 160));
       await r.ctx.close();
     }
+    // (31 oct.) « Non lues » : UNE règle pour Messages et Ma journée (§11,
+    // src/messagesNonLus.js). Mesuré le 20 oct. : Messages « 156 », Ma journée
+    // « 8 ». Une conversation marquée non lue mais sans message depuis 42 jours
+    // n'est comptée nulle part ; Messages la dit à part sous « Non lues ».
+    console.log('── « Non lues » : la même règle que Ma journée');
+    {
+      const lignes = rowsDe();
+      lignes.find((x) => x.id === 'harvest_111_inbox').data.payload.conversations.push(conv(390, 'vieux_390', 'Toujours dispo ?', true, 24 * 42));
+      const r = await rendre(b, { version: '5.135.0', lignes });
+      await r.pg.waitForTimeout(800);
+      const nl = await r.pg.evaluate(() => { const e = document.querySelector('[data-messagerie-tete]'); return e ? e.getAttribute('data-nonlus') : null; });
+      dit(nl === '2', 'Messages compte les non-lues de moins de 7 jours (2), pas le vieux drapeau', String(nl));
+      await r.pg.getByRole('button', { name: /^Non lues/ }).click(); await r.pg.waitForTimeout(300);
+      const anc = await r.pg.evaluate(() => { const e = document.querySelector('[data-nonlus-anciens]'); return e ? e.getAttribute('data-nonlus-anciens') : null; });
+      dit(anc === '1', 'la non-lue ancienne est DITE à part sous « Non lues », jamais cachée en silence', String(anc));
+      dit(await r.pg.locator('[data-messagerie] [data-conv="390"]').count() === 0, 'le filtre « Non lues » ne la liste pas');
+      await r.pg.goto(`http://localhost:${PORT}/?tab=journee`, { waitUntil: 'domcontentloaded' });
+      await r.pg.waitForTimeout(3500);
+      const tuile = await r.pg.evaluate(() => { const e = document.querySelector('[data-tuile="messages"]'); return e ? e.getAttribute('data-n') : null; });
+      dit(tuile === nl, 'Ma journée dit le MÊME nombre que Messages', `journee=${tuile} · messages=${nl}`);
+      dit(r.errs.length === 0, 'aucune erreur d’app', r.errs.join(' | ').slice(0, 160));
+      await r.ctx.close();
+    }
     console.log('── boîtes à jour (l’autre sens)');
     {
       // La vente de compte_a est plus ANCIENNE que sa dernière conversation captée.

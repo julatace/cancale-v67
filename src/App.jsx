@@ -10,6 +10,7 @@ import {auteurDernierConfirme,suiviNegociationVinted,reponseAttendueVinted,insta
 import {retourReponseVinted,cleReponseVinted,creerBrouillonsReponses,etatActionVinted,cleActionOffreVinted} from './reponseVinted.js';
 import {etatOffreVinted,offreVintedEnAttente,cleOffreVinted,appliquerOffresConfirmees,annonceOffreEnVente,offreOuverte} from './offresVinted.js';
 import {CONVERSATIONS_RETIREES,cleConversation,conversationRetiree,retirerConversation,remettreConversations,majAuGeste,phraseRetour} from './conversationsRetirees.js';
+import {conversationNonLue,conversationNonLueAncienne,messageRecent} from './messagesNonLus.js';
 import {etatSourceMemoire} from './suiviComptes.js';
 import {empreinteColis,controlePreparation} from './preparationColis.js';
 import FiabiliteVentes from './FiabiliteVentes.jsx';
@@ -17272,8 +17273,28 @@ function caEbayPayees(orders) {
 // « Vestiaire Collective » reste la CLÉ interne (prop `plat`, comparaisons
 // `plat===`) ; à l'écran on écrit « Vestiaire Co » (Julien, 27 oct.). Un seul
 // endroit qui décide du nom AFFICHÉ — les clés ne bougent pas (§11).
+// (31 oct.) L'ÉTAT du CA eBay, pour que la phrase dise ce qui est mesuré (§5 :
+// la phrase qui explique un chiffre vient de la même source que lui). Mesuré le
+// 20 oct. : eBay LU, 0 commande, et la ligne disait « total des ventes payées
+// en euros indisponible » — comme si la lecture avait raté.
+//   `undefined` lecture en cours · `null` pas su · tableau lu :
+//   'lu' (un total) · 'aucune' (aucune commande payée) · 'illisible' (des
+//   commandes payées, montant reçu en euros pas su).
+function etatCaEbay(orders) {
+  if (orders === undefined) return 'encours';
+  if (!Array.isArray(orders)) return 'passu';
+  if (caEbayPayees(orders) != null) return 'lu';
+  return orders.some(o => String((o && o.orderPaymentStatus) || '').toUpperCase() === 'PAID') ? 'illisible' : 'aucune';
+}
+const NOTE_CA_EBAY = {
+  lu: 'ventes payées',
+  aucune: 'pas encore de vente payée',
+  encours: 'lecture en cours',
+  passu: 'commandes eBay pas lues',
+  illisible: 'montant reçu en euros indisponible',
+};
 function nomAffichePlat(n) { return n === 'Vestiaire Collective' ? 'Vestiaire Co' : n; }
-function caParPlateforme(liveStats, lbcVentes, ebayCa) {
+function caParPlateforme(liveStats, lbcVentes, ebayCa, ebayCommandes) {
   const caVinted = liveStats && liveStats.caEncaisse != null ? liveStats.caEncaisse : null;
   // ⚠️ CA = VENTES FINALISÉES SEULEMENT (Julien, 1er oct.) : « le CA d'un mois est
   //    la somme des ventes FINALISÉES, pas celles en cours — une vente en cours
@@ -17286,7 +17307,7 @@ function caParPlateforme(liveStats, lbcVentes, ebayCa) {
   return [
     { nom:'Vinted', ca:caVinted, note:'ventes finalisées, tous comptes' + (liveStats && liveStats.nMasque > 0 ? ` · sans ${liveStats.nMasque} masquée${liveStats.nMasque>1?'s':''}` : '') },
     { nom:'Leboncoin', ca:caLbc, note:caLbc==null?'pas encore de vente finalisée':'ventes finalisées (argent reçu)' },
-    { nom:'eBay', ca:caEbay, note:caEbay==null?'total des ventes payées en euros indisponible':'ventes payées' },
+    { nom:'eBay', ca:caEbay, note: caEbay != null ? NOTE_CA_EBAY.lu : NOTE_CA_EBAY[etatCaEbay(ebayCommandes)] },
     { nom:'Vestiaire Collective', ca:null, note:'pas encore de vente captée' },
   ];
 }
@@ -25626,7 +25647,7 @@ function Plateforme({ plat, liveStats, lbcVentes = {ventes:[],inconnues:0}, ebay
 // (17 oct.) L'écran « Collectif » est retiré — Julien : « il ne sert à rien, il
 // est déjà représenté dans les statistiques ». `?tab=collectif` mène aux
 // Statistiques (`ONGLETS_DEPLACES`).
-function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,baseKO,premierJour,lbcVentes={ventes:[],inconnues:0},ebayCa=null,panelOff=null}) {
+function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,baseKO,premierJour,lbcVentes={ventes:[],inconnues:0},ebayCa=null,ebayCommandes,panelOff=null}) {
   // Les N° des annonces « à confirmer » (la liste dépliée sous « Annonces en ligne ») :
   // relus avec les chiffres, jamais un « sans N° » inventé (revue de la 5.167).
   const numerosDash=React.useMemo(()=>load('vinted_annonce_numeros',{}),[liveStats]);
@@ -25824,11 +25845,11 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
   //    dataviz), et l'identité portée par les libellés — pas par la couleur seule.
   // Anneau par plateforme — CONSOMME caParPlateforme (§11), ne recalcule rien.
   const platParts=useMemo(()=>{
-    const arr=caParPlateforme(liveStats,lbcVentes,ebayCa).filter(p=>p.ca!=null && p.ca>0)
+    const arr=caParPlateforme(liveStats,lbcVentes,ebayCa,ebayCommandes).filter(p=>p.ca!=null && p.ca>0)
       .map(p=>({nom:p.nom, court:nomAffichePlat(p.nom), ca:p.ca}));
     const total=arr.reduce((s,p)=>s+p.ca,0);
     return {arr,total};
-  },[liveStats,lbcVentes,ebayCa]);
+  },[liveStats,lbcVentes,ebayCa,ebayCommandes]);
   // CA du mois courant (par date de VENTE, §5) pour la jauge d'objectif.
   // ⚠️ Elle sommait l'ANCIENNE archive (`sales`, vide depuis juillet 2026) : la
   //    jauge restait à 0 € quoi qu'il vende. Elle lit maintenant « vendu ce
@@ -26137,7 +26158,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
       {(()=>{
         // §11 : LE MÊME helper que l'onglet Collectif — un seul propriétaire du
         // « CA par plateforme », les deux écrans ne peuvent pas diverger.
-        const plateformes = caParPlateforme(liveStats, lbcVentes, ebayCa);
+        const plateformes = caParPlateforme(liveStats, lbcVentes, ebayCa, ebayCommandes);
         const caVinted = plateformes[0].ca, caLbc = plateformes[1].ca;
         const parCompte = (liveStats && liveStats.caParCompte) || null;
         // Rien à décomposer tant que le CA Vinted n'est pas encore lu.
@@ -32023,7 +32044,13 @@ function VintedAccounts({ accounts, setAccounts, baseKO, onRetour }) {
 // l'ancienne identité au milieu de la nouvelle — les badges N° restaient VERTS
 // sur une app vermillon. Elles suivent maintenant la famille papier/encre.
 const INV_STATUS = {
-  online:       { label: 'En ligne',      color: '#0F8A6A', icon: '🟢' },
+  // (31 oct.) Le vert menthe (#0F8A6A) de l'ancienne palette survivait ici et
+  // teintait ~45 « Reçu », « ✓ posté », marges positives… — hors palette, et
+  // un bénéfice ne porte aucune couleur (§7). Un état « OK » s'écrit à l'ENCRE
+  // du thème courant (getter : `C` change avec le thème). ⚠️ Jamais en fond
+  // sous un texte blanc : en sombre l'encre est presque blanche (les deux
+  // endroits qui le faisaient prennent l'accent, `onAccent`).
+  online:       { label: 'En ligne',      get color() { return C.text; }, icon: '🟢' },
   pending_sale: { label: 'Vente en cours', color: '#1D4FD6', icon: '⏳' },
   sold:         { label: 'Vendu',         color: '#5C6672', icon: '💸' },
   stock:        { label: 'Stock',         color: '#A15C00', icon: '📦' },
@@ -44909,10 +44936,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         //    est de vieux échanges jamais rouverts. On ne compte que ce qui
         //    attend VRAIMENT une réponse : non lu, de moins de 7 jours, compte
         //    pas écarté.
-        const MSG_RECENT_MS = 7 * 864e5;
+        // (31 oct.) La règle vit dans src/messagesNonLus.js : Messages et le
+        // point de l'onglet lisent la même (§11).
         // (29 oct.) Une conversation qu'il a retirée de la liste ne compte plus ici
         // non plus (la même règle que la liste, §11) — jusqu'au message suivant.
-        const unread = (convs.items||[]).filter(c=>!acctOffOf(c) && c.unread && (Date.now() - (Date.parse(c.updated_at) || 0)) < MSG_RECENT_MS && !conversationRetiree(convRetirees, String((c._acc&&c._acc.vinted_user_id)||''), c)).length;
+        const unread = (convs.items||[]).filter(c=>!acctOffOf(c) && conversationNonLue(c) && !conversationRetiree(convRetirees, String((c._acc&&c._acc.vinted_user_id)||''), c)).length;
         // « en retard » = une limite LUE (email du bordereau) et dépassée ; une
         // date ESTIMÉE dépassée n'en est pas une (revue du 22 oct., `retard`
         // de api/_lib/limite-envoi.js) — la ligne « colis-limite » la dit.
@@ -48676,7 +48704,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           //    acheteur qui attend était annoncé comme « rien à faire ».
           //    ⇒ on compte TOUTE la liste ; ceux d'un compte estompé sont dits à
           //    côté, avec le geste, jamais à la place.
-          const nonLus = liste.filter(c=>c.unread).length;
+          // (31 oct.) « Non lue » = la règle de Ma journée (src/messagesNonLus.js,
+          //    §11) : non lue ET bougée ces 7 derniers jours. Les vieux drapeaux
+          //    sont comptés à part et dits (`nonLusAnciens`), jamais cachés.
+          const nonLus = liste.filter(c=>conversationNonLue(c)).length;
+          const nonLusAnciens = liste.filter(c=>conversationNonLueAncienne(c)).length;
           // (19 oct.) L'offre en attente d'une conversation : LA règle du fil
           // (`offreEnAttenteDe`, §11), sur le fil ouvert s'il est chargé (plus
           // frais), sinon sur la lecture ciblée des conversations captées. Pas su
@@ -48722,7 +48754,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           //    lu » au-dessus de non-lus cachés — le défaut du 8 octobre, revenu
           //    par le filtre. On compte donc sur les conversations AVANT le
           //    filtre de compte (comptes écartés exclus) : cachés, ils sont dits.
-          const nonLusAilleurs = filtreMsg ? (convs.items||[]).filter(c=>!acctOffOf(c) && c.unread && uidC(c)!==filtreMsg && !conversationRetiree(convRetirees,uidC(c),c)).length : 0;
+          const nonLusAilleurs = filtreMsg ? (convs.items||[]).filter(c=>!acctOffOf(c) && conversationNonLue(c) && uidC(c)!==filtreMsg && !conversationRetiree(convRetirees,uidC(c),c)).length : 0;
           // Les boîtes qui n'ont pas pu être lues (comptes qu'il n'a pas
           // écartés) : tant qu'il y en a une, « Tout est lu » serait un total
           // partiel présenté comme complet (§5).
@@ -48732,9 +48764,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           // plus récentes — l'ordre d'avant, à l'intérieur de chaque groupe.
           // (19 oct.) Dans chaque groupe, une offre en attente passe devant : elle
           // expire, et y répondre décide d'une vente.
-          const tri=liste.filter(c=>messageFilter==='all'||(messageFilter==='repondre'?reponseAttendue(c):messageFilter==='offres'?!!offreDeConv(c):c.unread)).sort((a,b)=>(prioMsg ? (uidC(b)===prioMsg)-(uidC(a)===prioMsg) : 0) || ((!!offreDeConv(b))-(!!offreDeConv(a))) || (new Date(b.updated_at||0)-new Date(a.updated_at||0)));
+          const tri=liste.filter(c=>messageFilter==='all'||(messageFilter==='repondre'?reponseAttendue(c):messageFilter==='offres'?!!offreDeConv(c):conversationNonLue(c))).sort((a,b)=>(prioMsg ? (uidC(b)===prioMsg)-(uidC(a)===prioMsg) : 0) || ((!!offreDeConv(b))-(!!offreDeConv(a))) || (new Date(b.updated_at||0)-new Date(a.updated_at||0)));
           const roListe = prioMsg ? liste.filter(c=>uidC(c)!==prioMsg) : [];
-          const nonLusRo = roListe.filter(c=>c.unread).length;
+          const nonLusRo = roListe.filter(c=>conversationNonLue(c)).length;
           const nomActif = prioMsg ? msgNomActif() : '';
           const plusieurs = new Set(liste.map(c=>uidC(c))).size > 1;
           const affiches = tri.slice(0, convMax);
@@ -48782,6 +48814,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               </div>
               {messageFilter==='repondre'&&<p className="vrm-inbox-feedback">{aRepondre.length?`${offresARepondre} offre${offresARepondre>1?'s':''} · ${aRepondre.length-offresARepondre} conversation${aRepondre.length-offresARepondre>1?'s':''} sans offre en attente`:'Aucune conversation confirmée comme étant à répondre.'} · Dernier auteur vérifié uniquement. Les fils non vérifiés restent dans Toutes.</p>}
               {messageFilter==='unread' && tri.length===0 && <p className="vrm-inbox-feedback">Aucune conversation non lue dans cette sélection.</p>}
+              {messageFilter==='unread' && nonLusAnciens>0 && <p className="vrm-inbox-feedback" data-nonlus-anciens={nonLusAnciens}>{nonLusAnciens} autre{nonLusAnciens>1?'s':''} marquée{nonLusAnciens>1?'s':''} non lue{nonLusAnciens>1?'s':''} sans message depuis plus de 7 jours — pas comptée{nonLusAnciens>1?'s':''} ici ni dans Ma journée ; {nonLusAnciens>1?'elles restent':'elle reste'} dans {'«\u00a0Toutes\u00a0»'}.</p>}
               {messageFilter==='offres' && tri.length===0 && <p className="vrm-inbox-feedback">Plus aucune offre en attente dans cette sélection.</p>}
               {nonLusAilleurs>0 && (
                 <div data-nonlus-ailleurs={nonLusAilleurs} style={{fontSize:12.5,color:C.text,lineHeight:1.45,marginBottom:8}}>
@@ -49198,7 +49231,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   ? <div style={{fontSize:11,color:C.text,marginTop:1}}>Prêt à tamponner pour <b>{num?`N°${num} · `:''}{one.title}</b> — un tap et c'est fait.</div>
                   : <div style={{fontSize:11,color:C.text,marginTop:1}}>Clique le bouton <b>📄</b> sur la vente concernée → il se <b>tamponne tout seul</b> avec le N° (pas besoin de rechoisir le fichier).</div>}
               </div>
-              {one && <button type="button" onClick={()=>startBordereau(num, one.title, freshLabel.acc, one.transaction_id)} style={{flexShrink:0,border:'none',background:INV_STATUS.online.color,color:'#fff',borderRadius:8,padding:'9px 13px',cursor:'pointer',fontSize:13,fontWeight:600,fontFamily:'inherit'}}>📄 Tamponner{num?` N°${num}`:''}</button>}
+              {one && <button type="button" onClick={()=>startBordereau(num, one.title, freshLabel.acc, one.transaction_id)} style={{flexShrink:0,border:'none',background:C.accent,color:C.onAccent,borderRadius:8,padding:'9px 13px',cursor:'pointer',fontSize:13,fontWeight:600,fontFamily:'inherit'}}>📄 Tamponner{num?` N°${num}`:''}</button>}
             </div>
           );
         })()}
@@ -51163,7 +51196,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   const ph = l.p.map(photoDe).find(Boolean);
                   return (
                     <div key={l.num} style={{display:'flex',alignItems:'center',gap:10,padding:'8px 11px',borderTop:i?`1px solid ${C.border}66`:'none',background:dbl?`${C.danger}0e`:'transparent'}}>
-                      <span style={{flexShrink:0,fontSize:14,fontWeight:700,color:'#fff',background:dbl?C.danger:INV_STATUS.online.color,borderRadius:8,padding:'3px 8px',minWidth:44,textAlign:'center'}}>N°{l.num}</span>
+                      <span style={{flexShrink:0,fontSize:14,fontWeight:700,color:'#fff',background:dbl?C.danger:C.accent,borderRadius:8,padding:'3px 8px',minWidth:44,textAlign:'center'}}>N°{l.num}</span>
                       <span style={{width:38,height:38,borderRadius:8,background:C.border,flexShrink:0,overflow:'hidden'}}>
                         {ph && <PhotoVinted src={ph} alt="" loading="lazy" style={{width:'100%',height:'100%',objectFit:'cover'}}/>}
                       </span>
@@ -58490,7 +58523,7 @@ function AppCoeur() {
     if(!liveStats) return 0;
     if(!Array.isArray(liveStats.unreadConvs)) return liveStats.unread||0;
     const ret=load(CONVERSATIONS_RETIREES,{});
-    return liveStats.unreadConvs.filter(x=>!conversationRetiree(ret,x.uid,x)).length;
+    return liveStats.unreadConvs.filter(x=>!conversationRetiree(ret,x.uid,x) && messageRecent(x.updated_at)).length;
   },[liveStats,retireesTick]);
   // Les ventes Vinted de TOUS les comptes liés, telles que l'écran Ventes les lit
   // (`_acc` posé) : `undefined` pas encore lu · `null` aucune lecture n'a abouti.
@@ -59120,7 +59153,7 @@ function AppCoeur() {
         }
         // (29 oct.) Les conversations retirées de la liste ne font plus le point
         // « nouveau » de l'onglet Messages (la même règle que la liste, §11).
-        if(conv.ok){ ok=true; const ret=load(CONVERSATIONS_RETIREES,{}); for(const c of conv.items){ if(!c.unread) continue; unreadConvs.push({uid:String(a.vinted_user_id),id:c.id,updated_at:c.updated_at}); if(!conversationRetiree(ret,String(a.vinted_user_id),c)) unread++; } }
+        if(conv.ok){ ok=true; const ret=load(CONVERSATIONS_RETIREES,{}); for(const c of conv.items){ if(!c.unread) continue; unreadConvs.push({uid:String(a.vinted_user_id),id:c.id,updated_at:c.updated_at}); if(!conversationRetiree(ret,String(a.vinted_user_id),c) && messageRecent(c.updated_at)) unread++; } }
       }
       // Paires en stock = nb de numéros réellement étiquetés dans le garage (3D).
       // Un numéro peut être posé sur une boîte seule (it.num), dans une case de
@@ -60260,7 +60293,7 @@ function AppCoeur() {
         {tab==='dashboard'&&!premierJour&&<div className="vrm-rubriques" style={{padding:'12px 16px 0'}}><PlatSubNav sub={platSub==='prix'?'prix':'stats'} setSub={setPlatSub} sections={[['stats','Vue d’ensemble'],['prix','Prix qui marche']]}/></div>}
         {tab==='dashboard'&&platSub==='prix'&&<PrixMarche data={pqmData} baseKO={baseKO}/>}
         {tab==='dashboard'&&premierJour&&<Onboarding setTab={setTab}/>}
-        {tab==='dashboard'&&platSub!=='prix'&&<Dashboard premierJour={premierJour} catalog={catalog} sales={sales} garageGrid={garageGrid} invoices={invoices} liveStats={liveStatsVus} lbcVentes={lbcVentes} ebayCa={ebayCa} onGo={setTab} actions={notifItems} baseKO={baseKO} panelOff={panelOffCoque}/>}
+        {tab==='dashboard'&&platSub!=='prix'&&<Dashboard premierJour={premierJour} catalog={catalog} sales={sales} garageGrid={garageGrid} invoices={invoices} liveStats={liveStatsVus} lbcVentes={lbcVentes} ebayCa={ebayCa} ebayCommandes={ebayCommandes} onGo={setTab} actions={notifItems} baseKO={baseKO} panelOff={panelOffCoque}/>}
         {/* ⚠️ UN SEUL ONGLET VINTED QUI CONTIENT TOUT : Aperçu (CA, argent,
             compteurs) + Annonces / Ventes / Achats rendus À L'INTÉRIEUR, via les
             MÊMES composants que les écrans séparés (aucune duplication §11). Les
