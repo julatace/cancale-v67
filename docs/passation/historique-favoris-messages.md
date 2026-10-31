@@ -1912,3 +1912,49 @@ public `/api/sante`, sans supposer l'un ou l'autre.
 > APPRISE de son propre envoi (rien à l'aveugle), plafond 50/h, pause sur 429/403. Favoris :
 > un NOMBRE par annonce ; « écrire aux favoris » pas construit (qui : jamais vu). Détail :
 > `historique-vestiaire.md` (31 octobre).
+
+
+## 31 octobre — Messages en volets (maquettes choisies : fil au téléphone, trois volets sur ordinateur)
+
+Julien a choisi deux maquettes (fil téléphone, écran ordinateur) : « applique ça », puis
+« fais exactement cette mise en page ». Appliqué sur l'écran Messages EXISTANT (tâche
+Messages, filtre Vinted) — aucun nouveau chemin d'envoi, aucune règle métier changée.
+
+- **Ordinateur (≥ 1024 px) : trois volets** — la liste · le fil · la **fiche de la paire**
+  (`rendreFicheConv`, `.vrm-msg-fiche`) : grande photo, titre · taille, prix · compte, N° en
+  pastille noire, « Rangée » (sa case dans « Mes meubles », `ouDansMeubles` par `cleNum`),
+  « Attention » (favoris · vues de l'annonce captée). Sur ordinateur, la carte de la paire en
+  tête du fil est cachée (la fiche la dit, une fois).
+- **Identité seulement (§5)** : `ficheDeConv` part de `paireDeConv` (transaction → `item_id`)
+  et lit l'annonce du MÊME `item_id`. Sans `item_id`, la fiche dit « Pas reliée à une
+  annonce … VRM ne devine pas la paire d'après le titre » (`data-fiche-conv="non-reliee"`).
+- **La liste** : « modèle · N° » (le N° de l'identité), photo ronde, filet entre les lignes,
+  point cobalt « non lu ». Le prix sort de la ligne (il est dans la fiche) ; `data-conv-prix` reste.
+- **Le fil** (les deux tailles) : la carte de la paire HORS du défilement (titre · taille ;
+  prix · Vinted · compte · rangement ; N°), bulles lui = encre pleine / acheteur = surface,
+  heure DANS la bulle. **Carte d'offre** « Offre de X € — ton mini : Y € » puis
+  **Refuser · contre-offre · Accepter** (encre pleine) : les MÊMES `actionOffre` — Accepter
+  demande confirmation, Refuser comme avant ; la contre-offre (`contreOffreProposee`,
+  `src/messagesVolets.js` : milieu offre/prix affiché arrondi aux 5 €, jamais sous son mini,
+  toujours entre l'offre et le prix) ne fait que REMPLIR « Ton prix » — rien ne part sans
+  « Envoyer l'offre ». Les repères (photo / prix / mini) au-dessus de l'offre sont retirés :
+  le mini est sur la carte, le prix dans la carte de la paire ou la fiche.
+- **Le pied** : ses réponses rapides existantes (`vinted_quick_replies`, éditables dans
+  « Réponses rapides ») en pastilles, « Écris ta réponse… », **micro de dictée** (`MicDictee`,
+  reconnaissance vocale du navigateur, §2.9 — elle AJOUTE au champ, rien ne part), Envoyer
+  rond cobalt (icône `send` ajoutée à `ICON_PATHS`).
+- **Téléphone** : liste plein écran, fil plein écran avec retour (inchangé), sans volet de fiche.
+- Styles : `src/styles-messages.css`, importée APRÈS `styles-vitrine.css` (`html body …` :
+  le fil est dans un portail sur téléphone, hors de la coque).
+
+Non fait : Leboncoin / Vestiaire / eBay gardent leurs propres fils (composants séparés) ;
+eBay hérite seulement de la grille deux colonnes. L'en-tête commun (recherche + filtres de
+site) appartient au chantier Colis.
+
+Preuves : `scripts/bancs/messages-volets.cjs` (1512 / 390, données inventées — deux
+annonces au MÊME titre, N°80/N°81, une conversation au même titre sans `item_id`) : vert ;
+rouge sur `origin/main` (7 rouges) ; rouge sous mutation (fiche prise par le titre : 3 rouges ;
+Accepter branché sur un geste sans confirmation : 1 rouge). `messages-priorite.cjs` lit
+aussi le nom accessible (Envoyer est une icône). `lbc-messages` (4) et
+`achats-messages-premium` (1) sont rouges à l'identique sur `origin/main`. `messagerie.cjs` mis à jour pour la nouvelle carte
+(ordre Refuser · contre · Accepter, mini sur la carte, contre-offre par `data-offre-geste`).

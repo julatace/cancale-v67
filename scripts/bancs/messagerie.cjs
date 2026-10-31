@@ -362,7 +362,8 @@ async function rendre(b, { version, tel = false, lignes = rows, offresKO = false
       // l'Accepter est mis en avant (« ✓ Accepter 45,00 € · ≥ ton mini »). Rien n'est
       // accepté tout seul — c'est le clic qui suit (ci-dessous) qui vend.
       const cue = await r.pg.evaluate(() => { const e = document.querySelector('[data-offre-au-dessus-mini]'); return e ? { min: e.getAttribute('data-offre-au-dessus-mini'), txt: e.innerText } : null; });
-      dit(cue && cue.min === '40' && /✓\s*Accepter/.test(cue.txt) && /ton mini/i.test(cue.txt), 'une offre ≥ ton prix mini est mise en avant pour l’accepter en 1 tap', JSON.stringify(cue));
+      // (31 oct., maquettes Messages) « Offre de 45 € — ton mini : 40 € », puis Accepter.
+      dit(cue && cue.min === '40' && /Accepter/.test(cue.txt) && /ton mini\s*:\s*40/i.test(cue.txt), 'une offre ≥ ton prix mini est mise en avant pour l’accepter en 1 tap', JSON.stringify(cue));
       // 7 bis. Le fil commence par la carte de la paire, et se groupe par jour.
       const fil = await r.pg.evaluate(() => { const c = document.querySelector('[data-fil-paire]'); const seps = [...document.querySelectorAll('[data-jour-sep]')].map((x) => x.getAttribute('data-jour-sep'));
         return { carte: c ? { item: c.getAttribute('data-fil-paire'), num: c.getAttribute('data-fil-num'), prix: c.getAttribute('data-fil-prix'), etat: c.getAttribute('data-fil-etat'), txt: c.innerText } : null, seps }; });
@@ -370,12 +371,14 @@ async function rendre(b, { version, tel = false, lignes = rows, offresKO = false
       dit(fil.seps.length === 2 && new Set(fil.seps).size === 2, 'les messages sont groupés par jour (deux jours, deux séparateurs)', JSON.stringify(fil.seps));
       await r.pg.screenshot({ path: path.join(require('os').tmpdir(), 'messagerie-fil-' + (tel ? 390 : 1512) + '.png') });
       dit(await r.pg.locator('.vrm-chat-negociation-etat b').innerText()==='Offre reçue','négociation : offre reçue issue du fil natif');
-      const reperes=await r.pg.locator('.vrm-chat-offre-reperes').innerText();
-      dit(reperes.includes('59')&&reperes.includes('40'),'prix affiché et minimum exacts sont réunis près de l’offre');
+      // (31 oct.) Le prix affiché est dans la carte de la paire (téléphone) ou la fiche
+      // (ordinateur) ; le minimum est sur la carte d'offre, à côté du montant.
+      const tete=await r.pg.locator('.vrm-chat-offre-tete').innerText();
+      dit(tete.includes('45')&&/ton mini\s*:\s*40/.test(tete),'le montant de l’offre et ton minimum exact sont réunis sur la carte d’offre',tete);
       const boutons=await r.pg.locator('.vrm-chat-offre-actions button').evaluateAll(xs=>xs.map(x=>({top:x.getBoundingClientRect().top,left:x.getBoundingClientRect().left})));
-      dit(boutons.length===3&&boutons.every(x=>Math.abs(x.top-boutons[0].top)<2)&&boutons[0].left<boutons[1].left&&boutons[1].left<boutons[2].left,'Accepter, Refuser et Contre-proposer sont côte à côte');
-      await r.pg.getByRole('button',{name:'Contre-proposer',exact:true}).click();
-      dit(await r.pg.getByRole('textbox',{name:"Prix de l'offre"}).isVisible(),'Contre-proposer ouvre le prix sans envoyer de requête');
+      dit(boutons.length===3&&boutons.every(x=>Math.abs(x.top-boutons[0].top)<2)&&boutons[0].left<boutons[1].left&&boutons[1].left<boutons[2].left,'Refuser, la contre-offre et Accepter sont côte à côte');
+      await r.pg.locator('[data-offre-geste="contre"]').click();
+      dit(await r.pg.getByRole('textbox',{name:"Prix de l'offre"}).isVisible() && r.execs.filter((x) => x.method !== 'GET').length === 0,'la contre-offre ouvre le prix sans envoyer de requête');
       await r.pg.getByRole('button', { name: /Accepter/ }).first().click();
       await r.pg.waitForTimeout(500);
       // Ouvrir un fil le relit par l'extension (une LECTURE, `GET`) : seul un

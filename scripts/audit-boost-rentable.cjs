@@ -21,6 +21,7 @@ const MUTATIONS = {
   boost_non_deduit: (s) => s.replace('const coutBoost = cote === \'b\' ? boost : 0;', 'const coutBoost = 0;'),
   marge_sans_montant: (s) => s.replace('const coutBoost = cote === \'b\' ? boost : 0;', "const coutBoost = cote === 'b' ? (boost || 0) : 0;"),
   passu_vide: (s) => s.replace('if (!Array.isArray(ventes) || txn == null || items == null || fiches == null) return { etat: \'passu\' };', "if (!Array.isArray(ventes)) return { etat: 'passu' }; txn = txn || {}; items = items || {}; fiches = fiches || {};"),
+  cout_non_saisi_compte: (s) => s.replace('coutC += Math.round(boost * 100);', 'coutC += Math.round((boost || 3) * 100);').replace('if (boost != null) { R.avecMontant += 1;', '{ if (boost != null) R.avecMontant += 1;'),
   par_titre: (s) => s.replace("const it = itemId ? items[itemId] : null;", "const it = (itemId ? items[itemId] : null) || Object.values(items).find((x) => x && x.title === o.title) || null;"),
 };
 
@@ -71,6 +72,7 @@ async function audit(src, bavard) {
     ok(R.etat === 'lu', 'A1 lu', R.etat);
     ok(R.boostees === 6 && R.avecMontant === 6 && R.nonBoostees === 6, 'A2 6 boostées (6 avec montant), 6 non boostées', JSON.stringify([R.boostees, R.avecMontant, R.nonBoostees]));
     ok(R.assez === true, 'A3 assez pour juger');
+    ok(R.coutBoost === 18, 'A6 coût des boosts saisis des paires vendues : 6 × 3 € = 18 €', R.coutBoost);
     ok(R.delai.b === 3 && R.delai.nonb === 10, 'A4 délai médian 3 j contre 10 j', JSON.stringify(R.delai));
     ok(R.vues.b === 200 && R.favoris.nonb === 4, 'A5 vues et favoris', JSON.stringify([R.vues, R.favoris]));
     ok(R.marge.b === 27 && R.marge.nonb === 30, 'A6 marge : 50 − 20 − 3 (boost) = 27 contre 30', JSON.stringify(R.marge));
@@ -100,6 +102,7 @@ async function audit(src, bavard) {
     const R = boostRentable({ ...j, ...inj });
     ok(R.boostees === 6 && R.avecMontant === 0, 'E1 6 boostées, aucune avec montant', JSON.stringify([R.boostees, R.avecMontant]));
     ok(R.marge.nb === 0 && R.marge.b === null, 'E2 marge des boostées inconnue', JSON.stringify(R.marge));
+    ok(R.coutBoost === 0 && R.avecMontant === 0, 'E4 aucun montant saisi : coût 0 sur 0 (l’écran dit « — »)', R.coutBoost);
     ok(R.delai.b === 3, 'E3 le délai, lui, reste comparé');
   });
   essaie('F. identité, jamais le titre', () => {

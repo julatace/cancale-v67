@@ -1972,3 +1972,67 @@ menu (Réglages), pas de « N° + Entrée ».
 règle : `menu-range` (« Plus », `?tab=plat_ebay` → Ventes · eBay, « eBay » écrit une fois), `coque-mobile` (onglets
 attendus), `glisser-onglet` (voisins de la nouvelle barre, jamais Vestiaire), `retour-historique` (« retour » rend le
 filtre de site d'avant).
+
+## 31 octobre 2026 — Statistiques mises en page comme la maquette choisie (images/4.png)
+
+**Demande de Julien** : il a choisi la maquette « Statistiques » (4 tuiles, « Vendu par
+semaine » / « Ce qui part vite » / « Par compte », « Par taille » / « Boost rentable ? »,
+sélecteur Semaine · Mois · Année à droite du titre) : « applique ça », puis « fais exactement
+cette mise en page ». La barre de recherche et les filtres de site du haut de la maquette
+sont l'en-tête commun (autre chantier) : pas touchés ici.
+
+**Ce qui change** : un bloc `StatsVitrine` (App.jsx, avant `StatsDetaillees`, styles dans
+`src/stats-vitrine.css`) monte juste sous le titre ; le reste de l'écran suit sous « Tout le
+détail », inchangé. Le sélecteur de période passe par le slot `right` de `ScreenHead`
+(`Segmente`, `data-sv-choix`). UNE règle de période pour tout le bloc
+(`bornesPeriode`, src/statsVentes.js) : semaine du lundi, mois du 1er, année du 1er janvier,
+minuit local ; la comparaison se fait avec la période d'avant **au même point** (même
+nombre de jours écoulés, même heure — `prevCoupe`), le sous-titre le dit (« Octobre ·
+comparé à septembre · au même jour »).
+
+**D'où vient chaque chiffre (aucune règle neuve sur l'argent, §11)** :
+- **Vendu** : `liveStats.venduLignes` (`ventesFaites`), montant, nombre, écart %. Un compte
+  illisible ⇒ « au moins », écart retiré, le compte manquant nommé ; rien lu ⇒ « — ».
+- **Bénéfice** : `vrm_benefice_jours` (`beneficeDesJours`) — brut des seules ventes au prix
+  d'achat connu, « au moins X € » et « N ventes sur M avec prix d'achat » dès qu'il en manque
+  un ; aucun prix ⇒ « — ».
+- **Délai médian** : relevé `vrm_stats_ventes` + date de mise en ligne de l'annonce reliée par
+  SA transaction (Vinted seulement), couverture « sur N ventes sur M ». Affiché à la
+  demi-journée (médiane de 3 et 10 = « 6,5 jours », jamais « 7 »).
+- **En ligne** : `texteEnLigne` (la coque) + « dont N qui dorment (30 j et plus) »
+  (`vrm_stats_stock`). Le `data-dash-stat="online"` a quitté le résumé replié « Stock et
+  volume de ventes » pour la tuile : le nombre n'est écrit qu'une fois sur l'écran (§7).
+- **Barres** : semaine ⇒ ses 7 jours ; mois ⇒ les 8 dernières semaines (`s` + n° ISO, comme la
+  maquette) ; année ⇒ ses 12 mois. Grises ; la barre en cours seule en cobalt ; un jour à
+  venir n'a pas de barre (`barresPeriode`).
+- **Ce qui part vite** : `delaisPar` par modèle sur la période, du plus court au plus long
+  (`plusRapides`), barre pleine = rapide.
+- **Par compte** : les MÊMES lignes que la tuile Vendu (`ventesPar`) ⇒ la somme des comptes =
+  la tuile. `ventesFaites` porte maintenant `compte` (Vinted : login ; Leboncoin :
+  `account` ; eBay : pseudo) — le miroir serveur `api/_lib/ventes-regle.js` est refabriqué
+  par `audit-bilan-semaine.cjs --recopie` (jamais à la main). Site écrit pour Leboncoin et
+  eBay ; délai médian par compte Vinted.
+- **Par taille** : relevé de la période, 6 tailles les plus vendues rangées par pointure, la
+  plus vendue en cobalt ; « N ventes · délai médian ».
+- **Boost rentable ?** : `boostRentable` sur les ventes de la période ; nouveau champ
+  `coutBoost` (somme des boosts SAISIS des paires vendues, couverture `avecMontant` sur
+  `boostees`). « Vendues en X j vs Y j » seulement si `assez` (5 + 5, même tranche) ; sinon
+  « — » et la phrase qui dit pourquoi. Aucune vente boostée connue ⇒ la carte dit pourquoi
+  (Vinted ne dit « boostée » que pendant le boost ; saisir le boost payé).
+
+Téléphone : même contenu empilé (tuiles 2 × 2) ; `styles-captures.css` range les cartes de
+Statistiques par `order` sur téléphone — le bloc reçoit `order:0` pour rester sous le titre.
+Grille 12 colonnes ≥ 1200 px (`styles-gestion.css`) : le bloc prend la rangée 2, le reste
+descend d'une rangée.
+
+**Preuves** : `scripts/audit-stats-ventes.cjs --prouve` (périodes, barres, semaines ISO,
+comptes, « part vite » calculés à la main ; 14/14 mutations dont `periode_entiere`,
+`semaine_dimanche`, `barre_en_cours_decalee`, `rapides_du_plus_lent`) ;
+`audit-boost-rentable.cjs --prouve` (coût 18 €, 8/8 mutations) ; nouveau banc
+`scripts/bancs/stats-vitrine.cjs` (horloge FIXÉE au jeudi 29 oct. 2026 15 h, chiffres de
+chaque tuile et carte calculés à la main pour Mois, Semaine et Année, cas partiel, cas « pas
+su » ; 112 verts à 1512 et 390 tactile ; 22 rouges sur `origin/main` ; mutation « période
+d'avant entière » ⇒ 4 rouges). `stats-detail` 44, `stats-premium` 42, `stats-compta` 58,
+`boost-rentable` 32, `chiffres-croises` 48, `journee-widgets` 167 (un rouge de placement à
+4 px au 1ᵉʳ passage, vert au second : instable), `enligne`, `comptes` verts. Captures
+1512/390, clair et sombre, regardées à côté de la maquette.

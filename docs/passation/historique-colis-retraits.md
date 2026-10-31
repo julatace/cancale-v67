@@ -2134,3 +2134,50 @@ la carte dit alors « indisponible ici », la liste reste.
 achat en route (ou laisser la relecture active faire) : si `journey_summary` porte le point
 de retrait, il apparaît dans « Par point relais ». Sinon, relire `panel_formes_suivi.journey.forme`
 (lecture seule) : la règle se règle sur la vraie forme, sans deviner.
+
+## 31 oct. (soir) — Colis en quatre colonnes, la maquette de Julien (« applique ça »)
+
+Julien a choisi la maquette « Colis sur ordinateur » : « Prêts à imprimer » · « En attente »
+· « À retirer » · « Partis », côte à côte, un compteur par colonne, des cartes (vignette,
+nom complet en gras, une ligne d'état — ambre si le geste est dû —, le N° en pastille mono
+à droite), la carte des points relais en bas de « À retirer », le bouton cobalt « Imprimer
+les N prêts » à droite du titre, le sous-titre « Rangés sur ce que tu peux faire
+maintenant », la recherche en haut à gauche (touche « / ») et les filtres de site à droite.
+
+**Aucune règle de classement neuve.** `src/colisColonnes.js` ne fait que RANGER, par le
+groupe que lui donne déjà une règle de l'app (`cartesColis` dans `Comptabilite`) :
+- ventes Vinted : `expeditions()` + `pret` (PDF reçu ou capté) ⇒ prêts ; sans PDF ⇒ en
+  attente (« bordereau pas encore lu » tant que la lecture n'est pas finie) ; cochée
+  `isShipDone` ⇒ partis (« Coché posté · Vinted ne l'a pas encore vu partir ») ;
+- eBay (`colisEbay`) : à poster, à vérifier, ne pas poster ⇒ en attente ; Vestiaire
+  (`colisVestiaire`, ventes à envoyer) ⇒ en attente ;
+- à retirer : `pickupUnion` — e-mails, conversations Vinted, ET `aVerifier`/`aConfirmer`
+  (VISIBLES, marqués « à vérifier », §5 « un colis caché est un colis perdu ») ;
+- partis : la même sélection que la section « Partis » (`venteStage`, 45 j).
+Un groupe inconnu tombe dans « En attente » marqué « à vérifier » — jamais jeté. La même
+identité n'est comptée qu'une fois. Ambre = les seuils existants (`dl <= 1` pour poster,
+`jours <= 1` pour retirer — la règle `urgents`), plus les retours.
+« Pas su » se dit DANS la colonne (ventes, bordereaux, e-mails de suivi, achats, eBay).
+Une colonne de plus de 8 cartes se replie derrière « Voir les N autres » (dit, jamais muet).
+Le bouton « Imprimer les N prêts » est l'ancien « Tout imprimer » : `ouvrirLot`, compte
+`lignesLot()` (= la colonne). Colis lit maintenant aussi les achats (`loadOrders('purchased')`
+sur `bordereaux`). Toute la liste d'avant (actions colis par colis, lot, imprimante,
+retours, conflits de N°, eBay, Partis repliés) reste DESSOUS, sous « Colis par colis ».
+Un clic sur une carte : prête/en attente ⇒ défile jusqu'à sa carte d'actions ; à retirer ⇒
+Achats ; eBay ⇒ sa commande ; Vestiaire ⇒ l'espace Vestiaire. `CarteRelaisColis compacte` :
+le fond puis une ligne par point (dans la colonne).
+
+**Barre du haut (ordinateur)** : `BarreHaut` dans la coque (recherche existante, « / » hors
+d'un champ ; la recherche cherche N°, modèle, marque — pas l'acheteur, la phrase ne le promet
+pas) ; la rangée de filtres d'un écran y monte par `DansBarreHaut` (portail ; téléphone :
+elle reste en place). Ventes/Annonces/Messages y envoient leur `FiltreSites` ; Colis y pose
+son filtre de site s'il y a au moins deux sites avec des colis (filtre visible, « N colis X
+sur M · tout voir »). La loupe de l'île se tait sur ordinateur (la barre la remplace).
+
+Preuves : banc `scripts/bancs/colis-colonnes.cjs` (1512 et 390 px, 11 colis inventés) :
+4 colonnes dans l'ordre (côte à côte / empilées), chaque colis dans SA colonne et une seule,
+somme des compteurs = total = cartes = 11, compteur écrit = cartes, bouton = prêts et ouvre
+le lot, ambre du dernier jour, « à vérifier » visible, 44 px au téléphone, « / ».
+Sur l'arbre d'avant (origin/main) : 20 rouges. Mutations : `fait → attente` ⇒ rouge ;
+`aVerifier` non rangé ⇒ rouge (rien de perdu, colis douteux).
+Non vu au banc : les épingles de la mini-carte (géocodage hors ligne).

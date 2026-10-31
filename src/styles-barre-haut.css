@@ -1,0 +1,33 @@
+/* ── LA BARRE DU HAUT, SUR ORDINATEUR (31 oct., maquettes de Julien) ─────────
+   À gauche la recherche (« Tape un N°… », touche « / »), à droite la rangée de
+   filtres de site de l'écran quand il en a une (portail `DansBarreHaut`). Elle
+   laisse la place de l'île d'actions fixée en haut à droite (`--vrm-ile`). */
+.vrm-barre-haut {
+  display: flex; align-items: center; gap: 16px; min-height: 44px;
+  padding-right: var(--vrm-ile, 0px); margin: 8px 0 6px; box-sizing: border-box;
+}
+.vrm-barre-recherche {
+  flex: 0 1 360px; min-width: 200px; min-height: 44px; display: flex; align-items: center; gap: 10px;
+  border: 0; border-radius: 12px; background: var(--vrm-surface, #F5F5F3); color: var(--vrm-muted, #56564F);
+  padding: 0 14px; font: inherit; font-size: 14px; cursor: text; text-align: left;
+}
+.vrm-barre-recherche:hover { box-shadow: 0 0 0 1px var(--vrm-line, #E4E4DF); }
+.vrm-barre-recherche:focus-visible { outline: 2px solid var(--vrm-focus, #2442B8); outline-offset: 2px; }
+.vrm-barre-recherche-txt { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.vrm-barre-kbd {
+  flex: none; font-family: var(--vrm-police-mono, ui-monospace, monospace); font-size: 12px; line-height: 1;
+  color: var(--vrm-muted, #56564F); background: var(--vrm-bg, #FFFFFF); border: 1px solid var(--vrm-line, #E4E4DF);
+  border-radius: 6px; padding: 4px 7px;
+}
+.vrm-barre-haut-droite { margin-left: auto; min-width: 0; display: flex; justify-content: flex-end; }
+.vrm-barre-haut-droite:empty { display: none; }
+.vrm-barre-haut-droite .vrm-filtre-site { flex-wrap: nowrap; margin: 0 !important; padding: 0 !important; }
+/* La tâche qui a envoyé sa rangée dans la barre ne garde pas de vide. */
+.vrm-tache-filtres:empty { display: none; }
+/* La carte d'un colis visée depuis une colonne : un repère bref. */
+.vrm-cc-cible { box-shadow: 0 0 0 2px var(--vrm-accent, #2442B8) !important; transition: box-shadow .2s; }
+/* Sous la barre, la rangée du titre n'a plus à laisser la place de l'île :
+   l'action de l'écran (« Imprimer les N prêts ») se range au bord droit. */
+@media (min-width: 1024px), (min-width: 768px) and (hover: hover) and (pointer: fine) {
+  .vrm-main:has(> .vrm-barre-haut) :is(.vrm-tete-row, .vrm-sous-ile) { padding-right: 0; }
+}

@@ -9,6 +9,7 @@ import SynchronisationVinted from './SynchronisationVinted.jsx';
 import {auteurDernierConfirme,suiviNegociationVinted,reponseAttendueVinted,instantVinted} from './suiviMessagerieVinted.js';
 import {retourReponseVinted,cleReponseVinted,creerBrouillonsReponses,etatActionVinted,cleActionOffreVinted} from './reponseVinted.js';
 import {etatOffreVinted,offreVintedEnAttente,cleOffreVinted,appliquerOffresConfirmees,annonceOffreEnVente,offreOuverte} from './offresVinted.js';
+import {contreOffreProposee} from './messagesVolets.js';
 import {CONVERSATIONS_RETIREES,cleConversation,conversationRetiree,retirerConversation,remettreConversations,majAuGeste,phraseRetour} from './conversationsRetirees.js';
 import {conversationNonLue,conversationNonLueAncienne,messageRecent} from './messagesNonLus.js';
 import {etatSourceMemoire} from './suiviComptes.js';
@@ -31,7 +32,7 @@ import {preparerLiaisonOAuth,lireLiaisonOAuth,resultatLiaisonPermis} from './aut
 import ConnexionsCompte from './auth/ConnexionsCompte.jsx';
 import {etatColisDepuisTexte,normaliserSuivi} from '../api/_lib/etat-colis-email.js';
 import {achatDuColis,suivisAchat,entreeIndexAchat} from './liensColis.js';
-import {avecSuiviDuSujet,finsDesLignes,sortiParSuivis,sortiParSuivi,suiviDeLigne,lienSuivi,codePostalLu,nouvelleVinted,transporteurDeForme,suiviValide,TRANSPORTEURS_SAISIE,normaliserCodePostal,idSuiviManuel,relireLigneSuivi,finDeCommandeAchat,fusionTransporteur,ligneDuTransporteur,ligneDeSuiviTransporteur,leverGarde,SELECT_TRANSP_META,ligneTranspDeMeta,sensDeLigne,incidentDeSuivis,incidentDeLigne,repartiAffichable} from '../api/_lib/suivi-colis.js';
+import {avecSuiviDuSujet,finsDesLignes,sortiParSuivis,sortiParSuivi,suiviDeLigne,lienSuivi,codePostalLu,nouvelleVinted,transporteurDeForme,suiviValide,TRANSPORTEURS_SAISIE,normaliserCodePostal,idSuiviManuel,relireLigneSuivi,finDeCommandeAchat,fusionTransporteur,ligneDuTransporteur,ligneDeSuiviTransporteur,leverGarde,SELECT_TRANSP_META,ligneTranspDeMeta,sensDeLigne,incidentDeSuivis,incidentDeLigne,repartiAffichable,nomTransporteurSuivi} from '../api/_lib/suivi-colis.js';
 import {ligneTransporteur,texteCodePostalMr,carrierLisible,carrierNonLu,nomTransporteur,LECTURE_SERVEUR_TRANSP,heureParis} from '../api/_lib/transporteurs.js';
 import PhotoProfil,{AvatarCompte} from './profil/AvatarPersonnel.jsx';
 import PorteConfidentialite from './PorteConfidentialite.jsx';
@@ -55,7 +56,8 @@ import {centimes,coutsVente,beneficePaire,champsCharges} from "./beneficePaire.j
 import CoutsVente from "./CoutsVente.jsx";
 import { boostRentable, SEUIL_BOOST } from "./boostRentable.js";
 import { CLE_WIDGETS_JOURNEE, WIDGETS_JOURNEE, NOM_TAILLE, DISPO_JOURNEE_DEFAUT, normaliserDispoJournee, deplacerWidget, retirerWidget, widgetFixe, tailleSuivante, tailleDefautWidget, caseVisible, widgetsAjoutables, dispoAEnregistrer } from "./journeeWidgets.js";
-import { rythmeVendu, ecartPct, quandTuVends, margesPar, delaisPar, tranchePrix, TRANCHES_PRIX, stockQuiDort, SEUILS_DORT, rotationStock, tauxVenteMois, tauxAnnulation } from "./statsVentes.js";
+import { rythmeVendu, ecartPct, quandTuVends, margesPar, delaisPar, tranchePrix, TRANCHES_PRIX, stockQuiDort, SEUILS_DORT, rotationStock, tauxVenteMois, tauxAnnulation, PERIODES, bornesPeriode, dansBornes, venduPeriode, barresPeriode, ventesPar, plusRapides } from "./statsVentes.js";
+import "./stats-vitrine.css";
 import {appelerFavorisDirect} from './favorisTransport.js';
 import React, { useState, useMemo, useEffect, useRef, lazy, Suspense } from "react";
 const Operations = lazy(() => import("./operations/Operations.jsx"));
@@ -106,6 +108,9 @@ import { DESCRIPTION_ORGANISATION } from "./operations/description.js";
 // (31 oct.) Colis → « À retirer » : la carte des points relais (règle pure + carte).
 import { regrouperRelais } from "./relaisColis.js";
 import CarteRelaisColis from "./CarteRelais.jsx";
+import ColisColonnes from "./ColisColonnes.jsx";
+import "./styles-barre-haut.css";
+import { colonnesColis, SITES_COLIS } from "./colisColonnes.js";
 import { SITES_TACHE, TACHES_SITE, estTacheSite, siteDeTache, redirigerOnglet, filtreRetenu, retenirFiltre } from "./navigationTache.js";
 // La migration qui cloisonne les vendeurs, lue depuis LE fichier (pas recopiée) :
 // deux copies finiraient par diverger, et c'est le genre de texte qu'on colle
@@ -6313,7 +6318,8 @@ const ventesFaites = ({ vinted, lbc, ebay, cachee } = {}) => {
     const t = tsCommande(o); if (!t) continue;
     const tx = o.transaction_id != null ? o.transaction_id : o.id;
     if (tx != null && !garde('vinted:' + tx)) continue;
-    lignes.push({ plateforme: 'Vinted', ts: t, eur: montantCommande(o) });
+    // (31 oct.) `compte` : le compte qui a vendu (Statistiques → « Par compte »), le même nom que le relevé des ventes.
+    lignes.push({ plateforme: 'Vinted', ts: t, eur: montantCommande(o), compte: String((o._acc && (o._acc.login || o._acc.vinted_user_id)) || '') });
   }
   for (const v of (lbc || [])) {
     if (!v || v.isSeller !== true || !v.txId || lbcAnnulee(v)) continue;
@@ -6321,7 +6327,7 @@ const ventesFaites = ({ vinted, lbc, ebay, cachee } = {}) => {
     if (!isFinite(eur)) continue;
     const t = Date.parse(v.dateVente || '');
     if (!t) { if (garde('lbc:' + v.txId)) sansDate += 1; continue; }
-    if (garde('lbc:' + v.txId)) lignes.push({ plateforme: 'Leboncoin', ts: t, eur });
+    if (garde('lbc:' + v.txId)) lignes.push({ plateforme: 'Leboncoin', ts: t, eur, compte: String(v.account || '') });
   }
   for (const e of (ebay || [])) {
     if (!e || String(e.orderPaymentStatus || '').toUpperCase() !== 'PAID' || !e.orderId) continue;
@@ -6329,7 +6335,7 @@ const ventesFaites = ({ vinted, lbc, ebay, cachee } = {}) => {
     const eur = montantRecuEbay(e).eur, t = Date.parse(e.creationDate || '');
     if (eur == null) { if (garde('ebay:' + e.orderId)) ecartees += 1; continue; }
     if (!t) continue;
-    if (garde('ebay:' + e.orderId)) lignes.push({ plateforme: 'eBay', ts: t, eur });
+    if (garde('ebay:' + e.orderId)) lignes.push({ plateforme: 'eBay', ts: t, eur, compte: String(e._pseudo || e._compte || '') });
   }
   return { lignes, sansDate, ecartees };
 };
@@ -13399,6 +13405,7 @@ const ICON_PATHS = {
   // icônes de la barre du bas.
   // Micro : saisie vocale (G34). Capsule + arceau + pied — au trait, jamais 🎤.
   mic:     <><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0"/><path d="M12 18v3"/><path d="M8.5 21h7"/></>,
+  send:    <><path d="M21 3 10 14"/><path d="M21 3l-6.5 18-4.5-7-7-4.5z"/></>,
   truck:   <><path d="M3 7.5h11v9H3z"/><path d="M14 11h3.6l2.4 2.6v2.9H14z"/><circle cx="7" cy="18" r="1.8"/><circle cx="17.4" cy="18" r="1.8"/></>,
   clock:   <><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 1.8"/></>,
   alert:   <><path d="M12 4.2 21 19.2H3L12 4.2Z"/><path d="M12 10v4"/><path d="M12 16.6h.01"/></>,
@@ -14131,7 +14138,31 @@ const DansEspacePlateforme = React.createContext(false);
 function EspacePlateforme({ nom, children }) {
   return <section className="vrm-market-space" aria-label={nom}><DansEspacePlateforme.Provider value={true}>{children}</DansEspacePlateforme.Provider></section>;
 }
-function ScreenHead({ icon, title, desc, right, principal }) {
+// (31 oct., maquette Colis) LA BARRE DU HAUT SUR ORDINATEUR : la recherche à
+// gauche, et à droite la rangée de filtres de site de l'écran quand il en a une.
+// Un écran y pose sa rangée par `DansBarreHaut` (un portail vers la place que
+// la coque réserve) ; sur téléphone il n'y a pas de barre : la rangée reste où
+// l'écran l'a écrite.
+const BarreHautSlot = React.createContext(null);
+function DansBarreHaut({ children }) {
+  const el = React.useContext(BarreHautSlot);
+  return el ? createPortal(children, el) : children;
+}
+function BarreHaut({ onChercher, poserSlot }) {
+  return (
+    <div className="vrm-barre-haut" data-barre-haut="">
+      <button type="button" className="vrm-barre-recherche" data-barre-recherche="" onClick={onChercher} aria-label="Rechercher une paire" title="Rechercher : un N°, un modèle, une marque (touche /)" aria-keyshortcuts="/">
+        <Icon name="search" size={18}/>
+        {/* La recherche existante cherche le N°, le modèle et la marque — pas
+            l'acheteur : la phrase ne le promet pas. */}
+        <span className="vrm-barre-recherche-txt">Tape un N°, un modèle, une marque…</span>
+        <kbd className="vrm-barre-kbd">/</kbd>
+      </button>
+      <div className="vrm-barre-haut-droite" ref={poserSlot}/>
+    </div>
+  );
+}
+function ScreenHead({ icon, title, desc, right, principal, sous }) {
   const line = typeof icon === 'string' && ICON_PATHS[icon];
   const Titre = React.useContext(DansEspacePlateforme) ? 'h2' : 'h1';
   // ⚠️ UNE MANCHETTE, PAS UN EN-TÊTE DE TABLEAU DE BORD. Le titre était une
@@ -14161,6 +14192,7 @@ function ScreenHead({ icon, title, desc, right, principal }) {
             ? <span aria-hidden="true" style={{display:'flex',color:C.muted,flexShrink:0}}><Icon name={icon} size={20}/></span>
             : (icon ? <span aria-hidden="true" style={{fontSize:18}}>{icon}</span> : null)}
           <Titre className="vrm-display" style={{color:C.text}}>{title}</Titre>
+          {sous ? <div className="vrm-screen-head-sous" data-sous-titre="">{sous}</div> : null}
           {/* ⚠️ LA DESCRIPTION D'ÉCRAN N'EST PLUS AFFICHÉE. Julien : « il y a trop
               d'informations partout, c'est horrible ». Ce paragraphe explique ce
               que fait l'écran — on le lit UNE fois, puis c'est du bruit tous les
@@ -25925,6 +25957,8 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
   // lui, Statistiques réécrivait « Du 1er au 30 oct. » là où Ventes et Achats
   // disent « 30 derniers jours » — le même choix, deux écritures (§11).
   const [caLabel,setCaLabel]=useState('');
+  // (31 oct., maquette) La période de la page : Semaine · Mois · Année — une règle (`bornesPeriode`) pour tout le bloc du haut.
+  const [periodeStats,setPeriodeStats]=useState('mois');
 
   const [objectif,setObjectif]=useState(()=>+(load('vrm_ca_objectif',0))||0); // objectif de CA du mois
   const [objEdit,setObjEdit]=useState(false);
@@ -26249,7 +26283,8 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
 
   return (
     <div className="vrm-finance-page vrm-statistiques-premium" style={{padding:16,display:'flex',flexDirection:'column',gap:18}}>
-      <ScreenHead icon="chart" title="Statistiques"/>
+      <ScreenHead icon="chart" title="Statistiques" right={<Segmente label="Période" className="vrm-sv-periode" value={periodeStats} onChange={setPeriodeStats} options={Object.entries(PERIODES).map(([v,l])=>({v,l,data:{'data-sv-choix':v}}))}/>}/>
+      <StatsVitrine liveStats={liveStats} panelOff={panelOff} periode={periodeStats}/>
 
       {/* Stats principales — priorité aux valeurs Vinted en direct (liveStats) :
           Articles en stock = nb de numéros étiquetés au garage · Valeur du stock =
@@ -26339,7 +26374,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
           sont à confirmer) ; la ligne de fraîcheur est la MÊME que celle de
           l'écran Annonces (`FraicheurAnnonces`, §11), et se tait quand tout
           est frais. */}
-      <details className="vrm-finance-stock"><summary>Stock et volume de ventes{liveStats && <> · <span style={{whiteSpace:'nowrap'}} data-dash-stat="online">annonces en ligne <b style={{color:C.text,fontWeight:600,fontVariantNumeric:'tabular-nums'}}>{texteEnLigne(liveStats)}</b></span></>}</summary><div className="vrm-finance-stock-grid">
+      <details className="vrm-finance-stock"><summary>Stock et volume de ventes{/* (31 oct.) le nombre d'annonces en ligne vit dans la tuile « En ligne » du haut (écrit une fois, §7) */}</summary><div className="vrm-finance-stock-grid">
         {/* ⚠️ LE LIBELLÉ ÉTAIT FAUX. « Paires en stock : 0 » s'affichait en gros
             alors qu'il y a 50 annonces en ligne — parce que ce compteur mesure
             les numéros POSÉS AU GARAGE (le garage est vide), ce que seule la
@@ -35236,6 +35271,278 @@ function BarresStats({ valeurs, titres, hauteur = 96, attenue = [], data }) {
 function LegendeBarres({ libelles }) {
   return <div style={{ display: 'grid', gridTemplateColumns: `repeat(${libelles.length}, minmax(0,1fr))`, fontSize: 11, color: C.muted, textAlign: 'center', marginTop: 4, fontVariantNumeric: 'tabular-nums' }}>{libelles.map((l, i) => <span key={i} style={{ overflow: 'visible', whiteSpace: 'nowrap' }}>{l}</span>)}</div>;
 }
+// ══════════════════════════════════════════════════════════════════════════════
+// STATISTIQUES — LA PAGE DE LA MAQUETTE (31 octobre, Julien : « applique ça »,
+// puis « fais exactement cette mise en page »). Une période choisie (Semaine ·
+// Mois · Année, `bornesPeriode`) gouverne TOUT ce bloc : 4 tuiles, « Vendu par
+// semaine », « Ce qui part vite », « Par compte », « Par taille », « Boost
+// rentable ? ». Aucune règle neuve sur l'argent ; chaque chiffre vient de son
+// propriétaire (§11) :
+//   · Vendu, Par compte, les barres : `liveStats.venduLignes` (`ventesFaites`,
+//     la population de « Vendu » de Ma journée) — la somme des comptes = la tuile ;
+//   · Bénéfice : `vrm_benefice_jours` (l'écran Ventes, la règle de « Ton
+//     bénéfice ») — brut des seules ventes au prix d'achat connu, « au moins »
+//     et « N sur M » dès qu'il en manque (§5) ;
+//   · Délai, Ce qui part vite, Par taille : le relevé `vrm_stats_ventes` et la
+//     date de mise en ligne de l'annonce reliée par SA transaction (Vinted) ;
+//   · En ligne : `texteEnLigne` (la coque) et `vrm_stats_stock` (l'écran Annonces) ;
+//   · Boost : `boostRentable` (src/boostRentable.js), ventes de la période.
+// « Pas su » s'écrit « — » avec la raison ; une seule couleur d'accent : la
+// barre en cours et la taille la plus vendue (§7). Banc : stats-vitrine.
+function useReleveStats() {
+  const [releve, setReleve] = React.useState(lireReleveVentes);
+  const [stock, setStock] = React.useState(lireStatsStock);
+  const [benef, setBenef] = React.useState(lireBeneficeJours);
+  React.useEffect(() => {
+    const f = (e) => { const k = e && e.detail && e.detail.k; if (k === 'vrm_stats_ventes') setReleve(lireReleveVentes()); if (k === 'vrm_stats_stock') setStock(lireStatsStock()); if (k === 'vrm_benefice_jours') setBenef(lireBeneficeJours()); };
+    window.addEventListener('vrm:save', f); return () => window.removeEventListener('vrm:save', f);
+  }, []);
+  const [extras, setExtras] = React.useState(undefined);
+  React.useEffect(() => { let mort = false; lireExtrasRepartition().then((x) => { if (!mort) setExtras(x); }).catch(() => { if (!mort) setExtras({ txn: null, items: null, dates: null }); }); return () => { mort = true; }; }, []);
+  const lignes = React.useMemo(() => {
+    if (!releve) return null;
+    const x = extras || {};
+    return releve.l.map((r) => {
+      const [plateforme, compte, id, ts, eur, achat, frais, titre] = r;
+      const t = plateforme === 'Vinted' && x.txn && id ? x.txn[String(id)] : null;
+      const it = t && t.item && x.items ? x.items[t.item] : null;
+      return { plateforme, compte, id, ts, eur, achat, frais, ...clesVenteStats(titre, it), enLigne: it ? dateMiseEnLigneMs(it, x.dates || null) : null };
+    });
+  }, [releve, extras]);
+  return { releve, stock, benef, extras, lignes };
+}
+const SITE_COURT = { Leboncoin: 'Leboncoin', eBay: 'eBay', Vestiaire: 'Vestiaire' };
+// Le titre de la période : « Octobre · comparé à septembre ».
+const titrePeriodeStats = (b) => {
+  const maj = (s) => s.charAt(0).toUpperCase() + s.slice(1);
+  if (b.type === 'semaine') return `Semaine du ${new Date(b.de).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' })} · comparée à la précédente`;
+  if (b.type === 'annee') return `${new Date(b.de).getFullYear()} · comparée à ${new Date(b.prevDe).getFullYear()}`;
+  return `${maj(new Date(b.de).toLocaleDateString('fr-FR', { month: 'long' }))} · comparé à ${new Date(b.prevDe).toLocaleDateString('fr-FR', { month: 'long' })}`;
+};
+function StatsVitrine({ liveStats, panelOff, periode }) {
+  const maintenant = React.useMemo(() => Date.now(), [periode, liveStats]); // eslint-disable-line react-hooks/exhaustive-deps
+  const b = React.useMemo(() => bornesPeriode(periode, maintenant), [periode, maintenant]);
+  const { releve, stock, benef, extras, lignes } = useReleveStats();
+  const { ventes: ventesCoque } = useVentesCoque();
+  const [nuage, setNuage] = React.useState(() => isCloudReady());
+  React.useEffect(() => onCloudReady(() => setNuage(true)), []);
+
+  const vendu = liveStats ? liveStats.venduLignes : undefined;
+  const manque = (liveStats && liveStats.venduManque) || [];
+  const partielVendu = manque.length > 0;
+  const V = React.useMemo(() => venduPeriode(vendu, b), [vendu, b]);
+  const barres = React.useMemo(() => barresPeriode(vendu, b.type, maintenant), [vendu, b, maintenant]);
+  // Bénéfice : les jours publiés compris dans la période (jusqu'à demain minuit).
+  const B = React.useMemo(() => benef ? beneficeDesJours(benef.jours, new Date(b.de), new Date(b.a)) : null, [benef, b]);
+  const dansP = (l) => l && dansBornes(l.ts, b.de, b.a);
+  const lp = React.useMemo(() => (lignes ? lignes.filter(dansP) : null), [lignes, b]); // eslint-disable-line react-hooks/exhaustive-deps
+  const datesPasSu = extras !== undefined && (!extras || extras.items == null || extras.txn == null);
+  const lv = lp && !datesPasSu && extras !== undefined ? lp.filter((l) => l.plateforme === 'Vinted') : null;
+  const Dl = React.useMemo(() => (lv ? delaisPar(lv, () => '') : null), [lv]);
+  const rapides = React.useMemo(() => (lv ? plusRapides(delaisPar(lv, (l) => l.modele), 5) : null), [lv]);
+  const tailles = React.useMemo(() => {
+    if (!lp || extras === undefined) return null;
+    const D = delaisPar(lp, (l) => l.taille);
+    const top = D.groupes.slice().sort((x, y) => y.n - x.n || (x.k < y.k ? -1 : 1)).slice(0, 6);
+    const num = (k) => { const n = parseFloat(String(k).replace(',', '.')); return isFinite(n) ? n : Infinity; };
+    return { n: D.n, sansTaille: D.n - D.groupes.reduce((s, g) => s + g.n, 0), plus: top.length ? top[0].k : null, groupes: top.sort((x, y) => num(x.k) - num(y.k) || (x.k < y.k ? -1 : 1)) };
+  }, [lp, extras, datesPasSu]);
+  // Par compte : les lignes du VENDU de la période (la tuile), compte et site.
+  const comptes = React.useMemo(() => {
+    if (!Array.isArray(vendu)) return null;
+    const P = ventesPar(vendu.filter(dansP), (l) => `${l.plateforme}|${l.compte || ''}`);
+    const dl = lp && lv ? delaisPar(lv, (l) => l.compte) : null;
+    const nbLbc = new Set(P.groupes.filter((g) => g.k.startsWith('Leboncoin|')).map((g) => g.k)).size;
+    return P.groupes.map((g) => {
+      const [plat, compte] = g.k.split('|');
+      const d = plat === 'Vinted' && dl ? dl.groupes.find((x) => x.k === compte) : null;
+      const nom = plat === 'Vinted' ? (compte || 'Vinted') : plat === 'Leboncoin' ? (nbLbc > 1 && compte ? `Leboncoin ${compte.slice(-4)}` : 'Leboncoin') : (compte || plat);
+      return { k: g.k, plat, nom, site: plat === 'Vinted' ? '' : (SITE_COURT[plat] || plat), n: g.n, eur: g.eur, mediane: d ? d.mediane : null, nDelai: d ? d.nDelai : 0 };
+    });
+  }, [vendu, b, lp, lv]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Boost : les ventes Vinted de la période seulement.
+  const boost = React.useMemo(() => {
+    if (!Array.isArray(ventesCoque) || !extras || !nuage) return null;
+    const hAcc = new Set((load('vinted_accounts_hidden', []) || []).map(String));
+    let fiches = null, buyByNum = {};
+    try { fiches = load('vinted_annonce_numeros', {}) || {}; buyByNum = load('vinted_buyprice_by_num', {}) || {}; } catch (_) { fiches = null; }
+    return boostRentable({
+      ventes: ventesCoque.filter((o) => { const t = Date.parse((o && o.date) || ''); return dansBornes(t, b.de, b.a); }),
+      txn: extras.txn, items: extras.items, fiches,
+      estAnnulee: (o) => classifyOrderStatus(o.status) === 'cancelled',
+      ecarte: (o) => compteEcarte(o && o._acc && o._acc.vinted_user_id, hAcc, panelOff || {}),
+      montantVente: montantCommande,
+      dateMiseEnLigne: (it) => dateMiseEnLigneMs(it, extras.dates || null),
+      prixAchat: (f) => prixAchatDe(f, buyByNum),
+    });
+  }, [ventesCoque, extras, nuage, panelOff, b]);
+
+  const pl = (n, s, p) => `${n} ${n > 1 ? (p || s + 's') : s}`;
+  // Un délai s'écrit à la demi-journée près (la médiane de 3 et 10 est 6,5 j, jamais « 7 »).
+  const j10 = (j) => Math.round(j * 10) / 10, jTxt = (j) => String(j10(j)).replace('.', ',');
+  const jours = (j) => (j == null ? '—' : j < 1 ? '< 1 j' : `${jTxt(j)} j`);
+  const joursLong = (j) => (j == null ? '—' : j < 1 ? 'moins d’un jour' : `${jTxt(j)} jour${j10(j) >= 2 ? 's' : ''}`);
+  const cents = (v) => (v == null ? '' : String(Math.round(v * 100)));
+  const nomPrec = b.type === 'semaine' ? 'la semaine d’avant' : b.type === 'annee' ? String(new Date(b.prevDe).getFullYear()) : new Date(b.prevDe).toLocaleDateString('fr-FR', { month: 'long' });
+  const auMemePoint = b.prevCoupe < b.prevA;
+
+  // ── Les 4 tuiles ──
+  const tuile = (k, lib, val, sous, attrs, titre) => (
+    <div className="vrm-sv-tuile" data-sv-tuile={k} title={titre || undefined} {...(attrs || {})}>
+      <div className="vrm-sv-tuile-lib">{lib}</div>
+      <div className="vrm-display vrm-sv-tuile-val" data-vide={val === '—' ? '1' : undefined}>{val}</div>
+      <div className="vrm-sv-tuile-sous">{sous}</div>
+    </div>
+  );
+  const tVendu = V == null
+    ? tuile('vendu', 'Vendu', '—', vendu === null ? 'ventes pas pu être lues' : 'je lis tes ventes…', { 'data-sv-etat': vendu === null ? 'passu' : 'encours' })
+    : tuile('vendu', 'Vendu', `${partielVendu ? 'au moins ' : ''}${fmt(V.eur)}`,
+      <>{pl(V.n, 'vente')}{V.ecart != null && !partielVendu ? <span title={`Comparé à ${nomPrec}${auMemePoint ? ', au même jour' : ''} : ${fmt(V.prec.eur)}`}>{` · ${V.ecart > 0 ? '+' : ''}${V.ecart} %`}</span> : null}{partielVendu ? ` · sans ${manque.join(', ')}` : ''}</>,
+      { 'data-sv-etat': 'lu', 'data-sv-n': V.n, 'data-sv-eur': cents(V.eur), 'data-sv-prec': cents(V.prec.eur), 'data-sv-ecart': V.ecart == null ? '' : V.ecart, 'data-sv-partiel': partielVendu ? '1' : '0' });
+  const tBenef = !B
+    ? tuile('benefice', 'Bénéfice', '—', 'ouvre Ventes une fois : il s’y calcule', { 'data-sv-etat': 'passu' })
+    : B.n === 0
+      ? tuile('benefice', 'Bénéfice', '—', 'aucune vente finalisée', { 'data-sv-etat': 'lu', 'data-sv-n': 0, 'data-sv-ncout': 0, 'data-sv-brut': '' })
+      : B.nCout === 0
+        ? tuile('benefice', 'Bénéfice', '—', `aucun prix d’achat sur ${pl(B.n, 'vente')}`, { 'data-sv-etat': 'lu', 'data-sv-n': B.n, 'data-sv-ncout': 0, 'data-sv-brut': '' })
+        : tuile('benefice', 'Bénéfice', `${B.nCout < B.n ? 'au moins ' : ''}${fmt(B.brut)}`, `${B.nCout} vente${B.nCout > 1 ? 's' : ''} sur ${B.n} avec prix d’achat`,
+          { 'data-sv-etat': 'lu', 'data-sv-n': B.n, 'data-sv-ncout': B.nCout, 'data-sv-brut': cents(B.brut) }, 'Brut : vente − prix d’achat, ventes finalisées, sur les seules ventes au prix d’achat connu.');
+  const tDelai = !releve
+    ? tuile('delai', 'Délai médian', '—', 'ouvre Ventes une fois : il s’y calcule', { 'data-sv-etat': 'passu' })
+    : extras === undefined ? tuile('delai', 'Délai médian', '—', 'je lis tes annonces…', { 'data-sv-etat': 'encours' })
+      : datesPasSu ? tuile('delai', 'Délai médian', '—', 'annonces pas pu être lues', { 'data-sv-etat': 'passu' })
+        : !Dl || Dl.nDelai === 0 ? tuile('delai', 'Délai médian', '—', Dl && Dl.n ? `aucune des ${pl(Dl.n, 'vente')} Vinted n’a de date de mise en ligne` : 'aucune vente Vinted finalisée', { 'data-sv-etat': 'lu', 'data-sv-mediane': '', 'data-sv-couv': Dl ? `0/${Dl.n}` : '0/0' })
+          : tuile('delai', 'Délai médian', joursLong(Dl.mediane), `entre mise en ligne et vente${Dl.nDelai < Dl.n ? ` · sur ${Dl.nDelai} ventes sur ${Dl.n}` : ''}`,
+            { 'data-sv-etat': 'lu', 'data-sv-mediane': Dl.mediane, 'data-sv-couv': `${Dl.nDelai}/${Dl.n}` }, 'Vinted seulement : Leboncoin et eBay ne donnent pas la date de mise en ligne.');
+  const enLigneTxt = texteEnLigne(liveStats);
+  const dort = stock && stock.dort && stock.dort.seuils ? (stock.dort.seuils[30] || { n: 0 }).n : null;
+  const tEnLigne = tuile('enligne', 'En ligne',
+    <span data-dash-stat="online">{enLigneTxt === '—' ? '—' : <><b style={{ fontWeight: 'inherit' }}>{enLigneTxt}</b> annonce{enLigneTxt === '1' ? '' : 's'}</>}</span>,
+    dort == null ? 'qui dorment : ouvre Annonces une fois' : `dont ${dort} qui dor${dort > 1 ? 'ment' : 't'} (30 j et plus)`,
+    { 'data-sv-etat': enLigneTxt === '—' ? 'passu' : 'lu', 'data-sv-dort': dort == null ? '' : dort }, 'Aujourd’hui, quelle que soit la période choisie.');
+
+  // ── Les barres ──
+  const maxB = barres ? Math.max(1, ...barres.map((x) => x.eur)) : 1;
+  const libBarre = (x) => b.type === 'semaine' ? new Date(x.debut).toLocaleDateString('fr-FR', { weekday: 'short' }).replace('.', '')
+    : b.type === 'annee' ? new Date(x.debut).toLocaleDateString('fr-FR', { month: 'short' }).replace('.', '') : `s${x.semaine}`;
+  const titreBarres = b.type === 'semaine' ? 'Vendu par jour' : b.type === 'annee' ? 'Vendu par mois' : 'Vendu par semaine';
+  const noteBarres = b.type === 'semaine' ? 'cette semaine' : b.type === 'annee' ? String(new Date(b.de).getFullYear()) : '8 dernières semaines';
+  const H = 190;
+
+  const carte = (k, titre, droite, corps, attrs, cls) => (
+    <section className={`vrm-sv-carte${cls ? ' ' + cls : ''}`} data-stats-carte={k} {...(attrs || {})}>
+      <div className="vrm-sv-carte-tete"><h2 className="vrm-display vrm-sv-carte-titre">{titre}</h2>{droite ? <span className="vrm-sv-note">{droite}</span> : null}</div>
+      {corps}
+    </section>
+  );
+  const vide = (txt, attrs) => <div className="vrm-sv-vide" {...(attrs || {})}>{txt}</div>;
+  const maxRapide = rapides && rapides.length ? Math.max(...rapides.map((g) => g.mediane), 1) : 1;
+  const maxTaille = tailles && tailles.groupes.length ? Math.max(...tailles.groupes.map((g) => g.n), 1) : 1;
+
+  return (
+    <div className="vrm-stats-vitrine" data-sv-periode={b.type} data-sv-de={b.de} data-sv-a={b.a}>
+      <div className="vrm-sv-sous-titre" data-sv-sous-titre="">{titrePeriodeStats(b)}{auMemePoint ? <span className="vrm-sv-note"> · au même jour</span> : null}</div>
+      <div className="vrm-sv-tuiles">{tVendu}{tBenef}{tDelai}{tEnLigne}</div>
+      <div className="vrm-sv-rangee vrm-sv-rangee-3">
+        {carte('sv-barres', titreBarres, noteBarres, !barres
+          ? vide(vendu === null ? 'Tes ventes n’ont pas pu être lues : aucune barre.' : 'Je lis tes ventes…')
+          : (
+            <div className="vrm-sv-barres" role="img" aria-label={`${titreBarres}, ${noteBarres}`} data-sv-barres={barres.map((x) => cents(x.eur)).join(',')} data-sv-barres-n={barres.map((x) => x.n).join(',')} data-sv-encours={barres.findIndex((x) => x.enCours)}>
+              {barres.map((x, i) => (
+                <div key={i} className="vrm-sv-barre-col" title={`${libBarre(x)} : ${x.avenir ? 'pas encore commencé' : `${fmt(x.eur)} · ${pl(x.n, 'vente')}`}${x.enCours ? ' (en cours)' : ''}`}>
+                  <div className="vrm-sv-barre-zone" style={{ height: H }}>
+                    {!x.avenir && x.eur > 0 && <div className="vrm-sv-barre" data-en-cours={x.enCours ? '1' : undefined} style={{ height: `${Math.max(2, x.eur / maxB * 100)}%` }}/>}
+                  </div>
+                  <div className="vrm-sv-barre-lib">{libBarre(x)}</div>
+                </div>
+              ))}
+            </div>
+          ), { 'data-sv-carte': 'barres' }, 'vrm-sv-large')}
+        {carte('sv-rapides', 'Ce qui part vite', rapides && rapides.length ? 'médiane' : null, !lignes
+          ? vide('Il se calcule avec le relevé de tes ventes : ouvre Ventes une fois.', { 'data-sv-etat': 'passu' })
+          : extras === undefined ? vide('Je lis les dates de mise en ligne…', { 'data-sv-etat': 'encours' })
+            : datesPasSu ? vide('Tes annonces n’ont pas pu être lues : aucun délai.', { 'data-sv-etat': 'passu' })
+              : !rapides.length ? vide('Aucune vente Vinted datée sur la période (il faut la date de mise en ligne de son annonce).', { 'data-sv-etat': 'lu' })
+                : (
+                  <div className="vrm-sv-lignes" data-sv-etat="lu">
+                    {rapides.map((g) => (
+                      <div key={g.k} className="vrm-sv-ligne-rapide" data-sv-rapide={g.k} data-mediane={g.mediane} data-ndelai={g.nDelai} title={`${g.k} : médiane ${jours(g.mediane)}, sur ${pl(g.nDelai, 'vente datée', 'ventes datées')}`}>
+                        <span className="vrm-sv-nom">{g.k.replace(/(^|\s)(\p{Ll})/gu, (m, e, c) => e + c.toUpperCase())}</span>
+                        <span className="vrm-sv-piste"><span style={{ width: `${Math.max(4, (1 - g.mediane / (maxRapide * 1.15)) * 100)}%` }}/></span>
+                        <span className="vrm-sv-chiffre">{jours(g.mediane)}</span>
+                      </div>
+                    ))}
+                  </div>
+                ), { 'data-sv-carte': 'rapides' })}
+        {carte('sv-comptes', 'Par compte', null, !comptes
+          ? vide(vendu === null ? 'Tes ventes n’ont pas pu être lues.' : 'Je lis tes ventes…', { 'data-sv-etat': vendu === null ? 'passu' : 'encours' })
+          : !comptes.length ? vide('Aucune vente sur la période.', { 'data-sv-etat': 'lu' })
+            : (
+              <div className="vrm-sv-lignes vrm-sv-comptes" data-sv-etat="lu">
+                {comptes.slice(0, 6).map((c) => (
+                  <div key={c.k} className="vrm-sv-ligne-compte" data-sv-compte={c.k} data-n={c.n} data-mediane={c.mediane == null ? '' : c.mediane}>
+                    <span className="vrm-sv-nom">{c.nom}{c.site ? <span className="vrm-sv-site"> ({c.site})</span> : null}</span>
+                    <span className="vrm-sv-n">{pl(c.n, 'vente')}</span>
+                    <span className="vrm-sv-chiffre" title={c.plat === 'Vinted' ? (c.mediane == null ? 'aucune vente datée' : `délai médian, sur ${pl(c.nDelai, 'vente datée', 'ventes datées')}`) : 'pas de date de mise en ligne sur cette plateforme'}>{jours(c.mediane)}</span>
+                  </div>
+                ))}
+                {comptes.length > 6 && <div className="vrm-sv-note">+ {pl(comptes.length - 6, 'autre compte', 'autres comptes')}</div>}
+              </div>
+            ), { 'data-sv-carte': 'comptes' })}
+      </div>
+      <div className="vrm-sv-rangee vrm-sv-rangee-2">
+        {carte('sv-tailles', 'Par taille', tailles && tailles.groupes.length ? 'médiane de vente' : null, !lignes
+          ? vide('Il se calcule avec le relevé de tes ventes : ouvre Ventes une fois.', { 'data-sv-etat': 'passu' })
+          : !tailles ? vide('Je lis tes annonces…', { 'data-sv-etat': 'encours' })
+            : !tailles.groupes.length ? vide(tailles.n ? `Aucune taille connue sur ${pl(tailles.n, 'vente finalisée', 'ventes finalisées')}.` : 'Aucune vente finalisée sur la période.', { 'data-sv-etat': 'lu' })
+              : (
+                <div className="vrm-sv-lignes" data-sv-etat="lu" data-sv-plus={tailles.plus}>
+                  {tailles.groupes.map((g) => (
+                    <div key={g.k} className="vrm-sv-ligne-taille" data-sv-taille={g.k} data-n={g.n} data-mediane={g.mediane == null ? '' : g.mediane}>
+                      <span className="vrm-display vrm-sv-taille">{g.k}</span>
+                      <span className="vrm-sv-piste vrm-sv-piste-epaisse"><span data-plus={g.k === tailles.plus ? '1' : undefined} style={{ width: `${Math.max(3, g.n / maxTaille * 100)}%` }}/></span>
+                      <span className="vrm-sv-chiffre">{pl(g.n, 'vente')} · {jours(g.mediane)}</span>
+                    </div>
+                  ))}
+                  {tailles.sansTaille > 0 && <div className="vrm-sv-note">{pl(tailles.sansTaille, 'vente')} sans taille connue.</div>}
+                </div>
+              ), { 'data-sv-carte': 'tailles' })}
+        {(() => {
+          const etat = boost == null ? (Array.isArray(ventesCoque) || ventesCoque === null || (extras && extras.items == null) ? 'passu' : 'encours') : boost.etat !== 'lu' ? 'passu' : boost.boostees === 0 ? 'aucun' : 'lu';
+          const droite = etat === 'lu' ? pl(boost.boostees, 'boost lu', 'boosts lus') : null;
+          const corps = etat === 'encours' ? vide('Je lis tes ventes et tes annonces…')
+            : etat === 'passu' ? vide('Ventes ou annonces pas pu être lues : rien n’est comparé.')
+              : etat === 'aucun' ? vide(`Aucune vente boostée connue sur la période. Vinted ne dit « boostée » que pendant le boost : pour la suite, saisis le boost payé dans la fiche de la paire (Annonces).`)
+                : (<>
+                  <div className="vrm-sv-boost">
+                    <div className="vrm-sv-boost-case" data-sv-boost="cout" data-v={boost.avecMontant ? cents(boost.coutBoost) : ''}>
+                      <div className="vrm-sv-tuile-lib">Coût</div>
+                      <div className="vrm-display vrm-sv-tuile-val">{boost.avecMontant ? `${boost.avecMontant < boost.boostees ? 'au moins ' : ''}${fmt(boost.coutBoost)}` : '—'}</div>
+                    </div>
+                    <div className="vrm-sv-boost-case" data-sv-boost="ventes" data-v={boost.boostees}>
+                      <div className="vrm-sv-tuile-lib">Ventes après</div>
+                      <div className="vrm-display vrm-sv-tuile-val">{boost.boostees}</div>
+                    </div>
+                    <div className="vrm-sv-boost-case" data-sv-boost="delai" data-v={boost.delai.b == null ? '' : `${boost.delai.b}/${boost.delai.nonb}`}>
+                      <div className="vrm-sv-tuile-lib">Vendues en</div>
+                      <div className="vrm-display vrm-sv-tuile-val">{boost.delai.b == null ? '—' : `${jours(boost.delai.b)} vs ${jours(boost.delai.nonb)}`}</div>
+                    </div>
+                  </div>
+                  <div className="vrm-sv-note vrm-sv-boost-note">
+                    {boost.avecMontant < boost.boostees ? `Coût saisi pour ${boost.avecMontant} sur ${boost.boostees}. ` : ''}
+                    {boost.delai.b == null ? `Sur ${pl(boost.boostees, 'boost')} seulement : il faut ${SEUIL_BOOST} ventes boostées et ${SEUIL_BOOST} autres de même tranche de prix pour comparer les délais.` : `Délai médian, boostées contre les autres de même tranche de prix (${boost.delai.nb} et ${boost.delai.nnb} ventes datées).`}
+                  </div>
+                </>);
+          return carte('sv-boost', 'Boost rentable ?', droite, corps, { 'data-sv-carte': 'boost', 'data-sv-etat': etat, 'data-sv-boostees': boost && boost.etat === 'lu' ? boost.boostees : '' });
+        })()}
+      </div>
+      <div className="vrm-sv-note vrm-sv-pied">
+        Vendu : toutes plateformes, au jour de la vente, ventes en cours comprises. Bénéfice, délai, modèles et tailles : ventes finalisées (délai : Vinted seulement).{liveStats && liveStats.venduSansDate ? ` ${pl(liveStats.venduSansDate, 'vente')} Leboncoin sans date : dans aucune période.` : ''}
+      </div>
+      <h2 className="vrm-sv-detail-titre">Tout le détail</h2>
+    </div>
+  );
+}
 function StatsDetaillees({ liveStats, panelOff }) {
   const sCarte = { padding: 18, background: C.card, border: `1px solid ${C.border}`, borderRadius: 12, boxShadow: C.shadow };
   const sTitre = { fontSize: 15, fontWeight: 600, color: C.text, letterSpacing: -0.15 };
@@ -41891,7 +42198,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // ou retiré relit (le cache ne sert plus une liste qui ne le couvre pas).
   useEffect(() => { if (accounts.length) loadOrders('sold', setSales); /* eslint-disable-next-line */ }, [cleComptes]);
   useEffect(() => { buysCharges.current = Array.isArray(buys.items); }, [buys.items]);
-  useEffect(() => { if ((curSub==='achats'||curSub==='journee') && accounts.length && (buys.items===null || (buys.comptes && buys.comptes!==cleComptes))) loadOrders('purchased', setBuys); /* eslint-disable-next-line */ }, [sub, cleComptes]);
+  // (31 oct.) Colis lit aussi les achats : sa colonne « À retirer » est la liste de `pickupUnion`.
+  useEffect(() => { if ((curSub==='achats'||curSub==='journee'||curSub==='bordereaux') && accounts.length && (buys.items===null || (buys.comptes && buys.comptes!==cleComptes))) loadOrders('purchased', setBuys); /* eslint-disable-next-line */ }, [sub, cleComptes]);
 
   // AUTO-LOCK : dès qu'une vente finalisée correspond à UNE SEULE annonce
   // numérotée (titre non ambigu), on verrouille le lien vente↔paire par n° de
@@ -42434,7 +42742,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       viderCacheLignes();                                          // vide le cache de lignes (relit la moisson fraîche)
       try { Object.keys(_acctCache).forEach(k => delete _acctCache[k]); _persistAcctCache(); } catch (_) {}
       if (curSub === 'ventes' || curSub === 'journee' || curSub === 'messages') loadOrders('sold', setSales, false, { silencieux: true });
-      if (curSub === 'achats' || curSub === 'journee') { loadOrders('purchased', setBuys, false, { silencieux: true }); lireSuivis(); }
+      if (curSub === 'achats' || curSub === 'journee' || curSub === 'bordereaux') { loadOrders('purchased', setBuys, false, { silencieux: true }); lireSuivis(); }
       if (curSub === 'annonces' || curSub === 'journee' || curSub === 'messages') loadListings();
       if (curSub === 'messages' || curSub === 'journee') loadConvs();
     };
@@ -43025,6 +43333,24 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // dernier message de la boîte (même instant, à une seconde près) : un résumé plus
   // ancien dirait l'auteur d'un AUTRE message. Sinon `null` (rien n'est écrit).
   const auteurDernier = (c,p) => auteurDernierConfirme(c,p?.r);
+  // (31 oct., maquettes Messages) LA FICHE DE LA PAIRE d'un fil — ce que la
+  // paire porte en plus de `paireDeConv`, et SEULEMENT par identité (§5) :
+  // l'annonce captée du même `item_id` (taille, favoris, vues), le N° posé sur
+  // CETTE annonce (son prix mini, sa case dans « Mes meubles » par `cleNum`).
+  // Aucun titre ne relie rien : sans `item_id`, la fiche dit qu'elle n'est pas
+  // reliée. Ce qu'on ne sait pas reste `null` (rien n'est écrit).
+  const ficheDeConv = (pc, acc) => {
+    if (!pc || pc.item == null) return null;
+    const ann = annonceParId.get(String(pc.item)) || null;
+    const fiche = numeros[String(pc.item)] || {};
+    const mn = Number(String(fiche.min ?? '').replace(',', '.'));
+    let rangement = null;
+    if (pc.num) { try { const o = ouDansMeubles(pc.num); if (o) rangement = `${o.meuble.name || 'Meuble'} · ${o.libelle}`; } catch (_) {} }
+    const n = (v) => (Number.isFinite(v) ? v : null);
+    return { ...pc, taille: (ann && ann.size) || null, compte: acc ? accName(acc) : '', rangement,
+      favoris: ann ? n(ann.favourites) : null, vues: ann ? n(ann.views) : null,
+      mini: isFinite(mn) && mn > 0 ? mn : null };
+  };
 
   // ── LEBONCOIN ET eBAY DANS LE BÉNÉFICE (19 oct.) — `ventesAutresBenefice`,
   // par IDENTITÉ seulement (SKU eBay, lien/référence Leboncoin). Les annonces
@@ -44903,6 +45229,73 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const signatureColis = e => empreinteColis({owner:AUTH.user?.id||'',compte:e.o?._acc?.vinted_user_id||e.b?.uid||'',transaction:e.txn||e.key,numero:(e.b?numForBord(e.b):'')||(e.o?effEntry(e.o)?.numero:'')||''});
   const [progressionLot,setProgressionLot]=useState(null);
   const lotActuel=React.useRef(null);lotActuel.current={expeditions,signatureColis,pdf:e=>(e.b&&e.b.hasPdf)||(e.txn&&labelsCaptes[e.txn])};
+  // ── (31 oct.) LES CARTES DES QUATRE COLONNES DE COLIS ──────────────────
+  // Chaque carte porte le groupe que lui donne une règle EXISTANTE (aucune règle
+  // de classement neuve) : `expeditions()` + `pret` + `isShipDone` pour les
+  // ventes Vinted, `colisEbay`, `colisVestiaire`, `pickupUnion` pour les
+  // retraits, `venteStage` pour les partis. `colonnesColis` les range.
+  const [siteColis, setSiteColis] = useState('toutes');
+  const cartesColis = () => {
+    const L = [];
+    const nomAvecTaille = (titre, o) => { const t = String(titre || '').trim(); const e = o ? effEntry(o) : null; const tl = e && e.taille ? String(e.taille) : ''; return tl && !tailleDansTitre(t, tl) ? `${t} · ${tl}` : t; };
+    const lectureFinie = labelsPrets && emailBords !== null;
+    for (const e of expeditions()) {
+      const o = e.o, b = e.b;
+      const poste = o ? isShipDone(o) : (b ? isBordShippedManual(b) : false);
+      const num = (b ? numForBord(b) : '') || (o ? (effEntry(o)?.numero || '') : '');
+      const lim = texteLimiteEnvoi(e.lim) || '';
+      const groupe = poste ? 'fait' : (e.pret ? 'pret' : 'attente');
+      const etat = groupe === 'fait' ? 'Coché posté · Vinted ne l’a pas encore vu partir'
+        : groupe === 'pret' ? (lim || 'bordereau prêt')
+        : [lectureFinie ? 'bordereau pas encore là' : 'bordereau pas encore lu', lim].filter(Boolean).join(' · ');
+      L.push({ cle: 'v:' + (e.txn || e.key), groupe, site: 'vinted', nom: nomAvecTaille(o ? o.title : (b && (b.modele || b.article)) || 'Bordereau', o), photo: o ? orderPhoto(o) : bordPhoto(b),
+        num, etat, ambre: groupe !== 'fait' && e.dl != null && e.dl <= 1, ouvrir: groupe !== 'fait', tx: e.txn || '' });
+    }
+    if (colisEb) {
+      const numEb = (x) => x.ordre ? (numLigneEbay(x.ordre, (x.ordre.lineItems || [])[0]) || '') : '';
+      for (const x of (colisEb.nePasPoster || [])) L.push({ cle: 'e:' + x.compte + ':' + x.orderId, groupe: 'ebay', site: 'ebay', nom: x.titre || `Commande ${x.orderId}`, num: numEb(x), etat: 'eBay · ne poste pas : annulation demandée', ambre: true, ouvrir: true, ebay: x });
+      for (const x of (colisEb.aVerifier || [])) L.push({ cle: 'e:' + x.compte + ':' + x.orderId, groupe: 'ebay', site: 'ebay', nom: x.titre || `Commande ${x.orderId}`, num: numEb(x), etat: 'eBay · à vérifier avant de poster', aVerifier: true, ouvrir: true, ebay: x });
+      for (const x of (colisEb.aPoster || [])) { const dl = x.jours;
+        const urg = dl == null ? '' : dl < 0 ? `${-dl} j de retard` : dl === 0 ? "à poster aujourd'hui" : dl === 1 ? 'à poster demain' : `${dl} j pour poster`;
+        L.push({ cle: 'e:' + x.compte + ':' + x.orderId, groupe: 'ebay', site: 'ebay', nom: x.titre || `Commande ${x.orderId}`, num: numEb(x), etat: ['eBay · étiquette à prendre dans eBay', urg].filter(Boolean).join(' · '), ambre: dl != null && dl <= 1, ouvrir: true, ebay: x }); }
+    }
+    const vc = colisVestiaire(vcEtat);
+    for (const v of ((vc && vc.aEnvoyer) || [])) { const j = joursAvantVc(v.limite);
+      L.push({ cle: 'vc:' + v.id, groupe: 'vestiaire', site: 'vestiaire', nom: 'Vente Vestiaire', num: v.num || '', etat: ['Vestiaire · ' + (v.etiquette === true ? 'bordereau sur Vestiaire' : 'pas encore de bordereau'), j == null ? '' : j < 0 ? 'date limite passée' : j === 0 ? "à poster aujourd'hui" : j === 1 ? 'à poster demain' : ''].filter(Boolean).join(' · '), ambre: j != null && j <= 1, ouvrir: true }); }
+    const maintenant = Date.now();
+    const photoAchat = (o) => (o ? (orderPhoto(o) || (indexSuivisAchats[String(o.transaction_id)] || {}).photo || null) : null);
+    const tpmC = transpMap;
+    const dernierJour = (j) => (Number.isFinite(j) && j <= 1 ? (j <= 0 ? "dernier jour aujourd'hui" : 'dernier jour demain') : '');
+    for (const t of (pickupUnion.emailList || [])) {
+      const a = achatDuColis(t, buysBase, indexSuivisAchats); const cl = cleanLieu(t.lieu); const code = codeRetrait(t.code); const ej = etatColisEmail(t, maintenant).jours;
+      L.push({ cle: 'r:e:' + (suiviDeLigne(t) || t.id || ''), groupe: 'retirer', site: 'vinted', nom: nomAvecTaille(a ? a.title : (nomTransporteurSuivi(t.carrier) !== 'Colis' ? `Colis ${nomTransporteurSuivi(t.carrier)}` : 'Colis à retirer'), a), photo: a ? photoAchat(a) : (t.photo || null),
+        etat: [cl.nom || (nomTransporteurSuivi(t.carrier) !== 'Colis' ? nomTransporteurSuivi(t.carrier) : ''), dernierJour(ej) || (code ? code : (qrImage(t) ? 'QR code' : 'code pas encore lu'))].filter(Boolean).join(' · '), ambre: Number.isFinite(ej) && ej <= 1, ouvrir: true });
+    }
+    for (const o of (pickupUnion.extra || [])) {
+      const r = relaisDe(o); const cl = cleanLieu(r && r.lieu); const code = r ? codeRetrait(r.code) : ''; const ej = etatColisVinted(o, maintenant, tpmC).jours;
+      L.push({ cle: 'r:v:' + o.transaction_id, groupe: 'retirer', site: 'vinted', nom: nomAvecTaille(o.title || 'Achat', o), photo: photoAchat(o), num: '',
+        etat: [cl.nom || 'au point relais', dernierJour(ej) || (code || 'code pas encore lu')].filter(Boolean).join(' · '), ambre: Number.isFinite(ej) && ej <= 1, ouvrir: true });
+    }
+    for (const x of (pickupUnion.aVerifier || [])) {
+      const o = x.kind === 'email' ? (x.o || achatDuColis(x.t, buysBase, indexSuivisAchats)) : x.o;
+      const lieu = x.kind === 'email' ? (cleanLieu(x.t && x.t.lieu).nom || (x.t && x.t.carrier) || '') : (cleanLieu((relaisDe(x.o) || {}).lieu).nom || '');
+      L.push({ cle: x.kind === 'email' ? 'r:e:' + (suiviDeLigne(x.t) || (x.t && x.t.id) || '') : 'r:v:' + (x.o && x.o.transaction_id), groupe: 'retirer', site: 'vinted', nom: nomAvecTaille(o ? o.title : (x.t && nomTransporteurSuivi(x.t.carrier) !== 'Colis' ? 'Colis ' + nomTransporteurSuivi(x.t.carrier) : 'Colis à retirer'), o), photo: o ? photoAchat(o) : ((x.t && x.t.photo) || null),
+        etat: [lieu, 'à vérifier : délai dépassé ou incident'].filter(Boolean).join(' · '), aVerifier: true, ouvrir: true });
+    }
+    for (const o of (pickupUnion.aConfirmer || [])) L.push({ cle: 'r:c:' + o.transaction_id, groupe: 'retirer', site: 'vinted', nom: nomAvecTaille(o.title || 'Achat', o), photo: photoAchat(o), etat: 'au point relais · à vérifier (compte pas relu)', aVerifier: true, ouvrir: true });
+    // Partis : la règle de la section « Partis » plus bas (même filtre, même ordre).
+    if (Array.isArray(sales.items)) {
+      const ordre = { 'Retournée': 0, 'Retour en cours': 0, 'Au relais': 1, 'En transit': 2, 'Livrée': 3 };
+      const TXT = { 'Retournée': 'Retour à vérifier', 'Retour en cours': 'Retour en cours', 'Au relais': 'Au relais de l’acheteur', 'En transit': 'En transit', 'Livrée': 'Livré' };
+      sales.items
+        .filter(o => o && !hiddenSales.has(String(o.transaction_id)) && !aExpedier(o))
+        .map(o => ({ o, st: venteStage(o), j: o.date ? Math.floor((Date.now() - new Date(o.date).getTime()) / 86400000) : null }))
+        .filter(x => ordre[x.st.label] != null && (x.j == null || x.j <= 45))
+        .sort((a, b) => (ordre[a.st.label] - ordre[b.st.label]) || ((b.j ?? 0) - (a.j ?? 0)))
+        .forEach(({ o, st }) => L.push({ cle: 'p:' + o.transaction_id, groupe: 'parti', site: 'vinted', nom: nomAvecTaille(o.title || 'Vente', o), photo: orderPhoto(o), num: effEntry(o)?.numero || '', etat: TXT[st.label] || st.label, ambre: ordre[st.label] === 0, ouvrir: false }));
+    }
+    return L;
+  };
   const ouvrirLot = () => {
     const L = lignesLot();
     if (!L.length) { toast('Aucun bordereau prêt à imprimer pour l\'instant.'); return; }
@@ -45178,6 +45571,32 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const msgPeutAgir = msgRelais || (vmrExtPresent() && extSait('messagerie')==='ok' && !__vmrPlusieurs);
   const msgLectureSeule = (acc) => (msgRelais && !msgCompteActif) || (!!msgCompteActif && String((acc && acc.vinted_user_id) || '') !== msgCompteActif);
   const msgNomActif = () => { const a = (accounts||[]).find(x=>String(x.vinted_user_id)===msgCompteActif); return a ? accName(a) : (msgRelaisVinted && msgRelaisVinted.login) || ''; };
+  // (31 oct., maquettes Messages) LE TROISIÈME VOLET (ordinateur ≥ 1024 px) : la
+  // fiche de la paire du fil ouvert. Reliée par IDENTITÉ seulement (`item_id` de
+  // la transaction, §5) — sans elle, la fiche le DIT, elle ne cherche rien par
+  // le titre. Lecture seule : aucun geste ici.
+  const rendreFicheConv=()=>{
+    if(!openConv) return <aside className="vrm-msg-fiche" data-fiche-conv="aucune" aria-label="Fiche de la paire"><p className="vrm-msg-fiche-vide">La fiche de la paire s’affiche ici quand tu ouvres une conversation.</p></aside>;
+    if(openConv.loading||openConv.error) return <aside className="vrm-msg-fiche" data-fiche-conv="attente" aria-label="Fiche de la paire"/>;
+    const pc=paireDeConv(String(openConv.acc?.vinted_user_id||''),openConv.convId,openConv.conversation);
+    const fc=ficheDeConv(pc,openConv.acc);
+    if(!fc) return (
+      <aside className="vrm-msg-fiche" data-fiche-conv="non-reliee" aria-label="Fiche de la paire">
+        <div className="vrm-msg-fiche-ph"><Icon name="image" size={36}/></div>
+        <p className="vrm-msg-fiche-vide"><b>Pas reliée à une annonce.</b> Vinted ne rattache aucun article à cette conversation : VRM ne devine pas la paire d’après le titre.</p>
+      </aside>);
+    const attention=[fc.favoris!=null?`${fc.favoris} favori${fc.favoris>1?'s':''}`:null, fc.vues!=null?`${fc.vues} vue${fc.vues>1?'s':''}`:null].filter(Boolean);
+    return (
+      <aside className="vrm-msg-fiche" data-fiche-conv="reliee" data-fiche-item={String(fc.item)} data-fiche-num={fc.num||undefined} aria-label="Fiche de la paire">
+        <div className="vrm-msg-fiche-ph">{fc.photo?<PhotoVinted src={fc.photo} alt="" loading="lazy"/>:<Icon name="image" size={36}/>}</div>
+        {fc.titre&&<div className="vrm-msg-fiche-t" data-fiche-titre="">{fc.titre}{fc.taille?` · ${fc.taille}`:''}</div>}
+        <div className="vrm-msg-fiche-s">{[fc.prix!=null?prix(fc.prix,fc.devise):null,fc.compte||null].filter(Boolean).join(' · ')}</div>
+        {fc.num&&<b className="vrm-num-pastille vrm-msg-fiche-num">N°{fc.num}</b>}
+        {fc.rangement&&<div className="vrm-msg-fiche-bloc" data-fiche-rangement=""><small>Rangée</small><b>{fc.rangement}</b></div>}
+        {attention.length>0&&<div className="vrm-msg-fiche-bloc" data-fiche-attention=""><small>Attention</small><b>{attention.join(' · ')}</b></div>}
+        {fc.url&&<a className="vrm-msg-fiche-lien" href={fc.url} target="_blank" rel="noreferrer">Voir l’annonce sur Vinted ↗</a>}
+      </aside>);
+  };
   const rendreConversation=()=>openConv && (
 <ResponsiveChatPortal><div className={curSub==='messages'?'vrm-chat-overlay vrm-chat-inline':'vrm-chat-overlay'} onClick={()=>setOpenConv(null)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:1000,display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
   <FermeAuRetour fermer={()=>setOpenConv(null)}/>
@@ -45206,6 +45625,24 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             {openConv.refreshError&&<div className="vrm-chat-note vrm-chat-read" role="alert" data-fil-actualisation-erreur style={{color:C.text}}><span>{openConv.refreshError} <a href={`https://www.vinted.fr/inbox/${openConv.convId}`} target="_blank" rel="noreferrer">Ouvrir sur Vinted ↗</a></span></div>}
             {!openConv.loading&&!openConv.error&&(()=>{const suivi0=suiviNegociationVinted(openConv.conversation,openConv.acc?.vinted_user_id,etatOffreVinted);const suivi=suivi0&&suivi0.libelle==='Offre reçue'&&offrePartieDuFil(openConv)?{libelle:'Annonce plus en vente',detail:'Elle n’est plus dans ton dressing : cette offre ne peut plus être acceptée.'}:suivi0;return suivi?<div className="vrm-chat-negociation-etat" role="status" title={suivi.detail}><b>{suivi.libelle}</b>{suivi.libelle==='Prix accepté'&&<small>{suivi.detail}</small>}</div>:null;})()}
             {!openConv.loading && !openConv.error && openConv.messages.some(m=>m.kind==='event' && /code|retrait|pickup|pin|suivi|tracking|colis|r[ée]cup[ée]rer|point relais/i.test(m.body)) && <div className="vrm-chat-shortcuts" style={{borderBottom:`1px solid ${C.border}`}}><button type="button" style={{color:C.accent}} onClick={()=>chatScroll.current?.querySelector('.vrm-chat-event-colis')?.scrollIntoView({block:'center',behavior:window.matchMedia('(prefers-reduced-motion:reduce)').matches?'auto':'smooth'})}>Retrait et suivi ↓</button></div>}
+            {/* (31 oct.) Hors du défilement : la carte reste en tête du fil (maquette téléphone). */}
+              {/* (19 oct.) LA PAIRE DE CE FIL, en tête — par la transaction de la
+                  conversation (identité, §5), jamais par le titre. Ce qu'on ne
+                  sait pas n'est pas écrit. */}
+              {!openConv.loading && !openConv.error && (()=>{ const pc = paireDeConv(String(openConv.acc?.vinted_user_id||''), openConv.convId, openConv.conversation); if (!pc || !(pc.titre || pc.prix!=null || pc.num || pc.etat)) return null; const fc = ficheDeConv(pc, openConv.acc); const ligne=[pc.prix!=null?prix(pc.prix,pc.devise):null,'Vinted',accName(openConv.acc)||null,fc&&fc.rangement].filter(Boolean); return (
+                <div className="vrm-chat-paire" data-fil-paire={pc.item!=null?String(pc.item):''} data-fil-num={pc.num||undefined} data-fil-prix={pc.prix!=null?String(pc.prix):undefined} data-fil-etat={pc.etat?pc.etat.k:undefined} style={{background:C.card,border:`1px solid ${C.border}`}}>
+                  <span className="vrm-chat-paire-ph" style={{background:C.card2||C.bg}}>{pc.photo?<PhotoVinted src={pc.photo} alt="" loading="lazy" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<Icon name="image" size={18} style={{color:C.muted,opacity:.55}}/>}</span>
+                  <div className="vrm-chat-paire-t">
+                    {pc.titre && <div className="vrm-chat-paire-n" style={{color:C.text}}>{pc.titre}{fc&&fc.taille?<span data-fil-taille=""> · {fc.taille}</span>:null}</div>}
+                    <div className="vrm-chat-paire-l" style={{color:C.muted}}>
+                      {ligne.map((x,k)=><React.Fragment key={k}>{k?' · ':''}<span className={k===0&&pc.prix!=null?'vrm-chat-paire-prix':undefined} title={k===0&&pc.prix!=null?(pc.prixDe==='vente'?'Prix de la vente':"Prix de l'annonce"):undefined}>{x}</span></React.Fragment>)}
+                      {pc.etat && <> <span className="vrm-msg-etat" data-etat={pc.etat.k} style={{borderColor:C.border}}>{pc.etat.t}</span></>}
+                      {pc.url && <> <a href={pc.url} target="_blank" rel="noreferrer" style={{color:C.muted}}>Annonce ↗</a></>}
+                    </div>
+                  </div>
+                  {pc.num && <b className="vrm-num-pastille vrm-chat-paire-num">N°{pc.num}</b>}
+                </div>
+              ); })()}
             <div ref={chatScroll} className="vrm-chat-history" style={{flex:1,overflow:'auto',padding:16,display:'flex',flexDirection:'column',gap:8}}>
               {openConv.loading && <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'20px 0'}}>Chargement…</div>}
               {openConv.error && <div style={{fontSize:13,color:C.danger}}>Erreur : {String(openConv.error)}</div>}
@@ -45218,23 +45655,6 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   ))}
                 </div>
               ) : null; })()}
-              {/* (19 oct.) LA PAIRE DE CE FIL, en tête — par la transaction de la
-                  conversation (identité, §5), jamais par le titre. Ce qu'on ne
-                  sait pas n'est pas écrit. */}
-              {!openConv.loading && !openConv.error && (()=>{ const pc = paireDeConv(String(openConv.acc?.vinted_user_id||''), openConv.convId, openConv.conversation); if (!pc || !(pc.titre || pc.prix!=null || pc.num || pc.etat)) return null; return (
-                <div className="vrm-chat-paire" data-fil-paire={pc.item!=null?String(pc.item):''} data-fil-num={pc.num||undefined} data-fil-prix={pc.prix!=null?String(pc.prix):undefined} data-fil-etat={pc.etat?pc.etat.k:undefined} style={{background:C.card,border:`1px solid ${C.border}`}}>
-                  <span className="vrm-chat-paire-ph" style={{background:C.bg,border:`1px solid ${C.border}`}}>{pc.photo?<PhotoVinted src={pc.photo} alt="" loading="lazy" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<Icon name="image" size={18} style={{color:C.muted,opacity:.55}}/>}</span>
-                  <div className="vrm-chat-paire-t">
-                    {pc.titre && <div className="vrm-chat-paire-n" style={{color:C.text}}>{pc.titre}</div>}
-                    <div className="vrm-chat-paire-l" style={{color:C.muted}}>
-                      {pc.num && <b style={{color:C.text}}>N°{pc.num}</b>}
-                      {pc.prix!=null && <span title={pc.prixDe==='vente'?'Prix de la vente':"Prix de l'annonce"} style={{color:C.text,fontWeight:600,fontVariantNumeric:'tabular-nums'}}>{prix(pc.prix,pc.devise)}</span>}
-                      {pc.etat && <span className="vrm-msg-etat" data-etat={pc.etat.k} style={{borderColor:C.border}}>{pc.etat.t}</span>}
-                      {pc.url && <a href={pc.url} target="_blank" rel="noreferrer" style={{color:C.accent}}>Annonce ↗</a>}
-                    </div>
-                  </div>
-                </div>
-              ); })()}
               {!openConv.loading && !openConv.error && openConv.messages.map((m,i)=>{
                 // (19 oct.) Les messages groupés par JOUR : un séparateur quand
                 // le jour change ; la bulle ne garde que l'heure.
@@ -45271,13 +45691,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                         </div>
                       : <div key={i} className="vrm-chat-event" style={{color:C.muted}}>{m.body}{(m.links||[]).map((l,j)=><a key={j} className="vrm-chat-link" href={l.url} target="_blank" rel="noreferrer" style={{color:C.accent}}>{l.bordereau?'bordereau ↗':'lien ↗'}</a>)}</div>)
                   : <div key={i} className={m.mine?'vrm-bulle-l vrm-bulle-moi':'vrm-bulle-l'}>
-                      <div className="vrm-bulle" style={m.mine?{background:C.accent,color:C.onAccent||'#fff'}:{background:C.card,color:C.text,border:`1px solid ${C.border}`}}>{m.body||(m.photos?.length?'📷 photo':'')}</div>
+                      <div className="vrm-bulle" data-bulle={m.mine?'moi':'acheteur'} style={m.mine?{background:C.text,color:C.bg}:{background:C.card2||C.card,color:C.text}}>{m.body||(m.photos?.length?'📷 photo':'')}{m.ts && <time className="vrm-bulle-h" dateTime={new Date(m.ts).toISOString()}>{new Date(m.ts).toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})}</time>}</div>
                       {(m.links||[]).map((l,j)=><a key={j} className="vrm-chat-link" href={l.url} target="_blank" rel="noreferrer" style={{color:C.accent}}>{l.bordereau?'Ouvrir le bordereau ↗':'Ouvrir le lien ↗'}</a>)}
                       {(m.photos||[]).length>0 && <div className="vrm-chat-photos">{m.photos.map((ph,j)=>{const src=photoArticle({photo:ph});return src?<PhotoVinted key={j} src={src} alt="Photo du message" loading="lazy" style={{width:104,height:128,objectFit:'cover',borderRadius:12}}/>:null;})}</div>}
-                      {(m.ts || (!m.mine && m.body)) && <div className="vrm-bulle-pied">
-                        {m.ts && <time dateTime={new Date(m.ts).toISOString()} style={{color:C.muted}}>{new Date(m.ts).toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})}</time>}
-                        {!m.mine && m.body ? <BoutonTraduire texte={m.body}/> : null}
-                      </div>}
+                      {!m.mine && m.body ? <div className="vrm-bulle-pied"><BoutonTraduire texte={m.body}/></div> : null}
                     </div>
               )}</React.Fragment>; })}
               {!openConv.loading && !openConv.error && openConv.messages.length===0 && <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'20px 0'}}>Aucun message.</div>}
@@ -45335,14 +45752,28 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   );
                   return (
                     <div className="vrm-chat-offre" data-offre={off?'attente':'libre'} data-offre-ro={ro?'1':undefined} style={{background:C.bg,border:`1px solid ${C.border}`,opacity:ro?0.55:1}}>
-                      {off&&<div className="vrm-chat-offre-reperes"><span className="vrm-chat-offre-photo">{pc?.photo?<PhotoVinted src={pc.photo} alt="Article de l’offre"/>:<Icon name="image" size={20}/>}</span><div><small>{pc?.prixDe==='vente'?'Prix de vente':'Prix affiché'}</small><b>{pc?.prix!=null?prix(pc.prix,pc.devise):'Non disponible'}</b></div><div><small>Ton minimum</small><b>{Number.isFinite(minF)&&minF>0?fmtE(minF):'Non défini'}</b></div></div>}
-                      {off && (
-                        <div className="vrm-chat-offre-l vrm-chat-offre-traiter" data-offre-au-dessus-mini={auDessusMini?String(Math.round(minF)):undefined}>
-                          <span className="vrm-chat-offre-t" style={{color:C.text}}><small className="vrm-chat-offre-label">{auDessusMini?`Offre ≥ ton mini (${prixCourt(minF)}) · à accepter`:'Offre reçue · à traiter'}</small><b data-montant="">{fmtE(off.prix)}</b></span>
-                          <div className="vrm-chat-offre-actions"><button type="button" className="vrm-chat-btn vrm-chat-btn-p" disabled={offreBusy||ro||offreBloquee} onClick={()=>actionOffre('accept', off)} style={{background:ro?C.border:C.accent,color:ro?C.muted:(C.onAccent||'#fff'),opacity:(offreBusy||offreBloquee)?0.6:1,fontWeight:auDessusMini?700:undefined}}>{auDessusMini?'✓ Accepter':'Accepter'}</button>
-                          <button type="button" className="vrm-chat-btn" disabled={offreBusy||ro||offreBloquee} onClick={()=>actionOffre('reject', off)} style={{border:`1px solid ${C.border}`,background:C.card,color:ro?C.muted:C.text,opacity:(offreBusy||offreBloquee)?0.6:1}}>Refuser</button><button type="button" className="vrm-chat-btn" disabled={!tx||ro||offreBusy||offreBloquee} style={{border:`1px solid ${C.border}`,background:C.card,color:ro?C.muted:C.text}} onClick={()=>{setContreOffreOuverte(true);requestAnimationFrame(()=>prixOffreRef.current?.focus());}}>Contre-proposer</button></div>
-                        </div>
-                      )}
+                      {/* (31 oct., maquettes Messages) LA CARTE D'OFFRE : « Offre de X € — ton
+                          mini : Y € » (le mini posé à côté du N°, par identité), puis
+                          Refuser · contre-offre proposée · Accepter. Les MÊMES gestes
+                          qu'avant (`actionOffre`) : Accepter demande confirmation, la
+                          contre-offre ne fait que REMPLIR le prix — rien ne part sans
+                          « Envoyer l'offre ». Aucun geste automatique (§3). */}
+                      {off && (()=>{
+                        const mini = Number.isFinite(minF)&&minF>0 ? minF : null;
+                        const contre = contreOffreProposee(off.prix, pc?.prix, mini);
+                        return (
+                        <div className="vrm-chat-offre-l vrm-chat-offre-traiter" data-offre-au-dessus-mini={auDessusMini?String(Math.round(minF)):undefined} data-offre-mini={mini!=null?String(mini):undefined} data-offre-contre={contre!=null?String(contre):undefined}>
+                          <div className="vrm-chat-offre-tete">
+                            <span className="vrm-chat-offre-t" style={{color:C.text}}>Offre de <b data-montant="">{fmtE(off.prix)}</b></span>
+                            <span className="vrm-chat-offre-mini" style={{color:C.muted}}>{mini!=null?<>ton mini : {fmtE(mini)}{auDessusMini?' · au-dessus':''}</>:'pas de prix mini'}</span>
+                          </div>
+                          <div className="vrm-chat-offre-actions">
+                            <button type="button" className="vrm-chat-btn" data-offre-geste="refuser" disabled={offreBusy||ro||offreBloquee} onClick={()=>actionOffre('reject', off)} style={{opacity:(offreBusy||offreBloquee)?0.6:1}}>Refuser</button>
+                            <button type="button" className="vrm-chat-btn" data-offre-geste="contre" disabled={!tx||ro||offreBusy||offreBloquee} aria-label={contre!=null?`Contre-proposer ${fmtE(contre)}`:'Contre-proposer'} title={contre!=null?`Prépare une contre-offre de ${fmtE(contre)} — rien ne part avant « Envoyer l'offre »`:"Prépare une contre-offre — rien ne part avant « Envoyer l'offre »"} onClick={()=>{if(contre!=null)setPrixOffre(String(contre));setContreOffreOuverte(true);requestAnimationFrame(()=>prixOffreRef.current?.focus());}}>{contre!=null?fmtE(contre):'Contre-offre'}</button>
+                            <button type="button" className="vrm-chat-btn vrm-chat-btn-p" data-offre-geste="accepter" disabled={offreBusy||ro||offreBloquee} onClick={()=>actionOffre('accept', off)} style={{opacity:(offreBusy||offreBloquee)?0.6:1}}>Accepter</button>
+                          </div>
+                        </div>);
+                      })()}
                       {tx && (
                         <details className="vrm-chat-negociation" open={!off||!!prixOffre||contreOffreOuverte}><summary>{off?'Proposer un autre prix':'Proposer un prix'}</summary><div className="vrm-chat-offre-l">
                           <span className="vrm-chat-offre-k" style={{color:C.muted}}>Ton prix</span>
@@ -45372,15 +45803,18 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     partie : la première dit « l'article est toujours disponible ». */}
                 {!offrePartieDuFil(openConv) && <div className="vrm-chat-rapides" style={{opacity:ro?0.5:1}}>
                   {(quickReplies&&quickReplies.length?quickReplies.map(t=>({e:'',t})):QUICK_REPLIES).map((q,i)=>(
-                    <button key={i} type="button" disabled={ro} onClick={()=>modifierReponse(q.t)} title={q.t}
-                      style={{border:`1px solid ${C.border}`,background:C.card,color:C.text}}>
-                      {q.e} {q.t.length>24?q.t.slice(0,24)+'…':q.t}
+                    <button key={i} type="button" className="vrm-chat-rapide" data-reponse-rapide={i} disabled={ro} onClick={()=>modifierReponse(q.t)} title={q.t}>
+                      {q.t.length>24?q.t.slice(0,24)+'…':q.t}
                     </button>
                   ))}
                 </div>}
                 <div className="vrm-chat-compose">
-                  <textarea aria-label="Réponse à la conversation" disabled={ro} value={replyText} onChange={e=>modifierReponse(e.target.value)} rows={1} placeholder={ro?'Lecture seule sur ce compte':'Écrire une réponse…'} onKeyDown={e=>{ if(e.key==='Enter'&&!e.shiftKey){ e.preventDefault(); sendReply(); } }} style={{border:`1px solid ${C.border}`,background:C.bg,color:C.text}}/>
-                  <button type="button" className="vrm-chat-send" onClick={sendReply} disabled={!!reponsesIncertaines[cleReponseVinted(openConv.acc?.vinted_user_id,openConv.convId)]||ro||replyBusy||!replyText.trim()||!msgPeutAgir||openConv.conversation?.allow_reply===false} style={{background:(ro||replyBusy||!replyText.trim())?C.border:C.accent,color:(ro||replyBusy||!replyText.trim())?C.muted:(C.onAccent||'#fff')}}>{replyBusy?'Envoi…':'Envoyer'}</button>
+                  <textarea aria-label="Réponse à la conversation" disabled={ro} value={replyText} onChange={e=>modifierReponse(e.target.value)} rows={1} placeholder={ro?'Lecture seule sur ce compte':'Écris ta réponse…'} onKeyDown={e=>{ if(e.key==='Enter'&&!e.shiftKey){ e.preventDefault(); sendReply(); } }} style={{color:C.text}}/>
+                  {/* (31 oct.) La dictée : la reconnaissance vocale DU NAVIGATEUR
+                      (`MicDictee`, déjà celle de la recherche) — aucune IA, aucune
+                      clé (§2.9). Elle AJOUTE au champ ; rien ne part sans « Envoyer ». */}
+                  {!ro && <MicDictee titre="Dicter la réponse" onText={(t)=>modifierReponse((replyText&&replyText.trim()?replyText.replace(/\s*$/,' '):'')+t)}/>}
+                  <button type="button" className="vrm-chat-send" aria-label={replyBusy?'Envoi en cours':'Envoyer'} title="Envoyer" onClick={sendReply} disabled={!!reponsesIncertaines[cleReponseVinted(openConv.acc?.vinted_user_id,openConv.convId)]||ro||replyBusy||!replyText.trim()||!msgPeutAgir||openConv.conversation?.allow_reply===false}><Icon name={replyBusy?'sync':'send'} size={19}/></button>
                 </div>
                 </>)}
               </div>
@@ -49625,9 +50059,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                           {(plusieurs||!!messageSearch.trim()) && c._acc && <span className="vrm-msg-acc" style={{color:C.muted}}>· {accName(c._acc)}</span>}
                           <time className="vrm-msg-time" dateTime={tsConv?new Date(tsConv).toISOString():undefined} title={tsConv?new Date(tsConv).toLocaleString('fr-FR',{weekday:'long',day:'numeric',month:'long',hour:'2-digit',minute:'2-digit'}):undefined} style={{color:c.unread&&!ro?C.accent:C.muted}}>{tsConv?heureMessage(tsConv):''}</time>
                         </span>
-                        {(()=>{ const titre=(paire&&paire.titre)||c.item_title||c.item?.title||''; const morceaux=[paire&&paire.num?`N°${paire.num}`:null, paire&&paire.prix!=null?prix(paire.prix,paire.devise):null, titre||null].filter(Boolean); if(!morceaux.length && !(paire&&paire.etat)) return null; return (
+                        {(()=>{ const titre=(paire&&paire.titre)||c.item_title||c.item?.title||''; const morceaux=[titre||null, paire&&paire.num?`N°${paire.num}`:null].filter(Boolean); if(!morceaux.length && !(paire&&paire.etat)) return null; return (
                           <span className="vrm-msg-article vrm-msg-paire" data-conv-paire="">
-                            <span className="vrm-msg-paire-t">{morceaux.map((x,j)=><React.Fragment key={j}>{j?' · ':''}{j===0&&paire&&paire.num?<b style={{color:C.text,fontWeight:600}}>{x}</b>:x}</React.Fragment>)}</span>
+                            {/* (31 oct., maquettes) « modèle · N° » : le N° vient de l'identité (paireDeConv), jamais du titre. */}
+                            <span className="vrm-msg-paire-t">{morceaux.map((x,j)=><React.Fragment key={j}>{j?' · ':''}{paire&&paire.num&&x===`N°${paire.num}`?<b className="vrm-msg-paire-num" style={{color:C.text,fontWeight:600}}>{x}</b>:x}</React.Fragment>)}</span>
                             {paire&&paire.etat && <span className="vrm-msg-etat" data-etat={paire.etat.k} style={{color:C.muted,borderColor:C.border}}>{paire.etat.t}</span>}
                           </span>); })()}
                         <span className="vrm-msg-l2">
@@ -49658,7 +50093,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             </div>
           );
         })()}
-        </div><div className="vrm-chat-column">{openConv?rendreConversation():<div className="vrm-chat-empty"><Icon name="chat" size={28}/><span>Choisis une conversation</span><small>Messages, offres et suivi de colis.</small></div>}</div></div>
+        </div><div className="vrm-chat-column">{openConv?rendreConversation():<div className="vrm-chat-empty"><Icon name="chat" size={28}/><span>Choisis une conversation</span><small>Messages, offres et suivi de colis.</small></div>}</div>{rendreFicheConv()}</div>
         {zoneMessages==='conversations'&&<details className="vrm-quick-settings"><summary>Réponses rapides</summary>
         {/* Réponses rapides : modèles éditables, proposés dans chaque conversation. */}
         <div style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:10,padding:'10px 12px',marginBottom:12}}>
@@ -49690,7 +50125,48 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
 
       {/* ── Bordereaux (ventes non annulées avec un numéro, à imprimer) ── */}
       {curSub==='bordereaux' && (<>
-        <ScreenHead icon="doc" title="Colis" desc="Ce que Vinted attend de toi, capté par l'extension. Le bordereau manquant est généré tout seul quand tu passes sur Vinted, puis déposé ici. Un colis parti disparaît sans rien cocher."/>
+        {(()=>{
+          // ── (31 oct.) LA MAQUETTE DE JULIEN : QUATRE COLONNES ─────────────
+          // « Prêts à imprimer » · « En attente » · « À retirer » · « Partis ».
+          // Le bouton « Imprimer les N prêts » est l'ancien « Tout imprimer » :
+          // la même action (`ouvrirLot`), le même compte (`lignesLot`, §11).
+          const cartes = cartesColis();
+          const vue = colonnesColis(cartes, siteColis);
+          const nPrets = lignesLot().length;
+          const sitesVus = SITES_COLIS.filter(x => vue.parSite[x]);
+          const nomSite = { vinted: 'Vinted', leboncoin: 'Leboncoin', ebay: 'eBay', vestiaire: 'Vestiaire' };
+          const ouvrir = (x) => {
+            if (x.ebay) { DEMANDE_EBAY_CIBLE.compte = x.ebay.compte; DEMANDE_EBAY_CIBLE.id = x.ebay.orderId; DEMANDE_EBAY_CIBLE.at = Date.now(); onNav && onNav('ebay_ventes'); return; }
+            if (x.site === 'vestiaire') { onNav && onNav('plat_vestiaire'); return; }
+            if (x.groupe === 'retirer') { onNav && onNav('cat_achats'); return; }
+            const el = x.tx ? document.querySelector(`[data-bord-card][data-tx-colis="${CSS.escape(String(x.tx))}"]`) : null;
+            if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); el.classList.add('vrm-cc-cible'); setTimeout(() => el.classList.remove('vrm-cc-cible'), 1600); }
+          };
+          // « Pas su » se DIT dans la colonne concernée, jamais un 0 muet (§5).
+          const notes = {
+            prets: (sales.loading && !sales.items) ? 'Je lis tes ventes…' : (sales.error && !(sales.items||[]).length) ? 'Tes ventes Vinted n’ont pas pu être lues.' : (!labelsPrets || emailBords===null) ? 'Je lis encore tes bordereaux : il y en a peut-être plus.' : null,
+            attente: colisEb === null ? 'Ventes eBay pas lues pour l’instant.' : null,
+            retirer: tracking===null ? 'E-mails de suivi pas encore lus.' : (buys.items===null && buys.loading) ? 'Je lis tes achats…' : null,
+          };
+          return (<>
+            <ScreenHead icon="doc" title="Colis" sous="Rangés sur ce que tu peux faire maintenant"
+              desc="Ce que Vinted attend de toi, capté par l'extension. Le bordereau manquant est généré tout seul quand tu passes sur Vinted, puis déposé ici. Un colis parti disparaît sans rien cocher."
+              right={nPrets>0 && (siteColis==='toutes'||siteColis==='vinted') ? <Bouton variante="primaire" icone="printer" data-lot-ouvrir="1" data-imprimer-prets={nPrets} onClick={ouvrirLot} disabled={batchBusy}
+                title="Tamponne tous les bordereaux reçus (numéro + titre) et les met à la suite dans un seul PDF">{batchBusy?'Préparation…':`Imprimer ${nPrets===1?'le prêt':`les ${nPrets} prêts`}`}</Bouton> : null}/>
+            {sitesVus.length > 1 && (
+              <DansBarreHaut>
+                <div className="vrm-rangee vrm-filtres vrm-filtre-site" role="group" aria-label="Filtrer les colis par site" data-filtre-site="colis">
+                  {['toutes', ...sitesVus].map(x => <button key={x} type="button" aria-pressed={siteColis===x} data-site={x} onClick={()=>setSiteColis(x)}>{x==='toutes'?'Tous les sites':nomSite[x]}</button>)}
+                </div>
+              </DansBarreHaut>
+            )}
+            {siteColis!=='toutes' && <div data-colis-filtre-note="" style={{fontSize:12,color:C.muted,margin:'0 2px 6px'}}>{vue.colonnes.reduce((t,c)=>t+c.cartes.length,0)} colis {nomSite[siteColis]} sur {vue.total} · <button type="button" className="vrm-lien-action" onClick={()=>setSiteColis('toutes')} style={{border:0,background:'transparent',padding:0,color:C.text,fontWeight:600,cursor:'pointer',fontFamily:'inherit',fontSize:12,minHeight:44}}>tout voir</button></div>}
+            <ColisColonnes colonnes={vue.colonnes} total={vue.total} onOuvrir={ouvrir} notes={notes}
+              Photo={(src) => imgMortes.has(src) ? null : <PhotoVinted src={src} alt="" loading="lazy" decoding="async" onError={()=>noterImgMorte(src)}/>}
+              pieds={{ retirer: groupesRelais && groupesRelais.groupes && (groupesRelais.groupes.length || groupesRelais.enRouteSansRelais) ? <CarteRelaisColis donnees={groupesRelais} C={C} compacte/> : null }}/>
+            <h2 className="vrm-colis-detail-titre" data-colis-detail="" style={{fontSize:'var(--vrm-t-section, 22px)',margin:'8px 2px 12px',color:C.text}}>Colis par colis</h2>
+          </>);
+        })()}
         {/* ⚠️ Un colis déjà expédié qui traîne ici vient presque toujours d'une
             capture ancienne (statut figé), pas d'un défaut. On le dit (§11, même
             message partout). */}
@@ -49784,13 +50260,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   {(()=>{ const u=urgenceColis(); if(!u.total || u.total<aPoster.length) return null;
                     return <div data-colis-urgence-ligne="" style={{fontSize:11.5,color:C.warn,fontWeight:600,marginTop:3}}>{u.parts.join(' · ')}{u.presseAttente ? <> — {ouSontLesPresses(u)}</> : null}</div>; })()}
                 </div>
-                {avecPdf.length>0 && (
-                  <button type="button" data-lot-ouvrir="1" onClick={ouvrirLot} disabled={batchBusy}
-                    title="Tamponne tous les bordereaux reçus (numéro + titre) et les met à la suite dans un seul PDF"
-                    className="vrm-colis-lot" style={{flexShrink:0,display:'inline-flex',alignItems:'center',justifyContent:'center',gap:8,border:'none',borderRadius:10,background:C.accent,color:'#fff',padding:'0 18px',minHeight:44,cursor:batchBusy?'default':'pointer',fontSize:14,fontWeight:600,fontFamily:'inherit',opacity:batchBusy?0.6:1}}>
-                    <Icon name="printer" size={16}/>{batchBusy?'Préparation…':avecPdf.length===1?'Imprimer':`Tout imprimer (${avecPdf.length})`}
-                  </button>
-                )}
+                {/* (31 oct.) « Tout imprimer » est monté dans l'en-tête : « Imprimer les N prêts » (même action, même compte). */}
                 {aGenItems.length>0 && <BoutonToutGenerer items={aGenItems}/>}
                 {lot && (()=>{
                   const L = lot.lignes || lignesLot();
@@ -59427,6 +59897,19 @@ function AppCoeur() {
   // masse », « Réglages » repassaient DESSOUS (verif_visuel). On publie sa
   // largeur réelle dans `--vrm-ile`, que la règle de index.html lit.
   const ileRef = React.useRef(null);
+  // (31 oct.) La place des filtres de site dans la barre du haut (ordinateur).
+  const [slotBarre, setSlotBarre] = React.useState(null);
+  // « / » ouvre la recherche (hors d'un champ de saisie), comme la maquette.
+  React.useEffect(() => {
+    const k = (e) => {
+      if (e.key !== '/' || e.ctrlKey || e.metaKey || e.altKey || e.defaultPrevented) return;
+      const t = e.target; const tag = t && t.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || (t && t.isContentEditable)) return;
+      e.preventDefault(); setGsOpen(true);
+    };
+    window.addEventListener('keydown', k);
+    return () => window.removeEventListener('keydown', k);
+  }, []);
   React.useEffect(() => {
     const el = ileRef.current;
     if (!ordi || !el || typeof ResizeObserver === 'undefined') { try { document.documentElement.style.removeProperty('--vrm-ile'); } catch (_) {} return undefined; }
@@ -60906,7 +61389,7 @@ function AppCoeur() {
           <h1>{TITRES_TACHE[t]}</h1>
         </header>
         <div className="vrm-tache-filtres" style={{padding:'0 16px'}}>
-          <FiltreSites tache={t} site={site} sites={sitesPresents} onSite={(s)=>setPlatSub(s)}/>
+          <DansBarreHaut><FiltreSites tache={t} site={site} sites={sitesPresents} onSite={(s)=>setPlatSub(s)}/></DansBarreHaut>
         </div>
         {site==='toutes'
           ? (baseKO ? <div style={{padding:16}}><LignePanne>Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui a échoué.</LignePanne></div>
@@ -61139,9 +61622,9 @@ function AppCoeur() {
                 écrans (Julien, 5 octobre). Voir `EtatActions`. */}
             {MULTI_USER && <EtatActions onNav={setTab} ordi={ordi} sombre={eD}/>}
             <PastilleStream/>
-            <button className="vrm-hbtn" type="button" onClick={()=>{setGsOpen(true);}} title="Rechercher" aria-label="Rechercher une paire" aria-pressed={gsOpen}>
+            {!ordi && <button className="vrm-hbtn" type="button" onClick={()=>{setGsOpen(true);}} title="Rechercher" aria-label="Rechercher une paire" aria-pressed={gsOpen}>
               <Icon name="search" size={21}/>
-            </button>
+            </button>}
             {/* Messages et Paramètres retirés de l'en-tête (Julien, 16 oct.) : ils sont
                 dans la navigation (rail, menu « Ton espace ») — deux portes de trop. */}
             </>); })()}
@@ -61286,6 +61769,10 @@ function AppCoeur() {
         // réserver sa hauteur : juste une marge pour ne pas coller la dernière
         // carte à la barre.
         paddingBottom: ordi ? 40 : 'calc(20px + env(safe-area-inset-bottom))'}}>
+        {/* (31 oct., maquette Colis) Sur ordinateur, la barre du haut : la
+            recherche (touche « / ») et la place des filtres de site de l'écran. */}
+        {ordi && <BarreHaut onChercher={()=>setGsOpen(true)} poserSlot={setSlotBarre}/>}
+        <BarreHautSlot.Provider value={ordi ? slotBarre : null}>
         <EcranGardeFou resetKey={tab}>
         {/* ⚠️⚠️ UN SEUL ENDROIT POUR « JE N'ARRIVE PAS À LIRE TES DONNÉES ».
             Mon premier correctif posait la garde ÉCRAN PAR ÉCRAN : j'en avais
@@ -61540,6 +62027,7 @@ function AppCoeur() {
         {tab==='vintedaccounts'&&<VintedAccounts accounts={vintedAccounts} setAccounts={setVintedAccounts} baseKO={baseKO} onRetour={()=>setTab('settings')}/>}
         </>)}
         </EcranGardeFou>
+        </BarreHautSlot.Provider>
       </main>
       {bienvenue && <Bienvenue prenom={String(load('vrm_prenom','')||'').trim()} dark={!!dark}
         onTheme={(d)=>{ if(!!d!==!!dark) toggleDark(); }}

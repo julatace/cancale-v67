@@ -230,7 +230,7 @@ const mesurer = (pg, tel) => pg.evaluate((tel) => {
 
 const ecrans = [
   { nom: 'annonces', tab: 'plat_vinted', section: 'annonces', attend: '[data-carte-annonce]', attrs: ['[data-ann-resume]', '.vrm-ann-grid', '[data-carte-annonce="9101"]'] },
-  { nom: 'leboncoin-ventes', tab: 'plat_leboncoin', section: 'ventes', attend: '[data-ventes-kpi]', attrs: ['[data-ventes-kpi="leboncoin"]', '[data-section="annonces"]', '[data-lbc-vente="l1"][data-lbc-etat="Finalisée"]'] },
+  { nom: 'leboncoin-ventes', tab: 'plat_leboncoin', section: 'ventes', attend: '[data-ventes-kpi]', attrs: ['[data-ventes-kpi="leboncoin"]', '[data-filtre-site="ventes"] [data-site="leboncoin"][aria-pressed="true"]', '[data-lbc-vente="l1"][data-lbc-etat="Finalisée"]'] },  // (31 oct.) la porte vers les autres sites : le filtre, plus les sous-onglets
   { nom: 'leboncoin-annonces', tab: 'plat_leboncoin', section: 'annonces', attend: '[data-lbc-catalog-id="lb3"]',  // (31 oct.) la liste RENDUE avant de juger le N° (machine chargée)
     attrs: ['[data-plat-resume]', '[data-lbc-catalog-id="lb3"] [data-lbc-catalog-num="B233"]'] },
   { nom: 'leboncoin-achats', tab: 'plat_leboncoin', section: 'achats', attend: '[data-lbc-achat]', attrs: ['.vrm-buy-row[data-lbc-achat="a1"]', '.vrm-buy-row[data-lbc-achat="a2"]', '[data-lbc-achat="a2"] a[href="https://suivi.test/a2"]', '[data-lbc-achat="a2"] [data-lbc-achat-qr]'] },
@@ -257,9 +257,19 @@ const ecrans = [
         console.log(`\n── ${ec.nom}, ${vp.width} px`);
         await essaie(`${ec.nom} ${vp.width}`, async () => {
           const { ctx, pg, errs } = await ouvrir(b, vp, { vide: !!ec.vide });
-          await pg.goto(`http://localhost:${PORT}/?tab=${ec.tab}`, { waitUntil: 'domcontentloaded' });
-          await pg.waitForSelector(`[data-section="${ec.section}"]`, { timeout: 15000 });
-          await pg.click(`[data-section="${ec.section}"]`);
+          // (31 oct., navigation par tâche) Ventes, Annonces et Messages d'un site sont
+          // les TÂCHES filtrées sur ce site (`?tab=ventes&site=leboncoin`) ; les autres
+          // sections (Achats, Compte, À traiter) restent dans l'espace du site
+          // (`?tab=plat_ebay&section=compte`), où l'on touche encore la section.
+          const site = { plat_vinted: 'vinted', plat_leboncoin: 'leboncoin', plat_ebay: 'ebay' }[ec.tab];
+          if (['ventes', 'annonces', 'messages'].includes(ec.section)) {
+            await pg.goto(`http://localhost:${PORT}/?tab=${ec.section}&site=${site}`, { waitUntil: 'domcontentloaded' });
+            await pg.waitForSelector(`[data-tache="${ec.section}"][data-tache-site="${site}"]`, { timeout: 15000 });
+          } else {
+            await pg.goto(`http://localhost:${PORT}/?tab=${ec.tab}&section=${ec.section}`, { waitUntil: 'domcontentloaded' });
+            await pg.waitForSelector(`[data-section="${ec.section}"]`, { timeout: 15000 });
+            await pg.click(`[data-section="${ec.section}"]`);
+          }
           if (ec.attend) await pg.waitForSelector(ec.attend, { timeout: 12000 }).catch(() => {});
           await pg.waitForTimeout(1600);
           const m = await mesurer(pg, tel);
