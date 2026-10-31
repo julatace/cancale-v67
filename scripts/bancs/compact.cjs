@@ -158,7 +158,8 @@ const ouvrirVente=async(p)=>{const t=p.locator('.vrm-sale-row .vrm-ledger-sale-t
   await p.getByRole('button',{name:'Confirmer le destinataire'}).click();await p.getByRole('button',{name:'Confirmer',exact:true}).click();
   await p.getByText('La facture n’a pas été mise en file. Relis son état dans Factures.',{exact:true}).waitFor();check(patch===1,'refus serveur annoncé sans faux succès');
   await p.route('**/api/ebay',async r=>{const action=r.request().method()==='POST'?r.request().postDataJSON().action:null;return r.fulfill({status:action==='sync'?503:200,contentType:'application/json',body:JSON.stringify(action==='status'?{ok:true,connected:true,comptes:[{cle:'',ref:'principal',principal:true,pseudo:'Compte de banc',relie:true}]}:action==='finances'?{reason:'scope'}:action==='sync'?{ok:false}:{ready:true,canConsent:true})});});
-  await p.goto(base+'/?tab=plat_ebay');await p.getByRole('button',{name:'Compte',exact:true}).click();await p.getByText('Compte eBay relié',{exact:true}).waitFor();
+  // (31 oct.) Navigation par tâche : `?tab=plat_ebay` seul mène à Ventes · eBay ; l'espace « Compte » se demande par sa section.
+  await p.goto(base+'/?tab=plat_ebay&section=compte');await p.getByRole('button',{name:'Compte',exact:true}).click({timeout:5000}).catch(()=>{});await p.getByText('Compte eBay relié',{exact:true}).waitFor();
   check(!(await p.getByRole('button',{name:'Autoriser les paiements'}).isVisible()),'paiements repliés, connexion claire');
   await p.getByText('Solde et paramètres du compte',{exact:true}).click();await p.getByRole('button',{name:'Autoriser les paiements'}).waitFor();check(await p.getByText('Compte eBay relié',{exact:true}).isVisible(),'scope paiements distinct de connexion');
   // ⚠️ Depuis le 14 octobre (84c83d3) la synchro eBay va compte par compte : la route « status » rend la liste

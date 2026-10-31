@@ -58750,7 +58750,7 @@ function DemandeCodeDiscord() {
 function FiltreSites({ tache, site, sites, onSite }) {
   const t = TACHES_SITE[tache] || {};
   const options = [
-    ...(t.toutes ? [{ id: 'toutes', label: 'Toutes' }] : []),
+    ...(t.toutes ? [{ id: 'toutes', label: 'Tous les sites' }] : []),
     ...SITES_TACHE.filter((s) => !sites || sites.has(s.id) || s.id === site),
   ];
   if (options.length < 2) return null;
