@@ -1,6 +1,9 @@
 import React from "react";
 import "./espace-emails.css";
 const rubriques = [
+  // (31 oct.) Le journal « Tes emails, ce que VRM en a fait » : une phrase par
+  // email, la raison et le geste quand il y a quelque chose à vérifier.
+  ["journal", "Journal", "Ce que VRM en a fait"],
   ["reception", "Réception", "Les emails reçus"],
   ["adresses", "Comptes", "Adresses et transfert"],
   ["a-traiter", "À rattacher", "Les emails mis de côté"],

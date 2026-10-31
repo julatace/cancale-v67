@@ -39,6 +39,7 @@ import {qrMfa} from './qrMfa.js';
 import {conflitAdresseCompte} from './receptionEmail.js';
 import SuiviReceptionEmails from './ReceptionEmails.jsx';
 import EspaceEmails from './EspaceEmails.jsx';
+import JournalEmails, {EntreeJournalEmails} from './JournalEmails.jsx';
 import RecusEmail from "./RecusEmail.jsx";
 import { cheminMonotone } from "./courbeMonotone.js";
 import VuesVentes from "./VuesVentes.jsx";
@@ -1843,6 +1844,10 @@ const ENTREPRISE_VIDE = {
 const VENTES_MASQUEES_AUCUNE = () => [];
 const SYNC_KEYS = [
   'vrm_vc_etiquettes','vrm_lbc_dates',
+  // (31 oct.) Les reçus d'achat qu'IL a déliés depuis le journal des emails
+  // (« Ce n'est pas ça ») : { [id de la ligne du reçu]: { tx, at } }. Rien n'est
+  // supprimé ; « Relier à nouveau » retire la clé.
+  'vrm_recus_delies',
   // (29 oct.) L'agent eBay qui demande : ses réglages, le résumé lu par Ma journée
   // et la notification du matin, ce qu'il a publié aujourd'hui (et « pas maintenant »).
   'vrm_agent_ebay_regles','vrm_agent_ebay_resume','vrm_agent_ebay_jour','vrm_agent_ebay_incertains',
@@ -37131,7 +37136,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // (29 oct.) LE REÇU (« facture ») DE CHAQUE ACHAT, PAR SON N° DE TRANSACTION
   // SEULEMENT (`api/_lib/recu-achat.js`, une règle, §5/§11). Index vide tant que
   // les reçus ne sont pas lus (« pas su » ne relie rien).
-  const indexRecusAchat = useMemo(() => indexRecusParTransaction(recusAchat, (r) => ventilationRecuAchat(r && r.texte).trouve), [recusAchat]);
+  // (31 oct.) Un reçu qu'IL a délié depuis le journal des emails (« Ce n'est pas
+  // ça ») ne désigne plus son achat ; rien n'est supprimé (`vrm_recus_delies`).
+  const [recusDelies, setRecusDelies] = useState(() => load('vrm_recus_delies', {}) || {});
+  useEffect(() => { const relire = () => setRecusDelies(load('vrm_recus_delies', {}) || {}); const off = onCloudReady(relire); const f = (e) => { if (e && e.detail && e.detail.k === 'vrm_recus_delies') relire(); }; window.addEventListener('vrm:save', f); return () => { off(); window.removeEventListener('vrm:save', f); }; }, []);
+  const indexRecusAchat = useMemo(() => indexRecusParTransaction(Array.isArray(recusAchat) ? recusAchat.filter((r) => !(r && r.id && recusDelies[r.id])) : recusAchat, (r) => ventilationRecuAchat(r && r.texte).trouve), [recusAchat, recusDelies]);
   const [receiptView, setReceiptView] = useState(null); // reçu affiché dans une modale in-app
   const [lotView, setLotView] = useState(null); // détail d'un lot : { loading, order, items }
   // (23 oct.) « Paires du lot » s'ouvre PAR-DESSUS le tiroir d'une vente : elle
@@ -49385,6 +49394,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             commune est dite UNE fois (§7) ; la ligne ne garde que ce qui la
             distingue. */}
         {only === 'bordereaux' ? <ColisVestiaireBloc vc={colisVestiaire(vcEtat)}/> : null}
+        {/* (31 oct.) Les emails reçus et ce que VRM en a fait — l'ambre quand un
+            email attend un geste (bordereau au N° deviné, reçu sans n°…). */}
+        {only === 'bordereaux' ? <EntreeJournalEmails headers={sbAuth} onOuvrir={(f)=>{demanderJournalEmails(f); onNav && onNav('settings');}}/> : null}
         {colisEb === null && <div data-colis-ebay="passu" style={{marginBottom:10}}><LignePanne>Les ventes eBay n'ont pas pu être lues pour l'instant — un colis eBay à poster n'est peut-être pas dans ce compte. Rien n'est perdu : rouvre Colis dans un moment.</LignePanne></div>}
         {colisEb && colisEb.aPoster.length>0 && (()=>{
           const L = colisEb.aPoster, n = L.length;
@@ -57224,8 +57236,11 @@ function phrasePersonne(p) {
 }
 // Le panneau des adresses se fait défiler jusqu'à lui quand on y arrive par le
 // geste de Ma journée (au moment du clic, Réglages n'est pas monté).
-const DEMANDE_ADRESSES = { on: false };
-function demanderAdresses(){DEMANDE_ADRESSES.on=true;window.dispatchEvent(new Event('vrm:ouvrir-adresses'));}
+const DEMANDE_ADRESSES = { on: false, vers: '', filtre: '' };
+function demanderAdresses(){DEMANDE_ADRESSES.on=true;DEMANDE_ADRESSES.vers='';window.dispatchEvent(new Event('vrm:ouvrir-adresses'));}
+// (31 oct.) Le journal « Tes emails, ce que VRM en a fait », ouvert depuis Colis
+// (filtré « à vérifier » quand il y a quelque chose à vérifier).
+function demanderJournalEmails(filtre){DEMANDE_ADRESSES.on=true;DEMANDE_ADRESSES.vers='journal';DEMANDE_ADRESSES.filtre=filtre||'';try{localStorage.setItem('vrm_reglages_vue','reglages');}catch(_){}window.dispatchEvent(new Event('vrm:ouvrir-adresses'));}
 // La forme acceptée pour une adresse de réception (saisie à la main OU
 // suggérée) : une seule règle.
 const ADRESSE_RECEPTION_OK = /^[^@\s]+@[^@\s.]+\.[^@\s]+$/;
@@ -57318,12 +57333,18 @@ function EmailsSetting({onComptes}) {
   const [vues, setVues] = useState(null);
   const [busy, setBusy] = useState('');
   const [versionReception,setVersionReception]=useState(0);
-  const [rubriqueEmail,setRubriqueEmail]=useState(()=>DEMANDE_ADRESSES.on?'adresses':'reception');
+  const [rubriqueEmail,setRubriqueEmail]=useState(()=>DEMANDE_ADRESSES.on?(DEMANDE_ADRESSES.vers||'adresses'):'reception');
+  const [journalFiltre,setJournalFiltre]=useState(()=>DEMANDE_ADRESSES.vers==='journal'?DEMANDE_ADRESSES.filtre:'');
+  // Les reçus d'achat qu'il a déliés (« Ce n'est pas ça ») — réversible, rien n'est supprimé.
+  const [recusDelies,setRecusDelies]=useState(()=>load('vrm_recus_delies',{})||{});
+  useEffect(()=>{const relire=()=>setRecusDelies(load('vrm_recus_delies',{})||{});const off=onCloudReady(relire);const f=e=>{if(e&&e.detail&&e.detail.k==='vrm_recus_delies')relire();};window.addEventListener('vrm:save',f);return()=>{off();window.removeEventListener('vrm:save',f);};},[]);
+  const delierRecu=(id,tx)=>{const n={...recusDelies,[id]:{tx:String(tx||''),at:new Date().toISOString()}};setRecusDelies(n);save('vrm_recus_delies',n);};
+  const relierRecu=(id)=>{const n={...recusDelies};delete n[id];setRecusDelies(n);save('vrm_recus_delies',n);};
   const espaceId=React.useId();
   const [adresseGuide,setAdresseGuide]=useState(''),[guideOuvert,setGuideOuvert]=useState(false);
   const configurerAdresse=adr=>{setAdresseGuide(adr);setGuideOuvert(true);requestAnimationFrame(()=>racine.current?.querySelector('.vrm-reception-parcours')?.scrollIntoView({block:'start',behavior:'smooth'}));};
   const [rechercheRattachement,setRechercheRattachement]=useState(''),[limiteRattachement,setLimiteRattachement]=useState(10);
-  useEffect(()=>{const ouvrir=()=>setRubriqueEmail('adresses');window.addEventListener('vrm:ouvrir-adresses',ouvrir);return()=>window.removeEventListener('vrm:ouvrir-adresses',ouvrir);},[]);
+  useEffect(()=>{const ouvrir=()=>{const v=DEMANDE_ADRESSES.vers;setRubriqueEmail(v||'adresses');if(v==='journal')setJournalFiltre(DEMANDE_ADRESSES.filtre||'');};window.addEventListener('vrm:ouvrir-adresses',ouvrir);return()=>window.removeEventListener('vrm:ouvrir-adresses',ouvrir);},[]);
   const [suiviAdresses,setSuiviAdresses]=useState(null);
   const [preuves, setPreuves] = useState(undefined);
   const [preuveBusy, setPreuveBusy] = useState('');
@@ -57670,7 +57691,14 @@ function EmailsSetting({onComptes}) {
       </details>
     </div>
     </div>
-    <div id={espaceId+'-reception'} data-email-panneau="reception" hidden={rubriqueEmail==='a-traiter'}>
+    {/* (31 oct.) Monté seulement quand on le regarde : aucune lecture pour un
+        onglet caché (« sauf si c'est trop lourd en données »). */}
+    <div id={espaceId+'-journal'} data-email-panneau="journal" hidden={rubriqueEmail!=='journal'}>
+      {rubriqueEmail==='journal'&&<JournalEmails headers={sbAuth} filtreInitial={journalFiltre} delies={recusDelies} onDelier={delierRecu} onRelier={relierRecu}
+        onNav={(t)=>{try{window.dispatchEvent(new CustomEvent('vrm:aller',{detail:t}));}catch(_){}}}
+        onNum={(n)=>{try{window.dispatchEvent(new CustomEvent('vrm:fiche-article',{detail:String(n)}));}catch(_){}}}/>}
+    </div>
+    <div id={espaceId+'-reception'} data-email-panneau="reception" hidden={rubriqueEmail==='a-traiter'||rubriqueEmail==='journal'}>
       <SuiviReceptionEmails onAdresseGuide={setAdresseGuide} adresseGuide={adresseGuide} guideOuvert={guideOuvert} onFermerGuide={()=>setGuideOuvert(false)} onVoirReception={()=>setRubriqueEmail('reception')} section={rubriqueEmail==='adresses'?'configuration':'reception'} key={uid} owner={uid} headers={sbAuth} theme={C} version={versionReception} onAdresses={setSuiviAdresses} onComptes={onComptes} onDeclarer={ajouterAdresses} preuves={preuves} onConfirmer={adr=>confirmerAdresse(adr,false)} quarantaine={quarantaine} onVerifier={()=>{setRubriqueEmail('a-traiter');requestAnimationFrame(()=>racine.current?.querySelector('[data-emails-mis-de-cote]')?.scrollIntoView({block:'center',behavior:'smooth'}));}}/>
     </div>
     <div id={espaceId+'-a-traiter'} data-email-panneau="a-traiter" hidden={rubriqueEmail!=='a-traiter'} className="vrm-email-rattachement">
@@ -58325,7 +58353,11 @@ function AppCoeur() {
     goto(window.location.search);
     const onMsg=(e)=>{ if(e.data&&e.data.type==='open-url'&&e.data.url){ try{ goto(new URL(e.data.url,window.location.origin).search); }catch(_){}} };
     if(navigator.serviceWorker) navigator.serviceWorker.addEventListener('message',onMsg);
-    return ()=>{ if(navigator.serviceWorker) navigator.serviceWorker.removeEventListener('message',onMsg); };
+    // (31 oct.) Un écran qui n'a pas `setTab` (le journal des emails) y mène par
+    // un événement — seulement vers un onglet connu.
+    const onAller=(e)=>{ const t=e&&e.detail; if(typeof t==='string'&&TABS_OK.includes(t)) setTab(t); };
+    window.addEventListener('vrm:aller',onAller);
+    return ()=>{ window.removeEventListener('vrm:aller',onAller); if(navigator.serviceWorker) navigator.serviceWorker.removeEventListener('message',onMsg); };
   },[]);
   const [dark,setDark]=useState(()=>load('vinted_dark',false));
   // Applique le thème (clair/sombre) en réassignant C avant chaque rendu

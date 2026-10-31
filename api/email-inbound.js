@@ -1,6 +1,7 @@
 import './_lib/sans-bruit.js';
 import {etatColisDepuisTexte,conserverRetrait,annonceArriveeFuture} from './_lib/etat-colis-email.js';
 import { accuseEmail, empreinteEmail } from "./_lib/accuse-email.js";
+import { resumeClassement, texteBorne } from "./_lib/resume-email.js";
 // api/email-inbound.js
 // ────────────────────────────────────────────────────────────────────────────
 // PIPELINE EMAIL UNIVERSEL (remplace l'Apps Script Gmail, marche pour TOUS les
@@ -143,14 +144,25 @@ async function repondre(res, code, corps) {
   // Aucun corps ni document dans cet index, et jamais de propriétaire deviné.
   if (contexte.reception && proprietaireCourant()) {
     const incident = code >= 400 || ecritureRatee();
-    const verification = corps.quarantaine || corps.garde || corps.type === "ignoré";
-    await supabaseUpsert([{id: `email_reception_${empreinteEmail(contexte.messageId)}`, data: {
+    // (31 oct.) CE QUE VRM A FAIT de cet email, en quelques dizaines d'octets
+    // (api/_lib/resume-email.js) : le journal « Tes emails, ce que VRM en a
+    // fait » le dit en une phrase. Une raison « à vérifier » (N° retrouvé par le
+    // titre, reçu sans n° de transaction…) range l'email « à vérifier ».
+    const resume = resumeClassement(incident ? 500 : code, corps, contexte.resumeExtra);
+    const verification = corps.quarantaine || corps.garde || corps.type === "ignoré" || !!resume.av;
+    const cle = empreinteEmail(contexte.messageId);
+    const texte = !incident ? texteBorne(contexte.texte) : '';
+    await supabaseUpsert([{id: `email_reception_${cle}`, data: {
       ...contexte.reception, at: new Date().toISOString(),
       etat: incident ? "erreur" : verification ? "a-verifier" : "integre",
       type: String(corps.type || "information"),
       raison: incident ? "Le rangement n’a pas été confirmé. Le collecteur doit réessayer." : verification ? "Le contenu est conservé pour vérification, sans intégration métier complète." : "",
       documentsVerifies: false, suppressionAutorisee: false,
-    }}]);
+      resume,
+    }},
+    // Le texte lisible (borné, sans HTML) vit dans SA ligne : la liste ne le lit
+    // jamais, « Voir le texte » le lit un email à la fois.
+    ...(texte ? [{ id: `email_texte_${cle}`, data: { texte, at: new Date().toISOString() } }] : [])]);
   }
   if (code < 400 && ecritureRatee()) {
     res.status(503).json({
@@ -1894,6 +1906,7 @@ export async function traiterEmail(req, res) {
   // ni acheteur, ni article. Mesuré sur les 184 offres archivées : le pseudo de
   // l'acheteur est vide sur TOUTES, et le montant sur une bonne partie.
   const corpsTexte = texteUtile(mail);
+  { const st = contexteVendeur.getStore(); if (st) st.texte = corpsTexte; }
   const rawForDetect = `${mail.from}\n${mail.to}\n${subject}\n${corpsTexte}`;
   const acc = await detectAccount(rawForDetect);
   // Date de RÉCEPTION de l'email : celle d'origine si on rejoue un email conservé
@@ -2039,6 +2052,7 @@ export async function traiterEmail(req, res) {
         tag: cleNotifColis(track, rowId), url: venteRetiree ? '/?tab=cat_ventes' : '/?tab=cat_achats',
       }, (track.status === 'available' || track.status === 'retour') ? 'colis' : 'suivi', [],
       track.status === 'available' ? [cleCodeRetrait(track.code)] : []); } catch (_) {}
+      { const st = contexteVendeur.getStore(); if (st) st.resumeExtra = { code: track.code, lieu: track.lieu, limite: track.limite, sens: sensLigne }; }
       await logEmail({ type: 'suivi', subject, from: mail.from, carrier, suivi: track.suivi, statut: track.label });
       await repondre(res, 200, { ok: true, type: 'suivi', carrier, suivi: track.suivi, status: track.status });
       return;
@@ -2084,6 +2098,7 @@ export async function traiterEmail(req, res) {
       // Notif push : bordereau prêt = colis à expédier.
       try { await pushOnce({ title: pdfTamponneB64 ? '📦 Bordereau prêt à imprimer' : '📦 Bordereau reçu', body: `${data.modele || 'Article'}${data.numero ? ` — N°${data.numero}` : ''}${pdfTamponneB64 ? ' : déjà tamponné' : ''} — à expédier${data.dateLimite ? ` avant le ${data.dateLimite}` : ''}.`, tag: `bord-${data.transaction}`, url: '/?tab=cat_bord' }, 'expedier'); } catch (_) {}
       await notifierDoubleVente(numeroLu, data.modele || data.article);
+      { const st = contexteVendeur.getStore(); if (st) st.resumeExtra = { parTitre: !!(data.numero && !numeroLu), article: data.modele || data.article }; }
       await logEmail({ type: 'bordereau', subject, from: mail.from, numero: data.numero, transaction: data.transaction, tamponne: !!pdfTamponneB64 });
       await repondre(res, 200, { ok: true, type: 'bordereau', transaction: data.transaction, numero: data.numero, pdf: !!pdf, tamponne: !!pdfTamponneB64 });
       return;
@@ -2191,6 +2206,7 @@ export async function traiterEmail(req, res) {
         tag: transaction ? `achat-tx${transaction}` : `achat-${key}`, url: '/?tab=cat_achats',
         _cat: 'achat',
       }); } catch (_) {}
+      { const st = contexteVendeur.getStore(); if (st) st.resumeExtra = { ligne: `email_achat_${key}` }; }
       await logEmail({ type: 'achat', subject, from: mail.from, prix, article, pdf: !!pdfA, account: acc.login || '' });
       await repondre(res, 200, { ok: true, type: 'achat', article, prix, transaction, pdf: !!pdfA });
       return;
@@ -2235,6 +2251,7 @@ export async function traiterEmail(req, res) {
           }
         }
       } catch (_) {}
+      { const st = contexteVendeur.getStore(); if (st) st.resumeExtra = { article: data.designation }; }
       await logEmail({ type: 'vente', subject, from: mail.from, prix: data.prix, numero: data.numero, facture: facture ? facture.number : null });
       await repondre(res, 200, { ok: true, type: 'vente', pseudo: data.pseudo, prix: data.prix, numero: data.numero, facture });
       return;

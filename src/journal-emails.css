@@ -1,0 +1,43 @@
+/* « Tes emails, ce que VRM en a fait » (31 oct.) — Vitrine : aplats « surface »,
+   une seule couleur d'accent (rare), l'ambre pour un geste à faire, 44 px. */
+.vrm-journal{margin:0 0 16px;border-radius:14px;background:var(--vrm-card,#fff);color:var(--vrm-ink,#111);min-width:0;overflow:hidden;font-size:14px;line-height:1.45}
+.vrm-journal-entete{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding:18px 18px 10px}
+.vrm-journal-entete h3{margin:0;font-size:18px;font-weight:800;letter-spacing:-.02em}
+.vrm-journal-entete p{margin:4px 0 0;font-size:13px;color:var(--vrm-muted,#5f5f5a)}
+.vrm-journal button,.vrm-journal select{font:inherit;min-height:44px;box-sizing:border-box;border-radius:12px;border:1px solid var(--vrm-line,#e4e4df);background:var(--vrm-surface,#f5f5f2);color:inherit;padding:0 14px;cursor:pointer}
+.vrm-journal button:disabled{opacity:.6;cursor:wait}
+.vrm-journal :focus-visible{outline:2px solid var(--vrm-focus,#2442B8);outline-offset:2px}
+.vrm-journal-filtres{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:flex-end;padding:0 18px 12px}
+.vrm-journal-segments{display:flex;gap:6px;flex-wrap:wrap}
+.vrm-journal-segments button{display:inline-flex;align-items:center;gap:8px}
+.vrm-journal-segments button[aria-pressed=true]{background:var(--vrm-ink,#111);color:var(--vrm-card,#fff);border-color:var(--vrm-ink,#111)}
+.vrm-journal-choix{display:grid;gap:3px;min-width:0;flex:1 1 180px}
+.vrm-journal-choix span{font-size:12px;color:var(--vrm-muted,#5f5f5a)}
+.vrm-journal-choix select{width:100%;max-width:100%;background:var(--vrm-card,#fff)}
+.vrm-journal-n-ambre{font-weight:700;color:var(--vrm-warn,#9a5b00);background:var(--vrm-warn-soft,#fbf1e1);border-radius:999px;padding:1px 8px;font-variant-numeric:tabular-nums}
+.vrm-journal-segments button[aria-pressed=true] .vrm-journal-n-ambre{background:var(--vrm-warn-soft,#fbf1e1)}
+.vrm-journal-couverture{margin:0 18px 8px;font-size:12px;color:var(--vrm-muted,#5f5f5a)}
+.vrm-journal-vide{margin:12px 18px;color:var(--vrm-muted,#5f5f5a)}
+.vrm-journal-vide button{margin-left:6px}
+.vrm-journal-liste{list-style:none;margin:0;padding:0}
+.vrm-journal-ligne{padding:14px 18px;border-top:1px solid var(--vrm-hair,#ececE8);min-width:0;overflow-wrap:anywhere}
+.vrm-journal-tete{display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px;font-size:12px;color:var(--vrm-muted,#5f5f5a)}
+.vrm-journal-etat{font-weight:700;color:var(--vrm-ink,#111);white-space:nowrap}
+.vrm-journal-etat[data-etat=verifier]{color:var(--vrm-warn,#9a5b00)}
+.vrm-journal-etat[data-etat=incompris],.vrm-journal-etat[data-etat=reessai],.vrm-journal-etat[data-etat=delie]{color:var(--vrm-muted,#5f5f5a)}
+.vrm-journal-quoi{margin:4px 0 0;font-size:15px;font-weight:700}
+.vrm-journal-fait{margin:2px 0 0;color:var(--vrm-ink,#111)}
+.vrm-journal-raison{margin:8px 0 0;padding:10px 12px;border-radius:12px;background:var(--vrm-warn-soft,#fbf1e1);color:var(--vrm-ink,#111);font-size:13px}
+.vrm-journal-ligne:not([data-etat=verifier]) .vrm-journal-raison{background:var(--vrm-surface,#f5f5f2)}
+.vrm-journal-raison p{margin:0}.vrm-journal-raison p+p{margin-top:4px}
+.vrm-journal-gestes{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.vrm-journal-note{margin:6px 0 0;font-size:12px;color:var(--vrm-muted,#5f5f5a)}
+.vrm-journal-pourquoi{margin-top:6px;font-size:12px;color:var(--vrm-muted,#5f5f5a)}
+.vrm-journal-pourquoi summary{cursor:pointer;min-height:44px;display:flex;align-items:center}
+.vrm-journal-pourquoi p{margin:0 0 4px}
+.vrm-journal-texte{margin:10px 0 0;padding:12px;border-radius:12px;background:var(--vrm-surface,#f5f5f2);font-family:var(--vrm-police-mono,ui-monospace,monospace);font-size:12px;line-height:1.5;white-space:pre-wrap;overflow-wrap:anywhere;max-height:320px;overflow:auto}
+.vrm-journal-texte-etat{margin:10px 0 0;font-size:12px;color:var(--vrm-muted,#5f5f5a)}
+.vrm-journal-plus{display:block;margin:12px 18px 18px;width:calc(100% - 36px)}
+.vrm-journal-entree{margin:12px 0}
+.vrm-journal-entree button{width:100%;display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:44px;padding:0 14px;border-radius:12px;border:1px solid var(--vrm-line,#e4e4df);background:var(--vrm-surface,#f5f5f2);color:var(--vrm-ink,#111);font:inherit;cursor:pointer;text-align:left}
+@media(max-width:440px){.vrm-journal-entete,.vrm-journal-filtres,.vrm-journal-ligne{padding-left:14px;padding-right:14px}.vrm-journal-couverture,.vrm-journal-vide{margin-left:14px;margin-right:14px}.vrm-journal select{font-size:16px}.vrm-journal-plus{margin-left:14px;margin-right:14px;width:calc(100% - 28px)}}
