@@ -2098,6 +2098,20 @@ function _installerRetourFeuilles() {
       setTimeout(() => { if (f.monte && f.consommee) { f.consommee = false; _poserFeuille(f); } }, 0);
     }
   });
+  // (1er nov., banc tous-boutons) ÉCHAP ferme la feuille du dessus, sur
+  // ordinateur, comme le geste « retour » : « Republier », la saisie des prix
+  // d'achat… ne se fermaient qu'à la souris. Un écran qui gère déjà Échap a
+  // refermé SA feuille avant ce tour (React rend un clavier tout de suite) :
+  // alors rien de plus — jamais deux feuilles pour un Échap.
+  window.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape' || e.defaultPrevented || e.isComposing) return;
+    const f = _feuillesOuvertes[_feuillesOuvertes.length - 1];
+    if (!f) return;
+    setTimeout(() => {
+      if (!f.monte || _feuillesOuvertes[_feuillesOuvertes.length - 1] !== f) return;
+      try { f.fermer.current && f.fermer.current(); } catch (_) {}
+    }, 0);
+  });
 }
 function _poserFeuille(f) {
   try { window.history.pushState({ ...(window.history.state || {}), vrmFeuille: f.id }, ''); } catch (_) {}
@@ -2396,7 +2410,10 @@ const planifierReprise = () => {
 };
 function PanneauSync({ onFermer, onReglages }) {
   const [, maj] = React.useReducer((x) => x + 1, 0);
-  React.useEffect(() => { const off = onSyncChange(() => maj()); const t = setInterval(maj, 5000); const f = (e) => { if (!e.target.closest || !e.target.closest('[data-sync-panneau],.vrm-sync-status')) onFermer(); }; document.addEventListener('pointerdown', f); return () => { off(); clearInterval(t); document.removeEventListener('pointerdown', f); }; }, []);
+  React.useEffect(() => { const off = onSyncChange(() => maj()); const t = setInterval(maj, 5000); const f = (e) => { if (!e.target.closest || !e.target.closest('[data-sync-panneau],.vrm-sync-status')) onFermer(); }; document.addEventListener('pointerdown', f);
+    // (1er nov., banc tous-boutons) Échap le referme aussi, comme toucher à côté.
+    const echap = (e) => { if (e.key === 'Escape') onFermer(); }; document.addEventListener('keydown', echap);
+    return () => { off(); clearInterval(t); document.removeEventListener('pointerdown', f); document.removeEventListener('keydown', echap); }; }, []);
   const i = _syncInfo;
   const h = (t) => t ? new Date(t).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : null;
   const titre = i.etat === 'synced' ? 'Tout est sauvegardé' : i.etat === 'saving' ? 'Sauvegarde en cours…' : i.etat === 'loading' ? 'Chargement de tes réglages…' : i.etat === 'refus' ? 'Sauvegarde bloquée' : i.etat === 'error' ? 'Dernière sauvegarde pas partie' : 'En attente';
@@ -2412,7 +2429,7 @@ function PanneauSync({ onFermer, onReglages }) {
       <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
         {i.etat === 'error' && <button type="button" data-sync-reessayer onClick={() => { reprendreSyncMaintenant(); maj(); }} style={{ border: 'none', background: C.accent, color: '#fff', borderRadius: 8, padding: '7px 12px', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>Réessayer maintenant</button>}
         {i.etat === 'refus' && <button type="button" onClick={() => location.reload()} style={{ border: 'none', background: C.accent, color: '#fff', borderRadius: 8, padding: '7px 12px', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>Recharger la page</button>}
-        <button type="button" onClick={onReglages} style={{ border: `1px solid ${C.border}`, background: 'transparent', color: C.text, borderRadius: 8, padding: '7px 12px', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>Réglages</button>
+        <button type="button" onClick={onReglages} style={{ border: `1px solid ${C.border}`, background: 'transparent', color: C.text, borderRadius: 8, padding: '7px 12px', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>Paramètres</button>
       </div>
     </div>
   );
@@ -10978,7 +10995,7 @@ function NotifsMuettes({ onNav }) {
       value={etat.devices ? `${etat.devices} appareil${etat.devices>1?'s':''} abonné${etat.devices>1?'s':''}` : null}
       desc="Le serveur n'a pas sa clé d'envoi : ni vente, ni colis, ni offre ne sonneront."
       detail={"Vercel → projet cancale-v67 → Settings → Environment Variables → ajouter VAPID_PRIVATE_KEY, puis redéployer. Rouvre ensuite l'app une fois sur chaque téléphone : il se réabonne tout seul."}
-      action={onNav && <Bouton variante="secondaire" icone="gear" className="vrm-b-petit" onClick={()=>onNav('settings')}>Réglages</Bouton>}
+      action={onNav && <Bouton variante="secondaire" icone="gear" className="vrm-b-petit" onClick={()=>onNav('settings')}>Paramètres</Bouton>}
       style={{marginBottom:14}}/>
   );
 }
@@ -14725,12 +14742,36 @@ function SideBar({ tab, setTab, entreprise, sites, badges }) {
     window.addEventListener('resize', poser);
     return () => { el.removeEventListener('scroll', poser); window.removeEventListener('resize', poser); try { ro && ro.disconnect(); } catch (_) {} };
   }, []);
+  // (1er nov., capture de Julien à 1512 × ~1000) « Vestiaire » COUPÉ à moitié
+  // par le filet du pied : une entrée de navigation ne se coupe jamais. Quand la
+  // colonne ne tient pas, ses rangées se RESSERRENT (densité 1 à 4, styles-
+  // finition.css) ; si même serrée elle ne tient pas, c'est TOUTE la colonne qui
+  // défile (pied compris), jamais une ligne coupée par un filet intérieur.
+  // Banc : scripts/bancs/tous-boutons.cjs (« colonne »).
+  const railRef = React.useRef(null);
+  const nEntrees = groupes.reduce((n, g) => n + g.items.length, 0);
+  React.useLayoutEffect(() => {
+    const rail = railRef.current, zone = zoneRef.current; if (!rail || !zone) return undefined;
+    let raf = 0;
+    const ajuster = () => {
+      rail.removeAttribute('data-rail-defile');
+      for (let d = 0; d <= 4; d++) {
+        if (d) rail.setAttribute('data-rail-densite', String(d)); else rail.removeAttribute('data-rail-densite');
+        if (zone.scrollHeight <= zone.clientHeight + 1) return;
+      }
+      rail.setAttribute('data-rail-defile', 'tout');
+    };
+    ajuster();
+    const plusTard = () => { cancelAnimationFrame(raf); raf = requestAnimationFrame(ajuster); };
+    window.addEventListener('resize', plusTard);
+    return () => { cancelAnimationFrame(raf); window.removeEventListener('resize', plusTard); };
+  }, [nEntrees, badges]);
   React.useEffect(() => {
     const el = zoneRef.current; if (!el) return;
     const b = el.querySelector('.vrm-rail-button[aria-current="page"]');
     try { if (b) b.scrollIntoView({ block: 'nearest', inline: 'nearest' }); } catch (_) {}
   }, [tab]);
-  return <nav className="vrm-sidebar vrm-atelier-rail" aria-label="Navigation principale" style={{width:NAV_LARGEUR,background:C.sidebar||C.chrome,borderRight:`1px solid ${C.chromeLine}`,color:C.onChrome}}>
+  return <nav ref={railRef} className="vrm-sidebar vrm-atelier-rail" aria-label="Navigation principale" style={{width:NAV_LARGEUR,background:C.sidebar||C.chrome,borderRight:`1px solid ${C.chromeLine}`,color:C.onChrome}}>
     <div className="vrm-sidebar-brand"><span className="vrm-sidebar-mot" role="img" aria-label="VRM">VRM</span><NomEntreprise entreprise={entreprise} className="vrm-sidebar-entreprise"/></div>
     <div className="vrm-rail-scroll" ref={zoneRef}>
       <div className="vrm-rail-platforms" data-nav-taches="">{NAV_TACHES.map(bouton)}</div>
@@ -17159,7 +17200,7 @@ function EtatActions({ onNav, ordi, sombre }) {
   //    connecte par l'ancien message) — sa fenêtre n'a que email et mot de passe.
   else if (code === 'vrm') { const voie = voieConnexionExt(); geste = <span data-etat-geste={voie === 'retard' ? 'maj-ou-mdp' : voie === 'serveur' ? 'mdp' : voie === 'page' ? 'page' : 'liaison'}>{__sessExtEnVol ? 'Un instant…'
     : voie === 'retard'
-      ? <>Cette extension ({vmrExtVersion() || 'version ?'}) ne sait pas recevoir la connexion de VRM : mets-la à jour en {EXT_ATTENDUE} (Réglages) — ou clique l'icône VRM en haut de Chrome et connecte-toi avec ton mot de passe VRM (<b>{monMail || 'ton email VRM'}</b>).</>
+      ? <>Cette extension ({vmrExtVersion() || 'version ?'}) ne sait pas recevoir la connexion de VRM : mets-la à jour en {EXT_ATTENDUE} (Paramètres → État des connexions) — ou clique l'icône VRM en haut de Chrome et connecte-toi avec ton mot de passe VRM (<b>{monMail || 'ton email VRM'}</b>).</>
       : voie === 'serveur'
         ? (fenetreAncienne()
           ? <>Le serveur n'a pas pu préparer sa connexion{__sessExtErreur.message ? ` (${__sessExtErreur.message})` : ''} : clique l'icône VRM en haut de Chrome et connecte-toi avec ton mot de passe VRM (<b>{monMail || 'ton email VRM'}</b>).</>
@@ -17174,7 +17215,7 @@ function EtatActions({ onNav, ordi, sombre }) {
   // passe VRM dans sa fenêtre — ou la mettre à jour.
   else if (code === 'autre-vrm') { const voie = voieConnexionExt(); geste = __sessExtEnVol ? <span>Un instant…</span>
     : voie === 'retard'
-      ? <span data-etat-geste="deconnecter">Cette extension ({vmrExtVersion() || 'version ?'}) ne sait pas recevoir la connexion de VRM. <button type="button" data-etat-geste-deconnecter="1" className="vrm-b vrm-b-discret" onClick={() => { deconnecterExtensionAncienne(); }}>Déconnecter l'extension de ce Chrome</button>, puis clique l'icône VRM en haut de Chrome et connecte-toi avec ton mot de passe VRM (<b>{monMail || 'ton email VRM'}</b>) — ou mets-la à jour en {EXT_ATTENDUE} (Réglages).</span>
+      ? <span data-etat-geste="deconnecter">Cette extension ({vmrExtVersion() || 'version ?'}) ne sait pas recevoir la connexion de VRM. <button type="button" data-etat-geste-deconnecter="1" className="vrm-b vrm-b-discret" onClick={() => { deconnecterExtensionAncienne(); }}>Déconnecter l'extension de ce Chrome</button>, puis clique l'icône VRM en haut de Chrome et connecte-toi avec ton mot de passe VRM (<b>{monMail || 'ton email VRM'}</b>) — ou mets-la à jour en {EXT_ATTENDUE} (Paramètres → État des connexions).</span>
       : voie === 'serveur'
         ? <span data-etat-geste="attendre-serveur">Le serveur n'a pas pu préparer sa connexion{__sessExtErreur.message ? ` (${__sessExtErreur.message})` : ''} : je réessaie dans {minutesAvantReessai()} min, cette page ouverte.</span>
         : <button type="button" data-etat-geste="recharger" className="vrm-b vrm-b-primaire" onClick={() => { try { window.location.reload(); } catch (_) {} }}>Recharger la page</button>; }
@@ -17624,7 +17665,7 @@ function Onboarding({ setTab }) {
         titreNeuf="Pour commencer, relie ton compte Vinted"
         introNeuf={<>VRM ne va rien chercher tout seul&nbsp;: c'est l'extension, dans ton navigateur Chrome, qui range ce que Vinted t'envoie déjà. Elle ne touche jamais à ton mot de passe Vinted.</>}/>
       <div style={{fontSize:12,color:C.muted,textAlign:'center',marginTop:14,lineHeight:1.4}}>
-        Déjà des données ailleurs&nbsp;? Va dans ⚙️ Réglages → Restaurer pour les récupérer.
+        Déjà des données ailleurs&nbsp;? Va dans Paramètres → Restaurer une sauvegarde pour les récupérer.
       </div>
     </div>
   );
@@ -20529,7 +20570,7 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
         body: JSON.stringify({ title: base, brand: extractBrand(base) || '', size: (pairSel && pairSel.taille) || extractSize(base) || '', price: prix || undefined, desc: desc || '', key: (load('vrm_ai_key', '') || '').trim() || undefined }) });
       const j = await r.json().catch(() => ({}));
       if (j && j.ok && j.title) { setTitre(String(j.title).slice(0, 80)); if (!desc.trim() && j.desc) setDesc(String(j.desc)); setCat(null); setCheck(null); setAiWhy(j.why || ''); }
-      else setRes({ err: (j && j.reason === 'no-key') ? 'Ajoute ta clé IA dans Réglages pour la rédaction automatique.' : 'L\'IA n\'a pas pu rédiger le titre — réessaie.' });
+      else setRes({ err: (j && j.reason === 'no-key') ? 'La rédaction automatique demande ta propre clé IA, et VRM n\'a pas encore de réglage pour la poser : écris le titre toi-même.' : 'L\'IA n\'a pas pu rédiger le titre — réessaie.' });
     } catch (_) { setRes({ err: 'IA injoignable — réessaie.' }); }
     setAiBusy(false);
   };
@@ -24105,7 +24146,7 @@ function AgentEbay({ comptes, comptesEbay, onAnnonces }) {
         <input data-agent-phrase="" value={phrase} onChange={(e) => { setPhrase(e.target.value); setCompris(null); }} placeholder="publie les Nike en 42 à plus de 60 €, +10 %, 3 par jour" style={{ minHeight: 44, borderRadius: 8, border: `1px solid ${E.border}`, background: E.surface, color: E.text, padding: '0 12px', fontSize: 16, fontFamily: 'inherit' }}/>
       </label>
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8 }}>
-        <button type="button" data-agent-comprendre="" disabled={!phrase.trim()} onClick={() => setCompris(comprendrePhrase(phrase, { comptes: comptesNoms, marques: marquesVues }))} style={s()}>Voir ce que je comprends</button>
+        <button type="button" data-agent-comprendre="" disabled={!phrase.trim()} title={!phrase.trim() ? 'Écris d’abord ta phrase au-dessus.' : undefined} onClick={() => setCompris(comprendrePhrase(phrase, { comptes: comptesNoms, marques: marquesVues }))} style={s()}>Voir ce que je comprends</button>
       </div>
       {compris && <div data-agent-compris="" style={{ marginTop: 10, fontSize: 12.5, color: E.text, lineHeight: 1.5 }}>
         {compris.negation ? <p data-agent-negation="" style={{ margin: 0 }}>Je ne sais pas encore EXCLURE avec une phrase (« {compris.negation} ») : je ne garde rien. Pour écarter une paire, touche « Jamais » sur sa ligne ; sinon, dis ce que tu VEUX publier (« publie les Nike à plus de 60 € »).</p>
@@ -25701,7 +25742,7 @@ function AnnoncesVestiaire() {
         <div data-vc-annonces-fraicheur="" style={{ ...style, marginBottom: 10 }}>
           {n} annonce{n > 1 ? 's' : ''}{d.complet ? '' : d.total != null ? ` (au moins — Vestiaire en annonce ${d.total})` : ' (au moins)'}, lue{n > 1 ? 's' : ''} sur Vestiaire {ageCourtVc(d.capturedAt)}.
           {vieille ? <> <b style={{ color: C.warn }}>À confirmer</b> : la lecture a plus de 24 h — {geste} pour la remettre à jour (rien n'est retiré d'ici).</> : null}
-          {sansFiche ? <> Photo, titre et prix arrivent avec l'extension {EXT_CAPACITES.vcfiche}{extSait('vcfiche') === 'ok' ? <> : {geste} une fois</> : <> — mets-la à jour depuis Réglages, puis {geste}</>}.</> : null}
+          {sansFiche ? <> Photo, titre et prix arrivent avec l'extension {EXT_CAPACITES.vcfiche}{extSait('vcfiche') === 'ok' ? <> : {geste} une fois</> : <> — mets-la à jour depuis Paramètres → État des connexions, puis {geste}</>}.</> : null}
         </div>
         <section className="vrm-lbc-catalog" aria-label="Mes annonces Vestiaire" style={{ margin: 0 }}>
           <ul>{liste.map(({ id, it, num, etat, label, brut }) => {
@@ -26217,7 +26258,7 @@ function FilVestiaire({ conv, num, titre, envoi, onFerme }) {
   else if (fil && fil.messages) pied = (
     <PiedSansEnvoi attrs={{ 'data-vc-repondre': cap !== 'ok' ? 'ext-' + cap : 'pas-appris', ...(cap === 'ok' ? { 'data-vc-pas-appris': envoi && envoi.raison ? envoi.raison : '' } : {}) }} lien={lien} texteLien="Répondre sur Vestiaire ↗"
       raison={cap === 'absente' ? <>Pour répondre d'ici, ouvre VRM dans le Chrome où l'extension est installée — sinon réponds sur Vestiaire.</>
-        : cap !== 'ok' ? <>Pour répondre d'ici, il faut l'extension <b>{EXT_CAPACITES.vcrepondre}</b> — mets-la à jour depuis <b>Réglages</b>.</>
+        : cap !== 'ok' ? <>Pour répondre d'ici, il faut l'extension <b>{EXT_CAPACITES.vcrepondre}</b> — mets-la à jour depuis <b>Paramètres → État des connexions</b>.</>
         : <>Pour répondre d'ici, l'extension doit d'abord VOIR comment Vestiaire envoie un message : envoie <b>une</b> réponse toi-même sur Vestiaire, dans ce Chrome. Ensuite, VRM pourra répondre — toujours sur ton clic.{envoi && envoi.raison ? <> (Dernier essai vu : pas encore sûr à refaire — {envoi.raison}.)</> : null}</>}>
       {resultat}
     </PiedSansEnvoi>
@@ -26411,7 +26452,7 @@ function VestiaireMesure() {
   return (
     <div data-vc-mesure="jamais" style={style}>
       {cap === 'ok' ? <>Pour que VRM apprenne à le lire : ouvre <b>Vestiaire Co</b> dans ce Chrome, connecté à ton compte vendeur, et passe sur tes ventes, tes articles et tes paiements. L'extension relève la <b>forme</b> des pages — jamais leur contenu.</>
-        : cap === 'retard' ? <>Pour que VRM apprenne à lire Vestiaire, l'extension doit passer en <b>{EXT_CAPACITES.vestiaire}</b> : celle installée ne sait pas encore l'observer. Mets-la à jour depuis <b>Réglages</b>.</>
+        : cap === 'retard' ? <>Pour que VRM apprenne à lire Vestiaire, l'extension doit passer en <b>{EXT_CAPACITES.vestiaire}</b> : celle installée ne sait pas encore l'observer. Mets-la à jour depuis <b>Paramètres → État des connexions</b>.</>
         : <>C'est l'extension, dans le Chrome de ton ordinateur, qui lit Vestiaire quand tu y passes.</>}
     </div>
   );
@@ -27312,7 +27353,7 @@ function Catalog({catalog,setCatalog,onDeleteId}) {
             onKeyDown={e=>{if(e.key==='Enter')triggerSearch();}}
             placeholder="Numéro... puis Entrée"
             style={{flex:1,minWidth:120}}/>
-          <Btn small onClick={triggerSearch} color={C.accent}>Chercher</Btn>
+          <Btn small onClick={triggerSearch} color={C.accent} disabled={!searchInput.trim()&&!search} title={!searchInput.trim()&&!search?'Tape d’abord un N° ou une date':undefined}>Chercher</Btn>
           {search&&<Btn small onClick={clearSearch} color={C.border}>✕</Btn>}
         </div>
         {['all','stock','vendu'].map(f=>(
@@ -27577,7 +27618,7 @@ function Sales({catalog,setCatalog,sales,setSales,invoices,invoiceSettings,entre
           onKeyDown={e=>{if(e.key==='Enter')triggerSearch();}}
           placeholder="Article, date... puis Entrée"
           style={{maxWidth:280,flex:1,minWidth:160}}/>
-        <Btn small onClick={triggerSearch} color={C.accent}>Chercher</Btn>
+        <Btn small onClick={triggerSearch} color={C.accent} disabled={!searchInput.trim()&&!search} title={!searchInput.trim()&&!search?'Tape d’abord un N° ou une date':undefined}>Chercher</Btn>
         {search&&<Btn small onClick={clearSearch} color={C.border}>✕</Btn>}
       </div>
       <Card style={{padding:0,overflow:'hidden'}}>
@@ -27981,7 +28022,7 @@ function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoice
           </Btn>
           <Btn small outline color={C.muted} onClick={exportExcel} style={{display:'inline-flex',alignItems:'center',gap:5}}><Icon name="save" size={13}/>Exporter Excel</Btn>
           <Btn small outline color={C.muted} onClick={()=>setShowPro(v=>!v)} aria-expanded={showPro} style={{display:'inline-flex',alignItems:'center',gap:5}}><Icon name="receipt" size={13}/>Facturation Pro</Btn>
-          <Btn small outline color={C.muted} onClick={()=>setShowSettings(true)} style={{display:'inline-flex',alignItems:'center',gap:5}}><Icon name="gear" size={13}/>Réglages</Btn>
+          <Btn small outline color={C.muted} onClick={()=>setShowSettings(true)} style={{display:'inline-flex',alignItems:'center',gap:5}}><Icon name="gear" size={13}/>Réglages des factures</Btn>
         </div>}/>
       </div>
       {showPro && <ProFactureSetting/>}
@@ -27996,7 +28037,7 @@ function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoice
           style={{flex:1,minWidth:200,padding:'9px 12px',background:C.surface,border:`1px solid ${C.border}`,borderRadius:8,
             color:C.text,fontSize:13,fontFamily:'inherit',outline:'none'}}
         />
-        <Btn small onClick={triggerSearch} color={C.accent}>Chercher</Btn>
+        <Btn small onClick={triggerSearch} color={C.accent} disabled={!searchInput.trim()&&!search} title={!searchInput.trim()&&!search?'Tape d’abord un N° ou une date':undefined}>Chercher</Btn>
         {search&&<Btn small onClick={clearSearch} color={C.border}>✕ Effacer</Btn>}
       </div>
       {search&&<div style={{fontSize:12,color:C.warn}}>
@@ -28036,7 +28077,7 @@ function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoice
               );
             })}
           </div>
-          <div className="vrm-aide" style={{fontSize:11,color:C.muted,marginTop:6,lineHeight:1.4}}>Préparées automatiquement à chaque vente Pro (coordonnées acheteur dans l'email Vinted). Réglages : Paramètres → Facturation Pro.</div>
+          <div className="vrm-aide" style={{fontSize:11,color:C.muted,marginTop:6,lineHeight:1.4}}>Préparées automatiquement à chaque vente Pro (coordonnées acheteur dans l'email Vinted). Réglages : le bouton « Facturation Pro » en haut de cet écran.</div>
         </div>
       )}
 
@@ -28046,7 +28087,7 @@ function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoice
           {id:'attente',icon:'clock',label:'En attente',count:counters.attente},
           {id:'comptabilisees',icon:'check',label:'Comptabilisées',count:counters.comptabilisees},
         ].map(z=>(
-          <button key={z.id} type="button" onClick={()=>{setZone(z.id);setPage(null);}}
+          <button key={z.id} type="button" aria-pressed={zone===z.id} onClick={()=>{setZone(z.id);setPage(null);}}
             style={{background:'transparent',border:'none',borderBottom:zone===z.id?`3px solid ${C.accent}`:'3px solid transparent',
               color:zone===z.id?C.accent:C.muted,padding:'8px 14px',cursor:'pointer',fontSize:13,fontWeight:500,fontFamily:'inherit',whiteSpace:'nowrap'}}>
             <span style={{display:'inline-flex',alignItems:'center',gap:5}}><Icon name={z.icon} size={13}/>{z.label} ({z.count})</span>
@@ -32563,7 +32604,7 @@ function VintedAccounts({ accounts, setAccounts, baseKO, onRetour }) {
 
   return (
     <div style={{padding:'16px 14px 40px'}}>
-      {onRetour && <Bouton variante="discret" className="vrm-settings-back" onClick={onRetour}>‹ Réglages</Bouton>}
+      {onRetour && <Bouton variante="discret" className="vrm-settings-back" onClick={onRetour}>‹ Paramètres</Bouton>}
       <GuideReglage titre="Relier et vérifier un compte" etapes={[
         ['Connecte ton compte', 'Ouvre Vinted avec l’extension VRM active, puis actualise cette liste.'],
         ['Vérifie son identité', 'Contrôle le pseudo et associe l’adresse qui reçoit les emails de ce compte.'],
@@ -34561,7 +34602,7 @@ function ProfilFiscalCarte({ onNav }) {
               ))}
             </nav>
             {regime !== 'micro' ? (
-              <div data-profil-regime-texte="" style={{ fontSize: 13, color: C.muted, lineHeight: 1.5 }}>{regime ? (REGIMES_FISCAUX.find((x) => x[0] === regime) || [])[3] : 'Choisis ton statut : VRM ne te parle d\'URSSAF que si tu es micro-entrepreneur.'}{regime === 'marge' ? <> Le taux de TVA se règle dans <button type="button" onClick={() => onNav && onNav('settings')} style={{ border: 'none', background: 'transparent', color: C.accent, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', padding: 0, fontSize: 13 }}>Réglages</button>.</> : null}</div>
+              <div data-profil-regime-texte="" style={{ fontSize: 13, color: C.muted, lineHeight: 1.5 }}>{regime ? (REGIMES_FISCAUX.find((x) => x[0] === regime) || [])[3] : 'Choisis ton statut : VRM ne te parle d\'URSSAF que si tu es micro-entrepreneur.'}{regime === 'marge' ? <> Le taux de TVA se règle dans <button type="button" onClick={() => onNav && onNav('settings')} style={{ border: 'none', background: 'transparent', color: C.accent, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', padding: 0, fontSize: 13 }}>Paramètres → Régime fiscal</button>.</> : null}</div>
             ) : (
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                 <span style={{ fontSize: 13, color: C.text, fontWeight: 600 }}>Taux de cotisations</span>
@@ -35081,7 +35122,7 @@ function MicroEntreprise({ taux, poserTaux, officiel, vlTaux, acreTaux }) {
             <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '4px 12px', marginTop: 8, fontSize: 13, color: C.muted }}>
               {lignesTaux.map(([l, t, n]) => <React.Fragment key={l}><span>{l} <span style={{ fontSize: 11.5 }}>· {n}</span></span><span style={{ color: C.text, fontVariantNumeric: 'tabular-nums', textAlign: 'right' }}>{pctFr(t)}</span></React.Fragment>)}
             </div>
-          ) : <div style={{ fontSize: 12.5, color: C.muted, marginTop: 6 }}>Posé à la main dans Réglages : VRM ne le change pas quand tu réponds ci-dessus.</div>}
+          ) : <div style={{ fontSize: 12.5, color: C.muted, marginTop: 6 }}>Posé à la main dans Paramètres → Régime fiscal : VRM ne le change pas quand tu réponds ci-dessus.</div>}
           <div style={{ fontSize: 12, color: C.muted, marginTop: 8 }}>Taux officiels 2026 de l'achat-revente, à vérifier sur ton espace URSSAF. VRM ne remplace pas un comptable.</div>
         </div>
       </div>
@@ -35640,7 +35681,7 @@ function RecapComptableMensuel() {
           <div data-recap-regle={urssafMois?'versement':'archive'} style={{fontSize:11,color:C.muted,marginTop:12,lineHeight:1.5}}>
             {urssafMois
               ? <>Ventes <b>finalisées</b>, toutes plateformes, comptées dans le mois où l'argent a été versé (Vinted), de la vente (Leboncoin), de la commande payée (eBay) — ou dans le mois où tu les as déclarées. Annulées et remboursements exclus, ventes masquées comprises ; une vente sans date de versement n'est dans aucun mois.</>
-              : <>Ventes de l'ancienne archive, à leur date de réception — annulées et remboursements exclus.</>} Cotisations estimées à {String(tauxUrssaf()).replace('.',',')} % (taux réglable dans Réglages). La déclaration se fait sur autoentrepreneur.urssaf.fr.
+              : <>Ventes de l'ancienne archive, à leur date de réception — annulées et remboursements exclus.</>} Cotisations estimées à {String(tauxUrssaf()).replace('.',',')} % (taux réglable dans Paramètres → Régime fiscal). La déclaration se fait sur autoentrepreneur.urssaf.fr.
           </div>
         </details></Card>
       )}
@@ -37926,7 +37967,7 @@ function ListeComptes({ id, valeur, options, onChange, note, skin, attrs }) {
     </div>
   );
 }
-function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, onFreeNum, liveStats, accountsReady, baseKO, premierJour: premierJourProp, compteSel = '', compteConnecte = '', alertes = null, panelOff = null, dansPlateforme = false, vueAchats, siteColisDemande = null, onColisLeboncoin = null }) {
+function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, onFreeNum, liveStats, accountsReady, baseKO, premierJour: premierJourProp, compteSel = '', compteConnecte = '', alertes = null, panelOff = null, dansPlateforme = false, vueAchats, siteColisDemande = null, onColisLeboncoin = null, sitesPresents = null }) {
   const [datesLbc] = useLigneSynchro('vrm_lbc_dates', lireDatesLbc);
   const [facturesVentes,setFacturesVentes]=useState([]);
   useEffect(()=>{if(only && only!=='ventes')return;let stop=false;fetchProInvoices({metadata:true}).then(rows=>{if(!stop)setFacturesVentes(rows);});return()=>{stop=true;};},[only]);
@@ -43503,7 +43544,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const n = achatsMasques(); n.add(String(o.transaction_id)); ecrireAchatsMasques([...n]);
     setBuys(prev => prev && prev.items ? { ...prev, items: prev.items.filter(x => String(x.transaction_id) !== String(o.transaction_id)) } : prev);
     if (_acctCache['purchased']) { _acctCache['purchased'].items = (_acctCache['purchased'].items || []).filter(x => String(x.transaction_id) !== String(o.transaction_id)); _persistAcctCache(); }
-    toast('Achat masqué — Réglages → Achats masqués pour le réafficher.');
+    toast('Achat masqué — Paramètres → Achats masqués pour le réafficher.');
   };
   const achatsAffiches = useMemo(() => { const uidA = o => String((o && o._acc && o._acc.vinted_user_id) || (o && o._uid) || '');
     let arr = buysBase
@@ -47602,7 +47643,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 des actions sans aucun compte lié (des colis repérés par email,
                 par exemple) — là seulement elle apprend quelque chose. */}
             {accounts.length===0 && !baseKO && !(jobs.length===0 && !loading && premierJour) && (
-              <div style={{marginTop:16,fontSize:13,color:C.muted,textAlign:'center',lineHeight:1.5,padding:'0 10px'}}>Lie un compte Vinted (Réglages → Comptes liés) pour remplir ta journée.</div>
+              <div style={{marginTop:16,fontSize:13,color:C.muted,textAlign:'center',lineHeight:1.5,padding:'0 10px'}}>Lie un compte Vinted (Paramètres → Comptes liés) pour remplir ta journée.</div>
             )}
             {/* Le bénéfice vit dans « Vendu et reçu » ; si cette carte n'est pas
                 sur l'écran (retirée), il garde sa propre carte ici : allumé dans
@@ -48924,7 +48965,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       laquelle c'était — elle a pu être reliée depuis). */}
                   {(()=>{ const sans = avail.filter(t => !compteDuColisEmail(t)); const n = sans.length;
                     const adresseLibre = sans.some(t => Array.isArray(t.recuSur) && t.recuSur.length);
-                    return n ? <div data-pickup-sans-compte={n} style={{fontSize:11.5,color:C.muted,marginTop:3,lineHeight:1.4}}>{n>1?`${n} colis : compte non reconnu`:'1 colis : compte non reconnu'}{adresseLibre?' — Relie-la dans Réglages → Comptes liés.':''} <Pourquoi label="Pourquoi">L'e-mail est arrivé sur une adresse qui n'était alors reliée à aucun de tes comptes Vinted (e-mail du compte, dans Réglages → Comptes liés).</Pourquoi></div> : null; })()}
+                    return n ? <div data-pickup-sans-compte={n} style={{fontSize:11.5,color:C.muted,marginTop:3,lineHeight:1.4}}>{n>1?`${n} colis : compte non reconnu`:'1 colis : compte non reconnu'}{adresseLibre?' — Relie-la dans Paramètres → Comptes liés.':''} <Pourquoi label="Pourquoi">L'e-mail est arrivé sur une adresse qui n'était alors reliée à aucun de tes comptes Vinted (e-mail du compte, dans Paramètres → Comptes liés).</Pourquoi></div> : null; })()}
                   {/* ⚠️ « À chaque fois on doit voir le nombre de paires que l'on
                       reçoit » (Julien). On compte les colis dont on SAIT nommer
                       la paire — jamais un total gonflé : quand il en manque, ça
@@ -49246,7 +49287,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       {avecCode
                         ? 'Donne le code de retrait, ou scanne le QR depuis la conversation Vinted'
                         : (()=>{ const e = extSaitLireCodes();
-                            if (e === 'retard') return "Extension en retard : elle ne lit pas encore les codes. Mets-la à jour (Réglages) ; en attendant, ouvre la conversation, le code y est.";
+                            if (e === 'retard') return "Extension en retard : elle ne lit pas encore les codes. Mets-la à jour (Paramètres → État des connexions) ; en attendant, ouvre la conversation, le code y est.";
                             if (e === 'absente') return "Ouvre la conversation Vinted du colis : le code et le QR y sont.";
                             // ⚠️ Le chemin SÛR en premier : le code est dans la
                             //    conversation (bouton sous chaque colis), et il y
@@ -50401,7 +50442,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       : <>La puce sous chaque annonce décide. L'extension prépare ensuite chacune{ou} — photos téléchargées dans un dossier, texte copié, formulaire pré-rempli : <b>c'est toi qui publies</b>. La <b>{EXT_CAPACITES[pl.capPhotos]}</b> les attache directement au formulaire.</>)
                   : l.etat==='absente'
                     ? <>Ton choix est enregistré. C'est l'extension, dans ton Chrome, qui prépare ensuite chaque annonce{nommer ? <> sur {pl.nom}</> : ''} — ouvre l'app sur l'ordinateur où elle est installée.</>
-                    : <>Ton choix est enregistré, <b>mais l'extension installée ne sait pas encore {nommer ? <>préparer {pl.nom}</> : 'les préparer'}</b> : il lui faut la <b>{EXT_CAPACITES[pl.cap]}</b>. Mets-la à jour depuis <b>Réglages</b> — tes coches ne bougent pas.</>;
+                    : <>Ton choix est enregistré, <b>mais l'extension installée ne sait pas encore {nommer ? <>préparer {pl.nom}</> : 'les préparer'}</b> : il lui faut la <b>{EXT_CAPACITES[pl.cap]}</b>. Mets-la à jour depuis <b>Paramètres → État des connexions</b> — tes coches ne bougent pas.</>;
           };
           return (<>
             {/* La phrase commune une seule fois, au-dessus des lignes. Sur la
@@ -50516,10 +50557,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             const ouverte = fichesOuvertes.has(String(it.id));
             const idRepli = `fiche-plus-${it._acc.vinted_user_id}-${it.id}`;
             const achatConnu = achat!=null && !isNaN(achat);
+            // (1er nov., banc tous-boutons) La photo promet « Ouvrir l'annonce sur
+            // Vinted » : sans `url` lue, le lien n'avait AUCUNE adresse (un clic
+            // mort). L'adresse se refait par l'identité de l'annonce (son id, sur
+            // le domaine du compte) ; sans id numérique, la photo n'est pas un lien.
+            const urlFiche = it.url || (/^\d+$/.test(String(it.id)) ? `https://${(it._acc && it._acc.domain) || 'www.vinted.fr'}/items/${it.id}` : '');
             return (
               <div className="vrm-ann-card vrm-fiche" key={it._acc.vinted_user_id+'_'+it.id} data-carte-annonce={it.id} data-fiche="29oct" data-fiche-ouverte={ouverte?'1':'0'} style={{borderRadius:12,background:C.card,border:`1px solid ${soldBord?C.warn:C.border}`,boxShadow:C.shadow||'none',display:'flex',flexDirection:'column',overflow:'hidden',...(estFloute(it)?STYLE_FLOU:null)}}>
                 <div className="vrm-ann-overview" style={{display:'flex',flexDirection:'column',position:'relative'}}>
-                  <a className="vrm-fiche-photo" data-fiche-photo href={it.url||undefined} target="_blank" rel="noreferrer" title="Ouvrir l'annonce sur Vinted" style={{display:'flex',alignItems:'center',justifyContent:'center',position:'relative',background:C.bg}}>
+                  <a className="vrm-fiche-photo" data-fiche-photo href={urlFiche||undefined} target={urlFiche?'_blank':undefined} rel="noreferrer" title={urlFiche?"Ouvrir l'annonce sur Vinted":undefined} style={{display:'flex',alignItems:'center',justifyContent:'center',position:'relative',background:C.bg}}>
                     {it.photo?<PhotoVinted src={it.photo} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<Icon name="image" size={28} style={{color:C.muted,opacity:.55}}/>}
                     {it._vrmAConfirmer && <span data-ann-a-confirmer="" title="Ce compte n'a pas été relu depuis plus de 24 h : cette annonce était en ligne à la dernière lecture. Ouvre vinted.fr sur ce compte pour le vérifier." style={{position:'absolute',right:10,top:10,fontSize:11,fontWeight:650,whiteSpace:'nowrap',color:C.text,background:C.card,border:`1px solid ${C.warn || C.border}`,borderRadius:999,padding:'4px 9px'}}>À confirmer{it._vrmAConfirmerLu ? ` · lu ${new Date(it._vrmAConfirmerLu).toLocaleDateString('fr-FR',{day:'numeric',month:'short'})}` : ''}</span>}
                     {it.promoted===true && <span data-boostee title="Vinted dit que cette annonce est boostée en ce moment" style={{position:'absolute',left:10,bottom:10,fontSize:11,fontWeight:650,whiteSpace:'nowrap',color:C.text,background:C.card,border:`1px solid ${C.border}`,borderRadius:999,padding:'4px 9px'}}>Boostée</span>}
@@ -50983,7 +51029,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           const cartes = cartesColis();
           const vue = colonnesColis(cartes, siteColis);
           const nPrets = lignesLot().length;
-          const sitesVus = SITES_COLIS.filter(x => vue.parSite[x]);
+          // (1er nov., capture de Julien : « Vestiaire » absent de Colis alors
+          // qu'il y a un compte) Même règle que les filtres d'Annonces, Ventes,
+          // Messages et que la rangée de Colis · Leboncoin : un site où il a un
+          // compte (`sitesPresents`, « pas su » ⇒ montré) a sa pastille, même
+          // sans colis ce jour-là ; un site qui porte des colis l'a toujours.
+          const sitesVus = SITES_COLIS.filter(x => vue.parSite[x] || (x !== 'leboncoin' && (!sitesPresents || sitesPresents.has(x))));
           const nomSite = { vinted: 'Vinted', leboncoin: 'Leboncoin', ebay: 'eBay', vestiaire: 'Vestiaire' };
           const ouvrir = (x) => {
             if (x.ebay) { DEMANDE_EBAY_CIBLE.compte = x.ebay.compte; DEMANDE_EBAY_CIBLE.id = x.ebay.orderId; DEMANDE_EBAY_CIBLE.at = Date.now(); onNav && onNav('ebay_ventes'); return; }
@@ -51220,7 +51271,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   </div>
                   <details className="vrm-label-help vrm-colis-imprimante-aide" style={{marginTop:8,marginBottom:0}}><summary>{imprimante==="thermique"?"L’étiquette seule, ton N° en bas":"Une feuille par bordereau"}</summary><div style={{fontSize:12,color:C.muted,lineHeight:1.5,paddingTop:4}}>
                     {imprimante==='thermique'
-                      ? <>L'étiquette seule, <b>au format 10 × 15 cm</b>, sans la fiche destinataire ni la pub du transporteur, avec ton <b>N° en petit en bas</b>. Si l'étiquette n'est pas repérable sur un bordereau, il part <b>entier</b> — et c'est écrit à la fin. Aperçus de chaque type : Réglages → Imprimante et bordereaux.</>
+                      ? <>L'étiquette seule, <b>au format 10 × 15 cm</b>, sans la fiche destinataire ni la pub du transporteur, avec ton <b>N° en petit en bas</b>. Si l'étiquette n'est pas repérable sur un bordereau, il part <b>entier</b> — et c'est écrit à la fin. Aperçus de chaque type : Paramètres → Imprimante et bordereaux.</>
                       : <>La page complète, une <b>feuille par bordereau</b>. Si ton imprimante sort du recto-verso, décoche-le dans sa fenêtre d'impression : le PDF le demande, le pilote peut passer outre.</>}
                   </div></details>
                 </div>
@@ -52523,7 +52574,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     {actif&&!repubAi.busy&&repubAi.reason&&(
                       <div style={{marginTop:8,fontSize:11.5,color:C.muted,lineHeight:1.45}}>
                         {repubAi.reason==='no-key'
-                          ? <>Pas de clé IA : ajoute-la dans <b>Réglages → Rédaction d'annonces par l'IA</b> (ou pose <b>AI_API_KEY</b> sur Vercel). Rien n'est inventé sans elle.</>
+                          ? <>Pas de clé IA : VRM n'a pas encore de réglage pour poser ta clé (ou pose <b>AI_API_KEY</b> sur Vercel). Rien n'est inventé sans elle.</>
                           : <>L'IA n'a pas répondu ({repubAi.reason}). Réessaie dans un instant.</>}
                       </div>
                     )}
@@ -52556,7 +52607,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             <div style={{display:'flex',gap:10,alignItems:'center',padding:'12px 16px',borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
               <div style={{flex:1,minWidth:0}}>
                 <div style={{fontSize:15,fontWeight:700,color:C.text,display:'flex',alignItems:'center',gap:8}}><Icon name="doc" size={17}/>Rapport comptable</div>
-                <div style={{fontSize:11,color:C.muted}}>{libelleRegime(report.regime)} · <span style={{opacity:0.8}}>régime modifiable dans Réglages</span></div>
+                <div style={{fontSize:11,color:C.muted}}>{libelleRegime(report.regime)} · <span style={{opacity:0.8}}>régime modifiable dans Paramètres → Régime fiscal</span></div>
               </div>
               <button type="button" onClick={()=>setShowReport(false)} aria-label="Fermer" style={{border:'none',background:'transparent',fontSize:22,color:C.muted,cursor:'pointer',lineHeight:1}}>×</button>
             </div>
@@ -54849,7 +54900,7 @@ function RepublierLeboncoin({ liste, exclues, onClose, onFini }) {
     : glob ? glob.texte
     : !vmrExtPresent() ? "L'extension VRM n'est pas détectée dans ce navigateur — installe-la, ou ouvre VRM dans le Chrome où elle est installée."
     : __vmrEtat === undefined ? "Je vérifie l'extension…"
-    : !saitSuppr ? `Ton extension (${vmrExtVersion() || 'version ?'}) ne sait pas encore supprimer une annonce Leboncoin : mets-la à jour (${EXT_CAPACITES.lbcsupprime}) depuis Réglages.` : '';
+    : !saitSuppr ? `Ton extension (${vmrExtVersion() || 'version ?'}) ne sait pas encore supprimer une annonce Leboncoin : mets-la à jour (${EXT_CAPACITES.lbcsupprime}) depuis Paramètres → État des connexions.` : '';
   const triees = (liste || []).filter((it) => !q || `${it.numero} ${it.lbc.titre} ${it.title}`.toLowerCase().includes(q.toLowerCase())).slice()
     .sort((a, b) => tri === 'favoris' ? ((b.lbc.favoris == null ? -1 : b.lbc.favoris) - (a.lbc.favoris == null ? -1 : a.lbc.favoris))
       : tri === 'vues' ? ((a.lbc.vues == null ? 1e9 : a.lbc.vues) - (b.lbc.vues == null ? 1e9 : b.lbc.vues))
@@ -55063,7 +55114,7 @@ function ConversationsLeboncoin() {
         <div style={{ fontWeight: 600, marginBottom: 4 }}>Pas encore de messages relevés</div>
         <div style={{ color: C.muted }}>
           {cap === 'ok' ? <>Ouvre <b>leboncoin.fr</b> une fois, connecté à ton compte : l'extension relèvera combien de messages t'attendent, compte par compte.</>
-            : cap === 'retard' ? <>L'extension installée ne relève pas encore les messages : il lui faut la <b>{EXT_CAPACITES.lbcmsg}</b>. Mets-la à jour depuis <b>Réglages</b>.</>
+            : cap === 'retard' ? <>L'extension installée ne relève pas encore les messages : il lui faut la <b>{EXT_CAPACITES.lbcmsg}</b>. Mets-la à jour depuis <b>Paramètres → État des connexions</b>.</>
             : <>C'est l'extension, sur ton ordinateur, qui relève tes messages Leboncoin quand tu passes sur leboncoin.fr.</>}
         </div>
         {ouvrir}
@@ -55164,7 +55215,7 @@ function FavorisLeboncoin() {
       <div style={{ fontSize: 12, color: C.muted, lineHeight: 1.55, marginBottom: 10 }}>
         Leboncoin donne le <b>nombre</b> de favoris de chaque annonce, jamais <b>qui</b> les a mis : VRM ne peut donc écrire à personne, et il ne le fait pas.{' '}
         {capStats === 'ok' ? <>Pour qu'une annonce ait son chiffre, ouvre ses <b>statistiques</b> sur Leboncoin (« Mes annonces » → l'annonce → Statistiques) : l'extension le relève toute seule.</>
-          : capStats === 'retard' ? <>Pour relever ce chiffre, il faut l'extension <b>{EXT_CAPACITES.lbcstats}</b> : mets-la à jour depuis Réglages, puis ouvre les <b>statistiques</b> de l'annonce sur Leboncoin.</>
+          : capStats === 'retard' ? <>Pour relever ce chiffre, il faut l'extension <b>{EXT_CAPACITES.lbcstats}</b> : mets-la à jour depuis Paramètres → État des connexions, puis ouvre les <b>statistiques</b> de l'annonce sur Leboncoin.</>
           : <>C'est l'extension, sur ton ordinateur, qui relève ce chiffre quand tu ouvres les <b>statistiques</b> d'une annonce sur Leboncoin.</>}
       </div>
       {!ads.length ? (
@@ -55822,7 +55873,7 @@ function LeboncoinScreen() {
         {/* Revue du 16 octobre : ce titre redisait l'onglet « Annonces » juste
             au-dessus. Il reste pour un lecteur d'écran, plus à l'œil. */}
         <h2 className="vrm-sr">Tes annonces Leboncoin</h2>
-        <button type="button" onClick={reload} style={{ marginLeft: 'auto', background: 'transparent', border: `1px solid ${C.border}`, borderRadius: 999, padding: '6px 12px', cursor: 'pointer', fontSize: 12, fontWeight: 700, color: C.text }}>{loading ? '…' : '↻ Actualiser'}</button>
+        <button type="button" onClick={reload} style={{ marginLeft: 'auto', minWidth: 44, background: 'transparent', border: `1px solid ${C.border}`, borderRadius: 999, padding: '6px 12px', cursor: 'pointer', fontSize: 12, fontWeight: 700, color: C.text }}>{loading ? '…' : '↻ Actualiser'}</button>
       </div>
       {erreurReception && <LignePanne>La relecture de tes données Leboncoin a échoué. Les informations précédentes restent affichées. Réessaie avec Actualiser.</LignePanne>}
       {conseilsLbc.length > 0 && (
@@ -56037,7 +56088,7 @@ function LeboncoinScreen() {
                 <div style={{ fontSize: 11, color: C.muted, marginBottom: 8 }}>La vente est <b>certaine</b> (la transaction Vinted désigne cette annonce). Retire-{vendues.length > 1 ? 'les' : 'la'} de Leboncoin pour ne pas vendre le même article deux fois — cherche la référence <b>VRM-N°</b> dans l'annonce. Le numéro de l'article ne change pas.
                   {pausables && se === 'ok' ? <> <span data-lbc-supprimer-geste="ok">Tu peux {vendues.length > 1 ? 'les' : 'la'} supprimer d'ici (sans retour) ou {vendues.length > 1 ? 'les' : 'la'} mettre en pause (elle se remet en ligne depuis « Mes annonces »), une à la fois.</span></>
                     : pausables && pe === 'ok' ? <> <span data-lbc-pause-geste="ok">Ou mets-{vendues.length > 1 ? 'les' : 'la'} en pause d'ici, une à la fois : ce n'est pas une suppression, elle se remet en ligne depuis « Mes annonces ».</span></> : null}
-                  {pausables && pe === 'retard' ? <> <span data-lbc-pause-geste="retard">Pour {vendues.length > 1 ? 'les' : 'la'} mettre en pause d'ici, mets l'extension à jour (Réglages).</span></> : null}
+                  {pausables && pe === 'retard' ? <> <span data-lbc-pause-geste="retard">Pour {vendues.length > 1 ? 'les' : 'la'} mettre en pause d'ici, mets l'extension à jour (Paramètres → État des connexions).</span></> : null}
                 </div>
                 {vendues.slice(0, 30).map((r, i) => Ligne(r, i, C.danger, true))}
                 {carteDoute === 'vendues' ? phraseDoute : null}
@@ -56049,7 +56100,7 @@ function LeboncoinScreen() {
                 <div data-lbc-retirer-ebay={venduesEbay.length} style={{ fontSize: 11, color: C.muted, marginBottom: 8 }}>La vente eBay est <b>certaine</b> (le SKU <b>VRM-N°</b> de la commande désigne cette paire). Retire-{venduesEbay.length > 1 ? 'les' : 'la'} de Leboncoin pour ne pas vendre le même article deux fois. Le numéro de l'article ne change pas.
                   {venduesEbay.some((r) => r.ident && r.lbc && r.id) && se === 'ok' ? <> <span data-lbc-supprimer-geste-ebay="ok">Tu peux {venduesEbay.length > 1 ? 'les' : 'la'} supprimer d'ici (sans retour) ou {venduesEbay.length > 1 ? 'les' : 'la'} mettre en pause, une à la fois.</span></>
                     : venduesEbay.some((r) => r.ident && r.lbc && r.id) && pe === 'ok' ? <> <span data-lbc-pause-geste-ebay="ok">Ou mets-{venduesEbay.length > 1 ? 'les' : 'la'} en pause d'ici, une à la fois : ce n'est pas une suppression.</span></> : null}
-                  {venduesEbay.some((r) => r.ident && r.lbc && r.id) && pe === 'retard' ? <> <span data-lbc-pause-geste-ebay="retard">Pour {venduesEbay.length > 1 ? 'les' : 'la'} mettre en pause d'ici, mets l'extension à jour (Réglages).</span></> : null}
+                  {venduesEbay.some((r) => r.ident && r.lbc && r.id) && pe === 'retard' ? <> <span data-lbc-pause-geste-ebay="retard">Pour {venduesEbay.length > 1 ? 'les' : 'la'} mettre en pause d'ici, mets l'extension à jour (Paramètres → État des connexions).</span></> : null}
                   {venduesEbay.some((r) => !r.ident) ? <> <span data-lbc-ebay-sans-ident={venduesEbay.filter((r) => !r.ident).length}>{(() => { const sans = venduesEbay.filter((r) => !r.ident); const ns = sans.map((r) => 'N°' + r.numero).join(', '); return sans.length > 1 ? `${ns} ne sont reliées que par ta marque « publiée » : VRM ne sait pas quelles annonces c'est sur Leboncoin, retire-les toi-même dans « Mes annonces ».` : `La ${ns} n'est reliée que par ta marque « publiée » : VRM ne sait pas quelle annonce c'est sur Leboncoin, retire-la toi-même dans « Mes annonces ».`; })()}</span></> : null}
                 </div>
                 {venduesEbay.slice(0, 30).map((r, i) => Ligne(r, i, C.danger, true))}
@@ -56194,7 +56245,7 @@ function LeboncoinScreen() {
                      ordinateur » était dit ici ET dans la ligne juste dessous
                      (`RaisonPublication`) — une cause, une phrase (§7). */
                   ? <Pourquoi ecrit label="Ce que VRM publie">Voici le titre <b>que VRM proposera</b> sur Leboncoin (50 caractères max, la taille à la fin).</Pourquoi>
-                  : <>Voici le titre <b>que VRM propose</b>. ⚠️ <b>Ton extension est plus ancienne que la {EXT_CAPACITES.lbctitre}</b> : elle publiera encore l'ancien titre (coupé en plein mot). Mets-la à jour depuis Réglages pour que ce soit ce titre-là qui parte.</>}
+                  : <>Voici le titre <b>que VRM propose</b>. ⚠️ <b>Ton extension est plus ancienne que la {EXT_CAPACITES.lbctitre}</b> : elle publiera encore l'ancien titre (coupé en plein mot). Mets-la à jour depuis Paramètres → État des connexions pour que ce soit ce titre-là qui parte.</>}
             </div>
             {/* ⚠️ LA LISTE SE GROUPE SUR CE QU'IL PEUT FAIRE, pas sur le numéro.
                 C'est la loi de l'écran Colis : mesuré ici, 54 des 59 annonces
@@ -56403,7 +56454,7 @@ function LeboncoinScreen() {
         // INSTALLÉE : c'est l'extension qui publie, avec SA règle.
         const e = extSait('publication');
         if (e === 'ok') return <>Chaque paire a son bouton <b>« Publier sur Leboncoin »</b> : l'extension ouvre le dépôt, attache les photos, remplit tout et publie <b>sans option payante</b>.</>;
-        if (e === 'retard') return <>Le bouton <b>« Publier sur Leboncoin »</b> arrive avec l'extension <b>{EXT_CAPACITES.publication}</b> : mets-la à jour depuis <b>Réglages</b>. En attendant, celle installée publie encore depuis son panneau sur leboncoin.fr.</>;
+        if (e === 'retard') return <>Le bouton <b>« Publier sur Leboncoin »</b> arrive avec l'extension <b>{EXT_CAPACITES.publication}</b> : mets-la à jour depuis <b>Paramètres → État des connexions</b>. En attendant, celle installée publie encore depuis son panneau sur leboncoin.fr.</>;
         return <>La publication part de l'ordinateur où l'extension est installée : ouvre cet écran là-bas et clique « Publier » sur la paire. Cette liste, elle, se consulte de partout.</>;
       })()}</div>
 
@@ -63134,7 +63185,8 @@ function AppCoeur() {
         </>}
         {(()=>{ const map={cat_annonces:'annonces',cat_ventes:'ventes',cat_bord:'bordereaux',cat_expedition:'bordereaux'}; if(tab==='cat_bord'&&platSub==='leboncoin') return null; return map[tab] ? <Comptabilite key={tab} accounts={vintedAccounts} only={map[tab]} liveStats={liveStatsVus} accountsReady={accountsLoaded} baseKO={baseKO} onNav={setTab} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}} onFreeNum={freeGarageNum}
           siteColisDemande={tab==='cat_bord'&&typeof platSub==='string'&&platSub.startsWith('site:')?platSub.slice(5):null}
-          onColisLeboncoin={tab==='cat_bord'&&(!sitesPresents||sitesPresents.has('leboncoin'))?()=>setPlatSub('leboncoin'):null}/> : null; })()}
+          onColisLeboncoin={tab==='cat_bord'&&(!sitesPresents||sitesPresents.has('leboncoin'))?()=>setPlatSub('leboncoin'):null}
+          sitesPresents={(tab==='cat_bord'||tab==='cat_expedition')?sitesPresents:null}/> : null; })()}
         {/* (31 oct., soir) LES COLIS À RETIRER VIVENT DANS COLIS. Sous les quatre
             colonnes, leur DÉTAIL — l'ancienne vue « À retirer » d'Achats, mêmes
             composants et mêmes lectures (§11) : codes et QR, dates limites, points
