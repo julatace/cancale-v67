@@ -2386,3 +2386,52 @@ touchés : `stock-piece` B (« la paire choisie… rien d'autre ne bouge », `4_
 moteur-offres, offres-auto, republier, stock-plan : verts.
 
 **Geste de Julien** : aucun.
+
+## 1er novembre — Chiffres de Ma journée : la semaine en barres, moins d'écritures
+
+**Demande de Julien** : « je n'aime pas le graphique, il n'est pas beau, je veux que tu le
+changes ; pareil pour le CA, le bénéfice : il y a des écritures partout qui gâchent tout, je
+veux que tout soit parfait ». Référence : la maquette A « Semaine en barres », simplifiée.
+Style Vitrine inchangé.
+
+**Ce qui change (forme seulement, aucune règle de calcul)** :
+- `CourbeSemaine` (cubique monotone, aire en dégradé, série « reçu » en pointillé, légende,
+  graduations) et `DayWeekNote` (« Vendu : jour de la vente · Reçu : jour du versement… »)
+  sont RETIRÉS. `BarresSemaine` : une barre par jour PASSÉ (montant vendu, angles droits,
+  cobalt), la valeur au-dessus seulement si elle tient dans sa colonne, un « 0 » discret pour
+  un jour sans vente, rien après aujourd'hui, aujourd'hui = libellé en encre + trait cobalt.
+  Le « reçu » du jour reste porté (`data-recu`, infobulle) mais ne se dessine plus. La
+  hauteur suit celle que la carte laisse (148–240 px ordinateur, 136 px téléphone).
+  `src/courbeMonotone.js` reste (test `syntheses`), App ne l'importe plus.
+- Carte « Vendu en … » : UN grand chiffre (le vendu du mois, `data-vendu-mois` — ce que
+  l'écran publie déjà), une ligne « 7 ventes · 2 aujourd'hui » (le nombre, pas le montant du
+  jour : il est déjà sur la barre « auj. »), puis une rangée de cases de même forme partagée
+  par des filets : **Bénéfice · Reçu en … · À mettre de côté (micro) · CA {année}**. Chaque
+  case : libellé, montant (Geist Mono tabulaire, « € » plus petit, `Montant`), au plus une
+  ligne : « au moins · 1 à dater », « au moins », « 2 sur 4 · 2 prix d'achat › » (ambre, ouvre
+  la saisie), « avant tes dépenses », « pas lu ». Les explications longues passent en `title`.
+  Deux colonnes en étroit, une colonne par case dès 560 px de carte (requête de conteneur).
+- Bénéfice (`BeneficeJournee`) : le net quand il se calcule, sinon le BRUT des ventes au prix
+  d'achat connu avec sa couverture et la porte ; montants arrondis à l'euro (les data-* gardent
+  les centimes, Comptabilité le détail). La ligne « Aujourd'hui : … brut · … net » est retirée
+  (dans l'infobulle et les data-*). « Masquer le bénéfice » reste en mode « Modifier » ; le
+  choix « Pas de dépenses · Ajouter une dépense » reste (une fois, caché au téléphone).
+- « Cette semaine » : le total à droite du titre (tu, si c'est le même nombre que le grand
+  chiffre : jamais deux fois, §7), `data-total-semaine` porté par la carte.
+- Tendances : 4 cases sans cadres, base nommée en une ligne courte (« contre 29 €/j »,
+  « contre 153 € »), le reste en infobulle. La carte « En attente » voisine prend les mêmes
+  montants en chasse fixe.
+- Styles : `src/styles-journee-chiffres.css`, chargée après Vitrine ; les cartes portent
+  `.vrm-jc` (les couches d'avant posaient grille, dégradé et notes cachées au téléphone).
+
+**Preuve** : banc neuf `scripts/bancs/journee-chiffres.cjs` (390 et 1512 px, clair et
+sombre) — 7 jours, aucune `path` (ni lissée ni seconde série), une barre par jour passé dont
+la hauteur suit le montant, aucun texte hors de sa boîte, lignes de texte du bloc ≤ 30 (390)
+/ ≤ 34 (1512), un seul chiffre ≥ 30 px, data-* publiés présents, jamais « encaissé ». Sur
+l'arbre d'avant (68c9fe12, copié et lancé depuis cet arbre) : 18 rouges (tracés `C`, 3 séries,
+aucune barre, 35 et 45 lignes). Après : 52 verts. `benefice-journee` adapté sans l'affaiblir
+(« en barres » au lieu de « monotones » ; la couleur du net lue sur le montant, et rouge si
+le montant est absent) ; `scripts/tests/iphone.cjs` vise `.vrm-jc-rangee` au lieu de
+`.vrm-day-recu`.
+
+**Geste de Julien** : regarder Ma journée (téléphone et ordinateur).
