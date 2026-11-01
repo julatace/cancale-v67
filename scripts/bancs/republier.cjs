@@ -124,6 +124,10 @@ const projette = (row, sel) => {
         await bouton.waitFor({ state: 'visible', timeout: 12000 }).catch(() => {});
         dit(await bouton.count() > 0 && await bouton.isVisible(), 'Annonces : un bouton « Actions » dans la barre');
         dit(await pg.locator('[data-republier-ouvrir],[data-brouillons-ouvrir]').count() === 0, 'un seul bouton : plus de « Republier » ni « Brouillons » à part');
+        // (1er nov.) La phrase de l'astuce N° : le mot en gras n'est pas un élément
+        // d'un conteneur flex à part (l'écart du flex posait « numéro , jamais »).
+        { const d = await pg.evaluate(() => { const a = document.querySelector('[data-astuce-numeros]'); if (!a) return 'absente'; const b = [...a.querySelectorAll('b')].find((x) => x.textContent === 'numéro'); return b ? getComputedStyle(b.parentElement).display : 'sans mot'; });
+          if (d !== 'absente') dit(d !== 'flex' && d !== 'sans mot', 'l’astuce « numéro, jamais redonné » se lit d’une traite (pas d’espace avant la virgule)', d); }
         const lb = await bouton.boundingBox().catch(() => null);
         dit(lb && lb.width >= 80 && lb.height >= 40, '« Actions » n’est pas écrasé dans une case de 44 px (barre du téléphone)', lb ? `${Math.round(lb.width)}×${Math.round(lb.height)}` : 'absent');
         await bouton.click();

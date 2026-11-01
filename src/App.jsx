@@ -18048,7 +18048,7 @@ function RetirerArgent({ liveStats }) {
     </div>
   );
 }
-function VintedResume({ liveStats, baseKO, siAJour = true, sauf = null }) {
+function VintedResume({ liveStats, baseKO, siAJour = true, sauf = null, sansMontants = false }) {
   // ⚠️ §7 : pendant une panne, le résumé NE répète PAS la ligne « Je n'ai pas pu
   //    lire » — le bloc de la coque la dit déjà, et la liste en dessous
   //    (Comptabilite) porte la sienne. Deux lignes ici = « la panne dite trois
@@ -18062,13 +18062,16 @@ function VintedResume({ liveStats, baseKO, siAJour = true, sauf = null }) {
   const box = { flex:'1 1 90px', minWidth:0 };
   const eti = { fontSize:10.5, color:C.muted, textTransform:'uppercase', letterSpacing:0.7, fontWeight:600 };
   return (
-    <><ResumePlateforme><div style={{padding:'12px 16px 0',display:'flex',flexDirection:'column',gap:10}}>
+    <>{/* (1er nov.) Sur Annonces, l'argent ne dit rien de la tâche (CA, porte-monnaie :
+        Ventes, Statistiques) et poussait les annonces sous la ligne de flottaison ;
+        la ligne de fraîcheur, elle, reste (elle dit si la liste est à jour). */}
+    {!sansMontants && <ResumePlateforme><div style={{padding:'12px 16px 0',display:'flex',flexDirection:'column',gap:10}}>
       <div className="vrm-summary-strip" style={{display:'flex',gap:14,flexWrap:'wrap',border:`1px solid ${C.border}`,background:C.card,borderRadius:12,padding:'12px 15px',boxShadow:C.shadow||'none'}}>
         <div style={box}><div style={eti}>CA finalisé</div><div className="vrm-display" style={{fontSize:20,fontWeight:700,color:C.text}}>{ca==null?'—':fmt(ca)}</div></div>
         <div style={box}><div style={eti}>Disponible</div><div className="vrm-display" style={{fontSize:20,fontWeight:700,color:C.text}}>{dispo==null?'—':fmt(dispo)}</div></div>
         <div style={box}><div style={eti}>En attente</div><div className="vrm-display" style={{fontSize:20,fontWeight:700,color:C.muted}}>{att==null?'—':fmt(att)}</div></div>
       </div>
-    </div></ResumePlateforme>
+    </div></ResumePlateforme>}
     {/* (18 oct.) Hors du repli : sur téléphone le résumé est replié, et une capture
         ancienne y était cachée — une alerte qu'on ne voit pas n'en est pas une. */}
     {(() => {
@@ -30746,12 +30749,24 @@ function AssistantRangement({ plan, planLu, ecrire, ficheParNum }) {
 
       {/* Où est la N° X ? — une lecture, aucune écriture. */}
       <div style={{ display: 'flex', gap: 8 }}>
-        <input value={q} onChange={e => setQ(e.target.value)} onKeyDown={e => { if (e.key !== 'Enter') return; e.preventDefault(); const v = q.trim(); if (!v || ouEstNumero(plan, v)) return; const p = aRanger.find(x => cleNum(x.numero) === cleNum(v)); if (p && prochaine) { ranger(p.numero, prochaine.itemId, prochaine.key); setQ(''); } else toast(p ? 'Plus aucune case libre.' : `N°${v} n'est pas parmi tes articles en stock — rien n'est rangé.`); }} placeholder="Où est la N° … ? (Entrée : la ranger)" inputMode={clavierNum()} aria-label="Chercher un numéro dans le stock" data-rgt-cherche=""
+        <input value={q} onChange={e => setQ(e.target.value)} onKeyDown={e => { if (e.key !== 'Enter') return; e.preventDefault(); const v = q.trim(); if (!v || ouEstNumero(plan, v)) return; const p = aRanger.find(x => cleNum(x.numero) === cleNum(v)); if (p && prochaine) { ranger(p.numero, prochaine.itemId, prochaine.key); setQ(''); } else toast(p ? 'Plus aucune case libre.' : `N°${v} n'est pas parmi tes articles en stock — rien n'est rangé.`); }} placeholder="Où est la N° … ?" inputMode={clavierNum()} aria-label="Chercher un numéro dans le stock" data-rgt-cherche=""
           style={{ flex: 1, minWidth: 0, border: `1px solid ${C.border}`, borderRadius: 10, padding: '10px 12px', fontSize: 16, background: C.card, color: C.text, outline: 'none', fontFamily: 'inherit' }} />
         {q && <Bouton variante="discret" icone="close" aria-label="Effacer la recherche" onClick={() => setQ('')} />}
       </div>
       {q.trim() && <div data-rgt-trouve={hit ? '1' : '0'} style={{ fontSize: 12.5, color: hit ? C.text : C.muted, lineHeight: 1.45, marginTop: -4 }}>
-        {hit ? <>N°{q.trim()} → <b>{hit.itemName}</b>{plusieursPieces ? ` (${hit.roomName})` : ''} · {hit.nom}</> : <>Aucune case ne porte la N°{q.trim()}.</>}
+        {hit ? <>N°{q.trim()} → <b>{hit.itemName}</b>{plusieursPieces ? ` (${hit.roomName})` : ''} · {hit.nom}</> : (() => {
+          // (1er nov.) « Aucune case ne porte la N°2 » se taisait sur le geste :
+          // une paire À RANGER se range d'ici (ce que faisait Entrée, sans le
+          // dire) ; une paire qui n'est pas en stock le dit.
+          const p = aRanger.find(x => cleNum(x.numero) === cleNum(q.trim()));
+          if (p) return <span data-rgt-a-ranger={p.numero} style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', color: C.text }}>
+            <span>N°{p.numero} n'est pas encore rangée{prochaine ? <> — prochaine case libre : <b>{prochaine.itemName}</b>{plusieursPieces ? ` (${prochaine.roomName})` : ''} · {prochaine.nom}</> : ' — plus aucune case libre.'}</span>
+            {prochaine && <Bouton variante="secondaire" className="vrm-b-petit" data-rgt-ranger-trouve={p.numero} onClick={() => { ranger(p.numero, prochaine.itemId, prochaine.key); setQ(''); }}>Ranger ici</Bouton>}
+            {casesLibres > 1 && <Bouton variante="discret" onClick={() => { setPlacer(p.numero); setQ(''); }}>Autre case</Bouton>}
+          </span>;
+          if (sur && !presents.has(cleNum(q.trim()))) return <span data-rgt-absente="">Aucune case ne porte la N°{q.trim()}, et elle n'est pas parmi tes articles en stock.</span>;
+          return <>Aucune case ne porte la N°{q.trim()}.</>;
+        })()}
       </div>}
 
       <div className="vrm-rgt">
@@ -31133,12 +31148,18 @@ function StockMeubles() {
     if (occ && occ !== cle) { if (ancien) u[occ] = ancien; else delete u[occ]; } // échange ou libère
     u[cle] = { m: mid, i };
     ecrireSlots(u);
+    // (1er nov.) Un geste réussi se DIT : où la paire vient d'être posée, avec
+    // les mots du meuble (rangée, colonne) — la case qui clignote peut être
+    // hors de l'écran sur téléphone.
+    const m = meubles.find((x) => x.id === mid); const f = ficheParCle[cle];
+    if (m) { const p = placeDansMeubles(i, m); toast(`N°${f ? f.numero : cle} rangée : ${m.name} · rangée ${p.rangee}, colonne ${p.colonne}.`, 'ok'); }
   };
   const retirerCase = (cle) => { const u = { ...slots }; delete u[cle]; ecrireSlots(u); };
   const sortir = (f) => {
     const cle = cleDeclarationPartie(f.numero, f.id, numeros);
     setPairsLost((prev) => { const u = { ...prev, [cle]: { id: String(f.id), at: new Date().toISOString(), title: f.title || '', from: 'stock' } }; save('vinted_pairs_lost', u); return u; });
     retirerCase(cleDeFiche(f));
+    toast(`N°${f.numero} sortie du stock — son numéro reste pris, jamais redonné.`, 'ok');
   };
   const cliquerCase = (mid, i) => {
     const occ = occupant(mid, i);
@@ -31236,7 +31257,7 @@ function StockMeubles() {
       const m = meubles.find((x) => x.id === modal.m);
       corps = (<>
         <h3 style={{ margin: '0 0 2px', fontSize: 18, color: C.text }}>Ranger dans {m ? m.name : ''}</h3>
-        <div style={{ color: C.muted, fontSize: 13, marginBottom: 12 }}>Case {modal.i + 1} · choisis l'article à y poser</div>
+        <div data-placer-case={m ? `${placeDansMeubles(modal.i, m).rangee}:${placeDansMeubles(modal.i, m).colonne}` : ''} style={{ color: C.muted, fontSize: 13, marginBottom: 12 }}>{m ? <>Rangée {placeDansMeubles(modal.i, m).rangee}, colonne {placeDansMeubles(modal.i, m).colonne}</> : 'Cette case'} · choisis l'article à y poser</div>
         {aRanger.length ? <div style={{ display: 'flex', flexDirection: 'column', gap: 2, maxHeight: '52vh', overflowY: 'auto' }}>
           {aRanger.map((f) => (
             <button type="button" key={f.id} onClick={() => { poser(cleDeFiche(f), modal.m, modal.i); fermerModal(); }} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 8px', borderRadius: 11, border: 'none', background: 'transparent', color: C.text, cursor: 'pointer', textAlign: 'left', width: '100%' }}>
@@ -31261,8 +31282,10 @@ function StockMeubles() {
           {m && (() => { const p = placeDansMeubles(s.i, m); return <div data-fiche-place="" style={{ fontSize: 15, fontWeight: 700, color: C.text, marginTop: 4 }}>Rangée {p.rangee} <span style={{ color: C.muted, fontWeight: 500 }}>(en partant du haut)</span> · colonne {p.colonne} <span style={{ color: C.muted, fontWeight: 500 }}>(depuis la gauche)</span></div>; })()}
         </div>
         <div style={{ display: 'flex', gap: 9 }}>
-          <button className="vrm-b vrm-b-secondaire" type="button" onClick={() => { setPlace(modal.cle); fermerModal(); }} style={btnSec}>Déplacer</button>
-          <button className="vrm-b vrm-b-secondaire" type="button" onClick={() => { retirerCase(modal.cle); fermerModal(); }} style={btnSec}>Retirer de la case</button>
+          {/* (1er nov.) Une paire PAS rangée : « Déplacer » et « Retirer de la case »
+              ne voulaient rien dire. Le geste est de la ranger. */}
+          <button className="vrm-b vrm-b-secondaire" type="button" data-fiche-ranger={m ? 'deplacer' : 'ranger'} onClick={() => { setPlace(modal.cle); fermerModal(); }} style={btnSec}>{m ? 'Déplacer' : 'Ranger dans une case'}</button>
+          {m && <button className="vrm-b vrm-b-secondaire" type="button" data-fiche-retirer="" onClick={() => { const n = f.numero; retirerCase(modal.cle); fermerModal(); toast(`N°${n} retirée de ${m.name} : elle repasse dans « À ranger ».`); }} style={btnSec}>Retirer de la case</button>}
         </div>
         {sold && <button className="vrm-b vrm-b-primaire" type="button" onClick={() => { sortir(f); fermerModal(); }} style={{ ...btnPri, width: '100%', marginTop: 9 }}>✓ Je l'ai sorti du stock</button>}
       </>);
@@ -49565,7 +49588,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         {astuceNum && listings.items?.length>0 && (
           <div data-astuce-numeros style={{display:'flex',gap:8,alignItems:'center',background:'var(--vrm-b-teinte)',borderRadius:10,padding:'0 4px 0 12px',margin:'0 0 12px',fontSize:12.5,lineHeight:1.45,color:C.muted}}>
             <span aria-hidden="true" style={{display:'flex',color:C.muted}}><Icon name="tag" size={16}/></span>
-            <div style={{flex:1,minWidth:0,display:'flex',alignItems:'center',gap:4,flexWrap:'wrap'}}>Chaque article a un <b style={{color:C.text,fontWeight:600}}>numéro</b>, jamais redonné. <Pourquoi label="À quoi il sert">Il suit l’ordre de mise en ligne : il sert à retrouver la paire sur ton étagère, sur Leboncoin et sur eBay. Il se change d’un clic sur la carte et n’est jamais donné à une autre paire.</Pourquoi></div>
+            <div style={{flex:1,minWidth:0,display:'flex',alignItems:'center',gap:4,flexWrap:'wrap'}}><span data-numero-phrase="">Chaque article a un <b style={{color:C.text,fontWeight:600}}>numéro</b>, jamais redonné.</span> <Pourquoi label="À quoi il sert">Il suit l’ordre de mise en ligne : il sert à retrouver la paire sur ton étagère, sur Leboncoin et sur eBay. Il se change d’un clic sur la carte et n’est jamais donné à une autre paire.</Pourquoi></div>
             <button type="button" aria-label="J’ai compris, masquer cette astuce" onClick={()=>{ save('vrm_astuce_numeros', false); setAstuceNum(false); }} style={{flexShrink:0,border:'none',background:'transparent',color:C.muted,cursor:'pointer',fontSize:16,lineHeight:1,minWidth:44,minHeight:44,padding:0,fontFamily:'inherit'}}>✕</button>
           </div>
         )}
@@ -50505,7 +50528,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         <SynchronisationVinted comptes={accounts.filter(a=>!acctOff(a.vinted_user_id)).map(a=>({uid:String(a.vinted_user_id),nom:accName(a)}))} owner={AUTH.user?.id||''} ownerActuel={()=>AUTH.user?.id||''} lire={q=>lireTout(q,{strict:true})} connexion={uid=>diagnosticConnexion({uid,owner:AUTH.user?.id,extension:__vmrEtat,reponse:syncReponses[String(uid)]})} ecouter={onVmrExt} verifier={()=>sonderPonts()} relire={()=>{loadOrders('sold',setSales,true);loadListings(true);}}/>
         <div className="vrm-messages-sections" role="group" aria-label="Choisir Conversations ou Favoris">
           <button type="button" aria-pressed={zoneMessages==='conversations'} onClick={()=>setZoneMessages('conversations')}><Icon name="chat" size={17}/>Conversations</button>
-          <button type="button" aria-pressed={zoneMessages==='favoris'} onClick={()=>setZoneMessages('favoris')}><span aria-hidden="true">♡</span>Favoris reçus</button>
+          <button type="button" aria-pressed={zoneMessages==='favoris'} onClick={()=>setZoneMessages('favoris')}><Icon name="heart" size={17}/>Favoris reçus</button>
         </div>
         <div hidden={zoneMessages!=='favoris'} style={{display:zoneMessages==='favoris'?undefined:'none'}}>
         <FavorisConnectes articlesVendus={articlesVendusFavoris} ecranActif={zoneMessages==='favoris'} chargementAutomatique={zoneMessages==='favoris'} key={'favoris:'+String(AUTH.user?.id||'')+':'+favorisUid} uid={favorisUid} nomCompte={favorisCompte?accNameOf(favorisCompte):''} owner={AUTH.user?.id||''} ownerActuel={()=>AUTH.user?.id||''} base={SUPABASE_URL} headers={()=>sbAuth()} executerFavori={t=>sondageConnu().then(()=>vmrExecUn({uid:favorisUid,method:'POST',endpoint:'/vrm/favoris',body:{jeton:t.jeton}},60000))} PhotoVinted={PhotoVinted}/>
@@ -53243,7 +53266,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           <SheetShell onClose={()=>setActionsOpen(false)} maxWidth={460}>
             <div data-actions-menu style={{display:'flex',flexDirection:'column',gap:8}}>
               <div style={{display:'flex',alignItems:'center',gap:8}}>
-                <h2 style={{margin:0,fontSize:18,fontWeight:700,color:C.text,flex:1}}>Actions sur Vinted</h2>
+                <h2 style={{margin:0,fontSize:18,fontWeight:700,color:C.text,flex:1}}>Republier et brouillons</h2>
                 <button type="button" onClick={()=>setActionsOpen(false)} aria-label="Fermer" style={{border:'none',background:'transparent',color:C.muted,fontSize:22,minWidth:44,minHeight:44,cursor:'pointer'}}>✕</button>
               </div>
               {/* (30 oct.) La cause commune (extension à mettre à jour) se dit UNE fois en tête ;
@@ -62278,14 +62301,16 @@ function AppCoeur() {
               sections restent les mêmes écrans (§11), juste à un tap. */}
           {/* (31 oct., soir) Pas sur Achats : le chiffre d'affaires et l'argent
               Vinted ne disent rien de ce qu'il a acheté (comme l'ancien écran Achats). */}
-          {!achats && <VintedResume liveStats={liveStatsVus} baseKO={baseKO} siAJour={sec!=='annonces'} sauf={(sec || 'ventes') === 'ventes' ? (liveStatsVus && liveStatsVus.venduManque) : null}/>}
+          {!achats && <VintedResume liveStats={liveStatsVus} baseKO={baseKO} siAJour={sec!=='annonces'} sansMontants={sec==='annonces'} sauf={(sec || 'ventes') === 'ventes' ? (liveStatsVus && liveStatsVus.venduManque) : null}/>}
           {/* PARITÉ (26 oct.) : eBay et Leboncoin portent une to-do rangée « À
               faire » en tête de leur espace ; la to-do de Vinted, c'est « Ma
               journée » — mais depuis l'espace Vinted elle n'était joignable
               nulle part. Une entrée, pas un second calcul : « Ma journée » est
               cross-plateforme et reste l'unique propriétaire de la liste (§11,
               aucun compteur dupliqué ici qui pourrait diverger). */}
-          {!baseKO && !premierJour && !achats && (
+          {/* (1er nov.) Pas sur Annonces : « Ma journée » est déjà dans la barre et la
+              colonne, la ligne ne faisait que repousser les annonces. */}
+          {!baseKO && !premierJour && !achats && sec!=='annonces' && (
             <div style={{ padding: '10px 16px 0' }}>
               {/* (26 oct., « trop brouillon ») Une ligne, pas une carte de deux lignes :
                   l'explication est dans Ma journée elle-même. */}
