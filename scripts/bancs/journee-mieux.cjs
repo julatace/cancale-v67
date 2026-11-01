@@ -10,7 +10,7 @@
 //   A. l'écran s'affiche sans erreur ni débordement ; l'en-tête (bonjour, date)
 //      est VISIBLE, ordinateur compris ;
 //   B. « À faire » : chaque ligne = un titre d'UNE ligne + au plus UNE ligne de
-//      détail (deux au téléphone) ; toutes les lignes de la liste ont la même hauteur ; un détail
+//      détail (téléphone compris, depuis le 1er nov.) ; toutes les lignes de la liste ont la même hauteur ; un détail
 //      raccourci l'est à la fin d'un MOT (jamais « transporteur pa… ») et le
 //      texte entier reste dans l'infobulle ;
 //   C. la Tournée (ordinateur) : aucun titre ni sous-titre coupé (ni « … », ni
@@ -23,7 +23,19 @@
 //      largeur de la grille, et les cartes d'une même rangée ont la même hauteur ;
 //   F. Tendances : aucune case « — » sans base posée comme un chiffre ;
 //   G. la colonne de gauche : aucune entrée n'a l'air désactivée (opacité, fondu) ;
-//   H. contraste du texte discret ≥ 4,5.
+//   H. contraste du texte discret ≥ 4,5 ;
+//   I. (1er nov., « je trouve cet endroit très répétitif ») à 320, 375, 390 et
+//      430 px : aucun libellé ni sous-ligne de case coupé (ni « … », ni texte qui
+//      dépasse sa boîte, ni ellipse CSS qui le rogne) ;
+//   J. aucun nombre de comptage (≥ 2) écrit deux fois dans Ma journée — montants,
+//      %, dates, heures, N°, tailles, barres de la semaine et dernières ventes mis
+//      à part ; le jeu pose des quantités toutes DIFFÉRENTES, si bien qu'un même
+//      nombre deux fois ne peut être qu'une redite (« 3 À envoyer » et « 3
+//      bordereaux prêts », « 0 sur 6 · 6 à compléter ») ;
+//   K. à côté de la case « À envoyer », « À faire » ne redit ni « Emballer les colis
+//      prêts » ni « N colis pressés » (la case porte « dont N aujourd'hui » et le
+//      bouton « Emballer ») ; la famille « à retirer / à vérifier » tient en UNE
+//      ligne au plus, et le geste « Emballer » reste joignable en un toucher.
 // Captures : CAPTURES=<dossier> ; lancer :
 //   npm run build && NODE_OPTIONS="--require $PWD/scripts/bancs/_porte-banc.cjs" BANC_PORT=96xx node scripts/bancs/journee-mieux.cjs
 const path = require('path');
@@ -36,8 +48,9 @@ const DIST = path.join(__dirname, '..', '..', 'dist');
 const PORT = Number(process.env.BANC_PORT) || Number(process.env.PORT) || 4871;
 const CAPT = process.env.CAPTURES || '';
 
-// Un jeudi après-midi.
-const maintenant = new Date(2026, 9, 15, 15, 30, 0);
+// Un lundi après-midi, le 2 novembre : la déclaration URSSAF d'octobre est à faire
+// (rythme mensuel), comme sur la capture de Julien du 1er novembre.
+const maintenant = new Date(2026, 10, 2, 15, 30, 0);
 const MS = maintenant.getTime();
 const il = (n, h = 12) => { const d = new Date(maintenant); d.setHours(h, 0, 0, 0); d.setDate(d.getDate() - n); return d; };
 const ilYa = (j) => new Date(MS - j * 86400000).toISOString();
@@ -50,35 +63,54 @@ const VENTES = [
   vente(9101, 'Autry Reelwind rose taille 40', 80, AEXP, ilYa(8), { transaction_user_status: 'needs_action' }),
   vente(9102, 'Adidas Samba OG noir taille 41', 72, AEXP, ilYa(3), { transaction_user_status: 'needs_action' }),
   vente(9103, 'Nike Dunk Low panda taille 44', 65, AEXP, il(0, 11), { transaction_user_status: 'needs_action' }),
-  vente(7003, 'Salomon XT-6 gris taille 43', 110, 'Colis en cours d\'acheminement', il(1), { transaction_user_status: 'waiting' }),
+  vente(9104, 'Puma Speedcat rouge taille 39', 58, AEXP, il(1, 9), { transaction_user_status: 'needs_action' }),
+  // Cochée « postée » il y a 3 jours, Vinted ne l'a pas vue partir : une ligne d'« À faire ».
+  vente(9105, 'Vans Old Skool noir taille 41', 49, AEXP, il(5), { transaction_user_status: 'needs_action' }),
+  vente(7003, 'Salomon XT-6 gris taille 43', 110, 'Colis en cours d\'acheminement', il(3), { transaction_user_status: 'waiting' }),
   vente(7005, 'Asics Gel-Kayano 14 argent taille 44', 89, 'Commande finalisée', il(3), { transaction_user_status: 'completed' }),
   vente(7006, 'Nike Dunk Low gris taille 38', 61, 'Commande finalisée', il(8), { transaction_user_status: 'completed' }),
   vente(7007, 'Adidas Spezial bleu taille 39', 54, 'Commande finalisée', il(10), { transaction_user_status: 'completed' }),
   vente(7008, 'Converse Chuck 70 noir taille 42', 38, 'Commande finalisée', il(12), { transaction_user_status: 'completed' }),
 ];
-const ACHATS = [{ transaction_id: 9401, conversation_id: 7101, title: 'Adidas Gazelle taille 40', price: { amount: '40', currency_code: 'EUR' }, status: RELAIS_ST, transaction_user_status: 'needs_action', date: ilYa(3) }];
+const ACHATS = [
+  { transaction_id: 9401, conversation_id: 7101, title: 'Adidas Gazelle taille 40', price: { amount: '40', currency_code: 'EUR' }, status: RELAIS_ST, transaction_user_status: 'needs_action', date: ilYa(3) },
+  // Au point relais selon Vinted, mais ni code ni n° de suivi : « pas encore relié ».
+  { transaction_id: 9402, conversation_id: 7102, title: 'New Balance 550 taille 42', price: { amount: '45', currency_code: 'EUR' }, status: RELAIS_ST, transaction_user_status: 'needs_action', date: ilYa(2) },
+];
 const VERSE = { 7005: il(0, 10), 7006: il(5), 7007: il(7) };
-const ANNONCES = Array.from({ length: 6 }, (_, k) => ({ id: 6000 + k, title: 'Annonce ' + k, price: { amount: String(40 + k * 7), currency_code: 'EUR' }, is_closed: false, is_hidden: false, is_draft: false, created_at_ts: il(30 + k).toISOString(), favourite_count: 0, view_count: 3 }));
+const ANNONCES = Array.from({ length: 9 }, (_, k) => ({ id: 6000 + k, title: 'Annonce ' + k, price: { amount: String(40 + k * 7), currency_code: 'EUR' }, is_closed: false, is_hidden: false, is_draft: false, created_at_ts: il(30 + k).toISOString(), favourite_count: 0, view_count: 3 }));
 const ACCOUNTS = [{ id: 1, vinted_user_id: UID, login: 'arthuror2', domain: 'www.vinted.fr', updated_at: maintenant.toISOString() }];
 const cap = maintenant.toISOString();
-const bord = (tx, suivi) => ({ id: `email_bord_${tx}`, data: { transaction: String(tx), filename: `bordereau_${tx}.pdf`, suivi, receivedAt: ilYa(0.2), uid: UID, account: 'arthuror2', pdfB64: 'JVBERi0xLjQK' } });
+const jjmmaaaa = (j) => { const d = new Date(MS + j * 86400000); return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`; };
+const bord = (tx, suivi, limite) => ({ id: `email_bord_${tx}`, data: { transaction: String(tx), filename: `bordereau_${tx}.pdf`, suivi, receivedAt: ilYa(0.2), uid: UID, account: 'arthuror2', pdfB64: 'JVBERi0xLjQK', ...(limite ? { dateLimite: limite } : {}) } });
 const LIGNES = [
   { id: `harvest_${UID}_orders_sold`, data: { capturedAt: cap, payload: { my_orders: VENTES } } },
   { id: `harvest_${UID}_orders_purchased`, data: { capturedAt: cap, payload: { my_orders: ACHATS } } },
   { id: `harvest_${UID}_listings`, data: { capturedAt: cap, payload: { items: ANNONCES, pagination: { total_entries: ANNONCES.length } } } },
   ...Object.entries(VERSE).map(([tx, d]) => ({ id: `harvest_${UID}_txn_${tx}`, data: { capturedAt: cap, payload: { transaction: { id: Number(tx), status: 450, status_title: 'Commande finalisée', status_updated_at: d.toISOString() } } } })),
   { id: `harvest_${UID}_txn_7008`, data: { capturedAt: cap, payload: { transaction: { id: 7008, status: 450, status_title: 'Commande finalisée' } } } },
-  bord(9101, '12345678'), bord(9102, 'VGS12345678'),
+  // Quatre colis à envoyer, quatre bordereaux prêts (« 4 À envoyer » et « 4
+  // bordereaux prêts » : la redite de la capture) ; un doit partir AUJOURD'HUI à
+  // 18 h, un demain à 10 h (« 2 colis pressés »), les deux autres plus tard.
+  bord(9101, '12345678', `${jjmmaaaa(1)} 10 h 00`), bord(9102, 'VGS12345678', `${jjmmaaaa(0)} 18 h 00`), bord(9103, 'VGS12345679', `${jjmmaaaa(3)} 12 h 00`), bord(9104, 'VGS12345680', `${jjmmaaaa(4)} 12 h 00`),
   { id: 'panel_colis_relais', data: { '9401': { code: 'B11111', lieu: 'Kusmi Tea, 13 Rue Saint-Vincent, 56000 Vannes, France', at: cap, url: 'https://www.vinted.fr/inbox/7101' } } },
   { id: 'email_track_vinted_1790000000000001', data: { type: 'suivi', carrier: 'vinted', suivi: '1790000000000001', status: 'available', statusLabel: 'Arrivé au point de retrait', subject: "Ton colis t'attend", receivedAt: ilYa(1), code: 'A22222', lieu: '*Consigne Vinted Go*, * Kusmi Tea *, * 13 Rue Saint-Vincent', limite: dans(4), consigne: true } },
   { id: 'email_track_mondialrelay_87654321', data: { type: 'suivi', carrier: 'mondialrelay', suivi: '87654321', status: 'available', statusLabel: 'Disponible en Point Relais', subject: 'Votre colis est disponible', receivedAt: ilYa(1), code: '554433', lieu: 'Tabac du Port, 12 Quai Gambetta, 35260 Cancale', limite: dans(2) } },
   // Délai de retrait passé : « à vérifier », jamais « à retirer ».
   { id: 'email_track_mondialrelay_99887766', data: { type: 'suivi', carrier: 'mondialrelay', suivi: '99887766', status: 'available', statusLabel: 'Disponible en Point Relais', subject: 'Votre colis est disponible', receivedAt: ilYa(12), code: '112233', lieu: 'Le Narval, 2 Place du Marché, 56000 Vannes', limite: dans(-3) } },
+  // Cinq colis au délai de retrait dépassé (« à vérifier ») : des quantités toutes
+  // Avec les deux colis à retirer ci-dessous, des quantités toutes différentes : 3 choses
+  // à faire, 4 à envoyer, 5 à retirer, 7 délais dépassés (+ 1 pas encore relié = 8 à
+  // vérifier), 2 ventes ce mois, 6 ventes en cours, 9 annonces.
+  ...[['Bar des Halles, 3 Rue Hoche, 35000 Rennes', '77001122'], ['Presse du Marché, 8 Place Sainte-Anne, 35000 Rennes', '77001133']].map(([lieu, suivi], i) => ({ id: `email_track_mondialrelay_${suivi}`, data: { type: 'suivi', carrier: 'mondialrelay', suivi, status: 'available', statusLabel: 'Disponible en Point Relais', subject: 'Votre colis est disponible', receivedAt: ilYa(1), code: `66${i}55${i}`, lieu, limite: dans(5) } })),
+  ...[55, 44, 33, 22, 11, 66].map((k, i) => ({ id: `email_track_mondialrelay_998877${k}`, data: { type: 'suivi', carrier: 'mondialrelay', suivi: `998877${k}`, status: 'available', statusLabel: 'Disponible en Point Relais', subject: 'Votre colis est disponible', receivedAt: ilYa(13 + i), code: `9988${k}`, lieu: 'Le Narval, 2 Place du Marché, 56000 Vannes', limite: dans(-4 - i) } })),
 ];
 const MAIN = {
   vinted_sale_overrides: { '9101': { numero: '60' }, '9102': { numero: '102' }, '9103': { numero: '73' }, '7005': { buyPrice: '40' }, '7006': { buyPrice: '25' } },
+  vinted_ship_done: { '9105': MS - 3 * 86400000 },
   vinted_bords_printed: { '9101': new Date(new Date(maintenant).setHours(9, 0, 0, 0)).toISOString() },
   vinted_urssaf_regime: 'micro_achat_revente',
+  vinted_urssaf_freq: 'mensuel', vinted_regime: 'micro',
 };
 
 let ko = 0, ok = 0;
@@ -117,7 +149,7 @@ const ouvrir = async (b, vp, sombre, sansAttente) => {
   const pg = await ctx.newPage();
   const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
   await pg.clock.install({ time: maintenant });
-  await pg.addInitScript(([s, w]) => { try { localStorage.setItem('vrm_acces_direct', '1'); localStorage.setItem('vrm_prenom', JSON.stringify('Julien')); if (s) localStorage.setItem('vinted_dark', 'true'); if (w) localStorage.setItem('vrm_journee_widgets', JSON.stringify(w)); } catch (_) {} }, [!!sombre, sansAttente ? SANS_ATTENTE : null]);
+  await pg.addInitScript(([s, w]) => { try { localStorage.setItem('vrm_acces_direct', '1'); localStorage.setItem('vrm_prenom', JSON.stringify('Julien')); localStorage.setItem('vinted_urssaf_freq', JSON.stringify('mensuel')); localStorage.setItem('vinted_regime', JSON.stringify('micro')); if (s) localStorage.setItem('vinted_dark', 'true'); if (w) localStorage.setItem('vrm_journee_widgets', JSON.stringify(w)); } catch (_) {} }, [!!sombre, sansAttente ? SANS_ATTENTE : null]);
   await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) ? r.abort() : /api-adresse|openfreemap/.test(r.request().url()) ? r.abort() : r.continue()));
   const main = { ...MAIN, ...(sombre ? { vinted_dark: true } : {}), ...(sansAttente ? { vrm_journee_widgets: SANS_ATTENTE } : {}) };
   await pg.route('**/rest/v1/**', (route) => {
@@ -182,7 +214,54 @@ const lire = (pg) => pg.evaluate(() => {
   const rail = [...document.querySelectorAll('.vrm-atelier-rail .vrm-rail-button, .vrm-atelier-rail a, .vrm-atelier-rail button')].filter(vu);
   let railMasque = false; for (const e of document.querySelectorAll('.vrm-rail-scroll')) { const cs = getComputedStyle(e); if ((cs.maskImage && cs.maskImage !== 'none') || (cs.webkitMaskImage && cs.webkitMaskImage !== 'none')) railMasque = true; }
   const railPales = rail.filter((e) => { let o = 1; for (let n = e; n; n = n.parentElement) o *= parseFloat(getComputedStyle(n).opacity || '1'); return o < 0.95 && !e.disabled && e.getAttribute('aria-disabled') !== 'true'; }).map((e) => e.textContent.trim().slice(0, 20));
+  // I. Les cases : libellé et sous-ligne jamais coupés.
+  const cases = [...document.querySelectorAll('[data-barre-jour] [data-tuile], [data-widget-tuile]')].filter(vu).map((bt) => {
+    const id = bt.getAttribute('data-tuile') || bt.getAttribute('data-widget-tuile');
+    const r = bt.getBoundingClientRect();
+    const textes = [...bt.querySelectorAll('.vrm-day-bar-l, .vrm-w-tuile-l, .vrm-day-bar-sous')].filter(vu).map((e) => {
+      const cs = getComputedStyle(e), q = e.getBoundingClientRect();
+      const rogne = cs.textOverflow === 'ellipsis' && cs.overflow !== 'visible' && cs.whiteSpace === 'nowrap';
+      return { t: e.textContent, coupe: e.scrollWidth > e.clientWidth + 1 || /…\s*$/.test(e.textContent) || q.right > r.right + 1 || rogne, sw: e.scrollWidth, cw: e.clientWidth, rogne };
+    });
+    return { id, textes };
+  });
+  // J. Les nombres de comptage écrits dans Ma journée.
+  const zone = document.querySelector('.vrm-day-layout');
+  const morceaux = [];
+  if (zone) {
+    const tw = document.createTreeWalker(zone, NodeFilter.SHOW_TEXT);
+    for (let n = tw.nextNode(); n; n = tw.nextNode()) {
+      const p = n.parentElement; if (!p || !n.textContent.trim()) continue;
+      // Hors jeu : les dernières ventes (prix, N°, tailles) et la carte de la semaine (axe des jours, barres).
+      if (p.closest('.vrm-day-recent, [data-carte-jours], svg, [aria-hidden="true"], .vrm-screen-head, [hidden], .vrm-sr-only')) continue;
+      if (!vu(p)) continue;
+      morceaux.push(n.textContent);
+    }
+  }
+  const brut = morceaux.join(' ').replace(/\s+/g, ' ');
+  const net = brut
+    .replace(/[+−-]?\d[\d\s\u202f\u00a0]*(?:,\d+)?\s*(?:€|%|c\/j)/g, ' ')
+    .replace(/N°\s*[A-Z]?\d+/gi, ' ').replace(/taille \d+/gi, ' ')
+    .replace(/\b20\d\d\b/g, ' ')
+    .replace(/\d+\s*h(?:\s*\d+)?\b/g, ' ').replace(/\b\d+\s*j\b/g, ' ').replace(/\b\d+ derniers jours\b/g, ' ')
+    .replace(/\b\d{1,2}(?:er)?\s+(?:janv|févr|mars|avr|mai|juin|juil|août|sept|oct|nov|déc)\w*\.?/gi, ' ');
+  const nombres = (net.match(/\b\d+\b/g) || []).map(Number).filter((x) => x >= 2);
+  const vus = {}; for (const x of nombres) vus[x] = (vus[x] || 0) + 1;
+  const redits = Object.keys(vus).filter((k) => vus[k] > 1);
+  // K. Ce que « À faire » redit à côté des cases.
+  const afaireRangs = [...document.querySelectorAll('.vrm-day-task-list [data-job]')].filter(vu);
+  const k = {
+    emballerLigne: afaireRangs.filter((e) => e.getAttribute('data-job') === 'emballer' || /Emballer les colis/i.test(e.textContent)).length,
+    pressesLigne: afaireRangs.filter((e) => (e.getAttribute('data-job') === 'colis-limite' && !e.closest('[data-alertes-argent]')) || /colis pressés/i.test(e.textContent)).length,
+    verifLignes: afaireRangs.filter((e) => /^retrait-(a-verifier|en-verification)$/.test(e.getAttribute('data-job'))).length,
+    emballerGeste: [...document.querySelectorAll('[data-job="emballer"]')].filter(vu).map((e) => ({ dansCase: !!e.closest('[data-case="envoyer"]'), h: Math.round(e.getBoundingClientRect().height) })),
+    sousEnvoyer: (document.querySelector('[data-case="envoyer"] [data-sous-ligne]') || {}).textContent || '',
+    sousRetirer: (document.querySelector('[data-case="retirer"] [data-sous-ligne]') || {}).textContent || '',
+    ambreEnvoyer: (() => { const e = document.querySelector('[data-case="envoyer"] [data-sous-ligne]'); return e ? getComputedStyle(e).color : ''; })(),
+    warn: getComputedStyle(document.documentElement).getPropertyValue('--vrm-warn').trim(),
+  };
   return {
+    cases, nombres, redits, k, texteNombres: net.slice(0, 600),
     tete: vu(tete), tombe: /pas pu s'afficher|Cannot access|is not defined/.test(document.body.innerText),
     deb: document.documentElement.scrollWidth - window.innerWidth,
     rangs, tr, tourneeVue, envoyerVue: caseVue('envoyer'), retirerVue: caseVue('retirer'), emballerJob,
@@ -202,9 +281,11 @@ const lire = (pg) => pg.evaluate(() => {
       console.log(JSON.stringify(await pg.evaluate(process.env.SONDE), null, 1));
       await ctx.close(); await b.close(); srv.close(); process.exit(0);
     }
-    const cas = [[{ width: 390, height: 844 }, false], [{ width: 390, height: 844 }, true], [{ width: 1512, height: 950 }, false], [{ width: 1512, height: 950 }, true], [{ width: 1440, height: 600 }, false], [{ width: 1280, height: 800 }, false], [{ width: 1512, height: 950 }, false, 'sans-attente']];
+    const cas = [[{ width: 390, height: 844 }, false], [{ width: 390, height: 844 }, true], [{ width: 320, height: 640 }, false], [{ width: 375, height: 812 }, false], [{ width: 430, height: 932 }, false], [{ width: 1512, height: 950 }, false], [{ width: 1512, height: 950 }, true], [{ width: 1440, height: 600 }, false], [{ width: 1280, height: 800 }, false], [{ width: 1512, height: 950 }, false, 'sans-attente']];
     for (const [vp, sombre, variante] of cas) {
       const nom = `${vp.width}${sombre ? '-sombre' : ''}${variante ? '-' + variante : ''}`;
+      // Mise au point : SEUL=390 ne joue que ce cas.
+      if (process.env.SEUL && process.env.SEUL !== nom) continue;
       const tel = vp.width < 600;
       console.log(`\n── Ma journée, ${nom}`);
       await essaie(nom, async () => {
@@ -229,11 +310,13 @@ const lire = (pg) => pg.evaluate(() => {
         // (une alerte de tête ne perd pas son sens : « 2 articles vendus sur Leboncoin, … »).
         dit(lu.rangs.every((r) => r.lt >= 1 && r.lt <= maxN && !r.coupeT), `B. chaque titre tient sur ${tel ? 'une ou deux lignes' : 'UNE ligne'}, sans être coupé`, JSON.stringify(lu.rangs.filter((r) => r.lt < 1 || r.lt > maxN || r.coupeT).map((r) => [r.job, r.lt, r.titre])));
         if (tel) dit(lu.rangs.filter((r) => r.lt === 1).length >= 2, 'B. au téléphone, les titres de ce jeu tiennent sur UNE ligne', JSON.stringify(lu.rangs.map((r) => [r.job, r.lt])));
-        // Au téléphone, deux lignes de détail au plus (un N°, une heure limite, un nom de paire
-        // ne doivent pas disparaître) ; sur ordinateur, une.
-        dit(lu.rangs.every((r) => r.ln <= maxN && !r.coupeN), `B. au plus ${maxN} ligne(s) de détail, qui tient dans sa boîte`, JSON.stringify(lu.rangs.filter((r) => r.ln > maxN || r.coupeN).map((r) => [r.job, r.ln, r.note])));
+        // (1er nov., « très répétitif ») UNE ligne de détail, téléphone compris (deux au
+        // téléphone avant) : la phrase entière reste dans l'infobulle et le nom du bouton.
+        dit(lu.rangs.every((r) => r.ln <= 1 && !r.coupeN), 'B. au plus UNE ligne de détail, qui tient dans sa boîte', JSON.stringify(lu.rangs.filter((r) => r.ln > 1 || r.coupeN).map((r) => [r.job, r.ln, r.note])));
         const hs = simples.map((r) => r.h);
-        dit(hs.length > 1 && Math.max(...hs) - Math.min(...hs) <= 2, 'B. toutes les lignes ont la même hauteur', JSON.stringify(simples.map((r) => [r.job, r.h])));
+        // (320 px : un titre passe à deux lignes, il ne reste parfois qu'une ligne « simple » à comparer.)
+        const largeurAjoutee = [320, 375, 430].includes(vp.width);
+        if (!(largeurAjoutee && hs.length < 2)) dit(hs.length > 1 && Math.max(...hs) - Math.min(...hs) <= 2, 'B. toutes les lignes ont la même hauteur', JSON.stringify(simples.map((r) => [r.job, r.h])));
         const malCoupe = lu.rangs.filter((r) => /…$/.test(r.note.trim())).filter((r) => { const pre = r.note.trim().replace(/…$/, '').trim(); const i = r.plein.indexOf(pre); return i < 0 || /[\p{L}\p{N}]/u.test(r.plein.charAt(i + pre.length)); });
         dit(malCoupe.length === 0, 'B. un détail raccourci l’est à la fin d’un mot, le texte entier dans l’infobulle', JSON.stringify(malCoupe.map((r) => [r.note, r.plein.slice(0, 80)])));
         dit(lu.rangs.every((r) => r.cN >= 4.5), 'H. le détail se lit (contraste ≥ 4,5)', JSON.stringify(lu.rangs.map((r) => Math.round(r.cN * 10) / 10)));
@@ -249,6 +332,16 @@ const lire = (pg) => pg.evaluate(() => {
         dit(lu.envoyerVue && lu.retirerVue, 'D. sans Tournée, les cases « à envoyer » et « à retirer » se voient', JSON.stringify({ envoyer: lu.envoyerVue, retirer: lu.retirerVue }));
         dit(!(lu.tourneeVue && (lu.envoyerVue || lu.retirerVue)), 'D. le nombre « à envoyer / à retirer » ne se voit pas deux fois (case + Tournée)', JSON.stringify({ envoyer: lu.envoyerVue, retirer: lu.retirerVue }));
         dit(!(lu.tourneeVue && lu.emballerJob), 'D. « Emballer les colis prêts » n’est pas redit dans « À faire » (l’étape Emballer y mène)');
+        // I.
+        const coupes = lu.cases.flatMap((c) => c.textes.filter((t) => t.coupe).map((t) => `${c.id}: « ${t.t} » (${t.sw}/${t.cw}${t.rogne ? ', ellipse' : ''})`));
+        dit(lu.cases.length >= 4 && coupes.length === 0, 'I. aucun libellé ni sous-ligne de case coupé', coupes.join(' · ') || `${lu.cases.length} cases`);
+        // J.
+        dit(lu.nombres.length >= 4 && lu.redits.length === 0, 'J. aucun nombre de comptage écrit deux fois dans Ma journée', lu.redits.length ? `redits : ${lu.redits.join(', ')} — ${lu.texteNombres.slice(0, 900)}` : lu.nombres.join(','));
+        // K.
+        dit(lu.k.emballerLigne === 0 && lu.k.pressesLigne === 0, 'K. « À faire » ne redit ni « Emballer les colis prêts » ni « N colis pressés » à côté de la case', JSON.stringify({ emballer: lu.k.emballerLigne, presses: lu.k.pressesLigne }));
+        dit(lu.k.verifLignes <= 1, 'K. « à vérifier » tient en UNE ligne d’« À faire » au plus', String(lu.k.verifLignes));
+        dit(lu.k.emballerGeste.length === 1 && lu.k.emballerGeste[0].dansCase && lu.k.emballerGeste[0].h >= 44, 'K. « Emballer » reste joignable en un toucher : le geste de la case « À envoyer » (≥ 44 px)', JSON.stringify(lu.k.emballerGeste));
+        dit(/^dont \d+ aujourd'hui$/.test(lu.k.sousEnvoyer.trim()) && /^\+ \d+ à vérifier$/.test(lu.k.sousRetirer.trim()), 'K. les cases portent l’urgence (« dont N aujourd’hui ») et le « à vérifier » (« + N à vérifier »)', JSON.stringify([lu.k.sousEnvoyer, lu.k.sousRetirer]));
         // E.
         if (vp.width >= 1280) {
           dit(lu.rangsChiffres.length >= 1 && lu.rangsChiffres.every((r) => r.part >= 0.9), 'E. les chiffres occupent ≥ 90 % de la largeur, rangée par rangée', JSON.stringify(lu.rangsChiffres));

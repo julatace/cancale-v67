@@ -515,7 +515,12 @@ async function navigateur() {
         dit(!errs.length, `E ${nom} : aucune erreur d'app`, errs[0]);
         if (vp.width < 600) {
           await ouvrirJournee(pg, errs);
-          const tu = await pg.evaluate(() => { const x = document.querySelector('[data-tuile="retirer"]'); const jb = document.querySelector('[data-job="retrait-en-verification"]'); const jv = document.querySelector('[data-job="retrait-a-verifier"]'); return x ? { n: x.getAttribute('data-n'), jn: jb ? jb.getAttribute('data-n') : null, jt: jb ? jb.innerText : '', jv: jv ? jv.innerText : null } : null; });
+          const tu = await pg.evaluate(() => { const x = document.querySelector('[data-tuile="retirer"]'); const jv = document.querySelector('[data-job="retrait-a-verifier"]');
+            // (1er nov., « très répétitif ») « à vérifier » et « en cours de vérification » tiennent
+            // en UNE ligne : `retrait-a-verifier` porte les achats pas encore reliés (`data-n-relier`),
+            // ou `retrait-en-verification` quand il n'y a qu'eux. La phrase longue est dans l'infobulle.
+            const jb = (jv && jv.hasAttribute('data-n-relier')) ? jv : document.querySelector('[data-job="retrait-en-verification"]');
+            return x ? { n: x.getAttribute('data-n'), jn: jb ? (jb.getAttribute('data-n-relier') || jb.getAttribute('data-n')) : null, jt: jb ? `${jb.innerText} ${jb.getAttribute('title') || ''}` : '', jv: jv ? jv.innerText : null } : null; });
           dit(tu && tu.jv != null && !/sans doute|repartis? chez le vendeur/i.test(tu.jv), `E ${nom} constat d : Ma journée dit « à vérifier », jamais « sans doute reparti »`, tu && String(tu.jv).replace(/\s+/g, ' ').slice(0, 140));
           dit(tu && tu.n === '2' && tu.jn === '1' && /en cours de vérification/.test(tu.jt), `E ${nom} : Ma journée dit 2 à retirer, et DIT (une ligne) l'achat en cours de vérification — jamais un total présenté complet`, tu && `${tu.n} · ${tu.jn} · ${tu.jt.replace(/\s+/g, ' ').slice(0, 160)}`);
         }
