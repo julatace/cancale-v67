@@ -70,4 +70,10 @@ html .vrm-app-shell .vrm-recherche-champ:focus, html .vrm-app-shell .vrm-recherc
    dans la fenêtre — jamais hors de vue au-dessus du défilement. */
 @media (min-width: 1024px), (min-width: 768px) and (hover: hover) and (pointer: fine) {
   .vrm-main > .vrm-barre-haut { position: sticky; top: 0; z-index: 45; background-color: var(--vrm-bg, #FFFFFF); }
+  /* (1er nov.) Collée, la barre gardait sa marge du haut (8 px) : le contenu qui
+     défile passait dans cette bande, au-dessus d'elle. La marge devient un
+     rembourrage (même place, même centre), et une ancre visée (« Colis par
+     colis », une carte de colis) s'arrête SOUS la barre, jamais dessous. */
+  .vrm-main > .vrm-barre-haut { margin-top: 0; padding-top: 8px; min-height: 52px; }
+  .vrm-main:has(> .vrm-barre-haut) { scroll-padding-top: 72px; }
 }

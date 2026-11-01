@@ -89,8 +89,13 @@ async function brancher(p){
    // Une commande ouverte depuis « À traiter » s'ouvre dans Ventes · eBay, en tiroir : on le referme d'abord, comme lui.
    const fermer=p.locator('button[aria-label="Fermer les détails de la vente"]:visible');if(await fermer.count()){await fermer.first().click();await p.waitForTimeout(300);}
    if(nom==='Messages'){await plusVers('messages');await filtreSite('messages','ebay');return;}
-   if(!(await p.locator('.vrm-platform-tabs:visible').count()))await p.locator('[data-espace-site="ebay"]:visible').first().click();
-   await p.locator('.vrm-platform-tabs').getByRole('button',{name:nom,exact:true}).click();
+   // (1er nov.) Depuis le 31 oct. (soir) les sections d'eBay sont des sous-onglets des tâches : « À traiter » et
+   //    « Offres » dans Ventes · eBay, « Compte » dans Paramètres (la porte « Aussi sur eBay » n'existe plus).
+   if(nom==='Compte'){await p.goto(base+'/?tab=plat_ebay&section=compte');await p.getByText('Compte eBay relié',{exact:true}).waitFor();return;}
+   const seg=p.locator('.vrm-platform-tabs:visible').getByRole('button',{name:nom,exact:true});
+   //    (Le lien de la tâche plutôt que la barre du bas : elle se cache le temps qu'une conversation se referme.)
+   if(!(await seg.count())){await p.goto(base+'/?tab=plat_ebay');await p.locator('[data-tache="ventes"][data-tache-site="ebay"]').waitFor();}
+   await p.locator('.vrm-platform-tabs:visible').getByRole('button',{name:nom,exact:true}).first().click();
   };let writes=[],commandeWrites=[],modeMessageCommande='refuse',modeReponse='refuse',lectureMessageFausse=false,messageCommandePret,libererMessageCommande;
   await p.route('**/api/ebay',async r=>{const body=r.request().method()==='POST'?r.request().postDataJSON():{};const a=body.action;let j={ok:true,connected:true,ready:true,canConsent:true};
    if(a==='status')j={ok:true,connected:true,comptes:[{cle:'',ref:'principal',principal:true,pseudo:'Compte de banc',relie:true}]};
@@ -320,12 +325,14 @@ async function brancher(p){
   await ongletBas('ventes');await filtreSite('ventes','leboncoin');
   await plusVers('messages');
   check(await p.locator('[data-tache="messages"]').getAttribute('data-tache-site')==='vinted' && await p.locator('[data-conv="71"]').count()===1, 'messages Vinted retrouvés en revenant sur Messages');
-  await p.goto(base+'/?tab=messages&site=vinted');await p.locator('[data-tache="messages"][data-tache-site="vinted"]').waitFor();await p.getByText('Client Vinted',{exact:true}).click();await p.getByText('Bonjour depuis Vinted',{exact:true}).waitFor();
-  check(await p.getByText('Merci pour votre achat',{exact:true}).isVisible(),'historique Vinted complet capté');check((await p.locator('.vrm-chat-panel').innerText()).includes('456789'),'code de retrait numérique conservé');
+  // (1er nov.) La bulle porte son heure DANS le même bloc (« Bonjour depuis Vinted 22:13 ») : le message se cherche
+  //    dans le fil (`.vrm-chat-panel`), plus en texte exact — le fil rendu était juste, le banc ne le voyait plus.
+  await p.goto(base+'/?tab=messages&site=vinted');await p.locator('[data-tache="messages"][data-tache-site="vinted"]').waitFor();await p.getByText('Client Vinted',{exact:true}).click();await p.locator('.vrm-chat-panel').getByText('Bonjour depuis Vinted').waitFor();
+  check(await p.locator('.vrm-chat-panel').getByText('Merci pour votre achat').isVisible(),'historique Vinted complet capté');check((await p.locator('.vrm-chat-panel').innerText()).includes('456789'),'code de retrait numérique conservé');
   rows.find(x=>x.id==='harvest_111_conv_71').data.payload.conversation.messages=[{id:901,entity_type:'message',created_at_ts:1700000003,entity:{user_id:22,body:'Nouveau message capturé'}}];
   await p.evaluate(()=>window.dispatchEvent(new CustomEvent('vrm:ext',{detail:{type:'maj',quoi:'messages',uid:'111',conv:'71'}})));
-  await p.getByText('Nouveau message capturé',{exact:true}).waitFor();
-  check(await p.getByText('Merci pour votre achat',{exact:true}).isVisible(),'capture partielle conserve l’historique déjà ouvert');
+  await p.locator('.vrm-chat-panel').getByText('Nouveau message capturé').waitFor();
+  check(await p.locator('.vrm-chat-panel').getByText('Merci pour votre achat').isVisible(),'capture partielle conserve l’historique déjà ouvert');
   check((await p.locator('.vrm-chat-panel').innerText()).includes('456789'),'capture partielle conserve le code de retrait');
   await p.setViewportSize({width:1512,height:900});await p.waitForTimeout(200);
   const gauche=await p.locator('.vrm-inbox-column').boundingBox(), droite=await p.locator('.vrm-chat-column').boundingBox();
@@ -475,7 +482,8 @@ async function brancher(p){
   check(await p.getByText('Remboursement partiel à vérifier',{exact:true}).isVisible(),'remboursement partiel nommé dans la commande');
   check(await p.getByText(/Un remboursement figure sur cette commande/).isVisible() && await p.getByText(/Bénéfice de l’article/).count()===0,'bénéfice absent quand le remboursement ne peut pas être intégré');
   check(await p.getByText('Enregistrer l’expédition',{exact:true}).count()===0,'commande partiellement remboursée ne propose pas une nouvelle expédition');
-  await p.goto(base+'/?tab=plat_leboncoin&section=colis');await p.locator('.vrm-platform-tabs').getByRole('button',{name:'Colis',exact:true}).click();await p.getByText('Colis à préparer',{exact:true}).waitFor();
+  // (1er nov.) « Colis Leboncoin » est une pastille de Colis depuis le 31 oct. (soir) : l'ancien lien y mène, sans segment à toucher.
+  await p.goto(base+'/?tab=plat_leboncoin&section=colis');{const sg=p.locator('.vrm-platform-tabs:visible').getByRole('button',{name:'Colis',exact:true});if(await sg.count())await sg.first().click();}await p.getByText('Colis à préparer',{exact:true}).waitFor();
   check(await p.getByText('Colis en route',{exact:true}).isVisible(),'colis expédié conservé au suivi');check(await p.getByText('Colis finalisé',{exact:true}).count()===0,'colis finalisé retiré des colis actifs');check(await p.locator('.vrm-lbc-package').count()===1,'seul le colis non expédié propose le bordereau');
   for(const width of [320,390,1440]){await p.setViewportSize({width,height:900});check(await p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'aucun débordement colis '+width);}
   rows.push({id:'email_track_pickup1',data:{id:'pickup1',carrier:'mondial',status:'available',lieu:'Relais Centre',artTitle:'Paire crème taille 42',code:'001234',suivi:'TRACK-01',receivedAt:maintenant,limite:new Date(Date.now()+3*86400000).toISOString().slice(0,10)}},

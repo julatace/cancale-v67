@@ -132,6 +132,9 @@ const projette = (row, sel) => {
       await pg.waitForTimeout(4000);
       if(process.env.BANC_CAPTURES){fs.mkdirSync(process.env.BANC_CAPTURES,{recursive:true});await pg.screenshot({path:path.join(process.env.BANC_CAPTURES,'annonces-premier-ecran-'+vp.width+'.png')});const g=pg.locator('.vrm-ann-grid').first();if(await g.count())await g.screenshot({path:path.join(process.env.BANC_CAPTURES,'annonces-fiches-'+vp.width+'.png')});}
       const stock=pg.locator('.vrm-ann-stock-tools');if(await stock.count())await stock.evaluate(e=>e.open=true);
+      // (1er nov., maquette Vitrine) Au téléphone, achat (connu), boost, marge et les gestes sont sous
+      //  « Plus d'actions » : on le déplie comme la personne avant de lire la carte (les MÊMES éléments).
+      if (vp.width < 600) { const bts = pg.locator('[data-carte-annonce] [data-fiche-plus-bouton][aria-expanded="false"]'); dit(await bts.count() > 0, 'au téléphone, chaque fiche replie le reste sous « Plus d’actions »', String(await bts.count())); while (await bts.count()) await bts.first().click(); }
       const c = await pg.evaluate(() => {
         const carte = (id) => { const el = document.querySelector(`[data-carte-annonce="${id}"]`); return el ? { t: el.innerText, html: (() => { const k = el.cloneNode(true); k.querySelectorAll('[data-marque]').forEach((m) => m.remove()); return k.outerHTML; })(), marques: [...el.querySelectorAll('[data-marque]')].map((m) => m.getAttribute('data-marque')).join(','), boost: !!el.querySelector('[data-boostee]'), aussi: !!el.querySelector('[data-aussi-sur]'), prepa: (el.querySelector('[data-prepa]') || {}).textContent || '' } : null; };
         return { a: carte('9101'), b: carte('9102'), c: carte('9103'), d: carte('9104'), sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth,
