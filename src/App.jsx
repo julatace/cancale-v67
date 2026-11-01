@@ -13562,6 +13562,192 @@ function BoutonTraduire({ texte }) {
   if (etat === 'ko') return <div style={{marginTop:3,fontSize:11,color:C.muted}}>traduction indisponible sur cet appareil</div>;
   return <button type="button" data-traduire onClick={lancer} style={{marginTop:3,fontSize:11,fontWeight:600,color:C.accent,background:'transparent',border:'none',padding:0,cursor:etat==='charge'?'default':'pointer',fontFamily:'inherit'}}>{etat === 'charge' ? 'traduction…' : '🌐 Traduire'}</button>;
 }
+// ══════════════════════════════════════════════════════════════════════════════
+// MESSAGES EN VOLETS — LA COMPOSITION PARTAGÉE (1er nov.)
+// ══════════════════════════════════════════════════════════════════════════════
+// Julien a choisi la mise en page de Messages · Vinted (31 oct.) : liste · fil ·
+// fiche de la paire. Ces morceaux la portent pour les QUATRE sites (Vinted,
+// Leboncoin, eBay, Vestiaire) : une ligne de liste, l'en-tête du fil, une bulle,
+// les pastilles de réponses rapides, le champ (dictée du navigateur, §2.9),
+// la fiche de la paire, et le pied « on ne peut pas répondre d'ici ».
+// Rien de métier ici : AUCUN envoi, aucune règle d'identité. Chaque site garde
+// SES gestes (ceux qui existaient), et décide lui-même ce que la fiche dit —
+// toujours par identité (§5), sinon « Pas reliée ». Un site qui ne permet pas
+// de répondre depuis VRM pose `PiedSansEnvoi` : il le dit, il ne fait pas semblant.
+function LigneConv({ actif, onClick, attrs, style, ariaLabel, photo, nom, sensible = false, compte, quand, couleurHeure, titre, num, etat, extrait, couleurExtrait, toi = false, apres = null, point = null }) {
+  const morceaux = [titre || null, num ? `N°${num}` : null].filter(Boolean);
+  return (
+    <button className={actif ? 'vrm-inbox-row is-current' : 'vrm-inbox-row'} type="button" {...(attrs || {})} aria-label={ariaLabel} onClick={onClick} style={style}>
+      <span className="vrm-msg-av" style={{background:C.card2||C.bg}}>
+        {photo ? <PhotoVinted src={photo} alt="" loading="lazy" style={{width:'100%',height:'100%',objectFit:'cover',borderRadius:12}}/> : <span className={sensible ? 'vrm-msg-ini vrm-sensible' : 'vrm-msg-ini'} style={{color:C.muted}}>{String(nom || '').trim().charAt(0).toUpperCase() || '·'}</span>}
+      </span>
+      <span className="vrm-msg-body">
+        <span className="vrm-msg-l1">
+          <span className="vrm-msg-name">{sensible ? <span className="vrm-sensible">{nom}</span> : nom}</span>
+          {compte && <span className="vrm-msg-acc" style={{color:C.muted}}>· {compte}</span>}
+          <time className="vrm-msg-time" dateTime={quand ? new Date(quand).toISOString() : undefined} title={quand ? new Date(quand).toLocaleString('fr-FR',{weekday:'long',day:'numeric',month:'long',hour:'2-digit',minute:'2-digit'}) : undefined} style={{color:couleurHeure||C.muted}}>{quand ? heureMessage(quand) : ''}</time>
+        </span>
+        {(morceaux.length > 0 || etat) && (
+          <span className="vrm-msg-article vrm-msg-paire" data-conv-paire="">
+            {/* (31 oct., maquettes) « modèle · N° » : le N° vient de l'identité, jamais du titre. */}
+            <span className="vrm-msg-paire-t">{morceaux.map((x,j)=><React.Fragment key={j}>{j?' · ':''}{num&&x===`N°${num}`?<b className="vrm-msg-paire-num" style={{color:C.text,fontWeight:600}}>{x}</b>:x}</React.Fragment>)}</span>
+            {etat && <span className="vrm-msg-etat" data-etat={etat.k} style={{color:C.muted,borderColor:C.border}}>{etat.t}</span>}
+          </span>
+        )}
+        <span className="vrm-msg-l2">
+          <span className="vrm-msg-extrait" style={{color:couleurExtrait||C.muted}}>{toi?<span className="vrm-msg-toi" style={{color:C.muted}}>Toi : </span>:null}{extrait||''}</span>
+          {apres}
+          {point && <span className="vrm-msg-dot" aria-label="non lu" style={{background:point}}/>}
+        </span>
+      </span>
+    </button>
+  );
+}
+// Le cadre du fil : plein écran au téléphone (portail), volet du milieu sur ordinateur.
+function CadreFil({ etiquette, onFermer, refPanneau, attrs, children }) {
+  return (
+    <ResponsiveChatPortal><div className="vrm-chat-overlay vrm-chat-inline">
+      <FermeAuRetour fermer={onFermer}/>
+      <div ref={refPanneau} className="vrm-chat-panel" role="dialog" aria-label={etiquette} {...(attrs || {})} style={{display:'flex',flexDirection:'column',background:C.bg,overflow:'hidden'}}>{children}</div>
+    </div></ResponsiveChatPortal>
+  );
+}
+function TeteFil({ onFermer, photo, nom, sensible = false, titre, compte, title, libelleFermer = 'Fermer la conversation', children }) {
+  return (
+    <div className="vrm-chat-head" style={{borderBottom:`1px solid ${C.border}`,background:C.card}} title={title}>
+      <button type="button" className="vrm-chat-back" aria-label={libelleFermer} onClick={onFermer} style={{color:C.accent}}>
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
+      </button>
+      {photo?<PhotoVinted src={photo} alt="" style={{width:36,height:36,borderRadius:10,objectFit:'cover',flexShrink:0}}/>:<span className="vrm-chat-head-ph" style={{background:C.card2||C.bg,color:C.muted}}><Icon name="chat" size={17}/></span>}
+      <div className="vrm-chat-head-t">
+        <div className="vrm-chat-head-n" style={{color:C.text}}>{sensible ? <span className="vrm-sensible">{nom}</span> : nom}</div>
+        {/* (revue) Le compte a sa propre place, jamais coupé : sur téléphone le
+            titre de la paire se coupe, le nom du compte reste lisible. */}
+        <div className="vrm-chat-head-s" style={{color:C.muted}}>{titre&&<span className="vrm-chat-head-titre">{titre}</span>}{titre&&compte&&<span aria-hidden="true" className="vrm-chat-head-sep"> · </span>}{compte&&<span className="vrm-chat-head-compte" data-fil-compte="">{compte}</span>}</div>
+      </div>
+      {children}
+    </div>
+  );
+}
+// Une bulle : lui = encre pleine, l'autre = surface ; l'heure DANS la bulle.
+// `qui` est dit aux lecteurs d'écran (« Toi », « L'autre personne »), jamais un nom
+// que le site ne donne pas.
+function BulleConv({ moi, qui, texte, quand, avecDate = false, attrs, apres = null, traduire = '' }) {
+  const d = quand ? new Date(quand) : null; const ok = d && isFinite(d.getTime());
+  return (
+    <div className={moi?'vrm-bulle-l vrm-bulle-moi':'vrm-bulle-l'} {...(attrs || {})}>
+      <div className="vrm-bulle" data-bulle={moi?'moi':'acheteur'} style={moi?{background:C.text,color:C.bg}:{background:C.card2||C.card,color:C.text}}>{qui?<span className="vrm-sr">{qui} : </span>:null}<span className="vrm-bulle-t">{texte}</span>{ok && <time className="vrm-bulle-h" dateTime={d.toISOString()}>{avecDate ? heureMessage(d.getTime()) : d.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})}</time>}</div>
+      {apres}
+      {!moi && traduire ? <div className="vrm-bulle-pied"><BoutonTraduire texte={traduire}/></div> : null}
+    </div>
+  );
+}
+// SES réponses rapides (éditables dans « Réponses rapides », `vinted_quick_replies`) :
+// les MÊMES sur les quatre sites. Un tap REMPLIT le champ, rien ne part.
+const listeRapides = (q) => (q && q.length ? q.map(t=>({e:'',t})) : QUICK_REPLIES);
+const reponsesRapidesPartagees = () => { let q = null; try { q = load('vinted_quick_replies', null); } catch (_) {} return listeRapides(Array.isArray(q) && q.length ? q.filter(t => typeof t === 'string' && t.trim()) : DEFAULT_QUICK_REPLIES); };
+function RapidesConv({ liste, onChoisir, desactive = false, style }) {
+  return (
+    <div className="vrm-chat-rapides" style={style}>
+      {liste.map((q,i)=>(
+        <button key={i} type="button" className="vrm-chat-rapide" data-reponse-rapide={i} disabled={desactive} onClick={()=>onChoisir(q.t)} title={q.t}>
+          {q.t.length>24?q.t.slice(0,24)+'…':q.t}
+        </button>
+      ))}
+    </div>
+  );
+}
+function ComposeConv({ valeur, onChange, onEnvoyer, desactive = false, placeholder = 'Écris ta réponse…', etiquette = 'Réponse à la conversation', libelleEnvoyer = 'Envoyer', entreeEnvoie = false, envoiBloque = false, enCours = false, attrsChamp, attrsEnvoyer }) {
+  return (
+    <div className="vrm-chat-compose">
+      <textarea aria-label={etiquette} disabled={desactive} value={valeur} onChange={e=>onChange(e.target.value)} rows={1} placeholder={placeholder} onKeyDown={entreeEnvoie ? (e=>{ if(e.key==='Enter'&&!e.shiftKey){ e.preventDefault(); onEnvoyer(); } }) : undefined} style={{color:C.text}} {...(attrsChamp || {})}/>
+      {/* (31 oct.) La dictée : la reconnaissance vocale DU NAVIGATEUR
+          (`MicDictee`, déjà celle de la recherche) — aucune IA, aucune
+          clé (§2.9). Elle AJOUTE au champ ; rien ne part sans « Envoyer ». */}
+      {!desactive && <MicDictee titre="Dicter la réponse" onText={(t)=>onChange((valeur&&valeur.trim()?valeur.replace(/\s*$/,' '):'')+t)}/>}
+      <button type="button" className="vrm-chat-send" aria-label={enCours?'Envoi en cours':libelleEnvoyer} title={libelleEnvoyer} onClick={onEnvoyer} disabled={envoiBloque} {...(attrsEnvoyer || {})}><Icon name={enCours?'sync':'send'} size={19}/></button>
+    </div>
+  );
+}
+// Le pied d'un fil où VRM NE PEUT PAS répondre : la raison, puis le seul geste qui marche.
+function PiedSansEnvoi({ raison, lien, texteLien, attrs, children }) {
+  return (
+    <div className="vrm-chat-foot" data-pied-envoi="impossible" {...(attrs || {})} style={{borderTop:`1px solid ${C.border}`,background:C.card}}>
+      <p className="vrm-chat-pied-raison" style={{margin:'0 0 10px',fontSize:13,lineHeight:1.5,color:C.muted}}>{raison}</p>
+      {children}
+      {lien && <a className="vrm-chat-vinted" data-pied-ouvrir="" href={lien} target="_blank" rel="noreferrer" style={{background:C.accent,color:C.onAccent||'#fff'}}>{texteLien}</a>}
+    </div>
+  );
+}
+// LA FICHE DE LA PAIRE (volet de droite, ordinateur ≥ 1024 px). `fc` est déjà
+// RELIÉE par identité par le site qui l'appelle ; sans elle : « Pas reliée » et
+// la raison du site. Lecture seule : aucun geste ici.
+function FicheConvVolet({ etat, fc, raison, site }) {
+  const a = { className: 'vrm-msg-fiche', 'aria-label': 'Fiche de la paire', 'data-fiche-site': site || undefined };
+  if (etat === 'aucune') return <aside {...a} data-fiche-conv="aucune"><p className="vrm-msg-fiche-vide">La fiche de la paire s’affiche ici quand tu ouvres une conversation.</p></aside>;
+  if (etat === 'attente') return <aside {...a} data-fiche-conv="attente"/>;
+  if (!fc) return (
+    <aside {...a} data-fiche-conv="non-reliee">
+      <div className="vrm-msg-fiche-ph"><Icon name="image" size={36}/></div>
+      <p className="vrm-msg-fiche-vide"><b>Pas reliée à une annonce.</b> {raison}</p>
+    </aside>);
+  return (
+    <aside {...a} data-fiche-conv="reliee" data-fiche-item={fc.item != null ? String(fc.item) : undefined} data-fiche-num={fc.num||undefined}>
+      <div className="vrm-msg-fiche-ph">{fc.photo?<PhotoVinted src={fc.photo} alt="" loading="lazy"/>:<Icon name="image" size={36}/>}</div>
+      {fc.titre&&<div className="vrm-msg-fiche-t" data-fiche-titre="">{fc.titre}{fc.taille?` · ${fc.taille}`:''}</div>}
+      <div className="vrm-msg-fiche-s">{(fc.sous||[]).filter(Boolean).join(' · ')}</div>
+      {fc.num&&<b className="vrm-num-pastille vrm-msg-fiche-num">N°{fc.num}</b>}
+      {(fc.blocs||[]).filter(x=>x&&x.val).map(x=><div key={x.cle} className="vrm-msg-fiche-bloc" {...{['data-fiche-'+x.cle]:''}}><small>{x.lib}</small><b>{x.val}</b></div>)}
+      {fc.lien&&fc.lien.href&&<a className="vrm-msg-fiche-lien" href={fc.lien.href} target="_blank" rel="noreferrer">{fc.lien.texte}</a>}
+    </aside>);
+}
+// La place d'un N° dans « Mes meubles » (par `cleNum`), écrite comme dans la fiche Vinted.
+const rangementDuNum = (num) => { if (!num) return null; try { const o = ouDansMeubles(num); if (o) return `${o.meuble.name || 'Meuble'} · ${o.libelle}`; } catch (_) {} return null; };
+// La fiche VRM d'un N° — par le NUMÉRO seulement (l'identité écrite sur le carton,
+// §5). Deux fiches sous ce N° qui ne portent pas le même titre : il ne désigne
+// personne (la règle de `numEbayLu`) ⇒ `null`, jamais un choix au hasard.
+const ficheDuNumero = (num) => {
+  const k = cleNum(num || ''); if (!k) return null;
+  let fiches = {}; try { fiches = load('vinted_annonce_numeros', {}) || {}; } catch (_) {}
+  const porteurs = Object.values(fiches).filter((f) => f && f.numero != null && cleNum(f.numero) === k);
+  if (!porteurs.length) return null;
+  if (new Set(porteurs.map((f) => normTitle(f.title || ''))).size > 1) return null;
+  const f = porteurs.slice().sort((a, b) => (Number(b.numberedAt) || 0) - (Number(a.numberedAt) || 0))[0];
+  return { titre: f.title || '', photo: f.photo || null };
+};
+// La même composition, passée aux écrans qui vivent hors de ce fichier (eBay → Messages, src/ebayGestion.jsx).
+const COMPO_MESSAGES = { LigneConv, CadreFil, TeteFil, BulleConv, RapidesConv, ComposeConv, PiedSansEnvoi, FicheConvVolet, rapides: reponsesRapidesPartagees };
+// LA FICHE D'UN ÉCHANGE eBay (1er nov.) — par IDENTITÉ seulement (§5) : l'ItemID
+// que eBay rattache à l'échange, l'annonce captée de CE compte sous cet ItemID,
+// et le N° que porte SON SKU `VRM-{n°}` (ou le lien posé à la main), lu par
+// `numEbayLu` (la règle de l'écran eBay, §11 : un N° douteux ne désigne personne).
+// Sans ItemID : `null` ⇒ « Pas reliée ».
+const paireEbayDe = (m, annonces, compteNom) => {
+  const id = m && m.itemId != null ? String(m.itemId).trim() : '';
+  if (!/^\d{1,19}$/.test(id)) return null;
+  const a = annonces ? annonces.get(id) || null : null;
+  const num = numEbayLu(a && a.sku, id, null, a && a.depuis) || '';
+  const p = a && a.price != null && a.price !== '' ? Number(String(a.price).replace(',', '.')) : NaN;
+  const obs = a && Number.isInteger(a.observateurs) ? a.observateurs : null;
+  return { item: id, num, photo: a && /^https:\/\//.test(String(a.photo || '')) ? a.photo : null, titre: (a && a.title) || (m.titre || ''),
+    // Le prix de l'annonce dans SA devise (affiché, jamais converti ni compté, §5).
+    sous: [Number.isFinite(p) && p > 0 ? `${p.toLocaleString('fr-FR', { minimumFractionDigits: Number.isInteger(p) ? 0 : 2, maximumFractionDigits: 2 })} ${!a.currency || a.currency === 'EUR' ? '€' : a.currency}` : null, 'eBay', compteNom || null],
+    blocs: [{ cle: 'rangement', lib: 'Rangée', val: rangementDuNum(num) }, { cle: 'attention', lib: 'Attention', val: obs != null ? `${obs} observateur${obs > 1 ? 's' : ''}` : null }],
+    lien: URL_ITEM_EBAY(id) ? { href: URL_ITEM_EBAY(id), texte: 'Voir l’annonce sur eBay ↗' } : null };
+};
+// Messages · eBay en volets : les annonces de CE compte (lecture projetée, §4.4),
+// puis l'écran d'avant (src/ebayGestion.jsx) avec la composition partagée.
+function EbayMessagesVolets({ compte, comptesEbay, ...p }) {
+  const [annonces, setAnnonces] = React.useState(null);   // Map ItemID → annonce · null pas encore lu / pas su
+  React.useEffect(() => { let vivant = true; (async () => {
+    let r = null; try { r = await lireEbayTous('ebay_listings', SEL_EBAY_ANNONCES, 'items', Array.isArray(comptesEbay) ? comptesEbay : undefined); } catch (_) { r = null; }
+    if (!vivant || !r) return;
+    const m = new Map(); for (const a of r.items || []) { if (a && a.itemId != null && (a._compte || 'principal') === (compte || 'principal') && !m.has(String(a.itemId))) m.set(String(a.itemId), a); }
+    setAnnonces(m);
+  })(); return () => { vivant = false; }; }, [compte, comptesEbay]);
+  const nom = Array.isArray(comptesEbay) && comptesEbay.length >= 2 ? nomCompteEbay(comptesEbay.find((c) => c.ref === compte)) : '';
+  return <EbayMessages {...p} compte={compte} compo={COMPO_MESSAGES} paireDe={(m) => paireEbayDe(m, annonces, nom)}/>;
+}
 // ⚠️⚠️ NAVIGATION PAR TÂCHE (31 octobre, décision de Julien : « A · par tâche,
 // en améliorant encore », puis « pour l'espace, il faut totalement réorganiser
 // les onglets… tout peut être amélioré »). La barre ne range plus les écrans par
@@ -25641,7 +25827,23 @@ const etiquetteResultatVc = (r) => {
   if (r.accepte === true && r.etape === 'refuse') return { ton: 'ko', texte: r.raison || "Vestiaire a refusé : le message n'est pas parti." };
   return { ton: 'ko', texte: (r.raison ? r.raison.charAt(0).toUpperCase() + r.raison.slice(1) : "Rien n'est parti.") + (/[.!]$/.test(r.raison || '') ? '' : '.') };
 };
-function FilVestiaire({ conv, num, envoi, onFerme }) {
+// (1er nov.) La présentation de Messages · Vinted (liste · fil · fiche de la
+// paire) : la composition partagée (`LigneConv`, `CadreFil`, `BulleConv`,
+// `ComposeConv`, `FicheConvVolet`). Les GESTES restent ceux de la 5.295 :
+// « Envoyer » n'existe qu'avec `extSait('vcrepondre') === 'ok'` ET une recette
+// apprise (`vc_envoi.appris`) ; sinon le pied le dit et propose Vestiaire.
+// La fiche est reliée par la RÉFÉRENCE VRM de l'article (ou le lien posé par
+// VRM à la publication) — le N° — puis la fiche VRM de CE N° (`ficheDuNumero`,
+// ambigu ⇒ rien) ; sans référence : « Pas reliée ».
+function ficheVestiaireDe(v, items) {
+  if (!v || !v.num) return null;
+  const f = ficheDuNumero(v.num);
+  const it = (v.pid && items && items[v.pid]) || null;
+  const fav = it && Number.isFinite(it.favoris) ? it.favoris : null;
+  return { item: v.pid || undefined, num: v.num, photo: f && f.photo, titre: f && f.titre, sous: ['Vestiaire'],
+    blocs: [{ cle: 'rangement', lib: 'Rangée', val: rangementDuNum(v.num) }, { cle: 'attention', lib: 'Attention', val: fav != null ? `${fav} favori${fav > 1 ? 's' : ''}` : null }] };
+}
+function FilVestiaire({ conv, num, titre, envoi, onFerme }) {
   const [fil, setFil] = React.useState(undefined);   // undefined en cours · null pas su · objet
   const [texte, setTexte] = React.useState('');
   const [enCours, setEnCours] = React.useState(false);
@@ -25669,54 +25871,52 @@ function FilVestiaire({ conv, num, envoi, onFerme }) {
     setEnCours(false); setRes(etiquetteResultatVc(r));
     if (r && r.accepte === true && r.etape === 'fait') { setTexte(''); relire(); }
   };
-  const style = { fontSize: 12.5, color: C.muted, lineHeight: 1.55 };
-  const heure = (iso) => { const t = Date.parse(iso || ''); return isFinite(t) ? new Date(t).toLocaleString('fr-FR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : 'date non dite'; };
+  const style = { fontSize: 13, color: C.muted, lineHeight: 1.55, textAlign: 'center', padding: '20px 0' };
   let corps;
   if (fil === undefined) corps = <div data-vc-fil="charge" style={style}>Lecture de la conversation…</div>;
   else if (fil === null) corps = <div data-vc-fil="pas-su" style={style}>Je n'ai pas pu lire cette conversation — rien n'est perdu, réessaie dans un moment.</div>;
   else if (!fil.messages) corps = <div data-vc-fil="jamais" style={style}>Le texte de cette conversation n'a pas encore été lu : ouvre-la une fois sur Vestiaire, dans le Chrome où l'extension est installée{cap === 'retard' ? <> (mise à jour en <b>{EXT_CAPACITES.vcfil}</b> d'abord)</> : ''}.</div>;
   else if (!fil.messages.length) corps = <div data-vc-fil="vide" style={style}>Conversation lue, mais Vestiaire n'y a rendu aucun message lisible.</div>;
   else corps = (
-    <div data-vc-fil="lu" data-vc-fil-n={fil.messages.length} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+    <div data-vc-fil="lu" data-vc-fil-n={fil.messages.length} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
       {fil.messages.slice(-80).map((m, i) => (
-        <div key={m.id || i} data-vc-msg={m.deMoi === true ? 'moi' : m.deMoi === false ? 'autre' : 'passu'} style={{ alignSelf: m.deMoi === true ? 'flex-end' : 'flex-start', maxWidth: '86%', background: m.deMoi === true ? C.card : 'transparent', border: `1px solid ${C.border}`, borderRadius: 10, padding: '8px 10px' }}>
-          <div style={{ fontSize: 13.5, color: C.text, whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', lineHeight: 1.45 }}>{m.t}</div>
-          <div style={{ fontSize: 11, color: C.muted, marginTop: 3 }}>{m.deMoi === true ? 'Toi' : m.deMoi === false ? "L'autre personne" : 'Auteur non dit par Vestiaire'} · {heure(m.at)}{m.envoyeParVrm ? ' · envoyé depuis VRM' : ''}</div>
-          {m.deMoi !== true && <BoutonTraduire texte={m.t}/>}
-        </div>
+        <BulleConv key={m.id || i} moi={m.deMoi === true} qui={m.deMoi === true ? 'Toi' : m.deMoi === false ? "L'autre personne" : ''} texte={m.t} quand={Date.parse(m.at || '') || null} avecDate traduire={m.deMoi !== true ? m.t : ''}
+          attrs={{ 'data-vc-msg': m.deMoi === true ? 'moi' : m.deMoi === false ? 'autre' : 'passu' }}
+          apres={(m.deMoi == null || m.envoyeParVrm || !Date.parse(m.at || '')) ? <small className="vrm-bulle-note" style={{ display: 'block', fontSize: 11, color: C.muted, marginTop: 3 }}>{[m.deMoi == null ? 'Auteur non dit par Vestiaire' : '', !Date.parse(m.at || '') ? 'date non dite' : '', m.envoyeParVrm ? 'envoyé depuis VRM' : ''].filter(Boolean).join(' · ')}</small> : null}/>
       ))}
     </div>
   );
   const page = fil && /^\/[\w/.-]*$/.test(fil.page || '') ? fil.page : '';
-  return (
-    <div data-vc-fil-ouvert={conv} style={{ display: 'flex', flexDirection: 'column', gap: 10, borderTop: `1px solid ${C.border}`, paddingTop: 10 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-        <div style={{ flex: 1, minWidth: 0, fontSize: 13.5, fontWeight: 700, color: C.text }}>{num ? `N°${num}` : 'Conversation pas reliée à une paire'}</div>
-        <button type="button" className="vrm-lien-action" onClick={onFerme} style={{ minHeight: 44, border: 'none', background: 'transparent', color: C.accent, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>Fermer</button>
+  const lien = `https://fr.vestiairecollective.com${page || '/'}`;
+  const resultat = res && <div role="status" data-vc-resultat={res.ton} style={{ fontSize: 12.5, color: res.ton === 'ko' ? C.warn : res.ton === 'ok' ? C.text : C.muted, lineHeight: 1.5, marginBottom: 8 }}>{res.texte}</div>;
+  let pied;
+  if (fil && fil.messages && peut) pied = (
+    <div className="vrm-chat-foot" data-vc-repondre="pret" style={{ borderTop: `1px solid ${C.border}`, background: C.card }}>
+      {resultat}
+      <RapidesConv liste={reponsesRapidesPartagees()} onChoisir={(t) => setTexte(String(t).slice(0, 2000))} desactive={enCours}/>
+      <ComposeConv valeur={texte} onChange={(t) => setTexte(String(t).slice(0, 2000))} onEnvoyer={envoyer} enCours={enCours} etiquette="Ta réponse sur Vestiaire" libelleEnvoyer="Envoyer sur Vestiaire"
+        envoiBloque={!texte.trim() || enCours} attrsEnvoyer={{ 'data-vc-envoyer': '' }}/>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginTop: 6 }}>
+        <span style={{ flex: 1, minWidth: 0, fontSize: 11.5, color: C.muted, lineHeight: 1.45 }}>Part de l'onglet Vestiaire ouvert dans ce Chrome, à ton nom, un message à la fois.</span>
+        <a href={lien} target="_blank" rel="noreferrer" className="vrm-lien-action" style={{ color: C.muted, fontWeight: 600, display: 'inline-flex', alignItems: 'center', minHeight: 44, fontSize: 12.5 }}>Ouvrir sur Vestiaire ↗</a>
       </div>
-      {corps}
-      {fil && fil.messages && (
-        <div data-vc-repondre={peut ? 'pret' : (cap !== 'ok' ? 'ext-' + cap : 'pas-appris')} style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-          {peut ? (<>
-            <textarea value={texte} onChange={(e) => setTexte(e.target.value.slice(0, 2000))} rows={3} placeholder="Ta réponse…" aria-label="Ta réponse sur Vestiaire"
-              style={{ width: '100%', boxSizing: 'border-box', fontSize: 16, fontFamily: 'inherit', color: C.text, background: C.bg, border: `1px solid ${C.border}`, borderRadius: 10, padding: 10, resize: 'vertical' }}/>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-              <Bouton variante="primaire" onClick={envoyer} disabled={!texte.trim() || enCours} data-vc-envoyer="">{enCours ? 'Envoi…' : 'Envoyer sur Vestiaire'}</Bouton>
-              <span style={{ fontSize: 11.5, color: C.muted }}>Part de l'onglet Vestiaire ouvert dans ce Chrome, à ton nom, un message à la fois.</span>
-            </div>
-          </>) : cap !== 'ok' ? (
-            <div style={style}>{cap === 'absente' ? <>Pour répondre d'ici, ouvre VRM dans le Chrome où l'extension est installée — sinon réponds sur Vestiaire.</> : <>Pour répondre d'ici, il faut l'extension <b>{EXT_CAPACITES.vcrepondre}</b> — mets-la à jour depuis <b>Réglages</b>.</>}</div>
-          ) : (
-            <div data-vc-pas-appris={envoi && envoi.raison ? envoi.raison : ''} style={style}>
-              Pour répondre d'ici, l'extension doit d'abord VOIR comment Vestiaire envoie un message : envoie <b>une</b> réponse toi-même sur Vestiaire, dans ce Chrome. Ensuite, VRM pourra répondre — toujours sur ton clic.
-              {envoi && envoi.raison ? <> (Dernier essai vu : pas encore sûr à refaire — {envoi.raison}.)</> : null}
-            </div>
-          )}
-          {res && <div role="status" data-vc-resultat={res.ton} style={{ fontSize: 12.5, color: res.ton === 'ko' ? C.warn : res.ton === 'ok' ? C.text : C.muted, lineHeight: 1.5 }}>{res.texte}</div>}
-          <a href={`https://fr.vestiairecollective.com${page || '/'}`} target="_blank" rel="noreferrer" className="vrm-lien-action" style={{ color: C.accent, fontWeight: 600, display: 'inline-flex', alignItems: 'center', minHeight: 44, fontSize: 12.5 }}>Ouvrir sur Vestiaire ↗</a>
-        </div>
-      )}
     </div>
+  );
+  else if (fil && fil.messages) pied = (
+    <PiedSansEnvoi attrs={{ 'data-vc-repondre': cap !== 'ok' ? 'ext-' + cap : 'pas-appris', ...(cap === 'ok' ? { 'data-vc-pas-appris': envoi && envoi.raison ? envoi.raison : '' } : {}) }} lien={lien} texteLien="Répondre sur Vestiaire ↗"
+      raison={cap === 'absente' ? <>Pour répondre d'ici, ouvre VRM dans le Chrome où l'extension est installée — sinon réponds sur Vestiaire.</>
+        : cap !== 'ok' ? <>Pour répondre d'ici, il faut l'extension <b>{EXT_CAPACITES.vcrepondre}</b> — mets-la à jour depuis <b>Réglages</b>.</>
+        : <>Pour répondre d'ici, l'extension doit d'abord VOIR comment Vestiaire envoie un message : envoie <b>une</b> réponse toi-même sur Vestiaire, dans ce Chrome. Ensuite, VRM pourra répondre — toujours sur ton clic.{envoi && envoi.raison ? <> (Dernier essai vu : pas encore sûr à refaire — {envoi.raison}.)</> : null}</>}>
+      {resultat}
+    </PiedSansEnvoi>
+  );
+  else if (fil !== undefined) pied = <PiedSansEnvoi lien={lien} texteLien="Ouvrir sur Vestiaire ↗" raison="Sans le texte de la conversation, VRM ne répond pas d'ici."/>;
+  return (
+    <CadreFil etiquette="Conversation Vestiaire" onFermer={onFerme} attrs={{ 'data-vc-fil-ouvert': conv }}>
+      <TeteFil onFermer={onFerme} nom={num ? `N°${num}` : 'Conversation pas reliée à une paire'} titre={titre || ''} compte="Vestiaire"/>
+      <div className="vrm-chat-history" style={{ flex: 1, overflow: 'auto', padding: 16, display: 'flex', flexDirection: 'column', gap: 8 }}>{corps}</div>
+      {pied}
+    </CadreFil>
   );
 }
 function MessagesVestiaire() {
@@ -25726,7 +25926,7 @@ function MessagesVestiaire() {
     try {
       const [rm, rl, rf, re] = await Promise.all([
         fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vc_messages&select=compteur:data->compteur,conversations:data->conversations,lecture:data->lecture`, { headers: sbAuth() }),
-        fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vc_listings&select=liens:data->liens`, { headers: sbAuth() }),
+        fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vc_listings&select=liens:data->liens,items:data->items`, { headers: sbAuth() }),
         // 5.295 : les fils lus, en SCALAIRES (§4.4 : jamais le texte de tous les fils d'un coup).
         fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.vc_fil_*&select=id,n:meta->>n,da:meta->>dernierAt,ap:meta->>apercu,dm:meta->>dernierDeMoi,pid:meta->>productId,ref:meta->>ref`, { headers: sbAuth() }),
         fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vc_envoi&select=appris:data->appris,raison:data->>raison,at:data->>at`, { headers: sbAuth() }),
@@ -25738,7 +25938,7 @@ function MessagesVestiaire() {
       const r = (jm && jm[0]) || {};
       const fils = {};
       for (const x of (Array.isArray(jf) ? jf : [])) { const id = String(x.id || '').replace(/^vc_fil_/, ''); if (id) fils[id] = x; }
-      setD({ compteur: r.compteur || null, conversations: r.conversations || null, lecture: r.lecture || null, liens: (jl && jl[0] && jl[0].liens) || {},
+      setD({ compteur: r.compteur || null, conversations: r.conversations || null, lecture: r.lecture || null, liens: (jl && jl[0] && jl[0].liens) || {}, items: (jl && jl[0] && jl[0].items) || {},
         fils: Array.isArray(jf) ? fils : null, envoi: Array.isArray(je) ? (je[0] ? { appris: je[0].appris === true, raison: je[0].raison || '', at: je[0].at || '' } : { appris: false, raison: '' }) : null });
     } catch (_) { setD(null); }
   }, []);
@@ -25764,8 +25964,11 @@ function MessagesVestiaire() {
       const pid = v.productId || (f && f.pid) || ''; const ref = v.ref || (f && f.ref) || '';
       const apercu = (f && f.ap) || v.apercu || '';
       const date = (f && f.da) || v.date || v.vuAt || '';
-      return { id, nonLu: v.nonLu, apercu, date, lu: !!(f && Number(f.n) > 0), num: cleNum((pid && d.liens[pid]) || ref || '') };
+      const deMoi = f && f.ap ? f.dm === 'true' : v.apercuDeMoi === true;
+      return { id, pid: String(pid || ''), nonLu: v.nonLu, apercu, deMoi, date, lu: !!(f && Number(f.n) > 0), num: cleNum((pid && d.liens[pid]) || ref || '') };
     }).sort((a, z) => (z.nonLu === true) - (a.nonLu === true) || String(z.date || '').localeCompare(String(a.date || '')));
+    const choisie = liste.find((v) => v.id === ouvert) || null;
+    const fcChoisie = choisie ? ficheVestiaireDe(choisie, d.items) : null;
     corps = (
       <div data-vc-messages="lu" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         <div data-vc-messages-nonlus={n == null ? 'passu' : String(n)} style={style}>
@@ -25774,29 +25977,41 @@ function MessagesVestiaire() {
           {' '}<a data-vc-messages-ouvrir="" href={lien} target="_blank" rel="noreferrer" className="vrm-lien-action" style={{ color: C.accent, fontWeight: 600, display: 'inline-flex', alignItems: 'center', minHeight: 44 }}>{page ? 'Ouvrir ta messagerie Vestiaire ↗' : 'Ouvrir Vestiaire ↗'}</a>
           {!page ? <> (la messagerie est dans le menu de ton compte)</> : null}
         </div>
-        {liste.length ? <>
-          <div style={style}>{liste.length} conversation{liste.length > 1 ? 's' : ''} vue{liste.length > 1 ? 's' : ''}{d.lecture && !d.lecture.complet ? ' (au moins)' : ''}. Touche-en une pour la lire{extSait('vcrepondre') === 'ok' ? ' et y répondre' : ''} — VRM n'en garde jamais le nom de la personne.</div>
-          {liste.slice(0, 40).map((v) => (
-            <div key={v.id} data-vc-conv={v.id} data-vc-conv-num={v.num || ''} data-vc-conv-nonlu={v.nonLu === true ? 'oui' : v.nonLu === false ? 'non' : 'passu'} data-vc-conv-lu={v.lu ? 'oui' : 'non'} style={{ borderTop: `1px solid ${C.border}`, paddingTop: 8 }}>
-              {ouvert === v.id ? <FilVestiaire conv={v.id} num={v.num} envoi={d.envoi} onFerme={() => setOuvert('')}/> : (
-                <button type="button" onClick={() => setOuvert(v.id)} aria-label={`Ouvrir la conversation ${v.num ? 'du N°' + v.num : ''}`} style={{ display: 'block', width: '100%', textAlign: 'left', background: 'transparent', border: 'none', padding: '4px 0', minHeight: 44, cursor: 'pointer', fontFamily: 'inherit' }}>
-                  <div style={{ fontSize: 13, color: C.text, fontWeight: v.nonLu === true ? 700 : 600 }}>{v.num ? `N°${v.num}` : 'Pas reliée à une paire'}{v.nonLu === true ? <span style={{ marginLeft: 8, color: C.accent }}>· non lue</span> : null}</div>
-                  {v.apercu ? <div style={{ fontSize: 12.5, color: C.text, marginTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{v.apercu}</div> : null}
-                  <div style={{ fontSize: 11.5, color: C.muted }}>{v.date ? new Date(v.date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }) : 'date non dite'}{v.nonLu == null ? ' · Vestiaire ne dit pas si elle est lue' : ''}{v.lu ? '' : ' · texte pas encore lu'}</div>
-                </button>
-              )}
-            </div>
-          ))}
-        </> : (d.conversations ? <div data-vc-conv-vide="" style={style}>Aucune conversation à la dernière lecture.</div>
-          : <div data-vc-conv-jamais="" style={style}>Le détail des conversations arrive quand tu ouvres ta messagerie sur Vestiaire dans ce Chrome.</div>)}
+        <div className="vrm-message-workspace">
+          <div className="vrm-inbox-column">
+            {liste.length ? <>
+              <div style={{ ...style, marginBottom: 6 }}>{liste.length} conversation{liste.length > 1 ? 's' : ''} vue{liste.length > 1 ? 's' : ''}{d.lecture && !d.lecture.complet ? ' (au moins)' : ''}. Touche-en une pour la lire{extSait('vcrepondre') === 'ok' ? ' et y répondre' : ''} — VRM n'en garde jamais le nom de la personne.</div>
+              <div className="vrm-msg-list">
+                {liste.slice(0, 40).map((v) => {
+                  const fv = v.num ? ficheDuNumero(v.num) : null; const t = Date.parse(v.date || '');
+                  return (
+                    <div key={v.id} data-vc-conv={v.id} data-vc-conv-num={v.num || ''} data-vc-conv-nonlu={v.nonLu === true ? 'oui' : v.nonLu === false ? 'non' : 'passu'} data-vc-conv-lu={v.lu ? 'oui' : 'non'}>
+                      <LigneConv actif={ouvert === v.id} onClick={() => setOuvert(v.id)} ariaLabel={`Ouvrir la conversation ${v.num ? 'du N°' + v.num : 'pas reliée à une paire'}`}
+                        photo={fv && fv.photo} nom="Vestiaire" quand={isFinite(t) ? t : null} couleurHeure={v.nonLu === true ? C.accent : C.muted}
+                        titre={fv && fv.titre} num={v.num}
+                        extrait={v.apercu || (v.lu ? '' : 'Texte pas encore lu')} toi={!!v.apercu && v.deMoi} couleurExtrait={v.nonLu === true ? C.text : C.muted}
+                        apres={v.nonLu == null ? <span className="vrm-msg-etat" title="Vestiaire ne dit pas si elle est lue" style={{ color: C.muted, borderColor: C.border }}>lu ?</span> : null}
+                        point={v.nonLu === true ? C.accent : null}/>
+                    </div>
+                  );
+                })}
+              </div>
+            </> : (d.conversations ? <div data-vc-conv-vide="" style={style}>Aucune conversation à la dernière lecture.</div>
+              : <div data-vc-conv-jamais="" style={style}>Le détail des conversations arrive quand tu ouvres ta messagerie sur Vestiaire dans ce Chrome.</div>)}
+          </div>
+          <div className="vrm-chat-column">{choisie
+            ? <FilVestiaire key={choisie.id} conv={choisie.id} num={choisie.num} titre={(fcChoisie && fcChoisie.titre) || ''} envoi={d.envoi} onFerme={() => setOuvert('')}/>
+            : <div className="vrm-chat-empty"><Icon name="chat" size={28}/><span>Choisis une conversation</span><small>Lis-la et réponds-y depuis VRM.</small></div>}</div>
+          {!choisie ? <FicheConvVolet site="vestiaire" etat="aucune"/>
+            : <FicheConvVolet site="vestiaire" etat={fcChoisie ? 'reliee' : 'non-reliee'} fc={fcChoisie} raison="Cet article Vestiaire ne porte aucune référence VRM : VRM ne devine pas la paire d’après le titre."/>}
+        </div>
       </div>
     );
   }
   return (
-    <Card style={{ padding: 16 }}>
-      <div style={{ fontSize: 14, fontWeight: 700, color: C.text, marginBottom: 6 }}>Tes messages Vestiaire</div>
+    <div data-messagerie-site="vestiaire">
       {corps}
-    </Card>
+    </div>
   );
 }
 // ══════════════════════════════════════════════════════════════════════════════
@@ -45589,26 +45804,16 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // la transaction, §5) — sans elle, la fiche le DIT, elle ne cherche rien par
   // le titre. Lecture seule : aucun geste ici.
   const rendreFicheConv=()=>{
-    if(!openConv) return <aside className="vrm-msg-fiche" data-fiche-conv="aucune" aria-label="Fiche de la paire"><p className="vrm-msg-fiche-vide">La fiche de la paire s’affiche ici quand tu ouvres une conversation.</p></aside>;
-    if(openConv.loading||openConv.error) return <aside className="vrm-msg-fiche" data-fiche-conv="attente" aria-label="Fiche de la paire"/>;
+    if(!openConv) return <FicheConvVolet site="vinted" etat="aucune"/>;
+    if(openConv.loading||openConv.error) return <FicheConvVolet site="vinted" etat="attente"/>;
     const pc=paireDeConv(String(openConv.acc?.vinted_user_id||''),openConv.convId,openConv.conversation);
     const fc=ficheDeConv(pc,openConv.acc);
-    if(!fc) return (
-      <aside className="vrm-msg-fiche" data-fiche-conv="non-reliee" aria-label="Fiche de la paire">
-        <div className="vrm-msg-fiche-ph"><Icon name="image" size={36}/></div>
-        <p className="vrm-msg-fiche-vide"><b>Pas reliée à une annonce.</b> Vinted ne rattache aucun article à cette conversation : VRM ne devine pas la paire d’après le titre.</p>
-      </aside>);
+    if(!fc) return <FicheConvVolet site="vinted" etat="non-reliee" raison="Vinted ne rattache aucun article à cette conversation : VRM ne devine pas la paire d’après le titre."/>;
     const attention=[fc.favoris!=null?`${fc.favoris} favori${fc.favoris>1?'s':''}`:null, fc.vues!=null?`${fc.vues} vue${fc.vues>1?'s':''}`:null].filter(Boolean);
-    return (
-      <aside className="vrm-msg-fiche" data-fiche-conv="reliee" data-fiche-item={String(fc.item)} data-fiche-num={fc.num||undefined} aria-label="Fiche de la paire">
-        <div className="vrm-msg-fiche-ph">{fc.photo?<PhotoVinted src={fc.photo} alt="" loading="lazy"/>:<Icon name="image" size={36}/>}</div>
-        {fc.titre&&<div className="vrm-msg-fiche-t" data-fiche-titre="">{fc.titre}{fc.taille?` · ${fc.taille}`:''}</div>}
-        <div className="vrm-msg-fiche-s">{[fc.prix!=null?prix(fc.prix,fc.devise):null,fc.compte||null].filter(Boolean).join(' · ')}</div>
-        {fc.num&&<b className="vrm-num-pastille vrm-msg-fiche-num">N°{fc.num}</b>}
-        {fc.rangement&&<div className="vrm-msg-fiche-bloc" data-fiche-rangement=""><small>Rangée</small><b>{fc.rangement}</b></div>}
-        {attention.length>0&&<div className="vrm-msg-fiche-bloc" data-fiche-attention=""><small>Attention</small><b>{attention.join(' · ')}</b></div>}
-        {fc.url&&<a className="vrm-msg-fiche-lien" href={fc.url} target="_blank" rel="noreferrer">Voir l’annonce sur Vinted ↗</a>}
-      </aside>);
+    return <FicheConvVolet site="vinted" etat="reliee" fc={{ item: fc.item, num: fc.num, photo: fc.photo, titre: fc.titre, taille: fc.taille,
+      sous: [fc.prix!=null?prix(fc.prix,fc.devise):null,fc.compte||null],
+      blocs: [{ cle:'rangement', lib:'Rangée', val: fc.rangement }, { cle:'attention', lib:'Attention', val: attention.join(' · ') }],
+      lien: fc.url ? { href: fc.url, texte: 'Voir l’annonce sur Vinted ↗' } : null }}/>;
   };
   const rendreConversation=()=>openConv && (
 <ResponsiveChatPortal><div className={curSub==='messages'?'vrm-chat-overlay vrm-chat-inline':'vrm-chat-overlay'} onClick={()=>setOpenConv(null)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:1000,display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
@@ -45617,23 +45822,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             {/* (16 oct.) En-tête de messagerie : retour à gauche (au doigt, c'est
                 là qu'on le cherche), la personne et la paire, l'actualisation à
                 droite. La source (« lu sur Vinted ») passe dans l'infobulle. */}
-            <div className="vrm-chat-head" style={{borderBottom:`1px solid ${C.border}`,background:C.card}} title={`${accName(openConv.acc)} · ${openConv.source==='extension'?'Lu sur Vinted':'Conversation enregistrée'}`}>
-              <button type="button" className="vrm-chat-back" aria-label="Fermer la conversation" onClick={()=>setOpenConv(null)} style={{color:C.accent}}>
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
-              </button>
-              {openConv.header?.photo?<PhotoVinted src={openConv.header.photo} alt="" style={{width:36,height:36,borderRadius:10,objectFit:'cover',flexShrink:0}}/>:<span className="vrm-chat-head-ph" style={{background:C.card2||C.bg,color:C.muted}}><Icon name="chat" size={17}/></span>}
-              <div className="vrm-chat-head-t">
-                <div className="vrm-chat-head-n" style={{color:C.text}}><span className="vrm-sensible">{openConv.header?.login||'Conversation'}</span></div>
-                {/* (revue) Le compte a sa propre place, jamais coupé : sur téléphone le
-                    titre de la paire se coupe, le nom du compte reste lisible — il en a
-                    plusieurs, c'est lui qui dit sur quel compte il répond. */}
-                {(()=>{const tit=openConv.conversation?.transaction?.item_title||openConv.conversation?.transaction?.item?.title||openConv.header?.title;const cpt=accName(openConv.acc);return <div className="vrm-chat-head-s" style={{color:C.muted}}>{tit&&<span className="vrm-chat-head-titre">{tit}</span>}{tit&&cpt&&<span aria-hidden="true" className="vrm-chat-head-sep"> · </span>}{cpt&&<span className="vrm-chat-head-compte" data-fil-compte="">{cpt}</span>}</div>;})()}
-              </div>
+            <TeteFil onFermer={()=>setOpenConv(null)} title={`${accName(openConv.acc)} · ${openConv.source==='extension'?'Lu sur Vinted':'Conversation enregistrée'}`}
+              photo={openConv.header?.photo} nom={openConv.header?.login||'Conversation'} sensible
+              titre={openConv.conversation?.transaction?.item_title||openConv.conversation?.transaction?.item?.title||openConv.header?.title} compte={accName(openConv.acc)}>
               {/* (revue) Une offre dont l'annonce est partie : LE geste est dans le
                   bloc de l'offre (« Retirer de la liste ») — pas deux fois (§7). */}
               {!offrePartieDuFil(openConv)&&<button className="vrm-chat-retirer" type="button" data-conv-retirer={String(openConv.convId)} aria-label="Retirer cette conversation de la liste" title={`Retirer de la liste — ${phraseRetour(1)}. Rien ne change sur Vinted.`} onClick={()=>retirerConvDeLaListe(openConv)} style={{color:C.text,borderColor:C.border}}><Icon name="eyeOff" size={15}/><span>Retirer</span></button>}
               <button className="vrm-icon-control vrm-chat-sync" type="button" aria-label={openConv.refreshing?"Actualisation en cours":"Actualiser la conversation"} disabled={openConv.loading||openConv.refreshing} aria-busy={!!openConv.refreshing} onClick={actualiserConversation} style={{color:C.muted}}><Icon name="sync" size={17}/></button>
-            </div>
+            </TeteFil>
             {openConv.refreshing&&<div className="vrm-chat-note vrm-chat-read" role="status" data-fil-actualisation style={{color:C.muted}}>Actualisation de la conversation…</div>}
             {openConv.refreshError&&<div className="vrm-chat-note vrm-chat-read" role="alert" data-fil-actualisation-erreur style={{color:C.text}}><span>{openConv.refreshError} <a href={`https://www.vinted.fr/inbox/${openConv.convId}`} target="_blank" rel="noreferrer">Ouvrir sur Vinted ↗</a></span></div>}
             {!openConv.loading&&!openConv.error&&(()=>{const suivi0=suiviNegociationVinted(openConv.conversation,openConv.acc?.vinted_user_id,etatOffreVinted);const suivi=suivi0&&suivi0.libelle==='Offre reçue'&&offrePartieDuFil(openConv)?{libelle:'Annonce plus en vente',detail:'Elle n’est plus dans ton dressing : cette offre ne peut plus être acceptée.'}:suivi0;return suivi?<div className="vrm-chat-negociation-etat" role="status" title={suivi.detail}><b>{suivi.libelle}</b>{suivi.libelle==='Prix accepté'&&<small>{suivi.detail}</small>}</div>:null;})()}
@@ -45703,12 +45899,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                           {(m.links||[]).map((l,j)=><a key={j} className="vrm-chat-link" href={l.url} target="_blank" rel="noreferrer" style={{color:C.accent}}>{l.bordereau?'Ouvrir le bordereau ↗':'Ouvrir le lien ↗'}</a>)}
                         </div>
                       : <div key={i} className="vrm-chat-event" style={{color:C.muted}}>{m.body}{(m.links||[]).map((l,j)=><a key={j} className="vrm-chat-link" href={l.url} target="_blank" rel="noreferrer" style={{color:C.accent}}>{l.bordereau?'bordereau ↗':'lien ↗'}</a>)}</div>)
-                  : <div key={i} className={m.mine?'vrm-bulle-l vrm-bulle-moi':'vrm-bulle-l'}>
-                      <div className="vrm-bulle" data-bulle={m.mine?'moi':'acheteur'} style={m.mine?{background:C.text,color:C.bg}:{background:C.card2||C.card,color:C.text}}>{m.body||(m.photos?.length?'📷 photo':'')}{m.ts && <time className="vrm-bulle-h" dateTime={new Date(m.ts).toISOString()}>{new Date(m.ts).toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})}</time>}</div>
+                  : <BulleConv key={i} moi={!!m.mine} texte={m.body||(m.photos?.length?'📷 photo':'')} quand={m.ts||null} traduire={m.body||''}
+                      apres={<>
                       {(m.links||[]).map((l,j)=><a key={j} className="vrm-chat-link" href={l.url} target="_blank" rel="noreferrer" style={{color:C.accent}}>{l.bordereau?'Ouvrir le bordereau ↗':'Ouvrir le lien ↗'}</a>)}
                       {(m.photos||[]).length>0 && <div className="vrm-chat-photos">{m.photos.map((ph,j)=>{const src=photoArticle({photo:ph});return src?<PhotoVinted key={j} src={src} alt="Photo du message" loading="lazy" style={{width:104,height:128,objectFit:'cover',borderRadius:12}}/>:null;})}</div>}
-                      {!m.mine && m.body ? <div className="vrm-bulle-pied"><BoutonTraduire texte={m.body}/></div> : null}
-                    </div>
+                      </>}/>
               )}</React.Fragment>; })}
               {!openConv.loading && !openConv.error && openConv.messages.length===0 && <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'20px 0'}}>Aucun message.</div>}
             </div>
@@ -45814,21 +46009,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 {/* Réponses rapides : remplissent la zone (tu ajustes puis envoies).
                     (29 oct., revue) Pas sur une offre dont l'annonce est prouvée
                     partie : la première dit « l'article est toujours disponible ». */}
-                {!offrePartieDuFil(openConv) && <div className="vrm-chat-rapides" style={{opacity:ro?0.5:1}}>
-                  {(quickReplies&&quickReplies.length?quickReplies.map(t=>({e:'',t})):QUICK_REPLIES).map((q,i)=>(
-                    <button key={i} type="button" className="vrm-chat-rapide" data-reponse-rapide={i} disabled={ro} onClick={()=>modifierReponse(q.t)} title={q.t}>
-                      {q.t.length>24?q.t.slice(0,24)+'…':q.t}
-                    </button>
-                  ))}
-                </div>}
-                <div className="vrm-chat-compose">
-                  <textarea aria-label="Réponse à la conversation" disabled={ro} value={replyText} onChange={e=>modifierReponse(e.target.value)} rows={1} placeholder={ro?'Lecture seule sur ce compte':'Écris ta réponse…'} onKeyDown={e=>{ if(e.key==='Enter'&&!e.shiftKey){ e.preventDefault(); sendReply(); } }} style={{color:C.text}}/>
-                  {/* (31 oct.) La dictée : la reconnaissance vocale DU NAVIGATEUR
-                      (`MicDictee`, déjà celle de la recherche) — aucune IA, aucune
-                      clé (§2.9). Elle AJOUTE au champ ; rien ne part sans « Envoyer ». */}
-                  {!ro && <MicDictee titre="Dicter la réponse" onText={(t)=>modifierReponse((replyText&&replyText.trim()?replyText.replace(/\s*$/,' '):'')+t)}/>}
-                  <button type="button" className="vrm-chat-send" aria-label={replyBusy?'Envoi en cours':'Envoyer'} title="Envoyer" onClick={sendReply} disabled={!!reponsesIncertaines[cleReponseVinted(openConv.acc?.vinted_user_id,openConv.convId)]||ro||replyBusy||!replyText.trim()||!msgPeutAgir||openConv.conversation?.allow_reply===false}><Icon name={replyBusy?'sync':'send'} size={19}/></button>
-                </div>
+                {!offrePartieDuFil(openConv) && <RapidesConv liste={listeRapides(quickReplies)} onChoisir={modifierReponse} desactive={ro} style={{opacity:ro?0.5:1}}/>}
+                <ComposeConv valeur={replyText} onChange={modifierReponse} onEnvoyer={sendReply} desactive={ro} entreeEnvoie enCours={replyBusy}
+                  placeholder={ro?'Lecture seule sur ce compte':'Écris ta réponse…'}
+                  envoiBloque={!!reponsesIncertaines[cleReponseVinted(openConv.acc?.vinted_user_id,openConv.convId)]||ro||replyBusy||!replyText.trim()||!msgPeutAgir||openConv.conversation?.allow_reply===false}/>
                 </>)}
               </div>
             ); })()}
@@ -50095,34 +50279,22 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       </div>
                     )}
                     {(()=>{ const nom=(c.opposite_user&&c.opposite_user.login)||'Conversation'; return (
-                    <button className={openConv?.convId===c.id && String(openConv.acc?.vinted_user_id)===uidC(c)?'vrm-inbox-row is-current':'vrm-inbox-row'} type="button" data-conv={c.id} data-conv-acces={prioMsg?(ro?'lecture':'action'):undefined} data-nonlu={c.unread?'1':undefined}
-                      data-conv-num={paire&&paire.num?paire.num:undefined} data-conv-prix={paire&&paire.prix!=null?String(paire.prix):undefined} data-conv-etat={paire&&paire.etat?paire.etat.k:undefined} data-conv-auteur={auteur||undefined} data-conv-quand={tsConv?new Date(tsConv).toISOString():undefined} data-conv-compte={c._acc?String(c._acc.vinted_user_id):undefined} data-conv-offre={offre?String(offre.prix):undefined}
+                    <LigneConv actif={openConv?.convId===c.id && String(openConv.acc?.vinted_user_id)===uidC(c)}
+                      attrs={{'data-conv':c.id,'data-conv-acces':prioMsg?(ro?'lecture':'action'):undefined,'data-nonlu':c.unread?'1':undefined,
+                        'data-conv-num':paire&&paire.num?paire.num:undefined,'data-conv-prix':paire&&paire.prix!=null?String(paire.prix):undefined,'data-conv-etat':paire&&paire.etat?paire.etat.k:undefined,'data-conv-auteur':auteur||undefined,'data-conv-quand':tsConv?new Date(tsConv).toISOString():undefined,'data-conv-compte':c._acc?String(c._acc.vinted_user_id):undefined,'data-conv-offre':offre?String(offre.prix):undefined}}
                       onClick={()=>openConversation(c)}
-                      style={{color:ro?C.muted:C.text,...(filtreMsg&&uidC(c)!==filtreMsg?STYLE_FLOU:null)}}>
-                      <span className="vrm-msg-av" style={{background:C.card2||C.bg}}>
-                        {photo ? <PhotoVinted src={photo} alt="" loading="lazy" style={{width:'100%',height:'100%',objectFit:'cover',borderRadius:12}}/> : <span className="vrm-msg-ini vrm-sensible" style={{color:C.muted}}>{String(nom).trim().charAt(0).toUpperCase()||'·'}</span>}
-                      </span>
-                      <span className="vrm-msg-body">
-                        <span className="vrm-msg-l1">
-                          <span className="vrm-msg-name"><span className="vrm-sensible">{nom}</span></span>
-                          {(plusieurs||!!messageSearch.trim()) && c._acc && <span className="vrm-msg-acc" style={{color:C.muted}}>· {accName(c._acc)}</span>}
-                          <time className="vrm-msg-time" dateTime={tsConv?new Date(tsConv).toISOString():undefined} title={tsConv?new Date(tsConv).toLocaleString('fr-FR',{weekday:'long',day:'numeric',month:'long',hour:'2-digit',minute:'2-digit'}):undefined} style={{color:c.unread&&!ro?C.accent:C.muted}}>{tsConv?heureMessage(tsConv):''}</time>
-                        </span>
-                        {(()=>{ const titre=(paire&&paire.titre)||c.item_title||c.item?.title||''; const morceaux=[titre||null, paire&&paire.num?`N°${paire.num}`:null].filter(Boolean); if(!morceaux.length && !(paire&&paire.etat)) return null; return (
-                          <span className="vrm-msg-article vrm-msg-paire" data-conv-paire="">
-                            {/* (31 oct., maquettes) « modèle · N° » : le N° vient de l'identité (paireDeConv), jamais du titre. */}
-                            <span className="vrm-msg-paire-t">{morceaux.map((x,j)=><React.Fragment key={j}>{j?' · ':''}{paire&&paire.num&&x===`N°${paire.num}`?<b className="vrm-msg-paire-num" style={{color:C.text,fontWeight:600}}>{x}</b>:x}</React.Fragment>)}</span>
-                            {paire&&paire.etat && <span className="vrm-msg-etat" data-etat={paire.etat.k} style={{color:C.muted,borderColor:C.border}}>{paire.etat.t}</span>}
-                          </span>); })()}
-                        <span className="vrm-msg-l2">
-                          <span className="vrm-msg-extrait" style={{color:c.unread?C.text:C.muted}}>{auteur==='toi'?<span className="vrm-msg-toi" style={{color:C.muted}}>Toi : </span>:null}{c.description||''}</span>
+                      style={{color:ro?C.muted:C.text,...(filtreMsg&&uidC(c)!==filtreMsg?STYLE_FLOU:null)}}
+                      photo={photo} nom={nom} sensible
+                      compte={(plusieurs||!!messageSearch.trim()) && c._acc ? accName(c._acc) : ''}
+                      quand={tsConv||null} couleurHeure={c.unread&&!ro?C.accent:C.muted}
+                      titre={(paire&&paire.titre)||c.item_title||c.item?.title||''} num={paire&&paire.num?paire.num:''} etat={paire&&paire.etat?paire.etat:null}
+                      extrait={c.description||''} couleurExtrait={c.unread?C.text:C.muted} toi={auteur==='toi'}
+                      apres={<>
                           {/* (19 oct.) Sur la ligne du message, pas sur celle de la paire : là
                               elle tronquait le N° et le prix (vu au rendu à 1512 px). */}
                           {messageFilter==='repondre'&&!offre&&<span className="vrm-msg-etat">{/\?/.test(c.description||'')?'Question reçue':'Message reçu'}</span>}{offre && <span className="vrm-msg-etat vrm-msg-offre" data-offre-liste={String(offre.prix)} style={{color:C.accent,borderColor:C.accent}}>Offre {prix(offre.prix)} en attente</span>}
-                          {c.unread && <span className="vrm-msg-dot" aria-label="non lu" style={{background:ro?C.muted:C.accent}}/>}
-                        </span>
-                      </span>
-                    </button>
+                      </>}
+                      point={c.unread ? (ro?C.muted:C.accent) : null}/>
                     ); })()}
                     </React.Fragment>
                   );
@@ -54210,6 +54382,7 @@ function MessagesLeboncoin() {
 }
 function ConversationsLeboncoin() {
   const [d, setD] = useState(undefined);
+  const [ouvert, setOuvert] = useState('');   // le compte dont le fil est ouvert (1er nov.)
   useEffect(() => { let stop = false; (async () => {
     try {
       const [rm, ra] = await Promise.all([
@@ -54257,35 +54430,60 @@ function ConversationsLeboncoin() {
     );
   }
   const total = releves.reduce((a, l) => a + (Number(l.c.unread) || 0), 0);
+  // (1er nov.) La présentation de Messages · Vinted (liste · fil · fiche). Ce que
+  // Leboncoin donne ne change pas : un NOMBRE par compte, jamais le texte ni
+  // l'annonce d'un message. Le fil le DIT et mène à Leboncoin ; la fiche dit
+  // « Pas reliée » (aucune identité ne relie un message à une annonce).
+  const choisi = lignes.find((l) => l.id === ouvert) || null;
+  const nonLus = (n) => (n > 0 ? `${n} message${n > 1 ? 's' : ''} non lu${n > 1 ? 's' : ''}` : 'Aucun message non lu');
   return (
-    <div data-messages-lbc={String(total)}>
+    <div data-messages-lbc={String(total)} data-messagerie-site="leboncoin">
       <div data-messages-lbc-total="" style={{ fontSize: 13.5, color: C.text, fontWeight: 600, marginBottom: 6 }}>
         {total > 0 ? `${total} message${total > 1 ? 's' : ''} non lu${total > 1 ? 's' : ''}` : 'Aucun message non lu'}
         {pasLus.length ? <span style={{ fontWeight: 400, color: C.muted }}>{` sur ${releves.length > 1 ? `${releves.length} comptes relevés` : 'le compte relevé'}`}</span> : null}
       </div>
-      {/* Chaque compte NOMMÉ avec SON nombre ; un compte lié jamais relevé dit
-          « — » et le geste, jamais « 0 » (« pas su » ≠ « rien »). */}
-      {[...releves, ...pasLus].map((l) => {
-        const vieux = l.c && Date.now() - Date.parse(l.c.at || 0) > 24 * 3600e3;
-        return (
-          <div key={l.id} data-compte-lbc={l.id} data-flou={lbcFloute(lbcOuvert, l.id) ? '1' : '0'} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 0', borderTop: `1px solid ${C.border}`, ...(lbcFloute(lbcOuvert, l.id) ? STYLE_FLOU : null) }}>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 13.5, fontWeight: 600, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{l.nom}{l.type ? <span style={{ fontWeight: 400, color: C.muted }}>{' · ' + l.type}</span> : null}</div>
-              {/* (29 oct., revue) Un compte pas encore lu : la ligne ne porte que
-                  « — » à droite ; la phrase sous la liste le nomme avec le geste. */}
-              {l.c ? <div style={{ fontSize: 11.5, color: C.muted, marginTop: 1 }}>mis à jour {age(l.c.at)}{vieux ? ' — ouvre leboncoin.fr sur ce compte pour le mettre à jour' : ''}</div> : null}
-            </div>
-            <div style={{ flexShrink: 0, textAlign: 'right', opacity: vieux ? 0.55 : 1 }}>
-              {l.c ? <><span style={{ fontSize: 20, fontWeight: 700, color: l.c.unread > 0 ? C.text : C.muted, fontVariantNumeric: 'tabular-nums' }}>{l.c.unread}</span>{' '}<span style={{ fontSize: 11.5, color: C.muted }}>non lu{l.c.unread > 1 ? 's' : ''}</span></> : <span style={{ fontSize: 13, color: C.muted }}>—</span>}
-            </div>
+      <div className="vrm-message-workspace">
+        <div className="vrm-inbox-column">
+          {/* Chaque compte NOMMÉ avec SON nombre ; un compte lié jamais relevé dit
+              « — » et le geste, jamais « 0 » (« pas su » ≠ « rien »). */}
+          <div className="vrm-msg-list">
+            {[...releves, ...pasLus].map((l) => {
+              const vieux = l.c && Date.now() - Date.parse(l.c.at || 0) > 24 * 3600e3;
+              const t = l.c ? Date.parse(l.c.at || '') : NaN;
+              const flou = lbcFloute(lbcOuvert, l.id);
+              return (
+                <div key={l.id} data-compte-lbc={l.id} data-flou={flou ? '1' : '0'} style={flou ? STYLE_FLOU : undefined}>
+                  <LigneConv actif={ouvert === l.id} onClick={() => setOuvert(l.id)} ariaLabel={`${l.nom} : ${l.c ? nonLus(Number(l.c.unread) || 0) : 'pas encore lu'}`}
+                    nom={l.nom} compte={l.type} quand={isFinite(t) ? t : null} couleurHeure={C.muted}
+                    extrait={l.c ? nonLus(Number(l.c.unread) || 0) : '—'} couleurExtrait={l.c && l.c.unread > 0 ? C.text : C.muted}
+                    apres={vieux ? <span className="vrm-msg-etat" title="Ouvre leboncoin.fr sur ce compte pour le mettre à jour" style={{ color: C.muted, borderColor: C.border }}>à relire</span> : null}
+                    point={l.c && l.c.unread > 0 ? C.accent : null}/>
+                </div>
+              );
+            })}
           </div>
-        );
-      })}
-      {/* Un compte « pas encore lu » : le geste est dit UNE fois, sous la liste
-          (§7) — pas sur chaque ligne. */}
-      {pasLus.length ? <div data-messages-lbc-geste="" style={{ fontSize: 12, color: C.muted, marginTop: 8, lineHeight: 1.5 }}>{pasLus.length > 1 ? `${pasLus.length} comptes n'ont pas encore été lus` : `${pasLus[0].nom} n'a pas encore été lu`} : connecte-toi une fois {pasLus.length > 1 ? 'à chacun' : 'à ce compte'} sur leboncoin.fr, avec l'extension, et son nombre de messages arrivera ici.</div> : null}
-      {ouvrir}
-      <div style={{ fontSize: 11, color: C.muted, marginTop: 10, lineHeight: 1.5 }}>On répond sur Leboncoin : Leboncoin ne donne à VRM que le nombre de non-lus, pas les messages.</div>
+          {/* Un compte « pas encore lu » : le geste est dit UNE fois, sous la liste
+              (§7) — pas sur chaque ligne. */}
+          {pasLus.length ? <div data-messages-lbc-geste="" style={{ fontSize: 12, color: C.muted, marginTop: 8, lineHeight: 1.5 }}>{pasLus.length > 1 ? `${pasLus.length} comptes n'ont pas encore été lus` : `${pasLus[0].nom} n'a pas encore été lu`} : connecte-toi une fois {pasLus.length > 1 ? 'à chacun' : 'à ce compte'} sur leboncoin.fr, avec l'extension, et son nombre de messages arrivera ici.</div> : null}
+          {/* Sous la liste, le lien reste discret : le geste « Répondre sur Leboncoin » est dans le fil (§7, l'accent est rare). */}
+          <a href="https://www.leboncoin.fr/messages" target="_blank" rel="noreferrer" data-ouvrir-messages-lbc="" className="vrm-lien-action" style={{ display: 'inline-flex', alignItems: 'center', minHeight: 44, marginTop: 6, color: C.text, fontSize: 13.5, fontWeight: 600 }}>Ouvrir mes messages Leboncoin ↗</a>
+          <div style={{ fontSize: 11, color: C.muted, marginTop: 4, lineHeight: 1.5 }}>On répond sur Leboncoin : Leboncoin ne donne à VRM que le nombre de non-lus, pas les messages.</div>
+        </div>
+        <div className="vrm-chat-column">{choisi ? (
+          <CadreFil etiquette="Messages Leboncoin" onFermer={() => setOuvert('')} attrs={{ 'data-lbc-fil': choisi.id }}>
+            <TeteFil onFermer={() => setOuvert('')} nom={choisi.nom} titre={choisi.type ? 'compte ' + choisi.type : ''} compte="Leboncoin"/>
+            <div className="vrm-chat-history" style={{ flex: 1, overflow: 'auto', padding: 16, display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <div data-lbc-fil-texte="absent" style={{ fontSize: 13.5, color: C.muted, lineHeight: 1.55, textAlign: 'center', padding: '24px 8px' }}>
+                {/* Le nombre est sur la ligne du compte (une fois, §7) : ici, seulement ce que VRM ne sait pas. */}
+                {choisi.c ? 'Leboncoin ne donne à VRM que le nombre de non-lus de ce compte, jamais le texte des messages : VRM ne les montre pas et n’y répond pas d’ici.'
+                  : 'Ce compte n’a pas encore été lu. Et même lu, Leboncoin ne donne à VRM que le nombre de non-lus, jamais le texte des messages : VRM n’y répond pas d’ici.'}
+              </div>
+            </div>
+            <PiedSansEnvoi raison="Pour lire et répondre, ouvre ta messagerie Leboncoin." lien="https://www.leboncoin.fr/messages" texteLien="Répondre sur Leboncoin ↗"/>
+          </CadreFil>
+        ) : <div className="vrm-chat-empty"><Icon name="chat" size={28}/><span>Choisis un compte</span><small>Leboncoin donne le nombre de non-lus, pas les messages.</small></div>}</div>
+        <FicheConvVolet site="leboncoin" etat={choisi ? 'non-reliee' : 'aucune'} raison="Leboncoin ne dit pas à VRM de quelle annonce parle un message : VRM ne devine pas la paire."/>
+      </div>
     </div>
   );
 }
@@ -61654,7 +61852,7 @@ function AppCoeur() {
               options={comptesEbay.map((c) => ({ val: c.ref, nom: nomCompteEbay(c) + (typeCompteEbayTexte(c) ? ` · ${typeCompteEbayTexte(c)}` : '') + (siteCompteEbayTexte(c) ? ` · ${siteCompteEbayTexte(c)}` : '') }))} />
           )}
           {sec==='ventes'&&<EbayVentes baseKO={baseKO} vue={ebayVueEff} comptesEbay={comptesEbay} cible={ebayCible?.section==='ventes'?ebayCible:null} onClearCible={()=>setEbayCible(null)}/>}
-          {sec==='messages'&&<div style={{padding:16}}><EbayActionCompte vue={ebayVueEff} comptes={comptesEbay} onCompte={setEbayVue}>{ref=><EbayMessages key={ref} owner={AUTH.user?.id || 'installation'} cible={ebayCible?.compte===ref && ebayCible.section==='messages'?ebayCible:null} onClearCible={()=>setEbayCible(null)} headers={enTeteSession} confirm={askConfirm} theme={C} compte={ref}/>}</EbayActionCompte></div>}
+          {sec==='messages'&&<div style={{padding:16}}><EbayActionCompte vue={ebayVueEff} comptes={comptesEbay} onCompte={setEbayVue}>{ref=><EbayMessagesVolets key={ref} comptesEbay={comptesEbay} owner={AUTH.user?.id || 'installation'} cible={ebayCible?.compte===ref && ebayCible.section==='messages'?ebayCible:null} onClearCible={()=>setEbayCible(null)} headers={enTeteSession} confirm={askConfirm} theme={C} compte={ref}/>}</EbayActionCompte></div>}
           {sec==='agent'&&!baseKO&&<div style={{padding:'16px 16px 0'}}><AgentEbay comptes={accountsLoaded?vintedAccounts:undefined} comptesEbay={comptesEbay} onAnnonces={()=>allerSec('annonces')}/></div>}
           {sec==='agent'&&<div style={{padding:16}}><EbayActionCompte vue={ebayVueEff} comptes={comptesEbay} onCompte={setEbayVue}>{ref=><><EbayRetours key={'rt-'+ref} headers={enTeteSession} confirm={askConfirm} theme={C} compte={ref}/><EbayAgent key={ref} headers={enTeteSession} theme={C} compte={ref} onSection={(section,t)=>{setEbayVue(ref);setEbayCible(cibleEbay(ref,{...t,section}));allerSec(section);}}/><EbayEvaluations key={'ev-'+ref} headers={enTeteSession} confirm={askConfirm} theme={C} compte={ref}/></>}</EbayActionCompte></div>}
           {sec==='promo'&&<div style={{padding:16}}><EbayActionCompte vue={ebayVueEff} comptes={comptesEbay} onCompte={setEbayVue}>{ref=><EbayPromotion key={'pr-'+ref} headers={enTeteSession} confirm={askConfirm} theme={C} compte={ref}/>}</EbayActionCompte></div>}

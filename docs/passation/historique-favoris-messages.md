@@ -1958,3 +1958,67 @@ Accepter branché sur un geste sans confirmation : 1 rouge). `messages-priorite.
 aussi le nom accessible (Envoyer est une icône). `lbc-messages` (4) et
 `achats-messages-premium` (1) sont rouges à l'identique sur `origin/main`. `messagerie.cjs` mis à jour pour la nouvelle carte
 (ordre Refuser · contre · Accepter, mini sur la carte, contre-offre par `data-offre-geste`).
+
+
+## 1er novembre — Messages · Leboncoin, eBay et Vestiaire en volets (la présentation de Vinted)
+
+Demande : la MÊME présentation que Messages · Vinted (31 oct.) sur les trois autres sites —
+liste · fil · fiche de la paire, pied avec réponses rapides, champ, dictée, envoyer —
+SANS changer ce que chaque site permet. Aucun nouveau chemin d'envoi, aucune règle métier
+changée, extension inchangée.
+
+**Une seule composition** (src/App.jsx, juste après `BoutonTraduire`) : `LigneConv` (photo
+ou initiale, pseudo, « modèle · N° », dernier message, heure, point non lu), `CadreFil`
+(portail plein écran au téléphone, volet du milieu sur ordinateur, `FermeAuRetour`),
+`TeteFil`, `BulleConv` (lui = encre pleine, l'autre = surface, heure DANS la bulle ; « Toi »
+/ « L'autre personne » dit aux lecteurs d'écran, jamais un nom que le site ne donne pas),
+`RapidesConv` (SES réponses rapides `vinted_quick_replies`, les mêmes partout), `ComposeConv`
+(champ, `MicDictee` du navigateur §2.9, Envoyer rond), `PiedSansEnvoi` (la raison + LE geste
+qui marche, « … sur le site ↗ », en encre pleine), `FicheConvVolet`. **Vinted les utilise
+aussi** (ligne, en-tête, bulles, pastilles, champ, fiche) : même DOM qu'avant, banc
+`messages-volets` vert. eBay vit dans `src/ebayGestion.jsx` : App lui passe la composition
+(`COMPO_MESSAGES`) et `paireDe` par `EbayMessagesVolets`.
+
+**Ce que chaque site garde EXACTEMENT** :
+- **eBay** : répondre (`repondre`, confirmé, sur SON clic), brouillon par échange, relire un
+  échange incertain, codes de retrait copiables, recherche, « Charger la suite » ; libellés
+  inchangés (« Conversation eBay », « Réponse au message eBay », « Envoyer la réponse »,
+  « Fermer la conversation eBay »), même règle « non lu » (`messageEbayNonLu`). Un échange
+  sans ItemID : déjà impossible de répondre ⇒ le pied le DIT (`PiedSansEnvoi`, « Ouvrir eBay »).
+- **Vestiaire** : « Envoyer sur Vestiaire » seulement avec `extSait('vcrepondre') === 'ok'` ET
+  `vc_envoi.appris` ; sinon le pied dit le geste (mettre à jour / envoyer UNE réponse soi-même)
+  et « Répondre sur Vestiaire ↗ ». Une commande `vcRepondre { conv, texte }` par clic, comme avant.
+- **Leboncoin** : Leboncoin ne donne à VRM qu'un NOMBRE de non-lus par compte — la liste a une
+  ligne par compte (son nombre, « — » si jamais lu, estompé si ce n'est pas le compte ouvert) ;
+  le fil d'un compte dit que le texte n'est jamais donné, aucune bulle n'est inventée ; le pied :
+  « Répondre sur Leboncoin ↗ ». Le lien sous la liste devient discret (le geste est dans le fil,
+  §7 : l'accent est rare ; le nombre n'est plus répété dans le fil).
+
+**La fiche, par identité seulement (§5)** :
+- eBay : l'ItemID de l'échange → l'annonce captée de CE compte sous cet ItemID → le N° de SON
+  SKU `VRM-{n°}` (ou du lien posé à la main) par `numEbayLu` (la règle de l'écran eBay : un N°
+  douteux ne désigne personne) ; prix dans SA devise (affiché, jamais compté), observateurs,
+  rangement, « Voir l'annonce sur eBay ». Sans ItemID : « Pas reliée ».
+- Vestiaire : la référence VRM de l'article (`liens[productId]` ou `ref`) → le N° → la fiche
+  VRM de CE N° (`ficheDuNumero` : deux fiches sous ce N° aux titres différents ⇒ rien) pour le
+  titre et la photo ; favoris en NOMBRE (`vc_listings.items[productId].favoris`), rangement.
+  Sans référence : « Pas reliée ».
+- Leboncoin : aucune identité ne relie un message à une annonce ⇒ toujours « Pas reliée »
+  (ce qui existe — référence VRM / lien posé à la main — relie des ANNONCES, pas des messages).
+
+Styles : `src/styles-messages.css` vise `[data-messagerie]` (Vinted) ET `[data-messagerie-site]`
+(les trois autres), même spécificité ; la grille trois volets s'applique dès qu'un écran pose
+sa `.vrm-msg-fiche`.
+
+Preuves : `scripts/bancs/messages-sites.cjs` (nouveau ; 1512 / 390, données inventées — deux
+paires au MÊME titre N°80 / N°81 ; eBay ItemID 2001 = VRM-80 face à 2002 = VRM-81 ; Vestiaire
+réf. 80 ; un échange eBay sans ItemID et une conversation Vestiaire sans référence) : vert
+; rouge sur `origin/main` (25 rouges) ; rouge sous mutation (annonce eBay prise par le titre + N° Vestiaire deviné sans référence : 6 rouges ; pied d’envoi eBay sans ItemID : 1 rouge). `vestiaire-messages`
+lit « Fermer » aussi dans le nom accessible (le retour est la flèche de l'en-tête).
+Verts aussi : messages-volets, messagerie, lbc-messages, vestiaire-messages, ebay-messages-journee,
+notif-messages, traduire-messages, dictee, coque-mobile, navigation-tache, messages-priorite,
+achats-messages-premium ; audits tdz, variables, icones, boutons, lbc-messages,
+ebay-messages-nonlus, vc-conversations. `revendeurs` s'arrête AVANT la partie Messages eBay, à
+l'identique sur `origin/main` (« en-tête séparé du contenu… — eBay », ligne 185) : sa partie
+clavier (« Tab inverse … ignore envoyer désactivé ») n'a donc pas pu être rejouée — le micro de
+dictée est maintenant le dernier contrôle du fil eBay, à revoir quand ce banc repassera.

@@ -79,7 +79,7 @@ export function EbayCommande({order,ouvrir=false,costs={},onCosts,owner,compte='
  </details>;
 }
 
-export function EbayMessages({compte='principal',owner,cible,onClearCible,headers,confirm,theme:C}){
+export function EbayMessages({compte='principal',owner,cible,onClearCible,headers,confirm,theme:C,compo,paireDe}){
  const call=(action,payload,headers,options)=>appelerEbay(action,{...payload,...(compte && compte!=='principal'?{compte}:{})},headers,options);
  const selection=useRef(null);
  const S=styleUI(C),[rows,setRows]=useState(null),[selected,setSelected]=useState(null),[body,setBody]=useState(''),[message,setMessage]=useState(''),[busy,setBusy]=useState(false),[page,setPage]=useState(1),[pages,setPages]=useState(null),[search,setSearch]=useState(''),[historySearch,setHistorySearch]=useState(''),[draftOK,setDraftOK]=useState(true),[codeCopie,setCodeCopie]=useState('');
@@ -112,32 +112,54 @@ export function EbayMessages({compte='principal',owner,cible,onClearCible,header
   finally{setBusy(false);}
  }
  const affiches=(rows || []).filter(m=>`${m.sender} ${m.subject} ${m.titre} ${m.body} ${(m.responses || []).join(' ')}`.toLowerCase().includes(search.toLowerCase()));
- return <section><div style={{display:'flex',alignItems:'center',gap:8,marginBottom:12}}><h2 className="vrm-ebay-titre-onglet" style={{margin:0,fontSize:22,color:C.text}}>Messages eBay</h2><button type="button" disabled={busy} onClick={()=>{cibleOuverte.current=null;charger();}} style={{...S.button,marginLeft:'auto'}}>Actualiser</button></div><Erreur message={message}/>
+ // (1er nov.) La présentation de Messages · Vinted (liste · fil · fiche de la
+ // paire) par la composition PARTAGÉE de l'app (`compo`, passée par App.jsx).
+ // Les gestes restent EXACTEMENT ceux d'avant : répondre (`repondre`, sur SON
+ // clic, confirmé), relire l'échange, copier un code, charger la suite. La fiche
+ // et le N° viennent de `paireDe` (App.jsx) : l'ItemID de l'échange, puis le SKU
+ // VRM-{n°} de CETTE annonce (§5) — sans ItemID, « Pas reliée ».
+ const {LigneConv,CadreFil,TeteFil,BulleConv,RapidesConv,ComposeConv,PiedSansEnvoi,FicheConvVolet,rapides}=compo;
+ async function envoyer(){
+  const m=selected,texte=body;if(!m || !m.itemId || busy || resultatIncertain.value || !texte.trim())return;
+  if(!await confirm({title:`Répondre à ${m.sender || 'cet acheteur'} ?`,desc:`${m.titre || m.subject}\n\n${texte}`,ok:'Envoyer la réponse',cancel:'Annuler'}))return;
+  setBusy(true);setMessage('');try{await call('repondre',{itemId:m.itemId,messageId:m.id,body:texte,confirme:true},headers,{write:true});effacerBrouillonSiIdentique(owner,compte,m.id,texte);setRows(p=>p?.map(x=>x.id===m.id?{...x,responses:[...(x.responses || []),texte]}:x));setSelected(p=>p?.id===m.id?{...p,responses:[...(p.responses || []),texte]}:p);if(selection.current===m.id){setBody(current=>current===texte?'':current);setMessage('Réponse acceptée par eBay.');}}catch(e){if(e.reason==='incertain')resultatIncertain.marquer(true);if(selection.current===m.id)setMessage(e.message);}finally{setBusy(false);}
+ }
+ const paireSel=selected && paireDe?paireDe(selected):null;
+ const codes=selected?codesRetraitEbay([selected.body,...(selected.responses || [])]):[];
+ const q=historySearch.toLowerCase();
+ return <section data-messagerie-site="ebay"><div style={{display:'flex',alignItems:'center',gap:8,marginBottom:12}}><h2 className="vrm-ebay-titre-onglet" style={{margin:0,fontSize:22,color:C.text}}>Messages eBay</h2><button type="button" disabled={busy} onClick={()=>{cibleOuverte.current=null;charger();}} style={{...S.button,marginLeft:'auto'}}>Actualiser</button></div><Erreur message={message}/>
   {cible && <p style={{fontSize:12}}>Message sélectionné <button type="button" onClick={onClearCible}>Voir tous les échanges</button>{rows && !rows.some(m=>String(m.id)===cible.id) && <span role="status"> · Cet échange n’est pas dans la page lue. Charge la suite ou actualise.</span>}</p>}
   <div className="vrm-message-workspace"><div className="vrm-inbox-column">{Array.isArray(rows) && rows.length>0 && <input type="search" aria-label="Rechercher un message eBay" value={search} onChange={e=>setSearch(e.target.value)} placeholder="Rechercher un échange…" style={{...S.input,marginBottom:10}}/>}
    {busy && rows===null && <p style={{fontSize:12,color:C.muted}}>Lecture des messages…</p>}
    {rows && !affiches.length && <p style={{fontSize:12,color:C.muted}}>Aucun échange dans cette sélection.</p>}
-   <div className="vrm-msg-list" style={{border:`1px solid ${C.border}`,background:C.card,display:affiches.length?undefined:'none'}}>{affiches.map(m=>{const aRepondre=messageEbayNonLu(m);const apercu=corpsLisible(m.body || '').replace(/\s+/g,' ').trim();const nom=m.sender || 'Acheteur',sujet=m.subject || m.titre || '',heure=heureCourte(m.date);return <button type="button" key={m.id} data-ebay-message={m.id} data-nonlu={aRepondre?'1':undefined} aria-label={[nom,sujet,heure,aRepondre?'pas encore de réponse':''].filter(Boolean).join(' ')} className={selected?.id===m.id?'vrm-inbox-row is-current':'vrm-inbox-row'} onClick={()=>selectMessage(m)} style={{color:C.text}}>
-     <span className="vrm-msg-av" aria-hidden="true" style={{background:C.card2 || C.bg}}><span className="vrm-msg-ini" style={{color:C.muted}}>{nom.trim().charAt(0).toUpperCase() || '·'}</span></span>
-     <span className="vrm-msg-body">
-      <span className="vrm-msg-l1"><b className="vrm-msg-name">{nom}</b>{heure && <span className="vrm-msg-time" style={{color:aRepondre?C.accent:C.muted}}>{heure}</span>}</span>
-      <span className="vrm-msg-l2"><span className="vrm-msg-extrait" style={{color:aRepondre?C.text:C.muted}}>{sujet}{apercu?<span style={{color:C.muted,fontWeight:400}}> — {apercu}</span>:null}</span>{aRepondre && <span className="vrm-msg-dot" title="Pas encore de réponse" style={{background:C.accent}}/>}</span>
-     </span>
-    </button>;})}</div>
+   <div className="vrm-msg-list" style={{display:affiches.length?undefined:'none'}}>{affiches.map(m=>{const aRepondre=messageEbayNonLu(m);const apercu=corpsLisible(m.body || '').replace(/\s+/g,' ').trim();const nom=m.sender || 'Acheteur',sujet=m.subject || m.titre || '',heure=heureCourte(m.date);const p=paireDe?paireDe(m):null;const t=Date.parse(m.date || '');
+    return <LigneConv key={m.id} actif={selected?.id===m.id} onClick={()=>selectMessage(m)} style={{color:C.text}}
+     attrs={{'data-ebay-message':m.id,'data-nonlu':aRepondre?'1':undefined,'data-conv-num':p && p.num?p.num:undefined,'data-conv-item':m.itemId || undefined}}
+     ariaLabel={[nom,sujet,heure,aRepondre?'pas encore de réponse':''].filter(Boolean).join(' ')}
+     photo={p && p.photo} nom={nom} sensible quand={Number.isFinite(t)?t:null} couleurHeure={aRepondre?C.accent:C.muted}
+     titre={(p && p.titre) || m.titre || ''} num={p && p.num} extrait={apercu || sujet} couleurExtrait={aRepondre?C.text:C.muted}
+     point={aRepondre?C.accent:null}/>;})}</div>
    {rows && ((pages!=null && page<pages) || (pages==null && rows.length>=50*page)) && <button type="button" disabled={busy} onClick={()=>charger(page+1)} style={{...S.button,marginTop:10}}>Charger la suite</button>}
    <p style={{fontSize:10,color:C.muted}}>Échanges remontés par eBay sur les 90 derniers jours.</p>
   </div><div className="vrm-chat-column">
-   {selected?<ResponsiveChatPortal><div className="vrm-chat-overlay vrm-chat-inline"><div ref={chatPanel} className="vrm-chat-panel" role="dialog" aria-label="Conversation eBay" style={{display:'flex',flexDirection:'column',background:C.card,overflow:'hidden'}}>
-    <div style={{display:'flex',gap:8,padding:12,borderBottom:`1px solid ${C.border}`}}><div style={{flex:1,minWidth:0}}><b style={{fontSize:14}}>{selected.sender || 'Acheteur'}</b><div style={{fontSize:11,color:C.muted}}>{selected.titre || selected.subject}</div></div><button type="button" aria-label="Fermer la conversation eBay" onClick={fermerConversation} style={S.button}>×</button></div>
-    {codesRetraitEbay([selected.body,...(selected.responses || [])]).length>0 && <div style={{display:'flex',flexWrap:'wrap',gap:6,padding:8}}>{codesRetraitEbay([selected.body,...(selected.responses || [])]).map(code=><button key={code} type="button" aria-label={`Copier le code eBay ${code}`} style={S.button} onClick={async()=>{try{await navigator.clipboard.writeText(code);setCodeCopie(code);}catch(_){setCodeCopie('erreur');}}}>{code} · {codeCopie===code?'Copié':'Copier'}</button>)}{codeCopie==='erreur' && <span role="status" style={{fontSize:11}}>Copie indisponible. Le code reste visible.</span>}</div>}
-    <input type="search" aria-label="Rechercher dans la conversation eBay" placeholder="Rechercher un message ou un code…" value={historySearch} onChange={e=>setHistorySearch(e.target.value)} style={{...S.input,flexShrink:0}}/>
-    <div className="vrm-chat-history" style={{flex:1,overflow:'auto',padding:14,display:'grid',alignContent:'start',gap:10}}>{corpsLisible(selected.body).toLowerCase().includes(historySearch.toLowerCase()) && <div style={{padding:12,border:`1px solid ${C.border}`,borderRadius:10,fontSize:13,whiteSpace:'pre-wrap',overflowWrap:'anywhere'}}>{corpsLisible(selected.body)}</div>}{historySearch && ![selected.body,...(selected.responses || [])].some(r=>corpsLisible(r).toLowerCase().includes(historySearch.toLowerCase())) && <p style={{fontSize:12,color:C.muted}}>Aucun message ne correspond à cette recherche.</p>}{(selected.responses || []).filter(r=>corpsLisible(r).toLowerCase().includes(historySearch.toLowerCase())).map((r,i)=><div key={i} style={{padding:12,borderRadius:10,background:C.bg,fontSize:13,whiteSpace:'pre-wrap',overflowWrap:'anywhere'}}>{corpsLisible(r)}</div>)}</div>
-    <div style={{padding:12,borderTop:`1px solid ${C.border}`,display:'grid',gap:8}}><Erreur message={message}/>{body && <small style={{color:C.muted}}>{draftOK?'Brouillon conservé dans cet onglet.':'Brouillon non sauvegardé : garde cet échange ouvert.'}</small>}<textarea aria-label="Réponse au message eBay" maxLength={2000} value={body} onChange={e=>modifierBody(e.target.value)} rows={3} placeholder="Écrire une réponse…" style={S.input}/><button type="button" style={S.button} disabled={busy || resultatIncertain.value || !body.trim() || !selected.itemId} onClick={async()=>{
-     const m=selected,texte=body;if(!await confirm({title:`Répondre à ${m.sender || 'cet acheteur'} ?`,desc:`${m.titre || m.subject}\n\n${texte}`,ok:'Envoyer la réponse',cancel:'Annuler'}))return;
-     setBusy(true);setMessage('');try{await call('repondre',{itemId:m.itemId,messageId:m.id,body:texte,confirme:true},headers,{write:true});effacerBrouillonSiIdentique(owner,compte,m.id,texte);setRows(p=>p?.map(x=>x.id===m.id?{...x,responses:[...(x.responses || []),texte]}:x));setSelected(p=>p?.id===m.id?{...p,responses:[...(p.responses || []),texte]}:p);if(selection.current===m.id){setBody(current=>current===texte?'':current);setMessage('Réponse acceptée par eBay.');}}catch(e){if(e.reason==='incertain')resultatIncertain.marquer(true);if(selection.current===m.id)setMessage(e.message);}finally{setBusy(false);}
-    }}>Envoyer la réponse</button>{resultatIncertain.value && <div style={{fontSize:12,color:C.muted}}><p>Le résultat du dernier envoi n’est pas confirmé. Relis cet échange avant une nouvelle réponse.</p><button type="button" style={S.button} disabled={busy || !selected.itemId} onClick={relireEchange}>Relire l’échange</button></div>}{!selected.itemId && <small style={{color:C.muted}}>Cet échange n’a pas d’annonce identifiée. Le contact des acheteurs d’une commande reste disponible dans Ventes.</small>}</div>
-   </div></div></ResponsiveChatPortal>:<div className="vrm-chat-empty"><span>Choisis un échange</span><small>Lis les réponses et réponds depuis VRM.</small></div>}
-  </div></div>
+   {selected?<CadreFil etiquette="Conversation eBay" onFermer={fermerConversation} refPanneau={chatPanel}>
+    <TeteFil onFermer={fermerConversation} libelleFermer="Fermer la conversation eBay" nom={selected.sender || 'Acheteur'} sensible titre={selected.titre || selected.subject} compte="eBay"/>
+    {codes.length>0 && <div style={{display:'flex',flexWrap:'wrap',gap:6,padding:8}}>{codes.map(code=><button key={code} type="button" aria-label={`Copier le code eBay ${code}`} style={S.button} onClick={async()=>{try{await navigator.clipboard.writeText(code);setCodeCopie(code);}catch(_){setCodeCopie('erreur');}}}>{code} · {codeCopie===code?'Copié':'Copier'}</button>)}{codeCopie==='erreur' && <span role="status" style={{fontSize:11}}>Copie indisponible. Le code reste visible.</span>}</div>}
+    <div style={{padding:'0 16px 8px',flexShrink:0}}><input type="search" aria-label="Rechercher dans la conversation eBay" placeholder="Rechercher un message ou un code…" value={historySearch} onChange={e=>setHistorySearch(e.target.value)} style={S.input}/></div>
+    <div className="vrm-chat-history" style={{flex:1,overflow:'auto',padding:16,display:'flex',flexDirection:'column',gap:8}}>
+     {corpsLisible(selected.body).toLowerCase().includes(q) && <BulleConv moi={false} qui="L’acheteur" texte={corpsLisible(selected.body)} quand={Date.parse(selected.date || '') || null} avecDate traduire={corpsLisible(selected.body)}/>}
+     {historySearch && ![selected.body,...(selected.responses || [])].some(r=>corpsLisible(r).toLowerCase().includes(q)) && <p style={{fontSize:12,color:C.muted}}>Aucun message ne correspond à cette recherche.</p>}
+     {(selected.responses || []).filter(r=>corpsLisible(r).toLowerCase().includes(q)).map((r,i)=><BulleConv key={i} moi qui="Toi" texte={corpsLisible(r)}/>)}
+    </div>
+    {selected.itemId ? <div className="vrm-chat-foot" style={{borderTop:`1px solid ${C.border}`,background:C.card}}>
+     <Erreur message={message}/>{body && <small style={{display:'block',color:C.muted,marginBottom:6}}>{draftOK?'Brouillon conservé dans cet onglet.':'Brouillon non sauvegardé : garde cet échange ouvert.'}</small>}
+     <RapidesConv liste={rapides()} onChoisir={modifierBody} desactive={busy}/>
+     <ComposeConv valeur={body} onChange={v=>modifierBody(String(v).slice(0,2000))} onEnvoyer={envoyer} etiquette="Réponse au message eBay" libelleEnvoyer="Envoyer la réponse" placeholder="Écris ta réponse…"
+      envoiBloque={busy || resultatIncertain.value || !body.trim() || !selected.itemId} enCours={busy} attrsChamp={{maxLength:2000}}/>
+     {resultatIncertain.value && <div style={{fontSize:12,color:C.muted}}><p>Le résultat du dernier envoi n’est pas confirmé. Relis cet échange avant une nouvelle réponse.</p><button type="button" style={S.button} disabled={busy || !selected.itemId} onClick={relireEchange}>Relire l’échange</button></div>}
+    </div> : <PiedSansEnvoi lien="https://www.ebay.fr/" texteLien="Ouvrir eBay ↗" raison="Cet échange n’a pas d’annonce identifiée : VRM ne peut pas y répondre d’ici. Le contact des acheteurs d’une commande reste disponible dans Ventes."><Erreur message={message}/></PiedSansEnvoi>}
+   </CadreFil>:<div className="vrm-chat-empty"><span>Choisis un échange</span><small>Lis les réponses et réponds depuis VRM.</small></div>}
+  </div>{!selected ? <FicheConvVolet site="ebay" etat="aucune"/> : <FicheConvVolet site="ebay" etat={paireSel?'reliee':'non-reliee'} fc={paireSel} raison="eBay ne rattache aucune annonce à cet échange : VRM ne devine pas la paire d’après le titre."/>}</div>
  </section>;
 }
 
