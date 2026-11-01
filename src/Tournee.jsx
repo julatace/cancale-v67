@@ -15,7 +15,7 @@ import './styles-tournee.css';
 
 const plur = (n, s, p) => `${n} ${n > 1 ? (p || s + 's') : s}`;
 
-function texteEtape(e) {
+function texteEtapeLong(e) {
   if (e.id === 'imprimer') {
     if (e.etat === 'passu') return { t: 'Imprimer les bordereaux', s: e.auMoins ? 'Ouvre Colis : il lit les bordereaux que l’extension a récupérés' : 'Je lis encore tes bordereaux…' };
     if (e.etat === 'rien') return { t: 'Imprimer', s: 'Aucun bordereau prêt à imprimer' };
@@ -53,6 +53,39 @@ function texteEtape(e) {
   return { t: 'Retirer', s: [pts.map((x) => `${x.nom || 'point pas encore connu'} ${x.n}`).join(' · '), presse ? `le plus pressé : ${presse.nom || 'point pas encore connu'}, ${texteJours(presse.jours, 'retrait')}` : ''].filter(Boolean).join(' · ') };
 }
 
+// (1er nov.) LE TEXTE COURT de chaque étape. Julien (1512 px) : « Imprimer 10 b… »,
+// « transporteur pa… », « Tabavap 5 · Ph… » — tout était coupé. Un titre qui dit
+// le nombre et le geste (« 10 à imprimer »), puis au plus deux lignes courtes :
+// deux noms au plus et « +N », le plus pressé. La phrase entière (`texteEtapeLong`)
+// reste dans l'infobulle et le nom du bouton. Les nombres sont ceux de l'étape.
+const deuxAuPlus = (l, f) => { const v = l.slice(0, 2).map(f); return v.join(' · ') + (l.length > 2 ? ` +${l.length - 2}` : ''); };
+// Une ligne ne se coupe qu'APRÈS un « · » ou un « : » — jamais au milieu d'un nom
+// (« Mondial / Relay », « Kusmi / Tea ») : chaque morceau reste d'un seul tenant.
+// Un morceau long (une phrase) garde ses coupures normales entre les mots.
+const morceaux = (l) => String(l).split(/(?<= [·:]) /u).map((m, k, t) => <React.Fragment key={k}><span className={m.length <= 28 ? 'vrm-tr-seg' : undefined}>{m}</span>{k < t.length - 1 ? ' ' : ''}</React.Fragment>);
+function texteEtape(e) {
+  const L = texteEtapeLong(e);
+  if (e.etat === 'passu') return { t: L.t.replace(/ les bordereaux$/, ''), s: [e.id === 'imprimer' && e.auMoins ? 'Colis les lit' : 'Lecture en cours'] };
+  if (e.etat === 'rien' || e.etat === 'fait') return { t: e.etat === 'fait' && e.n ? `${e.n} ${{ imprimer: e.n > 1 ? 'imprimés' : 'imprimé', emballer: e.n > 1 ? 'emballés' : 'emballé', deposer: e.n > 1 ? 'déposés' : 'déposé', retirer: e.n > 1 ? 'retirés' : 'retiré' }[e.id]}` : L.t.split(' · ')[0], s: [L.s] };
+  const n = e.n == null ? '' : `${e.auMoins ? 'Au moins ' : ''}${e.n} `;
+  if (e.id === 'imprimer') {
+    const deja = e.n - e.reste;
+    return { t: `${n}à imprimer`, s: [deja > 0 ? `${deja} déjà imprimé${deja > 1 ? 's' : ''}` : 'Prêts à imprimer', (e.parTransporteur || []).length ? deuxAuPlus(e.parTransporteur, (x) => `${x.nom} ${x.n}`) : ''].filter(Boolean) };
+  }
+  if (e.id === 'emballer') {
+    const nums = e.numeros || [];
+    return { t: `${n}à emballer`, s: [nums.length ? nums.slice(0, 3).map((x) => `N°${x}`).join(' · ') + (nums.length > 3 ? ` +${nums.length - 3}` : '') : 'Aucune n’a encore de N°', e.sansNumero && nums.length ? `${e.sansNumero} sans N°` : ''].filter(Boolean) };
+  }
+  if (e.id === 'deposer') {
+    const d = e.depots || [];
+    const presse = d.filter((x) => x.jours != null).sort((a, b) => a.jours - b.jours)[0];
+    return { t: `${n}à déposer`, s: [deuxAuPlus(d, (x) => `${x.nom || 'sans transporteur'} ${x.n}`), presse ? { t: `Le plus pressé : ${texteJours(presse.jours, 'depot')}`, ambre: presse.jours <= 1 } : ''].filter(Boolean) };
+  }
+  const pts = e.points || [];
+  const presse = pts.filter((x) => x.jours != null).sort((a, b) => a.jours - b.jours)[0];
+  return { t: `${n}à retirer${pts.length > 1 ? ` · ${pts.length} relais` : ''}`, s: [deuxAuPlus(pts, (x) => `${x.nom || 'point pas connu'} ${x.n}`), presse ? { t: `${presse.nom ? presse.nom + ' : ' : ''}${texteJours(presse.jours, 'retrait')}`, ambre: presse.jours <= 1 } : ''].filter(Boolean) };
+}
+
 function Pastille({ e, i }) {
   if (e.etat === 'fait') return <span className="vrm-tr-pastille is-fait" aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18"><path d="M5 12.5l4.2 4.2L19 7" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"/></svg></span>;
   return <span className={'vrm-tr-pastille' + (e.courante ? ' is-courante' : '')} aria-hidden="true">{i + 1}</span>;
@@ -66,18 +99,26 @@ export function CarteTournee({ tournee, nArrets = 0, onEtape, onOuvrirTournee })
       <header className="vrm-tr-tete">
         <h2 className="vrm-tr-titre">Ta tournée</h2>
         <span className="vrm-tr-compte">{tournee.faites} sur {etapes.length} faite{tournee.faites === 1 ? '' : 's'}</span>
+        {nArrets > 0 && (
+          <button type="button" className="vrm-tr-ouvrir-lien" data-tournee-ouvrir="" onClick={onOuvrirTournee}>Voir la tournée · {plur(nArrets, 'arrêt')} <span aria-hidden="true">›</span></button>
+        )}
       </header>
       <ol className="vrm-tr-etapes">
         {etapes.map((e, i) => {
           const tx = texteEtape(e);
+          const lg = texteEtapeLong(e);
           return (
             <li key={e.id} className={'vrm-tr-etape is-' + e.etat} data-tournee-etape={e.id} data-etat={e.etat} data-n={e.n == null ? '' : String(e.n)} data-courante={e.courante ? '1' : undefined}>
-              <button type="button" className="vrm-tr-bouton" title={`${tx.t} — ${tx.s}${e.id === 'emballer' && e.numeros.length ? ' : N°' + e.numeros.join(', N°') : ''}`} onClick={() => onEtape && onEtape(e.id)}
-                aria-label={`Étape ${i + 1}, ${tx.t}${e.etat === 'fait' ? ', faite' : ''} — ${tx.s}`}>
+              <button type="button" className="vrm-tr-bouton" title={`${lg.t} — ${lg.s}${e.id === 'emballer' && e.numeros.length ? ' : N°' + e.numeros.join(', N°') : ''}`} onClick={() => onEtape && onEtape(e.id)}
+                aria-label={`Étape ${i + 1}, ${lg.t}${e.etat === 'fait' ? ', faite' : ''} — ${lg.s}`}>
                 <Pastille e={e} i={i}/>
                 <span className="vrm-tr-texte">
                   <span className="vrm-tr-t">{e.etat === 'passu' ? <>{tx.t} <span className="vrm-tr-passu">—</span></> : tx.t}</span>
-                  <span className="vrm-tr-s">{tx.s}</span>
+                  {/* Le plus pressé passe en ambre (aujourd'hui, demain ou dépassé) : c'est ce que
+                      disait la couleur des cases « À envoyer » / « À retirer » que la Tournée remplace. */}
+                  {tx.s.map((l, k) => l && typeof l === 'object'
+                    ? <span key={k} className={'vrm-tr-s' + (l.ambre ? ' is-ambre' : '')} data-tournee-presse={l.ambre ? '' : undefined}>{morceaux(l.t)}</span>
+                    : <span key={k} className="vrm-tr-s">{morceaux(l)}</span>)}
                   {e.id === 'emballer' && e.etat === 'afaire' && e.numeros.length > 0 && (
                     <span className="vrm-tr-numeros" data-tournee-numeros={e.numeros.join(',')}>
                       {e.numeros.slice(0, 8).map((n, k) => <span key={n + ':' + k} className="vrm-tr-num">N°{n}</span>)}
@@ -92,14 +133,6 @@ export function CarteTournee({ tournee, nArrets = 0, onEtape, onOuvrirTournee })
           );
         })}
       </ol>
-      {nArrets > 0 && (
-        <div className="vrm-tr-pied">
-          <button type="button" className="vrm-tr-ouvrir" data-tournee-ouvrir="" onClick={onOuvrirTournee}>
-            <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M9 4L3 6.5v13.5l6-2.5 6 2.5 6-2.5V4l-6 2.5L9 4zM9 4v13.5M15 6.5V20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round"/></svg>
-            Voir la tournée · {plur(nArrets, 'arrêt')}
-          </button>
-        </div>
-      )}
     </section>
   );
 }

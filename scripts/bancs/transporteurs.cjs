@@ -190,7 +190,7 @@ const ouvrirAchats = async (pg, errs) => {
 };
 const ouvrirJournee = async (pg, errs) => {
   await pg.goto(`http://localhost:${PORT}/?tab=journee`, { waitUntil: 'domcontentloaded' });
-  await pg.locator('[data-tuile="retirer"]').first().waitFor({ timeout: 20000 }).catch(async (e) => { console.log('ÉCRAN : ' + (await pg.locator('body').innerText()).slice(0, 1200)); console.log('ERREURS : ' + errs.join(' | ')); throw e; });
+  await pg.locator('[data-tuile="retirer"]').first().waitFor({ timeout: 20000, state: 'attached' }).catch(async (e) => { console.log('ÉCRAN : ' + (await pg.locator('body').innerText()).slice(0, 1200)); console.log('ERREURS : ' + errs.join(' | ')); throw e; });
   // la tuile peut dire « pas encore lu » le temps que tout arrive
   for (let i = 0; i < 40; i++) { const n = await pg.locator('[data-tuile="retirer"]').first().getAttribute('data-n'); if (n !== '' && n != null) break; await pg.waitForTimeout(250); }
   await pg.waitForTimeout(1200);

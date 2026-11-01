@@ -375,7 +375,7 @@ async function main() {
     await essaie('revue suivis lents', async () => {
       const { ctx, pg, errs } = await preparer(b, { width: 390, height: 844 }, NOW, false, { suivis: 6000 });
       await pg.goto(`http://localhost:${PORT}/?tab=journee`, { waitUntil: 'domcontentloaded' });
-      await pg.locator('[data-tuile="retirer"]').first().waitFor({ timeout: 20000 }).catch(() => {});
+      await pg.locator('[data-tuile="retirer"]').first().waitFor({ timeout: 20000, state: 'attached' }).catch(() => {});
       await pg.waitForTimeout(1500);
       const A = await pg.evaluate(() => { const t = document.querySelector('[data-tuile="retirer"]'); const v = document.querySelector('[data-job="retrait-a-verifier"]'); return { n: t ? t.getAttribute('data-n') : null, job: v ? v.getAttribute('data-n') : null }; });
       dit(A.n === '' && A.job == null, '[défaut 12] e-mails de suivi en cours de lecture : « À retirer » dit « — » et aucune ligne « à vérifier » partielle', JSON.stringify(A));

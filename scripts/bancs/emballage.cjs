@@ -256,8 +256,13 @@ async function main() {
       if (vp.width === 390) await essaie('H', async () => {
         const { ctx, pg, errs } = await preparer(b, vp, 'journee');
         let job = null;
-        for (let i = 0; i < 40 && !job; i++) { job = await pg.$('[data-job="emballer"]'); if (!job) await pg.waitForTimeout(400); }
-        dit(!!job, `H ${T} Ma journée propose « Emballer les colis prêts »`);
+        // (1er nov.) Quand la Tournée est là, c'est SON étape « Emballer » qui ouvre la
+        // séance (la ligne « Emballer les colis prêts » n'est plus redite, §7) ; sans
+        // Tournée, la ligne d'« À faire ». Le même geste, le même mode.
+        for (let i = 0; i < 40 && !job; i++) { job = await pg.$('[data-job="emballer"]') || await pg.$('[data-tournee-etape="emballer"][data-etat="afaire"] button'); if (!job) await pg.waitForTimeout(400); }
+        const parTournee = !!job && !(await pg.$('[data-job="emballer"]'));
+        dit(!!job, `H ${T} Ma journée propose d'emballer les colis prêts${parTournee ? ' (étape Emballer de la Tournée)' : ''}`);
+        if (parTournee) dit(!(await pg.$('[data-job="emballer"]')), `H ${T} … une seule fois : pas de ligne « Emballer » en plus de l'étape`);
         if (job) {
           await job.click();
           await pg.waitForSelector('[data-emballage]', { timeout: 15000 }).catch(() => {});
