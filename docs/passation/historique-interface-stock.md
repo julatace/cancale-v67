@@ -2185,3 +2185,204 @@ la relecture des achats n'est payée que quand il sert. **Achats** ne montre plu
 plus la ligne « N colis à retirer → Colis » (`data-achats-vers-colis`, `pickupUnion.total`, seulement e-mails
 lus). Banc `navigation-tache.cjs` (K) mis à jour : 163 verts ; mutations (entrée remise, étape « À retirer »
 remise dans Achats, `cat_achats` qui ne mène plus au détail) ⇒ rouges.
+
+## 1er novembre 2026 — La fiche complète d'une paire (maquette « numero-B-fiche-paire » validée)
+
+**Demande** : depuis « Tout sur le N° » (et donc la vente « Fiche N° », le journal des e-mails),
+le mode emballage, une fiche qui raconte le PARCOURS de la paire par identité seulement : Achat →
+Stock → Annonce(s) → Vente → Colis → Argent ; « pas su » dit « — » + la raison ; une étape absente
+est grisée, jamais inventée.
+
+**Ce qui est fait** :
+- `rechercheParNumero(q, numData, comptes)` (App.jsx) : la lecture de `ToutSurLeNumero` sortie en
+  fonction ; le bloc de la recherche ET la fiche la lisent (une règle, §11).
+- `src/fichePaire.js` (pur) : `parcoursPaire(rn, …)` à partir du résultat de `toutSurLeNumero`
+  (N° par `cleNum`, vente Vinted par transaction → `item_id`, eBay par SKU, Leboncoin par lien/réf.).
+  La fiche de la paire = celle de l'annonce vendue (par la transaction), sinon une fiche portant
+  ce N°. `fusionEntreeVente` = la fusion d'`effEntry` (fiche ← correction posée sur la vente ←
+  prix par N°) : **`effEntry` l'appelle désormais**, plus de seconde copie. Bénéfice =
+  `beneficePaire` (l'écran Ventes) ; frais pas confirmés ⇒ « frais pas tous confirmés » sous le
+  montant (un bénéfice d'une paire aux frais inconnus est un PLAFOND, pas un plancher : on n'écrit
+  pas « au moins »). eBay : `montantRecuEbay` ; autre devise ⇒ écartée et dite. Versement :
+  transaction finalisée (450, `status_updated_at`), lu dans la MÊME réponse que le pont
+  transaction → annonce (aucune requête de plus). Ventes illisibles ⇒ vente, colis, argent « pas
+  su » (jamais « pas encore vendue »).
+- La coque lit `numData` quand la recherche OU la fiche est ouverte (`besoinNumData`) ; elle y
+  ajoute les vues/favoris des annonces lues (`stats`, un nombre seulement s'il est écrit), les
+  dates de versement et le compte de chaque vente (`_uid`).
+- `src/FichePaire.jsx` + `src/styles-fiche-paire.css` : portail plein écran, « ‹ Tout sur le N° »
+  (retour au bloc de recherche), grand N° mono, trois tuiles Achat / Vente / Bénéfice (« — » quand
+  pas su), frise (pastille pleine à l'encre = lue ; au trait, gris = pas su ou pas arrivée), et
+  « Bordereau » / « Emballer » quand la vente est à poster. Rouge seulement pour deux paires sous
+  ce N°. Ouverture : événement `vrm:fiche-paire` (bouton « Toute l'histoire du N° » de
+  `ToutSurLeNumero`, lien du mode emballage).
+
+**Preuves** : banc `scripts/bancs/fiche-paire.cjs` (390 + 1512, 48 contrôles) : N°117 complet
+(achat 52 € relié, Meuble B, vendue 95 € par SA transaction, colis livré, versé, +43 € « frais pas
+tous confirmés ») ; N°118 partiel (en ligne, 14 fav., 150 vues ; le reste grisé, « — ») ; 50 paires
+au même titre : N°227 = 36 € + tx 9226, N°228 = 37 € sans vente, N°211 = tx 9210 ; ventes en panne
+⇒ « pas su » ; recherche → fiche → retour. Sur `origin/main` : 9 rouges. Mutations rouges : fiche
+choisie par titre (C), ventes inconnues prises pour « pas vendue » (D).
+Non fait (pour ne pas croiser les chantiers parallèles du tiroir de vente et des cartes
+d'annonce) : un bouton « parcours » direct sur la carte d'annonce et la carte de colis — on y
+arrive par « Fiche N° » → « Toute l'histoire du N° ». Le reçu d'achat n'est pas relu ici (il vit
+dans Achats) : l'étape dit seulement « achat relié par son n° de transaction ».
+
+**Geste de Julien** : aucun. Taper un N° dans la recherche → « Toute l'histoire du N° ».
+## 1er novembre 2026 — Ma journée « Tournée » ; Ventes : bénéfice sur la ligne et « Déposé » au glissé
+
+Maquettes validées : `journee-A-tournee`, `journee-mode-tournee`, `ventes-B-journal`, `ventes-ordi`.
+
+**La tournée (Ma journée, en tête, après les alertes qui coûtent de l'argent)** — `src/tournee.js` (règle pure),
+`src/Tournee.jsx` (carte + plein écran), `src/styles-tournee.css`. Quatre étapes, AUCUNE règle de comptage neuve :
+- ① **Imprimer** : les lignes de « Imprimer les N prêts » de Colis (`lignesLot`). Ma journée ne lit pas les
+  bordereaux captés par l'extension (choix du 8 sept., coût) : comme la case « À envoyer », le nombre publié par
+  Colis (`vrm_colis_prets`) s'il parle du même lot, sinon « au moins ». Toucher l'étape ouvre l'impression
+  EXISTANTE (drapeau `_pendingBordPrint`, le même que `?print=bord`). Cochée quand tous les prêts sont imprimés
+  par VRM (`vinted_bords_printed`) — jamais tant que le nombre est « au moins ».
+- ② **Emballer** et ③ **Déposer** : `toShip` + ventes eBay à poster — le nombre de la case « À envoyer » =
+  `vrm_colis_aposter`. Les N° des paires dans l'ordre de leur date limite (⛔ jamais par emplacement, refusé le
+  11 oct.). Déposer regroupe par transporteur (lu sur la FORME du n° de suivi du bordereau,
+  `transporteurDeForme`) ; le point de dépôt n'est relié à un colis par aucune identité : jamais deviné. Les
+  deux se cochent quand plus rien n'est à poster ET qu'un colis a été marqué déposé aujourd'hui
+  (`vinted_ship_done`) : rien ne garde la trace de l'emballage seul, c'est dit dans le code. ② ouvre le mode
+  emballage s'il existe (il répond à l'événement `vrm:ouvrir-emballage` en posant `detail.pris = true` — contrat
+  pour le chantier « mode emballage ») ; sinon Colis, colonne « Prêts ».
+- ④ **Retirer** : les points de la colonne « À retirer » (`pointsARetirer`), nombre = `pickupUnion.total` =
+  `vrm_colis_retirer`. Cochée quand plus rien à retirer ET un colis noté retiré aujourd'hui
+  (`vrm_colis_collected_at`, `vinted_pickup_done`). Ouvre Colis → « À retirer ».
+- « Pas su » ⇒ « — », jamais 0 ni coché. Rien à faire du tout ⇒ pas de carte.
+- **Plein écran** (« Voir la tournée ») : `CarteRelaisColis` (compacte, nouvelles options `sansListe` et
+  `etiquette`) avec les seuls points relais, épingle = numéro de l'arrêt ; la liste des arrêts (dépôts par
+  transporteur + points relais) rangée par **date limite la plus proche, dit « pas un itinéraire »** ; aucune
+  distance ni durée (les « 4,2 km · 22 min » de la maquette ne sont pas mesurables : retirés). « Ouvrir dans
+  Plans » sur un point relais à adresse.
+
+**Ventes (liste Vinted)** — `src/beneficeLigne.js`, `src/GlisserDepose.jsx`, `src/styles-ventes-ligne.css`.
+- **Bénéfice sur la ligne** (`LigneVenteCompacte`, prop `benef`) : la règle du tiroir (`beneficePaire` = prix −
+  achat − frais connus, celle de `vrm_benefice_jours`). Prix d'achat manquant ⇒ « — » (le geste « Prix d'achat »
+  reste sur la ligne). Frais pas confirmés ⇒ **« au plus »** : ce qui manque ne peut que BAISSER le bénéfice
+  (la demande disait « au moins » : ce serait faux dans ce sens — à trancher par Julien si besoin). Téléphone :
+  le bénéfice sous le prix ; ordinateur : colonnes Prix · Achat · Bénéfice avec leur en-tête.
+- **« Déposé »** sur une vente À EXPÉDIER seulement : glisser vers la gauche (doigt) OU le bouton « Déposé » de
+  la ligne (jamais un geste caché seul). Rien n'est écrit pendant 5 s, barre « Annuler » (⇒ rien écrit). Puis LE
+  geste « ✓ Colis fait » de Colis, factorisé en `marquerPoste(o, b)` (`vinted_ship_done` + `vinted_bords_shipped`),
+  appelé désormais par Colis aussi. Écran quitté pendant le délai : la même écriture, faite hors état React.
+
+**Mise en page et §7** : les étapes Emballer / Déposer / Retirer ne réécrivent PAS leur total (c'est le
+nombre des cases « À envoyer » / « À retirer », déjà à l'écran) — seulement les détails (N°, par transporteur,
+par point). Sur ordinateur (≥ 1024 px) la carte est UNE rangée de quatre étapes (une ligne de texte chacune,
+le détail au survol) : sinon Ma journée ne tenait plus sans défiler (banc `journee-widgets`, 966 px > 950).
+
+**Preuves** : bancs `scripts/bancs/tournee.cjs` et `scripts/bancs/ventes-benefice-glisser.cjs` (nombres calculés
+à la main dans leur en-tête), rouges sur `origin/main`, rouges sous mutation (voir le rapport de session).
+
+## 1er novembre 2026 — Quatre défauts : barre du haut, fiche d'annonce au téléphone, Colis sans nombres redits, tiroir de vente
+
+**1. La barre du haut recouvrait un filtre (banc `revendeurs`, 1512 px).** Mesuré : ce n'était pas la
+colonne de gauche mais le bouton « eBay » des filtres de site, au bout de la barre du haut, passé SOUS
+l'île d'actions (x 1364-1405 contre une île à 1376-1496 ; trois écrans : Vinted, Leboncoin, eBay). Cause :
+`--vrm-ile` était mesurée en pixels ZOOMÉS (`getBoundingClientRect`, réglage « Taille » à 0,65 sur
+`<html>`) puis appliquée en `padding-right` avant le zoom (réserve à 65 %), et les 24 px entre l'île et le
+bord n'étaient pas comptés. Désormais la réserve = du bord droit du contenu au bord gauche de l'île, divisée
+par le zoom de `.vrm-main` (`currentCSSZoom`), remesurée au zoom (observateur sur l'attribut `style` de
+`<html>`) et au redimensionnement. Collée, la barre gardait sa marge du haut : le contenu défilait dans
+cette bande (marge de 8 px et rembourrage du haut de `.vrm-main`, que Chrome laisse au-dessus d'un élément collé) — la marge devient un rembourrage, la bande se couvre du fond (ombre pleine) ; une ancre visée s'arrête sous la barre
+(`scroll-padding-top`). Banc : rouge sur `origin/main` (3 recouvrements), vert après. Le banc était aussi
+en retard sur la navigation du 31 oct. (porte « Aussi sur eBay » disparue, Colis Leboncoin en pastille,
+bulles avec l'heure dedans, trois volets de Messages) : ses chemins suivent l'app, aucune règle retirée ;
+« Tab inverse » juge maintenant le DERNIER contrôle ACTIF du fil (le micro de dictée est arrivé après le
+champ), jamais l'envoi désactivé. 213 contrôles.
+
+**2. La fiche d'annonce au téléphone (maquette Vitrine).** Fermée : photo + N° sur la photo, nom + taille,
+prix, une ligne discrète (état en clair · vues · favoris · âge), et le prix d'achat seulement s'il MANQUE
+(ambre, §7). « Plus d'actions » (44 px au doigt, `data-fiche-plus-bouton`, `aria-expanded`) déplie l'état
+en jauge, mini, refuse, boost, marge, l'achat relié, le stock, la file Leboncoin, Relier, Passeport,
+Marquer vendue — les MÊMES éléments (repliés par CSS, `data-fiche-ouverte`), mêmes écritures, mêmes
+`data-*`. L'ordinateur ne change pas (bouton caché). Bancs : `vinted-ui` juge la fiche fermée (4 contrôles,
+rouges sur main) puis dépliée ; `annonces-carte` déplie au téléphone avant de lire. Restent rouges, déjà
+rouges sur main : `vinted-ui` « achat à côté de l'état » à 390 (Vitrine empile la paire) et « Achats : le
+même calendrier » ; `annonces-carte` « recherche et retour au stock » (la barre du bas se cache clavier
+ouvert).
+
+**3. Colis : plus de nombres redits sous les colonnes.** « 4 colis à envoyer · 3 bordereaux prêts · 1 en
+attente », les intertitres « Prêts à imprimer · 3 », « Partis … · 3 » et « Où sont ces 4 articles »
+redisaient les colonnes. Le récapitulatif (même règle, mêmes « au moins » / « pas su ») reste dit au
+lecteur d'écran (`.vrm-lu-seulement`, `role=status`) — les bancs qui le lisent (colis, postes,
+formes-communes…) gardent leur juge ; restent visibles l'urgence, la ligne eBay (sans nombre), « Tout
+générer », l'imprimante, le lot, les retours, les conflits de N°. Le repli « Colis par colis » fermé sur
+ordinateur n'a PAS été fait : les cartes des colonnes y conduisent (défilement vers la carte, ancre des
+retraits) et l'impression par lot y vit.
+
+**4. Le tiroir d'une vente se conduit comme une feuille (banc `compact`).** Au téléphone la feuille du bas
+couvrait « À expédier » (le centre du bouton à 521 px, la feuille à 522). Ouvert, le tiroir : se referme sur
+un toucher de la PAGE hors de lui (le toucher atteint sa cible ; jamais dans le tiroir, sur sa ligne, ni
+dans une autre feuille ou confirmation) ; au téléphone, réserve sa hauteur au bas de la page et remonte la
+ligne ouverte au-dessus de lui. Banc : rouge sur main (« intercepts pointer events »), vert après, avec un
+contrôle neuf « un toucher hors du tiroir le referme et atteint sa cible ». Le banc jugeait aussi le repli
+« Chiffres » sur Compte eBay, passé dans Paramètres : il le juge sur Ventes.
+
+### Paramètres, arrivée guidée et communauté : « logique et simple » (1er novembre)
+
+Demande de Julien : « continue à améliorer toute l'app, tout doit être parfait, logique et
+simple d'utilisation ». Tournée de Paramètres (Réglages, Mon compte, Abonnement, chaque
+sous-écran), de l'arrivée guidée et de la Communauté, à 390 et 1512 px. Aucune fonction ni
+décision retirée (Photoroom reste sur l'écran Vestiaire ; « Compléter les prix d'achat » reste
+dans Paramètres ; « Présentation de VRM » reste retirée des Réglages, sa demande du 27 oct.).
+
+| avant | après | pourquoi |
+|---|---|---|
+| groupe « Comptes Vinted » (qui rangeait aussi eBay, emails, sécurité) | « Comptes et emails » | le titre dit ce que le groupe contient |
+| « Import des emails Vinted » sous Comptabilité | à côté de « Réception des emails » | les deux réglages des emails ensemble |
+| « Ventes et achats masqués » | « Achats masqués · Retirés de la compta, à réafficher » | une vente ne se masque plus depuis le 29 oct. |
+| « Régime fiscal » sans valeur | le statut choisi à droite, « À choisir » sinon | savoir sans ouvrir ; jamais deviné (`vinted_regime`) |
+| « Compléter les prix d'achat » sans phrase | « Saisie en série, pour un bénéfice juste » | dire à quoi sert le geste |
+| « Mode stream » muet au téléphone (`vrm-aide` cachée) | sa phrase reste visible | le libellé seul ne dit rien |
+| Notifications : « Serveur prêt à envoyer · appareil abonné » (nombre absent) au-dessus d'« Activer sur cet appareil » | le nombre seulement s'il est lu, « … en tout » | on lisait « cet appareil est abonné » |
+| message d'essai : « Réglages → Ton abonnement » | « Paramètres → Abonnement » | chemin réel |
+| « Réglages → Extension » (n'existe pas), « Réglages → Mon compte » | « Paramètres → État des connexions », « Paramètres → Mon compte » | chemins réels |
+| État des connexions : « Dernière version observée dans ma boutique », « Données de l'extension », « Données des emails », « Aucune donnée enregistrée pour cette source », « Horodatage à vérifier », « Mise à jour observée » | « Version qui a lu en dernier », « Ce que l'extension a lu », « Emails reçus », « Rien reçu pour l'instant », « Date à vérifier », « Dernière arrivée » | vocabulaire de développeur (hors Sécurité des données, qui garde le sien) |
+| Mon compte : « Photo de profil » (titre) + carte « Ta photo de profil » dans une seconde carte, lettre « V » quand l'en-tête dit « C » | une carte, la lettre de l'en-tête | double titre, double cadre, lettre venue de nulle part |
+| deux lignes « Discord » (connexion rapide, profil) | « Discord » et « Profil Discord · ton pseudo et ton avatar Discord dans VRM » | deux fonctions, deux noms |
+| Arrivée guidée : plateformes « Vinted, Leboncoin et eBay » | + Vestiaire Collective | VRM le gère depuis le 27 oct. |
+| Arrivée guidée : « Terminer » au 5ᵉ écran, puis encore un écran | « Suivant » | « Terminer » ne terminait rien |
+| Arrivée guidée sombre : texte blanc sur #6F86E8 (~3:1) | encre sombre (`onAccent` de Vitrine) | lisibilité |
+| « changer quand tu veux dans Réglages » | « … dans Paramètres → Affichage » | chemin exact |
+| Communauté : « Me retirer de la carte » sans demander | demande d'abord (sa place et « premier de ta ville » sont effacées) | comme bloquer, classement, groupe |
+
+Bancs : `reglages-premium` (+ lignes masqués/régime/import, photo de profil, push sans nombre),
+`communaute` (« Annuler » ne retire rien), `connexions-reglages`, `abonnement` (le groupe se
+reconnaît par `data-groupe-reglages`, plus par son titre), `bienvenue` et `compta-simple`
+remis sur la navigation par tâche (« Ventes », menu « Plus » : ils cherchaient « Vinted » et
+« Gestion », disparus le 31 oct.). Détail compta : historique compta (même date).
+Non fait, signalé : Communauté utilise encore les boîtes du navigateur (`window.confirm`) ;
+Republier dit « Réglages → Rédaction d'annonces par l'IA », qui n'existe pas (écran d'un autre
+chantier).
+
+## 1er novembre — Stock, Republier, Annonces (ordinateur) : gestes fréquents plus courts, chaque geste se dit
+
+Demande de Julien : « continue à améliorer toute l'app, tout doit être parfait, logique et simple
+d'utilisation ». Périmètre de cette passe : Stock, l'atelier Republier, Favoris & offres, Achats,
+Annonces sur ordinateur. Aucune règle neuve, aucune fonction retirée, aucun numéro touché.
+
+| écran | avant | après | pourquoi |
+|---|---|---|---|
+| Stock → Cases | taper le N° d'une paire à ranger disait « Aucune case ne porte la N°2 » ; Entrée la rangeait, sans le dire (placeholder « (Entrée : la ranger) ») | « N°2 n'est pas encore rangée — prochaine case libre : … » + **Ranger ici** / **Autre case** ; un N° hors stock le dit (« … n'est pas parmi tes articles en stock ») ; placeholder « Où est la N° … ? » (Entrée marche toujours) | le geste le plus fréquent (ranger une paire qu'on a en main) se faisait par une touche cachée |
+| Stock → Meubles, case vide | « Case 6 · choisis l'article » | « Rangée 2, colonne 3 · choisis l'article » (`data-placer-case`) | le reste de l'écran parle en rangée/colonne (règle du meuble, recherche, fiche) |
+| Stock → Meubles, pose | rien ne se disait (la case clignote, parfois hors de l'écran sur téléphone) | message « N°31 rangée : Étagère salon · rangée 1, colonne 2. » | retour après un geste réussi |
+| Stock → Meubles, fiche d'une paire PAS rangée | « Déplacer » et « Retirer de la case » (sans objet) | « Ranger dans une case » seul (`data-fiche-ranger`) | bouton ambigu |
+| Stock → Meubles, « Retirer de la case » / « Je l'ai sorti du stock » | rien ne se disait | « N°… retirée de … : elle repasse dans « À ranger ». » / « N°… sortie du stock — son numéro reste pris, jamais redonné. » | retour ; rappelle la règle §5 (le numéro n'est jamais redonné). « Remettre en stock » reste le chemin de retour (Achats → retours) |
+| Annonces (Vinted) | en tête : CA finalisé · Disponible · En attente (des « — » tant que rien n'est lu) + « À faire aujourd'hui » | rien de tout ça sur Annonces (la ligne de fraîcheur reste) ; Ventes · Vinted les garde | l'argent ne dit rien de la tâche « annonces », Ma journée est dans la barre ; les cartes remontent d'environ 100 px sur ordinateur |
+| Annonces, astuce N° | « Chaque article a un numéro , jamais redonné. » (l'écart d'un conteneur flex posait une espace avant la virgule) | « … un numéro, jamais redonné. » | coquille visible |
+| Republier (menu) | bouton « Republier… » ouvrait une feuille titrée « Actions sur Vinted » | feuille « Republier et brouillons » | le titre dit ce qu'on vient de toucher. Entrées, ordre (coffre → supprimer → brouillon → mise en ligne) et réglages inchangés ; rien n'est remis (« Varier », réglage photo par annonce, secours) |
+
+**Contrôles** : banc neuf `scripts/bancs/stock-gestes.cjs` (390 tactile et 1512 px, données
+inventées) — **18 rouges** sur le build d'avant (3b60a48d), vert après ; `republier.cjs` + 1 contrôle
+(l'astuce N° ne passe pas par un conteneur flex) — 2 rouges avant, vert après. Rejoués verts :
+`republier`, `stock-retrouver`, `rangement`, `stock-planches`, `stock-partis`, `navigation-tache`,
+`messages-volets`, `lbc-comme-vinted`, `achats-messages-premium`. Rouges DÉJÀ là sur 3b60a48d, non
+touchés : `stock-piece` B (« la paire choisie… rien d'autre ne bouge », `4_0:[401,402]`) et C
+(instable), `garage3d` (molette, 2 rouges). Audits tdz, variables, icones, boutons, identite,
+moteur-offres, offres-auto, republier, stock-plan : verts.
+
+**Geste de Julien** : aucun.

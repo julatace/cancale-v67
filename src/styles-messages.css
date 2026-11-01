@@ -1,7 +1,7 @@
 /* (31 oct.) MESSAGES EN VOLETS — les maquettes choisies par Julien
    (fil au téléphone, trois volets sur ordinateur). Chargée APRÈS
    styles-vitrine.css : elle n'a le dernier mot que sur l'écran Messages
-   (Vinted, et les fils eBay qui partagent `.vrm-message-workspace`).
+   (Vinted, Leboncoin, eBay et Vestiaire depuis le 1er nov. — la même composition, `LigneConv`…).
    Rien de métier ici : une seule couleur d'accent (cobalt), réservée au
    bouton Envoyer et au point « non lu » (§7). Encre pleine = LUI.
    ⚠️ Le fil est posé dans un portail sur téléphone (hors `.vrm-app-shell`) :
@@ -23,7 +23,7 @@ html body .vrm-msg-fiche { display: none; }
     background: var(--vrm-bg) !important;
     overflow: hidden;
   }
-  /* eBay partage la classe sans volet de fiche : deux colonnes. */
+  /* Un écran sans volet de fiche : deux colonnes. (1er nov.) Les quatre sites ont maintenant le leur. */
   html body .vrm-message-workspace:not(:has(> .vrm-msg-fiche)) { grid-template-columns: minmax(300px, 340px) minmax(0, 1fr) !important; }
   html body .vrm-message-workspace > .vrm-inbox-column {
     height: var(--vrm-msg-h); max-height: none !important; overflow-y: auto;
@@ -43,16 +43,16 @@ html body .vrm-msg-fiche { display: none; }
 }
 
 /* ── La liste (toutes tailles) : lignes séparées d'un filet, photo ronde ── */
-html body [data-messagerie] .vrm-msg-list { border: 0 !important; background: transparent !important; box-shadow: none !important; border-radius: 0 !important; }
-html body [data-messagerie] .vrm-msg-list .vrm-inbox-row { padding: 14px 0 !important; min-height: 76px !important; border: 0 !important; border-bottom: 1px solid var(--vrm-line) !important; background: transparent !important; border-radius: 0 !important; box-shadow: none !important; gap: 12px; }
-html body [data-messagerie] .vrm-msg-list .vrm-inbox-row.is-current { box-shadow: inset 3px 0 var(--vrm-ink) !important; padding-left: 10px !important; background: var(--vrm-card2, var(--vrm-surface)) !important; }
-html body [data-messagerie] .vrm-msg-av { width: 52px !important; height: 52px !important; border-radius: 50% !important; overflow: hidden; flex-shrink: 0; }
-html body [data-messagerie] .vrm-msg-av img { border-radius: 50% !important; }
-html body [data-messagerie] .vrm-msg-name { font-size: 15px !important; font-weight: 600 !important; }
-html body [data-messagerie] .vrm-msg-paire-t { font-size: 12px !important; color: var(--vrm-muted) !important; }
-html body [data-messagerie] .vrm-msg-extrait { font-size: 13.5px !important; }
-html body [data-messagerie] .vrm-msg-time { font-family: var(--vrm-police-mono) !important; font-size: 12px !important; color: var(--vrm-muted) !important; }
-html body [data-messagerie] .vrm-msg-dot { background: var(--vrm-accent, #2442B8) !important; }
+html body :is([data-messagerie], [data-messagerie-site]) .vrm-msg-list { border: 0 !important; background: transparent !important; box-shadow: none !important; border-radius: 0 !important; }
+html body :is([data-messagerie], [data-messagerie-site]) .vrm-msg-list .vrm-inbox-row { padding: 14px 0 !important; min-height: 76px !important; border: 0 !important; border-bottom: 1px solid var(--vrm-line) !important; background: transparent !important; border-radius: 0 !important; box-shadow: none !important; gap: 12px; }
+html body :is([data-messagerie], [data-messagerie-site]) .vrm-msg-list .vrm-inbox-row.is-current { box-shadow: inset 3px 0 var(--vrm-ink) !important; padding-left: 10px !important; background: var(--vrm-card2, var(--vrm-surface)) !important; }
+html body :is([data-messagerie], [data-messagerie-site]) .vrm-msg-av { width: 52px !important; height: 52px !important; border-radius: 50% !important; overflow: hidden; flex-shrink: 0; }
+html body :is([data-messagerie], [data-messagerie-site]) .vrm-msg-av img { border-radius: 50% !important; }
+html body :is([data-messagerie], [data-messagerie-site]) .vrm-msg-name { font-size: 15px !important; font-weight: 600 !important; }
+html body :is([data-messagerie], [data-messagerie-site]) .vrm-msg-paire-t { font-size: 12px !important; color: var(--vrm-muted) !important; }
+html body :is([data-messagerie], [data-messagerie-site]) .vrm-msg-extrait { font-size: 13.5px !important; }
+html body :is([data-messagerie], [data-messagerie-site]) .vrm-msg-time { font-family: var(--vrm-police-mono) !important; font-size: 12px !important; color: var(--vrm-muted) !important; }
+html body :is([data-messagerie], [data-messagerie-site]) .vrm-msg-dot { background: var(--vrm-accent, #2442B8) !important; }
 
 /* ── La fiche de la paire (volet de droite) ─────────────────────────── */
 html body .vrm-msg-fiche-ph { aspect-ratio: 5 / 4; width: 100%; border-radius: var(--vrm-r-md, 14px); background: var(--vrm-card2, var(--vrm-surface)); display: flex; align-items: center; justify-content: center; overflow: hidden; color: var(--vrm-muted); }
@@ -123,3 +123,9 @@ html body .vrm-chat-panel .vrm-chat-send:disabled { opacity: .45 !important; }
   html body .vrm-chat-panel .vrm-chat-foot { padding: 10px 16px calc(12px + env(safe-area-inset-bottom)) !important; border-top: 1px solid var(--vrm-line) !important; }
   html body .vrm-chat-panel .vrm-chat-compose > textarea { font-size: 16px !important; }
 }
+
+/* (1er nov.) Le pied d'un fil où VRM ne peut pas répondre (Leboncoin, un échange
+   eBay sans annonce, Vestiaire sans recette apprise) : la raison, puis LE geste
+   qui marche, en encre pleine — le cobalt reste à Envoyer (§7). */
+html body .vrm-chat-panel [data-pied-envoi="impossible"] .vrm-chat-vinted { background: var(--vrm-ink) !important; color: var(--vrm-bg) !important; min-height: 46px; border-radius: 12px; }
+html body .vrm-chat-panel [data-pied-envoi="impossible"] .vrm-chat-pied-raison b { color: var(--vrm-ink); }

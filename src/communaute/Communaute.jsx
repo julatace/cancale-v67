@@ -425,7 +425,10 @@ export default function Communaute({ headers, sombre = false, prenom = '', Ferme
   const nonLus = convs.reduce((s, c) => s + (Number(c.nonLus) || 0), 0);
   const pres = useMemo(() => (moi ? profils.filter((p) => !p.moi && distanceKm({ lat: +moi.lat, lon: +moi.lon }, { lat: +p.lat, lon: +p.lon }) <= RAYON_PRES_KM) : []), [profils]);
 
+  // (1er nov.) Se retirer SUPPRIME sa ligne (et son rang de « premier de ta ville ») :
+  // le geste demande d'abord, comme bloquer, entrer au classement ou quitter un groupe.
   const quitter = async () => {
+    if (!window.confirm('Te retirer de la carte ? Plus personne ne te verra et ta place est effacée (« premier de ta ville » compris). Tu pourras revenir quand tu veux.')) return;
     const x = await api({ action: 'quitter' });
     if (!x.ok) { setToast(x.message || PAS_SU); return; }
     setToast('Tu n’es plus sur la carte.'); lire(true);

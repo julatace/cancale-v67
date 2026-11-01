@@ -151,6 +151,9 @@
 /* Inspecteur non modal : la liste conserve sa place et reste navigable. */
 .vrm-ledger-drawer-host{display:block!important;position:fixed!important;inset:0!important;width:100%!important;height:100%!important;min-height:0!important;pointer-events:none;z-index:150;background:transparent!important;}
 .vrm-ledger-drawer-host[hidden]{display:none!important;}
+/* (1er nov.) Téléphone : la feuille d'une vente couvre le bas de l'écran ; le temps qu'elle est ouverte, la page garde
+   une marge de sa hauteur (posée par LigneVenteCompacte) pour que la ligne ouverte remonte au-dessus d'elle. */
+@media(max-width:767px){html[data-feuille-vente] .vrm-app-shell:not(.vrm-ledger-drawer-host)>.vrm-main::after{content:'';display:block;height:var(--vrm-feuille-vente,0px);pointer-events:none;}}
 .vrm-ledger-drawer{pointer-events:auto;position:absolute;right:0;top:0;bottom:0;width:min(460px,100%);display:flex;flex-direction:column;background:var(--gestion-surface);color:var(--gestion-ink);border-left:1px solid var(--gestion-line);box-shadow:-12px 0 40px #14282e20;}
 .vrm-ledger-drawer-head{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;padding:22px 20px 18px;border-bottom:1px solid var(--gestion-line);background:var(--gestion-soft);}
 .vrm-ledger-drawer-head>div{min-width:0;}

@@ -228,3 +228,54 @@ l'extension apprend la forme d'envoi (VRM → Vestiaire → Messages dit alors �
 Vestiaire »). Relire ensuite `vc_recon.schemas`, `vc_session`, `vc_envoi.dernierEssai` et la
 `forme` de `vc_fil_*` (lecture seule) : si une réponse n'a pas été reconnue, c'est là que sa
 forme est écrite.
+
+## 1er novembre — Vestiaire « parfait » : annonces en fiches, ventes par étape, compte ouvert mis en avant (extension 5.296.0)
+
+Julien : « occupe-toi des dernières modifications : les annonces Vestiaire
+Collective, les ventes, tout ça — que tout soit parfait ».
+
+- **Annonces · Vestiaire en FICHES** (`AnnoncesVestiaire`, même mise en page que
+  Leboncoin, `vrm-lbc-catalog`) : photo, titre, N° relié par IDENTITÉ seulement
+  (`vc_listings.liens` ou référence VRM-{n°}, jamais le titre), prix lu (le nom
+  de sa clé en `title`), état (en ligne · en attente de validation · vendue ·
+  retirée ; un mot inconnu recopié tel quel, aucun mot ⇒ « état non dit »).
+  « Vendue » est PROUVÉE par une vente lue du même article (`vc_ventes.productId`).
+  La fraîcheur est dite une fois en tête ; plus de 24 h ⇒ « à confirmer » avec le
+  geste (rien n'est retiré). Le résumé du boost de « Mettre une paire en vente »
+  ne répète plus le nombre d'annonces (§7).
+- **L'extension lit la fiche** (`vc-inject.js` `ficheAnnonce`, fond
+  `ficheVcAnnonce`) sur `users/me/product-listings`, par des clés dont le NOM dit
+  ce qu'elles portent : titre (name/title…), UNE photo https d'un hôte
+  vestiairecollective.com, prix + clé (cents convertis), statut court ; jamais
+  rien sous une clé de personne ; la FORME de la première annonce est rangée
+  (`vc_listings.forme`). Un champ que la réponse ne porte pas n'efface jamais un
+  plein. ⚠️ Forme jamais vue pleine chez lui : à vérifier sur sa base
+  (`vc_listings.forme`, `items.*.titre/photo/prix/statut`) après son passage.
+- **Le compte de l'onglet sur chaque ligne** : annonces, ventes et achats portent
+  `compte` (celui que l'onglet a lu sur `/users/me`, jamais un compte dit par le
+  message). Une liste ENTIÈRE d'un compte ne retire plus les annonces d'un AUTRE
+  compte ; « à expédier » lue en entier sur un compte ne retire plus « à
+  expédier » aux ventes d'un autre (un colis caché est un colis perdu).
+- **Flou par compte BRANCHÉ** (`compteVcOuvert`, `vcFloute` dans
+  src/flouCompte.js, même règle que Leboncoin) : `vc_session` de moins de 12 h,
+  extension de CE navigateur connectée et à jour ; Annonces, Ventes, Achats,
+  Messages (conversations). Ligne sans compte ⇒ jamais floutée.
+- **Ventes par ÉTAPE** (`etapeVenteVc`) : à expédier (date limite, bordereau) →
+  contrôle par Vestiaire → livrée → versée/terminée, annulée/retournée ; « paid »
+  seul (payée par l'acheteur ? versée ?) n'est PAS rangé, recopié tel quel.
+  **Aucun montant à l'écran** (ni par vente) : la raison est dite UNE fois. Le
+  montant reste rangé, compté nulle part.
+- **États** : chaque lecture Vestiaire passe par `lireBaseRelue` (relue une fois
+  sur 401/5xx/réseau) ; « pas su » dit la raison avec « Réessayer » (44 px) ;
+  « jamais lu » et « vide » disent le geste sur vestiairecollective.com ; une
+  date illisible ne donne plus « Invalid Date ».
+- Preuves : `scripts/audit-lbc-vc-lecture.cjs` (V1-V5, vrai `vc-inject.js`,
+  vrai `vc.js`, vrai `background.js`) — 9 rouges Vestiaire sur la 5.295, vert
+  après, `--prouve` 5 mutations Vestiaire rouges ; banc
+  `scripts/bancs/vestiaire-fiches.cjs` (390/1512 : fiches, étapes, aucun montant,
+  flou, sans extension, session de 20 h, 401 relu, panne « pas su ») — rouge sur
+  `origin/main`, vert après. `vestiaire`, `vestiaire-messages`, `vestiaire-colis`,
+  `vc-publier` verts.
+- **Gestes de Julien** : installer la 5.296.0 ; sur vestiairecollective.com
+  (même Chrome), ouvrir « Mes articles », « Mes ventes », « Articles à
+  expédier » une fois.

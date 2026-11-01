@@ -391,6 +391,9 @@ html .vrm-app-shell .vrm-finance-metric.is-primary * { color: var(--vrm-ink) !im
 :root[data-theme="dark"] .vrm-bienvenue {
   --b-carte: #1A1A18; --b-encre: #F2F2EE; --b-doux: #B0B0A8; --b-filet: #2E2E2B; --b-sol: #0E0E0D; --b-accent: #6F86E8;
 }
+/* (1er nov.) En sombre, le texte du bouton principal suit `onAccent` de Vitrine
+   (encre sombre) : le blanc sur #6F86E8 ne se lisait qu'à ~3:1. */
+:root[data-theme="dark"] .vrm-bienvenue-principal { color: #0E0E0D; }
 /* Le voile sous une feuille : une ombre de la page, sans flou de verre. */
 .vrm-sheet-voile { -webkit-backdrop-filter: none !important; backdrop-filter: none !important; }
 

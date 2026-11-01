@@ -45,3 +45,22 @@ test('une lecture pendue ne capte pas « Actualiser » : la suivante repart sur 
  const actualiser=await lireReceptionLeboncoin(url,h,{transport:lp.fetch,delai:100});
  assert.deepEqual(actualiser,[{data:{ventes:{x:1}}}]);assert.equal(parties,2);
 });
+
+// (1er nov.) « Plus aucune erreur pendant la lecture » : un échec PASSAGER se relit
+// UNE fois (jeton expiré renouvelé avant, base qui hoquette, réseau) ; un refus
+// net ne se relit pas ; deux échecs ⇒ « pas su » (null), jamais une liste vide.
+test('un 401 se relit une fois avec le jeton renouvelé',async()=>{
+ let n=0,jeton='vieux';const vus=[];const t=async(u,{headers})=>{n++;vus.push(headers.authorization);return n===1?{ok:false,status:401,json:async()=>({})}:{ok:true,status:200,json:async()=>[{a:1}]};};
+ const r=await lireReceptionLeboncoin('https://base.test',()=>({authorization:'Bearer '+jeton}),{transport:t,pauseRelecture:1,rafraichir:async()=>{jeton='neuf';}});
+ assert.deepEqual(r,[{a:1}]);assert.equal(n,2);assert.deepEqual(vus,['Bearer vieux','Bearer neuf']);
+});
+test('un 5xx, une coupure ou un corps tronqué se relisent une fois',async()=>{
+ for(const premier of [{ok:false,status:503,json:async()=>({})},'reseau',{ok:true,status:200,json:async()=>{throw new SyntaxError('fin');}}]){
+  let n=0;const t=async()=>{n++;if(n===1){if(premier==='reseau')throw new TypeError('Failed to fetch');return premier;}return {ok:true,status:200,json:async()=>[]};};
+  assert.deepEqual(await lireReceptionLeboncoin('https://base.test',{},{transport:t,pauseRelecture:1}),[]);assert.equal(n,2);
+ }
+});
+test('un refus net ne se relit pas ; deux échecs rendent null',async()=>{
+ let n=0;assert.equal(await lireReceptionLeboncoin('https://base.test',{},{transport:async()=>{n++;return {ok:false,status:403,json:async()=>[]};},pauseRelecture:1}),null);assert.equal(n,1);
+ n=0;assert.equal(await lireReceptionLeboncoin('https://base.test',{},{transport:async()=>{n++;return {ok:false,status:500,json:async()=>[]};},pauseRelecture:1}),null);assert.equal(n,2);
+});

@@ -89,8 +89,13 @@ async function brancher(p){
    // Une commande ouverte depuis « À traiter » s'ouvre dans Ventes · eBay, en tiroir : on le referme d'abord, comme lui.
    const fermer=p.locator('button[aria-label="Fermer les détails de la vente"]:visible');if(await fermer.count()){await fermer.first().click();await p.waitForTimeout(300);}
    if(nom==='Messages'){await plusVers('messages');await filtreSite('messages','ebay');return;}
-   if(!(await p.locator('.vrm-platform-tabs:visible').count()))await p.locator('[data-espace-site="ebay"]:visible').first().click();
-   await p.locator('.vrm-platform-tabs').getByRole('button',{name:nom,exact:true}).click();
+   // (1er nov.) Depuis le 31 oct. (soir) les sections d'eBay sont des sous-onglets des tâches : « À traiter » et
+   //    « Offres » dans Ventes · eBay, « Compte » dans Paramètres (la porte « Aussi sur eBay » n'existe plus).
+   if(nom==='Compte'){await p.goto(base+'/?tab=plat_ebay&section=compte');await p.getByText('Compte eBay relié',{exact:true}).waitFor();return;}
+   const seg=p.locator('.vrm-platform-tabs:visible').getByRole('button',{name:nom,exact:true});
+   //    (Le lien de la tâche plutôt que la barre du bas : elle se cache le temps qu'une conversation se referme.)
+   if(!(await seg.count())){/* une conversation qui se referme fait « retour » dans l'historique : un chargement lancé au même instant est annulé (ERR_ABORTED) — on attend qu'elle soit partie, et on relance une fois. */await p.getByRole('dialog',{name:'Conversation eBay'}).waitFor({state:'detached',timeout:3000}).catch(()=>{});await p.waitForLoadState('load');await p.goto(base+'/?tab=plat_ebay').catch(()=>p.goto(base+'/?tab=plat_ebay'));await p.locator('[data-tache="ventes"][data-tache-site="ebay"]').waitFor();}
+   await p.locator('.vrm-platform-tabs:visible').getByRole('button',{name:nom,exact:true}).first().click();
   };let writes=[],commandeWrites=[],modeMessageCommande='refuse',modeReponse='refuse',lectureMessageFausse=false,messageCommandePret,libererMessageCommande;
   await p.route('**/api/ebay',async r=>{const body=r.request().method()==='POST'?r.request().postDataJSON():{};const a=body.action;let j={ok:true,connected:true,ready:true,canConsent:true};
    if(a==='status')j={ok:true,connected:true,comptes:[{cle:'',ref:'principal',principal:true,pseudo:'Compte de banc',relie:true}]};
@@ -121,7 +126,8 @@ async function brancher(p){
     await p.waitForFunction(()=>{const svg=document.querySelector('[data-courbe-semaine]');return svg&&Math.abs(Number(svg.getAttribute('width'))-svg.parentElement.clientWidth)<2;},null,{timeout:5000});
     await p.waitForTimeout(200);
     const bar=await p.locator('[data-barre-jour]').boundingBox(),recent=await p.locator('.vrm-day-recent').boundingBox(),stock=await p.locator('.vrm-day-stock').boundingBox();
-    check(bar.y<160,'actions quotidiennes en haut à densité '+zoom);
+    // (1er nov.) La rangée « Tournée » passe au-dessus de la barre du jour : la barre reste dans le haut de l'écran (proportionnel à la densité).
+    check(bar.y<240*zoom,'actions quotidiennes en haut à densité '+zoom);
     check(stock.x>=recent.x+recent.width-1,'stock à droite des dernières ventes '+zoom);
     check(stock.y+stock.height<900 && recent.y+recent.height<900,'vue globale visible sans défilement '+zoom);
     check(await p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'journée sans débordement '+zoom);
@@ -320,12 +326,14 @@ async function brancher(p){
   await ongletBas('ventes');await filtreSite('ventes','leboncoin');
   await plusVers('messages');
   check(await p.locator('[data-tache="messages"]').getAttribute('data-tache-site')==='vinted' && await p.locator('[data-conv="71"]').count()===1, 'messages Vinted retrouvés en revenant sur Messages');
-  await p.goto(base+'/?tab=messages&site=vinted');await p.locator('[data-tache="messages"][data-tache-site="vinted"]').waitFor();await p.getByText('Client Vinted',{exact:true}).click();await p.getByText('Bonjour depuis Vinted',{exact:true}).waitFor();
-  check(await p.getByText('Merci pour votre achat',{exact:true}).isVisible(),'historique Vinted complet capté');check((await p.locator('.vrm-chat-panel').innerText()).includes('456789'),'code de retrait numérique conservé');
+  // (1er nov.) La bulle porte son heure DANS le même bloc (« Bonjour depuis Vinted 22:13 ») : le message se cherche
+  //    dans le fil (`.vrm-chat-panel`), plus en texte exact — le fil rendu était juste, le banc ne le voyait plus.
+  await p.goto(base+'/?tab=messages&site=vinted');await p.locator('[data-tache="messages"][data-tache-site="vinted"]').waitFor();await p.getByText('Client Vinted',{exact:true}).click();await p.locator('.vrm-chat-panel').getByText('Bonjour depuis Vinted').waitFor();
+  check(await p.locator('.vrm-chat-panel').getByText('Merci pour votre achat').isVisible(),'historique Vinted complet capté');check((await p.locator('.vrm-chat-panel').innerText()).includes('456789'),'code de retrait numérique conservé');
   rows.find(x=>x.id==='harvest_111_conv_71').data.payload.conversation.messages=[{id:901,entity_type:'message',created_at_ts:1700000003,entity:{user_id:22,body:'Nouveau message capturé'}}];
   await p.evaluate(()=>window.dispatchEvent(new CustomEvent('vrm:ext',{detail:{type:'maj',quoi:'messages',uid:'111',conv:'71'}})));
-  await p.getByText('Nouveau message capturé',{exact:true}).waitFor();
-  check(await p.getByText('Merci pour votre achat',{exact:true}).isVisible(),'capture partielle conserve l’historique déjà ouvert');
+  await p.locator('.vrm-chat-panel').getByText('Nouveau message capturé').waitFor();
+  check(await p.locator('.vrm-chat-panel').getByText('Merci pour votre achat').isVisible(),'capture partielle conserve l’historique déjà ouvert');
   check((await p.locator('.vrm-chat-panel').innerText()).includes('456789'),'capture partielle conserve le code de retrait');
   await p.setViewportSize({width:1512,height:900});await p.waitForTimeout(200);
   const gauche=await p.locator('.vrm-inbox-column').boundingBox(), droite=await p.locator('.vrm-chat-column').boundingBox();
@@ -370,7 +378,10 @@ async function brancher(p){
   await p.waitForFunction(()=>document.querySelector('[aria-label="Conversation eBay"]')?.getAttribute('aria-modal')==='true');
   check(await p.locator('main').evaluate(e=>getComputedStyle(e).overflow==='hidden'),'retour mobile rétablit le défilement bloqué');
   await p.getByLabel('Fermer la conversation eBay').focus();
-  await p.keyboard.press('Shift+Tab');check(await p.getByLabel('Réponse au message eBay').evaluate(e=>e===document.activeElement),'Tab inverse reste dans la conversation et ignore envoyer désactivé');
+  // (1er nov.) Le fil eBay a désormais le micro de dictée APRÈS le champ (composition partagée, « messages-sites ») :
+  //  c'est un vrai contrôle. La règle ne change pas : Tab inverse depuis le premier contrôle va au DERNIER contrôle
+  //  ACTIF de la conversation (jamais l'envoi désactivé, jamais hors du fil) — jugé sur l'ordre réel, pas sur un nom.
+  await p.keyboard.press('Shift+Tab');check(await p.getByRole('dialog',{name:'Conversation eBay'}).evaluate(d=>{const a=document.activeElement;const actifs=[...d.querySelectorAll('button,input,select,textarea,a[href],[tabindex]')].filter(el=>!el.disabled&&el.tabIndex>=0&&el.getClientRects().length>0);const envoi=d.querySelector('.vrm-chat-send');return d.contains(a)&&!a.disabled&&a===actifs[actifs.length-1]&&!!envoi&&envoi.disabled&&a!==envoi;}),'Tab inverse reste dans la conversation et ignore envoyer désactivé');
   await p.keyboard.press('Escape');check(await p.getByRole('dialog',{name:'Conversation eBay',exact:true}).count()===0,'Échap ferme la conversation');
   check(await p.getByRole('button',{name:/Acheteur test Question/}).evaluate(e=>e===document.activeElement),'fermeture rend le focus à l’échange');
   check(await p.locator('main').evaluate(e=>getComputedStyle(e).overflow!=='hidden'),'défilement arrière restauré à la fermeture');
@@ -414,16 +425,20 @@ async function brancher(p){
   await p.getByRole('button',{name:/Message de la paire/}).click();await p.getByRole('dialog',{name:'Conversation eBay',exact:true}).waitFor();
   check(await p.getByLabel('Réponse au message eBay').inputValue()==='Merci pour votre message','raccourci ouvre le bon message et retrouve le brouillon refusé');
   await p.getByLabel('Réponse au message eBay').fill('Brouillon de la première paire');
+  // (1er nov.) Trois volets : la LISTE montre aussi le dernier message (« Bonjour, disponible ? ») — la recherche
+  //  juge le FIL (le dialogue « Conversation eBay »), où le message est d'abord présent, puis masqué.
+  const filEbay=p.getByRole('dialog',{name:'Conversation eBay'});
+  check(await filEbay.getByText('Bonjour, disponible ?',{exact:true}).count()===1,'le message de l’acheteur est dans le fil avant la recherche');
   await p.getByLabel('Rechercher dans la conversation eBay').fill('001234');
   check(await p.getByText('Code de retrait : 001234',{exact:true}).isVisible(),'recherche dans le contenu de la conversation');
-  check(await p.getByText('Bonjour, disponible ?',{exact:true}).count()===0,'recherche masque les messages sans correspondance');
+  check(await filEbay.getByText('Bonjour, disponible ?',{exact:true}).count()===0,'recherche masque les messages sans correspondance');
   await p.evaluate(()=>{Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:async v=>{window.__codeEbay=v;}}});});
   await p.getByRole('button',{name:'Copier le code eBay 001234',exact:true}).click();check(await p.evaluate(()=>window.__codeEbay)==='001234','code eBay copié avec ses zéros initiaux');
   await p.getByLabel('Fermer la conversation eBay').click();
   await p.getByRole('button',{name:/Autre acheteur Autre échange/}).click();check(await p.getByLabel('Réponse au message eBay').inputValue()==='','brouillons séparés par échange');
   await p.getByLabel('Réponse au message eBay').fill('Brouillon de la seconde paire');await p.getByLabel('Fermer la conversation eBay').click();
   await p.getByRole('button',{name:/Acheteur test Question/}).click();check(await p.getByLabel('Réponse au message eBay').inputValue()==='Brouillon de la première paire','changer d’échange conserve le brouillon');
-  await p.getByLabel('Fermer la conversation eBay').click();await p.reload();await ebaySection('Messages');await p.getByRole('button',{name:/Acheteur test Question/}).click();check(await p.getByLabel('Réponse au message eBay').inputValue()==='Brouillon de la première paire','rechargement conserve le brouillon dans cet onglet');
+  await p.getByLabel('Fermer la conversation eBay').click();await p.getByRole('dialog',{name:'Conversation eBay'}).waitFor({state:'detached'}).catch(()=>{});await p.waitForLoadState('load');await p.reload().catch(()=>p.reload());await ebaySection('Messages');await p.getByRole('button',{name:/Acheteur test Question/}).click();check(await p.getByLabel('Réponse au message eBay').inputValue()==='Brouillon de la première paire','rechargement conserve le brouillon dans cet onglet');
   await p.getByLabel('Fermer la conversation eBay').click();await ebaySection('À traiter');
   await p.getByRole('button',{name:/Paire à expédier/}).click();await p.getByText('Commande 1',{exact:true}).first().waitFor();await p.getByText('Prix d’achat à renseigner.',{exact:true}).count();
   await p.getByText('Bénéfice de l’article : à compléter',{exact:true}).click();await p.getByLabel('Prix d’achat eBay').fill('40');await p.getByLabel('Prix d’achat eBay').press('Tab');
@@ -436,7 +451,7 @@ async function brancher(p){
   await p.getByRole('button',{name:'Lire davantage de commandes',exact:true}).click();await p.getByText('4 commandes lues sur 4 pour cette lecture eBay. Lecture terminée.',{exact:true}).waitFor();await p.getByRole('button',{name:'Lire davantage de commandes',exact:true}).waitFor({state:'hidden'});check(await p.getByRole('button',{name:'Lire davantage de commandes',exact:true}).count()===0,'pagination terminée retire le bouton de suite');
   for(const width of [320,390,1512]){await p.setViewportSize({width,height:900});check(await p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'synchronisation par compte sans débordement '+width);}await p.setViewportSize({width:390,height:844});
 
-  await ebaySection('À traiter');await p.getByRole('button',{name:/Ancien échange à retrouver/}).click();await p.getByText('Message hors de la première page',{exact:true}).waitFor();check(await p.getByRole('dialog',{name:'Conversation eBay',exact:true}).isVisible(),'message absent de la première page lu directement');
+  await ebaySection('À traiter');await p.getByRole('button',{name:/Ancien échange à retrouver/}).click();await p.getByRole('dialog',{name:'Conversation eBay'}).getByText('Message hors de la première page',{exact:true}).waitFor();check(await p.getByRole('dialog',{name:'Conversation eBay',exact:true}).isVisible(),'message absent de la première page lu directement');
   await p.getByLabel('Fermer la conversation eBay').click();await ebaySection('À traiter');await p.getByRole('button',{name:/Ancienne commande à retrouver/}).click();await p.getByText('Commande old-1',{exact:true}).first().waitFor();check(await p.getByText('Actualiser la commande',{exact:true}).isVisible(),'commande absente du cache lue directement sur eBay');
   const contenu=p.getByRole('region',{name:'Articles de la commande eBay'});check(await contenu.getByText('Chargeur USB-C',{exact:true}).isVisible() && (await contenu.innerText()).includes('Quantité : 2'),'tous les articles et quantités de la commande visibles');
   await p.evaluate(()=>{Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:async v=>{window.__adresseCopie=v;}}});});
@@ -465,7 +480,7 @@ async function brancher(p){
   await ebaySection('Messages');await p.getByRole('button',{name:/Acheteur test Question/}).click();
   modeReponse='html';await p.getByRole('button',{name:'Envoyer la réponse',exact:true}).click();await p.getByRole('button',{name:'Annuler',exact:true}).locator('..').getByRole('button',{name:'Envoyer la réponse',exact:true}).click();
   await p.getByRole('button',{name:'Relire l’échange',exact:true}).waitFor();check(await p.getByRole('button',{name:'Envoyer la réponse',exact:true}).isDisabled(),'réponse réseau illisible bloque un renvoi immédiat');
-  await p.getByLabel('Fermer la conversation eBay').click();await p.reload();await ebaySection('Messages');await p.getByRole('button',{name:/Acheteur test Question/}).click();
+  await p.getByLabel('Fermer la conversation eBay').click();await p.getByRole('dialog',{name:'Conversation eBay'}).waitFor({state:'detached'}).catch(()=>{});await p.waitForLoadState('load');await p.reload().catch(()=>p.reload());await ebaySection('Messages');await p.getByRole('button',{name:/Acheteur test Question/}).click();
   check(await p.getByRole('button',{name:'Envoyer la réponse',exact:true}).isDisabled() && await p.getByRole('button',{name:'Relire l’échange',exact:true}).isVisible(),'état incertain conservé après rechargement de l’onglet');
   lectureMessageFausse=true;await p.getByRole('button',{name:'Relire l’échange',exact:true}).click();await p.waitForFunction(()=>document.body.textContent.includes('L’échange exact n’a pas pu être relu.'));check(await p.getByRole('button',{name:'Envoyer la réponse',exact:true}).isDisabled(),'lecture d’un autre échange ne débloque pas le renvoi');
   lectureMessageFausse=false;await p.getByRole('button',{name:'Relire l’échange',exact:true}).click();await p.getByText('Échange relu : vérifie les réponses avant de renvoyer.',{exact:true}).first().waitFor();
@@ -475,7 +490,8 @@ async function brancher(p){
   check(await p.getByText('Remboursement partiel à vérifier',{exact:true}).isVisible(),'remboursement partiel nommé dans la commande');
   check(await p.getByText(/Un remboursement figure sur cette commande/).isVisible() && await p.getByText(/Bénéfice de l’article/).count()===0,'bénéfice absent quand le remboursement ne peut pas être intégré');
   check(await p.getByText('Enregistrer l’expédition',{exact:true}).count()===0,'commande partiellement remboursée ne propose pas une nouvelle expédition');
-  await p.goto(base+'/?tab=plat_leboncoin&section=colis');await p.locator('.vrm-platform-tabs').getByRole('button',{name:'Colis',exact:true}).click();await p.getByText('Colis à préparer',{exact:true}).waitFor();
+  // (1er nov.) « Colis Leboncoin » est une pastille de Colis depuis le 31 oct. (soir) : l'ancien lien y mène, sans segment à toucher.
+  await p.goto(base+'/?tab=plat_leboncoin&section=colis');{const sg=p.locator('.vrm-platform-tabs:visible').getByRole('button',{name:'Colis',exact:true});if(await sg.count())await sg.first().click();}await p.getByText('Colis à préparer',{exact:true}).waitFor();
   check(await p.getByText('Colis en route',{exact:true}).isVisible(),'colis expédié conservé au suivi');check(await p.getByText('Colis finalisé',{exact:true}).count()===0,'colis finalisé retiré des colis actifs');check(await p.locator('.vrm-lbc-package').count()===1,'seul le colis non expédié propose le bordereau');
   for(const width of [320,390,1440]){await p.setViewportSize({width,height:900});check(await p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'aucun débordement colis '+width);}
   rows.push({id:'email_track_pickup1',data:{id:'pickup1',carrier:'mondial',status:'available',lieu:'Relais Centre',artTitle:'Paire crème taille 42',code:'001234',suivi:'TRACK-01',receivedAt:maintenant,limite:new Date(Date.now()+3*86400000).toISOString().slice(0,10)}},

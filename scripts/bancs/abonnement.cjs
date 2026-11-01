@@ -292,15 +292,17 @@ const boutons = (pg) => pg.evaluate(() => { const e = document.querySelector('[d
       const { ctx, pg } = await ouvrir(nav, { abo: ETATS.actif, compte: false });
       const onglets = await pg.evaluate(() => [...document.querySelectorAll('[data-onglets-reglages] [data-vue]')].map((b) => b.innerText.trim()));
       const aboAvant = await etatCarte(pg);
-      const reglagesAvant = await pg.evaluate(() => /Comptes Vinted/i.test(document.body.innerText));
+      // (1er nov.) Le groupe des comptes s'appelle « Comptes et emails » : on juge sa présence
+      // par son attribut (§6.4), plus par son titre.
+      const reglagesAvant = await pg.evaluate(() => !!document.querySelector('[data-groupe-reglages="comptes"]'));
       dit(onglets.length === 3 && /réglages/i.test(onglets[0]) && /compte/i.test(onglets[1]) && /abonnement/i.test(onglets[2]), 'les Paramètres ont trois onglets, dont « Abonnement »', onglets.join(' · '));
       dit(!aboAvant && reglagesAvant, '  par défaut « Réglages » : les réglages de l’app, pas l’abonnement', `abonnement=${aboAvant} réglages=${reglagesAvant}`);
       await pg.locator('[data-onglets-reglages] [data-vue="compte"]').click(); await pg.waitForTimeout(1200);
       const apres = await pg.evaluate(() => ({ abo: (document.querySelector('[data-abonnement]') || {}).getAttribute ? document.querySelector('[data-abonnement]').getAttribute('data-abonnement') : null,
-        email: /vendeuse@exemple\.test/.test(document.body.innerText), reglages: /Comptes Vinted/i.test(document.body.innerText), mdp: /mot de passe/i.test(document.body.innerText) }));
+        email: /vendeuse@exemple\.test/.test(document.body.innerText), reglages: !!document.querySelector('[data-groupe-reglages="comptes"]'), mdp: /mot de passe/i.test(document.body.innerText) }));
       dit(!apres.abo && apres.email && apres.mdp && !apres.reglages, '  « Mon compte » regroupe : identité, connexion — ni l’abonnement (son onglet), ni les réglages de l’app', JSON.stringify(apres));
       await pg.locator('[data-onglets-reglages] [data-vue="abonnement"]').click(); await pg.waitForTimeout(1200);
-      const abo = await pg.evaluate(() => ({ abo: (document.querySelector('[data-abonnement]') || {}).getAttribute ? document.querySelector('[data-abonnement]').getAttribute('data-abonnement') : null, reglages: /Comptes Vinted/i.test(document.body.innerText), mdp: /Changer mon mot de passe/i.test(document.body.innerText) }));
+      const abo = await pg.evaluate(() => ({ abo: (document.querySelector('[data-abonnement]') || {}).getAttribute ? document.querySelector('[data-abonnement]').getAttribute('data-abonnement') : null, reglages: !!document.querySelector('[data-groupe-reglages="comptes"]'), mdp: /Changer mon mot de passe/i.test(document.body.innerText) }));
       dit(abo.abo === 'actif' && !abo.reglages && !abo.mdp, '  « Abonnement » porte la carte de l’abonnement, et elle seule', JSON.stringify(abo));
       await ctx.close();
     });

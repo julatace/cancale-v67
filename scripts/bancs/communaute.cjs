@@ -662,6 +662,13 @@ async function partie019(nav) {
       const n = await attr(A3.pg, '[data-cm-total]', 'data-cm-total');
       dit(n === '1', 'Bruno a disparu de la carte d’Alice (elle seule)', n);
       console.log('\n── 1512 px · Alice se retire');
+      // (1er nov.) Le geste DEMANDE d'abord : « Annuler » ne retire rien.
+      let demande = '';
+      A3.pg.once('dialog', (d) => { demande = d.message(); d.dismiss(); });
+      await A3.pg.click('[data-cm-quitter]');
+      await A3.pg.waitForTimeout(800);
+      dit(!!demande && !!B.profils[A] && (await A3.pg.$('[data-cm-moi="visible"]')) !== null, '« Me retirer de la carte » demande d’abord ; « Annuler » ne retire rien', demande.slice(0, 60));
+      A3.pg.once('dialog', (d) => d.accept());
       await A3.pg.click('[data-cm-quitter]');
       await A3.pg.waitForSelector('[data-cm-moi="invisible"]', { timeout: 8000 });
       dit(!B.profils[A], '« Me retirer de la carte » : sa ligne est SUPPRIMÉE');

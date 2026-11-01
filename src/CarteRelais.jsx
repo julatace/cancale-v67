@@ -257,7 +257,10 @@ export function ColonneRetirer({ vue, C, Photo, onOuvrir, enRouteSansRelais = 0 
 
 // `compacte` (31 oct.) : posée ouverte, sans en-tête : le fond, puis une ligne
 // par point. Ailleurs elle reste repliée, comme avant.
-export default function CarteRelaisColis({ donnees, C, compacte = false }) {
+// (1er nov.) `sansListe` : le fond seul (la tournée de Ma journée liste ses
+// arrêts elle-même, dans SON ordre) ; `etiquette(p)` : le texte de l'épingle
+// (le numéro de l'arrêt) — sinon le nombre de colis, comme avant.
+export default function CarteRelaisColis({ donnees, C, compacte = false, sansListe = false, etiquette = null }) {
   const [ouverte, setOuverte] = React.useState(!!compacte);
   const [choisi, setChoisi] = React.useState('');
   const groupes = (donnees && donnees.groupes) || [];
@@ -272,14 +275,15 @@ export default function CarteRelaisColis({ donnees, C, compacte = false }) {
   const nomDe = (g) => g.nom || (g.inconnu ? 'Point pas encore connu' : g.adresseCourte || 'Point relais');
   if (compacte) return (
     <div className="vrm-relais-carte vrm-relais-compacte" data-relais-carte="ouverte" data-relais-points={groupes.length} data-relais-arrives={nArr} data-relais-attendus={nAtt} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-      {avecRepere.length > 0 && <FondRelais points={avecRepere} selection={choisi} onChoisir={setChoisi} C={C}/>}
-      {groupes.map((g) => (
+      {avecRepere.length > 0 && <FondRelais points={avecRepere} selection={choisi} onChoisir={setChoisi} C={C} etiquette={etiquette || undefined}/>}
+      {!sansListe && groupes.map((g) => (
         <div key={g.cle} data-relais-point={g.cle} data-relais-point-arrives={g.nArrives} data-relais-point-attendus={g.nAttendus} data-relais-repere={etatRepere(g)} style={{ ...muted, color: C.text }}>
           <b>{nomDe(g)}</b>{g.nArrives ? ` · ${g.nArrives} arrivé${g.nArrives > 1 ? 's' : ''}` : ''}{g.nAttendus ? ` · ${g.nAttendus} attendu${g.nAttendus > 1 ? 's' : ''}` : ''}
           {etatRepere(g) === 'non' && !g.inconnu ? <span style={{ color: C.muted }}> · pas sur la carte</span> : null}
         </div>
       ))}
-      {sansRelais > 0 && <div style={{ ...muted, fontSize: 11.5 }}>{sansRelais} achat{sansRelais > 1 ? 's' : ''} en route sans destination connue.</div>}
+      {sansListe && avecRepere.length === 0 && <div data-relais-sans-repere-tous="" style={muted}>{groupes.some((g) => etatRepere(g) === 'cherche') ? 'Je place les points sur la carte…' : 'Aucun point n’a pu être placé sur la carte : adresse incomplète ou pas trouvée sûrement.'}</div>}
+      {!sansListe && sansRelais > 0 && <div style={{ ...muted, fontSize: 11.5 }}>{sansRelais} achat{sansRelais > 1 ? 's' : ''} en route sans destination connue.</div>}
       {avecRepere.length > 0 && <div data-relais-note="" style={{ ...muted, fontSize: 10.5 }}>Fond : OpenFreeMap · © OpenMapTiles · © OpenStreetMap ; adresses : Base Adresse Nationale.</div>}
     </div>
   );

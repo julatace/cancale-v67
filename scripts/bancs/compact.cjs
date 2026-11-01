@@ -110,7 +110,13 @@ const ouvrirVente=async(p)=>{const t=p.locator('.vrm-sale-row .vrm-ledger-sale-t
       //    NOT_STARTED · IN_PROGRESS · FULFILLED) ; « NOT_FULFILLED » n'en est pas un et vaut « Expédition à
       //    confirmer ». La commande du banc porte donc NOT_STARTED (la forme réelle, comme revendeurs.cjs), et le
       //    second filtre d'eBay s'appelle « Expédiées » (doneLabel).
-      await p.getByRole('button',{name:'À expédier',exact:true}).click();await p.getByText('Paire eBay',{exact:true}).first().waitFor({timeout:5000}).catch(()=>{});check(await p.getByText('Paire eBay',{exact:true}).first().isVisible(),'NOT_STARTED reste à expédier');
+      // (1er nov.) La vente est OUVERTE (tiroir = feuille du bas au téléphone) : le filtre reste touchable au-dessus
+      //    d'elle, et ce toucher hors du tiroir le referme (comportement d'une feuille) — avant, la feuille couvrait
+      //    « À expédier » et interceptait le clic. Jugé sur l'état observé (tiroir caché), pas sur un délai.
+      check(await p.locator('.vrm-ledger-drawer-host:not([hidden])').count()===1,'vente ouverte avant le filtre');
+      await p.getByRole('button',{name:'À expédier',exact:true}).click({timeout:10000});
+      check(await p.waitForFunction(()=>!document.querySelector('.vrm-ledger-drawer-host:not([hidden])'),null,{timeout:5000}).then(()=>true,()=>false),'un toucher hors du tiroir le referme et atteint sa cible');
+      await p.getByText('Paire eBay',{exact:true}).first().waitFor({timeout:5000}).catch(()=>{});check(await p.getByText('Paire eBay',{exact:true}).first().isVisible(),'NOT_STARTED reste à expédier');
       await p.getByRole('button',{name:'Expédiées',exact:true}).click();await p.locator('.vrm-sale-row').first().waitFor({state:'detached',timeout:5000}).catch(()=>{});check((await p.locator('.vrm-sale-row').count())===0,'NOT_STARTED non expédiée');
     }
     if(process.env.BANC_CAPTURES){fs.mkdirSync(process.env.BANC_CAPTURES,{recursive:true});await p.screenshot({path:path.join(process.env.BANC_CAPTURES,'compact-'+tab+'.png')});}
@@ -166,6 +172,9 @@ const ouvrirVente=async(p)=>{const t=p.locator('.vrm-sale-row .vrm-ledger-sale-t
   //    des comptes reliés (la forme réelle, comme revendeurs.cjs — sans elle, aucun compte n'est à relire et rien
   //    ne part), et l'échec se dit par « Certaines lectures ont échoué… reprendre uniquement le compte concerné ».
   await p.getByRole('button',{name:'Actualiser',exact:true}).click();await p.getByText('Certaines lectures ont échoué. Tu peux reprendre uniquement le compte concerné.',{exact:true}).waitFor({timeout:10000});check(true,'échec actualisation expliqué');
+  // (1er nov.) « Compte eBay » vit dans Paramètres depuis la navigation par tâche (31 oct.) et n'a plus de repli
+  //    « Chiffres » : la rotation se juge sur Ventes, où le repli existe (fermé au téléphone, ouvert sur ordinateur).
+  await p.goto(base+'/?tab=cat_ventes');await p.locator('.vrm-platform-summary').first().waitFor();check(!(await p.locator('.vrm-platform-summary').first().evaluate(e=>e.open)),'chiffres repliés au téléphone avant rotation');
   await p.setViewportSize({width:1512,height:950});await p.waitForFunction(()=>document.querySelector('.vrm-platform-summary')?.open);check(true,'chiffres visibles sur ordinateur après rotation');
   check(!errors.length,'aucune erreur JavaScript');console.log(n+' contrôles compacts réussis.');
  }finally{if(b)await b.close();await new Promise(ok=>server.close(ok));}

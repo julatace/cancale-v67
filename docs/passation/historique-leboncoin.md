@@ -1177,3 +1177,52 @@ jamais rien »).
 - Geste de Julien : installer l'extension 5.294.0 (la 5.293.0 soumise à Mozilla ne
   change pas). Les références déjà effacées reviennent à la prochaine capture
   d'une page qui montre la description (l'annonce elle-même).
+
+## 1er novembre — « Il ne doit plus y avoir d'erreur pendant la lecture des données » (extension 5.296.0)
+
+Julien, mot pour mot : « pareil pour Leboncoin : il ne doit plus y avoir d'erreur
+pendant la lecture des données ».
+
+Recensé : chaque lecture Leboncoin de l'app (`src/App.jsx` : écran Leboncoin,
+Messages · Leboncoin, Favoris reçus, compte ouvert, ventes de la coque et de Ma
+journée, `lbcListingsSession`, diagnostic), du serveur (`api/email-inbound.js`
+`lireAnnoncesAilleurs`, `api/ship-reminders.js`, projections + pagination +
+`objetJson` — aucun défaut trouvé) et de l'extension (`storeLbc*`,
+`noterListeLbcComplete`, `noterDesactiveesLbc`, `noterRetraitVuLbc`, pause,
+suppression, stats, ventes, comptes, messages).
+
+Défauts trouvés et corrigés :
+1. **Fausses erreurs sur la carte de l'onglet** (`vrm-badge.js`) : la page d'une
+   transaction charge aussi des réponses qui ne sont pas des transactions
+   (`delivery-configurator-api/…/configs`, action d'un achat, étiquette) ; elles
+   passaient par `lbcVente` et posaient « Transactions : réponse reçue, format non
+   reconnu » en rouge PAR-DESSUS l'enregistrement réussi d'une seconde avant.
+   Seule une lecture de transactions (`LBC_TX_LECTURE`) note la réception ; une
+   liste rendue vide (`[]`) est « liste vide » (plus en rouge). Même chose côté
+   annonces : le flux d'accueil `dashboard/v1/search` (annonces d'autrui) ne pose
+   plus d'échec (`LBC_ANNONCES_LECTURE`), le tableau de bord pro `Ads: []` est
+   « liste vide ».
+2. **Une lecture de base passagère perdait la capture** : chaque rangement est un
+   lire-fusionner-réécrire ; un 401 (jeton qui vient d'expirer), un 5xx, un 408/429
+   ou une coupure ⇒ `null` ⇒ rien n'est écrit et la capture est perdue
+   (« enregistrement refusé »). `sbGetLbc` relit UNE fois 800 ms plus tard (jeton
+   renouvelé d'abord sur 401) ; un refus net (400/403/404) n'est pas relu ; au
+   bout, toujours « lecture KO ⇒ écriture nulle ». La carte dit « VRM n'a pas
+   répondu (relu une fois) : rien n'est perdu » au lieu de « enregistrement refusé ».
+3. **Côté app, une lecture ratée suffisait à afficher « je n'ai pas pu lire »** :
+   `lireReceptionLeboncoin` relit une fois sur 401 (jeton renouvelé par
+   `authRefresh`, en-têtes recalculés), 5xx, 408, 429, réseau ou corps tronqué ;
+   `lireBaseRelue` (App.jsx) l'applique à toutes les lectures Leboncoin et
+   Vestiaire de l'app. Messages · Leboncoin lisait `lbc_messages`/`lbc_accounts`
+   en `select=data` : projeté (§4.4). Le mémo `lbcListingsSession` (10 min) est
+   vidé à chaque « maj lbc » de l'extension (Favoris reçus montraient l'ancienne
+   lecture).
+- Vérifié, déjà juste : capture partielle qui n'écrase pas une complète (5.294,
+  `audit-fiabilite-annonces` vert), projection + pagination côté serveur.
+- Preuves : `scripts/audit-lbc-vc-lecture.cjs` (L1-L5, vrai `background.js` dans
+  `_fond-vm.cjs`, 503/401/403 servis) — 7 rouges Leboncoin sur la 5.295, vert
+  après, `--prouve` 5 mutations Leboncoin rouges ;
+  `scripts/tests/rafraichissement-leboncoin.test.mjs` (+3 tests : 401 relu avec le
+  jeton neuf, 5xx/coupure/corps tronqué relus, refus net non relu — rouges sur
+  l'ancien module) ; tous les `audit-lbc-*` et bancs Leboncoin verts.
+- Geste de Julien : installer la 5.296.0 et recharger ses onglets leboncoin.fr.

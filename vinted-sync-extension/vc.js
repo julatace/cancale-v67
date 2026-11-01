@@ -24,8 +24,13 @@
           ref: String((x && x.ref) || '').slice(0, 12),
           // 5.295 : combien de personnes l'ont mise en favori (un nombre, jamais qui).
           favoris: x && typeof x.favoris === 'number' && isFinite(x.favoris) && x.favoris >= 0 ? Math.floor(x.favoris) : null,
-          cleFavoris: String((x && x.cleFavoris) || '').slice(0, 40) }));
-        chrome.runtime.sendMessage({ from: 'cancale-vc', action: 'vcAnnonces', items, offset: Number(d.offset) || 0, total: typeof d.total === 'number' ? d.total : null, lus: Number(d.lus) || 0 }, () => { void chrome.runtime.lastError; });
+          cleFavoris: String((x && x.cleFavoris) || '').slice(0, 40),
+          // 5.296 : la fiche (titre affiché seul, une photo de Vestiaire, le prix avec sa clé, l'état tel quel).
+          titre: String((x && x.titre) || '').slice(0, 120),
+          photo: /^https:\/\/([\w-]+\.)*vestiairecollective\.com\//i.test(String((x && x.photo) || '')) ? String(x.photo).slice(0, 400) : '',
+          prix: x && x.prix && isFinite(Number(x.prix.valeur)) ? { valeur: Number(x.prix.valeur), devise: String(x.prix.devise || '').slice(0, 3), cle: String(x.prix.cle || '').slice(0, 60) } : null,
+          statut: String((x && x.statut) || '').slice(0, 40) }));
+        chrome.runtime.sendMessage({ from: 'cancale-vc', action: 'vcAnnonces', items, offset: Number(d.offset) || 0, total: typeof d.total === 'number' ? d.total : null, lus: Number(d.lus) || 0, forme: (Array.isArray(d.forme) ? d.forme : []).slice(0, 120).map((c) => String(c).slice(0, 120)) }, () => { void chrome.runtime.lastError; });
         return;
       }
       if (d.kind === 'vcventes') {

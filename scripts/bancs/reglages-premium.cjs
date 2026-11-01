@@ -167,6 +167,33 @@ async function interrupteurs(pg, T) {
           dit(m.sous.length >= 3 && m.panneauxVisibles === 0, `${T} : les panneaux longs sont derrière un chevron (rien de déplié sur la liste)`, `${m.sous.length} sous-écrans · ${m.panneauxVisibles} panneau(x) visible(s)`);
           const n = await interrupteurs(pg, T);
           if (vue === 'reglages') dit(n >= 3, `${T} : les interrupteurs de la page sont là (sombre, stream, alertes)`, `${n} vu(s)`);
+          // (1er nov.) Revue « logique et simple » : chaque ligne dit ce qu'elle porte.
+          if (vue === 'reglages') {
+            const r = await pg.evaluate(() => {
+              const m = document.querySelector('[data-reglage-masques]');
+              const g = document.querySelector('[data-reglage-regime]');
+              return {
+                masques: m ? m.innerText : null,
+                regime: g ? g.getAttribute('data-reglage-regime') : null,
+                regimeVal: g ? ((g.querySelector('.vrm-set-val') || {}).innerText || '').trim() : null,
+                importAvecEmails: !!document.querySelector('[data-groupe-reglages="comptes"] [data-sous-ouvrir="import"]') && !!document.querySelector('[data-groupe-reglages="comptes"] [data-sous-ouvrir="adresses"]'),
+              };
+            });
+            // Une vente ne se masque plus (29 oct.) : la ligne ne parle que des achats.
+            dit(r.masques != null && /achat/i.test(r.masques) && !/vente/i.test(r.masques), `${T} : la ligne des masqués ne promet plus de « ventes » masquées`, String(r.masques).replace(/\s+/g, ' '));
+            // Le régime n'est jamais deviné : pas choisi ⇒ la ligne le DIT à droite.
+            dit(r.regime === 'aucun' && !!r.regimeVal, `${T} : le régime fiscal pas choisi se voit sur sa ligne`, `${r.regime} · « ${r.regimeVal} »`);
+            dit(r.importAvecEmails, `${T} : l’import des emails est rangé avec la réception des emails`);
+          } else {
+            const p = await pg.evaluate(() => {
+              const c = document.querySelector('[data-photo-profil]');
+              const ent = document.querySelector('[data-profil-compte] .vrm-set-avatar');
+              const lettre = (e) => (e ? e.innerText : '').trim().slice(0, 1);
+              return c ? { double: !!c.closest('.vrm-set-liste'), lettre: lettre(c.querySelector('span')), tete: lettre(ent) } : null;
+            });
+            dit(!!p && !p.double, `${T} : la photo de profil n’est pas enfermée dans une seconde carte`, JSON.stringify(p));
+            dit(!!p && !!p.tete && p.lettre === p.tete, `${T} : la photo de profil a la même lettre de repli que l’en-tête`, JSON.stringify(p));
+          }
           // Chaque sous-écran : rendu, sans débordement (ni petite cible au doigt), puis retour.
           {
             for (const id of m.sous) {
@@ -193,6 +220,13 @@ async function interrupteurs(pg, T) {
                 return [...document.querySelectorAll('.vrm-set *')].filter((e) => egal(e) && vis(e) && ![...e.children].some(egal) && !e.closest('button, a, summary')).length;
               }, titre);
               dit(nTitre === 1, `${T} › « ${titre} » : le titre n’est écrit qu’une fois`, `${nTitre} fois`);
+              // (1er nov.) Le serveur n'a pas dit combien d'appareils sont abonnés : la ligne
+              // ne doit pas laisser croire que CET appareil l'est (au-dessus de « Activer »).
+              if (id === 'push') {
+                const t = await pg.evaluate(() => (document.querySelector('[data-sous-ecran="push"]') || {}).innerText || '');
+                const ligneSrv = (t.match(/Serveur prêt à envoyer[^\n]*/) || [''])[0];
+                dit(!!ligneSrv && (!/·/.test(ligneSrv) || /·\s*\d+ appareils? abonnés? en tout/.test(ligneSrv)), `${T} › « ${titre} » : aucun « appareil abonné » sans un nombre LU`, ligneSrv);
+              }
               await interrupteurs(pg, `${T} › ${titre}`);
               await pg.locator('[data-sous-retour]').click();
               await pg.waitForTimeout(500);
