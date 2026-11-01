@@ -37,7 +37,7 @@ import { numerosDeVente, annoncesEbayParNumero, annoncesLbcParNumero, doubleVent
 import { normaliserRegistre, comptesActifs } from './_lib/ebay.js';
 import { arriveLeAuRangement } from './_lib/arrivee-colis.js';
 import { limiteRetraitDepuisTexte, lieuDepuisExtrait, LIEU_AU_FUTUR } from './_lib/retrait-colis.js';
-import { codeRetraitTournure } from './_lib/code-retrait-email.js';
+import { codeRetraitTournure, nombreSurSaLigne, codeImpossible } from './_lib/code-retrait-email.js';
 import { decoderEntitesHtml } from './_lib/entites-html.js';
 import { transactionDuRecu } from './_lib/recu-achat.js';
 import { suiviDuSujet, finsDesLignes, sortiParSuivis, SELECT_TRANSP_META, ligneTranspDeMeta } from './_lib/suivi-colis.js';
@@ -907,23 +907,38 @@ export function parseCarrierEmail(mail, carrier, recuLe = new Date().toISOString
   //    Aucun transporteur observé n'utilise de lettres. On n'accepte que des chiffres.
   // (17 oct.) « Votre code de retrait EST 123456 » / « … sera 123456 » aussi :
   // un petit verbe entre le libellé et le nombre faisait manquer le code.
-  let code = (all.match(/(?:code\s+(?:de\s+)?(?:retrait|r[ée]ception|livraison)|pin)[\s*_\-–—]*(?:(?:est|sera)\b)?[\s*_\-–—]*[:：]?[\s*_\-–—]*(\d{4,10})\b/i) || [])[1] || null;
+  // (1er nov., audit des codes de retrait) Trois défauts mesurés en exécutant
+  // cette fonction (scripts/audit-codes-retrait.cjs) :
+  //   · « pin » était cherché DANS les mots (« Offre Lapin 2026 » au-dessus du
+  //     vrai code donnait le code 2026) ⇒ `\bpin\b` ;
+  //   · un libellé seul sur sa ligne prenait le nombre de la ligne d'après,
+  //     même « 56000 Vannes » ⇒ `nombreSurSaLigne` (le nombre doit y être SEUL) ;
+  //   · DEUX codes différents dans le même e-mail : le premier était pris, sans
+  //     savoir s'il est celui de CE n° de suivi ⇒ aucun (« code pas lu », l'app
+  //     renvoie à l'e-mail — mieux vaut un blanc qu'un faux).
+  const codesLus = [...new Set([...all.matchAll(/(?:code\s+(?:de\s+)?(?:retrait|r[ée]ception|livraison)|\bpin\b)[\s*_\-–—]*(?:(?:est|sera)\b)?[\s*_\-–—]*[:：]?[\s*_\-–—]*(\d{4,10})\b/gi)]
+    .filter((m) => nombreSurSaLigne(all, m)).map((m) => m[1]))];
+  const codesMultiples = codesLus.length > 1;
+  let code = codesLus.length === 1 ? codesLus[0] : null;
   // (22 oct.) Chronopost Pickup : « communiquez le code de retrait SUIVANT au
   // commerçant : 123456 » — règle partagée avec l'app (api/_lib/code-retrait-email.js).
-  if (!code) code = codeRetraitTournure(all) || null;
-  if (!code) {
+  if (!code && !codesMultiples) code = codeRetraitTournure(all) || null;
+  if (!code && !codesMultiples) {
     const m = all.match(/\bcode\s*[:\-]\s*(\d{4,10})\b/i);
     // garde-fou : ne pas confondre avec un code postal
-    if (m && !/postal/i.test(all.slice(Math.max(0, m.index - 14), m.index + 4))) code = m[1];
+    if (m && nombreSurSaLigne(all, m) && !/postal/i.test(all.slice(Math.max(0, m.index - 14), m.index + 4))) code = m[1];
   }
   // ⚠️ VINTED GO : code ALPHANUMÉRIQUE « C49341 » (mesuré sur un vrai email,
   //    2 oct. : « saisis le code suivant : C49341 »). On n'acceptait que des
   //    CHIFFRES — pour ne pas capter le mot « suivant » (bug Chronopost). On
   //    autorise donc 1-2 LETTRES SUIVIES de chiffres (« suivant », tout lettres,
   //    ne peut pas matcher) et seulement près d'un déclencheur « code ».
-  if (!code) {
-    const m = all.match(/(?:code\s+(?:de\s+)?(?:retrait|r[ée]ception|livraison|suivant)|saisis?\s+le\s+code(?:\s+suivant)?)[\s*_:：\-–—]*([A-Z]\d{3,10})\b/i);
-    if (m) code = m[1].toUpperCase();
+  // (1er nov.) Le commentaire dit « 1-2 lettres » mais le motif n'en prenait
+  // qu'une, et un code tout en chiffres après « saisis le code suivant » était
+  // manqué : la même forme que l'extension (`CODE_APRES`) et l'app (`codeRetrait`).
+  if (!code && !codesMultiples) {
+    const m = all.match(/(?:code\s+(?:de\s+)?(?:retrait|r[ée]ception|livraison|suivant)|saisis?\s+le\s+code(?:\s+suivant)?)[\s*_:：\-–—]*([A-Z]{1,2}\d{3,10}|\d{4,10})\b/i);
+    if (m && nombreSurSaLigne(all, m)) code = m[1].toUpperCase();
   }
   // ── Consigne Pickup / casier automatique (Chronopost Pickup) : le retrait se
   //    fait avec DEUX codes — un « Identifiant » ET un « Code d'ouverture » — (et
@@ -939,10 +954,10 @@ export function parseCarrierEmail(mail, carrier, recuLe = new Date().toISOString
     //    que la date limite et le lieu, eux, passaient. Au casier, sans ces deux
     //    nombres la porte ne s'ouvre pas.
     const DECOR = "[\\s*_\\-–—]*";
-    const mOuv = all.match(new RegExp(`code${DECOR}d['e’]?${DECOR}ouverture${DECOR}[:：]?${DECOR}(\\d{3,8})`, 'i'));
-    const mId = all.match(new RegExp(`identifiant${DECOR}[:：]?${DECOR}(\\d{3,8})`, 'i'));
-    if (mOuv) code = mOuv[1];   // le code d'ouverture devient le code principal
-    if (mId) code2 = mId[1];    // l'identifiant l'accompagne (les DEUX servent au casier)
+    const mOuv = all.match(new RegExp(`code${DECOR}d['e’]?${DECOR}ouverture${DECOR}[:：]?${DECOR}(\\d{3,8})(?!\\d)`, 'i'));
+    const mId = all.match(new RegExp(`identifiant${DECOR}[:：]?${DECOR}(\\d{3,8})(?!\\d)`, 'i'));
+    if (mOuv && nombreSurSaLigne(all, mOuv)) code = mOuv[1];   // le code d'ouverture devient le code principal
+    if (mId && nombreSurSaLigne(all, mId)) code2 = mId[1];    // l'identifiant l'accompagne (les DEUX servent au casier)
   }
   // Titre de l'article (permet de retrouver la photo côté achats)
   const artTitle = ((all.match(/(?:article|commande|achat)\s*[:\-]\s*([^\n]{4,70})/i) || [])[1] || '').trim() || null;
@@ -1091,6 +1106,12 @@ export function parseCarrierEmail(mail, carrier, recuLe = new Date().toISOString
     const l2 = lieuDepuisExtrait(extraitLieu);
     if (l2) lieu = l2;
   }
+
+  // (1er nov.) Un « code » qui est le n° de suivi du colis ou le code postal du
+  // lieu lu n'en est pas un (api/_lib/code-retrait-email.js, `codeImpossible`,
+  // la même règle relit les lignes déjà rangées) : aucun code plutôt qu'un faux.
+  if (code && codeImpossible(code, { suivi, lieu })) code = null;
+  if (code2 && codeImpossible(code2, { suivi, lieu })) code2 = null;
 
   // (23 oct.) « Information sur votre colis : il sera disponible dans les
   // prochains jours dans votre Relais Pickup » était rangé « disponible », avec
@@ -1959,6 +1980,24 @@ export async function traiterEmail(req, res) {
       const lecturePrecedente=await supabaseLireRow(rowId);
       if(!lecturePrecedente.lu){marquerEcritureRatee();await repondre(res,503,{ok:false,erreur:'base-injoignable'});return;}
       let prevLigne = lecturePrecedente.data || null;
+      // (1er nov., audit des codes de retrait) UN E-MAIL PROUVÉ PLUS ANCIEN NE
+      // REMPLACE PAS LE CODE D'UN PLUS RÉCENT. Le script Gmail lit sa boîte du
+      // plus récent au plus ancien (reprises, rejeux) : le « disponible » du 21
+      // (code 111111, relais A) traité APRÈS celui du 23 (colis redirigé, code
+      // 222222, relais B) réécrivait le code, le lieu et la date limite du 23 —
+      // Julien allait au relais A avec l'ancien code. Le plus récent pour CE n°
+      // gagne ; l'ancien ne fait que combler ce qui manque. Sans date d'e-mail
+      // des deux côtés, rien ne change (on ne sait pas lequel est le plus récent).
+      {
+        const emailAtNouveau = dateDeLEmail(corpsBrut);
+        const plusAncien = !!(emailAtNouveau && prevLigne && Number.isFinite(Date.parse(prevLigne.emailAt || '')) && Date.parse(emailAtNouveau) < Date.parse(prevLigne.emailAt));
+        if (plusAncien && prevLigne.status === 'available' && track.status === 'available') {
+          if (prevLigne.code) { track.code = prevLigne.code; track.code2 = prevLigne.code2 || null; }
+          if (prevLigne.qrB64 || prevLigne.qrUrl) { qr.qrB64 = prevLigne.qrB64 || null; qr.qrType = prevLigne.qrType || null; qr.qrUrl = prevLigne.qrUrl || null; }
+          if (prevLigne.lieu) track.lieu = prevLigne.lieu;
+          if (prevLigne.limite) track.limite = prevLigne.limite;
+        }
+      }
       if (track.status === 'available' || !qr.qrB64 || !qr.qrUrl || !track.code || !track.code2 || !track.lieu || !track.artTitle || !track.limite) {
         const prev = prevLigne;
         prevLigne = prev || null;
