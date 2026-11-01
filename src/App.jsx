@@ -4304,7 +4304,7 @@ const setProInvoiceStatus = async (inv, status) => {
     const filters=['status','buyerEmail','number','account','prix'].map(k=>`data->>${k}=eq.${encodeURIComponent(String(fresh[k]))}`).join('&');
     const res=await fetch(base+'&'+filters+'&select=id',{
       method:'PATCH',headers:sbAuth({'Content-Type':'application/json',Prefer:'return=representation'}),
-      body:JSON.stringify({data:{...fresh,status}}),
+      body:JSON.stringify({data:{...fresh,status,queuedAt:new Date().toISOString()}}),
     });
     if(!res.ok)return false;
     const changed=await res.json();return AUTH.user?.id===owner && Array.isArray(changed) && changed.length===1 && changed[0].id===inv._id;
@@ -4312,6 +4312,11 @@ const setProInvoiceStatus = async (inv, status) => {
 };
 function FactureSousVente({ factures, compte }) {
   const [ouvert,setOuvert]=useState(false),[choix,setChoix]=useState(''),[busy,setBusy]=useState(false),[queued,setQueued]=useState(false);
+  // (1er nov.) La file d'envoi n'est lue que pour le propriétaire de
+  // l'installation (`envoiFacturesParVRM`) : ailleurs, « Envoyer » mettait la
+  // facture « en cours d'envoi » pour toujours. Le geste n'est pas proposé.
+  const envoiVRM = useEstProprietaire();
+  if(!envoiVRM)return null;
   // Les reçus Pro du serveur attestent le compte professionnel. Aucun
   // rapprochement automatique par titre/prix : l'utilisateur choisit le reçu.
   const propres=(factures||[]).filter(i=>i.type==='facture_pro' && i.account===compte && compte);
@@ -10845,7 +10850,7 @@ function AchatsHorsPlateforme({ achats, ouvert, onBasculer, onAjouter, onModifie
             {champ('Date', <input data-champ="date" type="date" value={form.date} onChange={e => setForm(d => ({ ...d, date: e.target.value }))} style={inp} />)}
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
-            {champ('Où (facultatif)', <input data-champ="lieu" value={form.source} onChange={e => setForm(d => ({ ...d, source: e.target.value }))} placeholder="Brocante de Cancale, fournisseur…" autoComplete="off" style={inp} />)}
+            {champ('Où (facultatif)', <input data-champ="lieu" value={form.source} onChange={e => setForm(d => ({ ...d, source: e.target.value }))} placeholder="Brocante, vide-grenier, fournisseur…" autoComplete="off" style={inp} />)}
             <div className="vrm-rangee" style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 2 }}>
               {SOURCES_ACHAT_HORS.map(s => {
                 const actif = form.source.trim().toLowerCase() === s.toLowerCase();
@@ -10988,13 +10993,16 @@ function NotifsMuettes({ onNav }) {
       .catch(() => {});
     return () => { mort = true; };
   }, []);
+  // (1er nov.) La consigne Vercel ne s'adresse qu'au propriétaire de
+  // l'installation ; un autre vendeur lit que l'envoi n'est pas encore activé.
+  const proprio = useEstProprietaire();
   if (!etat || etat.pret) return null;
   return (
     <Notice tone="warn" icon="alert"
       title="Ton téléphone ne recevra aucune notification"
       value={etat.devices ? `${etat.devices} appareil${etat.devices>1?'s':''} abonné${etat.devices>1?'s':''}` : null}
-      desc="Le serveur n'a pas sa clé d'envoi : ni vente, ni colis, ni offre ne sonneront."
-      detail={"Vercel → projet cancale-v67 → Settings → Environment Variables → ajouter VAPID_PRIVATE_KEY, puis redéployer. Rouvre ensuite l'app une fois sur chaque téléphone : il se réabonne tout seul."}
+      desc={proprio ? "Le serveur n'a pas sa clé d'envoi : ni vente, ni colis, ni offre ne sonneront." : "Les notifications ne sont pas encore activées sur VRM : ni vente, ni colis, ni offre ne sonneront pour l'instant. Tu n'as rien à faire — elles arriveront d'elles-mêmes une fois activées."}
+      detail={proprio ? "Vercel → projet de l'installation → Settings → Environment Variables → ajouter VAPID_PRIVATE_KEY, puis redéployer. Rouvre ensuite l'app une fois sur chaque téléphone : il se réabonne tout seul." : undefined}
       action={onNav && <Bouton variante="secondaire" icone="gear" className="vrm-b-petit" onClick={()=>onNav('settings')}>Paramètres</Bouton>}
       style={{marginBottom:14}}/>
   );
@@ -15960,6 +15968,10 @@ const rechaufferQr = async (photo) => {
 // répond pas (au point relais, réseau faible). Une liste non vide, ou null.
 const codesHorsLigne = () => { try { const c = load('vrm_codes_hors_ligne', null); return (c && Array.isArray(c.codes) && c.codes.length) ? c : null; } catch (_) { return null; } };
 function BaseInjoignable() {
+  // (1er nov.) Les consignes Supabase ne parlent qu'au PROPRIÉTAIRE de
+  // l'installation : un autre vendeur lit que VRM est indisponible, pas qu'il
+  // doit redémarrer un projet qu'il n'a pas.
+  const proprio = useEstProprietaire();
   // ⚠️⚠️ « ÇA REVIENT TOUT SEUL » ÉTAIT FAUX LE TROISIÈME JOUR.
   // La phrase promettait une panne passagère. Le 9 septembre la base est
   // tombée et n'est PAS revenue : au bout de trois jours, l'app lui répétait
@@ -16004,7 +16016,9 @@ function BaseInjoignable() {
           Le serveur qui garde tes annonces, tes ventes et tes numéros ne répond pas.
           <b> Rien n'est perdu</b> — ni tes paires, ni tes numéros, ni ta compta : c'est la lecture qui échoue, pas tes données.
           <br/><br/>
-          {longue ? <>
+          {longue && !proprio ? <span data-panne-vendeur="">
+            <b>VRM est momentanément indisponible, réessaie dans quelques minutes.</b> Le souci est de notre côté, pas du tien : tu n'as rien à faire, et rien de ce que tu as enregistré n'est perdu.
+          </span> : longue ? <>
             Ça ne revient pas tout seul : <b>c'est ton hébergeur de données qui a un problème</b>.
             <br/><br/>
             <b>Deux boutons existent là-bas, et ce n'est pas le même selon le cas :</b>
@@ -17133,7 +17147,10 @@ function EtatActions({ onNav, ordi, sombre }) {
   const aRattraper = st.niveau === 'lecture' && code !== 'telephone' && code !== 'pause';
   const point = st.niveau === 'ok' ? C.accent : aRattraper ? C.warn : C.muted;
   const rl = etatRelais();
-  const libelle = st.niveau === 'ok' ? (st.relais ? 'Actions via ton ordinateur' : st.exception ? 'Actions possibles · sauf publier' : 'Actions possibles') : st.niveau === 'verif' ? 'Vérification…' : 'Lecture seule';
+  const libelle = st.niveau === 'ok' ? (st.relais ? 'Actions via ton ordinateur' : st.exception ? 'Actions possibles · sauf publier' : 'Actions possibles') : st.niveau === 'verif' ? 'Vérification…' : code === 'absente' ? 'Extension à installer' : 'Lecture seule';
+  // (1er nov., vendeur neuf) Avant toute installation, « Lecture seule » était la
+  // première chose lue en haut de chaque écran, sans dire de quoi : sans
+  // extension dans ce navigateur, la pastille dit le geste (même panneau, même clic).
   const court = !ordi;                       // en-tête de téléphone : peu de place
   const ink = sombre ? '#fff' : C.text, bd = sombre ? '#3A3A3C' : C.border;
 
@@ -17248,7 +17265,7 @@ function EtatActions({ onNav, ordi, sombre }) {
         style={{ '--etat-ton': point, display: 'inline-flex', alignItems: 'center', gap: 7, background: 'transparent', border: `1px solid ${bd}`, borderRadius: 999,
           padding: court ? '6px 8px' : '6px 10px 6px 11px', color: ink, cursor: 'pointer', fontSize: 12.5, fontWeight: 600, fontFamily: 'inherit', whiteSpace: 'nowrap' }}>
         <span aria-hidden="true" className="vrm-etat-point" style={{ width: 8, height: 8, borderRadius: 5, background: point, flexShrink: 0 }}/>
-        <span>{court && st.niveau === 'lecture' ? 'Lecture' : court && st.niveau === 'ok' ? (st.relais ? 'Via ton ordi' : 'Actions') : libelle}</span>
+        <span>{court && st.niveau === 'lecture' ? (code === 'absente' ? 'Extension' : 'Lecture') : court && st.niveau === 'ok' ? (st.relais ? 'Via ton ordi' : 'Actions') : libelle}</span>
         {!court && st.niveau === 'ok' && loginVinted ? <span className="vrm-etat-compte" style={{ color: C.muted, fontWeight: 500, maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis' }}>· {loginVinted}</span> : null}
         {!court ? <i className="vrm-etat-chevron" aria-hidden="true"><Icon name="chevron" size={13}/></i> : null}
       </button>
@@ -19369,6 +19386,9 @@ function ebayTitre(base, taille, max) {
 // texte blanc, gris iOS (#8E8E93), bleu eBay des boutons (#3665F3). Cartes PLATES
 // (pas d'ombre, pas de bordure) — c'est le contraste gris/noir qui détache.
 // Tous les espaces suivent le thème choisi, y compris eBay.
+// (1er nov.) Le compte eBay vit dans Paramètres → Comptes eBay depuis le 31 oct. :
+// un écran sans `setTab` y mène par le chemin des liens (`vrm:aller`).
+const allerComptesEbay = () => { try { window.dispatchEvent(new CustomEvent('vrm:aller', { detail: '?tab=plat_ebay&section=compte' })); } catch (_) {} };
 const EBAY_SKIN = Object.defineProperties({}, Object.fromEntries(
   Object.keys(THEMES.light).map(k => [k, { enumerable:true, get:() => C[k] }])
 ));
@@ -20556,7 +20576,7 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
   // si oui — jamais un bouton mort (§ « une clé perso reste sur l'appareil »).
   React.useEffect(() => { let stop = false;
     try { if ((load('vrm_ai_key', '') || '').trim()) { setAiPret(true); return; } } catch (_) {}
-    fetch('/api/ai').then(r => r.json()).then(j => { if (!stop && j && j.ready) setAiPret(true); }).catch(() => {});
+    fetch('/api/ai', { headers: enTeteSession() }).then(r => r.json()).then(j => { if (!stop && j && j.ready) setAiPret(true); }).catch(() => {});
     return () => { stop = true; };
   }, []);
   // Génère un titre eBay avec l'IA — à partir des VRAIES caractéristiques de la
@@ -20891,7 +20911,7 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
       // Publiée depuis un brouillon : il sort de la liste des brouillons.
       if (brouillonId) { const id = brouillonId; modifierBrouillonsEbay((items) => { if (items[id]) items[id] = { ...items[id], etatBrouillon: 'en-ligne', programme: { itemId: j.itemId, debut: null, demande: null, at: Date.now() } }; return items; }).then((w) => { if (w.ok && onBrouillon) onBrouillon(w.items); }); }
     }
-    else if (code === 0 || !j || code === 504 || (j && j.reason === 'incertain')) setRes({ err: (j && j.error) || 'eBay n\'a pas répondu — je ne sais pas si l\'annonce est partie. Rafraîchis depuis eBay (section « Compte ») avant de recommencer.' });
+    else if (code === 0 || !j || code === 504 || (j && j.reason === 'incertain')) setRes({ err: (j && j.error) || 'eBay n\'a pas répondu — je ne sais pas si l\'annonce est partie. Rafraîchis depuis eBay (Paramètres → Comptes eBay) avant de recommencer.' });
     else setRes({ err: (j && j.error) || 'eBay a refusé la publication.' });
     setBusy(false);
   };
@@ -21401,6 +21421,9 @@ function EbayConnexion({ onAnnonces, vue = '*', comptesEbay }) {
   const [comptesStatut, setComptesStatut] = React.useState(undefined);
   const [busy, setBusy] = React.useState(false);
   const [retour, setRetour] = React.useState('');
+  // (1er nov.) La configuration eBay Developer / Vercel ne parle qu'au
+  // propriétaire de l'installation ; un autre vendeur lit « pas encore activé ».
+  const proprio = useEstProprietaire();
   const [deconnexion, setDeconnexion] = React.useState({});   // ref → '…' | message
   React.useEffect(() => {
     try {
@@ -21446,7 +21469,7 @@ function EbayConnexion({ onAnnonces, vue = '*', comptesEbay }) {
       if (j && j.error) { setBusy(false); setRetour(j.error); return; }
     } catch (_) {}
     setBusy(false);
-    setRetour("Impossible de démarrer la connexion — vérifie la configuration eBay (docs/ebay-api.md).");
+    setRetour(proprio ? "Impossible de démarrer la connexion — vérifie la configuration eBay (docs/ebay-api.md)." : "Impossible de démarrer la connexion à eBay pour l'instant — réessaie dans quelques minutes.");
   };
   // DÉCONNECTER UN compte : confirmé, et il NOMME le compte. Les autres ne sont
   // pas touchés (la route l'exige aussi : `confirme:true`).
@@ -21570,12 +21593,16 @@ function EbayConnexion({ onAnnonces, vue = '*', comptesEbay }) {
           Je n'ai pas pu vérifier la connexion eBay : le serveur n'a pas répondu. Rien n'est perdu — rouvre cet écran dans un instant.
         </div>
       ) : !st.ready ? (
-        <div data-ebay-statut="non-configure" style={{ fontSize: 13, color: C.text, lineHeight: 1.55 }}>
-          eBay n'est <b>pas encore configuré</b>. Ajoute tes clés eBay dans Vercel (App ID, Dev ID, Cert ID), puis le RuName — la marche à suivre est dans <b>docs/ebay-api.md</b>. Tant que ce n'est pas fait, rien ne part sur eBay.
+        <div data-ebay-statut="non-configure" data-ebay-admin={proprio ? 'proprietaire' : 'vendeur'} style={{ fontSize: 13, color: C.text, lineHeight: 1.55 }}>
+          {proprio
+            ? <>eBay n'est <b>pas encore configuré</b>. Ajoute tes clés eBay dans Vercel (App ID, Dev ID, Cert ID), puis le RuName — la marche à suivre est dans <b>docs/ebay-api.md</b>. Tant que ce n'est pas fait, rien ne part sur eBay.</>
+            : <>eBay n'est <b>pas encore activé sur VRM</b> : tu ne peux pas encore y relier ton compte. Tu n'as rien à faire — cet écran te proposera « Connecter mon compte eBay » dès que ce sera ouvert.</>}
         </div>
       ) : !st.canConsent ? (
-        <div style={{ fontSize: 13, color: C.text, lineHeight: 1.55 }}>
-          Tes clés eBay sont posées ✓. Il manque le <b>RuName</b> (l'URL de redirection, variable <code>EBAY_RUNAME</code>) à créer dans le portail eBay Developer et à coller dans Vercel — voir <b>docs/ebay-api.md</b>.
+        <div data-ebay-statut="sans-runame" data-ebay-admin={proprio ? 'proprietaire' : 'vendeur'} style={{ fontSize: 13, color: C.text, lineHeight: 1.55 }}>
+          {proprio
+            ? <>Tes clés eBay sont posées ✓. Il manque le <b>RuName</b> (l'URL de redirection, variable <code>EBAY_RUNAME</code>) à créer dans le portail eBay Developer et à coller dans Vercel — voir <b>docs/ebay-api.md</b>.</>
+            : <>eBay n'est <b>pas encore activé sur VRM</b> : tu ne peux pas encore y relier ton compte. Tu n'as rien à faire.</>}
         </div>
       ) : connected === true ? (
         <>
@@ -22508,7 +22535,7 @@ function EbayBrouillons({ brouillons, connected, paires = [], onModifier, onPlan
             style={{ ...btn, flex: '1 1 160px', maxWidth: 320, padding: '11px 14px', border: 'none', background: E.accent, color: '#fff', opacity: (busy || !coches.length || connected !== true) ? 0.5 : 1 }}>{`Programmer la sélection${coches.length ? ` (${coches.length})` : ''}`}</button>
         </div>
       )}
-      {liste.length > 0 && connected !== true && <div style={{ fontSize: 11.5, color: E.muted, marginTop: 6 }}>{connected === false ? 'Relie ton compte eBay (section « Compte ») pour vérifier et programmer.' : connected === null ? 'Je n\'ai pas pu savoir si ton compte eBay est relié — rouvre l\'écran dans un moment.' : ''}</div>}
+      {liste.length > 0 && connected !== true && <div style={{ fontSize: 11.5, color: E.muted, marginTop: 6 }}>{connected === false ? 'Relie ton compte eBay (Paramètres → Comptes eBay) pour vérifier et programmer.' : connected === null ? 'Je n\'ai pas pu savoir si ton compte eBay est relié — rouvre l\'écran dans un moment.' : ''}</div>}
       {msg && <div style={{ fontSize: 12, color: E.warn, marginTop: 8, lineHeight: 1.45 }}>{msg}</div>}
     </div>
   );
@@ -24097,7 +24124,7 @@ function AgentEbay({ comptes, comptesEbay, onAnnonces }) {
       <h3 data-agent-question="" style={{ margin: 0, fontSize: 16, color: E.text }}>{titreQ}</h3>
       {prop.etat === 'en-cours' && <p style={{ fontSize: 12.5, color: E.muted, margin: '8px 0 0' }}>Je relis tes paires, tes ventes et tes annonces eBay…</p>}
       {prop.etat === 'pas-su' && <p data-agent-passu="" style={{ fontSize: 12.5, color: E.text, margin: '8px 0 0', lineHeight: 1.5 }}>Je n'ai pas pu lire {prop.pasSu.join(', ')} : je ne propose rien qui soit peut-être déjà vendu ou déjà sur eBay. Rouvre l'écran dans un moment — rien n'est perdu.</p>}
-      {prop.etat === 'sans-ebay' && <p style={{ fontSize: 12.5, color: E.muted, margin: '8px 0 0' }}>Relie d'abord ton compte eBay (section « Compte ») : je te proposerai ensuite les paires à publier.</p>}
+      {prop.etat === 'sans-ebay' && <p style={{ fontSize: 12.5, color: E.muted, margin: '8px 0 0' }}>Relie d'abord ton compte eBay (Paramètres → Comptes eBay) : je te proposerai ensuite les paires à publier.</p>}
       {prop.etat === 'devise' && <p data-agent-devise="" style={{ fontSize: 12.5, color: E.text, margin: '8px 0 0', lineHeight: 1.5 }}>Ton compte eBay « {nomCompte} » vend en {deviseCompte} : je ne convertis pas les prix de Vinted. Choisis un compte eBay en euros dans « Ce que je publie ».</p>}
       {prop.etat === 'eteint' && <p style={{ fontSize: 12.5, color: E.muted, margin: '8px 0 0' }}>L'agent est arrêté : il ne propose rien. <button type="button" onClick={() => garderRegles({ ...regles, actif: true })} style={s({ marginLeft: 6 })}>Le relancer</button></p>}
       {prop.etat === 'lu' && <>
@@ -25120,7 +25147,7 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
   // ⚠️ Une paire VENDUE sur eBay sort de cette liste (l'annonce est terminée) :
   //    c'est justement quand il n'en reste aucune que « retire-la de Vinted »
   //    compte le plus. Les alertes passent donc AVANT ce cas.
-  if (!itemsVue.length) return wrap(<>{head(0)}{publier}{alertes}{ligneComptesIllisibles}{lignePasSu}{ligneSansPreuve}{outilsSuite(pasSu)}<div style={{ color: E.muted, fontSize: 13, marginTop: 10, lineHeight: 1.5 }}>{vueSeule ? 'Pas d\'annonce en ligne sur ce compte eBay.' : 'Pas encore d\'annonce eBay en ligne.'} {connected === true ? 'Mets une paire en vente ci-dessus — elle apparaîtra ici.' : 'Connecte ton compte eBay (section « Compte ») et synchronise.'}</div></>);
+  if (!itemsVue.length) return wrap(<>{head(0)}{publier}{alertes}{ligneComptesIllisibles}{lignePasSu}{ligneSansPreuve}{outilsSuite(pasSu)}<div style={{ color: E.muted, fontSize: 13, marginTop: 10, lineHeight: 1.5 }}>{vueSeule ? 'Pas d\'annonce en ligne sur ce compte eBay.' : 'Pas encore d\'annonce eBay en ligne.'} {connected === true ? 'Mets une paire en vente ci-dessus — elle apparaîtra ici.' : <>Connecte ton compte eBay dans <button type="button" className="vrm-lien-action" data-vers-comptes-ebay="" onClick={allerComptesEbay} style={{ background: 'none', border: 'none', padding: 0, color: E.text, fontWeight: 700, textDecoration: 'underline', cursor: 'pointer', fontFamily: 'inherit', fontSize: 'inherit' }}>Paramètres → Comptes eBay</button>, puis synchronise.</>}</div></>);
   // ── 4. L'OFFRE AUX OBSERVATEURS et les annonces pas reliées : une phrase
   //    chacune, au-dessus de la liste ; sur la carte, seulement le bouton ou la
   //    pastille, qui distinguent (§7). ─────────────────────────────────────────
@@ -27846,6 +27873,8 @@ function Door({h}) {
 
 /* ── Factures ───────────────────────────────────────── */
 function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoiceSettings,entreprises,setEntreprises,activeEnt,setActiveEnt}) {
+  // (1er nov.) L'envoi des factures Pro par la boîte VRM : propriétaire de l'installation seul.
+  const envoiVRM = useEstProprietaire();
   const [searchInput,setSearchInput]=useState('');
   const [search,setSearch]=useState('');
   const [zone,setZone]=useState('attente'); // 'attente' | 'comptabilisees'
@@ -28051,7 +28080,12 @@ function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoice
           <div style={{display:'flex',flexDirection:'column',gap:8}}>
             {proInvs.slice(0,20).map(inv=>{
               const col=inv.status==='sent'?'#27a85d':inv.status==='queued'?C.warn:C.muted;
-              const lbl=inv.status==='sent'?'📧 envoyée':inv.status==='queued'?'⏳ envoi en cours':'brouillon';
+              // (1er nov.) JAMAIS « EN COURS D'ENVOI » À VIE : une facture en file
+              // depuis plus de 2 h n'est pas partie (la boîte d'envoi n'a pas
+              // tourné, ou elle n'envoie pas pour ce compte) — c'est dit, avec le geste.
+              const enFileDepuis=Date.parse(inv.queuedAt||inv.createdAt||'');
+              const fileBloquee=inv.status==='queued'&&(!envoiVRM||!Number.isFinite(enFileDepuis)||Date.now()-enFileDepuis>2*3600e3);
+              const lbl=inv.status==='sent'?'📧 envoyée':fileBloquee?'pas encore partie — ouvre-la (« Voir ») et envoie-la toi-même':inv.status==='queued'?'⏳ envoi en cours':envoiVRM?'brouillon':'à envoyer toi-même';
               return (
                 <div key={inv._id} style={{display:'flex',gap:10,alignItems:'center',padding:'8px 10px',border:`1px solid ${col}55`,background:`${col}0d`,borderRadius:10,flexWrap:'wrap'}}>
                   <div style={{flex:1,minWidth:140}}>
@@ -28065,7 +28099,7 @@ function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoice
                   <div style={{display:'flex',gap:6,flexShrink:0}}>
                     <button type="button" onClick={()=>{ ouvrirDocumentImprimable(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Facture ${xmlEsc(inv.number)}</title></head><body>${(inv.html||'').replace('cid:logoFacture','')}</body></html>`); }}
                       style={{padding:'6px 12px',borderRadius:8,border:`1px solid ${C.border}`,background:C.card,color:C.text,fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Voir</button>
-                    {inv.status==='draft'&&inv.buyerEmail&&(
+                    {envoiVRM&&inv.status==='draft'&&inv.buyerEmail&&(
                       <button type="button" onClick={async()=>{
                         if(!await askConfirm(`Mettre la facture ${inv.number} en file d'envoi à ${inv.buyerEmail} ?`)) return;
                         const ok=await setProInvoiceStatus(inv,'queued');
@@ -28367,8 +28401,22 @@ function ouvrirDocumentImprimable(html) {
   setTimeout(() => { try { w.focus(); w.print(); } catch (_) {} }, 400);
   return w;
 }
+// (1er nov., VRM vendu à d'autres) LE LOGO D'UNE FACTURE est celui de
+// l'entreprise QUI FACTURE : un vendeur remet SA facture à SON client. Le logo
+// VRM (`LOGO_CANCALE`) n'y figurait que parce que l'outil était celui d'un seul
+// vendeur — chez un autre, sa facture portait la marque de quelqu'un d'autre.
+// Le logo de l'entité (`logo`, image en data:) s'il existe ; sinon le
+// propriétaire de l'installation garde le sien (rien ne change pour lui) ;
+// sinon AUCUN logo — le nom de l'entreprise suffit, jamais celui d'un autre.
+function logoFacture(ent) {
+  const l = String((ent && ent.logo) || '');
+  if (/^data:image\/(png|jpe?g);base64,/i.test(l)) return l;
+  const uid = (AUTH.user && AUTH.user.id) || '';
+  const proprio = (PROPRIO_ETAT.uid === uid && PROPRIO_ETAT.v === true) || proprietaireMemorise(uid) === true;
+  return proprio ? LOGO_CANCALE : '';
+}
 function generatePDF(inv,settings) {
-  let _logo=LOGO_CANCALE;
+  let _logo=logoFacture(settings);
   const html=`<!DOCTYPE html>
 <html><head><meta charset="UTF-8"><title>Facture ${xmlEsc(inv.number)}</title>
 <style>
@@ -28403,9 +28451,9 @@ td.right{text-align:right;}
 @media print{body{margin:0;}}
 </style></head><body>
 <div class="header">
-  <div class="logo">
-    <img src="${xmlEsc(_logo)}" alt="Cancale Shoes Store" style="width:140px;height:auto;border-radius:8px;" />
-  </div>
+  ${_logo?`<div class="logo">
+    <img src="${xmlEsc(_logo)}" alt="${xmlEsc((settings&&settings.companyName)||'Logo')}" style="width:140px;height:auto;border-radius:8px;" />
+  </div>`:`<div style="font-size:18px;font-weight:800;color:#222;max-width:300px">${xmlEsc((settings&&settings.companyName)||'')}</div>`}
   <div class="title">
     <h1>FACTURE</h1>
     <div class="num"># ${xmlEsc(inv.number)}</div>
@@ -28554,7 +28602,7 @@ async function buildFacturXBytes(inv, ent){
     const T=(t,x,y,{s=10,b=false,c=dark,right=false}={})=>{ const f=b?bold:font; const str=String(t==null?'':t); const w=f.widthOfTextAtSize(str,s); page.drawText(str,{x:right?x-w:x,y,size:s,font:f,color:c}); };
     const eur=(+inv.sellPrice||0).toFixed(2).replace('.',',')+' €';
     try{
-      let logoSrc=LOGO_CANCALE;
+      let logoSrc=logoFacture(ent);
       const m=/^data:image\/(png|jpe?g);base64,(.+)$/i.exec(String(logoSrc||''));
       if(m){ const img=/png/i.test(m[1])?await pdf.embedPng(b64ToBytes(m[2])):await pdf.embedJpg(b64ToBytes(m[2])); const dim=img.scale(1); const h=62,w=h*(dim.width/dim.height||1); page.drawImage(img,{x:W-M-Math.min(w,90),y:762,width:Math.min(w,90),height:h}); }
     }catch(_){}
@@ -28586,7 +28634,7 @@ async function buildFacturXBytes(inv, ent){
     const xml=factureCII(inv, ent);
     const bytes=new TextEncoder().encode(xml);
     await pdf.attach(bytes,'factur-x.xml',{ mimeType:'text/xml', description:'Facture electronique Factur-X', creationDate:new Date(), modificationDate:new Date(), afRelationship:AFRelationship.Alternative });
-    pdf.setTitle('Facture '+(inv.number||'')); pdf.setAuthor(ent.companyName||''); pdf.setSubject('Facture'); pdf.setProducer('VRM Cancale'); pdf.setCreator('VRM Cancale');
+    pdf.setTitle('Facture '+(inv.number||'')); pdf.setAuthor(ent.companyName||''); pdf.setSubject('Facture'); pdf.setProducer('VRM'); pdf.setCreator('VRM');
     try{ const stream=pdf.context.stream(facturxXMP(inv),{Type:'Metadata',Subtype:'XML'}); const ref=pdf.context.register(stream); pdf.catalog.set(PDFName.of('Metadata'),ref); }catch(_){}
   }
   return await pdf.save({ useObjectStreams:false });
@@ -38702,13 +38750,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // Ajout MANUEL d'un point relais par son adresse exacte (fiable, pas de
   // « magasins au hasard »). On géocode l'adresse précise donnée.
   const addPointByAddress = async () => {
-    const input = await askText({ desc: 'Point relais — nom et adresse exacte :\nex : Maison de la Presse, 40 Rue du Port, 35260 Cancale' });
+    const input = await askText({ desc: 'Point relais — nom et adresse exacte :\nex : Maison de la Presse, 12 rue de la Gare, 75010 Paris' });
     if (!input || !input.trim()) return;
     const parts = input.split(',');
     const nom = parts[0].trim();
     const adresse = parts.slice(1).join(',').trim() || input.trim();
     const hit = await geocode(adresse) || await geocode(input.trim());
-    if (!hit) { toast('Adresse introuvable. Donne la rue + le code postal + la ville (ex : 40 Rue du Port, 35260 Cancale).'); return; }
+    if (!hit) { toast('Adresse introuvable. Donne la rue + le code postal + la ville (ex : 12 rue de la Gare, 75010 Paris).'); return; }
     const byName = new Map(savedPoints.map(s => [s.nom.toLowerCase(), s]));
     byName.set(nom.toLowerCase(), { nom, full: input.trim(), lat: hit.lat, lon: hit.lon });
     persistPoints([...byName.values()]);
@@ -38731,7 +38779,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         const rue = [a.house_number, a.road].filter(Boolean).join(' ');
         return { id: String(x.place_id || i), nom, adresse: [rue, a.postcode, ville].filter(Boolean).join(', '), lat: +x.lat, lon: +x.lon, full: x.display_name };
       });
-      setRelayPicker(p => p ? { ...p, loading: false, results, error: results.length ? null : 'Aucun lieu trouvé. Ajoute le nom de la ville (ex : « Super U Cancale »).' } : p);
+      setRelayPicker(p => p ? { ...p, loading: false, results, error: results.length ? null : 'Aucun lieu trouvé. Ajoute le nom de la ville (ex : « Super U Lyon »).' } : p);
     } catch (_) { setRelayPicker(p => p ? { ...p, loading: false, error: 'Recherche indisponible, réessaie.' } : p); }
   };
   const addFoundPlace = (f) => {
@@ -44803,7 +44851,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // sensible, juste { ready }.
   const [aiPret, setAiPret] = useState(() => { try { return !!(load('vrm_ai_key','')||'').trim(); } catch(_) { return false; } });
   useEffect(() => { if (aiPret) return; let stop=false;
-    fetch('/api/ai').then(r=>r.json()).then(j=>{ if(!stop && j && j.ready) setAiPret(true); }).catch(()=>{});
+    fetch('/api/ai', { headers: enTeteSession() }).then(r=>r.json()).then(j=>{ if(!stop && j && j.ready) setAiPret(true); }).catch(()=>{});
     return ()=>{ stop=true; }; }, [aiPret]);
   const redigerIA = async (e) => {
     if (!e) return;
@@ -46268,6 +46316,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   //    affichaient quand la base ne répondait pas. Une liste vide parce qu'on
   //    n'a pas pu lire n'est PAS une liste vide.
   const noAcc = accounts.length===0 && accountsReady;
+  // Posé pendant le rendu de Colis (les colonnes), lu juste après dans le même rendu.
+  let colisSansCompte = false;
   const NoAcc = () => !noAcc ? null : (baseKO
     ? <LignePanne>Je n'ai pas pu lire tes comptes Vinted — ce n'est pas « aucun compte lié ».</LignePanne>
     : <EmptyState icon="link" title="Aucun compte Vinted lié"
@@ -51059,6 +51109,22 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             attente: colisEb === null ? 'Ventes eBay pas lues pour l’instant.' : null,
             retirer: tracking===null ? 'E-mails de suivi pas encore lus.' : (buys.items===null && buys.loading) ? 'Je lis tes achats…' : (!colisRelaisLu || suivisVinted === undefined) ? 'Je relie encore tes achats à leurs colis : le compte peut bouger.' : null,
           };
+          // (1er nov., vendeur neuf) AUCUN COMPTE RELIÉ ET AUCUN COLIS D'AUCUN SITE :
+          // quatre « 0 » et « Vinted ne te demande aucun envoi » affirmaient un
+          // RIEN sur une lecture qui n'a pas eu lieu (§5 : « rien lu » ne vaut pas
+          // « rien »). On dit le geste à la place des colonnes. Comptes illisibles
+          // (`baseKO`) ⇒ ce n'est pas « aucun compte » : les colonnes et leurs notes
+          // restent. Un colis d'un autre site (eBay, Leboncoin, Vestiaire) ⇒ les
+          // colonnes restent aussi : il y a quelque chose de LU à montrer.
+          colisSansCompte = noAcc && !baseKO && vue.total === 0;
+          if (colisSansCompte) return (<>
+            <ScreenHead icon="doc" title="Colis" sous="Rangés sur ce que tu peux faire maintenant"/>
+            <div data-colis-sans-compte="">
+              <EmptyState icon="link" title="Relie ton compte Vinted pour voir tes colis"
+                desc="Tant qu'aucun compte n'est relié, VRM ne lit rien : il ne peut pas encore dire ce qui est à envoyer, à retirer ou parti. Installe l'extension Chrome sur ton ordinateur, puis ouvre vinted.fr une fois, connecté à ton compte."
+                action={onNav && <Bouton variante="primaire" icone="link" data-colis-relier="" onClick={()=>onNav('vintedaccounts')}>Relier mon compte Vinted</Bouton>}/>
+            </div>
+          </>);
           return (<>
             <ScreenHead icon="doc" title="Colis" sous="Rangés sur ce que tu peux faire maintenant"
               desc="Ce que Vinted attend de toi, capté par l'extension. Le bordereau manquant est généré tout seul quand tu passes sur Vinted, puis déposé ici. Un colis parti disparaît sans rien cocher."
@@ -51086,7 +51152,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             capture ancienne (statut figé), pas d'un défaut. On le dit (§11, même
             message partout). */}
         <div className="vrm-colis-fraicheur" style={{padding:'0 2px',marginBottom:10}}><FraicheurDonnees jours={liveStats && liveStats.dataAgeJours} compte={liveStats && liveStats.dataAgeCompte} comptes={liveStats && liveStats.dataAgeComptes} siAJour={false}/></div>
-        <NoAcc/>
+        {/* Sans compte relié, le geste est déjà dit à la place des colonnes (une fois, §7). */}
+        {!colisSansCompte && <NoAcc/>}
         {/* RÉCAP EN HAUT : combien de COLIS restent à envoyer. On compte ce que
             Vinted attend de toi (moisson de l'extension), pas les emails reçus :
             un email peut manquer, une vente à expédier ne ment pas. */}
@@ -51148,6 +51215,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           // nombre que Ma journée et la cloche, §11). eBay illisible ⇒ « au moins ».
           const nEb = colisEb && colisEb.aPoster ? colisEb.aPoster.length : 0;
           const tot = aPoster.length + nEb;
+          // Sans compte relié ni colis : le geste est dit en tête, pas « aucun envoi ».
+          if (colisSansCompte) return null;
           return (
             <div data-colis-recap={tot} data-colis-recap-vinted={aPoster.length} data-colis-recap-ebay={colisEb === undefined ? 'encours' : colisEb === null ? 'passu' : String(nEb)} className="vrm-colis-recap" style={{position:'relative',display:'flex',gap:12,alignItems:'flex-start',flexWrap:'wrap',background:C.card,border:`1px solid ${C.border}`,borderRadius:12,padding:'18px',marginBottom:16,overflow:'hidden',boxShadow:C.shadow||'none'}}>
               <div className="vrm-colis-recap-tete" style={{display:'flex',alignItems:'center',gap:16,flexWrap:'wrap',flex:'1 1 190px',minWidth:0}}>
@@ -51512,6 +51581,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             </button>) : null;
           const ex = voirPostes ? exTout : exTout.filter(x => !estPosteT(x));
           if (!ex.length && colisEb && colisEb.aPoster.length) return lignePostes;
+          // Sans compte relié, « aucun colis » n'est pas su : le geste est dit en tête (une fois).
+          if (!ex.length && colisSansCompte) return lignePostes;
           if (!ex.length) return (<>{lignePostes}
             <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'22px 16px',lineHeight:1.6}}>
               Aucun colis à envoyer.<br/>
@@ -51968,7 +52039,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               <div style={{display:'flex',gap:6}}>
                 <input autoFocus value={relayPicker.query} onChange={e=>setRelayPicker(p=>({...p,query:e.target.value}))}
                   onKeyDown={e=>{ if(e.key==='Enter') searchPlaces(relayPicker.query); }}
-                  placeholder="ex : Super U Cancale, Tabac de la Place Saint-Malo…"
+                  placeholder="ex : Super U Lyon, Tabac de la Place…"
                   style={{flex:1,border:`1px solid ${C.border}`,borderRadius:8,padding:'10px 12px',fontSize:13,fontFamily:'inherit',background:C.card,color:C.text,outline:'none'}}/>
                 <button type="button" onClick={()=>searchPlaces(relayPicker.query)} style={{border:'none',borderRadius:8,background:C.accent,color:'#fff',fontSize:13,fontWeight:600,padding:'0 16px',cursor:'pointer',fontFamily:'inherit'}}>Chercher</button>
               </div>
@@ -52574,7 +52645,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     {actif&&!repubAi.busy&&repubAi.reason&&(
                       <div style={{marginTop:8,fontSize:11.5,color:C.muted,lineHeight:1.45}}>
                         {repubAi.reason==='no-key'
-                          ? <>Pas de clé IA : VRM n'a pas encore de réglage pour poser ta clé (ou pose <b>AI_API_KEY</b> sur Vercel). Rien n'est inventé sans elle.</>
+                          ? <span data-ia-pas-active="">L'assistant IA n'est pas encore activé sur VRM pour ton compte : rien n'est rédigé sans lui, tes suggestions calculées restent là.</span>
                           : <>L'IA n'a pas répondu ({repubAi.reason}). Réessaie dans un instant.</>}
                       </div>
                     )}
@@ -53045,7 +53116,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         )});
         cards.push({ bg:FOND_ACCENT, last:true, body:(
           <div style={{textAlign:'center',width:'100%'}}>
-            <div style={{fontSize:26,fontWeight:800,color:'#fff',letterSpacing:-0.5}}>{w.mode==='month'?'Quel mois, Julien !':'Quelle année, Julien !'}</div>
+            <div style={{fontSize:26,fontWeight:800,color:'#fff',letterSpacing:-0.5}}>{(()=>{ /* (1er nov.) Le prénom DU vendeur (`vrm_prenom`, saisi par lui) ou rien — jamais celui d'un autre. */ const p=prenomLisible(load('vrm_prenom',''));return (w.mode==='month'?'Quel mois':'Quelle année')+(p?`, ${p}`:'')+' !';})()}</div>
             <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,margin:'18px 6px 0'}}>
               <div style={{background:'rgba(255,255,255,0.15)',borderRadius:10,padding:'12px 8px'}}><div style={{fontSize:24,fontWeight:800,color:'#fff'}}>{w.nb}</div><div style={{fontSize:11,color:'rgba(255,255,255,0.85)'}}>articles vendus</div></div>
               <div style={{background:'rgba(255,255,255,0.15)',borderRadius:10,padding:'12px 8px'}}><div style={{fontSize:24,fontWeight:800,color:'#fff'}}>{eur0(w.ca)}</div><div style={{fontSize:11,color:'rgba(255,255,255,0.85)'}}>de CA</div></div>
@@ -56685,6 +56756,12 @@ function ActionsReglages({comptes,onOuvrir}) {
 }
 
 function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dark, toggleDark, notifEnabled, onToggleNotif, ebayCompte = null, ouvrir = null, onOuvert }) {
+  // (1er nov., VRM vendu à d'autres) « Import des emails Vinted · Date de début »
+  // n'agit que sur la boîte du PROPRIÉTAIRE de l'installation : la réception
+  // collective (le script Gmail) ne lit pas la date d'un autre vendeur
+  // (docs/emails/boite-collective.md). Le montrer à un autre, c'était un réglage
+  // qui s'enregistre et ne fait rien : il n'est pas proposé.
+  const proprioInst = useEstProprietaire();
   // Actions sur le compte : une vraie fenêtre plutôt qu'un prompt du navigateur.
   // Un window.prompt ne se style pas, ne masque pas le mot de passe saisi, et
   // sur iPhone il s'affiche comme une alerte système au milieu de rien — c'est
@@ -56903,7 +56980,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       // (31 oct., soir) L'ancien « eBay → Compte » : connexion et comptes eBay reliés.
       ebayCompte && { id:'ebay', type:'panneau', ic:'link', lib:'Comptes eBay', desc:'Connexion à eBay, comptes reliés', el:ebayCompte },
       { id:'adresses', type:'panneau', ic:'mail', lib:'Réception des emails', desc:'Transfert et emails reçus', titreInterne:true, el:<EmailsSetting onComptes={()=>setTab('vintedaccounts')}/> },
-      { id:'import', type:'panneau', nu:true, ic:'calendar', lib:'Import des emails Vinted', desc:'Date de début de l’historique', el:<EmailStartSetting key={AUTH.user?.id||'sans-session'} nu/> },
+      proprioInst && { id:'import', type:'panneau', nu:true, ic:'calendar', lib:'Import des emails Vinted', desc:'Date de début de l’historique', el:<EmailStartSetting key={AUTH.user?.id||'sans-session'} nu/> },
       { id:'securite', type:'panneau', ic:'key', lib:'Sécurité des données', desc:'Qui peut lire et écrire tes données', el:<SecuriteSetting/> },
     ]},
     MULTI_USER && { id:'stock', titre:'Stock et rangement', items:[
@@ -57171,6 +57248,47 @@ async function lireAbonnement() {
     const j = await r.json();
     return j && j.ok ? j : null;
   } catch (_) { return null; }
+}
+// ── QUI EST LE PROPRIÉTAIRE DE L'INSTALLATION ? (1er nov., VRM vendu à d'autres) ──
+// Les CONSIGNES D'ADMINISTRATEUR (redémarrer le projet Supabase, poser une
+// variable sur Vercel, configurer eBay Developer, la clé VAPID, la clé IA) ne
+// s'adressent qu'à lui : un autre vendeur n'a ni ces comptes ni ces boutons, et
+// lire « redémarre ton projet » lui fait croire que la panne est chez LUI.
+// La BASE le dit (`/api/compte?mode=abonnement` → `proprietaire`, lu dans
+// `vrm_acces`, la même source que « gratuit, aucun abonnement » — §11).
+// Trois états : `undefined` en cours · `null` pas su · booléen lu. « Pas su »
+// (base en panne : précisément quand la consigne Supabase sert) retombe sur la
+// dernière réponse LUE sur cet appareil pour CE compte — une commodité
+// d'affichage, jamais une autorisation : ces consignes ne sont pas secrètes
+// (dépôt public), elles sont seulement inutiles et trompeuses pour un autre.
+// Rien de connu ⇒ `false` à l'écran (la phrase neutre « VRM est momentanément
+// indisponible » est vraie pour tout le monde).
+const cleProprioVu = (uid) => 'vrm_proprio_vu_' + String(uid || '');
+const PROPRIO_ETAT = { uid: null, v: undefined, p: null };
+function proprietaireMemorise(uid) { try { const v = localStorage.getItem(cleProprioVu(uid)); return v === '1' ? true : v === '0' ? false : null; } catch (_) { return null; } }
+function lireProprietaire() {
+  const uid = (AUTH.user && AUTH.user.id) || '';
+  if (!uid) return Promise.resolve(false);
+  if (PROPRIO_ETAT.uid === uid && typeof PROPRIO_ETAT.v === 'boolean') return Promise.resolve(PROPRIO_ETAT.v);
+  if (PROPRIO_ETAT.uid === uid && PROPRIO_ETAT.p) return PROPRIO_ETAT.p;
+  PROPRIO_ETAT.uid = uid; PROPRIO_ETAT.v = undefined;
+  PROPRIO_ETAT.p = lireAbonnement().then((x) => {
+    if (PROPRIO_ETAT.uid !== uid) return proprietaireMemorise(uid);
+    PROPRIO_ETAT.p = null;
+    if (!x || typeof x.proprietaire !== 'boolean') { PROPRIO_ETAT.v = undefined; return proprietaireMemorise(uid); }
+    PROPRIO_ETAT.v = x.proprietaire;
+    try { localStorage.setItem(cleProprioVu(uid), x.proprietaire ? '1' : '0'); } catch (_) {}
+    return x.proprietaire;
+  });
+  return PROPRIO_ETAT.p;
+}
+// `true` seulement si la base (ou, en panne, la dernière lecture de cet
+// appareil) dit propriétaire ; `false` sinon — y compris pendant la lecture.
+function useEstProprietaire() {
+  const uid = (AUTH.user && AUTH.user.id) || '';
+  const [v, setV] = useState(() => (PROPRIO_ETAT.uid === uid && typeof PROPRIO_ETAT.v === 'boolean') ? PROPRIO_ETAT.v : proprietaireMemorise(uid) === true);
+  useEffect(() => { let mort = false; lireProprietaire().then((x) => { if (!mort) setV(x === true); }); return () => { mort = true; }; }, [uid]);
+  return v === true;
 }
 // Ouvre Stripe (paiement ou gestion). Rend un message à afficher si ça échoue.
 async function ouvrirStripe(mode, extra) {
@@ -57677,7 +57795,7 @@ function MonAbonnement() {
           plus courante — un geste, pas un constat muet. */}
       {e.proprietaire && e.mentionsCompletes === null && (
         <div data-mentions-manquantes="pas-su" style={{ fontSize: 12.5, color: C.muted, marginTop: 8, lineHeight: 1.5 }}>
-          Je n'ai pas pu relire les mentions légales (<b style={{ color: C.text }}>public/legal/editeur.js</b>{typeof e.mentionsErreur === 'string' && e.mentionsErreur.trim() ? <> : « {e.mentionsErreur.trim().slice(0, 160)} »</> : null}) : le paiement reste fermé tant qu'elles ne sont pas lisibles. Cause la plus courante : une apostrophe dans un texte écrit entre apostrophes (« 'Julien d'Exemple' ») — écris-le entre guillemets droits (« "Julien d'Exemple" »).
+          Je n'ai pas pu relire les mentions légales (<b style={{ color: C.text }}>public/legal/editeur.js</b>{typeof e.mentionsErreur === 'string' && e.mentionsErreur.trim() ? <> : « {e.mentionsErreur.trim().slice(0, 160)} »</> : null}) : le paiement reste fermé tant qu'elles ne sont pas lisibles. Cause la plus courante : une apostrophe dans un texte écrit entre apostrophes (« 'Marie d'Exemple' ») — écris-le entre guillemets droits (« "Marie d'Exemple" »).
         </div>
       )}
       {prixAcorriger && (
@@ -57890,13 +58008,19 @@ function AbonnementRequis({ info }) {
             ? "Ton prélèvement n'est pas passé depuis plus de 14 jours : VRM est en pause. Mets ta carte à jour et tout revient tel quel — tes données sont intactes."
             : paiementFerme
               ? "Le paiement de l'abonnement n'est pas encore ouvert : rien n'a été prélevé. Tes données sont intactes : elles t'attendent. Réessaie un peu plus tard."
-              : `${prixLisible(info && info.prix)}, sans engagement, résiliable à tout moment. Tes données sont intactes : elles t'attendent dès que l'abonnement est actif.`}
+              : info && info.essaiDispo
+                ? <><b>{info.essaiJours || 7} jours gratuits</b>, puis {prixLisible(info.prix)}, sans engagement : aucun prélèvement pendant l'essai, résiliable à tout moment. Tes données sont intactes : elles t'attendent dès que l'essai commence.</>
+                : `${prixLisible(info && info.prix)}, sans engagement, résiliable à tout moment. Tes données sont intactes : elles t'attendent dès que l'abonnement est actif.`}
         </div>
+        {/* (1er nov., vendeur neuf) L'essai de 7 jours que promettent les CGV se dit
+            AUSSI sur la porte — `essaiDispo` vient du serveur (une règle, la même
+            que la carte de Paramètres) : jamais annoncé s'il ne peut pas être tenu. */}
+        {!impaye && !paiementFerme && info && info.essaiDispo && <div data-porte-essai="" style={{ fontSize: 11.5, color: C.muted, marginTop: 6, lineHeight: 1.5 }}>Essai gratuit <b>une seule fois</b> — par adresse e-mail et par compte Vinted. Ta carte n'est débitée qu'après {info.essaiJours || 7} jours ; tu peux résilier avant sans rien payer.</div>}
         {!paiementFerme && info && info.modeTest && <div style={{ fontSize: 12, color: C.muted, marginTop: 8 }}>Mode test : aucune vraie carte n'est débitée.</div>}
         {!impaye && !paiementFerme && <CaseCgv cases={cases} onChange={setCases}/>}
         {!paiementFerme && (
           <button type="button" disabled={occupe || (!impaye && !cgv)} data-sabonner="" onClick={agir} className="vrm-b vrm-b-primaire vrm-b-plein" style={{ marginTop: 18 }} title={!impaye && !cgv ? 'Coche d’abord les conditions de vente' : undefined}>
-            {occupe ? 'Ouverture du paiement…' : (impaye ? 'Mettre à jour ma carte' : "S'abonner")}
+            {occupe ? 'Ouverture du paiement…' : (impaye ? 'Mettre à jour ma carte' : info && info.essaiDispo ? `Commencer l'essai gratuit de ${info.essaiJours || 7} jours` : "S'abonner")}
           </button>
         )}
         {msg && !paiementFerme && <div style={{ fontSize: 12.5, color: C.warn, marginTop: 8 }}>{msg}</div>}
@@ -58618,6 +58742,11 @@ function ZoomSetting({ nu = false }) {
 // « envoi automatique » est LE consentement : OFF = aucune facture ne part
 // (les factures restent en brouillon, envoi manuel possible dans Factures).
 function ProFactureSetting() {
+  // (1er nov., VRM vendu à d'autres) L'envoi automatique passe par la boîte
+  // Gmail de l'installation, que le serveur ne fait tourner que pour son
+  // propriétaire : à un autre vendeur, l'interrupteur n'est pas proposé, et
+  // c'est dit (il ouvre la facture et l'envoie lui-même).
+  const envoiVRM = useEstProprietaire();
   const DEFAULTS = { actif:false, autoSend:false, nom:'', adresse:'', codePostal:'', ville:'', siret:'', tva:'', prefixe:'FA', tauxTva:'0', mentions:'', logo:'' };
   const [cfg, setCfg] = useState(undefined); // undefined = en cours · null = pas su · objet = lu
   const [status, setStatus] = useState('');
@@ -58730,7 +58859,12 @@ function ProFactureSetting() {
           placeholder="Mentions légales / pied de facture (ex : TVA non applicable – art. 293 B du CGI)"
           style={{width:'100%',boxSizing:'border-box',border:`1px solid ${C.border}`,borderRadius:8,padding:'8px 10px',fontSize:12,fontFamily:'inherit',background:C.bg,color:C.text,outline:'none',resize:'vertical',marginBottom:8}}/>
         {/* Envoi automatique */}
-        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:10,borderTop:`1px solid ${C.border}`,paddingTop:10}}>
+        {!envoiVRM ? (
+          <div data-facture-envoi="vendeur" style={{borderTop:`1px solid ${C.border}`,paddingTop:10}}>
+            <div style={{fontSize:13,fontWeight:600,color:C.text}}>Envoi à l'acheteur : par toi</div>
+            <div style={{fontSize:11,color:C.muted,marginTop:2,lineHeight:1.45}}>L'envoi automatique passe par la boîte d'envoi de l'installation VRM : il n'est pas ouvert aux autres vendeurs. Chaque facture est préparée dans Comptabilité → Factures : ouvre-la (« Voir »), enregistre-la en PDF et envoie-la à l'acheteur depuis Vinted ou ta messagerie.</div>
+          </div>
+        ) : <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:10,borderTop:`1px solid ${C.border}`,paddingTop:10}}>
           <div style={{minWidth:0}}>
             <div style={{fontSize:13,fontWeight:600,color:C.text}}>Envoi automatique à l'acheteur</div>
             <div style={{fontSize:11,color:C.muted,marginTop:2,lineHeight:1.4}}>Rien ne part sans ton accord. Tu peux couper à tout moment — l'arrêt est immédiat. OFF = les factures attendent dans l'onglet Factures.</div>
@@ -58740,7 +58874,7 @@ function ProFactureSetting() {
             background:cfg.autoSend?C.accent:'transparent',color:cfg.autoSend?'#fff':C.muted,
             border:`1.5px solid ${cfg.autoSend?C.accent:C.border}`,
           }}>{cfg.autoSend?'ON':'OFF'}</button>
-        </div>
+        </div>}
       </>)}
       {status && <div style={{fontSize:11,color:status.includes('⚠')?C.danger:C.muted,marginTop:8}}>{status}</div>}
     </div>
@@ -58836,6 +58970,12 @@ function EmailStartSetting({ nu = false }) {
       <div style={{fontSize:12.5,color:C.muted,marginBottom:12,lineHeight:1.45}}>
         Les emails Vinted sont pris en compte à partir de cette date (appliqué en 5 min au plus).
       </div>
+      {/* (1er nov.) Ce qui est VRAI : le script collectif (BOITE_PARTAGEE) ne lit pas
+          cette date — il reçoit pour tous les vendeurs ; sa date de départ est la
+          propriété VRM_START_DATE du script. Réservé au propriétaire (Paramètres). */}
+      <div data-import-collectif="" style={{fontSize:11.5,color:C.muted,margin:'-6px 0 12px',lineHeight:1.45}}>
+        Avec la boîte collective, cette date ne s’applique pas : le script utilise sa propriété <code>VRM_START_DATE</code> (Apps Script → Paramètres du projet → Propriétés du script).
+      </div>
       {reprise&&<p role="status" className="vrm-settings-draft" style={{color:C.warn}}>Une modification non enregistrée a été reprise pour ce compte. La date en ligne reste {base?base.split('-').reverse().join('/'):'non définie'} tant que tu ne valides pas.</p>}
       <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap'}}>
         <span style={{fontSize:12,fontWeight:500,color:C.text}}>À partir du</span>
@@ -58858,6 +58998,8 @@ function EmailStartSetting({ nu = false }) {
 // pipeline email branché (api/email-inbound.js). Un abonnement par appareil.
 // La clé vit dans src/vapid.js (une seule source, §11).
 function PushSetting() {
+  // (1er nov.) Les consignes Vercel/VAPID : au propriétaire de l'installation seul.
+  const proprio = useEstProprietaire();
   const [state, setState] = useState('checking'); // checking | unsupported | off | on | busy
   const [msg, setMsg] = useState(null);
   const [srv, setSrv] = useState(null);   // ce que le SERVEUR dit de lui-même
@@ -58963,7 +59105,7 @@ function PushSetting() {
         : j.coupe === 'abonnement'
         ? "Ton abonnement VRM n'est plus actif : les notifications sont en pause. Elles reviennent toutes seules dès que tu le reprends (Paramètres → Abonnement)."
         : (j.erreur === 'VAPID_PRIVATE_KEY absente'
-            ? '⚠ Le serveur ne peut RIEN envoyer : la clé VAPID_PRIVATE_KEY n\'est pas configurée sur Vercel. Tant qu\'elle manque, aucune notification ne partira.'
+            ? (proprio ? '⚠ Le serveur ne peut RIEN envoyer : la clé VAPID_PRIVATE_KEY n\'est pas configurée sur Vercel. Tant qu\'elle manque, aucune notification ne partira.' : 'Les notifications ne sont pas encore activées sur VRM : aucune ne peut partir pour l\'instant. Tu n\'as rien à faire.')
             : (j.total === 0 ? '⚠ Aucun appareil abonné. Active les notifications sur cet appareil d\'abord.'
             // ⚠️ Un abonnement scellé sur une ANCIENNE clé publique est mort pour
             // toujours (mesuré : 403 côté Chrome, VapidPkHashMismatch côté Apple).
@@ -58989,16 +59131,17 @@ function PushSetting() {
         <div data-push-serveur="pas-pret" style={{display:'flex',gap:8,alignItems:'flex-start',padding:'9px 11px',borderRadius:8,border:`1px solid ${C.warn}55`,background:`${C.warn}12`,marginBottom:10}}>
           <Icon name="alert" size={16} style={{color:C.warn,flexShrink:0,marginTop:1}}/>
           <div style={{fontSize:11.5,color:C.text,lineHeight:1.45,minWidth:0}}>
-            <b>Le serveur ne peut envoyer aucune notification</b> : sa clé manque. Activer ici ne changerait rien.
+            {proprio ? <><b>Le serveur ne peut envoyer aucune notification</b> : sa clé manque. Activer ici ne changerait rien.</>
+              : <span data-push-vendeur=""><b>Les notifications ne sont pas encore activées sur VRM.</b> Activer ici ne changerait rien pour l'instant ; tu n'as rien à faire.</span>}
             {/* ⚠️ UNE ALERTE QUI NE DIT PAS QUOI FAIRE NE SERT À RIEN. Julien n'est
                 pas développeur : la marche à suivre doit être exacte, dans l'ordre,
                 avec le nom du réglage à taper. */}
-            <details className="vrm-repli" style={{marginTop:7}}><summary>Ce qu'il faut faire, une seule fois</summary>
-              <div>1. Ouvrir <a href="https://vercel.com/shopcancale35-7638s-projects/cancale-v67/settings/environment-variables" target="_blank" rel="noreferrer" style={{color:C.accent,fontWeight:600}}>Vercel → Settings → Environment Variables</a></div>
+            {proprio && <details className="vrm-repli" style={{marginTop:7}}><summary>Ce qu'il faut faire, une seule fois</summary>
+              <div>1. Ouvrir <a href="https://vercel.com/dashboard" target="_blank" rel="noreferrer" style={{color:C.accent,fontWeight:600}}>Vercel → projet de l'installation → Settings → Environment Variables</a></div>
               <div>2. Ajouter la variable <code style={{fontSize:10.5}}>VAPID_PRIVATE_KEY</code> avec la clé privée que je t'ai donnée</div>
               <div>3. Redéployer (Deployments → ⋯ → Redeploy)</div>
               <div style={{marginTop:4,color:C.muted}}>La clé privée ne peut pas vivre dans le code : le dépôt est public, n'importe qui pourrait envoyer des notifications sur ton téléphone.</div>
-            </details>
+            </details>}
           </div>
         </div>
       )}
@@ -59080,6 +59223,8 @@ class EcranGardeFou extends React.Component {
 // et un verrou qu'on croit posé est pire qu'un verrou absent. Chacun est
 // SONDÉ pour de bon, et chaque ligne dit quoi faire s'il manque.
 function SecuriteSetting() {
+  // (1er nov.) Les consignes Vercel/Supabase de ce panneau : au propriétaire seul.
+  const proprio = useEstProprietaire();
   const [st, setSt] = useState(null);
   const [ext, setExt] = useState(undefined);   // undefined = pas encore demandé
   const [copie, setCopie] = useState('');
@@ -59254,6 +59399,7 @@ function SecuriteSetting() {
         etat={srv == null ? 'pas encore vérifié' : srv.serviceKey && srv.owner ? 'prêtes' : srv.serviceKey ? 'propriétaire manquant' : 'clé de service manquante'}
         d={srv == null ? PAS_SU : srv.serviceKey && srv.owner
           ? "Elles écriront sous ton compte une fois la base cloisonnée."
+          : !proprio ? "Pas encore activé sur VRM : c'est réglé de notre côté, tu n'as rien à faire."
           : "AVANT la migration, dans Vercel → Settings → Environment Variables : SUPABASE_SERVICE_KEY (Supabase → Settings → API → service_role) et VRM_OWNER_UID. Sans ça, emails et rappels ne seront plus enregistrés."}/>
       <Ligne t="Extension identifiée" ok={ext === undefined ? null : !!(ext && ext.connecte)}
         etat={ext === undefined ? '…' : !ext ? 'extension absente ici' : ext.connecte ? (ext.email || 'connectée') : 'pas connectée'}
@@ -59395,9 +59541,10 @@ async function lirePreuvesAdresses() {
   } catch (_) { return null; }
 }
 // Demande un lien pour UNE adresse. Rend `{ etat, message }` (etat `null` = pas su).
-async function demanderPreuveAdresse(adresse) {
+// `essai` (1er nov.) : un relais Apple, sur SA demande — le lien part quand même.
+async function demanderPreuveAdresse(adresse, essai) {
   try {
-    const r = await fetch('/api/email-rattacher?mode=preuve-demander', { method: 'POST', cache: 'no-store', headers: { 'Content-Type': 'application/json', ...enTeteSession() }, body: JSON.stringify({ adresse }) });
+    const r = await fetch('/api/email-rattacher?mode=preuve-demander', { method: 'POST', cache: 'no-store', headers: { 'Content-Type': 'application/json', ...enTeteSession() }, body: JSON.stringify(essai === true ? { adresse, essai: true } : { adresse }) });
     const j = await r.json().catch(() => ({}));
     if (r.ok && j && j.ok) return { etat: j.etat, via: j.via || null, message: '' };
     if (r.status === 422) return { etat: 'impossible', message: j.message || '' };
@@ -59417,7 +59564,10 @@ const PREUVE_LIGNE = {
   // demande sort de sa file — « Renvoyer » repart d'une demande neuve.
   echec: { t: "la boîte VRM n'a pas pu envoyer le lien — vérifie l'adresse", alerte: true, geste: 'Renvoyer' },
   aucune: { t: 'pas confirmée — ses emails sont mis de côté', alerte: true, geste: 'Confirmer' },
-  impossible: { t: "relais Apple : VRM ne peut pas y envoyer de lien", alerte: true, geste: '' },
+  // (1er nov.) Plus de quarantaine silencieuse : la ligne dit que ses emails sont
+  // mis de côté, l'aide dessous dit pourquoi et le geste sûr, et « Essayer quand
+  // même » envoie le lien (si Apple le laisse passer, l'adresse est prouvée).
+  impossible: { t: "relais Apple « Masquer mon adresse » : pas confirmée — ses emails sont mis de côté", alerte: true, geste: 'Essayer quand même' },
 };
 // (`estRelaisApple`, déclarée plus haut, sert aussi ici — une règle, §11.)
 function EmailsSetting({onComptes}) {
@@ -59500,9 +59650,11 @@ function EmailsSetting({onComptes}) {
     return true;
   };
   // ── LA PREUVE (22 octobre) : un lien part À CETTE ADRESSE ─────────────────
-  const confirmerAdresse = async (adr, silencieux) => {
+  const confirmerAdresse = async (adr, silencieux, essai) => {
     setPreuveBusy(adr);
-    const r = await demanderPreuveAdresse(adr);
+    // Un relais Apple : un clic de SA part (« Essayer quand même », « Renvoyer ») envoie
+    // le lien malgré tout (`essai`) ; la demande automatique, elle, ne l'envoie jamais.
+    const r = await demanderPreuveAdresse(adr, essai === true || estRelaisApple(adr));
     setPreuveBusy('');
     if (!silencieux || r.etat === null) {
       if (r.etat === 'prouvee') toast(r.via === 'compte' ? `${adr} est ton adresse de connexion VRM, déjà confirmée : c'est fait.` : `${adr} est confirmée.`);
@@ -59696,6 +59848,12 @@ function EmailsSetting({onComptes}) {
               <span data-adresse-preuve={ep.etat} data-adresse-retenue={ep.retenue ? 'oui' : 'non'} style={{display:'flex',alignItems:'center',gap:5,marginTop:3,fontSize:11.5,lineHeight:1.4,color:lp.alerte && !ep.retenue ? C.warn : C.muted}}>
                 {ep.etat === 'prouvee' && <span aria-hidden="true" style={{display:'inline-flex'}}><Icon name="check" size={12}/></span>}
                 <span>{lp.t}{ep.etat === 'prouvee' && ep.via === 'compte' ? ' (ton adresse de connexion VRM)' : ''}{ep.etat === 'envoyee' && ep.envoyeLe ? ` le ${quandLisible(ep.envoyeLe)} — ouvre-le depuis cette boîte` : ''}{ep.etat === 'transition' && estRelaisApple(adr) ? ' (relais Apple : aucun lien ne peut y arriver, elle reste à toi)' : ''}</span>
+              </span>
+            )}
+            {ep && estRelaisApple(adr) && !['prouvee', 'transition'].includes(ep.etat) && (
+              <span data-relais-apple-aide={ep.etat} style={{display:'block',marginTop:4,fontSize:11.5,lineHeight:1.45,color:C.muted}}>
+                Pourquoi : Apple n'accepte en principe sur ce relais que les emails de Vinted — le lien de VRM risque de ne pas y arriver, et tant que l'adresse n'est pas confirmée, ses emails sont mis de côté (rien n'est perdu, ils te reviennent dès la confirmation).
+                {' '}<b style={{color:C.text}}>Le plus sûr</b> : sur Vinted, Paramètres → Compte → E-mail, mets ton adresse habituelle (Gmail, Outlook…), puis ajoute-la ici et confirme-la. Tu peux aussi essayer d'envoyer le lien quand même.
               </span>
             )}
           </span>
@@ -60320,6 +60478,9 @@ function VentesToutes({ sites, ventesVinted, ventesKO, comptes, panelOff, lbcVen
   if (voit('vinted')) {
     if (ventesVinted === undefined) etats.push(['vinted', 'lecture', 'Vinted : lecture en cours…']);
     else if (ventesVinted === null) etats.push(['vinted', 'pas-su', 'Vinted : ventes pas lues — rien n’est perdu, réessaie dans un moment.']);
+    // (1er nov., vendeur neuf) Aucun compte relié : ce n'est pas « aucune vente »,
+    // c'est « rien lu » — le geste, comme les autres sites (« jamais lu »).
+    else if (Array.isArray(comptes) && comptes.length === 0 && !(Array.isArray(ventesVinted) && ventesVinted.length)) etats.push(['vinted', 'jamais', 'Vinted : aucun compte relié — installe l’extension Chrome sur ton ordinateur, puis ouvre vinted.fr une fois connecté.']);
     else if (ventesKO && ventesKO.length) {
       const labels = load('vinted_account_labels', {}) || {};
       const noms = ventesKO.map((u) => labels[u] || ((comptes || []).find((a) => String(a.vinted_user_id) === String(u)) || {}).login || ('#' + u));
@@ -60675,7 +60836,9 @@ function AppCoeur() {
     if(navigator.serviceWorker) navigator.serviceWorker.addEventListener('message',onMsg);
     // (31 oct.) Un écran qui n'a pas `setTab` (le journal des emails) y mène par
     // un événement — seulement vers un onglet connu.
-    const onAller=(e)=>{ const t=e&&e.detail; if(typeof t==='string'&&TABS_OK.includes(t)) setTab(t); };
+    // (1er nov.) Ou vers un chemin `?tab=…&section=…` (le même que les liens et
+    // les notifications) : « Paramètres → Comptes eBay » depuis Annonces · eBay.
+    const onAller=(e)=>{ const t=e&&e.detail; if(typeof t==='string'&&t.startsWith('?')) { goto(t); return; } if(typeof t==='string'&&TABS_OK.includes(t)) setTab(t); };
     window.addEventListener('vrm:aller',onAller);
     return ()=>{ window.removeEventListener('vrm:aller',onAller); if(navigator.serviceWorker) navigator.serviceWorker.removeEventListener('message',onMsg); };
   },[]);
@@ -61185,7 +61348,11 @@ function AppCoeur() {
   })(); return ()=>{ vivant=false; }; },[]);
   const sitesPresents=useMemo(()=>{
     const s=new Set();
-    if(!accountsLoaded || (vintedAccounts||[]).length>0) s.add('vinted');
+    // (1er nov., vendeur neuf) VINTED EST TOUJOURS LÀ — c'est le site principal :
+    // un vendeur qui n'a encore relié aucun compte voyait « Tous les sites ·
+    // Vestiaire » dans Ventes, sans Vinted, et aucun geste. Son écran Vinted dit
+    // « Aucun compte Vinted lié » et le geste (`NoAcc`), comme Annonces.
+    s.add('vinted');
     if(!sitesLus || sitesLus.leboncoin) s.add('leboncoin');
     // eBay : un compte relié au registre, ou des lignes du compte principal
     // d'avant le registre (le compte « implicite » seul ne prouve rien).
@@ -61565,6 +61732,10 @@ function AppCoeur() {
     return () => { window.removeEventListener('vrm:ext', f); signal.arreter(); };
   }, []);
   useEffect(()=>{
+    // (1er nov., vendeur neuf) Comptes LUS et aucun : les ventes Vinted sont un
+    // ensemble vide CONNU (pas « lecture en cours » pour toujours) — l'écran
+    // Ventes dit alors « aucun compte relié » et le geste. Base illisible ⇒ rien.
+    if(accountsLoaded && !baseKO && Array.isArray(vintedAccounts) && vintedAccounts.length===0){ setVentesCoque(v=>v===undefined?[]:v); return; }
     if(!accountsLoaded || !vintedAccounts || vintedAccounts.length===0) return;
     if(!nuagePret) return;              // sinon on compte des comptes qu'il a exclus
     let stop=false;
@@ -61836,7 +62007,7 @@ function AppCoeur() {
     })();
     return ()=>{stop=true;};
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  },[accountsLoaded, vintedAccounts, nuagePret, annoncesTick]);
+  },[accountsLoaded, vintedAccounts, nuagePret, annoncesTick, baseKO]);
 
   // ── « VENDU » : UNE RÈGLE, CELLE DE MA JOURNÉE (§11, 4 octobre) ────────────
   // L'accueil (« Aujourd'hui »), Statistiques (« Vendu ce mois », la courbe) et

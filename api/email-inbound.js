@@ -42,6 +42,7 @@ import { decoderEntitesHtml } from './_lib/entites-html.js';
 import { transactionDuRecu } from './_lib/recu-achat.js';
 import { suiviDuSujet, finsDesLignes, sortiParSuivis, SELECT_TRANSP_META, ligneTranspDeMeta } from './_lib/suivi-colis.js';
 import { modifierCas } from './_lib/suivi-vinted.js';
+import { estConfirmationTransfert, lireConfirmationTransfert, authentifieGoogle, sansLienConfirmation, idCodeGmail } from './_lib/transfert-gmail.js';
 
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://lgonxzrzjcqthjtbdpzo.supabase.co';
 // ⚠️ CLÉ DE SERVICE QUAND ELLE EXISTE. Ces routes tournent sur le serveur, sans
@@ -472,7 +473,16 @@ async function createProInvoice(sale, acc, cfg, now, attachments) {
   const number = `${cfg.prefixe || 'FA'}-${new Date().getFullYear()}-${('0000' + counter).slice(-4)}`;
   const dateStr = new Date().toLocaleDateString('fr-FR');
   const html = buildInvoiceHtml(cfg, sale, number, dateStr);
-  const status = cfg.autoSend ? 'queued' : 'draft';
+  // ⚠️ (1er nov., VRM vendu à d'autres) LA FILE D'ENVOI N'EST LUE QUE POUR LE
+  //    PROPRIÉTAIRE DE L'INSTALLATION : le script Gmail collectif envoie depuis
+  //    SA boîte (son nom, son quota) et ne lit `mode=factures` que dans le
+  //    contexte `VRM_OWNER_UID`. Une facture d'un autre vendeur mise « queued »
+  //    restait « en cours d'envoi » à vie et l'acheteur ne recevait rien. Pour
+  //    un autre vendeur : toujours un brouillon (il l'ouvre et l'envoie lui-même,
+  //    l'app le lui dit) — jamais une promesse d'envoi que rien ne tiendra.
+  const proprioInst = String(process.env.VRM_OWNER_UID || '').trim();
+  const envoiParVRM = !!proprioInst && String(proprietaireCourant() || '') === proprioInst;
+  const status = cfg.autoSend && envoiParVRM ? 'queued' : 'draft';
   // Le 2e document Vinted Pro (formulaire de retour), joint à la facture envoyée
   // à l'acheteur. On garde ses octets jusqu'à l'envoi (puis `facture-envoyee` les
   // purge — hygiène d'égress). Absent ⇒ chaîne vide, l'app le signale.
@@ -482,10 +492,10 @@ async function createProInvoice(sale, acc, cfg, now, attachments) {
     designation: sale.designation || '', prix: sale.prix || '',
     buyerName: sale.nomComplet || '', buyerEmail: sale.email, buyerAddress: sale.adresse || '',
     numero: sale.numero || '', pseudo: sale.pseudo || '', transaction: sale.transaction || '',
-    account: acc.login || '', html, createdAt: now,
+    account: acc.login || '', html, createdAt: now, ...(status === 'queued' ? { queuedAt: now } : {}),
     retourB64: retour ? retour.b64 : '', retourNom: retour ? retour.nom : '',
   } }]);
-  return { number, status, retour: !!retour };
+  return { number, status, retour: !!retour, envoiParVRM };
 }
 
 // Journal des emails traités (30 derniers, même les « ignorés ») : permet de
@@ -1414,6 +1424,35 @@ async function chargerRegistreEmails() {
 // déclaré son adresse d'arrivée (`peutReclamer`).
 // Base non cloisonnée (une seule boutique) : on n'arrive jamais ici (voir
 // l'appel), et la forme d'avant reste.
+// (1er nov.) Le code de validation d'un transfert Gmail, rendu à SON vendeur.
+// L'identité : l'adresse source nommée par Gmail, déclarée ET prouvée par un
+// seul vendeur (le registre gardé, la même règle que tous ses emails). Message
+// illisible ou pas signé par Google ⇒ quarantaine que personne ne réclame ;
+// adresse pas (encore) prouvée ⇒ quarantaine réclamable par celui qui la
+// prouvera. Le lien de validation du message n'est rangé nulle part.
+async function rendreCodeTransfert(req, res, corpsBrut, mail, registre, conflits) {
+  const lu = lireConfirmationTransfert(mail);
+  const mailSur = { ...mail, text: sansLienConfirmation(mail.text), html: sansLienConfirmation(mail.html), attachments: [] };
+  const authBrute = corpsBrut && (corpsBrut.authentification || (corpsBrut.headers && (corpsBrut.headers['authentication-results'] || corpsBrut.headers['Authentication-Results'])));
+  // Un rejeu (`__ownerForce`) vient d'une quarantaine réclamable : elle n'a été
+  // rangée avec son adresse source QUE si le message était authentifié.
+  const auth = req.__ownerForce ? true : authentifieGoogle(authBrute);
+  if (!lu || !auth) {
+    await mettreEnQuarantaine(mailSur, [], !lu ? 'confirmation de transfert Gmail illisible' : 'confirmation de transfert Gmail non signée par Google');
+    await repondre(res, 200, { ok: true, quarantaine: true, transfert: { rendu: false, raison: !lu ? 'illisible' : 'non-authentifie' } });
+    return;
+  }
+  const owner = req.__ownerForce ? String(req.__ownerForce) : resoudreProprietaire([lu.source], registre, '', conflits).owner;
+  if (!owner) {
+    await mettreEnQuarantaine(mailSur, [lu.source], "code de transfert Gmail : l'adresse source n'est confirmée par aucun vendeur");
+    await repondre(res, 200, { ok: true, quarantaine: true, transfert: { rendu: false, raison: 'adresse-non-prouvee' } });
+    return;
+  }
+  { const st = contexteVendeur.getStore(); if (st) st.owner = owner; }
+  const ok = await supabaseUpsert([{ id: idCodeGmail(lu.source), data: { adresse: lu.source, code: lu.code, recuLe: new Date().toISOString(), messageId: String(mail.messageId || '').slice(0, 300) } }]);
+  if (!ok) { await repondre(res, 503, { ok: false, erreur: 'base-injoignable', message: "Je n'ai pas pu ranger le code de validation : renvoie-le." }); return; }
+  await repondre(res, 200, { ok: true, type: 'connu-sans-action', transfert: { rendu: true } });
+}
 async function mettreEnQuarantaine(mail, adresses, raison) {
   try {
     const id = 'email_quarantaine_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
@@ -1917,6 +1956,11 @@ export async function traiterEmail(req, res) {
     return;
   }
   const registre = (lu && lu.registre) || {};
+  // (1er nov.) LE CODE DE VALIDATION D'UN TRANSFERT GMAIL arrive sur la boîte
+  // collective (son adresse de réception ne désigne personne) : il est rendu au
+  // vendeur qui a PROUVÉ l'adresse source que Gmail nomme — jamais à un autre
+  // (api/_lib/transfert-gmail.js). Traité avant la résolution ordinaire.
+  if (estConfirmationTransfert(mail)) { await rendreCodeTransfert(req, res, corpsBrut, mail, registre, (lu && lu.conflits) || []); return; }
   const adresses = adressesDeLivraison(corpsBrut, mail);
   const proprio = req.__ownerForce
     ? { owner: String(req.__ownerForce), via: 'rattachement' }
@@ -2302,7 +2346,7 @@ export async function traiterEmail(req, res) {
             facture = await createProInvoice(data, acc, cfg, now, mail.attachments);
             if (facture && !facture.deja) try { await pushOnce({
               title: facture.status === 'queued' ? '🧾 Facture en cours d\'envoi' : '🧾 Facture préparée',
-              body: `${facture.number} — ${data.designation || 'article'} (${data.prix} €) pour ${data.email}${facture.status === 'queued' ? '' : ' — envoi manuel dans Factures'}`,
+              body: `${facture.number} — ${data.designation || 'article'} (${data.prix} €) pour ${data.email}${facture.status === 'queued' ? '' : facture.envoiParVRM ? ' — envoi manuel dans Factures' : ' — ouvre-la dans Factures et envoie-la à l’acheteur'}`,
               tag: `inv-${facture.number}`, url: DESTINATIONS.facture(),
               _cat: 'facture',
             }); } catch (_) {}

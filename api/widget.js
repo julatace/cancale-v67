@@ -102,10 +102,24 @@ async function ownerDuToken(req, res) {
     return null;
   }
   if (!cl) return ''; // une seule boutique : rien ne change
-  let mains;
+  // ⚠️ (1er nov., VRM vendu à d'autres — §4.5) SUPABASE PLAFONNE UNE RÉPONSE À
+  //    1 000 LIGNES SANS LE DIRE. Une seule lecture de toutes les lignes `main`
+  //    ne voyait que les 1 000 premiers vendeurs : au-delà, la clé du widget
+  //    n'était « à personne » et le vendeur recevait 401. On lit PAR PAGES
+  //    (`Range`, ordre stable par `owner`) jusqu'à une page incomplète ; une
+  //    page ratée = « pas su » (503), jamais une liste tronquée prise pour
+  //    entière. Seuls deux scalaires sont projetés (§4.4).
+  let mains = [];
+  const PAGE = 1000;
   try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.main&select=owner,vrm_widget_token:data->>vrm_widget_token`, { headers: HEADERS });
-    mains = r.ok ? await r.json() : null;
+    for (let debut = 0; ; debut += PAGE) {
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.main&select=owner,vrm_widget_token:data->>vrm_widget_token&order=owner.asc`, { headers: { ...HEADERS, 'Range-Unit': 'items', Range: `${debut}-${debut + PAGE - 1}` } });
+      const page = (r.ok || r.status === 206) ? await r.json() : null;
+      if (!Array.isArray(page)) { mains = null; break; }
+      mains.push(...page);
+      if (page.length < PAGE) break;
+      if (debut > 200000) { mains = null; break; }   // garde-fou : jamais une liste tronquée prise pour entière
+    }
   } catch (_) { mains = null; }
   // « Pas su lire » ne vaut pas « aucun vendeur » : on ne devine pas, on le dit.
   if (!Array.isArray(mains)) {

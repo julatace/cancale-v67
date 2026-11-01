@@ -94,12 +94,17 @@ export async function lireReceptionEmail({owner,url,headers,fetcher=fetch}) {
   lire(`owner=eq.${encodeURIComponent(owner)}&select=vinted_user_id,login&limit=501`,'vinted_accounts'),
   lire(`owner=eq.${encodeURIComponent(owner)}&id=eq.panel_comptes_etat&select=data&limit=1`),
  ]);
+ // (1er nov.) Les codes de validation Gmail rendus À CE vendeur (api/_lib/transfert-gmail.js) :
+ // trois scalaires, filtrés par SON identifiant. Lecture ratée ⇒ rien d'affirmé (`null`).
+ let codesGmail=null;
+ try{codesGmail=await lire(`owner=eq.${encodeURIComponent(owner)}&id=like.vrm_gmail_transfert_*&select=adresse:data->>adresse,code:data->>code,recuLe:data->>recuLe&limit=50`);}catch(_){codesGmail=null;}
  const {correspondances,declarees,associes,adresseSuivie}=reglesComptes({registre,main,comptes,etats});
  const date=v=>Number.isFinite(Date.parse(v))?new Date(v).toISOString():null;
+ const codeDe=a=>{if(!Array.isArray(codesGmail))return undefined;const l=codesGmail.filter(c=>c&&normAdresse(c.adresse)===a&&/^\d{6,12}$/.test(String(c.code||''))).sort((x,y)=>String(y.recuLe||'').localeCompare(String(x.recuLe||'')))[0];return l?{code:String(l.code),recuLe:date(l.recuLe)}:null;};
  const emails=lignes.slice(0,100).map(({id,data:d={}})=>({id,adresses:[...new Set((Array.isArray(d.adresses)?d.adresses:[]).map(adresseSuivie))],subject:String(d.subject||'Email sans objet').slice(0,300),from:String(d.from||'').slice(0,200),at:date(d.at),sourceDate:date(d.sourceDate),etat:['integre','a-verifier','erreur'].includes(d.etat)?d.etat:'a-verifier',type:String(d.type||'information').slice(0,60),raison:String(d.raison||'').slice(0,300),documentsVerifies:false,suppressionAutorisee:false}));
  for(const email of emails){const associesMail=[...new Map(email.adresses.flatMap(associes).map(c=>[c.id,c])).values()];email.compte=associesMail.length===1?associesMail[0]:null;email.compteAmbigu=associesMail.length>1;}
  const dates=(journal[0]?.data?.entries||[]).map(e=>date(e.at)).filter(Boolean).sort().reverse();
- const adresses=[...new Set([...declarees,...Object.values(correspondances).map(normAdresse).filter(a=>a.includes('@')&&!estAdresseCollectrice(a))])].map(adresse=>({adresse,declaree:declarees.includes(adresse),comptes:associes(adresse),derniereReception:emails.filter(x=>x.adresses.includes(adresse)).map(x=>date(x.at)).filter(Boolean).sort().at(-1)||null}));
+ const adresses=[...new Set([...declarees,...Object.values(correspondances).map(normAdresse).filter(a=>a.includes('@')&&!estAdresseCollectrice(a))])].map(adresse=>({adresse,declaree:declarees.includes(adresse),comptes:associes(adresse),derniereReception:emails.filter(x=>x.adresses.includes(adresse)).map(x=>date(x.at)).filter(Boolean).sort().at(-1)||null,codeGmail:codeDe(adresse)}));
  const succes=passages.find(p=>p.id==='vrm_email_collecteur_succes')?.data;
  const passage=passages.find(p=>p.id==='vrm_email_collecteur_passage')?.data;
  return {ok:true,emails,adresses,plus:lignes.length>100,limite:100,dernierEmail:[emails[0]?.at,dates[0]].filter(Boolean).sort().at(-1)||null,collecteur:{dernierSucces:date(succes?.at),dernierPassage:date(passage?.at),etat:['debut','succes','erreur'].includes(passage?.etat)?passage.etat:null},attenteMesurable:false};

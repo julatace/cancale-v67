@@ -382,7 +382,14 @@ async function preuveDemander(req, res) {
     if (!await ecrireNeutre(id, { owner: u.id, adresse: a, etat: 'prouvee', via: 'compte', prouveeLe: iso })) { indispo(res); return; }
     res.status(200).json({ ok: true, etat: 'prouvee', via: 'compte' }); return;
   }
-  if (relaisApple(a)) { res.status(422).json({ ok: false, etat: 'impossible', raison: 'relais-apple', message: "Un relais Apple n'accepte que les emails de Vinted : aucun lien ne peut y arriver." }); return; }
+  // (1er nov., VRM vendu à d'autres) UN RELAIS APPLE « MASQUER MON ADRESSE »
+  // n'accepte en principe que les expéditeurs enregistrés par l'application
+  // (Vinted) — non mesuré d'ici. Sans demande explicite, on le DIT (422, la
+  // raison et le geste : mettre une adresse habituelle sur Vinted). Sur SA
+  // demande (`essai: true`), le lien part quand même — mêmes freins, même
+  // preuve, rien d'attribué tant qu'il n'est pas cliqué depuis SA session :
+  // si Apple le laisse passer, l'adresse est prouvée ; sinon rien ne change.
+  if (relaisApple(a) && corps.essai !== true) { res.status(422).json({ ok: false, etat: 'impossible', raison: 'relais-apple', message: "Une adresse « Masquer mon adresse » d'Apple n'accepte en principe que les emails de Vinted : le lien de VRM risque de ne jamais y arriver. Le plus sûr : sur Vinted (Paramètres → Compte → E-mail), mets ton adresse habituelle, puis déclare-la ici." }); return; }
   if (!cleLiens(process.env.SUPABASE_SERVICE_KEY || '')) { res.status(503).json({ ok: false, error: 'cle-service', message: "Le serveur ne sait pas encore fabriquer de lien (clé de service absente) — rien n'est envoyé." }); return; }
   // Freins : un renvoi toutes les 10 minutes, 5 par adresse et par jour,
   // 10 adresses différentes par vendeur et par jour (VRM n'arrose personne).
