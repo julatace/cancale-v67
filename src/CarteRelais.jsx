@@ -60,7 +60,7 @@ async function chercherRepere(p) {
 }
 
 // Les repères des points (cle → {lat,lon} | null | 'reseau'), cherchés quand `actif`.
-function useReperes(groupes, actif) {
+export function useReperes(groupes, actif) {
   const [reperes, setReperes] = React.useState({});
   React.useEffect(() => {
     if (!actif) return undefined;
@@ -81,13 +81,13 @@ function useReperes(groupes, actif) {
   }, [actif, groupes.map((g) => g.cle + g.geocode).join('|')]);
   return reperes;
 }
-const repereDe = (g, reperes) => (g.repere ? g.repere : (reperes[g.cle] && reperes[g.cle].lat != null ? reperes[g.cle] : null));
+export const repereDe = (g, reperes) => (g.repere ? g.repere : (reperes[g.cle] && reperes[g.cle].lat != null ? reperes[g.cle] : null));
 
 const jourFr = (s) => { const t = Date.parse(String(s || '') + 'T12:00:00'); return Number.isFinite(t) ? new Date(t).toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' }) : ''; };
 
 // `etiquette(p)` : le texte de l'épingle (le numéro du point dans la colonne, ou
 // son nombre de colis dans l'ancien bloc).
-function FondRelais({ points, selection, onChoisir, C, etiquette, hauteur = 260, onEtat }) {
+export function FondRelais({ points, selection, onChoisir, C, etiquette, hauteur = 260, onEtat }) {
   const boite = React.useRef(null);
   const [etat, setEtat] = React.useState('charge');
   React.useEffect(() => { if (onEtat) onEtat(etat); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [etat]);
