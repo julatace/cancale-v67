@@ -25,7 +25,23 @@
 //   G. le filtre choisi est retenu par écran (rouvert après un autre écran) ;
 //   H. badge ambre sur Colis quand des colis sont à expédier (nombre publié) ;
 //   I. « Plus » : groupés par tâche, rien de la barre du bas en double, aucun
-//      groupe vide, aucune entrée d'un site sans compte.
+//      groupe vide, aucune entrée d'un site sans compte ;
+// (31 oct., soir — « Achats à côté de À retirer », « pas la même chose dans les
+// deux onglets », « enlever Plateforme en bas des onglets glissants ») :
+//   J. « Plus » (téléphone) n'a PAS de groupe Plateformes ; la colonne
+//      (ordinateur, sa maquette) le garde ; dans les deux, « Colis à retirer »
+//      et « Achats » sont dans le même groupe, l'un juste sous l'autre ; la
+//      colonne tient sans défiler à 900 px de haut, et porte les compteurs
+//      PUBLIÉS (colis à poster, colis à retirer) — aucun sans nombre publié ;
+//   K. « Colis à retirer » et « Achats » sont deux écrans DISTINCTS : le
+//      premier n'a ni onglets d'étapes, ni liste, ni chiffres d'achats ; le
+//      second n'a ni « À retirer », ni colis groupés par relais ;
+//   L. chaque section propre d'un site est joignable depuis SA tâche :
+//      Ventes · eBay (Commandes · À traiter · Offres), Annonces · eBay
+//      (Annonces · Promotion), Achats · Leboncoin / eBay / Vestiaire, Colis ·
+//      Leboncoin, Annonces · Vestiaire (sa clé Photoroom), Paramètres → Comptes
+//      eBay ; et les anciens liens (`plat_ebay&section=…`, `plat_leboncoin&
+//      section=colis`, `plat_vestiaire`, `cat_achats`) y mènent.
 // `BANC_PORT` (défaut 8940), `CAPTURES=<dossier>` pour garder les captures,
 // `BANC_TAILLE=390|1512` pour une seule taille.
 'use strict';
@@ -62,7 +78,10 @@ const LBC_VENTES = {
 const cmd = (id, prix, titre, d) => ({ orderId: id, creationDate: d.toISOString(), orderPaymentStatus: 'PAID', orderFulfillmentStatus: 'NOT_STARTED', pricingSummary: { priceSubtotal: { value: prix, currency: 'EUR' }, total: { value: prix, currency: 'EUR' } }, lineItems: [{ title: titre, sku: 'VRM-12', legacyItemId: '1234567', quantity: 1 }] });
 const LIGNES_BASE = [
   { id: `harvest_${UID}_orders_sold`, data: { capturedAt: cap, payload: { my_orders: VENTES } } },
-  { id: `harvest_${UID}_orders_purchased`, data: { capturedAt: cap, payload: { my_orders: [] } } },
+  { id: `harvest_${UID}_orders_purchased`, data: { capturedAt: cap, payload: { my_orders: [
+    vente(8001, 'Nike Dunk Low gris taille 41', 45, 'Commande finalisée', il(6), { transaction_user_status: 'completed' }),
+    vente(8002, 'Asics Gel-Kayano 14 argent taille 42', 60, 'Le colis a été déposé au point relais', il(2), { transaction_user_status: 'needs_action' }),
+  ] } } },
   { id: `harvest_${UID}_listings`, data: { capturedAt: cap, payload: { items: ANNONCES, pagination: { total_entries: ANNONCES.length } } } },
   { id: 'lbc_ventes', data: { ventes: LBC_VENTES } },
   { id: 'lbc_listings', data: { items: {}, lectures: {} } },
@@ -88,7 +107,7 @@ srv.on('error', (e) => { console.log('❌ le port ' + PORT + ' est pris (' + e.c
 // `options.sansVestiaire` : aucune ligne Vestiaire (pas de compte) ; sinon des ventes.
 // `options.local` : ce que le navigateur porte déjà (filtre retenu, colis publiés).
 const ouvrir = async (b, tel, tab, options = {}) => {
-  const ctx = await b.newContext(tel ? { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2 } : { viewport: { width: 1512, height: 950 } });
+  const ctx = await b.newContext(tel ? { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2 } : { viewport: { width: 1512, height: options.hauteur || 950 } });
   const pg = await ctx.newPage();
   const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
   await pg.clock.install({ time: maintenant });
@@ -148,6 +167,12 @@ const etat = (pg) => pg.evaluate(() => {
     tombe: /pas pu s'afficher|Cannot access|is not defined/.test(document.body.innerText),
     espace: (document.querySelector('[data-entete-plateforme]') || {}).getAttribute ? document.querySelector('[data-entete-plateforme]').getAttribute('data-entete-plateforme') : '',
     sections: [...document.querySelectorAll('nav[aria-label="Sections de la plateforme"] [data-section]')].map((b) => b.getAttribute('data-section')),
+    section: t ? t.getAttribute('data-tache-section') : '',
+    sousActif: ((document.querySelector('[data-tache-sous] [aria-current="page"]') || {}).getAttribute || (() => ''))
+      .call(document.querySelector('[data-tache-sous] [aria-current="page"]'), 'data-section') || '',
+    ecranAchats: (document.querySelector('[data-ecran-achats]') || { getAttribute: () => '' }).getAttribute('data-ecran-achats'),
+    reglageOuvert: [...document.querySelectorAll('[data-sous-ecran]')].filter((x) => !x.hidden).map((x) => x.getAttribute('data-sous-ecran')).join(','),
+    colisSite: (document.querySelector('[data-filtre-site="colis"] button[aria-pressed="true"]') || { getAttribute: () => '' }).getAttribute('data-site'),
   };
 });
 const choisir = async (pg, site) => { const b = pg.locator(`[data-filtre-site] button[data-site="${site}"]`); if (!(await b.count())) return false; await b.first().click(); await pg.waitForTimeout(900); return true; };
@@ -162,7 +187,7 @@ const choisir = async (pg, site) => { const b = pg.locator(`[data-filtre-site] b
       const qui = tel ? '390 px' : '1512 px';
       console.log(`── ${qui} : A. la navigation`);
       await essaie(`${qui} : navigation`, async () => {
-        const { ctx, pg, errs } = await ouvrir(b, tel, 'journee', { local: { vrm_colis_aposter: { total: 2, enRetard: 0, vinted: 2, ebay: 0, at: maintenant.getTime() } } });
+        const { ctx, pg, errs } = await ouvrir(b, tel, 'journee', { local: { vrm_colis_aposter: { total: 2, enRetard: 0, vinted: 2, ebay: 0, at: maintenant.getTime() }, vrm_colis_retirer: { total: 3, prets: 3, sansCode: 0, aVerifier: 0, urgents: 0, at: maintenant.getTime() } } });
         if (tel) {
           const barre = await pg.evaluate(() => [...document.querySelectorAll('.vrm-mobile-nav > button')].map((x) => ({ lib: (x.querySelector('.vrm-nav-label') || x).innerText.trim(), h: Math.round(x.getBoundingClientRect().height), entree: x.getAttribute('data-nav-entree') || '' })));
           dit(barre.length === 5 && barre.map((x) => x.lib).join('|') === 'Journée|Annonces|Ventes|Colis|Plus', 'A. la barre du bas : Journée · Annonces · Ventes · Colis · Plus', JSON.stringify(barre));
@@ -173,17 +198,27 @@ const choisir = async (pg, site) => { const b = pg.locator(`[data-filtre-site] b
           await pg.waitForTimeout(500);
           const f = await pg.evaluate(() => { const m = document.querySelector('.vrm-sheet'); if (!m) return null; return { groupes: [...m.querySelectorAll('[data-nav-groupe]')].map((g) => ({ t: g.getAttribute('data-nav-groupe'), n: g.querySelectorAll('[data-nav-entree]').length })), entrees: [...m.querySelectorAll('[data-nav-entree]')].map((e) => e.getAttribute('data-nav-entree')), petits: [...m.querySelectorAll('[data-nav-entree]')].filter((e) => e.getBoundingClientRect().height < 44).length }; });
           await capture(pg, 'plus-telephone');
-          dit(!!f && f.groupes.map((g) => g.t).join('|') === 'Vendre|Expédier|Gérer|Argent|Plateformes|Moi', 'I. « Plus » groupé par tâche : Vendre · Expédier · Gérer · Argent · Plateformes · Moi', JSON.stringify(f && f.groupes));
+          dit(!!f && f.groupes.map((g) => g.t).join('|') === 'Vendre|Gérer|Argent|Moi', 'J. « Plus » groupé par tâche, SANS « Plateformes » ni « Expédier » : Vendre · Gérer · Argent · Moi', JSON.stringify(f && f.groupes));
+          const exp = await pg.evaluate(() => [...document.querySelectorAll('.vrm-sheet [data-nav-groupe="Gérer"] [data-nav-entree]')].map((e) => e.getAttribute('data-nav-entree')));
+          dit(exp.join('|') === 'garage|achats', 'J. « Gérer » : Stock puis Achats ; plus d’entrée « Colis à retirer » (ils vivent dans Colis)', exp.join('|'));
+          dit(!!f && !f.entrees.some((x) => /^plat_|^ebay_|^leboncoin$/.test(x)), 'J. aucune entrée de site dans « Plus »', JSON.stringify(f && f.entrees));
           dit(!!f && f.groupes.every((g) => g.n > 0), 'I. aucun groupe vide', JSON.stringify(f && f.groupes));
           dit(!!f && !['journee', 'annonces', 'ventes', 'cat_bord'].some((x) => f.entrees.includes(x)), 'I. rien de la barre du bas en double dans « Plus »', JSON.stringify(f && f.entrees));
           dit(!!f && new Set(f.entrees).size === f.entrees.length, 'I. aucune entrée deux fois', JSON.stringify(f && f.entrees));
-          dit(!!f && ['messages', 'republier', 'favoris', 'retraits', 'garage', 'achats', 'dashboard', 'compta', 'plat_ebay', 'plat_leboncoin', 'plat_vestiaire', 'communaute', 'settings'].every((x) => f.entrees.includes(x)), 'I. « Plus » porte Messages, Republier, Favoris, Retraits, Stock, Achats, Statistiques, Comptabilité, eBay, Leboncoin, Vestiaire, Communauté, Paramètres', JSON.stringify(f && f.entrees));
+          dit(!!f && ['messages', 'republier', 'favoris', 'achats', 'garage', 'dashboard', 'compta', 'communaute', 'settings'].every((x) => f.entrees.includes(x)), 'I. « Plus » porte Messages, Republier, Favoris, Colis à retirer, Achats, Stock, Statistiques, Comptabilité, Communauté, Paramètres', JSON.stringify(f && f.entrees));
           dit(!!f && f.petits === 0, 'I. rangées ≥ 44 px', String(f && f.petits));
         } else {
           const col = await pg.evaluate(() => ({ taches: [...document.querySelectorAll('.vrm-sidebar [data-nav-taches] [data-nav-entree]')].map((e) => e.getAttribute('data-nav-entree')), groupes: [...document.querySelectorAll('.vrm-sidebar [data-nav-groupe]')].map((g) => g.getAttribute('data-nav-groupe')), toutes: [...document.querySelectorAll('.vrm-sidebar [data-nav-entree]')].map((e) => e.getAttribute('data-nav-entree')), badge: (document.querySelector('.vrm-sidebar [data-badge-nav="cat_bord"]') || { getAttribute: () => '' }).getAttribute('data-badge-n'), pub: (() => { try { return JSON.parse(localStorage.getItem('vrm_colis_aposter')).total; } catch (_) { return null; } })() }));
           await capture(pg, 'colonne-ordinateur');
           dit(col.taches.join('|') === 'journee|annonces|ventes|messages|cat_bord', 'A. la colonne : Ma journée · Annonces · Ventes · Messages · Colis', col.taches.join('|'));
-          dit(col.groupes.join('|') === 'Vendre|Expédier|Gérer|Argent|Plateformes|Moi', 'A. puis les groupes par tâche', col.groupes.join('|'));
+          dit(col.groupes.join('|') === 'Vendre|Gérer|Argent|Plateformes|Moi', 'A/J. puis les groupes par tâche — « Plateformes » gardé dans la colonne (sa maquette)', col.groupes.join('|'));
+          const exp = await pg.evaluate(() => [...document.querySelectorAll('.vrm-sidebar [data-nav-groupe="Gérer"] [data-nav-entree]')].map((e) => e.getAttribute('data-nav-entree')));
+          dit(exp.join('|') === 'garage|achats' && !col.toutes.includes('retraits'), 'J. colonne, « Gérer » : Stock puis Achats ; aucune entrée « Colis à retirer »', exp.join('|'));
+          const plat = await pg.evaluate(() => [...document.querySelectorAll('.vrm-sidebar [data-nav-groupe="Plateformes"] [data-nav-entree]')].map((e) => e.getAttribute('data-nav-entree')));
+          dit(plat.join('|') === 'plat_ebay|plat_leboncoin|plat_vestiaire', 'J. colonne, « Plateformes » : eBay · Leboncoin · Vestiaire', plat.join('|'));
+          const cpt = await pg.evaluate(() => { const o = Object.fromEntries([...document.querySelectorAll('.vrm-sidebar [data-badge-nav]')].map((b) => [b.getAttribute('data-badge-nav'), b.getAttribute('data-badge-n')])); try { o.pubR = String(JSON.parse(localStorage.getItem('vrm_colis_retirer')).total); } catch (_) {} return o; });
+          dit(cpt.ventes === String(col.pub) && cpt.cat_bord === String(col.pub) && cpt.annonces === '4', 'J. compteurs de la colonne = les nombres PUBLIÉS (à poster ; annonces : les 4 sans numéro de la cloche)', JSON.stringify(cpt));
+          dit(!cpt.plat_ebay && !cpt.plat_leboncoin && !cpt.messages, 'J. aucun compteur sans nombre connu (eBay, Leboncoin, Messages)', JSON.stringify(cpt));
           dit(new Set(col.toutes).size === col.toutes.length, 'A. aucune entrée deux fois dans la colonne', col.toutes.join('|'));
           dit(col.toutes[col.toutes.length - 1] === 'settings', 'A. Paramètres en bas', col.toutes.join('|'));
           dit(col.badge !== '' && col.badge === String(col.pub) && Number(col.badge) > 0, 'H. badge sur Colis = le nombre publié', JSON.stringify({ b: col.badge, pub: col.pub }));
@@ -278,6 +313,107 @@ const choisir = async (pg, site) => { const b = pg.locator(`[data-filtre-site] b
         await ctx.close();
       });
 
+      // (31 oct., soir — Julien : « l'onglet Colis à retirer sert à rien si dans Colis on a
+      //  les codes de retrait ») Les colis à retirer vivent dans COLIS : la colonne, et
+      //  leur détail dessous ; Achats ne les montre plus.
+      console.log(`── ${qui} : K. les colis à retirer dans Colis, Achats sans eux`);
+      await essaie(`${qui} : colis à retirer`, async () => {
+        const { ctx, pg, errs } = await ouvrir(b, tel, 'cat_bord');
+        const f = await pg.evaluate(() => ({ col: !!document.querySelector('[data-cc-colonne="retirer"]'), ferme: !!document.querySelector('[data-colis-retraits="ferme"]'), ouvert: !!document.querySelector('[data-colis-retraits="ouvert"]') }));
+        dit(f.col && f.ferme && !f.ouvert, 'K. Colis : la colonne « À retirer », et la porte du détail (fermée tant qu’on ne la demande pas)', JSON.stringify(f));
+        await pg.locator('[data-colis-retraits-ouvrir]').first().click(); await pg.waitForTimeout(1500);
+        await capture(pg, `retraits-${tel ? 'tel' : 'ordi'}`);
+        const r = await pg.evaluate(() => { const z = document.querySelector('[data-colis-retraits="ouvert"]'); return { z: !!z, ecran: z && z.querySelector('[data-ecran-achats]') ? z.querySelector('[data-ecran-achats]').getAttribute('data-ecran-achats') : '',
+          onglets: z ? z.querySelectorAll('[data-achats-onglet]').length : -1, kpis: z ? z.querySelectorAll('.vrm-achats-kpis, .vrm-achats-search, .vrm-achats-recus-bas').length : -1,
+          relais: z ? z.querySelectorAll('.vrm-pickup-card, [data-pickup-total]').length : 0, tache: !!document.querySelector('[data-tache]') }; });
+        dit(r.z && r.ecran === 'retraits' && !r.tache, 'K. Colis : le détail des colis à retirer s’ouvre DANS Colis', JSON.stringify(r));
+        dit(r.onglets === 0 && r.kpis === 0, 'K. le détail : ni onglets d’étapes, ni recherche, ni chiffres, ni reçus d’achat', JSON.stringify(r));
+        dit(r.relais > 0, 'K. le détail montre le colis au point relais (l’achat 8002)', JSON.stringify(r));
+        dit(errs.length === 0, `${qui} : aucune erreur`, errs.join(' | '));
+        await ctx.close();
+      });
+      await essaie(`${qui} : achats`, async () => {
+        const { ctx, pg, errs } = await ouvrir(b, tel, 'achats');
+        await pg.waitForTimeout(800);
+        await capture(pg, `achats-${tel ? 'tel' : 'ordi'}`);
+        const a = await pg.evaluate(() => ({ ecran: (document.querySelector('[data-ecran-achats]') || { getAttribute: () => '' }).getAttribute('data-ecran-achats'),
+          onglets: [...document.querySelectorAll('[data-achats-onglet]')].map((x) => x.getAttribute('data-achats-onglet')),
+          kpis: document.querySelectorAll('.vrm-achats-kpis').length,
+          relais: document.querySelectorAll('.vrm-pickup-card, [data-pickup-total], [data-retraits-vide], [data-a-confirmer], [data-colis-retraits]').length,
+          versColis: (document.querySelector('[data-achats-vers-colis]') || { getAttribute: () => '' }).getAttribute('data-achats-vers-colis') }));
+        const e = await etat(pg);
+        dit(e.tache === 'achats' && e.site === 'vinted' && a.ecran === 'achats', 'K. ?tab=achats ouvre Achats · Vinted', JSON.stringify({ e, a }));
+        dit(a.onglets.join('|') === 'route|recus|all', 'K. Achats : En route · Reçus · Tous — pas d’« À retirer »', a.onglets.join('|'));
+        dit(a.kpis === 1 && a.relais === 0, 'K. Achats : ses chiffres, et aucun bloc de colis à retirer', JSON.stringify(a));
+        if (a.versColis) {
+          await pg.locator('[data-achats-vers-colis]').first().click(); await pg.waitForTimeout(1500);
+          const v = await pg.evaluate(() => ({ ouvert: !!document.querySelector('[data-colis-retraits="ouvert"]'), tache: !!document.querySelector('[data-tache]') }));
+          dit(v.ouvert && !v.tache, 'K. « N colis à retirer → Colis » ouvre Colis sur le détail des colis à retirer', JSON.stringify(v));
+          await pg.goBack().catch(() => {}); await pg.waitForTimeout(900);
+          await pg.evaluate(() => window.dispatchEvent(new CustomEvent('vrm:aller', { detail: 'achats' }))); await pg.waitForTimeout(900);
+        } else dit(false, 'K. Achats : la ligne « N colis à retirer → Colis » (l’achat 8002 est au relais)', JSON.stringify(a));
+        dit(e.filtres.join('|') === 'vinted|leboncoin|ebay|vestiaire', 'L. Achats : un filtre par site (Vinted · Leboncoin · eBay · Vestiaire)', e.filtres.join('|'));
+        for (const [site, sel] of [['leboncoin', '[data-lbc-achats-vide], [data-lbc-achat]'], ['ebay', '[data-ebay-achats-onglet], [data-ebay-achats-gagnes]'], ['vestiaire', '[data-vc-achats]']]) {
+          await choisir(pg, site);
+          const x = await etat(pg);
+          const n = await pg.evaluate((q) => document.querySelectorAll(q).length, sel);
+          dit(x.tache === 'achats' && x.site === site && n > 0, `L. Achats · ${site} rend les achats de ce site`, JSON.stringify({ x: x.site, n }));
+        }
+        dit(errs.length === 0, `${qui} : aucune erreur`, errs.join(' | '));
+        await ctx.close();
+      });
+
+      console.log(`── ${qui} : L. chaque section de site joignable depuis sa tâche`);
+      await essaie(`${qui} : sous-onglets eBay`, async () => {
+        const { ctx, pg, errs } = await ouvrir(b, tel, 'ventes');
+        await choisir(pg, 'ebay');
+        let e = await etat(pg);
+        const ss = await pg.evaluate(() => [...document.querySelectorAll('[data-tache-sous="ventes.ebay"] [data-section]')].map((x) => x.getAttribute('data-section')));
+        dit(ss.join('|') === 'ventes|agent|offres' && e.section === 'ventes', 'L. Ventes · eBay : Commandes · À traiter · Offres, sur Commandes', JSON.stringify({ ss, s: e.section }));
+        for (const sec of ['agent', 'offres']) {
+          await pg.locator(`[data-tache-sous] [data-section="${sec}"]`).first().click(); await pg.waitForTimeout(700);
+          e = await etat(pg);
+          const t = await pg.evaluate(() => (document.querySelector('[data-tache] section[aria-label="eBay"]') || { innerText: '' }).innerText.trim().length);
+          dit(e.tache === 'ventes' && e.site === 'ebay' && e.section === sec && e.sousActif === sec && t > 10, `L. Ventes · eBay · ${sec} rendu`, JSON.stringify({ e: e.section, t }));
+        }
+        if (!tel) await capture(pg, 'ventes-ebay-offres-ordi');
+        await pg.locator(tel ? '.vrm-mobile-nav [data-nav-entree="annonces"]' : '.vrm-sidebar [data-nav-entree="annonces"]').first().click(); await pg.waitForTimeout(700);
+        await choisir(pg, 'ebay');
+        const sa = await pg.evaluate(() => [...document.querySelectorAll('[data-tache-sous="annonces.ebay"] [data-section]')].map((x) => x.getAttribute('data-section')));
+        dit(sa.join('|') === 'annonces|promo', 'L. Annonces · eBay : Annonces · Promotion', sa.join('|'));
+        await pg.locator('[data-tache-sous] [data-section="promo"]').first().click(); await pg.waitForTimeout(700);
+        e = await etat(pg);
+        dit(e.tache === 'annonces' && e.section === 'promo', 'L. Annonces · eBay · Promotion rendu', JSON.stringify(e));
+        await choisir(pg, 'vestiaire');
+        const v = await pg.evaluate(() => ({ cle: document.querySelectorAll('[data-tache] [data-photoroom-cle], [data-tache] [data-photoroom-bloc]').length, sous: document.querySelectorAll('[data-tache-sous]').length }));
+        dit(v.cle > 0 && v.sous === 0, 'L. Annonces · Vestiaire porte la clé Photoroom (écran Vestiaire, jamais les Paramètres)', JSON.stringify(v));
+        dit(errs.length === 0, `${qui} : aucune erreur`, errs.join(' | '));
+        await ctx.close();
+      });
+      await essaie(`${qui} : colis leboncoin`, async () => {
+        const { ctx, pg, errs } = await ouvrir(b, tel, 'cat_bord');
+        await pg.locator('[data-filtre-site="colis"] button[data-site="leboncoin"]').first().waitFor({ timeout: 10000 }).catch(() => {});
+        const s1 = await pg.evaluate(() => [...document.querySelectorAll('[data-filtre-site="colis"] button[data-site]')].map((x) => x.getAttribute('data-site')));
+        dit(s1.includes('toutes') && s1.includes('leboncoin'), 'L. Colis : la rangée de sites porte « Leboncoin »', s1.join('|'));
+        await pg.locator('[data-filtre-site="colis"] button[data-site="leboncoin"]').first().click(); await pg.waitForTimeout(900);
+        let e = await etat(pg);
+        const n = await pg.evaluate(() => document.querySelectorAll('[data-colis-leboncoin] [data-lbc-colis-vide], [data-colis-leboncoin] [data-bord-card]').length);
+        dit(e.colisSite === 'leboncoin' && n > 0, 'L. Colis · Leboncoin rend les colis Leboncoin', JSON.stringify({ c: e.colisSite, n }));
+        await pg.locator('[data-filtre-site="colis"] button[data-site="vinted"]').first().click(); await pg.waitForTimeout(900);
+        e = await etat(pg);
+        const back = await pg.evaluate(() => ({ lbc: document.querySelectorAll('[data-colis-leboncoin]').length }));
+        dit(e.colisSite === 'vinted' && back.lbc === 0, 'L. Colis : une autre pastille ramène aux colonnes, filtrées sur son site', JSON.stringify({ c: e.colisSite, back }));
+        dit(errs.length === 0, `${qui} : aucune erreur`, errs.join(' | '));
+        await ctx.close();
+      });
+      if (!tel) await essaie('1512×900 : la colonne tient sans défiler', async () => {
+        const { ctx, pg } = await ouvrir(b, false, 'journee', { hauteur: 900 });
+        const h = await pg.evaluate(() => { const z = document.querySelector('.vrm-sidebar .vrm-rail-scroll'); const der = [...document.querySelectorAll('.vrm-sidebar [data-nav-entree]')].pop(); return z && der ? { sh: z.scrollHeight, ch: z.clientHeight, bas: Math.round(der.getBoundingClientRect().bottom), vh: innerHeight, der: der.getAttribute('data-nav-entree') } : null; });
+        await capture(pg, 'colonne-900');
+        dit(!!h && h.sh <= h.ch + 1 && h.bas <= h.vh && h.der === 'settings', 'J. à 900 px de haut, toute la colonne se voit sans défiler (Paramètres en dernier)', JSON.stringify(h));
+        await ctx.close();
+      });
+
       console.log(`── ${qui} : F. les anciens liens profonds`);
       const LIENS = [
         ['plat_vinted', { tache: 'ventes', site: 'vinted' }], ['cat_ventes', { tache: 'ventes', site: 'vinted' }],
@@ -285,18 +421,24 @@ const choisir = async (pg, site) => { const b = pg.locator(`[data-filtre-site] b
         ['plat_leboncoin', { tache: 'ventes', site: 'leboncoin' }], ['leboncoin', { tache: 'annonces', site: 'leboncoin' }],
         ['plat_ebay', { tache: 'ventes', site: 'ebay' }], ['ebay_annonces', { tache: 'annonces', site: 'ebay' }],
         ['cat_msg', { tache: 'messages', site: 'vinted' }], ['ebay_messages', { tache: 'messages', site: 'ebay' }],
-        ['ebay_agent', { espace: 'ebay', section: 'agent' }], ['plat_vestiaire', { vestiaire: true }],
-        ['cat_achats', { ecran: true }], ['cat_bord', { ecran: true }],
+        ['ebay_agent', { tache: 'ventes', site: 'ebay', section: 'agent' }], ['plat_vestiaire', { tache: 'annonces', site: 'vestiaire' }],
+        ['plat_ebay&section=agent', { tache: 'ventes', site: 'ebay', section: 'agent' }], ['plat_ebay&section=offres', { tache: 'ventes', site: 'ebay', section: 'offres' }],
+        ['plat_ebay&section=promo', { tache: 'annonces', site: 'ebay', section: 'promo' }], ['plat_ebay&section=achats', { tache: 'achats', site: 'ebay' }],
+        ['plat_ebay&section=compte', { reglage: 'ebay' }], ['plat_leboncoin&section=colis', { colis: 'leboncoin' }],
+        ['plat_leboncoin&section=achats', { tache: 'achats', site: 'leboncoin' }], ['plat_vinted&section=achats', { tache: 'achats', site: 'vinted' }],
+        ['cat_achats', { retraitsColis: true }], ['retraits', { retraitsColis: true }], ['achats', { tache: 'achats', site: 'vinted' }], ['cat_bord', { ecran: true }],
       ];
       for (const [id, attendu] of LIENS) {
         await essaie(`${qui} : ?tab=${id}`, async () => {
           const { ctx, pg, errs } = await ouvrir(b, tel, id);
           const e = await etat(pg);
           let bon;
-          if (attendu.tache) bon = e.tache === attendu.tache && e.site === attendu.site && e.presse === attendu.site;
-          else if (attendu.espace) bon = e.espace === attendu.espace && e.sections.includes(attendu.section) && !e.sections.includes('ventes');
-          else if (attendu.vestiaire) bon = !e.blanc && !e.tache && /vestiaire/i.test(await pg.evaluate(() => document.querySelector('.vrm-main').innerText));
+          if (attendu.tache) bon = e.tache === attendu.tache && e.site === attendu.site && e.presse === attendu.site && (!attendu.section || (e.section === attendu.section && e.sousActif === attendu.section));
+          else if (attendu.reglage) bon = !e.tache && e.reglageOuvert === attendu.reglage && await pg.evaluate(() => { const x = document.querySelector('[data-sous-ecran="ebay"]'); return !!(x && !x.hidden && x.querySelector('[data-ebay-compte-section]')); });
+          else if (attendu.colis) bon = !e.tache && e.colisSite === attendu.colis && await pg.evaluate(() => !!document.querySelector('[data-colis-leboncoin] [data-lbc-colis-vide], [data-colis-leboncoin] [data-bord-card]'));
+          else if (attendu.retraitsColis) bon = !e.tache && await pg.evaluate(() => !!document.querySelector('[data-colis-retraits="ouvert"] [data-ecran-achats="retraits"]') && !!document.querySelector('[data-cc-colonne="retirer"]'));
           else bon = !e.blanc && !e.tache;
+          bon = bon && !e.espace;
           dit(bon && !e.blanc && !e.tombe && errs.length === 0, `F. ?tab=${id} → ${JSON.stringify(attendu)}`, JSON.stringify({ ...e, errs }));
           await ctx.close();
         });

@@ -103,9 +103,10 @@ const envoisEbay = []; let avertir = false;
   const introuvables = [];
   for (const nom of ['Ventes', 'Annonces', 'Messages', 'Offres', 'Compte']) {
     // (31 oct.) Chaque « sous-onglet » d'hier a son adresse : la tâche filtrée sur eBay
-    //  (Ventes, Annonces, Messages) ou l'espace eBay sur sa section (Offres, Compte).
+    //  (Ventes, Annonces, Messages). (31 oct., soir) Offres : le sous-onglet de Ventes · eBay ;
+    //  Compte : le panneau « Comptes eBay » des Paramètres (l'ancien lien y mène).
     const URLS = { Ventes: '?tab=ventes&site=ebay', Annonces: '?tab=annonces&site=ebay', Messages: '?tab=messages&site=ebay', Offres: '?tab=plat_ebay&section=offres', Compte: '?tab=plat_ebay&section=compte' };
-    try { await pg.goto(`http://localhost:${PORT}/${URLS[nom]}`, { waitUntil: 'domcontentloaded' }); await pg.waitForSelector(nom === 'Offres' || nom === 'Compte' ? `nav.vrm-platform-tabs [data-section][aria-current="page"]` : `[data-tache-site="ebay"]`, { timeout: 15000 }); await pg.waitForTimeout(1500); } catch (e) { introuvables.push(nom + ' (' + String(e && e.message).split('\n')[0].slice(0, 90) + ')'); }
+    try { await pg.goto(`http://localhost:${PORT}/${URLS[nom]}`, { waitUntil: 'domcontentloaded' }); await pg.waitForSelector(nom === 'Offres' ? `[data-tache-sous] nav.vrm-platform-tabs [data-section="offres"][aria-current="page"]` : nom === 'Compte' ? `[data-sous-ecran="ebay"]:not([hidden]) [data-ebay-compte-section]` : `[data-tache-site="ebay"]`, { timeout: 15000 }); await pg.waitForTimeout(1500); } catch (e) { introuvables.push(nom + ' (' + String(e && e.message).split('\n')[0].slice(0, 90) + ')'); }
     parOnglet[nom] = { n: (await pg.$$('[data-poster="ebay"]')).length, vendre: (await pg.$$('text=Vendre un article sur eBay')).length,
       titre: await pg.evaluate(() => /Publier sur eBay · connexion/.test(document.body.innerText)) };
   }

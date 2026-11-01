@@ -108,43 +108,24 @@ async function main() {
     b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
     for (const vp of [{ width: 390, height: 780 }, { width: 1512, height: 950 }]) {
       const T = vp.width + 'px';
+      // (1er nov.) L'ANCIEN ÉCRAN « À RETIRER » D'ACHATS N'EXISTE PLUS (Julien : « l'onglet
+      // Colis à retirer sert à rien si dans Colis on a les codes de retrait »). Son lien
+      // (`cat_achats`, notifications) mène à Colis : la colonne « À retirer » porte les
+      // points relais ET leur carte (jugés plus bas, essai « Colis »), le détail dessous
+      // porte les codes et les blocs « Va à ». La carte n'est dessinée qu'UNE fois (§7).
       await essaie(T, async () => {
-        const { ctx, pg, errs, ban } = await preparer(b, vp);
+        const { ctx, pg, errs } = await preparer(b, vp);
         await pg.goto(`http://localhost:${PORT}/?tab=cat_achats`, { waitUntil: 'domcontentloaded' });
-        await pg.locator('[data-relais-carte]').first().waitFor({ timeout: 20000 });
+        await pg.locator('[data-colis-retraits="ouvert"]').first().waitFor({ timeout: 20000 });
+        await pg.locator('[data-cc-colonne="retirer"] [data-relais-point]').first().waitFor({ timeout: 25000 }).catch(() => {});
         await pg.waitForTimeout(1200);
-        const tete = await pg.evaluate(() => { const e = document.querySelector('[data-relais-carte]'); return e ? { etat: e.getAttribute('data-relais-carte'), p: e.getAttribute('data-relais-points'), a: e.getAttribute('data-relais-arrives'), t: e.getAttribute('data-relais-attendus'), txt: e.innerText } : null; });
-        dit(tete && tete.etat === 'fermee' && tete.p === '2' && tete.a === '2' && tete.t === '2', `${T} « Par point relais » : 2 points, 2 colis arrivés, 2 attendus (rien ne charge avant le clic)`, JSON.stringify(tete));
-        // (La recherche SANS code postal est celle qui existait avant : les lieux des
-        // e-mails géocodés pour « Ma tournée », `vrm_geo_cache_v2`. Celle de la carte
-        // porte toujours le code postal lu.)
-        const miens = () => ban.filter((u) => /[?&]postcode=/.test(u));
-        dit(miens().length === 0, `${T} la carte ne cherche aucune adresse tant qu'elle est fermée`, JSON.stringify(ban));
-        await pg.click('[data-relais-carte] > button');
-        await pg.waitForSelector('[data-relais-point][data-relais-repere="oui"]', { timeout: 10000 }).catch(() => {});
-        await pg.waitForTimeout(600);
-        const pts = await pg.evaluate(() => [...document.querySelectorAll('[data-relais-point]')].map((e) => ({ cle: e.getAttribute('data-relais-point'), a: e.getAttribute('data-relais-point-arrives'), t: e.getAttribute('data-relais-point-attendus'), rp: e.getAttribute('data-relais-repere'), txt: e.innerText, est: [...e.querySelectorAll('[data-relais-attendu]')].map((x) => x.getAttribute('data-relais-estimee')) })));
-        const k = pts.find((p) => p.cle === 'kusmitea|56000');
-        dit(!!k && k.a === '2' && k.t === '1' && /Kusmi Tea/.test(k.txt), `${T} UN point Kusmi Tea : le colis de l'e-mail ET celui de la conversation, et l'achat qui y va`, JSON.stringify(pts.map((p) => [p.cle, p.a, p.t])));
-        dit(!!k && k.est[0] === (new Date(Date.now() + 2 * 86400000).toISOString().slice(0, 10)) && /arrivée estimée/.test(k.txt), `${T} l'achat en route : son arrivée « estimée » (celle du suivi Vinted)`, k && k.txt.slice(0, 200));
-        dit(!!k && k.rp === 'oui', `${T} Kusmi Tea a son repère (adresse sûre à la Base Adresse Nationale)`, k && k.rp);
-        const t = pts.find((p) => p.cle === 'tabacinconnu|29200');
-        dit(!!t && t.rp === 'non' && /adresse lue est incomplète/.test(t.txt) && /date d'arrivée pas encore dite/.test(t.txt), `${T} un point sans rue : listé SANS repère, et c'est dit ; arrivée « pas encore dite »`, t && t.txt.slice(0, 200));
-        dit(miens().length === 1 && /postcode=56000/.test(miens()[0]) && !ban.some((u) => /Brest|29200/.test(decodeURIComponent(u))), `${T} UNE recherche d'adresse, avec le code postal lu (jamais pour une adresse incomplète)`, JSON.stringify(ban));
-        const note = await pg.evaluate(() => (document.querySelector('[data-relais-note]') || {}).innerText || '');
-        dit(/1 achat en route sans destination connue/.test(note), `${T} l'achat sans destination est compté à part (jamais deviné)`, note.slice(0, 200));
-        const fond = await pg.evaluate(() => { const e = document.querySelector('[data-relais-fond]'); return e ? e.getAttribute('data-relais-fond') : null; });
-        dit(fond === 'ko' || fond === 'pret' || fond === 'charge', `${T} la carte se pose (ou dit qu'elle est indisponible : fond hors ligne au banc), la liste reste`, String(fond));
-        // Les épingles : posées par MapLibre quand le navigateur dessine (WebGL) ;
-        // UNE seule ici (le seul point dont l'adresse est sûre), avec son nombre.
-        const ep = await pg.evaluate(() => [...document.querySelectorAll('[data-relais-epingle]')].map((e) => [e.getAttribute('data-relais-epingle'), e.getAttribute('data-relais-n'), e.hasAttribute('data-relais-arrives')]));
-        if (ep.length) dit(ep.length === 1 && ep[0][0] === 'kusmitea|56000' && ep[0][1] === '3' && ep[0][2] === true, `${T} UNE épingle (Kusmi Tea, 3 colis), aucune pour le point sans adresse sûre`, JSON.stringify(ep));
-        else console.log(`INFO ${T} pas d'épingle dessinée ici (navigateur du banc sans WebGL) — la liste porte le contrôle`);
-        const board = await pg.evaluate(() => document.querySelectorAll('.vrm-pickup-point').length);
-        dit(board >= 1, `${T} les blocs « Va à » de l'onglet restent là, sous la carte`, String(board));
-        const r = await pg.evaluate(() => ({ sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth, h: (document.querySelector('[data-relais-carte] > button') || { getBoundingClientRect: () => ({ height: 0 }) }).getBoundingClientRect().height }));
-        dit(r.sw <= r.cw + 1 && r.h >= 44, `${T} aucun débordement, l'en-tête se touche au doigt`, JSON.stringify(r));
-        if (process.env.SHOTS) await pg.screenshot({ path: path.join(process.env.SHOTS, `retrait-relais-carte-${vp.width}.png`), fullPage: false });
+        const r = await pg.evaluate(() => { const d = document.querySelector('[data-colis-retraits="ouvert"]');
+          return { col: document.querySelectorAll('[data-cc-colonne="retirer"] [data-relais-point]').length, cartesDetail: d ? d.querySelectorAll('[data-relais-carte]').length : -1,
+            blocs: d ? d.querySelectorAll('.vrm-pickup-point').length : 0, sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth }; });
+        dit(r.col >= 2, `${T} l'ancien lien mène à Colis : la colonne « À retirer » liste les points relais`, JSON.stringify(r));
+        dit(r.cartesDetail === 0, `${T} la carte n'est pas redessinée dans le détail (une carte, celle de la colonne)`, JSON.stringify(r));
+        dit(r.blocs >= 1, `${T} les blocs « Va à » (codes) sont dans le détail, sous les colonnes`, JSON.stringify(r));
+        dit(r.sw <= r.cw + 1, `${T} aucun débordement`, JSON.stringify(r));
         dit(!errs.length, `${T} aucune erreur d'app`, errs[0]);
         await ctx.close();
       });
