@@ -128,7 +128,7 @@ export const EN_COURS = 'localisation en cours…';
 export function codePasSurCarte(p, reperes) {
   if (!p || p.inconnu) return 'inconnu';
   if (repereDe(p, reperes)) return '';
-  if (p.sansCarte) return 'adresse';
+  if (p.sansCarte) return p.sansCarteCode || 'adresse';
   const r = reperes[p.cle];
   if (r === undefined) return p.geocode ? 'cherche' : 'adresse';
   if (r === 'reseau') return 'reseau';

@@ -105,7 +105,7 @@ import { DISCORD_ERREURS } from "./communaute/discordErreurs.js";
 import { noterTicketDiscord, ecouterDiscord, suivreCodeDiscord, etatCodeDiscord, reprendreDiscord, oublierTicketDiscord } from "./communaute/discordAttente.js";
 import { DESCRIPTION_ORGANISATION } from "./operations/description.js";
 // (31 oct.) Colis → « À retirer » : la carte des points relais (règle pure + carte).
-import { regrouperRelais, pointsARetirer } from "./relaisColis.js";
+import { regrouperRelais, pointsARetirer, lieuCompleteParTransporteur } from "./relaisColis.js";
 import CarteRelaisColis, { ColonneRetirer } from "./CarteRelais.jsx";
 import { CarteTournee, TourneePleinEcran } from "./Tournee.jsx";
 import { UneLigne } from "./UneLigne.jsx";
@@ -45846,9 +45846,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         geste: `Passe sur Vinted${qui ? ` connecté sur ${qui}` : ''} : l’extension y lit le point et le code. Ou ouvre la conversation du colis.` };
     };
     const lieuDe = (raw) => { const cl = cleanLieu(raw); return { lieuNom: cl.nom || '', lieuAdresse: cl.adresse || '' }; };
+    // (1er nov.) Le lieu d'un e-mail complété par le suivi du transporteur du
+    // MÊME n° (Vinted Go : rue + ville du point où le colis attend) — par
+    // identité, jamais par le nom ; deux adresses ⇒ rien, dit (`lieuConflit`).
+    const lieuDeLigne = (t) => { const k = suiviDeLigne(t); return lieuCompleteParTransporteur(lieuDe(t && t.lieu), (t && t.transp) || (tpmC && k ? tpmC.get(k) : null)); };
     const codeDeLigne = (t) => codeRetrait(t && t.code) || '';
     for (const t of (pickupUnion.emailList || [])) {
-      const a = achatDuColis(t, buysBase, indexSuivisAchats); const lu = lieuDe(t.lieu); const code = codeDeLigne(t); const ej = etatColisEmail(t, maintenant).jours;
+      const a = achatDuColis(t, buysBase, indexSuivisAchats); const lu = lieuDeLigne(t); const code = codeDeLigne(t); const ej = etatColisEmail(t, maintenant).jours;
       L.push({ cle: 'r:e:' + (suiviDeLigne(t) || t.id || ''), groupe: 'retirer', site: 'vinted', nom: nomAvecTaille(a ? a.title : (nomTr(t.carrier) ? `Colis ${nomTr(t.carrier)}` : 'Colis à retirer'), a), photo: a ? photoAchat(a) : (t.photo || null),
         etat: [lu.lieuNom || nomTr(t.carrier), dernierJour(ej) || (code ? code : (qrImage(t) ? 'QR code' : 'code pas encore lu'))].filter(Boolean).join(' · '), ambre: Number.isFinite(ej) && ej <= 1, ouvrir: true,
         ...lu, transporteur: t.carrier || '', code, code2: codeRetrait(t.code2) || '', qr: !!qrImage(t) && !code, jours: Number.isFinite(ej) ? ej : null, ...(lu.lieuNom ? {} : { sansLieu: sansLieuEmail(t) }) });
@@ -45861,7 +45865,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     }
     for (const x of (pickupUnion.aVerifier || [])) {
       const o = x.kind === 'email' ? (x.o || achatDuColis(x.t, buysBase, indexSuivisAchats)) : x.o;
-      const lu = x.kind === 'email' ? lieuDe(x.t && x.t.lieu) : lieuDe((relaisDe(x.o) || {}).lieu);
+      const lu = x.kind === 'email' ? lieuDeLigne(x.t) : lieuDe((relaisDe(x.o) || {}).lieu);
       const code = x.kind === 'email' ? codeDeLigne(x.t) : codeRetrait((relaisDe(x.o) || {}).code);
       L.push({ cle: x.kind === 'email' ? 'r:e:' + (suiviDeLigne(x.t) || (x.t && x.t.id) || '') : 'r:v:' + (x.o && x.o.transaction_id), groupe: 'retirer', site: 'vinted', nom: nomAvecTaille(o ? o.title : (x.t && nomTr(x.t.carrier) ? 'Colis ' + nomTr(x.t.carrier) : 'Colis à retirer'), o), photo: o ? photoAchat(o) : ((x.t && x.t.photo) || null),
         etat: [lu.lieuNom || (x.kind === 'email' ? nomTr(x.t && x.t.carrier) : ''), 'à vérifier : délai dépassé ou incident'].filter(Boolean).join(' · '), aVerifier: true, horsCompte: true, ouvrir: true,

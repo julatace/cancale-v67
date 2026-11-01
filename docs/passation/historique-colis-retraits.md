@@ -2380,3 +2380,70 @@ jugée sur `data-raison`), `colis-relais-push`, `navigation-tache` : verts.
 
 **Geste de Julien** : aucun. Ouvrir la tournée : chaque relais a une épingle avec son nombre, ou
 dit sous lui pourquoi il n'est pas sur la carte.
+
+## 1er nov. — Vinted Go : l'adresse de la consigne lue dans le suivi (par le n°)
+
+Julien, sur Colis → À retirer et la tournée : « Kusmi Tea · 13 Rue Saint-Vincent · 4 colis à
+retirer · encore 3 jours — Pas sur la carte : le message donne la rue du point mais ni son code
+postal ni sa ville » ; « je sais que tu peux avoir les infos en regardant sur Vinted Go ».
+
+**Sources regardées (réseau ouvert depuis le conteneur, lecture seule)** :
+1. **La réponse publique du suivi Vinted Go** `carrier.vintedgo.com/public/v3/tracking_events/{n}`
+   (déjà lue par le serveur depuis le 29 oct., relayée par l'extension en secours, `vg-v3`) —
+   **RETENUE**. Mesurée sur une vraie réponse : `{ tracking_events: [{ id, message, timestamp,
+   metadata, banner_message, group_header, group, state }], meta: { banner, expiration_time,
+   contextual_faq } }` ; l'évènement `ready_for_pickup` porte `metadata: { address: "24 Rue Hoche,
+   Vannes, FR", point_id: 107232 }` — rue, ville, pays, **jamais de code postal** ; tous les autres
+   évènements ont `metadata: {}`. L'ancien lecteur ne cherchait qu'un « CP Ville » : il ne lisait
+   **rien** (ni rue ni ville), et le message « Le colis est prêt à être retiré en consigne » n'a pas
+   de nom entre parenthèses (`lieuNom` vide aussi). C'est le point de CE n° (une identité, §5).
+2. **La page de suivi `vintedgo.com/fr/tracking/{n}`** (Next.js, rendue côté serveur) : son
+   `pointInfo` porte `{ id, code, point_type, name, address (rue), city, lat, lng, … }` — la
+   position EXACTE et le nom, toujours **sans code postal**. Écartée pour l'instant : c'est une page
+   HTML de ~66 Ko (pas une API), la forme peut changer sans prévenir, et la rue + la ville de la
+   réponse JSON suffisent à la Base Adresse (mode « ville », la ville exigée). L'API qui la nourrit
+   n'est pas publique (`/public/v3/points/{id}`, `pickup_points`, `carrier_locations`… : 404).
+3. **Le localisateur de points** `vintedgo.com/fr/carrier-locations` : une carte par zone
+   (`bounds`), pas de recherche par n° de suivi — un rattachement y serait par NOM : refusé (§5).
+4. **Les données Vinted lues par l'extension** (`relaisDestination`, `harvest_{uid}_pickup_points`) :
+   déjà branchées (achats en route ; liste de points par nom + CP ou même rue) — elles complètent
+   toujours la position quand le nom et la rue concordent.
+
+**Ce qui est fait** :
+- `api/_lib/transporteurs.js` : `lieuVintedGo` lit « rue, Ville, FR » (et « rue, CP Ville, FR » si
+  un jour il vient) ; `lireReponseVintedGo` rend `lieuRue`, `lieuVille`, `lieuCp`, `pointId` ;
+  `ligneApresEssai` les range sur `transp_vinted_{n°}` (gardés si la voie ne lit pas le lieu) ;
+  `SELECT_TRANSP_META` / `ligneTranspDeMeta` les relisent par `meta->>` (aucune migration : la
+  colonne `meta` prend tous les scalaires, 004). Notifications inchangées (`lieuNorm` = nom + CP).
+- `api/_lib/suivi-colis.js` `lieuTransp` : + la rue (Chronopost / Mondial Relay n'en ont pas).
+- `src/relaisColis.js` `lieuCompleteParTransporteur(lu, tr)` : le lieu de l'e-mail complété par la
+  ligne `transp_` du MÊME n° — seulement « disponible »/« retiré », seulement un transporteur qui
+  donne la RUE ; la rue de l'e-mail doit être la même (« St » = « Saint », accents, majuscules),
+  sinon `lieuConflit` (rue, CP ou ville différents) ⇒ `pointsARetirer` ne met **rien** sur la carte
+  (ni Base Adresse, ni liste Vinted) et dit « deux adresses … aucune n'est choisie »
+  (`sansCarteCode: 'deux-adresses'`) ; une consigne Vinted Go encore sans adresse dit « le suivi
+  Vinted Go de ce colis ne l'a pas encore donné : VRM le relit tout seul ; sinon ouvre le suivi
+  Vinted Go du colis une fois dans Chrome » (`vintedgo-pas-lu` — l'extension lit le suivi quand la
+  page est ouverte, `transpVu`). `CarteRelais` `codePasSurCarte` rend ce code.
+- `src/App.jsx` (cartes de Colis, donc aussi la tournée) : `lieuDeLigne` pour les e-mails « à
+  retirer » et « à vérifier » (`t.transp`, sinon `transpMap` par `suiviDeLigne`).
+- Aucune extension neuve : elle relaie déjà la réponse brute, le serveur la lit.
+
+**Preuves** : `audit-vintedgo-adresse` (32 contrôles, la forme réelle anonymisée — n°, ids, horaires
+refaits) : lecteur, ligne rangée, relecture scalaire, `lieuTransp`, règle de l'app (Kusmi Tea
+complété ⇒ un point « 4 » cherchable, Base Adresse même ville / autre ville refusée, liste Vinted ⇒
+CP et position ; pas lu ⇒ raison + geste ; deux rues / deux villes ⇒ rien ; Mondial Relay inchangé),
+branchement de Colis — **13 rouges** sur `origin/main`. Banc `tournee` §K (390 tactile + 1512) :
+4 e-mails Vinted Go sans CP et leurs lignes `transp_` FABRIQUÉES par le vrai code du serveur sur la
+forme réelle : « kusmi » ⇒ UNE épingle « 4 », dans la tournée ET dans Colis ; « kusmi-sans » ⇒
+aucune épingle, `vintedgo-pas-lu` ; « kusmi-deux » ⇒ aucune, `deux-adresses` nommant l'autre rue.
+Bancs `retrait-relais-carte`, `colis-colonnes`, `colis-relais-push`, audits `relais-carte`,
+`carte-relais`, `retrait-fiable`, `statut-transporteurs`, `transp-notif` : verts. `transporteurs` :
+les 12 mêmes rouges que sur `origin/main` (antérieurs, pas de ce chantier).
+Non vu : une vraie réponse « disponible » (celle mesurée était retirée — la forme de
+`ready_for_pickup` y est). Le code postal reste absent chez Vinted Go : la carte passe par rue +
+ville (ou la position de la liste Vinted quand nom et rue concordent).
+
+**Geste de Julien** : aucun. Les colis déjà « disponibles » sont relus par le serveur à son prochain
+passage ; s'il voit encore « le suivi Vinted Go … ne l'a pas encore donné », ouvrir une fois le suivi
+Vinted Go du colis dans Chrome.

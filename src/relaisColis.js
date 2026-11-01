@@ -203,6 +203,45 @@ export function regrouperRelais({ arrives = [], attendus = [] } = {}) {
     || String(a.prochaineEstimee || '9999').localeCompare(String(b.prochaineEstimee || '9999')) || b.nAttendus - a.nAttendus || a.nom.localeCompare(b.nom, 'fr'));
 }
 
+// ── LE LIEU COMPLÉTÉ PAR LE TRANSPORTEUR, PAR LE N° DE SUIVI (1er nov.) ─────
+// Julien : « Kusmi Tea · 13 Rue Saint-Vincent — Pas sur la carte : le message
+// donne la rue du point mais ni son code postal ni sa ville » ; « je sais que tu
+// peux avoir les infos en regardant sur Vinted Go ». L'e-mail de la consigne
+// Vinted Go ne porte ni code postal ni ville ; le SUIVI Vinted Go de CE colis
+// (`transp_vinted_{n°}`, lu par le serveur, ou relayé par l'extension) porte
+// l'adresse du point où il attend : rue + ville (mesuré : « 24 Rue Hoche,
+// Vannes, FR », jamais de code postal). Le rattachement est le n° de suivi (une
+// identité, §5) — jamais le nom du point.
+// `lu` : { lieuNom, lieuAdresse } (tel que l'e-mail ou la conversation l'écrit) ;
+// `tr` : la ligne `transp_` du MÊME n° (ou rien).
+// Rend `lu` inchangé, ou complété (`lieuComplete: 'transporteur'`), ou marqué
+// `lieuConflit` quand les deux sources donnent deux adresses (rien n'est choisi).
+// Seul un transporteur qui donne la RUE (Vinted Go) agit ici : Chronopost et
+// Mondial Relay (nom + ville, sans rue) ne changent rien à ce qui marchait.
+const ABREV_RUE = [[/\bst\b/g, 'saint'], [/\bste\b/g, 'sainte'], [/\bav\b/g, 'avenue'], [/\bbd\b/g, 'boulevard'], [/\bpl\b/g, 'place'], [/\bche?m\b/g, 'chemin'], [/\bimp\b/g, 'impasse'], [/\bfbg\b/g, 'faubourg']];
+export const normRue = (s) => {
+  let t = String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+  for (const [re, w] of ABREV_RUE) t = t.replace(re, w);
+  return t.replace(/\s+/g, '');
+};
+export function lieuCompleteParTransporteur(lu, tr) {
+  const base = { lieuNom: String((lu && lu.lieuNom) || ''), lieuAdresse: String((lu && lu.lieuAdresse) || '') };
+  if (!tr || typeof tr !== 'object' || !['disponible', 'retire'].includes(tr.etat)) return base;
+  const trRue = String(tr.lieuRue || '').trim();
+  const trCp = /^\d{5}$/.test(String(tr.lieuCp || '')) ? String(tr.lieuCp) : '';
+  const trVille = String(tr.lieuVille || '').trim();
+  if (!RUE.test(trRue) || (!trCp && trVille.length < 2)) return base;
+  const e = decouperAdresse(base.lieuAdresse);
+  const eRue = RUE.test(String(e.rue || '').trim()) ? String(e.rue).trim() : '';
+  const conflit = (quoi) => ({ ...base, lieuConflit: { quoi, email: [eRue, [e.cp, e.ville].filter(Boolean).join(' ')].filter(Boolean).join(', '), transporteur: [trRue, [trCp, trVille].filter(Boolean).join(' ')].filter(Boolean).join(', '), carrier: String(tr.carrier || '') } });
+  if (eRue && normRue(eRue) !== normRue(trRue)) return conflit('rue');
+  if (e.cp && trCp && e.cp !== trCp) return conflit('cp');
+  if (e.ville && trVille && normNomRelais(e.ville) !== normNomRelais(trVille)) return conflit('ville');
+  const cp = e.cp || trCp, ville = e.ville || trVille, rue = eRue || trRue;
+  if (cp === e.cp && ville === e.ville && rue === eRue) return base;   // rien à ajouter
+  return { lieuNom: base.lieuNom || String(tr.lieuNom || ''), lieuAdresse: `${rue}, ${[cp, ville].filter(Boolean).join(' ')}`, lieuComplete: 'transporteur' };
+}
+
 // ── LE REPÈRE DONNÉ PAR VINTED LUI-MÊME (1er nov.) ──────────────────────────
 // La liste des points relais que l'extension relève chez Vinted
 // (`harvest_{uid}_pickup_points` → nom, adresse, latitude, longitude) porte la
@@ -277,18 +316,32 @@ export function pointsARetirer({ colis = [], attendus = [], pointsVinted = [] } 
   const points = groupes.map((g) => {
     if (g.inconnu) return { ...g, numero: null, repere: null, sansCarte: null, epingle: nombreEpingle(g) };
     let x = { ...g };
-    const lu = repereDepuisPointsVinted(g, pointsVinted);
+    // (1er nov.) Deux adresses pour un colis de ce point (l'e-mail et le suivi du
+    // transporteur, même n°) : AUCUNE n'est mise sur la carte, et c'est dit.
+    const conflit = (g.arrives || []).map((c) => c.lieuConflit).find(Boolean) || null;
+    if (conflit) x.geocode = null;
+    const lu = conflit ? null : repereDepuisPointsVinted(g, pointsVinted);
     const rv = lu && lu.lat != null ? lu : null;
     if (rv) {
       const rue = x.rue || lisible(rv.rue), cp = x.cp || rv.cp, ville = x.ville || lisible(rv.ville);
       x = { ...x, rue, cp, ville, adresse: [rue, [cp, ville].filter(Boolean).join(' ')].filter(Boolean).join(', '), adresseCourte: [rue, ville].filter(Boolean).join(', ') || cp, geocode: adresseGeocodable({ rue, cp, ville }) };
     }
     numero++;
-    const sansCarte = rv ? null
+    // Une consigne Vinted Go dont le suivi n'a pas encore donné l'adresse : dit, avec le geste.
+    const vgPasLu = (x.transporteurs || []).includes('vinted') && !(x.arrives || []).some((c) => c.lieuComplete);
+    let sansCarte = rv ? null
       : !x.rue ? (x.cp || x.ville ? 'le message donne la ville du point mais pas sa rue' : 'le message ne donne pas l’adresse du point')
       : !x.geocode ? 'le message donne la rue du point mais ni son code postal ni sa ville'
       : null;
-    return { ...x, numero, repere: rv ? { lat: rv.lat, lon: rv.lon, source: 'vinted' } : null, sansCarte, vintedPlusieurs: !!(lu && lu.plusieurs), epingle: nombreEpingle(x) };
+    let sansCarteCode = sansCarte ? 'adresse' : '';
+    if (conflit) {
+      sansCarte = `deux adresses pour ce colis (e-mail : ${conflit.email || '—'} ; suivi ${conflit.carrier === 'vinted' ? 'Vinted Go' : 'du transporteur'} : ${conflit.transporteur}) : aucune n’est choisie`;
+      sansCarteCode = 'deux-adresses';
+    } else if (sansCarte && vgPasLu && x.rue && !x.geocode) {
+      sansCarte += ' — le suivi Vinted Go de ce colis ne l’a pas encore donné : VRM le relit tout seul ; sinon ouvre le suivi Vinted Go du colis une fois dans Chrome';
+      sansCarteCode = 'vintedgo-pas-lu';
+    }
+    return { ...x, numero, repere: rv ? { lat: rv.lat, lon: rv.lon, source: 'vinted' } : null, sansCarte, sansCarteCode, vintedPlusieurs: !!(lu && lu.plusieurs), epingle: nombreEpingle(x) };
   });
   const nComptes = points.reduce((t, p) => t + p.nComptes, 0);
   const nHors = points.reduce((t, p) => t + p.arrives.filter((c) => c.horsCompte).length, 0);
