@@ -1,0 +1,188 @@
+/* ════════════════════════════════════════════════════════════════════════════
+   FINITION « PREMIUM » — 1er novembre 2026
+   Julien : « améliore le rendu visuel surtout, le site doit être beaucoup plus
+   premium » — et il a REFUSÉ toute nouvelle direction de style et tout dégradé.
+   Donc rien de neuf ici : la palette Vitrine (blanc, encre, cobalt rare, ambre
+   = geste), ses polices, ses rayons. Seulement la FINITION : ce qui était coupé,
+   délavé, collé au bord, d'une taille ou d'un rayon à part.
+
+   Chargée APRÈS styles-vitrine.css et styles-messages.css (main.jsx) : une seule
+   feuille à lire, une seule à retirer pour revenir en arrière. Aucune donnée,
+   aucune règle, aucun data-*, aucun texte : la forme seule.
+   §7 : une seule couleur d'accent (cobalt), rare — ici, Envoyer et le focus ;
+   jamais `-webkit-overflow-scrolling: touch` (les feuilles passent par un portail).
+   Chaque bloc est vérifié par scripts/bancs/finition-premium.cjs.
+   ════════════════════════════════════════════════════════════════════════════ */
+
+/* ── 1. LA COLONNE DE L'ORDINATEUR : « Moi » posé au pied ─────────────────────
+   (Julien, capture Messages · Vinted) « Paramètres » était coupé par le bas de la
+   fenêtre : 16 entrées et 6 groupes dépassent 720–800 px. La colonne est une
+   pile : le mot VRM, la zone qui défile, puis le pied (Communauté, Paramètres)
+   qui ne défile jamais. */
+html .vrm-app-shell .vrm-atelier-rail { display: flex !important; flex-direction: column !important; overflow: hidden !important; }
+html .vrm-app-shell .vrm-atelier-rail > .vrm-sidebar-brand { flex: 0 0 auto; }
+html .vrm-app-shell .vrm-atelier-rail > .vrm-rail-scroll { flex: 1 1 auto; min-height: 0; }
+html .vrm-app-shell .vrm-atelier-rail > .vrm-rail-pied { flex: 0 0 auto; padding-top: 4px; }
+html .vrm-app-shell .vrm-atelier-rail > .vrm-rail-pied:empty { display: none; }
+/* Quand la zone du dessus défile, un filet sépare le pied ; le fondu existant
+   (`data-rail-suite`, styles-atelier) reste l’indice qu’il y a une suite. */
+html .vrm-app-shell .vrm-atelier-rail:has(> .vrm-rail-scroll[data-rail-suite]) > .vrm-rail-pied { border-top: 1px solid var(--vrm-line); padding-top: 6px; }
+html .vrm-app-shell .vrm-atelier-rail:has(> .vrm-rail-scroll[data-rail-suite]) > .vrm-rail-pied [data-nav-groupe].vrm-rail-management-group { margin-top: 2px; }
+/* Le libellé de l'entrée active : même encre, même graisse partout. */
+html .vrm-app-shell .vrm-atelier-rail .vrm-rail-button[aria-current="page"] { font-weight: 600; }
+html .vrm-app-shell .vrm-atelier-rail .vrm-rail-button:focus-visible { outline: 2px solid var(--vrm-accent); outline-offset: -2px; }
+
+/* ── 2. ENVOYER : net quand il marche, neutre quand il ne marche pas ───────────
+   Il était cobalt à 45 % d'opacité champ vide — on le croyait cassé. Désactivé :
+   fond neutre, icône grise, opacité pleine, et l'infobulle dit pourquoi
+   (`title`, ComposeConv). Actif : cobalt plein, icône en « sur accent »
+   (blanc au clair, encre au sombre : 4,5:1 au moins). */
+html body .vrm-chat-panel .vrm-chat-send {
+  background: var(--vrm-accent) !important; color: var(--vrm-on-accent, #fff) !important; opacity: 1 !important;
+  transition: background-color .12s ease, transform .12s ease;
+}
+html body .vrm-chat-panel .vrm-chat-send svg { color: inherit; }
+html body .vrm-chat-panel .vrm-chat-send:disabled {
+  background: var(--vrm-card2, var(--vrm-surface)) !important; color: var(--vrm-muted) !important; opacity: 1 !important; cursor: not-allowed;
+}
+html body .vrm-chat-panel .vrm-chat-send[aria-label="Envoi en cours"]:disabled { background: var(--vrm-accent) !important; color: var(--vrm-on-accent, #fff) !important; cursor: progress; }
+html body .vrm-chat-panel .vrm-chat-send:not(:disabled):active { transform: scale(.94); }
+@media (hover: hover) and (pointer: fine) {
+  html body .vrm-chat-panel .vrm-chat-send:not(:disabled):hover { background: color-mix(in srgb, var(--vrm-accent) 86%, var(--vrm-ink)) !important; }
+}
+html body .vrm-chat-panel .vrm-chat-send:focus-visible { outline: 2px solid var(--vrm-accent); outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) { html body .vrm-chat-panel .vrm-chat-send { transition: none; } }
+
+/* ── 3. LE FIL : en-tête, bulles, pied ─────────────────────────────────────── */
+/* En-tête : un filet sous lui, la personne en 16/600, la paire en 13 gris. */
+html body .vrm-chat-panel .vrm-chat-head { border-bottom: 1px solid var(--vrm-line) !important; gap: 12px; padding: 12px 16px !important; min-height: 64px; box-sizing: border-box; }
+html body .vrm-chat-panel .vrm-chat-head .vrm-chat-head-n { font-size: 16px; font-weight: 600; line-height: 1.25; letter-spacing: -.01em; }
+html body .vrm-chat-panel .vrm-chat-head .vrm-chat-head-s { font-size: 13px; line-height: 1.35; margin-top: 1px; }
+html body .vrm-chat-panel .vrm-chat-head-ph { width: 40px; height: 40px; border-radius: 50%; flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center; }
+html body .vrm-chat-panel .vrm-chat-head .vrm-chat-retirer { min-height: 36px; padding: 0 12px; border-radius: 999px; font-size: 13px; font-weight: 500; gap: 6px; display: inline-flex; align-items: center; }
+html body .vrm-chat-panel .vrm-chat-head .vrm-chat-sync { width: 40px; height: 40px; border-radius: 50%; }
+/* Les notes sous l'en-tête (actualisation, état de la négociation) : un rythme de 8. */
+html body .vrm-chat-panel > .vrm-chat-note { padding: 10px 16px; margin: 0; font-size: 13px; line-height: 1.45; border-bottom: 1px solid var(--vrm-line); }
+html body .vrm-chat-panel .vrm-chat-negociation-etat { padding: 8px 16px !important; font-size: 12.5px; color: var(--vrm-muted); }
+html body .vrm-chat-panel .vrm-chat-negociation-etat b { color: var(--vrm-ink); font-weight: 600; }
+/* Bulles : texte 15/1.45, 12×16 de marge, l'heure discrète sous le texte, à droite. */
+html body .vrm-chat-panel .vrm-chat-history { gap: 6px !important; scroll-padding: 16px; }
+html body .vrm-chat-panel .vrm-bulle-l + .vrm-bulle-l { margin-top: 2px; }
+html body .vrm-chat-panel .vrm-bulle-l:not(.vrm-bulle-moi) + .vrm-bulle-moi,
+html body .vrm-chat-panel .vrm-bulle-moi + .vrm-bulle-l:not(.vrm-bulle-moi) { margin-top: 10px; }
+html body .vrm-chat-panel .vrm-bulle-l > .vrm-bulle.vrm-bulle { font-size: 15px !important; line-height: 1.45 !important; padding: 10px 16px 8px !important; border-radius: 18px !important; gap: 2px; }
+html body .vrm-chat-panel .vrm-bulle-l:not(.vrm-bulle-moi) > .vrm-bulle.vrm-bulle { border-bottom-left-radius: 6px !important; }
+html body .vrm-chat-panel .vrm-bulle-l.vrm-bulle-moi > .vrm-bulle.vrm-bulle { border-bottom-right-radius: 6px !important; }
+html body .vrm-chat-panel .vrm-bulle-h { font-size: 11px; opacity: .62; letter-spacing: 0; }
+html body .vrm-chat-panel .vrm-bulle-pied { margin: 2px 0 0 12px; }
+html body .vrm-chat-panel .vrm-bulle-pied [data-traduire]:not(#_):not(#_) { min-height: 28px; font-size: 12px !important; color: var(--vrm-muted) !important; text-decoration: underline; text-decoration-color: var(--vrm-line); text-underline-offset: 3px; }
+/* Le séparateur de jour : une étiquette centrée, discrète. */
+html body .vrm-chat-panel .vrm-chat-jour { align-self: center; font-size: 12px; font-weight: 500; padding: 4px 10px; border-radius: 999px; margin: 8px 0 4px; }
+/* Une offre dans le fil : un encart à filet, du même rayon que la carte d'offre,
+   sans dégradé (« acceptée » portait un dégradé vert). */
+html body .vrm-chat-panel .vrm-chat-offer-event { border-radius: 14px !important; padding: 10px 14px !important; margin: 6px 0 !important; background: var(--vrm-bg) !important; border: 1px solid var(--vrm-line) !important; }
+html body .vrm-chat-panel .vrm-chat-offer-event[data-offer-status] { background: var(--vrm-bg) !important; background-image: none !important; }
+html body .vrm-chat-panel .vrm-chat-offer-event span { font-size: 13px; font-weight: 600; }
+html body .vrm-chat-panel .vrm-chat-offer-event strong { font-size: 16px; font-weight: 700; }
+html body .vrm-chat-panel .vrm-chat-offer-event :is(small, time) { font-size: 12px; color: var(--vrm-muted); }
+/* La carte d'offre : boutons à la même hauteur, le secondaire à filet. */
+html body .vrm-chat-panel .vrm-chat-offre-actions > .vrm-chat-btn { font-size: 14px !important; font-weight: 600 !important; }
+html body .vrm-chat-panel .vrm-chat-negociation > summary { min-height: 40px; display: flex; align-items: center; font-size: 13.5px; font-weight: 500; }
+/* La carte de la paire en tête du fil (téléphone) : titre sur une ligne propre. */
+html body .vrm-chat-panel .vrm-chat-paire-n { font-size: 15px !important; }
+html body .vrm-chat-panel .vrm-chat-paire-l { font-size: 13px !important; }
+/* Le pied : un filet au-dessus, pastilles 36 px, champ à filet qui s'allume au focus. */
+html body .vrm-chat-panel .vrm-chat-foot { border-top: 1px solid var(--vrm-line) !important; padding: 12px 16px 14px !important; }
+html body .vrm-chat-panel .vrm-chat-rapides { padding-bottom: 10px !important; scroll-padding-inline: 16px; }
+html body .vrm-chat-panel .vrm-chat-rapides > button { min-height: 36px !important; padding: 0 14px !important; font-size: 13.5px !important; font-weight: 500 !important; white-space: nowrap; }
+html body .vrm-chat-panel .vrm-chat-rapides > button:not(:disabled):active { transform: scale(.97); }
+@media (hover: hover) and (pointer: fine) {
+  html body .vrm-chat-panel .vrm-chat-rapides > button:not(:disabled):hover { border-color: var(--vrm-muted) !important; }
+}
+html body .vrm-chat-panel .vrm-chat-compose { gap: 8px !important; align-items: flex-end !important; }
+html body .vrm-chat-panel .vrm-chat-compose > textarea {
+  border: 1px solid var(--vrm-line) !important; background: var(--vrm-bg) !important; border-radius: 23px !important;
+  min-height: 46px !important; padding: 12px 18px !important; line-height: 20px !important; box-sizing: border-box; outline: none;
+  transition: border-color .12s ease;
+}
+html body .vrm-chat-panel .vrm-chat-compose > textarea::placeholder { color: var(--vrm-muted); opacity: 1; }
+html body .vrm-chat-panel .vrm-chat-compose > textarea:focus,
+html body .vrm-chat-panel .vrm-chat-compose > textarea:focus-visible { border-color: var(--vrm-accent) !important; outline: none !important; box-shadow: none !important; }
+html body .vrm-chat-panel .vrm-chat-compose > textarea:disabled { background: var(--vrm-card2, var(--vrm-surface)) !important; color: var(--vrm-muted) !important; }
+html body .vrm-chat-panel .vrm-chat-compose > [data-mic-dictee] { background: transparent !important; border: 1px solid var(--vrm-line) !important; color: var(--vrm-ink) !important; }
+@media (max-width: 767px) {
+  html body .vrm-chat-panel .vrm-chat-foot { padding: 10px 16px calc(12px + env(safe-area-inset-bottom)) !important; }
+  html body .vrm-chat-panel .vrm-chat-history { padding: 12px 16px 16px !important; }
+}
+
+/* ── 4. LA LISTE DES CONVERSATIONS ──────────────────────────────────────────
+   La ligne choisie touchait le bord (heure et point collés au filet) et portait
+   une barre d'encre + un fond : une seule marque, le fond, en pastille arrondie. */
+html body :is([data-messagerie], [data-messagerie-site]) .vrm-msg-list .vrm-inbox-row {
+  padding: 12px 12px !important; border-radius: 12px !important; border-bottom: 0 !important; margin: 0 0 2px !important;
+  transition: background-color .12s ease;
+}
+html body :is([data-messagerie], [data-messagerie-site]) .vrm-msg-list .vrm-inbox-row.is-current {
+  box-shadow: none !important; padding-left: 12px !important; background: var(--vrm-card2, var(--vrm-surface)) !important;
+}
+@media (hover: hover) and (pointer: fine) {
+  html body :is([data-messagerie], [data-messagerie-site]) .vrm-msg-list .vrm-inbox-row:not(.is-current):hover { background: var(--vrm-surface) !important; }
+}
+html body :is([data-messagerie], [data-messagerie-site]) .vrm-msg-list .vrm-inbox-row:focus-visible { outline: 2px solid var(--vrm-accent); outline-offset: -2px; }
+html body :is([data-messagerie], [data-messagerie-site]) .vrm-msg-av { width: 44px !important; height: 44px !important; }
+html body :is([data-messagerie], [data-messagerie-site]) .vrm-msg-l1 { align-items: baseline; gap: 6px; }
+html body :is([data-messagerie], [data-messagerie-site]) .vrm-msg-time { margin-left: auto; padding-left: 8px; flex-shrink: 0; }
+/* Les filtres de la liste : une rangée de pastilles, comme partout ailleurs. */
+html body .vrm-inbox-filters:not(#_) { display: flex !important; flex-wrap: wrap !important; gap: 6px !important; padding: 0 !important; border: 0 !important; background: transparent !important; box-shadow: none !important; }
+html body .vrm-inbox-filters > button:not(#_) {
+  min-height: 36px !important; padding: 0 12px !important; border-radius: 999px !important; border: 1px solid var(--vrm-line) !important;
+  background: var(--vrm-bg) !important; color: var(--vrm-ink) !important; font-size: 13px !important; font-weight: 500 !important;
+  display: inline-flex !important; align-items: center; gap: 6px; flex: 0 0 auto !important; box-shadow: none !important;
+}
+html body .vrm-inbox-filters > button > span { color: var(--vrm-muted); font-weight: 500; }
+html body .vrm-inbox-filters > button[aria-pressed="true"]:not(#_) { background: var(--vrm-ink) !important; border-color: var(--vrm-ink) !important; color: var(--vrm-bg) !important; }
+html body .vrm-inbox-filters > button[aria-pressed="true"] > span { color: inherit; opacity: .7; }
+@media (pointer: coarse) { html body .vrm-inbox-filters > button:not(#_) { min-height: 44px !important; } }
+
+/* ── 5. LES CHOIX SEGMENTÉS : jamais un mot plus large que son bouton ───────
+   (Statistiques au téléphone : « Semaine » débordait de sa pastille, collé au bord.) */
+html .vrm-app-shell .vrm-seg .vrm-seg-btn { white-space: nowrap; min-width: max-content !important; padding-inline: 14px !important; }
+html .vrm-app-shell .vrm-sv-periode { width: auto !important; max-width: 100%; }
+html .vrm-app-shell .vrm-sv-periode .vrm-seg-btn { flex: 1 0 auto !important; }
+
+/* ── 6. LES BOUTONS DÉSACTIVÉS SE LISENT ────────────────────────────────────
+   Un bouton grisé à 40–55 % d'opacité tombait sous 2:1 (« Générer le bordereau »
+   sur Colis) : on ne savait plus s'il était éteint ou mal imprimé. Il reste
+   lisible — texte gris sur l'aplat neutre — et ne réagit plus au survol.
+   Pas les interrupteurs ni les pastilles de choix : leur forme dit déjà l'état. */
+html .vrm-app-shell .vrm-main button:is(:disabled, [aria-disabled="true"]):not([role="switch"]):not([role="tab"]):not([aria-checked]):not(.vrm-seg-btn):not(.vrm-chat-send):not([data-reponse-rapide]):not(#_) {
+  opacity: 1 !important; color: var(--vrm-muted) !important; cursor: not-allowed;
+  background-color: var(--vrm-card2, var(--vrm-surface)) !important; border-color: transparent !important; box-shadow: none !important; filter: none !important;
+}
+html .vrm-app-shell .vrm-main button:is(:disabled, [aria-disabled="true"]):not([role="switch"]):not([role="tab"]):not([aria-checked]):not(.vrm-seg-btn):not(.vrm-chat-send) svg { color: inherit !important; opacity: 1 !important; }
+
+/* ── 7. LA TYPOGRAPHIE : plus rien sous 11 px (12 pour une étiquette de chiffre) */
+html .vrm-app-shell .vrm-main .vrm-summary-strip [style*="font-size: 10"] { font-size: 12px !important; }
+html .vrm-app-shell .vrm-main .vrm-tr-num { font-size: 12px !important; }
+html .vrm-app-shell .vrm-main .vrm-day-bar-l { font-size: 12px !important; }
+/* Les chiffres qui se comparent : à chasse fixe partout (déjà « tnum » sur le corps). */
+html .vrm-app-shell :is(.vrm-msg-time, .vrm-bulle-h, .vrm-chat-offer-event strong, .vrm-seg-n) { font-variant-numeric: tabular-nums; }
+
+/* ── 8. LES ÉTATS VIDES : un disque neutre, une icône au trait ──────────────── */
+html .vrm-app-shell .vrm-empty-state { border-radius: var(--vrm-r-md, 14px) !important; box-shadow: none !important; padding: 32px 20px !important; }
+html .vrm-app-shell .vrm-empty-state > div:nth-child(2) { font-size: 16px !important; font-weight: 650 !important; letter-spacing: -.01em !important; }
+html .vrm-app-shell .vrm-empty-state > div:nth-child(3) { font-size: 13px !important; color: var(--vrm-muted) !important; margin-top: 6px !important; }
+
+/* ── 9. LE FOCUS CLAVIER : un seul anneau, le même partout ─────────────────── */
+html .vrm-app-shell :is(button, a, [role="button"], summary, select):focus-visible { outline: 2px solid var(--vrm-accent); outline-offset: 2px; }
+html .vrm-app-shell :is(input, textarea, select):focus-visible { outline: 2px solid var(--vrm-accent); outline-offset: 0; }
+
+/* ── 10. L'EN-TÊTE DU FIL AU TÉLÉPHONE : le nom de la paire avant le décor ───
+   À 390 px, la pastille d'icône générique (sans photo) prenait 40 px et coupait
+   le titre de la paire en « Sal… » : elle s'efface, la photo réelle reste. */
+@media (max-width: 767px) {
+  html body .vrm-chat-panel .vrm-chat-head { padding: 8px 12px 8px 4px !important; gap: 8px; }
+  html body .vrm-chat-panel .vrm-chat-head > .vrm-chat-head-ph { display: none !important; }
+  html body .vrm-chat-panel .vrm-chat-head .vrm-chat-retirer { padding: 0 12px; min-height: 44px; }
+  html body .vrm-chat-panel .vrm-chat-head .vrm-chat-sync { width: 44px; height: 44px; }
+}

@@ -185,11 +185,19 @@ async function main() {
         dit(conf, `${T} plein écran : Mondial Relay (1 j) · Tabac du Port (2 j) · Vinted Go (4 j) · Kusmi Tea (4 j) · dépôt sans transporteur (6 j)`, JSON.stringify(ar.l));
         const sommes = { d: ar.l.filter((x) => x.type === 'depot').reduce((t, x) => t + Number(x.n), 0), r: ar.l.filter((x) => x.type === 'retrait').reduce((t, x) => t + Number(x.n), 0) };
         dit(sommes.d === 3 && sommes.r === 3, `${T} plein écran : 3 colis à déposer et 3 à retirer, aucun perdu`, JSON.stringify(sommes));
-        const carte = await pg.evaluate(() => ({ carte: !!document.querySelector('[data-tournee-plein] [data-relais-carte]') || !!document.querySelector('[data-tournee-plein] [data-tournee-sans-carte]'), km: /\bkm\b|\bmin\b/.test((document.querySelector('[data-tournee-plein]') || {}).innerText || ''), depots: !!document.querySelector('[data-tournee-depots-hors-carte]') }));
+        const carte = await pg.evaluate(() => ({ carte: !!document.querySelector('[data-tournee-plein] [data-relais-fond]') || !!document.querySelector('[data-tournee-plein] [data-tournee-sans-carte]'), km: /\bkm\b|\bmin\b/.test((document.querySelector('[data-tournee-plein]') || {}).innerText || ''), depots: !!document.querySelector('[data-tournee-depots-hors-carte]') }));
         dit(carte.carte && !carte.km && carte.depots, `${T} plein écran : la carte des points relais (ou sa raison), aucune distance ni durée inventée, les dépôts dits hors carte`, JSON.stringify(carte));
         const ep = await pg.evaluate(() => [...document.querySelectorAll('[data-tournee-plein] [data-relais-epingle]')].map((e) => [e.getAttribute('data-relais-epingle'), e.textContent]).sort());
         if (ep.length) dit(JSON.stringify(ep) === JSON.stringify([['kusmitea|56000', '4'], ['tabacduport|35260', '2']]), `${T} plein écran : chaque épingle porte le numéro de SON arrêt (Tabac du Port 2, Kusmi Tea 4)`, JSON.stringify(ep));
         else console.log(`INFO ${T} plein écran : pas d'épingle dessinée ici (navigateur du banc sans WebGL) — la liste porte le contrôle`);
+        // (1er nov., Julien : « 5 points de retrait mais 3 sur la carte ») Chaque arrêt de
+        // retrait est SUR la carte (son numéro sur une épingle) ou dit « Pas sur la carte » sous lui.
+        const cov = await pg.evaluate(() => {
+          const surEp = new Set([...document.querySelectorAll('[data-tournee-plein] [data-relais-epingle]')].flatMap((e) => e.textContent.split('·')));
+          return [...document.querySelectorAll('[data-tournee-arret][data-type="retrait"]')].map((e) => ({ num: e.getAttribute('data-numero'), carte: surEp.has(e.getAttribute('data-numero')), dit: !!e.querySelector('[data-tournee-hors-carte]'), ko: !!document.querySelector('[data-relais-carte-ko]') }));
+        });
+        if (!cov.some((x) => x.ko)) dit(cov.length > 0 && cov.every((x) => x.carte !== x.dit), `${T} plein écran : chaque point de retrait est sur la carte OU dit « pas sur la carte » avec sa raison`, JSON.stringify(cov));
+        else console.log(`INFO ${T} plein écran : fond de carte indisponible ici — la liste porte le contrôle`);
         await pg.screenshot({ path: path.join(SHOTS, `tournee-plein-${vp.width}.png`) });
         await pg.click('[data-tournee-fermer]');
         await pg.waitForTimeout(400);

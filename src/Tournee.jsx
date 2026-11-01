@@ -3,13 +3,13 @@
 //  Les étapes et les arrêts viennent de `src/tournee.js` (règle pure) ; cet
 //  écran n'en recalcule aucun. Chaque étape ouvre l'écran qui fait le geste
 //  (`onEtape`) : impression des prêts, Colis, la colonne « À retirer ».
-//  La carte du mode plein écran est `CarteRelaisColis` (celle de Colis), avec les
+//  La carte du mode plein écran est le fond de Colis (`FondRelais`), avec les
 //  seuls points relais : un point de DÉPÔT n'est relié à un colis par aucune
 //  identité, il n'a donc pas d'épingle (jamais devinée).
 // ════════════════════════════════════════════════════════════════════════════
 import React from 'react';
 import { createPortal } from 'react-dom';
-import CarteRelaisColis from './CarteRelais.jsx';
+import { useReperes, repereDe, FondRelais } from './CarteRelais.jsx';
 import { texteJours } from './tournee.js';
 import './styles-tournee.css';
 
@@ -112,8 +112,36 @@ export function TourneePleinEcran({ arrets = [], C, onFermer, onArret, zIndex = 
     window.addEventListener('keydown', f);
     return () => window.removeEventListener('keydown', f);
   }, [onFermer]);
-  // La carte : les points relais seulement (avec leur numéro d'arrêt sur l'épingle).
-  const groupes = arrets.filter((a) => a.type === 'retrait' && a.point && !a.inconnu).map((a) => ({ ...a.point, numero: a.numero }));
+  // La carte : les points relais seulement, avec le numéro d'ARRÊT sur l'épingle.
+  // (1er nov., Julien : « ça affiche 5 points de retrait mais sur la carte il y en
+  // a que 3 ».) Chaque point de retrait est soit SUR la carte, soit dit « pas sur
+  // la carte » avec sa raison, sous son arrêt ; deux points au même endroit
+  // partagent UNE épingle qui porte leurs deux numéros (« 2·5 »).
+  const retraits = arrets.filter((a) => a.type === 'retrait');
+  const connus = retraits.filter((a) => a.point && !a.inconnu);
+  const reperes = useReperes(connus.map((a) => a.point), true);
+  const [etatFond, setEtatFond] = React.useState('charge');
+  const parPos = new Map();
+  for (const a of connus) {
+    const r = repereDe(a.point, reperes); if (!r) continue;
+    const k = `${Number(r.lat).toFixed(5)},${Number(r.lon).toFixed(5)}`;
+    const g = parPos.get(k);
+    if (g) { g.numeros.push(a.numero); g.nArrives += a.point.nArrives || 0; g.nAttendus += a.point.nAttendus || 0; }
+    else parPos.set(k, { ...a.point, cle: a.point.cle, lat: r.lat, lon: r.lon, numero: a.numero, numeros: [a.numero], nArrives: a.point.nArrives || 0, nAttendus: a.point.nAttendus || 0 });
+  }
+  const epingles = [...parPos.values()];
+  const surCarte = new Set(connus.filter((a) => repereDe(a.point, reperes)).map((a) => a.cle));
+  const raisonHors = (a) => {
+    if (a.type !== 'retrait' || surCarte.has(a.cle)) return '';
+    if (etatFond === 'ko') return '';
+    if (a.inconnu || !a.point) return 'le point de retrait n’est pas encore connu';
+    if (a.point.sansCarte) return a.point.sansCarte;
+    const r = reperes[a.point.cle];
+    if (r === undefined) return a.point.geocode ? 'localisation en cours…' : 'l’adresse lue est incomplète';
+    if (r === 'reseau') return 'la carte des adresses n’a pas répondu, réessai à la prochaine ouverture';
+    return 'cette adresse n’a pas été trouvée sûrement';
+  };
+  const nHors = retraits.filter((a) => raisonHors(a)).length;
   const nDepots = arrets.filter((a) => a.type === 'depot').length;
   return createPortal(
     <div className="vrm-tr-plein" role="dialog" aria-modal="true" aria-label="Ta tournée" data-tournee-plein="" style={{ zIndex }}>
@@ -125,10 +153,16 @@ export function TourneePleinEcran({ arrets = [], C, onFermer, onArret, zIndex = 
         <span className="vrm-tr-plein-compte" data-tournee-arrets={arrets.length}>{plur(arrets.length, 'arrêt')}</span>
       </div>
       <div className="vrm-tr-plein-carte">
-        {groupes.length > 0
-          ? <CarteRelaisColis donnees={{ groupes, enRouteSansRelais: 0 }} C={C} compacte sansListe etiquette={(p) => String(p.numero)}/>
-          : <p className="vrm-tr-note" data-tournee-sans-carte="">Aucun point relais à placer sur la carte.</p>}
-        {nDepots > 0 && <p className="vrm-tr-note" data-tournee-depots-hors-carte={nDepots}>Les dépôts ne sont pas sur la carte : le point où tu déposes n’est écrit nulle part pour un colis.</p>}
+        {epingles.length > 0
+          ? <FondRelais points={epingles} C={C} etiquette={(p) => p.numeros.join('·')} hauteur={300} onEtat={setEtatFond}/>
+          : <p className="vrm-tr-note" data-tournee-sans-carte="">{retraits.length ? 'Aucun point de retrait n’a encore pu être placé sur la carte (la raison est sous chacun).' : 'Aucun point relais à placer sur la carte.'}</p>}
+        {epingles.length > 0 && etatFond !== 'ko' && <p className="vrm-tr-note vrm-tr-credit">Fond : OpenFreeMap · © OpenMapTiles · © OpenStreetMap ; adresses : Base Adresse Nationale.</p>}
+        {retraits.length > 0 && epingles.length > 0 && etatFond !== 'ko' && (
+          <p className="vrm-tr-note" data-tournee-retraits-carte={retraits.length - nHors} data-tournee-retraits-hors={nHors}>
+            {nHors === 0 ? `Les ${plur(retraits.length, 'point')} de retrait sont sur la carte.` : `${retraits.length - nHors} point${retraits.length - nHors > 1 ? 's' : ''} de retrait sur ${retraits.length} sur la carte · ${nHors} pas sur la carte (la raison est sous chacun).`}
+          </p>
+        )}
+        {nDepots > 0 && <p className="vrm-tr-note" data-tournee-depots-hors-carte={nDepots}>Les dépôts n’ont pas d’épingle : le point où tu déposes n’est écrit nulle part pour un colis.</p>}
       </div>
       <div className="vrm-tr-plein-feuille">
         <div className="vrm-tr-plein-tete">
@@ -150,6 +184,7 @@ export function TourneePleinEcran({ arrets = [], C, onFermer, onArret, zIndex = 
                   </span>
                   <span className={'vrm-tr-quand' + (a.jours != null && a.jours <= 1 ? ' is-ambre' : '')}>{quand}</span>
                 </button>
+                {raisonHors(a) ? <span className="vrm-tr-hors" data-tournee-hors-carte={a.cle}>Pas sur la carte : {raisonHors(a)}</span> : null}
                 {a.type === 'retrait' && a.adresse && a.nom ? <a className="vrm-tr-plans" href={lienPlans(`${a.nom}, ${a.point && a.point.adresse ? a.point.adresse : a.adresse}`)} target="_blank" rel="noopener noreferrer">Ouvrir dans Plans</a> : null}
               </li>
             );
