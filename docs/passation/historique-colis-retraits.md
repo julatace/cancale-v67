@@ -2380,3 +2380,80 @@ jugée sur `data-raison`), `colis-relais-push`, `navigation-tache` : verts.
 
 **Geste de Julien** : aucun. Ouvrir la tournée : chaque relais a une épingle avec son nombre, ou
 dit sous lui pourquoi il n'est pas sur la carte.
+
+## 1er nov. — Audit des codes de retrait, de bout en bout (extension 5.297.0)
+
+Julien : « la fiabilité des codes de retrait, c'est super important ». Un code faux ou manquant :
+il se déplace au relais pour rien, ou il ne peut pas retirer.
+
+**Les chemins tracés** (un propriétaire par étape, §11) :
+- **E-mail** → `api/email-inbound.js` `parseCarrierEmail` (code, `code2` du casier, QR par
+  `extractPickupQr`, lieu, limite par `api/_lib/retrait-colis.js`) → ligne `email_track_{transporteur}_{suivi}`
+  (fusion avec la ligne d'avant, `conserverRetrait`) → relue partout par `relireLigneSuivi`
+  (`api/_lib/suivi-colis.js` : app via `reclassifyTrack`, widget et rappel via `relireLigneMeta`).
+- **Conversation Vinted** → extension `retraitDeConversation` → `noterRetrait` → `panel_colis_relais`
+  (par n° de transaction) → app `relaisDe` ; notification par `api/push` → `notifRetraitConversation`
+  (relit la ligne, ne croit pas l'extension).
+- **Suivi Vinted / transporteur** : statut, lieu, limite — jamais de code (vérifié).
+- **À la main** : un n° de suivi ajouté (`suivisManuels`) ; aucune saisie ni photo de code.
+- **Affichage** : un seul ensemble, `pickupUnion` (App) — Colis → À retirer, détail codes/QR, Tournée,
+  Ma journée hors ligne (`journeeHorsLigne`), équipe ; filtre d'affichage `codeRetrait` + `qrImage`.
+  Le widget ne montre que des nombres (jamais un code). Leboncoin / eBay / Vestiaire : aucun code de
+  retrait lisible (rien à deviner).
+
+**Défauts trouvés et corrigés** (chacun rouge sur `origin/main` 66ad4d36, `scripts/audit-codes-retrait.cjs`
+lancé depuis l'arbre `git archive` : 22 rouges ; vert après ; `--prouve` 16/16 mutations rouges) :
+1. **Code postal pris pour le code** : « Présentez votre code de retrait » seul sur sa ligne (le code n'est
+   que dans l'image du QR), l'adresse dessous ⇒ code « 56000 ». Idem « Code : » puis « 35260 CANCALE ».
+   ⇒ `nombreSurSaLigne` (`api/_lib/code-retrait-email.js`) : un nombre pris sur la ligne SUIVANTE doit y
+   être seul (case de tableau) ; et `codeImpossible` : un code égal au code postal du lieu n'en est pas un.
+2. **Le n° de suivi pris pour le code** (« Votre code de retrait : » puis le n° du colis) ⇒ `codeImpossible`.
+3. **« pin » cherché dans les mots** : « Offre Lapin 2026 » au-dessus du vrai code donnait 2026 ⇒ `\bpin\b`.
+4. **Deux codes différents dans un e-mail** : le premier était pris sans savoir s'il est celui de CE n°
+   ⇒ aucun code (« code pas lu », les lignes gardées dans `extraitCode`).
+5. **Identifiant / code d'ouverture de casier tronqués** (9 chiffres ⇒ les 8 premiers) ⇒ `(?!\d)`.
+6. **Ordre des e-mails** : le script Gmail lit du plus récent au plus ancien ; le « disponible » du 21
+   (relais A, 111111) traité après celui du 23 (colis redirigé, relais B, 222222) réécrivait code, lieu et
+   limite ⇒ un e-mail PROUVÉ plus ancien (`sourceDate`) ne fait que combler ce qui manque. Sans date des
+   deux côtés : inchangé (on ne sait pas).
+7. **Deux lignes du même n° (Vinted + Chronopost) fondues par `pickupUnion`** : le QR (Pickup Pass) et
+   l'identifiant du casier de la ligne écartée disparaissaient ; deux codes différents se départageaient au
+   « plus complet ». ⇒ `fusionLignesMemeSuivi` (pure, App) : le code va avec son `code2` et son QR ; codes
+   différents ⇒ le plus récent (date de l'e-mail) fait foi pour code, lieu, limite, et le QR de l'ancien
+   code n'est pas montré à côté du nouveau.
+8. **Extension : un rappel sans code effaçait le code** (« Rends-toi au point relais … avant le … ») : le
+   DERNIER message d'arrivée seul était lu, et `noterRetrait` réécrivait la ligne sans le code ⇒
+   `retraitDeConversation` reprend le code (et son QR) du message d'arrivée le plus récent qui les porte,
+   seulement si le lieu est compatible (`lieuxCompatibles` : un colis redirigé vers un autre relais ne
+   reprend pas l'ancien code) ; `noterRetrait` ne vide plus un code rangé sur une relecture sans code.
+9. (manqué, pas faux) Vinted Go : code tout en chiffres ou à deux lettres après « saisis le code suivant »
+   ⇒ lu (même forme que l'extension et l'app).
+Les lignes déjà rangées avec le code postal ou le suivi comme code ne sont plus montrées
+(`relireLigneSuivi`) : « code pas lu », jamais un faux.
+
+**Laissés, et pourquoi** :
+- Codes espacés « 931 207 » / « 931-207 » : non lus (« code pas lu ») — joindre des groupes de chiffres
+  peut fabriquer un faux (« 1234 56000 ») ; aucune forme réelle mesurée.
+- Une notification « 📍 » ne resonne pas quand un NOUVEAU code arrive pour le même n° (clé
+  `relais-{suivi}-code`) : l'écran montre le bon code ; changer la clé touche l'anti-doublon partagé.
+- E-mail transféré à la main / réponse citant un ancien e-mail : le premier code cité est pris (règle 4 si
+  deux codes différents) ; le pipeline Gmail envoie l'e-mail d'origine, pas un transfert.
+- Anglais (« collection code ») : VRM reste sur la France.
+- Quoted-printable : décodé en amont par `api/_lib/lire-email.js` (inchangé).
+
+**Preuves** : `scripts/audit-codes-retrait.cjs` (A corpus de 22 e-mails inventés — la vraie
+`parseCarrierEmail` ; B `relireLigneSuivi` ; C la vraie route sur une fausse base à état ; D les règles
+de l'app par Babel ; E le vrai background.js dans `_fond-vm`). Sur l'avant, D rend « absente » (la fusion
+était en ligne dans le composant) : ses trois mutations (QR, identifiant, plus récent) sont rouges.
+Audits voisins verts (transporteurs, retrait-fiable, retrait, statuts, retrait-conv, evt-extension,
+retrait-confirmer, fusion, suivi-colis, colis-retrait, arrivee-colis, statut-transporteurs, email-formes,
+relais-carte, transp-ext, transp-notif, colis-sens, colis-heure, journal-emails, extension-zip, coherence).
+Bancs relancés un par un sur le build d'après (`npm run build` vert) : `retrait-relais-carte`,
+`colis-colonnes`, `colis-relais-push`, `colis-fiables`, `colis-heure`, `tournee`, `a-confirmer`,
+`codes-hors-ligne`, `retrait-conv-push`, `equipe` verts ; `retrait` ne rend rien ici (il lit `fx/`,
+absent du conteneur) ; `transporteurs` (12), `statuts-colis` (24), `retrait-carte` (3) rouges, les MÊMES
+lignes rouges, mot pour mot, sur le build d'`origin/main` 66ad4d36 (sélecteurs et couleurs d'écrans
+changés depuis — rien à voir avec les codes).
+
+**Geste de Julien** : installer l'extension **5.297.0** (remplacer le dossier, ⟳ dans chaque Chrome).
+La règle 6 dépend de `sourceDate` (la date Gmail), envoyée par `scripts/gmail-forwarder.gs` : le recoller (geste déjà attendu, §9) la garantit ; sans elle, rien ne change par rapport à avant.

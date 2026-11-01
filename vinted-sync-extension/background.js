@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.296.0';
+const CODE_VERSION = '5.297.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -5562,6 +5562,23 @@ const sansBalises = (s) => String(s == null ? '' : s)
 // On accepte donc au plus deux lettres majuscules suivies de 4 à 10 chiffres :
 // « suivant » n'a aucun chiffre, il reste écarté.
 const CODE_APRES = /^([A-Z]{0,2}\d{4,10})\b/;
+// (5.297) Deux lieux lus dans des messages d'arrivée désignent-ils le MÊME point ?
+// Vide d'un côté ⇒ oui (rien ne les oppose) ; deux codes postaux différents ⇒
+// non ; sinon le premier mot propre de l'un (sans « point relais », « consigne »,
+// « Vinted Go »…) doit se trouver dans l'autre. Sert seulement à ne pas reprendre
+// le code d'un AUTRE relais : un doute rend « non », et le code n'est pas repris.
+const MOTS_LIEU_GENERIQUES = new Set(['point', 'points', 'relais', 'relay', 'consigne', 'casier', 'locker', 'vinted', 'pickup', 'bureau', 'poste', 'retrait', 'mondial', 'chronopost', 'les', 'des', 'dans', 'chez', 'au', 'aux']);
+function lieuxCompatibles(a, b) {
+  const norm = (s) => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+  const na = norm(a), nb = norm(b);
+  if (!na.trim() || !nb.trim()) return true;
+  const cpa = na.match(/\b\d{5}\b/), cpb = nb.match(/\b\d{5}\b/);
+  if (cpa && cpb && cpa[0] !== cpb[0]) return false;
+  const mots = (s) => s.split(/[^a-z0-9]+/).filter((w) => w.length >= 2 && !/^\d+$/.test(w) && !MOTS_LIEU_GENERIQUES.has(w) && w !== 'go');
+  const ma = mots(na), mb = mots(nb);
+  if (!ma.length || !mb.length) return false;
+  return mb.includes(ma[0]) || ma.includes(mb[0]);
+}
 // ⚠️ UN COLIS QUI PART N'EST JAMAIS UN COLIS À RETIRER. « Article à emballer et
 // envoyer », « imprime le bordereau », « dépose ton colis dans n'importe quel
 // point relais » parlent de point relais mais pour un ENVOI. On l'écarte EN
@@ -5584,7 +5601,7 @@ function retraitDeConversation(conv) {
     // ⚠️ CÔTÉ ACHETEUR UNIQUEMENT. Côté vendeur, « la commande est arrivée »
     // veut dire que l'ACHETEUR l'a reçue — ce n'est pas un colis pour nous.
     if (String(t.current_user_side || '') === 'seller') return null;
-    let trouve = null, arriveMs = null;
+    let trouve = null, arriveMs = null; const arrivees = [];
     for (const m of (Array.isArray(c.messages) ? c.messages : [])) {
       if (!m || (m.entity_type !== 'action_message' && m.entity_type !== 'status_message')) continue;
       const e = m.entity || {};
@@ -5602,8 +5619,50 @@ function retraitDeConversation(conv) {
       // On garde le HTML BRUT : « Scanne ton code de retrait » est un LIEN, et
       // c'est derrière lui que vit le QR (capture d'écran de Julien).
       trouve = { titre, sous, html: String(e.subtitle || ''), actions: e.actions || [] };
+      arrivees.push(trouve);
     }
     if (!trouve) return null;
+    // ⚠️ (5.297, audit des codes de retrait) UN RAPPEL SANS CODE N'EFFACE PAS LE
+    // CODE. Le DERNIER message d'arrivée fait foi, mais Vinted envoie des rappels
+    // (« Rends-toi au point relais … avant le … ») qui ne redonnent pas le code :
+    // le code lu dans le message d'arrivée disparaissait, et la ligne rangée était
+    // réécrite sans lui. On reprend le code (et le QR qui va avec lui) du message
+    // d'arrivée le plus récent qui les porte — seulement s'il parle du MÊME point
+    // (un colis redirigé vers un autre relais a un autre code : on ne mélange pas).
+    // Un code plus récent, lui, remplace toujours l'ancien.
+    const fin = lireArrivee(trouve);
+    for (let i = arrivees.length - 2; i >= 0 && (!fin.code || !fin.qr || !fin.lieu); i--) {
+      const e = lireArrivee(arrivees[i]);
+      if (!lieuxCompatibles(fin.lieu, e.lieu)) break;
+      if (!fin.code && e.code) fin.code = e.code;
+      if (!fin.qr && e.qr && (!fin.code || fin.code === e.code)) fin.qr = e.qr;
+      if (!fin.lieu && e.lieu) fin.lieu = e.lieu;
+    }
+    const { txt, lieu, code, qr } = fin;
+    if (!lieu && !code && !qr) return null;           // rien d’utile : on n’invente pas
+    // (5.179) LE TRANSPORTEUR, SEULEMENT S'IL EST ÉCRIT EN TOUTES LETTRES dans le
+    // message (« Mondial Relay », « Vinted Go »…). Jamais déduit du mot « point
+    // relais » (tous le disent) : sans nom, on laisse vide.
+    const TRANSP = [[/vinted\s*go/i, 'vinted'], [/mondial\s*relay/i, 'mondialrelay'], [/relais\s*colis/i, 'relaiscolis'],
+      [/chronopost|pickup\s*station/i, 'chronopost'], [/inpost/i, 'inpost'], [/colissimo|la\s+poste/i, 'colissimo'],
+      [/\bups\b/i, 'ups'], [/\bdpd\b/i, 'dpd'], [/\bgls\b/i, 'gls'], [/\bdhl\b/i, 'dhl'], [/shop2shop/i, 'shop2shop']];
+    const vus = TRANSP.filter(([re]) => re.test(txt)).map(([, k]) => k);
+    const transporteur = vus.length === 1 ? vus[0] : '';   // deux noms dans le texte = on ne choisit pas
+    const cid = String(c.id || '');
+    return {
+      tx: String(t.id || ''), item: String(t.item_id || ''),
+      titre: String(t.item_title || c.subtitle || c.description || ''),
+      photo: (t.item_photo && t.item_photo.url) || null,
+      lieu, code, qr, transporteur, conv: cid,
+      url: c.conversation_url || (cid ? `https://www.vinted.fr/inbox/${cid}` : ''),
+      ...(arriveMs ? { arriveLe: new Date(arriveMs).toISOString() } : {}),
+      at: new Date().toISOString(),
+    };
+  } catch (_) { return null; }
+}
+// Lieu, code et lien du QR d'UN message d'arrivée (5.297 : sorti de
+// `retraitDeConversation` pour relire aussi les messages d'avant le dernier).
+function lireArrivee(trouve) {
     const txt = trouve.titre + ' ' + trouve.sous;
     // Lieu : ce qui suit le marqueur, jusqu'à la fin de la phrase.
     let lieu = '';
@@ -5640,26 +5699,7 @@ function retraitDeConversation(conv) {
       qr = /^https?:/i.test(href) ? href : ('https://www.vinted.fr' + (href[0] === '/' ? '' : '/') + href);
       break;
     }
-    if (!lieu && !code && !qr) return null;           // rien d'utile : on n'invente pas
-    // (5.179) LE TRANSPORTEUR, SEULEMENT S'IL EST ÉCRIT EN TOUTES LETTRES dans le
-    // message (« Mondial Relay », « Vinted Go »…). Jamais déduit du mot « point
-    // relais » (tous le disent) : sans nom, on laisse vide.
-    const TRANSP = [[/vinted\s*go/i, 'vinted'], [/mondial\s*relay/i, 'mondialrelay'], [/relais\s*colis/i, 'relaiscolis'],
-      [/chronopost|pickup\s*station/i, 'chronopost'], [/inpost/i, 'inpost'], [/colissimo|la\s+poste/i, 'colissimo'],
-      [/\bups\b/i, 'ups'], [/\bdpd\b/i, 'dpd'], [/\bgls\b/i, 'gls'], [/\bdhl\b/i, 'dhl'], [/shop2shop/i, 'shop2shop']];
-    const vus = TRANSP.filter(([re]) => re.test(txt)).map(([, k]) => k);
-    const transporteur = vus.length === 1 ? vus[0] : '';   // deux noms dans le texte = on ne choisit pas
-    const cid = String(c.id || '');
-    return {
-      tx: String(t.id || ''), item: String(t.item_id || ''),
-      titre: String(t.item_title || c.subtitle || c.description || ''),
-      photo: (t.item_photo && t.item_photo.url) || null,
-      lieu, code, qr, transporteur, conv: cid,
-      url: c.conversation_url || (cid ? `https://www.vinted.fr/inbox/${cid}` : ''),
-      ...(arriveMs ? { arriveLe: new Date(arriveMs).toISOString() } : {}),
-      at: new Date().toISOString(),
-    };
-  } catch (_) { return null; }
+    return { txt, lieu, code, qr };
 }
 // L'heure d'un message de conversation (5.204). Vinted l'écrit en ISO avec
 // décalage (mesuré) ; une forme en secondes ou millisecondes est lue aussi.
@@ -5701,6 +5741,12 @@ async function noterRetrait(r, uid) {
     const avant = cur[r.tx];
     // Un message plus récent qui ne NOMME pas le transporteur ne l'efface pas.
     if (!r.transporteur && avant && avant.transporteur) r = { ...r, transporteur: avant.transporteur };
+    // (5.297, audit des codes de retrait) Une relecture qui ne voit PAS le code
+    // (rappel seul, fil tronqué) ne l'efface pas : le code rangé reste, avec son
+    // QR, tant que le lieu ne dit pas un AUTRE point. « Pas lu » n'efface rien.
+    if (avant && !r.code && avant.code && lieuxCompatibles(r.lieu, avant.lieu)) {
+      r = { ...r, code: avant.code, ...(!r.qr && avant.qr ? { qr: avant.qr } : {}), ...(!r.lieu && avant.lieu ? { lieu: avant.lieu } : {}) };
+    }
     // 5.204 : la date d'arrivée déjà rangée est la PREMIÈRE vue — un rappel
     // relu plus tard ne la repousse pas, une relecture sans elle ne l'efface pas.
     if (avant && avant.arriveLe && !isNaN(Date.parse(avant.arriveLe))

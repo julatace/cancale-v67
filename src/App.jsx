@@ -158,7 +158,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.296.0';
+const EXT_ATTENDUE = '5.297.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -33581,6 +33581,33 @@ const cleanLieuCorps = (s) => {
   const nom = titleCasePR(nomRaw);
   return { nom, adresse: s.replace(/^[^,]+,?\s*/, '').trim(), display: titleCasePR(s.slice(0, 60)) };
 };
+// ── DEUX LIGNES D'E-MAIL « DISPONIBLE » POUR LE MÊME N° DE SUIVI (1er nov.) ──
+// `pickupUnion` n'en garde qu'une (un colis, une ligne) : la plus complète `m`,
+// complétée par l'autre `s`. (Audit des codes de retrait,
+// scripts/audit-codes-retrait.cjs) Avant, seuls le lieu, le code et la date
+// limite étaient reportés : le QR (Pickup Pass) et l'identifiant du casier
+// (`code2`) de l'autre ligne disparaissaient — au casier, sans eux la porte ne
+// s'ouvre pas —, et deux codes DIFFÉRENTS se départageaient au « plus complet »,
+// pas au plus récent (un nouveau code émis pour ce n° restait caché derrière
+// l'ancien). Le code va avec son second code ; le plus récent (date de l'e-mail)
+// fait foi pour le code, le lieu et la limite quand les codes diffèrent.
+const scoreLigneRetrait = (t) => (codeRetrait(t.code) ? 4 : 0) + (cleanLieu(t.lieu).nom ? 2 : 0) + (qrImage(t) ? 1 : 0);
+const fusionLignesMemeSuivi = (m, s) => {
+  const quand = (x) => Date.parse(x.emailAt || x.receivedAt || '') || 0;
+  const cm = codeRetrait(m.code), cs = codeRetrait(s.code);
+  const neuf = !!(cm && cs && cm !== cs && quand(s) > quand(m));   // l'autre ligne porte un code PLUS RÉCENT
+  const [p, q] = neuf ? [s, m] : [m, s];                          // p fait foi pour le code, le lieu, la limite
+  const src = codeRetrait(p.code) ? p : codeRetrait(q.code) ? q : p;
+  const autre = src === p ? q : p;
+  // L'autre ligne parle-t-elle du MÊME code (ou d'aucun) ? Sinon son QR et son
+  // identifiant vont avec un AUTRE code : ils ne sont pas montrés à côté.
+  const memeCode = !codeRetrait(src.code) || !codeRetrait(autre.code) || codeRetrait(autre.code) === codeRetrait(src.code);
+  const qrSrc = qrImage(src) ? src : (memeCode && qrImage(autre)) ? autre : {};
+  return { ...m, lieu: (cleanLieu(p.lieu).nom ? p.lieu : (q.lieu || p.lieu)) || null,
+    code: src.code || null, code2: src.code2 || (memeCode ? autre.code2 : null) || null,
+    qrB64: qrSrc.qrB64 || null, qrType: qrSrc.qrType || null, qrUrl: qrSrc.qrUrl || null, consigne: !!(m.consigne || s.consigne),
+    limite: p.limite || q.limite || null, limiteAt: p.limiteAt || q.limiteAt || null };
+};
 // Clé photo stable (indépendante de la taille d'image) extraite d'une URL Vinted :
 //   https://images1.vinted.net/t/{JETON}/{taille}/{n}.jpeg  ->  {JETON}
 // Le JETON identifie LA photo de l'article, identique sur l'annonce et sur la
@@ -39665,15 +39692,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // la plus complète (code, lieu, QR) et on y reporte le lieu, le code et la
     // date limite que l'autre est seule à donner (même n° = même colis).
     {
-      const score = (t) => (codeRetrait(t.code) ? 4 : 0) + (cleanLieu(t.lieu).nom ? 2 : 0) + (qrImage(t) ? 1 : 0);
       const parN = new Map(); const garde = [];
       for (const t of emailList) {
         const k = suiviDeLigne(t);
         if (!k) { garde.push(t); continue; }
         if (!parN.has(k)) { parN.set(k, garde.length); garde.push(t); continue; }
         const i = parN.get(k); const a = garde[i];
-        const [m, s] = score(t) > score(a) ? [t, a] : [a, t];
-        garde[i] = { ...m, lieu: (cleanLieu(m.lieu).nom ? m.lieu : (s.lieu || m.lieu)) || null, code: m.code || s.code || null, limite: m.limite || s.limite || null, limiteAt: m.limiteAt || s.limiteAt || null };
+        const [m, s] = scoreLigneRetrait(t) > scoreLigneRetrait(a) ? [t, a] : [a, t];
+        garde[i] = fusionLignesMemeSuivi(m, s);
         if (cmdParColis.has(colisKey(s)) && !cmdParColis.has(colisKey(garde[i]))) cmdParColis.set(colisKey(garde[i]), cmdParColis.get(colisKey(s)));
       }
       if (garde.length !== emailList.length) emailList.splice(0, emailList.length, ...garde);
