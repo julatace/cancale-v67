@@ -141,6 +141,47 @@ const toasts = (pg) => pg.evaluate(() => [...document.querySelectorAll('.vrm-toa
         await ctx.close();
       });
 
+      // ── E. (1er nov., audit X7) Ranger dans une case OCCUPÉE demande, jamais en silence ──
+      // N°12 est dans la case i=6 (rangée 2, colonne 3). On choisit N°31 (pas rangée)
+      // puis on touche la case de N°12 : une question nomme N°12 ; « Annuler » ne
+      // change rien ; « À ranger » le fait ET le dit ; l'occupante ne disparaît jamais
+      // du plan sans un mot.
+      await essaie(`E ${qui}`, async () => {
+        const { ctx, pg, errs } = await ouvrir(b, tel, 'garage', 'meubles');
+        await pg.waitForSelector('[data-meuble="mA"] [data-meuble-grille]', { timeout: 25000 });
+        await pg.waitForTimeout(800);
+        const choisir31 = async () => { await pg.locator('button[aria-label^="Ranger la paire N°31"]').first().click(); await pg.waitForTimeout(200); };
+        const case12 = '[data-meuble="mA"] [data-meuble-grille] button[aria-label="N°12 — rangée 2, colonne 3"]';
+        await choisir31();
+        await pg.click(case12);
+        const q = await pg.waitForSelector('[data-ask-choix]', { timeout: 3000 }).then(() => true).catch(() => false);
+        dit(q, `E. ${qui} : toucher une case occupée DEMANDE (feuille de choix)`);
+        const txt = q ? await pg.evaluate(() => { const c = document.querySelector('[data-ask-choix]'); return c ? c.parentElement.innerText : ''; }) : '';
+        const opts = q ? await pg.evaluate(() => [...document.querySelectorAll('[data-ask-choix] [data-choix]')].map((x) => x.getAttribute('data-choix'))) : [];
+        dit(/N°12/.test(txt) && opts.includes('aranger') && opts.includes('choisir'), `E. ${qui} : … elle nomme l'occupante N°12 et propose où la mettre`, JSON.stringify(opts));
+        await pg.screenshot({ path: path.join(CAPT, `stock-gestes-occupee-${qui}.png`) });
+        let slots = await pg.evaluate(() => JSON.parse(localStorage.getItem('vrm_slots') || '{}'));
+        dit(slots['12'] && slots['12'].i === 6 && !slots['31'], `E. ${qui} : rien n'est écrit avant la réponse`, JSON.stringify(slots));
+        if (q) {
+          await pg.locator('[data-ask-choix] ~ button, [data-ask-choix] + button').first().click().catch(async () => { await pg.keyboard.press('Escape'); });
+          await pg.waitForTimeout(400);
+        }
+        slots = await pg.evaluate(() => JSON.parse(localStorage.getItem('vrm_slots') || '{}'));
+        dit(slots['12'] && slots['12'].i === 6 && !slots['31'], `E. ${qui} : « Annuler » ne change rien (N°12 reste dans sa case)`, JSON.stringify(slots));
+        await choisir31();
+        await pg.click(case12);
+        if (await pg.waitForSelector('[data-ask-choix] [data-choix="aranger"]', { timeout: 3000 }).then(() => true).catch(() => false)) {
+          await pg.click('[data-ask-choix] [data-choix="aranger"]');
+          await pg.waitForTimeout(600);
+        }
+        slots = await pg.evaluate(() => JSON.parse(localStorage.getItem('vrm_slots') || '{}'));
+        const t = await toasts(pg);
+        dit(slots['31'] && slots['31'].i === 6 && !slots['12'], `E. ${qui} : « À ranger » : N°31 prend la case, N°12 sort de la case`, JSON.stringify(slots));
+        dit(t.some((x) => /N°31/.test(x) && /N°12/.test(x) && /À ranger/.test(x)), `E. ${qui} : … et le message dit où est N°12`, JSON.stringify(t));
+        dit(errs.length === 0, `E. ${qui} : aucune erreur d'app`, errs.join(' | '));
+        await ctx.close();
+      });
+
       // ── C. Annonces : pas d'argent, pas de « À faire aujourd'hui » ; Ventes les garde ──
       await essaie(`C ${qui}`, async () => {
         const { ctx, pg, errs } = await ouvrir(b, tel, 'annonces');

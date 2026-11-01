@@ -1431,3 +1431,41 @@ refait là-bas), vert après, rouge sous mutation.
 - ⚠️ **Non mesuré** : aucun appel réel aux transporteurs (formes de `mesures.json`) ;
   rien lu en production pour ce tour ; la vraie forme de `nav.indispo` sur un Firefox
   réel.
+
+## 1er novembre — Audit des actions : deux paires au même titre sous un N° sont ROUGES (X1, X5, X7)
+
+Audit « actions » (rapport X1-X9). Ce qui change pour les numéros :
+
+- **X1 — `conflitsDeNumeros` ne dispense plus par le TITRE.** Depuis le 17 août
+  (ab3c7272), deux porteurs au même titre normalisé n'étaient pas un conflit (« une
+  vente et son annonce encore ouverte »). Deux « Nike Dunk Low Panda 42 » différentes
+  sous le N°40 — deux ventes à poster, une vente et une AUTRE annonce, deux annonces —
+  n'allumaient aucun rouge, nulle part (Ma journée, Colis, mode emballage, Stock), alors
+  que 22 % des ventes ont un titre en double. Désormais seule la paire PROUVÉE la même
+  est dispensée : UNE vente et UNE annonce dont l'identité de la vente (`item`, posé par
+  `porteursNum` depuis `identiteAnnonce` : transaction → item_id, sinon photo exacte /
+  dossier non ambigu) EST l'id de l'annonce. Deux ventes à poster ⇒ toujours rouge ;
+  vente sans identité ⇒ rouge. « Tout sur le N° » (`src/rechercheNumero.js`) passe
+  `item` aussi (transaction → item_id seulement : plus prudent).
+- **Doublons réglés seuls (20 oct.) sans rien deviner** : `doublonsAReattribuer` ne
+  renumérote une annonce à côté d'une vente à poster que si l'identité de la vente est
+  CONNUE, et jamais l'annonce qui EST la paire vendue ; vente sans identité ou deux
+  ventes ⇒ rien n'est renuméroté, le rouge reste.
+- **X5 — `confirmerNumerosAVerifier`** (impression) comptait les FICHES : chaque paire
+  republiée (fiche de l'annonce supprimée + fiche reprise par `recreeDe`) déclenchait
+  « Le N°12 est porté par deux paires ». On compte maintenant les PAIRES (fiches reliées
+  par `recreeDe` de proche en proche) ; la fiche remplacée ne se redit pas non plus dans
+  « pas encore vérifié » / « pas encore écrit ».
+- **X7 — Stock : une case occupée DEMANDE.** Ranger une paire dans une case qui porte
+  une paire présente ouvre une feuille : échanger (si la paire rangée avait une place),
+  « je choisis maintenant la nouvelle case de N°12 », ou « N°12 repart dans À ranger » —
+  chaque issue est dite dans le message ; « Annuler » ne change rien. Avant, l'occupante
+  repartait dans « À ranger » en silence. Les choix longs d'`askChoix` s'affichent une
+  par ligne.
+- Preuves : `audit-conflits-numeros.cjs` (26 contrôles ; 11 rouges sur origin/main,
+  `--prouve` : 4 mutations attrapées), `audit-impression-carton.cjs` (3 rouges avant,
+  `--prouve`), banc `stock-gestes` §E (390/1512, rouge sur le build d'avant, captures
+  regardées), `audit-recherche-numero`, `audit-masquees-numeros`, `audit-identite` verts.
+- Non mesuré : combien de N° de la vraie base deviennent rouges avec la nouvelle règle
+  (lecture seule à faire) — une vente encore sans identité à côté de SON annonce encore
+  ouverte s'allume jusqu'à la relecture du dressing (mieux vaut un rouge qu'un faux).

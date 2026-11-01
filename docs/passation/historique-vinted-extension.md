@@ -883,3 +883,30 @@ Julien (iPhone, Orion) : « fais le rattrapage quand je reviens sur Vinted ».
   script de contenu au retour sur l'onglet (c'est le standard ; à vérifier chez lui).
 - ⚠️ Le premier retour après l'installation de la 5.294 relit toujours (aucune
   lecture complète encore datée) : une fois, puis la règle des 3 min.
+
+## 1er novembre — Audit des actions : Republier, plafonds, plusieurs Chrome (extension 5.307.0)
+
+- **X8** : `rendreActions` rend SES places : `compterAction` rend l'horodatage exact de
+  la réservation (`at`), `gardeStricte(…, { recu })` le transmet ; on retire d'abord ces
+  entrées-là (repli d'avant la 5.307 : les plus ANCIENNES ≥ `depuis`, plus les plus
+  récentes, qui étaient celles d'autres gestes). Republier, favoris et Vestiaire.
+- **X9** : suppression « sans réponse claire » (republier ET en ligne → brouillon) ⇒
+  verrou de 30 min sur l'annonce (`poserVerrouRecreer`) : une relance ne refait plus un
+  second brouillon ni une seconde suppression (`audit-recreer` J3, rouge sur l'avant).
+  « Brouillons → en ligne » reste ouvert.
+- **X6 (en partie)** — plusieurs Chrome sur un compte : (a) le QUOTA DU JOUR se compte
+  aussi en base (`coffre_{uid}_*.versBrouillon.supprimeLe`, tous les Chrome ; le plus
+  grand des deux compte) ; base muette ⇒ refus (fail-closed), rien n'est touché ;
+  (b) le VERROU de republication est aussi en base, sur la ligne de l'annonce
+  (`coffre_{uid}_{id}.versBrouillon` : en cours, brouillon flou, suppression ou mise en
+  ligne incertaine, < 30 min) — la relance depuis un AUTRE Chrome est refusée sans
+  requête. `audit-republier-plusieurs-chrome.cjs` (5 rouges sur l'avant, 4 mutations).
+  ⏳ **À FAIRE (décision de Julien)** : le plafond de 50 actions/heure (`vrmActions`)
+  reste par navigateur (deux Chrome = 100/h, mesuré et rapporté par l'audit, §E). Le
+  passer en base (ligne par compte en comparer-et-échanger, jamais `main`) toucherait
+  CHAQUE geste (bordereaux, réponses, offres) : une base injoignable les arrêterait
+  tous (fail-closed). Pas fait ici.
+- X2/X3 (favoris) : historique favoris-messages ; X4 (Leboncoin) : historique leboncoin.
+- Version **5.307.0** (CODE_VERSION, manifeste, EXT_ATTENDUE, CAPTEUR_VERSION,
+  relaisVersion), zip et paquets Orion régénérés ; `audit-extension-zip`,
+  `audit-coherence`, les 40 audits sur `_fond-vm` verts.

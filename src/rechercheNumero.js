@@ -142,7 +142,10 @@ export const toutSurLeNumero = (q, d, o, series = []) => {
   // règle de `porteursNum`) : elle porte son numéro.
   for (const a of annonces) if (a.etat === 'en-ligne' || a.etat === 'a-confirmer' || a.etat === 'masquee') porteurs.push({ type: 'annonce', titre: a.title, id: a.id, aConfirmer: a.etat === 'a-confirmer', masquee: a.etat === 'masquee' });
   for (const v of ventesVinted) {
-    if (o.aPoster && o.aPoster(v)) porteurs.push({ type: 'vente', titre: v.title || '', id: v._tx });
+    // `item` : l'identité de l'annonce vendue (transaction → item_id) — seule
+    // preuve qu'une vente et son annonce encore ouverte sont UNE paire (1er nov.,
+    // `conflitsDeNumeros` ne dispense plus jamais par le titre).
+    if (o.aPoster && o.aPoster(v)) porteurs.push({ type: 'vente', titre: v.title || '', id: v._tx, item: v._item });
     // Annulée AVANT l'envoi : la paire n'a jamais quitté l'étagère, elle porte
     // encore son numéro (la règle de `porteursNum`).
     else if (o.revenue && o.revenue(v)) porteurs.push({ type: 'annulee', titre: v.title || '', id: v._tx });

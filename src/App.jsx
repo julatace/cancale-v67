@@ -160,7 +160,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.299.0';
+const EXT_ATTENDUE = '5.307.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -2320,9 +2320,10 @@ function ConfirmHost() {
       <SheetShell onClose={() => close(null)} z={Z_CONFIRMATION}>
         <div style={{fontSize:17,fontWeight:700,color:C.text,letterSpacing:'-0.02em',lineHeight:1.35}}>{tc}</div>
         {cc.length > 0 && <div style={{fontSize:12.5,color:C.muted,marginTop:6,lineHeight:1.55,whiteSpace:'pre-wrap'}}>{cc.join('\n')}</div>}
-        <div data-ask-choix style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(120px,1fr))',gap:8,marginTop:14}}>
+        {/* (1er nov.) Des choix en PHRASES (la case occupée du Stock) : une par ligne, jamais coupées dans une grille de 120 px. */}
+        <div data-ask-choix style={{display:'grid',gridTemplateColumns:(q.options || []).some(([, lib]) => String(lib).length > 24) ? '1fr' : 'repeat(auto-fill,minmax(120px,1fr))',gap:8,marginTop:14}}>
           {(q.options || []).map(([val, lib]) => (
-            <Bouton variante="secondaire" key={val} data-choix={val} onClick={() => close(val)} className="vrm-b-court" style={{minHeight:44}}>{lib}</Bouton>
+            <Bouton variante="secondaire" key={val} data-choix={val} onClick={() => close(val)} className={String(lib).length > 24 ? undefined : 'vrm-b-court'} style={String(lib).length > 24 ? {minHeight:44,whiteSpace:'normal',textAlign:'left',height:'auto',padding:'10px 14px'} : {minHeight:44}}>{lib}</Bouton>
           ))}
         </div>
         <Bouton variante="discret" plein onClick={() => close(null)} style={{marginTop:12}}>{q.cancel || 'Annuler'}</Bouton>
@@ -9973,8 +9974,26 @@ const confirmerNumerosAVerifier = async (numeros) => {
     if (!cles.size) return true;
     // ⚠️ 20 octobre (« j'ai failli perdre 100 euros ») : DEUX fiches sous le même
     // numéro, c'est deux paires — tamponner ce numéro peut envoyer la mauvaise.
+    // ⚠️ 1er nov. (audit X5) : une paire REPUBLIÉE laisse DEUX fiches au même N°
+    // — celle de l'annonce supprimée et celle de la nouvelle, qui la reprend par
+    // `recreeDe` (une IDENTITÉ posée par VRM, `src/repriseNumero.js`). C'est UNE
+    // paire, un carton : la question sortait sur presque chaque colis republié,
+    // et serait cliquée sans lire le jour où elle est vraie. On compte les PAIRES
+    // (fiches reliées par `recreeDe`, de proche en proche), jamais les fiches.
     const parCle = {};
-    for (const f of Object.values(fiches)) { const k = f && cleNum(f.numero); if (k && cles.has(k)) (parCle[k] = parCle[k] || []).push(f); }
+    for (const [id, f] of Object.entries(fiches)) { const k = f && cleNum(f.numero); if (k && cles.has(k)) (parCle[k] = parCle[k] || []).push({ id: String(id), f }); }
+    const pairesDe = (liste) => {
+      const chef = new Map(liste.map((x) => [x.id, x.id]));
+      const trouve = (a) => { while (chef.get(a) !== a) a = chef.get(a); return a; };
+      for (const x of liste) {
+        const de = x.f && x.f.recreeDe != null ? String(x.f.recreeDe) : '';
+        if (de && chef.has(de)) chef.set(trouve(x.id), trouve(de));
+      }
+      const groupes = new Map();
+      for (const x of liste) { const r = trouve(x.id); if (!groupes.has(r)) groupes.set(r, x.f); }
+      return [...groupes.values()];
+    };
+    for (const k of Object.keys(parCle)) parCle[k] = pairesDe(parCle[k]);
     const doubles = Object.keys(parCle).filter((k) => parCle[k].length > 1);
     if (doubles.length) {
       const liste = doubles.slice(0, 3).map((k) => `N°${k} : ${parCle[k].slice(0, 3).map((f) => f.title || 'un article').join(' · ')}`).join('\n');
@@ -9985,7 +10004,12 @@ const confirmerNumerosAVerifier = async (numeros) => {
       });
       if (!ok) return false;
     }
-    const pasEcrit = Object.values(fiches).filter((f) => f && cles.has(cleNum(f.numero)) && reattribueAEcrire(f));
+    // La fiche d'une annonce REMPLACÉE par sa republication (même N°) ne se redit
+    // pas : la nouvelle porte la même paire (X5, ci-dessus).
+    const remplacees = new Set();
+    for (const f of Object.values(fiches)) { if (f && f.recreeDe != null && cles.has(cleNum(f.numero))) { const a = fiches[String(f.recreeDe)]; if (a && cleNum(a.numero) === cleNum(f.numero)) remplacees.add(String(f.recreeDe)); } }
+    const vivantes = Object.entries(fiches).filter(([id]) => !remplacees.has(String(id))).map(([, f]) => f);
+    const pasEcrit = vivantes.filter((f) => f && cles.has(cleNum(f.numero)) && reattribueAEcrire(f));
     if (pasEcrit.length) {
       const ok = await askConfirm({
         title: `As-tu écrit le N°${pasEcrit[0].numero} sur le carton ?`,
@@ -9994,7 +10018,7 @@ const confirmerNumerosAVerifier = async (numeros) => {
       });
       if (!ok) return false;
     }
-    const doute = Object.values(fiches).filter((f) => f && cles.has(cleNum(f.numero)) && ficheAVerifier(f));
+    const doute = vivantes.filter((f) => f && cles.has(cleNum(f.numero)) && ficheAVerifier(f));
     if (!doute.length) return true;
     const liste = doute.slice(0, 4).map((f) => `N°${f.numero} · ${f.title || 'un article'}`).join('\n');
     return await askConfirm({
@@ -31234,19 +31258,46 @@ function StockMeubles() {
   const nVendus = fiches.filter(estVendu).length;
   const nEcartes = Object.keys(numeros).filter((id) => { const f = { id, ...(numeros[id] || {}) }; return String(f.numero == null ? '' : f.numero).trim() && !annonceDeclareePartie(f.id, numeros, pairsLost) && horsCompte(f); }).length;
 
-  const poser = (cle, mid, i) => {
+  // ⚠️⚠️ 1er nov. (audit X7) — UNE CASE OCCUPÉE DEMANDE. Avant, toucher par erreur
+  // une case pleine y posait la paire et renvoyait l'OCCUPANTE dans « À ranger »
+  // sans un mot (le toast ne parlait que de la nouvelle) : son carton restait dans
+  // la case, « Où est la N°12 ? » ne la trouvait plus, et le plan mentait. Une case
+  // qui porte une paire PRÉSENTE (`ficheParCle`) pose la question : échanger (si la
+  // paire qu'on range avait une place), choisir la nouvelle case de l'occupante, ou
+  // la remettre « À ranger » — chaque issue DITE ; « Annuler » ne change rien.
+  const poser = async (cle, mid, i) => {
     const u = { ...slots };
     // occupant éventuel de la case cible
     const occ = Object.keys(u).find((c) => u[c] && u[c].m === mid && u[c].i === i);
     const ancien = u[cle];
-    if (occ && occ !== cle) { if (ancien) u[occ] = ancien; else delete u[occ]; } // échange ou libère
+    const m = meubles.find((x) => x.id === mid); const f = ficheParCle[cle];
+    const ici = (mm, ii) => { if (!mm) return 'cette case'; const p = placeDansMeubles(ii, mm); return `${mm.name} · rangée ${p.rangee}, colonne ${p.colonne}`; };
+    let suite = null;
+    if (occ && occ !== cle) {
+      const fo = ficheParCle[occ];
+      if (fo) {
+        const mAncien = ancien ? meubles.find((x) => x.id === ancien.m) : null;
+        const options = [];
+        if (ancien && mAncien) options.push(['echanger', `Échanger : N°${fo.numero} va dans l'ancienne case de N°${f ? f.numero : cle} (${ici(mAncien, ancien.i)})`]);
+        options.push(['choisir', `Je choisis maintenant la nouvelle case de N°${fo.numero}`]);
+        options.push(['aranger', `N°${fo.numero} repart dans « À ranger » (son carton sort de cette case)`]);
+        const choix = await askChoix({
+          title: `${ici(m, i)} contient déjà N°${fo.numero}`,
+          desc: `${fo.title ? '« ' + fo.title + ' »\n' : ''}Tu ranges N°${f ? f.numero : cle} dans cette case : où va N°${fo.numero} ?`,
+          options, cancel: 'Annuler — ne rien changer',
+        });
+        if (choix == null) { toast(`Rien n'a changé : N°${fo.numero} reste dans ${ici(m, i)}.`); return false; }
+        if (choix === 'echanger' && ancien && mAncien) { u[occ] = ancien; suite = `N°${fo.numero} est maintenant dans ${ici(mAncien, ancien.i)}.`; }
+        else { delete u[occ]; suite = choix === 'choisir' ? `Touche la case où tu poses N°${fo.numero}.` : `N°${fo.numero} est dans « À ranger ».`; if (choix === 'choisir') setPlace(occ); }
+      } else { if (ancien) u[occ] = ancien; else delete u[occ]; }   // case notée pour une paire qui n'est plus là
+    }
     u[cle] = { m: mid, i };
     ecrireSlots(u);
     // (1er nov.) Un geste réussi se DIT : où la paire vient d'être posée, avec
     // les mots du meuble (rangée, colonne) — la case qui clignote peut être
     // hors de l'écran sur téléphone.
-    const m = meubles.find((x) => x.id === mid); const f = ficheParCle[cle];
-    if (m) { const p = placeDansMeubles(i, m); toast(`N°${f ? f.numero : cle} rangée : ${m.name} · rangée ${p.rangee}, colonne ${p.colonne}.`, 'ok'); }
+    if (m) toast(`N°${f ? f.numero : cle} rangée : ${ici(m, i)}.${suite ? ' ' + suite : ''}`, 'ok');
+    return true;
   };
   const retirerCase = (cle) => { const u = { ...slots }; delete u[cle]; ecrireSlots(u); };
   const sortir = (f) => {
@@ -31257,7 +31308,7 @@ function StockMeubles() {
   };
   const cliquerCase = (mid, i) => {
     const occ = occupant(mid, i);
-    if (place) { poser(place, mid, i); setPlace(null); return; }
+    if (place) { const p = place; setPlace(null); poser(p, mid, i); return; }
     if (occ) setModal({ type: 'fiche', cle: cleDeFiche(occ) });
     else setModal({ type: 'placer', m: mid, i });
   };
@@ -32918,14 +32969,33 @@ const tailleDansTitre = (titre, taille) => {
 // jamais le titre) : le bloc rouge s'allumait pour chaque paire rangée.
 // Restent un conflit : le même numéro dans DEUX cases différentes (deux
 // cartons), ou deux paires différentes hors garage (deux annonces, une
-// annonce et une autre vente…). Une vente et son annonce encore ouverte au
-// même titre restent la même paire (règle d'avant, inchangée).
+// annonce et une autre vente…).
+// ⚠️⚠️ 1ER NOV. — PLUS JAMAIS PAR LE TITRE (§2.4, §5). Avant, deux porteurs au
+// MÊME TITRE étaient dispensés (« une vente et son annonce encore ouverte ») :
+// deux « Nike Dunk Low Panda 42 » différentes sous le N°40 — deux ventes à
+// poster, ou une vente et une autre annonce — n'allumaient AUCUN rouge, nulle
+// part (22 % des ventes ont un titre en double). Seule la paire PROUVÉE la même
+// est dispensée : UNE vente et UNE annonce dont l'identité de la vente
+// (`item`, posée par `porteursNum` depuis `identiteAnnonce` : transaction →
+// item_id, sinon photo exacte) EST l'id de l'annonce. Deux ventes à poster sous
+// un N° ⇒ toujours rouge. Vente sans identité ⇒ rouge (on ne sait pas).
 // ⚠️ 25 OCT — DÉCISION DE JULIEN : « ne montre plus en rouge un conflit venant
 // d'une vente ANNULÉE ». Une vente annulée ne part jamais : elle ne peut donc
 // pas être « la mauvaise paire qui s'expédie ». Elle garde son numéro dans
 // `porteursNum` (jamais réattribué, §5) mais ne compte PLUS comme un porteur
 // en conflit. Reste rouge un vrai conflit entre deux articles EN VENTE.
 function conflitsDeNumeros(porteurs) {
+  // Deux porteurs (dédoublonnés par type:id) qui sont la MÊME paire, PROUVÉ :
+  // une vente et une annonce, l'identité de la vente = l'id de l'annonce.
+  function memePaireProuvee(paires) {
+    const uniq = [];
+    const vus = new Set();
+    for (const x of (paires || [])) { const k = x.type + ':' + x.id; if (!vus.has(k)) { vus.add(k); uniq.push(x); } }
+    if (uniq.length !== 2) return false;
+    const v = uniq.find(x => x.type === 'vente'), a = uniq.find(x => x.type === 'annonce');
+    if (!v || !a) return false;
+    return v.item != null && String(v.item) !== '' && String(v.item) === String(a.id);
+  }
   const out = [];
   for (const n in (porteurs || {})) {
     const p = porteurs[n] || [];
@@ -32937,10 +33007,7 @@ function conflitsDeNumeros(porteurs) {
     const paires = p.filter(x => x.type !== 'garage' && x.type !== 'annulee');
     const ids = new Set(paires.map(x => x.type + ':' + x.id));
     let deux = cases.size > 1;
-    if (!deux && paires.length > 1 && ids.size > 1) {
-      const titres = new Set(paires.map(x => normTitle(x.titre || '')));
-      if (!(paires.length === 2 && titres.size === 1)) deux = true;
-    }
+    if (!deux && ids.size > 1) deux = !memePaireProuvee(paires);
     if (deux) out.push({ numero: n, porteurs: p });
   }
   return out.sort((a, b) => triNum(a.numero, b.numero));
@@ -32978,7 +33045,16 @@ function doublonsAReattribuer(conflits, fiches) {
     const autres = p.filter((x) => x.type !== 'annonce' && x.type !== 'vente');
     if (autres.length) continue;                       // garage / annulée : pas deviné
     let bouger;
-    if (ventes.length === 1) bouger = annonces;
+    // (1er nov.) Une vente à poster garde le N° ; une annonce ne change que si on
+    // SAIT qu'elle n'est pas la paire vendue : l'identité de la vente (`item`) est
+    // connue, et l'annonce qui EST cette paire (encore ouverte) ne bouge pas.
+    // Vente sans identité ⇒ rien n'est deviné, le rouge reste (§5).
+    if (ventes.length === 1) {
+      const item = ventes[0].item != null && String(ventes[0].item) !== '' ? String(ventes[0].item) : null;
+      if (!item) continue;
+      bouger = annonces.filter((x) => String(x.id) !== item);
+      if (!bouger.length) continue;
+    }
     else if (!ventes.length && annonces.length >= 2) {
       const rang = (x) => { const f = fiches[x.id] || {}; return [f.auto === false || f.manuelAt ? 0 : 1, String(f.numberedAt || '9999'), String(x.id)]; };
       const tri = [...annonces].sort((a, b) => { const ra = rang(a), rb = rang(b); for (let i = 0; i < 3; i++) { if (ra[i] < rb[i]) return -1; if (ra[i] > rb[i]) return 1; } return 0; });
@@ -40944,7 +41020,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       if (!revenue && !needsBordereau(o.status)) continue;      // colis déjà parti : la place est libre
       if (isHidden(o)) continue;
       const e = effEntry(o); const n = e && e.numero;
-      if (n != null) add(n, { type: revenue ? 'annulee' : 'vente', titre: o.title, id: String(o.transaction_id || '') });
+      // `item` : l'IDENTITÉ de l'annonce vendue (transaction → item_id, sinon photo
+      // exacte, `identiteAnnonce`) — la seule chose qui dispense une vente et son
+      // annonce encore ouverte du rouge (`conflitsDeNumeros`), jamais le titre.
+      if (n != null) add(n, { type: revenue ? 'annulee' : 'vente', titre: o.title, id: String(o.transaction_id || ''), item: identiteAnnonce(o) || null });
     }
     for (const cell in (garageGrid || {})) {
       const vals = Array.isArray(garageGrid[cell]) ? garageGrid[cell] : [];
@@ -40952,7 +41031,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     }
     return m;
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [listings.items, listings.aConfirmer, masqueesSurEtagere, listings.lues, sales.items, numeros, saleOv, garageGrid, hiddenSales, hiddenAccts, labelsCaptes, emailBords]);
+  }, [listings.items, listings.aConfirmer, masqueesSurEtagere, listings.lues, sales.items, numeros, saleOv, garageGrid, hiddenSales, hiddenAccts, labelsCaptes, emailBords, txnItem]);
 
   // Numéros OCCUPÉS par une paire réellement présente — jamais réattribuables.
   const numsOccupes = useMemo(() => {

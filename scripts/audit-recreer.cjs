@@ -147,6 +147,16 @@ const zero = (j) => gestes(j).length === 0;   // 5.266 : lire la liste des coule
     const r1 = await appel(); const n1 = f.j.vinted.length; const r2 = await appel();
     dit(r1.etape === 'incertain' && /PEUT-ÊTRE/.test(r1.raison || ''), "mise en ligne sans réponse claire (5xx) : « peut-être en ligne », dit", `etape=${r1.etape} ${r1.raison || ''}`);
     dit(r2.accepte === false && r2.code === 'recreer-incertaine' && f.j.vinted.length === n1, "une seconde tentative juste après est REFUSÉE sans rien envoyer (pas de seconde copie)", `code=${r2.code} requêtes=${f.j.vinted.length - n1}`); }
+  // J3 — (1er nov., audit X9) SUPPRESSION sans réponse claire : l'ancienne est peut-être
+  //      encore en ligne. Une relance juste après ne refait PAS de brouillon (ni une
+  //      seconde suppression) : refusée sans aucune requête — republier ET en ligne → brouillon.
+  for (const versBrouillon of [false, true]) {
+    const f = monter({ src: process.env.BG_SRC || undefined, suppression: 502 });
+    const appel = () => f.ctx.recreerVinted({ cmd: 'recreerVinted', uid: '111', id: '9101', prix: 54, titre: 'Nike Air Max 1', confirme: true, versBrouillon });
+    const r1 = await appel(); const n1 = f.j.vinted.length; const r2 = await appel();
+    const nb = f.j.vinted.filter((v) => v.methode === 'POST' && /item_upload\/drafts\/?$/.test(v.chemin)).length;
+    dit((r1.etape === 'incertain' || r1.etape === 'double') && r2.accepte === false && r2.code === 'recreer-incertaine' && f.j.vinted.length === n1 && nb === 1,
+      `${versBrouillon ? 'en ligne → brouillon' : 'republier'}, suppression sans réponse claire puis relance : refusée, aucun second brouillon`, `r1=${r1.etape} r2=${r2.code || r2.etape} brouillons=${nb} requêtes=${f.j.vinted.length - n1}`); }
   // J2 — une création REFUSÉE (4xx) ne bloque pas la tentative suivante.
   { const f = monter({ src: process.env.BG_SRC || undefined, brouillon: 422 });
     await f.ctx.recreerVinted({ cmd: 'recreerVinted', uid: '111', id: '9101', prix: 54, titre: 'Nike', confirme: true });

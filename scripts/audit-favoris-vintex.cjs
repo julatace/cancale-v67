@@ -12,7 +12,7 @@
 //  Vinted qui note chaque requête, faux serveur VRM qui rend l'autorisation) :
 //    · l'ordre C T O R, tout depuis la page, sans `Authorization` ;
 //    · le prix de l'offre = prix de l'annonce − la réduction (« 45.00 ») ;
-//    · sans réduction : C T R (aucune offre) ; prix illisible : aucune offre ;
+//    · sans réduction : C T R (aucune offre) ; prix illisible : ni offre ni message (X2) ;
 //    · les pauses tirées dans les plages mesurées ;
 //    · le fil n'est relu que si la réponse de création ne suffit pas ;
 //    · sans onglet Vinted : RIEN ne part (`onglet_vinted`) ;
@@ -94,7 +94,9 @@ const seq = (j) => j.vinted.map((v) => /conversations$/.test(v.chemin) ? 'C' : /
   { const { f, r } = await run({ pourcentage: null });
     dit(r.ok && seq(f.j) === 'CTR', 'sans réduction : conversation, transaction, message — aucune offre', seq(f.j)); }
   { const { f, r } = await run({ prix: null });
-    dit(r.ok && seq(f.j) === 'CTR', "prix de l'annonce illisible : aucune offre inventée, le message part", seq(f.j)); }
+    // 1er nov. (audit X2) : une offre DEMANDÉE dont le prix ne se lit pas n'est pas
+    // faite — et le message qui l'annonce ne part PAS (« refusé », raison dite).
+    dit(!r.ok && r.json && r.json.raison === 'offre_prix_inconnu' && seq(f.j) === 'CT', "prix de l'annonce illisible : aucune offre inventée, et le message qui l'annoncerait ne part pas", seq(f.j) + ' ' + JSON.stringify(r.json)); }
   { const { f, r } = await run({ creationComplete: false });
     dit(r.ok && seq(f.j) === 'CLTOR', 'réponse de création incomplète : le fil est relu avant tout envoi', seq(f.j)); }
   { const { f, r } = await run({ onglets: [] });
