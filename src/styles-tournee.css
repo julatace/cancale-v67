@@ -1,0 +1,67 @@
+/* ══ LA TOURNÉE DE MA JOURNÉE (1er nov., maquette « journee-A-tournee ») ══════
+   Vitrine (§7) : blanc, encre, l'accent RARE — seulement sur le numéro de
+   l'étape en cours ; l'ambre pour une date limite d'aujourd'hui ou demain. Une
+   étape faite est barrée, sa pastille pleine encre avec la coche. Cibles 44 px. */
+.vrm-tr { margin: 0 0 18px; padding: 4px 0 0; color: var(--vrm-ink); }
+.vrm-tr-tete { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin: 0 2px 4px; }
+.vrm-tr-titre { margin: 0; font-size: 20px; font-weight: 800; letter-spacing: -.015em; color: var(--vrm-ink); }
+.vrm-tr-compte, .vrm-tr-ordre { font-size: 13px; color: var(--vrm-muted); text-align: right; }
+.vrm-tr-etapes, .vrm-tr-arrets { list-style: none; margin: 0; padding: 0; }
+.vrm-tr-etape, .vrm-tr-arret { border-bottom: 1px solid var(--vrm-line); }
+.vrm-tr-etape:last-child { border-bottom: 0; }
+.vrm-tr-bouton, .vrm-tr-arret-bouton {
+  display: grid; grid-template-columns: 44px minmax(0, 1fr) auto; align-items: center; column-gap: 14px;
+  width: 100%; min-height: 64px; padding: 12px 0; margin: 0; border: 0; background: transparent;
+  color: inherit; font: inherit; text-align: left; cursor: pointer; -webkit-tap-highlight-color: transparent;
+}
+.vrm-tr-bouton:disabled { cursor: default; }
+.vrm-tr-bouton:focus-visible, .vrm-tr-arret-bouton:focus-visible, .vrm-tr-ouvrir:focus-visible, .vrm-tr-fermer:focus-visible { outline: 2px solid var(--vrm-focus, var(--vrm-accent)); outline-offset: 2px; border-radius: 10px; }
+.vrm-tr-pastille {
+  width: 44px; height: 44px; border-radius: 22px; display: grid; place-items: center;
+  font-size: 17px; font-weight: 600; font-variant-numeric: tabular-nums;
+  background: var(--vrm-card2); color: var(--vrm-ink);
+}
+.vrm-tr-pastille.is-courante { background: var(--vrm-accent); color: var(--vrm-on-accent, #fff); }
+.vrm-tr-pastille.is-fait, .vrm-tr-pastille.is-arret { background: var(--vrm-ink); color: var(--vrm-bg); }
+.vrm-tr-texte { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.vrm-tr-t { font-size: 16px; font-weight: 700; line-height: 1.25; color: var(--vrm-ink); overflow-wrap: anywhere; }
+.vrm-tr-s { font-size: 14px; line-height: 1.35; color: var(--vrm-muted); overflow-wrap: anywhere; }
+.vrm-tr-passu { color: var(--vrm-muted); font-weight: 600; }
+.vrm-tr-etape.is-fait .vrm-tr-t { text-decoration: line-through; text-decoration-thickness: 2px; color: var(--vrm-muted); }
+.vrm-tr-etape.is-rien .vrm-tr-t, .vrm-tr-etape.is-passu .vrm-tr-t { color: var(--vrm-muted); font-weight: 600; }
+.vrm-tr-chevron { font-size: 22px; color: var(--vrm-muted); padding-left: 4px; }
+.vrm-tr-numeros { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.vrm-tr-num { font-family: var(--vrm-police-mono, ui-monospace, monospace); font-size: 14px; padding: 5px 10px; border-radius: 999px; background: var(--vrm-card2); color: var(--vrm-ink); }
+.vrm-tr-num.is-plus { color: var(--vrm-muted); }
+.vrm-tr-sans { font-size: 13px; color: var(--vrm-muted); align-self: center; }
+.vrm-tr-pied { margin-top: 10px; }
+.vrm-tr-ouvrir {
+  display: flex; align-items: center; justify-content: center; gap: 10px; width: 100%; min-height: 48px;
+  border: 1px solid var(--vrm-line); border-radius: 14px; background: var(--vrm-surface, transparent);
+  color: var(--vrm-ink); font: inherit; font-size: 15px; font-weight: 650; cursor: pointer;
+}
+@media (min-width: 768px) {
+  .vrm-tr-pied { display: flex; justify-content: flex-end; }
+  .vrm-tr-ouvrir { width: auto; padding: 0 18px; }
+}
+
+/* ── Le mode plein écran ─────────────────────────────────────────────────── */
+.vrm-tr-plein {
+  position: fixed; inset: 0; display: flex; flex-direction: column; background: var(--vrm-bg, #fff); color: var(--vrm-ink);
+  font-family: var(--vrm-police, inherit); padding-top: env(safe-area-inset-top); overflow: hidden;
+}
+.vrm-tr-plein-barre { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 16px; }
+.vrm-tr-fermer { width: 44px; height: 44px; border-radius: 22px; border: 0; background: var(--vrm-card2); color: var(--vrm-ink); display: grid; place-items: center; cursor: pointer; }
+.vrm-tr-plein-compte { font-size: 15px; font-weight: 650; padding: 10px 16px; border-radius: 22px; background: var(--vrm-surface, #fff); border: 1px solid var(--vrm-line); }
+.vrm-tr-plein-carte { padding: 0 16px; flex: 0 0 auto; }
+.vrm-tr-plein-carte .vrm-relais-fond { height: min(38vh, 320px) !important; }
+.vrm-tr-note { font-size: 13px; color: var(--vrm-muted); line-height: 1.45; margin: 8px 2px 0; }
+.vrm-tr-plein-feuille { flex: 1 1 auto; overflow-y: auto; overscroll-behavior: contain; padding: 14px 16px calc(20px + env(safe-area-inset-bottom)); }
+.vrm-tr-plein-tete { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 4px; }
+.vrm-tr-arret { display: flex; flex-direction: column; }
+.vrm-tr-quand { font-size: 13px; color: var(--vrm-muted); text-align: right; max-width: 120px; }
+.vrm-tr-quand.is-ambre { color: var(--vrm-warn); font-weight: 650; }
+.vrm-tr-plans { align-self: flex-start; margin: -6px 0 10px 58px; min-height: 44px; display: flex; align-items: center; font-size: 14px; font-weight: 600; color: var(--vrm-b-lien, var(--vrm-accent)); text-decoration: none; }
+@media (min-width: 768px) {
+  .vrm-tr-plein { left: auto; width: min(520px, 100vw); border-left: 1px solid var(--vrm-line); box-shadow: -12px 0 40px rgba(15, 15, 14, .12); }
+}

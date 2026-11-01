@@ -1,0 +1,53 @@
+/* ══ VENTES : PRIX · ACHAT · BÉNÉFICE SUR LA LIGNE, ET « DÉPOSÉ » (1er nov.) ══
+   Maquettes « ventes-B-journal » (téléphone : le bénéfice sous le prix) et
+   « ventes-ordi » (ordinateur : colonnes Prix · Achat · Bénéfice). Les lignes
+   gardent la forme Vitrine (styles-vitrine.css) ; ces règles ne valent que pour
+   une ligne qui porte ses colonnes (`data-benef-cols`). */
+html body .vrm-app-shell .vrm-main .vrm-sale-row[data-benef-cols] > button.vrm-ledger-sale-toggle { grid-template-rows: auto auto auto; }
+html body .vrm-app-shell .vrm-main .vrm-sale-row[data-benef-cols] > button.vrm-ledger-sale-toggle > .vrm-ledger-photo-empty,
+html body .vrm-app-shell .vrm-main .vrm-sale-row[data-benef-cols] > button.vrm-ledger-sale-toggle > .vrm-ledger-sale-title,
+html body .vrm-app-shell .vrm-main .vrm-sale-row[data-benef-cols] > button.vrm-ledger-sale-toggle > .vrm-ledger-sale-plus { grid-row: 1 / span 3; }
+html body .vrm-app-shell .vrm-main .vrm-sale-row[data-benef-cols] > button.vrm-ledger-sale-toggle > .vrm-ledger-sale-amount { grid-column: 3; grid-row: 1; }
+html body .vrm-app-shell .vrm-main .vrm-sale-row[data-benef-cols] > button.vrm-ledger-sale-toggle > .vrm-ledger-sale-benef { grid-column: 3; grid-row: 2; align-self: start; }
+html body .vrm-app-shell .vrm-main .vrm-sale-row[data-benef-cols] > button.vrm-ledger-sale-toggle > .vrm-ledger-sale-state { grid-column: 3; grid-row: 3; }
+html body .vrm-app-shell .vrm-main .vrm-sale-row[data-benef-cols] > button.vrm-ledger-sale-toggle > .vrm-ledger-sale-achat { display: none; }
+.vrm-ledger-sale-benef, .vrm-ledger-sale-achat { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; font-size: 14px; font-weight: 600; color: var(--vrm-ink); }
+.vrm-ledger-sale-benef[data-benef-etat="achat"], .vrm-ledger-sale-benef[data-benef-etat="illisible"], .vrm-ledger-sale-benef[data-benef-etat="prix"] { color: var(--vrm-muted); font-weight: 500; }
+.vrm-ledger-sale-benef .vrm-benef-borne { display: block; font-size: 11px; line-height: 1.2; font-weight: 500; color: var(--vrm-muted); }
+.vrm-ledger-sale-achat[data-achat-etat="manque"] { color: var(--vrm-warn); font-weight: 600; }
+.vrm-ventes-entete { display: none; }
+@media (min-width: 768px) {
+  html body .vrm-app-shell .vrm-main .vrm-sale-row[data-benef-cols] > button.vrm-ledger-sale-toggle {
+    grid-template-columns: 80px minmax(0, 1fr) minmax(110px, 170px) minmax(72px, 100px) minmax(64px, 90px) minmax(84px, 120px) 32px !important;
+    grid-template-rows: auto;
+  }
+  html body .vrm-app-shell .vrm-main .vrm-sale-row[data-benef-cols] > button.vrm-ledger-sale-toggle > :is(.vrm-ledger-photo-empty, .vrm-ledger-sale-title, .vrm-ledger-sale-plus, .vrm-ledger-sale-state, .vrm-ledger-sale-amount, .vrm-ledger-sale-achat, .vrm-ledger-sale-benef) { grid-row: 1; align-self: center; }
+  html body .vrm-app-shell .vrm-main .vrm-sale-row[data-benef-cols] > button.vrm-ledger-sale-toggle > .vrm-ledger-sale-state { grid-column: 3; }
+  html body .vrm-app-shell .vrm-main .vrm-sale-row[data-benef-cols] > button.vrm-ledger-sale-toggle > .vrm-ledger-sale-amount { grid-column: 4; }
+  html body .vrm-app-shell .vrm-main .vrm-sale-row[data-benef-cols] > button.vrm-ledger-sale-toggle > .vrm-ledger-sale-achat { display: block; grid-column: 5; }
+  html body .vrm-app-shell .vrm-main .vrm-sale-row[data-benef-cols] > button.vrm-ledger-sale-toggle > .vrm-ledger-sale-benef { grid-column: 6; font-size: 15px; font-weight: 700; }
+  html body .vrm-app-shell .vrm-main .vrm-sale-row[data-benef-cols] > button.vrm-ledger-sale-toggle > .vrm-ledger-sale-plus { grid-column: 7; }
+  html body .vrm-app-shell .vrm-main .vrm-ventes-liste > .vrm-ventes-entete {
+    display: grid; grid-template-columns: 80px minmax(0, 1fr) minmax(110px, 170px) minmax(72px, 100px) minmax(64px, 90px) minmax(84px, 120px) 32px;
+    column-gap: 16px; padding: 4px 0 10px; border-bottom: 1px solid var(--vrm-line); font-size: 13px; font-weight: 500; color: var(--vrm-muted);
+  }
+  html body .vrm-app-shell .vrm-main .vrm-ventes-liste > .vrm-ventes-entete > .is-droite { text-align: right; }
+}
+
+/* ── « Déposé » ─────────────────────────────────────────────────────────── */
+.vrm-gestes-pile { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
+html body .vrm-app-shell .vrm-main .vrm-sale-row[data-glisse-depose] { position: relative; touch-action: pan-y; }
+html body .vrm-app-shell .vrm-main .vrm-sale-row[data-glisse-actif]::after {
+  content: 'Déposé'; position: absolute; top: 0; bottom: 0; left: 100%; width: 60vw; display: flex; align-items: center; padding-left: 20px;
+  background: var(--vrm-card2); color: var(--vrm-ink); font-size: 15px; font-weight: 700; pointer-events: none;
+}
+html body .vrm-app-shell .vrm-main .vrm-sale-row[data-glisse-pret]::after { background: var(--vrm-ink); color: var(--vrm-bg); }
+html body .vrm-app-shell .vrm-main .vrm-sale-row[data-depose-attente] { opacity: .55; }
+.vrm-depose-barre {
+  position: fixed; left: 16px; right: 16px; bottom: calc(84px + env(safe-area-inset-bottom)); display: flex; align-items: center; gap: 12px;
+  padding: 6px 6px 6px 16px; border-radius: 14px; background: var(--vrm-ink, #111); color: var(--vrm-bg, #fff);
+  box-shadow: var(--vrm-ombre-flottante, 0 10px 28px rgba(0,0,0,.2)); font-size: 15px;
+}
+.vrm-depose-barre-t { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.vrm-depose-annuler { min-height: 44px; padding: 0 16px; border: 0; border-radius: 10px; background: transparent; color: inherit; font: inherit; font-weight: 700; text-decoration: underline; cursor: pointer; }
+@media (min-width: 768px) { .vrm-depose-barre { left: auto; right: 24px; bottom: 24px; max-width: 420px; } }

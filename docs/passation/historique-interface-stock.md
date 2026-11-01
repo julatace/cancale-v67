@@ -2229,3 +2229,45 @@ arrive par « Fiche N° » → « Toute l'histoire du N° ». Le reçu d'achat n
 dans Achats) : l'étape dit seulement « achat relié par son n° de transaction ».
 
 **Geste de Julien** : aucun. Taper un N° dans la recherche → « Toute l'histoire du N° ».
+## 1er novembre 2026 — Ma journée « Tournée » ; Ventes : bénéfice sur la ligne et « Déposé » au glissé
+
+Maquettes validées : `journee-A-tournee`, `journee-mode-tournee`, `ventes-B-journal`, `ventes-ordi`.
+
+**La tournée (Ma journée, en tête, après les alertes qui coûtent de l'argent)** — `src/tournee.js` (règle pure),
+`src/Tournee.jsx` (carte + plein écran), `src/styles-tournee.css`. Quatre étapes, AUCUNE règle de comptage neuve :
+- ① **Imprimer** : les lignes de « Imprimer les N prêts » de Colis (`lignesLot`). Ma journée ne lit pas les
+  bordereaux captés par l'extension (choix du 8 sept., coût) : comme la case « À envoyer », le nombre publié par
+  Colis (`vrm_colis_prets`) s'il parle du même lot, sinon « au moins ». Toucher l'étape ouvre l'impression
+  EXISTANTE (drapeau `_pendingBordPrint`, le même que `?print=bord`). Cochée quand tous les prêts sont imprimés
+  par VRM (`vinted_bords_printed`) — jamais tant que le nombre est « au moins ».
+- ② **Emballer** et ③ **Déposer** : `toShip` + ventes eBay à poster — le nombre de la case « À envoyer » =
+  `vrm_colis_aposter`. Les N° des paires dans l'ordre de leur date limite (⛔ jamais par emplacement, refusé le
+  11 oct.). Déposer regroupe par transporteur (lu sur la FORME du n° de suivi du bordereau,
+  `transporteurDeForme`) ; le point de dépôt n'est relié à un colis par aucune identité : jamais deviné. Les
+  deux se cochent quand plus rien n'est à poster ET qu'un colis a été marqué déposé aujourd'hui
+  (`vinted_ship_done`) : rien ne garde la trace de l'emballage seul, c'est dit dans le code. ② ouvre le mode
+  emballage s'il existe (il répond à l'événement `vrm:ouvrir-emballage` en posant `detail.pris = true` — contrat
+  pour le chantier « mode emballage ») ; sinon Colis, colonne « Prêts ».
+- ④ **Retirer** : les points de la colonne « À retirer » (`pointsARetirer`), nombre = `pickupUnion.total` =
+  `vrm_colis_retirer`. Cochée quand plus rien à retirer ET un colis noté retiré aujourd'hui
+  (`vrm_colis_collected_at`, `vinted_pickup_done`). Ouvre Colis → « À retirer ».
+- « Pas su » ⇒ « — », jamais 0 ni coché. Rien à faire du tout ⇒ pas de carte.
+- **Plein écran** (« Voir la tournée ») : `CarteRelaisColis` (compacte, nouvelles options `sansListe` et
+  `etiquette`) avec les seuls points relais, épingle = numéro de l'arrêt ; la liste des arrêts (dépôts par
+  transporteur + points relais) rangée par **date limite la plus proche, dit « pas un itinéraire »** ; aucune
+  distance ni durée (les « 4,2 km · 22 min » de la maquette ne sont pas mesurables : retirés). « Ouvrir dans
+  Plans » sur un point relais à adresse.
+
+**Ventes (liste Vinted)** — `src/beneficeLigne.js`, `src/GlisserDepose.jsx`, `src/styles-ventes-ligne.css`.
+- **Bénéfice sur la ligne** (`LigneVenteCompacte`, prop `benef`) : la règle du tiroir (`beneficePaire` = prix −
+  achat − frais connus, celle de `vrm_benefice_jours`). Prix d'achat manquant ⇒ « — » (le geste « Prix d'achat »
+  reste sur la ligne). Frais pas confirmés ⇒ **« au plus »** : ce qui manque ne peut que BAISSER le bénéfice
+  (la demande disait « au moins » : ce serait faux dans ce sens — à trancher par Julien si besoin). Téléphone :
+  le bénéfice sous le prix ; ordinateur : colonnes Prix · Achat · Bénéfice avec leur en-tête.
+- **« Déposé »** sur une vente À EXPÉDIER seulement : glisser vers la gauche (doigt) OU le bouton « Déposé » de
+  la ligne (jamais un geste caché seul). Rien n'est écrit pendant 5 s, barre « Annuler » (⇒ rien écrit). Puis LE
+  geste « ✓ Colis fait » de Colis, factorisé en `marquerPoste(o, b)` (`vinted_ship_done` + `vinted_bords_shipped`),
+  appelé désormais par Colis aussi. Écran quitté pendant le délai : la même écriture, faite hors état React.
+
+**Preuves** : bancs `scripts/bancs/tournee.cjs` et `scripts/bancs/ventes-benefice-glisser.cjs` (nombres calculés
+à la main dans leur en-tête), rouges sur `origin/main`, rouges sous mutation (voir le rapport de session).

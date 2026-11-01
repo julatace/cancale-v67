@@ -108,6 +108,10 @@ import { DESCRIPTION_ORGANISATION } from "./operations/description.js";
 // (31 oct.) Colis → « À retirer » : la carte des points relais (règle pure + carte).
 import { regrouperRelais, pointsARetirer } from "./relaisColis.js";
 import CarteRelaisColis, { ColonneRetirer } from "./CarteRelais.jsx";
+import { CarteTournee, TourneePleinEcran } from "./Tournee.jsx";
+import { GlisserVente, useDeposeDiffere, BarreAnnulerDepose } from "./GlisserDepose.jsx";
+import { beneficeLigneVente, texteBenefice, euros as eurosLigne } from "./beneficeLigne.js";
+import { etapesTournee, arretsTournee, gestesDepuis } from "./tournee.js";
 import ColisColonnes from "./ColisColonnes.jsx";
 import "./styles-barre-haut.css";
 import "./styles-recherche.css";
@@ -18669,7 +18673,10 @@ function FiltresVentes({ value, onChange, search, onSearch, cancelled = false, d
 // sur la ligne elle-même, sous le titre — les MÊMES composants et les MÊMES
 // écritures que dans le tiroir (`CoutAchatVente`), rien de neuf. Le tiroir ne
 // change pas.
-function LigneVenteCompacte({ photo, photoNoeud = null, titre, sous = '', etat, etatNoeud = null, ton = '', montant, children, numerosArticle = [], plateforme = '', initialOuvert = false, gestes = null, montantCentimes, ...props }) {
+// (1er nov.) `benef` : les colonnes Achat · Bénéfice de la ligne (src/beneficeLigne.js,
+// la règle de `beneficePaire`) — { etat, achatTxt, benefTxt, achatCentimes,
+// benefCentimes }. Absent ⇒ la ligne d'avant, rien de plus.
+function LigneVenteCompacte({ photo, photoNoeud = null, titre, sous = '', etat, etatNoeud = null, ton = '', montant, children, numerosArticle = [], plateforme = '', initialOuvert = false, gestes = null, montantCentimes, benef, ...props }) {
   const [ouvert, setOuvert] = React.useState(initialOuvert);
   const panneau = React.useId();
   const declencheur = React.useRef(null);
@@ -18697,12 +18704,14 @@ function LigneVenteCompacte({ photo, photoNoeud = null, titre, sous = '', etat, 
   const dejaOuvert = React.useRef(false);
   if (ouvert) dejaOuvert.current = true;
   const numerosFiche=[...new Set(numerosArticle.map(n=>String(n||'').trim()).filter(Boolean))];
-  return <div {...props} data-ligne-ouverte={ouvert} data-plateforme-vente={plateforme||undefined}>
+  return <div {...props} data-ligne-ouverte={ouvert} data-plateforme-vente={plateforme||undefined} data-benef-cols={benef?'':undefined}>
     <button ref={declencheur} type="button" className="vrm-ledger-sale-toggle" aria-expanded={ouvert} aria-controls={panneau} aria-haspopup="dialog" aria-label={`Ouvrir les actions : ${titre || 'vente'}`} onClick={()=>setOuvert(v=>!v)}>
       <span className="vrm-ledger-photo-empty">{photoNoeud || <PhotoVente src={photo} size={46} portrait/>}</span>
       <span className="vrm-ledger-sale-title" title={titre}><span className="vrm-ledger-sale-nom">{titre || '(sans titre)'}</span>{sous ? <span className="vrm-ledger-sale-sous" data-vente-sous="">{sous}</span> : null}</span>
       <span className="vrm-ledger-sale-state" title={etat} data-ton={ton || undefined}>{etatNoeud || etat}</span>
       <span className="vrm-ledger-sale-amount" data-prix-vente={montantCentimes ?? undefined}>{montant}</span>
+      {benef ? <span className="vrm-ledger-sale-achat" data-achat-ligne={benef.achatCentimes ?? ''} data-achat-etat={benef.achatCentimes == null ? 'manque' : 'lu'}>{benef.achatTxt}</span> : null}
+      {benef ? <span className="vrm-ledger-sale-benef" data-benef-ligne={benef.benefCentimes ?? ''} data-benef-etat={benef.etat} aria-label={benef.aria || undefined}>{benef.etat === 'partiel' ? <><span className="vrm-benef-borne">au plus </span>{benef.benefTxt}</> : benef.benefTxt}</span> : null}
       <span className="vrm-ledger-sale-plus" aria-hidden="true">{ouvert?'−':'⋯'}</span>
     </button>
     {gestes ? <div className="vrm-ledger-gestes" data-gestes-ligne="">{gestes}</div> : null}
@@ -39777,6 +39786,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // « ✓ Colis fait » : LE geste (la vente ET son bordereau). Le bouton de la
   // carte et le mode emballage appellent cette fonction — une seule écriture.
   const marquerColisFait = (o, b) => { if (o && !isShipDone(o)) toggleShipDone(o); if (b) markBordShipped(b); };
+  // (1er nov.) « Déposé » de Ventes (bouton et glissé) : le MÊME geste.
+  const marquerPoste = marquerColisFait;
   // (voir isBordDone plus bas : « colis fait » à la main, ou expédié d'après
   // Vinted (auto), OU marqué « expédié » à la main (statut Vinted en retard).
   // ── QUAND UN BORDEREAU SORT-IL DE LA LISTE ? ─────────────────────────────
@@ -43821,6 +43832,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // changement d'onglet (§34).
   const [dropOffs, setDropOffs] = useState(null);
   const [dropOpen, setDropOpen] = useState(false);
+  // (1er nov.) Le mode plein écran de la tournée (Ma journée).
+  const [tourneeOuverte, setTourneeOuverte] = useState(false);
   const [voirPostes, setVoirPostes] = useState(false); // Colis : afficher les colis marqués « postés »
   useEffect(() => {
     // Aussi sur Achats : c'est là qu'on complète l'adresse et les horaires d'un
@@ -45284,6 +45297,21 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     if (parCle.size) sortirPartisDuStock([...parCle.values()]);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sales.items, listings.items, porteursNum, baseKO, lbcLu, lbcVentes, ebayCmd, lbcItemsBenef]);
+  // ── (1er nov.) « DÉPOSÉ » DEPUIS VENTES : glissé (téléphone) ou bouton ─────
+  // Rien n'est écrit pendant DELAI_ANNULER_DEPOSE (« Annuler » ⇒ rien) ; puis LE
+  // geste de Colis (`marquerPoste`). Écran quitté entre-temps : la même écriture
+  // (mêmes clés, mêmes valeurs), faite sans l'état React qui disparaît.
+  const shipDoneRef = React.useRef(shipDone); shipDoneRef.current = shipDone;
+  const bordsShippedRef = React.useRef(bordsShipped); bordsShippedRef.current = bordsShipped;
+  const deposeVente = useDeposeDiffere(
+    (o) => marquerPoste(o, o && o.transaction_id != null ? (bordsParTxn[String(o.transaction_id)] || null) : null),
+    undefined,
+    (o) => {
+      const k = o && o.transaction_id != null ? String(o.transaction_id) : '';
+      if (k) { const u = { ...(load('vinted_ship_done', {}) || {}), ...(shipDoneRef.current || {}) }; if (!u[k]) { u[k] = Date.now(); save('vinted_ship_done', u); } }
+      const b = k ? bordsParTxn[k] : null; const kb = b ? bordKey(b) : null;
+      if (kb) save('vinted_bords_shipped', { ...(load('vinted_bords_shipped', {}) || {}), ...(bordsShippedRef.current || {}), [kb]: 1 });
+    });
   const preparerLigneVente = (o) => {
     const tx = String(o.transaction_id);
     const e = effEntry(o); const num = e?.numero;
@@ -45303,14 +45331,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       JSON.stringify(e), baseE, ov, photo, sourcesPhoto.join('\n'), hidden, isShipDone(o), estFloute(o),
       JSON.stringify(venteStage(o)), o._acc ? accNameOf(o._acc) : '', cell ? garageCellLabel(cell) : '', inGarage(num),
       saleOutcome(o), isPairLost(num), num ? numeroReprenable(num) : null,
-      !!labelsCaptes[tx], !!bordParTx[tx], identiteAnnonce(o)];
+      !!labelsCaptes[tx], !!bordParTx[tx], identiteAnnonce(o), !!(deposeVente.attente && deposeVente.attente.cle === tx)];
     return { deps, e, baseE, photo, sourcesPhoto, ov, hidden };
   };
   const actionsVentes = React.useRef(null);
-  actionsVentes.current = { imprimerBordereauVente, markPairLost, unmarkPairLost, onLocate, openPicker, rechargerLabels, setSaleOverride, toggleHidden };
+  actionsVentes.current = { imprimerBordereauVente, markPairLost, unmarkPairLost, onLocate, openPicker, rechargerLabels, setSaleOverride, toggleHidden, demanderDepose: deposeVente.demander };
   const actionsVentesProxy = React.useMemo(() => {
     const a = {};
-    for (const k of ['imprimerBordereauVente', 'markPairLost', 'unmarkPairLost', 'openPicker', 'rechargerLabels', 'setSaleOverride', 'toggleHidden']) a[k] = (...x) => actionsVentes.current[k](...x);
+    for (const k of ['imprimerBordereauVente', 'markPairLost', 'unmarkPairLost', 'openPicker', 'rechargerLabels', 'setSaleOverride', 'toggleHidden', 'demanderDepose']) a[k] = (...x) => actionsVentes.current[k](...x);
     // `onLocate` est une prop facultative : la ligne teste `onLocate&&…`.
     Object.defineProperty(a, 'onLocate', { enumerable: true, get: () => (actionsVentes.current.onLocate ? (...x) => actionsVentes.current.onLocate(...x) : undefined) });
     return a;
@@ -46695,6 +46723,64 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           { id:'messages', ic:'chat', l:'Messages', t:tuiles.messages, tab:tuiles.messages && tuiles.messages.versEbay ? 'ebay_messages' : 'cat_msg', pasSu: loading || convs.items == null },
           { id:'prix', ic:'tag', l:'Prix à baisser', t:tuiles.prix, tab:'cat_annonces', pasSu: loading || listings.items == null },
         ];
+        // ── (1er nov.) LA TOURNÉE : la journée rangée en étapes ─────────────
+        // Aucune règle neuve (src/tournee.js) : les MÊMES listes que les cases
+        // « À envoyer » / « À retirer » (`toShip` + eBay, `pickupUnion`, publiées
+        // dans `vrm_colis_aposter` / `vrm_colis_retirer`), les prêts de « Imprimer
+        // les N prêts » (`lignesLot`), les points de la colonne « À retirer »
+        // (`pointsARetirer`). Une étape se coche sur un geste réellement noté
+        // aujourd'hui (impression, « Déposé », « Je l'ai eu »).
+        const tournee = (() => {
+          if (baseKO || premierJour || loading) return null;
+          try {
+            const tEnv = T.find(x => x.id === 'envoyer'), tRet = T.find(x => x.id === 'retirer');
+            const lignesImpr = lignesLot().map(l => ({ cle: l.cle, imprime: l.imprime, transporteur: (l.e && l.e.b && l.e.b.suivi) ? (transporteurDeForme(l.e.b.suivi) || '') : '' }));
+            // La règle de la case « À envoyer » (plus haut) : sans les bordereaux captés
+            // (lus par Colis seulement), le nombre publié par Colis s'il parle du même
+            // lot, sinon « au moins » ce que les e-mails disent (§5).
+            const pubPrets = labelsPrets ? null : load('vrm_colis_prets', null);
+            const pretsExact = labelsPrets || toShip.length === 0 || !!(pubPrets && pubPrets.total === toShip.length);
+            const nPrets = (!labelsPrets && pubPrets && pubPrets.total === toShip.length) ? Math.max(pubPrets.prets, lignesImpr.length) : lignesImpr.length;
+            const aPoster = toShip.map(t => { const o = t.o || {}; const tx = String(o.transaction_id || ''); const b = tx ? bordsParTxn[tx] : null; const en = effEntry(o);
+                return { cle: 'v:' + tx, num: (b ? numForBord(b) : '') || (en && en.numero) || '', titre: o.title || '', transporteur: b && b.suivi ? (transporteurDeForme(b.suivi) || '') : '', jours: Number.isFinite(t.daysLeft) ? t.daysLeft : null, site: 'vinted' }; })
+              .concat(((colisEb && colisEb.aPoster) || []).map(x => ({ cle: 'e:' + x.compte + ':' + x.orderId, num: x.ordre ? (numLigneEbay(x.ordre, (x.ordre.lineItems || [])[0]) || '') : '', titre: x.titre || '', transporteur: '', jours: Number.isFinite(x.jours) ? x.jours : null, site: 'ebay' })))
+              .sort((a, b) => (a.jours == null ? 9999 : a.jours) - (b.jours == null ? 9999 : b.jours));
+            const colRet = colonnesColis(cartesColis(), 'toutes').colonnes.find(c => c.cle === 'retirer');
+            const pointsVinted = ((dropOffs && dropOffs.carriers) || []).flatMap(c => c.points || []);
+            const parPoint = pointsARetirer({ colis: ((colRet && colRet.cartes) || []).map(x => ({ ...x, id: x.cle, titre: x.nom, nom: x.lieuNom || '', adresse: x.lieuAdresse || '' })), attendus: [], pointsVinted });
+            const minuit0 = new Date(); minuit0.setHours(0, 0, 0, 0); const m0 = minuit0.getTime();
+            const t = etapesTournee({
+              lignesImpr, nPrets, pretsAuMoins: !pretsExact, imprPasSu: emailBords === null,
+              aPoster, nAPoster: tEnv && !tEnv.pasSu ? (tEnv.t ? tEnv.t.n : 0) : null,
+              points: parPoint.points, nARetirer: tRet && !tRet.pasSu ? (tRet.t ? tRet.t.n : 0) : null,
+              gestes: { imprimes: gestesDepuis(bordsPrinted, m0), deposes: gestesDepuis(shipDone, m0), retires: gestesDepuis(collectedAt, m0) + gestesDepuis(pickupDone, m0) },
+            });
+            const deposer = t.etapes.find(e => e.id === 'deposer');
+            const arrets = arretsTournee({ depots: deposer && deposer.etat === 'afaire' ? deposer.depots : [], points: t.etapes.find(e => e.id === 'retirer').etat === 'afaire' ? parPoint.points : [] });
+            return { ...t, arrets };
+          } catch (_) { return null; }
+        })();
+        const allerDansColis = (sel) => { const t0 = Date.now(); const essai = () => { const el = document.querySelector(sel); if (el) { try { el.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch (_) { el.scrollIntoView(); } return; } if (Date.now() - t0 < 6000) setTimeout(essai, 150); }; setTimeout(essai, 150); };
+        const ouvrirEtapeTournee = (id) => {
+          if (id === 'imprimer') {
+            // L'impression EXISTANTE de Colis (« Imprimer les N prêts ») : ouverte
+            // d'elle-même s'il reste des prêts à imprimer (le même drapeau que
+            // le lien ?print=bord de l'extension), sinon Colis seul.
+            const e = tournee && tournee.etapes.find(x => x.id === 'imprimer');
+            if (e && e.etat === 'afaire') _pendingBordPrint = true;
+            if (onNav) onNav('cat_bord'); return;
+          }
+          if (id === 'emballer') {
+            // Le mode emballage, s'il existe dans cette version (il répond à
+            // l'appel en posant `pris`) ; sinon la colonne « Prêts » de Colis.
+            let pris = false;
+            try { const ev = new CustomEvent('vrm:ouvrir-emballage', { detail: { pris: false, depuis: 'tournee' } }); window.dispatchEvent(ev); pris = !!ev.detail.pris; } catch (_) {}
+            if (pris) return;
+            if (onNav) onNav('cat_bord'); allerDansColis('[data-cc-colonne="prets"]'); return;
+          }
+          if (id === 'deposer') { if (onNav) onNav('cat_bord'); allerDansColis('[data-colis-detail]'); return; }
+          if (id === 'retirer') { if (onNav) onNav('retraits'); try { window.dispatchEvent(new CustomEvent('vrm:ancre-retraits')); } catch (_) {} }
+        };
         const tacheSimple = (j, i) => (
           <button className="vrm-day-task" key={(j.id||'j')+i} type="button" title={j.sub} data-job={j.id||undefined} data-n={j.n!=null?j.n:undefined} data-limite-heure={j.limiteHeure!=null?j.limiteHeure:undefined} data-urssaf-echeance={j.urssaf?j.urssaf.dueIso:undefined} data-urssaf-apayer={j.urssaf?(j.urssaf.apayer==null?'':String(j.urssaf.apayer)):undefined} data-urssaf-partiel={j.urssaf&&j.urssaf.partiel?'1':undefined} onClick={()=>{ if (j.avant) j.avant(); if (onNav) onNav(j.tab); }} style={{display:'flex',alignItems:'center',gap:13,padding:'14px 15px',borderRadius:10,border:`1px solid ${C.border}`,background:C.card,boxShadow:C.shadow||'none',cursor:'pointer',textAlign:'left',width:'100%',minWidth:0,fontFamily:'inherit'}}>
             {/* ⚠️ Avant : un carré de 46 px teinté à la couleur du statut,
@@ -47028,6 +47114,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               <div className="vrm-aide" data-alertes-fixes="" style={{fontSize:12,color:C.muted,margin:'-4px 2px 12px'}}>Ces alertes restent en tête : elles peuvent te coûter de l'argent.</div>
             )}
 
+            {/* (1er nov.) LA TOURNÉE : Imprimer → Emballer → Déposer → Retirer, en tête. */}
+            {tournee && <CarteTournee tournee={tournee} nArrets={tournee.arrets.length} onEtape={ouvrirEtapeTournee} onOuvrirTournee={()=>setTourneeOuverte(true)}/>}
+            {tournee && tourneeOuverte && <TourneePleinEcran arrets={tournee.arrets} C={C} zIndex={Z_CONFIRMATION} Retour={FermeAuRetour} onFermer={()=>setTourneeOuverte(false)}
+              onArret={(a)=>{ setTourneeOuverte(false); ouvrirEtapeTournee(a.type === 'depot' ? 'deposer' : 'retirer'); }}/>}
+
             {/* (21 octobre) Les messages eBay n'ont pas pu être lus : dit UNE fois,
                 sans chiffre — la case « Messages » ne compte alors que Vinted. */}
             {!baseKO && !premierJour && !loading && tuiles.messages && tuiles.messages.ebay === null && (
@@ -47226,6 +47317,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         <RaisonBordereauxGrises ventes={ventesAffichees.filter(o=>o && o.transaction_id!=null && !isHidden(o) && classifyOrderStatus(o.status)!=='cancelled' && aExpedier(o) && !isShipDone(o) && !labelsCaptes[String(o.transaction_id)] && !bordParTx[String(o.transaction_id)])}/>
         <div className="vrm-ventes-liste" style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:12,overflow:'hidden',boxShadow:C.shadow||'none'}}>
           <div className="vrm-ledger-heading" aria-hidden="true"><span>Article</span><span className="vrm-ledger-state-heading">État</span><span>Montant</span></div>
+          {/* (1er nov.) Sur ordinateur : les colonnes Prix · Achat · Bénéfice (maquette « ventes-ordi »). */}
+          <div className="vrm-ventes-entete" aria-hidden="true" data-ventes-entete-cols=""><span/><span>Article</span><span>État</span><span className="is-droite">Prix</span><span className="is-droite">Achat</span><span className="is-droite">Bénéfice</span><span/></div>
           {/* ⚠️ UNE FRAPPE NE RECRÉE PLUS LES 60 LIGNES AU RENDU URGENT (16 oct.).
               Mesuré (banc `ventes-frappe.cjs`, téléphone ×4) : chaque lettre
               recréait les 60 lignes au rendu urgent PUIS au rendu différé —
@@ -47256,13 +47349,31 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             const baseBuy = baseE && baseE.buyPrice!=null && String(baseE.buyPrice).trim()!=='' ? String(baseE.buyPrice) : '';
             // Les gestes passent par `actionsVentes` : une ligne gardée telle
             // quelle appelle quand même la version À JOUR de chaque fonction.
-            const { imprimerBordereauVente, markPairLost, unmarkPairLost, onLocate, openPicker, rechargerLabels, setSaleOverride, toggleHidden } = actionsVentesProxy;
+            const { imprimerBordereauVente, markPairLost, unmarkPairLost, onLocate, openPicker, rechargerLabels, setSaleOverride, toggleHidden, demanderDepose } = actionsVentesProxy;
+            // (1er nov.) Prix · Achat · Bénéfice SUR LA LIGNE — la règle du tiroir
+            // (`beneficePaire`, src/beneficeLigne.js) : « — » sans prix d'achat (le geste
+            // « Prix d'achat » est sur la ligne), « au plus » tant que les frais ne sont
+            // pas confirmés (ce qui manque ne peut que baisser le bénéfice).
+            const devise = o.price?.currency_code;
+            const lb = (devise && devise !== 'EUR') ? { etat:'prix', achat:null, benefice:null } : beneficeLigneVente(o.price?.amount, e, { annulee: st==='cancelled' });
+            const coutManque = !hidden && st!=='cancelled' && buy==null && !(e && e.buyFromId);
+            const benefLigne = { etat: lb.etat, achatCentimes: lb.achat!=null ? Math.round(lb.achat*100) : null, benefCentimes: lb.benefice!=null ? Math.round(lb.benefice*100) : null,
+              achatTxt: lb.achat!=null ? `${eurosLigne(lb.achat)} €` : (st==='cancelled' ? '' : coutManque ? 'à saisir' : '—'), benefTxt: texteBenefice(lb.etat==='partiel' ? { ...lb, etat:'ok' } : lb),
+              aria: lb.etat==='partiel' ? `Bénéfice : au plus ${texteBenefice({ ...lb, etat:'ok' })}, frais pas confirmés` : lb.etat==='achat' ? "Bénéfice : prix d'achat manquant" : undefined };
+            // (1er nov.) « DÉPOSÉ » : seulement une vente À EXPÉDIER, pas encore cochée.
+            const txL = String(o.transaction_id);
+            const deposeIci = !!(deposeVente.attente && deposeVente.attente.cle === txL);
+            const peutDeposer = !hidden && st!=='cancelled' && aExpedier(o) && !isShipDone(o) && o.transaction_id!=null;
+            const libDepose = num ? `N°${num}` : (o.title || '');
+            const gesteCout = coutManque ? <CoutAchatVente surLigne onSaisir={p=>setSaleOverride(o.transaction_id,{buyPrice:p})}
+                  onRelier={()=>{ const idf = identiteAnnonce(o); openPicker(idf ? { id: idf, title: o.title, photo: photo, price: sell, _acc: o._acc } : { id: '_v'+o.transaction_id, _saleTx: String(o.transaction_id), title: o.title, photo: photo, price: sell, _acc: o._acc }); }}/> : null;
+            const gesteDepose = peutDeposer ? <Bouton variante="secondaire" icone="check" className="vrm-depose-bouton" data-depose-vente={txL} data-sans-glisse="" disabled={deposeIci} aria-label={`Marquer ${libDepose || 'ce colis'} déposé`} onClick={()=>demanderDepose(txL, o, libDepose)}>Déposé</Bouton> : null;
             return (
+              <GlisserVente actif={peutDeposer && !deposeIci} onDepose={()=>demanderDepose(txL, o, libDepose)}>{gp => (
               // Ligne de vente dans la liste groupée (filet fin entre les lignes,
               // pas de carte encadrée séparée — style démo, comme Achats).
               <LigneVenteCompacte montantCentimes={sell!=null?Math.round(sell*100):undefined} numerosArticle={num?[num]:[]} plateforme="vinted" photo={photo} photoNoeud={photo?<PhotoVenteSources {...photoSourcesProps} data-photo-vente="ligne" style={{width:28,height:36,borderRadius:8,objectFit:'cover',flexShrink:0}}/>:null} titre={(()=>{ const t=String((e&&e.size)||o.size||'').trim(); const nom=t&&!tailleDansTitre(o.title,t)?`${o.title} · taille ${t}`:o.title; return num?`N°${num} · ${nom}`:nom; })()}
-                gestes={(!hidden && st!=='cancelled' && buy==null && !(e && e.buyFromId)) ? <CoutAchatVente surLigne onSaisir={p=>setSaleOverride(o.transaction_id,{buyPrice:p})}
-                  onRelier={()=>{ const idf = identiteAnnonce(o); openPicker(idf ? { id: idf, title: o.title, photo: photo, price: sell, _acc: o._acc } : { id: '_v'+o.transaction_id, _saleTx: String(o.transaction_id), title: o.title, photo: photo, price: sell, _acc: o._acc }); }}/> : null} sous={[o.date?new Date(o.date).toLocaleDateString('fr-FR',{day:'numeric',month:'short'}):'', (o._acc && !ventesUnCompte) ? accNameOf(o._acc) : ''].filter(Boolean).join(' · ')} etat={venteStage(o).label} ton={st!=='cancelled' && aExpedier(o) && !isShipDone(o) ? 'action' : (st==='cancelled' ? 'annule' : '')} montant={sell!=null?`${Number.isInteger(sell)?sell:sell.toFixed(2).replace('.',',')} ${cur(o.price?.currency_code)}`:'—'} className="vrm-sale-row" key={o.transaction_id} data-tx={String(o.transaction_id)} style={{borderTop:i>0?`1px solid ${C.border}`:'none',opacity:hidden?0.5:(st==='cancelled'?0.6:1),padding:'12px 14px',display:'flex',flexDirection:'column',gap:10,...(estFloute(o)?STYLE_FLOU:null)}}>
+                {...gp} benef={benefLigne} data-depose-attente={deposeIci?'1':undefined} gestes={(gesteCout || gesteDepose) ? <div className="vrm-gestes-pile">{gesteCout}{gesteDepose}</div> : null} sous={[o.date?new Date(o.date).toLocaleDateString('fr-FR',{day:'numeric',month:'short'}):'', (o._acc && !ventesUnCompte) ? accNameOf(o._acc) : ''].filter(Boolean).join(' · ')} etat={venteStage(o).label} ton={st!=='cancelled' && aExpedier(o) && !isShipDone(o) ? 'action' : (st==='cancelled' ? 'annule' : '')} montant={sell!=null?`${Number.isInteger(sell)?sell:sell.toFixed(2).replace('.',',')} ${cur(o.price?.currency_code)}`:'—'} className="vrm-sale-row" key={o.transaction_id} data-tx={String(o.transaction_id)} style={{borderTop:i>0?`1px solid ${C.border}`:'none',opacity:hidden?0.5:(st==='cancelled'?0.6:1),padding:'12px 14px',display:'flex',flexDirection:'column',gap:10,...(estFloute(o)?STYLE_FLOU:null),...(gp.style||{})}}>
                {/* ── Haut : photo · titre + méta · prix ─────────────────────── */}
                <div className="vrm-sale-overview" style={{display:'flex',gap:12,alignItems:'flex-start'}}>
                 <div className="vrm-sale-photo" style={{width:72,height:72,borderRadius:10,background:C.card2||C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
@@ -47398,9 +47509,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                </details></div>
                </div>
               </LigneVenteCompacte>
+              )}</GlisserVente>
             );
           }}/>; })}
         </div>
+        <BarreAnnulerDepose attente={deposeVente.attente} onAnnuler={deposeVente.annuler} zIndex={Z_CONFIRMATION - 1}/>
         {/* ⚠️ RIEN N'EST CACHÉ : le compte total est écrit sur le bouton, et
             un clic ouvre la suite. On dessine 60 cartes au lieu de 287 — sur
             iPhone, la page passait de 46 209 px (cinquante-quatre écrans) à
