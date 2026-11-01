@@ -188,7 +188,19 @@ async function allerTache(pg, tache, site) {
         // ou champ visible dont le bord droit sort de l'écran.
         deborde: [...document.querySelectorAll('button,input')].filter((e) => {
           const r = e.getBoundingClientRect();
-          return r.width > 0 && r.height > 0 && r.right > document.documentElement.clientWidth + 1;
+          if (!(r.width > 0 && r.height > 0 && r.right > document.documentElement.clientWidth + 1)) return false;
+          // (1er nov.) Une RANGÉE DÉFILANTE (§7 : filtres de site, onglets) n'est
+          // pas un rognage : son contenu se fait glisser au doigt. Seul un
+          // conteneur qui défile VRAIMENT (overflow-x auto/scroll ET plus large
+          // que lui-même) l'excuse ; un `overflow: hidden` reste rouge.
+          for (let p = e.parentElement; p && p !== document.body; p = p.parentElement) {
+            const ox = getComputedStyle(p).overflowX;
+            if ((ox === 'auto' || ox === 'scroll') && p.scrollWidth > p.clientWidth + 1) {
+              const rp = p.getBoundingClientRect();
+              if (rp.right <= document.documentElement.clientWidth + 1) return false;
+            }
+          }
+          return true;
         }).map((e) => (e.getAttribute('aria-label') || e.textContent.trim().slice(0, 14) || e.tagName)),
         // L'agent qui conseille (parité eBay) : la liste rangée des priorités.
         conseils: [...document.querySelectorAll('[data-lbc-conseil]')].map((e) => e.getAttribute('data-lbc-conseil')),

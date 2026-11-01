@@ -329,7 +329,7 @@ const atRelay = (s) => /d[ée]pos[ée]/i.test(s || '') && /point\s+relais|bureau
 // achats Vinted « déposé en point relais » : mesuré le 23 oct., « 1 à retirer »
 // (une Salomon sans doute repartie) quand l'app en comptait 7, et AUCUN colis
 // venu d'un e-mail (le Mondial Relay du 21 octobre compris).
-const MAIN_WIDGET = ['vrm_widget_token', 'vrm_lbc_colis_done', 'vinted_pickup_done', 'vinted_bords_hidden', 'vinted_ship_done', 'vinted_bords_shipped', 'vinted_sales_hidden', 'vinted_urssaf_mois', 'vrm_colis_retirer', 'vrm_colis_collected', 'vinted_accounts_hidden'];
+const MAIN_WIDGET = ['vrm_widget_token', 'vrm_lbc_colis_done', 'vinted_pickup_done', 'vinted_bords_hidden', 'vinted_ship_done', 'vinted_bords_shipped', 'vinted_urssaf_mois', 'vrm_colis_retirer', 'vrm_colis_collected', 'vinted_accounts_hidden'];
 // (23 oct.) LES COLIS ARRIVÉS PAR E-MAIL APRÈS LA DERNIÈRE PUBLICATION DE L'APP.
 // La liste publiée (`vrm_colis_retirer`) est une photo prise à la dernière
 // ouverture de l'app : un colis arrivé depuis, app fermée, n'y est pas — c'est
@@ -558,9 +558,12 @@ async function main() {
 //      et le montant connu part dans `receivedAuMoins`, avec ce qui manque ;
 //    • sinon le montant, et les ventes finalisées pas encore datées à côté
 //      (`receivedADater`, la couverture comme sur l'app).
-// ⚠️ Le seuil de 3 jours : `at` ne bouge que quand la ligne CHANGE (l'app ne
-//    republie pas un contenu identique). Au-delà, on ne sait plus si de
-//    l'argent est arrivé depuis — mieux vaut un tiret qu'un montant périmé.
+// ⚠️ Le seuil de 3 jours : `at` est l'heure de la dernière LECTURE complète
+//    (1er nov. : l'app re-date une ligne identique au-delà de 6 h et au
+//    changement de mois, `URSSAF_REDATE_MS`). Au-delà de 3 jours sans lecture,
+//    on ne sait plus si de l'argent est arrivé depuis — mieux vaut un tiret
+//    qu'un montant périmé. Le 1er du mois, une lecture neuve publie le mois
+//    courant absent de `recu` ⇒ un vrai 0 (« 0 € reçu »), pas un tiret.
 export const RECU_MAX_AGE_MS = 3 * 86400000;
 export function recuDuMoisPublie(publie, ym, maintenant = Date.now()) {
   const vide = (raison) => ({ received: null, receivedAuMoins: null, receivedManque: null, receivedADater: null, receivedAt: null, receivedRaison: raison });

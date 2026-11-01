@@ -5957,6 +5957,13 @@ const classifyOrderStatus = (status) => {
   // « Le paiement a échoué » (statut 220, vu en base) : aucune vente n'a eu lieu.
   // Sans ce test il comptait dans les « ventes en cours » et comme colis à poster.
   if (/paiement\s+a\s+[ée]chou|[ée]chec\s+du\s+paiement/i.test(s)) return 'cancelled';
+  // ⚠️ (1er nov., audit A12) UNE RÈGLE « PAS UNE VENTE » : tout état qui « a
+  // échoué » fait REVENIR la paire pour l'anti double vente (`PAS_UNE_VENTE`,
+  // app ET extension) ; il ne compte donc pas non plus comme vendu ici. Avant,
+  // seul « le paiement a échoué » sortait : une autre « …a échoué » était
+  // revenue d'un côté, vendue de l'autre. `audit-flux-divers.cjs` exige que
+  // `classifyOrderStatus(s) === 'cancelled'` ⇔ `PAS_UNE_VENTE.test(s)`.
+  if (/[ée]chou/i.test(s)) return 'cancelled';
   if (/finalis/i.test(s)) return 'completed';
   return 'pending';
 };
@@ -6720,7 +6727,10 @@ const ventesFaites = ({ vinted, lbc, ebay, vestiaire, cachee } = {}) => {
     if (!isFinite(eur)) { if (garde('lbc:' + v.txId)) nonComptees.push({ plateforme: 'Leboncoin', raison: 'prix inconnu', ts: Date.parse(v.dateVente || '') || null }); continue; }
     const t = Date.parse(v.dateVente || '');
     if (!t) { if (garde('lbc:' + v.txId)) sansDate += 1; continue; }
-    if (garde('lbc:' + v.txId)) lignes.push({ plateforme: 'Leboncoin', ts: t, eur, compte: String(v.account || '') });
+    // (1er nov., audit A11) Une date posée à la main (`dateSaisie`, rangée à midi
+    // par `avecDatesLbc`) ou lue sans heure n'a pas d'HEURE : elle ne compte dans
+    // aucune case « Quand tu vends » (`heureLue: false` ⇒ « sans heure »).
+    if (garde('lbc:' + v.txId)) lignes.push({ plateforme: 'Leboncoin', ts: t, eur, compte: String(v.account || ''), heureLue: !(v.dateSaisie === true || /^\d{4}-\d{2}-\d{2}$/.test(String(v.dateVente).trim())) });
   }
   for (const e of (ebay || [])) {
     if (!e || String(e.orderPaymentStatus || '').toUpperCase() !== 'PAID' || !e.orderId) continue;
@@ -14063,6 +14073,11 @@ function BulleConv({ moi, qui, texte, quand, avecDate = false, attrs, apres = nu
 // SES réponses rapides (éditables dans « Réponses rapides », `vinted_quick_replies`) :
 // les MÊMES sur les quatre sites. Un tap REMPLIT le champ, rien ne part.
 const listeRapides = (q) => (q && q.length ? q.map(t=>({e:'',t})) : QUICK_REPLIES);
+// (1er nov., audit A13) Sous une annonce PROUVÉE partie (vendue, supprimée — même
+// sans offre), aucune réponse rapide ne dit « toujours disponible » : un toucher
+// la mettrait dans le champ, et elle serait fausse. Les autres restent.
+const REPONSE_DISPONIBLE = /disponible|\bdispo\b/i;
+const rapidesDuFil = (liste, partie) => (partie ? (liste || []).filter((q) => !REPONSE_DISPONIBLE.test(String(q && q.t || ''))) : liste);
 const reponsesRapidesPartagees = () => { let q = null; try { q = load('vinted_quick_replies', null); } catch (_) {} return listeRapides(Array.isArray(q) && q.length ? q.filter(t => typeof t === 'string' && t.trim()) : DEFAULT_QUICK_REPLIES); };
 function RapidesConv({ liste, onChoisir, desactive = false, style }) {
   return (
@@ -35481,6 +35496,10 @@ function FacturationElectroniqueCarte({ data, maj, lbcVentes, lbcCoqueLu, ebayCo
 // lit dans la ligne publiée par l'écran Ventes (`vinted_urssaf_mois`), relue à
 // l'arrivée du nuage et à chaque publication — aucun CA n'est recalculé ici.
 // Sans ligne publiée : « — » et l'endroit où ça se calcule, jamais un zéro (§5).
+// (1er nov., audit A8) Une ligne `vinted_urssaf_mois` identique est re-datée par
+// une lecture complète au-delà de 6 h (ou au changement de mois) : le widget
+// juge la fraîcheur d'une LECTURE (3 jours au plus), pas celle d'un changement.
+const URSSAF_REDATE_MS = 6 * 3600000;
 const lireLigneUrssaf = () => { try { const v = load('vinted_urssaf_mois', null); return v && Array.isArray(v.mois) ? v : null; } catch (_) { return null; } };
 function useLigneUrssaf() {
   const [v, setV] = React.useState(lireLigneUrssaf);
@@ -41127,6 +41146,18 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const off = offreEnAttenteDe(oc.conversation);
     return off && !offreDuFil(oc) ? off : null;
   };
+  // (1er nov., audit A13) L'annonce du fil est-elle PROUVÉE plus en vente, offre
+  // ou pas ? La même règle que l'offre (`annonceOffreEnVente`, par IDENTITÉ :
+  // l'annonce de la transaction du fil), datée de la dernière activité du fil
+  // (`majAuGeste`) : une lecture COMPLÈTE du dressing de ce compte, faite APRÈS,
+  // ne la montre plus nulle part. « Pas su » ⇒ false (rien n'est retiré).
+  const annonceDuFilPartie = (oc) => {
+    if (!oc || !oc.conversation) return false;
+    if (offrePartieDuFil(oc)) return true;
+    const tr = oc.conversation.transaction || {}, it = tr.item_id;
+    const ts = Date.parse(majAuGeste(oc.inboxUpdatedAt || null, oc.messages) || '');
+    return annonceOffreEnVente({ item: it != null ? String(it) : null, side: typeof tr.current_user_side === 'string' ? tr.current_user_side : null, ts: Number.isFinite(ts) ? ts : null }, String((oc.acc && oc.acc.vinted_user_id) || ''), lectureOffres) === 'non';
+  };
   // « Retirer de la liste » (29 oct.) : sur SON clic, depuis le fil ouvert. La date
   // que la boîte montre est gardée : une date plus récente (message, offre
   // acceptée ou refusée) la remet dans la liste (`conversationRetiree`). Rien n'est touché sur Vinted.
@@ -41449,7 +41480,18 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       const avant = load('vinted_urssaf_mois', null);
       const charge = { mois: liste, aDater: ad, ecartees: ecartees.length, sources, declare: declarables.declare, recu, nonComptees };
       const memeChose = avant && JSON.stringify({ mois: avant.mois, aDater: avant.aDater, ecartees: avant.ecartees, sources: avant.sources, declare: avant.declare, recu: avant.recu, nonComptees: avant.nonComptees }) === JSON.stringify(charge);
-      if (!memeChose) save('vinted_urssaf_mois', { ...charge, at: Date.now() });
+      // ⚠️ (1er nov., audit A8) `at` = l'heure d'une LECTURE complète, pas d'un
+      // changement. Le widget refuse une ligne de plus de 3 jours ou d'un autre
+      // mois (`recuDuMoisPublie`) : sans nouvel argent, l'app ne republiait rien
+      // et l'iPhone passait à « — » au bout de 3 jours, app ouverte chaque jour —
+      // et restait « — » tout le début d'un mois sans versement. Une lecture
+      // complète (cet effet ne tourne que sur une lecture neuve) re-date donc la
+      // ligne quand elle a plus de `URSSAF_REDATE_MS` ou date d'un autre mois.
+      const moisParis = (t) => new Date(t).toLocaleDateString('en-CA', { timeZone: 'Europe/Paris' }).slice(0, 7);
+      const maintenant = Date.now();
+      const atAvant = avant ? Number(avant.at) : NaN;
+      const fraiche = Number.isFinite(atAvant) && maintenant - atAvant < URSSAF_REDATE_MS && moisParis(atAvant) === moisParis(maintenant);
+      if (!memeChose || !fraiche) save('vinted_urssaf_mois', { ...charge, at: maintenant });
     } catch (_) {}
   }, [sales.items, sales.failedUids, declarables, lbcLu, ebayCmd, declUrssaf, ventesVc, recuNonComptees]);
 
@@ -42505,10 +42547,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const n = String(num || '').trim(); if (!n) return;
     const cell = garageCellOf(garageGrid, n);
     const ok = await askConfirm(
+      // ⚠️ (1er nov., audit A9) Ce que le geste FAIT, rien d'autre. Il disait
+      // « son numéro sera libéré » (un N° n'est JAMAIS redonné, §5 — le pool est
+      // append-only) et « la vente reste dans ta compta comme perte » (aucun
+      // calcul ne lit `vinted_pairs_lost` : aucune perte n'est comptée).
       `Déclarer l'article N°${n} PERDU ?\n\n` +
-      `• Son numéro sera libéré (plus compté en stock).\n` +
+      `• Il sort du stock (plus compté parmi tes paires).\n` +
       (cell ? `• Sa case au garage (${garageCellLabel(cell)}) sera vidée.\n` : '') +
-      `• La vente reste dans ta compta comme perte.\n\n` +
+      `• Son N°${n} reste le sien : il n'est jamais redonné à une autre paire.\n` +
+      `• VRM ne compte aucune perte : la vente annulée n'est déjà plus dans ton chiffre d'affaires, et son prix d'achat n'entre dans aucun total.\n\n` +
       `À ne faire que si l'article ne te revient pas.`
     );
     if (!ok) return;
@@ -47141,7 +47188,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 {/* Réponses rapides : remplissent la zone (tu ajustes puis envoies).
                     (29 oct., revue) Pas sur une offre dont l'annonce est prouvée
                     partie : la première dit « l'article est toujours disponible ». */}
-                {!offrePartieDuFil(openConv) && <RapidesConv liste={listeRapides(quickReplies)} onChoisir={modifierReponse} desactive={ro} style={{opacity:ro?0.5:1}}/>}
+                {!offrePartieDuFil(openConv) && <RapidesConv liste={rapidesDuFil(listeRapides(quickReplies), annonceDuFilPartie(openConv))} onChoisir={modifierReponse} desactive={ro} style={{opacity:ro?0.5:1}}/>}
                 <ComposeConv valeur={replyText} onChange={modifierReponse} onEnvoyer={sendReply} desactive={ro} entreeEnvoie enCours={replyBusy}
                   placeholder={ro?'Lecture seule sur ce compte':'Écris ta réponse…'}
                   envoiBloque={!!reponsesIncertaines[cleReponseVinted(openConv.acc?.vinted_user_id,openConv.convId)]||ro||replyBusy||!replyText.trim()||!msgPeutAgir||openConv.conversation?.allow_reply===false}/>
@@ -48547,13 +48594,16 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               const saleItem = (() => { const idf = identiteAnnonce(o); return idf ? { id: idf, title: o.title, photo: photo, price: sell, _acc: o._acc } : { id: '_v'+o.transaction_id, _saleTx: String(o.transaction_id), title: o.title, photo: photo, price: sell, _acc: o._acc }; })();
               const cell = num && aExpedier(o) ? garageCellOf(garageGrid, num) : null;
               const lienVinted = o.conversation_id ? `https://www.vinted.fr/inbox/${encodeURIComponent(o.conversation_id)}` : (o.transaction_id != null ? `https://www.vinted.fr/member/transactions/${encodeURIComponent(o.transaction_id)}` : '');
+              // (1er nov., audit A9) Une perte ne « libère » aucun numéro : elle sort
+              // du stock, sa case est vidée, son N° n'est jamais redonné (§5).
+              // `k` marque une ancienne paire (N° B…) qui prendra un numéro neuf.
               const issue = (() => {
                 if (!(st === 'cancelled' && num)) return null;
                 const out = saleOutcome(o); const arch = !numeroReprenable(num);
-                if (isPairLost(num)) return `N°${num} déclarée perdue : son numéro est libéré et sa case au garage vidée.`;
-                if (out === 'retour') return arch ? `La paire te revient. Le N°${num} est un ancien numéro : elle prendra un numéro neuf à sa republication.` : `La paire te revient : elle garde le N°${num}, republie-la avec le même.`;
-                if (out === 'suspendue') return `Rien n'est tranché : le N°${num} est conservé.`;
-                return arch ? `Si la paire t'est renvoyée, elle prendra un numéro neuf (le N°${num} est un ancien numéro).` : `Si la paire t'est renvoyée, republie-la avec le N°${num}.`;
+                if (isPairLost(num)) return { t: `N°${num} déclarée perdue : elle est sortie du stock et sa case au garage est vidée. Son numéro n'est jamais redonné à une autre paire.` };
+                if (out === 'retour') return arch ? { k: 'retour', t: `La paire te revient. Le N°${num} est un ancien numéro : elle prendra un numéro neuf à sa republication.` } : { t: `La paire te revient : elle garde le N°${num}, republie-la avec le même.` };
+                if (out === 'suspendue') return { t: `Rien n'est tranché : le N°${num} est conservé.` };
+                return arch ? { k: 'renvoi', t: `Si la paire t'est renvoyée, elle prendra un numéro neuf (le N°${num} est un ancien numéro).` } : { t: `Si la paire t'est renvoyée, republie-la avec le N°${num}.` };
               })();
               const bordGeste = !hidden && st !== 'cancelled' && aExpedier(o) && !isShipDone(o) && o.transaction_id != null;
               return <>
@@ -48568,7 +48618,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 </header>
                 <section className="vrm-recap-etat" data-recap-etat={vs.label}>
                   <p className="vrm-recap-phrase" data-recap-phrase=""><strong>{phrase.gras}</strong>{phrase.suite ? ' ' + phrase.suite : ''}</p>
-                  {issue ? <p className="vrm-recap-issue" data-retour-archive={/numéro neuf/.test(issue) ? 'oui' : undefined}>{issue}</p> : null}
+                  {issue ? <p className="vrm-recap-issue" data-retour-archive={issue.k}>{issue.t}</p> : null}
                   {o._fromEmail ? <p className="vrm-recap-issue">Reconstituée depuis l'email — pas encore confirmée par Vinted.</p> : null}
                   {etapes ? <ol className="vrm-recap-frise" data-recap-frise="" aria-label="Où en est la vente">
                     {etapes.map((x) => <li key={x.cle} data-etape={x.cle} data-fait={x.fait ? '1' : '0'} data-preuve={x.preuve || ''} data-ici={x.ici ? '1' : undefined}>
@@ -56626,18 +56676,21 @@ function LeboncoinScreen() {
           {data.doublons.map((d) => {
             const ph = (Array.isArray(d.ad.images) && d.ad.images[0]) || '';
             return (
-              <div key={String(d.vente.txId || d.ad.id)} data-doublon={d.numero} style={{ display: 'flex', gap: 10, alignItems: 'center', padding: '8px 0', borderTop: `1px solid ${C.border}` }}>
+              <div key={String(d.vente.txId || d.ad.id)} data-doublon={d.numero} style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center', padding: '8px 0', borderTop: `1px solid ${C.border}` }}>
                 <div style={{ width: 44, height: 44, borderRadius: 8, overflow: 'hidden', flexShrink: 0, background: C.card2 || C.border }}>
                   {ph ? <PhotoVinted src={ph} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }}/> : null}
                 </div>
-                <div style={{ flex: 1, minWidth: 0 }}>
+                {/* (1er nov.) Au téléphone, les deux gestes (largeur fixe) écrasaient le
+                    texte à une lettre par ligne : la rangée passe à la ligne, le
+                    texte garde au moins 160 px. */}
+                <div style={{ flex: '1 1 160px', minWidth: 0 }}>
                   <div style={{ fontSize: 12.5, fontWeight: 700, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>N°{d.numero} · {d.vente.title || d.ad.subject || ''}</div>
                   <div style={{ fontSize: 11, color: C.muted }}>
                     Leboncoin : {d.vente.stepLabel || 'vendue'}{d.vente.price != null ? ` · ${lbcEuro(d.vente.price)}` : ''}
                     {d.vendueVinted.length > 0 && <span style={{ color: C.warn, fontWeight: 700 }}> · vendue AUSSI sur Vinted : une des deux ventes ne pourra pas partir — annule-en une</span>}
                   </div>
                 </div>
-                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end', flexShrink: 0 }}>
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end', flexShrink: 0, marginLeft: 'auto' }}>
                 {d.vintedUrl && <a href={d.vintedUrl} target="_blank" rel="noreferrer" style={{ flexShrink: 0, border: `1px solid ${C.border}`, borderRadius: 8, padding: '6px 10px', fontSize: 12, fontWeight: 600, color: C.text, textDecoration: 'none' }}>Ouvrir sur Vinted</a>}
                 {data.liensMain && String(data.liensMain[String(d.ad.id)] || '').trim() && (
                   <button type="button" data-lbc-delier={String(d.ad.id)} onClick={() => { if (window.confirm(`Ce n'est pas la N°${d.numero} ? Je retire ce lien : la vente redevient « sans article » et tu pourras choisir le bon.`)) { delierAnnonceLbc(d.ad.id); reload(); } }}
@@ -56772,7 +56825,13 @@ function LeboncoinScreen() {
           const pe = pauseEtat();
           const se = supprEtat();
           const Ligne = (r, i, coul, pausable) => (
-            <div key={i} data-lbc-retirer={r.id || r.numero} data-lbc-retirer-sortie={r.sortie || undefined} style={{ fontSize: 12.5, color: C.text, padding: '3px 0', display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '4px 8px' }}>
+            // (1er nov., audit A5) La notification « double vente » vise la ligne
+            // par son N° (`cleNum`, chaque N° d'un lot) : `data-lbc-retirer` porte
+            // l'identifiant Leboncoin quand l'annonce est reliée, il ne pouvait
+            // jamais répondre au N° de la notification (`src/cibleNotif.js`).
+            // Seules les lignes VENDUES (pausable) le portent : une ligne « à
+            // vérifier » ou « en pause » n'est pas une double vente.
+            <div key={i} data-lbc-retirer={r.id || r.numero} data-lbc-retirer-num={pausable ? (String(r.numero == null ? '' : r.numero).split('+').map(cleNum).filter(Boolean).join(' ') || undefined) : undefined} data-lbc-retirer-sortie={r.sortie || undefined} style={{ fontSize: 12.5, color: C.text, padding: '3px 0', display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '4px 8px' }}>
               <span><b>N°{r.numero}</b> · {r.title || '—'}
               {r.url ? <> · <a href={r.url} target="_blank" rel="noreferrer" style={{ color: coul, fontWeight: 700 }}>voir sur Leboncoin</a></> : null}
               {r.sortie ? <span style={{ color: C.muted }}> · {r.sortie === 'pause' ? "l'annonce reliée est en pause depuis VRM" : r.sortie === 'supprimee' ? "l'annonce reliée a été supprimée de Leboncoin" : "l'annonce reliée n'est plus dans ta liste"}</span> : null}</span>
@@ -56806,7 +56865,7 @@ function LeboncoinScreen() {
             </div>
           ) : null;
           return (<>
-            {vendues.length > 0 && (
+            {vendues.length > 0 && (<div data-lbc-retirer-bloc="vinted">
               <Card style={{ borderColor: C.warn }}>
                 <Titre>{vendues.length} vendue{vendues.length > 1 ? 's' : ''} sur Vinted — à retirer de Leboncoin</Titre>
                 <div style={{ fontSize: 11, color: C.muted, marginBottom: 8 }}>La vente est <b>certaine</b> (la transaction Vinted désigne cette annonce). Retire-{vendues.length > 1 ? 'les' : 'la'} de Leboncoin pour ne pas vendre le même article deux fois — cherche la référence <b>VRM-N°</b> dans l'annonce. Le numéro de l'article ne change pas.
@@ -56817,8 +56876,8 @@ function LeboncoinScreen() {
                 {vendues.slice(0, 30).map((r, i) => Ligne(r, i, C.danger, true))}
                 {carteDoute === 'vendues' ? phraseDoute : null}
               </Card>
-            )}
-            {venduesEbay.length > 0 && (
+            </div>)}
+            {venduesEbay.length > 0 && (<div data-lbc-retirer-bloc="ebay">
               <Card style={{ borderColor: C.warn }}>
                 <Titre>{venduesEbay.length} vendue{venduesEbay.length > 1 ? 's' : ''} sur eBay — à retirer de Leboncoin</Titre>
                 <div data-lbc-retirer-ebay={venduesEbay.length} style={{ fontSize: 11, color: C.muted, marginBottom: 8 }}>La vente eBay est <b>certaine</b> (le SKU <b>VRM-N°</b> de la commande désigne cette paire). Retire-{venduesEbay.length > 1 ? 'les' : 'la'} de Leboncoin pour ne pas vendre le même article deux fois. Le numéro de l'article ne change pas.
@@ -56829,7 +56888,7 @@ function LeboncoinScreen() {
                 </div>
                 {venduesEbay.slice(0, 30).map((r, i) => Ligne(r, i, C.danger, true))}
               </Card>
-            )}
+            </div>)}
             {venduesVc.length > 0 && (
               <Card style={{ borderColor: C.warn }}>
                 <Titre>{venduesVc.length} vendue{venduesVc.length > 1 ? 's' : ''} sur Vestiaire — à retirer de Leboncoin</Titre>
