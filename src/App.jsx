@@ -55943,7 +55943,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       { id:'liens', type:'nav', ic:'link', lib:'Comptes liés', desc:'Pseudos et adresses de tes comptes', onClick:()=>setTab('vintedaccounts') },
       { id:'connexions', type:'panneau', ic:'sync', lib:'État des connexions', desc:'Ce qui marche, ce qui attend un geste', titreInterne:true, el:<ConnexionsSetting key={AUTH.user?.id||'sans-session'} comptes={comptes||[]} onComptes={()=>setTab('vintedaccounts')} onPlateforme={versPlateforme}/> },
       // (31 oct., soir) L'ancien « eBay → Compte » : connexion et comptes eBay reliés.
-      ebayCompte && { id:'ebay', type:'panneau', ic:'link', lib:'Comptes eBay', desc:'Connexion à eBay, comptes reliés', titreInterne:true, el:ebayCompte },
+      ebayCompte && { id:'ebay', type:'panneau', ic:'link', lib:'Comptes eBay', desc:'Connexion à eBay, comptes reliés', el:ebayCompte },
       { id:'adresses', type:'panneau', ic:'mail', lib:'Réception des emails', desc:'Transfert et emails reçus', titreInterne:true, el:<EmailsSetting onComptes={()=>setTab('vintedaccounts')}/> },
       { id:'securite', type:'panneau', ic:'key', lib:'Sécurité des données', desc:'Qui peut lire et écrire tes données', el:<SecuriteSetting/> },
     ]},
