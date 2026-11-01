@@ -191,7 +191,7 @@ const lire = (pg) => pg.evaluate(() => {
   return {
     total: at('[data-pickup-total]', 'data-pickup-total'), aVerifier: at('[data-pickup-a-verifier]', 'data-pickup-a-verifier'),
     sansCompte: at('[data-pickup-sans-compte]', 'data-pickup-sans-compte'), nSansCompte: document.querySelectorAll('[data-pickup-sans-compte]').length,
-    blocAVerifier: at('[data-a-verifier]', 'data-a-verifier'), fraicheur: at('[data-fraicheur-achats]', 'data-fraicheur-achats'), nFraicheur: document.querySelectorAll('[data-fraicheur-achats]').length,
+    blocAVerifier: at('[data-oublies][data-a-verifier]', 'data-a-verifier'), fraicheur: at('[data-fraicheur-achats]', 'data-fraicheur-achats'), nFraicheur: document.querySelectorAll('[data-fraicheur-achats]').length,
     cartes, aVerif, repartis, texte: document.body.innerText, deborde: document.documentElement.scrollWidth > window.innerWidth + 1,
     // L'ordre des points relais : la liste des n° de suivi de chaque bloc, dans l'ordre affiché.
     blocs: [...document.querySelectorAll('.vrm-pickup-point')].map((b) => [...b.querySelectorAll('[data-colis-suivi]')].map((x) => x.getAttribute('data-colis-suivi'))),
@@ -347,10 +347,12 @@ async function main() {
       await pg.goto(`http://localhost:${PORT}/?tab=cat_achats`, { waitUntil: 'domcontentloaded' });
       await pg.locator('.vrm-pickup-point, [data-pickup-total], [data-suivis-ko]').first().waitFor({ timeout: 20000 }).catch(() => {});
       await pg.waitForTimeout(3000);
-      const K = await pg.evaluate(() => { const p = document.querySelector('[data-achats-onglet="attente"]'); const seg = [...document.querySelectorAll('.vrm-seg-btn')].find((x) => /À retirer/.test(x.innerText));
-        return { n: p ? p.getAttribute('data-n') : null, seg: seg ? seg.innerText : '', ko: document.querySelector('[data-suivis-ko]') ? document.querySelector('[data-suivis-ko]').getAttribute('data-suivis-ko') : null, texte: document.body.innerText,
+      // (31 oct., soir) « Colis à retirer » n'a plus d'onglet « À retirer N » : le nombre est
+      // porté par le titre de la liste (`data-pickup-total`), et sa phrase.
+      const K = await pg.evaluate(() => { const p = document.querySelector('[data-pickup-total]'); const seg = p;
+        return { n: p ? p.getAttribute('data-pickup-total') : null, seg: seg ? seg.innerText : '', ko: document.querySelector('[data-suivis-ko]') ? document.querySelector('[data-suivis-ko]').getAttribute('data-suivis-ko') : null, texte: document.body.innerText,
                  btn: (() => { const r = document.querySelector('[data-suivis-reessayer]'); return r ? r.getBoundingClientRect().height : 0; })() }; });
-      dit(K.n === '—' && !/À retirer\s*\d/.test(K.seg), '[défaut 6] e-mails de suivi illisibles : « À retirer » dit « — », jamais un total partiel', `data-n=${K.n} · « ${K.seg.replace(/\n/g, ' ')} »`);
+      dit(K.n === '—' && (K.seg === '' || /^Au moins \d/.test(K.seg.trim())), '[défaut 6] e-mails de suivi illisibles : le nombre dit « — » (attribut), et la phrase « au moins » — jamais un total partiel présenté comme complet', `data-n=${K.n} · « ${K.seg.replace(/\n/g, ' ')} »`);
       dit(K.ko === 'jamais' && /n'ont pas pu être lus/.test(K.texte) && K.btn >= 44, '[défaut 6] … la panne est DITE, avec « Réessayer » (44 px)', `ko=${K.ko} · bouton ${K.btn}px`);
       dit(!/aucun email de suivi reçu/i.test(K.texte), '[défaut 6] … jamais « aucun email de suivi reçu »');
       // « Réessayer » sur la MÊME page (pas un rechargement, qui relirait de toute façon).

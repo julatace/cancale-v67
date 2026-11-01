@@ -33,7 +33,7 @@ export const FILTRES_TYPE = [
   ['autre', 'Informations'],
 ];
 
-const ONGLETS = { cat_bord: 'Ouvrir Colis', cat_achats: 'Ouvrir Achats', cat_ventes: 'Ouvrir Ventes', cat_msg: 'Ouvrir Messages', cat_annonces: 'Ouvrir Annonces' };
+const ONGLETS = { cat_bord: 'Ouvrir Colis', achats: 'Ouvrir Achats', retraits: 'Ouvrir Colis à retirer', cat_ventes: 'Ouvrir Ventes', cat_msg: 'Ouvrir Messages', cat_annonces: 'Ouvrir Annonces' };
 const lien = (tab) => (tab ? { tab, label: ONGLETS[tab] } : null);
 const maj = (s) => { const t = String(s || '').trim(); return t ? t[0].toLocaleUpperCase('fr') + t.slice(1) : ''; };
 const euros = (m) => { const t = String(m || '').trim(); return t ? `${t.replace('.', ',')} €` : ''; };
@@ -67,7 +67,7 @@ const POURQUOI_PAS_DELIER = {
 };
 
 const ANCIEN = 'Classé avant le 31 oct. — détail non gardé.';
-const ongletDuType = { suivi: 'cat_bord', bordereau: 'cat_bord', achat: 'cat_achats', vente: 'cat_ventes', finalisation: 'cat_ventes', offre: 'cat_msg', message: 'cat_msg', favori: 'cat_annonces', action: 'cat_msg' };
+const ongletDuType = { suivi: 'cat_bord', bordereau: 'cat_bord', achat: 'achats', vente: 'cat_ventes', finalisation: 'cat_ventes', offre: 'cat_msg', message: 'cat_msg', favori: 'cat_annonces', action: 'cat_msg' };
 const TYPES_ANCIENS = { suivi: 'Suivi de colis', bordereau: 'Bordereau', achat: 'Reçu d’achat', vente: 'Vente', finalisation: 'Versement', offre: 'Offre', message: 'Message', favori: 'Favori', action: 'Demande Vinted', 'connu-sans-action': 'Information', information: 'Information', ignoré: 'Email non reconnu' };
 
 // e : une ligne du journal (route `mode=journal`) ; delies : { [id de la ligne
@@ -104,7 +104,7 @@ export function lectureEmail(e, delies = {}) {
         : 'Nouvelles d’un colis';
       o = { quoi: r.lim && r.st === 'available' ? `${quoi} · à retirer avant le ${r.lim}` : quoi,
         fait: r.s ? `Rangé avec le colis n° ${r.s}` : 'Gardé, relié à aucun colis',
-        lien: lien(r.sens === 'sortant' && r.st === 'delivered' ? 'cat_ventes' : r.st === 'delivered' ? 'cat_achats' : 'cat_bord'),
+        lien: lien(r.sens === 'sortant' && r.st === 'delivered' ? 'cat_ventes' : r.st === 'delivered' ? 'achats' : 'cat_bord'),
         cible: r.s ? { k: 'suivi', v: r.s } : null };
       if (r.av === 'sans-suivi') Object.assign(o, { raison: 'Je n’ai pas trouvé le n° de suivi dans cet email : je ne sais pas à quel colis il appartient.', geste: 'Lis le texte ci-dessous ; si c’est un de tes colis, retrouve-le dans Colis par son code.' });
       o.delier = { offert: false, pourquoi: POURQUOI_PAS_DELIER.suivi };
@@ -133,7 +133,7 @@ export function lectureEmail(e, delies = {}) {
       const d = r.id && delies && delies[r.id];
       o = { quoi: `Reçu d’achat${r.a ? ` · ${r.a}` : ''}${r.px ? ` (${euros(r.px)})` : ''}`,
         fait: r.tx ? (d ? `Délié par toi de l’achat n° ${r.tx}` : `Reçu rangé avec ton achat n° ${r.tx}`) : 'Gardé, relié à aucun achat',
-        lien: lien('cat_achats'), cible: r.tx ? { k: 'tx', v: r.tx } : null };
+        lien: lien('achats'), cible: r.tx ? { k: 'tx', v: r.tx } : null };
       if (r.av === 'sans-tx') Object.assign(o, { raison: 'Je n’ai pas trouvé le n° de transaction dans ce reçu : il n’est relié à aucun achat (jamais par le titre).', geste: 'Retrouve-le dans Achats → Reçus d’achat par email.' });
       if (r.tx && r.id) o.delier = { offert: true, id: r.id, tx: r.tx, delie: !!d };
       if (d) o.etat = 'delie';
@@ -161,7 +161,7 @@ export function lectureEmail(e, delies = {}) {
       o = { quoi: `${r.de || 'Quelqu’un'} a mis ${r.a ? `« ${r.a} »` : 'ton article'} en favori`, fait: 'Notification envoyée', lien: lien('cat_annonces') };
       break;
     case 'action':
-      o = { quoi: maj(r.f) || `« ${sujet} »`, fait: 'Notification envoyée — la réponse se fait sur Vinted', lien: lien(/achat/i.test(r.f || '') ? 'cat_achats' : 'cat_msg') };
+      o = { quoi: maj(r.f) || `« ${sujet} »`, fait: 'Notification envoyée — la réponse se fait sur Vinted', lien: lien(/achat/i.test(r.f || '') ? 'achats' : 'cat_msg') };
       break;
     case 'connu-sans-action':
       o = { quoi: maj(r.f) || `« ${sujet} »`, fait: 'Rien à faire — gardé' };

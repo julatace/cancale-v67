@@ -262,7 +262,11 @@ const ecrans = [
           // sections (Achats, Compte, À traiter) restent dans l'espace du site
           // (`?tab=plat_ebay&section=compte`), où l'on touche encore la section.
           const site = { plat_vinted: 'vinted', plat_leboncoin: 'leboncoin', plat_ebay: 'ebay' }[ec.tab];
-          if (['ventes', 'annonces', 'messages'].includes(ec.section)) {
+          // (31 oct., soir) Achats est une tâche aussi ; Compte eBay est un panneau des Paramètres.
+          if (ec.section === 'compte') {
+            await pg.goto(`http://localhost:${PORT}/?tab=${ec.tab}&section=compte`, { waitUntil: 'domcontentloaded' });
+            await pg.waitForSelector('[data-sous-ecran="ebay"]:not([hidden]) [data-ebay-compte-section]', { timeout: 15000 });
+          } else if (['ventes', 'annonces', 'messages', 'achats'].includes(ec.section)) {
             await pg.goto(`http://localhost:${PORT}/?tab=${ec.section}&site=${site}`, { waitUntil: 'domcontentloaded' });
             await pg.waitForSelector(`[data-tache="${ec.section}"][data-tache-site="${site}"]`, { timeout: 15000 });
           } else {

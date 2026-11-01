@@ -285,6 +285,14 @@ html .vrm-app-shell .vrm-day-layout .vrm-day-recu-n { font-weight: 800 !importan
   content: ''; position: absolute; inset: -14px -12px;
 }
 :root body .vrm-app-shell .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche .vrm-fiche-num input { color: inherit !important; font-family: var(--vrm-police-mono) !important; }
+/* (31 oct., soir) §7 : au doigt, 44 px AFFICHÉS — la zone étendue (`::after`) ne
+   compte pas pour l'œil ni pour la mesure. Au téléphone, la pastille du N° fait
+   44 px de haut (l'étiquette reste la même, juste plus haute). */
+@media (max-width: 767px), (hover: none), (pointer: coarse) {
+  :root body .vrm-app-shell .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche .vrm-fiche-num.vrm-fiche-num.vrm-fiche-num button[data-edition]:not(#vrm-aucun) {
+    min-height: 44px !important; height: 44px;
+  }
+}
 /* « À confirmer » : un contour ambre. */
 html .vrm-app-shell [data-ann-a-confirmer] {
   color: var(--vrm-warn) !important; border: 1px solid var(--vrm-warn) !important; background: var(--vrm-bg) !important; border-radius: 8px !important;
@@ -600,9 +608,19 @@ html .vrm-app-shell .vrm-main .vrm-filtre-site > button[aria-pressed="true"] { b
   html .vrm-app-shell .vrm-filtre-site > button[aria-pressed] { min-height: 36px; padding: 0 14px; font-size: 13px; }
 }
 :root[data-theme="dark"] body .vrm-app-shell .vrm-main .vrm-filtre-site > button[aria-pressed="true"] { background: var(--vrm-ink) !important; color: var(--vrm-bg) !important; }
-/* La colonne porte maintenant les groupes de « Plus » : les tâches gardent
-   44 px, les groupes se resserrent (souris, pas de doigt) pour que tout tienne
-   sur un écran de 950 px sans défiler. */
-html .vrm-app-shell .vrm-atelier-rail [data-nav-groupe].vrm-rail-management-group { margin-top: 14px; }
-html .vrm-app-shell .vrm-atelier-rail [data-nav-groupe] .vrm-rail-section-label { font-size: 12px; padding-bottom: 3px; }
-html .vrm-app-shell .vrm-atelier-rail [data-nav-groupe] .vrm-rail-button { min-height: 34px; font-size: 14px; padding-top: 2px; padding-bottom: 2px; }
+/* LA COLONNE DE L'ORDINATEUR, COMME SA MAQUETTE (31 oct., soir : « fais
+   exactement cette mise en page »). « VRM » écrit en haut, chaque entrée sur
+   38 px (souris, pas de doigt), les groupes à un souffle les uns des autres,
+   la pastille ambre (contour + chiffre, « comme le 10 ») au bout de la ligne : 17 entrées et 6
+   groupes tiennent sans défiler dans 900 px de haut. */
+html .vrm-app-shell .vrm-atelier-rail { padding: 18px 12px 10px; }
+html .vrm-app-shell .vrm-atelier-rail .vrm-sidebar-brand { padding: 0 12px 12px; gap: 10px; align-items: baseline; }
+html .vrm-app-shell .vrm-atelier-rail .vrm-sidebar-mot { font-family: var(--vrm-police); font-size: 21px; font-weight: 800; letter-spacing: -.02em; line-height: 1; color: var(--vrm-ink); }
+html .vrm-app-shell .vrm-atelier-rail :is(.vrm-rail-platforms, .vrm-rail-management) { gap: 0; padding-top: 0; }
+html .vrm-app-shell .vrm-atelier-rail .vrm-rail-button { min-height: 38px; font-size: 14.5px; padding-top: 2px; padding-bottom: 2px; border-radius: 10px; }
+html .vrm-app-shell .vrm-atelier-rail [data-nav-groupe].vrm-rail-management-group { margin-top: 9px; }
+html .vrm-app-shell .vrm-atelier-rail [data-nav-groupe] .vrm-rail-section-label { font-size: 12px; line-height: 16px; padding: 0 12px 5px; }
+@media (max-height: 820px) {
+  html .vrm-app-shell .vrm-atelier-rail .vrm-rail-button { min-height: 34px; }
+  html .vrm-app-shell .vrm-atelier-rail [data-nav-groupe].vrm-rail-management-group { margin-top: 8px; }
+}

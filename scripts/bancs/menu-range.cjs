@@ -116,7 +116,7 @@ const INTERDITS = ['Collectif', 'Prix qui marche', 'Factures', 'Dans Vinted', 'A
     // aucun logo ne le répète.
     for (const tel of [true, false]) {
       const { ctx, pg } = await page(nav, tel, 'plat_ebay');
-      const e = await pg.evaluate(() => { const s = document.querySelector('[data-tache]'); if (!s) return null; const h = s.querySelector('[data-tache-tete] h1'); const p = s.querySelector('[data-filtre-site] button[aria-pressed="true"]'); return { logos: s.querySelectorAll('[data-tache-tete] img[src*="ebay"], .vrm-market-heading img[src*="ebay"]').length, titre: h ? h.innerText.trim() : '', filtre: p ? p.innerText.trim() : '', entetes: s.querySelectorAll('[data-entete-plateforme]').length }; });
+      const e = await pg.evaluate(() => { const s = document.querySelector('[data-tache]'); if (!s) return null; const h = s.querySelector('[data-tache-tete] h1'); const p = s.querySelector('[data-filtre-site] button[aria-pressed="true"]') || document.querySelector('[data-barre-haut] [data-filtre-site] button[aria-pressed="true"]'); return { logos: s.querySelectorAll('[data-tache-tete] img[src*="ebay"], .vrm-market-heading img[src*="ebay"]').length, titre: h ? h.innerText.trim() : '', filtre: p ? p.innerText.trim() : '', entetes: s.querySelectorAll('[data-entete-plateforme]').length }; });
       dit(!!e && e.logos === 0 && e.titre === 'Ventes' && e.filtre === 'eBay' && e.entetes === 0, `${tel ? 'téléphone' : 'ordinateur'} : ?tab=plat_ebay ouvre Ventes filtré sur eBay, « eBay » écrit une seule fois`, JSON.stringify(e));
       await ctx.close();
     }

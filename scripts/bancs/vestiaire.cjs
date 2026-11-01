@@ -66,6 +66,8 @@ srv.listen(PORT);
       if (etat === 'jamais') dit(v && v.etat === 'jamais' && /Vestiaire/.test(v.t), 'jamais relevé : le geste qui fait avancer', v && v.t.slice(0, 120));
       if (etat === 'panne') dit(v && v.etat === 'pas-su' && !/pages,/.test(v.t), 'lecture ratée : ni chiffre, ni « jamais »', v && v.t.slice(0, 120));
       // 5.238 : les messages Vestiaire — trois états, jamais « 0 » sur un « pas su ».
+      // (31 oct., soir) Ils vivent dans Messages · Vestiaire (`?tab=plat_vestiaire` mène à Annonces · Vestiaire).
+      await pg.goto(`http://localhost:${PORT}/?tab=messages&site=vestiaire`, { waitUntil: 'domcontentloaded' });
       await pg.waitForSelector('[data-vc-messages]:not([data-vc-messages="charge"])', { timeout: 10000 }).catch(() => {});
       const m = await pg.evaluate(() => { const e = document.querySelector('[data-vc-messages]'); if (!e) return null; const a = e.querySelector('[data-vc-messages-ouvrir]'); const c = [...e.querySelectorAll('[data-vc-conv]')].map((x) => ({ id: x.getAttribute('data-vc-conv'), num: x.getAttribute('data-vc-conv-num'), nl: x.getAttribute('data-vc-conv-nonlu') })); return { etat: e.getAttribute('data-vc-messages'), n: (e.querySelector('[data-vc-messages-nonlus]') || {}).getAttribute ? e.querySelector('[data-vc-messages-nonlus]').getAttribute('data-vc-messages-nonlus') : null, href: a ? a.href : '', h: a ? a.getBoundingClientRect().height : 0, c, t: e.innerText }; });
       if (etat === 'lu') {
@@ -76,7 +78,8 @@ srv.listen(PORT);
       }
       if (etat === 'jamais') dit(m && m.etat === 'jamais' && !/\b0 message/.test(m.t), 'messages jamais relevés : le geste, aucun « 0 »', m && m.t.slice(0, 120));
       if (etat === 'panne') dit(m && m.etat === 'pas-su' && !/non lu/.test(m.t), 'messages illisibles : « pas su », aucun nombre', m && m.t.slice(0, 120));
-      // 5.239 : les achats Vestiaire — trois états.
+      // 5.239 : les achats Vestiaire — trois états. (31 oct., soir) Dans Achats · Vestiaire.
+      await pg.goto(`http://localhost:${PORT}/?tab=achats&site=vestiaire`, { waitUntil: 'domcontentloaded' });
       await pg.waitForSelector('[data-vc-achats]:not([data-vc-achats="charge"])', { timeout: 10000 }).catch(() => {});
       const ac = await pg.evaluate(() => { const e = document.querySelector('[data-vc-achats]'); if (!e) return null; const s = e.querySelector('[data-suivre-colis]'); return { etat: e.getAttribute('data-vc-achats'), t: e.innerText, suivre: s ? s.href : '', h: s ? s.getBoundingClientRect().height : 0 }; });
       if (etat === 'lu') {
