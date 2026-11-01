@@ -57,6 +57,9 @@
   width: 32px; min-height: 44px; margin: -12px -6px -12px 0; vertical-align: middle;
   color: var(--vrm-muted); font-size: 14px; font-weight: 400;
 }
+/* (1er nov., banc tous-boutons) Au doigt, le « ⓘ » faisait 32 px de large : 44 px
+   de cible (§7), sans rien pousser — les 12 px gagnés sont repris en marge. */
+@media (pointer: coarse) { .vrm-pourquoi:not(.vrm-pourquoi-ecrit) > summary { width: 44px; margin-left: -6px; margin-right: -12px; } }
 .vrm-pourquoi > summary::-webkit-details-marker { display: none; }
 .vrm-pourquoi > summary::marker { content: ''; }
 .vrm-pourquoi[open] > div { display: block; margin-top: 6px; font-size: 12px; line-height: 1.45; color: var(--vrm-muted); font-weight: 400; }

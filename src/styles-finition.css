@@ -28,6 +28,23 @@ html .vrm-app-shell .vrm-atelier-rail > .vrm-rail-pied:empty { display: none; }
    (`data-rail-suite`, styles-atelier) reste l’indice qu’il y a une suite. */
 html .vrm-app-shell .vrm-atelier-rail:has(> .vrm-rail-scroll[data-rail-suite]) > .vrm-rail-pied { border-top: 1px solid var(--vrm-line); padding-top: 6px; }
 html .vrm-app-shell .vrm-atelier-rail:has(> .vrm-rail-scroll[data-rail-suite]) > .vrm-rail-pied [data-nav-groupe].vrm-rail-management-group { margin-top: 2px; }
+/* (1er nov., capture de Julien) Une entrée n'est JAMAIS coupée par le filet du
+   pied : la colonne se RESSERRE d'abord (`data-rail-densite`, posé par SideBar
+   en mesurant), puis, si elle ne tient toujours pas, défile EN ENTIER. */
+/* 1-2 : seuls les espaces se resserrent (les entrées gardent 34 px, finition-premium) ;
+   3-4 : les entrées passent à 30 puis 28 px — seulement quand, sinon, une ligne serait coupée. */
+html .vrm-app-shell .vrm-atelier-rail:is([data-rail-densite="1"], [data-rail-densite="2"], [data-rail-densite="3"], [data-rail-densite="4"]) [data-nav-groupe].vrm-rail-management-group { margin-top: 5px; }
+html .vrm-app-shell .vrm-atelier-rail:is([data-rail-densite="1"], [data-rail-densite="2"], [data-rail-densite="3"], [data-rail-densite="4"]) [data-nav-groupe] .vrm-rail-section-label { padding-bottom: 3px; }
+html .vrm-app-shell .vrm-atelier-rail:is([data-rail-densite="1"], [data-rail-densite="2"], [data-rail-densite="3"], [data-rail-densite="4"]) .vrm-rail-button { min-height: 34px; }
+html .vrm-app-shell .vrm-atelier-rail:is([data-rail-densite="2"], [data-rail-densite="3"], [data-rail-densite="4"]) { padding-top: 10px; }
+html .vrm-app-shell .vrm-atelier-rail:is([data-rail-densite="2"], [data-rail-densite="3"], [data-rail-densite="4"]) .vrm-sidebar-brand { padding-bottom: 6px; }
+html .vrm-app-shell .vrm-atelier-rail:is([data-rail-densite="2"], [data-rail-densite="3"], [data-rail-densite="4"]) [data-nav-groupe].vrm-rail-management-group { margin-top: 3px; }
+html .vrm-app-shell .vrm-atelier-rail:is([data-rail-densite="2"], [data-rail-densite="3"], [data-rail-densite="4"]) [data-nav-groupe] .vrm-rail-section-label { font-size: 11px; line-height: 14px; padding-bottom: 2px; }
+html .vrm-app-shell .vrm-atelier-rail[data-rail-densite="3"] .vrm-rail-button { min-height: 30px; }
+html .vrm-app-shell .vrm-atelier-rail[data-rail-densite="4"] .vrm-rail-button { min-height: 28px; font-size: 14px; }
+html .vrm-app-shell .vrm-atelier-rail[data-rail-defile] { overflow-y: auto !important; scrollbar-width: thin; }
+html .vrm-app-shell .vrm-atelier-rail[data-rail-defile] > .vrm-rail-scroll { flex: 0 0 auto; overflow: visible; border: 0 !important; }
+html .vrm-app-shell .vrm-atelier-rail[data-rail-defile] > .vrm-rail-pied { border-top: 0 !important; }
 /* Le libellé de l'entrée active : même encre, même graisse partout. */
 html .vrm-app-shell .vrm-atelier-rail .vrm-rail-button[aria-current="page"] { font-weight: 600; }
 html .vrm-app-shell .vrm-atelier-rail .vrm-rail-button:focus-visible { outline: 2px solid var(--vrm-accent); outline-offset: -2px; }
