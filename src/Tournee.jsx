@@ -28,7 +28,8 @@ function texteEtape(e) {
     if (e.etat === 'passu') return { t: 'Emballer', s: 'Je lis encore tes ventes…' };
     if (e.etat === 'rien') return { t: 'Emballer', s: 'Aucun colis à emballer' };
     if (e.etat === 'fait') return { t: 'Emballer', s: "Tout est parti aujourd'hui" };
-    return { t: `Emballer ${plur(e.n, 'colis', 'colis')}`, s: e.numeros.length ? 'Va chercher ces paires, la plus pressée d’abord' : 'Aucune de ces paires n’a encore de N°' };
+    // Le total n'est pas réécrit : c'est le nombre de la case « À envoyer » (§7).
+    return { t: 'Emballer', s: e.numeros.length ? [e.numeros.map((n) => `N°${n}`).join(' · '), e.sansNumero ? `${e.sansNumero} sans N°` : ''].filter(Boolean).join(' · ') : 'Aucune de ces paires n’a encore de N°' };
   }
   if (e.id === 'deposer') {
     if (e.etat === 'passu') return { t: 'Déposer', s: 'Je lis encore tes ventes…' };
@@ -38,8 +39,8 @@ function texteEtape(e) {
     const seul = d.length === 1 ? d[0] : null;
     const presse = d.filter((x) => x.jours != null).sort((a, b) => a.jours - b.jours)[0];
     const quand = presse ? texteJours(presse.jours, 'depot') : '';
-    if (seul) return { t: `Déposer ${plur(e.n, 'colis', 'colis')}${seul.nom ? ` · ${seul.nom}` : ''}`, s: [seul.nom ? '' : 'transporteur pas encore connu', quand].filter(Boolean).join(' · ') };
-    return { t: `Déposer ${plur(e.n, 'colis', 'colis')}`, s: [d.map((x) => `${x.nom || 'transporteur pas encore connu'} ${x.n}`).join(' · '), quand ? `le plus pressé : ${quand}` : ''].filter(Boolean).join(' · ') };
+    if (seul) return { t: `Déposer${seul.nom ? ` · ${seul.nom}` : ''}`, s: [seul.nom ? '' : 'transporteur pas encore connu', quand].filter(Boolean).join(' · ') };
+    return { t: 'Déposer', s: [d.map((x) => `${x.nom || 'transporteur pas encore connu'} ${x.n}`).join(' · '), quand ? `le plus pressé : ${quand}` : ''].filter(Boolean).join(' · ') };
   }
   // retirer
   if (e.etat === 'passu') return { t: 'Retirer', s: 'Je lis encore tes colis à retirer…' };
@@ -48,8 +49,8 @@ function texteEtape(e) {
   const pts = e.points || [];
   const seul = pts.length === 1 ? pts[0] : null;
   const presse = pts.filter((x) => x.jours != null).sort((a, b) => a.jours - b.jours)[0];
-  if (seul) return { t: `Retirer ${plur(e.n, 'colis', 'colis')}${seul.nom ? ` · ${seul.nom}` : ''}`, s: [seul.nom ? '' : 'point pas encore connu', seul.jours != null ? texteJours(seul.jours, 'retrait') : ''].filter(Boolean).join(' · ') || 'Le code est dans Colis' };
-  return { t: `Retirer ${plur(e.n, 'colis', 'colis')}`, s: [`${plur(pts.length, 'point relais', 'points relais')}`, presse ? `le plus pressé : ${presse.nom || 'point pas encore connu'}, ${texteJours(presse.jours, 'retrait')}` : ''].filter(Boolean).join(' · ') };
+  if (seul) return { t: `Retirer${seul.nom ? ` · ${seul.nom}` : ''}`, s: [seul.nom ? '' : 'point pas encore connu', seul.jours != null ? texteJours(seul.jours, 'retrait') : ''].filter(Boolean).join(' · ') || 'Le code est dans Colis' };
+  return { t: 'Retirer', s: [pts.map((x) => `${x.nom || 'point pas encore connu'} ${x.n}`).join(' · '), presse ? `le plus pressé : ${presse.nom || 'point pas encore connu'}, ${texteJours(presse.jours, 'retrait')}` : ''].filter(Boolean).join(' · ') };
 }
 
 function Pastille({ e, i }) {
@@ -71,7 +72,7 @@ export function CarteTournee({ tournee, nArrets = 0, onEtape, onOuvrirTournee })
           const tx = texteEtape(e);
           return (
             <li key={e.id} className={'vrm-tr-etape is-' + e.etat} data-tournee-etape={e.id} data-etat={e.etat} data-n={e.n == null ? '' : String(e.n)} data-courante={e.courante ? '1' : undefined}>
-              <button type="button" className="vrm-tr-bouton" onClick={() => onEtape && onEtape(e.id)}
+              <button type="button" className="vrm-tr-bouton" title={`${tx.t} — ${tx.s}${e.id === 'emballer' && e.numeros.length ? ' : N°' + e.numeros.join(', N°') : ''}`} onClick={() => onEtape && onEtape(e.id)}
                 aria-label={`Étape ${i + 1}, ${tx.t}${e.etat === 'fait' ? ', faite' : ''} — ${tx.s}`}>
                 <Pastille e={e} i={i}/>
                 <span className="vrm-tr-texte">

@@ -168,11 +168,11 @@ async function main() {
         dit(!empl, `${T} aucune « impression de la journée triée par emplacement » (refusée le 11 oct.)`);
         const sw = await pg.evaluate(() => ({ sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth }));
         dit(sw.sw <= sw.cw + 1, `${T} aucun débordement`, JSON.stringify(sw));
-        await pg.evaluate(() => { const t = document.querySelector('[data-tournee]'); if (t) t.scrollIntoView({ block: 'start' }); });
+        await pg.evaluate(() => { const t = document.querySelector('[data-tournee]'); if (t) t.scrollIntoView({ block: 'center' }); });
         await pg.waitForTimeout(300);
         await pg.screenshot({ path: path.join(SHOTS, `tournee-carte-${vp.width}.png`) });
         // ── B. LE MODE PLEIN ÉCRAN ────────────────────────────────────────────
-        await pg.click('[data-tournee-ouvrir]');
+        await pg.locator('[data-tournee-ouvrir]:visible').first().click();
         await pg.locator('[data-tournee-plein]').waitFor({ timeout: 8000 });
         await pg.waitForTimeout(800);
         const ar = await pg.evaluate(() => ({ ordre: !!document.querySelector('[data-tournee-ordre="limite"]'),
@@ -195,7 +195,7 @@ async function main() {
         await pg.waitForTimeout(400);
         dit(!(await pg.$('[data-tournee-plein]')), `${T} plein écran : se ferme`);
         // ── C. CHAQUE ÉTAPE OUVRE SON ÉCRAN ───────────────────────────────────
-        await pg.evaluate(() => { const t = document.querySelector('[data-tournee]'); if (t) t.scrollIntoView({ block: 'start' }); });
+        await pg.evaluate(() => { const t = document.querySelector('[data-tournee]'); if (t) t.scrollIntoView({ block: 'center' }); });
         await pg.click('[data-tournee-etape="imprimer"] button');
         const lot = await pg.locator('[data-lot-imprimer]').first().waitFor({ timeout: 25000 }).then(() => true).catch(() => false);
         dit(lot, `${T} Imprimer ouvre l'impression EXISTANTE des prêts (« Imprimer les N prêts » de Colis)`);
@@ -222,7 +222,7 @@ async function main() {
         dit(par.retirer && par.retirer.etat === 'afaire' && par.retirer.courante, `${T} Retirer reste à faire, c'est l'étape en cours`, JSON.stringify(par.retirer));
         const f = await pg.evaluate(() => document.querySelector('[data-tournee]').getAttribute('data-tournee-faites'));
         dit(f === '3', `${T} 3 sur 4 faites`, f);
-        await pg.evaluate(() => { const t = document.querySelector('[data-tournee]'); if (t) t.scrollIntoView({ block: 'start' }); });
+        await pg.evaluate(() => { const t = document.querySelector('[data-tournee]'); if (t) t.scrollIntoView({ block: 'center' }); });
         await pg.waitForTimeout(300);
         await pg.screenshot({ path: path.join(SHOTS, `tournee-fait-${vp.width}.png`) });
         dit(!errs.length, `${T} D aucune erreur d'app`, errs[0]);

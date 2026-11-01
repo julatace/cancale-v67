@@ -2269,5 +2269,10 @@ Maquettes validées : `journee-A-tournee`, `journee-mode-tournee`, `ventes-B-jou
   geste « ✓ Colis fait » de Colis, factorisé en `marquerPoste(o, b)` (`vinted_ship_done` + `vinted_bords_shipped`),
   appelé désormais par Colis aussi. Écran quitté pendant le délai : la même écriture, faite hors état React.
 
+**Mise en page et §7** : les étapes Emballer / Déposer / Retirer ne réécrivent PAS leur total (c'est le
+nombre des cases « À envoyer » / « À retirer », déjà à l'écran) — seulement les détails (N°, par transporteur,
+par point). Sur ordinateur (≥ 1024 px) la carte est UNE rangée de quatre étapes (une ligne de texte chacune,
+le détail au survol) : sinon Ma journée ne tenait plus sans défiler (banc `journee-widgets`, 966 px > 950).
+
 **Preuves** : bancs `scripts/bancs/tournee.cjs` et `scripts/bancs/ventes-benefice-glisser.cjs` (nombres calculés
 à la main dans leur en-tête), rouges sur `origin/main`, rouges sous mutation (voir le rapport de session).
