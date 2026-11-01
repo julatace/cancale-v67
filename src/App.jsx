@@ -47840,8 +47840,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             </div>
           );
         })()}
-        {/* (31 oct., soir) Dans Colis, la colonne « À retirer » porte déjà la carte des
-            points relais (une carte, pas deux, §7) : le détail ne la redessine pas. */}
+        {/* (1er nov.) Dans Colis, la colonne « À retirer » (`ColonneRetirer`) porte les
+            points relais et leur carte : le détail ne la redessine pas (une carte, §7). */}
         {aFilter==='attente' && !modeRetraits && <CarteRelaisColis donnees={groupesRelais} C={C}/>}
         {/* (31 oct., soir) « Colis à retirer » sans rien à aller chercher le DIT —
             seulement quand tout est lu (e-mails de suivi, achats) : pas su ≠ rien. */}
