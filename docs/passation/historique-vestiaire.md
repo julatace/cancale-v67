@@ -399,3 +399,98 @@ installer la 5.299.0 ; la carte dira alors COMBIEN d'annonces elle a trouvées s
 lue », c'est que la page « Mes articles » ne charge pas `users/me/product-listings`
 sous la forme connue : relire `vc_recon.chemins`/`schemas` et `vc_listings.formeInconnue`
 (lecture seule) pour viser la bonne route.
+
+
+## 1er novembre 2026 — Vestiaire partout (anti double vente, argent, colis)
+
+Julien : « fais tout comme un pro, il ne doit y avoir aucune erreur possible ».
+L'audit des parcours du 1er novembre avait mesuré que Vestiaire vivait à part :
+
+- **A1** une vente Vestiaire ne faisait « à retirer » nulle part (Vinted,
+  Leboncoin, eBay), ne sortait pas la paire du Stock ; une vente ailleurs ne
+  disait jamais « à retirer de Vestiaire » ;
+- **A2** « toutes plateformes » (CA déclaré, URSSAF, Vendu, bénéfice, seuils
+  TVA/plafond) sans Vestiaire, et sans le dire ;
+- **A4** les colis Leboncoin et Vestiaire à poster n'étaient comptés que dans
+  l'écran Colis (ni Ma journée, ni la cloche, ni le widget, ni les rappels) ;
+- **A6** « Vendus ailleurs » comparait les N° en minuscules (« 007 » ≠ « 7 ») ;
+- **A10** une vente Vinted au prix illisible comptait 0 € dans le CA et le Vendu.
+
+### Ce qui est fait — UNE règle, UN propriétaire
+
+- `api/_lib/vestiaire-regle.js` (nouveau, importé par l'app ET le serveur) :
+  identité (`numVcVente`, `numVcAnnonce` : lien posé par VRM, sinon référence
+  VRM-n° de l'article — jamais le titre), étapes (`VC_VENTE_ETAPES` déplacée
+  d'App.jsx), `vcVenteAnnulee`, `vcVentePartie`, l'argent (`montantRecuVc` : compté
+  seulement si le NOM de la clé dit « ce que tu reçois » et la devise est EUR ;
+  `dateVersementVc` : seulement une clé `verseLe`), les colis (`colisVcAPoster`,
+  jours à l'heure de Paris), l'état d'une annonce (`etatAnnonceVcBrut`,
+  `VC_ANNONCE_ETATS` déplacée), `annoncesVcEnLigne` (lecture < 24 h, sinon rien),
+  `stockVestiaire`, `retraitsVestiaire`.
+- `api/_lib/colis-sites.js` (nouveau) : `lbcColisAPoster` (la règle de l'écran
+  Colis Leboncoin, qui l'utilise), `colisLbcAPoster`, `resumeColisSites`,
+  `totalColis`. Les règles Leboncoin viennent du miroir `ventes-regle.js`
+  (+ `lbcExpediee`, + `montantCommandeLu` dans `NOMS`, refabriqué par
+  `audit-bilan-semaine.cjs --recopie` ; sa tête importe les règles Vestiaire).
+- **Anti double vente** : `numerosDejaVendus` reçoit `ventesVc` (« pas su »
+  nommé, vente sans identité comptée `vcSansPaire`) ⇒ eBay « à retirer »
+  (`aRetirerEbayAilleurs`, texte « vendue sur Vestiaire »), programmées à
+  annuler, publication pas reproposée ; écran Leboncoin : carte « vendue sur
+  Vestiaire — à retirer de Leboncoin » (`numerosVendusVc` + `aRetirerDeLbcEbay`) ;
+  cloche : « vendu sur Vestiaire, encore en vente sur Vinted », « vendue … encore
+  en ligne sur Vestiaire — à retirer de Vestiaire », « à retirer de Leboncoin
+  (vendue sur Vestiaire) » ; « Vendus ailleurs » (`chargerRetraitsMulti`) lit
+  `vc_listings`/`vc_ventes` (`retraitsVestiaire`) ; la sortie du Stock
+  (`stockVestiaire`) ; le serveur (email entrant d'une vente Vinted) pousse
+  « encore en vente sur Vestiaire » (`annoncesVcEnLigne`, `doubleVenteApprise`).
+  VRM ne retire JAMAIS rien tout seul de Vestiaire ni sur une vente Vestiaire
+  (le retrait automatique eBay ne lit que la preuve Vinted).
+- **Argent** : `ventesFaites` / `ventesDeclarables` reçoivent `vestiaire` ;
+  `montantCommandeLu` (null, jamais 0) ; les ventes non comptées sont rendues
+  (`nonComptees`, `ecartees[].manque`) et dites : Ma journée (Vendu « au moins ·
+  N non comptées », Reçu, CA de l'année, cotisations), carte CA de Compta, carte
+  URSSAF (Puce « dans aucun chiffre — ce total est un minimum »), seuils
+  (`caAnnee`), rappel URSSAF (`montantPeriodeUrssaf` partiel, miroir refabriqué),
+  widget (`recuDuMoisPublie`, `moneyAuMoins`), bilan de la semaine, facturation
+  électronique, Statistiques, bénéfice (« sans N vente Vestiaire », publié
+  `horsVestiaire`). La publication `vinted_urssaf_mois` porte
+  `sources.Vestiaire` et `nonComptees: { n, par }`.
+- **Colis** : `vrm_colis_aposter` porte `leboncoin` et `vestiaire` (total et
+  retards) ; la case « À envoyer » de Ma journée (`data-leboncoin`,
+  `data-vestiaire`) et la Tournée les comptent ; le widget et les rappels (matin :
+  date limite Vestiaire ; soir : « Demain : N colis » ; bilan) lisent les mêmes
+  règles ; un site illisible ⇒ « au moins », nommé. Leboncoin n'écrit aucune date
+  limite : jamais « en retard ».
+- **A6** : `articlesVendusAilleurs` compare par `cleNum`.
+
+### Preuves (§6)
+
+- `scripts/audit-vestiaire-partout.cjs` : 43 verts ; sur `origin/main` (copié dans
+  `git archive`) 22 rouges dont des rouges de COMPORTEMENT sans aucune règle neuve
+  (prix vide compté `eur: 0`, « 007 »/« 7 » non rapprochés) ; `--mutations` : 9/9
+  tuées (montant sans clé « versé », annulée comptée, identité par titre, prix
+  illisible à 0 €, « Colis fait » recompté, lecture périmée dite en ligne, sans
+  `cleNum`, date limite jamais en retard, Vestiaire hors du verdict).
+- `scripts/bancs/colis-tous-sites.cjs` (les VRAIES routes widget + soir) : 12 OK,
+  9 KO sur l'avant (widget 1 au lieu de 3, soir « 1 colis »).
+- `scripts/bancs/vestiaire-bout-en-bout.cjs` §E : la vente écrite par le vrai
+  code de l'extension compte dans Ma journée, la cloche et Colis (même nombre),
+  et son montant pas sûr est nommé.
+  Sur l'avant : 4 rouges (Colis montrait 1 carte, la cloche publiait 0).
+- Bancs relancés, verts : `vendu-recu`, `journee-mieux`, `journee-chiffres`,
+  `colis-colonnes`, `revendeurs`, `tournee`, `bilan-semaine`, `rappel-soir`,
+  `widget-colis`, `widget-multi`, `ship-multi`, `double-vente-push`. Rouges
+  IDENTIQUES sur `origin/main` (pas de ce chantier) : `double-vente` (bouton
+  « Vestiaire » des filtres rogné, 2 KO), `statuts-colis` (filtres de Ventes),
+  `audit-numerotation-lecteurs` (déjà noté dans l'audit des parcours).
+- Audits adaptés à la règle déplacée (jamais affaiblis) : `audit-urssaf`
+  (`montantCommandeLu` extrait), `audit-capture-vc-lbc` (familles chargées depuis
+  le module), banc `bilan-semaine`.
+
+### Ce qui reste
+
+- Le montant Vestiaire : tant que l'extension ne range pas une clé dont le nom dit
+  ce que Vestiaire verse (et `verseLe`), TOUTES ses ventes sont « non comptées »,
+  dites à côté de chaque total. Mesurer la forme réelle (`vc_ventes.forme`) avant
+  d'apprendre une clé à l'extension.
+- A3 (même paire sur deux comptes Vinted), A5, A7–A9, A11–A14 : hors de ce chantier.

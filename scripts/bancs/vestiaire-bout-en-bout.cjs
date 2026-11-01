@@ -20,6 +20,11 @@
 //   C. l'extension connectée à un AUTRE compte VRM : chaque écran Vestiaire le dit
 //      en tête (c'est pourquoi rien n'arriverait ici) ;
 //   D. aucune erreur, aucun débordement. Données INVENTÉES (dépôt public).
+//   E. (1er nov., audit A4/A2) la vente Vestiaire à expédier COMPTE ailleurs que
+//      sur son écran : Ma journée « À envoyer » (`data-vestiaire`), la cloche
+//      (`vrm_colis_aposter.vestiaire`), la colonne de Colis — le MÊME nombre
+//      (§11) ; et son montant, pas sûr, n'entre dans aucun « vendu » : il est
+//      NOMMÉ (`data-vendu-non-comptees`), jamais compté ni tu.
 const path = require('path'), fs = require('fs'), http = require('http'), os = require('os'), vm = require('vm');
 let chromium;
 try { ({ chromium } = require(path.join(__dirname, '..', '..', 'node_modules', 'playwright'))); }
@@ -206,6 +211,30 @@ const lireEcran = (pg, attr) => pg.evaluate((a) => {
         const rail = await o.pg.evaluate(() => !!document.querySelector('[data-nav-entree="plat_vestiaire"]'));
         dit(rail, 'la colonne porte l’entrée « Vestiaire » (Plateformes), même sans rien de capté', String(rail));
       }
+      dit(o.errs.length === 0, 'aucune erreur d’app', o.errs.join(' | ').slice(0, 160));
+      await o.ctx.close();
+    }
+    {
+      console.log('── 1512 px · E. la vente Vestiaire à poster compte partout, et son argent est dit');
+      const o = await ouvrir(b, { width: 1512, height: 950 }, lignes, MOI);
+      await o.pg.goto(o.pg.url().split('?')[0] + '?tab=journee', { waitUntil: 'domcontentloaded' }).catch(() => {});
+      await o.pg.waitForSelector('[data-tuile="envoyer"][data-vestiaire]', { timeout: 20000 }).catch(() => {});
+      await o.pg.waitForTimeout(1500);
+      const j = await o.pg.evaluate(() => {
+        const t = document.querySelector('[data-tuile="envoyer"]');
+        let pub = null; try { pub = JSON.parse(localStorage.getItem('vrm_colis_aposter') || 'null'); } catch (_) {}
+        const h = document.querySelector('[data-vendu-mois]');
+        return { n: t ? t.getAttribute('data-n') : null, vc: t ? t.getAttribute('data-vestiaire') : null, pub,
+          vendu: h ? h.getAttribute('data-vendu-mois') : null, nc: h ? h.getAttribute('data-vendu-non-comptees') : null, partiel: h ? h.getAttribute('data-vendu-partiel') : null };
+      });
+      dit(j.vc === '1' && Number(j.n) >= 1, 'Ma journée « À envoyer » compte la vente Vestiaire à expédier', JSON.stringify({ n: j.n, vc: j.vc }));
+      dit(j.pub && j.pub.vestiaire === 1 && j.pub.total === Number(j.n), 'la cloche (`vrm_colis_aposter`) publie le MÊME nombre, Vestiaire compris', JSON.stringify(j.pub));
+      dit(j.nc === '1' && (j.vendu === '' || j.partiel === '1'), '« Vendu en … » : la vente Vestiaire au montant pas sûr n’est pas comptée, elle est NOMMÉE (« au moins »)', JSON.stringify({ vendu: j.vendu, nc: j.nc, partiel: j.partiel }));
+      await o.pg.screenshot({ path: path.join(CAPTURES, 'vc-bout-journee-1512.png'), fullPage: true }).catch(() => {});
+      await o.pg.goto(o.pg.url().split('?')[0] + '?tab=cat_bord', { waitUntil: 'domcontentloaded' }).catch(() => {});
+      await o.pg.waitForSelector('[data-cc-carte][data-site="vestiaire"]', { timeout: 20000 }).catch(() => {});
+      const c = await o.pg.evaluate(() => [...document.querySelectorAll('[data-cc-carte][data-site="vestiaire"]')].map((x) => x.getAttribute('data-cc-carte')));
+      dit(c.length === 1 && (!j.pub || j.pub.vestiaire === c.length), 'Colis porte la même vente Vestiaire (une carte) : Colis = Ma journée = la cloche', JSON.stringify(c));
       dit(o.errs.length === 0, 'aucune erreur d’app', o.errs.join(' | ').slice(0, 160));
       await o.ctx.close();
     }

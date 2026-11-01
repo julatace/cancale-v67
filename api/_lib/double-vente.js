@@ -26,7 +26,12 @@
 //  Fonctions PURES : `scripts/bancs/double-vente-push.cjs` exécute la route.
 // ════════════════════════════════════════════════════════════════════════════
 import { cleNum, numeroExterne } from './numerotation.js';
-import { DESTINATIONS } from './lien-notif.js';
+import { DESTINATIONS, lienNotif } from './lien-notif.js';
+// (1er nov., audit A1) Vestiaire : ses annonces PROUVÉES en ligne, par identité
+// (annonce créée par VRM ou référence VRM-n° — jamais le titre), la règle de
+// l'app (api/_lib/vestiaire-regle.js, un propriétaire, importée).
+import { annoncesVcEnLigne } from './vestiaire-regle.js';
+export { annoncesVcEnLigne };
 
 const NUM_OK = /^([A-Z]{1,3})?\d{1,6}$/;
 // STRICT : « VRM-125 », « VRM-B125 », et rien d'autre (la même que `numDeSkuEbay`).
@@ -180,16 +185,19 @@ export function annoncesLbcParNumero(items, ventes, liens, mk, accounts = {}) {
 
 // Ce que la vente rencontre ailleurs. `ebay` / `lbc` : Map (lu) ou `null` (pas
 // su ⇒ cette plateforme ne dit RIEN). Rend [{ numero, plateforme, annonces }].
-export function doubleVenteApprise(numero, ebay, lbc) {
+// `vc` : Map N° → annonces Vestiaire PROUVÉES en ligne (lecture de moins de
+// 24 h), ou `null` (pas su, ou lecture trop vieille ⇒ Vestiaire ne dit RIEN).
+export function doubleVenteApprise(numero, ebay, lbc, vc = null) {
   const hits = [];
   for (const n of numerosDeVente(numero)) {
     if (ebay && ebay.has(n)) hits.push({ numero: n, plateforme: 'ebay', annonces: ebay.get(n) });
     if (lbc && lbc.has(n)) hits.push({ numero: n, plateforme: 'leboncoin', annonces: lbc.get(n) });
+    if (vc && vc.has(n)) hits.push({ numero: n, plateforme: 'vestiaire', annonces: vc.get(n) });
   }
   return hits;
 }
 
-const NOM = { ebay: 'eBay', leboncoin: 'Leboncoin' };
+const NOM = { ebay: 'eBay', leboncoin: 'Leboncoin', vestiaire: 'Vestiaire' };
 // La notification : la paire, le N°, la plateforme. Clé anti-doublon = la
 // paire et les annonces qu'elle rencontre (identités) : le bordereau et l'email
 // « vendu » d'une MÊME vente donnent la même clé, un email rejoué aussi.
@@ -203,8 +211,10 @@ export function notificationDoubleVente(hits, titre) {
   const ids = hits.flatMap((h) => h.annonces.map((a) => h.plateforme + ':' + (a.itemId || a.id))).sort();
   return {
     title: `⚠️ Vendue sur Vinted — ${n} encore en vente sur ${ou}`,
-    body: `${paire ? paire + ' — ' : ''}${n} ${nums.length > 1 ? 'sont' : 'est'} encore en vente sur ${ou} : retire-la${plats.length > 1 ? ' des deux' : ''} pour ne pas la vendre deux fois.`,
+    body: `${paire ? paire + ' — ' : ''}${n} ${nums.length > 1 ? 'sont' : 'est'} encore en vente sur ${ou} : retire-la${plats.length > 2 ? ' de tous' : plats.length > 1 ? ' des deux' : ''} pour ne pas la vendre deux fois.`,
     tag: `dv-${nums.join('+')}-${ids.join(',')}`.slice(0, 200),
-    url: DESTINATIONS.doublon({ plat: plats.includes('ebay') ? 'ebay' : 'leboncoin', num: (hits.find((h) => h.plateforme === (plats.includes('ebay') ? 'ebay' : 'leboncoin')) || {}).numero }),
+    // Vestiaire seul : l'écran Annonces · Vestiaire (VRM n'y retire rien, il le dit).
+    url: (plats.length === 1 && plats[0] === 'vestiaire') ? lienNotif('annonces', { site: 'vestiaire' })
+      : DESTINATIONS.doublon({ plat: plats.includes('ebay') ? 'ebay' : 'leboncoin', num: (hits.find((h) => h.plateforme === (plats.includes('ebay') ? 'ebay' : 'leboncoin')) || {}).numero }),
   };
 }

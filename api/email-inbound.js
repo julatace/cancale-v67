@@ -33,7 +33,7 @@ import { modifierNeutre } from './_lib/neutre-cas.js';
 import { normaliserEntrant, formeRecue, demasquerRelais } from './_lib/lire-email.js';
 import { sbCle } from './_lib/cle.js';
 import { numeroDuTitreApresCoupure, lireMarqueur, archiveDe, estArchive } from './_lib/numerotation.js';
-import { numerosDeVente, annoncesEbayParNumero, annoncesLbcParNumero, doubleVenteApprise, notificationDoubleVente } from './_lib/double-vente.js';
+import { numerosDeVente, annoncesEbayParNumero, annoncesLbcParNumero, annoncesVcEnLigne, doubleVenteApprise, notificationDoubleVente } from './_lib/double-vente.js';
 import { normaliserRegistre, comptesActifs } from './_lib/ebay.js';
 import { arriveLeAuRangement } from './_lib/arrivee-colis.js';
 import { limiteRetraitDepuisTexte, lieuDepuisExtrait, LIEU_AU_FUTUR } from './_lib/retrait-colis.js';
@@ -767,19 +767,30 @@ const objetJson = (v) => {
 };
 export async function lireAnnoncesAilleurs() {
   const cl = await baseCloisonnee();
-  if (cl === null || (cl && !proprietaireCourant())) return { ebay: null, lbc: null };
-  const [mainL, reg, ebayL, lbcL, ventesL, comptesLbc] = await Promise.all([
+  if (cl === null || (cl && !proprietaireCourant())) return { ebay: null, lbc: null, vc: null };
+  const [mainL, reg, ebayL, lbcL, ventesL, comptesLbc, vcL, vcV] = await Promise.all([
     lirePagine('id=eq.main&select=mk:data->vrm_numerotation,liens:data->vrm_lbc_liens,fiches:data->vinted_annonce_numeros,liensEbay:data->vrm_ebay_liens'),
     lirePagine('id=eq.ebay_comptes&select=comptes:data->comptes'),
     lirePagine('id=like.ebay_listings%25&select=id,items:data->items'),
     lirePagine('id=eq.lbc_listings&select=items:data->items'),
     lirePagine('id=eq.lbc_ventes&select=ventes:data->ventes'),
     lirePagine('id=eq.lbc_accounts&select=accounts:data->accounts'),
+    // (1er nov., audit A1) Vestiaire : ses annonces (état, liens posés par VRM) et ses ventes.
+    lirePagine('id=eq.vc_listings&select=items:data->items,liens:data->liens,capturedAt:data->>capturedAt'),
+    lirePagine('id=eq.vc_ventes&select=ventes:data->ventes'),
   ]);
+  // Vestiaire ne dépend pas du marqueur 013 (ses annonces sont nées après la
+  // coupure) : une lecture ratée ⇒ `null` (il ne dit RIEN).
+  let vc = null;
+  if (vcL && vcV) {
+    const lst = vcL[0] ? { items: objetJson(vcL[0].items), liens: objetJson(vcL[0].liens), capturedAt: vcL[0].capturedAt } : null;
+    const vv = vcV[0] ? objetJson(vcV[0].ventes) : null;
+    if (lst && lst.items !== undefined && lst.liens !== undefined && vv !== undefined) vc = annoncesVcEnLigne({ items: lst.items || {}, liens: lst.liens || {}, capturedAt: lst.capturedAt }, vv || {}).parNum;
+  }
   // Le marqueur 013 : illisible ⇒ aucune traduction possible ⇒ rien.
-  if (!mainL) return { ebay: null, lbc: null };
+  if (!mainL) return { ebay: null, lbc: null, vc };
   const mk = mainL[0] ? objetJson(mainL[0].mk) : null;
-  if (mk === undefined) return { ebay: null, lbc: null };
+  if (mk === undefined) return { ebay: null, lbc: null, vc };
   const liens = mainL[0] ? objetJson(mainL[0].liens) : null;
   let ebay = null;
   if (reg && ebayL) {
@@ -796,7 +807,7 @@ export async function lireAnnoncesAilleurs() {
     const accounts=comptesLbc[0]?objetJson(comptesLbc[0].accounts):null;
     if (items !== undefined && ventes !== undefined && accounts !== undefined) lbc = annoncesLbcParNumero(items || {}, ventes || {}, liens || {}, mk, accounts||{});
   }
-  return { ebay, lbc };
+  return { ebay, lbc, vc };
 }
 // Une vente Vinted vient d'être apprise : la paire est-elle PROUVÉE en vente
 // ailleurs ? Rien sans N°, rien sur « pas su », rien en rejeu en lot, rien si
@@ -806,8 +817,8 @@ async function notifierDoubleVente(numero, titre) {
     if ((contexteVendeur.getStore() || {}).silence) return;
     if (!numerosDeVente(numero).length) return;
     if (!(await pushCategorieActive('doublevente'))) return;
-    const { ebay, lbc } = await lireAnnoncesAilleurs();
-    const notif = notificationDoubleVente(doubleVenteApprise(numero, ebay, lbc), titre);
+    const { ebay, lbc, vc } = await lireAnnoncesAilleurs();
+    const notif = notificationDoubleVente(doubleVenteApprise(numero, ebay, lbc, vc), titre);
     if (notif) await pushOnce(notif, 'doublevente');
   } catch (_) {}
 }

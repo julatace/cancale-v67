@@ -4,6 +4,8 @@ import { contexteVendeur, proprietaireCourant } from './_lib/owner.js';
 import { accesVendeur } from './_lib/abonnement.js';
 import { comptesActifs, normaliserRegistre } from './_lib/ebay.js';
 import { colisEbay, resumeColisEbay, lireCommandesEbayServeur } from './_lib/ebay-a-expedier.js';
+// (1er nov., audit A4) Les colis Leboncoin et Vestiaire : la règle de Colis.
+import { resumeColisSites } from './_lib/colis-sites.js';
 // La date limite d'envoi (avec son heure) : UNE règle, celle de l'app, du rappel
 // du matin et du rappel du soir (§11, 22 octobre).
 import { bordsParTransaction, compterEcheances, lireDateLimite } from './_lib/limite-envoi.js';
@@ -162,6 +164,19 @@ async function colisEbayDuVendeur() {
     })));
   } catch (_) { return null; }
 }
+// (1er nov., audit A4) Les colis Leboncoin et Vestiaire à poster — la règle de
+// Colis (`resumeColisSites`), sur leurs seules ventes (§4.4, jamais le blob).
+// Une lecture ratée ⇒ ce site vaut `null` : le widget dit « au moins » et le nomme.
+async function colisAutresSites(fait) {
+  try {
+    const [l, v, li] = await Promise.all([ligneProjetee('lbc_ventes', ['ventes']), ligneProjetee('vc_ventes', ['ventes']), ligneProjetee('vc_listings', ['liens'])]);
+    return resumeColisSites({
+      lbc: l === undefined ? null : ((l && l.ventes && typeof l.ventes === 'object') ? l.ventes : {}),
+      vc: (v === undefined || li === undefined) ? null : { ventes: (v && v.ventes) || null, liens: (li && li.liens) || {} },
+      fait,
+    });
+  } catch (_) { return { leboncoin: null, vestiaire: null }; }
+}
 async function bordRows() {
   return await fetchPaginated(scoped(`app_data?id=like.email_bord_*&select=${BORD_SELECT}`));
 }
@@ -300,7 +315,7 @@ const atRelay = (s) => /d[ée]pos[ée]/i.test(s || '') && /point\s+relais|bureau
 // achats Vinted « déposé en point relais » : mesuré le 23 oct., « 1 à retirer »
 // (une Salomon sans doute repartie) quand l'app en comptait 7, et AUCUN colis
 // venu d'un e-mail (le Mondial Relay du 21 octobre compris).
-const MAIN_WIDGET = ['vrm_widget_token', 'vinted_pickup_done', 'vinted_bords_hidden', 'vinted_ship_done', 'vinted_bords_shipped', 'vinted_sales_hidden', 'vinted_urssaf_mois', 'vrm_colis_retirer', 'vrm_colis_collected', 'vinted_accounts_hidden'];
+const MAIN_WIDGET = ['vrm_widget_token', 'vrm_lbc_colis_done', 'vinted_pickup_done', 'vinted_bords_hidden', 'vinted_ship_done', 'vinted_bords_shipped', 'vinted_sales_hidden', 'vinted_urssaf_mois', 'vrm_colis_retirer', 'vrm_colis_collected', 'vinted_accounts_hidden'];
 // (23 oct.) LES COLIS ARRIVÉS PAR E-MAIL APRÈS LA DERNIÈRE PUBLICATION DE L'APP.
 // La liste publiée (`vrm_colis_retirer`) est une photo prise à la dernière
 // ouverture de l'app : un colis arrivé depuis, app fermée, n'y est pas — c'est
@@ -550,6 +565,13 @@ export function recuDuMoisPublie(publie, ym, maintenant = Date.now()) {
   const src = (publie.sources && typeof publie.sources === 'object') ? publie.sources : null;
   if (!src) return vide('illisible');
   const manque = Object.entries(src).filter(([, v]) => v === 'pasSu').map(([k]) => k);
+  // (1er nov., audits A2/A10) Des ventes dont l'argent ne se lit pas (prix
+  // Vinted pas lu, montant Vestiaire pas sûr) : publiées à part par l'app
+  // (`nonComptees.par` = { 'Vestiaire|montant pas sûr': 2 }). Le reçu est alors
+  // un MINIMUM, et leur site est nommé (jamais un total partiel présenté complet).
+  const nc = publie.nonComptees && typeof publie.nonComptees === 'object' ? publie.nonComptees : null;
+  if (nc && Number(nc.n) > 0) for (const k of Object.keys(nc.par || {})) { const site = String(k).split('|')[0]; if (site && !manque.includes(site)) manque.push(site); }
+  if (nc && Number(nc.n) > 0 && !Object.keys(nc.par || {}).length) manque.push('ventes au montant pas lu');
   const ad = publie.aDater && publie.aDater.par && publie.aDater.par.Vinted;
   const aDater = ad && Number(ad.n) > 0 ? { n: Number(ad.n), ca: Math.round(Number(ad.ca) || 0) } : null;
   const base = { receivedADater: aDater, receivedAt: new Date(at).toISOString(), receivedRaison: null };
@@ -608,6 +630,8 @@ export default async function handler(req, res) {
       rows('email_sale_*'), main(), snapshot(), colisEbayDuVendeur(),
     ]);
     const sold = txSold ? [] : await harvestOrders('sold', vivants);
+    const autres = m ? await colisAutresSites(m.vrm_lbc_colis_done) : { leboncoin: null, vestiaire: null };
+    const lbcC = autres.leboncoin, vcC = autres.vestiaire;
     const purchased = txBuy ? [] : await harvestOrders('purchased', vivants);
 
     // ⚠️ AVANT TOUT LE RESTE : a-t-on seulement pu LIRE ? Un chiffre absent est
@@ -720,6 +744,10 @@ export default async function handler(req, res) {
       salesMonth = snap.ventesMois != null ? Number(snap.ventesMois) || 0 : salesMonth;
       moneySource = 'app';
     }
+    // (1er nov., audits A2/A10) Des ventes du mois dont l'argent ne se lit pas
+    // (prix Vinted pas lu, montant Vestiaire pas sûr) : publiées par l'app à
+    // côté du montant ⇒ « au moins » (jamais un total partiel présenté complet).
+    const moneyNonComptees = moneySource === 'app' ? (Number(snap.caMoisNonComptees) || 0) : null;
     // Argent REÇU ce mois : la ligne publiée par l'app (voir `recuDuMoisPublie`),
     // plus les emails de finalisation — une seule règle, celle de Ma journée.
     const recu = recuDuMoisPublie(m.vinted_urssaf_mois, ym);
@@ -728,10 +756,14 @@ export default async function handler(req, res) {
       // (19 oct.) Ventes eBay comprises — le même nombre que Colis et Ma journée
       // (§11). eBay illisible ⇒ `ebay: null`, `auMoins: true` : le total Vinted
       // seul, dit « au moins » (jamais un total partiel présenté complet).
+      // (1er nov., audit A4) + Leboncoin (aucune date limite : dans aucun jour)
+      // et Vestiaire (sa date limite) — le nombre de Colis et de Ma journée.
       ship: {
-        total: shipTotal + (eb ? eb.total : 0), overdue: shipOverdue + (eb ? eb.overdue : 0),
-        today: shipToday + (eb ? eb.today : 0), tomorrow: shipTomorrow + (eb ? eb.tomorrow : 0),
-        vinted: shipTotal, ebay: eb, auMoins: !eb, manque: eb ? [] : ['eBay'],
+        total: shipTotal + (eb ? eb.total : 0) + (lbcC ? lbcC.total : 0) + (vcC ? vcC.total : 0),
+        overdue: shipOverdue + (eb ? eb.overdue : 0) + (vcC ? vcC.overdue : 0),
+        today: shipToday + (eb ? eb.today : 0) + (vcC ? vcC.today : 0), tomorrow: shipTomorrow + (eb ? eb.tomorrow : 0) + (vcC ? vcC.tomorrow : 0),
+        vinted: shipTotal, ebay: eb, leboncoin: lbcC, vestiaire: vcC,
+        auMoins: !eb || !lbcC || !vcC, manque: [!eb && 'eBay', !lbcC && 'Leboncoin', !vcC && 'Vestiaire'].filter(Boolean),
         // (22 oct.) L'heure limite la plus proche, par jour (« avant 10 h »), et
         // les ventes Vinted dont la limite n'a pas pu être connue (ni email, ni
         // date de vente lue) — elles comptent dans `total`, dans aucun jour.
@@ -765,6 +797,7 @@ export default async function handler(req, res) {
       moneyMonth: Math.round(moneyMonth),
       salesMonth,
       moneySource, // 'app' = identique à l'écran de l'app · 'emails' = repli
+      moneyAuMoins: moneyNonComptees > 0, moneyNonComptees,
 
       ...recu,
       pending: snap && snap.enAttente != null ? snap.enAttente : null,

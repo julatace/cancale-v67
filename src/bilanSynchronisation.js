@@ -1,3 +1,4 @@
+import { cleNum } from "../api/_lib/numerotation.js";
 // Compare only confirmed rows of the same account/source. A first read is a baseline,
 // an absent row is never inferred to be deleted from a paginated/partial capture.
 const serialiser = (valeur) =>
@@ -83,14 +84,16 @@ export function articlesVendusAilleurs({
   const parNum = new Map();
   for (const [id, e] of Object.entries(numeros))
     if (e?.numero != null && String(e.numero).trim()) {
-      const n = String(e.numero).trim().toLowerCase();
+      // (1er nov., audit A6) LA clé des numéros (`cleNum` : « 007 » = « 7 »,
+      // « B 125 » = « B125 »), la même que l'app et l'extension — un N° saisi
+      // autrement ne doit plus faire disparaître une vente ailleurs.
+      const n = cleNum(e.numero);
+      if (!n) continue;
       if (!parNum.has(n)) parNum.set(n, []);
       parNum.get(n).push(String(id));
     }
   const groupe = (n) => {
-    n = String(n || "")
-      .trim()
-      .toLowerCase();
+    n = cleNum(n);
     if (!n) return null;
     const ids = parNum.get(n) || [];
     if (!ids.length) return null;

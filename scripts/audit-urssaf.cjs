@@ -28,7 +28,11 @@ const SRC = fs.readFileSync(path.join(RACINE, 'src', 'App.jsx'), 'utf8');
 const ENGAGEE_SRC = (() => {
   const c = SRC.indexOf('const commandeEbayEngagee = ');
   const d = c > 0 ? SRC.indexOf(';\n', c) : -1;
-  return c > 0 && d > c ? SRC.slice(c, d + 1) + '\n' : '';
+  // (1er nov., audit A10) + `montantCommandeLu` : un prix Vinted illisible n'est
+  // jamais 0 € dans le CA — la vraie règle, extraite elle aussi.
+  const e = SRC.indexOf('const montantCommandeLu = ');
+  const f = e > 0 ? SRC.indexOf('\n};\n', e) : -1;
+  return (c > 0 && d > c ? SRC.slice(c, d + 1) + '\n' : '') + (e > 0 && f > e ? SRC.slice(e, f + 3) + '\n' : '');
 })();
 let ko = 0;
 const ok = (m) => console.log('✅ ' + m);
@@ -60,7 +64,7 @@ if (!bloc || !/caUrssafParMois/.test(bloc)) {
     },
   };
   const EXPORTE = "\n;Object.assign(this, { tauxUrssaf, moisDeVente, venteFinalisee, caUrssafParMois });";
-  vm.createContext(ctx); vm.runInContext(bloc + EXPORTE, ctx);
+  vm.createContext(ctx); vm.runInContext((/const montantCommandeLu = /.test(bloc) ? '' : (ENGAGEE_SRC.match(/const montantCommandeLu = [\s\S]*?\n\};\n/) || [''])[0]) + bloc + EXPORTE, ctx);
 
   // Les statuts RÉELLEMENT présents en base (relevé du 2 septembre).
   const cas = [
@@ -547,8 +551,9 @@ if (!bloc || !/caUrssafParMois/.test(bloc)) {
     const j = SRC.indexOf('}, [declarables', i);
     const corps = SRC.slice(SRC.indexOf('() =>', i), j + 1);
     const run = (declarables, lbcLu, ebayCmd) => {
-      c.__arg = { declarables, lbcLu, lbcVentes: { ventes: [{ txId: 'A', isSeller: true, price: 7500, stepLabel: 'Paiement effectué', dateVente: '2026-10-02T10:00:00+02:00', title: 'lbc' }] }, ebayCmd, declUrssaf: {} };
-      return vm.runInContext(`(() => { const { declarables, lbcLu, lbcVentes, ebayCmd, declUrssaf } = __arg; const datesLbc = {}; const avecDatesLbc = (v) => v; return (${corps})(); })()`, c);
+      // (1er nov.) + `ventesVc` (les ventes Vestiaire, lues à part) : aucune ici.
+      c.__arg = { declarables, lbcLu, lbcVentes: { ventes: [{ txId: 'A', isSeller: true, price: 7500, stepLabel: 'Paiement effectué', dateVente: '2026-10-02T10:00:00+02:00', title: 'lbc' }] }, ebayCmd, declUrssaf: {}, ventesVc: [] };
+      return vm.runInContext(`(() => { const { declarables, lbcLu, lbcVentes, ebayCmd, declUrssaf, ventesVc } = __arg; const datesLbc = {}; const avecDatesLbc = (v) => v; return (${corps})(); })()`, c);
     };
     const EB = [{ orderId: 'E1', orderPaymentStatus: 'PAID', creationDate: '2026-10-03T10:00:00.000Z', pricingSummary: { total: { value: '72.00', currency: 'EUR' } }, paymentSummary: { totalDueSeller: { value: '66.00', currency: 'EUR' } }, totalMarketplaceFee: { value: '6.00', currency: 'EUR' } }];
     const pasSu = run(null, true, EB);

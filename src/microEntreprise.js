@@ -57,6 +57,11 @@ export const caAnnee = (ligne, annee) => {
   const pasSu = Object.keys(src).filter((k) => src[k] === 'pasSu');
   if (pasSu.length) raisons.push(`${pasSu.join(' et ')} pas lu${pasSu.length > 1 ? 's' : ''}`);
   if (ligne.aDater && Number(ligne.aDater.n) > 0) raisons.push(`${ligne.aDater.n} vente${ligne.aDater.n > 1 ? 's' : ''} sans date de versement`);
+  // (1er nov., audits A2/A10) Les ventes dont l'argent ne se lit pas (prix
+  // Vinted pas lu, montant Vestiaire pas sûr…) : publiées à part par l'écran
+  // Ventes (`nonComptees`), elles font du CA de l'année un MINIMUM, dit.
+  const nc = ligne.nonComptees && Number(ligne.nonComptees.n);
+  if (nc > 0) raisons.push(`${nc} vente${nc > 1 ? 's' : ''} dont l'argent ne se lit pas (${Object.keys(ligne.nonComptees.par || {}).map((k) => k.split('|')[0]).filter((x, i, a) => a.indexOf(x) === i).join(', ') || 'plateforme non dite'})`);
   return { ca: r2(ca), mois, partiel: raisons.length > 0, raisons };
 };
 
