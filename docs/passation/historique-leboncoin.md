@@ -1226,3 +1226,25 @@ Défauts trouvés et corrigés :
   jeton neuf, 5xx/coupure/corps tronqué relus, refus net non relu — rouges sur
   l'ancien module) ; tous les `audit-lbc-*` et bancs Leboncoin verts.
 - Geste de Julien : installer la 5.296.0 et recharger ses onglets leboncoin.fr.
+
+## 1er novembre — Audit de la capture Leboncoin (annonces, messages) (extension 5.299.0)
+
+Julien : « fais en sorte que l'extension capte les annonces et les messages pour
+Vestiaire et Leboncoin parfaitement ». Relu de la page au fond : `lbc-inject.js`
+(`handle` : 2xx seulement, XHR json lue, messagerie = compteur seul, liste
+complète `owner_listing`/`dashboard/v1/search` par cumul de pages au même total,
+statistiques à un seul identifiant d'annonce), `storeLbcListings` (5.294 : un
+champ vide n'efface pas un plein), `noterSessionLbc`, `storeLbcMessages`.
+
+Défaut trouvé et corrigé : **`storeLbcMessages` n'était pas en file.** La page
+charge `linked_accounts` et le compteur de messagerie dans la même seconde : deux
+lire-fusionner-réécrire lisaient la même ligne et le second effaçait l'écriture
+du premier (le compteur d'un compte, ou les noms des comptes liés, perdus jusqu'au
+passage suivant). ⇒ une écriture à la fois (`_lbcMessagesChaine`). Preuve :
+`audit-capture-vc-lbc.cjs` C8 (vrai background.js, deux arrivées simultanées) —
+rouge sur la 5.296, vert après, mutation « sans file » rouge.
+
+Laissés (vérifiés, pas de défaut reproduit) : les statistiques d'une annonce
+remplacent l'objet `stats` entier (un relevé sans `TotalFavorites` ne garde pas
+l'ancien nombre — choix : ne pas mêler deux périodes) ; un total nul de la liste
+complète ne décide rien (choix du 22 oct.). Geste de Julien : installer la 5.299.0.

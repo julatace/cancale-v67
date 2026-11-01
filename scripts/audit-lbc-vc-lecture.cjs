@@ -50,11 +50,11 @@ if (process.argv.includes('--prouve')) {
     ['accueilNote', 'src', "if(r&&(r.etat==='enregistre'||LBC_ANNONCES_LECTURE.test(String(msg.url))))", "if(r&&(r.etat==='enregistre'||LBC_ANNONCES_LECTURE.test(String(msg.url))||/dashboard/.test(String(msg.url))))"],
     ['sansRelecture', 'src', 'if (!passager || essai > 0) break;', 'break;'],
     ['relitTout', 'src', 'passager = res.status === 401 || res.status === 408 || res.status === 429 || res.status >= 500;', 'passager = true;'],
-    ['compteIgnore', 'src', "if (entier) { const autres = {}; for (const [k, v] of Object.entries(data.items)) if (compte && v && v.compte && v.compte !== compte) autres[k] = v; data.items = Object.assign(autres, lus); }", 'if (entier) { data.items = lus; }'],
-    ['expedierAutreCompte', 'src', "&& !(compteM && v.compte && v.compte !== compteM)", ''],
+    ['compteIgnore', 'src', "if (entier) { const garde = {}; for (const [k, v] of Object.entries(data.items)) if ((complets && complets.has(k)) || (v && autreCompteVc(v.compte, compte))) garde[k] = v; data.items = Object.assign(garde, lus); }", 'if (entier) { data.items = lus; }'],
+    ['expedierAutreCompte', 'src', "&& !dansListe.has(id) && !autreCompteVc(v.compte, compteM)", '&& !dansListe.has(id)'],
     ['photoToutHote', 'inject', "/(^|\\.)vestiairecollective\\.com$/i.test(u.hostname) && /\\.(jpe?g", "/./.test(u.hostname) && /\\.(jpe?g"],
     ['relaisPerdFiche', 'relais', "titre: String((x && x.titre) || '').slice(0, 120),", ''],
-    ['ficheEcrasee', 'src', "titre: String(x.titre || '').slice(0, 120) || prev.titre || '',", "titre: String(x.titre || '').slice(0, 120),"],
+    ['ficheEcrasee', 'src', "titre: coupeVc(x.titre || '', 120) || prev.titre || '',", "titre: coupeVc(x.titre || '', 120),"],
   ];
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'lbc-vc-lecture-'));
   let tous = true;
@@ -190,7 +190,7 @@ async function vestiaire() {
   const f = faireFond({ src: F.src, lignes: { vc_listings: { items: { A1: { boost: null, ref: '', vuAt: '2026-10-30T10:00:00Z', titre: 'Annonce du compte A', compte: 'compteA' } }, liens: {} } } });
   // L'onglet 21 a lu /users/me du compte B.
   if (typeof f.ctx.noterSessionVc === 'function') await f.ctx.noterSessionVc('compteB', 21, []);
-  await f.envoyer(Object.assign(relaisAnnonces(d), { compte: 'compteMenteur' }), senderVc(21));
+  await f.envoyer(Object.assign(relaisAnnonces(d), { compte: 'compteMenteur', moi: 'compteB' }), senderVc(21));
   const items = (f.lignes.vc_listings || {}).items || {};
   dit(items.P900 && items.P900.titre === 'Baskets Nike Dunk Low' && items.P900.photo && items.P900.prix && items.P900.prix.valeur === 99 && items.P900.statut === 'on_sale', 'V1 · le fond range la fiche (titre, photo, prix, état)', JSON.stringify(items.P900));
   dit(items.P900 && items.P900.compte === 'compteB', 'V2 · la ligne porte le compte de l’ONGLET, jamais celui que dirait le message', 'compte=' + (items.P900 && items.P900.compte));
@@ -203,7 +203,7 @@ async function vestiaire() {
   // V4 — « à expédier » d'un compte ne retire pas celles d'un autre.
   const g = faireFond({ src: F.src, lignes: { vc_ventes: { ventes: { VA: { productId: 'A1', aExpedier: true, compte: 'compteA', sources: ['a-expedier'] } }, lectures: {} } } });
   if (typeof g.ctx.noterSessionVc === 'function') await g.ctx.noterSessionVc('compteB', 22, []);
-  await g.envoyer({ from: 'cancale-vc', action: 'vcVentes', source: 'a-expedier', ventes: [{ id: 'VB', productId: 'P900', ref: '41', etat: 'to_ship' }], offset: 0, total: 1, lus: 1, forme: [] }, senderVc(22));
+  await g.envoyer({ from: 'cancale-vc', action: 'vcVentes', source: 'a-expedier', ventes: [{ id: 'VB', productId: 'P900', ref: '41', etat: 'to_ship' }], offset: 0, total: 1, lus: 1, forme: [], moi: 'compteB' }, senderVc(22));
   const v = ((g.lignes.vc_ventes || {}).ventes) || {};
   dit(v.VA && v.VA.aExpedier === true, 'V4 · la liste « à expédier » du compte B ne retire pas « à expédier » à la vente du compte A', JSON.stringify(v.VA));
   dit(v.VB && v.VB.aExpedier === true && v.VB.compte === 'compteB', 'V4 · la vente du compte B est rangée avec son compte', JSON.stringify(v.VB));

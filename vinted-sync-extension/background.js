@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.297.0';
+const CODE_VERSION = '5.299.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -2676,9 +2676,10 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           let hote = ''; try { hote = new URL((sender && sender.tab && sender.tab.url) || '').hostname; } catch (_) {}
           if (!/(^|\.)vestiairecollective\.com$/i.test(hote)) { sendResponse({ ok: false }); return; }
           // 5.296 : le compte est celui que l'ONGLET a lu sur `/users/me` (vide = pas su), jamais celui que dirait le message.
-          const compteOnglet = await compteVcOnglet(sender && sender.tab && sender.tab.id);
-          const ok = await rangerVcAnnonces({ items: msg.items, offset: msg.offset, total: msg.total, lus: msg.lus, forme: msg.forme, compte: compteOnglet });
-          await noterVcCapte('annonces', ok === true, Array.isArray(msg.items) ? msg.items.length : 0);
+          // 5.299 : … et seulement si la PAGE dit le même (`compteVcCapture`) : un onglet où l'on vient de changer de compte n'étiquette rien.
+          const compteOnglet = await compteVcCapture(sender && sender.tab && sender.tab.id, msg.moi);
+          const ok = await rangerVcAnnonces({ items: msg.items, offset: msg.offset, total: msg.total, lus: msg.lus, forme: msg.forme, compte: compteOnglet, complet: msg.complet, inconnu: msg.inconnu });
+          if (Array.isArray(msg.inconnu)) { noterDiag('vc_format_inconnu_annonces'); await noterVcCapte('annonces', ok === true, 0, { inconnu: true }); } else await noterVcCapte('annonces', ok === true, Array.isArray(msg.items) ? msg.items.length : 0);
           sendResponse({ ok: ok === true });
         } catch (e) { sendResponse({ ok: false, error: String(e) }); }
       })();
@@ -2701,8 +2702,8 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         try {
           let hote = ''; try { hote = new URL((sender && sender.tab && sender.tab.url) || '').hostname; } catch (_) {}
           if (!/(^|\.)vestiairecollective\.com$/i.test(hote)) { sendResponse({ ok: false }); return; }
-          const ok = await rangerVcVentes(Object.assign({}, msg, { compte: await compteVcOnglet(sender && sender.tab && sender.tab.id) }));
-          await noterVcCapte('ventes', ok === true, Array.isArray(msg.ventes) ? msg.ventes.length : 0);
+          const ok = await rangerVcVentes(Object.assign({}, msg, { compte: await compteVcCapture(sender && sender.tab && sender.tab.id, msg.moi) }));
+          if (Array.isArray(msg.inconnu)) { noterDiag('vc_format_inconnu_ventes'); await noterVcCapte('ventes', ok === true, 0, { inconnu: true }); } else await noterVcCapte('ventes', ok === true, Array.isArray(msg.ventes) ? msg.ventes.length : 0);
           sendResponse({ ok: ok === true });
         } catch (e) { sendResponse({ ok: false, error: String(e) }); }
       })();
@@ -2715,9 +2716,10 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           let hote = ''; try { hote = new URL((sender && sender.tab && sender.tab.url) || '').hostname; } catch (_) {}
           if (!/(^|\.)vestiairecollective\.com$/i.test(hote)) { sendResponse({ ok: false }); return; }
           // 5.295 : le compte est celui que l'ONGLET a lu sur `/users/me`, jamais celui que dirait le message.
-          const compteOnglet = await compteVcOnglet(sender && sender.tab && sender.tab.id);
-          const ok = await rangerVcMessages(msg.action === 'vcCompteur' ? { compteur: msg.messages } : Object.assign({}, msg, { compte: compteOnglet }));
-          await noterVcCapte('messages', ok === true, msg.action === 'vcCompteur' ? Number(msg.messages) || 0 : (Array.isArray(msg.conversations) ? msg.conversations.length : 0));
+          // 5.299 : le compteur aussi porte le compte (chaque compte a SES non-lus).
+          const compteOnglet = await compteVcCapture(sender && sender.tab && sender.tab.id, msg.moi);
+          const ok = await rangerVcMessages(msg.action === 'vcCompteur' ? { compteur: msg.messages, compte: compteOnglet } : Object.assign({}, msg, { compte: compteOnglet }));
+          if (Array.isArray(msg.inconnu)) { noterDiag('vc_format_inconnu_messages'); await noterVcCapte('messages', ok === true, 0, { inconnu: true }); } else await noterVcCapte(msg.action === 'vcCompteur' ? 'nonlus' : 'messages', ok === true, msg.action === 'vcCompteur' ? Number(msg.messages) || 0 : (Array.isArray(msg.conversations) ? msg.conversations.length : 0));
           sendResponse({ ok: ok === true });
         } catch (e) { sendResponse({ ok: false, error: String(e) }); }
       })();
@@ -2729,8 +2731,8 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         try {
           let hote = ''; try { hote = new URL((sender && sender.tab && sender.tab.url) || '').hostname; } catch (_) {}
           if (!/(^|\.)vestiairecollective\.com$/i.test(hote)) { sendResponse({ ok: false }); return; }
-          const ok = await rangerVcAchats(Object.assign({}, msg, { compte: await compteVcOnglet(sender && sender.tab && sender.tab.id) }));
-          await noterVcCapte('achats', ok === true, Array.isArray(msg.achats) ? msg.achats.length : 0);
+          const ok = await rangerVcAchats(Object.assign({}, msg, { compte: await compteVcCapture(sender && sender.tab && sender.tab.id, msg.moi) }));
+          if (Array.isArray(msg.inconnu)) { noterDiag('vc_format_inconnu_achats'); await noterVcCapte('achats', ok === true, 0, { inconnu: true }); } else await noterVcCapte('achats', ok === true, Array.isArray(msg.achats) ? msg.achats.length : 0);
           sendResponse({ ok: ok === true });
         } catch (e) { sendResponse({ ok: false, error: String(e) }); }
       })();
@@ -2746,7 +2748,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           const tabId = sender && sender.tab ? sender.tab.id : null;
           let ok = false;
           if (msg.action === 'vcMoi') ok = await noterSessionVc(msg.id, tabId, msg.forme);
-          else if (msg.action === 'vcFil') { ok = await rangerVcFil(msg, await compteVcOnglet(tabId)); await noterVcCapte('fils', ok === true, Array.isArray(msg.messages) ? msg.messages.length : 0); }
+          else if (msg.action === 'vcFil') { ok = await rangerVcFil(msg, await compteVcCapture(tabId, msg.moi)); await noterVcCapte('fils', ok === true, Array.isArray(msg.messages) ? msg.messages.length : 0); }
           else ok = await noterRecetteVc(msg.recette);
           sendResponse({ ok: ok === true });
         } catch (e) { sendResponse({ ok: false, error: String(e) }); }
@@ -10957,10 +10959,14 @@ const avecVivant = (jobId) => (/^bord:/.test(String(jobId)) && BORD_EN_COURS.has
 // 5.243 : ce que l'extension a RANGÉ de Vestiaire (ventes, annonces, messages,
 // achats) — pour que la carte du logo dise ce qui est capté, au lieu de
 // « VRM apprend à lire » (faux depuis la 5.236). Local, sans réseau.
-async function noterVcCapte(quoi, ok, n) {
+// 5.299 (1er nov., retour de Julien : « Annonces : lues à l'instant » et rien dans
+// VRM) : « lues » ne disait pas COMBIEN. La carte dit désormais le nombre trouvé
+// (0 = « aucune dans ce que Vestiaire a rendu »), une réponse au format inconnu
+// (`inconnu`), et les non-lus à part des conversations (`nonlus`).
+async function noterVcCapte(quoi, ok, n, extra) {
   try {
     const cur = (await chrome.storage.local.get('vrmVcCapte')).vrmVcCapte || {};
-    if (ok) cur[quoi] = { at: Date.now(), n: Number(n) || 0 };
+    if (ok) cur[quoi] = Object.assign({ at: Date.now(), n: Number(n) || 0 }, extra && extra.inconnu ? { inconnu: true } : {});
     await chrome.storage.local.set({ vrmVcCapte: cur });
     await noterFlux('vestiaire', ok);
   } catch (_) {}
@@ -14592,12 +14598,20 @@ async function rangerVcVentesMaintenant(m) {
     };
   }
   const offset = Number(m.offset) || 0; const total = typeof m.total === 'number' ? m.total : null;
-  const entier = offset === 0 && total != null && lus.size >= total && Number(m.lus || 0) >= total;
+  // 5.299 : une liste lue en entier sur PLUSIEURS pages (`complet` = ses identifiants) fait foi aussi.
+  const complets = idsCompletsVc(m.complet, total);
+  const entier = (offset === 0 && total != null && lus.size >= total && Number(m.lus || 0) >= total) || !!complets;
+  const dansListe = complets || lus;
   // (5.296) La liste « à expédier » d'UN compte ne dit rien des ventes d'un autre
   // compte (compte connu et différent) : elles restent à expédier (un colis
-  // caché est un colis perdu).
+  // caché est un colis perdu). (5.299) Compte de la lecture PAS SU : une vente
+  // rangée sous un compte reste à expédier (on ne sait pas si c'est le même).
   const compteM = (m.compte && /^[\w-]{1,40}$/.test(String(m.compte))) ? String(m.compte) : '';
-  if (source === 'a-expedier' && entier) for (const [id, v] of Object.entries(ventes)) if (v.aExpedier && !lus.has(id) && !(compteM && v.compte && v.compte !== compteM)) ventes[id] = { ...v, aExpedier: false, plusAExpedierDepuis: now };
+  if (source === 'a-expedier' && entier) for (const [id, v] of Object.entries(ventes)) if (v.aExpedier && !dansListe.has(id) && !autreCompteVc(v.compte, compteM)) ventes[id] = { ...v, aExpedier: false, plusAExpedierDepuis: now };
+  // 5.299 : une réponse au format inconnu ne date AUCUNE lecture (« rien lu » ne vaut pas « lu, vide »).
+  if (Array.isArray(m.inconnu)) {
+    if (!lus.size) { const forme0 = Object.assign({}, cur.forme || {}, { ['inconnu-' + source]: m.inconnu.slice(0, 60) }); const ok0 = await supabaseUpsert('app_data', [{ id: 'vc_ventes', data: Object.assign({}, cur, { forme: forme0 }) }], 'id'); return ok0 === true; }
+  }
   const lectures = Object.assign({}, cur.lectures || {}, { [source]: { at: now, total, complet: entier } });
   const forme = Object.assign({}, cur.forme || {});
   if (Array.isArray(m.forme) && m.forme.length) forme[source] = m.forme.slice(0, 120);
@@ -14624,10 +14638,11 @@ function rangerVcMessages(m) {
 async function rangerVcMessagesMaintenant(m) {
   const now = new Date();
   const seulCompteur = m && typeof m.compteur === 'number' && !Array.isArray(m.conversations);
+  const compteM = (m && m.compte && /^[\w-]{1,40}$/.test(String(m.compte))) ? String(m.compte) : '';
   if (seulCompteur) {
     const n = Math.floor(m.compteur);
     if (!isFinite(n) || n < 0) return false;
-    if (_vcCompteurEcrit && _vcCompteurEcrit.n === n && now - _vcCompteurEcrit.at < VC_COMPTEUR_REECRIRE_MS) return true;
+    if (_vcCompteurEcrit && _vcCompteurEcrit.n === n && _vcCompteurEcrit.compte === compteM && now - _vcCompteurEcrit.at < VC_COMPTEUR_REECRIRE_MS) return true;
   }
   const rows = await sbGet('app_data?id=eq.vc_messages&select=data');
   if (rows === null) return false;
@@ -14637,8 +14652,16 @@ async function rangerVcMessagesMaintenant(m) {
   if (seulCompteur) {
     const n = Math.floor(m.compteur);
     const prec = cur.compteur || {};
-    if (prec.messages === n && prec.at && now - Date.parse(prec.at) < VC_COMPTEUR_REECRIRE_MS) { _vcCompteurEcrit = { n, at: Date.parse(prec.at) }; return true; }
-    data.compteur = { messages: n, at: iso };
+    if (prec.messages === n && (prec.compte || '') === compteM && prec.at && now - Date.parse(prec.at) < VC_COMPTEUR_REECRIRE_MS) { _vcCompteurEcrit = { n, compte: compteM, at: Date.parse(prec.at) }; return true; }
+    // 5.299 — CHAQUE COMPTE A SES NON-LUS. Le compteur relu par la page est celui
+    // du compte OUVERT : un seul nombre pour tous les comptes disait les non-lus
+    // du dernier onglet passé. `compteur` reste le dernier relevé (avec son
+    // compte) ; `compteurs[compte]` garde celui de chaque compte connu.
+    data.compteur = Object.assign({ messages: n, at: iso }, compteM ? { compte: compteM } : {});
+    if (compteM) data.compteurs = Object.assign({}, cur.compteurs || {}, { [compteM]: { messages: n, at: iso } });
+  } else if (Array.isArray(m.inconnu) && !(Array.isArray(m.conversations) && m.conversations.length)) {
+    // 5.299 : format inconnu ⇒ aucune lecture datée, la forme est gardée pour viser juste.
+    data.formeInconnue = m.inconnu.slice(0, 60);
   } else {
     const conv = Object.assign({}, cur.conversations || {});
     const lus = new Set();
@@ -14652,15 +14675,18 @@ async function rangerVcMessagesMaintenant(m) {
         nonLu: x.nonLu === true || x.nonLu === false ? x.nonLu : (prev.nonLu === true || prev.nonLu === false ? prev.nonLu : null),
         date: x.date || prev.date || '', vuAt: iso, premiereVue: prev.premiereVue || iso,
         // 5.295 : l'aperçu du dernier message (texte borné) et le compte Vestiaire de l'onglet qui l'a lue.
-        apercu: String(x.apercu || prev.apercu || '').slice(0, 160),
+        apercu: coupeVc(x.apercu || prev.apercu || '', 160),
         apercuDeMoi: x.apercu ? (x.apercuDeMoi === true || x.apercuDeMoi === false ? x.apercuDeMoi : null) : (prev.apercuDeMoi === true || prev.apercuDeMoi === false ? prev.apercuDeMoi : null),
         compte: (m.compte && /^[\w-]{1,40}$/.test(String(m.compte))) ? String(m.compte) : (prev.compte || ''),
       };
     }
     const offset = Number(m.offset) || 0; const total = typeof m.total === 'number' ? m.total : null;
-    const entier = offset === 0 && total != null && lus.size >= total && Number(m.lus || 0) >= total;
+    const complets = idsCompletsVc(m.complet, total);
+    const entier = (offset === 0 && total != null && lus.size >= total && Number(m.lus || 0) >= total) || !!complets;
+    const dansListe = complets || lus;
     // Lue en entier : une conversation qui n'y est plus n'est plus « non lue » (rien n'est effacé).
-    if (entier) for (const [id, v] of Object.entries(conv)) if (!lus.has(id) && v.nonLu === true) conv[id] = { ...v, nonLu: null };
+    // (5.299) Seulement sur le compte LU : la conversation d'un autre compte (ou si le compte n'est pas su) garde son « non lu ».
+    if (entier) for (const [id, v] of Object.entries(conv)) if (!dansListe.has(id) && v.nonLu === true && !autreCompteVc(v.compte, compteM)) conv[id] = { ...v, nonLu: null };
     data.conversations = conv;
     const page = /^[\w/{}.-]{1,160}$/.test(String(m.page || '')) ? String(m.page) : ((cur.lecture && cur.lecture.page) || '');
     data.lecture = { at: iso, total, complet: entier, page };
@@ -14669,7 +14695,7 @@ async function rangerVcMessagesMaintenant(m) {
   data.capturedAt = iso;
   const ok = await supabaseUpsert('app_data', [{ id: 'vc_messages', data }], 'id');
   if (ok === true) {
-    if (seulCompteur) _vcCompteurEcrit = { n: data.compteur.messages, at: now.getTime() };
+    if (seulCompteur) _vcCompteurEcrit = { n: data.compteur.messages, compte: compteM, at: now.getTime() };
     notifierApp({ type: 'maj', quoi: 'vestiaire' });
   }
   return ok === true;
@@ -14690,6 +14716,11 @@ async function rangerVcAchatsMaintenant(m) {
   const rows = await sbGet('app_data?id=eq.vc_achats&select=data');
   if (rows === null) return false;
   const cur = (rows && rows[0] && rows[0].data) || {};
+  // 5.299 : format inconnu ⇒ aucune lecture datée, la forme est gardée.
+  if (Array.isArray(m.inconnu) && !(Array.isArray(m.achats) && m.achats.length)) {
+    const ok0 = await supabaseUpsert('app_data', [{ id: 'vc_achats', data: Object.assign({}, cur, { formeInconnue: m.inconnu.slice(0, 60) }) }], 'id');
+    return ok0 === true;
+  }
   const now = new Date().toISOString();
   const achats = Object.assign({}, cur.achats || {});
   let n = 0;
@@ -14724,7 +14755,7 @@ function ficheVcAnnonce(x, prev, compte, maintenant) {
   return { boost: x.boost === true || x.boost === false ? x.boost : null, cles: (x.cles || []).slice(0, 6).map(String), ref: String(x.ref || '').slice(0, 12), vuAt: maintenant,
     // 5.295 : combien de personnes l'ont mise en favori — un nombre, `null` = pas su.
     favoris: typeof x.favoris === 'number' && isFinite(x.favoris) && x.favoris >= 0 ? Math.floor(x.favoris) : null, cleFavoris: String(x.cleFavoris || '').slice(0, 40),
-    titre: String(x.titre || '').slice(0, 120) || prev.titre || '',
+    titre: coupeVc(x.titre || '', 120) || prev.titre || '',
     photo: (/^https:\/\/([\w-]+\.)*vestiairecollective\.com\//i.test(String(x.photo || '')) ? String(x.photo).slice(0, 400) : '') || prev.photo || '',
     prix: prix || prev.prix || null,
     statut: String(x.statut || '').slice(0, 40) || prev.statut || '',
@@ -14748,7 +14779,11 @@ async function rangerVcAnnoncesMaintenant(patch) {
     if (!/^[\w-]{1,40}$/.test(k) || !v) continue;
     if (data.liens[k] !== String(v)) { data.liens[k] = String(v); change = true; }
   }
-  if (Array.isArray(patch.items)) {
+  if (Array.isArray(patch.inconnu) && !(Array.isArray(patch.items) && patch.items.length)) {
+    // 5.299 : une réponse au format INCONNU n'est pas « aucune annonce » : ni
+    // fraîcheur, ni total, ni liste vidée — seulement sa forme, pour viser juste.
+    data.formeInconnue = patch.inconnu.slice(0, 60).map((c) => String(c).slice(0, 120)); change = true;
+  } else if (Array.isArray(patch.items)) {
     const lus = {};
     for (const x of patch.items.slice(0, 200)) {
       const id = String((x && x.id) || '');
@@ -14756,13 +14791,18 @@ async function rangerVcAnnoncesMaintenant(patch) {
       lus[id] = ficheVcAnnonce(x, data.items[id] || {}, compte, maintenant);
     }
     const offset = Number(patch.offset) || 0; const total = typeof patch.total === 'number' ? patch.total : null;
-    const entier = offset === 0 && total != null && Object.keys(lus).length >= total && Number(patch.lus || 0) >= total;
+    // 5.299 : une liste lue en entier sur PLUSIEURS pages (`complet`) fait foi aussi.
+    const complets = idsCompletsVc(patch.complet, total);
+    const entier = (offset === 0 && total != null && Object.keys(lus).length >= total && Number(patch.lus || 0) >= total) || !!complets;
     // (5.296) Une liste ENTIÈRE ne fait foi que pour SON compte : les annonces
-    // d'un autre compte Vestiaire (compte connu et différent) restent. Compte de
-    // l'onglet pas su ⇒ la règle d'avant (une seule boîte supposée).
-    if (entier) { const autres = {}; for (const [k, v] of Object.entries(data.items)) if (compte && v && v.compte && v.compte !== compte) autres[k] = v; data.items = Object.assign(autres, lus); }
+    // d'un autre compte Vestiaire (compte connu et différent) restent.
+    // (5.299) Compte de la lecture PAS SU : une annonce rangée sous un compte
+    // reste (on ne sait pas si c'est le même) ; une annonce sans compte suit la
+    // règle d'avant. Les annonces des pages déjà lues de la même liste restent.
+    if (entier) { const garde = {}; for (const [k, v] of Object.entries(data.items)) if ((complets && complets.has(k)) || (v && autreCompteVc(v.compte, compte))) garde[k] = v; data.items = Object.assign(garde, lus); }
     else data.items = Object.assign(data.items, lus);
     data.complet = entier; data.total = total; data.capturedAt = maintenant; change = true;
+    if (data.formeInconnue) delete data.formeInconnue;
     if (compte) data.lectures = Object.assign({}, cur.lectures || {}, { [compte]: { at: maintenant, total, complet: entier } });
     if (Array.isArray(patch.forme) && patch.forme.length) data.forme = patch.forme.slice(0, 120).map((c) => String(c).slice(0, 120));
   }
@@ -14800,6 +14840,30 @@ const VC_PAUSE_MS = 30 * 60000;
 const VC_SESSION_REECRIRE_MS = 6 * 3600 * 1000;
 const VC_FIL_MAX = 300;
 let VC_REPONSE_EN_VOL = false;
+// 5.299 (1er nov.) — LE COMPTE D'UNE CAPTURE. L'onglet garde le compte de son
+// dernier `/users/me` ; mais quand on change de compte DANS le même onglet, la
+// page neuve peut rendre « Mes articles » avant son `/users/me` : la capture
+// prenait l'ANCIEN compte — et une liste entière du compte B, rangée sous A,
+// effaçait les annonces de A. ⇒ le compte n'est posé que si la PAGE (le `moi`
+// lu dans CE document) et l'onglet disent le même ; sinon `''` (pas su).
+async function compteVcCapture(tabId, moi) {
+  try { await _vcSessionChaine; } catch (_) {}
+  const onglet = await compteVcOnglet(tabId);
+  const page = /^[\w-]{1,40}$/.test(String(moi || '')) ? String(moi) : '';
+  return onglet && page && onglet === page ? onglet : '';
+}
+// Une ligne rangée sous un compte que la lecture ne couvre pas : un AUTRE compte
+// connu, ou n'importe quel compte quand celui de la lecture n'est pas su.
+const autreCompteVc = (ligne, lecture) => !!(ligne && (!lecture || ligne !== lecture));
+// Les identifiants d'une liste lue EN ENTIER sur plusieurs pages (vc-inject.js
+// `lotComplet`) : exactement le total annoncé, tous distincts, sinon rien.
+function idsCompletsVc(liste, total) {
+  if (!Array.isArray(liste) || typeof total !== 'number' || !(total > 0)) return null;
+  const ids = new Set(liste.map(String).filter((x) => /^[\w-]{1,40}$/.test(x)));
+  return ids.size === total && liste.length === total ? ids : null;
+}
+// Un texte coupé ne coupe jamais un émoji en deux (la base refuserait la ligne entière).
+const coupeVc = (x, n) => { let t = String(x == null ? '' : x).replace(/[\ud800-\udbff](?![\udc00-\udfff])|(^|[^\ud800-\udbff])[\udc00-\udfff]/g, '$1'); if (t.length <= n) return t; t = t.slice(0, n); return /[\ud800-\udbff]$/.test(t) ? t.slice(0, -1) : t; };
 async function compteVcOnglet(tabId) {
   if (tabId == null) return '';
   try { const m = (await chrome.storage.local.get(VC_ONGLETS))[VC_ONGLETS] || {}; const e = m[String(tabId)]; return e && /^[\w-]{1,40}$/.test(String(e.compte || '')) ? String(e.compte) : ''; } catch (_) { return ''; }
@@ -14872,7 +14936,7 @@ async function rangerVcFilMaintenant(m, compte, deVrm) {
   if (rows === null) return false;                                   // lecture ratée ⇒ rien
   const cur = (rows && rows[0] && rows[0].data) || null;
   const neufs = (Array.isArray(m.messages) ? m.messages : []).slice(0, 200).map((x) => ({
-    id: /^[\w-]{1,40}$/.test(String((x && x.id) || '')) ? String(x.id) : '', t: String((x && x.t) || '').slice(0, 2000),
+    id: /^[\w-]{1,40}$/.test(String((x && x.id) || '')) ? String(x.id) : '', t: coupeVc((x && x.t) || '', 2000),
     deMoi: deVrm === true ? true : (x && (x.deMoi === true || x.deMoi === false) ? x.deMoi : null), at: /^\d{4}-\d{2}-\d{2}T/.test(String((x && x.at) || '')) ? String(x.at).slice(0, 30) : '',
     ...(deVrm === true ? { envoyeParVrm: true } : {}) })).filter((x) => x.t);
   const { liste, change } = fusionMessagesVc(cur && cur.messages, neufs);
@@ -14881,7 +14945,7 @@ async function rangerVcFilMaintenant(m, compte, deVrm) {
   const dernier = liste[liste.length - 1] || null;
   const now = new Date().toISOString();
   const data = { v: 1, conv, compte: compteFil, productId: m.productId || (cur && cur.productId) || '', ref: m.ref || (cur && cur.ref) || '',
-    messages: liste, n: liste.length, dernierAt: (dernier && dernier.at) || '', apercu: dernier ? String(dernier.t).slice(0, 160) : '', dernierDeMoi: dernier ? dernier.deMoi : null,
+    messages: liste, n: liste.length, dernierAt: (dernier && dernier.at) || '', apercu: dernier ? coupeVc(dernier.t, 160) : '', dernierDeMoi: dernier ? dernier.deMoi : null,
     page: /^[\w/{}.-]{1,160}$/.test(String(m.page || '')) ? String(m.page) : ((cur && cur.page) || ''), forme: Array.isArray(m.forme) && m.forme.length ? m.forme.slice(0, 80) : ((cur && cur.forme) || []), capturedAt: now };
   const ok = await supabaseUpsert('app_data', [{ id, data }], 'id');
   if (ok === true) notifierApp({ type: 'maj', quoi: 'vestiaire' });
@@ -14968,7 +15032,7 @@ async function repondreVestiaire(msg) {
     if (!cpt.ok) return { accepte: false, code: 'plafond', raison: `déjà ${ACTIONS_MAX_HEURE} actions sur ce compte Vestiaire cette heure-ci — réessaie dans ${Math.max(1, Math.ceil((cpt.resteMs || 0) / 60000))} min` };
     const depuis = Date.now() - 5;
     let rep = null;
-    try { rep = await avecDelai(chrome.tabs.sendMessage(o.tabId, { from: 'vrm-fond', action: 'vcRepondre', conv, texte, recette }, { frameId: 0 }), 25000, null); } catch (_) { rep = null; }
+    try { rep = await avecDelai(chrome.tabs.sendMessage(o.tabId, { from: 'vrm-fond', action: 'vcRepondre', conv, texte, recette, compte: o.compte }, { frameId: 0 }), 25000, null); } catch (_) { rep = null; }
     const statut = (rep && Number(rep.statut)) || 0;
     if (!rep || rep.ok !== true) {
       if (rep && rep.code === 'invalide') { await rendreActions('vc:' + o.compte, depuis, 1); return { accepte: false, code: 'invalide', raison: 'message refusé par la page — rien n’est parti' }; }
@@ -14979,6 +15043,7 @@ async function repondreVestiaire(msg) {
       // Arrêté AVANT de partir (en-têtes absents, recette refusée, déjà un envoi) : rien n'est parti.
       await rendreActions('vc:' + o.compte, depuis, 1);
       const e = String(rep.erreur || '');
+      if (e === 'autre-compte' || e === 'compte-pas-su') return { accepte: false, code: 'autre-compte', raison: "l'onglet Vestiaire n'est plus (ou pas encore) sur le compte de cette conversation — recharge la page Vestiaire sur le bon compte, puis réessaie (rien n'est parti)" };
       if (e === 'entetes') return { accepte: false, code: 'entetes', raison: "la page Vestiaire n'a pas encore parlé à son serveur depuis son ouverture — recharge ta messagerie Vestiaire, puis réessaie (rien n'est parti)" };
       if (e && e !== 'reseau') return { accepte: false, code: 'arrete', raison: `rien n'est parti (${e})` };
       return { accepte: true, etape: 'incertain', raison: "le réseau a coupé pendant l'envoi — regarde la conversation sur Vestiaire avant de renvoyer" };
@@ -15932,7 +15997,19 @@ async function storeVcRecon(patch) {
     }
   } catch (_) {}
 }
-async function storeLbcMessages(patch) {
+// 5.299 (1er nov.) — UNE ÉCRITURE À LA FOIS. La page Leboncoin charge ses comptes
+// liés et le compteur de messagerie dans la même seconde : deux
+// lire-fusionner-réécrire partaient ensemble, lisaient la même ligne, et le
+// second effaçait ce que le premier venait d'écrire (le compteur d'un compte, ou
+// les noms des comptes, perdus jusqu'au passage suivant). Comme les autres lignes
+// Leboncoin : en file.
+let _lbcMessagesChaine = Promise.resolve();
+function storeLbcMessages(patch) {
+  const run = _lbcMessagesChaine.then(() => storeLbcMessagesUneFois(patch), () => storeLbcMessagesUneFois(patch));
+  _lbcMessagesChaine = run.then(() => {}, () => {});
+  return run;
+}
+async function storeLbcMessagesUneFois(patch) {
   try {
     const rows = await sbGetLbc('app_data?id=eq.lbc_messages&select=data');
     if (rows === null) return;

@@ -57,6 +57,14 @@
     return '{x}';
   }).join('/').slice(0, 160);
   const cleSure = (k) => (/@|\d{3,}|[0-9a-f]{16,}/i.test(k) || k.length > 40) ? '{k}' : k;
+  // 5.299 (1er nov.) — UN TEXTE COUPÉ NE COUPE JAMAIS UN ÉMOJI EN DEUX. `slice`
+  // compte en unités UTF-16 : couper à 160 au milieu d'un émoji laisse une
+  // moitié (« surrogate » seul) ; `JSON.stringify` l'écrit `\ud83d`, et la base
+  // (jsonb de Postgres) REFUSE toute la ligne — un aperçu de message avec un
+  // émoji à la mauvaise place empêchait d'enregistrer TOUTES les conversations.
+  // On retire les moitiés orphelines et on coupe avant un émoji entamé.
+  const bienForme = (x) => String(x == null ? '' : x).replace(/[\ud800-\udbff](?![\udc00-\udfff])|(^|[^\ud800-\udbff])[\udc00-\udfff]/g, '$1');
+  const coupe = (x, n) => { let t = bienForme(x); if (t.length <= n) return t; t = t.slice(0, n); return /[\ud800-\udbff]$/.test(t) ? t.slice(0, -1) : t; };
 
   function cheminsDeCles(v, prefixe, out, prof) {
     if (!out) out = []; if (out.length > 300 || (prof || 0) > 6) return out;
@@ -212,43 +220,61 @@
   const CLE_PHOTO = /^(picture|pictures|photo|photos|image|images|thumbnail|thumbnails|cover|coverPicture|cover_picture|mainPicture|main_picture|path|url|src|large|medium|small)$/i;
   const CLE_PRIX = /^(price|prices|sellingPrice|selling_price|listingPrice|listing_price|salePrice|sale_price|amount)$/i;
   const CLE_STATUT_ANNONCE = /^(status|state|productStatus|product_status|listingStatus|listing_status|publicationStatus|publication_status)$/i;
+  // 5.299 (1er nov.) — LA FICHE SE LIT DU PLUS PROCHE AU PLUS PROFOND, et jamais
+  // chez le vendeur ni la marque. Avant, la lecture descendait dans le premier
+  // objet rencontré : une annonce `{ brand: { name: 'Nike' }, name: 'Dunk Low' }`
+  // prenait « Nike » pour titre (la clé `brand` venait avant), et
+  // `{ seller: { picture: … }, pictures: [...] }` prenait l'AVATAR du vendeur
+  // pour photo de l'annonce. ⇒ niveau par niveau (la clé de l'annonce elle-même
+  // gagne), et rien sous une clé de vendeur, de marque, de profil ou de logo.
+  const PAS_FICHE = /seller|vendor|owner|shop|store|brand|designer|avatar|profile|logo|badge|flag|icon/i;
   function photoAnnonce(e) {
     let out = '';
-    const visite = (x, prof, sousPhoto) => {
-      if (out || x == null || prof > 4) return;
-      if (typeof x === 'string') {
-        if (!sousPhoto) return;
-        try { const u = new URL(x, location.origin); if (u.protocol === 'https:' && !u.username && !u.password && /(^|\.)vestiairecollective\.com$/i.test(u.hostname) && /\.(jpe?g|png|webp|avif)(\?|$)|\/(images?|pictures?|photos?)\//i.test(u.pathname)) out = u.href.slice(0, 400); } catch (_) {}
-        return;
-      }
-      if (Array.isArray(x)) { for (const v of x.slice(0, 6)) visite(v, prof + 1, sousPhoto); return; }
-      if (typeof x !== 'object') return;
-      for (const k of Object.keys(x).slice(0, 80)) { if (PAS_ACHETEUR.test(k)) continue; visite(x[k], prof + 1, sousPhoto || CLE_PHOTO.test(k)); }
+    const essai = (x) => {
+      if (out || typeof x !== 'string') return;
+      try { const u = new URL(x, location.origin); if (u.protocol === 'https:' && !u.username && !u.password && /(^|\.)vestiairecollective\.com$/i.test(u.hostname) && /\.(jpe?g|png|webp|avif)(\?|$)|\/(images?|pictures?|photos?)\//i.test(u.pathname)) out = u.href.slice(0, 400); } catch (_) {}
     };
-    visite(e, 0, false);
+    // Niveau par niveau : [valeur, profondeur, sous une clé de photo ?] ; les
+    // chaînes d'un niveau passent avant tout ce qui est plus profond.
+    let niveau = [[e, 0, false]];
+    while (niveau.length && !out) {
+      const suivant = [];
+      for (const [x, prof, sousPhoto] of niveau) {
+        if (out || x == null || prof > 4) continue;
+        if (typeof x === 'string') { if (sousPhoto) essai(x); continue; }
+        if (Array.isArray(x)) { for (const v of x.slice(0, 6)) suivant.push([v, prof + 1, sousPhoto]); continue; }
+        if (typeof x !== 'object') continue;
+        for (const k of Object.keys(x).slice(0, 80)) { if (PAS_ACHETEUR.test(k) || PAS_FICHE.test(k)) continue; suivant.push([x[k], prof + 1, sousPhoto || CLE_PHOTO.test(k)]); }
+      }
+      niveau = suivant;
+    }
     return out;
   }
   function ficheAnnonce(e) {
     const out = { titre: '', prix: null, statut: '' };
-    const visite = (x, prof, chemin) => {
-      if (!x || typeof x !== 'object' || Array.isArray(x) || prof > 2) return;
-      for (const k of Object.keys(x).slice(0, 80)) {
-        const v = x[k];
-        if (PAS_ACHETEUR.test(k)) continue;
-        if (!out.titre && CLE_TITRE.test(k) && typeof v === 'string' && v.trim()) out.titre = v.replace(/\s+/g, ' ').trim().slice(0, 120);
-        if (!out.statut && CLE_STATUT_ANNONCE.test(k) && (typeof v === 'string' || typeof v === 'number')) { const t = String(v); if (/^[\w .:-]{1,40}$/.test(t)) out.statut = t; }
-        if (!out.prix && CLE_PRIX.test(k)) {
-          if (typeof v === 'number' && isFinite(v)) out.prix = { valeur: v, devise: '', cle: chemin + k };
-          else if (v && typeof v === 'object' && !Array.isArray(v)) {
-            const n = typeof v.amount === 'number' ? v.amount : (typeof v.value === 'number' ? v.value : (typeof v.cents === 'number' ? v.cents / 100 : (typeof v.amount === 'string' && /^\d+([.,]\d+)?$/.test(v.amount) ? Number(v.amount.replace(',', '.')) : null)));
-            const d = typeof v.currency === 'string' ? v.currency : (typeof v.currencyCode === 'string' ? v.currencyCode : '');
-            if (n != null && isFinite(n)) out.prix = { valeur: n, devise: /^[A-Z]{3}$/.test(d) ? d : '', cle: chemin + k + (typeof v.cents === 'number' ? '.cents' : '') };
+    let niveau = [[e, '']];
+    for (let prof = 0; prof <= 2 && niveau.length; prof++) {
+      const suivant = [];
+      for (const [x, chemin] of niveau) {
+        if (!x || typeof x !== 'object' || Array.isArray(x)) continue;
+        for (const k of Object.keys(x).slice(0, 80)) {
+          const v = x[k];
+          if (PAS_ACHETEUR.test(k) || PAS_FICHE.test(k)) continue;
+          if (!out.titre && CLE_TITRE.test(k) && typeof v === 'string' && v.trim()) out.titre = coupe(v.replace(/\s+/g, ' ').trim(), 120);
+          if (!out.statut && CLE_STATUT_ANNONCE.test(k) && (typeof v === 'string' || typeof v === 'number')) { const t = String(v); if (/^[\w .:-]{1,40}$/.test(t)) out.statut = t; }
+          if (!out.prix && CLE_PRIX.test(k)) {
+            if (typeof v === 'number' && isFinite(v)) out.prix = { valeur: v, devise: '', cle: chemin + k };
+            else if (v && typeof v === 'object' && !Array.isArray(v)) {
+              const n = typeof v.amount === 'number' ? v.amount : (typeof v.value === 'number' ? v.value : (typeof v.cents === 'number' ? v.cents / 100 : (typeof v.amount === 'string' && /^\d+([.,]\d+)?$/.test(v.amount) ? Number(v.amount.replace(',', '.')) : null)));
+              const d = typeof v.currency === 'string' ? v.currency : (typeof v.currencyCode === 'string' ? v.currencyCode : '');
+              if (n != null && isFinite(n)) out.prix = { valeur: n, devise: /^[A-Z]{3}$/.test(d) ? d : '', cle: chemin + k + (typeof v.cents === 'number' ? '.cents' : '') };
+            }
           }
+          if (v && typeof v === 'object' && !Array.isArray(v) && !CLE_PRIX.test(k)) suivant.push([v, chemin + k + '.']);
         }
-        if (v && typeof v === 'object' && !Array.isArray(v) && !CLE_PRIX.test(k)) visite(v, prof + 1, chemin + k + '.');
       }
-    };
-    visite(e, 0, '');
+      niveau = suivant;
+    }
     out.photo = photoAnnonce(e);
     return out;
   }
@@ -266,6 +292,36 @@
   // le doute garde tout.
   const PARAMS_NEUTRES = /^(offset|limit|page|per_?page|pagesize|page_?size|sort|sort_?by|sort_?order|order|order_?by|direction|lang|language|locale|iso_?country|country|currency|site_?id|_|t|ts)$/i;
   const sansFiltre = (u) => { for (const k of u.searchParams.keys()) if (!PARAMS_NEUTRES.test(k)) return false; return true; };
+  // 5.299 (1er nov.) — « RIEN LU » NE VAUT PAS « LISTE VIDE ». Quand aucune
+  // liste n'est trouvée dans la réponse, ce n'est une liste VIDE que si la
+  // réponse a la forme connue d'une liste vide (`[]`, `{data: []}`, ou un total
+  // de 0) ; sinon c'est un FORMAT INCONNU (champ renommé, autre API) : le fond
+  // n'en tire rien — ni fraîcheur, ni « aucune annonce » — et garde sa forme.
+  const listeConnue = (obj, arr) => arr.length > 0 || (Array.isArray(obj) && obj.length === 0) || (obj && Array.isArray(obj.data) && obj.data.length === 0) || !!(obj && obj.meta && obj.meta.count === 0);
+  const formeInconnue = (obj) => cheminsDeCles(obj).map(sansId).filter((c) => !PAS_ACHETEUR.test(c.split(':')[0])).slice(0, 60);
+  // 5.299 — UNE LISTE EN PLUSIEURS PAGES. Seule la page 0 qui rend tout faisait
+  // foi : au-delà d'une page (plus de 20, 48… annonces), la liste n'était jamais
+  // ENTIÈRE, et une annonce vendue ou supprimée restait « en ligne » pour
+  // toujours. La règle de la liste complète Leboncoin (22 oct.) : les pages lues
+  // dans CE document, à la MÊME requête (hors pagination), au MÊME total, sur le
+  // MÊME compte, en moins de 3 minutes, dont les identifiants DISTINCTS
+  // atteignent le total ⇒ la liste est entière (on envoie ses identifiants) ;
+  // un total qui change repart de zéro ; plus d'identifiants que le total ⇒
+  // incohérent, rien ne décide. En mémoire de la page seulement.
+  const PARAMS_PAGE = /^(offset|limit|page|per_?page|pagesize|page_?size|_|t|ts)$/i;
+  const lots = new Map();
+  function lotComplet(famille, u, total, ids) {
+    if (typeof total !== 'number' || !(total > 0) || total > 2000) return null;
+    const req = [...u.searchParams.entries()].filter(([k]) => !PARAMS_PAGE.test(k)).map(([k, v]) => k + '=' + v).sort().join('&');
+    const tete = famille + '|' + u.hostname + u.pathname + '|';
+    const cle = tete + req + '|' + total + '|' + moiId;
+    for (const k of [...lots.keys()]) if (k.startsWith(tete) && k !== cle) lots.delete(k);
+    let l = lots.get(cle);
+    if (!l || Date.now() - l.t0 > 180000) { l = { ids: new Set(), t0: Date.now() }; lots.set(cle, l); }
+    for (const id of ids) l.ids.add(String(id));
+    if (l.ids.size > total) { lots.delete(cle); return null; }
+    return l.ids.size === total ? [...l.ids] : null;
+  }
   function noteAnnonces(url, texte) {
     try {
       let u; try { u = new URL(url, location.origin); } catch (_) { return; }
@@ -277,7 +333,8 @@
       const total = obj.meta && typeof obj.meta.count === 'number' && sansFiltre(u) ? obj.meta.count : null;
       const items = arr.slice(0, 200).map((e) => { const b = boostDe(e); const f = favorisDe(e); const fi = ficheAnnonce(e); return { id: idDe(e), boost: b.boost, cles: b.cles, ref: refDe(e), favoris: f.n, cleFavoris: f.cle, titre: fi.titre, photo: fi.photo, prix: fi.prix, statut: fi.statut }; }).filter((x) => /^[\w-]{1,40}$/.test(x.id));
       const forme = arr.length ? cheminsDeCles(arr[0]).map(sansId).filter((c) => !PAS_ACHETEUR.test(c.split(':')[0])).slice(0, 120) : [];
-      post({ kind: 'vcannonces', items, offset, total, lus: arr.length, forme });
+      if (!listeConnue(obj, arr)) { post({ kind: 'vcannonces', items: [], offset, total: null, lus: 0, forme: [], inconnu: formeInconnue(obj), moi: moiId }); return; }
+      post({ kind: 'vcannonces', items, offset, total, lus: arr.length, forme, complet: lotComplet('annonces', u, total, items.map((x) => x.id)), moi: moiId });
     } catch (_) {}
   }
   // La CRÉATION d'une annonce : son identifiant, rendu par Vestiaire, relie
@@ -417,7 +474,8 @@
       }).filter((x) => /^[\w-]{1,40}$/.test(x.id));
       // La FORME d'une vente (noms de clés et types, jamais une valeur) : pour viser juste ensuite.
       const forme = arr.length ? cheminsDeCles(arr[0]).map(sansId).filter((c) => !PAS_ACHETEUR.test(c.split(':')[0])).slice(0, 120) : [];
-      post({ kind: 'vcventes', source, ventes, offset, total, lus: arr.length, forme });
+      if (!listeConnue(obj, arr)) { post({ kind: 'vcventes', source, ventes: [], offset, total: null, lus: 0, forme: [], inconnu: formeInconnue(obj), moi: moiId }); return; }
+      post({ kind: 'vcventes', source, ventes, offset, total, lus: arr.length, forme, complet: lotComplet('ventes-' + source, u, total, ventes.map((x) => x.id)), moi: moiId });
     } catch (_) {}
   }
 
@@ -454,7 +512,7 @@
       let obj; try { obj = JSON.parse(texte); } catch (_) { return; }
       const un = obj && obj.data && obj.data.unseen;
       if (!un || typeof un.messages !== 'number' || !isFinite(un.messages) || un.messages < 0) return;
-      post({ kind: 'vccompteur', messages: Math.floor(un.messages) });
+      post({ kind: 'vccompteur', messages: Math.floor(un.messages), moi: moiId });
     } catch (_) {}
   }
   function noteMessages(url, texte) {
@@ -480,7 +538,8 @@
       }).filter((x) => /^[\w-]{1,40}$/.test(x.id));
       for (const c of conversations) if (ID_CONV.test(c.id)) convsVues.add(c.id);
       const forme = arr.length ? cheminsDeCles(arr[0]).map(sansId).filter((c) => !PAS_ACHETEUR.test(c.split(':')[0])).slice(0, 120) : [];
-      post({ kind: 'vcmessages', conversations, offset, total, lus: arr.length, forme, page: normChemin(sansId(location.pathname)), moi: moiId });
+      if (!listeConnue(obj, arr)) { post({ kind: 'vcmessages', conversations: [], offset, total: null, lus: 0, forme: [], inconnu: formeInconnue(obj), page: normChemin(sansId(location.pathname)), moi: moiId }); return; }
+      post({ kind: 'vcmessages', conversations, offset, total, lus: arr.length, forme, complet: lotComplet('messages', u, total, conversations.map((x) => x.id)), page: normChemin(sansId(location.pathname)), moi: moiId });
     } catch (_) {}
   }
 
@@ -504,7 +563,7 @@
     if (!prod || typeof prod !== 'object') return '';
     const b = prod.brand && typeof prod.brand === 'object' ? prod.brand.name : prod.brand;
     const t = typeof prod.name === 'string' ? prod.name : (typeof prod.title === 'string' ? prod.title : '');
-    return [typeof b === 'string' ? b : '', t].filter(Boolean).join(' ').replace(/\s+/g, ' ').trim().slice(0, 80);
+    return coupe([typeof b === 'string' ? b : '', t].filter(Boolean).join(' ').replace(/\s+/g, ' ').trim(), 80);
   }
   function suiviAchat(e) {
     const out = { suivi: '', transporteur: '' };
@@ -546,7 +605,8 @@
         return { id: String(e.id != null ? e.id : '').slice(0, 40), productId: /^[\w-]{1,40}$/.test(pid) ? pid : '', nom: nomArticle(prod), etat: sc.etat, date: sc.date, montant: sc.montant, suivi: sv.suivi, transporteur: sv.transporteur };
       }).filter((x) => /^[\w-]{1,40}$/.test(x.id));
       const forme = arr.length ? cheminsDeCles(arr[0]).map(sansId).filter((c) => !PAS_ACHAT.test(c.split(':')[0])).slice(0, 120) : [];
-      post({ kind: 'vcachats', achats, offset, total, lus: arr.length, forme, page: normChemin(sansId(location.pathname)) });
+      if (!listeConnue(obj, arr)) { post({ kind: 'vcachats', achats: [], offset, total: null, lus: 0, forme: [], inconnu: formeInconnue(obj), page: normChemin(sansId(location.pathname)), moi: moiId }); return; }
+      post({ kind: 'vcachats', achats, offset, total, lus: arr.length, forme, page: normChemin(sansId(location.pathname)), moi: moiId });
     } catch (_) {}
   }
 
@@ -611,7 +671,7 @@
   const CLE_AUTEUR_ID = /^(senderId|sender_id|authorId|author_id|fromId|from_id|userId|user_id|ownerId|owner_id)$/i;
   const CLE_AUTEUR = /^(sender|author|from|user|owner|createdBy|created_by)$/i;
   const CLE_DATE_MSG = /^(createdAt|created_at|sentAt|sent_at|date|timestamp|time|updatedAt|updated_at)$/i;
-  const propreTexte = (s, max) => String(s).replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]+/g, ' ').replace(/[ \t]+/g, ' ').trim().slice(0, max || 2000);
+  const propreTexte = (s, max) => coupe(String(s).replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]+/g, ' ').replace(/[ \t]+/g, ' ').trim(), max || 2000);
   function texteMsg(e, prof) {
     if (!e || typeof e !== 'object' || Array.isArray(e) || (prof || 0) > 1) return '';
     for (const k of Object.keys(e).slice(0, 60)) {
@@ -683,7 +743,7 @@
       if (!CLE_APERCU.test(k)) continue;
       const v = e[k];
       if (typeof v === 'string' && v.trim()) return { t: propreTexte(v, 160), deMoi: null };
-      if (v && typeof v === 'object' && !Array.isArray(v)) { const t = texteMsg(v); if (t) return { t: t.slice(0, 160), deMoi: deMoiMsg(v) }; }
+      if (v && typeof v === 'object' && !Array.isArray(v)) { const t = texteMsg(v); if (t) return { t: coupe(t, 160), deMoi: deMoiMsg(v) }; }
     }
     return null;
   }
@@ -767,6 +827,10 @@
       || typeof r.modele !== 'string' || !/^\/[\w\-/{}.]*$/.test(r.modele) || (r.modele.split('{conv}').length - 1) > 1
       || !Array.isArray(r.cleTexte) || !r.cleTexte.length || !Array.isArray(r.fixes)) return fin({ statut: 0, erreur: 'recette' });
     if (envoiEnCours) return fin({ statut: 0, erreur: 'en-cours' });
+    // 5.299 — au nom du compte OUVERT DANS CETTE PAGE seulement (le fond dit
+    // lequel il attend) : un onglet où l'on vient de changer de compte, ou qui
+    // n'a pas encore lu `/users/me`, ne parle pour personne.
+    if (d.compte !== undefined && (!moiId || String(d.compte) !== moiId)) return fin({ statut: 0, erreur: moiId ? 'autre-compte' : 'compte-pas-su' });
     const h = {};
     for (const n of (Array.isArray(r.entetes) ? r.entetes : [])) {
       const k = String(n).toLowerCase();
@@ -811,7 +875,8 @@
             const ct = res.headers && res.headers.get && res.headers.get('content-type');
             noteVu(url, meth, res.status, ct);
             if (DE_VC(url) && /^(POST|PUT)$/i.test(String(meth))) noteEnvoi(url, meth, res.status, corpsEnvoye, ent);
-            if (DE_VC(url) && /json/i.test(String(ct || ''))) res.clone().text().then((t) => { noteSchema(url, t); noteCatalogue(url, t); noteMoi(url, t); noteAnnonces(url, t); noteVentes(url, t); noteCompteur(url, t); noteMessages(url, t); noteFil(url, t); noteAchats(url, t); notePublication(url, meth, res.status, t); }).catch(() => {});
+            // 5.299 : une réponse d'ERREUR (401, 404, 500…) n'est ni une liste, ni un compte, ni un schéma.
+            if (DE_VC(url) && res.status >= 200 && res.status < 300 && /json/i.test(String(ct || ''))) res.clone().text().then((t) => { noteSchema(url, t); noteCatalogue(url, t); noteMoi(url, t); noteAnnonces(url, t); noteVentes(url, t); noteCompteur(url, t); noteMessages(url, t); noteFil(url, t); noteAchats(url, t); notePublication(url, meth, res.status, t); }).catch(() => {});
           } catch (_) {}
         }).catch(() => {});
       } catch (_) {}
@@ -831,9 +896,11 @@
             const url = this.__vcUrl || '';
             const ct = this.getResponseHeader && this.getResponseHeader('content-type');
             noteVu(url, this.__vcMeth, this.status, ct);
-            const t = (this.responseType === '' || this.responseType === 'text') ? this.responseText : null;
+            // 5.299 : une page qui demande `responseType = 'json'` était ignorée (rien n'était lu).
+            let t = null;
+            try { t = this.responseType === 'json' ? (this.response == null ? null : JSON.stringify(this.response)) : (this.responseType === '' || this.responseType === 'text') ? this.responseText : null; } catch (_) { t = null; }
             if (DE_VC(url) && /^(POST|PUT)$/i.test(String(this.__vcMeth || ''))) noteEnvoi(url, this.__vcMeth, this.status, this.__vcCorps, this.__vcH);
-            if (t && /json/i.test(String(ct || ''))) { noteSchema(url, t); noteCatalogue(url, t); noteMoi(url, t); noteAnnonces(url, t); noteVentes(url, t); noteCompteur(url, t); noteMessages(url, t); noteFil(url, t); noteAchats(url, t); notePublication(url, this.__vcMeth, this.status, t); }
+            if (t && this.status >= 200 && this.status < 300 && /json/i.test(String(ct || ''))) { noteSchema(url, t); noteCatalogue(url, t); noteMoi(url, t); noteAnnonces(url, t); noteVentes(url, t); noteCompteur(url, t); noteMessages(url, t); noteFil(url, t); noteAchats(url, t); notePublication(url, this.__vcMeth, this.status, t); }
           } catch (_) {}
         });
       } catch (_) {}

@@ -284,7 +284,9 @@ const choisir = async (pg, site) => { const b = pg.locator(`[data-filtre-site] b
         await pg.waitForTimeout(800);
         const p = await pg.evaluate(() => ({ etat: (document.querySelector('[data-toutes-etat-site="leboncoin"]') || { getAttribute: () => '' }).getAttribute('data-etat'), lbc: document.querySelectorAll('[data-toutes-vente="leboncoin"]').length, filtres: [...document.querySelectorAll('[data-filtre-site] button[data-site]')].map((x) => x.getAttribute('data-site')) }));
         dit(p.etat === 'pas-su' && p.lbc === 0, 'E. ventes Leboncoin en 522 : le site est NOMMÉ « pas lu », aucune ligne inventée', JSON.stringify(p));
-        dit(!p.filtres.includes('vestiaire'), 'B. sans compte Vestiaire, pas de pastille Vestiaire', JSON.stringify(p.filtres));
+        // (1er nov., Julien : « même s'il n'y a rien de capté, je veux les onglets comme
+        // Vinted, Leboncoin ») Vestiaire est TOUJOURS là ; son écran dit « pas encore lu ».
+        dit(p.filtres.includes('vestiaire'), 'B. même sans données Vestiaire, la pastille Vestiaire est là', JSON.stringify(p.filtres));
         await ctx.close();
       });
 

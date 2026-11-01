@@ -169,10 +169,10 @@ const fuite = (o) => { const s = JSON.stringify(o == null ? null : o); return PE
     dit(F.lignes.vc_session && F.lignes.vc_session.id === MOI && F.store.vrmVcOnglets && F.store.vrmVcOnglets['31'] && F.store.vrmVcOnglets['31'].compte === MOI, '`vc_session = { id, at }` rangé, et le compte tenu PAR ONGLET', JSON.stringify({ s: F.lignes.vc_session, o: F.store.vrmVcOnglets }));
     const autreSite = await F.page({ action: 'vcMoi', id: 'PIRATE' }, 32, 'https://evil.exemple.test/');
     dit(F.lignes.vc_session.id === MOI && !(F.store.vrmVcOnglets || {})['32'], 'un message venu d’un autre site que Vestiaire ne pose rien', JSON.stringify(autreSite));
-    await F.page({ action: 'vcFil', conv: CONV, productId: '900001', ref: '401', messages: [{ id: 'M1', t: 'Bonjour, toujours dispo ?', deMoi: false, at: '2026-10-31T08:00:00.000Z' }, { id: 'M2', t: 'Oui !', deMoi: true, at: '2026-10-31T08:05:00.000Z' }] });
+    await F.page({ action: 'vcFil', conv: CONV, productId: '900001', moi: MOI, ref: '401', messages: [{ id: 'M1', t: 'Bonjour, toujours dispo ?', deMoi: false, at: '2026-10-31T08:00:00.000Z' }, { id: 'M2', t: 'Oui !', deMoi: true, at: '2026-10-31T08:05:00.000Z' }] });
     const fil = F.lignes[`vc_fil_${CONV}`];
     dit(!!fil && fil.compte === MOI && fil.n === 2 && fil.apercu === 'Oui !' && fil.dernierDeMoi === true && fil.dernierAt === '2026-10-31T08:05:00.000Z', '`vc_fil_{conv}` : les messages, le compte DE L’ONGLET, l’aperçu et le « de toi » du dernier (scalaires lus par l’app)', JSON.stringify(fil && { c: fil.compte, n: fil.n, a: fil.apercu, d: fil.dernierDeMoi }));
-    await F.page({ action: 'vcFil', conv: CONV, messages: [{ id: 'M3', t: 'Super', deMoi: false, at: '2026-10-31T08:06:00.000Z' }] });
+    await F.page({ action: 'vcFil', conv: CONV, moi: MOI, messages: [{ id: 'M3', t: 'Super', deMoi: false, at: '2026-10-31T08:06:00.000Z' }] });
     dit(F.lignes[`vc_fil_${CONV}`].n === 3, 'une page qui ne rend que le dernier message n’efface pas les autres (fusion)', String(F.lignes[`vc_fil_${CONV}`].n));
     const avantKO = JSON.stringify(F.lignes[`vc_fil_${CONV}`]);
     // Répondre avant d'avoir appris : rien ne part, le geste est dit.
@@ -202,7 +202,7 @@ const fuite = (o) => { const s = JSON.stringify(o == null ? null : o); return PE
     // Un 429 ⇒ la pause ; pendant la pause, rien ne part.
     const G = faire({ rep: () => ({ ok: true, statut: 429, cles: [] }) });
     await G.page({ action: 'vcMoi', id: MOI });
-    await G.page({ action: 'vcFil', conv: CONV, messages: [{ id: 'M1', t: 'Bonjour', deMoi: false, at: '2026-10-31T08:00:00.000Z' }] });
+    await G.page({ action: 'vcFil', conv: CONV, moi: MOI, messages: [{ id: 'M1', t: 'Bonjour', deMoi: false, at: '2026-10-31T08:00:00.000Z' }] });
     await G.page({ action: 'vcEnvoiAppris', recette });
     const g1 = await G.cmd({ cmd: 'vcRepondre', conv: CONV, texte: 'Bonjour' });
     const g2 = await G.cmd({ cmd: 'vcRepondre', conv: CONV, texte: 'Bonjour' });
@@ -210,14 +210,14 @@ const fuite = (o) => { const s = JSON.stringify(o == null ? null : o); return PE
     // Arrêté avant de partir (pas d'en-têtes dans la page) : la place est RENDUE.
     const K = faire({ rep: () => ({ ok: true, statut: 0, erreur: 'entetes', cles: [] }) });
     await K.page({ action: 'vcMoi', id: MOI });
-    await K.page({ action: 'vcFil', conv: CONV, messages: [{ id: 'M1', t: 'Bonjour', deMoi: false, at: '2026-10-31T08:00:00.000Z' }] });
+    await K.page({ action: 'vcFil', conv: CONV, moi: MOI, messages: [{ id: 'M1', t: 'Bonjour', deMoi: false, at: '2026-10-31T08:00:00.000Z' }] });
     await K.page({ action: 'vcEnvoiAppris', recette });
     const k1 = await K.cmd({ cmd: 'vcRepondre', conv: CONV, texte: 'Bonjour' });
     dit(k1 && k1.accepte === false && k1.code === 'entetes' && /recharge ta messagerie/.test(k1.raison) && ((K.store.vrmActions || {})['vc:' + MOI] || []).length === 0, 'arrêté AVANT de partir (la page n’a pas encore parlé à son serveur) : dit, et la place du plafond est RENDUE', JSON.stringify({ k1, a: K.store.vrmActions }));
     // L'onglet est sur un AUTRE compte que celui de la conversation ⇒ refus.
     const M = faire();
     await M.page({ action: 'vcMoi', id: MOI });
-    await M.page({ action: 'vcFil', conv: CONV, messages: [{ id: 'M1', t: 'Bonjour', deMoi: false, at: '2026-10-31T08:00:00.000Z' }] });
+    await M.page({ action: 'vcFil', conv: CONV, moi: MOI, messages: [{ id: 'M1', t: 'Bonjour', deMoi: false, at: '2026-10-31T08:00:00.000Z' }] });
     await M.page({ action: 'vcEnvoiAppris', recette });
     await M.page({ action: 'vcMoi', id: 'U5555' });
     const m1 = await M.cmd({ cmd: 'vcRepondre', conv: CONV, texte: 'Bonjour' });

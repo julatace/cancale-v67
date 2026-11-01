@@ -10,6 +10,14 @@
   // 5.295 : les envois en attente de leur réponse (jeton → réponse au fond).
   const envoisEnAttente = new Map();
   const vivant = () => { try { return !!(chrome && chrome.runtime && chrome.runtime.id); } catch (_) { return false; } };
+  // 5.299 : ce qui accompagne chaque liste — le compte que la PAGE a lu sur
+  // `/users/me` (le fond ne le prend que s'il est d'accord avec l'onglet), les
+  // identifiants d'une liste lue EN ENTIER sur plusieurs pages, et la forme
+  // d'une réponse qu'on n'a pas su lire (noms de clés et types, jamais une valeur).
+  const moiDe = (d) => (/^[\w-]{1,40}$/.test(String((d && d.moi) || '')) ? String(d.moi) : '');
+  const completDe = (d) => (Array.isArray(d && d.complet) ? d.complet.slice(0, 2000).map((x) => String(x).slice(0, 40)).filter((x) => /^[\w-]{1,40}$/.test(x)) : null);
+  const inconnuDe = (d) => (Array.isArray(d && d.inconnu) ? d.inconnu.slice(0, 60).map((c) => String(c).slice(0, 120)) : null);
+  const suite = (d) => ({ moi: moiDe(d), complet: completDe(d), inconnu: inconnuDe(d) });
   window.addEventListener('message', (event) => {
     try {
       if (event.source !== window) return;
@@ -30,7 +38,7 @@
           photo: /^https:\/\/([\w-]+\.)*vestiairecollective\.com\//i.test(String((x && x.photo) || '')) ? String(x.photo).slice(0, 400) : '',
           prix: x && x.prix && isFinite(Number(x.prix.valeur)) ? { valeur: Number(x.prix.valeur), devise: String(x.prix.devise || '').slice(0, 3), cle: String(x.prix.cle || '').slice(0, 60) } : null,
           statut: String((x && x.statut) || '').slice(0, 40) }));
-        chrome.runtime.sendMessage({ from: 'cancale-vc', action: 'vcAnnonces', items, offset: Number(d.offset) || 0, total: typeof d.total === 'number' ? d.total : null, lus: Number(d.lus) || 0, forme: (Array.isArray(d.forme) ? d.forme : []).slice(0, 120).map((c) => String(c).slice(0, 120)) }, () => { void chrome.runtime.lastError; });
+        chrome.runtime.sendMessage(Object.assign({ from: 'cancale-vc', action: 'vcAnnonces', items, offset: Number(d.offset) || 0, total: typeof d.total === 'number' ? d.total : null, lus: Number(d.lus) || 0, forme: (Array.isArray(d.forme) ? d.forme : []).slice(0, 120).map((c) => String(c).slice(0, 120)) }, suite(d)), () => { void chrome.runtime.lastError; });
         return;
       }
       if (d.kind === 'vcventes') {
@@ -40,7 +48,7 @@
           montant: x && x.montant && isFinite(Number(x.montant.valeur)) ? { valeur: Number(x.montant.valeur), devise: String(x.montant.devise || '').slice(0, 3), cle: String(x.montant.cle || '').slice(0, 60) } : null,
           limite: String((x && x.limite) || '').slice(0, 30), etiquette: x && (x.etiquette === true || x.etiquette === false) ? x.etiquette : null,
           suivi: String((x && x.suivi) || '').slice(0, 40), transporteur: String((x && x.transporteur) || '').slice(0, 30) }));
-        chrome.runtime.sendMessage({ from: 'cancale-vc', action: 'vcVentes', source: d.source === 'a-expedier' ? 'a-expedier' : 'ventes', ventes, offset: Number(d.offset) || 0, total: typeof d.total === 'number' ? d.total : null, lus: Number(d.lus) || 0, forme: (Array.isArray(d.forme) ? d.forme : []).slice(0, 120).map((c) => String(c).slice(0, 120)) }, () => { void chrome.runtime.lastError; });
+        chrome.runtime.sendMessage(Object.assign({ from: 'cancale-vc', action: 'vcVentes', source: d.source === 'a-expedier' ? 'a-expedier' : 'ventes', ventes, offset: Number(d.offset) || 0, total: typeof d.total === 'number' ? d.total : null, lus: Number(d.lus) || 0, forme: (Array.isArray(d.forme) ? d.forme : []).slice(0, 120).map((c) => String(c).slice(0, 120)) }, suite(d)), () => { void chrome.runtime.lastError; });
         return;
       }
       // 5.238 : tes messages Vestiaire — le NOMBRE de non-lus, et des conversations
@@ -48,7 +56,7 @@
       if (d.kind === 'vccompteur') {
         const n = Number(d.messages);
         if (!isFinite(n) || n < 0) return;
-        chrome.runtime.sendMessage({ from: 'cancale-vc', action: 'vcCompteur', messages: Math.floor(n) }, () => { void chrome.runtime.lastError; });
+        chrome.runtime.sendMessage({ from: 'cancale-vc', action: 'vcCompteur', messages: Math.floor(n), moi: moiDe(d) }, () => { void chrome.runtime.lastError; });
         return;
       }
       if (d.kind === 'vcmessages') {
@@ -57,7 +65,7 @@
           nonLu: x && (x.nonLu === true || x.nonLu === false) ? x.nonLu : null, date: String((x && x.date) || '').slice(0, 30),
           // 5.295 : l'aperçu du dernier message (texte borné, jamais un nom).
           apercu: String((x && x.apercu) || '').slice(0, 160), apercuDeMoi: x && (x.apercuDeMoi === true || x.apercuDeMoi === false) ? x.apercuDeMoi : null }));
-        chrome.runtime.sendMessage({ from: 'cancale-vc', action: 'vcMessages', moi: /^[\w-]{1,40}$/.test(String(d.moi || '')) ? String(d.moi) : '', conversations, offset: Number(d.offset) || 0, total: typeof d.total === 'number' ? d.total : null, lus: Number(d.lus) || 0, page: String(d.page || '').slice(0, 160), forme: (Array.isArray(d.forme) ? d.forme : []).slice(0, 120).map((c) => String(c).slice(0, 120)) }, () => { void chrome.runtime.lastError; });
+        chrome.runtime.sendMessage(Object.assign({ from: 'cancale-vc', action: 'vcMessages', conversations, offset: Number(d.offset) || 0, total: typeof d.total === 'number' ? d.total : null, lus: Number(d.lus) || 0, page: String(d.page || '').slice(0, 160), forme: (Array.isArray(d.forme) ? d.forme : []).slice(0, 120).map((c) => String(c).slice(0, 120)) }, suite(d)), () => { void chrome.runtime.lastError; });
         return;
       }
       // 5.295 : le compte Vestiaire ouvert dans CET onglet (son identifiant seul).
@@ -98,7 +106,7 @@
           etat: String((x && x.etat) || '').slice(0, 40), date: String((x && x.date) || '').slice(0, 30),
           montant: x && x.montant && isFinite(Number(x.montant.valeur)) ? { valeur: Number(x.montant.valeur), devise: String(x.montant.devise || '').slice(0, 3), cle: String(x.montant.cle || '').slice(0, 60) } : null,
           suivi: String((x && x.suivi) || '').slice(0, 40), transporteur: String((x && x.transporteur) || '').slice(0, 30) }));
-        chrome.runtime.sendMessage({ from: 'cancale-vc', action: 'vcAchats', achats, offset: Number(d.offset) || 0, total: typeof d.total === 'number' ? d.total : null, lus: Number(d.lus) || 0, page: String(d.page || '').slice(0, 160), forme: (Array.isArray(d.forme) ? d.forme : []).slice(0, 120).map((c) => String(c).slice(0, 120)) }, () => { void chrome.runtime.lastError; });
+        chrome.runtime.sendMessage(Object.assign({ from: 'cancale-vc', action: 'vcAchats', achats, offset: Number(d.offset) || 0, total: typeof d.total === 'number' ? d.total : null, lus: Number(d.lus) || 0, page: String(d.page || '').slice(0, 160), forme: (Array.isArray(d.forme) ? d.forme : []).slice(0, 120).map((c) => String(c).slice(0, 120)) }, suite(d)), () => { void chrome.runtime.lastError; });
         return;
       }
       // 5.243 : le catalogue du dépôt (libellés publics du site, jamais une personne).
@@ -139,7 +147,8 @@
       const jeton = (self.crypto && crypto.randomUUID) ? crypto.randomUUID() : (Date.now().toString(36) + Math.random().toString(36).slice(2, 12));
       const t = setTimeout(() => { if (envoisEnAttente.delete(jeton)) sendResponse({ ok: false, code: 'muet' }); }, 20000);
       envoisEnAttente.set(jeton, (r) => { clearTimeout(t); sendResponse(r); });
-      window.postMessage({ __tag: 'CANCALE_VC_ORDRE', kind: 'repondre', jeton, conv, texte, recette: msg.recette }, '*');
+      // 5.299 : le compte au nom duquel le fond veut parler — la page refuse si ce n'est pas le sien.
+      window.postMessage(Object.assign({ __tag: 'CANCALE_VC_ORDRE', kind: 'repondre', jeton, conv, texte, recette: msg.recette }, /^[\w-]{1,40}$/.test(String(msg.compte || '')) ? { compte: String(msg.compte) } : {}), '*');
       return true;
     });
   } catch (_) {}

@@ -160,7 +160,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.297.0';
+const EXT_ATTENDUE = '5.299.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -25597,12 +25597,31 @@ const VC_ANNONCE_ETATS = [
   ['attente', /pending|review|moderat|waiting|attente|submitted|soumis|draft|brouillon|incomplet|to.?validate|validation/i, 'En attente de validation'],
   ['en-ligne', /on.?sale|online|en.?ligne|published|publi[ée]|active|live|en.?vente|for.?sale|selling|approved|valid/i, 'En ligne'],
 ];
-function etatAnnonceVc(it, vendueParVente) {
+function etatAnnonceVc(it, vendueParVente, capturedAt) {
   if (vendueParVente) return { etat: 'vendue', label: 'Vendue', brut: (it && it.statut) || '' };
   const brut = String((it && it.statut) || '').trim();
+  // (1er nov., 5.299) UNE ANNONCE QUI N'EST PLUS DANS LES LECTURES n'est pas
+  // « en ligne ». Une liste en plusieurs pages n'était jamais lue en entier :
+  // une annonce vendue ou supprimée gardait son dernier mot (« on_sale ») et
+  // passait pour en ligne sous une lecture fraîche. Plus vue depuis plus de 24 h
+  // alors que la liste a été relue ⇒ « à confirmer » (rien n'est retiré).
+  const vu = Date.parse((it && it.vuAt) || ''), lu = Date.parse(capturedAt || '');
+  if (isFinite(vu) && isFinite(lu) && lu - vu > 24 * 3600e3 && !(brut && VC_ANNONCE_ETATS.slice(0, 2).some(([, re]) => re.test(brut)))) {
+    return { etat: 'a-confirmer', label: `Plus vue sur Vestiaire depuis ${ageCourtVc(it.vuAt).replace(/^il y a /, '')} — à confirmer`, brut };
+  }
   if (!brut) return { etat: 'pas-dit', label: 'État non dit par Vestiaire', brut: '' };
   const f = VC_ANNONCE_ETATS.find(([, re]) => re.test(brut));
   return f ? { etat: f[0], label: f[2], brut } : { etat: 'autre', label: `Vestiaire : « ${brut} »`, brut };
+}
+// (1er nov., 5.299) LES NON-LUS VESTIAIRE, COMPTE PAR COMPTE. Le compteur que la
+// page relit est celui du compte OUVERT : l'extension 5.299 le range par compte
+// (`vc_messages.compteurs`). On additionne ce qu'on sait de chacun, avec la date
+// du relevé le plus ancien ; avant la 5.299, le seul dernier relevé.
+function nonLusVestiaire(compteur, compteurs) {
+  const par = compteurs && typeof compteurs === 'object' ? Object.values(compteurs).filter((c) => c && typeof c.messages === 'number' && isFinite(c.messages) && c.messages >= 0) : [];
+  if (par.length) return { n: par.reduce((t, c) => t + c.messages, 0), comptes: par.length, at: par.map((c) => String(c.at || '')).filter(Boolean).sort()[0] || '' };
+  if (compteur && typeof compteur.messages === 'number' && isFinite(compteur.messages)) return { n: compteur.messages, comptes: 1, at: compteur.at || '' };
+  return null;
 }
 const ageCourtVc = (iso) => { const t = Date.parse(iso || ''); if (!isFinite(t)) return ''; const h = Math.max(0, Math.round((Date.now() - t) / 3600000)); return h < 1 ? "il y a moins d'une heure" : h < 24 ? `il y a ${h} h` : `il y a ${Math.round(h / 24)} j`; };
 function PhotoVc({ src }) {
@@ -25622,12 +25641,27 @@ function PhotoVc({ src }) {
 // Une lecture de plus de 24 h ⇒ « à confirmer » (rien n'est retiré).
 // Avant la 5.296, l'extension ne rangeait ni photo, ni titre, ni prix : la fiche
 // le dit (« mise à jour ») au lieu d'afficher des fiches vides muettes.
+// (1er nov., 5.299 — retour de Julien : l'extension dit « Envoyées à VRM » et
+// « rien n'apparaît dans VRM ») : l'extension écrit sous le compte VRM où ELLE
+// est connectée. Connectée à un autre compte (ou à aucun), ce qu'elle lit sur
+// Vestiaire n'arrive jamais sur cet écran — et l'écran disait seulement « pas
+// encore lu ». On le dit EN TÊTE de chaque écran Vestiaire, avec le geste (le
+// même texte que partout ailleurs, `raisonExtGlobale`, §11).
+function ExtVestiaireCompte() {
+  const sansSouris = useSansSouris();
+  useExtVivante();
+  const g = raisonExtGlobale(sansSouris, { cap: 'vestiaire', role: 'lit Vestiaire' });
+  if (!g || !['autre-vrm', 'vrm', 'vrm-passu'].includes(g.code)) return null;
+  return <div data-vc-ext={g.code} role="status" style={{ fontSize: 12.5, lineHeight: 1.55, color: C.warn, border: `1px solid ${C.border}`, borderRadius: 10, padding: '10px 12px', background: C.card }}>
+    <b>Ce que l'extension lit sur Vestiaire n'arrive pas ici.</b> {g.texte}
+  </div>;
+}
 function AnnoncesVestiaire() {
   const [d, setD] = useState(undefined);   // undefined en cours · null pas su · objet
   const vcOuvert = useCompteVcOuvert();
   const relire = React.useCallback(async () => {
     const [rl, rv] = await Promise.all([
-      lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vc_listings&select=items:data->items,liens:data->liens,capturedAt:data->>capturedAt,complet:data->complet,total:data->total`),
+      lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vc_listings&select=items:data->items,liens:data->liens,capturedAt:data->>capturedAt,complet:data->complet,total:data->total,inconnu:data->formeInconnue`),
       lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vc_ventes&select=ventes:data->ventes`),
     ]);
     if (!Array.isArray(rl)) { setD(null); return; }
@@ -25635,7 +25669,7 @@ function AnnoncesVestiaire() {
     // Les ventes ne servent qu'à PROUVER « vendue » ; illisibles ⇒ on n'en tire rien.
     const vendus = new Set();
     if (Array.isArray(rv) && rv[0] && rv[0].ventes && typeof rv[0].ventes === 'object') for (const v of Object.values(rv[0].ventes)) if (v && v.productId) vendus.add(String(v.productId));
-    setD({ items: r.items && typeof r.items === 'object' ? r.items : null, liens: (r.liens && typeof r.liens === 'object') ? r.liens : {}, capturedAt: r.capturedAt || '', complet: r.complet === true, total: typeof r.total === 'number' ? r.total : null, vendus, ventesKO: !Array.isArray(rv) });
+    setD({ items: r.items && typeof r.items === 'object' ? r.items : null, liens: (r.liens && typeof r.liens === 'object') ? r.liens : {}, capturedAt: r.capturedAt || '', complet: r.complet === true, total: typeof r.total === 'number' ? r.total : null, vendus, ventesKO: !Array.isArray(rv), inconnu: Array.isArray(r.inconnu) && r.inconnu.length > 0 });
   }, []);
   useEffect(() => { relire(); }, [relire]);
   useEffect(() => {
@@ -25647,13 +25681,15 @@ function AnnoncesVestiaire() {
   let corps;
   if (d === undefined) corps = <div data-vc-annonces="charge" style={style}>Lecture de tes annonces Vestiaire…</div>;
   else if (d === null) corps = <div data-vc-annonces="pas-su" style={style}>Je n'ai pas pu lire tes annonces Vestiaire — rien n'est perdu, c'est la lecture qui a échoué. <button type="button" className="vrm-lien-action" data-vc-annonces-relire="" onClick={() => { setD(undefined); relire(); }} style={{ background: 'none', border: 'none', color: C.accent, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', minHeight: 44, padding: 0 }}>Réessayer</button></div>;
+  // (5.299) Vestiaire a répondu, mais dans une forme que l'extension ne sait pas encore lire : on le DIT (jamais « aucune annonce »).
+  else if (d.inconnu && !(d.items && Object.keys(d.items).length)) corps = <div data-vc-annonces="format" style={style}>Vestiaire a bien répondu quand tu as ouvert tes articles, mais dans une forme que VRM ne sait pas encore lire : <b style={{ color: C.text }}>aucune annonce n'est devinée</b>. La forme de la réponse est gardée (sans aucune valeur) pour que la prochaine mise à jour de l'extension la lise.</div>;
   else if (!d.items || !d.capturedAt) corps = <div data-vc-annonces="jamais" style={style}>Tes annonces Vestiaire n'ont pas encore été lues : {geste}{extSait('vcfiche') === 'retard' ? <> — mise à jour en <b>{EXT_CAPACITES.vcfiche}</b> d'abord</> : ''}. Elle les lit en passant, sans rien cliquer.</div>;
   else {
     const liste = Object.entries(d.items).filter(([, it]) => it && typeof it === 'object').map(([id, it]) => {
       const num = cleNum(d.liens[id] || it.ref || '');
-      return { id, it, num, ...etatAnnonceVc(it, d.vendus.has(String(id))) };
+      return { id, it, num, ...etatAnnonceVc(it, d.vendus.has(String(id)), d.capturedAt) };
     });
-    const ordre = { 'en-ligne': 0, attente: 1, autre: 2, 'pas-dit': 3, vendue: 4, retiree: 5 };
+    const ordre = { 'en-ligne': 0, attente: 1, autre: 2, 'pas-dit': 3, 'a-confirmer': 4, vendue: 5, retiree: 6 };
     liste.sort((a, z) => (ordre[a.etat] - ordre[z.etat]) || (z.num ? 1 : 0) - (a.num ? 1 : 0) || String(a.num || '').localeCompare(String(z.num || ''), 'fr', { numeric: true }));
     const age = Date.now() - Date.parse(d.capturedAt);
     const vieille = !(age <= 24 * 3600e3);
@@ -26024,10 +26060,10 @@ function VentesVestiaire({ comptes }) {
 async function lireVestiaireColis() {
   try {
     // (1er nov.) Relue une fois sur un échec passager (`lireBaseRelue`).
-    const j = await lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=in.(vc_ventes,vc_messages,vc_achats,vc_listings)&select=id,ventes:data->ventes,compteur:data->compteur,achats:data->achats,liens:data->liens`);
+    const j = await lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=in.(vc_ventes,vc_messages,vc_achats,vc_listings)&select=id,ventes:data->ventes,compteur:data->compteur,compteurs:data->compteurs,achats:data->achats,liens:data->liens`);
     if (!Array.isArray(j)) return null;
     const par = Object.fromEntries(j.map((x) => [x.id, x]));
-    return { ventes: (par.vc_ventes && par.vc_ventes.ventes) || null, compteur: (par.vc_messages && par.vc_messages.compteur) || null,
+    return { ventes: (par.vc_ventes && par.vc_ventes.ventes) || null, compteur: (par.vc_messages && par.vc_messages.compteur) || null, compteurs: (par.vc_messages && par.vc_messages.compteurs) || null,
       achats: (par.vc_achats && par.vc_achats.achats) || null, liens: (par.vc_listings && par.vc_listings.liens) || {} };
   } catch (_) { return null; }
 }
@@ -26042,7 +26078,8 @@ function colisVestiaire(d) {
   const enRoute = d.achats ? Object.entries(d.achats).filter(([, v]) => v && v.suivi && !VC_ACHAT_FINI.test(String(v.etat || ''))).map(([id, v]) => ({
     id, nom: v.nom || '', suivi: v.suivi, transporteur: v.transporteur || '', etat: v.etat || '', date: v.date || '',
   })) : null;
-  const messages = d.compteur && typeof d.compteur.messages === 'number' ? d.compteur.messages : null;
+  const nl = nonLusVestiaire(d.compteur, d.compteurs);
+  const messages = nl ? nl.n : null;
   return { aEnvoyer, enRoute, messages };
 }
 function joursAvantVc(iso) { const t = Date.parse(iso || ''); if (!isFinite(t)) return null; const a = new Date(); a.setHours(0,0,0,0); const b = new Date(t); b.setHours(0,0,0,0); return Math.round((b - a) / 86400000); }
@@ -26202,7 +26239,7 @@ function MessagesVestiaire() {
     try {
       // (1er nov.) Relues une fois sur un échec passager (`lireBaseRelue`).
       const [jm, jl, jf, je] = await Promise.all([
-        lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vc_messages&select=compteur:data->compteur,conversations:data->conversations,lecture:data->lecture`),
+        lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vc_messages&select=compteur:data->compteur,compteurs:data->compteurs,conversations:data->conversations,lecture:data->lecture`),
         lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vc_listings&select=liens:data->liens,items:data->items`),
         // 5.295 : les fils lus, en SCALAIRES (§4.4 : jamais le texte de tous les fils d'un coup).
         lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=like.vc_fil_*&select=id,n:meta->>n,da:meta->>dernierAt,ap:meta->>apercu,dm:meta->>dernierDeMoi,pid:meta->>productId,ref:meta->>ref`),
@@ -26212,7 +26249,7 @@ function MessagesVestiaire() {
       const r = (jm && jm[0]) || {};
       const fils = {};
       for (const x of (Array.isArray(jf) ? jf : [])) { const id = String(x.id || '').replace(/^vc_fil_/, ''); if (id) fils[id] = x; }
-      setD({ compteur: r.compteur || null, conversations: r.conversations || null, lecture: r.lecture || null, liens: (jl && jl[0] && jl[0].liens) || {}, items: (jl && jl[0] && jl[0].items) || {},
+      setD({ compteur: r.compteur || null, compteurs: r.compteurs || null, conversations: r.conversations || null, lecture: r.lecture || null, liens: (jl && jl[0] && jl[0].liens) || {}, items: (jl && jl[0] && jl[0].items) || {},
         fils: Array.isArray(jf) ? fils : null, envoi: Array.isArray(je) ? (je[0] ? { appris: je[0].appris === true, raison: je[0].raison || '', at: je[0].at || '' } : { appris: false, raison: '' }) : null });
     } catch (_) { setD(null); }
   }, []);
@@ -26231,7 +26268,8 @@ function MessagesVestiaire() {
   else if (d === null) corps = <div data-vc-messages="pas-su" style={style}>Je n'ai pas pu lire tes messages Vestiaire — rien n'est perdu, réessaie dans un moment.</div>;
   else if (!d.compteur && !d.conversations && !(d.fils && Object.keys(d.fils).length)) corps = <div data-vc-messages="jamais" style={style}>Pas encore relevés. Ouvre Vestiaire dans le Chrome où l'extension VRM est installée{extSait('vcmessages') === 'retard' ? <> — mise à jour en <b>{EXT_CAPACITES.vcmessages}</b> d'abord</> : ''} : elle relève le nombre de messages non lus en passant, et tes conversations quand tu ouvres ta messagerie.</div>;
   else {
-    const n = d.compteur && typeof d.compteur.messages === 'number' ? d.compteur.messages : null;
+    const nl = nonLusVestiaire(d.compteur, d.compteurs);
+    const n = nl ? nl.n : null;
     const ids = new Set([...Object.keys(d.conversations || {}), ...Object.keys(d.fils || {})]);
     const liste = [...ids].map((id) => {
       const v = (d.conversations || {})[id] || {}; const f = (d.fils || {})[id] || null;
@@ -26247,7 +26285,7 @@ function MessagesVestiaire() {
       <div data-vc-messages="lu" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         <div data-vc-messages-nonlus={n == null ? 'passu' : String(n)} style={style}>
           {n == null ? <>Nombre de non-lus pas encore relevé.</>
-            : <><b style={{ color: C.text }}>{n === 0 ? 'Aucun message non lu' : `${n} message${n > 1 ? 's' : ''} non lu${n > 1 ? 's' : ''}`}</b> sur Vestiaire, au dernier relevé ({age(d.compteur.at)}).</>}
+            : <><b style={{ color: C.text }}>{n === 0 ? 'Aucun message non lu' : `${n} message${n > 1 ? 's' : ''} non lu${n > 1 ? 's' : ''}`}</b>{nl.comptes > 1 ? <span data-vc-messages-comptes={nl.comptes}> sur tes {nl.comptes} comptes Vestiaire, au dernier relevé de chacun (le plus ancien {age(nl.at)})</span> : <> sur Vestiaire, au dernier relevé ({age(nl.at)})</>}.</>}
           {' '}<a data-vc-messages-ouvrir="" href={lien} target="_blank" rel="noreferrer" className="vrm-lien-action" style={{ color: C.accent, fontWeight: 600, display: 'inline-flex', alignItems: 'center', minHeight: 44 }}>{page ? 'Ouvrir ta messagerie Vestiaire ↗' : 'Ouvrir Vestiaire ↗'}</a>
           {!page ? <> (la messagerie est dans le menu de ton compte)</> : null}
         </div>
@@ -61101,7 +61139,15 @@ function AppCoeur() {
     // eBay : un compte relié au registre, ou des lignes du compte principal
     // d'avant le registre (le compte « implicite » seul ne prouve rien).
     if(!Array.isArray(comptesEbay) || !sitesLus || comptesEbay.some(c=>!c.implicite) || sitesLus.ebay) s.add('ebay');
-    if(!sitesLus || sitesLus.vestiaire) s.add('vestiaire');
+    // (1er nov., 5.299 — Julien : « même s'il n'y a rien de capté par l'extension,
+    // je veux qu'il y ait les onglets etc. comme avec Vinted, Leboncoin ») :
+    // Vestiaire est TOUJOURS là. Avant, il n'apparaissait que si `vc_listings`
+    // ou `vc_ventes` existait AU MONTAGE de l'app (lu une seule fois) : une
+    // extension qui venait de ranger ses messages, ou une première lecture faite
+    // app ouverte, laissait Vestiaire absent des filtres et de la colonne —
+    // « rien n'apparaît dans VRM ». Son écran dit lui-même « pas encore lu » et
+    // le geste à faire.
+    s.add('vestiaire');
     return s;
   },[accountsLoaded,vintedAccounts,sitesLus,comptesEbay]);
   // Le badge de Colis : le nombre PUBLIÉ par l'écran qui a toutes les sources
@@ -62371,6 +62417,7 @@ function AppCoeur() {
   // de l'extension).
   const rendreVestiaire=(t)=>(
     <section className="vrm-market-space" aria-label="Vestiaire" data-tache-vestiaire={t} style={{padding:16,display:'flex',flexDirection:'column',gap:18}}>
+      <ExtVestiaireCompte/>
       {baseKO ? <LignePanne>Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui a échoué.</LignePanne>
         : t==='ventes' ? <VentesVestiaire comptes={vintedAccounts}/>
         : t==='annonces' ? <>

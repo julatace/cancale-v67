@@ -301,6 +301,25 @@ const cliquer = async (pg) => { await pg.mouse.click(1512 - 16 - 22, 900 - 16 - 
     await ctx.close();
   });
 
+  // ── 6 bis. VESTIAIRE CAPTÉ : COMBIEN, PAS SEULEMENT « LUES » (1er nov., 5.299) ──
+  // Retour de Julien : « Annonces : lues à l'instant · Envoyées à VRM » et rien
+  // dans VRM. « lues » ne disait pas qu'AUCUNE annonce n'avait été trouvée.
+  console.log('\n── Vestiaire capté : le nombre trouvé, famille par famille');
+  await essaie('vestiaire-nombres', async () => {
+    const t = Date.now() - 30000;
+    const etat = { ok: true, plateforme: 'vestiaire', capte: true, mesure: false, version: '5.299.0', vrm: { ok: true, connecte: true, email: 'sophie@exemple.fr', cloisonne: true }, site: null, flux: { okAt: t }, bascule: null,
+      vcCapte: { annonces: { at: t, n: 0 }, ventes: { at: t, n: 2 }, nonlus: { at: t, n: 3 }, messages: { at: t, n: 0, inconnu: true } } };
+    const { ctx, pg } = await rendre(nav, etat, { url: 'https://fr.vestiairecollective.com/' });
+    await survoler(pg);
+    const l = await lire(pg);
+    dit(/Annonces : aucune dans ce que Vestiaire a rendu/.test(l.carte) && !/Annonces : lues/.test(l.carte), '0 annonce trouvée ⇒ la carte le DIT (plus « lues » tout court)', l.carte.replace(/\n/g, ' · ').slice(0, 400));
+    dit(/Ventes : 2 ventes lues/.test(l.carte), 'le nombre de ventes trouvées est dit', l.carte.replace(/\n/g, ' · ').slice(0, 400));
+    dit(/Messages non lus : 3/.test(l.carte), 'les non-lus sont dits à part des conversations');
+    dit(/Conversations : Vestiaire a répondu dans une forme pas encore lue/.test(l.carte), 'une réponse au format inconnu est dite, jamais « lues »');
+    await pg.screenshot({ path: path.join(SORTIE, 'badge-vestiaire-nombres.png') });
+    await ctx.close();
+  });
+
   // ── 7. UNE AUTRE SESSION VRM A ÉTÉ ADOPTÉE (mesuré le 2 octobre) ─────────
   console.log('\n── Ce Chrome a changé de compte VRM');
   await essaie('bascule', async () => {
