@@ -108,6 +108,8 @@ import { DESCRIPTION_ORGANISATION } from "./operations/description.js";
 import { regrouperRelais, pointsARetirer } from "./relaisColis.js";
 import CarteRelaisColis, { ColonneRetirer } from "./CarteRelais.jsx";
 import { CarteTournee, TourneePleinEcran } from "./Tournee.jsx";
+// (1er nov.) Julien : « enlève Tournée » — la carte n'est plus sur Ma journée.
+const TOURNEE_SUR_JOURNEE = false;
 import { UneLigne } from "./UneLigne.jsx";
 import { GlisserVente, useDeposeDiffere, BarreAnnulerDepose } from "./GlisserDepose.jsx";
 import { beneficeLigneVente, texteBenefice, euros as eurosLigne } from "./beneficeLigne.js";
@@ -47091,7 +47093,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         // « Emballer les colis prêts » n'est pas redite : l'étape Emballer ouvre
         // le même mode. Une PETITE case qu'il a ajoutée lui-même reste : c'est
         // son choix (Modifier → Ajouter).
-        const casesDansTournee = !!(tournee && tournee.utile);
+        // (1er nov., Julien : « enlève Tournée ») La carte Tournée n'est plus montrée sur
+        // Ma journée : les cases « à envoyer / à retirer » et la ligne « Emballer les colis
+        // prêts » reprennent leur place. Le code reste (`TOURNEE_SUR_JOURNEE`) s'il la redemande.
+        const casesDansTournee = TOURNEE_SUR_JOURNEE && !!(tournee && tournee.utile);
         if (casesDansTournee) {
           for (let k = jobs.length - 1; k >= 0; k--) if (jobs[k].id === 'emballer') jobs.splice(k, 1);
           jobs.sort((a,b)=>a.prio-b.prio);
@@ -47475,8 +47480,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             )}
 
             {/* (1er nov.) LA TOURNÉE : Imprimer → Emballer → Déposer → Retirer, en tête. */}
-            {tournee && <CarteTournee tournee={tournee} nArrets={tournee.arrets.length} onEtape={ouvrirEtapeTournee} onOuvrirTournee={()=>setTourneeOuverte(true)}/>}
-            {tournee && tourneeOuverte && <TourneePleinEcran arrets={tournee.arrets} C={C} zIndex={Z_CONFIRMATION} Retour={FermeAuRetour} onFermer={()=>setTourneeOuverte(false)}
+            {TOURNEE_SUR_JOURNEE && tournee && <CarteTournee tournee={tournee} nArrets={tournee.arrets.length} onEtape={ouvrirEtapeTournee} onOuvrirTournee={()=>setTourneeOuverte(true)}/>}
+            {TOURNEE_SUR_JOURNEE && tournee && tourneeOuverte && <TourneePleinEcran arrets={tournee.arrets} C={C} zIndex={Z_CONFIRMATION} Retour={FermeAuRetour} onFermer={()=>setTourneeOuverte(false)}
               onArret={(a)=>{ setTourneeOuverte(false); ouvrirEtapeTournee(a.type === 'depot' ? 'deposer' : 'retirer'); }}/>}
 
             {/* (21 octobre) Les messages eBay n'ont pas pu être lus : dit UNE fois,

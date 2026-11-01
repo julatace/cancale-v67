@@ -168,6 +168,13 @@ const attendreTournee = async (pg) => {
 };
 
 async function main() {
+  // (1er nov., Julien : « enlève Tournée » sur Ma journée) Tant que la carte est
+  // retirée (`TOURNEE_SUR_JOURNEE = false` dans l'app), ce banc le DIT et s'arrête :
+  // les épingles de relais restent vérifiées par retrait-relais-carte et colis-colonnes.
+  if (/const TOURNEE_SUR_JOURNEE = false/.test(fs.readFileSync(path.join(__dirname, '..', '..', 'src', 'App.jsx'), 'utf8'))) {
+    console.log('INFO Tournée retirée de Ma journée (décision du 1er nov.) — rien à vérifier ici tant qu’elle n’est pas remise.');
+    srv.close(); return;
+  }
   let b;
   try {
     b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
