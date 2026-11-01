@@ -273,7 +273,9 @@ export const repartiAffichable = (ms, maintenant = Date.now()) => !Number.isFini
 // Pure ; ne touche jamais la ligne rangée (une COPIE).
 export const DISPO_LEVE_GARDE_MS = 6 * 3600000;
 const dernierEmailMs = (l) => msDe(l.emailAt != null ? l.emailAt : l.ea) ?? msDe(l.receivedAt != null ? l.receivedAt : l.r);
-export const lieuTransp = (t) => (t ? [t.lieuNom, [t.lieuCp, t.lieuVille].filter(Boolean).join(' ')].filter(Boolean).join(', ') : '');
+// (1er nov.) + la RUE quand le transporteur la donne (Vinted Go : « 24 Rue Hoche,
+// Vannes ») ; Chronopost et Mondial Relay n'en donnent pas : inchangés.
+export const lieuTransp = (t) => (t ? [t.lieuNom, t.lieuRue, [t.lieuCp, t.lieuVille].filter(Boolean).join(' ')].filter(Boolean).join(', ') : '');
 export function fusionTransporteur(l, t, maintenant = Date.now()) {
   if (!l || !t || !t.etat) return l;
   const st = l.status != null ? l.status : l.s;

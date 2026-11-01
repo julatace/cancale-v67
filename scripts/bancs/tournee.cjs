@@ -22,6 +22,18 @@
 // Scénario « fait » : les 3 colis marqués déposés aujourd'hui et les deux
 // bordereaux imprimés ⇒ Imprimer, Emballer, Déposer cochés ; Retirer en cours.
 // Scénario « rien » : ni colis à poster ni à retirer ⇒ AUCUNE carte.
+// Scénarios « kusmi* » (1er nov., sa capture « Kusmi Tea · 13 Rue Saint-Vincent ·
+// 4 colis — pas sur la carte : ni code postal ni ville ») : QUATRE e-mails de la
+// consigne Vinted Go, à la forme rangée (« *Consigne Vinted Go*, * Kusmi Tea *,
+// * 13 Rue Saint-Vincent », sans code postal ni ville), et la ligne
+// `transp_vinted_{n°}` de CHAQUE n° FABRIQUÉE PAR LE VRAI CODE du serveur
+// (`lireReponseVintedGo` sur la forme réelle de la réponse Vinted Go mesurée le
+// 1er nov., puis `ligneApresEssai`) :
+//   · « kusmi » : le suivi dit « 13 Rue Saint-Vincent, Vannes, FR » ⇒ le point est
+//     complété PAR LE N° ⇒ UNE épingle « 4 » ;
+//   · « kusmi-sans » : aucun suivi lu ⇒ pas d'épingle, la raison et le geste ;
+//   · « kusmi-deux » : le suivi dit « 24 Rue Hoche, Vannes, FR » ⇒ deux adresses ⇒
+//     pas d'épingle, c'est dit.
 // Jugé sur les attributs `data-tournee-*` (§6.4), jamais sur un libellé.
 const path = require('path');
 let chromium;
@@ -47,6 +59,27 @@ const ACCOUNTS = [{ id: 1, vinted_user_id: '111', login: 'compte_banc', domain: 
 const minuitIso = (() => { const d = new Date(); d.setHours(0, 0, 30, 0); return (d.getTime() > MAINTENANT ? new Date(MAINTENANT) : d).toISOString(); })();
 const OV = { '9101': { numero: '117' }, '9102': { numero: '42' }, '9103': { numero: '73' } };
 
+// Les lignes `transp_vinted_…` des scénarios « kusmi* » : faites par le VRAI code
+// du serveur sur la forme réelle de la réponse (`main` les fabrique avant tout).
+let TRANSP_KUSMI = { kusmi: [], 'kusmi-deux': [] };
+const SUIVIS_KUSMI = ['1790000000000011', '1790000000000012', '1790000000000013', '1790000000000014'];
+async function fabriquerTranspKusmi() {
+  const T = await import('file://' + path.join(__dirname, '..', '..', 'api', '_lib', 'transporteurs.js'));
+  const iso = (ms) => new Date(ms).toISOString();
+  const ev = (id, group, message, ms, metadata = {}) => ({ id, message, timestamp: iso(ms), metadata, banner_message: null, group_header: null, group, state: 'delivery' });
+  const rep = (adresse) => JSON.stringify({ tracking_events: [
+    ev(9000000011, 'ready_for_pickup', 'Le colis est prêt à être retiré en consigne', MAINTENANT - 20 * 3600000, { address: adresse, point_id: 900123 }),
+    ev(9000000010, 'in_transit', 'Le colis est en chemin vers le/la consigne', MAINTENANT - 30 * 3600000),
+    ev(9000000008, 'shipped', 'Le colis a été déposé en point relais', MAINTENANT - 60 * 3600000),
+    ev(9000000007, 'created', "Bordereau d'envoi créé", MAINTENANT - 70 * 3600000),
+  ], meta: { banner: null, expiration_time: iso(MAINTENANT + 3 * 86400000), contextual_faq: [] } });
+  const fab = (adresse) => SUIVIS_KUSMI.map((su) => {
+    const lu = T.lireReponseVintedGo(200, 'application/json', rep(adresse), { suivi: su });
+    return { id: T.cleTransp('vinted', su), data: T.ligneApresEssai(null, lu, { carrier: 'vinted', suivi: su, source: 'serveur', statut: 200, maintenant: MAINTENANT }) };
+  });
+  TRANSP_KUSMI = { kusmi: fab('13 Rue Saint-Vincent, Vannes, FR'), 'kusmi-deux': fab('24 Rue Hoche, Vannes, FR') };
+}
+
 function lignes(sc) {
   const L = [
     { id: 'harvest_111_listings', data: { capturedAt: new Date(MAINTENANT - 60000).toISOString(), payload: { items: [] } } },
@@ -66,6 +99,11 @@ function lignes(sc) {
     L.push(tr('chronopost', '22220001', 'TERRA CBD, 11 RUE HOCHE, 56000 VANNES', 4));
     L.push(tr('mondialrelay', '33330001', 'Phone Cash, 17 Rue Thiers, Vannes', 6));
     L.push(tr('mondialrelay', '44440001', 'LE NARVAL, 2 PLACE DU MARCHE, 56000 VANNES', 6));
+    return L;
+  }
+  if (/^kusmi/.test(sc)) {
+    for (const su of SUIVIS_KUSMI) L.push({ id: `email_track_vinted_${su}`, data: { type: 'suivi', carrier: 'vinted', suivi: su, status: 'available', statusLabel: 'Arrivé au point de retrait', subject: "Ton colis t'attend", receivedAt: ilYa(1), code: 'K' + su.slice(-5), lieu: '*Consigne Vinted Go*, * Kusmi Tea *, * 13 Rue Saint-Vincent', limite: dans(3), consigne: true } });
+    L.push(...(TRANSP_KUSMI[sc] || []));
     return L;
   }
   if (sc !== 'rien') {
@@ -122,7 +160,7 @@ async function preparer(b, vp, sc) {
     if (/api-adresse\.data\.gouv\.fr/.test(u)) {
       const q = decodeURIComponent(u);
       const hn = (lon, lat, pr) => ({ geometry: { coordinates: [lon, lat] }, properties: { type: 'housenumber', ...pr } });
-      const f = /Saint-Vincent/i.test(q) ? [{ geometry: { coordinates: [-2.7581, 47.6582] }, properties: { score: 0.93, type: 'housenumber', postcode: '56000' } }]
+      const f = /Saint-Vincent/i.test(q) ? [{ geometry: { coordinates: [-2.7581, 47.6582] }, properties: { score: 0.93, type: 'housenumber', postcode: '56000', city: 'Vannes', name: '13 Rue Saint-Vincent' } }]
         : /Gambetta/i.test(q) ? [{ geometry: { coordinates: [-1.8516, 48.6763] }, properties: { score: 0.91, type: 'housenumber', postcode: '35260' } }]
         // Vannes (coordonnées inventées, ordre de grandeur réel) :
         : /29 Rue Hoche/i.test(q) ? [hn(-2.7590, 47.6572, { score: 0.95, postcode: '56000', city: 'Vannes', name: '29 Rue Hoche' })]
@@ -177,6 +215,7 @@ async function main() {
   }
   let b;
   try {
+    await fabriquerTranspKusmi();
     b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
     for (const vp of [{ width: 390, height: 844 }, { width: 1512, height: 950 }]) {
       const T = vp.width + 'px';
@@ -331,6 +370,73 @@ async function main() {
         await pg.waitForTimeout(400);
         await pg.screenshot({ path: path.join(SHOTS, `colis-vannes-${vp.width}.png`) });
         dit(!errs.length, `${T} V aucune erreur d'app`, errs[0]);
+        await ctx.close();
+      });
+      // ── K. LA CONSIGNE VINTED GO SANS CODE POSTAL (1er nov., sa capture) ──────
+      // CALCULÉ À LA MAIN : 4 colis à retirer chez Kusmi Tea (4 e-mails, 4 n°).
+      //   kusmi      ⇒ adresse complétée par le suivi (13 Rue Saint-Vincent, Vannes)
+      //                ⇒ une épingle « 4 », sur la carte, dans la tournée ET dans Colis ;
+      //   kusmi-sans ⇒ aucune épingle, raison `vintedgo-pas-lu` + le geste dit ;
+      //   kusmi-deux ⇒ aucune épingle, raison `deux-adresses` (24 Rue Hoche nommée).
+      // (L’achat 9401, commun à tous les scénarios, reste sous « Point pas encore connu ».)
+      for (const sc of ['kusmi', 'kusmi-sans', 'kusmi-deux']) await essaie(`${T} K ${sc}`, async () => {
+        const { ctx, pg, errs } = await preparer(b, vp, sc);
+        await pg.goto(`http://localhost:${PORT}/?tab=journee`, { waitUntil: 'domcontentloaded' });
+        await attendreTournee(pg);
+        const ret = await pg.evaluate(() => { const e = document.querySelector('[data-tournee-etape="retirer"]'); let pub = null; try { pub = JSON.parse(localStorage.getItem('vrm_colis_retirer') || 'null'); } catch (_) {} return { n: e && e.getAttribute('data-n'), pub: pub && pub.total }; });
+        dit(ret.n === '4' && String(ret.pub) === '4', `${T} K ${sc} Retirer : 4 colis chez Kusmi Tea = vrm_colis_retirer`, JSON.stringify(ret));
+        await pg.locator('[data-tournee-ouvrir]:visible').first().click();
+        await pg.locator('[data-tournee-plein]').waitFor({ timeout: 8000 });
+        await pg.waitForFunction(() => !document.querySelector('[data-tournee-plein] [data-raison="cherche"]') && (document.querySelectorAll('[data-tournee-plein] [data-relais-epingle]').length > 0 || document.querySelectorAll('[data-tournee-plein] [data-tournee-hors-carte]').length > 0), null, { timeout: 15000 }).catch(() => {});
+        await pg.waitForTimeout(1200);
+        const L = await pg.evaluate(() => ({
+          ep: [...document.querySelectorAll('[data-tournee-plein] [data-relais-epingle]')].map((e) => [e.getAttribute('data-relais-epingle'), e.textContent]).sort(),
+          arr: [...document.querySelectorAll('[data-tournee-arret][data-type="retrait"]')].map((e) => { const h = e.querySelector('[data-tournee-hors-carte]'); return { cle: e.getAttribute('data-tournee-arret'), n: e.getAttribute('data-n'), carte: e.getAttribute('data-tournee-sur-carte'), raison: h ? h.getAttribute('data-raison') : null, txt: h ? h.textContent : '' }; }),
+        }));
+        const k = L.arr.find((x) => /kusmi/.test(x.cle));
+        if (sc === 'kusmi') {
+          dit(JSON.stringify(L.ep) === JSON.stringify([['kusmitea|', '4']]), `${T} K kusmi : l'adresse lue dans le suivi Vinted Go DU MÊME N° ⇒ UNE épingle « 4 »`, JSON.stringify(L.ep));
+          dit(!!k && k.carte === 'oui' && !k.raison && k.n === '4', `${T} K kusmi : l'arrêt Kusmi Tea est sur la carte, plus de « pas sur la carte »`, JSON.stringify(k));
+        } else {
+          const code = sc === 'kusmi-sans' ? 'vintedgo-pas-lu' : 'deux-adresses';
+          const motif = sc === 'kusmi-sans' ? /ouvre le suivi Vinted Go/ : /deux adresses[\s\S]*24 Rue Hoche/;
+          dit(L.ep.length === 0, `${T} K ${sc} : AUCUNE épingle (rien n'est deviné)`, JSON.stringify(L.ep));
+          dit(!!k && k.carte === 'non' && k.raison === code && motif.test(k.txt), `${T} K ${sc} : « pas sur la carte », raison « ${code} » dite sous l'arrêt`, JSON.stringify(k));
+        }
+        await pg.screenshot({ path: path.join(SHOTS, `tournee-${sc}-${vp.width}.png`) });
+        await pg.click('[data-tournee-fermer]');
+        await pg.waitForTimeout(300);
+        await pg.evaluate(() => { const t = document.querySelector('[data-tournee]'); if (t) t.scrollIntoView({ block: 'center' }); });
+        await pg.click('[data-tournee-etape="retirer"] button');
+        await pg.locator('[data-cc-colonne="retirer"] [data-relais-point]').first().waitFor({ timeout: 25000 });
+        await pg.waitForFunction(() => !document.querySelector('[data-cc-colonne="retirer"] [data-relais-repere="cherche"]'), null, { timeout: 15000 }).catch(() => {});
+        await pg.waitForTimeout(1500);
+        const K = await pg.evaluate(() => ({
+          ep: [...document.querySelectorAll('[data-cc-colonne="retirer"] [data-relais-epingle]')].map((e) => [e.getAttribute('data-relais-epingle'), e.textContent]).sort(),
+          pts: [...document.querySelectorAll('[data-cc-colonne="retirer"] [data-relais-point]')].map((e) => ({ cle: e.getAttribute('data-relais-point'), past: (e.querySelector('[data-relais-pastille]') || {}).textContent || null, rp: e.getAttribute('data-relais-repere'), raison: (e.querySelector('[data-relais-sans-repere]') || { getAttribute: () => null }).getAttribute('data-raison'), txt: (e.querySelector('[data-relais-sans-repere]') || {}).textContent || '' })),
+        }));
+        dit(JSON.stringify(K.ep) === JSON.stringify(L.ep), `${T} K ${sc} Colis → À retirer : les mêmes épingles que la tournée`, JSON.stringify(K.ep));
+        // (1er nov., sa capture de la colonne) La phrase du point porte le NOMBRE en
+        // clair (« 4 colis à retirer »), le même que sa pastille ; sans photo, jamais
+        // un carré gris vide : une icône de colis (`data-sans-photo`).
+        const R = await pg.evaluate(() => {
+          const p = [...document.querySelectorAll('[data-cc-colonne="retirer"] [data-relais-point]')].find((e) => /kusmi/.test(e.getAttribute('data-relais-point')));
+          if (!p) return null;
+          const res = p.querySelector('.vrm-rp-resume'); const vis = (e) => { const st = getComputedStyle(e); const r = e.getBoundingClientRect(); return st.visibility !== 'hidden' && r.width > 2 && r.height > 2; };
+          const cartes = [...p.querySelectorAll('[data-cc-carte]')];
+          return { resume: res ? res.innerText : '', past: (p.querySelector('[data-relais-pastille]') || {}).textContent || '', sorte: (p.querySelector('[data-relais-pastille]') || { getAttribute: () => '' }).getAttribute('data-relais-pastille-sorte'),
+            cartes: cartes.length, vides: cartes.filter((c) => { const v = c.querySelector('.vrm-cc-photo-vide'); return v && vis(v); }).length,
+            icones: cartes.filter((c) => { const i = c.querySelector('[data-sans-photo] svg'); return i && vis(i); }).length };
+        });
+        dit(!!R && /^4 colis à retirer\b/.test(R.resume) && R.past === '4' && R.sorte === 'aretirer', `${T} K ${sc} Colis : la phrase dit « 4 colis à retirer » en clair, la pastille dit le même nombre (sorte « à retirer »)`, JSON.stringify(R));
+        dit(!!R && R.cartes === 4 && R.vides === 0 && R.icones === 4, `${T} K ${sc} Colis : 4 colis sans photo ⇒ 4 icônes de colis, aucun carré gris vide`, JSON.stringify(R));
+        const kp = K.pts.find((x) => /kusmi/.test(x.cle));
+        if (sc === 'kusmi') dit(K.pts.filter((x) => x.cle !== "__inconnu").length === 1 && !!kp && kp.rp !== 'non' && kp.past === '4' && !kp.raison, `${T} K kusmi Colis : UN point Kusmi Tea, pastille « 4 », sur la carte`, JSON.stringify(K.pts));
+        else dit(K.pts.filter((x) => x.cle !== "__inconnu").length === 1 && !!kp && kp.raison === (sc === 'kusmi-sans' ? 'vintedgo-pas-lu' : 'deux-adresses') && kp.txt.length > 30, `${T} K ${sc} Colis : la même raison dite sous le point`, JSON.stringify(K.pts));
+        await pg.evaluate(() => { const c = document.querySelector('[data-cc-colonne="retirer"]'); if (c) c.scrollIntoView({ block: 'start' }); });
+        await pg.waitForTimeout(400);
+        await pg.screenshot({ path: path.join(SHOTS, `colis-${sc}-${vp.width}.png`) });
+        dit(!errs.length, `${T} K ${sc} aucune erreur d'app`, errs[0]);
         await ctx.close();
       });
       // ── E. RIEN À FAIRE ⇒ PAS DE CARTE ──────────────────────────────────────
