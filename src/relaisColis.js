@@ -39,7 +39,10 @@ export const cpDe = (s) => { const m = /\b(\d{5})\b/.exec(String(s || '')); retu
 //     quand l'e-mail ne donne que « 40 RUE DU PORT 35260 CANCALE » (« Cancale »).
 // Le nom propre est rendu, ou '' : un point sans nom reste un point (son
 // adresse le désigne), jamais un nom inventé.
-const TYPE_EN_TETE = /^(?:(?:votre|ton|le|la|au|en|dans)\s+)?(?:point\s+relais|point\s+de\s+retrait|relais\s+pick-?up|consigne(?:\s+vinted\s*go|\s+pick-?up|\s+automatique)?|locker(?:\s*24\s*\/?\s*7)?|casier)\b\s*[:\-–]?\s*/i;
+const TYPE_EN_TETE = /^(?:(?:votre|ton|le|la|au|en|dans)\s+)?(?:point\s+relais|point\s+de\s+retrait|relais\s+pick-?up|consigne(?:\s+vinted\s*go|\s+pick-?up|\s+automatique)?|locker(?:\s*24\s*\/?\s*7)?(?:\s+vinted\s*go)?|casier|vinted\s*go|mondial\s+relay|relais\s+colis|chronopost(?:\s+pick-?up)?)\b\s*[:,\-–]?\s*/i;
+// (1er nov., « plus fiable ») Le TYPE peut aussi venir EN QUEUE : « Kusmi Tea -
+// Consigne Vinted Go », « TABAVAP (Point Relais) ». Il est retiré de la même façon.
+const TYPE_EN_QUEUE = /\s*(?:[,\-–(]\s*)(?:point\s+relais|point\s+de\s+retrait|relais\s+pick-?up|consigne(?:\s+vinted\s*go|\s+pick-?up)?|locker(?:\s+vinted\s*go)?|vinted\s*go)\s*\)?\s*$/i;
 const PAS_UN_POINT = /^(?:mondialrelay|chronopost|chronopostpickup|vinted|vintedgo|relaiscolis|laposte|colissimo|pickup|relaispickup|ups|dpd|gls|inpost|pointrelais|pointderetrait|consigne|consignevintedgo|consignepickup|locker|casier|lieunonindique)$/;
 export function nomRelaisPropre(nom, ville = '') {
   let s = String(nom || '').replace(/®|™|©|[*_]+/g, ' ').replace(/\s+/g, ' ').trim();
@@ -50,21 +53,31 @@ export function nomRelaisPropre(nom, ville = '') {
     if (!reste) break;
     s = reste;
   }
+  { const q = TYPE_EN_QUEUE.exec(s); if (q && s.slice(0, q.index).trim()) s = s.slice(0, q.index).trim(); }
+  s = s.replace(/^[\s,;:\-–]+|[\s,;:\-–]+$/g, '').trim();
   const n = normNomRelais(s);
   if (!n || n.replace(/[0-9]/g, '').length < 2 || PAS_UN_POINT.test(n)) return '';
   if (ville && n === normNomRelais(ville)) return '';
-  return s;
+  // « le Narval » (l'article mis en minuscule par la mise en forme du lieu) : la
+  // première lettre d'un nom reste une majuscule.
+  return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
 // L'adresse qu'on peut chercher sur une carte : une RUE (qui commence par son
 // numéro) ET un code postal ou une ville. Sinon `null` — un nom de commerce
 // seul, ou une ville seule, poserait l'épingle au centre de la ville : faux.
+// (1er nov., « plus fiable ») Une rue lue SANS code postal ni ville à part
+// (« 29 RUE HOCHE VANNES » : la ville collée à la rue) est cherchée telle quelle,
+// et le résultat n'est gardé que si SA ville termine le texte et SON adresse en
+// est tout le début, mot pour mot (`jugerBan`, mode `texte`) — sinon rien, dit.
 const RUE = /^\d{1,4}\s*(?:bis|ter)?[\s,]+\S{2,}/i;
+// Un nom suivi de « <numéro> <type de voie> … » : l'adresse collée au nom.
+const ADRESSE_DANS_NOM = /^(.*?[A-Za-zÀ-ÿ].*?)[\s,]+(\d{1,4}\s*(?:bis|ter)?[\s,]+(?:rue|avenue|av\.?|boulevard|bd|place|pl\.?|quai|chemin|all[ée]e|route|impasse|cours|square|faubourg|passage|esplanade|promenade|rond-point|r[ée]sidence|zac|za|zi)\b.*)$/i;
 export function adresseGeocodable(p) {
   if (!p) return null;
   const rue = String(p.rue || '').trim(), cp = String(p.cp || '').trim(), ville = String(p.ville || '').trim();
   if (!RUE.test(rue)) return null;
-  if (!/^\d{5}$/.test(cp) && ville.length < 2) return null;
+  if (!/^\d{5}$/.test(cp) && ville.length < 2) return rue.split(/\s+/).length >= 4 && !rue.includes(',') ? rue.replace(/\s+/g, ' ') : null;
   return `${rue}, ${[cp, ville].filter(Boolean).join(' ')}`.replace(/\s+/g, ' ').trim();
 }
 
@@ -80,6 +93,12 @@ export function decouperAdresse(adresse) {
   if (m) return { rue: m[1].replace(/[,\s]+$/, ''), cp: m[2], ville: m[3].trim() };
   const sansVille = /^(.*?)[,\s]+(\d{5})$/.exec(s);
   if (sansVille) return { rue: sansVille[1].replace(/[,\s]+$/, ''), cp: sansVille[2], ville: '' };
+  // (1er nov.) « 29 Rue Hoche, Vannes » : la rue, une virgule, la ville SANS code
+  // postal. Avant, le tout passait pour la rue et le point n'avait pas de ville :
+  // jamais cherché sur la carte (« il manque le code postal et la ville »). La
+  // ville est le DERNIER morceau, des lettres seulement, après une rue numérotée.
+  const rueVille = /^(\d{1,4}\s*(?:bis|ter)?[\s,]+[^,]{3,60}?)\s*,\s*([A-Za-zÀ-ÿ'’ -]{2,40})$/i.exec(s);
+  if (rueVille) return { rue: rueVille[1].trim(), cp: '', ville: rueVille[2].trim() };
   return { rue: /^\d{5}\b/.test(s) ? '' : s, cp: cpDe(s), ville: '' };
 }
 // Un texte TOUT EN MAJUSCULES (« 29 RUE HOCHE ») s'écrit lisiblement ; le reste tel quel.
@@ -106,11 +125,24 @@ export function regrouperRelais({ arrives = [], attendus = [] } = {}) {
     if (!x) return;
     const idc = String(x.id || '');
     if (idc) { if (vu.has(idc)) return; vu.add(idc); }
-    const morceaux = x.adresse != null && x.rue == null ? decouperAdresse(x.adresse) : { rue: x.rue || '', cp: x.cp || '', ville: x.ville || '' };
+    let morceaux = x.adresse != null && x.rue == null ? decouperAdresse(x.adresse) : { rue: x.rue || '', cp: x.cp || '', ville: x.ville || '' };
+    let nomLu = x.nom;
+    // (1er nov.) L'adresse COLLÉE au nom (« TABAVAP 29 RUE HOCHE VANNES » : sans
+    // code postal, `cleanLieu` garde tout comme nom) : le nom est ce qui précède le
+    // numéro de la rue, l'adresse ce qui suit. Sans quoi ce point était un « nom »
+    // à part, sans adresse — jamais sur la carte, et pas avec les autres Tabavap.
+    if (!RUE.test(String(morceaux.rue || '').trim())) {
+      const colle = ADRESSE_DANS_NOM.exec(String(nomLu || '').replace(/[*_]+/g, ' ').replace(/\s+/g, ' ').trim());
+      if (colle) {
+        const d = decouperAdresse(colle[2]);
+        nomLu = colle[1];
+        morceaux = { rue: d.rue, cp: morceaux.cp && /^\d{5}$/.test(String(morceaux.cp)) ? morceaux.cp : d.cp, ville: morceaux.ville || d.ville };
+      }
+    }
     const cp = /^\d{5}$/.test(String(morceaux.cp || '')) ? String(morceaux.cp) : '';
     const rueLue = String(morceaux.rue || '').trim();
     const rueOk = RUE.test(rueLue) ? rueLue : '';
-    const nom = nomRelaisPropre(x.nom, morceaux.ville);
+    const nom = nomRelaisPropre(nomLu, morceaux.ville);
     // L'identité d'un LIEU : son nom propre + son code postal ; sans nom, sa rue
     // + son code postal (une adresse est un endroit) ; sans rien, « pas connu ».
     const cle = nom ? normNomRelais(nom) + '|' + cp : (rueOk && cp ? 'adr:' + normNomRelais(rueOk) + '|' + cp : CLE_INCONNU);
@@ -178,22 +210,57 @@ export function regrouperRelais({ arrives = [], attendus = [] } = {}) {
 // par identité : le MÊME nom propre ET le même code postal (ou, sans code
 // postal lu, la même rue). Plusieurs positions possibles ⇒ rien (on ne choisit
 // pas). Jamais le nom seul : « Carrefour City » existe dans chaque ville.
-export function repereDepuisPointsVinted(p, liste) {
-  if (!p || p.inconnu || !p.nom || !Array.isArray(liste)) return null;
-  const n = normNomRelais(p.nom);
-  const bons = liste.filter((q) => {
-    if (!q || normNomRelais(nomRelaisPropre(q.nom)) !== n) return false;
-    const lat = Number(q.lat), lon = Number(q.lon);
-    if (q.lat === '' || q.lon === '' || q.lat == null || q.lon == null) return false;
-    if (!Number.isFinite(lat) || !Number.isFinite(lon) || (!lat && !lon) || Math.abs(lat) > 90 || Math.abs(lon) > 180) return false;
-    const a = decouperAdresse(q.adresse);
-    if (p.cp) return a.cp === p.cp;
-    return !!(p.rue && a.rue && normNomRelais(a.rue) === normNomRelais(p.rue));
-  });
+// (1er nov., « plus fiable ») Le nom est comparé SANS accents, majuscules,
+// espaces ni ponctuation, et sans le type de lieu (« TABA'VAP » = « Tabavap »,
+// « Relais Pickup TERRA CBD » = « Terra Cbd ») ; et la MÊME ADRESSE (même rue
+// avec son numéro, même code postal) désigne le même endroit même quand Vinted
+// écrit le nom autrement (« SARL TABAVAP ») — une adresse est une identité de
+// lieu, pas une ressemblance. Plusieurs positions à cette adresse ⇒ rien.
+const posValide = (q) => {
+  if (!q || q.lat === '' || q.lon === '' || q.lat == null || q.lon == null) return false;
+  const lat = Number(q.lat), lon = Number(q.lon);
+  return Number.isFinite(lat) && Number.isFinite(lon) && !(!lat && !lon) && Math.abs(lat) <= 90 && Math.abs(lon) <= 180;
+};
+const unePosition = (bons) => {
   const pos = [...new Set(bons.map((q) => `${Number(q.lat).toFixed(4)},${Number(q.lon).toFixed(4)}`))];
-  if (pos.length !== 1) return null;
-  const a = decouperAdresse(bons[0].adresse);
-  return { lat: Number(bons[0].lat), lon: Number(bons[0].lon), rue: a.rue, cp: a.cp, ville: a.ville, source: 'vinted' };
+  return pos.length;
+};
+export function repereDepuisPointsVinted(p, liste) {
+  if (!p || p.inconnu || !Array.isArray(liste)) return null;
+  const sortie = (q, par) => { const a = decouperAdresse(q.adresse); return { lat: Number(q.lat), lon: Number(q.lon), rue: a.rue, cp: a.cp, ville: a.ville, source: 'vinted', par }; };
+  if (p.nom) {
+    const n = normNomRelais(p.nom);
+    const bons = liste.filter((q) => {
+      if (!posValide(q) || normNomRelais(nomRelaisPropre(q.nom)) !== n) return false;
+      const a = decouperAdresse(q.adresse);
+      if (p.cp) return a.cp === p.cp;
+      return !!(p.rue && a.rue && normNomRelais(a.rue) === normNomRelais(p.rue));
+    });
+    const k = unePosition(bons);
+    if (k === 1) return sortie(bons[0], 'nom');
+    if (k > 1) return { plusieurs: true };
+  }
+  if (p.rue && p.cp && RUE.test(String(p.rue))) {
+    const r = normNomRelais(p.rue);
+    const bons = liste.filter((q) => { if (!posValide(q)) return false; const a = decouperAdresse(q.adresse); return a.cp === p.cp && !!a.rue && normNomRelais(a.rue) === r; });
+    const k = unePosition(bons);
+    if (k === 1) return sortie(bons[0], 'adresse');
+    if (k > 1) return { plusieurs: true };
+  }
+  return null;
+}
+
+// Le NOMBRE d'une épingle (1er nov., Julien : « il doit y avoir UN point par
+// relais avec le NOMBRE de colis ») : les colis à y RETIRER (ceux du compte de
+// Ma journée, `vrm_colis_retirer`) ; un point sans colis compté porte ses « à
+// vérifier », sinon ses colis en route. La ligne du point dit CE nombre, de la
+// même fonction (une seule source).
+export function nombreEpingle(p) {
+  if (!p) return { n: 0, sorte: 'aretirer' };
+  const hors = (p.arrives || []).filter((c) => c.horsCompte).length;
+  if (p.nComptes > 0) return { n: p.nComptes, sorte: 'aretirer' };
+  if (hors > 0) return { n: hors, sorte: 'averifier' };
+  return { n: p.nAttendus || 0, sorte: 'enroute' };
 }
 
 // ── LA COLONNE « À RETIRER », PAR POINT (1er nov.) ──────────────────────────
@@ -201,55 +268,113 @@ export function repereDepuisPointsVinted(p, liste) {
 // avoir d'erreur et ça doit être un peu plus clair ». Chaque colis de la colonne
 // (ceux que `pickupUnion` compte, et ses « à vérifier » marqués `horsCompte`)
 // tombe sous SON point, ou sous « Point pas encore connu » avec sa raison —
-// jamais écarté. Les points reçoivent un NUMÉRO (le même sur la carte et dans
-// la liste) et, s'ils ne peuvent pas y être, la raison en clair.
+// jamais écarté. Les points reçoivent un rang (`numero`, l'ordre de la liste),
+// le nombre de leur épingle (`nombreEpingle`) et, s'ils ne peuvent pas être sur
+// la carte, la raison en clair.
 export function pointsARetirer({ colis = [], attendus = [], pointsVinted = [] } = {}) {
   const groupes = regrouperRelais({ arrives: colis, attendus });
   let numero = 0;
   const points = groupes.map((g) => {
-    if (g.inconnu) return { ...g, numero: null, repere: null, sansCarte: null };
+    if (g.inconnu) return { ...g, numero: null, repere: null, sansCarte: null, epingle: nombreEpingle(g) };
     let x = { ...g };
-    const rv = repereDepuisPointsVinted(g, pointsVinted);
+    const lu = repereDepuisPointsVinted(g, pointsVinted);
+    const rv = lu && lu.lat != null ? lu : null;
     if (rv) {
       const rue = x.rue || lisible(rv.rue), cp = x.cp || rv.cp, ville = x.ville || lisible(rv.ville);
       x = { ...x, rue, cp, ville, adresse: [rue, [cp, ville].filter(Boolean).join(' ')].filter(Boolean).join(', '), adresseCourte: [rue, ville].filter(Boolean).join(', ') || cp, geocode: adresseGeocodable({ rue, cp, ville }) };
     }
     numero++;
     const sansCarte = rv ? null
-      : !x.rue ? (x.cp || x.ville ? 'la rue du point n’a pas été donnée, seulement la ville' : 'l’adresse du point n’a pas été donnée')
-      : !x.geocode ? 'il manque le code postal et la ville du point'
+      : !x.rue ? (x.cp || x.ville ? 'le message donne la ville du point mais pas sa rue' : 'le message ne donne pas l’adresse du point')
+      : !x.geocode ? 'le message donne la rue du point mais ni son code postal ni sa ville'
       : null;
-    return { ...x, numero, repere: rv ? { lat: rv.lat, lon: rv.lon, source: 'vinted' } : null, sansCarte };
+    return { ...x, numero, repere: rv ? { lat: rv.lat, lon: rv.lon, source: 'vinted' } : null, sansCarte, vintedPlusieurs: !!(lu && lu.plusieurs), epingle: nombreEpingle(x) };
   });
   const nComptes = points.reduce((t, p) => t + p.nComptes, 0);
   const nHors = points.reduce((t, p) => t + p.arrives.filter((c) => c.horsCompte).length, 0);
   return { points, nComptes, nHors, nAttendus: points.reduce((t, p) => t + p.nAttendus, 0) };
 }
 
-// Le résultat de la Base Adresse Nationale n'est GARDÉ que s'il est sûr : une
-// adresse (pas une commune), un score ≥ 0,6, et le MÊME code postal que celui
-// lu. Sinon `null` : le point est listé sans repère, et c'est dit.
+// ── LA BASE ADRESSE NATIONALE : un repère SÛR, ou la raison (1er nov.) ──────
+// Un résultat n'est GARDÉ que s'il est sûr : une adresse (numéro ou rue, jamais
+// une commune ni un lieu-dit), un score suffisant, et
+//   · mode « code postal » : le MÊME code postal que celui lu ;
+//   · mode « ville » (rue + ville lues, sans code postal) : la MÊME ville, et un
+//     score plus haut (0,7) ;
+//   · mode « texte » (la ville collée à la rue) : SA ville termine le texte et
+//     SON adresse (« 29 Rue Hoche ») en est tout le début, mot pour mot.
+// Et il doit être SEUL : deux résultats qui passent ces filtres à plus de 80 m
+// l'un de l'autre, avec des scores proches ⇒ plusieurs endroits possibles ⇒
+// rien (on ne choisit pas), et c'est dit.
+// Rend { lat, lon } ou { echec: 'introuvable' | 'incertain' | 'ville' | 'ambigu' }.
+const metres = (a, b) => {
+  const R = 6371000, r = Math.PI / 180;
+  const dLat = (b.lat - a.lat) * r, dLon = (b.lon - a.lon) * r;
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(a.lat * r) * Math.cos(b.lat * r) * Math.sin(dLon / 2) ** 2;
+  return 2 * R * Math.asin(Math.min(1, Math.sqrt(h)));
+};
+export function jugerBan(json, attendu = {}) {
+  const cp = /^\d{5}$/.test(String(attendu.cp || '')) ? String(attendu.cp) : '';
+  const ville = cp ? '' : String(attendu.ville || '').trim();
+  const texte = !cp && !ville && attendu.texte ? normNomRelais(attendu.texte) : '';
+  const seuil = cp ? 0.6 : 0.7;
+  const feats = json && Array.isArray(json.features) ? json.features : [];
+  if (!feats.length) return { echec: 'introuvable' };
+  let raison = 'introuvable';
+  const bons = [];
+  for (const f of feats) {
+    if (!f || !f.geometry || !Array.isArray(f.geometry.coordinates)) continue;
+    const pr = f.properties || {};
+    const [lon, lat] = f.geometry.coordinates.map(Number);
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) continue;
+    if (pr.type && !/^(housenumber|street)$/.test(String(pr.type))) { if (raison === 'introuvable') raison = 'incertain'; continue; }
+    if (!(Number(pr.score) >= seuil)) { if (raison === 'introuvable') raison = 'incertain'; continue; }
+    if (cp && String(pr.postcode || '') !== cp) { raison = 'ville'; continue; }
+    if (ville && normNomRelais(pr.city) !== normNomRelais(ville)) { raison = 'ville'; continue; }
+    if (texte) {
+      const c = normNomRelais(pr.city), nm = normNomRelais(pr.name);
+      if (!c || c.length < 3 || !texte.endsWith(c) || texte.slice(0, texte.length - c.length) !== nm) { raison = 'ville'; continue; }
+    }
+    if (!cp && !ville && !texte) { /* aucun contrôle de lieu possible */ raison = 'ville'; continue; }
+    bons.push({ lat, lon, score: Number(pr.score), type: String(pr.type || '') });
+  }
+  if (!bons.length) return { echec: raison };
+  const numeros = bons.filter((b) => b.type === 'housenumber');
+  const parmi = (numeros.length ? numeros : bons).sort((a, b) => b.score - a.score);
+  const tete = parmi[0];
+  if (parmi.some((b) => b !== tete && b.score >= tete.score - 0.1 && metres(b, tete) > 80)) return { echec: 'ambigu' };
+  return { lat: tete.lat, lon: tete.lon };
+}
+// L'ancienne forme (un repère ou `null`), gardée pour ceux qui ne veulent pas la raison.
 export function repereDepuisBan(json, cpAttendu) {
-  const f = json && Array.isArray(json.features) ? json.features[0] : null;
-  if (!f || !f.geometry || !Array.isArray(f.geometry.coordinates)) return null;
-  const pr = f.properties || {};
-  const [lon, lat] = f.geometry.coordinates.map(Number);
-  if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
-  if (!(Number(pr.score) >= 0.6)) return null;
-  if (pr.type && !/^(housenumber|street)$/.test(String(pr.type))) return null;
-  if (cpAttendu && String(pr.postcode || '') !== String(cpAttendu)) return null;
-  return { lat, lon };
+  const r = jugerBan(json, { cp: cpAttendu });
+  return r && r.lat != null ? { lat: r.lat, lon: r.lon } : null;
 }
 
 // (1er nov.) LES REQUÊTES À LA BASE ADRESSE NATIONALE, dans l'ordre : l'adresse
 // complète filtrée par son code postal ; puis la rue + la ville seules (un code
 // postal mal relié à la ville dans la base) — le résultat devant TOUJOURS
-// porter le code postal lu (`repereDepuisBan`). Rien à chercher sans rue.
+// porter le code postal lu. Sans code postal : rue + ville (la ville exigée), ou
+// le texte lu tel quel (mode « texte »). Rien à chercher sans rue. Chaque
+// requête porte ce que `jugerBan` doit vérifier (`attendu`).
 export function requetesBan(p) {
   const g = adresseGeocodable(p);
   if (!g) return [];
   const cp = /^\d{5}$/.test(String(p.cp || '')) ? String(p.cp) : '';
-  const q = [{ q: g, postcode: cp }];
-  if (p.ville && cp) q.push({ q: `${String(p.rue).trim()}, ${String(p.ville).trim()}`, postcode: '' });
-  return q;
+  const ville = String(p.ville || '').trim();
+  if (cp) {
+    const q = [{ q: g, postcode: cp, attendu: { cp } }];
+    if (ville) q.push({ q: `${String(p.rue).trim()}, ${ville}`, postcode: '', attendu: { cp } });
+    return q;
+  }
+  if (ville.length >= 2) return [{ q: g, postcode: '', attendu: { ville } }];
+  return [{ q: g, postcode: '', attendu: { texte: g } }];
 }
+
+// La raison, en français simple, pour laquelle la Base Adresse n'a pas placé un point.
+export const RAISONS_BAN = {
+  introuvable: 'cette adresse n’existe pas dans la Base Adresse Nationale',
+  incertain: 'l’adresse n’a pas été reconnue avec assez de certitude',
+  ville: 'la ville trouvée n’est pas celle du message (ou la ville n’est pas écrite) : rien n’est deviné',
+  ambigu: 'plusieurs endroits possibles pour cette adresse : aucun n’est choisi',
+};

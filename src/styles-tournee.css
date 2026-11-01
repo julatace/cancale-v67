@@ -92,3 +92,9 @@
 /* (1er nov.) Une phrase par point pas sur la carte, sous son arrêt ; la carte et la liste défilent ensemble. */
 .vrm-tr-hors { margin: -6px 0 10px 58px; font-size: 12.5px; color: var(--vrm-muted); line-height: 1.4; }
 .vrm-tr-credit { font-size: 11px; }
+/* (1er nov.) L'arrêt dont l'épingle vient d'être touchée. */
+.vrm-tr-arret.is-choisi { background: var(--vrm-surface-2, rgba(15, 15, 14, .04)); box-shadow: inset 3px 0 0 var(--vrm-ink, #0F0F0E); border-radius: 8px; scroll-margin: 80px; }
+/* (1er nov.) Pastille d'un retrait = son épingle (le nombre de colis, l'accent de l'épingle) ; d'un dépôt = une icône. */
+.vrm-tr-pastille.is-epingle { background: var(--vrm-accent); color: var(--vrm-on-accent, #fff); }
+.vrm-tr-pastille.is-epingle.is-neutre { background: var(--vrm-bg); color: var(--vrm-ink); box-shadow: inset 0 0 0 1.5px var(--vrm-line); }
+.vrm-tr-pastille.is-depot { background: transparent; color: var(--vrm-ink); box-shadow: inset 0 0 0 1.5px var(--vrm-line); }

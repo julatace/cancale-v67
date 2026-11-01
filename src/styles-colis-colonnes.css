@@ -58,6 +58,9 @@ button.vrm-cc-carte:focus-visible { outline: 2px solid var(--vrm-focus, #2442B8)
 .vrm-rp-tete { display: flex; align-items: flex-start; gap: 10px; padding: 2px 2px 0; }
 .vrm-rp-numero { flex: none; width: 26px; height: 26px; border-radius: 13px; background: var(--vrm-ink, #0F0F0E); color: var(--vrm-bg, #FFFFFF);
   font: 600 13px/26px var(--vrm-police-mono, ui-monospace, monospace); text-align: center; font-variant-numeric: tabular-nums; margin-top: 1px; }
+/* (1er nov.) La pastille porte le NOMBRE de colis — la même que l'épingle (même couleur). */
+.vrm-rp-compte { width: auto; min-width: 26px; padding: 0 6px; box-sizing: border-box; background: var(--vrm-bg, #FFFFFF); color: var(--vrm-ink, #0F0F0E); box-shadow: inset 0 0 0 1.5px var(--vrm-line, #E4E4DF); }
+.vrm-rp-compte.is-fort { background: var(--vrm-accent, #2f5bd3); color: #fff; box-shadow: none; }
 .vrm-rp-numero.is-vide { background: transparent; color: var(--vrm-muted, #56564F); box-shadow: inset 0 0 0 1.5px var(--vrm-line, #E4E4DF); }
 .vrm-rp-ident { display: flex; flex-direction: column; min-width: 0; gap: 1px; }
 .vrm-rp-nom { font-size: 15px; font-weight: 700; line-height: 1.25; color: var(--vrm-ink, #0F0F0E); overflow-wrap: anywhere; }

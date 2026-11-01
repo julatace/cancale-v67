@@ -2317,3 +2317,66 @@ rouge (pas de bouton). Mutations rouges : tri par N° (B, H), conflits ignorés 
 au dernier « Suivant » (F), geste à moitié sans le bordereau (G).
 
 **Geste de Julien** : aucun. Ouvrir Colis → « Emballer » au pied de « Prêts à imprimer ».
+
+## 1er nov. — Une épingle par relais, avec le nombre de colis (et plus fiable)
+
+Julien, sur la tournée plein écran (capture : Tabavap 29 Rue Hoche — 5 colis, Phone Cash 17 Rue
+Thiers, Terra Cbd 11 Rue Hoche, un dépôt Chronopost ; 3 épingles) : « ça affiche 5 points de retrait
+mais sur la carte il y en a que 3 », puis « il doit y avoir UN point par relais avec le NOMBRE de
+colis, ça doit être beaucoup plus fiable ».
+
+**Causes trouvées (pourquoi un point de retrait n'avait pas d'épingle)** — mesurées sur le code et
+les formes rangées, pas sur sa base (non joignable d'ici) :
+1. **Ma journée ne lisait jamais la liste des points de Vinted** (`dropOffs`, positions exactes) :
+   l'effet ne chargeait que sur Colis et Achats. La tournée ne plaçait ses points que par la Base
+   Adresse.
+2. **Adresse sans code postal** : « 29 Rue Hoche, Vannes » passait ENTIÈRE pour la rue
+   (`decouperAdresse` exigeait un code postal) ⇒ « il manque le code postal et la ville », jamais
+   cherchée. « TABAVAP 29 RUE HOCHE VANNES » (sans code postal, `cleanLieu` garde tout comme NOM)
+   devenait un point « Tabavap 29 Rue Hoche Vannes » sans adresse, à part des autres Tabavap.
+3. **Base Adresse : `limit=1`** — le premier résultat était pris même quand deux endroits
+   passaient les filtres (faux possible) ; et sans code postal, AUCUN contrôle de ville.
+4. **Échec figé** : un « pas trouvé » était noté 24 h dans `vrm_geo_relais_v1` ; une règle
+   corrigée ne levait pas l'échec ⇒ cache passé en `vrm_geo_relais_v2` (avec la raison).
+5. **Budget de 25 « recherches », cache compris**, puis plus rien (au-delà de 25 points).
+6. **Nom Vinted écrit autrement** que dans l'e-mail (« SARL Phone » pour Phone Cash) : la position
+   de Vinted n'était prise que sur le nom ⇒ ajout : la MÊME ADRESSE (rue avec son numéro + code
+   postal) désigne le même endroit. (Accents/majuscules/apostrophe : déjà normalisés — vérifié.)
+7. **Type de lieu en queue ou transporteur en tête** : « Kusmi Tea - Consigne Vinted Go »,
+   « Vinted Go Kusmi Tea » ne rejoignaient pas « Kusmi Tea ».
+8. Deux points au même endroit partageaient une épingle « 2·5 » (numéros d'arrêt) ; une carte refaite
+   après un échec de fond restait masquée (`display:none`) et se cadrait sur une boîte de taille 0.
+
+**Ce qui est fait** :
+- `src/relaisColis.js` : `decouperAdresse` lit « rue, Ville » ; l'adresse collée au nom est
+  séparée (`ADRESSE_DANS_NOM`) ; `adresseGeocodable` accepte la ville collée à la rue (≥ 4 mots) ;
+  `nomRelaisPropre` retire le type en queue, « Vinted Go »/transporteur en tête, la ponctuation,
+  remet une majuscule ; `repereDepuisPointsVinted` : par nom + CP, sinon par la même adresse ;
+  plusieurs positions ⇒ `{ plusieurs }` (rien, et c'est noté) ; **`jugerBan`** : type
+  numéro/rue, score ≥ 0,6 (0,7 sans CP), même CP — ou même ville — ou, mode texte, SA ville termine
+  le texte et SON adresse en est tout le début ; deux résultats à plus de 80 m avec des scores
+  proches ⇒ `ambigu` ; `requetesBan` porte ce qu'il faut vérifier ; **`nombreEpingle`** (colis à
+  retirer = `nComptes`, sinon « à vérifier », sinon « en route ») ; `RAISONS_BAN` en français.
+- `src/CarteRelais.jsx` : `FondRelais` — UNE épingle par point, le NOMBRE dessus, deux points au
+  même endroit côte à côte (décalés), l'épingle choisie entourée ; la carte repart de « charge » ;
+  `useReperes` rend le cache tout de suite, budget de 40 requêtes RÉSEAU, `limit=5` ;
+  `raisonPasSurCarte` / `codePasSurCarte` (une phrase pour Colis ET la tournée, code en `data-raison`).
+  `ColonneRetirer` : la pastille du point = son épingle (même nombre, même couleur s'il est sur la
+  carte), le résumé ne réécrit pas le nombre.
+- `src/Tournee.jsx` : une épingle par point de retrait avec `a.n` (= la ligne, = `vrm_colis_retirer`) ;
+  toucher l'épingle met l'arrêt en avant et le fait défiler ; pastille d'un retrait = son nombre
+  (neutre s'il n'est pas sur la carte), d'un dépôt = une icône (un seul sens pour un nombre).
+- `src/App.jsx` : `dropOffs` lu aussi sur Ma journée quand la tournée s'ouvre.
+
+**Preuves** : `audit-relais-carte` +16 (section D) — sur l'avant (`--app` HEAD) 15 rouges ;
+mutations rouges : ambiguïté retirée, « rue, Ville » retiré, contrôle du mode texte retiré.
+Banc `tournee` + section V (Vannes : Tabavap 3 colis dont un n° de suivi écrit deux fois, Terra Cbd,
+Phone Cash sans CP, Le Narval ambigu ; fond minimal servi) : 3 épingles « 3 », « 1 », « 1 », Le Narval
+« pas sur la carte » raison `ambigu`, chaque retrait sur la carte OU dit, épingle = ligne, toucher ⇒
+ligne choisie, mêmes épingles et pastilles dans Colis, Retirer 6 = `vrm_colis_retirer`. Sur l'avant
+(arbre `git archive`) : 20 rouges ; mutation « épingle = numéro d'arrêt » : 8 rouges. Bancs
+`retrait-relais-carte`, `colis-colonnes` (attendus mis à jour : l'épingle porte le nombre, raison
+jugée sur `data-raison`), `colis-relais-push`, `navigation-tache` : verts.
+
+**Geste de Julien** : aucun. Ouvrir la tournée : chaque relais a une épingle avec son nombre, ou
+dit sous lui pourquoi il n'est pas sur la carte.

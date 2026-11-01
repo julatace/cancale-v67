@@ -44113,10 +44113,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   useEffect(() => {
     // Aussi sur Achats : c'est là qu'on complète l'adresse et les horaires d'un
     // point de retrait dont l'email ne donne que le nom.
-    if (dropOffs !== null || (curSub !== 'bordereaux' && curSub !== 'achats')) return;
+    // (1er nov., « 5 points de retrait mais 3 sur la carte ») Et sur Ma journée
+    // quand la tournée s'ouvre : la position que Vinted donne pour un point
+    // (`repereDepuisPointsVinted`) n'était lue que sur Colis et Achats — la
+    // tournée plaçait ses points par la seule Base Adresse. Une seule lecture
+    // (~4 lignes), seulement au geste « Voir la tournée ».
+    if (dropOffs !== null || (curSub !== 'bordereaux' && curSub !== 'achats' && !(curSub === 'journee' && tourneeOuverte))) return;
     fetchDropOffPoints(accountUids).then(d => { if (d) setDropOffs(d); }).catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [curSub]);
+  }, [curSub, tourneeOuverte]);
 
   // ── Analyse de perf (façon outil pro) ──────────────────────────────
   // Objectif de CA mensuel (synchronisé). L'utilisateur le fixe, la barre suit le
