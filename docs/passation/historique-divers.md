@@ -46,7 +46,11 @@
 > 139 s (le dépassement de 90 s était la limite du lanceur). En passant : banc `double-vente` rouge sur main — la carte
 > « vendu sur Leboncoin — encore sur Vinted » écrasait le titre à une lettre par ligne à 390 px (les deux gestes en
 > largeur fixe) ⇒ la rangée passe à la ligne (texte ≥ 160 px) ; et le contrôle « rogné » excuse une RANGÉE DÉFILANTE
-> (filtres de site, §7 : conteneur qui défile vraiment), jamais un `overflow: hidden`. Extension inchangée. Geste de
+> (filtres de site, §7 : conteneur qui défile vraiment), jamais un `overflow: hidden`. Après le merge de main
+> (multi-vendeurs, Vestiaire partout) : « Vendus ailleurs » garde le `cleNum` importé de main ET les lots éclatés ;
+> `audit-xss-facture` (rouge sur main : `generatePDF` appelle `logoFacture`) extrait aussi `logoFacture`, session sans
+> propriétaire (la mutation `sanscsp` rougit toujours). Rouge laissé, déjà sur main : le test
+> `scripts/tests/bilan-synchronisation-adaptateur.test.mjs` (2 lectures au lieu d'1). Extension inchangée. Geste de
 > Julien : aucun.
 
 > **31 octobre — tournée de TOUS les bancs (183) et audits (160), après les chantiers du 27-29 :** 5 défauts de l'app
