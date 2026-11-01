@@ -2644,3 +2644,71 @@ vue globale sans défiler exigée en densité 0,65, les gestes et le haut des ch
 normale (voir la décision ci-dessus).
 
 **Geste de Julien** : regarder Ma journée (téléphone et ordinateur).
+
+## 1er novembre 2026 — Cohérence de tous les onglets et de chaque bouton (banc `tous-boutons`)
+
+Julien : « continue à regarder la cohérence de tous les onglets, de chaque bouton ».
+Au lieu de regarder écran par écran, un banc les visite TOUS et clique tout :
+`scripts/bancs/tous-boutons.cjs` (données inventées, mêmes formes que
+`navigation-tache.cjs` ; aucune écriture n'a d'effet, aucune confirmation n'est
+acceptée — une feuille ouverte est seulement refermée). À 390 px tactile et
+1512 px : la coque (colonne, barre du bas, « Plus »), Ma journée et sa Tournée,
+chaque filtre de site et sous-onglet d'Annonces, Ventes, Messages, Achats et
+Colis, Republier, Favoris & offres, Stock, Statistiques (+ Prix qui marche),
+Comptabilité (+ Factures), Communauté, Comptes liés, Achats masqués,
+Organisation, Paramètres et CHACUN de ses panneaux — 99 écrans, ~820 éléments
+cliqués un par un. Il juge : erreur JS, écran tombé/blanc, onglet inconnu,
+bouton mort, lien sans adresse, feuille qui ne se ferme pas (et Échap sur
+ordinateur), texte qui nomme un écran et en ouvre un autre, « Réglages »/« Stats »
+au lieu du nom de la colonne, cible < 44 px au doigt, désactivé sans raison ;
+et (demande du coordinateur, capture de Julien) aucune entrée de la colonne à
+moitié visible à 1512×1000, 1512×880, 1440×800, 1280×720, 1280×650, et Vestiaire
+dans les filtres de Colis quand le compte existe. Exceptions commentées dans le
+banc (onglet « Réglages » DANS Paramètres, barres du graphique des mois…).
+
+Sur `origin/main` (66ad4d3, arbre `git archive`, même banc) : 29 défauts + 5
+feuilles ciblées ; après : 0. Corrigé :
+- **Échap ferme la feuille du dessus** sur ordinateur (`_installerRetourFeuilles`,
+  App.jsx) : Republier, prix d'achat à compléter, Relier un achat, Passeport,
+  Marquer vendue, offres automatiques, Nouvelle facture, Comptes liés… ne se
+  fermaient qu'à la souris. Un écran qui gère déjà Échap a refermé SA feuille
+  avant ce tour : rien de plus (jamais deux feuilles pour un Échap). Le panneau
+  « Synchronisation » (pas une feuille) se ferme aussi à Échap.
+- **« Ouvrir l'annonce sur Vinted »** (photo d'une fiche d'annonce) n'avait
+  aucune adresse quand `url` n'était pas lue : l'adresse se refait par
+  l'identité (id + domaine du compte) ; sans id, la photo n'est plus un lien.
+- **Un nom par destination** : « Réglages » désignait l'écran Paramètres dans
+  ~25 phrases et boutons (« Mets-la à jour depuis Réglages », « ‹ Réglages »,
+  le bouton du panneau de synchronisation…) ⇒ « Paramètres », et pour
+  l'extension « Paramètres → État des connexions » (là où sont les liens de mise
+  à jour). Chemins qui n'existaient pas : « Réglages → Rédaction d'annonces par
+  l'IA » (aucun réglage ne pose la clé IA — la phrase le dit), « Réglages → Mes
+  adresses de réception » (⇒ « Paramètres → Réception des emails »), « Paramètres
+  → Facturation Pro » (le bouton est sur l'écran Factures), « Réglages →
+  Restaurer » (⇒ « Paramètres → Restaurer une sauvegarde »). Le bouton
+  « Réglages » des Factures (réglages locaux) devient « Réglages des factures ».
+  Inchangés : l'onglet « Réglages » DANS Paramètres (à côté de « Mon compte »),
+  « Réglages » de l'iPhone.
+- **Désactivés qui disent pourquoi** : « Voir ce que je comprends » (agent
+  eBay), « Afficher les favoris », « Actualiser » (Organisation), « Chercher »
+  des Factures (était un bouton MORT champ vide : désactivé, avec la raison).
+  Les zones « En attente / Comptabilisées » portent `aria-pressed`.
+- **Cibles au doigt** : le « ⓘ » des explications passe de 32 à 44 px au doigt
+  (sans rien pousser) ; « ↻ Actualiser » de Leboncoin ne rétrécit plus à 35 px
+  pendant la lecture.
+- **La colonne ne coupe jamais une entrée** (capture de Julien : « Vestiaire »
+  coupé par le filet du pied) : SideBar mesure et pose `data-rail-densite` 1-4
+  (espaces resserrés d'abord, entrées à 34 px gardées ; 30 puis 28 px seulement
+  quand sinon une ligne serait coupée) ; si même serrée elle ne tient pas
+  (< ~640 px de haut), TOUTE la colonne défile (`data-rail-defile`), pied compris.
+- **Colis : les filtres de site suivent la règle d'Annonces/Ventes** — un site
+  où il a un compte (`sitesPresents`, « pas su » ⇒ montré) a sa pastille, même
+  sans colis ce jour-là (Vestiaire manquait).
+
+Laissé (et pourquoi) : la rangée de filtres de Colis défile à l'horizontale à
+1280 px (la 4ᵉ pastille est sous le bord, comme toute rangée défilante) ; le
+banc ne clique jamais un lien externe (il vérifie seulement son adresse) ; les
+écrans qui dépendent de l'extension (Messages Vinted) sont visités dans leur
+état « non lu ». Lancer : `BANC_PORT=9150 node scripts/bancs/tous-boutons.cjs`
+(≈ 1 h en série ; `BANC_TAILLE`, `BANC_ECRANS` pour une partie ; 4 processus
+en parallèle ≈ 30 min).

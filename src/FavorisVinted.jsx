@@ -252,7 +252,7 @@ export default function FavorisVinted({uid,owner,ownerActuel,base,headers,nomCom
   </div>;
 
   return <section className="vrm-favoris-liste" aria-label="Favoris reçus">
-    <header><div><h3>Favoris reçus</h3><small>{nomCompte||(uid?'Compte Vinted sélectionné':'Choisis le compte à consulter')}</small></div><div className="vrm-favoris-actions"><button type="button" onClick={charger} disabled={preparation||!uid||!owner||etat.charge||reglages.sauvegarde||importation}>{etat.charge?'Lecture…':data?'Actualiser':'Afficher les favoris'}</button></div></header>
+    <header><div><h3>Favoris reçus</h3><small>{nomCompte||(uid?'Compte Vinted sélectionné':'Choisis le compte à consulter')}</small></div><div className="vrm-favoris-actions"><button type="button" onClick={charger} disabled={preparation||!uid||!owner||etat.charge||reglages.sauvegarde||importation} title={etat.charge?'Lecture en cours…':!uid?'Choisis d’abord le compte Vinted à consulter.':!owner?'Connecte-toi à VRM pour lire tes favoris.':preparation||importation?'Une préparation est en cours : attends qu’elle finisse.':reglages.sauvegarde?'Tes réglages s’enregistrent : un instant.':undefined}>{etat.charge?'Lecture…':data?'Actualiser':'Afficher les favoris'}</button></div></header>
     {!uid&&<p className="vrm-favoris-note">Choisis un compte Vinted dans le sélecteur au-dessus pour afficher ses favoris.</p>}
     {!feuille&&alertes}
     {data&&<>
