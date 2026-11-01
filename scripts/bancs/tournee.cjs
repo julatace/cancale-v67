@@ -330,7 +330,7 @@ async function main() {
       await essaie(T + ' E', async () => {
         const { ctx, pg, errs } = await preparer(b, vp, 'rien');
         await pg.goto(`http://localhost:${PORT}/?tab=journee`, { waitUntil: 'domcontentloaded' });
-        await pg.locator('[data-tuile="envoyer"]').first().waitFor({ timeout: 25000 });
+        await pg.locator('[data-tuile="envoyer"]').first().waitFor({ timeout: 25000, state: 'attached' });
         await pg.waitForTimeout(3500);
         dit(!(await pg.$('[data-tournee]')), `${T} rien à poster ni à retirer ⇒ aucune carte « tournée » (pas de case vide)`);
         dit(!errs.length, `${T} E aucune erreur d'app`, errs[0]);

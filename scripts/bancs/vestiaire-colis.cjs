@@ -143,7 +143,7 @@ const jobs = (pg) => pg.evaluate(() => ({ env: (document.querySelector('[data-jo
         });
         await essaie('Ma journée ' + mode, async () => {
           await pg.goto(`http://localhost:${PORT}/?tab=journee`, { waitUntil: 'domcontentloaded' });
-          await pg.waitForSelector('[data-tuile="envoyer"]', { timeout: 15000 });
+          await pg.waitForSelector('[data-tuile="envoyer"]', { timeout: 15000, state: 'attached' });
           await pg.waitForTimeout(3000);
           const t = await jobs(pg);
           if (mode === 'lu') {

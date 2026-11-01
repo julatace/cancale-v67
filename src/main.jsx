@@ -96,6 +96,8 @@ import './styles-messages.css';
 import './styles-journee-chiffres.css';
 // (1er nov.) La finition « premium » (sans nouvelle palette ni dégradé) — en tout dernier.
 import './styles-finition.css';
+// (1er nov.) Ma journée calme : colonne tenue, listes à filets, une hiérarchie — après la finition.
+import './styles-journee-mieux.css';
 import { suivreRangeesDefilantes } from './rangeesDefilantes.js';
 if (typeof document !== 'undefined') { if (document.body) suivreRangeesDefilantes(); else document.addEventListener('DOMContentLoaded', suivreRangeesDefilantes); }
 

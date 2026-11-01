@@ -2488,3 +2488,92 @@ le montant est absent) ; `scripts/tests/iphone.cjs` vise `.vrm-jc-rangee` au lie
 `.vrm-day-recu`.
 
 **Geste de Julien** : regarder Ma journée (téléphone et ordinateur).
+
+## 1er novembre — Ma journée calme : une colonne, une hiérarchie, des listes à filets
+
+**Demande de Julien**, après la refonte des chiffres : « pour Ma journée tu peux faire mieux
+encore », puis sur sa capture à 1512 px : « tu ne trouves pas que ça fait bordel ? », « c'est
+pas pro », « tu peux faire 15 fois mieux, là ça fait bâclé ». Ce qu'on voyait : le même nombre
+trois fois (Tournée « Imprimer 10 b… », case « 10 À envoyer », carte « Emballer les colis
+prêts — 10 bordereaux »), tous les sous-titres de la Tournée coupés au milieu d'un mot, « À
+faire » en mosaïque (cartes de largeurs et hauteurs différentes, textes de 3-4 lignes), les
+chiffres sur la moitié gauche de l'écran, « Tendances » qui écrivait « — aucune date » comme un
+chiffre, et « eBay » grisé dans la colonne de gauche.
+
+**Méthode** : un croquis HTML de l'écran entier (390 et 1512) avant de coder
+(`taste-skill`, `references/app-screens.md` : une colonne tenue, couleur sur les données, des
+filets plutôt que des aplats, une hiérarchie de lecture) ; puis boucle capture → correction.
+
+**Ce qui change (forme seulement ; aucune règle de calcul, aucune alerte ni cible retirée)** :
+- **La colonne** : sur ordinateur, Ma journée tient dans 1120 px centrés (plus de cartes
+  étirées sur 1 300 px). Ordre : le bonjour (titre de page 32 px, 28 au téléphone ; date et
+  « N choses à faire » sur une ligne ; « Modifier » à droite) → **Urgent** (les alertes qui
+  coûtent, toujours en tête, maintenant sous un titre) → **Ta tournée** → les gestes restants
+  → **À faire** → les chiffres. Chaque section : un titre de 15 px, 8 px au-dessus de sa
+  boîte, 32 px entre deux sections (24 au téléphone).
+- **« À faire » et l'urgent en liste** : une boîte blanche à filet d'1 px, une ligne de 64 px
+  par alerte (icône 20 px · titre · une ligne de détail · « Voir › »). Le titre est la partie
+  de la phrase AVANT « — » (« 3 colis pressés »), le détail le reste + le sous-titre
+  (« Le plus urgent à poster aujourd'hui · N°60 · … »). `src/UneLigne.jsx` coupe une ligne trop
+  longue à la fin du dernier MOT entier (« … »), jamais au milieu ; le texte entier est dans
+  l'infobulle et le nom du bouton. Au téléphone (`lignesTel`), titre et détail peuvent
+  prendre DEUX lignes avant d'être coupés : un N°, une heure limite (« c'était avant 7 h »),
+  un nom de paire ou de compte ne disparaissent pas (bancs `colis-heure`, `double-vente`,
+  `ebay-messages-journee`) ; toutes les lignes y ont la hauteur de deux (84 px). « Voir »
+  devient « › ». Le rappel URSSAF
+  garde son bouton « Noter ma déclaration » à droite (dessous au téléphone).
+- **La Tournée porte « à envoyer » et « à retirer »** (§7, le même nombre jamais deux fois) :
+  quand elle est affichée (`tournee.utile`), les cases « À envoyer » / « À retirer » se taisent
+  (rendues `hidden`, leurs `data-tuile`/`data-n` restent pour les bancs) ; ce que disait leur
+  couleur (colis en retard, dernier jour de retrait) est dit par l'étape elle-même : sa ligne
+  « le plus pressé » passe en AMBRE quand c'est aujourd'hui, demain ou dépassé
+  (`data-tournee-presse`) — pas de ligne d'alerte en plus (les actions de « À faire » restent
+  exactement celles d'avant, banc `journee-widgets`). La ligne « Emballer les colis prêts »
+  n'est plus redite (l'étape Emballer ouvre le même mode). Une PETITE case « À envoyer » qu'il
+  a ajoutée lui-même (Modifier → Ajouter) reste : c'est son choix. Restent dans la barre
+  « Messages » et « Prix à baisser », en une rangée à filets.
+- ⚠️ **Décision à confirmer par Julien — « tout visible sans défiler »** : la règle d'avant
+  (banc `revendeurs`, `journee-widgets` : photos et stock visibles sans défiler à 1512×900) ne
+  tient plus avec un écran aéré en sections (≈ 1 300 px de haut). Elle reste exigée en densité
+  resserrée (0,65, Réglages) ; en densité normale, les gestes (Tournée, À faire) et le haut des
+  chiffres se voient sans défiler, les photos et le stock suivent. S'il préfère tout voir d'un
+  coup, la densité 0,65 le fait.
+- **Tournée** : titres courts (« 10 à imprimer », « 7 à emballer », « 3 à déposer », « 13 à
+  retirer · 5 relais »), deux lignes au plus (deux noms et « +N », le plus pressé), une ligne
+  ne se coupe qu'après « · » ou « : » (`morceaux`) ; la phrase longue d'avant
+  (`texteEtapeLong`) reste en infobulle. « Voir la tournée · N arrêts » est un lien dans
+  l'en-tête de la section (il ne mange plus la rangée). Une boîte à filets : 4 colonnes sur
+  ordinateur, une liste au téléphone (les N° en pastilles).
+- **Aucune rangée à moitié vide** : `GrilleJournee` élargit les widgets AFFICHÉS d'une rangée
+  que la disposition ne remplit pas (une carte retirée ou muette) — 6 colonnes dès 1280 px,
+  2 de 1024 à 1279 (`data-etire6`/`--etire6`). Pas en mode « Modifier » (la vraie taille s'y
+  voit). La disposition par défaut et `connus` ne changent pas.
+- **Chiffres** : cartes blanches à filet d'1 px (plus d'aplats gris empilés), barres de la
+  semaine plus larges (jusqu'à 44 px, la moitié de la colonne) ; « En attente » à côté de
+  cartes plus hautes : son montant en haut, sa phrase au pied. **Tendances** : une case sans
+  base (« — aucune date », « pas de moyenne ») n'est plus posée comme un chiffre ; la carte mène
+  à Statistiques qui le dit avec sa raison. Les cases gardent leurs `data-tendance`/`data-v`.
+- **Dernières ventes** : le titre de la paire coupé au mot (`UneLigne`). « Vendus ailleurs » au
+  pied : même boîte à filet.
+- **Colonne de gauche** : le fondu (`mask-image`, `data-rail-suite`) pâlissait la dernière
+  entrée visible (« eBay » avait l'air désactivé) : retiré, un filet d'1 px dit la suite.
+- Styles : `src/styles-journee-mieux.css`, chargée en tout dernier ; `src/styles-tournee.css`
+  (carte) réécrite.
+
+**Preuve** : banc neuf `scripts/bancs/journee-mieux.cjs` (390 clair/sombre, 1512 clair/sombre,
+1440×600, 1280, et 1512 avec une disposition sans « En attente ») : en-tête visible ; titre et
+détail d'UNE ligne (deux au plus au téléphone), hauteurs égales, coupe au mot avec le texte
+entier en infobulle ;
+Tournée sans rien de coupé ; pas de case « à envoyer/à retirer » visible à côté de la Tournée ni
+de ligne « Emballer » ; chiffres ≥ 90 % de la largeur et même hauteur par rangée ; aucune case
+Tendances « — » ; aucune entrée de la colonne fondue ; contraste ≥ 4,5. Sur `origin/main`
+(001983fa, arbre copié, banc lancé depuis lui) : 38 rouges (dont 1512 sans « En attente » : 66 % de la largeur ; 1440×600 : la
+colonne masquée). Après : 118 verts. Rouges laissés, identiques sur `origin/main` (même
+arbre copié) : `transporteurs` (13), `statuts-colis` (2), `poste-sans-depart` (2). Bancs adaptés sans affaiblir la règle : `emballage`
+(H : la séance s'ouvre par l'étape Emballer de la Tournée quand elle est là, et pas deux
+fois), `ebay-colis`, `vestiaire-colis`, `tournee`, `colis-fiables`, `transporteurs` (la case
+porteuse est attendue « attachée », plus « visible ») ; `revendeurs` et `journee-widgets` : la
+vue globale sans défiler exigée en densité 0,65, les gestes et le haut des chiffres en densité
+normale (voir la décision ci-dessus).
+
+**Geste de Julien** : regarder Ma journée (téléphone et ordinateur).

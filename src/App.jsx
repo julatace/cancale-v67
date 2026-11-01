@@ -108,6 +108,7 @@ import { DESCRIPTION_ORGANISATION } from "./operations/description.js";
 import { regrouperRelais, pointsARetirer } from "./relaisColis.js";
 import CarteRelaisColis, { ColonneRetirer } from "./CarteRelais.jsx";
 import { CarteTournee, TourneePleinEcran } from "./Tournee.jsx";
+import { UneLigne } from "./UneLigne.jsx";
 import { GlisserVente, useDeposeDiffere, BarreAnnulerDepose } from "./GlisserDepose.jsx";
 import { beneficeLigneVente, texteBenefice, euros as eurosLigne } from "./beneficeLigne.js";
 import { etapesTournee, arretsTournee, gestesDepuis } from "./tournee.js";
@@ -11457,7 +11458,7 @@ function BarresSemaine({ jours }) {
   const H = Math.round(Math.max(Hmin, Math.min(240, Hdispo || 0))), haut = 18, bas = 34;
   const base = H - bas, plot = base - haut;
   const col = W / 7;
-  const larg = Math.max(10, Math.min(compact ? 26 : 30, col * 0.56));
+  const larg = Math.max(10, Math.min(compact ? 28 : 44, col * 0.5));
   const X = (i) => col * i + col / 2;
   const vus = jours.filter((j) => !j.futur);
   const max = Math.max(1, ...vus.map((j) => j.vendu.eur));
@@ -36800,6 +36801,33 @@ function GrilleJournee({ dispo, poser, rendus, edition, setEdition, peutModifier
   const [ajout, setAjout] = React.useState(false);
   const liste = ordre || dispo;
   const cle = liste.map((w) => w.id + ':' + w.t).join(',');
+  // (1er nov.) AUCUNE RANGÉE À MOITIÉ VIDE. Julien : « le bloc chiffres n'occupe
+  // que la moitié gauche ». Une rangée que ses widgets ne remplissent pas (une
+  // carte retirée, une autre muette aujourd'hui) se partage la place restante :
+  // chaque widget AFFICHÉ de la rangée s'élargit d'autant. Hors mode « Modifier »
+  // seulement — là, chaque widget montre sa vraie taille, celle qu'il choisit.
+  // Deux grilles : 6 colonnes (≥ 1280 px) et 2 colonnes (1024–1279 px).
+  const etirer = (cols, spanDe) => {
+    const out = {};
+    if (edition) return out;
+    let rang = [], somme = 0;
+    const clore = () => {
+      const reste = cols - somme;
+      if (reste > 0 && rang.length) rang.forEach((w, k) => { const s = spanDe(w.t) + Math.floor(reste / rang.length) + (k >= rang.length - (reste % rang.length) ? 1 : 0); out[w.id] = Math.min(cols, s); });
+      rang = []; somme = 0;
+    };
+    for (const w of liste) {
+      if (!rendus[w.id]) continue;
+      const s = Math.min(cols, spanDe(w.t));
+      if (somme + s > cols) clore();
+      rang.push(w); somme += s;
+      if (somme === cols) clore();
+    }
+    clore();
+    return out;
+  };
+  const etire6 = etirer(6, (t) => ({ petit: 1, moyen: 2, grand: 4, pleine: 6 })[t] || 6);
+  const etire2 = etirer(2, (t) => ({ petit: 1, moyen: 1 })[t] || 2);
 
   // Les places AVANT un changement d'ordre, de taille, un retrait ou un ajout :
   // les voisins glissent ensuite de là vers leur nouvelle place (FLIP).
@@ -36998,6 +37026,7 @@ function GrilleJournee({ dispo, poser, rendus, edition, setEdition, peutModifier
           return (
             <div key={w.id} ref={(el) => { if (el) elems.current.set(w.id, el); else elems.current.delete(w.id); }}
               className="vrm-widget" data-widget={w.id} data-taille={w.t} data-vide={corps ? undefined : ''} data-tire={tire === w.id ? '' : undefined}
+              data-etire6={etire6[w.id] || undefined} data-etire2={etire2[w.id] || undefined} style={{ '--etire6': etire6[w.id] || undefined, '--etire2': etire2[w.id] || undefined }}
               data-fixe={d.fixe ? '' : undefined} data-sans-carte={d.carte === false ? '' : undefined}
               tabIndex={edition ? 0 : undefined} role={edition ? 'group' : undefined} aria-label={edition ? `${d.nom} — flèches pour déplacer${d.fixe ? '' : ', Suppr pour retirer'}` : undefined}
               onPointerDown={surDown(w.id)} onPointerMove={surMove} onPointerUp={surUp} onPointerCancel={surUp} onKeyDown={clavier(w.id)}>
@@ -46966,11 +46995,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         // retard, colis eBay à ne pas poster, coché « posté » mais pas parti) ne
         // sont PAS des widgets : elles restent en tête, et on ne peut pas les retirer.
         const aWidget = (id) => dispoJournee.some(w => w.id === id);
-        const alertesArgent = jobs.filter(j => j.urgent);
+        let alertesArgent = jobs.filter(j => j.urgent);
         // Un widget « Déclaration URSSAF » sur l'écran PREND la ligne de
         // l'échéance : elle n'est plus dans « À faire » (dite une fois, §7).
-        const urssafJob = aWidget('urssaf') ? jobs.find(j => !j.urgent && j.id === 'urssaf') : null;
-        const jobsAFaire = jobs.filter(j => !j.urgent && j !== urssafJob);
+        let urssafJob = aWidget('urssaf') ? jobs.find(j => !j.urgent && j.id === 'urssaf') : null;
+        let jobsAFaire = jobs.filter(j => !j.urgent && j !== urssafJob);
         const ko = nomsVentesKO.length > 0;
         // (22 oct.) `loading` ne vaut vrai que si les comptes sont connus ET que
         // les QUATRE lectures manquent. Avant que la liste des comptes soit
@@ -47029,7 +47058,28 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             return { ...t, arrets };
           } catch (_) { return null; }
         })();
-        const allerDansColis = (sel) => { const t0 = Date.now(); const essai = () => { const el = document.querySelector(sel); if (el) { try { el.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch (_) { el.scrollIntoView(); } return; } if (Date.now() - t0 < 6000) setTimeout(essai, 150); }; setTimeout(essai, 150); };
+        // ── (1er nov.) LE MÊME NOMBRE N'EST PAS ÉCRIT TROIS FOIS (§7) ─────────
+        // Julien (capture à 1512 px) : « 10 bordereaux » dans la Tournée, dans la
+        // case « 10 À envoyer » et dans la carte « Emballer les colis prêts ».
+        // Quand la Tournée est là, ELLE porte ces nombres : l'étape Emballer =
+        // la case « À envoyer », l'étape Retirer = la case « À retirer » (même
+        // source, `vrm_colis_aposter` / `vrm_colis_retirer`, banc `tournee`).
+        // Les deux cases de la barre se taisent (elles restent dans la page, sans
+        // s'afficher, avec leurs data-*) ; ce que disait leur couleur (colis en
+        // retard, dernier jour de retrait) est dit par l'étape elle-même : sa
+        // ligne « le plus pressé » passe en ambre (Tournee.jsx). La ligne
+        // « Emballer les colis prêts » n'est pas redite : l'étape Emballer ouvre
+        // le même mode. Une PETITE case qu'il a ajoutée lui-même reste : c'est
+        // son choix (Modifier → Ajouter).
+        const casesDansTournee = !!(tournee && tournee.utile);
+        if (casesDansTournee) {
+          for (let k = jobs.length - 1; k >= 0; k--) if (jobs[k].id === 'emballer') jobs.splice(k, 1);
+          jobs.sort((a,b)=>a.prio-b.prio);
+          alertesArgent = jobs.filter(j => j.urgent);
+          urssafJob = aWidget('urssaf') ? jobs.find(j => !j.urgent && j.id === 'urssaf') : null;
+          jobsAFaire = jobs.filter(j => !j.urgent && j !== urssafJob);
+        }
+        const allerDansColis =(sel) => { const t0 = Date.now(); const essai = () => { const el = document.querySelector(sel); if (el) { try { el.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch (_) { el.scrollIntoView(); } return; } if (Date.now() - t0 < 6000) setTimeout(essai, 150); }; setTimeout(essai, 150); };
         const ouvrirEtapeTournee = (id) => {
           if (id === 'imprimer') {
             // L'impression EXISTANTE de Colis (« Imprimer les N prêts ») : ouverte
@@ -47052,74 +47102,76 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           if (id === 'deposer') { if (onNav) onNav('cat_bord'); allerDansColis('[data-colis-detail]'); return; }
           if (id === 'retirer') { if (onNav) onNav('retraits'); try { window.dispatchEvent(new CustomEvent('vrm:ancre-retraits')); } catch (_) {} }
         };
-        const tacheSimple = (j, i) => (
-          <button className="vrm-day-task" key={(j.id||'j')+i} type="button" title={j.sub} data-job={j.id||undefined} data-n={j.n!=null?j.n:undefined} data-limite-heure={j.limiteHeure!=null?j.limiteHeure:undefined} data-urssaf-echeance={j.urssaf?j.urssaf.dueIso:undefined} data-urssaf-apayer={j.urssaf?(j.urssaf.apayer==null?'':String(j.urssaf.apayer)):undefined} data-urssaf-partiel={j.urssaf&&j.urssaf.partiel?'1':undefined} onClick={()=>{ if (j.avant) j.avant(); if (onNav) onNav(j.tab); }} style={{display:'flex',alignItems:'center',gap:13,padding:'14px 15px',borderRadius:10,border:`1px solid ${C.border}`,background:C.card,boxShadow:C.shadow||'none',cursor:'pointer',textAlign:'left',width:'100%',minWidth:0,fontFamily:'inherit'}}>
-            {/* ⚠️ Avant : un carré de 46 px teinté à la couleur du statut,
-                avec un EMOJI de 24 px dedans. Trois de ces pavés colorés
-                empilés, c'est ce qui faisait « application générée ».
-                Maintenant : une pastille neutre et l'icône au trait, du
-                même dessin que la barre du bas. La couleur ne sert plus
-                qu'à l'icône et au chevron — le fond reste calme. */}
-            {/* 30 sept. — « pas assez de photos » : une action qui porte
-                des paires les MONTRE (jusqu'à 3 vignettes en éventail) ;
-                les autres gardent leur icône. */}
-            {j.photos && j.photos.length
-              ? <div style={{display:'flex',flexShrink:0,paddingRight:2}}>
-                  {j.photos.map((ph,k)=>(
-                    <PhotoVinted key={ph} src={ph} alt="" loading="lazy" onError={()=>noterImgMorte(ph)}
-                      style={{width:46,height:46,borderRadius:8,objectFit:'cover',border:`2px solid ${C.card}`,marginLeft:k?-18:0,background:C.bg,boxShadow:'0 1px 3px rgba(0,0,0,.25)'}}/>
-                  ))}
-                </div>
-              : <div style={{width:42,height:42,borderRadius:8,background:C.bg,border:`1px solid ${C.border}`,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,color:j.color}}><Icon name={j.icon} size={20}/></div>}
-            <div style={{flex:1,minWidth:0}}>
-              <div className="vrm-day-task-title" style={{fontSize:15,fontWeight:700,color:C.text}}>{j.title}</div>
-              {/* ⚠️ UNE URGENCE ÉCRITE EN GRIS N'EST PAS UNE URGENCE.
-                  « 3 en retard — à poster en priorité » et « 3 hors
-                  délai — va vite les chercher » se lisaient de la même
-                  couleur que « Bordereau + paire au stock ». La
-                  consigne porte la couleur seulement quand il y a
-                  vraiment quelque chose à rattraper (§5.65 : c'est le
-                  chiffre qui se colore, pas le fond). */}
-              <div className="vrm-day-task-note" style={{fontSize:12,color:j.urgent?j.color:C.muted,fontWeight:j.urgent?600:400,marginTop:2,lineHeight:1.35}}>{j.sub}</div>
-            </div>
-            <span className="vrm-day-task-action" style={{fontSize:12,color:j.color,fontWeight:600,flexShrink:0}}>{j.action || 'Voir'} <span aria-hidden="true">›</span></span>
+        // ── (1er nov.) « À FAIRE » EN LISTE RÉGULIÈRE ─────────────────────────
+        // Julien : « ça fait bordel » — des cartes de largeurs et de hauteurs
+        // différentes, des textes de 3-4 lignes. Une ligne par alerte : l'icône,
+        // un titre COURT, UNE ligne de détail (coupée à la fin d'un mot, jamais
+        // au milieu : `UneLigne`), « Voir ». Le texte entier reste dans
+        // l'infobulle et dans le nom du bouton (lecteur d'écran). Les phrases
+        // sont celles d'avant, découpées à l'affichage : la partie avant « — »
+        // est le titre, le reste et le sous-titre font le détail. Aucune règle,
+        // aucune alerte, aucune cible ne change.
+        const decouper = (j) => {
+          const titre = String(j.title || '');
+          const k = j.court ? -1 : titre.indexOf(' — ');
+          const court = j.court || (k > 0 ? titre.slice(0, k) : titre);
+          const reste = j.court ? (titre !== j.court ? titre : '') : (k > 0 ? titre.slice(k + 3) : '');
+          // La suite de la phrase du titre prend sa majuscule ; un sous-titre garde la sienne
+          // (il peut commencer par un nom de compte : « boutique_pro (2), … »).
+          const det = [reste ? reste.charAt(0).toUpperCase() + reste.slice(1) : '', j.sub].filter(Boolean).join(' · ');
+          return { court, detail: det };
+        };
+        const corpsTache = (j, x) => (<>
+          {j.photos && j.photos.length
+            ? <span className="vrm-day-task-photos" aria-hidden="true">
+                {j.photos.map((ph,k)=>(
+                  <PhotoVinted key={ph} src={ph} alt="" loading="lazy" onError={()=>noterImgMorte(ph)} style={{marginLeft:k?-14:0}}/>
+                ))}
+              </span>
+            : <span className="vrm-day-task-ic" aria-hidden="true" style={{color:j.color}}><Icon name={j.icon} size={20}/></span>}
+          <span className="vrm-day-task-textes">
+            <UneLigne className="vrm-day-task-title" texte={x.court} lignesTel={2}/>
+            {x.detail ? <UneLigne className={'vrm-day-task-note' + (j.urgent ? ' is-urgent' : '')} texte={x.detail} lignesTel={2}/> : null}
+          </span>
+        </>);
+        const tacheSimple = (j, i) => { const x = decouper(j); const plein = x.detail ? `${x.court}\n${x.detail}` : x.court; return (
+          <button className={'vrm-day-task' + (j.urgent ? ' is-urgent' : '')} key={(j.id||'j')+i} type="button" title={plein} aria-label={plein.replace('\n', ' — ')} data-job={j.id||undefined} data-n={j.n!=null?j.n:undefined} data-limite-heure={j.limiteHeure!=null?j.limiteHeure:undefined} data-urssaf-echeance={j.urssaf?j.urssaf.dueIso:undefined} data-urssaf-apayer={j.urssaf?(j.urssaf.apayer==null?'':String(j.urssaf.apayer)):undefined} data-urssaf-partiel={j.urssaf&&j.urssaf.partiel?'1':undefined} onClick={()=>{ if (j.avant) j.avant(); if (onNav) onNav(j.tab); }}>
+            {corpsTache(j, x)}
+            <span className="vrm-day-task-action" style={j.urgent ? {color:j.color} : undefined}><span className="vrm-day-task-action-mot">{j.action || 'Voir'} </span><span aria-hidden="true">›</span></span>
           </button>
-        );
-        // (22 oct., chantier URSSAF) LE RAPPEL URSSAF PORTE SON GESTE : « C'est
-        // déclaré » à côté de « Voir ». Un bouton ne se met pas dans un bouton :
-        // la ligne devient un groupe de deux, même surface, mêmes attributs.
-        const tache = (j, i) => (j.urssaf && Array.isArray(j.urssaf.aNoter) && j.urssaf.aNoter.length > 0) ? (
-          <div className="vrm-day-task" key={(j.id||'j')+i} role="group" data-job={j.id||undefined} data-n={j.n!=null?j.n:undefined} data-urssaf-echeance={j.urssaf.dueIso} data-urssaf-apayer={j.urssaf.apayer==null?'':String(j.urssaf.apayer)} data-urssaf-partiel={j.urssaf.partiel?'1':undefined}
-            style={{display:'flex',alignItems:'center',gap:13,padding:'14px 15px',borderRadius:10,border:`1px solid ${C.border}`,background:C.card,boxShadow:C.shadow||'none',textAlign:'left',width:'100%',minWidth:0,boxSizing:'border-box',flexWrap:'wrap',gridColumn:'1 / -1'}}>
-            <button type="button" title={j.sub} onClick={()=>{ if (j.avant) j.avant(); if (onNav) onNav(j.tab); }} style={{display:'flex',alignItems:'center',gap:13,flex:'1 1 220px',minWidth:0,background:'transparent',border:0,padding:0,margin:0,cursor:'pointer',textAlign:'left',fontFamily:'inherit',color:'inherit'}}>
-              <div style={{width:42,height:42,borderRadius:8,background:C.bg,border:`1px solid ${C.border}`,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,color:j.color}}><Icon name={j.icon} size={20}/></div>
-              <div style={{flex:1,minWidth:0}}>
-                <div className="vrm-day-task-title" style={{fontSize:15,fontWeight:700,color:C.text}}>{j.title}</div>
-                <div className="vrm-day-task-note" style={{fontSize:12,color:C.muted,fontWeight:400,marginTop:2,lineHeight:1.35}}>{j.sub}</div>
-              </div>
-              <span className="vrm-day-task-action" aria-hidden="true" style={{fontSize:16,color:j.color,fontWeight:600,flexShrink:0}}>›</span>
+        ); };
+        // (22 oct., chantier URSSAF) LE RAPPEL URSSAF PORTE SON GESTE : « Noter ma
+        // déclaration » à côté. Un bouton ne se met pas dans un bouton : la ligne
+        // devient un groupe de deux, même forme, mêmes attributs.
+        const tache = (j, i) => { if (!(j.urssaf && Array.isArray(j.urssaf.aNoter) && j.urssaf.aNoter.length > 0)) return tacheSimple(j, i);
+          const x = decouper(j); const plein = x.detail ? `${x.court}\n${x.detail}` : x.court;
+          return (
+          <div className="vrm-day-task is-groupe" key={(j.id||'j')+i} role="group" data-job={j.id||undefined} data-n={j.n!=null?j.n:undefined} data-urssaf-echeance={j.urssaf.dueIso} data-urssaf-apayer={j.urssaf.apayer==null?'':String(j.urssaf.apayer)} data-urssaf-partiel={j.urssaf.partiel?'1':undefined} title={plein}>
+            <button type="button" className="vrm-day-task-ouvrir" aria-label={plein.replace('\n', ' — ')} onClick={()=>{ if (j.avant) j.avant(); if (onNav) onNav(j.tab); }}>
+              {corpsTache(j, x)}
             </button>
-            <Bouton variante="secondaire" icone="check" className="vrm-b-petit" data-urssaf-cest-declare={j.urssaf.aNoter[0]} onClick={()=>demanderDeclaration(j.urssaf.aNoter[0], onNav)} style={{flexShrink:0}}>
+            <Bouton variante="secondaire" icone="check" className="vrm-b-petit vrm-day-task-geste" data-urssaf-cest-declare={j.urssaf.aNoter[0]} onClick={()=>demanderDeclaration(j.urssaf.aNoter[0], onNav)}>
               {j.urssaf.mois && j.urssaf.mois.length > 1 ? `Noter ma déclaration — ${(() => { const [y, m] = j.urssaf.aNoter[0].split('-'); return new Date(Number(y), Number(m) - 1, 1).toLocaleDateString('fr-FR', { month: 'long' }); })()}` : 'Noter ma déclaration'}
             </Bouton>
           </div>
-        ) : tacheSimple(j, i);
+        ); };
         const listeTaches = (liste, attr) => (
-          <div className="vrm-day-task-list" {...attr} style={{display:'grid',gridTemplateColumns:'repeat(auto-fit, minmax(min(340px, 100%), 1fr))',gap:10}}>
+          <div className="vrm-day-task-list" {...attr}>
             {liste.map(tache)}
           </div>
         );
         const vuHero = !baseKO && !premierJour && !loading && sales.items;
         const W = {};
         W.barre = (!baseKO && !premierJour) ? (
-          <div data-barre-jour="" className="vrm-day-bar" style={{border:`1px solid ${C.border}`,background:C.card,boxShadow:C.shadow||'none'}}>
+          <div data-barre-jour="" className="vrm-day-bar" data-barre-tournee={casesDansTournee ? '' : undefined}>
             {T.map((x, k) => {
               const n = x.t ? x.t.n : 0;
               const vif = !x.pasSu && n > 0;
+              // La Tournée porte « à envoyer » et « à retirer » (voir `casesDansTournee`).
+              const tu = casesDansTournee && (x.id === 'envoyer' || x.id === 'retirer');
               return (
-                <button key={x.id} type="button" data-tuile={x.id} data-n={x.pasSu ? '' : String(n)} data-ebay={(x.id === 'envoyer' || x.id === 'messages') && x.t && x.t.ebay !== undefined ? (x.t.ebay === null ? 'passu' : String(x.t.ebay)) : undefined} title={x.pasSu ? (x.titrePasSu || 'Pas encore lu') : (x.t && x.t.sub) || ''} onClick={()=>onNav&&onNav(x.tab)}
-                  style={{borderLeft: k ? `1px solid ${C.border}` : 'none'}}>
-                  <span className="vrm-day-bar-ic" style={{color:x.t && x.t.alerte ? C.warn : vif ? C.accent : C.muted}}><Icon name={x.ic} size={18}/></span>
+                <button key={x.id} type="button" hidden={tu} data-tuile-dans-tournee={tu ? '' : undefined} data-tuile={x.id} data-n={x.pasSu ? '' : String(n)} data-ebay={(x.id === 'envoyer' || x.id === 'messages') && x.t && x.t.ebay !== undefined ? (x.t.ebay === null ? 'passu' : String(x.t.ebay)) : undefined} title={x.pasSu ? (x.titrePasSu || 'Pas encore lu') : (x.t && x.t.sub) || ''} onClick={()=>onNav&&onNav(x.tab)}>
+                  <span className="vrm-day-bar-ic" style={{color:x.t && x.t.alerte ? C.warn : C.muted}}><Icon name={x.ic} size={18}/></span>
                   <span className="vrm-display vrm-day-bar-n" style={{color:vif ? C.text : C.muted}}>{x.pasSu ? '—' : n}</span>
                   <span className="vrm-day-bar-l" style={{color:C.muted}}>{x.l}</span>
                 </button>
@@ -47260,7 +47312,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                         {num && <span style={{position:'absolute',top:9,right:9,fontSize:10.5,fontWeight:700,color:'#fff',background:'rgba(11,15,21,.62)',borderRadius:8,padding:'2px 8px'}}>N°{num}</span>}
                       </div>
                       <div style={{padding:'10px 11px 11px'}}>
-                        <div style={{fontSize:13.5,fontWeight:600,color:C.text,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{o.title||'—'}</div>
+                        <UneLigne texte={o.title||'—'} title={o.title||undefined} style={{display:'block',fontSize:13.5,fontWeight:600,color:C.text,overflow:'hidden',whiteSpace:'nowrap'}}/>
                         <div style={{display:'flex',alignItems:'baseline',justifyContent:'space-between',gap:8,marginTop:4}}>
                           <span className="vrm-display" style={{fontSize:15,fontWeight:700,color:C.text}}>{montantCommande(o).toFixed(0)} €</span>
                         </div>
@@ -47334,14 +47386,18 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             avecAttente
               ? { id: 'panier', l: 'Panier moyen 30 j', n: R.panier30.moyen == null ? '—' : <Montant v={R.panier30.moyen}/>, sous: null, titre: R.panier30.n ? `sur ${R.panier30.n} vente${R.panier30.n > 1 ? 's' : ''} en 30 jours` : 'aucune vente en 30 jours', v: R.panier30.moyen }
               : { id: 'attente', l: 'En attente', n: loading ? '—' : <Montant v={valAttente} prefixe={escrowJ ? '' : '≈ '}/>, sous: escrowJ ? null : 'estimation', titre: escrowJ ? 'chez Vinted' : `${inRoute.length} vente${inRoute.length > 1 ? 's' : ''} en cours · estimation`, v: valAttente },
-          ];
+          // (1er nov.) Une tendance SANS BASE (« — aucune date », « pas de moyenne »)
+          // n'est pas un chiffre : elle ne prend pas une case. Statistiques la dit,
+          // avec sa raison (rythme, stock qui dort) — la carte y mène.
+          ].filter((c) => c.v != null && !(loading && c.id === 'attente'));
+          if (!cases.length) return null;
           return (
             <div className="vrm-day-card vrm-day-tendances vrm-jc" data-widget-tendances="" style={{border:`1px solid ${C.border}`,background:C.card}}>
               <div className="vrm-day-head">
                 <span className="vrm-day-k" style={{color:C.muted}}>Tendances</span>
                 <Bouton variante="discret" className="vrm-day-lien" data-tendances-stats="" href="?tab=dashboard" onClick={(ev)=>{ ev.preventDefault(); if (onNav) onNav('dashboard'); }}>Statistiques ›</Bouton>
               </div>
-              <div className="vrm-jc-rangee vrm-jc-4 vrm-jc-tendances">
+              <div className={`vrm-jc-rangee${cases.length > 3 ? ' vrm-jc-4' : ''} vrm-jc-tendances`} data-tendances-n={cases.length} style={{ '--n': cases.length }}>
                 {cases.map((c) => (
                   <button key={c.id} type="button" className="vrm-jc-cell vrm-jc-tendance" data-tendance={c.id} data-v={c.v == null ? '' : String(c.v)} title={c.titre} onClick={()=>onNav&&onNav('dashboard')}>
                     <span className="vrm-jc-l">{c.l}</span>
@@ -47388,7 +47444,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             {/* LES ALERTES QUI COÛTENT DE L'ARGENT : toujours en tête, hors grille,
                 jamais retirables — une alerte cachée, c'est une paire vendue deux
                 fois ou un colis qui ne part pas. */}
-            {!loading && alertesArgent.length>0 && listeTaches(alertesArgent, {'data-alertes-argent': ''})}
+            {!loading && alertesArgent.length>0 && (
+              <section className="vrm-day-urgent" aria-label="Urgent">
+                <h2 className="vrm-day-titre-section">Urgent</h2>
+                {listeTaches(alertesArgent, {'data-alertes-argent': ''})}
+              </section>
+            )}
             {editJournee && !loading && alertesArgent.length>0 && (
               <div className="vrm-aide" data-alertes-fixes="" style={{fontSize:12,color:C.muted,margin:'-4px 2px 12px'}}>Ces alertes restent en tête : elles peuvent te coûter de l'argent.</div>
             )}
