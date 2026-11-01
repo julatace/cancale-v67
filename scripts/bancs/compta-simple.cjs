@@ -291,10 +291,13 @@ async function scenarioC(b, vp, sombre) {
     await ouvrir(pg, 'journee');
     await pg.waitForTimeout(2500);
     if (tel) {
-      await pg.locator('.vrm-tabbar').getByRole('button', { name: 'Gestion', exact: true }).click();
-      await pg.getByRole('menuitem', { name: 'Comptabilité', exact: true }).waitFor({ timeout: 8000 });
-      check(await pg.getByRole('menuitem', { name: 'Comptabilité', exact: true }).isVisible(), `C ${nom} — le menu Gestion s'ouvre (Comptabilité y est)`);
-      check((await pg.getByRole('menuitem', { name: 'Organisation', exact: true }).count()) === 0, `C ${nom} — « Organisation » n'est plus dans le menu Gestion`);
+      // (1er nov.) La barre du bas n'a plus « Gestion » : la navigation par tâche range
+      // Comptabilité sous « Plus ». La règle jugée reste la même (le menu la porte,
+      // Organisation n'y est pas).
+      await pg.locator('.vrm-tabbar').getByRole('button', { name: 'Plus', exact: true }).click();
+      await pg.getByRole('menuitem', { name: /^Comptabilité/ }).first().waitFor({ timeout: 8000 });
+      check(await pg.getByRole('menuitem', { name: /^Comptabilité/ }).first().isVisible(), `C ${nom} — le menu Plus s'ouvre (Comptabilité y est)`);
+      check((await pg.getByRole('menuitem', { name: /^Organisation/ }).count()) === 0, `C ${nom} — « Organisation » n'est pas dans le menu Plus`);
       await pg.keyboard.press('Escape');
     } else {
       check((await pg.locator('.vrm-sidebar').getByRole('button', { name: 'Comptabilité', exact: true }).count()) === 1, `C ${nom} — le rail porte Comptabilité`);

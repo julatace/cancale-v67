@@ -7,8 +7,8 @@ export function etatExtensionAffichage({presente,version,retard=false}){
 export function etatDerniereLecture(valeur,maintenant=Date.now()){
  if(valeur===undefined)return {etat:'lecture',titre:'Vérification en cours…'};
  if(valeur===null||!Number.isFinite(valeur.n)||valeur.n<0)return {etat:'inconnue',titre:'Lecture impossible · à réessayer'};
- if(valeur.n===0)return {etat:'vide',titre:'Aucune donnée enregistrée pour cette source'};
+ if(valeur.n===0)return {etat:'vide',titre:'Rien reçu pour l’instant'};
  if(!Number.isFinite(valeur.ts)||valeur.ts<=0)return {etat:'inconnue',titre:'Données présentes · date non vérifiée'};
- if(valeur.ts>maintenant+300000)return {etat:'inconnue',titre:'Horodatage à vérifier'};
- return {etat:'observee',titre:'Mise à jour observée',date:new Date(valeur.ts).toISOString()};
+ if(valeur.ts>maintenant+300000)return {etat:'inconnue',titre:'Date à vérifier'};
+ return {etat:'observee',titre:'Dernière arrivée',date:new Date(valeur.ts).toISOString()};
 }

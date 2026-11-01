@@ -11,21 +11,24 @@
 //   3. LA PREMIÈRE ÉTAPE : brancher l'extension (Ma journée la détaille).
 // Rien n'est imposé : ni statut fiscal (jamais au démarrage, 27 oct.), ni
 // plateforme. Les écrans illustrés disent « exemple » : ce ne sont pas ses
-// données (§2.3). Vue une fois ⇒ `vrm_bienvenue_vue` (synchronisé) ; « Revoir
-// la présentation » dans Réglages → Affichage la rouvre.
+// données (§2.3). Vue une fois ⇒ `vrm_bienvenue_vue` (synchronisé). (La ligne
+// « Présentation de VRM » des Réglages a été retirée le 27 oct., sa demande :
+// la présentation ne se rouvre plus.)
+// (1er nov.) Vestiaire Collective, géré par VRM depuis le 27 oct., est nommé
+// avec les autres plateformes ; « Réglages » devient le chemin réel.
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 
 export const DEMO_BIENVENUE = [
   { cle: 'journee', titre: 'Ma journée', texte: "Chaque matin, l'essentiel : les colis à poster avant leur heure limite, ceux à retirer avec leur code, tes messages et l'argent reçu.",
     lignes: [['Colis à poster', 'avant 10 h'], ['À retirer', 'code 482 913'], ['Messages', '3 non lus']] },
-  { cle: 'plateformes', titre: 'Tes plateformes', texte: "Vinted, Leboncoin et eBay au même endroit : ventes, annonces, messages. Une paire vendue d'un côté est signalée ailleurs, pour ne jamais la vendre deux fois.",
+  { cle: 'plateformes', titre: 'Tes plateformes', texte: "Vinted, Leboncoin, eBay et Vestiaire Collective au même endroit : ventes, annonces, messages. Une paire vendue d'un côté est signalée ailleurs, pour ne jamais la vendre deux fois.",
     lignes: [['Vinted', 'vendue'], ['Leboncoin', 'à retirer'], ['eBay', 'à retirer']] },
   { cle: 'numeros', titre: 'Un numéro par paire', texte: "Chaque paire reçoit un numéro à écrire sur sa boîte. Il est tamponné sur le bordereau et te montre où elle est rangée. Deux paires n'ont jamais le même.",
     lignes: [['N°41', 'étagère 2 · case 3'], ['N°42', 'étagère 2 · case 4'], ['N°43', 'à ranger']] },
   { cle: 'compta', titre: 'Ta compta', texte: "Ce que tu vends, ce que tu reçois, ton bénéfice. Et selon ton statut, ce que tu dois déclarer. Rien n'est imposé : tu choisis quand tu veux.",
     lignes: [['Vendu ce mois', '1 240 €'], ['Reçu', '980 €'], ['Bénéfice', '+ 410 €']] },
-  { cle: 'extension', titre: "L'extension", texte: "Une extension pour ton navigateur lit tes ventes, tes colis et tes bordereaux sur Vinted, Leboncoin et eBay. C'est la première chose à installer : on t'accompagne pas à pas.",
+  { cle: 'extension', titre: "L'extension", texte: "Une extension pour ton navigateur lit tes ventes, tes colis et tes bordereaux sur Vinted, Leboncoin, eBay et Vestiaire. C'est la première chose à installer : on t'accompagne pas à pas.",
     lignes: [['Ventes', 'lues'], ['Bordereaux', 'prêts à imprimer'], ['Colis', 'suivis']] },
 ];
 
@@ -110,7 +113,7 @@ export default function Bienvenue({ prenom = '', dark = false, onTheme, onTermin
           <div className="vrm-bienvenue-corps" key="univers">
             <p className="vrm-bienvenue-sur">Bienvenue{prenom ? `, ${prenom}` : ''}</p>
             <h2 id="vrm-bienvenue-titre">Choisis ton univers</h2>
-            <p className="vrm-bienvenue-texte">Un clic, et VRM prend ses couleurs. Tu pourras changer quand tu veux dans Réglages.</p>
+            <p className="vrm-bienvenue-texte">Un clic, et VRM prend ses couleurs. Tu pourras changer quand tu veux dans Paramètres → Affichage.</p>
             <div className="vrm-bienvenue-univers" role="radiogroup" aria-label="Univers">
               {[['clair', 'Clair', 'Lumineux, pour la journée', false], ['nuit', 'Nuit', 'Sombre, reposant le soir', true]].map(([k, t, s, d]) => (
                 <button key={k} type="button" role="radio" aria-checked={dark === d} data-univers={k} data-choisi={dark === d ? '1' : '0'} onClick={() => onTheme && onTheme(d)}>
@@ -142,7 +145,8 @@ export default function Bienvenue({ prenom = '', dark = false, onTheme, onTermin
                   {voix ? '⏸ Couper la voix' : '🔊 Écouter la visite'}
                 </button>
               )}
-              <button type="button" className="vrm-bienvenue-principal" data-bienvenue-suivant onClick={suivant}>{etape === n ? 'Terminer' : 'Suivant'}</button>
+              <button type="button" className="vrm-bienvenue-principal" data-bienvenue-suivant onClick={suivant}>{/* (1er nov.) « Terminer » au 5ᵉ écran ne terminait rien : un écran suit (« Prêt »). */}
+              Suivant</button>
             </div>
           </div>
         )}

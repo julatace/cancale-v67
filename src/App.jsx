@@ -5735,7 +5735,7 @@ const tauxUrssaf = () => tauxDe(load('vinted_urssaf_taux', TAUX_URSSAF_DEFAUT));
 // cotisations du bénéfice, carte URSSAF : tous passent par elle (§11).
 const REGIMES_FISCAUX = [
   ['particulier', 'Particulier', 'Je vends mes propres affaires', "Rien à déclarer à l'URSSAF : VRM ne calcule aucune cotisation."],
-  ['micro', 'Micro-entrepreneur', 'Auto-entrepreneur, achat-revente', 'VRM estime tes cotisations URSSAF sur ce que tu encaisses.'],
+  ['micro', 'Micro-entrepreneur', 'Auto-entrepreneur, achat-revente', 'VRM estime tes cotisations URSSAF sur ce que tu reçois.'],
   ['societe', 'Société', 'SAS, SASU, SARL, EURL…', "Tes impôts et cotisations ne se calculent pas sur le chiffre d'affaires : VRM ne les estime pas."],
   ['marge', 'Régime de la marge', 'Société, TVA sur la marge', 'VRM calcule la TVA sur ta marge.'],
 ];
@@ -15059,7 +15059,7 @@ function PorteNouveauOAuth({ fournisseur, email, onContinuer }) {
       </>}
       {etape === 'confirmer' && <>
         <h1 id="vrm-nouveau-oauth-titre" style={{ fontSize: 20, margin: '0 0 10px' }}>Supprimer ce compte vide ?</h1>
-        <p style={{ fontSize: 14, lineHeight: 1.5, margin: '0 0 18px', color: C.muted }}>Ton vrai compte n’est pas touché. Ensuite : connecte-toi {deja ? <>avec <strong>{deja.email}</strong></> : 'avec ton email'}, puis Réglages → Mon compte → Comptes associés → « Connecter {nom} ». La prochaine fois, « Se connecter avec {nom} » ouvrira ton vrai compte.</p>
+        <p style={{ fontSize: 14, lineHeight: 1.5, margin: '0 0 18px', color: C.muted }}>Ton vrai compte n’est pas touché. Ensuite : connecte-toi {deja ? <>avec <strong>{deja.email}</strong></> : 'avec ton email'}, puis Paramètres → Mon compte → Comptes associés → « Connecter {nom} ». La prochaine fois, « Se connecter avec {nom} » ouvrira ton vrai compte.</p>
         {err && <p role="alert" style={{ fontSize: 13, color: C.warn || C.text, margin: '0 0 12px' }}>{err}</p>}
         <div style={{ display: 'grid', gap: 10 }}>
           <button type="button" className="vrm-b vrm-b-primaire vrm-b-plein" data-nouveau-oauth="supprimer" disabled={busy || !email} onClick={supprimer}>{busy ? 'Suppression…' : 'Supprimer ce compte vide'}</button>
@@ -15068,7 +15068,7 @@ function PorteNouveauOAuth({ fournisseur, email, onContinuer }) {
       </>}
       {etape === 'fait' && <>
         <h1 id="vrm-nouveau-oauth-titre" style={{ fontSize: 20, margin: '0 0 10px' }}>C’est fait</h1>
-        <p style={{ fontSize: 14, lineHeight: 1.5, margin: '0 0 18px', color: C.muted }}>Le compte vide est supprimé. Connecte-toi avec ton email, puis Réglages → Mon compte → Comptes associés → « Connecter {nom} ».</p>
+        <p style={{ fontSize: 14, lineHeight: 1.5, margin: '0 0 18px', color: C.muted }}>Le compte vide est supprimé. Connecte-toi avec ton email, puis Paramètres → Mon compte → Comptes associés → « Connecter {nom} ».</p>
         <button type="button" className="vrm-b vrm-b-primaire vrm-b-plein" onClick={() => authSignOut()}>Aller à la connexion</button>
       </>}
     </div>
@@ -15167,7 +15167,7 @@ function PorteMfa({ session }) {
             </button>
             <div data-mfa-perdu={plusieurs ? 'autre-appareil' : 'contact'} style={{fontSize:12,color:C.muted,marginTop:14,lineHeight:1.5,borderTop:`1px solid ${C.border}`,paddingTop:12}}>
               {plusieurs
-                ? <><b style={{color:C.text}}>Un appareil perdu ou changé ?</b> Entre avec le code d'un AUTRE de tes appareils, puis retire celui qui est perdu dans Réglages → Mon compte → Double vérification.</>
+                ? <><b style={{color:C.text}}>Un appareil perdu ou changé ?</b> Entre avec le code d'un AUTRE de tes appareils, puis retire celui qui est perdu dans Paramètres → Mon compte → Double vérification.</>
                 : <><b style={{color:C.text}}>Plus accès à ton app (téléphone perdu ou changé) ?</b> La double vérification ne se retire pas depuis cet écran. Écris à VRM depuis l'adresse email de ton compte : {contact
                   ? <a href={`mailto:${contact}`} style={{color:C.accent,textDecoration:'none'}}>{contact}</a>
                   : <span data-contact-absent="">{CONTACT_A_VENIR}</span>}.</>}
@@ -17126,7 +17126,7 @@ function EtatActions({ onNav, ordi, sombre }) {
   // ── LE geste qui débloque (un seul) ─────────────────────────────────────────
   let geste = null;
   if (code === 'telephone' && rl.niveau === 'perime') geste = <span data-etat-geste="ordinateur">Ouvre Chrome sur ton ordinateur (l'extension VRM s'y réveille toute seule) : dès qu'elle donne signe de vie, les actions reviennent ici.</span>;
-  else if (code === 'telephone' && rl.niveau === 'retard') geste = <span data-etat-geste="maj-ordinateur">Sur ton ordinateur : installe la {EXT_ATTENDUE} (Réglages → Extension), puis ⟳ dans chrome://extensions.</span>;
+  else if (code === 'telephone' && rl.niveau === 'retard') geste = <span data-etat-geste="maj-ordinateur">Sur ton ordinateur : installe la {EXT_ATTENDUE} (Paramètres → État des connexions), puis ⟳ dans chrome://extensions.</span>;
   // (29 oct.) Une ligne : le geste, sans la liste de ce qu'il débloque (le titre
   // « Lecture seule » et la ligne « Extension » le disent déjà, §7).
   else if (code === 'telephone') geste = <span data-etat-geste="telephone">Pour agir, ouvre VRM sur ton ordinateur.{rl.niveau === 'absent' ? <>{' '}<Pourquoi label="Et d'ici ?">Avec l’extension à jour sur ton ordinateur, tes demandes partiront aussi d’ici : elle les exécute pour toi.</Pourquoi></> : null}</span>;
@@ -17276,7 +17276,7 @@ function EtatActions({ onNav, ordi, sombre }) {
               //    (`capacitesManquantes`, tirée d'EXT_CAPACITES, §11).
               : (() => { const retard = !vmrExtPresent() && extEnRetard(derniere.v); const manque = retard ? capacitesManquantes(derniere.v) : []; return (
                 <>Dernière capture reçue de ton extension : <b style={{ color: C.text }}>{derniere.at ? ilYaCourt(derniere.at) : 'date inconnue'}</b>{derniere.v ? ` (version ${derniere.v})` : ''}. Elle écrit quand tu passes sur Vinted.
-                {retard ? <> <span style={{ color: C.warn, fontWeight: 600 }}>À mettre à jour en {EXT_ATTENDUE}</span> sur l'ordinateur où elle est installée (Réglages → Extension){manque.length ? <> : celle-ci ne sait pas encore {listeFr(manque)}.</> : '.'}</> : null}</>
+                {retard ? <> <span style={{ color: C.warn, fontWeight: 600 }}>À mettre à jour en {EXT_ATTENDUE}</span> sur l'ordinateur où elle est installée (Paramètres → État des connexions){manque.length ? <> : celle-ci ne sait pas encore {listeFr(manque)}.</> : '.'}</> : null}</>
               ); })()}
           </div>
           {geste && <div className="vrm-etat-geste" data-etat-geste-zone>{geste}</div>}
@@ -36352,7 +36352,7 @@ function ComptaLigne({ gauche, droite, onDel, extra, attrs }) {
       <span className="vrm-set-lib">{gauche}</span>
       <span className="vrm-display" style={{ fontSize: 15, fontWeight: 600, color: C.text, whiteSpace: 'nowrap', flexShrink: 0, fontVariantNumeric: 'tabular-nums' }}>{droite}</span>
       {extra}
-      <button type="button" onClick={onDel} title="Supprimer" aria-label="Supprimer" style={{ border: 'none', background: 'transparent', color: C.muted, fontSize: 20, cursor: 'pointer', flexShrink: 0, lineHeight: 1, padding: '0 2px', minHeight: 36, minWidth: 28 }}>×</button>
+      <button type="button" onClick={onDel} title="Supprimer" aria-label="Supprimer" data-compta-supprimer="" style={{ border: 'none', background: 'transparent', color: C.muted, fontSize: 20, cursor: 'pointer', flexShrink: 0, lineHeight: 1, padding: 0, minHeight: 44, minWidth: 44, marginRight: -10 }}>×</button>
     </div>
   );
 }
@@ -37151,11 +37151,13 @@ function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, pan
     if (!m) { setDErr('Le montant doit être un nombre en euros, par exemple 12,50.'); return; }
     setDErr('');
     maj({ ...data, depenses: [{ id: rCompId(), date: dDate || auj, libelle: dLib.trim(), cat: dCat, montant: m }, ...depenses] });
+    toast(`✓ Dépense ajoutée : ${fmt(m)}`);
     setDLib(''); setDMnt(''); setDCat(COMPTA_CATS[0]); setDDate(auj); setOuvert('');
   };
   const ajouterPack = () => {
     const m = parseMontant(pMnt); if (!m) return;
     maj({ ...data, packs: [{ id: rCompId(), plateforme: pPlat, compte: pCpt.trim(), montant: m, date: pDate || auj }, ...packs] });
+    toast(`✓ Pack ajouté : ${fmt(m)}`);
     setPCpt(''); setPMnt(''); setPDate(auj); setOuvert('');
   };
   // Un abonnement mal saisi n'est pas ajouté, et on DIT pourquoi (jamais en silence).
@@ -37166,10 +37168,27 @@ function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, pan
     if (!ymCompta(aDeb)) { setAErr('Il faut une date de début.'); return; }
     if (aFin && aFin < aDeb) { setAErr('La date de fin est avant la date de début.'); return; }
     maj({ ...data, abonnements: [{ id: rCompId(), libelle: aLib.trim(), montant: m, periode: aPer === 'an' ? 'an' : 'mois', debut: aDeb, fin: aFin || '' }, ...abonnements] });
+    toast(`✓ Abonnement ajouté : ${aLib.trim()}`);
     setALib(''); setAMnt(''); setAPer('mois'); setADeb(auj); setAFin(''); setAErr(''); setOuvert('');
   };
-  const terminerAbonnement = (id) => maj({ ...data, abonnements: abonnements.map(a => a.id === id ? { ...a, fin: auj } : a) });
-  const retirer = (cle, id) => maj({ ...data, [cle]: (data[cle] || []).filter(x => x.id !== id) });
+  // (1er nov.) Le « × » d'une ligne supprimait la dépense d'un toucher, sans
+  // demander ni rien dire ; « Arrêter » terminait un abonnement de même. Les
+  // deux DEMANDENT (en nommant la ligne) puis disent ce qui est fait.
+  // L'écriture part de l'état le plus frais (la confirmation est asynchrone).
+  const majFraiche = (f) => setData((cur) => { const next = f(cur); try { save('vrm_compta', next); } catch (_) {} return next; });
+  const nomLigneCompta = (cle, x) => !x ? '' : cle === 'packs' ? `Pack ${x.plateforme || ''}`.trim() : String(x.libelle || '');
+  const terminerAbonnement = async (id) => {
+    const a = abonnements.find((x) => x.id === id);
+    if (!(await askConfirm({ title: `Arrêter « ${nomLigneCompta('abonnements', a)} » ?`, desc: 'Le mois en cours reste compté dans tes charges, les suivants non.', ok: 'Arrêter', cancel: 'Annuler' }))) return;
+    majFraiche((cur) => ({ ...cur, abonnements: (cur.abonnements || []).map(x => x.id === id ? { ...x, fin: auj } : x) }));
+    toast('✓ Abonnement arrêté ce mois-ci');
+  };
+  const retirer = async (cle, id) => {
+    const x = (data[cle] || []).find((y) => y.id === id);
+    if (!(await askConfirm({ title: `Supprimer « ${nomLigneCompta(cle, x)} » ?`, desc: `${x && Number(x.montant) ? fmt(Number(x.montant)) + ' sortent' : 'Elle sort'} de tes charges et de tes rapports.`, ok: 'Supprimer', cancel: 'Annuler', danger: true }))) return;
+    majFraiche((cur) => ({ ...cur, [cle]: (cur[cle] || []).filter(y => y.id !== id) }));
+    toast('Supprimé de tes charges');
+  };
   // Export CSV des charges pour le comptable (date · type · libellé · montant).
   const exporterCharges = () => {
     const e = (v) => `"${String(v == null ? '' : v).replace(/"/g, '""')}"`;
@@ -56555,6 +56574,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
   // ── Les valeurs dites à droite des lignes : lues dans LEUR réglage, jamais
   //    recalculées (§11). Relues à chaque rendu (fermer un sous-écran en est un).
   const valNumeros = (() => { const p = prefixeNumeros(); return p ? `Série ${p}` : 'Chiffres'; })();
+  const valRegime = (() => { const r = regimeFiscal(); const x = r && REGIMES_FISCAUX.find((g) => g[0] === r); return x ? x[1] : 'À choisir'; })();
   const valZoom = (() => { const z = readZoom(); const t = etroit && Number(z) < 1 ? '1' : z; return (ZOOMS.find(([v]) => v === t) || [, 'Normal'])[1]; })();
   const derniereSauvegarde = (() => { const t = Number(load('vinted_last_backup', 0)) || 0; const days = t ? Math.floor((Date.now() - t) / 86400000) : null; return { t, days, old: days === null || days >= 30 }; })();
   const tokWidget = load('vrm_widget_token', '');
@@ -56644,12 +56664,17 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
   // ── LES GROUPES ────────────────────────────────────────────────────────────
   // Réglages de l'APP.
   const GROUPES_REGLAGES = [
-    { id:'comptes', titre:'Comptes Vinted', items:[
+    // (1er nov.) Le groupe portait « Comptes Vinted » mais rangeait aussi eBay, les
+    // emails et la sécurité : son titre dit maintenant ce qu'il contient, et
+    // « Import des emails Vinted » vient à côté de « Réception des emails »
+    // (il était dans Comptabilité, loin de l'autre réglage des emails).
+    { id:'comptes', titre:'Comptes et emails', items:[
       { id:'liens', type:'nav', ic:'link', lib:'Comptes liés', desc:'Pseudos et adresses de tes comptes', onClick:()=>setTab('vintedaccounts') },
       { id:'connexions', type:'panneau', ic:'sync', lib:'État des connexions', desc:'Ce qui marche, ce qui attend un geste', titreInterne:true, el:<ConnexionsSetting key={AUTH.user?.id||'sans-session'} comptes={comptes||[]} onComptes={()=>setTab('vintedaccounts')} onPlateforme={versPlateforme}/> },
       // (31 oct., soir) L'ancien « eBay → Compte » : connexion et comptes eBay reliés.
       ebayCompte && { id:'ebay', type:'panneau', ic:'link', lib:'Comptes eBay', desc:'Connexion à eBay, comptes reliés', el:ebayCompte },
       { id:'adresses', type:'panneau', ic:'mail', lib:'Réception des emails', desc:'Transfert et emails reçus', titreInterne:true, el:<EmailsSetting onComptes={()=>setTab('vintedaccounts')}/> },
+      { id:'import', type:'panneau', nu:true, ic:'calendar', lib:'Import des emails Vinted', desc:'Date de début de l’historique', el:<EmailStartSetting key={AUTH.user?.id||'sans-session'} nu/> },
       { id:'securite', type:'panneau', ic:'key', lib:'Sécurité des données', desc:'Qui peut lire et écrire tes données', el:<SecuriteSetting/> },
     ]},
     MULTI_USER && { id:'stock', titre:'Stock et rangement', items:[
@@ -56672,14 +56697,17 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       { id:'imprimante', type:'panneau', nu:true, ic:'printer', lib:'Imprimante et bordereaux', desc:'Papier et aperçus', val: imprimanteChoisie() === 'thermique' ? 'Thermique · 10×15' : 'Normale · A4', el:<ImprimanteSetting nu/> },
     ], pied: <>Le N° se pose dans un espace blanc du PDF, jamais au hasard. <Pourquoi label="Comment le N° est placé">VRM cherche sur chaque page une zone blanche avec une marge autour du numéro ; le document garde sa taille. Sans espace suffisant, le tamponnage est refusé plutôt que placé au hasard. Vérifie dans « Imprimante et bordereaux » → « Voir les aperçus ».</Pourquoi></> },
     { id:'compta', titre:'Comptabilité', items:[
-      { id:'regime', type:'panneau', nu:true, ic:'receipt', lib:'Régime fiscal', desc:'Statut et taux des rapports', el:<RegimeSetting nu/> },
-      { id:'import', type:'panneau', nu:true, ic:'calendar', lib:'Import des emails Vinted', desc:'Début de l’historique', el:<EmailStartSetting key={AUTH.user?.id||'sans-session'} nu/> },
+      // (1er nov.) À droite, le statut CHOISI (lu dans `vinted_regime`, jamais deviné) :
+      // « À choisir » tant qu'il ne l'a pas posé — avant, il fallait ouvrir pour savoir.
+      { id:'regime', type:'panneau', nu:true, ic:'receipt', lib:'Régime fiscal', desc:'Statut et taux des rapports', val:valRegime, data:{ 'data-reglage-regime': regimeFiscal() || 'aucun' }, el:<RegimeSetting nu/> },
       // Julien, 1er oct. : « les ventes masquées, je veux que ce soit dans les
       // paramètres, pas sous Factures ». L'écran reste monté, joignable ici.
-      { id:'masques', type:'nav', ic:'eyeOff', lib:'Ventes et achats masqués', onClick:()=>setTab('masques') },
+      // (1er nov.) Depuis le 29 oct. une VENTE ne se masque plus : la ligne disait
+      // encore « Ventes et achats masqués » pour un écran qui ne liste que des achats.
+      { id:'masques', type:'nav', ic:'eyeOff', lib:'Achats masqués', desc:'Retirés de la compta, à réafficher', onClick:()=>setTab('masques'), data:{ 'data-reglage-masques':'' } },
       // (31 oct., soir) La porte « Compléter les prix d'achat » revient ici (retirée par la
       // refonte du 31 oct.) : même destination — Annonces · Vinted, saisie en série ouverte.
-      { id:'prixachat', type:'nav', ic:'cash', lib:"Compléter les prix d'achat", onClick:()=>{DEMANDE_SAISIE_PRIX.on=true;setTab('vinted_annonces');} },
+      { id:'prixachat', type:'nav', ic:'cash', lib:"Compléter les prix d'achat", desc:'Saisie en série, pour un bénéfice juste', onClick:()=>{DEMANDE_SAISIE_PRIX.on=true;setTab('vinted_annonces');} },
 
     ]},
     { id:'affichage', titre:'Affichage', items:[
@@ -56717,7 +56745,10 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
     // (29 oct., revue) PAS de carte Photoroom ici : le 17 oct. Julien a dit du
     // détourage « ne le mets pas dans les paramètres ». Elle vit sur l'écran
     // Vestiaire Collective (le banc detourage-reglage refuse la carte ici).
-    AUTH.user && {id:'photo-profil',titre:'Photo de profil',items:[{id:'photo-profil',type:'el',el:<PhotoProfil key={AUTH.user.id} owner={AUTH.user.id} headers={enTeteSession} theme={C}/>} ]},
+    // (1er nov.) La carte porte déjà son titre (« Ta photo de profil ») : le groupe ne
+    // le redit pas et ne l'enferme plus dans une seconde carte. Sa lettre de repli est
+    // celle de l'en-tête (l'initiale de l'email), plus un « V » qui ne venait de rien.
+    AUTH.user && {id:'photo-profil',titre:null,brut:true,items:[{id:'photo-profil',type:'el',el:<PhotoProfil key={AUTH.user.id} owner={AUTH.user.id} headers={enTeteSession} theme={C} lettre={String(AUTH.user.email||'?').slice(0,1).toUpperCase()}/>} ]},
     // (17 oct.) L'abonnement a SON onglet (« Abonnement ») ; ici, un renvoi.
     AUTH.user && { id:'boutique', titre:'Ta boutique', items:[
       // (30 oct.) « Abonnement et factures » retiré : l'onglet « Abonnement » du haut fait la même chose.
@@ -58088,7 +58119,7 @@ function DiscordCompte() {
   );
   return (
     <div data-discord-compte={lu.discord ? 'relie' : 'aucun'} style={{ fontSize: 13, color: C.text, padding:'14px',border:`1px solid ${C.border}`,borderRadius:12,background:C.card,display:'flex',alignItems:'center',justifyContent:'space-between',gap:12,flexWrap:'wrap' }}>
-      <div style={{display:'flex',alignItems:'center',gap:10,minWidth:0}}><span aria-hidden="true" style={{width:32,height:32,display:'grid',placeItems:'center',borderRadius:8,background:'#5865F218'}}><BrandMark id="discord"/></span><span>{lu.discord ? <>Discord relié : <b data-discord-compte-pseudo={lu.discord}>{lu.discord}</b></> : <><b>Discord</b><span style={{display:'block',fontSize:11,color:C.muted,marginTop:2}}>Associe ton profil et son avatar à VRM</span></>}</span></div>
+      <div style={{display:'flex',alignItems:'center',gap:10,minWidth:0}}><span aria-hidden="true" style={{width:32,height:32,display:'grid',placeItems:'center',borderRadius:8,background:'#5865F218'}}><BrandMark id="discord"/></span><span>{lu.discord ? <>Discord relié : <b data-discord-compte-pseudo={lu.discord}>{lu.discord}</b></> : <><b>Profil Discord</b><span style={{display:'block',fontSize:11,color:C.muted,marginTop:2}}>Ton pseudo et ton avatar Discord dans VRM</span></>}</span></div>
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
         {lu.connexion && <button type="button" data-discord-compte-connecter="" disabled={occupe} onClick={connecter} className="vrm-b vrm-b-secondaire">{occupe ? 'Un instant…' : lu.discord ? 'Changer de compte' : 'Connecter Discord'}</button>}
         {lu.discord && <button type="button" data-discord-compte-retirer="" disabled={occupe} onClick={retirer} className="vrm-b vrm-b-discret">Retirer</button>}
@@ -58322,7 +58353,8 @@ function StreamSetting() {
       <IconeReglage name="eyeOff"/>
       <span className="vrm-set-lib">
         <b style={{color:C.text}}>Mode stream</b>
-        <small className="vrm-aide" style={{color:C.muted}}>Floute pseudos, emails et codes pour filmer ton écran.</small>
+        {/* (1er nov.) Sans cette ligne, « Mode stream » ne disait rien au téléphone (vrm-aide s'y tait). */}
+        <small style={{color:C.muted}}>Floute pseudos, emails et codes pour filmer ton écran.</small>
       </span>
       <Interrupteur on={on} label="Mode stream" onClick={() => poserStream(!on)}/>
     </div>
@@ -58700,7 +58732,7 @@ function PushSetting() {
       setMsg(j.sent > 0
         ? `✅ Test envoyé à ${j.sent} appareil${j.sent>1?'s':''} — la notif doit apparaître.`
         : j.coupe === 'abonnement'
-        ? "Ton abonnement VRM n'est plus actif : les notifications sont en pause. Elles reviennent toutes seules dès que tu le reprends (Réglages → Ton abonnement)."
+        ? "Ton abonnement VRM n'est plus actif : les notifications sont en pause. Elles reviennent toutes seules dès que tu le reprends (Paramètres → Abonnement)."
         : (j.erreur === 'VAPID_PRIVATE_KEY absente'
             ? '⚠ Le serveur ne peut RIEN envoyer : la clé VAPID_PRIVATE_KEY n\'est pas configurée sur Vercel. Tant qu\'elle manque, aucune notification ne partira.'
             : (j.total === 0 ? '⚠ Aucun appareil abonné. Active les notifications sur cet appareil d\'abord.'
@@ -58743,7 +58775,11 @@ function PushSetting() {
       )}
       {srv && srv.pret && (
         <div style={{fontSize:11.5,color:C.muted,marginBottom:10}}>
-          Serveur prêt à envoyer · <b style={{color:C.text}}>{srv.devices}</b> appareil{srv.devices>1?'s':''} abonné{srv.devices>1?'s':''}.
+          {/* (1er nov.) Sans nombre lu, la ligne disait « · appareil abonné » — lu comme
+              « CET appareil est abonné », juste au-dessus d'« Activer sur cet appareil ».
+              Le nombre est celui de TOUS ses appareils : on le dit. */}
+          Serveur prêt à envoyer{Number.isFinite(Number(srv.devices)) && srv.devices !== null && srv.devices !== undefined
+            ? <> · <b data-push-appareils={Number(srv.devices)} style={{color:C.text}}>{Number(srv.devices)}</b> appareil{Number(srv.devices)>1?'s':''} abonné{Number(srv.devices)>1?'s':''} en tout</> : null}.
         </div>
       )}
       {state!=='unsupported' && (
@@ -59681,12 +59717,12 @@ function ConnexionsSetting({comptes=[],onComptes,onPlateforme}) {
         <p>Si Orion refuse le fichier : télécharge « Orion · en dossier », ouvre-le dans l'app Fichiers (le toucher donne un dossier « VRM-Orion »), puis dans Orion, Extensions → + → depuis un fichier, et choisis ce dossier (ou le fichier manifest.json qui est dedans).</p>
         <a href="/VRM-Orion-installation.txt" target="_blank" rel="noopener noreferrer">Voir les instructions Orion</a>
       </details>
-      <details><summary>Dernière version observée dans ma boutique</summary><p>{derniereExt===undefined?'Lecture en cours…':derniereExt===null?'Cette information n’a pas pu être lue.':derniereExt==='aucune'?'Aucune version enregistrée.':`Version ${derniereExt.v} · ${dateLisible(derniereExt.at)}.`} Celle de la dernière capture, peut-être faite ailleurs : elle ne confirme pas la version utilisée ici.</p></details>
+      <details><summary>Version qui a lu en dernier</summary><p>{derniereExt===undefined?'Lecture en cours…':derniereExt===null?'Cette information n’a pas pu être lue.':derniereExt==='aucune'?'Aucune version enregistrée.':`Version ${derniereExt.v} · ${dateLisible(derniereExt.at)}.`} Celle de la dernière capture, peut-être faite ailleurs : elle ne confirme pas la version utilisée ici.</p></details>
     </section>
-    <section className="vrm-connexion-source" data-connexion="capture" style={{borderColor:C.border}}><h3>Données de l’extension</h3><strong>{capture.titre}</strong>{capture.date&&<time dateTime={capture.date}>{dateLisible(capture.date)}</time>}<p style={{color:C.muted}}>Pour la rafraîchir : ouvre le compte sur sa plateforme, extension active.</p></section>
+    <section className="vrm-connexion-source" data-connexion="capture" style={{borderColor:C.border}}><h3>Ce que l’extension a lu</h3><strong>{capture.titre}</strong>{capture.date&&<time dateTime={capture.date}>{dateLisible(capture.date)}</time>}<p style={{color:C.muted}}>Pour la rafraîchir : ouvre le compte sur sa plateforme, extension active.</p></section>
     <SuiviComptes comptes={comptes} lignes={capt?.lignes||null} onComptes={onComptes}/>
     {onPlateforme&&<div className="vrm-connexions-actions"><Bouton variante="secondaire" onClick={()=>onPlateforme('plat_leboncoin')}>Comptes Leboncoin</Bouton><Bouton variante="secondaire" onClick={()=>onPlateforme('plat_ebay')}>Comptes eBay</Bouton></div>}
-    <section className="vrm-connexion-source" data-connexion="emails" style={{borderColor:C.border}}><h3>Données des emails</h3><strong>{emails.titre}</strong>{emails.date&&<time dateTime={emails.date}>{dateLisible(emails.date)}</time>}<p style={{color:C.muted}}>Date des données reçues, pas une preuve que chaque transfert marche. Détail : « Réception des emails ».</p></section>
+    <section className="vrm-connexion-source" data-connexion="emails" style={{borderColor:C.border}}><h3>Emails reçus</h3><strong>{emails.titre}</strong>{emails.date&&<time dateTime={emails.date}>{dateLisible(emails.date)}</time>}<p style={{color:C.muted}}>La date du dernier arrivé, pas la preuve que chaque transfert marche. Détail : « Réception des emails ».</p></section>
     {((Array.isArray(drift)&&drift.length>0)||(Array.isArray(plantages)&&plantages.length>0))&&<details className="vrm-connexion-source" style={{borderColor:C.border}}><summary>Incidents et détails pour l’assistance</summary>
       {Array.isArray(drift)&&drift.length>0&&<p>Le format de certaines réponses est à vérifier : {[...new Set(drift.map(x=>nomFamille(x.type)))].join(', ')}.</p>}
       {Array.isArray(plantages)&&plantages.length>0&&<p data-plantages={plantages.length}>{plantages.length} incident(s) observé(s) ces 7 derniers jours. Dernier : {plantages[0].message} · {dateLisible(plantages[0].at)}.</p>}
@@ -59796,14 +59832,16 @@ function RegimeSetting({ nu = false }) {
       {!nu && <div style={{fontSize:13,fontWeight:600,color:C.text,marginBottom:4}}>Régime fiscal</div>}
       <div className="vrm-aide" style={{fontSize:12.5,color:C.muted,marginBottom:12,lineHeight:1.45}}>Adapte le rapport comptable à ta situation.</div>
       <div style={{display:'flex',flexDirection:'column',gap:8}}>
-        {REGIMES_FISCAUX.map(([id,t,,d])=>(
+        {/* (1er nov.) La ligne courte (« Je vends mes propres affaires », « SAS, SASU… »)
+            aide à se reconnaître : elle n'était dite que dans Comptabilité. */}
+        {REGIMES_FISCAUX.map(([id,t,qui,d])=>(
           <button type="button" key={id} onClick={()=>pick(id)} style={{textAlign:'left',display:'flex',gap:10,alignItems:'flex-start',padding:'10px 12px',borderRadius:8,cursor:'pointer',
             border:`1px solid ${regime===id?C.accent:C.border}`,background:regime===id?`${C.accent}12`:'transparent'}}>
             <span style={{flexShrink:0,width:18,height:18,marginTop:1,borderRadius:8,border:`2px solid ${regime===id?C.accent:C.border}`,display:'flex',alignItems:'center',justifyContent:'center'}}>
               {regime===id && <span style={{width:9,height:9,borderRadius:8,background:C.accent}}/>}
             </span>
             <span style={{minWidth:0}}>
-              <span style={{fontSize:13,fontWeight:600,color:C.text,display:'block'}}>{t}</span>
+              <span style={{fontSize:13,fontWeight:600,color:C.text,display:'block'}}>{t} <span data-regime-qui="" style={{fontWeight:400,color:C.muted}}>· {qui}</span></span>
               <span style={{fontSize:12,color:C.muted,lineHeight:1.4}}>{d}</span>
             </span>
           </button>
@@ -59815,7 +59853,9 @@ function RegimeSetting({ nu = false }) {
             <span style={{fontSize:12,fontWeight:500,color:C.text}}>Taux de cotisations</span>
             <input type="text" inputMode="decimal" value={txUrs}
               onChange={e=>setTxUrs(e.target.value)}
-              onBlur={()=>{ const v=parseFloat(String(txUrs).replace(',','.')); const ok=(isFinite(v)&&v>=0&&v<=50)?v:TAUX_URSSAF_DEFAUT; setTxUrs(virgule(ok)); save('vinted_urssaf_taux', ok); }}
+              onBlur={()=>{ const v=parseFloat(String(txUrs).replace(',','.')); const ok=(isFinite(v)&&v>=0&&v<=50)?v:TAUX_URSSAF_DEFAUT; const avant=Number(load('vinted_urssaf_taux', TAUX_URSSAF_DEFAUT)); setTxUrs(virgule(ok)); save('vinted_urssaf_taux', ok);
+                // (1er nov.) Le taux s'enregistrait sans rien dire ; un taux illisible retombait au défaut en silence.
+                if (ok !== v) toast(`Taux illisible : ${virgule(ok)} % gardé`, 'error'); else if (ok !== avant) toast(`✓ Taux enregistré : ${virgule(ok)} %`); }}
               style={{width:70,border:`1px solid ${C.border}`,borderRadius:8,padding:'5px 8px',fontSize:13,fontWeight:600,background:C.bg,color:C.text,outline:'none'}}/>
             <span style={{fontSize:12,color:C.muted}}>% du CA</span>
           </div>
@@ -60782,8 +60822,9 @@ function AppCoeur() {
   const premierJour = accountsLoaded && !baseKO && vintedAccounts.length === 0;
   // (27 oct.) La présentation d'arrivée (src/Bienvenue.jsx) : une fois, pour une
   // nouvelle personne (aucun compte Vinted lié, base lue), seulement quand le
-  // nuage est arrivé (« pas su » ne la rouvre pas sur un autre appareil). Elle se
-  // revoit depuis Réglages → Affichage (évènement `vrm:bienvenue`).
+  // nuage est arrivé (« pas su » ne la rouvre pas sur un autre appareil).
+  // (L'évènement `vrm:bienvenue` reste écouté ; aucune ligne des Réglages ne
+  // l'envoie plus depuis le 27 oct., à sa demande.)
   const [bienvenue,setBienvenue]=useState(false);
   useEffect(()=>{
     if(!premierJour) return undefined;

@@ -2321,3 +2321,40 @@ dans une autre feuille ou confirmation) ; au téléphone, réserve sa hauteur au
 ligne ouverte au-dessus de lui. Banc : rouge sur main (« intercepts pointer events »), vert après, avec un
 contrôle neuf « un toucher hors du tiroir le referme et atteint sa cible ». Le banc jugeait aussi le repli
 « Chiffres » sur Compte eBay, passé dans Paramètres : il le juge sur Ventes.
+
+### Paramètres, arrivée guidée et communauté : « logique et simple » (1er novembre)
+
+Demande de Julien : « continue à améliorer toute l'app, tout doit être parfait, logique et
+simple d'utilisation ». Tournée de Paramètres (Réglages, Mon compte, Abonnement, chaque
+sous-écran), de l'arrivée guidée et de la Communauté, à 390 et 1512 px. Aucune fonction ni
+décision retirée (Photoroom reste sur l'écran Vestiaire ; « Compléter les prix d'achat » reste
+dans Paramètres ; « Présentation de VRM » reste retirée des Réglages, sa demande du 27 oct.).
+
+| avant | après | pourquoi |
+|---|---|---|
+| groupe « Comptes Vinted » (qui rangeait aussi eBay, emails, sécurité) | « Comptes et emails » | le titre dit ce que le groupe contient |
+| « Import des emails Vinted » sous Comptabilité | à côté de « Réception des emails » | les deux réglages des emails ensemble |
+| « Ventes et achats masqués » | « Achats masqués · Retirés de la compta, à réafficher » | une vente ne se masque plus depuis le 29 oct. |
+| « Régime fiscal » sans valeur | le statut choisi à droite, « À choisir » sinon | savoir sans ouvrir ; jamais deviné (`vinted_regime`) |
+| « Compléter les prix d'achat » sans phrase | « Saisie en série, pour un bénéfice juste » | dire à quoi sert le geste |
+| « Mode stream » muet au téléphone (`vrm-aide` cachée) | sa phrase reste visible | le libellé seul ne dit rien |
+| Notifications : « Serveur prêt à envoyer · appareil abonné » (nombre absent) au-dessus d'« Activer sur cet appareil » | le nombre seulement s'il est lu, « … en tout » | on lisait « cet appareil est abonné » |
+| message d'essai : « Réglages → Ton abonnement » | « Paramètres → Abonnement » | chemin réel |
+| « Réglages → Extension » (n'existe pas), « Réglages → Mon compte » | « Paramètres → État des connexions », « Paramètres → Mon compte » | chemins réels |
+| État des connexions : « Dernière version observée dans ma boutique », « Données de l'extension », « Données des emails », « Aucune donnée enregistrée pour cette source », « Horodatage à vérifier », « Mise à jour observée » | « Version qui a lu en dernier », « Ce que l'extension a lu », « Emails reçus », « Rien reçu pour l'instant », « Date à vérifier », « Dernière arrivée » | vocabulaire de développeur (hors Sécurité des données, qui garde le sien) |
+| Mon compte : « Photo de profil » (titre) + carte « Ta photo de profil » dans une seconde carte, lettre « V » quand l'en-tête dit « C » | une carte, la lettre de l'en-tête | double titre, double cadre, lettre venue de nulle part |
+| deux lignes « Discord » (connexion rapide, profil) | « Discord » et « Profil Discord · ton pseudo et ton avatar Discord dans VRM » | deux fonctions, deux noms |
+| Arrivée guidée : plateformes « Vinted, Leboncoin et eBay » | + Vestiaire Collective | VRM le gère depuis le 27 oct. |
+| Arrivée guidée : « Terminer » au 5ᵉ écran, puis encore un écran | « Suivant » | « Terminer » ne terminait rien |
+| Arrivée guidée sombre : texte blanc sur #6F86E8 (~3:1) | encre sombre (`onAccent` de Vitrine) | lisibilité |
+| « changer quand tu veux dans Réglages » | « … dans Paramètres → Affichage » | chemin exact |
+| Communauté : « Me retirer de la carte » sans demander | demande d'abord (sa place et « premier de ta ville » sont effacées) | comme bloquer, classement, groupe |
+
+Bancs : `reglages-premium` (+ lignes masqués/régime/import, photo de profil, push sans nombre),
+`communaute` (« Annuler » ne retire rien), `connexions-reglages`, `abonnement` (le groupe se
+reconnaît par `data-groupe-reglages`, plus par son titre), `bienvenue` et `compta-simple`
+remis sur la navigation par tâche (« Ventes », menu « Plus » : ils cherchaient « Vinted » et
+« Gestion », disparus le 31 oct.). Détail compta : historique compta (même date).
+Non fait, signalé : Communauté utilise encore les boîtes du navigateur (`window.confirm`) ;
+Republier dit « Réglages → Rédaction d'annonces par l'IA », qui n'existe pas (écran d'un autre
+chantier).
