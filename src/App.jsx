@@ -62,7 +62,7 @@ import {appelerFavorisDirect} from './favorisTransport.js';
 import React, { useState, useMemo, useEffect, useRef, lazy, Suspense } from "react";
 const Operations = lazy(() => import("./operations/Operations.jsx"));
 const Communaute = lazy(() => import("./communaute/Communaute.jsx"));
-import { createPortal } from "react-dom";
+import { createPortal, flushSync } from "react-dom";
 import Bienvenue from "./Bienvenue.jsx";
 import { VAPID_PUBLIC_KEY } from "./vapid.js";
 import { noterPlantage, viderPlantages, ecouterViolationsCspDans } from "./plantages.js";
@@ -110,8 +110,10 @@ import { regrouperRelais, pointsARetirer } from "./relaisColis.js";
 import CarteRelaisColis, { ColonneRetirer } from "./CarteRelais.jsx";
 import ColisColonnes from "./ColisColonnes.jsx";
 import "./styles-barre-haut.css";
+import "./styles-recherche.css";
 import { colonnesColis, SITES_COLIS } from "./colisColonnes.js";
 import { SITES_TACHE, TACHES_SITE, estTacheSite, siteDeTache, redirigerOnglet, filtreRetenu, retenirFiltre } from "./navigationTache.js";
+import { lireCible, selecteursCible, phraseAbsente } from "./cibleNotif.js";
 // La migration qui cloisonne les vendeurs, lue depuis LE fichier (pas recopiée) :
 // deux copies finiraient par diverger, et c'est le genre de texte qu'on colle
 // dans une base de production sans le relire.
@@ -14098,12 +14100,12 @@ function ToutSurLeNumero({ q, numData, comptes, onNav, onStock, onChercher }) {
       {rn.annonces.length > 0 && titreSec('L\'article')}
       {rn.annonces.map((a) => ligne('a' + a.id, { 'data-tout-annonce': a.id, 'data-tout-annonce-etat': a.etat }, a.title || '(sans titre)', ETAT_ANN[a.etat] + (a.price ? ' · ' + prixCourt(String(a.price).replace(',', '.')) : ''), () => onNav('cat_annonces')))}
       {(vinted.length + lbc.length + ebay.length + rn.annoncesEbay.length) > 0 && titreSec('Ventes et autres plateformes')}
-      {vinted.map((o) => ligne('v' + o._tx, { 'data-tout-vente': 'vinted', 'data-tout-tx': o._tx }, o.title || '(sans titre)', `Vente Vinted · ${etapeVente(o, { poste: (x) => !!shipDone[String(x.transaction_id)] }).label}${o.date ? ' · ' + jour(o.date) : ''}`, () => onNav('cat_ventes')))}
+      {vinted.map((o) => ligne('v' + o._tx, { 'data-tout-vente': 'vinted', 'data-tout-tx': o._tx }, o.title || '(sans titre)', `Vente Vinted · ${etapeVente(o, { poste: (x) => !!shipDone[String(x.transaction_id)] }).label}${o.date ? ' · ' + jour(o.date) : ''}`, () => onNav('cat_ventes', { type: 'vente', tx: String(o._tx) })))}
       {lbc.map((v) => ligne('l' + v._id, { 'data-tout-vente': 'leboncoin' }, v.title || '(sans titre)', `Vente Leboncoin · ${lbcAnnulee(v) ? 'annulée' : lbcFinalisee(v) ? 'finalisée' : 'en cours'}${v.price != null ? ' · ' + lbcEuro(v.price) : ''}`, () => onNav('plat_leboncoin')))}
       {ebay.map((c) => ligne('e' + c.orderId, { 'data-tout-vente': 'ebay' }, ((c.lineItems || [])[0] || {}).title || 'Commande eBay', `Vente eBay · ${commandeEbayEngagee(c) ? 'payée' : 'annulée ou remboursée'}${c.creationDate ? ' · ' + jour(c.creationDate) : ''}`, () => onNav('ebay_ventes')))}
       {rn.annoncesEbay.map((a) => ligne('ea' + a.itemId, { 'data-tout-annonce-ebay': String(a.itemId) }, a.title || 'Annonce eBay', 'En vente sur eBay', () => onNav('ebay_annonces')))}
       {rn.bordereaux.length > 0 && titreSec('Bordereau')}
-      {rn.bordereaux.map((b) => ligne('b' + b.tx, { 'data-tout-bord': b.tx, 'data-tout-bord-etat': b.etat }, ETAT_BORD[b.etat], 'Colis de la vente Vinted', () => onNav('cat_bord')))}
+      {rn.bordereaux.map((b) => ligne('b' + b.tx, { 'data-tout-bord': b.tx, 'data-tout-bord-etat': b.etat }, ETAT_BORD[b.etat], 'Colis de la vente Vinted', () => onNav('cat_bord', b.etat === 'poste' ? null : { type: 'colis', tx: String(b.tx) })))}
       {(rn.stock || rn.annonces.length > 0) && titreSec('Stock')}
       {rn.stock
         ? ligne('s', { 'data-tout-stock': rn.stock.itemName || 'range' }, `Rangé : ${rn.stock.itemName || 'un meuble'}`, [rn.stock.roomName, rn.stock.nom].filter(Boolean).join(' · '), () => onStock(k))
@@ -14148,18 +14150,74 @@ function DansBarreHaut({ children }) {
   const el = React.useContext(BarreHautSlot);
   return el ? createPortal(children, el) : children;
 }
-function BarreHaut({ onChercher, poserSlot }) {
+// (31 oct., Julien : « quand on appuie sur la barre de recherche, ça fait un
+// grand écran blanc ; je veux que ça reste sur la page et que ça permette juste
+// d'écrire ») La recherche se tape DANS la barre : le champ est un vrai champ,
+// les résultats tombent dans un panneau sous lui (`champ`, rendu par la coque).
+function BarreHaut({ champ, poserSlot }) {
   return (
     <div className="vrm-barre-haut" data-barre-haut="">
-      <button type="button" className="vrm-barre-recherche" data-barre-recherche="" onClick={onChercher} aria-label="Rechercher une paire" title="Rechercher : un N°, un modèle, une marque (touche /)" aria-keyshortcuts="/">
-        <Icon name="search" size={18}/>
-        {/* La recherche existante cherche le N°, le modèle et la marque — pas
-            l'acheteur : la phrase ne le promet pas. */}
-        <span className="vrm-barre-recherche-txt">Tape un N°, un modèle, une marque…</span>
-        <kbd className="vrm-barre-kbd">/</kbd>
-      </button>
+      {champ}
       <div className="vrm-barre-haut-droite" ref={poserSlot}/>
     </div>
+  );
+}
+// ── LA CIBLE D'UNE NOTIFICATION (31 oct.) ───────────────────────────────────
+// Une notification (ou un résultat de recherche) demande un élément précis de
+// l'écran qu'elle ouvre : une conversation, une vente, la carte d'un colis…
+// (`src/cibleNotif.js`). Posée ici au niveau MODULE (l'écran n'est pas encore
+// monté), consommée une fois par `CibleNotif` quand l'écran attendu est là.
+// Rien ne répond en 12 s ⇒ UNE ligne le dit ; l'écran reste, jamais blanc.
+const CIBLE_NOTIF = { c: null, tab: null, at: 0 };
+const poserCible = (c, tab) => { CIBLE_NOTIF.c = c || null; CIBLE_NOTIF.tab = tab || null; CIBLE_NOTIF.at = Date.now(); try { window.dispatchEvent(new Event('vrm:cible-notif')); } catch (_) {} };
+function CibleNotif({ tab, sub }) {
+  const [absente, setAbsente] = React.useState(null);
+  const [jeton, setJeton] = React.useState(0);
+  React.useEffect(() => { const f = () => setJeton((n) => n + 1); window.addEventListener('vrm:cible-notif', f); return () => window.removeEventListener('vrm:cible-notif', f); }, []);
+  React.useEffect(() => {
+    const d = CIBLE_NOTIF;
+    if (!d.c || Date.now() - d.at > 60000) return undefined;
+    if (d.tab && d.tab !== tab) return undefined;           // l'écran attendu n'est pas encore là
+    const c = d.c; d.c = null; setAbsente(null);
+    const sel = selecteursCible(c);
+    const t0 = Date.now(); let fini = false, deplie = false; const minuteurs = [];
+    const vu = (el) => el && el.getClientRects().length > 0;
+    // Un geste de la personne arrête les re-défilements (la mémoire de
+    // défilement de l'écran peut repasser derrière la première fois).
+    const geste = () => { fini = true; };
+    const evts = ['wheel', 'touchstart', 'keydown'];
+    const trouver = () => { for (const q of sel.essais) { try { const el = document.querySelector(q); if (vu(el)) return el; } catch (_) {} } return null; };
+    const marquer = (el) => {
+      const reduit = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      try { el.scrollIntoView({ behavior: reduit ? 'auto' : 'smooth', block: 'center' }); } catch (_) {}
+      el.classList.add('vrm-cible-notif'); el.setAttribute('data-cible-notif', c.type);
+      minuteurs.push(setTimeout(() => { try { el.classList.remove('vrm-cible-notif'); } catch (_) {} }, 2600));
+      evts.forEach((e) => window.addEventListener(e, geste, { passive: true, once: true }));
+      [700, 1600].forEach((ms) => minuteurs.push(setTimeout(() => { if (fini) return; const x = trouver() || el; try { const r = x.getBoundingClientRect(); if (r.top < 0 || r.bottom > (window.innerHeight || 800)) x.scrollIntoView({ behavior: 'auto', block: 'center' }); } catch (_) {} }, ms)));
+      if (sel.ouvrir != null) { const b = sel.ouvrir ? el.querySelector(sel.ouvrir) : el; if (b && typeof b.click === 'function') minuteurs.push(setTimeout(() => { try { if (b.getAttribute('aria-expanded') !== 'true') b.click(); } catch (_) {} }, 120)); }
+    };
+    const essayer = () => {
+      const el = trouver();
+      if (el) { marquer(el); return; }
+      // Replié derrière « Voir les N autres » : on déplie, une fois.
+      if (!deplie && Date.now() - t0 > 1200) { deplie = true; for (const q of sel.deplier) { try { const b = document.querySelector(q); if (b) b.click(); } catch (_) {} } }
+      if (Date.now() - t0 > 12000) { setAbsente(c); return; }
+      minuteurs.push(setTimeout(essayer, 250));
+    };
+    minuteurs.push(setTimeout(essayer, 60));
+    return () => { minuteurs.forEach(clearTimeout); evts.forEach((e) => window.removeEventListener(e, geste)); };
+  // ⚠️ PAS `sub` dans les dépendances : le filtre de site d'une tâche arrive
+  // APRÈS l'écran (délai nul de `setTab`) ; relancer l'effet annulait la
+  // recherche en cours, cible déjà consommée — rien n'était jamais visé.
+  }, [tab, jeton]); // eslint-disable-line react-hooks/exhaustive-deps
+  const tabVu = React.useRef(tab);
+  React.useEffect(() => { if (tabVu.current !== tab) { tabVu.current = tab; setAbsente(null); } }, [tab]);
+  if (!absente) return null;
+  return (
+    <p className="vrm-cible-absente" data-cible-absente={absente.type} role="status">
+      <span>{phraseAbsente(absente)}</span>
+      <button type="button" onClick={() => setAbsente(null)} aria-label="Fermer ce message">OK</button>
+    </p>
   );
 }
 function ScreenHead({ icon, title, desc, right, principal, sous }) {
@@ -59727,7 +59785,14 @@ function AppCoeur() {
     // mesurait l'accueil (un faux vert dans ma propre couverture d'hier).
     // `journee` manquait aussi : invisible parce que c'est l'état de départ.
     const TABS_OK=['ventes','annonces','messages','journee','collectif','plat_vinted','plat_leboncoin','plat_ebay','plat_vestiaire','prixmarche','dashboard','compta','cat_annonces','cat_ventes','cat_achats','cat_bord','cat_msg','cat_expedition','garage','organisation','communaute','invoices','masques','settings','vintedaccounts','catalog','sales','stockvinted','leboncoin','ebay_annonces','ebay_ventes','ebay_agent','ebay_messages','vinted_annonces'];
-    const goto=(search)=>{ try{ const p=new URLSearchParams(search); const t=p.get('tab'); if(p.get('print')==='bord') _pendingBordPrint=true; if(t&&TABS_OK.includes(t)){ const site=p.get('site'), section=p.get('section'); if(site&&estTacheSite(t)&&siteDeTache(t,site)===site) subVoulue.current=site; else if(section&&/^[a-z]{2,12}$/.test(section)&&t.startsWith('plat_')) subVoulue.current=section; setTab(t); window.history.replaceState(window.history.state,'',window.location.pathname); } }catch(_){}};
+    // (31 oct.) Une notification mène à l'élément PRÉCIS : `cible` (+ son
+    // identité) et `vue` (src/cibleNotif.js, api/_lib/lien-notif.js). Une
+    // `section` vaut aussi pour Comptabilité et Statistiques.
+    const goto=(search)=>{ try{ const p=new URLSearchParams(search); const t=p.get('tab'); if(p.get('print')==='bord') _pendingBordPrint=true; if(t&&TABS_OK.includes(t)){ const site=p.get('site'), section=p.get('section'), vue=p.get('vue');
+      if(site&&estTacheSite(t)&&siteDeTache(t,site)===site) subVoulue.current=site; else if(section&&/^[a-z]{2,12}$/.test(section)&&(t.startsWith('plat_')||t==='compta'||t==='dashboard')) subVoulue.current=section;
+      if(vue==='achats'){ VUE_ACHATS_NAV='all'; demanderVue('achats'); } else if(vue==='retraits'){ VUE_ACHATS_NAV='attente'; demanderVue('retraits'); } else if(vue==='favoris') demanderVue('favoris');
+      const cible=lireCible(p); if(cible) poserCible(cible, redirigerOnglet(t, subVoulue.current, ONGLETS_DEPLACES).tab);
+      setTab(t); window.history.replaceState(window.history.state,'',window.location.pathname); } }catch(_){}};
     goto(window.location.search);
     const onMsg=(e)=>{ if(e.data&&e.data.type==='open-url'&&e.data.url){ try{ goto(new URL(e.data.url,window.location.origin).search); }catch(_){}} };
     if(navigator.serviceWorker) navigator.serviceWorker.addEventListener('message',onMsg);
@@ -59803,6 +59868,25 @@ function AppCoeur() {
   useEffect(()=>onCloudReady(()=>{ purgerComptesSupprimes(); }),[]);
   const [gsOpen,setGsOpen]=useState(false);
   const [gsQ,setGsQ]=useState('');
+  // (31 oct.) LA RECHERCHE EN PLACE : le champ vit dans la barre (ordinateur) ou
+  // dans l'en-tête (téléphone) ; `gsOpen` ne dit plus « un écran par-dessus »
+  // mais « le panneau des résultats est déplié sous le champ ».
+  const gsChampRef=React.useRef(null);
+  const [hautRecherche,setHautRecherche]=useState(56);
+  const fermerRecherche=React.useCallback(()=>{ setGsOpen(false); try{ gsChampRef.current&&gsChampRef.current.blur(); }catch(_){} },[]);
+  // `flushSync` : le champ du téléphone existe AVANT le focus, dans le même
+  // geste — sinon iOS n'ouvre pas le clavier (un focus hors geste est ignoré).
+  const ouvrirRecherche=React.useCallback(()=>{ flushSync(()=>setGsOpen(true)); const el=gsChampRef.current; if(el){ try{ el.focus({preventScroll:true}); }catch(_){} } },[]);
+  React.useLayoutEffect(()=>{ if(!gsOpen) return; const h=document.querySelector('.vrm-app-header'); if(h){ const b=h.getBoundingClientRect().bottom; if(b>0) setHautRecherche(Math.round(b)); } },[gsOpen]);
+  // Échap ou un toucher hors du champ et du panneau referment ; rien d'autre ne
+  // bouge (la page derrière garde sa place). Une feuille ouverte par-dessus (un
+  // tiroir de vente) n'est pas « dehors ».
+  useEffect(()=>{ if(!gsOpen) return undefined;
+    const dehors=(e)=>{ const t=e.target; if(!t || typeof t.closest!=='function') return; if(t.closest('[data-recherche-zone],[data-recherche-panneau],[role="dialog"],.vrm-ledger-drawer-host')) return; setGsOpen(false); };
+    const echap=(e)=>{ if(e.key==='Escape' && !e.defaultPrevented){ fermerRecherche(); } };
+    document.addEventListener('pointerdown',dehors,true); window.addEventListener('keydown',echap);
+    return ()=>{ document.removeEventListener('pointerdown',dehors,true); window.removeEventListener('keydown',echap); };
+  },[gsOpen,fermerRecherche]);
   // Recherche globale COMPLÈTE : au 1er usage, on charge une fois les données
   // moissonnées (annonces/ventes/achats en ligne + publiées Leboncoin) depuis
   // Supabase → la recherche marche même sans avoir ouvert les onglets Ventes/Achats.
@@ -59834,7 +59918,7 @@ function AppCoeur() {
   // transactions (§4.4), pagination stricte (§4.5).
   const [numData,setNumData]=useState(null);
   const [revisionFiche,relireFiche]=React.useReducer(n=>n+1,0);
-  useEffect(()=>{const ouvrir=e=>{if(typeof e.detail!=='string'||!e.detail.trim()||e.detail.length>64)return;setNumData(null);relireFiche();setGsQ(e.detail.trim());setGsOpen(true);};window.addEventListener('vrm:fiche-article',ouvrir);return()=>window.removeEventListener('vrm:fiche-article',ouvrir);},[]);
+  useEffect(()=>{const ouvrir=e=>{if(typeof e.detail!=='string'||!e.detail.trim()||e.detail.length>64)return;setNumData(null);relireFiche();setGsQ(e.detail.trim());setGsOpen(true);setTimeout(()=>{ try{ gsChampRef.current&&gsChampRef.current.focus({preventScroll:true}); }catch(_){} },0);};window.addEventListener('vrm:fiche-article',ouvrir);return()=>window.removeEventListener('vrm:fiche-article',ouvrir);},[]);
   useEffect(()=>{ if(!gsOpen){ setNumData(null); return undefined; } if(numData) return undefined; let vivant=true; (async()=>{
     const sb=async(q)=>{ try{ const r=await fetch(`${SUPABASE_URL}/rest/v1/${q}`,{headers:sbAuth()}); if(!r.ok) return null; const j=await r.json(); return Array.isArray(j)?j:null; }catch(_){ return null; } };
     // Le Stock vit dans SA ligne (`vrm_room`) : la copie de l'appareil peut
@@ -59964,7 +60048,7 @@ function AppCoeur() {
       if (e.key !== '/' || e.ctrlKey || e.metaKey || e.altKey || e.defaultPrevented) return;
       const t = e.target; const tag = t && t.tagName;
       if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || (t && t.isContentEditable)) return;
-      e.preventDefault(); setGsOpen(true);
+      e.preventDefault(); ouvrirRecherche();
     };
     window.addEventListener('keydown', k);
     return () => window.removeEventListener('keydown', k);
@@ -61584,6 +61668,133 @@ function AppCoeur() {
           {sec==='compte'&&<div data-ebay-compte-section="" style={{ padding: 16 }}>{baseKO?<div style={{ color: EBAY_SKIN.muted, fontSize: 13 }}>Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui a échoué.</div>:<EbayConnexion onAnnonces={()=>allerSec('annonces')} vue={ebayVueEff} comptesEbay={comptesEbay}/>}</div>}
         </DansEspacePlateforme.Provider></section>); };
 
+  // ── LA RECHERCHE EN PLACE (31 oct.) : les résultats, un panneau sous le champ ──
+  const panneauRecherche = !gsOpen ? null : (()=>{
+        const q = gsQ.trim().toLowerCase();
+        const numeros = load('vinted_annonce_numeros', {});
+        const listCache = (_acctCache['listings'] && _acctCache['listings'].items) || [];
+        const soldCache = ((_acctCache['sold'] && _acctCache['sold'].items) || []).length ? _acctCache['sold'].items : (gsData && gsData.sold) || [];
+        const buyCache = ((_acctCache['purchased'] && _acctCache['purchased'].items) || []).length ? _acctCache['purchased'].items : (gsData && gsData.bought) || [];
+        const onlineIds = new Set([...listCache.map(it=>String(it.id)), ...((gsData && [...gsData.online]) || [])]);
+        const lbcSet = (gsData && gsData.lbc) || new Set();
+        const garageBoxOf = (numero)=>{ for(const [box,arr] of Object.entries(garageGrid||{})){ if(Array.isArray(arr)&&arr.some(v=>String(v).trim()===String(numero))) return box; } return null; };
+        const hit = (s)=> q && String(s||'').toLowerCase().includes(q);
+        let pairs=[], ventes=[], achats=[];
+        const kNumQ = lireNumeroCherche(gsQ, { cleNum }, [prefixeNumeros(), archiveNumeros()]);
+        if(q){
+          // Paires numérotées (index principal : N°, titre, marque).
+          const okUid = comptesRecherche(vintedAccounts);
+          pairs = Object.entries(numeros).map(([id,e])=>({id, ...e}))
+            .filter(e=> !okUid || !e.accountId || okUid.has(String(e.accountId)))
+            .filter(e=> hit(e.numero) || hit(e.title) || hit(extractBrand(e.title||'')))
+            .filter(e=> !kNumQ || cleNum(e.numero||'')!==kNumQ)   // la paire exacte est dans « Tout sur le N° »
+            .map(e=>{ const box=garageBoxOf(e.numero); const online=onlineIds.has(String(e.id)); const onLbc=lbcSet.has(String(e.id))||lbcSet.has(String(e.numero)); return {...e, box, online, onLbc}; })
+            .sort((a,b)=>(parseInt(a.numero,10)||0)-(parseInt(b.numero,10)||0))
+            .slice(0,40);
+          const numeredIds = new Set(pairs.map(p=>String(p.id)));
+          ventes = soldCache.filter(o=> (hit(o.title)||hit(extractBrand(o.title||''))) ).slice(0,25);
+          achats = buyCache.filter(o=> (hit(o.title)||hit(extractBrand(o.title||''))) ).slice(0,25);
+        }
+        const total = pairs.length+ventes.length+achats.length;
+        // (31 oct.) Une ligne mène à SON élément (la vente ouverte, la carte du colis).
+        const go=(tab,cible)=>{ setGsOpen(false); if(cible) poserCible(cible, redirigerOnglet(tab, null, ONGLETS_DEPLACES).tab); setTab(tab); };
+        // Un NUMÉRO tapé (« 128 », « B128 », « n128 ») : le bloc « Tout sur le
+        // N° » passe devant, par identité (src/rechercheNumero.js).
+        const estNumQ = !!kNumQ;
+        // Revue du 16 octobre : la recherche écrivait le statut BRUT de Vinted
+        // (« Le paiement a été validé ») et la date en 15/10/2026, quand la carte
+        // de la même vente dit « À expédier · 15 oct. ». Même règle (`etapeVente`,
+        // `etapeAchat`), même forme de date que les cartes.
+        const shipDoneGs = load('vinted_ship_done', {}) || {};
+        const posteMain = (o) => !!(o && shipDoneGs[String(o.transaction_id)]);
+        const jourCourt = (d) => { const t = new Date(d); return isNaN(t.getTime()) ? '' : t.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }); };
+        const numBadge=(n)=> <span style={{flexShrink:0,minWidth:26,height:26,borderRadius:8,background:C.accent,color:C.onAccent,fontSize:12,fontWeight:700,display:'flex',alignItems:'center',justifyContent:'center',padding:'0 5px'}}>{n?`#${n}`:'—'}</span>;
+        const thumb=(src,fb)=> <div style={{width:44,height:44,borderRadius:8,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>{src?<PhotoVinted src={src} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:20}}>{fb||<Icon name="image" size={18} style={{color:C.muted,opacity:.55}}/>}</span>}</div>;
+        return (
+        <div className="vrm-global-search vrm-recherche-panneau" id="vrm-recherche-resultats" data-recherche-panneau="" data-recherche-q={q} role="region" aria-label="Résultats de la recherche"
+          style={ordi?{background:C.bg,borderColor:C.border}:{top:hautRecherche,background:C.bg,borderColor:C.border}} onMouseDown={e=>{ if(e.target===e.currentTarget) e.preventDefault(); }}>
+          <FermeAuRetour fermer={()=>setGsOpen(false)}/>
+          <div className="vrm-recherche-corps">
+            {!q && <div data-recherche-vide="" style={{padding:'14px 12px',textAlign:'left',color:C.muted,fontSize:13,lineHeight:1.6}}>Tape un <b>numéro</b>, un <b>modèle</b> ou une <b>marque</b>.<br/><span style={{fontSize:12}}>Cherche partout : annonces en ligne, ventes, achats, garage {gsData?'et Leboncoin':'…'}{!gsData?<> · <span style={{opacity:0.8}}>indexation en cours…</span></>:''}</span></div>}
+            {q && total===0 && !estNumQ && <div data-recherche-rien="" style={{padding:'14px 12px',textAlign:'left',color:C.muted,fontSize:13}}>Aucun résultat pour « {gsQ} ».<br/><span style={{fontSize:12}}>{gsData?'Aucune paire, vente ou achat ne correspond.':'Indexation en cours, réessaie dans un instant…'}</span></div>}
+            {q && estNumQ && <ToutSurLeNumero q={gsQ} numData={numData} comptes={vintedAccounts} onNav={go} onChercher={(n)=>setGsQ(String(n))} onStock={(n)=>{ setGsOpen(false); setGarageLocate(String(n)); DEMANDE_STOCK_CHERCHE.nums=[String(n)]; DEMANDE_STOCK_CHERCHE.at=Date.now(); setTab('garage'); }}/>}
+            {pairs.length>0 && <div style={{fontSize:11,fontWeight:700,color:C.muted,textTransform:'uppercase',letterSpacing:0.4,margin:'12px 2px 6px'}}>Paires numérotées ({pairs.length})</div>}
+            {pairs.map(p=>(
+              <button key={'p'+p.id} type="button" onClick={()=>{ if(p.box!=null){ setGsOpen(false); setGarageLocate(String(p.numero)); setTab('garage'); } else go(p.online?'cat_annonces':'cat_ventes'); }}
+                style={{width:'100%',minHeight:44,display:'flex',alignItems:'center',gap:11,padding:'9px 10px',marginBottom:6,background:C.card,border:`1px solid ${C.border}`,borderRadius:10,cursor:'pointer',fontFamily:'inherit',textAlign:'left'}}>
+                {numBadge(p.numero)}
+                {thumb(p.photo)}
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontSize:13,fontWeight:600,color:C.text,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{p.title||'(sans titre)'}</div>
+                  <div style={{fontSize:12,color:C.muted,fontWeight:500,marginTop:2,display:'flex',gap:8,flexWrap:'wrap'}}>
+                    <span style={{color:p.online?INV_STATUS.online.color:C.muted}}>{p.online?'🟢 En ligne':'⚪ Retirée'}</span>
+                    {p.onLbc && <span style={{color:LBC_ORANGE}}>🟠 Leboncoin</span>}
+                    {p.box!=null && <span style={{color:C.accent}}>Au garage</span>}
+                    {p.buyPrice && <span>achat {prixCourt(String(p.buyPrice).replace(',', '.'))}</span>}
+                    {p.price && <span>· {prixCourt(String(p.price).replace(',', '.'))}</span>}
+                  </div>
+                </div>
+                <span style={{fontSize:17,color:C.muted}}>›</span>
+              </button>
+            ))}
+            {ventes.length>0 && <div style={{fontSize:11,fontWeight:700,color:C.muted,textTransform:'uppercase',letterSpacing:0.4,margin:'14px 2px 6px'}}>Ventes ({ventes.length})</div>}
+            {ventes.map((o,i)=>(
+              <button key={'v'+(o.transaction_id||i)} type="button" onClick={()=>{ setGsOpen(false); if(o.transaction_id!=null) poserCible({type:'vente',tx:String(o.transaction_id)},'ventes'); subVoulue.current='vinted'; setTab('ventes'); }} data-recherche-vente={o.transaction_id!=null?String(o.transaction_id):undefined}
+                style={{width:'100%',minHeight:44,display:'flex',alignItems:'center',gap:11,padding:'9px 10px',marginBottom:6,background:C.card,border:`1px solid ${C.border}`,borderRadius:10,cursor:'pointer',fontFamily:'inherit',textAlign:'left'}}>
+                {thumb(orderPhoto(o),'💸')}
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontSize:13,fontWeight:600,color:C.text,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{o.title||'(sans titre)'}</div>
+                  <div data-recherche-statut={etapeVente(o, { poste: posteMain }).label} style={{fontSize:12,color:C.muted,fontWeight:500,marginTop:2}}>{etapeVente(o, { poste: posteMain }).label}{o.date?' · '+jourCourt(o.date):''}</div>
+                </div>
+                <span style={{fontSize:17,color:C.muted}}>›</span>
+              </button>
+            ))}
+            {achats.length>0 && <div style={{fontSize:11,fontWeight:700,color:C.muted,textTransform:'uppercase',letterSpacing:0.4,margin:'14px 2px 6px'}}>Achats ({achats.length})</div>}
+            {achats.map((o,i)=>(
+              <button key={'a'+(o.transaction_id||i)} type="button" onClick={()=>{ setGsOpen(false); VUE_ACHATS_NAV='all'; demanderVue('achats'); if(o.transaction_id!=null) poserCible({type:'achat',tx:String(o.transaction_id)},'cat_achats'); setTab('cat_achats'); }} data-recherche-achat={o.transaction_id!=null?String(o.transaction_id):undefined}
+                style={{width:'100%',minHeight:44,display:'flex',alignItems:'center',gap:11,padding:'9px 10px',marginBottom:6,background:C.card,border:`1px solid ${C.border}`,borderRadius:10,cursor:'pointer',fontFamily:'inherit',textAlign:'left'}}>
+                {thumb(orderPhoto(o),'📦')}
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontSize:13,fontWeight:600,color:C.text,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{o.title||'(sans titre)'}</div>
+                  <div data-recherche-statut={etapeAchat(o, null).label} style={{fontSize:12,color:C.muted,fontWeight:500,marginTop:2}}>{etapeAchat(o, null).label}{o.date?' · '+jourCourt(o.date):''}</div>
+                </div>
+                <span style={{fontSize:17,color:C.muted}}>›</span>
+              </button>
+            ))}
+          </div>
+        </div>
+        );
+      })();
+  // Le champ lui-même : sur ordinateur dans la barre du haut (toujours là, on
+  // tape dedans), sur téléphone dans l'en-tête (la loupe l'ouvre, le clavier
+  // monte sans changer d'écran). Échap ou un toucher dehors referme ; la page
+  // derrière ne bouge pas.
+  const champRecherche = (mobile) => (
+    <input ref={gsChampRef} type="search" className="vrm-recherche-champ" data-recherche-champ="" enterKeyHint="search" autoComplete="off" spellCheck={false}
+      aria-label={mobile ? 'Rechercher une paire : N°, modèle ou marque' : 'Rechercher une paire'} placeholder={mobile ? 'N°, modèle ou marque…' : 'Tape un N°, un modèle, une marque…'}
+      role="combobox" aria-autocomplete="list" aria-expanded={gsOpen} aria-controls="vrm-recherche-resultats" aria-keyshortcuts={mobile ? undefined : '/'}
+      title={mobile ? undefined : 'Rechercher : un N°, un modèle, une marque (touche /)'}
+      value={gsQ} onChange={e=>{ setGsQ(e.target.value); if(!gsOpen) setGsOpen(true); }} onFocus={()=>{ if(!gsOpen) setGsOpen(true); }}
+      onKeyDown={e=>{ if(e.key==='Escape'){ e.preventDefault(); e.stopPropagation(); fermerRecherche(); } }}/>
+  );
+  const champRechercheOrdi = (
+    <div className="vrm-recherche" data-recherche-zone="" data-recherche-ouverte={gsOpen?'1':'0'}>
+      <label className="vrm-barre-recherche" data-barre-recherche="">
+        <Icon name="search" size={18}/>
+        {champRecherche(false)}
+        {gsQ ? <button type="button" className="vrm-recherche-effacer" aria-label="Effacer la recherche" onClick={()=>{ setGsQ(''); try{ gsChampRef.current&&gsChampRef.current.focus(); }catch(_){} }}><Icon name="close" size={14}/></button>
+          : <kbd className="vrm-barre-kbd">/</kbd>}
+      </label>
+      {panneauRecherche}
+    </div>
+  );
+  const champRechercheMobile = (
+    <div className="vrm-hdr-recherche" data-recherche-zone="" style={{background:C.bg}}>
+      <Icon name="search" size={18} style={{color:C.muted,flexShrink:0}}/>
+      {champRecherche(true)}
+      <button type="button" className="vrm-hdr-recherche-fermer" aria-label="Fermer la recherche" onClick={fermerRecherche} style={{color:C.text}}>Fermer</button>
+    </div>
+  );
   return (
     <div className="vrm-app-shell" style={{...variablesTheme(C,dark),height:'100%',width:'100%',display:'flex',flexDirection:'column',overflowX:'clip',background:C.bg,color:C.text,fontFamily:'inherit',transition:'background .3s,color .3s',boxSizing:'border-box'}}
       onTouchStart={e=>{
@@ -61643,6 +61854,7 @@ function AppCoeur() {
           <NomEntreprise entreprise={entreprise} className="vrm-hdr-entreprise"/>
         </div>
         {!ordi && <div className="vrm-hdr-titre" data-titre-ecran="">{titreCourant}</div>}
+        {!ordi && gsOpen && champRechercheMobile}
         <div className="vrm-header-actions">
           <div style={{display:'flex',alignItems:'center'}}>
             {false&&<span style={{color:C.accent,fontWeight:500}}>📦 {Object.values(garageGrid).flatMap(a=>Array.isArray(a)?a:[]).filter(v=>v&&v.trim()!=='').length}</span>}
@@ -61681,7 +61893,7 @@ function AppCoeur() {
                 écrans (Julien, 5 octobre). Voir `EtatActions`. */}
             {MULTI_USER && <EtatActions onNav={setTab} ordi={ordi} sombre={eD}/>}
             <PastilleStream/>
-            {!ordi && <button className="vrm-hbtn" type="button" onClick={()=>{setGsOpen(true);}} title="Rechercher" aria-label="Rechercher une paire" aria-pressed={gsOpen}>
+            {!ordi && <button className="vrm-hbtn" type="button" data-recherche-zone="" data-recherche-loupe="" onClick={()=>{ if(gsOpen) fermerRecherche(); else ouvrirRecherche(); }} title="Rechercher" aria-label="Rechercher une paire" aria-expanded={gsOpen} aria-controls="vrm-recherche-resultats">
               <Icon name="search" size={21}/>
             </button>}
             {/* Messages et Paramètres retirés de l'en-tête (Julien, 16 oct.) : ils sont
@@ -61690,108 +61902,8 @@ function AppCoeur() {
           </div>
         </div>
       </header>
-      {/* Recherche globale : une paire par N°, titre ou marque, dans tous les onglets. */}
-      {gsOpen && (()=>{
-        const q = gsQ.trim().toLowerCase();
-        const numeros = load('vinted_annonce_numeros', {});
-        const listCache = (_acctCache['listings'] && _acctCache['listings'].items) || [];
-        const soldCache = ((_acctCache['sold'] && _acctCache['sold'].items) || []).length ? _acctCache['sold'].items : (gsData && gsData.sold) || [];
-        const buyCache = ((_acctCache['purchased'] && _acctCache['purchased'].items) || []).length ? _acctCache['purchased'].items : (gsData && gsData.bought) || [];
-        const onlineIds = new Set([...listCache.map(it=>String(it.id)), ...((gsData && [...gsData.online]) || [])]);
-        const lbcSet = (gsData && gsData.lbc) || new Set();
-        const garageBoxOf = (numero)=>{ for(const [box,arr] of Object.entries(garageGrid||{})){ if(Array.isArray(arr)&&arr.some(v=>String(v).trim()===String(numero))) return box; } return null; };
-        const hit = (s)=> q && String(s||'').toLowerCase().includes(q);
-        let pairs=[], ventes=[], achats=[];
-        const kNumQ = lireNumeroCherche(gsQ, { cleNum }, [prefixeNumeros(), archiveNumeros()]);
-        if(q){
-          // Paires numérotées (index principal : N°, titre, marque).
-          const okUid = comptesRecherche(vintedAccounts);
-          pairs = Object.entries(numeros).map(([id,e])=>({id, ...e}))
-            .filter(e=> !okUid || !e.accountId || okUid.has(String(e.accountId)))
-            .filter(e=> hit(e.numero) || hit(e.title) || hit(extractBrand(e.title||'')))
-            .filter(e=> !kNumQ || cleNum(e.numero||'')!==kNumQ)   // la paire exacte est dans « Tout sur le N° »
-            .map(e=>{ const box=garageBoxOf(e.numero); const online=onlineIds.has(String(e.id)); const onLbc=lbcSet.has(String(e.id))||lbcSet.has(String(e.numero)); return {...e, box, online, onLbc}; })
-            .sort((a,b)=>(parseInt(a.numero,10)||0)-(parseInt(b.numero,10)||0))
-            .slice(0,40);
-          const numeredIds = new Set(pairs.map(p=>String(p.id)));
-          ventes = soldCache.filter(o=> (hit(o.title)||hit(extractBrand(o.title||''))) ).slice(0,25);
-          achats = buyCache.filter(o=> (hit(o.title)||hit(extractBrand(o.title||''))) ).slice(0,25);
-        }
-        const total = pairs.length+ventes.length+achats.length;
-        const go=(tab)=>{ setGsOpen(false); setTab(tab); };
-        // Un NUMÉRO tapé (« 128 », « B128 », « n128 ») : le bloc « Tout sur le
-        // N° » passe devant, par identité (src/rechercheNumero.js).
-        const estNumQ = !!kNumQ;
-        // Revue du 16 octobre : la recherche écrivait le statut BRUT de Vinted
-        // (« Le paiement a été validé ») et la date en 15/10/2026, quand la carte
-        // de la même vente dit « À expédier · 15 oct. ». Même règle (`etapeVente`,
-        // `etapeAchat`), même forme de date que les cartes.
-        const shipDoneGs = load('vinted_ship_done', {}) || {};
-        const posteMain = (o) => !!(o && shipDoneGs[String(o.transaction_id)]);
-        const jourCourt = (d) => { const t = new Date(d); return isNaN(t.getTime()) ? '' : t.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }); };
-        const numBadge=(n)=> <span style={{flexShrink:0,minWidth:26,height:26,borderRadius:8,background:C.accent,color:C.onAccent,fontSize:12,fontWeight:700,display:'flex',alignItems:'center',justifyContent:'center',padding:'0 5px'}}>{n?`#${n}`:'—'}</span>;
-        const thumb=(src,fb)=> <div style={{width:44,height:44,borderRadius:8,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>{src?<PhotoVinted src={src} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:20}}>{fb||<Icon name="image" size={18} style={{color:C.muted,opacity:.55}}/>}</span>}</div>;
-        return (
-        <div className="vrm-global-search" style={{position:'fixed',inset:0,zIndex:70,background:C.bg,display:'flex',flexDirection:'column'}}>
-          <FermeAuRetour fermer={()=>setGsOpen(false)}/>
-          <div className="vrm-global-search-head" style={{display:'flex',alignItems:'center',gap:10,padding:'12px 14px',borderBottom:`1px solid ${C.border}`,background:C.surface}}>
-            <Icon name="search" size={19} style={{color:C.muted,flexShrink:0}}/>
-            <input aria-label="Rechercher un article dans VRM" type="search" autoFocus value={gsQ} onChange={e=>setGsQ(e.target.value)} placeholder="N°, nom du modèle ou marque…"
-              style={{flex:1,background:C.bg,border:`1px solid ${C.border}`,borderRadius:8,padding:'10px 12px',color:C.text,fontSize:15,fontFamily:'inherit',outline:'none'}}/>
-            <button className="vrm-icon-control" type="button" onClick={()=>{setGsOpen(false);}} aria-label="Fermer la recherche"
-              style={{background:'transparent',border:`1px solid ${C.border}`,borderRadius:8,width:38,height:38,color:C.text,cursor:'pointer',fontSize:17,fontWeight:600,fontFamily:'inherit',flexShrink:0}}><Icon name="close" size={15}/></button>
-          </div>
-          <div style={{flex:1,overflowY:'auto',padding:'8px 14px 40px',WebkitOverflowScrolling:'touch'}}>
-            {!q && <div style={{padding:'40px 16px',textAlign:'center',color:C.muted,fontSize:13,lineHeight:1.6}}>Tape un <b>numéro</b>, un <b>modèle</b> ou une <b>marque</b>.<br/><span style={{fontSize:12}}>Cherche partout : annonces en ligne, ventes, achats, garage {gsData?'et Leboncoin':'…'}{!gsData?<> · <span style={{opacity:0.8}}>indexation en cours…</span></>:''}</span></div>}
-            {q && total===0 && !estNumQ && <div style={{padding:'40px 16px',textAlign:'center',color:C.muted,fontSize:13}}>Aucun résultat pour « {gsQ} ».<br/><span style={{fontSize:12}}>{gsData?'Aucune paire, vente ou achat ne correspond.':'Indexation en cours, réessaie dans un instant…'}</span></div>}
-            {q && estNumQ && <ToutSurLeNumero q={gsQ} numData={numData} comptes={vintedAccounts} onNav={go} onChercher={(n)=>setGsQ(String(n))} onStock={(n)=>{ setGsOpen(false); setGarageLocate(String(n)); DEMANDE_STOCK_CHERCHE.nums=[String(n)]; DEMANDE_STOCK_CHERCHE.at=Date.now(); setTab('garage'); }}/>}
-            {pairs.length>0 && <div style={{fontSize:11,fontWeight:700,color:C.muted,textTransform:'uppercase',letterSpacing:0.4,margin:'12px 2px 6px'}}>Paires numérotées ({pairs.length})</div>}
-            {pairs.map(p=>(
-              <button key={'p'+p.id} type="button" onClick={()=>{ if(p.box!=null){ setGsOpen(false); setGarageLocate(String(p.numero)); setTab('garage'); } else go(p.online?'cat_annonces':'cat_ventes'); }}
-                style={{width:'100%',display:'flex',alignItems:'center',gap:11,padding:'9px 10px',marginBottom:6,background:C.card,border:`1px solid ${C.border}`,borderRadius:10,cursor:'pointer',fontFamily:'inherit',textAlign:'left'}}>
-                {numBadge(p.numero)}
-                {thumb(p.photo)}
-                <div style={{flex:1,minWidth:0}}>
-                  <div style={{fontSize:13,fontWeight:600,color:C.text,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{p.title||'(sans titre)'}</div>
-                  <div style={{fontSize:12,color:C.muted,fontWeight:500,marginTop:2,display:'flex',gap:8,flexWrap:'wrap'}}>
-                    <span style={{color:p.online?INV_STATUS.online.color:C.muted}}>{p.online?'🟢 En ligne':'⚪ Retirée'}</span>
-                    {p.onLbc && <span style={{color:LBC_ORANGE}}>🟠 Leboncoin</span>}
-                    {p.box!=null && <span style={{color:C.accent}}>Au garage</span>}
-                    {p.buyPrice && <span>achat {prixCourt(String(p.buyPrice).replace(',', '.'))}</span>}
-                    {p.price && <span>· {prixCourt(String(p.price).replace(',', '.'))}</span>}
-                  </div>
-                </div>
-                <span style={{fontSize:17,color:C.muted}}>›</span>
-              </button>
-            ))}
-            {ventes.length>0 && <div style={{fontSize:11,fontWeight:700,color:C.muted,textTransform:'uppercase',letterSpacing:0.4,margin:'14px 2px 6px'}}>Ventes ({ventes.length})</div>}
-            {ventes.map((o,i)=>(
-              <button key={'v'+(o.transaction_id||i)} type="button" onClick={()=>go('cat_ventes')}
-                style={{width:'100%',display:'flex',alignItems:'center',gap:11,padding:'9px 10px',marginBottom:6,background:C.card,border:`1px solid ${C.border}`,borderRadius:10,cursor:'pointer',fontFamily:'inherit',textAlign:'left'}}>
-                {thumb(orderPhoto(o),'💸')}
-                <div style={{flex:1,minWidth:0}}>
-                  <div style={{fontSize:13,fontWeight:600,color:C.text,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{o.title||'(sans titre)'}</div>
-                  <div data-recherche-statut={etapeVente(o, { poste: posteMain }).label} style={{fontSize:12,color:C.muted,fontWeight:500,marginTop:2}}>{etapeVente(o, { poste: posteMain }).label}{o.date?' · '+jourCourt(o.date):''}</div>
-                </div>
-                <span style={{fontSize:17,color:C.muted}}>›</span>
-              </button>
-            ))}
-            {achats.length>0 && <div style={{fontSize:11,fontWeight:700,color:C.muted,textTransform:'uppercase',letterSpacing:0.4,margin:'14px 2px 6px'}}>Achats ({achats.length})</div>}
-            {achats.map((o,i)=>(
-              <button key={'a'+(o.transaction_id||i)} type="button" onClick={()=>go('cat_achats')}
-                style={{width:'100%',display:'flex',alignItems:'center',gap:11,padding:'9px 10px',marginBottom:6,background:C.card,border:`1px solid ${C.border}`,borderRadius:10,cursor:'pointer',fontFamily:'inherit',textAlign:'left'}}>
-                {thumb(orderPhoto(o),'📦')}
-                <div style={{flex:1,minWidth:0}}>
-                  <div style={{fontSize:13,fontWeight:600,color:C.text,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{o.title||'(sans titre)'}</div>
-                  <div data-recherche-statut={etapeAchat(o, null).label} style={{fontSize:12,color:C.muted,fontWeight:500,marginTop:2}}>{etapeAchat(o, null).label}{o.date?' · '+jourCourt(o.date):''}</div>
-                </div>
-                <span style={{fontSize:17,color:C.muted}}>›</span>
-              </button>
-            ))}
-          </div>
-        </div>
-        );
-      })()}
+      {/* (31 oct.) Sur téléphone, les résultats de la recherche tombent sous l'en-tête (pas d'écran plein). */}
+      {!ordi && panneauRecherche}
       {/* Le panneau « 🔔 Notifications » (cloche) est retiré le 17 octobre : rien ne
           l'ouvrait plus (`setNotifOpen(true)` n'existait nulle part). `notifItems`
           reste : Ma journée, le tableau de bord et le Collectif le rendent. */}
@@ -61830,8 +61942,9 @@ function AppCoeur() {
         paddingBottom: ordi ? 40 : 'calc(20px + env(safe-area-inset-bottom))'}}>
         {/* (31 oct., maquette Colis) Sur ordinateur, la barre du haut : la
             recherche (touche « / ») et la place des filtres de site de l'écran. */}
-        {ordi && <BarreHaut onChercher={()=>setGsOpen(true)} poserSlot={setSlotBarre}/>}
+        {ordi && <BarreHaut champ={champRechercheOrdi} poserSlot={setSlotBarre}/>}
         <BarreHautSlot.Provider value={ordi ? slotBarre : null}>
+        <CibleNotif tab={tab} sub={platSub}/>
         <EcranGardeFou resetKey={tab}>
         {/* ⚠️⚠️ UN SEUL ENDROIT POUR « JE N'ARRIVE PAS À LIRE TES DONNÉES ».
             Mon premier correctif posait la garde ÉCRAN PAR ÉCRAN : j'en avais

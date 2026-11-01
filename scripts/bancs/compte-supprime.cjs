@@ -111,7 +111,7 @@ async function main() {
         dit(ec.etat === 'actif' && !ec.test, `${T} la carte du compte dit « Actif », sans « Tester la connexion »`, JSON.stringify(ec));
         // La recherche.
         await pg.locator('[aria-label="Rechercher une paire"]').first().click();
-        const champ = pg.locator('input[placeholder^="N°, nom du modèle"]');
+        const champ = pg.locator('[data-recherche-champ]');
         await champ.fill('nike'); await pg.waitForTimeout(900);
         const nike = await pg.evaluate(() => document.body.innerText);
         dit(!/Nike Sacai/.test(nike), `${T} la recherche ne montre plus les paires du compte supprimé`, (nike.match(/[^\n]*Nike[^\n]*/g) || []).join(' | '));
@@ -120,6 +120,9 @@ async function main() {
         dit(/Adidas Spezial/.test(adi), `${T} l'autre sens : la paire du compte vivant est trouvée`);
         // MODE STREAM : allumé dans Réglages, les noms de comptes sont floutés.
         await pg.keyboard.press('Escape').catch(() => {});
+        // (31 oct.) Échap ferme le panneau de recherche, qui retire son entrée
+        // d'historique (retour) : on la laisse partir avant de naviguer.
+        await pg.waitForTimeout(600);
         await pg.goto(`http://localhost:${PORT}/?tab=settings`, { waitUntil: 'domcontentloaded' });
         const inter = pg.locator('[data-stream-reglage] button[role="switch"]');
         await inter.waitFor({ timeout: 12000 }); await inter.scrollIntoViewIfNeeded(); await inter.click();

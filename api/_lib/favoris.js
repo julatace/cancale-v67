@@ -7,6 +7,7 @@ import {initialiserFile,vueFile,lancerFile,reserverFile,terminerFile,arreterFile
 import {validerReglagesFavoris} from '../../src/reglagesFavoris.js';
 import {sendPushToAll,pushCategorieActive} from './push.js';
 import {contexteVendeur} from './owner.js';
+import {DESTINATIONS} from './lien-notif.js';
 import {preparerMessageFavori} from '../../src/favorisVinted.js';
 
 // The neutral row cannot be edited by the browser (RLS). One row per Vinted
@@ -42,7 +43,7 @@ async function notifierFinFavoris(owner,fin){
   return contexteVendeur.run({owner},async()=>{
     if(!(await pushCategorieActive('favoris')))return {envoye:false};
     const {title,body}=texteFinFavoris(fin);
-    return sendPushToAll({title,body,url:'/?tab=cat_msg',tag:'favoris-file-'+String(fin.lot||'')});
+    return sendPushToAll({title,body,url:DESTINATIONS.favorisFile(),tag:'favoris-file-'+String(fin.lot||'')});
   });
 }
 export async function routeFavoris(req,res){

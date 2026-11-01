@@ -179,7 +179,7 @@ const lire = (pg) => pg.evaluate(() => {
   const epingles = [...document.querySelectorAll('[data-relais-epingle]')].map((e) => [e.getAttribute('data-relais-epingle'), e.getAttribute('data-relais-numero'), e.textContent]);
   return { points, pub, epingles, total: racine ? Number(racine.getAttribute('data-colis-colonnes')) : null, cols,
     bouton: bt ? { n: Number(bt.getAttribute('data-imprimer-prets')), txt: bt.innerText.trim(), bg: getComputedStyle(bt).backgroundColor } : null,
-    barre: !!document.querySelector('[data-barre-recherche]'), barreTxt: ((document.querySelector('[data-barre-recherche]') || {}).innerText || ''),
+    barre: !!document.querySelector('[data-barre-recherche]'), barreTxt: ((document.querySelector('[data-barre-recherche]') || {}).innerText || '') + ' ' + ((document.querySelector('[data-barre-recherche] input') || {}).placeholder || ''),
     sous: ((document.querySelector('[data-sous-titre]') || {}).innerText || ''),
     sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth };
 });

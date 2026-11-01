@@ -2036,3 +2036,55 @@ d'avant entière » ⇒ 4 rouges). `stats-detail` 44, `stats-premium` 42, `stats
 `boost-rentable` 32, `chiffres-croises` 48, `journee-widgets` 167 (un rouge de placement à
 4 px au 1ᵉʳ passage, vert au second : instable), `enligne`, `comptes` verts. Captures
 1512/390, clair et sombre, regardées à côté de la maquette.
+
+---
+
+## 31 octobre — La recherche EN PLACE (plus d'écran blanc) et l'ergonomie autour
+
+**Demande de Julien** : « Quand on appuie sur la barre de recherche, ça fait un grand écran
+blanc ; je veux que ça reste sur la page et que ça permette juste d'écrire. »
+
+**Avant** : la barre du haut (ordinateur) et la loupe (téléphone) ouvraient
+`.vrm-global-search`, une couche `position:fixed; inset:0` au fond plein — un écran blanc
+avec son propre champ. **Maintenant** :
+
+- **Ordinateur** : la barre du haut porte un VRAI champ (`[data-recherche-champ]`, rôle
+  combobox). Toucher la barre, ou « / » depuis n'importe où, met le focus dedans ; les
+  résultats tombent dans un panneau déroulant sous le champ (`.vrm-recherche-panneau`,
+  max 70 % de la hauteur, il défile seul, `overscroll-behavior: contain`). La page derrière
+  reste visible et ne bouge pas. La barre du haut est désormais **collante** (`sticky`) :
+  la recherche reste joignable quand on a descendu la page, et son panneau tombe toujours
+  dans la fenêtre (avant, « / » en bas de page ouvrait un panneau hors de vue).
+- **Téléphone** : la loupe ouvre le champ DANS l'en-tête (il recouvre le logo et le titre,
+  avec « Fermer » à droite, 44 px) ; le focus est posé dans le même geste (`flushSync`)
+  pour que le clavier d'iOS monte ; les résultats sont une liste sous l'en-tête (fixe,
+  70 dvh au plus), pas une feuille plein écran. Champ à 16 px (pas de zoom d'iOS).
+- **Fermer** : Échap, un toucher hors du champ et du panneau, « Fermer », ou « retour »
+  (le panneau garde `FermeAuRetour` : le geste retour le ferme sans changer d'écran).
+- Les **règles de recherche ne changent pas** : le N° par identité (`lireNumeroCherche`,
+  `cleNum`, bloc « Tout sur le N° » de `src/rechercheNumero.js`), les modèles/marques par
+  texte — c'est une recherche, rien n'y RELIE quoi que ce soit (§5).
+- `WebkitOverflowScrolling:'touch'` qui traînait sur la liste de l'ancienne couche est parti
+  avec elle (§7).
+
+**Ergonomie corrigée sur le chemin** (changements localisés) :
+1. Une **vente** trouvée par la recherche OUVRE cette vente (son tiroir), au lieu de laisser
+   Ventes en haut de liste ; un **achat** trouvé mène à SA ligne dans Achats (vue complète).
+2. Dans « Tout sur le N° », la vente Vinted ouvre SA vente, le bordereau mène à SA carte
+   dans Colis (sauf un colis déjà posté).
+3. « / » met le focus dans le champ sans faire défiler la page ; un deuxième « / » dans le
+   champ s'écrit normalement.
+4. Le double cadre de focus (champ + barre) est remplacé par un seul, sur la barre.
+
+**Preuves** : `scripts/bancs/recherche-en-place.cjs` (390 tactile et 1512 : focus dans un
+champ sans changer d'écran, aucune couche fixe ne couvre ≥ 85 % de la fenêtre, panneau
+< 80 % de la hauteur, défilement de la page inchangé, résultats à la frappe, « Tout sur le
+N° » dans le panneau, Échap, toucher dehors, lignes ≥ 44 px, aucun débordement) — 30 verts ;
+**11 rouges sur `origin/main`**, **7 rouges sous mutation** (`BANC_MUTATION=plein` : le
+panneau redevient un écran plein). `recherche-numero.cjs` (50 verts) et
+`retour-historique.cjs` (18 verts) suivent le nouveau champ ; `colis-colonnes.cjs`,
+`compte-supprime.cjs`, `scripts/tests/iphone.cjs` lisent le champ par `[data-recherche-champ]`.
+Captures 390/1512 regardées : le contenu reste derrière le panneau.
+
+Fichiers : `src/App.jsx` (coque : `champRechercheOrdi`, `champRechercheMobile`,
+`panneauRecherche`, `BarreHaut({ champ })`), `src/styles-recherche.css` (nouveau).

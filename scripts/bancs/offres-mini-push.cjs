@@ -37,7 +37,9 @@ const dit = (c, m, d) => { if (c) okc++; else ko++; console.log((c ? '✅ ' : '�
 
 // Une offre EN ATTENTE (statut 10) de l'acheteur `opp` sur l'article `item`.
 const offreMsg = (opp, oid, prix) => ({ entity_type: 'offer_request_message', entity: { user_id: opp, current: true, status: 10, status_title: '', price: { amount: String(prix) }, transaction_id: 'TX' + oid, offer_request_id: oid } });
-const conv = (item, opp, oid, prix) => ({ opp: String(opp), item: String(item), msgs: [offreMsg(opp, oid, prix)] });
+// (31 oct.) L'identité de la LIGNE (`harvest_{uid}_conv_{id}`) : la notification d'une
+// offre seule ouvre SA conversation.
+const conv = (item, opp, oid, prix) => ({ id: `harvest_900_conv_7${item}`, opp: String(opp), item: String(item), msgs: [offreMsg(opp, oid, prix)] });
 
 let CFG;
 function reset(cfg) {
@@ -92,7 +94,13 @@ const mini = () => pushes.filter((p) => /prix mini/i.test(`${p.title} ${p.body}`
     console.log(`     téléphone : « ${p.title} » / « ${p.body} »`);
     dit(mini().length === 1, 'UNE notification « au-dessus de ton prix mini »', String(mini().length));
     dit(/1 tap/i.test(p.body || ''), 'elle dit « à accepter en 1 tap »', p.body);
-    dit(p.url === '/?tab=cat_msg', 'le clic ouvre Messages (?tab=cat_msg)', p.url); }
+    dit(p.url === '/?tab=messages&site=vinted&cible=conv&conv=7444&compte=900', 'le clic ouvre SA conversation (Messages · Vinted, la carte d’offre)', p.url); }
+
+  console.log('\n── A2. deux offres au-dessus du mini : le filtre « Offres » de Messages');
+  reset({ planchers: { 444: { numero: '7', min: '40' }, 445: { numero: '8', min: '40' } }, convs: [conv(444, 5301, 'O1b', 45), conv(445, 5302, 'O1c', 50)] });
+  await lancer();
+  { const p = mini()[0] || {};
+    dit(mini().length === 1 && p.url === '/?tab=messages&site=vinted&cible=offres', 'UNE notification, qui ouvre Messages filtré sur les offres', `${mini().length} · ${p.url}`); }
 
   console.log('\n── B. offre 35 € (sous le plancher) : rien');
   reset({ convs: [conv(444, 5301, 'O2', 35)] });

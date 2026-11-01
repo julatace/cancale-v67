@@ -382,7 +382,7 @@ function chargeApp(noms, injecte) {
     dit(JSON.stringify(tags) === JSON.stringify(['retrait-a_verifier-09440000000022', 'retrait-dernier-30000021', 'retrait-dernier-VGS12345678027']),
       'cron : « dernier jour » (dont le n° lu dans le sujet) et « à vérifier » (garde Chronopost passée), jamais le colis retiré ailleurs, coché, ni fini pour l\'app', `HTTP ${r1.code} · ${tags.join(' · ')}`);
     const d = p1.find((p) => p.tag === 'retrait-dernier-30000021') || {};
-    dit(/^📍 Dernier jour pour retirer /.test(d.title || '') && /30000021/.test(d.body || '') && /Bar Test/.test(`${d.title} ${d.body}`) && d.url === '/?tab=cat_achats', '« 📍 Dernier jour pour retirer <lieu> », le n° dans le texte, ouvre Achats', `${d.title} | ${d.body}`);
+    dit(/^📍 Dernier jour pour retirer /.test(d.title || '') && /30000021/.test(d.body || '') && /Bar Test/.test(`${d.title} ${d.body}`) && /^\/\?tab=cat_bord&cible=retrait(&tx=\d+)?&suivi=30000021$/.test(d.url || ''), '« 📍 Dernier jour pour retirer <lieu> », le n° dans le texte, ouvre Colis → « À retirer », SA carte (31 oct.)', `${d.title} | ${d.body}`);
     const v = p1.find((p) => p.tag === 'retrait-a_verifier-09440000000022') || {};
     // (29 oct.) « sans doute reparti » ne s'écrit plus : un délai dépassé ne prouve
     // rien (mesuré le 29 : 5 « sans doute repartis » sur 5 avaient été RETIRÉS) —
@@ -562,7 +562,7 @@ function chargeApp(noms, injecte) {
     resetBase(); await oublis();
     base.set(`${A}|email_bord_99000124`, { type: 'bordereau', transaction: '99000124', suivi: 'XW123456780FR', receivedAt: '2026-10-20T08:00:00Z' });
     await recoit(chrono('Votre colis a été retiré', 'Bonjour,\nVotre colis XW123456780FR a été retiré.', 83));
-    dit(pushes.every((p) => /vente/i.test(p.title || '') && /cat_ventes/.test(p.url || '')), 's\'il sonne, c\'est « Ta vente : colis retiré par l\'acheteur », vers Ventes', JSON.stringify(pushes.map((p) => [p.title, p.url])));
+    dit(pushes.every((p) => /vente/i.test(p.title || '') && /^\/\?tab=ventes&site=vinted/.test(p.url || '')), 's\'il sonne, c\'est « Ta vente : colis retiré par l\'acheteur », vers Ventes · Vinted', JSON.stringify(pushes.map((p) => [p.title, p.url])));
     // L'autre sens : un ACHAT (aucun bordereau) retiré sonne toujours, une fois.
     resetBase(); await oublis();
     await recoit(chrono('Votre colis a été retiré', 'Bonjour,\nVotre colis XW123456781FR a été retiré.', 84));

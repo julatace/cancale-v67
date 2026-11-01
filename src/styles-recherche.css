@@ -1,0 +1,73 @@
+/* ── LA RECHERCHE EN PLACE (31 oct., Julien : « ça fait un grand écran blanc ;
+   je veux que ça reste sur la page et que ça permette juste d'écrire ») ──────
+   Ordinateur : le champ est DANS la barre du haut, les résultats dans un panneau
+   déroulant juste sous lui, au-dessus du contenu (qui reste visible et à sa
+   place). Téléphone : la loupe ouvre le champ dans l'en-tête, les résultats en
+   liste sous lui — jamais une feuille plein écran. Cibles au doigt : 44 px. */
+.vrm-recherche { position: relative; flex: 0 1 420px; min-width: 220px; }
+.vrm-recherche > .vrm-barre-recherche { width: 100%; box-sizing: border-box; }
+.vrm-recherche[data-recherche-ouverte="1"] > .vrm-barre-recherche { box-shadow: 0 0 0 1px var(--vrm-line, #E4E4DF); }
+.vrm-barre-recherche:focus-within { outline: 2px solid var(--vrm-focus, #2442B8); outline-offset: 2px; }
+.vrm-recherche-champ {
+  flex: 1; min-width: 0; min-height: 44px; border: 0; background: transparent; color: var(--vrm-ink, inherit);
+  font: inherit; font-size: 14px; padding: 0; outline: none; -webkit-appearance: none; appearance: none;
+}
+/* Le contour de focus est porté par la barre entière (`:focus-within`), pas
+   par le champ : un seul cadre, pas deux emboîtés. */
+html .vrm-app-shell .vrm-recherche-champ:focus, html .vrm-app-shell .vrm-recherche-champ:focus-visible { outline: none !important; box-shadow: none !important; }
+.vrm-recherche-champ::placeholder { color: var(--vrm-muted, #56564F); opacity: 1; }
+.vrm-recherche-champ::-webkit-search-cancel-button { display: none; }
+.vrm-recherche-effacer {
+  flex: none; display: grid; place-items: center; width: 32px; height: 32px; margin-right: -8px;
+  border: 0; border-radius: 8px; background: transparent; color: var(--vrm-muted, #56564F); cursor: pointer;
+}
+.vrm-recherche-effacer:hover { background: var(--vrm-bg, #fff); }
+
+/* Le panneau des résultats. */
+.vrm-recherche-panneau {
+  position: absolute; z-index: 80; top: calc(100% + 6px); left: 0;
+  width: min(680px, calc(100vw - 48px)); max-height: min(70vh, calc(100vh - 120px));
+  display: flex; flex-direction: column; box-sizing: border-box;
+  border: 1px solid var(--vrm-line, #E4E4DF); border-radius: 14px;
+  box-shadow: var(--vrm-ombre-flottante, 0 10px 28px rgba(15,15,14,.12));
+  overflow: hidden;
+}
+.vrm-recherche-corps { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 8px 10px 12px; }
+
+/* ── Téléphone ───────────────────────────────────────────────────────────── */
+.vrm-hdr-recherche {
+  position: absolute; inset: 0; z-index: 2; display: flex; align-items: center; gap: 8px; box-sizing: border-box;
+  padding: env(safe-area-inset-top) max(10px, env(safe-area-inset-right)) 0 max(12px, env(safe-area-inset-left));
+}
+.vrm-hdr-recherche .vrm-recherche-champ { font-size: 16px; /* pas de zoom d'iOS sous 16 px */
+  background: var(--vrm-surface, #F5F5F3); border-radius: 10px; padding: 0 12px; }
+.vrm-hdr-recherche-fermer {
+  flex: none; min-height: 44px; min-width: 44px; padding: 0 6px; border: 0; background: transparent;
+  font: inherit; font-size: 15px; font-weight: 600; cursor: pointer;
+}
+@media (max-width: 767px), (max-width: 1023px) and (hover: none), (max-width: 1023px) and (pointer: coarse), (max-width: 1023px) and (pointer: none) {
+  .vrm-recherche-panneau {
+    position: fixed; left: 0; right: 0; width: auto; top: 56px; z-index: 75;
+    max-height: min(70dvh, calc(100dvh - 140px)); border-radius: 0 0 16px 16px; border-width: 0 0 1px;
+  }
+  .vrm-recherche-corps { padding: 6px 12px 12px; }
+}
+
+/* ── LA CIBLE D'UNE NOTIFICATION (31 oct.) ───────────────────────────────────
+   L'élément visé se signale un instant (un filet d'accent, l'accent RARE du §7),
+   puis redevient neutre. */
+.vrm-cible-notif { box-shadow: 0 0 0 2px var(--vrm-accent, #2442B8) !important; border-radius: 10px; transition: box-shadow .3s ease; }
+.vrm-cible-absente {
+  display: flex; align-items: center; gap: 10px; margin: 8px 16px; padding: 4px 4px 4px 12px; min-height: 44px; box-sizing: border-box;
+  border: 1px solid var(--vrm-line, #E4E4DF); border-radius: 12px; background: var(--vrm-surface, #F5F5F3);
+  color: var(--vrm-ink, inherit); font-size: 13px; line-height: 1.4;
+}
+.vrm-cible-absente > span { flex: 1; min-width: 0; }
+.vrm-cible-absente > button { flex: none; min-height: 44px; min-width: 44px; border: 0; background: transparent; color: inherit; font: inherit; font-weight: 600; cursor: pointer; }
+
+/* Sur ordinateur, la barre du haut RESTE en haut quand la page défile : la
+   recherche (et « / ») est joignable de partout, et son panneau tombe toujours
+   dans la fenêtre — jamais hors de vue au-dessus du défilement. */
+@media (min-width: 1024px), (min-width: 768px) and (hover: hover) and (pointer: fine) {
+  .vrm-main > .vrm-barre-haut { position: sticky; top: 0; z-index: 45; background-color: var(--vrm-bg, #FFFFFF); }
+}

@@ -23,6 +23,7 @@ import { resumeClassement, texteBorne } from "./_lib/resume-email.js";
 
 import crypto from 'crypto';
 import { sendPushToAll, pushCategorieActive } from './_lib/push.js';
+import { DESTINATIONS, conversationDeLEmail } from './_lib/lien-notif.js';
 import { stampBordereau } from './_lib/stamp.js';
 
 import { contexteVendeur, proprietaireCourant, duVendeur as duVendeurLib } from './_lib/owner.js';
@@ -1622,7 +1623,7 @@ export function notifRetraitConversation(e, tx) {
   const titre = String(e.titre || '').trim().slice(0, 60);
   return {
     payload: { title: '📍 Colis à retirer', body: (titre ? `${titre} · ` : '') + parts.join('. ') + '.',
-      tag: e.suivi ? `relais-${e.suivi}-code` : `relais-tx${tx}-code`, url: '/?tab=cat_achats' },
+      tag: e.suivi ? `relais-${e.suivi}-code` : `relais-tx${tx}-code`, url: DESTINATIONS.retrait({ tx, suivi: e.suivi }) },
     aussi: [cleCodeRetrait(code)],
   };
 }
@@ -2067,7 +2068,7 @@ export async function traiterEmail(req, res) {
       if (!sortiAilleurs) try { await pushOnce({
         title: venteRetiree ? '✅ Ta vente : colis retiré par l’acheteur' : `${icons[track.status]} ${titles[track.status]}`,
         body: bodyNotifColis(track, carrier),
-        tag: cleNotifColis(track, rowId), url: venteRetiree ? '/?tab=cat_ventes' : '/?tab=cat_achats',
+        tag: cleNotifColis(track, rowId), url: venteRetiree ? DESTINATIONS.vente({}) : (track.status === 'available' ? DESTINATIONS.retrait({ suivi: track.suivi }) : DESTINATIONS.achat({})),
       }, (track.status === 'available' || track.status === 'retour') ? 'colis' : 'suivi', [],
       track.status === 'available' ? [cleCodeRetrait(track.code)] : []); } catch (_) {}
       { const st = contexteVendeur.getStore(); if (st) st.resumeExtra = { code: track.code, lieu: track.lieu, limite: track.limite, sens: sensLigne }; }
@@ -2114,7 +2115,7 @@ export async function traiterEmail(req, res) {
       };
       await supabaseUpsert([row]);
       // Notif push : bordereau prêt = colis à expédier.
-      try { await pushOnce({ title: pdfTamponneB64 ? '📦 Bordereau prêt à imprimer' : '📦 Bordereau reçu', body: `${data.modele || 'Article'}${data.numero ? ` — N°${data.numero}` : ''}${pdfTamponneB64 ? ' : déjà tamponné' : ''} — à expédier${data.dateLimite ? ` avant le ${data.dateLimite}` : ''}.`, tag: `bord-${data.transaction}`, url: '/?tab=cat_bord' }, 'expedier'); } catch (_) {}
+      try { await pushOnce({ title: pdfTamponneB64 ? '📦 Bordereau prêt à imprimer' : '📦 Bordereau reçu', body: `${data.modele || 'Article'}${data.numero ? ` — N°${data.numero}` : ''}${pdfTamponneB64 ? ' : déjà tamponné' : ''} — à expédier${data.dateLimite ? ` avant le ${data.dateLimite}` : ''}.`, tag: `bord-${data.transaction}`, url: DESTINATIONS.colis({ tx: data.transaction }) }, 'expedier'); } catch (_) {}
       await notifierDoubleVente(numeroLu, data.modele || data.article);
       { const st = contexteVendeur.getStore(); if (st) st.resumeExtra = { parTitre: !!(data.numero && !numeroLu), article: data.modele || data.article }; }
       await logEmail({ type: 'bordereau', subject, from: mail.from, numero: data.numero, transaction: data.transaction, tamponne: !!pdfTamponneB64 });
@@ -2147,7 +2148,7 @@ export async function traiterEmail(req, res) {
       try { await pushOnce({
         title: '💰 Argent reçu',
         body: `${montant ? montant + ' € viré sur ton compte Vinted' : 'Transaction finalisée'}${article ? ' — ' + article.slice(0, 50) : ''}${acc.login ? ` (${acc.login})` : ''}.`,
-        tag: `final-${key}`, url: '/?tab=cat_ventes',
+        tag: `final-${key}`, url: DESTINATIONS.vente({}),
         _cat: 'argent',
       }); } catch (_) {}
       await logEmail({ type: 'finalisation', subject, from: mail.from, montant, article, account: acc.login || '' });
@@ -2221,7 +2222,7 @@ export async function traiterEmail(req, res) {
         body: `${article || 'Commande Vinted'}${prix ? ` — ${prix} €` : ''}${acc.login ? ` (${acc.login})` : ''} — justificatif archivé.`,
         // Une notification par ACHAT (son n°), pas par email : la copie
         // transférée d'un reçu déjà reçu ne sonne pas une seconde fois.
-        tag: transaction ? `achat-tx${transaction}` : `achat-${key}`, url: '/?tab=cat_achats',
+        tag: transaction ? `achat-tx${transaction}` : `achat-${key}`, url: DESTINATIONS.achat({ tx: transaction }),
         _cat: 'achat',
       }); } catch (_) {}
       { const st = contexteVendeur.getStore(); if (st) st.resumeExtra = { ligne: `email_achat_${key}` }; }
@@ -2245,7 +2246,7 @@ export async function traiterEmail(req, res) {
         data.numero = jn.numero; if (jn.numeroTitre) data.numeroTitre = jn.numeroTitre; }
       await supabaseUpsert([{ id: `email_sale_${key}`, data: { type: 'vente', ...data, account: acc.login || '', uid: acc.uid || '', receivedAt: now } }]);
       // Notif push : vente en temps réel, même app fermée et ordi éteint.
-      try { await pushOnce({ title: '💸 Vendu !', body: `${data.designation || 'Article'}${data.prix ? ` — ${data.prix} €` : ''}${acc.login ? ` (${acc.login})` : ''}`, tag: `sale-${key}`, url: '/?tab=cat_ventes' }, 'vente'); } catch (_) {}
+      try { await pushOnce({ title: '💸 Vendu !', body: `${data.designation || 'Article'}${data.prix ? ` — ${data.prix} €` : ''}${acc.login ? ` (${acc.login})` : ''}`, tag: `sale-${key}`, url: DESTINATIONS.vente({ tx: data.transaction }) }, 'vente'); } catch (_) {}
       await notifierDoubleVente(data.numero, data.designation);
       // Facturation Pro : ne se déclenche que si activée dans l'app ET que
       // l'email est celui d'un compte Vinted PRO (la mention de Vinted) ET qu'il
@@ -2263,7 +2264,7 @@ export async function traiterEmail(req, res) {
             if (facture && !facture.deja) try { await pushOnce({
               title: facture.status === 'queued' ? '🧾 Facture en cours d\'envoi' : '🧾 Facture préparée',
               body: `${facture.number} — ${data.designation || 'article'} (${data.prix} €) pour ${data.email}${facture.status === 'queued' ? '' : ' — envoi manuel dans Factures'}`,
-              tag: `inv-${facture.number}`, url: '/?tab=invoices',
+              tag: `inv-${facture.number}`, url: DESTINATIONS.facture(),
               _cat: 'facture',
             }); } catch (_) {}
           }
@@ -2331,7 +2332,7 @@ export async function traiterEmail(req, res) {
       try { await pushOnce({
         title: `💰 Offre ${montant ? montant + ' €' : ''}${qui ? ' de ' + qui : ''}`,
         body: `${article ? `« ${article.trim().slice(0, 40)} »` : 'Un acheteur t\'a fait une offre'}${acc.login ? ` (${acc.login})` : ''}${advice || ' — expire en 24h.'}`,
-        tag: `offer-${key}`, url: '/?tab=cat_msg',
+        tag: `offer-${key}`, url: DESTINATIONS.message({ conv: conversationDeLEmail(mail), compte: acc.uid }),
         _cat: 'offre',
       }); } catch (_) {}
       // Archive l'offre + le conseil pour le panneau « Copilote d'offres » de l'app.
@@ -2388,7 +2389,7 @@ export async function traiterEmail(req, res) {
       try { await pushOnce({
         title: `💬 ${paire ? court(paire, 70) : (qui || 'Message Vinted')}`,
         body: `${qui && paire ? `${qui} · ` : ''}Nouveau message${acc.login ? ` sur ${acc.login}` : ''}${extrait ? ` : « ${extrait} »` : ' — ouvre Vinted pour répondre.'}`,
-        tag: cleEmail || `msg-${cleEntiere}`, url: '/?tab=cat_msg',
+        tag: cleEmail || `msg-${cleEntiere}`, url: DESTINATIONS.message({ conv: conversationDeLEmail(mail), compte: acc.uid }),
         _cat: 'message',
       }, null, aliasAncien); } catch (_) {}
       await logEmail({ type: 'message', subject, from: mail.from, de: qui, extrait, paire, account: acc.login || '' });
@@ -2406,7 +2407,7 @@ export async function traiterEmail(req, res) {
       try { await pushOnce({
         title: '❤️ Nouveau favori !',
         body: `${qui || 'Quelqu\'un'} craque sur « ${(article || 'ton article').slice(0, 45)} »${prix ? ` (${prix} €)` : ''}${acc.login ? ` (${acc.login})` : ''} — fais-lui une offre !`,
-        tag: `fav-${key}`, url: '/?tab=cat_annonces',
+        tag: `fav-${key}`, url: DESTINATIONS.favori(),
         _cat: 'favori',
       }); } catch (_) {}
       await logEmail({ type: 'favori', subject, from: mail.from, de: qui, article, account: acc.login || '' });
@@ -2440,7 +2441,7 @@ export async function traiterEmail(req, res) {
           notif = {
             title: `⚠️ Annulation demandée${article ? ` — ${court(article, 60)}` : ''}`,
             body: `${qui || "L'acheteur"} veut annuler${raison ? ` (« ${court(raison, 70)} »)` : ''}${acc.login ? ` sur ${acc.login}` : ''} — accepte ou refuse dans la conversation Vinted.`,
-            tag: `annul-${key}`, url: '/?tab=cat_msg',
+            tag: `annul-${key}`, url: DESTINATIONS.message({ conv: conversationDeLEmail(mail), compte: acc.uid }),
           };
         } else {
           const article = subject.replace(/\s*-\s*Confirmation requise\s*$/i, '').trim();
@@ -2449,7 +2450,7 @@ export async function traiterEmail(req, res) {
           notif = {
             title: `📦 Achat livré${article ? ` — ${court(article, 60)}` : ''}`,
             body: `Vérifie-le${limite ? ` : tu as jusqu'au ${limite} pour signaler un problème` : ' et signale un problème à temps'}${acc.login ? ` (${acc.login})` : ''} — sinon la vente est finalisée.`,
-            tag: `livre-${key}`, url: '/?tab=cat_achats',
+            tag: `livre-${key}`, url: DESTINATIONS.achat({}),
           };
         }
         try { await pushOnce(notif, 'action'); } catch (_) {}
