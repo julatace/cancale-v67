@@ -112,6 +112,10 @@ import ColisColonnes from "./ColisColonnes.jsx";
 import "./styles-barre-haut.css";
 import "./styles-recherche.css";
 import { colonnesColis, SITES_COLIS } from "./colisColonnes.js";
+import { fusionEntreeVente, parcoursPaire } from "./fichePaire.js";
+import { etatNumeroColis } from "./emballage.js";
+import ModeEmballage from "./ModeEmballage.jsx";
+import FichePaire from "./FichePaire.jsx";
 import { SITES_TACHE, TACHES_SITE, estTacheSite, siteDeTache, sectionDeTache, sousSections, subDeTache, redirigerOnglet, filtreRetenu, retenirFiltre } from "./navigationTache.js";
 import { lireCible, selecteursCible, phraseAbsente } from "./cibleNotif.js";
 // La migration qui cloisonne les vendeurs, lue depuis LE fichier (pas recopiée) :
@@ -14214,8 +14218,11 @@ function EmptyState({ icon, title, desc, action }) {
 // Rend ce que `toutSurLeNumero` (src/rechercheNumero.js) a trouvé PAR IDENTITÉ.
 // Aucune couleur (§7) sauf le rouge des deux paires présentes sous ce N° (§5).
 // Chaque ligne mène à son écran. `numData` absent = lecture en cours.
-function ToutSurLeNumero({ q, numData, comptes, onNav, onStock, onChercher }) {
-  const lecture = !numData;
+// (1er nov.) La lecture « Tout sur le N° » : les sources lues par la coque
+// (`numData`) passées à la règle `toutSurLeNumero` avec les règles de l'app.
+// UNE fonction pour le bloc de la recherche ET la fiche complète d'une paire
+// (`FichePaire`) — les deux disent la même chose de la même paire (§11).
+function rechercheParNumero(q, numData, comptes) {
   const nd = numData || {};
   const numeros = load('vinted_annonce_numeros', {}) || {};
   const cloud = isCloudReady();
@@ -14240,7 +14247,7 @@ function ToutSurLeNumero({ q, numData, comptes, onNav, onStock, onChercher }) {
     archive: archiveNumeros(),
   }, {
     cleNum, conflits: conflitsDeNumeros,
-    ouStock: (plan, k) => { const m = ouDansMeubles(k); if (m) return { itemId: 'meuble:' + m.meuble.id, key: String(m.i), itemName: m.meuble.name, nom: m.libelle, roomName: '' }; return ouEstNumero(plan, k); },
+    ouStock: ouStockNumero,
     numEbayLigne: numLigneEbay,
     numEbayAnnonce: (a) => numEbayLu(a && a.sku, a && a.itemId, null, a && a.depuis),
     numLbc: (v) => numeroLbcIdentite(v, nd.lbcItems || null, liensLbc),
@@ -14250,6 +14257,14 @@ function ToutSurLeNumero({ q, numData, comptes, onNav, onStock, onChercher }) {
     expediee: (o) => etapeVente(o, { poste: (x) => !!shipDone[String(x.transaction_id)] }).step >= 2,
     revenue: (o) => classifyOrderStatus(o && o.status) === 'cancelled' && !/exp[eé]di|achemin|livr|remis|d[eé]pos/i.test((o && o.status) || ''),
   }, series);
+  return { rn, nd, shipDone, numeros: fichesLues };
+}
+// Où est rangé ce N° : « Mes meubles » d'abord (tenu à la main), puis la pièce
+// du Stock — la règle de « Tout sur le N° », lue aussi par le mode emballage.
+const ouStockNumero = (plan, k) => { const m = ouDansMeubles(k); if (m) return { itemId: 'meuble:' + m.meuble.id, key: String(m.i), itemName: m.meuble.name, nom: m.libelle, roomName: '' }; return plan ? ouEstNumero(plan, k) : null; };
+function ToutSurLeNumero({ q, numData, comptes, onNav, onStock, onChercher, onFiche }) {
+  const lecture = !numData;
+  const { rn, nd, shipDone } = rechercheParNumero(q, numData, comptes);
   if (rn.etat === 'invalide') return null;
   const k = rn.cle;
   const jour = (d) => { const t = new Date(d); return isNaN(t.getTime()) ? '' : t.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }); };
@@ -14273,6 +14288,8 @@ function ToutSurLeNumero({ q, numData, comptes, onNav, onStock, onChercher }) {
   return (
     <div data-tout-num={k} data-tout-etat={lecture && rn.etat !== 'trouve' ? 'lecture' : rn.etat} data-tout-lecture={lecture ? '1' : '0'} style={{ marginTop: 10, padding: '10px 12px', background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12 }}>
       <div style={{ fontSize: 15, fontWeight: 700, color: C.text }}>Tout sur le N°{k}</div>
+      {/* (1er nov.) La fiche complète : le parcours de CETTE paire, par identité. */}
+      {onFiche && rn.etat === 'trouve' && ligne('parcours', { 'data-tout-parcours': k }, `Toute l'histoire du N°${k}`, 'Achat, stock, annonces, vente, colis, argent', () => onFiche(k))}
       {rn.ancienNumero && <div style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>Un ancien numéro (d'avant la remise à zéro) : il ne désigne que l'histoire.</div>}
       {rn.double && (
         <div data-tout-double="1" role="alert" style={{ marginTop: 8, padding: '8px 10px', borderRadius: 8, border: `1px solid ${C.danger}`, color: C.danger, fontSize: 13, fontWeight: 600 }}>
@@ -28690,6 +28707,9 @@ const DEMANDE_STOCK_CHERCHE = { nums: null, at: 0 };
 // commande à ouvrir dans eBay → Ventes. Au niveau MODULE (l'écran eBay n'est pas
 // monté au moment du clic) ; lue une fois, valable 30 s.
 const DEMANDE_EBAY_CIBLE = { compte: null, id: null, at: 0 };
+// (1er nov.) « Emballer » demandé d'ailleurs (Ma journée, la fiche d'une paire) :
+// l'écran Colis ouvre le mode emballage en montant, une fois.
+const DEMANDE_EMBALLAGE = { at: 0 };
 // (29 oct., revue) Ma journée « N à retirer de Leboncoin » ouvrait Leboncoin →
 // Annonces en HAUT, deux écrans au-dessus de la paire. La cible est posée au clic
 // (`avant`), l'écran Leboncoin la consomme une fois ses données rendues.
@@ -39754,6 +39774,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const [shipDone, setShipDone] = useState(() => load('vinted_ship_done', {}));
   const isShipDone = (o) => !!(o && shipDone[String(o.transaction_id)]);
   const toggleShipDone = (o) => { const k = o && o.transaction_id!=null ? String(o.transaction_id) : null; if(!k) return; setShipDone(prev=>{ const u={...prev}; if(u[k]) delete u[k]; else u[k]=Date.now(); save('vinted_ship_done',u); return u; }); };
+  // « ✓ Colis fait » : LE geste (la vente ET son bordereau). Le bouton de la
+  // carte et le mode emballage appellent cette fonction — une seule écriture.
+  const marquerColisFait = (o, b) => { if (o && !isShipDone(o)) toggleShipDone(o); if (b) markBordShipped(b); };
   // (voir isBordDone plus bas : « colis fait » à la main, ou expédié d'après
   // Vinted (auto), OU marqué « expédié » à la main (statut Vinted en retard).
   // ── QUAND UN BORDEREAU SORT-IL DE LA LISTE ? ─────────────────────────────
@@ -40421,23 +40444,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const bn = buyByNum[String(e.numero).trim()];
     return (bn != null && String(bn).trim() !== '') ? { ...e, buyPrice: bn } : e;
   };
-  const effEntry = (o) => {
-    const base = resolvedEntry(o);
-    const ov = (o && o.transaction_id != null) ? saleOv[String(o.transaction_id)] : null;
-    if (!ov) return withBuyByNum(base);
-    const merged = { ...(base || {}) };
-    if (ov.numero != null && ov.numero !== '') merged.numero = ov.numero;
-    if (ov.buyPrice != null && ov.buyPrice !== '') merged.buyPrice = ov.buyPrice;
-    if (ov.fees != null && ov.fees !== '') merged.fees = ov.fees;
-    for(const [key] of champsCharges) if(ov[key]!=null && ov[key]!=='')merged[key]=ov[key];
-    if(ov.fraisComplets!=null)merged.fraisComplets=ov.fraisComplets;
-    // ⚠️ ACHAT RELIÉ DEPUIS LA VENTE (pour une vente SANS identité d'annonce :
-    // pas de paire où écrire, on relie sur la vente elle-même). `AchatRelie` lit
-    // `buyFromId`/`buyFrom` — sans ce passage, le reçu relié par l'écran Ventes
-    // n'apparaîtrait jamais. Même propriétaire que `choosePick` (§11).
-    if (ov.buyFromId) { merged.buyFromId = ov.buyFromId; merged.buyFrom = ov.buyFrom || merged.buyFrom; }
-    return withBuyByNum(merged);
-  };
+  // (1er nov.) La fusion (fiche ← correction posée sur la vente ← prix par N°)
+  // vit dans `fusionEntreeVente` (src/fichePaire.js) : la fiche complète d'une
+  // paire la lit aussi — une seule règle (§11).
+  // ⚠️ ACHAT RELIÉ DEPUIS LA VENTE (pour une vente SANS identité d'annonce :
+  // pas de paire où écrire, on relie sur la vente elle-même). `AchatRelie` lit
+  // `buyFromId`/`buyFrom` — la fusion les fait ressortir (même propriétaire que
+  // `choosePick`, §11).
+  const effEntry = (o) => fusionEntreeVente(resolvedEntry(o), (o && o.transaction_id != null) ? saleOv[String(o.transaction_id)] : null, buyByNum);
 
   // ── FIABILITÉ DU NUMÉRO : QUI PORTE PHYSIQUEMENT CE NUMÉRO ? ──────────────
   // Julien : « si le numéro n'est pas le bon, la paire est presque impossible à
@@ -45524,6 +45538,46 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     }
     return L;
   };
+  // ── (1er nov.) LE MODE EMBALLAGE ────────────────────────────────────────
+  // Les colis de la colonne « Prêts à imprimer », DANS SON ORDRE (jamais triés
+  // par emplacement — refus du 11 oct.), un par un. Chaque colis porte : son N°
+  // (la règle de la carte), l'état de ce N° (`conflitsNum` ⇒ rouge, à vérifier
+  // sur le carton ⇒ ambre, les règles de l'impression), où est la paire (le
+  // Stock, par N° : `ouStockNumero`), le transporteur du bordereau s'il est écrit.
+  // Le geste final est `marquerColisFait` — celui de « ✓ Colis fait ».
+  const [emballage, setEmballage] = useState(() => {
+    if (curSub !== 'bordereaux' || !DEMANDE_EMBALLAGE.at || Date.now() - DEMANDE_EMBALLAGE.at > 60000) return false;
+    DEMANDE_EMBALLAGE.at = 0; return true;
+  });
+  useEffect(() => {
+    if (curSub !== 'bordereaux') return undefined;
+    const f = () => { DEMANDE_EMBALLAGE.at = 0; setEmballage(true); };
+    window.addEventListener('vrm:emballer', f);
+    return () => window.removeEventListener('vrm:emballer', f);
+  }, [curSub]);
+  const colisEmballage = () => {
+    const vue = colonnesColis(cartesColis(), 'toutes');
+    const prets = ((vue.colonnes.find(c => c.cle === 'prets') || {}).cartes) || [];
+    const parCle = new Map(expeditions().map(e => ['v:' + (e.txn || e.key), e]));
+    let plan = null; try { const pl = load('vrm_room_plan', null); plan = pl ? normalizePlan(pl) : null; } catch (_) { plan = null; }
+    const meublesLus = (load('vrm_meubles', []) || []).length > 0;
+    return prets.map(x => {
+      const e = parCle.get(x.cle) || null;
+      const o = e && e.o, b = e && e.b;
+      const ou = x.num ? ouStockNumero(plan, x.num) : null;
+      const emplacement = ou ? { etat: 'range', texte: [ou.itemName || 'Un meuble', ou.nom].filter(Boolean).join(' · '), detail: ou.roomName || '' }
+        : !x.num ? { etat: 'pas-range', texte: 'Sans N° : pas de place dans le Stock' }
+        : (plan || meublesLus) ? { etat: 'pas-range', texte: 'Pas rangée dans le Stock' }
+        : { etat: 'pas-lu', texte: 'Stock pas encore lu sur cet appareil' };
+      const tr = b && b.transporteur ? nomTransporteurSuivi(b.transporteur) : '';
+      const transporteur = tr && tr !== 'Colis' ? tr : '';
+      const lim = e ? (texteLimiteEnvoi(e.lim) || '') : '';
+      return { cle: x.cle, tx: x.tx, num: x.num || '', nom: x.nom, photo: x.photo || null, e,
+        sous: [o && o._acc ? accNameOf(o._acc) : '', lim].filter(Boolean).join(' · '),
+        etatNum: etatNumeroColis(x.num, { cleNum, conflits: conflitsNum, fiches: numeros, aVerifier: (f) => ficheAVerifier(f) || reattribueAEcrire(f) }),
+        emplacement, transporteur, transport: transporteur ? `Bordereau ${transporteur}${b && b.suivi ? ` · suivi ${b.suivi}` : ''}` : '' };
+    });
+  };
   const ouvrirLot = () => {
     const L = lignesLot();
     if (!L.length) { toast('Aucun bordereau prêt à imprimer pour l\'instant.'); return; }
@@ -46223,6 +46277,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   return (
     <div style={{padding:'16px 14px 40px'}}>
       <input ref={bordRef} type="file" accept="application/pdf,.pdf" onChange={onBordFile} style={{display:'none'}}/>
+      {emballage && (()=>{
+        // (1er nov.) Le mode emballage : un portail plein écran (§7, FermeAuRetour).
+        const lectureEmb = (sales.loading && !sales.items) ? 'Je lis tes ventes…' : (sales.error && !(sales.items||[]).length) ? 'Tes ventes Vinted n’ont pas pu être lues.' : (!labelsPrets || emailBords===null) ? 'Je lis encore tes bordereaux…' : null;
+        return <ModeEmballage colis={colisEmballage()} lecture={lectureEmb} onFermer={()=>setEmballage(false)} Icon={Icon} Retour={FermeAuRetour}
+          Photo={(src)=>imgMortes.has(src) ? null : <PhotoVinted src={src} alt="" loading="lazy" decoding="async" onError={()=>noterImgMorte(src)}/>}
+          onFiche={(n)=>{ setEmballage(false); try { window.dispatchEvent(new CustomEvent('vrm:fiche-paire', { detail: String(n) })); } catch (_) {} }}
+          onMarquer={(liste)=>{ let n=0; for (const x of liste) { if (x && x.e && x.e.o) { marquerColisFait(x.e.o, x.e.b); n++; } } if (n) toast(n>1?`${n} colis marqués postés.`:'Colis marqué posté.'); return n; }}/>;
+      })()}
       {/* Le titre de l'écran est porté par <ScreenHead> plus bas, dans chaque
           section : ce <h2> le répétait juste au-dessus (« Annonces » puis
           « Annonces en ligne »). Un seul titre par écran. */}
@@ -46296,6 +46358,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             : pretsImpr>0 ? `${combien}${exact?' — le reste attend le sien':''}`
             : 'Bordereau + article au stock, coche par colis';
           tuiles.envoyer = { n: toShip.length, sub, alerte: late>0 };
+          // (1er nov.) LE MODE EMBALLAGE, d'ici : il s'ouvre sur Colis, sur les
+          // colis de la colonne « Prêts à imprimer », dans son ordre.
+          if (pretsImpr > 0) jobs.push({ id:'emballer', n:pretsImpr, icon:'box', color:C.text,
+            title:'Emballer les colis prêts', sub:`${combien} — un par un : le N°, la photo, où est la paire`,
+            action:'Emballer', tab:'cat_bord', prio:1, avant:()=>{ DEMANDE_EMBALLAGE.at = Date.now(); } });
         }
         // (19 oct.) LES VENTES eBAY À POSTER comptent dans « À envoyer » — la
         // même règle que Colis (`colisEb`, §11). L'étiquette se prend dans eBay
@@ -50395,6 +50462,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             )}
             {siteColis!=='toutes' && <div data-colis-filtre-note="" style={{fontSize:12,color:C.muted,margin:'0 2px 6px'}}>{vue.colonnes.reduce((t,c)=>t+c.cartes.length,0)} colis {nomSite[siteColis]} sur {vue.total} · <button type="button" className="vrm-lien-action" onClick={()=>setSiteColis('toutes')} style={{border:0,background:'transparent',padding:0,color:C.text,fontWeight:600,cursor:'pointer',fontFamily:'inherit',fontSize:12,minHeight:44}}>tout voir</button></div>}
             <ColisColonnes colonnes={vue.colonnes} total={vue.total} onOuvrir={ouvrir} notes={notes}
+              pieds={{ prets: ((vue.colonnes.find(c => c.cle === 'prets') || {}).cartes || []).length > 0
+                ? <Bouton variante="secondaire" icone="box" data-emballer-ouvrir={((vue.colonnes.find(c => c.cle === 'prets') || {}).cartes || []).length} onClick={() => setEmballage(true)} style={{ width: '100%', minHeight: 44 }}>Emballer</Bouton> : null }}
               Photo={photoCarte}
               corps={{ retirer: <ColonneRetirer vue={parPoint} C={C} Photo={photoCarte} onOuvrir={ouvrir} enRouteSansRelais={(groupesRelais && groupesRelais.enRouteSansRelais) || 0}/> }}/>
             <h2 className="vrm-colis-detail-titre" data-colis-detail="" style={{fontSize:'var(--vrm-t-section, 22px)',margin:'8px 2px 12px',color:C.text}}>Colis par colis</h2>
@@ -51064,7 +51133,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                           qui divergeaient. */}
                       <button type="button" onClick={()=>{
                         if (posted) { if(o) { if(isShipDone(o)) toggleShipDone(o); } if(b && isBordShippedManual(b)) unmarkBordShipped(b); }
-                        else { if(o && !isShipDone(o)) toggleShipDone(o); if(b) markBordShipped(b); }
+                        else marquerColisFait(o, b);
                       }} title={posted?'Annuler « colis fait »':'Marquer comme posté → il sort de la liste'} data-geste="fait"
                         className="vrm-colis-sec vrm-colis-ter" style={{...sec,border:`1px solid ${C.border}`,background:posted?C.bg:'transparent',color:posted?C.text:C.muted}}>
                         {posted?'↺ Pas encore':'✓ Colis fait'}
@@ -60085,14 +60154,23 @@ function AppCoeur() {
   const [numData,setNumData]=useState(null);
   const [revisionFiche,relireFiche]=React.useReducer(n=>n+1,0);
   useEffect(()=>{const ouvrir=e=>{if(typeof e.detail!=='string'||!e.detail.trim()||e.detail.length>64)return;setNumData(null);relireFiche();setGsQ(e.detail.trim());setGsOpen(true);setTimeout(()=>{ try{ gsChampRef.current&&gsChampRef.current.focus({preventScroll:true}); }catch(_){} },0);};window.addEventListener('vrm:fiche-article',ouvrir);return()=>window.removeEventListener('vrm:fiche-article',ouvrir);},[]);
-  useEffect(()=>{ if(!gsOpen){ setNumData(null); return undefined; } if(numData) return undefined; let vivant=true; (async()=>{
+  // (1er nov.) LA FICHE COMPLÈTE D'UNE PAIRE (`FichePaire`) : ouverte depuis
+  // « Tout sur le N° » ou le mode emballage ; elle lit les MÊMES sources.
+  const [ficheNum,setFicheNum]=useState(null);
+  useEffect(()=>{const ouvrir=e=>{const n=e&&e.detail; if(typeof n!=='string'||!n.trim()||n.length>64)return; setFicheNum(n.trim());};window.addEventListener('vrm:fiche-paire',ouvrir);return()=>window.removeEventListener('vrm:fiche-paire',ouvrir);},[]);
+  const besoinNumData=gsOpen||!!ficheNum;
+  useEffect(()=>{ if(!besoinNumData){ setNumData(null); return undefined; } if(numData) return undefined; let vivant=true; (async()=>{
     const sb=async(q)=>{ try{ const r=await fetch(`${SUPABASE_URL}/rest/v1/${q}`,{headers:sbAuth()}); if(!r.ok) return null; const j=await r.json(); return Array.isArray(j)?j:null; }catch(_){ return null; } };
+    let versementsLus=null;
     // Le Stock vit dans SA ligne (`vrm_room`) : la copie de l'appareil peut
     // manquer (purgée à la remise à zéro, appareil neuf) — on la lit ici.
     const [lstRows, soldRows, txnItem, bE, bL, lbcRows, cE, planLu]=await Promise.all([
       sb('app_data?id=like.harvest_*_listings&select=id,data'),
       sb('app_data?id=like.harvest_*_orders_sold&select=id,data'),
-      (async()=>{ try{ const rows=await lireTout(TXN_META_SELECT,{strict:true}); if(rows===null) return null; noterEtatsTxn(rows); const m={}; for(const r of rows){ if(r&&r.tx&&r.item) m[String(r.tx)]=String(r.item); } return m; }catch(_){ return null; } })(),
+      (async()=>{ try{ const rows=await lireTout(TXN_META_SELECT,{strict:true}); if(rows===null) return null; noterEtatsTxn(rows); const m={}; for(const r of rows){ if(r&&r.tx&&r.item) m[String(r.tx)]=String(r.item); }
+        // (1er nov.) La date de versement (transaction finalisée, 450) — la règle
+        // de `fetchVersementsVinted`, lue dans la MÊME réponse (aucune requête de plus).
+        const ver={}; for(const r of rows){ if(r&&r.tx&&String(r.s)==='450'&&r.su&&!isNaN(Date.parse(r.su))) ver[String(r.tx)]=r.su; } versementsLus=ver; return m; }catch(_){ return null; } })(),
       lireTout('id=like.email_bord_*&select=id,tx:meta->>transaction,pdf:meta->>_pdf',{strict:true}).catch(()=>null),
       lireTout('id=like.harvest_*_label_*&select=id,tx:meta->>tx,pdf:meta->>_pdf',{strict:true}).catch(()=>null),
       sb('app_data?id=eq.lbc_ventes&select=ventes:data->ventes'),
@@ -60100,9 +60178,12 @@ function AppCoeur() {
       loadRoomPlan().catch(()=>undefined),
     ]);
     const plan=planLu===undefined?null:normalizePlan(planLu);
-    let enLigne=null, aConfirmer=null, masquees=null;
+    let enLigne=null, aConfirmer=null, masquees=null, stats=null;
     if(lstRows){ try{ const lu=await lireLignesEnLigne(lstRows); enLigne=new Set(); aConfirmer=new Set(); masquees=new Set();
       for(const r of lu.lignes){ const p=(r.data&&r.data.payload)||{}; for(const it of (p.items||[])){ if(!it.is_closed&&!it.is_hidden&&!it.is_draft) enLigne.add(String(it.id)); } }
+      // (1er nov.) Vues et favoris de chaque annonce lue (la fiche d'une paire) :
+      // un nombre seulement s'il est écrit, jamais un 0 deviné.
+      stats={}; for(const r of lstRows){ const p=(r&&r.data&&r.data.payload)||{}; for(const it of (p.items||[])){ if(!it||it.id==null) continue; const fav=Number.isFinite(it.favourite_count)?it.favourite_count:(Number.isFinite(it.favourites_count)?it.favourites_count:null); stats[String(it.id)]={vues:Number.isFinite(it.view_count)?it.view_count:null,favoris:fav}; } }
       for(const l of lu.aConfirmer.values()) for(const it of (l||[])) aConfirmer.add(String(it.id));
       // 22 oct. : les masquées par Vinted — la même règle que l'écran Annonces (`<masquees-regle>`).
       const supp=await lireSupprimeesTous();
@@ -60111,7 +60192,7 @@ function AppCoeur() {
       for(const r of lstRows){ const k=/^harvest_(\d+)_listings$/.exec(String((r&&r.id)||'')); const res=k?lu.parCompte.get(k[1]):null; if(!res) continue;
         for(const it of masqueesPresentes(masqueesDuCompte(res.fermees, supp===null?null:(supp.get(k[1])||{}), dateLectureDressing(r)), fichesM, perduesM)) masquees.add(String(it.id)); }
     }catch(_){ enLigne=null; aConfirmer=null; masquees=null; } }
-    let ventes=null; if(soldRows){ ventes=[]; const vus=new Set(); for(const r of soldRows){ const p=(r.data&&r.data.payload)||{}; for(const o of (p.my_orders||[])){ const t=String(o.transaction_id||''); if(t&&!vus.has(t)){ vus.add(t); ventes.push(o); } } } }
+    let ventes=null; if(soldRows){ ventes=[]; const vus=new Set(); for(const r of soldRows){ const p=(r.data&&r.data.payload)||{}; const uid=(/^harvest_(\d+)_orders_sold$/.exec(String((r&&r.id)||''))||[])[1]||null; for(const o of (p.my_orders||[])){ const t=String(o.transaction_id||''); if(t&&!vus.has(t)){ vus.add(t); ventes.push(uid?{...o,_uid:uid}:o); } } } }
     const bordereaux=(bE&&bL)?[...bE,...bL].filter(b=>b&&b.tx).map(b=>({tx:String(b.tx),pdf:!!b.pdf&&String(b.pdf)!=='false'})):null;
     let lbcVentes=null, lbcItems=null;
     if(lbcRows){ const v=(lbcRows[0]&&lbcRows[0].ventes)||{}; lbcVentes=Object.entries(v).map(([id,x])=>({...(x||{}),_id:id})).filter(x=>x.isSeller===true);
@@ -60119,8 +60200,8 @@ function AppCoeur() {
     let ebayCommandes=null, ebayAnnonces=null;
     if(Array.isArray(cE)){ const tous=async(base,sel,champ)=>{ const r=await lireEbayTous(base,sel,champ,cE); return (!r||r.illisibles.length)?null:r.items; };
       [ebayCommandes, ebayAnnonces]=await Promise.all([tous('ebay_orders',SEL_EBAY_COMMANDES,'orders'), tous('ebay_listings',SEL_EBAY_ANNONCES,'items')]); }
-    if(vivant) setNumData({enLigne,aConfirmer,masquees,ventes,txnItem,bordereaux,lbcVentes,lbcItems,ebayCommandes,ebayAnnonces,plan});
-  })(); return ()=>{ vivant=false; }; /* eslint-disable-next-line */ },[gsOpen,revisionFiche]);
+    if(vivant) setNumData({enLigne,aConfirmer,masquees,ventes,txnItem,bordereaux,lbcVentes,lbcItems,ebayCommandes,ebayAnnonces,plan,stats,versements:txnItem==null?null:versementsLus});
+  })(); return ()=>{ vivant=false; }; /* eslint-disable-next-line */ },[besoinNumData,revisionFiche]);
   const swipeStart=React.useRef(null); // pour le swipe entre onglets du bas
   // Passer à l'onglet voisin au doigt ou avec les flèches du clavier.
   // La souris conserve ses gestes de sélection, sans changer de plateforme.
@@ -61914,7 +61995,7 @@ function AppCoeur() {
           <div className="vrm-recherche-corps">
             {!q && <div data-recherche-vide="" style={{padding:'14px 12px',textAlign:'left',color:C.muted,fontSize:13,lineHeight:1.6}}>Tape un <b>numéro</b>, un <b>modèle</b> ou une <b>marque</b>.<br/><span style={{fontSize:12}}>Cherche partout : annonces en ligne, ventes, achats, garage {gsData?'et Leboncoin':'…'}{!gsData?<> · <span style={{opacity:0.8}}>indexation en cours…</span></>:''}</span></div>}
             {q && total===0 && !estNumQ && <div data-recherche-rien="" style={{padding:'14px 12px',textAlign:'left',color:C.muted,fontSize:13}}>Aucun résultat pour « {gsQ} ».<br/><span style={{fontSize:12}}>{gsData?'Aucune paire, vente ou achat ne correspond.':'Indexation en cours, réessaie dans un instant…'}</span></div>}
-            {q && estNumQ && <ToutSurLeNumero q={gsQ} numData={numData} comptes={vintedAccounts} onNav={go} onChercher={(n)=>setGsQ(String(n))} onStock={(n)=>{ setGsOpen(false); setGarageLocate(String(n)); DEMANDE_STOCK_CHERCHE.nums=[String(n)]; DEMANDE_STOCK_CHERCHE.at=Date.now(); setTab('garage'); }}/>}
+            {q && estNumQ && <ToutSurLeNumero q={gsQ} numData={numData} comptes={vintedAccounts} onNav={go} onFiche={(n)=>setFicheNum(String(n))} onChercher={(n)=>setGsQ(String(n))} onStock={(n)=>{ setGsOpen(false); setGarageLocate(String(n)); DEMANDE_STOCK_CHERCHE.nums=[String(n)]; DEMANDE_STOCK_CHERCHE.at=Date.now(); setTab('garage'); }}/>}
             {pairs.length>0 && <div style={{fontSize:11,fontWeight:700,color:C.muted,textTransform:'uppercase',letterSpacing:0.4,margin:'12px 2px 6px'}}>Paires numérotées ({pairs.length})</div>}
             {pairs.map(p=>(
               <button key={'p'+p.id} type="button" onClick={()=>{ if(p.box!=null){ setGsOpen(false); setGarageLocate(String(p.numero)); setTab('garage'); } else go(p.online?'cat_annonces':'cat_ventes'); }}
@@ -62142,6 +62223,24 @@ function AppCoeur() {
         {ordi && <BarreHaut champ={champRechercheOrdi} poserSlot={setSlotBarre}/>}
         <BarreHautSlot.Provider value={ordi ? slotBarre : null}>
         <CibleNotif tab={tab} sub={platSub}/>
+        {ficheNum && (()=>{
+          // (1er nov.) LA FICHE COMPLÈTE D'UNE PAIRE : la même lecture que « Tout
+          // sur le N° » (`rechercheParNumero`), racontée en parcours (`parcoursPaire`).
+          const { rn, numeros } = rechercheParNumero(ficheNum, numData, vintedAccounts);
+          const nomCompte = (uid) => { const a = (vintedAccounts || []).find(x => String(x.vinted_user_id) === String(uid)); if (!a) return null; const labels = load('vinted_account_labels', {}) || {}; return labels[a.vinted_user_id] || a.login || `#${a.vinted_user_id}`; };
+          const shipDone = load('vinted_ship_done', {}) || {};
+          const p = parcoursPaire(rn, { fiches: numeros, saleOv: load('vinted_sale_overrides', {}) || {}, buyByNum: load('vinted_buyprice_by_num', {}) || {},
+            stats: numData ? (numData.stats === undefined ? null : numData.stats) : null, versements: numData ? (numData.versements === undefined ? null : numData.versements) : null, nomCompte }, {
+            etapeVente: (o) => etapeVente(o, { poste: (x) => !!shipDone[String(x.transaction_id)] }),
+            venteAnnulee: (o) => classifyOrderStatus(o && o.status) === 'cancelled' || (o && o.transaction_id != null && txnAnnuleeAvantEnvoi(o.transaction_id)),
+            montantRecuEbay, commandeEbayEngagee, lbcAnnulee, lbcFinalisee,
+          });
+          const fermer = () => setFicheNum(null);
+          return <FichePaire p={p} num={ficheNum} lecture={!numData} onFermer={fermer} onRetour={()=>{ fermer(); setGsQ(String((p && p.num) || ficheNum)); setGsOpen(true); }}
+            onBordereau={(tx)=>{ fermer(); setGsOpen(false); poserCible({ type: 'colis', tx: String(tx) }, redirigerOnglet('cat_bord', null, ONGLETS_DEPLACES).tab); setTab('cat_bord'); }}
+            onEmballer={()=>{ fermer(); setGsOpen(false); DEMANDE_EMBALLAGE.at = Date.now(); setTab('cat_bord'); try { window.dispatchEvent(new Event('vrm:emballer')); } catch (_) {} }}
+            Photo={(src)=><PhotoVinted src={src} alt="" loading="lazy"/>} Icon={Icon} Retour={FermeAuRetour}/>;
+        })()}
         <EcranGardeFou resetKey={tab}>
         {/* ⚠️⚠️ UN SEUL ENDROIT POUR « JE N'ARRIVE PAS À LIRE TES DONNÉES ».
             Mon premier correctif posait la garde ÉCRAN PAR ÉCRAN : j'en avais

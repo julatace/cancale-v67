@@ -2185,3 +2185,47 @@ la relecture des achats n'est payée que quand il sert. **Achats** ne montre plu
 plus la ligne « N colis à retirer → Colis » (`data-achats-vers-colis`, `pickupUnion.total`, seulement e-mails
 lus). Banc `navigation-tache.cjs` (K) mis à jour : 163 verts ; mutations (entrée remise, étape « À retirer »
 remise dans Achats, `cat_achats` qui ne mène plus au détail) ⇒ rouges.
+
+## 1er novembre 2026 — La fiche complète d'une paire (maquette « numero-B-fiche-paire » validée)
+
+**Demande** : depuis « Tout sur le N° » (et donc la vente « Fiche N° », le journal des e-mails),
+le mode emballage, une fiche qui raconte le PARCOURS de la paire par identité seulement : Achat →
+Stock → Annonce(s) → Vente → Colis → Argent ; « pas su » dit « — » + la raison ; une étape absente
+est grisée, jamais inventée.
+
+**Ce qui est fait** :
+- `rechercheParNumero(q, numData, comptes)` (App.jsx) : la lecture de `ToutSurLeNumero` sortie en
+  fonction ; le bloc de la recherche ET la fiche la lisent (une règle, §11).
+- `src/fichePaire.js` (pur) : `parcoursPaire(rn, …)` à partir du résultat de `toutSurLeNumero`
+  (N° par `cleNum`, vente Vinted par transaction → `item_id`, eBay par SKU, Leboncoin par lien/réf.).
+  La fiche de la paire = celle de l'annonce vendue (par la transaction), sinon une fiche portant
+  ce N°. `fusionEntreeVente` = la fusion d'`effEntry` (fiche ← correction posée sur la vente ←
+  prix par N°) : **`effEntry` l'appelle désormais**, plus de seconde copie. Bénéfice =
+  `beneficePaire` (l'écran Ventes) ; frais pas confirmés ⇒ « frais pas tous confirmés » sous le
+  montant (un bénéfice d'une paire aux frais inconnus est un PLAFOND, pas un plancher : on n'écrit
+  pas « au moins »). eBay : `montantRecuEbay` ; autre devise ⇒ écartée et dite. Versement :
+  transaction finalisée (450, `status_updated_at`), lu dans la MÊME réponse que le pont
+  transaction → annonce (aucune requête de plus). Ventes illisibles ⇒ vente, colis, argent « pas
+  su » (jamais « pas encore vendue »).
+- La coque lit `numData` quand la recherche OU la fiche est ouverte (`besoinNumData`) ; elle y
+  ajoute les vues/favoris des annonces lues (`stats`, un nombre seulement s'il est écrit), les
+  dates de versement et le compte de chaque vente (`_uid`).
+- `src/FichePaire.jsx` + `src/styles-fiche-paire.css` : portail plein écran, « ‹ Tout sur le N° »
+  (retour au bloc de recherche), grand N° mono, trois tuiles Achat / Vente / Bénéfice (« — » quand
+  pas su), frise (pastille pleine à l'encre = lue ; au trait, gris = pas su ou pas arrivée), et
+  « Bordereau » / « Emballer » quand la vente est à poster. Rouge seulement pour deux paires sous
+  ce N°. Ouverture : événement `vrm:fiche-paire` (bouton « Toute l'histoire du N° » de
+  `ToutSurLeNumero`, lien du mode emballage).
+
+**Preuves** : banc `scripts/bancs/fiche-paire.cjs` (390 + 1512, 48 contrôles) : N°117 complet
+(achat 52 € relié, Meuble B, vendue 95 € par SA transaction, colis livré, versé, +43 € « frais pas
+tous confirmés ») ; N°118 partiel (en ligne, 14 fav., 150 vues ; le reste grisé, « — ») ; 50 paires
+au même titre : N°227 = 36 € + tx 9226, N°228 = 37 € sans vente, N°211 = tx 9210 ; ventes en panne
+⇒ « pas su » ; recherche → fiche → retour. Sur `origin/main` : 9 rouges. Mutations rouges : fiche
+choisie par titre (C), ventes inconnues prises pour « pas vendue » (D).
+Non fait (pour ne pas croiser les chantiers parallèles du tiroir de vente et des cartes
+d'annonce) : un bouton « parcours » direct sur la carte d'annonce et la carte de colis — on y
+arrive par « Fiche N° » → « Toute l'histoire du N° ». Le reçu d'achat n'est pas relu ici (il vit
+dans Achats) : l'étape dit seulement « achat relié par son n° de transaction ».
+
+**Geste de Julien** : aucun. Taper un N° dans la recherche → « Toute l'histoire du N° ».
