@@ -126,7 +126,8 @@ async function brancher(p){
     await p.waitForFunction(()=>{const svg=document.querySelector('[data-courbe-semaine]');return svg&&Math.abs(Number(svg.getAttribute('width'))-svg.parentElement.clientWidth)<2;},null,{timeout:5000});
     await p.waitForTimeout(200);
     const bar=await p.locator('[data-barre-jour]').boundingBox(),recent=await p.locator('.vrm-day-recent').boundingBox(),stock=await p.locator('.vrm-day-stock').boundingBox();
-    check(bar.y<160,'actions quotidiennes en haut à densité '+zoom);
+    // (1er nov.) La rangée « Tournée » passe au-dessus de la barre du jour : la barre reste dans le haut de l'écran (proportionnel à la densité).
+    check(bar.y<240*zoom,'actions quotidiennes en haut à densité '+zoom);
     check(stock.x>=recent.x+recent.width-1,'stock à droite des dernières ventes '+zoom);
     check(stock.y+stock.height<900 && recent.y+recent.height<900,'vue globale visible sans défilement '+zoom);
     check(await p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'journée sans débordement '+zoom);
