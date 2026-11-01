@@ -55,7 +55,8 @@ const VC_FIL = [
 ];
 const LIGNES = (appris) => ({
   ebay_listings: [{ items: EBAY_ANNONCES, capturedAt: iso(0) }],
-  lbc_messages: [{ data: { compteurs: { u1: { unread: 4, at: iso(0.2) } }, comptes: { u1: { name: 'Compte particulier', pro: false, at: iso(0) } } } }],
+  // (1er nov.) Lecture PROJETÉE (`compteurs:data->compteurs,comptes:data->comptes`) : la vraie forme.
+  lbc_messages: [{ compteurs: { u1: { unread: 4, at: iso(0.2) } }, comptes: { u1: { name: 'Compte particulier', pro: false, at: iso(0) } } }],
   vc_messages: [{ compteur: { messages: 1, at: iso(0.3) }, conversations: {
     C1: { productId: '900001', ref: '80', nonLu: true, date: iso(2), apercu: 'Vous faites 110 € ?', apercuDeMoi: false },
     C2: { productId: '900002', ref: '', nonLu: false, date: iso(1), apercu: 'La boîte est incluse ?', apercuDeMoi: false } }, lecture: { at: iso(0), total: 2, complet: true, page: '/messages/' } }],

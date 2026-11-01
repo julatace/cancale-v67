@@ -196,6 +196,62 @@
     return { n, cle };
   }
   const idDe = (e) => String(e.id != null ? e.id : (e.productId != null ? e.productId : e.product_id)).slice(0, 40);
+  // 5.296 (1er nov.) — LA FICHE D'UNE ANNONCE : Julien veut ses annonces Vestiaire
+  // « en fiches comme Vinted ». La forme d'une annonce de `product-listings`
+  // n'a JAMAIS été vue pleine chez lui : on ne lit que des clés dont le NOM dit
+  // ce qu'elles portent, et rien d'autre (« pas su » ⇒ vide, jamais deviné) :
+  //   · le TITRE (name/title…) — affichage seul, JAMAIS une identité (§5) ;
+  //   · UNE photo : une adresse https d'un hôte vestiairecollective.com, sous une
+  //     clé picture/photo/image… ;
+  //   · le PRIX avec le nom de sa clé (comme une vente) ;
+  //   · l'ÉTAT de l'annonce (status/state…) — un mot court recopié tel quel.
+  //   Jamais rien sous une clé de personne (`PAS_ACHETEUR`).
+  // Et la FORME de la première annonce (noms de clés et types, jamais une valeur)
+  // pour viser juste ensuite.
+  const CLE_TITRE = /^(name|title|productName|product_name|displayName|display_name)$/i;
+  const CLE_PHOTO = /^(picture|pictures|photo|photos|image|images|thumbnail|thumbnails|cover|coverPicture|cover_picture|mainPicture|main_picture|path|url|src|large|medium|small)$/i;
+  const CLE_PRIX = /^(price|prices|sellingPrice|selling_price|listingPrice|listing_price|salePrice|sale_price|amount)$/i;
+  const CLE_STATUT_ANNONCE = /^(status|state|productStatus|product_status|listingStatus|listing_status|publicationStatus|publication_status)$/i;
+  function photoAnnonce(e) {
+    let out = '';
+    const visite = (x, prof, sousPhoto) => {
+      if (out || x == null || prof > 4) return;
+      if (typeof x === 'string') {
+        if (!sousPhoto) return;
+        try { const u = new URL(x, location.origin); if (u.protocol === 'https:' && !u.username && !u.password && /(^|\.)vestiairecollective\.com$/i.test(u.hostname) && /\.(jpe?g|png|webp|avif)(\?|$)|\/(images?|pictures?|photos?)\//i.test(u.pathname)) out = u.href.slice(0, 400); } catch (_) {}
+        return;
+      }
+      if (Array.isArray(x)) { for (const v of x.slice(0, 6)) visite(v, prof + 1, sousPhoto); return; }
+      if (typeof x !== 'object') return;
+      for (const k of Object.keys(x).slice(0, 80)) { if (PAS_ACHETEUR.test(k)) continue; visite(x[k], prof + 1, sousPhoto || CLE_PHOTO.test(k)); }
+    };
+    visite(e, 0, false);
+    return out;
+  }
+  function ficheAnnonce(e) {
+    const out = { titre: '', prix: null, statut: '' };
+    const visite = (x, prof, chemin) => {
+      if (!x || typeof x !== 'object' || Array.isArray(x) || prof > 2) return;
+      for (const k of Object.keys(x).slice(0, 80)) {
+        const v = x[k];
+        if (PAS_ACHETEUR.test(k)) continue;
+        if (!out.titre && CLE_TITRE.test(k) && typeof v === 'string' && v.trim()) out.titre = v.replace(/\s+/g, ' ').trim().slice(0, 120);
+        if (!out.statut && CLE_STATUT_ANNONCE.test(k) && (typeof v === 'string' || typeof v === 'number')) { const t = String(v); if (/^[\w .:-]{1,40}$/.test(t)) out.statut = t; }
+        if (!out.prix && CLE_PRIX.test(k)) {
+          if (typeof v === 'number' && isFinite(v)) out.prix = { valeur: v, devise: '', cle: chemin + k };
+          else if (v && typeof v === 'object' && !Array.isArray(v)) {
+            const n = typeof v.amount === 'number' ? v.amount : (typeof v.value === 'number' ? v.value : (typeof v.cents === 'number' ? v.cents / 100 : (typeof v.amount === 'string' && /^\d+([.,]\d+)?$/.test(v.amount) ? Number(v.amount.replace(',', '.')) : null)));
+            const d = typeof v.currency === 'string' ? v.currency : (typeof v.currencyCode === 'string' ? v.currencyCode : '');
+            if (n != null && isFinite(n)) out.prix = { valeur: n, devise: /^[A-Z]{3}$/.test(d) ? d : '', cle: chemin + k + (typeof v.cents === 'number' ? '.cents' : '') };
+          }
+        }
+        if (v && typeof v === 'object' && !Array.isArray(v) && !CLE_PRIX.test(k)) visite(v, prof + 1, chemin + k + '.');
+      }
+    };
+    visite(e, 0, '');
+    out.photo = photoAnnonce(e);
+    return out;
+  }
   // ⚠️ (31 oct., 5.294) UNE LISTE FILTRÉE N'EST PAS LA LISTE. Le fond tient une
   // liste pour ENTIÈRE quand la page 0 rend autant d'éléments que le `total`
   // annoncé — et alors il REMPLACE (annonces) ou retire ce qui n'y est plus
@@ -219,8 +275,9 @@
       const arr = tableauAnnonces(obj) || [];
       const offset = Number(u.searchParams.get('offset') || (obj.meta && obj.meta.offset) || 0) || 0;
       const total = obj.meta && typeof obj.meta.count === 'number' && sansFiltre(u) ? obj.meta.count : null;
-      const items = arr.slice(0, 200).map((e) => { const b = boostDe(e); const f = favorisDe(e); return { id: idDe(e), boost: b.boost, cles: b.cles, ref: refDe(e), favoris: f.n, cleFavoris: f.cle }; }).filter((x) => /^[\w-]{1,40}$/.test(x.id));
-      post({ kind: 'vcannonces', items, offset, total, lus: arr.length });
+      const items = arr.slice(0, 200).map((e) => { const b = boostDe(e); const f = favorisDe(e); const fi = ficheAnnonce(e); return { id: idDe(e), boost: b.boost, cles: b.cles, ref: refDe(e), favoris: f.n, cleFavoris: f.cle, titre: fi.titre, photo: fi.photo, prix: fi.prix, statut: fi.statut }; }).filter((x) => /^[\w-]{1,40}$/.test(x.id));
+      const forme = arr.length ? cheminsDeCles(arr[0]).map(sansId).filter((c) => !PAS_ACHETEUR.test(c.split(':')[0])).slice(0, 120) : [];
+      post({ kind: 'vcannonces', items, offset, total, lus: arr.length, forme });
     } catch (_) {}
   }
   // La CRÉATION d'une annonce : son identifiant, rendu par Vestiaire, relie

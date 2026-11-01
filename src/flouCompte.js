@@ -46,3 +46,27 @@ export function lbcFloute(ouvert, compteLigne) {
   const c = idCompteLbcFlou(compteLigne);
   return !!(ouvert && c && c !== ouvert);
 }
+
+// ── LE COMPTE VESTIAIRE OUVERT (1er nov., extension 5.295-5.296) ─────────────
+// Ce que l'extension relève (background.js, `noterSessionVc`) : `vc_session =
+// { id, at, comptes }` — l'identifiant lu sur la réponse `/users/me` que
+// Vestiaire charge pour le compte CONNECTÉ dans l'onglet, réécrit à chaque
+// changement de compte, sinon au plus toutes les 6 h. Les lignes rangées depuis
+// la 5.295 (conversations) et la 5.296 (annonces, ventes, achats) portent
+// `compte`, celui de l'onglet qui les a lues (vide = pas su).
+// ⇒ La MÊME règle que Leboncoin : le compte ouvert est `vc_session.id` s'il a
+//   été relevé il y a moins de `LBC_OUVERT_MS` (12 h) ; sinon, ou illisible ⇒
+//   '' = pas su, aucun flou. Une ligne sans compte relevé n'est jamais floutée.
+// ⚠️ `comptes` (les comptes déjà vus) ne désigne jamais le compte OUVERT.
+export function compteVcOuvert(session, maintenant = Date.now()) {
+  if (!session || typeof session !== 'object') return '';
+  const id = String(session.id == null ? '' : session.id).trim();
+  if (!/^[\w-]{1,40}$/.test(id)) return '';
+  const t = Date.parse(String(session.at || ''));
+  if (!Number.isFinite(t) || maintenant - t > LBC_OUVERT_MS || t - maintenant > 5 * 60e3) return '';
+  return id;
+}
+export function vcFloute(ouvert, compteLigne) {
+  const c = String(compteLigne == null ? '' : compteLigne).trim();
+  return !!(ouvert && c && c !== ouvert);
+}

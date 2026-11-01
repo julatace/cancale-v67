@@ -26,7 +26,7 @@ import FavorisVinted from './FavorisVinted.jsx';
 import RepartitionAnneau from './RepartitionAnneau.jsx';
 import AnnoncesLeboncoin from './AnnoncesLeboncoin.jsx';
 import {suivreReceptionLeboncoin,lireReceptionLeboncoin} from './rafraichissementLeboncoin.js';
-import { STYLE_FLOU, compteLbcOuvert, lbcFloute } from './flouCompte.js';
+import { STYLE_FLOU, compteLbcOuvert, lbcFloute, compteVcOuvert, vcFloute } from './flouCompte.js';
 import DiagnosticLeboncoin from './DiagnosticLeboncoin.jsx';
 import {preparerLiaisonOAuth,lireLiaisonOAuth,resultatLiaisonPermis} from './auth/liaisonOAuth.js';
 import ConnexionsCompte from './auth/ConnexionsCompte.jsx';
@@ -157,7 +157,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.295.0';
+const EXT_ATTENDUE = '5.296.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -582,7 +582,7 @@ const extEnRetard = (v) => !!v && cmpVersion(v, EXT_ATTENDUE) < 0;
 // ⚠️ (30 oct., intégration) `transp`, `lbcsupprime` et `lbcstats` arrivent tous
 //    en 5.291.0 : 5.288 (Leboncoin) et 5.290 (colis) étaient des numéros de
 //    branche, jamais servis ; aucune version publiée ne porte ces fonctions.
-const EXT_CAPACITES = { transp: '5.291.0', favorisouvrir:'5.225.0', favorisliste:'5.218.0', suivivinted: '5.217.0', favoris: '5.217.0', liaison: '5.171.0', supprimees: '5.165.0', enligne: '5.170.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', preuves: '5.172.0', etatcompte: '5.181.0', lbcfiche: '5.182.0', relais: '5.183.0', lbcpack: '5.185.0', annulee: '5.185.0', confirmer: '5.206.0', retraitnotif: '5.206.0', offresauto: '5.234.0', vcpublier: '5.235.0', vcauto: '5.236.0', vcventes: '5.237.0', vcmessages: '5.238.0', vcachats: '5.239.0', republier: '5.240.0', republiermodif: '5.247.0', recreer: '5.248.0', lettre: '5.250.0', brouillon: '5.251.0', versbrouillon: '5.253.0', republierbrouillon: '5.254.0', refaire: '5.255.0', republierpage: '5.277.0', republierfile: '5.279.0', favorisperso: '5.281.0', lbcsupprime: '5.291.0', lbcstats: '5.291.0', vcsession: '5.295.0', vcfil: '5.295.0', vcrepondre: '5.295.0', vcfavoris: '5.295.0', relaisdest: '5.295.0' };
+const EXT_CAPACITES = { transp: '5.291.0', favorisouvrir:'5.225.0', favorisliste:'5.218.0', suivivinted: '5.217.0', favoris: '5.217.0', liaison: '5.171.0', supprimees: '5.165.0', enligne: '5.170.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', preuves: '5.172.0', etatcompte: '5.181.0', lbcfiche: '5.182.0', relais: '5.183.0', lbcpack: '5.185.0', annulee: '5.185.0', confirmer: '5.206.0', retraitnotif: '5.206.0', offresauto: '5.234.0', vcpublier: '5.235.0', vcauto: '5.236.0', vcventes: '5.237.0', vcmessages: '5.238.0', vcachats: '5.239.0', republier: '5.240.0', republiermodif: '5.247.0', recreer: '5.248.0', lettre: '5.250.0', brouillon: '5.251.0', versbrouillon: '5.253.0', republierbrouillon: '5.254.0', refaire: '5.255.0', republierpage: '5.277.0', republierfile: '5.279.0', favorisperso: '5.281.0', lbcsupprime: '5.291.0', lbcstats: '5.291.0', vcsession: '5.295.0', vcfil: '5.295.0', vcrepondre: '5.295.0', vcfavoris: '5.295.0', relaisdest: '5.295.0', vcfiche: '5.296.0' };
 // Trois états, jamais un seul : pas d'extension ici · en retard · à jour.
 const extSait = (quoi) => {
   if (!vmrExtPresent()) return 'absente';                    // téléphone, autre navigateur
@@ -904,6 +904,11 @@ const sbAuth = (extra) => {
   }
   return Object.assign({ apikey: SUPABASE_KEY, Authorization: `Bearer ${tok}` }, extra || {});
 };
+// (1er nov.) UNE lecture de notre base qui se relit une fois sur un échec PASSAGER
+// (jeton expiré à l'instant — renouvelé avant la relecture —, 5xx, réseau) :
+// la règle de `lireReceptionLeboncoin` (src/rafraichissementLeboncoin.js). Rend
+// `null` (« pas su ») au bout, jamais `[]`. Leboncoin et Vestiaire la lisent.
+function lireBaseRelue(url) { return lireReceptionLeboncoin(url, sbAuth, { rafraichir: () => authRefresh() }); }
 // Complète une ligne à écrire avec son propriétaire. La base a un défaut
 // (auth.uid()) mais on l'envoie explicitement : c'est plus lisible, et la règle
 // `with check` de Postgres vérifie qu'on n'écrit pas au nom d'un autre.
@@ -25494,6 +25499,143 @@ function ClePhotoroom({ cadre = true }) {
 // qu'elle RECONNAÎT et attache les photos ; IL relit et publie (le formulaire
 // n'a jamais été vu : VRM ne clique jamais « Publier » à sa place). « Déjà
 // publiée » note la paire (`vinted_vc_posted`) : elle sort de la liste.
+// ── LE COMPTE VESTIAIRE OUVERT, MIS EN AVANT (1er nov.) ─────────────────────
+// Julien (31 oct.) : « pareil pour Leboncoin et Vestiaire […] les autres
+// floutées comme pour Vinted ». La règle est celle de Leboncoin (src/flouCompte.js,
+// `compteVcOuvert`) : `vc_session` relevé il y a moins de 12 h, et seulement si
+// l'extension de CE navigateur est là, connectée, à jour (la pause Vinted ne
+// compte pas). Pas su ⇒ '' : rien n'est flouté.
+function useCompteVcOuvert() {
+  useExtVivante();
+  const sansSouris = useSansSouris();
+  const [s, setS] = useState(undefined);
+  useEffect(() => {
+    let vivant = true;
+    const lire = async () => {
+      const rows = await lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vc_session&select=id:data->>id,at:data->>at`);
+      if (vivant) setS(Array.isArray(rows) ? (rows[0] || {}) : null);
+    };
+    lire();
+    const f = (e) => { const x = e && e.detail; if (x && x.type === 'maj' && x.quoi === 'vestiaire') lire(); };
+    window.addEventListener('vrm:ext', f);
+    return () => { vivant = false; window.removeEventListener('vrm:ext', f); };
+  }, []);
+  if (!s || !vmrExtPresent()) return '';
+  const g = raisonExtGlobale(sansSouris);
+  if (g && g.code !== 'pause') return '';
+  return compteVcOuvert(s);
+}
+// L'ÉTAT D'UNE ANNONCE VESTIAIRE (1er nov.) — le mot que Vestiaire écrit, rangé
+// dans une des familles qu'on sait dire. La forme n'a jamais été vue pleine : un
+// mot qu'aucune famille ne reconnaît est recopié TEL QUEL (jamais deviné), aucun
+// mot ⇒ « état non dit ». Une VENTE lue (`vc_ventes`, même identifiant
+// d'article) prouve « vendue », quel que soit le mot.
+const VC_ANNONCE_ETATS = [
+  ['vendue', /sold|vendu/i, 'Vendue'],
+  ['retiree', /invalid|reject|refus|withdraw|retir|delet|supprim|archiv|expir|inactiv|unpublish|deactiv|cancel|annul/i, 'Retirée'],
+  ['attente', /pending|review|moderat|waiting|attente|submitted|soumis|draft|brouillon|incomplet|to.?validate|validation/i, 'En attente de validation'],
+  ['en-ligne', /on.?sale|online|en.?ligne|published|publi[ée]|active|live|en.?vente|for.?sale|selling|approved|valid/i, 'En ligne'],
+];
+function etatAnnonceVc(it, vendueParVente) {
+  if (vendueParVente) return { etat: 'vendue', label: 'Vendue', brut: (it && it.statut) || '' };
+  const brut = String((it && it.statut) || '').trim();
+  if (!brut) return { etat: 'pas-dit', label: 'État non dit par Vestiaire', brut: '' };
+  const f = VC_ANNONCE_ETATS.find(([, re]) => re.test(brut));
+  return f ? { etat: f[0], label: f[2], brut } : { etat: 'autre', label: `Vestiaire : « ${brut} »`, brut };
+}
+const ageCourtVc = (iso) => { const t = Date.parse(iso || ''); if (!isFinite(t)) return ''; const h = Math.max(0, Math.round((Date.now() - t) / 3600000)); return h < 1 ? "il y a moins d'une heure" : h < 24 ? `il y a ${h} h` : `il y a ${Math.round(h / 24)} j`; };
+function PhotoVc({ src }) {
+  const [ko, setKo] = useState(false);
+  let url = ''; try { const u = new URL(src); if (u.protocol === 'https:' && !u.username && !u.password && /(^|\.)vestiairecollective\.com$/i.test(u.hostname)) url = u.href; } catch (_) {}
+  return url && !ko ? <img src={url} alt="" loading="lazy" onError={() => setKo(true)}/> : <span aria-label="Photo indisponible" className="vrm-lbc-catalog-photo-empty">—</span>;
+}
+// ══════════════════════════════════════════════════════════════════════════════
+// VESTIAIRE : TES ANNONCES EN FICHES (1er nov., extension 5.296)
+// ══════════════════════════════════════════════════════════════════════════════
+// Julien : « les annonces Vestiaire Collective, les ventes, tout ça — que tout
+// soit parfait ». Les annonces lues par l'extension (`vc_listings`), en fiches
+// comme Vinted et Leboncoin (la même mise en page, `vrm-lbc-catalog`) : la photo,
+// le N° (relié par IDENTITÉ seulement — l'annonce créée par VRM ou la référence
+// VRM-{n°} de l'annonce, jamais le titre, §5), le prix lu (avec le nom de sa clé
+// dans `title`), l'état, et la FRAÎCHEUR de la lecture dite une fois en tête.
+// Une lecture de plus de 24 h ⇒ « à confirmer » (rien n'est retiré).
+// Avant la 5.296, l'extension ne rangeait ni photo, ni titre, ni prix : la fiche
+// le dit (« mise à jour ») au lieu d'afficher des fiches vides muettes.
+function AnnoncesVestiaire() {
+  const [d, setD] = useState(undefined);   // undefined en cours · null pas su · objet
+  const vcOuvert = useCompteVcOuvert();
+  const relire = React.useCallback(async () => {
+    const [rl, rv] = await Promise.all([
+      lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vc_listings&select=items:data->items,liens:data->liens,capturedAt:data->>capturedAt,complet:data->complet,total:data->total`),
+      lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vc_ventes&select=ventes:data->ventes`),
+    ]);
+    if (!Array.isArray(rl)) { setD(null); return; }
+    const r = rl[0] || {};
+    // Les ventes ne servent qu'à PROUVER « vendue » ; illisibles ⇒ on n'en tire rien.
+    const vendus = new Set();
+    if (Array.isArray(rv) && rv[0] && rv[0].ventes && typeof rv[0].ventes === 'object') for (const v of Object.values(rv[0].ventes)) if (v && v.productId) vendus.add(String(v.productId));
+    setD({ items: r.items && typeof r.items === 'object' ? r.items : null, liens: (r.liens && typeof r.liens === 'object') ? r.liens : {}, capturedAt: r.capturedAt || '', complet: r.complet === true, total: typeof r.total === 'number' ? r.total : null, vendus, ventesKO: !Array.isArray(rv) });
+  }, []);
+  useEffect(() => { relire(); }, [relire]);
+  useEffect(() => {
+    const f = (e) => { const x = e && e.detail; if (x && x.type === 'maj' && x.quoi === 'vestiaire') relire(); };
+    window.addEventListener('vrm:ext', f); return () => window.removeEventListener('vrm:ext', f);
+  }, [relire]);
+  const style = { fontSize: 12.5, color: C.muted, lineHeight: 1.55 };
+  const geste = <>ouvre <b style={{ color: C.text }}>« Mes articles »</b> sur vestiairecollective.com, dans le Chrome où l'extension VRM est installée</>;
+  let corps;
+  if (d === undefined) corps = <div data-vc-annonces="charge" style={style}>Lecture de tes annonces Vestiaire…</div>;
+  else if (d === null) corps = <div data-vc-annonces="pas-su" style={style}>Je n'ai pas pu lire tes annonces Vestiaire — rien n'est perdu, c'est la lecture qui a échoué. <button type="button" className="vrm-lien-action" data-vc-annonces-relire="" onClick={() => { setD(undefined); relire(); }} style={{ background: 'none', border: 'none', color: C.accent, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', minHeight: 44, padding: 0 }}>Réessayer</button></div>;
+  else if (!d.items || !d.capturedAt) corps = <div data-vc-annonces="jamais" style={style}>Tes annonces Vestiaire n'ont pas encore été lues : {geste}{extSait('vcfiche') === 'retard' ? <> — mise à jour en <b>{EXT_CAPACITES.vcfiche}</b> d'abord</> : ''}. Elle les lit en passant, sans rien cliquer.</div>;
+  else {
+    const liste = Object.entries(d.items).filter(([, it]) => it && typeof it === 'object').map(([id, it]) => {
+      const num = cleNum(d.liens[id] || it.ref || '');
+      return { id, it, num, ...etatAnnonceVc(it, d.vendus.has(String(id))) };
+    });
+    const ordre = { 'en-ligne': 0, attente: 1, autre: 2, 'pas-dit': 3, vendue: 4, retiree: 5 };
+    liste.sort((a, z) => (ordre[a.etat] - ordre[z.etat]) || (z.num ? 1 : 0) - (a.num ? 1 : 0) || String(a.num || '').localeCompare(String(z.num || ''), 'fr', { numeric: true }));
+    const age = Date.now() - Date.parse(d.capturedAt);
+    const vieille = !(age <= 24 * 3600e3);
+    const sansFiche = liste.length > 0 && liste.every(({ it }) => !it.titre && !it.photo && !it.prix && !it.statut);
+    const n = liste.length;
+    if (!n) corps = <div data-vc-annonces="vide" style={style}>Aucune annonce sur Vestiaire à la dernière lecture ({ageCourtVc(d.capturedAt)}). Si tu viens d'en publier une, {geste} : la liste se met à jour toute seule.</div>;
+    else corps = (
+      <div data-vc-annonces="lu" data-vc-annonces-n={n} data-vc-annonces-vieille={vieille ? '1' : '0'}>
+        <div data-vc-annonces-fraicheur="" style={{ ...style, marginBottom: 10 }}>
+          {n} annonce{n > 1 ? 's' : ''}{d.complet ? '' : d.total != null ? ` (au moins — Vestiaire en annonce ${d.total})` : ' (au moins)'}, lue{n > 1 ? 's' : ''} sur Vestiaire {ageCourtVc(d.capturedAt)}.
+          {vieille ? <> <b style={{ color: C.warn }}>À confirmer</b> : la lecture a plus de 24 h — {geste} pour la remettre à jour (rien n'est retiré d'ici).</> : null}
+          {sansFiche ? <> Photo, titre et prix arrivent avec l'extension {EXT_CAPACITES.vcfiche}{extSait('vcfiche') === 'ok' ? <> : {geste} une fois</> : <> — mets-la à jour depuis Réglages, puis {geste}</>}.</> : null}
+        </div>
+        <section className="vrm-lbc-catalog" aria-label="Mes annonces Vestiaire" style={{ margin: 0 }}>
+          <ul>{liste.map(({ id, it, num, etat, label, brut }) => {
+            const flou = vcFloute(vcOuvert, it.compte);
+            const prix = it.prix && isFinite(Number(it.prix.valeur)) ? (it.prix.devise && it.prix.devise !== 'EUR' ? `${Number(it.prix.valeur).toFixed(2).replace('.', ',')} ${it.prix.devise}` : fmt(it.prix.valeur)) : '—';
+            const extra = [it.boost === true ? 'boostée' : '', typeof it.favoris === 'number' ? `${it.favoris} favori${it.favoris > 1 ? 's' : ''}` : ''].filter(Boolean).join(' · ');
+            return (
+              <li key={id} data-vc-annonce={id} data-vc-annonce-num={num || ''} data-vc-annonce-etat={etat} data-flou={flou ? '1' : '0'} style={flou ? STYLE_FLOU : undefined}>
+                <PhotoVc src={it.photo}/>
+                <div className="vrm-lbc-catalog-info">
+                  <strong>{it.titre || (num ? `N°${num}` : 'Annonce sans titre lu')}</strong>
+                  <small>{num ? <span data-vc-annonce-numtxt="">N°{num}</span> : 'Pas reliée à une paire'}{extra ? ` · ${extra}` : ''}</small>
+                  <div><span data-etat={etat === 'en-ligne' ? 'active' : etat === 'vendue' ? 'vendue' : 'autre'} title={brut ? `Vestiaire écrit « ${brut} »` : undefined}>{label}</span></div>
+                </div>
+                <b data-vc-annonce-prix={it.prix ? String(it.prix.valeur) : ''} title={it.prix && it.prix.cle ? `Prix lu sur « ${it.prix.cle} »` : undefined}>{prix}</b>
+              </li>
+            );
+          })}</ul>
+        </section>
+        {liste.some((l) => !l.num) ? <div style={{ ...style, marginTop: 8 }}>Une annonce « pas reliée » ne porte ni la référence VRM-n° ni le lien d'une publication faite depuis VRM : VRM ne devine pas la paire (jamais par le titre).</div> : null}
+        {d.ventesKO ? <div style={{ ...style, marginTop: 4 }}>Tes ventes Vestiaire n'ont pas pu être relues : « vendue » n'est dit que si Vestiaire l'écrit sur l'annonce.</div> : null}
+      </div>
+    );
+  }
+  return (
+    <Card style={{ padding: 16, width: '100%', boxSizing: 'border-box' }}>
+      <div style={{ fontSize: 14, fontWeight: 700, color: C.text, marginBottom: 6 }}>Tes annonces Vestiaire</div>
+      {corps}
+    </Card>
+  );
+}
 function PublierVestiaire({ comptes }) {
   const { paires, enLigne } = useEbayPaires(comptes);
   // (28 oct.) La photo de l'ÉTIQUETTE, choisie par lui : Vestiaire la veut en
@@ -25557,16 +25699,18 @@ function PublierVestiaire({ comptes }) {
   }, [vcAnn]);
   const resumeBoost = (() => {
     if (vcAnn === undefined) return null;
-    if (vcAnn === null) return { code: 'pas-su', texte: "Je n'ai pas pu lire tes annonces Vestiaire — rien n'est perdu, réessaie dans un moment." };
+    if (vcAnn === null) return null;   // (1er nov.) dit par « Tes annonces Vestiaire » au-dessus
     const items = vcAnn.items ? Object.values(vcAnn.items) : null;
-    if (!items || !vcAnn.capturedAt) return { code: 'jamais', texte: "Tes annonces Vestiaire n'ont pas encore été lues : ouvre « Mes articles » sur Vestiaire dans ce Chrome, l'extension y lit lesquelles sont boostées." };
+    // (1er nov.) Le NOMBRE d'annonces, leur fraîcheur et « jamais lues » sont dits
+    // une fois, par la carte « Tes annonces Vestiaire » au-dessus (§7 : le même
+    // nombre ne s'écrit pas deux fois sur un écran) ; ici, le boost seul.
+    if (!items || !vcAnn.capturedAt) return null;
     const n = items.length, b = items.filter((x) => x && x.boost === true).length, inc = items.filter((x) => !x || x.boost == null).length;
-    const quand = (() => { const h = Math.round((Date.now() - Date.parse(vcAnn.capturedAt)) / 3600000); return !isFinite(h) ? '' : h < 1 ? "il y a moins d'une heure" : h < 24 ? `il y a ${h} h` : `il y a ${Math.round(h / 24)} j`; })();
-    const total = vcAnn.complet ? '' : (vcAnn.total != null ? ` (au moins — Vestiaire en annonce ${vcAnn.total})` : ' (au moins)');
-    if (!n) return { code: 'vide', texte: `Aucune annonce sur Vestiaire à la dernière lecture (${quand}).` };
+    if (!n) return null;
     const nums = [...boostParNum.entries()].filter(([, v]) => v === true).map(([k]) => 'N°' + k).sort((a, z) => a.localeCompare(z, 'fr', { numeric: true }));
     const sansN = b - items.filter((x, i) => x && x.boost === true && cleNum(((vcAnn.liens || {})[Object.keys(vcAnn.items)[i]]) || x.ref || '')).length;
-    return { code: 'lu', b, texte: `${n} annonce${n > 1 ? 's' : ''} sur Vestiaire${total}, lue${n > 1 ? 's' : ''} ${quand} : ${b} boostée${b > 1 ? 's' : ''}${nums.length ? ` (${nums.join(', ')}${sansN > 0 ? ` et ${sansN} pas reliée${sansN > 1 ? 's' : ''} à une paire` : ''})` : ''}${inc ? ` · ${inc} dont Vestiaire ne dit pas le boost` : ''}.` };
+
+    return { code: 'lu', b, texte: `Boost : ${b ? `${b} boostée${b > 1 ? 's' : ''}` : 'aucune boostée'}${nums.length ? ` (${nums.join(', ')}${sansN > 0 ? ` et ${sansN} pas reliée${sansN > 1 ? 's' : ''} à une paire` : ''})` : ''}${inc ? ` · ${inc} dont Vestiaire ne dit pas le boost` : ''}.` };
   })();
   // 5.295 — LES FAVORIS VESTIAIRE : combien de personnes ont mis chaque annonce
   // en favori (un NOMBRE lu par l'extension, jamais qui). Par identité seulement
@@ -25689,19 +25833,45 @@ function PublierVestiaire({ comptes }) {
 // pas : §3). ⚠️ Le montant n'entre dans AUCUN total (CA, URSSAF, bénéfice) : on
 // ne sait pas encore si c'est le prix ou ce que Vestiaire te verse ; sa clé est
 // dite. La forme d'une vente n'a jamais été vue : un état inconnu est recopié tel quel.
+// L'ÉTAPE D'UNE VENTE VESTIAIRE (1er nov.) — le parcours Vestiaire : tu expédies,
+// Vestiaire CONTRÔLE l'article, il est livré, puis l'argent t'est versé. VRM ne
+// sait que ce que la ligne dit : « à expédier » (lu dans la liste « articles à
+// expédier ») et le MOT que Vestiaire écrit sur la vente, rangé dans une étape
+// seulement quand il la nomme (contrôle, en route, livrée, versée, terminée,
+// annulée). Un mot qu'aucune étape ne nomme est recopié TEL QUEL ; « paid » seul
+// (payée par l'acheteur ? versée à toi ?) n'est PAS rangé — mieux vaut un blanc
+// qu'un faux. Rien ici ne touche à un montant.
+const VC_VENTE_ETAPES = [
+  ['annulee', /cancel|annul|refund|rembours|return|retour|litige|dispute/i, 'Annulée ou retournée'],
+  ['versee', /payout|paid.?out|vers[ée]|virement|transferred|credited|cr[ée]dit/i, 'Argent versé'],
+  ['terminee', /complet|finali|termin|closed|done|clotur/i, 'Terminée'],
+  ['livree', /deliver|livr|received|re[cç]u/i, 'Livrée à l’acheteur'],
+  ['controle', /authenti|control|inspect|verif|expertis|check|quality/i, 'Contrôle par Vestiaire'],
+  ['en-route', /ship|sent|transit|exp[ée]di|envoy|on.?the.?way|in.?delivery|dispatch/i, 'Envoyée'],
+];
+const VC_PARCOURS = [['a-expedier', 'À expédier'], ['controle', 'Contrôle'], ['livree', 'Livrée'], ['versee', 'Versée']];
+function etapeVenteVc(v) {
+  if (v && v.aExpedier === true) return { etape: 'a-expedier', label: 'À expédier', rang: 0 };
+  const brut = String((v && v.etat) || '').trim();
+  const f = brut ? VC_VENTE_ETAPES.find(([, re]) => re.test(brut)) : null;
+  if (f) { const rang = { 'en-route': 1, controle: 1, livree: 2, terminee: 3, versee: 3 }[f[0]]; return { etape: f[0], label: f[2], rang: rang == null ? null : rang }; }
+  if (v && v.plusAExpedierDepuis) return { etape: 'plus-a-expedier', label: 'Plus dans « à expédier » (envoyée ou annulée — Vestiaire ne dit pas laquelle)', rang: null };
+  return { etape: brut ? 'autre' : 'pas-dit', label: brut ? `Vestiaire : « ${brut} »` : 'Étape non dite par Vestiaire', rang: null };
+}
+const dateCourteVc = (iso) => { const t = Date.parse(iso || ''); return isFinite(t) ? new Date(t).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }) : ''; };
 function VentesVestiaire({ comptes }) {
   const { paires, enLigne } = useEbayPaires(comptes);
   const [d, setD] = React.useState(undefined);   // undefined en cours · null pas su · objet
+  const vcOuvert = useCompteVcOuvert();
   const relire = React.useCallback(async () => {
-    try {
-      const [rv, rl] = await Promise.all([
-        fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vc_ventes&select=ventes:data->ventes,lectures:data->lectures`, { headers: sbAuth() }),
-        fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vc_listings&select=liens:data->liens`, { headers: sbAuth() }),
-      ]);
-      if (!rv.ok || !rl.ok) throw new Error('lecture');
-      const [jv, jl] = await Promise.all([rv.json(), rl.json()]);
-      setD({ ventes: (jv && jv[0] && jv[0].ventes) || null, lectures: (jv && jv[0] && jv[0].lectures) || {}, liens: (jl && jl[0] && jl[0].liens) || {} });
-    } catch (_) { setD(null); }
+    // (1er nov.) Relues une fois sur un échec passager (`lireBaseRelue`).
+    const [jv, jl] = await Promise.all([
+      lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vc_ventes&select=ventes:data->ventes,lectures:data->lectures`),
+      lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vc_listings&select=liens:data->liens`),
+    ]);
+    if (!Array.isArray(jv) || !Array.isArray(jl)) { setD(null); return; }
+    const v = jv[0] && jv[0].ventes;
+    setD({ ventes: v && typeof v === 'object' && !Array.isArray(v) ? v : null, lectures: (jv[0] && jv[0].lectures && typeof jv[0].lectures === 'object') ? jv[0].lectures : {}, liens: (jl[0] && jl[0].liens && typeof jl[0].liens === 'object') ? jl[0].liens : {} });
   }, []);
   React.useEffect(() => { relire(); }, [relire]);
   React.useEffect(() => {
@@ -25714,47 +25884,62 @@ function VentesVestiaire({ comptes }) {
     return m;
   }, [paires]);
   const style = { fontSize: 12.5, color: C.muted, lineHeight: 1.55 };
+  const geste = <>ouvre <b style={{ color: C.text }}>« Mes ventes »</b> et <b style={{ color: C.text }}>« Articles à expédier »</b> sur vestiairecollective.com, dans le Chrome où l'extension VRM est installée</>;
+  // ⚠️ (1er nov.) AUCUN MONTANT à l'écran : Vestiaire écrit un chiffre sur chaque
+  // vente, mais VRM ne sait pas encore si c'est le prix payé par l'acheteur ou ce
+  // que Vestiaire te verse (commission déduite). Le montant reste rangé, il n'est
+  // ni montré ni compté (CA, URSSAF, bénéfice) — c'est dit UNE fois, en tête.
+  const phraseMontant = <div data-vc-ventes-montant="" style={{ ...style, marginTop: 8 }}>Aucun montant Vestiaire n'est montré ni compté (chiffre d'affaires, URSSAF, bénéfice) : VRM ne sait pas encore si le chiffre lu est le prix de vente ou ce que Vestiaire te verse.</div>;
   let corps;
   if (d === undefined) corps = <div data-vc-ventes="charge" style={style}>Lecture de tes ventes Vestiaire…</div>;
-  else if (d === null) corps = <div data-vc-ventes="pas-su" style={style}>Je n'ai pas pu lire tes ventes Vestiaire — rien n'est perdu, réessaie dans un moment.</div>;
-  else if (!d.ventes) corps = <div data-vc-ventes="jamais" style={style}>Pas encore lues. Ouvre <b style={{ color: C.text }}>tes ventes</b> et <b style={{ color: C.text }}>« articles à expédier »</b> sur Vestiaire, dans le Chrome où l'extension VRM est installée{extSait('vcventes') === 'retard' ? <> — mise à jour en <b>{EXT_CAPACITES.vcventes}</b> d'abord</> : ''} : elle les lit en passant.</div>;
+  else if (d === null) corps = <div data-vc-ventes="pas-su" style={style}>Je n'ai pas pu lire tes ventes Vestiaire — rien n'est perdu, c'est la lecture qui a échoué. <button type="button" className="vrm-lien-action" data-vc-ventes-relire="" onClick={() => { setD(undefined); relire(); }} style={{ background: 'none', border: 'none', color: C.accent, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', minHeight: 44, padding: 0 }}>Réessayer</button></div>;
+  else if (!d.ventes) corps = <div data-vc-ventes="jamais" style={style}>Pas encore lues : {geste}{extSait('vcventes') === 'retard' ? <> — mise à jour en <b>{EXT_CAPACITES.vcventes}</b> d'abord</> : ''}. Elle les lit en passant.</div>;
   else {
-    const liste = Object.entries(d.ventes).map(([id, v]) => {
+    const liste = Object.entries(d.ventes).filter(([, v]) => v && typeof v === 'object').map(([id, v]) => {
       const num = cleNum((v.productId && d.liens[v.productId]) || v.ref || '');
-      return { id, ...v, num };
+      return { id, ...v, num, ...etapeVenteVc(v) };
     // (31 oct.) Les ventes À EXPÉDIER d'abord (la date limite la plus proche en tête), puis les autres, la plus récente d'abord.
     }).sort((a, z) => (z.aExpedier === true) - (a.aExpedier === true) || (a.aExpedier && z.aExpedier ? String(a.limite || '9999').localeCompare(String(z.limite || '9999')) : 0) || String(z.date || z.premiereVue || '').localeCompare(String(a.date || a.premiereVue || '')));
     const aExp = liste.filter((v) => v.aExpedier);
     const lue = d.lectures && d.lectures['a-expedier'];
-    if (!liste.length) corps = <div data-vc-ventes="vide" style={style}>Aucune vente Vestiaire à la dernière lecture.</div>;
+    const derniere = [d.lectures && d.lectures.ventes && d.lectures.ventes.at, lue && lue.at].filter(Boolean).sort().pop() || '';
+    if (!liste.length) corps = <div data-vc-ventes="vide" style={style}>Aucune vente Vestiaire à la dernière lecture{derniere ? ` (${ageCourtVc(derniere)})` : ''}. Après une vente, {geste} : elle apparaît ici.</div>;
     else corps = (
       <div data-vc-ventes="lu" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         <div data-vc-ventes-resume="" style={style}>
-          {liste.length} vente{liste.length > 1 ? 's' : ''} vue{liste.length > 1 ? 's' : ''} · <b style={{ color: C.text }}>{aExp.length} à expédier</b>{lue && !lue.complet ? ' (au moins)' : ''}.
-          {' '}Les montants ne comptent dans aucun total tant qu'on ne sait pas si c'est le prix ou ce que Vestiaire te verse.
+          {liste.length} vente{liste.length > 1 ? 's' : ''} vue{liste.length > 1 ? 's' : ''} · <b style={{ color: C.text }}>{aExp.length} à expédier</b>{lue && !lue.complet ? ' (au moins)' : ''}{derniere ? `, lues ${ageCourtVc(derniere)}` : ''}.
+          {!lue ? <> La liste « Articles à expédier » n'a pas encore été lue : {geste}.</> : null}
         </div>
         {liste.slice(0, 30).map((v) => {
           const enV = v.num && enLigne ? enLigneParNum.get(v.num) : null;
+          const flou = vcFloute(vcOuvert, v.compte);
+          const jl = v.aExpedier ? joursAvantVc(v.limite) : null;
           return (
-            <div key={v.id} data-vc-vente={v.id} data-vc-vente-num={v.num || ''} style={{ borderTop: `1px solid ${C.border}`, paddingTop: 8 }}>
-              <div style={{ fontSize: 13, color: C.text, fontWeight: 600 }}>{v.num ? `N°${v.num}` : 'Pas reliée à une paire'}{v.aExpedier ? <span data-vc-vente-aexp="" style={{ marginLeft: 8, color: C.warn }}>· à expédier</span> : null}</div>
+            <div key={v.id} data-vc-vente={v.id} data-vc-vente-num={v.num || ''} data-vc-vente-etape={v.etape} data-flou={flou ? '1' : '0'} style={{ borderTop: `1px solid ${C.border}`, paddingTop: 8, ...(flou ? STYLE_FLOU : {}) }}>
+              <div style={{ fontSize: 13, color: C.text, fontWeight: 600 }}>{v.num ? `N°${v.num}` : 'Pas reliée à une paire'}<span data-vc-vente-etape-texte="" style={{ marginLeft: 8, color: v.aExpedier ? C.warn : C.muted, fontWeight: v.aExpedier ? 600 : 500 }}>· {v.label}</span>{v.aExpedier ? <span data-vc-vente-aexp="" hidden/> : null}</div>
+              {v.rang != null && v.etape !== 'annulee' ? (
+                <ol data-vc-vente-parcours={v.rang} aria-label="Étapes de la vente" style={{ listStyle: 'none', display: 'flex', gap: 4, padding: 0, margin: '6px 0 2px', flexWrap: 'wrap' }}>
+                  {VC_PARCOURS.map(([k, t], i) => <li key={k} aria-current={i === v.rang ? 'step' : undefined} style={{ fontSize: 11, padding: '2px 8px', borderRadius: 999, border: `1px solid ${i === v.rang ? C.text : C.border}`, color: i <= v.rang ? C.text : C.muted, fontWeight: i === v.rang ? 700 : 500 }}>{t}</li>)}
+                </ol>
+              ) : null}
               <div style={{ fontSize: 11.5, color: C.muted }}>
-                {v.etat ? `Vestiaire : « ${v.etat} »` : 'état non dit'}{v.date ? ` · ${new Date(v.date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}` : ''}
-                {v.montant ? ` · ${fmt(v.montant.valeur)}${v.montant.devise && v.montant.devise !== 'EUR' ? ' ' + v.montant.devise : ''} (« ${v.montant.cle} »)` : ''}
+                {[v.date ? `vendue le ${dateCourteVc(v.date)}` : '', v.etat && v.etape !== 'autre' ? `Vestiaire : « ${v.etat} »` : ''].filter(Boolean).join(' · ') || 'date de vente non dite par Vestiaire'}
               </div>
               {/* (31 oct.) Le colis de la vente, tel que Vestiaire l'écrit (rangé depuis la 5.240) : la date limite d'envoi,
                   le transporteur et le n° de suivi ; « plus à expédier » quand la liste lue EN ENTIER ne la porte plus
                   (expédiée ou annulée — on ne dit pas laquelle). */}
-              {(v.aExpedier && v.limite) || v.suivi || v.plusAExpedierDepuis ? <div data-vc-vente-colis="" style={{ fontSize: 11.5, color: C.muted }}>
-                {[v.aExpedier && v.limite ? `à envoyer avant le ${new Date(v.limite).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}` : '',
+              {v.aExpedier || v.suivi || v.plusAExpedierDepuis ? <div data-vc-vente-colis="" style={{ fontSize: 11.5, color: C.muted }}>
+                {[v.aExpedier ? (v.limite && dateCourteVc(v.limite) ? (jl != null && jl < 0 ? `date limite passée (${dateCourteVc(v.limite)})` : `à envoyer avant le ${dateCourteVc(v.limite)}`) : 'date limite non dite par Vestiaire') : '',
+                  v.aExpedier ? (v.etiquette === true ? 'bordereau disponible sur Vestiaire' : v.etiquette === false ? 'pas encore de bordereau' : '') : '',
                   v.suivi ? `${v.transporteur ? v.transporteur + ' ' : ''}n° ${v.suivi}` : '',
-                  !v.aExpedier && v.plusAExpedierDepuis ? `plus dans « à expédier » depuis le ${new Date(v.plusAExpedierDepuis).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}` : ''].filter(Boolean).join(' · ')}
+                  !v.aExpedier && v.plusAExpedierDepuis && dateCourteVc(v.plusAExpedierDepuis) ? `plus dans « à expédier » depuis le ${dateCourteVc(v.plusAExpedierDepuis)}` : ''].filter(Boolean).join(' · ')}
               </div> : null}
               {!v.num ? <div style={{ fontSize: 11, color: C.muted }}>Aucune référence VRM-n° lue sur l'article : VRM ne devine pas la paire.</div> : null}
               {enV ? <div data-vc-vente-vinted="" style={{ fontSize: 11.5, color: C.warn, marginTop: 2 }}>Encore en ligne sur Vinted — retire-la de Vinted pour ne pas la vendre deux fois. <a href={`https://www.vinted.fr/items/${enV.id}`} target="_blank" rel="noreferrer" style={{ color: C.accent, fontWeight: 600 }}>Ouvrir l'annonce ↗</a></div> : null}
             </div>
           );
         })}
+        {liste.length > 30 ? <div style={style}>Les 30 plus récentes sont montrées (sur {liste.length}).</div> : null}
       </div>
     );
   }
@@ -25762,6 +25947,7 @@ function VentesVestiaire({ comptes }) {
     <Card style={{ padding: 16 }}>
       <div style={{ fontSize: 14, fontWeight: 700, color: C.text, marginBottom: 6 }}>Tes ventes Vestiaire</div>
       {corps}
+      {d && d.ventes && Object.keys(d.ventes).length ? phraseMontant : null}
     </Card>
   );
 }
@@ -25776,9 +25962,8 @@ function VentesVestiaire({ comptes }) {
 // messages non lus. Un champ jamais rangé vaut `null` (« pas su »), jamais 0.
 async function lireVestiaireColis() {
   try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=in.(vc_ventes,vc_messages,vc_achats,vc_listings)&select=id,ventes:data->ventes,compteur:data->compteur,achats:data->achats,liens:data->liens`, { headers: sbAuth() });
-    if (!r.ok) return null;
-    const j = await r.json();
+    // (1er nov.) Relue une fois sur un échec passager (`lireBaseRelue`).
+    const j = await lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=in.(vc_ventes,vc_messages,vc_achats,vc_listings)&select=id,ventes:data->ventes,compteur:data->compteur,achats:data->achats,liens:data->liens`);
     if (!Array.isArray(j)) return null;
     const par = Object.fromEntries(j.map((x) => [x.id, x]));
     return { ventes: (par.vc_ventes && par.vc_ventes.ventes) || null, compteur: (par.vc_messages && par.vc_messages.compteur) || null,
@@ -25950,20 +26135,19 @@ function FilVestiaire({ conv, num, titre, envoi, onFerme }) {
 }
 function MessagesVestiaire() {
   const [d, setD] = React.useState(undefined);   // undefined en cours · null pas su · objet
+  const vcOuvert = useCompteVcOuvert();
   const [ouvert, setOuvert] = React.useState('');
   const relire = React.useCallback(async () => {
     try {
-      const [rm, rl, rf, re] = await Promise.all([
-        fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vc_messages&select=compteur:data->compteur,conversations:data->conversations,lecture:data->lecture`, { headers: sbAuth() }),
-        fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vc_listings&select=liens:data->liens,items:data->items`, { headers: sbAuth() }),
+      // (1er nov.) Relues une fois sur un échec passager (`lireBaseRelue`).
+      const [jm, jl, jf, je] = await Promise.all([
+        lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vc_messages&select=compteur:data->compteur,conversations:data->conversations,lecture:data->lecture`),
+        lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vc_listings&select=liens:data->liens,items:data->items`),
         // 5.295 : les fils lus, en SCALAIRES (§4.4 : jamais le texte de tous les fils d'un coup).
-        fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.vc_fil_*&select=id,n:meta->>n,da:meta->>dernierAt,ap:meta->>apercu,dm:meta->>dernierDeMoi,pid:meta->>productId,ref:meta->>ref`, { headers: sbAuth() }),
-        fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vc_envoi&select=appris:data->appris,raison:data->>raison,at:data->>at`, { headers: sbAuth() }),
+        lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=like.vc_fil_*&select=id,n:meta->>n,da:meta->>dernierAt,ap:meta->>apercu,dm:meta->>dernierDeMoi,pid:meta->>productId,ref:meta->>ref`),
+        lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vc_envoi&select=appris:data->appris,raison:data->>raison,at:data->>at`),
       ]);
-      if (!rm.ok || !rl.ok) throw new Error('lecture');
-      const [jm, jl] = await Promise.all([rm.json(), rl.json()]);
-      const jf = rf.ok ? await rf.json().catch(() => null) : null;
-      const je = re.ok ? await re.json().catch(() => null) : null;
+      if (!Array.isArray(jm) || !Array.isArray(jl)) throw new Error('lecture');
       const r = (jm && jm[0]) || {};
       const fils = {};
       for (const x of (Array.isArray(jf) ? jf : [])) { const id = String(x.id || '').replace(/^vc_fil_/, ''); if (id) fils[id] = x; }
@@ -25994,7 +26178,7 @@ function MessagesVestiaire() {
       const apercu = (f && f.ap) || v.apercu || '';
       const date = (f && f.da) || v.date || v.vuAt || '';
       const deMoi = f && f.ap ? f.dm === 'true' : v.apercuDeMoi === true;
-      return { id, pid: String(pid || ''), nonLu: v.nonLu, apercu, deMoi, date, lu: !!(f && Number(f.n) > 0), num: cleNum((pid && d.liens[pid]) || ref || '') };
+      return { id, pid: String(pid || ''), nonLu: v.nonLu, apercu, deMoi, date, lu: !!(f && Number(f.n) > 0), num: cleNum((pid && d.liens[pid]) || ref || ''), compte: v.compte || '' };
     }).sort((a, z) => (z.nonLu === true) - (a.nonLu === true) || String(z.date || '').localeCompare(String(a.date || '')));
     const choisie = liste.find((v) => v.id === ouvert) || null;
     const fcChoisie = choisie ? ficheVestiaireDe(choisie, d.items) : null;
@@ -26014,10 +26198,10 @@ function MessagesVestiaire() {
                 {liste.slice(0, 40).map((v) => {
                   const fv = v.num ? ficheDuNumero(v.num) : null; const t = Date.parse(v.date || '');
                   return (
-                    <div key={v.id} data-vc-conv={v.id} data-vc-conv-num={v.num || ''} data-vc-conv-nonlu={v.nonLu === true ? 'oui' : v.nonLu === false ? 'non' : 'passu'} data-vc-conv-lu={v.lu ? 'oui' : 'non'}>
+                    <div key={v.id} data-vc-conv={v.id} data-vc-conv-num={v.num || ''} data-vc-conv-nonlu={v.nonLu === true ? 'oui' : v.nonLu === false ? 'non' : 'passu'} data-vc-conv-lu={v.lu ? 'oui' : 'non'} data-flou={vcFloute(vcOuvert, v.compte) ? '1' : '0'} style={vcFloute(vcOuvert, v.compte) && ouvert !== v.id ? STYLE_FLOU : undefined}>
                       <LigneConv actif={ouvert === v.id} onClick={() => setOuvert(v.id)} ariaLabel={`Ouvrir la conversation ${v.num ? 'du N°' + v.num : 'pas reliée à une paire'}`}
                         photo={fv && fv.photo} nom="Vestiaire" quand={isFinite(t) ? t : null} couleurHeure={v.nonLu === true ? C.accent : C.muted}
-                        titre={fv && fv.titre} num={v.num}
+                        titre={(fv && fv.titre) || (v.num ? '' : 'Pas reliée à une paire')} num={v.num}
                         extrait={v.apercu || (v.lu ? '' : 'Texte pas encore lu')} toi={!!v.apercu && v.deMoi} couleurExtrait={v.nonLu === true ? C.text : C.muted}
                         apres={v.nonLu == null ? <span className="vrm-msg-etat" title="Vestiaire ne dit pas si elle est lue" style={{ color: C.muted, borderColor: C.border }}>lu ?</span> : null}
                         point={v.nonLu === true ? C.accent : null}/>
@@ -26053,13 +26237,13 @@ function MessagesVestiaire() {
 // d'achat ni aucun total : c'est toi qui saisis tes prix d'achat (§2.5).
 function AchatsVestiaire() {
   const [d, setD] = React.useState(undefined);   // undefined en cours · null pas su · objet
+  const vcOuvert = useCompteVcOuvert();
   const relire = React.useCallback(async () => {
-    try {
-      const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vc_achats&select=achats:data->achats,lecture:data->lecture`, { headers: sbAuth() });
-      if (!r.ok) throw new Error('lecture');
-      const j = await r.json();
-      setD({ achats: (j && j[0] && j[0].achats) || null, lecture: (j && j[0] && j[0].lecture) || null });
-    } catch (_) { setD(null); }
+    // (1er nov.) Relue une fois sur un échec passager (`lireBaseRelue`).
+    const j = await lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vc_achats&select=achats:data->achats,lecture:data->lecture`);
+    if (!Array.isArray(j)) { setD(null); return; }
+    const a = j[0] && j[0].achats;
+    setD({ achats: a && typeof a === 'object' && !Array.isArray(a) ? a : null, lecture: (j[0] && j[0].lecture) || null });
   }, []);
   React.useEffect(() => { relire(); }, [relire]);
   React.useEffect(() => {
@@ -26069,23 +26253,23 @@ function AchatsVestiaire() {
   const style = { fontSize: 12.5, color: C.muted, lineHeight: 1.55 };
   let corps;
   if (d === undefined) corps = <div data-vc-achats="charge" style={style}>Lecture de tes achats Vestiaire…</div>;
-  else if (d === null) corps = <div data-vc-achats="pas-su" style={style}>Je n'ai pas pu lire tes achats Vestiaire — rien n'est perdu, réessaie dans un moment.</div>;
+  else if (d === null) corps = <div data-vc-achats="pas-su" style={style}>Je n'ai pas pu lire tes achats Vestiaire — rien n'est perdu, c'est la lecture qui a échoué. <button type="button" className="vrm-lien-action" data-vc-achats-relire="" onClick={() => { setD(undefined); relire(); }} style={{ background: 'none', border: 'none', color: C.accent, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', minHeight: 44, padding: 0 }}>Réessayer</button></div>;
   else if (!d.achats) corps = <div data-vc-achats="jamais" style={style}>Pas encore lus. Ouvre <b style={{ color: C.text }}>tes achats</b> (« Mes commandes ») sur Vestiaire, dans le Chrome où l'extension VRM est installée{extSait('vcachats') === 'retard' ? <> — mise à jour en <b>{EXT_CAPACITES.vcachats}</b> d'abord</> : ''} : elle les lit en passant. Ton panier n'est jamais lu.</div>;
   else {
-    const liste = Object.entries(d.achats).map(([id, v]) => ({ id, ...v }))
+    const liste = Object.entries(d.achats).filter(([, v]) => v && typeof v === 'object').map(([id, v]) => ({ id, ...v }))
       .sort((a, z) => String(z.date || z.premiereVue || '').localeCompare(String(a.date || a.premiereVue || '')));
-    if (!liste.length) corps = <div data-vc-achats="vide" style={style}>Aucun achat Vestiaire à la dernière lecture.</div>;
+    if (!liste.length) corps = <div data-vc-achats="vide" style={style}>Aucun achat Vestiaire à la dernière lecture{d.lecture && d.lecture.at ? ` (${ageCourtVc(d.lecture.at)})` : ''}. Après un achat, ouvre <b style={{ color: C.text }}>« Mes commandes »</b> sur vestiairecollective.com dans ce Chrome : il apparaît ici.</div>;
     else corps = (
       <div data-vc-achats="lu" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         <div data-vc-achats-resume="" style={style}>
           {liste.length} achat{liste.length > 1 ? 's' : ''} vu{liste.length > 1 ? 's' : ''}{d.lecture && !d.lecture.complet ? ' (au moins)' : ''}. Les montants n'entrent dans aucun prix d'achat ni aucun total : tes prix d'achat, c'est toi qui les saisis.
         </div>
         {liste.slice(0, 30).map((v) => (
-          <div key={v.id} data-vc-achat={v.id} data-vc-achat-suivi={v.suivi || ''} style={{ borderTop: `1px solid ${C.border}`, paddingTop: 8 }}>
+          <div key={v.id} data-vc-achat={v.id} data-vc-achat-suivi={v.suivi || ''} data-flou={vcFloute(vcOuvert, v.compte) ? '1' : '0'} style={{ borderTop: `1px solid ${C.border}`, paddingTop: 8, ...(vcFloute(vcOuvert, v.compte) ? STYLE_FLOU : {}) }}>
             <div style={{ fontSize: 13, color: C.text, fontWeight: 600, overflowWrap: 'anywhere' }}>{v.nom || 'Article sans nom lu'}</div>
             <div style={{ fontSize: 11.5, color: C.muted }}>
-              {v.etat ? `Vestiaire : « ${v.etat} »` : 'état non dit'}{v.date ? ` · ${new Date(v.date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}` : ''}
-              {v.montant ? ` · ${fmt(v.montant.valeur)}${v.montant.devise && v.montant.devise !== 'EUR' ? ' ' + v.montant.devise : ''} (« ${v.montant.cle} »)` : ''}
+              {v.etat ? `Vestiaire : « ${v.etat} »` : 'état non dit'}{dateCourteVc(v.date) ? ` · ${dateCourteVc(v.date)}` : ''}
+              {v.montant && isFinite(Number(v.montant.valeur)) ? ` · ${fmt(v.montant.valeur)}${v.montant.devise && v.montant.devise !== 'EUR' ? ' ' + v.montant.devise : ''} (« ${v.montant.cle} »)` : ''}
               {v.suivi ? ` · suivi ${v.suivi}${v.transporteur ? ' (' + v.transporteur + ')' : ''}` : ''}
             </div>
             {v.suivi ? <BoutonSuivreColis transporteur={v.transporteur} suivi={v.suivi}/> : null}
@@ -37783,7 +37967,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   useEffect(()=>{
     const suivi=suivreReceptionLeboncoin({fenetre:window,document,relire:async(estActif)=>{
     try {
-      const rows = await lireReceptionLeboncoin(`${SUPABASE_URL}/rest/v1/app_data?id=eq.lbc_ventes&select=data`,sbAuth());
+      const rows = await lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.lbc_ventes&select=data`);
       if (!estActif()) return;
       if (!Array.isArray(rows)) { setLbcLu(null); return; }
       const obj = (rows && rows[0] && rows[0].data && rows[0].data.ventes) || {};
@@ -53448,7 +53632,7 @@ function useCompteLbcOuvert() {
   const [accs, setAccs] = useState(undefined);
   useEffect(() => {
     const suivi = suivreReceptionLeboncoin({ fenetre: window, document, relire: async (estActif) => {
-      const rows = await lireReceptionLeboncoin(URL_LBC_COMPTES_FLOU(), sbAuth());
+      const rows = await lireBaseRelue(URL_LBC_COMPTES_FLOU());
       if (!estActif()) return;
       setAccs(Array.isArray(rows) ? ((rows[0] && rows[0].a) || {}) : null);
     } });
@@ -53694,6 +53878,9 @@ const lbcPasRevue = (ad) => { const j = lbcJoursSansVoir(ad); return j != null &
 // Les annonces Leboncoin captées (226 Ko mesurés le 4 octobre) : lues une fois
 // par session au plus pour le centre de notifications. `null` = pas su.
 let _lbcAnnoncesSession = null;
+// (1er nov.) Une capture rangée par l'extension (« maj lbc ») périme ce mémo :
+// sans ça, Favoris reçus montraient pendant 10 min la lecture d'avant.
+try { window.addEventListener('vrm:ext', (e) => { const x = e && e.detail; if (x && x.type === 'maj' && x.quoi === 'lbc') _lbcAnnoncesSession = null; }); } catch (_) {}
 async function lbcAnnoncesSession() {
   const l = await lbcListingsSession();
   return l ? l.items : null;
@@ -53705,9 +53892,7 @@ async function lbcListingsSession() {
   if (_lbcAnnoncesSession && Date.now() - _lbcAnnoncesSession.t < 10 * 60000) return _lbcAnnoncesSession;
   try {
     // (31 oct.) Projetée (§4.4) : les deux champs lus, jamais `select=data`.
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.lbc_listings&select=items:data->items,lectures:data->lectures`, { headers: sbAuth() });
-    if (!r.ok) return null;
-    const rows = await r.json();
+    const rows = await lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.lbc_listings&select=items:data->items,lectures:data->lectures`);
     if (!Array.isArray(rows)) return null;
     const d = rows[0] || {};
     _lbcAnnoncesSession = { t: Date.now(), items: d.items || {}, lectures: d.lectures || {} };
@@ -54572,16 +54757,16 @@ function ConversationsLeboncoin() {
   const [ouvert, setOuvert] = useState('');   // le compte dont le fil est ouvert (1er nov.)
   useEffect(() => { let stop = false; (async () => {
     try {
-      const [rm, ra] = await Promise.all([
-        fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.lbc_messages&select=data`, { headers: sbAuth() }),
-        fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.lbc_accounts&select=data`, { headers: sbAuth() }),
+      // (1er nov.) Projetées (§4.4) et relues une fois sur un échec passager
+      // (`lireBaseRelue`) : un jeton qui expire ne fait plus dire « pas pu lire ».
+      const [jm, ja] = await Promise.all([
+        lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.lbc_messages&select=compteurs:data->compteurs,comptes:data->comptes`),
+        lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.lbc_accounts&select=a:data->accounts`),
       ]);
-      if (!rm.ok) { if (!stop) setD(null); return; }
-      const jm = await rm.json(); const ja = ra.ok ? await ra.json() : [];
       if (!Array.isArray(jm)) { if (!stop) setD(null); return; }
-      const m = (jm[0] && jm[0].data) || {};
-      const acc = (Array.isArray(ja) && ja[0] && ja[0].data && ja[0].data.accounts) || {};
-      if (!stop) setD({ compteurs: m.compteurs || {}, comptes: m.comptes || {}, acc });
+      const m = jm[0] || {};
+      const acc = (Array.isArray(ja) && ja[0] && ja[0].a && typeof ja[0].a === 'object') ? ja[0].a : {};
+      if (!stop) setD({ compteurs: (m.compteurs && typeof m.compteurs === 'object') ? m.compteurs : {}, comptes: (m.comptes && typeof m.comptes === 'object') ? m.comptes : {}, acc });
     } catch (_) { if (!stop) setD(null); }
   })(); return () => { stop = true; }; }, []);
   const cap = extSait('lbcmsg');
@@ -54687,14 +54872,12 @@ function FavorisLeboncoin() {
   const lbcOuvert = useCompteLbcOuvert();
   useEffect(() => { let stop = false; (async () => {
     try {
-      const [l, rv, ra] = await Promise.all([
+      const [l, jv, ja] = await Promise.all([
         lbcListingsSession(),
-        fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.lbc_ventes&select=v:data->ventes`, { headers: sbAuth() }),
-        fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.lbc_accounts&select=a:data->accounts`, { headers: sbAuth() }),
+        lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.lbc_ventes&select=v:data->ventes`),
+        lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.lbc_accounts&select=a:data->accounts`),
       ]);
-      if (!l || !rv.ok || !ra.ok) { if (!stop) setD(null); return; }
-      const jv = await rv.json(), ja = await ra.json();
-      if (!Array.isArray(jv) || !Array.isArray(ja)) { if (!stop) setD(null); return; }
+      if (!l || !Array.isArray(jv) || !Array.isArray(ja)) { if (!stop) setD(null); return; }
       if (!stop) setD({ items: l.items || {}, ventes: (jv[0] && jv[0].v) || {}, acc: (ja[0] && ja[0].a) || {} });
     } catch (_) { if (!stop) setD(null); }
   })(); return () => { stop = true; }; }, []);
@@ -54765,7 +54948,7 @@ function LeboncoinScreen() {
   const [erreurReception,setErreurReception]=useState(false);
   const suiviReception=useRef(null);
   const reload=()=>suiviReception.current?.actualiser();
-  const sbGet = q => lireReceptionLeboncoin(`${SUPABASE_URL}/rest/v1/${q}`,sbAuth());
+  const sbGet = q => lireBaseRelue(`${SUPABASE_URL}/rest/v1/${q}`);
   const lireDonnees = async (estActif) => {
     setLoading(true);
     setErreurReception(false);
@@ -60564,7 +60747,7 @@ function AppCoeur() {
   useEffect(()=>{
     const suivi=suivreReceptionLeboncoin({fenetre:window,document,relire:async(estActif)=>{
     try {
-      const rows = await lireReceptionLeboncoin(`${SUPABASE_URL}/rest/v1/app_data?id=eq.lbc_ventes&select=data`,sbAuth());
+      const rows = await lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.lbc_ventes&select=data`);
       if (!estActif()) return;
       if (!Array.isArray(rows)) { setLbcCoqueLu(null); return; }
       const obj = (rows && rows[0] && rows[0].data && rows[0].data.ventes) || {};
@@ -61910,6 +62093,7 @@ function AppCoeur() {
       {baseKO ? <LignePanne>Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui a échoué.</LignePanne>
         : t==='ventes' ? <VentesVestiaire comptes={vintedAccounts}/>
         : t==='annonces' ? <>
+            <AnnoncesVestiaire/>
             <PublierVestiaire comptes={vintedAccounts}/>
             <Card style={{padding:16}}>
               <ClePhotoroom cadre={false}/>
@@ -62020,7 +62204,7 @@ function AppCoeur() {
           {sec==='annonces'&&(baseKO?<div style={{padding:16}}><LignePanne>Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui a échoué.</LignePanne></div>:<LeboncoinScreen/>)}
           {/* (27 oct.) Le diagnostic est une aide en cas de souci : en bas de
               l'espace, plus une ligne en tête de chaque section. */}
-          <div data-diag-lbc="" style={{padding:'0 16px'}}><DiagnosticLeboncoin key={AUTH.user?.id||'sans-session'} lire={q=>lireReceptionLeboncoin(`${SUPABASE_URL}/rest/v1/${q}`,sbAuth())} couleurs={C}/></div>
+          <div data-diag-lbc="" style={{padding:'0 16px'}}><DiagnosticLeboncoin key={AUTH.user?.id||'sans-session'} lire={q=>lireBaseRelue(`${SUPABASE_URL}/rest/v1/${q}`)} couleurs={C}/></div>
         </section>); };
   const rendreEbay=(sec)=>{ const allerSec=(x)=>allerSection('plat_ebay',x); return (<section className="vrm-market-space" aria-label="eBay">
           {/* Julien : « eBay, je veux tout pareil que Vinted — les onglets achats,

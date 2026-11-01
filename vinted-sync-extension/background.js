@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.295.0';
+const CODE_VERSION = '5.296.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -2675,7 +2675,9 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         try {
           let hote = ''; try { hote = new URL((sender && sender.tab && sender.tab.url) || '').hostname; } catch (_) {}
           if (!/(^|\.)vestiairecollective\.com$/i.test(hote)) { sendResponse({ ok: false }); return; }
-          const ok = await rangerVcAnnonces({ items: msg.items, offset: msg.offset, total: msg.total, lus: msg.lus });
+          // 5.296 : le compte est celui que l'ONGLET a lu sur `/users/me` (vide = pas su), jamais celui que dirait le message.
+          const compteOnglet = await compteVcOnglet(sender && sender.tab && sender.tab.id);
+          const ok = await rangerVcAnnonces({ items: msg.items, offset: msg.offset, total: msg.total, lus: msg.lus, forme: msg.forme, compte: compteOnglet });
           await noterVcCapte('annonces', ok === true, Array.isArray(msg.items) ? msg.items.length : 0);
           sendResponse({ ok: ok === true });
         } catch (e) { sendResponse({ ok: false, error: String(e) }); }
@@ -2699,7 +2701,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         try {
           let hote = ''; try { hote = new URL((sender && sender.tab && sender.tab.url) || '').hostname; } catch (_) {}
           if (!/(^|\.)vestiairecollective\.com$/i.test(hote)) { sendResponse({ ok: false }); return; }
-          const ok = await rangerVcVentes(msg);
+          const ok = await rangerVcVentes(Object.assign({}, msg, { compte: await compteVcOnglet(sender && sender.tab && sender.tab.id) }));
           await noterVcCapte('ventes', ok === true, Array.isArray(msg.ventes) ? msg.ventes.length : 0);
           sendResponse({ ok: ok === true });
         } catch (e) { sendResponse({ ok: false, error: String(e) }); }
@@ -2727,7 +2729,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         try {
           let hote = ''; try { hote = new URL((sender && sender.tab && sender.tab.url) || '').hostname; } catch (_) {}
           if (!/(^|\.)vestiairecollective\.com$/i.test(hote)) { sendResponse({ ok: false }); return; }
-          const ok = await rangerVcAchats(msg);
+          const ok = await rangerVcAchats(Object.assign({}, msg, { compte: await compteVcOnglet(sender && sender.tab && sender.tab.id) }));
           await noterVcCapte('achats', ok === true, Array.isArray(msg.achats) ? msg.achats.length : 0);
           sendResponse({ ok: ok === true });
         } catch (e) { sendResponse({ ok: false, error: String(e) }); }
@@ -2878,7 +2880,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           }
           if (msg.action === 'lbcRaw' && msg.body) {
             if(/\/compte\/(?:part|pro)\/mes-annonces/i.test(String(msg.url))){try{const u=new URL(msg.url),t=new URL(sender.url||sender.tab?.url);if(sender.frameId>0||u.origin+u.pathname!==t.origin+t.pathname){sendResponse({ok:false});return;}}catch(_){sendResponse({ok:false});return;}}
-            const r=await handleLbcRaw(msg.url,msg.body,msg.session);if(r&&(r.etat==='enregistre'||/\/adfinder\/v\d+\/myads\b|\/classifieds\/analysis\/list|\/dashboard\/v\d+\/search|\/compte\/(?:part|pro)\/mes-annonces/i.test(String(msg.url))))await noterReceptionLbc('annonces',r,sender);sendResponse(r||{ok:true,etat:'sans-annonce'});return;
+            const r=await handleLbcRaw(msg.url,msg.body,msg.session);if(r&&(r.etat==='enregistre'||LBC_ANNONCES_LECTURE.test(String(msg.url))))await noterReceptionLbc('annonces',r,sender);sendResponse(r||{ok:true,etat:'sans-annonce'});return;
           }
           // 22 oct. : une liste COMPLÈTE d'un vendeur (toutes les pages, total
           // atteint — prouvé par la page, voir lbc-inject.js). Seulement depuis le
@@ -2928,13 +2930,27 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
             if(!ownerReception){sendResponse({ok:false,etat:'ecriture-refusee'});return;}
             const corps=String(msg.body);
             if(/\/compte\/(?:part|pro)\/(?:transaction|mes-transactions)/i.test(String(msg.url))){try{const u=new URL(msg.url),t=new URL(sender.url||sender.tab?.url);if(sender.frameId>0||u.origin+u.pathname!==t.origin+t.pathname){sendResponse({ok:false});return;}}catch(_){sendResponse({ok:false});return;}}
-            if(msg.coupe||new TextEncoder().encode(corps).length>200000){const r={ok:false,etat:'partiel'};await noterReceptionLbc('transactions',r,sender);sendResponse(r);return;}
+            // ⚠️ (1er nov., 5.296) « Il ne doit plus y avoir d'erreur pendant la lecture » :
+            //    la page d'une transaction charge AUSSI des réponses qui ne sont pas
+            //    des transactions (configuration de livraison, action d'un achat,
+            //    étiquette…) — elles passent par ici pour leur FORME. Elles disaient
+            //    « Transactions : réponse reçue, format non reconnu » en rouge sur la
+            //    carte, PAR-DESSUS l'enregistrement réussi d'une seconde avant. Seule
+            //    une lecture de transactions (liste ou détail) note la réception ; une
+            //    liste rendue VIDE est « liste vide », pas un format inconnu.
+            const lectureTx=LBC_TX_LECTURE.test(String(msg.url||''));
+            if(msg.coupe||new TextEncoder().encode(corps).length>200000){const r={ok:false,etat:'partiel'};if(lectureTx)await noterReceptionLbc('transactions',r,sender);sendResponse(r);return;}
             const compte=msg.session?await sessionDeListe(msg.session):null;
             if(msg.session&&!compte){sendResponse({ok:false,etat:'compte-non-confirme'});return;}
             const ventes=extraireVentesLbc(msg.url,corps);
             if(compte)for(const v of ventes){v.account=compte.id;v.accountName=compte.name||'';}
 
-            if(!ventes.length){const r={ok:false,etat:'format-non-reconnu',nombre:0};await noterReceptionLbc('transactions',r,sender);sendResponse(r);return;}
+            if(!ventes.length){
+              let vide=false;try{const j=JSON.parse(corps);vide=Array.isArray(j)&&j.length===0;}catch(_){}
+              const r=vide?{ok:true,etat:'liste-vide',nombre:0}:{ok:false,etat:'format-non-reconnu',nombre:0};
+              if(lectureTx)await noterReceptionLbc('transactions',r,sender);
+              if(!vide)storeLbcVente(msg.url,corps,false,ownerReception).catch(()=>{});
+              sendResponse(r);return;}
             const ok=await rangerLbcVentes(ventes,ownerReception),r={ok:ok===true,etat:ok===true?'enregistre':'ecriture-refusee',nombre:ventes.length};await noterReceptionLbc('transactions',r,sender);sendResponse(r);storeLbcVente(msg.url,corps,false,ownerReception).catch(()=>{});return;
           }
           // Le catalogue Leboncoin (codes de catégorie/marque/taille/état) : sa
@@ -13350,6 +13366,38 @@ async function lireMain(cles) {
 //    une moitié de liste serait pire qu'une lecture ratée, parce qu'elle a l'air
 //    d'une réponse.
 const SB_PAGE = 1000;
+// ══════════════════════════════════════════════════════════════════════════════
+// (1er nov., 5.296) LES LECTURES QUI PRÉCÈDENT UNE ÉCRITURE LEBONCOIN SE RELISENT
+// UNE FOIS. Julien : « il ne doit plus y avoir d'erreur pendant la lecture des
+// données Leboncoin ». Chaque capture (annonces, comptes, ventes, messages) est
+// un lire-fusionner-réécrire : une lecture ratée n'écrit RIEN (§5, le sens sûr)
+// — et la capture était perdue, la carte de l'onglet disait « enregistrement
+// refusé ». Or l'échec le plus courant est passager : un jeton qui vient
+// d'expirer (401 — renouvelé avant de relire), une base qui hoquette (5xx,
+// 408, 429) ou le réseau. Une SEULE relecture, 800 ms plus tard ; un refus net
+// (400, 403, 404) ne se relit pas. Toujours « rien lu ⇒ rien écrit » au bout.
+async function sbGetLbc(query) {
+  for (let essai = 0; essai < 2; essai++) {
+    let passager = true;
+    try {
+      const session = await authToken();
+      if (!session?.user_id || !session.access_token) return null;
+      const filtre = `${query.includes('?') ? '&' : '?'}owner=eq.${encodeURIComponent(session.user_id)}`;
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/${query}${filtre}`, { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${session.access_token}` } });
+      if (res.ok) {
+        const rows = await res.json();
+        if (!Array.isArray(rows)) return null;
+        return (await loadSession())?.user_id === session.user_id ? rows : null;
+      }
+      passager = res.status === 401 || res.status === 408 || res.status === 429 || res.status >= 500;
+      if (res.status === 401 && essai === 0) { try { await refreshSession({ force: true }); } catch (_) {} }
+    } catch (_) { passager = true; }
+    if (!passager || essai > 0) break;
+    try { noterDiag('lbc_lecture_relue'); } catch (_) {}
+    await new Promise((r) => setTimeout(r, 800));
+  }
+  return null;
+}
 async function sbGetTout(query) {
   const session=await authToken();
   if(!session?.user_id||!session.access_token)return null;
@@ -14493,11 +14541,17 @@ async function rangerVcVentesMaintenant(m) {
       etiquette: x.etiquette === true || x.etiquette === false ? x.etiquette : (prev.etiquette === true || prev.etiquette === false ? prev.etiquette : null),
       aExpedier: source === 'a-expedier' ? true : (prev.aExpedier === true),
       sources, vuAt: now, premiereVue: prev.premiereVue || now,
+      // 5.296 : le compte Vestiaire de l'onglet qui l'a lue (vide = pas su).
+      compte: (m.compte && /^[\w-]{1,40}$/.test(String(m.compte))) ? String(m.compte) : (prev.compte || ''),
     };
   }
   const offset = Number(m.offset) || 0; const total = typeof m.total === 'number' ? m.total : null;
   const entier = offset === 0 && total != null && lus.size >= total && Number(m.lus || 0) >= total;
-  if (source === 'a-expedier' && entier) for (const [id, v] of Object.entries(ventes)) if (v.aExpedier && !lus.has(id)) ventes[id] = { ...v, aExpedier: false, plusAExpedierDepuis: now };
+  // (5.296) La liste « à expédier » d'UN compte ne dit rien des ventes d'un autre
+  // compte (compte connu et différent) : elles restent à expédier (un colis
+  // caché est un colis perdu).
+  const compteM = (m.compte && /^[\w-]{1,40}$/.test(String(m.compte))) ? String(m.compte) : '';
+  if (source === 'a-expedier' && entier) for (const [id, v] of Object.entries(ventes)) if (v.aExpedier && !lus.has(id) && !(compteM && v.compte && v.compte !== compteM)) ventes[id] = { ...v, aExpedier: false, plusAExpedierDepuis: now };
   const lectures = Object.assign({}, cur.lectures || {}, { [source]: { at: now, total, complet: entier } });
   const forme = Object.assign({}, cur.forme || {});
   if (Array.isArray(m.forme) && m.forme.length) forme[source] = m.forme.slice(0, 120);
@@ -14603,6 +14657,7 @@ async function rangerVcAchatsMaintenant(m) {
       etat: x.etat || p.etat || '', date: x.date || p.date || '', montant: x.montant || p.montant || null,
       suivi: x.suivi || p.suivi || '', transporteur: x.transporteur || p.transporteur || '',
       vuAt: now, premiereVue: p.premiereVue || now,
+      compte: (m.compte && /^[\w-]{1,40}$/.test(String(m.compte))) ? String(m.compte) : (p.compte || ''),
     };
   }
   const offset = Number(m.offset) || 0; const total = typeof m.total === 'number' ? m.total : null;
@@ -14612,6 +14667,22 @@ async function rangerVcAchatsMaintenant(m) {
   const ok = await supabaseUpsert('app_data', [{ id: 'vc_achats', data }], 'id');
   if (ok === true) notifierApp({ type: 'maj', quoi: 'vestiaire' });
   return ok === true;
+}
+// 5.296 (1er nov.) — UNE ANNONCE VESTIAIRE RANGÉE : boost, référence, favoris
+// (5.236-5.295) et sa FICHE — titre (affichage seul, jamais une identité, §5),
+// une photo de Vestiaire, le prix avec le nom de sa clé, l'état tel que
+// Vestiaire l'écrit, le compte de l'onglet. Un champ que la réponse ne porte pas
+// ne remplace jamais un plein (la règle Leboncoin de la 5.294).
+function ficheVcAnnonce(x, prev, compte, maintenant) {
+  const prix = x.prix && isFinite(Number(x.prix.valeur)) ? { valeur: Number(x.prix.valeur), devise: String(x.prix.devise || '').slice(0, 3), cle: String(x.prix.cle || '').slice(0, 60) } : null;
+  return { boost: x.boost === true || x.boost === false ? x.boost : null, cles: (x.cles || []).slice(0, 6).map(String), ref: String(x.ref || '').slice(0, 12), vuAt: maintenant,
+    // 5.295 : combien de personnes l'ont mise en favori — un nombre, `null` = pas su.
+    favoris: typeof x.favoris === 'number' && isFinite(x.favoris) && x.favoris >= 0 ? Math.floor(x.favoris) : null, cleFavoris: String(x.cleFavoris || '').slice(0, 40),
+    titre: String(x.titre || '').slice(0, 120) || prev.titre || '',
+    photo: (/^https:\/\/([\w-]+\.)*vestiairecollective\.com\//i.test(String(x.photo || '')) ? String(x.photo).slice(0, 400) : '') || prev.photo || '',
+    prix: prix || prev.prix || null,
+    statut: String(x.statut || '').slice(0, 40) || prev.statut || '',
+    compte: compte || prev.compte || '' };
 }
 let _vcAnnoncesChaine = Promise.resolve();
 function rangerVcAnnonces(patch) {
@@ -14624,7 +14695,8 @@ async function rangerVcAnnoncesMaintenant(patch) {
   if (rows === null) return false;
   const cur = (rows && rows[0] && rows[0].data) || {};
   const maintenant = new Date().toISOString();
-  const data = { items: Object.assign({}, cur.items || {}), liens: Object.assign({}, cur.liens || {}), capturedAt: cur.capturedAt || null, complet: !!cur.complet, total: cur.total == null ? null : cur.total };
+  const data = Object.assign({}, cur, { items: Object.assign({}, cur.items || {}), liens: Object.assign({}, cur.liens || {}), capturedAt: cur.capturedAt || null, complet: !!cur.complet, total: cur.total == null ? null : cur.total });
+  const compte = /^[\w-]{1,40}$/.test(String(patch.compte || '')) ? String(patch.compte) : '';
   let change = false;
   if (patch.liens) for (const [k, v] of Object.entries(patch.liens)) {
     if (!/^[\w-]{1,40}$/.test(k) || !v) continue;
@@ -14635,14 +14707,18 @@ async function rangerVcAnnoncesMaintenant(patch) {
     for (const x of patch.items.slice(0, 200)) {
       const id = String((x && x.id) || '');
       if (!/^[\w-]{1,40}$/.test(id)) continue;
-      lus[id] = { boost: x.boost === true || x.boost === false ? x.boost : null, cles: (x.cles || []).slice(0, 6).map(String), ref: String(x.ref || '').slice(0, 12), vuAt: maintenant,
-        // 5.295 : combien de personnes l'ont mise en favori — un nombre, `null` = pas su.
-        favoris: typeof x.favoris === 'number' && isFinite(x.favoris) && x.favoris >= 0 ? Math.floor(x.favoris) : null, cleFavoris: String(x.cleFavoris || '').slice(0, 40) };
+      lus[id] = ficheVcAnnonce(x, data.items[id] || {}, compte, maintenant);
     }
     const offset = Number(patch.offset) || 0; const total = typeof patch.total === 'number' ? patch.total : null;
     const entier = offset === 0 && total != null && Object.keys(lus).length >= total && Number(patch.lus || 0) >= total;
-    data.items = entier ? lus : Object.assign(data.items, lus);
+    // (5.296) Une liste ENTIÈRE ne fait foi que pour SON compte : les annonces
+    // d'un autre compte Vestiaire (compte connu et différent) restent. Compte de
+    // l'onglet pas su ⇒ la règle d'avant (une seule boîte supposée).
+    if (entier) { const autres = {}; for (const [k, v] of Object.entries(data.items)) if (compte && v && v.compte && v.compte !== compte) autres[k] = v; data.items = Object.assign(autres, lus); }
+    else data.items = Object.assign(data.items, lus);
     data.complet = entier; data.total = total; data.capturedAt = maintenant; change = true;
+    if (compte) data.lectures = Object.assign({}, cur.lectures || {}, { [compte]: { at: maintenant, total, complet: entier } });
+    if (Array.isArray(patch.forme) && patch.forme.length) data.forme = patch.forme.slice(0, 120).map((c) => String(c).slice(0, 120));
   }
   if (!change) return true;
   const ok = await supabaseUpsert('app_data', [{ id: 'vc_listings', data }], 'id');
@@ -15167,6 +15243,13 @@ async function buildLbcData() {
   return { queue, removals, unlinked, stats, postedList };
 }
 // Un accusé porte le résultat d'une écriture de données, pas d'un compteur.
+// (1er nov., 5.296) Les réponses qui LISENT des transactions Leboncoin (liste et
+// détail) — les seules qui notent « Transactions : … » sur la carte de l'onglet.
+const LBC_TX_LECTURE=/consumergoods\/proxy\/v\d+\/pages\/transactions|\/compte\/(?:part|pro)\/(?:transaction|mes-transactions)|own_orders|pro-order-proxy/i;
+// Les réponses qui LISENT la liste privée de SES annonces — les seules qui notent
+// un échec « Annonces : … » (le flux d'accueil `dashboard/v1/search` mêle les
+// annonces d'autrui : n'y trouver aucune des siennes n'est pas une erreur).
+const LBC_ANNONCES_LECTURE=/\/adfinder\/v\d+\/myads\b|\/classifieds\/analysis\/list|\/compte\/(?:part|pro)\/mes-annonces/i;
 async function noterReceptionLbc(famille,resultat,sender){
   const tab=sender?.tab?.id;if(tab==null||sender?.frameId>0||!['annonces','transactions'].includes(famille))return;
   try{const cartes=(await chrome.storage.local.get('vrmLbcTransport')).vrmLbcTransport||{},avant=cartes[tab]||{};
@@ -15208,7 +15291,7 @@ async function storeLbcListings(url, listings,ownerAttendu=null){
 }
 async function storeLbcListingsUneFois(url, listings,owner) {
   try {
-    const prevRows = await sbGet('app_data?id=eq.lbc_listings&select=data');
+    const prevRows = await sbGetLbc('app_data?id=eq.lbc_listings&select=data');
     // ⚠️ « RIEN LU » NE VAUT PAS « RIEN ». `sbGet` rend `null` quand la base n'a
     //    pas répondu : repartir de `{}` réécrirait la ligne avec la seule annonce
     //    du moment, et effacerait tout l'historique de ses annonces Leboncoin.
@@ -15318,7 +15401,7 @@ async function noterDesactiveesLbc(ids, miens) {
   if (!vus.size) return { ok: true, n: 0 };
   return enChaineLbcListings(async () => {
     try {
-      const rows = await sbGet('app_data?id=eq.lbc_listings&select=data');
+      const rows = await sbGetLbc('app_data?id=eq.lbc_listings&select=data');
       if (rows === null) { noterDiag('lbc_desactivees_lecture_ratee'); return { ok: false, code: 'lecture' }; }
       const data = (rows[0] && rows[0].data) || {};
       const items = Object.assign({}, data.items || {});
@@ -15355,7 +15438,7 @@ async function noterListeLbcComplete(owner, ids, total) {
   owner = idCompteLbc(owner);
   return enChaineLbcListings(async () => {
     try {
-      const rows = await sbGet('app_data?id=eq.lbc_listings&select=data');
+      const rows = await sbGetLbc('app_data?id=eq.lbc_listings&select=data');
       if (rows === null) { noterDiag('lbc_liste_complete_lecture_ratee'); return { ok: false, code: 'lecture' }; }
       const data = (rows[0] && rows[0].data) || {};
       const items = Object.assign({}, data.items || {});
@@ -15414,7 +15497,7 @@ async function noterRetraitVuLbc(ids, quoi, statut) {
   const miens = new Set([...(await comptesMiens())].map(idCompteLbc).filter(Boolean));
   return enChaineLbcListings(async () => {
     try {
-      const rows = await sbGet('app_data?id=eq.lbc_listings&select=data');
+      const rows = await sbGetLbc('app_data?id=eq.lbc_listings&select=data');
       if (rows === null) { noterDiag('lbc_retrait_vu_lecture_ratee'); return { ok: false, n: 0 }; }
       const data = (rows[0] && rows[0].data) || {};
       const items = Object.assign({}, data.items || {});
@@ -15455,7 +15538,7 @@ async function noterStatsAnnonceLbc(id, m) {
   const miens = new Set([...(await comptesMiens())].map(idCompteLbc).filter(Boolean));
   return enChaineLbcListings(async () => {
     try {
-      const rows = await sbGet('app_data?id=eq.lbc_listings&select=data');
+      const rows = await sbGetLbc('app_data?id=eq.lbc_listings&select=data');
       if (rows === null) { noterDiag('lbc_stats_lecture_ratee'); return { ok: false, n: 0 }; }
       const data = (rows[0] && rows[0].data) || {};
       const ad = (data.items || {})[id];
@@ -15473,7 +15556,7 @@ async function noterStatsAnnonceLbc(id, m) {
 async function noterPauseLbc(id, statut) {
   return enChaineLbcListings(async () => {
     try {
-      const rows = await sbGet('app_data?id=eq.lbc_listings&select=data');
+      const rows = await sbGetLbc('app_data?id=eq.lbc_listings&select=data');
       if (rows === null) return false;
       const data = (rows[0] && rows[0].data) || {};
       const items = Object.assign({}, data.items || {});
@@ -15611,7 +15694,7 @@ const LBC_SUPPRIME_MAX_HEURE = 10;
 async function noterSuppressionLbc(id, statut) {
   return enChaineLbcListings(async () => {
     try {
-      const rows = await sbGet('app_data?id=eq.lbc_listings&select=data');
+      const rows = await sbGetLbc('app_data?id=eq.lbc_listings&select=data');
       if (rows === null) return false;
       const data = (rows[0] && rows[0].data) || {};
       const items = Object.assign({}, data.items || {});
@@ -15805,7 +15888,7 @@ async function storeVcRecon(patch) {
 }
 async function storeLbcMessages(patch) {
   try {
-    const rows = await sbGet('app_data?id=eq.lbc_messages&select=data');
+    const rows = await sbGetLbc('app_data?id=eq.lbc_messages&select=data');
     if (rows === null) return;
     const cur = (rows[0] && rows[0].data) || {};
     const compteurs = Object.assign({}, cur.compteurs || {});
@@ -15838,7 +15921,7 @@ async function storeLbcAccount(acc,ownerAttendu=null){
 }
 async function storeLbcAccountUneFois(acc,owner) {
   try {
-    const prevRows = await sbGet('app_data?id=eq.lbc_accounts&select=data');
+    const prevRows = await sbGetLbc('app_data?id=eq.lbc_accounts&select=data');
     if (prevRows === null) {await noterFlux('leboncoin',false);return false;}                 // pas su ≠ aucun compte (voir storeLbcListings)
     const prev = (prevRows[0] && prevRows[0].data && prevRows[0].data.accounts) || {};
     const merged = Object.assign({}, prev);
@@ -15952,7 +16035,7 @@ async function noterSessionLbc(userId, ident) {
   // Un nom déjà rangé SOUS CET ID (une fiche à son id, une capture d'avant).
   if (!name || !type) {
     try {
-      const rows = await sbGet('app_data?id=eq.lbc_accounts&select=data');
+      const rows = await sbGetLbc('app_data?id=eq.lbc_accounts&select=data');
       const a = rows && rows[0] && rows[0].data && rows[0].data.accounts && rows[0].data.accounts[id];
       if (a && !(a.source && LBC_URL_AUTRUI.test(String(a.source)) && !a.sessionAt)) { name = name || String(a.name || ''); type = type || String(a.type || ''); }
     } catch (_) {}
@@ -16298,7 +16381,7 @@ async function rangerLbcVentes(list,ownerAttendu=null) {
 }
 async function rangerLbcVentesUneFois(list,owner) {
   if (!list || !list.length) return false;
-  const prev = await sbGet('app_data?id=eq.lbc_ventes&select=data');
+  const prev = await sbGetLbc('app_data?id=eq.lbc_ventes&select=data');
   if (prev === null) return false;                          // pas su ≠ vide — on n'écrase rien
   const cur = (prev[0] && prev[0].data) || {};
   const ventes = Object.assign({}, cur.ventes || {});
@@ -16629,7 +16712,7 @@ function detectLbcAccount(data, url) {
 async function comptesMiens() {
   const s = new Set();
   try {
-    const rows = await sbGet('app_data?id=eq.lbc_accounts&select=data');
+    const rows = await sbGetLbc('app_data?id=eq.lbc_accounts&select=data');
     const accs = (rows && rows[0] && rows[0].data && rows[0].data.accounts) || {};
     for (const id in accs) { const src = accs[id] && accs[id].source; if ((accs[id] && accs[id].sessionAt) || !src || (LBC_URL_MOI.test(String(src)) && !LBC_URL_AUTRUI.test(String(src)))) s.add(String(id)); }
   } catch (_) {}
@@ -16916,6 +16999,9 @@ async function handleLbcRaw(url, body, sessionPage,ownerAttendu=null) {
   await storeLbcRecon({ url, quota: quota || undefined, sample: { url, at: new Date().toISOString(), found: found.length, quota, body: String(body).slice(0, 9000) } },owner);
   if (found.length) return await storeLbcListings(url, found,owner);
   if(listeMoi&&sessListe&&(Array.isArray(data?.ads)||Array.isArray(data?.data?.ads))&&racine.length===0)return {ok:true,etat:'liste-vide',nombre:0,photos:0};
+  // (1er nov., 5.296) Le tableau de bord pro qui rend `Ads: []` (Total 0) est une
+  // liste VIDE, pas un format inconnu.
+  if(/\/classifieds\/analysis\/list/i.test(String(url||''))&&data&&Array.isArray(data.Ads)&&data.Ads.length===0)return {ok:true,etat:'liste-vide',nombre:0,photos:0};
   return {ok:true,etat:'aucune-annonce-reconnue',nombre:0,photos:0};
 }
 // Télécharge les photos d'une paire en FICHIERS (fini les onglets). Rangées dans

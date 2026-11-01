@@ -41,14 +41,17 @@ srv.listen(PORT);
         // (sonde `select=id`) : ce banc joue un vendeur Leboncoin, une ligne de
         // l'extension existe.
         if (/id=in\.\(lbc_listings/.test(u) && /select=id(&|$)/.test(u)) return j([{ id: 'lbc_accounts' }]);
+        // (1er nov.) La VRAIE forme : l'app projette (`compteurs:data->compteurs,…`,
+        // `a:data->accounts`, §4.4) — on rend ce que PostgREST rendrait (§6.3).
+        const proj = (d) => { const sel = (/[?&]select=([^&]*)/.exec(u) || [])[1] || 'data'; if (sel === 'data') return { data: d }; const o = {}; for (const part of sel.split(',')) { const m = /^(?:([^:]+):)?data->>?(\w+)$/.exec(part); if (m) o[m[1] || m[2]] = d[m[2]] === undefined ? null : d[m[2]]; } return o; };
         if (/id=eq\.lbc_messages/.test(u)) {
           if (etat === 'panne') return route.fulfill({ status: 522, contentType: 'text/html', headers: { 'access-control-allow-origin': '*' }, body: '<html>522</html>' });
-          if (etat === 'session') return j([{ data: { compteurs: { abc: { unread: 2, at: auj.toISOString() } }, comptes: {} } }]);
-          return j(etat === 'lu' ? [{ data: MSG }] : []);
+          if (etat === 'session') return j([proj({ compteurs: { abc: { unread: 2, at: auj.toISOString() } }, comptes: {} })]);
+          return j(etat === 'lu' ? [proj(MSG)] : []);
         }
         // (28 oct.) Le compteur porte l'id NU, la session privée le range sous
         // `lbc-account:{id}` avec son NOM : une seule identité (5.212).
-        if (etat === 'session' && /id=eq\.lbc_accounts/.test(u)) return j([{ data: { accounts: { abc: { id: 'abc', sessionAt: auj.toISOString() }, 'lbc-account:abc': { id: 'lbc-account:abc', name: 'Moncompte', type: 'particulier', sessionAt: auj.toISOString() } } } }]);
+        if (etat === 'session' && /id=eq\.lbc_accounts/.test(u)) return j([proj({ accounts: { abc: { id: 'abc', sessionAt: auj.toISOString() }, 'lbc-account:abc': { id: 'lbc-account:abc', name: 'Moncompte', type: 'particulier', sessionAt: auj.toISOString() } } })]);
         return j([]);
       });
       await pg.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"pret":true}' }));

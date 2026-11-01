@@ -282,8 +282,9 @@
       for(const famille of ['annonces','transactions']){
         const r=e.transport?.receptions?.[famille];
         if(!r){flux+=`<div class="val gris">${labels[famille]} : nouvelle intégration non confirmée dans cet onglet</div>`;continue;}
-        const bon=r.etat==='enregistre';
-        const texte=r.etat==='liste-vide'?'liste reçue vide, historique conservé':r.etat==='compte-non-confirme'?'compte non confirmé, aucune attribution faite':bon?`${r.nombre} ${r.nombre===1?'enregistrée':'enregistrées'}${famille==='annonces'?` · ${r.photos} avec photo`:''} ${depuis(r.at)}`:r.etat==='aucune-annonce-reconnue'||r.etat==='format-non-reconnu'?'réponse reçue, format non reconnu':r.etat==='partiel'?'réponse trop volumineuse, non intégrée':'enregistrement refusé, données précédentes conservées';
+        // (1er nov., 5.296) Une liste rendue vide par Leboncoin n'est pas une erreur de lecture : pas en rouge.
+        const bon=r.etat==='enregistre'||r.etat==='liste-vide';
+        const texte=r.etat==='liste-vide'?'liste reçue vide, historique conservé':r.etat==='compte-non-confirme'?'compte non confirmé, aucune attribution faite':bon?`${r.nombre} ${r.nombre===1?'enregistrée':'enregistrées'}${famille==='annonces'?` · ${r.photos} avec photo`:''} ${depuis(r.at)}`:r.etat==='aucune-annonce-reconnue'||r.etat==='format-non-reconnu'?'réponse reçue, format non reconnu':r.etat==='partiel'?'réponse trop volumineuse, non intégrée':r.etat==='lecture-refusee'?'VRM n’a pas répondu (relu une fois) : rien n’est perdu, la prochaine page réessaie':'enregistrement refusé, données précédentes conservées';
         flux+=`<div class="val ${bon?'':'alerte'}">${labels[famille]} : ${esc(texte)}</div>`;
       }
     }
