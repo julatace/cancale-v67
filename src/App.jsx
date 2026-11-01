@@ -14179,6 +14179,10 @@ function CibleNotif({ tab, sub }) {
     if (!d.c || Date.now() - d.at > 60000) return undefined;
     if (d.tab && d.tab !== tab) return undefined;           // l'écran attendu n'est pas encore là
     const c = d.c; d.c = null; setAbsente(null);
+    // (1er nov.) Si l'écran change encore pendant la recherche (redirection,
+    // filtre posé après coup), la cible n'est pas perdue : elle est rendue à
+    // CIBLE_NOTIF et la prochaine exécution la reprend (garde des 60 s).
+    let regle = false;
     const sel = selecteursCible(c);
     const t0 = Date.now(); let fini = false, deplie = false; const minuteurs = [];
     const vu = (el) => el && el.getClientRects().length > 0;
@@ -14193,19 +14197,22 @@ function CibleNotif({ tab, sub }) {
       el.classList.add('vrm-cible-notif'); el.setAttribute('data-cible-notif', c.type);
       minuteurs.push(setTimeout(() => { try { el.classList.remove('vrm-cible-notif'); } catch (_) {} }, 2600));
       evts.forEach((e) => window.addEventListener(e, geste, { passive: true, once: true }));
-      [700, 1600].forEach((ms) => minuteurs.push(setTimeout(() => { if (fini) return; const x = trouver() || el; try { const r = x.getBoundingClientRect(); if (r.top < 0 || r.bottom > (window.innerHeight || 800)) x.scrollIntoView({ behavior: 'auto', block: 'center' }); } catch (_) {} }, ms)));
+      // (1er nov.) L'écran peut se redessiner juste après (données qui arrivent) :
+      // l'élément visé est alors un NOUVEAU nœud — on le re-marque, sinon la
+      // surbrillance et la marque disparaissent avec l'ancien.
+      [700, 1600, 3000].forEach((ms) => minuteurs.push(setTimeout(() => { const x = trouver() || el; if (x !== el && x.getAttribute('data-cible-notif') == null) { x.setAttribute('data-cible-notif', c.type); if (ms < 3000) { x.classList.add('vrm-cible-notif'); minuteurs.push(setTimeout(() => { try { x.classList.remove('vrm-cible-notif'); } catch (_) {} }, 1600)); } } if (fini) return; try { const r = x.getBoundingClientRect(); if (r.top < 0 || r.bottom > (window.innerHeight || 800)) x.scrollIntoView({ behavior: 'auto', block: 'center' }); } catch (_) {} }, ms)));
       if (sel.ouvrir != null) { const b = sel.ouvrir ? el.querySelector(sel.ouvrir) : el; if (b && typeof b.click === 'function') minuteurs.push(setTimeout(() => { try { if (b.getAttribute('aria-expanded') !== 'true') b.click(); } catch (_) {} }, 120)); }
     };
     const essayer = () => {
       const el = trouver();
-      if (el) { marquer(el); return; }
+      if (el) { regle = true; marquer(el); return; }
       // Replié derrière « Voir les N autres » : on déplie, une fois.
       if (!deplie && Date.now() - t0 > 1200) { deplie = true; for (const q of sel.deplier) { try { const b = document.querySelector(q); if (b) b.click(); } catch (_) {} } }
-      if (Date.now() - t0 > 12000) { setAbsente(c); return; }
+      if (Date.now() - t0 > 12000) { regle = true; setAbsente(c); return; }
       minuteurs.push(setTimeout(essayer, 250));
     };
     minuteurs.push(setTimeout(essayer, 60));
-    return () => { minuteurs.forEach(clearTimeout); evts.forEach((e) => window.removeEventListener(e, geste)); };
+    return () => { minuteurs.forEach(clearTimeout); evts.forEach((e) => window.removeEventListener(e, geste)); if (!regle && !CIBLE_NOTIF.c) { CIBLE_NOTIF.c = c; } };
   // ⚠️ PAS `sub` dans les dépendances : le filtre de site d'une tâche arrive
   // APRÈS l'écran (délai nul de `setTab`) ; relancer l'effet annulait la
   // recherche en cours, cible déjà consommée — rien n'était jamais visé.
