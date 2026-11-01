@@ -126,6 +126,41 @@
   :root body .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche { animation: none !important; }
 }
 
+/* ── TÉLÉPHONE : UNE FICHE QUI SE LIT (1er nov., maquette Vitrine) ─────────
+   Julien : « trop de cases empilées sous la photo ». Fermée, la fiche montre la
+   photo et son N°, le nom et la taille, le prix, une ligne discrète (état · vues
+   · favoris · âge) — et, s'il manque, le prix d'achat : le seul geste à faire,
+   en ambre (§7). « Plus d'actions » déplie le reste : l'état en jauge, mini,
+   refuse, boost, marge, l'achat relié, le stock, la file Leboncoin, Relier,
+   Passeport, Marquer vendue. Mêmes éléments, mêmes écritures : seulement
+   repliés. L'ordinateur garde la fiche entière (le bouton y est caché). */
+.vrm-fiche-plus-bouton, .vrm-fiche-etat-court { display: none; }
+@media (max-width: 767px) {
+  :root body .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche[data-fiche-ouverte="0"] .vrm-fiche-etat-court { display: inline; }
+  :root body .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche[data-fiche-ouverte="0"] :is([data-chiffres], [data-fiche-plus], [data-fiche-etat]) { display: none !important; }
+  :root body .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche[data-fiche-ouverte="0"] [data-fiche-duo] { grid-template-columns: minmax(0, 1fr) !important; }
+  :root body .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche[data-fiche-ouverte="0"] [data-fiche-duo]:not(:has([data-fiche-achat="inconnu"])) { display: none !important; }
+  /* Fermée : la ligne discrète suit le prix, le geste ambre vient après elle (maquette). */
+  :root body .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche[data-fiche-ouverte="0"] [data-fiche-duo] { order: 2; }
+  :root body .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche .vrm-fiche-plus-bouton { order: 3; }
+  /* Le prix d'achat manquant : le geste à faire, en ambre (fermée comme ouverte). */
+  :root body .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche [data-fiche-achat="inconnu"] {
+    border-color: var(--vrm-warn, #B7791F) !important; background: var(--vrm-warn-soft, transparent) !important;
+  }
+  :root body .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche [data-fiche-achat="inconnu"] .vrm-fiche-etat-haut > span:first-child { color: var(--vrm-warn, #B7791F) !important; }
+  :root body .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche .vrm-ann-ledger-info { gap: 6px !important; }
+  :root body .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche [data-etat-ligne] { line-height: 1.35; }
+  /* « Plus d'actions » : discret, toute la largeur ; 55 px CSS = 44 px au doigt (zoom 0,8). */
+  :root body .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche .vrm-fiche-plus-bouton {
+    display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%;
+    min-height: 55px !important; margin: 0 !important; padding: 0 2px !important; box-sizing: border-box;
+    border: 0 !important; border-top: 1px solid var(--vrm-line) !important; border-radius: 0 !important;
+    background: transparent !important; color: var(--vrm-muted) !important;
+    font: inherit; font-size: 13px !important; font-weight: 600 !important; cursor: pointer; text-align: left;
+  }
+  :root body .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche .vrm-fiche-plus-bouton[aria-expanded="true"] { color: var(--vrm-ink) !important; }
+}
+
 /* ── LES OFFRES AUTOMATIQUES, en UNE ligne (29 oct.) ──────────────────────
    Julien : « que ce ne soit pas un bouton comme ça, j'aime pas avec tout le
    texte, c'est moche ». Une ligne : le nom, l'état en trois mots, ⓘ, et

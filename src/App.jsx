@@ -18701,6 +18701,50 @@ function LigneVenteCompacte({ photo, photoNoeud = null, titre, sous = '', etat, 
     fermer.current?.focus({preventScroll:true});
   },[ouvert,panneau]);
   const close=()=>{setOuvert(false);declencheur.current?.focus({preventScroll:true});};
+  // (1er nov.) LE TIROIR SE CONDUIT COMME UNE FEUILLE. Ouvert, il gardait la
+  //  main sur l'écran : sur téléphone la feuille du bas couvrait les filtres
+  //  (« À expédier ») et un toucher au-dessus ne faisait rien d'autre que passer
+  //  (banc `compact` : « un tiroir intercepte le clic »). Désormais :
+  //   · un toucher sur la PAGE, hors du tiroir, le referme ET atteint sa cible
+  //     (rien n'est empêché) — jamais un toucher dans le tiroir, sur sa propre
+  //     ligne (elle bascule d'elle-même), ni dans une autre feuille ou une
+  //     confirmation ouverte par-dessus (portail, `role="dialog"`) ;
+  //   · au téléphone, la ligne ouverte remonte AU-DESSUS de la feuille (une
+  //     marge de la hauteur de la feuille est réservée au bas de la page le
+  //     temps qu'elle est ouverte) : la vente qu'on lit et les filtres restent
+  //     visibles et touchables.
+  React.useEffect(()=>{
+    if(!ouvert)return undefined;
+    const racine=document.documentElement;
+    const dehors=(e)=>{
+      const t=e.target;if(!t||typeof t.closest!=='function')return;
+      const tiroir=document.getElementById(panneau);
+      if(tiroir&&tiroir.contains(t))return;
+      if(declencheur.current&&declencheur.current.contains(t))return;
+      if(t.closest('.vrm-ledger-drawer-host,[role="dialog"],[role="alertdialog"],[aria-modal="true"]'))return;
+      if(!t.closest('.vrm-app-shell'))return;
+      setOuvert(false);
+    };
+    document.addEventListener('pointerdown',dehors,true);
+    let posee=false;
+    const raf=requestAnimationFrame(()=>{
+      try{
+        if(!window.matchMedia('(max-width: 767px)').matches)return;
+        const tiroir=document.getElementById(panneau);const ligne=declencheur.current&&declencheur.current.closest('[data-ligne-ouverte]');
+        if(!tiroir||!ligne)return;
+        const haut=tiroir.getBoundingClientRect().top,r=ligne.getBoundingClientRect();
+        const main=ligne.closest('.vrm-main');const z=(main&&typeof main.currentCSSZoom==='number'&&main.currentCSSZoom>0)?main.currentCSSZoom:1;
+        racine.style.setProperty('--vrm-feuille-vente',Math.ceil((window.innerHeight-haut)/z)+'px');racine.setAttribute('data-feuille-vente',panneau);posee=true;
+        const depasse=Math.min(r.bottom,r.top+declencheur.current.getBoundingClientRect().height)-(haut-12);
+        if(depasse<=0)return;
+        let defile=ligne.parentElement;
+        while(defile&&defile!==document.body){const cs=getComputedStyle(defile);if(/(auto|scroll)/.test(cs.overflowY)&&defile.scrollHeight>defile.clientHeight)break;defile=defile.parentElement;}
+        if(!defile||defile===document.body)defile=document.scrollingElement||racine;
+        defile.scrollBy({top:depasse,behavior:'auto'});
+      }catch(_){}
+    });
+    return()=>{document.removeEventListener('pointerdown',dehors,true);cancelAnimationFrame(raf);if(posee&&racine.getAttribute('data-feuille-vente')===panneau){racine.removeAttribute('data-feuille-vente');racine.style.removeProperty('--vrm-feuille-vente');}};
+  },[ouvert,panneau]);
   // ⚠️ LE TIROIR N'EST MONTÉ QU'À SA PREMIÈRE OUVERTURE, PUIS GARDÉ (31 oct.).
   //    Depuis le 21 oct., chaque ligne montait d'avance son tiroir complet
   //    (photo, coûts, bordereau, facture…), même fermé : c'était l'essentiel du
@@ -38136,6 +38180,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const [linkPickFor, setLinkPickFor] = useState(null); // bordereau en cours de liaison manuelle
   const [linkSearch, setLinkSearch] = useState('');
   const [passportFor, setPassportFor] = useState(null); // { it, e, num } → modale « Passeport de la paire »
+  // (1er nov.) Téléphone : les fiches dont « Plus d'actions » est ouvert (par id d'annonce).
+  const [fichesOuvertes, setFichesOuvertes] = useState(() => new Set());
   // ── Atelier de republication ──────────────────────────────────────────────
   // Brouillons de nouvelles versions d'annonces : clé = id d'annonce wardrobe,
   // valeur = { title, desc, price, versions:[{title,desc,price,at,scoreBefore,scoreAfter}], updatedAt }.
@@ -50262,8 +50308,19 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             const prepaEtat = etatPrepaLbc(item, num);
             const prepa = prepaEtat && (prepaEtat.code === 'partielle' || prepaEtat.code !== annStats.prepaCommun) ? prepaEtat.texte : null;
             const tailleHorsTitre = it.size && !tailleDansTitre(it.title, it.size) ? it.size : '';
+            // (1er nov., Julien : « trop de cases empilées sous la photo » — maquette Vitrine)
+            // AU TÉLÉPHONE la fiche se lit : photo + N°, nom + taille, prix, une ligne
+            // discrète (état · vues · favoris · âge). Le prix d'achat MANQUANT reste à la
+            // vue (le seul geste ambre, §7) ; tout le reste — l'état en jauge, mini,
+            // refuse, boost, marge, l'achat relié, le stock, la file Leboncoin, Relier,
+            // Passeport, Marquer vendue — passe sous « Plus d'actions ». RIEN n'est
+            // supprimé : les MÊMES éléments, les mêmes écritures, les mêmes data-*,
+            // seulement repliés (styles-annonces-fiche.css). L'ordinateur ne change pas.
+            const ouverte = fichesOuvertes.has(String(it.id));
+            const idRepli = `fiche-plus-${it._acc.vinted_user_id}-${it.id}`;
+            const achatConnu = achat!=null && !isNaN(achat);
             return (
-              <div className="vrm-ann-card vrm-fiche" key={it._acc.vinted_user_id+'_'+it.id} data-carte-annonce={it.id} data-fiche="29oct" style={{borderRadius:12,background:C.card,border:`1px solid ${soldBord?C.warn:C.border}`,boxShadow:C.shadow||'none',display:'flex',flexDirection:'column',overflow:'hidden',...(estFloute(it)?STYLE_FLOU:null)}}>
+              <div className="vrm-ann-card vrm-fiche" key={it._acc.vinted_user_id+'_'+it.id} data-carte-annonce={it.id} data-fiche="29oct" data-fiche-ouverte={ouverte?'1':'0'} style={{borderRadius:12,background:C.card,border:`1px solid ${soldBord?C.warn:C.border}`,boxShadow:C.shadow||'none',display:'flex',flexDirection:'column',overflow:'hidden',...(estFloute(it)?STYLE_FLOU:null)}}>
                 <div className="vrm-ann-overview" style={{display:'flex',flexDirection:'column',position:'relative'}}>
                   <a className="vrm-fiche-photo" data-fiche-photo href={it.url||undefined} target="_blank" rel="noreferrer" title="Ouvrir l'annonce sur Vinted" style={{display:'flex',alignItems:'center',justifyContent:'center',position:'relative',background:C.bg}}>
                     {it.photo?<PhotoVinted src={it.photo} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<Icon name="image" size={28} style={{color:C.muted,opacity:.55}}/>}
@@ -50289,7 +50346,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       <div className="vrm-fiche-cell vrm-fiche-etat" data-fiche-etat style={cell}>
                         <JaugeEtat statut={it.condition} lib={<span style={lib}>État</span>}/>
                       </div>
-                      <div className="vrm-fiche-cell vrm-fiche-achat" data-fiche-achat={achat!=null&&!isNaN(achat)?'connu':'inconnu'} style={cell}>
+                      <div className="vrm-fiche-cell vrm-fiche-achat" data-fiche-achat={achatConnu?'connu':'inconnu'} style={cell}>
                         <span className="vrm-fiche-etat-haut"><span style={lib}>Prix d'achat</span><Icon name="pencil" size={12} style={{color:C.muted,flexShrink:0}}/></span>
                         <EnLigne data="achat" value={buy} onCommit={v=>updatePair(item,{buyPrice:v,buyFromId:null,buyFrom:null})} inputMode="decimal" placeholder={achat!=null&&!isNaN(achat)?String(achat):'€'} largeur={72}
                           titre="Prix d'achat — cliquer pour le saisir" rendu={<span style={{...valeur,fontSize:15}}>{achat!=null&&!isNaN(achat)?prixCourt(achat):'—'}</span>}/>
@@ -50319,6 +50376,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     </div>
                     <div data-etat-ligne style={{fontSize:12,color:C.muted,display:'flex',alignItems:'center',flexWrap:'wrap',gap:'4px 12px',minWidth:0}}>
                       <span data-stats-annonce style={{display:'inline-flex',flexWrap:'wrap',alignItems:'center',gap:'2px 12px'}}>
+                        {it.condition ? <span className="vrm-fiche-etat-court" data-etat-court="">{String(it.condition)}</span> : null}
                         {it.views!=null && <span style={{display:'inline-flex',alignItems:'center',gap:4}}><Icon name="eye" size={13}/>{it.views}</span>}
                         {it.favourites!=null && <span style={{display:'inline-flex',alignItems:'center',gap:4}}><Icon name="heart" size={13}/>{it.favourites}</span>}
                         {age!=null && <span title={`En ligne depuis ${age} jours`} style={{color:sleeps?C.warn:C.muted,fontWeight:sleeps?600:400}}>{age} j{sleeps?' · dort':''}</span>}
@@ -50333,11 +50391,16 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       </span>
                     </div>
                     {soldBord && <div title="Un bordereau d'envoi a été reçu pour cet article : il est vendu. Il disparaîtra des annonces à la prochaine mise à jour Vinted." style={{fontSize:12,fontWeight:600,color:C.warn}}>Vendue — bordereau reçu</div>}
+                    {/* Téléphone seulement (caché sur ordinateur, où tout reste à la vue). */}
+                    <button type="button" className="vrm-fiche-plus-bouton" data-fiche-plus-bouton="" aria-expanded={ouverte} aria-controls={idRepli}
+                      onClick={()=>setFichesOuvertes(x=>{ const n=new Set(x); const k=String(it.id); if(n.has(k)) n.delete(k); else n.add(k); return n; })}>
+                      <span>{ouverte ? 'Moins d’actions' : 'Plus d’actions'}</span><Icon name="chevron" size={14} style={{transform:ouverte?'rotate(-90deg)':'rotate(90deg)',transition:'transform .15s'}}/>
+                    </button>
                   </div>
                 </div>
                 {/* CE QUI ÉTAIT DANS « ⋯ Gérer l'annonce », À LA VUE (29 oct.) : l'achat
                     relié, le stock, Leboncoin (la file et sa préparation), les gestes. */}
-                <div className="vrm-fiche-plus" data-fiche-plus style={{display:'flex',flexDirection:'column',gap:8,borderTop:`1px solid ${C.border}`}}>
+                <div className="vrm-fiche-plus" id={idRepli} data-fiche-plus style={{display:'flex',flexDirection:'column',gap:8,borderTop:`1px solid ${C.border}`}}>
                   <AchatRelie entry={e} numero={num}/>
                   <div className="vrm-fiche-gestes" data-fiche-gestes style={{display:'flex',flexWrap:'wrap',alignItems:'center',gap:6}}>
                     {num && (
@@ -50840,7 +50903,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           return (
             <div data-colis-recap={tot} data-colis-recap-vinted={aPoster.length} data-colis-recap-ebay={colisEb === undefined ? 'encours' : colisEb === null ? 'passu' : String(nEb)} className="vrm-colis-recap" style={{position:'relative',display:'flex',gap:12,alignItems:'flex-start',flexWrap:'wrap',background:C.card,border:`1px solid ${C.border}`,borderRadius:12,padding:'18px',marginBottom:16,overflow:'hidden',boxShadow:C.shadow||'none'}}>
               <div className="vrm-colis-recap-tete" style={{display:'flex',alignItems:'center',gap:16,flexWrap:'wrap',flex:'1 1 190px',minWidth:0}}>
-                <div style={{flex:1,minWidth:180}}>
+                {/* (1er nov.) LES COLONNES DU HAUT DISENT DÉJÀ CES NOMBRES (Prêts · En attente),
+                    §7 : « le même nombre ne s'écrit jamais deux fois sur un écran ». Le récapitulatif
+                    (même règle, mêmes « au moins » et « pas su ») reste dit au lecteur d'écran et lu
+                    par les bancs, sans s'afficher ; ce qui n'existe qu'ici (eBay, urgence, boutons,
+                    imprimante, lot) reste visible. */}
+                <div className="vrm-colis-recap-texte" style={{flex:1,minWidth:0}}>
+                  <div className="vrm-lu-seulement" role="status" data-colis-recap-texte="">
                   <div style={{display:'flex',alignItems:'baseline',gap:10,flexWrap:'wrap'}}>
                     {tot>0 && <span className="vrm-display" style={{fontSize:34,fontWeight:800,color:C.text,letterSpacing:'-.035em',lineHeight:1,fontVariantNumeric:'tabular-nums'}}>{colisEb === null ? 'au moins ' : ''}{tot}</span>}
                     <span style={{fontSize:15,fontWeight:600,color:C.text}}>{tot>0 ? 'colis à envoyer' : (sales.error && !(sales.items||[]).length) ? 'Colis à envoyer : pas encore lus' : colisEb === null ? 'Aucun colis Vinted à envoyer' : 'Aucun colis à envoyer'}</span>
@@ -50850,9 +50919,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       ? (!lectureComplete && avecPdf.length===0) ? 'Je lis encore tes bordereaux…'
                       : `${lectureComplete?'':'au moins '}${avecPdf.length} bordereau${avecPdf.length>1?'x':''} prêt${avecPdf.length>1?'s':''} à imprimer${lectureComplete && aPoster.length-avecPdf.length>0 && !(emailBordsKO && emailBords===null)?` · ${aPoster.length-avecPdf.length} en attente de bordereau`:''}${proNb>0?` · ${proNb} avec facture (pro)`:''}${lectureComplete?'':' — je n’ai pas encore pu lire tous tes bordereaux'}`
                       : nEb ? '' : (sales.error && !(sales.items||[]).length) ? 'Tes ventes Vinted n\'ont pas pu être lues : « aucun » n\'est pas su (voir dessous).' : 'Vinted ne te demande aucun envoi en ce moment.'}
-                    {nEb>0 && <span data-colis-recap-ebay-ligne="">{aPoster.length>0?' · ':''}{nEb} vente{nEb>1?'s':''} eBay — l'étiquette se prend dans eBay (ci-dessous)</span>}
+                    {nEb>0 && <span>{aPoster.length>0?' · ':''}{nEb} vente{nEb>1?'s':''} eBay</span>}
                     {colisEb === null && <span data-colis-recap-ebay-ligne="passu">{tot>0?' · ':''}ventes eBay pas lues pour l'instant</span>}
                   </div>
+                  </div>
+                  {/* Ce que les colonnes ne disent pas : OÙ se prend l'étiquette eBay (sans le nombre). */}
+                  {nEb>0 && <div data-colis-recap-ebay-ligne="" style={{fontSize:12.5,color:C.muted,lineHeight:1.45}}>Ventes eBay : l'étiquette se prend dans eBay (ci-dessous).</div>}
                   {/* ⚠️ L'URGENCE EST ÉCRITE ICI QUAND ELLE CONCERNE TOUS LES
                       COLIS. Le bandeau rouge juste en dessous ne compte que
                       l'urgent : quand TOUS les colis sont en retard, il
@@ -51253,7 +51325,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 return (
                   <button type="button" data-colis-stock={nums.length} onClick={() => { DEMANDE_STOCK_CHERCHE.nums = nums; DEMANDE_STOCK_CHERCHE.at = Date.now(); onNav && onNav('garage'); }}
                     style={{alignSelf:'flex-start',display:'inline-flex',alignItems:'center',gap:8,border:`1px solid ${C.border}`,borderRadius:10,background:C.card,color:C.text,padding:'0 14px',minHeight:44,fontSize:13.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>
-                    <Icon name="home" size={16}/>Où sont ces {nums.length} article{nums.length>1?'s':''} dans le stock
+                    <Icon name="home" size={16}/>{/* (1er nov.) sans le nombre : c'est celui des colonnes (§7) */}Où sont {nums.length>1?'ces articles':'cet article'} dans le stock
                   </button>
                 );
               })()}
@@ -51301,7 +51373,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   <React.Fragment key={e.key}>
                   {ouvreGrp && (
                     <div data-groupe={grp} className="vrm-colis-groupe" style={{gridColumn:'1 / -1',display:'flex',flexDirection:'column',gap:4,padding:ix===0?'0 2px 2px':'18px 2px 2px'}}>
-                      <span style={{fontSize:11,fontWeight:600,letterSpacing:'.07em',textTransform:'uppercase',color:C.muted}}>{titreGrp} <span style={{color:C.text,fontVariantNumeric:'tabular-nums'}}>· {nbParGroupe[grp]}</span></span>
+                      <span style={{fontSize:11,fontWeight:600,letterSpacing:'.07em',textTransform:'uppercase',color:C.muted}}>{titreGrp}</span>{/* (1er nov.) son nombre est celui de sa colonne, en haut (§7) : pas redit. */}
                       {sousGrp && <span className="vrm-aide" style={{fontSize:12,color:C.muted,lineHeight:1.45,maxWidth:640}}>{sousGrp}</span>}
                     </div>
                   )}
@@ -51480,7 +51552,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           return (
             <details data-colis-partis={partis.length} className="vrm-colis-partis vrm-repli" style={{marginTop:18,border:`1px solid ${C.border}`,borderRadius:12,background:C.card,padding:'0 14px 4px'}}>
               <summary style={{lineHeight:1.4,paddingBlock:12}}>
-                Partis — Vinted suit le colis · {partis.length}
+                Partis — Vinted suit le colis
                 <span style={{fontWeight:500,color:C.muted}}> ({morceaux.join(' · ')})</span>
               </summary>
               <div style={{fontSize:11.5,color:C.muted,margin:'6px 0 8px',lineHeight:1.45}}>Rien à faire ici : ces colis sont chez le transporteur ou chez l'acheteur. Ils quittent cette liste quand Vinted finalise la vente.{retours > 0 ? ' Un retour se vérifie : l\'article doit te revenir.' : ''}</div>
@@ -60604,10 +60676,38 @@ function AppCoeur() {
   React.useEffect(() => {
     const el = ileRef.current;
     if (!ordi || !el || typeof ResizeObserver === 'undefined') { try { document.documentElement.style.removeProperty('--vrm-ile'); } catch (_) {} return undefined; }
-    const poser = () => { try { document.documentElement.style.setProperty('--vrm-ile', Math.ceil(el.getBoundingClientRect().width + 16) + 'px'); } catch (_) {} };
+    // (1er nov.) La place se mesure DEPUIS LE BORD DROIT DU CONTENU jusqu'au bord
+    //  gauche de l'île, et se traduit dans les unités de `.vrm-main` : avec le
+    //  réglage « Taille » (zoom sur <html>), `getBoundingClientRect` rend des
+    //  pixels zoomés alors que `padding-right` s'applique avant le zoom — la
+    //  réserve tombait à 65 % et le filtre « eBay » de la barre du haut passait
+    //  sous l'île (revendeurs, 1512 px). Les 24 px qui séparent l'île du bord
+    //  n'étaient pas comptés non plus.
+    const poser = () => {
+      try {
+        const r = el.getBoundingClientRect();
+        const main = document.querySelector('.vrm-main');
+        let besoin = r.width + 16;
+        if (main && r.width > 0) {
+          const z = (typeof main.currentCSSZoom === 'number' && main.currentCSSZoom > 0) ? main.currentCSSZoom : 1;
+          const m = main.getBoundingClientRect();
+          const pd = parseFloat(getComputedStyle(main).paddingRight) || 0;
+          const bordContenu = m.right - pd * z;
+          besoin = Math.max(r.width / z + 16, (bordContenu - r.left) / z + 12);
+        }
+        const v = Math.ceil(besoin) + 'px';
+        // Une écriture identique ne repart pas dans l'observateur ci-dessous.
+        if (document.documentElement.style.getPropertyValue('--vrm-ile') !== v) document.documentElement.style.setProperty('--vrm-ile', v);
+      } catch (_) {}
+    };
     poser();
     const ro = new ResizeObserver(poser); ro.observe(el);
-    return () => ro.disconnect();
+    // Le zoom se pose sur <html> (attribut style) et la fenêtre change de taille :
+    // ni l'un ni l'autre ne redimensionne l'île dans ses propres unités.
+    const mo = typeof MutationObserver !== 'undefined' ? new MutationObserver(poser) : null;
+    if (mo) mo.observe(document.documentElement, { attributes: true, attributeFilter: ['style', 'class'] });
+    window.addEventListener('resize', poser);
+    return () => { ro.disconnect(); if (mo) mo.disconnect(); window.removeEventListener('resize', poser); };
   }, [ordi]);
   // (16 oct.) GRAND TITRE FAÇON iOS. Le titre large vit dans l'écran (son
   // `ScreenHead`, l'en-tête de plateforme) ; dès qu'on a défilé au-delà, l'en-tête
