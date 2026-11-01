@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.299.0';
+const CODE_VERSION = '5.307.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -9456,8 +9456,26 @@ async function repubAujourdhui(uid) {
 async function noterRepubJour(uid) {
   try { const m = (await chrome.storage.local.get('vrmRepubJour')).vrmRepubJour || {}; const t = Date.now(); m[uid] = (Array.isArray(m[uid]) ? m[uid] : []).filter((x) => typeof x === 'number' && t - x < 86400000).concat(t); await chrome.storage.local.set({ vrmRepubJour: m }); } catch (_) {}
 }
+// ⚠️⚠️ 1er nov. (audit X6) — LE QUOTA DU JOUR EST CELUI DU COMPTE, PAS DE CE CHROME.
+// Le compteur local (`vrmRepubJour`) ne voit que CE navigateur : deux Chrome sur le
+// même compte Vinted faisaient 100 republications « sous 50 ». La base VRM sait ce
+// qui a été republié sur le compte, quel que soit le Chrome : chaque republication
+// note `versBrouillon.supprimeLe` sur SA ligne `coffre_{uid}_{id}`. On compte les
+// deux et on garde le plus grand. Base muette ⇒ on REFUSE (rien n'a été touché) :
+// republier écrit de toute façon dans la base avant tout geste.
+const QUOTA_BASE_PAS_LU = 'quota-base';
+async function republieesEnBase(uid) {
+  const depuis = new Date(Date.now() - 86400000).toISOString();
+  let rows; try { rows = await sbGet(`app_data?id=like.coffre_${uid}_*&data->versBrouillon->>supprimeLe=gte.${encodeURIComponent(depuis)}&select=s:data->versBrouillon->>supprimeLe`); } catch (_) { rows = null; }
+  if (!Array.isArray(rows)) return null;
+  const t = Date.now();
+  return rows.map((r) => Date.parse((r && r.s) || '')).filter((x) => Number.isFinite(x) && t - x < 86400000);
+}
 async function gardeJourRepub(uid) {
-  const l = await repubAujourdhui(uid);
+  const loc = await repubAujourdhui(uid);
+  const base = await republieesEnBase(uid);
+  if (base === null) return { code: QUOTA_BASE_PAS_LU, raison: "la base VRM n'a pas répondu : je ne peux pas compter les republications du jour sur ce compte (tous tes Chrome) — rien n'a été touché, réessaie dans un moment." };
+  const l = base.length > loc.length ? base : loc;
   if (l.length < REPUB_PAR_JOUR) return null;
   const h = Math.max(1, Math.ceil((Math.min(...l) + 86400000 - Date.now()) / 3600000));
   return { code: 'quota-jour', raison: `${REPUB_PAR_JOUR} paires republiées sur ce compte ces dernières 24 h — c'est la limite de VRM pour ne pas te faire repérer. La prochaine dans environ ${h} h. Rien n'a été touché.` };
@@ -10112,6 +10130,15 @@ async function recreerVinted(msg) {
   // Une recréation dont l'issue est INCONNUE (création partie sans réponse) bloque
   // la suivante de la MÊME annonce : la relancer créerait une seconde copie.
   const verrou = await lireVerrouRecreer(id);
+  // ⚠️ 1er nov. (audit X6) — LE VERROU EST AUSSI EN BASE, sur la ligne de l'annonce
+  // (`coffre_{uid}_{id}.versBrouillon`, relue juste au-dessus, base muette ⇒ refus) :
+  // une republication en cours ou à l'issue incertaine dans un AUTRE Chrome du même
+  // compte bloque celle-ci 30 min (sinon un second brouillon, puis une seconde
+  // suppression). Le verrou local reste (il couvre la même chose dans CE Chrome).
+  const vb = sauve && sauve.versBrouillon && typeof sauve.versBrouillon === 'object' ? sauve.versBrouillon : null;
+  const tVb = vb ? Date.parse(vb.majAt || vb.at || '') : NaN;
+  const vbEnVol = !!(vb && Number.isFinite(tVb) && Date.now() - tVb < RECREER_VERROU_MS && (vb.etat === 'enregistre' || vb.etat === 'brouillon-range' || vb.etat === 'mise-en-ligne-incertaine' || /incertaine|flou/.test(String(vb.cause || ''))));
+  if (!verrou && vbEnVol) return { accepte: false, code: 'recreer-incertaine', raison: `une republication de cette annonce est en cours ou restée sans réponse claire il y a ${Math.max(1, Math.round((Date.now() - tVb) / 60000))} min (peut-être depuis un autre Chrome) — regarde ton dressing et tes brouillons Vinted avant de réessayer. Rien n'a été touché.` };
   if (verrou) return { accepte: false, code: 'recreer-incertaine', raison: `une recréation de cette annonce est partie il y a ${Math.max(1, Math.round((Date.now() - verrou) / 60000))} min sans réponse claire de Vinted — regarde ton dressing avant de réessayer (rien n'a été touché cette fois)` };
   // (29 oct., « il ne doit pas y avoir d'erreur possible ») La TAILLE est vérifiée
   // AVANT de toucher à l'annonce : sinon Vinted la refuse APRÈS la suppression.
@@ -10141,9 +10168,11 @@ async function recreerVinted(msg) {
   //    paires étaient passées entre-temps — l'ancienne annonce déjà supprimée, il ne
   //    restait qu'un brouillon. Plus de place pour toute la paire ⇒ rien ne part.
   const nA = msg.versBrouillon === true ? 2 : 3;
-  const tRes = Date.now();
-  const stop = await gardeStricte(uid, acc, { reserve: RESERVE_GESTES, actions: nA });
+  const recu = {};
+  const tAvant = Date.now();
+  const stop = await gardeStricte(uid, acc, { reserve: RESERVE_GESTES, actions: nA, recu });
   if (stop) return { accepte: false, code: stop.code, raison: stop.error };
+  const tRes = Number(recu.at) || tAvant;     // l'horodatage EXACT de SES places (X8)
   let envoyes = 0, confie = false;
   return await avecVinted(async () => { try {
     suiviRepub(id);
@@ -10235,6 +10264,10 @@ async function recreerVinted(msg) {
     if (suppIncertaine && !versB) {
       noterDiag(`republier_suppression_incertaine_${(rdV && rdV.status) || 0}`);
       await majVersBrouillon(uid, id, { etat: 'a-publier', draftId, supprime: false, cause: 'suppression-incertaine' });
+      // ⚠️ 1er nov. (audit X9) : l'ancienne est PEUT-ÊTRE encore en ligne — 30 min sans
+      // nouvelle recréation de CETTE annonce (sinon un second brouillon, puis une seconde
+      // suppression). « Brouillons → en ligne » reste ouvert pour le brouillon rangé.
+      await poserVerrouRecreer(id);
       return { refaire: true, accepte: true, etape: 'incertain', draftId, raison: "le brouillon est rangé sur Vinted, mais Vinted n'a pas répondu clairement à la suppression de l'ancienne annonce : elle est PEUT-ÊTRE encore en ligne. VRM s'arrête là (jamais deux fois la même paire en ligne) — regarde ton dressing ; si elle n'y est plus, « Brouillons → en ligne » met le brouillon en ligne." };
     }
     if (!suppIncertaine && !rdV.ok) {
@@ -10245,9 +10278,9 @@ async function recreerVinted(msg) {
     await noterRepubJour(uid);
     if (suppIncertaine) noterDiag(`versbrouillon_suppression_incertaine_${(rdV && rdV.status) || 0}`);
     else { try { await noterSuppressionCompte(uid, id, new Date().toISOString()); } catch (_) {} }
-    await majVersBrouillon(uid, id, { etat: versB ? 'fait' : 'brouillon-range', draftId, supprime: !suppIncertaine, supprimeLe: suppIncertaine ? null : new Date().toISOString() });
+    await majVersBrouillon(uid, id, { etat: versB ? 'fait' : 'brouillon-range', draftId, supprime: !suppIncertaine, supprimeLe: suppIncertaine ? null : new Date().toISOString(), ...(suppIncertaine ? { cause: 'suppression-incertaine' } : {}) });
     if (versB) {
-      if (suppIncertaine) return { accepte: true, etape: 'double', draftId, raison: "le brouillon est rangé sur Vinted. Vinted n'a pas répondu clairement à la suppression : l'annonce est PEUT-ÊTRE encore en ligne — regarde ton dressing." };
+      if (suppIncertaine) { await poserVerrouRecreer(id); return { accepte: true, etape: 'double', draftId, raison: "le brouillon est rangé sur Vinted. Vinted n'a pas répondu clairement à la suppression : l'annonce est PEUT-ÊTRE encore en ligne — regarde ton dressing." }; }
       noterDiag('versbrouillon_ok');
       return { accepte: true, etape: 'fait', draftId, brouillon: true, nouveau: prix, nouveauTitre: titre };
     }
@@ -10466,6 +10499,13 @@ function unCompteurALaFois(fn) {
 // (29 oct., revue) Les gestes RÉSERVÉS par une paire qui s'arrête AVANT de les envoyer
 // (onglet absent, annonce disparue, photo illisible, brouillon refusé…) sont RENDUS :
 // sinon chaque essai raté brûlait 3 des actions de l'heure sans rien envoyer.
+// ⚠️ 1er nov. (audit X8) : on rend SES places, pas les plus récentes. Avant, les n
+// dernières entrées ≥ `depuis` partaient — celles d'AUTRES gestes faits pendant la
+// paire : le total restait juste, mais une place se libérait plus tard (ou plus tôt)
+// que la vraie. `depuis` est désormais l'horodatage EXACT de la réservation (rendu par
+// `compterAction` / `gardeStricte(…, { recu })`) : on retire d'abord ces entrées-là ;
+// un horodatage d'avant la 5.307 (pris juste avant la réservation, pas exact) retombe
+// sur les PLUS ANCIENNES entrées ≥ `depuis` — les siennes, réservées juste après.
 function rendreActions(uid, depuis, n) {
   return unCompteurALaFois(async () => {
     try {
@@ -10473,7 +10513,9 @@ function rendreActions(uid, depuis, n) {
       const cur = (await chrome.storage.local.get(cle))[cle] || {};
       const l = (cur[uid] || []).slice().sort((a, b) => a - b);
       let k = Math.max(0, Math.floor(Number(n) || 0));
-      for (let i = l.length - 1; i >= 0 && k > 0; i--) if (l[i] >= depuis) { l.splice(i, 1); k--; }
+      const d = Number(depuis) || 0;
+      for (let i = 0; i < l.length && k > 0;) { if (l[i] === d) { l.splice(i, 1); k--; } else i++; }
+      for (let i = 0; i < l.length && k > 0;) { if (l[i] >= d) { l.splice(i, 1); k--; } else i++; }
       cur[uid] = l; await chrome.storage.local.set({ [cle]: cur });
     } catch (_) {}
   });
@@ -10496,7 +10538,7 @@ async function compterActionUn(uid, plafond, n = 1) {
     if (list.length + k > max) return { ok: false, n: list.length, resteMs: Math.max(0, list[Math.max(0, list.length + k - 1 - max)] + 3600000 - t) };
     for (let i = 0; i < k; i++) list.push(t); cur[uid] = list;
     await chrome.storage.local.set({ [cle]: cur });
-    return { ok: true, n: list.length };
+    return { ok: true, n: list.length, at: t };
   } catch (_) { return { ok: true, n: 0 }; }
 }
 // ⚠️⚠️ UNE RÉSERVE POUR LES GESTES SUR CLIC (revue du 9 octobre). Un seul clic
@@ -10685,6 +10727,8 @@ async function gardeStricte(uid, acc, opts = {}) {
   const reserve = Math.max(0, Number(opts.reserve) || 0);
   const nA = Math.max(1, Math.floor(Number(opts.actions) || 1));
   const c = await compterAction(String(uid), ACTIONS_MAX_HEURE - reserve, nA);
+  // `recu` : l'horodatage EXACT des places prises, pour les rendre (X8).
+  if (c.ok && opts.recu && typeof opts.recu === 'object') opts.recu.at = c.at || null;
   if (!c.ok) {
     const min = Math.max(1, Math.ceil(Number(c.resteMs || 0) / 60000));
     if (reserve && c.n < ACTIONS_MAX_HEURE) {
@@ -10775,8 +10819,29 @@ async function executerMessageFavori(uid,acc,body){
   // ouvert sur ce compte, RIEN ne part.
   const pg=await pageVintedPour(acc);
   if(pg.refus)return rep('refuse',0,'onglet_vinted');
+  // L'offre native de Vinted, si une réduction est choisie.
+  // 5.281 : `offre` {mode:'pct'|'euros'|'prix', valeur, arrondi} ; sinon l'ancien `pourcentage`.
+  const pct=Number(body.pourcentage);
+  const offre=body.offre&&typeof body.offre==='object'?body.offre:Number.isInteger(pct)&&pct>=1&&pct<=99?{mode:'pct',valeur:pct,arrondi:false}:null;
+  // ⚠️⚠️ 1er nov. (audit X3) — UN FAVORI, C'EST 2 OU 3 ÉCRITURES CHEZ VINTED
+  // (conversation, offre, message), et elles sont TOUTES comptées, RÉSERVÉES d'un
+  // coup AVANT la première, sous la réserve des gestes sur clic (`RESERVE_GESTES` :
+  // la file, automatique, s'arrête à 45 comme les bordereaux). Avant : UNE action
+  // comptée, APRÈS la création de la conversation — une file de 50 favoris faisait
+  // 150 écritures « sous 50/h », la 50ᵉ place était prise (plus de réponse possible
+  // à un acheteur), et plafond plein la conversation partait QUAND MÊME. Les places
+  // qui ne servent pas (arrêt avant l'écriture) sont RENDUES, les siennes (X8).
+  const nA=offre?3:2;
+  const recu={};
+  const arretPlafond=await gardeStricte(uid,acc,{reserve:RESERVE_GESTES,actions:nA,recu});
+  if(arretPlafond)return rep('refuse',0,['plafond','plafond-bordereaux'].includes(arretPlafond.code)?'quota_extension':arretPlafond.code==='vinted-pause'?'pause_vinted':arretPlafond.code==='vinted-autre'?'compte_vinted_different':arretPlafond.code==='vinted-absent'?'compte_vinted_absent':'vinted_refus');
+  const tRes=Number(recu.at)||0;
+  let ecrits=0;
+  const partie=x=>!(x&&(x.sansPage||x.pause));
+  try{
   etape('conversation');
   const creation=await vintedPage(acc,'POST','/api/v2/conversations',{initiator:body.initiator,item_id:body.itemId,opposite_user_id:body.recipientId},{timeoutMs:12000});
+  if(partie(creation))ecrits++;
   if(creation.sansPage)return rep('refuse',0,'onglet_vinted');
   if(creation.pause)return rep('refuse',0,'pause_vinted');
   if(!creation.ok)return rep(creation.status>=400&&creation.status<500?'refuse':'incertain',creation.status);
@@ -10812,22 +10877,27 @@ async function executerMessageFavori(uid,acc,body){
     if(t.ok&&artTx&&artTx!==body.itemId)return rep('refuse',t.status,'identite_non_confirmee');
     const pr=prixDeTransaction(tr);if(pr){prixAnnonce=pr.montant;devise=pr.devise;}
   }else noterDiag('favori_sans_transaction');
-  const arret=await gardeStricte(uid,acc); // le message (et son offre) consomment UNE action
-  if(arret)return rep('refuse');
-  // L'offre native de Vinted : seulement si une offre est choisie ET le prix lu.
-  // 5.281 : `offre` {mode:'pct'|'euros'|'prix', valeur, arrondi} ; sinon l'ancien `pourcentage`.
-  const pct=Number(body.pourcentage);
-  const offre=body.offre&&typeof body.offre==='object'?body.offre:Number.isInteger(pct)&&pct>=1&&pct<=99?{mode:'pct',valeur:pct,arrondi:false}:null;
-  if(id(tx)&&offre){
-    const prix=prixOffreFavori(prixAnnonce,offre);
-    if(prix){
-      await pauseFavori('offre');
-      if(await gardeStricte(uid,acc,{lecture:true}))return rep('refuse');
-      etape('offre');
-      const o=await vintedPage(acc,'POST',`/api/v2/transactions/${tx}/offers`,{offer:{currency:devise,price:prix}},{timeoutMs:12000});
-      if(o.sansPage)return rep('refuse',0,'onglet_vinted');
-      noterDiag(o.ok?'favori_offre_ok':'favori_offre_refusee_'+(o.status||'reseau'));
-    }else noterDiag('favori_offre_prix_inconnu');
+  // Les places de la conversation, de l'offre et du message sont réservées depuis le
+  // départ (X3) : ici on ne revérifie que le compte connecté et la pause de Vinted.
+  if(await gardeStricte(uid,acc,{lecture:true}))return rep('refuse');
+  // ⚠️⚠️ 1er nov. (audit X2) — UNE OFFRE DEMANDÉE QUI N'EST PAS FAITE ARRÊTE TOUT.
+  // Avant : Vinted refusait l'offre (422), ou son prix était illisible, et le message
+  // « je t'ai fait une offre » partait QUAND MÊME, compté « envoyé » : l'acheteuse
+  // lisait une offre qui n'existe pas. Offre refusée / prix inconnu ⇒ AUCUN message,
+  // « refusé » avec la raison ; réponse incertaine ⇒ « incertain » (jamais renvoyé).
+  if(offre){
+    const prix=id(tx)?prixOffreFavori(prixAnnonce,offre):null;
+    if(!prix){noterDiag('favori_offre_prix_inconnu');return rep('refuse',0,'offre_prix_inconnu');}
+    await pauseFavori('offre');
+    if(await gardeStricte(uid,acc,{lecture:true}))return rep('refuse');
+    etape('offre');
+    const o=await vintedPage(acc,'POST',`/api/v2/transactions/${tx}/offers`,{offer:{currency:devise,price:prix}},{timeoutMs:12000});
+    if(partie(o))ecrits++;
+    if(o.sansPage)return rep('refuse',0,'onglet_vinted');
+    if(o.pause)return rep('refuse',0,'pause_vinted');
+    const offreFaite=!!(o.ok&&(o.json?.code==null||Number(o.json.code)===0));
+    noterDiag(offreFaite?'favori_offre_ok':'favori_offre_refusee_'+(o.status||'reseau'));
+    if(!offreFaite)return (o.status>=400&&o.status<500)||(o.ok&&!offreFaite)?rep('refuse',o.status,'offre_refusee'):rep('incertain',o.status,'offre_incertaine');
   }
   // {username} = le pseudo du destinataire lu dans CE fil (vérifié plus haut) ;
   // {a|b} = une variante tirée au hasard pour ce message.
@@ -10837,6 +10907,7 @@ async function executerMessageFavori(uid,acc,body){
   if(await gardeStricte(uid,acc,{lecture:true}))return rep('refuse');
   etape('envoi');
   const r=await vintedPage(acc,'POST',`/api/v2/conversations/${convId}/replies`,{reply:{body:texteFinal,photo_temp_uuids:null,is_personal_data_sharing_check_skipped:false}},{timeoutMs:12000});
+  if(partie(r))ecrits++;
   // (29 oct., revue) Pas d'onglet, onglet hors de Vinted, ou pause : le message n'est PAS
   // parti (vérifié dans la page avant l'envoi) — un refus certain, pas « à vérifier »
   // (qui arrêtait toutes les files).
@@ -10844,6 +10915,7 @@ async function executerMessageFavori(uid,acc,body){
   if(r.pause)return rep('refuse',0,'pause_vinted');
   if(r.ok&&r.json?.code===0){etape('confirmation');return rep('envoye',r.status);}
   return rep(!r.ok&&r.status>=400&&r.status<500?'refuse':'incertain',r.status);
+  }finally{const reste=nA-ecrits;if(reste>0&&tRes)await rendreActions(String(uid),tRes,reste);}
 }
 // Mesuré sur Vintex (29 oct., 9 favoris) : création → transaction 3,2–6,0 s ;
 // transaction → offre 0,3–0,8 s ; offre → message 0,4–0,5 s. Tiré au hasard.
@@ -15030,7 +15102,7 @@ async function repondreVestiaire(msg) {
     if (!o.ok) return { accepte: false, code: o.code, raison: o.raison };
     const cpt = await compterAction('vc:' + o.compte, ACTIONS_MAX_HEURE);
     if (!cpt.ok) return { accepte: false, code: 'plafond', raison: `déjà ${ACTIONS_MAX_HEURE} actions sur ce compte Vestiaire cette heure-ci — réessaie dans ${Math.max(1, Math.ceil((cpt.resteMs || 0) / 60000))} min` };
-    const depuis = Date.now() - 5;
+    const depuis = Number(cpt.at) || (Date.now() - 5);   // SES places (X8)
     let rep = null;
     try { rep = await avecDelai(chrome.tabs.sendMessage(o.tabId, { from: 'vrm-fond', action: 'vcRepondre', conv, texte, recette, compte: o.compte }, { frameId: 0 }), 25000, null); } catch (_) { rep = null; }
     const statut = (rep && Number(rep.statut)) || 0;
@@ -15734,7 +15806,7 @@ async function pauseLbcDepuisApp(msg) {
     if (journal.length >= LBC_PAUSE_MAX_HEURE) return { accepte: false, code: 'plafond', raison: `déjà ${LBC_PAUSE_MAX_HEURE} mises en pause cette heure-ci — réessaie plus tard` };
     // L'annonce, relue EN BASE (l'app n'envoie qu'un identifiant, jamais un compte).
     const [rows, accRows] = await Promise.all([
-      sbGet(`app_data?id=eq.lbc_listings&select=a:data->items->${id}`),
+      sbGet(`app_data?id=eq.lbc_listings&select=a:data->items->"${id}"`),   // clé ENTRE GUILLEMETS : nu, PostgREST le lit comme un index de tableau (X4, comme `lireFicheAnnonce`)
       sbGet('app_data?id=eq.lbc_accounts&select=a:data->accounts'),
     ]);
     if (rows === null) return { accepte: false, code: 'lecture', raison: "la base VRM n'a pas répondu — rien n'est parti chez Leboncoin" };
@@ -15831,7 +15903,7 @@ async function supprimeLbcDepuisApp(msg) {
     if (journal.length >= LBC_SUPPRIME_MAX_HEURE) return { accepte: false, code: 'plafond', raison: `déjà ${LBC_SUPPRIME_MAX_HEURE} suppressions cette heure-ci — réessaie plus tard` };
     // L'annonce, relue EN BASE juste avant (l'app n'envoie qu'un identifiant).
     const [rows, accRows] = await Promise.all([
-      sbGet(`app_data?id=eq.lbc_listings&select=a:data->items->${id}`),
+      sbGet(`app_data?id=eq.lbc_listings&select=a:data->items->"${id}"`),   // clé ENTRE GUILLEMETS : nu, PostgREST le lit comme un index de tableau (X4, comme `lireFicheAnnonce`)
       sbGet('app_data?id=eq.lbc_accounts&select=a:data->accounts'),
     ]);
     if (rows === null) return { accepte: false, code: 'lecture', raison: "la base VRM n'a pas répondu — rien n'est parti chez Leboncoin" };

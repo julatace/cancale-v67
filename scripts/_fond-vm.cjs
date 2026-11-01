@@ -27,6 +27,8 @@
 // ════════════════════════════════════════════════════════════════════════════
 const fs = require('fs'), vm = require('vm'), path = require('path');
 const { metaVersData } = require('./bancs/_meta.cjs');
+// (1er nov., X4) Un segment numérique NU est un INDEX de tableau pour PostgREST.
+const { appliquerSegment, erreurProjection } = require('./_chemin-json.cjs');
 
 function cheminSource(argv = process.argv) {
   const i = argv.indexOf('--src');
@@ -47,7 +49,7 @@ function projette(row, select) {
     const texte = /->>[^>]*$/.test(expr);
     const parts = expr.split(/->>|->/);
     let v = parts[0] === 'data' ? row.data : row[parts[0]];
-    for (const p0 of parts.slice(1)) { const p = p0.replace(/^"(.*)"$/, '$1'); v = v == null ? undefined : v[p]; }
+    for (const p0 of parts.slice(1)) v = appliquerSegment(v, p0);
     if (texte && v != null && typeof v !== 'string') v = typeof v === 'object' ? JSON.stringify(v) : String(v);
     out[alias || parts[parts.length - 1]] = v === undefined ? null : v;
   }
@@ -58,7 +60,7 @@ function filtreOk(row, u) {
   const re = /[?&](data(?:->>?[A-Za-z_]+)+)=([^&]+)/g; let m;
   while ((m = re.exec(u))) {
     const parts = m[1].split(/->>|->/); let v = row.data;
-    for (const p of parts.slice(1)) v = v == null ? undefined : v[p];
+    for (const p of parts.slice(1)) v = appliquerSegment(v, p);
     const cond = m[2];
     if (/^eq\./.test(cond) && String(v) !== cond.slice(3)) return false;
     if (cond === 'not.is.null' && v == null) return false;
@@ -209,6 +211,7 @@ function faireFond({ src, lignes = {}, vinted = () => ({ status: 404, body: {} }
       // PostgREST lit un segment NUMÉRIQUE nu comme un index de tableau (int) : au-delà
       // de 2 147 483 647 il répond 400 (mesuré le 28 oct. sur `data->10312441750`).
       if (/->\d+/.test(sel) && (sel.match(/->(\d+)/g) || []).some((x) => Number(x.slice(2)) > 2147483647)) return rep(400, { code: '22003', message: 'value out of range for type integer' });
+      { const e400 = erreurProjection(sel); if (e400) return rep(e400.status, e400.body); }
       const eq = /[?&]id=eq\.([^&]+)/.exec(u), like = /[?&]id=like\.([^&]+)/.exec(u), dans = /[?&]id=in\.\(([^)]*)\)/.exec(u);
       const sortie = [];
       if (eq) { if (lignes[eq[1]] !== undefined) sortie.push({ id: eq[1], data: lignes[eq[1]] }); }

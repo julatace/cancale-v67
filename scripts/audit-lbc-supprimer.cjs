@@ -12,6 +12,7 @@
 // par l'extension. Le VRAI lbc-inject.js (MAIN), le VRAI lbc-relay.js (isolé)
 // et le VRAI background.js sont exécutés (vm), identifiants INVENTÉS.
 const fs = require('fs'), vm = require('vm'), path = require('path'), os = require('os');
+const CHEMIN = require(require('path').join(__dirname, '_chemin-json.cjs'));
 const { spawnSync } = require('child_process');
 const racine = path.join(__dirname, '..');
 const arg = (n, d) => { const i = process.argv.indexOf(n); return i > 0 ? process.argv[i + 1] : d; };
@@ -156,7 +157,10 @@ function fond(seed, local0, opts = {}) {
         const sel = /select=([^&]+)/.exec(u); const s = sel ? sel[1] : 'data';
         if (s === 'data') return rep(true, JSON.stringify([{ id, data: base[id] }]));
         const row = {};
-        for (const part of s.split(',')) { const [alias, chemin] = part.includes(':') ? part.split(':') : [part, part]; const ks = chemin.split('->').map((x) => x.replace(/^>/, '')); let v = { data: base[id] }; for (const k of ks) v = v == null ? v : v[k]; row[alias] = v === undefined ? null : v; }
+        // (1er nov., X4) La forme de PostgREST : un segment numérique NU est un index
+        // de tableau (NULL sur un objet, 400 au-delà d'un int) ; seul `"…"` est une clé.
+        const e400 = CHEMIN.erreurProjection(s); if (e400) return rep(false, JSON.stringify(e400.body), e400.status);
+        for (const part of s.split(',')) { const [alias, chemin] = part.includes(':') ? part.split(':') : [part, part]; const ks = chemin.split('->').map((x) => x.replace(/^>/, '')); let v = { data: base[id] }; v = v.data; if (ks[0] !== 'data') v = undefined; for (const k of ks.slice(1)) v = CHEMIN.appliquerSegment(v, k); row[alias] = v === undefined ? null : v; }
         return rep(true, JSON.stringify([row]));
       }
       return rep(true, '[]');

@@ -2031,3 +2031,20 @@ utilisé comme icône devient une icône au trait). Contrôle D de `scripts/banc
 (rouge sur 3b60a48d). Rien d'autre ne change : favoris sur SON clic, offres auto éteintes par défaut,
 prix mini à côté du N°. Récit de la passe : historique-interface-stock.md, « 1er novembre — Stock,
 Republier, Annonces ».
+
+## 1er novembre — Favoris : jamais un message qui annonce une offre absente, jamais au-delà du plafond (X2, X3, extension 5.307.0)
+
+- **X2** : une offre DEMANDÉE qui n'est pas faite ARRÊTE le favori — Vinted refuse
+  l'offre (4xx) ⇒ « refusé », raison `offre_refusee` ; prix de l'article illisible ou pas
+  de transaction ⇒ `offre_prix_inconnu` ; réponse sans statut clair (0/5xx) ⇒
+  « incertain », `offre_incertaine`. Le message (« je t'ai fait une offre ») ne part
+  PAS. Avant, il partait et le résultat était « envoyé ». Raisons ajoutées au serveur
+  (`api/_lib/favoris-file.js`) et à l'app (`RAISONS_FAVORIS`). `audit-favoris-vintex`
+  (prix illisible ⇒ C T, plus de message) mis à la nouvelle règle.
+- **X3** : un favori = 2 écritures (conversation, message) ou 3 (avec l'offre),
+  TOUTES comptées et RÉSERVÉES d'un coup AVANT la conversation, sous `RESERVE_GESTES`
+  (la file s'arrête à 45 ; une réponse à un acheteur passe encore). Plafond plein ⇒
+  RIEN n'est créé chez Vinted, raison `quota_extension`. Les places non servies sont
+  rendues (les siennes, X8).
+- Preuve : `audit-favoris-ecritures.cjs` (vrai `executerMessageFavori` dans le vm ;
+  16 rouges sur origin/main ; `--prouve` : 5 mutations attrapées).

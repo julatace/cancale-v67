@@ -6,7 +6,15 @@
 // On EXÉCUTE la vraie fonction (`confirmerNumerosAVerifier`, extraite d'App.jsx)
 // dans un `vm`, et on vérifie que les trois chemins d'impression l'appellent.
 const fs = require('fs'), path = require('path'), vm = require('vm');
-const APP = fs.readFileSync(path.join(__dirname, '..', 'src', 'App.jsx'), 'utf8');
+// (1er nov., audit X5) Une paire REPUBLIÉE (fiche de l'annonce supprimée + fiche
+// de la nouvelle qui la reprend par `recreeDe`) est UNE paire : pas de question
+// « porté par deux paires ». `--prouve` : la mutation (on recompte les fiches)
+// doit rendre l'audit rouge.
+const MUTATION = (s) => s.replace('    for (const k of Object.keys(parCle)) parCle[k] = pairesDe(parCle[k]);\n', '');
+const PROUVE = process.argv.includes('--prouve');
+const APP0 = fs.readFileSync(path.join(__dirname, '..', 'src', 'App.jsx'), 'utf8');
+const APP = PROUVE ? MUTATION(APP0) : APP0;
+if (PROUVE && APP === APP0) { console.log('❌ la mutation ne s\'applique plus (texte changé)'); process.exit(1); }
 let ko = 0;
 const dit = (c, m, d) => { if (!c) ko++; console.log(`${c ? '✅' : '❌'} ${m}${d ? ' — ' + d : ''}`); };
 const prend = (re, nom) => { const m = APP.match(re); if (!m) { dit(false, `${nom} trouvé dans App.jsx`); return ''; } return m[0]; };
@@ -50,6 +58,28 @@ const code = [
     dit((await f(['90'])) === false && demandes.length === 1 && /90/.test(demandes[0].title), 'N°90 neuf pas encore écrit sur le carton : on DEMANDE', `${demandes.length} question(s)`);
     fiches.a.reattribue.ecrit = '2026-10-20T11:00:00Z'; demandes = [];
     dit((await f(['90'])) === true && demandes.length === 0, '… « C\'est écrit » fait : aucune question');
+    // 1er nov. (X5) : la paire N°12 republiée par VRM — l'ancienne fiche (annonce
+    // supprimée) et la nouvelle qui la reprend (`recreeDe`) : UNE paire.
+    fiches = {
+      5000000001: { numero: '12', title: 'Nike Air Max 90 blanc 42', numberedAt: '2026-10-09T10:00:00Z', auto: true },
+      5000000002: { numero: '12', title: 'Nike Air Max 90 blanc 42', numberedAt: '2026-10-09T10:00:00Z', auto: true, recreeDe: '5000000001', recreeAt: '2026-10-30T10:00:00Z' },
+    };
+    demandes = []; reponse = false;
+    dit((await f(['12'])) === true && demandes.length === 0, 'N°12 republiée une fois (fiche reprise par `recreeDe`) : une paire, aucune question', `${demandes.length} question(s) ${demandes.map(d => d.title).join(' | ')}`);
+    fiches[5000000003] = { numero: '12', title: 'Nike Air Max 90 blanc 42', auto: true, recreeDe: '5000000002' };
+    demandes = [];
+    dit((await f(['12'])) === true && demandes.length === 0, 'republiée deux fois (A → B → C) : toujours une paire', `${demandes.length} question(s)`);
+    // Renumérotée pendant la panne PUIS republiée : UNE question « pas vérifié » sur UNE paire.
+    const pan = { 6000000001: { numero: '14', title: 'Samba', auto: true, numberedAt: '2026-10-15T10:00:00Z' }, 6000000002: { numero: '14', title: 'Samba', auto: true, numberedAt: '2026-10-15T10:00:00Z', recreeDe: '6000000001' } };
+    const sauve = fiches; fiches = pan; demandes = []; reponse = false;
+    dit((await f(['14'])) === false && demandes.length === 1 && /n'est pas encore vérifié/.test(demandes[0].title), 'N°14 de la panne, republiée : une seule question, au singulier (une paire)', demandes.map(d => d.title).join(' | '));
+    fiches = sauve;
+    fiches[5000000009] = { numero: '12', title: 'Nike Air Max 90 blanc 42', auto: true, numberedAt: '2026-10-25T10:00:00Z' };
+    demandes = []; reponse = false;
+    dit((await f(['12'])) === false && demandes.length === 1 && /deux paires/.test(demandes[0].title), 'la chaîne republiée + une AUTRE paire au même titre sous le N°12 : on DEMANDE', `${demandes.length} question(s)`);
+    fiches = { a: { numero: '13', title: 'X', recreeDe: '99999' }, b: { numero: '13', title: 'Y' } };
+    demandes = []; reponse = false;
+    dit((await f(['13'])) === false && demandes.length === 1, 'un `recreeDe` vers une fiche d\'un AUTRE N° ne dispense rien', `${demandes.length} question(s)`);
   }
   // Les trois chemins d'impression l'appellent, juste après la garde de version.
   const appels = (APP.match(/await confirmerNumerosAVerifier\(/g) || []).length;
