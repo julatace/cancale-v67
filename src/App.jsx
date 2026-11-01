@@ -5873,6 +5873,19 @@ const rappelUrssaf = ({ freq, now = new Date(), declare = null, ligne = null, ta
   const aNoter = yms.filter((ym) => !moisDeclare(declare, ym));
   return { text, sub, label: due.label, dueIso: `${due.dueDate.getFullYear()}-${String(due.dueDate.getMonth() + 1).padStart(2, '0')}-${String(due.dueDate.getDate()).padStart(2, '0')}`, daysLeft: due.daysLeft, ca, apayer, partiel, proche, mois: yms, aNoter };
 };
+// (1er nov.) La forme COURTE du rappel pour Ma journée (titre d'une ligne, une
+// ligne de détail) : les mêmes valeurs que `rappelUrssaf`, rien de recalculé.
+const urssafCourt = (r, text, sub) => {
+  if (!r || !r.dueIso) return {};
+  const [y, m, d] = r.dueIso.split('-').map(Number);
+  const echeance = new Date(y, m - 1, d);
+  const quoi = /^T\d/.test(String(r.label || '')) ? `du ${String(r.label).split(' ')[0]}` : (() => { const mois = String(r.label || '').split(' ')[0]; return /^[aeiouyéèh]/i.test(mois) ? `d'${mois}` : `de ${mois}`; })();
+  const quand = r.daysLeft <= 0 ? "aujourd'hui" : r.daysLeft === 1 ? 'demain' : `dans ${r.daysLeft} jours`;
+  const date = `avant le ${echeance.getDate()} ${echeance.toLocaleDateString('fr-FR', { month: 'short' })}`;
+  const montant = r.apayer == null ? 'montant : ouvre Ventes une fois' : `≈ ${Math.round(r.apayer)} € à payer${r.partiel ? ' (au moins)' : ''}`;
+  const det = `${r.proche ? quand : date} · ${montant}`;
+  return { court: `Déclarer l'URSSAF ${quoi}`, detail: det.charAt(0).toUpperCase() + det.slice(1), plein: [text, sub].filter(Boolean).join(' — ') };
+};
 // ── LE SUIVI DE SES DÉCLARATIONS URSSAF (29 octobre) ─────────────────────
 // Julien : « pour l'URSSAF fait un vrai suivi ». Une ligne par période (mois ou
 // trimestre, SON rythme), des 12 derniers mois : son échéance, son état
@@ -46820,6 +46833,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           if (pretsImpr > 0) jobs.push({ id:'emballer', n:pretsImpr, icon:'box', color:C.text,
             title:'Emballer les colis prêts', sub:`${combien} — un par un : le N°, la photo, où est la paire`,
             action:'Emballer', tab:'cat_bord', prio:1, avant:()=>{ DEMANDE_EMBALLAGE.at = Date.now(); } });
+          // (1er nov., « très répétitif ») Le même geste porté par la case « À envoyer »
+          // quand elle se voit : la ligne d'« À faire » n'est alors plus redite (§7).
+          if (pretsImpr > 0) tuiles.envoyer.emballer = { n: pretsImpr, exact, phrase: `${combien} — un par un : le N°, la photo, où est la paire` };
         }
         // (19 oct.) LES VENTES eBAY À POSTER comptent dans « À envoyer » — la
         // même règle que Colis (`colisEb`, §11). L'étiquette se prend dans eBay
@@ -46863,10 +46879,16 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             // le rouge est pour deux paires sous un même N° — ici l'ambre, comme
             // l'urgence de Colis (`data-colis-urgence`, 21 oct.).
             const verif = p.depasse && !p.retard;
+            const titreL = presses.length===1 ? `1 colis${verif?' :':''} ${quand}` : `${presses.length} colis pressés — le plus urgent${verif?' :':''} ${quand}`;
+            const subL = `${num}${o.title||''}${qui?` · ${qui}`:''}${p.limite==='estimee'?' · date estimée (vente + 7 j)':''}`;
             jobs.push({ id:'colis-limite', n:presses.length, icon:'truck', color:C.warn, urgent:!!p.depasse,
-              title: presses.length===1 ? `1 colis${verif?' :':''} ${quand}` : `${presses.length} colis pressés — le plus urgent${verif?' :':''} ${quand}`,
-              sub: `${num}${o.title||''}${qui?` · ${qui}`:''}${p.limite==='estimee'?' · date estimée (vente + 7 j)':''}`,
+              title: titreL, sub: subL,
               tab:'cat_bord', prio:p.depasse?0.15:0.6, limiteHeure:p.heure||'' });
+            // (1er nov., « très répétitif ») Pas en retard : la case « À envoyer » le porte
+            // en sous-ligne (« dont 3 aujourd'hui ») et la ligne n'est plus redite (§7).
+            // En retard (alerte de tête, jamais retirable) : la ligne reste, la case se tait.
+            const nAuj = presses.filter(t => t.depasse || t.daysLeft <= 0).length;
+            tuiles.envoyer = { ...tuiles.envoyer, presses: { n: presses.length, nAuj, urgent: !!p.depasse, heure: p.heure || '', phrase: `${titreL} — ${subL}` } };
           }
         }
         // ⚠️ « COCHÉ POSTÉ » MAIS VINTED NE L'A PAS VU PARTIR (6 octobre) : la
@@ -47011,7 +47033,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         if (Array.isArray(alertes)) for (const a of alertes) {
           if (!a || !(a.dv || a.jr)) continue;
           if (a.dv) jobs.push({id:'double-vente', n:a.n, icon:a.ic||'alert', color:a.dv==='num'?C.danger:C.warn, urgent:true, title:a.text, tab:a.tab, prio:-1, avant:a.avant});
-          else jobs.push({id:a.job||('a-faire-'+a.ic), n:a.n, icon:a.ic||'info', color:a.urssaf&&a.urssaf.proche?C.warn:C.text, title:a.text, sub:a.sub, tab:a.tab, prio:3, urssaf:a.urssaf});
+          else jobs.push({id:a.job||('a-faire-'+a.ic), n:a.n, icon:a.ic||'info', color:a.urssaf&&a.urssaf.proche?C.warn:C.text, title:a.text, sub:a.sub, tab:a.tab, prio:3, urssaf:a.urssaf,
+            // (1er nov., « très répétitif ») Le rappel URSSAF en court : « Déclarer
+            // l'URSSAF d'octobre » + « Avant le 30 nov. · ≈ 331 € à payer (au moins) ».
+            // Le reçu de la période est dit sur l'écran URSSAF (un seul montant ici) ;
+            // la phrase entière reste dans l'infobulle. Mêmes valeurs (`rappelUrssaf`).
+            ...(a.urssaf ? urssafCourt(a.urssaf, a.text, a.sub) : {})});
         }
         // (21-22 oct.) MA JOURNÉE EN WIDGETS : les colis EN RETARD et les colis
         // HORS DÉLAI ne sont dits que par la couleur de leur case (barre ou petite
@@ -47046,27 +47073,58 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         // (revue du 23 oct.) Pas avant que les e-mails de suivi soient lus : le
         // nombre serait celui des seuls colis vus par Vinted, et il changerait
         // sous ses yeux une seconde plus tard.
-        if (tracking !== null && (pickupUnion.aVerifier||[]).length) {
-          const nv = pickupUnion.aVerifier.length;
-          jobs.push({ id:'retrait-a-verifier', n:nv, icon:'box', color:C.warn,
-            // (29 oct.) Plus « sans doute repartis » : seuls le transporteur ou Vinted le disent.
-            title:`${nv} colis à vérifier`,
-            // (revue du 23 oct.) Plus de « 7 jours » écrit pour tous : chaque
-            // transporteur a SA garde (`gardeDe`), dite dans Achats, colis par colis.
-            sub:`Délai de retrait dépassé${pickupUnion.aVerifier.some(x=>x.e&&x.e.etat==='transporteur')?', ou le transporteur signale un problème':''} : ${nv>1?'regarde-les':'regarde-le'} dans Colis`,
+        // (1er nov., « très répétitif ») « À VÉRIFIER » EN UNE LIGNE. Julien voyait
+        // « 13 À retirer », « 2 colis à vérifier — Délai de retrait dépassé… » et
+        // « 2 achats au point relais en cours de vérification — Vinted les dit… » :
+        // trois voix pour la même famille. Les MÊMES listes qu'avant
+        // (`pickupUnion.aVerifier`, `pickupUnion.aConfirmer`), aucune règle neuve :
+        //  · la case « À retirer » dit le total à côté de son nombre (« + 4 à
+        //    vérifier », jamais « dont » : ces colis ne sont PAS dans « à retirer ») ;
+        //  · UNE ligne d'« À faire », titre court, raison courte (« 2 délais
+        //    dépassés · 2 pas encore reliés ») — le texte long reste en infobulle.
+        // `data-job` reste « retrait-a-verifier » (délai dépassé, `data-n`) ; les achats
+        // pas encore reliés sont dans `data-n-relier`.
+        // (23 oct.) Jamais compté « à retirer » ; pas avant que les e-mails de suivi
+        // soient lus (revue du 23 oct. : le nombre changerait sous ses yeux).
+        // (29 oct.) Plus « sans doute repartis » : seuls le transporteur ou Vinted le disent.
+        if (tracking !== null && ((pickupUnion.aVerifier||[]).length || (pickupUnion.aConfirmer||[]).length)) {
+          const av = pickupUnion.aVerifier || [], nv = av.length, nc = (pickupUnion.aConfirmer||[]).length;
+          const nT = av.filter(x => x.e && x.e.etat === 'transporteur').length, nD = nv - nT;
+          const pl = (k, s, p) => k > 1 ? p : s;
+          const raisons = [
+            nD ? `${nD} ${pl(nD, 'délai dépassé', 'délais dépassés')}` : '',
+            nT ? `${nT} ${pl(nT, 'incident', 'incidents')}` : '',
+            nc ? `${nc} pas encore ${pl(nc, 'relié', 'reliés')}` : '',
+          ].filter(Boolean).join(' · ');
+          const long = [
+            nv ? `${nv} colis : délai de retrait dépassé${nT ? ', ou le transporteur signale un problème' : ''}.` : '',
+            nc ? `${nc} achat${nc>1?'s':''} au point relais en cours de vérification : Vinted ${nc>1?'les dit':'le dit'} « déposé${nc>1?'s':''} en point relais », mais rien ne ${nc>1?'les':'le'} relie encore à un colis (ni code de retrait, ni n° de suivi) — ${nc>1?'ils ne comptent':'il ne compte'} pas dans « à retirer ».` : '',
+            'Regarde-les dans Colis.',
+          ].filter(Boolean).join(' ');
+          tuiles.retirer = { ...tuiles.retirer, aVerifier: nv + nc };
+          jobs.push({ id: nv ? 'retrait-a-verifier' : 'retrait-en-verification', n: nv || nc, nRelier: nc, icon:'box', color: nv ? C.warn : C.muted,
+            title: `${nv + nc} colis à vérifier`, court: 'Colis à vérifier', detail: raisons, plein: long,
             tab:'retraits', prio:0.6 });
         }
-        // (29 oct.) LES ACHATS « AU POINT RELAIS » EN COURS DE VÉRIFICATION (ni
-        // code ni n° de suivi : peut-être le même colis qu'un e-mail) — hors du
-        // nombre de la case « À retirer », donc DITS ici, une ligne (la case ne
-        // le dit qu'au survol, invisible au doigt). Jamais un total partiel
-        // présenté comme complet (§5).
-        if (tracking !== null && (pickupUnion.aConfirmer||[]).length) {
-          const nc = pickupUnion.aConfirmer.length;
-          jobs.push({ id:'retrait-en-verification', n:nc, icon:'box', color:C.muted,
-            title:`${nc} achat${nc>1?'s':''} au point relais en cours de vérification`,
-            sub:`Vinted ${nc>1?'les dit':'le dit'} « déposé${nc>1?'s':''} en point relais », mais rien ne ${nc>1?'les':'le'} relie encore à un colis (ni code de retrait, ni n° de suivi) : ${nc>1?'ils ne comptent':'il ne compte'} pas dans « à retirer ». ${nc>1?'Regarde-les':'Regarde-le'} dans Colis.`,
-            tab:'retraits', prio:0.65 });
+        // (1er nov., « très répétitif ») LE MÊME NOMBRE UNE FOIS (§7). Quand la case
+        // « À envoyer » se voit (barre ou petite case), elle porte l'emballage (son
+        // bouton « Emballer ») et les colis pressés pas encore en retard (« dont 3
+        // aujourd'hui ») : leurs lignes d'« À faire » ne sont plus redites. La case
+        // « À retirer » porte le nombre « à vérifier » : la ligne garde un titre sans
+        // nombre. Sans case, tout reste dans « À faire » (chaque geste joignable).
+        {
+          const envoyerVu = caseVisible(dispoJournee, 'envoyer') && !TOURNEE_SUR_JOURNEE;
+          const retirerVu = caseVisible(dispoJournee, 'retirer') && !TOURNEE_SUR_JOURNEE;
+          if (envoyerVu) {
+            for (let k = jobs.length - 1; k >= 0; k--) {
+              const j = jobs[k];
+              if (j.id === 'emballer' || (j.id === 'colis-limite' && !j.urgent)) jobs.splice(k, 1);
+            }
+          } else if (tuiles.envoyer) tuiles.envoyer = { ...tuiles.envoyer, emballer: null, presses: null };
+          for (const j of jobs) if (j.id === 'retrait-a-verifier' || j.id === 'retrait-en-verification') {
+            if (!retirerVu) { j.court = null; j.title = `${j.title} — ${j.detail}`; j.detail = null; }
+          }
+          if (!retirerVu && tuiles.retirer) tuiles.retirer = { ...tuiles.retirer, aVerifier: 0 };
         }
         jobs.sort((a,b)=>a.prio-b.prio);
         // RÉSULTAT DU JOUR : les paires VENDUES aujourd'hui (pas l'argent viré,
@@ -47246,6 +47304,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         // est le titre, le reste et le sous-titre font le détail. Aucune règle,
         // aucune alerte, aucune cible ne change.
         const decouper = (j) => {
+          // (1er nov.) Une ligne qui porte SA forme courte (titre + raison courte) :
+          // le texte long (`plein`) reste dans l'infobulle et pour le lecteur d'écran.
+          if (j.court && j.detail !== undefined) return { court: j.court, detail: j.detail || '', plein: j.plein || '' };
           const titre = String(j.title || '');
           const k = j.court ? -1 : titre.indexOf(' — ');
           const court = j.court || (k > 0 ? titre.slice(0, k) : titre);
@@ -47265,11 +47326,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             : <span className="vrm-day-task-ic" aria-hidden="true" style={{color:j.color}}><Icon name={j.icon} size={20}/></span>}
           <span className="vrm-day-task-textes">
             <UneLigne className="vrm-day-task-title" texte={x.court} lignesTel={2}/>
-            {x.detail ? <UneLigne className={'vrm-day-task-note' + (j.urgent ? ' is-urgent' : '')} texte={x.detail} lignesTel={2}/> : null}
+            {/* (1er nov., « très répétitif ») Le détail tient sur UNE ligne, téléphone compris :
+                coupé à la fin d'un mot, le texte entier dans l'infobulle et le nom du bouton. */}
+            {x.detail ? <UneLigne className={'vrm-day-task-note' + (j.urgent ? ' is-urgent' : '')} texte={x.detail} lignesTel={1}/> : null}
           </span>
         </>);
-        const tacheSimple = (j, i) => { const x = decouper(j); const plein = x.detail ? `${x.court}\n${x.detail}` : x.court; return (
-          <button className={'vrm-day-task' + (j.urgent ? ' is-urgent' : '')} key={(j.id||'j')+i} type="button" title={plein} aria-label={plein.replace('\n', ' — ')} data-job={j.id||undefined} data-n={j.n!=null?j.n:undefined} data-limite-heure={j.limiteHeure!=null?j.limiteHeure:undefined} data-urssaf-echeance={j.urssaf?j.urssaf.dueIso:undefined} data-urssaf-apayer={j.urssaf?(j.urssaf.apayer==null?'':String(j.urssaf.apayer)):undefined} data-urssaf-partiel={j.urssaf&&j.urssaf.partiel?'1':undefined} onClick={()=>{ if (j.avant) j.avant(); if (onNav) onNav(j.tab); }}>
+        const tacheSimple = (j, i) => { const x = decouper(j); const plein = x.plein ? `${x.court}\n${x.detail ? x.detail + '\n' : ''}${x.plein}` : x.detail ? `${x.court}\n${x.detail}` : x.court; return (
+          <button className={'vrm-day-task' + (j.urgent ? ' is-urgent' : '')} key={(j.id||'j')+i} type="button" title={plein} aria-label={plein.replace(/\n/g, ' — ')} data-job={j.id||undefined} data-n={j.n!=null?j.n:undefined} data-n-relier={j.nRelier!=null?j.nRelier:undefined} data-limite-heure={j.limiteHeure!=null?j.limiteHeure:undefined} data-urssaf-echeance={j.urssaf?j.urssaf.dueIso:undefined} data-urssaf-apayer={j.urssaf?(j.urssaf.apayer==null?'':String(j.urssaf.apayer)):undefined} data-urssaf-partiel={j.urssaf&&j.urssaf.partiel?'1':undefined} onClick={()=>{ if (j.avant) j.avant(); if (onNav) onNav(j.tab); }}>
             {corpsTache(j, x)}
             <span className="vrm-day-task-action" style={j.urgent ? {color:j.color} : undefined}><span className="vrm-day-task-action-mot">{j.action || 'Voir'} </span><span aria-hidden="true">›</span></span>
           </button>
@@ -47278,10 +47341,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         // déclaration » à côté. Un bouton ne se met pas dans un bouton : la ligne
         // devient un groupe de deux, même forme, mêmes attributs.
         const tache = (j, i) => { if (!(j.urssaf && Array.isArray(j.urssaf.aNoter) && j.urssaf.aNoter.length > 0)) return tacheSimple(j, i);
-          const x = decouper(j); const plein = x.detail ? `${x.court}\n${x.detail}` : x.court;
+          const x = decouper(j); const plein = x.plein ? `${x.court}\n${x.detail ? x.detail + '\n' : ''}${x.plein}` : x.detail ? `${x.court}\n${x.detail}` : x.court;
           return (
           <div className="vrm-day-task is-groupe" key={(j.id||'j')+i} role="group" data-job={j.id||undefined} data-n={j.n!=null?j.n:undefined} data-urssaf-echeance={j.urssaf.dueIso} data-urssaf-apayer={j.urssaf.apayer==null?'':String(j.urssaf.apayer)} data-urssaf-partiel={j.urssaf.partiel?'1':undefined} title={plein}>
-            <button type="button" className="vrm-day-task-ouvrir" aria-label={plein.replace('\n', ' — ')} onClick={()=>{ if (j.avant) j.avant(); if (onNav) onNav(j.tab); }}>
+            <button type="button" className="vrm-day-task-ouvrir" aria-label={plein.replace(/\n/g, ' — ')} onClick={()=>{ if (j.avant) j.avant(); if (onNav) onNav(j.tab); }}>
               {corpsTache(j, x)}
             </button>
             <Bouton variante="secondaire" icone="check" className="vrm-b-petit vrm-day-task-geste" data-urssaf-cest-declare={j.urssaf.aNoter[0]} onClick={()=>demanderDeclaration(j.urssaf.aNoter[0], onNav)}>
@@ -47296,6 +47359,44 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         );
         const vuHero = !baseKO && !premierJour && !loading && sales.items;
         const W = {};
+        // ── (1er nov., « très répétitif ») LA CASE PORTE SA SOUS-LIGNE ET SON GESTE ──
+        // « À envoyer » : les colis pressés pas encore en retard (« dont 3
+        // aujourd'hui », ambre si c'est aujourd'hui) et le bouton « Emballer » (le
+        // même mode emballage que la ligne d'avant). « À retirer » : « + 4 à
+        // vérifier » (ambre ; « + », pas « dont » : ces colis ne sont PAS comptés
+        // dans « à retirer »). Le texte long reste dans l'infobulle (`title`).
+        const sousCase = (x) => {
+          if (x.pasSu || !x.t) return null;
+          if (x.id === 'envoyer' && x.t.presses && !x.t.presses.urgent) {
+            const p = x.t.presses;
+            return p.nAuj > 0 ? { texte: `dont ${p.nAuj} aujourd'hui`, ambre: true, cle: 'presses' } : { texte: `dont ${p.n} demain`, ambre: false, cle: 'presses' };
+          }
+          if (x.id === 'retirer' && x.t.aVerifier > 0) return { texte: `+ ${x.t.aVerifier} à vérifier`, ambre: true, cle: 'a-verifier' };
+          return null;
+        };
+        const titreCase = (x) => x.pasSu ? (x.titrePasSu || 'Pas encore lu') : [x.t && x.t.sub, x.t && x.t.presses && !x.t.presses.urgent ? x.t.presses.phrase : ''].filter(Boolean).join(' · ');
+        const gesteCase = (x) => {
+          const e = x.id === 'envoyer' && !x.pasSu && x.t && x.t.emballer;
+          if (!e) return null;
+          const n = x.t.n || 0;
+          return (
+            <Bouton variante="secondaire" icone="box" className="vrm-b-petit vrm-day-case-geste" data-job="emballer" data-n={e.n} title={e.phrase}
+              onClick={()=>{ DEMANDE_EMBALLAGE.at = Date.now(); if (onNav) onNav('cat_bord'); }}>
+              {e.n >= n ? 'Emballer' : `Emballer les ${e.n} prêts`}
+            </Bouton>
+          );
+        };
+        const corpsCase = (x, n, vif) => {
+          const so = sousCase(x);
+          return (<>
+            <span className="vrm-day-bar-ic" style={{color:x.t && x.t.alerte ? C.warn : C.muted}}><Icon name={x.ic} size={18}/></span>
+            <span className="vrm-display vrm-day-bar-n" style={{color:vif ? C.text : C.muted}}>{x.pasSu ? '—' : n}</span>
+            <span className="vrm-day-bar-txt">
+              <span className="vrm-day-bar-l" style={{color:C.muted}}>{x.l}</span>
+              {so ? <span className={'vrm-day-bar-sous' + (so.ambre ? ' is-ambre' : '')} data-sous-ligne={so.cle}>{so.texte}</span> : null}
+            </span>
+          </>);
+        };
         W.barre = (!baseKO && !premierJour) ? (
           <div data-barre-jour="" className="vrm-day-bar" data-barre-tournee={casesDansTournee ? '' : undefined}>
             {T.map((x, k) => {
@@ -47303,12 +47404,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               const vif = !x.pasSu && n > 0;
               // La Tournée porte « à envoyer » et « à retirer » (voir `casesDansTournee`).
               const tu = casesDansTournee && (x.id === 'envoyer' || x.id === 'retirer');
+              const geste = gesteCase(x);
               return (
-                <button key={x.id} type="button" hidden={tu} data-tuile-dans-tournee={tu ? '' : undefined} data-tuile={x.id} data-n={x.pasSu ? '' : String(n)} data-ebay={(x.id === 'envoyer' || x.id === 'messages') && x.t && x.t.ebay !== undefined ? (x.t.ebay === null ? 'passu' : String(x.t.ebay)) : undefined} title={x.pasSu ? (x.titrePasSu || 'Pas encore lu') : (x.t && x.t.sub) || ''} onClick={()=>onNav&&onNav(x.tab)}>
-                  <span className="vrm-day-bar-ic" style={{color:x.t && x.t.alerte ? C.warn : C.muted}}><Icon name={x.ic} size={18}/></span>
-                  <span className="vrm-display vrm-day-bar-n" style={{color:vif ? C.text : C.muted}}>{x.pasSu ? '—' : n}</span>
-                  <span className="vrm-day-bar-l" style={{color:C.muted}}>{x.l}</span>
-                </button>
+                <div key={x.id} className="vrm-day-case" data-case={x.id} hidden={tu}>
+                  <button type="button" hidden={tu} data-tuile-dans-tournee={tu ? '' : undefined} data-tuile={x.id} data-n={x.pasSu ? '' : String(n)} data-presses={x.id === 'envoyer' && x.t && x.t.presses ? String(x.t.presses.n) : undefined} data-limite-heure={x.id === 'envoyer' && x.t && x.t.presses ? x.t.presses.heure : undefined} data-a-verifier={x.id === 'retirer' && x.t && x.t.aVerifier ? String(x.t.aVerifier) : undefined} data-ebay={(x.id === 'envoyer' || x.id === 'messages') && x.t && x.t.ebay !== undefined ? (x.t.ebay === null ? 'passu' : String(x.t.ebay)) : undefined} title={titreCase(x)} onClick={()=>onNav&&onNav(x.tab)}>
+                    {corpsCase(x, n, vif)}
+                  </button>
+                  {geste}
+                </div>
               );
             })}
           </div>
@@ -47473,7 +47576,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             {stock ? <>
               <div className="vrm-day-stock-meter" role="img" aria-label={`${stock.renseignes} annonces sur ${stock.total} avec un prix d’achat`}><span style={{width:(stock.total?stock.renseignes/stock.total*100:0)+'%',background:C.accent}}/></div>
               <div className="vrm-day-stock-prices"><span>Coût d’achat renseigné</span><b>{stock.renseignes?stock.cout.toLocaleString('fr-FR',{style:'currency',currency:'EUR'}):'—'}</b></div>
-              <p>{stock.renseignes} sur {stock.total} avec un prix d’achat{stock.manquants>0 ? <> · <Bouton variante="discret" data-stock-completer="" onClick={()=>{ DEMANDE_SAISIE_PRIX.on = true; if (onNav) onNav('vinted_annonces'); }}>{stock.manquants} à compléter ›</Bouton></> : null}</p>
+              {/* (1er nov., « très répétitif ») Le total est écrit juste au-dessus : la
+                  couverture ne le redit pas (« 0 sur 6 · 6 à compléter » disait 6 deux fois). */}
+              <p data-stock-renseignes={stock.renseignes}>{stock.renseignes === 0 ? 'Aucune' : stock.manquants === 0 ? 'Toutes' : stock.renseignes} avec un prix d’achat{stock.manquants>0 ? <> · <Bouton variante="discret" data-stock-completer="" onClick={()=>{ DEMANDE_SAISIE_PRIX.on = true; if (onNav) onNav('vinted_annonces'); }}>{stock.renseignes === 0 ? 'Compléter' : `${stock.manquants} à compléter`} ›</Bouton></> : null}</p>
             </> : <p>{listings.error?'Annonces pas lues pour l’instant.':'Lecture des annonces…'}</p>}
             {stock && listings.incomplet && <p role="status">Lecture partielle : des comptes n’ont pas pu être lus.</p>}
             <div className="vrm-day-stock-links vrm-b-rangee"><Bouton variante="secondaire" icone="tag" className="vrm-b-petit" onClick={()=>onNav&&onNav('cat_annonces')}>Voir les annonces</Bouton><Bouton variante="secondaire" icone="box" className="vrm-b-petit" onClick={()=>onNav&&onNav('garage')}>Ouvrir le stock</Bouton></div>
@@ -47546,12 +47651,17 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         for (const x of T) {
           const n = x.t ? x.t.n : 0, vif = !x.pasSu && n > 0;
           W[x.id] = (!baseKO && !premierJour) ? (
-            <button type="button" className="vrm-day-card vrm-w-tuile" data-widget-tuile={x.id} data-n={x.pasSu ? '' : String(n)} title={x.pasSu ? (x.titrePasSu || 'Pas encore lu') : (x.t && x.t.sub) || ''} onClick={()=>onNav&&onNav(x.tab)}
+            <div className="vrm-w-tuile-case" data-case={x.id}>
+            <button type="button" className="vrm-day-card vrm-w-tuile" data-widget-tuile={x.id} data-n={x.pasSu ? '' : String(n)} title={titreCase(x)} onClick={()=>onNav&&onNav(x.tab)}
               style={{border:`1px solid ${C.border}`,background:C.card,boxShadow:C.shadow||'none'}}>
               <span style={{color:x.t && x.t.alerte ? C.warn : vif ? C.accent : C.muted}}><Icon name={x.ic} size={20}/></span>
               <span className="vrm-display vrm-w-tuile-n" style={{color:vif ? C.text : C.muted}}>{x.pasSu ? '—' : n}</span>
               <span className="vrm-w-tuile-l" style={{color:C.muted}}>{x.l}</span>
+              {(() => { const so = sousCase(x); return so ? <span className={'vrm-day-bar-sous' + (so.ambre ? ' is-ambre' : '')} data-sous-ligne={so.cle}>{so.texte}</span> : null; })()}
             </button>
+            {/* La barre porte déjà le geste quand elle est là : jamais deux « Emballer ». */}
+            {aWidget('barre') ? null : gesteCase(x)}
+            </div>
           ) : null;
         }
         return (

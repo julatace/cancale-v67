@@ -2712,3 +2712,61 @@ banc ne clique jamais un lien externe (il vérifie seulement son adresse) ; les
 état « non lu ». Lancer : `BANC_PORT=9150 node scripts/bancs/tous-boutons.cjs`
 (≈ 1 h en série ; `BANC_TAILLE`, `BANC_ECRANS` pour une partie ; 4 processus
 en parallèle ≈ 30 min).
+
+## 1er novembre — Ma journée sans redite (« je trouve cet endroit très répétitif »)
+
+Capture de Julien (iPhone 390 px, sa vraie base) : « 10 À envoy… · 13 À retirer ·
+35 Messag… · 2 Prix à b… » (libellés COUPÉS), puis dans « À faire » : « 3 colis
+pressés — Le plus urgent… », « 2 colis à vérifier — Délai de retrait dépassé… »,
+« 2 achats au point relais en cours de vérification — Vinted les dit… », « Emballer
+les colis prêts — 10 bordereaux prêts à imprimer… », « Nouveau mois : déclaration
+URSSAF octobre 2026 à faire avant le 30… — Au moins 2670,97 € reçus · à payer ≈ au
+moins 331,20 € ». Le même nombre deux fois (10), la même famille trois fois.
+
+**Ce qui change (aucune règle de calcul, mêmes sources : `toShip`, `colisEb`,
+`pickupUnion`, `vrm_colis_aposter`, `vrm_colis_retirer`, `rappelUrssaf`)** :
+- **Les cases** : grille 2 × 2 au téléphone, quatre colonnes sur ordinateur ;
+  libellés ENTIERS (« À envoyer », « À retirer », « Messages », « Prix à baisser »),
+  plus d'ellipse CSS, un libellé long passe à la ligne. Chaque case est un
+  `div.vrm-day-case[data-case]` qui contient le bouton `[data-tuile]` (data-* gardés,
+  plus `data-presses`, `data-limite-heure`, `data-a-verifier`) et son geste.
+- **Envoyer** : la case porte une sous-ligne « dont N aujourd'hui » (ambre ; « dont N
+  demain » en neutre) quand les colis pressés ne sont PAS en retard, et le bouton
+  secondaire **« Emballer »** (`data-job="emballer"`, même `DEMANDE_EMBALLAGE` que
+  l'ancienne ligne ; « Emballer les N prêts » si tous ne le sont pas). Les lignes
+  « N colis pressés » (non urgente) et « Emballer les colis prêts » ne sont plus
+  dans « À faire » tant qu'une case « À envoyer » se voit (barre ou petite case). Un
+  colis EN RETARD reste une alerte de tête (Urgent, jamais retirable) et la case se
+  tait alors sur les pressés. Sans case, les deux lignes reviennent (rien d'injoignable).
+- **Retirer** : « + N à vérifier » (ambre) sous « À retirer » — **« + » et pas
+  « dont »** (demandé « dont 4 à vérifier ») : ces colis ne sont PAS comptés dans
+  « à retirer » (règle du 23 oct.), « dont » aurait été faux (§5). « À vérifier » et
+  « en cours de vérification » tiennent en UNE ligne : « Colis à vérifier » + « 2
+  délais dépassés · 2 pas encore reliés » (+ « N incidents » quand le transporteur
+  signale un problème) ; `data-job="retrait-a-verifier"` (`data-n` = délais dépassés,
+  `data-n-relier` = achats pas encore reliés), ou `retrait-en-verification` s'il n'y a
+  qu'eux. Sans case « À retirer », le titre reprend le nombre (« 4 colis à vérifier »).
+- **Lignes d'« À faire »** : titre et détail sur UNE ligne chacun, téléphone compris
+  (`UneLigne lignesTel={1}` pour le détail ; un titre peut encore passer à deux
+  lignes à 320 px). La phrase longue va dans l'infobulle et le nom du bouton
+  (`plein`). URSSAF : « Déclarer l'URSSAF d'octobre » + « Avant le 30 nov. · ≈ 331 € à
+  payer (au moins) » (« Dans 3 jours · … » quand l'échéance est proche) ; le reçu de
+  la période n'est plus redit ici (écran URSSAF) — `urssafCourt`, mêmes valeurs que
+  `rappelUrssaf`, `data-urssaf-*` inchangés.
+- **Stock actuel** : « 0 sur 6 avec un prix d'achat · 6 à compléter » écrivait 6 deux
+  fois (le total est juste au-dessus) ⇒ « Aucune avec un prix d'achat · Compléter › »,
+  « N avec un prix d'achat · M à compléter › », « Toutes avec un prix d'achat ».
+
+**Banc `journee-mieux`** (jeu au 2 novembre, rythme URSSAF mensuel, quantités toutes
+différentes : 3 choses, 4 à envoyer dont 1 aujourd'hui, 5 à retirer, 7 délais
+dépassés + 1 pas relié = 8 à vérifier, 2 ventes, 6 en cours, 9 annonces) : I. aucun
+libellé ni sous-ligne de case coupé à 320/375/390/430 (scrollWidth, « … », ellipse
+CSS) ; J. aucun nombre de comptage ≥ 2 écrit deux fois (montants, %, dates, heures,
+N°, tailles, « 30 j », « 7 derniers jours », semaine et dernières ventes à part) ;
+K. pas de ligne « Emballer » ni « colis pressés » à côté de la case, une ligne « à
+vérifier » au plus, « Emballer » joignable (≥ 44 px) dans la case, sous-lignes
+présentes ; B. une ligne de détail au plus, téléphone compris. Sur `origin/main` :
+67 rouges (I, J « 2, 4, 9 », K, B) ; après : 224 verts. Mutation (dédoublonnage
+coupé + ellipse remise) : 5 rouges. `transporteurs.cjs` lit la ligne fusionnée
+(`data-n-relier`, phrase dans l'infobulle). Planche AVANT/APRÈS 390 clair :
+capture de session.
