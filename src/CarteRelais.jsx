@@ -15,7 +15,7 @@
 //    seulement si elle est sûre (`repereDepuisBan`). Une adresse incomplète ou
 //    incertaine ⇒ le point est listé SANS repère, et la raison est dite — jamais
 //    une épingle au centre de la ville. Les repères trouvés sont gardés dans CE
-//    navigateur (`vrm_geo_relais_v1`, une commodité : perdu, il coûte une
+//    navigateur (`vrm_geo_relais_v2`, une commodité : perdu, il coûte une
 //    recherche) ; un échec n'est pas redemandé avant 24 h ; une panne de réseau
 //    n'est pas notée (réessayée à la prochaine ouverture).
 //  · Pas de WebGL, style injoignable ⇒ « carte indisponible ici », la liste reste.
@@ -29,47 +29,85 @@
 //  sont sous « Point pas encore connu », avec la raison et le geste.
 // ════════════════════════════════════════════════════════════════════════════
 import React from 'react';
-import { repereDepuisBan, requetesBan } from './relaisColis.js';
+import { jugerBan, requetesBan, nombreEpingle, RAISONS_BAN } from './relaisColis.js';
 
-const CACHE = 'vrm_geo_relais_v1';
+// (1er nov., « plus fiable ») v2 : la règle a changé (rue + ville sans code
+// postal, ville collée à la rue, résultat ambigu refusé) — les échecs notés
+// sous l'ancienne règle ne figent plus un point hors de la carte, et un repère
+// trouvé sans contrôle de ville n'est plus repris.
+const CACHE = 'vrm_geo_relais_v2';
+const ECHEC_MS = 24 * 3600e3;
 const lireCache = () => { try { return JSON.parse(localStorage.getItem(CACHE) || '{}') || {}; } catch (_) { return {}; } };
 const ecrireCache = (c) => { try { localStorage.setItem(CACHE, JSON.stringify(c)); } catch (_) {} };
 const cleAdr = (a) => String(a || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
 
-// Rend { lat, lon } (sûr), null (cherché, pas sûr : noté 24 h) ou 'reseau'
-// (la Base Adresse Nationale n'a pas répondu : rien n'est noté).
-async function chercherRepere(p) {
+// Ce qu'on sait déjà de ce point SANS appeler la Base Adresse (le cache) :
+// { lat, lon } · { echec: raison } · undefined (à chercher).
+function repereEnCache(p) {
   const reqs = requetesBan(p);
-  if (!reqs.length) return null;
+  if (!reqs.length) return undefined;
+  const c = lireCache()[cleAdr(reqs[0].q)];
+  if (c && c.lat != null) return { lat: c.lat, lon: c.lon };
+  if (c && c.echec && Date.now() - c.echec < ECHEC_MS) return { echec: c.raison || 'introuvable' };
+  return undefined;
+}
+// Rend { lat, lon } (sûr), { echec: raison } (cherché, pas sûr : noté 24 h) ou
+// 'reseau' (la Base Adresse Nationale n'a pas répondu : rien n'est noté).
+// (1er nov.) Deux écrans qui cherchent la même adresse en même temps (la colonne
+// de Colis et la tournée, ou un effet relancé) partagent UNE requête en cours.
+const REQ_EN_COURS = new Map();
+function chercherRepere(p) {
+  const reqs = requetesBan(p);
+  const k = reqs.length ? cleAdr(reqs[0].q) : '';
+  if (k && REQ_EN_COURS.has(k)) return REQ_EN_COURS.get(k);
+  const pr = chercherRepereReseau(p).finally(() => { if (k) REQ_EN_COURS.delete(k); });
+  if (k) REQ_EN_COURS.set(k, pr);
+  return pr;
+}
+async function chercherRepereReseau(p) {
+  const reqs = requetesBan(p);
+  if (!reqs.length) return { echec: 'introuvable' };
   const k = cleAdr(reqs[0].q);
-  const cache = lireCache();
-  const c = cache[k];
-  if (c && c.lat != null) return c;
-  if (c && c.echec && Date.now() - c.echec < 24 * 3600e3) return null;
-  let hit = null;
+  let res = null;
   try {
     for (const r of reqs) {
-      const rep = await fetch(`https://api-adresse.data.gouv.fr/search/?limit=1&q=${encodeURIComponent(r.q)}${r.postcode ? `&postcode=${r.postcode}` : ''}`, { credentials: 'omit' });
+      const rep = await fetch(`https://api-adresse.data.gouv.fr/search/?limit=5&q=${encodeURIComponent(r.q)}${r.postcode ? `&postcode=${r.postcode}` : ''}`, { credentials: 'omit' });
       if (!rep.ok) throw new Error('ban ' + rep.status);
-      hit = repereDepuisBan(await rep.json(), p.cp);
-      if (hit) break;
+      const j = jugerBan(await rep.json(), r.attendu || { cp: p.cp });
+      // Un résultat sûr, ou « plusieurs endroits » : on s'arrête (la requête
+      // suivante, plus large, ne lèverait pas une ambiguïté).
+      if (j.lat != null || j.echec === 'ambigu') { res = j; break; }
+      if (!res) res = j;
     }
   } catch (_) { return 'reseau'; }
-  const c2 = lireCache(); c2[k] = hit || { echec: Date.now() }; ecrireCache(c2);
-  return hit;
+  const sur = res && res.lat != null;
+  const c2 = lireCache(); c2[k] = sur ? { lat: res.lat, lon: res.lon } : { echec: Date.now(), raison: (res && res.echec) || 'introuvable' }; ecrireCache(c2);
+  return sur ? { lat: res.lat, lon: res.lon } : { echec: (res && res.echec) || 'introuvable' };
 }
 
-// Les repères des points (cle → {lat,lon} | null | 'reseau'), cherchés quand `actif`.
+// Les repères des points (cle → {lat,lon} | {echec} | 'reseau'), cherchés quand `actif`.
+// (1er nov.) Ce qui est déjà en cache est rendu TOUT DE SUITE et ne compte pas
+// dans le budget (avant : 25 « recherches », cache compris, puis plus rien) ; un
+// effet relancé (une lecture qui arrive) reprend où le précédent s'est arrêté.
+const BUDGET_RESEAU = 40;
 export function useReperes(groupes, actif) {
   const [reperes, setReperes] = React.useState({});
+  const cle = groupes.map((g) => g.cle + '=' + (g.geocode || '')).join('|');
   React.useEffect(() => {
     if (!actif) return undefined;
     let vivant = true;
+    const deja = {};
+    for (const g of groupes) {
+      if (g.repere || !g.geocode) continue;
+      const c = repereEnCache(g);
+      if (c !== undefined) deja[g.cle] = c;
+    }
+    if (Object.keys(deja).length) setReperes((r) => ({ ...r, ...deja }));
     (async () => {
       let n = 0;
       for (const g of groupes) {
-        if (!vivant || n >= 25) break;
-        if (g.repere || !g.geocode || reperes[g.cle] !== undefined) continue;
+        if (!vivant || n >= BUDGET_RESEAU) break;
+        if (g.repere || !g.geocode || deja[g.cle] !== undefined) continue;
         n++;
         const hit = await chercherRepere(g);
         if (!vivant) return;
@@ -78,22 +116,68 @@ export function useReperes(groupes, actif) {
     })();
     return () => { vivant = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [actif, groupes.map((g) => g.cle + g.geocode).join('|')]);
+  }, [actif, cle]);
   return reperes;
 }
 export const repereDe = (g, reperes) => (g.repere ? g.repere : (reperes[g.cle] && reperes[g.cle].lat != null ? reperes[g.cle] : null));
 
+// LA raison, en français simple, pour laquelle un point n'est pas sur la carte
+// (la même phrase dans Colis et dans la tournée) ; '' s'il y est.
+export const EN_COURS = 'localisation en cours…';
+// Le code machine de cette raison (pour les bancs, `data-*`) : '' sur la carte.
+export function codePasSurCarte(p, reperes) {
+  if (!p || p.inconnu) return 'inconnu';
+  if (repereDe(p, reperes)) return '';
+  if (p.sansCarte) return 'adresse';
+  const r = reperes[p.cle];
+  if (r === undefined) return p.geocode ? 'cherche' : 'adresse';
+  if (r === 'reseau') return 'reseau';
+  return (r && r.echec) || 'introuvable';
+}
+export function raisonPasSurCarte(p, reperes) {
+  if (!p || p.inconnu) return 'le point de retrait n’est pas encore connu';
+  if (repereDe(p, reperes)) return '';
+  if (p.sansCarte) return p.sansCarte;
+  const r = reperes[p.cle];
+  if (r === undefined) return p.geocode ? EN_COURS : 'le message ne donne pas une adresse complète';
+  if (r === 'reseau') return 'la carte des adresses n’a pas répondu, réessai à la prochaine ouverture';
+  const base = RAISONS_BAN[(r && r.echec) || 'introuvable'] || RAISONS_BAN.introuvable;
+  return p.vintedPlusieurs ? `${base} (et la liste de Vinted donne plusieurs positions pour ce nom)` : base;
+}
+
+// Les épingles : UNE par point relais, qui porte le NOMBRE de colis
+// (`nombreEpingle`). Deux points au même endroit (un casier dans un commerce) :
+// deux épingles côte à côte, jamais l'une cachée sous l'autre.
+function decalages(points) {
+  const parPos = new Map();
+  return points.map((p) => {
+    const k = `${Number(p.lat).toFixed(5)},${Number(p.lon).toFixed(5)}`;
+    const i = parPos.get(k) || 0; parPos.set(k, i + 1);
+    return i;
+  });
+}
+
 const jourFr = (s) => { const t = Date.parse(String(s || '') + 'T12:00:00'); return Number.isFinite(t) ? new Date(t).toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' }) : ''; };
 
-// `etiquette(p)` : le texte de l'épingle (le numéro du point dans la colonne, ou
-// son nombre de colis dans l'ancien bloc).
+// UNE épingle par point relais (1er nov.), qui porte le NOMBRE de colis
+// (`nombreEpingle` — la ligne du point dit le même) ; `etiquette(p)` ne sert
+// qu'à l'ancien bloc « Par point relais » (arrivés + attendus). Toucher une
+// épingle appelle `onChoisir(cle)` ; l'épingle choisie est entourée.
 export function FondRelais({ points, selection, onChoisir, C, etiquette, hauteur = 260, onEtat }) {
   const boite = React.useRef(null);
+  const elements = React.useRef(new Map());
   const [etat, setEtat] = React.useState('charge');
   React.useEffect(() => { if (onEtat) onEtat(etat); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [etat]);
-  const cle = points.map((p) => `${p.cle}:${p.lat}:${p.lon}:${p.nArrives}:${p.nAttendus}:${p.numero || ''}`).join('|');
+  const texte = (p) => String(etiquette ? etiquette(p) : nombreEpingle(p).n);
+  const cle = points.map((p) => `${p.cle}:${p.lat}:${p.lon}:${texte(p)}:${nombreEpingle(p).sorte}`).join('|');
   React.useEffect(() => {
     let vivant = true, carte = null; const marqueurs = [];
+    // (1er nov.) Une carte refaite (un repère arrivé) repart de « charge » : un
+    // échec passé ne la cache plus, et elle se cadre sur une boîte À SA TAILLE
+    // (avant, une boîte masquée par un échec donnait un cadrage faux).
+    setEtat('charge');
+    elements.current = new Map();
+    const dec = decalages(points);
     import('./fondCarte.js').then((f) => {
       if (!f.webglDispo()) throw new Error('webgl');
       return f.chargerMaplibre().then((ml) => {
@@ -101,24 +185,32 @@ export function FondRelais({ points, selection, onChoisir, C, etiquette, hauteur
         const lats = points.map((p) => p.lat), lons = points.map((p) => p.lon);
         carte = new ml.Map({ container: boite.current, style: { version: 8, sources: {}, layers: [] }, center: [(Math.min(...lons) + Math.max(...lons)) / 2, (Math.min(...lats) + Math.max(...lats)) / 2], zoom: 12, attributionControl: { compact: true }, dragRotate: false, pitchWithRotate: false });
         carte.once('load', () => {
-          if (points.length > 1) carte.fitBounds([[Math.min(...lons), Math.min(...lats)], [Math.max(...lons), Math.max(...lats)]], { padding: 40, maxZoom: 15, duration: 0 });
+          try { carte.resize(); } catch (_) {}
+          if (points.length > 1) carte.fitBounds([[Math.min(...lons), Math.min(...lats)], [Math.max(...lons), Math.max(...lats)]], { padding: { top: 48, bottom: 64, left: 40, right: 40 }, maxZoom: 15, duration: 0 });
           else carte.setZoom(14);
-          for (const p of points) {
+          points.forEach((p, i) => {
+            const ep = nombreEpingle(p);
             const el = document.createElement('button');
             el.type = 'button';
             el.className = 'vrm-relais-epingle';
             el.setAttribute('data-relais-epingle', p.cle);
-            el.setAttribute('data-relais-n', String(p.nArrives + p.nAttendus));
-            if (p.numero) el.setAttribute('data-relais-numero', String(p.numero));
-            el.setAttribute('aria-label', `${p.numero ? p.numero + '. ' : ''}${p.nom || p.adresseCourte || 'Point relais'} : ${p.nArrives} colis`);
-            el.textContent = etiquette ? etiquette(p) : String(p.nArrives + p.nAttendus);
+            el.setAttribute('data-relais-n', texte(p));
+            el.setAttribute('data-relais-sorte', ep.sorte);
+            const quoi = ep.sorte === 'aretirer' ? 'à retirer' : ep.sorte === 'averifier' ? 'à vérifier' : 'en route';
+            el.setAttribute('aria-label', `${p.nom || p.adresseCourte || 'Point relais'} : ${ep.n} colis ${quoi}`);
+            el.textContent = texte(p);
             // Une seule couleur d'accent, rare (§7) : l'épingle d'un point où des
-            // colis ATTENDENT ; un point où ils ne sont qu'attendus reste neutre.
-            el.style.cssText = `min-width:34px;height:34px;padding:0 8px;border-radius:17px;border:2px solid #fff;font:700 14px/30px system-ui,sans-serif;cursor:pointer;box-shadow:0 2px 6px rgba(0,0,0,.3);color:${p.nArrives > 0 ? '#fff' : '#1d2430'};background:${p.nArrives > 0 ? (C.accent || '#2f5bd3') : '#fff'}`;
-            if (p.nArrives > 0) el.setAttribute('data-relais-arrives', '');
+            // colis ATTENDENT d'être retirés ; les autres restent neutres.
+            const fort = ep.sorte === 'aretirer';
+            el.style.cssText = `min-width:34px;height:34px;padding:0 8px;border-radius:17px;border:2px solid #fff;font:700 14px/30px system-ui,sans-serif;cursor:pointer;box-shadow:0 2px 6px rgba(0,0,0,.3);color:${fort ? '#fff' : '#1d2430'};background:${fort ? (C.accent || '#2f5bd3') : '#fff'}`;
+            if (fort) el.setAttribute('data-relais-arrives', '');
             el.addEventListener('click', (e) => { e.stopPropagation(); onChoisir && onChoisir(p.cle); });
-            marqueurs.push(new ml.Marker({ element: el, anchor: 'bottom' }).setLngLat([p.lon, p.lat]).addTo(carte));
-          }
+            elements.current.set(p.cle, el);
+            // Deux points au même endroit : côte à côte (38 px), jamais superposés.
+            const k = dec[i];
+            marqueurs.push(new ml.Marker({ element: el, anchor: 'bottom', offset: [k ? (k % 2 ? 1 : -1) * Math.ceil(k / 2) * 38 : 0, 0] }).setLngLat([p.lon, p.lat]).addTo(carte));
+          });
+          marquerChoisi(elements.current, selection);
           f.poserFond(carte, { sombre: false, annule: () => !vivant }).then(() => { if (vivant) setEtat('pret'); }).catch(() => { if (vivant) setEtat('ko'); });
         });
       });
@@ -126,13 +218,25 @@ export function FondRelais({ points, selection, onChoisir, C, etiquette, hauteur
     return () => { vivant = false; for (const m of marqueurs) { try { m.remove(); } catch (_) {} } if (carte) carte.remove(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cle]);
+  React.useEffect(() => { marquerChoisi(elements.current, selection); }, [selection]);
+  const ko = etat === 'ko';
   return (
     <div style={{ position: 'relative' }}>
-      <div ref={boite} data-relais-fond={etat} className="vrm-relais-fond" style={{ width: '100%', height: hauteur, borderRadius: 10, overflow: 'hidden', background: '#eaeef2', display: etat === 'ko' ? 'none' : 'block' }}/>
-      {etat === 'ko' && <div data-relais-carte-ko="" style={{ fontSize: 12, color: 'var(--vrm-muted, #667)', padding: '8px 0' }}>La carte ne s’affiche pas ici pour l’instant — la liste ci-dessous reste juste.</div>}
+      <div ref={boite} data-relais-fond={etat} className="vrm-relais-fond" aria-hidden={ko ? 'true' : undefined}
+        style={{ width: '100%', height: hauteur, borderRadius: 10, overflow: 'hidden', background: '#eaeef2', ...(ko ? { position: 'absolute', left: 0, top: 0, visibility: 'hidden', pointerEvents: 'none' } : null) }}/>
+      {ko && <div data-relais-carte-ko="" style={{ fontSize: 12, color: 'var(--vrm-muted, #667)', padding: '8px 0' }}>La carte ne s’affiche pas ici pour l’instant — la liste ci-dessous reste juste.</div>}
       {selection ? <span className="vrm-sr">{selection}</span> : null}
     </div>
   );
+}
+function marquerChoisi(els, selection) {
+  for (const [k, el] of els) {
+    const oui = !!selection && k === selection;
+    if (oui) el.setAttribute('data-relais-choisi', ''); else el.removeAttribute('data-relais-choisi');
+    el.style.outline = oui ? '3px solid #1d2430' : '';
+    el.style.outlineOffset = oui ? '2px' : '';
+    el.style.zIndex = oui ? '2' : '';
+  }
 }
 
 // ── LA COLONNE « À RETIRER », PAR POINT (1er nov.) ──────────────────────────
@@ -179,18 +283,11 @@ export function ColonneRetirer({ vue, C, Photo, onOuvrir, enRouteSansRelais = 0 
     const el = racine.current && [...racine.current.querySelectorAll('[data-relais-point]')].find((e) => e.getAttribute('data-relais-point') === cle);
     if (el) { try { el.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch (_) { el.scrollIntoView(); } }
   };
-  const raisonCarte = (p) => {
-    if (repereDe(p, reperes)) return null;
-    if (p.sansCarte) return p.sansCarte;
-    const r = reperes[p.cle];
-    if (r === undefined) return 'localisation en cours…';
-    if (r === 'reseau') return 'la carte des adresses n’a pas répondu, réessai à la prochaine ouverture';
-    return 'cette adresse n’a pas été trouvée sûrement';
-  };
+  const raisonCarte = (p) => raisonPasSurCarte(p, reperes) || null;
   if (!points.length && !enRouteSansRelais) return null;
   return (
     <div className="vrm-rp" ref={racine} data-retirer-par-point={connus.length} data-retirer-comptes={vue ? vue.nComptes : 0} data-retirer-hors={vue ? vue.nHors : 0} data-retirer-sur-carte={surCarte.length}>
-      {surCarte.length > 0 && <FondRelais points={surCarte} selection={choisi} onChoisir={choisir} C={C} etiquette={(p) => String(p.numero)} hauteur={200} onEtat={setEtatFond}/>}
+      {surCarte.length > 0 && <FondRelais points={surCarte} selection={choisi} onChoisir={choisir} C={C} hauteur={200} onEtat={setEtatFond}/>}
       {connus.length > 0 && surCarte.length < connus.length && etatFond !== 'ko' && (
         <p className="vrm-rp-note" data-retirer-pas-carte={connus.length - surCarte.length}>
           {surCarte.length ? `${plur(surCarte.length, 'point')} sur la carte · ${connus.length - surCarte.length} pas sur la carte (la raison est sous chacun).` : `Aucun point sur la carte pour l’instant (la raison est sous chacun).`}
@@ -204,23 +301,30 @@ export function ColonneRetirer({ vue, C, Photo, onOuvrir, enRouteSansRelais = 0 
         const jMixte = new Set(comptes.map((c) => c.jours).filter((j) => j != null)).size > 1;
         const raison = raisonCarte(p);
         const lim = texteLimite(p.prochaineLimite);
+        // (1er nov.) La pastille du point = son épingle : le MÊME nombre, de la
+        // même fonction (`nombreEpingle`) ; le résumé ne le réécrit pas (§7).
+        const ep = nombreEpingle(p);
+        const morceaux = [
+          p.nComptes || (!p.nAttendus && !hors.length) ? { k: 'aretirer', t: ep.sorte === 'aretirer' ? 'colis à retirer' : plur(p.nComptes, 'colis à retirer', 'colis à retirer') } : null,
+          hors.length ? { k: 'averifier', t: ep.sorte === 'averifier' ? 'à vérifier' : `${hors.length} à vérifier` } : null,
+          p.nAttendus ? { k: 'enroute', t: ep.sorte === 'enroute' ? 'en route' : `${p.nAttendus} en route` } : null,
+        ].filter(Boolean);
         return (
           <section key={p.cle} className={'vrm-rp-point' + (choisi === p.cle ? ' is-choisi' : '')} data-relais-point={p.cle} data-relais-numero={p.numero}
-            data-relais-point-arrives={p.nArrives} data-relais-point-comptes={p.nComptes} data-relais-point-attendus={p.nAttendus}
-            data-relais-repere={repereDe(p, reperes) ? 'oui' : (raison && raison !== 'localisation en cours…' ? 'non' : 'cherche')} data-relais-urgent={p.urgent ? '1' : undefined}>
+            data-relais-point-arrives={p.nArrives} data-relais-point-comptes={p.nComptes} data-relais-point-attendus={p.nAttendus} data-relais-epingle-n={ep.n}
+            data-relais-repere={repereDe(p, reperes) ? 'oui' : (raison && raison !== EN_COURS ? 'non' : 'cherche')} data-relais-urgent={p.urgent ? '1' : undefined}>
             <header className="vrm-rp-tete">
-              <span className="vrm-rp-numero" aria-hidden="true">{p.numero}</span>
+              <span className={'vrm-rp-numero vrm-rp-compte' + (ep.sorte === 'aretirer' && repereDe(p, reperes) ? ' is-fort' : '')} data-relais-pastille={ep.n} aria-hidden="true">{ep.n}</span>
               <span className="vrm-rp-ident">
                 <b className="vrm-rp-nom" data-relais-nom="">{p.nom || p.adresseCourte || 'Point relais'}</b>
                 {p.nom && p.adresseCourte ? <span className="vrm-rp-adresse" data-relais-adresse="">{p.adresseCourte}</span> : null}
                 {!p.nom ? <span className="vrm-rp-adresse">nom du point pas écrit dans le message</span> : null}
                 <span className="vrm-rp-resume">
-                  {p.nComptes || (!p.nAttendus && !hors.length) ? <span data-relais-compte={p.nComptes}>{plur(p.nComptes, 'colis', 'colis')}</span> : null}
-                  {hors.length ? <span>{p.nComptes ? ' · ' : ''}{hors.length} à vérifier</span> : null}
-                  {p.nAttendus ? <span>{p.nComptes || hors.length ? ' · ' : ''}{p.nAttendus} en route</span> : null}
+                  <span className="vrm-sr">{ep.n} </span>
+                  {morceaux.map((m, i) => <span key={m.k} data-relais-compte={m.k === 'aretirer' ? p.nComptes : undefined}>{i ? ' · ' : ''}{m.t}</span>)}
                   {lim ? <span className={p.urgent ? 'is-ambre' : ''} data-relais-limite={p.prochaineLimite}> · {lim}</span> : null}
                 </span>
-                {raison ? <span className="vrm-rp-pas-carte" data-relais-sans-repere="">Pas sur la carte : {raison}.</span> : null}
+                {raison ? <span className="vrm-rp-pas-carte" data-relais-sans-repere="" data-raison={codePasSurCarte(p, reperes)}>Pas sur la carte : {raison}.</span> : null}
               </span>
             </header>
             <div className="vrm-rp-liste">
@@ -271,11 +375,11 @@ export default function CarteRelaisColis({ donnees, C, compacte = false, sansLis
   if (!groupes.length && !sansRelais) return null;
   const avecRepere = groupes.filter((g) => !g.inconnu && repereDe(g, reperes)).map((g) => ({ ...g, ...repereDe(g, reperes) }));
   const muted = { fontSize: 12, color: C.muted, lineHeight: 1.5 };
-  const etatRepere = (g) => (repereDe(g, reperes) ? 'oui' : (g.inconnu || !g.geocode || reperes[g.cle] === null || reperes[g.cle] === 'reseau' ? 'non' : 'cherche'));
+  const etatRepere = (g) => (repereDe(g, reperes) ? 'oui' : (g.inconnu || !g.geocode || (reperes[g.cle] && reperes[g.cle].echec) || reperes[g.cle] === 'reseau' ? 'non' : 'cherche'));
   const nomDe = (g) => g.nom || (g.inconnu ? 'Point pas encore connu' : g.adresseCourte || 'Point relais');
   if (compacte) return (
     <div className="vrm-relais-carte vrm-relais-compacte" data-relais-carte="ouverte" data-relais-points={groupes.length} data-relais-arrives={nArr} data-relais-attendus={nAtt} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-      {avecRepere.length > 0 && <FondRelais points={avecRepere} selection={choisi} onChoisir={setChoisi} C={C} etiquette={etiquette || undefined}/>}
+      {avecRepere.length > 0 && <FondRelais points={avecRepere} selection={choisi} onChoisir={setChoisi} C={C} etiquette={etiquette || ((g) => g.nArrives + g.nAttendus)}/>}
       {!sansListe && groupes.map((g) => (
         <div key={g.cle} data-relais-point={g.cle} data-relais-point-arrives={g.nArrives} data-relais-point-attendus={g.nAttendus} data-relais-repere={etatRepere(g)} style={{ ...muted, color: C.text }}>
           <b>{nomDe(g)}</b>{g.nArrives ? ` · ${g.nArrives} arrivé${g.nArrives > 1 ? 's' : ''}` : ''}{g.nAttendus ? ` · ${g.nAttendus} attendu${g.nAttendus > 1 ? 's' : ''}` : ''}
@@ -298,7 +402,7 @@ export default function CarteRelaisColis({ donnees, C, compacte = false, sansLis
       </button>
       {ouverte && (
         <div style={{ padding: '0 14px 14px', display: 'flex', flexDirection: 'column', gap: 10 }}>
-          {avecRepere.length > 0 && <FondRelais points={avecRepere} selection={choisi} onChoisir={setChoisi} C={C}/>}
+          {avecRepere.length > 0 && <FondRelais points={avecRepere} selection={choisi} onChoisir={setChoisi} C={C} etiquette={(g) => g.nArrives + g.nAttendus}/>}
           {groupes.map((g) => {
             const er = etatRepere(g);
             return (

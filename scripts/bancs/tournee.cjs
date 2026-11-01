@@ -53,6 +53,21 @@ function lignes(sc) {
     { id: 'harvest_111_orders_purchased', data: { capturedAt: new Date(MAINTENANT).toISOString(), payload: { my_orders: sc === 'rien' ? [] : ACHATS } } },
     { id: 'harvest_111_orders_sold', data: { capturedAt: new Date(MAINTENANT).toISOString(), payload: { my_orders: sc === 'rien' ? [] : VENTES } } },
   ];
+  if (sc === 'vannes') {
+    // (1er nov., sa capture : 5 points, 3 épingles) Quatre relais à Vannes, à la
+    // forme des e-mails rangés : Tabavap (TROIS colis, dont un n° de suivi écrit
+    // par Mondial Relay ET par Vinted — compté une fois), Terra Cbd (11 rue
+    // Hoche : deux relais dans la même rue), Phone Cash dont l'adresse est lue
+    // SANS code postal (« 17 Rue Thiers, Vannes »), et Le Narval, dont la Base
+    // Adresse rend DEUX endroits possibles (ambigu ⇒ pas d'épingle, raison dite).
+    const tr = (carrier, suivi, lieu, j) => ({ id: `email_track_${carrier}_${suivi}`, data: { type: 'suivi', carrier, suivi, status: 'available', statusLabel: 'Disponible en Point Relais', subject: 'Votre colis est disponible', receivedAt: ilYa(1), code: String(suivi).slice(-6), lieu, limite: dans(j) } });
+    L.push(tr('mondialrelay', '11110001', 'TABAVAP, 29 RUE HOCHE, 56000 VANNES', 3), tr('mondialrelay', '11110002', 'TABAVAP, 29 RUE HOCHE, 56000 VANNES', 3), tr('mondialrelay', '11110003', 'TABAVAP, 29 RUE HOCHE, 56000 VANNES', 5));
+    L.push(tr('vinted', '11110003', 'TABAVAP, 29 RUE HOCHE, 56000 VANNES', 5));
+    L.push(tr('chronopost', '22220001', 'TERRA CBD, 11 RUE HOCHE, 56000 VANNES', 4));
+    L.push(tr('mondialrelay', '33330001', 'Phone Cash, 17 Rue Thiers, Vannes', 6));
+    L.push(tr('mondialrelay', '44440001', 'LE NARVAL, 2 PLACE DU MARCHE, 56000 VANNES', 6));
+    return L;
+  }
   if (sc !== 'rien') {
     L.push(bord(9101, '12345678'), bord(9102, 'VGS12345678'));
     L.push({ id: 'panel_colis_relais', data: { '9401': { code: 'B11111', lieu: 'Kusmi Tea, 13 Rue Saint-Vincent, 56000 Vannes, France', at: new Date(MAINTENANT).toISOString(), url: 'https://www.vinted.fr/inbox/7101' } } });
@@ -106,10 +121,23 @@ async function preparer(b, vp, sc) {
     const u = r.request().url();
     if (/api-adresse\.data\.gouv\.fr/.test(u)) {
       const q = decodeURIComponent(u);
+      const hn = (lon, lat, pr) => ({ geometry: { coordinates: [lon, lat] }, properties: { type: 'housenumber', ...pr } });
       const f = /Saint-Vincent/i.test(q) ? [{ geometry: { coordinates: [-2.7581, 47.6582] }, properties: { score: 0.93, type: 'housenumber', postcode: '56000' } }]
-        : /Gambetta/i.test(q) ? [{ geometry: { coordinates: [-1.8516, 48.6763] }, properties: { score: 0.91, type: 'housenumber', postcode: '35260' } }] : [];
+        : /Gambetta/i.test(q) ? [{ geometry: { coordinates: [-1.8516, 48.6763] }, properties: { score: 0.91, type: 'housenumber', postcode: '35260' } }]
+        // Vannes (coordonnées inventées, ordre de grandeur réel) :
+        : /29 Rue Hoche/i.test(q) ? [hn(-2.7590, 47.6572, { score: 0.95, postcode: '56000', city: 'Vannes', name: '29 Rue Hoche' })]
+        : /11 Rue Hoche/i.test(q) ? [hn(-2.7584, 47.6581, { score: 0.95, postcode: '56000', city: 'Vannes', name: '11 Rue Hoche' })]
+        // Sans code postal demandé : la Base rend la bonne adresse, À VANNES (la ville lue).
+        : /17 Rue Thiers/i.test(q) ? [hn(-2.7606, 47.6553, { score: 0.91, postcode: '56000', city: 'Vannes', name: '17 Rue Thiers' }), hn(-1.5536, 47.2130, { score: 0.62, postcode: '44000', city: 'Nantes', name: '17 Rue Thiers' })]
+        // Deux « 2 Place du Marché » à 56000, loin l'un de l'autre, scores proches : ambigu.
+        : /Place du March/i.test(q) ? [hn(-2.7560, 47.6590, { score: 0.88, postcode: '56000', city: 'Vannes', name: '2 Place du Marché' }), hn(-2.7300, 47.6400, { score: 0.86, postcode: '56000', city: 'Vannes', name: '2 Place du Marché' })] : [];
       return r.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify({ features: f }) });
     }
+    // Un fond minimal SERVI (une source GeoJSON, tuilée par MapLibre lui-même) : le
+    // fond « dessine » au banc, et les phrases « pas sur la carte » s'affichent.
+    if (/tiles\.openfreemap\.org\/styles\//.test(u)) return r.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' },
+      body: JSON.stringify({ version: 8, sources: { banc: { type: 'geojson', attribution: 'OpenFreeMap © OpenMapTiles © OpenStreetMap', data: { type: 'FeatureCollection', features: [{ type: 'Feature', geometry: { type: 'Point', coordinates: [-2.759, 47.657] }, properties: {} }] } } },
+        layers: [{ id: 'fond', type: 'background', paint: { 'background-color': '#eef0f2' } }, { id: 'pt', type: 'circle', source: 'banc', paint: { 'circle-radius': 2, 'circle-color': '#ccd' } }] }) });
     if (/tiles\.openfreemap\.org/.test(u)) return r.abort();
     return ['image', 'media', 'font'].includes(r.request().resourceType()) ? r.abort() : r.continue();
   });
@@ -174,8 +202,10 @@ async function main() {
         // ── B. LE MODE PLEIN ÉCRAN ────────────────────────────────────────────
         await pg.locator('[data-tournee-ouvrir]:visible').first().click();
         await pg.locator('[data-tournee-plein]').waitFor({ timeout: 8000 });
+        // La carte se charge à part (MapLibre) : on attend ses épingles, sans délai fixe.
+        await pg.waitForFunction(() => document.querySelectorAll('[data-tournee-plein] [data-relais-epingle]').length >= 2 || !!document.querySelector('[data-relais-carte-ko]'), null, { timeout: 15000 }).catch(() => {});
         await pg.waitForTimeout(800);
-        const ar = await pg.evaluate(() => ({ ordre: !!document.querySelector('[data-tournee-ordre="limite"]'),
+        const ar =await pg.evaluate(() => ({ ordre: !!document.querySelector('[data-tournee-ordre="limite"]'),
           l: [...document.querySelectorAll('[data-tournee-arret]')].map((e) => ({ cle: e.getAttribute('data-tournee-arret'), type: e.getAttribute('data-type'), n: e.getAttribute('data-n'), j: e.getAttribute('data-jours'), num: e.getAttribute('data-numero') })) }));
         const jours = ar.l.map((x) => (x.j === '' ? 9999 : Number(x.j)));
         const croissant = jours.every((j, k) => !k || j >= jours[k - 1]);
@@ -188,14 +218,17 @@ async function main() {
         const carte = await pg.evaluate(() => ({ carte: !!document.querySelector('[data-tournee-plein] [data-relais-fond]') || !!document.querySelector('[data-tournee-plein] [data-tournee-sans-carte]'), km: /\bkm\b|\bmin\b/.test((document.querySelector('[data-tournee-plein]') || {}).innerText || ''), depots: !!document.querySelector('[data-tournee-depots-hors-carte]') }));
         dit(carte.carte && !carte.km && carte.depots, `${T} plein écran : la carte des points relais (ou sa raison), aucune distance ni durée inventée, les dépôts dits hors carte`, JSON.stringify(carte));
         const ep = await pg.evaluate(() => [...document.querySelectorAll('[data-tournee-plein] [data-relais-epingle]')].map((e) => [e.getAttribute('data-relais-epingle'), e.textContent]).sort());
-        if (ep.length) dit(JSON.stringify(ep) === JSON.stringify([['kusmitea|56000', '4'], ['tabacduport|35260', '2']]), `${T} plein écran : chaque épingle porte le numéro de SON arrêt (Tabac du Port 2, Kusmi Tea 4)`, JSON.stringify(ep));
-        else console.log(`INFO ${T} plein écran : pas d'épingle dessinée ici (navigateur du banc sans WebGL) — la liste porte le contrôle`);
+        // (1er nov., Julien : « UN point par relais avec le NOMBRE de colis ») L'épingle
+        // porte le nombre de colis à retirer : Kusmi Tea 2, Tabac du Port 1 (pas le n° d'arrêt).
+        if (ep.length) dit(JSON.stringify(ep) === JSON.stringify([['kusmitea|56000', '2'], ['tabacduport|35260', '1']]), `${T} plein écran : une épingle par relais, qui porte SON nombre de colis (Kusmi Tea 2, Tabac du Port 1)`, JSON.stringify(ep));
+        else dit(false, `${T} plein écran : les épingles sont posées (le banc a WebGL : elles existent dans le DOM même si le fond échoue)`);
         // (1er nov., Julien : « 5 points de retrait mais 3 sur la carte ») Chaque arrêt de
-        // retrait est SUR la carte (son numéro sur une épingle) ou dit « Pas sur la carte » sous lui.
+        // retrait est SUR la carte (une épingle à SA clé, au même nombre que la ligne) ou dit « Pas sur la carte » sous lui.
         const cov = await pg.evaluate(() => {
-          const surEp = new Set([...document.querySelectorAll('[data-tournee-plein] [data-relais-epingle]')].flatMap((e) => e.textContent.split('·')));
-          return [...document.querySelectorAll('[data-tournee-arret][data-type="retrait"]')].map((e) => ({ num: e.getAttribute('data-numero'), carte: surEp.has(e.getAttribute('data-numero')), dit: !!e.querySelector('[data-tournee-hors-carte]'), ko: !!document.querySelector('[data-relais-carte-ko]') }));
+          const surEp = new Map([...document.querySelectorAll('[data-tournee-plein] [data-relais-epingle]')].map((e) => ['r:' + e.getAttribute('data-relais-epingle'), e.textContent]));
+          return [...document.querySelectorAll('[data-tournee-arret][data-type="retrait"]')].map((e) => ({ cle: e.getAttribute('data-tournee-arret'), n: e.getAttribute('data-n'), carte: surEp.has(e.getAttribute('data-tournee-arret')), memeN: surEp.get(e.getAttribute('data-tournee-arret')) === e.getAttribute('data-n'), dit: !!e.querySelector('[data-tournee-hors-carte]'), ko: !!document.querySelector('[data-relais-carte-ko]') }));
         });
+        dit(cov.filter((x) => x.carte).every((x) => x.memeN), `${T} plein écran : l'épingle dit le MÊME nombre que la ligne de son arrêt`, JSON.stringify(cov));
         if (!cov.some((x) => x.ko)) dit(cov.length > 0 && cov.every((x) => x.carte !== x.dit), `${T} plein écran : chaque point de retrait est sur la carte OU dit « pas sur la carte » avec sa raison`, JSON.stringify(cov));
         else console.log(`INFO ${T} plein écran : fond de carte indisponible ici — la liste porte le contrôle`);
         await pg.screenshot({ path: path.join(SHOTS, `tournee-plein-${vp.width}.png`) });
@@ -234,6 +267,63 @@ async function main() {
         await pg.waitForTimeout(300);
         await pg.screenshot({ path: path.join(SHOTS, `tournee-fait-${vp.width}.png`) });
         dit(!errs.length, `${T} D aucune erreur d'app`, errs[0]);
+        await ctx.close();
+      });
+      // ── V. SA CAPTURE : QUATRE RELAIS À VANNES (1er nov.) ───────────────────
+      // CALCULÉ À LA MAIN : Tabavap 3 (le n° 11110003 écrit deux fois compte une
+      // fois), Terra Cbd 1, Phone Cash 1 (adresse sans code postal, rue + ville
+      // sûres), Le Narval 1 (Base Adresse ambiguë) ⇒ Retirer 6 = vrm_colis_retirer ;
+      // 3 épingles « 3 », « 1 », « 1 » ; Le Narval « pas sur la carte », raison « ambigu ».
+      await essaie(T + ' V', async () => {
+        const { ctx, pg, errs } = await preparer(b, vp, 'vannes');
+        await pg.goto(`http://localhost:${PORT}/?tab=journee`, { waitUntil: 'domcontentloaded' });
+        await attendreTournee(pg);
+        const ret = await pg.evaluate(() => { const e = document.querySelector('[data-tournee-etape="retirer"]'); let pub = null; try { pub = JSON.parse(localStorage.getItem('vrm_colis_retirer') || 'null'); } catch (_) {} return { n: e && e.getAttribute('data-n'), pub: pub && pub.total }; });
+        dit(ret.n === '6' && String(ret.pub) === '6', `${T} V Retirer : 6 colis (Tabavap 3 dont un n° de suivi en double compté une fois, Terra Cbd 1, Phone Cash 1, Le Narval 1) = vrm_colis_retirer`, JSON.stringify(ret));
+        await pg.locator('[data-tournee-ouvrir]:visible').first().click();
+        await pg.locator('[data-tournee-plein]').waitFor({ timeout: 8000 });
+        await pg.waitForFunction(() => !document.querySelector('[data-tournee-plein] [data-raison="cherche"]') && document.querySelectorAll('[data-tournee-plein] [data-relais-epingle]').length > 0, null, { timeout: 15000 }).catch(() => {});
+        await pg.waitForTimeout(1200);
+        const L = await pg.evaluate(() => ({
+          ep: [...document.querySelectorAll('[data-tournee-plein] [data-relais-epingle]')].map((e) => [e.getAttribute('data-relais-epingle'), e.textContent]).sort(),
+          fond: (document.querySelector('[data-tournee-plein] [data-relais-fond]') || {}).getAttribute ? document.querySelector('[data-tournee-plein] [data-relais-fond]').getAttribute('data-relais-fond') : null,
+          arr: [...document.querySelectorAll('[data-tournee-arret][data-type="retrait"]')].map((e) => { const h = e.querySelector('[data-tournee-hors-carte]'); return { cle: e.getAttribute('data-tournee-arret'), n: e.getAttribute('data-n'), carte: e.getAttribute('data-tournee-sur-carte'), raison: h ? h.getAttribute('data-raison') : null, txt: h ? h.textContent : '' }; }),
+        }));
+        dit(JSON.stringify(L.ep) === JSON.stringify([['phonecash|', '1'], ['tabavap|56000', '3'], ['terracbd|56000', '1']]), `${T} V une épingle par relais avec son NOMBRE : Tabavap 3 (trois colis ⇒ UNE épingle), Terra Cbd 1 et Tabavap, tous deux rue Hoche ⇒ deux épingles, Phone Cash (sans code postal) 1`, JSON.stringify(L.ep));
+        const par = Object.fromEntries(L.arr.map((x) => [x.cle, x]));
+        const nar = L.arr.find((x) => /narval/.test(x.cle));
+        dit(!!nar && nar.carte === 'non' && nar.raison === 'ambigu' && nar.txt.length > 20, `${T} V Le Narval : la Base Adresse rend deux endroits ⇒ PAS d'épingle, « pas sur la carte » et la raison dite`, JSON.stringify(nar));
+        dit(L.arr.length === 4 && L.arr.every((x) => (x.carte === 'oui') !== !!x.raison), `${T} V chaque point de retrait est sur la carte OU dit pourquoi il n'y est pas — jamais en silence`, JSON.stringify(L.arr));
+        dit(L.ep.every(([k, t]) => par['r:' + k] && par['r:' + k].n === t), `${T} V l'épingle et la ligne de l'arrêt disent le même nombre`, JSON.stringify([L.ep, L.arr.map((x) => [x.cle, x.n])]));
+        dit(L.fond === 'pret', `${T} V le fond de carte (servi au banc) est dessiné`, String(L.fond));
+        await pg.screenshot({ path: path.join(SHOTS, `tournee-vannes-${vp.width}.png`) });
+        // Toucher une épingle met SA ligne en avant.
+        await pg.evaluate(() => { const e = [...document.querySelectorAll('[data-tournee-plein] [data-relais-epingle]')].find((x) => x.getAttribute('data-relais-epingle') === 'terracbd|56000'); if (e) e.click(); });
+        await pg.waitForTimeout(700);
+        const ch = await pg.evaluate(() => ({ li: [...document.querySelectorAll('[data-tournee-choisi]')].map((e) => e.getAttribute('data-tournee-arret')), ep: [...document.querySelectorAll('[data-relais-choisi]')].map((e) => e.getAttribute('data-relais-epingle')) }));
+        dit(JSON.stringify(ch.li) === '["r:terracbd|56000"]' && JSON.stringify(ch.ep) === '["terracbd|56000"]', `${T} V toucher l'épingle Terra Cbd met SA ligne en avant (et l'épingle)`, JSON.stringify(ch));
+        await pg.screenshot({ path: path.join(SHOTS, `tournee-vannes-choisi-${vp.width}.png`) });
+        await pg.click('[data-tournee-fermer]');
+        await pg.waitForTimeout(300);
+        // ── La même chose dans Colis → À retirer ────────────────────────────
+        await pg.evaluate(() => { const t = document.querySelector('[data-tournee]'); if (t) t.scrollIntoView({ block: 'center' }); });
+        await pg.click('[data-tournee-etape="retirer"] button');
+        await pg.locator('[data-cc-colonne="retirer"] [data-relais-point]').first().waitFor({ timeout: 25000 });
+        await pg.waitForFunction(() => !document.querySelector('[data-cc-colonne="retirer"] [data-relais-repere="cherche"]'), null, { timeout: 15000 }).catch(() => {});
+        await pg.waitForTimeout(1500);
+        const K = await pg.evaluate(() => ({
+          ep: [...document.querySelectorAll('[data-cc-colonne="retirer"] [data-relais-epingle]')].map((e) => [e.getAttribute('data-relais-epingle'), e.textContent]).sort(),
+          pts: [...document.querySelectorAll('[data-cc-colonne="retirer"] [data-relais-point]')].map((e) => ({ cle: e.getAttribute('data-relais-point'), past: (e.querySelector('[data-relais-pastille]') || {}).textContent || null, rp: e.getAttribute('data-relais-repere'), raison: (e.querySelector('[data-relais-sans-repere]') || { getAttribute: () => null }).getAttribute('data-raison') })),
+        }));
+        dit(JSON.stringify(K.ep) === JSON.stringify(L.ep), `${T} V Colis → À retirer : les mêmes épingles, avec les mêmes nombres`, JSON.stringify(K.ep));
+        const kp = Object.fromEntries(K.pts.map((x) => [x.cle, x]));
+        dit(K.ep.every(([k, t]) => kp[k] && kp[k].past === t), `${T} V Colis : la pastille de chaque point dit le nombre de SON épingle`, JSON.stringify(K.pts));
+        const kn = K.pts.find((x) => /narval/.test(x.cle));
+        dit(!!kn && kn.rp === 'non' && kn.raison === 'ambigu', `${T} V Colis : Le Narval pas sur la carte, raison « ambigu » dite sous lui`, JSON.stringify(kn));
+        await pg.evaluate(() => { const c = document.querySelector('[data-cc-colonne="retirer"]'); if (c) c.scrollIntoView({ block: 'start' }); });
+        await pg.waitForTimeout(400);
+        await pg.screenshot({ path: path.join(SHOTS, `colis-vannes-${vp.width}.png`) });
+        dit(!errs.length, `${T} V aucune erreur d'app`, errs[0]);
         await ctx.close();
       });
       // ── E. RIEN À FAIRE ⇒ PAS DE CARTE ──────────────────────────────────────

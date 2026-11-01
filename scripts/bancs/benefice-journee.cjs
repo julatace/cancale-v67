@@ -190,7 +190,7 @@ const toucheForce=async(pg,sel,T)=>{ const l=pg.locator(sel).first(); await l.ev
         dit(!!j,'jamais choisi, bénéfice publié ⇒ la carte est dans Ma journée PAR DÉFAUT');
         dit(await pg.locator('[data-journee-benef-masquer]').count()===0,'hors du mode « Modifier », aucun bouton « Masquer »');
         dit(await pg.locator('.vrm-day-money [data-journee-benef]').count()===1,'CA et bénéfice partagent la même carte');
-        dit(await pg.locator('[data-style-courbe=monotone]').count()===1,'graphique hebdomadaire avec courbes monotones');
+        dit(await pg.locator('[data-style-courbe=barres]').count()===1 && await pg.locator('[data-courbe-semaine] [data-barre]').count()>0,'graphique hebdomadaire en barres (1er nov. : plus de courbe lissée)');
         dit(!!c && c.etat==='lu' && !!j && j.etat==='lu','les deux cartes lisent la publication',`${c&&c.etat} / ${j&&j.etat}`);
         dit(!!c && !!j && c.brut!=='' && j.brut===c.brut,'BRUT du mois identique à Comptabilité',`${j&&j.brut} · ${c&&c.brut}`);
         dit(!!c && !!j && c.net!=='' && j.net===c.net,'NET du mois identique à Comptabilité (charges et cotisations comprises)',`${j&&j.net} · ${c&&c.net}`);
@@ -198,8 +198,8 @@ const toucheForce=async(pg,sel,T)=>{ const l=pg.locator(sel).first(); await l.ev
         // Aujourd'hui = la même publication, lue directement.
         const att=await pg.evaluate(()=>{ const p=JSON.parse(localStorage.getItem('vrm_benefice_jours')||'null'); const d=new Date(); const k=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; const t=p&&p.jours&&p.jours[k]; return t?String(t[0]):'0'; });
         dit(!!j && j['jour-n']===att,'aujourd’hui : le nombre de ventes vient de la publication',`${j&&j['jour-n']} · ${att}`);
-        const couleur=await pg.evaluate(()=>{ const e=document.querySelector('[data-journee-benef-ligne="net"] .vrm-display'); return e?getComputedStyle(e).color:''; });
-        dit(!/rgb\((2[0-9]{2}), ?([0-9]{1,2}), ?([0-9]{1,2})\)/.test(couleur),'aucun rouge sur le bénéfice',couleur);
+        const couleur=await pg.evaluate(()=>{ const e=document.querySelector('[data-journee-benef-ligne="net"] .vrm-jc-montant'); return e?getComputedStyle(e).color:'(absent)'; });
+        dit(couleur!=='(absent)' && !/rgb\((2[0-9]{2}), ?([0-9]{1,2}), ?([0-9]{1,2})\)/.test(couleur),'aucun rouge sur le bénéfice',couleur);
         dit(await pg.locator('[data-journee-benef-detail]').count()===1,'un lien vers Comptabilité pour le détail');
         if(process.env.BANC_CAPTURE) await pg.locator('.vrm-day-top').screenshot({path:path.join(process.env.BANC_CAPTURE,`journee-benef-${T.nom}.png`)});
         const deb=await pg.evaluate(()=>document.documentElement.scrollWidth-document.documentElement.clientWidth);
