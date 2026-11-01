@@ -42,7 +42,6 @@ import SuiviReceptionEmails from './ReceptionEmails.jsx';
 import EspaceEmails from './EspaceEmails.jsx';
 import JournalEmails, {EntreeJournalEmails} from './JournalEmails.jsx';
 import RecusEmail from "./RecusEmail.jsx";
-import { cheminMonotone } from "./courbeMonotone.js";
 import VuesVentes from "./VuesVentes.jsx";
 import BordereauxAuto from "./BordereauxAuto.jsx";
 import {resumerStockJournee} from './stockJournee.js';
@@ -11417,87 +11416,76 @@ function prenomLisible(v) {
   return t.includes('@') ? '' : t;
 }
 
-// Courbe à POINTS RELIÉS de la semaine : en abscisse les jours (lun → dim), en
-// ordonnée le chiffre d'affaires, la valeur écrite au-dessus de chaque point.
-// Vendu (trait plein, accent) et reçu (pointillé, gris) quand il est connu.
-// ⚠️ (16 oct., « pas premium sur iPhone ») : dessinée à la LARGEUR MESURÉE et à
-//    une HAUTEUR FIXE — en `viewBox` étiré, elle grossissait avec l'écran
-//    (chiffres de 30 px sur ordinateur, graphique plus haut que l'écran). Plus
-//    d'axe gradué à gauche (il mangeait la place) : la valeur est écrite sur
-//    chaque point, détourée de la couleur du fond pour ne jamais se mélanger
-//    aux repères.
-// Les explications restent visibles sur ordinateur, accessibles au toucher sur mobile.
-function DayWeekNote({children,label='Ventes et versements'}) {
-  const [mobile,setMobile]=React.useState(()=>window.matchMedia('(max-width:767px)').matches);
-  React.useEffect(()=>{
-    const mq=window.matchMedia('(max-width:767px)');
-    const maj=()=>setMobile(mq.matches);
-    mq.addEventListener('change',maj);
-    return ()=>mq.removeEventListener('change',maj);
-  },[]);
-  return mobile ? <details className="vrm-day-week-help"><summary className="vrm-day-help-toggle">{label}</summary>{children}</details> : children;
+// (1er nov.) UN MONTANT des chiffres de Ma journée : le nombre en Geist Mono
+// tabulaire, « € » plus petit, insécables. Pas su ⇒ « — » (jamais 0 €, §5).
+function Montant({ v, dec = 0, prefixe = '' }) {
+  if (v == null || !Number.isFinite(Number(v))) return <span className="vrm-jc-montant vrm-jc-vide">—</span>;
+  const n = Number(v).toLocaleString('fr-FR', { minimumFractionDigits: dec, maximumFractionDigits: dec });
+  return <span className="vrm-jc-montant">{prefixe}{n}<span className="vrm-jc-eur">{' '}€</span></span>;
 }
 
-function CourbeSemaine({ jours, hauteur = 176 }) {
+// ── LA SEMAINE EN BARRES (1er nov.) ───────────────────────────────────────────
+// Julien : « je n'aime pas le graphique, il n'est pas beau ». La courbe lissée
+// (cubique monotone) inventait une pente entre deux jours et plongeait sous un
+// jour sans vente ; la série « reçu » en pointillé, sa légende et sa phrase
+// d'explication encombraient la carte. Maintenant : UNE barre par jour passé,
+// montant VENDU (date de la vente) — une seule série, aucune légende.
+//   · la valeur au-dessus de la barre, seulement si elle tient dans sa colonne ;
+//   · un « 0 » discret pour un jour passé sans vente ; rien après aujourd'hui ;
+//   · aujourd'hui : son libellé en encre, souligné d'un trait cobalt ;
+//   · barres à angles droits, posées sur une ligne de base, sans grille.
+// Le « reçu » du jour reste PORTÉ (`data-recu`, et dans l'infobulle) : les bancs
+// le lisent, il ne se dessine plus (une seule série par graphique). Dessinée à
+// la LARGEUR MESURÉE et à une hauteur fixe (16 oct. : un viewBox étiré
+// grossissait les chiffres avec l'écran).
+function BarresSemaine({ jours }) {
   const ref = React.useRef(null);
   const [W, setW] = React.useState(340);
-  const [compact,setCompact] = React.useState(()=>window.matchMedia('(max-width:767px)').matches);
+  const [Hdispo, setHdispo] = React.useState(0);
+  const [compact, setCompact] = React.useState(() => { try { return window.matchMedia('(max-width:767px)').matches; } catch (_) { return false; } });
   React.useLayoutEffect(() => {
     const el = ref.current; if (!el) return undefined;
-    const mesure = () => { const mobile = window.matchMedia('(max-width:767px)').matches; const w = el.clientWidth; setCompact(mobile); if (w > 0) setW((v) => (Math.abs(v - w) > 1 ? w : v)); };
+    // La hauteur aussi : côte à côte avec « Vendu », la carte est plus haute que
+    // le graphique ; les barres prennent la place (jusqu'à 240 px) au lieu d'un vide.
+    const mesure = () => { let mobile = false; try { mobile = window.matchMedia('(max-width:767px)').matches; } catch (_) {} const w = el.clientWidth, h = el.clientHeight; setCompact(mobile); if (w > 0) setW((v) => (Math.abs(v - w) > 1 ? w : v)); setHdispo((v) => (Math.abs(v - h) > 1 ? h : v)); };
     mesure();
     if (typeof ResizeObserver === 'undefined') return undefined;
     const ro = new ResizeObserver(mesure); ro.observe(el);
     return () => ro.disconnect();
   }, []);
-  const uid = React.useId ? React.useId().replace(/:/g, '') : 'cs';
-  const H = compact ? 150 : hauteur, gx = 14, gd = compact ? 14 : 46, gy = compact ? 26 : 24, bas = 36;
-  const trait = C.accent;
-  const vus = jours.filter(j => !j.futur);
-  const max = Math.max(10, ...vus.map(j => Math.max(j.vendu.eur, j.recu ? j.recu.eur : 0)));
-  const pas = max <= 50 ? 10 : max <= 200 ? 50 : max <= 500 ? 100 : max <= 1000 ? 250 : 500;
-  const haut = Math.ceil(max / pas) * pas;
-  const col = (W - gx - gd) / 6;
-  const X = (i) => gx + i * col;
-  const Y = (v) => gy + (1 - v / haut) * (H - gy - bas);
-  const base = H - bas;
-  const eur = (x) => `${Math.round(x).toLocaleString('fr-FR')} €`;
-  const points = (cle) => jours.map((j, i) => (j.futur || (cle === 'recu' && !j.recu)) ? null : [X(i), Y(cle === 'recu' ? j.recu.eur : j.vendu.eur)]).filter(Boolean);
-  const chemin = cheminMonotone;
-  const pv = points('vendu');
+  const Hmin = compact ? 136 : 148;
+  const H = Math.round(Math.max(Hmin, Math.min(240, Hdispo || 0))), haut = 18, bas = 34;
+  const base = H - bas, plot = base - haut;
+  const col = W / 7;
+  const larg = Math.max(10, Math.min(compact ? 26 : 30, col * 0.56));
+  const X = (i) => col * i + col / 2;
+  const vus = jours.filter((j) => !j.futur);
+  const max = Math.max(1, ...vus.map((j) => j.vendu.eur));
   const totV = vus.reduce((a, j) => a + j.vendu.eur, 0);
-  const avecRecu = jours.every(j => j.recu);
-  const iAuj = jours.findIndex(j => j.auj);
-  const bande = Math.min(40, col - 4);
-  const pic=jours.reduce((best,j,i)=>!j.futur&&j.vendu.eur>(jours[best]?.vendu.eur||0)?i:best,0);
+  const eur = (x) => `${Math.round(x).toLocaleString('fr-FR')} €`;
+  const mono = { fontFamily: 'var(--vrm-police-mono)', fontVariantNumeric: 'tabular-nums' };
   return (
-    <div ref={ref} style={{width:'100%'}}>
-      <svg data-courbe-semaine="" data-style-courbe="monotone" width={W} height={H} viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`Semaine en cours : ${eur(totV)} vendus`} style={{display:'block',overflow:'visible'}}>
-        <defs>
-          <linearGradient id={`csg${uid}`} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor={trait} stopOpacity="0.22"/>
-            <stop offset="100%" stopColor={trait} stopOpacity="0"/>
-          </linearGradient>
-        </defs>
-        {iAuj >= 0 && !compact && <rect x={X(iAuj) - bande / 2} y={gy - 10} width={bande} height={base - gy + 16} rx="10" fill={C.bg}/>}
-        {!compact && [0, 0.5, 1].map(f => <g key={f}><text x={W-1} y={Y(haut*f)+3} textAnchor="end" fontSize="10" fill={C.muted} style={{fontVariantNumeric:"tabular-nums"}}>{eur(haut*f)}</text><line x1={gx - 8} x2={W - gd + 8} y1={Y(haut * f)} y2={Y(haut * f)} stroke={C.border} strokeWidth="1" strokeOpacity=".65" strokeDasharray="2 5"/></g>)}
-        <line x1={gx - 8} x2={W - gd + 8} y1={base} y2={base} stroke={C.border} strokeWidth="1"/>
-        {pv.length > 1 && <path d={`${chemin(pv)} L${pv[pv.length - 1][0].toFixed(1)},${base} L${pv[0][0].toFixed(1)},${base} Z`} fill={`url(#csg${uid})`}/>}
-        {avecRecu && <path d={chemin(points('recu'))} fill="none" stroke={C.muted} strokeWidth="1.5" strokeOpacity=".8" strokeDasharray="4 5" strokeLinecap="round"/>}
-        <path d={chemin(pv)} fill="none" stroke={trait} strokeWidth="2.6" strokeLinejoin="round" strokeLinecap="round"/>
-        {jours.map((j, i) => (
-          <g key={j.cle} data-jour={j.cle} data-vendu={j.futur ? '' : Math.round(j.vendu.eur * 100)} data-recu={j.futur || !j.recu ? '' : Math.round(j.recu.eur * 100)}>
-            {!j.futur && <>
-              <title>{`${j.long} · vendu ${eur(j.vendu.eur)} (${j.vendu.n} vente${j.vendu.n > 1 ? 's' : ''})${j.recu ? ` · reçu ${eur(j.recu.eur)}` : ''}`}</title>
-              {avecRecu && j.recu.eur > 0 && <circle cx={X(i)} cy={Y(j.recu.eur)} r="2.8" fill={C.card} stroke={C.muted} strokeWidth="1.4"/>}
-              <circle cx={X(i)} cy={Y(j.vendu.eur)} r={j.auj ? 4.3 : 2.8} fill={j.auj ? trait : C.card} stroke={trait} strokeWidth="1.8"/>
-              {compact && j.vendu.eur > 0 && <text data-courbe-valeur="" x={Math.max(16,Math.min(W-16,X(i)))} y={Math.max(12, Y(j.vendu.eur) - 11)} textAnchor="middle" fontSize="11" fontWeight={j.auj || i===pic ? 700 : 600} fill={j.auj || i===pic ? C.text : C.muted} stroke={C.card} strokeWidth="4" strokeLinejoin="round" paintOrder="stroke" style={{fontVariantNumeric:'tabular-nums'}}>{Math.round(j.vendu.eur)}</text>}
-              {!compact && i===pic && j.vendu.eur > 0 && <text x={Math.max(42,Math.min(W-42,X(i)))} y={Math.max(14, Y(j.vendu.eur) - 10)} textAnchor="middle" fontSize="11" fontWeight="700" fill={C.text} stroke={j.auj ? C.bg : C.card} strokeWidth="4" strokeLinejoin="round" paintOrder="stroke" style={{fontVariantNumeric:'tabular-nums'}}>{Math.round(j.vendu.eur)}</text>}
-            </>}
-            <text x={X(i)} y={H - 20} textAnchor="middle" fontSize="10" fontWeight="500" fill={C.muted} opacity={j.futur ? 0.55 : 1}>{j.jour.toLowerCase()}</text>
-            <text x={X(i)} y={H - 6} textAnchor="middle" fontSize="11" fontWeight={j.auj ? 700 : 600} fill={j.auj ? (compact ? trait : C.text) : C.muted} opacity={j.futur ? 0.55 : 1} style={{fontVariantNumeric:'tabular-nums'}}>{j.num}</text>
-          </g>
-        ))}
+    <div ref={ref} className="vrm-jc-barres" style={{ width: '100%', minHeight: Hmin }}>
+      <svg data-courbe-semaine="" data-style-courbe="barres" width={W} height={H} viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`Semaine en cours : ${eur(totV)} vendus`} style={{ display: 'block' }}>
+        <line x1={0} x2={W} y1={base + 0.5} y2={base + 0.5} stroke={C.border} strokeWidth="1"/>
+        {jours.map((j, i) => {
+          const v = j.futur ? null : j.vendu.eur;
+          const h = v == null ? 0 : Math.max(v > 0 ? 3 : 0, (v / max) * plot);
+          const txt = v == null ? '' : String(Math.round(v));
+          // La valeur ne s'écrit que si elle tient dans sa colonne (≈ 6,8 px par chiffre à 11 px).
+          const tient = txt.length * 6.8 <= col - 4;
+          const encre = j.auj ? C.text : C.muted;
+          return (
+            <g key={j.cle} data-jour={j.cle} data-vendu={j.futur ? '' : Math.round(j.vendu.eur * 100)} data-recu={j.futur || !j.recu ? '' : Math.round(j.recu.eur * 100)} data-auj={j.auj ? '' : undefined}>
+              {!j.futur && <title>{`${j.long} · vendu ${eur(j.vendu.eur)} (${j.vendu.n} vente${j.vendu.n > 1 ? 's' : ''})${j.recu ? ` · reçu ${eur(j.recu.eur)}` : ''}`}</title>}
+              {v != null && <rect data-barre="" x={X(i) - larg / 2} y={base - h} width={larg} height={h} fill={C.accent}/>}
+              {v != null && tient && <text x={X(i)} y={base - h - 6} textAnchor="middle" fontSize={v > 0 ? 11 : 10} fill={v > 0 ? C.text : C.muted} opacity={v > 0 ? 1 : 0.7} style={mono}>{txt}</text>}
+              <text x={X(i)} y={H - 18} textAnchor="middle" fontSize="11" fontWeight={j.auj ? 700 : 500} fill={encre} opacity={j.futur ? 0.5 : 1}>{j.jour.toLowerCase()}</text>
+              <text x={X(i)} y={H - 5} textAnchor="middle" fontSize="11" fill={encre} opacity={j.futur ? 0.5 : 1} style={mono}>{j.num}</text>
+              {j.auj && <rect x={X(i) - 9} y={H - 2} width={18} height={2} fill={C.accent}/>}
+            </g>
+          );
+        })}
       </svg>
     </div>
   );
@@ -28640,7 +28628,7 @@ const GARAGE_AMBIANCES = [
 // ── Compteur qui monte (le CA du héros) ────────────────────────────────────
 // Une montée fluide de 0 jusqu'à la vraie valeur — décoration, elle ATTERRIT
 // toujours sur le chiffre exact (§5). `prefers-reduced-motion` ⇒ pas d'anim.
-function CountUpEuro({ value }) {
+function CountUpEuro({ value, petitEuro = false }) {
   const cible = Number(value) || 0;
   const [v, setV] = React.useState(() => {
     try { return matchMedia('(prefers-reduced-motion: reduce)').matches ? cible : 0; } catch (_) { return cible; }
@@ -28657,6 +28645,7 @@ function CountUpEuro({ value }) {
   // overflow-wrap:anywhere (pour qu'un montant énorme ne déborde pas la carte),
   // qui cassait « 299 » / « € » même à travers l'espace insécable : un nowrap
   // sur le nombre le protège, avec l'espace fine insécable (typographie FR).
+  if (petitEuro) return <span className="vrm-jc-montant">{Math.round(v).toLocaleString('fr-FR')}<span className="vrm-jc-eur">{'\u202f'}€</span></span>;
   return <span style={{whiteSpace:'nowrap'}}>{Math.round(v).toLocaleString('fr-FR') + ' €'}</span>;
 }
 
@@ -36509,7 +36498,7 @@ function ChoixDepenses({ onAucune, onAjouter, compact = false }) {
   const lien = { background: 'none', border: 0, padding: 0, fontWeight: 600, cursor: 'pointer', fontSize: 'inherit', fontFamily: 'inherit', minHeight: 0 };
   return (
     <div data-depenses-choix="" style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'baseline', gap: '4px 14px', fontSize: compact ? 12.5 : 13, color: compact ? 'inherit' : C.muted, lineHeight: 1.45 }}>
-      <button type="button" data-depenses-aucune="" onClick={onAucune} className={compact ? 'vrm-lien-action' : undefined} style={{ ...lien, color: compact ? 'inherit' : C.text }}>Je n'ai pas de dépenses à noter</button>
+      <button type="button" data-depenses-aucune="" onClick={onAucune} className={compact ? 'vrm-lien-action' : undefined} style={{ ...lien, color: compact ? 'inherit' : C.text }}>{compact ? 'Pas de dépenses' : "Je n'ai pas de dépenses à noter"}</button>
       <button type="button" data-depenses-ajouter="" onClick={onAjouter} className={compact ? 'vrm-lien-action' : undefined} style={{ ...lien, color: C.accent }}>Ajouter une dépense</button>
     </div>
   );
@@ -36655,66 +36644,55 @@ function BeneficeJournee({ onNav, place, edition = false }) {
   const raisonNet = !B ? '' : B.raison === 'achats' ? `il manque le prix d'achat de ${sansAchat} vente${sansAchat > 1 ? 's' : ''}`
     : B.raison === 'frais' ? 'des frais eBay ne sont pas connus'
     : B.raison === 'cotisations' ? 'en attente de ton CA déclaré (écran Ventes)'
-    : B.depenses === 'jamais' ? 'après frais et cotisations'
+    : B.depenses === 'jamais' ? 'après frais et cotisations, avant tes dépenses'
     : 'après frais, charges et cotisations';
   const allerCompta = (ev) => { if (ev) ev.preventDefault(); if (onNav) onNav('compta'); };
   const versSaisiePrix = () => { DEMANDE_SAISIE_PRIX.on = true; if (onNav) onNav('vinted_annonces'); };
-  const chiffre = (lib, v, sous, ligne) => (
-    <div style={{ minWidth: 0 }} data-journee-benef-ligne={ligne}>
-      <div className="vrm-day-k" style={{ color: C.muted }}>{lib}</div>
-      <div className="vrm-display" style={{ fontSize: 22, fontWeight: 700, color: v == null ? C.muted : C.text, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>{val(v)}</div>
-      {sous ? <div className="vrm-day-note" style={{ color: C.muted }}>{sous}</div> : null}
-    </div>
-  );
-  return (
-    <div className={place === "integre" ? "vrm-day-benef-inline" : "vrm-day-card"} data-journee-benef="" data-journee-benef-etat={etat}
-      data-journee-benef-n={B ? String(B.n) : ''} data-journee-benef-ncout={B ? String(B.nCout) : ''}
-      data-journee-benef-brut={B && B.nCout > 0 ? e2(B.brut) : ''} data-journee-benef-net={B ? e2(B.netFinal) : ''}
-      data-journee-benef-raison={B ? B.raison : ''} data-journee-benef-couverture={B ? couvertureBenefice(B) : ''}
-      data-journee-benef-jour-n={J ? String(J.n) : ''} data-journee-benef-jour-brut={J && J.nCout > 0 ? e2(J.brut) : ''}
-      data-journee-benef-jour-net={J && J.nCout > 0 ? e2(J.net) : ''}
-      data-journee-benef-depenses={depenses}
-      style={place === 'integre' ? {borderTop:`1px solid ${C.border}`} : { border: `1px solid ${C.border}`, background: C.card, boxShadow: C.shadow || 'none' }}>
-      <div className="vrm-day-head">
-        <span className="vrm-day-k" style={{ color: C.muted }}>Ton bénéfice{B ? ` · ${B.libelle}` : ''}</span>
-        <Bouton variante="discret" href="?tab=compta" className="vrm-day-lien" data-journee-benef-detail="" onClick={allerCompta}>Détail ›</Bouton>
-      </div>
-      {!B ? (
-        <div className="vrm-day-note" style={{ color: C.muted, marginTop: 6, lineHeight: 1.5 }}>
-          {etat === 'encours' ? 'Je lis ton bénéfice…' : <>Il se calcule dans l'écran Ventes : ouvre-le une fois. <Bouton variante="discret" href="?tab=cat_ventes" onClick={(ev) => { ev.preventDefault(); if (onNav) onNav('cat_ventes'); }}>Ventes ›</Bouton></>}
-        </div>
-      ) : (<>
-        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(0,1fr)', gap: 12, marginTop: place === 'integre' ? 2 : 8 }}>
-          {chiffre('Brut ce mois', brutDe(B), B.n === 0 ? 'aucune vente finalisée' : '', 'brut')}
-          {chiffre(B.depenses === 'jamais' ? 'Net avant tes dépenses' : 'Net ce mois', B.netFinal, raisonNet, 'net')}
-        </div>
-        {depenses === 'jamais' && (
-          <div className="vrm-day-note" style={{ marginTop: 8, color: C.muted }}>
-            <ChoixDepenses compact onAucune={sansDepenses} onAjouter={ajouterDepense} />
-          </div>
-        )}
-        {B.nCout < B.n && (
-          <div className="vrm-day-note" style={{ marginTop: 6 }}>
-            <Bouton variante="discret" data-journee-benef-porte="" onClick={versSaisiePrix}>Compléter les prix d'achat ›</Bouton>
-          </div>
-        )}
-        {/* (31 oct.) La ligne du jour n'est dessinée que s'il y a une vente
-            aujourd'hui : vide, elle ajoutait un filet et 20 px sous la carte. */}
-        {J && J.n > 0 && <div className="vrm-day-note" data-journee-benef-ligne="jour" style={{ color: C.muted, marginTop: 10, paddingTop: 10, borderTop: `1px solid ${C.border}`, lineHeight: 1.5 }}>
-          {J && J.n > 0
-            ? <>Aujourd'hui : <b style={{ color: C.text, fontWeight: 600 }}>{val(brutDe(J))}</b> brut{J.nCout > 0 ? <> · <b style={{ color: C.text, fontWeight: 600 }}>{val(J.net)}</b> net des ventes</> : null}{J.nCout < J.n ? ` (prix d'achat connus pour ${J.nCout} sur ${J.n})` : ''}</>
-            : null}
-        </div>}
-      </>)}
+  // (1er nov.) UNE case de la rangée des chiffres : un libellé, le montant, au
+  // plus une ligne. Le net quand il se calcule ; sinon le brut des ventes au
+  // prix d'achat connu, sa couverture (« 1 sur 3 ») et la porte AMBRE vers la
+  // saisie des prix (§5 : le chiffre faux est la porte pour le corriger). Le
+  // détail (brut, frais, charges, cotisations, aujourd'hui) vit dans
+  // Comptabilité (« Bénéfice › ») et dans l'infobulle — plus sur cette carte.
+  const avecNet = !!B && B.netFinal != null;
+  const brut = brutDe(B);
+  const valeur = !B ? null : avecNet ? B.netFinal : brut;
+  let sous = null;
+  if (!B) sous = etat === 'encours' ? 'je le lis…' : <button type="button" className="vrm-jc-geste-neutre" onClick={() => { if (onNav) onNav('cat_ventes'); }}>se calcule dans l'écran Ventes ›</button>;
+  else if (B.nCout < B.n) sous = <>{B.nCout} sur {B.n} · <button type="button" className="vrm-jc-geste" data-journee-benef-porte="" onClick={versSaisiePrix}>{sansAchat} prix d'achat ›</button></>;
+  else if (!avecNet && B.raison === 'frais') sous = 'frais eBay inconnus';
+  else if (!avecNet && B.raison === 'cotisations') sous = 'CA déclaré en attente';
+  else if (B.depenses === 'jamais') sous = 'avant tes dépenses';
+  const titre = B ? `Ton bénéfice · ${B.libelle} — ${avecNet ? raisonNet : `brut : ${raisonNet}`}${J && J.n > 0 && J.nCout > 0 ? ` · aujourd'hui ${val(J.net)} net des ventes` : ''}` : "Ton bénéfice se calcule dans l'écran Ventes";
+  const attrs = {
+    'data-journee-benef': '', 'data-journee-benef-etat': etat,
+    'data-journee-benef-n': B ? String(B.n) : '', 'data-journee-benef-ncout': B ? String(B.nCout) : '',
+    'data-journee-benef-brut': B && B.nCout > 0 ? e2(B.brut) : '', 'data-journee-benef-net': B ? e2(B.netFinal) : '',
+    'data-journee-benef-raison': B ? B.raison : '', 'data-journee-benef-couverture': B ? couvertureBenefice(B) : '',
+    'data-journee-benef-jour-n': J ? String(J.n) : '', 'data-journee-benef-jour-brut': J && J.nCout > 0 ? e2(J.brut) : '',
+    'data-journee-benef-jour-net': J && J.nCout > 0 ? e2(J.net) : '',
+    'data-journee-benef-depenses': depenses,
+  };
+  const corps = (
+    <>
+      <a href="?tab=compta" className="vrm-jc-l vrm-jc-l-lien" data-journee-benef-detail="" onClick={allerCompta}>{B && !avecNet ? 'Bénéfice brut' : 'Bénéfice'}<span aria-hidden="true"> ›</span></a>
+      <div className="vrm-jc-v" data-journee-benef-ligne={avecNet ? 'net' : 'brut'}><Montant v={valeur}/></div>
+      {sous ? <div className="vrm-jc-sous">{sous}</div> : null}
+      {depenses === 'jamais' && (
+        <div className="vrm-jc-choix"><ChoixDepenses compact onAucune={sansDepenses} onAjouter={ajouterDepense} /></div>
+      )}
       {/* (31 oct.) « Masquer » vit dans le mode « Modifier », comme le − des
           widgets ; on le remet par « + Ajouter » (feuille des widgets). */}
       {edition && (
-        <div style={{ marginTop: 6 }}>
+        <div style={{ marginTop: 8 }}>
           <Bouton variante="secondaire" className="vrm-b-petit" data-journee-benef-masquer="" onClick={() => poser(false)}>Masquer le bénéfice</Bouton>
         </div>
       )}
-    </div>
+    </>
   );
+  return place === 'integre'
+    ? <div className="vrm-jc-cell" title={titre} {...attrs}>{corps}</div>
+    : <div className="vrm-day-card vrm-jc vrm-jc-carte" title={titre} {...attrs} style={{ border: `1px solid ${C.border}`, background: C.card }}><div className="vrm-jc-cell">{corps}</div></div>;
 }
 // (31 oct.) Plus d'interrupteur dans Réglages → Affichage (sa décision) : le
 // bénéfice se masque et se remet DANS Ma journée, en mode « Modifier ».
@@ -47155,43 +47133,55 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             {listeTaches(jobsAFaire, {})}
           </div>
         ) : null;
+        // ── (1er nov.) LES CHIFFRES DE LA JOURNÉE, ÉPURÉS ──────────────────────
+        // Julien : « il y a des écritures partout qui gâchent tout ». UN grand
+        // chiffre (le vendu du mois, ce que publie l'écran : `data-vendu-mois`),
+        // puis une rangée de cases de même forme — Bénéfice, Reçu, cotisations
+        // (micro), CA de l'année : un libellé, le montant, AU PLUS une ligne.
+        // La couverture partielle reste dite, en mot court (« au moins »,
+        // « 1 sur 3 », « — ») ; l'explication longue passe en infobulle (title).
+        // Aucune règle de calcul n'a changé : mêmes variables qu'avant.
+        const libMois = moisNom;
+        const aDaterTitre = adVinted > 0 ? ` ${adVinted} vente${adVinted>1?'s':''} Vinted sans date de versement : ${extSait('versement')==='ok' ? `l'extension ${adVinted>1?'les':'la'} cherche à tes prochaines visites sur Vinted` : extSait('versement')==='retard' ? `mets l'extension à jour (${EXT_CAPACITES.versement}) pour ${adVinted>1?'les':'la'} récupérer` : `l'extension, sur ton ordinateur, ${adVinted>1?'les':'la'} récupère`}.` : '';
+        const auMoinsRecu = adTous > 0 || nomsVentesKO.length > 0;
         W.vendu = vuHero ? (
-          <div className="vrm-day-money vrm-day-card" style={{border:`1px solid ${C.border}`,background:C.card,boxShadow:C.shadow||'none'}}>
+          <div className="vrm-day-money vrm-day-card vrm-jc" style={{border:`1px solid ${C.border}`,background:C.card}}>
             <div className="vrm-day-head">
-              <span className="vrm-day-k" style={{color:C.muted}}>Vendu en {moisNom}</span>
+              <span className="vrm-day-k" style={{color:C.muted}}>Vendu en {libMois}</span>
               <Bouton variante="discret" className="vrm-day-lien" onClick={()=>onNav&&onNav('cat_ventes')}>Mes ventes ›</Bouton>
             </div>
             {/* (16 oct.) « Rien lu » ne vaut pas « 0 € » (§5) : si AUCUN compte
                 n'a pu être lu, le chiffre est « — » ; si une partie seulement,
-                c'est « au moins », et les comptes manquants sont nommés. */}
+                c'est « au moins ». */}
             {(() => { const actifs = (accounts||[]).filter(a=>!acctOff(a.vinted_user_id)).length; const toutKO = actifs>0 && nomsVentesKO.length>=actifs && moisN===0; const partiel = !toutKO && nomsVentesKO.length>0; return (<>
-            <div data-vendu-mois={toutKO ? '' : Math.round(moisEur*100)} data-vendu-partiel={partiel ? '1' : ''} className="vrm-display vrm-day-hero-n" style={{color:toutKO?C.muted:C.text}}>{toutKO ? '—' : <CountUpEuro value={moisEur}/>}</div>
-            {toutKO && <div data-vendu-manque="" style={{fontSize:12,color:C.muted,marginTop:4}}>Tes ventes n'ont pas pu être lues pour l'instant — ce n'est pas zéro.</div>}
+            <div data-vendu-mois={toutKO ? '' : Math.round(moisEur*100)} data-vendu-partiel={partiel ? '1' : ''} className="vrm-day-hero-n vrm-jc-hero" title={partiel ? `Sans ${nomsVentesKO.join(', ')} (ventes pas lues)` : undefined}>{toutKO ? <span className="vrm-jc-montant vrm-jc-vide">—</span> : <CountUpEuro value={moisEur} petitEuro/>}</div>
+            {toutKO
+              ? <div data-vendu-manque="" className="vrm-jc-sous">Tes ventes n'ont pas pu être lues — ce n'est pas zéro.</div>
+              : <div className="vrm-jc-sous">{partiel ? 'au moins · ' : ''}{moisN} vente{moisN>1?'s':''}{jourN>0 && <> · <span data-vendu-jour={Math.round(jourEur*100)}>{jourN} aujourd'hui</span></>}</div>}
             </>); })()}
-            <div className="vrm-day-meta" style={{color:C.muted}}>
-              <span><b style={{color:C.text,fontWeight:600}}>{moisN}</b> vente{moisN>1?'s':''}</span>
-              {jourN>0 && <>
-                <span aria-hidden="true" style={{opacity:.45}}>·</span>
-                <span data-vendu-jour={Math.round(jourEur*100)} style={{color:C.accent,fontWeight:600}}>+{Math.round(jourEur).toLocaleString('fr-FR')} € aujourd'hui <span style={{fontWeight:500,opacity:.85}}>({jourN} vente{jourN>1?'s':''})</span></span>
-              </>}
-            </div>
-            <div data-recu-mois={recuMois==null?'':Math.round(recuMois*100)} data-recu-sans={recuSans ? nomsVentesKO.join(',') : ''} className="vrm-day-recu" style={{borderTop:`1px solid ${C.border}`}}>
-              <div style={{minWidth:0}}>
-                <div className="vrm-day-k" style={{color:C.muted}}>Reçu en {moisNom}</div>
-                {adTous > 0 && <div data-recu-adater={adTous} className="vrm-day-note" style={{color:C.muted}}>au moins · {adTous} vente{adTous>1?'s':''} à dater</div>}
-                {declarables === null && <div className="vrm-day-note" style={{color:C.muted}}>dates de versement illisibles pour l'instant</div>}
-                {cotisMois != null && <div data-cotis-mois={Math.round(cotisMois*100)} data-cotis-aumoins={cotisAuMoins?'1':''} className="vrm-day-note" style={{color:C.muted}}>≈ {cotisAuMoins ? 'au moins ' : ''}{cotisMois.toLocaleString('fr-FR',{minimumFractionDigits:2,maximumFractionDigits:2})} € de cotisations<span className="vrm-cotis-long"> à mettre de côté ({load('vinted_urssaf_freq','trimestriel')==='mensuel' ? 'à payer le mois prochain' : 'à payer après la fin du trimestre'})</span></div>}
+            <div className={`vrm-jc-rangee${cotisMois != null ? ' vrm-jc-4' : ''}`}>
+              <BeneficeJournee onNav={onNav} place="integre" edition={editJournee}/>
+              <div className="vrm-jc-cell" data-recu-mois={recuMois==null?'':Math.round(recuMois*100)} data-recu-sans={recuSans ? nomsVentesKO.join(',') : ''}
+                title={`Reçu en ${libMois} : tes ventes versées ce mois (date du versement).${recuSans ? ` Sans ${nomsVentesKO.join(', ')} (ventes pas lues).` : ''}${adTous > 0 ? ` ${adTous} vente${adTous>1?'s':''} finalisée${adTous>1?'s':''} sans date de versement : dans aucun mois pour l'instant.` : ''}${aDaterTitre}`}>
+                <div className="vrm-jc-l">Reçu en {libMois}</div>
+                <div className="vrm-jc-v">{declarables === undefined ? <span className="vrm-jc-montant vrm-jc-vide">…</span> : <Montant v={recuMois}/>}</div>
+                {declarables === null ? <div className="vrm-jc-sous">pas lu</div>
+                  : auMoinsRecu ? <div className="vrm-jc-sous" data-recu-adater={adTous > 0 ? adTous : undefined} data-a-dater={adVinted > 0 ? adVinted : undefined}>au moins{adTous > 0 ? ` · ${adTous} à dater` : ''}</div> : null}
               </div>
-              <span className="vrm-display vrm-day-recu-n" style={{color:C.text}}>{declarables === undefined ? '…' : recuMois == null ? '—' : `${Math.round(recuMois).toLocaleString('fr-FR')} €`}</span>
-            </div>
-            <div data-ca-annee={caAnnee==null?'':Math.round(caAnnee*100)} className="vrm-day-recu" style={{borderTop:`1px solid ${C.border}`}}>
-              <div style={{minWidth:0}}>
-                <div className="vrm-day-k" style={{color:C.muted}}>Chiffre d'affaires {anIci}</div>
-                {adTous > 0 && <div data-ca-adater={adTous} className="vrm-day-note" style={{color:C.muted}}>au moins · {adTous} vente{adTous>1?'s':''} à dater</div>}
+              {cotisMois != null && (
+                <div className="vrm-jc-cell" data-cotis-mois={Math.round(cotisMois*100)} data-cotis-aumoins={cotisAuMoins?'1':''}
+                  title={`Cotisations URSSAF à mettre de côté, sur le CA déclaré de ${libMois} — ${load('vinted_urssaf_freq','trimestriel')==='mensuel' ? 'à payer le mois prochain' : 'à payer après la fin du trimestre'}.`}>
+                  <div className="vrm-jc-l">À mettre de côté</div>
+                  <div className="vrm-jc-v"><Montant v={cotisMois} prefixe="≈ "/></div>
+                  <div className="vrm-jc-sous">{cotisAuMoins ? 'au moins · ' : ''}URSSAF</div>
+                </div>
+              )}
+              <div className="vrm-jc-cell" data-ca-annee={caAnnee==null?'':Math.round(caAnnee*100)} title={`Chiffre d'affaires ${anIci} : tes ventes versées cette année, toutes plateformes (le CA déclaré).`}>
+                <div className="vrm-jc-l">CA {anIci}</div>
+                <div className="vrm-jc-v">{declarables === undefined ? <span className="vrm-jc-montant vrm-jc-vide">…</span> : <Montant v={caAnnee}/>}</div>
+                {adTous > 0 && <div className="vrm-jc-sous" data-ca-adater={adTous}>au moins</div>}
               </div>
-              <span className="vrm-display vrm-day-recu-n" style={{color:C.text}}>{declarables === undefined ? '…' : caAnnee == null ? '—' : `${Math.round(caAnnee).toLocaleString('fr-FR')} €`}</span>
             </div>
-            <BeneficeJournee onNav={onNav} place="integre" edition={editJournee}/>
           </div>
         ) : (jourN>0 || (!baseKO && !premierJour && benefJourneeOn)) ? (<>
           {/* Le jour seul, quand le héros n'est pas là (lecture en cours d'un
@@ -47200,32 +47190,24 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             <button type="button" onClick={()=>onNav&&onNav('cat_ventes')} className="vrm-day-card vrm-day-jour"
               style={{border:`1px solid ${C.border}`,background:C.card,boxShadow:C.shadow||'none',textAlign:'left',cursor:'pointer',fontFamily:'inherit',width:'100%'}}>
               <span className="vrm-day-k" style={{color:C.muted}}>Vendu aujourd'hui</span>
-              <span data-vendu-jour={Math.round(jourEur*100)} className="vrm-display" style={{fontSize:24,fontWeight:700,color:C.accent,fontVariantNumeric:'tabular-nums'}}>{Math.round(jourEur).toLocaleString('fr-FR')} €</span>
-              <span style={{fontSize:13,color:C.muted}}>{jourN} vente{jourN>1?'s':''}</span>
+              <span data-vendu-jour={Math.round(jourEur*100)} className="vrm-jc-v"><Montant v={jourEur}/></span>
+              <span className="vrm-jc-sous">{jourN} vente{jourN>1?'s':''}</span>
             </button>
           )}
           {!baseKO && !premierJour && <BeneficeJournee onNav={onNav} place="carte" edition={editJournee}/>}
         </>) : null;
         W.semaine = vuHero ? (()=>{
           const totSem = semaine.filter(j=>!j.futur).reduce((a,j)=>a+j.vendu.eur,0);
-          const geste = extSait('versement');
+          // Le même nombre ne s'écrit pas deux fois (§7) : si toute la vente du
+          // mois tient dans la semaine, le total est déjà le grand chiffre.
+          const redit = aWidget('vendu') && Math.round(totSem*100) === Math.round(moisEur*100);
           return (
-          <div data-carte-jours="" className="vrm-day-week vrm-day-card" style={{border:`1px solid ${C.border}`,background:C.card,boxShadow:C.shadow||'none'}}>
+          <div data-carte-jours="" data-total-semaine={Math.round(totSem*100)} className="vrm-day-week vrm-day-card vrm-jc vrm-jc-semaine" style={{border:`1px solid ${C.border}`,background:C.card}}>
             <div className="vrm-day-head">
               <span className="vrm-day-k" style={{color:C.muted}}>Cette semaine</span>
-              <span className="vrm-day-legende" style={{color:C.muted}}>
-                <span><i aria-hidden="true" style={{background:C.accent}}/>Vendu</span>
-                <span><i aria-hidden="true" className="vrm-day-pointille" style={{borderColor:C.muted}}/>Reçu</span>
-              </span>
+              {!redit && <span className="vrm-jc-total" title="Vendu cette semaine (date de la vente)"><Montant v={totSem}/></span>}
             </div>
-            <div className="vrm-day-week-n" style={{color:C.text}}><span className="vrm-display" data-total-semaine={Math.round(totSem*100)}>{Math.round(totSem).toLocaleString('fr-FR')} €</span> <span style={{fontSize:13,fontWeight:500,color:C.muted}}>vendus</span></div>
-            <CourbeSemaine jours={semaine}/>
-            <DayWeekNote><div className="vrm-day-note" style={{color:C.muted,marginTop:8}}>
-              Vendu : jour de la vente · Reçu : jour du versement.
-              {declarables === null && <> « Reçu » pas lu — ce n'est pas zéro.</>}
-              {adVinted > 0 && <span data-a-dater={adVinted}> {adVinted} vente{adVinted>1?'s':''} sans date de versement, pas encore dans « reçu ».{' '}
-                <Pourquoi label="Et ensuite ?">{geste==='ok' ? <>L'extension {adVinted>1?'les':'la'} cherche à tes prochaines visites sur Vinted.</> : geste==='retard' ? <>Mets l'extension à jour ({EXT_CAPACITES.versement}) pour {adVinted>1?'les':'la'} récupérer.</> : <>L'extension, sur ton ordinateur, {adVinted>1?'les':'la'} récupère.</>}</Pourquoi></span>}
-            </div></DayWeekNote>
+            <BarresSemaine jours={semaine}/>
           </div>
           );
         })() : null;
@@ -47242,13 +47224,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           <div data-argent-attente={Math.round(val*100)} className="vrm-day-wallet vrm-day-card" style={{border:`1px solid ${C.border}`,background:C.card,boxShadow:C.shadow||'none',gridTemplateColumns:avecDispo?'minmax(0,1fr) minmax(0,1fr)':'minmax(0,1fr)'}}>
             <div style={{minWidth:0}}>
               <div className="vrm-day-k" style={{color:C.muted,display:'flex',alignItems:'center',gap:6}}><Icon name="wallet" size={14}/>En attente</div>
-              <div className="vrm-display vrm-day-wallet-n" style={{color:C.text}}>{escrow?'':'≈ '}{Math.round(val).toLocaleString('fr-FR')} €</div>
+              <div className="vrm-display vrm-day-wallet-n" style={{color:C.text}}><Montant v={val} prefixe={escrow?'':'≈ '}/></div>
               <div className="vrm-day-note" style={{color:C.muted}}>{inRoute.length} vente{inRoute.length>1?'s':''} en cours{escrow?'':' · estimation'}</div>
             </div>
             {avecDispo && (
               <div style={{minWidth:0,borderLeft:`1px solid ${C.border}`,paddingLeft:16}}>
                 <div className="vrm-day-k" style={{color:C.muted}}>À virer</div>
-                <div className="vrm-display vrm-day-wallet-n" style={{color:C.text}}>{escrow.dispo.toFixed(2).replace('.',',')} €</div>
+                <div className="vrm-display vrm-day-wallet-n" style={{color:C.text}}><Montant v={escrow.dispo} dec={2}/></div>
                 <div className="vrm-day-note" style={{color:C.muted}}>déjà disponibles{escrow.accounts>1?` · ${escrow.accounts} porte-monnaie`:''}{escrow.plusVieuxJours>7?` · lu il y a ${escrow.plusVieuxJours} j`:''}</div>
               </div>
             )}
@@ -47340,27 +47322,31 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           // Aucune date de mise en ligne connue : « — », jamais « 0 paire ».
           const dort = datesOk && stockDort && stockDort.datesConnues > 0 ? stockDort.seuils[SLEEP_DAYS] || null : null;
           const avecAttente = aWidget('attente');
+          // (1er nov.) Chaque case : un libellé, le chiffre, au plus une ligne
+          // courte qui nomme sa base (« contre 29 €/j »). Le détail (nombre de
+          // ventes, jours de la moyenne, annonces datées) passe en infobulle.
+          const e0 = (x) => <Montant v={x}/>;
+          const pct = (v) => <span className="vrm-jc-montant">{v > 0 ? '+' : ''}{v}<span className="vrm-jc-eur">{'\u202f'}%</span></span>;
           const cases = [
-            { id: 'jour', l: "Aujourd'hui", n: eJ == null ? '—' : pctStat(eJ), sous: R.moyenne ? `contre ${fmt(R.moyenne.eur)}/j en moyenne${R.moyenne.depuisPremiere ? ` (${R.moyenne.jours} j)` : ' (28 j)'}` : 'pas encore de moyenne', v: eJ },
-            { id: 'semaine', l: '7 derniers jours', n: e7 == null ? '—' : pctStat(e7), sous: `${fmt(R.j7.eur)} contre ${fmt(R.j7av.eur)} les 7 d'avant`, v: e7 },
-            { id: 'dort', l: `En ligne depuis ${SLEEP_DAYS} j et plus`, n: dort ? String(dort.n) : '—', sous: dort ? `${fmt(dort.valeur)} affichés${stockDort.datesConnues < stockDort.total ? ` · ${stockDort.datesConnues}/${stockDort.total} datées` : ''}` : (listingDatesLu === null || listings.error ? 'dates de mise en ligne pas lues' : datesOk && stockDort ? 'aucune date de mise en ligne connue' : 'je lis tes annonces…'), v: dort ? dort.n : null },
+            { id: 'jour', l: "Aujourd'hui", n: eJ == null ? '—' : pct(eJ), sous: R.moyenne ? <>contre {e0(R.moyenne.eur)}/j</> : 'pas de moyenne', titre: R.moyenne ? `Vendu aujourd'hui contre ${fmt(R.moyenne.eur)}/j en moyenne${R.moyenne.depuisPremiere ? ` (${R.moyenne.jours} j)` : ' (28 j)'}` : 'pas encore de moyenne', v: eJ },
+            { id: 'semaine', l: '7 derniers jours', n: e7 == null ? '—' : pct(e7), sous: <>contre {e0(R.j7av.eur)}</>, titre: `${fmt(R.j7.eur)} vendus ces 7 jours, contre ${fmt(R.j7av.eur)} les 7 d'avant`, v: e7 },
+            { id: 'dort', l: `En ligne depuis ${SLEEP_DAYS} j +`, n: dort ? String(dort.n) : '—', sous: dort ? <>{e0(dort.valeur)} affichés</> : (listingDatesLu === null || listings.error ? 'pas lu' : datesOk && stockDort ? 'aucune date' : 'je lis…'), titre: dort ? `${dort.n} annonce${dort.n > 1 ? 's' : ''} en ligne depuis ${SLEEP_DAYS} jours et plus, ${fmt(dort.valeur)} affichés${stockDort.datesConnues < stockDort.total ? ` · ${stockDort.datesConnues} sur ${stockDort.total} datées` : ''}` : (listingDatesLu === null || listings.error ? 'dates de mise en ligne pas lues' : datesOk && stockDort ? 'aucune date de mise en ligne connue' : 'je lis tes annonces…'), v: dort ? dort.n : null },
             avecAttente
-              ? { id: 'panier', l: 'Panier moyen (30 j)', n: eurStat(R.panier30.moyen), sous: R.panier30.n ? `sur ${R.panier30.n} vente${R.panier30.n > 1 ? 's' : ''}` : 'aucune vente en 30 jours', v: R.panier30.moyen }
-              : { id: 'attente', l: 'En attente', n: loading ? '—' : `${escrowJ ? '' : '≈ '}${Math.round(valAttente).toLocaleString('fr-FR')} €`, sous: escrowJ ? 'chez Vinted' : `${inRoute.length} vente${inRoute.length > 1 ? 's' : ''} en cours · estimation`, v: valAttente },
+              ? { id: 'panier', l: 'Panier moyen 30 j', n: R.panier30.moyen == null ? '—' : <Montant v={R.panier30.moyen}/>, sous: null, titre: R.panier30.n ? `sur ${R.panier30.n} vente${R.panier30.n > 1 ? 's' : ''} en 30 jours` : 'aucune vente en 30 jours', v: R.panier30.moyen }
+              : { id: 'attente', l: 'En attente', n: loading ? '—' : <Montant v={valAttente} prefixe={escrowJ ? '' : '≈ '}/>, sous: escrowJ ? null : 'estimation', titre: escrowJ ? 'chez Vinted' : `${inRoute.length} vente${inRoute.length > 1 ? 's' : ''} en cours · estimation`, v: valAttente },
           ];
           return (
-            <div className="vrm-day-card vrm-day-tendances" data-widget-tendances="" style={{border:`1px solid ${C.border}`,background:C.card,boxShadow:C.shadow||'none'}}>
+            <div className="vrm-day-card vrm-day-tendances vrm-jc" data-widget-tendances="" style={{border:`1px solid ${C.border}`,background:C.card}}>
               <div className="vrm-day-head">
                 <span className="vrm-day-k" style={{color:C.muted}}>Tendances</span>
                 <Bouton variante="discret" className="vrm-day-lien" data-tendances-stats="" href="?tab=dashboard" onClick={(ev)=>{ ev.preventDefault(); if (onNav) onNav('dashboard'); }}>Statistiques ›</Bouton>
               </div>
-              <div className="vrm-tendances-grille">
+              <div className="vrm-jc-rangee vrm-jc-4 vrm-jc-tendances">
                 {cases.map((c) => (
-                  <button key={c.id} type="button" className="vrm-tendance" data-tendance={c.id} data-v={c.v == null ? '' : String(c.v)} onClick={()=>onNav&&onNav('dashboard')}
-                    style={{borderColor:C.border,color:C.text}}>
-                    <span className="vrm-tendance-l" style={{color:C.muted}}>{c.l}</span>
-                    <span className="vrm-display vrm-tendance-n" style={{color:c.n === '—' ? C.muted : C.text}}>{c.n}</span>
-                    <span className="vrm-tendance-sous" style={{color:C.muted}}>{c.sous}</span>
+                  <button key={c.id} type="button" className="vrm-jc-cell vrm-jc-tendance" data-tendance={c.id} data-v={c.v == null ? '' : String(c.v)} title={c.titre} onClick={()=>onNav&&onNav('dashboard')}>
+                    <span className="vrm-jc-l">{c.l}</span>
+                    <span className="vrm-jc-v">{typeof c.n === 'string' ? <span className={`vrm-jc-montant${c.n === '—' ? ' vrm-jc-vide' : ''}`}>{c.n}</span> : c.n}</span>
+                    {c.sous ? <span className="vrm-jc-sous">{c.sous}</span> : null}
                   </button>
                 ))}
               </div>

@@ -92,6 +92,8 @@ import './styles-boutons.css';
 import './styles-vitrine.css';
 // (31 oct.) Messages en volets (maquettes choisies) — après Vitrine, l'écran Messages seul.
 import './styles-messages.css';
+// (1er nov.) Les chiffres de Ma journée (Vendu, Cette semaine en barres, Tendances), épurés — après Vitrine.
+import './styles-journee-chiffres.css';
 // (1er nov.) La finition « premium » (sans nouvelle palette ni dégradé) — en tout dernier.
 import './styles-finition.css';
 import { suivreRangeesDefilantes } from './rangeesDefilantes.js';
