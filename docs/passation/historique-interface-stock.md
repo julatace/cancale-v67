@@ -2386,3 +2386,56 @@ touchés : `stock-piece` B (« la paire choisie… rien d'autre ne bouge », `4_
 moteur-offres, offres-auto, republier, stock-plan : verts.
 
 **Geste de Julien** : aucun.
+## 1er novembre 2026 — Finition « premium » (sans nouvelle palette ni dégradé)
+
+Demande de Julien : « améliore le rendu visuel surtout, le site doit être beaucoup plus
+premium ». Il avait refusé 25 directions de style et toutes les variantes de dégradé :
+Vitrine reste (blanc, encre, cobalt rare, ambre = geste). Le gain vient de la finition,
+dans une feuille dédiée chargée en dernier, `src/styles-finition.css` (une seule à
+retirer pour revenir en arrière), plus trois retouches de JSX sans règle métier.
+
+Défauts corrigés (vus sur captures, avant/après) :
+1. **Envoyer** (fil de Messages) : champ vide, il était cobalt à 45 % d'opacité — on le
+   croyait cassé. Désactivé : fond neutre, icône grise, opacité pleine, et l'infobulle
+   dit pourquoi (`ComposeConv` : « Écris d'abord ta réponse », « Envoi en cours… », ou
+   « la raison est écrite au-dessus ») ; `aria-label` inchangé (« Envoyer »). Actif :
+   cobalt plein ; en sombre l'icône passe en `--vrm-on-accent` (blanc sur #6F86E8 = 3,4:1).
+2. **Paramètres coupé** en bas de la colonne (16 entrées + 6 groupes dépassent 720–800 px) :
+   le groupe « Moi » (Communauté, Paramètres) est rendu dans `.vrm-rail-pied`, hors de la
+   zone qui défile (même ordre, mêmes entrées, mêmes `data-nav-groupe`) ; un filet le
+   sépare quand la zone défile ; le fondu `data-rail-suite` reste l'indice (edge-tailles).
+3. **Fil** : filet sous l'en-tête, bulles 15/1.45 à coin « queue », heure discrète,
+   séparateur de jour centré, encart d'offre à filet (le dégradé vert de « acceptée »
+   retiré), pied à filet, champ arrondi qui s'allume en cobalt au focus, pastilles 36 px.
+   Au téléphone, la pastille d'icône générique de l'en-tête s'efface : le titre de la
+   paire n'est plus coupé en « Sal… ».
+4. **Liste des conversations** : la ligne choisie touchait le bord et portait barre + fond ;
+   une seule marque (fond arrondi), marge de 12 px ; filtres en pastilles comme ailleurs.
+5. **« Traduire »** : plus d'emoji 🌐, lien gris souligné au lieu d'un cobalt sous chaque
+   message (§7 : l'accent reste rare).
+6. **États vides** : plus d'emoji (🛍️, 🔌, 🟢) ni de pavé teinté d'accent — icône au trait
+   dans un disque neutre (`EmptyState` accepte un nom d'`ICON_PATHS`).
+7. **Boutons désactivés** (`:disabled` ou `aria-disabled`) : à 40–55 % d'opacité ils
+   tombaient sous 2:1 (« Générer le bordereau », « Corriger ») ; ils restent lisibles,
+   texte gris sur l'aplat neutre. Interrupteurs, onglets et choix segmentés exclus.
+8. **Choix segmentés** : « Semaine » débordait de sa pastille (Statistiques, 390 px).
+9. **Typographie** : étiquettes de chiffres à 10,5–11 px (bande « CA finalisé », N° de la
+   tournée, barre de Ma journée) portées à 12 px ; chiffres en tabulaire.
+10. **Focus clavier** : un seul anneau cobalt de 2 px partout.
+
+Piège : le système de boutons (`styles-boutons.css`) passe par `:is(…, body > :not(#root))`,
+donc porte une spécificité d'ID ; une règle de finition sur un bouton sans classe doit
+ajouter `:not(#_)` pour l'emporter.
+
+Banc neuf : `scripts/bancs/finition-premium.cjs` (données inventées) — A. colonne à
+1512×950, 1440×800, 1280×720 (Paramètres et Communauté visibles sans défiler, chaque
+entrée atteignable) ; B. Envoyer vide/saisi, 390 et 1512, clair et sombre (fond neutre et
+`title` ; cobalt plein, contraste ≥ 4,5) ; C. bulles ≥ 12 px de marge, pied dans le fil ;
+D. huit écrans × 2 tailles × 2 thèmes, captures `SHOTS=`. **7 rouges sur le build
+d'avant (f7437534), 0 après.** Sonde : `SONDE='<expr>' SONDE_TAB= SONDE_VP=`.
+Bancs relancés : messages-volets, navigation-tache, colis-colonnes, stats-vitrine, tournee,
+ventes-benefice-glisser, coque-mobile, formes-communes, plateformes-premium,
+ventes-colis-premium, traduire-messages verts ; `messages-sites` (1 rouge : un POST
+`app_data` à l'ouverture) et `edge-tailles` (6 rouges « île d'actions » à 1024/960 px)
+étaient déjà rouges avant, identiques après. Non touché : la barre du haut
+(`styles-barre-haut.css`, un autre chantier).

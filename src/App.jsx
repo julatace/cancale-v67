@@ -13570,10 +13570,10 @@ function BoutonTraduire({ texte }) {
       else setEtat('ko');
     } catch (_) { setEtat('ko'); }
   };
-  if (etat === 'fait') return <div data-traduit={langue} style={{marginTop:4,fontSize:12.5,color:C.muted,fontStyle:'italic',whiteSpace:'pre-wrap',wordBreak:'break-word'}}>🌐 {trad}<span style={{display:'block',fontSize:10,fontStyle:'normal',marginTop:2}}>traduit de {NOM_LANGUE[langue] || langue}</span></div>;
+  if (etat === 'fait') return <div data-traduit={langue} style={{marginTop:4,fontSize:12.5,color:C.muted,fontStyle:'italic',whiteSpace:'pre-wrap',wordBreak:'break-word'}}>{trad}<span style={{display:'block',fontSize:10,fontStyle:'normal',marginTop:2}}>traduit de {NOM_LANGUE[langue] || langue}</span></div>;
   if (etat === 'deja') return <div data-traduit="fr" style={{marginTop:3,fontSize:11,color:C.muted}}>déjà en français</div>;
   if (etat === 'ko') return <div style={{marginTop:3,fontSize:11,color:C.muted}}>traduction indisponible sur cet appareil</div>;
-  return <button type="button" data-traduire onClick={lancer} style={{marginTop:3,fontSize:11,fontWeight:600,color:C.accent,background:'transparent',border:'none',padding:0,cursor:etat==='charge'?'default':'pointer',fontFamily:'inherit'}}>{etat === 'charge' ? 'traduction…' : '🌐 Traduire'}</button>;
+  return <button type="button" data-traduire onClick={lancer} style={{marginTop:3,fontSize:11,fontWeight:600,color:C.accent,background:'transparent',border:'none',padding:0,cursor:etat==='charge'?'default':'pointer',fontFamily:'inherit'}}>{etat === 'charge' ? 'traduction…' : 'Traduire'}</button>;
 }
 // ══════════════════════════════════════════════════════════════════════════════
 // MESSAGES EN VOLETS — LA COMPOSITION PARTAGÉE (1er nov.)
@@ -13671,6 +13671,10 @@ function RapidesConv({ liste, onChoisir, desactive = false, style }) {
   );
 }
 function ComposeConv({ valeur, onChange, onEnvoyer, desactive = false, placeholder = 'Écris ta réponse…', etiquette = 'Réponse à la conversation', libelleEnvoyer = 'Envoyer', entreeEnvoie = false, envoiBloque = false, enCours = false, attrsChamp, attrsEnvoyer }) {
+  // (1er nov., finition) Un Envoyer grisé dit POURQUOI (infobulle) : champ vide,
+  // envoi en cours, ou la raison déjà écrite au-dessus du champ. Le libellé
+  // lu par les lecteurs d'écran reste « Envoyer ».
+  const raisonBloque = !envoiBloque ? libelleEnvoyer : enCours ? 'Envoi en cours…' : !String(valeur || '').trim() ? 'Écris d’abord ta réponse' : 'Envoi impossible ici pour le moment — la raison est écrite au-dessus';
   return (
     <div className="vrm-chat-compose">
       <textarea aria-label={etiquette} disabled={desactive} value={valeur} onChange={e=>onChange(e.target.value)} rows={1} placeholder={placeholder} onKeyDown={entreeEnvoie ? (e=>{ if(e.key==='Enter'&&!e.shiftKey){ e.preventDefault(); onEnvoyer(); } }) : undefined} style={{color:C.text}} {...(attrsChamp || {})}/>
@@ -13678,7 +13682,7 @@ function ComposeConv({ valeur, onChange, onEnvoyer, desactive = false, placehold
           (`MicDictee`, déjà celle de la recherche) — aucune IA, aucune
           clé (§2.9). Elle AJOUTE au champ ; rien ne part sans « Envoyer ». */}
       {!desactive && <MicDictee titre="Dicter la réponse" onText={(t)=>onChange((valeur&&valeur.trim()?valeur.replace(/\s*$/,' '):'')+t)}/>}
-      <button type="button" className="vrm-chat-send" aria-label={enCours?'Envoi en cours':libelleEnvoyer} title={libelleEnvoyer} onClick={onEnvoyer} disabled={envoiBloque} {...(attrsEnvoyer || {})}><Icon name={enCours?'sync':'send'} size={19}/></button>
+      <button type="button" className="vrm-chat-send" aria-label={enCours?'Envoi en cours':libelleEnvoyer} title={raisonBloque} data-envoi-bloque={envoiBloque?'':undefined} onClick={onEnvoyer} disabled={envoiBloque} {...(attrsEnvoyer || {})}><Icon name={enCours?'sync':'send'} size={19}/></button>
     </div>
   );
 }
@@ -14212,7 +14216,9 @@ function PeriodePicker({ value, onChange, titre = 'Période', vide }) {
 function EmptyState({ icon, title, desc, action }) {
   return (
     <div className="vrm-empty-state" style={{textAlign:'center',padding:'34px 20px',background:C.card,border:`1px solid ${C.border}`,borderRadius:12,boxShadow:C.shadow||'none'}}>
-      <div style={{width:56,height:56,margin:'0 auto 12px',borderRadius:8,background:`${C.accent}12`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:26}}>{icon}</div>
+      {/* (1er nov., finition) Un nom d'icône au trait (jeu de la barre), dans un
+          disque neutre — plus d'emoji ni de pavé teinté d'accent (§7). */}
+      <div className="vrm-empty-ic" aria-hidden="true" style={{width:48,height:48,margin:'0 auto 12px',borderRadius:'50%',background:C.card2||C.bg,color:C.muted,display:'flex',alignItems:'center',justifyContent:'center',fontSize:22}}>{ICON_PATHS[icon] ? <Icon name={icon} size={22}/> : icon}</div>
       <div style={{fontSize:15,fontWeight:700,color:C.text,letterSpacing:-0.3}}>{title}</div>
       {desc && <div style={{fontSize:12,color:C.muted,marginTop:5,lineHeight:1.5,maxWidth:340,marginLeft:'auto',marginRight:'auto'}}>{desc}</div>}
       {action && <div style={{marginTop:14}}>{action}</div>}
@@ -14708,6 +14714,7 @@ function SideBar({ tab, setTab, entreprise, sites, badges }) {
   // coupe le bas de la colonne, et la zone défile SANS barre visible : elle dit
   // de quel côté il en reste (`data-rail-suite`, un fondu en CSS), et l'entrée
   // de l'écran ouvert est ramenée dans la vue à chaque changement.
+  const groupe = g => <section key={g.titre} className="vrm-rail-management-group" aria-label={g.titre} data-nav-groupe={g.titre}><div className="vrm-rail-section-label">{g.titre}</div><div className="vrm-rail-management">{g.items.map(bouton)}</div></section>;
   const zoneRef = React.useRef(null);
   React.useEffect(() => {
     const el = zoneRef.current; if (!el) return undefined;
@@ -14732,8 +14739,12 @@ function SideBar({ tab, setTab, entreprise, sites, badges }) {
     <div className="vrm-sidebar-brand"><span className="vrm-sidebar-mot" role="img" aria-label="VRM">VRM</span><NomEntreprise entreprise={entreprise} className="vrm-sidebar-entreprise"/></div>
     <div className="vrm-rail-scroll" ref={zoneRef}>
       <div className="vrm-rail-platforms" data-nav-taches="">{NAV_TACHES.map(bouton)}</div>
-      {groupes.map(g => <section key={g.titre} className="vrm-rail-management-group" aria-label={g.titre} data-nav-groupe={g.titre}><div className="vrm-rail-section-label">{g.titre}</div><div className="vrm-rail-management">{g.items.map(bouton)}</div></section>)}
+      {groupes.filter(g => g.titre !== 'Moi').map(groupe)}
     </div>
+    {/* (1er nov., finition) « Moi » (Communauté, Paramètres) reste posé au pied
+        de la colonne : une fenêtre basse fait défiler le reste, jamais
+        Paramètres coupé par le bas. Même ordre, mêmes entrées. */}
+    <div className="vrm-rail-pied">{groupes.filter(g => g.titre === 'Moi').map(groupe)}</div>
   </nav>;
 }
 
@@ -46116,7 +46127,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const noAcc = accounts.length===0 && accountsReady;
   const NoAcc = () => !noAcc ? null : (baseKO
     ? <LignePanne>Je n'ai pas pu lire tes comptes Vinted — ce n'est pas « aucun compte lié ».</LignePanne>
-    : <EmptyState icon="🔌" title="Aucun compte Vinted lié"
+    : <EmptyState icon="link" title="Aucun compte Vinted lié"
         desc="Installe l'extension Chrome puis ouvre vinted.fr une fois : tes annonces, ventes, achats et messages arrivent ici tout seuls."
         action={onNav && <button type="button" onClick={()=>onNav('vintedaccounts')} style={{border:'none',background:C.accent,color:C.onAccent||'#fff',borderRadius:10,padding:'11px 18px',fontSize:13,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Voir mes comptes</button>}/>
   );
@@ -49433,7 +49444,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         {buys.loading && !buys.items && <Skeleton variant="row" count={5}/>}
         {buys.error && <LoadError onRetry={()=>loadOrders('purchased',setBuys,true)}/>}
         {!modeRetraits && buys.items && !buys.error && buysBase.length===0 && (
-          <EmptyState icon="🛍️" title="Aucun achat pour l'instant"
+          <EmptyState icon="bag" title="Aucun achat pour l'instant"
             desc="Tes achats Vinted arrivent ici tout seuls dès que l'extension a capté ton compte. Rien à faire."/>
         )}
         {/* ⚠️ SUR ORDINATEUR, LA LISTE SE RANGE EN DEUX COLONNES.
@@ -49856,7 +49867,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         {/* Aucune annonce en ligne MAIS des annonces à confirmer : la ligne du
             dessus le dit déjà, avec le geste (§7 — une cause, une phrase). */}
         {listings.items && !listings.error && listings.items.length===0 && !annAConfirmer.length && (
-          <EmptyState icon="🟢" title="Aucune annonce en ligne"
+          <EmptyState icon="tag" title="Aucune annonce en ligne"
             desc="Ouvre ta boutique sur vinted.fr une fois, avec l'extension active : tes annonces remonteront ici automatiquement."
             action={<a href="https://www.vinted.fr/member/general/settings" target="_blank" rel="noreferrer" style={{display:'inline-block',background:C.accent,color:'#fff',textDecoration:'none',fontWeight:600,fontSize:13,padding:'10px 16px',borderRadius:10}}>Ouvrir Vinted ↗</a>}/>
         )}
