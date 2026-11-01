@@ -1,3 +1,4 @@
+import { cleNum } from "../api/_lib/numerotation.js";
 // Compare only confirmed rows of the same account/source. A first read is a baseline,
 // an absent row is never inferred to be deleted from a paginated/partial capture.
 const serialiser = (valeur) =>
@@ -81,12 +82,9 @@ export function resumerLecture(avant, source) {
 // les DEUX cartons (comme `numerosDeVente`). Avant, la comparaison se faisait
 // en minuscules sur le texte brut : une fiche saisie « 007 » vendue sur
 // Leboncoin (réf « VRM-7 ») ne sortait jamais dans « Vendus ailleurs ».
-// `audit-flux-divers.cjs` compare cette clé à celle de l'app.
-export const cleNumSync = (v) => {
-  let s = String(v == null ? "" : v).trim().toUpperCase().replace(/[\s\-_.]/g, "");
-  if (/^\d+$/.test(s)) s = String(parseInt(s, 10));
-  return s;
-};
+// `cleNum` est celle du serveur (`api/_lib/numerotation.js`) ; `audit-flux-divers.cjs`
+// la compare à celle de l'app.
+export const cleNumSync = (v) => cleNum(v);
 export const numerosSync = (v) => [
   ...new Set(String(v == null ? "" : v).split("+").map(cleNumSync).filter(Boolean)),
 ];

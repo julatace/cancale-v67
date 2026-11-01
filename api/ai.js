@@ -28,8 +28,20 @@ export default async function handler(req, res) {
   //    qui sinon répondrait pour lui tant que la clé de l'IA n'est pas posée.
   if (req.query && req.query.mode === 'detourage') return handleDetourage(req, res);
   // Santé : l'app interroge cette route pour afficher « IA branchée / non ».
+  // ⚠️ (1er nov., VRM vendu à d'autres — §2.9) « prête » ne se dit qu'à celui
+  //    que la clé du SERVEUR sert vraiment : le propriétaire de l'installation
+  //    (`VRM_OWNER_UID`, la même règle que le POST ci-dessous). Elle répondait
+  //    `ready` à TOUT visiteur dès qu'`AI_API_KEY` était posée : le bouton
+  //    « ✨ Rédiger » apparaissait chez chaque vendeur, et répondait « no-key »
+  //    au clic. Sans session, ou un autre vendeur : `ready:false` et la raison
+  //    (`pas-active`) — l'app n'affiche pas un bouton qui ne marchera pas.
+  //    Aucune clé ne se lit ni ne se dit ici.
   if (req.method === 'GET') {
-    res.status(200).json({ ok: true, ready: !!(process.env.AI_API_KEY || process.env.ANTHROPIC_API_KEY), model: MODEL });
+    const cleSrv = !!(process.env.AI_API_KEY || process.env.ANTHROPIC_API_KEY);
+    const proprio = String(process.env.VRM_OWNER_UID || '');
+    let pourLui = false;
+    if (cleSrv && proprio) { try { const u = await utilisateurDe(req); pourLui = !!u && u.id === proprio; } catch (_) { pourLui = false; } }
+    res.status(200).json({ ok: true, ready: cleSrv && pourLui, ...(cleSrv && pourLui ? {} : { raison: 'pas-active' }), model: MODEL });
     return;
   }
   if (req.method !== 'POST') { res.status(405).json({ ok: false, error: 'POST' }); return; }

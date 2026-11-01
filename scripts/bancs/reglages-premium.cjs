@@ -176,7 +176,11 @@ async function interrupteurs(pg, T) {
                 masques: m ? m.innerText : null,
                 regime: g ? g.getAttribute('data-reglage-regime') : null,
                 regimeVal: g ? ((g.querySelector('.vrm-set-val') || {}).innerText || '').trim() : null,
-                importAvecEmails: !!document.querySelector('[data-groupe-reglages="comptes"] [data-sous-ouvrir="import"]') && !!document.querySelector('[data-groupe-reglages="comptes"] [data-sous-ouvrir="adresses"]'),
+                // (1er nov.) « Import des emails » n'agit que pour la boîte du PROPRIÉTAIRE de
+                // l'installation : chez un vendeur (ABO.proprietaire false) il n'est pas
+                // proposé ; s'il l'est, il vit à côté de la réception des emails.
+                importAvecEmails: !!document.querySelector('[data-groupe-reglages="comptes"] [data-sous-ouvrir="adresses"]') && (!document.querySelector('[data-sous-ouvrir="import"]') || !!document.querySelector('[data-groupe-reglages="comptes"] [data-sous-ouvrir="import"]')),
+                importVendeur: !!document.querySelector('[data-sous-ouvrir="import"]'),
               };
             });
             // Une vente ne se masque plus (29 oct.) : la ligne ne parle que des achats.
@@ -184,6 +188,7 @@ async function interrupteurs(pg, T) {
             // Le régime n'est jamais deviné : pas choisi ⇒ la ligne le DIT à droite.
             dit(r.regime === 'aucun' && !!r.regimeVal, `${T} : le régime fiscal pas choisi se voit sur sa ligne`, `${r.regime} · « ${r.regimeVal} »`);
             dit(r.importAvecEmails, `${T} : l’import des emails est rangé avec la réception des emails`);
+            dit(!r.importVendeur, `${T} : l’import des emails (boîte du propriétaire seulement) n’est pas proposé à un vendeur`);
           } else {
             const p = await pg.evaluate(() => {
               const c = document.querySelector('[data-photo-profil]');

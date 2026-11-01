@@ -2317,3 +2317,49 @@ exécutées par : `notif-messages.cjs` (le lien `/inbox/` ⇒ `cible=conv`), `of
 (une offre ⇒ sa conversation ; deux ⇒ « Offres »), `retrait-conv-push`, `colis-relais-push`,
 `double-vente-push`, `rappel-soir`, `audit-suivi-colis`, `audit-suivi-vinted`,
 `audit-rappel-urssaf`, `audit-colis-heure`.
+
+## 1er novembre — VRM vendu à d'autres revendeurs : 19 défauts de l'audit « un autre vendeur », ce qui se corrige dans le code
+
+Julien : « fais tout comme un pro, il ne doit y avoir aucune erreur possible ». Audit de départ : Sophie (inventée),
+base vide, aucune extension, pas propriétaire de l'installation. Ni le cloisonnement ni la règle « c'est l'adresse de
+RÉCEPTION qui décide » ne sont affaiblis.
+
+- **Code de validation Gmail (D1)** — Gmail envoie le code du transfert à la boîte collective, pas au vendeur. Le script
+  (`confirmationTransfertVRM`) envoie le message à VRM avec `Authentication-Results` et ne le classe `vrm-configuration`
+  que sur l'accusé. Le serveur (`api/_lib/transfert-gmail.js`, branche `rendreCodeTransfert` d'`email-inbound`) exige
+  l'expéditeur `forwarding-noreply@google.com`, une signature DKIM/DMARC « pass » de google.com, et que le sujet et le corps
+  donnent la même adresse source, le même code et la boîte collective comme destination. Le code va au vendeur qui a
+  **prouvé** cette adresse (même registre gardé que pour ses emails), dans `vrm_gmail_transfert_<empreinte>`. Il est lu par
+  `lireReceptionEmail` (`codeGmail`) et affiché dans Configurer le transfert, étape « Activer » : « Ton code de validation
+  Gmail : … ». Adresse pas prouvée ⇒ quarantaine réclamable ; message non signé ⇒ quarantaine sans destinataire. Le lien de
+  validation n'est jamais rangé (`sansLienConfirmation`). ⚠️ **Le script doit être recollé par Julien.**
+- **Factures Pro (D5)** — la file n'est lue que pour `VRM_OWNER_UID` (envoi depuis SA boîte Gmail, sur son quota). Pour
+  tout autre vendeur, le serveur crée donc un **brouillon**, jamais `queued`, et la notification dit « ouvre-la dans
+  Factures et envoie-la ». Interrupteur et bouton « Envoyer » : réservés au propriétaire, avec la raison expliquée aux
+  autres. Une facture en file depuis plus de 2 h ne dit plus « envoi en cours » (`queuedAt`).
+- **Relais Apple (D6)** — la raison est dite (Apple n'accepte en principe que Vinted), avec le geste sûr : changer l'email
+  sur Vinted, puis le déclarer. La ligne dit « ses emails sont mis de côté ». « Essayer quand même » envoie le lien
+  (`essai: true`, mêmes freins et même preuve).
+- **Consignes d'administrateur (D7)** — `useEstProprietaire()` (la base, `/api/compte?mode=abonnement`, dernière réponse
+  lue sur l'appareil en cas de panne) réserve au propriétaire : Supabase Restart, Vercel/VAPID, eBay Developer, clé de
+  service. Les autres lisent « VRM est momentanément indisponible, réessaie dans quelques minutes » ou « pas encore activé
+  sur VRM ». `GET /api/ai` ne dit `ready` qu'au propriétaire (§2.9).
+- **Textes (D8, D9, D16)** — rétrospective : prénom du vendeur ou rien. Facture : logo de l'entité, sinon celui du
+  propriétaire pour lui seul, sinon aucun ; `alt` = nom de l'entreprise ; producteur PDF « VRM ». Exemples neutres.
+  `scripts/audit-vendeur-neutre.cjs` interdit désormais tout texte « Julien/Cancale/… » et toute consigne d'administrateur
+  hors condition `proprio`.
+- **Vendeur neuf (D10-D15, D18, D19)** — Colis sans compte ni colis : « Relie ton compte Vinted pour voir tes colis »
+  avec le geste, à la place de quatre « 0 ». Vinted toujours présent dans les filtres, et Ventes dit « aucun compte
+  relié ». Annonces · eBay mène à Paramètres → Comptes eBay (`vrm:aller` accepte un `?tab=…`). Sans extension, la pastille
+  affiche « Extension à installer ». La porte d'abonnement parle de l'essai de 7 jours (`essaiDispo`). L'accueil dit que
+  l'ordinateur avec Chrome reste nécessaire. « Import des emails · date » est réservé au propriétaire (avec la note
+  `VRM_START_DATE`). Le widget lit par pages `Range` (au-delà de 1 000 vendeurs).
+
+**Preuves.**
+- `audit-vendeur-neutre.cjs` : 21 verts, 12 rouges sur `origin/main` (`f04af748`), 9 mutations sur 9 rouges.
+- Banc `scripts/bancs/vendeur-neuf.cjs`, adapté du banc jetable de l'audit.
+- Audits `abonnement`, `lancement`, `routes-revue`, `proprietaire-email`, `email-cle`, `fonctions-api` (12),
+  `preuve-adresse`, `comptes-sans-email` : verts. `audit-secrets` est déjà rouge sur `origin/main` (editeur.js, contact.js).
+
+**Ce qui exige Julien** : recoller `gmail-forwarder.gs` et poser `EMAIL_INBOUND_SECRET` ; SMTP Supabase ;
+`public/legal/editeur.js` ; Stripe (prix 16,99 €, clé).

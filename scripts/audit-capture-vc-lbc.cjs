@@ -304,11 +304,16 @@ function fonctionsApp() {
   if (_app !== undefined) return _app;
   try {
     const src = fs.readFileSync(F.app, 'utf8');
-    const i = src.indexOf('const VC_ANNONCE_ETATS'), j = src.indexOf('function PhotoVc(');
+    // (1er nov.) Les familles et la règle d'état vivent dans api/_lib/vestiaire-regle.js
+    // (un propriétaire pour l'app et le serveur) : chargées ici avec l'écran.
+    let i = src.indexOf('const VC_ANNONCE_ETATS'); if (i < 0) i = src.indexOf('// (1er nov.) Les familles (`VC_ANNONCE_ETATS`)');
+    const j = src.indexOf('function PhotoVc(');
     if (i < 0 || j < i) { _app = null; return _app; }
     const ctx = { Date, Math, isFinite, Number, String, Object, Array };
     vm.createContext(ctx);
-    vm.runInContext(src.slice(i, j) + '\n;this.etatAnnonceVc = etatAnnonceVc; this.nonLusVestiaire = typeof nonLusVestiaire === "function" ? nonLusVestiaire : null;', ctx);
+    let regle = '';
+    try { regle = fs.readFileSync(path.join(__dirname, '..', 'api', '_lib', 'vestiaire-regle.js'), 'utf8').replace(/^import .*$/mg, '').replace(/^export /mg, '') + '\nconst cleNum = (v) => String(v == null ? "" : v).trim().toUpperCase();\nconst joursAvant = () => null;\n'; } catch (_) {}
+    vm.runInContext((/const VC_ANNONCE_ETATS/.test(src.slice(i, j)) ? '' : regle) + src.slice(i, j) + '\n;this.etatAnnonceVc = etatAnnonceVc; this.nonLusVestiaire = typeof nonLusVestiaire === "function" ? nonLusVestiaire : null;', ctx);
     _app = ctx;
   } catch (e) { _app = null; }
   return _app;

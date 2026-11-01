@@ -33,7 +33,7 @@ const MUTATIONS = {
   'cible-id-leboncoin': ['src/cibleNotif.js', "(n ? [`[data-lbc-retirer-num~=\"${q(n)}\"]`]", "(n ? [`[data-lbc-retirer=\"${q(n)}\"]`]"],
   'cible-sans-cle': ['src/cibleNotif.js', "const n = c.num ? cleNumCible(c.num) : '';", "const n = c.num ? String(c.num) : '';"],
   'ligne-sans-cle': ['src/App.jsx', ".split('+').map(cleNum).filter(Boolean).join(' ') || undefined) : undefined}", ".trim() || undefined) : undefined}"],
-  'vendus-texte-brut': ['src/bilanSynchronisation.js', 'export const cleNumSync = (v) => {\n  let s = String(v == null ? "" : v).trim().toUpperCase().replace(/[\\s\\-_.]/g, "");\n  if (/^\\d+$/.test(s)) s = String(parseInt(s, 10));', 'export const cleNumSync = (v) => {\n  let s = String(v == null ? "" : v).trim().toLowerCase();'],
+  'vendus-texte-brut': ['src/bilanSynchronisation.js', 'export const cleNumSync = (v) => cleNum(v);', 'export const cleNumSync = (v) => String(v == null ? "" : v).trim().toLowerCase();'],
   'vendus-lot-entier': ['src/bilanSynchronisation.js', '.split("+").map(cleNumSync)', '.split("§").map(cleNumSync)'],
   'vendus-lot-ambigu-ignore': ['src/bilanSynchronisation.js', 'return g.every(Boolean) ? g : null;', 'return g.some(Boolean) ? g.filter(Boolean) : null;'],
   'offre-ambigu-apres-prix': ['api/email-inbound.js', "const memes = Object.values(map || {}).filter((e) => e && norm(e.title) === t);", "const memes = Object.values(map || {}).filter((e) => e && norm(e.title) === t && e.buyPrice != null && String(e.buyPrice).trim() !== '');"],

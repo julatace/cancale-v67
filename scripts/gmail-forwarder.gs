@@ -91,11 +91,31 @@ function categorieVRM(j){
  if(c==='a-verifier')return 'vrm-a-verifier';
  return ({achat:'vrm-achats',vente:'vrm-ventes',bordereau:'vrm-bordereaux',finalisation:'vrm-versements',finalise:'vrm-versements',colis:'vrm-colis',suivi:'vrm-colis',message:'vrm-messages',offre:'vrm-offres'})[c]||'vrm-informations';
 }
+// (1er nov.) LE CODE DE VALIDATION D'UN TRANSFERT GMAIL. Quand un vendeur ajoute
+// cette boîte comme adresse de transfert, Gmail envoie le code ICI. Le message
+// part à VRM tel quel, avec l'en-tête `Authentication-Results` (la signature de
+// Google, posée par Gmail à la livraison) : VRM rend le code au vendeur qui a
+// CONFIRMÉ l'adresse source que Gmail nomme, dans SON écran — jamais à un
+// autre ; sinon le message va en quarantaine (api/_lib/transfert-gmail.js).
+// Le message n'est classé « vrm-configuration » que sur l'accusé de VRM : sans
+// accusé, il est retenté au passage suivant. Aucun lien de validation n'est
+// ouvert, ni ici ni par VRM.
 function confirmationTransfertVRM(){
  const label=labelVRM('vrm-configuration');
  const messages=messagesVRM('from:forwarding-noreply@google.com -label:vrm-configuration -in:trash -in:spam',20);
- messages.forEach(m=>classerMessageVRM(m.id,[label],[]));
- // Aucun lien de validation n'est ouvert automatiquement.
+ messages.forEach(m=>{
+  try{
+   const msg=GmailApp.getMessageById(m.id),header=nom=>{try{return msg.getHeader(nom)||'';}catch(_){return '';}};
+   const id=header('Message-ID')||msg.getId();
+   const payload={messageId:id,from:msg.getFrom(),to:msg.getTo(),subject:msg.getSubject(),text:msg.getPlainBody(),html:'',deliveredTo:header('Delivered-To'),authentification:header('Authentication-Results'),headers:{'delivered-to':header('Delivered-To')},source:BOITE_PARTAGEE?'gmail-shared':'gmail-v2',sourceMessageId:msg.getId(),sourceDate:msg.getDate().toISOString(),attachments:[]};
+   const json=JSON.stringify(payload);
+   const r=UrlFetchApp.fetch(ENDPOINT,{headers:{'x-vrm-email-key':secretVRM()},method:'post',contentType:'application/json',payload:json,muteHttpExceptions:true});
+   const code=r.getResponseCode();let j=null;try{j=JSON.parse(r.getContentText());}catch(_){}
+   if(!accuseValideVRM(code,j,id,empreinteVRM(json)))throw Error('VRM n’a pas confirmé ('+code+')');
+   classerMessageVRM(m.id,[label],[]);
+   Logger.log('VRM : code de transfert Gmail '+(j.transfert&&j.transfert.rendu?'rendu à son vendeur.':'mis de côté (adresse source pas encore confirmée).'));
+  }catch(e){Logger.log('VRM : code de transfert Gmail conservé, à réessayer : '+String(e.message||e));}
+ });
 }
 // Télémétrie sans sujet, contenu, adresse personnelle ni compteur collectif.
 function signalerPassageVRM(etat){

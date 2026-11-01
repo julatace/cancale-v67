@@ -36,6 +36,10 @@ import { withOwnerAll, conflictTarget, contexteVendeur, proprietaireCourant } fr
 import { sbCle } from './_lib/cle.js';
 import { comptesActifs, normaliserRegistre } from './_lib/ebay.js';
 import { colisEbay, resumeColisEbay, lireCommandesEbayServeur } from './_lib/ebay-a-expedier.js';
+// (1er nov., audit A4) Les colis Leboncoin et Vestiaire à poster, et les ventes
+// Vestiaire du bilan : les règles de l'app (un propriétaire, importé).
+import { resumeColisSites } from './_lib/colis-sites.js';
+import { ventesVcDe } from './_lib/vestiaire-regle.js';
 import { relireCommandesVendeur } from './_lib/ebay-relecture.js';
 import { rappelsRetraitDuJour, texteRappelRetrait, SELECT_SUIVI_META, txDuColis, liensDesLignes, finDesTransactions, SELECT_TRANSP_META, ligneTranspDeMeta } from './_lib/suivi-colis.js';
 // (24 oct.) Le statut des colis lu chez leur transporteur (C1, C5).
@@ -169,14 +173,14 @@ async function lireCommandesEbay() {
     lireLigne: getRowProjete, lireToutes: (p) => fetchPaginated(scoped(p)), comptesActifs, normaliserRegistre,
   });
 }
-const MAIN_BILAN = ['vinted_accounts_hidden', 'vinted_ship_done', 'vinted_bords_shipped', 'vrm_paires_dorment'];
+const MAIN_BILAN = ['vinted_accounts_hidden', 'vinted_ship_done', 'vinted_bords_shipped', 'vrm_paires_dorment', 'vrm_lbc_colis_done'];
 const ensemble = (v) => new Set(Array.isArray(v) ? v.map(String) : []);
 const objet = (v) => (v && typeof v === 'object' && !Array.isArray(v) ? v : {});
 
 // Lit tout ce que le bilan d'UN vendeur demande. Chaque source vaut `null`
 // quand sa lecture a échoué — jamais `[]` à sa place (« rien lu » ≠ « rien »).
 async function lireDonneesBilan() {
-  const [comptesL, m, panneau, lignes, lbcL, ebayL, txn] = await Promise.all([
+  const [comptesL, m, panneau, lignes, lbcL, ebayL, txn, vcV, vcL] = await Promise.all([
     fetchPaginated(scoped('vinted_accounts?select=vinted_user_id,login')),
     getRowProjete('main', MAIN_BILAN),
     getRow('panel_accounts_off'),
@@ -187,6 +191,9 @@ async function lireDonneesBilan() {
     lireCommandesEbay(),
     // Les dates de versement : trois scalaires par transaction (§4.4), paginé (§4.5).
     fetchPaginated(scoped('app_data?id=like.harvest_%25_txn_%25&select=tx:meta->>id,s:meta->>status,su:meta->>status_updated_at')),
+    // (1er nov.) Les ventes Vestiaire et les liens de ses annonces (identité).
+    getRowProjete('vc_ventes', ['ventes']),
+    getRowProjete('vc_listings', ['liens']),
   ]);
   const comptes = Array.isArray(comptesL)
     ? comptesL.map((c) => ({ uid: String((c && c.vinted_user_id) || ''), login: String((c && c.login) || '') })).filter((c) => c.uid)
@@ -206,8 +213,13 @@ async function lireDonneesBilan() {
     masquesComptes: mm ? ensemble(mm.vinted_accounts_hidden) : null,
     panneau: panneau === undefined ? null : objet(panneau),
     lbc: lbcL === undefined ? null : Object.values(objet(lbcL && lbcL.ventes)),
+    // Les colis Leboncoin et Vestiaire à poster (`txsAExpedier`) : les mêmes lignes.
+    lbcVentes: lbcL === undefined ? null : (objet(lbcL && lbcL.ventes) || {}),
+    vc: (vcV === undefined || vcL === undefined) ? null : { ventes: (vcV && vcV.ventes) || null, liens: (vcL && vcL.liens) || {} },
     ebay: ebayL,
     versements: versementsDeLignes(txn),
+    // `null` = illisible (le bilan le NOMME) ; ligne absente = aucune vente.
+    vestiaire: (vcV === undefined || vcL === undefined) ? null : ventesVcDe({ ventes: (vcV && vcV.ventes) || null, liens: (vcL && vcL.liens) || {} }),
     main: mm,
   };
 }
@@ -219,8 +231,10 @@ async function lireDonneesBilan() {
 function colisAExpedier(d) {
   const t = txsAExpedier(d);
   if (!t) return null;
-  return t.vinted.size + (t.ebay ? t.ebay.total : 0);
+  return t.vinted.size + (t.ebay ? t.ebay.total : 0) + (t.leboncoin ? t.leboncoin.total : 0) + (t.vestiaire ? t.vestiaire.total : 0);
 }
+// Un site illisible parmi ceux qui portent des colis : le nombre est « au moins ».
+const colisManque = (t) => (t ? [!t.ebay && 'eBay', !t.leboncoin && 'Leboncoin', !t.vestiaire && 'Vestiaire'].filter(Boolean) : []);
 // Les transactions Vinted à expédier (un Set) et le résumé eBay (`null` =
 // illisible) — la composition du widget, partagée par le bilan du lundi et le
 // rappel du soir (§11 : une règle, deux lecteurs). `null` = pas su.
@@ -242,7 +256,10 @@ function txsAExpedier(d) {
   // widget et l'app (`colisEbay`, §11). eBay illisible ⇒ le nombre Vinted seul,
   // dit « au moins » par l'appelant (jamais un total partiel présenté complet).
   const eb = resumeColisEbay(colisEbay(d.ebay));
-  return { vinted: new Set(txs.map(String).filter(pasPartie)), ebay: eb };
+  // (1er nov., audit A4) Leboncoin et Vestiaire : la règle de Colis
+  // (`resumeColisSites`). Illisible ⇒ `null`, nommé par l'appelant.
+  const autres = resumeColisSites({ lbc: d.lbcVentes, vc: d.vc, fait: d.main.vrm_lbc_colis_done });
+  return { vinted: new Set(txs.map(String).filter(pasPartie)), ebay: eb, leboncoin: autres.leboncoin, vestiaire: autres.vestiaire };
 }
 
 // `soir` : le bilan du DIMANCHE SOIR (26 oct.). Il porte la semaine EN COURS
@@ -259,7 +276,7 @@ async function bilanDeLaSemaine(maintenant = Date.now(), soir = false) {
   const d = await lireDonneesBilan();
   if (Array.isArray(d.comptes) && !d.comptes.length) return 'aucun compte Vinted lié';
   const b = calculerBilan({
-    ...d, colis: colisAExpedier(d), colisAuMoins: !Array.isArray(d.ebay),
+    ...d, colis: colisAExpedier(d), colisAuMoins: colisManque(txsAExpedier(d)).length > 0, colisManque: colisManque(txsAExpedier(d)),
     dorment: d.main ? d.main.vrm_paires_dorment : null,
     debut: sem.debut, fin: sem.fin, seuilCapture: sem.seuilCapture, maintenant,
   });
@@ -613,7 +630,10 @@ async function traiterVendeurApresRelecture() {
     else if (!Array.isArray(d.bords)) vintedSkip = 'bordereaux illisibles';
     // Vinted illisible et rien à dire pour eBay : on se tait, sans mémo (le
     // passage suivant, tout lu, ne doit pas se croire « déjà notifié »).
-    if (vintedSkip && (!eb || (!(eb.overdue + eb.today + eb.tomorrow) && !eb.nePasPoster))) return { urssaf, bilan, retrait, offremini, agentebay, skipped: vintedSkip + ' — aucune notification envoyée' };
+    // (1er nov., audit A4) Les ventes Vestiaire : leur date limite, la règle de Colis.
+    const vcR = t ? t.vestiaire : resumeColisSites({ vc: d.vc }).vestiaire;
+    const vcDus = vcR ? vcR.overdue + vcR.today + vcR.tomorrow : 0;
+    if (vintedSkip && !vcDus && (!eb || (!(eb.overdue + eb.today + eb.tomorrow) && !eb.nePasPoster))) return { urssaf, bilan, retrait, offremini, agentebay, skipped: vintedSkip + ' — aucune notification envoyée' };
 
     const c = vintedSkip ? null : compterEcheances({ txs: [...t.vinted], ventes: ventesParTx(d), bords: bordsDuVendeur(d), maintenant: Date.now() });
     // ⚠️ (revue du 22 oct.) `overdue` = une limite LUE (email du bordereau, ou
@@ -625,6 +645,7 @@ async function traiterVendeurApresRelecture() {
     const aVerifier = c ? c.estimeeDepassee : 0;
     const ebayDus = eb ? eb.overdue + eb.today + eb.tomorrow : 0;
     if (eb) { overdue += eb.overdue; dueToday += eb.today; dueTomorrow += eb.tomorrow; }
+    if (vcR) { overdue += vcR.overdue; dueToday += vcR.today; dueTomorrow += vcR.tomorrow; }
     const total = overdue + aVerifier + dueToday + dueTomorrow;
     const nePasPoster = eb ? eb.nePasPoster : 0;
 
@@ -633,13 +654,13 @@ async function traiterVendeurApresRelecture() {
     if (dedup.date === today && dedup.total === total && (dedup.nePasPoster || 0) === nePasPoster) return { urssaf, bilan, retrait, offremini, agentebay, skipped: 'déjà notifié', total };
 
     if ((total > 0 || nePasPoster > 0) && await pushCategorieActive('expedier')) {
-      const txt = texteMatin({ overdue, aVerifier, dueToday, dueTomorrow, ebayDus, nePasPoster, vinted: c });
+      const txt = texteMatin({ overdue, aVerifier, dueToday, dueTomorrow, ebayDus, vestiaireDus: vcDus, nePasPoster, vinted: c });
       await sendPushToAll({ ...txt, tag: 'ship-reminder', url: DESTINATIONS.colis({}) });
     }
     await ecrireDedup('ship_reminder_dedup', { date: today, total, nePasPoster });
     return { urssaf, bilan, retrait, offremini, agentebay, overdue, aVerifier, dueToday, dueTomorrow, total,
       ...(c ? { heures: { aujourdhui: c.premier.aujourdhui ? c.premier.aujourdhui.heure : null, demain: c.premier.demain ? c.premier.demain.heure : null }, estimees: c.estimees, sansLimite: c.sansLimite } : {}),
-      ebay: eb ? { aPoster: eb.total, dus: ebayDus, nePasPoster } : null, ...(vintedSkip ? { vintedSkip } : {}) };
+      ebay: eb ? { aPoster: eb.total, dus: ebayDus, nePasPoster } : null, vestiaire: vcR ? { aPoster: vcR.total, dus: vcDus } : null, ...(vintedSkip ? { vintedSkip } : {}) };
 }
 
 // Le texte du matin : une fonction pure (le banc la juge par la sortie de la
@@ -649,7 +670,7 @@ async function traiterVendeurApresRelecture() {
 // « du retard ! » ne part QUE sur une limite LUE et dépassée (`overdue`) ; une
 // date ESTIMÉE dépassée est « à vérifier sur Vinted » (`aVerifier`), jamais un
 // retard (revue du 22 octobre).
-export function texteMatin({ overdue, aVerifier = 0, dueToday, dueTomorrow, ebayDus = 0, nePasPoster = 0, vinted = null }) {
+export function texteMatin({ overdue, aVerifier = 0, dueToday, dueTomorrow, ebayDus = 0, vestiaireDus = 0, nePasPoster = 0, vinted = null }) {
   const total = overdue + aVerifier + dueToday + dueTomorrow;
   const premier = (vinted && vinted.premier) || {};
   const avec = (n, mot, p) => {
@@ -665,9 +686,12 @@ export function texteMatin({ overdue, aVerifier = 0, dueToday, dueTomorrow, ebay
   // Le mot suit la donnée : une étiquette eBay se prend DANS eBay (l'acheteur
   // l'a payée, §2.8). Côté Vinted, ce sont des COLIS : une vente sans
   // bordereau reçu compte aussi (22 octobre).
-  const quoi = !ebayDus ? `${total} colis à envoyer`
+  // (1er nov.) Vestiaire : son bordereau se prend sur Vestiaire — dit dans le « dont ».
+  const dont = [ebayDus ? `${ebayDus} eBay` : '', vestiaireDus ? `${vestiaireDus} Vestiaire` : ''].filter(Boolean);
+  const quoi = !dont.length ? `${total} colis à envoyer`
     : ebayDus === total ? `${total} colis eBay à envoyer`
-    : `${total} colis à envoyer, dont ${ebayDus} eBay`;
+    : vestiaireDus === total ? `${total} colis Vestiaire à envoyer`
+    : `${total} colis à envoyer, dont ${dont.join(' et ')}`;
   const corps = total > 0 ? `${quoi} (${parts.join(' · ')}).` : '';
   // La date estimée : dite pour celles d'aujourd'hui et de demain, et pour
   // celles « à vérifier » (une phrase, §7 : leur part le dit déjà « estimée »).
@@ -676,7 +700,7 @@ export function texteMatin({ overdue, aVerifier = 0, dueToday, dueTomorrow, ebay
   const stop = nePasPoster ? ` ${nePasPoster > 1 ? `${nePasPoster} acheteurs eBay ont` : 'Un acheteur eBay a'} demandé l'annulation : ne poste pas ${nePasPoster > 1 ? 'ces colis' : 'ce colis'}.` : '';
   return {
     title: nePasPoster && !total ? '✋ Commande eBay : ne poste pas' : overdue ? '⏰ Colis à expédier — du retard !' : '📮 Colis à expédier',
-    body: (corps + estime + stop).trim() + (ebayDus || nePasPoster ? " Ouvre l'app pour les voir." : " Ouvre l'app pour les préparer."),
+    body: (corps + estime + stop).trim() + (ebayDus || vestiaireDus || nePasPoster ? " Ouvre l'app pour les voir." : " Ouvre l'app pour les préparer."),
   };
 }
 
@@ -686,15 +710,19 @@ export function texteMatin({ overdue, aVerifier = 0, dueToday, dueTomorrow, ebay
 // projeté, §4.4), ventes moissonnées (liste + résumé), commandes eBay, et les
 // bordereaux reçus par email (leur date limite, AVEC l'heure). Chaque source
 // vaut `null` quand sa lecture a échoué (« rien lu » ne vaut pas « rien »).
-const MAIN_COLIS = ['vinted_ship_done', 'vinted_bords_shipped', 'vinted_bords_hidden'];
+const MAIN_COLIS = ['vinted_ship_done', 'vinted_bords_shipped', 'vinted_bords_hidden', 'vrm_lbc_colis_done'];
 async function lireDonneesColis() {
   const BORD = 'dateLimite:data->>dateLimite,transaction:data->>transaction,suivi:data->>suivi,numero:data->>numero,receivedAt:data->>receivedAt,filename:data->>filename';
-  const [comptesL, m, lignes, ebay, bords] = await Promise.all([
+  const [comptesL, m, lignes, ebay, bords, lbcL, vcV, vcL] = await Promise.all([
     fetchPaginated(scoped('vinted_accounts?select=vinted_user_id,login')),
     getRowProjete('main', MAIN_COLIS),
     fetchPaginated(scoped('app_data?id=like.harvest_%25_orders_sold&select=id,orders:data->payload->my_orders,txns:data->resume->txns')),
     lireCommandesEbay(),
     fetchPaginated(scoped(`app_data?id=like.email_bord_*&select=${BORD}`)),
+    // (1er nov., audit A4) Les colis Leboncoin et Vestiaire : leurs seules ventes (§4.4).
+    getRowProjete('lbc_ventes', ['ventes']),
+    getRowProjete('vc_ventes', ['ventes']),
+    getRowProjete('vc_listings', ['liens']),
   ]);
   const comptes = Array.isArray(comptesL) ? comptesL.map((c) => ({ uid: String((c && c.vinted_user_id) || '') })).filter((c) => c.uid) : null;
   let commandes = null;
@@ -705,7 +733,9 @@ async function lireDonneesColis() {
       if (um) commandes[um[1]] = { orders: Array.isArray(l.orders) ? l.orders : [], txns: Array.isArray(l.txns) ? l.txns : null };
     }
   }
-  return { comptes, commandes, main: m === undefined ? null : objet(m), ebay, bords };
+  return { comptes, commandes, main: m === undefined ? null : objet(m), ebay, bords,
+    lbcVentes: lbcL === undefined ? null : (objet(lbcL && lbcL.ventes) || {}),
+    vc: (vcV === undefined || vcL === undefined) ? null : { ventes: (vcV && vcV.ventes) || null, liens: (vcL && vcL.liens) || {} } };
 }
 // Les ventes par transaction (leur DATE sert à la limite estimée), des seuls
 // comptes encore liés — la même portée que `txsAExpedier`.
@@ -743,7 +773,7 @@ function bordsDuVendeur(d) {
 // Le texte : une fonction pure (le banc la juge par la sortie de la route).
 // `aVerifier` : les dates ESTIMÉES (pas d'email de bordereau) qui seront
 // passées demain — jamais « déjà en retard » (revue du 22 octobre).
-export function texteSoir({ n, auMoins, retard, aVerifier = 0, demain, heureDemain = null }) {
+export function texteSoir({ n, auMoins, retard, aVerifier = 0, demain, heureDemain = null, manque = null }) {
   const N = `${auMoins ? 'au moins ' : ''}${n} colis à poster`;
   const H = heureDemain ? heureCourte(heureDemain) : '';
   const parts = [];
@@ -752,7 +782,7 @@ export function texteSoir({ n, auMoins, retard, aVerifier = 0, demain, heureDema
   if (demain) parts.push(`${demain} avec la date limite demain${H ? (demain === 1 ? ` à ${H}` : `, la première à ${H}`) : ''}`);
   return {
     title: retard ? `⏰ Demain : ${N}` : `📮 Demain : ${N}`,
-    body: `${parts.length ? `Dont ${parts.join(', ')}. ` : ''}${auMoins ? "Les ventes eBay n'ont pas pu être relues : il peut y en avoir plus. " : ''}Prépare-les ce soir.`,
+    body: `${parts.length ? `Dont ${parts.join(', ')}. ` : ''}${auMoins ? `Les ventes ${(Array.isArray(manque) && manque.length ? manque : ['eBay']).join(' et ')} n'ont pas pu être relues : il peut y en avoir plus. ` : ''}Prépare-les ce soir.`,
   };
 }
 async function rappelDuSoir() {
@@ -764,8 +794,10 @@ async function rappelDuSoir() {
   const d = await lireDonneesColis();
   const t = txsAExpedier(d);
   if (!t) return { soir: 'lecture ratée — rien envoyé' };
-  const auMoins = !t.ebay;
-  const n = t.vinted.size + (t.ebay ? t.ebay.total : 0);
+  // (1er nov., audit A4) + Leboncoin et Vestiaire : le nombre de Colis (§11).
+  const manque = colisManque(t);
+  const auMoins = manque.length > 0;
+  const n = t.vinted.size + (t.ebay ? t.ebay.total : 0) + (t.leboncoin ? t.leboncoin.total : 0) + (t.vestiaire ? t.vestiaire.total : 0);
   if (!n) return { soir: 'rien à poster', n: 0 };
   // Le « dont » : seulement CES ventes (sous-ensemble de N). Demain, une limite
   // d'aujourd'hui (ou d'avant) est déjà passée : elle compte « en retard ».
@@ -782,10 +814,11 @@ async function rappelDuSoir() {
     heureDemain = c.premier.demain ? c.premier.demain.heure : null;
   }
   if (t.ebay) { retard += t.ebay.overdue + t.ebay.today; demain += t.ebay.tomorrow; }
+  if (t.vestiaire) { retard += t.vestiaire.overdue + t.vestiaire.today; demain += t.vestiaire.tomorrow; }
   if (!(await ecrireDedup('soir_reminder_dedup', { date: today, n }))) return { soir: 'mémo non écrit — rien envoyé' };
-  const txt = texteSoir({ n, auMoins, retard, aVerifier, demain, heureDemain: t.ebay && t.ebay.tomorrow ? null : heureDemain });
+  const txt = texteSoir({ n, auMoins, retard, aVerifier, demain, manque, heureDemain: (t.ebay && t.ebay.tomorrow) || (t.vestiaire && t.vestiaire.tomorrow) ? null : heureDemain });
   const envoi = await sendPushToAll({ ...txt, tag: 'soir-' + today, url: DESTINATIONS.colis({}) });
-  return { soir: 'envoyé', n, retard, aVerifier, demain, auMoins, envoi: envoi && (envoi.coupe || envoi.erreur || envoi.sent) };
+  return { soir: 'envoyé', n, retard, aVerifier, demain, auMoins, manque, envoi: envoi && (envoi.coupe || envoi.erreur || envoi.sent) };
 }
 async function traiterVendeurSoir() {
   // Le soir : lire et notifier les changements, puis le rappel du soir.
