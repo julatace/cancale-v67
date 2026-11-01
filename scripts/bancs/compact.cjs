@@ -84,15 +84,19 @@ const ouvrirVente=async(p)=>{const t=p.locator('.vrm-sale-row .vrm-ledger-sale-t
       await p.locator('.vrm-sale-row .vrm-ledger-sale-toggle').first().click();await p.locator('.vrm-sale-row[data-ligne-ouverte=true]').first().waitFor({timeout:5000});}
     // (21 oct.) La vente ouverte se détaille dans un TIROIR (portail, `aria-controls` du bouton de la ligne) : on y mesure.
     const idT=await p.locator('.vrm-sale-row .vrm-ledger-sale-toggle').first().getAttribute('aria-controls').catch(()=>null);
-    const cibleVente=idT&&await p.locator(`[id="${idT}"] .vrm-sale-row`).count()?p.locator(`[id="${idT}"] .vrm-sale-row`).first():p.locator('.vrm-sale-row').first();
-    const pos=await cibleVente.evaluate(e=>{const a=e.querySelector('.vrm-sale-photo').getBoundingClientRect(),b=e.querySelector('.vrm-sale-info').getBoundingClientRect(),r=e.getBoundingClientRect(),ov=e.querySelector('.vrm-sale-overview');return {w:a.width,h:a.height,left:a.left,right:b.left,row:r.height,ligne:ov?ov.getBoundingClientRect().height:null};});
+    // (1er nov.) Le tiroir d'une vente VINTED est le récapitulatif (maquette A) : la photo est dans son
+    //    en-tête (`.vrm-recap-tete`), à gauche du N° et du nom (`.vrm-recap-ident`), CARRÉE et de taille
+    //    constante (84 × 84 au téléphone) ; l'en-tête reste sous 200 px. Leboncoin et eBay gardent leur tiroir.
+    const recap=idT&&await p.locator(`[id="${idT}"] .vrm-recap-tete`).count();
+    const cibleVente=recap?p.locator(`[id="${idT}"] .vrm-recap-tete`).first():idT&&await p.locator(`[id="${idT}"] .vrm-sale-row`).count()?p.locator(`[id="${idT}"] .vrm-sale-row`).first():p.locator('.vrm-sale-row').first();
+    const pos=await cibleVente.evaluate(e=>{const a=e.querySelector('.vrm-sale-photo').getBoundingClientRect(),b=e.querySelector('.vrm-sale-info, .vrm-recap-ident').getBoundingClientRect(),r=e.getBoundingClientRect(),ov=e.matches('.vrm-recap-tete')?e:e.querySelector('.vrm-sale-overview');return {w:a.width,h:a.height,left:a.left,right:b.left,row:r.height,ligne:ov?ov.getBoundingClientRect().height:null};});
     // ⚠️ L'écran Ventes de Vinted a sa propre liste depuis le 16 octobre (b8d11f2, « Ventes premium », `.vrm-ventes-liste` : vignette CARRÉE 56 × 56 sur téléphone) ; Leboncoin et eBay gardent la ligne partagée 64 × 84. Chaque liste est jugée sur SA taille exacte, photo à gauche des informations.
     //    Et depuis #545 (« plateformes premium », 16 octobre) Leboncoin et eBay ont, AU TÉLÉPHONE, leur ligne d'app native
     //    (`styles-mineral.css` : vignette portrait 52 × 68). Ce banc est à 390 px : c'est cette taille-là qu'il exige.
     //    (20 octobre) Et depuis fc4c73e (« ventes mobiles sur une seule ligne », styles-mobile-studio.css), les DEUX listes
     //    ont au téléphone la même vignette portrait 36 × 48, ouverte comme repliée. Une taille exacte, jugée vente ouverte.
     //    (26 octobre) Julien : « on voit à peine les photos » — la vignette passe à 60 × 80 (décision de sa demande).
-    const attendu={w:60,h:80,nom:'photo portrait à gauche '};
+    const attendu=recap?{w:84,h:84,nom:'photo carrée du récapitulatif à gauche '}:{w:60,h:80,nom:'photo portrait à gauche '};
     check(pos.w===attendu.w && pos.h===attendu.h && pos.right>pos.left,attendu.nom+tab+' ('+pos.w+'×'+pos.h+')');
     // ⚠️ Ventes Vinted (b8d11f2, 16 octobre) : la LIGNE (`.vrm-sale-overview` : vignette, titre, statut, montant,
     //    bouton du bordereau sous le titre) reste sous 200 px ; les gestes du coût d'achat et « Modifier › »

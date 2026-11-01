@@ -126,10 +126,17 @@ async function brancher(p){
     await p.waitForFunction(()=>{const svg=document.querySelector('[data-courbe-semaine]');return svg&&Math.abs(Number(svg.getAttribute('width'))-svg.parentElement.clientWidth)<2;},null,{timeout:5000});
     await p.waitForTimeout(200);
     const bar=await p.locator('[data-barre-jour]').boundingBox(),recent=await p.locator('.vrm-day-recent').boundingBox(),stock=await p.locator('.vrm-day-stock').boundingBox();
-    // (1er nov.) La rangée « Tournée » passe au-dessus de la barre du jour : la barre reste dans le haut de l'écran (proportionnel à la densité).
-    check(bar.y<240*zoom,'actions quotidiennes en haut à densité '+zoom);
+    // (1er nov., « Ma journée calme ») Les actions du jour, ce sont d'abord les étapes de la Tournée
+    // quand elle est là (elle porte « à envoyer / à retirer »), sinon la barre : en haut de l'écran.
+    const tour=await p.locator('[data-tournee]').count()?await p.locator('[data-tournee]').boundingBox():null;
+    check((tour||bar).y<240*zoom,'actions quotidiennes en haut à densité '+zoom+(tour?' (la Tournée)':''));
     check(stock.x>=recent.x+recent.width-1,'stock à droite des dernières ventes '+zoom);
-    check(stock.y+stock.height<900 && recent.y+recent.height<900,'vue globale visible sans défilement '+zoom);
+    // Vue globale : en densité resserrée (0,65), TOUT tient sans défiler ; en densité normale,
+    // l'écran est aéré (une colonne, des sections) : les gestes et le haut des chiffres se voient
+    // sans défiler, les photos et le stock suivent (décision du 1er nov., à confirmer par Julien).
+    if(zoom<1) check(stock.y+stock.height<900 && recent.y+recent.height<900,'vue globale visible sans défilement '+zoom);
+    else { const v=await p.locator('.vrm-day-money').boundingBox(); const af=await p.locator('.vrm-day-task-list:not([data-alertes-argent])').first().boundingBox();
+      check(v && v.y<900 && (!af || af.y+af.height<900),'gestes et haut des chiffres visibles sans défilement '+zoom); }
     check(await p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'journée sans débordement '+zoom);
     if(process.env.BANC_CAPTURES){fs.mkdirSync(process.env.BANC_CAPTURES,{recursive:true});await p.screenshot({path:path.join(process.env.BANC_CAPTURES,'journee-'+zoom+'.png')});}
   }
@@ -266,16 +273,17 @@ async function brancher(p){
   check(await vente.getByPlaceholder(/prix d'achat/).count()>0,'une fois le coût connu, « Modifier » propose de le corriger');
   await vente.getByText('Détail des frais et du bénéfice',{exact:true}).click();
   await vente.getByLabel('Commission plateforme',{exact:true}).fill('10,50');await vente.getByLabel('Commission plateforme',{exact:true}).press('Tab');
-  await p.waitForFunction(()=>document.querySelector('.vrm-ledger-drawer-host:not([hidden]) .vrm-sale-price')?.textContent.includes('69,50'));
-  check((await vente.locator('.vrm-sale-price').innerText()).includes('estimé'),'frais déduits et bénéfice indiqué estimé');
+  await p.waitForFunction(()=>document.querySelector('.vrm-ledger-drawer-host:not([hidden]) [data-recap-benef-etat]')?.textContent.includes('69,50'));
+  // (1er nov.) Le récapitulatif dit « au plus » (frais pas confirmés : `data-recap-benef-etat="partiel"`), comme la ligne.
+  check((await vente.locator('[data-recap-benef-etat]').getAttribute('data-recap-benef-etat'))==='partiel' && /au plus/.test(await vente.locator('[data-recap-benef-etat]').innerText()),'frais déduits et bénéfice indiqué « au plus » (estimé)');
   await vente.getByRole('checkbox',{name:/Tous les frais sont renseignés/}).check();
-  check(!(await vente.locator('.vrm-sale-price').innerText()).includes('estimé'),'confirmation des frais rend le bénéfice complet');
+  check((await vente.locator('[data-recap-benef-etat]').getAttribute('data-recap-benef-etat'))==='ok' && !/au plus/.test(await vente.locator('[data-recap-benef-etat]').innerText()),'confirmation des frais rend le bénéfice complet');
   await vente.getByLabel('Port payé par moi',{exact:true}).fill('3');await vente.getByLabel('Port payé par moi',{exact:true}).press('Tab');
-  await p.waitForFunction(()=>document.querySelector('.vrm-ledger-drawer-host:not([hidden]) .vrm-sale-price')?.textContent.includes('66,50'));
-  check((await vente.locator('.vrm-sale-price').innerText()).includes('estimé'),'nouveau frais déduit et confirmation invalidée');
+  await p.waitForFunction(()=>document.querySelector('.vrm-ledger-drawer-host:not([hidden]) [data-recap-benef-etat]')?.textContent.includes('66,50'));
+  check((await vente.locator('[data-recap-benef-etat]').getAttribute('data-recap-benef-etat'))==='partiel','nouveau frais déduit et confirmation invalidée');
   await vente.getByLabel('Port payé par moi',{exact:true}).fill('3abc');await vente.getByLabel('Port payé par moi',{exact:true}).evaluate(e=>e.blur());
   check(!(await vente.getByLabel('Port payé par moi',{exact:true}).evaluate(e=>e.validity.valid)),'montant invalide refusé sans modifier le bénéfice');
-  check((await vente.locator('.vrm-sale-price').innerText()).includes('66,50'),'montant invalide conserve le dernier calcul enregistré');
+  check((await vente.locator('[data-recap-benef-etat]').innerText()).includes('66,50'),'montant invalide conserve le dernier calcul enregistré');
   await vente.getByRole('checkbox',{name:/Tous les frais sont renseignés/}).click();check(!(await vente.getByRole('checkbox',{name:/Tous les frais sont renseignés/}).isChecked()),'frais invalides empêchent la confirmation du bénéfice');
   await vente.getByLabel('Port payé par moi',{exact:true}).fill('3');await vente.getByLabel('Port payé par moi',{exact:true}).press('Tab');
   for(const width of [320,390,1512]){await p.setViewportSize({width,height:900});check(await p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'frais de vente sans débordement '+width);}

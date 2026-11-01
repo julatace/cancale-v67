@@ -94,8 +94,12 @@ import './styles-vitrine.css';
 import './styles-messages.css';
 // (1er nov.) Les chiffres de Ma journée (Vendu, Cette semaine en barres, Tendances), épurés — après Vitrine.
 import './styles-journee-chiffres.css';
+// (1er nov.) Le récapitulatif d'une vente (tiroir de Ventes, maquette A) — après Vitrine.
+import './styles-recap-vente.css';
 // (1er nov.) La finition « premium » (sans nouvelle palette ni dégradé) — en tout dernier.
 import './styles-finition.css';
+// (1er nov.) Ma journée calme : colonne tenue, listes à filets, une hiérarchie — après la finition.
+import './styles-journee-mieux.css';
 import { suivreRangeesDefilantes } from './rangeesDefilantes.js';
 if (typeof document !== 'undefined') { if (document.body) suivreRangeesDefilantes(); else document.addEventListener('DOMContentLoaded', suivreRangeesDefilantes); }
 

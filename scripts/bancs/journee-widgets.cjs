@@ -317,7 +317,9 @@ if (require.main === module) (async () => {
           dit(!!(R.vendu && R.semaine && R.attente && egaux(R.vendu.top, R.semaine.top) && egaux(R.semaine.top, R.attente.top) && R.vendu.left < R.semaine.left && R.semaine.left < R.attente.left), 'ordinateur : vendu | semaine | attente sur une rangée, comme avant', JSON.stringify([R.vendu, R.semaine, R.attente]));
           dit(!!(R.recentes && R.stock && egaux(R.recentes.top, R.stock.top) && R.stock.left >= R.recentes.left + R.recentes.w - 1 && R.recentes.w > R.stock.w * 1.6), 'ordinateur : les photos (2/3) puis le stock à leur droite (1/3), comme avant', JSON.stringify([R.recentes, R.stock]));
           dit(!!(R.barre && egaux(R.barre.w, l.grilleL)), 'ordinateur : la barre sur toute la largeur', JSON.stringify([R.barre && R.barre.w, l.grilleL]));
-          dit(!!(R.stock && R.recentes && R.stock.top + R.stock.h <= T.vp.height && R.recentes.top + R.recentes.h <= T.vp.height), 'ordinateur : toute la journée visible sans défiler', JSON.stringify([R.recentes, R.stock]));
+          // (1er nov., « Ma journée calme ») L'écran est aéré : les gestes (À faire) et le haut des
+          // chiffres se voient sans défiler ; les photos et le stock suivent (revendeurs : tout tient en densité 0,65).
+          dit(!!(R.afaire && R.vendu && R.afaire.top + R.afaire.h <= T.vp.height && R.vendu.top < T.vp.height && R.stock && R.recentes), 'ordinateur : les gestes et le haut des chiffres visibles sans défiler', JSON.stringify([R.afaire, R.vendu]));
         } else {
           const pleins = ['barre', 'afaire', 'vendu', 'semaine', 'attente', 'stock', 'recentes'].filter((id) => R[id] && egaux(R[id].w, l.grilleL));
           dit(pleins.length === 7, 'téléphone : chaque widget prend toute la largeur', pleins.join(','));
