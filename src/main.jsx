@@ -92,6 +92,8 @@ import './styles-boutons.css';
 import './styles-vitrine.css';
 // (31 oct.) Messages en volets (maquettes choisies) — après Vitrine, l'écran Messages seul.
 import './styles-messages.css';
+// (1er nov.) Le récapitulatif d'une vente (tiroir de Ventes, maquette A) — après Vitrine.
+import './styles-recap-vente.css';
 import { suivreRangeesDefilantes } from './rangeesDefilantes.js';
 if (typeof document !== 'undefined') { if (document.body) suivreRangeesDefilantes(); else document.addEventListener('DOMContentLoaded', suivreRangeesDefilantes); }
 

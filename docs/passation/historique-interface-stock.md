@@ -2386,3 +2386,71 @@ touchés : `stock-piece` B (« la paire choisie… rien d'autre ne bouge », `4_
 moteur-offres, offres-auto, republier, stock-plan : verts.
 
 **Geste de Julien** : aucun.
+
+## Récapitulatif d'une vente — 1er novembre 2026
+
+**Demande** : « je n'aime pas trop le récapitulatif de la vente », puis, devant
+quatre maquettes (0 actuel, A « fiche en lignes nettes », B « photo en vitrine »,
+C « deux colonnes, cascade ») : « applique tout, je veux que ce soit clair ».
+Appliqué : **A**, style Vitrine inchangé.
+
+**Où** : le tiroir qui s'ouvre quand on touche une vente dans Ventes · Vinted
+(feuille du bas au téléphone, panneau de droite sur ordinateur). La coque
+(`LigneVenteCompacte`) prend une prop `recap` (fonction qui rend tout le contenu) ;
+sans elle, le tiroir d'avant (Leboncoin, eBay — non touchés). « Tous les sites »
+n'a pas de tiroir : une ligne y mène à l'écran de son site.
+
+**De haut en bas** :
+1. photo carrée de taille constante (84 px téléphone, 96 px ordinateur), pastille
+   `N°…` seulement si l'identité donne le N° (`effEntry`), sinon « Sans N° VRM » ;
+   nom complet ; taille si elle n'est pas déjà dans le titre ; état de l'article
+   seulement si SON annonce est trouvée par identité (`txnItem`) ;
+2. UNE phrase d'état (`phraseVente`) et la frise Vendue → Bordereau → Déposée →
+   Livrée → Argent reçu (`friseVente`, `src/recapVente.js`, sans React). Preuves :
+   bordereau = PDF relié par n° de transaction (`bordParTx`, `labelsCaptes`) ;
+   déposée = « Colis fait » (`vinted_ship_done`) ou un statut qui dit que le colis a
+   bougé (`COLIS_DEJA_BOUGE`, `waiting`, au relais) ; livrée = « livré / remis /
+   réceptionné » ou finalisée ; argent = finalisée (450, texte ou champ machine),
+   date = `fetchVersementsVinted`. Une étape plus loin prouvée coche les
+   précédentes (`preuve: 'deduite'`, sans date) ; sinon « à venir ». La frise
+   REMPLACE la pastille de statut (retirée le 28 sept. parce qu'elle redisait la
+   pastille) : jamais les deux. Annulée / remboursée / retour / suspendue : pas
+   de frise, la phrase dit l'état (avec l'issue du N° qui existait déjà) ;
+3. l'argent en lignes, chiffres Geist Mono à droite : Prix · Frais (si saisis) ·
+   Prix d'achat (sinon le geste ambre « Saisir le prix d'achat » = `CoutAchatVente
+   recap`, « ou relier un achat » à côté) · trait · Bénéfice (règle de la ligne,
+   `beneficeLigneVente` : « — » sans achat, « au plus » frais pas confirmés) ·
+   Versé (date, « oui — date pas lue », ou « — pas encore »). Aucune règle de
+   calcul changée ; `data-benef-vente` garde son sens ;
+4. détails : acheteur (si lu), compte, date de vente (seulement sans frise : la
+   frise la porte), n° de suivi du bordereau, rangement, achat relié ;
+5. gestes : un seul principal (le bordereau, tant que le colis doit partir), puis
+   Conversation (cible `conv` → Messages, le chemin des notifications), Fiche de
+   la paire, Voir sur Vinted ↗, Voir au stock, Voir le lot, Article perdu / Il est
+   revenu, la facture, et « N° et frais » replié (mêmes champs et écritures :
+   `CoutsVente`, N°, correction du prix, reçu d'achat, changer l'achat relié).
+
+**Redites retirées** : la date de vente n'est plus écrite deux fois (frise), le
+prix d'achat n'est plus redit dans « Achat relié » (montant dans l'argent), la
+date du versement n'est que dans « Versé », le N° une fois (« Fiche de la paire »
+porte `aria-label="Fiche N°…"`). « 🖨 » retiré du libellé du grand bouton
+bordereau (l'icône le dit déjà).
+
+**Contrôles** : banc `scripts/bancs/recap-vente.cjs` (390 clair, 390 sombre,
+1512) — frise cochée seulement sur preuve (payée seule / bordereau / livrée +
+colis fait / finalisée versée le 25), jamais pastille + frise, « — » sans prix
+d'achat, « au plus 42,05 € », un nombre une fois, ni « encaissé » ni « n/d »,
+aucun débordement, montants entiers, cibles 44 px, toucher à côté qui referme,
+annulée sans frise. **Rouge avant** (dist d'avant : 30 rouges) et **rouge par
+mutation** (frise qui coche « Déposée » sans preuve). Bancs adaptés sans
+affaiblir : `compact` (photo du récapitulatif 84 × 84 à gauche, en-tête < 200 px),
+`revendeurs` (« estimé » → `data-recap-benef-etat` partiel/ok, mêmes montants),
+`mobile` (photo du récapitulatif 84 × 84 à toutes les largeurs). Verts : compact,
+revendeurs, ventes-colis-premium, double-vente, ventes-benefice-glisser,
+ventes-frappe, coque-mobile, photo-vente, ventes-bordereau, notifs-destination,
+pont, deux-extensions, lbc-comme-vinted. Rouges DÉJÀ rouges avant (mêmes lignes
+sur le dist d'avant) : `feuilles-coque` (27), `achats-hors-plateforme` (4),
+`annonces-ventes-brouillon` (15, clics de navigation), `mobile` (« navigation
+hors du contenu » à 320 px, avant d'arriver au tiroir).
+
+**Geste de Julien** : regarder une vente (téléphone et ordinateur).
