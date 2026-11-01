@@ -94,6 +94,8 @@ import './styles-vitrine.css';
 import './styles-messages.css';
 // (1er nov.) Les chiffres de Ma journée (Vendu, Cette semaine en barres, Tendances), épurés — après Vitrine.
 import './styles-journee-chiffres.css';
+// (1er nov.) Le récapitulatif d'une vente (tiroir de Ventes, maquette A) — après Vitrine.
+import './styles-recap-vente.css';
 // (1er nov.) La finition « premium » (sans nouvelle palette ni dégradé) — en tout dernier.
 import './styles-finition.css';
 import { suivreRangeesDefilantes } from './rangeesDefilantes.js';

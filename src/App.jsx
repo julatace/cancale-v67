@@ -110,6 +110,7 @@ import CarteRelaisColis, { ColonneRetirer } from "./CarteRelais.jsx";
 import { CarteTournee, TourneePleinEcran } from "./Tournee.jsx";
 import { GlisserVente, useDeposeDiffere, BarreAnnulerDepose } from "./GlisserDepose.jsx";
 import { beneficeLigneVente, texteBenefice, euros as eurosLigne } from "./beneficeLigne.js";
+import { friseVente, phraseVente, eurosRecap, ETATS_HORS_PARCOURS } from "./recapVente.js";
 import { etapesTournee, arretsTournee, gestesDepuis } from "./tournee.js";
 import ColisColonnes from "./ColisColonnes.jsx";
 import "./styles-barre-haut.css";
@@ -10900,7 +10901,10 @@ function AchatsHorsPlateforme({ achats, ouvert, onBasculer, onAjouter, onModifie
 // manque : « Saisir le prix » écrit `saleOv[tx].buyPrice` — la MÊME écriture
 // que le champ de « Modifier », déjà lue par `effEntry` → `beneficePaire` (§11).
 // Un montant illisible n'est jamais enregistré : on le dit (§2.5, on ne devine pas).
-function CoutAchatVente({ onSaisir, onRelier, surLigne = false }) {
+// (1er nov.) `recap` : dans le récapitulatif de la vente, à la place du montant
+// d'achat qui manque — un seul geste AMBRE « Saisir le prix d'achat » (§7 : un
+// geste à faire), « ou relier un achat » à côté, discret. Mêmes écritures.
+function CoutAchatVente({ onSaisir, onRelier, surLigne = false, recap = false }) {
   const [edit, setEdit] = useState(false);
   const [txt, setTxt] = useState('');
   const [err, setErr] = useState('');
@@ -10911,9 +10915,9 @@ function CoutAchatVente({ onSaisir, onRelier, surLigne = false }) {
     onSaisir(p); setEdit(false); setTxt(''); setErr('');
   };
   return (
-    <div data-cout-vente={surLigne ? 'ligne' : ''} className="vrm-cout-vente" style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+    <div data-cout-vente={surLigne ? 'ligne' : recap ? 'recap' : ''} className={recap ? 'vrm-cout-vente vrm-cout-recap' : 'vrm-cout-vente'} style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
       <div className="vrm-cout-rangee" style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-        <span className="vrm-cout-label" style={{ fontSize: 12, color: C.muted, flex: '0 0 auto' }}>Coût d'achat ?</span>
+        {recap ? null : <span className="vrm-cout-label" style={{ fontSize: 12, color: C.muted, flex: '0 0 auto' }}>Coût d'achat ?</span>}
         {edit ? (
           <form onSubmit={ev => { ev.preventDefault(); valider(); }} style={{ display: 'flex', alignItems: 'center', gap: 6, flex: '1 1 200px', minWidth: 0 }}>
             <div style={{ position: 'relative', flex: 1, minWidth: 0 }}>
@@ -10926,8 +10930,8 @@ function CoutAchatVente({ onSaisir, onRelier, surLigne = false }) {
           </form>
         ) : (
           <>
-            <Bouton variante="secondaire" icone="pencil" data-cout-vente-saisir onClick={() => setEdit(true)} title="Taper le prix payé, sans relier d'achat">Prix d’achat</Bouton>
-            {onRelier && <Bouton variante="secondaire" icone="link" data-cout-vente-relier onClick={onRelier} title="Choisir l'achat Vinted correspondant : son prix remplit le coût">Relier un achat</Bouton>}
+            <Bouton variante="secondaire" icone="pencil" className={recap ? 'vrm-geste-ambre' : undefined} data-cout-vente-saisir onClick={() => setEdit(true)} title="Taper le prix payé, sans relier d'achat">{recap ? 'Saisir le prix d’achat' : 'Prix d’achat'}</Bouton>
+            {onRelier && <Bouton variante={recap ? 'discret' : 'secondaire'} icone="link" data-cout-vente-relier onClick={onRelier} title="Choisir l'achat Vinted correspondant : son prix remplit le coût">{recap ? 'ou relier un achat' : 'Relier un achat'}</Bouton>}
           </>
         )}
       </div>
@@ -16401,7 +16405,7 @@ function BoutonBordereau({ uid, tx, conv, login, aGenerer, pdf, onImprimer, onFa
     fontSize: grand ? 14 : 12.5, padding: grand ? '11px 14px' : '7px 11px', cursor: 'pointer', whiteSpace: 'nowrap' };
   if (pdf) {
     return <button type="button" data-bouton-bord="pdf" data-imprime="1" data-tx={tx} onClick={onImprimer} title="Bordereau tamponné (titre + N°), puis impression"
-      style={{ ...base, border: 'none', background: C.accent, color: C.onAccent || '#fff' }}><Icon name="doc" size={grand ? 16 : 14}/>{grand ? '🖨 Imprimer le bordereau' : 'Bordereau'}</button>;
+      style={{ ...base, border: 'none', background: C.accent, color: C.onAccent || '#fff' }}><Icon name="doc" size={grand ? 16 : 14}/>{grand ? 'Imprimer le bordereau' : 'Bordereau'}</button>;
   }
   if (!aGenerer || !uid || !tx) return null;
   const glob = raisonExtGlobale(sansSouris);
@@ -18686,7 +18690,13 @@ function FiltresVentes({ value, onChange, search, onSearch, cancelled = false, d
 // (1er nov.) `benef` : les colonnes Achat · Bénéfice de la ligne (src/beneficeLigne.js,
 // la règle de `beneficePaire`) — { etat, achatTxt, benefTxt, achatCentimes,
 // benefCentimes }. Absent ⇒ la ligne d'avant, rien de plus.
-function LigneVenteCompacte({ photo, photoNoeud = null, titre, sous = '', etat, etatNoeud = null, ton = '', montant, children, numerosArticle = [], plateforme = '', initialOuvert = false, gestes = null, montantCentimes, benef, ...props }) {
+// (1er nov., « je veux que ce soit clair ») `recap` : le RÉCAPITULATIF de la vente
+// (maquette A, « fiche en lignes nettes ») — une fonction ({ titreId, fermerRef,
+// fermer }) ⇒ le contenu ENTIER du tiroir (en-tête photo · N° · nom, phrase
+// d'état et frise, l'argent en lignes, les détails, les gestes). Absent ⇒ le
+// tiroir d'avant (Leboncoin, eBay). Rien d'autre ne change : même feuille, même
+// fermeture d'un toucher à côté, même `FermeAuRetour`, même portail.
+function LigneVenteCompacte({ photo, photoNoeud = null, titre, sous = '', etat, etatNoeud = null, ton = '', montant, children, numerosArticle = [], plateforme = '', initialOuvert = false, gestes = null, montantCentimes, benef, recap = null, ...props }) {
   const [ouvert, setOuvert] = React.useState(initialOuvert);
   const panneau = React.useId();
   const declencheur = React.useRef(null);
@@ -18772,12 +18782,14 @@ function LigneVenteCompacte({ photo, photoNoeud = null, titre, sous = '', etat, 
     {/* « Retour » (geste du téléphone, ← du navigateur) ferme d'abord le tiroir. */}
     {ouvert && <FermeAuRetour fermer={close}/>}
     {dejaOuvert.current && createPortal(<div className="vrm-app-shell vrm-ledger-drawer-host" hidden={!ouvert}>
-      <section className="vrm-ledger-drawer" role="dialog" aria-modal="false" aria-labelledby={panneau+'-titre'} id={panneau} onKeyDown={e=>{if(e.target.matches('input,textarea,select,[contenteditable=true]'))return;if(e.key==='Escape'&&!e.defaultPrevented){e.preventDefault();e.stopPropagation();close();}}}>
+      <section className={recap?'vrm-ledger-drawer vrm-recap':'vrm-ledger-drawer'} role="dialog" aria-modal="false" aria-labelledby={panneau+'-titre'} id={panneau} data-recap-vente={recap?'':undefined} onKeyDown={e=>{if(e.target.matches('input,textarea,select,[contenteditable=true]'))return;if(e.key==='Escape'&&!e.defaultPrevented){e.preventDefault();e.stopPropagation();close();}}}>
+        {recap ? <div className="vrm-main vrm-ledger-drawer-body vrm-recap-corps">{recap({ titreId: panneau+'-titre', fermerRef: fermer, fermer: close })}</div> : <>
         <header className="vrm-ledger-drawer-head"><div><span>VENTE</span><h2 id={panneau+'-titre'}>{titre || 'Vente'}</h2><p>{etat}{etat&&montant?' · ':''}{montant}</p></div><button ref={fermer} type="button" aria-label="Fermer les détails de la vente" onClick={close}><Icon name="close" size={18}/></button></header>
         <div className="vrm-main vrm-ledger-drawer-body">
           <div className="vrm-fiche-vente-acces"><span>{plateforme?plateforme[0].toUpperCase()+plateforme.slice(1):'Vente'} · {sous||'Compte et date dans les détails'}</span>
           {numerosFiche.length?numerosFiche.map(n=><Bouton variante="discret" key={n} onClick={()=>{close();window.dispatchEvent(new CustomEvent('vrm:fiche-article',{detail:n}));}}>Fiche N°{n} ›</Bouton>):<small title="Pas de numéro VRM confirmé pour cette vente : aucune fiche n’est choisie au hasard.">Sans N° VRM</small>}</div>
           <div className="vrm-ventes-liste"><div className={props.className} data-ligne-ouverte="true"><div className="vrm-ledger-sale-content">{children}</div></div></div></div>
+        </>}
       </section>
     </div>,document.body)}
   </div>;
@@ -45600,8 +45612,16 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       JSON.stringify(e), baseE, ov, photo, sourcesPhoto.join('\n'), hidden, isShipDone(o), estFloute(o),
       JSON.stringify(venteStage(o)), o._acc ? accNameOf(o._acc) : '', cell ? garageCellLabel(cell) : '', inGarage(num),
       saleOutcome(o), isPairLost(num), num ? numeroReprenable(num) : null,
-      !!labelsCaptes[tx], !!bordParTx[tx], identiteAnnonce(o), !!(deposeVente.attente && deposeVente.attente.cle === tx)];
-    return { deps, e, baseE, photo, sourcesPhoto, ov, hidden };
+      !!labelsCaptes[tx], !!bordParTx[tx], identiteAnnonce(o), !!(deposeVente.attente && deposeVente.attente.cle === tx),
+      // (1er nov.) le récapitulatif de la vente lit aussi ces preuves (frise, versement, suivi)
+      versements ? (versements[tx] || '') : versements, (bordParTx[tx] && bordParTx[tx].receivedAt) || '', (bordParTx[tx] && bordParTx[tx].suivi) || '',
+      (labelsCaptes[tx] && labelsCaptes[tx].capturedAt) || '', shipDone[tx] || 0, (etatTxn(tx) || {}).s ?? null, !!onNav, JSON.stringify(e && e.buyFromId ? achatRelie(e) : null)];
+    // L'état de l'article (« Très bon état ») : celui de SON annonce, trouvée par
+    // identité (`txnItem`, la transaction), jamais par titre — sinon rien.
+    const annonce = txnItem[tx] != null ? lst.find((it) => it && String(it.id) === String(txnItem[tx])) : null;
+    const etatArticle = annonce && typeof annonce.status === 'string' && /neuf|[ée]tat|satisfaisant/i.test(annonce.status) ? annonce.status : '';
+    deps.push(etatArticle);
+    return { deps, e, baseE, photo, sourcesPhoto, ov, hidden, etatArticle };
   };
   const actionsVentes = React.useRef(null);
   actionsVentes.current = { imprimerBordereauVente, markPairLost, unmarkPairLost, onLocate, openPicker, rechargerLabels, setSaleOverride, toggleHidden, demanderDepose: deposeVente.demander };
@@ -47647,146 +47667,145 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             const gesteCout = coutManque ? <CoutAchatVente surLigne onSaisir={p=>setSaleOverride(o.transaction_id,{buyPrice:p})}
                   onRelier={()=>{ const idf = identiteAnnonce(o); openPicker(idf ? { id: idf, title: o.title, photo: photo, price: sell, _acc: o._acc } : { id: '_v'+o.transaction_id, _saleTx: String(o.transaction_id), title: o.title, photo: photo, price: sell, _acc: o._acc }); }}/> : null;
             const gesteDepose = peutDeposer ? <Bouton variante="secondaire" icone="check" className="vrm-depose-bouton" data-depose-vente={txL} data-sans-glisse="" disabled={deposeIci} aria-label={`Marquer ${libDepose || 'ce colis'} déposé`} onClick={()=>demanderDepose(txL, o, libDepose)}>Déposé</Bouton> : null;
+            // ── (1er nov.) LE RÉCAPITULATIF DE LA VENTE — maquette A, « fiche en lignes nettes »
+            // (Julien : « applique tout, je veux que ce soit clair »). De haut en bas : la paire
+            // (photo, N° seulement si l'identité le donne, nom, taille), UNE phrase d'état et la
+            // frise (src/recapVente.js : une étape n'est cochée que PROUVÉE), l'argent en lignes
+            // (mêmes règles qu'avant : `beneficeLigneVente`/`beneficePaire`), les détails, puis
+            // les gestes — les MÊMES fonctions et écritures que l'ancien tiroir, rien de retiré.
+            // ⚠️ La frise REMPLACE la pastille de statut ici (jamais les deux, cf. 28 sept.).
+            const recapVente = ({ titreId, fermerRef, fermer }) => {
+              const s = String(o.status || ''); const tus = String(o.transaction_user_status || '').toLowerCase();
+              const vs = venteStage(o);
+              const horsParcours = ETATS_HORS_PARCOURS.includes(vs.label) || st === 'cancelled';
+              const bordE = bordParTx[txL] || null, bordC = labelsCaptes[txL] || null;
+              const posteMain = isShipDone(o);
+              const etx = etatTxn(o.transaction_id);
+              const finalisee = /finalis/i.test(s) || tus === 'completed' || !!(etx && etx.s === 450);
+              const livreeLue = finalisee || /\blivr[ée]|remis\b|r[ée]ceptionn/i.test(s);
+              const bougeLu = livreeLue || tus === 'waiting' || COLIS_DEJA_BOUGE.test(s) || isAtRelayStatus(s);
+              const versement = versements ? (versements[txL] || null) : null;
+              const etapes = horsParcours ? null : friseVente({
+                vendue: { lu: true, t: o.date || null },
+                bordereau: { lu: !!(bordE || bordC), t: (bordE && bordE.receivedAt) || (bordC && bordC.capturedAt) || null },
+                deposee: { lu: posteMain || bougeLu, t: posteMain ? shipDone[txL] : null },
+                livree: { lu: livreeLue, t: null },
+                argent: { lu: finalisee, t: versement },
+              });
+              const aExp = !hidden && st !== 'cancelled' && aExpedier(o) && !posteMain;
+              const phrase = phraseVente({ etat: vs.label, aide: vs.aide, etapes: etapes || [], aExpedier: aExp, posteMain });
+              const jourCourt = (t) => t == null ? '' : new Date(t).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
+              const taille = String((e && e.size) || o.size || '').trim();
+              const nom = o.title || '(sans titre)';
+              const sousTitre = [taille && !tailleDansTitre(o.title, taille) ? `Taille ${taille}` : '', pre.etatArticle || ''].filter(Boolean).join(' · ');
+              // L'argent : la règle de la ligne (`lb`), aucune autre.
+              const autreDevise = !!(devise && devise !== 'EUR');
+              const fraisConnus = !autreDevise && bilan.valid && bilan.cents > 0 ? bilan.total : null;
+              const benefTexte = lb.benefice == null ? '—' : eurosRecap(lb.benefice);
+              const benefAide = st === 'cancelled' ? '' : lb.etat === 'partiel' ? 'frais pas confirmés' : lb.etat === 'illisible' ? 'un montant saisi est illisible' : lb.etat === 'prix' ? (autreDevise ? 'vente dans une autre devise' : 'prix de vente pas lu') : '';
+              const verse = st === 'cancelled' ? null : finalisee ? (versement ? `le ${jourCourt(Date.parse(versement))}` : 'oui — date pas lue') : '— pas encore';
+              const acheteur = o.user_login || (o.buyer && o.buyer.login) || (o.opposite_user && o.opposite_user.login) || '';
+              const aRelie = !hidden && st !== 'cancelled' && e && e.buyFromId ? achatRelie(e) : null;
+              const saleItem = (() => { const idf = identiteAnnonce(o); return idf ? { id: idf, title: o.title, photo: photo, price: sell, _acc: o._acc } : { id: '_v'+o.transaction_id, _saleTx: String(o.transaction_id), title: o.title, photo: photo, price: sell, _acc: o._acc }; })();
+              const cell = num && aExpedier(o) ? garageCellOf(garageGrid, num) : null;
+              const lienVinted = o.conversation_id ? `https://www.vinted.fr/inbox/${encodeURIComponent(o.conversation_id)}` : (o.transaction_id != null ? `https://www.vinted.fr/member/transactions/${encodeURIComponent(o.transaction_id)}` : '');
+              const issue = (() => {
+                if (!(st === 'cancelled' && num)) return null;
+                const out = saleOutcome(o); const arch = !numeroReprenable(num);
+                if (isPairLost(num)) return `N°${num} déclarée perdue : son numéro est libéré et sa case au garage vidée.`;
+                if (out === 'retour') return arch ? `La paire te revient. Le N°${num} est un ancien numéro : elle prendra un numéro neuf à sa republication.` : `La paire te revient : elle garde le N°${num}, republie-la avec le même.`;
+                if (out === 'suspendue') return `Rien n'est tranché : le N°${num} est conservé.`;
+                return arch ? `Si la paire t'est renvoyée, elle prendra un numéro neuf (le N°${num} est un ancien numéro).` : `Si la paire t'est renvoyée, republie-la avec le N°${num}.`;
+              })();
+              const bordGeste = !hidden && st !== 'cancelled' && aExpedier(o) && !isShipDone(o) && o.transaction_id != null;
+              return <>
+                <header className="vrm-recap-tete">
+                  <div className="vrm-sale-photo vrm-recap-photo">{photo ? <PhotoArticleAgrandissable src={photo} titre={o.title}><PhotoVenteSources {...photoSourcesProps} data-photo-vente="detail" style={{width:'100%',height:'100%',objectFit:'cover'}}/></PhotoArticleAgrandissable> : <Icon name="image" size={22} style={{color:C.muted,opacity:.55}}/>}</div>
+                  <div className="vrm-recap-ident">
+                    {num ? <span className="vrm-recap-num" data-recap-num={num}>N°{num}</span> : <span className="vrm-recap-sans-num" data-recap-num="" title="Pas de numéro VRM confirmé pour cette vente : aucune fiche n’est choisie au hasard.">Sans N° VRM</span>}
+                    <h2 id={titreId} className="vrm-recap-nom">{nom}</h2>
+                    {sousTitre ? <p className="vrm-recap-sous">{sousTitre}</p> : null}
+                  </div>
+                  <button ref={fermerRef} type="button" className="vrm-recap-fermer" aria-label="Fermer les détails de la vente" onClick={fermer}><Icon name="close" size={18}/></button>
+                </header>
+                <section className="vrm-recap-etat" data-recap-etat={vs.label}>
+                  <p className="vrm-recap-phrase" data-recap-phrase=""><strong>{phrase.gras}</strong>{phrase.suite ? ' ' + phrase.suite : ''}</p>
+                  {issue ? <p className="vrm-recap-issue" data-retour-archive={/numéro neuf/.test(issue) ? 'oui' : undefined}>{issue}</p> : null}
+                  {o._fromEmail ? <p className="vrm-recap-issue">Reconstituée depuis l'email — pas encore confirmée par Vinted.</p> : null}
+                  {etapes ? <ol className="vrm-recap-frise" data-recap-frise="" aria-label="Où en est la vente">
+                    {etapes.map((x) => <li key={x.cle} data-etape={x.cle} data-fait={x.fait ? '1' : '0'} data-preuve={x.preuve || ''} data-ici={x.ici ? '1' : undefined}>
+                      <span className="vrm-recap-point" aria-hidden="true"/>
+                      <span className="vrm-recap-etape">{x.label}</span>
+                      <span className="vrm-recap-quand">{x.fait ? (x.t != null && x.cle !== 'argent' ? jourCourt(x.t) : 'fait') : 'à venir'}</span>
+                    </li>)}
+                  </ol> : null}
+                </section>
+                <section className="vrm-recap-argent" aria-label="L'argent">
+                  <h3 className="vrm-recap-titre">L'argent</h3>
+                  <dl>
+                    <div className="vrm-recap-ligne"><dt>Prix de vente</dt><dd data-prix-vente={sell!=null?Math.round(sell*100):undefined}>{sell==null ? '—' : autreDevise ? `${String(sell).replace('.',',')} ${cur(devise)}` : eurosRecap(sell)}</dd></div>
+                    {fraisConnus != null ? <div className="vrm-recap-ligne" data-recap-frais={fraisConnus.toFixed(2)}><dt>Frais</dt><dd>{eurosRecap(-fraisConnus)}</dd></div> : null}
+                    {st !== 'cancelled' ? <div className="vrm-recap-ligne" data-recap-achat={lb.achat != null ? lb.achat.toFixed(2) : ''}><dt>Prix d’achat</dt><dd>{lb.achat != null ? eurosRecap(-lb.achat) : coutManque ? <CoutAchatVente recap onSaisir={p=>setSaleOverride(o.transaction_id,{buyPrice:p})} onRelier={()=>openPicker(saleItem)}/> : '—'}</dd></div> : null}
+                    {st !== 'cancelled' ? <div className="vrm-recap-ligne vrm-recap-benef" data-recap-benef-etat={lb.etat} data-benef-vente={benef!=null?benef.toFixed(2):undefined}><dt>Bénéfice</dt><dd><span className="vrm-recap-valeur">{lb.etat === 'partiel' ? <span className="vrm-recap-borne">au plus </span> : null}<span className="vrm-recap-montant">{benefTexte}</span></span>{benefAide ? <small>{benefAide}</small> : null}</dd></div> : null}
+                    {verse != null ? <div className="vrm-recap-ligne vrm-recap-verse" data-recap-verse={finalisee ? (versement ? 'date' : 'oui') : 'non'}><dt>Versé sur ton porte-monnaie</dt><dd>{verse}</dd></div> : null}
+                  </dl>
+                </section>
+                <section className="vrm-recap-details" aria-label="Détails">
+                  <dl>
+                    {acheteur ? <div className="vrm-recap-ligne"><dt>Acheteur</dt><dd>{acheteur}</dd></div> : null}
+                    {o._acc ? <div className="vrm-recap-ligne"><dt>Compte</dt><dd>{accNameOf(o._acc)} · Vinted</dd></div> : null}
+                    {(!etapes || !o.date) ? <div className="vrm-recap-ligne"><dt>Vendue</dt><dd>{o.date ? new Date(o.date).toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' }) : '— date pas lue'}</dd></div> : null}
+                    {bordE && bordE.suivi ? <div className="vrm-recap-ligne"><dt>Suivi</dt><dd className="vrm-recap-mono">{bordE.suivi}</dd></div> : null}
+                    {cell ? <div className="vrm-recap-ligne"><dt>Rangement</dt><dd><button type="button" className="vrm-lien-action" onClick={()=>{fermer();onLocate&&onLocate(num);}} title="Voir la paire au stock">{garageCellLabel(cell)}</button></dd></div>
+                      : (num && aExpedier(o) && garageUtilise) ? <div className="vrm-recap-ligne"><dt>Rangement</dt><dd>pas au garage</dd></div> : null}
+                    {aRelie ? <div className="vrm-recap-ligne" data-recap-achat-relie=""><dt>Achat relié</dt><dd><span className="vrm-recap-achat-photo">{orderPhoto(aRelie) ? <PhotoVinted src={orderPhoto(aRelie)} alt="Photo de l'achat" data-photo-achat="1" loading="lazy" decoding="async"/> : null}</span>{[aRelie.date ? new Date(aRelie.date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }) : '', 'Vinted'].filter(Boolean).join(' · ')}</dd></div> : null}
+                  </dl>
+                </section>
+                <section className="vrm-recap-gestes" aria-label="Actions">
+                  {bordGeste ? <div className="vrm-recap-principal"><BoutonBordereau grand uid={o._acc && o._acc.vinted_user_id} tx={String(o.transaction_id)} conv={o.conversation_id} login={accNameOf(o._acc)}
+                    aGenerer pdf={!!(labelsCaptes[txL] || bordParTx[txL])} onImprimer={()=>imprimerBordereauVente(o)} onFait={(u)=>rechargerLabels(u)}/></div> : null}
+                  <div className="vrm-recap-grille">
+                    {o.conversation_id && onNav ? <Bouton variante="secondaire" icone="chat" data-recap-conversation="" onClick={()=>{ fermer(); poserCible({ type: 'conv', conv: String(o.conversation_id), compte: String((o._acc && o._acc.vinted_user_id) || '') }, redirigerOnglet('messages', null, ONGLETS_DEPLACES).tab); onNav('messages'); }}>Conversation</Bouton> : null}
+                    {num ? <Bouton variante="secondaire" icone="doc" data-recap-fiche={num} aria-label={`Fiche N°${num}`} onClick={()=>{fermer();window.dispatchEvent(new CustomEvent('vrm:fiche-article',{detail:num}));}}>Fiche de la paire</Bouton> : null}
+                    {lienVinted ? <Bouton variante="secondaire" href={lienVinted} target="_blank" rel="noreferrer" data-recap-vinted="">Voir sur Vinted ↗</Bouton> : null}
+                    {num && aExpedier(o) && !hidden && inGarage(num) ? <Bouton variante="secondaire" icone="pin" onClick={()=>{fermer();onLocate&&onLocate(num);}} aria-label="Voir au stock">Voir au stock</Bouton> : null}
+                    {isLotTitle(o.title) ? <Bouton variante="secondaire" icone="box" onClick={async(ev)=>{ lotOrigineRef.current = ev.currentTarget; setLotView({loading:true,order:o,items:[]}); const items=await fetchLotItems(o._acc,o.transaction_id); setLotView({loading:false,order:o,items}); }} title="Voir les paires du lot" aria-label="Voir les paires du lot">Voir le lot</Bouton> : null}
+                    {st==='cancelled' && num && saleOutcome(o)==='rembourse' && !isPairLost(num) ? <Bouton variante="secondaire" onClick={()=>markPairLost(num,o)} title={`Tu as remboursé l'acheteur. Si l'article ne revient PAS, déclare-le perdu : le N°${num} sera libéré et sa case au garage vidée.`} aria-label="Déclarer l'article perdu">Article perdu ?</Bouton> : null}
+                    {num && isPairLost(num) ? <Bouton variante="discret" onClick={()=>unmarkPairLost(num)} title={`Annuler : l'article N°${num} est finalement revenu.`} aria-label="Annuler article perdu">Il est revenu</Bouton> : null}
+                  </div>
+                  <FactureSousVente factures={facturesVentes} compte={o._acc?.login}/>
+                  <details className="vrm-sale-details vrm-recap-modifier"><summary title="Numéro, coût d’achat, frais">N° et frais</summary>
+                    {!hidden && <CoutsVente entry={e} onSave={patch=>setSaleOverride(o.transaction_id,patch)} theme={C}/>}
+                    {!hidden && (
+                      <div style={{display:'flex',gap:6,alignItems:'center',flexWrap:'wrap',minWidth:0}}>
+                        <div title={num?undefined:"Article pas encore identifié automatiquement : pose son N° ici"} style={{display:'flex',alignItems:'center',gap:3,border:`1px solid ${C.border}`,borderRadius:8,padding:'5px 7px',background:C.bg,width:74,flexShrink:0}}>
+                          <span style={{fontSize:11,color:C.muted,fontWeight:500}}>N°</span>
+                          <ChampSaisie value={ov.numero ?? ''} onCommit={v=>setSaleOverride(o.transaction_id,{numero:v})} placeholder={baseNum||'?'} inputMode={clavierNum()} style={{width:'100%',minWidth:0,border:'none',background:'transparent',color:C.text,fontSize:13,fontWeight:500,outline:'none'}}/>
+                        </div>
+                        {/* (30 oct.) Tant que « Saisir le prix d'achat » est visible plus haut, ce champ
+                            ferait la même chose une seconde fois (même écriture) : il ne revient qu'une
+                            fois le coût connu, pour le CORRIGER. */}
+                        {!coutManque && <div style={{flex:'1 1 140px',minWidth:0,display:'flex',alignItems:'center',gap:3,border:`1px solid ${C.border}`,borderRadius:8,padding:'5px 8px',background:C.bg}}>
+                          <ChampSaisie value={ov.buyPrice ?? ''} onCommit={v=>setSaleOverride(o.transaction_id,{buyPrice:v})} placeholder={baseBuy?`achat ${baseBuy}€ (auto)`:"prix d'achat"} inputMode="decimal" style={{width:'100%',minWidth:0,border:'none',background:'transparent',color:C.text,fontSize:13,fontWeight:500,outline:'none'}}/>
+                          <span style={{fontSize:11,color:C.muted}}>€</span>
+                        </div>}
+                        {(ov.numero!=null||ov.buyPrice!=null) && <span style={{fontSize:10,color:C.muted,flexShrink:0}} title="Valeurs saisies à la main pour cette vente (priment sur l'auto)">✎</span>}
+                      </div>
+                    )}
+                    {aRelie ? <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+                      <Bouton variante="secondaire" icone="doc" onClick={()=>generateAchatJustificatif(aRelie,{ account:aRelie._accName||accNameOf(aRelie._acc), regime:load('vinted_regime','micro'), numero:num||'' })} title="Reçu d'achat PDF (avec le N° de l'article)" aria-label="Reçu d'achat">Reçu d’achat</Bouton>
+                      <Bouton variante="discret" onClick={()=>openPicker(saleItem)} title="Relier un autre achat à cette vente">Changer l’achat relié</Bouton>
+                    </div> : null}
+                  </details>
+                </section>
+              </>;
+            };
             return (
               <GlisserVente actif={peutDeposer && !deposeIci} onDepose={()=>demanderDepose(txL, o, libDepose)}>{gp => (
               // Ligne de vente dans la liste groupée (filet fin entre les lignes,
               // pas de carte encadrée séparée — style démo, comme Achats).
               <LigneVenteCompacte montantCentimes={sell!=null?Math.round(sell*100):undefined} numerosArticle={num?[num]:[]} plateforme="vinted" photo={photo} photoNoeud={photo?<PhotoVenteSources {...photoSourcesProps} data-photo-vente="ligne" style={{width:28,height:36,borderRadius:8,objectFit:'cover',flexShrink:0}}/>:null} titre={(()=>{ const t=String((e&&e.size)||o.size||'').trim(); const nom=t&&!tailleDansTitre(o.title,t)?`${o.title} · taille ${t}`:o.title; return num?`N°${num} · ${nom}`:nom; })()}
-                {...gp} benef={benefLigne} data-depose-attente={deposeIci?'1':undefined} gestes={(gesteCout || gesteDepose) ? <div className="vrm-gestes-pile">{gesteCout}{gesteDepose}</div> : null} sous={[o.date?new Date(o.date).toLocaleDateString('fr-FR',{day:'numeric',month:'short'}):'', (o._acc && !ventesUnCompte) ? accNameOf(o._acc) : ''].filter(Boolean).join(' · ')} etat={venteStage(o).label} ton={st!=='cancelled' && aExpedier(o) && !isShipDone(o) ? 'action' : (st==='cancelled' ? 'annule' : '')} montant={sell!=null?`${Number.isInteger(sell)?sell:sell.toFixed(2).replace('.',',')} ${cur(o.price?.currency_code)}`:'—'} className="vrm-sale-row" key={o.transaction_id} data-tx={String(o.transaction_id)} style={{borderTop:i>0?`1px solid ${C.border}`:'none',opacity:hidden?0.5:(st==='cancelled'?0.6:1),padding:'12px 14px',display:'flex',flexDirection:'column',gap:10,...(estFloute(o)?STYLE_FLOU:null),...(gp.style||{})}}>
-               {/* ── Haut : photo · titre + méta · prix ─────────────────────── */}
-               <div className="vrm-sale-overview" style={{display:'flex',gap:12,alignItems:'flex-start'}}>
-                <div className="vrm-sale-photo" style={{width:72,height:72,borderRadius:10,background:C.card2||C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
-                  {photo?<PhotoArticleAgrandissable src={photo} titre={o.title}><PhotoVenteSources {...photoSourcesProps} data-photo-vente="detail" style={{width:'100%',height:'100%',objectFit:'cover'}}/></PhotoArticleAgrandissable>:<span style={{fontSize:20}}><Icon name="image" size={20} style={{color:C.muted,opacity:.55}}/></span>}
-                </div>
-                <div className="vrm-sale-info" style={{flex:'1 1 auto',minWidth:0}}>
-                  <div className="vrm-sale-title" style={{fontSize:15,fontWeight:600,color:C.text,letterSpacing:-0.2,
-                    display:'-webkit-box',WebkitLineClamp:2,WebkitBoxOrient:'vertical',overflow:'hidden',lineHeight:1.3}} title={o.title}>{num?`N°${num} · `:''}{o.title}</div>
-                  <div className="vrm-sale-meta" style={{fontSize:12.5,color:C.muted,marginTop:4,display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
-                    {(()=>{ const vs=venteStage(o); return <span className="vrm-statut vrm-vente-redit" data-statut-vente={vs.label} title={vs.aide||undefined} style={{color:C.text,fontWeight:600,display:'inline-flex',alignItems:'center',gap:5,flexShrink:0}}><span aria-hidden="true" style={{width:7,height:7,borderRadius:999,background:vs.color,display:'inline-block'}}/>{vs.label}</span>; })()}
-                    {o._acc && !ventesUnCompte && <span className="vrm-vente-redit"><AcctTag acc={o._acc} name={accNameOf(o._acc)}/></span>}
-                    {o._fromEmail && <span title="Reconstituée depuis l'email — pas encore confirmée par Vinted" style={{flexShrink:0,fontSize:10,fontWeight:600,color:C.muted,border:`1px solid ${C.border}`,borderRadius:8,padding:'1px 6px'}}>email</span>}
-                    <span className="vrm-vente-redit" style={{flexShrink:0}}>{o.date?new Date(o.date).toLocaleDateString('fr-FR',{day:'numeric',month:'short'}):''}</span>
-                    {num && aExpedier(o) && (()=>{ const cell=garageCellOf(garageGrid,num); return cell ? <span onClick={()=>onLocate&&onLocate(num)} title="Voir la paire au stock" style={{color:C.blue||C.accent,fontWeight:600,cursor:'pointer'}}>{garageCellLabel(cell)}</span> : (garageUtilise ? <span style={{color:C.muted,fontWeight:500}} title="Cette paire n'est pas rangée au garage">pas au garage</span> : null); })()}
-                    {st==='cancelled' && num && (()=>{
-                      const out = saleOutcome(o);
-                      const pastille = {color:C.text,fontWeight:600,background:C.card2||C.bg,border:`1px solid ${C.border}`,borderRadius:8,padding:'1px 8px',flexShrink:0};
-                      if (isPairLost(num)) return <span style={pastille} title="Article déclaré perdu : son numéro est libéré et sa case au garage vidée.">N°{num} perdue</span>;
-                      // ⚠️ (relecture du 11 octobre) Un numéro d'ARCHIVE (« B198 ») ne
-                      //    se redonne jamais : l'app le refuse dans le champ N°. Dire
-                      //    « garde le N°B198 » envoyait faire le geste qu'elle refuse.
-                      const arch = !numeroReprenable(num);
-                      if (out === 'retour') return arch
-                        ? <span data-retour-archive="retour" style={pastille} title={`Retour initié : la paire te revient. Le N°${num} est un ancien numéro — elle prendra un numéro NEUF à sa republication : écris-le sur son étiquette.`}>Revient · numéro neuf</span>
-                        : <span style={pastille} title="Retour initié : la paire te revient. Elle garde son numéro — republie-la avec le même.">Revient · garde le N°{num}</span>;
-                      if (out === 'suspendue') return <span style={{...pastille,color:C.muted}} title="Transaction suspendue par Vinted : rien n'est tranché, on ne touche pas au numéro.">Suspendue · N°{num} conservé</span>;
-                      return arch
-                        ? <span data-retour-archive="renvoi" style={pastille} title={`Vente annulée : si la paire t'est renvoyée, elle prendra un numéro NEUF à sa republication (le N°${num} est un ancien numéro) — écris-le sur son étiquette.`}>Si renvoyée · numéro neuf</span>
-                        : <span style={pastille} title="Vente annulée : si la paire t'est renvoyée, republie-la avec CE numéro (l'app le réutilise automatiquement).">Si renvoyée · garde le N°{num}</span>;
-                    })()}
-                    {/* « ⚠️ à identifier » RETIRÉ (30 sept.) : écrit en orange sur
-                        chaque vente sans N°, c'était la même alerte ×N (§7). Le
-                        champ « N° ? » juste dessous porte la même information. */}
-                  </div>
-                </div>
-                <div className="vrm-sale-price" style={{textAlign:'right',flexShrink:0}}>
-                  <div className="vrm-display" data-prix-vente={sell!=null?Math.round(sell*100):undefined} style={{fontSize:17,fontWeight:700,color:C.text}}>{sell!=null?`${Number.isInteger(sell)?sell:sell.toFixed(2).replace('.',',')} ${cur(o.price?.currency_code)}`:''}</div>
-                  {benef!=null && <div data-benef-vente={benef.toFixed(2)} style={{fontSize:12,fontWeight:600,color:benef>=0?C.text:C.warn}}>{benef>=0?'+':''}{prixCourt(benef)}{!bilan.complet && <small style={{display:'block',fontSize:9,color:C.muted}}>estimé</small>}</div>}
-                  {benef!=null && fees>0 && <div className="vrm-sale-frais" style={{fontSize:9,color:C.muted}}>frais −{prixCourt(fees)}</div>}
-                  {/* LE BORDEREAU, SOUS LE PRIX (E1, puis 2 octobre). Un seul
-                      bouton : il imprime si le PDF est là (capté par l'extension,
-                      ou reçu par email en secours), sinon il COMMANDE l'extension.
-                      ⚠️ Seulement tant que le colis doit partir : une fois expédiée
-                      ou finalisée, une vente n'a plus de bordereau à afficher
-                      (« il ne devrait même pas y en avoir », Julien). */}
-                  {!hidden && st!=='cancelled' && aExpedier(o) && !isShipDone(o) && o.transaction_id!=null && (
-                    <div className="vrm-sale-action" style={{marginTop:6,display:'flex',justifyContent:'flex-end'}}>
-                      <BoutonBordereau uid={o._acc && o._acc.vinted_user_id} tx={String(o.transaction_id)} conv={o.conversation_id} login={accNameOf(o._acc)}
-                        aGenerer pdf={!!(labelsCaptes[String(o.transaction_id)] || bordParTx[String(o.transaction_id)])}
-                        onImprimer={()=>imprimerBordereauVente(o)} onFait={(u)=>rechargerLabels(u)}/>
-                    </div>
-                  )}
-                </div>
-               </div>
-               {/* ── Bas : une seule pastille de statut · les actions groupées ─── */}
-               {/* Coût inconnu : les deux gestes, VISIBLES (pas derrière « Modifier »).
-                   (16 oct.) Le coût et « Modifier » partagent UNE rangée sous le
-                   titre (`vrm-sale-bas`) : sur iPhone la carte perd deux étages. */}
-               <div className="vrm-sale-bas">
-               {!hidden && st!=='cancelled' && buy==null && !(e && e.buyFromId) && (
-                 <CoutAchatVente onSaisir={p=>setSaleOverride(o.transaction_id,{buyPrice:p})}
-                   onRelier={()=>{ const idf = identiteAnnonce(o); openPicker(idf ? { id: idf, title: o.title, photo: photo, price: sell, _acc: o._acc } : { id: '_v'+o.transaction_id, _saleTx: String(o.transaction_id), title: o.title, photo: photo, price: sell, _acc: o._acc }); }}/>
-               )}
-               <div className="vrm-sale-footer"><FactureSousVente factures={facturesVentes} compte={o._acc?.login}/>
-               <details className="vrm-sale-details"><summary title="Numéro, coût d’achat, frais et autres actions">N° et frais</summary>
-               {!hidden && <CoutsVente entry={e} onSave={patch=>setSaleOverride(o.transaction_id,patch)} theme={C}/>}
-               <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
-                {/* Saisie N° + prix d'achat SUR LA MÊME LIGNE que les actions
-                    (30 sept. : une ligne de moins par vente). */}
-                {!hidden && (
-                  <div style={{display:'flex',gap:6,alignItems:'center',flex:'1 1 200px',minWidth:0}}>
-                    <div title={num?undefined:"Article pas encore identifié automatiquement : pose son N° ici"} style={{display:'flex',alignItems:'center',gap:3,border:`1px solid ${C.border}`,borderRadius:8,padding:'5px 7px',background:C.bg,width:74,flexShrink:0}}>
-                      <span style={{fontSize:11,color:C.muted,fontWeight:500}}>N°</span>
-                      <ChampSaisie value={ov.numero ?? ''} onCommit={v=>setSaleOverride(o.transaction_id,{numero:v})} placeholder={baseNum||'?'} inputMode={clavierNum()} style={{width:'100%',minWidth:0,border:'none',background:'transparent',color:C.text,fontSize:13,fontWeight:500,outline:'none'}}/>
-                    </div>
-                    {/* (30 oct.) Tant que « Saisir le prix » est visible au-dessus, ce champ
-                        faisait la même chose une seconde fois (même écriture) : il ne
-                        revient qu'une fois le coût connu, pour le CORRIGER. */}
-                    {!(!hidden && st!=='cancelled' && buy==null && !(e && e.buyFromId)) && <div style={{flex:1,minWidth:0,display:'flex',alignItems:'center',gap:3,border:`1px solid ${C.border}`,borderRadius:8,padding:'5px 8px',background:C.bg}}>
-                      <ChampSaisie value={ov.buyPrice ?? ''} onCommit={v=>setSaleOverride(o.transaction_id,{buyPrice:v})} placeholder={baseBuy?`achat ${baseBuy}€ (auto)`:"prix d'achat"} inputMode="decimal" style={{width:'100%',minWidth:0,border:'none',background:'transparent',color:C.text,fontSize:13,fontWeight:500,outline:'none'}}/>
-                      <span style={{fontSize:11,color:C.muted}}>€</span>
-                    </div>}
-                    {(ov.numero!=null||ov.buyPrice!=null) && <span style={{fontSize:10,color:C.muted,flexShrink:0}} title="Valeurs saisies à la main pour cette vente (priment sur l'auto)">✎</span>}
-                  </div>
-                )}
-                <div style={{display:'flex',alignItems:'center',gap:6,flexShrink:0,marginLeft:'auto'}}>
-                {num && aExpedier(o) && !hidden && inGarage(num) && (
-                  <Bouton variante="secondaire" icone="pin" onClick={()=>onLocate&&onLocate(num)} title={`Voir l'article N°${num} au stock`} aria-label="Voir au stock" style={{flexShrink:0}}/>
-                )}
-                {st==='cancelled' && num && saleOutcome(o)==='rembourse' && !isPairLost(num) && (
-                  <Bouton variante="secondaire" className="vrm-b-petit" onClick={()=>markPairLost(num,o)} title={`Tu as remboursé l'acheteur. Si l'article ne revient PAS, déclare-le perdu : le N°${num} sera libéré et sa case au garage vidée.`} aria-label="Déclarer l'article perdu" style={{flexShrink:0}}>Article perdu ?</Bouton>
-                )}
-                {num && isPairLost(num) && (
-                  <Bouton variante="discret" onClick={()=>unmarkPairLost(num)} title={`Annuler : l'article N°${num} est finalement revenu.`} aria-label="Annuler article perdu" style={{flexShrink:0}}>Il est revenu</Bouton>
-                )}
-                {isLotTitle(o.title) && (
-                  <button className="vrm-b vrm-b-secondaire vrm-b-petit" type="button" onClick={async(ev)=>{ lotOrigineRef.current = ev.currentTarget; setLotView({loading:true,order:o,items:[]}); const items=await fetchLotItems(o._acc,o.transaction_id); setLotView({loading:false,order:o,items}); }} title="Voir les paires du lot" aria-label="Voir les paires du lot" style={{flexShrink:0}}><Icon name="box" size={18}/>Voir le lot</button>
-                )}
-                </div>
-               </div>
-               {/* La barre de progression a été retirée : la pastille de statut
-                   ci-dessus dit déjà où en est la vente (style maquette iOS,
-                   28 sept.). Un segment de plus, c'est la même info deux fois. */}
-               {/* « je veux que ça fasse également ça dans les ventes, donc avec le
-                   numéro et l'achat qui correspond » — le N° est dans le titre de la
-                   ligne, l'achat relié (photo + reçu) juste ici. Il vient de la paire
-                   identifiée par Vinted (§5.34), jamais d'un rapprochement par titre. */}
-               {/* ⚠️ RELIER L'ACHAT DEPUIS LA VENTE (demande de Julien : « relier
-                   les achats avec les ventes »). Sur une vente AVEC identité
-                   d'annonce on relie la PAIRE (le même geste que l'écran
-                   Annonces, §11) ; sans identité, on relie la vente elle-même
-                   (`_saleTx` → override). Le picker trie déjà les achats de même
-                   marque/taille en tête (`scoreAchat`) : « même si l'app ne
-                   trouve pas, elle fait une sélection » (sa demande) — et c'est
-                   TOUJOURS son clic qui tranche, jamais un rapprochement
-                   automatique par titre (§5). On ne le propose pas sur une vente
-                   annulée. */}
-               {!hidden && st!=='cancelled' && (()=>{
-                 const idf = identiteAnnonce(o);
-                 const saleItem = idf
-                   ? { id: idf, title: o.title, photo: photo, price: sell, _acc: o._acc }
-                   : { id: '_v'+o.transaction_id, _saleTx: String(o.transaction_id), title: o.title, photo: photo, price: sell, _acc: o._acc };
-                 if (e && e.buyFromId) return (
-                   <div style={{display:'flex',alignItems:'center',gap:8}}>
-                     <div style={{flex:1,minWidth:0}}><AchatRelie entry={e} numero={num}/></div>
-                     <Bouton variante="discret" onClick={()=>openPicker(saleItem)} title="Relier un autre achat à cette vente" style={{flexShrink:0}}>Changer</Bouton>
-                   </div>
-                 );
-                 // (coût inconnu : « Saisir le prix » et « Relier un achat » sont
-                 //  visibles au-dessus, `CoutAchatVente` — pas une 2ᵉ fois ici, §7)
-                 return null;
-               })()}
-               </details></div>
-               </div>
+                {...gp} benef={benefLigne} recap={recapVente} data-depose-attente={deposeIci?'1':undefined} gestes={(gesteCout || gesteDepose) ? <div className="vrm-gestes-pile">{gesteCout}{gesteDepose}</div> : null} sous={[o.date?new Date(o.date).toLocaleDateString('fr-FR',{day:'numeric',month:'short'}):'', (o._acc && !ventesUnCompte) ? accNameOf(o._acc) : ''].filter(Boolean).join(' · ')} etat={venteStage(o).label} ton={st!=='cancelled' && aExpedier(o) && !isShipDone(o) ? 'action' : (st==='cancelled' ? 'annule' : '')} montant={sell!=null?`${Number.isInteger(sell)?sell:sell.toFixed(2).replace('.',',')} ${cur(o.price?.currency_code)}`:'—'} className="vrm-sale-row" key={o.transaction_id} data-tx={String(o.transaction_id)} style={{borderTop:i>0?`1px solid ${C.border}`:'none',opacity:hidden?0.5:(st==='cancelled'?0.6:1),padding:'12px 14px',display:'flex',flexDirection:'column',gap:10,...(estFloute(o)?STYLE_FLOU:null),...(gp.style||{})}}>
               </LigneVenteCompacte>
               )}</GlisserVente>
             );

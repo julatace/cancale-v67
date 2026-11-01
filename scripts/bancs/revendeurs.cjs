@@ -266,16 +266,17 @@ async function brancher(p){
   check(await vente.getByPlaceholder(/prix d'achat/).count()>0,'une fois le coût connu, « Modifier » propose de le corriger');
   await vente.getByText('Détail des frais et du bénéfice',{exact:true}).click();
   await vente.getByLabel('Commission plateforme',{exact:true}).fill('10,50');await vente.getByLabel('Commission plateforme',{exact:true}).press('Tab');
-  await p.waitForFunction(()=>document.querySelector('.vrm-ledger-drawer-host:not([hidden]) .vrm-sale-price')?.textContent.includes('69,50'));
-  check((await vente.locator('.vrm-sale-price').innerText()).includes('estimé'),'frais déduits et bénéfice indiqué estimé');
+  await p.waitForFunction(()=>document.querySelector('.vrm-ledger-drawer-host:not([hidden]) [data-recap-benef-etat]')?.textContent.includes('69,50'));
+  // (1er nov.) Le récapitulatif dit « au plus » (frais pas confirmés : `data-recap-benef-etat="partiel"`), comme la ligne.
+  check((await vente.locator('[data-recap-benef-etat]').getAttribute('data-recap-benef-etat'))==='partiel' && /au plus/.test(await vente.locator('[data-recap-benef-etat]').innerText()),'frais déduits et bénéfice indiqué « au plus » (estimé)');
   await vente.getByRole('checkbox',{name:/Tous les frais sont renseignés/}).check();
-  check(!(await vente.locator('.vrm-sale-price').innerText()).includes('estimé'),'confirmation des frais rend le bénéfice complet');
+  check((await vente.locator('[data-recap-benef-etat]').getAttribute('data-recap-benef-etat'))==='ok' && !/au plus/.test(await vente.locator('[data-recap-benef-etat]').innerText()),'confirmation des frais rend le bénéfice complet');
   await vente.getByLabel('Port payé par moi',{exact:true}).fill('3');await vente.getByLabel('Port payé par moi',{exact:true}).press('Tab');
-  await p.waitForFunction(()=>document.querySelector('.vrm-ledger-drawer-host:not([hidden]) .vrm-sale-price')?.textContent.includes('66,50'));
-  check((await vente.locator('.vrm-sale-price').innerText()).includes('estimé'),'nouveau frais déduit et confirmation invalidée');
+  await p.waitForFunction(()=>document.querySelector('.vrm-ledger-drawer-host:not([hidden]) [data-recap-benef-etat]')?.textContent.includes('66,50'));
+  check((await vente.locator('[data-recap-benef-etat]').getAttribute('data-recap-benef-etat'))==='partiel','nouveau frais déduit et confirmation invalidée');
   await vente.getByLabel('Port payé par moi',{exact:true}).fill('3abc');await vente.getByLabel('Port payé par moi',{exact:true}).evaluate(e=>e.blur());
   check(!(await vente.getByLabel('Port payé par moi',{exact:true}).evaluate(e=>e.validity.valid)),'montant invalide refusé sans modifier le bénéfice');
-  check((await vente.locator('.vrm-sale-price').innerText()).includes('66,50'),'montant invalide conserve le dernier calcul enregistré');
+  check((await vente.locator('[data-recap-benef-etat]').innerText()).includes('66,50'),'montant invalide conserve le dernier calcul enregistré');
   await vente.getByRole('checkbox',{name:/Tous les frais sont renseignés/}).click();check(!(await vente.getByRole('checkbox',{name:/Tous les frais sont renseignés/}).isChecked()),'frais invalides empêchent la confirmation du bénéfice');
   await vente.getByLabel('Port payé par moi',{exact:true}).fill('3');await vente.getByLabel('Port payé par moi',{exact:true}).press('Tab');
   for(const width of [320,390,1512]){await p.setViewportSize({width,height:900});check(await p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'frais de vente sans débordement '+width);}
