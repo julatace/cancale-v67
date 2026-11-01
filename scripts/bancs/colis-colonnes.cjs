@@ -173,7 +173,7 @@ const lire = (pg) => pg.evaluate(() => {
   const points = [...document.querySelectorAll('[data-cc-colonne="retirer"] [data-relais-point]')].map((p) => ({ cle: p.getAttribute('data-relais-point'), numero: p.getAttribute('data-relais-numero'),
     compte: Number(p.getAttribute('data-relais-point-comptes')), repere: p.getAttribute('data-relais-repere'),
     nom: ((p.querySelector('.vrm-rp-nom') || {}).textContent || '').trim(), resume: ((p.querySelector('.vrm-rp-resume') || {}).innerText || ''),
-    ambre: !!p.querySelector('.vrm-rp-resume .is-ambre'), pasCarte: ((p.querySelector('[data-relais-sans-repere]') || {}).textContent || ''),
+    ambre: !!p.querySelector('.vrm-rp-resume .is-ambre'), pasCarte: ((p.querySelector('[data-relais-sans-repere]') || {}).textContent || ''), raisonCode: (p.querySelector('[data-relais-sans-repere]') || { getAttribute: () => null }).getAttribute('data-raison'), pastille: (p.querySelector('[data-relais-pastille]') || {}).textContent || null,
     cartes: [...p.querySelectorAll('[data-cc-carte]')].map((k) => ({ cle: k.getAttribute('data-cc-carte'), txt: k.innerText, code: (k.querySelector('[data-code-retrait]') || { getAttribute: () => null }).getAttribute('data-code-retrait'), raison: ((k.querySelector('[data-sans-lieu-raison]') || {}).innerText || '') })) }));
   let pub = null; try { pub = JSON.parse(localStorage.getItem('vrm_colis_retirer') || 'null'); } catch (_) {}
   const epingles = [...document.querySelectorAll('[data-relais-epingle]')].map((e) => [e.getAttribute('data-relais-epingle'), e.getAttribute('data-relais-numero'), e.textContent]);
@@ -239,7 +239,7 @@ async function main() {
         const inc = L.points.find((p) => p.cle === '__inconnu');
         dit(!!inc && /Point pas encore connu/.test(inc.nom) && inc.cartes.length === 1 && /Chronopost ne nomme pas le point/.test(inc.cartes[0].raison) && /e-mail du transporteur/.test(inc.cartes[0].raison), `${T} un colis sans lieu : sous « Point pas encore connu », avec la raison et le geste`, inc && JSON.stringify(inc.cartes));
         const port = L.points.find((p) => p.cle === 'barlenautilus|35260');
-        dit(!!port && /Pas sur la carte : la rue du point n’a pas été donnée/.test(port.pasCarte), `${T} un point sans rue est listé, « pas sur la carte » avec la raison`, port && port.pasCarte);
+        dit(!!port && port.raisonCode === 'adresse' && /^Pas sur la carte : .{10,}/.test(port.pasCarte), `${T} un point sans rue est listé, « pas sur la carte » avec la raison`, port && port.pasCarte);
         const kus = L.points.find((p) => p.cle === 'kusmitea|56000');
         dit(!!kus && kus.compte === 2 && kus.repere === 'oui' && !kus.pasCarte, `${T} Kusmi Tea (Vinted Go sans code postal + conversation) : un point, placé par la liste de points de Vinted`, kus && JSON.stringify([kus.compte, kus.repere, kus.pasCarte]));
         const mermoz = L.points.find((p) => p.cle === 'relaispressingmermoz|35000');
@@ -247,7 +247,7 @@ async function main() {
         const codeGrand = (L.points.find((p) => p.cle === 'carrefour|35000') || { cartes: [] }).cartes[0];
         dit(!!codeGrand && codeGrand.code === '418205', `${T} le code de retrait est écrit sur la carte`, codeGrand && JSON.stringify(codeGrand));
         const ep = L.epingles.find((e) => e[0] === 'kusmitea|56000');
-        if (L.epingles.length) dit(!!ep && ep[2] === (kus && kus.numero), `${T} l'épingle porte le numéro du point dans la liste`, JSON.stringify(L.epingles));
+        if (L.epingles.length) dit(!!ep && ep[2] === String(kus && kus.compte) && kus.pastille === ep[2], `${T} l'épingle porte le NOMBRE de colis du point, le même que sa pastille dans la liste`, JSON.stringify(L.epingles));
         else console.log(`--  ${T} épingles non dessinées ici (fond de carte hors ligne) — numéros vérifiés sur la liste`);
         const prets = L.cols.find((c) => c.cle === 'prets');
         dit(!!L.bouton && prets && L.bouton.n === prets.n && new RegExp(`\\b${prets.n}\\b`).test(L.bouton.txt) && /prêts?/.test(L.bouton.txt), `${T} « Imprimer les N prêts » = le compteur des prêts`, JSON.stringify(L.bouton) + ' / ' + (prets && prets.n));

@@ -9,7 +9,7 @@
 // ════════════════════════════════════════════════════════════════════════════
 import React from 'react';
 import { createPortal } from 'react-dom';
-import { useReperes, repereDe, FondRelais } from './CarteRelais.jsx';
+import { useReperes, repereDe, FondRelais, raisonPasSurCarte, codePasSurCarte } from './CarteRelais.jsx';
 import { texteJours } from './tournee.js';
 import './styles-tournee.css';
 
@@ -112,37 +112,38 @@ export function TourneePleinEcran({ arrets = [], C, onFermer, onArret, zIndex = 
     window.addEventListener('keydown', f);
     return () => window.removeEventListener('keydown', f);
   }, [onFermer]);
-  // La carte : les points relais seulement, avec le numéro d'ARRÊT sur l'épingle.
-  // (1er nov., Julien : « ça affiche 5 points de retrait mais sur la carte il y en
-  // a que 3 ».) Chaque point de retrait est soit SUR la carte, soit dit « pas sur
-  // la carte » avec sa raison, sous son arrêt ; deux points au même endroit
-  // partagent UNE épingle qui porte leurs deux numéros (« 2·5 »).
+  // La carte : les points relais seulement. (1er nov., Julien : « ça affiche 5
+  // points de retrait mais sur la carte il y en a que 3 » puis « il doit y avoir
+  // UN point par relais avec le NOMBRE de colis ».) Une épingle par point de
+  // retrait, qui porte le nombre de colis à y retirer — le MÊME que la ligne de
+  // l'arrêt (`a.n` = `nComptes`, le compte de `vrm_colis_retirer`). Toucher une
+  // épingle met la ligne en avant et la fait défiler. Un point qui n'a pas
+  // d'épingle le dit sous son arrêt, avec la raison (`raisonPasSurCarte`, la
+  // même phrase que Colis) — jamais en silence.
   const retraits = arrets.filter((a) => a.type === 'retrait');
   const connus = retraits.filter((a) => a.point && !a.inconnu);
   const reperes = useReperes(connus.map((a) => a.point), true);
   const [etatFond, setEtatFond] = React.useState('charge');
-  const parPos = new Map();
-  for (const a of connus) {
-    const r = repereDe(a.point, reperes); if (!r) continue;
-    const k = `${Number(r.lat).toFixed(5)},${Number(r.lon).toFixed(5)}`;
-    const g = parPos.get(k);
-    if (g) { g.numeros.push(a.numero); g.nArrives += a.point.nArrives || 0; g.nAttendus += a.point.nAttendus || 0; }
-    else parPos.set(k, { ...a.point, cle: a.point.cle, lat: r.lat, lon: r.lon, numero: a.numero, numeros: [a.numero], nArrives: a.point.nArrives || 0, nAttendus: a.point.nAttendus || 0 });
-  }
-  const epingles = [...parPos.values()];
-  const surCarte = new Set(connus.filter((a) => repereDe(a.point, reperes)).map((a) => a.cle));
+  const [choisi, setChoisi] = React.useState('');
+  const liste = React.useRef(null);
+  const epingles = connus.map((a) => {
+    const r = repereDe(a.point, reperes);
+    // Le nombre de l'épingle = celui de l'arrêt (une seule source).
+    return r ? { ...a.point, cle: a.point.cle, lat: r.lat, lon: r.lon, nComptes: a.n } : null;
+  }).filter(Boolean);
+  const surCarte = new Set(epingles.map((p) => 'r:' + p.cle));
   const raisonHors = (a) => {
     if (a.type !== 'retrait' || surCarte.has(a.cle)) return '';
-    if (etatFond === 'ko') return '';
-    if (a.inconnu || !a.point) return 'le point de retrait n’est pas encore connu';
-    if (a.point.sansCarte) return a.point.sansCarte;
-    const r = reperes[a.point.cle];
-    if (r === undefined) return a.point.geocode ? 'localisation en cours…' : 'l’adresse lue est incomplète';
-    if (r === 'reseau') return 'la carte des adresses n’a pas répondu, réessai à la prochaine ouverture';
-    return 'cette adresse n’a pas été trouvée sûrement';
+    return raisonPasSurCarte(a.point && !a.inconnu ? a.point : null, reperes);
+  };
+  const choisir = (cleRelais) => {
+    setChoisi(cleRelais);
+    const el = liste.current && [...liste.current.querySelectorAll('[data-tournee-arret]')].find((e) => e.getAttribute('data-tournee-arret') === 'r:' + cleRelais);
+    if (el) { try { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (_) { el.scrollIntoView(); } }
   };
   const nHors = retraits.filter((a) => raisonHors(a)).length;
   const nDepots = arrets.filter((a) => a.type === 'depot').length;
+  const ko = etatFond === 'ko';
   return createPortal(
     <div className="vrm-tr-plein" role="dialog" aria-modal="true" aria-label="Ta tournée" data-tournee-plein="" style={{ zIndex }}>
       {Retour ? <Retour fermer={onFermer}/> : null}
@@ -154,12 +155,12 @@ export function TourneePleinEcran({ arrets = [], C, onFermer, onArret, zIndex = 
       </div>
       <div className="vrm-tr-plein-carte">
         {epingles.length > 0
-          ? <FondRelais points={epingles} C={C} etiquette={(p) => p.numeros.join('·')} hauteur={300} onEtat={setEtatFond}/>
+          ? <FondRelais points={epingles} selection={choisi} onChoisir={choisir} C={C} hauteur={300} onEtat={setEtatFond}/>
           : <p className="vrm-tr-note" data-tournee-sans-carte="">{retraits.length ? 'Aucun point de retrait n’a encore pu être placé sur la carte (la raison est sous chacun).' : 'Aucun point relais à placer sur la carte.'}</p>}
-        {epingles.length > 0 && etatFond !== 'ko' && <p className="vrm-tr-note vrm-tr-credit">Fond : OpenFreeMap · © OpenMapTiles · © OpenStreetMap ; adresses : Base Adresse Nationale.</p>}
-        {retraits.length > 0 && epingles.length > 0 && etatFond !== 'ko' && (
+        {epingles.length > 0 && !ko && <p className="vrm-tr-note vrm-tr-credit">Fond : OpenFreeMap · © OpenMapTiles · © OpenStreetMap ; adresses : Vinted, Base Adresse Nationale.</p>}
+        {retraits.length > 0 && epingles.length > 0 && !ko && (
           <p className="vrm-tr-note" data-tournee-retraits-carte={retraits.length - nHors} data-tournee-retraits-hors={nHors}>
-            {nHors === 0 ? `Les ${plur(retraits.length, 'point')} de retrait sont sur la carte.` : `${retraits.length - nHors} point${retraits.length - nHors > 1 ? 's' : ''} de retrait sur ${retraits.length} sur la carte · ${nHors} pas sur la carte (la raison est sous chacun).`}
+            {nHors === 0 ? `${retraits.length > 1 ? `Les ${retraits.length} points` : 'Le point'} de retrait ${retraits.length > 1 ? 'sont' : 'est'} sur la carte, chacun avec son nombre de colis.` : `${retraits.length - nHors} point${retraits.length - nHors > 1 ? 's' : ''} de retrait sur ${retraits.length} sur la carte · ${nHors} pas sur la carte (la raison est sous chacun).`}
           </p>
         )}
         {nDepots > 0 && <p className="vrm-tr-note" data-tournee-depots-hors-carte={nDepots}>Les dépôts n’ont pas d’épingle : le point où tu déposes n’est écrit nulle part pour un colis.</p>}
@@ -169,22 +170,32 @@ export function TourneePleinEcran({ arrets = [], C, onFermer, onArret, zIndex = 
           <h2 className="vrm-tr-titre">Ta tournée</h2>
           <span className="vrm-tr-ordre" data-tournee-ordre="limite">par date limite la plus proche — pas un itinéraire</span>
         </div>
-        <ol className="vrm-tr-arrets">
+        <ol className="vrm-tr-arrets" ref={liste}>
           {arrets.map((a) => {
             const quand = texteJours(a.jours, a.type);
             const quoi = a.type === 'depot' ? `déposer ${plur(a.n, 'colis', 'colis')}` : `retirer ${plur(a.n, 'colis', 'colis')}`;
             const nom = a.type === 'depot' ? (a.nom ? `Dépôt ${a.nom}` : 'Dépôt · transporteur pas encore connu') : (a.nom || (a.inconnu ? 'Point pas encore connu' : a.adresse || 'Point relais'));
+            // Une carte qui ne s'affiche pas ici (pas de WebGL, fond injoignable) : une
+            // phrase pour toutes, au-dessus — pas répétée sous chaque arrêt.
+            const hors = ko ? '' : raisonHors(a);
+            const estChoisi = a.type === 'retrait' && choisi && a.cleRelais === choisi;
             return (
-              <li key={a.cle} className={'vrm-tr-arret is-' + a.type} data-tournee-arret={a.cle} data-type={a.type} data-numero={a.numero} data-n={a.n} data-jours={a.jours == null ? '' : String(a.jours)}>
+              <li key={a.cle} className={'vrm-tr-arret is-' + a.type + (estChoisi ? ' is-choisi' : '')} data-tournee-arret={a.cle} data-type={a.type} data-numero={a.numero} data-n={a.n} data-jours={a.jours == null ? '' : String(a.jours)}
+                data-tournee-sur-carte={a.type === 'retrait' ? (surCarte.has(a.cle) ? 'oui' : 'non') : undefined} data-tournee-choisi={estChoisi ? '1' : undefined}>
                 <button type="button" className="vrm-tr-arret-bouton" onClick={() => onArret && onArret(a)}>
-                  <span className="vrm-tr-pastille is-arret" aria-hidden="true">{a.numero}</span>
+                  {/* (1er nov.) Un seul sens pour un nombre sur cet écran : celui des
+                      colis. Un retrait porte le nombre de SON épingle (même couleur) ;
+                      un dépôt, l'icône d'un colis. L'ordre se lit de haut en bas. */}
+                  {a.type === 'retrait'
+                    ? <span className={'vrm-tr-pastille is-epingle' + (a.inconnu || !surCarte.has(a.cle) ? ' is-neutre' : '')} data-tournee-pastille={a.n} aria-hidden="true">{a.n}</span>
+                    : <span className="vrm-tr-pastille is-depot" aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18"><path d="M4 8l8-4 8 4v8l-8 4-8-4V8zm0 0l8 4 8-4M12 12v8" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round"/></svg></span>}
                   <span className="vrm-tr-texte">
                     <span className="vrm-tr-t">{nom}</span>
                     <span className="vrm-tr-s">{[a.type === 'retrait' && a.nom ? a.adresse : '', quoi].filter(Boolean).join(' · ')}</span>
                   </span>
                   <span className={'vrm-tr-quand' + (a.jours != null && a.jours <= 1 ? ' is-ambre' : '')}>{quand}</span>
                 </button>
-                {raisonHors(a) ? <span className="vrm-tr-hors" data-tournee-hors-carte={a.cle}>Pas sur la carte : {raisonHors(a)}</span> : null}
+                {hors ? <span className="vrm-tr-hors" data-tournee-hors-carte={a.cle} data-raison={a.type === 'retrait' ? codePasSurCarte(a.point && !a.inconnu ? a.point : null, reperes) : undefined}>Pas sur la carte : {hors}.</span> : null}
                 {a.type === 'retrait' && a.adresse && a.nom ? <a className="vrm-tr-plans" href={lienPlans(`${a.nom}, ${a.point && a.point.adresse ? a.point.adresse : a.adresse}`)} target="_blank" rel="noopener noreferrer">Ouvrir dans Plans</a> : null}
               </li>
             );
