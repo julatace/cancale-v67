@@ -181,7 +181,7 @@ function refus(statut, ctype, corps, { mr = false } = {}) {
   if (s >= 200 && s < 300 && estHtml(ctype, corps)) return 'bloque';
   return null;
 }
-const rendu = (res, x = {}) => ({ res, etat: null, detail: null, etatAt: null, libelle: '', lieuNom: '', lieuVille: '', lieuCp: '', limite: null, limiteSure: false, limiteAt: null, cpRendu: '', forme: '', evenements: [], ...x });
+const rendu = (res, x = {}) => ({ res, etat: null, detail: null, etatAt: null, libelle: '', lieuNom: '', lieuVille: '', lieuCp: '', lieuRue: '', pointId: '', limite: null, limiteSure: false, limiteAt: null, cpRendu: '', forme: '', evenements: [], ...x });
 // Les évènements gardés (pour le diagnostic) : les 20 plus récents, du plus
 // ancien au plus récent, bornés.
 const garderEvenements = (evs) => evs.slice(-20).map((e) => ({ at: e.at || null, code: propre(e.code, 24), libelle: propre(e.libelle, 160), lieu: propre(e.lieu, 120), cp: /^\d{5}$/.test(String(e.cp || '')) ? String(e.cp) : '' }));
@@ -290,6 +290,27 @@ export function lireReponseChronopost(statut, ctype, corps, { suivi = '' } = {})
   return rendu('ok', { ...base, etat: 'en_route', detail: sens === 'retarde' ? 'retarde' : null, etatAt: ds.at });
 }
 
+// (1er nov.) L'adresse d'un point Vinted Go telle que `metadata.address` l'écrit :
+// « 24 Rue Hoche, Vannes, FR » (mesuré : rue, ville, pays — sans code postal),
+// et, si un jour elle le porte, « 24 Rue Hoche, 56000 Vannes, FR ». Rend
+// { lieuRue, lieuCp, lieuVille } ; un morceau qu'on ne reconnaît pas reste vide
+// (une rue doit commencer par son numéro ; une ville, des lettres seulement).
+export function lieuVintedGo(adr) {
+  const parts = String(adr || '').split(',').map((x) => propre(x, 80)).filter(Boolean);
+  if (parts.length && /^[A-Z]{2}$/.test(parts[parts.length - 1])) parts.pop();          // le pays (« FR »)
+  const vide = { lieuRue: '', lieuCp: '', lieuVille: '' };
+  if (!parts.length) return vide;
+  let lieuCp = '', lieuVille = '';
+  const der = parts[parts.length - 1];
+  const cpVille = /^(\d{5})\s+([A-Za-zÀ-ÿ'’ -]{2,60})$/.exec(der);
+  if (cpVille) { lieuCp = cpVille[1]; lieuVille = cpVille[2].trim(); parts.pop(); }
+  else if (/^\d{5}$/.test(der)) { lieuCp = der; parts.pop(); }
+  else if (/^[A-Za-zÀ-ÿ'’ -]{2,60}$/.test(der)) { lieuVille = der; parts.pop(); }
+  const rue = parts.join(', ');
+  const lieuRue = /^\d{1,4}\s*(?:bis|ter)?[\s,]+\S{2,}/i.test(rue) ? propre(rue, 80) : '';
+  return { lieuRue, lieuCp, lieuVille: propre(lieuVille, 60) };
+}
+
 // ══ VINTED GO — carrier.vintedgo.com /public/v3/tracking_events (JSON) ══════
 // (29 oct., revue n° 9) LE RETOUR, SEULEMENT SUR LES VALEURS RELEVÉES (le JS de
 // la page de suivi, mesures.json : « retour = return → in_transit →
@@ -321,14 +342,22 @@ export function lireReponseVintedGo(statut, ctype, corps, { suivi = '' } = {}) {
   if (!brut.length) return rendu('introuvable');
   if (!brut.every((e) => typeof e.group === 'string')) return rendu('forme', { forme: formeDe(j) });
   // Du plus récent au plus ancien (l'ordre de Vinted Go pour une même seconde).
-  const evs = brut.map((e, i) => ({ i, group: String(e.group || ''), state: String(e.state || ''), ms: msDe(e.timestamp), libelle: String(e.message || ''), lieu: e.metadata && typeof e.metadata === 'object' ? String(e.metadata.address || '') : '' }))
+  const evs = brut.map((e, i) => ({ i, group: String(e.group || ''), state: String(e.state || ''), ms: msDe(e.timestamp), libelle: String(e.message || ''), lieu: e.metadata && typeof e.metadata === 'object' ? String(e.metadata.address || '') : '', pointId: e.metadata && typeof e.metadata === 'object' && /^\d{1,12}$/.test(String(e.metadata.point_id == null ? '' : e.metadata.point_id)) ? String(e.metadata.point_id) : '' }))
     .sort((a, b) => ((b.ms ?? 0) - (a.ms ?? 0)) || (a.i - b.i));
   const chrono = [...evs].reverse().map((e) => ({ at: isoDe(e.ms), code: e.group, libelle: e.libelle, lieu: e.lieu, cp: (/\b(\d{5})\b/.exec(e.lieu) || [])[1] || '' }));
   const evenements = garderEvenements(chrono);
   const d = evs[0];
   const base = { evenements, libelle: propre(d.libelle, 160), etatAt: isoDe(d.ms) };
   const nomPoint = () => { for (const e of evs) { const m = /\(([^()]{2,60})\)\s*$/.exec(e.libelle); if (m) return propre(m[1], 80); } return ''; };
-  const lieuDe = (adr) => { const a = String(adr || ''); const m = /(?:^|,\s*)(\d{5})\s+([^,]+)/.exec(a); return { lieuCp: m ? m[1] : '', lieuVille: m ? propre(m[2], 60) : '' }; };
+  // (1er nov.) LE LIEU DU POINT, LU SUR LA FORME RÉELLE. Mesuré sur la vraie
+  // réponse (`carrier.vintedgo.com/public/v3/tracking_events/{n}`) : l'évènement
+  // `ready_for_pickup` porte `metadata: { address: "24 Rue Hoche, Vannes, FR",
+  // point_id: 107232 }` — la RUE, la VILLE, le pays, JAMAIS de code postal (les
+  // autres évènements : `metadata: {}`). L'ancien motif n'acceptait qu'un « CP
+  // Ville » : il ne lisait RIEN (ni rue ni ville) et la consigne d'un e-mail sans
+  // code postal (« Kusmi Tea, 13 Rue Saint-Vincent ») restait « pas sur la
+  // carte ». C'est le point de CE n° de suivi (une identité), rien n'est deviné.
+  const lieuDe = (adr, pointId = '') => ({ ...lieuVintedGo(adr), pointId: pointId || '' });
   // 1. Un retour (valeurs relevées) : repart chez l'expéditeur (« returned » :
   //    rendu) — sauf un retour ANNULÉ depuis (`return_cancelled` plus récent).
   const iRetour = evs.findIndex(estRetourVg);                       // le plus récent (evs : du plus récent au plus ancien)
@@ -349,7 +378,7 @@ export function lireReponseVintedGo(statut, ctype, corps, { suivi = '' } = {}) {
   }
   const pret = evs.find((e) => e.group === 'ready_for_pickup');
   if (d.group === 'delivered' && (d.state === 'delivery' || !d.state)) {
-    return rendu('ok', { ...base, etat: 'retire', lieuNom: nomPoint(), ...(pret ? lieuDe(pret.lieu) : {}) });
+    return rendu('ok', { ...base, etat: 'retire', lieuNom: nomPoint(), ...(pret ? lieuDe(pret.lieu, pret.pointId) : {}) });
   }
   if (d.group === 'ready_for_pickup') {
     // La date limite = `meta.expiration_time`, et SEULEMENT dans cet état (elle
@@ -359,7 +388,7 @@ export function lireReponseVintedGo(statut, ctype, corps, { suivi = '' } = {}) {
     // (29 oct., revue n° 11) + l'HEURE (`limiteAt`) : « 2026-10-28T09:34:00Z »
     // expire à 11 h 34 à Paris — le jour seul faisait dire « à retirer
     // aujourd'hui » à 7 h pour un colis qui part à 11 h 34. Le jour reste la clé.
-    return rendu('ok', { ...base, etat: 'disponible', lieuNom: nomPoint(), ...lieuDe(d.lieu), limite: exp ? jourParis(exp) : null, limiteSure: !!exp, limiteAt: exp ? isoDe(exp) : null });
+    return rendu('ok', { ...base, etat: 'disponible', lieuNom: nomPoint(), ...lieuDe(d.lieu, d.pointId), limite: exp ? jourParis(exp) : null, limiteSure: !!exp, limiteAt: exp ? isoDe(exp) : null });
   }
   const sens = VG_GROUPES[d.group];
   if (d.state === 'dispose' || sens === 'incident') return rendu('ok', { ...base, etat: 'incident', detail: d.group === 'lost' ? 'perdu' : null });
@@ -584,13 +613,14 @@ export function ligneApresEssai(avant, lu, { carrier, suivi, voie, source = 'ser
   if (res === 'ok' && finalEtat(a) && !finalEtat(lu)) { out.essais = 0; out.fini = finiApres(out); return out; }
   if (res === 'ok') {
     out.essais = 0;
-    for (const k of ['etat', 'detail', 'etatAt', 'dernierAt', 'libelle', 'lieuNom', 'lieuVille', 'lieuCp', 'limite', 'limiteSure', 'limiteAt']) out[k] = lu[k] === undefined ? null : lu[k];
+    for (const k of ['etat', 'detail', 'etatAt', 'dernierAt', 'libelle', 'lieuNom', 'lieuVille', 'lieuCp', 'lieuRue', 'pointId', 'limite', 'limiteSure', 'limiteAt']) out[k] = lu[k] === undefined ? null : lu[k];
     if (msDe(out.limiteAt) == null) out.limiteAt = null;
     out.cpRefuse = ''; out.cpRefuseSource = '';
     // Une voie qui ne porte pas le lieu (Mondial Relay `mr-fr-mvc`) : la ligne
     // garde celui qu'elle avait, jamais effacé par un blanc.
-    if (lu.lieuNonLu) for (const k of ['lieuNom', 'lieuVille', 'lieuCp']) out[k] = a[k] == null ? '' : a[k];
+    if (lu.lieuNonLu) for (const k of ['lieuNom', 'lieuVille', 'lieuCp', 'lieuRue', 'pointId']) out[k] = a[k] == null ? '' : a[k];
     out.libelle = propre(out.libelle, 160); out.lieuNom = propre(out.lieuNom, 80); out.lieuVille = propre(out.lieuVille, 60);
+    out.lieuRue = propre(out.lieuRue, 80); out.pointId = /^\d{1,12}$/.test(String(out.pointId || '')) ? String(out.pointId) : '';
     if (!/^\d{5}$/.test(String(out.lieuCp || ''))) out.lieuCp = '';
     out.limiteSure = !!out.limiteSure;
     out.lu = iso; out.source = source;
@@ -625,7 +655,7 @@ export function ligneApresEssai(avant, lu, { carrier, suivi, voie, source = 'ser
 
 // ── LES SCALAIRES LUS PAR LES LECTEURS (app, cron, widget, e-mails) ──────────
 // Jamais `select=data` (§4.4) : les évènements restent dans la ligne.
-export const SELECT_TRANSP_META = 'id,suivi:meta->>suivi,carrier:meta->>carrier,etat:meta->>etat,detail:meta->>detail,etatAt:meta->>etatAt,libelle:meta->>libelle,lieuNom:meta->>lieuNom,lieuVille:meta->>lieuVille,lieuCp:meta->>lieuCp,limite:meta->>limite,limiteSure:meta->>limiteSure,limiteAt:meta->>limiteAt,lu:meta->>lu,source:meta->>source,essai:meta->>essai,essaiRes:meta->>essaiRes,essaiSource:meta->>essaiSource,essais:meta->>essais,cp:meta->>cp,cpSource:meta->>cpSource,cpEssayes:meta->>cpEssayes,cpJour:meta->>cpJour,cpRefuse:meta->>cpRefuse,cpRefuseSource:meta->>cpRefuseSource,cpCherche:meta->>cpCherche,fini:meta->>fini';
+export const SELECT_TRANSP_META = 'id,suivi:meta->>suivi,carrier:meta->>carrier,etat:meta->>etat,detail:meta->>detail,etatAt:meta->>etatAt,libelle:meta->>libelle,lieuNom:meta->>lieuNom,lieuVille:meta->>lieuVille,lieuCp:meta->>lieuCp,lieuRue:meta->>lieuRue,pointId:meta->>pointId,limite:meta->>limite,limiteSure:meta->>limiteSure,limiteAt:meta->>limiteAt,lu:meta->>lu,source:meta->>source,essai:meta->>essai,essaiRes:meta->>essaiRes,essaiSource:meta->>essaiSource,essais:meta->>essais,cp:meta->>cp,cpSource:meta->>cpSource,cpEssayes:meta->>cpEssayes,cpJour:meta->>cpJour,cpRefuse:meta->>cpRefuse,cpRefuseSource:meta->>cpRefuseSource,cpCherche:meta->>cpCherche,fini:meta->>fini';
 // (29 oct., revue n° 8) PLUS DE FENÊTRE DE 45 JOURS CHEZ LES LECTEURS. Une ligne
 // « fini » (retiré, rendu) qui sortait de la fenêtre redonnait l'état d'AVANT la
 // lecture : un colis retiré ressortait « à vérifier — trop long » au 46e jour,
@@ -643,6 +673,7 @@ export function ligneTranspDeMeta(x) {
   return {
     id: x.id, suivi, carrier: m[1], etat, detail: x.detail || null, etatAt: x.etatAt || null, libelle: String(x.libelle || ''),
     lieuNom: String(x.lieuNom || ''), lieuVille: String(x.lieuVille || ''), lieuCp: String(x.lieuCp || ''),
+    lieuRue: String(x.lieuRue || ''), pointId: /^\d{1,12}$/.test(String(x.pointId || '')) ? String(x.pointId) : '',
     limite: /^\d{4}-\d{2}-\d{2}$/.test(String(x.limite || '')) ? String(x.limite) : null, limiteSure: bool(x.limiteSure), limiteAt: msDe(x.limiteAt) != null ? new Date(msDe(x.limiteAt)).toISOString() : null,
     lu: x.lu || null, source: x.source || '', essai: x.essai || null, essaiRes: RESULTATS.includes(x.essaiRes) ? x.essaiRes : null, essaiSource: String(x.essaiSource || ''),
     essais: Number(x.essais) || 0, cp: /^\d{5}$/.test(String(x.cp || '')) ? String(x.cp) : '', cpSource: String(x.cpSource || ''),
