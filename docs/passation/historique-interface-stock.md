@@ -2229,3 +2229,48 @@ arrive par « Fiche N° » → « Toute l'histoire du N° ». Le reçu d'achat n
 dans Achats) : l'étape dit seulement « achat relié par son n° de transaction ».
 
 **Geste de Julien** : aucun. Taper un N° dans la recherche → « Toute l'histoire du N° ».
+
+## 1er novembre 2026 — Quatre défauts : barre du haut, fiche d'annonce au téléphone, Colis sans nombres redits, tiroir de vente
+
+**1. La barre du haut recouvrait un filtre (banc `revendeurs`, 1512 px).** Mesuré : ce n'était pas la
+colonne de gauche mais le bouton « eBay » des filtres de site, au bout de la barre du haut, passé SOUS
+l'île d'actions (x 1364-1405 contre une île à 1376-1496 ; trois écrans : Vinted, Leboncoin, eBay). Cause :
+`--vrm-ile` était mesurée en pixels ZOOMÉS (`getBoundingClientRect`, réglage « Taille » à 0,65 sur
+`<html>`) puis appliquée en `padding-right` avant le zoom (réserve à 65 %), et les 24 px entre l'île et le
+bord n'étaient pas comptés. Désormais la réserve = du bord droit du contenu au bord gauche de l'île, divisée
+par le zoom de `.vrm-main` (`currentCSSZoom`), remesurée au zoom (observateur sur l'attribut `style` de
+`<html>`) et au redimensionnement. Collée, la barre gardait sa marge du haut : le contenu défilait dans
+cette bande (marge de 8 px et rembourrage du haut de `.vrm-main`, que Chrome laisse au-dessus d'un élément collé) — la marge devient un rembourrage, la bande se couvre du fond (ombre pleine) ; une ancre visée s'arrête sous la barre
+(`scroll-padding-top`). Banc : rouge sur `origin/main` (3 recouvrements), vert après. Le banc était aussi
+en retard sur la navigation du 31 oct. (porte « Aussi sur eBay » disparue, Colis Leboncoin en pastille,
+bulles avec l'heure dedans, trois volets de Messages) : ses chemins suivent l'app, aucune règle retirée ;
+« Tab inverse » juge maintenant le DERNIER contrôle ACTIF du fil (le micro de dictée est arrivé après le
+champ), jamais l'envoi désactivé. 213 contrôles.
+
+**2. La fiche d'annonce au téléphone (maquette Vitrine).** Fermée : photo + N° sur la photo, nom + taille,
+prix, une ligne discrète (état en clair · vues · favoris · âge), et le prix d'achat seulement s'il MANQUE
+(ambre, §7). « Plus d'actions » (44 px au doigt, `data-fiche-plus-bouton`, `aria-expanded`) déplie l'état
+en jauge, mini, refuse, boost, marge, l'achat relié, le stock, la file Leboncoin, Relier, Passeport,
+Marquer vendue — les MÊMES éléments (repliés par CSS, `data-fiche-ouverte`), mêmes écritures, mêmes
+`data-*`. L'ordinateur ne change pas (bouton caché). Bancs : `vinted-ui` juge la fiche fermée (4 contrôles,
+rouges sur main) puis dépliée ; `annonces-carte` déplie au téléphone avant de lire. Restent rouges, déjà
+rouges sur main : `vinted-ui` « achat à côté de l'état » à 390 (Vitrine empile la paire) et « Achats : le
+même calendrier » ; `annonces-carte` « recherche et retour au stock » (la barre du bas se cache clavier
+ouvert).
+
+**3. Colis : plus de nombres redits sous les colonnes.** « 4 colis à envoyer · 3 bordereaux prêts · 1 en
+attente », les intertitres « Prêts à imprimer · 3 », « Partis … · 3 » et « Où sont ces 4 articles »
+redisaient les colonnes. Le récapitulatif (même règle, mêmes « au moins » / « pas su ») reste dit au
+lecteur d'écran (`.vrm-lu-seulement`, `role=status`) — les bancs qui le lisent (colis, postes,
+formes-communes…) gardent leur juge ; restent visibles l'urgence, la ligne eBay (sans nombre), « Tout
+générer », l'imprimante, le lot, les retours, les conflits de N°. Le repli « Colis par colis » fermé sur
+ordinateur n'a PAS été fait : les cartes des colonnes y conduisent (défilement vers la carte, ancre des
+retraits) et l'impression par lot y vit.
+
+**4. Le tiroir d'une vente se conduit comme une feuille (banc `compact`).** Au téléphone la feuille du bas
+couvrait « À expédier » (le centre du bouton à 521 px, la feuille à 522). Ouvert, le tiroir : se referme sur
+un toucher de la PAGE hors de lui (le toucher atteint sa cible ; jamais dans le tiroir, sur sa ligne, ni
+dans une autre feuille ou confirmation) ; au téléphone, réserve sa hauteur au bas de la page et remonte la
+ligne ouverte au-dessus de lui. Banc : rouge sur main (« intercepts pointer events »), vert après, avec un
+contrôle neuf « un toucher hors du tiroir le referme et atteint sa cible ». Le banc jugeait aussi le repli
+« Chiffres » sur Compte eBay, passé dans Paramètres : il le juge sur Ventes.

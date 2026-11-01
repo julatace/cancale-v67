@@ -18719,7 +18719,7 @@ function LigneVenteCompacte({ photo, photoNoeud = null, titre, sous = '', etat, 
         if(!tiroir||!ligne)return;
         const haut=tiroir.getBoundingClientRect().top,r=ligne.getBoundingClientRect();
         const main=ligne.closest('.vrm-main');const z=(main&&typeof main.currentCSSZoom==='number'&&main.currentCSSZoom>0)?main.currentCSSZoom:1;
-        racine.style.setProperty('--vrm-feuille-vente',Math.ceil((innerHeight-haut)/z)+'px');racine.setAttribute('data-feuille-vente',panneau);posee=true;
+        racine.style.setProperty('--vrm-feuille-vente',Math.ceil((window.innerHeight-haut)/z)+'px');racine.setAttribute('data-feuille-vente',panneau);posee=true;
         const depasse=Math.min(r.bottom,r.top+declencheur.current.getBoundingClientRect().height)-(haut-12);
         if(depasse<=0)return;
         let defile=ligne.parentElement;

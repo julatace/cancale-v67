@@ -75,5 +75,9 @@ html .vrm-app-shell .vrm-recherche-champ:focus, html .vrm-app-shell .vrm-recherc
      rembourrage (même place, même centre), et une ancre visée (« Colis par
      colis », une carte de colis) s'arrête SOUS la barre, jamais dessous. */
   .vrm-main > .vrm-barre-haut { margin-top: 0; padding-top: 8px; min-height: 52px; }
+  /* `.vrm-main` garde son rembourrage du haut, que Chrome laisse au-dessus d'un
+     élément collé : la bande se couvre du fond (une ombre pleine, sans rien
+     intercepter), le contenu ne passe plus au-dessus de la barre. */
+  .vrm-main > .vrm-barre-haut { box-shadow: 0 -32px 0 0 var(--vrm-bg, #FFFFFF); }
   .vrm-main:has(> .vrm-barre-haut) { scroll-padding-top: 72px; }
 }
