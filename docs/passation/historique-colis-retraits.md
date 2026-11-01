@@ -2275,3 +2275,45 @@ Non vu : le fond de carte réel (tuiles hors ligne au banc : « La carte ne s'af
 colis sous « Point pas encore connu » dit quoi faire. Les e-mails Vinted Go DÉJÀ rangés sans code
 postal le restent (pas de rejeu) : ils rejoignent le point de la conversation, ou se placent par la
 liste de points de Vinted.
+
+## 1er novembre 2026 — Le mode emballage (maquette « journee-mode-emballage » validée)
+
+**Demande** : depuis Colis (colonne « Prêts à imprimer », bouton « Emballer ») et Ma journée, un
+écran plein qui passe les colis à poster UN PAR UN : le N° en très grand, la photo, nom + taille,
+où est la paire, le transporteur si connu, trois cases (« paire trouvée », « emballée »,
+« bordereau collé »), « Suivant », et à la fin « Marquer ces colis comme postés » sur SON clic.
+
+**Ce qui est fait** (aucune règle de classement neuve) :
+- `src/emballage.js` (pur) : `etatNumeroColis` — `double` si `conflitsDeNumeros` (la règle de
+  l'app, deux paires PRÉSENTES sous le N°) le dit ⇒ rouge + « vérifie le carton » ; `a-verifier`
+  si une fiche du N° est `ficheAVerifier` ou `reattribueAEcrire` (les règles de l'impression)
+  ⇒ ambre ; `sans` ⇒ gris, « fie-toi à la photo et au titre ». `ordreSeance` : l'ordre de la
+  colonne à l'ouverture, un nouveau prêt s'ajoute à la fin. `aMarquerPostes` : trois cases
+  cochées ET toujours dans « Prêts ». La séance (cases + ordre) vit dans `localStorage`
+  (`vrm_emballage_seance`, JAMAIS synchronisée), 12 h au plus, effacée par le geste final.
+- `src/ModeEmballage.jsx` + `src/styles-emballage.css` : portail plein écran (z 9000,
+  `FermeAuRetour`, Échap en capture), N° en Geist Mono 88–168 px, cases de 60 px, « Passer » /
+  « Colis suivant » (« Emballé · colis suivant » quand les trois cases le sont), récapitulatif
+  (N°, nom, « prêt à marquer » ou « 1/3 cases »), Wake Lock si le navigateur l'a (sinon rien),
+  lien « Toute l'histoire du N° » (fiche complète).
+- `App.jsx` (Comptabilite) : `colisEmballage()` lit la colonne `prets` de `colonnesColis(cartesColis())`
+  dans SON ordre (jamais trié par emplacement — refus du 11 oct.) ; emplacement par N°
+  (`ouStockNumero` : « Mes meubles » puis la pièce, la règle de « Tout sur le N° », sortie de
+  `ToutSurLeNumero` pour être partagée) ; transporteur seulement s'il est écrit sur le bordereau
+  (les e-mails de bordereau ne le portent pas : rien n'est inventé). Le geste « ✓ Colis fait »
+  devient `marquerColisFait(o, b)` (vente ET bordereau) — le bouton de la carte et le mode
+  emballage appellent la même fonction. Bouton « Emballer » au pied de « Prêts à imprimer »
+  (`pieds` de `ColisColonnes`) ; Ma journée : tâche « Emballer les colis prêts » (même compte que
+  la tuile) qui ouvre Colis par `DEMANDE_EMBALLAGE` (+ événement `vrm:emballer` si Colis est déjà
+  monté).
+
+**Preuves** : banc `scripts/bancs/emballage.cjs` (390 tactile + 1512, 56 contrôles) : ordre =
+colonne Prêts, N° en Geist Mono, emplacement « Meuble B · rangée 2, colonne 3 » / « Pas rangée »,
+N°42 sur deux ventes à poster ⇒ rouge, N°73 numéroté pendant la panne ⇒ ambre, cases gardées après
+fermeture, `vinted_ship_done` inchangé après tout le parcours, 2 colis complets sur 4 ⇒ « Marquer
+ces 2 colis », écriture identique au bouton « ✓ Colis fait » (`ship_done[tx]` horodaté,
+`bords_shipped[tx]=1`), Ma journée ⇒ séance sur Colis, 44 px, aucun débordement. Sur `origin/main` :
+rouge (pas de bouton). Mutations rouges : tri par N° (B, H), conflits ignorés (D), geste sans clic
+au dernier « Suivant » (F), geste à moitié sans le bordereau (G).
+
+**Geste de Julien** : aucun. Ouvrir Colis → « Emballer » au pied de « Prêts à imprimer ».
