@@ -238,12 +238,15 @@ const lire = (pg) => pg.evaluate(() => {
         dit(malCoupe.length === 0, 'B. un détail raccourci l’est à la fin d’un mot, le texte entier dans l’infobulle', JSON.stringify(malCoupe.map((r) => [r.note, r.plein.slice(0, 80)])));
         dit(lu.rangs.every((r) => r.cN >= 4.5), 'H. le détail se lit (contraste ≥ 4,5)', JSON.stringify(lu.rangs.map((r) => Math.round(r.cN * 10) / 10)));
         // C.
-        if (!tel) {
+        // (1er nov., Julien : « enlève Tournée » sur Ma journée) La carte n'est plus là :
+        // C ne s'applique que si elle revient.
+        if (!tel && lu.tourneeVue) {
           dit(lu.tr.length >= 4 && lu.tr.every((t) => !t.coupe && !t.points), 'C. Tournée : aucun titre ni sous-titre coupé', JSON.stringify(lu.tr.filter((t) => t.coupe || t.points).map((t) => t.txt)));
         }
         dit(lu.tr.every((t) => t.c >= 4.5), 'H. Tournée : contraste ≥ 4,5', JSON.stringify(lu.tr.map((t) => Math.round(t.c * 10) / 10)));
         // D.
-        dit(lu.tourneeVue && lu.tourneeEmballer, 'D. la Tournée est là (le banc la sert)');
+        dit(!lu.tourneeVue, 'D. la Tournée n’est plus sur Ma journée (sa décision du 1er nov.)');
+        dit(lu.envoyerVue && lu.retirerVue, 'D. sans Tournée, les cases « à envoyer » et « à retirer » se voient', JSON.stringify({ envoyer: lu.envoyerVue, retirer: lu.retirerVue }));
         dit(!(lu.tourneeVue && (lu.envoyerVue || lu.retirerVue)), 'D. le nombre « à envoyer / à retirer » ne se voit pas deux fois (case + Tournée)', JSON.stringify({ envoyer: lu.envoyerVue, retirer: lu.retirerVue }));
         dit(!(lu.tourneeVue && lu.emballerJob), 'D. « Emballer les colis prêts » n’est pas redit dans « À faire » (l’étape Emballer y mène)');
         // E.
