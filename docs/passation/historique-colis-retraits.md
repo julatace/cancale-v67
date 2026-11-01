@@ -2447,3 +2447,16 @@ ville (ou la position de la liste Vinted quand nom et rue concordent).
 **Geste de Julien** : aucun. Les colis déjà « disponibles » sont relus par le serveur à son prochain
 passage ; s'il voit encore « le suivi Vinted Go … ne l'a pas encore donné », ouvrir une fois le suivi
 Vinted Go du colis dans Chrome.
+
+**Suite (même jour, sa capture de la colonne « À retirer », 1512 px)** — deux défauts de plus :
+- la ligne d'un relais disait « colis à retirer · 2 à vérifier · encore 2 jours » SANS le nombre (il
+  n'était que sur la pastille ronde, lue comme un numéro d'ordre) ⇒ `ColonneRetirer` écrit le nombre
+  EN CLAIR (« 4 colis à retirer · encore 3 jours », « 2 à vérifier », « 1 en route ») ; la pastille,
+  même nombre de la même source (`nombreEpingle`), porte une icône de colis (forme de l'épingle de la
+  carte, infobulle « 4 colis à retirer — l'épingle de ce point sur la carte », `data-relais-pastille-sorte`) ;
+- une carte de colis sans photo avait un carré GRIS vide ⇒ une petite icône de colis neutre
+  (`data-sans-photo`), jamais un carré vide (cartes sous un relais seulement ; les autres colonnes
+  n'ont pas changé).
+Banc `tournee` §K : la phrase commence par « 4 colis à retirer », pastille « 4 » sorte `aretirer`,
+4 cartes sans photo ⇒ 4 icônes, 0 carré vide (390 et 1512) ; sur l'avant, la capture montre « colis à
+retirer » sans nombre et les carrés gris (`colonne-AVANT` / `colonne-APRES` regardées).

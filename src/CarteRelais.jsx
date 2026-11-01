@@ -248,7 +248,14 @@ function CarteColisRetirer({ x, Photo, onOuvrir, limiteSurCarte }) {
   const corps = (
     <>
       <span className="vrm-cc-haut">
-        <span className="vrm-cc-photo" aria-hidden="true">{(x.photo && Photo && Photo(x.photo)) || <span className="vrm-cc-photo-vide"/>}</span>
+        {(() => {
+          // (1er nov., sa capture) Sans photo, jamais un carré gris vide : une
+          // petite icône de colis, neutre, à la place de la photo.
+          const ph = x.photo && Photo ? Photo(x.photo) : null;
+          return ph
+            ? <span className="vrm-cc-photo" aria-hidden="true">{ph}</span>
+            : <span className="vrm-cc-photo is-sans" data-sans-photo="" aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" strokeLinecap="round"><path d="M3.5 7.5 12 3l8.5 4.5v9L12 21l-8.5-4.5z"/><path d="M3.5 7.5 12 12l8.5-4.5M12 12v9"/></svg></span>;
+        })()}
         <span className="vrm-cc-nom" title={x.titre}>{x.titre}</span>
         {x.num ? <span className="vrm-cc-num" data-numero={x.num}>N°{x.num}</span> : null}
       </span>
@@ -302,25 +309,29 @@ export function ColonneRetirer({ vue, C, Photo, onOuvrir, enRouteSansRelais = 0 
         const raison = raisonCarte(p);
         const lim = texteLimite(p.prochaineLimite);
         // (1er nov.) La pastille du point = son épingle : le MÊME nombre, de la
-        // même fonction (`nombreEpingle`) ; le résumé ne le réécrit pas (§7).
+        // même fonction (`nombreEpingle`).
+        // (1er nov., sa capture : « colis à retirer · 2 à vérifier » sans nombre)
+        // La phrase porte le nombre EN CLAIR (« 4 colis à retirer ») ; la pastille
+        // est l'épingle de la carte (même forme, une icône de colis) : elle se lit
+        // comme un nombre de colis, jamais comme un numéro d'ordre.
         const ep = nombreEpingle(p);
         const morceaux = [
-          p.nComptes || (!p.nAttendus && !hors.length) ? { k: 'aretirer', t: ep.sorte === 'aretirer' ? 'colis à retirer' : plur(p.nComptes, 'colis à retirer', 'colis à retirer') } : null,
-          hors.length ? { k: 'averifier', t: ep.sorte === 'averifier' ? 'à vérifier' : `${hors.length} à vérifier` } : null,
-          p.nAttendus ? { k: 'enroute', t: ep.sorte === 'enroute' ? 'en route' : `${p.nAttendus} en route` } : null,
+          p.nComptes || (!p.nAttendus && !hors.length) ? { k: 'aretirer', t: plur(p.nComptes, 'colis à retirer', 'colis à retirer') } : null,
+          hors.length ? { k: 'averifier', t: `${hors.length} à vérifier` } : null,
+          p.nAttendus ? { k: 'enroute', t: `${p.nAttendus} en route` } : null,
         ].filter(Boolean);
         return (
           <section key={p.cle} className={'vrm-rp-point' + (choisi === p.cle ? ' is-choisi' : '')} data-relais-point={p.cle} data-relais-numero={p.numero}
             data-relais-point-arrives={p.nArrives} data-relais-point-comptes={p.nComptes} data-relais-point-attendus={p.nAttendus} data-relais-epingle-n={ep.n}
             data-relais-repere={repereDe(p, reperes) ? 'oui' : (raison && raison !== EN_COURS ? 'non' : 'cherche')} data-relais-urgent={p.urgent ? '1' : undefined}>
             <header className="vrm-rp-tete">
-              <span className={'vrm-rp-numero vrm-rp-compte' + (ep.sorte === 'aretirer' && repereDe(p, reperes) ? ' is-fort' : '')} data-relais-pastille={ep.n} aria-hidden="true">{ep.n}</span>
+              <span className={'vrm-rp-numero vrm-rp-compte vrm-rp-epingle' + (ep.sorte === 'aretirer' && repereDe(p, reperes) ? ' is-fort' : '')} data-relais-pastille={ep.n} data-relais-pastille-sorte={ep.sorte} aria-hidden="true"
+                title={ep.sorte === 'aretirer' ? `${plur(ep.n, 'colis à retirer', 'colis à retirer')} — l’épingle de ce point sur la carte` : ep.sorte === 'averifier' ? `${ep.n} à vérifier` : `${ep.n} en route`}><svg className="vrm-rp-epingle-ic" viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" aria-hidden="true"><path d="M3.5 7.5 12 3l8.5 4.5v9L12 21l-8.5-4.5z"/><path d="M3.5 7.5 12 12l8.5-4.5M12 12v9"/></svg>{ep.n}</span>
               <span className="vrm-rp-ident">
                 <b className="vrm-rp-nom" data-relais-nom="">{p.nom || p.adresseCourte || 'Point relais'}</b>
                 {p.nom && p.adresseCourte ? <span className="vrm-rp-adresse" data-relais-adresse="">{p.adresseCourte}</span> : null}
                 {!p.nom ? <span className="vrm-rp-adresse">nom du point pas écrit dans le message</span> : null}
                 <span className="vrm-rp-resume">
-                  <span className="vrm-sr">{ep.n} </span>
                   {morceaux.map((m, i) => <span key={m.k} data-relais-compte={m.k === 'aretirer' ? p.nComptes : undefined}>{i ? ' · ' : ''}{m.t}</span>)}
                   {lim ? <span className={p.urgent ? 'is-ambre' : ''} data-relais-limite={p.prochaineLimite}> · {lim}</span> : null}
                 </span>

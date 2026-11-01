@@ -409,6 +409,20 @@ async function main() {
           pts: [...document.querySelectorAll('[data-cc-colonne="retirer"] [data-relais-point]')].map((e) => ({ cle: e.getAttribute('data-relais-point'), past: (e.querySelector('[data-relais-pastille]') || {}).textContent || null, rp: e.getAttribute('data-relais-repere'), raison: (e.querySelector('[data-relais-sans-repere]') || { getAttribute: () => null }).getAttribute('data-raison'), txt: (e.querySelector('[data-relais-sans-repere]') || {}).textContent || '' })),
         }));
         dit(JSON.stringify(K.ep) === JSON.stringify(L.ep), `${T} K ${sc} Colis → À retirer : les mêmes épingles que la tournée`, JSON.stringify(K.ep));
+        // (1er nov., sa capture de la colonne) La phrase du point porte le NOMBRE en
+        // clair (« 4 colis à retirer »), le même que sa pastille ; sans photo, jamais
+        // un carré gris vide : une icône de colis (`data-sans-photo`).
+        const R = await pg.evaluate(() => {
+          const p = [...document.querySelectorAll('[data-cc-colonne="retirer"] [data-relais-point]')].find((e) => /kusmi/.test(e.getAttribute('data-relais-point')));
+          if (!p) return null;
+          const res = p.querySelector('.vrm-rp-resume'); const vis = (e) => { const st = getComputedStyle(e); const r = e.getBoundingClientRect(); return st.visibility !== 'hidden' && r.width > 2 && r.height > 2; };
+          const cartes = [...p.querySelectorAll('[data-cc-carte]')];
+          return { resume: res ? res.innerText : '', past: (p.querySelector('[data-relais-pastille]') || {}).textContent || '', sorte: (p.querySelector('[data-relais-pastille]') || { getAttribute: () => '' }).getAttribute('data-relais-pastille-sorte'),
+            cartes: cartes.length, vides: cartes.filter((c) => { const v = c.querySelector('.vrm-cc-photo-vide'); return v && vis(v); }).length,
+            icones: cartes.filter((c) => { const i = c.querySelector('[data-sans-photo] svg'); return i && vis(i); }).length };
+        });
+        dit(!!R && /^4 colis à retirer\b/.test(R.resume) && R.past === '4' && R.sorte === 'aretirer', `${T} K ${sc} Colis : la phrase dit « 4 colis à retirer » en clair, la pastille dit le même nombre (sorte « à retirer »)`, JSON.stringify(R));
+        dit(!!R && R.cartes === 4 && R.vides === 0 && R.icones === 4, `${T} K ${sc} Colis : 4 colis sans photo ⇒ 4 icônes de colis, aucun carré gris vide`, JSON.stringify(R));
         const kp = K.pts.find((x) => /kusmi/.test(x.cle));
         if (sc === 'kusmi') dit(K.pts.filter((x) => x.cle !== "__inconnu").length === 1 && !!kp && kp.rp !== 'non' && kp.past === '4' && !kp.raison, `${T} K kusmi Colis : UN point Kusmi Tea, pastille « 4 », sur la carte`, JSON.stringify(K.pts));
         else dit(K.pts.filter((x) => x.cle !== "__inconnu").length === 1 && !!kp && kp.raison === (sc === 'kusmi-sans' ? 'vintedgo-pas-lu' : 'deux-adresses') && kp.txt.length > 30, `${T} K ${sc} Colis : la même raison dite sous le point`, JSON.stringify(K.pts));
