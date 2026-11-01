@@ -38,7 +38,10 @@ const REGLES = [
     'une clé privée en repli dans le code = tout le monde peut notifier les téléphones du vendeur'],
   // Seule exception : la boîte COLLECTIVE du service (vers laquelle les vendeurs font
   // suivre leurs emails Vinted) — une adresse publique de VRM, pas une personne.
-  ['aucun email personnel', /(?<![a-z0-9._%+-])(?!vrm\.vinted35@gmail\.com)[a-z0-9._%+-]+@(gmail|icloud|outlook|hotmail|yahoo|orange|free|laposte|wanadoo)\.[a-z]{2,}/i,
+  // Et (31 oct., décision de Julien) son adresse de CONTACT publique, la même boîte
+  // avec le suffixe « +contact » (mentions légales, CGV, point de contact DSA) —
+  // CETTE adresse exacte seulement, aucun autre suffixe.
+  ['aucun email personnel', /(?<![a-z0-9._%+-])(?!vrm\.vinted35(?:\+contact)?@gmail\.com)[a-z0-9._%+-]+@(gmail|icloud|outlook|hotmail|yahoo|orange|free|laposte|wanadoo)\.[a-z]{2,}/i,
     'donnée personnelle publiée dans un dépôt ouvert'],
   ['aucun SIRET en dur', /\bsiret\s*:\s*['"]\d{9,}['"]/i,
     "l'identité d'entreprise ne doit pas être une valeur par défaut : un nouveau vendeur la trouverait sur ses factures"],

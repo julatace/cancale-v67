@@ -25,6 +25,13 @@ export const classifyOrderStatus = (status) => {
   // « Le paiement a échoué » (statut 220, vu en base) : aucune vente n'a eu lieu.
   // Sans ce test il comptait dans les « ventes en cours » et comme colis à poster.
   if (/paiement\s+a\s+[ée]chou|[ée]chec\s+du\s+paiement/i.test(s)) return 'cancelled';
+  // ⚠️ (1er nov., audit A12) UNE RÈGLE « PAS UNE VENTE » : tout état qui « a
+  // échoué » fait REVENIR la paire pour l'anti double vente (`PAS_UNE_VENTE`,
+  // app ET extension) ; il ne compte donc pas non plus comme vendu ici. Avant,
+  // seul « le paiement a échoué » sortait : une autre « …a échoué » était
+  // revenue d'un côté, vendue de l'autre. `audit-flux-divers.cjs` exige que
+  // `classifyOrderStatus(s) === 'cancelled'` ⇔ `PAS_UNE_VENTE.test(s)`.
+  if (/[ée]chou/i.test(s)) return 'cancelled';
   if (/finalis/i.test(s)) return 'completed';
   return 'pending';
 };
@@ -182,7 +189,10 @@ export const ventesFaites = ({ vinted, lbc, ebay, cachee } = {}) => {
     if (!isFinite(eur)) continue;
     const t = Date.parse(v.dateVente || '');
     if (!t) { if (garde('lbc:' + v.txId)) sansDate += 1; continue; }
-    if (garde('lbc:' + v.txId)) lignes.push({ plateforme: 'Leboncoin', ts: t, eur, compte: String(v.account || '') });
+    // (1er nov., audit A11) Une date posée à la main (`dateSaisie`, rangée à midi
+    // par `avecDatesLbc`) ou lue sans heure n'a pas d'HEURE : elle ne compte dans
+    // aucune case « Quand tu vends » (`heureLue: false` ⇒ « sans heure »).
+    if (garde('lbc:' + v.txId)) lignes.push({ plateforme: 'Leboncoin', ts: t, eur, compte: String(v.account || ''), heureLue: !(v.dateSaisie === true || /^\d{4}-\d{2}-\d{2}$/.test(String(v.dateVente).trim())) });
   }
   for (const e of (ebay || [])) {
     if (!e || String(e.orderPaymentStatus || '').toUpperCase() !== 'PAID' || !e.orderId) continue;

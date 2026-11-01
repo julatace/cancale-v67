@@ -5,6 +5,50 @@
 
 # VRM — dossier de passation
 
+> **1er novembre — audit des parcours métier, défauts A5 à A14 (hors A1, A2, A4, A10 — autre chantier — et A3, qui
+> attend Julien : même paire sur deux comptes Vinted).** Julien : « fais tout comme un pro, il ne doit y avoir aucune
+> erreur possible ». Corrigé, chaque point EXÉCUTÉ par `scripts/audit-flux-divers.cjs` (26 rouges sur `origin/main`
+> f04af748 rejoué par `git archive`, 17/17 mutations attrapées avec `--prouve`) :
+> (A5) la notification « double vente » Leboncoin surlignait la PREMIÈRE ligne : `data-lbc-retirer` porte l'identifiant
+> Leboncoin d'une annonce reliée, il ne répondait jamais au N° de la notification et le repli `[data-lbc-retirer]`
+> prenait la première. Chaque ligne VENDUE porte `data-lbc-retirer-num` (la `cleNum` de chacun de ses N°, lot éclaté,
+> séparés par des espaces, visé par `~=`) ; `src/cibleNotif.js` (`cleNumCible`) ne vise QUE ce N° (eBay : la ligne
+> « vendue sur Vinted » ou « sur Leboncoin » de ce N°) ; sans N°, le bloc (`data-lbc-retirer-bloc`) ; absente ⇒ une
+> phrase qui ne promet plus « réglée ». Banc `lbc-supprimer` § notification (N°14/N°18/N°99, 390 et 1512 px ; la
+> N°18 rouge sur l'avant). (A6) « Vendus ailleurs » (`src/bilanSynchronisation.js`) compare par `cleNumSync` (= `cleNum`) :
+> « 007 » = « 7 », « B 125 » = « B125 », lot « 12+15 » = les deux cartons ; un lot dont UN N° est ambigu est ambigu
+> (compté, rien deviné). (A7) Le conseil d'une offre reçue par email (`api/email-inbound.js`) : `jugerPrixParTitre`
+> juge l'ambiguïté sur TOUTES les fiches du titre (une homonyme sans prix rend le cas ambigu) ; plus jamais « ✅ Accepte :
+> +X € net » — au mieux « une paire à ce titre a coûté X € (reconnue au titre seulement) : vérifie que c'est elle » ;
+> ambigu ⇒ « N paires portent ce titre : ouvre la conversation » ; `buy` rangé seulement si une fiche, marqué
+> `buySur: 'titre'`, `net` plus calculé (rien ne le lisait). (A8) Widget « Reçu ce mois » : l'app re-date
+> `vinted_urssaf_mois` sur une lecture complète au-delà de 6 h ou au changement de mois (`URSSAF_REDATE_MS`), le
+> widget juge donc une LECTURE ; le 1er du mois sans versement ⇒ 0 (`recu` sans le mois = un vrai zéro), plus « — ».
+> (A9) « Déclarer perdue » et le récapitulatif de vente ne disent plus « numéro libéré » ni « reste dans ta compta comme
+> perte » (aucun calcul ne lit `vinted_pairs_lost`) : « il sort du stock, sa case est vidée, son N° n'est jamais
+> redonné, VRM ne compte aucune perte » ; le récap porte `{k, t}` (`data-retour-archive` = `retour`/`renvoi`).
+> (A11) `ventesFaites` : une vente Leboncoin datée à la main (`dateSaisie`, rangée à midi) ou lue sans heure porte
+> `heureLue: false` ⇒ « sans heure » dans Statistiques, plus dans la case « 12 h ». (A12) `classifyOrderStatus` sort
+> aussi tout « …a échoué » (= `PAS_UNE_VENTE`, app ET extension) ; la copie serveur `api/_lib/ventes-regle.js`
+> refabriquée (`audit-bilan-semaine --recopie`). ⚠️ Reste UN écart nommé dans l'audit, dans le sens sûr : « Échec du
+> paiement » (mot « échec ») est pas vendu pour la compta mais vivant pour `PAS_UNE_VENTE` (extension non republiée
+> ici) ; et `transaction_user_status === 'failed'` n'est lu que par la preuve de vente — à aligner à la prochaine
+> version de l'extension. (A13) Sous une annonce PROUVÉE partie, même sans offre (`annonceDuFilPartie` : la règle de
+> l'offre, datée de la dernière activité du fil), plus aucune réponse rapide « disponible » (`rapidesDuFil`).
+> (A14) `api/widget.js` et `api/ship-reminders.js` ne projettent plus `vinted_sales_hidden`.
+> Audits rouges sur main remis d'aplomb SANS affaiblir leur règle (c'était l'orthographe qui avait changé, le
+> comportement était là) : `facture-achat`/`recu-achat` (l'index des reçus privé des seuls reçus DÉLIÉS par son clic),
+> `numerotation-lecteurs` (`{k, t}`), `offre-annonce-partie` ×2 (`RapidesConv`, `badgesNav.messages`), `offres-email`
+> (`attrs={{'data-conv': …}}`), `photos-vinted` (`PhotoVc` : https *.vestiairecollective.com seulement, raison écrite),
+> `politique-hotes` (`CarteRelais.jsx` → BAN = la ligne « points relais » de la politique, déjà dans `connect-src` ;
+> `maps.apple.com` = un lien « Ouvrir dans Plans »), `secrets` (l'adresse de contact publique EXACTE
+> `vrm.vinted35+contact@gmail.com`, décision du 31 oct.). `vc-publier` vert seul (rouge sous charge), `renum-b` vert en
+> 139 s (le dépassement de 90 s était la limite du lanceur). En passant : banc `double-vente` rouge sur main — la carte
+> « vendu sur Leboncoin — encore sur Vinted » écrasait le titre à une lettre par ligne à 390 px (les deux gestes en
+> largeur fixe) ⇒ la rangée passe à la ligne (texte ≥ 160 px) ; et le contrôle « rogné » excuse une RANGÉE DÉFILANTE
+> (filtres de site, §7 : conteneur qui défile vraiment), jamais un `overflow: hidden`. Extension inchangée. Geste de
+> Julien : aucun.
+
 > **31 octobre — tournée de TOUS les bancs (183) et audits (160), après les chantiers du 27-29 :** 5 défauts de l'app
 > corrigés : (1) la purge d'un compte supprimé pour de bon ne vidait plus rien — le filtre `fetch` du 29 oct.
 > (`src/comptesSupprimes.js`) lui cachait ses lignes ; une lecture qui doit les voir passe `{ vrmVoirSupprimes: true }`

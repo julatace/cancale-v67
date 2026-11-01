@@ -54,6 +54,8 @@ const LIEN = 'lien ouvert d’un clic par la personne (rien ne part tout seul)';
 const COUPLES = {
   'src/App.jsx|api-adresse.data.gouv.fr': ['politique', 'achats'],
   'src/App.jsx|nominatim.openstreetmap.org': ['politique', 'achats'],
+  // (1er nov.) La carte des points relais (Colis → À retirer, Tournée) géocode par la même BAN, depuis le navigateur.
+  'src/CarteRelais.jsx|api-adresse.data.gouv.fr': ['politique', 'achats'],
   'src/App.jsx|cdn.jsdelivr.net': ['politique', 'pdfjs'],
   'src/studioPhoto.js|cdn.jsdelivr.net': ['politique', 'ort'],
   'src/communaute/Communaute.jsx|api-adresse.data.gouv.fr': ['politique', 'ville'],
@@ -86,6 +88,7 @@ const COUPLES = {
   'src/ConfigurerTransfert.jsx|outlook.live.com': ['lien', LIEN],
   'src/ConfigurerTransfert.jsx|www.icloud.com': ['lien', LIEN],
   'src/navigateurExtension.js|play.google.com': ['lien', LIEN],
+  'src/Tournee.jsx|maps.apple.com': ['lien', LIEN + ' — « Ouvrir dans Plans » d’un point de retrait'],
   // Une origine SENTINELLE en `.invalid` (RFC 6761 : ne se résout jamais) quand
   // le domaine Vinted reçu n'est pas reconnu — rien ne part.
   'src/favorisVinted.js|invalide.invalid': ['vrm', 'origine sentinelle .invalid, jamais contactée'],
