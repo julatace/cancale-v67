@@ -2259,3 +2259,61 @@ Audit en lecture seule de sa production (`panel_diag_capture` de la 5.194, journ
 **« Ce n'est pas ça »** : proposé pour les reçus d'achat seulement (relié par le n° de transaction lu dans le reçu) — `vrm_recus_delies` (SYNC_KEYS), lu par l'index des reçus de Comptabilité ; rien n'est supprimé, « Relier à nouveau » remet. Pas proposé pour un bordereau (le n° de transaction est écrit par Vinted : il ne peut appartenir qu'à cette vente) ni pour un colis (relié par son n° de suivi) — l'écran le dit (« Et si ce n'est pas ça ? »). Ventes, offres, messages, favoris : rien n'est relié, seulement notifié.
 
 **Preuves** : `scripts/audit-journal-emails.cjs` (58 contrôles) EXÉCUTE `api/email-inbound.js` (bordereau, bordereau sans PDF, bordereau illisible, code Mondial Relay, reçu avec/sans n°, vente, email inconnu avec `<script>`, texte de 9 000 caractères, panne d'écriture ⇒ 503) et `api/email-rattacher.js?mode=journal` sur une base servie en PostgREST (projection honorée) : 401 sans session, owner de la session seul, jamais `select=data`, page < 30 Ko, filtres, texte d'un AUTRE vendeur jamais rendu, id invalide ⇒ 400, panne ⇒ 503 ; puis la phrase de chaque type et 50 reçus au même titre. Rouge sur l'ancien code (11 rouges puis arrêt) et sous 7 mutations (N° par titre non marqué, N° par titre relié, liste en `select=id,data`, texte non gardé, raison ignorée dans l'état, id du texte non vérifié, « délier » sans identité). Banc `scripts/bancs/journal-emails.cjs` (390 px tactile et 1512 px, 60 contrôles, captures `docs/style-2026-10-31/emails/`). Verts : bancs reception-emails, emails-action, emails-mis-de-cote, attente-email, recus, adresses-preuve ; audits email-cle, email-formes, email-rattacher, preuve-adresse, fonctions-api, tdz, variables, proprietaire-email ; `scripts/tests/reception-email.test.mjs`.
+
+---
+
+## 31 octobre — Chaque notification mène à SON élément (destination + cible)
+
+**Demande de Julien** : « Quand on reçoit une notification, ça doit nous amener précisément à
+l'endroit où ça doit nous amener. »
+
+**Le contrat** : le serveur pose l'adresse par UNE règle, `api/_lib/lien-notif.js`
+(`DESTINATIONS`, `lienNotif`) ; l'app la lit par `src/cibleNotif.js` (`lireCible`,
+`selecteursCible`, `phraseAbsente`) et `CibleNotif` (coque). Clés : `tab`, `site`, `section`,
+`vue`, et la **cible** nommée par une IDENTITÉ — `conv` (+ `compte`), `tx`, `suivi`, `num`,
+`colonne`. Jamais un titre, jamais une donnée sensible (ni pseudo, ni montant, ni code).
+Une identité mal formée est omise ⇒ l'écran s'ouvre nu. Sur l'écran, l'élément est défilé
+au centre, cerclé un instant (l'accent rare, §7) et marqué `data-cible-notif` ; une
+conversation et une vente s'OUVRENT ; un élément replié derrière « Voir les N autres » est
+déplié. Rien en 12 s ⇒ **une ligne** le dit (`[data-cible-absente]`), l'écran reste.
+`goto` (lien `?tab=` à froid, message `open-url` du service worker à chaud) pose la cible ;
+`section` vaut désormais aussi pour Comptabilité et Statistiques.
+
+| notification | émetteur | destination |
+|---|---|---|
+| 💬 Nouveau message | email (`email-inbound`) | Messages · Vinted · la conversation ouverte (l'id lu dans le lien `vinted.fr/inbox/<id>` de l'email — mesuré dans la forme réelle du banc `notif-messages`) ; sans lien : Messages · Vinted |
+| 💰 Offre (email) | email | idem (sa conversation, carte d'offre dedans) |
+| Offre au-dessus du prix mini | `ship-reminders` | une offre : SA conversation (id de la ligne `harvest_{uid}_conv_{id}`, projection `select=id,…`) ; plusieurs : Messages filtré « Offres » |
+| ⚠️ Annulation demandée | email | Messages · Vinted · la conversation si le lien est là |
+| 💸 Vendu ! | email | Ventes · Vinted · la vente ouverte (n° de transaction de l'email) |
+| 💰 Argent reçu (finalisée) | email | Ventes · Vinted |
+| 📦 Bordereau prêt | email | Colis · la carte `v:{tx}` |
+| Rappel du matin / du soir | `ship-reminders` | Colis · colonne « Prêts à imprimer » |
+| 📍 Code de retrait (conversation) | extension → `/api/push {action:'retrait', tx}` | Colis · « À retirer » · la carte `r:v:{tx}` |
+| 📍 Colis arrivé (email transporteur) | email | Colis · « À retirer » · la carte `r:e:{suivi}` |
+| 📍 Dernier jour / à vérifier | `ship-reminders` (retraits) | Colis · « À retirer » · la carte (suivi, + tx s'il est unique) |
+| Statut transporteur (disponible) | `transporteurs-notif` | Colis · « À retirer » · la carte ; autres étapes : Achats · l'achat |
+| 📦 Étape du suivi Vinted d'un achat | extension → `/api/push {action:'suivi'}` | Achats (vue complète) · la ligne de l'achat |
+| 🛍 Achat confirmé / 📦 Achat livré à vérifier | email | Achats · l'achat (si n° de transaction) |
+| ✅ Ta vente : colis retiré par l'acheteur | email | Ventes · Vinted |
+| ⚠️ Double vente | `double-vente` (email vente/bordereau) | Annonces · eBay (ligne `data-ebay-doublon=N°`) ou Annonces · Leboncoin (« à retirer ») |
+| ❤️ Favori | email | Annonces · Vinted |
+| File des favoris finie | `favoris` | Messages · Vinted · vue Favoris |
+| 🧾 Facture | email | Comptabilité · Factures |
+| URSSAF (le 1er, la veille) | `rappel-urssaf` | Comptabilité · « Ta déclaration URSSAF » (`[data-compta-urssaf]`, « C'est déclaré » y est) |
+| 🛒 Agent eBay | `agent-ebay-rappel` | eBay · À traiter (inchangé, déjà exact) |
+| Bilan de la semaine | `ship-reminders` | Ma journée (inchangé) |
+
+**L'extension n'a pas à changer** : elle n'envoie que le n° de transaction (et le compte)
+au serveur, qui relit la ligne et pose la destination. Elle n'a aucune notification à elle
+(`chrome.notifications` n'est pas utilisé).
+
+**Preuves** : `scripts/bancs/notifs-destination.cjs` EXÉCUTE `api/_lib/lien-notif.js` et
+ouvre l'app sur chaque adresse, à froid et une fois à chaud (`open-url`), 390 tactile et
+1512 : bon écran, bon filtre, élément visé par identité, conversation ouverte avec sa carte
+d'offre, vente ouverte, absent dit en une ligne, jamais blanc — 56 verts ; rouge sur
+`origin/main` ; rouge sous mutation (`BANC_MUTATION=sanscible`). Les routes modifiées sont
+exécutées par : `notif-messages.cjs` (le lien `/inbox/` ⇒ `cible=conv`), `offres-mini-push`
+(une offre ⇒ sa conversation ; deux ⇒ « Offres »), `retrait-conv-push`, `colis-relais-push`,
+`double-vente-push`, `rappel-soir`, `audit-suivi-colis`, `audit-suivi-vinted`,
+`audit-rappel-urssaf`, `audit-colis-heure`.

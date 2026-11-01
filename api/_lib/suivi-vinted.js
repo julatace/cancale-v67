@@ -45,6 +45,7 @@ import { sbCle } from './cle.js';
 import { etatColisDepuisTexte, normaliserSuivi } from './etat-colis-email.js';
 import { cleCodeRetrait } from '../email-inbound.js';
 import { clesEtapeTx, jourParis } from './transporteurs.js';
+import { DESTINATIONS } from './lien-notif.js';
 
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://lgonxzrzjcqthjtbdpzo.supabase.co';
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imxnb254enJ6amNxdGhqdGJkcHpvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk1ODIyMjYsImV4cCI6MjA5NTE1ODIyNn0.QJQSKILJLEpbDvBP4w7xD-olxoUjX1H2rxrYdo63GWQ';
@@ -150,7 +151,7 @@ export function notifSuivi(titre, dernier, tx) {
     title: nom ? `📦 ${nom}` : '📦 Ton colis',
     body: `Vinted : « ${t} »`,
     tag: `vrm-suivi-${tx}`,
-    url: '/?tab=cat_achats',
+    url: DESTINATIONS.achat({ tx }),
   };
 }
 

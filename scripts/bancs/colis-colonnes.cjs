@@ -9,6 +9,22 @@
 //   · 1 achat au point relais (code lu en conversation) ⇒ à retirer ;
 //   · 1 colis d'e-mail disponible, dernier jour demain ⇒ à retirer, en ambre ;
 //   · 1 colis d'e-mail arrivé il y a 30 jours ⇒ à retirer, « à vérifier ».
+// (1er nov.) « À retirer » PAR POINT RELAIS, aux formes réelles des sources :
+//   · Mondial Relay « TABA'VAP, 29 Rue Hoche, 56000 Vannes » (e-mail) et la
+//     conversation « point relais TABAVAP, TABAVAP, 29 RUE HOCHE, 56000 VANNES »
+//     ⇒ UN point, deux colis ;
+//   · Vinted Go « *Consigne Vinted Go*, * Kusmi Tea *, * 13 Rue Saint-Vincent »
+//     (sans code postal) et la conversation « Kusmi Tea, 13 Rue Saint-Vincent,
+//     56000 Vannes » ⇒ UN point, dont la position vient de la liste de points de
+//     Vinted (même nom + même code postal ; l'homonyme de Rennes est écarté) ;
+//   · le même n° de suivi écrit par Vinted (code) ET par Chronopost (lieu
+//     « TERRA CBD, 11 RUE HOCHE ») ⇒ UN colis, avec son code, sous Terra Cbd —
+//     et Ma journée le compte une fois ;
+//   · un Chronopost sans lieu ⇒ « Point pas encore connu », raison et geste ;
+//   · le lieu du transporteur sans rue (« TABAC DU PORT, 35260 CANCALE ») ⇒ le
+//     point est listé, « pas sur la carte » avec la raison.
+//   Le compteur de « À retirer » = `vrm_colis_retirer.total` (Ma journée) ; le
+//   colis « à vérifier » est visible, à part (« + 1 à vérifier »).
 // Exige : 4 colonnes dans l'ordre (côte à côte à 1512, empilées à 390), chaque
 // colis dans EXACTEMENT une colonne, la bonne ; rien de perdu (somme des
 // compteurs = total = nombre de colis posés) ; chaque compteur = ses cartes ;
@@ -38,18 +54,35 @@ const VENTES = [
   v(7102, 'Adidas Gazelle taille 42', RELAIS_ST, 'waiting', 4, 'an7'),
   v(7103, 'Asics GT-2160 taille 43', 'Le colis a été livré', 'waiting', 6, 'an8'),
 ];
+const achat = (tx, conv, titre, j) => ({ transaction_id: tx, conversation_id: conv, title: titre, price: { amount: '40', currency_code: 'EUR' }, status: RELAIS_ST, transaction_user_status: 'needs_action', date: ilYa(j) });
 const ACHATS = [
-  { transaction_id: 9401, conversation_id: 7801, title: 'Vans Old Skool taille 41', price: { amount: '40', currency_code: 'EUR' }, status: RELAIS_ST, transaction_user_status: 'needs_action', date: ilYa(3) },
+  achat(9401, 7801, 'Vans Old Skool taille 41', 3),
+  achat(9402, 7802, 'Puma Suede taille 42', 2),
+  achat(9403, 7803, 'Reebok Club C taille 40', 2),
 ];
 const NUMS = Object.fromEntries(['117', '42', '73', 'B233', '61', '64', '52', '70'].map((n, i) => ['an' + (i + 1), { numero: n, title: VENTES[i].title, price: 50 }]));
 const ACCOUNTS = [{ id: 1, vinted_user_id: '111', login: 'compte_banc', domain: 'www.vinted.fr', updated_at: iso(M) }];
 const ROWS = [
   { id: 'main', data: { vinted_ship_done: { 7005: M - 3600000 }, vinted_annonce_numeros: NUMS } },
-  { id: 'panel_colis_relais', data: { 9401: { code: '418205', lieu: 'Locker Carrefour, 4 Rue de Paris, 35000 Rennes, France', at: iso(M), url: 'https://www.vinted.fr/inbox/7801' } } },
+  { id: 'panel_colis_relais', data: {
+    9401: { code: '418205', lieu: 'Locker Carrefour, 4 Rue de Paris, 35000 Rennes, France', at: iso(M), url: 'https://www.vinted.fr/inbox/7801' },
+    9402: { code: '998877', lieu: 'point relais TABAVAP, TABAVAP, 29 RUE HOCHE, 56000 VANNES', at: iso(M), url: 'https://www.vinted.fr/inbox/7802' },
+    9403: { code: 'B11111', lieu: 'Kusmi Tea, 13 Rue Saint-Vincent, 56000 Vannes, France', at: iso(M), url: 'https://www.vinted.fr/inbox/7803' },
+  } },
+  { id: 'harvest_111_pickup_points', data: { capturedAt: iso(M), payload: { nearby_drop_off_points: { carrier: { name: 'Vinted Go' }, drop_off_points: [
+    { code: 'VG1', name: 'Kusmi Tea', drop_off_point_address: '13 Rue Saint-Vincent, 56000 Vannes', latitude: 47.6571, longitude: -2.7570, distance: 1.2, distance_unit: 'km' },
+    { code: 'VG2', name: 'Kusmi Tea', drop_off_point_address: '2 Rue Lafayette, 35000 Rennes', latitude: 48.11, longitude: -1.68, distance: 9, distance_unit: 'km' },
+  ] } } } },
   { id: 'harvest_111_orders_sold', data: { capturedAt: iso(M), payload: { my_orders: VENTES } } },
   { id: 'harvest_111_orders_purchased', data: { capturedAt: iso(M), payload: { my_orders: ACHATS } } },
   ...[7001, 7002, 7003].map((tx) => ({ id: `email_bord_${tx}`, data: { transaction: String(tx), filename: `bordereau_${tx}.pdf`, suivi: `TRK${tx}`, receivedAt: iso(M - 3 * 3600e3), pdfB64: 'JVBERi0xLjQK' } })),
   { id: 'email_track_vinted_1790000000000002', data: { type: 'suivi', carrier: 'vinted', suivi: '1790000000000002', status: 'available', statusLabel: 'Arrivé au point de retrait', subject: "Ton colis t'attend", receivedAt: ilYa(4), code: '3904112', lieu: 'Relais Pressing Mermoz, 14 Avenue Mermoz, 35000 Rennes', limite: dans(1) } },
+  { id: 'email_track_mondialrelay_55500002', data: { type: 'suivi', carrier: 'mondialrelay', suivi: '55500002', status: 'available', statusLabel: 'Disponible', subject: 'Votre colis est disponible', receivedAt: ilYa(1), code: '445566', lieu: "TABA'VAP, 29 Rue Hoche, 56000 Vannes", limite: dans(3) } },
+  { id: 'email_track_vinted_1790000000000003', data: { type: 'suivi', carrier: 'vinted', suivi: '1790000000000003', status: 'available', statusLabel: 'Arrivé au point de retrait', subject: "Ton colis t'attend", receivedAt: ilYa(1), code: 'A22222', lieu: '*Consigne Vinted Go*, * Kusmi Tea *, * 13 Rue Saint-Vincent', limite: dans(4), consigne: true } },
+  { id: 'email_track_vinted_04103186091937', data: { type: 'suivi', carrier: 'vinted', suivi: '04103186091937', status: 'available', statusLabel: 'Arrivé au point de retrait', subject: "Ton colis t'attend", receivedAt: ilYa(1), code: '551200' } },
+  { id: 'email_track_chronopost_04103186091937', data: { type: 'suivi', carrier: 'chronopost', suivi: '04103186091937', status: 'available', statusLabel: 'Disponible', subject: 'Votre colis est disponible en Relais Pickup', receivedAt: ilYa(1), lieu: 'TERRA CBD, 11 RUE HOCHE, 56000 VANNES', limite: dans(5) } },
+  { id: 'email_track_chronopost_XW000111222FR', data: { type: 'suivi', carrier: 'chronopost', suivi: 'XW000111222FR', status: 'available', statusLabel: 'Disponible', subject: 'Votre colis est disponible', receivedAt: ilYa(1), code: '778899' } },
+  { id: 'email_track_mondialrelay_55500003', data: { type: 'suivi', carrier: 'mondialrelay', suivi: '55500003', status: 'available', statusLabel: 'Disponible', subject: 'Votre colis est disponible', receivedAt: ilYa(1), code: '123456', lieu: 'BAR LE NAUTILUS, 35260 CANCALE', limite: dans(2) } },
   { id: 'email_track_mondialrelay_55500001', data: { type: 'suivi', carrier: 'mondialrelay', suivi: '55500001', status: 'available', statusLabel: 'Disponible', subject: 'Votre colis est disponible', receivedAt: ilYa(30), code: '771234', lieu: 'Tabac du Port, 2 Quai Gambetta, 35260 Cancale' } },
 ];
 // La place attendue de chaque colis (sa clé d'identité → sa colonne).
@@ -57,7 +90,17 @@ const ATTENDU = {
   'v:7001': 'prets', 'v:7002': 'prets', 'v:7003': 'prets', 'v:7004': 'attente', 'v:7005': 'partis',
   'p:7101': 'partis', 'p:7102': 'partis', 'p:7103': 'partis',
   'r:v:9401': 'retirer', 'r:e:1790000000000002': 'retirer', 'r:e:55500001': 'retirer',
+  'r:e:55500002': 'retirer', 'r:v:9402': 'retirer', 'r:e:1790000000000003': 'retirer', 'r:v:9403': 'retirer',
+  'r:e:04103186091937': 'retirer', 'r:e:XW000111222FR': 'retirer', 'r:e:55500003': 'retirer',
 };
+// Le POINT de chaque colis à retirer (sa clé de lieu) — par identité.
+const POINT = {
+  'r:e:55500002': 'tabavap|56000', 'r:v:9402': 'tabavap|56000',
+  'r:e:1790000000000003': 'kusmitea|56000', 'r:v:9403': 'kusmitea|56000',
+  'r:e:04103186091937': 'terracbd|56000', 'r:e:XW000111222FR': '__inconnu', 'r:e:55500003': 'barlenautilus|35260',
+  'r:v:9401': 'carrefour|35000', 'r:e:1790000000000002': 'relaispressingmermoz|35000', 'r:e:55500001': 'tabacduport|35260',
+};
+const HORS_COMPTE = ['r:e:55500001'];
 const ORDRE = ['prets', 'attente', 'retirer', 'partis'];
 
 let ko = 0;
@@ -108,7 +151,7 @@ async function preparer(b, vp) {
     const eq = /id=eq\.([^&]*)/.exec(u);
     if (eq) return j(ROWS.filter((r) => r.id === eq[1]).map(forme));
     const inn = /id=in\.\(([^)]*)\)/.exec(u);
-    if (inn) { const ids = inn[1].split(','); return j(ROWS.filter((r) => ids.includes(r.id)).map(forme)); }
+    if (inn) { const ids = inn[1].split(',').map((x) => x.replace(/^"|"$/g, '')); return j(ROWS.filter((r) => ids.includes(r.id)).map(forme)); }
     const lk = /id=like\.([^&]*)/.exec(u);
     if (lk) { const re = new RegExp('^' + lk[1].replace(/[.]/g, '\\.').replace(/[*%]/g, '.*') + '$'); return j(ROWS.filter((r) => re.test(r.id)).map(forme)); }
     return j([]);
@@ -122,14 +165,21 @@ const lire = (pg) => pg.evaluate(() => {
   const racine = document.querySelector('[data-colis-colonnes]');
   const cols = [...document.querySelectorAll('[data-cc-colonne]')].map((c) => {
     const r = c.getBoundingClientRect();
-    return { cle: c.getAttribute('data-cc-colonne'), n: Number(c.getAttribute('data-cc-n')), ecrit: ((c.querySelector('.vrm-cc-compte') || {}).textContent || '').trim(),
+    return { cle: c.getAttribute('data-cc-colonne'), n: Number(c.getAttribute('data-cc-n')), ecrit: ((c.querySelector('.vrm-cc-compte') || {}).textContent || '').trim(), horsTxt: ((c.querySelector('[data-cc-hors-txt]') || {}).textContent || '').trim(),
       x: Math.round(r.left), y: Math.round(r.top), w: Math.round(r.width),
-      cartes: [...c.querySelectorAll('[data-cc-carte]')].map((k) => ({ cle: k.getAttribute('data-cc-carte'), dans: k.getAttribute('data-cc-dans'), ambre: k.getAttribute('data-ambre') === '1', verif: k.getAttribute('data-a-verifier') === '1', h: Math.round(k.getBoundingClientRect().height), txt: k.innerText })) };
+      hors: Number(c.getAttribute('data-cc-hors')), cartes: [...c.querySelectorAll('[data-cc-carte]')].map((k) => ({ cle: k.getAttribute('data-cc-carte'), dans: k.getAttribute('data-cc-dans'), ambre: k.getAttribute('data-ambre') === '1', verif: k.getAttribute('data-a-verifier') === '1', hors: k.getAttribute('data-hors-compte') === '1', h: Math.round(k.getBoundingClientRect().height), txt: k.innerText })) };
   });
   const bt = document.querySelector('[data-imprimer-prets]');
-  return { total: racine ? Number(racine.getAttribute('data-colis-colonnes')) : null, cols,
+  const points = [...document.querySelectorAll('[data-cc-colonne="retirer"] [data-relais-point]')].map((p) => ({ cle: p.getAttribute('data-relais-point'), numero: p.getAttribute('data-relais-numero'),
+    compte: Number(p.getAttribute('data-relais-point-comptes')), repere: p.getAttribute('data-relais-repere'),
+    nom: ((p.querySelector('.vrm-rp-nom') || {}).textContent || '').trim(), resume: ((p.querySelector('.vrm-rp-resume') || {}).innerText || ''),
+    ambre: !!p.querySelector('.vrm-rp-resume .is-ambre'), pasCarte: ((p.querySelector('[data-relais-sans-repere]') || {}).textContent || ''),
+    cartes: [...p.querySelectorAll('[data-cc-carte]')].map((k) => ({ cle: k.getAttribute('data-cc-carte'), txt: k.innerText, code: (k.querySelector('[data-code-retrait]') || { getAttribute: () => null }).getAttribute('data-code-retrait'), raison: ((k.querySelector('[data-sans-lieu-raison]') || {}).innerText || '') })) }));
+  let pub = null; try { pub = JSON.parse(localStorage.getItem('vrm_colis_retirer') || 'null'); } catch (_) {}
+  const epingles = [...document.querySelectorAll('[data-relais-epingle]')].map((e) => [e.getAttribute('data-relais-epingle'), e.getAttribute('data-relais-numero'), e.textContent]);
+  return { points, pub, epingles, total: racine ? Number(racine.getAttribute('data-colis-colonnes')) : null, cols,
     bouton: bt ? { n: Number(bt.getAttribute('data-imprimer-prets')), txt: bt.innerText.trim(), bg: getComputedStyle(bt).backgroundColor } : null,
-    barre: !!document.querySelector('[data-barre-recherche]'), barreTxt: ((document.querySelector('[data-barre-recherche]') || {}).innerText || ''),
+    barre: !!document.querySelector('[data-barre-recherche]'), barreTxt: ((document.querySelector('[data-barre-recherche]') || {}).innerText || '') + ' ' + ((document.querySelector('[data-barre-recherche] input') || {}).placeholder || ''),
     sous: ((document.querySelector('[data-sous-titre]') || {}).innerText || ''),
     sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth };
 });
@@ -163,14 +213,46 @@ async function main() {
         dit(!doublons.length, `${T} aucun colis dans deux colonnes`, JSON.stringify(doublons));
         const faux = Object.entries(ATTENDU).filter(([cle, col]) => !toutes.some((k) => k.cle === cle && k.col === col)).map(([cle, col]) => `${cle}→${col} vu dans ${(toutes.find((k) => k.cle === cle) || {}).col || 'aucune'}`);
         dit(!faux.length, `${T} chaque colis est dans SA colonne (prêt, en attente, à retirer, parti)`, JSON.stringify(faux));
-        const somme = L.cols.reduce((t, c) => t + c.n, 0);
-        dit(somme === L.total && L.total === toutes.length && toutes.length === Object.keys(ATTENDU).length, `${T} rien de perdu : somme des compteurs = total = cartes = colis posés (${Object.keys(ATTENDU).length})`, `somme ${somme} · total ${L.total} · cartes ${toutes.length}`);
-        const faussesCompte = L.cols.filter((c) => !(String(c.n) === c.ecrit && c.n === c.cartes.length)).map((c) => `${c.cle}: écrit ${c.ecrit}, n ${c.n}, cartes ${c.cartes.length}`);
-        dit(!faussesCompte.length, `${T} chaque compteur écrit = ses cartes`, JSON.stringify(faussesCompte));
+        const somme = L.cols.reduce((t, c) => t + c.n + (c.hors || 0), 0);
+        dit(somme === L.total && L.total === toutes.length && toutes.length === Object.keys(ATTENDU).length, `${T} rien de perdu : somme des compteurs (+ à vérifier) = total = cartes = colis posés (${Object.keys(ATTENDU).length})`, `somme ${somme} · total ${L.total} · cartes ${toutes.length}`);
+        const faussesCompte = L.cols.filter((c) => !(new RegExp('^' + c.n + '(\\D|$)').test(c.ecrit) && c.n + (c.hors || 0) === c.cartes.length && c.cartes.filter((k) => k.hors).length === (c.hors || 0))).map((c) => `${c.cle}: écrit ${c.ecrit}, n ${c.n}, hors ${c.hors}, cartes ${c.cartes.length}`);
+        dit(!faussesCompte.length, `${T} chaque compteur écrit = ses cartes comptées (les « à vérifier » à part)`, JSON.stringify(faussesCompte));
+        // ── (1er nov.) « À RETIRER » PAR POINT ──
+        const ret = L.cols.find((c) => c.cle === 'retirer') || { n: -1, hors: -1, cartes: [], ecrit: '', horsTxt: '' };
+        dit(!!L.pub && Number.isFinite(L.pub.total) && ret.n === L.pub.total, `${T} le compteur « À retirer » = le nombre de Ma journée (vrm_colis_retirer)`, `colonne ${ret.n} · publié ${L.pub && L.pub.total}`);
+        dit(ret.hors === HORS_COMPTE.length && /^\+ 1 à vérifier$/.test(ret.horsTxt) && ret.ecrit === String(ret.n), `${T} le colis « à vérifier » est visible, à part (« + 1 à vérifier »), hors du compte`, ret.ecrit + ' / ' + ret.horsTxt);
+        const puma = ret.cartes.find((k) => k.cle === 'r:v:9402');
+        dit(!!puma && /Puma Suede taille 42/.test(puma.txt) && /998877/.test(puma.txt), `${T} une carte à retirer porte le nom de la paire et son code`, puma && puma.txt);
+        const dansPoint = {}; for (const p of L.points) for (const k of p.cartes) dansPoint[k.cle] = (dansPoint[k.cle] ? dansPoint[k.cle] + ',' : '') + p.cle;
+        const malRanges = Object.entries(POINT).filter(([cle, pt]) => dansPoint[cle] !== pt).map(([cle, pt]) => `${cle}: attendu ${pt}, vu ${dansPoint[cle] || 'aucun'}`);
+        dit(!malRanges.length, `${T} chaque colis à retirer est sous SON point (même relais écrit deux fois = un point ; sans lieu = « pas encore connu »)`, JSON.stringify(malRanges));
+        const horsPoint = ret.cartes.filter((k) => !dansPoint[k.cle]).map((k) => k.cle);
+        dit(!horsPoint.length && Object.keys(dansPoint).length === ret.cartes.length, `${T} aucune carte « À retirer » hors d'un point`, JSON.stringify(horsPoint));
+        const connus = L.points.filter((p) => p.cle !== '__inconnu');
+        dit(connus.length > 0 && connus.every((p, i) => p.numero === String(i + 1)), `${T} les points sont numérotés 1…N dans l'ordre de la liste`, JSON.stringify(connus.map((p) => [p.cle, p.numero])));
+        const sommePts = L.points.reduce((t, p) => t + p.compte, 0);
+        dit(sommePts === ret.n, `${T} la somme des colis par point = le compteur de la colonne`, `${sommePts} / ${ret.n}`);
+        const tv = L.points.find((p) => p.cle === 'tabavap|56000');
+        dit(!!tv && tv.compte === 2, `${T} TABA'VAP (e-mail) et TABAVAP (conversation) : un point, 2 colis`, tv && JSON.stringify([tv.nom, tv.compte]));
+        const terra = L.points.find((p) => p.cle === 'terracbd|56000');
+        dit(!!terra && terra.cartes.length === 1 && terra.cartes[0].code === '551200', `${T} le même n° écrit par Vinted (code) et Chronopost (lieu) : un colis, son code, sous Terra Cbd`, terra && JSON.stringify(terra.cartes));
+        const inc = L.points.find((p) => p.cle === '__inconnu');
+        dit(!!inc && /Point pas encore connu/.test(inc.nom) && inc.cartes.length === 1 && /Chronopost ne nomme pas le point/.test(inc.cartes[0].raison) && /e-mail du transporteur/.test(inc.cartes[0].raison), `${T} un colis sans lieu : sous « Point pas encore connu », avec la raison et le geste`, inc && JSON.stringify(inc.cartes));
+        const port = L.points.find((p) => p.cle === 'barlenautilus|35260');
+        dit(!!port && /Pas sur la carte : la rue du point n’a pas été donnée/.test(port.pasCarte), `${T} un point sans rue est listé, « pas sur la carte » avec la raison`, port && port.pasCarte);
+        const kus = L.points.find((p) => p.cle === 'kusmitea|56000');
+        dit(!!kus && kus.compte === 2 && kus.repere === 'oui' && !kus.pasCarte, `${T} Kusmi Tea (Vinted Go sans code postal + conversation) : un point, placé par la liste de points de Vinted`, kus && JSON.stringify([kus.compte, kus.repere, kus.pasCarte]));
+        const mermoz = L.points.find((p) => p.cle === 'relaispressingmermoz|35000');
+        dit(!!mermoz && mermoz.ambre && /dernier jour (demain|aujourd’hui)/.test(mermoz.resume) && L.points[0] && L.points[0].cle === 'relaispressingmermoz|35000', `${T} le point au dernier jour : en tête, « dernier jour » en ambre`, mermoz && JSON.stringify([mermoz.resume, L.points[0] && L.points[0].cle]));
+        const codeGrand = (L.points.find((p) => p.cle === 'carrefour|35000') || { cartes: [] }).cartes[0];
+        dit(!!codeGrand && codeGrand.code === '418205', `${T} le code de retrait est écrit sur la carte`, codeGrand && JSON.stringify(codeGrand));
+        const ep = L.epingles.find((e) => e[0] === 'kusmitea|56000');
+        if (L.epingles.length) dit(!!ep && ep[2] === (kus && kus.numero), `${T} l'épingle porte le numéro du point dans la liste`, JSON.stringify(L.epingles));
+        else console.log(`--  ${T} épingles non dessinées ici (fond de carte hors ligne) — numéros vérifiés sur la liste`);
         const prets = L.cols.find((c) => c.cle === 'prets');
         dit(!!L.bouton && prets && L.bouton.n === prets.n && new RegExp(`\\b${prets.n}\\b`).test(L.bouton.txt) && /prêts?/.test(L.bouton.txt), `${T} « Imprimer les N prêts » = le compteur des prêts`, JSON.stringify(L.bouton) + ' / ' + (prets && prets.n));
         const amb = toutes.find((k) => k.cle === 'r:e:1790000000000002');
-        dit(!!amb && amb.ambre && /dernier jour demain/.test(amb.txt), `${T} le dernier jour de retrait est écrit en ambre`, amb && JSON.stringify(amb));
+        dit(!!amb && amb.ambre, `${T} le colis au dernier jour est marqué ambre (la phrase est dans l'en-tête de son point)`, amb && JSON.stringify(amb));
         const ver = toutes.find((k) => k.cle === 'r:e:55500001');
         dit(!!ver && ver.verif && /à vérifier/.test(ver.txt), `${T} un colis douteux reste VISIBLE, marqué « à vérifier »`, ver && JSON.stringify(ver));
         const n117 = toutes.find((k) => k.cle === 'v:7001');

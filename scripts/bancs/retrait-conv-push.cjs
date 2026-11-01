@@ -117,7 +117,7 @@ const JETON = 'aaa.bbb.ccc';
     dit(r.code === 200, 'la route répond 200', `HTTP ${r.code} ${JSON.stringify(r.corps)}`);
     dit(relais().length === 1 && /Colis à retirer/.test(p.title || ''), 'une notification « 📍 Colis à retirer »', `${relais().length}`);
     dit(/C65735/.test(p.body || '') && /Consigne Banc/.test(p.body || ''), 'le code et le lieu relus dans SA ligne sont dedans', p.body);
-    dit(p.url === '/?tab=cat_achats', 'le clic ouvre Achats', p.url);
+    dit(p.url === `/?tab=cat_bord&cible=retrait&tx=${TX}`, 'le clic ouvre Colis → « À retirer », SA carte (par la transaction) — 31 oct.', p.url);
     await extension(TX);
     dit(relais().length === 1, 'redemandée (nouvel essai de l’extension) : rien de plus', `${relais().length}`);
   });

@@ -30,6 +30,7 @@ import { sendPushToAll, pushCategorieActive } from './push.js';
 import { modifierCas } from './suivi-vinted.js';
 import { changementANotifier, texteNotifTransp, clesEtapeTx, NOTIF_AGE_MAX_MS } from './transporteurs.js';
 import { normaliserSuivi } from './etat-colis-email.js';
+import { DESTINATIONS } from './lien-notif.js';
 import { cleCodeRetrait } from '../email-inbound.js';
 
 const msDe = (v) => { const ms = Date.parse(String(v || '')); return Number.isFinite(ms) ? ms : null; };
@@ -61,7 +62,7 @@ export async function envoyerNotifTransp(t, ch, { txs = [], codes = [] } = {}) {
   if (r === null) return { envoye: false, raison: 'pas-su' };
   if (r === false) return { envoye: false, raison: 'deja-annonce' };
   const txt = texteNotifTransp(t, ch);
-  const e = await sendPushToAll({ title: txt.title, body: txt.body, tag: ch.cle, url: '/?tab=cat_achats' });
+  const e = await sendPushToAll({ title: txt.title, body: txt.body, tag: ch.cle, url: (() => { const un = (txs || []).filter(Boolean); const tx = un.length === 1 ? un[0] : ''; return ch.etat === 'disponible' ? DESTINATIONS.retrait({ suivi: t.suivi, tx }) : DESTINATIONS.achat({ tx }); })() });
   if (e && e.coupe) return { envoye: false, raison: 'abonnement' };
   if (!e || !(Number(e.sent) > 0)) return { envoye: false, raison: e && e.erreur ? 'envoi-impossible' : 'aucun-appareil' };
   return { envoye: true, raison: ch.etat };

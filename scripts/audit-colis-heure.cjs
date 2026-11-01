@@ -160,7 +160,7 @@ const res = () => ({ code: null, corps: null, status(n) { this.code = n; return 
     dit(b.dueTomorrow === 1 && /1 demain avant 10 h/.test(p.body || ''), 'le colis IMPRIMÉ mais pas parti est compté — « 1 demain avant 10 h » (l’heure lue dans l’email)', p.body);
     dit(b.dueToday === 1 && /Date estimée pour 1/.test(p.body || ''), 'la vente SANS email de bordereau est comptée (vente + 7 j), et dite estimée', p.body);
     dit(b.overdue === 1 && /1 en retard/.test(p.body || '') && /^⏰/.test(p.title || ''), 'la limite « aujourd’hui 7 h 00 » est EN RETARD à 7 h 10 (le retard compte à partir de l’heure)', `${p.title} / overdue=${b.overdue}`);
-    dit(matinDe().length === 1 && p.url === '/?tab=cat_bord', 'UNE notification, qui ouvre Colis', `${matinDe().length} · ${p.url}`);
+    dit(matinDe().length === 1 && p.url === '/?tab=cat_bord&cible=colonne&colonne=prets', 'UNE notification, qui ouvre Colis (colonne « Prêts », 31 oct.)', `${matinDe().length} · ${p.url}`);
   });
 
   console.log('\n── 2. Le widget : les mêmes échéances, à la même heure');

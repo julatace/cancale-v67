@@ -78,8 +78,12 @@ srv.listen(PORT);
         } else dit(false, `[${tag}] filtres de site de Ventes trouvés`, JSON.stringify(filtres));
       } else dit(false, `[${tag}] onglet Ventes trouvé`, labels.join(', '));
       // Une FEUILLE ouverte : « retour » la ferme d'abord, sans changer d'écran.
-      const RECH = 'button[aria-label="Rechercher une paire"]';
-      const ouverte = () => pg.$('button[aria-label="Fermer la recherche"]').then(e => !!e);
+      // (31 oct.) La recherche est EN PLACE : la loupe ouvre le champ dans
+      // l'en-tête (téléphone), le champ de la barre se tape directement
+      // (ordinateur). « Ouverte » = le panneau des résultats est déplié.
+      const RECH = tactile ? 'button[aria-label="Rechercher une paire"]' : '[data-recherche-champ]';
+      const ouverte = () => pg.$('[data-recherche-panneau]').then(e => !!e);
+      const fermerX = async () => { if (tactile) await pg.click('button[aria-label="Fermer la recherche"]'); else await pg.keyboard.press('Escape'); };
       if (await pg.$(RECH)) {
         await clic(l1);
         const avant = await actif();
@@ -89,7 +93,7 @@ srv.listen(PORT);
         dit(!(await ouverte()) && (await actif()) === avant && pg.url().startsWith(base), `[${tag}] « retour » ferme la feuille ouverte, sans changer d'écran`, `${await ouverte()} · ${await actif()} · ${pg.url()}`);
         // Fermée par ×, son entrée part : le retour suivant change bien d'écran.
         await pg.click(RECH); await pg.waitForTimeout(400);
-        await pg.click('button[aria-label="Fermer la recherche"]'); await pg.waitForTimeout(500);
+        await fermerX(); await pg.waitForTimeout(500);
         await pg.goBack({ waitUntil: 'commit' }).catch(() => {}); await pg.waitForTimeout(500);
         dit((await actif()) !== avant && pg.url().startsWith(base), `[${tag}] fermée par ×, le « retour » suivant revient à l'écran d'avant (pas un retour à vide)`, `${await actif()}`);
       } else dit(false, `[${tag}] bouton de recherche trouvé`);

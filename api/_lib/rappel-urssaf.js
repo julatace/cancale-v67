@@ -16,6 +16,7 @@
 //     SANS montant : un rappel de trop coûte moins qu'une déclaration oubliée.
 // Fonction PURE (aucune lecture, aucun envoi) : exécutée par l'audit.
 import { rappelUrssaf, tauxDe, nextUrssafDeadline, moisPeriodeUrssaf, moisDeclare, _startOfDay } from './urssaf-regle.js';
+import { DESTINATIONS } from './lien-notif.js';
 
 // Les seules clés de `main` qu'elle lit (§4.4 : `main` pèse ~200 Ko).
 export const MAIN_URSSAF = ['vinted_regime', 'vinted_urssaf_freq', 'vinted_urssaf_taux', 'vrm_urssaf_declare', 'vinted_urssaf_mois'];
@@ -27,7 +28,9 @@ export const RAPPEL_SANS_MONTANT = 'Nouveau mois : pense à déclarer ton chiffr
 // (aucune ligne) · `undefined` (pas su). Rend `{ envoyer, titre, corps, url,
 // montant, raison }` — `montant` = à payer (nombre) ou `null`.
 export function notificationUrssaf({ today, main }) {
-  const url = '/?tab=journee';
+  // (31 oct.) Comptabilité → « Ta déclaration URSSAF » : la carte du mois, son
+  // montant et « C'est déclaré » (la même que Ma journée rappelle).
+  const url = DESTINATIONS.urssaf();
   // (27 oct.) SEUL un micro-entrepreneur reçoit ce rappel : un particulier, une
   // société, un régime de la marge, ou un statut jamais choisi n'ont rien à
   // déclarer à l'URSSAF (règle de l'app : `urssafConcerne`). Réglages illisibles

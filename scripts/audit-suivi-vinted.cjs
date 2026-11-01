@@ -657,7 +657,7 @@ const ecrits = (f, id) => f.j.posts.filter((ids) => ids.includes(id)).length;
       const p = pushes[0] || {};
       console.log(`     sur le téléphone : « ${p.title} » / « ${p.body} »`);
       dit(r1.code === 200 && r1.corps && r1.corps.envoye === true && pushes.length === 1, 'une étape neuve ⇒ 200, UNE notification', `HTTP ${r1.code} ${JSON.stringify(r1.corps)} · ${pushes.length}`);
-      dit(/Baskets banc A/.test(p.title || '') && /Vinted : « Colis en cours de livraison »/.test(p.body || '') && p.url === '/?tab=cat_achats', 'le titre de l’achat (par la transaction) et l’étape relue dans SA ligne ; le clic ouvre Achats', JSON.stringify(p));
+      dit(/Baskets banc A/.test(p.title || '') && /Vinted : « Colis en cours de livraison »/.test(p.body || '') && p.url === `/?tab=cat_achats&vue=achats&cible=achat&tx=${TX}`, 'le titre de l’achat (par la transaction) et l’étape relue dans SA ligne ; le clic ouvre Achats, SUR cet achat (31 oct.)', JSON.stringify(p));
       const r2 = await appel(TX, '111');
       dit(r2.code === 200 && pushes.length === 1, 'la même étape redemandée ⇒ rien de plus (une fois par étape)', `${JSON.stringify(r2.corps)} · ${pushes.length}`);
       base.set(`${OWNER}|harvest_111_suivi_${TX}`, suivi(0.5, 'Colis livré'));

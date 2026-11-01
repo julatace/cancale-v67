@@ -149,7 +149,7 @@ const res = () => ({ code: null, corps: null, status(n) { this.code = n; return 
     dit(a.length === 1, 'A reçoit UN rappel du soir sur son appareil', `A=${a.length} · HTTP ${r.code}`);
     dit(/^⏰ Demain : 3 colis à poster/.test(p.title || ''), 'le titre dit « ⏰ Demain : 3 colis à poster » (2 Vinted + 1 eBay ; le colis coché « posté » exclu)', p.title);
     dit(/1 déjà en retard/.test(p.body || '') && /1 avec la date limite demain/.test(p.body || '') && !/2 déjà en retard/.test(p.body || ''), 'le « dont » : 1 en retard (limite ce soir), 1 avec la date limite demain — le bordereau du colis coché « posté » n’est pas compté', p.body);
-    dit(p.url === '/?tab=cat_bord', 'le clic ouvre Colis', p.url);
+    dit(p.url === '/?tab=cat_bord&cible=colonne&colonne=prets', 'le clic ouvre Colis, sur la colonne « Prêts à imprimer » (31 oct.)', p.url);
     dit(b.length === 0, 'B n’a rien à poster ⇒ rien pour B', `B=${b.length}`);
     const lect = lus.filter((u) => /orders_sold|email_bord|ebay_orders|ebay_comptes|vinted_accounts|soir_reminder_dedup/.test(u));
     dit(lect.length > 0 && lect.every((u) => /owner=eq\./.test(u)), 'toutes les lectures portent owner=eq.<vendeur>', `${lect.length} lectures`);

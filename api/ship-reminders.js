@@ -22,6 +22,7 @@
 
 import './_lib/sans-bruit.js';
 import { sendPushToAll, pushCategorieActive } from './_lib/push.js';
+import { DESTINATIONS } from './_lib/lien-notif.js';
 import { notificationAgentEbay } from './_lib/agent-ebay-rappel.js';
 import { semainePassee, semaineCourante, calculerBilan, bilanAEnvoyer, texteBilan, versementsDeLignes } from './_lib/bilan-semaine.js';
 import { notificationUrssaf, rappelAvantEcheance, MAIN_URSSAF } from './_lib/rappel-urssaf.js';
@@ -365,7 +366,7 @@ async function rappelsColisRetrait(maintenant = Date.now()) {
   let envoi = null;
   for (const x of nouveaux) {
     const t = texteRappelRetrait(x);
-    envoi = await sendPushToAll({ title: t.title, body: t.body, tag: 'retrait-' + x.cle, url: '/?tab=cat_achats' });
+    envoi = await sendPushToAll({ title: t.title, body: t.body, tag: 'retrait-' + x.cle, url: DESTINATIONS.retrait({ suivi: x.suivi, tx: (() => { const t = txsPar.get(x.suivi); return t && t.size === 1 ? [...t][0] : ''; })() }) });
   }
   // Aucun n° de suivi ni lieu dans la réponse d'un cron : des nombres.
   return { retrait: 'envoyé', dernier: nouveaux.filter((x) => x.etat === 'dernier').length, aVerifier: nouveaux.filter((x) => x.etat === 'a_verifier').length,
@@ -410,14 +411,15 @@ async function rappelsOffresMini(maintenant = Date.now()) {
     if (isFinite(v) && v > 0) planchers.set(String(id), v);
   }
   if (!planchers.size) return 'aucun prix mini posé';
-  const rows = await fetchPaginated(scoped(`app_data?id=like.harvest_%25_conv_%25&${OFFRES_MINI_FILTRE}&select=opp:data->payload->conversation->opposite_user->>id,item:data->payload->conversation->transaction->>item_id,msgs:data->payload->conversation->messages`));
+  const rows = await fetchPaginated(scoped(`app_data?id=like.harvest_%25_conv_%25&${OFFRES_MINI_FILTRE}&select=id,opp:data->payload->conversation->opposite_user->>id,item:data->payload->conversation->transaction->>item_id,msgs:data->payload->conversation->messages`));
   if (rows === null) return 'conversations illisibles — rien envoyé';       // « pas su » ⇒ rien
   const auMini = [];
+  const convDe = new Map();   // offre → sa conversation (l'identité de la LIGNE, harvest_{uid}_conv_{id})
   for (const r of rows) {
     const item = r && r.item != null && r.item !== '' ? String(r.item) : null;
     if (!item || !planchers.has(item)) continue;
     const off = offreCouranteServeur(r && r.opp != null ? r.opp : null, r && r.msgs);
-    if (off && off.prix >= planchers.get(item)) auMini.push(off.oid);
+    if (off && off.prix >= planchers.get(item)) { auMini.push(off.oid); const m = /^harvest_(\d+)_conv_(\d+)$/.exec(String((r && r.id) || '')); if (m) convDe.set(off.oid, { compte: m[1], conv: m[2] }); }
   }
   const deja = await getRow('offres_mini_dedup');
   if (deja === undefined) return 'mémo illisible — rien envoyé';            // « pas su » ⇒ rien
@@ -427,10 +429,12 @@ async function rappelsOffresMini(maintenant = Date.now()) {
   const garde = [...vus, ...nouveaux].slice(-400);                          // mémo borné
   if (!(await ecrireDedup('offres_mini_dedup', { oids: garde, at: new Date(maintenant).toISOString() }))) return 'mémo non écrit — rien envoyé';
   const n = nouveaux.length;
+  // Une seule offre ⇒ sa conversation, ouverte, avec la carte d'offre ; plusieurs ⇒ le filtre « Offres ».
+  const uneSeule = n === 1 ? (convDe.get(nouveaux[0]) || null) : null;
   const envoi = await sendPushToAll({
     title: n > 1 ? `${n} offres au-dessus de ton prix mini` : 'Une offre au-dessus de ton prix mini',
     body: n > 1 ? `${n} offres à accepter en 1 tap dans VRM.` : 'À accepter en 1 tap dans VRM.',
-    tag: 'offremini', url: '/?tab=cat_msg' });
+    tag: 'offremini', url: n === 1 && uneSeule ? DESTINATIONS.message(uneSeule) : DESTINATIONS.offres() });
   return { offremini: 'envoyé', n, envoi: envoi && (envoi.coupe || envoi.erreur || envoi.sent) };
 }
 
@@ -630,7 +634,7 @@ async function traiterVendeurApresRelecture() {
 
     if ((total > 0 || nePasPoster > 0) && await pushCategorieActive('expedier')) {
       const txt = texteMatin({ overdue, aVerifier, dueToday, dueTomorrow, ebayDus, nePasPoster, vinted: c });
-      await sendPushToAll({ ...txt, tag: 'ship-reminder', url: '/?tab=cat_bord' });
+      await sendPushToAll({ ...txt, tag: 'ship-reminder', url: DESTINATIONS.colis({}) });
     }
     await ecrireDedup('ship_reminder_dedup', { date: today, total, nePasPoster });
     return { urssaf, bilan, retrait, offremini, agentebay, overdue, aVerifier, dueToday, dueTomorrow, total,
@@ -780,7 +784,7 @@ async function rappelDuSoir() {
   if (t.ebay) { retard += t.ebay.overdue + t.ebay.today; demain += t.ebay.tomorrow; }
   if (!(await ecrireDedup('soir_reminder_dedup', { date: today, n }))) return { soir: 'mémo non écrit — rien envoyé' };
   const txt = texteSoir({ n, auMoins, retard, aVerifier, demain, heureDemain: t.ebay && t.ebay.tomorrow ? null : heureDemain });
-  const envoi = await sendPushToAll({ ...txt, tag: 'soir-' + today, url: '/?tab=cat_bord' });
+  const envoi = await sendPushToAll({ ...txt, tag: 'soir-' + today, url: DESTINATIONS.colis({}) });
   return { soir: 'envoyé', n, retard, aVerifier, demain, auMoins, envoi: envoi && (envoi.coupe || envoi.erreur || envoi.sent) };
 }
 async function traiterVendeurSoir() {

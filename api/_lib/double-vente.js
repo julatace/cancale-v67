@@ -26,6 +26,7 @@
 //  Fonctions PURES : `scripts/bancs/double-vente-push.cjs` exécute la route.
 // ════════════════════════════════════════════════════════════════════════════
 import { cleNum, numeroExterne } from './numerotation.js';
+import { DESTINATIONS } from './lien-notif.js';
 
 const NUM_OK = /^([A-Z]{1,3})?\d{1,6}$/;
 // STRICT : « VRM-125 », « VRM-B125 », et rien d'autre (la même que `numDeSkuEbay`).
@@ -204,6 +205,6 @@ export function notificationDoubleVente(hits, titre) {
     title: `⚠️ Vendue sur Vinted — ${n} encore en vente sur ${ou}`,
     body: `${paire ? paire + ' — ' : ''}${n} ${nums.length > 1 ? 'sont' : 'est'} encore en vente sur ${ou} : retire-la${plats.length > 1 ? ' des deux' : ''} pour ne pas la vendre deux fois.`,
     tag: `dv-${nums.join('+')}-${ids.join(',')}`.slice(0, 200),
-    url: plats.includes('ebay') ? '/?tab=ebay_annonces' : '/?tab=leboncoin',
+    url: DESTINATIONS.doublon({ plat: plats.includes('ebay') ? 'ebay' : 'leboncoin', num: (hits.find((h) => h.plateforme === (plats.includes('ebay') ? 'ebay' : 'leboncoin')) || {}).numero }),
   };
 }
