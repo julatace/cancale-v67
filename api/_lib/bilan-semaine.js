@@ -142,6 +142,14 @@ export function calculerBilan(e) {
   } else manque.push('Vinted (illisible)');
   if (!Array.isArray(e.lbc)) manque.push('Leboncoin (illisible)');
   if (!Array.isArray(e.ebay)) manque.push('eBay (illisible)');
+  // (1er nov., audit A2) Vestiaire : `vestiaire` = les ventes rangées
+  // (`ventesVcDe`) ; `null` = illisible (NOMMÉ) ; absent = pas de lecture
+  // demandée (un appelant d'avant), rien n'est dit.
+  if (e.vestiaire === null) manque.push('Vestiaire (illisible)');
+  const vestiaire = Array.isArray(e.vestiaire) ? e.vestiaire : [];
+  // Les ventes dont l'argent ne se lit pas (prix Vinted pas lu, montant
+  // Vestiaire pas sûr…) : une phrase par site, le nombre en clair.
+  const phraseNc = (xs) => { const g = new Map(); for (const x of xs) { const k = `${x.plateforme} (${x.raison})`; g.set(k, (g.get(k) || 0) + 1); } return [...g.entries()].map(([k, n]) => `${n} vente${n > 1 ? 's' : ''} ${k}`); };
   // Une vente Leboncoin captée AVANT le lundi existait déjà : elle ne peut pas
   // être de cette semaine. On ne garde que les autres — la règle reste celle de
   // l'app, ce n'est qu'un tri sur la date de capture.
@@ -150,28 +158,32 @@ export function calculerBilan(e) {
   const cachee = vintedLisible ? (o) => e.masquesTx.has(String(o && o.transaction_id)) || compteEcarte(o && o._acc && o._acc.vinted_user_id, e.masquesComptes, e.panneau) : () => false;
 
   // ── VENDU : `ventesFaites`, au jour de la VENTE ──
-  const vf = ventesFaites({ vinted, lbc, ebay, cachee });
+  const vf = ventesFaites({ vinted, lbc, ebay, vestiaire, cachee });
   let n = 0, eur = 0;
   for (const l of vf.lignes) if (dansSemaine(l.ts, debut, fin)) { n += 1; eur += l.eur; }
   const manqueVendu = [...manque];
   if (vf.sansDate) manqueVendu.push(`${vf.sansDate} vente${vf.sansDate > 1 ? 's' : ''} Leboncoin sans date`);
+  manqueVendu.push(...phraseNc((vf.nonComptees || []).filter((x) => x.ts == null || dansSemaine(x.ts, debut, fin))));
   out.vendu = { etat: manqueVendu.length ? 'partiel' : 'su', n, eur: Math.round(eur * 100) / 100, manque: manqueVendu };
 
   // ── REÇU : `ventesDeclarables`, au jour du VERSEMENT ──
   if (e.versements == null && vintedLisible) {
     out.recu = { etat: 'pas-su', eur: 0, manque: ['dates de versement illisibles'] };
   } else {
-    const vd = ventesDeclarables({ vinted, lbc, ebay, exclu: vintedLisible ? (o) => compteEcarte(o && o._acc && o._acc.vinted_user_id, e.masquesComptes, e.panneau) : undefined, versements: e.versements || {} });
+    const vd = ventesDeclarables({ vinted, lbc, ebay, vestiaire, exclu: vintedLisible ? (o) => compteEcarte(o && o._acc && o._acc.vinted_user_id, e.masquesComptes, e.panneau) : undefined, versements: e.versements || {} });
     let r = 0;
     for (const l of vd.lignes) if (dansSemaine(l.ts, debut, fin)) r += l.eur;
     const manqueRecu = [...manque];
+    // Une vente versée hors de la semaine, ou vendue APRÈS elle, ne peut pas y manquer.
+    manqueRecu.push(...phraseNc((vd.ecartees || []).filter((x) => x && x.manque && (x.ts ? dansSemaine(x.ts, debut, fin) : !(x.tsVente && x.tsVente >= fin)))));
     if (vd.aDater.length) manqueRecu.push(`${vd.aDater.length} vente${vd.aDater.length > 1 ? 's' : ''} finalisée${vd.aDater.length > 1 ? 's' : ''} sans date de versement`);
     out.recu = { etat: manqueRecu.length ? 'partiel' : 'su', eur: Math.round(r * 100) / 100, manque: manqueRecu };
   }
 
   // ── COLIS : le nombre que l'app et le widget appellent « à expédier » ──
   // (19 oct.) Ventes eBay comprises ; eBay illisible ⇒ « au moins » (partiel).
-  if (Number.isFinite(e.colis)) out.colis = { etat: e.colisAuMoins ? 'partiel' : 'su', n: e.colis };
+  // (1er nov.) + Leboncoin et Vestiaire ; `colisManque` nomme le site illisible.
+  if (Number.isFinite(e.colis)) out.colis = { etat: e.colisAuMoins ? 'partiel' : 'su', n: e.colis, manque: Array.isArray(e.colisManque) && e.colisManque.length ? e.colisManque : ['eBay'] };
 
   // ── QUI DORMENT : publié par l'écran Annonces (`vrm_paires_dorment`) ──
   // On ne le recalcule pas (§11). Plus de 8 jours, ce n'est plus une mesure.
@@ -206,7 +218,7 @@ export function texteBilan(b, sem) {
   if (r.etat === 'pas-su') l.push("Reçu : à voir dans l'app.");
   else l.push(r.etat === 'partiel' ? `Reçu : au moins ${euros(r.eur)} (le détail dans l'app).` : `Reçu : ${euros(r.eur)}.`);
   if (b.colis.etat === 'su') l.push(b.colis.n ? `À expédier maintenant : ${b.colis.n} colis.` : 'Rien à expédier.');
-  else if (b.colis.etat === 'partiel') l.push(`À expédier maintenant : au moins ${b.colis.n} colis (ventes eBay pas lues).`);
+  else if (b.colis.etat === 'partiel') l.push(`À expédier maintenant : au moins ${b.colis.n} colis (ventes ${(b.colis.manque || ['eBay']).join(' et ')} pas lues).`);
   else l.push("À expédier : à voir dans l'app.");
   if (b.dorment.etat === 'su' && (b.dorment.n > 0 || !b.dorment.auMoins)) {
     l.push(b.dorment.n
