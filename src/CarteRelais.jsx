@@ -53,7 +53,18 @@ function repereEnCache(p) {
 }
 // Rend { lat, lon } (sûr), { echec: raison } (cherché, pas sûr : noté 24 h) ou
 // 'reseau' (la Base Adresse Nationale n'a pas répondu : rien n'est noté).
-async function chercherRepere(p) {
+// (1er nov.) Deux écrans qui cherchent la même adresse en même temps (la colonne
+// de Colis et la tournée, ou un effet relancé) partagent UNE requête en cours.
+const REQ_EN_COURS = new Map();
+function chercherRepere(p) {
+  const reqs = requetesBan(p);
+  const k = reqs.length ? cleAdr(reqs[0].q) : '';
+  if (k && REQ_EN_COURS.has(k)) return REQ_EN_COURS.get(k);
+  const pr = chercherRepereReseau(p).finally(() => { if (k) REQ_EN_COURS.delete(k); });
+  if (k) REQ_EN_COURS.set(k, pr);
+  return pr;
+}
+async function chercherRepereReseau(p) {
   const reqs = requetesBan(p);
   if (!reqs.length) return { echec: 'introuvable' };
   const k = cleAdr(reqs[0].q);
