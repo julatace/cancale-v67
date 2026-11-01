@@ -279,3 +279,123 @@ Collective, les ventes, tout ça — que tout soit parfait ».
 - **Gestes de Julien** : installer la 5.296.0 ; sur vestiairecollective.com
   (même Chrome), ouvrir « Mes articles », « Mes ventes », « Articles à
   expédier » une fois.
+
+## 1er novembre — « Que l'extension capte les annonces et les messages parfaitement » : audit de la capture (extension 5.299.0)
+
+Julien : « fais en sorte que l'extension capte les annonces et les messages pour
+Vestiaire et Leboncoin parfaitement ». Tracé de chaque capture Vestiaire, de la
+réponse réseau (`vc-inject.js`) au relais (`vc.js`), au fond (`rangerVc*`,
+`noterSessionVc`, `rangerVcFil`) et à l'écran (`AnnoncesVestiaire`,
+`MessagesVestiaire`, `colisVestiaire`). Défauts trouvés (tous reproduits sur le
+vrai code de la 5.296) et corrigés :
+
+1. **Une réponse d'erreur passait pour une lecture.** Les analyseurs ne
+   regardaient pas le code HTTP : un 401 JSON (`{errors:[…]}`) de
+   `users/me/product-listings` partait comme une liste vide — `capturedAt` à
+   « maintenant », `total` effacé, `lectures[compte]` daté : l'écran disait
+   « lue à l'instant » sur des données anciennes. ⇒ seules les réponses 2xx sont
+   lues (listes, compte, schéma).
+2. **Un format inconnu passait pour « aucune annonce ».** Une réponse dont aucune
+   liste n'est reconnue (champ renommé, autre API) donnait `items: []`. ⇒ c'est
+   une liste VIDE seulement sous la forme connue (`[]`, `{data: []}`,
+   `meta.count === 0`) ; sinon `inconnu` (la forme : noms de clés + types) : le
+   fond ne date rien, ne vide rien, garde `formeInconnue` (vc_listings,
+   vc_messages, vc_achats ; `forme['inconnu-…']` pour vc_ventes) et note
+   `vc_format_inconnu_*`.
+3. **XHR en `responseType = 'json'` ignorée** (rien n'était lu). ⇒ lue (comme Leboncoin).
+4. **Changer de compte dans le même onglet rangeait sous l'ANCIEN compte.** Le
+   fond prenait le compte de l'onglet (dernier `/users/me`) ; la page neuve rend
+   « Mes articles » avant son `/users/me` ⇒ la liste ENTIÈRE du compte B était
+   rangée sous A et effaçait les annonces de A. ⇒ chaque capture porte le `moi`
+   de la page (lu dans CE document) ; le compte n'est posé que si page et onglet
+   disent le même (`compteVcCapture`, après la file de `noterSessionVc`), sinon
+   `''`. Et une liste entière lue sans compte su ne retire plus une annonce (ni
+   « à expédier », ni « non lu ») rangée sous un compte (`autreCompteVc`).
+   Répondre : le fond dit au nom de quel compte il parle, la page refuse si son
+   `/users/me` n'est pas celui-là (`autre-compte`, rien ne part).
+5. **Liste en plusieurs pages jamais entière.** Seule la page 0 qui rend tout
+   faisait foi : au-delà d'une page, une annonce vendue/supprimée restait « en
+   ligne » pour toujours. ⇒ `lotComplet` (règle de la liste complète Leboncoin) :
+   pages du même document, même requête hors pagination, même total, même
+   compte, < 3 min, identifiants distincts = total ⇒ `complet` (les ids) ; le fond
+   fait foi avec (annonces, à expédier, non-lus). Côté app : une annonce plus vue
+   depuis 24 h alors que la liste a été relue est « Plus vue sur Vestiaire depuis
+   … — à confirmer » (`etatAnnonceVc`, rien n'est retiré).
+6. **La fiche se trompait** : lecture en profondeur d'abord ⇒ `brand.name`
+   (« Nike ») pris pour titre quand `brand` précède `name`, l'avatar du vendeur
+   (`seller.picture`) pris pour photo. ⇒ niveau par niveau, rien sous
+   vendeur/marque/profil/logo (`PAS_FICHE`).
+7. **Un émoji coupé faisait refuser la ligne entière.** `slice(0,160)` au milieu
+   d'un émoji laisse une moitié (`\ud83d`) que jsonb REFUSE : un aperçu de
+   message mal coupé empêchait d'enregistrer toutes les conversations (et le
+   fil). ⇒ `coupe` (page) / `coupeVc` (fond) : jamais de moitié d'émoji.
+8. **Les non-lus d'un seul compte.** `vc_messages.compteur` était celui du
+   dernier onglet. ⇒ `compteur.compte` + `compteurs[compte]` ; l'app additionne
+   (`nonLusVestiaire`, « sur tes N comptes, le plus ancien relevé il y a … »).
+
+Laissés (dit) : une conversation dont tous les messages sont des photos est
+rangée avec `n = 0` (l'app dit « Texte pas encore lu ») ; les paramètres de
+pagination réels de Vestiaire ne sont toujours pas MESURÉS (une requête
+`page[offset]` ne fera jamais foi — le sens sûr) ; le compte d'une capture
+arrivée avant `/users/me` reste `''` (jamais flouté, jamais un faux).
+
+Preuves : `scripts/audit-capture-vc-lbc.cjs` (C1-C9 : vrai vc-inject.js avec
+fetch ET XHR, vrai vc.js, vrai background.js dans `_fond-vm.cjs` avec une base
+qui refuse les moitiés d'émoji comme jsonb, vraies fonctions de l'écran extraites
+de App.jsx) — 22 rouges sur `origin/main`, vert après ; `--prouve` : 17 mutations
+toutes rouges. `audit-lbc-vc-lecture` et `audit-vc-conversations` passent le `moi`
+comme le vrai relais (leurs mutations remises sur le nouveau texte, toutes rouges).
+
+**Gestes de Julien** : installer la 5.299.0 ; sur vestiairecollective.com (même
+Chrome), ouvrir « Mes articles » et faire défiler JUSQU'AU BOUT (toutes les pages :
+c'est ce qui permet de retirer une annonce supprimée), puis la messagerie. S'il a
+plusieurs comptes Vestiaire : recharger la page après chaque changement de compte.
+
+### Même jour — « Envoyées à VRM… et rien n'apparaît dans VRM » (retour de Julien, 5.299.0)
+
+La carte de l'extension disait « hopcancale35@gmail.com · Compte Vestiaire
+Collective · connecté · Ventes / Annonces / Messages : lues à l'instant · Envoyées
+à VRM à l'instant », et l'app ne montrait rien. Tracé de bout en bout (la base de
+Julien n'est PAS lisible d'ici : l'outil Supabase de cette session pointe un autre
+projet — rien n'a été mesuré sur sa base). Ce qui pouvait empêcher l'affichage :
+
+1. **Vestiaire absent des filtres et de la colonne.** `sitesPresents` ne
+   montrait Vestiaire que si `vc_listings` ou `vc_ventes` existait, lu UNE fois au
+   montage de l'app : extension qui n'avait rangé que ses messages (compteur,
+   `vc_session`), ou première lecture faite app ouverte ⇒ aucune entrée Vestiaire
+   (Annonces, Ventes, Messages, Achats, colonne) — « rien n'apparaît ». ⇒
+   Vestiaire est TOUJOURS là (sa demande : « même s'il n'y a rien de capté… je
+   veux qu'il y ait les onglets »), chaque écran dit « pas encore lu » + le geste.
+2. **« lues » ne voulait pas dire « trouvées ».** `noterVcCapte` posait « lues »
+   dès qu'une réponse était rangée, même vide (0 annonce), même au format inconnu
+   (avant 5.299 rangé comme liste vide), et le simple compteur de non-lus
+   s'affichait « Messages : lues ». ⇒ la carte dit le NOMBRE trouvé (« aucune dans
+   ce que Vestiaire a rendu — ouvre la page de tes annonces »), « forme pas encore
+   lue » pour un format inconnu, et les non-lus à part (`nonlus`).
+   « Envoyées à VRM » (vrmFlux.okAt) n'est posé que sur une réponse 2xx de la base
+   (`supabaseUpsert` → `res.ok`) : vérifié, pas un mensonge.
+3. **Extension connectée à un autre compte VRM** : elle écrit sous le compte VRM
+   où ELLE est connectée (la carte affiche hopcancale35@gmail.com) ; si l'app est
+   ouverte sur un autre compte, rien n'arrive, et l'écran disait seulement « pas
+   encore lu ». ⇒ chaque écran Vestiaire le dit en tête (`ExtVestiaireCompte`,
+   texte de `raisonExtGlobale` : `autre-vrm`, `vrm`, `vrm-passu`).
+4. Format inconnu ⇒ l'écran Annonces dit « Vestiaire a répondu dans une forme que
+   VRM ne sait pas encore lire » (`data-vc-annonces="format"`), jamais « aucune
+   annonce ».
+
+Preuves : `scripts/bancs/vestiaire-bout-en-bout.cjs` — le VRAI vc-inject.js →
+vc.js → background.js (`_fond-vm.cjs`) écrit les lignes, l'app (dist/) sert
+EXACTEMENT ces lignes : annonces (N°41 relié), vente à expédier, conversation et
+3 non-lus affichés (390/1512) ; base vide ⇒ filtre « Vestiaire » proposé depuis
+Vinted sur les 4 écrans + entrée de la colonne + « pas encore lu » ; autre compte
+VRM ⇒ dit en tête. Sur `origin/main` : 13 rouges (filtre et colonne absents,
+autre compte muet), vert après. `bancs/badge.cjs` §6 bis : 4 rouges sur l'ancienne
+carte, vert après ; `audit-capture-vc-lbc` C1/C6 (carte : inconnu, non-lus à part).
+
+**Gestes de Julien** : vérifier que le compte VRM de l'app est bien
+hopcancale35@gmail.com (sinon l'écran Vestiaire le dit maintenant en orange) ;
+installer la 5.299.0 ; la carte dira alors COMBIEN d'annonces elle a trouvées sur
+« Mes articles » — si elle dit « aucune » alors qu'il en a, ou « forme pas encore
+lue », c'est que la page « Mes articles » ne charge pas `users/me/product-listings`
+sous la forme connue : relire `vc_recon.chemins`/`schemas` et `vc_listings.formeInconnue`
+(lecture seule) pour viser la bonne route.
