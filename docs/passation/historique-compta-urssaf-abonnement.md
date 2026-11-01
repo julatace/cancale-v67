@@ -1624,3 +1624,26 @@ une notion existante : les règles de calcul sont PURES dans `src/statsVentes.js
 - **Non fait, dit ici** : délai d'expédition (aucune date d'envoi fiable par vente),
   remise prix affiché → prix vendu (le prix affiché d'une annonce vendue n'est pas gardé),
   rentabilité du boost (la carte « Le boost est-il rentable ? » existe déjà).
+
+### Comptabilité et régime : demander, puis dire (1er novembre)
+
+Même tournée que « Paramètres, arrivée guidée et communauté » (historique interface-stock).
+
+- **Supprimer une dépense, un abonnement, un pack ou un coût fixe** (le « × » de la ligne) :
+  avant, un toucher supprimait sans rien demander ni dire, sur une cible de 28 px. Après :
+  confirmation qui NOMME la ligne et son montant (« 12,50 € sortent de tes charges et de tes
+  rapports »), « Supprimé de tes charges » ensuite, cible 44 px. L'écriture part de l'état le
+  plus frais (la confirmation est asynchrone : `majFraiche`).
+- **« Arrêter » un abonnement** : demande d'abord (« le mois en cours reste compté, les suivants
+  non »), puis « ✓ Abonnement arrêté ce mois-ci ».
+- **Ajouter** une dépense, un abonnement, un pack : « ✓ … ajouté(e) » (rien ne le disait, le
+  formulaire se refermait seulement).
+- **Régime fiscal** (Paramètres) : « sur ce que tu encaisses » → « sur ce que tu reçois » (§5 :
+  jamais « encaissé ») ; chaque choix montre sa ligne courte (« Je vends mes propres affaires »,
+  « SAS, SASU, SARL, EURL… ») pour se reconnaître ; le taux saisi à la main dit
+  « ✓ Taux enregistré : 12,4 % », et un taux illisible dit qu'il est remplacé par le défaut
+  (avant : en silence) ; la ligne de Paramètres montre le statut choisi, « À choisir » sinon.
+- Aucune règle de calcul ne change (§11).
+
+Banc : `compta-abonnements` — « × » ⇒ la confirmation nomme l'abonnement ; « Annuler » ne
+retire rien (écran et `vrm_compta`) ; « Supprimer » le retire des deux et le dit.

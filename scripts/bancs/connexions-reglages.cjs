@@ -94,7 +94,8 @@ const projette = (row, sel) => {
       dit(await capture.isVisible(),`${largeur} : une panne reste une lecture impossible, pas un compte vide`);
       const ext=pg.locator('[data-connexion="extension"]');
       dit(await ext.getByText('Aucune réponse dans ce navigateur',{exact:true}).isVisible(),`${largeur} : le statut local n'est pas déduit de la version historique`);
-      await ext.getByText('Dernière version observée dans ma boutique',{exact:true}).click();
+      // (1er nov.) « dans ma boutique » ne voulait rien dire : c'est la version de la dernière lecture.
+      await ext.getByText('Version qui a lu en dernier',{exact:true}).click();
       dit(/ne confirme pas la version utilisée ici/.test(await ext.innerText()),`${largeur} : la version historique ne certifie pas cet appareil`);
       panneCapture=false;await pg.getByRole('button',{name:'Actualiser les états',exact:true}).click();
       await pg.waitForFunction(()=>!document.querySelector('[data-connexion="capture"]').innerText.includes('Lecture impossible')&&!document.querySelector('[data-connexion="capture"]').innerText.includes('Vérification en cours'));
