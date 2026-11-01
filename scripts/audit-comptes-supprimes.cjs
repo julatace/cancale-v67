@@ -51,7 +51,11 @@ const verif = (c, m) => { if (c) { ok++; console.log('✅', m); } else { ko++; c
   const rp = await (await fe(`${BASE}/rest/v1/app_data?or=(id.like.harvest_199082413_*)&select=id`, { vrmVoirSupprimes: true })).json();
   verif(rp.length === 3, 'la lecture marquée vrmVoirSupprimes (purge) voit les lignes du compte supprimé');
   const purge = app0.slice(app0.indexOf('const purgerComptesSupprimes'), app0.indexOf('const purgerComptesSupprimes') + 2500);
-  verif(/select=id,sup:data->>supprime`, \{[^}]*vrmVoirSupprimes: true/.test(purge), 'la purge passe vrmVoirSupprimes à sa lecture');
+  // (1er nov.) La purge lit par `lireLignesDuCompte` (toutes les pages, préfixe
+  // exact), qui demande `voirSupprimes` à `lireTout`, qui le passe à fetch.
+  const lldc = app0.slice(app0.indexOf('async function lireLignesDuCompte('), app0.indexOf('async function lireLignesDuCompte(') + 1200);
+  const lt0 = app0.slice(app0.indexOf('const lireTout = async'), app0.indexOf('\n};', app0.indexOf('const lireTout = async')));
+  verif(/lireLignesDuCompte\(uid, 'id,sup:data->>supprime'\)/.test(purge) && /voirSupprimes: true/.test(lldc) && /opts\.voirSupprimes \? \{ vrmVoirSupprimes: true \}/.test(lt0), 'la purge passe vrmVoirSupprimes à sa lecture');
   const fv = M.creerFiltreSupprimes(vrai(lignes), BASE, () => new Set());
   verif((await (await fv(`${BASE}/rest/v1/app_data?id=like.harvest_*`)).json()).length === 3, 'aucun compte supprimé ⇒ réponse intacte');
   const ferr = M.creerFiltreSupprimes(async () => new Response('x', { status: 522 }), BASE, () => sup);
@@ -60,7 +64,7 @@ const verif = (c, m) => { if (c) { ok++; console.log('✅', m); } else { ko++; c
   // 3. Branché dans l'app.
   const app = fs.readFileSync(path.join(RACINE, 'src', 'App.jsx'), 'utf8');
   verif(/installerFiltreSupprimes\(SUPABASE_URL\)/.test(app), 'le filtre est posé sur fetch au démarrage');
-  const lt = app.slice(app.indexOf('const lireTout = async'), app.indexOf('const lireTout = async') + 1500);
+  const lt = app.slice(app.indexOf('const lireTout = async'), app.indexOf('\n};', app.indexOf('const lireTout = async')));
   verif(/return sansComptesSupprimes\(out\)/.test(lt), 'lireTout retire les lignes après la pagination');
   verif(/localStorage\.setItem\(CLE_SUPPRIMES/.test(app), 'la liste est rangée sur une lecture réussie des comptes');
 

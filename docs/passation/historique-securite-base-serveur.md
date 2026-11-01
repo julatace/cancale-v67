@@ -2363,3 +2363,128 @@ RÉCEPTION qui décide » ne sont affaiblis.
 
 **Ce qui exige Julien** : recoller `gmail-forwarder.gs` et poser `EMAIL_INBOUND_SECRET` ; SMTP Supabase ;
 `public/legal/editeur.js` ; Stripe (prix 16,99 €, clé).
+## 1er novembre — Données sûres : deux appareils, plus de 1 000 lignes, purge d'un compte, widget
+
+Suite de l'audit « conditions difficiles » du 1er novembre (points 1, 2, 4, 5, 8 et
+« lireTout non strict »). Julien : « il ne doit y avoir aucune erreur possible ».
+
+### 1-2. La ligne `main` ne se réécrit plus en entier (deux appareils, deux onglets)
+
+**Le défaut (mesuré au banc)** : `cloudPush` renvoyait TOUTES les clés synchronisées
+depuis le `localStorage` (upsert de la ligne entière). L'iPhone resté ouvert depuis le
+matin effaçait, au moindre réglage touché, le prénom, les prix d'achat, les colis cochés,
+le mois URSSAF déclaré saisis entre-temps sur le Mac. Deux onglets d'Annonces : le prix du
+N°1 saisi dans l'un disparaissait au prix du N°2 saisi dans l'autre (chaque écran
+réécrivait SA carte périmée).
+
+**La règle (une seule, `src/fusionNuage.js`, module pur)** : fusion à trois voies, clé par
+clé puis sous-clé par sous-clé — `base` (ce que CET onglet et le nuage savaient ensemble),
+`local`, `nuage`. Une clé intacte ici prend le nuage ; intacte là-bas, l'appareil ; touchée
+des deux côtés : objet fusionné par sous-clé, liste par élément (ajouts et retraits), valeur
+simple = celle de l'appareil qui envoie. L'ordre des clés ne compte pas (`jsonStable`).
+- **Numéros (§5)** : pool `vinted_used_numeros` = UNION (jamais rétréci) ; fiches et
+  ventes fusionnées champ par champ, mais REFUS (`conflit`, rien n'est écrit, bloc
+  « Recharger » — `signalerNumerosPerimes('vrm_fiche_perdue')`, les saisies gardées, les
+  numéros de l'écran pas rejoués) dès que la fusion produirait ce qu'aucun côté n'avait :
+  la même fiche renumérotée des deux côtés, deux paires sous un N° que personne n'y
+  mettait, un N° neuf donné des deux côtés à deux paires. `vrm_numerotation` : le nuage,
+  toujours. `vinted_accounts` : la copie allégée de l'appareil (la table fait foi).
+- **Écriture** : comparer-et-échanger sur `data.rev` (le motif de `modifierDonnee`) —
+  PATCH `id=eq.main&owner=eq.…&data->>rev=eq.N` (`is.null` pour une ligne d'avant),
+  `return=representation` ; 0 ligne ⇒ devancé ⇒ relecture ENTIÈRE (`cache:'no-store'`,
+  jamais la réponse partagée), refusion, réécriture (6 essais). Ligne absente ⇒
+  INSERTION sans fusion (409 ⇒ relire). **Une lecture ratée n'écrit RIEN** (reprise
+  planifiée comme avant). Un envoi à la fois (`_pushEnVol`). Les refus de la base
+  (013/017, lettre d'archive) sont traités comme avant.
+- **Après l'écriture**, la fusion est reposée dans le navigateur (`poserFusionLocale` :
+  une clé changée ICI pendant l'aller-retour garde ce geste par-dessus) et les écrans
+  concernés se relisent.
+- **Relecture du nuage** au retour au premier plan (`visibilitychange`, `pageshow`) et
+  toutes les 60 s quand l'onglet est visible : une lecture SCALAIRE (`rev`, `updated_at`)
+  d'abord, la ligne entière seulement si elle a changé ; fusion, puis envoi si l'appareil
+  avait du neuf.
+- **Les écrans se relisent** : 47 états `useState(() => load('clé…'))` d'une clé
+  synchronisée passent par `useStateCle` (même initialiseur, rejoué quand la clé change
+  ailleurs : fusion du nuage, ou évènement `storage` d'un autre onglet). `vrm:save` est
+  aussi émis (`distant: true`) pour les lecteurs qui l'écoutaient déjà.
+- **La sauvegarde ne réécrit plus une carte périmée** (`save` → `fusionALaSauvegarde`) :
+  si la clé a changé ailleurs pendant les 500 ms (autre onglet, fusion du nuage), la
+  valeur de l'écran est fusionnée à trois voies avec le navigateur (base : la valeur
+  d'avant le changement venu d'ailleurs pour une clé qu'aucun écran ne relit, sinon celle
+  du moment du geste). Les numéros gardent leurs refus.
+- Au chargement, la base de la fusion est le NUAGE tel que lu (`noterBaseNuage`), pas le
+  navigateur restauré : ce que l'appareil a de plus (numéros fusionnés, saisies rejouées)
+  reste une différence locale, donc envoyée. Rien d'autre ne change au chargement
+  (`fusionNumerosAuChargement`, `CLES_FUSION_LIENS`, `rejouerSaisies` intacts).
+
+### 4 et « lireTout non strict ». Plus de 1 000 lignes
+
+- `lireTout` : **une page ratée = `null`, toujours** (les 13 lecteurs non stricts
+  recevaient la première page seule, comme complète). Une page pleine au garde-fou de 20
+  pages = `null`. Un **416 à une frontière exacte** (1 000, 2 000 lignes) n'est « fini »
+  que si `Content-Range: */N` vaut ce qu'on a lu ; sinon `null`. `voirSupprimes` passe
+  `vrmVoirSupprimes` (lectures de purge).
+- Paginés par `lireTout` (au lieu d'un `fetch` nu coupé à 1 000) : bordereaux email
+  (`fetchEmailBordereaux` — les plus RÉCENTS tombaient : Colis 0 prêt et « Tout générer
+  (5) » au lieu de 5 prêts), `email_track_*`, `email_sale_*` (empreintes : un tiers au
+  hasard disparaissait), `email_achat_*`, `email_invoice_*` (une lecture ratée rend
+  `null`, plus « aucune facture » ; les écrans gardent ce qu'ils montraient), bordereaux
+  captés `harvest_{uid}_label_*`, purge d'un compte.
+- `api/*.js` relus (§4.4) : `fetchPaginated` (widget, ship-reminders), `lirePagine`
+  (email-inbound), `lireTout` (transporteurs-lecture), `lirePages` (email-rattacher)
+  rendent déjà `null` sur une page ratée ; `lireLignes` (email-inbound) lit des familles
+  filtrées par n° de suivi ou `status=queued` (quelques lignes). Rien à changer côté
+  serveur. Reste : un 416 pile à une frontière y vaut « pas su » (prudent, pas faux).
+
+### 5. Supprimer le compte « 35 » ne touche plus « 352… »
+
+`deleteVintedAccount` lisait `or=(id.like.harvest_35_*,…)` (le `_` de LIKE est un joker :
+`harvest_352_*`, `harvest_3500_*` passaient) et vidait tout ce qui revenait, sans la garde
+de ses voisines ; aucune des trois purges ne paginait. Les trois passent par
+`lireLignesDuCompte(uid)` : motif échappé (`echapperLike` : `\_`, `\%`), deux lectures
+(`harvest_`, `coffre_`), toutes les pages, préfixe exact revérifié en JS, `uid` en
+chiffres seulement ; une lecture ratée ne vide RIEN ; écritures par lots de 500.
+`lecturesPartagees.js` comprend l'échappement `\` (invalidation des lectures partagées).
+
+### 8. Le widget ne publie plus « 0 en ligne » sur une panne
+
+Un compte actif dont les annonces n'ont pas pu être lues (`annKO`) ⇒ `online: null` et
+`onlinePasSu` ; à l'écriture de `widget_stats`, le nombre DÉJÀ publié est relu (scalaire)
+et reste (`onlineRaison` dit pourquoi) ; s'il ne se relit pas, rien n'est écrit. En marche
+normale, le vrai nombre part (`onlineAt`).
+
+### Preuves (§6)
+
+| contrôle | après | sur `origin/main` (f04af748) | mutation |
+|---|---|---|---|
+| `scripts/bancs/deux-appareils.cjs` (A-G, 28 contrôles : deux appareils, premier plan, prix d'achat sur deux appareils et deux onglets, lecture ratée, numéros, numérotation concurrente) | 28 verts | **9 rouges** (prénom effacé, prix du N°1 et du N°3 effacés, ligne écrite ailleurs écrasée pendant la panne…) | « l'appareil gagne » (`localGagne` = toutes les clés) ⇒ 5 rouges |
+| `scripts/bancs/gros-volumes.cjs` (V1-V4 : 1 105 bordereaux, lectures coupées sur Colis/Ma journée/Annonces/Achats, page 2 en panne, widget) | 9 verts | **6 rouges** (0 prêt + « Tout générer (5) », 4 familles lues coupées, `online: 0` publié) | `annKO` retiré ⇒ rouge V4 |
+| `scripts/audit-fusion-nuage.cjs` (24 contrôles, module exécuté + App.jsx) | vert | — (module neuf) | `--prouve` : 9 mutations, toutes rouges |
+| `scripts/audit-purge-compte.cjs` (les vraies fonctions dans un `vm`, LIKE réel, 1 250 lignes) | 9 verts | **7 rouges** (`--app <App.jsx d'avant>` : 352…, 3500, coffre_352 vidés ; 283 lignes restantes) | `--prouve` : 3 mutations rouges |
+
+Audits relancés verts : `audit-identite`, `audit-chiffres`, `audit-fusion`,
+`audit-numero-vinted`, `audit-numeros-lettres`, `audit-renum-b`, `audit-lectures`,
+`audit-lectures-partagees`, `audit-comptes-supprimes` (mis à jour : la purge passe par
+`lireLignesDuCompte`, `lireTout` lu jusqu'à sa fin). `audit-numerotation-lecteurs` reste
+rouge comme sur `origin/main` (banc périmé par le récapitulatif de vente, rapport d'audit).
+
+Bancs relancés sur le build final : `revendeurs`, `journee-mieux`, `colis-colonnes`,
+`vendu-recu`, `deux-appareils`, `gros-volumes` verts. `panne` : le seul rouge est celui
+d'`origin/main` (« cat_achats : bloc ×1, ligne ×2 », défaut n°25 de l'audit ; un rouge
+`cat_ventes` vu une fois ne s'est pas reproduit). `double-vente` : « Vestiaire rogné à
+390 px » — rouge AUSSI avec le build d'`origin/main` servi depuis ce même arbre (la
+pastille Vestiaire de la rangée défilante dépasse le bord ; sans lien avec ce chantier).
+
+Un envoi qui n'apporte rien de neuf au nuage (la même valeur resauvegardée) n'écrit
+pas : sinon chaque appareil ouvert relirait la ligne entière à chaque passage.
+
+### Ce qui reste
+- Un écran qui lit une clé synchronisée AUTREMENT que par `useState(() => load(…))`
+  (calcul au vol, `useMemo`) n'est pas réveillé par la fusion : il la voit à son prochain
+  montage. Sa sauvegarde est protégée par la fusion à la sauvegarde.
+- Un appareil resté sur l'ANCIEN code (onglet jamais rechargé) écrit encore la ligne
+  entière sans `rev` : la prochaine écriture du nouveau code le voit (`rev` changé ou
+  `updated_at`) et fusionne, mais ce que l'ancien code a écrasé avant est perdu.
+- Une saisie faite hors ligne puis l'app refermée : au chargement suivant, le nuage
+  remplace encore le navigateur pour les clés ordinaires (comportement d'avant, `rejouerSaisies`
+  ne couvre que l'écran rechargé pour numéros périmés).
