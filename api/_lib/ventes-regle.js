@@ -15,6 +15,9 @@
 // ⚠️ NE RIEN MODIFIER ICI À LA MAIN : modifier App.jsx, puis refabriquer ce
 //    fichier avec `node scripts/audit-bilan-semaine.cjs --recopie`.
 /* eslint-disable */
+// (1er nov.) Les règles Vestiaire ont UN propriétaire (api/_lib/vestiaire-regle.js),
+// importé tel quel par l'app et ici — ce n'est pas une recopie.
+import { vcVenteAnnulee, montantRecuVc, dateVersementVc, dateVenteVc, etapeMotVc } from './vestiaire-regle.js';
 
 export const classifyOrderStatus = (status) => {
   const s = status || '';
@@ -39,6 +42,15 @@ export const montantCommande = (o) => {
   return isNaN(n) ? 0 : n;
 };
 
+export const montantCommandeLu = (o) => {
+  const p = o && o.price;
+  if (p == null) return null;
+  const v = (typeof p === 'object') ? (p.amount ?? p.value) : p;
+  if (v == null || String(v).trim() === '') return null;
+  const n = Number(String(v).replace(',', '.'));
+  return isFinite(n) ? n : null;
+};
+
 export const lbcAnnulee = (o) => o.stepStatus === 'cancelled' || /annul|cancel|refund|rembours/i.test((o.parcelStatus || '') + ' ' + (o.stepStatus || '') + ' ' + (o.stepLabel || ''));
 
 export const lbcFinalisee = (o) => {
@@ -56,6 +68,12 @@ export const lbcFinalisee = (o) => {
   // et pas `livr` : « en cours de livraison » = EN TRANSIT, pas livré. Et pas de
   // « reçu » seul (ambigu : « paiement reçu » peut être un palier amont).
   return /paiement effectu|termin[ée]|finalis|cl[oô]tur|livr[ée]|colis re[çc]u|\bclos/i.test((o.stepLabel || '') + ' ' + (o.stepStatus || ''));
+};
+
+export const lbcExpediee = o => {
+  const t=[o.parcelStatus,o.stepStatus,o.stepLabel].filter(Boolean).join(' ').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
+  if(/(?:a|avant) (?:envoyer|expedier)|attente (?:de |du )?(?:depot|expedition|prise en charge)/.test(t))return false;
+  return /in[_ -]?transit|out[_ -]?for[_ -]?delivery|shipped|dispatched|collected|en cours de livraison|colis (?:envoye|depose|remis)|expedie(?:e|s)?\b|pris en charge|collecte par/.test(t);
 };
 
 export const venteFinalisee = (o) => classifyOrderStatus(o && o.status) === 'completed';
@@ -92,7 +110,7 @@ export const indexDeclarations = (reg) => {
 
 export const moisDeclare = (reg, ym) => !!(reg && typeof reg === 'object' && reg[ym] && Array.isArray(reg[ym].ids));
 
-export const ventesDeclarables = ({ vinted, lbc, ebay, masquee, exclu, versements, declare } = {}) => {
+export const ventesDeclarables = ({ vinted, lbc, ebay, vestiaire, masquee, exclu, versements, declare } = {}) => {
   const lignes = [], aDater = [], ecartees = [], vus = new Set();
   let exclues = 0;
   const garde = (l) => { if (vus.has(l.id)) return false; vus.add(l.id); return true; };
@@ -126,9 +144,12 @@ export const ventesDeclarables = ({ vinted, lbc, ebay, masquee, exclu, versement
     if (exclu && exclu(o)) { exclues += 1; continue; }
     const tx = o.transaction_id != null ? o.transaction_id : o.id;
     const id = 'vinted:' + (tx != null ? tx : ('?' + lignes.length));
-    const eur = montantCommande(o), masq = !!(masquee && masquee(o));
+    // (1er nov., audit A10) Un prix illisible n'est jamais 0 € : la vente est
+    // mise à part et DITE (`manque`), le total devient « au moins ».
+    const eur = montantCommandeLu(o), masq = !!(masquee && masquee(o));
     const v = (versements && tx != null) ? versements[String(tx)] : null;
     const t = v ? Date.parse(v) : 0;
+    if (eur == null) { if (!vus.has(id)) { vus.add(id); ecartees.push({ id, plateforme: 'Vinted', raison: 'prix pas lu', titre: o.title || '', manque: true, ts: t || null, tsVente: tsCommande(o) || null }); } continue; }
     if (!t) { if (!vus.has(id)) { vus.add(id); aDaterOuDeclaree({ id, plateforme: 'Vinted', eur, titre: o.title || '', masquee: masq, o, dateVente: o.date }); } continue; }
     const l = { id, plateforme: 'Vinted', ts: t, ym: ymDeTs(t), eur, titre: o.title || '', masquee: masq, o, dateVente: o.date };
     if (garde(l)) lignes.push(place(l));
@@ -138,7 +159,7 @@ export const ventesDeclarables = ({ vinted, lbc, ebay, masquee, exclu, versement
     if (lbcAnnulee(v) || !lbcFinalisee(v)) continue;
     const eur = v.price != null ? Number(v.price) / 100 : NaN;
     const id = 'lbc:' + v.txId;
-    if (!isFinite(eur)) { if (!vus.has(id)) { vus.add(id); ecartees.push({ id, plateforme: 'Leboncoin', raison: 'prix inconnu', titre: v.title || '' }); } continue; }
+    if (!isFinite(eur)) { if (!vus.has(id)) { vus.add(id); ecartees.push({ id, plateforme: 'Leboncoin', raison: 'prix inconnu', titre: v.title || '', manque: true }); } continue; }
     const t = Date.parse(v.dateVente || '');
     if (!t) { if (!vus.has(id)) { vus.add(id); aDaterOuDeclaree({ id, plateforme: 'Leboncoin', eur, titre: v.title || '', masquee: false }); } continue; }
     const l = { id, plateforme: 'Leboncoin', ts: t, ym: ymDeTs(t), eur, titre: v.title || '', masquee: false };
@@ -160,12 +181,34 @@ export const ventesDeclarables = ({ vinted, lbc, ebay, masquee, exclu, versement
     const l = { id, plateforme: 'eBay', ts: t, ym: ymDeTs(t), eur, titre, masquee: false };
     if (garde(l)) lignes.push(place(l));
   }
+  // (1er nov., audit A2) VESTIAIRE : une vente compte si son montant REÇU est
+  // sûr (`montantRecuVc` : la clé dit que c'est ce que Vestiaire te verse, en
+  // euros) et datée de son VERSEMENT (`dateVersementVc`). Montant pas sûr ⇒
+  // mise à part et NOMMÉE (`manque`) : le total dit « au moins », jamais un
+  // total partiel présenté complet (§5). Finalisée sans date de versement ⇒
+  // « à dater » ; pas encore versée ⇒ pas encore reçue (comme Vinted).
+  for (const v of (vestiaire || [])) {
+    if (!v || !v.id || vcVenteAnnulee(v)) continue;
+    const id = 'vestiaire:' + v.id;
+    if (vus.has(id)) continue;
+    const recu = montantRecuVc(v);
+    if (recu.eur == null) { vus.add(id); ecartees.push({ id, plateforme: 'Vestiaire', raison: recu.raison, titre: '', manque: true, tsVente: dateVenteVc(v) || null }); continue; }
+    const t = dateVersementVc(v);
+    if (!t) { const et = etapeMotVc(v); if (et === 'versee' || et === 'terminee') { vus.add(id); aDaterOuDeclaree({ id, plateforme: 'Vestiaire', eur: recu.eur, titre: '', masquee: false }); } continue; }
+    const l = { id, plateforme: 'Vestiaire', ts: t, ym: ymDeTs(t), eur: recu.eur, titre: '', masquee: false };
+    if (garde(l)) lignes.push(place(l));
+  }
   return { lignes, aDater, ecartees, exclues, declare: idx ? 'lu' : 'pasSu' };
 };
 
-export const ventesFaites = ({ vinted, lbc, ebay, cachee } = {}) => {
+export const ventesFaites = ({ vinted, lbc, ebay, vestiaire, cachee } = {}) => {
   const lignes = [], vus = new Set();
   let sansDate = 0, ecartees = 0;   // ecartees : commandes eBay au montant reçu illisible (montantRecuEbay)
+  // (1er nov., audits A2 et A10) Les ventes FAITES dont l'argent ne se lit pas
+  // (Vinted au prix illisible, Leboncoin au prix inconnu, Vestiaire au montant
+  // pas sûr) : jamais 0 €, jamais tues — rangées ici, avec leur date de vente
+  // quand on l'a (`ts`), pour que chaque total dise « au moins » et les NOMME.
+  const nonComptees = [];
   const garde = (id) => { if (vus.has(id)) return false; vus.add(id); return true; };
   for (const o of (vinted || [])) {
     if (!o || (cachee && cachee(o))) continue;
@@ -173,13 +216,15 @@ export const ventesFaites = ({ vinted, lbc, ebay, cachee } = {}) => {
     const t = tsCommande(o); if (!t) continue;
     const tx = o.transaction_id != null ? o.transaction_id : o.id;
     if (tx != null && !garde('vinted:' + tx)) continue;
+    const eurV = montantCommandeLu(o);
+    if (eurV == null) { nonComptees.push({ plateforme: 'Vinted', raison: 'prix pas lu', ts: t }); continue; }
     // (31 oct.) `compte` : le compte qui a vendu (Statistiques → « Par compte »), le même nom que le relevé des ventes.
-    lignes.push({ plateforme: 'Vinted', ts: t, eur: montantCommande(o), compte: String((o._acc && (o._acc.login || o._acc.vinted_user_id)) || '') });
+    lignes.push({ plateforme: 'Vinted', ts: t, eur: eurV, compte: String((o._acc && (o._acc.login || o._acc.vinted_user_id)) || '') });
   }
   for (const v of (lbc || [])) {
     if (!v || v.isSeller !== true || !v.txId || lbcAnnulee(v)) continue;
     const eur = v.price != null ? Number(v.price) / 100 : NaN;
-    if (!isFinite(eur)) continue;
+    if (!isFinite(eur)) { if (garde('lbc:' + v.txId)) nonComptees.push({ plateforme: 'Leboncoin', raison: 'prix inconnu', ts: Date.parse(v.dateVente || '') || null }); continue; }
     const t = Date.parse(v.dateVente || '');
     if (!t) { if (garde('lbc:' + v.txId)) sansDate += 1; continue; }
     if (garde('lbc:' + v.txId)) lignes.push({ plateforme: 'Leboncoin', ts: t, eur, compte: String(v.account || '') });
@@ -192,7 +237,16 @@ export const ventesFaites = ({ vinted, lbc, ebay, cachee } = {}) => {
     if (!t) continue;
     if (garde('ebay:' + e.orderId)) lignes.push({ plateforme: 'eBay', ts: t, eur, compte: String(e._pseudo || e._compte || '') });
   }
-  return { lignes, sansDate, ecartees };
+  // VESTIAIRE, au jour de la VENTE : compté si le montant reçu est sûr et la
+  // vente datée ; sinon NOMMÉ (`nonComptees`), jamais deviné.
+  for (const v of (vestiaire || [])) {
+    if (!v || !v.id || vcVenteAnnulee(v) || !garde('vestiaire:' + v.id)) continue;
+    const t = dateVenteVc(v), recu = montantRecuVc(v);
+    if (recu.eur == null) { nonComptees.push({ plateforme: 'Vestiaire', raison: recu.raison, ts: t || null }); continue; }
+    if (!t) { nonComptees.push({ plateforme: 'Vestiaire', raison: 'vente pas datée', ts: null }); continue; }
+    lignes.push({ plateforme: 'Vestiaire', ts: t, eur: recu.eur, compte: String(v.compte || '') });
+  }
+  return { lignes, sansDate, ecartees, nonComptees };
 };
 
 export const compteEcarte = (uid, masques, panneau) => {

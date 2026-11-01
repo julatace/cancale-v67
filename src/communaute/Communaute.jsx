@@ -263,7 +263,7 @@ function Rejoindre({ api, moi, prenom, discordCompte = '', onFait, onAnnuler, Fe
       {(() => { const dd = (moi && moi.discord) || discordCompte; return dd && pseudo !== dd && <button type="button" className="vrm-cm-lien" onClick={() => setPseudo(dd)} data-cm-pseudo-discord>Prendre « {dd} » (Discord)</button>; })()}
       <form className="vrm-cm-ville" onSubmit={chercher}>
         <label className="vrm-cm-champ"><span>Ta ville</span>
-          <input value={q} maxLength={80} autoComplete="off" onChange={(e) => { setQ(e.target.value); setChoix(null); }} placeholder="Commence à taper : Cancale, Lyon…" data-cm-ville-q /></label>
+          <input value={q} maxLength={80} autoComplete="off" onChange={(e) => { setQ(e.target.value); setChoix(null); }} placeholder="Commence à taper : Lyon, Nantes…" data-cm-ville-q /></label>
         {cherche && <p className="vrm-cm-note" role="status" data-cm-ville-cherche>Recherche…</p>}
         <div className="vrm-cm-ligne-boutons">
           <button type="submit" disabled={occupe} data-cm-chercher>Chercher</button>
@@ -764,7 +764,7 @@ function Groupes({ api, moi, groupes, actif, onChoisir, onFait }) {
       : <form className="vrm-cm-ville" onSubmit={mode === 'entrer' ? entrer : creer} data-cm-groupe-form={mode}>
         <label className="vrm-cm-champ"><span>{mode === 'entrer' ? 'Le code du groupe' : 'Le nom du groupe'}</span>
           <input value={v} maxLength={mode === 'entrer' ? 12 : 40} autoCapitalize={mode === 'entrer' ? 'characters' : 'sentences'} autoCorrect="off" spellCheck={false}
-            onChange={(e) => setV(e.target.value)} placeholder={mode === 'entrer' ? 'ABCD-2345' : 'Accompagnement de Julien'} data-cm-groupe-champ /></label>
+            onChange={(e) => setV(e.target.value)} placeholder={mode === 'entrer' ? 'ABCD-2345' : 'Revendeurs de Lyon'} data-cm-groupe-champ /></label>
         {mode === 'entrer' ? <p className="vrm-cm-note">Ses membres verront ton pseudo, ta ville et ton nombre de ventes Vinted — jamais un montant.</p>
           : <p className="vrm-cm-note">Tu recevras un code à donner à tes membres. Toi seul pourras le changer.</p>}
         <div className="vrm-cm-ligne-boutons">

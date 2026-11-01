@@ -85,7 +85,10 @@ export const montantPeriodeUrssaf = (due, ligne, taux) => {
   const atPub = typeof ligne.at === 'number' ? ligne.at : Date.parse(ligne.at || '');
   const debutPeriode = minuitParisMs(due.periodStart.getFullYear(), due.periodStart.getMonth(), due.periodStart.getDate());
   const finPeriode = minuitParisMs(due.periodEnd.getFullYear(), due.periodEnd.getMonth(), due.periodEnd.getDate() + 1);
-  const partiel = !!(ligne.aDater && Number(ligne.aDater.n) > 0) || !(atPub >= finPeriode);
+  // (1er nov., audits A2/A10) + des ventes dont l'argent ne se lit pas (prix
+  // Vinted pas lu, montant Vestiaire pas sûr), publiées à part (`nonComptees`) :
+  // le montant de l'échéance est alors un MINIMUM, jamais présenté complet (§5).
+  const partiel = !!(ligne.aDater && Number(ligne.aDater.n) > 0) || !!(ligne.nonComptees && Number(ligne.nonComptees.n) > 0) || !(atPub >= finPeriode);
   // (22 oct., revue) Une ligne publiée AVANT le début de la période ne dit rien
   // d'elle ; une ligne qui n'en porte AUCUN mois et dont le total n'est qu'un
   // minimum (publiée avant la fin, date illisible, ventes sans date de

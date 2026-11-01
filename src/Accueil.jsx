@@ -294,6 +294,7 @@ const CSS = `
 .acc-bande{background:${K.surface};border-top:1px solid ${K.line};border-bottom:1px solid ${K.line}}
 .acc-deux{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:72px;align-items:start}
 .acc-h2b{font-size:28px;line-height:1.15;letter-spacing:-.02em;font-weight:700}
+.acc-note{margin:18px 0 0;font-size:13.5px;line-height:1.55;color:${K.muted}}
 .acc-etapes{list-style:none;margin:24px 0 0;padding:0;display:flex;flex-direction:column;gap:18px}
 .acc-etapes li{display:flex;gap:14px;align-items:flex-start}
 .acc-etapes .n{width:28px;height:28px;border-radius:8px;background:${K.card2};border:1px solid ${K.line2};display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;color:${K.text};flex-shrink:0}
@@ -575,7 +576,7 @@ export default function Accueil({ onEntrer }) {
                 <div data-prerequis="" data-variante={sansSouris ? 'tactile' : 'souris'}>
                   {sansSouris
                     ? 'Crée ton compte ici, puis installe l’extension une fois dans Chrome sur ordinateur.'
-                    : 'S’installe une fois dans Chrome, sur ton ordinateur. Ensuite, ton téléphone suffit.'}
+                    : 'S’installe une fois dans Chrome, sur ton ordinateur — qui reste nécessaire pour lire Vinted. Ton téléphone suit tout.'}
                 </div>
               </div>
             </div>
@@ -657,7 +658,7 @@ export default function Accueil({ onEntrer }) {
         <section className="acc-sec acc-bande" id="comment" data-section="comment">
           <div className="acc-in acc-deux">
             <div>
-              <h2 className="acc-h2b">Une installation, sur ton ordinateur. Ensuite, ton téléphone suffit.</h2>
+              <h2 className="acc-h2b" data-prerequis-ordinateur="">Une installation, sur ton ordinateur. Ensuite, tu suis tout depuis ton téléphone.</h2>
               <ol className="acc-etapes">
                 <li><span className="n">1</span><div><h3>Crée ton compte</h3><p>Un email et un mot de passe.{ACCES_OFFERT && <span data-sans-carte=""> Aucune carte bancaire.</span>}</p></div></li>
                 <li><span className="n">2</span><div><h3>Ajoute l’extension à Chrome</h3><p>{EXTENSION_SUR_LE_STORE
@@ -665,6 +666,11 @@ export default function Accueil({ onEntrer }) {
                   : 'Une seule fois, sur ton ordinateur. Elle n’est pas encore sur le Chrome Web Store : VRM te guide pas à pas, puis tu la connectes avec le même email.'}</p></div></li>
                 <li><span className="n">3</span><div><h3>Passe sur Vinted</h3><p>Avec chacun de tes comptes. Ventes, annonces, bordereaux et messages arrivent dans VRM.</p></div></li>
               </ol>
+              {/* (1er nov., vendeur neuf) CE QUI EST VRAI : VRM lit Vinted par l'extension,
+                  dans le Chrome de l'ordinateur. Le téléphone consulte et commande, mais
+                  une action (bordereau, réponse, republication) passe par l'ordinateur
+                  allumé, Chrome ouvert — « ton téléphone suffit » promettait l'inverse. */}
+              <p className="acc-note" data-ordinateur-necessaire="">Ton ordinateur avec Chrome reste nécessaire : c’est lui qui lit Vinted. Depuis le téléphone, tu consultes tout ; les actions passent par l’ordinateur allumé, Chrome ouvert.</p>
             </div>
             <div className="acc-conf" data-confiance="">
               <h2 className="acc-h2b">Tes comptes restent les tiens.</h2>

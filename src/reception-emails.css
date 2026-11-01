@@ -20,6 +20,8 @@
 .vrm-transfert-etapes small{font-size:10px;font-weight:400;}
 .vrm-transfert-etape-active{padding:14px;border:1px solid #9badaa55;border-radius:12px;margin-top:14px;}
 .vrm-transfert-etape-active h4{margin:0 0 8px;}
+.vrm-transfert-code{margin:10px 0;padding:10px 12px;border:1px solid #9badaa55;border-radius:10px}
+.vrm-transfert-code b[data-code-gmail-valeur]{font-family:var(--vrm-mono,ui-monospace,monospace);font-size:1.25em;letter-spacing:.06em}
 .vrm-transfert-navigation{display:flex;justify-content:space-between;gap:8px;margin-top:12px;}
 @media(max-width:767px){.vrm-transfert-etapes{grid-template-columns:1fr;}.vrm-transfert-etapes button{display:grid;grid-template-columns:20px 1fr auto;align-items:center;padding:8px!important;}.vrm-transfert-etapes b{font-size:12px;}.vrm-transfert-navigation button{font-size:12px!important;}}
 .vrm-transfert-etapes button,.vrm-transfert-navigation button{min-height:44px;}
