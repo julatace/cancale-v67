@@ -2229,3 +2229,31 @@ arrive par « Fiche N° » → « Toute l'histoire du N° ». Le reçu d'achat n
 dans Achats) : l'étape dit seulement « achat relié par son n° de transaction ».
 
 **Geste de Julien** : aucun. Taper un N° dans la recherche → « Toute l'histoire du N° ».
+
+## 1er novembre — Stock, Republier, Annonces (ordinateur) : gestes fréquents plus courts, chaque geste se dit
+
+Demande de Julien : « continue à améliorer toute l'app, tout doit être parfait, logique et simple
+d'utilisation ». Périmètre de cette passe : Stock, l'atelier Republier, Favoris & offres, Achats,
+Annonces sur ordinateur. Aucune règle neuve, aucune fonction retirée, aucun numéro touché.
+
+| écran | avant | après | pourquoi |
+|---|---|---|---|
+| Stock → Cases | taper le N° d'une paire à ranger disait « Aucune case ne porte la N°2 » ; Entrée la rangeait, sans le dire (placeholder « (Entrée : la ranger) ») | « N°2 n'est pas encore rangée — prochaine case libre : … » + **Ranger ici** / **Autre case** ; un N° hors stock le dit (« … n'est pas parmi tes articles en stock ») ; placeholder « Où est la N° … ? » (Entrée marche toujours) | le geste le plus fréquent (ranger une paire qu'on a en main) se faisait par une touche cachée |
+| Stock → Meubles, case vide | « Case 6 · choisis l'article » | « Rangée 2, colonne 3 · choisis l'article » (`data-placer-case`) | le reste de l'écran parle en rangée/colonne (règle du meuble, recherche, fiche) |
+| Stock → Meubles, pose | rien ne se disait (la case clignote, parfois hors de l'écran sur téléphone) | message « N°31 rangée : Étagère salon · rangée 1, colonne 2. » | retour après un geste réussi |
+| Stock → Meubles, fiche d'une paire PAS rangée | « Déplacer » et « Retirer de la case » (sans objet) | « Ranger dans une case » seul (`data-fiche-ranger`) | bouton ambigu |
+| Stock → Meubles, « Retirer de la case » / « Je l'ai sorti du stock » | rien ne se disait | « N°… retirée de … : elle repasse dans « À ranger ». » / « N°… sortie du stock — son numéro reste pris, jamais redonné. » | retour ; rappelle la règle §5 (le numéro n'est jamais redonné). « Remettre en stock » reste le chemin de retour (Achats → retours) |
+| Annonces (Vinted) | en tête : CA finalisé · Disponible · En attente (des « — » tant que rien n'est lu) + « À faire aujourd'hui » | rien de tout ça sur Annonces (la ligne de fraîcheur reste) ; Ventes · Vinted les garde | l'argent ne dit rien de la tâche « annonces », Ma journée est dans la barre ; les cartes remontent d'environ 100 px sur ordinateur |
+| Annonces, astuce N° | « Chaque article a un numéro , jamais redonné. » (l'écart d'un conteneur flex posait une espace avant la virgule) | « … un numéro, jamais redonné. » | coquille visible |
+| Republier (menu) | bouton « Republier… » ouvrait une feuille titrée « Actions sur Vinted » | feuille « Republier et brouillons » | le titre dit ce qu'on vient de toucher. Entrées, ordre (coffre → supprimer → brouillon → mise en ligne) et réglages inchangés ; rien n'est remis (« Varier », réglage photo par annonce, secours) |
+
+**Contrôles** : banc neuf `scripts/bancs/stock-gestes.cjs` (390 tactile et 1512 px, données
+inventées) — **18 rouges** sur le build d'avant (3b60a48d), vert après ; `republier.cjs` + 1 contrôle
+(l'astuce N° ne passe pas par un conteneur flex) — 2 rouges avant, vert après. Rejoués verts :
+`republier`, `stock-retrouver`, `rangement`, `stock-planches`, `stock-partis`, `navigation-tache`,
+`messages-volets`, `lbc-comme-vinted`, `achats-messages-premium`. Rouges DÉJÀ là sur 3b60a48d, non
+touchés : `stock-piece` B (« la paire choisie… rien d'autre ne bouge », `4_0:[401,402]`) et C
+(instable), `garage3d` (molette, 2 rouges). Audits tdz, variables, icones, boutons, identite,
+moteur-offres, offres-auto, republier, stock-plan : verts.
+
+**Geste de Julien** : aucun.

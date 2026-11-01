@@ -2022,3 +2022,12 @@ ebay-messages-nonlus, vc-conversations. `revendeurs` s'arrête AVANT la partie M
 l'identique sur `origin/main` (« en-tête séparé du contenu… — eBay », ligne 185) : sa partie
 clavier (« Tab inverse … ignore envoyer désactivé ») n'a donc pas pu être rejouée — le micro de
 dictée est maintenant le dernier contrôle du fil eBay, à revoir quand ce banc repassera.
+
+## 1er novembre — Favoris & offres : « Favoris reçus » porte une icône au trait
+
+Avant : `♡` (un caractère) devant « Favoris reçus », à côté de l'icône au trait de « Conversations ».
+Après : la même icône `heart` que l'entrée « Favoris & offres » de la colonne (§7 : un emoji/caractère
+utilisé comme icône devient une icône au trait). Contrôle D de `scripts/bancs/stock-gestes.cjs`
+(rouge sur 3b60a48d). Rien d'autre ne change : favoris sur SON clic, offres auto éteintes par défaut,
+prix mini à côté du N°. Récit de la passe : historique-interface-stock.md, « 1er novembre — Stock,
+Republier, Annonces ».
