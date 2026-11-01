@@ -13644,7 +13644,7 @@ function BulleConv({ moi, qui, texte, quand, avecDate = false, attrs, apres = nu
   const d = quand ? new Date(quand) : null; const ok = d && isFinite(d.getTime());
   return (
     <div className={moi?'vrm-bulle-l vrm-bulle-moi':'vrm-bulle-l'} {...(attrs || {})}>
-      <div className="vrm-bulle" data-bulle={moi?'moi':'acheteur'} style={moi?{background:C.text,color:C.bg}:{background:C.card2||C.card,color:C.text}}>{qui?<span className="vrm-sr">{qui} : </span>:null}<span className="vrm-bulle-t">{texte}</span>{ok && <time className="vrm-bulle-h" dateTime={d.toISOString()}>{avecDate ? heureMessage(d.getTime()) : d.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})}</time>}</div>
+      <div className="vrm-bulle" data-bulle={moi?'moi':'acheteur'} style={moi?{background:C.text,color:C.bg}:{background:C.card2||C.card,color:C.text}}>{qui?<span className="vrm-sr">{qui} : </span>:null}<span className="vrm-bulle-t">{texteSansBalises(texte)}</span>{ok && <time className="vrm-bulle-h" dateTime={d.toISOString()}>{avecDate ? heureMessage(d.getTime()) : d.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})}</time>}</div>
       {apres}
       {!moi && traduire ? <div className="vrm-bulle-pied"><BoutonTraduire texte={traduire}/></div> : null}
     </div>
@@ -14380,6 +14380,9 @@ function BarreHaut({ champ, poserSlot }) {
 // (`src/cibleNotif.js`). Posée ici au niveau MODULE (l'écran n'est pas encore
 // monté), consommée une fois par `CibleNotif` quand l'écran attendu est là.
 // Rien ne répond en 12 s ⇒ UNE ligne le dit ; l'écran reste, jamais blanc.
+// (1er nov.) Vinted glisse du HTML dans certains messages de statut (« dépose ton colis
+// dans n'importe quel <a href=…>point relais</a> ») : on n'affiche que le texte, jamais une balise.
+const texteSansBalises = (t) => String(t == null ? '' : t).replace(/<br\s*\/?>/gi, '\n').replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'");
 const CIBLE_NOTIF = { c: null, tab: null, at: 0 };
 const poserCible = (c, tab) => { CIBLE_NOTIF.c = c || null; CIBLE_NOTIF.tab = tab || null; CIBLE_NOTIF.at = Date.now(); try { window.dispatchEvent(new Event('vrm:cible-notif')); } catch (_) {} };
 function CibleNotif({ tab, sub }) {
@@ -45977,10 +45980,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     : /code|retrait|pickup|pin|suivi|tracking|colis|r[ée]cup[ée]rer|point relais/i.test(m.body)
                       ? <div key={i} className="vrm-chat-event vrm-chat-event-colis" style={{background:C.card,border:`1px solid ${C.border}`}}>
                           <div className="vrm-chat-event-k" style={{color:C.muted}}>Colis · retrait</div>
-                          <div style={{fontSize:14,fontWeight:500,color:C.text,whiteSpace:'pre-wrap',wordBreak:'break-word'}}>{m.body}</div>
+                          <div style={{fontSize:14,fontWeight:500,color:C.text,whiteSpace:'pre-wrap',wordBreak:'break-word'}}>{texteSansBalises(m.body)}</div>
                           {(m.links||[]).map((l,j)=><a key={j} className="vrm-chat-link" href={l.url} target="_blank" rel="noreferrer" style={{color:C.accent}}>{l.bordereau?'Ouvrir le bordereau ↗':'Ouvrir le lien ↗'}</a>)}
                         </div>
-                      : <div key={i} className="vrm-chat-event" style={{color:C.muted}}>{m.body}{(m.links||[]).map((l,j)=><a key={j} className="vrm-chat-link" href={l.url} target="_blank" rel="noreferrer" style={{color:C.accent}}>{l.bordereau?'bordereau ↗':'lien ↗'}</a>)}</div>)
+                      : <div key={i} className="vrm-chat-event" style={{color:C.muted}}>{texteSansBalises(m.body)}{(m.links||[]).map((l,j)=><a key={j} className="vrm-chat-link" href={l.url} target="_blank" rel="noreferrer" style={{color:C.accent}}>{l.bordereau?'bordereau ↗':'lien ↗'}</a>)}</div>)
                   : <BulleConv key={i} moi={!!m.mine} texte={m.body||(m.photos?.length?'📷 photo':'')} quand={m.ts||null} traduire={m.body||''}
                       apres={<>
                       {(m.links||[]).map((l,j)=><a key={j} className="vrm-chat-link" href={l.url} target="_blank" rel="noreferrer" style={{color:C.accent}}>{l.bordereau?'Ouvrir le bordereau ↗':'Ouvrir le lien ↗'}</a>)}
@@ -46776,7 +46779,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             let pris = false;
             try { const ev = new CustomEvent('vrm:ouvrir-emballage', { detail: { pris: false, depuis: 'tournee' } }); window.dispatchEvent(ev); pris = !!ev.detail.pris; } catch (_) {}
             if (pris) return;
-            if (onNav) onNav('cat_bord'); allerDansColis('[data-cc-colonne="prets"]'); return;
+            // Le mode emballage de Colis (DEMANDE_EMBALLAGE, comme « Emballer les colis prêts ») : il s'ouvre en arrivant.
+            DEMANDE_EMBALLAGE.at = Date.now();
+            if (onNav) onNav('cat_bord'); try { setTimeout(() => window.dispatchEvent(new Event('vrm:emballer')), 0); } catch (_) {} return;
           }
           if (id === 'deposer') { if (onNav) onNav('cat_bord'); allerDansColis('[data-colis-detail]'); return; }
           if (id === 'retirer') { if (onNav) onNav('retraits'); try { window.dispatchEvent(new CustomEvent('vrm:ancre-retraits')); } catch (_) {} }
