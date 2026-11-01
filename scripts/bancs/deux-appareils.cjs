@@ -34,6 +34,8 @@
 //   G  numérotation concurrente : A a donné un numéro NEUF à une paire, B
 //      (périmé) donne le même à une AUTRE ⇒ aucune écriture avec deux paires
 //      sous ce numéro, le bloc « Recharger » s'ouvre.
+//   H  la ligne connue se relit ABSENTE (base qui répond [] sans erreur) ⇒
+//      aucune clé de l'appareil effacée, aucune ligne réécrite sans elles.
 //
 //  §6.1 : rouge sur le build d'avant (`BANC_DIST=<dist d'avant>`), vert après ;
 //  mutations dans `scripts/audit-fusion-nuage.cjs --prouve`.
@@ -244,6 +246,33 @@ const prixFiche = (d, id) => String(((d && d.vinted_annonce_numeros) || {})[id]?
     const txt = await pB.pg.evaluate(() => document.body.innerText || '');
     dit(/[Rr]echarge/.test(txt), 'G : B dit de recharger (le bloc des numéros)', '');
     await pB.pg.screenshot({ path: path.join(CAPT, 'G-B-bloc.png') });
+  }
+  // ── H (la ligne connue se relit ABSENTE) ───────────────────────────────────
+  // Une base cloisonnée qui refuse la session répond `[]` sans erreur : la ligne
+  // `main` que l'appareil vient de lire ou d'écrire « disparaît ». Fusionner avec
+  // ce vide effaçait les clés de l'appareil (banc reglages-premium : le jeton du
+  // widget). Pas su ⇒ rien n'est effacé, rien n'est écrit.
+  if (joue('H')) {
+    const avantLs = await pA.pg.evaluate(() => ({ p: localStorage.getItem('vrm_prenom'), n: localStorage.getItem('vinted_annonce_numeros') }));
+    const cache = base.lignes.get('main'); base.lignes.delete('main');
+    const t0 = Date.now();
+    await pA.pg.goto(srv.url + '/?tab=settings', { waitUntil: 'domcontentloaded' }).catch(() => {});
+    base.lignes.set('main', cache);
+    await pA.pg.waitForTimeout(5000);
+    base.lignes.delete('main');
+    await pA.pg.locator('[data-reglage-sombre]').first().click().catch(() => {});
+    await pA.pg.waitForTimeout(3500);
+    await pA.pg.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+    await pA.pg.waitForTimeout(2500);
+    const apresLs = await pA.pg.evaluate(() => ({ p: localStorage.getItem('vrm_prenom'), n: localStorage.getItem('vinted_annonce_numeros') }));
+    // Les fiches peuvent s'enrichir entre-temps (l'écran vit) : on juge qu'aucune
+    // ne PERD sa présence ni son numéro.
+    const fa = JSON.parse(avantLs.n || '{}'), fb = JSON.parse(apresLs.n || '{}');
+    const perdues = Object.keys(fa).filter((id) => !fb[id] || H.cleNum((fb[id] || {}).numero) !== H.cleNum((fa[id] || {}).numero));
+    dit(apresLs.p === avantLs.p && perdues.length === 0, 'H : ligne relue absente ⇒ aucune clé de l\'appareil effacée', JSON.stringify({ avant: avantLs.p, apres: apresLs.p, fichesPerdues: perdues.length }));
+    const inserees = base.ecritures.filter((e) => e.at >= t0 && e.meth === 'POST' && [].concat(e.corps || []).some((x) => x && x.id === 'main'));
+    dit(inserees.every((e) => [].concat(e.corps).every((x) => x.id !== 'main' || (x.data && x.data.vrm_prenom === JSON.parse(avantLs.p || 'null')))), 'H : aucune ligne réécrite sans ce que l\'appareil porte', String(inserees.length));
+    base.lignes.set('main', base.lignes.get('main') || cache);
   }
   const jsErr = errs.flat().filter((m) => !/ResizeObserver|Failed to fetch|NetworkError/.test(m));
   dit(jsErr.length === 0, 'aucune erreur JS', jsErr.slice(0, 3).join(' | '));

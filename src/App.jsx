@@ -2622,6 +2622,11 @@ const poserFusionLocale = (M, brutLu, Llu) => {
 // bloc « Recharger » — ses saisies sont gardées, les numéros de cet écran ne
 // sont pas rejoués (`rechargerEnGardantLesSaisies`). C'est ce que faisait déjà
 // le refus de la base (`vrm_fiche_perdue`), en plus tôt.
+// Une ligne connue (lue ou écrite par cet onglet) qui se relit absente : pas su.
+const ligneDisparue = (c) => !!(c && !c.existe && _snapNuage && _snapNuage.existe);
+// La base de la fusion : face à une ligne ABSENTE, l'appareil et le nuage n'ont
+// rien en commun — tout ce que porte l'appareil est à garder, jamais « retiré ».
+const baseFusion = () => (_snapNuage && _snapNuage.existe ? _baseNuage : {});
 const conflitNumerosNuage = (motif) => {
   _pushBloque = true;
   try { console.warn('[VRM] fusion refusée (numéros) :', motif); } catch (_) {}
@@ -2658,7 +2663,7 @@ const cloudPush = () => {
       for (let essai = 0; essai < 6 && !fini; essai++) {
         const { L, brut } = essai === 0 ? premier : lireLocalSync();
         const N = _snapNuage.data || {};
-        const f = fusionnerLigne({ cles: SYNC_KEYS, base: _baseNuage, local: L, nuage: N, cleNum, localGagne: ['vinted_accounts'] });
+        const f = fusionnerLigne({ cles: SYNC_KEYS, base: baseFusion(), local: L, nuage: N, cleNum, localGagne: ['vinted_accounts'] });
         if (f.conflit) { conflitNumerosNuage(f.conflit); return; }
         // Rien de neuf pour le nuage (une sauvegarde de la même valeur) : on
         // n'écrit pas — sinon chaque appareil ouvert relirait la ligne entière.
@@ -2710,6 +2715,12 @@ const cloudPush = () => {
           // On relit la ligne ENTIÈRE ; une lecture ratée n'écrit rien.
           const c = await lireNuageComplet(owner);
           if (c === undefined) { _emitSync('error', 'la base n’a pas répondu'); planifierReprise(); return; }
+          // ⚠️ (1er nov., banc reglages-premium) Une ligne qu'on SAIT exister et
+          //    qui se relit ABSENTE n'est pas « vide » : c'est une lecture qui ne
+          //    dit pas la vérité (session refusée, base cloisonnée qui répond [] sans
+          //    erreur). Fusionner avec ce vide EFFAÇAIT les clés de l'appareil (le
+          //    jeton du widget disparaissait). Pas su ⇒ rien n'est écrit ni effacé.
+          if (ligneDisparue(c)) { _emitSync('error', 'ta ligne de réglages ne se relit pas — rien n’est touché, je réessaie'); planifierReprise(); return; }
           _snapNuage = { data: c.data, rev: c.rev, existe: c.existe, maj: c.maj };
           await new Promise(ok => setTimeout(ok, 30 * (essai + 1)));
           continue;
@@ -2763,13 +2774,14 @@ const relireNuage = (opts = {}) => {
       if (!r.ok) return false;
       const rows = await r.json();
       if (!Array.isArray(rows) || rows.length > 1) return false;
+      if (!rows[0] && _snapNuage.existe) return false;   // ligne connue relue absente : pas su
       const revLue = rows[0] && rows[0].rev != null && rows[0].rev !== '' ? Number(rows[0].rev) : null;
       const majLue = rows[0] ? (rows[0].maj || null) : null;
       if (!!rows[0] === _snapNuage.existe && revLue === _snapNuage.rev && (majLue == null || _snapNuage.maj == null || Date.parse(majLue) === Date.parse(_snapNuage.maj))) return false;
       const c = await lireNuageComplet(owner);
-      if (c === undefined || AUTH.user?.id !== owner || _pushEnVol || _cloudTimer || _pushBloque) return false;
+      if (c === undefined || ligneDisparue(c) || AUTH.user?.id !== owner || _pushEnVol || _cloudTimer || _pushBloque) return false;
       const { L, brut } = lireLocalSync();
-      const f = fusionnerLigne({ cles: SYNC_KEYS, base: _baseNuage, local: L, nuage: c.data, cleNum, localGagne: ['vinted_accounts'] });
+      const f = fusionnerLigne({ cles: SYNC_KEYS, base: c.existe ? _baseNuage : {}, local: L, nuage: c.data, cleNum, localGagne: ['vinted_accounts'] });
       if (f.conflit) { conflitNumerosNuage(f.conflit); return false; }
       const { changees, gardees } = poserFusionLocale(f.data, brut, L);
       const base = {}; for (const k of SYNC_KEYS) { const v = (k === 'vinted_accounts' || gardees.has(k)) ? _baseNuage[k] : c.data[k]; if (v !== undefined) base[k] = v; }

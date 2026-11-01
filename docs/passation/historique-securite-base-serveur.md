@@ -2488,3 +2488,19 @@ pas : sinon chaque appareil ouvert relirait la ligne entière à chaque passage.
 - Une saisie faite hors ligne puis l'app refermée : au chargement suivant, le nuage
   remplace encore le navigateur pour les clés ordinaires (comportement d'avant, `rejouerSaisies`
   ne couvre que l'écran rechargé pour numéros périmés).
+
+### Suite — une ligne `main` relue ABSENTE n'efface plus rien (1er nov., banc `reglages-premium`)
+
+Après intégration, `reglages-premium` devenait instable : la ligne « Widget iPhone »
+(présente si `vrm_widget_token` est dans le navigateur) disparaissait en cours de parcours.
+Le banc sert `main` absente (`[]`) et répond `201 []` aux écritures. Chemin : la ligne
+insérée par l'appareil (connue) ; le PATCH conditionnel rend 0 ligne ⇒ relecture ⇒ ABSENTE ⇒
+la fusion prenait ce vide pour « le nuage a tout retiré » (clé intacte ici ⇒ valeur du
+nuage) et EFFAÇAIT les clés du navigateur. **Vrai défaut**, pas une fiction : une base
+cloisonnée qui refuse la session répond `[]` sans erreur. Correctif (`cloudPush`,
+`relireNuage`) : une ligne que l'onglet sait exister et qui se relit absente = « pas su »
+(`ligneDisparue`) — rien n'est écrit ni effacé, reprise planifiée ; face à une ligne
+vraiment absente (premier jour), la base de la fusion est vide (`baseFusion`) : tout ce
+que porte l'appareil est gardé. Preuve : `deux-appareils` §H (ligne relue absente ⇒ prénom
+et fiches gardés, aucune ligne réécrite sans eux) — **2 rouges** sur 5d7b34f4 (prénom et
+fiches effacés), vert après ; `reglages-premium` lancé 5 fois de suite : 5 verts.
