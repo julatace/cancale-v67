@@ -59756,7 +59756,7 @@ function AppCoeur() {
     // `section` vaut aussi pour Comptabilité et Statistiques.
     const goto=(search)=>{ try{ const p=new URLSearchParams(search); const t=p.get('tab'); if(p.get('print')==='bord') _pendingBordPrint=true; if(t&&TABS_OK.includes(t)){ const site=p.get('site'), section=p.get('section'), vue=p.get('vue');
       if(site&&estTacheSite(t)&&siteDeTache(t,site)===site) subVoulue.current=site; else if(section&&/^[a-z]{2,12}$/.test(section)&&(t.startsWith('plat_')||t==='compta'||t==='dashboard')) subVoulue.current=section;
-      if(vue==='achats'){ VUE_ACHATS_NAV='all'; demanderVue('achats'); } else if(vue==='retraits'){ VUE_ACHATS_NAV='attente'; demanderVue('retraits'); } else if(vue==='favoris') demanderVue('favoris');
+      if(vue==='achats'){ demanderVue('achats'); } else if(vue==='retraits'){ demanderVue('retraits'); } else if(vue==='favoris') demanderVue('favoris');
       // (1er nov.) `cat_achats` mène aux colis à retirer (dans Colis) ; avec `vue=achats`, c'est l'écran Achats.
       const tt=(t==='cat_achats'&&vue==='achats')?'achats':t;
       const cible=lireCible(p); if(cible) poserCible(cible, redirigerOnglet(tt, subVoulue.current, ONGLETS_DEPLACES).tab);
@@ -61750,7 +61750,7 @@ function AppCoeur() {
             ))}
             {achats.length>0 && <div style={{fontSize:11,fontWeight:700,color:C.muted,textTransform:'uppercase',letterSpacing:0.4,margin:'14px 2px 6px'}}>Achats ({achats.length})</div>}
             {achats.map((o,i)=>(
-              <button key={'a'+(o.transaction_id||i)} type="button" onClick={()=>{ setGsOpen(false); VUE_ACHATS_NAV='all'; demanderVue('achats'); if(o.transaction_id!=null) poserCible({type:'achat',tx:String(o.transaction_id)},'achats'); setTab('achats'); }} data-recherche-achat={o.transaction_id!=null?String(o.transaction_id):undefined}
+              <button key={'a'+(o.transaction_id||i)} type="button" onClick={()=>{ setGsOpen(false); demanderVue('achats'); if(o.transaction_id!=null) poserCible({type:'achat',tx:String(o.transaction_id)},'achats'); setTab('achats'); }} data-recherche-achat={o.transaction_id!=null?String(o.transaction_id):undefined}
                 style={{width:'100%',minHeight:44,display:'flex',alignItems:'center',gap:11,padding:'9px 10px',marginBottom:6,background:C.card,border:`1px solid ${C.border}`,borderRadius:10,cursor:'pointer',fontFamily:'inherit',textAlign:'left'}}>
                 {thumb(orderPhoto(o),'📦')}
                 <div style={{flex:1,minWidth:0}}>
