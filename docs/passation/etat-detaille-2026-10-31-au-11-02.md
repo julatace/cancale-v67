@@ -51,3 +51,13 @@ Déplacé TEL QUEL depuis CLAUDE.md §9 le 2 novembre 2026 (le fichier dépassai
   PROUVÉE ; CSP en Report-Only (la bascule à faire : historique sécurité) ; Ma journée en
   widgets ; carte de la communauté (OpenFreeMap) ; colis à l'heure ; « C'est déclaré ».
   → `docs/passation/2026-10-22-integration.md`.
+
+
+## Lignes retirées de CLAUDE.md §9 le 2 nov. (taille), telles quelles
+
+- **23-24 oct.** — Suivi des colis par n° et par Vinted (5.216-5.217), colis à retirer
+  fiables (date limite lue, « à vérifier »), eBay « Inactives » (lecture seule), reçu
+  d'achat lisible, feuilles au-dessus de la barre sur iPhone. → colis / ebay / interface.
+- **26 oct.** — eBay multi-sites (chaque compte sur SON site, argent en euros), eBay à
+  l'international (destination, douane) ; retrait « pour de bon » par catégorie
+  (annonces, messages) ; suppression ciblée (bordereaux et relevés séparés). → ebay / divers.
