@@ -58,7 +58,7 @@ const txn = (id, jours) => ({ id: `harvest_${A}_txn_${id}`, data: { capturedAt: 
 const LIGNES = [
   { id: `harvest_${A}_orders_sold`, data: { capturedAt: cap, payload: { my_orders: VENTES } } },
   { id: `harvest_${A}_listings`, data: { capturedAt: cap, payload: { items: [], pagination: null } } },
-  { id: 'email_bord_8002', data: { transaction: '8002', uid: A, filename: 'b1.pdf', modele: 'Samba', transporteur: 'Mondial Relay', receivedAt: il(0, 12).toISOString(), pdfB64: PDF_B64 } },
+  { id: 'email_bord_8002', data: { transaction: '8002', uid: A, filename: 'b1.pdf', modele: 'Samba', transporteur: 'Mondial Relay', suivi: '24813377', dateLimite: il(-1, 12).toISOString(), receivedAt: il(0, 12).toISOString(), pdfB64: PDF_B64 } },
   { id: 'email_bord_8003', data: { transaction: '8003', uid: A, filename: 'b2.pdf', modele: 'New Balance', suivi: '24819306', transporteur: 'Chronopost', receivedAt: il(3, 12).toISOString(), pdfB64: PDF_B64 } },
   txn(8005, 6), txn(8007, 36), txn(8008, 66),
 ];
@@ -195,6 +195,10 @@ const ECRANS = [
           dit(!m.petites.length, 'les gestes Fusion font 44 px', m.petites.join(' | '));
           dit(!m.encaisse, 'jamais « encaissé »');
           dit(!m.violet, 'pas de violet');
+          if (SHOTS) {
+            await pg.screenshot({ path: path.join(SHOTS, `${E.id}-${nom}.png`) });
+            if (vp.width < 600) { await pg.setViewportSize({ width: vp.width, height: 2400 }); await pg.waitForTimeout(500); await pg.screenshot({ path: path.join(SHOTS, `${E.id}-${nom}-long.png`) }); await pg.setViewportSize(vp); }
+          }
           // La puce transporteur : à GAUCHE du bouton, même rangée, 44 px, rayon 12, une ligne.
           const R = m.rangees.filter(Boolean);
           if (E.id === 'ventes' || E.id === 'colis') dit(R.length > 0, 'une rangée « puce + bordereau » au moins', String(R.length));
@@ -225,10 +229,6 @@ const ECRANS = [
           }
           if (E.id === 'colis') {
             dit(m.frises.length > 0, 'chaque colis porte sa frise', String(m.frises.length));
-          }
-          if (SHOTS) {
-            await pg.screenshot({ path: path.join(SHOTS, `${E.id}-${nom}.png`) });
-            if (vp.width < 600) { await pg.setViewportSize({ width: vp.width, height: 2400 }); await pg.waitForTimeout(500); await pg.screenshot({ path: path.join(SHOTS, `${E.id}-${nom}-long.png`) }); await pg.setViewportSize(vp); }
           }
         });
         dit(!errs.length, 'aucune erreur d’app', errs.join(' | ').slice(0, 300));
