@@ -21445,7 +21445,7 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
     setBusy(true); setRes(null); setCheck(null);
     // `appelEbay` ne lève jamais : une coupure (code 0) ou une réponse illisible
     // n'est PAS « impossible » — la requête a pu arriver, l'annonce exister.
-    const { code, j } = await appelEbay({ action: 'publish', item: b.item, ...corpsCompteEbay(comptePub) });
+    const { code, j } = await appelEbay({ action: 'publish', item: b.item, confirme: true, ...corpsCompteEbay(comptePub) });   // posé après SON clic (P12)
     if (j && j.ok) {
       if (plusieursPub && onCompte) onCompte(comptePub);
       // Ce qu'eBay a fait de la règle (relue après l'ajout), et ce qu'il signale.
@@ -43444,7 +43444,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         + (e.regle && e.regle.etat === 'connue' ? `\n\nTa règle d'offre (dès ${prix(e.regle.accepte)}) peut tomber avec le changement de prix : VRM la relit après et te le dit.` : ''), ok: 'Baisser sur eBay' });
     if (!okc) return;
     setEbayBaisse((m) => ({ ...m, [e.itemId]: { etat: 'envoi', prix: e.sugg } }));
-    const res = resultatReviseEbay(await appelEbay({ action: 'revise', itemId: e.itemId, price: e.sugg, prixVu: e.prixActuel, ...corpsCompteEbay(e.compte) }));
+    const res = resultatReviseEbay(await appelEbay({ action: 'revise', itemId: e.itemId, price: e.sugg, prixVu: e.prixActuel, confirme: true, ...corpsCompteEbay(e.compte) }));
     if (res.etat === 'ok') {
       // Ce que le changement de prix a fait à la règle d'offre (relue par la route).
       setEbayBaisse((m) => ({ ...m, [e.itemId]: { etat: 'ok', prix: e.sugg, regleMsg: res.msg || '', regleTon: res.ton || 'ok' } }));

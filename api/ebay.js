@@ -2119,6 +2119,14 @@ async function handleApp(req, res) {
     // (SKU, déjà en vente / programmée relue chez eBay, prix, livraison gérée
     // par eBay). Elle est inscrite au journal des actions (« Publiée par
     // l'agent ») : un résultat incertain se relit avant tout nouvel essai.
+    // (2 nov., audit « plateformes » P12) Publier et changer un prix ENGAGENT
+    // (une annonce mise en vente, un prix qui vend) : comme `programmer`,
+    // `retirer`, `regleoffre` et `modifierannonce`, le serveur exige la
+    // confirmation que l'app ne pose qu'après le clic de Julien (`confirme:true`).
+    if ((action === 'publish' || (action === 'revise' && b.price != null)) && b.confirme !== true) {
+      res.status(400).json({ ok: false, reason: 'confirmation', error: action === 'publish' ? 'Publication non confirmée — rien n\'a été publié.' : 'Changement de prix non confirmé — rien n\'a changé sur eBay.' });
+      return;
+    }
     if (action === 'publish' && b.agent === true) {
       if (b.confirme !== true) { res.status(400).json({ ok: false, reason: 'confirmation', error: 'L\'agent ne publie qu\'après ton oui — rien n\'a été publié.' }); return; }
       const num = b.item && b.item.numero != null ? String(b.item.numero).slice(0, 16) : '';

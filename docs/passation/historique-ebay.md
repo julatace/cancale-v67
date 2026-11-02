@@ -1785,3 +1785,16 @@ Julien : « lance eBay UK et US ». Tout l'eBay de VRM était figé sur eBay.fr
   compte UK ou US relié ; les règles de chaque site (catégories, états, livraison
   gérée) viennent d'eBay au moment de publier ; l'interface reste en français.
 
+
+## 2 novembre — jeton gardé (P9) et confirmation serveur (P12)
+
+- P9 : `accessToken` échangeait le refresh_token à CHAQUE geste (relecture de fond :
+  144 fois par jour et par compte), sur l'identifiant d'application commun à tous les
+  vendeurs. Le jeton est gardé dans `ebay_tokens_acces{suffixe}` (préfixe protégé en
+  écriture par la migration 014), réutilisé jusqu'à 5 min de sa fin, seulement s'il
+  vient du MÊME refresh_token (empreinte SHA-256) ; `deconnecterCompte` l'efface
+  (`oublierAcces`) ; `{ neuf: true }` force l'échange. `audit-ebay-jeton-cache` :
+  5 rouges sur l'avant, mutations (empreinte, marge) rouges.
+- P12 : `publish` et `revise` avec prix exigent `confirme:true` (comme programmer,
+  retirer, regleoffre, modifierannonce) ; l'app le pose après le clic.
+  `audit-ebay-route` [P12] : sans confirmation ⇒ 400 « confirmation », zéro appel eBay.
