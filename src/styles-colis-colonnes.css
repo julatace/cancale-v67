@@ -125,3 +125,15 @@ button.vrm-cc-carte:focus-visible { outline: 2px solid var(--vrm-focus, #0071E3)
 .vrm-rp-suivi { font-family: var(--vrm-police-mono, ui-monospace, monospace); font-size: 11.5px; letter-spacing: .02em; color: var(--vrm-muted, #56564F); overflow-wrap: anywhere; }
 /* « J'ai retiré » garde sa hauteur (44 px) : la règle commune l'étirait à la hauteur du code. */
 .vrm-main .vrm-rp-gestes .vrm-pickup-collect { align-self: center !important; height: 44px; }
+/* (2 nov.) « J'ai retiré » se LIT en toutes lettres au téléphone (jamais « ✓ » seul) :
+   le libellé a sa propre classe, que la règle « icône seule » de styles-captures ne cache pas. */
+.vrm-main .vrm-rp-gestes .vrm-pickup-collect { width: auto !important; flex: 0 0 auto !important; min-width: 44px; padding: 0 14px !important; overflow: visible; text-overflow: clip; font-size: 13px !important; }
+.vrm-rp-retire-label { white-space: nowrap; }
+/* (2 nov.) « Tout générer (N) » seul : pas de bloc gris autour d'un bouton seul. */
+.vrm-main .vrm-colis-recap.vrm-colis-recap-nu { padding: 0 !important; border: 0 !important; background: transparent !important; box-shadow: none !important; margin: 0 0 12px !important; }
+/* (2 nov.) Au téléphone, une phrase sous le titre prend toute la largeur : l'action
+   du haut (« Imprimer les N prêts ») passe dessous, la phrase ne se coupe plus. */
+@media (max-width: 767px) {
+  .vrm-main .vrm-tete-row > .vrm-screen-head-titre:has(> .vrm-screen-head-sous) { flex: 1 1 100%; min-width: 0; }
+  .vrm-main .vrm-tete-row:has(> .vrm-screen-head-titre > .vrm-screen-head-sous) > :nth-child(2) { justify-content: flex-start !important; }
+}

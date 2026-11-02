@@ -82,7 +82,8 @@ let ko=0; const dit=(c,m,d)=>{if(!c)ko++;console.log((c?'OK  ':'KO  ')+m+(d?' �
     const partis=document.querySelector('[data-colis-partis]');
     return {entete: m?+m[1]:(/Aucun colis à envoyer/.test(t)?0:null),
             cartes: document.querySelectorAll('[data-bord-card]').length,
-            postes: lig?+lig.getAttribute('data-voir-postes'):0,
+            /* (2 nov.) le nombre des cochés est dit sur « Partis » (plus de ligne permanente en tête) */
+            postes: partis&&partis.hasAttribute('data-partis-coches')?+partis.getAttribute('data-partis-coches'):(lig?+lig.getAttribute('data-voir-postes'):0),
             dansPartis: partis?partis.querySelectorAll('[data-parti="coche"]').length:0,
             sousIntertitre: [...document.querySelectorAll('[data-colis-partis] [data-postes-pas-partis] [data-parti="coche"], [data-colis-partis] [data-postes-recents] [data-parti="coche"]')].length,
             cartesPostees: [...document.querySelectorAll('[data-bord-card]')].filter(el=>/Pas encore/.test(el.innerText)).length};

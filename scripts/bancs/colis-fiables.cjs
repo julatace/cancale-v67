@@ -192,7 +192,7 @@ const lire = (pg) => pg.evaluate(() => {
   const repartis = [...document.querySelectorAll('[data-reparti-suivi],[data-reparti-tx]')].map((x) => ({ suivi: x.getAttribute('data-reparti-suivi') || '', tx: x.getAttribute('data-reparti-tx') || '', t: x.innerText }));
   return {
     total: at('[data-pickup-total]', 'data-pickup-total'), aVerifier: at('[data-pickup-a-verifier]', 'data-pickup-a-verifier'),
-    sansCompte: at('[data-pickup-sans-compte]', 'data-pickup-sans-compte'), nSansCompte: document.querySelectorAll('[data-pickup-sans-compte]').length,
+    sansCompte: at('[data-pickup-sans-compte]', 'data-pickup-sans-compte'), nSansCompte: document.querySelectorAll('[data-pickup-sans-compte]').length, sansCompteGeste: document.querySelectorAll('[data-pickup-sans-compte] [data-pickup-sans-compte-geste]').length,
     blocAVerifier: at('[data-retirer-a-verifier]', 'data-retirer-a-verifier'), fraicheur: at('[data-fraicheur-achats]', 'data-fraicheur-achats'), nFraicheur: document.querySelectorAll('[data-fraicheur-achats]').length,
     cartes, aVerif, repartis, texte: document.body.innerText, deborde: document.documentElement.scrollWidth > window.innerWidth + 1,
     // L'ordre des points relais : la liste des n° de suivi de chaque bloc, dans l'ordre affiché.
@@ -233,8 +233,8 @@ async function main() {
         dit(L.publie && L.publie.total === 4 && L.publie.aVerifier === 3 && Array.isArray(L.publie.colis) && L.publie.colis.length === 4, `${T} la publication lue par le widget dit 4 à retirer, 3 à vérifier, et la liste des 4 colis comptés`, L.publie ? JSON.stringify({ total: L.publie.total, aVerifier: L.publie.aVerifier, n: (L.publie.colis || []).length }) : 'absente');
         const c1 = carte('30000001');
         dit(!!c1, `${T} le Mondial Relay arrivé sur une adresse reliée à aucun compte APPARAÎT (jamais écarté)`, c1 ? '' : 'absent');
-        dit(c1 && c1.compte === '' && L.sansCompte === '2' && L.nSansCompte === 1 && (L.texte.match(/compte non reconnu/g) || []).length === 1, `${T} … « compte non reconnu » dit UNE fois pour les deux colis sans compte`, `sansCompte=${L.sansCompte} ×${L.nSansCompte}`);
-        dit(/Relie-la dans Paramètres/.test(L.texte), `${T} … avec le geste, puisqu'une adresse de réception connue n'est reliée à aucun compte`);
+        dit(c1 && c1.compte === '' && L.sansCompte === '2' && L.nSansCompte === 1, `${T} … l'adresse reliée à aucun compte dite UNE fois pour les deux colis (2 nov. : la ligne dit le geste, pas « compte non reconnu »)`, `sansCompte=${L.sansCompte} ×${L.nSansCompte}`);
+        dit(L.sansCompteGeste === 1 && /Paramètres → Comptes liés/.test(L.texte), `${T} … avec le geste (un lien vers Paramètres → Comptes liés), puisqu'une adresse de réception connue n'est reliée à aucun compte`, `liens=${L.sansCompteGeste}`);
         dit(c1 && c1.limite === '2026-10-26' && /jusqu'au 26\/10/.test(c1.limiteTxt), `${T} sa date limite (26/10) est sur la carte`, c1 && `${c1.limite} « ${c1.limiteTxt} »`);
         dit(c1 && /30000001/.test(c1.t) && /123456/.test(c1.t), `${T} son n° de suivi et son code sont sur la carte`);
         const c2 = carte('09440000000002');
