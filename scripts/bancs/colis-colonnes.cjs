@@ -277,6 +277,24 @@ async function main() {
         dit(!!puma && /Puma Suede taille 42/.test(puma.txt) && /Code de retrait\s*998877/.test(puma.txt), `${T} une carte à retirer dit ce que c'est et SON code, nommé (« Code de retrait 998877 »)`, puma && puma.txt);
         const sansGeste = L.idents.filter((x) => x.cle.startsWith('r:') && !x.retire).map((x) => x.cle);
         dit(!sansGeste.length, `${T} chaque colis à retirer porte « J'ai retiré » sur SA carte`, JSON.stringify(sansGeste));
+        // (2 nov., n° 1) « J'ai retiré » se LIT : le texte visible du bouton (rendu, pas le
+        // DOM) — mot « retiré » dessiné en entier dans le bouton, rien de rogné ni coupé
+        // (`clip-path`, `text-overflow`), 44 px au doigt. Un « ✓ » seul ne dit pas le geste.
+        const retire = await pg.evaluate(() => [...document.querySelectorAll('[data-cc-colonne="retirer"] [data-colis-retire]')].filter((b) => b.getClientRects().length).map((b) => {
+          const br = b.getBoundingClientRect(); const cs = getComputedStyle(b);
+          const w = document.createTreeWalker(b, NodeFilter.SHOW_TEXT); let n, ok = false, larg = 0, raison = 'pas de texte « retiré »';
+          while ((n = w.nextNode())) {
+            if (!/retir/i.test(n.textContent)) continue;
+            const r = document.createRange(); r.selectNodeContents(n); const rr = r.getBoundingClientRect(); larg = Math.round(rr.width);
+            let el = n.parentElement, coupe = '';
+            while (el && el !== b.parentElement) { const c = getComputedStyle(el); if ((c.clipPath && c.clipPath !== 'none') || c.clip !== 'auto' && c.clip) coupe = 'clip'; if (c.visibility === 'hidden' || c.opacity === '0' || c.display === 'none') coupe = 'caché'; const er = el.getBoundingClientRect(); if (el !== b && (er.width < rr.width - 1) && c.overflow !== 'visible') coupe = 'rogné ' + Math.round(er.width) + 'px'; el = el.parentElement; }
+            const dedans = rr.left >= br.left - 1 && rr.right <= br.right + 1 && rr.width > 30;
+            ok = !coupe && dedans; raison = coupe || (dedans ? '' : 'hors du bouton');
+          }
+          return { ok: ok && cs.textOverflow !== 'ellipsis' && b.scrollWidth <= b.clientWidth + 1 && br.height >= 44 - 0.5, txt: b.innerText.trim(), h: Math.round(br.height), larg, raison: raison || (cs.textOverflow === 'ellipsis' ? 'ellipsis' : b.scrollWidth > b.clientWidth + 1 ? 'déborde' : br.height < 44 ? 'h<44' : '') };
+        }));
+        const retireKO = retire.filter((x) => !x.ok);
+        dit(retire.length > 0 && !retireKO.length, `${T} « J'ai retiré » se lit en toutes lettres sur chaque carte (texte rendu, pas rogné, 44 px)`, JSON.stringify(retireKO.slice(0, 3).concat(retire.length ? [] : ['aucun bouton'])));
         dit(!L.ban, `${T} jamais « Base Adresse Nationale » à l'écran`, '');
         if (!ordi) dit(!L.phraseCarte, `${T} au téléphone, aucune phrase sur la carte (« Pas sur la carte… », « La carte ne s'affiche pas… »)`, '');
         dit(!L.ecrases.length, `${T} À retirer : aucun texte écrasé`, JSON.stringify(L.ecrases.slice(0, 5)));
@@ -302,6 +320,43 @@ async function main() {
         const nPrets = Object.values(GROUPE_ENV).filter((g) => g === 'pret').length;
         dit(!!L.bouton && L.bouton.n === nPrets && new RegExp(`\\b${nPrets}\\b`).test(L.bouton.txt) && /prêts?/.test(L.bouton.txt), `${T} « Imprimer les N prêts » = les prêts`, JSON.stringify(L.bouton));
         dit(L.emballer, `${T} « Emballer » reste accessible`, '');
+        // (2 nov., n° 3, 4 et 5) Le haut d'« À envoyer », avant la première carte.
+        await pg.evaluate(() => { window.scrollTo(0, 0); const m = document.querySelector('.vrm-main'); if (m) m.scrollTop = 0; });
+        await pg.waitForTimeout(200);
+        const haut = await pg.evaluate(() => {
+          const main = document.querySelector('.vrm-main') || document.body;
+          const tg = main.querySelector('[data-tout-generer]');
+          const nTg = tg ? Number((/\((\d+)\)/.exec(tg.innerText) || [])[1]) : null;
+          // Le même nombre dit deux fois : « Tout générer (N) » puis « N bordereau(x) à générer ».
+          const redit = nTg != null && [...main.querySelectorAll('[data-raison-bord]')].some((r) => r.getClientRects().length && new RegExp('\\b' + nTg + '\\s*bordereaux?\\s*à générer').test(r.innerText));
+          // Un bloc encadré autour d'un bouton seul.
+          const rc = main.querySelector('[data-colis-recap]');
+          let cadre = null;
+          if (rc && rc.getClientRects().length) {
+            const vis = [...rc.querySelectorAll('button,a,[data-colis-urgence-ligne],[data-colis-recap-ebay-ligne]')].filter((e) => e.getClientRects().length && getComputedStyle(e).visibility !== 'hidden');
+            const cs = getComputedStyle(rc);
+            const encadre = parseFloat(cs.borderTopWidth) > 0 || (cs.backgroundColor !== 'rgba(0, 0, 0, 0)' && cs.backgroundColor !== 'transparent') || parseFloat(cs.paddingTop) > 4;
+            cadre = { n: vis.length, encadre, seul: vis.length === 1 && vis[0].hasAttribute('data-tout-generer') };
+          }
+          const premiere = main.querySelector('[data-bord-card]');
+          const pr = premiere ? premiere.getBoundingClientRect() : null;
+          const apres = (sel) => { const e = main.querySelector(sel); return !e ? 'absent' : !premiere ? 'sans carte' : (premiere.compareDocumentPosition(e) & Node.DOCUMENT_POSITION_FOLLOWING ? 'dessous' : 'dessus'); };
+          const sous = document.querySelector('[data-sous-titre]'); const sr = sous ? sous.getBoundingClientRect() : null;
+          const lh = sous ? (parseFloat(getComputedStyle(sous).lineHeight) || 19) : 19;
+          const bt = document.querySelector('[data-imprimer-prets]'); const btr = bt ? bt.getBoundingClientRect() : null;
+          const posteFixe = [...main.querySelectorAll('button')].some((b) => b.getClientRects().length && /est dans « Partis »|sont dans « Partis »/.test(b.innerText));
+          return { nTg, redit, cadre, premiereTop: pr ? Math.round(pr.top) : null, vh: window.innerHeight,
+            journal: apres('[data-journal-entree]'), stock: apres('[data-colis-stock]'), posteFixe,
+            sous: sr ? { w: Math.round(sr.width), h: Math.round(sr.height), lignes: Math.round(sr.height / lh), cote: !!(btr && btr.top < sr.bottom - 2 && btr.bottom > sr.top + 2) } : null };
+        });
+        dit(haut.nTg == null || !haut.redit, `${T} À envoyer : le nombre de « Tout générer (N) » n'est pas redit par une ligne « N bordereau(x) à générer »`, JSON.stringify([haut.nTg, haut.redit]));
+        dit(!haut.cadre || !(haut.cadre.seul && haut.cadre.encadre), `${T} À envoyer : pas de bloc encadré autour d'un bouton seul`, JSON.stringify(haut.cadre));
+        dit(haut.journal !== 'dessus' && haut.stock !== 'dessus', `${T} À envoyer : « Tes emails… » et « Où sont ces articles » sous la liste, pas avant la première carte`, JSON.stringify([haut.journal, haut.stock]));
+        dit(!haut.posteFixe, `${T} À envoyer : pas de phrase permanente « … est dans Partis » (le nombre est sur « Partis »)`, '');
+        if (!ordi) {
+          dit(!!haut.sous && !haut.sous.cote && haut.sous.lignes <= 1, `${T} le sous-titre tient sur UNE ligne, le bouton du haut n'est pas à côté de lui`, JSON.stringify(haut.sous));
+          dit(haut.premiereTop != null && haut.premiereTop < haut.vh - 60, `${T} la première carte de colis est au-dessus de la ligne de flottaison (un colis prêt)`, `${haut.premiereTop} / ${haut.vh}`);
+        }
         dit(!L.ban, `${T} À envoyer : jamais « Base Adresse Nationale »`, '');
         dit(!L.ecrases.length, `${T} À envoyer : aucun texte écrasé`, JSON.stringify(L.ecrases.slice(0, 5)));
         dit(L.sw <= L.cw + 1, `${T} À envoyer : aucun débordement horizontal`, `${L.sw} > ${L.cw}`);
