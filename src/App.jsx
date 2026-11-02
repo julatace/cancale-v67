@@ -26905,11 +26905,12 @@ function joursAvantVc(iso) { const t = Date.parse(iso || ''); return isFinite(t)
 function ColisVestiaireBloc({ vc }) {
   if (vc === undefined || (vc && !vc.aEnvoyer && !vc.enRoute)) return null;
   if (vc === null) return <div data-colis-vestiaire="passu" style={{ marginBottom: 10 }}><LignePanne>Les colis Vestiaire n'ont pas pu être lus pour l'instant. Rien n'est perdu : rouvre Colis dans un moment.</LignePanne></div>;
-  const E = vc.aEnvoyer || [], R = vc.enRoute || [];
-  if (!E.length && !R.length) return null;
+  // (2 nov.) Les achats en route (`vc.enRoute`) ne sont plus ici : `AchatsVestiaireEnRoute`, sous « À retirer ».
+  const E = vc.aEnvoyer || [];
+  if (!E.length) return null;
   const titre = (t, n) => <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: '.07em', textTransform: 'uppercase', color: C.muted }}>{t} <span style={{ color: C.text, fontVariantNumeric: 'tabular-nums' }}>· {n}</span></span>;
   return (
-    <div data-colis-vestiaire={E.length} data-colis-vestiaire-route={R.length} style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 16 }}>
+    <div data-colis-vestiaire={E.length} style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 16 }}>
       {E.length > 0 && <>
         {titre('Ventes Vestiaire à envoyer', E.length)}
         <div className="vrm-aide" style={{ fontSize: 12, color: C.muted, lineHeight: 1.5 }}>{E.every((v) => v.bordereau) ? 'Les bordereaux sont dans VRM (« Imprimer le bordereau »). ' : 'Le bordereau se prend sur Vestiaire (onglet « articles à expédier ») — ou ici, une fois la page de la vente ouverte sur Vestiaire. '}Ce que VRM lit vient de ta dernière visite sur Vestiaire avec l'extension.</div>
@@ -26927,17 +26928,30 @@ function ColisVestiaireBloc({ vc }) {
             {!v.num ? <div style={{ fontSize: 11, color: C.muted }}>Aucune référence VRM-n° lue sur l'article : VRM ne devine pas la paire.</div> : null}
           </div>); })}
       </>}
-      {R.length > 0 && <>
-        {titre('Achats Vestiaire en route', R.length)}
-        {R.map((v) => (
-          <div key={v.id} data-vc-route={v.id} style={{ border: `1px solid ${C.border}`, borderRadius: 10, padding: '10px 12px', background: C.card }}>
-            <div style={{ fontSize: 13, fontWeight: 600, color: C.text, overflowWrap: 'anywhere' }}>{v.nom || 'Article sans nom lu'}</div>
-            <div style={{ fontSize: 11.5, color: C.muted }}>{v.etat ? `Vestiaire : « ${v.etat} » · ` : ''}suivi {v.suivi}{v.transporteur ? ` (${v.transporteur})` : ''}</div>
-            <BoutonSuivreColis transporteur={v.transporteur} suivi={v.suivi}/>
-          </div>
-        ))}
-      </>}
     </div>
+  );
+}
+// (2 nov.) LES ACHATS VESTIAIRE EN ROUTE — sortis de « À envoyer » (Julien : ce qui
+// ARRIVE n'a rien à faire avec ce qu'on envoie) : ils vivent sous « À retirer »,
+// HORS du compte « à retirer » (en route, pas encore au relais — rien n'est caché,
+// §5). Même liste qu'avant (`colisVestiaire(d).enRoute`), le transporteur LU en plus.
+function AchatsVestiaireEnRoute({ vc, transporteurDe }) {
+  if (vc === null) return <div data-colis-vestiaire-route="passu" style={{ marginTop: 14 }}><LignePanne>Les achats Vestiaire en route n'ont pas pu être lus pour l'instant. Rien n'est perdu : rouvre Colis dans un moment.</LignePanne></div>;
+  const R = (vc && vc.enRoute) || [];
+  if (!R.length) return null;
+  return (
+    <section className="vrm-colis-en-route" data-colis-vestiaire-route={R.length} style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 18 }}>
+      <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: '.07em', textTransform: 'uppercase', color: C.muted }}>Achats Vestiaire en route <span style={{ color: C.text, fontVariantNumeric: 'tabular-nums' }}>· {R.length}</span></span>
+      {R.map((v) => { const tr = transporteurDe ? transporteurDe(v.transporteur, v.suivi) : transporteurDuColis({ declare: v.transporteur, suivi: v.suivi }); return (
+        <div key={v.id} data-vc-route={v.id} data-colis-ident={'vcr:' + v.id} data-transporteur={cleStatTransporteur(tr)} style={{ border: `1px solid ${C.border}`, borderRadius: 10, padding: '10px 12px', background: C.card, display: 'flex', flexDirection: 'column', gap: 4 }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: C.text, overflowWrap: 'anywhere' }}>{v.nom || 'Article sans nom lu'}</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            <PastilleTransporteur t={tr} C={C} seul taille={18}/>
+            <span style={{ fontSize: 11.5, color: C.muted, overflowWrap: 'anywhere' }}>{v.etat ? `Vestiaire : « ${v.etat} » · ` : ''}suivi {v.suivi}</span>
+          </div>
+          <BoutonSuivreColis transporteur={tr.cle || v.transporteur} suivi={v.suivi}/>
+        </div>); })}
+    </section>
   );
 }
 // ══════════════════════════════════════════════════════════════════════════════
@@ -52380,6 +52394,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 {colRet && colRet.cartes.length > 0
                   ? <ColonneRetirer vue={parPoint} C={C} Photo={photoCarte} gestes={gestesRetrait} detail={arriveeRetrait} nomTransporteur={(k) => (CARRIERS[k] && CARRIERS[k].name) || ''} avecCarte={ordiColis} enRouteSansRelais={(groupesRelais && groupesRelais.enRouteSansRelais) || 0}/>
                   : (toutLuRet ? <p className="vrm-colis-vide" data-retraits-vide="">Aucun colis à aller chercher pour l’instant.</p> : null)}
+                {voitSite('vestiaire') ? <AchatsVestiaireEnRoute vc={colisVestiaire(vcEtat)} transporteurDe={transporteurColis}/> : null}
               </section>
             )}
           </>);
