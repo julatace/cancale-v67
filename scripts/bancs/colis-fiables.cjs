@@ -234,7 +234,7 @@ async function main() {
         const c1 = carte('30000001');
         dit(!!c1, `${T} le Mondial Relay arrivé sur une adresse reliée à aucun compte APPARAÎT (jamais écarté)`, c1 ? '' : 'absent');
         dit(c1 && c1.compte === '' && L.sansCompte === '2' && L.nSansCompte === 1 && (L.texte.match(/compte non reconnu/g) || []).length === 1, `${T} … « compte non reconnu » dit UNE fois pour les deux colis sans compte`, `sansCompte=${L.sansCompte} ×${L.nSansCompte}`);
-        dit(/Relie-la dans Réglages/.test(L.texte), `${T} … avec le geste, puisqu'une adresse de réception connue n'est reliée à aucun compte`);
+        dit(/Relie-la dans Paramètres/.test(L.texte), `${T} … avec le geste, puisqu'une adresse de réception connue n'est reliée à aucun compte`);
         dit(c1 && c1.limite === '2026-10-26' && /jusqu'au 26\/10/.test(c1.limiteTxt), `${T} sa date limite (26/10) est sur la carte`, c1 && `${c1.limite} « ${c1.limiteTxt} »`);
         dit(c1 && /30000001/.test(c1.t) && /123456/.test(c1.t), `${T} son n° de suivi et son code sont sur la carte`);
         const c2 = carte('09440000000002');
