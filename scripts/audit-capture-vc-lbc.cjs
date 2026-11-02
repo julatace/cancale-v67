@@ -325,13 +325,14 @@ function fonctionsApp() {
 // au premier niveau. Sur la 5.313 toute la liste tombait en « forme inconnue ».
 async function c10() {
   const p = pageVc();
-  const env = (id, type, titre, sous, cents) => ({ type, [type]: { product: { id, headline: titre, subHeadline: sous, picturePath: '/p/x.jpg', price: { formatted: 'x', cents, currency: 'EUR' }, sellerEarnings: { formatted: 'x', cents: cents - 1500, currency: 'EUR' }, path: '/x.shtml', segment: 'x' }, listingDate: '2026-10-30T10:00:00Z', negotiationsSummary: { totalNegotiationsCount: 0, ongoingNegotiationsCount: 0, pendingSellerActionCount: 0 }, singleNegotiationId: null, hasPriceDropRecommendation: false } });
+  const env = (id, type, titre, sous, cents) => ({ type, [type]: { product: { id, headline: titre, subHeadline: sous, picturePath: `${id}-1_2.jpg`, price: { formatted: 'x', cents, currency: 'EUR' }, sellerEarnings: { formatted: 'x', cents: cents - 1500, currency: 'EUR' }, path: '/x.shtml', segment: 'x' }, listingDate: '2026-10-30T10:00:00Z', negotiationsSummary: { totalNegotiationsCount: 0, ongoingNegotiationsCount: 0, pendingSellerActionCount: 0 }, singleNegotiationId: null, hasPriceDropRecommendation: false } });
   const d = (await p.charge(`${API}/users/me/product-listings?offset=0&limit=20`, { meta: { limit: 20, offset: 0, count: 2 }, data: [env(60001, 'published', 'Nike', 'Baskets Dunk Low', 12000), env(60002, 'published', 'Adidas', 'Baskets Samba', 9000)] })).find((x) => x.kind === 'vcannonces');
   const it = (d && d.items) || [];
   dit(d && !d.inconnu && it.length === 2, 'C10 · la forme réelle (enveloppe « published ») est LUE : deux annonces, pas une forme inconnue', JSON.stringify(d && { n: it.length, inconnu: !!d.inconnu }));
   dit(it[0] && it[0].id === '60001' && it[1] && it[1].id === '60002', 'C10 · chaque annonce a l’identifiant de SON produit', JSON.stringify(it.map((x) => x.id)));
   dit(it[0] && it[0].titre === 'Nike Baskets Dunk Low' && it[0].prix && it[0].prix.valeur === 120 && it[0].statut === 'published', 'C10 · titre (headline + subHeadline), prix 120 €, état « published »', JSON.stringify(it[0] && { t: it[0].titre, p: it[0].prix, s: it[0].statut }));
   dit(d && d.complet && d.complet.length === 2, 'C10 · la liste lue en entier fait foi', JSON.stringify(d && d.complet));
+  dit(it[0] && it[0].photo === 'https://images.vestiairecollective.com/produit/60001-1_2.jpg', 'C10 · (5.316) la photo : le nom de fichier de Vestiaire sur SON serveur d’images', JSON.stringify(it[0] && it[0].photo));
 }
 // C11 (2 nov., 5.315) — « TOUT VESTIAIRE » : la réponse entière gardée telle quelle,
 // sans secret, un PDF (bordereau) gardé, rien d'un autre site, rien d'une erreur.
@@ -359,6 +360,31 @@ async function c11() {
   const msg = r(Object.assign({}, m1[0], { moi: 'compteA' })).find((y) => y.action === 'vcBrut'); await f.envoyer(msg, senderVc(30));
   dit(Object.keys(f.lignes).length === n0, 'C11 · la même réponse revue ne crée pas de seconde ligne', '');
 }
+// C12 (2 nov., 5.316) — TA VENTE VESTIAIRE COMPLÈTE, sur la forme RÉELLE relevée
+// le 2 nov. (`ots/sales`, `contents/timeline/seller` ; valeurs inventées) : titre,
+// photo, ce que Vestiaire verse (« 203,23 € »), transporteur, suivi, et le
+// BORDEREAU PDF rapatrié de son adresse signée.
+async function c12() {
+  const p = pageVc();
+  const vente = { data: { products: [{ action: { type: 'timeline', title: 'Expédiez maintenant', context: { url: '' }, message: 'x' }, ezlink: '70001.shtml', status: 'ACTION_NEEDED', imageUrl: '70001-1_2.jpg', sellerId: '1', soldDate: '2026-11-02 14:17:41', brandName: 'Gucci', productId: '70001', externalRef: '', productName: 'Cabas en cuir', sellerPrice: '209,52 €', currencyRate: '1.0000', productPrice: '209,52 €', sellerEarning: '1 203,23 €', isDirectShipping: true, orderConfirmationDate: '2026-11-02 14:17:40' }] }, meta: { count: 1, limit: 20, offset: 1 } };
+  const v = (await p.charge(`${API}/ots/sales?status=ACTION_NEEDED&isoCountry=FR`, vente)).find((x) => x.kind === 'vcventes');
+  const x = v && v.ventes && v.ventes[0];
+  dit(x && x.id === '70001' && x.titre === 'Gucci Cabas en cuir' && x.photo === 'https://images.vestiairecollective.com/produit/70001-1_2.jpg', 'C12 · la vente : titre (marque + nom) et photo de Vestiaire', JSON.stringify(x && { id: x.id, t: x.titre, p: x.photo }));
+  dit(x && x.montant && x.montant.valeur === 1203.23 && x.montant.devise === 'EUR' && x.montant.cle === 'sellerEarning', 'C12 · ce que Vestiaire te verse : « 1 203,23 € » lu au centime, sous sa clé', JSON.stringify(x && x.montant));
+  const tl = { data: { steps: { sellerShipment: { status: 'pending', shipmentDetails: { labelUrl: null, labelType: 'printable_label', shipByDate: '9 novembre 2026', chosenCarrier: { carrierName: 'Chronopost' }, trackingNumber: 'XW000000001JF', shippingLabelUrl: 'https://vc-prod-tms-s3-01.s3.eu-west-1.amazonaws.com/shipment_documents/x/70001.pdf?X-Amz-Signature=abc' } }, sellerPayment: { status: 'upcoming' } }, header: { date: '24 novembre 2026' }, status: 'shipmentInProgress' } };
+  const t = (await p.charge(`${API}/contents/timeline/seller?product=70001&version=3`, tl)).find((y) => y.kind === 'vctimeline');
+  dit(t && t.transporteur === 'Chronopost' && t.suivi === 'XW000000001JF' && /amazonaws\.com\/shipment_documents\/x\/70001\.pdf/.test(t.bordereau) && t.paiementEstime === '24 novembre 2026', 'C12 · le suivi : Chronopost, n° de suivi, adresse du bordereau, paiement estimé', JSON.stringify(t && { tr: t.transporteur, s: t.suivi, p: t.paiementEstime }));
+  const f = faireFond({ src: F.src, lignes: {} });
+  const vrai = f.ctx.fetch;
+  f.ctx.fetch = async (u, o) => (/amazonaws\.com/.test(String(u)) ? { ok: true, status: 200, arrayBuffer: async () => { const b = Buffer.from('%PDF-1.4\n bordereau Chronopost de banc ' + 'x'.repeat(200) + '\n%%EOF'); return b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength); }, headers: { get: () => 'application/pdf' } } : vrai(u, o));
+  await f.ctx.noterSessionVc('compteA', 30, []);
+  const r = relais();
+  for (const d of [v, t]) { const msg = r(Object.assign({}, d, { moi: 'compteA' })).find((y) => y.action === 'vcVentes' || y.action === 'vcTimeline'); if (msg) await f.envoyer(msg, senderVc(30)); }
+  const ve = f.lignes.vc_ventes && f.lignes.vc_ventes.ventes && f.lignes.vc_ventes.ventes['70001'];
+  const lab = f.lignes.vc_label_70001;
+  dit(ve && ve.titre === 'Gucci Cabas en cuir' && ve.photo && ve.transporteur === 'Chronopost' && ve.suivi === 'XW000000001JF' && ve.bordereau && ve.bordereau.id === 'vc_label_70001', 'C12 · le fond range la vente complète, reliée à son bordereau', JSON.stringify(ve && { t: ve.titre, tr: ve.transporteur, b: ve.bordereau }));
+  dit(lab && Buffer.from(lab.b64, 'base64').slice(0, 5).toString() === '%PDF-' && lab.suivi === 'XW000000001JF', 'C12 · le bordereau PDF est rangé (vc_label_…)', String(!!lab));
+}
 async function c9() {
   const app = fonctionsApp();
   const lu = new Date().toISOString(), vieux = new Date(Date.now() - 3 * 86400e3).toISOString(), frais = new Date(Date.now() - 3600e3).toISOString();
@@ -370,7 +396,7 @@ async function c9() {
 }
 
 (async () => {
-  for (const [nom, f] of [['C1', c1], ['C2', c2], ['C3', c3], ['C4', c4], ['C5', c5], ['C6', c6], ['C7', c7], ['C8', c8], ['C9', c9], ['C10', c10], ['C11', c11]]) {
+  for (const [nom, f] of [['C1', c1], ['C2', c2], ['C3', c3], ['C4', c4], ['C5', c5], ['C6', c6], ['C7', c7], ['C8', c8], ['C9', c9], ['C10', c10], ['C11', c11], ['C12', c12]]) {
     try { await f(); } catch (e) { dit(false, `${nom} : l’audit a tourné jusqu’au bout`, String((e && e.stack) || e).slice(0, 300)); }
   }
   console.log(ko ? `\n❌ ${ko} contrôle(s) rouge(s)` : '\n✅ capture Vestiaire et Leboncoin : tout est vert');
