@@ -4,6 +4,7 @@ import BilanSynchronisation from './BilanSynchronisation.jsx';
 import VendusAilleurs from './VendusAilleurs.jsx';
 import { articlesVendusAilleurs } from './bilanSynchronisation.js';
 import { gardeOffres } from './offresGarde.js';
+import { jugerBrouillon, lectureBrouillons } from './brouillonsProposables.js';
 import {AnnoncesACompleter,ComparaisonComptesVinted,HistoriqueArticle} from './OutilsArticlesVinted.jsx';
 import {comparerComptes,diagnosticConnexion} from './outilsArticlesVinted.js';
 import {correspondRechercheMessage} from './rechercheMessagesVinted.js';
@@ -171,7 +172,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.310.0';
+const EXT_ATTENDUE = '5.312.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -596,7 +597,7 @@ const extEnRetard = (v) => !!v && cmpVersion(v, EXT_ATTENDUE) < 0;
 // ⚠️ (30 oct., intégration) `transp`, `lbcsupprime` et `lbcstats` arrivent tous
 //    en 5.291.0 : 5.288 (Leboncoin) et 5.290 (colis) étaient des numéros de
 //    branche, jamais servis ; aucune version publiée ne porte ces fonctions.
-const EXT_CAPACITES = { republierquestion: '5.310.0', favorisauto: '5.309.0', offresgarde: '5.308.0', transp: '5.291.0', favorisouvrir:'5.225.0', favorisliste:'5.218.0', suivivinted: '5.217.0', favoris: '5.217.0', liaison: '5.171.0', supprimees: '5.165.0', enligne: '5.170.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', preuves: '5.172.0', etatcompte: '5.181.0', lbcfiche: '5.182.0', relais: '5.183.0', lbcpack: '5.185.0', annulee: '5.185.0', confirmer: '5.206.0', retraitnotif: '5.206.0', offresauto: '5.234.0', vcpublier: '5.235.0', vcauto: '5.236.0', vcventes: '5.237.0', vcmessages: '5.238.0', vcachats: '5.239.0', republier: '5.240.0', republiermodif: '5.247.0', recreer: '5.248.0', lettre: '5.250.0', brouillon: '5.251.0', versbrouillon: '5.253.0', republierbrouillon: '5.254.0', refaire: '5.255.0', republierpage: '5.277.0', republierfile: '5.279.0', favorisperso: '5.281.0', lbcsupprime: '5.291.0', lbcstats: '5.291.0', vcsession: '5.295.0', vcfil: '5.295.0', vcrepondre: '5.295.0', vcfavoris: '5.295.0', relaisdest: '5.295.0', vcfiche: '5.296.0' };
+const EXT_CAPACITES = { plafondcompte: '5.312.0', freinrepub: '5.311.0', numeroscompte: '5.311.0', republierquestion: '5.310.0', favorisauto: '5.309.0', offresgarde: '5.308.0', transp: '5.291.0', favorisouvrir:'5.225.0', favorisliste:'5.218.0', suivivinted: '5.217.0', favoris: '5.217.0', liaison: '5.171.0', supprimees: '5.165.0', enligne: '5.170.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', preuves: '5.172.0', etatcompte: '5.181.0', lbcfiche: '5.182.0', relais: '5.183.0', lbcpack: '5.185.0', annulee: '5.185.0', confirmer: '5.206.0', retraitnotif: '5.206.0', offresauto: '5.234.0', vcpublier: '5.235.0', vcauto: '5.236.0', vcventes: '5.237.0', vcmessages: '5.238.0', vcachats: '5.239.0', republier: '5.240.0', republiermodif: '5.247.0', recreer: '5.248.0', lettre: '5.250.0', brouillon: '5.251.0', versbrouillon: '5.253.0', republierbrouillon: '5.254.0', refaire: '5.255.0', republierpage: '5.277.0', republierfile: '5.279.0', favorisperso: '5.281.0', lbcsupprime: '5.291.0', lbcstats: '5.291.0', vcsession: '5.295.0', vcfil: '5.295.0', vcrepondre: '5.295.0', vcfavoris: '5.295.0', relaisdest: '5.295.0', vcfiche: '5.296.0' };
 // Trois états, jamais un seul : pas d'extension ici · en retard · à jour.
 const extSait = (quoi) => {
   if (!vmrExtPresent()) return 'absente';                    // téléphone, autre navigateur
@@ -3307,8 +3308,11 @@ function dateLectureDressing(ligne) {
 //   · et cette lecture a moins de 24 h. Au-delà (ou jamais lue) on ne SAIT pas :
 //     ses annonces ne sont ni « en ligne » ni « disparues » — « à confirmer »,
 //     dites à part, jamais comptées (« rien lu ne vaut pas rien », §4.1).
-// Une annonce présente dans la lecture publique mais pas dans le dressing (elle
-// vient d'être republiée) est en ligne, avec ce que la lecture publique en sait.
+// ⚠️ (2 nov., Julien : « tant que l'extension n'a pas capté depuis le compte où
+// l'annonce est, elle ne peut pas ajouter une annonce dans VRM » — le cas
+// shop_cancale) Une annonce présente dans la lecture publique mais JAMAIS dans
+// le dressing capté connecté n'est PAS ajoutée : elle attend la capture faite
+// depuis son compte. Un compte sans aucune capture connectée n'apparaît pas.
 // Une annonce ouverte dans un dressing plus ancien et ABSENTE de la lecture
 // publique plus récente n'est plus en ligne (supprimée, vendue ou masquée) : elle
 // est rendue FERMÉE (`_vrmAbsente`), jamais « vendue » (rien ne le prouve).
@@ -3350,7 +3354,10 @@ function enLigneDuCompte(liste, pub, suppIds, maintenant) {
       if (!id || vus.has(id)) continue;
       vus.add(id);
       const l = parL.get(id) || null, p = parP.get(id) || null;
-      if (!l && !p) continue;
+      // ⚠️ (2 nov., Julien) Une lecture PUBLIQUE n'AJOUTE jamais une annonce : elle
+      // confirme ou retire ce que SON compte a déjà capté connecté. Une annonce vue
+      // seulement en public attend la prochaine capture faite depuis son compte.
+      if (!l) continue;
       if (l && venduePourSonVendeur(l)) { r.fermees.push(l); continue; }
       cand.push(Object.assign({}, l || {}, p || {}, { id: (l || p).id, is_closed: false, is_hidden: false, is_draft: false }));
     }
@@ -4092,7 +4099,11 @@ const dressingEnLigne = async (uid, row, opts = {}) => {
     // supprimé sur Vinted APRÈS la lecture n'y est plus (règle des suppressions).
     _vrmBrouillons: (payload && Array.isArray(payload.items) ? payload.items : [])
       .filter((x) => x && x.is_draft && !x.is_closed && !supprimeeApres(supp, x.id, ts))
-      .map((x) => ({ ...x, _vrmBrLu: isFinite(ts) ? ts : null })) };
+      .map((x) => ({ ...x, _vrmBrLu: isFinite(ts) ? ts : null })),
+    // (2 nov.) La lecture de SON dressing (sa session, la seule qui voit les
+    // brouillons) : datée, et complète ou non. Seule une lecture complète prouve
+    // qu'un brouillon n'y est plus (`src/brouillonsProposables.js`).
+    _vrmBrLecture: lectureBrouillons(payload, isFinite(ts) ? ts : NaN) };
 };
 // Bordereaux reçus par EMAIL (pipeline usevrm) : lignes app_data email_bord_*
 // = { numero, modele, taille, transaction, pdfB64, ... }. Le PDF est en base64.
@@ -9067,6 +9078,7 @@ const fetchVintedListings = async (account, page = 1, opts = {}) => {
                masquees: (h._vrmMasquees || []).map((it) => ({ ...mapWardrobeItem(it), _vrmMasquee: true, _vrmVueMasqueeLe: h._vrmMasqueesLu || null })),
                // 28 oct. : ses BROUILLONS Vinted (`is_draft`), lus dans le même dressing.
                brouillons: (Array.isArray(h._vrmBrouillons) ? h._vrmBrouillons : h.items.filter((x) => x && x.is_draft && !x.is_closed)).map((x) => ({ ...mapWardrobeItem(x), _vrmBrLu: x._vrmBrLu != null ? x._vrmBrLu : null })),
+               brLecture: h._vrmBrLecture || null,
                lu: Number.isFinite(h._vrmLu) ? h._vrmLu : null, complet: h._vrmComplet === true,
                pagination: h.pagination || null, source: 'harvest' };
     }
@@ -12731,7 +12743,7 @@ function etatBrouillon(i, uid) {
   const prix = i.prix != null && i.prix !== '' ? Number(i.prix) : NaN;
   return String(i.titre || '').trim() && prix > 0 && Number(i.nph) > 0 ? 'pret' : 'incomplet';
 }
-function useBrouillonsVinted(brouillonsDressing, actif, comptes) {
+function useBrouillonsVinted(brouillonsDressing, actif, comptes, lectures) {
   const [infos, setInfos] = useState(undefined);   // undefined = lecture · null = pas su · {} = lu
   const [tick, setTick] = useState(0);
   const [ecartes, setEcartes] = useState(() => { const v = load(BROUILLONS_ECARTES, {}); return v && typeof v === 'object' ? v : {}; });
@@ -12764,19 +12776,29 @@ function useBrouillonsVinted(brouillonsDressing, actif, comptes) {
     });
     // Enregistré sur Vinted APRÈS la dernière lecture du dressing de ce compte :
     // l'extension l'a vu passer (2xx de Vinted), le dressing ne peut pas encore le montrer.
+    // (2 nov.) Qu'il soit encore là se juge par `jugerBrouillon` (lecture COMPLÈTE de
+    // SON dressing, jamais la lecture publique d'un autre compte, qui ne voit aucun brouillon).
     if (infos) for (const [id, i] of Object.entries(infos)) {
       if (vus.has(id) || i.etat !== 'brouillon' || !i.uid) continue;
-      const at = Date.parse(i.at || ''); const lu = _harvestSeen[`${i.uid}_listings`];
-      if (!isFinite(at) || (Number.isFinite(lu) && lu >= at + SUPPR_MARGE_MS)) continue;   // relu depuis et absent : plus sur Vinted
+      const at = Date.parse(i.at || '');
+      if (!isFinite(at)) continue;
       const acc = (comptes || []).find((a) => String(a.vinted_user_id) === String(i.uid)) || { vinted_user_id: i.uid };
       const prix = i.prix != null && i.prix !== '' ? Number(i.prix) : null;
       L.push({ id, title: i.titre || '', price: prix, photo: '', _acc: acc, _uid: String(i.uid), _info: i, _etat: etatBrouillon(i, i.uid), _vu: null, _enregistre: at, _source: 'extension' });
     }
     return L;
   }, [brouillonsDressing, infos, comptes]);
-  const liste = tout && tout.filter((b) => { const e = Date.parse(ecartes[b.id] || ''); return !(isFinite(e) && !(Number.isFinite(b._vu) && b._vu > e)); });
-  const nEcartes = tout ? tout.length - liste.length : 0;
-  return { liste, infos, nEcartes, ecarter, remettre, relire: () => setTick((t) => t + 1) };
+  // (2 nov., « elle propose des brouillons qui ne viennent pas de ce compte, et même
+  // quand ils n'existent plus ») Chaque brouillon porte SA place (`_place`) : la règle
+  // unique de `src/brouillonsProposables.js`, jugée à chaque rendu (le compte ouvert
+  // dans Chrome change sans prévenir). « Plus sur Vinted » sort de la liste, compté.
+  const vc = vintedDeChrome();
+  const juge = tout && tout.map((b) => ({ ...b, _place: jugerBrouillon({ uid: b._uid, source: b._source, vu: b._vu, enregistre: b._enregistre, etat: b._etat }, { uidChrome: vc === undefined ? undefined : (vc ? vc.uid : null), lectures: lectures || null, maintenant: Date.now() }).place }));
+  const garde = juge && juge.filter((b) => { const e = Date.parse(ecartes[b.id] || ''); return !(isFinite(e) && !(Number.isFinite(b._vu) && b._vu > e)); });
+  const nEcartes = juge ? juge.length - garde.length : 0;
+  const liste = garde && garde.filter((b) => b._place !== 'plus-sur-vinted');
+  const nDisparus = garde ? garde.length - liste.length : 0;
+  return { liste, infos, nEcartes, nDisparus, uidChrome: vc === undefined ? undefined : (vc ? vc.uid : null), loginChrome: vc ? vc.login : '', ecarter, remettre, relire: () => setTick((t) => t + 1) };
 }
 // ── « BROUILLONS À REFAIRE » (28 oct., sa demande : « un bouton pour refaire un
 // brouillon raté ») ─────────────────────────────────────────────────────────
@@ -12914,10 +12936,14 @@ function BrouillonsARefaire({ br, refaire, onClose, onVoirBrouillons, peutAgir, 
 }
 const ilYaBr = (t) => { const m = Math.max(1, Math.round((Date.now() - t) / 60000)); return m < 60 ? `${m} min` : m < 48 * 60 ? `${Math.round(m / 60)} h` : `${Math.round(m / 1440)} j`; };
 function BrouillonsVinted({ br, publier, brouillonOk, onClose, onFile }) {
-  const { liste, infos, nEcartes, ecarter, remettre } = br;
+  const { liste: liste0, infos, nEcartes, nDisparus = 0, uidChrome, loginChrome, ecarter, remettre } = br;
   const [etat, setEtat] = useState({});            // { [id]: { etape, raison } }
   const domaine = (it) => (it && it._acc && it._acc.domain) || 'www.vinted.fr';
-  const compte = (it) => (it._acc && (it._acc.login || it._acc.username)) || '';
+  const compte = (it) => (it._acc && (it._acc.login || it._acc.username)) || (it._uid ? `compte ${it._uid}` : '');
+  // (2 nov.) Les brouillons du compte ouvert dans Chrome d'abord (les seuls qu'on
+  // peut mettre en ligne d'ici), puis ceux des autres comptes, groupés par compte.
+  const rangPlace = (b) => (String(b._uid) === String(uidChrome || '') ? 0 : 1);
+  const liste = liste0 && liste0.slice().sort((a, b) => rangPlace(a) - rangPlace(b) || compte(a).localeCompare(compte(b)));
   const prixDe = (it) => { const i = it._info; const p = i && i.prix != null && i.prix !== '' ? Number(i.prix) : NaN; return p > 0 ? p : Number(it.price && typeof it.price === 'object' ? it.price.amount : it.price); };
   const mettre = async (it) => {
     const titre = (it._info && it._info.titre) || it.title || 'ce brouillon';
@@ -12930,7 +12956,8 @@ function BrouillonsVinted({ br, publier, brouillonOk, onClose, onFile }) {
     if (r && r.etape === 'fait') br.relire();
   };
   const lien = { minHeight: 44, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', padding: '0 12px', borderRadius: 8, border: `1px solid ${C.border}`, color: C.text, fontSize: 13, fontWeight: 600, textDecoration: 'none', fontFamily: 'inherit', background: 'transparent', cursor: 'pointer' };
-  const nPrets = liste ? liste.filter((b) => b._etat === 'pret').length : 0;
+  const nPrets = liste ? liste.filter((b) => b._place === 'proposable').length : 0;
+  const nomChrome = loginChrome || (uidChrome ? `compte ${uidChrome}` : '');
   return (
     <SheetShell onClose={onClose} maxWidth={560}>
       <div data-brouillons-vinted style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -12941,36 +12968,45 @@ function BrouillonsVinted({ br, publier, brouillonOk, onClose, onFile }) {
         {liste === null && <div style={{ fontSize: 13.5, color: C.muted }}>Lecture de tes annonces…</div>}
 
         {liste && !liste.length && <div data-brouillons-vide style={{ fontSize: 13.5, color: C.muted }}>Aucun brouillon sur Vinted d'après tes dressings lus par VRM.</div>}
+        {liste && liste.length > 0 && <div data-brouillons-compte-chrome={uidChrome || (uidChrome === null ? 'aucun' : 'passu')} style={{ fontSize: 12.5, color: C.muted, lineHeight: 1.45 }}>{uidChrome
+          ? <>Compte ouvert dans Chrome : <b style={{ color: C.text }}>{nomChrome}</b>. Seuls ses brouillons se mettent en ligne d'ici.</>
+          : uidChrome === null ? "Aucun compte Vinted ouvert dans Chrome : ouvre vinted.fr sur le compte du brouillon pour le mettre en ligne."
+          : "Compte Vinted ouvert dans Chrome pas encore connu : ouvre vinted.fr sur le compte du brouillon pour le mettre en ligne."}</div>}
         {infos === null && liste && liste.length > 0 && <div data-brouillons-passu style={{ fontSize: 12.5, color: C.muted }}>VRM n'a pas pu lire tes brouillons enregistrés : « Mettre en ligne » attend, « Ouvrir sur Vinted » marche.</div>}
         {!brouillonOk && liste && liste.length > 0 && <div data-brouillons-maj style={{ fontSize: 12.5, color: C.muted }}>Mettre en ligne d'ici demande l'extension VRM {EXT_CAPACITES.brouillon} ou plus récente.</div>}
         {brouillonOk && nPrets > 1 && onFile && <Bouton variante="primaire" data-brouillons-file onClick={onFile} style={{ alignSelf: 'flex-start', minHeight: 44 }}>En mettre plusieurs en ligne…</Bouton>}
         {liste && liste.map((it) => {
           const e = etat[it.id]; const i = it._info;
           const publie = it._etat === 'publie', complet = it._etat === 'pret';
+          const place = it._place || 'a-verifier'; const proposable = place === 'proposable';
+          const horsCompte = place === 'autre-compte' || place === 'compte-inconnu';
           const titre = it.title || (i && i.titre) || 'Brouillon sans titre';
           const prixAff = prixDe(it);
           return (
-            <div key={it.id} data-brouillon={it.id} data-brouillon-etat={it._etat} data-brouillon-source={it._source} style={{ display: 'flex', gap: 10, alignItems: 'center', padding: 10, border: `1px solid ${C.border}`, borderRadius: 12, background: C.card }}>
+            <div key={it.id} data-brouillon={it.id} data-brouillon-etat={it._etat} data-brouillon-source={it._source} data-brouillon-place={place} data-brouillon-compte={it._uid || ''} style={{ display: 'flex', gap: 10, alignItems: 'center', padding: 10, border: `1px solid ${C.border}`, borderRadius: 12, background: C.card, opacity: horsCompte ? 0.6 : 1 }}>
               <div style={{ width: 56, height: 70, borderRadius: 8, overflow: 'hidden', background: C.bg, flexShrink: 0 }}>{it.photo ? <PhotoVinted src={it.photo} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : null}</div>
               <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 3 }}>
                 <div style={{ fontSize: 14, fontWeight: 600, color: C.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{titre}</div>
-                <div style={{ fontSize: 12.5, color: C.muted }}>{prixAff > 0 ? `${prixCourt(prixAff)} · ` : 'sans prix · '}{compte(it)}</div>
+                <div style={{ fontSize: 12.5, color: C.muted }}>{prixAff > 0 ? `${prixCourt(prixAff)} · ` : 'sans prix · '}compte <b data-brouillon-pseudo style={{ color: C.text, fontWeight: 600 }}>{compte(it) || 'inconnu'}</b></div>
                 <div data-brouillon-vu style={{ fontSize: 12, color: C.muted }}>{it._source === 'extension' ? `enregistré il y a ${ilYaBr(it._enregistre)} — pas encore relu dans ton dressing` : Number.isFinite(it._vu) ? `vu sur Vinted il y a ${ilYaBr(it._vu)}` : 'vu sur Vinted (date de lecture inconnue)'}</div>
                 {e && e.etape === 'envoi' && <SuiviGeste ids={[it.id]} liste={ETAPES_REPUB.publier} label={(it._info && it._info.titre) || it.title || 'ce brouillon'} />}
                 {e && e.etape === 'fait' && <div data-brouillon-fait style={{ fontSize: 12.5, color: C.text }}>✓ En ligne sur Vinted</div>}
                 {e && e.etape && e.etape !== 'envoi' && e.etape !== 'fait' && <div data-brouillon-raison style={{ fontSize: 12.5, color: C.warn || C.muted }}>{e.raison || 'pas fait'}</div>}
-                {!e && publie && <div style={{ fontSize: 12.5, color: C.muted }}>Mis en ligne par VRM — ton dressing le montrera à la prochaine lecture.</div>}
-                {!e && it._etat === 'incomplet' && <div style={{ fontSize: 12.5, color: C.muted }}>Il lui manque {[!String((i && i.titre) || '').trim() && 'un titre', !(Number(i && i.prix) > 0) && 'un prix', !(Number(i && i.nph) > 0) && 'des photos'].filter(Boolean).join(', ')} — finis-le sur Vinted.</div>}
-                {!e && it._etat === 'inconnu' && <div data-brouillon-capter style={{ fontSize: 12.5, color: C.text, lineHeight: 1.5 }}>Pas encore vu par l'extension : ouvre-le sur Vinted et fais « Enregistrer le brouillon » sans rien changer. <Pourquoi label="Pourquoi ?">Il a été fait avant l'extension, ou ailleurs. Une fois enregistré sur Vinted, il arrive ici tout de suite, prêt à mettre en ligne.</Pourquoi></div>}
+                {!e && horsCompte && <div data-brouillon-hors-compte style={{ fontSize: 12.5, color: C.text, lineHeight: 1.45 }}>Brouillon de {compte(it) || 'un autre compte'} — ouvre Vinted sur ce compte pour le mettre en ligne.</div>}
+                {!e && place === 'a-verifier' && <div data-brouillon-a-verifier style={{ fontSize: 12.5, color: C.text, lineHeight: 1.45 }}>À vérifier sur Vinted : ouvre ton dressing sur ce compte, jusqu'en bas. <Pourquoi label="Pourquoi ?">VRM n'a pas de lecture complète et récente (moins de 24 h) des brouillons de {compte(it) || 'ce compte'} : il a pu être supprimé ou mis en ligne depuis.</Pourquoi></div>}
+                {!e && !horsCompte && place !== 'a-verifier' && publie && <div style={{ fontSize: 12.5, color: C.muted }}>Mis en ligne par VRM — ton dressing le montrera à la prochaine lecture.</div>}
+                {!e && !horsCompte && place !== 'a-verifier' && it._etat === 'incomplet' && <div style={{ fontSize: 12.5, color: C.muted }}>Il lui manque {[!String((i && i.titre) || '').trim() && 'un titre', !(Number(i && i.prix) > 0) && 'un prix', !(Number(i && i.nph) > 0) && 'des photos'].filter(Boolean).join(', ')} — finis-le sur Vinted.</div>}
+                {!e && !horsCompte && place !== 'a-verifier' && it._etat === 'inconnu' && <div data-brouillon-capter style={{ fontSize: 12.5, color: C.text, lineHeight: 1.5 }}>Pas encore vu par l'extension : ouvre-le sur Vinted et fais « Enregistrer le brouillon » sans rien changer. <Pourquoi label="Pourquoi ?">Il a été fait avant l'extension, ou ailleurs. Une fois enregistré sur Vinted, il arrive ici tout de suite, prêt à mettre en ligne.</Pourquoi></div>}
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6, flexShrink: 0 }}>
-                {complet && brouillonOk && (!e || (e.etape !== 'fait' && e.etape !== 'incertain')) && <Bouton data-brouillon-publier disabled={e && e.etape === 'envoi'} onClick={() => mettre(it)} style={{ minHeight: 44 }}>Mettre en ligne</Bouton>}
-                <Bouton variante={complet && brouillonOk ? 'discret' : 'secondaire'} data-brouillon-ouvrir href={`https://${domaine(it)}/items/${it.id}/edit`} target="_blank" rel="noopener noreferrer" style={{ minHeight: 44 }}>Ouvrir sur Vinted ↗</Bouton>
+                {proposable && complet && brouillonOk && (!e || (e.etape !== 'fait' && e.etape !== 'incertain')) && <Bouton data-brouillon-publier disabled={e && e.etape === 'envoi'} onClick={() => mettre(it)} style={{ minHeight: 44 }}>Mettre en ligne</Bouton>}
+                <Bouton variante={proposable && complet && brouillonOk ? 'discret' : 'secondaire'} data-brouillon-ouvrir href={`https://${domaine(it)}/items/${it.id}/edit`} target="_blank" rel="noopener noreferrer" style={{ minHeight: 44 }}>Ouvrir sur Vinted ↗</Bouton>
                 {!e && <Bouton variante="discret" data-brouillon-ecarter onClick={() => ecarter(it.id)} title="Il n'est plus sur Vinted : le retirer de cette liste">Plus sur Vinted</Bouton>}
               </div>
             </div>
           );
         })}
+        {nDisparus > 0 && <div data-brouillons-disparus={nDisparus} style={{ fontSize: 12.5, color: C.muted }}>{nDisparus === 1 ? 'Un brouillon n’est plus sur Vinted' : `${nDisparus} brouillons ne sont plus sur Vinted`} (absent{nDisparus > 1 ? 's' : ''} de la dernière lecture complète de leur dressing) : retiré{nDisparus > 1 ? 's' : ''} de la liste.</div>}
         {nEcartes > 0 && <div data-brouillons-ecartes={nEcartes} style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', fontSize: 12.5, color: C.muted }}>
           <span style={{ flex: '1 1 200px' }}>{nEcartes} brouillon{nEcartes > 1 ? 's' : ''} retiré{nEcartes > 1 ? 's' : ''} de la liste (« Plus sur Vinted »).</span>
           <Bouton variante="discret" data-brouillons-remettre onClick={remettre}>Les remettre</Bouton>
@@ -13047,6 +13083,8 @@ const ACTIONS_REPUB = {
   versBrouillon: { titre: 'Repasser en brouillon', etapes: [['choix', '1. Choisir'], ['modif', '2. Modifier'], ['envoi', '3. Passer en brouillon']], lancer: 'Passer en brouillon', fait: '✓ en brouillon', faits: 'passée en brouillon', confirme: () => `seront retirées de la vente et rangées dans mes brouillons Vinted, comme dans l'aperçu.` },
   enLigne: { titre: 'Mettre des brouillons en ligne', etapes: [['choix', '1. Choisir'], ['envoi', '2. Mettre en ligne']], lancer: 'Mettre en ligne', fait: '✓ en ligne', faits: 'mise en ligne', confirme: () => `seront mis en ligne sur mon compte Vinted, tels que je les ai enregistrés.` },
 };
+// Modifier sur place : un seul geste (le PUT), que l'extension ne détaille pas.
+const ETAPES_MODIF = [['envoi', 'Modification sur Vinted']];
 // Les étapes d'une recréation, dans l'ordre (annoncées par l'extension 5.259).
 const ETAPES_REPUB = {
   // 29 oct. (5.277, « comme Vintex ») : lecture, photos, brouillon, PUIS suppression, pause de 1 à 3 min, mise en ligne.
@@ -13167,7 +13205,7 @@ function SuiviGeste({ ids, liste, label }) {
 }
 function progressionRepub(p, action, viaB, listeImposee) {
   const liste = listeImposee || (action === 'versBrouillon' ? ETAPES_REPUB.versBrouillon : (viaB ? ETAPES_REPUB.brouillon : ETAPES_REPUB.direct));
-  if (!p || !p.etape) return { etape: '', part: 0.03, texte: 'Préparation…' };
+  if (!p || !p.etape) return { etape: '', part: 0.03, texte: liste.length === 1 ? `Étape 1 sur 1 · ${liste[0][1]}…` : 'Préparation…' };
   if (p.etape === 'secours-taille') { const j = liste.findIndex((x) => x[0] === 'en-ligne'); return { etape: p.etape, part: Math.min(0.97, Math.max(0, j) / liste.length + 0.6 / liste.length), texte: texteSecoursTaille(p) + '…' }; }
   if (p.etape === 'secours-photos') { const j = liste.findIndex((x) => x[0] === 'en-ligne'); return { etape: p.etape, part: Math.min(0.97, Math.max(0, j) / liste.length + 0.5 / liste.length), texte: texteSecoursPhotos(p) + '…' }; }
   const i = liste.findIndex((x) => x[0] === p.etape);
@@ -13234,8 +13272,14 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
   // l'extension peut agir (garde stricte). Compte pas su ou aucun ⇒ aucune paire,
   // et la phrase dit pourquoi — jamais une liste d'un autre compte.
   const compteUid = compteChrome ? String(compteChrome) : '';
-  const annonces = compteUid ? toutes.filter((a) => String(a.uid || '') === compteUid) : [];
-  const horsCompte = toutes.length - annonces.length;
+  // (2 nov.) « Brouillons → en ligne » : les brouillons des AUTRES comptes restent
+  // montrés, grisés, avec leur compte (« brouillon du compte X — ouvre Vinted sur ce
+  // compte »), jamais cochables. Un brouillon d'un autre compte qui arriverait sans
+  // raison est bloqué ici aussi : seul le compte de Chrome peut partir.
+  const annonces = action === 'enLigne'
+    ? toutes.map((a) => (String(a.uid || '') === compteUid || a.bloque) ? a : { ...a, bloque: `brouillon du compte ${a.compte || a.uid || 'inconnu'} — ouvre Vinted sur ce compte pour le mettre en ligne`, place: 'autre-compte' })
+    : (compteUid ? toutes.filter((a) => String(a.uid || '') === compteUid) : []);
+  const horsCompte = action === 'enLigne' ? 0 : toutes.length - annonces.length;
   const nomCompte = (compteVinted && compteVinted.login) || (compteUid ? `compte ${compteUid}` : '');
   const recree = action === 'recreer' || action === 'versBrouillon';   // une nouvelle annonce / un brouillon : favoris perdus
   const [etape, setEtape] = useState('choix');
@@ -13308,7 +13352,7 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
   // DORMENT (les plus anciennes, les moins vues), pas celles qui plaisent.
   const triVal = (a) => tri === 'vues' ? (a.vues == null ? 1e9 : a.vues) : tri === 'favoris' ? (a.favoris == null ? 1e9 : a.favoris) : -(a.age == null ? -1 : a.age);
   const liste = annonces.filter((a) => !q.trim() || bas(a.titre).includes(bas(q.trim())) || String(a.key).includes(q.trim()) || bas(a.compte).includes(bas(q.trim())))
-    .slice().sort((x, y) => triVal(x) - triVal(y));
+    .slice().sort((x, y) => (action === 'enLigne' ? (x.bloque ? 1 : 0) - (y.bloque ? 1 : 0) : 0) || triVal(x) - triVal(y));
   // Une annonce déjà recréée il y a moins de 2 jours : la recréer encore ressemble
   // à un doublon pour Vinted (les vendeurs conseillent 2-3 jours d'écart).
   const RECREE_RECENT_MS = 48 * 3600e3;
@@ -13334,7 +13378,21 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
   // mélangé, ou réglé à la main. (Par brouillon, depuis le 28 oct. nuit : enregistrée,
   // supprimée, PUIS recréée — voir `recreerVinted`.) C'est l'ordre de PASSAGE qui change, donc
   // l'ordre dans lequel les nouvelles annonces apparaissent sur Vinted.
-  const aFaire = ordre ? [...ordre.map((id) => aFaireSel.find((a) => a.id === id)).filter(Boolean), ...aFaireSel.filter((a) => !ordre.includes(a.id))] : aFaireSel;
+  const aFaireCalc = ordre ? [...ordre.map((id) => aFaireSel.find((a) => a.id === id)).filter(Boolean), ...aFaireSel.filter((a) => !ordre.includes(a.id))] : aFaireSel;
+  // (2 nov., capture de Julien : « En cours : l'avancée est ci-dessous. » puis RIEN)
+  // CAUSE : la file était recalculée à chaque rendu depuis la liste VIVANTE (ses
+  // paires en ligne, ses brouillons). Pendant la republication, l'ancienne annonce
+  // est supprimée de Vinted (étape « Retrait ») et le brouillon mis en ligne sort
+  // de ses brouillons : la relecture les retirait de `aFaire` — la paire EN COURS
+  // disparaissait, puis toute la file : plus de barre, plus de ligne, la phrase
+  // « ci-dessous » mentait. La file est FIGÉE au lancement (ordre, paires, prix) ;
+  // seule une paire pas commencée qui a quitté la liste vivante (vendue, retirée)
+  // est sautée, et c'est dit sur sa ligne.
+  const [figee, setFigee] = useState(null);
+  const aFaire = mode !== 'idle' && figee ? figee : aFaireCalc;
+  const lancerFile = () => { setFigee(aFaireCalc.map((a) => ({ ...a }))); setMode('run'); };
+  // La paire suivante, dont le bloc d'avancée dit le temps : sa ligne ne le redit pas (§7).
+  const idAnnoncee = mode === 'run' ? ((aFaire.find((a) => !st[a.id]) || {}).id || null) : null;
   const melanger = () => {
     const ids = aFaireSel.map((a) => a.id); if (ids.length < 2) return;
     let t; for (let k = 0; k < 8; k++) { t = ids.slice(); for (let i = t.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [t[i], t[j]] = [t[j], t[i]]; } if (t.join() !== aFaire.map((a) => a.id).join()) break; }
@@ -13356,6 +13414,11 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
   // annonce commencée finit toujours (jamais coupée en deux).
   React.useEffect(() => {
     if (mode !== 'run' || busy.current) return;
+    // Une paire PAS COMMENCÉE qui n'est plus dans la liste vivante (vendue, retirée,
+    // brouillon disparu) : sautée, jamais envoyée, et dit sur sa ligne.
+    // Une liste vivante VIDE (relecture en cours, lecture ratée) ne dit rien : « rien lu » ne vaut pas « rien » (§5).
+    const partie = toutes.length > 0 && aFaire.find((a) => !st[a.id] && !aFaireCalc.some((x) => x.id === a.id));
+    if (partie) { setSt((p) => ({ ...p, [partie.id]: { etat: 'echec', code: 'plus-dans-la-liste', raison: action === 'enLigne' ? 'pas envoyé : ce brouillon n’est plus proposable (plus sur Vinted, ou sur un autre compte)' : 'pas envoyée : elle n’est plus en ligne sur ce compte (vendue ou retirée)' } })); return; }
     const suiv = aFaire.find((a) => !st[a.id]);
     // Des mises en ligne encore planifiées (« à la suite ») : la file n'est finie qu'après elles.
     if (!suiv) { if (!aFaire.some((a) => (st[a.id] || {}).etat === 'planifiee')) setMode('fini'); return; }
@@ -13379,7 +13442,8 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
       const arreter = (raison) => { setArret(raison || ''); const m = /dans (\d+) ?min/.exec(String(raison || '')); setArretJusqua(m ? Date.now() + Number(m[1]) * 60000 : 0); setMode(resteApres ? 'pause' : 'fini'); };
       // Un refus qui vaut pour TOUTE la file (Vinted demande de ralentir, plafond
       // de l'heure atteint) : on s'arrête au lieu d'enchaîner les refus.
-      if (r && (r.code === 'vinted-pause' || r.code === 'plafond')) arreter(r.raison);
+      // (2 nov., 5.311) Le frein après un refus de Vinted vaut pour tout le compte : la file s'arrête.
+      if (r && (r.code === 'vinted-pause' || r.code === 'plafond' || r.code === 'frein-refus')) arreter(r.raison);
       // (28 oct.) L'extension n'a pas répondu à temps : elle travaille peut-être
       // encore sur CETTE paire. Enchaîner empilerait la suivante derrière elle et
       // laisserait croire à un échec : la file s'arrête, la ligne dit « pas su ».
@@ -13442,6 +13506,48 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
   const ETAPES = A.etapes;
   const iEtape = Math.max(0, ETAPES.findIndex((x) => x[0] === etape));
   const s2 = (n, mot, pl) => `${n} ${n > 1 ? (pl || mot + 's') : mot}`;
+  const blocAvancement = etape === 'envoi' && mode !== 'idle' && aFaire.length > 0 ? (() => {
+              const finies = aFaire.filter((a) => { const e = (st[a.id] || {}).etat; return e && e !== 'encours' && e !== 'planifiee'; }).length;
+              const enCours = aFaire.find((a) => (st[a.id] || {}).etat === 'encours');
+              const nPlanif = aFaire.filter((a) => (st[a.id] || {}).etat === 'planifiee').length;
+              const pasCommencees = aFaire.filter((a) => !st[a.id]).length;
+              // (2 nov.) L'étape de la paire en cours, pour CHAQUE geste (mettre un brouillon
+              // en ligne et modifier sur place aussi, plus seulement recréer).
+              const lstEnCours = action === 'versBrouillon' ? ETAPES_REPUB.versBrouillon : action === 'enLigne' ? ETAPES_REPUB.publier : action === 'modifier' ? ETAPES_MODIF : ((viaBrouillon && !!brouillonOk) ? ETAPES_REPUB.brouillon : ETAPES_REPUB.direct);
+              const peEnCours = enCours ? progressionRepub(prog[String(enCours.id)], action, viaBrouillon && !!brouillonOk, lstEnCours) : null;
+              // La suivante : son temps d'attente (tiré avant de lancer), dit pendant que celle-ci tourne.
+              const suivante = enCours ? aFaire.find((a) => !st[a.id]) : null;
+              const tSuiv = suivante && Number.isFinite(plan[suivante.id]) ? plan[suivante.id] : null;
+              // (30 oct., « la barre est incompréhensible ») La barre mesure ce qui est
+              // RÉUSSI : jamais pleine quand 3 paires sur 4 ont raté. Ce qui demande un
+              // regard (pas faite, à vérifier) se lit en ambre à la suite.
+              const nPasFaites = nEchec + nRefaire;
+              const total = aFaire.length;
+              const part = Math.min(1, (nFait + (peEnCours ? peEnCours.part : 0)) / total);
+              const partRate = Math.min(1 - part, (nPasFaites + nDouble) / total);
+              const prochN = Math.min(total, total - pasCommencees + 1);
+              const pl = (n, s1, s2x) => `${n} ${n > 1 ? (s2x || s1 + 's') : s1}`;
+              const motF = (n) => (n > 1 ? A.faits.replace(/^(\S+)/, '$1s') : A.faits);
+              const bilan = `${nFait} sur ${total} ${motF(nFait)}`;
+              const titre = mode === 'fini' ? (arret ? 'Arrêté' : (nPasFaites || nDouble) ? 'Fini' : 'Terminé') : mode === 'pause' ? (arret ? 'Arrêté' : 'En pause') : enCours ? `Paire ${aFaire.indexOf(enCours) + 1} sur ${total}` : `Paire ${prochN} sur ${total}`;
+              const r = mode === 'run' && prochaine ? Math.max(0, Math.round((prochaine.at - Date.now()) / 1000)) : null;
+              const phrase = mode === 'run'
+                ? (enCours ? <><b data-republier-en-cours={enCours.id} style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{enCours.numero ? `N°${enCours.numero} · ` : ''}{enCours.titre || 'sans titre'}</b>{suivante && tSuiv != null ? <span data-republier-suivante={tSuiv} style={{ display: 'block', color: C.muted, fontSize: 12.5 }}>{tSuiv > 0 ? `Puis la suivante, ${duree(tSuiv)} après celle-ci.` : 'Puis la suivante, tout de suite après.'}</span> : null}</> : r != null ? <span data-republier-prochaine={prochaine.s}>Prochaine paire dans {r >= 60 ? `${Math.floor(r / 60)} min ${String(r % 60).padStart(2, '0')} s` : `${r} s`}</span> : 'Préparation de la suite…')
+                : arret ? <span data-republier-arret>{String(arret).replace(/[.\s]+$/, '')}. Rien d'autre n'est parti.</span>
+                : mode === 'pause' ? 'Rien ne part tant que tu ne reprends pas.'
+                : (!(nPasFaites || nDouble) ? 'Tout est fait.' : null);
+              // Deux mots seulement : « pas faite » (rien n'a changé sur Vinted) et
+              // « à vérifier » (la nouvelle annonce est en ligne, l'ancienne est restée).
+              const erreur = (nPasFaites || nDouble) ? <>{[nPasFaites ? `${pl(nPasFaites, 'pas faite', 'pas faites')}${nRefaire ? ` (dont ${pl(nRefaire, 'brouillon à refaire', 'brouillons à refaire')} : bouton sur sa ligne)` : ''} : rien n'a changé sur Vinted${onReessayer && nEchec ? ' — « Réessayer » en bas' : ''}` : null, nDouble ? `${pl(nDouble, 'à vérifier', 'à vérifier')} : ouvre l'ancienne annonce sur Vinted (lien sur sa ligne)` : null].filter(Boolean).join(' · ')}.</> : null;
+              const compte = [bilan, enCours ? '1 en cours' : null, nPasFaites ? pl(nPasFaites, 'pas faite', 'pas faites') : null, nDouble ? pl(nDouble, 'à vérifier', 'à vérifier') : null, nPlanif ? pl(nPlanif, 'prévue') : null, pasCommencees ? pl(pasCommencees, 'restante') : null].filter(Boolean).join(' · ');
+              return <Avancement titre={titre} phrase={phrase} part={part} partRate={partRate} label={`${nFait} sur ${total} ${motF(nFait)}`} erreur={erreur}
+                data={{ 'data-republier-total': `${finies}/${total}`, 'data-republier-reussies': `${nFait}/${total}`, 'data-republier-bilan': '' }}
+                compte={<span>{compte}</span>}>
+                {peEnCours && <div data-republier-progression={enCours.id} data-republier-etape={peEnCours.etape || 'attente'}>
+                  <BarreGeste p={prog[String(enCours.id)]} liste={lstEnCours} label={`Paire ${aFaire.indexOf(enCours) + 1}`} barre={false} />
+                </div>}
+              </Avancement>;
+  })() : null;
   return (
     <div onClick={fermer} data-noswipe="1" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
       <FermeAuRetour fermer={fermer} />
@@ -13463,7 +13569,11 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
           </div>
           <button type="button" onClick={fermer} aria-label="Fermer" disabled={mode === 'run'} title={mode === 'run' ? 'Mets en pause pour fermer' : undefined} style={{ border: 'none', background: 'transparent', fontSize: 24, color: C.muted, cursor: mode === 'run' ? 'default' : 'pointer', minWidth: 44, minHeight: 44 }}>×</button>
         </div>
-        <div style={{ overflowY: 'auto', padding: '12px 16px 16px', display: 'flex', flexDirection: 'column', gap: 12, flex: 1 }}>
+        {/* (2 nov.) L'avancée HORS de la zone qui défile : la paire en cours, son étape,
+            la barre, « N sur M » et le temps avant la suivante se voient toujours,
+            sans défiler, quelle que soit la longueur de la liste en dessous. */}
+        {blocAvancement && <div data-republier-avancee style={{ flexShrink: 0, padding: '10px 16px', borderBottom: `1px solid ${C.border}`, background: C.bg, maxHeight: '45dvh', overflowY: 'auto' }}>{blocAvancement}</div>}
+        <div style={{ overflowY: 'auto', padding: '12px 16px 16px', display: 'flex', flexDirection: 'column', gap: 12, flex: 1, minHeight: 0 }}>
           {etape === 'choix' && <>
             <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
               <input value={q} onChange={(ev) => setQ(ev.target.value)} placeholder="Chercher un titre, un N°" aria-label="Chercher une paire" style={{ ...champ, flex: 1, minWidth: 0 }} />
@@ -13491,13 +13601,13 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
             <div style={{ display: 'flex', flexDirection: 'column', border: `1px solid ${C.border}`, borderRadius: 10, overflow: 'hidden' }}>
               {liste.length === 0 && <div style={{ padding: 14, fontSize: 13, color: C.muted }}>{annonces.length ? 'Aucune ne correspond.' : !compteUid ? 'Le compte ouvert dans Chrome n’est pas encore connu.' : action === 'enLigne' ? "Aucun brouillon sur ce compte d'après tes dressings lus par VRM." : "Aucune paire en ligne sur ce compte n'a été lue pour l'instant."}</div>}
               {liste.map((a) => (
-                <label key={a.id} data-republier-paire={a.id} data-republier-bloque={a.bloque ? 'oui' : undefined} style={{ display: 'flex', gap: 10, alignItems: 'center', padding: '8px 10px', minHeight: 56, borderBottom: `1px solid ${C.border}`, cursor: a.bloque ? 'default' : 'pointer', background: sel.has(a.id) ? 'var(--vrm-b-teinte)' : 'transparent', opacity: a.bloque ? 0.6 : 1 }}>
+                <label key={a.id} data-republier-paire={a.id} data-republier-bloque={a.bloque ? 'oui' : undefined} data-republier-place={a.place || undefined} data-republier-compte-paire={action === 'enLigne' ? (a.uid || '') : undefined} style={{ display: 'flex', gap: 10, alignItems: 'center', padding: '8px 10px', minHeight: 56, borderBottom: `1px solid ${C.border}`, cursor: a.bloque ? 'default' : 'pointer', background: sel.has(a.id) ? 'var(--vrm-b-teinte)' : 'transparent', opacity: a.bloque ? 0.6 : 1 }}>
                   <input type="checkbox" disabled={!!a.bloque} checked={sel.has(a.id) && !a.bloque} onChange={() => toggle(a.id)} style={{ width: 20, height: 20, accentColor: C.accent, flexShrink: 0 }} />
                   <span style={{ width: 40, height: 50, borderRadius: 6, background: C.border, overflow: 'hidden', flexShrink: 0 }}>{a.photo ? <PhotoVinted src={a.photo} alt="" loading="lazy" decoding="async" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : null}</span>
                   <span style={{ flex: 1, minWidth: 0 }}>
                     <span style={{ display: 'block', fontSize: 13.5, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{a.numero ? <b>N°{a.numero} · </b> : null}{a.titre || '—'}</span>
                     {/* Le compte n'est plus redit sur chaque ligne : ce sont toutes celles du compte ouvert dans Chrome (§7). */}
-                    <span style={{ display: 'block', fontSize: 12, color: C.muted }}>{prixCourt(a.prix)}{a.age != null ? ` · en ligne depuis ${a.age} j` : ''}{a.vues != null ? ` · ${s2(a.vues, 'vue')}` : ''}{a.favoris != null ? ` · ${s2(a.favoris, 'favori')}` : ''}</span>
+                    <span style={{ display: 'block', fontSize: 12, color: C.muted }}>{action === 'enLigne' ? <>compte <b style={{ color: C.text, fontWeight: 600 }}>{a.compte || a.uid || 'inconnu'}</b> · </> : null}{prixCourt(a.prix)}{a.age != null ? ` · en ligne depuis ${a.age} j` : ''}{a.vues != null ? ` · ${s2(a.vues, 'vue')}` : ''}{a.favoris != null ? ` · ${s2(a.favoris, 'favori')}` : ''}</span>
                     {recree && recente(a) && <span data-republier-recente={a.id} style={{ display: 'block', fontSize: 12, color: C.warn }}>déjà recréée il y a {ilYa(a.recreeAt)} — attends 2 jours</span>}
                     {a.note && <span data-republier-note={a.id} style={{ display: 'block', fontSize: 12, color: C.muted }}>{a.note}</span>}
                     {a.bloque && <span data-republier-bloque-raison={a.id} style={{ display: 'block', fontSize: 12, color: C.muted }}>{a.bloque}</span>}
@@ -13615,7 +13725,7 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
           {etape === 'envoi' && <>
             {/* (28 oct.) Après un passage, les anciennes annonces sont supprimées de Vinted :
                 elles sortent de la liste et la phrase disait « 0 annonce à supprimer ». */}
-            {!aFaire.length && <div data-republier-vide style={{ fontSize: 13.5, color: C.text, lineHeight: 1.5 }}>{mode === 'idle' ? "Aucune des annonces choisies n'est encore en ligne (déjà republiées ou retirées) : reviens à « Choisir »." : 'En cours : l’avancée est ci-dessous.'}</div>}
+            {!aFaire.length && <div data-republier-vide style={{ fontSize: 13.5, color: C.text, lineHeight: 1.5 }}>{mode === 'idle' ? "Aucune des annonces choisies n'est encore en ligne (déjà republiées ou retirées) : reviens à « Choisir »." : 'Aucune paire dans cette file.'}</div>}
             {/* (30 oct.) Avant de lancer : UNE phrase par fait, le détail derrière ⓘ. */}
             {action === 'recreer' && !!aFaire.length && mode === 'idle' && <div data-republier-explique style={{ fontSize: 13.5, color: C.text, lineHeight: 1.5 }}><b>{s2(aFaire.length, 'annonce')}</b> à recréer sur Vinted, une par une. Le N° VRM passe sur la nouvelle. <Pourquoi label="Comment ça marche">Pour chacune : ses photos sont renvoyées{regNeutre ? '' : ' avec tes réglages'}, {viaBrouillon && brouillonOk ? "l'annonce est enregistrée dans VRM, retirée de Vinted, recréée en brouillon, puis mise en ligne. Si la mise en ligne échoue, le brouillon reste dans tes brouillons Vinted et rien n'est perdu." : 'la nouvelle annonce est créée, et seulement si elle est bien en ligne l’ancienne est supprimée.'}</Pourquoi></div>}
             {action === 'modifier' && !!aFaire.length && mode === 'idle' && <div data-republier-explique style={{ fontSize: 13.5, color: C.text, lineHeight: 1.5 }}><b>{s2(aFaire.length, 'annonce')}</b> à modifier sur place, une par une : même annonce, favoris et vues gardés.</div>}
@@ -13654,43 +13764,6 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
                 la paire en cours et SON étape en une ligne (la liste des étapes repliée),
                 combien sont faites / restent, ce qui a raté. Plus de seconde barre par
                 ligne : la ligne ne dit que son état. */}
-            {mode !== 'idle' && aFaire.length > 0 && (() => {
-              const finies = aFaire.filter((a) => { const e = (st[a.id] || {}).etat; return e && e !== 'encours' && e !== 'planifiee'; }).length;
-              const enCours = aFaire.find((a) => (st[a.id] || {}).etat === 'encours');
-              const nPlanif = aFaire.filter((a) => (st[a.id] || {}).etat === 'planifiee').length;
-              const pasCommencees = aFaire.filter((a) => !st[a.id]).length;
-              const peEnCours = enCours && recree ? progressionRepub(prog[String(enCours.id)], action, viaBrouillon && !!brouillonOk) : null;
-              // (30 oct., « la barre est incompréhensible ») La barre mesure ce qui est
-              // RÉUSSI : jamais pleine quand 3 paires sur 4 ont raté. Ce qui demande un
-              // regard (pas faite, à vérifier) se lit en ambre à la suite.
-              const nPasFaites = nEchec + nRefaire;
-              const total = aFaire.length;
-              const part = Math.min(1, (nFait + (peEnCours ? peEnCours.part : 0)) / total);
-              const partRate = Math.min(1 - part, (nPasFaites + nDouble) / total);
-              const prochN = Math.min(total, total - pasCommencees + 1);
-              const pl = (n, s1, s2x) => `${n} ${n > 1 ? (s2x || s1 + 's') : s1}`;
-              const motF = (n) => (n > 1 ? A.faits.replace(/^(\S+)/, '$1s') : A.faits);
-              const bilan = `${nFait} sur ${total} ${motF(nFait)}`;
-              const titre = mode === 'fini' ? (arret ? 'Arrêté' : (nPasFaites || nDouble) ? 'Fini' : 'Terminé') : mode === 'pause' ? (arret ? 'Arrêté' : 'En pause') : enCours ? `Paire ${aFaire.indexOf(enCours) + 1} sur ${total}` : `Paire ${prochN} sur ${total}`;
-              const r = mode === 'run' && prochaine ? Math.max(0, Math.round((prochaine.at - Date.now()) / 1000)) : null;
-              const phrase = mode === 'run'
-                ? (enCours ? <b>{enCours.numero ? `N°${enCours.numero} · ` : ''}{enCours.titre}</b> : r != null ? <span data-republier-prochaine={prochaine.s}>Prochaine paire dans {r >= 60 ? `${Math.floor(r / 60)} min ${String(r % 60).padStart(2, '0')} s` : `${r} s`}</span> : 'Préparation de la suite…')
-                : arret ? <span data-republier-arret>{String(arret).replace(/[.\s]+$/, '')}. Rien d'autre n'est parti.</span>
-                : mode === 'pause' ? 'Rien ne part tant que tu ne reprends pas.'
-                : (!(nPasFaites || nDouble) ? 'Tout est fait.' : null);
-              // Deux mots seulement : « pas faite » (rien n'a changé sur Vinted) et
-              // « à vérifier » (la nouvelle annonce est en ligne, l'ancienne est restée).
-              const erreur = (nPasFaites || nDouble) ? <>{[nPasFaites ? `${pl(nPasFaites, 'pas faite', 'pas faites')}${nRefaire ? ` (dont ${pl(nRefaire, 'brouillon à refaire', 'brouillons à refaire')} : bouton sur sa ligne)` : ''} : rien n'a changé sur Vinted${onReessayer && nEchec ? ' — « Réessayer » en bas' : ''}` : null, nDouble ? `${pl(nDouble, 'à vérifier', 'à vérifier')} : ouvre l'ancienne annonce sur Vinted (lien sur sa ligne)` : null].filter(Boolean).join(' · ')}.</> : null;
-              const compte = [bilan, enCours ? '1 en cours' : null, nPasFaites ? pl(nPasFaites, 'pas faite', 'pas faites') : null, nDouble ? pl(nDouble, 'à vérifier', 'à vérifier') : null, nPlanif ? pl(nPlanif, 'prévue') : null, pasCommencees ? pl(pasCommencees, 'restante') : null].filter(Boolean).join(' · ');
-              const lstEnCours = action === 'versBrouillon' ? ETAPES_REPUB.versBrouillon : ((viaBrouillon && !!brouillonOk) ? ETAPES_REPUB.brouillon : ETAPES_REPUB.direct);
-              return <Avancement titre={titre} phrase={phrase} part={part} partRate={partRate} label={`${nFait} sur ${total} ${motF(nFait)}`} erreur={erreur}
-                data={{ 'data-republier-total': `${finies}/${total}`, 'data-republier-reussies': `${nFait}/${total}`, 'data-republier-bilan': '' }}
-                compte={<span>{compte}</span>}>
-                {peEnCours && <div data-republier-progression={enCours.id} data-republier-etape={peEnCours.etape || 'attente'}>
-                  <BarreGeste p={prog[String(enCours.id)]} liste={lstEnCours} label={`Paire ${aFaire.indexOf(enCours) + 1}`} barre={false} />
-                </div>}
-              </Avancement>;
-            })()}
             <div style={{ display: 'flex', flexDirection: 'column', border: `1px solid ${C.border}`, borderRadius: 10, overflow: 'hidden' }}>
               {mode === 'idle' && aFaire.length > 1 && <div data-republier-ordre={ordre ? 'regle' : 'selection'} style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', padding: '6px 10px', borderBottom: `1px solid ${C.border}`, fontSize: 12.5, color: C.muted }}>
                 <span style={{ flex: '1 1 160px' }}>{ordre ? 'Ordre réglé à la main' : 'Ordre : celui de ta sélection'}</span>
@@ -13702,14 +13775,14 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
                 const statut = s.etat === 'fait' ? (s.refait ? 'brouillon refait' : A.fait) : s.etat === 'encours' ? 'en cours…' : s.etat === 'planifiee' ? `brouillon prêt · en ligne vers ${s.jusqua ? new Date(s.jusqua).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : '…'}` : s.etat === 'echec' ? 'pas faite' : s.etat === 'a-refaire' ? 'brouillon à refaire' : s.etat ? '⚠ à vérifier' : (mode === 'idle' ? '' : 'en attente');
                 // (30 oct.) La pause de Vinted est dite UNE fois, dans le bloc du haut :
                 // la ligne dit seulement que la paire n'est pas partie à cause d'elle.
-                const raison = s.code === 'vinted-pause' || s.code === 'plafond' ? 'pas partie : arrêt demandé par Vinted (voir en haut)' : s.raison && (pb || s.refait) ? s.raison : '';
+                const raison = s.code === 'frein-refus' ? 'pas partie : pause après un refus de Vinted (voir en haut)' : s.code === 'vinted-pause' || s.code === 'plafond' ? 'pas partie : arrêt demandé par Vinted (voir en haut)' : s.raison && (pb || s.refait) ? s.raison : '';
                 const urlAncienne = action !== 'enLigne' && /^\d+$/.test(String(a.id || '')) ? `https://www.vinted.fr/items/${a.id}` : '';
                 return (
                 <div key={a.id} data-republier-ligne={a.id} data-republier-statut={s.etat || 'attente'} style={{ padding: '6px 10px', borderBottom: `1px solid ${C.border}`, fontSize: 13 }}>
                   <div style={{ display: 'flex', gap: 8, alignItems: 'center', minHeight: 32 }}>
                     <span style={{ flexShrink: 0, width: 18, color: C.muted, fontVariantNumeric: 'tabular-nums' }}>{i + 1}.</span>
                     <span style={{ flex: 1, minWidth: 0, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{a.numero ? <b>N°{a.numero} · </b> : null}{a.titre}</span>
-                    {!s.etat && <span data-republier-attente={i === 0 ? 0 : (plan[a.id] || '')} style={{ flexShrink: 0, fontSize: 12, color: C.muted, fontVariantNumeric: 'tabular-nums' }}>{i === 0 ? 'tout de suite' : Number.isFinite(plan[a.id]) && plan[a.id] > 0 ? `+${duree(plan[a.id])}` : ''}</span>}
+                    {!s.etat && a.id !== idAnnoncee && <span data-republier-attente={i === 0 ? 0 : (plan[a.id] || '')} style={{ flexShrink: 0, fontSize: 12, color: C.muted, fontVariantNumeric: 'tabular-nums' }}>{i === 0 ? 'tout de suite' : Number.isFinite(plan[a.id]) && plan[a.id] > 0 ? `+${duree(plan[a.id])}` : ''}</span>}
                     {mode === 'idle' && aFaire.length > 1 && <span style={{ display: 'flex', flexShrink: 0 }}>
                       <button type="button" aria-label="Monter" data-republier-monter={a.id} disabled={i === 0} onClick={() => bouger(a.id, -1)} style={{ border: 'none', background: 'transparent', color: i === 0 ? C.border : C.text, minWidth: 44, minHeight: 44, fontSize: 16, cursor: i === 0 ? 'default' : 'pointer' }}>↑</button>
                       <button type="button" aria-label="Descendre" data-republier-descendre={a.id} disabled={i === aFaire.length - 1} onClick={() => bouger(a.id, 1)} style={{ border: 'none', background: 'transparent', color: i === aFaire.length - 1 ? C.border : C.text, minWidth: 44, minHeight: 44, fontSize: 16, cursor: i === aFaire.length - 1 ? 'default' : 'pointer' }}>↓</button>
@@ -13737,7 +13810,7 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
           </>}
           {etape === 'envoi' && mode === 'idle' && <>
             <Bouton variante="discret" onClick={() => setEtape(action === 'enLigne' ? 'choix' : 'modif')}>Retour</Bouton>
-            <Bouton variante="primaire" data-republier-lancer disabled={!ok || !aFaire.length} title={!aFaire.length ? 'Aucune paire à envoyer' : !ok ? 'Coche « Je confirme » d’abord' : undefined} onClick={() => setMode('run')}>{A.lancer} ({aFaire.length})</Bouton>
+            <Bouton variante="primaire" data-republier-lancer disabled={!ok || !aFaire.length} title={!aFaire.length ? 'Aucune paire à envoyer' : !ok ? 'Coche « Je confirme » d’abord' : undefined} onClick={lancerFile}>{A.lancer} ({aFaire.length})</Bouton>
           </>}
           {mode === 'run' && <>
             <span style={{ flex: 1, minWidth: 0, fontSize: 12.5, color: C.muted }}>Garde cette fenêtre ouverte.</span>
@@ -41163,7 +41236,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     return tout;
   };
   const [listings, setListings] = useState({ loading:false, items:null });
-  const brVinted = useBrouillonsVinted(listings.brouillons, brouillonsOpen || actionsOpen || repubAction === 'enLigne', accounts);
+  const brVinted = useBrouillonsVinted(listings.brouillons, brouillonsOpen || actionsOpen || repubAction === 'enLigne', accounts, listings.brLectures);
   // (29 oct.) Les annonces présentes (en ligne, à confirmer, masquées) : un
   // brouillon qui y figure a été mis en ligne, à la main ou par VRM.
   const presentesIds = React.useMemo(() => { const st = new Set(); for (const l of [listings.items, listings.aConfirmer, listings.masquees]) if (Array.isArray(l)) for (const it of l) if (it && it.id != null) st.add(String(it.id)); return st; }, [listings.items, listings.aConfirmer, listings.masquees]);
@@ -43904,7 +43977,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const courante=gardesLectures.current.annonces();if(!courante())return;
     const cached0 = !force && !parSignal && entreeCache('listings');
     const cached = cached0 && Array.isArray(cached0.masquees) ? cached0 : null;
-    if (cached) { setListings({ loading:false, items:cached.items, comptes:cached.comptes, lues:cached.lues||{}, complets:cached.complets||{}, supprimees:cached.supprimees||{}, aConfirmer:cached.aConfirmer||[], masquees:cached.masquees, brouillons:cached.brouillons||null, ko:cached.failedUids, ...(cached.failedUids.length ? { incomplet: true } : {}) }); return; }
+    if (cached) { setListings({ loading:false, items:cached.items, comptes:cached.comptes, lues:cached.lues||{}, complets:cached.complets||{}, supprimees:cached.supprimees||{}, aConfirmer:cached.aConfirmer||[], masquees:cached.masquees, brouillons:cached.brouillons||null, brLectures:cached.brLectures||null, ko:cached.failedUids, ...(cached.failedUids.length ? { incomplet: true } : {}) }); return; }
     // `silencieux` (5.165, relecture sur signal de l'extension) : on garde ce qui
     // est affiché pendant la lecture, et un échec ne remplace rien.
     if (!silencieux && !parSignal) setListings({ loading:true, items:null, error:false });
@@ -43927,7 +44000,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // dressing, ou sa lecture publique relue depuis un autre compte) ; les
     // annonces « à confirmer » (compte pas relu depuis 24 h) vivent à part —
     // jamais dans `items`, donc jamais comptées en ligne.
-    const lues = {}, complets = {}, supprimees = {}, aConfirmer = [], masquees = [], brouillons = [];
+    const lues = {}, complets = {}, supprimees = {}, aConfirmer = [], masquees = [], brouillons = [], brLectures = {};
     for (const { acc, r } of results) {
       const uid = String(acc.vinted_user_id);
       if (r === null) {                                    // relecture sur signal : ce compte garde ce qu'on montrait
@@ -43938,6 +44011,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         (avant.aConfirmer || []).forEach(it => { if (String(it._acc && it._acc.vinted_user_id) === uid) aConfirmer.push(it); });
         (avant.masquees || []).forEach(it => { if (String(it._acc && it._acc.vinted_user_id) === uid) masquees.push(it); });
         (avant.brouillons || []).forEach(it => { if (String(it._acc && it._acc.vinted_user_id) === uid) brouillons.push(it); });
+        if (avant.brLectures && avant.brLectures[uid]) brLectures[uid] = avant.brLectures[uid];
         if ((avant.ko || []).includes(uid)) { anyErr = true; failedUids.push(uid); }
         continue;
       }
@@ -43947,7 +44021,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         if (r.supprimees) supprimees[uid] = r.supprimees;
         (r.aConfirmer || []).forEach(it => aConfirmer.push({ ...it, _acc:acc }));
         (r.masquees || []).forEach(it => masquees.push({ ...it, _acc:acc }));
-        (r.brouillons || []).forEach(it => brouillons.push({ ...it, _acc:acc })); }
+        (r.brouillons || []).forEach(it => brouillons.push({ ...it, _acc:acc }));
+        if (r.brLecture) brLectures[uid] = r.brLecture; }
       else { anyErr=true; failedUids.push(uid); }
     }
     const error = out.length===0 && anyErr && !anyOk;
@@ -43966,13 +44041,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       }
     } catch (_) { /* sans ce complément, le critère reste simplement inconnu */ }
     if(!courante())return;
-    if (!error) putCache('listings', out, { failedUids }, demandes, { lues, complets, supprimees, aConfirmer, masquees, brouillons });
+    if (!error) putCache('listings', out, { failedUids }, demandes, { lues, complets, supprimees, aConfirmer, masquees, brouillons, brLectures });
     // Annonces que VINTED a marquées vendues (identité, jamais un titre). Sur
     // signal, seuls quelques comptes sont relus : on AJOUTE, on n'efface rien.
     if (vendues.size) setVenduesVinted(parSignal ? (p) => new Set([...p, ...vendues]) : vendues);
     // `incomplet` : au moins un compte n'a pas répondu. Les chiffres tirés de
     // cette liste sont alors des minorants (le bilan de la semaine le dit).
-    setListings({ loading:false, items: out, error, incomplet: anyErr, comptes: demandes, lues, complets, supprimees, aConfirmer, masquees, brouillons, ko: failedUids });
+    setListings({ loading:false, items: out, error, incomplet: anyErr, comptes: demandes, lues, complets, supprimees, aConfirmer, masquees, brouillons, brLectures, ko: failedUids });
     if (!parSignal && signalPendantLecture.current) { signalPendantLecture.current = false; setTimeout(() => loadListings(false, true, null), 200); }
   };
   const loadConvs = async (force) => {
@@ -49980,7 +50055,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       {cd&&(
                         <CodeRetraitCopiable label="Code de retrait" code={cd}/>
                       )}
-                      {(()=>{ const e=entreeSuiviAchat(o); const su=suivisAchat(o, indexSuivisAchats)[0]; return su ? <BoutonSuivreColis transporteur={(e&&e.transporteur)||transporteurDeForme(su)||''} suivi={su} codePostal={codePostalLu({lieu: rel && rel.lieu})} enLigne/> : null; })()}
+                      {(()=>{ const e=entreeSuiviAchat(o); const su=suivisAchat(o, indexSuivisAchats)[0]; return su ? <BoutonSuivreColis transporteur={(e&&e.transporteur)||transporteurDeForme(su)||''} suivi={su} codePostal={codePostalLu({lieu: rel && rel.lieu})} enLigne court/> : null; })()}
                       <button className="vrm-pickup-collect" type="button" onClick={()=>markPickupDone(o)} title="J'ai retiré ce colis" aria-label="J’ai retiré ce colis" data-pickup-sans-code={cd?undefined:''} style={{flexShrink:0,marginLeft:cd?undefined:'auto',whiteSpace:'nowrap'}}><span aria-hidden="true">✓</span><span className="vrm-pickup-collect-label"> J’ai retiré</span></button>
                     </div>
                     );
@@ -51832,7 +51907,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           <button type="button" aria-pressed={zoneMessages==='favoris'} onClick={()=>setZoneMessages('favoris')}><Icon name="heart" size={17}/>Favoris reçus</button>
         </div>
         <div hidden={zoneMessages!=='favoris'} style={{display:zoneMessages==='favoris'?undefined:'none'}}>
-        <FavorisConnectes articlesVendus={articlesVendusFavoris} ecranActif={zoneMessages==='favoris'} chargementAutomatique={zoneMessages==='favoris'} key={'favoris:'+String(AUTH.user?.id||'')+':'+favorisUid} uid={favorisUid} nomCompte={favorisCompte?accNameOf(favorisCompte):''} owner={AUTH.user?.id||''} ownerActuel={()=>AUTH.user?.id||''} base={SUPABASE_URL} headers={()=>sbAuth()} executerFavori={t=>sondageConnu().then(()=>vmrExecUn({uid:favorisUid,method:'POST',endpoint:'/vrm/favoris',body:{jeton:t.jeton}},60000))} PhotoVinted={PhotoVinted}/>
+        <FavorisConnectes articlesVendus={articlesVendusFavoris} articleFavori={id=>{const it=annonceParId.get(String(id)),n=(numeros[String(id)]||{}).numero;return it||n?{titre:it?.title||'',numero:n||'',photo:typeof it?.photo==='string'?it.photo:it?.photo?.url||null}:null;}} ecranActif={zoneMessages==='favoris'} chargementAutomatique={zoneMessages==='favoris'} key={'favoris:'+String(AUTH.user?.id||'')+':'+favorisUid} uid={favorisUid} nomCompte={favorisCompte?accNameOf(favorisCompte):''} owner={AUTH.user?.id||''} ownerActuel={()=>AUTH.user?.id||''} base={SUPABASE_URL} headers={()=>sbAuth()} executerFavori={t=>sondageConnu().then(()=>vmrExecUn({uid:favorisUid,method:'POST',endpoint:'/vrm/favoris',body:{jeton:t.jeton}},60000))} PhotoVinted={PhotoVinted}/>
         </div>
         <div className="vrm-message-workspace" hidden={zoneMessages!=='conversations'} style={{display:zoneMessages==='conversations'?undefined:'none'}}><div className="vrm-inbox-column">
         <label className="vrm-msg-search" style={{color:C.muted}}><Icon name="search" size={16}/><input type="search" aria-label="Rechercher une conversation" maxLength={200} placeholder="Pseudo, article, N° de rangement…" value={messageSearch} onChange={e=>setMessageSearch(e.target.value)} style={{color:C.text}}/></label>
@@ -54594,12 +54669,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       ); })()}
       {actionsOpen && (()=>{
         const nBr = brVinted.liste ? brVinted.liste.length : 0;
-        const nPret = brVinted.liste ? brVinted.liste.filter(b=>b._etat==='pret').length : 0;
+        const nPret = brVinted.liste ? brVinted.liste.filter(b=>b._place==='proposable').length : 0;
         const ent = [
           ...(nRefaire ? [{ k:'refaire', t:`Brouillons à refaire · ${nRefaire}`, d:'Un passage par brouillon n’est pas allé au bout : le refaire depuis ce qui est enregistré dans VRM.', cap:'refaire' }] : []),
           { k:'recreer', t:'Republier', d:'Supprimer et recréer : favoris et vues repartent de zéro.', cap:'recreer' },
           { k:'modifier', t:'Modifier prix ou titre', d:'Sur place : favoris et vues gardés.', cap:'republiermodif' },
-          { k:'enLigne', t:'Brouillons → en ligne', d: nBr ? `${nPret} prêt${nPret>1?'s':''} sur ${nBr} brouillon${nBr>1?'s':''}.` : 'Aucun brouillon sur Vinted.', cap:'brouillon', vide: !nBr },
+          { k:'enLigne', t:'Brouillons → en ligne', d: nBr ? `${nPret} prêt${nPret>1?'s':''} à mettre en ligne sur ${nBr} brouillon${nBr>1?'s':''}${brVinted.uidChrome ? ' (compte ouvert dans Chrome)' : ''}.` : 'Aucun brouillon sur Vinted.', cap:'brouillon', vide: !nBr },
           { k:'versBrouillon', t:'En ligne → brouillon', d:'Retirer de la vente, gardé en brouillon (favoris et vues perdus).', cap:'versbrouillon' },
           { k:'voir', t:`Voir mes brouillons${nBr?` · ${nBr}`:''}`, d:'Ouvrir, mettre en ligne ou retirer un brouillon.' },
         ];
@@ -54708,7 +54783,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         const annoncesBr = (brVinted.liste||[]).map(b=>{ const i=b._info; const p=i&&i.prix!=null&&i.prix!==''?Number(i.prix):Number(b.price&&typeof b.price==='object'?b.price.amount:b.price);
           return { id:String(b.id), numero:'', key:String(b.id), titre:(i&&i.titre)||b.title||'Brouillon sans titre', prix:p>0?p:null, floor:null, photo:b.photo||'', photos:b.photo?[b.photo]:[], uid:b._uid||'', compte:(b._acc&&(b._acc.login||b._acc.username))||'', favoris:null, vues:null, age:null, recreeAt:null,
             note: b._source==='extension' ? `enregistré il y a ${ilYaBr(b._enregistre)}` : Number.isFinite(b._vu) ? `vu sur Vinted il y a ${ilYaBr(b._vu)}` : '',
-            bloque: b._etat==='pret' ? '' : (RAISON_BR[b._etat]||'pas prêt') }; });
+            // (2 nov.) LA règle des brouillons proposables (`_place`, src/brouillonsProposables.js) :
+            // compte de Chrome, présence prouvée par une lecture complète et récente, contenu prêt.
+            place: b._place||'a-verifier',
+            bloque: b._place==='proposable' ? '' : b._place==='autre-compte' ? `brouillon du compte ${(b._acc&&(b._acc.login||b._acc.username))||b._uid||'inconnu'} — ouvre Vinted sur ce compte pour le mettre en ligne`
+              : b._place==='compte-inconnu' ? `brouillon du compte ${(b._acc&&(b._acc.login||b._acc.username))||b._uid||'inconnu'} — ouvre Vinted sur ce compte dans Chrome pour le mettre en ligne`
+              : b._place==='pas-pret' ? (RAISON_BR[b._etat]||'pas prêt')
+              : `à vérifier sur Vinted : pas de lecture complète et récente des brouillons de ${(b._acc&&(b._acc.login||b._acc.username))||'ce compte'} — ouvre ton dressing Vinted sur ce compte` }; });
         const fermer = ()=>{ setRepubAction(null); setRepubReprise(null); };
         const reessayer = (ids)=>{ setRepubReprise(ids.map(String)); setRepubCle(c=>c+1); };
         // (28 oct.) « Refaire le brouillon » sur la ligne ratée : la même commande que

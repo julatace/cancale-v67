@@ -1,7 +1,7 @@
-// BANC de api/ebay-deletion.js — l'endpoint de conformité eBay, EXÉCUTÉ (§4.10).
+// BANC de la route ?mode=deletion d'api/ebay.js — l'endpoint de conformité eBay, EXÉCUTÉ (§4.10).
 // Vérifie que le challenge de vérification renvoie le hash EXACT attendu par
 // eBay (sha256(challengeCode + verificationToken + endpoint)), que sans token
-// c'est honnête (503), et qu'une notification (POST) est bien acquittée (200).
+// c'est honnête (503), et qu'une notification (POST) non signée est refusée (412).
 const path = require('path'); const crypto = require('crypto');
 const RACINE = path.join(__dirname, '..', '..');
 let ko = 0;
@@ -36,10 +36,11 @@ const faireRes = () => { const r = { code: null, corps: null }; r.status = (n) =
   { const res = faireRes(); await handler({ method: 'GET', query: { mode: 'deletion', mode: 'deletion' }, headers: {} }, res);
     dit(res.code === 200 && res.corps && res.corps.ready === true, 'GET sans challenge : santé ready:true quand le token est là'); }
 
-  // 5. Notification POST → acquittée 200
+  // 5. Notification POST SANS signature → 412 (doc eBay), rien n'est fait.
+  //    (2 nov.) La notification signée et l'anonymisation : audit-ebay-suppression.cjs.
   { const res = faireRes(); await handler({ method: 'POST', query: { mode: 'deletion' }, body: { metadata: {}, notification: {} }, headers: {} }, res);
-    dit(res.code === 200 && res.corps && res.corps.ok === true, 'une notification de suppression est acquittée (200)'); }
+    dit(res.code === 412 && res.corps && res.corps.ok === false, 'une notification sans signature eBay est refusée (412)'); }
 
-  console.log(ko ? ('\n' + ko + ' controle(s) non conforme(s).') : '\nL\'endpoint de conformité eBay répond au challenge avec le bon hash et acquitte les notifications.');
+  console.log(ko ? ('\n' + ko + ' controle(s) non conforme(s).') : '\nL\'endpoint de conformité eBay répond au challenge avec le bon hash et refuse une notification non signée.');
   process.exit(ko ? 1 : 0);
 })();
