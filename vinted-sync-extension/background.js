@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.307.0';
+const CODE_VERSION = '5.308.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -8266,8 +8266,24 @@ function espaceAcceptMs() { return ESPACE_ACCEPT_MIN_MS + Math.floor(Math.random
 // Trois états : objet lu · `null` pas su (⇒ éteint) · éteint par défaut. L'app
 // est propriétaire de `vinted_offres_auto` et des `min` (vinted_annonce_numeros) ;
 // l'extension les LIT (§11).
+// <offres-garde-regle> (5.308, 2 nov. — audit « plateformes » P2) Copie de
+// `gardeRefuse` (src/offresGarde.js, comparée par audit-offres-garde.cjs) :
+// accepter une offre seulement sur une garde publiée par l'app, COMPLÈTE,
+// fraîche (48 h), qui ne nomme pas l'annonce (vendue ailleurs ou sur Vinted).
+// Rend null si l'acceptation est permise, sinon la raison.
+function offreGardeDit(garde, item, maintenant) {
+  const now = Number.isFinite(maintenant) ? maintenant : Date.now();
+  if (!garde || typeof garde !== 'object' || garde.v !== 1) return 'garde-absente';
+  const at = Number(garde.at);
+  if (!Number.isFinite(at) || now - at > 48 * 3600 * 1000 || at > now + 120000) return 'garde-perimee';
+  if (garde.complet !== true) return 'garde-incomplete';
+  if (!Array.isArray(garde.items)) return 'garde-absente';
+  if (item == null || garde.items.includes(String(item))) return 'vendue-ailleurs';
+  return null;
+}
+// </offres-garde-regle>
 async function offreAutoReglages() {
-  const m = await lireMain(['vinted_offres_auto', 'vinted_annonce_numeros', 'vinted_offre_refus_msg']);
+  const m = await lireMain(['vinted_offres_auto', 'vinted_annonce_numeros', 'vinted_offre_refus_msg', 'vinted_offres_garde']);
   if (m === null) return null;                         // « pas su » ⇒ on n'allume rien
   const actif = m.vinted_offres_auto === true;
   const nums = m.vinted_annonce_numeros || {};
@@ -8278,7 +8294,8 @@ async function offreAutoReglages() {
   }
   // Le message de refus est SON texte (jamais inventé) ; vide ⇒ on refuse sans écrire.
   const msgRefus = String(m.vinted_offre_refus_msg || '').trim();
-  return { actif, mins, refuses, msgRefus };
+  const garde = m.vinted_offres_garde && typeof m.vinted_offres_garde === 'object' ? m.vinted_offres_garde : null;
+  return { actif, mins, refuses, msgRefus, garde };
 }
 // Les offres de CE compte qui attendent VRAIMENT une réponse, lues dans les
 // conversations DÉJÀ captées (aucun appel Vinted ajouté). Copie fidèle de
@@ -8363,6 +8380,25 @@ async function autoAccepterOffres(uid) {
       if (isFinite(min) && min > 0 && o.prix >= min) quoi = 'accept';
       else if (isFinite(refuse) && refuse > 0 && o.prix < refuse) quoi = 'reject';
       if (!quoi) continue;
+      // (5.308) Jamais une acceptation sur une paire vendue ailleurs, ni sur une
+      // garde absente, incomplète ou périmée : l'offre attend, rien n'est envoyé,
+      // et c'est dit une fois par offre (journal + diag). Le refus reste permis.
+      if (quoi === 'accept') {
+        const raison = offreGardeDit(reg.garde, o.item, Date.now());
+        if (raison) {
+          const dits = (await chrome.storage.local.get('vrmOffresGardeDit')).vrmOffresGardeDit || {};
+          if (!dits[o.oid]) {
+            dits[o.oid] = Date.now();
+            for (const k in dits) if (dits[k] < Date.now() - 7 * 86400000) delete dits[k];
+            await chrome.storage.local.set({ vrmOffresGardeDit: dits });
+            noterDiag('offre_auto_garde_' + raison);
+            logActivity(raison === 'vendue-ailleurs'
+              ? `⛔ Offre de ${o.prix.toFixed(2)} € NON acceptée : cette paire est vendue ailleurs (retire l'annonce Vinted)`
+              : `⏸ Offre de ${o.prix.toFixed(2)} € pas acceptée : ouvre VRM pour qu'il vérifie qu'elle n'est vendue nulle part ailleurs`);
+          }
+          continue;
+        }
+      }
       // Délai aléatoire depuis la PREMIÈRE fois où VRM voit l'offre.
       if (!pv[o.oid]) { pv[o.oid] = { at: Date.now() + delaiOffreMs(), uid: String(uid), quoi }; pvChange = true; await chrome.storage.local.set({ vrmOffresPrevues: pv }); noterDiag('offre_auto_prevue'); continue; }
       if (pv[o.oid].at > Date.now()) continue;

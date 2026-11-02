@@ -2,6 +2,8 @@ import {creerGardeLectures,garderConversationsNonLues} from './lecturesVinted.js
 import {lienAnnonceLeboncoin,etatAnnonceLeboncoin} from './etatAnnonceLeboncoin.js';
 import BilanSynchronisation from './BilanSynchronisation.jsx';
 import VendusAilleurs from './VendusAilleurs.jsx';
+import { articlesVendusAilleurs } from './bilanSynchronisation.js';
+import { gardeOffres } from './offresGarde.js';
 import {AnnoncesACompleter,ComparaisonComptesVinted,HistoriqueArticle} from './OutilsArticlesVinted.jsx';
 import {comparerComptes,diagnosticConnexion} from './outilsArticlesVinted.js';
 import {correspondRechercheMessage} from './rechercheMessagesVinted.js';
@@ -164,7 +166,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.307.0';
+const EXT_ATTENDUE = '5.308.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -589,7 +591,7 @@ const extEnRetard = (v) => !!v && cmpVersion(v, EXT_ATTENDUE) < 0;
 // ⚠️ (30 oct., intégration) `transp`, `lbcsupprime` et `lbcstats` arrivent tous
 //    en 5.291.0 : 5.288 (Leboncoin) et 5.290 (colis) étaient des numéros de
 //    branche, jamais servis ; aucune version publiée ne porte ces fonctions.
-const EXT_CAPACITES = { transp: '5.291.0', favorisouvrir:'5.225.0', favorisliste:'5.218.0', suivivinted: '5.217.0', favoris: '5.217.0', liaison: '5.171.0', supprimees: '5.165.0', enligne: '5.170.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', preuves: '5.172.0', etatcompte: '5.181.0', lbcfiche: '5.182.0', relais: '5.183.0', lbcpack: '5.185.0', annulee: '5.185.0', confirmer: '5.206.0', retraitnotif: '5.206.0', offresauto: '5.234.0', vcpublier: '5.235.0', vcauto: '5.236.0', vcventes: '5.237.0', vcmessages: '5.238.0', vcachats: '5.239.0', republier: '5.240.0', republiermodif: '5.247.0', recreer: '5.248.0', lettre: '5.250.0', brouillon: '5.251.0', versbrouillon: '5.253.0', republierbrouillon: '5.254.0', refaire: '5.255.0', republierpage: '5.277.0', republierfile: '5.279.0', favorisperso: '5.281.0', lbcsupprime: '5.291.0', lbcstats: '5.291.0', vcsession: '5.295.0', vcfil: '5.295.0', vcrepondre: '5.295.0', vcfavoris: '5.295.0', relaisdest: '5.295.0', vcfiche: '5.296.0' };
+const EXT_CAPACITES = { offresgarde: '5.308.0', transp: '5.291.0', favorisouvrir:'5.225.0', favorisliste:'5.218.0', suivivinted: '5.217.0', favoris: '5.217.0', liaison: '5.171.0', supprimees: '5.165.0', enligne: '5.170.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', preuves: '5.172.0', etatcompte: '5.181.0', lbcfiche: '5.182.0', relais: '5.183.0', lbcpack: '5.185.0', annulee: '5.185.0', confirmer: '5.206.0', retraitnotif: '5.206.0', offresauto: '5.234.0', vcpublier: '5.235.0', vcauto: '5.236.0', vcventes: '5.237.0', vcmessages: '5.238.0', vcachats: '5.239.0', republier: '5.240.0', republiermodif: '5.247.0', recreer: '5.248.0', lettre: '5.250.0', brouillon: '5.251.0', versbrouillon: '5.253.0', republierbrouillon: '5.254.0', refaire: '5.255.0', republierpage: '5.277.0', republierfile: '5.279.0', favorisperso: '5.281.0', lbcsupprime: '5.291.0', lbcstats: '5.291.0', vcsession: '5.295.0', vcfil: '5.295.0', vcrepondre: '5.295.0', vcfavoris: '5.295.0', relaisdest: '5.295.0', vcfiche: '5.296.0' };
 // Trois états, jamais un seul : pas d'extension ici · en retard · à jour.
 const extSait = (quoi) => {
   if (!vmrExtPresent()) return 'absente';                    // téléphone, autre navigateur
@@ -1905,7 +1907,7 @@ const SYNC_KEYS = [
   // Le marqueur de la remise à zéro (migration 013) : ÉCRIT PAR LE SERVEUR SEUL
   // (le garde-fou de la base le recopie depuis la ligne d'avant, quoi que le
   // navigateur envoie). Synchronisé pour être LU : série d'archive, version.
-  'vrm_numerotation', 'vinted_repond_auto','vinted_offres_auto','vinted_offre_refus_msg','vrm_photo_presets','vrm_points_relais','vrm_ville','vrm_colis_collected','vrm_colis_collected_at',
+  'vrm_numerotation', 'vinted_repond_auto','vinted_offres_auto','vinted_offre_refus_msg','vinted_offres_garde','vrm_photo_presets','vrm_points_relais','vrm_ville','vrm_colis_collected','vrm_colis_collected_at',
   'vinted_txn_link','vinted_sales_hidden','vinted_purchases_hidden','vinted_accounts_hidden','vinted_autonum','vinted_urssaf_freq','vinted_urssaf_taux',
   // « J'ai déclaré ce mois » : quelles ventes il a déclarées, et dans quel mois
   // (`ventesDeclarables`). Écrit sur SON clic uniquement.
@@ -47453,6 +47455,25 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     for(const [compte,l] of Object.entries(Array.isArray(rows)?rows.find(r=>r.id==='lbc_listings'&&r.owner===owner)?.lectures||{}:{})){const id=idCompteLbcApp(compte),at=Date.parse(l?.at||'');if(comptesProuves.has(id)&&Number.isFinite(at))completes.push({plateforme:'Leboncoin',compte:id,at});}
     return { numeros, annonces, ventes, manques, completes };
   };
+  // (2 nov., audit « plateformes » P2, GRAVE) LA GARDE DES OFFRES AUTOMATIQUES.
+  // Moteur allumé ⇒ l'app publie les annonces Vinted vendues AILLEURS (eBay,
+  // Leboncoin, Vestiaire) ou déjà vendues sur Vinted, et si la liste est complète
+  // (`src/offresGarde.js`). L'extension n'accepte une offre que sur une garde
+  // complète, fraîche (48 h), qui ne nomme pas l'annonce. Une lecture ratée publie
+  // une garde INCOMPLÈTE : plus aucune acceptation (« pas su » ne vaut pas « oui »).
+  React.useEffect(() => {
+    if (!offresAuto) return;
+    if (!Array.isArray(sales.items) || !Array.isArray(listings.items) || !txnPret) return;
+    let vivant = true;
+    const t = setTimeout(async () => {
+      let g;
+      try { const data = await chargerRetraitsMulti(); g = gardeOffres(data, articlesVendusAilleurs(data)); }
+      catch (_) { g = gardeOffres(null, null); }
+      if (vivant) save('vinted_offres_garde', g);
+    }, 4000);
+    return () => { vivant = false; clearTimeout(t); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [offresAuto, sales.items, listings.items, txnPret]);
   const sourcesBilan=[
     {id:'ventes-vinted',libelle:'Ventes Vinted',onglet:'cat_ventes',comptes:accounts.filter(a=>!acctOff(a.vinted_user_id)).map(a=>({uid:String(a.vinted_user_id),nom:accNameOf(a)})),items:Array.isArray(sales.items)?sales.items.map(o=>({id:o.transaction_id,compte:String(o._acc?.vinted_user_id||''),titre:o.title,valeurs:[o.status,o.price]})):null,charge:sales.loading,erreur:sales.error,echecs:sales.failedUids||[],partiel:true,revision:accounts.map(a=>_harvestSeen[`${a.vinted_user_id}_orders_sold`])},
     {id:'annonces-vinted',libelle:'Annonces Vinted',onglet:'cat_annonces',comptes:accounts.filter(a=>!acctOff(a.vinted_user_id)).map(a=>({uid:String(a.vinted_user_id),nom:accNameOf(a)})),items:Array.isArray(listings.items)?listings.items.map(it=>({id:it.id,compte:String(it._acc?.vinted_user_id||''),titre:it.title,valeurs:[it.title,it.price,it.photo,it.photoCount,it.condition]})):null,charge:listings.loading,erreur:listings.error,echecs:listings.ko||[],partiel:!!listings.incomplet,revision:listings.lues},
@@ -50648,7 +50669,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             Seul ce qui demande un GESTE reste visible : l'extension qui ne peut pas. */}
         {listings.items?.length>0 && (() => {
           const nbMini = (annBase || []).filter((it) => { const v = Number(String(((numeros || {})[it.id] || {}).min ?? '').replace(',', '.')); return isFinite(v) && v > 0; }).length;
-          const ext = offresAuto ? extSait('offresauto') : 'ok';
+          // (2 nov.) `offresgarde` (5.308) : une extension plus ancienne accepterait une
+          // offre sur une paire vendue ailleurs — elle est dite « à mettre à jour ».
+          const ext = offresAuto ? extSait('offresgarde') : 'ok';
           // (29 oct., revue) Court, et il passe à la ligne s'il le faut : au téléphone il
           // était coupé (« Allumées · 2 annonces avec u… ») — justement le nombre.
           const etat = !offresAuto ? 'Éteintes' : nbMini === 0 ? 'Allumées · aucun mini posé' : `Allumées · ${nbMini} annonce${nbMini > 1 ? 's' : ''} avec mini`;
@@ -50681,7 +50704,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             {offresAuto && ext!=='ok' && (
               <div data-offres-auto-ext={ext} className="vrm-offres-auto-ext" style={{color:C.warn}}>{ext==='absente'
                 ? "Rien ne part d'ici : ouvre VRM dans le Chrome (ordinateur) où l'extension est installée."
-                : `Rien ne part : mets l'extension à jour (${EXT_CAPACITES.offresauto.replace(/\.0$/,'')}).`}</div>
+                : `Mets l'extension à jour (${EXT_CAPACITES.offresgarde.replace(/\.0$/,'')}) : une plus ancienne pourrait accepter une offre sur une paire déjà vendue ailleurs.`}</div>
             )}
           </div>
           );
