@@ -11,7 +11,7 @@
 //   A. le bouton « Emballer » de la colonne Prêts porte le nombre de prêts ;
 //   B. l'ORDRE de la séance = l'ordre des cartes de la colonne « Prêts » (pas trié
 //      par emplacement — refus du 11 oct.) ;
-//   C. le N° en très grand (Geist Mono), l'emplacement lu dans le Stock (« Meuble
+//   C. le N° en très grand (police système depuis le style Apple du 2 nov. ; Geist Mono avant), l'emplacement lu dans le Stock (« Meuble
 //      B · rangée 2, colonne 3 ») ou « Pas rangée » ;
 //   D. deux paires sous un N° ⇒ le N° en rouge + « vérifie le carton » ; N° à
 //      vérifier ⇒ ambre ;
@@ -211,7 +211,7 @@ async function main() {
           await pg.click('[data-emb-suivant]'); await pg.waitForTimeout(150);
         }
         const p117 = vus['v:7001'];
-        dit(!!p117 && p117.grand === '117' && /Geist Mono/.test(p117.police) && p117.taille >= 80, `C ${T} le N° en très grand, en Geist Mono`, p117 && `${p117.grand} · ${p117.police} · ${p117.taille}px`);
+        dit(!!p117 && p117.grand === '117' && /-apple-system|SF Pro/.test(p117.police) && p117.taille >= 80, `C ${T} le N° en très grand, police système (style Apple du 2 nov.)`, p117 && `${p117.grand} · ${p117.police} · ${p117.taille}px`);
         dit(!!p117 && p117.emplEtat === 'range' && /Meuble B/.test(p117.empl) && /rangée 2, colonne 3/.test(p117.empl), `C ${T} l'emplacement lu dans le Stock, par N°`, p117 && p117.empl);
         // Le bordereau reçu par e-mail ne nomme pas le transporteur : rien n'est inventé.
         dit(!!p117 && !p117.transport && !/Bordereau .+ collé/.test(JSON.stringify(p117.cases)), `C ${T} transporteur pas connu ⇒ aucune ligne inventée`, p117 && p117.transport);
