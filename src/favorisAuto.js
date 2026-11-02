@@ -93,7 +93,10 @@ export function limiteJourAuto(reglages, allumeLe, maintenant) {
 export function hasardAuto(graine) {
   let h = 0x811c9dc5;
   for (const c of String(graine || '')) h = Math.imul(h ^ c.charCodeAt(0), 0x01000193) >>> 0;
-  return h / 4294967296;
+  // Brassage final (fmix32) : sans lui, deux identifiants voisins (« n1 », « n2 »)
+  // tiraient presque la même attente (mesuré : 16 à 17 min pour 8 favoris).
+  h ^= h >>> 16; h = Math.imul(h, 0x85ebca6b) >>> 0; h ^= h >>> 13; h = Math.imul(h, 0xc2b2ae35) >>> 0; h ^= h >>> 16;
+  return (h >>> 0) / 4294967296;
 }
 // L'attente après le favori, en ms, tirée entre le minimum et le maximum
 // (déterministe sur le favori : le même favori garde la même heure prévue).
