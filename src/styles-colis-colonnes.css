@@ -137,3 +137,14 @@ button.vrm-cc-carte:focus-visible { outline: 2px solid var(--vrm-focus, #0071E3)
   .vrm-main .vrm-tete-row > .vrm-screen-head-titre:has(> .vrm-screen-head-sous) { flex: 1 1 100%; min-width: 0; }
   .vrm-main .vrm-tete-row:has(> .vrm-screen-head-titre > .vrm-screen-head-sous) > :nth-child(2) { justify-content: flex-start !important; }
 }
+/* (2 nov.) Le transporteur LU d'un colis à retirer (logo + nom, src/PastilleTransporteur.jsx). */
+.vrm-rp-transp { display: flex; align-items: center; min-width: 0; margin-top: 3px; }
+/* (2 nov.) La pastille du transporteur à côté du bouton bordereau (carte « À envoyer »).
+   Téléphone : sa propre ligne, collée sous le bouton (jamais tassée en « Chr… ») ;
+   ordinateur : sous le bouton, dans sa colonne. */
+@media (max-width: 767px) {
+  .vrm-colis-carte .vrm-colis-actions > .vrm-transporteur { flex: 0 0 100% !important; min-width: 0 !important; max-width: 100% !important; justify-content: flex-start !important; text-align: left !important; border-color: transparent !important; padding: 0 2px !important; min-height: 24px !important; }
+}
+@media (min-width: 768px) {
+  .vrm-colis-grille[data-colis-lignes] .vrm-colis-carte .vrm-colis-actions > .vrm-transporteur { grid-column: 1 / -1; grid-row: 2; justify-self: start; margin-top: 4px; border-color: transparent !important; padding: 0 2px !important; min-height: 24px !important; }
+}

@@ -31,6 +31,8 @@
 import React from 'react';
 import { jugerBan, requetesBan, nombreEpingle, RAISONS_BAN } from './relaisColis.js';
 import './styles-colis-colonnes.css';
+import PastilleTransporteur from './PastilleTransporteur.jsx';
+import { cleStatTransporteur } from './transporteursVisuels.js';
 
 // (1er nov., « plus fiable ») v2 : la règle a changé (rue + ville sans code
 // postal, ville collée à la rue, résultat ambigu refusé) — les échecs notés
@@ -254,14 +256,16 @@ function marquerChoisi(els, selection) {
 const plur = (n, s, p) => `${n} ${n > 1 ? (p || s + 's') : s}`;
 const texteLimite = (j) => (j == null ? '' : j < 0 ? 'date limite passée' : j === 0 ? 'dernier jour aujourd’hui' : j === 1 ? 'dernier jour demain' : `encore ${j} jours`);
 
-function CarteColisRetirer({ x, Photo, gestes, detail, limiteSurCarte, avecLieu = false, raison = '' }) {
+function CarteColisRetirer({ x, Photo, gestes, detail, limiteSurCarte, avecLieu = false, raison = '', C = null, avecTransporteur = false }) {
   const ph = x.photo && Photo ? Photo(x.photo) : null;
   // Avec `detail` (l'écran Colis), la date limite exacte de CE colis y est dite.
   const surCarte = limiteSurCarte && !detail;
   const sousTitre = [avecLieu ? (x.lieuNom || '') : '', raison, surCarte && x.jours != null ? texteLimite(x.jours) : ''].filter(Boolean);
   const codeTxt = x.code ? x.code : x.qr ? 'QR code' : '';
   const attrs = { 'data-cc-carte': x.cle, 'data-cc-dans': 'retirer', 'data-site': x.site || 'vinted', 'data-ambre': x.ambre ? '1' : undefined, 'data-a-verifier': x.aVerifier ? '1' : undefined, 'data-hors-compte': x.horsCompte ? '1' : undefined, 'data-sans-lieu': x.sansLieu ? '1' : undefined, 'data-colis-ident': x.cle, 'data-en-verification-tx': String(x.cle || '').startsWith('r:c:') ? String(x.cle).slice(4) : undefined,
-    'data-a-verifier-raison': x.horsCompte && x.raisonCode ? x.raisonCode : undefined, 'data-a-verifier-code': x.horsCompte ? (x.encoreCode || x.code || x.qr ? 'oui' : 'non') : undefined };
+    'data-a-verifier-raison': x.horsCompte && x.raisonCode ? x.raisonCode : undefined, 'data-a-verifier-code': x.horsCompte ? (x.encoreCode || x.code || x.qr ? 'oui' : 'non') : undefined,
+    // (2 nov.) Le transporteur LU de CE colis (src/transporteursVisuels.js) : la clé des statistiques.
+    'data-transporteur': x.transp ? cleStatTransporteur(x.transp) : undefined };
   return (
     <div className="vrm-cc-carte vrm-rp-carte" {...attrs}>
       <span className="vrm-cc-haut">
@@ -271,6 +275,7 @@ function CarteColisRetirer({ x, Photo, gestes, detail, limiteSurCarte, avecLieu 
         <span className="vrm-rp-quoi">
           <span className="vrm-cc-nom" title={x.titre}>{x.titre}</span>
           {sousTitre.length ? <span className={'vrm-rp-sous' + (surCarte && x.jours != null && x.jours <= 1 ? ' is-ambre' : '')} data-rp-sous="">{sousTitre.join(' · ')}</span> : null}
+          {avecTransporteur && x.transp ? <span className="vrm-rp-transp"><PastilleTransporteur t={x.transp} C={C} seul taille={18}/></span> : null}
           {detail ? detail(x) : null}
         </span>
         {x.num ? <span className="vrm-cc-num" data-numero={x.num}>N°{x.num}</span> : null}
@@ -324,6 +329,11 @@ export function ColonneRetirer({ vue, C, Photo, gestes = null, detail = null, no
         const trs = [...new Set(comptes.map((c) => c.transporteur || ''))];
         const trCode = trs.length === 1 && trs[0] ? trs[0] : '';
         const trNom = trCode && nomTransporteur ? nomTransporteur(trCode) : '';
+        // (2 nov.) Le transporteur LU (logo + nom) : une fois en tête quand tous les colis
+        // du point ont le même ; sinon sur chaque carte (§7 : jamais dit deux fois).
+        const tStats = [...new Set(comptes.map((c) => cleStatTransporteur(c.transp)))];
+        const tCommun = comptes.length && comptes.every((c) => c.transp) && tStats.length === 1 ? comptes[0].transp : null;
+        const tParCarte = comptes.some((c) => c.transp) && !tCommun;
         const morceaux = [
           p.nComptes ? plur(p.nComptes, 'colis', 'colis') : null,
           p.nAttendus ? `${p.nAttendus} en route` : null,
@@ -337,7 +347,9 @@ export function ColonneRetirer({ vue, C, Photo, gestes = null, detail = null, no
               <span className="vrm-rp-ident">
                 <b className="vrm-rp-nom" data-relais-nom="">{p.nom || p.adresseCourte || 'Point relais'}</b>
                 {p.nom && (p.adresse || p.adresseCourte) ? <span className="vrm-rp-adresse" data-relais-adresse="">{p.adresse || p.adresseCourte}</span> : null}
-                {trNom ? <span className="vrm-rp-adresse" data-relais-transporteur={trCode}>{trNom}</span> : null}
+                {tCommun && (tCommun.cle || tCommun.nom || !comptes.some((c) => c.trInconnu))
+                  ? <span className="vrm-rp-transp" data-relais-transporteur={trCode || tCommun.cle || ''}><PastilleTransporteur t={tCommun} C={C} seul taille={18}/></span>
+                  : (trNom && !tParCarte ? <span className="vrm-rp-adresse" data-relais-transporteur={trCode}>{trNom}</span> : null)}
                 {(() => { const n = comptes.filter((c) => c.trInconnu).length; return n ? <span className="vrm-rp-adresse" data-transp="transporteur-inconnu" data-transp-n={n}>Transporteur pas encore connu{n > 1 ? ` pour ${n} colis` : ''} : le suivi Vinted ne le nomme pas</span> : null; })()}
                 <span className="vrm-rp-resume">
                   {morceaux.map((m, i) => <span key={i} data-relais-compte={i === 0 && p.nComptes ? p.nComptes : undefined}>{i ? ' · ' : ''}{m}</span>)}
@@ -347,7 +359,7 @@ export function ColonneRetirer({ vue, C, Photo, gestes = null, detail = null, no
               </span>
             </header>
             <div className="vrm-rp-liste">
-              {comptes.map((x) => <CarteColisRetirer key={x.cle || x.id} x={x} Photo={Photo} gestes={gestes} detail={detail} limiteSurCarte={jMixte}/>)}
+              {comptes.map((x) => <CarteColisRetirer key={x.cle || x.id} x={x} Photo={Photo} gestes={gestes} detail={detail} limiteSurCarte={jMixte} C={C} avecTransporteur={tParCarte && !x.trInconnu}/>)}
               {p.attendus.map((c) => (
                 <div key={c.id} className="vrm-rp-attendu" data-relais-attendu={c.id} data-relais-estimee={c.estimee || ''}>
                   En route{c.titre ? ` · ${c.titre}` : ''} — {c.estimee ? <>arrivée estimée {jourFr(c.estimee)}</> : <span>date d’arrivée pas encore dite</span>}
@@ -367,7 +379,7 @@ export function ColonneRetirer({ vue, C, Photo, gestes = null, detail = null, no
             </span>
           </header>
           <div className="vrm-rp-liste">
-            {inconnusComptes.map((x) => <CarteColisRetirer key={x.cle || x.id} x={x} Photo={Photo} gestes={gestes} detail={detail}/>)}
+            {inconnusComptes.map((x) => <CarteColisRetirer key={x.cle || x.id} x={x} Photo={Photo} gestes={gestes} detail={detail} C={C} avecTransporteur={!x.trInconnu}/>)}
           </div>
         </section>
       )}
@@ -383,7 +395,7 @@ export function ColonneRetirer({ vue, C, Photo, gestes = null, detail = null, no
             </span>
           </header>
           <div className="vrm-rp-liste">
-            {aVerifier.map((x, i) => <CarteColisRetirer key={x.cle || x.id} x={x} Photo={Photo} gestes={gestes} detail={detail} avecLieu raison={raisonCommune ? '' : raisons[i]}/>)}
+            {aVerifier.map((x, i) => <CarteColisRetirer key={x.cle || x.id} x={x} Photo={Photo} gestes={gestes} detail={detail} avecLieu raison={raisonCommune ? '' : raisons[i]} C={C} avecTransporteur={!x.trInconnu}/>)}
           </div>
         </section>
       )}
