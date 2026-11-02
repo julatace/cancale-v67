@@ -122,11 +122,15 @@ async function sain(pg, ecran) {
   const m = /n'a pas pu s'afficher|n’a pas pu s’afficher|Cannot access|is not defined/.exec(r.t);
   dit(!m, `${ecran} : l'écran n'est pas tombé sur le garde-fou`, m && m[0]);
 }
+// (2 nov., colis clair) L'alerte est UNE ligne en tête de « À envoyer » (son nombre) ;
+// les colis eux-mêmes sont dans « Partis » (replié), sous l'intertitre qui dit le
+// geste une fois (`data-postes-pas-partis`) — chaque colis une fois sur l'écran.
 const lireAlerte = (pg) => pg.evaluate(() => {
   const el = document.querySelector('[data-poste-sans-depart]');
   if (!el) return null;
-  return { n: Number(el.getAttribute('data-poste-sans-depart')), txs: [...el.querySelectorAll('[data-tx]')].map((x) => ({ tx: x.getAttribute('data-tx'), limite: x.getAttribute('data-limite') })),
-    txt: el.innerText };
+  const g = document.querySelector('[data-postes-pas-partis]');
+  return { n: Number(el.getAttribute('data-poste-sans-depart')), txs: g ? [...g.querySelectorAll('[data-tx]')].map((x) => ({ tx: x.getAttribute('data-tx'), limite: x.getAttribute('data-limite') })) : [],
+    txt: g ? g.textContent : '' };
 });
 const aEnvoyer = (pg) => pg.evaluate(() => { const m = /(\d+)\s*colis à envoyer/.exec(document.body.innerText); return m ? Number(m[1]) : 0; });
 
@@ -163,6 +167,7 @@ const aEnvoyer = (pg) => pg.evaluate(() => { const m = /(\d+)\s*colis à envoyer
         await pg.goto(`http://localhost:${PORT}/?tab=cat_bord`, { waitUntil: 'domcontentloaded' });
         await pg.waitForTimeout(4500);
         const avant = await aEnvoyer(pg);
+        await pg.evaluate(() => { const d = document.querySelector('[data-colis-partis]'); if (d) d.open = true; });
         await pg.click('[data-annuler-poste="9201"]', { timeout: 5000 });
         await pg.waitForTimeout(900);
         const a = await lireAlerte(pg);

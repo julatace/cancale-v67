@@ -52922,29 +52922,42 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               </summary>
               <div style={{fontSize:11.5,color:C.muted,margin:'6px 0 8px',lineHeight:1.45}}>Rien à faire ici : ces colis sont chez le transporteur ou chez l'acheteur. Ils quittent cette liste quand Vinted finalise la vente.{retours > 0 ? ' Un retour se vérifie : l\'article doit te revenir.' : ''}</div>
               <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit, minmax(min(430px,100%), 1fr))',gap:6}}>
-                {postes.map((e) => {
-                  const o = e.o, b = e.b; const tx = o ? String(o.transaction_id) : '';
-                  const ph = o ? orderPhoto(o) : bordPhoto(b);
-                  const num = (b ? numForBord(b) : '') || (o ? (effEntry(o)?.numero || '') : '');
-                  const np = tx ? nonPartisPar.get(tx) : null;
-                  const depuis = np ? (np.heures < 48 ? `${np.heures} h` : `${Math.floor(np.heures/24)} j`) : '';
-                  return (
-                    <div key={'pc'+(e.txn||e.key)} data-parti="coche" data-colis-ident={'v:'+(e.txn||e.key)} style={{display:'flex',gap:10,alignItems:'center',flexWrap:'wrap',padding:'7px 9px',border:`1px solid ${np && np.limiteDepassee ? C.warn+'88' : C.border}`,borderRadius:8,minWidth:0}}>
-                      <div style={{width:34,height:34,borderRadius:5,background:C.border,flexShrink:0,overflow:'hidden'}}>{ph && !imgMortes.has(ph) && <PhotoVinted src={ph} alt="" loading="lazy" onError={()=>noterImgMorte(ph)} style={{width:'100%',height:'100%',objectFit:'cover'}}/>}</div>
-                      <div style={{flex:'1 1 160px',minWidth:0}}>
-                        <div style={{fontSize:12.5,fontWeight:600,color:C.text,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{num ? `N°${num} · ` : ''}{(o && o.title) || (b && (b.modele || b.article)) || 'Vente'}</div>
-                        <div style={{fontSize:11,color:C.muted,marginTop:2,display:'flex',gap:8,flexWrap:'wrap'}}>
-                          <span style={{color:C.text,fontWeight:600}}>Coché « posté »</span>
-                          {np ? <span style={{color:C.warn,fontWeight:600}}>Vinted ne l'a pas vu partir{depuis ? ` (coché il y a ${depuis})` : ''}{np.limiteDepassee ? ' · date limite dépassée' : ''}</span> : <span>Vinted ne l'a pas encore vu partir</span>}
-                          {plusieursComptes && o && o._acc && <span>· {accNameOf(o._acc)}</span>}
+                {(() => {
+                  // (2 nov.) Deux intertitres, la phrase commune dite UNE fois (§7) : ceux que
+                  // Vinted n'a pas vus partir (`cochesNonPartis`, le geste à faire, ambre),
+                  // puis ceux cochés à l'instant. La ligne ne garde que ce qui la distingue.
+                  const ligne = (e) => {
+                    const o = e.o, b = e.b; const tx = o ? String(o.transaction_id) : '';
+                    const ph = o ? orderPhoto(o) : bordPhoto(b);
+                    const num = (b ? numForBord(b) : '') || (o ? (effEntry(o)?.numero || '') : '');
+                    const np = tx ? nonPartisPar.get(tx) : null;
+                    const depuis = np ? (np.heures < 48 ? `${np.heures} h` : `${Math.floor(np.heures/24)} j`) : '';
+                    return (
+                      <div key={'pc'+(e.txn||e.key)} data-parti="coche" data-colis-ident={'v:'+(e.txn||e.key)} {...(np ? { 'data-tx': tx, 'data-limite': np.limiteDepassee ? 'depassee' : 'ok' } : {})} style={{display:'flex',gap:10,alignItems:'center',flexWrap:'wrap',padding:'7px 9px',border:`1px solid ${np && np.limiteDepassee ? C.warn+'88' : C.border}`,borderRadius:8,minWidth:0}}>
+                        <div style={{width:34,height:34,borderRadius:5,background:C.border,flexShrink:0,overflow:'hidden'}}>{ph && !imgMortes.has(ph) && <PhotoVinted src={ph} alt="" loading="lazy" onError={()=>noterImgMorte(ph)} style={{width:'100%',height:'100%',objectFit:'cover'}}/>}</div>
+                        <div style={{flex:'1 1 160px',minWidth:0}}>
+                          <div style={{fontSize:12.5,fontWeight:600,color:C.text,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{num ? `N°${num} · ` : ''}{(o && o.title) || (b && (b.modele || b.article)) || 'Vente'}</div>
+                          <div style={{fontSize:11,color:C.muted,marginTop:2,display:'flex',gap:8,flexWrap:'wrap'}}>
+                            {depuis ? <span>coché il y a {depuis}</span> : null}
+                            {np && np.limiteDepassee ? <span style={{color:C.warn,fontWeight:600}}>date limite dépassée</span> : (np && np.joursLimite != null ? <span>{np.joursLimite === 0 ? 'limite aujourd’hui' : `limite dans ${np.joursLimite} j`}</span> : null)}
+                            {plusieursComptes && o && o._acc && <span>{accNameOf(o._acc)}</span>}
+                          </div>
                         </div>
+                        <button type="button" data-annuler-poste={tx || e.key} onClick={()=>{ if(o && isShipDone(o)) toggleShipDone(o); if(b && isBordShippedManual(b)) unmarkBordShipped(b); }}
+                          title="Le colis est encore chez toi : il revient dans « à envoyer », avec son bordereau"
+                          style={{flexShrink:0,minHeight:44,border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:8,padding:'0 12px',fontSize:12.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>↺ Pas encore posté</button>
                       </div>
-                      <button type="button" data-annuler-poste={tx || e.key} onClick={()=>{ if(o && isShipDone(o)) toggleShipDone(o); if(b && isBordShippedManual(b)) unmarkBordShipped(b); }}
-                        title="Le colis est encore chez toi : il revient dans « à envoyer », avec son bordereau"
-                        style={{flexShrink:0,minHeight:44,border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:8,padding:'0 12px',fontSize:12.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>↺ Pas encore posté</button>
-                    </div>
-                  );
-                })}
+                    );
+                  };
+                  const pasVus = postes.filter(e => e.o && nonPartisPar.has(String(e.o.transaction_id)));
+                  const recents = postes.filter(e => !(e.o && nonPartisPar.has(String(e.o.transaction_id))));
+                  const titre = (t, ambre) => <div className="vrm-colis-groupe" style={{gridColumn:'1 / -1',fontSize:12,fontWeight:600,color:ambre?C.warn:C.muted,padding:'6px 2px 0',lineHeight:1.4}}>{t}</div>;
+                  return (<>
+                    {pasVus.length > 0 && <div data-postes-pas-partis={pasVus.length} style={{gridColumn:'1 / -1',display:'grid',gap:6}}>{titre('Cochés « postés » que Vinted n’a pas vus partir — Vérifie que le colis a bien été déposé, ou remets-le dans « à envoyer ».', true)}{pasVus.map(ligne)}</div>}
+                    {recents.length > 0 && <div data-postes-recents={recents.length} style={{gridColumn:'1 / -1',display:'grid',gap:6}}>{titre('Cochés « postés » — Vinted ne les a pas encore vus partir.', false)}{recents.map(ligne)}</div>}
+                    {partis.length > 0 && (pasVus.length > 0 || recents.length > 0) && titre('Suivis par Vinted', false)}
+                  </>);
+                })()}
                 {partis.map(({ o, st, j }) => {
                   const ph = orderPhoto(o);
                   return (
