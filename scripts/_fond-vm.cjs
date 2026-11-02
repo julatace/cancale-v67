@@ -217,7 +217,7 @@ function faireFond({ src, lignes = {}, vinted = () => ({ status: 404, body: {} }
       if (eq) { if (lignes[eq[1]] !== undefined) sortie.push({ id: eq[1], data: lignes[eq[1]] }); }
       else if (dans) { for (const k of dans[1].split(',')) if (lignes[k] !== undefined) sortie.push({ id: k, data: lignes[k] }); }
       else if (like) {
-        const re = new RegExp('^' + like[1].replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*').replace(/%/g, '.*') + '$');
+        const re = new RegExp('^' + like[1].replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*').replace(/%/g, '.*').replace(/_/g, '.') + '$');   // comme Postgres : « _ » = un caractère quelconque
         for (const k of Object.keys(lignes)) if (re.test(k)) sortie.push({ id: k, data: lignes[k] });
       }
       // Pagination par `Range` (sbGetTout) : on sert tout d'un coup, c'est un banc.
