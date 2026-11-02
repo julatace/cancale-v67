@@ -2826,13 +2826,10 @@ const relireNuage = (opts = {}) => {
   return _relireEnVol;
 };
 if (typeof window !== 'undefined') {
-  document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState !== 'visible') return;
-    // (2 nov.) Des changements attendent dans la file : on les renvoie (le même
-    // chemin, qui relit et fusionne) ; sinon on relit simplement.
-    if (isCloudReady() && !_pushBloque && !_pushEnVol && !_cloudTimer && fileNonVide()) { _repriseN = 0; reprendreSyncMaintenant(); }
-    else relireNuage();
-  });
+  // (2 nov.) Des changements attendent dans la file : on les renvoie (le même
+  // chemin, qui relit et fusionne) ; sinon on relit simplement.
+  const renvoyerFile = () => { if (!isCloudReady() || _pushBloque || _pushEnVol || _cloudTimer || !fileNonVide()) return false; _repriseN = 0; reprendreSyncMaintenant(); return true; };
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState !== 'visible') return; if (renvoyerFile()) return; relireNuage(); });
   window.addEventListener('pageshow', (e) => { if (e && e.persisted) relireNuage({ force: true }); });
   setInterval(() => { if (document.visibilityState === 'visible') relireNuage(); }, 60 * 1000);
   // Un AUTRE onglet de ce navigateur a écrit une clé synchronisée : le
