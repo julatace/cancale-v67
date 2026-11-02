@@ -102,6 +102,8 @@ function messageEbaySur(m) {
 }
 
 // Une valeur XML lisible (eBay échappe les apostrophes, les guillemets…).
+// (2 nov., P13) Le texte d'une section CDATA ne peut pas contenir « ]]> » : on le coupe.
+export const cdataSur = (s) => String(s == null ? '' : s).split(']]>').join(']]]]><![CDATA[>');
 const dexml = (s) => String(s == null ? '' : s).replace(/<!\[CDATA\[|\]\]>/g, '')
   .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&#39;/g, "'").replace(/&amp;/g, '&');
 
@@ -708,7 +710,9 @@ function itemXml(it) {
     // L'identité de la paire (`VRM-{n°}`). ⚠️ Posée par `avecSku` à partir du
     // NUMÉRO, jamais recopiée d'un `sku` envoyé par le navigateur.
     (it.sku ? `<SKU>${esc(it.sku)}</SKU>` : '') +
-    `<Description><![CDATA[${String(it.description || it.title || '')}]]></Description>` +
+    // (2 nov., audit P13) Un « ]]> » dans la description fermait le CDATA et cassait le XML :
+    // découpé en deux sections (]]]]><![CDATA[>), le texte publié reste identique.
+    `<Description><![CDATA[${cdataSur(String(it.description || it.title || ''))}]]></Description>` +
     `<PrimaryCategory><CategoryID>${esc(it.categoryId)}</CategoryID></PrimaryCategory>` +
     `<StartPrice>${Number(String(it.price).replace(',', '.')).toFixed(2)}</StartPrice>` +
     `<Quantity>${parseInt(it.quantity || 1, 10)}</Quantity>` +

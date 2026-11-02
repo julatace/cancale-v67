@@ -6655,6 +6655,14 @@ const ventesDeclarables = ({ vinted, lbc, ebay, vestiaire, masquee, exclu, verse
     if (garde(l)) lignes.push(place(l));
   }
   for (const e of (ebay || [])) {
+    // (2 nov., audit P1) Une commande REMBOURSÉE EN PARTIE (`PARTIALLY_REFUNDED`)
+    // sortait de partout sans rien dire : elle est mise à part et NOMMÉE (« au
+    // moins »), son montant réel n'étant pas lu (§5 : un total partiel se dit).
+    if (e && e.orderId && String(e.orderPaymentStatus || '').toUpperCase() === 'PARTIALLY_REFUNDED') {
+      const idp = 'ebay:' + e.orderId;
+      if (!vus.has(idp)) { vus.add(idp); ecartees.push({ id: idp, plateforme: 'eBay', raison: 'remboursement partiel — montant à vérifier sur eBay', titre: (Array.isArray(e.lineItems) && e.lineItems[0] && e.lineItems[0].title) || '', manque: true }); }
+      continue;
+    }
     if (!e || String(e.orderPaymentStatus || '').toUpperCase() !== 'PAID' || !e.orderId) continue;
     // (revue argent, 19 oct.) Une commande ANNULÉE garde `PAID` (eBay le temps
     // du remboursement, et VRM quand il accepte une annulation :
@@ -6760,6 +6768,8 @@ const ventesFaites = ({ vinted, lbc, ebay, vestiaire, cachee } = {}) => {
     if (garde('lbc:' + v.txId)) lignes.push({ plateforme: 'Leboncoin', ts: t, eur, compte: String(v.account || ''), heureLue: !(v.dateSaisie === true || /^\d{4}-\d{2}-\d{2}$/.test(String(v.dateVente).trim())) });
   }
   for (const e of (ebay || [])) {
+    // (2 nov., P1) Remboursée en partie : vendue, mais son montant n'est pas sûr ⇒ nommée.
+    if (e && e.orderId && String(e.orderPaymentStatus || '').toUpperCase() === 'PARTIALLY_REFUNDED') { if (garde('ebay:' + e.orderId)) nonComptees.push({ plateforme: 'eBay', raison: 'remboursement partiel — montant à vérifier', ts: Date.parse(e.creationDate || '') || null }); continue; }
     if (!e || String(e.orderPaymentStatus || '').toUpperCase() !== 'PAID' || !e.orderId) continue;
     if (!commandeEbayEngagee(e)) continue;   // annulée : rien de vendu (même règle que le CA déclaré)
     const eur = montantRecuEbay(e).eur, t = Date.parse(e.creationDate || '');
@@ -35843,7 +35853,7 @@ function MicroEntreprise({ taux, poserTaux, officiel, vlTaux, acreTaux }) {
             {' '}VRM ne compte que ce qu'il a capté sur tes plateformes reliées : compare avec le total de tes déclarations URSSAF de l'année.
           </div>
         </>)}
-        {cfe ? <div data-micro-cfe="" style={{ fontSize: 12.5, color: C.text, marginTop: 10, paddingTop: 10, borderTop: `1px solid ${C.border}`, lineHeight: 1.5 }}>CFE : l'avis est à payer au plus tard le <b>{cfe.limite}</b>, dans ton espace professionnel sur impots.gouv.fr. Exonérée l'année de création de ton entreprise.</div> : null}
+        {cfe ? <div data-micro-cfe="" style={{ fontSize: 12.5, color: C.text, marginTop: 10, paddingTop: 10, borderTop: `1px solid ${C.border}`, lineHeight: 1.5 }}>CFE : si tu as reçu un avis, il est à payer au plus tard le <b>{cfe.limite}</b>, dans ton espace professionnel sur impots.gouv.fr. Pas d'avis l'année de création de ton entreprise, ni si ton chiffre d'affaires d'il y a deux ans était sous 5 000 €.</div> : null}
       </div>
     </Card>
   );
@@ -36136,6 +36146,8 @@ function CarteUrssafMois({ liveStats, onNav }) {
             {moisCourantCA!=null && adV && adV.n > 0 && extSait('versement')!=='retard' && <div>Ventes Vinted sans date de versement : {extSait('versement')==='ok' ? <>l'extension va chercher leur date à tes prochaines visites sur Vinted (compte par compte)</> : <>c'est l'extension, sur ton ordinateur, qui va chercher ces dates</>}.</div>}
             {moisCourantCA!=null && adL && adL.n > 0 && <div>Ventes Leboncoin sans date : {extSait('lbcdate')==='ok' ? <>ouvre « Mes transactions » sur leboncoin.fr, l'extension la relève au passage</> : extSait('lbcdate')==='retard' ? <>une fois l'extension à jour, ouvre « Mes transactions » sur leboncoin.fr</> : <>depuis l'ordinateur où l'extension est installée, ouvre « Mes transactions » sur leboncoin.fr</>}.</div>}
             {moisCourantCA!=null && (e.par||{}).Leboncoin && <div>Leboncoin : daté au jour de la vente (sa date de versement n'est pas encore captée).</div>}
+            {/* (2 nov., audit P7) eBay ne transmet pas la date de son versement : le dire. */}
+            {moisCourantCA!=null && (e.par||{}).eBay && <div data-ca-ebay-date="">eBay : daté au jour de la commande (eBay ne transmet pas la date de son versement).</div>}
             <div>Ces ventes sont datées au jour où la plateforme t'a <b>versé l'argent</b> (la commande finalisée par l'acheteur), pas au jour de la vente. Vérifie ton taux et ton chiffre sur autoentrepreneur.urssaf.fr — je ne suis pas comptable.</div>
           </div>
         </details>
