@@ -26671,7 +26671,7 @@ function PublierVestiaire({ comptes }) {
     const nums = [...boostParNum.entries()].filter(([, v]) => v === true).map(([k]) => 'N°' + k).sort((a, z) => a.localeCompare(z, 'fr', { numeric: true }));
     const sansN = b - items.filter((x, i) => x && x.boost === true && numVcAnnonce(Object.keys(vcAnn.items)[i], x, vcAnn.liens || {}, vcLoc.auto)).length;
 
-    return { code: 'lu', b, texte: `Boost : ${b ? `${b} boostée${b > 1 ? 's' : ''}` : 'aucune boostée'}${nums.length ? ` (${nums.join(', ')}${sansN > 0 ? ` et ${sansN} pas reliée${sansN > 1 ? 's' : ''} à une paire` : ''})` : ''}${inc ? ` · ${inc} dont Vestiaire ne dit pas le boost` : ''}.` };
+    return { code: 'lu', b, texte: `Boost : ${b ? `${b} boostée${b > 1 ? 's' : ''}` : 'aucune boostée'}${nums.length ? ` (${nums.join(', ')}${sansN > 0 ? ` et ${sansN} pas reliée${sansN > 1 ? 's' : ''} à un article` : ''})` : ''}${inc ? ` · ${inc} dont Vestiaire ne dit pas le boost` : ''}.` };
   })();
   // 5.295 — LES FAVORIS VESTIAIRE : combien de personnes ont mis chaque annonce
   // en favori (un NOMBRE lu par l'extension, jamais qui). Par identité seulement
@@ -26714,9 +26714,9 @@ function PublierVestiaire({ comptes }) {
   const btn = (accent) => ({ display: 'inline-flex', alignItems: 'center', minHeight: 36, borderRadius: 8, fontFamily: 'inherit', fontWeight: 600, fontSize: 12.5, padding: '7px 11px', cursor: 'pointer',
     border: `1px solid ${accent && !glob ? C.accent : C.border}`, background: accent && !glob ? `${C.accent}14` : 'transparent', color: accent && !glob ? C.accent : C.muted });
   let corps;
-  if (enLigne === undefined || publiees === undefined) corps = <div data-vc-publier="charge" style={{ fontSize: 12.5, color: C.muted }}>Lecture de tes paires en ligne…</div>;
+  if (enLigne === undefined || publiees === undefined) corps = <div data-vc-publier="charge" style={{ fontSize: 12.5, color: C.muted }}>Lecture de tes articles en ligne…</div>;
   else if (enLigne === null) corps = <div data-vc-publier="pas-su" style={{ fontSize: 12.5, color: C.muted }}>Je n'ai pas pu lire tes annonces Vinted — rien n'est perdu, réessaie dans un moment.</div>;
-  else if (!liste.length) corps = <div data-vc-publier="vide" style={{ fontSize: 12.5, color: C.muted }}>{paires.length ? 'Toutes tes paires en ligne sont notées publiées sur Vestiaire.' : "Aucune paire en ligne et numérotée pour l'instant."}</div>;
+  else if (!liste.length) corps = <div data-vc-publier="vide" style={{ fontSize: 12.5, color: C.muted }}>{paires.length ? 'Tous tes articles en ligne sont notés publiés sur Vestiaire.' : "Aucun article en ligne et numéroté pour l'instant."}</div>;
   else corps = (
     <div data-vc-publier="lu" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
       {publiees === null && <div style={{ fontSize: 11.5, color: C.muted }}>Je n'ai pas pu lire lesquelles sont déjà notées publiées sur Vestiaire — l'extension le revérifie au clic.</div>}
@@ -26765,12 +26765,12 @@ function PublierVestiaire({ comptes }) {
           </div>
         );
       })}
-      {liste.length > 12 && !tout && <button type="button" className="vrm-lien-action" onClick={() => setTout(true)} style={{ alignSelf: 'flex-start', background: 'none', border: 'none', color: C.accent, fontWeight: 600, fontSize: 12.5, cursor: 'pointer', fontFamily: 'inherit', padding: 0 }}>Voir les {liste.length} paires</button>}
+      {liste.length > 12 && !tout && <button type="button" className="vrm-lien-action" onClick={() => setTout(true)} style={{ alignSelf: 'flex-start', background: 'none', border: 'none', color: C.accent, fontWeight: 600, fontSize: 12.5, cursor: 'pointer', fontFamily: 'inherit', padding: 0 }}>Voir les {liste.length} articles</button>}
     </div>
   );
   return (
     <Card style={{ padding: 16 }}>
-      <div style={{ fontSize: 14, fontWeight: 700, color: C.text, marginBottom: 4 }}>Mettre une paire en vente sur Vestiaire</div>
+      <div style={{ fontSize: 14, fontWeight: 700, color: C.text, marginBottom: 4 }}>Mettre un article en vente sur Vestiaire</div>
       <div style={{ fontSize: 12, color: C.muted, lineHeight: 1.5, marginBottom: 10 }}>
         {auto
           ? <span data-vc-auto="oui">L'extension ouvre Vestiaire (clique « Vendre un article » si besoin), remplit la description, le prix et ce qu'elle reconnaît, attache les photos — détourées si ta clé Photoroom est posée, sinon elle te propose de les attacher sans détourage — <b style={{ color: C.text }}>et publie toute seule, sans booster</b> : elle décoche toute option payante et ne clique jamais un bouton qui porte un prix. Si Vestiaire exige un champ qu'elle ne devine pas (catégorie, modèle), elle attend que tu le choisisses, puis publie.</span>
@@ -26941,7 +26941,7 @@ function LigneVenteVc({ v, fait, enV, flou, i = 0 }) {
       argent: { lu: mot === 'versee', t: v.verseLe || null },
     });
     const ici = etapes ? (etapes.find((x) => x.ici) || {}).cle : null;
-    const phrase = vcVenteAnnulee(v) ? { gras: 'Annulée.', suite: 'La paire ne part pas : elle reste chez toi.' }
+    const phrase = vcVenteAnnulee(v) ? { gras: 'Annulée.', suite: 'L’article ne part pas : il reste chez toi.' }
       : v.aExpedier && !fait ? { gras: 'À expédier.', suite: v.bordereau ? 'Imprime le bordereau (titre et N° tamponnés), puis dépose le colis.' : 'Le bordereau se prend sur Vestiaire, puis dépose le colis.' }
       : v.aExpedier && fait ? { gras: 'Colis fait.', suite: 'Vestiaire confirmera l’envoi au premier passage chez le transporteur.' }
       : mot === 'controle' ? { gras: 'Contrôle par Vestiaire.', suite: 'Vestiaire vérifie l’article avant de l’envoyer à l’acheteur.' }
@@ -26991,7 +26991,7 @@ function LigneVenteVc({ v, fait, enV, flou, i = 0 }) {
         {v.aExpedier && !fait && v.bordereau ? <div className="vrm-recap-principal"><PastilleTransporteur t={trV} C={C} data-recap-transporteur=""/><BoutonImprimerVc v={v} grand/></div> : null}
         <div className="vrm-recap-grille">
           {v.aExpedier ? <Bouton variante="secondaire" icone="check" data-geste="fait" data-vc-fait={v.id} onClick={() => marquerVc('vrm_vc_colis_done', v.id, !fait)}>{fait ? '↺ Pas encore' : 'Colis fait'}</Bouton> : null}
-          {v.num ? <Bouton variante="secondaire" icone="doc" data-recap-fiche={v.num} aria-label={`Fiche N°${v.num}`} onClick={() => { fermer(); window.dispatchEvent(new CustomEvent('vrm:fiche-article', { detail: v.num })); }}>Fiche de la paire</Bouton> : null}
+          {v.num ? <Bouton variante="secondaire" icone="doc" data-recap-fiche={v.num} aria-label={`Fiche N°${v.num}`} onClick={() => { fermer(); window.dispatchEvent(new CustomEvent('vrm:fiche-article', { detail: v.num })); }}>Fiche de l’article</Bouton> : null}
         </div>
       </section>
     </>;

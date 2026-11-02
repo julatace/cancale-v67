@@ -581,7 +581,7 @@ Aucune modification de l'extension (tout ce qu'il faut était déjà rangé par 
 - **Ventes** : `LigneVenteVc` = `LigneVenteCompacte` comme Vinted (`vrm-sale-row`, `data-tx="vc:…"`,
   « N° · titre », date · « à envoyer avant … », l'étape, ce que Vestiaire verse, Achat · Bénéfice — prix
   d'achat SAISI pour le N° (`vinted_buyprice_by_num`, seulement si ≤ 1 fiche porte ce N°), « Prix d'achat » sur
-  la ligne) et le récapitulatif au toucher (frise, l'argent, détails, Imprimer, Colis fait, Fiche de la paire).
+  la ligne) et le récapitulatif au toucher (frise, l'argent, détails, Imprimer, Colis fait, Fiche de l’article).
 - **Colis → À envoyer** : `CarteColisVc` = la carte d'un colis Vinted (`vrm-colis-carte`, `data-bord-card`,
   Imprimer · Imprimé · Colis fait, `data-geste`) ; « Chronopost · suivi … » n'est plus écrit deux fois : la
   pastille transporteur (`PastilleTransporteur`, module transporteurs fusionné en #971) à côté du bouton, le n° de
@@ -609,3 +609,8 @@ Aucune modification de l'extension (tout ce qu'il faut était déjà rangé par 
 - Les annonces Vestiaire seules n'entrent pas encore au Stock (`vinted_nums_physiques` reste Vinted/eBay/Leboncoin).
 - Le bénéfice d'une vente Vestiaire est sur la ligne ; le total « bénéfice » dit toujours « sans N vente Vestiaire ».
 - Le serveur (e-mail entrant) ne lit pas `vrm_vc_numeros` pour l'anti double vente immédiate (l'app, oui).
+- (21 h 44, Julien : « ce n'est pas toujours une paire, là c'est un sac ») Sur les écrans touchés (annonces,
+  publier, ventes, colis Vestiaire) : « article », jamais « paire » ; aucune taille ni catégorie supposée.
+  Disent encore « paire » (pas touchés ici) : Messages Vestiaire (« Conversation pas reliée à une paire »,
+  « Pas reliée à une paire »), la cloche (« N paires vendues …, encore en ligne sur Vestiaire »), l'écran
+  Leboncoin (« La vente Vestiaire désigne cette paire… »), `LIB_KO` (« pas reliée à une paire »).

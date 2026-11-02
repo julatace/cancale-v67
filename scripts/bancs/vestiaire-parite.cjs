@@ -262,7 +262,8 @@ const compte = (t, mot) => (String(t).match(new RegExp(mot, 'g')) || []).length;
         await pg.keyboard.press('Escape').catch(() => {});
       });
       await essaie('E. Colis fait', async () => {
-        await pg.goto(`http://localhost:${PORT}/?tab=cat_bord`, { waitUntil: 'domcontentloaded' });
+        // La visionneuse du PDF qui se ferme peut interrompre la navigation (ERR_ABORTED) : on la refait une fois.
+        await pg.goto(`http://localhost:${PORT}/?tab=cat_bord`, { waitUntil: 'domcontentloaded' }).catch(() => pg.waitForTimeout(500).then(() => pg.goto(`http://localhost:${PORT}/?tab=cat_bord`, { waitUntil: 'domcontentloaded' })));
         await pg.waitForSelector('[data-colis-onglet-choix="envoyer"]', { timeout: 15000 }).then(() => pg.click('[data-colis-onglet-choix="envoyer"]')).catch(() => {});
         await pg.waitForSelector('[data-vc-fait="V1"]', { timeout: 15000 });
         await pg.click('[data-vc-fait="V1"]');
