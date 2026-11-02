@@ -65,12 +65,15 @@ export function selecteursCible(c) {
     case 'offres': return { essais: ['[data-offres-au-mini]'], ouvrir: '', deplier: [] };
     case 'vente': return { essais: [`.vrm-sale-row[data-tx="${q(c.tx)}"]`], ouvrir: '.vrm-ledger-sale-toggle', deplier: [] };
     case 'colis': return {
-      essais: [`[data-cc-carte="v:${q(c.tx)}"]`, `[data-bord-card][data-tx-colis="${q(c.tx)}"]`],
+      // (2 nov.) Colis → « À envoyer » : la carte détaillée porte l'identité.
+      essais: [`[data-colis-ident="v:${q(c.tx)}"]`, `[data-bord-card][data-tx-colis="${q(c.tx)}"]`],
       ouvrir: null, deplier: ['[data-cc-colonne="prets"] [data-cc-plus]', '[data-cc-colonne="attente"] [data-cc-plus]'] };
     case 'retrait': return {
       essais: [c.tx ? `[data-cc-carte="r:v:${q(c.tx)}"]` : null, c.tx ? `[data-cc-carte="r:c:${q(c.tx)}"]` : null, c.suivi ? `[data-cc-carte="r:e:${q(c.suivi)}"]` : null].filter(Boolean),
       ouvrir: null, deplier: ['[data-cc-colonne="retirer"] [data-cc-plus]'] };
-    case 'colonne': return { essais: [`[data-cc-colonne="${q(c.colonne)}"]`], ouvrir: null, deplier: [] };
+    // (2 nov.) Plus de colonnes : le groupe de la liste (« Prêts à imprimer », « En
+    // attente du bordereau »), « À retirer », ou « Partis » (replié).
+    case 'colonne': return { essais: [`[data-cc-colonne="${q(c.colonne)}"]`, ...({ prets: ['[data-groupe="pret"]'], attente: ['[data-groupe="attente"]'] }[c.colonne] || [])], ouvrir: null, deplier: [] };
     case 'achat': return { essais: [`.vrm-buy-row[data-achat-tx="${q(c.tx)}"]`], ouvrir: null, deplier: [] };
     case 'urssaf': return { essais: ['[data-compta-urssaf]', '#compta-urssaf'], ouvrir: null, deplier: [] };
     // ⚠️ (1er nov., audit A5) Avec un N°, SEULE la ligne de ce N° répond —

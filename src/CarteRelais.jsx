@@ -30,6 +30,7 @@
 // ════════════════════════════════════════════════════════════════════════════
 import React from 'react';
 import { jugerBan, requetesBan, nombreEpingle, RAISONS_BAN } from './relaisColis.js';
+import './styles-colis-colonnes.css';
 
 // (1er nov., « plus fiable ») v2 : la règle a changé (rue + ville sans code
 // postal, ville collée à la rue, résultat ambigu refusé) — les échecs notés
@@ -163,7 +164,7 @@ const jourFr = (s) => { const t = Date.parse(String(s || '') + 'T12:00:00'); ret
 // (`nombreEpingle` — la ligne du point dit le même) ; `etiquette(p)` ne sert
 // qu'à l'ancien bloc « Par point relais » (arrivés + attendus). Toucher une
 // épingle appelle `onChoisir(cle)` ; l'épingle choisie est entourée.
-export function FondRelais({ points, selection, onChoisir, C, etiquette, hauteur = 260, onEtat }) {
+export function FondRelais({ points, selection, onChoisir, C, etiquette, hauteur = 260, onEtat, muet = false }) {
   const boite = React.useRef(null);
   const elements = React.useRef(new Map());
   const [etat, setEtat] = React.useState('charge');
@@ -224,7 +225,7 @@ export function FondRelais({ points, selection, onChoisir, C, etiquette, hauteur
     <div style={{ position: 'relative' }}>
       <div ref={boite} data-relais-fond={etat} className="vrm-relais-fond" aria-hidden={ko ? 'true' : undefined}
         style={{ width: '100%', height: hauteur, borderRadius: 10, overflow: 'hidden', background: '#eaeef2', ...(ko ? { position: 'absolute', left: 0, top: 0, visibility: 'hidden', pointerEvents: 'none' } : null) }}/>
-      {ko && <div data-relais-carte-ko="" style={{ fontSize: 12, color: 'var(--vrm-muted, #667)', padding: '8px 0' }}>La carte ne s’affiche pas ici pour l’instant — la liste ci-dessous reste juste.</div>}
+      {ko && !muet && <div data-relais-carte-ko="" style={{ fontSize: 12, color: 'var(--vrm-muted, #667)', padding: '8px 0' }}>La carte ne s’affiche pas ici pour l’instant — la liste ci-dessous reste juste.</div>}
       {selection ? <span className="vrm-sr">{selection}</span> : null}
     </div>
   );
@@ -239,108 +240,112 @@ function marquerChoisi(els, selection) {
   }
 }
 
-// ── LA COLONNE « À RETIRER », PAR POINT (1er nov.) ──────────────────────────
+// ── « À RETIRER », PAR POINT (1er nov. ; refait le 2 nov., « on ne comprend rien ») ──
+// Julien, au téléphone : « des colis dans tous les sens avec des codes de retrait
+// partout ». Chaque colis à retirer est écrit UNE fois, ici, sous SON point
+// (la règle `pointsARetirer` ne change pas) : ce que c'est, SON code une fois
+// (nommé, copiable — rendu par `gestes`, qui vient de l'écran Colis avec le QR,
+// « Suivre » et « J'ai retiré »). Les colis « à vérifier » (`horsCompte`) restent
+// VISIBLES (§5 : un colis caché est un colis perdu), dans un groupe à part en bas,
+// leur raison dite une fois en tête quand elle est commune. Au téléphone la carte
+// n'est pas dessinée (`avecCarte` faux) : aucune phrase sur la carte dans la liste.
 const plur = (n, s, p) => `${n} ${n > 1 ? (p || s + 's') : s}`;
 const texteLimite = (j) => (j == null ? '' : j < 0 ? 'date limite passée' : j === 0 ? 'dernier jour aujourd’hui' : j === 1 ? 'dernier jour demain' : `encore ${j} jours`);
 
-function CarteColisRetirer({ x, Photo, onOuvrir, limiteSurCarte }) {
+function CarteColisRetirer({ x, Photo, gestes, detail, limiteSurCarte, avecLieu = false, raison = '' }) {
+  const ph = x.photo && Photo ? Photo(x.photo) : null;
+  // Avec `detail` (l'écran Colis), la date limite exacte de CE colis y est dite.
+  const surCarte = limiteSurCarte && !detail;
+  const sousTitre = [avecLieu ? (x.lieuNom || '') : '', raison, surCarte && x.jours != null ? texteLimite(x.jours) : ''].filter(Boolean);
   const codeTxt = x.code ? x.code : x.qr ? 'QR code' : '';
-  const corps = (
-    <>
+  const attrs = { 'data-cc-carte': x.cle, 'data-cc-dans': 'retirer', 'data-site': x.site || 'vinted', 'data-ambre': x.ambre ? '1' : undefined, 'data-a-verifier': x.aVerifier ? '1' : undefined, 'data-hors-compte': x.horsCompte ? '1' : undefined, 'data-sans-lieu': x.sansLieu ? '1' : undefined, 'data-colis-ident': x.cle, 'data-en-verification-tx': String(x.cle || '').startsWith('r:c:') ? String(x.cle).slice(4) : undefined,
+    'data-a-verifier-raison': x.horsCompte && x.raisonCode ? x.raisonCode : undefined, 'data-a-verifier-code': x.horsCompte ? (x.encoreCode || x.code || x.qr ? 'oui' : 'non') : undefined };
+  return (
+    <div className="vrm-cc-carte vrm-rp-carte" {...attrs}>
       <span className="vrm-cc-haut">
-        {(() => {
-          // (1er nov., sa capture) Sans photo, jamais un carré gris vide : une
-          // petite icône de colis, neutre, à la place de la photo.
-          const ph = x.photo && Photo ? Photo(x.photo) : null;
-          return ph
-            ? <span className="vrm-cc-photo" aria-hidden="true">{ph}</span>
-            : <span className="vrm-cc-photo is-sans" data-sans-photo="" aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" strokeLinecap="round"><path d="M3.5 7.5 12 3l8.5 4.5v9L12 21l-8.5-4.5z"/><path d="M3.5 7.5 12 12l8.5-4.5M12 12v9"/></svg></span>;
-        })()}
-        <span className="vrm-cc-nom" title={x.titre}>{x.titre}</span>
+        {ph
+          ? <span className="vrm-cc-photo" aria-hidden="true">{ph}</span>
+          : <span className="vrm-cc-photo is-sans" data-sans-photo="" aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" strokeLinecap="round"><path d="M3.5 7.5 12 3l8.5 4.5v9L12 21l-8.5-4.5z"/><path d="M3.5 7.5 12 12l8.5-4.5M12 12v9"/></svg></span>}
+        <span className="vrm-rp-quoi">
+          <span className="vrm-cc-nom" title={x.titre}>{x.titre}</span>
+          {sousTitre.length ? <span className={'vrm-rp-sous' + (surCarte && x.jours != null && x.jours <= 1 ? ' is-ambre' : '')} data-rp-sous="">{sousTitre.join(' · ')}</span> : null}
+          {detail ? detail(x) : null}
+        </span>
         {x.num ? <span className="vrm-cc-num" data-numero={x.num}>N°{x.num}</span> : null}
       </span>
-      <span className="vrm-rp-code-ligne">
-        {codeTxt
-          ? <span className="vrm-rp-code" data-code-retrait={x.code || ''}>{codeTxt}{x.code2 ? <span className="vrm-rp-code2"> · {x.code2}</span> : null}</span>
-          : <span className="vrm-rp-sans-code">{x.horsCompte ? '' : 'code pas encore lu'}</span>}
-        {x.aVerifier
-          ? <span className="vrm-cc-etat" data-a-verifier-txt="">à vérifier : délai dépassé ou incident</span>
-          : (limiteSurCarte && x.jours != null ? <span className={'vrm-cc-etat' + (x.jours <= 1 ? ' is-ambre' : '')}>{texteLimite(x.jours)}</span> : null)}
-      </span>
-      {x.sansLieu ? <span className="vrm-rp-raison" data-sans-lieu-raison=""><span>{x.sansLieu.raison}</span> <span className="vrm-rp-geste">{x.sansLieu.geste}</span></span> : null}
-    </>
+      {x.sansLieu && !x.horsCompte ? <span className="vrm-rp-raison" data-sans-lieu-raison=""><span>{x.sansLieu.raison}</span> <span className="vrm-rp-geste">{x.sansLieu.geste}</span></span> : null}
+      {gestes
+        ? <span className="vrm-rp-gestes" data-code-retrait={x.code || ''}>{gestes(x)}</span>
+        : <span className="vrm-rp-code-ligne">
+            {codeTxt ? <span className="vrm-rp-code" data-code-retrait={x.code || ''}>{codeTxt}{x.code2 ? <span className="vrm-rp-code2"> · {x.code2}</span> : null}</span> : <span className="vrm-rp-sans-code">code pas encore lu</span>}
+          </span>}
+    </div>
   );
-  const attrs = { 'data-cc-carte': x.cle, 'data-cc-dans': 'retirer', 'data-site': x.site || 'vinted', 'data-ambre': x.ambre ? '1' : undefined, 'data-a-verifier': x.aVerifier ? '1' : undefined, 'data-hors-compte': x.horsCompte ? '1' : undefined, 'data-sans-lieu': x.sansLieu ? '1' : undefined };
-  return onOuvrir && x.ouvrir
-    ? <button type="button" className="vrm-cc-carte vrm-rp-carte" {...attrs} onClick={() => onOuvrir(x)}>{corps}</button>
-    : <div className="vrm-cc-carte vrm-rp-carte" {...attrs}>{corps}</div>;
 }
 
-export function ColonneRetirer({ vue, C, Photo, onOuvrir, enRouteSansRelais = 0 }) {
+export function ColonneRetirer({ vue, C, Photo, gestes = null, detail = null, nomTransporteur = null, avecCarte = true, enRouteSansRelais = 0 }) {
   const points = (vue && vue.points) || [];
   const connus = points.filter((p) => !p.inconnu);
   const inconnu = points.find((p) => p.inconnu) || null;
-  const reperes = useReperes(connus, connus.length > 0);
+  // Au téléphone (pas de carte) : aucune adresse n'est cherchée pour la carte.
+  const reperes = useReperes(connus, avecCarte && connus.length > 0);
   const [choisi, setChoisi] = React.useState('');
   const [etatFond, setEtatFond] = React.useState('charge');
   const racine = React.useRef(null);
-  const surCarte = connus.map((p) => { const r = repereDe(p, reperes); return r ? { ...p, lat: r.lat, lon: r.lon } : null; }).filter(Boolean);
+  const surCarte = avecCarte ? connus.map((p) => { const r = repereDe(p, reperes); return r ? { ...p, lat: r.lat, lon: r.lon } : null; }).filter(Boolean) : [];
   const choisir = (cle) => {
     setChoisi(cle);
     const el = racine.current && [...racine.current.querySelectorAll('[data-relais-point]')].find((e) => e.getAttribute('data-relais-point') === cle);
     if (el) { try { el.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch (_) { el.scrollIntoView(); } }
   };
-  const raisonCarte = (p) => raisonPasSurCarte(p, reperes) || null;
+  const carteVisible = avecCarte && surCarte.length > 0 && etatFond !== 'ko';
+  // Les « à vérifier » de TOUS les points (et du point inconnu) : un groupe à part, en bas.
+  const aVerifier = points.flatMap((p) => p.arrives.filter((c) => c.horsCompte));
+  const raisons = aVerifier.map((c) => c.raisonVerif || 'délai dépassé ou incident');
+  const raisonCommune = raisons.length && raisons.every((r) => r === raisons[0]) ? raisons[0] : '';
+  const inconnusComptes = inconnu ? inconnu.arrives.filter((c) => !c.horsCompte) : [];
   if (!points.length && !enRouteSansRelais) return null;
   return (
-    <div className="vrm-rp" ref={racine} data-retirer-par-point={connus.length} data-retirer-comptes={vue ? vue.nComptes : 0} data-retirer-hors={vue ? vue.nHors : 0} data-retirer-sur-carte={surCarte.length}>
-      {surCarte.length > 0 && <FondRelais points={surCarte} selection={choisi} onChoisir={choisir} C={C} hauteur={200} onEtat={setEtatFond}/>}
-      {connus.length > 0 && surCarte.length < connus.length && etatFond !== 'ko' && (
-        <p className="vrm-rp-note" data-retirer-pas-carte={connus.length - surCarte.length}>
-          {surCarte.length ? `${plur(surCarte.length, 'point')} sur la carte · ${connus.length - surCarte.length} pas sur la carte (la raison est sous chacun).` : `Aucun point sur la carte pour l’instant (la raison est sous chacun).`}
-        </p>
-      )}
+    <div className="vrm-rp" ref={racine} data-retirer-par-point={connus.length} data-retirer-comptes={vue ? vue.nComptes : 0} data-retirer-hors={vue ? vue.nHors : 0} data-retirer-sur-carte={surCarte.length} data-retirer-carte={avecCarte ? '1' : '0'}>
+      {avecCarte && surCarte.length > 0 && <FondRelais points={surCarte} selection={choisi} onChoisir={choisir} C={C} hauteur={240} onEtat={setEtatFond} muet/>}
       {connus.map((p) => {
         const comptes = p.arrives.filter((c) => !c.horsCompte);
-        const hors = p.arrives.filter((c) => c.horsCompte);
+        if (!comptes.length && !p.attendus.length) return null;
         // La date limite d'un colis ne s'écrit sur SA carte que si les colis du
         // point n'ont pas la même (sinon c'est la phrase de l'en-tête, §7).
         const jMixte = new Set(comptes.map((c) => c.jours).filter((j) => j != null)).size > 1;
-        const raison = raisonCarte(p);
+        const raisonCarte = carteVisible ? (raisonPasSurCarte(p, reperes) || null) : null;
         const lim = texteLimite(p.prochaineLimite);
-        // (1er nov.) La pastille du point = son épingle : le MÊME nombre, de la
-        // même fonction (`nombreEpingle`).
-        // (1er nov., sa capture : « colis à retirer · 2 à vérifier » sans nombre)
-        // La phrase porte le nombre EN CLAIR (« 4 colis à retirer ») ; la pastille
-        // est l'épingle de la carte (même forme, une icône de colis) : elle se lit
-        // comme un nombre de colis, jamais comme un numéro d'ordre.
         const ep = nombreEpingle(p);
+        // Le transporteur du point : celui que la source NOMME, et seulement s'il est
+        // le même pour tous ses colis (jamais « Vinted Go » écrit en dur).
+        const trs = [...new Set(comptes.map((c) => c.transporteur || ''))];
+        const trCode = trs.length === 1 && trs[0] ? trs[0] : '';
+        const trNom = trCode && nomTransporteur ? nomTransporteur(trCode) : '';
         const morceaux = [
-          p.nComptes || (!p.nAttendus && !hors.length) ? { k: 'aretirer', t: plur(p.nComptes, 'colis à retirer', 'colis à retirer') } : null,
-          hors.length ? { k: 'averifier', t: `${hors.length} à vérifier` } : null,
-          p.nAttendus ? { k: 'enroute', t: `${p.nAttendus} en route` } : null,
+          p.nComptes ? plur(p.nComptes, 'colis', 'colis') : null,
+          p.nAttendus ? `${p.nAttendus} en route` : null,
         ].filter(Boolean);
         return (
           <section key={p.cle} className={'vrm-rp-point' + (choisi === p.cle ? ' is-choisi' : '')} data-relais-point={p.cle} data-relais-numero={p.numero}
             data-relais-point-arrives={p.nArrives} data-relais-point-comptes={p.nComptes} data-relais-point-attendus={p.nAttendus} data-relais-epingle-n={ep.n}
-            data-relais-repere={repereDe(p, reperes) ? 'oui' : (raison && raison !== EN_COURS ? 'non' : 'cherche')} data-relais-urgent={p.urgent ? '1' : undefined}>
+            data-relais-repere={!avecCarte ? 'sans-carte' : repereDe(p, reperes) ? 'oui' : (raisonCarte && raisonCarte !== EN_COURS ? 'non' : 'cherche')} data-relais-urgent={p.urgent ? '1' : undefined}>
             <header className="vrm-rp-tete">
-              <span className={'vrm-rp-numero vrm-rp-compte vrm-rp-epingle' + (ep.sorte === 'aretirer' && repereDe(p, reperes) ? ' is-fort' : '')} data-relais-pastille={ep.n} data-relais-pastille-sorte={ep.sorte} aria-hidden="true"
-                title={ep.sorte === 'aretirer' ? `${plur(ep.n, 'colis à retirer', 'colis à retirer')} — l’épingle de ce point sur la carte` : ep.sorte === 'averifier' ? `${ep.n} à vérifier` : `${ep.n} en route`}><svg className="vrm-rp-epingle-ic" viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" aria-hidden="true"><path d="M3.5 7.5 12 3l8.5 4.5v9L12 21l-8.5-4.5z"/><path d="M3.5 7.5 12 12l8.5-4.5M12 12v9"/></svg>{ep.n}</span>
+              {carteVisible ? <span className={'vrm-rp-numero vrm-rp-compte vrm-rp-epingle' + (ep.sorte === 'aretirer' && repereDe(p, reperes) ? ' is-fort' : '')} data-relais-pastille={ep.n} data-relais-pastille-sorte={ep.sorte} aria-hidden="true" title="Son épingle sur la carte">{ep.n}</span> : null}
               <span className="vrm-rp-ident">
                 <b className="vrm-rp-nom" data-relais-nom="">{p.nom || p.adresseCourte || 'Point relais'}</b>
-                {p.nom && p.adresseCourte ? <span className="vrm-rp-adresse" data-relais-adresse="">{p.adresseCourte}</span> : null}
-                {!p.nom ? <span className="vrm-rp-adresse">nom du point pas écrit dans le message</span> : null}
+                {p.nom && (p.adresse || p.adresseCourte) ? <span className="vrm-rp-adresse" data-relais-adresse="">{p.adresse || p.adresseCourte}</span> : null}
+                {trNom ? <span className="vrm-rp-adresse" data-relais-transporteur={trCode}>{trNom}</span> : null}
+                {(() => { const n = comptes.filter((c) => c.trInconnu).length; return n ? <span className="vrm-rp-adresse" data-transp="transporteur-inconnu" data-transp-n={n}>Transporteur pas encore connu{n > 1 ? ` pour ${n} colis` : ''} : le suivi Vinted ne le nomme pas</span> : null; })()}
                 <span className="vrm-rp-resume">
-                  {morceaux.map((m, i) => <span key={m.k} data-relais-compte={m.k === 'aretirer' ? p.nComptes : undefined}>{i ? ' · ' : ''}{m.t}</span>)}
-                  {lim ? <span className={p.urgent ? 'is-ambre' : ''} data-relais-limite={p.prochaineLimite}> · {lim}</span> : null}
+                  {morceaux.map((m, i) => <span key={i} data-relais-compte={i === 0 && p.nComptes ? p.nComptes : undefined}>{i ? ' · ' : ''}{m}</span>)}
+                  {lim && p.nComptes ? <span className={p.urgent ? 'is-ambre' : ''} data-relais-limite={p.prochaineLimite}> · {lim}</span> : null}
                 </span>
-                {raison ? <span className="vrm-rp-pas-carte" data-relais-sans-repere="" data-raison={codePasSurCarte(p, reperes)}>Pas sur la carte : {raison}.</span> : null}
+                {raisonCarte ? <span className="vrm-rp-pas-carte" data-relais-sans-repere="" data-raison={codePasSurCarte(p, reperes)}>Pas sur la carte : {raisonCarte}.</span> : null}
               </span>
             </header>
             <div className="vrm-rp-liste">
-              {comptes.map((x) => <CarteColisRetirer key={x.cle || x.id} x={x} Photo={Photo} onOuvrir={onOuvrir} limiteSurCarte={jMixte}/>)}
-              {hors.map((x) => <CarteColisRetirer key={x.cle || x.id} x={x} Photo={Photo} onOuvrir={onOuvrir}/>)}
+              {comptes.map((x) => <CarteColisRetirer key={x.cle || x.id} x={x} Photo={Photo} gestes={gestes} detail={detail} limiteSurCarte={jMixte}/>)}
               {p.attendus.map((c) => (
                 <div key={c.id} className="vrm-rp-attendu" data-relais-attendu={c.id} data-relais-estimee={c.estimee || ''}>
                   En route{c.titre ? ` · ${c.titre}` : ''} — {c.estimee ? <>arrivée estimée {jourFr(c.estimee)}</> : <span>date d’arrivée pas encore dite</span>}
@@ -350,22 +355,37 @@ export function ColonneRetirer({ vue, C, Photo, onOuvrir, enRouteSansRelais = 0 
           </section>
         );
       })}
-      {inconnu && (
+      {inconnusComptes.length > 0 && (
         <section className="vrm-rp-point vrm-rp-inconnu" data-relais-point={inconnu.cle} data-relais-point-arrives={inconnu.nArrives} data-relais-point-comptes={inconnu.nComptes}>
           <header className="vrm-rp-tete">
-            <span className="vrm-rp-numero is-vide" aria-hidden="true">?</span>
             <span className="vrm-rp-ident">
               <b className="vrm-rp-nom">Point pas encore connu</b>
-              <span className="vrm-rp-resume">{plur(inconnu.nComptes, 'colis', 'colis')}{inconnu.nArrives - inconnu.nComptes ? ` · ${inconnu.nArrives - inconnu.nComptes} à vérifier` : ''} — le message reçu ne dit pas encore où il est</span>
+              {(() => { const n = inconnusComptes.filter((c) => c.trInconnu).length; return n ? <span className="vrm-rp-adresse" data-transp="transporteur-inconnu" data-transp-n={n}>Transporteur pas encore connu{n > 1 ? ` pour ${n} colis` : ''} : le suivi Vinted ne le nomme pas</span> : null; })()}
+              <span className="vrm-rp-resume">{plur(inconnu.nComptes, 'colis', 'colis')} — le message reçu ne dit pas encore où {inconnu.nComptes > 1 ? 'ils sont' : 'il est'}</span>
             </span>
           </header>
           <div className="vrm-rp-liste">
-            {inconnu.arrives.map((x) => <CarteColisRetirer key={x.cle || x.id} x={x} Photo={Photo} onOuvrir={onOuvrir}/>)}
+            {inconnusComptes.map((x) => <CarteColisRetirer key={x.cle || x.id} x={x} Photo={Photo} gestes={gestes} detail={detail}/>)}
           </div>
         </section>
       )}
       {enRouteSansRelais > 0 && <p className="vrm-rp-note" data-retirer-en-route-sans={enRouteSansRelais}>{plur(enRouteSansRelais, 'achat')} en route dont Vinted ne dit pas encore le point d’arrivée.</p>}
-      {surCarte.length > 0 && etatFond !== 'ko' && <p className="vrm-rp-note vrm-rp-attrib" data-relais-note="">Fond : OpenFreeMap · © OpenMapTiles · © OpenStreetMap ; adresses : Vinted, Base Adresse Nationale.</p>}
+      {aVerifier.length > 0 && (
+        <section className="vrm-rp-point vrm-rp-verifier" data-retirer-a-verifier={aVerifier.length}>
+          <header className="vrm-rp-tete">
+            <span className="vrm-rp-ident">
+              <b className="vrm-rp-nom">À vérifier · {aVerifier.length}</b>
+              {(() => { const n = aVerifier.filter((c) => c.trInconnu).length; return n ? <span className="vrm-rp-adresse" data-transp="transporteur-inconnu" data-transp-n={n}>Transporteur pas encore connu{n > 1 ? ` pour ${n} colis` : ''} : le suivi Vinted ne le nomme pas</span> : null; })()}
+              {(() => { const n = aVerifier.filter((c) => String(c.cle || '').startsWith('r:c:')).length; return n ? <span className="vrm-rp-resume" data-en-verification={n}>{n > 1 ? `${n} achats en cours de vérification` : '1 achat en cours de vérification'} : Vinted {n > 1 ? 'les dit' : 'le dit'} au point relais, mais rien ne {n > 1 ? 'les' : 'le'} relie encore à un colis ci-dessus — peut-être le même. Hors du compte.</span> : null; })()}
+              <span className="vrm-rp-resume">{raisonCommune ? `${raisonCommune[0].toUpperCase()}${raisonCommune.slice(1)}. ` : ''}Hors du compte « à retirer » : regarde le suivi, et touche « J’ai retiré » si tu l’as eu.{(() => { const n = aVerifier.filter((c) => c.encoreCode || c.code || c.qr).length; return n ? ` ${n > 1 ? `${n} ont encore leur code ou leur QR` : '1 a encore son code ou son QR'} : peut-être encore au relais.` : ''; })()}</span>
+            </span>
+          </header>
+          <div className="vrm-rp-liste">
+            {aVerifier.map((x, i) => <CarteColisRetirer key={x.cle || x.id} x={x} Photo={Photo} gestes={gestes} detail={detail} avecLieu raison={raisonCommune ? '' : raisons[i]}/>)}
+          </div>
+        </section>
+      )}
+      {carteVisible && <p className="vrm-rp-note vrm-rp-attrib" data-relais-note="">Fond : OpenFreeMap · © OpenMapTiles · © OpenStreetMap ; adresses : Vinted, adresse.data.gouv.fr.</p>}
     </div>
   );
 }
@@ -399,7 +419,7 @@ export default function CarteRelaisColis({ donnees, C, compacte = false, sansLis
       ))}
       {sansListe && avecRepere.length === 0 && <div data-relais-sans-repere-tous="" style={muted}>{groupes.some((g) => etatRepere(g) === 'cherche') ? 'Je place les points sur la carte…' : 'Aucun point n’a pu être placé sur la carte : adresse incomplète ou pas trouvée sûrement.'}</div>}
       {!sansListe && sansRelais > 0 && <div style={{ ...muted, fontSize: 11.5 }}>{sansRelais} achat{sansRelais > 1 ? 's' : ''} en route sans destination connue.</div>}
-      {avecRepere.length > 0 && <div data-relais-note="" style={{ ...muted, fontSize: 10.5 }}>Fond : OpenFreeMap · © OpenMapTiles · © OpenStreetMap ; adresses : Base Adresse Nationale.</div>}
+      {avecRepere.length > 0 && <div data-relais-note="" style={{ ...muted, fontSize: 10.5 }}>Fond : OpenFreeMap · © OpenMapTiles · © OpenStreetMap ; adresses : adresse.data.gouv.fr.</div>}
     </div>
   );
   return (
@@ -434,7 +454,7 @@ export default function CarteRelaisColis({ donnees, C, compacte = false, sansLis
           <div data-relais-note="" style={{ ...muted, fontSize: 11.5 }}>
             Un colis n'est rangé sous un point que par ce qui le désigne lui (l'e-mail du transporteur, la conversation, ou le suivi Vinted de CET achat) — jamais deviné.
             {sansRelais > 0 ? ` ${sansRelais} achat${sansRelais > 1 ? 's' : ''} en route sans destination connue : elle ne vient que du suivi Vinted de l'achat, quand il la donne (l'extension le relit en passant).` : ''}
-            {' '}Les arrivées sont celles que Vinted estime, pas une promesse. Fond : OpenFreeMap · © OpenMapTiles · © OpenStreetMap ; adresses : Base Adresse Nationale.
+            {' '}Les arrivées sont celles que Vinted estime, pas une promesse. Fond : OpenFreeMap · © OpenMapTiles · © OpenStreetMap ; adresses : adresse.data.gouv.fr.
           </div>
         </div>
       )}

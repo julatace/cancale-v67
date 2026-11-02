@@ -85,7 +85,7 @@ async function rendre(nav, { tab, proprietaire = false, baseKO = false, telephon
     texte: document.body.innerText,
     sansCompteColis: !!document.querySelector('[data-colis-sans-compte]'),
     relierColis: !!document.querySelector('[data-colis-relier]'),
-    colonnes: !!document.querySelector('[data-colis-colonnes]'),
+    colonnes: !!document.querySelector('[data-colis-onglet]'),
     filtreVinted: !!document.querySelector('[data-filtre-site] [data-site="vinted"], .vrm-filtre-site [data-site="vinted"]'),
     etatVinted: (document.querySelector('[data-toutes-etat-site="vinted"]') || {}).getAttribute ? document.querySelector('[data-toutes-etat-site="vinted"]').getAttribute('data-etat') : null,
     versComptesEbay: !!document.querySelector('[data-vers-comptes-ebay]'),

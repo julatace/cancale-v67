@@ -119,21 +119,21 @@ async function main() {
       await essaie(T, async () => {
         const { ctx, pg, errs } = await preparer(b, vp);
         await pg.goto(`http://localhost:${PORT}/?tab=cat_achats`, { waitUntil: 'domcontentloaded' });
-        await pg.locator('.vrm-pickup-point').first().waitFor({ timeout: 15000 }).catch(async e=>{console.log('ÉCRAN DE BANC : '+(await pg.locator('body').innerText()).slice(0,1500));console.log('ERREURS : '+errs.join(' | '));throw e;});
+        await pg.locator('[data-cc-colonne="retirer"] [data-relais-point]').first().waitFor({ timeout: 15000 }).catch(async e=>{console.log('ÉCRAN DE BANC : '+(await pg.locator('body').innerText()).slice(0,1500));console.log('ERREURS : '+errs.join(' | '));throw e;});
         await pg.waitForTimeout(1500);
         // Ce que montre CHAQUE carte : l'attribut et la ligne VISIBLE (pas un repli fermé).
         if(process.env.BANC_RETRAITS){
-          const alpha=pg.locator('.vrm-pickup-card').filter({hasText:'Colis Alpha'}),bravo=pg.locator('.vrm-pickup-card').filter({hasText:'Colis Bravo'});
+          const alpha=pg.locator('[data-cc-colonne="retirer"] [data-cc-carte]').filter({hasText:'Colis Alpha'}),bravo=pg.locator('[data-cc-colonne="retirer"] [data-cc-carte]').filter({hasText:'Colis Bravo'});
           await alpha.scrollIntoViewIfNeeded();dit(await alpha.locator('img').getAttribute('src')===ACHATS[0].photo,`${T} photo du premier achat reliée par suivi, depuis la transaction captée`);
           await bravo.scrollIntoViewIfNeeded();dit(await bravo.locator('img').getAttribute('src')===ACHATS[1].photo,`${T} même titre, deuxième suivi : deuxième photo`);
           ROWS.push(track('email_track_vinted_11110001',{carrier:'vinted',suivi:'11110001',status:'delivered',subject:'Votre colis a été retiré par l’acheteur',receivedAt:new Date().toISOString()}));
-          await pg.goto(`http://localhost:${PORT}/?tab=cat_achats`,{waitUntil:'domcontentloaded'});await pg.locator('.vrm-pickup-point').first().waitFor({timeout:15000}).catch(async e=>{console.log('RECHARGEMENT : '+(await pg.locator('body').innerText()).slice(0,1600));throw e;});await pg.waitForTimeout(1700);
-          const actifs=await pg.locator('.vrm-pickup-card').allTextContents();dit(!actifs.some(t=>t.includes('Colis Alpha')),`${T} le retrait confirmé enlève l’autre email disponible du même suivi`);
+          await pg.goto(`http://localhost:${PORT}/?tab=cat_achats`,{waitUntil:'domcontentloaded'});await pg.locator('[data-cc-colonne="retirer"] [data-relais-point]').first().waitFor({timeout:15000}).catch(async e=>{console.log('RECHARGEMENT : '+(await pg.locator('body').innerText()).slice(0,1600));throw e;});await pg.waitForTimeout(1700);
+          const actifs=await pg.locator('[data-cc-colonne="retirer"] [data-cc-carte]').allTextContents();dit(!actifs.some(t=>t.includes('Colis Alpha')),`${T} le retrait confirmé enlève l’autre email disponible du même suivi`);
           dit(actifs.filter(t=>t.includes('Article identique')).length===1,`${T} l’ancien statut Vinted ne recrée pas le colis déjà retiré`);
           dit(actifs.some(t=>t.includes('Colis Bravo')),`${T} le second suivi reste à retirer`);dit(!errs.length,`${T} aucune erreur d’app`,errs[0]);
           ROWS.splice(ROWS.findIndex(r=>r.id==='email_track_vinted_11110001'),1);await ctx.close();return;
         }
-        const cartes = await pg.evaluate(() => [...document.querySelectorAll('.vrm-pickup-card, [data-oublie]')].map((c) => {
+        const cartes = await pg.evaluate(() => [...document.querySelectorAll('[data-cc-colonne="retirer"] [data-cc-carte]')] /* (2 nov.) Colis → « À retirer », chaque colis une fois */.map((c) => {
           const e = c.matches('[data-arrive-le]') ? c : c.querySelector('[data-arrive-le]');
           const ligne = c.querySelector('.vrm-arrive') || (c.matches('[data-oublie]') ? c.querySelector('[data-oublie-info]') : null);
           const r = ligne ? ligne.getBoundingClientRect() : null;

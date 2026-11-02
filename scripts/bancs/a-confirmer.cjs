@@ -118,7 +118,7 @@ async function main() {
         dit(bloc && bloc.liens.join(' ') === 'https://www.vinted.fr/inbox/7702 https://www.vinted.fr/inbox/7701', `${T} le lien vers SA conversation, sur chaque ligne`, bloc && bloc.liens.join(' '));
         dit(bloc && (bloc.t.match(/compte_banc/g) || []).length === 1, `${T} le compte nommé UNE fois (le même pour tous, §7)`, bloc && String((bloc.t.match(/compte_banc/g) || []).length));
         dit(bloc && bloc.haut >= 44, `${T} le lien se touche au doigt (≥ 44 px)`, bloc && String(bloc.haut));
-        const arr = await pg.evaluate(() => { const c = [...document.querySelectorAll('[data-arrive-le]')].find((x) => /Cortez/.test((x.closest('.vrm-pickup-card') || x).innerText)); return c && { le: c.getAttribute('data-arrive-le'), sur: c.getAttribute('data-arrive-sur') }; });
+        const arr = await pg.evaluate(() => { const c = [...document.querySelectorAll('[data-arrive-le]')].find((x) => /Cortez/.test((x.closest('[data-cc-carte]') || x.closest('.vrm-pickup-card') || x).innerText)); return c && { le: c.getAttribute('data-arrive-le'), sur: c.getAttribute('data-arrive-sur') }; });
         dit(arr && arr.sur === 'oui' && arr.le === jourLocal(ARRIVE), `${T} l'heure du message d'arrivée (conversation) = date SÛRE`, arr && `${arr.le} ${arr.sur}`);
         await pg.goto(`http://localhost:${PORT}/?tab=journee`, { waitUntil: 'domcontentloaded' });
         await pg.locator('[data-job="a-confirmer"]').first().waitFor({ timeout: 15000 }).catch(() => {});
@@ -133,7 +133,7 @@ async function main() {
         ROWS = lignes(true); PANNE = true;
         const { ctx, pg, errs } = await preparer(b, vp);
         await pg.goto(`http://localhost:${PORT}/?tab=cat_achats`, { waitUntil: 'domcontentloaded' });
-        await pg.locator('.vrm-pickup-point').first().waitFor({ timeout: 15000 });
+        await pg.locator('[data-cc-colonne="retirer"] [data-relais-point], [data-retraits-vide]').first().waitFor({ timeout: 15000 }); // (2 nov.) Colis → « À retirer », par point relais
         await pg.waitForTimeout(1200);
         const v = await pg.evaluate(() => { const e = document.querySelector('[data-a-confirmer]'); return e ? e.getAttribute('data-a-confirmer') : null; });
         dit(v === 'passu', `${T} ligne illisible ⇒ Achats dit « pas pu lire » (jamais « rien à confirmer »)`, String(v));
@@ -147,7 +147,7 @@ async function main() {
         ROWS = lignes(false); PANNE = false;
         const { ctx, pg, errs } = await preparer(b, vp);
         await pg.goto(`http://localhost:${PORT}/?tab=cat_achats`, { waitUntil: 'domcontentloaded' });
-        await pg.locator('.vrm-pickup-point').first().waitFor({ timeout: 15000 });
+        await pg.locator('[data-cc-colonne="retirer"] [data-relais-point], [data-retraits-vide]').first().waitFor({ timeout: 15000 }); // (2 nov.) Colis → « À retirer », par point relais
         await pg.waitForTimeout(1200);
         dit(!(await pg.locator('[data-a-confirmer]').count()), `${T} rien à confirmer ⇒ aucun bloc`);
         dit(!errs.length, `${T} aucune erreur d'app (vide)`, errs[0]);

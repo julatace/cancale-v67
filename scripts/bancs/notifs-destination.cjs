@@ -125,8 +125,8 @@ const lire = (pg) => pg.evaluate(() => {
   const conv = q('.vrm-inbox-row.is-current');
   return {
     tache: tache ? tache.getAttribute('data-tache') : null, site: tache ? tache.getAttribute('data-tache-site') : null,
-    colis: !!q('[data-colis-colonnes]'), achats: !!q('.vrm-buy-row'), compta: !!q('[data-compta-urssaf]'),
-    cible: cible ? { type: cible.getAttribute('data-cible-notif'), cle: cible.getAttribute('data-cc-carte') || cible.getAttribute('data-conv') || cible.getAttribute('data-tx') || cible.getAttribute('data-achat-tx') || cible.getAttribute('data-cc-colonne') || (cible.hasAttribute('data-compta-urssaf') ? 'urssaf' : '') || (cible.hasAttribute('data-offres-au-mini') ? 'offres' : ''), ouverte: cible.getAttribute('data-ligne-ouverte') } : null,
+    colis: !!q('[data-colis-onglet]'), achats: !!q('.vrm-buy-row'), compta: !!q('[data-compta-urssaf]'),
+    cible: cible ? { type: cible.getAttribute('data-cible-notif'), cle: cible.getAttribute('data-colis-ident') || cible.getAttribute('data-cc-carte') || cible.getAttribute('data-conv') || cible.getAttribute('data-tx') || cible.getAttribute('data-achat-tx') || cible.getAttribute('data-cc-colonne') || (cible.hasAttribute('data-compta-urssaf') ? 'urssaf' : '') || (cible.hasAttribute('data-offres-au-mini') ? 'offres' : ''), ouverte: cible.getAttribute('data-ligne-ouverte') } : null,
     fil: !!q('button[aria-label="Fermer la conversation"]'), convCourante: conv ? conv.getAttribute('data-conv') : null,
     offre: !!q('.vrm-chat-panel [data-offre], [data-offre]'),
     tiroir: !!document.querySelector('.vrm-ledger-drawer-host:not([hidden])'),
