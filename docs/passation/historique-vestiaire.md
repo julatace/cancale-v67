@@ -510,3 +510,24 @@ sellerEarnings, picturePath, path }, listingDate, negotiationsSummary } }`, sans
 - `audit-capture-vc-lbc` C10 (forme réelle, valeurs inventées) : rouge sur la 5.313, vert sur la 5.314.
 Geste : installer la 5.314.0, puis sur vestiairecollective.com ouvrir « Mes articles » ET « Mes ventes »
 (défiler jusqu'au bout) : la vente apparaît dans VRM à ce moment-là.
+
+## 2 novembre (soir) — 5.315.0 : « TOUT Vestiaire » gardé tel quel
+
+Julien : « fais vraiment une extension qui capte tout Vestiaire : dès que je vais sur un onglet, ça
+enregistre, pour après pouvoir capter toutes les infos — les ventes, les bordereaux, etc. »
+- Rien n'est DEMANDÉ à Vestiaire (aucune requête de plus, aucun geste simulé) : on garde ce que la page
+  charge déjà, sur SON compte, dans SON onglet.
+- `vc-inject.js` : toute réponse JSON 2xx de vestiairecollective.com (≤ 400 Ko), les données de page
+  (`__NEXT_DATA__`) à chaque chargement, et tout PDF reçu par la page (bordereau, ≤ 3 Mo, d'où qu'il
+  vienne, en-tête `%PDF` vérifié). Paramètres d'adresse « secrets » masqués (`token=_`).
+- Le fond (`rangerVcBrut`, `rangerVcPdf`) : une ligne par adresse `vc_brut_{empreinte}` = { url, methode,
+  sorte (api/page), page, compte (celui de l'onglet, `compteVcCapture`), at, taille, json } — la dernière
+  réponse vue ; clés secrètes du contenu VIDÉES (`[retiré]` : jetons, mots de passe, carte, IBAN…) ;
+  `vc_pdf_{empreinte}` = { url, page, compte, at, taille, b64 }. Deux budgets (taille de la base) : SES
+  données (/me/, commandes, ventes, envois, bordereaux, messages, porte-monnaie…) 1 500 adresses × 400 Ko ;
+  le reste (catalogue, autres vendeurs) 300 × 100 Ko (`chrome.storage.local`, §4.9). L'app ne lit pas
+  ces lignes : elles servent à construire les lectures exactes (ventes, montant versé, bordereaux) sur la
+  forme RÉELLE.
+- `audit-capture-vc-lbc` C11.
+Geste : installer la 5.315.0 et se promener sur Vestiaire (Mes articles, Mes ventes, une vente ouverte,
+son bordereau, les messages, le porte-monnaie) ; puis dire à la session : « regarde ce qu'elle a capté ».
