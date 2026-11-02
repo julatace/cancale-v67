@@ -95,8 +95,9 @@ export function lireCompteur(d) {
   return null;                                           // forme inconnue : on ne devine pas
 }
 // Rend { n } · { erreur:'pas-su' }. `cle` = l'identité de la pièce (tx).
-export async function prendreNumero(owner, idCompteur, cle, essais = 4) {
+export async function prendreNumero(owner, idCompteur, cle, essais = 12) {
   for (let i = 0; i < essais; i++) {
+    if (i) await new Promise((r) => setTimeout(r, 20 + Math.floor(Math.random() * 60 * i)));
     const brut = await lireLigne(idCompteur, owner, 'data');
     if (brut === undefined) return { erreur: 'pas-su' };
     const c = lireCompteur(brut);

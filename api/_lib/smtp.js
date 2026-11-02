@@ -23,6 +23,9 @@ import crypto from 'crypto';
 
 const CRLF = '\r\n';
 const DELAI_MS = Number(process.env.SMTP_DELAI_MS) || 20000;
+// Pour les bancs SEULEMENT : un faux serveur local (jamais réglé en production —
+// rien ne l'écrit hors de scripts/).
+export const _banc = { connecter: null, tlsOptions: null };
 
 // Les boîtes connues : leur serveur d'envoi. « Autre » : le vendeur le donne.
 export const FOURNISSEURS = {
@@ -124,7 +127,8 @@ export async function envoyerSmtp({ seulementConnexion = false, hote, port, util
   const raison = (r) => r.lignes.map((l) => l.slice(4)).join(' ').replace(/\s+/g, ' ').slice(0, 300);
   const refus = (etape, r) => ({ issue: 'refuse', etape, code: r && r.code, message: r ? raison(r) : '' });
   try {
-    const ouvrir = connecter || ((o) => new Promise((ok, ko) => {
+    if (_banc.tlsOptions) tlsOptions = { ...tlsOptions, ..._banc.tlsOptions };
+    const ouvrir = connecter || _banc.connecter || ((o) => new Promise((ok, ko) => {
       const s = o.securise
         ? tls.connect({ host: o.hote, port: o.port, servername: o.hote, ...tlsOptions }, () => ok(s))
         : net.connect({ host: o.hote, port: o.port }, () => ok(s));
