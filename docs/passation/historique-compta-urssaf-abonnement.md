@@ -1722,3 +1722,61 @@ clair + 1512 sombre ; mutation : état d'envoi pas gardé ⇒ rouge) ; `audit-ro
 de TVA) ; connecter sa boîte (Gmail : « mot de passe d'application ») et s'envoyer un essai ; puis, sur une
 vente Pro, « Envoyer la facture à l'acheteur ». Les 5 ventes Pro déjà reçues gardent leurs numéros
 FA-2026-0001…0005.
+
+---
+
+## 2 novembre (soir) — Comptabilité en trois questions
+
+**Demande de Julien (20 h 41)** : « il y a beaucoup d'incompréhension de ma part quand je vais dans les
+emails ou dans les statistiques, comptabilité, SURTOUT comptabilité. […] le plus simple possible pour les
+utilisateurs. »
+
+**Regardé avant (données inventées, 390 tactile clair + 1512 sombre)** : l'écran ouvrait sur « Vendu et
+reçu » (trois fois 60,00 € : Vendu, Finalisé, Reçu (versé), plus un tableau), puis un bénéfice en cinq
+lignes (« Bénéfice brut — CA − prix d'achat », « − charges », « − cotisations URSSAF », net), puis
+« Statut : Micro-entrepreneur · Changer » flottant au milieu, la carte URSSAF (« À payer », « Net après
+paiement », « Ventes finalisées », « Calculé sur le CA… »), la prochaine déclaration (« son montant est
+celui du mois, juste au-dessus »), trois totaux de dépenses + deux totaux de section, le suivi, la
+micro-entreprise ouverte, puis « Avancé ». Le même nombre écrit plusieurs fois (7,44 € à payer = la ligne
+« − cotisations » ; 25,49 € deux fois ; 60,00 € quatre fois ; 12,99 € deux fois), du jargon (CA, brut,
+Finalisé, charges, cotisations), un sommaire à cinq pastilles, deux sélecteurs de période sans lien.
+
+**Fait (présentation seulement — aucune règle de calcul ne change, §5/§11)** :
+1. **« Combien j'ai gagné ? »** (`BeneficeCompta`) : un libellé (« Ton bénéfice · octobre 2026 », ou « Net
+   avant tes dépenses »), UN chiffre (`netFinal` de `beneficePeriode`, inchangé, `data-compta-chiffre="gagne"`),
+   une phrase venue du même calcul (sa `raison` : « Il manque le prix d'achat de N vente(s) sur M : sans
+   lui, VRM ne peut pas calculer ce que tu as gagné », sinon ce qu'il compte), la couverture, le geste
+   (« Compléter les prix d'achat », « Ajouter une dépense », ou le choix des dépenses). Les lignes du calcul
+   (bénéfice sur tes ventes, frais, dépenses, URSSAF) se replient sous « Le détail du calcul ». Les
+   `data-benef-*` sont les mêmes.
+2. **« Combien je dois déclarer ? »** (`StatutFiscal partie="declarer"` → `CarteUrssafMois`) : la
+   prochaine déclaration EN TÊTE (date, compte à rebours, « À déclarer (argent reçu) » — l'ancien « Reçu
+   (versé) » —, « À payer ≈ », « Déclarer sur l'URSSAF », « Noter ma déclaration »), puis « Octobre, en cours
+   · à payer (12,4 %) » et sa phrase « À mettre de côté : 12,4 % de l'argent reçu en octobre, toutes
+   plateformes (60,00 €, 1 vente) ». **Retirés de la carte** : « Net après paiement » (redisait le bénéfice
+   autrement, sans les prix d'achat) et la tuile « Ventes finalisées » (le nombre est dans la phrase,
+   `data-urssaf-mois-n`). Statut pas choisi ⇒ la question du statut ici ; autre régime ⇒ sa phrase ici.
+3. **« Le détail »**, une liste de replis fermés (`ComptaRepli`, rendus même fermés) : « Vendu et reçu »
+   (`CaParPeriodeCarte dansRepli`, une phrase dit vendu/reçu), « Tes dépenses » (deux repères : ce mois-ci,
+   depuis janvier ; les totaux de section qui redisaient une ligne sont retirés), « Tes déclarations URSSAF »
+   (`SuiviUrssaf sansTitre`), « Ta micro-entreprise » (inchangée, s'ouvre seule sur une question), et
+   **« Documents et réglages »** (l'ancien « Avancé », même `id`/`data-compta-avance`) qui commence par
+   « Ton statut · Changer ». Le sommaire à pastilles est retiré.
+- Les gestes : « Ajouter une dépense » ouvre « Tes dépenses » et son formulaire ; la vente Leboncoin à
+  dater renvoie par un bouton qui ouvre « Vendu et reçu » (`ouvrirRepliCompta`). Les gestes d'une réponse
+  sont à l'encre, soulignés, 44 px : le bleu d'accent sur l'aplat gris des cartes ne tenait que 4,3:1
+  (`--vrm-b-lien` surchargé dans la carte : la règle des liens-boutons passe par un sélecteur à identifiant).
+- La facturation électronique renvoie à « Ton entreprise (Comptabilité → Documents et réglages) ».
+- Styles : `src/styles-compta-claire.css` (chargée après la finition).
+
+**Preuves** : banc `scripts/bancs/compta-claire.cjs` (données inventées : 5 ventes Vinted dont une en
+cours, une Leboncoin pas datée, une Vestiaire, 2 dépenses, un abonnement, prix d'achat complets puis
+partiels ; 390 tactile clair + 1512 sombre) : trois questions dans l'ordre, un chiffre puis sa phrase,
+replis fermés (rien supprimé), chaque montant visible écrit UNE fois, aucun jargon visible (CA, brut,
+Finalisé, encaissé, n/d), aucun débordement, cibles ≥ 44 px, aucune erreur page/console, chiffres
+inchangés (−2,93 € · 7,44 € · 25,49 € · 42,68 €), manque nommé et « Compléter » visibles, les deux gestes.
+Bancs remis à la nouvelle règle (en le disant dans chacun) : `compta-simple` (176 verts), `urssaf`,
+`stats-compta`, `chiffres-croises` (plus de « Net après paiement », le CA et le nombre de ventes lus dans
+la phrase), `declare-urssaf` (le libellé du net `data-benef-titre`), `suivi-urssaf`, `dater-lbc` (replis
+ouverts d'un toucher, `ouvrirDetailCompta` de `_compta.cjs`) ; `audit-suivi-urssaf` accepte `sansTitre`.
+⚠️ Non mesuré : sa vraie base ; un vrai iPhone.
