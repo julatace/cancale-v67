@@ -232,6 +232,8 @@ const faireRes = () => { const r = { code: 0, corps: null }; r.status = (c) => {
   dit(smtp.recus.length === 0, 'B3 la vérification n’envoie aucun message', `${smtp.recus.length} message(s)`);
   const g = await appel(A, null, 'GET');
   dit(g.code === 200 && g.corps.boite.etat === 'posee' && !JSON.stringify(g.corps).includes('chiffre') && !JSON.stringify(g.corps).includes(MDP.replace(/\s/g, '')), 'B4 l’app apprend « connectée » et l’adresse — jamais le mot de passe ni le chiffré', JSON.stringify(g.corps.boite));
+  const hv = smtpMod.hoteValide;
+  dit(hv('smtp.gmail.com') && hv('ssl0.ovh.net') && !hv('127.0.0.1') && !hv('10.0.0.5') && !hv('172.16.0.1') && !hv('localhost') && !hv('smtp.internal') && !hv('metadata.google.internal'), 'B6 le serveur d’envoi est un NOM public (jamais une IP ni un nom local)', '');
   const e0 = await appel(A, { action: 'boite-essai' });
   dit(e0.corps.issue === 'envoye' && smtp.recus.length === 1 && /boutique@banc\.test/.test(smtp.recus[0].rcpt[0]), 'B5 l’e-mail d’essai part à SA propre adresse', JSON.stringify(e0.corps));
 

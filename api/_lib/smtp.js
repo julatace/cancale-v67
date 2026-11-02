@@ -44,8 +44,13 @@ export function fournisseurDe(email) {
   for (const [k, f] of Object.entries(FOURNISSEURS)) if (f.domaines.includes(d.toLowerCase())) return k;
   return null;
 }
-export const hoteValide = (h) => /^(?=.{1,200}$)[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/i.test(String(h || ''))
-  && !/^(localhost|127\.|10\.|192\.168\.|169\.254\.|0\.)/i.test(String(h || ''));
+// Un NOM d'hôte (jamais une adresse IP, jamais un nom local) : le serveur de
+// VRM ne doit pas pouvoir être dirigé vers son propre réseau.
+export const hoteValide = (h) => {
+  const x = String(h || '').toLowerCase();
+  return /^(?=.{1,200}$)[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)*\.[a-z]{2,24}$/.test(x)
+    && !/(^|\.)(localhost|local|internal|lan|home|corp)$/.test(x);
+};
 
 // ── Le message MIME ─────────────────────────────────────────────────────────
 // En-tête non ASCII : encodé (RFC 2047), découpé pour rester sous 76 colonnes.
