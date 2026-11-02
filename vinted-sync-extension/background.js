@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.311.0';
+const CODE_VERSION = '5.312.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -10964,12 +10964,46 @@ function rendreActions(uid, depuis, n) {
       for (let i = 0; i < l.length && k > 0;) { if (l[i] === d) { l.splice(i, 1); k--; } else i++; }
       for (let i = 0; i < l.length && k > 0;) { if (l[i] >= d) { l.splice(i, 1); k--; } else i++; }
       cur[uid] = l; await chrome.storage.local.set({ [cle]: cur });
+      if (!/^vc:/.test(String(uid))) await publierActions(uid, l);
     } catch (_) {}
   });
 }
 // Une requête qui n'est PAS partie chez Vinted (pas d'onglet, onglet hors du site,
 // pause demandée par Vinted) : son issue est CERTAINE — rien n'a été fait.
 function pasParti(r) { return !!(r && (r.sansPage || r.pause)); }
+// ── LE PLAFOND EST CELUI DU COMPTE, TOUS CHROME CONFONDUS (2 nov., 5.312 — audit X6,
+// sa décision : « oui ») Deux Chrome sur le même compte Vinted faisaient chacun leurs
+// 50 actions dans l'heure. Chaque Chrome publie SES horodatages de l'heure pour le
+// compte dans SA ligne (`actions_compte_{uid}_{navigateur}`, un seul écrivain par
+// ligne : pas de concurrence d'écriture), et le compte additionne ceux des AUTRES
+// Chrome avant de dire oui. Lecture de la base ratée ⇒ le compte de CE Chrome seul
+// (comme avant), noté — jamais un blocage de toutes les actions sur un hoquet.
+const ACTIONS_PARTAGEES = 'actions_compte_';
+async function idNavigateur() {
+  try {
+    const g = (await chrome.storage.local.get('vrmIdNavigateur')).vrmIdNavigateur;
+    if (typeof g === 'string' && /^[0-9a-f]{16}$/.test(g)) return g;
+    const n = [...crypto.getRandomValues(new Uint8Array(8))].map((b) => b.toString(16).padStart(2, '0')).join('');
+    await chrome.storage.local.set({ vrmIdNavigateur: n });
+    return n;
+  } catch (_) { return ''; }
+}
+async function actionsAutresNavigateurs(uid) {
+  const moi = await idNavigateur();
+  let rows; try { rows = await sbGet(`app_data?id=like.${ACTIONS_PARTAGEES}${uid}_*&select=id,ts:data->ts`); } catch (_) { rows = null; }
+  if (!Array.isArray(rows)) return null;
+  const t = Date.now(); let n = 0; const toutes = [];
+  for (const r of rows) {
+    if (!r || String(r.id || '') === `${ACTIONS_PARTAGEES}${uid}_${moi}`) continue;
+    for (const x of (Array.isArray(r.ts) ? r.ts : [])) { const v = Number(x); if (Number.isFinite(v) && t - v < 3600000 && v <= t + 60000) { n++; toutes.push(v); } }
+  }
+  return { n, toutes };
+}
+async function publierActions(uid, list) {
+  const moi = await idNavigateur(); if (!moi) return;
+  const t = Date.now();
+  try { await supabaseUpsert('app_data', [{ id: `${ACTIONS_PARTAGEES}${uid}_${moi}`, data: { uid: String(uid), nav: moi, ts: (list || []).filter((x) => t - x < 3600000), at: new Date(t).toISOString() } }], 'id'); } catch (_) {}
+}
 function compterAction(uid, plafond = ACTIONS_MAX_HEURE, n = 1) { return unCompteurALaFois(() => compterActionUn(uid, plafond, n)); }
 async function compterActionUn(uid, plafond, n = 1) {
   try {
@@ -10982,10 +11016,15 @@ async function compterActionUn(uid, plafond, n = 1) {
     // le premier (brouillon, suppression, mise en ligne) — jamais une paire arrêtée
     // entre la suppression et la mise en ligne par le plafond.
     const k = Math.max(1, Math.floor(Number(n) || 1));
-    if (list.length + k > max) return { ok: false, n: list.length, resteMs: Math.max(0, list[Math.max(0, list.length + k - 1 - max)] + 3600000 - t) };
+    // (5.312) Les actions des AUTRES Chrome sur ce compte comptent aussi.
+    const autres = /^vc:/.test(String(uid)) ? { n: 0, toutes: [] } : await actionsAutresNavigateurs(uid);
+    if (autres === null) noterDiag('actions_partagees_pas_lues');
+    const tous = list.concat(autres ? autres.toutes : []).sort((a, b) => a - b);
+    if (tous.length + k > max) return { ok: false, n: tous.length, resteMs: Math.max(0, tous[Math.max(0, tous.length + k - 1 - max)] + 3600000 - t) };
     for (let i = 0; i < k; i++) list.push(t); cur[uid] = list;
     await chrome.storage.local.set({ [cle]: cur });
-    return { ok: true, n: list.length, at: t };
+    if (!/^vc:/.test(String(uid))) await publierActions(uid, list);
+    return { ok: true, n: tous.length + k, at: t };
   } catch (_) {
     // ⚠️ 2 nov. (audit « plateformes » P10) : le stockage de l'extension ne répond pas
     // (quota plein, profil abîmé) ⇒ le plafond SE FERME. Avant : `{ ok: true }`, et
