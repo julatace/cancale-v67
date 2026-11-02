@@ -46831,7 +46831,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         ...(lu.lieuNom ? {} : { sansLieu: x.kind === 'email' ? sansLieuEmail(x.t) : sansLieuVinted(x.o) }),
         // (2 nov.) Présentation seulement : la raison (`raisonAVerifier`, la même que
         // l'ancien bloc « à vérifier ») et la source, pour les gestes de SA carte.
-        raisonVerif: raisonAVerifier(x), src: x.kind === 'email' ? { t: x.t, o: x.o || null } : { o: x.o } });
+        raisonVerif: raisonAVerifier(x), raisonCode: (x.e && x.e.etat) || '', encoreCode: aEncoreCode(x), src: x.kind === 'email' ? { t: x.t, o: x.o || null } : { o: x.o } });
     }
     for (const o of (pickupUnion.aConfirmer || [])) { const r = relaisDe(o); const lu = lieuDe(r && r.lieu);
       L.push({ cle: 'r:c:' + o.transaction_id, groupe: 'retirer', site: 'vinted', nom: nomAvecTaille(o.title || 'Achat', o), photo: photoAchat(o), etat: 'au point relais · à vérifier (compte pas relu)', aVerifier: true, horsCompte: true, ouvrir: true,
@@ -52134,6 +52134,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           const nEnv = pubEnv && Number.isFinite(pubEnv.total) ? pubEnv.total : null;
           const envPartiel = !!pubEnv && (pubEnv.ebay === null || pubEnv.leboncoin === null || pubEnv.vestiaire === null);
           const nRet = pubRet && Number.isFinite(pubRet.total) ? pubRet.total : null;
+          // E-mails de suivi pas lus : le nombre est un plancher (« au moins », §5).
+          const retPartiel = tracking === null;
           const uEnv = urgenceColis();
           const urgentEnv = !!(uEnv && uEnv.total) || !!(colisEb && (colisEb.aPoster || []).some(x => x.jours != null && x.jours <= 1));
           const urgentRet = !!(pubRet && pubRet.urgents) || ((colRet && colRet.cartes) || []).some(x => x.ambre);
@@ -52171,12 +52173,24 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           // colis, celle de l'ancien détail (`LigneArrivee`), sur sa carte.
           // + le n° de suivi (23 oct. : « c'est le seul numéro qu'il a dans l'e-mail et la
           // notification ») ; « Date d'arrivée inconnue » se dit aussi (pas su ≠ rien).
+          // + SA date limite, exacte (celle de l'e-mail ou du transporteur, heure comprise ;
+          // « inconnue » ou « vers le … (estimé) » dits tels quels — les phrases de l'ancien
+          // détail, `texteLimiteRetrait`), et son compte quand il y en a plusieurs.
+          const plusieursComptesRet = (accounts || []).length > 1;
           const arriveeRetrait = (x) => { const t = (x.src && x.src.t) || null, o = (x.src && x.src.o) || null;
-            const arr = t ? arriveeColisEmail(t) : (o ? (etatColisVinted(o, Date.now(), transpMap) || {}).arr : null);
+            const ev = !t && o ? (etatColisVinted(o, Date.now(), transpMap) || {}) : null;
+            const arr = t ? arriveeColisEmail(t) : (ev ? ev.arr : null);
             const su = t ? (t.suivi || '') : '';
+            const lim = t ? t.limite : (ev && ev.limite), limAt = t ? t.limiteAt : (ev && ev.limiteAt), vers = t ? t.limiteVers : (ev && ev.limiteVers);
+            const jl = lim ? joursAvant(lim) : null;
+            const cpt = t ? (compteDuColisEmail(t) || '') : (o && o._acc ? accName(o._acc) : '');
             return (<>
               <LigneArrivee arr={arr || null} style={{marginTop:0}}/>
-              {su ? <span className="vrm-rp-suivi" data-rp-suivi={su}>n° {su}</span> : null}
+              {!x.horsCompte && (jl != null
+                ? <span className={'vrm-rp-sous' + (jl <= 1 ? ' is-ambre' : '')} data-colis-limite={String(lim).slice(0,10)}>{texteLimiteRetrait(jl, lim, limAt)}</span>
+                : vers ? <span className="vrm-rp-sous" data-colis-limite="vers" data-colis-limite-vers={String(vers)}>À retirer vers le {new Date(String(vers).slice(0,10)+'T00:00:00').toLocaleDateString('fr-FR',{day:'2-digit',month:'2-digit'})} (estimé : le transporteur ne donne pas la date)</span>
+                : <span className="vrm-rp-sous" data-colis-limite="inconnue">Date limite de retrait inconnue (4 à 7 j en général)</span>)}
+              {(su || (plusieursComptesRet && cpt)) ? <span className="vrm-rp-suivi" data-rp-suivi={su} data-colis-compte={cpt}>{[su ? `n° ${su}` : '', plusieursComptesRet && cpt ? `compte ${cpt}` : ''].filter(Boolean).join(' · ')}</span> : null}
             </>); };
           const toutLuRet = !notes.retirer && !baseKO && tracking !== null && Array.isArray(buys.items) && !buys.error;
           return (<>
@@ -52197,7 +52211,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               <Segmente plein label="Colis à envoyer ou à retirer" value={onglet} onChange={(v) => onOngletColis && onOngletColis(v)}
                 options={[
                   { v: 'envoyer', l: 'À envoyer', n: nEnv != null ? `${nEnv}${envPartiel ? '+' : ''}` : null, data: { 'data-colis-onglet-choix': 'envoyer', 'data-colis-onglet-n': nEnv != null ? String(nEnv) : '', 'data-urgent': urgentEnv ? '1' : '0', title: envPartiel ? `Au moins ${nEnv} : un site n'a pas pu être lu` : undefined } },
-                  { v: 'retirer', l: 'À retirer', n: nRet != null ? String(nRet) : null, data: { 'data-colis-onglet-choix': 'retirer', 'data-colis-onglet-n': nRet != null ? String(nRet) : '', 'data-urgent': urgentRet ? '1' : '0' } },
+                  { v: 'retirer', l: 'À retirer', n: nRet != null ? `${nRet}${retPartiel ? '+' : ''}` : null, data: { 'data-colis-onglet-choix': 'retirer', 'data-colis-onglet-n': nRet != null ? String(nRet) : '', 'data-urgent': urgentRet ? '1' : '0', title: retPartiel && nRet != null ? `Au moins ${nRet} : les e-mails de suivi n'ont pas pu être lus` : undefined } },
                 ]}/>
             </div>
             {siteColis!=='toutes' && <div data-colis-filtre-note="" style={{fontSize:12,color:C.muted,margin:'0 2px 6px'}}>{vue.colonnes.reduce((t,c)=>t+c.cartes.length,0)} colis {nomSite[siteColis]} sur {vue.total} · <button type="button" className="vrm-lien-action" onClick={()=>setSiteColis('toutes')} style={{border:0,background:'transparent',padding:0,color:C.text,fontWeight:600,cursor:'pointer',fontFamily:'inherit',fontSize:12,minHeight:44}}>tout voir</button></div>}
@@ -52208,8 +52222,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               </div>
             )}
             {onglet === 'retirer' && (
-              <section className="vrm-colis-retirer" data-cc-colonne="retirer" data-cc-n={colRet ? colRet.n : 0} data-cc-hors={colRet ? colRet.nHors : 0}>
+              <section className="vrm-colis-retirer" data-cc-colonne="retirer" data-cc-n={colRet ? colRet.n : 0} data-cc-hors={colRet ? colRet.nHors : 0}
+                data-pickup-total={tracking === null ? '—' : pickupUnion.total} data-pickup-a-verifier={pickupUnion.aVerifier.length}>
                 {notes.retirer ? <p className="vrm-colis-note" data-cc-note="retirer">{notes.retirer}</p> : null}
+                {(() => { // (23 oct.) Un compte inconnu ne fait jamais disparaître un colis : dit UNE fois, avec le geste.
+                  const sans = (pickupUnion.emailList || []).filter(t => !compteDuColisEmail(t)); const n = sans.length;
+                  if (!n) return null;
+                  const adresseLibre = sans.some(t => Array.isArray(t.recuSur) && t.recuSur.length);
+                  return <p className="vrm-colis-note" data-pickup-sans-compte={n}>{n>1?`${n} colis : compte non reconnu`:'1 colis : compte non reconnu'}{adresseLibre?' — Relie-la dans Paramètres → Comptes liés.':''}</p>; })()}
                 {colRet && colRet.cartes.length > 0
                   ? <ColonneRetirer vue={parPoint} C={C} Photo={photoCarte} gestes={gestesRetrait} detail={arriveeRetrait} nomTransporteur={(k) => (CARRIERS[k] && CARRIERS[k].name) || ''} avecCarte={ordiColis} enRouteSansRelais={(groupesRelais && groupesRelais.enRouteSansRelais) || 0}/>
                   : (toutLuRet ? <p className="vrm-colis-vide" data-retraits-vide="">Aucun colis à aller chercher pour l’instant.</p> : null)}

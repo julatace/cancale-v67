@@ -254,9 +254,12 @@ const texteLimite = (j) => (j == null ? '' : j < 0 ? 'date limite passée' : j =
 
 function CarteColisRetirer({ x, Photo, gestes, detail, limiteSurCarte, avecLieu = false, raison = '' }) {
   const ph = x.photo && Photo ? Photo(x.photo) : null;
-  const sousTitre = [avecLieu ? (x.lieuNom || '') : '', raison, limiteSurCarte && x.jours != null ? texteLimite(x.jours) : ''].filter(Boolean);
+  // Avec `detail` (l'écran Colis), la date limite exacte de CE colis y est dite.
+  const surCarte = limiteSurCarte && !detail;
+  const sousTitre = [avecLieu ? (x.lieuNom || '') : '', raison, surCarte && x.jours != null ? texteLimite(x.jours) : ''].filter(Boolean);
   const codeTxt = x.code ? x.code : x.qr ? 'QR code' : '';
-  const attrs = { 'data-cc-carte': x.cle, 'data-cc-dans': 'retirer', 'data-site': x.site || 'vinted', 'data-ambre': x.ambre ? '1' : undefined, 'data-a-verifier': x.aVerifier ? '1' : undefined, 'data-hors-compte': x.horsCompte ? '1' : undefined, 'data-sans-lieu': x.sansLieu ? '1' : undefined, 'data-colis-ident': x.cle };
+  const attrs = { 'data-cc-carte': x.cle, 'data-cc-dans': 'retirer', 'data-site': x.site || 'vinted', 'data-ambre': x.ambre ? '1' : undefined, 'data-a-verifier': x.aVerifier ? '1' : undefined, 'data-hors-compte': x.horsCompte ? '1' : undefined, 'data-sans-lieu': x.sansLieu ? '1' : undefined, 'data-colis-ident': x.cle,
+    'data-a-verifier-raison': x.horsCompte && x.raisonCode ? x.raisonCode : undefined, 'data-a-verifier-code': x.horsCompte ? (x.encoreCode || x.code || x.qr ? 'oui' : 'non') : undefined };
   return (
     <div className="vrm-cc-carte vrm-rp-carte" {...attrs}>
       <span className="vrm-cc-haut">
@@ -265,7 +268,7 @@ function CarteColisRetirer({ x, Photo, gestes, detail, limiteSurCarte, avecLieu 
           : <span className="vrm-cc-photo is-sans" data-sans-photo="" aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" strokeLinecap="round"><path d="M3.5 7.5 12 3l8.5 4.5v9L12 21l-8.5-4.5z"/><path d="M3.5 7.5 12 12l8.5-4.5M12 12v9"/></svg></span>}
         <span className="vrm-rp-quoi">
           <span className="vrm-cc-nom" title={x.titre}>{x.titre}</span>
-          {sousTitre.length ? <span className={'vrm-rp-sous' + (limiteSurCarte && x.jours != null && x.jours <= 1 ? ' is-ambre' : '')} data-rp-sous="">{sousTitre.join(' · ')}</span> : null}
+          {sousTitre.length ? <span className={'vrm-rp-sous' + (surCarte && x.jours != null && x.jours <= 1 ? ' is-ambre' : '')} data-rp-sous="">{sousTitre.join(' · ')}</span> : null}
           {detail ? detail(x) : null}
         </span>
         {x.num ? <span className="vrm-cc-num" data-numero={x.num}>N°{x.num}</span> : null}
@@ -370,7 +373,7 @@ export function ColonneRetirer({ vue, C, Photo, gestes = null, detail = null, no
           <header className="vrm-rp-tete">
             <span className="vrm-rp-ident">
               <b className="vrm-rp-nom">À vérifier · {aVerifier.length}</b>
-              <span className="vrm-rp-resume">{raisonCommune ? `${raisonCommune[0].toUpperCase()}${raisonCommune.slice(1)}. ` : ''}Hors du compte « à retirer » : regarde le suivi, et touche « J’ai retiré » si tu l’as eu.</span>
+              <span className="vrm-rp-resume">{raisonCommune ? `${raisonCommune[0].toUpperCase()}${raisonCommune.slice(1)}. ` : ''}Hors du compte « à retirer » : regarde le suivi, et touche « J’ai retiré » si tu l’as eu.{(() => { const n = aVerifier.filter((c) => c.encoreCode || c.code || c.qr).length; return n ? ` ${n > 1 ? `${n} ont encore leur code ou leur QR` : '1 a encore son code ou son QR'} : peut-être encore au relais.` : ''; })()}</span>
             </span>
           </header>
           <div className="vrm-rp-liste">
