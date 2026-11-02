@@ -15,6 +15,12 @@
   transition: transform .12s cubic-bezier(.2,.7,.2,1), background-color .15s ease, border-color .15s ease, color .15s ease;
 }
 .vrm-main button:not(:disabled):active, .vrm-main [role="button"]:active { transform: scale(.97); }
+/* (2 nov., Julien : « les points relais bougent un tout petit peu dès qu'on bouge
+   la caméra ») Une épingle de carte est un bouton que MapLibre déplace en écrivant
+   son `transform` à chaque image : la transition ci-dessus la faisait traîner
+   derrière le fond (jusqu'à 3 px mesurés, banc carte-stable). Une épingle ne
+   s'anime jamais : elle suit la carte, image par image. */
+.maplibregl-marker, .maplibregl-marker * { transition: none !important; }
 
 .vrm-main .vrm-platform-tabs + * { animation: vrm-section-entree .24s cubic-bezier(.2,.7,.2,1); }
 @keyframes vrm-section-entree { from { opacity: 0; } to { opacity: 1; } }
