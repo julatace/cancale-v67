@@ -113,7 +113,9 @@ const ouvrir = async (b, vp, tab, opts = {}) => {
   const ctx = await b.newContext({ viewport: vp, ...(vp.width < 600 ? { isMobile: true, hasTouch: true, deviceScaleFactor: 2 } : {}) });
   const pg = await ctx.newPage();
   const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
-  await pg.addInitScript((d) => { try { localStorage.setItem('vrm_acces_direct', '1'); localStorage.setItem('vinted_regime', JSON.stringify('micro')); localStorage.setItem('vinted_urssaf_taux', '13.5'); localStorage.setItem('vinted_urssaf_mois', JSON.stringify(d.publie)); localStorage.setItem('vinted_accounts_hidden', JSON.stringify(['333'])); } catch (_) {} }, { publie });
+  // (2 nov.) Le détail des Statistiques vit dans deux volets repliés (RepliStats) : le banc les
+  // ouvre comme Julien le ferait (état gardé sur l'appareil), puis juge les mêmes chiffres.
+  await pg.addInitScript((d) => { try { localStorage.setItem('vrm_acces_direct','1'); localStorage.setItem('vrm_stats_replis', JSON.stringify({ argent: true, vente: true })); localStorage.setItem('vinted_regime', JSON.stringify('micro')); localStorage.setItem('vinted_urssaf_taux', '13.5'); localStorage.setItem('vinted_urssaf_mois', JSON.stringify(d.publie)); localStorage.setItem('vinted_accounts_hidden', JSON.stringify(['333'])); } catch (_) {} }, { publie });
   await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) ? r.abort() : r.continue()));
   const L = lignes(!!opts.pack);
   await pg.route('**/rest/v1/**', (route) => {
@@ -224,9 +226,11 @@ const ouvrir = async (b, vp, tab, opts = {}) => {
         dit(t.deb <= 1, 'aucun débordement horizontal', `${t.deb} px`);
         const e2 = (s) => s == null ? null : Number(String(s).replace(/[\s\u00a0\u202f€]/g, '').replace(',', '.'));
         const ap = e2((/À PAYER \([\d,.]+ ?%\)\s*\n\s*([\d\s.,\u00a0\u202f]+€)/i.exec(t.urssaf) || [])[1]);
-        const nt = e2((/NET APRÈS PAIEMENT\s*\n\s*([\d\s.,\u00a0\u202f]+€)/i.exec(t.urssaf) || [])[1]);
-        const cc = e2((/CA des ventes finalisées[^\n]*?\(([\d\s.,\u00a0\u202f]+€)\)/i.exec(t.urssaf) || [])[1]);
-        dit(ap === aPayer && nt === net && cc === caMoisDecl, 'la déclaration URSSAF est dans Compta : CA × 13,5 % = à payer, CA − à payer = net', `${cc} → ${ap} · ${nt}`);
+        // (2 nov., Comptabilité claire) « Net après paiement » est RETIRÉ de la carte (il redisait le
+        // bénéfice autrement) ; le CA cité est dans la phrase sous le chiffre : « … de l'argent reçu en
+        // octobre, toutes plateformes (60,00 €, 1 vente) ». Sur un code d'avant : « CA des ventes finalisées … ».
+        const cc = e2((/(?:CA des ventes finalisées|argent reçu en)[^\n]*?\(([\d\s.,\u00a0\u202f]+€)/i.exec(t.urssaf) || [])[1]);
+        dit(ap === aPayer && cc === caMoisDecl, 'la déclaration URSSAF est dans Compta : CA × 13,5 % = à payer (le CA cité sous le chiffre)', `${cc} → ${ap}`);
         dit(/Prochaine déclaration/.test(t.urssaf), 'la prochaine échéance est dans Compta');
         const nLignes = await pg.evaluate(() => { const h = [...document.querySelectorAll('span')].find((s) => /Récap comptable mensuel/.test(s.textContent)); const card = h && h.closest('.vrm-card, [class*="card"]') || (h && h.parentElement && h.parentElement.parentElement); return card ? card.querySelectorAll('tbody tr').length : -1; });
         dit(nLignes === publie.mois.length, 'le récap comptable mensuel est dans Compta : une ligne par mois publié', String(nLignes));

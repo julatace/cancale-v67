@@ -109,7 +109,9 @@ async function page(b, T, opts={}){
   const ctx=await b.newContext({viewport:T.vp, isMobile:!!T.isMobile, hasTouch:!!T.hasTouch, colorScheme: opts.sombre ? 'dark' : 'light'});
   const pg=await ctx.newPage();
   const errs=[]; pg.on('pageerror',e=>errs.push(e.message));
-  await pg.addInitScript((sombre)=>{try{localStorage.setItem('vrm_acces_direct','1'); if(sombre) localStorage.setItem('vinted_dark','true');}catch(_){}}, !!opts.sombre);
+  // (2 nov.) Le détail des Statistiques vit dans deux volets repliés (RepliStats) : le banc les
+  // ouvre comme Julien le ferait (état gardé sur l'appareil), puis juge les mêmes chiffres.
+  await pg.addInitScript((sombre)=>{try{localStorage.setItem('vrm_acces_direct','1'); localStorage.setItem('vrm_stats_replis', JSON.stringify({ argent: true, vente: true })); if(sombre) localStorage.setItem('vinted_dark','true');}catch(_){}}, !!opts.sombre);
   await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i,(r)=>(['image','media','font'].includes(r.request().resourceType())?r.abort():r.continue()));
   await pg.route('**/rest/v1/**',route=>{
     const u=decodeURIComponent(metaVersData(route.request().url()));

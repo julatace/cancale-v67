@@ -2868,3 +2868,39 @@ petit peu dès qu'on bouge la caméra : pour moi c'est important ».
 - À trancher par Julien : Vestiaire visible pour qui ne l'utilise pas ; « Vérifications » sans compte
   Vinted ; chiffres d'un vendeur sans Vinted. Relevés non corrigés : onglets de Stock coupés à 390 px,
   barres de mois de 25 px, traits d'union insécables espacés (police du banc ?).
+
+### 2 nov. (soir) — E-mails et Statistiques plus clairs (branche `claude/emails-stats`)
+Julien, 20 h 41 : « beaucoup d'incompréhension quand je vais dans les emails ou dans les
+statistiques […] ça doit être beaucoup plus intuitif ». Présentation, mots, ordre et
+regroupement seulement : **aucune règle ne change** (mêmes routes `reception`/`liste`/`preuves`/
+`journal`, `etatCollecteur`, `resumeReceptionComptes`, mêmes sources des chiffres).
+- **E-mails** (Paramètres → « E-mails », ex-« Réception des emails ») : onglets NUS Aperçu · E-mails ·
+  Adresses · À rattacher (plus de nombre ni d'explication ; le nom accessible garde l'ancien mot).
+  L'**Aperçu** (`src/emailsApercu.js`, `ApercuEmails` dans `src/ReceptionEmails.jsx`) répond dans
+  l'ordre : « Oui, tes e-mails arrivent dans VRM » / « à vérifier » / « pas pu lire » + le dernier
+  arrivé ; « À faire » (une ligne par cause et SON geste en ambre : mis de côté, à vérifier, adresse
+  à confirmer ou sans compte, aucune adresse) ou « Rien à faire » seulement si tout a été LU ;
+  « Ce que VRM en a fait » (rangés par famille, une ligne ouvre le journal filtré sur ce type) ;
+  « Par adresse » (dès 2 adresses). L'ancienne liste (recherche, filtre par adresse) est repliée
+  sous « Chercher un e-mail précis » ; ses compteurs par état, son bandeau « Service de réception »
+  et l'aide en double sont retirés ; la synthèse par adresse a quitté l'onglet Adresses. Mots :
+  « Intégré » → « Rangé », « À réessayer » → « En attente », plus de « collecteur »/« suivis ».
+  Journal : titre « Tes e-mails, un par un », couverture sans recompter les états (ils sont sur les
+  filtres). « À rattacher » : « Réessayer cet e-mail » au singulier.
+- **Statistiques** : tuiles en phrases (« +213 % par rapport à septembre », « il manque le prix
+  d'achat des autres », « Temps pour vendre : la moitié de tes paires partent plus vite »),
+  « Quel compte vend le mieux » (phrase sans chiffre, avant le graphique au téléphone), « Les modèles
+  qui partent vite », « Les tailles qui se vendent », semaines dites par leur lundi (« 26/10 », plus
+  « s44 »). Tout le reste est rangé en **deux volets repliés** (`RepliStats`) : « L'argent depuis le
+  début » et « Ce qui se vend, ton rythme, le stock qui dort » — montés seulement ouverts, état gardé
+  sur l'appareil (`vrm_stats_replis`, commodité). Le montant vendu de la période n'est plus écrit
+  3 fois. « × moyen » → « Multiplicateur moyen (vente ÷ achat) », « Détails » → « Moyennes ».
+- Preuves : banc `emails-stats-clairs` (390 tactile clair + 1512 sombre, 53 verts ; **17 rouges sur
+  origin/main** ; mutation « tout compter comme rangé » ⇒ rouge). Remis à la nouvelle présentation,
+  en le disant dans le banc : `reception-emails` (ouvre la liste repliée ; les compteurs par état
+  sont jugés sur l'Aperçu), `stats-detail`, `stats-premium`, `stats-compta` (ouvrent les volets),
+  `stats-vitrine` (semaines datées), `scripts/tests/espace-emails-interface.cjs` (liste attachée
+  mais repliée ; bouchons manquants `useStateCle`… — il échouait déjà sur `main`).
+- À trancher par Julien : retirer la liste technique repliée (doublon du journal, mais seule
+  recherche plein texte) ; les deux « Boost rentable ? » (période en haut, tout le temps dans le
+  volet) ; « Articles ajoutés par jour » et les deux courbes mensuelles du volet « argent ».

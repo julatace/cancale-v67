@@ -100,7 +100,8 @@ essaie(() => {
 });
 
 const app = src0;
-verif(/<SuiviUrssaf onNav=\{onNav\} \/>/.test(app), 'la carte est rendue dans Comptabilité');
+// (2 nov.) Dans « Le détail », le repli porte le titre : la carte y est rendue `sansTitre`.
+verif(/<SuiviUrssaf onNav=\{onNav\}( sansTitre)? \/>/.test(app), 'la carte est rendue dans Comptabilité');
 verif(/data-suivi-noter=\{l\.aNoter\[0\]\} onClick=\{\(\) => demanderDeclaration\(/.test(app), '« C\'est déclaré » passe par le formulaire du rapport (un seul, §11)');
 verif(/payé \{l\.montant/.test(app) === false, 'le suivi n\'affiche plus `montant` (le CA tapé) comme un paiement');
 verif(/e\.detail\.k === 'vrm_urssaf_declare' && isCloudReady\(\)\) setDeclUrssaf\(lireDeclarations\(\)\)/.test(app), 'le rapport relit le registre complété depuis Comptabilité (sinon il l\'effacerait)');
