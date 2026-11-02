@@ -15,7 +15,9 @@ const ventes = [
 const rows = [{id:'harvest_111_orders_sold',data:{capturedAt:maintenant,payload:{my_orders:ventes}}}];
 const pixel='iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aD1sAAAAASUVORK5CYII=';
 ventes[0].photo={url:'https://images1.vinted.net/test.png'};
-rows.push({id:'email_invoice_test',data:{type:'facture_pro',status:'draft',account:compte.login,number:'FA1',designation:ventes[0].title,prix:95,buyerEmail:'acheteur@example.test'}},
+// (2 nov.) La preuve Pro d'une vente : l'e-mail Vinted Pro de SA transaction (src/FacturePro.jsx).
+const preuvesPro=[{id:'email_sale_pro1',data:{type:'vente',pro:true,transaction:'9001',nomComplet:'Acheteuse Banc',adresse:'1 rue X, Rennes, 35000, FR, France',email:'acheteur@example.test',account:compte.login}},{id:'email_sale_pro2',data:{type:'vente',pro:true,transaction:'9002',nomComplet:'Acheteur Banc',adresse:'2 rue Y, Rennes, 35000, FR, France',email:'acheteur2@example.test',account:compte.login}}];
+rows.push(...preuvesPro,
 {id:'lbc_ventes',data:{ventes:{one:{txId:1,isSeller:true,title:'Paire Leboncoin',price:9500,photo:'data:image/png;base64,'+pixel,stepStatus:'done',stepLabel:'Terminé'}}}},
 {id:'ebay_orders',data:{orders:[{orderId:'1',orderPaymentStatus:'PAID',orderFulfillmentStatus:'NOT_STARTED',lineItems:[{title:'Paire eBay',legacyItemId:'12'}],pricingSummary:{total:{value:'95',currency:'EUR'}}}]}},
 {id:'ebay_listings',data:{items:[{itemId:'12',imageUrl:'data:image/png;base64,'+pixel}]}});
@@ -126,10 +128,13 @@ const ouvrirVente=async(p)=>{const t=p.locator('.vrm-sale-row .vrm-ledger-sale-t
     if(process.env.BANC_CAPTURES){fs.mkdirSync(process.env.BANC_CAPTURES,{recursive:true});await p.screenshot({path:path.join(process.env.BANC_CAPTURES,'compact-'+tab+'.png')});}
   }
   await p.goto(base+'/?tab=cat_ventes');await p.locator('.vrm-sale-row').first().waitFor();await ouvrirVente(p);
-  await p.locator('.vrm-sale-invoice').first().waitFor();
-  check((await p.locator('.vrm-sale-invoice').count())>0,'facture proposée au compte avec reçu Pro');
-  await p.getByRole('button',{name:"Envoyer une facture à l'acheteur"}).first().click();
-  check(await p.getByLabel('Facture de cette vente').isVisible(),'choix explicite facture, aucun envoi à ouverture');
+  let appelsFacture=0;await p.route('**/api/compte?mode=facture-pro',r=>{if(r.request().method()==='POST')appelsFacture++;return r.fulfill({status:200,contentType:'application/json',body:JSON.stringify({ok:true,boite:{etat:'aucune'},fournisseurs:{}})});});
+  await p.locator('[data-fp-vente="a-faire"]').first().waitFor();
+  check((await p.locator('[data-fp-vente]').count())>0,'facture proposée sur une vente prouvée Pro (e-mail Vinted Pro de SA transaction)');
+  await p.locator('[data-fp-vente="a-faire"]').first().click();
+  await p.locator('[data-fp-feuille-vente]').first().waitFor();
+  check(appelsFacture===0,'ouvrir la facture n’émet ni n’envoie rien');
+  await p.keyboard.press('Escape');
   // (31 oct.) La période se choisit au calendrier (ChoixPeriode, 29-30 oct.) : plus de « Deux dates » ni de champs.
   //    Même règle jugée : un intervalle touché à l'envers n'est jamais appliqué à l'envers, et les dates filtrent vraiment.
   const jours = async () => p.evaluate(() => [...document.querySelectorAll('[data-periode-panneau] [data-jour]')].filter((b) => !b.disabled).map((b) => b.getAttribute('data-jour')));
@@ -150,23 +155,15 @@ const ouvrirVente=async(p)=>{const t=p.locator('.vrm-sale-row .vrm-ledger-sale-t
   //    dans une case de 140 px) : le geste visible est « Réinitialiser les ventes » (période, recherche et filtre).
   //    On clique ce que la personne VOIT ; la croix cachée n'est pas un geste.
   await p.getByRole('button',{name:'Réinitialiser les ventes',exact:true}).click();await p.locator('.vrm-sale-row').first().waitFor({timeout:5000}).catch(()=>{});check((await p.locator('.vrm-sale-row').count())>0,'effacement restaure les ventes');
-  rows.splice(rows.findIndex(x=>x.id==='email_invoice_test'),1);
+  for(const x of preuvesPro)rows.splice(rows.indexOf(x),1);
   await p.goto(base+'/?tab=cat_ventes');await p.locator('.vrm-sale-row').first().waitFor();await ouvrirVente(p);
-  check((await p.locator('.vrm-sale-invoice').count())===0,'pas de bouton sur compte sans preuve Pro');
+  await p.waitForTimeout(800);check((await p.locator('[data-fp-vente]').count())===0,'pas de bouton sur compte sans preuve Pro');
   await p.addInitScript(()=>{localStorage.setItem('vrm_session',JSON.stringify({access_token:'test.test.test',refresh_token:'fake',expires_at:Date.now()+3600000,user:{id:'11111111-1111-1111-1111-111111111111',email:'test@example.test'}}));});
   await p.route('**/auth/v1/user',r=>r.fulfill({contentType:'application/json',body:JSON.stringify({id:'11111111-1111-1111-1111-111111111111',email:'test@example.test'})}));
   await p.goto(base+'/?tab=cat_ventes');await p.locator('.vrm-sale-row').first().waitFor();await ouvrirVente(p);
   await p.waitForFunction(()=>{const i=document.querySelector('.vrm-sale-row img');return i && i.complete && i.naturalWidth>0;},{},{timeout:30000});
   check(await p.locator('.vrm-sale-row img').first().evaluate(e=>e.complete && e.naturalWidth>0),'photo Vinted récupérée sans extension sur téléphone');
   if(process.env.BANC_CAPTURES)await p.screenshot({path:path.join(process.env.BANC_CAPTURES,'compact-photo-telephone.png')});
-  rows.push({id:'email_invoice_test',data:{type:'facture_pro',status:'draft',account:compte.login,number:'FA1',designation:ventes[0].title,prix:95,buyerEmail:'acheteur@example.test'}});
-  let patch=0;await p.route('**/rest/v1/app_data?**',async r=>{if(r.request().method()==='PATCH' && r.request().url().includes('email_invoice_test')){patch++;return r.fulfill({status:403,contentType:'application/json',body:'{}'});}return r.fallback();});
-  await p.goto(base+'/?tab=cat_ventes');await p.locator('.vrm-sale-row').first().waitFor();await ouvrirVente(p);await p.locator('.vrm-sale-invoice').first().waitFor();
-  await p.getByRole('button',{name:"Envoyer une facture à l'acheteur"}).first().click();await p.getByLabel('Facture de cette vente').selectOption('email_invoice_test');
-  check(patch===0,'choisir un brouillon ne déclenche pas envoi');
-  await p.getByRole('button',{name:'Confirmer le destinataire'}).click();await p.getByRole('button',{name:'Annuler',exact:true}).click();check(patch===0,'annuler confirmation ne déclenche pas envoi');
-  await p.getByRole('button',{name:'Confirmer le destinataire'}).click();await p.getByRole('button',{name:'Confirmer',exact:true}).click();
-  await p.getByText('La facture n’a pas été mise en file. Relis son état dans Factures.',{exact:true}).waitFor();check(patch===1,'refus serveur annoncé sans faux succès');
   await p.route('**/api/ebay',async r=>{const action=r.request().method()==='POST'?r.request().postDataJSON().action:null;return r.fulfill({status:action==='sync'?503:200,contentType:'application/json',body:JSON.stringify(action==='status'?{ok:true,connected:true,comptes:[{cle:'',ref:'principal',principal:true,pseudo:'Compte de banc',relie:true}]}:action==='finances'?{reason:'scope'}:action==='sync'?{ok:false}:{ready:true,canConsent:true})});});
   // (31 oct.) Navigation par tâche : `?tab=plat_ebay` seul mène à Ventes · eBay ; l'espace « Compte » se demande par sa section.
   await p.goto(base+'/?tab=plat_ebay&section=compte');await p.getByRole('button',{name:'Compte',exact:true}).click({timeout:5000}).catch(()=>{});await p.getByText('Compte eBay relié',{exact:true}).waitFor();
