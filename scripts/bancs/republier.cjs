@@ -32,7 +32,9 @@ const ITEMS = [
 const MAIN = { vinted_annonce_numeros: { '9102': { numero: '42' }, '9103': { numero: '43' }, '9106': { numero: '45', buyPrice: '47', recreeAt: new Date(auj - 5 * 3600e3).toISOString() }, '9107': { numero: '46' } } };
 const rows = [
   { id: 'main', data: MAIN },
-  { id: 'harvest_111_listings', data: { capturedAt: auj.toISOString(), payload: { items: ITEMS } } },
+  // (2 nov.) La vraie forme : la moisson active porte la pagination de Vinted. Sans total,
+  // la lecture n'est pas COMPLÈTE et un brouillon ne peut pas être proposé (brouillonsProposables).
+  { id: 'harvest_111_listings', data: { capturedAt: auj.toISOString(), payload: { items: ITEMS, pagination: { total_entries: ITEMS.length } } } },
   // (28 oct.) Un AUTRE compte (222) : ses paires ne sont pas proposées tant que Chrome est sur 111.
   { id: 'harvest_222_listings', data: { capturedAt: auj.toISOString(), payload: { items: [ann(9301, { title: 'Puma Suede autre compte taille 42', created_at_ts: Math.floor(auj / 1000) - 90 * 86400 })] } } },
   { id: 'vinted_brouillon_9201', data: { id: '9201', uid: '111', titre: 'Nike Air Max 1 dark teal', prix: 65, nPhotos: 4, etat: 'brouillon' } },
