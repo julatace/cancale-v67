@@ -43,3 +43,11 @@ Déplacé TEL QUEL depuis CLAUDE.md §9 le 2 novembre 2026 (le fichier dépassai
   eBay se relit tout seul ; Leboncoin : compte de session, date de vente. → numeros / ebay.
 - **21 oct.** — Discord sur téléphone, date d'arrivée des colis, rappel du soir, « Tout
   sur le N° », captcha prêt, revue visuelle. → `docs/passation/2026-10-21.md`.
+
+
+## Ligne retirée de CLAUDE.md §9 le 2 nov. (taille), telle quelle
+
+- **22 oct.** — Double vérification gratuite (second appareil) ; adresse de réception
+  PROUVÉE ; CSP en Report-Only (la bascule à faire : historique sécurité) ; Ma journée en
+  widgets ; carte de la communauté (OpenFreeMap) ; colis à l'heure ; « C'est déclaré ».
+  → `docs/passation/2026-10-22-integration.md`.

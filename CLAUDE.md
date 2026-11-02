@@ -619,10 +619,6 @@ Une ligne par chantier. Le récit complet des lignes du 31 oct. au 2 nov. est, m
 - **23-24 oct.** — Suivi des colis par n° et par Vinted (5.216-5.217), colis à retirer
   fiables (date limite lue, « à vérifier »), eBay « Inactives » (lecture seule), reçu
   d'achat lisible, feuilles au-dessus de la barre sur iPhone. → colis / ebay / interface.
-- **22 oct.** — Double vérification gratuite (second appareil) ; adresse de réception
-  PROUVÉE ; CSP en Report-Only (la bascule à faire : historique sécurité) ; Ma journée en
-  widgets ; carte de la communauté (OpenFreeMap) ; colis à l'heure ; « C'est déclaré ».
-  → `docs/passation/2026-10-22-integration.md`.
 - **Avant le 20 oct.** — `docs/passation/etat-detaille-2026-10-31-au-11-02.md` (fin) et `docs/journal-2026.md`.
 
 ---
