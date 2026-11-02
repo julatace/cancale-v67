@@ -314,7 +314,9 @@ async function scenarioC(b, vp, sombre) {
     check(await ecran.isVisible() && await pg.getByRole('button', { name: 'Réservations', exact: true }).isVisible(), `C ${nom} — Réglages → Stock et rangement → Organisation l'ouvre`);
     // (revue) L'en-tête dit d'où l'on vient et à quoi ça sert — la MÊME phrase que Réglages.
     const tete = await pg.evaluate(() => ({ sur: (document.querySelector('.vrm-operations .ops-surtitre') || {}).textContent || '', acc: ((document.querySelector('.vrm-operations .ops-entete p') || {}).textContent || '').trim() }));
-    check(!/gestion/i.test(tete.sur) && /réglages/i.test(tete.sur), `C ${nom} — le surtitre de l'écran dit « Réglages », plus « Gestion » : « ${tete.sur} »`);
+    // (2 nov.) « Paramètres » partout (1er nov., banc tous-boutons, CLAUDE.md §9) :
+    // l'écran d'où l'on vient s'appelle désormais « Paramètres ».
+    check(!/gestion/i.test(tete.sur) && /paramètres/i.test(tete.sur), `C ${nom} — le surtitre de l'écran dit « Paramètres », plus « Gestion » : « ${tete.sur} »`);
     check(!!tete.acc && descOrga.includes(tete.acc), `C ${nom} — sous le titre, la phrase de Réglages : « ${tete.acc} »`);
     if (!tel) check((await pg.locator('.vrm-sidebar [aria-label="Paramètres"][aria-current="page"]').count()) === 1, `C ${nom} — la roue des Réglages est mise en avant dans le rail`);
     await ouvrir(pg, 'organisation');
