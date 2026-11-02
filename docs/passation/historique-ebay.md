@@ -1798,3 +1798,49 @@ Julien : « lance eBay UK et US ». Tout l'eBay de VRM était figé sur eBay.fr
 - P12 : `publish` et `revise` avec prix exigent `confirme:true` (comme programmer,
   retirer, regleoffre, modifierannonce) ; l'app le pose après le clic.
   `audit-ebay-route` [P12] : sans confirmation ⇒ 400 « confirmation », zéro appel eBay.
+
+## 2 novembre — suppression d'un compte eBay : signature vérifiée, données anonymisées (P8)
+
+Audit « plateformes » P8 : `POST /api/ebay-deletion` (« Marketplace Account
+Deletion ») répondait 200 sans rien vérifier ni effacer. Corrigé
+(`api/_lib/ebay-suppression.js`, appelé par `handleDeletion` dans `api/ebay.js` ;
+aucune fonction `api/` en plus).
+
+- **Ce que dit eBay** : doc « Marketplace User Account Deletion »
+  (developer.ebay.com/develop/guides/marketplace-user-account-deletion) — défi GET
+  SHA-256(challengeCode + jeton de vérification + adresse) en hexadécimal, JSON
+  `{challengeResponse}` ; acquitter par 200/201/202/204 ; signature fausse ⇒ **412** ;
+  eBay renvoie tant qu'il n'a pas son acquittement (24 h ⇒ adresse « en panne »,
+  30 jours pour réparer) ; clé publique à garder en cache (1 h conseillée).
+  `getPublicKey` : `GET /commerce/notification/v1/public_key/{kid}` (jeton
+  d'APPLICATION). Code officiel `event-notification-nodejs-sdk` : ECDSA/SHA-1,
+  vérifié sur `JSON.stringify(message)`.
+- **Route** : en-tête `x-ebay-signature` (base64 de `{alg,kid,signature,digest}`) ;
+  absent, illisible, `kid` inconnu d'eBay (404) ou signature fausse ⇒ 412, rien lu
+  ni écrit. Clé illisible (réseau, 5xx, pas de jeton d'application) ⇒ 503. Le
+  corps vérifié : flux brut si lisible, sinon `req.body` re-sérialisé (comme le
+  code officiel). `kid` : format vérifié, inconnu retenu « refusé » 1 h, au plus
+  10 clés neuves par heure et par instance (relecture-sûreté S8).
+- **Effacement** (clé de service exigée, sinon 503 — jamais « rien trouvé ») :
+  lignes `ebay_orders{suffixe}` de TOUS les vendeurs, paginées (`Range`), préfiltrées
+  `data->>orders=ilike.*pseudo*` puis comparées par égalité EXACTE du pseudo (sans
+  casse). Acheteur ⇒ `buyer` = `{username:"compte eBay supprimé", pays}`, `shipTo`
+  = marque + pays, retirés : e-mail, téléphones, notes, `giftDetails`,
+  `finalDestinationAddress`, `taxIdentifier`… ; montants, dates, n°, articles
+  gardés ; `_compteEbaySupprime:true`. Vendeur ⇒ seul `sellerId` change.
+  Écriture `modifierDonnee` (comparer-et-échanger) ; lecture ou écriture ratée ⇒
+  503, eBay rejoue (idempotent : une commande déjà anonymisée ne se réécrit pas).
+  Mesuré dans le code : `ebay_messages` (nombre + ids), `ebay_offres`,
+  `ebay_finances`, `ebay_agent_journal` (ids) ne portent aucune donnée d'acheteur.
+- **Un vendeur relié qui ferme son compte eBay** (registre `ebay_comptes` : clé
+  = `cleCompteDe(eiasToken)`, ou pseudo exact) : `deconnecterCompte` (jeton vidé,
+  `deconnecteLe`), pseudo remplacé par la marque. Ses autres comptes restent.
+- **Preuve** : `scripts/audit-ebay-suppression.cjs` (31 contrôles ; route
+  exécutée, paire ECDSA générée, vraie signature, fausse base PostgREST à état) :
+  20 rouges sur `origin/main`, vert après ; 9 mutations (vérification sautée,
+  clé illisible ⇒ 412, écriture ratée acquittée, liste illisible acquittée,
+  adresse gardée, coordonnées gardées, sans clé de service, vendeur non
+  déconnecté, cache retiré) toutes rouges. `scripts/bancs/ebay-deletion.cjs` : un
+  POST non signé attend maintenant 412.
+- Variable : `EBAY_VERIF_TOKEN` (alias accepté `EBAY_VERIFICATION_TOKEN`) ;
+  `EBAY_DELETION_URL` doit être l'adresse EXACTE déclarée chez eBay.
