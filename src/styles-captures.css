@@ -295,3 +295,44 @@
 /* Jours cochés : neutres (l'accent reste rare, §7). */
 .vrm-favoris-auto .vrm-favoris-auto-jours button[aria-pressed=true]{background:var(--vrm-ink);color:var(--vrm-surface);}
 .vrm-favoris-auto .vrm-favoris-auto-jours button{min-width:0;padding:0 4px;}
+/* ── Messages aux favoris, écran refait (2 nov.) : mode auto · ton message ·
+   une ligne par favori rangée par état. Une seule couleur d'accent (le bouton
+   d'envoi), ambre seulement pour un geste à faire. */
+.vrm-fav-ecran{display:flex;flex-direction:column;gap:12px;font-size:14px;padding:14px;}
+.vrm-fav-ecran h4{margin:0;font-size:15px;font-weight:600;}
+.vrm-fav-ecran .vrm-favoris-auto{margin:0;background:var(--vrm-surface);}
+.vrm-fav-ecran .vrm-favoris-auto header small{font-size:13px;}
+.vrm-favoris-auto .vrm-favoris-auto-calme{color:var(--vrm-muted);}
+.vrm-favoris-auto-repli summary{min-height:44px;display:flex;align-items:center;cursor:pointer;color:var(--vrm-muted);}
+.vrm-favoris-auto-repli[open]{display:flex;flex-direction:column;gap:8px;}
+.vrm-fav-message{display:flex;flex-direction:column;gap:8px;padding:10px 12px;border:1px solid var(--vrm-line);border-radius:10px;}
+.vrm-fav-message-tete{display:flex;align-items:center;justify-content:space-between;gap:10px;}
+.vrm-fav-message-texte{margin:0;padding:8px 10px;border-radius:8px;background:var(--vrm-card2);white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.45;}
+.vrm-fav-message .vrm-favoris-note{margin:0;font-size:13px;}
+.vrm-fav-message>button.is-principal{align-self:stretch;}
+.vrm-fav-ecran .vrm-fav-lien{border:0;background:transparent;color:var(--vrm-ink);text-decoration:underline;text-underline-offset:3px;min-width:44px;padding:6px 4px;}
+.vrm-fav-geste{margin:0;color:var(--vrm-warn);line-height:1.45;}
+.vrm-fav-groupes{display:flex;flex-direction:column;gap:16px;}
+.vrm-fav-groupe-tete{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;padding-bottom:6px;border-bottom:1px solid var(--vrm-line);}
+.vrm-fav-groupe-tete>div{min-width:0;display:flex;flex-direction:column;gap:3px;}
+.vrm-fav-compte{color:var(--vrm-muted);font-weight:400;font-variant-numeric:tabular-nums;margin-left:4px;}
+.vrm-fav-phrase{margin:0;color:var(--vrm-muted);line-height:1.45;}
+.vrm-fav-lignes{list-style:none;margin:0;padding:0;}
+.vrm-fav-lignes li{display:grid;grid-template-columns:40px minmax(0,1fr) auto auto;gap:10px;align-items:center;min-height:56px;padding:6px 0;border-bottom:1px solid var(--vrm-line);}
+.vrm-fav-lignes li:last-child{border-bottom:0;}
+.vrm-fav-photo{width:40px;height:48px;border-radius:6px;overflow:hidden;background:var(--vrm-card2);display:grid;place-items:center;}
+.vrm-fav-photo img{width:100%;height:100%;object-fit:cover;display:block;}
+.vrm-fav-photo .vrm-favoris-photo{width:100%;height:100%;font-size:18px;color:var(--vrm-muted);}
+.vrm-fav-ligne-texte{min-width:0;display:flex;flex-direction:column;gap:2px;}
+.vrm-fav-ligne-texte strong{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.vrm-fav-ligne-texte span{color:var(--vrm-muted);font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.vrm-fav-ligne-texte span b{color:var(--vrm-ink);font-weight:600;font-variant-numeric:tabular-nums;}
+.vrm-fav-quand{color:var(--vrm-muted);font-size:13px;white-space:nowrap;font-variant-numeric:tabular-nums;}
+.vrm-fav-ecran .vrm-fav-ouvrir{min-width:44px;}
+@media(max-width:767px){
+  .vrm-fav-ecran{padding:10px;}
+  .vrm-fav-lignes li{grid-template-columns:36px minmax(0,1fr) auto;row-gap:2px;}
+  .vrm-fav-lignes .vrm-fav-photo{width:36px;height:44px;grid-row:span 2;}
+  .vrm-fav-lignes .vrm-fav-quand{grid-column:2;grid-row:2;font-size:12px;}
+  .vrm-fav-lignes .vrm-fav-ouvrir{grid-column:3;grid-row:1 / span 2;}
+}
