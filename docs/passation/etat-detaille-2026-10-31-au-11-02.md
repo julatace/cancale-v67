@@ -94,3 +94,27 @@ Déplacé TEL QUEL depuis CLAUDE.md §9 le 2 novembre 2026 (le fichier dépassai
   `{ vrmVoirSupprimes: true }`). → divers / sécurité.
 - **29 oct.** — Ventes masquées impossibles ; Organisation hors du menu ; saisie « N° +
   Entrée » retirée ; carte de la communauté gardée claire en mode sombre.
+
+## Autres lignes du 29 oct. sorties de CLAUDE.md §9 le 2 nov. (telles quelles)
+
+- **29 oct.** — Leboncoin comme Vinted (5.288→5.291) : liste « Mes annonces » complète qui
+  fait sortir les disparues, « à retirer de Leboncoin » par identité, « Supprimer de
+  Leboncoin » (confirmé, 10/h), Republier Leboncoin, favoris en NOMBRES seulement. → leboncoin.
+- **29 oct.** — Statut chez le transporteur lu par le SERVEUR (Mondial Relay, Chronopost,
+  Vinted Go), l'extension en secours. → colis-retraits.
+- **29 oct.** — Messages : une offre sur une annonce plus en vente ne reste pas en tête
+  (`src/offresVinted.js`) ; « Retirer de la liste ». ⚠️ depuis le 18 oct. aucune requête
+  `/api/v2/conversations/…` ne part de la page : l'extension mesure la nouvelle route. → favoris-messages.
+- **29 oct.** — Écrans Vinted : grandes photos, état en jauge, calendrier de périodes,
+  pastille Actions. → interface.
+- **29 oct.** — Comptabilité simple (ordre seul changé), micro-entreprise repliée, suivi
+  URSSAF (mensuel/trimestriel), cotisations dans Ma journée, déclaration de revenus
+  (cases 5KO/5TA), CFE, rappel 3 jours avant l'échéance. → compta.
+- **29 oct.** — Reçu d'achat par email relié à SON achat par n° (`api/_lib/recu-achat.js`) ;
+  le mot est « reçu », pas « facture » (`NOM_RECU_ACHAT`). → compta / colis.
+- **29 oct.** — Agent eBay qui DEMANDE (jamais sans son oui) ; eBay → Achats : recherche
+  et fil (jeton d'application). → ebay.
+- **29 oct.** — Clé Photoroom par vendeur, chiffrée, sur l'écran Vestiaire (pas dans
+  Paramètres). → vestiaire.
+- **29 oct.** — Plafond d'actions **50/h** (sa décision) ; Republier comme Vintex (5.277-5.285).
+  → vinted-extension.
