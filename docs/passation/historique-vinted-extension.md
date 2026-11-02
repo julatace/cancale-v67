@@ -936,3 +936,30 @@ avant la fin), terminé sur `claude/republier-question` :
 Preuve : `audit-republier-question` 16 contrôles ; sur la 5.309 de `main` 6 rouges,
 sur le travail de l'agent 2 rouges (second tour), mutations (refus muet retenu,
 réponse hors liste acceptée) rouges.
+
+## 2 novembre (soir) — extension 5.311.0 : frein après refus, numéros et annonces du seul compte
+
+Julien (15 h 45) : « quand l'extension republie elle oublie de tout prendre en compte, elle
+avait oublié la couleur et la taille, et elle insistait, et Vinted a détecté
+l'automatisation » ; « quand je suis sur le compte Angèle et que je me promène sur le compte
+Arthur, je ne veux pas voir le numéro associé à l'annonce d'Arthur » ; « tant que l'extension
+n'a pas capté depuis le compte où l'annonce est, elle ne peut pas ajouter une annonce dans
+VRM — c'est ce qui s'est passé avec shop_cancale ».
+Mesuré (diagnostic `panel_diag_capture`, compteurs cumulés) : `brouillon_publier_refuse_400`
+11, `vinted_refus_champs_size` 10, `republier_mise_en_ligne_refusee_400` 6,
+`refaire_mise_en_ligne_refusee_400` 3, une fois `listing_restricted`.
+- **Frein** : tout refus 4xx (hors 401/429) d'un geste de republication (création, brouillon,
+  mise en ligne, changement de prix) pose `vrmFreinRepub[uid]` : 30 min, 24 h si la réponse
+  parle de restriction. `recreerVinted`, `publierBrouillon`, `refaireBrouillon`,
+  `republierVinted` et la mise en ligne planifiée s'arrêtent avant toute requête
+  (`code:'frein-refus'`, phrase avec l'heure de reprise) ; l'atelier arrête la file.
+  Complète la 5.310 (champ manquant repris ou demandé AVANT l'envoi, refus nommé jamais
+  renvoyé tel quel).
+- **`<enligne-regle>` (app = extension)** : une annonce vue seulement dans la lecture PUBLIQUE
+  d'un autre compte n'est plus ajoutée ; un compte sans capture connectée n'apparaît pas ;
+  `relireAnnoncesAutresComptes` ne relit que les comptes déjà captés connectés
+  (`lecturesParCompte().propres`). `audit-enligne` : les cas de l'ancienne règle retournés.
+- **Numéros sur Vinted** : `numerosPermisDansPage` rend l'uid du compte de l'onglet ;
+  `numerosDuCompte` ne rend que les N° dont le compte (`accountId` de la fiche, uid de la
+  ligne `harvest_{uid}_txn_*` / `_orders_sold`) est celui-là ; compte inconnu ⇒ rien.
+  `audit-numero-vinted` « autre compte » : 3 rouges sur la 5.310.

@@ -487,6 +487,8 @@ sans la fonction.
 | `relaisdest` | `relaisDestination` | **5.295.0** | « le point relais où arrivent tes achats (quand le suivi Vinted le donne) » |
 | `vcfiche` | `ficheVcAnnonce` | **5.296.0** (1er nov.) | annonces Vestiaire en fiches (photo, titre, prix, état) et le compte de l'onglet sur annonces/ventes/achats (flou par compte) |
 | `favorisauto` | `freinFavoriAuto` | **5.309.0** (2 nov.) | mode auto des favoris |
+| `freinrepub` | `poserFreinRepub` | **5.311.0** (2 nov.) | un refus de Vinted freine la republication de CE compte (30 min ; 24 h si restreint) |
+| `numeroscompte` | `numerosDuCompte` | **5.311.0** (2 nov.) | sur Vinted, seuls les N° du compte connecté dans l'onglet |
 | `republierquestion` | `reglerAvant` | **5.310.0** (2 nov.) | Republier remplit un champ manquant depuis l'annonce elle-même, sinon DEMANDE (valeurs de Vinted) ; un refus nommé n'est jamais renvoyé tel quel |
 
 ---
@@ -496,11 +498,11 @@ sans la fonction.
 Une ligne par chantier ou décision, le plus récent d'abord. Détail : le fichier
 d'historique du thème (cherche le titre ou la date).
 
-**Extension servie : 5.310.0** (2 nov.). **À lire en premier : `docs/passation/2026-11-02-liste.md`.** **Production** : https://vrm.center,
+**Extension servie : 5.311.0** (2 nov.). **À lire en premier : `docs/passation/2026-11-02-liste.md`.** **Production** : https://vrm.center,
 vérifier par `curl https://vrm.center/api/sante`.
 
 ### Gestes encore attendus de Julien
-- Installer l'extension **5.310.0** (remplacer le dossier, puis ⟳ dans CHAQUE Chrome).
+- Installer l'extension **5.311.0** (remplacer le dossier, puis ⟳ dans CHAQUE Chrome).
 - Sur leboncoin.fr, ouvrir « Mes annonces » sur CHACUN de ses comptes Leboncoin.
 - Recoller `scripts/gmail-forwarder.gs` (avec sa clé) dans la boîte qui fait tourner le
   script, puis poser `EMAIL_INBOUND_SECRET` sur Vercel (l'ancien script lit encore la
@@ -525,6 +527,7 @@ vérifier par `curl https://vrm.center/api/sante`.
 
 ### Décisions et chantiers (octobre–novembre 2026)
 Une ligne par chantier. Le récit complet des lignes du 31 oct. au 2 nov. est, mot pour mot, dans `docs/passation/etat-detaille-2026-10-31-au-11-02.md`.
+- **2 nov. (soir)** — **Extension 5.311.0** (sa plainte : « elle insistait, Vinted a détecté l'automatisation » ; « je ne veux pas voir les N° d'Arthur depuis Angèle » ; shop_cancale) : frein après tout refus de Vinted (`vrmFreinRepub`, 30 min / 24 h si `listing_restricted`, l'atelier s'arrête) ; ⚠️ **une lecture PUBLIQUE n'ajoute JAMAIS une annonce** (`<enligne-regle>`, sa décision) et les comptes jamais captés connectés ne sont plus relus ; N° affichés sur Vinted = ceux du compte de l'onglet seulement (`numerosDuCompte`, par `accountId`). → historique vinted-extension. Geste : installer la 5.311.0.
 - **2 nov.** — Visite en bulles à la première connexion (`src/VisiteBulles.jsx`, `vrm_visite_vue` synchronisée, « Revoir la visite » dans Paramètres → Aide), onglets NUS (plus aucune explication à côté), une phrase sous le titre de 6 écrans (`src/phrasesEcran.js`) ; banc `demo-bulles` vert 390/1512. → historique interface-stock. Geste : regarder la visite au téléphone (Paramètres → Aide → Revoir la visite).
 - **2 nov.** — eBay : jeton d'accès gardé côté serveur jusqu'à 5 min de sa fin (`ebay_tokens_acces`, lié à l'empreinte du refresh, effacé à la déconnexion, `audit-ebay-jeton-cache`, P9) ; publier et changer un prix exigent `confirme:true` côté serveur (P12). → historique ebay. Geste : aucun.
 - **2 nov.** — **Republier qui règle ses problèmes** (**5.310.0**, `reglerAvant`, `audit-republier-question`) : champ vide repris de la recette de CETTE annonce (2 tours), sinon UNE question avec les valeurs de Vinted (« Choisir la catégorie » sur la ligne, réponse posée une fois) ; refus nommé retenu, jamais renvoyé ; plafond fermé si le stockage de l'extension est muet (P10) ; message de refus d'offre compté (P11). → historique vinted-extension. Geste : installer la 5.310.0.
@@ -558,7 +561,6 @@ Une ligne par chantier. Le récit complet des lignes du 31 oct. au 2 nov. est, m
 - **1er nov.** — Ventes : bénéfice sur la ligne (« au plus » si frais non confirmés), « Déposé » annulable 5 s. (La Tournée de ce lot a été retirée ensuite, voir plus haut.) → historique interface-stock. Geste : dire si « au plus » lui va.
 - **1er nov.** — Paramètres, compta, arrivée, communauté plus simples (groupe « Comptes et emails », suppressions qui demandent). → historiques interface-stock et compta. Geste : aucun.
 - **1er nov.** — Colis → « À retirer » par point relais : aucun colis écarté (« Point pas encore connu » + raison), même relais écrit deux fois = un point (nom propre + CP), position Vinted ou Base Adresse, compteur = Ma journée (`vrm_colis_retirer`), même n° de suivi compté une fois. → historique colis-retraits (« 1er nov. »). Geste : aucun.
-- **31 oct.** — **Prix 16,99 €/mois** (sa décision ; 14,99 € depuis le 27 oct., CGV version 2026-10-31, essai 7 j inchangé) ; adresse de contact **vrm.vinted35+contact@gmail.com** (sa décision), tenue hors de la réception des colis (`gmail-forwarder.gs`, à recoller). Geste : prix Stripe à 16,99 €.
 - **31 oct.** — Emails : journal « Tes emails, ce que VRM en a fait » (Paramètres → Emails → Journal, et depuis Colis) : une phrase par email, raison et geste ; résumé court écrit au classement (`api/_lib/resume-email.js`), texte à part (`email_texte_*`), `mode=journal` paginé (≈ 11 Ko/page). → historique sécurité-base-serveur. Geste : aucun.
 - **31 oct.** — Extension 5.295.0 : Vestiaire (compte, conversations, réponse par recette APPRISE, favoris en nombre), relais des achats. → historiques vestiaire / colis-retraits. Geste : envoyer UNE réponse soi-même sur Vestiaire.
 - **31 oct.** — Statistiques détaillées + widget « Tendances » ; bénéfice de Ma journée masquable en mode « Modifier ». → historiques interface-stock et compta. Geste : aucun.
