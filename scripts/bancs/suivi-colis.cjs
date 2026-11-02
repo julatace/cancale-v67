@@ -191,7 +191,7 @@ const lire = (pg) => pg.evaluate(() => {
     return {
       t: c.innerText, suivi: s ? s.getAttribute('data-colis-suivi') : null, conv,
       nv: [...c.querySelectorAll('[data-nouvelle-vinted]')].map((x) => x.getAttribute('data-nouvelle-vinted')),
-      suivre: [...c.querySelectorAll('a[data-suivre-colis]')].map((a) => { const r = a.getBoundingClientRect(); return { href: a.getAttribute('href'), site: a.getAttribute('data-suivre-site'), n: a.getAttribute('data-suivre-colis'), cp: a.getAttribute('data-suivre-cp'), h: r.height, t: a.innerText + ' ' + (a.getAttribute('title') || '') }; // (2 nov.) forme courte « Suivre ↗ » : le libellé long est son titre }),
+      suivre: [...c.querySelectorAll('a[data-suivre-colis]')].map((a) => { const r = a.getBoundingClientRect(); return { href: a.getAttribute('href'), site: a.getAttribute('data-suivre-site'), n: a.getAttribute('data-suivre-colis'), cp: a.getAttribute('data-suivre-cp'), h: r.height, t: a.innerText + ' ' + (a.getAttribute('title') || '') }; /* (2 nov.) forme courte « Suivre ↗ » : le libellé long est son titre */ }),
     };
   });
   const onglet0 = document.querySelector('[data-colis-onglet-choix="retirer"]'); const onglet = onglet0 ? { getAttribute: () => onglet0.getAttribute('data-colis-onglet-n') } : null;
