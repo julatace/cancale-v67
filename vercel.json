@@ -2,6 +2,11 @@
   "regions": [
     "dub1"
   ],
+  "functions": {
+    "api/compte.js": {
+      "maxDuration": 60
+    }
+  },
   "git": {
     "deploymentEnabled": {
       "claude/**": false
