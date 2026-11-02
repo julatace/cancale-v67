@@ -15888,7 +15888,7 @@ function AuthScreen() {
    Rien si « réduire les animations ». */
 .vrm-cx-aurore{position:absolute;inset:0;pointer-events:none;overflow:hidden}
 .vrm-cx-aurore i{position:absolute;border-radius:50%;filter:blur(50px);will-change:transform}
-.vrm-cx-aurore i:nth-child(1){width:62%;aspect-ratio:1;left:-18%;top:-22%;background:#2442B8;opacity:.32;animation:vrmCxDerive1 19s ease-in-out infinite alternate}
+.vrm-cx-aurore i:nth-child(1){width:62%;aspect-ratio:1;left:-18%;top:-22%;background:#0071E3;opacity:.32;animation:vrmCxDerive1 19s ease-in-out infinite alternate}
 .vrm-cx-aurore i:nth-child(2){width:48%;aspect-ratio:1;right:-14%;top:18%;background:#56564F;opacity:.26;animation:vrmCxDerive2 23s ease-in-out infinite alternate}
 .vrm-cx-aurore i:nth-child(3){width:56%;aspect-ratio:1;left:22%;bottom:-30%;background:#252522;opacity:.6;animation:vrmCxDerive3 27s ease-in-out infinite alternate}
 @keyframes vrmCxDerive1{to{transform:translate3d(18%,14%,0) scale(1.12)}}

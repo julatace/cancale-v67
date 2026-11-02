@@ -13,7 +13,7 @@ html body .vrm-ledger-drawer.vrm-recap {
   --recap-muted: var(--vrm-muted, #5E5E58);
   --recap-line: var(--vrm-line, #E4E4DE);
   --recap-soft: var(--vrm-card2, #F1F1EC);
-  --recap-accent: var(--vrm-accent, #2442B8);
+  --recap-accent: var(--vrm-accent, #0071E3);
   --recap-warn: var(--vrm-warn, #A15C00);
   --recap-mono: var(--vrm-police-mono, 'Geist Mono', ui-monospace, monospace);
   background: var(--vrm-surface, #FFFFFF);

@@ -6,37 +6,40 @@
 //   · fond blanc franc ; les blocs sont des aplats « surface » (#F5F5F3) SANS
 //     ombre ni cadre appuyé ; la photo porte la carte ;
 //   · encre presque noire, atténué chaud, filets #E4E4DF ;
-//   · UNE couleur d'accent, rare : le cobalt #2442B8 (action principale, trait
+//   · UNE couleur d'accent, rare : le cobalt #0071E3 (action principale, trait
 //     de l'onglet actif) ; ambre = geste à faire ; rouge = deux paires sous un N°.
 //     Le violet reste refusé ; `blue` et `purple` (anciennes teintes secondaires)
 //     retombent sur l'atténué pour qu'aucune seconde couleur ne revienne.
 // Les ombres ne restent qu'à ce qui FLOTTE (menus, feuilles, fenêtres).
 // Détail : docs/passation/historique-interface-stock.md (« Vitrine »).
+// (2 nov., Julien : « copie le style simple et minimaliste d'Apple ») L'accent devient
+// le BLEU D'APPLE (#0071E3 clair, #0A84FF sombre), toujours rare, et la police celle
+// du système (SF Pro sur iPhone et Mac, styles-vitrine.css). Le reste ne change pas.
 export const MINERAL = Object.freeze({
  bg:'#FFFFFF',surface:'#F5F5F3',card:'#F5F5F3',card2:'#ECECE8',
  border:'#E4E4DF',text:'#0F0F0E',muted:'#56564F',faint:'#64645C',
- accent:'#2442B8',accentSoft:'#5D74D6',onAccent:'#FFFFFF',
+ accent:'#0071E3',accentSoft:'#4A9BEF',onAccent:'#FFFFFF',
  danger:'#B43E35',warn:'#8A5300',warnSoft:'#FFF1D6',gold:'#8A5300',blue:'#56564F',purple:'#56564F',
  shadow:'none',
  shadowMd:'0 1px 2px rgba(15,15,14,.06), 0 10px 28px rgba(15,15,14,.10)',
  shadowLg:'0 6px 16px rgba(15,15,14,.08), 0 24px 56px rgba(15,15,14,.16)',
- ring:'rgba(36,66,184,.20)',glass:'#FFFFFF',bar:'#FFFFFF',hair:'rgba(15,15,14,.09)',
+ ring:'rgba(0,113,227,.20)',glass:'#FFFFFF',bar:'#FFFFFF',hair:'rgba(15,15,14,.09)',
  sidebar:'#FFFFFF',chrome:'#FFFFFF',onChrome:'#0F0F0E',chromeMuted:'#56564F',chromeLine:'#E4E4DF',
  chromeGradient:'#FFFFFF',photo:'#ECECE8',
- s1:'#2442B8',s2:'#9AA6DB',selection:'#2442B8'
+ s1:'#0071E3',s2:'#8DB8F2',selection:'#0071E3'
 });
 // Le sombre, dérivé : un noir chaud (pas de « bleu nuit »), trois marches de
 // clarté, le cobalt éclairci pour tenir 4,5:1 (texte FONCÉ dessus), l'ambre clair.
 export const MINERAL_DARK = Object.freeze({
  bg:'#0E0E0D',surface:'#1A1A18',card:'#1A1A18',card2:'#252522',
  border:'#2E2E2B',text:'#F2F2EE',muted:'#B0B0A8',faint:'#9A9A92',
- accent:'#6F86E8',accentSoft:'#93A5EE',onAccent:'#0E0E0D',
+ accent:'#0A84FF',accentSoft:'#64B0FF',onAccent:'#FFFFFF',
  danger:'#FF9188',warn:'#F0B44C',warnSoft:'#2E2412',gold:'#F0B44C',blue:'#B0B0A8',purple:'#B0B0A8',
  shadow:'none',shadowMd:'0 10px 28px rgba(0,0,0,.40)',shadowLg:'0 16px 48px rgba(0,0,0,.50)',
- ring:'rgba(111,134,232,.28)',glass:'#1A1A18',bar:'#1A1A18',hair:'rgba(242,242,238,.10)',
+ ring:'rgba(10,132,255,.28)',glass:'#1A1A18',bar:'#1A1A18',hair:'rgba(242,242,238,.10)',
  sidebar:'#0E0E0D',chrome:'#0E0E0D',onChrome:'#F2F2EE',chromeMuted:'#B0B0A8',chromeLine:'#2E2E2B',
  chromeGradient:'#0E0E0D',photo:'#252522',
- s1:'#6F86E8',s2:'#93A5EE',selection:'#6F86E8'
+ s1:'#0A84FF',s2:'#64B0FF',selection:'#0A84FF'
 });
 // Les portails (détails de vente, fenêtres) héritent du document : mêmes jetons
 // que la coque, sans seconde palette à entretenir dans les feuilles CSS.
