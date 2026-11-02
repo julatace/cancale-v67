@@ -110,6 +110,9 @@ const ecrireAilleurs = (base, maj) => {
 
   // ── P + M ──────────────────────────────────────────────────────────────────
   if (joue('P') || joue('M')) {
+    // L'app a fini d'envoyer ce qu'elle publie à l'ouverture (la file est vide) :
+    // on mesure SA saisie, pas les chiffres de démarrage.
+    await H.attendre(async () => (await o.pg.evaluate(() => localStorage.getItem('vrm_file_envoi'))) == null, 15000);
     A.etat.faute = COUPE;
     dit(await saisirPrix(o.pg, 1, '41'), 'P : prix du N°1 saisi pendant la coupure');
     await o.pg.waitForTimeout(3000);
