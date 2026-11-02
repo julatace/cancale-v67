@@ -151,3 +151,7 @@ Déplacé TEL QUEL depuis CLAUDE.md §9 le 2 novembre 2026 (le fichier dépassai
 ### Lignes de §9 déplacées telles quelles
 - **1er nov.** — Chiffres de Ma journée épurés (semaine en barres, un grand chiffre + Bénéfice · Reçu · À mettre de côté · CA), règles inchangées. → historique interface-stock. Geste : aucun.
 - **1er nov.** — Récapitulatif d'une vente (frise Vendue → Argent reçu cochée seulement PROUVÉE, `src/recapVente.js`). → historique interface-stock. Geste : regarder une vente.
+
+### Lignes de §9 déplacées telles quelles
+- **1er nov.** — Ma journée calme (colonne centrée, Urgent → À faire → chiffres, liste à filets `src/UneLigne.jsx`) ; « tout sans défiler » exigé seulement en densité 0,65. → historique interface-stock. Geste : dire si l'écran aéré lui va.
+- **1er nov.** — Une épingle par point relais avec le nombre de colis ; adresse ambiguë ⇒ « pas sur la carte » + raison (`jugerBan`). → historique colis-retraits. Geste : aucun.

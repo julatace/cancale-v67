@@ -50,6 +50,13 @@ export function resumeClassement(code, corps, extra) {
       break;
     }
     case 'finalisation': r = { t, mt: court(c.montant, 12), a: court(c.article) }; break;
+    // (2 nov.) Vente Vestiaire : l'identité est l'annonce Vestiaire (n° du sujet).
+    case 'vente-vestiaire': {
+      if (c.garde) { r = { t, av: 'analyse' }; break; }
+      r = { t, p: ident(c.productId), a: court(x.article), mt: court(c.gain, 12), lim: court(c.limite, 25), nv: c.nouvelle ? 1 : undefined };
+      if (!r.p) r.av = 'analyse';
+      break;
+    }
     case 'achat': {
       r = { t, tx: ident(c.transaction), a: court(c.article), px: court(c.prix, 12), id: ident(x.ligne, 40), pdf: c.pdf ? 1 : 0 };
       if (!r.tx) r.av = 'sans-tx';

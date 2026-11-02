@@ -553,6 +553,90 @@ Reste : les ACTIONS depuis VRM (baisser un prix, répondre à une offre, retirer
 doit dire lesquelles ; chacune s'apprend sur SON geste fait une fois sur Vestiaire (recette, comme
 `vcrepondre`), jamais devinée.
 
+## 2 novembre (nuit) — les emails de vente Vestiaire intégrés (branche `claude/vc-emails`)
+
+Julien (21 h 38) : « regarde pour les mails de Vestiaire Collective pour les ventes, je veux qu'on les
+intègre, fais ça bien ». Puis (21 h 44) : « ce n'est pas toujours une paire, là c'est un sac » — tout
+texte Vestiaire dit « l'article ».
+
+### Ce que la base montrait (lecture seule, 2 nov. vers 21 h 45)
+- **Aucun email Vestiaire n'est jamais arrivé** dans VRM : 0 ligne `email_inconnu_*`, `email_reception_*`,
+  `email_texte_*`, journal ni quarantaine qui parle de Vestiaire — alors que les emails Vinted, eBay,
+  Leboncoin (et même Whatnot) arrivent (dernier reçu le soir même).
+- Le registre des adresses porte deux adresses « Masquer mon e-mail » (privaterelay) : ce sont celles
+  des comptes VINTED (les emails Vinted relayés y arrivent). Apple fabrique UNE adresse par site :
+  celle de Vestiaire n'y est (très probablement) pas.
+- Pourquoi rien n'arrive : la règle de transfert iCloud documentée (`docs/email-pipeline.md`, étape 4)
+  est « expéditeur contient `vinted` ». L'email Vestiaire arrive par le relais Apple avec un expéditeur
+  réécrit `…_at_vestiairecollective_com_…@privaterelay.appleid.com` (nom « Vestiaire Collective ») :
+  il ne contient pas « vinted », il reste dans iCloud.
+- L'extension avait DÉJÀ lu cette vente (`vc_ventes`, clé = productId = n° du sujet, montant
+  `sellerEarning` égal au « Vous gagnez » de l'email, limite `…T23:59:59+01:00`). La forme de
+  `vc_ventes` sert donc de référence au rangement de l'email.
+
+### Défaut trouvé sur le code d'avant
+Si l'email était arrivé, il aurait été pris par la branche **vente Vinted** (le sujet contient
+« vendu ») : `parseSaleEmail` échoue (pas de « a acheté ») ⇒ gardé TRONQUÉ à 2 000 caractères,
+« analyse impossible ». Un autre email Vestiaire parlant de « colis … livré » devenait un suivi de
+colis `autre` sans n°.
+
+### Ce qui est fait
+- `api/_lib/vestiaire-email.js` (fonctions pures) : identité = n° du SUJET « Votre article vient
+  d'être vendu (#N) » ; la « Réf » du corps doit dire le même, sinon rien n'est rangé (email gardé
+  entier, « à vérifier ») ; « Vous gagnez » en EUR (clé `vousGagnez`, ajoutée à `CLE_RECU_VC`) —
+  absent ou autre devise ⇒ `null`, jamais le prix de vente ; date limite « avant le lundi 9 novembre »
+  ⇒ `2026-11-09T23:59:59+01:00` (décalage de Paris calculé, année suivante pour décembre→janvier,
+  date impossible ⇒ rien) ; date de vente = heure de l'email si même jour que « Vente confirmée »,
+  sinon le jour seul ; étiquette `true` seulement si le bouton est là ; photo seulement une image
+  `images.vestiairecollective.com` qui porte le productId. Le LIEN de l'étiquette n'est pas gardé
+  (redirection ou lien signé qui expire ; l'extension rapatrie déjà le PDF, `vc_label_*`).
+- `api/email-inbound.js` : branche Vestiaire AVANT les colis et les ventes Vinted (le vendeur est
+  déjà décidé par l'adresse de réception) ; l'email lu va dans `vc_email_vente_{productId}` (prix de
+  vente et marque y restent), puis la vente est fusionnée dans **`vc_ventes`** par `modifierCas`
+  (`fusionnerVenteEmailVc`) : vente connue (même clé ou même `productId` sous une autre clé) ⇒
+  seulement ce qui est vide est complété, `aExpedier`/état jamais touchés, un montant sûr jamais
+  remplacé (un montant « pas sûr » l'est) ; vente inconnue ⇒ née « à expédier », source `email`,
+  sans `verseLe` (le CA reste daté au versement). Lecture ou écriture ratée ⇒ 503. Notification
+  « Vendu sur Vestiaire » (catégorie vente, une fois par annonce) seulement pour une vente nouvelle.
+  Un autre email Vestiaire (forme pas apprise) est gardé ENTIER (`email_inconnu`, raison
+  « Vestiaire : forme pas encore apprise ») — sauf un email de transporteur NOMMÉ.
+- Journal « Tes emails, ce que VRM en a fait » : type `vente-vestiaire` (résumé : annonce, gain,
+  limite ; phrase « Vente Vestiaire : … · tu reçois … » ; filtre « Ventes et versements »).
+- Aucune ligne de l'app ni de l'extension changée : Ventes, Colis → À envoyer, Ma journée, le widget,
+  les rappels et les totaux lisent déjà `vc_ventes` par `api/_lib/vestiaire-regle.js`.
+
+### Preuves (§6)
+- `scripts/audit-vestiaire-email.cjs` (47 contrôles) EXÉCUTE la route sur des emails fabriqués de
+  la forme reçue (HTML en tableaux ; email BRUT MIME quoted-printable, sujet RFC 2047) : V1-V13,
+  R1-R3 (règles de l'app : colis à poster, montant compté, aucun mois de CA), D1-D9 (une seule vente
+  avec l'extension, colis parti pas ressuscité, autre annonce intacte), I1-I2, Q1-Q2 (adresse
+  inconnue ⇒ quarantaine neutre), E1-E3 (503), A1-A2, P1-P10, J1-J3.
+- Code d'avant (`origin/main` au 2 nov.) : **25 rouges**. Mutations (Réf différente acceptée,
+  `aExpedier` ressuscité, prix de vente pris pour le gain, lecture ratée acquittée, identité par clé
+  seule, montant sûr écrasé) : chacune rouge.
+- Verts : `audit-vestiaire-partout`, `audit-routes-revue`, `audit-secrets`, `audit-fonctions-api`
+  (toujours 12), `audit-journal-emails`, `audit-email-formes`, `audit-proprietaire-email`,
+  `audit-email-rattacher`, `audit-preuve-adresse`, `audit-offres-email`… Rouges identiques AVANT et
+  APRÈS (environnement) : `vendeur-neutre`, `recu-achat`, `colis-retrait` (`@babel/parser` absent
+  ici), `flux-divers`, `lectures`, `transporteurs`, `codes-retrait`, `retrait-fiable`.
+
+### Reste / limites
+- Les emails Vestiaire d'expédition, de livraison, de **paiement** et d'annulation : formes
+  inconnues (aucun dans la base). Ils seront gardés entiers dès qu'ils arriveront ; le paiement
+  (date de versement ⇒ CA déclaré) se branchera sur leur forme réelle, jamais devinée.
+- Risque résiduel : l'extension réécrit `vc_ventes` sans comparer-et-échanger ; si elle écrit dans
+  la même fraction de seconde que l'email, l'entrée de l'email peut sauter — la ligne
+  `vc_email_vente_*` la garde, et l'extension relit de toute façon la même vente chez Vestiaire.
+- Pas de notification « double vente » depuis l'email Vestiaire (le texte de `notificationDoubleVente`
+  dit « Vendue sur Vinted ») ; l'app montre déjà « vendu sur Vestiaire, encore en vente sur Vinted ».
+
+### Geste de Julien
+Faire arriver les emails Vestiaire : dans iCloud.com → Mail → Réglages → Règles, ajouter une règle
+« Si l'expéditeur contient `vestiairecollective` → Transférer à » **la même adresse que la règle
+Vinted** ; puis, si VRM met le premier email Vestiaire en quarantaine (adresse non reconnue),
+déclarer et confirmer dans VRM l'adresse « Masquer mon e-mail » que Vestiaire utilise (Paramètres →
+Comptes et emails).
+
 ## 2 novembre (soir) — Vestiaire comme Vinted et Leboncoin : photo entière, un N° par annonce, ventes et colis à la même forme, bordereau tamponné
 
 Julien (captures du 2 nov., 21 h) : « pour Vestiaire c'est bien, juste c'est beaucoup zoomé sur le produit ; et
