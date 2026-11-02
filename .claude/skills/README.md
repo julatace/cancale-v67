@@ -87,3 +87,9 @@ ne PAS le lancer (réseau limité, et inutile) — lire `SKILL.md` et les fichie
 **Règle de travail** : tout chantier visuel lit `impeccable` (+ `craft-floor.md`),
 `emil-design-eng` et `apple-design`, et passe ses captures par `design-critique`
 avant de les montrer. Les règles de `CLAUDE.md` (§7, refus) passent toujours avant.
+
+### `ui-ux-pro-max` (ajoutée le 2 nov., 21 h 55)
+Source : `github.com/nextlevelbuilder/ui-ux-pro-max-skill` (commit `713eef5`, ~144 000 étoiles), licence MIT (`ui-ux-pro-max/LICENSE`).
+Base de règles UI/UX cherchable en local (styles, palettes, typographies, 119 règles UX) :
+`python3 .claude/skills/ui-ux-pro-max/scripts/search.py "<requête>" --domain style|ux|typography|color`.
+Aucun appel réseau dans la recherche. À consulter avec `impeccable` pour tout écran.
