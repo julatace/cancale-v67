@@ -8,6 +8,7 @@ import AutomatisationFavoris from './AutomatisationFavoris.jsx';
 import ModeAutoFavoris from './ModeAutoFavoris.jsx';
 import DiagnosticFavoris from './DiagnosticFavoris.jsx';
 import {RAISONS_FAVORIS,progressionFavoris,dureeFavoris} from './favorisProgression.js';
+import {groupesFavoris,resumeOffre} from './favorisEcran.js';
 // La photo vient du CDN de Vinted : elle passe par `PhotoVinted` (sans référent,
 // secours par l'extension, pictogramme), fourni par l'app. Sans lui, aucune
 // image : une photo Vinted affichée hors de la règle partirait cassée.
@@ -26,7 +27,8 @@ function PhotoNotification({src, PhotoVinted}) {
 const ETAPES=[['choix','1. Choisir'],['message','2. Message'],['envoi','3. Envoi']];
 const ETAT_ENVOI={attente:'En attente',reserve:'En cours…',envoye:'Envoyé',ignore:'Conversation déjà commencée — rien envoyé',incertain:'À vérifier sur Vinted',annule:'Annulé — non envoyé',verifie:'Clôturé après vérification',refuse:'Interrompu'};
 
-export default function FavorisVinted({uid,owner,ownerActuel,base,headers,nomCompte,executerFavori,favorisDisponible=false,favorisRaison='',favorisPerso=false,verifierExtension,recupererPage,ouvrirFavori,chargementAutomatique=false,PhotoVinted=null,ecranActif=true,FermeAuRetour=null,articlesVendus=AUCUN_ARTICLE_VENDU,extensionAuto=null}) {
+export default function FavorisVinted({uid,owner,ownerActuel,base,headers,nomCompte,executerFavori,favorisDisponible=false,favorisRaison='',favorisPerso=false,verifierExtension,recupererPage,ouvrirFavori,chargementAutomatique=false,PhotoVinted=null,ecranActif=true,FermeAuRetour=null,articlesVendus=AUCUN_ARTICLE_VENDU,extensionAuto=null,articleFavori=null}) {
+  const [vueAuto,setVueAuto]=React.useState(null),[groupesOuverts,setGroupesOuverts]=React.useState({});
   const [etat,setEtat]=React.useState({}),[selection,setSelection]=React.useState([]),[message,setMessage]=React.useState(''),[retour,setRetour]=React.useState(''),[max,setMax]=React.useState(50);
   // L'offre (29 oct., comme Vintex) : aucune · diminuer (% ou €) · fixer à un prix ; arrondi à l'euro.
   const [offreChoix,setOffreChoix]=React.useState('aucune'),[typeDim,setTypeDim]=React.useState('pct'),[montantOffre,setMontantOffre]=React.useState(''),[arrondi,setArrondi]=React.useState(false),champMessage=React.useRef(null);
@@ -52,7 +54,7 @@ export default function FavorisVinted({uid,owner,ownerActuel,base,headers,nomCom
   const inserer=t=>{const el=champMessage.current,a=el?.selectionStart??message.length,b=el?.selectionEnd??message.length;const suite=(message.slice(0,a)+t+message.slice(b)).slice(0,2000);setMessage(suite);change();requestAnimationFrame(()=>{try{el?.focus();el?.setSelectionRange(a+t.length,a+t.length);}catch{}});};
   const requete=React.useRef(0),occupe=React.useRef(false);
   const scope=owner+':'+uid, data=etat.scope===scope?etat.data:undefined;
-  React.useEffect(()=>{requete.current++;occupe.current=false;setEtat({});setHistorique(null);setPreparation(false);setImportation(false);setOuverture('');setVerifications({});setControle(null);setControleEnvoi(null);setErreurOuverture('');ouvrirEnCours.current=false;retourVinted.current=false;setFiltre('tous');setRecherche('');annulerImport.current=true;setSelection([]);setMessage('');setReduction('');setOffreChoix('aucune');setTypeDim('pct');setMontantOffre('');setArrondi(false);setIntervalle('6');setRythme('fixe');setIntervalleMax('12');setReglages({});setFeuille(false);setEtape('choix');reglagesLus.current=false;edition.current=0;sauvegarde.current=false;setRetour('');setMax(50);return()=>{requete.current++;};},[uid,owner]);
+  React.useEffect(()=>{requete.current++;occupe.current=false;setEtat({});setHistorique(null);setPreparation(false);setImportation(false);setOuverture('');setVerifications({});setControle(null);setControleEnvoi(null);setErreurOuverture('');ouvrirEnCours.current=false;retourVinted.current=false;setFiltre('tous');setRecherche('');annulerImport.current=true;setSelection([]);setMessage('');setReduction('');setOffreChoix('aucune');setTypeDim('pct');setMontantOffre('');setArrondi(false);setIntervalle('6');setRythme('fixe');setIntervalleMax('12');setReglages({});setFeuille(false);setEtape('choix');reglagesLus.current=false;edition.current=0;sauvegarde.current=false;setRetour('');setMax(50);setVueAuto(null);setGroupesOuverts({});return()=>{requete.current++;};},[uid,owner]);
   const charger=async()=>{
     if(occupe.current||sauvegarde.current)return;
     const n=++requete.current;occupe.current=true;setEtat({scope,charge:true});setSelection([]);setRetour('');
@@ -247,24 +249,56 @@ export default function FavorisVinted({uid,owner,ownerActuel,base,headers,nomCom
       <div className="vrm-favoris-feuille-pied">
         {etape!=='choix'?<button type="button" disabled={selectionVerrouillee} onClick={()=>setEtape(etape==='envoi'?'message':'choix')}>← Retour</button>:<span/>}
         {etape==='choix'&&<button type="button" className="is-principal" disabled={!selection.length} onClick={()=>setEtape('message')}>Continuer · {selection.length}</button>}
-        {etape==='message'&&<button type="button" className="is-principal" disabled={!selection.length||!apercu.message||!!apercu.erreur} onClick={()=>setEtape('envoi')}>Continuer</button>}
+        {etape==='message'&&(selection.length?<button type="button" className="is-principal" disabled={!apercu.message||!!apercu.erreur} onClick={()=>setEtape('envoi')}>Continuer</button>
+          :<button type="button" className="is-principal" data-favoris-enregistrer-message disabled={!reglages.prets||reglages.sauvegarde||!apercu.message||!!apercu.erreur||!!erreurRythme} onClick={async()=>{if(await enregistrer()){setRetour('Message enregistré. Rien n’est envoyé.');setFeuille(false);}}}>{reglages.sauvegarde?'Enregistrement…':'Enregistrer'}</button>)}
       </div>
     </div>
   </div>;
 
-  return <section className="vrm-favoris-liste" aria-label="Favoris reçus">
-    <header><div><h3>Favoris reçus</h3><small>{nomCompte||(uid?'Compte Vinted sélectionné':'Choisis le compte à consulter')}</small></div><div className="vrm-favoris-actions"><button type="button" onClick={charger} disabled={preparation||!uid||!owner||etat.charge||reglages.sauvegarde||importation} title={etat.charge?'Lecture en cours…':!uid?'Choisis d’abord le compte Vinted à consulter.':!owner?'Connecte-toi à VRM pour lire tes favoris.':preparation||importation?'Une préparation est en cours : attends qu’elle finisse.':reglages.sauvegarde?'Tes réglages s’enregistrent : un instant.':undefined}>{etat.charge?'Lecture…':data?'Actualiser':'Afficher les favoris'}</button></div></header>
+  // ── L'ÉCRAN (2 nov., « plus simple ») : le mode auto, ton message, puis une
+  // ligne par favori rangée par état — la phrase et le geste en tête de groupe.
+  const journalAuto=(vueAuto?.auto||vueFile?.auto)?.journal||[];
+  const ligneParId=new Map(lignes.map(x=>[x.id,x]));
+  const groupes=data?groupesFavoris({lignes,statut,journal:journalAuto,vendue,article:id=>{try{return articleFavori?.(id)||null;}catch{return null;}},maintenant}):[];
+  const modifierMessage=()=>{if(!data&&!etat.charge)charger();setEtape('message');setFeuille(true);};
+  const ouvrirEnvoi=()=>{if(!data&&!etat.charge)charger();setEtape('envoi');setFeuille(true);};
+  const messageAffiche=message.trim()||(offreChoix!=='aucune'?MESSAGE_PAR_DEFAUT:'');
+  const PAR_GROUPE=6;
+  const sansPhoto=<span className="vrm-favoris-photo" aria-hidden="true"/>;
+  const photoLigne=x=>x.photo&&PhotoVinted?<PhotoVinted src={x.photo} alt="" loading="lazy" repli={sansPhoto}/>:sansPhoto;
+  return <section className="vrm-favoris-liste vrm-fav-ecran" aria-label="Favoris reçus" data-fav-ecran>
+    <header><div><h3>Messages aux favoris</h3><small>{nomCompte||(uid?'Compte Vinted sélectionné':'Choisis le compte à consulter')}</small></div><div className="vrm-favoris-actions"><button type="button" onClick={charger} disabled={preparation||!uid||!owner||etat.charge||reglages.sauvegarde||importation} title={etat.charge?'Lecture en cours…':!uid?'Choisis d’abord le compte Vinted à consulter.':!owner?'Connecte-toi à VRM pour lire tes favoris.':preparation||importation?'Un envoi se prépare : attends qu’il finisse.':reglages.sauvegarde?'Ton message s’enregistre : un instant.':undefined}>{etat.charge?'Lecture…':data?'Actualiser':'Afficher les favoris'}</button></div></header>
     {!uid&&<p className="vrm-favoris-note">Choisis un compte Vinted dans le sélecteur au-dessus pour afficher ses favoris.</p>}
-    {!feuille&&alertes}
-    {data&&<>
-      <p className="vrm-favoris-note">{data.reception==='absente'?'Aucune capture reçue pour ce compte. Ouvre la cloche Vinted avec l’extension connectée, puis actualise.':`${lignes.length} favori${lignes.length>1?'s':''} reçu${lignes.length>1?'s':''}. ${data.archive?.sync?.complete&&!data.archive?.limite?'Toutes les pages de la dernière lecture sont conservées.':'Historique à compléter.'}`}{data.totalPages>1?` Vinted indique ${data.totalPages} pages de notifications.`:''}</p>
-      <div className="vrm-favoris-resume" data-favoris-resume><span><b>{compter('contacter')}</b> à contacter</span><span><b>{compter('envoyes')}</b> déjà envoyé{compter('envoyes')>1?'s':''}</span><span><b>{compter('contactes')}</b> en conversation</span></div>
-    </>}
-    {(fileActive||!!p.total)&&<div className="vrm-favoris-file-resume" data-favoris-file={fileActive?'active':'finie'} role="status">{fileActive?<>Envoi en cours : <b>{p.termines} / {p.total}</b> traités · {p.envoyes} envoyé{p.envoyes>1?'s':''}{p.secondes>0?` · prochain dans ${dureeFavoris(p.secondes)}`:''}{rythmeTexte?` · ${rythmeTexte}`:''}</>:<>Dernier envoi : {p.envoyes} envoyé{p.envoyes>1?'s':''} sur {p.total}{p.incertains?` · ${p.incertains} à vérifier sur Vinted`:''}{p.refuses?` · ${p.refuses} interrompu${p.refuses>1?'s':''}`:''}</>}</div>}
-    {uid&&owner&&<ModeAutoFavoris uid={uid} owner={owner} ownerActuel={ownerActuel} headers={headers} nomCompte={nomCompte} extensionAuto={extensionAuto}/>}
-    {uid&&owner&&<div className="vrm-favoris-outils">
+    {uid&&owner&&<ModeAutoFavoris uid={uid} owner={owner} ownerActuel={ownerActuel} headers={headers} nomCompte={nomCompte} extensionAuto={extensionAuto} onVue={setVueAuto}/>}
+    {uid&&owner&&<div className="vrm-fav-message" data-fav-message={!reglages.prets?(reglages.erreur?'erreur':'lecture'):messageAffiche?'pret':'vide'}>
+      <div className="vrm-fav-message-tete"><h4>Ton message</h4><button type="button" className="vrm-fav-lien" data-fav-message-modifier disabled={preparation||fileActive} onClick={modifierMessage}>Modifier</button></div>
+      {!reglages.prets?<p className="vrm-favoris-note">{reglages.erreur||'Lecture…'}</p>
+        :messageAffiche?<><p className="vrm-fav-message-texte" data-fav-message-texte>{messageAffiche}</p><p className="vrm-favoris-note" data-fav-message-offre>{resumeOffre(offre)}{!reglages.enregistres?' Pas encore enregistré.':''}</p></>
+        :<p className="vrm-fav-geste" data-fav-geste>Aucun message enregistré : touche « Modifier » pour l’écrire.</p>}
       <button type="button" className="is-principal" data-favoris-ouvrir disabled={importation} onClick={ouvrirFeuille}>{fileActive?'Suivre l’envoi en cours':'Envoyer un message aux favoris'}</button>
     </div>}
+    {!feuille&&alertes}
+    {data&&data.reception==='absente'&&<p className="vrm-fav-geste" data-fav-geste data-fav-vide="absente">VRM n’a encore vu aucun favori sur ce compte : ouvre la cloche de Vinted avec ce compte, puis Actualiser.</p>}
+    {data&&data.reception!=='absente'&&!lignes.length&&<p className="vrm-favoris-note" data-fav-vide="aucun">Aucun favori pour l’instant.</p>}
+    {!!groupes.length&&<div className="vrm-fav-groupes">{groupes.map(g=>{
+      const ouvert=groupesOuverts[g.cle]===true,vues=ouvert?g.lignes:g.lignes.slice(0,PAR_GROUPE);
+      const phrase=g.code==='en_cours'&&fileActive&&p.secondes>0?`${g.phrase} Prochain dans ${dureeFavoris(p.secondes)}.`:g.phrase;
+      return <section key={g.cle} className="vrm-fav-groupe" data-fav-groupe={g.code} data-fav-raison={g.raison||undefined} data-fav-ton={g.ton} aria-label={g.titre}>
+        <header className="vrm-fav-groupe-tete">
+          <div><h4>{g.titre} <span className="vrm-fav-compte" data-fav-compte={g.lignes.length}>{g.lignes.length}</span></h4>
+            {phrase&&<p className="vrm-fav-phrase" data-fav-phrase>{phrase}</p>}
+            {g.geste&&<p className="vrm-fav-geste" data-fav-geste>{g.geste}</p>}</div>
+          {g.code==='a_verifier'&&<button type="button" onClick={ouvrirEnvoi}>Vérifier</button>}
+          {g.code==='en_cours'&&<button type="button" onClick={ouvrirEnvoi}>Suivre</button>}
+        </header>
+        <ul className="vrm-fav-lignes">{vues.map(x=><li key={x.id} data-fav-ligne={x.id} data-fav-etat={g.code} {...(x.numero?{'data-fav-numero':x.numero}:{})} {...(x.dateEnvoi?{'data-fav-envoye-le':x.dateEnvoi}:{})}>
+          <span className="vrm-fav-photo">{photoLigne(x)}</span>
+          <div className="vrm-fav-ligne-texte"><strong data-fav-pseudo>{x.pseudo||'Pseudo non lu'}</strong>{(x.numero||x.titre)&&<span data-fav-annonce>{x.numero?<b>N° {x.numero}</b>:null}{x.numero&&x.titre?' · ':''}{x.titre}</span>}</div>
+          <time className="vrm-fav-quand" dateTime={x.dateEnvoi||undefined}>{x.detail}</time>
+          {x.ouvrir&&ouvrirFavori&&ligneParId.get(x.id)&&<button type="button" className="vrm-fav-ouvrir" data-fav-ouvrir disabled={!!ouverture||importation||fileActive} aria-label={`Ouvrir sur Vinted le favori de ${x.pseudo||'cette personne'}`} onClick={()=>ouvrir(ligneParId.get(x.id))}>{ouverture===x.id?'…':'Ouvrir'}</button>}
+        </li>)}</ul>
+        {g.lignes.length>PAR_GROUPE&&<button type="button" className="vrm-fav-lien" onClick={()=>setGroupesOuverts(o=>({...o,[g.cle]:!ouvert}))}>{ouvert?'Voir moins':'Voir tout'}</button>}
+      </section>;})}</div>}
     {uid&&owner&&(typeof document!=='undefined'?createPortal(contenuFeuille,document.body):contenuFeuille)}
     {!feuille&&assistance}
   </section>;
