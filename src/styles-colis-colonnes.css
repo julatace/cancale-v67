@@ -123,3 +123,5 @@ button.vrm-cc-carte:focus-visible { outline: 2px solid var(--vrm-focus, #0071E3)
   .vrm-colis-retirer { max-width: 900px; }
 }
 .vrm-rp-suivi { font-family: var(--vrm-police-mono, ui-monospace, monospace); font-size: 11.5px; letter-spacing: .02em; color: var(--vrm-muted, #56564F); overflow-wrap: anywhere; }
+/* « J'ai retiré » garde sa hauteur (44 px) : la règle commune l'étirait à la hauteur du code. */
+.vrm-main .vrm-rp-gestes .vrm-pickup-collect { align-self: center !important; height: 44px; }
