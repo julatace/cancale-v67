@@ -508,6 +508,12 @@ async function accessToken(owner, suffixe = '') {
     body: `grant_type=refresh_token&refresh_token=${encodeURIComponent(refresh)}`,
   });
   const j = await r.json().catch(() => ({}));
+  // (2 nov., audit P3) eBay REFUSE la connexion (mot de passe changé, accès retiré,
+  // 18 mois écoulés) : `invalid_grant`. Chaque geste répondait « Impossible de
+  // rafraîchir le jeton » sans dire quoi faire, et le compte restait « relié ».
+  // ⇒ une raison à part, `reconnecter`, et le geste dit (règle §2.7).
+  if (!r.ok && (r.status === 400 || r.status === 401) && j && j.error === 'invalid_grant') return { ok: false, status: 401,
+    reason: 'reconnecter', error: 'eBay a refusé la connexion de ce compte (mot de passe changé, accès retiré ou connexion trop ancienne). Reconnecte-le : Paramètres → Compte eBay → « Déconnecter » ce compte, puis connecte-le à nouveau.', detail: String(j.error_description || '') };
   if (!r.ok || !j.access_token) return { ok: false, status: r.status >= 500 ? 502 : (r.status || 502),
     reason: 'refresh-failed', error: 'Impossible de rafraîchir le jeton eBay', detail: (j && (j.error_description || j.error)) || '' };
   return { ok: true, token: j.access_token, expires_in: j.expires_in || null };

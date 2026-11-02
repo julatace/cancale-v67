@@ -39,16 +39,19 @@
   unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
 }
 :root {
-  --vrm-police: 'Bricolage Grotesque', 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
-  --vrm-police-mono: 'Geist Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+  /* (2 nov., Julien : « copie le style simple et minimaliste d'Apple ») La police
+     SYSTÈME d'Apple : SF Pro sur iPhone, iPad et Mac, Segoe UI / Roboto ailleurs.
+     Les N° gardent leurs chiffres alignés (tabular-nums), sans chasse fixe. */
+  --vrm-police: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Display', 'Inter', 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --vrm-police-mono: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Inter', 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
   --vrm-r-sm: 10px; --vrm-r-md: 14px; --vrm-r-lg: 14px;
   --vrm-ombre-flottante: 0 1px 2px rgba(15,15,14,.06), 0 10px 28px rgba(15,15,14,.12);
   --vrm-t-title: 34px; --vrm-t-section: 22px;
   --vrm-b-h: 44px;
 }
 @media (min-width: 1024px), (min-width: 768px) and (hover: hover) and (pointer: fine) { :root { --vrm-t-title: 44px; --vrm-t-section: 26px; } }
-:root[data-theme="dark"] { --vrm-ombre-flottante: 0 10px 28px rgba(0,0,0,.45); --vrm-focus: #6F86E8; }
-:root[data-theme="light"] { --vrm-focus: #2442B8; }
+:root[data-theme="dark"] { --vrm-ombre-flottante: 0 10px 28px rgba(0,0,0,.45); --vrm-focus: #0A84FF; }
+:root[data-theme="light"] { --vrm-focus: #0071E3; }
 
 html body, html body :is(button, input, select, textarea),
 html .vrm-app-shell, body > :not(#root) {
@@ -56,11 +59,12 @@ html .vrm-app-shell, body > :not(#root) {
   font-optical-sizing: auto;
 }
 html body { font-feature-settings: "tnum" 1; }
-html :is(h1, h2, h3, .vrm-display) { font-family: var(--vrm-police) !important; font-weight: 800; letter-spacing: -.02em; }
+html :is(h1, h2, h3, .vrm-display) { font-family: var(--vrm-police) !important; font-weight: 700; letter-spacing: -.022em; }
 /* Les N° et les codes : la police à chasse fixe, comme une étiquette de carton. */
 html .vrm-app-shell :is(.vrm-colis-num, .vrm-apub-num, .vrm-tout-num-ligne, [data-edition="numero"], .vrm-pickup-code, .vrm-code-retrait),
 html .vrm-app-shell .vrm-fiche-num {
-  font-family: var(--vrm-police-mono) !important; font-weight: 500 !important; letter-spacing: 0 !important;
+  font-family: var(--vrm-police-mono) !important; font-weight: 600 !important; letter-spacing: 0 !important;
+  font-variant-numeric: tabular-nums;
 }
 
 /* ── 1. LE FOND : blanc franc, sans lueur ni grain ───────────────────────── */
@@ -385,14 +389,14 @@ html .vrm-app-shell .vrm-inbox-row.is-current { box-shadow: inset 3px 0 var(--vr
 html .vrm-app-shell .vrm-finance-metric.is-primary { background: var(--vrm-surface) !important; border-color: transparent !important; }
 html .vrm-app-shell .vrm-finance-metric.is-primary * { color: var(--vrm-ink) !important; }
 .vrm-bienvenue {
-  --b-carte: #FFFFFF; --b-encre: #0F0F0E; --b-doux: #56564F; --b-filet: #E4E4DF; --b-sol: #F5F5F3; --b-accent: #2442B8;
+  --b-carte: #FFFFFF; --b-encre: #0F0F0E; --b-doux: #56564F; --b-filet: #E4E4DF; --b-sol: #F5F5F3; --b-accent: #0071E3;
   backdrop-filter: none; -webkit-backdrop-filter: none;
 }
 :root[data-theme="dark"] .vrm-bienvenue {
-  --b-carte: #1A1A18; --b-encre: #F2F2EE; --b-doux: #B0B0A8; --b-filet: #2E2E2B; --b-sol: #0E0E0D; --b-accent: #6F86E8;
+  --b-carte: #1A1A18; --b-encre: #F2F2EE; --b-doux: #B0B0A8; --b-filet: #2E2E2B; --b-sol: #0E0E0D; --b-accent: #0A84FF;
 }
 /* (1er nov.) En sombre, le texte du bouton principal suit `onAccent` de Vitrine
-   (encre sombre) : le blanc sur #6F86E8 ne se lisait qu'à ~3:1. */
+   (encre sombre) : le blanc sur #0A84FF ne se lisait qu'à ~3:1. */
 :root[data-theme="dark"] .vrm-bienvenue-principal { color: #0E0E0D; }
 /* Le voile sous une feuille : une ombre de la page, sans flou de verre. */
 .vrm-sheet-voile { -webkit-backdrop-filter: none !important; backdrop-filter: none !important; }

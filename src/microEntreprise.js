@@ -116,7 +116,9 @@ export const jaugeSeuils = ({ ligne, now = new Date() } = {}) => {
 export const optionsMicro = (v) => {
   const o = v && typeof v === 'object' ? v : {};
   const lib = o.liberatoire === 'oui' || o.liberatoire === 'non' ? o.liberatoire : null;
-  return { liberatoire: lib, acre: o.acre === true, at: Number(o.at) || 0 };
+  // (2 nov.) ACRE : false · 'avant' (début avant le 1er juillet 2026, ou l'ancien « oui ») · 'apres'.
+  const acre = o.acre === 'apres' ? 'apres' : (o.acre === true || o.acre === 'avant') ? 'avant' : false;
+  return { liberatoire: lib, acre, at: Number(o.at) || 0 };
 };
 
 // Le calendrier de paiement. Mensuel : le CA du mois M se déclare ET se paie

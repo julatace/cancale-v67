@@ -108,13 +108,13 @@ const LEGAL = [
 const ANCRES = [['colis', 'Colis'], ['ailleurs', 'Vendu ailleurs'], ['urssaf', 'URSSAF'], ['prix', 'Prix'], ['faq', 'Questions']];
 
 const CSS = `
-.acc{position:relative;background:${K.bg};color:${K.text};min-height:100vh;font-family:'Bricolage Grotesque','Inter',system-ui,-apple-system,'Segoe UI',sans-serif;overflow-x:clip;-webkit-font-smoothing:antialiased;font-variant-numeric:normal;font-feature-settings:normal}
+.acc{position:relative;background:${K.bg};color:${K.text};min-height:100vh;font-family:-apple-system,BlinkMacSystemFont,'Inter',system-ui,-apple-system,'Segoe UI',sans-serif;overflow-x:clip;-webkit-font-smoothing:antialiased;font-variant-numeric:normal;font-feature-settings:normal}
 @supports not (overflow-x:clip){.acc{overflow-x:hidden}}
 .acc *{box-sizing:border-box}
 .acc a{color:inherit}
 .acc :focus-visible{outline:2px solid ${K.accent};outline-offset:2px;border-radius:8px}
 .acc button,.acc a{-webkit-tap-highlight-color:transparent;touch-action:manipulation}
-:where(.acc) h1,:where(.acc) h2,:where(.acc) h3{font-family:'Bricolage Grotesque','Inter',system-ui,sans-serif;margin:0;color:${K.text}}
+:where(.acc) h1,:where(.acc) h2,:where(.acc) h3{font-family:-apple-system,BlinkMacSystemFont,'Inter',system-ui,sans-serif;margin:0;color:${K.text}}
 :where(.acc) p{margin:0}
 .acc-in{max-width:1180px;margin:0 auto;padding:0 20px}
 .acc-sentinelle{position:absolute;top:8px;left:0;width:1px;height:1px;pointer-events:none}
@@ -128,14 +128,14 @@ const CSS = `
 .acc .cj-lib img.vrm-brand-asset{padding:0;border-radius:3px}
 .acc-marque{display:flex;align-items:center;gap:10px;flex-shrink:0;text-decoration:none}
 .acc-marque img{width:36px;height:36px;border-radius:9px;display:block;object-fit:contain;background:${K.ink};padding:2px;box-sizing:border-box}
-.acc-marque b{font-family:'Bricolage Grotesque','Inter',sans-serif;font-size:19px;font-weight:700;letter-spacing:.04em}
+.acc-marque b{font-family:-apple-system,BlinkMacSystemFont,'Inter',sans-serif;font-size:19px;font-weight:700;letter-spacing:.04em}
 .acc-ancres{display:flex;gap:2px;margin-left:22px}
 .acc-ancres a{color:${K.muted};font-size:14px;font-weight:500;padding:8px 10px;border-radius:8px;text-decoration:none;transition:color 160ms ease}
 @media (hover:hover) and (pointer:fine){.acc-ancres a:hover{color:${K.text}}}
 .acc-nav-droite{margin-left:auto;display:flex;align-items:center;gap:6px}
 
 /* Les boutons : une forme, trois poids. */
-.acc .acc-btn{position:relative;display:inline-flex;align-items:center;justify-content:center;gap:10px;height:48px;min-height:0;padding:0 20px;border-radius:10px;border:none;cursor:pointer;font-family:'Bricolage Grotesque','Inter',system-ui,sans-serif;font-size:15px;font-weight:600;letter-spacing:-.005em;white-space:nowrap;text-decoration:none;filter:none;transition:transform 120ms ${COURBE_SORTIE},box-shadow 160ms ${COURBE_SORTIE},opacity 180ms ${COURBE_SORTIE}}
+.acc .acc-btn{position:relative;display:inline-flex;align-items:center;justify-content:center;gap:10px;height:48px;min-height:0;padding:0 20px;border-radius:10px;border:none;cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,'Inter',system-ui,sans-serif;font-size:15px;font-weight:600;letter-spacing:-.005em;white-space:nowrap;text-decoration:none;filter:none;transition:transform 120ms ${COURBE_SORTIE},box-shadow 160ms ${COURBE_SORTIE},opacity 180ms ${COURBE_SORTIE}}
 .acc .acc-p{background:${K.cta};color:#FFFFFF;box-shadow:none}
 .acc .acc-btn:active:not(:disabled){transform:scale(.97);filter:none}
 .acc .acc-btn:hover{filter:none}
@@ -144,7 +144,7 @@ const CSS = `
   .acc .acc-p:hover{box-shadow:none;background:#1C3594}
   .acc .acc-btn:hover .acc-chev{transform:translateX(2px)}
 }
-.acc .acc-lien{display:inline-flex;align-items:center;min-height:44px;padding:0 6px;border:none;background:none;cursor:pointer;font-family:'Bricolage Grotesque','Inter',system-ui,sans-serif;font-size:14px;font-weight:500;color:${K.muted};text-decoration:none;filter:none}
+.acc .acc-lien{display:inline-flex;align-items:center;min-height:44px;padding:0 6px;border:none;background:none;cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,'Inter',system-ui,sans-serif;font-size:14px;font-weight:500;color:${K.muted};text-decoration:none;filter:none}
 .acc .acc-lien b{font-weight:600;color:${K.text};margin-left:4px}
 @media (hover:hover) and (pointer:fine){.acc .acc-lien:hover b,.acc .acc-lien:hover{text-decoration:underline;text-underline-offset:3px;text-decoration-thickness:1px}}
 .acc .acc-lien:active:not(:disabled){transform:none}
@@ -196,7 +196,7 @@ const CSS = `
 @keyframes accCarte3D{from{transform:rotateX(14deg) translateY(10px)}to{transform:rotateX(0) translateY(0)}}
 @media (prefers-reduced-motion:reduce){.acc-tilt{animation:none!important;transition:none!important;transform:none!important}}
 .acc-carte-jour > .acc-revoir-l{position:absolute;left:0;right:0;top:100%;height:34px;display:flex;justify-content:flex-end;align-items:center;max-width:500px}
-.acc .acc-revoir{display:inline-flex;align-items:center;gap:6px;min-height:32px;padding:0 4px;border:none;background:none;cursor:pointer;font-family:'Bricolage Grotesque','Inter',system-ui,sans-serif;font-size:13px;font-weight:500;color:${K.muted};animation:accApparait 200ms ${COURBE_SORTIE} both}
+.acc .acc-revoir{display:inline-flex;align-items:center;gap:6px;min-height:32px;padding:0 4px;border:none;background:none;cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,'Inter',system-ui,sans-serif;font-size:13px;font-weight:500;color:${K.muted};animation:accApparait 200ms ${COURBE_SORTIE} both}
 @media (hover:hover) and (pointer:fine){.acc .acc-revoir:hover{color:${K.text}}}
 @keyframes accApparait{from{opacity:0}to{opacity:1}}
 
@@ -275,7 +275,7 @@ const CSS = `
 .acc-qs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-top:16px}
 .acc-q{background:${K.card};border:1px solid ${K.line};border-radius:12px;padding:18px;box-shadow:${REFLET}}
 .acc-q .acc-icone{color:${K.muted};flex-shrink:0;margin-top:1px}
-.acc-q h3{display:flex;align-items:flex-start;gap:10px;font-family:'Bricolage Grotesque','Inter',system-ui,sans-serif;font-size:15px;font-weight:600;line-height:1.35;letter-spacing:-.005em}
+.acc-q h3{display:flex;align-items:flex-start;gap:10px;font-family:-apple-system,BlinkMacSystemFont,'Inter',system-ui,sans-serif;font-size:15px;font-weight:600;line-height:1.35;letter-spacing:-.005em}
 .acc-q p{font-size:14px;line-height:1.45;color:${K.muted};margin-top:6px}
 /* Les cartes répondent sous le curseur (sur SOURIS seulement — sur mobile un
    survol reste collé après un tap, et la carte-question y est de toute façon
@@ -298,7 +298,7 @@ const CSS = `
 .acc-etapes{list-style:none;margin:24px 0 0;padding:0;display:flex;flex-direction:column;gap:18px}
 .acc-etapes li{display:flex;gap:14px;align-items:flex-start}
 .acc-etapes .n{width:28px;height:28px;border-radius:8px;background:${K.card2};border:1px solid ${K.line2};display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;color:${K.text};flex-shrink:0}
-.acc-etapes h3{font-family:'Bricolage Grotesque','Inter',system-ui,sans-serif;font-size:16px;font-weight:600;line-height:1.35;letter-spacing:0;margin-top:3px}
+.acc-etapes h3{font-family:-apple-system,BlinkMacSystemFont,'Inter',system-ui,sans-serif;font-size:16px;font-weight:600;line-height:1.35;letter-spacing:0;margin-top:3px}
 .acc-etapes p{font-size:15px;line-height:1.55;color:${K.muted};margin-top:3px}
 .acc-conf p{font-size:15px;line-height:1.6;color:${K.muted};margin-top:14px}
 .acc-conf p:first-of-type{margin-top:24px;color:${K.text}}
@@ -309,7 +309,7 @@ const CSS = `
 .acc-prix{background:${K.card};border:1px solid ${K.line2};border-radius:12px;padding:28px;box-shadow:${REFLET},${OMBRE_CARTE}}
 .acc-offert{display:inline-flex;font-size:13px;font-weight:600;color:${K.text};background:${K.card2};border:1px solid ${K.line2};border-radius:8px;padding:4px 10px;margin-top:16px}
 .acc-gros{display:flex;align-items:baseline;gap:10px;margin-top:12px}
-.acc-gros b{font-family:'Bricolage Grotesque','Inter',sans-serif;font-size:52px;font-weight:700;letter-spacing:-.02em;line-height:1;font-variant-numeric:tabular-nums}
+.acc-gros b{font-family:-apple-system,BlinkMacSystemFont,'Inter',sans-serif;font-size:52px;font-weight:700;letter-spacing:-.02em;line-height:1;font-variant-numeric:tabular-nums}
 .acc-gros span{font-size:16px;color:${K.muted}}
 .acc-prix ul{list-style:none;margin:16px 0 0;padding:0;display:flex;flex-direction:column;gap:4px;font-size:15px;line-height:1.5;color:${K.text}}
 .acc-prix .petit{font-size:14px;line-height:1.5;color:${K.muted};margin-top:14px}
