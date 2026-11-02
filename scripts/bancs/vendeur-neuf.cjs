@@ -54,7 +54,7 @@ const ecouter = () => new Promise((res, rej) => {
 async function rendre(nav, { tab, proprietaire = false, baseKO = false, telephone = false, apres = null }) {
   const ctx = await nav.newContext(telephone ? { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true } : { viewport: { width: 1512, height: 950 } });
   const pg = await ctx.newPage();
-  await pg.addInitScript((s) => { try { localStorage.setItem('vrm_session', JSON.stringify(s)); localStorage.setItem('vrm_bienvenue_vue', '1'); localStorage.setItem('vrm_base_ko_depuis', new Date(Date.now() - 3 * 3600e3).toISOString()); } catch (_) {} }, SESSION);
+  await pg.addInitScript((s) => { try { localStorage.setItem('vrm_session', JSON.stringify(s)); localStorage.setItem('vrm_bienvenue_vue', '1'); localStorage.setItem('vrm_visite_vue', '1'); localStorage.setItem('vrm_base_ko_depuis', new Date(Date.now() - 3 * 3600e3).toISOString()); } catch (_) {} }, SESSION);
   await pg.route(/^https?:\/\/(?!localhost)/, (r) => r.abort());
   await pg.route('**/auth/v1/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ access_token: 'jeton-de-banc', refresh_token: 'r', expires_in: 3600, user: SESSION.user, factors: [] }) }));
   await pg.route('**/rest/v1/**', (r) => {

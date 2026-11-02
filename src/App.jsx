@@ -66,6 +66,9 @@ const Operations = lazy(() => import("./operations/Operations.jsx"));
 const Communaute = lazy(() => import("./communaute/Communaute.jsx"));
 import { createPortal, flushSync } from "react-dom";
 import Bienvenue from "./Bienvenue.jsx";
+import VisiteBulles from "./VisiteBulles.jsx";
+import { CLE_VISITE } from "./visiteBulles.js";
+import { PHRASES_ECRAN } from "./phrasesEcran.js";
 import { VAPID_PUBLIC_KEY } from "./vapid.js";
 import { noterPlantage, viderPlantages, ecouterViolationsCspDans } from "./plantages.js";
 import * as photosVinted from "./photosVinted.js";
@@ -1899,6 +1902,9 @@ const SYNC_KEYS = [
   'vinted_goal','vinted_regime','vrm_micro_options','vinted_tva','vinted_bordereau_formats','vinted_bords_printed','vrm_imprimante','vrm_prenom','vrm_num_prefixe',
   // (27 oct.) La présentation d'arrivée a été vue (ou passée) : ne revient pas sur un autre appareil.
   'vrm_bienvenue_vue',
+  // (2 nov.) La visite en bulles a été vue (ou passée) : elle ne revient ni après
+  // un rechargement ni sur un autre appareil (src/visiteBulles.js, CLE_VISITE).
+  'vrm_visite_vue',
   // (28 oct., 5.252) Les brouillons qu'il a retirés de la liste (« plus sur Vinted »).
   'vrm_brouillons_ecartes',
   // (28 oct.) Les « brouillons à refaire » qu'il a déclarés réglés (faits à la main sur Vinted).
@@ -14341,15 +14347,21 @@ const GROUPES_PLUS=[
     {id:'compta',    icon:'euro',  label:'Comptabilité'},
   ]},
   { titre:'Plateformes', ordi:true, items:[
-    {id:'ebay_agent',     cle:'plat_ebay',      icon:'grid', site:'ebay',      label:'eBay',      desc:'Ventes · eBay : commandes, à traiter, offres'},
-    {id:'leboncoin',      cle:'plat_leboncoin', icon:'tag',  site:'leboncoin', label:'Leboncoin', desc:'Annonces · Leboncoin : à retirer, publier', avant:()=>{ DEMANDE_LBC_CIBLE.sel='[data-lbc-retirer]'; DEMANDE_LBC_CIBLE.at=Date.now(); }},
-    {id:'plat_vestiaire', cle:'plat_vestiaire', icon:'shop', site:'vestiaire', label:'Vestiaire', desc:'Annonces · Vestiaire : publier, ta clé Photoroom'},
+    {id:'ebay_agent',     cle:'plat_ebay',      icon:'grid', site:'ebay',      label:'eBay'},
+    {id:'leboncoin',      cle:'plat_leboncoin', icon:'tag',  site:'leboncoin', label:'Leboncoin', avant:()=>{ DEMANDE_LBC_CIBLE.sel='[data-lbc-retirer]'; DEMANDE_LBC_CIBLE.at=Date.now(); }},
+    {id:'plat_vestiaire', cle:'plat_vestiaire', icon:'shop', site:'vestiaire', label:'Vestiaire'},
   ]},
   { titre:'Moi', items:[
     {id:'communaute', icon:'pin',  label:'Communauté'},
     {id:'settings',   icon:'gear', label:'Paramètres'},
   ]},
 ];
+// ⚠️ (2 nov., Julien : « il ne doit pas y avoir des écritures partout à côté des
+// onglets, c'est vraiment dégueulasse ») UNE ENTRÉE DE NAVIGATION = UNE ICÔNE ET UN
+// NOM, rien d'autre : plus de `desc` (sous-ligne de « Plus », bulle `title` de la
+// colonne). Ce que fait un écran se montre UNE fois, dans la visite en bulles
+// (src/visiteBulles.js), puis l'onglet reste nu. Les pastilles-nombres (ambre =
+// geste) restent. Banc : scripts/bancs/demo-bulles.cjs (« onglets nus »).
 const cleEntree=(t)=>t.cle||t.id;
 // Les écrans qu'on ouvre ponctuellement — la liste à plat (titres, glisser,
 // audits) : chaque écran une fois.
@@ -15224,7 +15236,7 @@ function BadgeNav({ t, badges, place }) {
 // Tout tient sans défiler à 900 px de haut (styles-vitrine.css).
 function SideBar({ tab, setTab, entreprise, sites, badges }) {
   const groupes = groupesVisibles(sites, t => !t.tel, true);
-  const bouton=(t)=>{ const on=entreeActive(t, tab); return <button key={cleEntree(t)} type="button" className="vrm-rail-button" aria-label={t.label} title={t.desc?`${t.label} — ${t.desc}`:t.label} data-nav-entree={cleEntree(t)} onClick={()=>ouvrirEntree(t,setTab)} aria-current={on?'page':undefined}><NavigationIcon item={t} size={18}/><span className="vrm-rail-lib" aria-hidden="true">{t.label}</span><BadgeNav t={t} badges={badges} place="rail"/></button>; };
+  const bouton=(t)=>{ const on=entreeActive(t, tab); return <button key={cleEntree(t)} type="button" className="vrm-rail-button" aria-label={t.label} title={t.label} data-nav-entree={cleEntree(t)} onClick={()=>ouvrirEntree(t,setTab)} aria-current={on?'page':undefined}><NavigationIcon item={t} size={18}/><span className="vrm-rail-lib" aria-hidden="true">{t.label}</span><BadgeNav t={t} badges={badges} place="rail"/></button>; };
   // (30 oct., Edge sous Windows) Une fenêtre basse (1366×768 → 630 px utiles)
   // coupe le bas de la colonne, et la zone défile SANS barre visible : elle dit
   // de quel côté il en reste (`data-rail-suite`, un fondu en CSS), et l'entrée
@@ -15330,7 +15342,7 @@ function MenuEcrans({ tab, setTab, dark = false, bottom = false, sites = null, b
     return (
       <button key={cleEntree(t)} type="button" role="menuitem" className="vrm-sheet-row" data-nav-entree={cleEntree(t)} onClick={()=>{ ouvrirEntree(t, setTab); setOpen(false); }} aria-current={on?'page':undefined}>
         <span className="vrm-sheet-ic"><NavigationIcon item={t} size={19}/></span>
-        <span className="vrm-sheet-lib">{t.label}{t.desc ? <span className="vrm-sheet-desc">{t.desc}</span> : null}</span>
+        <span className="vrm-sheet-lib">{t.label}</span>
         <BadgeNav t={t} badges={badges} place="feuille"/>
         <span aria-hidden="true" className="vrm-sheet-fin"><Icon name={on?'check':'chevron'} size={on?17:16}/></span>
       </button>
@@ -48574,6 +48586,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               <div className="vrm-day-greeting vrm-w-tete">
                 <div className="vrm-day-hello" style={{color:C.text}}>{hello}{prenomLisible(prenom) ? ' ' + prenomLisible(prenom) : ''}</div>
                 <div className="vrm-day-date" style={{color:C.muted}}>{dateStr}</div>
+                <p className="vrm-phrase-ecran" data-phrase-ecran="journee">{PHRASES_ECRAN.journee}</p>
                 {!loading && jobs.length>0 && <div className="vrm-day-todo" style={{color:C.muted}}><b style={{color:C.text,fontWeight:600}}>{jobs.length} chose{jobs.length>1?'s':''}</b> à faire aujourd'hui</div>}
                 {!premierJour && !editJournee && (
                   <button type="button" className="vrm-w-modifier" data-widgets-modifier="" aria-label="Modifier les widgets de Ma journée" onClick={()=>setEditJournee(true)} style={{color:'var(--vrm-b-lien)',fontWeight:600}}>Modifier</button>
@@ -52084,7 +52097,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           // colonnes restent aussi : il y a quelque chose de LU à montrer.
           colisSansCompte = noAcc && !baseKO && vue.total === 0;
           if (colisSansCompte) return (<>
-            <ScreenHead icon="doc" title="Colis" sous="Rangés sur ce que tu peux faire maintenant"/>
+            <ScreenHead icon="doc" title="Colis" sous={<span className="vrm-phrase-ecran" data-phrase-ecran="colis">{PHRASES_ECRAN.colis}</span>}/>
             <div data-colis-sans-compte="">
               <EmptyState icon="link" title="Relie ton compte Vinted pour voir tes colis"
                 desc="Tant qu'aucun compte n'est relié, VRM ne lit rien : il ne peut pas encore dire ce qui est à envoyer, à retirer ou parti. Installe l'extension Chrome sur ton ordinateur, puis ouvre vinted.fr une fois, connecté à ton compte."
@@ -52092,7 +52105,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             </div>
           </>);
           return (<>
-            <ScreenHead icon="doc" title="Colis" sous="Rangés sur ce que tu peux faire maintenant"
+            <ScreenHead icon="doc" title="Colis" sous={<span className="vrm-phrase-ecran" data-phrase-ecran="colis">{PHRASES_ECRAN.colis}</span>}
               desc="Ce que Vinted attend de toi, capté par l'extension. Le bordereau manquant est généré tout seul quand tu passes sur Vinted, puis déposé ici. Un colis parti disparaît sans rien cocher."
               right={nPrets>0 && (siteColis==='toutes'||siteColis==='vinted') ? <Bouton variante="primaire" icone="printer" data-lot-ouvrir="1" data-imprimer-prets={nPrets} onClick={ouvrirLot} disabled={batchBusy}
                 title="Tamponne tous les bordereaux reçus (numéro + titre) et les met à la suite dans un seul PDF">{batchBusy?'Préparation…':`Imprimer ${nPrets===1?'le prêt':`les ${nPrets} prêts`}`}</Bouton> : null}/>
@@ -58067,7 +58080,10 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
         {' '}<span className="vrm-aide" style={{color:C.muted,fontWeight:400}}>Sans les PDF de bordereau ni tes connexions Vinted.</span>
       </span>
     )},
-    {id:'aide',titre:'Besoin d’aide ?',items:[{id:'depannage',type:'panneau',nu:true,ic:'info',lib:'Résoudre un problème',desc:'Emails, comptes, impression',el:<div className="vrm-settings-help">
+    {id:'aide',titre:'Besoin d’aide ?',items:[
+      // (2 nov.) La visite en bulles, rejouée sur son clic (src/VisiteBulles.jsx).
+      { id:'visite', type:'action', ic:'info', lib:'Revoir la visite', desc:'Les onglets de VRM, un par un', onClick:()=>{ try { window.dispatchEvent(new Event('vrm:visite')); } catch (_) {} }, data:{ 'data-reglage-visite':'' } },
+      {id:'depannage',type:'panneau',nu:true,ic:'info',lib:'Résoudre un problème',desc:'Emails, comptes, impression',el:<div className="vrm-settings-help">
       <details><summary>Je ne reçois pas mes emails</summary><p>Vérifie l’adresse associée au compte Vinted, sa confirmation, puis le transfert depuis ta messagerie. L’historique reçu permet de distinguer un email absent d’un email à vérifier.</p><Bouton variante="secondaire" onClick={()=>ouvrirSous('adresses')}>Ouvrir la réception des emails</Bouton></details>
       <details><summary>Mon compte Vinted n’apparaît pas</summary><p>Connecte le compte attendu sur Vinted et vérifie que l’extension utilise ton compte VRM. Actualise ensuite les comptes liés et contrôle le pseudo. N’ajoute pas les données d’un autre vendeur.</p><Bouton variante="secondaire" onClick={()=>setTab('vintedaccounts')}>Voir mes comptes liés</Bouton></details>
       <details><summary>Mon bordereau s’imprime mal</summary><p>Choisis le papier correspondant à ton imprimante, ouvre un aperçu puis contrôle l’échelle d’impression. Le numéro doit rester dans un espace blanc. En cas d’échec d’un lot, relance uniquement les fichiers refusés.</p><Bouton variante="secondaire" onClick={()=>ouvrirSous('imprimante')}>Vérifier l’impression</Bouton></details>
@@ -58168,6 +58184,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
         </div>
       ) : (<>
         <div className="vrm-set-tete"><h2 className="vrm-set-h1" style={{color:C.text}}>Paramètres</h2></div>
+        <p className="vrm-phrase-ecran vrm-phrase-reglages" data-phrase-ecran="settings">{PHRASES_ECRAN.settings}</p>
         <ReglagesPasLus/>
         {ongletsCompte && (
           <div role="tablist" aria-label="Paramètres" data-onglets-reglages="" className="vrm-set-seg" style={{background:`${C.text}0f`}}>
@@ -62259,6 +62276,20 @@ function AppCoeur() {
     return onCloudReady(()=>{ if(!load('vrm_bienvenue_vue',null)) setBienvenue(true); });
   },[premierJour]);
   useEffect(()=>{ const o=()=>setBienvenue(true); window.addEventListener('vrm:bienvenue',o); return ()=>window.removeEventListener('vrm:bienvenue',o); },[]);
+  // (2 nov.) LA VISITE EN BULLES (src/VisiteBulles.jsx) : après Bienvenue, une
+  // fois par compte VRM — la même personne neuve (`premierJour`), seulement quand
+  // le nuage est arrivé (« pas su » ne la rouvre pas) et jamais par-dessus
+  // Bienvenue. « Vue » = `vrm_visite_vue` (synchronisée). Rejouable depuis
+  // Paramètres → « Revoir la visite » (évènement `vrm:visite`).
+  const [visite,setVisite]=useState(false);
+  useEffect(()=>{
+    if(!premierJour||bienvenue) return undefined;
+    let vivant=true; let t=0;
+    // (`save` écrit après 500 ms : « Bienvenue vue » se relit après ce délai.)
+    const stop=onCloudReady(()=>{ if(!vivant) return; t=setTimeout(()=>{ if(vivant&&load('vrm_bienvenue_vue',null)&&!load(CLE_VISITE,null)) setVisite(true); },900); });
+    return ()=>{ vivant=false; clearTimeout(t); if(typeof stop==='function') stop(); };
+  },[premierJour,bienvenue]);
+  useEffect(()=>{ const o=()=>setVisite(true); window.addEventListener('vrm:visite',o); return ()=>window.removeEventListener('vrm:visite',o); },[]);
   const [liveStats,setLiveStats]=useState(null); // résumé Vinted en direct pour l'accueil
   // (29 oct., revue) Le point « nouveau » de l'onglet Messages suit le geste
   // « Retirer » / « Les remettre » TOUT DE SUITE (il ne bougeait qu'au prochain
@@ -63782,6 +63813,7 @@ function AppCoeur() {
       <section className="vrm-tache" data-tache={t} data-tache-site={site} data-tache-section={sec} aria-label={TITRES_TACHE[t]}>
         <header className="vrm-market-heading vrm-tache-tete" data-tache-tete={t}>
           <h1>{TITRES_TACHE[t]}</h1>
+          {PHRASES_ECRAN[t] ? <p className="vrm-phrase-ecran" data-phrase-ecran={t}>{PHRASES_ECRAN[t]}</p> : null}
         </header>
         <div className="vrm-tache-filtres" style={{padding:'0 16px'}}>
           <DansBarreHaut><FiltreSites tache={t} site={site} sites={sitesPresents} onSite={(s)=>setPlatSub(s)}/></DansBarreHaut>
@@ -64506,6 +64538,8 @@ function AppCoeur() {
       {bienvenue && <Bienvenue prenom={String(load('vrm_prenom','')||'').trim()} dark={!!dark}
         onTheme={(d)=>{ if(!!d!==!!dark) toggleDark(); }}
         onTerminer={()=>{ save('vrm_bienvenue_vue',{at:new Date().toISOString()}); setBienvenue(false); if(tab!=='journee') setTab('journee'); }}/>}
+      {visite && !bienvenue && <VisiteBulles z={Z_CONFIRMATION}
+        onTerminer={(raison)=>{ setVisite(false); if(raison!=='rien') save(CLE_VISITE,{at:new Date().toISOString(),fin:raison}); }}/>}
       <MemoireDefilement ecran={`${tab}:${(tab.startsWith('plat_')||estTacheSite(tab))?platSub:''}`}/>
       {/* Une seule navigation à la fois : latérale sur ordinateur, en bas sur
           téléphone. Jamais les deux — c'est la même liste d'écrans. */}

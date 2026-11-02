@@ -180,7 +180,7 @@ const lire = (pg) => pg.evaluate(() => {
   return { points, pub, epingles, total: racine ? Number(racine.getAttribute('data-colis-colonnes')) : null, cols,
     bouton: bt ? { n: Number(bt.getAttribute('data-imprimer-prets')), txt: bt.innerText.trim(), bg: getComputedStyle(bt).backgroundColor } : null,
     barre: !!document.querySelector('[data-barre-recherche]'), barreTxt: ((document.querySelector('[data-barre-recherche]') || {}).innerText || '') + ' ' + ((document.querySelector('[data-barre-recherche] input') || {}).placeholder || ''),
-    sous: ((document.querySelector('[data-sous-titre]') || {}).innerText || ''),
+    sous: ((document.querySelector('[data-sous-titre]') || {}).innerText || ''), phrase: !!document.querySelector('[data-sous-titre] [data-phrase-ecran="colis"]'),
     sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth };
 });
 
@@ -257,7 +257,8 @@ async function main() {
         dit(!!ver && ver.verif && /à vérifier/.test(ver.txt), `${T} un colis douteux reste VISIBLE, marqué « à vérifier »`, ver && JSON.stringify(ver));
         const n117 = toutes.find((k) => k.cle === 'v:7001');
         dit(!!n117 && /N°\S+/.test(n117.txt) && /Adidas Samba OG taille 41/.test(n117.txt), `${T} la carte porte le nom complet et le N° en pastille`, n117 && n117.txt);
-        dit(/Rangés sur ce que tu peux faire maintenant/.test(L.sous) || !ordi, `${T} le sous-titre de la maquette`, L.sous);
+        // (2 nov.) Le sous-titre est la phrase de l'écran (src/phrasesEcran.js, D2).
+        dit((L.phrase && L.sous.trim().length > 0) || !ordi, `${T} le sous-titre : la phrase de l'écran`, L.sous);
         if (!ordi) { const petites = toutes.filter((k) => k.h < 44); dit(!petites.length, `${T} chaque carte se touche au doigt (44 px)`, JSON.stringify(petites.map((k) => [k.cle, k.h]))); }
         dit(L.sw <= L.cw + 1, `${T} aucun débordement horizontal`, `${L.sw} > ${L.cw}`);
         if (ordi) {

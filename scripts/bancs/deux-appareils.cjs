@@ -61,7 +61,7 @@ function fabriquer() {
   return H.creerBase({
     accounts: [{ id: 1, vinted_user_id: UID, login: 'vendeur_banc', domain: 'www.vinted.fr', updated_at: frais(3600e3), created_at: frais(60 * 86400000) }],
     lignes: [
-      { id: 'main', data: { vrm_prenom: '', vinted_dark: false, vinted_buyprice_by_num: {}, vinted_annonce_numeros: fiches, vinted_used_numeros: ['1', '2', '3', '4', '5'], vrm_bienvenue_vue: { at: 'banc' } } },
+      { id: 'main', data: { vrm_prenom: '', vinted_dark: false, vinted_buyprice_by_num: {}, vinted_annonce_numeros: fiches, vinted_used_numeros: ['1', '2', '3', '4', '5'], vrm_bienvenue_vue: { at: 'banc' }, vrm_visite_vue: { at: 'banc' } } },
       { id: `harvest_${UID}_listings`, data: { capturedAt: frais(60e3), nItems: items.length, payload: { items, pagination: { total_entries: items.length } } } },
       { id: `harvest_${UID}_enligne`, data: { capturedAt: frais(60e3), complet: true, n: items.length, ids: items.map((x) => x.id), items: items.map((x) => ({ id: x.id, title: x.title })) } },
       { id: `harvest_${UID}_profile`, data: { capturedAt: frais(60e3), payload: { user: { id: Number(UID), login: 'vendeur_banc' } } } },

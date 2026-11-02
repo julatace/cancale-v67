@@ -79,6 +79,8 @@ import './styles-statut.css';
 import './styles-annonces-pro.css';
 import './styles-mouvement.css';
 import './styles-bienvenue.css';
+// (2 nov.) La visite en bulles (src/VisiteBulles.jsx) — hors de la coque, ses propres teintes.
+import './styles-visite.css';
 import './styles-disposition.css';
 import './styles-telephone.css';
 import './styles-epure.css';

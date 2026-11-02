@@ -60,7 +60,7 @@ function fabriquer({ nVentes = 1300, nAnnonces = 60, nBord = 1105, nSale = 1200,
   for (let i = 0; i < nTrack; i++) lignes.push({ id: `email_track_mondialrelay_${String(100000 + i)}`, data: { carrier: 'mondialrelay', tracking: String(100000 + i), status: 'livre', receivedAt: iso((i + 30) * J) } });
   for (let i = 0; i < nAchat; i++) lignes.push({ id: `email_achat_${String(500000 + i)}`, data: { subject: 'Ton reçu', article: 'Achat ' + i, prix: '20', transaction: String(30000000000 + i), account: 'gros_vendeur', uid: UID, receivedAt: iso((i + 30) * J), type: 'recu' } });
   lignes.push({ id: 'widget_stats', data: { online: 24, onlineAt: '2026-10-31', caMois: 0, ventesMois: 0 } });
-  lignes.push({ id: 'main', data: { vinted_annonce_numeros: numeros, vinted_used_numeros: Object.values(numeros).map((x) => x.numero), vrm_bienvenue_vue: { at: 'banc' }, vrm_widget_token: 'jeton-banc' } });
+  lignes.push({ id: 'main', data: { vinted_annonce_numeros: numeros, vinted_used_numeros: Object.values(numeros).map((x) => x.numero), vrm_bienvenue_vue: { at: 'banc' }, vrm_visite_vue: { at: 'banc' }, vrm_widget_token: 'jeton-banc' } });
   return H.creerBase({ accounts: [{ id: 1000, vinted_user_id: UID, login: 'gros_vendeur', domain: 'www.vinted.fr', updated_at: iso(3600e3), created_at: iso(60 * J) }], lignes });
 }
 const familleDe = (u) => { const m = /id=like\.([a-z]+_[a-z]+)_\*/.exec(u); return m ? m[1] : null; };
