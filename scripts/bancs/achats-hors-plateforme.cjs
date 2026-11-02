@@ -108,6 +108,10 @@ async function preparer(b, vp) {
       }
       return j([]);
     }
+    // (2 nov.) La base de production est CLOISONNÉE, et depuis « Données sûres »
+    // (1er nov.) l'app n'écrit la ligne `main` que sur une base cloisonnée : la
+    // sonde de schéma (`select=owner&limit=1`) répond donc comme la production.
+    if (/select=owner&limit=1/.test(u)) return j([]);
     if (/select=owner/.test(u)) return route.fulfill({ status: 400, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: '{"m":1}' });
     if (/\/rest\/v1\/vinted_accounts/.test(u)) return j(ACCOUNTS);
     const sel = (/[?&]select=([^&]*)/.exec(u) || [])[1] || null;
