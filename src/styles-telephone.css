@@ -108,3 +108,12 @@
     text-transform: none !important; letter-spacing: 0 !important; font-size: 13px !important; font-weight: 600 !important;
   }
 }
+
+/* (2 nov.) Au téléphone, l'imprimante est cachée (ci-dessus) : un récapitulatif
+   de Colis sans autre geste restait une boîte VIDE en haut de l'écran. */
+@media (max-width: 767px) {
+  .vrm-app-shell .vrm-colis-recap[data-colis-recap-sans-geste="1"] {
+    padding: 0 !important; margin: 0 !important; border: 0 !important;
+    background: transparent !important; box-shadow: none !important; min-height: 0 !important;
+  }
+}
