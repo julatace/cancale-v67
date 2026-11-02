@@ -50,13 +50,22 @@
         chrome.runtime.sendMessage({ from: 'cancale-vc', action: 'vcPdf', url: String(d.url || '').slice(0, 400), statut: Number(d.statut) || 0, page: String(d.page || '').slice(0, 200), b64: d.b64, moi: moiDe(d) }, () => { void chrome.runtime.lastError; });
         return;
       }
+      // 5.316 : le suivi d'UNE vente (transporteur, n° de suivi, bordereau PDF signé, étapes).
+      if (d.kind === 'vctimeline' && /^\d{3,15}$/.test(String(d.productId || ''))) {
+        const et = d.etapes && typeof d.etapes === 'object' ? Object.fromEntries(Object.entries(d.etapes).slice(0, 12).map(([k, v]) => [String(k).slice(0, 30), String(v).slice(0, 20)])) : {};
+        chrome.runtime.sendMessage({ from: 'cancale-vc', action: 'vcTimeline', productId: String(d.productId), transporteur: String(d.transporteur || '').slice(0, 40), suivi: /^[A-Z0-9]{6,40}$/i.test(String(d.suivi || '')) ? String(d.suivi) : '', bordereau: /^https:\/\/[\w.-]+\.amazonaws\.com\//i.test(String(d.bordereau || '')) ? String(d.bordereau).slice(0, 2000) : '', typeBordereau: String(d.typeBordereau || '').slice(0, 30), statut: String(d.statut || '').slice(0, 40), etapes: et, paiementEstime: String(d.paiementEstime || '').slice(0, 40), moi: moiDe(d) }, () => { void chrome.runtime.lastError; });
+        return;
+      }
       if (d.kind === 'vcventes') {
         const ventes = (Array.isArray(d.ventes) ? d.ventes : []).slice(0, 200).map((x) => ({
           id: String((x && x.id) || '').slice(0, 40), productId: String((x && x.productId) || '').slice(0, 40), ref: String((x && x.ref) || '').slice(0, 12),
           etat: String((x && x.etat) || '').slice(0, 40), date: String((x && x.date) || '').slice(0, 30),
           montant: x && x.montant && isFinite(Number(x.montant.valeur)) ? { valeur: Number(x.montant.valeur), devise: String(x.montant.devise || '').slice(0, 3), cle: String(x.montant.cle || '').slice(0, 60) } : null,
           limite: String((x && x.limite) || '').slice(0, 30), etiquette: x && (x.etiquette === true || x.etiquette === false) ? x.etiquette : null,
-          suivi: String((x && x.suivi) || '').slice(0, 40), transporteur: String((x && x.transporteur) || '').slice(0, 30) }));
+          suivi: String((x && x.suivi) || '').slice(0, 40), transporteur: String((x && x.transporteur) || '').slice(0, 30),
+          // 5.316 : le titre affiché (marque + nom) et la photo de Vestiaire.
+          titre: String((x && x.titre) || '').slice(0, 140),
+          photo: /^https:\/\/images\.vestiairecollective\.com\/produit\/[\w.-]{1,60}$/i.test(String((x && x.photo) || '')) ? String(x.photo) : '' }));
         chrome.runtime.sendMessage(Object.assign({ from: 'cancale-vc', action: 'vcVentes', source: d.source === 'a-expedier' ? 'a-expedier' : 'ventes', ventes, offset: Number(d.offset) || 0, total: typeof d.total === 'number' ? d.total : null, lus: Number(d.lus) || 0, forme: (Array.isArray(d.forme) ? d.forme : []).slice(0, 120).map((c) => String(c).slice(0, 120)) }, suite(d)), () => { void chrome.runtime.lastError; });
         return;
       }

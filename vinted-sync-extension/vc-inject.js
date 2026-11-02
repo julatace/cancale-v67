@@ -183,12 +183,18 @@
   // l'identifiant de SON produit. Rien d'autre n'est deviné.
   const enveloppe = (e) => (e && typeof e === 'object' && !Array.isArray(e) && e.id == null && e.productId == null && e.product_id == null
     && typeof e.type === 'string' && /^[\w-]{1,40}$/.test(e.type) && e[e.type] && typeof e[e.type] === 'object' && !Array.isArray(e[e.type])) ? e[e.type] : null;
+  // 5.316 — LA PHOTO D'UN ARTICLE : Vestiaire n'écrit que le NOM du fichier
+  // (« 73026101-1_3.jpg », `picturePath` / `imageUrl`) ; ses pages l'affichent
+  // depuis https://images.vestiairecollective.com/produit/{nom} (adresse relevée
+  // dans ses propres réponses). Un nom d'une autre forme ⇒ pas de photo.
+  const photoVc = (nom) => (typeof nom === 'string' && /^\d{5,12}-\d{1,3}_\d{1,3}\.(jpe?g|png|webp)$/i.test(nom) ? 'https://images.vestiairecollective.com/produit/' + nom : '');
   function deplier(e) {
     const env = enveloppe(e);
     if (!env) return e;
     const out = Object.assign({}, env, { status: e.type });
     const p = env.product && typeof env.product === 'object' && !Array.isArray(env.product) ? env.product : null;
     if (out.id == null && p && p.id != null) out.productId = p.id;
+    if (p && photoVc(p.picturePath)) out.picture = photoVc(p.picturePath);
     // Le titre affiché : « headline » et « subHeadline » de Vestiaire, mis bout à
     // bout (affichage seul, jamais une identité — §5).
     if (p && out.name == null && (typeof p.headline === 'string' || typeof p.subHeadline === 'string')) out.name = [p.headline, p.subHeadline].filter((x) => typeof x === 'string' && x.trim()).join(' ');
@@ -395,8 +401,13 @@
   const CLE_DATE = /date|created|sold|paid|ordered|At$/i;
   const CLE_MONTANT = /^(price|amount|total|totalPrice|total_price|totalAmount|total_amount|paidAmount|paid_amount|sellerPrice|seller_price|earning|earnings|payout|netAmount|net_amount|sellingPrice|selling_price)$/i;
   const PAS_ACHETEUR = /buyer|customer|address|recipient|shipping_?address|email|phone|message|user|member|interlocutor|sender|participant|author|counterpart|contact/i;
+  // 5.316 — CE QUE VESTIAIRE TE VERSE : `sellerEarning` (« 203,23 € », une
+  // chaîne mise en forme) — mesuré sur ta vente du 2 nov. Lu seulement s'il est
+  // écrit en euros, au centime.
+  const eurosEcrits = (t) => { const m = /^\s*(\d{1,3}(?:[\s\u00a0\u202f.]?\d{3})*|\d+)(?:,(\d{2}))?\s*€\s*$/.exec(String(t || '')); return m ? Number(m[1].replace(/[\s\u00a0\u202f.]/g, '')) + (m[2] ? Number(m[2]) / 100 : 0) : null; };
   function scalairesVente(e) {
     const out = { etat: '', date: '', montant: null };
+    if (e && typeof e.sellerEarning === 'string' && eurosEcrits(e.sellerEarning) != null) out.montant = { valeur: eurosEcrits(e.sellerEarning), devise: 'EUR', cle: 'sellerEarning' };
     const visite = (x, prof, chemin) => {
       if (!x || typeof x !== 'object' || prof > 2) return;
       for (const k of Object.keys(x).slice(0, 80)) {
@@ -472,6 +483,33 @@
       post({ kind: 'vccatalogue', chemin: cle.slice(0, 160), body: t.slice(0, VC_CATALOGUE_MAX), coupe: t.length > VC_CATALOGUE_MAX });
     } catch (_) {}
   }
+  // 5.316 — LE SUIVI D'UNE VENTE (`/contents/timeline/seller?product=…`, la page
+  // « Mes ventes » d'un article) : le transporteur choisi, le n° de suivi, le
+  // BORDEREAU (un PDF déposé par Vestiaire, adresse signée et datée), la date
+  // limite d'envoi, l'étape et la date de paiement estimée. Rien de l'acheteur.
+  function noteTimeline(url, texte) {
+    try {
+      let u; try { u = new URL(url, location.origin); } catch (_) { return; }
+      if (!DE_VC(url) || !/\/contents\/timeline\/seller\/?$/i.test(u.pathname)) return;
+      const pid = String(u.searchParams.get('product') || '');
+      if (!/^\d{3,15}$/.test(pid)) return;
+      let obj; try { obj = JSON.parse(texte); } catch (_) { return; }
+      const d = obj && obj.data && typeof obj.data === 'object' ? obj.data : null;
+      if (!d) return;
+      const st = d.steps && typeof d.steps === 'object' ? d.steps : {};
+      const exp = st.sellerShipment && st.sellerShipment.shipmentDetails && typeof st.sellerShipment.shipmentDetails === 'object' ? st.sellerShipment.shipmentDetails : {};
+      const lab = typeof exp.shippingLabelUrl === 'string' ? exp.shippingLabelUrl : (typeof exp.labelUrl === 'string' ? exp.labelUrl : '');
+      let bordereau = '';
+      try { const b = new URL(lab); if (b.protocol === 'https:' && /(^|\.)amazonaws\.com$/i.test(b.hostname) && /\.pdf$/i.test(b.pathname)) bordereau = b.href.slice(0, 2000); } catch (_) {}
+      const etapes = Object.keys(st).filter((k) => st[k] && typeof st[k] === 'object' && typeof st[k].status === 'string').reduce((o, k) => { o[k] = st[k].status.slice(0, 20); return o; }, {});
+      post({ kind: 'vctimeline', productId: pid,
+        transporteur: exp.chosenCarrier && typeof exp.chosenCarrier.carrierName === 'string' ? exp.chosenCarrier.carrierName.slice(0, 40) : '',
+        suivi: typeof exp.trackingNumber === 'string' && /^[A-Z0-9]{6,40}$/i.test(exp.trackingNumber) ? exp.trackingNumber : '',
+        bordereau, typeBordereau: typeof exp.labelType === 'string' ? exp.labelType.slice(0, 30) : '',
+        statut: typeof d.status === 'string' ? d.status.slice(0, 40) : '', etapes,
+        paiementEstime: d.header && typeof d.header.date === 'string' ? d.header.date.slice(0, 40) : '', moi: moiId });
+    } catch (_) {}
+  }
   function noteVentes(url, texte) {
     try {
       let u; try { u = new URL(url, location.origin); } catch (_) { return; }
@@ -491,7 +529,9 @@
         const pid = prod && prod.id != null ? String(prod.id) : (e.productId != null ? String(e.productId) : (e.product_id != null ? String(e.product_id) : ''));
         const sc = scalairesVente(e);
         const cv = colisVente(e); const sv = suiviAchat(e);
-        return { id: idDe(e), productId: /^[\w-]{1,40}$/.test(pid) ? pid : '', ref: refVente(e), etat: sc.etat, date: sc.date, montant: sc.montant, limite: cv.limite, etiquette: cv.etiquette, suivi: sv.suivi, transporteur: sv.transporteur };
+        const fi = ficheAnnonce(e);
+        const titre = [typeof e.brandName === 'string' ? e.brandName.trim() : '', fi.titre].filter(Boolean).join(' ').slice(0, 140);
+        return { id: idDe(e), productId: /^[\w-]{1,40}$/.test(pid) ? pid : '', ref: refVente(e), etat: sc.etat, date: sc.date, montant: sc.montant, limite: cv.limite, etiquette: cv.etiquette, suivi: sv.suivi, transporteur: sv.transporteur, titre, photo: photoVc(e.imageUrl) || photoAnnonce(e) };
       }).filter((x) => /^[\w-]{1,40}$/.test(x.id));
       // La FORME d'une vente (noms de clés et types, jamais une valeur) : pour viser juste ensuite.
       const forme = arr.length ? cheminsDeCles(arr[0]).map(sansId).filter((c) => !PAS_ACHETEUR.test(c.split(':')[0])).slice(0, 120) : [];
@@ -931,7 +971,7 @@
             if (DE_VC(url) && /^(POST|PUT)$/i.test(String(meth))) noteEnvoi(url, meth, res.status, corpsEnvoye, ent);
             // 5.299 : une réponse d'ERREUR (401, 404, 500…) n'est ni une liste, ni un compte, ni un schéma.
             if (res.status >= 200 && res.status < 300 && /pdf/i.test(String(ct || ''))) res.clone().arrayBuffer().then((o) => notePdf(url, res.status, o)).catch(() => {});
-            if (DE_VC(url) && res.status >= 200 && res.status < 300 && /json/i.test(String(ct || ''))) res.clone().text().then((t) => { noteBrut(url, meth, res.status, t, 'api'); noteSchema(url, t); noteCatalogue(url, t); noteMoi(url, t); noteAnnonces(url, t); noteVentes(url, t); noteCompteur(url, t); noteMessages(url, t); noteFil(url, t); noteAchats(url, t); notePublication(url, meth, res.status, t); }).catch(() => {});
+            if (DE_VC(url) && res.status >= 200 && res.status < 300 && /json/i.test(String(ct || ''))) res.clone().text().then((t) => { noteBrut(url, meth, res.status, t, 'api'); noteSchema(url, t); noteCatalogue(url, t); noteMoi(url, t); noteAnnonces(url, t); noteVentes(url, t); noteTimeline(url, t); noteCompteur(url, t); noteMessages(url, t); noteFil(url, t); noteAchats(url, t); notePublication(url, meth, res.status, t); }).catch(() => {});
           } catch (_) {}
         }).catch(() => {});
       } catch (_) {}
@@ -956,7 +996,7 @@
             try { t = this.responseType === 'json' ? (this.response == null ? null : JSON.stringify(this.response)) : (this.responseType === '' || this.responseType === 'text') ? this.responseText : null; } catch (_) { t = null; }
             if (DE_VC(url) && /^(POST|PUT)$/i.test(String(this.__vcMeth || ''))) noteEnvoi(url, this.__vcMeth, this.status, this.__vcCorps, this.__vcH);
             if (this.status >= 200 && this.status < 300 && /pdf/i.test(String(ct || '')) && this.response instanceof ArrayBuffer) notePdf(url, this.status, this.response);
-            if (t && this.status >= 200 && this.status < 300 && /json/i.test(String(ct || ''))) { noteBrut(url, this.__vcMeth, this.status, t, 'api'); noteSchema(url, t); noteCatalogue(url, t); noteMoi(url, t); noteAnnonces(url, t); noteVentes(url, t); noteCompteur(url, t); noteMessages(url, t); noteFil(url, t); noteAchats(url, t); notePublication(url, this.__vcMeth, this.status, t); }
+            if (t && this.status >= 200 && this.status < 300 && /json/i.test(String(ct || ''))) { noteBrut(url, this.__vcMeth, this.status, t, 'api'); noteSchema(url, t); noteCatalogue(url, t); noteMoi(url, t); noteAnnonces(url, t); noteVentes(url, t); noteTimeline(url, t); noteCompteur(url, t); noteMessages(url, t); noteFil(url, t); noteAchats(url, t); notePublication(url, this.__vcMeth, this.status, t); }
           } catch (_) {}
         });
       } catch (_) {}

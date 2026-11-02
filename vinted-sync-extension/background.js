@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.315.0';
+const CODE_VERSION = '5.316.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -2681,6 +2681,17 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           const ok = await rangerVcAnnonces({ items: msg.items, offset: msg.offset, total: msg.total, lus: msg.lus, forme: msg.forme, compte: compteOnglet, complet: msg.complet, inconnu: msg.inconnu });
           if (Array.isArray(msg.inconnu)) { noterDiag('vc_format_inconnu_annonces'); await noterVcCapte('annonces', ok === true, 0, { inconnu: true }); } else await noterVcCapte('annonces', ok === true, Array.isArray(msg.items) ? msg.items.length : 0);
           sendResponse({ ok: ok === true });
+        } catch (e) { sendResponse({ ok: false, error: String(e) }); }
+      })();
+      return true;
+    }
+    if (msg && msg.from === 'cancale-vc' && msg.action === 'vcTimeline') {
+      (async () => {
+        try {
+          let hote = ''; try { hote = new URL((sender && sender.tab && sender.tab.url) || '').hostname; } catch (_) {}
+          if (!/(^|\.)vestiairecollective\.com$/i.test(hote)) { sendResponse({ ok: false }); return; }
+          const compteOnglet = await compteVcCapture(sender && sender.tab && sender.tab.id, msg.moi);
+          sendResponse({ ok: (await rangerVcTimeline(msg, compteOnglet)) === true });
         } catch (e) { sendResponse({ ok: false, error: String(e) }); }
       })();
       return true;
@@ -15222,6 +15233,9 @@ async function rangerVcVentesMaintenant(m) {
       etat: x.etat || prev.etat || '', date: x.date || prev.date || '',
       montant: x.montant || prev.montant || null,
       limite: x.limite || prev.limite || '', suivi: x.suivi || prev.suivi || '', transporteur: x.transporteur || prev.transporteur || '',
+      // 5.316 : le titre affiché et la photo ; et ce que la page « suivi » a appris (gardé).
+      titre: x.titre || prev.titre || '', photo: x.photo || prev.photo || '',
+      ...(prev.bordereau ? { bordereau: prev.bordereau } : {}), ...(prev.statutVc ? { statutVc: prev.statutVc } : {}), ...(prev.paiementEstime ? { paiementEstime: prev.paiementEstime } : {}), ...(prev.etapesVc ? { etapesVc: prev.etapesVc } : {}),
       etiquette: x.etiquette === true || x.etiquette === false ? x.etiquette : (prev.etiquette === true || prev.etiquette === false ? prev.etiquette : null),
       aExpedier: source === 'a-expedier' ? true : (prev.aExpedier === true),
       sources, vuAt: now, premiereVue: prev.premiereVue || now,
@@ -15453,6 +15467,47 @@ async function rangerVcPdf(m, compte) {
   const ok = await supabaseUpsert('app_data', [{ id, data: { url: String(m.url || ''), page: String(m.page || ''), compte: compte || '', at: new Date().toISOString(), taille: Math.floor(b64.length * 3 / 4), b64 } }], 'id');
   if (ok === true) _vcBrutVu.set(id, { c: '', at: Date.now() });
   return ok === true;
+}
+// ── 5.316 — LE SUIVI D'UNE VENTE VESTIAIRE (et son BORDEREAU) ───────────────
+// `vctimeline` (vc-inject.js) : transporteur, n° de suivi, étapes, paiement
+// estimé, et l'adresse SIGNÉE du bordereau PDF que Vestiaire a déposé. Le fond
+// va chercher ce PDF (une adresse de stockage, pas une page de Vestiaire — comme
+// un bordereau Vinted, §3 « générer un bordereau et récupérer son PDF »), vérifie
+// « %PDF » et le range dans `vc_label_{produit}` ; la vente porte
+// `bordereau: { id, at }`. Une adresse expirée ou illisible ⇒ rien rangé, dit.
+async function rangerVcTimeline(m, compte) {
+  const pid = String(m.productId || '');
+  if (!/^\d{3,15}$/.test(pid)) return false;
+  let bord = null;
+  if (m.bordereau) {
+    try {
+      const r = await fetch(m.bordereau, { credentials: 'omit' });
+      const buf = r.ok ? new Uint8Array(await r.arrayBuffer()) : null;
+      if (buf && buf.length > 100 && buf.length <= 3 * 1024 * 1024 && buf[0] === 0x25 && buf[1] === 0x50 && buf[2] === 0x44 && buf[3] === 0x46) {
+        let bin = ''; for (let i = 0; i < buf.length; i += 0x8000) bin += String.fromCharCode.apply(null, buf.subarray(i, i + 0x8000));
+        const ok = await supabaseUpsert('app_data', [{ id: 'vc_label_' + pid, data: { productId: pid, at: new Date().toISOString(), taille: buf.length, suivi: m.suivi || '', transporteur: m.transporteur || '', compte: compte || '', b64: btoa(bin) } }], 'id');
+        if (ok === true) bord = { id: 'vc_label_' + pid, at: new Date().toISOString() };
+      } else noterDiag('vc_bordereau_illisible');
+    } catch (_) { noterDiag('vc_bordereau_injoignable'); }
+  }
+  const run = _vcVentesChaine.then(async () => {
+    const rows = await sbGet('app_data?id=eq.vc_ventes&select=data');
+    if (rows === null) return false;
+    const cur = (rows && rows[0] && rows[0].data) || {};
+    const ventes = Object.assign({}, cur.ventes || {});
+    const prev = ventes[pid] || { productId: pid, premiereVue: new Date().toISOString(), sources: [] };
+    ventes[pid] = { ...prev, productId: pid,
+      transporteur: m.transporteur || prev.transporteur || '', suivi: m.suivi || prev.suivi || '',
+      statutVc: m.statut || prev.statutVc || '', etapesVc: m.etapes && Object.keys(m.etapes).length ? m.etapes : (prev.etapesVc || null),
+      paiementEstime: m.paiementEstime || prev.paiementEstime || '',
+      ...(bord ? { bordereau: bord } : {}),
+      compte: prev.compte || (compte && /^[\w-]{1,40}$/.test(compte) ? compte : '') };
+    const ok = await supabaseUpsert('app_data', [{ id: 'vc_ventes', data: { ...cur, ventes } }], 'id');
+    if (ok === true) notifierApp({ type: 'maj', quoi: 'vestiaire' });
+    return ok === true;
+  });
+  _vcVentesChaine = run.then(() => {}, () => {});
+  return run;
 }
 let _vcAnnoncesChaine = Promise.resolve();
 function rangerVcAnnonces(patch) {

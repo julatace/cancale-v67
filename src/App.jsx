@@ -172,7 +172,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.315.0';
+const EXT_ATTENDUE = '5.316.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -26677,6 +26677,24 @@ function etapeVenteVc(v) {
   if (v && v.plusAExpedierDepuis) return { etape: 'plus-a-expedier', label: 'Plus dans « à expédier » (envoyée ou annulée — Vestiaire ne dit pas laquelle)', rang: null };
   return { etape: brut ? 'autre' : 'pas-dit', label: brut ? `Vestiaire : « ${brut} »` : 'Étape non dite par Vestiaire', rang: null };
 }
+// (2 nov., 5.316) LE BORDEREAU D'UNE VENTE VESTIAIRE : le PDF que l'extension a
+// rapatrié (`vc_label_{produit}`), lu AU CLIC seulement (§4.4).
+function BoutonBordereauVc({ id, titre }) {
+  const [etat, setEtat] = useState('');
+  const ouvrir = async () => {
+    setEtat('lecture');
+    const j = await lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${encodeURIComponent(id)}&select=b64:data->>b64`);
+    const b64 = Array.isArray(j) && j[0] && j[0].b64;
+    if (!b64) { setEtat(Array.isArray(j) ? 'absent' : 'passu'); return; }
+    const url = URL.createObjectURL(new Blob([b64ToBytes(b64)], { type: 'application/pdf' }));
+    setEtat('');
+    if (!ouvrirPdfOnglet(url, 'bordereau-vestiaire.pdf', `Bordereau Vestiaire${titre ? ' — ' + titre : ''}`)) { const a = document.createElement('a'); a.href = url; a.target = '_blank'; a.rel = 'noopener'; document.body.appendChild(a); a.click(); a.remove(); }
+  };
+  return <div style={{ margin: '4px 0 6px' }}>
+    <Bouton variante="secondaire" icone="printer" data-vc-bordereau={id} disabled={etat === 'lecture'} onClick={ouvrir}>{etat === 'lecture' ? 'Lecture du bordereau…' : 'Imprimer le bordereau'}</Bouton>
+    {etat === 'absent' ? <span style={{ display: 'block', fontSize: 12, color: C.muted, marginTop: 4 }}>Le bordereau n'est plus rangé — rouvre la vente sur Vestiaire.</span> : etat === 'passu' ? <span style={{ display: 'block', fontSize: 12, color: C.muted, marginTop: 4 }}>La base n'a pas répondu — réessaie.</span> : null}
+  </div>;
+}
 const dateCourteVc = (iso) => { const t = Date.parse(iso || ''); return isFinite(t) ? new Date(t).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }) : ''; };
 function VentesVestiaire({ comptes }) {
   const { paires, enLigne } = useEbayPaires(comptes);
@@ -26741,6 +26759,15 @@ function VentesVestiaire({ comptes }) {
           const jl = v.aExpedier ? joursAvantVc(v.limite) : null;
           return (
             <div key={v.id} data-vc-vente={v.id} data-vc-vente-num={v.num || ''} data-vc-vente-etape={v.etape} data-flou={flou ? '1' : '0'} style={{ borderTop: `1px solid ${C.border}`, paddingTop: 8, ...(flou ? STYLE_FLOU : {}) }}>
+              {/* (2 nov., 5.316) La vente telle que Vestiaire la montre : photo, titre, ce qu'il te verse, le bordereau. */}
+              {v.titre || v.photo ? <div data-vc-vente-fiche="" style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 6 }}>
+                <span className="vrm-vc-vente-photo" style={{ width: 52, height: 52, borderRadius: 8, overflow: 'hidden', background: C.bg, flexShrink: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}><PhotoVc src={v.photo || ''}/></span>
+                <span style={{ minWidth: 0 }}>
+                  <span style={{ display: 'block', fontSize: 14, fontWeight: 600, color: C.text, overflowWrap: 'anywhere' }}>{v.titre || 'Article Vestiaire'}</span>
+                  {montantRecuVc(v).eur != null ? <span data-vc-vente-verse={montantRecuVc(v).eur.toFixed(2)} style={{ display: 'block', fontSize: 12.5, color: C.muted }}>Vestiaire te verse {montantRecuVc(v).eur.toFixed(2).replace('.', ',')} €{v.paiementEstime ? ` · paiement estimé le ${v.paiementEstime}` : ''}</span> : null}
+                </span>
+              </div> : null}
+              {v.bordereau && v.bordereau.id ? <BoutonBordereauVc id={v.bordereau.id} titre={v.titre}/> : null}
               <div style={{ fontSize: 13, color: C.text, fontWeight: 600 }}>{v.num ? `N°${v.num}` : 'Pas reliée à une paire'}<span data-vc-vente-etape-texte="" style={{ marginLeft: 8, color: v.aExpedier ? C.warn : C.muted, fontWeight: v.aExpedier ? 600 : 500 }}>· {v.label}</span>{v.aExpedier ? <span data-vc-vente-aexp="" hidden/> : null}</div>
               {v.rang != null && v.etape !== 'annulee' ? (
                 <ol data-vc-vente-parcours={v.rang} aria-label="Étapes de la vente" style={{ listStyle: 'none', display: 'flex', gap: 4, padding: 0, margin: '6px 0 2px', flexWrap: 'wrap' }}>

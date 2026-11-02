@@ -531,3 +531,24 @@ enregistre, pour après pouvoir capter toutes les infos — les ventes, les bord
 - `audit-capture-vc-lbc` C11.
 Geste : installer la 5.315.0 et se promener sur Vestiaire (Mes articles, Mes ventes, une vente ouverte,
 son bordereau, les messages, le porte-monnaie) ; puis dire à la session : « regarde ce qu'elle a capté ».
+
+## 2 novembre (soir) — 5.316.0 : ta vente Vestiaire complète, photos, bordereau
+
+Julien : « les photos ne chargent pas […] je veux que ma vente apparaisse ». Lu dans ce que la 5.315 a
+gardé (`vc_brut_*`, formes réelles) :
+- photos : Vestiaire n'écrit que le NOM du fichier (`picturePath` / `imageUrl`, « 73026101-1_3.jpg ») ; ses
+  pages l'affichent depuis `https://images.vestiairecollective.com/produit/{nom}` (relevé dans ses propres
+  réponses) ⇒ `photoVc` (annonces et ventes) ; une autre forme ⇒ pas de photo ;
+- la vente (`/ots/sales`, `/users/me/awaiting-shipping-items`) : `productId`, `brandName` + `productName`,
+  `sellerEarning` (« 203,23 € », ce que Vestiaire verse — clé reconnue par `CLE_RECU_VC`, donc comptée
+  dans les totaux), `shipByDate` ; elle était déjà rangée dans `vc_ventes` (sans titre, photo ni montant) ;
+- le suivi (`/contents/timeline/seller?product=`) : transporteur (`chosenCarrier.carrierName`), n° de suivi,
+  BORDEREAU (`shippingLabelUrl`, PDF sur un stockage amazonaws, adresse signée), étapes, paiement estimé
+  ⇒ `noteTimeline` → `rangerVcTimeline` : le fond rapatrie le PDF (vérifie `%PDF`, ≤ 3 Mo) dans
+  `vc_label_{produit}`, la vente porte `bordereau: { id, at }`, transporteur, suivi, `paiementEstime`.
+- App (« Tes ventes Vestiaire ») : photo, titre, « Vestiaire te verse … · paiement estimé le … »,
+  « Imprimer le bordereau » (PDF lu au clic, `BoutonBordereauVc`).
+- `audit-capture-vc-lbc` C10 (photo) et C12 (vente, montant, suivi, bordereau rapatrié).
+Reste : les ACTIONS depuis VRM (baisser un prix, répondre à une offre, retirer une annonce…) — Julien
+doit dire lesquelles ; chacune s'apprend sur SON geste fait une fois sur Vestiaire (recette, comme
+`vcrepondre`), jamais devinée.
