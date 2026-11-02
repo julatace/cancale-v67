@@ -55,7 +55,7 @@ const path = require('path');
 const fs = require('fs'), http = require('http'), os = require('os'), cp = require('child_process');
 let chromium;
 try { ({ chromium } = require(path.join(__dirname, '..', '..', 'node_modules', 'playwright'))); }
-catch (_) { ({ chromium } = require('/home/user/cancale-v67/node_modules/playwright')); }
+catch (_) { ({ chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'))); }
 const { metaVersData } = require('./_meta.cjs');
 const RACINE = path.join(__dirname, '..', '..');
 const DIST = process.env.BANC_DIST || path.join(RACINE, 'dist');
@@ -78,7 +78,7 @@ function distAvant() {
   try {
     fs.mkdirSync(dir, { recursive: true });
     cp.execSync(`git archive ${sha} | tar -x -C "${dir}"`, { cwd: RACINE, stdio: 'ignore', shell: '/bin/bash' });
-    const nm = fs.existsSync(path.join(RACINE, 'node_modules')) ? fs.realpathSync(path.join(RACINE, 'node_modules')) : '/home/user/cancale-v67/node_modules';
+    const nm = fs.existsSync(path.join(RACINE, 'node_modules')) ? fs.realpathSync(path.join(RACINE, 'node_modules')) : require('path').join(__dirname, '..', '..', 'node_modules');
     if (!fs.existsSync(path.join(dir, 'node_modules'))) fs.symlinkSync(nm, path.join(dir, 'node_modules'));
     cp.execSync('npx vite build --logLevel error', { cwd: dir, stdio: 'ignore', timeout: 240000 });
     return path.join(dir, 'dist');

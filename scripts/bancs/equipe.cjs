@@ -39,7 +39,7 @@ function dossierPdfjs() {
 const RACINE = path.join(__dirname, '..', '..');
 let chromium;
 try { ({ chromium } = require(path.join(RACINE, 'node_modules', 'playwright'))); }
-catch (_) { ({ chromium } = require('/home/user/cancale-v67/node_modules/playwright')); }
+catch (_) { ({ chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'))); }
 const DIST = path.join(RACINE, 'dist');
 const PORT = Number(process.env.BANC_PORT || 5011);
 const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.png': 'image/png', '.svg': 'image/svg+xml', '.webmanifest': 'application/manifest+json' };

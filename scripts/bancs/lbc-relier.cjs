@@ -9,7 +9,7 @@
 //   · l'EXTENSION applique la même règle : le VRAI `adRefKeys` de background.js,
 //     exécuté dans un vm, rend ce N° pour cette annonce (§11 — sinon l'app
 //     relie et le panneau ne relie pas).
-const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
+const { chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'));
 const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http'), path = require('path');
 const DIST = path.join(__dirname, '..', '..', 'dist');

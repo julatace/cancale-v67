@@ -11,7 +11,7 @@
 //   · colis jamais retiré (25 j) ⇒ sa date, sur sa ligne.
 // Exige, à 390 px tactile et 1512 px : chaque carte porte `data-arrive-le` et la
 // ligne est VISIBLE (pas dans un repli fermé), le jour juste, le bon mot.
-const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
+const { chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'));
 const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http'), path = require('path');
 const DIST = path.join(__dirname, '..', '..', 'dist');

@@ -3,7 +3,7 @@
 // La numérotation automatique a redonné N°1 à N°16 en août alors qu'ils étaient
 // déjà dans le pool. Deux paires sous le même numéro = la mauvaise chaussure
 // part. Ce banc vérifie que l'app le lui DIT, en rouge, là où se fait le geste.
-const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
+const { chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'));
 const { metaVersData } = require('./_meta.cjs');
 const { dressingsDuJour } = require('./_instantane.cjs'); // fx/ est une photo datée : la lecture du dressing la plus récente = « il y a 1 min » (règle « en ligne » ≤ 24 h)
 const fs=require('fs'), http=require('http'), path=require('path');

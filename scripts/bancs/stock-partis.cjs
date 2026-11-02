@@ -13,7 +13,7 @@
 //  5. (même jour) Leboncoin et eBay : N°48 (Leboncoin « Colis envoyé », relié à la
 //     main) et N°49 (eBay « Expédiée », SKU VRM-49) sortent ; N°50 et N°51, à
 //     envoyer, restent.
-const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
+const { chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'));
 const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http'), path = require('path');
 const DIST = process.env.BANC_DIST || path.join(__dirname, '..', '..', 'dist');

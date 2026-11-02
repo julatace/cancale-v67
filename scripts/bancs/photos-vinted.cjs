@@ -79,7 +79,7 @@
 // On juge les ÉLÉMENTS rendus (naturalWidth, `data-photo-vinted`,
 // `data-photos-bloquees` = la cause affichée, `data-photos-geste`), les
 // demandes reçues par le pont et le corps envoyé à la base — pas une formulation.
-const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
+const { chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'));
 const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http'), https = require('https'), path = require('path'), os = require('os'), cp = require('child_process');
 const DIST = process.env.BANC_DIST || path.join(__dirname, '..', '..', 'dist');

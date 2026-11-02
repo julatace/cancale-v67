@@ -3,7 +3,7 @@
 // jamais relevé (le geste) · lecture ratée (la phrase de panne). Et JAMAIS un
 // chiffre d'affaires Vestiaire : rien n'est capté tant que la forme d'une vente
 // n'a pas été vue.
-const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
+const { chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'));
 const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http'), path = require('path');
 const DIST = path.join(__dirname, '..', '..', 'dist');

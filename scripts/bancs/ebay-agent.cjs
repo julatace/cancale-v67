@@ -45,7 +45,7 @@
 //      avant la confirmation (les frais montrés datent de moins de 30 min) ;
 //   N. Réglages → Notifications ne promet pas « N paires prêtes » (la
 //      notification dit souvent « N paires à regarder »).
-const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
+const { chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'));
 const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http'), path = require('path');
 const DIST = path.join(__dirname, '..', '..', 'dist');

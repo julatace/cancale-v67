@@ -30,7 +30,7 @@ require('./_porte-banc.cjs');
 //   · `copy()` annonçait « Titre copié » sans rien copier — une promesse rejetée
 //     ne passe pas par `catch`, et ce fichier n'avait même pas de repli ;
 //   · le remplissage s'arrêtait au bout de 90 s EN SILENCE.
-const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
+const { chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'));
 const fs = require('fs'), http = require('http'), path = require('path');
 const EXT = path.join(__dirname, '..', '..', 'vinted-sync-extension', 'ebay.js');
 const SRC = fs.readFileSync(EXT, 'utf8');

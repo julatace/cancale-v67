@@ -53,7 +53,7 @@ const FICHIERS = ['src/App.jsx', 'vinted-sync-extension/background.js',
 // moteur JavaScript : chaînes, gabarits et expressions régulières compris.
 let babel = null;
 try { babel = require(path.join(__dirname, '..', 'node_modules', '@babel', 'parser')); }
-catch (_) { try { babel = require('/home/user/cancale-v67/node_modules/@babel/parser'); } catch (_) {} }
+catch (_) { try { babel = require(require('path').join(__dirname, '..', 'node_modules', '@babel', 'parser')); } catch (_) {} }
 const sansCommentaires = (t) => {
   if (babel) {
     try {

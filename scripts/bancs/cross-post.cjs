@@ -25,7 +25,7 @@ const path = require('path'), fs = require('fs'), http = require('http');
 const RACINE = path.join(__dirname, '..', '..');
 const { projette } = require(path.join(RACINE, 'scripts/_fond-vm.cjs'));
 const { metaVersData } = require('./_meta.cjs');
-const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
+const { chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'));
 const DIST = path.join(RACINE, 'dist');
 const PORT = Number(process.env.BANC_PORT) || 7210;
 let ko = 0;

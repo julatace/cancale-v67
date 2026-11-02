@@ -21,7 +21,7 @@
 //   K. Vinted → Ventes, une vente OUVERTE : « Bordereau », « Saisir le prix »,
 //      « Relier un achat », « Modifier » font 44 px au doigt (28-32 px depuis
 //      la vente compacte).
-const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
+const { chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'));
 const { metaVersData } = require('./_meta.cjs');
 const { dressingsDuJour } = require('./_instantane.cjs');
 const fs = require('fs'), http = require('http'), path = require('path');

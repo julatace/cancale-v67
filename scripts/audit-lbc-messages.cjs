@@ -15,7 +15,7 @@
 //   · un UUID dans un chemin devient `{uuid}` (il partait à moitié en clair).
 // Sur le code d'avant : le compteur ne partait pas, et le texte de la
 // conversation partait en entier (preuve par le comportement, §6.1).
-const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
+const { chromium } = require(require('path').join(__dirname, '..', 'node_modules', 'playwright'));
 const fs = require('fs'), path = require('path');
 const racine = path.join(__dirname, '..');
 const INJ = fs.readFileSync(path.join(racine, 'vinted-sync-extension', 'lbc-inject.js'), 'utf8');

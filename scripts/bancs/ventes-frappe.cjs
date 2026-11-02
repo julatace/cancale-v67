@@ -31,7 +31,7 @@ require('./_porte-banc.cjs');
 const path = require('path'), fs = require('fs'), http = require('http');
 let chromium;
 try { ({ chromium } = require(path.join(__dirname, '..', '..', 'node_modules', 'playwright'))); }
-catch (_) { ({ chromium } = require('/home/user/cancale-v67/node_modules/playwright')); }
+catch (_) { ({ chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'))); }
 const { fabriquer, repondre } = require('./_base-volume.cjs');
 // ⚠️ Jamais un chemin absolu (§6.1) : le dist se déduit de l'emplacement du banc.
 const DIST = path.join(__dirname, '..', '..', 'dist');

@@ -9,7 +9,7 @@ require('./_porte-banc.cjs');
 //   · « avancer » rejoue l'écran suivant ;
 //   · une SECTION d'une plateforme (Ventes → Annonces) est une entrée aussi ;
 //   · un changement d'onglet ne crée qu'UNE entrée (pas une par section posée).
-const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
+const { chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'));
 const fs = require('fs'), http = require('http'), path = require('path');
 const DIST = path.join(__dirname, '..', '..', 'dist');
 const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.png': 'image/png', '.svg': 'image/svg+xml', '.webmanifest': 'application/manifest+json' };

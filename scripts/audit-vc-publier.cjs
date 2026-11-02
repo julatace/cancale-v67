@@ -204,7 +204,7 @@ function faire({ numero = '401', vendus = [], preuveKO = false, posted = [], pos
 
   // ── B. vc-depot.js dans un vrai Chromium ────────────────────────────────
   await essaie('page', async () => {
-    let chromium; try { ({ chromium } = require('playwright')); } catch (_) { ({ chromium } = require('/home/user/cancale-v67/node_modules/playwright')); }
+    let chromium; try { ({ chromium } = require('playwright')); } catch (_) { ({ chromium } = require(require('path').join(__dirname, '..', 'node_modules', 'playwright'))); }
     const nav = await chromium.launch(fs.existsSync('/opt/pw-browsers/chromium') ? { executablePath: '/opt/pw-browsers/chromium' } : {});
     const code = fs.readFileSync(path.join(EXT, 'vc-depot.js'), 'utf8');
     const AD = { id: '1001', numero: '401', title: 'Salomon XT-6 blanc T40', description: 'Paire propre.\nRéf. VRM-401', price: '99.00', photos: ['u1', 'u2'], etat: 'Très bon état', marque: 'Salomon', taille: '40' };

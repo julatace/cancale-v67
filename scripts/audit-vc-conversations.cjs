@@ -42,7 +42,7 @@ const fuite = (o) => { const s = JSON.stringify(o == null ? null : o); return PE
 (async () => {
   // ══ A. vc-inject.js dans un vrai navigateur ══════════════════════════════
   await essaie('A. vc-inject.js', async () => {
-    let chromium; try { ({ chromium } = require('playwright')); } catch (_) { ({ chromium } = require('/home/user/cancale-v67/node_modules/playwright')); }
+    let chromium; try { ({ chromium } = require('playwright')); } catch (_) { ({ chromium } = require(require('path').join(__dirname, '..', 'node_modules', 'playwright'))); }
     const nav = await chromium.launch(fs.existsSync('/opt/pw-browsers/chromium') ? { executablePath: '/opt/pw-browsers/chromium', args: ['--no-sandbox'] } : { args: ['--no-sandbox'] });
     const inj = fs.readFileSync(injPath, 'utf8');
     const ouvrir = async () => {

@@ -55,7 +55,7 @@
 // On juge les ATTRIBUTS (`data-bord-card`, `data-groupe`, `data-tx`,
 // `data-bouton-bord`) et les NOMBRES rendus. Les libellés d'étape ne sont lus
 // que là où le libellé EST la chose vérifiée (l'étape affichée d'une vente).
-const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
+const { chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'));
 const { metaVersData } = require('./_meta.cjs');
 const { monterTiroirs } = require('./_tiroirs.cjs');
 const fs = require('fs'), http = require('http'), path = require('path'), os = require('os');

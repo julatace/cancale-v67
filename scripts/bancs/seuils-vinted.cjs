@@ -35,7 +35,7 @@
 //      et le DIT à côté du chiffre.
 // Et toujours : un compte exclu n'apparaît pas, aucun rouge ni ambre (§7),
 // aucun débordement, aucune erreur d'app. Port 4802.
-const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
+const { chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'));
 const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http'), path = require('path');
 const DIST = path.join(__dirname, '..', '..', 'dist');

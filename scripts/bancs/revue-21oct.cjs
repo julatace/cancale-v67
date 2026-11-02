@@ -17,7 +17,7 @@
 //   K. Communauté (panne) : « Réessayer » ne colle pas au texte.
 //   L. Comptes liés : « Gérer ce compte » centré dans sa zone de 44 px.
 //   M. Vinted : un espace après le bandeau de fraîcheur.
-const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
+const { chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'));
 const { metaVersData } = require('./_meta.cjs');
 const { dressingsDuJour } = require('./_instantane.cjs');
 const fs = require('fs'), http = require('http'), path = require('path');

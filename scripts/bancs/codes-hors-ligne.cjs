@@ -3,7 +3,7 @@
 // sur BaseInjoignable — et sans ce chantier, il ne voit plus SES codes. On en
 // garde une copie LOCALE : phase 1 (base up) les lit → cache écrit ; phase 2
 // (base KO) les affiche depuis le cache. Données INVENTÉES (vit dans le dépôt).
-const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
+const { chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'));
 const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http'), path = require('path');
 const DIST = path.join(__dirname, '..', '..', 'dist');

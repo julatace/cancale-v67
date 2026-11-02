@@ -29,7 +29,7 @@
 const fs = require('fs'), path = require('path');
 let parser;
 try { parser = require(path.join(__dirname, '..', 'node_modules', '@babel', 'parser')); }
-catch (_) { parser = require('/home/user/cancale-v67/node_modules/@babel/parser'); }
+catch (_) { parser = require(require('path').join(__dirname, '..', 'node_modules', '@babel', 'parser')); }
 
 const iSrc = process.argv.indexOf('--src');
 const RACINE = iSrc > 0 ? path.resolve(process.argv[iSrc + 1]) : path.join(__dirname, '..');

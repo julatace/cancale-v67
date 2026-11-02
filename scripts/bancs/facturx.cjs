@@ -24,8 +24,8 @@
 //   F. aucun débordement horizontal, aucune erreur d'app.
 // On juge des `data-*`, des NOMBRES et du CONTENU des fichiers, jamais un libellé
 // d'écran (§6.5) — sauf la présence d'une raison non vide.
-const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
-const { PDFDocument, PDFName, PDFDict, PDFArray, PDFRawStream } = require('/home/user/cancale-v67/node_modules/pdf-lib');
+const { chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'));
+const { PDFDocument, PDFName, PDFDict, PDFArray, PDFRawStream } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'pdf-lib'));
 const zlib = require('zlib');
 const { metaVersData } = require('./_meta.cjs');
 const { ouvrirAvanceCompta } = require('./_compta.cjs');

@@ -11,7 +11,7 @@
 //      on ne scinde pas, et on n'invente pas un faux bénéfice).
 // §6.1 : sur le code d'avant il n'y a qu'« Bénéfice estimé » — les libellés
 // « brut »/« net » sont absents, donc le scénario A tombe au rouge.
-const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
+const { chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'));
 const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http'), path = require('path');
 const DIST = path.join(__dirname, '..', '..', 'dist');

@@ -32,7 +32,7 @@
 //     pour celle qui part dans moins d'une heure ; « Annuler » rend la réponse
 //     d'eBay telle quelle et renvoie au Seller Hub sur un refus ;
 //   · aucun débordement horizontal, aucune erreur de page.
-const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
+const { chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'));
 const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http'), path = require('path'), os = require('os');
 const DIST = path.join(__dirname, '..', '..', 'dist');

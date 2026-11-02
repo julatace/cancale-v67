@@ -19,7 +19,7 @@
 // Rendu à 390 px tactile clair, 390 px tactile sombre, 1512 px, horloge pilotée
 // (23 oct. puis 27 oct. : la date limite du Mondial Relay passe).
 // `BANC_DIST` : un autre build (preuve §6.1 et mutations).
-const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
+const { chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'));
 const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http'), path = require('path');
 const DIST = process.env.BANC_DIST || path.join(__dirname, '..', '..', 'dist');
