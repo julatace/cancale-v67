@@ -101,6 +101,17 @@ const ouvrir = async (b, vp, sombre, tab) => {
   await pg.addInitScript((s) => { try {
     localStorage.setItem('vrm_acces_direct', '1'); localStorage.setItem('vinted_dark', JSON.stringify(s));
     localStorage.setItem('vrm_visite_vue', JSON.stringify(true));
+    // La publication du bénéfice (celle qu'écrit l'écran Ventes, en centimes) et le CA déclaré
+    // publié : INVENTÉS, pour que Compta ait de quoi montrer (Ma journée et Ventes la réécrivent).
+    if (location.search.includes('tab=compta')) {
+      const j = (n, ca, nCout, cout, caCouvert, frais) => [n, ca, frais, nCout, cout, caCouvert, frais, 0, 0, 0, 0, 0];
+      localStorage.setItem('vrm_benefice_jours', JSON.stringify({ v: 2, jours: {
+        '2026-06-12': j(2, 15000, 2, 7000, 15000, 0), '2026-07-08': j(3, 21000, 3, 9500, 21000, 0), '2026-08-20': j(2, 13000, 2, 6500, 13000, 0),
+        '2026-09-15': j(4, 30000, 3, 12000, 22000, 0), '2026-10-03': j(3, 22800, 3, 10200, 22800, 0), '2026-11-01': j(2, 17800, 2, 7500, 17800, 0) } }));
+      localStorage.setItem('vinted_urssaf_mois', JSON.stringify({ at: Date.now(), mois: [{ ym: '2026-10', ca: 228, n: 3, par: { Vinted: { ca: 228, n: 3 } } }, { ym: '2026-11', ca: 178, n: 2, par: { Vinted: { ca: 178, n: 2 } } }] }));
+      localStorage.setItem('vinted_urssaf_freq', JSON.stringify('mensuel'));
+      localStorage.setItem('vrm_compta', JSON.stringify({ sansDepenses: { at: Date.now() } }));
+    }
     localStorage.setItem('vinted_sale_overrides', JSON.stringify({ '8004': { buyPrice: '45', numero: '23' }, '8005': { buyPrice: '30', numero: '61' }, '8003': { numero: '124' }, '8001': { numero: '99', buyPrice: '28' } }));
   } catch (_) {} }, !!sombre);
   await pg.route(/^https?:\/\/[^/]*vinted\.net\//i, (r) => { const m = /\/b(\d+)\//.exec(r.request().url()); return r.fulfill({ status: 200, contentType: 'image/svg+xml', body: photoSvg(m ? Number(m[1]) : 0) }); });

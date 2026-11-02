@@ -37459,6 +37459,124 @@ function useBeneficeCalcul(compta, periode) {
   const B = pub ? beneficePeriode({ jours: pub.jours, compta, ligneUrssaf, taux: tauxUrssaf(), periode, toutes: Number(pub.v) >= 2, urssaf: regime === undefined || urssafConcerne(regime) }) : null;
   return { pub, etat, B };
 }
+// ── (2 nov.) COMPTA « FUSION » (le style choisi par Julien sur les maquettes) ──
+// En tête de Comptabilité : la carte sombre « Ce que tu as gagné », l'anneau
+// (où passe l'argent vendu), les barres des six derniers mois et l'encart de la
+// déclaration URSSAF. AUCUN chiffre n'est calculé ici (§5, une règle par notion) :
+//   · le mois = `useBeneficeCalcul(compta, 'mois')` (publication de Ventes
+//     `vrm_benefice_jours`, charges, CA déclaré publié `vinted_urssaf_mois`) — la
+//     MÊME lecture que la carte « Ton bénéfice » et Ma journée ;
+//   · les six mois = `beneficeDesJours` sur la même publication (brut des ventes
+//     au prix d'achat connu ; « — » pour un mois dont aucun prix n'est connu) ;
+//   · l'URSSAF = `rappelUrssaf` (le rappel de Ma journée), sinon la prochaine
+//     échéance (`nextUrssafDeadline`) dite sans couleur ; « J'ai déclaré » ouvre
+//     le formulaire de toujours (`demanderDeclaration`), rien n'est écrit ici.
+// Pas su ⇒ « — » ; couverture partielle dite (« X prix d'achat à saisir »).
+// Jamais « encaissé ». Aucune couleur d'accent sur un bénéfice (§7).
+function ComptaFusion({ compta, onNav }) {
+  const { pub, etat, B } = useBeneficeCalcul(compta, 'mois');
+  const ligneUrssaf = useLigneUrssaf();
+  const regime = useRegimeFiscal();
+  if (etat === 'encours') return null;
+  const avecNet = !!B && B.netFinal != null;
+  const brut = !B ? null : B.nCout > 0 ? B.brut : (B.n === 0 ? 0 : null);
+  const valeur = !B ? null : avecNet ? B.netFinal : brut;
+  const sansAchat = B ? B.n - B.nCout : 0;
+  const versSaisiePrix = () => { DEMANDE_SAISIE_PRIX.on = true; if (onNav) onNav('vinted_annonces'); };
+  const moisLong = new Date().toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
+  const sous = !B ? <>Ton bénéfice se calcule dans Ventes · <button type="button" onClick={() => onNav && onNav('cat_ventes')}>ouvrir Ventes</button></>
+    : <>{B.n === 0 ? 'aucune vente finalisée ce mois-ci' : <>sur {fmt(B.ca)} de ventes finalisées</>}
+      {sansAchat > 0 ? <> · <button type="button" data-fu-compta-porte="" onClick={versSaisiePrix}>{sansAchat} prix d'achat à saisir</button></> : null}
+      {B && !avecNet && B.n > 0 ? <> · brut</> : null}</>;
+  const micro = regime === undefined || urssafConcerne(regime);
+  const cases = [
+    { cle: 'declarer', n: B && B.caDecl != null ? fmt(B.caDecl) : null, l: 'à déclarer', titre: `CA déclaré de ${moisLong} (date du versement, la ligne publiée par Ventes)`, attrs: { 'data-fu-ca-decl': B && B.caDecl != null ? String(B.caDecl) : '' } },
+    ...(micro ? [{ cle: 'urssaf', n: B && B.cotis != null ? fmt(B.cotis) : null, l: 'URSSAF', titre: 'Cotisations estimées sur le CA déclaré du mois', attrs: { 'data-fu-cotis': B && B.cotis != null ? String(B.cotis) : '' } }] : []),
+    { cle: 'ventes', n: B ? String(B.n) : null, l: B && B.n === 1 ? 'vente' : 'ventes', titre: 'Ventes finalisées ce mois-ci', attrs: { 'data-fu-n': B ? String(B.n) : '' } },
+  ];
+  // L'anneau : seulement quand le NET se calcule (tous les prix d'achat, frais et
+  // cotisations connus) — les quatre parts somment alors au vendu du mois.
+  const anneau = (() => {
+    if (!B || !avecNet || !(B.ca > 0) || B.nCout !== B.n) return null;
+    const cotis = B.cotis || 0, achat = B.cout || 0, benef = B.netFinal;
+    const frais = Math.round((B.ca - achat - cotis - benef) * 100) / 100;
+    if (benef < 0 || frais < -0.01) return null;
+    return { parts: [['benef', 'Bénéfice', benef], ['cotis', 'Cotisations', cotis], ['achat', "Prix d'achat", achat], ['frais', 'Frais et dépenses', Math.max(0, frais)]], total: B.ca, pct: Math.round((benef / B.ca) * 100) };
+  })();
+  const R = 52, L = 2 * Math.PI * R;
+  let cumul = 0;
+  // Six derniers mois, brut des ventes au prix d'achat connu (même publication).
+  const mois6 = (() => {
+    if (!pub) return null;
+    const d = new Date(); const out = [];
+    for (let k = 5; k >= 0; k--) {
+      const de = new Date(d.getFullYear(), d.getMonth() - k, 1), a = new Date(d.getFullYear(), d.getMonth() - k + 1, 1);
+      const r = beneficeDesJours(pub.jours, de, a);
+      out.push({ cle: `${de.getFullYear()}-${de.getMonth() + 1}`, l: de.toLocaleDateString('fr-FR', { month: 'short' }), v: r.nCout > 0 ? r.brut : (r.n === 0 ? 0 : null), n: r.n, nCout: r.nCout, courant: k === 0 });
+    }
+    return out;
+  })();
+  const max6 = mois6 ? Math.max(1, ...mois6.map((m) => (m.v != null && m.v > 0 ? m.v : 0))) : 1;
+  // L'URSSAF : le rappel (période finie, à déclarer) ou la prochaine échéance.
+  const freq = load('vinted_urssaf_freq', 'trimestriel');
+  const rappel = micro ? rappelUrssaf({ freq, declare: lireDeclarations(), ligne: ligneUrssaf }) : null;
+  const prochaine = micro && !rappel ? nextUrssafDeadline(freq) : null;
+  const dateCourte = (iso) => { const [y, m, dd] = String(iso).split('-').map(Number); return new Date(y, m - 1, dd).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' }); };
+  return (
+    <div className="vrm-fu-compta vrm-fu-ecran" data-fu-compta="">
+      <CarteMois surtitre="Ce que tu as gagné" data-fu-benef-etat={etat} data-fu-benef={valeur == null ? '' : String(valeur)} data-fu-benef-net={avecNet ? '1' : '0'}
+        valeur={valeur == null ? null : <>{sansAchat > 0 && valeur != null ? <span className="vrm-fu-borne">sur {B.nCout}/{B.n}</span> : null}{fmt(valeur)}</>}
+        sous={sous} cases={cases}/>
+      <div className="vrm-fu-compta-grille">
+        <section className="vrm-fu-panneau" aria-label="Où passe l'argent vendu" data-fu-anneau={anneau ? String(anneau.pct) : ''}>
+          <div className="vrm-fu-panneau-tete"><h3>Où passe l'argent</h3><span>{moisLong}</span></div>
+          <div className="vrm-fu-anneau">
+            {anneau ? (
+              <svg width="132" height="132" viewBox="0 0 132 132" role="img" aria-label={`Il te reste ${anneau.pct} % de ce que tu as vendu`}>
+                <circle cx="66" cy="66" r={R} fill="none" stroke="var(--fu-piste)" strokeWidth="16"/>
+                {anneau.parts.map(([cle, , v]) => { const part = anneau.total > 0 ? v / anneau.total : 0; const seg = <circle key={cle} className={'vrm-fu-arc is-' + cle} cx="66" cy="66" r={R} fill="none" strokeWidth="16" strokeDasharray={`${Math.max(0, part * L - 2)} ${L}`} strokeDashoffset={-cumul * L} transform="rotate(-90 66 66)"/>; cumul += part; return seg; })}
+                <text x="66" y="66" textAnchor="middle" className="vrm-fu-anneau-centre">{anneau.pct} %</text>
+                <text x="66" y="86" textAnchor="middle" className="vrm-fu-anneau-sous">te reste</text>
+              </svg>
+            ) : null}
+            <ul className="vrm-fu-legende">
+              <li data-fu-part="benef"><i className="is-benef"/><span>{avecNet ? 'Bénéfice' : 'Bénéfice brut'}</span><b>{valeur == null ? '—' : fmt(valeur)}</b></li>
+              {micro ? <li data-fu-part="cotis"><i className="is-cotis"/><span>Cotisations</span><b>{B && B.cotis != null ? fmt(B.cotis) : '—'}</b></li> : null}
+              <li data-fu-part="achat"><i className="is-achat"/><span>Prix d'achat{sansAchat > 0 ? ` (${B.nCout} sur ${B.n})` : ''}</span><b>{B && B.nCout > 0 ? fmt(B.cout) : '—'}</b></li>
+              {anneau ? <li data-fu-part="frais"><i className="is-frais"/><span>Frais et dépenses</span><b>{fmt(anneau.parts[3][2])}</b></li> : null}
+            </ul>
+          </div>
+          {!anneau ? <p className="vrm-fu-note">{!B ? 'Rien à répartir tant que le bénéfice n’est pas calculé.' : sansAchat > 0 ? 'La répartition s’affiche quand tous les prix d’achat du mois sont saisis.' : B.n === 0 ? 'Aucune vente finalisée ce mois-ci.' : 'La répartition s’affiche quand les frais et les cotisations du mois sont connus.'}</p> : null}
+        </section>
+        <section className="vrm-fu-panneau" aria-label="Bénéfice des six derniers mois" data-fu-mois6={mois6 ? mois6.map((m) => (m.v == null ? '' : Math.round(m.v))).join(',') : ''}>
+          <div className="vrm-fu-panneau-tete"><h3>6 derniers mois</h3><span>bénéfice brut</span></div>
+          {mois6 ? (
+            <div className="vrm-fu-barres">
+              {mois6.map((m) => (
+                <div key={m.cle} className="vrm-fu-barre" data-courant={m.courant ? '' : undefined} data-vide={m.v == null ? '' : undefined}
+                  title={m.v == null ? `${m.l} : aucun prix d'achat connu (${m.n} vente${m.n > 1 ? 's' : ''})` : `${m.l} : ${fmt(m.v)}${m.nCout < m.n ? ` · ${m.nCout} vente${m.nCout > 1 ? 's' : ''} sur ${m.n} au prix d'achat connu` : ''}`}>
+                  <b className="vrm-fu-barre-v">{m.v == null ? '—' : Math.round(m.v)}</b>
+                  <div className="vrm-fu-barre-piste"><i style={{ height: m.v == null ? '24%' : `${Math.max(3, (Math.max(0, m.v) / max6) * 100)}%` }}/></div>
+                  <span>{m.l.replace('.', '')}</span>
+                </div>
+              ))}
+            </div>
+          ) : <p className="vrm-fu-note">Se calcule dans Ventes.</p>}
+        </section>
+      </div>
+      {rappel ? (
+        <section className="vrm-fu-declaration" data-fu-urssaf={rappel.dueIso} aria-label="Déclaration URSSAF">
+          <div><b>Déclaration URSSAF · {rappel.label}</b><span>avant le {dateCourte(rappel.dueIso)}{rappel.apayer != null ? ` · ≈ ${rappel.partiel ? 'au moins ' : ''}${fmt(rappel.apayer)} à payer` : ''}</span></div>
+          {rappel.aNoter && rappel.aNoter.length ? <button type="button" className="vrm-fu-encre-btn" data-fu-geste="" data-urssaf-cest-declare={rappel.aNoter[0]} onClick={() => demanderDeclaration(rappel.aNoter[0], onNav)}>J'ai déclaré</button> : null}
+        </section>
+      ) : prochaine ? (
+        <section className="vrm-fu-declaration is-calme" data-fu-urssaf-prochaine={prochaine.label} aria-label="Prochaine déclaration URSSAF">
+          <div><b>Prochaine déclaration URSSAF · {prochaine.label}</b><span>avant le {prochaine.dueDate.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' })}{prochaine.daysLeft > 0 ? ` · dans ${prochaine.daysLeft} jours` : ''}</span></div>
+        </section>
+      ) : null}
+    </div>
+  );
+}
 // (22 oct.) LE CHOIX, UNE SEULE FOIS : tant que rien n'a jamais été noté, le
 // « net » n'est qu'un net AVANT ses dépenses (cartons, scotch, essence…). Deux
 // réponses, synchronisées dans `vrm_compta` : « je n'ai pas de dépenses à
@@ -38260,6 +38378,8 @@ function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, pan
   return (
     <div className="vrm-finance-page" style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 16 }}>
       <ScreenHead icon="euro" title="Comptabilité" desc="Ce que tu as vendu et reçu, ton bénéfice, ton URSSAF et tes dépenses." />
+      {/* (2 nov., style « Fusion ») La carte sombre, l'anneau, les six mois, l'URSSAF — sur les MÊMES lectures. */}
+      <ComptaFusion compta={data} onNav={onNav}/>
       {!ligneComptaPub && <div data-compta-pas-calcule="" style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', padding: '10px 14px', borderRadius: 12, background: 'var(--vrm-b-teinte)', fontSize: 13, color: C.text }}>
         {/* (2 nov.) Un compte neuf, sans compte Vinted : « ouvre Ventes » ne menait
             nulle part (Ventes n'a rien à publier). La cause vraie et son geste —
@@ -49131,7 +49251,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             // MÊME `friseVente` — une règle, deux formes.
             const preuvesFrise = preuvesFriseDe(o);
             const fuEtapes = preuvesFrise.etapes ? friseVenteFusion(preuvesFrise.etapes, { geste: peutDeposer }) : null;
-            const fuTransp = preuvesFrise.bordE && preuvesFrise.bordE.suivi ? (transporteurDeForme(preuvesFrise.bordE.suivi) || '') : '';
+            // Le transporteur : la règle de la pastille (`transporteurVente` → `transporteurDuColis`), la même que le tiroir.
+            const fuTransp = transporteurVente(preuvesFrise.bordE);
             const fuPdf = !!(labelsCaptes[txL] || bordParTx[txL]);
             const recapVente = ({ titreId, fermerRef, fermer }) => {
               const { s, tus, vs, horsParcours, bordE, bordC, posteMain, finalisee, versement, etapes } = preuvesFrise;
@@ -49258,7 +49379,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 {...gp} benef={benefLigne} recap={recapVente} data-depose-attente={deposeIci?'1':undefined}
                 data-fu-ligne="" frise={fuEtapes ? <Frise etapes={fuEtapes} cle={txL} className="vrm-fu-ligne-frise" label="Où en est la vente"/> : null}
                 bas={peutDeposer && fuPdf ? <div className="vrm-fu-ligne-bas" data-sans-glisse="">
-                  {fuTransp ? <span className="vrm-fu-transp" data-fu-transporteur={fuTransp}>{fuTransp}</span> : null}
+                  <PastilleTransporteur t={fuTransp} C={C} className="vrm-fu-transp" data-fu-transporteur=""/>
                   <button type="button" className="vrm-fu-principal" data-fu-geste="" data-fu-imprimer={txL} onClick={()=>imprimerBordereauVente(o)}><Icon name="printer" size={16}/>Imprimer le bordereau</button>
                 </div> : null} gestes={(gesteCout || gesteDepose) ? <div className="vrm-gestes-pile">{gesteCout}{gesteDepose}</div> : null} sous={[o.date?dateFr(o.date, {day:'numeric',month:'short'}):'', (o._acc && !ventesUnCompte) ? accNameOf(o._acc) : ''].filter(Boolean).join(' · ')} etat={venteStage(o).label} ton={st!=='cancelled' && aExpedier(o) && !isShipDone(o) ? 'action' : (st==='cancelled' ? 'annule' : '')} montant={sell!=null?`${Number.isInteger(sell)?sell:sell.toFixed(2).replace('.',',')} ${cur(o.price?.currency_code)}`:'—'} className="vrm-sale-row" key={o.transaction_id} data-tx={String(o.transaction_id)} style={{borderTop:i>0?`1px solid ${C.border}`:'none',opacity:hidden?0.5:(st==='cancelled'?0.6:1),padding:'12px 14px',display:'flex',flexDirection:'column',gap:10,...(estFloute(o)?STYLE_FLOU:null),...(gp.style||{})}}>
               </LigneVenteCompacte>

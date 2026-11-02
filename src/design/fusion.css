@@ -129,10 +129,10 @@ button.vrm-fu-case:focus-visible { outline: 2px solid #0a84ff; outline-offset: 2
 .vrm-fu-site { display: inline-flex; align-items: center; gap: 6px; font: 500 12px/1.3 var(--vrm-police); color: var(--fu-gris); white-space: nowrap; }
 .vrm-fu-site::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--fu-gris3); flex: none; }
 .vrm-fu-transp {
-  display: inline-flex; align-items: center; gap: 7px; min-height: 44px; padding: 0 12px; box-sizing: border-box;
-  border-radius: 12px; background: var(--fu-case); color: var(--fu-encre); font: 600 13px/1.2 var(--vrm-police); white-space: nowrap;
+  display: inline-flex !important; align-items: center !important; gap: 7px !important; min-height: 44px !important; padding: 0 12px !important; box-sizing: border-box;
+  border-radius: 12px !important; border: 0 !important; background: var(--fu-case) !important; color: var(--fu-encre); font: 600 13px/1.2 var(--vrm-police); white-space: nowrap;
 }
-.vrm-fu-transp::before { content: ''; width: 16px; height: 16px; border-radius: 4px; background: var(--fu-gris3); opacity: .55; flex: none; }
+.vrm-fu-transp [data-transporteur-nom] { font-size: 13px !important; color: var(--fu-encre) !important; }
 .vrm-fu-titre-section { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin: 22px 2px 10px; }
 .vrm-fu-titre-section h2, .vrm-fu-titre-section h3 { margin: 0; font: 700 20px/1.2 var(--vrm-police); letter-spacing: -.02em; color: var(--fu-encre); }
 .vrm-fu-titre-section span { font: 600 13px/1.2 var(--vrm-police); color: var(--fu-gris2); font-variant-numeric: tabular-nums; }
@@ -318,11 +318,11 @@ html body .vrm-app-shell .vrm-fu-ecran [data-fu-colis] { border: 0 !important; b
 .vrm-fu-legende li > i { width: 10px; height: 10px; border-radius: 3px; flex: none; }
 .vrm-fu-legende li > span { flex: 1 1 auto; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .vrm-fu-legende li > b { font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
-.vrm-fu-barres { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 10px; align-items: end; height: 132px; }
+.vrm-fu-barres { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 10px; align-items: stretch; height: 150px; }
 .vrm-fu-barre { display: flex; flex-direction: column; align-items: stretch; justify-content: flex-end; gap: 8px; height: 100%; min-width: 0; }
-.vrm-fu-barre > i { display: block; border-radius: 8px; background: var(--fu-piste); min-height: 4px; }
-.vrm-fu-barre[data-courant] > i { background: var(--fu-bleu); }
-.vrm-fu-barre[data-vide] > i { background: transparent; border: 1.5px dashed var(--fu-piste); }
+.vrm-fu-barre-piste { flex: 1 1 auto; min-height: 0; display: flex; align-items: flex-end; }
+.vrm-fu-barre-piste > i { display: block; width: 100%; border-radius: 8px; background: var(--fu-piste); min-height: 4px; }
+.vrm-fu-barre[data-vide] .vrm-fu-barre-piste > i { background: transparent; border: 1.5px dashed var(--fu-piste); }
 .vrm-fu-barre > span { font: 600 11px/1 var(--vrm-police); color: var(--fu-gris2); text-align: center; white-space: nowrap; }
 .vrm-fu-barre[data-courant] > span { color: var(--fu-encre); font-weight: 700; }
 .vrm-fu-declaration {
@@ -350,3 +350,21 @@ html body .vrm-app-shell .vrm-main .vrm-sale-row[data-fu-ligne] > .vrm-ledger-ge
 html body .vrm-app-shell .vrm-main .vrm-sale-row[data-fu-ligne] > .vrm-ledger-gestes .vrm-gestes-pile { flex-direction: row; flex-wrap: wrap; align-items: center; }
 html body .vrm-app-shell .vrm-main .vrm-sale-row[data-fu-ligne] > .vrm-ledger-gestes :is(button, .vrm-b) { border-radius: 12px !important; background: var(--fu-case) !important; border: 0 !important; color: var(--fu-encre) !important; }
 html body .vrm-app-shell .vrm-main .vrm-sale-row[data-fu-ligne] > button.vrm-ledger-sale-toggle { padding-top: 0 !important; padding-bottom: 0 !important; min-height: 0 !important; }
+
+/* Compta : l'anneau en tons neutres (encre → gris), l'encart URSSAF calme quand
+   rien n'est encore à déclarer. */
+.vrm-fu-arc.is-benef { stroke: var(--fu-encre); }
+.vrm-fu-arc.is-cotis { stroke: var(--fu-gris2); }
+.vrm-fu-arc.is-achat { stroke: var(--fu-gris3); }
+.vrm-fu-arc.is-frais { stroke: transparent; }
+.vrm-fu-legende li > i.is-benef { background: var(--fu-encre); }
+.vrm-fu-legende li > i.is-cotis { background: var(--fu-gris2); }
+.vrm-fu-legende li > i.is-achat { background: var(--fu-gris3); }
+.vrm-fu-legende li > i.is-frais { background: var(--fu-piste); }
+.vrm-fu-note { margin: 12px 0 0; font: 500 13px/1.45 var(--vrm-police); color: var(--fu-gris); }
+.vrm-fu-barre-v { font: 700 11px/1 var(--vrm-police); color: var(--fu-gris2); text-align: center; font-variant-numeric: tabular-nums; }
+.vrm-fu-barre[data-courant] .vrm-fu-barre-v { color: var(--fu-encre); }
+.vrm-fu-barre[data-courant] .vrm-fu-barre-piste > i { background: var(--fu-encre); }
+.vrm-fu-declaration.is-calme { background: var(--fu-carte); color: var(--fu-encre); box-shadow: var(--fu-ombre); }
+.vrm-fu-declaration.is-calme span { color: var(--fu-gris); }
+.vrm-fu-compta .vrm-fu-carte { margin: 0; }
