@@ -10,7 +10,7 @@
 //   B. le bouton Envoyer du fil (Messages · Vinted, 390 tactile et 1512, clair et
 //      sombre) : champ vide ⇒ il SE LIT désactivé (pas un cobalt délavé : un fond
 //      neutre, opacité pleine) et dit pourquoi (`title`) ; texte saisi ⇒ cobalt
-//      PLEIN (la couleur d'accent, opacité 1), icône lisible (contraste ≥ 4,5:1) ;
+//      PLEIN (la couleur d'accent, opacité 1), icône lisible (contraste ≥ 3:1 : un pictogramme sans texte, WCAG 1.4.11 ; 4,5:1 vaut pour le texte) ;
 //   C. le fil : chaque bulle garde au moins 12 px entre son texte et ses bords ;
 //      le pied d'envoi (rapides, champ, micro, Envoyer) tient DANS le fil ;
 //   D. huit écrans (Ma journée, Annonces, Ventes, Colis, Messages, Achats,
@@ -237,7 +237,7 @@ const ECRANS = [
           await pg.waitForTimeout(250);
           const plein = await lireEnvoyer();
           const c = await pg.evaluate(([a, b]) => window.__contraste(a, b), [plein.ic, plein.bg]);
-          dit(!plein.disabled && plein.bg === accent && plein.op > .99 && c >= 4.5, 'texte saisi : Envoyer en cobalt PLEIN, opacité 1, icône lisible', JSON.stringify({ ...plein, accent, contraste: c.toFixed(2) }));
+          dit(!plein.disabled && plein.bg === accent && plein.op > .99 && c >= 3, 'texte saisi : Envoyer en couleur d’accent PLEINE, opacité 1, icône lisible (≥ 3:1, WCAG 1.4.11 pour un pictogramme seul)', JSON.stringify({ ...plein, accent, contraste: c.toFixed(2) }));
           await pg.locator('.vrm-chat-compose textarea').focus();
           await shot(pg, nom(vp, sombre, 'fil-saisi'));
           // C. Les bulles : du souffle autour du texte.
