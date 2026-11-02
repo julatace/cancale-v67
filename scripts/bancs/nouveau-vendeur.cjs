@@ -271,6 +271,11 @@ async function tournee(nav, { W, sombre, scenario, base }) {
     dit(!r.pointsSeuls.length, `${T} ${nom} : aucune ligne qui commence par « · »`, r.pointsSeuls.join(' ¦ '));
     dit(!r.colles.length, `${T} ${nom} : rien n'est collé (carte vide et ce qui suit, texte et son bandeau)`, r.colles.join(' ¦ '));
     dit(!r.debord && !r.dehors.length, `${T} ${nom} : rien ne déborde à droite`, JSON.stringify(r.dehors));
+    if (scenario === 'vide' && tab === 'compta') {
+      // Sans compte Vinted, « ouvre Ventes » ne mène nulle part : la vraie cause et son geste.
+      const t = await o.pg.evaluate(() => document.body.innerText);
+      dit(!/ouvre Ventes une fois|ouvre-le une fois/.test(t) && /aucun compte Vinted n’est encore relié/.test(t), `${T} ${nom} : sans compte, la cause vraie (aucun compte relié), pas « ouvre Ventes »`, (/Pas encore calculé[^\n]*/.exec(t) || [''])[0]);
+    }
     if (o.tel) dit(!r.petits.length, `${T} ${nom} : chaque cible au doigt fait 44 px`, r.petits.slice(0, 8).join(' ¦ '));
     dit(!r.coupes.length, `${T} ${nom} : aucun titre coupé`, r.coupes.join(' ¦ '));
   }

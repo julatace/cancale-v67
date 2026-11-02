@@ -37527,7 +37527,7 @@ const repondreSansDepenses = (compta, ecrire) => {
   if (depensesEtat(compta) !== 'jamais') return;
   ecrire({ ...COMPTA_DEFAUT, ...(compta || {}), sansDepenses: { at: Date.now() } });
 };
-function BeneficeCompta({ compta, onNav, onSansDepenses, onAjouterDepense }) {
+function BeneficeCompta({ compta, onNav, onSansDepenses, onAjouterDepense, sansCompte = false }) {
   const [nuagePret, setNuagePret] = React.useState(() => isCloudReady());
   React.useEffect(() => onCloudReady(() => setNuagePret(true)), []);
   const [periode, setPeriode] = React.useState(() => { try { const v = localStorage.getItem('vrm_compta_periode_benef'); return PERIODES_BENEF.some(([k]) => k === v) ? v : 'mois'; } catch (_) { return 'mois'; } });
@@ -37561,7 +37561,7 @@ function BeneficeCompta({ compta, onNav, onSansDepenses, onAjouterDepense }) {
       <div className="vrm-set-liste" style={{ background: C.card, border: `1px solid ${C.border}`, '--vrm-set-filet': C.border }}>
         {!B ? (
           <div className="vrm-set-ligne"><span className="vrm-set-lib"><small style={{ color: C.muted, marginTop: 0, lineHeight: 1.5 }}>
-            {etat === 'encours' ? 'Je lis ton bénéfice…' : <>Ton bénéfice se calcule dans l'écran Ventes, à partir de tes prix d'achat : ouvre-le une fois{onNav ? <> (<a href="?tab=cat_ventes" onClick={(ev) => { ev.preventDefault(); onNav('cat_ventes'); }} style={{ color: C.accent, fontWeight: 600, textDecoration: 'none' }}>Ventes</a>)</> : null}, il arrivera ici.</>}
+            {etat === 'encours' ? 'Je lis ton bénéfice…' : sansCompte ? <span data-benefice-sans-compte="">Ton bénéfice arrivera ici dès qu’un compte Vinted sera relié (le bandeau du haut dit comment).</span> : <>Ton bénéfice se calcule dans l'écran Ventes, à partir de tes prix d'achat : ouvre-le une fois{onNav ? <> (<a href="?tab=cat_ventes" onClick={(ev) => { ev.preventDefault(); onNav('cat_ventes'); }} style={{ color: C.accent, fontWeight: 600, textDecoration: 'none' }}>Ventes</a>)</> : null}, il arrivera ici.</>}
           </small></span></div>
         ) : (<>
           <Ligne lib="Bénéfice brut" val={B.nCout > 0 ? B.brut : (B.n === 0 ? 0 : null)}
@@ -38093,7 +38093,7 @@ function GrilleJournee({ dispo, poser, rendus, edition, setEdition, peutModifier
     </>
   );
 }
-function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, accounts }) {
+function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, accounts, comptesLus = false }) {
   const [data, setData] = React.useState(() => {
     try { const d = load('vrm_compta', null); return d && typeof d === 'object' ? { ...COMPTA_DEFAUT, ...d } : { ...COMPTA_DEFAUT }; }
     catch (_) { return { ...COMPTA_DEFAUT }; }
@@ -38301,8 +38301,16 @@ function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, pan
     <div className="vrm-finance-page" style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 16 }}>
       <ScreenHead icon="euro" title="Comptabilité" desc="Ce que tu as vendu et reçu, ton bénéfice, ton URSSAF et tes dépenses." />
       {!ligneComptaPub && <div data-compta-pas-calcule="" style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', padding: '10px 14px', borderRadius: 12, background: 'var(--vrm-b-teinte)', fontSize: 13, color: C.text }}>
+        {/* (2 nov.) Un compte neuf, sans compte Vinted : « ouvre Ventes » ne menait
+            nulle part (Ventes n'a rien à publier). La cause vraie et son geste —
+            seulement quand la liste des comptes est LUE (pas su ≠ aucun). */}
+        {comptesLus && Array.isArray(accounts) && accounts.length === 0 ? (<>
+          <span style={{ flex: '1 1 220px' }} data-compta-sans-compte="">Ce calcul part de tes ventes Vinted : aucun compte Vinted n’est encore relié.</span>
+          <Bouton className="vrm-b-petit" onClick={() => onNav && onNav('vintedaccounts')}>Relier mon compte</Bouton>
+        </>) : (<>
         <span style={{ flex: '1 1 220px' }}>Pas encore calculé : ouvre <b>Ventes</b> une fois sur cet appareil.</span>
         <Bouton className="vrm-b-petit" onClick={() => onNav && onNav('cat_ventes')}>Ouvrir Ventes</Bouton>
+        </>)}
       </div>}
       {/* (29 octobre) Julien : « pour la compta, améliore tout, mets de côté la
           facturation électronique et fais quelque chose de simple ». En haut, ce
@@ -38323,7 +38331,7 @@ function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, pan
       </div>
 
       <div id="compta-benefice" style={{ scrollMarginTop: 72 }}>
-      <BeneficeCompta compta={data} onNav={onNav}
+      <BeneficeCompta compta={data} onNav={onNav} sansCompte={comptesLus && Array.isArray(accounts) && accounts.length === 0}
         onSansDepenses={() => repondreSansDepenses(data, maj)}
         onAjouterDepense={() => { setOuvert('dep'); setVersDepense((n) => n + 1); }} />
       </div>
@@ -64882,7 +64890,7 @@ function AppCoeur() {
         {tab==='garage'   &&<Garage    catalog={catalog} garageGrid={garageGrid} setGarageGrid={setGarageGrid} blockedCells={blockedCells} setBlockedCells={setBlockedCells} extraCols={extraCols} setExtraCols={setExtraCols} cellColors={cellColors} setCellColors={setCellColors} locate={garageLocate} onLocateConsumed={()=>setGarageLocate(null)} placeNum={garagePlace} onPlaced={()=>setGaragePlace(null)}/>}
         {tab==='comptabilite'&&<Comptabilite accounts={vintedAccounts} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}}/>}
         {tab==='compta'&&<div className="vrm-rubriques" style={{padding:'12px 16px 0'}}><PlatSubNav sub={platSub==='factures'?'factures':'compta'} setSub={setPlatSub} sections={/* (30 oct.) « Comptabilité » était écrit deux fois en tête (segment + titre) : « Vue d’ensemble », comme Statistiques */ [['compta','Vue d’ensemble'],['factures','Factures']]}/></div>}
-        {tab==='compta'&&platSub!=='factures'&&<ComptaPro liveStats={liveStatsVus} onNav={setTab} lbcVentes={lbcVentes} lbcCoqueLu={lbcCoqueLu} ebayCommandes={ebayCommandes} panelOff={panelOffCoque} accounts={vintedAccounts}/>}
+        {tab==='compta'&&platSub!=='factures'&&<ComptaPro liveStats={liveStatsVus} onNav={setTab} lbcVentes={lbcVentes} lbcCoqueLu={lbcCoqueLu} ebayCommandes={ebayCommandes} panelOff={panelOffCoque} accounts={vintedAccounts} comptesLus={accountsLoaded && !baseKO}/>}
         {/* (31 oct., soir) Colis · Leboncoin : la pastille « Leboncoin » de la rangée
             de filtres de Colis ouvre les colis Leboncoin (bordereau, QR — l'ancien
             « Leboncoin → Colis », `LeboncoinColis`) ; les autres pastilles
