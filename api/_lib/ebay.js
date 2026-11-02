@@ -453,6 +453,7 @@ async function resoudreCompte(brut, owner) {
 async function deconnecterCompte(compte, owner) {
   const ok = await ecrireLignes([{ id: TOKENS_ID + (compte.suffixe || ''), data: { refresh_token: '', deconnecteLe: Date.now() } }], owner);
   if (!ok) return { ok: false, status: 502, reason: 'store-failed', error: 'Je n\'ai pas pu déconnecter ce compte (base injoignable) — rien n\'a changé, réessaie.' };
+  await oublierAcces(owner, compte.suffixe || '');
   if (!(await baseCloisonnee())) return { ok: true, status: 200, registre: null };
   const t = Date.now();
   const w = await modifierComptes(owner, (l) => {
@@ -491,12 +492,44 @@ async function hasRefresh(owner, suffixe = '') {
 // La valeur seule (ou null) — pour les lecteurs d'avant.
 async function readRefresh(owner, suffixe = '') { return (await lireRefresh(owner, suffixe)) || null; }
 
+// ── LE JETON D'ACCÈS GARDÉ (2 nov., audit « plateformes » P9) ───────────────
+// Avant, chaque geste échangeait le refresh_token contre un jeton neuf (~2 h) :
+// une publication en faisait 1 + 1 par autre compte, la relecture de fond 144
+// par jour et par compte — tous sur l'identifiant d'application de VRM, commun
+// à tous les vendeurs (un plafond OAuth d'eBay ferait tout échouer d'un coup).
+// ⇒ Le jeton est gardé CÔTÉ SERVEUR dans `ebay_tokens_acces{suffixe}` (préfixe
+//   `ebay_tokens` : la garde de la base, migration 014, interdit à tout
+//   navigateur de l'écrire ; l'app ne lit jamais `ebay_tokens*`), réutilisé
+//   jusqu'à 5 min avant son expiration, et seulement s'il vient du MÊME
+//   refresh_token (empreinte) : une reconnexion ou une déconnexion l'invalide.
+//   Une lecture ratée = pas de cache (on redemande, comme avant) ; une écriture
+//   ratée ne change rien au geste.
+const ACCES_ID = 'ebay_tokens_acces';
+const ACCES_MARGE_MS = 5 * 60 * 1000;
+const empreinteRefresh = (r) => crypto.createHash('sha256').update(String(r)).digest('hex').slice(0, 32);
+async function lireAccesGarde(owner, suffixe, refresh) {
+  const d = await lireDonnee(ACCES_ID + (suffixe || ''), owner);
+  if (!d || typeof d !== 'object') return null;
+  if (d.empreinte !== empreinteRefresh(refresh) || typeof d.access !== 'string' || !d.access) return null;
+  const exp = Number(d.expireA);
+  if (!Number.isFinite(exp) || exp - ACCES_MARGE_MS <= Date.now()) return null;
+  return { token: d.access, expires_in: Math.floor((exp - Date.now()) / 1000) };
+}
+async function garderAcces(owner, suffixe, refresh, token, expiresIn) {
+  const s = Number(expiresIn) > 0 ? Number(expiresIn) : 7200;
+  try { await ecrireLignes([{ id: ACCES_ID + (suffixe || ''), data: { access: token, expireA: Date.now() + s * 1000, empreinte: empreinteRefresh(refresh) } }], owner); } catch (_) {}
+}
+async function oublierAcces(owner, suffixe) {
+  try { await ecrireLignes([{ id: ACCES_ID + (suffixe || ''), data: { access: '', expireA: 0, empreinte: '' } }], owner); } catch (_) {}
+}
+
 // Échange le refresh_token de CE vendeur (et de CE compte eBay) contre un
-// access_token frais (~2 h).
-async function accessToken(owner, suffixe = '') {
+// access_token frais (~2 h) — ou rend celui qui est gardé (voir plus haut).
+async function accessToken(owner, suffixe = '', opts = {}) {
   const refresh = await lireRefresh(owner, suffixe);
   if (refresh === undefined) return { ok: false, status: 503, reason: 'store-unreachable', error: 'Je n\'ai pas pu lire ta connexion eBay (base injoignable) — rien n\'a été envoyé à eBay.' };
   if (!refresh) return { ok: false, status: 401, reason: 'not-connected', error: 'Aucun compte eBay relié.' };
+  if (!opts.neuf) { const g = await lireAccesGarde(owner, suffixe, refresh); if (g) return { ok: true, token: g.token, expires_in: g.expires_in, garde: true }; }
   // ⚠️ AUCUN `scope=` ici. eBay renvoie alors TOUS les droits déjà accordés à ce
   // refresh_token. Redemander `SCOPES` casserait tout le jour où on y ajoute un
   // droit (comme `sell.finances`) que le jeton actuel n'a pas encore : eBay
@@ -516,6 +549,7 @@ async function accessToken(owner, suffixe = '') {
     reason: 'reconnecter', error: 'eBay a refusé la connexion de ce compte (mot de passe changé, accès retiré ou connexion trop ancienne). Reconnecte-le : Paramètres → Compte eBay → « Déconnecter » ce compte, puis connecte-le à nouveau.', detail: String(j.error_description || '') };
   if (!r.ok || !j.access_token) return { ok: false, status: r.status >= 500 ? 502 : (r.status || 502),
     reason: 'refresh-failed', error: 'Impossible de rafraîchir le jeton eBay', detail: (j && (j.error_description || j.error)) || '' };
+  await garderAcces(owner, suffixe, refresh, j.access_token, j.expires_in);
   return { ok: true, token: j.access_token, expires_in: j.expires_in || null };
 }
 
@@ -677,6 +711,6 @@ function seuilTropBas(accepte, prix) {
   return 2 * Math.round(accepte * 100) < Math.round(prix * 100);
 }
 
-export { SCOPES, appId, certId, ruName, keysReady, canConsent, authUrl, appToken, jetonApplication, oublierJetonApplication, exchangeCode, hasRefresh, readRefresh, lireRefresh, accessToken, storeData, portee, lireReglageVendeur, lireDonnee, lireResumeCommandes, modifierDonnee,
+export { oublierAcces, SCOPES, appId, certId, ruName, keysReady, canConsent, authUrl, appToken, jetonApplication, oublierJetonApplication, exchangeCode, hasRefresh, readRefresh, lireRefresh, accessToken, storeData, portee, lireReglageVendeur, lireDonnee, lireResumeCommandes, modifierDonnee,
   COMPTES_ID, CLE_COMPTE, suffixeCompte, cleCompteDe, identiteEbay, lireComptes, normaliserRegistre, modifierComptes, comptesActifs, rangerConnexion, apprendrePrincipal, apprendreTypes, resoudreCompte, deconnecterCompte,
   MONTANT_MAX, montantOk, valideRegleOffre, seuilTropBas };

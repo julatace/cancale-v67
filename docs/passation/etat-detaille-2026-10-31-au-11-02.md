@@ -66,3 +66,4 @@ Déplacé TEL QUEL depuis CLAUDE.md §9 le 2 novembre 2026 (le fichier dépassai
   guidée (`Bienvenue.jsx`) ; annonces en fiches produit ; un article parti sort du Stock.
 - **31 oct. (soir)** — Les colis à retirer vivent dans Colis seulement ; Achats à part ; sections de site en sous-onglets. → historique interface-stock. Geste : aucun.
 - **31 oct. (nuit)** — Recherche en place et notifications qui mènent à l'endroit exact (`api/_lib/lien-notif.js` ⇄ `src/cibleNotif.js`). → historiques interface-stock et sécurité. Geste : aucun.
+- **31 oct. (soir)** — Colis en 4 colonnes (Prêts · En attente · À retirer · Partis, sa maquette) + barre du haut ordinateur (recherche « / », filtres de site à droite) ; aucune règle neuve, la liste d'avant reste sous « Colis par colis ». → historique colis-retraits. Geste : regarder Colis sur ordinateur.

@@ -759,13 +759,13 @@ const RA = {};
   const item = { title: 'Nike Dunk Low panda T42', categoryId: '15709', price: '100', conditionId: '3000', photos: ['https://img.test/1.jpg'], aspects: { Marque: 'Nike' }, ebayGere: true };
   await essaie('publish avec numéro', async () => {
     remettre();
-    const o = await app(JWT_J, { action: 'publish', item: { ...item, numero: '401' } });
+    const o = await app(JWT_J, { action: 'publish', confirme: true, item: { ...item, numero: '401' } });
     const add = auCompte(o.journal).find((x) => x.appel === 'AddFixedPriceItem');
     dit(o.code === 200 && add && /<SKU>VRM-401<\/SKU>/.test(add.corps) && o.corps.sku === 'VRM-401', 'une paire publiée part avec son SKU VRM-401', `HTTP ${o.code}`);
   });
   await essaie('publish : rien de recopié du navigateur', async () => {
     remettre();
-    const o = await app(JWT_J, { action: 'publish', item: { ...item, sku: 'EVIL-1', scheduleTime: iso(Date.now() + 2 * JOUR), uuid: 'B'.repeat(32) } });
+    const o = await app(JWT_J, { action: 'publish', confirme: true, item: { ...item, sku: 'EVIL-1', scheduleTime: iso(Date.now() + 2 * JOUR), uuid: 'B'.repeat(32) } });
     const add = auCompte(o.journal).find((x) => x.appel === 'AddFixedPriceItem');
     dit(o.code === 200 && add && !/<SKU>/.test(add.corps) && !/<ScheduleTime>/.test(add.corps) && !/<UUID>/.test(add.corps),
       "sans numéro, aucun SKU — et un `sku`, une heure ou un UUID glissés dans `item` ne sont jamais recopiés", add ? add.corps.slice(0, 80) : 'aucun appel');
@@ -778,7 +778,7 @@ const RA = {};
   });
   await essaie('publish numéro illisible', async () => {
     remettre();
-    const o = await app(JWT_J, { action: 'publish', item: { ...item, numero: 'zz' } });
+    const o = await app(JWT_J, { action: 'publish', confirme: true, item: { ...item, numero: 'zz' } });
     dit(o.code === 400 && auCompte(o.journal).length === 0, 'un numéro de paire illisible ⇒ rien n\'est publié (pas de faux lien)', `HTTP ${o.code}`);
   });
   await essaie('offreinfo', async () => {
@@ -871,10 +871,10 @@ const RA = {};
   });
   await essaie('modifier : réponse sans Ack', async () => {
     remettre(); mode.trading = 'reseau';
-    const o = await app(JWT_J, { action: 'revise', itemId: '110000000001', price: '70', prixVu: '80' });
+    const o = await app(JWT_J, { action: 'revise', confirme: true, itemId: '110000000001', price: '70', prixVu: '80' });
     dit(o.code === 504 && o.corps.reason === 'incertain', 'changer un prix, réseau coupé ⇒ « incertain », jamais « eBay a refusé »', `HTTP ${o.code} · ${o.corps && o.corps.error}`);
     remettre(); mode.trading = 'refus';
-    const o2 = await app(JWT_J, { action: 'revise', itemId: '110000000001', price: '70', prixVu: '80' });
+    const o2 = await app(JWT_J, { action: 'revise', confirme: true, itemId: '110000000001', price: '70', prixVu: '80' });
     dit(o2.code !== 504 && o2.corps.ok === false && o2.corps.reason !== 'incertain', 'l\'autre sens : un vrai refus (Ack Failure) reste un refus', `HTTP ${o2.code}`);
   });
 
@@ -1009,21 +1009,21 @@ const RA = {};
     const MK = { version: 2, archive: 'B', coupure: '2026-10-09T00:00:00.000Z', ebayAnnonces: { 110000000001: { 22: 'B22' }, 110000000900: { 553: '3' } }, renum: { 553: '3' } };
     const base = () => { remettre(); remettreBase(); lignes.push({ owner: J, id: 'main', data: { vrm_numerotation: MK } }); };
     base();
-    let o = await app(JWT_J, { action: 'publish', numerotation: 2, item: { ...item, numero: '22' } });
+    let o = await app(JWT_J, { action: 'publish', confirme: true, numerotation: 2, item: { ...item, numero: '22' } });
     dit(o.code === 200 && o.corps.ok === true, 'publier la NOUVELLE 22 pendant que l\'annonce d\'avant « VRM-22 » (la B22) est en ligne : elle part', `HTTP ${o.code} · ${o.corps && (o.corps.reason || o.corps.error)}`);
     base(); ebay['at-J'].actives.push(annonce('110000000900', 'Autry', 'VRM-553', '60.0', '2026-10-10T08:10:00.000Z'));
-    o = await app(JWT_J, { action: 'publish', numerotation: 2, item: { ...item, numero: '3' } });
+    o = await app(JWT_J, { action: 'publish', confirme: true, numerotation: 2, item: { ...item, numero: '3' } });
     dit(o.code === 409 && o.corps.reason === 'deja-en-ligne' && o.corps.itemId === '110000000900' && !auCompte(o.journal).some((x) => /AddFixed/.test(x.appel)),
       'publier la 3 pendant que « VRM-553 » (numéro provisoire devenu 3) est en ligne : 409, pas de seconde annonce', `HTTP ${o.code} · ${o.corps && o.corps.reason}`);
     base();
-    o = await app(JWT_J, { action: 'publish', item: { ...item, numero: '553' } });
+    o = await app(JWT_J, { action: 'publish', confirme: true, item: { ...item, numero: '553' } });
     dit(o.code === 409 && o.corps.reason === 'numerotation-perimee' && chezEbay(o.journal).length === 0,
       'un écran d\'AVANT la remise à zéro (aucune version, numéro provisoire 553) : refusé, rien ne part chez eBay', `HTTP ${o.code} · ${o.corps && o.corps.reason}`);
     base();
     o = await app(JWT_J, { action: 'programmer', confirme: true, uuid: 'A'.repeat(32), fraisVus: 0.2, scheduleTime: iso(Date.now() + 2 * JOUR), item: { ...item, numero: '30' }, numerotation: 1 });
     dit(o.code === 409 && o.corps.reason === 'numerotation-perimee' && chezEbay(o.journal).length === 0, 'programmer depuis un écran d\'une autre version : refusé, rien ne part', `HTTP ${o.code}`);
     base(); mode.mainKo = true;
-    o = await app(JWT_J, { action: 'publish', numerotation: 2, item: { ...item, numero: '30' } });
+    o = await app(JWT_J, { action: 'publish', confirme: true, numerotation: 2, item: { ...item, numero: '30' } });
     dit(o.code === 503 && o.corps.reason === 'numerotation-pas-su' && chezEbay(o.journal).length === 0, 'numérotation illisible : rien n\'est publié', `HTTP ${o.code}`);
     remettre(); remettreBase();                        // les blocs suivants partent d'une base sans marqueur
   });
@@ -1052,7 +1052,7 @@ const RA = {};
   });
   await essaie('toutes les erreurs', async () => {
     remettre(); mode.add = 'deuxErreurs';
-    const o = await app(JWT_J, { action: 'publish', item: { ...item, numero: '23' } });
+    const o = await app(JWT_J, { action: 'publish', confirme: true, item: { ...item, numero: '23' } });
     dit(o.code >= 400 && /catégorie ne convient pas/.test((o.corps && o.corps.error) || '') && !/titre est long/.test((o.corps && o.corps.error) || ''),
       'deux <Errors> (un Warning PUIS une Error) ⇒ c\'est le message de l\'ERREUR qui est rendu', `HTTP ${o.code} · ${o.corps && o.corps.error}`);
   });
@@ -1144,35 +1144,35 @@ const RA = {};
       const o = await app(JWT_J, prog());
       remettre();
       ebay['at-J'].actives.push(annonce('110000000511', 'Salomon XT-6', forme, '120.0', '2026-09-01T10:00:00.000Z'));
-      const o2 = await app(JWT_J, { action: 'publish', item: { ...item, numero: '30' } });
+      const o2 = await app(JWT_J, { action: 'publish', confirme: true, item: { ...item, numero: '30' } });
       dit(o.code === 409 && o.corps.reason === 'deja-programmee' && o2.code === 409 && o2.corps.reason === 'deja-en-ligne' && ![o, o2].some((x) => auCompte(x.journal).some((y) => /AddFixed/.test(y.appel))),
         `une annonce sous « ${forme} » est la N°30 : programmer et publier la refusent (409), rien d'ajouté`, `programmer HTTP ${o.code} · publier HTTP ${o2.code}`);
     }
     remettre();
     ebay['at-J'].actives.push(annonce('110000000512', 'Autre', 'VRM-300', '50.0', '2026-09-01T10:00:00.000Z'));
-    const o3 = await app(JWT_J, { action: 'publish', item: { ...item, numero: '30' } });
+    const o3 = await app(JWT_J, { action: 'publish', confirme: true, item: { ...item, numero: '30' } });
     dit(o3.code === 200 && o3.corps.ok === true, 'l\'autre sens : « VRM-300 » n\'est PAS la N°30 — la publication part', `HTTP ${o3.code}`);
   });
   // « Publier » avait AUCUNE garde : une paire déjà en vente ou programmée
   // repartait en seconde annonce (revue du 6 octobre, prouvé).
   await essaie('publier : une paire, une annonce', async () => {
     remettre();
-    const o = await app(JWT_J, { action: 'publish', item: { ...item, numero: '22' } });
+    const o = await app(JWT_J, { action: 'publish', confirme: true, item: { ...item, numero: '22' } });
     const n = ebay['at-J'].actives.filter((x) => x.sku === 'VRM-22').length;
     dit(o.code === 409 && o.corps.reason === 'deja-en-ligne' && n === 1 && !auCompte(o.journal).some((x) => /AddFixed/.test(x.appel)),
       'publier la N°22, déjà EN LIGNE ⇒ 409, eBay n\'a toujours qu\'une annonce VRM-22', `HTTP ${o.code} · ${n} annonce(s)`);
     remettre();
     ebay['at-J'].programmees.push(annonce('110000000777', 'Salomon XT-6', 'VRM-30', '120.0', iso(Date.now() + JOUR)));
-    const o2 = await app(JWT_J, { action: 'publish', item: { ...item, numero: '30' } });
+    const o2 = await app(JWT_J, { action: 'publish', confirme: true, item: { ...item, numero: '30' } });
     const n2 = [...ebay['at-J'].actives, ...ebay['at-J'].programmees].filter((x) => x.sku === 'VRM-30').length;
     dit(o2.code === 409 && o2.corps.reason === 'deja-programmee' && o2.corps.itemId === '110000000777' && n2 === 1,
       'publier la N°30, PROGRAMMÉE pour demain ⇒ 409 « déjà programmée », une seule annonce VRM-30', `HTTP ${o2.code} · ${n2} annonce(s)`);
     remettre(); mode.liste = 'ko';
-    const o3 = await app(JWT_J, { action: 'publish', item: { ...item, numero: '30' } });
+    const o3 = await app(JWT_J, { action: 'publish', confirme: true, item: { ...item, numero: '30' } });
     dit(o3.code === 503 && o3.corps.reason === 'pas-su' && !auCompte(o3.journal).some((x) => /AddFixed/.test(x.appel)),
       'ses annonces illisibles ⇒ 503 « pas su », rien n\'est publié', `HTTP ${o3.code}`);
     remettre();
-    const o4 = await app(JWT_J, { action: 'publish', item: { ...item } });
+    const o4 = await app(JWT_J, { action: 'publish', confirme: true, item: { ...item } });
     dit(o4.code === 200 && o4.corps.ok === true && !auCompte(o4.journal).some((x) => x.appel === 'GetMyeBaySelling'),
       'l\'autre sens : une annonce SANS N° (pas de SKU, rien à comparer) part comme avant', `HTTP ${o4.code} · ${appels(o4.journal)}`);
   });
@@ -1184,7 +1184,7 @@ const RA = {};
     const n = ebay['at-J'].programmees.filter((x) => x.sku === 'VRM-30').length;
     dit(o.code === 504 && o.corps.reason === 'incertain' && n === 1, 'programmer : eBay crée l\'annonce puis répond 503 en HTML ⇒ 504 « incertain », jamais « refusée »', `HTTP ${o.code} · ${o.corps && o.corps.error}`);
     remettre(); mode.add = '503-apres';
-    const o2 = await app(JWT_J, { action: 'publish', item: { ...item, numero: '401' } });
+    const o2 = await app(JWT_J, { action: 'publish', confirme: true, item: { ...item, numero: '401' } });
     dit(o2.code === 504 && o2.corps.reason === 'incertain', 'publier : même cas ⇒ 504 « incertain »', `HTTP ${o2.code}`);
     const avecProg0 = (dans) => { remettre(); ebay['at-J'].programmees.push(annonce('110000000900', 'Salomon XT-6', 'VRM-30', '120.0', iso(Date.now() + dans))); };
     avecProg0(2 * JOUR); mode.end = '503-apres';
@@ -1528,7 +1528,7 @@ const RA = {};
   await essaie('multi : une paire en vente sur A1 ne part pas sur A2', async () => {
     await avecDeuxComptes();
     ebay['at-J'].actives.push(VRM30());
-    const o = await app(JWT_J, { action: 'publish', compte: CLE_A2, item: { ...item, numero: '30' } });
+    const o = await app(JWT_J, { action: 'publish', confirme: true, compte: CLE_A2, item: { ...item, numero: '30' } });
     dit(o.code === 409 && o.corps.reason === 'deja-en-ligne' && o.corps.autreCompte === true && /julien_part/.test(o.corps.error || '') && !auCompte(o.journal).some((x) => x.appel === 'AddFixedPriceItem'),
       'publier VRM-30 sur julien_pro alors qu\'elle est en vente sur julien_part ⇒ 409, le compte est nommé, aucune annonce créée', `HTTP ${o.code} · ${o.corps && o.corps.error}`);
     const lus = auCompte(o.journal).filter((x) => x.appel === 'GetMyeBaySelling').map((x) => x.jeton);
@@ -1537,23 +1537,23 @@ const RA = {};
     dit(p.code === 409 && !auCompte(p.journal).some((x) => /Verify|AddFixed/.test(x.appel)), 'programmer VRM-30 sur julien_pro ⇒ 409 aussi, ni vérification ni ajout', `HTTP ${p.code}`);
     ebay['at-J'].actives = ebay['at-J'].actives.filter((x) => x.sku !== 'VRM-30');
     ebay['at-A2'].programmees.push(annonce('110000000931', 'Salomon XT-6 noir T43', 'VRM-30', '120.0', iso(Date.now() + 3 * JOUR)));
-    const o2 = await app(JWT_J, { action: 'publish', item: { ...item, numero: '30' } });
+    const o2 = await app(JWT_J, { action: 'publish', confirme: true, item: { ...item, numero: '30' } });
     dit(o2.code === 409 && o2.corps.reason === 'deja-programmee' && !auCompte(o2.journal).some((x) => x.appel === 'AddFixedPriceItem'),
       'et dans l\'autre sens : programmée sur julien_pro ⇒ elle ne part pas sur le premier compte', `HTTP ${o2.code}`);
     remettre(); await avecDeuxComptes();
-    const o3 = await app(JWT_J, { action: 'publish', compte: CLE_A2, item: { ...item, numero: '31' } });
+    const o3 = await app(JWT_J, { action: 'publish', confirme: true, compte: CLE_A2, item: { ...item, numero: '31' } });
     const add = auCompte(o3.journal).find((x) => x.appel === 'AddFixedPriceItem');
     dit(o3.code === 200 && add && add.jeton === 'at-A2' && o3.corps.compte === 'julien_pro', "l'autre sens : une paire libre partout part sur julien_pro, avec SON jeton", `HTTP ${o3.code}`);
   });
   await essaie('multi : un compte illisible ⇒ rien ne part', async () => {
     await avecDeuxComptes();
     mode.listeKoPour = 'at-J';
-    const o = await app(JWT_J, { action: 'publish', compte: CLE_A2, item: { ...item, numero: '32' } });
+    const o = await app(JWT_J, { action: 'publish', confirme: true, compte: CLE_A2, item: { ...item, numero: '32' } });
     dit(o.code === 503 && o.corps.reason === 'pas-su' && /julien_part/.test(o.corps.error || '') && !auCompte(o.journal).some((x) => x.appel === 'AddFixedPriceItem'),
       'la liste de julien_part illisible ⇒ publier sur julien_pro est refusé « pas su », en nommant le compte qui manque', `HTTP ${o.code} · ${o.corps && o.corps.error}`);
     mode.listeKoPour = '';
     lignes.find((x) => x.owner === J && x.id === 'ebay_tokens').data.refresh_token = 'rt-mort';
-    const o2 = await app(JWT_J, { action: 'publish', compte: CLE_A2, item: { ...item, numero: '32' } });
+    const o2 = await app(JWT_J, { action: 'publish', confirme: true, compte: CLE_A2, item: { ...item, numero: '32' } });
     dit(o2.code === 503 && !auCompte(o2.journal).some((x) => x.appel === 'AddFixedPriceItem'), 'le jeton de julien_part mort ⇒ pareil, rien ne part sur julien_pro', `HTTP ${o2.code}`);
   });
   await essaie('multi : déconnecter UN compte', async () => {
@@ -1569,7 +1569,7 @@ const RA = {};
     const s = await app(JWT_J, { action: 'status' });
     dit(s.corps && s.corps.comptes && s.corps.comptes.length === 1 && s.corps.comptes[0].pseudo === 'julien_part', '« status » ne le rend plus (il sort du sélecteur)', JSON.stringify(s.corps && s.corps.comptes && s.corps.comptes.map((c) => c.pseudo)));
     ebay['at-A2'].actives.push(VRM30());
-    const p = await app(JWT_J, { action: 'publish', item: { ...item, numero: '30' } });
+    const p = await app(JWT_J, { action: 'publish', confirme: true, item: { ...item, numero: '30' } });
     dit(p.code === 200 && !auCompte(p.journal).some((x) => x.jeton === 'at-A2'), 'un compte déconnecté n\'est plus relu (aucun appel avec son jeton)', `HTTP ${p.code}`);
     const r = await connecter(JWT_J, 'code-A2', true);
     const a2b = (registre(J) || []).find((x) => x.cle === CLE_A2);
@@ -1953,7 +1953,7 @@ const RA = {};
   await essaie('[R-prix-change]', async () => {
     const regleR2 = () => lignes.push({ owner: J, id: 'ebay_offres', data: { items: { '110000000302': { lu: true, offresActives: true, accepte: 70, refuse: 50, devise: 'EUR', prix: 90, lueA: Date.now() - H, par: 'sync' }, '110000000301': { lu: true, offresActives: false, accepte: null, refuse: null, devise: 'EUR', prix: 80, lueA: Date.now() - H, par: 'sync' } }, capturedAt: 5 } });
     avecR(); regleR2();
-    const o = await app(JWT_J, { action: 'revise', itemId: '110000000302', price: '95', prixVu: '90' });
+    const o = await app(JWT_J, { action: 'revise', confirme: true, itemId: '110000000302', price: '95', prixVu: '90' });
     const marque = o.journal.find((x) => x.ou === 'base' && /ebay_offres/.test(x.corps) && /en-cours/.test(x.corps));
     const rev = auCompte(o.journal).find((x) => x.appel === 'ReviseInventoryStatus');
     dit(!!marque && !!rev && marque.seq < rev.seq, '[R-prix-change] une annonce à règle : marquée « en cours » AVANT le changement de prix', `${marque && marque.seq} < ${rev && rev.seq}`);
@@ -1961,30 +1961,30 @@ const RA = {};
     dit(o.code === 200 && o.corps.regle && o.corps.regle.tombee === true && o.corps.regle.avant && o.corps.regle.avant.accepte === 70 && it && it.accepte === null,
       '[R-prix-change] eBay a fait tomber la règle ⇒ « tombée », ce qu\'elle était, et l\'entrée relue (aucune)', JSON.stringify(o.corps.regle));
     avecR(); regleR2(); mode.prix = 'garde';
-    const o2 = await app(JWT_J, { action: 'revise', itemId: '110000000302', price: '95', prixVu: '90' });
+    const o2 = await app(JWT_J, { action: 'revise', confirme: true, itemId: '110000000302', price: '95', prixVu: '90' });
     dit(o2.code === 200 && o2.corps.regle.tombee === false && o2.corps.regle.lecture.accepte === 70 && o2.corps.regle.lecture.prix === 95, '[R-prix-change] eBay l\'a gardée ⇒ « pas tombée », relue à 70 € sur un prix de 95 €', JSON.stringify(o2.corps.regle));
     avecR(); regleR2(); mode.prix = 'refus-23004';
-    const o3 = await app(JWT_J, { action: 'revise', itemId: '110000000302', price: '65', prixVu: '90' });
+    const o3 = await app(JWT_J, { action: 'revise', confirme: true, itemId: '110000000302', price: '65', prixVu: '90' });
     const it3 = (offresDe(J) || {})['110000000302'];
     dit(o3.code === 422 && (o3.corps.erreurs || [])[0] && o3.corps.erreurs[0].code === '23004' && it3 && it3.lu === true && it3.accepte === 70, '[R-prix-change] eBay refuse le prix (23004) ⇒ 422 avec son code, l\'entrée = la relecture (jamais « en cours »)', JSON.stringify(it3));
     avecR(); regleR2(); mode.trading = 'reseau';
-    const o4 = await app(JWT_J, { action: 'revise', itemId: '110000000302', price: '95', prixVu: '90' });
+    const o4 = await app(JWT_J, { action: 'revise', confirme: true, itemId: '110000000302', price: '95', prixVu: '90' });
     const it4 = (offresDe(J) || {})['110000000302'];
     dit(o4.code === 504 && it4 && it4.lu === false && it4.raison === 'incertain', '[R-prix-change] réseau coupé ⇒ 504, l\'entrée « incertaine »', JSON.stringify(it4));
     avecR(); regleR2(); mode.offresEcritureKo = true;
-    const o5 = await app(JWT_J, { action: 'revise', itemId: '110000000302', price: '95', prixVu: '90' });
+    const o5 = await app(JWT_J, { action: 'revise', confirme: true, itemId: '110000000302', price: '95', prixVu: '90' });
     dit(o5.code === 503 && o5.corps.reason === 'note' && !auCompte(o5.journal).some((x) => x.appel === 'ReviseInventoryStatus'), '[R-prix-change] le marqueur ne s\'écrit pas ⇒ 503, le prix n\'est PAS changé', `HTTP ${o5.code}`);
     avecR(); regleR2();
-    const o6 = await app(JWT_J, { action: 'revise', itemId: '110000000301', price: '85', prixVu: '80' });
+    const o6 = await app(JWT_J, { action: 'revise', confirme: true, itemId: '110000000301', price: '85', prixVu: '80' });
     dit(o6.code === 200 && o6.corps.regle.tombee === false && !o6.journal.some((x) => x.ou === 'base' && /en-cours/.test(x.corps)), '[R-prix-change] une annonce SANS règle connue ⇒ « pas tombée », aucun marqueur', JSON.stringify(o6.corps.regle));
     avecR();
-    const o7 = await app(JWT_J, { action: 'revise', itemId: '110000000302', price: '95', prixVu: '90' });
+    const o7 = await app(JWT_J, { action: 'revise', confirme: true, itemId: '110000000302', price: '95', prixVu: '90' });
     dit(o7.code === 200 && o7.corps.regle.tombee === null && (offresDe(J) || {})['110000000302'], '[R-prix-change] une annonce sans entrée ⇒ « pas su » (null), la lecture rangée', JSON.stringify(o7.corps.regle));
     avecR(); regleR2(); mode.offresKo = true;
-    const o8 = await app(JWT_J, { action: 'revise', itemId: '110000000302', price: '95', prixVu: '90' });
+    const o8 = await app(JWT_J, { action: 'revise', confirme: true, itemId: '110000000302', price: '95', prixVu: '90' });
     dit(o8.code === 200 && o8.corps.regle.tombee === null, '[R-prix-change] ligne des règles illisible ⇒ « pas su » (null), jamais « pas tombée »', JSON.stringify(o8.corps.regle));
     avecR(); regleR2();
-    const o9 = await app(JWT_J, { action: 'revise', itemId: '110000000302', quantity: '2' });
+    const o9 = await app(JWT_J, { action: 'revise', confirme: true, itemId: '110000000302', quantity: '2' });
     dit(o9.code === 200 && !auCompte(o9.journal).some((x) => x.appel === 'GetItem') && !o9.journal.some((x) => x.ou === 'base' && /ebay_offres/.test(x.corps)), '[R-prix-change] le stock seul ⇒ aucun GetItem, rien n\'est écrit dans ebay_offres');
   });
   // ── [R-concurrence] (11 octobre, revue) DEUX GESTES SUR DEUX CARTES DU MÊME
@@ -2136,7 +2136,7 @@ const RA = {};
       await pret2;
       const res2 = faireRes();
       const itemP = { title: 'Nike Air Max 1 bleu taille 44', categoryId: '15709', price: '74', conditionId: '3000', photos: ['https://img.test/1.jpg'], aspects: { Marque: 'Nike' }, ebayGere: true, numero: '77', offre: { accepte: 66 } };
-      await route.default({ method: 'POST', query: {}, headers: { authorization: 'Bearer ' + JWT_J }, body: { action: 'publish', item: itemP } }, res2);
+      await route.default({ method: 'POST', query: {}, headers: { authorization: 'Bearer ' + JWT_J }, body: { action: 'publish', confirme: true, item: itemP } }, res2);
       const id = res2.corps && res2.corps.itemId;
       fini2(); const sy = await pS; global.fetch = f0;
       const e2 = id ? (offresDe(J) || {})[String(id)] : null;
@@ -2167,7 +2167,7 @@ const RA = {};
     for (const action of ['pubverify', 'publish']) {
       for (const [nom, offre] of [['seuil 1e-9 confirmé', { accepte: 1e-9, sousMoitie: true }], ['seuil 5e-324 confirmé', { accepte: 5e-324, sousMoitie: true }], ['refus 1e-9', { accepte: 66, refuse: 1e-9 }]]) {
         avecR();
-        const x = await app(JWT_J, { action, item: { ...itemC, offre } });
+        const x = await app(JWT_J, { action, confirme: true, item: { ...itemC, offre } });
         const parti = auCompte(x.journal).find((y) => /AddFixed|VerifyAdd/.test(y.appel));
         dit(x.code === 400 && x.corps.reason === 'offre' && zero(x), `[R-crea] ${action} ${nom} ⇒ 400 « offre », zéro appel eBay (jamais « 0.00 » chez eBay)`, `HTTP ${x.code} · ${parti ? (parti.corps.match(/<(?:BestOfferAutoAcceptPrice|MinimumBestOfferPrice)[^>]*>[^<]*</g) || []).join(' ') : 'rien parti'}`);
       }
@@ -2187,13 +2187,22 @@ const RA = {};
     dit(p.code === 200 && pv && pa && pv.corps.includes(BLOC66) && pa.corps.includes(BLOC66) && p.corps.offre && p.corps.offre.envoyee && p.corps.offre.envoyee.accepte === 66 && !auCompte(p.journal).slice(iA + 1).some((x) => x.appel === 'GetItem'),
       '[R-crea] programmer : vérification ET ajout portent le même bloc, la réponse dit ce qui a été ENVOYÉ, aucune relecture d\'une annonce pas commencée', `HTTP ${p.code} · ${appels(p.journal)}`);
     avecR();
-    const q = await app(JWT_J, { action: 'publish', item: { ...itemC, offre: { accepte: 66, refuse: null } } });
+    const q = await app(JWT_J, { action: 'publish', confirme: true, item: { ...itemC, offre: { accepte: 66, refuse: null } } });
     const iQ = auCompte(q.journal).findIndex((x) => x.appel === 'AddFixedPriceItem');
     dit(q.code === 200 && q.corps.offre && q.corps.offre.verifie === true && auCompte(q.journal).slice(iQ + 1).filter((x) => x.appel === 'GetItem').length === 1, '[R-crea] publier avec une règle ⇒ UNE relecture après l\'ajout, « vérifiée »', `HTTP ${q.code} · ${appels(q.journal)}`);
   });
   // (29 octobre) L'AGENT eBAY QUI DEMANDE : une publication marquée `agent`
   // n'existe que sur SON oui — la route le revérifie (jamais le navigateur seul),
   // passe par les mêmes gardes que « Publier », et l'inscrit au journal.
+  // (2 nov., audit « plateformes » P12) Publier et changer un prix exigent la
+  // confirmation que l'app ne pose qu'après le clic : sans elle, rien ne part.
+  await essaie('[P12]', async () => {
+    for (const [nom, corps] of [['publier sans confirmation', { action: 'publish', item: { ...itemC, numero: '64' } }], ['changer le prix sans confirmation', { action: 'revise', itemId: '110000000302', price: '95', prixVu: '90' }], ['confirme « true » en texte', { action: 'publish', confirme: 'true', item: { ...itemC, numero: '64' } }]]) {
+      avecR();
+      const x = await app(JWT_J, corps);
+      dit(x.code === 400 && x.corps.reason === 'confirmation' && zero(x), `[P12] ${nom} ⇒ 400 « confirmation », zéro appel eBay`, `HTTP ${x.code} · ${x.corps && x.corps.reason}`);
+    }
+  });
   await essaie('[R-agent]', async () => {
     for (const [nom, extra] of [['sans confirmation', {}], ['confirme « true » en texte', { confirme: 'true' }]]) {
       avecR();
@@ -2201,7 +2210,7 @@ const RA = {};
       dit(x.code === 400 && x.corps.reason === 'confirmation' && zero(x), `[R-agent] ${nom} ⇒ 400 « confirmation », zéro appel eBay`, `HTTP ${x.code} · ${x.corps && x.corps.reason}`);
     }
     avecR();
-    const ok = await app(JWT_J, { action: 'publish', agent: true, confirme: true, item: { ...itemC, numero: '63' } });
+    const ok = await app(JWT_J, { action: 'publish', confirme: true, agent: true, confirme: true, item: { ...itemC, numero: '63' } });
     dit(ok.code === 200 && auCompte(ok.journal).some((y) => y.appel === 'AddFixedPriceItem'), '[R-agent] confirmé ⇒ la publication part (mêmes gardes que « Publier »)', `HTTP ${ok.code} · ${appels(ok.journal)}`);
     const jr = lignes.find((l) => /^ebay_agent_journal/.test(l.id));
     const ent = jr && JSON.stringify(jr.data || {});
@@ -2210,19 +2219,19 @@ const RA = {};
     // résultat incertain ne peut plus créer une seconde annonce.
     const U = 'ABCDEF0123456789ABCDEF0123456789';
     avecR(); uuidsVus.clear();
-    const u1 = await app(JWT_J, { action: 'publish', agent: true, confirme: true, uuid: U, item: { ...itemC, numero: '64' } });
+    const u1 = await app(JWT_J, { action: 'publish', confirme: true, agent: true, confirme: true, uuid: U, item: { ...itemC, numero: '64' } });
     const add1 = auCompte(u1.journal).find((y) => y.appel === 'AddFixedPriceItem');
     dit(u1.code === 200 && add1 && new RegExp('<UUID>' + U + '</UUID>').test(add1.corps || ''), '[R-agent] l\'identifiant d\'envoi part dans <UUID> de l\'ajout', `HTTP ${u1.code}`);
     const ver1 = auCompte(u1.journal).filter((y) => y.appel === 'VerifyAddFixedPriceItem');
     dit(!ver1.some((y) => /<UUID>/.test(y.corps || '')), '[R-agent] jamais d\'UUID dans une vérification à blanc');
     avecR(); uuidsVus.clear(); mode.add = '488';
-    const u2 = await app(JWT_J, { action: 'publish', agent: true, confirme: true, uuid: U, item: { ...itemC, numero: '65' } });
+    const u2 = await app(JWT_J, { action: 'publish', confirme: true, agent: true, confirme: true, uuid: U, item: { ...itemC, numero: '65' } });
     dit(u2.code === 200 && u2.corps.ok === true && u2.corps.deja === true && auCompte(u2.journal).some((y) => y.appel === 'GetItem'), '[R-agent] 488 (cet envoi a DÉJÀ créé l\'annonce) CONFIRMÉ par GetItem ⇒ publiée, pas une seconde annonce', `HTTP ${u2.code} · ${appels(u2.journal)}`);
     avecR(); uuidsVus.clear(); mode.add = '488'; mode.getitem = 'autre';
-    const u3 = await app(JWT_J, { action: 'publish', agent: true, confirme: true, uuid: U, item: { ...itemC, numero: '66' } });
+    const u3 = await app(JWT_J, { action: 'publish', confirme: true, agent: true, confirme: true, uuid: U, item: { ...itemC, numero: '66' } });
     dit(u3.code === 504 && u3.corps.reason === 'incertain' && u3.corps.ok === false, '[R-agent] 488 dont l\'annonce porte un AUTRE SKU ⇒ « incertain », jamais ok', `HTTP ${u3.code}`);
     avecR(); uuidsVus.clear();
-    const u4 = await app(JWT_J, { action: 'publish', item: { ...itemC, numero: '67', uuid: U } });
+    const u4 = await app(JWT_J, { action: 'publish', confirme: true, item: { ...itemC, numero: '67', uuid: U } });
     const add4 = auCompte(u4.journal).find((y) => y.appel === 'AddFixedPriceItem');
     dit(add4 && !/<UUID>/.test(add4.corps || ''), '[R-agent] « Publier » sans identifiant d\'envoi (et un uuid glissé dans `item` est ignoré) : le XML d\'avant', add4 ? 'sans UUID' : 'aucun ajout');
   });
@@ -2230,7 +2239,7 @@ const RA = {};
     const st = iso(Date.now() + 2 * JOUR);
     const corpsDe = async (offre) => {
       const out = [];
-      for (const corps of [{ action: 'pubverify', item: { ...itemC, ...offre } }, { action: 'publish', item: { ...itemC, ...offre } }, { action: 'programmer', confirme: true, uuid: 'D0FFEE0123456789ABCDEF0123456789', fraisVus: 0.2, scheduleTime: st, item: { ...itemC, numero: '62', ...offre } }]) {
+      for (const corps of [{ action: 'pubverify', item: { ...itemC, ...offre } }, { action: 'publish', confirme: true, item: { ...itemC, ...offre } }, { action: 'programmer', confirme: true, uuid: 'D0FFEE0123456789ABCDEF0123456789', fraisVus: 0.2, scheduleTime: st, item: { ...itemC, numero: '62', ...offre } }]) {
         remettre(); remettreBase(); prochainId = 110000000777;
         const o = await app(JWT_J, corps);
         out.push(auCompte(o.journal).filter((x) => /AddFixed|VerifyAdd/.test(x.appel)).map((x) => x.corps).join('\n'));
@@ -2416,7 +2425,7 @@ const RA = {};
   for (const [prix, attendu] of [['1.250', null], ['74,999', null], ['74 €', null], ['0', null], ['-5', null], ['1e3', null], ['74,5', '74.50'], ['74', '74.00'], [74.5, '74.50']]) {
     await essaie('[ARG-prix] publish ' + prix, async () => {
       remettre();
-      const o = await app(JWT_J, { action: 'publish', item: { ...item, price: prix } });
+      const o = await app(JWT_J, { action: 'publish', confirme: true, item: { ...item, price: prix } });
       const add = AJOUTS(o.journal);
       const envoye = add.map((x) => (/<StartPrice>([^<]*)<\/StartPrice>/.exec(x.corps) || [])[1]);
       if (attendu == null) dit(o.code === 400 && add.length === 0, `[ARG-prix] publier au prix ${JSON.stringify(prix)} ⇒ 400, rien n'est envoyé à eBay (jamais un autre montant)`, `HTTP ${o.code} · envoyé ${envoye.join(',') || '∅'}`);
@@ -2427,19 +2436,19 @@ const RA = {};
     remettre();
     const v = await app(JWT_J, { action: 'pubverify', item: { ...item, price: '1.250' } });
     const p = await app(JWT_J, prog({ item: { ...item, numero: '30', price: '1.250' } }));
-    const r = await app(JWT_J, { action: 'revise', itemId: '110000000001', price: '1.250', prixVu: '80' });
+    const r = await app(JWT_J, { action: 'revise', confirme: true, itemId: '110000000001', price: '1.250', prixVu: '80' });
     dit(v.code === 400 && AJOUTS(v.journal).length === 0 && p.code === 400 && AJOUTS(p.journal).length === 0 && r.code === 400 && !auCompte(r.journal).some((x) => x.appel === 'ReviseInventoryStatus'),
       '[ARG-prix] « 1.250 » refusé aussi à la vérification, à la programmation et au changement de prix — rien n\'est envoyé', `${v.code}/${p.code}/${r.code}`);
   });
   await essaie('[ARG-prix] règle d\'offre sur un prix illisible', async () => {
     remettre();
-    const o = await app(JWT_J, { action: 'publish', item: { ...item, price: '1.250', offre: { accepte: 1 } } });
+    const o = await app(JWT_J, { action: 'publish', confirme: true, item: { ...item, price: '1.250', offre: { accepte: 1 } } });
     dit(o.code === 400 && AJOUTS(o.journal).length === 0, '[ARG-prix] un seuil d\'offre ne se juge pas contre un prix mal lu (1,25 au lieu de 1 250) — 400, rien ne part', `HTTP ${o.code}`);
   });
   await essaie('[ARG-port] item sans ebayGere', async () => {
     remettre();
     const it2 = { ...item }; delete it2.ebayGere;
-    const o = await app(JWT_J, { action: 'publish', item: it2 });
+    const o = await app(JWT_J, { action: 'publish', confirme: true, item: it2 });
     const add = AJOUTS(o.journal);
     const port = add.map((x) => (/<ShippingServiceCost>([^<]*)<\/ShippingServiceCost>/.exec(x.corps) || [])[1]).filter((x) => x != null);
     dit(o.code === 200 && add.length === 1 && !add.some((x) => /<ShippingDetails>/.test(x.corps)) && !port.length, '[ARG-port] un item sans `ebayGere` part en livraison gérée par eBay — jamais un port posé par VRM (encore moins 0,00 €)', `HTTP ${o.code} · port ${port.join(',') || '∅'}`);
@@ -2447,36 +2456,36 @@ const RA = {};
   for (const cout of [undefined, '0', '0,00', 'abc']) {
     await essaie('[ARG-port] tarif fixe ' + cout, async () => {
       remettre();
-      const o = await app(JWT_J, { action: 'publish', item: { ...item, ebayGere: false, ...(cout === undefined ? {} : { shippingCost: cout }) } });
+      const o = await app(JWT_J, { action: 'publish', confirme: true, item: { ...item, ebayGere: false, ...(cout === undefined ? {} : { shippingCost: cout }) } });
       dit(o.code === 400 && AJOUTS(o.journal).length === 0, `[ARG-port] tarif fixe avec un port ${JSON.stringify(cout)} ⇒ 400 : VRM ne pose jamais « livraison gratuite »`, `HTTP ${o.code}`);
     });
   }
   await essaie('[ARG-port] tarif fixe explicite', async () => {
     remettre();
-    const o = await app(JWT_J, { action: 'publish', item: { ...item, ebayGere: false, shippingCost: '5,90' } });
+    const o = await app(JWT_J, { action: 'publish', confirme: true, item: { ...item, ebayGere: false, shippingCost: '5,90' } });
     const add = AJOUTS(o.journal);
     dit(o.code === 200 && add.length === 1 && /<ShippingServiceCost>5\.90<\/ShippingServiceCost>/.test(add[0].corps), '[ARG-port] l\'autre sens : un port explicite (5,90 €) part tel quel', `HTTP ${o.code}`);
   });
   await essaie('[ARG-vu] prix changé chez eBay', async () => {
     remettre();
     const a = ebay['at-J'].actives.find((x) => x.itemId === '110000000001'); a.prix = '90.0';
-    const o = await app(JWT_J, { action: 'revise', itemId: '110000000001', price: '53', prixVu: '80' });
+    const o = await app(JWT_J, { action: 'revise', confirme: true, itemId: '110000000001', price: '53', prixVu: '80' });
     dit(o.code === 409 && !auCompte(o.journal).some((x) => x.appel === 'ReviseInventoryStatus') && a.prix === '90.0',
       '[ARG-vu] l\'écran montrait 80 €, eBay est à 90 € ⇒ 409, le prix n\'est PAS changé', `HTTP ${o.code} · prix chez eBay ${a.prix}`);
-    const o2 = await app(JWT_J, { action: 'revise', itemId: '110000000001', price: '53' });
+    const o2 = await app(JWT_J, { action: 'revise', confirme: true, itemId: '110000000001', price: '53' });
     dit(o2.code === 400 && !auCompte(o2.journal).some((x) => x.appel === 'ReviseInventoryStatus'), '[ARG-vu] sans le prix vu ⇒ 400, rien n\'est envoyé', `HTTP ${o2.code}`);
-    const o3 = await app(JWT_J, { action: 'revise', itemId: '110000000001', price: '53', prixVu: '90' });
+    const o3 = await app(JWT_J, { action: 'revise', confirme: true, itemId: '110000000001', price: '53', prixVu: '90' });
     dit(o3.code === 200 && a.prix === '53.00', '[ARG-vu] l\'autre sens : le prix vu est celui d\'eBay ⇒ changé', `HTTP ${o3.code} · ${a.prix}`);
   });
   await essaie('[ARG-vu] autre devise', async () => {
     remettre();
     const a = ebay['at-J'].actives.find((x) => x.itemId === '110000000001'); a.devise = 'USD';
-    const o = await app(JWT_J, { action: 'revise', itemId: '110000000001', price: '53', prixVu: '80' });
+    const o = await app(JWT_J, { action: 'revise', confirme: true, itemId: '110000000001', price: '53', prixVu: '80' });
     dit(o.code === 409 && !auCompte(o.journal).some((x) => x.appel === 'ReviseInventoryStatus'), '[ARG-vu] une annonce en USD ⇒ rien n\'est changé (VRM écrit des euros)', `HTTP ${o.code}`);
   });
   await essaie('[ARG-vu] relecture ratée', async () => {
     remettre(); mode.getitem = 'ko';
-    const o = await app(JWT_J, { action: 'revise', itemId: '110000000001', price: '53', prixVu: '80' });
+    const o = await app(JWT_J, { action: 'revise', confirme: true, itemId: '110000000001', price: '53', prixVu: '80' });
     dit(o.code === 503 && !auCompte(o.journal).some((x) => x.appel === 'ReviseInventoryStatus'), '[ARG-vu] eBay ne rend pas l\'annonce ⇒ 503, rien n\'est changé (« pas su »)', `HTTP ${o.code}`);
   });
   await essaie('[ARG-colis] payée, remboursée en partie, pas partie', async () => {
@@ -2604,7 +2613,7 @@ const RA = {};
   await essaie('[INA] une inactive ne bloque jamais une publication', async () => {
     remettre(); remettreBase();
     ebay['at-J'].invendues = [INACTIVE_A()];          // VRM-30, terminée sans vente
-    const o = await app(JWT_J, { action: 'publish', item: { ...item, numero: '30' } });
+    const o = await app(JWT_J, { action: 'publish', confirme: true, item: { ...item, numero: '30' } });
     dit(o.code === 200 && o.corps.ok === true && !listesDe(o.journal).some((x) => /<UnsoldList>/.test(x.corps)),
       '[INA] la N°30 n\'existe chez eBay QUE terminée sans vente ⇒ la publier part (200) — la garde ne demande même pas les inactives', `HTTP ${o.code} · ${o.corps && o.corps.reason}`);
     remettre(); remettreBase();
@@ -2742,12 +2751,12 @@ const RA = {};
       const st = await app(JWT_J, { action: 'status' });
       const c2 = (st.corps.comptes || []).find((x) => x.cle === CLE_A2) || {};
       dit(c2.site === 'GB' && c2.marche && c2.marche.devise === 'GBP' && c2.marche.domaine === 'www.ebay.co.uk', '[MKT] « status » dit à l\'app le marché de chaque compte (devise, domaine)', JSON.stringify(c2.marche));
-      const o = await app(JWT_J, { action: 'publish', compte: CLE_A2, item: { ...item, numero: '401' } });
+      const o = await app(JWT_J, { action: 'publish', confirme: true, compte: CLE_A2, item: { ...item, numero: '401' } });
       const add = chezEbay(o.journal).find((x) => x.appel === 'AddFixedPriceItem');
       dit(o.code === 200 && add && add.site === '3' && /<Currency>GBP<\/Currency>/.test(add.corps) && /<Country>GB<\/Country>/.test(add.corps) && !/EUR/.test(add.corps),
         '[MKT] l\'annonce part sur eBay.co.uk (SiteID 3), en livres, pays GB — jamais en euros', add ? `site=${add.site}` : `HTTP ${o.code}`);
       dit(o.corps && /ebay\.co\.uk\/itm\//.test(o.corps.url || ''), '[MKT] le lien rendu est celui d\'eBay.co.uk', o.corps && o.corps.url);
-      const p = await app(JWT_J, { action: 'publish', item: { ...item, numero: '402' } });
+      const p = await app(JWT_J, { action: 'publish', confirme: true, item: { ...item, numero: '402' } });
       const addP = chezEbay(p.journal).find((x) => x.appel === 'AddFixedPriceItem');
       dit(p.code === 200 && addP && addP.site === '71' && /<Currency>EUR<\/Currency>/.test(addP.corps), '[MKT] le compte français, lui, reste sur eBay.fr en euros', addP ? `site=${addP.site}` : `HTTP ${p.code}`);
       const pi = await app(JWT_J, { action: 'pubinfo', compte: CLE_A2, title: 'Nike Dunk' });
@@ -2762,7 +2771,7 @@ const RA = {};
       await app(JWT_J, { action: 'status' });
       await connecter(JWT_J, 'code-A2', true);
       const a2 = (registre(J) || []).find((x) => x.cle === CLE_A2);
-      const o = await app(JWT_J, { action: 'publish', compte: CLE_A2, item: { ...item, numero: '403' } });
+      const o = await app(JWT_J, { action: 'publish', confirme: true, compte: CLE_A2, item: { ...item, numero: '403' } });
       dit(a2 && a2.site === '?' && o.code === 409 && o.corps.reason === 'marche-non-gere' && chezEbay(o.journal).length === 0,
         '[MKT] un compte inscrit sur un site que VRM ne gère pas ⇒ 409, rien publié (jamais en France à la place)', `site=${a2 && a2.site} HTTP ${o.code}`);
     } finally { delete SITES_GETUSER['at-A2']; }
@@ -2771,7 +2780,7 @@ const RA = {};
     remettre(); remettreBase();
     await app(JWT_J, { action: 'status' });
     mode.comptesKo = true;
-    const o = await app(JWT_J, { action: 'publish', item: { ...item, numero: '404' } });
+    const o = await app(JWT_J, { action: 'publish', confirme: true, item: { ...item, numero: '404' } });
     mode.comptesKo = false;
     dit(o.code === 503 && o.corps.reason === 'marche-pas-su' && chezEbay(o.journal).length === 0, '[MKT] registre illisible ⇒ 503 « marché pas su », rien publié', `HTTP ${o.code}`);
   });
