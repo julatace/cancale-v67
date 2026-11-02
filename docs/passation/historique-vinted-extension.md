@@ -963,3 +963,22 @@ Mesuré (diagnostic `panel_diag_capture`, compteurs cumulés) : `brouillon_publi
   `numerosDuCompte` ne rend que les N° dont le compte (`accountId` de la fiche, uid de la
   ligne `harvest_{uid}_txn_*` / `_orders_sold`) est celui-là ; compte inconnu ⇒ rien.
   `audit-numero-vinted` « autre compte » : 3 rouges sur la 5.310.
+
+## 2 novembre (soir) — 5.312.0 : lecture d'abord, plafond par compte
+
+- Julien (16 h 09) : « tout est déjà rempli, l'extension a simplement à lire ». Mesuré dans
+  `recreerVinted` : une recette apprise (`vrm_vinted_modele`) servait de BASE, et la lecture
+  de la page « Modifier » (`GET item_upload/items/{id}`) n'était faite que si la recette
+  manquait ; plus loin une seconde lecture partait, et son contenu était JETÉ. Une recette
+  ancienne sans taille partait donc sans taille (le refus `size` ×10 de son diagnostic).
+  Désormais : quota du jour, verrou et place dans l'heure d'abord (aucune requête), puis
+  UNE lecture de l'annonce, dont les champs (catégorie, attributs, couleur, colis, marque)
+  l'emportent sur la recette (`itemPourRecreer({ vivant })`). `audit-recreer` C3b : sur la
+  5.310, catégorie 77 de la recette et AUCUNE taille, deux lectures ; après : les valeurs de
+  Vinted, une lecture.
+- Plafond 50/h par COMPTE (audit X6, son « oui ») : `actions_compte_{uid}_{navigateur}` (un
+  écrivain par ligne), `compterActionUn` additionne les autres Chrome ; base muette ⇒ ce
+  Chrome seul + `actions_partagees_pas_lues`. `audit-republier-plusieurs-chrome` E : 100
+  actions acceptées sur l'avant, 50 après.
+- Intègre le chantier d'agent `claude/brouillons-avancee` (brouillons proposables par compte
+  et lecture complète, file de Republier figée au lancement, bloc d'avancée fixe).

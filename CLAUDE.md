@@ -487,6 +487,7 @@ sans la fonction.
 | `relaisdest` | `relaisDestination` | **5.295.0** | « le point relais où arrivent tes achats (quand le suivi Vinted le donne) » |
 | `vcfiche` | `ficheVcAnnonce` | **5.296.0** (1er nov.) | annonces Vestiaire en fiches (photo, titre, prix, état) et le compte de l'onglet sur annonces/ventes/achats (flou par compte) |
 | `favorisauto` | `freinFavoriAuto` | **5.309.0** (2 nov.) | mode auto des favoris |
+| `plafondcompte` | `publierActions` | **5.312.0** (2 nov.) | le plafond de 50 actions/heure est celui du COMPTE, tous Chrome confondus |
 | `freinrepub` | `poserFreinRepub` | **5.311.0** (2 nov.) | un refus de Vinted freine la republication de CE compte (30 min ; 24 h si restreint) |
 | `numeroscompte` | `numerosDuCompte` | **5.311.0** (2 nov.) | sur Vinted, seuls les N° du compte connecté dans l'onglet |
 | `republierquestion` | `reglerAvant` | **5.310.0** (2 nov.) | Republier remplit un champ manquant depuis l'annonce elle-même, sinon DEMANDE (valeurs de Vinted) ; un refus nommé n'est jamais renvoyé tel quel |
@@ -498,11 +499,11 @@ sans la fonction.
 Une ligne par chantier ou décision, le plus récent d'abord. Détail : le fichier
 d'historique du thème (cherche le titre ou la date).
 
-**Extension servie : 5.311.0** (2 nov.). **À lire en premier : `docs/passation/2026-11-02-liste.md`.** **Production** : https://vrm.center,
+**Extension servie : 5.312.0** (2 nov. ; la 5.311.0 n'a jamais été servie seule). **À lire en premier : `docs/passation/2026-11-02-liste.md`.** **Production** : https://vrm.center,
 vérifier par `curl https://vrm.center/api/sante`.
 
 ### Gestes encore attendus de Julien
-- Installer l'extension **5.311.0** (remplacer le dossier, puis ⟳ dans CHAQUE Chrome).
+- Installer l'extension **5.312.0** (remplacer le dossier, puis ⟳ dans CHAQUE Chrome).
 - Sur leboncoin.fr, ouvrir « Mes annonces » sur CHACUN de ses comptes Leboncoin.
 - Recoller `scripts/gmail-forwarder.gs` (avec sa clé) dans la boîte qui fait tourner le
   script, puis poser `EMAIL_INBOUND_SECRET` sur Vercel (l'ancien script lit encore la
@@ -527,6 +528,7 @@ vérifier par `curl https://vrm.center/api/sante`.
 
 ### Décisions et chantiers (octobre–novembre 2026)
 Une ligne par chantier. Le récit complet des lignes du 31 oct. au 2 nov. est, mot pour mot, dans `docs/passation/etat-detaille-2026-10-31-au-11-02.md`.
+- **2 nov. (soir)** — **Extension 5.312.0** : plafond 50/h par COMPTE tous Chrome confondus (`actions_compte_{uid}_{navigateur}`, base muette ⇒ ce Chrome seul) ; Republier LIT TOUJOURS l'annonce sur Vinted d'abord (une lecture, ses champs l'emportent sur une recette ancienne — « elle oubliait la couleur et la taille ») ; brouillons d'un autre compte grisés et nommés, brouillons disparus retirés (`src/brouillonsProposables.js`) ; avancée de Republier figée et toujours visible (banc `brouillons-avancee`). → historique vinted-extension. Geste : installer la 5.312.0.
 - **2 nov. (soir)** — **Extension 5.311.0** (sa plainte : « elle insistait, Vinted a détecté l'automatisation » ; « je ne veux pas voir les N° d'Arthur depuis Angèle » ; shop_cancale) : frein après tout refus de Vinted (`vrmFreinRepub`, 30 min / 24 h si `listing_restricted`, l'atelier s'arrête) ; ⚠️ **une lecture PUBLIQUE n'ajoute JAMAIS une annonce** (`<enligne-regle>`, sa décision) et les comptes jamais captés connectés ne sont plus relus ; N° affichés sur Vinted = ceux du compte de l'onglet seulement (`numerosDuCompte`, par `accountId`). → historique vinted-extension. Geste : installer la 5.311.0.
 - **2 nov.** — Visite en bulles à la première connexion (`src/VisiteBulles.jsx`, `vrm_visite_vue` synchronisée, « Revoir la visite » dans Paramètres → Aide), onglets NUS (plus aucune explication à côté), une phrase sous le titre de 6 écrans (`src/phrasesEcran.js`) ; banc `demo-bulles` vert 390/1512. → historique interface-stock. Geste : regarder la visite au téléphone (Paramètres → Aide → Revoir la visite).
 - **2 nov.** — eBay : jeton d'accès gardé côté serveur jusqu'à 5 min de sa fin (`ebay_tokens_acces`, lié à l'empreinte du refresh, effacé à la déconnexion, `audit-ebay-jeton-cache`, P9) ; publier et changer un prix exigent `confirme:true` côté serveur (P12). → historique ebay. Geste : aucun.
@@ -542,7 +544,7 @@ Une ligne par chantier. Le récit complet des lignes du 31 oct. au 2 nov. est, m
 - **1er nov.** — VRM pour d'autres vendeurs : 19 défauts corrigés (code Gmail au vendeur qui a PROUVÉ l'adresse, factures Pro au propriétaire seul, textes neutres `audit-vendeur-neutre`). → historique sécurité-base-serveur. Geste : recoller `scripts/gmail-forwarder.gs` + `EMAIL_INBOUND_SECRET`.
 - **1er nov.** — Vestiaire partout : une vente Vestiaire rend sa paire « vendue » PAR IDENTITÉ sur tous les sites ; entre dans CA/URSSAF/bénéfice seulement si le montant est sûr, sinon « non comptée » nommée (`audit-vestiaire-partout`). → historique vestiaire. Geste : aucun.
 - **1er nov.** — Données sûres : `main` fusionnée clé par clé (`src/fusionNuage.js`) + PATCH conditionnel sur `data.rev`, `lireTout` sans trou, purge au préfixe exact (`audit-fusion-nuage`, `audit-purge-compte`). → historique sécurité-base-serveur. Geste : aucun.
-- **1er nov.** — Audit des actions X1-X9 (extension **5.307.0**) : deux paires au même titre sous un N° = rouge, Republier verrouillé et quota en base. ⏳ plafond 50/h encore par Chrome (décision par défaut, voir passation de la nuit §4). → historiques numéros, favoris-messages, leboncoin, vinted-extension. Geste : installer la 5.307.0.
+- **1er nov.** — Audit des actions X1-X9 (extension **5.307.0**) : deux paires au même titre sous un N° = rouge, Republier verrouillé et quota en base. (plafond par compte fait en 5.312.) → historiques numéros, favoris-messages, leboncoin, vinted-extension. Geste : installer la 5.307.0.
 - **1er nov.** — Ma journée sans redite (cases 2 × 2 au téléphone, « dont N aujourd'hui », une ligne « Colis à vérifier »). → historique interface-stock. Geste : regarder Ma journée au téléphone.
 - **1er nov.** — Capture Vestiaire/Leboncoin fiable (extension **5.299.0**) : une réponse inconnue n'est plus « lue, vide », compte de la page = compte de l'onglet, liste entière (`audit-capture-vc-lbc`). → historiques vestiaire et leboncoin. Geste : app ouverte sur le compte VRM de l'extension, « Mes articles » Vestiaire défilé jusqu'au bout.
 - **1er nov.** — Tournée RETIRÉE de Ma journée (sa demande) : `TOURNEE_SUR_JOURNEE = false`, code gardé. Geste : aucun.
@@ -561,8 +563,6 @@ Une ligne par chantier. Le récit complet des lignes du 31 oct. au 2 nov. est, m
 - **1er nov.** — Ventes : bénéfice sur la ligne (« au plus » si frais non confirmés), « Déposé » annulable 5 s. (La Tournée de ce lot a été retirée ensuite, voir plus haut.) → historique interface-stock. Geste : dire si « au plus » lui va.
 - **1er nov.** — Paramètres, compta, arrivée, communauté plus simples (groupe « Comptes et emails », suppressions qui demandent). → historiques interface-stock et compta. Geste : aucun.
 - **1er nov.** — Colis → « À retirer » par point relais : aucun colis écarté (« Point pas encore connu » + raison), même relais écrit deux fois = un point (nom propre + CP), position Vinted ou Base Adresse, compteur = Ma journée (`vrm_colis_retirer`), même n° de suivi compté une fois. → historique colis-retraits (« 1er nov. »). Geste : aucun.
-- **31 oct.** — Statistiques détaillées + widget « Tendances » ; bénéfice de Ma journée masquable en mode « Modifier ». → historiques interface-stock et compta. Geste : aucun.
-- **31 oct.** — Navigation par tâche (Journée · Annonces · Ventes · Colis · Plus ; anciens `?tab=` redirigés, `src/navigationTache.js`). → historique interface-stock. Geste : aucun.
 - **31 oct.** — Extension **5.293.0 soumise à addons.mozilla.org** par Julien (fiche `vrm-outil-du-revendeur`, compte vrm.vinted35@gmail.com) : Orion iPhone refuse l'installation par fichier (essais du 31 oct.) mais installe depuis la boutique (Dark Reader OK). Geste : à l'acceptation, donner le lien → `LIENS_BOUTIQUES.firefox` ; Chrome Web Store : `docs/publier-extension-pas-a-pas.md`.
 - **31 oct.** — Compétence **taste** (Leonxlnx/taste-skill, MIT) installée dans `.claude/skills/taste-skill/` à sa demande : tout changement de style passe par elle (`references/app-screens.md` pour les écrans de l'app) ; §7 et ses refus priment. → `.claude/skills/README.md`.
 - **31 oct. (soir)** — Vinted/extension **5.293.0** (intégrée avec Leboncoin en 5.293.0) : le pont photo relaie le `statut` du CDN (lien mort 404/410 plus redemandé avant 30 min, refus passagers en tête du témoin) ; détourage Vestiaire : `cle-pas-su` arrête la série et se dit en français. → historique vinted-extension. Geste : installer la 5.293.0 une fois fusionnée.
