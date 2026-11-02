@@ -63,8 +63,16 @@ export const vcVenteAnnulee = (v) => !!v && v.aExpedier !== true && etapeMotVc(v
 export const vcVentePartie = (v) => !!v && v.aExpedier !== true && ['en-route', 'controle', 'livree', 'terminee', 'versee'].includes(etapeMotVc(v));
 
 // ── L'IDENTITÉ (§5) ─────────────────────────────────────────────────────────
-export const numVcVente = (v, liens) => cleNum((v && v.productId && objet(liens) && liens[v.productId]) || (v && v.ref) || '');
-export const numVcAnnonce = (id, it, liens) => cleNum((id != null && objet(liens) && liens[String(id)]) || (it && it.ref) || '');
+// (2 nov., soir) `auto` = les numéros que VRM a DONNÉS aux annonces Vestiaire
+// qui n'en portaient pas (`main.vrm_vc_numeros`, src/numerosVestiaire.js) : une
+// identité par `productId`, après le lien posé par VRM et la référence lue.
+// La vente hérite du N° de SON annonce (même produit). Absent ⇒ comme avant.
+export const numAutoVc = (auto, id) => {
+  const e = id != null && objet(auto) ? auto[String(id)] : null;
+  return e == null ? '' : (typeof e === 'object' ? String(e.numero == null ? '' : e.numero) : String(e));
+};
+export const numVcVente = (v, liens, auto) => cleNum((v && v.productId && objet(liens) && liens[v.productId]) || (v && v.ref) || (v && v.productId ? numAutoVc(auto, v.productId) : '') || '');
+export const numVcAnnonce = (id, it, liens, auto) => cleNum((id != null && objet(liens) && liens[String(id)]) || (it && it.ref) || numAutoVc(auto, id) || '');
 
 // ── L'ARGENT ────────────────────────────────────────────────────────────────
 // Le NOM de la clé dit que c'est ce que le vendeur reçoit (versement, gain,
@@ -89,7 +97,7 @@ export function ventesVcDe(d) {
   const ventes = objet(d.ventes);
   if (!ventes) return d.ventes == null ? [] : null;
   const liens = objet(d.liens) || {};
-  return Object.entries(ventes).filter(([, v]) => objet(v)).map(([id, v]) => ({ ...v, id: String(id), num: numVcVente(v, liens) }));
+  return Object.entries(ventes).filter(([, v]) => objet(v)).map(([id, v]) => ({ ...v, id: String(id), num: numVcVente(v, liens, d.auto) }));
 }
 
 // ── LES COLIS À ENVOYER ─────────────────────────────────────────────────────
@@ -102,15 +110,22 @@ export function colisVcAPoster(d, maintenant = Date.now()) {
   const ventes = objet(d.ventes);
   if (!ventes) return d.ventes == null ? [] : null;
   const liens = objet(d.liens) || {};
-  return Object.entries(ventes).filter(([, v]) => objet(v) && v.aExpedier === true).map(([id, v]) => {
+  // (2 nov., soir) « Colis fait » posé par lui (`main.vrm_vc_colis_done`,
+  // { [id de vente]: ts }) : le colis sort de « à poster », comme Vinted et
+  // Leboncoin. Vestiaire le dira « envoyée » ensuite.
+  const fait = objet(d.fait) || {};
+  return Object.entries(ventes).filter(([id, v]) => objet(v) && v.aExpedier === true && !fait[String(id)]).map(([id, v]) => {
     const t = Date.parse(v.limite || '');
     return {
-      id: String(id), num: numVcVente(v, liens), limite: v.limite || '', suivi: v.suivi || '', transporteur: v.transporteur || '',
+      id: String(id), num: numVcVente(v, liens, d.auto), productId: v.productId == null ? '' : String(v.productId), limite: v.limite || '', suivi: v.suivi || '', transporteur: v.transporteur || '',
       etiquette: v.etiquette === true ? true : v.etiquette === false ? false : null, date: v.date || '',
       jours: Number.isFinite(t) ? joursAvant(t, maintenant) : null,
       // (2 nov., 5.316) pour l'affichage seulement — jamais une identité (§5).
       titre: typeof v.titre === 'string' ? v.titre : '', photo: typeof v.photo === 'string' ? v.photo : '',
       bordereau: v.bordereau && typeof v.bordereau === 'object' && typeof v.bordereau.id === 'string' ? v.bordereau : null,
+      // (2 nov., soir) pour la ligne de Colis, comme celle de Vinted : ce que
+      // Vestiaire verse (`montantRecuVc` le juge), le compte de l'onglet.
+      montant: objet(v.montant) ? v.montant : null, compte: typeof v.compte === 'string' ? v.compte : '',
     };
   }).sort((a, z) => String(a.limite || '9999').localeCompare(String(z.limite || '9999')));
 }
@@ -157,7 +172,7 @@ export function annoncesVcEnLigne(lst, ventes, maintenant = Date.now()) {
   if (vieille) return { parNum: out, vieille: true, lue: true };
   for (const [id, it] of Object.entries(d.items)) {
     if (!objet(it)) continue;
-    const num = numVcAnnonce(id, it, d.liens);
+    const num = numVcAnnonce(id, it, d.liens, d.auto);
     if (!num || etatAnnonceVcBrut(it, vendus.has(String(id)), d.capturedAt) !== 'en-ligne') continue;
     if (!out.has(num)) out.set(num, []);
     out.get(num).push({ id: String(id), titre: String(it.titre || '') });
@@ -199,7 +214,7 @@ export function retraitsVestiaire({ lst, ventes, maintenant = Date.now() } = {})
   let inconnu = 0;
   for (const [id, it] of Object.entries((objet(lst) && objet(lst.items)) || {})) {
     if (!objet(it)) continue;
-    const num = numVcAnnonce(id, it, liens);
+    const num = numVcAnnonce(id, it, liens, lst.auto);
     if (!num) continue;
     const etat = etatAnnonceVcBrut(it, vendus.has(String(id)), lst.capturedAt);
     const active = (etat === 'vendue' || etat === 'retiree') ? false : (etat === 'en-ligne' && !vieille) ? true : null;
@@ -211,7 +226,7 @@ export function retraitsVestiaire({ lst, ventes, maintenant = Date.now() } = {})
   let sansIdentite = 0;
   for (const [id, v] of Object.entries(vv)) {
     if (!objet(v) || vcVenteAnnulee(v)) continue;
-    const num = numVcVente(v, liens);
+    const num = numVcVente(v, liens, lst && lst.auto);
     if (!num) { sansIdentite++; continue; }
     vs.push({ id: 'vc:' + String(id), numero: num, plateforme: 'Vestiaire', engagee: true });
   }
