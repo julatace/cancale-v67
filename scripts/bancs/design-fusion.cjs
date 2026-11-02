@@ -156,7 +156,8 @@ const mesure = (pg) => pg.evaluate(() => {
     rangees: [...document.querySelectorAll('[data-rangee-bord]')].filter(vis).map((r) => {
       const puce = r.querySelector('.vrm-puce-transp'); const autre = [...r.children].find((c) => c !== puce && vis(c));
       const bt = autre ? (autre.matches('button,a') ? autre : autre.querySelector('button,a')) : null;
-      if (!puce || !bt) return { ok: false, pourquoi: !puce ? 'pas de puce' : 'pas de bouton' };
+      if (!puce) return { ok: false, pourquoi: 'pas de puce' };
+      if (!bt) return null; // pas de bouton (ex. Vestiaire sans bordereau : une phrase) — rien à aligner
       const a = puce.getBoundingClientRect(), b = bt.getBoundingClientRect();
       const txt = bt.innerText.trim();
       return { ok: true, memeLigne: Math.abs(a.top - b.top) < 2 && Math.abs(a.height - b.height) < 2, h: Math.round(a.height), gauche: a.right <= b.left + 1,
@@ -195,7 +196,7 @@ const ECRANS = [
           dit(!m.encaisse, 'jamais « encaissé »');
           dit(!m.violet, 'pas de violet');
           // La puce transporteur : à GAUCHE du bouton, même rangée, 44 px, rayon 12, une ligne.
-          const R = m.rangees;
+          const R = m.rangees.filter(Boolean);
           if (E.id === 'ventes' || E.id === 'colis') dit(R.length > 0, 'une rangée « puce + bordereau » au moins', String(R.length));
           if (R.length) {
             const mauvaises = R.filter((r) => !(r.ok && r.memeLigne && r.gauche && r.h === 44 && r.uneLigne && r.rayon === '12px'));
