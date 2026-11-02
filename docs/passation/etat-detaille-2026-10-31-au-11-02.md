@@ -143,3 +143,7 @@ Déplacé TEL QUEL depuis CLAUDE.md §9 le 2 novembre 2026 (le fichier dépassai
 - **1er nov.** — Colis → « À retirer » par point relais : aucun colis écarté (« Point pas encore connu » + raison), même relais écrit deux fois = un point (nom propre + CP), position Vinted ou Base Adresse, compteur = Ma journée (`vrm_colis_retirer`), même n° de suivi compté une fois. → historique colis-retraits (« 1er nov. »). Geste : aucun.
 - **31 oct.** — Compétence **taste** (Leonxlnx/taste-skill, MIT) installée dans `.claude/skills/taste-skill/` à sa demande : tout changement de style passe par elle (`references/app-screens.md` pour les écrans de l'app) ; §7 et ses refus priment. → `.claude/skills/README.md`.
 - **31 oct.** — Style « Vitrine » (son choix parmi 4 maquettes) appliqué à toute l'app, clair et sombre → historique interface-stock (« Vitrine »). Geste : regarder l'app ; dire si « Tout imprimer » doit être fixé au-dessus de la barre du bas.
+
+### Lignes de §9 déplacées telles quelles
+- **1er nov.** — Stock : « Où est la N° ? » propose « Ranger ici / Autre case » pour une paire pas rangée ; cases dites en rangée/colonne ; ranger, retirer, sortir du stock le disent. Annonces : plus de chiffres d'argent ni « À faire aujourd'hui » en tête (ils restent dans Ventes). Menu « Republier et brouillons » (ordre inchangé). → historique interface-stock. Geste : aucun.
+- **1er nov.** — Finition « premium » (`src/styles-finition.css` chargée en dernier, plus d'emoji, étiquettes ≥ 12 px). → historique interface-stock. Geste : aucun.
