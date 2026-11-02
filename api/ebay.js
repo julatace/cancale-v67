@@ -31,8 +31,10 @@ import {creerApresVenteEbay,annulerCommandeRangee} from './_lib/ebay-apres-vente
 import { vendeurExige, baseCloisonnee } from './_lib/session.js';
 import { accesVendeur } from './_lib/abonnement.js';
 import { creerRechercheEbay } from './_lib/ebay-recherche.js';
+import { traiterSuppressionEbay } from './_lib/ebay-suppression.js';
+import { sbCle } from './_lib/cle.js';
 import { keysReady, canConsent, ruName, authUrl, appToken, jetonApplication, oublierJetonApplication, hasRefresh, accessToken, storeData, lireReglageVendeur, lireDonnee, lireResumeCommandes, modifierDonnee,
-  lireComptes, comptesActifs, rangerConnexion, apprendrePrincipal, apprendreTypes, resoudreCompte, deconnecterCompte, suffixeCompte,
+  lireComptes, comptesActifs, rangerConnexion, apprendrePrincipal, apprendreTypes, resoudreCompte, deconnecterCompte, suffixeCompte, normaliserRegistre, cleCompteDe,
   montantOk, valideRegleOffre, seuilTropBas } from './_lib/ebay.js';
 
 // ── LE CONTEXTE D'UNE ACTION : QUI (le vendeur de la session) ET SUR QUEL
@@ -1798,23 +1800,47 @@ async function handleRelire(ctx) {
 }
 
 // ── CONFORMITÉ : notification de suppression de compte ──────────────────────
-const verifToken = () => process.env.EBAY_VERIF_TOKEN || '';
+// Le défi GET (doc eBay « Marketplace User Account Deletion ») : SHA-256 de
+// challengeCode + jeton de vérification + adresse EXACTE déclarée chez eBay
+// (`EBAY_DELETION_URL`), en hexadécimal, rendu en JSON `{challengeResponse}`.
+// Le POST (signé) est traité par `api/_lib/ebay-suppression.js` : signature
+// vérifiée (sinon 412), puis anonymisation chez tous les vendeurs ; une
+// panne ⇒ 503, eBay renvoie la notification.
+const verifToken = () => process.env.EBAY_VERIF_TOKEN || process.env.EBAY_VERIFICATION_TOKEN || '';
+// eBay : 32 à 80 caractères, lettres, chiffres, « _ » et « - ».
+const verifTokenConforme = () => /^[A-Za-z0-9_-]{32,80}$/.test(verifToken());
 function deletionUrl(req) {
   if (process.env.EBAY_DELETION_URL) return process.env.EBAY_DELETION_URL;
-  const host = (req.headers && (req.headers['x-forwarded-host'] || req.headers.host)) || 'vrm.center';
+  const host = String((req.headers && (req.headers['x-forwarded-host'] || req.headers.host)) || 'vrm.center').split(',')[0].trim();
   return `https://${host}/api/ebay-deletion`;   // l'URL publique stable, pas le chemin interne
 }
 async function handleDeletion(req, res) {
   if (req.method === 'GET') {
-    const code = (req.query && (req.query.challenge_code || req.query.challengeCode)) || '';
-    if (!code) { res.status(200).json({ ok: true, ready: !!verifToken() }); return; }
+    let code = req.query && (req.query.challenge_code != null ? req.query.challenge_code : req.query.challengeCode);
+    if (Array.isArray(code)) code = code[0];
+    code = code == null ? '' : String(code);
+    if (!code) { res.status(200).json({ ok: true, ready: !!verifToken(), tokenConforme: verifTokenConforme() }); return; }
     if (!verifToken()) { res.status(503).json({ ok: false, reason: 'no-verif-token', error: 'EBAY_VERIF_TOKEN non configuré sur Vercel.' }); return; }
     const hash = crypto.createHash('sha256');
-    hash.update(String(code)); hash.update(verifToken()); hash.update(deletionUrl(req));  // ordre imposé par eBay
+    hash.update(code); hash.update(verifToken()); hash.update(deletionUrl(req));  // ordre imposé par eBay
+    if (typeof res.setHeader === 'function') res.setHeader('Content-Type', 'application/json');
     res.status(200).json({ challengeResponse: hash.digest('hex') });
     return;
   }
-  if (req.method === 'POST') { res.status(200).json({ ok: true }); return; }
+  if (req.method === 'POST') {
+    let r;
+    try {
+      r = await traiterSuppressionEbay(req, {
+        supabaseUrl: process.env.SUPABASE_URL || 'https://lgonxzrzjcqthjtbdpzo.supabase.co',
+        cleService: process.env.SUPABASE_SERVICE_KEY || '',
+        sbCle, jetonApplication, oublierJetonApplication, modifierDonnee, deconnecterCompte, normaliserRegistre, suffixeCompte, cleCompteDe,
+      });
+    } catch (_) {
+      r = { status: 503, body: { ok: false, reason: 'panne', error: 'Notification non traitée — eBay la renverra.' } };
+    }
+    res.status(r.status).json(r.body);
+    return;
+  }
   res.status(405).json({ ok: false, error: 'GET/POST' });
 }
 
