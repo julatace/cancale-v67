@@ -73,3 +73,24 @@ Déplacé TEL QUEL depuis CLAUDE.md §9 le 2 novembre 2026 (le fichier dépassai
 - **31 oct.** — Statistiques détaillées + widget « Tendances » ; bénéfice de Ma journée masquable en mode « Modifier ». → historiques interface-stock et compta. Geste : aucun.
 - **31 oct.** — Navigation par tâche (Journée · Annonces · Ventes · Colis · Plus ; anciens `?tab=` redirigés, `src/navigationTache.js`). → historique interface-stock. Geste : aucun.
 - **31 oct.** — Extension **5.293.0 soumise à addons.mozilla.org** par Julien (fiche `vrm-outil-du-revendeur`, compte vrm.vinted35@gmail.com) : Orion iPhone refuse l'installation par fichier (essais du 31 oct.) mais installe depuis la boutique (Dark Reader OK). Geste : à l'acceptation, donner le lien → `LIENS_BOUTIQUES.firefox` ; Chrome Web Store : `docs/publier-extension-pas-a-pas.md`.
+
+
+## Lignes du 28 oct. sorties de CLAUDE.md §9 le 2 nov. (telles quelles)
+
+- **28 oct.** — VRM reste sur la France (décision). Stock : un article une fois, toutes
+  plateformes ; meubles, plateaux, planches, hauteurs et « max N » partout. → interface-stock.
+- **28 oct.** — Republier : supprime et recrée (5.248), brouillons Vinted, menu « Actions »,
+  « Refaire le brouillon », couleur et taille vérifiées avant la mise en ligne. → vinted-extension.
+- **28 oct.** — Vestiaire : formulaire « smart listing », étiquette en 2ᵉ photo, Taille/État/Prix.
+- **28 oct.** — Tour de chaque espace sur ses vraies données (Vinted, Leboncoin, eBay,
+  Vestiaire, Ma journée, Colis).
+
+## Lignes du 29 oct. sorties de CLAUDE.md §9 le 2 nov. (telles quelles)
+
+- **29 oct.** — Favoris comme Vintex (5.280-5.281) : variables `{username}`, `{a|b}`,
+  offre réelle ; plafond de file retiré. → favoris-messages.
+- **29 oct.** — shop_cancale : tout retiré, ventes comprises (sa décision) ; un compte
+  supprimé ne sort plus d'aucune lecture (`src/comptesSupprimes.js`, sauf
+  `{ vrmVoirSupprimes: true }`). → divers / sécurité.
+- **29 oct.** — Ventes masquées impossibles ; Organisation hors du menu ; saisie « N° +
+  Entrée » retirée ; carte de la communauté gardée claire en mode sombre.

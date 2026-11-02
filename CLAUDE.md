@@ -528,6 +528,9 @@ vérifier par `curl https://vrm.center/api/sante`.
 
 ### Décisions et chantiers (octobre–novembre 2026)
 Une ligne par chantier. Le récit complet des lignes du 31 oct. au 2 nov. est, mot pour mot, dans `docs/passation/etat-detaille-2026-10-31-au-11-02.md`.
+- **2 nov. (soir)** — Sécurité : la politique CSP complète passe **en vigueur** (`vercel.json`, était en surveillance ; 2 violations relevées, aucune de VRM) ; banc `csp` vert. → historique sécurité. Geste : sur iPhone et ordinateur, vérifier que la carte de la Communauté s'affiche, qu'un bordereau s'ouvre, et Réglages → Imprimante → « Voir les aperçus ».
+- **2 nov. (soir)** — eBay : la notification « suppression de compte » est vérifiée (signature, sinon 412) puis appliquée (coordonnées d'acheteur effacées, montants gardés ; panne ⇒ 503, eBay renvoie) (`api/_lib/ebay-suppression.js`, `audit-ebay-suppression`). → historique ebay. Geste : aucun.
+- **2 nov. (soir)** — Favoris : écran simplifié (mode auto en une phrase + un geste, « Ton message », une ligne par favori rangée par état ; `src/favorisEcran.js`, `audit-favoris-ecran`, banc `favoris-ecran`). Geste : regarder Messages → Favoris reçus.
 - **2 nov. (soir)** — **Extension 5.312.0** : plafond 50/h par COMPTE tous Chrome confondus (`actions_compte_{uid}_{navigateur}`, base muette ⇒ ce Chrome seul) ; Republier LIT TOUJOURS l'annonce sur Vinted d'abord (une lecture, ses champs l'emportent sur une recette ancienne — « elle oubliait la couleur et la taille ») ; brouillons d'un autre compte grisés et nommés, brouillons disparus retirés (`src/brouillonsProposables.js`) ; avancée de Republier figée et toujours visible (banc `brouillons-avancee`). → historique vinted-extension. Geste : installer la 5.312.0.
 - **2 nov. (soir)** — **Extension 5.311.0** (sa plainte : « elle insistait, Vinted a détecté l'automatisation » ; « je ne veux pas voir les N° d'Arthur depuis Angèle » ; shop_cancale) : frein après tout refus de Vinted (`vrmFreinRepub`, 30 min / 24 h si `listing_restricted`, l'atelier s'arrête) ; ⚠️ **une lecture PUBLIQUE n'ajoute JAMAIS une annonce** (`<enligne-regle>`, sa décision) et les comptes jamais captés connectés ne sont plus relus ; N° affichés sur Vinted = ceux du compte de l'onglet seulement (`numerosDuCompte`, par `accountId`). → historique vinted-extension. Geste : installer la 5.311.0.
 - **2 nov.** — Visite en bulles à la première connexion (`src/VisiteBulles.jsx`, `vrm_visite_vue` synchronisée, « Revoir la visite » dans Paramètres → Aide), onglets NUS (plus aucune explication à côté), une phrase sous le titre de 6 écrans (`src/phrasesEcran.js`) ; banc `demo-bulles` vert 390/1512. → historique interface-stock. Geste : regarder la visite au téléphone (Paramètres → Aide → Revoir la visite).
@@ -596,20 +599,6 @@ Une ligne par chantier. Le récit complet des lignes du 31 oct. au 2 nov. est, m
   Paramètres). → vestiaire.
 - **29 oct.** — Plafond d'actions **50/h** (sa décision) ; Republier comme Vintex (5.277-5.285).
   → vinted-extension.
-- **29 oct.** — Favoris comme Vintex (5.280-5.281) : variables `{username}`, `{a|b}`,
-  offre réelle ; plafond de file retiré. → favoris-messages.
-- **29 oct.** — shop_cancale : tout retiré, ventes comprises (sa décision) ; un compte
-  supprimé ne sort plus d'aucune lecture (`src/comptesSupprimes.js`, sauf
-  `{ vrmVoirSupprimes: true }`). → divers / sécurité.
-- **29 oct.** — Ventes masquées impossibles ; Organisation hors du menu ; saisie « N° +
-  Entrée » retirée ; carte de la communauté gardée claire en mode sombre.
-- **28 oct.** — VRM reste sur la France (décision). Stock : un article une fois, toutes
-  plateformes ; meubles, plateaux, planches, hauteurs et « max N » partout. → interface-stock.
-- **28 oct.** — Republier : supprime et recrée (5.248), brouillons Vinted, menu « Actions »,
-  « Refaire le brouillon », couleur et taille vérifiées avant la mise en ligne. → vinted-extension.
-- **28 oct.** — Vestiaire : formulaire « smart listing », étiquette en 2ᵉ photo, Taille/État/Prix.
-- **28 oct.** — Tour de chaque espace sur ses vraies données (Vinted, Leboncoin, eBay,
-  Vestiaire, Ma journée, Colis).
 - **Avant le 20 oct.** — `docs/passation/etat-detaille-2026-10-31-au-11-02.md` (fin) et `docs/journal-2026.md`.
 
 ---
