@@ -52169,9 +52169,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           };
           // Depuis quand il attend (demande de Julien, 23 oct.) : la date d'arrivée de CE
           // colis, celle de l'ancien détail (`LigneArrivee`), sur sa carte.
+          // + le n° de suivi (23 oct. : « c'est le seul numéro qu'il a dans l'e-mail et la
+          // notification ») ; « Date d'arrivée inconnue » se dit aussi (pas su ≠ rien).
           const arriveeRetrait = (x) => { const t = (x.src && x.src.t) || null, o = (x.src && x.src.o) || null;
             const arr = t ? arriveeColisEmail(t) : (o ? (etatColisVinted(o, Date.now(), transpMap) || {}).arr : null);
-            return arr ? <LigneArrivee arr={arr} style={{marginTop:0}}/> : null; };
+            const su = t ? (t.suivi || '') : '';
+            return (<>
+              <LigneArrivee arr={arr || null} style={{marginTop:0}}/>
+              {su ? <span className="vrm-rp-suivi" data-rp-suivi={su}>n° {su}</span> : null}
+            </>); };
           const toutLuRet = !notes.retirer && !baseKO && tracking !== null && Array.isArray(buys.items) && !buys.error;
           return (<>
             <ScreenHead icon="doc" title="Colis" sous={<span className="vrm-phrase-ecran" data-phrase-ecran="colis">{PHRASES_ECRAN.colis}</span>}
