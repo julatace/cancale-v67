@@ -8,7 +8,7 @@
 // une vente déjà envoyée (V3), un achat en route (A1, suivi Chronopost), un
 // achat livré (A2), 2 messages non lus. Exigé aux deux tailles :
 //   1. Colis : « Ventes Vestiaire à envoyer · 2 », V1 = N°401 avec sa limite,
-//      V2 « pas reliée » (jamais un titre), V3 absente ; « Achats en route · 1 »
+//      V2 reçoit le N° neuf de son produit (404, 2 nov. soir — jamais un titre), V3 absente ; « Achats en route · 1 »
 //      avec « Suivre » vers Chronopost (44 px), A2 absent ;
 //   2. Ma journée : « 2 ventes Vestiaire à envoyer » (ambre : demain) et
 //      « 2 messages Vestiaire non lus » ;
@@ -139,8 +139,10 @@ const jobs = (pg) => pg.evaluate(() => ({ env: (document.querySelector('[data-jo
           if (mode === 'lu') {
             dit(c.bloc === '2' && c.ventes.map((v) => v.id).sort().join() === 'V1,V2', 'Colis : les 2 ventes Vestiaire à envoyer, pas celle déjà partie', JSON.stringify(c.ventes.map((v) => v.id)));
             const v1 = c.ventes.find((v) => v.id === 'V1') || {}, v2 = c.ventes.find((v) => v.id === 'V2') || {};
-            dit(v1.num === '401' && v1.lim && /demain/.test(v1.t) && /bordereau disponible/.test(v1.t), 'V1 : N°401 (référence VRM), à envoyer demain, bordereau disponible', v1.t);
-            dit(v2.num === '' && /Pas reliée/.test(v2.t) && /bordereau : pas su/.test(v2.t), 'V2 : pas reliée (aucun titre deviné), bordereau « pas su »', v2.t);
+            dit(v1.num === '401' && v1.lim && /demain/.test(v1.t) && /bordereau disponible/i.test(v1.t), 'V1 : N°401 (référence VRM), à envoyer demain, bordereau disponible', v1.t);
+            // (2 nov., soir) « un numéro par annonce » : V2, sans référence, reçoit le N° de SON
+            // produit (900002), du plus haut + 1 (401 et 403, références lues, sont pris) — jamais un titre deviné.
+            dit(v2.num === '404' && /bordereau : pas su/i.test(v2.t), 'V2 : sans référence ⇒ le N° neuf de son produit (404), bordereau « pas su »', `${v2.num} · ${v2.t}`);
             dit(c.route === null && !c.achats.length, '« À envoyer » : aucun achat en route (ce qui arrive n’est pas à envoyer)', JSON.stringify(c.achats));
             await pg.click('[data-colis-onglet-choix="retirer"]'); await pg.waitForTimeout(800);
             const r = await lire(pg);

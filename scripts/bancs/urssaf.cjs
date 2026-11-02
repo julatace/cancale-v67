@@ -166,13 +166,16 @@ const eur=(s)=>{ if(s==null) return null; const n=Number(String(s).replace(/\s|�
   // trouvait plus rien. On prend la première parenthèse qui porte un MONTANT
   // (« (argent versé) » n'en porte pas) ; sans phrase de CA (« ce chiffre se
   // calcule sur l'écran Ventes »), rien n'est trouvé et le contrôle est rouge.
-  const caCite = eur((/CA des ventes finalisées[^\n]*?\(([\d\s.,  ]+€)\)/i.exec(t)||[])[1]);
-  const nFinal = Number((/VENTES FINALISÉES\s*\n\s*(\d+)/i.exec(t)||[])[1]);
+  // (2 nov., Comptabilité claire) Le CA et le nombre de ventes sont dans la phrase sous le chiffre :
+  // « … de l'argent reçu en octobre, toutes plateformes (60,00 €, 1 vente) ». « Net après paiement »
+  // est retiré de la carte (il redisait le bénéfice autrement) : plus jugé.
+  const caCite = eur((/(?:CA des ventes finalisées|argent reçu en)[^\n]*?\(([\d\s.,  ]+€)/i.exec(t)||[])[1]);
+  const nFinal = Number(((/VENTES FINALISÉES\s*\n\s*(\d+)/i.exec(t)||/argent reçu en[^\n]*?, (\d+) ventes?\)/i.exec(t)||[])[1]));
   console.log(`   rendu : taux ${taux} % · CA cité ${caCite} € · à payer ${aPayer} € · net ${net} € · ${nFinal} vente(s) finalisée(s)`);
 
-  dit(caCite!=null && aPayer!=null && net!=null && taux!=null,
-    'la carte du mois affiche taux, CA, à payer et net',
-    'un des quatre est introuvable dans le rendu');
+  dit(caCite!=null && aPayer!=null && taux!=null,
+    'la carte du mois affiche taux, CA et à payer',
+    'un des trois est introuvable dans le rendu');
 
   if(caCite!=null && aPayer!=null && taux!=null){
     // ⚠️ LE CŒUR DU BANC. « 19,32 € à payer » ne peut pas venir de « 0,00 € ».
