@@ -167,7 +167,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.309.0';
+const EXT_ATTENDUE = '5.310.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -592,7 +592,7 @@ const extEnRetard = (v) => !!v && cmpVersion(v, EXT_ATTENDUE) < 0;
 // ⚠️ (30 oct., intégration) `transp`, `lbcsupprime` et `lbcstats` arrivent tous
 //    en 5.291.0 : 5.288 (Leboncoin) et 5.290 (colis) étaient des numéros de
 //    branche, jamais servis ; aucune version publiée ne porte ces fonctions.
-const EXT_CAPACITES = { favorisauto: '5.309.0', offresgarde: '5.308.0', transp: '5.291.0', favorisouvrir:'5.225.0', favorisliste:'5.218.0', suivivinted: '5.217.0', favoris: '5.217.0', liaison: '5.171.0', supprimees: '5.165.0', enligne: '5.170.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', preuves: '5.172.0', etatcompte: '5.181.0', lbcfiche: '5.182.0', relais: '5.183.0', lbcpack: '5.185.0', annulee: '5.185.0', confirmer: '5.206.0', retraitnotif: '5.206.0', offresauto: '5.234.0', vcpublier: '5.235.0', vcauto: '5.236.0', vcventes: '5.237.0', vcmessages: '5.238.0', vcachats: '5.239.0', republier: '5.240.0', republiermodif: '5.247.0', recreer: '5.248.0', lettre: '5.250.0', brouillon: '5.251.0', versbrouillon: '5.253.0', republierbrouillon: '5.254.0', refaire: '5.255.0', republierpage: '5.277.0', republierfile: '5.279.0', favorisperso: '5.281.0', lbcsupprime: '5.291.0', lbcstats: '5.291.0', vcsession: '5.295.0', vcfil: '5.295.0', vcrepondre: '5.295.0', vcfavoris: '5.295.0', relaisdest: '5.295.0', vcfiche: '5.296.0' };
+const EXT_CAPACITES = { republierquestion: '5.310.0', favorisauto: '5.309.0', offresgarde: '5.308.0', transp: '5.291.0', favorisouvrir:'5.225.0', favorisliste:'5.218.0', suivivinted: '5.217.0', favoris: '5.217.0', liaison: '5.171.0', supprimees: '5.165.0', enligne: '5.170.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', preuves: '5.172.0', etatcompte: '5.181.0', lbcfiche: '5.182.0', relais: '5.183.0', lbcpack: '5.185.0', annulee: '5.185.0', confirmer: '5.206.0', retraitnotif: '5.206.0', offresauto: '5.234.0', vcpublier: '5.235.0', vcauto: '5.236.0', vcventes: '5.237.0', vcmessages: '5.238.0', vcachats: '5.239.0', republier: '5.240.0', republiermodif: '5.247.0', recreer: '5.248.0', lettre: '5.250.0', brouillon: '5.251.0', versbrouillon: '5.253.0', republierbrouillon: '5.254.0', refaire: '5.255.0', republierpage: '5.277.0', republierfile: '5.279.0', favorisperso: '5.281.0', lbcsupprime: '5.291.0', lbcstats: '5.291.0', vcsession: '5.295.0', vcfil: '5.295.0', vcrepondre: '5.295.0', vcfavoris: '5.295.0', relaisdest: '5.295.0', vcfiche: '5.296.0' };
 // Trois états, jamais un seul : pas d'extension ici · en retard · à jour.
 const extSait = (quoi) => {
   if (!vmrExtPresent()) return 'absente';                    // téléphone, autre navigateur
@@ -13136,6 +13136,7 @@ function progressionRepub(p, action, viaB, listeImposee) {
 // requêtes acceptées). On lui DEMANDE ; sur son « oui », la commande repart avec
 // la couleur. Jamais choisie à sa place.
 async function avecCouleurBrouillon(envoyer, titre) {
+  let couleurPosee;
   let r = await envoyer(undefined);
   if (r && r.accepte === false && r.code === 'couleur-absente') {
     const cs = r.couleurs && typeof r.couleurs === 'object' ? Object.entries(r.couleurs).filter(([id, nom]) => /^\d+$/.test(id) && nom) : [];
@@ -13152,9 +13153,32 @@ async function avecCouleurBrouillon(envoyer, titre) {
       id = await askChoix({ title: 'Quelle est la couleur de cette paire ?', desc: `Vinted refuse de mettre en ligne une annonce sans couleur.${titre ? `\n« ${titre} »` : ''}\nChoisis-la : VRM la met et publie le brouillon tout de suite.`, options, cancel: 'Pas maintenant' });
     }
     if (id == null) return { ...r, raison: "pas mise en ligne — choisis sa couleur sur Vinted (« Modifier »), puis publie-le. Rien n'a été touché." };
-    r = await envoyer(Number(id));
+    couleurPosee = Number(id);
+    r = await envoyer(couleurPosee);
+  }
+  // (2 nov., extension 5.310) Il manque un AUTRE champ (catégorie, taille, état…)
+  // que VRM n'a pas pu reprendre de l'annonce elle-même : l'extension pose UNE
+  // question avec les valeurs de Vinted. On la lui pose ; sa réponse repart une
+  // fois. Jamais deux fois le même champ (pas de boucle), trois questions au plus.
+  const reponses = {}; const deja = new Set();
+  for (let k = 0; k < 3 && r && questionRepubOk(r.question) && !deja.has(r.question.champ); k++) {
+    deja.add(r.question.champ);
+    const v = await demanderQuestionRepub(r.question, titre);
+    if (v == null) return r;
+    reponses[r.question.champ] = v;
+    r = await envoyer(couleurPosee, { ...reponses });
   }
   return r;
+}
+// La question de l'extension est-elle utilisable (un champ, des valeurs de Vinted) ?
+const questionRepubOk = (q) => !!(q && typeof q === 'object' && q.champ && Array.isArray(q.options) && q.options.length && q.options.every((o) => Array.isArray(o) && /^\d{1,12}$/.test(String(o[0])) && o[1]));
+// Une feuille : « Quelle est la catégorie de la N°12 ? » + un bouton par valeur.
+async function demanderQuestionRepub(q, titre) {
+  if (!questionRepubOk(q)) return null;
+  const qui = q.num ? `la N°${q.num}` : 'cette paire';
+  const autres = Array.isArray(q.autres) && q.autres.length ? `\nIl manque aussi : ${q.autres.join(', ')}.` : '';
+  const id = await askChoix({ title: `Choisis ${q.nom || 'la valeur'} de ${qui}`, desc: `Vinted refuse l’annonce sans ${q.nom || 'ce champ'}, et VRM ne l’a pas trouvé sur l’annonce elle-même.${titre ? `\n« ${titre} »` : ''}\nChoisis : VRM le pose et reprend, une seule fois. Rien n’a été touché.${autres}`, options: q.options.map(([i, t]) => [String(i), String(t)]), cancel: 'Pas maintenant' });
+  return id == null ? null : String(id);
 }
 function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChrome, compteVinted, majExt, lettreOk, brouillonOk, onClose, onReessayer = null, action = 'recreer', reprise = null }) {
   const A = ACTIONS_REPUB[action] || ACTIONS_REPUB.recreer;
@@ -13302,7 +13326,7 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
       let r; try { r = await publier(suiv, { prix: x.prix != null ? x.prix : suiv.prix, titre: x.titre || suiv.titre, reglages: { ...reg }, lettre: lettreOn && lettreOk ? (lettres[suiv.id] || '') : '', viaBrouillon: viaBrouillon && !!brouillonOk }); } catch (_) { r = { etat: 'echec', raison: 'erreur' }; }
       busy.current = false;
       const etat = r && ['fait', 'double', 'incertain', 'a-refaire', 'planifiee'].includes(r.etat) ? r.etat : 'echec';
-      setSt((p) => ({ ...p, [suiv.id]: { etat, code: (r && r.code) || '', raison: (r && r.raison) || (etat === 'echec' ? "l'extension n'a pas répondu" : ''), nouveau: r && r.nouveau, jusqua: r && r.jusqua } }));
+      setSt((p) => ({ ...p, [suiv.id]: { etat, code: (r && r.code) || '', raison: (r && r.raison) || (etat === 'echec' ? "l'extension n'a pas répondu" : ''), nouveau: r && r.nouveau, jusqua: r && r.jusqua, question: questionRepubOk(r && r.question) ? r.question : null } }));
       // (30 oct.) Plus aucune paire à tenter : l'arrêt est l'état FINAL (rien à reprendre).
       const resteApres = aFaire.some((a) => a.id !== suiv.id && !st[a.id]);
       const arreter = (raison) => { setArret(raison || ''); const m = /dans (\d+) ?min/.exec(String(raison || '')); setArretJusqua(m ? Date.now() + Number(m[1]) * 60000 : 0); setMode(resteApres ? 'pause' : 'fini'); };
@@ -13339,6 +13363,21 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
     let r; try { r = await refaire(a); } catch (_) { r = { etat: 'echec', raison: 'erreur' }; }
     const e = r && ['fait', 'incertain', 'a-refaire'].includes(r.etat) ? r.etat : 'echec';
     setSt((p) => ({ ...p, [a.id]: { etat: e === 'echec' ? 'a-refaire' : e, raison: (r && r.raison) || (e === 'fait' ? '' : "l'extension n'a pas répondu"), refait: e === 'fait' } }));
+  };
+  // (2 nov., 5.310) Il manquait un champ que VRM n'a pas trouvé sur l'annonce :
+  // SA réponse (une valeur de Vinted) repart pour CETTE paire seulement, une fois.
+  // La file ne s'est pas arrêtée pour l'attendre (rien ne bloque les autres paires).
+  const repondreLigne = async (a) => {
+    const s0 = st[a.id] || {};
+    const v = await demanderQuestionRepub(s0.question, a.titre || '');
+    if (v == null) return;
+    const reponses = { ...(s0.reponses || {}), [s0.question.champ]: v };
+    setSt((p) => ({ ...p, [a.id]: { etat: 'encours' } }));
+    const x = apercu(a);
+    let r; try { r = await publier(a, { prix: x.prix != null ? x.prix : a.prix, titre: x.titre || a.titre, reglages: { ...reg }, lettre: lettreOn && lettreOk ? (lettres[a.id] || '') : '', viaBrouillon: viaBrouillon && !!brouillonOk, reponses }); } catch (_) { r = { etat: 'echec', raison: 'erreur' }; }
+    const etat = r && ['fait', 'double', 'incertain', 'a-refaire', 'planifiee'].includes(r.etat) ? r.etat : 'echec';
+    const q2 = questionRepubOk(r && r.question) && !(r.question.champ in reponses) ? r.question : null;
+    setSt((p) => ({ ...p, [a.id]: { etat, code: (r && r.code) || '', raison: (r && r.raison) || (etat === 'echec' ? "l'extension n'a pas répondu" : ''), nouveau: r && r.nouveau, jusqua: r && r.jusqua, question: q2, reponses } }));
   };
   const cssReg = { filter: `brightness(${reg.bright}) contrast(${reg.contrast}) saturate(${reg.sat})`, transform: `rotate(${reg.rot}deg) scale(${reg.zoom})`, transformOrigin: 'center center' };
   const curseur = (lab, cle, min, max, pas) => (
@@ -13631,6 +13670,7 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
                     {statut && <span data-republier-prevue={s.etat === 'planifiee' ? (s.jusqua || 0) : undefined} style={{ flexShrink: 0, fontSize: 12, fontWeight: 600, padding: '3px 8px', borderRadius: 99, background: pb ? 'transparent' : s.etat === 'fait' ? 'var(--vrm-b-teinte)' : 'transparent', border: pb ? `1px solid ${C.warn}` : 'none', color: pb ? C.warn : s.etat === 'fait' ? C.text : C.muted, whiteSpace: 'nowrap' }}>{statut}</span>}
                   </div>
                   {raison && <div style={{ fontSize: 12.5, color: pb ? C.warn : C.muted, padding: '0 0 4px 26px', lineHeight: 1.45 }}>{raison}</div>}
+                  {s.question && s.etat === 'echec' && mode !== 'run' && <div className="vrm-b-rangee" style={{ padding: '2px 0 4px 26px' }}><Bouton data-republier-question={s.question.champ} onClick={() => repondreLigne(a)}>{`Choisir ${s.question.nom || 'la valeur'}`}</Bouton></div>}
                   {s.etat === 'a-refaire' && refaire && mode !== 'run' && <div className="vrm-b-rangee" style={{ padding: '2px 0 4px 26px' }}><Bouton data-republier-refaire={a.id} onClick={() => refaireLigne(a)}>Refaire le brouillon</Bouton></div>}
                   {(s.etat === 'double' || s.etat === 'incertain') && urlAncienne && <div style={{ padding: '0 0 4px 26px' }}><Bouton variante="discret" href={urlAncienne} target="_blank" rel="noopener noreferrer" data-republier-voir-ancienne={a.id}>{s.etat === 'double' ? "Supprimer l'ancienne sur Vinted ↗" : 'Vérifier sur Vinted ↗'}</Bouton></div>}
                   {recree && pb && prog[String(a.id)] && prog[String(a.id)].etape && (() => { const lst = action === 'versBrouillon' ? ETAPES_REPUB.versBrouillon : ((viaBrouillon && !!brouillonOk) ? ETAPES_REPUB.brouillon : ETAPES_REPUB.direct); const pe = progressionRepub(prog[String(a.id)], action, viaBrouillon && !!brouillonOk); return (
@@ -33686,7 +33726,7 @@ function numerosReserves(data, maintenant) {
 // Un état de commande qui fait REVENIR la paire : elle n'est pas vendue.
 // ⚠️ Même expression que côté extension (`background.js`) — une notion, une
 //    règle (§11). Deux copies qui divergeraient donneraient deux files.
-const PAS_UNE_VENTE = /annul|cancel|refus|rembours|retour|suspend|[ée]chou/i;
+const PAS_UNE_VENTE = /annul|cancel|refus|rembours|retour|suspend|[ée]chou|[ée]chec\s+du\s+paiement/i;
 // ⚠️⚠️ 11 OCTOBRE — LA PREUVE QUI MANQUAIT À L'ANTI DOUBLE VENTE eBAY. Plainte
 // de Julien : « J'ai fait une vente hier, j'avais relié les deux paires, ça n'a
 // pas retiré la paire sur eBay, ça ne m'a même pas proposé ». Mesuré en lecture
@@ -41050,7 +41090,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // ce qui est enregistré dans VRM et ne touche jamais l'annonce d'origine.
   const refaireBrouillon = async (b) => {
     if (!b || !b.uid || !b.id) return { etape:'echec', raison:'annonce incomplète' };
-    const r=await avecCouleurBrouillon((couleur)=>vmrCmdSuivi({ cmd:'refaireBrouillon', uid:String(b.uid), id:String(b.id), confirme:true, couleur }, 480000), b.titre||b.title||'');
+    const r=await avecCouleurBrouillon((couleur,reponses)=>vmrCmdSuivi({ cmd:'refaireBrouillon', uid:String(b.uid), id:String(b.id), num:b.numero?String(b.numero):undefined, confirme:true, couleur, reponses }, 480000), b.titre||b.title||'');
     brRefaire.relire(); brVinted.relire();
     if (r.sansReponse) return { etape:'incertain', raison:TEXTE_SANS_REPONSE+' (dans tes brouillons aussi)' };
     if (r && r.accepte) return { etape:r.etape, raison: r.etape==='fait' ? (r.raison || (r.nouvelId ? 'Remise en ligne.' : 'Le brouillon est rangé sur Vinted.')) : (r.raison||''), nouvelId:r.nouvelId, refaire:!!r.refaire };
@@ -54506,7 +54546,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           publier={async (it) => {
             const uid = it._acc ? String(it._acc.vinted_user_id||'') : '';
             if (!uid) return { etape:'echec', raison:'compte introuvable' };
-            const r=await avecCouleurBrouillon((couleur)=>vmrCmdSuivi({ cmd:'publierBrouillon', uid, draftId:String(it.id), confirme:true, couleur }, 360000), it.title||it.titre||'');
+            const r=await avecCouleurBrouillon((couleur,reponses)=>vmrCmdSuivi({ cmd:'publierBrouillon', uid, draftId:String(it.id), confirme:true, couleur, reponses }, 360000), it.title||it.titre||'');
             if (r.sansReponse) { brVinted.relire(); return { etape:'incertain', raison:TEXTE_SANS_REPONSE }; }
             if (r && r.accepte) return { etape:r.etape, raison:r.raison||'' };
             return { etape:'echec', raison:(r&&(r.raison||r.error))||"l'extension n'a pas répondu" };
@@ -54535,7 +54575,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         });
         const publierR = async (a, v) => {
           if(!a.uid) return { etat:'echec', raison:'compte introuvable' };
-          const r=await vmrCmdSuivi({ cmd:'recreerVinted', uid:a.uid, id:a.id, prix:v.prix!=null?v.prix:undefined, titre:v.titre!=null?v.titre:undefined, plancher:a.floor, reglages:v.reglages, lettre:v.lettre||undefined, viaBrouillon:v.viaBrouillon===true, differer:v.viaBrouillon===true&&extSait('republierfile')==='ok', confirme:true }, 480000);
+          const r=await vmrCmdSuivi({ cmd:'recreerVinted', uid:a.uid, id:a.id, num:a.numero||undefined, reponses:v.reponses||undefined, prix:v.prix!=null?v.prix:undefined, titre:v.titre!=null?v.titre:undefined, plancher:a.floor, reglages:v.reglages, lettre:v.lettre||undefined, viaBrouillon:v.viaBrouillon===true, differer:v.viaBrouillon===true&&extSait('republierfile')==='ok', confirme:true }, 480000);
           if (r.sansReponse) { brRefaire.relire(); return { etat:'incertain', code:'sans-reponse', raison:TEXTE_SANS_REPONSE }; }
           if (r && r.accepte && r.nouvelId && (r.etape==='fait' || r.etape==='double')) reporterNumero(a.id, String(r.nouvelId));
           // (29 oct., « à la suite comme Vintex ») Mise en ligne PLANIFIÉE par l'extension :
@@ -54546,8 +54586,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             return { etat:'planifiee', jusqua:Number(r.jusqua)||0, raison:'', nouveau:r.nouveau };
           }
           if (r && r.accepte && ['fait','double','incertain'].includes(r.etape)) return { etat:r.etape, raison:r.raison||'', nouveau:r.nouveau };
-          if (r && r.accepte && r.refaire) { brRefaire.relire(); return { etat:'a-refaire', raison:r.raison||'' }; }
-          return { etat:'echec', code:(r&&r.code)||'', raison:(r&&(r.raison||r.error))||"l'extension n'a pas répondu" };
+          if (r && r.accepte && r.refaire) { brRefaire.relire(); return { etat:'a-refaire', raison:r.raison||'', question:r.question||null }; }
+          return { etat:'echec', code:(r&&r.code)||'', raison:(r&&(r.raison||r.error))||"l'extension n'a pas répondu", question:(r&&r.question)||null };
         };
         // (28 oct., 5.252) Modifier SUR PLACE : le PUT mesuré (`republierVinted`), le
         // prix et le titre EXACTS de l'aperçu ; jamais sous le prix d'achat.
@@ -54564,17 +54604,17 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         // créé (sa décision du 28 oct. au soir). Le N° reste sur l'ancienne fiche.
         const publierVersB = async (a, v) => {
           if(!a.uid) return { etat:'echec', raison:'compte introuvable' };
-          const r=await vmrCmdSuivi({ cmd:'recreerVinted', uid:a.uid, id:a.id, prix:v.prix!=null?v.prix:undefined, titre:v.titre!=null?v.titre:undefined, plancher:a.floor, reglages:v.reglages, lettre:v.lettre||undefined, versBrouillon:true, confirme:true }, 480000);
+          const r=await vmrCmdSuivi({ cmd:'recreerVinted', uid:a.uid, id:a.id, num:a.numero||undefined, reponses:v.reponses||undefined, prix:v.prix!=null?v.prix:undefined, titre:v.titre!=null?v.titre:undefined, plancher:a.floor, reglages:v.reglages, lettre:v.lettre||undefined, versBrouillon:true, confirme:true }, 480000);
           if (r.sansReponse) { brRefaire.relire(); brVinted.relire(); return { etat:'incertain', code:'sans-reponse', raison:TEXTE_SANS_REPONSE+' (dans tes brouillons aussi)' }; }
           if (r && r.accepte && ['fait','double','incertain'].includes(r.etape)) { if (r.etape==='fait') brVinted.relire(); return { etat:r.etape, raison:r.raison||'' }; }
-          if (r && r.accepte && r.refaire) { brRefaire.relire(); return { etat:'a-refaire', raison:r.raison||'' }; }
-          return { etat:'echec', code:(r&&r.code)||'', raison:(r&&(r.raison||r.error))||"l'extension n'a pas répondu" };
+          if (r && r.accepte && r.refaire) { brRefaire.relire(); return { etat:'a-refaire', raison:r.raison||'', question:r.question||null }; }
+          return { etat:'echec', code:(r&&r.code)||'', raison:(r&&(r.raison||r.error))||"l'extension n'a pas répondu", question:(r&&r.question)||null };
         };
         // (28 oct., 5.252) Brouillons → en ligne, à la suite : ses brouillons (la liste
         // de « Voir mes brouillons », §11) ; seuls ceux PRÊTS se cochent.
         const publierEnLigne = async (a) => {
           if(!a.uid) return { etat:'echec', raison:'compte introuvable' };
-          const r=await avecCouleurBrouillon((couleur)=>vmrCmdSuivi({ cmd:'publierBrouillon', uid:a.uid, draftId:a.id, confirme:true, couleur }, 360000), a.titre||'');
+          const r=await avecCouleurBrouillon((couleur,reponses)=>vmrCmdSuivi({ cmd:'publierBrouillon', uid:a.uid, draftId:a.id, confirme:true, couleur, reponses }, 360000), a.titre||'');
           if (r.sansReponse) { brVinted.relire(); return { etat:'incertain', code:'sans-reponse', raison:TEXTE_SANS_REPONSE }; }
           if (r && r.accepte && r.etape==='fait') { brVinted.relire(); return { etat:'fait' }; }
           if (r && r.accepte && r.etape==='incertain') return { etat:'incertain', raison:r.raison||'' };

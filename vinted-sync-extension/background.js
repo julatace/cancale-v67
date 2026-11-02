@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.309.0';
+const CODE_VERSION = '5.310.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -8342,7 +8342,12 @@ async function repondreOffre({ uid, tx, oid, quoi, prix, conv, msg }) {
   noterDiag(r.ok ? `offre_auto_${quoi}` : `offre_auto_${quoi}_refuse_${r.status}`);
   // Refus : si LE VENDEUR a écrit un message (jamais inventé), on l'envoie APRÈS
   // le refus réussi — même file « une requête à la fois », vide ⇒ rien n'est écrit.
+  // ⚠️ 2 nov. (audit « plateformes » P11) : le message est une SECONDE requête chez
+  // Vinted — elle prend sa place dans le plafond (sous la réserve des gestes, comme
+  // `garde`). Plus de place (ou stockage muet) ⇒ le message ne part pas, c'est noté.
   if (quoi === 'reject' && r && r.ok && conv && msg) {
+    const c2 = await compterAction(String(uid), ACTIONS_MAX_HEURE - RESERVE_GESTES);
+    if (!c2.ok) { noterDiag('offre_auto_refus_message_' + (c2.code === 'stockage' ? 'stockage' : 'plafond')); return { ok: true, status: r.status, error: '', messagePasParti: true }; }
     try {
       const rm = await vintedSend(acc, 'POST', `/api/v2/conversations/${conv}/replies`, { message: String(msg) });
       noterDiag(rm && rm.ok ? 'offre_auto_refus_message' : `offre_auto_refus_message_ko_${rm && rm.status}`);
@@ -8904,12 +8909,15 @@ async function grilleTailles(uid, acc, catalogId, opts = {}) {
   if (!cat || cat === '0') return { raison: "la catégorie de l'annonce est inconnue" };
   let st = null; try { st = (await chrome.storage.local.get(TAILLES_VU))[TAILLES_VU] || null; } catch (_) {}
   const c = st && st[cat];
-  if (c && Array.isArray(c.options) && Number(c.at) > Date.now() - 24 * 3600000) return { options: c.options, requis: Array.isArray(c.requis) ? c.requis : [], sansTaille: !!c.sansTaille, codes: Array.isArray(c.codes) ? c.codes : [] };
+  if (c && Array.isArray(c.options) && Number(c.at) > Date.now() - 24 * 3600000) return { options: c.options, requis: Array.isArray(c.requis) ? c.requis : [], sansTaille: !!c.sansTaille, codes: Array.isArray(c.codes) ? c.codes : [], etats: Array.isArray(c.etats) ? c.etats : [] };
   // (29 oct., sa décision : « l'extension doit, avant d'appuyer sur publier, regarder si
   // toutes les catégories sont remplies ») La 5.280 ne la lisait JAMAIS pendant une
   // republication (cache seulement) : grille absente ⇒ la taille n'était PAS vérifiée et
   // Vinted refusait « Le champ Taille doit être renseigné » après coup. Elle est lue
   // (une fois par catégorie et par 24 h, comme la page de dépôt le fait), AVANT tout geste.
+  // (2 nov., 5.310) La complétion par identité et la question dans l'app n'appellent
+  // JAMAIS la grille pendant une republication : le cache, sinon rien.
+  if (opts.sansLecture || !acc) return { raison: "VRM ne connaît pas encore la liste de Vinted pour cette catégorie" };
   if (opts.cacheSeul) noterDiag('tailles_cache_absent_lue');
   const g = await gardeLecture(uid, acc, 'clic');
   if (g) return { raison: g.error };
@@ -8922,10 +8930,10 @@ async function grilleTailles(uid, acc, catalogId, opts = {}) {
   if (!lisible) { noterDiag('tailles_forme_inconnue'); return { raison: "VRM n'a pas su lire la liste des tailles de Vinted (forme gardée pour la passe suivante)" }; }
   // Une catégorie SANS taille (aucun nœud « size ») : lue, rien à poser.
   const garde = (options || []).slice(0, 300); const sansTaille = !options;
-  try { const tout = { ...(st || {}) }; tout[cat] = { options: garde, requis, sansTaille, codes: tout_codes(r.json), at: Date.now() }; const cles = Object.keys(tout); if (cles.length > 30) delete tout[cles[0]]; await chrome.storage.local.set({ [TAILLES_VU]: tout }); } catch (_) {}
+  try { const tout = { ...(st || {}) }; tout[cat] = { options: garde, requis, sansTaille, codes: tout_codes(r.json), etats: optionsCodeDe(r.json, ['condition', 'status']) || [], at: Date.now() }; const cles = Object.keys(tout); if (cles.length > 30) delete tout[cles[0]]; await chrome.storage.local.set({ [TAILLES_VU]: tout }); } catch (_) {}
   noterDiag('tailles_lues');
   if (!garde.length && !sansTaille) return { raison: "Vinted n'a rendu aucune taille pour cette catégorie" };
-  return { options: garde, requis, sansTaille, codes: tout_codes(r.json) };
+  return { options: garde, requis, sansTaille, codes: tout_codes(r.json), etats: optionsCodeDe(r.json, ['condition', 'status']) || [] };
 }
 // La taille que Vinted donnait à la paire : le coffre de l'ancienne annonce,
 // sinon son annonce (ou le brouillon) dans le dressing. `null` = pas su.
@@ -8969,38 +8977,279 @@ const NOM_CHAMP_VINTED = { size: 'la taille', condition: "l'état", status: "l'�
 // annonce / le brouillon (pour lire la taille de la paire).
 async function champsManquantsAvant(uid, acc, it, idsPaire, opts = {}) {
   const manque = [];
+  // (2 nov., 5.310) Le CODE de chaque champ qui manque (`opts.codesManque`) : c'est
+  // lui que la complétion par identité et la question dans l'app utilisent.
+  const codes = Array.isArray(opts.codesManque) ? opts.codesManque : [];
+  const noter = (c) => { if (!codes.includes(c)) codes.push(c); };
   const attrs = Array.isArray(it.item_attributes) ? it.item_attributes : [];
   const a = (code) => attrs.find((x) => x && x.code === code && Array.isArray(x.ids) && x.ids.length);
-  if (!String(it.title || '').trim()) manque.push('le titre');
+  if (!String(it.title || '').trim()) { manque.push('le titre'); noter('title'); }
   const prix = Number(it.price && typeof it.price === 'object' ? it.price.amount : it.price);
-  if (!(isFinite(prix) && prix > 0)) manque.push('le prix');
-  if (!(Array.isArray(it.assigned_photos) && it.assigned_photos.length)) manque.push('les photos');
-  if (!(Number(it.catalog_id) > 0)) manque.push('la catégorie');
-  if (String(it.description || '').trim().length < DESCRIPTION_MIN) manque.push('la description (5 caractères au moins)');
-  if (!idsCouleurVinted(it).length) manque.push('la couleur');
-  if (!(Number(it.package_size_id) > 0)) manque.push('la taille du colis');
+  if (!(isFinite(prix) && prix > 0)) { manque.push('le prix'); noter('price'); }
+  if (!(Array.isArray(it.assigned_photos) && it.assigned_photos.length)) { manque.push('les photos'); noter('photos'); }
+  if (!(Number(it.catalog_id) > 0)) { manque.push('la catégorie'); noter('catalog_id'); }
+  if (String(it.description || '').trim().length < DESCRIPTION_MIN) { manque.push('la description (5 caractères au moins)'); noter('description'); }
+  if (!idsCouleurVinted(it).length) { manque.push('la couleur'); noter('color'); }
+  if (!(Number(it.package_size_id) > 0)) { manque.push('la taille du colis'); noter('package_size_id'); }
   if (Number(it.catalog_id) > 0) {
     const g = await grilleTailles(uid, acc, it.catalog_id, opts);
-    if (g.codes && g.codes.includes('condition') && !a('condition') && !a('status')) manque.push("l'état");
+    if (g.codes && g.codes.includes('condition') && !a('condition') && !a('status')) { manque.push("l'état"); noter('condition'); }
     if (g.options && g.options.length) {
       const sz = a('size'); const ids = sz ? sz.ids.map(Number) : [];
       if (!ids.length || !ids.some((x) => g.options.some((o) => o.id === x))) {
         const libelle = await libelleTaillePaire(uid, idsPaire || []);
         const t = libelle ? choisirTaille(g.options, libelle) : { raison: "VRM ne connaît pas la taille de cette paire" };
         if (t.id) { it.item_attributes = [...attrs.filter((x) => x && x.code !== 'size'), { code: 'size', ids: [t.id] }]; noterDiag('avant_taille_corrigee'); }
-        else manque.push(`la taille (${t.raison})`);
+        else { manque.push(`la taille (${t.raison})`); noter('size'); }
       }
     }
     for (const code of (g.requis || [])) {
       if (code === 'size' || code === 'condition' || code === 'status' || code === 'color' || code === 'brand') {
-        if (code === 'brand' && !(Number(it.brand_id) > 0)) manque.push('la marque');
+        if (code === 'brand' && !(Number(it.brand_id) > 0)) { manque.push('la marque'); noter('brand'); }
         continue;
       }
-      if (!a(code)) manque.push(NOM_CHAMP_VINTED[code] || code.replace(/_/g, ' '));
+      if (!a(code)) { manque.push(NOM_CHAMP_VINTED[code] || code.replace(/_/g, ' ')); noter(code); }
     }
   }
   if (manque.length) noterDiag('avant_manque_' + manque.length);
   return [...new Set(manque)];
+}
+// ══════════════════════════════════════════════════════════════════════════════
+// REPUBLIER QUI RÈGLE SES PROBLÈMES (2 novembre, 5.310 — demande de Julien :
+// « s'il manque une catégorie, ça tape indéfiniment sur Publier ; il faut qu'elle
+// puisse remplir elle-même ou demander »).
+// ⚠️ Ce n'est PAS le retour de `completionSecoursPhotos` / `photosNeuvesBrouillon` /
+//    `secoursTaille` (retirés le 29 oct. : des RENVOIS EN RAFALE sur un refus). Ici :
+//   1. AVANT d'envoyer, un champ obligatoire vide est rempli UNE fois depuis une
+//      source d'IDENTITÉ — la même annonce rangée dans VRM (coffre de l'ancienne
+//      annonce, sa recette acceptée par Vinted, sa fiche), jamais le titre, jamais
+//      une autre paire ;
+//   2. sinon VRM S'ARRÊTE et DEMANDE dans l'app (`code:'question'`) : le champ, et
+//      les valeurs que Vinted propose, lues dans ce qui est DÉJÀ connu (cache de la
+//      grille 24 h, liste des couleurs, catégories déjà acceptées par Vinted sur
+//      ses annonces) — jamais d'appel de grille pendant une republication ;
+//   3. sa réponse revient UNE fois (`msg.reponses`), validée contre ces mêmes
+//      valeurs ; on reprend ;
+//   4. un refus de Vinted est RETENU (signature du corps envoyé) : le même corps
+//      n'est jamais renvoyé sur le même refus — la question est reposée sans
+//      requête (`vrmRefusRepub`).
+// ══════════════════════════════════════════════════════════════════════════════
+const NOM_QUESTION = { catalog_id: 'la catégorie', size: 'la taille', condition: "l'état", color: 'la couleur', package_size_id: 'la taille du colis', brand: 'la marque', photos: 'les photos', description: 'la description', title: 'le titre', price: 'le prix' };
+const ORDRE_QUESTIONS = ['photos', 'description', 'title', 'price', 'catalog_id', 'size', 'condition', 'color', 'package_size_id', 'brand'];
+// Les valeurs d'un attribut (`condition`, `status`…) dans la réponse de la grille.
+function optionsCodeDe(j, codesVoulus) {
+  const out = []; let vu = false;
+  const prendre = (o, prof) => {
+    if (!o || typeof o !== 'object' || prof > 9) return;
+    if (Array.isArray(o)) { for (const x of o) prendre(x, prof + 1); return; }
+    const id = Number(o.id);
+    const t = [o.title, o.name, o.label].find((v) => typeof v === 'string' && v.trim());
+    if (Number.isSafeInteger(id) && id > 0 && t && t.length <= 40) out.push({ id, t: t.trim() });
+    for (const k of Object.keys(o)) if (o[k] && typeof o[k] === 'object') prendre(o[k], prof + 1);
+  };
+  const chercher = (o, prof) => {
+    if (!o || typeof o !== 'object' || prof > 8) return;
+    if (Array.isArray(o)) { for (const x of o) chercher(x, prof + 1); return; }
+    if (codesVoulus.includes(String(o.code || '').toLowerCase())) { vu = true; for (const k of Object.keys(o)) if (o[k] && typeof o[k] === 'object') prendre(o[k], 0); return; }
+    for (const k of Object.keys(o)) if (o[k] && typeof o[k] === 'object') chercher(o[k], prof + 1);
+  };
+  chercher(j, 0);
+  if (!vu) return null;
+  const vus = new Set(); return out.filter((o) => (vus.has(o.id) ? false : (vus.add(o.id), true))).slice(0, 40);
+}
+// Le champ Vinted d'une erreur de validation → le code de la question.
+function codeChampRefus(e) {
+  const f = String((e && (e.field || e.name)) || '').toLowerCase().split('.')[0];
+  const v = String((e && (e.value || e.message)) || '');
+  if (f === 'catalog_id' || /cat[ée]gorie/i.test(v)) return 'catalog_id';
+  if (f === 'size' || f === 'size_id' || /champ taille/i.test(v)) return 'size';
+  if (f === 'status_id' || f === 'status' || f === 'condition' || /[ée]tat/i.test(v)) return 'condition';
+  if (f === 'color_ids' || f === 'colors' || f === 'color1_id' || /couleur/i.test(v)) return 'color';
+  if (f === 'package_size_id' || /colis/i.test(v)) return 'package_size_id';
+  if (f === 'brand_id' || f === 'brand' || /marque/i.test(v)) return 'brand';
+  if (f === 'assigned_photos' || f === 'photos' || /photo/i.test(v)) return 'photos';
+  if (f === 'description') return 'description';
+  if (f === 'title') return 'title';
+  if (f === 'price') return 'price';
+  return '';
+}
+function codesDuRefus(rc) {
+  const j = rc && rc.json && typeof rc.json === 'object' ? rc.json : null;
+  const errs = j && Array.isArray(j.errors) ? j.errors : [];
+  return [...new Set(errs.map(codeChampRefus).filter(Boolean))];
+}
+// La signature de ce qui part (les champs que Vinted juge) : même signature ⇒ même essai.
+function signatureCorps(d) {
+  const x = d || {};
+  const attrs = (Array.isArray(x.item_attributes) ? x.item_attributes : []).filter((a) => a && a.code).map((a) => a.code + ':' + (a.ids || []).join('+')).sort().join(',');
+  const prix = x.price && typeof x.price === 'object' ? x.price.amount : x.price;
+  const s = [x.catalog_id, attrs, idsCouleurVinted(x).join('+'), x.package_size_id, x.brand_id, (Array.isArray(x.assigned_photos) && x.assigned_photos.length ? 'p' : '-'), String(x.description || '').trim().length >= DESCRIPTION_MIN ? 'd' : '-', String(x.title || '').trim() ? 't' : '-', prix].join('|');
+  let h = 5381; for (let i = 0; i < s.length; i++) h = ((h * 33) ^ s.charCodeAt(i)) >>> 0;
+  return h.toString(36);
+}
+const REFUS_REPUB = 'vrmRefusRepub';
+const REFUS_REPUB_MS = 7 * 86400000;
+async function refusDejaVu(cle, d) {
+  try {
+    const m = (await chrome.storage.local.get(REFUS_REPUB))[REFUS_REPUB] || {};
+    const e = m[cle];
+    if (e && e.sig === signatureCorps(d) && Date.now() - Number(e.at) < REFUS_REPUB_MS) return e;
+  } catch (_) {}
+  return null;
+}
+async function retenirRefus(cle, d, rc) {
+  // Seulement un refus qui NOMME le champ fautif : renvoyer le même corps ne peut
+  // que reprendre le même refus. Un refus muet (400/422 sans champ) n'est pas retenu :
+  // un nouveau clic de Julien reste possible (ce n'est pas une boucle).
+  if (!codesDuRefus(rc).length) return;
+  try {
+    const m = (await chrome.storage.local.get(REFUS_REPUB))[REFUS_REPUB] || {};
+    for (const k of Object.keys(m)) if (!(Date.now() - Number(m[k] && m[k].at) < REFUS_REPUB_MS)) delete m[k];
+    m[cle] = { sig: signatureCorps(d), champs: codesDuRefus(rc), status: Number(rc && rc.status) || 0, raison: String(raisonRefusVinted(rc) || '').slice(0, 200), at: Date.now() };
+    await chrome.storage.local.set({ [REFUS_REPUB]: m });
+  } catch (_) {}
+}
+// Les sources d'IDENTITÉ d'une paire : pour chaque identifiant (l'ancienne annonce,
+// le brouillon), son coffre (corps du brouillon enregistré), sa recette acceptée
+// par Vinted, sa fiche (codes relevés sur SA page « Modifier »). Rend une liste
+// d'objets « corps » (catalog_id, item_attributes, color_ids…), du plus sûr au moins
+// sûr. `null` = la base n'a pas répondu (pas su ⇒ on ne remplit rien).
+async function sourcesIdentite(uid, ids) {
+  const out = [];
+  const bons = [...new Set((ids || []).map(String).filter((x) => /^\d{4,15}$/.test(x)))];
+  if (!bons.length) return out;
+  let modeles = null;
+  for (const id of bons) {
+    let cf; try { cf = await sbGet(`app_data?id=eq.coffre_${uid}_${id}&select=c:data->versBrouillon->>corps,u:data->>uid`); } catch (_) { cf = null; }
+    if (cf === null) return null;
+    const ligne = cf && cf[0];
+    if (ligne && ligne.c && (!ligne.u || String(ligne.u) === String(uid))) { try { const o = JSON.parse(ligne.c); const d = o && (o.draft || o.item); if (d && typeof d === 'object') out.push({ src: 'coffre', id, d }); } catch (_) {} }
+    if (modeles === null) { try { const r = await sbGet('app_data?id=eq.vrm_vinted_modele&select=data'); modeles = r === null ? null : ((r && r[0] && r[0].data) || {}); } catch (_) { modeles = null; } if (modeles === null) return null; }
+    const m = modeles[id];
+    if (m && m.corps && (!m.uid || String(m.uid) === String(uid))) { try { const o = JSON.parse(m.corps); const d = o && (o.item || o.draft); if (d && typeof d === 'object') out.push({ src: 'recette', id, d }); } catch (_) {} }
+    const f = await lireFicheAnnonce(id);
+    if (f === null) return null;
+    if (f && f.codes && typeof f.codes === 'object') out.push({ src: 'fiche', id, d: f.codes });
+  }
+  return out;
+}
+// Remplit UNE fois, sur place, les champs vides de `it` depuis les sources
+// d'identité. Ne remplace JAMAIS une valeur posée. La taille ne vient que d'un code
+// présent dans la grille connue (cache) quand il y en a une. Rend les codes remplis.
+async function completerParIdentite(uid, acc, it, ids, codes) {
+  const faits = [];
+  if (!it || !Array.isArray(codes) || !codes.length) return faits;
+  const src = await sourcesIdentite(uid, ids);
+  if (!src || !src.length) return faits;
+  const attrs = () => (Array.isArray(it.item_attributes) ? it.item_attributes : []);
+  const attrDe = (d, code) => (Array.isArray(d.item_attributes) ? d.item_attributes : []).find((x) => x && x.code === code && Array.isArray(x.ids) && x.ids.length);
+  let grille = null;
+  const grilleDe = async (cat) => { if (grille === null) grille = await grilleTailles(uid, acc, cat, { cacheSeul: true, sansLecture: true }); return grille; };
+  for (const code of codes) {
+    for (const { d } of src) {
+      if (code === 'catalog_id' && !(Number(it.catalog_id) > 0) && Number(d.catalog_id) > 0) { it.catalog_id = Number(d.catalog_id); faits.push(code); break; }
+      if (code === 'package_size_id' && !(Number(it.package_size_id) > 0) && Number(d.package_size_id) > 0) { it.package_size_id = Number(d.package_size_id); faits.push(code); break; }
+      if (code === 'brand' && !(Number(it.brand_id) > 0) && Number(d.brand_id) > 0) { it.brand_id = Number(d.brand_id); if (d.brand && !it.brand) it.brand = d.brand; faits.push(code); break; }
+      if (code === 'color' && !idsCouleurVinted(it).length && idsCouleurVinted(d).length) { it.color_ids = idsCouleurVinted(d); faits.push(code); break; }
+      if (code === 'condition') { const a = attrDe(d, 'condition') || attrDe(d, 'status'); if (a) { it.item_attributes = [...attrs().filter((x) => x && x.code !== a.code), { code: a.code, ids: a.ids.slice(0, 2) }]; faits.push(code); break; } }
+      if (code === 'size' && Number(it.catalog_id) > 0 && Number(d.catalog_id || it.catalog_id) === Number(it.catalog_id)) {
+        const a = attrDe(d, 'size'); if (!a) continue;
+        const g = await grilleDe(it.catalog_id);
+        if (g && Array.isArray(g.options) && g.options.length && !a.ids.some((x) => g.options.some((o) => o.id === Number(x)))) continue;   // ce code n'est plus dans la grille
+        it.item_attributes = [...attrs().filter((x) => x && x.code !== 'size'), { code: 'size', ids: a.ids.slice(0, 2) }]; faits.push(code); break;
+      }
+      if (!['catalog_id', 'package_size_id', 'brand', 'color', 'condition', 'size'].includes(code)) {
+        const a = attrDe(d, code); if (a && !attrDe(it, code)) { it.item_attributes = [...attrs(), { code, ids: a.ids.slice(0, 4) }]; faits.push(code); break; }
+      }
+    }
+  }
+  if (faits.length) noterDiag('completer_identite_' + faits.join('_'));
+  return faits;
+}
+// Les valeurs que VRM peut proposer pour un champ — lues dans ce qui est DÉJÀ
+// connu, jamais par une requête pendant la republication. `null` : pas de liste
+// sûre ⇒ la question dit seulement le geste sur Vinted.
+async function optionsQuestion(uid, champ, it) {
+  if (champ === 'size' || champ === 'condition') {
+    if (!(Number(it && it.catalog_id) > 0)) return null;
+    const g = await grilleTailles(uid, null, it.catalog_id, { cacheSeul: true, sansLecture: true });
+    const l = champ === 'size' ? (g && g.options) : (g && g.etats);
+    return Array.isArray(l) && l.length ? l.slice(0, 80).map((o) => [String(o.id), String(o.t)]) : null;
+  }
+  if (champ === 'color') {
+    let st = null; try { st = (await chrome.storage.local.get(COULEURS_VU))[COULEURS_VU] || null; } catch (_) {}
+    const l = { ...((st && st.liste) || {}), ...COULEURS_VINTED_SURES };
+    const o = Object.entries(l).filter(([id, nom]) => /^\d+$/.test(id) && nom).sort((a, b) => Number(a[0]) - Number(b[0]));
+    return o.length ? o.map(([id, nom]) => [String(id), String(nom)]) : null;
+  }
+  if (champ === 'catalog_id') {
+    // Les catégories que Vinted a DÉJÀ acceptées sur ses annonces (recettes), nommées
+    // par le catalogue de Vinted. Une catégorie sans nom connu n'est pas proposée.
+    let r; try { r = await sbGet('app_data?id=eq.vrm_vinted_modele&select=data'); } catch (_) { r = null; }
+    const m = (r && r[0] && r[0].data) || {};
+    const ids = new Set();
+    for (const k of Object.keys(m)) { const e = m[k]; if (!e || !e.corps || (e.uid && String(e.uid) !== String(uid))) continue; try { const o = JSON.parse(e.corps); const d = o && (o.item || o.draft); if (d && Number(d.catalog_id) > 0) ids.add(Number(d.catalog_id)); } catch (_) {} }
+    if (!ids.size) return null;
+    try { await chargerCataloguesPlateformes(); } catch (_) {}
+    const o = [...ids].map((id) => [String(id), cheminCatalogueVinted(_catVinted, id)]).filter(([, t]) => t).sort((a, b) => a[1].localeCompare(b[1], 'fr'));
+    return o.length ? o.slice(0, 40) : null;
+  }
+  return null;
+}
+// UNE question (le premier champ qui bloque, dans un ordre fixe), avec ses valeurs.
+async function questionRepub(uid, it, codes, ctx = {}) {
+  const champ = ORDRE_QUESTIONS.find((c) => (codes || []).includes(c)) || (codes || [])[0] || '';
+  if (!champ) return null;
+  const options = await optionsQuestion(uid, champ, it).catch(() => null);
+  const nom = NOM_QUESTION[champ] || String(champ).replace(/_/g, ' ');
+  const geste = options ? '' : (champ === 'photos'
+    ? "Ouvre le brouillon sur Vinted (Mes brouillons → « Modifier »), rajoute les photos, puis relance depuis VRM."
+    : `Sur Vinted → « Modifier » → choisis ${nom} → « Enregistrer », puis relance depuis VRM : l'extension l'apprend.`);
+  return { champ, nom, options, geste, id: ctx.id ? String(ctx.id) : '', draftId: ctx.draftId ? String(ctx.draftId) : '', autres: (codes || []).filter((c) => c !== champ).map((c) => NOM_QUESTION[c] || c) };
+}
+// Sa réponse, validée contre les MÊMES valeurs que la question, posée une fois.
+async function appliquerReponses(uid, it, reponses) {
+  const poses = [];
+  if (!it || !reponses || typeof reponses !== 'object') return poses;
+  for (const champ of Object.keys(reponses).filter((c) => ['catalog_id', 'size', 'condition', 'color'].includes(c))) {
+    const v = String(reponses[champ]);
+    if (!/^\d{1,12}$/.test(v)) continue;
+    const options = await optionsQuestion(uid, champ, it).catch(() => null);
+    if (!options || !options.some(([id]) => id === v)) { noterDiag('reponse_refusee_' + champ); continue; }
+    const n = Number(v);
+    const attrs = Array.isArray(it.item_attributes) ? it.item_attributes : [];
+    if (champ === 'catalog_id') { if (Number(it.catalog_id) !== n) it.item_attributes = attrs.filter((x) => x && x.code !== 'size'); it.catalog_id = n; }
+    else if (champ === 'color') it.color_ids = [n];
+    else { const code = champ === 'condition' && attrs.some((x) => x && x.code === 'status') ? 'status' : champ; it.item_attributes = [...(Array.isArray(it.item_attributes) ? it.item_attributes : []).filter((x) => x && x.code !== code), { code, ids: [n] }]; }
+    poses.push(champ);
+  }
+  if (poses.length) noterDiag('reponse_posee_' + poses.join('_'));
+  return poses;
+}
+// Tout en un : réponses, puis vérification ; ce qui manque est complété UNE fois
+// par identité, revérifié ; il manque encore quelque chose ⇒ la question.
+// Rend { manque: [libellés], question|null, completes: [codes], reponses: [codes] }.
+async function reglerAvant(uid, acc, it, ids, reponses, ctx = {}) {
+  const poses = await appliquerReponses(uid, it, reponses);
+  let codes = [];
+  let manque = await champsManquantsAvant(uid, acc, it, ids, { cacheSeul: true, codesManque: codes });
+  const completes = [];
+  // Deux tours au plus : une catégorie reprise peut rendre d'autres champs
+  // obligatoires (l'état, la taille de CETTE catégorie), repris au second tour.
+  for (let tour = 0; tour < 2 && manque.length; tour++) {
+    const faits = await completerParIdentite(uid, acc, it, ids, codes.slice());
+    if (!faits.length) break;
+    completes.push(...faits);
+    codes = []; manque = await champsManquantsAvant(uid, acc, it, ids, { cacheSeul: true, codesManque: codes });
+  }
+  const question = manque.length ? await questionRepub(uid, it, codes, ctx) : null;
+  return { manque, question, completes, reponses: poses };
+}
+function phraseQuestion(q, avant) {
+  if (!q) return '';
+  const qui = q.num ? `de la N°${q.num}` : 'de cette paire';
+  const base = q.options ? `Il manque ${q.nom} ${qui} : choisis dans VRM, la republication reprend sur ta réponse.` : `Il manque ${q.nom} ${qui}. ${q.geste}`;
+  return `${base}${q.autres && q.autres.length ? ` (Il manque aussi : ${q.autres.join(', ')}.)` : ''}${avant ? ' Rien n’a été touché.' : ''}`;
 }
 // (29 oct.) Le brouillon tel que Vinted le montre MAINTENANT (`GET item_upload/items/{id}`,
 // la page « Modifier » du brouillon — Vintex la lit aussi avant la mise en ligne).
@@ -9541,7 +9790,9 @@ function uuidRecreer() {
 }
 // Le corps de création : la recette de CETTE annonce, jamais un champ deviné.
 // Rend { item } ou { manque: [...] }.
-function itemPourRecreer({ modeleCorps, codes, titre, prix, description, brand, photoIds, temp }) {
+// (2 nov., 5.310) `partiel` : rend aussi le corps INCOMPLET ({ item, manque }) —
+// `reglerAvant` le complète depuis une identité ou pose la question ; jamais envoyé tel quel.
+function itemPourRecreer({ modeleCorps, codes, titre, prix, description, brand, photoIds, temp, partiel }) {
   // (29 oct.) Tout passe par un brouillon : la forme COURTE {id, orientation} — celle des brouillons du site et de Vintex (mesurée).
   const assigned = photoIds.map((id) => ({ id, orientation: 0 }));
   let base = null;
@@ -9552,9 +9803,9 @@ function itemPourRecreer({ modeleCorps, codes, titre, prix, description, brand, 
     if (!(Number(c.catalog_id) > 0)) manque.push('la catégorie');
     if (!(Array.isArray(c.item_attributes) && c.item_attributes.length)) manque.push('la taille et l’état');
     if (!(Number(c.package_size_id) > 0)) manque.push('la taille du colis');
-    if (manque.length) return { manque };
-    base = { id: null, isbn: null, brand: c.brand || brand || null, brand_id: Number(c.brand_id) > 0 ? Number(c.brand_id) : null, catalog_id: Number(c.catalog_id),
-      color_ids: Array.isArray(c.color_ids) ? c.color_ids : [], item_attributes: c.item_attributes, package_size_id: Number(c.package_size_id),
+    if (manque.length && !partiel) return { manque };
+    base = { id: null, isbn: null, brand: c.brand || brand || null, brand_id: Number(c.brand_id) > 0 ? Number(c.brand_id) : null, catalog_id: Number(c.catalog_id) > 0 ? Number(c.catalog_id) : null,
+      color_ids: Array.isArray(c.color_ids) ? c.color_ids : [], item_attributes: Array.isArray(c.item_attributes) ? c.item_attributes : [], package_size_id: Number(c.package_size_id) > 0 ? Number(c.package_size_id) : null,
       manufacturer: null, measurement_width: null, measurement_length: null, manufacturer_labelling: null };
     if (typeof c.is_unisex === 'boolean') base.is_unisex = c.is_unisex;
   }
@@ -9565,10 +9816,11 @@ function itemPourRecreer({ modeleCorps, codes, titre, prix, description, brand, 
   if (!idsCouleurVinted(item).length) {
     const cc = idsCouleurVinted(codes || {});
     if (cc.length) item.color_ids = cc;
-    else return { manque: ['la couleur'] };
+    else if (!partiel) return { manque: ['la couleur'] };
+    else item.color_ids = [];
   } else item.color_ids = idsCouleurVinted(item);
-  if (!item.description.trim()) return { manque: ['la description'] };
-  return { item };
+  if (!item.description.trim() && !partiel) return { manque: ['la description'] };
+  return partiel ? { item, partiel: true } : { item };
 }
 // ── SES BROUILLONS VINTED (28 octobre) ─────────────────────────────────────
 // Une ligne par brouillon : `vinted_brouillon_{draftId}` = { uid, corps, titre,
@@ -9691,8 +9943,15 @@ async function publierBrouillon(msg) {
   if (!r.titre) manque.push('un titre');
   if (!(r.prix > 0)) manque.push('un prix');
   if (!r.nPhotos) manque.push('des photos');
-  if (!(Number(r.d.catalog_id) > 0)) manque.push('une catégorie');
   if (!String(r.d.description || '').trim()) manque.push('une description');
+  // (2 nov., 5.310) La couleur et la catégorie manquantes viennent d'abord de
+  // l'IDENTITÉ de la paire (l'ancienne annonce d'un brouillon VRM, le brouillon) ;
+  // la catégorie qui manque encore devient la question (`reglerAvant`, plus bas).
+  if (!manque.length && (!idsCouleurVinted(r.d).length || !(Number(r.d.catalog_id) > 0))) {
+    const fx = await completerParIdentite(uid, acc, r.d, [b.ancienId, id], [!idsCouleurVinted(r.d).length ? 'color' : '', !(Number(r.d.catalog_id) > 0) ? 'catalog_id' : ''].filter(Boolean));
+    if (fx.length) { try { await rangerBrouillon(id, { corps: JSON.stringify({ ...JSON.parse(b.corps), draft: r.d }) }); } catch (_) {} }
+  }
+  if (!idsCouleurVinted(r.d).length && msg.reponses && msg.reponses.color != null) await appliquerReponses(uid, r.d, { color: msg.reponses.color });
   if (!idsCouleurVinted(r.d).length) {
     // (28 oct.) Il a CHOISI la couleur dans VRM : on la pose (seulement une couleur mesurée).
     const ch = Number(msg.couleur);
@@ -9731,10 +9990,18 @@ async function publierBrouillon(msg) {
       if (lu.photos === 0) return { accepte: false, code: 'incomplet', raison: "Vinted refuserait ce brouillon : il n'a plus aucune photo chez Vinted. Ouvre-le sur Vinted (Mes brouillons → « Modifier »), rajoute les photos, puis réessaie. Rien n'a été touché." };
       r.nPhotos = Array.isArray(r.d.assigned_photos) ? r.d.assigned_photos.length : r.nPhotos;
     } }
-  { const avant2 = JSON.stringify(r.d.item_attributes || []);
-    const manque2 = await champsManquantsAvant(uid, acc, r.d, [b.ancienId, id], { cacheSeul: true });
-    if (!manque2.length && JSON.stringify(r.d.item_attributes || []) !== avant2) { try { await rangerBrouillon(id, { corps: JSON.stringify({ ...JSON.parse(b.corps), draft: r.d }) }); } catch (_) {} }
-    if (manque2.length) return { accepte: false, code: 'incomplet', raison: `Vinted refuserait ce brouillon : il manque ${manque2.join(', ')}. Finis-le sur Vinted (Mes brouillons → « Modifier »), puis réessaie. Rien n'a été touché.` }; }
+  { const avant2 = signatureCorps(r.d) + JSON.stringify(r.d.item_attributes || []);
+    const rg2 = await reglerAvant(uid, acc, r.d, [b.ancienId, id], msg.reponses, { id: b.ancienId, draftId: id, num: msg.num });
+    const manque2 = rg2.manque;
+    if (!manque2.length && (signatureCorps(r.d) + JSON.stringify(r.d.item_attributes || [])) !== avant2) { try { await rangerBrouillon(id, { corps: JSON.stringify({ ...JSON.parse(b.corps), draft: r.d }) }); } catch (_) {} }
+    const q2 = rg2.question ? { ...rg2.question, num: msg.num ? String(msg.num) : '' } : null;
+    if (manque2.length) return { accepte: false, code: 'incomplet', question: q2, raison: `Vinted refuserait ce brouillon : il manque ${manque2.join(', ')}. ${q2 && q2.options ? 'Choisis dans VRM : il est mis en ligne sur ta réponse (ou finis-le sur Vinted : Mes brouillons → « Modifier »).' : 'Finis-le sur Vinted (Mes brouillons → « Modifier »), puis réessaie.'} Rien n'a été touché.` };
+    const dv2 = await refusDejaVu('b' + id, r.d);
+    if (dv2) {
+      noterDiag('brouillon_refus_deja_vu');
+      const qd = await questionRepub(uid, r.d, dv2.champs, { id: b.ancienId, draftId: id });
+      return { accepte: false, code: 'refus-deja-vu', question: qd ? { ...qd, num: msg.num ? String(msg.num) : '' } : null, raison: `Vinted a déjà refusé exactement ce brouillon${dv2.raison ? ` (${dv2.raison})` : ''} — VRM ne le renvoie pas tel quel. ${qd && qd.options ? `Choisis ${qd.nom} dans VRM, il repart sur ta réponse.` : 'Corrige-le sur Vinted (Mes brouillons → « Modifier »), puis réessaie.'} Rien n'a été touché.` };
+    } }
   // (28 oct.) Un brouillon fait par VRM AVANT la 5.261 peut porter la même photo
   // plusieurs fois (liens du coffre en double). Ses photos ont été envoyées dans
   // l'ordre des liens du coffre de l'ancienne annonce : on retrouve la clé de
@@ -9780,7 +10047,9 @@ async function publierBrouillon(msg) {
     if (!rc.ok) {
       noterDiag(`brouillon_publier_refuse_${rc.status}`);
       const msgV = raisonRefusVinted(rc);
-      return { accepte: true, etape: 'echec', taille: tailleRefusee(rc) || undefined, raison: `Vinted a refusé la mise en ligne (${rc.status}${msgV ? ' : ' + String(msgV).slice(0, 200) : ''}) — le brouillon est intact.${gesteRefus(rc, corpsC)}` };
+      await retenirRefus('b' + id, r.d, rc);
+      const qP = await questionRepub(uid, r.d, codesDuRefus(rc), { id: b.ancienId, draftId: id });
+      return { accepte: true, etape: 'echec', question: qP ? { ...qP, num: msg.num ? String(msg.num) : '' } : undefined, taille: tailleRefusee(rc) || undefined, raison: `Vinted a refusé la mise en ligne (${rc.status}${msgV ? ' : ' + String(msgV).slice(0, 200) : ''}) — le brouillon est intact.${gesteRefus(rc, corpsC)}` };
     }
     const j = rc.json || {}; const it = (j.item && typeof j.item === 'object') ? j.item : (j.draft && typeof j.draft === 'object') ? j.draft : j;
     const itemId = it && it.id != null && /^\d{4,15}$/.test(String(it.id)) ? String(it.id) : id;
@@ -9854,7 +10123,7 @@ async function refaireBrouillon(msg) {
   }
   if (!brouillonParti && (vb.etat === 'a-publier' || vb.etat === 'brouillon-range') && /^\d{4,15}$/.test(String(vb.draftId || ''))) {
     if (!(vb.publier === true && vb.supprime === true)) { await majVersBrouillon(uid, id, { etat: 'fait' }); return { accepte: true, etape: 'fait', brouillon: true, draftId: String(vb.draftId) }; }
-    const r = await publierBrouillon({ uid, draftId: String(vb.draftId), confirme: true, couleur: msg.couleur });
+    const r = await publierBrouillon({ uid, draftId: String(vb.draftId), confirme: true, couleur: msg.couleur, reponses: msg.reponses, num: msg.num });
     if (r && r.accepte && r.etape === 'fait') await majVersBrouillon(uid, id, { etat: 'fait', nouvelId: r.itemId || null });
     else if (r && r.accepte && r.etape === 'incertain') await majVersBrouillon(uid, id, { etat: 'mise-en-ligne-incertaine' });
     return r && r.accepte ? { ...r, draftId: String(vb.draftId), refaire: r.etape === 'echec' } : r;
@@ -9877,7 +10146,18 @@ async function refaireBrouillon(msg) {
     }
   }
   const prixD = Number(d && (d.price && typeof d.price === 'object' ? d.price.amount : d.price));
-  if (!d || !String(d.title || '').trim() || !(prixD > 0) || !(Number(d.catalog_id) > 0) || !String(d.description || '').trim()) return { accepte: false, code: 'illisible', raison: "le contenu enregistré est incomplet — rien n'a été touché" };
+  if (!d || !String(d.title || '').trim() || !(prixD > 0) || !String(d.description || '').trim()) return { accepte: false, code: 'illisible', raison: "le contenu enregistré est incomplet — rien n'a été touché" };
+  // (2 nov., 5.310) Ce qui manque au contenu enregistré (catégorie, taille, état…)
+  // est complété UNE fois depuis l'identité de l'annonce, ou demandé — avant tout envoi.
+  if (d) {
+    const phD = d.assigned_photos; d.assigned_photos = [{ id: 1 }];
+    const rgR = await reglerAvant(uid, acc, d, [id, vb.draftId], msg.reponses, { id, num: msg.num });
+    d.assigned_photos = phD;
+    const qR = rgR.question ? { ...rgR.question, num: msg.num ? String(msg.num) : '' } : null;
+    if (rgR.manque.length && !(qR && qR.champ === 'color' && rgR.manque.length === 1)) return { accepte: false, code: 'incomplet', question: qR, raison: `Vinted refuserait ce brouillon : il manque ${rgR.manque.join(', ')}. ${qR && qR.options ? 'Choisis dans VRM, il est refait sur ta réponse.' : 'Rien n’est deviné.'} Rien n'a été touché.` };
+    const dvR = await refusDejaVu('r' + id, { ...d, assigned_photos: [{ id: 1 }] });
+    if (dvR) { const qd = await questionRepub(uid, d, dvR.champs, { id }); return { accepte: false, code: 'refus-deja-vu', question: qd ? { ...qd, num: msg.num ? String(msg.num) : '' } : null, raison: `Vinted a déjà refusé exactement ce brouillon${dvR.raison ? ` (${dvR.raison})` : ''} — VRM ne le renvoie pas tel quel. ${qd && qd.options ? `Choisis ${qd.nom} dans VRM.` : 'Corrige-le sur Vinted, puis réessaie.'} Rien n'a été touché.` }; }
+  }
   const couleursR = idsCouleurVinted(d).length ? null : await couleursConnues(uid, acc);
   if (couleursR && couleursR[Number(msg.couleur)]) d.color_ids = [Number(msg.couleur)];
   if (!idsCouleurVinted(d).length) return { accepte: false, code: 'couleur-absente', couleurs: couleursR || COULEURS_VINTED_SURES, raison: "le contenu enregistré n'a pas de couleur, et Vinted refuse de mettre en ligne une annonce sans couleur. Si le brouillon est dans tes brouillons Vinted, ouvre-le, choisis la couleur et publie-le ; sinon, rien n'a été touché." };
@@ -9916,6 +10196,7 @@ async function refaireBrouillon(msg) {
     if (!rb.ok) {
       noterDiag(`refaire_brouillon_refuse_${rb.status}`);
       const msgV = raisonRefusVinted(rb);
+      await retenirRefus('r' + id, brouillon, rb);
       await majVersBrouillon(uid, id, { etat: 'a-refaire', peutExister: false, cause: `refuse-${rb.status}` });
       return { accepte: true, etape: 'echec', refaire: true, raison: `Vinted a refusé le brouillon (${rb.status}${msgV ? ' : ' + String(msgV).slice(0, 200) : ''}) — tout reste enregistré dans VRM` };
     }
@@ -9959,6 +10240,7 @@ async function refaireBrouillon(msg) {
     if (!rc.ok) {
       noterDiag(`refaire_mise_en_ligne_refusee_${rc.status}`);
       const msgV = raisonRefusVinted(rc);
+      await retenirRefus('b' + draftId, corpsC.draft, rc);
       await majVersBrouillon(uid, id, { etat: 'a-publier' });
       return { accepte: true, etape: 'echec', refaire: true, draftId, raison: `le brouillon est rangé sur Vinted, mais Vinted a refusé de le mettre en ligne (${rc.status}${msgV ? ' : ' + String(msgV).slice(0, 200) : ''}) — « Refaire » le remet en ligne, sans en créer un autre.${gesteRefus(rc, corpsC)}` };
     }
@@ -10158,10 +10440,12 @@ async function recreerVinted(msg) {
       return { accepte: false, code: 'recette-absente', raison: `VRM a demandé à Vinted la catégorie, la taille, l’état et le colis de CETTE annonce, mais ${appris.raison}. Rien n'a été touché.` };
     }
   }
-  if (essai.manque) {
-    if (essai.manque.length === 1 && essai.manque[0] === 'la couleur') return { accepte: false, code: 'couleur-absente', raison: "VRM ne connaît pas la couleur de CETTE annonce, et Vinted refuse de mettre en ligne une annonce sans couleur. Ouvre-la sur Vinted → « Modifier » → vérifie la couleur → « Enregistrer » une fois : l'extension l'apprend. Rien n'a été touché." };
-    return { accepte: false, code: 'recette-absente', raison: `VRM ne connaît pas encore ${essai.manque.join(', ')} exact${essai.manque.length > 1 ? 's' : ''} de CETTE annonce. Ouvre-la sur Vinted → « Modifier » → « Enregistrer » (sans rien changer) une fois : l'extension l'apprend. Rien n'a été touché.` };
-  }
+  // (2 nov., 5.310) Une recette incomplète n'arrête plus d'emblée : le corps PARTIEL
+  // passe par `reglerAvant` (complété UNE fois depuis l'identité de CETTE annonce, ou
+  // la question posée dans l'app). Il manque encore quelque chose ⇒ on s'arrête ICI,
+  // avant toute requête, et la question part avec la réponse.
+  const manqueRecette = essai.manque || null;
+  if (manqueRecette) essai = itemPourRecreer({ modeleCorps: modele && modele.corps, codes: details.codes, titre, prix, description, brand: sauve && sauve.brand, photoIds: [1], temp: 'x', partiel: true });
   const reglages = reglagesPhotoSurs(msg.reglages);
   // Une recréation dont l'issue est INCONNUE (création partie sans réponse) bloque
   // la suivante de la MÊME annonce : la relancer créerait une seconde copie.
@@ -10182,16 +10466,28 @@ async function recreerVinted(msg) {
   // libellé exact ⇒ posée ; le code enregistré n'est plus dans la grille et rien
   // d'exact ⇒ on s'arrête, RIEN n'est touché. Taille ou grille pas sues ⇒ comme
   // avant (le secours après refus reste).
-  let tailleAvant = null;
+  // (2 nov., 5.310) Ce qui a été corrigé AVANT (taille au libellé exact, champs
+  // complétés par identité, SA réponse) est reporté sur le corps envoyé.
+  let corrige = null;
   {
     const it0 = { ...(essai.item || {}), assigned_photos: [{ id: 1 }] };
-    const avant = JSON.stringify(it0.item_attributes || []);
-    const manqueA = await champsManquantsAvant(uid, acc, it0, [id], { cacheSeul: true });
-    if (manqueA.length) {
+    const rg = await reglerAvant(uid, acc, it0, [id], msg.reponses, { id, num: msg.num });
+    if (rg.manque.length) {
       noterDiag('recreer_avant_bloque');
-      return { accepte: false, code: 'incomplet', raison: `Vinted refuserait cette annonce : il manque ${manqueA.join(', ')}. Rien n'a été touché : ton annonce est toujours en ligne. Sur Vinted → « Modifier » → complète → « Enregistrer », puis relance.` };
+      const q = rg.question ? { ...rg.question, num: msg.num ? String(msg.num) : '' } : null;
+      if (manqueRecette && manqueRecette.length === 1 && manqueRecette[0] === 'la couleur' && rg.manque.length === 1 && /couleur/.test(rg.manque[0])) return { accepte: false, code: 'couleur-absente', question: q, raison: "VRM ne connaît pas la couleur de CETTE annonce, et Vinted refuse de mettre en ligne une annonce sans couleur. Ouvre-la sur Vinted → « Modifier » → vérifie la couleur → « Enregistrer » une fois : l'extension l'apprend. Rien n'a été touché." };
+      if (manqueRecette) return { accepte: false, code: 'recette-absente', question: q, raison: `VRM ne connaît pas encore ${rg.manque.join(', ')} exact${rg.manque.length > 1 ? 's' : ''} de CETTE annonce${q && q.options ? ' : choisis dans VRM, la republication reprend sur ta réponse' : ". Ouvre-la sur Vinted → « Modifier » → « Enregistrer » (sans rien changer) une fois : l'extension l'apprend"}. Rien n'a été touché.` };
+      return { accepte: false, code: 'incomplet', question: q, raison: `Vinted refuserait cette annonce : il manque ${rg.manque.join(', ')}. Rien n'a été touché : ton annonce est toujours en ligne. ${q && q.options ? 'Choisis dans VRM, la republication reprend sur ta réponse.' : 'Sur Vinted → « Modifier » → complète → « Enregistrer », puis relance.'}` };
     }
-    if (JSON.stringify(it0.item_attributes || []) !== avant) { const sz = (it0.item_attributes || []).find((x) => x && x.code === 'size'); tailleAvant = sz && sz.ids[0]; }
+    // Le même corps a déjà été REFUSÉ par Vinted : jamais renvoyé (aucune requête).
+    const dv = await refusDejaVu('r' + id, it0);
+    if (dv) {
+      noterDiag('recreer_refus_deja_vu');
+      const q = await questionRepub(uid, it0, dv.champs, { id, num: msg.num });
+      return { accepte: false, code: 'refus-deja-vu', question: q ? { ...q, num: msg.num ? String(msg.num) : '' } : null, raison: `Vinted a déjà refusé exactement cette annonce${dv.raison ? ` (${dv.raison})` : ''} — VRM ne la renvoie pas telle quelle. ${q && q.options ? `Choisis ${q.nom} dans VRM, la republication reprend.` : 'Corrige-la sur Vinted (« Modifier » → « Enregistrer »), puis relance.'} Rien n'a été touché.` };
+    }
+    corrige = { catalog_id: it0.catalog_id, item_attributes: it0.item_attributes, color_ids: it0.color_ids, package_size_id: it0.package_size_id, brand_id: it0.brand_id, brand: it0.brand };
+    if (rg.completes.length || rg.reponses.length) etapeRepub(id, 'complete', { champs: [...rg.completes, ...rg.reponses] });
   }
   // (29 oct.) Quelques paires par jour et par compte (le modèle de Vintex).
   const jour = await gardeJourRepub(uid);
@@ -10242,8 +10538,8 @@ async function recreerVinted(msg) {
     if (tp.sansPage) return { accepte: false, code: 'onglet-vinted', raison: tp.erreur };
     if (!tp.ids) return { accepte: true, etape: 'echec', raison: `${tp.erreur} — rien n'a été créé ni supprimé, ton annonce est intacte` };
     const ids = tp.ids;
-    const built = itemPourRecreer({ modeleCorps: modele && modele.corps, codes: details.codes, titre, prix, description, brand: sauve && sauve.brand, photoIds: ids, temp });
-    if (tailleAvant && built.item) built.item.item_attributes = [...(Array.isArray(built.item.item_attributes) ? built.item.item_attributes.filter((a) => a && a.code !== 'size') : []), { code: 'size', ids: [tailleAvant] }];
+    const built = itemPourRecreer({ modeleCorps: modele && modele.corps, codes: details.codes, titre, prix, description, brand: sauve && sauve.brand, photoIds: ids, temp, partiel: !!manqueRecette });
+    if (built.item && corrige) for (const k of Object.keys(corrige)) if (corrige[k] != null) built.item[k] = corrige[k];
     const corps = { item: built.item, parcel: null, push_up: false, upload_session_id: temp };
     const brouillonV = { ...built.item, id: null }; delete brouillonV.push_up;
     const corpsBV = { draft: brouillonV, feedback_id: null, parcel: null, upload_session_id: temp };
@@ -10272,8 +10568,10 @@ async function recreerVinted(msg) {
     if (!rbV.ok) {
       noterDiag(`versbrouillon_brouillon_refuse_${rbV.status}`);
       const msgB = raisonRefusVinted(rbV);
+      await retenirRefus('r' + id, brouillonV, rbV);
       await majVersBrouillon(uid, id, { etat: 'fait', cause: `brouillon-refuse-${rbV.status}` });
-      return { accepte: true, etape: 'echec', raison: `Vinted a refusé le brouillon (${rbV.status}${msgB ? ' : ' + String(msgB).slice(0, 200) : ''}) — rien n'a été supprimé, ton annonce est toujours en ligne.${gesteRefus(rbV, corps)}` };
+      const qB = await questionRepub(uid, brouillonV, codesDuRefus(rbV), { id, num: msg.num });
+      return { accepte: true, etape: 'echec', question: qB ? { ...qB, num: msg.num ? String(msg.num) : '' } : undefined, raison: `Vinted a refusé le brouillon (${rbV.status}${msgB ? ' : ' + String(msgB).slice(0, 200) : ''}) — rien n'a été supprimé, ton annonce est toujours en ligne.${gesteRefus(rbV, corps)}` };
     }
     const draftId = idDeBrouillon(rbV.json);
     if (!draftId) {
@@ -10324,7 +10622,7 @@ async function recreerVinted(msg) {
     // (29 oct., « fais les brouillons et tout à la suite comme Vintex ») `msg.differer` :
     // l'attente ne bloque plus — la mise en ligne est PLANIFIÉE (chrome.storage.local) et
     // faite par l'extension à l'heure tirée ; l'app enchaîne la paire suivante pendant ce temps.
-    const job = { id, uid, draftId, titre, prix, nPhotos: ids.length, urls, lettreFin: lettreFin || null, corpsCV: JSON.stringify(corpsCV), corps: JSON.stringify(corps), description, sauve, tRes };
+    const job = { id, uid, num: msg.num ? String(msg.num) : '', draftId, titre, prix, nPhotos: ids.length, urls, lettreFin: lettreFin || null, corpsCV: JSON.stringify(corpsCV), corps: JSON.stringify(corps), description, sauve, tRes };
     await poserVerrouRecreer(id);
     confie = true;   // le dernier geste réservé (la mise en ligne) appartient désormais à finRepubBrouillon
     if (msg.differer === true) {
@@ -10449,12 +10747,21 @@ async function finRepubBrouillon(acc, job) {
     const rlB = await vintedPage(acc, 'GET', `/api/v2/item_upload/items/${draftId}`, null, { timeoutMs: 30000 });
     if (corpsCV && corpsCV.draft) {
       const lu = appliquerBrouillonLu(corpsCV.draft, rlB, draftId);
-      const manqueF = lu.photos === 0 ? ['les photos'] : await champsManquantsAvant(uid, acc, corpsCV.draft, [id, draftId], { cacheSeul: true });
+      const rgF = lu.photos === 0 ? { manque: ['les photos'], question: await questionRepub(uid, corpsCV.draft, ['photos'], { id, draftId }) } : await reglerAvant(uid, acc, corpsCV.draft, [id, draftId], null, { id, draftId });
+      const manqueF = rgF.manque;
+      const dvF = manqueF.length ? null : await refusDejaVu('b' + draftId, corpsCV.draft);
+      if (dvF) {
+        await rendre1(); await leverVerrouRecreer(id);
+        await majVersBrouillon(uid, id, { etat: 'a-publier', draftId, cause: 'refus-deja-vu' });
+        const qD = await questionRepub(uid, corpsCV.draft, dvF.champs, { id, draftId });
+        return { refaire: true, accepte: true, etape: 'brouillon-a-refaire', draftId, question: qD ? { ...qD, num: job.num || '' } : undefined, raison: `l'ancienne annonce est supprimée et le brouillon est rangé, mais Vinted a déjà refusé exactement ce brouillon — VRM ne le renvoie pas tel quel. ${qD && qD.options ? `Choisis ${qD.nom} dans VRM : il est mis en ligne sur ta réponse.` : 'Corrige-le sur Vinted (Mes brouillons → « Modifier »), puis « Publier ».'}` };
+      }
       if (manqueF.length) {
         await rendre1(); await leverVerrouRecreer(id);
         await majVersBrouillon(uid, id, { etat: 'a-publier', draftId, cause: 'incomplet' });
         noterDiag('republier_fin_bloque_incomplet');
-        return { refaire: true, accepte: true, etape: 'brouillon-a-refaire', draftId, raison: `l'ancienne annonce est supprimée et le brouillon est rangé, mais VRM ne l'a PAS mis en ligne : Vinted le refuserait, il manque ${manqueF.join(', ')}. Ouvre-le sur Vinted (Mes brouillons → « Modifier »), complète, puis « Publier ».` };
+        if (rgF.question && rgF.question.options) return { refaire: true, accepte: true, etape: 'brouillon-a-refaire', draftId, question: { ...rgF.question, num: job.num || '' }, raison: `l'ancienne annonce est supprimée et le brouillon est rangé, mais il manque ${manqueF.join(', ')} : ${phraseQuestion({ ...rgF.question, num: job.num || '' })}` };
+        return { refaire: true, accepte: true, etape: 'brouillon-a-refaire', draftId, question: rgF.question ? { ...rgF.question, num: job.num || '' } : undefined, raison: `l'ancienne annonce est supprimée et le brouillon est rangé, mais VRM ne l'a PAS mis en ligne : Vinted le refuserait, il manque ${manqueF.join(', ')}. Ouvre-le sur Vinted (Mes brouillons → « Modifier »), complète, puis « Publier ».` };
       }
     }
     etapeRepub(id, 'en-ligne');
@@ -10475,8 +10782,10 @@ async function finRepubBrouillon(acc, job) {
       noterDiag(`republier_mise_en_ligne_refusee_${rcV.status}`);
       if (photosRefusees(rcV)) { try { echantillonRate('vinted_refus_photos', draftId, JSON.stringify((rcV.json && rcV.json.errors) || rcV.json || '')); } catch (_) {} }
       const msgV = raisonRefusVinted(rcV);
+      await retenirRefus('b' + draftId, corpsCV.draft, rcV);
       await majVersBrouillon(uid, id, { etat: 'a-publier', draftId, cause: `refuse-${rcV.status}` });
-      return { refaire: true, accepte: true, etape: 'brouillon-a-refaire', draftId, raison: `l'ancienne annonce est supprimée et le brouillon est rangé, mais Vinted a refusé de le mettre en ligne (${rcV.status}${msgV ? ' : ' + String(msgV).slice(0, 200) : ''}) — VRM s'arrête là (pas de nouvel essai en rafale). Il est dans tes brouillons : Actions → Brouillons → en ligne.${gesteRefus(rcV, corpsCV)}` };
+      const qV = await questionRepub(uid, corpsCV.draft, codesDuRefus(rcV), { id, draftId });
+      return { refaire: true, accepte: true, etape: 'brouillon-a-refaire', draftId, question: qV ? { ...qV, num: job.num || '' } : undefined, raison: `l'ancienne annonce est supprimée et le brouillon est rangé, mais Vinted a refusé de le mettre en ligne (${rcV.status}${msgV ? ' : ' + String(msgV).slice(0, 200) : ''}) — VRM s'arrête là (pas de nouvel essai en rafale). Il est dans tes brouillons : Actions → Brouillons → en ligne.${gesteRefus(rcV, corpsCV)}` };
     }
     const jV = rcV.json || {}; const itV = (jV.item && typeof jV.item === 'object') ? jV.item : (jV.draft && typeof jV.draft === 'object') ? jV.draft : jV;
     const nouvelIdV = itV && itV.id != null && /^\d{4,15}$/.test(String(itV.id)) ? String(itV.id) : draftId;
@@ -10575,8 +10884,16 @@ async function compterActionUn(uid, plafond, n = 1) {
     for (let i = 0; i < k; i++) list.push(t); cur[uid] = list;
     await chrome.storage.local.set({ [cle]: cur });
     return { ok: true, n: list.length, at: t };
-  } catch (_) { return { ok: true, n: 0 }; }
+  } catch (_) {
+    // ⚠️ 2 nov. (audit « plateformes » P10) : le stockage de l'extension ne répond pas
+    // (quota plein, profil abîmé) ⇒ le plafond SE FERME. Avant : `{ ok: true }`, et
+    // toutes les actions passaient sans être comptées. Un geste refusé coûte moins
+    // qu'un compte bloqué par Vinted.
+    try { noterDiag('compteur_actions_stockage'); } catch (_) {}
+    return { ok: false, n: 0, code: 'stockage' };
+  }
 }
+const RAISON_STOCKAGE = "le stockage de l'extension ne répond pas : VRM ne peut pas compter tes actions de l'heure, donc il n'agit pas. Recharge l'extension (⟳ dans chrome://extensions) ; si ça continue, redémarre Chrome. Rien n'a été envoyé.";
 // ⚠️⚠️ UNE RÉSERVE POUR LES GESTES SUR CLIC (revue du 9 octobre). Un seul clic
 //    « Tout générer (20) » commandait 20 bordereaux et prenait les 20 actions de
 //    l'heure : une réponse à un acheteur depuis la messagerie de l'app était
@@ -10615,7 +10932,11 @@ async function compterLectureUn(uid, plafond) {
     list.push(t); cur[uid] = list;
     await chrome.storage.local.set({ [cle]: cur });
     return { ok: true, n: list.length };
-  } catch (_) { return { ok: true, n: 0 }; }
+  } catch (_) {
+    // 2 nov. (P10) : stockage muet ⇒ la lecture n'est PAS faite (fermé, jamais ouvert).
+    try { noterDiag('compteur_lectures_stockage'); } catch (_) {}
+    return { ok: false, n: 0, code: 'stockage' };
+  }
 }
 // ══ L'ARGENT ET LES COLIS PASSENT AVANT LES PHOTOS (5.162, 6 octobre) ══════
 // MESURÉ avant de coder : `capterRetraits`, `capterDatesVersement` et
@@ -10697,6 +11018,7 @@ async function gardeLecture(uid, acc, classe = 'photos') {
   // colis, comme la relecture — jamais à leur place.
   const plafond = prioritaire ? LECTURES_MAX_HEURE : LECTURES_MAX_HEURE - (await reserveLectures(uid, (classe === 'enligne' || classe === 'suivi') ? 'enligne' : 'photos'));
   const c = await compterLecture(String(uid), plafond);
+  if (!c.ok && c.code === 'stockage') return { ok: false, code: 'stockage', error: RAISON_STOCKAGE };
   if (!c.ok) return prioritaire
     ? { ok: false, code: 'trop-de-lectures',
         error: `${LECTURES_MAX_HEURE} lectures sur ce compte dans l'heure — on s'arrête pour ne pas attirer l'attention. La suite au prochain passage.` }
@@ -10765,6 +11087,7 @@ async function gardeStricte(uid, acc, opts = {}) {
   const c = await compterAction(String(uid), ACTIONS_MAX_HEURE - reserve, nA);
   // `recu` : l'horodatage EXACT des places prises, pour les rendre (X8).
   if (c.ok && opts.recu && typeof opts.recu === 'object') opts.recu.at = c.at || null;
+  if (!c.ok && c.code === 'stockage') return { ok: false, code: 'stockage', error: RAISON_STOCKAGE };
   if (!c.ok) {
     const min = Math.max(1, Math.ceil(Number(c.resteMs || 0) / 60000));
     if (reserve && c.n < ACTIONS_MAX_HEURE) {
@@ -12060,6 +12383,7 @@ async function garde(uid, acc) {
   // à un acheteur, trancher une offre). Avant, à 45 le moteur prenait les 5
   // dernières et la réponse sur clic était refusée « plafond ».
   const c = await compterAction(String(uid), ACTIONS_MAX_HEURE - RESERVE_GESTES);
+  if (!c.ok && c.code === 'stockage') return { ok: false, code: 'stockage', error: RAISON_STOCKAGE };
   if (!c.ok) {
     return { ok: false, code: 'trop-d-actions',
              error: `${ACTIONS_MAX_HEURE - RESERVE_GESTES} actions automatiques sur ce compte dans l'heure — les ${RESERVE_GESTES} dernières sont gardées pour tes gestes. Réessaie plus tard.` };
@@ -14277,7 +14601,7 @@ function mpChoisi(e, place) {
 //   On ne liste pas des codes numériques : un code inconnu demain doit compter
 //   comme une vente, pas disparaître — c'est le même sens que
 //   `classifyOrderStatus` côté app.
-const PAS_UNE_VENTE = /annul|cancel|refus|rembours|retour|suspend|[ée]chou/i;
+const PAS_UNE_VENTE = /annul|cancel|refus|rembours|retour|suspend|[ée]chou|[ée]chec\s+du\s+paiement/i;
 // ⚠️⚠️ 5.169 (11 octobre) — LA PREUVE QUI MANQUAIT À L'ANTI DOUBLE VENTE.
 // Plainte de Julien : « J'ai fait une vente hier, j'avais relié les deux paires,
 // ça n'a pas retiré la paire sur eBay, ça ne m'a même pas proposé ». Mesuré en
@@ -15160,6 +15484,7 @@ async function repondreVestiaire(msg) {
     const o = await ongletVestiaire(compteFil);
     if (!o.ok) return { accepte: false, code: o.code, raison: o.raison };
     const cpt = await compterAction('vc:' + o.compte, ACTIONS_MAX_HEURE);
+    if (!cpt.ok && cpt.code === 'stockage') return { accepte: false, code: 'stockage', raison: RAISON_STOCKAGE };
     if (!cpt.ok) return { accepte: false, code: 'plafond', raison: `déjà ${ACTIONS_MAX_HEURE} actions sur ce compte Vestiaire cette heure-ci — réessaie dans ${Math.max(1, Math.ceil((cpt.resteMs || 0) / 60000))} min` };
     const depuis = Number(cpt.at) || (Date.now() - 5);   // SES places (X8)
     let rep = null;
