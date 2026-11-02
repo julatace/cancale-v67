@@ -2770,3 +2770,23 @@ présentes ; B. une ligne de détail au plus, téléphone compris. Sur `origin/m
 coupé + ellipse remise) : 5 rouges. `transporteurs.cjs` lit la ligne fusionnée
 (`data-n-relier`, phrase dans l'infobulle). Planche AVANT/APRÈS 390 clair :
 capture de session.
+
+## 2 novembre — Visite en bulles, onglets nus, une phrase par écran
+
+Julien : « une démo visuelle un peu comme Vinteer : des petits nuages qui montrent les
+fonctionnalités quand tu crées ton compte, mais il ne doit pas y avoir des écritures
+partout à côté des onglets ». Fait par un agent (branche `claude/demo-bulles`),
+intégré sur `claude/demo-bulles-integ`.
+- `src/visiteBulles.js` (la règle, sans React) + `src/VisiteBulles.jsx` : une bulle à la
+  fois, posée sur l'onglet RÉEL (barre du bas / colonne), Suivant · Passer · points ;
+  Échap, « Passer », un toucher dehors la ferment et la notent vue ; onglet absent ⇒
+  bulle sautée (jamais dans le vide) ; focus gardé, `aria-live`, 44 px, mouvement réduit.
+- Ouverte une fois, après Bienvenue, pour une personne neuve, quand le nuage est arrivé ;
+  « vue » = `vrm_visite_vue` (SYNC_KEYS). Rejouable : Paramètres → Aide → « Revoir la visite ».
+- Onglets nus : plus de `desc` sous les entrées de « Plus », plus de `title` explicatif
+  dans la colonne.
+- `src/phrasesEcran.js` : une phrase (≤ 10 mots, sans jargon) sous le titre de Journée,
+  Annonces, Ventes, Colis, Messages, Paramètres.
+- Banc `scripts/bancs/demo-bulles.cjs` (390 px tactile, 1512 px) : vert le 2 nov. dans
+  un bac à sable Vercel (Chromium installé là). Les captures n'ont pas pu être regardées
+  depuis la session (le proxy refuse l'adresse du bac à sable) : Julien la regarde.
