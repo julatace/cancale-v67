@@ -360,6 +360,7 @@ export function ColonneRetirer({ vue, C, Photo, gestes = null, detail = null, no
           <header className="vrm-rp-tete">
             <span className="vrm-rp-ident">
               <b className="vrm-rp-nom">Point pas encore connu</b>
+              {(() => { const n = inconnusComptes.filter((c) => c.trInconnu).length; return n ? <span className="vrm-rp-adresse" data-transp="transporteur-inconnu" data-transp-n={n}>Transporteur pas encore connu{n > 1 ? ` pour ${n} colis` : ''} : le suivi Vinted ne le nomme pas</span> : null; })()}
               <span className="vrm-rp-resume">{plur(inconnu.nComptes, 'colis', 'colis')} — le message reçu ne dit pas encore où {inconnu.nComptes > 1 ? 'ils sont' : 'il est'}</span>
             </span>
           </header>
