@@ -30,7 +30,7 @@ Déplacé TEL QUEL depuis CLAUDE.md §9 le 2 novembre 2026 (le fichier dépassai
 - **31 oct.** — **Navigation par tâche** (son choix « A », puis « réorganiser les onglets ») : barre Journée · Annonces · Ventes · Colis · Plus ; colonne Ma journée · Annonces · Ventes · Messages · Colis + groupes Vendre · Expédier · Gérer · Argent · Plateformes · Moi ; filtres de site dans Annonces/Ventes/Messages (« Vinted » = l'ancien écran Vinted), « Toutes » pour Ventes seulement ; anciens `?tab=` redirigés (`src/navigationTache.js`). → historique interface-stock (« Navigation par tâche »). Geste : regarder la carte, trancher les points ouverts.
 
 
-## Lignes de CLAUDE.md §9 déplacées TELLES QUELLES le 2 novembre (audit des données, place sous 60 Ko)
+## Lignes les plus anciennes de §9, déplacées TEL QUELLES le 2 novembre 2026 (mode auto des favoris)
 
 - **16-19 oct.** — Relais du téléphone (5.183), double vérification TOTP, studio photo,
   mode équipe (016), carte et classement de la communauté (018-020, appliquées). → divers.
@@ -38,3 +38,8 @@ Déplacé TEL QUEL depuis CLAUDE.md §9 le 2 novembre 2026 (le fichier dépassai
 - **3-9 oct.** — L'app pilote l'extension (bordereaux, publication), messagerie intégrée,
   numéros à lettres, CA daté au versement, abonnement Stripe (mode test), sécurité
   (routes fermées, RLS, origines exactes de l'extension).
+- **Septembre** — le reste : `docs/journal-2026.md` et les historiques.
+- **20 oct.** — Doublons de N° réglés seuls ; revues « argent » (app, extension, eBay) ;
+  eBay se relit tout seul ; Leboncoin : compte de session, date de vente. → numeros / ebay.
+- **21 oct.** — Discord sur téléphone, date d'arrivée des colis, rappel du soir, « Tout
+  sur le N° », captcha prêt, revue visuelle. → `docs/passation/2026-10-21.md`.
