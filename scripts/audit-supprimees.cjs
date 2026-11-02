@@ -186,8 +186,14 @@ function lecteurAnnoncesApp(ligne, ids) {
       const sel = (/[?&]select=([^&]*)/.exec(u) || [])[1] || '';
       return { ok: true, json: async () => projette([ligne], u) };
     } };
+  // 2 nov. : `dressingEnLigne` note la lecture des brouillons (`lectureBrouillons`,
+  // importée de src/brouillonsProposables.js). Sans elle le lecteur levait et l'écran
+  // rendait [] (§6.3) : la VRAIE fonction est chargée (absente d'un code d'avant : rien).
+  const fbp = path.join(racine, 'src', 'brouillonsProposables.js');
+  const lb = fs.existsSync(fbp) ? /export function lectureBrouillons\([\s\S]*?\n\}\n/.exec(fs.readFileSync(fbp, 'utf8')) : null;
+  const brouillons = lb ? 'const fini = (v) => typeof v === "number" && isFinite(v);\n' + lb[0].replace(/^export /, '') : '';
   vm.createContext(ctx);
-  vm.runInContext(`${harvestTs}\n${videe}\n${regle}\n${enligne}\n${masquees}\n${retirees}\n${complete}\n${dressingEnLigne}\n${brut}\n;this.lire = fetchHarvestBrut;`, ctx);
+  vm.runInContext(`${harvestTs}\n${videe}\n${regle}\n${enligne}\n${masquees}\n${retirees}\n${complete}\n${brouillons}\n${dressingEnLigne}\n${brut}\n;this.lire = fetchHarvestBrut;`, ctx);
   return ctx.lire;
 }
 

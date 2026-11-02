@@ -204,6 +204,16 @@ const zero = (j) => gestes(j).length === 0;   // 5.266 : lire la liste des coule
     const { f, r } = await run({ extra: { vrm_vinted_modele: { '9101': { corps: sansCouleur, at: nowISO(), uid: '111' } } }, lecture: { status: 200, body: { item: { id: 9101, catalog_id: 1234, color_ids: [7], item_attributes: [{ code: 'size', ids: [56] }], package_size_id: 1 } } } });
     let it = {}; try { it = JSON.parse(creations(f.j)[0].corps).draft; } catch (_) {}
     dit(r.etape === 'fait' && JSON.stringify(it.color_ids) === '[7]', "modèle sans couleur : elle est lue chez Vinted, l'annonce part avec", JSON.stringify({ e: r.etape, code: r.code, c: it.color_ids })); }
+  // C3b — (2 nov., 5.311, Julien : « elle avait oublié la couleur et la taille… tout est
+  //       déjà rempli, l'extension a simplement à lire ») Une recette ANCIENNE (sans la
+  //       taille, autre catégorie) et l'annonce telle que Vinted la montre aujourd'hui :
+  //       c'est Vinted qui fait foi, champ par champ, et une seule lecture part.
+  { const vieille = JSON.stringify({ item: { ...JSON.parse(MODELE).item, catalog_id: 77, item_attributes: [], color_ids: [] } });
+    const { f, r } = await run({ viaBrouillon: true, extra: { vrm_vinted_modele: { '9101': { corps: vieille, at: nowISO(), uid: '111' } } }, lecture: { status: 200, body: { item: { id: 9101, catalog_id: 1234, color_ids: [7], item_attributes: [{ code: 'size', ids: [56] }, { code: 'status', ids: [2] }], package_size_id: 1 } } } });
+    let it = {}; try { it = JSON.parse(creations(f.j)[0].corps).draft; } catch (_) {}
+    const lectures = f.j.vinted.filter((x) => x.methode === 'GET' && /\/item_upload\/items\/9101$/.test(x.chemin)).length;
+    dit(r.etape === 'fait' && it.catalog_id === 1234 && JSON.stringify(it.color_ids) === '[7]' && (it.item_attributes || []).some((a) => a.code === 'size' && a.ids[0] === 56) && it.package_size_id === 1, "recette ancienne sans taille ni couleur : la catégorie, la taille, l'état, la couleur et le colis LUS sur Vinted partent", JSON.stringify({ e: r.etape, code: r.code, cat: it.catalog_id, c: it.color_ids, a: it.item_attributes, raison: r.raison }));
+    dit(lectures === 1, "une seule lecture de l'annonce (sa page « Modifier »), jamais deux", String(lectures)); }
   // C4 — la barre de progression : chaque étape est annoncée à l'app, dans l'ordre.
   { const { f, r } = await run({ viaBrouillon: true });
     const et = f.j.evts.filter((e) => e && e.quoi === 'repub' && e.id === '9101' && e.etape).map((e) => e.etape);
@@ -542,12 +552,14 @@ const zero = (j) => gestes(j).length === 0;   // 5.266 : lire la liste des coule
     dit((f.lignes['coffre_111_9101'] || {}).versBrouillon && f.lignes['coffre_111_9101'].versBrouillon.etat === 'a-publier', "… et le coffre dit « brouillon à mettre en ligne » (Refaire le met en ligne, sans en créer un second)", JSON.stringify((f.lignes['coffre_111_9101'] || {}).versBrouillon || {}).slice(0, 120)); }
   // S — (28 oct., « on ne suit pas vraiment l'avancée ») Chaque pause est annoncée
   //     à l'app avec sa durée ; Refaire annonce ses étapes.
+  // La pause du frein (5.311) écoulée : 30 min plus tard.
+  const finFrein = (f) => { const m = f.store.vrmFreinRepub; if (m) for (const k of Object.keys(m)) m[k].jusqua = Date.now() - 1000; };
   const planterARefaire = (f) => { const c = f.lignes['coffre_111_9101']; if (c && c.versBrouillon) { c.versBrouillon.etat = 'a-refaire'; c.versBrouillon.supprime = true; c.versBrouillon.publier = true; c.versBrouillon.majAt = new Date(Date.now() - 3600e3).toISOString(); } };
   { let st = 422; const f = monter({ src: process.env.BG_SRC || undefined, brouillon: () => st });
     await f.ctx.recreerVinted({ cmd: 'recreerVinted', uid: '111', id: '9101', prix: 54, titre: 'Nike', viaBrouillon: true, confirme: true });
     const pauses = f.j.evts.filter((e) => e && e.quoi === 'repub' && e.pause);
     dit(pauses.length >= 2 && pauses.every((e) => e.id === '9101' && e.ms > 0 && e.jusqua > 0), "chaque pause est annoncée à l'app (quoi, durée) : elle peut afficher le compte à rebours", JSON.stringify(pauses.map((e) => [e.pause, e.ms])));
-    planterARefaire(f); st = 200; const n0 = f.j.evts.length;
+    planterARefaire(f); st = 200; finFrein(f); const n0 = f.j.evts.length;
     if (typeof f.ctx.refaireBrouillon === 'function') await f.ctx.refaireBrouillon({ cmd: 'refaireBrouillon', uid: '111', id: '9101', confirme: true });
     const et = [...new Set(f.j.evts.slice(n0).filter((e) => e && e.quoi === 'repub' && e.etape).map((e) => e.etape))].join(',');
     dit(et === 'photos,brouillon,attente,en-ligne', "Refaire annonce ses étapes (photos, brouillon, pause, mise en ligne)", et); }
@@ -555,12 +567,19 @@ const zero = (j) => gestes(j).length === 0;   // 5.266 : lire la liste des coule
   //     enregistré dans VRM, sans JAMAIS retoucher l'annonce d'origine ; mise en
   //     ligne seulement si la suppression de l'ancienne est CERTAINE.
   const sansDelai = (p, ms = 60000) => Promise.race([p, new Promise((_, ko) => setTimeout(() => ko(new Error('bloqué (file Vinted ?)')), ms))]);
-  const refaire = (f, o = {}) => typeof f.ctx.refaireBrouillon === 'function' ? sansDelai(f.ctx.refaireBrouillon({ cmd: 'refaireBrouillon', uid: '111', id: '9101', confirme: o.confirme !== false })).catch((e) => ({ erreur: e.message })) : Promise.resolve({ absent: true });
+  // (5.311) Sauf `garderFrein`, Refaire est joué APRÈS la pause du frein (un clic plus tard).
+  const refaire = (f, o = {}) => { if (!o.garderFrein) finFrein(f); return refaire0(f, o); };
+  const refaire0 = (f, o = {}) => typeof f.ctx.refaireBrouillon === 'function' ? sansDelai(f.ctx.refaireBrouillon({ cmd: 'refaireBrouillon', uid: '111', id: '9101', confirme: o.confirme !== false })).catch((e) => ({ erreur: e.message })) : Promise.resolve({ absent: true });
   const vb = (f) => (f.lignes['coffre_111_9101'] || {}).versBrouillon || {};
   { let st = 422; const f = monter({ src: process.env.BG_SRC || undefined, brouillon: () => st });
     const r1 = await f.ctx.recreerVinted({ cmd: 'recreerVinted', uid: '111', id: '9101', prix: 54, titre: 'Nike Air Max 1', viaBrouillon: true, confirme: true });
     dit(r1.etape === 'echec' && suppressions(f.j).length === 0 && vb(f).supprime !== true, "republier, brouillon refusé : l'ancienne n'est PAS supprimée (jamais « à refaire » sur une annonce encore en ligne)", JSON.stringify({ e: r1.etape, v: vb(f).etat, s: vb(f).supprime }));
-    planterARefaire(f); st = 200; const n0 = f.j.vinted.length;
+    planterARefaire(f); st = 200;
+    // (2 nov., 5.311) Juste après un refus de Vinted, le compte est FREINÉ : Refaire
+    // ne part pas (jamais un refus en série), et le dit ; après la pause, il part.
+    const nF = f.j.vinted.length; const rf = await refaire(f, { garderFrein: true });
+    dit(rf.code === 'frein-refus' && f.j.vinted.length === nF && /reprends à partir de/.test(rf.raison || ''), "Refaire juste après un refus de Vinted : freiné, aucune requête, l'heure de reprise est dite", JSON.stringify({ code: rf.code, n: f.j.vinted.length - nF, raison: rf.raison }));
+    finFrein(f); const n0 = f.j.vinted.length;
     const r = await refaire(f); const seq = seqDe({ vinted: f.j.vinted.slice(n0) });
     dit(seq === 'PPBM' && r.etape === 'fait' && vb(f).etat === 'fait', "Refaire : photos ×2 depuis VRM, PUIS brouillon, PUIS mise en ligne — l'ancienne n'est pas retouchée", `seq=${seq} etape=${r.etape} ${r.raison || r.erreur || ''}`);
     let b = {}; try { b = JSON.parse(brouillonsP({ vinted: f.j.vinted.slice(n0) })[0].corps); } catch (_) {}
