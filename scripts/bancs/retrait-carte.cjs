@@ -95,9 +95,9 @@ async function main() {
           const r = (e) => e && e.getBoundingClientRect();
           const a = r(c), z = r(k);
           const croise = a && z && !(a.right <= z.left || z.right <= a.left || a.bottom <= z.top || z.bottom <= a.top);
-          const carte = c && c.closest('.vrm-pickup-card'); const rc = carte && carte.getBoundingClientRect();
+          const carte = c && (c.closest('[data-cc-carte]') || c.closest('.vrm-pickup-card')); // (2 nov.) Colis → « À retirer », par point const rc = carte && carte.getBoundingClientRect();
           const tr = document.querySelector('[data-relais-transporteur]'), ad = document.querySelector('[data-relais-adresse]');
-          return { tr: tr ? tr.getAttribute('data-relais-transporteur') + '|' + tr.innerText : '', ad: ad ? ad.innerText : '', badgeV: !!document.querySelector('.vrm-pickup-point [title="Vinted Go"]'), code: c && c.querySelector('strong').textContent, croise, dedans: !!(rc && z && z.right <= rc.right + 1 && a.right <= rc.right + 1), txt: carte ? carte.innerText : '' };
+          return { tr: tr ? tr.getAttribute('data-relais-transporteur') + '|' + tr.innerText : '', ad: ad ? ad.innerText : '', badgeV: !!document.querySelector('.vrm-pickup-point [title="Vinted Go"], [data-relais-point] [title="Vinted Go"]'), code: c && c.querySelector('strong').textContent, croise, dedans: !!(rc && z && z.right <= rc.right + 1 && a.right <= rc.right + 1), txt: carte ? carte.innerText : '' };
         });
         dit(/^mondialrelay\|Mondial Relay/.test(m.tr) && !m.badgeV, `${T} le transporteur nommé par la conversation est dit (jamais « Vinted Go » en dur)`, m.tr);
         dit(/12 rue du Port, 35260 Cancale/i.test(m.ad), `${T} l’adresse du point relais est écrite en entier`, m.ad);

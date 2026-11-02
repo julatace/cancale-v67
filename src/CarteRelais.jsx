@@ -280,7 +280,7 @@ function CarteColisRetirer({ x, Photo, gestes, detail, limiteSurCarte, avecLieu 
   );
 }
 
-export function ColonneRetirer({ vue, C, Photo, gestes = null, detail = null, avecCarte = true, enRouteSansRelais = 0 }) {
+export function ColonneRetirer({ vue, C, Photo, gestes = null, detail = null, nomTransporteur = null, avecCarte = true, enRouteSansRelais = 0 }) {
   const points = (vue && vue.points) || [];
   const connus = points.filter((p) => !p.inconnu);
   const inconnu = points.find((p) => p.inconnu) || null;
@@ -314,6 +314,11 @@ export function ColonneRetirer({ vue, C, Photo, gestes = null, detail = null, av
         const raisonCarte = carteVisible ? (raisonPasSurCarte(p, reperes) || null) : null;
         const lim = texteLimite(p.prochaineLimite);
         const ep = nombreEpingle(p);
+        // Le transporteur du point : celui que la source NOMME, et seulement s'il est
+        // le même pour tous ses colis (jamais « Vinted Go » écrit en dur).
+        const trs = [...new Set(comptes.map((c) => c.transporteur || ''))];
+        const trCode = trs.length === 1 && trs[0] ? trs[0] : '';
+        const trNom = trCode && nomTransporteur ? nomTransporteur(trCode) : '';
         const morceaux = [
           p.nComptes ? plur(p.nComptes, 'colis', 'colis') : null,
           p.nAttendus ? `${p.nAttendus} en route` : null,
@@ -326,7 +331,8 @@ export function ColonneRetirer({ vue, C, Photo, gestes = null, detail = null, av
               {carteVisible ? <span className={'vrm-rp-numero vrm-rp-compte vrm-rp-epingle' + (ep.sorte === 'aretirer' && repereDe(p, reperes) ? ' is-fort' : '')} data-relais-pastille={ep.n} data-relais-pastille-sorte={ep.sorte} aria-hidden="true" title="Son épingle sur la carte">{ep.n}</span> : null}
               <span className="vrm-rp-ident">
                 <b className="vrm-rp-nom" data-relais-nom="">{p.nom || p.adresseCourte || 'Point relais'}</b>
-                {p.nom && p.adresseCourte ? <span className="vrm-rp-adresse" data-relais-adresse="">{p.adresseCourte}</span> : null}
+                {p.nom && (p.adresse || p.adresseCourte) ? <span className="vrm-rp-adresse" data-relais-adresse="">{p.adresse || p.adresseCourte}</span> : null}
+                {trNom ? <span className="vrm-rp-adresse" data-relais-transporteur={trCode}>{trNom}</span> : null}
                 <span className="vrm-rp-resume">
                   {morceaux.map((m, i) => <span key={i} data-relais-compte={i === 0 && p.nComptes ? p.nComptes : undefined}>{i ? ' · ' : ''}{m}</span>)}
                   {lim && p.nComptes ? <span className={p.urgent ? 'is-ambre' : ''} data-relais-limite={p.prochaineLimite}> · {lim}</span> : null}

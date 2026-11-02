@@ -52157,7 +52157,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               {x.code ? <CodeRetraitCopiable label={x.code2 ? 'Code d’ouverture' : 'Code de retrait'} code={x.code}/> : null}
               {qi ? <button className="vrm-icon-control vrm-rp-qr" type="button" onClick={() => openQrView(t)} title="QR de retrait — afficher en grand pour scanner" aria-label="Afficher le QR de retrait en grand" data-colis-qr="">
                 <img src={qi} alt="QR de retrait" onError={() => noterImgMorte(qrImage(t))}/></button> : null}
-              {!x.code && !qi ? <span className="vrm-rp-sans-code" data-colis-sans-code="">{t ? 'Code dans l’e-mail du transporteur' : 'Code pas encore lu'}</span> : null}
+              {!x.code && !qi ? (!t && relV && relV.lieu && !relV.qr
+                // La conversation a été LUE (le lieu en vient) et ne porte aucun code :
+                // il arrive par l'e-mail du transporteur (même phrase que l'ancien détail).
+                ? <span className="vrm-rp-sans-code" data-colis-sans-code="" data-colis-sans-code-conv="">Code par l’e-mail du transporteur</span>
+                : <span className="vrm-rp-sans-code" data-colis-sans-code="">{t ? 'Code dans l’e-mail du transporteur' : 'Code pas encore lu'}</span>) : null}
               {hrefV ? <Bouton variante="discret" href={hrefV} target="_blank" rel="noreferrer" data-colis-conv="">{relV && relV.qr ? 'Voir le QR ↗' : 'Conversation ↗'}</Bouton> : null}
               {suivre}
               {(t || o) ? <button className="vrm-pickup-collect" type="button" data-colis-retire="" onClick={() => (t ? markCollected(t) : markPickupDone(o))} aria-label="J’ai retiré ce colis"><span aria-hidden="true">✓</span><span className="vrm-pickup-collect-label"> J’ai retiré</span></button> : null}
@@ -52201,7 +52205,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               <section className="vrm-colis-retirer" data-cc-colonne="retirer" data-cc-n={colRet ? colRet.n : 0} data-cc-hors={colRet ? colRet.nHors : 0}>
                 {notes.retirer ? <p className="vrm-colis-note" data-cc-note="retirer">{notes.retirer}</p> : null}
                 {colRet && colRet.cartes.length > 0
-                  ? <ColonneRetirer vue={parPoint} C={C} Photo={photoCarte} gestes={gestesRetrait} detail={arriveeRetrait} avecCarte={ordiColis} enRouteSansRelais={(groupesRelais && groupesRelais.enRouteSansRelais) || 0}/>
+                  ? <ColonneRetirer vue={parPoint} C={C} Photo={photoCarte} gestes={gestesRetrait} detail={arriveeRetrait} nomTransporteur={(k) => (CARRIERS[k] && CARRIERS[k].name) || ''} avecCarte={ordiColis} enRouteSansRelais={(groupesRelais && groupesRelais.enRouteSansRelais) || 0}/>
                   : (toutLuRet ? <p className="vrm-colis-vide" data-retraits-vide="">Aucun colis à aller chercher pour l’instant.</p> : null)}
               </section>
             )}
