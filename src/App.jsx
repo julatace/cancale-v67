@@ -43961,7 +43961,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       livree: { lu: livreeLue, t: null },
       argent: { lu: finalisee, t: versement },
     });
-    return { s, tus, vs, horsParcours, bordE, bordC, posteMain, finalisee, versement, etapes };
+    return { s, tus, vs, horsParcours, bordE, bordC, posteMain, finalisee, versement, etapes, bougeLu, livreeLue };
   };
   // Suit l'ENSEMBLE des comptes (`cleComptes`), pas leur nombre : un compte lié
   // ou retiré relit (le cache ne sert plus une liste qui ne le couvre pas).
@@ -52610,6 +52610,23 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               desc="Ce que Vinted attend de toi, capté par l'extension. Le bordereau manquant est généré tout seul quand tu passes sur Vinted, puis déposé ici. Un colis parti disparaît sans rien cocher."
               right={onglet === 'envoyer' && nPrets>0 && (siteColis==='toutes'||siteColis==='vinted') ? <Bouton variante="primaire" icone="printer" data-lot-ouvrir="1" data-imprimer-prets={nPrets} onClick={ouvrirLot} disabled={batchBusy}
                 title="Tamponne tous les bordereaux reçus (numéro + titre) et les met à la suite dans un seul PDF">{batchBusy?'Préparation…':`Imprimer ${nPrets===1?'le prêt':`les ${nPrets} prêts`}`}</Bouton> : null}/>
+            {/* (2 nov., style « Fusion ») LA CARTE « AUJOURD'HUI ». Le grand chiffre est le
+                nombre de colis À ENVOYER publié par cet écran (`vrm_colis_aposter`, celui de Ma
+                journée et du sélecteur, « au moins » si un site n'est pas lu) ; « à imprimer » =
+                les bordereaux prêts (`lignesLot`, le compte de « Imprimer les N prêts ») ;
+                « déposés » = les « Colis fait » d'aujourd'hui (`gestesDepuis`, la règle de la
+                Tournée) ; « à retirer » = `vrm_colis_retirer`. Aucun nombre recalculé. */}
+            {!baseKO && (() => { const m0 = new Date(); m0.setHours(0, 0, 0, 0); const deposes = gestesDepuis(shipDone, m0.getTime());
+              return (
+              <CarteMois className="vrm-fu-ecran vrm-fu-colis" surtitre="Aujourd'hui" data-fu-colis-envoyer={nEnv == null ? '' : String(nEnv)}
+                valeur={nEnv == null ? null : <>{envPartiel ? <span className="vrm-fu-borne">au moins</span> : null}{nEnv} colis</>}
+                sous={nEnv == null ? 'Je lis tes colis…' : nEnv === 0 ? 'Rien à envoyer pour l’instant' : <>à envoyer{nPrets > 0 ? <> · <b>{nPrets} bordereau{nPrets > 1 ? 'x' : ''} prêt{nPrets > 1 ? 's' : ''}</b></> : null}</>}
+                cases={[
+                  { cle: 'imprimer', n: nPrets, l: 'à imprimer', titre: 'Bordereaux reçus, prêts à imprimer', onClick: nPrets > 0 ? () => onOngletColis && onOngletColis('envoyer') : undefined, attrs: { 'data-n': String(nPrets) } },
+                  { cle: 'deposes', n: deposes, l: deposes > 1 ? 'déposés' : 'déposé', titre: "Colis marqués « Colis fait » aujourd'hui", attrs: { 'data-n': String(deposes) } },
+                  { cle: 'retirer', n: nRet == null ? null : `${nRet}${retPartiel ? '+' : ''}`, l: 'à retirer', titre: retPartiel && nRet != null ? `Au moins ${nRet} : les e-mails de suivi n'ont pas pu être lus` : 'Colis arrivés à aller chercher', onClick: () => onOngletColis && onOngletColis('retirer'), attrs: { 'data-n': nRet == null ? '' : String(nRet) } },
+                ]}/>
+              ); })()}
             {/* (31 oct., soir) + « Leboncoin » quand il y a un compte : ses colis ont
                 leur écran (bordereau, QR), ouvert par la coque (`onColisLeboncoin`). */}
             {(sitesVus.length > 1 || onColisLeboncoin) && (
@@ -53166,6 +53183,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 const pdf = !!(b && b.hasPdf) || !!capte;
                 // (2 nov.) Le transporteur LU de ce colis (n° de son bordereau), à côté du bouton.
                 const trV = transporteurVente(b);
+                // (2 nov., Fusion) LA FRISE DU COLIS : Imprimé → Déposé → En route → Livré. Rien de
+                // neuf : « imprimé » = la coche de toujours (`vinted_bords_printed`), « déposé » =
+                // « Colis fait » ou un statut Vinted qui a bougé, « en route » / « livré » = les
+                // preuves de la vente (`preuvesFriseDe`, la règle de la frise de Ventes). Une
+                // étape plus loin prouvée coche celles d'avant ; « pas su » n'est jamais coché.
+                // L'étape en cours est ambre seulement si la limite d'envoi est aujourd'hui/demain.
+                const pvC = o ? preuvesFriseDe(o) : null;
+                const imprimeC = !!((e.txn && bordsPrinted[e.txn]) || (b && isBordPrinted(b)));
+                const fuColis = friseColisFusion({ imprime: imprimeC, depose: posted || !!(pvC && pvC.bougeLu), enroute: !!(pvC && pvC.bougeLu), livre: !!(pvC && pvC.livreeLue) }, { geste: dl != null && dl <= 1 && !posted });
                 const acc = o ? o._acc : null;
                 // Une charnière de groupe : le premier colis d'un groupe porte
                 // son intertitre (voir `groupeDe` plus haut). C'est ce qui rend
@@ -53257,6 +53283,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     {/* ACTION PRINCIPALE : imprimer si le PDF est là, sinon aller
                         le générer sur Vinted. Le glisser-fichier reste dispo pour
                         celui qui n'a pas branché sa boîte mail. */}
+                    <Frise etapes={fuColis} cle={String(e.txn||e.key)} className="vrm-colis-frise" label="Où en est le colis"/>
                     <div className="vrm-colis-actions" style={{display:'flex',gap:8,alignItems:'center',marginTop:12,flexWrap:'wrap'}}>
                       {/* (2 nov. au soir) Julien : « à côté du bouton bordereau, marqué Chronopost avec le
                           logo » — LA RANGÉE : la puce du transporteur LU (n° du bordereau, ligne du

@@ -112,6 +112,7 @@ const ouvrir = async (b, vp, sombre, tab) => {
       localStorage.setItem('vinted_urssaf_mois', JSON.stringify({ at: Date.now(), mois: [{ ym: '2026-10', ca: 228, n: 3, par: { Vinted: { ca: 228, n: 3 } } }, { ym: '2026-11', ca: 178, n: 2, par: { Vinted: { ca: 178, n: 2 } } }] }));
       localStorage.setItem('vinted_urssaf_freq', JSON.stringify('mensuel'));
       localStorage.setItem('vrm_compta', JSON.stringify({ sansDepenses: { at: Date.now() } }));
+      localStorage.setItem('vinted_regime', JSON.stringify('micro'));
     }
     localStorage.setItem('vinted_sale_overrides', JSON.stringify({ '8004': { buyPrice: '45', numero: '23' }, '8005': { buyPrice: '30', numero: '61' }, '8003': { numero: '124' }, '8001': { numero: '99', buyPrice: '28' } }));
   } catch (_) {} }, !!sombre);
@@ -187,6 +188,7 @@ const ECRANS = [
           await pg.waitForTimeout(1800);
           if (MUTATION) await pg.evaluate(() => { const s = document.querySelector('[data-fu-frise="8001"] [data-fu-etape="livree"]'); if (s) s.setAttribute('data-fait', '1'); });
           const m = await mesure(pg);
+          if (process.env.FUSION_DBG) console.log(await pg.evaluate((sel) => [...document.querySelectorAll(sel)].slice(0, 1).map((r) => [r, ...r.querySelectorAll('*')].slice(0, 6).map((e) => { const c = getComputedStyle(e); const b = e.getBoundingClientRect(); return `${e.tagName}.${String(e.className).slice(0, 30)} w${Math.round(b.width)} x${Math.round(b.left)} flex:${c.flex} disp:${c.display}`; }).join('\n')).join('\n'), process.env.FUSION_DBG));
           dit(m.carte, 'la carte sombre du mois est là');
           dit(m.deb <= 1 && !m.hors.length, 'aucun débordement horizontal', `${m.deb}px ${m.hors.join(' | ')}`);
           dit(!m.petites.length, 'les gestes Fusion font 44 px', m.petites.join(' | '));
@@ -206,6 +208,17 @@ const ECRANS = [
               if (att == null) dit(!f, `vente ${tx} annulée : pas de frise`, f ? f.faits : '');
               else dit(!!f && f.faits === att, `vente ${tx} : la frise ne coche que le prouvé`, f ? `${f.faits} (attendu ${att})` : 'pas de frise');
             }
+            // Le récapitulatif (tiroir) de 8002 : la puce à gauche de « Imprimer le bordereau ».
+            const t = pg.locator('.vrm-sale-row[data-tx="8002"] .vrm-ledger-sale-toggle').first();
+            await t.scrollIntoViewIfNeeded(); await t.click();
+            const id = await t.getAttribute('aria-controls');
+            await pg.locator(`[id="${id}"]`).waitFor({ state: 'visible', timeout: 8000 }); await pg.waitForTimeout(500);
+            const rr = (await mesure(pg)).rangees.filter((r) => r.ok);
+            const recap = await pg.evaluate((id) => { const d = document.getElementById(id); const r = d && d.querySelector('[data-rangee-bord]'); if (!r) return null; const p = r.querySelector('.vrm-puce-transp'), b = [...r.children].find((c) => c !== p); const bt = b && (b.matches('button') ? b : b.querySelector('button')); if (!p || !bt) return { ok: false }; const a = p.getBoundingClientRect(), c = bt.getBoundingClientRect(); return { ok: Math.abs(a.top - c.top) < 2 && Math.round(a.height) === 44 && Math.round(c.height) === 44 && a.right <= c.left + 1 }; }, id);
+            dit(recap && recap.ok, 'récapitulatif : la puce à gauche du bouton, même rangée, 44 px', JSON.stringify(recap));
+            if (SHOTS) await pg.locator(`[id="${id}"] [data-rangee-bord]`).first().screenshot({ path: path.join(SHOTS, `pastille-recap-${nom}.png`) }).catch(() => {});
+            await pg.keyboard.press('Escape'); await pg.waitForTimeout(300);
+            void rr;
             const f1 = m.frises.find((x) => x.cle === '8001');
             dit(f1 && f1.cours === 'postee', '8001 à poster : « Postée » est l’étape en cours', f1 && f1.cours);
           }
