@@ -52195,11 +52195,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   l'identité de CE colis (n° de suivi, transaction) — rien quand il n'y a rien. */}
               {t ? <>
                   <LigneNouvelleVinted nv={nouvelleDe(pickupUnion.cmdParColis && pickupUnion.cmdParColis.get(colisKey(t)))} transp={transpMap} suivi={suiviDeLigne(t)}/>
-                  <LigneTransporteur transp={transpMap} suivi={suiviDeLigne(t)} carrier={t.carrier} court limiteCarte={t.limite || t.limiteVers || ''}/>
+                  {/* « pas encore lu chez le transporteur » sur chaque carte serait la même phrase
+                      partout (§7) : la ligne ne s'écrit que quand le transporteur a répondu. */}
+                  {transpMap && transpMap.get(normaliserSuivi(suiviDeLigne(t))) ? <LigneTransporteur transp={transpMap} suivi={suiviDeLigne(t)} carrier={t.carrier} court limiteCarte={t.limite || t.limiteVers || ''}/> : null}
                 </>
                 : o ? (() => { const su2 = suivisAchat(o, indexSuivisAchats)[0] || ''; const e2 = entreeSuiviAchat(o); return <>
                   <LigneNouvelleVinted nv={nouvelleDe(o)} transp={transpMap} suivi={su2}/>
-                  {su2 ? <LigneTransporteur transp={transpMap} suivi={su2} carrier={(e2 && e2.transporteur) || transporteurDeForme(su2) || ''} court limiteCarte={(ev && (ev.limite || ev.limiteVers)) || ''}/> : null}
+                  {su2 && transpMap && transpMap.get(normaliserSuivi(su2)) ? <LigneTransporteur transp={transpMap} suivi={su2} carrier={(e2 && e2.transporteur) || transporteurDeForme(su2) || ''} court limiteCarte={(ev && (ev.limite || ev.limiteVers)) || ''}/> : null}
                 </>; })() : null}
             </>); };
           const toutLuRet = !notes.retirer && !baseKO && tracking !== null && Array.isArray(buys.items) && !buys.error;
