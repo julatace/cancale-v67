@@ -125,6 +125,10 @@ import { UneLigne } from "./UneLigne.jsx";
 import { GlisserVente, useDeposeDiffere, BarreAnnulerDepose } from "./GlisserDepose.jsx";
 import { beneficeLigneVente, texteBenefice, euros as eurosLigne } from "./beneficeLigne.js";
 import { friseVente, phraseVente, eurosRecap, ETATS_HORS_PARCOURS } from "./recapVente.js";
+// (2 nov.) Le style « Fusion » : la carte sombre du mois et la frise de suivi (src/design/).
+import CarteMois from "./design/CarteMois.jsx";
+import Frise from "./design/Frise.jsx";
+import { friseVenteFusion, friseColisFusion } from "./design/friseFusion.js";
 import { etapesTournee, arretsTournee, gestesDepuis } from "./tournee.js";
 import "./styles-barre-haut.css";
 import "./styles-recherche.css";
@@ -48337,7 +48341,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   <PhotoVinted key={ph} src={ph} alt="" loading="lazy" onError={()=>noterImgMorte(ph)} style={{marginLeft:k?-14:0}}/>
                 ))}
               </span>
-            : <span className="vrm-day-task-ic" aria-hidden="true" style={{color:j.color}}><Icon name={j.icon} size={20}/></span>}
+            : (j.n != null && Number.isFinite(Number(j.n)) && Number(j.n) > 0)
+              /* (2 nov., Fusion) La pastille chiffrée, NEUTRE (encre ; ambre pâle seulement si urgent). */
+              ? <span className={'vrm-fu-pastille' + (j.urgent ? ' is-urgent' : '') + (Number(j.n) > 99 ? ' is-long' : '')} aria-hidden="true" data-fu-pastille={String(j.n)}>{Number(j.n) > 999 ? '999+' : j.n}</span>
+              : <span className={'vrm-fu-pastille is-icone' + (j.urgent ? ' is-urgent' : '')} aria-hidden="true"><Icon name={j.icon} size={20}/></span>}
           <span className="vrm-day-task-textes">
             <UneLigne className="vrm-day-task-title" texte={x.court} lignesTel={2}/>
             {/* (1er nov., « très répétitif ») Le détail tient sur UNE ligne, téléphone compris :
@@ -48462,8 +48469,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               ? <div data-vendu-manque="" className="vrm-jc-sous">Tes ventes n'ont pas pu être lues — ce n'est pas zéro.</div>
               : <div className="vrm-jc-sous">{partiel ? 'au moins · ' : ''}{moisN} vente{moisN>1?'s':''}{jourN>0 && <> · <span data-vendu-jour={Math.round(jourEur*100)}>{jourN} aujourd'hui</span></>}{ncMois.length ? <> · <span data-vendu-manque-phrase="" title={phraseNcMois}>{ncMois.length} non comptée{ncMois.length>1?'s':''}</span></> : null}</div>}
             </>); })()}
-            <div className={`vrm-jc-rangee${cotisMois != null ? ' vrm-jc-4' : ''}`}>
-              <BeneficeJournee onNav={onNav} place="integre" edition={editJournee}/>
+            {/* (2 nov., Fusion) Le bénéfice est dans la tête sombre : plus redit ici (§7). */}
+            <div className="vrm-jc-rangee">
               <div className="vrm-jc-cell" data-recu-mois={recuMois==null?'':Math.round(recuMois*100)} data-recu-sans={recuSans ? nomsVentesKO.join(',') : ''} data-recu-non-comptees={recuNonComptees.length || undefined}
                 title={`Reçu en ${libMois} : tes ventes versées ce mois (date du versement).${recuSans ? ` Sans ${nomsVentesKO.join(', ')} (ventes pas lues).` : ''}${adTous > 0 ? ` ${adTous} vente${adTous>1?'s':''} finalisée${adTous>1?'s':''} sans date de versement : dans aucun mois pour l'instant.` : ''}${phraseNcRecu ? ` Comptées nulle part : ${phraseNcRecu}.` : ''}${aDaterTitre}`}>
                 <div className="vrm-jc-l">Reçu en {libMois}</div>
@@ -48488,19 +48495,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               </div>
             </div>
           </div>
-        ) : (jourN>0 || (!baseKO && !premierJour && benefJourneeOn)) ? (<>
-          {/* Le jour seul, quand le héros n'est pas là (lecture en cours d'un
-              autre bloc) : une ligne sobre, jamais un bandeau bleu. */}
-          {jourN>0 && (
-            <button type="button" onClick={()=>onNav&&onNav('cat_ventes')} className="vrm-day-card vrm-day-jour"
-              style={{border:`1px solid ${C.border}`,background:C.card,boxShadow:C.shadow||'none',textAlign:'left',cursor:'pointer',fontFamily:'inherit',width:'100%'}}>
-              <span className="vrm-day-k" style={{color:C.muted}}>Vendu aujourd'hui</span>
-              <span data-vendu-jour={Math.round(jourEur*100)} className="vrm-jc-v"><Montant v={jourEur}/></span>
-              <span className="vrm-jc-sous">{jourN} vente{jourN>1?'s':''}</span>
-            </button>
-          )}
-          {!baseKO && !premierJour && <BeneficeJournee onNav={onNav} place="carte" edition={editJournee}/>}
-        </>) : null;
+        ) : null;
+        // (2 nov., Fusion) « Vendu aujourd'hui » et le bénéfice vivent dans la tête
+        // sombre, toujours là : la carte de secours d'avant (le jour seul, le
+        // bénéfice en carte) les aurait redits (§7).
         W.semaine = vuHero ? (()=>{
           // (2 nov., audit des données ; limites n°10) Aucun compte lu : sept « 0 »
           // seraient un rien inventé (§5) — la carte le dit. Une partie seulement :
@@ -48690,22 +48688,58 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           ) : null;
         }
         return (
-          <div className="vrm-day-layout">
+          <div className="vrm-day-layout vrm-fu-ecran">
             <ScreenHead icon="sun" title="Ma journée"/>
 
-            {/* La tête (bonjour, date, nombre de choses à faire) reste hors de la
-                grille ; le bouton « Modifier » y vit, discret. */}
-            {!baseKO && (
-              <div className="vrm-day-greeting vrm-w-tete">
-                <div className="vrm-day-hello" style={{color:C.text}}>{hello}{prenomLisible(prenom) ? ' ' + prenomLisible(prenom) : ''}</div>
-                <div className="vrm-day-date" style={{color:C.muted}}>{dateStr}</div>
-                <p className="vrm-phrase-ecran" data-phrase-ecran="journee">{PHRASES_ECRAN.journee}</p>
-                {!loading && jobs.length>0 && <div className="vrm-day-todo" style={{color:C.muted}}><b style={{color:C.text,fontWeight:600}}>{jobs.length} chose{jobs.length>1?'s':''}</b> à faire aujourd'hui</div>}
+            {/* (2 nov., style « Fusion », son choix) LA TÊTE SOMBRE : la date, le
+                bonjour, la semaine (un point sous un jour qui a vendu), puis deux
+                cases — « Vendu aujourd'hui » (`bilanVentes`, la règle de « Vendu ») et
+                le bénéfice du mois (`BeneficeJournee`, la publication
+                `vrm_benefice_jours` — il n'est plus redit plus bas, §7). Les
+                classes d'avant restent (`vrm-day-greeting`, `vrm-day-hello`…) :
+                mêmes repères pour les bancs, une autre forme. */}
+            {!baseKO && (() => {
+              const actifsT = (accounts||[]).filter(a=>!acctOff(a.vinted_user_id)).length;
+              const ventesPasLues = actifsT>0 && nomsVentesKO.length>=actifsT && jourN===0;
+              const venduLu = vuHero && !ventesPasLues;
+              return (
+              <section className="vrm-day-greeting vrm-w-tete vrm-fu-carte vrm-fu-tete" data-fu-carte="" aria-label="Ta journée">
+                <div className="vrm-fu-tete-haut">
+                  <div className="vrm-day-date vrm-fu-bonjour">{dateStr}</div>
+                  <div className="vrm-day-hello vrm-fu-titre-tete">{hello}{prenomLisible(prenom) ? ' ' + prenomLisible(prenom) : ''}</div>
+                  <p className="vrm-phrase-ecran vrm-fu-date" data-phrase-ecran="journee">{PHRASES_ECRAN.journee}</p>
+                  {!loading && jobs.length>0 && <div className="vrm-day-todo vrm-fu-date"><b>{jobs.length} chose{jobs.length>1?'s':''}</b> à faire aujourd'hui</div>}
+                </div>
                 {!premierJour && !editJournee && (
-                  <button type="button" className="vrm-w-modifier" data-widgets-modifier="" aria-label="Modifier les widgets de Ma journée" onClick={()=>setEditJournee(true)} style={{color:'var(--vrm-b-lien)',fontWeight:600}}>Modifier</button>
+                  <button type="button" className="vrm-w-modifier" data-widgets-modifier="" aria-label="Modifier les widgets de Ma journée" onClick={()=>setEditJournee(true)}>Modifier</button>
                 )}
-              </div>
-            )}
+                {vuHero && Array.isArray(semaine) && semaine.length===7 && (
+                  <ol className="vrm-fu-semaine" aria-label="Cette semaine" data-fu-semaine="">
+                    {semaine.map((j)=>(
+                      <li key={j.cle} className="vrm-fu-jour" data-auj={j.auj?'':undefined} data-futur={j.futur?'':undefined} data-vendu={j.futur||ventesPasLues?undefined:String(j.vendu.n)} title={j.futur ? j.long : `${j.long} : ${j.vendu.n} vente${j.vendu.n>1?'s':''}`}>
+                        <span aria-hidden="true">{j.jour.charAt(0)}</span><b>{j.num}</b>
+                      </li>
+                    ))}
+                  </ol>
+                )}
+                {!premierJour && (
+                  <div className="vrm-fu-cases">
+                    {(venduLu || jourN>0) ? (
+                      <button type="button" className="vrm-fu-case is-jour" data-fu-case="jour" data-fu-vendu-jour={Math.round(jourEur*100)} title={`Vendu aujourd'hui, toutes plateformes (date de la vente)${nomsVentesKO.length?` — sans ${nomsVentesKO.join(', ')} (ventes pas lues)`:''}`} onClick={()=>onNav&&onNav('cat_ventes')}>
+                        <span>Vendu aujourd'hui</span>
+                        <b><Montant v={jourEur}/></b>
+                        <span className="vrm-fu-case-sous">{nomsVentesKO.length ? 'au moins · ' : ''}{jourN>0 ? `${jourN} vente${jourN>1?'s':''}` : 'aucune vente pour l’instant'}</span>
+                      </button>
+                    ) : (vuHero && ventesPasLues) ? (
+                      <div className="vrm-fu-case is-jour" data-fu-case="jour" data-fu-vendu-jour="">
+                        <span>Vendu aujourd'hui</span><b className="is-vide">—</b><span className="vrm-fu-case-sous">ventes pas lues</span>
+                      </div>
+                    ) : null}
+                    <BeneficeJournee onNav={onNav} place="integre" edition={editJournee}/>
+                  </div>
+                )}
+              </section>
+              ); })()}
 
             {/* ⚠️ Rétabli (retiré par #500) : si le serveur ne peut plus envoyer
                 AUCUNE notification, il faut le voir ICI. */}
@@ -48785,7 +48819,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             {/* Le bénéfice vit dans « Vendu et reçu » ; si cette carte n'est pas
                 sur l'écran (retirée), il garde sa propre carte ici : allumé dans
                 Réglages ⇒ toujours visible (un seul propriétaire, §11). */}
-            {!baseKO && !premierJour && !aWidget('vendu') && <BeneficeJournee onNav={onNav} place="carte" edition={editJournee}/>}
+            {/* (2 nov., Fusion) Le bénéfice vit dans la tête sombre, toujours rendue : plus de carte de secours ici. */}
             {/* (29 oct.) Le contrôle « vendus ailleurs » passe SOUS la journée : au-dessus du
                 bonjour il repoussait les compteurs du jour. Les vraies doubles ventes
                 restent en tête (alertes qui coûtent de l'argent).

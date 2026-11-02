@@ -1,0 +1,194 @@
+// Banc : LE STYLE « FUSION » (2 nov., le choix de Julien sur les maquettes :
+// « voilà j'aime bien, sans trop de couleur non plus, ça doit être premium »).
+// Rend Ma journée, Ventes, Colis et Compta à 390 px (tactile) et 1512 px, en
+// clair ET en sombre, sur des données INVENTÉES (le dépôt est public).
+//
+// Il juge la RÈGLE, pas l'orthographe (§6.4) — data-* et nombres rendus :
+//   1. la frise de chaque vente (Vendue → Postée → Livrée → Payée) ne coche une
+//      étape que PROUVÉE par la règle de src/recapVente.js :
+//        · 8001 payée, sans bordereau            ⇒ Vendue seule, Postée « en cours » (à poster) ;
+//        · 8002 bordereau reçu par email         ⇒ Vendue seule cochée (le bordereau n'est pas « postée ») ;
+//        · 8003 « en route » (waiting)           ⇒ Vendue + Postée ;
+//        · 8004 « livré »                        ⇒ Vendue + Postée (déduite) + Livrée ;
+//        · 8005 finalisée (450)                  ⇒ les quatre ;
+//        · 8006 annulée                          ⇒ pas de frise ;
+//      MUTATION (FUSION_MUTATION=1) : le banc force une étape non prouvée dans
+//      la page (data-fait) ⇒ il DOIT passer au rouge ;
+//   2. la carte du mois (sombre) est là sur Ventes, Ma journée, Colis, Compta, et
+//      ses chiffres viennent des règles (data-* comparés au texte de la page) ;
+//   3. la frise d'un colis (Imprimé → Déposé → En route → Livré) suit la même règle ;
+//   4. aucun débordement horizontal, des cibles de 44 px sur les boutons Fusion,
+//      jamais « encaissé », jamais de violet ; aucune erreur d'app.
+// Lancer : npm run build && BANC_PORT=45xx node scripts/bancs/design-fusion.cjs
+// Captures : SHOTS=<dossier> node scripts/bancs/design-fusion.cjs
+const path = require('path');
+let chromium;
+try { ({ chromium } = require(path.join(__dirname, '..', '..', 'node_modules', 'playwright'))); }
+catch (_) { ({ chromium } = require('playwright')); }
+const { metaVersData } = require('./_meta.cjs');
+const fs = require('fs'), http = require('http');
+const DIST = path.join(__dirname, '..', '..', 'dist');
+const PORT = Number(process.env.BANC_PORT || process.env.PORT || 4398);
+const SHOTS = process.env.SHOTS || '';
+const MUTATION = process.env.FUSION_MUTATION === '1';
+const SEUL = process.env.FUSION_ECRANS ? process.env.FUSION_ECRANS.split(',') : null;
+
+const maintenant = new Date(2026, 10, 2, 17, 30, 0);
+const il = (n, h = 12) => { const d = new Date(maintenant); d.setHours(h, 0, 0, 0); d.setDate(d.getDate() - n); return d; };
+const A = '111';
+let nPhoto = 0;
+const vente = (id, titre, prix, statut, d, tus, extra = {}) => ({ transaction_id: id, conversation_id: 50000 + id, title: titre, price: { amount: String(prix), currency_code: 'EUR' }, status: statut, transaction_user_status: tus, date: d.toISOString(), photo: { url: `https://images1.vinted.net/t/b${++nPhoto}/f800/${id}.jpeg?s=x` }, ...extra });
+const VENTES = [
+  vente(8001, 'Salomon XT-6 noir taille 38,5', 70, 'Le paiement a été validé', il(0, 11), 'needs_action'),
+  vente(8002, 'Adidas Samba OG noir gomme taille 40', 72, 'Le paiement a été validé', il(1, 9), 'needs_action'),
+  vente(8003, 'New Balance 550 vert taille 42', 88, 'Le colis est en route', il(3, 10), 'waiting'),
+  vente(8004, 'Nike Air Max 1 rouge taille 43', 115, 'Le colis a été livré', il(1, 10), 'waiting'),
+  vente(8005, 'Asics Gel-Kayano 14 argent taille 44', 89, 'Commande finalisée', il(9), 'completed'),
+  vente(8007, 'Nike Dunk Low Panda taille 41', 79, 'Commande finalisée', il(40), 'completed'),
+  vente(8008, 'Nike Air Force 1 blanche taille 44', 60, 'Commande finalisée', il(70), 'completed'),
+  vente(8006, 'Nike Shox TL noir taille 41', 95, 'Commande annulée', il(1), 'failed'),
+];
+// Ce que la frise DOIT cocher (règle de src/recapVente.js, projetée en quatre étapes).
+const ATTENDU = { 8001: 'vendue', 8002: 'vendue', 8003: 'vendue,postee', 8004: 'vendue,postee,livree', 8005: 'vendue,postee,livree,payee', 8006: null };
+const ACCOUNTS = [{ id: 1, vinted_user_id: A, login: 'boutique_test', domain: 'www.vinted.fr', updated_at: maintenant.toISOString() }];
+const cap = maintenant.toISOString();
+const PDF_B64 = fs.readFileSync(path.join(__dirname, 'bordereau-test.b64'), 'utf8').trim();
+const txn = (id, jours) => ({ id: `harvest_${A}_txn_${id}`, data: { capturedAt: cap, payload: { transaction: { id, item_id: id + 900, status: 450, status_title: 'Commande finalisée', status_updated_at: il(jours, 9).toISOString() } } } });
+const LIGNES = [
+  { id: `harvest_${A}_orders_sold`, data: { capturedAt: cap, payload: { my_orders: VENTES } } },
+  { id: `harvest_${A}_listings`, data: { capturedAt: cap, payload: { items: [], pagination: null } } },
+  { id: 'email_bord_8002', data: { transaction: '8002', uid: A, filename: 'b1.pdf', modele: 'Samba', transporteur: 'Mondial Relay', receivedAt: il(0, 12).toISOString(), pdfB64: PDF_B64 } },
+  { id: 'email_bord_8003', data: { transaction: '8003', uid: A, filename: 'b2.pdf', modele: 'New Balance', suivi: '24819306', transporteur: 'Chronopost', receivedAt: il(3, 12).toISOString(), pdfB64: PDF_B64 } },
+  txn(8005, 6), txn(8007, 36), txn(8008, 66),
+];
+
+let ko = 0, ok = 0;
+const dit = (c, m, d) => { if (c) ok++; else ko++; console.log((c ? '  ✅ ' : '  ❌ ') + m + (d ? ' — ' + d : '')); };
+const essaie = async (nom, f) => { try { await f(); } catch (e) { dit(false, nom, String(e.message || e).slice(0, 200)); } };
+
+const types = { '.js': 'text/javascript', '.css': 'text/css', '.html': 'text/html', '.png': 'image/png', '.svg': 'image/svg+xml', '.json': 'application/json', '.webmanifest': 'application/json', '.woff2': 'font/woff2', '.mjs': 'text/javascript' };
+const srv = http.createServer((q, r) => {
+  let f = q.url.split('?')[0]; if (f === '/' || !path.extname(f)) f = '/index.html';
+  const p = path.join(DIST, f);
+  if (!fs.existsSync(p)) { r.writeHead(404); return r.end(); }
+  r.writeHead(200, { 'content-type': types[path.extname(p)] || 'application/octet-stream' }); fs.createReadStream(p).pipe(r);
+});
+srv.on('error', (e) => { console.log('❌ le port ' + PORT + ' est pris (' + e.code + ') — relance avec BANC_PORT=…'); process.exit(1); });
+srv.listen(PORT);
+
+const projette = (row, sel) => {
+  if (!sel || sel === '*') return row;
+  const out = {};
+  for (const part of sel.split(',')) {
+    const m = /^(?:([^:]+):)?(.+)$/.exec(part.trim()); if (!m) continue;
+    const src = m[2], alias = m[1] || src.split(/->>|->/).pop();
+    if (src === 'id') { out[alias] = row.id; continue; }
+    if (src === 'data') { out[alias] = row.data; continue; }
+    if (src === 'updated_at') { out[alias] = cap; continue; }
+    let v = row.data; for (const seg of src.replace(/^data(->>|->)/, '').split(/->>|->/)) v = v == null ? null : v[seg];
+    out[alias] = v == null ? null : (/->>/.test(src) && typeof v !== 'string' ? String(v) : v);
+  }
+  return out;
+};
+const TEINTES = ['#dfe3e8', '#e8e1d8', '#dfe5dd', '#e6dcdc'];
+const photoSvg = (k) => `<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400"><rect width="400" height="400" fill="${TEINTES[k % 4]}"/><path d="M60 250 C80 190 150 175 190 200 C230 222 285 205 330 232 C352 246 346 282 306 284 L84 284 C62 284 52 268 60 250 Z" fill="rgba(30,34,40,.62)"/><path d="M60 284 L330 284 L326 300 L66 300 Z" fill="rgba(255,255,255,.85)"/></svg>`;
+
+const ouvrir = async (b, vp, sombre, tab) => {
+  const ctx = await b.newContext({ viewport: vp, ...(vp.width < 600 ? { isMobile: true, hasTouch: true, deviceScaleFactor: 2 } : {}) });
+  const pg = await ctx.newPage();
+  const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
+  await pg.clock.install({ time: maintenant });
+  await pg.addInitScript((s) => { try {
+    localStorage.setItem('vrm_acces_direct', '1'); localStorage.setItem('vinted_dark', JSON.stringify(s));
+    localStorage.setItem('vrm_visite_vue', JSON.stringify(true));
+    localStorage.setItem('vinted_sale_overrides', JSON.stringify({ '8004': { buyPrice: '45', numero: '23' }, '8005': { buyPrice: '30', numero: '61' }, '8003': { numero: '124' }, '8001': { numero: '99', buyPrice: '28' } }));
+  } catch (_) {} }, !!sombre);
+  await pg.route(/^https?:\/\/[^/]*vinted\.net\//i, (r) => { const m = /\/b(\d+)\//.exec(r.request().url()); return r.fulfill({ status: 200, contentType: 'image/svg+xml', body: photoSvg(m ? Number(m[1]) : 0) }); });
+  await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1|[^/]*vinted\.net)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) ? r.abort() : r.continue()));
+  await pg.route('**/rest/v1/**', (route) => {
+    const u = decodeURIComponent(metaVersData(route.request().url()));
+    if (route.request().method() !== 'GET') return route.fulfill({ status: 201, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: '[]' });
+    const j = (d) => route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*', 'content-range': `0-${Math.max(0, d.length - 1)}/${d.length}` }, body: JSON.stringify(d) });
+    if (/select=owner/.test(u)) return route.fulfill({ status: 400, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: '{"m":1}' });
+    if (/\/rest\/v1\/vinted_accounts/.test(u)) return j(ACCOUNTS);
+    const sel = (/[?&]select=([^&]*)/.exec(u) || [])[1] || null;
+    const forme = (r) => (sel && sel !== 'data,updated_at,cap:data->>capturedAt' && !/^id,data/.test(sel)) ? projette(r, sel) : ({ ...r, updated_at: cap, cap: r.data.capturedAt });
+    const filtres = [...u.matchAll(/[?&]data->>([a-zA-Z_]+)=(not\.)?is\.null/g)];
+    const passe = (r) => filtres.every(([, k, non]) => (r.data[k] == null) === !non);
+    const eq = /[?&]id=eq\.([^&]*)/.exec(u);
+    if (eq) return j(LIGNES.filter((r) => r.id === eq[1] && passe(r)).map(forme));
+    const lk = /[?&]id=like\.([^&]*)/.exec(u);
+    if (lk) { const re = new RegExp('^' + lk[1].replace(/[.]/g, '\\.').replace(/[*%]/g, '.*') + '$'); return j(LIGNES.filter((r) => re.test(r.id) && passe(r)).map(forme)); }
+    return j([]);
+  });
+  await pg.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"pret":true}' }));
+  await pg.goto(`http://localhost:${PORT}/?tab=${tab}`, { waitUntil: 'domcontentloaded' });
+  return { ctx, pg, errs };
+};
+
+// Ce que la page montre — mesuré dans le DOM, jamais un libellé.
+const mesure = (pg) => pg.evaluate(() => {
+  const vw = window.innerWidth;
+  const vis = (e) => { const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0; };
+  const hors = [...document.querySelectorAll('.vrm-main *')].filter((e) => vis(e) && !e.closest('svg,.vrm-rangee,.vrm-filtres,[data-defile]') && getComputedStyle(e).position !== 'fixed' && e.getBoundingClientRect().right > vw + 1).map((e) => String(e.className && e.className.baseVal == null ? e.className : e.tagName).slice(0, 40));
+  const petites = [...document.querySelectorAll('[data-fu-geste]')].filter(vis).filter((e) => e.getBoundingClientRect().height < 43.5).map((e) => `${Math.round(e.getBoundingClientRect().height)}px ${e.textContent.trim().slice(0, 20)}`);
+  const violet = [...document.querySelectorAll('[class*="vrm-fu"]')].some((e) => { const c = getComputedStyle(e); return [c.backgroundColor, c.color].some((x) => { const m = /rgba?\((\d+), (\d+), (\d+)/.exec(x); if (!m) return false; const [r, g, bb] = m.slice(1).map(Number); return r > 110 && bb > 160 && g < 90; }); });
+  return {
+    deb: document.documentElement.scrollWidth - vw, hors: hors.slice(0, 6), petites,
+    carte: !!document.querySelector('[data-fu-carte]'), violet,
+    encaisse: /encaiss/i.test(document.querySelector('.vrm-main') ? document.querySelector('.vrm-main').innerText : ''),
+    frises: [...document.querySelectorAll('[data-fu-frise]')].map((f) => ({ cle: f.getAttribute('data-fu-frise'), faits: [...f.querySelectorAll('[data-fu-etape]')].filter((s) => s.getAttribute('data-fait') === '1').map((s) => s.getAttribute('data-fu-etape')).join(','), cours: (f.querySelector('[data-cours]') || { getAttribute: () => '' }).getAttribute('data-fu-etape') })),
+  };
+});
+
+const ECRANS = [
+  { id: 'journee', tab: 'journee', attend: '.vrm-day-layout' },
+  { id: 'ventes', tab: 'cat_ventes', attend: '.vrm-sale-row[data-tx]' },
+  { id: 'colis', tab: 'cat_bord', attend: '.vrm-main' },
+  { id: 'compta', tab: 'compta', attend: '.vrm-main' },
+];
+
+(async () => {
+  const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] }).catch(() => chromium.launch());
+  try {
+    for (const [vp, sombre, nom] of [[{ width: 390, height: 844 }, false, '390-clair'], [{ width: 390, height: 844 }, true, '390-sombre'], [{ width: 1512, height: 982 }, false, '1512-clair'], [{ width: 1512, height: 982 }, true, '1512-sombre']]) {
+      for (const E of ECRANS) {
+        if (SEUL && !SEUL.includes(E.id)) continue;
+        console.log(`\n— ${E.id} · ${nom}`);
+        const { ctx, pg, errs } = await ouvrir(b, vp, sombre, E.tab);
+        await essaie(E.id, async () => {
+          await pg.locator(E.attend).first().waitFor({ timeout: 30000 });
+          await pg.locator('[data-fu-carte]').first().waitFor({ timeout: 15000 }).catch(() => {});
+          await pg.waitForTimeout(1800);
+          if (MUTATION) await pg.evaluate(() => { const s = document.querySelector('[data-fu-frise="8001"] [data-fu-etape="livree"]'); if (s) s.setAttribute('data-fait', '1'); });
+          const m = await mesure(pg);
+          dit(m.carte, 'la carte sombre du mois est là');
+          dit(m.deb <= 1 && !m.hors.length, 'aucun débordement horizontal', `${m.deb}px ${m.hors.join(' | ')}`);
+          dit(!m.petites.length, 'les gestes Fusion font 44 px', m.petites.join(' | '));
+          dit(!m.encaisse, 'jamais « encaissé »');
+          dit(!m.violet, 'pas de violet');
+          if (E.id === 'ventes') {
+            for (const [tx, att] of Object.entries(ATTENDU)) {
+              const f = m.frises.find((x) => x.cle === tx);
+              if (att == null) dit(!f, `vente ${tx} annulée : pas de frise`, f ? f.faits : '');
+              else dit(!!f && f.faits === att, `vente ${tx} : la frise ne coche que le prouvé`, f ? `${f.faits} (attendu ${att})` : 'pas de frise');
+            }
+            const f1 = m.frises.find((x) => x.cle === '8001');
+            dit(f1 && f1.cours === 'postee', '8001 à poster : « Postée » est l’étape en cours', f1 && f1.cours);
+          }
+          if (E.id === 'colis') {
+            dit(m.frises.length > 0, 'chaque colis porte sa frise', String(m.frises.length));
+          }
+          if (SHOTS) {
+            await pg.screenshot({ path: path.join(SHOTS, `${E.id}-${nom}.png`) });
+            if (vp.width < 600) await pg.screenshot({ path: path.join(SHOTS, `${E.id}-${nom}-long.png`), fullPage: true });
+          }
+        });
+        dit(!errs.length, 'aucune erreur d’app', errs.join(' | ').slice(0, 300));
+        await ctx.close();
+      }
+    }
+  } finally { await b.close(); srv.close(); }
+  console.log(`\n${ok} vert(s), ${ko} rouge(s)`);
+  process.exit(ko ? 1 : 0);
+})();

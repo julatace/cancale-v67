@@ -1,0 +1,58 @@
+// La carte sombre « Fusion » (Julien : « la première photo avec les stats
+// novembre ») : un surtitre, UN grand chiffre, une sous-ligne, une rangée de
+// cases translucides, et une petite courbe quand c'est une tendance.
+// Elle n'invente rien : chaque valeur lui est passée par l'écran, qui la tient
+// de sa règle (§5 « une seule règle par notion »). Une valeur `null` s'écrit
+// « — » (pas su), jamais 0.
+import React from 'react';
+import { cheminMonotone } from '../courbeMonotone.js';
+
+// La courbe : des valeurs (une par jour), dessinées sans sommet inventé
+// (interpolation monotone), remplissage dégradé. Moins de deux points ⇒ rien.
+export function Courbe({ valeurs, largeur = 96, hauteur = 46 }) {
+  const id = React.useId().replace(/:/g, '');
+  const v = (valeurs || []).filter((x) => Number.isFinite(x));
+  if (v.length < 2 || !v.some((x) => x > 0)) return null;
+  const max = Math.max(...v), min = Math.min(0, ...v);
+  const pad = 5;
+  const pts = v.map((x, i) => [pad + (i * (largeur - 2 * pad)) / (v.length - 1), hauteur - pad - ((x - min) / ((max - min) || 1)) * (hauteur - 2 * pad)]);
+  const d = cheminMonotone(pts);
+  const [xf, yf] = pts[pts.length - 1];
+  return (
+    <svg className="vrm-fu-courbe" width={largeur} height={hauteur} viewBox={`0 0 ${largeur} ${hauteur}`} aria-hidden="true">
+      <defs><linearGradient id={'fu' + id} x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#0a84ff" stopOpacity=".42" /><stop offset="1" stopColor="#0a84ff" stopOpacity="0" /></linearGradient></defs>
+      <path d={`${d} L${xf.toFixed(2)},${hauteur} L${pts[0][0].toFixed(2)},${hauteur} Z`} fill={`url(#fu${id})`} />
+      <path d={d} fill="none" stroke="#0a84ff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+      <circle cx={xf} cy={yf} r="3.5" fill="#0a84ff" />
+    </svg>
+  );
+}
+
+// cases : [{ cle, n, l, titre, onClick, attrs }] — `n` peut être un nœud.
+export default function CarteMois({ surtitre, valeur, sous = null, cases = [], courbe = null, enHaut = null, children = null, className = '', ...attrs }) {
+  const vide = valeur == null || valeur === '';
+  return (
+    <section className={'vrm-fu-carte' + (className ? ' ' + className : '')} data-fu-carte="" {...attrs}>
+      {enHaut}
+      <div className="vrm-fu-carte-tete">
+        <div className="vrm-fu-carte-txt">
+          {surtitre ? <span className="vrm-fu-surtitre">{surtitre}</span> : null}
+          <div className={'vrm-fu-grand' + (vide ? ' is-vide' : '')}>{vide ? '—' : valeur}</div>
+          {sous ? <div className="vrm-fu-sous">{sous}</div> : null}
+        </div>
+        {courbe && courbe.length ? <Courbe valeurs={courbe} /> : null}
+      </div>
+      {cases.length ? (
+        <div className="vrm-fu-cases" style={{ '--n': cases.length }}>
+          {cases.map((c) => {
+            const corps = <><b className={c.n == null ? 'is-vide' : undefined}>{c.n == null ? '—' : c.n}</b><span>{c.l}</span></>;
+            return c.onClick
+              ? <button key={c.cle} type="button" className="vrm-fu-case" data-fu-case={c.cle} title={c.titre} onClick={c.onClick} {...(c.attrs || {})}>{corps}</button>
+              : <div key={c.cle} className="vrm-fu-case" data-fu-case={c.cle} title={c.titre} {...(c.attrs || {})}>{corps}</div>;
+          })}
+        </div>
+      ) : null}
+      {children}
+    </section>
+  );
+}
