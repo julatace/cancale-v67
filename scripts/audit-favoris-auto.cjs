@@ -227,6 +227,16 @@ async function scenarios() {
       monde(b, { maintenant: horloge, favoris: [['n1', 201, 101, 3 * H], ['n7', 201, 107, 61 * MIN]], dressing: [101, 107].map((id) => ({ id })) });
       const t = await call('auto');
       dit(t.body.ajoute === false && (t.body.vue?.auto?.journal || []).some((x) => x.notificationId === 'n7' && x.raison === 'contacte_30j'), 'même personne, autre article, moins de 30 jours : VRM n’écrit pas', JSON.stringify(t.body).slice(0, 220)); }
+    // 8 bis. Même personne, MÊME article, plus de 30 jours après : toujours jamais
+    //        (un seul message par couple, pour toujours — la règle des 30 jours ne
+    //        suffit pas à la tenir).
+    { horloge = T0; const { b, call } = neuf(); await allumer(call); horloge = T0 + 2 * H;
+      monde(b, { maintenant: horloge, favoris: [['n1', 201, 101, 61 * MIN]] });
+      await call('auto'); const s = await call('suivant'); await call('consommer', { jeton: s.body.travail.jeton, version: '5.309.0' }); await call('terminer', { jeton: s.body.travail.jeton, resultat: 'envoye', ecrits: 3 });
+      horloge += 31 * 24 * H;
+      monde(b, { maintenant: horloge, favoris: [['n1b', 201, 101, 2 * H], ['n2', 202, 102, 61 * MIN]] });
+      const t = await call('auto'); const s2 = await call('suivant');
+      dit(t.body.ajoute === true && s2.body.travail?.recipientId === '202', 'même personne, même article, 31 jours après : jamais un 2e message — et le favori suivant passe (pas bloqué derrière)', JSON.stringify({ t: t.body.ajoute, s: s2.body.travail }).slice(0, 200)); }
     // 9. Horaires et jours.
     { horloge = T0; const { b, call } = neuf(); await allumer(call);
       horloge = Date.parse('2026-11-02T21:30:00Z'); // 22 h 30 à Paris
@@ -338,6 +348,8 @@ const MUTATIONS = [
   ['api/_lib/favoris-auto.js', "if(!dansPlageAuto(a.reglages,maintenant))return {etat:'hors_horaires'};", '', 'horaires ignorés'],
   ['api/_lib/favoris-auto.js', "if(env.length>=lim)", "if(env.length>=a.reglages.parJour)", 'montée progressive retirée'],
   ['api/_lib/favoris-auto.js', "if(contacteRecemment(d,cible.recipientId,maintenant)){sauts.push({l,cible,raison:'contacte_30j'});continue;}", '', '30 jours ignorés'],
+  ['api/_lib/favoris-auto.js', "if(coupleDejaTraite(d,cible.itemId,cible.recipientId))continue;", '', 'un message par couple oublié (tri)'],
+  ['api/_lib/favoris-auto.js', "return Object.values(d?.groupes||{}).some(g=>(g.jobs||[]).some(j=>j.id===id&&", "return Object.values(d?.groupes||{}).some(g=>(g.jobs||[]).some(j=>false&&", 'un message par couple oublié (partout)'],
   ['api/_lib/favoris-auto.js', "if(quand>maintenant){", "if(false){", 'attente après le favori retirée'],
   ['api/_lib/favoris.js', "if(dansBoite.length||fil.length){sauts.push({...pr,raison:'conversation_existante'});continue;}", '', 'conversation existante ignorée'],
   ['api/_lib/favoris.js', "if(gTout&&gTout!=='vendue-ailleurs')return stop('garde_absente');", '', 'garde absente acceptée'],
