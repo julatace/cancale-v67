@@ -9360,7 +9360,7 @@ const _ecoutesVc = new Set();
 const signalerVc = () => { for (const f of _ecoutesVc) { try { f(); } catch (_) {} } };
 // Une clé Vestiaire posée par un geste : visible tout de suite, synchronisée par `save`.
 const vcPoser = (k, v) => { _vcMem[k] = v; save(k, v); signalerVc(); };
-if (typeof window !== 'undefined') {
+if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
   // La valeur gardée (fusionnée, ou venue d'un autre appareil) remplace la copie en mémoire.
   window.addEventListener('vrm:save', (e) => { const k = e && e.detail && e.detail.k; if (k && k in _vcMem) { delete _vcMem[k]; signalerVc(); } });
 }
@@ -26563,7 +26563,7 @@ function AnnoncesVestiaire() {
                 <PhotoVc src={it.photo}/>
                 <div className="vrm-lbc-catalog-info">
                   <strong>{it.titre || (num ? `N°${num}` : 'Annonce sans titre lu')}</strong>
-                  <small>{num ? <span data-vc-annonce-numtxt="">N°{num}</span> : 'Pas reliée à une paire'}{extra ? ` · ${extra}` : ''}</small>
+                  <small>{num ? <span data-vc-annonce-numtxt="">N°{num}</span> : etat === 'retiree' ? 'Sans N° (retirée)' : 'N° en attente'}{extra ? ` · ${extra}` : ''}</small>
                   <div><span data-etat={etat === 'en-ligne' ? 'active' : etat === 'vendue' ? 'vendue' : 'autre'} title={brut ? `Vestiaire écrit « ${brut} »` : undefined}>{label}</span></div>
                 </div>
                 <b data-vc-annonce-prix={it.prix ? String(it.prix.valeur) : ''} title={it.prix && it.prix.cle ? `Prix lu sur « ${it.prix.cle} »` : undefined}>{prix}</b>
@@ -26571,7 +26571,10 @@ function AnnoncesVestiaire() {
             );
           })}</ul>
         </section>
-        {liste.some((l) => !l.num) ? <div style={{ ...style, marginTop: 8 }}>Une annonce « pas reliée » ne porte ni la référence VRM-n° ni le lien d'une publication faite depuis VRM : VRM ne devine pas la paire (jamais par le titre).</div> : null}
+        {/* (2 nov., soir) Chaque annonce reçoit un N° (comme Vinted et Leboncoin) : celui de
+            la paire publiée depuis VRM ou de sa référence VRM-n°, sinon un N° neuf — par
+            l'identifiant Vestiaire du produit, jamais par le titre. */}
+        {liste.some((l) => !l.num && l.etat !== 'retiree') ? <div data-vc-annonces-attente="" style={{ ...style, marginTop: 8 }}>« N° en attente » : le numéro arrive dès que VRM a relu tes numéros (quelques secondes, connexion nécessaire). Il se donne par l'identifiant Vestiaire de l'annonce, jamais par le titre.</div> : null}
         {d.ventesKO ? <div style={{ ...style, marginTop: 4 }}>Tes ventes Vestiaire n'ont pas pu être relues : « vendue » n'est dit que si Vestiaire l'écrit sur l'annonce.</div> : null}
       </div>
     );
@@ -26904,7 +26907,7 @@ const limiteVcTexte = (v) => {
   return j == null ? `à envoyer avant le ${dateCourteVc(v.limite)}` : j < 0 ? `date limite passée (${dateCourteVc(v.limite)})` : j === 0 ? "à envoyer aujourd'hui" : j === 1 ? 'à envoyer demain' : `à envoyer avant le ${dateCourteVc(v.limite)}`;
 };
 // UNE LIGNE DE VENTE VESTIAIRE (écran Ventes) — `LigneVenteCompacte`, comme Vinted.
-function LigneVenteVc({ v, fait, enV, flou }) {
+function LigneVenteVc({ v, fait, enV, flou, i = 0 }) {
   const lb = beneficeVc(v, fait);
   const { etat, ton } = etatLigneVc(v, fait);
   const titre = v.titre || 'Article Vestiaire';
@@ -26981,7 +26984,8 @@ function LigneVenteVc({ v, fait, enV, flou }) {
     </>;
   };
   return (
-    <LigneVenteCompacte data-vc-vente={v.id} data-vc-vente-num={v.num || ''} data-vc-vente-etape={v.etape} data-flou={flou ? '1' : '0'} style={flou ? STYLE_FLOU : undefined}
+    <LigneVenteCompacte className="vrm-sale-row" data-tx={'vc:' + v.id} data-vc-vente={v.id} data-vc-vente-num={v.num || ''} data-vc-vente-etape={v.etape} data-flou={flou ? '1' : '0'}
+      style={{ borderTop: i > 0 ? `1px solid ${C.border}` : 'none', opacity: vcVenteAnnulee(v) ? 0.6 : 1, padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 10, ...(flou ? STYLE_FLOU : null) }}
       montantCentimes={lb.verse != null ? Math.round(lb.verse * 100) : undefined} numerosArticle={v.num ? [v.num] : []} plateforme="vestiaire"
       photo={v.photo || ''} photoNoeud={photoNoeud} titre={nomLigne} sous={sous} etat={etat} ton={ton}
       montant={lb.verse != null ? `${eurosLigne(lb.verse)} €` : '—'} benef={benef} recap={recap}
@@ -27048,7 +27052,7 @@ function VentesVestiaire({ comptes }) {
         <div className="vrm-ventes-liste" data-vc-ventes-liste="" style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:12,overflow:'hidden',boxShadow:C.shadow||'none'}}>
           <div className="vrm-ledger-heading" aria-hidden="true"><span>Article</span><span className="vrm-ledger-state-heading">État</span><span>Montant</span></div>
           <div className="vrm-ventes-entete" aria-hidden="true" data-ventes-entete-cols=""><span/><span>Article</span><span>État</span><span className="is-droite">Versé</span><span className="is-droite">Achat</span><span className="is-droite">Bénéfice</span><span/></div>
-          {liste.slice(0, 30).map((v) => <LigneVenteVc key={v.id} v={v} fait={vcLoc.fait[v.id] || null} enV={v.num && enLigne ? enLigneParNum.get(v.num) : null} flou={vcFloute(vcOuvert, v.compte)}/>)}
+          {liste.slice(0, 30).map((v, i) => <LigneVenteVc key={v.id} i={i} v={v} fait={vcLoc.fait[v.id] || null} enV={v.num && enLigne ? enLigneParNum.get(v.num) : null} flou={vcFloute(vcOuvert, v.compte)}/>)}
         </div>
         {liste.length > 30 ? <div style={style}>Les 30 plus récentes sont montrées (sur {liste.length}).</div> : null}
       </div>
