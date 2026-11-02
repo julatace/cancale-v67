@@ -63,7 +63,7 @@ const items = [
       const p = await appel({ action: 'programmer', item: it, confirme: true, uuid: 'A'.repeat(31) + String(i), fraisVus: 0.35, scheduleTime: '' });
       console.log(`=== programmer ${i} → HTTP ${p.code} ok=${p.corps && p.corps.ok}`);
     }
-    const q = await appel({ action: 'publish', item: it });
+    const q = await appel({ action: 'publish', confirme: true, item: it });
     console.log(`=== publish ${i} → HTTP ${q.code} ok=${q.corps && q.corps.ok}`);
   }
   console.log('=== CORPS ENVOYÉS À eBAY (' + envois.length + ')');
