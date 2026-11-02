@@ -52268,7 +52268,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           // Vinted ne s'écrit que si elle change ce qu'il a à faire (arrivé / disponible au
           // point relais, retour à l'expéditeur, annulé, remboursé, incident) ; le reste
           // (« vient de partir du centre de tri »…) ne s'affiche pas.
-          const nvUtile = (nv) => (nv && nv.t && /point relais|disponible|retir|retour|exp[ée]diteur|renvoy|annul|rembours|perdu|incident|probl[eè]me|endommag/i.test(nv.t)) ? nv : null;
+          // Sur une carte « à vérifier », la nouvelle dit POURQUOI le colis n'est pas où il
+          // l'attend (« en cours de livraison »…) : elle reste.
+          const nvUtile = (nv, x) => (nv && nv.t && x && x.aVerifier) ? nv : (nv && nv.t && /point relais|disponible|retir|retour|exp[ée]diteur|renvoy|annul|rembours|perdu|incident|probl[eè]me|endommag/i.test(nv.t)) ? nv : null;
           const arriveeRetrait = (x) => { const t = (x.src && x.src.t) || null, o = (x.src && x.src.o) || null;
             const ev = !t && o ? (etatColisVinted(o, Date.now(), transpMap) || {}) : null;
             const arr = t ? arriveeColisEmail(t) : (ev ? ev.arr : null);
@@ -52286,13 +52288,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               {/* (23-24 oct.) La dernière nouvelle de Vinted et ce que dit le transporteur, par
                   l'identité de CE colis (n° de suivi, transaction) — rien quand il n'y a rien. */}
               {t ? <>
-                  <LigneNouvelleVinted nv={nvUtile(nouvelleDe(pickupUnion.cmdParColis && pickupUnion.cmdParColis.get(colisKey(t))))} transp={transpMap} suivi={suiviDeLigne(t)}/>
+                  <LigneNouvelleVinted nv={nvUtile(nouvelleDe(pickupUnion.cmdParColis && pickupUnion.cmdParColis.get(colisKey(t))), x)} transp={transpMap} suivi={suiviDeLigne(t)}/>
                   {/* « pas encore lu chez le transporteur » sur chaque carte serait la même phrase
                       partout (§7) : la ligne ne s'écrit que quand le transporteur a répondu. */}
                   {transpMap && transpMap.get(normaliserSuivi(suiviDeLigne(t))) ? <LigneTransporteur transp={transpMap} suivi={suiviDeLigne(t)} carrier={t.carrier} court limiteCarte={t.limite || t.limiteVers || ''}/> : null}
                 </>
                 : o ? (() => { const su2 = suivisAchat(o, indexSuivisAchats)[0] || ''; const e2 = entreeSuiviAchat(o); return <>
-                  <LigneNouvelleVinted nv={nvUtile(nouvelleDe(o))} transp={transpMap} suivi={su2}/>
+                  <LigneNouvelleVinted nv={nvUtile(nouvelleDe(o), x)} transp={transpMap} suivi={su2}/>
                   {su2 && transpMap && transpMap.get(normaliserSuivi(su2)) ? <LigneTransporteur transp={transpMap} suivi={su2} carrier={(e2 && e2.transporteur) || transporteurDeForme(su2) || ''} court limiteCarte={(ev && (ev.limite || ev.limiteVers)) || ''}/> : null}
                 </>; })() : null}
             </>); };
