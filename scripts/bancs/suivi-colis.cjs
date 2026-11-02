@@ -181,20 +181,20 @@ function PONT(o) {
 
 const ouvrir = async (pg, errs) => {
   await pg.goto(`http://localhost:${PORT}/?tab=cat_achats`, { waitUntil: 'domcontentloaded' });
-  await pg.locator('.vrm-pickup-card').first().waitFor({ timeout: 20000 }).catch(async (e) => { console.log('ÉCRAN : ' + (await pg.locator('body').innerText()).slice(0, 1200)); console.log('ERREURS : ' + errs.join(' | ')); throw e; });
+  await pg.locator('[data-cc-colonne="retirer"] [data-cc-carte]').first().waitFor({ timeout: 20000 }) /* (2 nov.) Colis → « À retirer » */.catch(async (e) => { console.log('ÉCRAN : ' + (await pg.locator('body').innerText()).slice(0, 1200)); console.log('ERREURS : ' + errs.join(' | ')); throw e; });
   await pg.waitForTimeout(1800);
 };
 const lire = (pg) => pg.evaluate(() => {
-  const cartes = [...document.querySelectorAll('.vrm-pickup-card')].map((c) => {
-    const s = c.querySelector('[data-colis-suivi]');
+  const cartes = [...document.querySelectorAll('[data-cc-colonne="retirer"] [data-cc-carte]:not([data-en-verification-tx])')].map((c) => {
+    const s0 = c.querySelector('[data-rp-suivi]'); const s = s0 ? { getAttribute: () => s0.getAttribute('data-rp-suivi') || null } : null;
     const conv = [...c.querySelectorAll('a[href*="/inbox/"]')].map((a) => a.getAttribute('href'));
     return {
       t: c.innerText, suivi: s ? s.getAttribute('data-colis-suivi') : null, conv,
       nv: [...c.querySelectorAll('[data-nouvelle-vinted]')].map((x) => x.getAttribute('data-nouvelle-vinted')),
-      suivre: [...c.querySelectorAll('a[data-suivre-colis]')].map((a) => { const r = a.getBoundingClientRect(); return { href: a.getAttribute('href'), site: a.getAttribute('data-suivre-site'), n: a.getAttribute('data-suivre-colis'), cp: a.getAttribute('data-suivre-cp'), h: r.height, t: a.innerText }; }),
+      suivre: [...c.querySelectorAll('a[data-suivre-colis]')].map((a) => { const r = a.getBoundingClientRect(); return { href: a.getAttribute('href'), site: a.getAttribute('data-suivre-site'), n: a.getAttribute('data-suivre-colis'), cp: a.getAttribute('data-suivre-cp'), h: r.height, t: a.innerText + ' ' + (a.getAttribute('title') || '') }; /* (2 nov.) forme courte « Suivre ↗ » : le libellé long est son titre */ }),
     };
   });
-  const onglet = document.querySelector('[data-achats-onglet="attente"]');
+  const onglet0 = document.querySelector('[data-colis-onglet-choix="retirer"]'); const onglet = onglet0 ? { getAttribute: () => onglet0.getAttribute('data-colis-onglet-n') } : null;
   const etat = document.querySelector('[data-suivi-vinted-etat]');
   return {
     cartes, total: onglet ? onglet.getAttribute('data-n') : null,
@@ -418,7 +418,7 @@ async function revue24(b) {
       await ouvrir(pg, errs);
       const g = await pg.evaluate(() => {
         const W = window.innerWidth;
-        return [...document.querySelectorAll('[data-a-verifier] .vrm-oublie-gestes')].map((x) => [...x.children].map((c) => { const r = c.getBoundingClientRect(); return { t: (c.innerText || c.getAttribute('aria-label') || c.tagName).slice(0, 30), l: Math.round(r.left), r: Math.round(r.right), ok: r.left >= -0.5 && r.right <= W + 0.5 }; }));
+        return [...document.querySelectorAll('[data-a-verifier] .vrm-oublie-gestes, [data-retirer-a-verifier] .vrm-rp-gestes')].map((x) => [...x.children].map((c) => { const r = c.getBoundingClientRect(); return { t: ((c.querySelector && c.querySelector('strong')) ? c.querySelector('strong').innerText : (c.innerText || c.getAttribute('aria-label') || c.tagName)).slice(0, 30), l: Math.round(r.left), r: Math.round(r.right), ok: r.left >= -0.5 && r.right <= W + 0.5 }; }));
       });
       const tous = g.flat();
       dit(g.length >= 2 && tous.length >= 4, `F ${nom} : les rangées « à vérifier » (e-mail et Vinted) sont rendues`, `${g.length} rangée(s)`);

@@ -2550,3 +2550,66 @@ côté app `lieuTransporteurRepare` relit les lignes déjà rangées dans cette 
 (pays en ville ET rue finissant par « , <Ville> »), jamais « France » comme ville.
 `audit-vintedgo-adresse` : 6 contrôles neufs, rouges sur l'avant, 3 rouges si l'on
 retire la réparation (mutation).
+
+## 2 novembre — Colis clair : un sélecteur, chaque colis une fois (branche `claude/colis-clair`)
+Julien, au téléphone, mot pour mot : « Il y a des colis dans tous les sens avec des codes de
+retrait partout, on ne comprend rien dans l'application. Refais ça bien s'il te plaît. »
+**Mesuré avant** (rendu réel à 390 px, banc `colis-colonnes`) : les quatre colonnes (Prêts ·
+En attente · À retirer + à vérifier · Partis) avec leurs cartes, puis « Colis par colis » qui
+REDISAIT les colis à envoyer, puis « Codes, QR et points relais » qui REDISAIT les colis à
+retirer et leurs codes ; « Pas sur la carte : cette adresse n'existe pas dans la Base Adresse
+Nationale » et « La carte ne s'affiche pas ici… » dans la liste du téléphone. Chaque colis 2 ou
+3 fois ; par le lien « à retirer » (`?tab=retraits`), chaque code de retrait écrit 2 fois.
+**Fait (présentation seulement, aucune règle de données changée)** :
+- En tête, `Segmente` « À envoyer · N » / « À retirer · N ». N = `vrm_colis_aposter.total`
+  et `vrm_colis_retirer.total` (les nombres de Ma journée ; « + » si un site n'a pas été lu).
+  Par défaut l'onglet qui a de l'urgent (son nombre en ambre), sinon « À envoyer ». Le choix
+  vit dans la coque (`ongletColis`) : un lien « à retirer » (`retraits`, Ma journée,
+  `vrm:ancre-retraits`, notification `retrait`) ouvre « À retirer » ; une notification
+  `colis` ouvre « À envoyer ». Le filtre de site (`voitSite`) vaut pour les deux.
+- **À envoyer** : la carte détaillée de chaque colis (l'ancien « Colis par colis »), groupes
+  toujours nommés « Prêts à imprimer » / « En attente du bordereau », « Imprimer les N prêts »
+  (même lot) et « Emballer ». Les cochés « postés » ne sont plus dans la liste de travail :
+  ils sont dans **« Partis »** (replié) sous deux intertitres (« que Vinted n'a pas vus
+  partir — Vérifie que le colis a bien été déposé… » en ambre ; « Vinted ne les a pas encore
+  vus partir »), avec « ↺ Pas encore posté ». En tête, une seule ligne ambre
+  (`data-poste-sans-depart`) mène à « Partis ».
+- **À retirer** : `ColonneRetirer` (src/CarteRelais.jsx) refait — par point (règle
+  `pointsARetirer` inchangée) : nom, adresse, « N colis · dernier jour … » ; chaque colis :
+  ce que c'est, sa date d'arrivée (`LigneArrivee`), SA date limite exacte (`texteLimiteRetrait`,
+  « inconnue » / « vers le … (estimé) » compris), son n° de suivi, son compte (s'il y en a plusieurs),
+  la nouvelle de Vinted et le statut du transporteur (seulement quand il a répondu), puis SES gestes (`gestesRetrait`, App) :
+  « Code de retrait 123456 » copiable (`CodeRetraitCopiable`), le QR, « Suivre ↗ » court,
+  « J'ai retiré » (`markCollected` / `markPickupDone`). « Point pas encore connu » + raison.
+  En tête du point : nom, adresse complète, transporteur (s'il est le même pour tous), « N colis ·
+  dernier jour … ». « N colis : compte non reconnu » dit une fois. Les « à vérifier » (`horsCompte`) dans un groupe à part en bas « À vérifier · N », raison
+  dite une fois quand elle est commune (`raisonVerif` = `raisonAVerifier`). Sous la liste, la
+  coque monte les OUTILS de retrait seulement (`retraitsOutils` : « Tout est OK », suivi Vinted,
+  n° de suivi à la main, réception des e-mails, colis repartis) — sans redire un colis.
+- Au téléphone la carte n'est pas dessinée (et rien n'est géocodé) ; sur ordinateur elle reste,
+  ses raisons en mots simples (`RAISONS_BAN.introuvable` = « adresse introuvable sur la
+  carte »), jamais « Base Adresse Nationale » à l'écran (attribution : adresse.data.gouv.fr).
+- `src/ColisColonnes.jsx` retiré (sa CSS est importée par CarteRelais.jsx) ; `cibleNotif.js`
+  vise `data-colis-ident` (identité posée sur chaque ligne de colis : `v:`, `p:`, `e:`, `vc:`, `r:`).
+**Preuve** : banc `colis-colonnes` réécrit (« colis clair », options `PLAN=1`, `TRANCHES=1
+SHOTS=…`) : chaque colis EXACTEMENT une fois (identité lue sous toutes ses formes, d'avant
+comme d'après), chaque code une fois (y compris par `?tab=retraits`), jamais « Base Adresse
+Nationale », aucune phrase de carte au téléphone, aucun texte écrasé, compteurs = Ma journée,
+à vérifier visible, lot d'impression. Rouge sur 77580c1 (avant), vert après.
+**Suite (décisions du coordinateur, 2 nov.)** : un point sans date limite lue est trié sur
+ce qui reste de la garde de SON transporteur (`urgenceTri` → `triPoint`, src/relaisColis.js),
+jamais rangé derrière tous les autres. « Transporteur pas encore connu » et « en cours de
+vérification » sont dits UNE fois, en tête du groupe (point, « Point pas encore connu »,
+« À vérifier »), plus sur chaque carte. Une nouvelle de Vinted ne s'écrit sur la carte que si
+elle change le geste (au relais / disponible, retiré, retour, annulé, remboursé, incident,
+« en cours de livraison » = pas encore au relais) ; sur une carte « à vérifier » elle reste
+toujours (elle dit pourquoi). Bancs `transporteurs` F et `suivi-colis` E8 jugent ces faits.
+**Dernier passage « simple comme Apple » (2 nov.)** : « J'ai retiré » en toutes lettres au
+téléphone (libellé `vrm-rp-retire-label`, que la règle « icône seule » ne cache pas) ; la
+ligne des colis arrivés sur une adresse reliée à aucun compte dit le geste (lien Paramètres →
+Comptes liés) et se tait quand l'adresse n'est pas connue (les colis restent sur leurs
+cartes) ; haut d'« À envoyer » : « Tout générer (N) » sans cadre autour, la raison des
+boutons grisés sans redire N, « Tes emails… » et « Où sont ces articles » sous la liste, plus
+de phrase permanente « …est dans Partis » (le nombre est sur « Partis », `data-partis-coches`) ;
+au téléphone la phrase sous le titre prend toute la largeur. Banc `colis-colonnes` : 9 rouges
+sur a80e584d, vert après (a205264e).

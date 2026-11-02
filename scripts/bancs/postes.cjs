@@ -71,21 +71,23 @@ let ko=0; const dit=(c,m,d)=>{if(!c)ko++;console.log((c?'OK  ':'KO  ')+m+(d?' �
   //  · postes  — le nombre ANNONCÉ par la ligne « … les N colis marqués postés »
   //              (0 si la ligne n'est pas là) ; montres = la liste les montre ;
   //  · sep     — le nombre écrit sur l'intertitre du groupe « fait ».
+  // (2 nov., colis clair) Un colis coché « posté » quitte la liste de travail et
+  // va dans « Partis » (replié), sous un intertitre — une ligne en tête le dit
+  // (`data-voir-postes`, son nombre). Même règle qu'avant : personne ne disparaît
+  // (cartes + postés = la liste d'avant), le compte du haut colle aux cartes.
   const compte=()=>pg.evaluate(()=>{
     const t=document.body.innerText||'';
     const m=/(\d+)\s*\n?\s*colis à envoyer/.exec(t);
-    // (30 oct.) Le libellé est raccourci (« Voir les N colis postés ») : le nombre se lit sur `data-voir-postes`.
     const lig=document.querySelector('button[data-voir-postes]');
-    const n=lig?[null,lig.getAttribute('data-voir-postes')]:null;
-    const g=document.querySelector('[data-groupe="fait"]');
-    const ns=g?/·\s*(\d+)/.exec(g.textContent):null;
+    const partis=document.querySelector('[data-colis-partis]');
     return {entete: m?+m[1]:(/Aucun colis à envoyer/.test(t)?0:null),
             cartes: document.querySelectorAll('[data-bord-card]').length,
-            postes: n?+n[1]:0, montres: !!(lig && /^\s*Cacher/.test(lig.textContent)),
-            sep: g?(ns?+ns[1]:NaN):null};
+            /* (2 nov.) le nombre des cochés est dit sur « Partis » (plus de ligne permanente en tête) */
+            postes: partis&&partis.hasAttribute('data-partis-coches')?+partis.getAttribute('data-partis-coches'):(lig?+lig.getAttribute('data-voir-postes'):0),
+            dansPartis: partis?partis.querySelectorAll('[data-parti="coche"]').length:0,
+            sousIntertitre: [...document.querySelectorAll('[data-colis-partis] [data-postes-pas-partis] [data-parti="coche"], [data-colis-partis] [data-postes-recents] [data-parti="coche"]')].length,
+            cartesPostees: [...document.querySelectorAll('[data-bord-card]')].filter(el=>/Pas encore/.test(el.innerText)).length};
   });
-  // L'écran est « posé » quand le réseau s'est tu depuis 1,2 s ET que ce qu'il
-  // dit n'a pas bougé sur 1,5 s.
   const stable=async(besoinCartes)=>{
     const t0=Date.now(); let prev='', n=0, s=null;
     while(Date.now()-t0<20000){
@@ -96,60 +98,34 @@ let ko=0; const dit=(c,m,d)=>{if(!c)ko++;console.log((c?'OK  ':'KO  ')+m+(d?' �
     }
     return s;
   };
-  const voirPostes=async(voulu)=>{
-    await pg.evaluate(v=>{const b=document.querySelector('button[data-voir-postes]');
-      if(b && /^\s*Cacher/.test(b.textContent)!==v) b.click();},voulu);
-    return stable(false);
-  };
   const a=await stable(true);
   dit(a.cartes>0, 'la liste des colis est rendue', a.cartes+' cartes · en-tête '+a.entete+' · '+a.postes+' postés annoncés');
-  // Au départ déjà : le compte du haut, c'est la liste affichée, et les postés
-  // (déjà cochés dans la vraie base) sont annoncés à part. Dérouler l'annonce
-  // doit les montrer TOUS, sous « Déjà postés », et le compte du haut plus eux
-  // doit faire la liste entière.
-  let a2=a;
-  if(a.postes>0){ a2=await voirPostes(true); await voirPostes(false); }
-  dit(a.entete===a.cartes && a.entete+(+a2.sep||0)===a2.cartes && (+a2.sep||0)===a.postes,
-      'au départ déjà, le compte du haut plus les postés font la liste',
-      `${a.entete} affichés + ${a2.sep||0} postés = ${a2.cartes} (annoncés : ${a.postes})`);
-  // On coche « Colis fait » sur DEUX colis (c'est SON geste, jamais automatique),
-  // dans l'état où il ouvre l'écran : les postés repliés.
+  dit(a.entete===a.cartes && a.postes===a.dansPartis && a.dansPartis===a.sousIntertitre && a.cartesPostees===0,
+      'au départ déjà : le compte du haut = les cartes, et les postés annoncés sont tous dans « Partis », sous leur intertitre',
+      JSON.stringify(a));
   for(let i=0;i<2;i++){
     await pg.evaluate(()=>{const b=[...document.querySelectorAll('[data-bord-card] button')].find(x=>/Colis fait/.test(x.textContent)); if(b)b.click();});
     await pg.waitForTimeout(700);
   }
   const c=await stable(false);
-  dit(c.postes===a.postes+2, 'l\'annonce des colis « postés » monte de 2',
-      `${a.postes} -> ${c.postes}`);
-  dit(c.cartes+c.postes===a.cartes+a.postes, 'aucun colis ne disparaît en le cochant (affichés + annoncés)',
-      `${c.cartes} + ${c.postes} (avant ${a.cartes} + ${a.postes})`);
-  dit(c.entete===a.entete-2, "l'en-tête ne compte plus que les colis qui restent", `${a.entete} -> ${c.entete}`);
-  // On déroule les postés : ceux qui ont été annoncés doivent tous être là.
-  const d=await voirPostes(true);
+  dit(c.postes===a.postes+2 && c.dansPartis===a.dansPartis+2, 'l\'annonce des colis « postés » monte de 2, et « Partis » les porte',
+      `${a.postes} -> ${c.postes} · Partis ${a.dansPartis} -> ${c.dansPartis}`);
+  dit(c.cartes+c.dansPartis===a.cartes+a.dansPartis, 'aucun colis ne disparaît en le cochant (cartes + « Partis »)',
+      `${c.cartes} + ${c.dansPartis} (avant ${a.cartes} + ${a.dansPartis})`);
+  dit(c.entete===a.entete-2 && c.entete===c.cartes, "l'en-tête ne compte plus que les colis qui restent", `${a.entete} -> ${c.entete}`);
+  dit(c.cartesPostees===0, 'aucun colis posté ne reste dans la liste de travail (chaque colis une fois)', String(c.cartesPostees));
+  // « ↺ Pas encore posté » le remet dans la liste.
+  await pg.evaluate(()=>{const d=document.querySelector('[data-colis-partis]'); if(d) d.open=true;});
+  await pg.evaluate(()=>{const b=document.querySelector('[data-colis-partis] [data-annuler-poste]'); if(b) b.click();});
+  const d=await stable(false);
   await pg.screenshot({path:SC+'/z-postes.png',fullPage:true});
-  dit(d.montres && d.sep===c.postes && d.cartes===a.cartes+a.postes,
-      'dérouler les postés montre exactement ceux annoncés, aucun perdu',
-      `annoncés ${c.postes} · intertitre ${d.sep} · ${d.cartes} cartes (liste d'avant ${a.cartes+a.postes})`);
-  dit(d.entete + (+d.sep||0) === d.cartes, 'le compte du haut plus les postés font la liste entière',
-      `${d.entete} + ${d.sep} = ${d.cartes}`);
-  // le séparateur est bien AVANT le premier colis posté, pas ailleurs
+  dit(d.cartes===c.cartes+1 && d.dansPartis===c.dansPartis-1, '« ↺ Pas encore posté » le remet dans la liste, une fois', JSON.stringify(d));
   const ordre=await pg.evaluate(()=>{
     const g=[...document.querySelectorAll('[data-bord-card]')][0]?.parentElement;
     if(!g) return null;
-    return [...g.children].map(el=>el.hasAttribute('data-bord-card')
-      ? (/Pas encore/.test(el.innerText)?'poste':'a-envoyer')
-      : el.hasAttribute('data-groupe') ? 'SEP:'+el.getAttribute('data-groupe') : 'AUTRE').join(',');
+    return [...g.children].map(el=>el.hasAttribute('data-bord-card') ? 'carte' : el.hasAttribute('data-groupe') ? 'SEP:'+el.getAttribute('data-groupe') : 'AUTRE').join(',');
   });
-  // Chaque groupe s'ouvre par son intertitre, et TOUS les postés sont après le
-  // dernier — qui est celui des postés — : aucun colis à envoyer ne se
-  // retrouve sous « Déjà postés ».
-  const cases=(ordre||'').split(',');
-  const dernierSep=cases.map(x=>x.startsWith('SEP')).lastIndexOf(true);
-  const apres=cases.slice(dernierSep+1);
-  const avant=cases.slice(0,dernierSep);
-  dit(dernierSep>0 && cases[dernierSep]==='SEP:fait' && apres.length>0 && apres.every(x=>x==='poste') && !avant.includes('poste'),
-      'tous les colis postés sont sous le dernier intertitre, et eux seuls', ordre);
-  dit((cases[0]||'').startsWith('SEP'), 'la liste s\'ouvre par un intertitre', cases[0]);
+  dit((ordre||'').startsWith('SEP'), 'la liste s\'ouvre par un intertitre', ordre);
   dit(errs.length===0, "aucune erreur d'app", errs.slice(0,2).join(' | '));
   await b.close(); srv.close();
   console.log(ko?('\n'+ko+' controle(s) non conforme(s).'):'\nLe compte du haut et la liste disent la meme chose.');

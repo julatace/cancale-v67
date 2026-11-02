@@ -188,17 +188,22 @@ export function regrouperRelais({ arrives = [], attendus = [] } = {}) {
     // n'a plus de date à tenir).
     const lims = p.arrives.filter((c) => !c.aVerifier && Number.isFinite(c.jours)).map((c) => c.jours);
     const prochaineLimite = lims.length ? Math.min(...lims) : null;
+    // (2 nov., revue du 23 oct. rétablie) Pour TRIER seulement : sans date limite lue,
+    // ce qui reste de la garde de SON transporteur (`urgenceTri`, posé par l'écran sur
+    // chaque colis : Mondial Relay 5 j, Vinted Go 6 j…). Jamais affiché, jamais « en retard ».
+    const tris = p.arrives.filter((c) => !c.aVerifier && Number.isFinite(c.tri)).map((c) => c.tri);
+    const triPoint = lims.length ? Math.min(...lims, ...tris) : (tris.length ? Math.min(...tris) : null);
     p.arrives.sort((a, b) => (a.aVerifier ? 1 : 0) - (b.aVerifier ? 1 : 0) || (Number.isFinite(a.jours) ? a.jours : 99) - (Number.isFinite(b.jours) ? b.jours : 99));
     const rue = lisible(p.rue), ville = lisible(p.ville);
     return { ...p, rue, ville, adresse: [rue, [p.cp, ville].filter(Boolean).join(' ')].filter(Boolean).join(', '), adresseCourte: [rue, ville].filter(Boolean).join(', ') || p.cp,
       geocode: p.inconnu ? null : adresseGeocodable({ rue, cp: p.cp, ville }),
       nArrives: p.arrives.length, nAttendus: p.attendus.length, nComptes: p.arrives.filter((c) => !c.horsCompte).length,
-      prochaineEstimee: est[0] || null, prochaineLimite, urgent: prochaineLimite != null && prochaineLimite <= 1 };
+      prochaineEstimee: est[0] || null, prochaineLimite, triPoint, urgent: prochaineLimite != null && prochaineLimite <= 1 };
   });
   // Le point où des colis ATTENDENT d'abord (ils repartent si on ne vient pas) :
   // la date limite la plus proche en tête, puis le plus chargé ; puis les points
   // où des colis vont arriver, le plus tôt d'abord ; « pas encore connu » à la fin.
-  const lim = (x) => (x.prochaineLimite == null ? 99 : x.prochaineLimite);
+  const lim = (x) => (x.triPoint != null ? x.triPoint : x.prochaineLimite == null ? 99 : x.prochaineLimite);
   return liste.sort((a, b) => (a.inconnu ? 1 : 0) - (b.inconnu ? 1 : 0) || (b.nArrives > 0) - (a.nArrives > 0) || lim(a) - lim(b) || b.nArrives - a.nArrives
     || String(a.prochaineEstimee || '9999').localeCompare(String(b.prochaineEstimee || '9999')) || b.nAttendus - a.nAttendus || a.nom.localeCompare(b.nom, 'fr'));
 }
@@ -443,7 +448,7 @@ export function requetesBan(p) {
 
 // La raison, en français simple, pour laquelle la Base Adresse n'a pas placé un point.
 export const RAISONS_BAN = {
-  introuvable: 'cette adresse n’existe pas dans la Base Adresse Nationale',
+  introuvable: 'adresse introuvable sur la carte',
   incertain: 'l’adresse n’a pas été reconnue avec assez de certitude',
   ville: 'la ville trouvée n’est pas celle du message (ou la ville n’est pas écrite) : rien n’est deviné',
   ambigu: 'plusieurs endroits possibles pour cette adresse : aucun n’est choisi',

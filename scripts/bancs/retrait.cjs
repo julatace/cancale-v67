@@ -328,6 +328,9 @@ let ko=0; const dit=(c,m,d)=>{if(!c)ko++;console.log((c?'OK  ':'KO  ')+m+(d?' �
         return b ? Number(b.getAttribute('data-action-n')) : null; });
       if (Number.isFinite(n) && n > 0) nombres[t] = n; continue;
     }
+    // (2 nov., colis clair) Colis → « À retirer » porte son nombre sur le sélecteur.
+    const nSel = await pg.evaluate(()=>{ const e=document.querySelector('[data-colis-onglet-choix="retirer"]'); return e ? Number(e.getAttribute('data-colis-onglet-n')) : null; });
+    if (Number.isFinite(nSel) && nSel > 0) { nombres[t] = nSel; continue; }
     const txt = await pg.evaluate(()=>document.body.innerText||'');
     const m = /(\d+)\s+colis à retirer/.exec(txt) || /Retirer\s+(\d+)\s+colis/.exec(txt);
     if (m) nombres[t] = Number(m[1]);

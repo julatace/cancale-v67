@@ -11,7 +11,7 @@
 //   A. le bouton « Emballer » de la colonne Prêts porte le nombre de prêts ;
 //   B. l'ORDRE de la séance = l'ordre des cartes de la colonne « Prêts » (pas trié
 //      par emplacement — refus du 11 oct.) ;
-//   C. le N° en très grand (Geist Mono), l'emplacement lu dans le Stock (« Meuble
+//   C. le N° en très grand (police système depuis le style Apple du 2 nov. ; Geist Mono avant), l'emplacement lu dans le Stock (« Meuble
 //      B · rangée 2, colonne 3 ») ou « Pas rangée » ;
 //   D. deux paires sous un N° ⇒ le N° en rouge + « vérifie le carton » ; N° à
 //      vérifier ⇒ ambre ;
@@ -136,8 +136,8 @@ async function preparer(b, vp, tab) {
   return { ctx, pg, errs };
 }
 const attendrePrets = async (pg) => {
-  await pg.locator('[data-colis-colonnes]').first().waitFor({ timeout: 25000 }).catch(() => {});
-  for (let i = 0; i < 40; i++) { const n = await pg.evaluate(() => document.querySelectorAll('[data-cc-colonne="prets"] [data-cc-carte]').length); if (n >= 4) break; await pg.waitForTimeout(400); }
+  await pg.locator('[data-colis-onglet]').first().waitFor({ timeout: 25000 }).catch(() => {});
+  for (let i = 0; i < 40; i++) { const n = await pg.evaluate(() => document.querySelectorAll('[data-bord-card][data-groupe-carte="pret"]').length); if (n >= 4) break; await pg.waitForTimeout(400); }
   await pg.waitForTimeout(800);
 };
 const ls = (pg, k) => pg.evaluate((k) => { try { return JSON.parse(localStorage.getItem(k) || 'null'); } catch (_) { return null; } }, k);
@@ -172,7 +172,7 @@ async function main() {
       await essaie(T, async () => {
         const { ctx, pg, errs } = await preparer(b, vp, 'cat_bord');
         await attendrePrets(pg);
-        const cartes = await pg.evaluate(() => [...document.querySelectorAll('[data-cc-colonne="prets"] [data-cc-carte]')].map((k) => k.getAttribute('data-cc-carte')));
+        const cartes = await pg.evaluate(() => [...document.querySelectorAll('[data-bord-card][data-groupe-carte="pret"]')].map((k) => k.getAttribute('data-colis-ident')));
         dit(JSON.stringify(cartes.slice().sort()) === JSON.stringify(PRETS.slice().sort()), `${T} la colonne « Prêts » porte les 4 prêts (le banc a de quoi juger)`, cartes.join());
         const bt = await pg.$('[data-emballer-ouvrir]');
         const nBt = bt ? Number(await bt.getAttribute('data-emballer-ouvrir')) : null;
@@ -211,7 +211,7 @@ async function main() {
           await pg.click('[data-emb-suivant]'); await pg.waitForTimeout(150);
         }
         const p117 = vus['v:7001'];
-        dit(!!p117 && p117.grand === '117' && /Geist Mono/.test(p117.police) && p117.taille >= 80, `C ${T} le N° en très grand, en Geist Mono`, p117 && `${p117.grand} · ${p117.police} · ${p117.taille}px`);
+        dit(!!p117 && p117.grand === '117' && /-apple-system|SF Pro/.test(p117.police) && p117.taille >= 80, `C ${T} le N° en très grand, police système (style Apple du 2 nov.)`, p117 && `${p117.grand} · ${p117.police} · ${p117.taille}px`);
         dit(!!p117 && p117.emplEtat === 'range' && /Meuble B/.test(p117.empl) && /rangée 2, colonne 3/.test(p117.empl), `C ${T} l'emplacement lu dans le Stock, par N°`, p117 && p117.empl);
         // Le bordereau reçu par e-mail ne nomme pas le transporteur : rien n'est inventé.
         dit(!!p117 && !p117.transport && !/Bordereau .+ collé/.test(JSON.stringify(p117.cases)), `C ${T} transporteur pas connu ⇒ aucune ligne inventée`, p117 && p117.transport);
@@ -248,7 +248,7 @@ async function main() {
           const forme = (s, bb, tx) => JSON.stringify([typeof s[tx], bb[tx]]);
           dit(forme(ship2, bords2, '7004') === forme(ship2, bords2, '7001') && forme(ship2, bords2, '7004') === JSON.stringify(['number', 1]), `G ${T} le bouton « ✓ Colis fait » écrit la même chose que le mode emballage`, `${forme(ship2, bords2, '7004')} / ${forme(ship2, bords2, '7001')}`);
         } else dit(false, `G ${T} le bouton « ✓ Colis fait » de la carte N°42 (7004) est trouvé`);
-        const prets2 = await pg.evaluate(() => [...document.querySelectorAll('[data-cc-colonne="prets"] [data-cc-carte]')].map((k) => k.getAttribute('data-cc-carte')));
+        const prets2 = await pg.evaluate(() => [...document.querySelectorAll('[data-bord-card][data-groupe-carte="pret"]')].map((k) => k.getAttribute('data-colis-ident')));
         dit(prets2.join() === 'v:7002', `G ${T} les colis marqués quittent « Prêts à imprimer »`, prets2.join());
         dit(!errs.length, `I ${T} aucune erreur d'app`, errs[0]);
         await ctx.close();
@@ -268,7 +268,7 @@ async function main() {
           await pg.waitForSelector('[data-emballage]', { timeout: 15000 }).catch(() => {});
           for (let i = 0; i < 30; i++) { const E = await ecran(pg); if (E && E.ordre.length >= 4) break; await pg.waitForTimeout(400); }
           const E = await ecran(pg);
-          const cartes = await pg.evaluate(() => [...document.querySelectorAll('[data-cc-colonne="prets"] [data-cc-carte]')].map((k) => k.getAttribute('data-cc-carte')));
+          const cartes = await pg.evaluate(() => [...document.querySelectorAll('[data-bord-card][data-groupe-carte="pret"]')].map((k) => k.getAttribute('data-colis-ident')));
           dit(!!E && E.vue === 'colis' && JSON.stringify(E.ordre) === JSON.stringify(cartes), `H ${T} … qui ouvre la séance sur Colis, dans l'ordre de la colonne`, E && (E.ordre.join() + ' / ' + cartes.join()));
           await pg.screenshot({ path: path.join(SHOTS, `emballage-${vp.width}-depuis-journee.png`) });
           // La fiche complète de la paire, depuis le colis en cours (par son N°).

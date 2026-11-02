@@ -185,7 +185,7 @@ async function preparer(b, vp, sombre, opts = {}) {
 
 const ouvrirAchats = async (pg, errs) => {
   await pg.goto(`http://localhost:${PORT}/?tab=cat_achats`, { waitUntil: 'domcontentloaded' });
-  await pg.locator('.vrm-pickup-card').first().waitFor({ timeout: 20000 }).catch(async (e) => { console.log('ÉCRAN : ' + (await pg.locator('body').innerText()).slice(0, 1200)); console.log('ERREURS : ' + errs.join(' | ')); throw e; });
+  await pg.locator('[data-cc-colonne="retirer"] [data-cc-carte]').first().waitFor({ timeout: 20000 }).catch(async (e) => { console.log('ÉCRAN : ' + (await pg.locator('body').innerText()).slice(0, 1200)); console.log('ERREURS : ' + errs.join(' | ')); throw e; });
   await pg.waitForTimeout(1800);
 };
 const ouvrirJournee = async (pg, errs) => {
@@ -199,18 +199,19 @@ const ouvrirJournee = async (pg, errs) => {
 const ROUGE_JS = `(v) => { const m = /rgba?\\(([\\d.]+),\\s*([\\d.]+),\\s*([\\d.]+)/.exec(v || ''); if (!m) return false; const r=+m[1], g=+m[2], b=+m[3]; return r > 150 && g < 120 && b < 120 && r - g > 80 && Math.abs(g - b) < 40; }`;
 const lire = (pg) => pg.evaluate((rougeSrc) => {
   const rouge = new Function('return ' + rougeSrc)();
-  const lieuDuGroupe = (el) => { for (let e = el; e; e = e.parentElement) { const d = e.querySelector && e.querySelector('.vrm-pickup-dest'); if (d) return d.innerText; } return ''; };
+  // (2 nov., colis clair) Colis → « À retirer » : le lieu est l'en-tête du point de la carte.
+  const lieuDuGroupe = (el) => { const p = el.closest('[data-relais-point]'); const d = p && p.querySelector('.vrm-rp-tete'); return d ? d.innerText : ''; };
   const ligneT = (c) => { const x = c.querySelector('.vrm-transp'); return x ? { etat: x.getAttribute('data-transp'), etatLu: x.getAttribute('data-transp-etat'), t: x.innerText, color: getComputedStyle(x).color, court: x.hasAttribute('data-transp-court') } : null; };
-  const cartes = [...document.querySelectorAll('.vrm-pickup-card')].map((c) => {
-    const s = c.querySelector('[data-colis-suivi]');
+  const cartes = [...document.querySelectorAll('[data-cc-colonne="retirer"] [data-cc-carte]:not([data-hors-compte])')].map((c) => {
+    const s0 = c.querySelector('[data-rp-suivi]'); const s = s0 ? { getAttribute: () => s0.getAttribute('data-rp-suivi') || null } : null;
     const lim = c.querySelector('[data-colis-limite]');
     return { suivi: s ? s.getAttribute('data-colis-suivi') : null, t: c.innerText, transp: ligneT(c), lieu: lieuDuGroupe(c),
       limite: lim ? lim.getAttribute('data-colis-limite') : null, limiteVers: lim ? lim.getAttribute('data-colis-limite-vers') : null,
       codePasLu: (c.querySelector('[data-colis-code-pas-lu]') || {}).getAttribute ? c.querySelector('[data-colis-code-pas-lu]').getAttribute('data-colis-code-pas-lu') : null };
   });
-  const verif = [...document.querySelectorAll('[data-a-verifier] [data-oublie]')].map((x) => ({ suivi: x.getAttribute('data-colis-suivi'), raison: x.getAttribute('data-a-verifier-raison'), transp: ligneT(x), t: x.innerText }));
+  const verif = [...document.querySelectorAll('[data-retirer-a-verifier] [data-cc-carte]')].map((x) => ({ suivi: (x.querySelector('[data-rp-suivi]') || { getAttribute: () => null }).getAttribute('data-rp-suivi'), raison: x.getAttribute('data-a-verifier-raison'), transp: ligneT(x), t: x.innerText }));
   const repartis = [...document.querySelectorAll('[data-repartis] [data-reparti-suivi]')].map((x) => ({ suivi: x.getAttribute('data-reparti-suivi'), transp: ligneT(x), t: x.innerText }));
-  const zones = [...document.querySelectorAll('.vrm-pickup-card, [data-a-verifier], [data-repartis], [data-transp-mr], [data-transp-mr-refus], [data-transp-passu], [data-transp-non-lu]')];
+  const zones = [...document.querySelectorAll('[data-cc-colonne="retirer"] [data-cc-carte], [data-a-verifier], [data-repartis], [data-transp-mr], [data-transp-mr-refus], [data-transp-passu], [data-transp-non-lu]')];
   const rougesVus = [];
   // La pastille de MARQUE d'un transporteur (CarrierBadge : titre + graisse 900,
   // le rouge de Chronopost) n'est pas une alerte : elle est écartée.
@@ -231,10 +232,12 @@ const lire = (pg) => pg.evaluate((rougeSrc) => {
     mrOrdi: mrOrdi ? mrOrdi.innerText : null, nMr: document.querySelectorAll('[data-transp-mr-refus]').length,
     cpTete: [...document.querySelectorAll('[data-transp-cp]')].map((x) => ({ k: x.getAttribute('data-transp-cp'), n: x.getAttribute('data-transp-cp-n'), t: x.innerText })),
     passu: passu ? passu.innerText : null, nPassu: document.querySelectorAll('[data-transp-passu]').length, hReessayer: h(reessayer), hAjouter: h(ajouter),
-    suivre: [...document.querySelectorAll('.vrm-pickup-card a[data-suivre-colis]')].map((a) => a.getBoundingClientRect().height),
-    total: onglet ? onglet.getAttribute('data-n') : null,
+    suivre: [...document.querySelectorAll('[data-cc-colonne="retirer"] [data-cc-carte] a[data-suivre-colis]')].map((a) => a.getBoundingClientRect().height),
+    // (2 nov., colis clair) Le nombre de « À retirer » est sur le sélecteur de Colis.
+    total: (document.querySelector('[data-colis-onglet-choix="retirer"]') || onglet || { getAttribute: () => null }).getAttribute(document.querySelector('[data-colis-onglet-choix="retirer"]') ? 'data-colis-onglet-n' : 'data-n'),
     // L'ambre de CE thème (C.warn) : la bordure du bloc « à vérifier » le porte.
-    ambre: (() => { const v = document.querySelector('[data-a-verifier]'); return v ? getComputedStyle(v).borderTopColor : null; })(),
+    // (2 nov.) L'ambre du thème, lu sur la variable `--vrm-warn` (le bloc « à vérifier » n'a plus de bordure).
+    ambre: (() => { const e = document.createElement('span'); e.style.color = 'var(--vrm-warn)'; (document.querySelector('.vrm-main') || document.body).appendChild(e); const c = getComputedStyle(e).color; e.remove(); return c && c !== 'rgba(0, 0, 0, 0)' ? c : null; })(),
     texte: document.body.innerText, deborde: document.documentElement.scrollWidth > window.innerWidth + 1,
     bg: getComputedStyle(document.body).backgroundColor,
   };
@@ -313,7 +316,9 @@ async function navigateur() {
         dit(lu && lu.etat === 'lu' && lu.court && /^Confirmé chez Mondial Relay (il y a|à l'instant)/.test(lu.t) && !/Point Relais|jusqu|vers le/i.test(lu.t), `${nom} A : ligne LUE « disponible » : une marque courte (« Confirmé chez Mondial Relay il y a 1 h »), sans redire le point ni la limite`, lu && lu.t);
         dit(lu && ambre && lu.color !== ambre, `${nom} A : une ligne « disponible » reste NEUTRE (l'ambre est pour un retour, un incident, un inconnu)`, lu && lu.color);
         dit(passu && passu.transp && passu.transp.etat === 'passu' && /n'a pas répondu/.test(passu.transp.t), `${nom} A : ligne PAS SU : « n'a pas répondu — VRM réessaie plus tard »`, passu && passu.transp && passu.transp.t);
-        dit(jamais && jamais.transp && jamais.transp.etat === 'jamais' && /pas encore lu chez le transporteur/.test(jamais.transp.t), `${nom} A : ligne JAMAIS LUE : « pas encore lu chez le transporteur »`, jamais && jamais.transp && jamais.transp.t);
+        // (2 nov., colis clair) « pas encore lu chez le transporteur » sur chaque carte était la même
+        // phrase partout (§7) : une ligne jamais lue n'écrit RIEN sur la carte (rien n'est affirmé).
+        dit(jamais && !jamais.transp, `${nom} A : ligne JAMAIS LUE : rien d'affirmé sur la carte (pas de ligne du transporteur)`, jamais && jamais.transp && jamais.transp.t);
         // (tour 2 n° 2) Le geste est dit UNE fois en tête, la carte n'en garde que l'état.
         dit(cpi && cpi.transp && cpi.transp.etat === 'cp-inconnu' && /code postal du point relais inconnu/.test(cpi.transp.t) && !/N° de suivi ajoutés/.test(cpi.transp.t), `${nom} A : « code postal inconnu » sur la carte, sans le geste (dit en tête)`, cpi && cpi.transp && cpi.transp.t);
         dit(r.cpTete.length === 1 && r.cpTete[0].k === 'inconnu' && r.cpTete[0].n === '1' && /N° de suivi ajoutés/.test(r.cpTete[0].t), `${nom} A : « code postal inconnu » : le GESTE (l'ajouter avec son code postal) dit UNE fois en tête de liste`, JSON.stringify(r.cpTete));
@@ -472,15 +477,16 @@ async function navigateur() {
     ];
     const lireE = (pg) => pg.evaluate(() => {
       const conv = (el) => [...el.querySelectorAll('a[href*="/inbox/"]')].map((a) => (a.getAttribute('href') || '').split('/inbox/')[1]);
-      const cartes = [...document.querySelectorAll('.vrm-pickup-card')].map((c) => { const s = c.querySelector('[data-colis-suivi]'); const lt = c.querySelector('[data-colis-limite-transp]'); return { suivi: s ? s.getAttribute('data-colis-suivi') : null, conv: conv(c), t: c.innerText, limTransp: lt ? lt.getAttribute('data-colis-limite') : null, limTxt: lt ? lt.innerText : '' }; });
+      // (2 nov., colis clair) Colis → « À retirer » : cartes par point, « à vérifier » en bas.
+      const cartes = [...document.querySelectorAll('[data-cc-colonne="retirer"] [data-cc-carte]:not([data-hors-compte])')].map((c) => { const s0 = c.querySelector('[data-rp-suivi]'); const s = s0 && s0.getAttribute('data-rp-suivi') ? { getAttribute: () => s0.getAttribute('data-rp-suivi') } : null; const lt = c.querySelector('[data-colis-limite-transp]'); return { suivi: s ? s.getAttribute('data-colis-suivi') : null, conv: conv(c), t: c.innerText, limTransp: lt ? lt.getAttribute('data-colis-limite') : null, limTxt: lt ? lt.innerText : '' }; });
       return {
-        cartes, total: (document.querySelector('[data-achats-onglet="attente"]') || { getAttribute: () => null }).getAttribute('data-n'),
-        verif: [...document.querySelectorAll('[data-a-verifier] [data-oublie]')].map((x) => x.getAttribute('data-colis-suivi')),
-        verifV: [...document.querySelectorAll('[data-a-verifier] [data-a-verifier-vinted]')].map((x) => x.getAttribute('data-a-verifier-vinted')),
+        cartes, total: (document.querySelector('[data-colis-onglet-choix="retirer"]') || { getAttribute: () => null }).getAttribute('data-colis-onglet-n'),
+        verif: [...document.querySelectorAll('[data-retirer-a-verifier] [data-cc-carte^="r:e:"]')].map((x) => (x.querySelector('[data-rp-suivi]') || { getAttribute: () => null }).getAttribute('data-rp-suivi')),
+        verifV: [...document.querySelectorAll('[data-retirer-a-verifier] [data-cc-carte^="r:v:"]')].map((x) => x.getAttribute('data-cc-carte').slice(4)),
         repS: [...document.querySelectorAll('[data-repartis] [data-reparti-suivi]')].map((x) => x.getAttribute('data-reparti-suivi')),
         repT: [...document.querySelectorAll('[data-repartis] [data-reparti-tx]')].map((x) => x.getAttribute('data-reparti-tx')),
         enVerif: [...document.querySelectorAll('[data-en-verification-tx]')].map((x) => x.getAttribute('data-en-verification-tx')),
-        verifTxt: (document.querySelector('[data-a-verifier]') || { innerText: '' }).innerText,
+        verifTxt: (document.querySelector('[data-retirer-a-verifier]') || document.querySelector('[data-a-verifier]') || { innerText: '' }).innerText,
         texte: document.body.innerText, deborde: document.documentElement.scrollWidth > window.innerWidth + 1,
       };
     });
@@ -553,26 +559,33 @@ async function navigateur() {
       await ouvrirAchats(pg, errs);
       const x = await pg.evaluate(() => {
         const bloc = document.querySelector('[data-en-verification]');
-        const carte = [...document.querySelectorAll('.vrm-pickup-card, [data-en-verification-tx], [data-a-verifier-vinted]')].find((c) => [...c.querySelectorAll('a[href*="/inbox/"]')].some((a) => /\/inbox\/7708/.test(a.getAttribute('href') || '')) || c.getAttribute('data-en-verification-tx') === '9708');
-        const l = carte ? carte.querySelector('.vrm-transp') : null;
+        // (2 nov., colis clair) « transporteur pas encore connu » est dit UNE fois, en tête
+        // du groupe de la carte (son point, ou « À vérifier ») — jamais sur chaque carte.
+        const carte = [...document.querySelectorAll('[data-cc-colonne="retirer"] [data-cc-carte]')].find((c) => /:9708$/.test(c.getAttribute('data-cc-carte') || ''));
+        const groupe = carte ? (carte.closest('[data-retirer-a-verifier]') || carte.closest('[data-relais-point]')) : null;
+        const l0 = groupe ? groupe.querySelector('[data-transp="transporteur-inconnu"]') : null;
+        const l = l0 ? { getAttribute: () => 'transporteur-inconnu', innerText: l0.innerText } : null;
         return { bloc: bloc ? bloc.innerText : null, ligne: l ? { etat: l.getAttribute('data-transp'), t: l.innerText } : null, trouve: !!carte };
       });
       dit(x.bloc != null && !/extension/i.test(x.bloc), 'F n° 4 : le bloc « en cours de vérification » ne promet rien de l\'extension (le geste vit dans « Suivi Vinted », gardé par sa version)', (x.bloc || 'absent').replace(/\s+/g, ' ').slice(0, 220));
-      dit(x.trouve && x.ligne && x.ligne.etat === 'transporteur-inconnu', 'F n° 5 : un achat dont le suivi Vinted donne un n° sans transporteur ⇒ sa carte dit « transporteur pas encore connu », jamais rien', x.ligne ? `${x.ligne.etat} « ${x.ligne.t} »` : (x.trouve ? 'aucune ligne' : 'carte introuvable'));
+      dit(x.trouve && x.ligne && x.ligne.etat === 'transporteur-inconnu', 'F n° 5 : un achat dont le suivi Vinted donne un n° sans transporteur ⇒ l\'en-tête de son groupe dit « transporteur pas encore connu », jamais rien', x.ligne ? `${x.ligne.etat} « ${x.ligne.t} »` : (x.trouve ? 'aucune ligne' : 'carte introuvable'));
       dit(!errs.length, 'F n° 4-5 : aucune erreur d\'app', errs[0]);
       await ctx.close();
     });
     await essaie('F 390 · n° 6 : une étape Vinted plus ancienne que la lecture du transporteur ne s\'affiche pas', async () => {
       // L'achat 9703 : Vinted Go le dit « disponible » depuis 1 j (lu il y a 30 min).
-      const lireNv = async (atNv) => {
+      // (2 nov., colis clair) Une nouvelle de Vinted ne s'écrit que si elle change ce qu'il a à
+      // faire : « vient de partir du centre de tri » jamais ; « disponible au point relais » oui,
+      // si elle est plus récente que ce que dit le transporteur.
+      const lireNv = async (atNv, texte = 'Ton colis vient de partir du centre de tri') => {
         const ROWS = ROWS_E();
         const sv = ROWS.find((x) => x.id === 'harvest_111_suivi_9703');
-        sv.data.dernier = { t: 'Ton colis vient de partir du centre de tri', at: atNv };
+        sv.data.dernier = { t: texte, at: atNv };
         sv.data.etapes = [sv.data.dernier];
         const { ctx, pg, errs } = await preparer(b, { width: 390, height: 844 }, false, { rows: ROWS });
         await ouvrirAchats(pg, errs);
         const x = await pg.evaluate(() => {
-          const carte = [...document.querySelectorAll('.vrm-pickup-card')].find((c) => [...c.querySelectorAll('a[href*="/inbox/"]')].some((a) => /\/inbox\/7703/.test(a.getAttribute('href') || '')));
+          const carte = [...document.querySelectorAll('[data-cc-colonne="retirer"] [data-cc-carte]')].find((c) => /:9703$/.test(c.getAttribute('data-cc-carte') || '') || [...c.querySelectorAll('a[href*="/inbox/"]')].some((a) => /\/inbox\/7703/.test(a.getAttribute('href') || '')));
           return carte ? { nv: !!carte.querySelector('[data-nouvelle-vinted]'), transp: !!carte.querySelector('.vrm-transp') } : null;
         });
         await ctx.close();
@@ -580,8 +593,10 @@ async function navigateur() {
       };
       const vieux = await lireNv(j(2));
       dit(vieux.x && vieux.x.transp && !vieux.x.nv, 'F n° 6 : « vient de partir du centre de tri » (il y a 2 j) sous « disponible » chez le transporteur (depuis 1 j) ne s\'affiche pas', JSON.stringify(vieux.x));
-      const recent = await lireNv(j(0.01));
-      dit(recent.x && recent.x.nv, 'F n° 6, l\'autre sens : une étape Vinted PLUS RÉCENTE que l\'évènement du transporteur reste affichée', JSON.stringify(recent.x));
+      const recent = await lireNv(j(0.01), 'Ton colis est disponible au point relais');
+      dit(recent.x && recent.x.nv, 'F n° 6, l\'autre sens : une étape Vinted qui change le geste, PLUS RÉCENTE que l\'évènement du transporteur, reste affichée', JSON.stringify(recent.x));
+      const tri = await lireNv(j(0.01));
+      dit(tri.x && !tri.x.nv, 'F n° 6 bis : « vient de partir du centre de tri », même récent, ne change rien à faire ⇒ pas affiché', JSON.stringify(tri.x));
       dit(!vieux.errs.length && !recent.errs.length, 'F n° 6 : aucune erreur d\'app', vieux.errs[0] || recent.errs[0]);
     });
     await essaie('F 1512 · n° 12 : ce que l\'extension dit d\'elle-même (`nav.indispo`)', async () => {

@@ -77,7 +77,9 @@ const lecturesCoupees = (base, familles) => {
   });
   return out;
 };
-const colonnes = (pg) => pg.evaluate(() => Object.fromEntries([...document.querySelectorAll('[data-cc-colonne]')].map((e) => [e.getAttribute('data-cc-colonne'), Number(e.getAttribute('data-cc-n'))])));
+// (2 nov., colis clair) Plus de colonnes : les groupes de la liste « À envoyer »
+// (`data-groupe-carte` des cartes de bordereau), la même règle (`pret`).
+const colonnes = (pg) => pg.evaluate(() => { if (!document.querySelector('[data-colis-onglet]')) return {}; const n = (g) => document.querySelectorAll(`[data-bord-card][data-groupe-carte="${g}"]`).length; return { prets: n('pret'), attente: n('attente') }; });
 
 (async () => {
   const srv = await H.serveur(process.env.BANC_PORT || process.env.PORT || 0);

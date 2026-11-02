@@ -126,6 +126,8 @@ const jobs = (pg) => pg.evaluate(() => ({ env: (document.querySelector('[data-jo
         const { ctx, pg, errs } = await preparer(b, vp, mode);
         await essaie('Colis ' + mode, async () => {
           await pg.goto(`http://localhost:${PORT}/?tab=cat_bord`, { waitUntil: 'domcontentloaded' });
+          // (2 nov., colis clair) Les colis à envoyer sont sous « À envoyer » (l'onglet urgent s'ouvre par défaut).
+          await pg.waitForSelector('[data-colis-onglet-choix="envoyer"]', { timeout: 15000 }).then(() => pg.click('[data-colis-onglet-choix="envoyer"]')).catch(() => {});
           await pg.waitForSelector('[data-colis-recap]', { timeout: 15000 });
           await pg.waitForTimeout(3000);
           const c = await lire(pg);

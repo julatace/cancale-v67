@@ -321,16 +321,20 @@ const choisir = async (pg, site) => { const b = pg.locator(`[data-filtre-site] b
       console.log(`── ${qui} : K. les colis à retirer dans Colis, Achats sans eux`);
       await essaie(`${qui} : colis à retirer`, async () => {
         const { ctx, pg, errs } = await ouvrir(b, tel, 'cat_bord');
-        const f = await pg.evaluate(() => ({ col: !!document.querySelector('[data-cc-colonne="retirer"]'), ferme: !!document.querySelector('[data-colis-retraits="ferme"]'), ouvert: !!document.querySelector('[data-colis-retraits="ouvert"]') }));
-        dit(f.col && f.ferme && !f.ouvert, 'K. Colis : la colonne « À retirer », et la porte du détail (fermée tant qu’on ne la demande pas)', JSON.stringify(f));
-        await pg.locator('[data-colis-retraits-ouvrir]').first().click(); await pg.waitForTimeout(1500);
+        // (2 nov., colis clair) Plus de colonnes ni de « porte du détail » : un sélecteur
+        // « À envoyer » / « À retirer » ; sous « À retirer », la liste par point relais
+        // (chaque colis une fois) puis les OUTILS de retrait (sans redire les colis).
+        const f = await pg.evaluate(() => ({ choix: [...document.querySelectorAll('[data-colis-onglet-choix]')].map((x) => x.getAttribute('data-colis-onglet-choix')).join('|'), porte: !!document.querySelector('[data-colis-retraits-ouvrir]') }));
+        dit(f.choix === 'envoyer|retirer' && !f.porte, 'K. Colis : le sélecteur « À envoyer » / « À retirer » (plus de porte vers un détail qui redisait les colis)', JSON.stringify(f));
+        await pg.locator('[data-colis-onglet-choix="retirer"]').first().click(); await pg.waitForTimeout(1500);
         await capture(pg, `retraits-${tel ? 'tel' : 'ordi'}`);
-        const r = await pg.evaluate(() => { const z = document.querySelector('[data-colis-retraits="ouvert"]'); return { z: !!z, ecran: z && z.querySelector('[data-ecran-achats]') ? z.querySelector('[data-ecran-achats]').getAttribute('data-ecran-achats') : '',
+        const r = await pg.evaluate(() => { const z = document.querySelector('[data-colis-retraits="outils"]'); return { z: !!z, ecran: z && z.querySelector('[data-ecran-achats]') ? z.querySelector('[data-ecran-achats]').getAttribute('data-ecran-achats') : '',
           onglets: z ? z.querySelectorAll('[data-achats-onglet]').length : -1, kpis: z ? z.querySelectorAll('.vrm-achats-kpis, .vrm-achats-search, .vrm-achats-recus-bas').length : -1,
-          relais: z ? z.querySelectorAll('.vrm-pickup-card, [data-pickup-total]').length : 0, tache: !!document.querySelector('[data-tache]') }; });
-        dit(r.z && r.ecran === 'retraits' && !r.tache, 'K. Colis : le détail des colis à retirer s’ouvre DANS Colis', JSON.stringify(r));
-        dit(r.onglets === 0 && r.kpis === 0, 'K. le détail : ni onglets d’étapes, ni recherche, ni chiffres, ni reçus d’achat', JSON.stringify(r));
-        dit(r.relais > 0, 'K. le détail montre le colis au point relais (l’achat 8002)', JSON.stringify(r));
+          redits: z ? z.querySelectorAll('.vrm-pickup-card, [data-oublie], [data-a-verifier-vinted], [data-en-verification-tx]').length : -1,
+          relais: document.querySelectorAll('[data-cc-colonne="retirer"] [data-cc-carte]').length, r8002: !!document.querySelector('[data-cc-colonne="retirer"] [data-colis-ident="r:v:8002"]'), tache: !!document.querySelector('[data-tache]') }; });
+        dit(r.z && r.ecran === 'retraits-outils' && !r.tache, 'K. Colis → « À retirer » : les outils de retrait s’ouvrent DANS Colis', JSON.stringify(r));
+        dit(r.onglets === 0 && r.kpis === 0 && r.redits === 0, 'K. les outils : ni onglets d’étapes, ni recherche, ni chiffres, ni reçus d’achat, et aucun colis redit', JSON.stringify(r));
+        dit(r.relais > 0 && r.r8002, 'K. « À retirer » montre le colis au point relais (l’achat 8002), une fois', JSON.stringify(r));
         dit(errs.length === 0, `${qui} : aucune erreur`, errs.join(' | '));
         await ctx.close();
       });
@@ -349,8 +353,8 @@ const choisir = async (pg, site) => { const b = pg.locator(`[data-filtre-site] b
         dit(a.kpis === 1 && a.relais === 0, 'K. Achats : ses chiffres, et aucun bloc de colis à retirer', JSON.stringify(a));
         if (a.versColis) {
           await pg.locator('[data-achats-vers-colis]').first().click(); await pg.waitForTimeout(1500);
-          const v = await pg.evaluate(() => ({ ouvert: !!document.querySelector('[data-colis-retraits="ouvert"]'), tache: !!document.querySelector('[data-tache]') }));
-          dit(v.ouvert && !v.tache, 'K. « N colis à retirer → Colis » ouvre Colis sur le détail des colis à retirer', JSON.stringify(v));
+          const v = await pg.evaluate(() => ({ ouvert: !!document.querySelector('[data-colis-onglet="retirer"]') && !!document.querySelector('[data-cc-colonne="retirer"]'), tache: !!document.querySelector('[data-tache]') }));
+          dit(v.ouvert && !v.tache, 'K. « N colis à retirer → Colis » ouvre Colis sur « À retirer »', JSON.stringify(v));
           await pg.goBack().catch(() => {}); await pg.waitForTimeout(900);
           await pg.evaluate(() => window.dispatchEvent(new CustomEvent('vrm:aller', { detail: 'achats' }))); await pg.waitForTimeout(900);
         } else dit(false, 'K. Achats : la ligne « N colis à retirer → Colis » (l’achat 8002 est au relais)', JSON.stringify(a));
@@ -438,7 +442,7 @@ const choisir = async (pg, site) => { const b = pg.locator(`[data-filtre-site] b
           if (attendu.tache) bon = e.tache === attendu.tache && e.site === attendu.site && e.presse === attendu.site && (!attendu.section || (e.section === attendu.section && e.sousActif === attendu.section));
           else if (attendu.reglage) bon = !e.tache && e.reglageOuvert === attendu.reglage && await pg.evaluate(() => { const x = document.querySelector('[data-sous-ecran="ebay"]'); return !!(x && !x.hidden && x.querySelector('[data-ebay-compte-section]')); });
           else if (attendu.colis) bon = !e.tache && e.colisSite === attendu.colis && await pg.evaluate(() => !!document.querySelector('[data-colis-leboncoin] [data-lbc-colis-vide], [data-colis-leboncoin] [data-bord-card]'));
-          else if (attendu.retraitsColis) bon = !e.tache && await pg.evaluate(() => !!document.querySelector('[data-colis-retraits="ouvert"] [data-ecran-achats="retraits"]') && !!document.querySelector('[data-cc-colonne="retirer"]'));
+          else if (attendu.retraitsColis) bon = !e.tache && await pg.evaluate(() => !!document.querySelector('[data-colis-onglet="retirer"]') && !!document.querySelector('[data-cc-colonne="retirer"]') && !!document.querySelector('[data-colis-retraits="outils"] [data-ecran-achats="retraits-outils"]'));
           else bon = !e.blanc && !e.tache;
           bon = bon && !e.espace;
           dit(bon && !e.blanc && !e.tombe && errs.length === 0, `F. ?tab=${id} → ${JSON.stringify(attendu)}`, JSON.stringify({ ...e, errs }));
