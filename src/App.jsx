@@ -47301,9 +47301,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   });
   const NoAcc = () => !noAcc ? null : (baseKO
     ? <LignePanne>Je n'ai pas pu lire tes comptes Vinted — ce n'est pas « aucun compte lié ».</LignePanne>
-    : <EmptyState icon="link" title="Aucun compte Vinted lié"
+    : <div className="vrm-noacc" style={{marginBottom:12}}>{/* (2 nov.) la carte touchait le sélecteur posé dessous (Messages, Achats) */}<EmptyState icon="link" title="Aucun compte Vinted lié"
         desc="Installe l'extension Chrome puis ouvre vinted.fr une fois : tes annonces, ventes, achats et messages arrivent ici tout seuls."
-        action={onNav && <button type="button" onClick={()=>onNav('vintedaccounts')} style={{border:'none',background:C.accent,color:C.onAccent||'#fff',borderRadius:10,padding:'11px 18px',fontSize:13,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Voir mes comptes</button>}/>
+        action={onNav && <button type="button" onClick={()=>onNav('vintedaccounts')} style={{border:'none',background:C.accent,color:C.onAccent||'#fff',borderRadius:10,padding:'11px 18px',fontSize:13,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Voir mes comptes</button>}/></div>
   );
   // ── MESSAGES : LE COMPTE DE L'EXTENSION D'ABORD (16 octobre) ─────────────
   // L'extension n'agit qu'au nom du compte connecté dans l'onglet Vinted de ce

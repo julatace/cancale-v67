@@ -219,12 +219,22 @@ const INSPECTE = (pg, tel) => pg.evaluate((tel) => {
     if (e.tagName === 'A' && getComputedStyle(e).display === 'inline') continue; // lien dans une phrase
     if (r.height < 43.5 || r.width < 43.5) petits.push(`${(e.innerText || e.getAttribute('aria-label') || e.tagName).trim().replace(/\s+/g, ' ').slice(0, 30)} ${Math.round(r.width)}×${Math.round(r.height)}` + (window.__bancSonde ? ' <' + e.outerHTML.slice(0, 220) + ' | parent ' + (e.parentElement && e.parentElement.className) + '>' : ''));
   }
+  // Une carte « écran vide » collée à ce qui suit (aucun espace entre les deux).
+  const colles = [];
+  for (const c of document.querySelectorAll('.vrm-main .vrm-empty-state')) {
+    if (!vis(c)) continue;
+    let e = c, suiv = null;
+    while (e && e !== document.body && !suiv) { suiv = e.nextElementSibling; while (suiv && !vis(suiv)) suiv = suiv.nextElementSibling; if (!suiv) e = e.parentElement; }
+    if (!suiv) continue;
+    const ecart = suiv.getBoundingClientRect().top - c.getBoundingClientRect().bottom;
+    if (ecart > -1 && ecart < 4) colles.push(`${(c.innerText || '').trim().split('\n')[0].slice(0, 40)} ⇢ ${(suiv.innerText || suiv.className || '').trim().split('\n')[0].slice(0, 30)} (${Math.round(ecart)} px)`);
+  }
   // Titres coupés par une ellipse.
   const coupes = [];
   for (const e of document.querySelectorAll('.vrm-main h1, .vrm-main h2, .vrm-main h3, [data-phrase-ecran]')) {
     if (vis(e) && e.scrollWidth > e.clientWidth + 1 && /ellipsis/.test(getComputedStyle(e).textOverflow)) coupes.push(e.innerText.trim().slice(0, 50));
   }
-  return { mauvais, regles, pointsSeuls, debord, dehors, petits, coupes, titre: (document.querySelector('.vrm-main h1, .vrm-main h2') || {}).innerText || '' };
+  return { mauvais, regles, pointsSeuls, colles, debord, dehors, petits, coupes, titre: (document.querySelector('.vrm-main h1, .vrm-main h2') || {}).innerText || '' };
 }, tel);
 
 const ECRANS = [['journee', 'Ma journée'], ['annonces', 'Annonces'], ['ventes', 'Ventes'], ['cat_bord', 'Colis'], ['messages', 'Messages'], ['garage', 'Stock'], ['achats', 'Achats'], ['dashboard', 'Statistiques'], ['compta', 'Comptabilité'], ['settings', 'Paramètres']];
@@ -248,6 +258,7 @@ async function tournee(nav, { W, sombre, scenario, base }) {
     dit(!r.mauvais.length, `${T} ${nom} : aucun NaN / undefined / Invalid Date / null à l'écran`, r.mauvais.join(' ¦ '));
     dit(!r.regles.length, `${T} ${nom} : jamais « au moins 0 € », et un français juste`, r.regles.join(' ¦ '));
     dit(!r.pointsSeuls.length, `${T} ${nom} : aucune ligne qui commence par « · »`, r.pointsSeuls.join(' ¦ '));
+    dit(!r.colles.length, `${T} ${nom} : une carte vide n'est jamais collée à ce qui la suit`, r.colles.join(' ¦ '));
     dit(!r.debord && !r.dehors.length, `${T} ${nom} : rien ne déborde à droite`, JSON.stringify(r.dehors));
     if (o.tel) dit(!r.petits.length, `${T} ${nom} : chaque cible au doigt fait 44 px`, r.petits.slice(0, 8).join(' ¦ '));
     dit(!r.coupes.length, `${T} ${nom} : aucun titre coupé`, r.coupes.join(' ¦ '));
