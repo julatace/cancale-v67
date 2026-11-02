@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.310.0';
+const CODE_VERSION = '5.311.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -2555,11 +2555,11 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           if (msg.action === 'saveDetail' && msg.id && msg.detail) { await saveItemDetail(msg.id, msg.detail); sendResponse({ ok: true }); return; }
           if (msg.action === 'numeroPourPublier') { sendResponse(await reserverNumeroPourOnglet(sender && sender.tab ? sender.tab.id : null, msg.domain || 'www.vinted.fr')); return; }
           if (msg.action === 'numeros') {
-            if (!await numerosPermisDansPage(sender)) { sendResponse({ok:true,items:{},convs:{},txs:{},portee:'hors_compte'}); return; }
+            const uidOnglet = await numerosPermisDansPage(sender);
+            if (!uidOnglet) { sendResponse({ok:true,items:{},convs:{},txs:{},portee:'hors_compte'}); return; }
             const m = await numerosPourAffichage();
             if (!m) { sendResponse({ ok: false }); return; }
-            const pick = (src, ids) => { const o = {}; for (const id of (Array.isArray(ids) ? ids.slice(0, 400) : [])) if (src[String(id)]) o[String(id)] = src[String(id)]; return o; };
-            sendResponse({ ok: true, items: pick(m.parItem, msg.items), convs: pick(m.parConv, msg.convs), txs: pick(m.parTx, msg.txs) }); return;
+            sendResponse({ ok: true, ...numerosDuCompte(m, uidOnglet, msg) }); return;
           }
           sendResponse({ ok: false, error: 'action inconnue' });
         } catch (e) { sendResponse({ ok: false, error: String(e) }); }
@@ -3540,15 +3540,22 @@ async function lierPublicationsEnAttente() {
   notifierApp({ type: 'maj', quoi: 'annonces' });
 }
 // Une visite d'un autre profil ne doit afficher aucun numéro de rangement.
+// (2 nov., Julien : « quand je suis sur le compte Angèle et que je me promène sur
+// le compte Arthur, je ne veux pas voir le numéro de l'annonce d'Arthur ») Rend
+// l'uid du compte CONNECTÉ dans l'onglet, ou '' : seuls SES numéros se montrent,
+// partout (annonce, catalogue, profil, messages). Compte pas su ⇒ aucun numéro.
 async function numerosPermisDansPage(sender) {
-  let u; try { u = new URL(sender?.tab?.url || sender?.url || ''); } catch { return false; }
-  if (u.protocol !== 'https:' || !/^(?:www\.)?vinted\.(?:fr|com|it|de)$/.test(u.hostname)) return false;
-  const membre = /^\/member\/(\d+)(?:[-/]|$)/.exec(u.pathname);
-  if (!membre) return !/^\/member(?:\/|$)/.test(u.pathname);
+  let u; try { u = new URL(sender?.tab?.url || sender?.url || ''); } catch { return ''; }
+  if (u.protocol !== 'https:' || !/^(?:www\.)?vinted\.(?:fr|com|it|de)$/.test(u.hostname)) return '';
   const uid = await activeAccountId(u.host);
-  if (!uid) return false;
-  const profil = await profilIdRange(uid);
-  return !!profil && String(profil) === membre[1];
+  if (!uid) return '';
+  const membre = /^\/member\/(\d+)(?:[-/]|$)/.exec(u.pathname);
+  if (/^\/member(?:\/|$)/.test(u.pathname)) {
+    if (!membre) return '';
+    const profil = await profilIdRange(uid);
+    if (!profil || String(profil) !== membre[1]) return '';
+  }
+  return String(uid);
 }
 // Les numéros à AFFICHER sur Vinted, par identité seulement (cache 2 min).
 let _numsAffichage = null;
@@ -3560,19 +3567,32 @@ async function numerosPourAffichage() {
   if (main === null) return null;
   const r = await lireResa();
   const parItem = {}, parTx = {}, parConv = {};
-  for (const [id, e] of Object.entries(main.vinted_annonce_numeros || {})) { const n = e && String(e.numero == null ? '' : e.numero).trim(); if (n) parItem[id] = n; }
-  if (r) for (const [id, v] of Object.entries(r.items)) if (!parItem[id]) parItem[id] = String(v.numero);
+  // (2 nov.) Le COMPTE Vinted de chaque numéro, par identité : `accountId` de la
+  // fiche (l'uid du dressing où l'annonce a été captée), l'uid de la ligne
+  // `harvest_{uid}_txn_{tx}` / `harvest_{uid}_orders_sold`. Inconnu ⇒ jamais montré.
+  const cItem = {}, cTx = {}, cConv = {};
+  for (const [id, e] of Object.entries(main.vinted_annonce_numeros || {})) { const n = e && String(e.numero == null ? '' : e.numero).trim(); if (n) { parItem[id] = n; if (e.accountId != null && String(e.accountId)) cItem[id] = String(e.accountId); } }
+  if (r) for (const [id, v] of Object.entries(r.items)) if (!parItem[id]) { parItem[id] = String(v.numero); if (v && v.uid != null && String(v.uid)) cItem[id] = String(v.uid); }
   const txItems = await sbGetTout('app_data?id=like.harvest_*_txn_*&select=id,item:meta->>item_id');
-  for (const row of (txItems || [])) { const m = /_txn_(\d+)$/.exec(String(row.id || '')); if (m && row.item && parItem[String(row.item)]) parTx[m[1]] = parItem[String(row.item)]; }
-  for (const [tx, e] of Object.entries(main.vinted_sale_overrides || {})) { const n = e && String(e.numero == null ? '' : e.numero).trim(); if (n && /^\d+$/.test(tx)) parTx[tx] = n; }
+  const txCompte = {};
+  for (const row of (txItems || [])) { const m = /^harvest_(\d+)_txn_(\d+)$/.exec(String(row.id || '')); if (!m) continue; txCompte[m[2]] = m[1]; if (row.item && parItem[String(row.item)]) { parTx[m[2]] = parItem[String(row.item)]; cTx[m[2]] = m[1]; } }
+  for (const [tx, e] of Object.entries(main.vinted_sale_overrides || {})) { const n = e && String(e.numero == null ? '' : e.numero).trim(); if (n && /^\d+$/.test(tx)) { parTx[tx] = n; if (txCompte[tx]) cTx[tx] = txCompte[tx]; else delete cTx[tx]; } }
   const ventes = await sbGetTout('app_data?id=like.harvest_*_orders_sold&select=id,o:data->payload->my_orders');
-  for (const row of (ventes || [])) for (const o of (Array.isArray(row.o) ? row.o : [])) {
+  for (const row of (ventes || [])) { const k = /^harvest_(\d+)_orders_sold$/.exec(String(row.id || '')); for (const o of (Array.isArray(row.o) ? row.o : [])) {
     const tx = o && o.transaction_id != null ? String(o.transaction_id) : '', cv = o && o.conversation_id != null ? String(o.conversation_id) : '';
-    if (tx && cv && parTx[tx]) parConv[cv] = parTx[tx];
-  }
+    if (tx && cv && parTx[tx]) { parConv[cv] = parTx[tx]; if (k) cConv[cv] = k[1]; }
+  } }
   if (String((await loadSession())?.user_id || '') !== owner) return null;
-  _numsAffichage = { owner, at: Date.now(), parItem, parTx, parConv };
+  _numsAffichage = { owner, at: Date.now(), parItem, parTx, parConv, cItem, cTx, cConv };
   return _numsAffichage;
+}
+// Les numéros que CET onglet peut montrer : ceux des annonces, ventes et
+// conversations du compte connecté seulement (`uid`), jamais ceux d'un autre de
+// ses comptes. Rend { items, convs, txs }.
+function numerosDuCompte(m, uid, msg) {
+  const u = String(uid || '');
+  const pick = (src, comptes, ids) => { const o = {}; if (!u) return o; for (const id of (Array.isArray(ids) ? ids.slice(0, 400) : [])) { const k = String(id); if (src[k] && comptes && comptes[k] === u) o[k] = src[k]; } return o; };
+  return { items: pick(m.parItem, m.cItem, msg.items), convs: pick(m.parConv, m.cConv, msg.convs), txs: pick(m.parTx, m.cTx, msg.txs) };
 }
 // <supprimees-regle> — LA MÊME RÈGLE QUE L'APP (src/App.jsx), §11 ; comparées par
 // `audit-supprimees.cjs`. Une annonce `id` lue dans un dressing capturé à `capTs`
@@ -3614,8 +3634,11 @@ function dateLectureDressing(ligne) {
 //   · et cette lecture a moins de 24 h. Au-delà (ou jamais lue) on ne SAIT pas :
 //     ses annonces ne sont ni « en ligne » ni « disparues » — « à confirmer »,
 //     dites à part, jamais comptées (« rien lu ne vaut pas rien », §4.1).
-// Une annonce présente dans la lecture publique mais pas dans le dressing (elle
-// vient d'être republiée) est en ligne, avec ce que la lecture publique en sait.
+// ⚠️ (2 nov., Julien : « tant que l'extension n'a pas capté depuis le compte où
+// l'annonce est, elle ne peut pas ajouter une annonce dans VRM » — le cas
+// shop_cancale) Une annonce présente dans la lecture publique mais JAMAIS dans
+// le dressing capté connecté n'est PAS ajoutée : elle attend la capture faite
+// depuis son compte. Un compte sans aucune capture connectée n'apparaît pas.
 // Une annonce ouverte dans un dressing plus ancien et ABSENTE de la lecture
 // publique plus récente n'est plus en ligne (supprimée, vendue ou masquée) : elle
 // est rendue FERMÉE (`_vrmAbsente`), jamais « vendue » (rien ne le prouve).
@@ -3657,7 +3680,10 @@ function enLigneDuCompte(liste, pub, suppIds, maintenant) {
       if (!id || vus.has(id)) continue;
       vus.add(id);
       const l = parL.get(id) || null, p = parP.get(id) || null;
-      if (!l && !p) continue;
+      // ⚠️ (2 nov., Julien) Une lecture PUBLIQUE n'AJOUTE jamais une annonce : elle
+      // confirme ou retire ce que SON compte a déjà capté connecté. Une annonce vue
+      // seulement en public attend la prochaine capture faite depuis son compte.
+      if (!l) continue;
       if (l && venduePourSonVendeur(l)) { r.fermees.push(l); continue; }
       cand.push(Object.assign({}, l || {}, p || {}, { id: (l || p).id, is_closed: false, is_hidden: false, is_draft: false }));
     }
@@ -5378,6 +5404,10 @@ async function lecturesParCompte() {
   const b = await sbGet('app_data?id=like.harvest_*_enligne&select=id,cap:meta->>capturedAt');
   if (a === null || b === null) return null;
   const m = new Map();
+  // (2 nov.) Les comptes CAPTÉS CONNECTÉS au moins une fois (leur dressing daté) :
+  // seuls ceux-là sont relus en public — une lecture publique n'ajoute rien.
+  m.propres = new Set();
+  for (const r of a) { const k = /^harvest_(\d+)_listings$/.exec(String((r && r.id) || '')); if (k && isFinite(Date.parse((r && r.cap) || ''))) m.propres.add(k[1]); }
   for (const r of [...a, ...b]) {
     const k = /^harvest_(\d+)_(?:listings|enligne)$/.exec(String((r && r.id) || ''));
     if (!k) continue;
@@ -5411,6 +5441,7 @@ async function relireAnnoncesAutresComptes(uidConnecte) {
     const recent = (u) => (t - Number(echecs[u] || 0) < ENLIGNE_ECHEC_RECENT_MS) || (t - Number(freins[u] || 0) < ENLIGNE_ECHEC_RECENT_MS);
     const candidats = [...new Set(accts.map((a) => String((a && a.vinted_user_id) || '')))]
       .filter((u) => u && u !== String(uidConnecte) && !noirs.has(u) && !off.has(u) && !refuses.has(u))
+      .filter((u) => lus.propres.has(u))                                            // jamais capté connecté : rien à confirmer
       .filter((u) => !(t - Number(freins[u] || 0) < ENLIGNE_FREIN_MS))             // freiné : pas avant demain
       .filter((u) => !(t - Number(essais[u] || 0) < ENLIGNE_DELAI_MS))
       .filter((u) => !(t - Number(lus.get(u) || 0) < ENLIGNE_DELAI_MS))
@@ -9089,6 +9120,38 @@ function signatureCorps(d) {
 }
 const REFUS_REPUB = 'vrmRefusRepub';
 const REFUS_REPUB_MS = 7 * 86400000;
+// ── LE FREIN APRÈS UN REFUS (2 nov., 5.311 — Julien : « elle oubliait la couleur et
+// la taille, et elle insistait, et Vinted a détecté l'automatisation »). Mesuré dans
+// son diagnostic : 11 mises en ligne de brouillon refusées (taille : 10), 6 mises en
+// ligne planifiées refusées, et une fois `listing_restricted`. Une série de refus
+// est exactement ce qu'un humain ne fait pas.
+// ⇒ Tout refus de Vinted sur un geste de republication (création, brouillon, mise
+//   en ligne, changement de prix ; 4xx hors 401/429, qui ont leurs propres règles)
+//   FREINE la republication de CE compte : plus aucun de ces gestes pendant 30 min,
+//   et 24 h si Vinted dit que les mises en ligne sont restreintes. Les lectures ne
+//   sont pas touchées. Le frein se DIT (« Vinted a refusé … reprends à HH:MM »).
+const FREIN_REPUB = 'vrmFreinRepub';
+const FREIN_REPUB_MS = 30 * 60 * 1000;
+const FREIN_RESTREINT_MS = 24 * 3600 * 1000;
+const refusRestreint = (rc) => { try { return /restrict|limit[ée]|bloqu|suspend/i.test(JSON.stringify((rc && rc.json) || '')); } catch (_) { return false; } };
+async function lireFreinRepub(uid) {
+  try { const m = (await chrome.storage.local.get(FREIN_REPUB))[FREIN_REPUB] || {}; const f = m[String(uid)]; return f && Number(f.jusqua) > Date.now() ? f : null; } catch (_) { return null; }
+}
+async function poserFreinRepub(uid, rc) {
+  const st = Number(rc && rc.status) || 0;
+  if (!(st >= 400 && st < 500) || st === 401 || st === 429) return null;
+  const restreint = refusRestreint(rc);
+  const f = { jusqua: Date.now() + (restreint ? FREIN_RESTREINT_MS : FREIN_REPUB_MS), restreint, status: st, at: Date.now() };
+  try { const m = (await chrome.storage.local.get(FREIN_REPUB))[FREIN_REPUB] || {}; const cur = m[String(uid)]; if (!(cur && Number(cur.jusqua) > f.jusqua)) m[String(uid)] = f; await chrome.storage.local.set({ [FREIN_REPUB]: m }); } catch (_) {}
+  noterDiag(restreint ? 'frein_repub_restreint' : 'frein_repub_refus');
+  return f;
+}
+function phraseFreinRepub(f) {
+  const h = new Date(Number(f.jusqua)).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+  return f.restreint
+    ? `Vinted limite les mises en ligne de ce compte : VRM ne republie plus rien sur ce compte pendant 24 h (jusqu'à ${h} demain). Rien n'a été envoyé.`
+    : `Vinted a refusé une mise en ligne sur ce compte il y a peu : VRM fait une pause (pas de refus en série) — reprends à partir de ${h}. Rien n'a été envoyé.`;
+}
 async function refusDejaVu(cle, d) {
   try {
     const m = (await chrome.storage.local.get(REFUS_REPUB))[REFUS_REPUB] || {};
@@ -9557,6 +9620,7 @@ async function republierVinted(msg) {
   if (!acc) return { accepte: false, code: 'absente', raison: 'compte introuvable' };
   const stop = await gardeStricte(uid, acc);
   if (stop) return { accepte: false, code: stop.code, raison: stop.error };
+  { const fr = await lireFreinRepub(uid); if (fr) { noterDiag('frein_repub_tenu'); return { accepte: false, code: 'frein-refus', jusqua: fr.jusqua, raison: phraseFreinRepub(fr) }; } }
   // 1. SAUVEGARDE COFFRE vérifiée (filet : de quoi tout refaire si besoin).
   let coffre; try { coffre = await sbGet(`app_data?id=eq.coffre_${uid}_${id}&select=data`); } catch (_) { coffre = null; }
   if (coffre === null) return { accepte: false, code: 'coffre-lecture', raison: "je n'ai pas pu vérifier la sauvegarde — on ne touche à rien" };
@@ -9573,7 +9637,7 @@ async function republierVinted(msg) {
   return await avecVinted(async () => {
     const r = await vintedPage(acc, 'PUT', `/api/v2/item_upload/items/${id}`, built.corps);
     if (r && r.sansPage) return { accepte: false, code: 'onglet-vinted', raison: raisonSansPage(r) };
-    if (!r || !r.ok) return { accepte: true, etape: 'echec', raison: `Vinted a refusé la modification (${(r && r.status) || 0}) — ton annonce est inchangée`, ancien: built.ancien, nouveau: built.nouveau };
+    if (!r || !r.ok) { await poserFreinRepub(uid, r); return { accepte: true, etape: 'echec', raison: `Vinted a refusé la modification (${(r && r.status) || 0}) — ton annonce est inchangée`, ancien: built.ancien, nouveau: built.nouveau }; }
     noterDiag('republier_vinted_ok');
     return { accepte: true, etape: 'fait', ancien: built.ancien, nouveau: built.nouveau, ancienTitre: built.ancienTitre, nouveauTitre: built.nouveauTitre };
   });
@@ -9921,6 +9985,7 @@ async function publierBrouillon(msg) {
   if (!acc) return { accepte: false, code: 'absente', raison: 'compte introuvable' };
   const stop0 = await gardeStricte(uid, acc, { lecture: true });
   if (stop0) return { accepte: false, code: stop0.code, raison: stop0.error };
+  { const fr = await lireFreinRepub(uid); if (fr) { noterDiag('frein_repub_tenu'); return { accepte: false, code: 'frein-refus', jusqua: fr.jusqua, raison: phraseFreinRepub(fr) }; } }
   let rows; try { rows = await sbGet(`app_data?id=eq.vinted_brouillon_${id}&select=data`); } catch (_) { rows = null; }
   if (rows === null) return { accepte: false, code: 'lecture', raison: "je n'ai pas pu lire ce brouillon — on ne touche à rien" };
   const b = (rows && rows[0] && rows[0].data) || null;
@@ -10047,7 +10112,7 @@ async function publierBrouillon(msg) {
     if (!rc.ok) {
       noterDiag(`brouillon_publier_refuse_${rc.status}`);
       const msgV = raisonRefusVinted(rc);
-      await retenirRefus('b' + id, r.d, rc);
+      await retenirRefus('b' + id, r.d, rc); await poserFreinRepub(uid, rc);
       const qP = await questionRepub(uid, r.d, codesDuRefus(rc), { id: b.ancienId, draftId: id });
       return { accepte: true, etape: 'echec', question: qP ? { ...qP, num: msg.num ? String(msg.num) : '' } : undefined, taille: tailleRefusee(rc) || undefined, raison: `Vinted a refusé la mise en ligne (${rc.status}${msgV ? ' : ' + String(msgV).slice(0, 200) : ''}) — le brouillon est intact.${gesteRefus(rc, corpsC)}` };
     }
@@ -10097,6 +10162,7 @@ async function refaireBrouillon(msg) {
   if (!acc) return { accepte: false, code: 'absente', raison: 'compte introuvable' };
   const stop0 = await gardeStricte(uid, acc, { lecture: true });
   if (stop0) return { accepte: false, code: stop0.code, raison: stop0.error };
+  { const fr = await lireFreinRepub(uid); if (fr) { noterDiag('frein_repub_tenu'); return { accepte: false, code: 'frein-refus', jusqua: fr.jusqua, raison: phraseFreinRepub(fr) }; } }
   let rows; try { rows = await sbGet(`app_data?id=eq.coffre_${uid}_${id}&select=data`); } catch (_) { rows = null; }
   if (rows === null) return { accepte: false, code: 'lecture', raison: "je n'ai pas pu lire ce qui est enregistré dans VRM — rien n'a été touché, réessaie dans un moment" };
   const sauve = (rows && rows[0] && rows[0].data) || null;
@@ -10196,7 +10262,7 @@ async function refaireBrouillon(msg) {
     if (!rb.ok) {
       noterDiag(`refaire_brouillon_refuse_${rb.status}`);
       const msgV = raisonRefusVinted(rb);
-      await retenirRefus('r' + id, brouillon, rb);
+      await retenirRefus('r' + id, brouillon, rb); await poserFreinRepub(uid, rb);
       await majVersBrouillon(uid, id, { etat: 'a-refaire', peutExister: false, cause: `refuse-${rb.status}` });
       return { accepte: true, etape: 'echec', refaire: true, raison: `Vinted a refusé le brouillon (${rb.status}${msgV ? ' : ' + String(msgV).slice(0, 200) : ''}) — tout reste enregistré dans VRM` };
     }
@@ -10240,7 +10306,7 @@ async function refaireBrouillon(msg) {
     if (!rc.ok) {
       noterDiag(`refaire_mise_en_ligne_refusee_${rc.status}`);
       const msgV = raisonRefusVinted(rc);
-      await retenirRefus('b' + draftId, corpsC.draft, rc);
+      await retenirRefus('b' + draftId, corpsC.draft, rc); await poserFreinRepub(uid, rc);
       await majVersBrouillon(uid, id, { etat: 'a-publier' });
       return { accepte: true, etape: 'echec', refaire: true, draftId, raison: `le brouillon est rangé sur Vinted, mais Vinted a refusé de le mettre en ligne (${rc.status}${msgV ? ' : ' + String(msgV).slice(0, 200) : ''}) — « Refaire » le remet en ligne, sans en créer un autre.${gesteRefus(rc, corpsC)}` };
     }
@@ -10384,6 +10450,7 @@ async function recreerVinted(msg) {
   if (!acc) return { accepte: false, code: 'absente', raison: 'compte introuvable' };
   const stop0 = await gardeStricte(uid, acc, { lecture: true });   // compte et pause d'abord, sans compter de geste
   if (stop0) return { accepte: false, code: stop0.code, raison: stop0.error };
+  { const fr = await lireFreinRepub(uid); if (fr) { noterDiag('frein_repub_tenu'); return { accepte: false, code: 'frein-refus', jusqua: fr.jusqua, raison: phraseFreinRepub(fr) }; } }
   // 1. Le coffre (photos, description) : le filet ET la matière de la nouvelle annonce.
   let coffre; try { coffre = await sbGet(`app_data?id=eq.coffre_${uid}_${id}&select=data`); } catch (_) { coffre = null; }
   if (coffre === null) return { accepte: false, code: 'coffre-lecture', raison: "je n'ai pas pu vérifier la sauvegarde — on ne touche à rien" };
@@ -10568,7 +10635,7 @@ async function recreerVinted(msg) {
     if (!rbV.ok) {
       noterDiag(`versbrouillon_brouillon_refuse_${rbV.status}`);
       const msgB = raisonRefusVinted(rbV);
-      await retenirRefus('r' + id, brouillonV, rbV);
+      await retenirRefus('r' + id, brouillonV, rbV); await poserFreinRepub(uid, rbV);
       await majVersBrouillon(uid, id, { etat: 'fait', cause: `brouillon-refuse-${rbV.status}` });
       const qB = await questionRepub(uid, brouillonV, codesDuRefus(rbV), { id, num: msg.num });
       return { accepte: true, etape: 'echec', question: qB ? { ...qB, num: msg.num ? String(msg.num) : '' } : undefined, raison: `Vinted a refusé le brouillon (${rbV.status}${msgB ? ' : ' + String(msgB).slice(0, 200) : ''}) — rien n'a été supprimé, ton annonce est toujours en ligne.${gesteRefus(rbV, corps)}` };
@@ -10743,6 +10810,7 @@ async function finRepubBrouillon(acc, job) {
     if (deja && deja[0] && deja[0].etat === 'publie') { await rendre1(); await leverVerrouRecreer(id); await majVersBrouillon(uid, id, { etat: 'fait', draftId }); return { accepte: true, etape: 'fait', draftId, nouvelId: draftId, raison: 'le brouillon était déjà en ligne — rien n’a été renvoyé.' }; }
     if (await lireVerrouRecreer('b' + draftId)) { await rendre1(); await majVersBrouillon(uid, id, { etat: 'mise-en-ligne-incertaine', draftId }); return { accepte: true, etape: 'incertain', draftId, raison: "une autre mise en ligne de ce brouillon est partie sans réponse claire — VRM n'en renvoie pas une seconde. Regarde ton dressing." }; }
     const stopC = await gardeStricte(uid, acc, { lecture: true });
+    { const fr = await lireFreinRepub(uid); if (fr) { await rendre1(); await leverVerrouRecreer(id); await majVersBrouillon(uid, id, { etat: 'a-publier', draftId, cause: 'frein' }); noterDiag('frein_repub_tenu'); return { refaire: true, accepte: true, etape: 'brouillon-a-refaire', draftId, raison: `l'ancienne annonce est supprimée et le brouillon est rangé, mais il n'a PAS été mis en ligne : ${phraseFreinRepub(fr)} « Brouillons → en ligne » le mettra en ligne ensuite, sans en créer un autre.` }; } }
     if (stopC) { await rendre1(); await leverVerrouRecreer(id); await majVersBrouillon(uid, id, { etat: 'a-publier', draftId }); return { refaire: true, accepte: true, etape: 'brouillon-a-refaire', draftId, raison: `l'ancienne annonce est supprimée et le brouillon est rangé, mais il n'a pas été mis en ligne (${stopC.error}) — « Brouillons → en ligne » le met en ligne, sans en créer un autre.` }; }
     const rlB = await vintedPage(acc, 'GET', `/api/v2/item_upload/items/${draftId}`, null, { timeoutMs: 30000 });
     if (corpsCV && corpsCV.draft) {
@@ -10782,7 +10850,7 @@ async function finRepubBrouillon(acc, job) {
       noterDiag(`republier_mise_en_ligne_refusee_${rcV.status}`);
       if (photosRefusees(rcV)) { try { echantillonRate('vinted_refus_photos', draftId, JSON.stringify((rcV.json && rcV.json.errors) || rcV.json || '')); } catch (_) {} }
       const msgV = raisonRefusVinted(rcV);
-      await retenirRefus('b' + draftId, corpsCV.draft, rcV);
+      await retenirRefus('b' + draftId, corpsCV.draft, rcV); await poserFreinRepub(uid, rcV);
       await majVersBrouillon(uid, id, { etat: 'a-publier', draftId, cause: `refuse-${rcV.status}` });
       const qV = await questionRepub(uid, corpsCV.draft, codesDuRefus(rcV), { id, draftId });
       return { refaire: true, accepte: true, etape: 'brouillon-a-refaire', draftId, question: qV ? { ...qV, num: job.num || '' } : undefined, raison: `l'ancienne annonce est supprimée et le brouillon est rangé, mais Vinted a refusé de le mettre en ligne (${rcV.status}${msgV ? ' : ' + String(msgV).slice(0, 200) : ''}) — VRM s'arrête là (pas de nouvel essai en rafale). Il est dans tes brouillons : Actions → Brouillons → en ligne.${gesteRefus(rcV, corpsCV)}` };

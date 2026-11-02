@@ -170,7 +170,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.310.0';
+const EXT_ATTENDUE = '5.311.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -595,7 +595,7 @@ const extEnRetard = (v) => !!v && cmpVersion(v, EXT_ATTENDUE) < 0;
 // ⚠️ (30 oct., intégration) `transp`, `lbcsupprime` et `lbcstats` arrivent tous
 //    en 5.291.0 : 5.288 (Leboncoin) et 5.290 (colis) étaient des numéros de
 //    branche, jamais servis ; aucune version publiée ne porte ces fonctions.
-const EXT_CAPACITES = { republierquestion: '5.310.0', favorisauto: '5.309.0', offresgarde: '5.308.0', transp: '5.291.0', favorisouvrir:'5.225.0', favorisliste:'5.218.0', suivivinted: '5.217.0', favoris: '5.217.0', liaison: '5.171.0', supprimees: '5.165.0', enligne: '5.170.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', preuves: '5.172.0', etatcompte: '5.181.0', lbcfiche: '5.182.0', relais: '5.183.0', lbcpack: '5.185.0', annulee: '5.185.0', confirmer: '5.206.0', retraitnotif: '5.206.0', offresauto: '5.234.0', vcpublier: '5.235.0', vcauto: '5.236.0', vcventes: '5.237.0', vcmessages: '5.238.0', vcachats: '5.239.0', republier: '5.240.0', republiermodif: '5.247.0', recreer: '5.248.0', lettre: '5.250.0', brouillon: '5.251.0', versbrouillon: '5.253.0', republierbrouillon: '5.254.0', refaire: '5.255.0', republierpage: '5.277.0', republierfile: '5.279.0', favorisperso: '5.281.0', lbcsupprime: '5.291.0', lbcstats: '5.291.0', vcsession: '5.295.0', vcfil: '5.295.0', vcrepondre: '5.295.0', vcfavoris: '5.295.0', relaisdest: '5.295.0', vcfiche: '5.296.0' };
+const EXT_CAPACITES = { freinrepub: '5.311.0', numeroscompte: '5.311.0', republierquestion: '5.310.0', favorisauto: '5.309.0', offresgarde: '5.308.0', transp: '5.291.0', favorisouvrir:'5.225.0', favorisliste:'5.218.0', suivivinted: '5.217.0', favoris: '5.217.0', liaison: '5.171.0', supprimees: '5.165.0', enligne: '5.170.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', preuves: '5.172.0', etatcompte: '5.181.0', lbcfiche: '5.182.0', relais: '5.183.0', lbcpack: '5.185.0', annulee: '5.185.0', confirmer: '5.206.0', retraitnotif: '5.206.0', offresauto: '5.234.0', vcpublier: '5.235.0', vcauto: '5.236.0', vcventes: '5.237.0', vcmessages: '5.238.0', vcachats: '5.239.0', republier: '5.240.0', republiermodif: '5.247.0', recreer: '5.248.0', lettre: '5.250.0', brouillon: '5.251.0', versbrouillon: '5.253.0', republierbrouillon: '5.254.0', refaire: '5.255.0', republierpage: '5.277.0', republierfile: '5.279.0', favorisperso: '5.281.0', lbcsupprime: '5.291.0', lbcstats: '5.291.0', vcsession: '5.295.0', vcfil: '5.295.0', vcrepondre: '5.295.0', vcfavoris: '5.295.0', relaisdest: '5.295.0', vcfiche: '5.296.0' };
 // Trois états, jamais un seul : pas d'extension ici · en retard · à jour.
 const extSait = (quoi) => {
   if (!vmrExtPresent()) return 'absente';                    // téléphone, autre navigateur
@@ -3266,8 +3266,11 @@ function dateLectureDressing(ligne) {
 //   · et cette lecture a moins de 24 h. Au-delà (ou jamais lue) on ne SAIT pas :
 //     ses annonces ne sont ni « en ligne » ni « disparues » — « à confirmer »,
 //     dites à part, jamais comptées (« rien lu ne vaut pas rien », §4.1).
-// Une annonce présente dans la lecture publique mais pas dans le dressing (elle
-// vient d'être republiée) est en ligne, avec ce que la lecture publique en sait.
+// ⚠️ (2 nov., Julien : « tant que l'extension n'a pas capté depuis le compte où
+// l'annonce est, elle ne peut pas ajouter une annonce dans VRM » — le cas
+// shop_cancale) Une annonce présente dans la lecture publique mais JAMAIS dans
+// le dressing capté connecté n'est PAS ajoutée : elle attend la capture faite
+// depuis son compte. Un compte sans aucune capture connectée n'apparaît pas.
 // Une annonce ouverte dans un dressing plus ancien et ABSENTE de la lecture
 // publique plus récente n'est plus en ligne (supprimée, vendue ou masquée) : elle
 // est rendue FERMÉE (`_vrmAbsente`), jamais « vendue » (rien ne le prouve).
@@ -3309,7 +3312,10 @@ function enLigneDuCompte(liste, pub, suppIds, maintenant) {
       if (!id || vus.has(id)) continue;
       vus.add(id);
       const l = parL.get(id) || null, p = parP.get(id) || null;
-      if (!l && !p) continue;
+      // ⚠️ (2 nov., Julien) Une lecture PUBLIQUE n'AJOUTE jamais une annonce : elle
+      // confirme ou retire ce que SON compte a déjà capté connecté. Une annonce vue
+      // seulement en public attend la prochaine capture faite depuis son compte.
+      if (!l) continue;
       if (l && venduePourSonVendeur(l)) { r.fermees.push(l); continue; }
       cand.push(Object.assign({}, l || {}, p || {}, { id: (l || p).id, is_closed: false, is_hidden: false, is_draft: false }));
     }
@@ -13338,7 +13344,8 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
       const arreter = (raison) => { setArret(raison || ''); const m = /dans (\d+) ?min/.exec(String(raison || '')); setArretJusqua(m ? Date.now() + Number(m[1]) * 60000 : 0); setMode(resteApres ? 'pause' : 'fini'); };
       // Un refus qui vaut pour TOUTE la file (Vinted demande de ralentir, plafond
       // de l'heure atteint) : on s'arrête au lieu d'enchaîner les refus.
-      if (r && (r.code === 'vinted-pause' || r.code === 'plafond')) arreter(r.raison);
+      // (2 nov., 5.311) Le frein après un refus de Vinted vaut pour tout le compte : la file s'arrête.
+      if (r && (r.code === 'vinted-pause' || r.code === 'plafond' || r.code === 'frein-refus')) arreter(r.raison);
       // (28 oct.) L'extension n'a pas répondu à temps : elle travaille peut-être
       // encore sur CETTE paire. Enchaîner empilerait la suivante derrière elle et
       // laisserait croire à un échec : la file s'arrête, la ligne dit « pas su ».
@@ -13661,7 +13668,7 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
                 const statut = s.etat === 'fait' ? (s.refait ? 'brouillon refait' : A.fait) : s.etat === 'encours' ? 'en cours…' : s.etat === 'planifiee' ? `brouillon prêt · en ligne vers ${s.jusqua ? new Date(s.jusqua).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : '…'}` : s.etat === 'echec' ? 'pas faite' : s.etat === 'a-refaire' ? 'brouillon à refaire' : s.etat ? '⚠ à vérifier' : (mode === 'idle' ? '' : 'en attente');
                 // (30 oct.) La pause de Vinted est dite UNE fois, dans le bloc du haut :
                 // la ligne dit seulement que la paire n'est pas partie à cause d'elle.
-                const raison = s.code === 'vinted-pause' || s.code === 'plafond' ? 'pas partie : arrêt demandé par Vinted (voir en haut)' : s.raison && (pb || s.refait) ? s.raison : '';
+                const raison = s.code === 'frein-refus' ? 'pas partie : pause après un refus de Vinted (voir en haut)' : s.code === 'vinted-pause' || s.code === 'plafond' ? 'pas partie : arrêt demandé par Vinted (voir en haut)' : s.raison && (pb || s.refait) ? s.raison : '';
                 const urlAncienne = action !== 'enLigne' && /^\d+$/.test(String(a.id || '')) ? `https://www.vinted.fr/items/${a.id}` : '';
                 return (
                 <div key={a.id} data-republier-ligne={a.id} data-republier-statut={s.etat || 'attente'} style={{ padding: '6px 10px', borderBottom: `1px solid ${C.border}`, fontSize: 13 }}>

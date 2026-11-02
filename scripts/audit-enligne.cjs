@@ -168,11 +168,12 @@ console.log('── A. La règle « en ligne » : la même dans l\'app et dans l
       ['dressing de 3 jours, aucune autre lecture ⇒ à confirmer (ni en ligne, ni disparues)', L([art(1), art(2)], 72), null, null, { en: '', ac: '1,2', abs: '', src: 'dressing' }],
       ['dressing sans date ⇒ à confirmer (« pas su »)', { items: [art(1)], cap: NaN }, null, null, { en: '', ac: '1', abs: '', src: '' }],
       ['dressing du 8, lecture publique de ce matin sans les anciennes ⇒ elles SORTENT', L([art(1), art(2), art(3)], 72), P([], 1), null, { en: '', ac: '', abs: '1,2,3', src: 'public' }],
-      ['republiée à l\'instant (dans la lecture publique, pas dans le dressing) ⇒ EN LIGNE', L([art(1)], 72), P([art(9, { title: 'Paire republiée' })], 0.2), null, { en: '9', ac: '', abs: '1', src: 'public' }],
+      // (2 nov., Julien) Vue SEULEMENT en public (jamais captée depuis son compte) ⇒ PAS ajoutée.
+      ['vue seulement dans la lecture publique (jamais captée depuis son compte) ⇒ PAS ajoutée ; l\'ancienne absente sort', L([art(1)], 72), P([art(9, { title: 'Paire republiée' })], 0.2), null, { en: '', ac: '', abs: '1', src: 'public' }],
       ['le dressing plus récent que la lecture publique fait foi', L([art(1), art(2)], 1), P([art(1)], 3), null, { en: '1,2', ac: '', abs: '', src: 'dressing' }],
       ['lecture publique INCOMPLÈTE ⇒ ignorée', L([art(1), art(2)], 2), P([art(1)], 0.5, { complet: false }), null, { en: '1,2', ac: '', abs: '', src: 'dressing' }],
       ['vendue pour son vendeur, « ouverte » vue de l\'extérieur ⇒ ne se rouvre pas', L([art(1, { is_closed: true, item_closing_action: 'sold' })], 30), P([art(1)], 1), null, { en: '', ac: '', abs: '', src: 'public' }],
-      ['supprimée APRÈS la lecture publique ⇒ sort', L([], 30), P([art(1), art(2)], 3), { '1': new Date(NOW - 1 * H).toISOString() }, { en: '2', ac: '', abs: '', src: 'public' }],
+      ['supprimée APRÈS la lecture publique ⇒ sort', L([art(1), art(2)], 30), P([art(1), art(2)], 3), { '1': new Date(NOW - 1 * H).toISOString() }, { en: '2', ac: '', abs: '', src: 'public' }],
       // Revue de la 5.167 : une suppression vue en 2xx est DÉFINITIVE face à une lecture PUBLIQUE (Vinted ne
       // réutilise jamais un identifiant ; la vue publique n'est pas mesurée) — le DRESSING, lui, fait toujours foi (5.165).
       ['supprimée AVANT une lecture publique qui la montre encore ⇒ elle reste supprimée (la vue publique ne la rouvre pas)', L([], 30), P([art(1)], 1), { '1': new Date(NOW - 3 * H).toISOString() }, { en: '', ac: '', abs: '', src: 'public' }],
@@ -196,7 +197,7 @@ console.log('── A. La règle « en ligne » : la même dans l\'app et dans l
     // La republiée porte ce que la lecture publique en sait (titre, prix, photo).
     const r9 = A.compte(L([art(1)], 72), P([art(9, { title: 'Nike neuve', price: { amount: '61.0' }, photo: { url: 'https://images1.vinted.net/x.jpg' } })], 0.2), null, NOW);
     const n9 = r9.enLigne[0] || {};
-    dit(n9.title === 'Nike neuve' && n9.price && n9.price.amount === '61.0' && n9.photo && n9.photo.url, 'la republiée s\'affiche avec ce que la lecture publique sait (titre, prix, photo)', JSON.stringify(n9));
+    dit(r9.enLigne.length === 0 && !n9.id, 'une annonce vue seulement en public n\'apparaît nulle part (elle attend la capture depuis son compte)', JSON.stringify(n9));
     // Une annonce connue des DEUX : la vue du dressing garde ses chiffres (vues), la lecture publique rafraîchit le prix.
     const r1 = A.compte(L([art(1, { view_count: 40, price: { amount: '70.0' } })], 30), P([art(1, { price: { amount: '55.0' } })], 1), null, NOW);
     dit(r1.enLigne[0] && r1.enLigne[0].view_count === 40 && r1.enLigne[0].price.amount === '55.0', 'connue des deux : les vues du dressing restent, le prix est celui de la lecture la plus récente', JSON.stringify(r1.enLigne[0]));
@@ -217,8 +218,8 @@ console.log('── A. La règle « en ligne » : la même dans l\'app et dans l
     dit(vue(ra) === vue(re), 'lignes : l\'app et l\'extension rendent la même chose', `app ${vue(ra)} · ext ${vue(re)}`);
     const parId = Object.fromEntries(ra.lignes.map((x) => [x.id, x.data.payload.items.map((it) => `${it.id}${it.is_closed ? (it._vrmAbsente ? 'a' : 'f') : ''}`).sort().join(',')]));
     dit(parId.harvest_111_listings === '10,11f', 'compte frais : son dressing tel quel', parId.harvest_111_listings);
-    dit(parId.harvest_222_listings === '20a,21a,22', 'compte relu en public : les anciennes rendues FERMÉES (absentes), la republiée en ligne', parId.harvest_222_listings);
-    dit(parId.harvest_444_listings === '40', 'un compte connu seulement par sa lecture publique a sa ligne', parId.harvest_444_listings);
+    dit(parId.harvest_222_listings === '20a,21a', 'compte relu en public : les anciennes rendues FERMÉES (absentes), la nouvelle vue seulement en public n\'est PAS ajoutée', parId.harvest_222_listings);
+    dit(!('harvest_444_listings' in parId), 'un compte connu SEULEMENT par sa lecture publique n\'apparaît pas (le cas shop_cancale)', parId.harvest_444_listings);
     dit(!('harvest_333_listings' in parId) || parId.harvest_333_listings === '', 'compte figé depuis 3 jours : aucune annonce en ligne', parId.harvest_333_listings);
     dit(ra.aConfirmer.has('333') && ids(ra.aConfirmer.get('333')) === '30', 'et ses annonces sont rendues à part, « à confirmer »', JSON.stringify([...ra.aConfirmer.keys()]));
 
@@ -425,14 +426,14 @@ console.log('── A. La règle « en ligne » : la même dans l\'app et dans l
     const f = faireFond({ src: BG, lignes, connecte: '111' });
     const lbc = await f.ctx.buildLbcData();
     const q = (lbc.queue || []).map((a) => String(a.numero)).sort().join(',');
-    dit(q === '109', 'Leboncoin : la republiée est dans la file, l\'ancienne et celle « à confirmer » n\'y sont pas', q);
+    dit(q === '', 'Leboncoin : ni l\'ancienne, ni celle « à confirmer », ni celle vue seulement en public ne sont dans la file', q);
     const rem = (lbc.removals || []).map((r) => String(r.numero)).sort().join(',');
     dit(!rem.includes('301'), 'une paire « à confirmer » publiée sur Leboncoin n\'est PAS dite « à retirer » (on ne sait pas)', rem);
     dit(rem.includes('101'), 'l\'ancienne, absente de la lecture la plus récente, l\'est (« plus en ligne, à vérifier »)', JSON.stringify(lbc.removals));
     dit(lbc.stats && lbc.stats.aConfirmer === 1, 'le nombre « à confirmer » est rendu', JSON.stringify(lbc.stats && lbc.stats.aConfirmer));
     const eb = await faireFond({ src: BG, lignes: JSON.parse(JSON.stringify(lignes)), connecte: '111' }).ctx.buildEbayData();
     const qe = (eb.queue || []).map((a) => String(a.numero)).sort().join(',');
-    dit(qe === '109' && eb.aConfirmer === 1, 'eBay : pareil', `${qe} · à confirmer ${eb.aConfirmer}`);
+    dit(qe === '' && eb.aConfirmer === 1, 'eBay : pareil', `${qe} · à confirmer ${eb.aConfirmer}`);
   });
 
   // ══════════════════════════════════════════════════════════════════════════
