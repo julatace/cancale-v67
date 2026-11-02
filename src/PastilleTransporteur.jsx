@@ -15,13 +15,15 @@ import { PAS_LU, logosDuTransporteur, cleStatTransporteur } from './transporteur
 
 const ECHECS = new Set();
 
-function LogoTransporteur({ cle, taille, decale }) {
+// `repli` : ce qui se montre tant que (ou si) aucun logo ne s'est chargé.
+export function LogoTransporteur({ cle, taille, decale = false, repli = null }) {
   const urls = logosDuTransporteur(cle).filter((u) => !ECHECS.has(u));
   const [i, setI] = React.useState(0);
   const [pret, setPret] = React.useState(false);
   const url = urls[i];
-  if (!url) return null;
-  return (
+  if (!url) return repli;
+  return (<>
+    {!pret ? repli : null}
     <span aria-hidden="true" data-transporteur-logo={pret ? 'charge' : 'attente'}
       style={{ width: taille, height: taille, borderRadius: Math.round(taille * 0.27), background: '#fff', boxShadow: 'inset 0 0 0 1px rgba(0,0,0,.10)', display: pret ? 'inline-flex' : 'none', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', flexShrink: 0, marginLeft: decale ? -6 : 0 }}>
       <img src={url} alt="" width={taille - 4} height={taille - 4} decoding="async" referrerPolicy="no-referrer"
@@ -29,7 +31,7 @@ function LogoTransporteur({ cle, taille, decale }) {
         onError={() => { ECHECS.add(url); setPret(false); setI((k) => k + 1); }}
         style={{ width: taille - 4, height: taille - 4, objectFit: 'contain', display: 'block' }}/>
     </span>
-  );
+  </>);
 }
 
 // `t` : le résultat de `transporteurDuColis` ; `C` : le thème de l'app.

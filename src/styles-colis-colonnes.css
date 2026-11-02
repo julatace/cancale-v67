@@ -137,3 +137,5 @@ button.vrm-cc-carte:focus-visible { outline: 2px solid var(--vrm-focus, #0071E3)
   .vrm-main .vrm-tete-row > .vrm-screen-head-titre:has(> .vrm-screen-head-sous) { flex: 1 1 100%; min-width: 0; }
   .vrm-main .vrm-tete-row:has(> .vrm-screen-head-titre > .vrm-screen-head-sous) > :nth-child(2) { justify-content: flex-start !important; }
 }
+/* (2 nov.) Le transporteur LU d'un colis à retirer (logo + nom, src/PastilleTransporteur.jsx). */
+.vrm-rp-transp { display: flex; align-items: center; min-width: 0; margin-top: 3px; }
