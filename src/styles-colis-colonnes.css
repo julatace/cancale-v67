@@ -14,7 +14,7 @@
 }
 button.vrm-cc-carte { cursor: pointer; }
 button.vrm-cc-carte:hover { box-shadow: 0 0 0 1px var(--vrm-line, #E4E4DF); }
-button.vrm-cc-carte:focus-visible { outline: 2px solid var(--vrm-focus, #2442B8); outline-offset: 2px; }
+button.vrm-cc-carte:focus-visible { outline: 2px solid var(--vrm-focus, #0071E3); outline-offset: 2px; }
 .vrm-cc-haut { display: flex; align-items: center; gap: 10px; min-width: 0; }
 .vrm-cc-photo { width: 36px; height: 36px; border-radius: 8px; overflow: hidden; flex: none; background: var(--vrm-card2, #ECECE8); display: block; }
 .vrm-cc-photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
@@ -56,7 +56,7 @@ button.vrm-cc-carte:focus-visible { outline: 2px solid var(--vrm-focus, #2442B8)
 .vrm-rp-note { font-size: 12px; line-height: 1.4; color: var(--vrm-muted, #56564F); margin: 0 2px; }
 .vrm-rp-attrib { font-size: 10.5px; }
 .vrm-rp-point { display: flex; flex-direction: column; gap: 6px; scroll-margin-top: 72px; border-radius: 12px; }
-.vrm-rp-point.is-choisi { outline: 2px solid var(--vrm-focus, #2442B8); outline-offset: 3px; }
+.vrm-rp-point.is-choisi { outline: 2px solid var(--vrm-focus, #0071E3); outline-offset: 3px; }
 .vrm-rp-tete { display: flex; align-items: flex-start; gap: 10px; padding: 2px 2px 0; }
 .vrm-rp-numero { flex: none; width: 26px; height: 26px; border-radius: 13px; background: var(--vrm-ink, #0F0F0E); color: var(--vrm-bg, #FFFFFF);
   font: 600 13px/26px var(--vrm-police-mono, ui-monospace, monospace); text-align: center; font-variant-numeric: tabular-nums; margin-top: 1px; }

@@ -7,7 +7,7 @@
 .vrm-recherche { position: relative; flex: 0 1 420px; min-width: 220px; }
 .vrm-recherche > .vrm-barre-recherche { width: 100%; box-sizing: border-box; }
 .vrm-recherche[data-recherche-ouverte="1"] > .vrm-barre-recherche { box-shadow: 0 0 0 1px var(--vrm-line, #E4E4DF); }
-.vrm-barre-recherche:focus-within { outline: 2px solid var(--vrm-focus, #2442B8); outline-offset: 2px; }
+.vrm-barre-recherche:focus-within { outline: 2px solid var(--vrm-focus, #0071E3); outline-offset: 2px; }
 .vrm-recherche-champ {
   flex: 1; min-width: 0; min-height: 44px; border: 0; background: transparent; color: var(--vrm-ink, inherit);
   font: inherit; font-size: 14px; padding: 0; outline: none; -webkit-appearance: none; appearance: none;
@@ -56,7 +56,7 @@ html .vrm-app-shell .vrm-recherche-champ:focus, html .vrm-app-shell .vrm-recherc
 /* ── LA CIBLE D'UNE NOTIFICATION (31 oct.) ───────────────────────────────────
    L'élément visé se signale un instant (un filet d'accent, l'accent RARE du §7),
    puis redevient neutre. */
-.vrm-cible-notif { box-shadow: 0 0 0 2px var(--vrm-accent, #2442B8) !important; border-radius: 10px; transition: box-shadow .3s ease; }
+.vrm-cible-notif { box-shadow: 0 0 0 2px var(--vrm-accent, #0071E3) !important; border-radius: 10px; transition: box-shadow .3s ease; }
 .vrm-cible-absente {
   display: flex; align-items: center; gap: 10px; margin: 8px 16px; padding: 4px 4px 4px 12px; min-height: 44px; box-sizing: border-box;
   border: 1px solid var(--vrm-line, #E4E4DF); border-radius: 12px; background: var(--vrm-surface, #F5F5F3);

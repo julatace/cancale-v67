@@ -105,7 +105,7 @@ Chaque refus a une raison technique ou une décision de Julien. Détail complet 
 | **Téléphone (vérification par SMS à l'inscription)** | Pas fait exprès (§2.9, payant sur sa clé). |
 | **International** | ⛔ **28 oct. : VRM RESTE SUR LA FRANCE** (pas de traduction, dollars, compta étrangère, Depop/Poshmark/Mercari). Les comptes eBay.co.uk/.com déjà gérés restent, sans plus ; l'argent reste en euros (une commande en GBP/USD est écartée et dite, jamais convertie). |
 | **Détourage** | Vestiaire Collective SEUL (sa décision du 17 oct. : « pas du tout pour Leboncoin, ne le mets pas dans les paramètres »). La carte « Ta clé Photoroom » vit sur l'écran Vestiaire, **pas dans Paramètres** (`detourage-reglage.cjs` le refuse). Studio photo : détourage local gratuit (U²-Net, licences vérifiées). |
-| **Palette** | Le violet reste **REFUSÉ** (27 oct.) ; **Vitrine (31 oct., son choix) remplace Perle** : blanc, encre, accent cobalt rare, Bricolage Grotesque + Geist Mono (`src/themeMineral.js`, `src/styles-vitrine.css`). |
+| **Palette** | Violet **REFUSÉ** ; Vitrine (31 oct.) + **Apple (2 nov., sa demande)** : blanc, encre, accent **bleu Apple** `#0071E3`/`#0A84FF` rare, police système (SF Pro), chiffres alignés sans chasse fixe (`src/themeMineral.js`, `src/styles-vitrine.css`). |
 | **Ventes masquées** | ⚠️ 29 oct. : **on ne peut plus masquer une vente** (« on ne doit plus pouvoir les masquer ») ; `vinted_sales_hidden` n'est plus lu nulle part. Les ACHATS masqués restent. |
 | **Saisie « N° + Entrée »** | Retirée de Ventes, Colis, Annonces, Leboncoin, eBay (29 oct.) ; la loupe « Tout sur le N° » et la saisie du Stock restent. |
 | **Bloc « offres à trancher » des emails dans Messages** | Retiré le 24 oct. sur sa demande (moyennes par modèle et liens génériques compris). Ne pas le rétablir. Les offres dans les conversations restent. |
@@ -398,7 +398,7 @@ déploient pas (`vercel.json`) ; ne jamais « promouvoir » une prévisualisatio
 > chiffre ne porte une couleur que s'il y a vraiment quelque chose à rattraper ;
 > **ambre** pour un geste à faire, **rouge** seulement pour deux paires sous un N°.
 
-- Vitrine (31 oct., son choix) remplace Perle (`src/themeMineral.js`, `src/styles-vitrine.css` chargée en dernier), mode sombre CHOISI
+- Vitrine + Apple (police système, bleu Apple ; styles-vitrine.css en dernier), mode sombre CHOISI
   (`vinted_dark`, estampillé sur la racine avant le premier rendu).
 - Une forme par fonction : boutons (une règle de base, jamais `display:inline-flex`),
   `Segmente`, `vrm-filtres`, `vrm-repli`, `vrm-lien-action`, rangées défilantes.
