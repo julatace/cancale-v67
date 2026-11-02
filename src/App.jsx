@@ -52266,11 +52266,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           const plusieursComptesRet = (accounts || []).length > 1;
           // (2 nov., décision du coordinateur) Sur la carte « À retirer », une nouvelle de
           // Vinted ne s'écrit que si elle change ce qu'il a à faire (arrivé / disponible au
-          // point relais, retour à l'expéditeur, annulé, remboursé, incident) ; le reste
+          // point relais, retour à l'expéditeur, annulé, remboursé, incident, ou « en cours de
+          // livraison » : pas encore au relais, inutile d'y aller) ; le reste
           // (« vient de partir du centre de tri »…) ne s'affiche pas.
           // Sur une carte « à vérifier », la nouvelle dit POURQUOI le colis n'est pas où il
           // l'attend (« en cours de livraison »…) : elle reste.
-          const nvUtile = (nv, x) => (nv && nv.t && x && x.aVerifier) ? nv : (nv && nv.t && /point relais|disponible|retir|retour|exp[ée]diteur|renvoy|annul|rembours|perdu|incident|probl[eè]me|endommag/i.test(nv.t)) ? nv : null;
+          const nvUtile = (nv, x) => (nv && nv.t && x && x.aVerifier) ? nv : (nv && nv.t && /point relais|disponible|retir|retour|exp[ée]diteur|renvoy|annul|rembours|perdu|incident|probl[eè]me|endommag|en cours de livraison|en route|en transit/i.test(nv.t)) ? nv : null;
           const arriveeRetrait = (x) => { const t = (x.src && x.src.t) || null, o = (x.src && x.src.o) || null;
             const ev = !t && o ? (etatColisVinted(o, Date.now(), transpMap) || {}) : null;
             const arr = t ? arriveeColisEmail(t) : (ev ? ev.arr : null);
