@@ -295,9 +295,13 @@ export function lireReponseChronopost(statut, ctype, corps, { suivi = '' } = {})
 // et, si un jour elle le porte, « 24 Rue Hoche, 56000 Vannes, FR ». Rend
 // { lieuRue, lieuCp, lieuVille } ; un morceau qu'on ne reconnaît pas reste vide
 // (une rue doit commencer par son numéro ; une ville, des lettres seulement).
+// (2 nov., mesuré en base : 4 colis du point 124054 rangés « 13 Rue Saint-Vincent,
+// Vannes » / ville « France » ⇒ hors de la carte) Le pays s'écrit aussi EN TOUTES
+// LETTRES (« …, Vannes, France ») : il est retiré comme « FR ».
+export const PAYS_FIN_ADRESSE = /^(?:[A-Z]{2}|France|Belgique|Belgi[eë]|Belgium|Nederland|Pays-Bas|Netherlands|Deutschland|Allemagne|Germany|Italia|Italie|Italy|Espa[ñn]a|Espagne|Spain|Portugal|Österreich|Autriche|Austria|Polska|Pologne|Poland)$/i;
 export function lieuVintedGo(adr) {
   const parts = String(adr || '').split(',').map((x) => propre(x, 80)).filter(Boolean);
-  if (parts.length && /^[A-Z]{2}$/.test(parts[parts.length - 1])) parts.pop();          // le pays (« FR »)
+  if (parts.length && PAYS_FIN_ADRESSE.test(parts[parts.length - 1])) parts.pop();   // le pays (« FR », « France »)
   const vide = { lieuRue: '', lieuCp: '', lieuVille: '' };
   if (!parts.length) return vide;
   let lieuCp = '', lieuVille = '';

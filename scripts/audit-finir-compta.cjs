@@ -40,7 +40,7 @@ function controle(APP, MSG) {
   const dit = (ok, quoi, detail) => { n++; if (!ok) ko++; console.log(`${ok ? '✅' : '❌'} ${quoi}${!ok && detail ? ' — ' + detail : ''}`); };
   // ── A ─────────────────────────────────────────────────────────────────────
   const ctx = vm.createContext({ console, Math, Number, String, Array, Object, JSON, Date });
-  for (const nom of ['commandeEbayEngagee', 'montantRecuEbay', 'caEbayPayees', 'etatCaEbay', 'NOTE_CA_EBAY', 'lbcAnnulee', 'lbcFinalisee', 'caParPlateforme']) {
+  for (const nom of ['commandeEbayEngagee', 'montantRecuEbay', 'caEbayPayees', 'etatCaEbay', 'NOTE_CA_EBAY', 'lbcAnnulee', 'lbcFinalisee', 'caVestiaireFinalise', 'caParPlateforme']) {
     const t = extraire(APP, nom);
     try { vm.runInContext(t.replace(/^ *const /, 'var ') + `\n;this.${nom} = ${nom};`, ctx); } catch (_) {}
   }

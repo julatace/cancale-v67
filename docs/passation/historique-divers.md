@@ -571,3 +571,76 @@ SECURITE.md · .env.example      ce qui doit rester hors du dépôt
 Chromium du banc : `/opt/pw-browsers/chromium-1194/chrome-linux/chrome`
 (`--use-angle=swiftshader --no-sandbox`).
 
+
+---
+
+## 2 novembre 2026 — audit des données (« chaque donnée au bon endroit », liste E0c)
+
+**Demande de Julien** : « Audite le site : toutes les données qui sont à un tel endroit doivent
+correspondre à ce qui est attendu, il ne doit y avoir aucune erreur. Envisage tous les cas de figure
+de tous les utilisateurs qu'on peut rencontrer. »
+
+**Méthode.** Point de départ : les rapports du 1er nov. (`audits-2026-11-01/flux.md`, `utilisateurs.md`,
+`limites.md`, `ecrans.md`) moins ce qui est déjà corrigé (CLAUDE.md §9, `etat-detaille-…`). Pour chaque
+écran, chaque nombre a été suivi jusqu'à sa règle : Ma journée (vendu, reçu, CA, semaine, colis),
+Statistiques (tuile Vendu, Finalisé sur Vinted, Finalisé par plateforme, CA par compte), Comptabilité
+(périodes, couverture), Annonces (bandeau), Colis (états vides), widget (`caMois`, `caMoisNonComptees`)
+et bilan du lundi (`api/_lib/bilan-semaine.js`). Profils joués sur données inventées : vendeur sans compte,
+un compte, comptes masqués/exclus, Vinted + Leboncoin + eBay (frais pas encore lus, dollars) + Vestiaire
+(montant sûr / pas sûr / annulée / illisible), base lente, prix illisibles, date illisible, 1er du mois à
+0 h 30 (Paris). Les 215 audits du dépôt rejoués : 160 verts ; les autres rouges viennent tous de l'environnement
+(`@babel/parser` absent, `web-push` 47 fois, `fast-xml-parser` 3, `@maplibre/maplibre-gl-style-spec` 1),
+plus `audit-lectures` (sa regex ne trouve plus `recupererLabel` quand le repli sans Babel retire les
+commentaires — faux rouge d'environnement : la fonction existe, background.js:13149) et `audit-facture-achat`
+(la route email-inbound ne se charge pas sans `web-push`).
+
+**Défauts trouvés et corrigés** (tous prouvés par `scripts/audit-donnees-ecrans.cjs` : **30 rouges sur
+`origin/main`, 0 après, 13/13 mutations tuées**) :
+
+- **G1 — eBay aux frais pas encore lus : un « vendu » partiel présenté complet.** `ventesFaites` comptait
+  la commande dans `ecartees` (un nombre) et nulle part ailleurs : Ma journée, Statistiques, le widget
+  (`caMoisNonComptees`) et le bilan du lundi disaient le total sans « au moins ». Chaque vente eBay récente
+  était concernée (les frais arrivent après le paiement). ⇒ la commande va aussi dans `nonComptees`
+  (raison « frais eBay pas encore lus » ou « devise USD », avec sa date) ; au CA déclaré elle est `manque`
+  (carte URSSAF, widget, Compta disent « au moins »). La phrase de Compta « N commandes eBay écartées » est
+  retirée : la même vente est dite dans « Pas dans « vendu » » (une phrase, §7). Miroir serveur
+  `api/_lib/ventes-regle.js` modifié à l'identique (l'audit vérifie l'égalité ; `--recopie` d'audit-bilan-semaine
+  exige `@babel/parser`, absent ici — le texte a été recopié mot pour mot et comparé).
+- **G2 — « dimanche 1 novembre »** en tête de Ma journée ⇒ `dateJourFr` (« 1er »).
+- **Finalisé par plateforme (Statistiques)** : Vestiaire affichait « pas encore de vente captée » EN DUR
+  alors que ses ventes au montant sûr comptent dans Ma journée/Compta/URSSAF ; un prix Leboncoin inconnu y
+  valait 0 €. ⇒ `caVestiaireFinalise` (mêmes règles `montantRecuVc`, étape versée/terminée ; pas sûr ⇒ « — »
+  + raison ; illisible ⇒ « pas lues ») ; Leboncoin au prix inconnu ⇒ « — » + « N ventes au prix inconnu ».
+- **Statistiques, tuile « Vendu »** : ne disait « au moins » que pour un compte non lu ; les ventes de la
+  période au montant pas lu (`venduNonComptees`) ⇒ « au moins » et « N non comptées » (infobulle = la phrase).
+- **« Finalisé sur Vinted » / CA par compte / par jour** : un prix illisible valait 0 € muet (ou `NaN`) dans
+  la boucle de la coque ⇒ `montantCommandeLu`, compté à part (`prixPasLu`) et dit (« au moins », une ligne).
+- **Annonces, bandeau** : « NaN € de valeur » sur un prix illisible (limites n°13) ⇒ seuls les prix lisibles,
+  « au moins … (prix lu sur N) ».
+- **« Invalid Date »** sur 9 dates de vente (Colis, Ventes, récap, exports) ⇒ `dateFr` (« date inconnue »).
+- **Base lente (limites n°3)** : Ma journée disait « Lie un compte Vinted » avant le retour de la liste des
+  comptes ⇒ seulement quand `accountsReady === true`. Colis disait « Aucun colis à envoyer » avant les ventes
+  ⇒ « Je lis tes ventes… » / « pas pu être lues ».
+- **Semaine de Ma journée (limites n°10)** : sept « 0 » quand aucune vente n'était lue ⇒ « ce n'est pas zéro » ;
+  une partie lue ⇒ « au moins » sur le total.
+- **Fuseau (limites n°19)** : charge de Comptabilité datée en UTC (le 1er à 0 h 30 = mois d'avant), récap
+  mensuel, objectif proposé et « jours où tu as vendu » au jour UTC ⇒ `dateLocaleISO` / `cleJourLocal`.
+  L'audit joue la règle sous `TZ=Europe/Paris` le 1er nov. à 0 h 30.
+
+**Vérifié juste, rien à changer** : « vendu ce mois » de Ma journée = la coque (widget) = Statistiques
+(même `ventesFaites`, minuit LOCAL du 1er, exécuté) ; miroir serveur identique pour `ventesFaites`,
+`ventesDeclarables`, `montantRecuEbay`, `commandeEbayEngagee`, `montantCommandeLu` ; les comptes exclus ne
+sont dans aucun total ; la même commande lue deux fois n'est dite qu'une fois.
+
+**Laissés, avec la raison** :
+- Bancs de rendu non lancés ici (pas de build Vite dans ce conteneur) : regarder Ma journée, Statistiques,
+  Colis et Annonces après fusion (captures). Le build sera fait ailleurs.
+- `audit-bilan-semaine --recopie`, `audit-tdz`, `audit-benefice`, `audit-statuts`, `audit-vendeur-neutre`
+  exigent `@babel/parser` ; 47 audits exigent `web-push` : à relancer dans un conteneur qui les a.
+- Limites n°2 (deux onglets), 6 (2 000 annonces), 7 (coupure réseau), 9 (iOS 15), 17 (lireTout non strict
+  sur `TXN_META_SELECT`, stats, fraîcheur), 24 (île 960-1024) : chantier E1 de la liste (chargement, hors
+  ligne, téléphone) — hors du périmètre « données au bon endroit » ou demandant un banc de rendu.
+- Flux A3 (même paire sur deux comptes Vinted) : décision par défaut inchangée (nuit §4).
+- Écrans N5 (« 372 € » trois fois), N11 (Reçu = CA côte à côte) : affichage, pas une donnée fausse — D2/D5.
+- `liveStats.caEncaisse` (Finalisé sur Vinted) reste daté de la vente, sur Vinted seul : c'est dit à l'écran
+  (« Vinted seul · au jour de la vente »), règle inchangée.
