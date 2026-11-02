@@ -87,13 +87,14 @@ export default function VendusAilleurs({
       }}
     >
       <summary>
-        Vendus ailleurs · annonces à retirer{" "}
+        {/* (2 nov., 22 h 30) Le titre court, le geste en pilule (carte « À faire » de Ma journée). */}
+        <b className="vrm-va-titre">Vendus ailleurs</b>{" "}
         <span>
           {v.charge
             ? "Vérification…"
             : v.lignes
               ? `${v.lignes.length} annonce${v.lignes.length > 1 ? "s" : ""} à vérifier`
-              : "Vérifier mes plateformes"}
+              : "Vérifier"}
         </span>
       </summary>
       <p>Reliés par référence VRM, jamais par titre — retire-les sur leur plateforme.</p>
