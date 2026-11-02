@@ -285,6 +285,7 @@ async function main() {
           return out.slice(0, 5);
         });
         dit(!ecrases.length, `${T} aucun texte écrasé en colonne d'une lettre (replis ouverts)`, JSON.stringify(ecrases));
+        if (process.env.PLAN) console.log('PLAN ' + T + '\n' + (await pg.evaluate(() => { const m = document.querySelector('.vrm-main'); return (m ? m.innerText : document.body.innerText).replace(/\n{2,}/g, '\n').slice(0, 6000); })));
         if (process.env.TRANCHES) {
           const H = await pg.evaluate(() => { const m = document.querySelector('.vrm-main'); return m ? m.scrollHeight : document.documentElement.scrollHeight; });
           for (let i = 0, y = 0; y < H && i < 12; i++, y += vp.height - 120) {
