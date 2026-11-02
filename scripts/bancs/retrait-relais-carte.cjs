@@ -157,14 +157,14 @@ async function main() {
         if (tel || !fondOk) dit(!!ti && !/Pas sur la carte/.test(ti.txt) && !/Base Adresse/.test(ti.txt) && /date d’arrivée pas encore dite/.test(ti.txt), `${T} Colis : le point sans rue est listé, sans phrase sur une carte absente`, ti && ti.txt.slice(0, 220));
         else dit(!!ti && ti.rp === 'non' && ti.raison === 'adresse' && /Pas sur la carte : .{10,}/.test(ti.txt) && !/Base Adresse/.test(ti.txt) && /date d’arrivée pas encore dite/.test(ti.txt), `${T} Colis : le point sans rue est listé, la raison dite en mots simples`, ti && ti.txt.slice(0, 220));
         const miens = ban.filter((u) => /[?&]postcode=/.test(u));
-        if (tel) dit(ban.length === 0, `${T} Colis : au téléphone (pas de carte), aucune adresse n'est cherchée`, JSON.stringify(ban));
+        if (tel) dit(miens.length === 0, `${T} Colis : au téléphone (pas de carte), la carte ne cherche aucune adresse`, JSON.stringify(ban));
         else dit(miens.length === 1 && /postcode=56000/.test(miens[0]) && !ban.some((u) => /Brest|29200/.test(decodeURIComponent(u))), `${T} Colis : une seule recherche d'adresse, avec le code postal ; aucune pour l'adresse incomplète`, JSON.stringify(ban));
         const note = await pg.evaluate(() => (document.querySelector('[data-retirer-en-route-sans]') || {}).innerText || '');
         dit(/1 achat en route dont Vinted ne dit pas encore le point/.test(note), `${T} Colis : l'achat sans destination est dit à part`, note);
         const tot = await pg.evaluate(() => { const c = document.querySelector('[data-cc-colonne="retirer"]'); let pub = null; try { pub = JSON.parse(localStorage.getItem('vrm_colis_retirer') || 'null'); } catch (_) {} return { n: Number(c.getAttribute('data-cc-n')), pub: pub && pub.total }; });
         dit(tot.n === 2 && tot.pub === 2, `${T} Colis : le compteur « À retirer » = Ma journée (2)`, JSON.stringify(tot));
         const ep = await pg.evaluate(() => [...document.querySelectorAll('[data-relais-epingle]')].map((e) => [e.getAttribute('data-relais-epingle'), e.getAttribute('data-relais-numero'), e.textContent]));
-        if (ep.length) {
+        if (ep.length && fondOk) { // (2 nov.) fond indisponible ⇒ la carte est cachée, ses épingles aussi
           dit(ep.length === 1 && ep[0][0] === 'kusmitea|56000' && ep[0][2] === '2' && k && k.past === '2', `${T} Colis : l'épingle porte le NOMBRE de colis à retirer (2), le même que la pastille du point`, JSON.stringify(ep));
           await pg.evaluate(() => { const m = document.querySelector('.vrm-main'); if (m) m.scrollTop = 0; window.scrollTo(0, 0); });
           await pg.evaluate(() => document.querySelector('[data-relais-epingle]').click());

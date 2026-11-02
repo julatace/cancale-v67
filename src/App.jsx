@@ -40152,6 +40152,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // (2 nov., colis clair) Les n° de suivi ajoutés ou reliés sous Colis → « À retirer »
   // (les outils, une autre instance) changent les cartes de la liste par point : la
   // liste les relit aussitôt (même lecture, rien de neuf).
+  // « Réessayer » (e-mails de suivi) touché sous Colis → « À retirer » (les outils) : la
+  // liste par point relit aussi (sinon elle garderait « pas lu »).
+  useEffect(() => { const f = () => { if (curSub === 'bordereaux') lireSuivis({ force: true }); }; window.addEventListener('vrm:suivis-relire', f); return () => window.removeEventListener('vrm:suivis-relire', f); }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const relireSuivisManuelsPartout = async () => { await relireSuivisManuels(); try { window.dispatchEvent(new Event('vrm:suivis-manuels')); } catch (_) {} };
   useEffect(() => { const f = () => { if (curSub === 'bordereaux' || curSub === 'achats') relireSuivisManuels(); }; window.addEventListener('vrm:suivis-manuels', f); return () => window.removeEventListener('vrm:suivis-manuels', f); }, []); // eslint-disable-line react-hooks/exhaustive-deps
   // Lue au montage, et RELUE quand l'extension prévient qu'un code vient d'être
@@ -46816,7 +46819,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const codeDeLigne = (t) => codeRetrait(t && t.code) || '';
     for (const t of (pickupUnion.emailList || [])) {
       const a = achatDuColis(t, buysBase, indexSuivisAchats); const lu = lieuDeLigne(t); const code = codeDeLigne(t); const ej = etatColisEmail(t, maintenant).jours;
-      L.push({ cle: 'r:e:' + (suiviDeLigne(t) || t.id || ''), groupe: 'retirer', site: 'vinted', nom: nomAvecTaille(a ? a.title : (nomTr(t.carrier) ? `Colis ${nomTr(t.carrier)}` : 'Colis à retirer'), a), photo: a ? photoAchat(a) : (t.photo || null),
+      L.push({ cle: 'r:e:' + (suiviDeLigne(t) || t.id || ''), groupe: 'retirer', site: 'vinted', nom: nomAvecTaille(a ? a.title : (t.artTitle || (nomTr(t.carrier) ? `Colis ${nomTr(t.carrier)}` : 'Colis à retirer')), a), photo: a ? photoAchat(a) : (t.photo || null),
         etat: [lu.lieuNom || nomTr(t.carrier), dernierJour(ej) || (code ? code : (qrImage(t) ? 'QR code' : 'code pas encore lu'))].filter(Boolean).join(' · '), ambre: Number.isFinite(ej) && ej <= 1, ouvrir: true,
         ...lu, transporteur: t.carrier || '', code, code2: codeRetrait(t.code2) || '', qr: !!qrImage(t) && !code, jours: Number.isFinite(ej) ? ej : null, ...(lu.lieuNom ? {} : { sansLieu: sansLieuEmail(t) }), src: { t } });
     }
@@ -49746,7 +49749,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             <span style={{flex:'1 1 220px'}}>{tracking===null
               ? <>Les e-mails de suivi n'ont pas pu être lus : leurs colis (codes, lieux) manquent ici. Rien n'est perdu.</>
               : <>Dernière lecture des e-mails de suivi ratée : tu vois la lecture d'avant.</>}</span>
-            <Bouton variante="secondaire" icone="sync" data-suivis-reessayer="" onClick={()=>lireSuivis({ force:true })} style={{flexShrink:0,minHeight:44}}>Réessayer</Bouton>
+            <Bouton variante="secondaire" icone="sync" data-suivis-reessayer="" onClick={()=>{ lireSuivis({ force:true }); try { window.dispatchEvent(new Event('vrm:suivis-relire')); } catch (_) {} }} style={{flexShrink:0,minHeight:44}}>Réessayer</Bouton>
           </div>
         )}
         {/* (24 oct.) Ce que le statut chez les transporteurs ne peut pas dire ici,
