@@ -253,7 +253,9 @@ const TABS=['journee','ventes','annonces','messages','achats','retraits','plat_v
     // « pas encore de vente captée », JAMAIS « 0 € » (un zéro inventé).
     dit(/Finalisé par plateforme/i.test(dashTxt),'le CA se décompose par plateforme',dashTxt?'':'tableau de bord non lu');
     dit(/CA Vinted par compte/i.test(dashTxt),'le CA Vinted se décompose par compte');
-    dit(/pas encore de vente captée/.test(dashTxt),'une plateforme sans vente dit « pas encore de vente captée », pas « 0 € »');
+    // (2 nov.) Depuis l'audit des données E0c (f8f5be86), Vestiaire suit ses vraies
+    // règles : sans vente finalisée, la ligne dit « pas encore de vente finalisée ».
+    dit(/pas encore de vente (captée|finalisée)/.test(dashTxt),'une plateforme sans vente dit « pas encore de vente … », pas « 0 € »');
     // ── eBay câblé dans le CA (§ caEbayPayees) : une commande PAYÉE captée doit
     // apparaître dans la décomposition, avec sa note « ventes payées ». Sur le
     // code d'avant `caParPlateforme` ignorait les commandes eBay → eBay restait

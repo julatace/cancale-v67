@@ -2790,3 +2790,62 @@ intégré sur `claude/demo-bulles-integ`.
 - Banc `scripts/bancs/demo-bulles.cjs` (390 px tactile, 1512 px) : vert le 2 nov. dans
   un bac à sable Vercel (Chromium installé là). Les captures n'ont pas pu être regardées
   depuis la session (le proxy refuse l'adresse du bac à sable) : Julien la regarde.
+
+## 2 nov. — tournée de tous les bancs
+
+Demande de Julien : « continue à tout auditer ». Branche `claude/tournee-bancs`
+(partie de `origin/main` à ea3c7ca4). Les bancs tournent dans des bacs à sable
+Vercel (4 vCPU, 3 bancs à la fois) ; ici, ni vite ni les dépendances de l'app.
+
+**Ce qui a tourné : 128 bancs sur 257** (lots 0 et 1, répartis en tourniquet sur
+la liste triée). **94 verts, 34 rouges.** Les 129 autres (lots 2 et 3, dont
+`tous-boutons`) n'ont PAS tourné : le quota Sandbox du plan Hobby est épuisé
+(« Hobby plan usage limit exceeded », remis à zéro le 1er déc.) — geste de Julien
+s'il veut la suite avant (passer le projet en Pro, ou attendre). Aucune
+classification « rouge avant tel commit » n'a pu être faite pour la même raison.
+
+### Rouges corrigés : bancs périmés, revérifiés VERTS dans le bac
+- `achats-hors-plateforme` — `main` s'écrit par PATCH conditionnel sur `data.rev`
+  (« Données sûres », 1er nov.) et SEULEMENT sur une base cloisonnée : le banc ne
+  gardait que les POST et sa sonde de schéma répondait « pas migrée ».
+- `nuage`, `numeros-panne` — même cause (PATCH `id=eq.main`).
+- `cartes-vivantes` — Vitrine (31 oct., son choix) a retiré l'élévation au
+  survol et l'entrée en cascade : on juge que la carte d'accueil publique
+  RÉPOND (fond), et que dans l'app rien ne se soulève ni n'entre en cascade
+  (réafficher la cascade ⇒ rouge).
+- `compta-simple` — « Paramètres » partout (1er nov.).
+- `audit-reel-20oct`, `fluidite`, `ebay-annonces`, `pave-vinted` — navigation par
+  tâche (31 oct.) : lien profond `?tab=plat_…&section=…`, Achats =
+  `?tab=cat_achats&vue=achats`.
+
+### Corrigés mais PAS revérifiés (quota épuisé avant la relance)
+`ebay-comptes` (aide `sousOnglet` reprise d'`ebay-regle-offre`), `feuilles-coque`
+(sections Vinted par lien profond), `panne` (mode d'emploi Supabase réservé au
+propriétaire depuis le 1er nov. : jugé pour lui, et l'autre sens ajouté pour un
+autre vendeur ; écran Achats ajouté), `photos-vinted` (Achats par `vrm:aller`),
+`verif_visuel` (Vestiaire dit « pas encore de vente finalisée » depuis E0c).
+`reglages` : à moitié — les panneaux sont des sous-écrans (1er nov.), le banc les
+ouvre et lit leur texte, mais il reste 6 rouges (le bloc « réglages pas lus »
+n'apparaît plus) : à sonder, la cause n'est pas trouvée.
+
+### Rouges NON corrigés
+- Domaine colis (branche `claude/colis-clair`, pas touchés) : `colis-fiables`,
+  `emballage` (attend Geist Mono, police système depuis le style Apple),
+  `postes`, `retrait-carte`, `transporteurs`, `suivi-colis`, `vendeur-neuf`,
+  `oublies` (`cat_achats` mène à Colis → À retirer), et `panne` sur `cat_achats`
+  (Colis → À retirer dit la panne deux fois).
+- Environnement : `capacites` (exige `fx/`), `pont` (exige l'historique git, le
+  bac clone en profondeur 1).
+- À examiner (défaut possible de l'app, non tranché) : `vitesse` (lectures au-dessus
+  du plafond : Ma journée 70 > 62 à 390 px, Achats 97 > 78, brouillons eBay lus sur
+  Ma journée, famille des transactions balayée 3 fois) ; `verif_dark` (rail plus
+  clair que la page en sombre : 0,8855 vs 0,0044) ; `mobile` (320 px, Ma journée :
+  `main` passe sous la barre du bas) ; `recherche-en-place` (1512 : « / » remet la
+  page en haut, 120 → 0) ; `journee-mieux` (titres sur 2 lignes au téléphone) ;
+  `lbc-pause` (Ma journée : « 1 à retirer de Leboncoin » sans « N°18 » sur la
+  même ligne) ; `imprimante` (aperçus Chronopost, lecteur PDF injoignable) ;
+  `annonces-carte` (390 : le bouton « Annonces » de la barre introuvable après
+  Stock ; 1512 : deux fiches décalées de 6 px, une fois sur deux).
+- Décision de Julien contre le banc : `finition-premium` — Envoyer en bleu Apple
+  sombre `#0A84FF` sous une icône blanche = contraste 3,65, le banc exige 4,5
+  (la norme pour une icône seule est 3). À lui de dire.
