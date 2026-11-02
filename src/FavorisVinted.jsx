@@ -5,6 +5,7 @@ import {lireReglagesFavoris,sauverReglagesFavoris,validerReglagesFavoris,offreFa
 import {personnaliserMessageFavori,prixOffreFavori,aDesVariablesFavori} from './favorisMessage.js';
 import {controleOuvertureFavori,echecVerificationFavori} from './favorisOuverture.js';
 import AutomatisationFavoris from './AutomatisationFavoris.jsx';
+import ModeAutoFavoris from './ModeAutoFavoris.jsx';
 import DiagnosticFavoris from './DiagnosticFavoris.jsx';
 import {RAISONS_FAVORIS,progressionFavoris,dureeFavoris} from './favorisProgression.js';
 // La photo vient du CDN de Vinted : elle passe par `PhotoVinted` (sans référent,
@@ -25,7 +26,7 @@ function PhotoNotification({src, PhotoVinted}) {
 const ETAPES=[['choix','1. Choisir'],['message','2. Message'],['envoi','3. Envoi']];
 const ETAT_ENVOI={attente:'En attente',reserve:'En cours…',envoye:'Envoyé',ignore:'Conversation déjà commencée — rien envoyé',incertain:'À vérifier sur Vinted',annule:'Annulé — non envoyé',verifie:'Clôturé après vérification',refuse:'Interrompu'};
 
-export default function FavorisVinted({uid,owner,ownerActuel,base,headers,nomCompte,executerFavori,favorisDisponible=false,favorisRaison='',favorisPerso=false,verifierExtension,recupererPage,ouvrirFavori,chargementAutomatique=false,PhotoVinted=null,ecranActif=true,FermeAuRetour=null,articlesVendus=AUCUN_ARTICLE_VENDU}) {
+export default function FavorisVinted({uid,owner,ownerActuel,base,headers,nomCompte,executerFavori,favorisDisponible=false,favorisRaison='',favorisPerso=false,verifierExtension,recupererPage,ouvrirFavori,chargementAutomatique=false,PhotoVinted=null,ecranActif=true,FermeAuRetour=null,articlesVendus=AUCUN_ARTICLE_VENDU,extensionAuto=null}) {
   const [etat,setEtat]=React.useState({}),[selection,setSelection]=React.useState([]),[message,setMessage]=React.useState(''),[retour,setRetour]=React.useState(''),[max,setMax]=React.useState(50);
   // L'offre (29 oct., comme Vintex) : aucune · diminuer (% ou €) · fixer à un prix ; arrondi à l'euro.
   const [offreChoix,setOffreChoix]=React.useState('aucune'),[typeDim,setTypeDim]=React.useState('pct'),[montantOffre,setMontantOffre]=React.useState(''),[arrondi,setArrondi]=React.useState(false),champMessage=React.useRef(null);
@@ -260,6 +261,7 @@ export default function FavorisVinted({uid,owner,ownerActuel,base,headers,nomCom
       <div className="vrm-favoris-resume" data-favoris-resume><span><b>{compter('contacter')}</b> à contacter</span><span><b>{compter('envoyes')}</b> déjà envoyé{compter('envoyes')>1?'s':''}</span><span><b>{compter('contactes')}</b> en conversation</span></div>
     </>}
     {(fileActive||!!p.total)&&<div className="vrm-favoris-file-resume" data-favoris-file={fileActive?'active':'finie'} role="status">{fileActive?<>Envoi en cours : <b>{p.termines} / {p.total}</b> traités · {p.envoyes} envoyé{p.envoyes>1?'s':''}{p.secondes>0?` · prochain dans ${dureeFavoris(p.secondes)}`:''}{rythmeTexte?` · ${rythmeTexte}`:''}</>:<>Dernier envoi : {p.envoyes} envoyé{p.envoyes>1?'s':''} sur {p.total}{p.incertains?` · ${p.incertains} à vérifier sur Vinted`:''}{p.refuses?` · ${p.refuses} interrompu${p.refuses>1?'s':''}`:''}</>}</div>}
+    {uid&&owner&&<ModeAutoFavoris uid={uid} owner={owner} ownerActuel={ownerActuel} headers={headers} nomCompte={nomCompte} extensionAuto={extensionAuto}/>}
     {uid&&owner&&<div className="vrm-favoris-outils">
       <button type="button" className="is-principal" data-favoris-ouvrir disabled={importation} onClick={ouvrirFeuille}>{fileActive?'Suivre l’envoi en cours':'Envoyer un message aux favoris'}</button>
     </div>}

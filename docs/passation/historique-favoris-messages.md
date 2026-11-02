@@ -3,6 +3,65 @@
 > Texte déplacé TEL QUEL depuis `CLAUDE.md` le 31 octobre 2026 (allègement du dossier : 1,36 Mo → moins de 60 Ko).
 > Rien n'a été réécrit : les paragraphes gardent leur ordre d'origine. Le classement par thème est automatique (mots du titre) — en cas de doute, chercher par `grep` dans tous les `docs/passation/historique-*.md`.
 
+> ⚠️⚠️ **2 novembre — MODE AUTOMATIQUE DES MESSAGES AUX FAVORIS (5.309.0), sa décision « Oui, mode auto », comme
+> Vintex et Bleam** (branche `claude/favoris-auto`). Quand quelqu'un met une annonce en favori, VRM lui écrit tout seul son
+> message enregistré (+ la vraie offre Vinted de ses réglages), sans clic. **Éteint par défaut** ; l'allumer passe par une
+> confirmation qui dit le risque (« Vinted peut quand même voir ça comme un robot… aucune garantie ») et le serveur refuse
+> l'allumage sans `confirme:true`. **Architecture (choisie, justifiée)** : on RÉUTILISE la route et la file existantes
+> (`api/_lib/favoris.js`, `favoris-file.js`) — identité prouvée par `resoudreCiblesFavoris`, comparer-et-échanger sur la ligne
+> neutre par UID, autorisation à usage unique consommée par l'extension, dédoublonnage article:personne. Un moteur dans
+> l'extension (comme `autoAccepterOffres`) aurait dû recopier la preuve d'identité, la garde, la boîte et les quotas côté
+> navigateur ; le serveur les a déjà, et les quotas DOIVENT vivre en base (plusieurs Chrome). Nouvelles actions de la route :
+> `auto_regler` (réglages validés par `validerAutoFavoris`, `allumeLe` posé), `auto_stop` (éteint + annule le message pas
+> parti), `auto` (un TOUR). Le tour (`tourAuto`) : 1) l'état de la file seule (`etatAuto` : éteint · pause · à vérifier ·
+> occupé · hors horaires · quota heure · quota jour · espacement) — rien d'autre n'est lu s'il ne permet rien ; 2) captures
+> projetées ; seuls les favoris arrivés APRÈS l'allumage et de moins de 3 jours sont résolus (jamais d'arriéré) ; 3) par
+> favori : attente tirée au hasard (10–60 min par défaut, déterministe sur l'id, `attenteFavoriMs`, empreinte FNV + fmix32 —
+> sans fmix 8 favoris voisins tiraient tous 16–17 min), identité prouvée sinon SAUTÉ et journalisé (il ne bloque pas les
+> autres), couple déjà traité ⇒ jamais, personne contactée < 30 j (tous articles) ⇒ jamais ; 4) la paire : dressing
+> `harvest_{uid}_listings` COMPLET (`total_entries`) de moins de 24 h (réservée `is_reserved`, vendue, fermée, en pause
+> `is_hidden`, absente ⇒ sautée) + garde `vinted_offres_garde` (`gardeRefuse` : absente/incomplète/périmée ⇒ RIEN ;
+> vendue ailleurs ⇒ sautée) ; 5) aucune conversation avec cette personne : boîte `harvest_{uid}_inbox` lue < 24 h, puis
+> `data->payload->conversations=cs.[{"opposite_user":{"id":N}}]` (mesuré en lecture seule sur sa base : `opposite_user.id`
+> est un NOMBRE, l'inclusion répond vrai/faux comme attendu) et `harvest_{uid}_conv_*` par `opposite_user->>id` ; 6) le
+> comparer-et-échanger revérifie tout (`ajouterAuto`) et pose AU PLUS un message (`auto:true`, `lot:'auto'`). Le message part
+> ensuite par le chemin existant (suivant → consommer → extension → terminer). Quotas côté SERVEUR (`autoEnvois` dans la
+> ligne neutre, comptés à la réservation) : 30/24 h glissantes et 12/h par défaut, réglables (≤ 50 / ≤ 20), montée
+> progressive 10/j la 1re semaine, 20 la 2e (`limiteJourAuto`), écart 3–12 min tiré au hasard entre deux messages auto
+> (`ecartAutoMs`), EN PLUS du plafond d'actions de l'extension (50/h, réserve 5 — non touché). Horaires 9 h–21 h heure de
+> Paris (`Intl`, été/hiver) et jours au choix ; une réservation auto qui trouve le mode éteint/en pause/hors horaires est
+> annulée sans rien envoyer. **Pause 24 h** (`pauseAutoJusqua` dans la ligne neutre, tous propriétaires) sur `pause_vinted`,
+> `vinted_frein` (429/403) ou `vinted_robot` (captcha, datadome, « automat », « robot », « unusual activity »…). **Extension
+> 5.309.0** (`freinFavoriAuto`, capacité `favorisauto`) : un message `auto` n'écrit RIEN dans une conversation qui porte déjà
+> UN message, même système (`conversation_existante`, résultat certain `ignore`) ; chaque réponse de Vinted passe par
+> `freinFavoriAuto` ; elle rend `ecrits` (écritures parties). Le serveur refuse l'autorisation d'un message auto à une
+> extension < 5.309 (`version5309`). **App** : `src/PiloteFavorisAuto.jsx` monté dans AppCoeur (VRM ouvert dans un onglet de
+> l'ordinateur suffit, écran Messages pas exigé ; onglet en arrière-plan compris), un tour toutes les 2–5 min au hasard pour
+> les comptes allumés (relus toutes les 30 min) ; `src/ModeAutoFavoris.jsx` dans Messages → Favoris reçus : état en une
+> phrase, compteurs 24 h / heure, réglages, Stop, journal (à qui, quand, ou pourquoi un favori a été sauté). La traduction du
+> résultat de l'extension est UNE fonction (`traduireResultatFavori`, src/favorisProgression.js) pour le clic et l'auto.
+> **Ajout de Julien (2 nov., 13 h) : « il doit pouvoir régler tous les problèmes lui-même, ou demander s'il en a un »** :
+> jamais de boucle — un refus AVANT toute écriture (`ecrits:0`, onglet absent, compte, extension…) laisse UN second essai
+> (`AUTO_ESSAIS` = 2), puis `essais_epuises` au journal et on passe au suivant ; un message prêt alors que l'extension ne
+> peut pas l'envoyer n'est même pas posé (aucun essai gâché). Quand un geste de Julien débloque (`DEMANDES_AUTO` : ouvrir un
+> favori depuis la cloche, onglet vinted.fr sur ce compte, bon compte, recharger/installer l'extension, reconnecter,
+> rouvrir dressing/messagerie/cloche, enregistrer le message, vérifier un envoi incertain, ouvrir Annonces pour la garde),
+> VRM le DEMANDE : `g.auto.demande` dans la ligne neutre, affichée « À faire : … » en ambre, notification push UNE fois par
+> demande (catégorie `favoris`) ; elle tombe d'elle-même quand un message repart. **Preuves** : `scripts/audit-favoris-auto.cjs`
+> (54 contrôles, EXÉCUTE la vraie route `api/compte.js` sur une fausse base à état qui applique projections et filtres
+> `cs.`/`->>`, et le vrai `background.js` par `_fond-vm`) ; `--prouve --avant f540d439` (base de la branche) : 11 rouges sur
+> le code d'avant, 20 mutations toutes rouges (éteint, pause, horaires, montée, 30 j, couple, attente, conversation existante,
+> garde, dressing, réservée, frein, vieille extension, extension × 2, boucle, extension absente, demande répétée, arrêt
+> muet). Verts : tests favoris (13 fichiers), `audit-favoris-vintex` 17, `-ecritures`, `-autres-comptes`, `audit-coherence`,
+> `audit-extension-zip`, `audit-fonctions-api` (12 fonctions, aucune ajoutée), `audit-moteur-offres` 24, `audit-offres-garde`
+> 25, `audit-exec` 21. Écran rendu dans Chromium à 390 px (éteint, confirmation, allumé avec demande et journal, Stop) :
+> aucune erreur, aucune largeur en trop. ⚠️ Non vérifié ici : `npm run build` (vite absent ; esbuild compile tout sauf trois
+> dépendances tierces absentes), `web-push` remplacé par un bouchon LOCAL non commité pour charger la route, aucun envoi réel
+> sur Vinted (forme de la réponse de création avec messages d'un fil ancien jamais vue : la garde `conversation_existante`
+> lit `messages`, `message_count`, `total_messages`, `has_more`). **Geste de Julien** : installer la 5.309, ouvrir UN favori
+> depuis la cloche de Vinted sur chaque compte (prouver le lien), garder VRM et un onglet vinted.fr ouverts, enregistrer son
+> message, puis Messages → Favoris reçus → Mode automatique → Régler et allumer.
+
 > ⚠️⚠️ **29 octobre — LEBONCOIN COMME VINTED : capture juste, « à retirer » visible, Supprimer, Republier, favoris (5.288) :**
 > Julien : « il n'y a plus que 2 annonces et VRM en a encore 8 », « j'ai vendu une paire sur Vinted et VRM ne m'a pas dit de
 > la supprimer », « je veux pouvoir supprimer une annonce de Leboncoin », « trop brouillon… mêmes méthodes d'affichage que

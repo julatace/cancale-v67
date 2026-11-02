@@ -486,6 +486,7 @@ sans la fonction.
 | `vcfavoris` | `rangerVcAnnonces` | **5.295.0** | le NOMBRE de favoris par annonce Vestiaire (jamais qui) |
 | `relaisdest` | `relaisDestination` | **5.295.0** | « le point relais où arrivent tes achats (quand le suivi Vinted le donne) » |
 | `vcfiche` | `ficheVcAnnonce` | **5.296.0** (1er nov.) | annonces Vestiaire en fiches (photo, titre, prix, état) et le compte de l'onglet sur annonces/ventes/achats (flou par compte) |
+| `favorisauto` | `freinFavoriAuto` | **5.309.0** (2 nov.) | mode auto des favoris |
 
 ---
 
@@ -494,7 +495,7 @@ sans la fonction.
 Une ligne par chantier ou décision, le plus récent d'abord. Détail : le fichier
 d'historique du thème (cherche le titre ou la date).
 
-**Extension servie : 5.308.0** (2 nov.). **À lire en premier : `docs/passation/2026-11-02-liste.md`.** **Production** : https://vrm.center,
+**Extension servie : 5.308.0** (2 nov. ; 5.309.0 sur `claude/favoris-auto`). **À lire en premier : `docs/passation/2026-11-02-liste.md`.** **Production** : https://vrm.center,
 vérifier par `curl https://vrm.center/api/sante`.
 
 ### Gestes encore attendus de Julien
@@ -523,6 +524,7 @@ vérifier par `curl https://vrm.center/api/sante`.
 
 ### Décisions et chantiers (octobre–novembre 2026)
 Une ligne par chantier. Le récit complet des lignes du 31 oct. au 2 nov. est, mot pour mot, dans `docs/passation/etat-detaille-2026-10-31-au-11-02.md`.
+- **2 nov.** — **Mode auto des messages aux favoris** (éteint par défaut, **5.309.0**, `src/favorisAuto.js`, `api/_lib/favoris-auto.js`, `audit-favoris-auto`) : jamais de boucle, VRM demande le geste qui débloque. → historique favoris-messages. Geste : installer la 5.309, ouvrir un favori depuis la cloche, allumer.
 - **2 nov.** — Offres auto : jamais sur une paire vendue ailleurs (**5.308.0**, `src/offresGarde.js`). Geste : installer.
 - **2 nov.** — Colis : le filtre de site vaut pour TOUT l'écran (`voitSite`, `retoursPourSite` : plus de Vinted sous eBay, Julien : « inadmissible ») ; boîte vide du récapitulatif au téléphone retirée ; 190 chemins absolus `/home/user/…` retirés des audits/bancs. Audits : tous verts sauf ceux qui exigent Postgres (6) ou `@babel/parser` (1), absents ici. Geste : regarder Colis au téléphone.
 - **2 nov. (matin)** — Audit du dossier : les 7 chantiers « en cours » de la nuit n'ont JAMAIS été poussés ⇒ perdus, à refaire (nuit §3) ; §9 condensé, §8 recopié du code, ancienne « passation en cours » archivée. Geste : si la session de la nuit est encore ouverte, lui faire pousser ses worktrees.
@@ -623,13 +625,7 @@ Une ligne par chantier. Le récit complet des lignes du 31 oct. au 2 nov. est, m
   sur le N° », captcha prêt, revue visuelle. → `docs/passation/2026-10-21.md`.
 - **20 oct.** — Doublons de N° réglés seuls ; revues « argent » (app, extension, eBay) ;
   eBay se relit tout seul ; Leboncoin : compte de session, date de vente. → numeros / ebay.
-- **16-19 oct.** — Relais du téléphone (5.183), double vérification TOTP, studio photo,
-  mode équipe (016), carte et classement de la communauté (018-020, appliquées). → divers.
-- **11 oct.** — Remise à zéro des numéros (013, appliquée), prix 12,99 €, Messages eBay.
-- **3-9 oct.** — L'app pilote l'extension (bordereaux, publication), messagerie intégrée,
-  numéros à lettres, CA daté au versement, abonnement Stripe (mode test), sécurité
-  (routes fermées, RLS, origines exactes de l'extension).
-- **Septembre** — le reste : `docs/journal-2026.md` et les historiques.
+- **Avant le 20 oct.** — `docs/passation/etat-detaille-2026-10-31-au-11-02.md` (fin) et `docs/journal-2026.md`.
 
 ---
 
