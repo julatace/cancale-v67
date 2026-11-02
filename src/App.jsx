@@ -37494,7 +37494,8 @@ function BeneficeCompta({ compta, onNav, onSansDepenses, onAjouterDepense, sansC
     : B.raison === 'cotisations' ? <>En attente de ton chiffre d'affaires déclaré : ouvre l'écran Ventes une fois.</>
     : B.n === 0 ? <>Aucune vente finalisée sur la période{B.depenses === 'jamais' ? '' : ' : seules tes dépenses comptent'}.</>
     : <>Ce qu'il te reste{B.depenses === 'jamais' ? ' avant tes dépenses' : ''} : tes ventes finalisées, moins le prix d'achat des paires{B.fraisCouverts > 0 ? ', les frais de vente' : ''}{B.depenses === 'jamais' ? '' : ', tes dépenses'}{B.sansCotis ? '' : " et l'URSSAF"}.</>;
-  const couverture = !B || B.n === 0 ? null
+  // La couverture n'est redite que si la phrase ne la dit pas déjà (raison « achats »).
+  const couverture = !B || B.n === 0 || B.raison === 'achats' ? null
     : B.nCout === B.n ? <>Prix d'achat {B.n === 1 ? 'connu pour 1 vente' : `connus pour les ${B.n} ventes`}.</>
     : <span data-benef-manque="" style={{ color: C.warn }}>Prix d'achat {B.nCout > 1 ? 'connus' : 'connu'} pour {B.nCout} vente{B.nCout > 1 ? 's' : ''} sur {B.n}.</span>;
   return (
