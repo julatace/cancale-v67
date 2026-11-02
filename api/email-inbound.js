@@ -447,55 +447,31 @@ function buildInvoiceHtml(cfg, sale, number, dateStr) {
 }
 
 async function createProInvoice(sale, acc, cfg, now, attachments) {
-  // L'IDENTITÉ d'une facture est la transaction quand l'email la porte (pièce
-  // jointe « Formulaire-retour-commande-{tx} ») : deux ventes au même pseudo,
-  // prix et titre ne partagent plus une facture. Sans transaction : l'ancienne clé.
-  const key = sale.transaction ? `tx${sale.transaction}` : shortHash(`${sale.pseudo}|${sale.prix}|${(sale.designation || '').slice(0, 40)}`);
-  // ⚠️⚠️ REVUE DU 17 OCTOBRE (`scripts/audit-routes-revue.cjs`, A et B).
-  //  · Le MÊME email revient (un 503 est fait pour ça, le script Gmail renvoie
-  //    tout le fil) : la facture déjà émise recevait un NOUVEAU numéro et
-  //    repassait « à envoyer » — le script l'envoyait une seconde fois à
-  //    l'acheteur. Une facture émise ne change plus jamais de numéro.
-  //  · Compteur ILLISIBLE : `null` valait 0, la route émettait « FA-AAAA-0001 »
-  //    (déjà donné) et RÉÉCRIVAIT le compteur à 1 — toutes les factures
-  //    suivantes reprenaient des numéros déjà émis. Pas su ⇒ aucune facture, et
-  //    la route répond 503 (l'email reviendra).
+  // ⚠️⚠️ (2 novembre — la facture Pro refaite, api/_lib/facture-pro.js) L'email
+  //    de vente ne NUMÉROTE plus rien. Un numéro de facture est une pièce
+  //    comptable : il se donne quand le vendeur ÉMET la facture (son clic sur la
+  //    vente), d'une séquence sans trou. Ici on ne garde que ce que l'email
+  //    apporte et que rien d'autre ne donne : l'acheteur (nom, adresse, e-mail,
+  //    déjà rangés dans `email_sale_*`) et le formulaire de retour de Vinted, que
+  //    l'envoi joindra à la facture. Les 5 brouillons numérotés avant le 2 nov.
+  //    gardent leur numéro (la facture émise le reprend).
+  if (!sale.transaction) return null;               // l'identité d'une facture est la transaction
+  const key = `tx${sale.transaction}`;
   const deja = await supabaseLireRow(`email_invoice_${key}`);
   if (!deja.lu) { marquerEcritureRatee(); return null; }
-  if (deja.data && deja.data.number) return { number: deja.data.number, status: deja.data.status || 'draft', deja: true };
-  const cpt = await supabaseLireRow('vrm_invoice_counter');
-  if (!cpt.lu) { marquerEcritureRatee(); return null; }
-  const lu = cpt.data == null ? 0 : parseInt(cpt.data, 10);
-  if (!Number.isFinite(lu) || lu < 0) { marquerEcritureRatee(); return null; }
-  // Numéro séquentiel : compteur partagé dans Supabase (jamais réutilisé).
-  const counter = lu + 1;
-  if (!(await supabaseUpsert([{ id: 'vrm_invoice_counter', data: counter }]))) return null;
-  const number = `${cfg.prefixe || 'FA'}-${new Date().getFullYear()}-${('0000' + counter).slice(-4)}`;
-  const dateStr = new Date().toLocaleDateString('fr-FR');
-  const html = buildInvoiceHtml(cfg, sale, number, dateStr);
-  // ⚠️ (1er nov., VRM vendu à d'autres) LA FILE D'ENVOI N'EST LUE QUE POUR LE
-  //    PROPRIÉTAIRE DE L'INSTALLATION : le script Gmail collectif envoie depuis
-  //    SA boîte (son nom, son quota) et ne lit `mode=factures` que dans le
-  //    contexte `VRM_OWNER_UID`. Une facture d'un autre vendeur mise « queued »
-  //    restait « en cours d'envoi » à vie et l'acheteur ne recevait rien. Pour
-  //    un autre vendeur : toujours un brouillon (il l'ouvre et l'envoie lui-même,
-  //    l'app le lui dit) — jamais une promesse d'envoi que rien ne tiendra.
-  const proprioInst = String(process.env.VRM_OWNER_UID || '').trim();
-  const envoiParVRM = !!proprioInst && String(proprietaireCourant() || '') === proprioInst;
-  const status = cfg.autoSend && envoiParVRM ? 'queued' : 'draft';
-  // Le 2e document Vinted Pro (formulaire de retour), joint à la facture envoyée
-  // à l'acheteur. On garde ses octets jusqu'à l'envoi (puis `facture-envoyee` les
-  // purge — hygiène d'égress). Absent ⇒ chaîne vide, l'app le signale.
+  if (deja.data && (deja.data.number || deja.data.contenu)) return { number: deja.data.number || '', status: deja.data.status || 'draft', deja: true };
   const retour = formulaireRetourDe(attachments);
-  await supabaseUpsert([{ id: `email_invoice_${key}`, data: {
-    type: 'facture_pro', number, status,
+  const ok = await supabaseUpsert([{ id: `email_invoice_${key}`, data: {
+    ...(deja.data || {}),
+    type: 'facture_pro', number: '', status: 'draft',
     designation: sale.designation || '', prix: sale.prix || '',
     buyerName: sale.nomComplet || '', buyerEmail: sale.email, buyerAddress: sale.adresse || '',
-    numero: sale.numero || '', pseudo: sale.pseudo || '', transaction: sale.transaction || '',
-    account: acc.login || '', html, createdAt: now, ...(status === 'queued' ? { queuedAt: now } : {}),
+    numero: sale.numero || '', pseudo: sale.pseudo || '', transaction: sale.transaction,
+    account: acc.login || '', createdAt: (deja.data && deja.data.createdAt) || now,
     retourB64: retour ? retour.b64 : '', retourNom: retour ? retour.nom : '',
   } }]);
-  return { number, status, retour: !!retour, envoiParVRM };
+  if (!ok) return null;
+  return { number: '', status: 'draft', retour: !!retour, prete: true };
 }
 
 // Journal des emails traités (30 derniers, même les « ignorés ») : permet de
@@ -2363,26 +2339,14 @@ export async function traiterEmail(req, res) {
       // Notif push : vente en temps réel, même app fermée et ordi éteint.
       try { await pushOnce({ title: '💸 Vendu !', body: `${data.designation || 'Article'}${data.prix ? ` — ${data.prix} €` : ''}${acc.login ? ` (${acc.login})` : ''}`, tag: `sale-${key}`, url: DESTINATIONS.vente({ tx: data.transaction }) }, 'vente'); } catch (_) {}
       await notifierDoubleVente(data.numero, data.designation);
-      // Facturation Pro : ne se déclenche que si activée dans l'app ET que
-      // l'email est celui d'un compte Vinted PRO (la mention de Vinted) ET qu'il
-      // porte l'adresse email de l'acheteur. Un compte particulier : jamais.
+      // Vente PRO (la mention de Vinted) avec l'e-mail de l'acheteur et sa
+      // transaction : on garde le formulaire de retour pour la facture que le
+      // vendeur émettra d'un clic sur la vente (api/_lib/facture-pro.js). Un
+      // compte particulier : jamais. Aucun numéro n'est donné ici.
       let facture = null;
       try {
-        if (data.pro && data.email) {
-          // Réglage ILLISIBLE ≠ « facturation coupée » : sans ça, la facture
-          // n'était jamais faite et l'email acquitté. Pas su ⇒ 503, il reviendra.
-          const cfgLu = await supabaseLireRow('vrm_pro_facture');
-          if (!cfgLu.lu) marquerEcritureRatee();
-          const cfg = cfgLu.lu ? cfgLu.data : null;
-          if (cfg && cfg.actif) {
-            facture = await createProInvoice(data, acc, cfg, now, mail.attachments);
-            if (facture && !facture.deja) try { await pushOnce({
-              title: facture.status === 'queued' ? '🧾 Facture en cours d\'envoi' : '🧾 Facture préparée',
-              body: `${facture.number} — ${data.designation || 'article'} (${data.prix} €) pour ${data.email}${facture.status === 'queued' ? '' : facture.envoiParVRM ? ' — envoi manuel dans Factures' : ' — ouvre-la dans Factures et envoie-la à l’acheteur'}`,
-              tag: `inv-${facture.number}`, url: DESTINATIONS.facture(),
-              _cat: 'facture',
-            }); } catch (_) {}
-          }
+        if (data.pro && data.email && data.transaction) {
+          facture = await createProInvoice(data, acc, null, now, mail.attachments);
         }
       } catch (_) {}
       { const st = contexteVendeur.getStore(); if (st) st.resumeExtra = { article: data.designation }; }

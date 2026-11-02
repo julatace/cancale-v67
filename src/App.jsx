@@ -97,6 +97,7 @@ import RechercheEbay,{repereAdmis} from "./ebayRecherche.jsx";
 import { contactEmail, CONTACT_A_VENIR } from "./contact.js";
 import { captchaActif, routeProtegee, jetonCaptcha, etatCaptcha, abonnerCaptcha, consommerCaptcha, corpsAvecCaptcha, monterWidget, MSG_CAPTCHA_ATTENTE, MSG_CAPTCHA_REFUS, MSG_CAPTCHA_ERREUR } from "./captcha.js";
 import { boutiqueIci, boutiqueOrion, estAndroid, pageExtensionsIci, nomNavigateurIci, mobileIci, LIENS_BOUTIQUES, LIEN_FIREFOX_ANDROID, LIEN_ORION_FICHIER, NOTICE_ORION, phraseNavigateur } from "./navigateurExtension.js";
+import { FicheFacturation, FactureVente, ListeFacturesPro, relireFactures } from "./FacturePro.jsx";
 import { etatFacturation, factureDepuisVente, pdfFacturX, nomFichierFacture, recapEReporting, recapCsv, recapJson, eurDe, frJour } from "./facturationElectronique.js";
 import { lireSuperPdp, appelSuperPdp, enBase64, libelleEnvoi, ENV_LIBELLE } from "./superpdp.js";
 import { lirePhotoroom, appelPhotoroom, phraseVerif, phraseSansReponse, dateCourte, LIEN_CLE, LIEN_TARIFS } from "./photoroomCle.js";
@@ -4663,60 +4664,6 @@ const fetchProInvoices = async ({metadata=false}={}) => {
       .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
   } catch (_) { return null; }
 };
-// Relire avant l'envoi et modifier seulement un brouillon encore identique.
-const setProInvoiceStatus = async (inv, status) => {
-  if(status!=='queued' || !inv?._id || !inv.buyerEmail || inv.type!=='facture_pro')return false;
-  const owner=AUTH.user?.id;
-  try {
-    const base=`${SUPABASE_URL}/rest/v1/app_data?id=eq.${encodeURIComponent(inv._id)}`;
-    const read=await fetch(base+'&select=id,data',{headers:sbAuth()});
-    if(!read.ok)return false;
-    const rows=await read.json();const fresh=Array.isArray(rows)&&rows.length===1?rows[0].data:null;
-    if(!fresh || fresh.type!=='facture_pro' || fresh.status!=='draft' || fresh.buyerEmail!==inv.buyerEmail || fresh.number!==inv.number || fresh.account!==inv.account || fresh.prix!==inv.prix || AUTH.user?.id!==owner)return false;
-    const filters=['status','buyerEmail','number','account','prix'].map(k=>`data->>${k}=eq.${encodeURIComponent(String(fresh[k]))}`).join('&');
-    const res=await fetch(base+'&'+filters+'&select=id',{
-      method:'PATCH',headers:sbAuth({'Content-Type':'application/json',Prefer:'return=representation'}),
-      body:JSON.stringify({data:{...fresh,status,queuedAt:new Date().toISOString()}}),
-    });
-    if(!res.ok)return false;
-    const changed=await res.json();return AUTH.user?.id===owner && Array.isArray(changed) && changed.length===1 && changed[0].id===inv._id;
-  }catch(_){return false;}
-};
-function FactureSousVente({ factures, compte }) {
-  const [ouvert,setOuvert]=useState(false),[choix,setChoix]=useState(''),[busy,setBusy]=useState(false),[queued,setQueued]=useState(false);
-  // (1er nov.) La file d'envoi n'est lue que pour le propriétaire de
-  // l'installation (`envoiFacturesParVRM`) : ailleurs, « Envoyer » mettait la
-  // facture « en cours d'envoi » pour toujours. Le geste n'est pas proposé.
-  const envoiVRM = useEstProprietaire();
-  if(!envoiVRM)return null;
-  // Les reçus Pro du serveur attestent le compte professionnel. Aucun
-  // rapprochement automatique par titre/prix : l'utilisateur choisit le reçu.
-  const propres=(factures||[]).filter(i=>i.type==='facture_pro' && i.account===compte && compte);
-  if(!propres.length)return null;
-  const drafts=propres.filter(i=>i.status==='draft' && i.buyerEmail);
-  const inv=drafts.find(i=>i._id===choix);
-  return <div className="vrm-sale-invoice" data-ouvert={ouvert ? "true" : undefined}>
-    {queued?<span role="status">Facture mise en file d'envoi</span>:<>
-      <Bouton variante="discret" icone="receipt" onClick={()=>setOuvert(!ouvert)} aria-expanded={ouvert} aria-label="Envoyer une facture à l'acheteur"><span className="vrm-invoice-full">Envoyer une facture à l'acheteur</span><span className="vrm-invoice-short" aria-hidden="true">Facture</span></Bouton>
-      {ouvert && <div style={{display:'grid',gap:6,padding:'6px 0'}}>
-        <label style={{fontSize:11}}>Choisir la facture de cette vente
-          <select aria-label="Facture de cette vente" value={choix} onChange={e=>setChoix(e.target.value)} style={{display:'block',width:'100%',padding:8,marginTop:4,color:C.text,background:C.card,border:`1px solid ${C.border}`,borderRadius:8}}>
-            <option value="">Sélectionner un brouillon</option>{drafts.map(i=><option key={i._id} value={i._id}>{i.number} · {i.designation} · {i.prix} € · {i.buyerEmail}</option>)}
-          </select>
-        </label>
-        {!drafts.length && <span style={{fontSize:11.5,color:C.muted}}>Aucun brouillon à envoyer pour ce compte (les reçus sont dans Factures).</span>}
-        {inv && <span data-facture-retour={inv.retourNom ? 'oui' : 'non'} style={{fontSize:11,color:inv.retourNom?C.muted:C.warn,lineHeight:1.4}}>{inv.retourNom
-          ? 'La facture et le formulaire de retour partent ensemble.'
-          : 'Seule la facture part : le formulaire de retour n’est pas arrivé avec l’email de vente — joins-le toi-même.'}</span>}
-        {inv && <button type="button" disabled={busy} onClick={async()=>{
-          if(!await askConfirm(`Mettre la facture ${inv.number} (${inv.prix} €) en file d'envoi à ${inv.buyerEmail} ?`))return;
-          setBusy(true);const ok=await setProInvoiceStatus(inv,'queued');setBusy(false);
-          if(ok)setQueued(true);else toast('La facture n’a pas été mise en file. Relis son état dans Factures.');
-        }} className="vrm-b vrm-b-secondaire">{busy?'Vérification…':'Confirmer le destinataire'}</button>}
-      </div>}
-    </>}
-  </div>;
-}
 // Reçus d'achat archivés (emails Vinted « Ton reçu pour la commande... ») :
 // lignes email_achat_* = { subject, article, prix, transaction, texte, pdfB64 }.
 // ⚠️ (29 oct.) §4.4 : plus de `select=data`. La ligne peut porter un PDF joint
@@ -4784,6 +4731,9 @@ const ordersFromEmailSales = (mails, accounts) => {
       // rien ne dit le contraire (`classifyOrderStatus` la classe « pending »).
       status: 'Vendu — en attente',
       _fromEmail: true,
+      // (2 nov.) Le n° de transaction que l'email Vinted Pro porte (pièce jointe
+      // « Formulaire-retour-commande-{tx} ») : l'identité de SA facture Pro.
+      _txMail: /^\d{6,20}$/.test(String(m.transaction || '')) ? String(m.transaction) : '',
       _acc: acc,
     };
   }).filter(Boolean);
@@ -28636,8 +28586,6 @@ function Door({h}) {
 
 /* ── Factures ───────────────────────────────────────── */
 function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoiceSettings,entreprises,setEntreprises,activeEnt,setActiveEnt}) {
-  // (1er nov.) L'envoi des factures Pro par la boîte VRM : propriétaire de l'installation seul.
-  const envoiVRM = useEstProprietaire();
   const [searchInput,setSearchInput]=useState('');
   const [search,setSearch]=useState('');
   const [zone,setZone]=useState('attente'); // 'attente' | 'comptabilisees'
@@ -28650,9 +28598,7 @@ function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoice
   // `vrm_pro_facture` — seul l'endroit change (§11 : un seul propriétaire).
   const [showPro,setShowPro]=useState(false);
   const [fetching,setFetching]=useState(false);
-  const [proInvs,setProInvs]=useState(null); // factures Pro (pipeline email)
   const PER_PAGE=50;
-  useEffect(()=>{ fetchProInvoices().then(r=>{ if(r) setProInvs(r); }); },[]);
 
   // ⚠️⚠️ CHEMIN GOOGLE SHEETS RETIRÉ (9 septembre) — IL ÉTAIT MORT, MESURÉ.
   // `fetchVintedInvoices` appelait un Apps Script
@@ -28676,19 +28622,9 @@ function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoice
   // lit `email_invoice_*` en base — les reçus Vinted arrivés par email
   // (`api/email-inbound`). Plus « + Nouvelle facture » pour la saisie.
 
-  // 🔄 Rafraîchissement automatique toutes les 5 min — sur la source VIVANTE.
-  // ⚠️ Cette boucle interrogeait l'Apps Script mort (404) toutes les 5 minutes,
-  //    en silence. Elle relit maintenant les reçus Vinted arrivés par email
-  //    (`email_invoice_*`), c'est-à-dire ce qui remplit réellement l'écran.
-  const _autoFetchedRef=React.useRef(false);
-  useEffect(()=>{
-    if(_autoFetchedRef.current) return;
-    _autoFetchedRef.current=true;
-    const interval=setInterval(()=>{ fetchProInvoices().then(r=>{ if(r) setProInvs(r); }); }, 5*60*1000);
-    return ()=>clearInterval(interval);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  },[]);
-  
+  // (2 nov.) Les factures Pro se lisent dans `ListeFacturesPro` (src/FacturePro.jsx),
+  // en scalaires — plus de relecture `select=data` toutes les 5 minutes (§4.4).
+
   // Numéro auto pour la prochaine facture — SÉQUENCE PROPRE À L'ENTITÉ ACTIVE.
   // Une facture sans `entrepriseId` appartient à la 1ʳᵉ entité (rétro-compat).
   // Chaque micro-entreprise garde ainsi sa propre numérotation continue (légal).
@@ -28808,16 +28744,17 @@ function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoice
               pouvait QUE échouer. Il relit maintenant les reçus arrivés par
               email — la source qui remplit vraiment cet écran. */}
           <Btn small outline color={C.muted} disabled={fetching}
-            onClick={async()=>{ setFetching(true); try{ const r=await fetchProInvoices(); if(r){ setProInvs(r); toast('Reçus Vinted relus'); } else toast('Les reçus n\'ont pas pu être relus — réessaie dans un instant.'); } finally { setFetching(false); } }}
+            onClick={async()=>{ setFetching(true); try{ const r=await relireFactures(DEPS_FACTURE); if(r) toast('Factures relues'); else toast('Les factures n\'ont pas pu être relues — réessaie dans un instant.'); } finally { setFetching(false); } }}
             style={{display:'inline-flex',alignItems:'center',gap:5}}>
-            <Icon name="sync" size={13}/>{fetching?'Chargement…':'Relire les reçus'}
+            <Icon name="sync" size={13}/>{fetching?'Chargement…':'Relire les factures'}
           </Btn>
           <Btn small outline color={C.muted} onClick={exportExcel} style={{display:'inline-flex',alignItems:'center',gap:5}}><Icon name="save" size={13}/>Exporter Excel</Btn>
           <Btn small outline color={C.muted} onClick={()=>setShowPro(v=>!v)} aria-expanded={showPro} style={{display:'inline-flex',alignItems:'center',gap:5}}><Icon name="receipt" size={13}/>Facturation Pro</Btn>
           <Btn small outline color={C.muted} onClick={()=>setShowSettings(true)} style={{display:'inline-flex',alignItems:'center',gap:5}}><Icon name="gear" size={13}/>Réglages des factures</Btn>
         </div>}/>
       </div>
-      {showPro && <ProFactureSetting/>}
+      {showPro && <FicheFacturation deps={DEPS_FACTURE}/>}
+      <ListeFacturesPro deps={DEPS_FACTURE}/>
 
       {/* Barre de recherche : par n° de paire ou date de vente (cherche dans toutes les zones) */}
       <div style={{display:'flex',gap:6,alignItems:'center',flexWrap:'wrap'}}>
@@ -28836,48 +28773,6 @@ function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoice
         🔍 Recherche « {search} » dans toutes les factures — {fullList.length} résultat{fullList.length>1?'s':''}. Tu peux supprimer directement avec 🗑.
       </div>}
       
-      {/* Factures Pro (pipeline email) : préparées par le serveur, envoi Gmail */}
-      {Array.isArray(proInvs)&&proInvs.length>0&&(
-        <div>
-          <div style={{fontSize:12,fontWeight:600,color:C.text,margin:'0 0 8px'}}>🧾 Factures Pro ({proInvs.length})</div>
-          <div style={{display:'flex',flexDirection:'column',gap:8}}>
-            {proInvs.slice(0,20).map(inv=>{
-              const col=inv.status==='sent'?'#27a85d':inv.status==='queued'?C.warn:C.muted;
-              // (1er nov.) JAMAIS « EN COURS D'ENVOI » À VIE : une facture en file
-              // depuis plus de 2 h n'est pas partie (la boîte d'envoi n'a pas
-              // tourné, ou elle n'envoie pas pour ce compte) — c'est dit, avec le geste.
-              const enFileDepuis=Date.parse(inv.queuedAt||inv.createdAt||'');
-              const fileBloquee=inv.status==='queued'&&(!envoiVRM||!Number.isFinite(enFileDepuis)||Date.now()-enFileDepuis>2*3600e3);
-              const lbl=inv.status==='sent'?'📧 envoyée':fileBloquee?'pas encore partie — ouvre-la (« Voir ») et envoie-la toi-même':inv.status==='queued'?'⏳ envoi en cours':envoiVRM?'brouillon':'à envoyer toi-même';
-              return (
-                <div key={inv._id} style={{display:'flex',gap:10,alignItems:'center',padding:'8px 10px',border:`1px solid ${col}55`,background:`${col}0d`,borderRadius:10,flexWrap:'wrap'}}>
-                  <div style={{flex:1,minWidth:140}}>
-                    <div style={{fontSize:13,fontWeight:600,color:C.text}}>
-                      {inv.number} <span style={{fontSize:11,fontWeight:600,color:col,marginLeft:4}}>{lbl}</span>
-                    </div>
-                    <div style={{fontSize:11,color:C.muted,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',maxWidth:260}}>
-                      {inv.designation||'Article'} · {inv.prix} € · {inv.buyerName||inv.buyerEmail}
-                    </div>
-                  </div>
-                  <div style={{display:'flex',gap:6,flexShrink:0}}>
-                    <button type="button" onClick={()=>{ ouvrirDocumentImprimable(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Facture ${xmlEsc(inv.number)}</title></head><body>${(inv.html||'').replace('cid:logoFacture','')}</body></html>`); }}
-                      style={{padding:'6px 12px',borderRadius:8,border:`1px solid ${C.border}`,background:C.card,color:C.text,fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Voir</button>
-                    {envoiVRM&&inv.status==='draft'&&inv.buyerEmail&&(
-                      <button type="button" onClick={async()=>{
-                        if(!await askConfirm(`Mettre la facture ${inv.number} en file d'envoi à ${inv.buyerEmail} ?`)) return;
-                        const ok=await setProInvoiceStatus(inv,'queued');
-                        if(ok){ const r=await fetchProInvoices(); if(r) setProInvs(r); } else toast('Échec — réessaie.');
-                      }} style={{padding:'6px 12px',borderRadius:8,border:'none',background:C.accent,color:'#fff',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Envoyer</button>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-          <div className="vrm-aide" style={{fontSize:11,color:C.muted,marginTop:6,lineHeight:1.4}}>Préparées automatiquement à chaque vente Pro (coordonnées acheteur dans l'email Vinted). Réglages : le bouton « Facturation Pro » en haut de cet écran.</div>
-        </div>
-      )}
-
       {/* Sous-onglets zones */}
       <div style={{display:'flex',gap:0,borderBottom:`1px solid ${C.border}`,overflowX:'auto',opacity:search?0.4:1,pointerEvents:search?'none':'auto'}}>
         {[
@@ -38268,7 +38163,7 @@ function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, pan
   // Factures reçues (reçus Vinted par email) : on consomme juste le NOMBRE pour
   // renvoyer vers l'écran Factures, on ne duplique pas la liste (§7/§11).
   const [nFactures, setNFactures] = React.useState(null);
-  React.useEffect(() => { let stop = false; fetchProInvoices().then(r => { if (!stop) setNFactures(Array.isArray(r) ? r.length : null); }).catch(() => {}); return () => { stop = true; }; }, []);
+  React.useEffect(() => { let stop = false; fetchProInvoices({ metadata: true }).then(r => { if (!stop) setNFactures(Array.isArray(r) ? r.filter((x) => x.number).length : null); }).catch(() => {}); return () => { stop = true; }; }, []);
 
   // ── Palette d'écran (§7 : neutre partout, UN accent rare) ──────────────────
   const inp = { border: `1px solid ${C.border}`, background: C.bg, color: C.text, borderRadius: 8, padding: '9px 11px', fontSize: 15, fontFamily: 'inherit', minWidth: 0, outline: 'none', boxSizing: 'border-box', minHeight: 40 };
@@ -38876,8 +38771,6 @@ function ListeComptes({ id, valeur, options, onChange, note, skin, attrs }) {
 }
 function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, onFreeNum, liveStats, accountsReady, baseKO, premierJour: premierJourProp, compteSel = '', compteConnecte = '', alertes = null, panelOff = null, dansPlateforme = false, vueAchats, siteColisDemande = null, onColisLeboncoin = null, sitesPresents = null, ongletColis = null, onOngletColis = null, onOngletVu = null, retraitsOutils = false }) {
   const [datesLbc] = useLigneSynchro('vrm_lbc_dates', lireDatesLbc);
-  const [facturesVentes,setFacturesVentes]=useState([]);
-  useEffect(()=>{if(only && only!=='ventes')return;let stop=false;fetchProInvoices({metadata:true}).then(rows=>{if(!stop&&rows)setFacturesVentes(rows);});return()=>{stop=true;};},[only]);
   // L'IDENTITÉ de l'ensemble des comptes liés (triée) : c'est elle que suivent
   // les relectures et le cache — jamais `accounts.length` (un compte retiré et
   // un autre ajouté gardent la même longueur).
@@ -46744,7 +46637,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const ov = saleOv[tx] || {};
     const hidden = isHidden(o);
     const cell = num ? garageCellOf(garageGrid, num) : null;
-    const deps = [C, INV_STATUS, facturesVentes, ventesUnCompte, garageUtilise, clavierNum(),
+    const deps = [C, INV_STATUS, ventesUnCompte, garageUtilise, clavierNum(),
       JSON.stringify(e), baseE, ov, photo, sourcesPhoto.join('\n'), hidden, isShipDone(o), estFloute(o),
       JSON.stringify(venteStage(o)), o._acc ? accNameOf(o._acc) : '', cell ? garageCellLabel(cell) : '', inGarage(num),
       saleOutcome(o), isPairLost(num), num ? numeroReprenable(num) : null,
@@ -49146,7 +49039,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     {st==='cancelled' && num && saleOutcome(o)==='rembourse' && !isPairLost(num) ? <Bouton variante="secondaire" onClick={()=>markPairLost(num,o)} title={`Tu as remboursé l'acheteur. Si l'article ne revient PAS, déclare-le perdu : le N°${num} sera libéré et sa case au garage vidée.`} aria-label="Déclarer l'article perdu">Article perdu ?</Bouton> : null}
                     {num && isPairLost(num) ? <Bouton variante="discret" onClick={()=>unmarkPairLost(num)} title={`Annuler : l'article N°${num} est finalement revenu.`} aria-label="Annuler article perdu">Il est revenu</Bouton> : null}
                   </div>
-                  <FactureSousVente factures={facturesVentes} compte={o._acc?.login}/>
+                  {(o._fromEmail ? o._txMail : o.transaction_id != null) ? <FactureVente deps={DEPS_FACTURE} vente={{ tx: String(o._fromEmail ? o._txMail : o.transaction_id), uid: o._acc && o._acc.vinted_user_id, compte: o._acc && o._acc.login, titre: o.title || '', centimes: sell != null && !autreDevise ? Math.round(sell * 100) : null, venteLe: o.date || '' }}/> : null}
                   <details className="vrm-sale-details vrm-recap-modifier"><summary title="Numéro, coût d’achat, frais">N° et frais</summary>
                     {!hidden && <CoutsVente entry={e} onSave={patch=>setSaleOverride(o.transaction_id,patch)} theme={C}/>}
                     {!hidden && (
@@ -58617,6 +58510,15 @@ const RETOUR_ABONNEMENT = (() => { try { return new URLSearchParams(window.locat
 // la page de gestion Stripe, lien direct). Capté au chargement pour la même raison.
 const RETOUR_VUE = (() => { try { return new URLSearchParams(window.location.search).get('vue') || ''; } catch (_) { return ''; } })();
 const enTeteSession = () => (AUTH.session && AUTH.session.access_token ? { Authorization: `Bearer ${AUTH.session.access_token}` } : {});
+// ── LA FACTURE PRO (2 nov.) : les outils de l'app que src/FacturePro.jsx emprunte.
+const ecrireReglage = async (id, data) => {
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=${SB_CONFLICT}`, { method: 'POST', headers: { ...sbAuth(), 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify([withOwner({ id, data })]) });
+    if (r.ok) { try { window.dispatchEvent(new CustomEvent('vrm:profil-fiscal', { detail: data })); } catch (_) {} }
+    return r.ok;
+  } catch (_) { return false; }
+};
+const DEPS_FACTURE = { lireReglage, ecrireReglage, lireTout, enTeteSession, askConfirm, toast: (m) => toast(m), chercherEntreprise, ouvrirPdfOnglet, FermeAuRetour, typeCompteVinted };
 // Trois états : `undefined` en cours · `null` pas su · l'objet du serveur.
 async function lireAbonnement() {
   try {
@@ -60110,150 +60012,6 @@ function ZoomSetting({ nu = false }) {
       </div>
       <Segmente label="Taille de l'affichage" plein value={selection} onChange={choisir} style={{marginTop:11}}
         options={choix.map(([v, label]) => ({ v, l: label }))}/>
-    </div>
-  );
-}
-
-// Facturation Pro : réglages rangés dans Supabase (ligne vrm_pro_facture) —
-// c'est cette ligne que lit le serveur quand une vente Pro arrive. Le toggle
-// « envoi automatique » est LE consentement : OFF = aucune facture ne part
-// (les factures restent en brouillon, envoi manuel possible dans Factures).
-function ProFactureSetting() {
-  // (1er nov., VRM vendu à d'autres) L'envoi automatique passe par la boîte
-  // Gmail de l'installation, que le serveur ne fait tourner que pour son
-  // propriétaire : à un autre vendeur, l'interrupteur n'est pas proposé, et
-  // c'est dit (il ouvre la facture et l'envoie lui-même).
-  const envoiVRM = useEstProprietaire();
-  const DEFAULTS = { actif:false, autoSend:false, nom:'', adresse:'', codePostal:'', ville:'', siret:'', tva:'', prefixe:'FA', tauxTva:'0', mentions:'', logo:'' };
-  const [cfg, setCfg] = useState(undefined); // undefined = en cours · null = pas su · objet = lu
-  const [status, setStatus] = useState('');
-  const HEADERS = sbAuth();
-  const saveTimer = React.useRef(null);
-
-  useEffect(() => { (async () => {
-    try {
-      // ⚠️⚠️ CE PANNEAU RÉÉCRIT LA LIGNE ENTIÈRE AU PREMIER CARACTÈRE TAPÉ.
-      //    Avant, une lecture ratée (aucun `res.ok` : sur un 522 Cloudflare
-      //    `res.json()` lève, et le `catch` posait les valeurs par DÉFAUT) lui
-      //    montrait un formulaire VIDE — et la première frappe écrasait sa
-      //    raison sociale, son adresse et son SIRET. C'est l'entité que porte
-      //    le reçu d'achat envoyé à son comptable (§5) : sans elle, il redit
-      //    « Ma boutique ». « Rien lu » ne vaut pas « rien ».
-      const d = await lireReglage('vrm_pro_facture');
-      setCfg(d === null ? null : { ...DEFAULTS, ...d });
-    } catch (_) { setCfg(null); }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  })(); }, []);
-
-  const persist = (next) => {
-    if (cfg === null) return;                  // pas lu : on n'écrit rien
-    setCfg(next); setStatus('enregistrement…');
-    try { window.dispatchEvent(new CustomEvent('vrm:profil-fiscal', { detail: next })); } catch (_) {}
-    if (saveTimer.current) clearTimeout(saveTimer.current);
-    saveTimer.current = setTimeout(async () => {
-      try {
-        await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=${SB_CONFLICT}`, {
-          method: 'POST',
-          headers: { ...HEADERS, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' },
-          body: JSON.stringify([withOwner({ id: 'vrm_pro_facture', data: next })]),
-        });
-        setStatus('✓ enregistré');
-      } catch (_) { setStatus('⚠ échec — réessaie'); }
-    }, 600);
-  };
-  const upd = (field, val) => persist({ ...cfg, [field]: val });
-
-  // Trois états : `undefined` = en cours · `null` = la base n'a pas répondu ·
-  // un objet = lu. Un panneau qui a ÉCHOUÉ ne doit pas dire « Chargement… »
-  // pour toujours, et surtout pas montrer des champs vides à remplir.
-  if (cfg === undefined) return <div style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:10,padding:'12px 14px',fontSize:12,color:C.muted}}>Chargement…</div>;
-  if (cfg === null) return (
-    <div style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:10,padding:'12px 14px'}}>
-      <div style={{fontSize:13,fontWeight:600,color:C.text,marginBottom:6}}>🧾 Facturation Pro</div>
-      <span style={{display:'inline-block',fontSize:11,fontWeight:600,color:C.muted,background:C.bg,border:`1px solid ${C.border}`,borderRadius:999,padding:'2px 9px'}}>{REGLAGE_PAS_LU}</span>
-    </div>
-  );
-
-  const input = (field, placeholder, flex) => (
-    <input value={cfg[field]||''} onChange={e=>upd(field, e.target.value)} placeholder={placeholder}
-      style={{flex:flex||'1 1 130px',border:`1px solid ${C.border}`,borderRadius:8,padding:'8px 10px',fontSize:13,fontFamily:'inherit',background:C.bg,color:C.text,outline:'none',minWidth:0}}/>
-  );
-
-  return (
-    <div style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:10,padding:'12px 14px'}}>
-      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8,marginBottom:4}}>
-        <div style={{fontSize:13,fontWeight:600,color:C.text}}>🧾 Facturation Pro</div>
-        <button type="button" onClick={()=>upd('actif', !cfg.actif)} style={{
-          padding:'4px 14px',borderRadius:8,fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit',
-          background:cfg.actif?C.accent:'transparent',color:cfg.actif?'#fff':C.muted,
-          border:`1.5px solid ${cfg.actif?C.accent:C.border}`,
-        }}>{cfg.actif?'Activée':'Désactivée'}</button>
-      </div>
-      <div style={{fontSize:12,color:C.muted,marginBottom:cfg.actif?12:0,lineHeight:1.4}}>
-        Pour les comptes Vinted Pro : l'email de vente contient les coordonnées de l'acheteur — l'app prépare la facture avec tes informations ci-dessous.
-      </div>
-      {cfg.actif && (<>
-        {/* Logo */}
-        <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:10}}>
-          {cfg.logo && <img src={cfg.logo} alt="logo" style={{height:46,width:46,objectFit:'contain',borderRadius:8,border:`1px solid ${C.border}`,background:'#fff'}}/>}
-          <label style={{cursor:'pointer'}}>
-            <input type="file" accept="image/*" style={{display:'none'}} onChange={e=>{
-              const f=e.target.files[0]; if(!f) return;
-              const r=new FileReader();
-              r.onload=ev=>upd('logo', ev.target.result);
-              r.readAsDataURL(f); e.target.value='';
-            }}/>
-            <span style={{padding:'6px 12px',borderRadius:8,fontSize:12,fontWeight:600,cursor:'pointer',background:'transparent',color:C.accent,border:`1.5px solid ${C.accent}66`,display:'inline-block'}}>
-              {cfg.logo?'Changer le logo':'Ajouter un logo'}
-            </span>
-          </label>
-          {cfg.logo && <button type="button" onClick={()=>upd('logo','')} style={{padding:'6px 12px',borderRadius:8,fontSize:12,fontWeight:600,cursor:'pointer',background:'transparent',color:C.danger,border:`1.5px solid ${C.danger}66`,fontFamily:'inherit'}}>Retirer</button>}
-        </div>
-        {/* Identité */}
-        <div style={{display:'flex',flexWrap:'wrap',gap:8,marginBottom:8}}>
-          {input('nom','Nom commercial','1 1 100%')}
-          {input('adresse','Adresse','1 1 100%')}
-          {input('codePostal','Code postal','1 1 90px')}
-          {input('ville','Ville')}
-          {input('siret','SIRET','1 1 100%')}
-          {input('tva','N° TVA intracom. (si assujetti)','1 1 100%')}
-        </div>
-        {/* Préfixe + taux TVA */}
-        <div style={{display:'flex',flexWrap:'wrap',gap:8,alignItems:'center',marginBottom:8}}>
-          <span style={{fontSize:12,fontWeight:500,color:C.text}}>Préfixe</span>
-          {input('prefixe','FA','0 1 70px')}
-          <span style={{fontSize:12,fontWeight:500,color:C.text,marginLeft:6}}>TVA</span>
-          <select value={cfg.tauxTva||'0'} onChange={e=>upd('tauxTva', e.target.value)}
-            style={{border:`1px solid ${C.border}`,borderRadius:8,padding:'8px 10px',fontSize:13,fontFamily:'inherit',background:C.bg,color:C.text,outline:'none'}}>
-            <option value="0">0 % (franchise)</option>
-            <option value="5.5">5,5 %</option>
-            <option value="10">10 %</option>
-            <option value="20">20 %</option>
-          </select>
-        </div>
-        {/* Mentions */}
-        <textarea value={cfg.mentions||''} onChange={e=>upd('mentions', e.target.value)} rows={2}
-          placeholder="Mentions légales / pied de facture (ex : TVA non applicable – art. 293 B du CGI)"
-          style={{width:'100%',boxSizing:'border-box',border:`1px solid ${C.border}`,borderRadius:8,padding:'8px 10px',fontSize:12,fontFamily:'inherit',background:C.bg,color:C.text,outline:'none',resize:'vertical',marginBottom:8}}/>
-        {/* Envoi automatique */}
-        {!envoiVRM ? (
-          <div data-facture-envoi="vendeur" style={{borderTop:`1px solid ${C.border}`,paddingTop:10}}>
-            <div style={{fontSize:13,fontWeight:600,color:C.text}}>Envoi à l'acheteur : par toi</div>
-            <div style={{fontSize:11,color:C.muted,marginTop:2,lineHeight:1.45}}>L'envoi automatique passe par la boîte d'envoi de l'installation VRM : il n'est pas ouvert aux autres vendeurs. Chaque facture est préparée dans Comptabilité → Factures : ouvre-la (« Voir »), enregistre-la en PDF et envoie-la à l'acheteur depuis Vinted ou ta messagerie.</div>
-          </div>
-        ) : <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:10,borderTop:`1px solid ${C.border}`,paddingTop:10}}>
-          <div style={{minWidth:0}}>
-            <div style={{fontSize:13,fontWeight:600,color:C.text}}>Envoi automatique à l'acheteur</div>
-            <div style={{fontSize:11,color:C.muted,marginTop:2,lineHeight:1.4}}>Rien ne part sans ton accord. Tu peux couper à tout moment — l'arrêt est immédiat. OFF = les factures attendent dans l'onglet Factures.</div>
-          </div>
-          <button type="button" onClick={()=>upd('autoSend', !cfg.autoSend)} style={{
-            flexShrink:0,padding:'6px 16px',borderRadius:8,fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit',
-            background:cfg.autoSend?C.accent:'transparent',color:cfg.autoSend?'#fff':C.muted,
-            border:`1.5px solid ${cfg.autoSend?C.accent:C.border}`,
-          }}>{cfg.autoSend?'ON':'OFF'}</button>
-        </div>}
-      </>)}
-      {status && <div style={{fontSize:11,color:status.includes('⚠')?C.danger:C.muted,marginTop:8}}>{status}</div>}
     </div>
   );
 }
