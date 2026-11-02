@@ -67,3 +67,30 @@ Déplacé TEL QUEL depuis CLAUDE.md §9 le 2 novembre 2026 (le fichier dépassai
 - **31 oct. (soir)** — Les colis à retirer vivent dans Colis seulement ; Achats à part ; sections de site en sous-onglets. → historique interface-stock. Geste : aucun.
 - **31 oct. (nuit)** — Recherche en place et notifications qui mènent à l'endroit exact (`api/_lib/lien-notif.js` ⇄ `src/cibleNotif.js`). → historiques interface-stock et sécurité. Geste : aucun.
 - **31 oct. (soir)** — Colis en 4 colonnes (Prêts · En attente · À retirer · Partis, sa maquette) + barre du haut ordinateur (recherche « / », filtres de site à droite) ; aucune règle neuve, la liste d'avant reste sous « Colis par colis ». → historique colis-retraits. Geste : regarder Colis sur ordinateur.
+- **31 oct.** — **Prix 16,99 €/mois** (sa décision ; 14,99 € depuis le 27 oct., CGV version 2026-10-31, essai 7 j inchangé) ; adresse de contact **vrm.vinted35+contact@gmail.com** (sa décision), tenue hors de la réception des colis (`gmail-forwarder.gs`, à recoller). Geste : prix Stripe à 16,99 €.
+- **31 oct.** — Emails : journal « Tes emails, ce que VRM en a fait » (Paramètres → Emails → Journal, et depuis Colis) : une phrase par email, raison et geste ; résumé court écrit au classement (`api/_lib/resume-email.js`), texte à part (`email_texte_*`), `mode=journal` paginé (≈ 11 Ko/page). → historique sécurité-base-serveur. Geste : aucun.
+- **31 oct.** — Extension 5.295.0 : Vestiaire (compte, conversations, réponse par recette APPRISE, favoris en nombre), relais des achats. → historiques vestiaire / colis-retraits. Geste : envoyer UNE réponse soi-même sur Vestiaire.
+- **31 oct.** — Statistiques détaillées + widget « Tendances » ; bénéfice de Ma journée masquable en mode « Modifier ». → historiques interface-stock et compta. Geste : aucun.
+- **31 oct.** — Navigation par tâche (Journée · Annonces · Ventes · Colis · Plus ; anciens `?tab=` redirigés, `src/navigationTache.js`). → historique interface-stock. Geste : aucun.
+- **31 oct.** — Extension **5.293.0 soumise à addons.mozilla.org** par Julien (fiche `vrm-outil-du-revendeur`, compte vrm.vinted35@gmail.com) : Orion iPhone refuse l'installation par fichier (essais du 31 oct.) mais installe depuis la boutique (Dark Reader OK). Geste : à l'acceptation, donner le lien → `LIENS_BOUTIQUES.firefox` ; Chrome Web Store : `docs/publier-extension-pas-a-pas.md`.
+
+
+## Lignes du 28 oct. sorties de CLAUDE.md §9 le 2 nov. (telles quelles)
+
+- **28 oct.** — VRM reste sur la France (décision). Stock : un article une fois, toutes
+  plateformes ; meubles, plateaux, planches, hauteurs et « max N » partout. → interface-stock.
+- **28 oct.** — Republier : supprime et recrée (5.248), brouillons Vinted, menu « Actions »,
+  « Refaire le brouillon », couleur et taille vérifiées avant la mise en ligne. → vinted-extension.
+- **28 oct.** — Vestiaire : formulaire « smart listing », étiquette en 2ᵉ photo, Taille/État/Prix.
+- **28 oct.** — Tour de chaque espace sur ses vraies données (Vinted, Leboncoin, eBay,
+  Vestiaire, Ma journée, Colis).
+
+## Lignes du 29 oct. sorties de CLAUDE.md §9 le 2 nov. (telles quelles)
+
+- **29 oct.** — Favoris comme Vintex (5.280-5.281) : variables `{username}`, `{a|b}`,
+  offre réelle ; plafond de file retiré. → favoris-messages.
+- **29 oct.** — shop_cancale : tout retiré, ventes comprises (sa décision) ; un compte
+  supprimé ne sort plus d'aucune lecture (`src/comptesSupprimes.js`, sauf
+  `{ vrmVoirSupprimes: true }`). → divers / sécurité.
+- **29 oct.** — Ventes masquées impossibles ; Organisation hors du menu ; saisie « N° +
+  Entrée » retirée ; carte de la communauté gardée claire en mode sombre.

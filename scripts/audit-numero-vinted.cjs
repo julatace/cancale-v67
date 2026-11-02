@@ -19,11 +19,11 @@ const fs = require('fs'), path = require('path'), vm = require('vm');
 let ko = 0, ok = 0;
 const dit = (bon, quoi, det) => { if (bon) ok++; else ko++; console.log(`${bon ? '✅' : '❌'} ${quoi}${det ? ' — ' + det : ''}`); };
 const essaie = async (quoi, fn) => { try { return await fn(); } catch (e) { ko++; console.log(`❌ ${quoi} — a levé : ${e && e.message}`); return null; } };
-const MAIN = () => ({ vinted_used_numeros: [1, 2, 3, 51, 52, 'B558'], vinted_annonce_numeros: { '10400000001': { numero: '73' }, '10400000002': { numero: '12' } }, vinted_sale_overrides: { '9000001': { numero: '60' } } });
+const MAIN = () => ({ vinted_used_numeros: [1, 2, 3, 51, 52, 'B558'], vinted_annonce_numeros: { '10400000001': { numero: '73', accountId: '111' }, '10400000002': { numero: '12', accountId: '111' }, '10400000222': { numero: '22', accountId: '222' } }, vinted_sale_overrides: { '9000001': { numero: '60' } } });
 function monter(opts = {}) {
   const lignes = { main: MAIN(), 'harvest_111_orders_sold': { payload: { my_orders: [{ transaction_id: 9000001, conversation_id: 8000001 }, { transaction_id: 9000002, conversation_id: 8000002 }] } },
     'harvest_111_txn_9000002': { payload: { transaction: { id: 9000002, item_id: 10400000002 } } }, ...(opts.lignes || {}) };
-  const f = faireFond({ src: cheminSource(), lignes, lectureKO: opts.lectureKO || (() => false) });
+  const f = faireFond({ src: cheminSource(), lignes, lectureKO: opts.lectureKO || (() => false), ...(opts.connecte ? { connecte: opts.connecte } : {}) });
   if (opts.ecritureKO) {
     const f0 = f.ctx.fetch;
     f.ctx.fetch = async (u, o = {}) => (opts.ecritureKO() && /panel_num_reserves/.test(String(u) + String(o.body || '')) && (o.method || 'GET') !== 'GET')
@@ -87,6 +87,21 @@ const resaDe = (f) => f.lignes.panel_num_reserves || null;
     dit(r && r.ok && r.items['10400000001'] === '73' && !r.items['10400000099'], 'annonce : le numéro de SA fiche, rien pour une annonce inconnue', JSON.stringify(r && r.items));
     dit(r && r.convs['8000001'] === '60' && r.convs['8000002'] === '12' && !r.convs['8000099'], 'vente : par la conversation → transaction → N° (corrigé ou fiche de l\'annonce)', JSON.stringify(r && r.convs));
     dit(r && r.txs['9000002'] === '12', 'transaction → annonce → N°', JSON.stringify(r && r.txs));
+  });
+  // (2 nov., Julien) Connecté sur le compte 111, il se promène sur une annonce, une
+  // vente, une conversation du compte 222 : AUCUN numéro de 222 ne s'affiche.
+  await essaie('autre compte', async () => {
+    const lignes = { 'harvest_222_orders_sold': { payload: { my_orders: [{ transaction_id: 9000222, conversation_id: 8000222 }] } }, 'harvest_222_txn_9000222': { payload: { transaction: { id: 9000222, item_id: 10400000222 } } } };
+    const f = monter({ lignes });
+    const r = await f.envoyer({ from: 'cancale-vcapture', action: 'numeros', items: ['10400000001', '10400000222'], convs: ['8000222'], txs: ['9000222'] }, { tab: { id: 5 }, origin: 'https://www.vinted.fr', url: 'https://www.vinted.fr/items/10400000222' });
+    dit(r && r.ok && r.items['10400000001'] === '73' && !r.items['10400000222'] && !r.convs['8000222'] && !r.txs['9000222'], 'connecté sur 111 : ni l\'annonce, ni la vente, ni la conversation de 222 ne montrent leur N°', JSON.stringify(r && [r.items, r.convs, r.txs]));
+    const f2 = monter({ lignes, connecte: '222' });
+    const r2 = await f2.envoyer({ from: 'cancale-vcapture', action: 'numeros', items: ['10400000001', '10400000222'], convs: ['8000222'], txs: ['9000222'] }, { tab: { id: 5 }, origin: 'https://www.vinted.fr', url: 'https://www.vinted.fr/items/10400000222' });
+    dit(r2 && r2.ok && r2.items['10400000222'] === '22' && r2.txs['9000222'] === '22' && r2.convs['8000222'] === '22' && !r2.items['10400000001'], 'connecté sur 222 : SES numéros, et plus ceux de 111', JSON.stringify(r2 && [r2.items, r2.convs, r2.txs]));
+    const MAIN0 = MAIN(); delete MAIN0.vinted_annonce_numeros['10400000001'].accountId;
+    const f3 = monter({ lignes: { main: MAIN0 } });
+    const r3 = await f3.envoyer({ from: 'cancale-vcapture', action: 'numeros', items: ['10400000001'] }, tab(5));
+    dit(r3 && r3.ok && !r3.items['10400000001'], 'une fiche sans compte connu : aucun numéro (pas su ≠ oui)', JSON.stringify(r3 && r3.items));
   });
   // Le vrai inject.js : la publication.
   await essaie('inject.js', async () => {

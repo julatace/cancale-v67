@@ -69,14 +69,18 @@ const EXE = ['/opt/pw-browsers/chromium'].find((p) => fs.existsSync(p));
 
 // ── Mutations / bascule ─────────────────────────────────────────────────────
 const MUT = process.env.BANC_CSP_MUTATION || '';
-const VIGUEUR = !!process.env.BANC_CSP_EN_VIGUEUR;
-if (VIGUEUR || MUT) {
+// (2 nov.) La politique complète est EN VIGUEUR dans vercel.json : le banc le lit
+// lui-même (plus de clé Report-Only) au lieu d'exiger la variable.
+const DEJA_EN_VIGUEUR = !/Content-Security-Policy-Report-Only/.test(fs.readFileSync(path.join(RACINE, 'vercel.json'), 'utf8'));
+const VIGUEUR = !!process.env.BANC_CSP_EN_VIGUEUR || DEJA_EN_VIGUEUR;
+if ((VIGUEUR && !DEJA_EN_VIGUEUR) || MUT) {
   V.vercelMute((cfg) => {
     // La politique complète vit dans SA règle (22 oct. : `/((?!sw\.js).*)`, le
     // service worker n'est pas sous elle) — on la cherche par sa clé.
-    const regle = cfg.headers.find((x) => (x.headers || []).some((e) => e.key === 'Content-Security-Policy-Report-Only'));
+    const complete = (e) => e.key === 'Content-Security-Policy-Report-Only' || (DEJA_EN_VIGUEUR && e.key === 'Content-Security-Policy' && /script-src/.test(e.value));
+    const regle = cfg.headers.find((x) => (x.headers || []).some(complete));
     const h = regle.headers;
-    const ro = h.find((e) => e.key === 'Content-Security-Policy-Report-Only');
+    const ro = h.find(complete);
     if (MUT === 'swpolitique') regle.source = '/(.*)';
     else if (MUT) {
       const retirer = { supabase: /\s(https|wss):\/\/lgonxzrzjcqthjtbdpzo\.supabase\.co/g, jsdelivr: /\shttps:\/\/cdn\.jsdelivr\.net/g, vinted: /\shttps:\/\/\*\.vinted\.net/g, openfreemap: /\shttps:\/\/tiles\.openfreemap\.org/g, tous: /\s(https|wss):\/\/[^\s;]+/g }[MUT];
@@ -271,7 +275,7 @@ const nouvelles = (vues, depuis) => vues.slice(depuis);
 
     // ── La fenêtre du reçu d'achat : le VRAI `openReceipt`, ses deux boutons ──
     console.log(`── ${vp.width} px — reçu, facture, bordereau`);
-    await pg.goto(`${ORIGINE}/?tab=cat_achats`, { waitUntil: 'domcontentloaded' }); await calme(pg, 1500);
+    await pg.goto(`${ORIGINE}/?tab=cat_achats&vue=achats`, { waitUntil: 'domcontentloaded' }); await calme(pg, 1500);
     // (22 oct., revue) Le QR Vinted Go (http dans sa base) part en https, et ne
     // fait signaler aucune violation (la tournée des écrans juge les violations).
     dit(VG.https > 0 && VG.http === 0, 'le QR Vinted Go (http dans les emails) est demandé en https, jamais en http', `https ${VG.https} · http ${VG.http}`);
@@ -284,7 +288,7 @@ const nouvelles = (vues, depuis) => vues.slice(depuis);
       let j = null;
       for (let i = 0; i < 30; i++) { j = await journalCsp(pg); if (j && j.some((e) => /interdit-page/.test(e.message))) break; await pg.waitForTimeout(100); }
       const e = (j || []).find((x) => /interdit-page/.test(x.message));
-      dit(!!e && /^cat_achats/.test(e.ecran || ''), 'le journal nomme l\'écran d\'une violation de la page (history.state, pas l\'adresse)', e ? `écran « ${e.ecran} »` : 'rien au journal');
+      dit(!!e && /^(cat_)?achats/.test(e.ecran || ''), 'le journal nomme l\'écran d\'une violation de la page (history.state, pas l\'adresse)', e ? `écran « ${e.ecran} »` : 'rien au journal');
       await pg.waitForTimeout(300);
       vues.splice(n0);
     }
