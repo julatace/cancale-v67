@@ -9856,11 +9856,23 @@ function uuidRecreer() {
 // Rend { item } ou { manque: [...] }.
 // (2 nov., 5.310) `partiel` : rend aussi le corps INCOMPLET ({ item, manque }) —
 // `reglerAvant` le complète depuis une identité ou pose la question ; jamais envoyé tel quel.
-function itemPourRecreer({ modeleCorps, codes, titre, prix, description, brand, photoIds, temp, partiel }) {
+function itemPourRecreer({ modeleCorps, codes, vivant, titre, prix, description, brand, photoIds, temp, partiel }) {
   // (29 oct.) Tout passe par un brouillon : la forme COURTE {id, orientation} — celle des brouillons du site et de Vintex (mesurée).
   const assigned = photoIds.map((id) => ({ id, orientation: 0 }));
   let base = null;
   if (modeleCorps) { try { const o = JSON.parse(modeleCorps); const it = o && (o.item && typeof o.item === 'object' ? o.item : null); if (it && it.catalog_id != null) { base = { ...it }; for (const k of ['photos', 'upload_session_id', 'is_draft', 'is_hidden', 'is_closed', 'push_up']) delete base[k]; } } catch (_) {} }
+  // (2 nov., 5.311 — Julien : « tout est déjà rempli, l'extension a simplement à
+  // lire ») Ce que Vinted montre MAINTENANT sur l'annonce (sa page « Modifier »,
+  // lue juste avant) l'emporte, champ par champ, sur une recette ancienne : une
+  // recette apprise avant que la taille ou la couleur soit posée partait SANS elles.
+  if (base && vivant && typeof vivant === 'object') {
+    if (Number(vivant.catalog_id) > 0) base.catalog_id = Number(vivant.catalog_id);
+    if (Array.isArray(vivant.item_attributes) && vivant.item_attributes.length) base.item_attributes = vivant.item_attributes;
+    if (idsCouleurVinted(vivant).length) base.color_ids = idsCouleurVinted(vivant);
+    if (Number(vivant.package_size_id) > 0) base.package_size_id = Number(vivant.package_size_id);
+    if (Number(vivant.brand_id) > 0) { base.brand_id = Number(vivant.brand_id); if (vivant.brand) base.brand = vivant.brand; }
+    if (typeof vivant.is_unisex === 'boolean') base.is_unisex = vivant.is_unisex;
+  }
   if (!base) {
     const c = codes || {};
     const manque = [];
@@ -10414,7 +10426,8 @@ async function apprendreRecetteVinted(acc, uid, id) {
   const stop = await gardeLecture(uid, acc, 'clic');
   if (stop) return { raison: stop.error || 'la lecture n’est pas possible pour l’instant' };
   const r = await vintedPage(acc, 'GET', `/api/v2/item_upload/items/${id}`, null, { timeoutMs: 30000 });
-  if (!r || !r.ok) { noterDiag(`recette_lecture_refuse_${(r && r.status) || 0}`); return { raison: `Vinted a refusé la lecture (${(r && r.status) || 'pas de réponse'})` }; }
+  if (r && r.sansPage) return { raison: raisonSansPage(r), sansPage: true };
+  if (!r || !r.ok) { noterDiag(`recette_lecture_refuse_${(r && r.status) || 0}`); return { raison: `Vinted a refusé la lecture (${(r && r.status) || 'pas de réponse'})`, status: (r && r.status) || 0 }; }
   const j = r.json && typeof r.json === 'object' ? r.json : null;
   const f = j ? ficheDeCorpsVinted(j.item && typeof j.item === 'object' ? j : { item: j }, id) : null;
   const c = f && f.codes;
@@ -10495,25 +10508,6 @@ async function recreerVinted(msg) {
     if (d2.length >= DESCRIPTION_MIN) { descBase = d2; description = lettreFin ? `${descBase}\n\n${lettreFin}` : descBase; if (appris.codes) details.codes = { ...(details.codes || {}), ...appris.codes }; }
     else { noterDiag('recreer_sans_description'); return { accepte: false, code: 'description-absente', raison: "VRM ne connaît pas la description de cette annonce, et Vinted refuse une annonce sans description (5 caractères au moins). Ouvre-la sur Vinted → « Modifier » → « Enregistrer » une fois : l'extension l'apprend. Rien n'a été touché." }; }
   }
-  let essai = itemPourRecreer({ modeleCorps: modele && modele.corps, codes: details.codes, titre, prix, description, brand: sauve && sauve.brand, photoIds: [1], temp: 'x' });
-  // (28 oct., « j'ai modifié, corrige et fais ça bien ») La recette manque : on la
-  // LIT chez Vinted, comme le fait sa page « Modifier » (une lecture, aucun geste).
-  if (essai.manque) {
-    if (!appris) appris = await apprendreRecetteVinted(acc, uid, id);
-    if (appris && appris.codes) {
-      details.codes = { ...(details.codes || {}), ...appris.codes };
-      essai = itemPourRecreer({ modeleCorps: modele && modele.corps, codes: details.codes, titre, prix, description, brand: sauve && sauve.brand, photoIds: [1], temp: 'x' });
-    } else if (appris && appris.raison) {
-      return { accepte: false, code: 'recette-absente', raison: `VRM a demandé à Vinted la catégorie, la taille, l’état et le colis de CETTE annonce, mais ${appris.raison}. Rien n'a été touché.` };
-    }
-  }
-  // (2 nov., 5.310) Une recette incomplète n'arrête plus d'emblée : le corps PARTIEL
-  // passe par `reglerAvant` (complété UNE fois depuis l'identité de CETTE annonce, ou
-  // la question posée dans l'app). Il manque encore quelque chose ⇒ on s'arrête ICI,
-  // avant toute requête, et la question part avec la réponse.
-  const manqueRecette = essai.manque || null;
-  if (manqueRecette) essai = itemPourRecreer({ modeleCorps: modele && modele.corps, codes: details.codes, titre, prix, description, brand: sauve && sauve.brand, photoIds: [1], temp: 'x', partiel: true });
-  const reglages = reglagesPhotoSurs(msg.reglages);
   // Une recréation dont l'issue est INCONNUE (création partie sans réponse) bloque
   // la suivante de la MÊME annonce : la relancer créerait une seconde copie.
   const verrou = await lireVerrouRecreer(id);
@@ -10527,6 +10521,45 @@ async function recreerVinted(msg) {
   const vbEnVol = !!(vb && Number.isFinite(tVb) && Date.now() - tVb < RECREER_VERROU_MS && (vb.etat === 'enregistre' || vb.etat === 'brouillon-range' || vb.etat === 'mise-en-ligne-incertaine' || /incertaine|flou/.test(String(vb.cause || ''))));
   if (!verrou && vbEnVol) return { accepte: false, code: 'recreer-incertaine', raison: `une republication de cette annonce est en cours ou restée sans réponse claire il y a ${Math.max(1, Math.round((Date.now() - tVb) / 60000))} min (peut-être depuis un autre Chrome) — regarde ton dressing et tes brouillons Vinted avant de réessayer. Rien n'a été touché.` };
   if (verrou) return { accepte: false, code: 'recreer-incertaine', raison: `une recréation de cette annonce est partie il y a ${Math.max(1, Math.round((Date.now() - verrou) / 60000))} min sans réponse claire de Vinted — regarde ton dressing avant de réessayer (rien n'a été touché cette fois)` };
+  // (2 nov., 5.311) Les refus qui ne demandent RIEN à Vinted passent AVANT la lecture
+  // de l'annonce : quota du jour, et place dans l'heure pour toute la paire (regardée
+  // sans rien réserver ; la réservation reste plus bas, juste avant les gestes).
+  { const jour0 = await gardeJourRepub(uid); if (jour0) return { accepte: false, code: jour0.code, raison: jour0.raison }; }
+  { const nA0 = msg.versBrouillon === true ? 2 : 3;
+    let n0 = 0; try { const l = ((await chrome.storage.local.get('vrmActions')).vrmActions || {})[uid]; n0 = Array.isArray(l) ? l.filter((t) => Date.now() - Number(t) < 3600000).length : 0; } catch (_) {}
+    if (n0 + nA0 > ACTIONS_MAX_HEURE - RESERVE_GESTES) {
+      const recu0 = {};
+      const stopP = await gardeStricte(uid, acc, { reserve: RESERVE_GESTES, actions: nA0, recu: recu0 });
+      if (stopP) return { accepte: false, code: stopP.code, raison: stopP.error };
+      if (recu0.at) await rendreActions(uid, Number(recu0.at), nA0);   // passé entre-temps : on rend, la vraie réservation est plus bas
+    } }
+  // (2 nov., 5.311) TOUJOURS lire l'annonce chez Vinted avant de la refaire (une
+  // lecture, comme sa page « Modifier » ; Vintex fait de même) : ce qu'elle porte
+  // aujourd'hui (catégorie, taille, état, couleur, colis, marque) fait foi.
+  if (!appris) appris = await apprendreRecetteVinted(acc, uid, id);
+  if (appris && appris.sansPage) return { accepte: false, code: 'onglet-vinted', raison: appris.raison };
+  if (appris && (appris.status === 404 || appris.status === 410)) { noterDiag('recreer_annonce_absente'); return { accepte: true, etape: 'echec', raison: "Vinted dit que cette annonce n'existe plus (elle a peut-être été supprimée ou vendue) — VRM ne recrée rien. Regarde ton dressing." }; }
+  const vivant = appris && appris.codes ? appris.codes : null;
+  if (vivant) details.codes = { ...(details.codes || {}), ...vivant }; else noterDiag('recreer_sans_lecture_vivante');
+  let essai = itemPourRecreer({ modeleCorps: modele && modele.corps, codes: details.codes, vivant, titre, prix, description, brand: sauve && sauve.brand, photoIds: [1], temp: 'x' });
+  // (28 oct., « j'ai modifié, corrige et fais ça bien ») La recette manque : on la
+  // LIT chez Vinted, comme le fait sa page « Modifier » (une lecture, aucun geste).
+  if (essai.manque) {
+    if (!appris) appris = await apprendreRecetteVinted(acc, uid, id);
+    if (appris && appris.codes) {
+      details.codes = { ...(details.codes || {}), ...appris.codes };
+      essai = itemPourRecreer({ modeleCorps: modele && modele.corps, codes: details.codes, vivant, titre, prix, description, brand: sauve && sauve.brand, photoIds: [1], temp: 'x' });
+    } else if (appris && appris.raison) {
+      return { accepte: false, code: 'recette-absente', raison: `VRM a demandé à Vinted la catégorie, la taille, l’état et le colis de CETTE annonce, mais ${appris.raison}. Rien n'a été touché.` };
+    }
+  }
+  // (2 nov., 5.310) Une recette incomplète n'arrête plus d'emblée : le corps PARTIEL
+  // passe par `reglerAvant` (complété UNE fois depuis l'identité de CETTE annonce, ou
+  // la question posée dans l'app). Il manque encore quelque chose ⇒ on s'arrête ICI,
+  // avant toute requête, et la question part avec la réponse.
+  const manqueRecette = essai.manque || null;
+  if (manqueRecette) essai = itemPourRecreer({ modeleCorps: modele && modele.corps, codes: details.codes, vivant, titre, prix, description, brand: sauve && sauve.brand, photoIds: [1], temp: 'x', partiel: true });
+  const reglages = reglagesPhotoSurs(msg.reglages);
   // (29 oct., « il ne doit pas y avoir d'erreur possible ») La TAILLE est vérifiée
   // AVANT de toucher à l'annonce : sinon Vinted la refuse APRÈS la suppression.
   // Grille lue (une fois par catégorie et par 24 h) : taille de la paire au
@@ -10595,7 +10628,8 @@ async function recreerVinted(msg) {
     // 1. La page de l'annonce, lue comme le site (une lecture). Elle dit aussi si
     //    l'onglet Vinted est là : sans lui, rien ne part.
     etapeRepub(id, 'lecture');
-    const rl = await vintedPage(acc, 'GET', `/api/v2/item_upload/items/${id}`, null, { timeoutMs: 30000 });
+    // (2 nov., 5.311) Déjà LUE au début (et son contenu utilisé) : pas de seconde lecture.
+    const rl = appris ? null : await vintedPage(acc, 'GET', `/api/v2/item_upload/items/${id}`, null, { timeoutMs: 30000 });
     if (rl && rl.sansPage) return { accepte: false, code: 'onglet-vinted', raison: raisonSansPage(rl) };
     if (rl && (rl.status === 404 || rl.status === 410)) { noterDiag('recreer_annonce_absente'); return { accepte: true, etape: 'echec', raison: "Vinted dit que cette annonce n'existe plus (elle a peut-être été supprimée ou vendue) — VRM ne recrée rien. Regarde ton dressing." }; }
     // 2. Les photos, une par une, depuis la page.
@@ -10605,7 +10639,7 @@ async function recreerVinted(msg) {
     if (tp.sansPage) return { accepte: false, code: 'onglet-vinted', raison: tp.erreur };
     if (!tp.ids) return { accepte: true, etape: 'echec', raison: `${tp.erreur} — rien n'a été créé ni supprimé, ton annonce est intacte` };
     const ids = tp.ids;
-    const built = itemPourRecreer({ modeleCorps: modele && modele.corps, codes: details.codes, titre, prix, description, brand: sauve && sauve.brand, photoIds: ids, temp, partiel: !!manqueRecette });
+    const built = itemPourRecreer({ modeleCorps: modele && modele.corps, codes: details.codes, vivant, titre, prix, description, brand: sauve && sauve.brand, photoIds: ids, temp, partiel: !!manqueRecette });
     if (built.item && corrige) for (const k of Object.keys(corrige)) if (corrige[k] != null) built.item[k] = corrige[k];
     const corps = { item: built.item, parcel: null, push_up: false, upload_session_id: temp };
     const brouillonV = { ...built.item, id: null }; delete brouillonV.push_up;

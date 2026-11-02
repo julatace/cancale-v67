@@ -204,6 +204,16 @@ const zero = (j) => gestes(j).length === 0;   // 5.266 : lire la liste des coule
     const { f, r } = await run({ extra: { vrm_vinted_modele: { '9101': { corps: sansCouleur, at: nowISO(), uid: '111' } } }, lecture: { status: 200, body: { item: { id: 9101, catalog_id: 1234, color_ids: [7], item_attributes: [{ code: 'size', ids: [56] }], package_size_id: 1 } } } });
     let it = {}; try { it = JSON.parse(creations(f.j)[0].corps).draft; } catch (_) {}
     dit(r.etape === 'fait' && JSON.stringify(it.color_ids) === '[7]', "modèle sans couleur : elle est lue chez Vinted, l'annonce part avec", JSON.stringify({ e: r.etape, code: r.code, c: it.color_ids })); }
+  // C3b — (2 nov., 5.311, Julien : « elle avait oublié la couleur et la taille… tout est
+  //       déjà rempli, l'extension a simplement à lire ») Une recette ANCIENNE (sans la
+  //       taille, autre catégorie) et l'annonce telle que Vinted la montre aujourd'hui :
+  //       c'est Vinted qui fait foi, champ par champ, et une seule lecture part.
+  { const vieille = JSON.stringify({ item: { ...JSON.parse(MODELE).item, catalog_id: 77, item_attributes: [], color_ids: [] } });
+    const { f, r } = await run({ viaBrouillon: true, extra: { vrm_vinted_modele: { '9101': { corps: vieille, at: nowISO(), uid: '111' } } }, lecture: { status: 200, body: { item: { id: 9101, catalog_id: 1234, color_ids: [7], item_attributes: [{ code: 'size', ids: [56] }, { code: 'status', ids: [2] }], package_size_id: 1 } } } });
+    let it = {}; try { it = JSON.parse(creations(f.j)[0].corps).draft; } catch (_) {}
+    const lectures = f.j.vinted.filter((x) => x.methode === 'GET' && /\/item_upload\/items\/9101$/.test(x.chemin)).length;
+    dit(r.etape === 'fait' && it.catalog_id === 1234 && JSON.stringify(it.color_ids) === '[7]' && (it.item_attributes || []).some((a) => a.code === 'size' && a.ids[0] === 56) && it.package_size_id === 1, "recette ancienne sans taille ni couleur : la catégorie, la taille, l'état, la couleur et le colis LUS sur Vinted partent", JSON.stringify({ e: r.etape, code: r.code, cat: it.catalog_id, c: it.color_ids, a: it.item_attributes, raison: r.raison }));
+    dit(lectures === 1, "une seule lecture de l'annonce (sa page « Modifier »), jamais deux", String(lectures)); }
   // C4 — la barre de progression : chaque étape est annoncée à l'app, dans l'ordre.
   { const { f, r } = await run({ viaBrouillon: true });
     const et = f.j.evts.filter((e) => e && e.quoi === 'repub' && e.id === '9101' && e.etape).map((e) => e.etape);
