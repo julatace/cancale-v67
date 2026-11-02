@@ -14601,7 +14601,7 @@ function mpChoisi(e, place) {
 //   On ne liste pas des codes numériques : un code inconnu demain doit compter
 //   comme une vente, pas disparaître — c'est le même sens que
 //   `classifyOrderStatus` côté app.
-const PAS_UNE_VENTE = /annul|cancel|refus|rembours|retour|suspend|[ée]chou|[ée]chec\\s+du\\s+paiement/i;
+const PAS_UNE_VENTE = /annul|cancel|refus|rembours|retour|suspend|[ée]chou|[ée]chec\s+du\s+paiement/i;
 // ⚠️⚠️ 5.169 (11 octobre) — LA PREUVE QUI MANQUAIT À L'ANTI DOUBLE VENTE.
 // Plainte de Julien : « J'ai fait une vente hier, j'avais relié les deux paires,
 // ça n'a pas retiré la paire sur eBay, ça ne m'a même pas proposé ». Mesuré en

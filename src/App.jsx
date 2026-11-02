@@ -33726,7 +33726,7 @@ function numerosReserves(data, maintenant) {
 // Un état de commande qui fait REVENIR la paire : elle n'est pas vendue.
 // ⚠️ Même expression que côté extension (`background.js`) — une notion, une
 //    règle (§11). Deux copies qui divergeraient donneraient deux files.
-const PAS_UNE_VENTE = /annul|cancel|refus|rembours|retour|suspend|[ée]chou|[ée]chec\\s+du\\s+paiement/i;
+const PAS_UNE_VENTE = /annul|cancel|refus|rembours|retour|suspend|[ée]chou|[ée]chec\s+du\s+paiement/i;
 // ⚠️⚠️ 11 OCTOBRE — LA PREUVE QUI MANQUAIT À L'ANTI DOUBLE VENTE eBAY. Plainte
 // de Julien : « J'ai fait une vente hier, j'avais relié les deux paires, ça n'a
 // pas retiré la paire sur eBay, ça ne m'a même pas proposé ». Mesuré en lecture
