@@ -12945,8 +12945,8 @@ function BrouillonsVinted({ br, publier, brouillonOk, onClose, onFile }) {
                 {e && e.etape === 'envoi' && <SuiviGeste ids={[it.id]} liste={ETAPES_REPUB.publier} label={(it._info && it._info.titre) || it.title || 'ce brouillon'} />}
                 {e && e.etape === 'fait' && <div data-brouillon-fait style={{ fontSize: 12.5, color: C.text }}>✓ En ligne sur Vinted</div>}
                 {e && e.etape && e.etape !== 'envoi' && e.etape !== 'fait' && <div data-brouillon-raison style={{ fontSize: 12.5, color: C.warn || C.muted }}>{e.raison || 'pas fait'}</div>}
-                {!e && horsCompte && <div data-brouillon-hors-compte style={{ fontSize: 12.5, color: C.text, lineHeight: 1.45 }}>Brouillon du compte {compte(it) || 'inconnu'} — ouvre Vinted sur ce compte dans Chrome pour le mettre en ligne.</div>}
-                {!e && place === 'a-verifier' && <div data-brouillon-a-verifier style={{ fontSize: 12.5, color: C.text, lineHeight: 1.45 }}>À vérifier sur Vinted : pas de lecture complète et récente des brouillons de {compte(it) || 'ce compte'}. Ouvre ton dressing Vinted sur ce compte et fais-le défiler jusqu'en bas.</div>}
+                {!e && horsCompte && <div data-brouillon-hors-compte style={{ fontSize: 12.5, color: C.text, lineHeight: 1.45 }}>Brouillon de {compte(it) || 'un autre compte'} — ouvre Vinted sur ce compte pour le mettre en ligne.</div>}
+                {!e && place === 'a-verifier' && <div data-brouillon-a-verifier style={{ fontSize: 12.5, color: C.text, lineHeight: 1.45 }}>À vérifier sur Vinted : ouvre ton dressing sur ce compte, jusqu'en bas. <Pourquoi label="Pourquoi ?">VRM n'a pas de lecture complète et récente (moins de 24 h) des brouillons de {compte(it) || 'ce compte'} : il a pu être supprimé ou mis en ligne depuis.</Pourquoi></div>}
                 {!e && !horsCompte && place !== 'a-verifier' && publie && <div style={{ fontSize: 12.5, color: C.muted }}>Mis en ligne par VRM — ton dressing le montrera à la prochaine lecture.</div>}
                 {!e && !horsCompte && place !== 'a-verifier' && it._etat === 'incomplet' && <div style={{ fontSize: 12.5, color: C.muted }}>Il lui manque {[!String((i && i.titre) || '').trim() && 'un titre', !(Number(i && i.prix) > 0) && 'un prix', !(Number(i && i.nph) > 0) && 'des photos'].filter(Boolean).join(', ')} — finis-le sur Vinted.</div>}
                 {!e && !horsCompte && place !== 'a-verifier' && it._etat === 'inconnu' && <div data-brouillon-capter style={{ fontSize: 12.5, color: C.text, lineHeight: 1.5 }}>Pas encore vu par l'extension : ouvre-le sur Vinted et fais « Enregistrer le brouillon » sans rien changer. <Pourquoi label="Pourquoi ?">Il a été fait avant l'extension, ou ailleurs. Une fois enregistré sur Vinted, il arrive ici tout de suite, prêt à mettre en ligne.</Pourquoi></div>}
@@ -13344,6 +13344,8 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
   const [figee, setFigee] = useState(null);
   const aFaire = mode !== 'idle' && figee ? figee : aFaireCalc;
   const lancerFile = () => { setFigee(aFaireCalc.map((a) => ({ ...a }))); setMode('run'); };
+  // La paire suivante, dont le bloc d'avancée dit le temps : sa ligne ne le redit pas (§7).
+  const idAnnoncee = mode === 'run' ? ((aFaire.find((a) => !st[a.id]) || {}).id || null) : null;
   const melanger = () => {
     const ids = aFaireSel.map((a) => a.id); if (ids.length < 2) return;
     let t; for (let k = 0; k < 8; k++) { t = ids.slice(); for (let i = t.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [t[i], t[j]] = [t[j], t[i]]; } if (t.join() !== aFaire.map((a) => a.id).join()) break; }
@@ -13732,7 +13734,7 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
                   <div style={{ display: 'flex', gap: 8, alignItems: 'center', minHeight: 32 }}>
                     <span style={{ flexShrink: 0, width: 18, color: C.muted, fontVariantNumeric: 'tabular-nums' }}>{i + 1}.</span>
                     <span style={{ flex: 1, minWidth: 0, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{a.numero ? <b>N°{a.numero} · </b> : null}{a.titre}</span>
-                    {!s.etat && <span data-republier-attente={i === 0 ? 0 : (plan[a.id] || '')} style={{ flexShrink: 0, fontSize: 12, color: C.muted, fontVariantNumeric: 'tabular-nums' }}>{i === 0 ? 'tout de suite' : Number.isFinite(plan[a.id]) && plan[a.id] > 0 ? `+${duree(plan[a.id])}` : ''}</span>}
+                    {!s.etat && a.id !== idAnnoncee && <span data-republier-attente={i === 0 ? 0 : (plan[a.id] || '')} style={{ flexShrink: 0, fontSize: 12, color: C.muted, fontVariantNumeric: 'tabular-nums' }}>{i === 0 ? 'tout de suite' : Number.isFinite(plan[a.id]) && plan[a.id] > 0 ? `+${duree(plan[a.id])}` : ''}</span>}
                     {mode === 'idle' && aFaire.length > 1 && <span style={{ display: 'flex', flexShrink: 0 }}>
                       <button type="button" aria-label="Monter" data-republier-monter={a.id} disabled={i === 0} onClick={() => bouger(a.id, -1)} style={{ border: 'none', background: 'transparent', color: i === 0 ? C.border : C.text, minWidth: 44, minHeight: 44, fontSize: 16, cursor: i === 0 ? 'default' : 'pointer' }}>↑</button>
                       <button type="button" aria-label="Descendre" data-republier-descendre={a.id} disabled={i === aFaire.length - 1} onClick={() => bouger(a.id, 1)} style={{ border: 'none', background: 'transparent', color: i === aFaire.length - 1 ? C.border : C.text, minWidth: 44, minHeight: 44, fontSize: 16, cursor: i === aFaire.length - 1 ? 'default' : 'pointer' }}>↓</button>
