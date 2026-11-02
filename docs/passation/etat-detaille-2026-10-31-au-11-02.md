@@ -61,3 +61,6 @@ Déplacé TEL QUEL depuis CLAUDE.md §9 le 2 novembre 2026 (le fichier dépassai
 - **26 oct.** — eBay multi-sites (chaque compte sur SON site, argent en euros), eBay à
   l'international (destination, douane) ; retrait « pour de bon » par catégorie
   (annonces, messages) ; suppression ciblée (bordereaux et relevés séparés). → ebay / divers.
+- **27 oct.** — Atelier de republication (tranches 1-5) ; Vestiaire depuis VRM (publier
+  sans booster, ventes, achats, messages) ; statut fiscal adapté à la personne ; arrivée
+  guidée (`Bienvenue.jsx`) ; annonces en fiches produit ; un article parti sort du Stock.

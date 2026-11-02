@@ -612,9 +612,6 @@ Une ligne par chantier. Le récit complet des lignes du 31 oct. au 2 nov. est, m
 - **28 oct.** — Vestiaire : formulaire « smart listing », étiquette en 2ᵉ photo, Taille/État/Prix.
 - **28 oct.** — Tour de chaque espace sur ses vraies données (Vinted, Leboncoin, eBay,
   Vestiaire, Ma journée, Colis).
-- **27 oct.** — Atelier de republication (tranches 1-5) ; Vestiaire depuis VRM (publier
-  sans booster, ventes, achats, messages) ; statut fiscal adapté à la personne ; arrivée
-  guidée (`Bienvenue.jsx`) ; annonces en fiches produit ; un article parti sort du Stock.
 - **Avant le 20 oct.** — `docs/passation/etat-detaille-2026-10-31-au-11-02.md` (fin) et `docs/journal-2026.md`.
 
 ---
