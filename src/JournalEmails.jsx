@@ -66,9 +66,9 @@ function LigneEmail({ e, headers, delies, onNav, onNum, onDelier, onRelier }) {
   );
 }
 
-export default function JournalEmails({ headers, filtreInitial = '', delies = {}, onNav, onNum, onDelier, onRelier, version = 0 }) {
+export default function JournalEmails({ headers, filtreInitial = '', typeInitial = '', delies = {}, onNav, onNum, onDelier, onRelier, version = 0 }) {
   const [etat, setEtat] = useState(filtreInitial === 'a-verifier' || filtreInitial === 'erreur' ? filtreInitial : '');
-  const [type, setType] = useState('');
+  const [type, setType] = useState(() => (FILTRES_TYPE.some(([k]) => k && k === typeInitial) ? typeInitial : ''));
   const [adresse, setAdresse] = useState('');
   const [pages, setPages] = useState(undefined); // undefined en cours · null pas su · {emails,...}
   const [lecture, setLecture] = useState(false);
@@ -96,13 +96,13 @@ export default function JournalEmails({ headers, filtreInitial = '', delies = {}
   useEffect(() => { if (filtreInitial === 'a-verifier' || filtreInitial === 'erreur') setEtat(filtreInitial); }, [filtreInitial]);
 
   const c = pages && pages.compteurs;
-  const segments = [['', 'Tout'], ['a-verifier', 'À vérifier'], ['erreur', 'À réessayer']];
+  const segments = [['', 'Tout'], ['a-verifier', 'À vérifier'], ['erreur', 'En attente']];
   return (
     <section className="vrm-journal" data-journal-emails="" aria-label="Tes emails, ce que VRM en a fait">
       <header className="vrm-journal-entete">
         <div>
-          <h3>Tes emails, ce que VRM en a fait</h3>
-          <p>Le plus récent d’abord. Ce qui demande un geste est en ambre, avec la raison.</p>
+          <h3>Tes e-mails, un par un</h3>
+          <p>Le plus récent d’abord. Chaque e-mail dit ce que VRM en a fait ; ce qui demande un geste est en ambre.</p>
         </div>
         <button type="button" className="vrm-journal-actualiser" onClick={() => charger(0)} disabled={lecture}>{lecture ? 'Lecture…' : 'Actualiser'}</button>
       </header>
@@ -131,7 +131,7 @@ export default function JournalEmails({ headers, filtreInitial = '', delies = {}
       {pages === undefined && <p className="vrm-journal-vide" role="status">Lecture du journal…</p>}
       {pages === null && <p className="vrm-journal-vide" role="alert" data-journal="pas-su">Je n’ai pas pu lire le journal de tes emails — rien n’est perdu, ils restent rangés. <button type="button" onClick={() => charger(0)}>Réessayer</button></p>}
       {pages && <>
-        {c && <p className="vrm-journal-couverture" data-journal-sur={c.sur}>Sur les {c.sur} derniers emails suivis{c.plus ? ' (les plus anciens ne sont pas comptés)' : ''} : {c.integre} rangés · {c.aVerifier} à vérifier{c.incompris ? ` (dont ${c.incompris} pas compris)` : ''}{c.erreur ? ` · ${c.erreur} en attente de réessai` : ''}.</p>}
+        {c && <p className="vrm-journal-couverture" data-journal-sur={c.sur}>Sur tes {c.sur} derniers e-mails{c.plus ? ' (les plus anciens ne sont pas comptés)' : ''}{c.incompris ? ` · dont ${c.incompris} pas compris` : ''}.</p>}
         {pages.emails.length === 0 && <p className="vrm-journal-vide" data-journal="vide">{etat || type || adresse ? 'Aucun email pour ce filtre.' : 'Aucun email suivi pour l’instant. Le prochain email reçu apparaîtra ici.'}</p>}
         <ul className="vrm-journal-liste">
           {pages.emails.map((e) => <LigneEmail key={e.id} e={e} headers={entetes} delies={delies} onNav={onNav} onNum={onNum} onDelier={onDelier} onRelier={onRelier}/>)}

@@ -92,3 +92,26 @@
   .vrm-stats-vitrine .vrm-sv-boost-case .vrm-sv-tuile-val { font-size: 15px; }
   .vrm-stats-vitrine .vrm-sv-barre-zone { height: 140px !important; }
 }
+
+/* (2 nov.) « Quel compte vend le mieux » : une phrase, sans chiffre (les lignes les portent). */
+.vrm-stats-vitrine .vrm-sv-phrase { font-size: 13px; color: var(--vrm-ink); margin: 0 0 6px; line-height: 1.45; }
+@media (max-width: 899px) {
+  /* Au téléphone : le compte qui vend et les modèles rapides avant le graphique. */
+  .vrm-stats-vitrine .vrm-sv-rangee-3 > [data-sv-carte=comptes] { order: 1; }
+  .vrm-stats-vitrine .vrm-sv-rangee-3 > [data-sv-carte=rapides] { order: 2; }
+  .vrm-stats-vitrine .vrm-sv-rangee-3 > [data-sv-carte=barres] { order: 3; }
+}
+
+/* (2 nov.) Le détail des Statistiques en deux volets repliés : un titre, une phrase. */
+.vrm-statistiques-premium > .vrm-stats-repli { background: var(--vrm-surface); border: 1px solid var(--vrm-line); border-radius: 12px; padding: 0 16px; }
+.vrm-statistiques-premium > .vrm-stats-repli > summary { min-height: 64px; align-items: center; gap: 12px; cursor: pointer; list-style: none; }
+.vrm-stats-repli-tete { display: flex; flex-direction: column; gap: 3px; flex: 1 1 auto; min-width: 0; padding: 12px 0; }
+.vrm-stats-repli-titre { font-size: 15px; font-weight: 600; color: var(--vrm-ink); letter-spacing: -.01em; }
+.vrm-stats-repli-phrase { font-size: 13px; color: var(--vrm-muted); line-height: 1.4; font-weight: 400; }
+.vrm-stats-repli-corps { display: flex; flex-direction: column; gap: 16px; padding: 4px 0 16px; }
+@media (min-width: 1200px) {
+  .vrm-stats-repli-corps { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); align-items: start; }
+  .vrm-stats-repli-corps > * { grid-column: 1 / -1; min-width: 0; }
+  .vrm-stats-repli-corps > [data-stats-carte=hero] { grid-column: 1 / 9; }
+  .vrm-stats-repli-corps > .vrm-finance-goal { grid-column: 9 / -1; }
+}
