@@ -2963,3 +2963,39 @@ Revue de contraste (ui-ux-pro-max §1) : aucun texte gris sous 4,5:1.
 
 **Reste** : la frise sur les lignes Leboncoin, eBay et Vestiaire (il leur faut leurs preuves
 propres, pas de règle à inventer) ; Annonces, Achats, Messages, Paramètres dans le même esprit.
+
+### 2 nov., 22 h — « recopie à l'identique, sans textes explicatifs » (Julien)
+
+Julien : « j'aime beaucoup la Fusion carte sombre mais le problème c'est que tu ne recopies pas
+à l'identique et que tout le temps tu ajoutes des textes explicatifs partout, ce qui est
+horrible ». Les quatre écrans suivent maintenant les maquettes (valeurs relevées dans les
+`.dc.html`), comparées côte à côte à 390 × 844 (`compare-*.png`) :
+
+- **Ma journée** : la tête sombre bord à bord (rayon 30 en bas), « Bonsoir … » puis « Ma
+  journée » 34/800, les sept derniers jours (aujourd'hui à droite, cercle blanc), « Vendu
+  aujourd'hui » et « Bénéfice du mois » (`BeneficeJournee fusion`). Puis « À faire · N gestes » :
+  une carte par geste — les cases du jour (Colis à poster / à retirer, Messages, Prix à baisser,
+  mêmes compteurs, mêmes `data-tuile`), les alertes, le rappel URSSAF ; pastille 42 px encre
+  (ambre si pressé), pilule d'action bleue. **La grille des widgets (Vendu du mois, semaine,
+  attente, dernières ventes, stock, tendances) n'est plus rendue** : drapeau
+  `JOURNEE_AVEC_WIDGETS = false` (src/App.jsx), un mot pour la remettre. Les bancs de ces
+  widgets (`journee-chiffres`, `journee-mieux`, `journee-premium`, `journee-widgets`,
+  `vendu-recu`, une partie de `chiffres-croises` et `benefice-journee`) sont rouges tant que
+  le drapeau est éteint : à trancher.
+- **Ventes** : la date au-dessus du titre, plus de phrase, ni « Chiffres », ni « À faire
+  aujourd'hui », ni recherche, ni période, ni raison commune ; la carte du mois (« N ventes ·
+  bénéfice X € » quand le net se calcule ; cases à poster · en route · à payer, qui filtrent la
+  liste d'un toucher) ; chaque vente a la forme de la maquette (`LigneVenteCompacte fusion`) —
+  les filtres et « Outils » restent (des boutons).
+- **Colis** : la date et le titre, la carte « Aujourd'hui », « J'envoie · N / Je reçois · N »,
+  les colis **rangés par transporteur** (en-tête : tuile du logo, nom, « N colis »), le bouton
+  rond en haut à droite = le bouton bordereau lui-même ; ni « Emballer », ni « Tout générer »,
+  ni imprimante, ni intertitres, ni aide. La carte Vestiaire garde sa rangée puce + bordereau.
+- **Compta** : « Novembre 2026 » / « Compta » ; la carte sombre « Ce que tu as gagné » (une
+  ligne courte, trois cases : à déclarer · URSSAF · ventes) ; l'anneau (parts en %) ; les six
+  mois (mois courant en bleu) ; l'encart ambre « Déclaration URSSAF » + « J'ai déclaré »
+  (`rappelUrssaf`). Les intitulés des trois questions, la carte URSSAF du mois et le détail du
+  calcul ne s'affichent plus ; « Le détail » (replis) reste dessous.
+- Phrases d'écran retirées pour journee/ventes/colis (`src/phrasesEcran.js`).
+- Bancs mis à jour (note « retiré à la demande de Julien, 2 nov. 22 h ») : `compta-claire`,
+  `demo-bulles`, `design-fusion`.
