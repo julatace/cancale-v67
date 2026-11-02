@@ -50,7 +50,7 @@ function migrerAncienne(d) {
 }
 
 // ── L'APERÇU (le même instantané que le PDF) ────────────────────────────────
-const EXEMPLE = { acheteur: { nom: 'Marie Dupont', adresse: '5 avenue de la Gare\n75011 Paris', email: 'marie@exemple.fr' }, designation: 'Nike Air Max 90 — taille 42', centimes: 12950, venteLe: new Date(Date.now() - 2 * 86400000).toISOString(), reference: '0000000000', plateforme: 'Vinted' };
+const EXEMPLE = { acheteur: { nom: 'Nom de l’acheteur', adresse: 'Son adresse\n00000 Sa ville', email: 'acheteur@exemple.fr' }, designation: 'Nike Air Max 90 — taille 42', centimes: 12950, venteLe: new Date(Date.now() - 2 * 86400000).toISOString(), reference: '0000000000', plateforme: 'Vinted' };
 export function ApercuFacture({ contenu, provisoire = false }) {
   if (!contenu) return null;
   const c = contenu; const T = c.totaux; const marge = c.regime === 'marge';
