@@ -9098,6 +9098,10 @@ async function refusDejaVu(cle, d) {
   return null;
 }
 async function retenirRefus(cle, d, rc) {
+  // Seulement un refus qui NOMME le champ fautif : renvoyer le même corps ne peut
+  // que reprendre le même refus. Un refus muet (400/422 sans champ) n'est pas retenu :
+  // un nouveau clic de Julien reste possible (ce n'est pas une boucle).
+  if (!codesDuRefus(rc).length) return;
   try {
     const m = (await chrome.storage.local.get(REFUS_REPUB))[REFUS_REPUB] || {};
     for (const k of Object.keys(m)) if (!(Date.now() - Number(m[k] && m[k].at) < REFUS_REPUB_MS)) delete m[k];
@@ -9987,7 +9991,7 @@ async function publierBrouillon(msg) {
     const manque2 = rg2.manque;
     if (!manque2.length && (signatureCorps(r.d) + JSON.stringify(r.d.item_attributes || [])) !== avant2) { try { await rangerBrouillon(id, { corps: JSON.stringify({ ...JSON.parse(b.corps), draft: r.d }) }); } catch (_) {} }
     const q2 = rg2.question ? { ...rg2.question, num: msg.num ? String(msg.num) : '' } : null;
-    if (manque2.length) return { accepte: false, code: 'incomplet', question: q2, raison: `Vinted refuserait ce brouillon : il manque ${manque2.join(', ')}. ${q2 && q2.options ? 'Choisis dans VRM : il est mis en ligne sur ta réponse.' : 'Finis-le sur Vinted (Mes brouillons → « Modifier »), puis réessaie.'} Rien n'a été touché.` };
+    if (manque2.length) return { accepte: false, code: 'incomplet', question: q2, raison: `Vinted refuserait ce brouillon : il manque ${manque2.join(', ')}. ${q2 && q2.options ? 'Choisis dans VRM : il est mis en ligne sur ta réponse (ou finis-le sur Vinted : Mes brouillons → « Modifier »).' : 'Finis-le sur Vinted (Mes brouillons → « Modifier »), puis réessaie.'} Rien n'a été touché.` };
     const dv2 = await refusDejaVu('b' + id, r.d);
     if (dv2) {
       noterDiag('brouillon_refus_deja_vu');
