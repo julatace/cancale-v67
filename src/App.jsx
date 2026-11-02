@@ -40149,6 +40149,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   };
   const poserSuivisManuels = (l) => setSuivisManuels(prev => (l && prev && JSON.stringify(prev) === JSON.stringify(l)) ? prev : l);
   const relireSuivisManuels = async () => { poserSuivisManuels(await lireSuivisManuelsVal()); };
+  // (2 nov., colis clair) Les n° de suivi ajoutés ou reliés sous Colis → « À retirer »
+  // (les outils, une autre instance) changent les cartes de la liste par point : la
+  // liste les relit aussitôt (même lecture, rien de neuf).
+  const relireSuivisManuelsPartout = async () => { await relireSuivisManuels(); try { window.dispatchEvent(new Event('vrm:suivis-manuels')); } catch (_) {} };
+  useEffect(() => { const f = () => { if (curSub === 'bordereaux' || curSub === 'achats') relireSuivisManuels(); }; window.addEventListener('vrm:suivis-manuels', f); return () => window.removeEventListener('vrm:suivis-manuels', f); }, []); // eslint-disable-line react-hooks/exhaustive-deps
   // Lue au montage, et RELUE quand l'extension prévient qu'un code vient d'être
   // lu dans une conversation (`maj retrait`, 5.155) — avant, elle n'était lue
   // qu'une fois : un code arrivé pendant qu'il regardait l'écran n'apparaissait
@@ -50452,7 +50457,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             extension qui sait le faire (`extSait('suivivinted')`). */}
         {aFilter==='attente' && <EtatSuiviVinted achats={[...pickupUnion.extra, ...(pickupUnion.aConfirmer||[]), ...pickupUnion.aVerifier.filter(x=>x.kind==='vinted').map(x=>x.o)]}
           suivisVinted={suivisVinted} etatDe={etatSuiviDe} accName={accName} relire={relireSuivisVinted}/>}
-        {aFilter==='attente' && <SuivisManuels liste={suivisManuels} tracking={tracking} transp={transpMap} achats={buysBase} accName={accName} relire={relireSuivisManuels}
+        {aFilter==='attente' && <SuivisManuels liste={suivisManuels} tracking={tracking} transp={transpMap} achats={buysBase} accName={accName} relire={relireSuivisManuelsPartout}
           etapeDe={(n)=>etapeDuSuiviManuel(n,{union:pickupUnion,fins:finsSuivis,tracking,collected,index:indexSuivisAchats,raison:raisonAVerifier})}/>}
         {/* (29 oct.) « EN COURS DE VÉRIFICATION » : des achats que Vinted dit
             « déposés en point relais », qu'AUCUNE identité ne relie encore à un
