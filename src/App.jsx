@@ -18351,7 +18351,7 @@ function Onboarding({ setTab }) {
       <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:12}}>
         <VrmLogo size={44}/>
         <div>
-          <div style={{fontSize:22,fontWeight:700,color:C.text,letterSpacing:'-0.02em'}}>Bienvenue 👋</div>
+          <div style={{fontSize:22,fontWeight:700,color:C.text,letterSpacing:'-0.02em'}}>Bienvenue</div>
           <div style={{fontSize:13.5,color:C.muted,lineHeight:1.45,marginTop:2}}>
             Ton poste de pilotage&nbsp;: ce que tu vends, où c'est rangé, ce que ça te rapporte.
           </div>
@@ -50989,7 +50989,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             dit déjà où l'on est : pas de second titre. */}
         {!dansPlateforme && <ScreenHead icon="tag" title="Annonces en ligne" />}
         <NoAcc/>
-        <AnnoncesACompleter items={annBase} numeros={numeros} drafts={drafts} ouvrir={setAtelier} charger={()=>loadListings(true)} charge={listings.loading} PhotoVinted={PhotoVinted} incomplet={!Array.isArray(listings.items)||!!listings.error||!!listings.incomplet}/>
+        {/* (2 nov.) Sans compte Vinted, rien à compléter : « 0 à relire sur Vinted » n'était qu'un zéro de plus. */}
+        {!noAcc && <AnnoncesACompleter items={annBase} numeros={numeros} drafts={drafts} ouvrir={setAtelier} charger={()=>loadListings(true)} charge={listings.loading} PhotoVinted={PhotoVinted} incomplet={!Array.isArray(listings.items)||!!listings.error||!!listings.incomplet}/>}
         {astuceNum && listings.items?.length>0 && (
           <div data-astuce-numeros style={{display:'flex',gap:8,alignItems:'center',background:'var(--vrm-b-teinte)',borderRadius:10,padding:'0 4px 0 12px',margin:'0 0 12px',fontSize:12.5,lineHeight:1.45,color:C.muted}}>
             <span aria-hidden="true" style={{display:'flex',color:C.muted}}><Icon name="tag" size={16}/></span>
