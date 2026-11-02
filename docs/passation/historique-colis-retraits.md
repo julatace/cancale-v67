@@ -2596,3 +2596,11 @@ SHOTS=…`) : chaque colis EXACTEMENT une fois (identité lue sous toutes ses fo
 comme d'après), chaque code une fois (y compris par `?tab=retraits`), jamais « Base Adresse
 Nationale », aucune phrase de carte au téléphone, aucun texte écrasé, compteurs = Ma journée,
 à vérifier visible, lot d'impression. Rouge sur 77580c1 (avant), vert après.
+**Suite (décisions du coordinateur, 2 nov.)** : un point sans date limite lue est trié sur
+ce qui reste de la garde de SON transporteur (`urgenceTri` → `triPoint`, src/relaisColis.js),
+jamais rangé derrière tous les autres. « Transporteur pas encore connu » et « en cours de
+vérification » sont dits UNE fois, en tête du groupe (point, « Point pas encore connu »,
+« À vérifier »), plus sur chaque carte. Une nouvelle de Vinted ne s'écrit sur la carte que si
+elle change le geste (au relais / disponible, retiré, retour, annulé, remboursé, incident,
+« en cours de livraison » = pas encore au relais) ; sur une carte « à vérifier » elle reste
+toujours (elle dit pourquoi). Bancs `transporteurs` F et `suivi-colis` E8 jugent ces faits.
