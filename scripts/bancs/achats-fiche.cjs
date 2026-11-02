@@ -90,7 +90,7 @@ async function preparer(b, vp, opts = {}) {
 
 // Va sur Achats, onglet « Tous », et ouvre le menu ⋯ de la carte (par tx).
 async function ouvrirMenu(pg, tx) {
-  await pg.goto(`http://localhost:${PORT}/?tab=cat_achats`, { waitUntil: 'domcontentloaded' });
+  await pg.goto(`http://localhost:${PORT}/?tab=cat_achats&vue=achats`, { waitUntil: 'domcontentloaded' });
   await pg.waitForTimeout(900);
   // onglet « Tous » (un achat finalisé = « Reçu », pas sous « À retirer »)
   const tous = pg.locator('button', { hasText: /^Tous$/ });

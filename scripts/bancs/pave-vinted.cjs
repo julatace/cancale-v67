@@ -179,7 +179,8 @@ const attendTrouve = async (pg) => { for (let i = 0; i < 30; i++) { const e = aw
         dit(apres.url === avant.url && apres.sec === avant.sec && !/INPUT|TEXTAREA/.test(apres.focus), 'un N° tapé hors d’un champ ne fait rien (ni focus, ni onglet)', JSON.stringify({ avant, apres }));
       });
       console.log('\n── Achats, 1512 px');
-      await allerA(pg, 'cat_achats', '[data-achats-onglet]');
+      // (2 nov.) Depuis le 1er nov., `cat_achats` mène à Colis → À retirer ; l'écran Achats est `vue=achats`.
+      await allerA(pg, 'cat_achats&vue=achats', '[data-achats-onglet]');
       await essaie('Achats', async () => {
         dit(!(await pg.$('[data-num-plat]')) && !(await pg.$('[data-num-plat-saisie]')), 'plus de saisie « N° + Entrée » sur Achats');
         const avant = await pg.evaluate(() => ({ url: location.search, sec: (document.querySelector('[data-section][aria-current="page"],[data-section][aria-pressed="true"]') || { getAttribute: () => '' }).getAttribute('data-section') }));

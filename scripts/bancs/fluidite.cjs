@@ -141,8 +141,9 @@ const texte = (pg) => pg.evaluate(() => document.body.innerText);
         // l'espace Vinted ; Ventes est un onglet de la navigation, filtré sur Vinted.
         await pg.goto(`http://localhost:${PORT}/?tab=plat_vinted&section=achats`, { waitUntil: 'domcontentloaded' });
         await pg.waitForTimeout(3000);
-        // L'espace Vinted n'a plus qu'une section (Achats) : aucune barre de sections.
-        dit(await pg.evaluate(() => !document.querySelector('[data-tache]') && !!document.querySelector('[data-entete-plateforme="vinted"]')), 'il est bien sur Achats, dans l’espace Vinted (pas sur Ventes)');
+        // (2 nov.) Plus aucun espace de site n'est monté (31 oct., soir, b5418826) :
+        // `plat_vinted&section=achats` mène à la TÂCHE Achats filtrée sur Vinted.
+        dit(await pg.evaluate(() => { const t = document.querySelector('[data-tache]'); return !!t && t.getAttribute('data-tache') === 'achats' && t.getAttribute('data-tache-site') === 'vinted'; }), 'il est bien sur Achats · Vinted (pas sur Ventes)');
         await pg.waitForTimeout(1500);
         etat.ventes = [NOUVELLE, ...BASE]; etat.cap = ilYa(0);
         await signal(pg, 'ventes');

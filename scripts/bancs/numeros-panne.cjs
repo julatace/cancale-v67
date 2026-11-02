@@ -55,8 +55,13 @@ async function brancher(pg, etat) {
     const json = (d, st = 200) => r.fulfill({ status: st, contentType: 'application/json', headers: { 'access-control-allow-origin': '*', 'content-range': '0-0/0' }, body: JSON.stringify(d) });
     if (/select=owner/.test(u)) return json([]);
     if (req.method() !== 'GET') {
-      try { const b = JSON.parse(req.postData() || '[]'); (Array.isArray(b) ? b : [b]).forEach((row) => { if (row && row.id === 'main' && row.data) etat.ecrits.push(row.data); }); } catch (_) {}
+      // (2 nov.) Depuis « Données sûres » (1er nov.), une ligne `main` qui existe
+      // s'écrit par PATCH `id=eq.main` conditionnel sur `data.rev` : le corps est
+      // `{ data, updated_at }` (sans `id`), la réponse la ligne écrite ([] = devancé).
+      const patchMain = req.method() === 'PATCH' && /app_data/.test(u) && /[?&]id=eq\.main(&|$)/.test(u);
+      try { const b = JSON.parse(req.postData() || '[]'); (Array.isArray(b) ? b : [b]).forEach((row) => { if (row && (row.id === 'main' || patchMain) && row.data) etat.ecrits.push(row.data); }); } catch (_) {}
       if (etat.panneEcriture && /app_data/.test(u)) return json({ code: '57014', message: 'canceling statement due to statement timeout' }, 500);
+      if (patchMain) { try { const b = JSON.parse(req.postData() || 'null'); if (b && b.data) etat.main = b.data; } catch (_) {} return json([{ id: 'main' }]); }
       return json([]);
     }
     if (/\/rest\/v1\/vinted_accounts/.test(u)) return json([COMPTE]);
