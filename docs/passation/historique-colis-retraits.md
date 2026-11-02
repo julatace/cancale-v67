@@ -2604,3 +2604,12 @@ vérification » sont dits UNE fois, en tête du groupe (point, « Point pas enc
 elle change le geste (au relais / disponible, retiré, retour, annulé, remboursé, incident,
 « en cours de livraison » = pas encore au relais) ; sur une carte « à vérifier » elle reste
 toujours (elle dit pourquoi). Bancs `transporteurs` F et `suivi-colis` E8 jugent ces faits.
+**Dernier passage « simple comme Apple » (2 nov.)** : « J'ai retiré » en toutes lettres au
+téléphone (libellé `vrm-rp-retire-label`, que la règle « icône seule » ne cache pas) ; la
+ligne des colis arrivés sur une adresse reliée à aucun compte dit le geste (lien Paramètres →
+Comptes liés) et se tait quand l'adresse n'est pas connue (les colis restent sur leurs
+cartes) ; haut d'« À envoyer » : « Tout générer (N) » sans cadre autour, la raison des
+boutons grisés sans redire N, « Tes emails… » et « Où sont ces articles » sous la liste, plus
+de phrase permanente « …est dans Partis » (le nombre est sur « Partis », `data-partis-coches`) ;
+au téléphone la phrase sous le titre prend toute la largeur. Banc `colis-colonnes` : 9 rouges
+sur a80e584d, vert après (a205264e).
