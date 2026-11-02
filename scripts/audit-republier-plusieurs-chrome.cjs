@@ -31,8 +31,8 @@ const MUTATIONS = {
   verrou_eternel: (s) => s.replace('Date.now() - tVb < RECREER_VERROU_MS && (vb.etat', 'true && (vb.etat'),
 };
 
-function monter(src, { extra = {}, coffreVb = null, lectureKO = null } = {}) {
-  const lignes = { main: { capturedAt: nowISO(), vinted_annonce_numeros: { '9101': { numero: '41' } } }, vinted_item_details: {},
+function monter(src, { extra = {}, coffreVb = null, lectureKO = null, partage = null } = {}) {
+  const lignes = partage || { main: { capturedAt: nowISO(), vinted_annonce_numeros: { '9101': { numero: '41' } } }, vinted_item_details: {},
     coffre_111_9101: { id: '9101', title: 'Nike Air Max 1', price: 60, desc: 'Nickel, boîte d’origine', photos: PHOTOS, ...(coffreVb ? { versBrouillon: coffreVb } : {}) },
     vrm_vinted_modele: { '9101': { corps: MODELE, at: nowISO(), uid: '111' } }, ...extra };
   let n = 500;
@@ -81,17 +81,30 @@ async function lancer(src) {
   return ko;
 }
 async function aFaire(src) {
-  // E. Le plafond horaire : deux Chrome (deux vm, deux `chrome.storage.local`) sur le même compte.
-  const a = monter(src), b = monter(src);
+  // E. (2 nov., 5.312) Le plafond horaire est celui du COMPTE : deux Chrome (deux vm, deux
+  // `chrome.storage.local`) sur le même compte, la MÊME base VRM.
+  let ko = 0;
+  const base = {};
+  const a = monter(src, { partage: base }), b = monter(src, { partage: base });
+  // Deux identités de navigateur distinctes (chaque Chrome a la sienne).
+  await a.ctx.chrome.storage.local.set({ vrmIdNavigateur: 'aaaaaaaaaaaaaaaa' }); await b.ctx.chrome.storage.local.set({ vrmIdNavigateur: 'bbbbbbbbbbbbbbbb' });
   let n = 0;
   for (const f of [a, b]) for (let i = 0; i < 60; i++) { const g = await f.ctx.gardeStricte('111', { vinted_user_id: '111', domain: 'www.vinted.fr' }, {}); if (g === null) n++; else break; }
-  console.log(`  ⏳ À FAIRE (E) : deux Chrome sur le même compte acceptent ${n} actions dans l'heure (plafond 50 par Chrome, pas par compte) — voir l'en-tête.`);
+  const bon = n === 50;
+  if (!bon) ko++;
+  console.log(`${bon ? '  ✅' : '  ❌'} E. deux Chrome sur le même compte : ${n} actions acceptées dans l'heure (attendu : 50, le plafond du COMPTE)`);
+  // Base qui ne répond pas : chaque Chrome retombe sur SON compte (jamais tout bloqué).
+  const c = monter(src, { lectureKO: (u) => /actions_compte_/.test(u) });
+  let m = 0; for (let i = 0; i < 60; i++) { const g = await c.ctx.gardeStricte('111', { vinted_user_id: '111', domain: 'www.vinted.fr' }, {}); if (g === null) m++; else break; }
+  if (m !== 50) ko++;
+  console.log(`${m === 50 ? '  ✅' : '  ❌'} E. base muette : le compte de CE Chrome seul (${m} sur 50), aucun blocage de toutes les actions`);
+  return ko;
 }
 
 (async () => {
   const src = cheminSource();
   if (!process.argv.includes('--prouve')) {
-    const ko = await lancer(src); await aFaire(src);
+    const ko = (await lancer(src)) + (await aFaire(src));
     console.log(ko ? `\n❌ ${ko} contrôle(s) rouge(s)` : '\n✅ quota du jour et verrou de republication tenus pour le COMPTE, tous Chrome confondus');
     process.exit(ko ? 1 : 0);
   }
