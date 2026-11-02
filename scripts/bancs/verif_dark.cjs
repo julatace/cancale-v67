@@ -156,14 +156,17 @@ const TABS=['journee','ventes','annonces','messages','achats','retraits','collec
         const f=v=>{v/=255;return v<=0.03928?v/12.92:Math.pow((v+0.055)/1.055,2.4);};
         return 0.2126*f(+m[1])+0.7152*f(+m[2])+0.0722*f(+m[3]); };
       const d = await pg.evaluate(() => {
-        const nav = document.querySelector('nav') || document.querySelector('aside');
+        const nav = document.querySelector('nav.vrm-sidebar');   // (2 nov.) LE rail latéral : le premier <nav> venu était un segment clair
         const main = document.querySelector('main') || document.body;
-        let carte = null;
+        let carte = null, filet = null;
         for (const el of main.querySelectorAll('div')) { const bg = getComputedStyle(el).backgroundColor;
           if (bg && bg !== 'rgba(0, 0, 0, 0)' && el.getBoundingClientRect().width > 300) { carte = bg; break; } }
+        // La carte du style Vitrine : le premier bloc large qui porte un filet.
+        for (const el of main.querySelectorAll('div,section')) { const cs = getComputedStyle(el);
+          if ((parseFloat(cs.borderTopWidth) || 0) >= 1 && cs.borderTopStyle !== 'none' && !/rgba\([^)]*, 0\)/.test(cs.borderTopColor) && el.getBoundingClientRect().width > 300) { filet = { l: parseFloat(cs.borderTopWidth), c: cs.borderTopColor }; break; } }
         const m = document.querySelector('meta[name="theme-color"]');
         return { rail: nav ? getComputedStyle(nav).backgroundColor : null,
-                 page: getComputedStyle(document.body).backgroundColor, carte,
+                 page: getComputedStyle(document.body).backgroundColor, carte, filet,
                  theme: m ? m.getAttribute('content') : null,
                  scheme: getComputedStyle(document.documentElement).colorScheme };
       });
@@ -175,11 +178,16 @@ const TABS=['journee','ventes','annonces','messages','achats','retraits','collec
         `theme-color = ${d.theme}`);
       dit(d.scheme === 'dark', 'et les champs natifs aussi (`color-scheme`)',
         `color-scheme = ${d.scheme} — la date de Réglages s'affichait en boîte blanche`);
-      // §7 : le sombre tient par la HIÉRARCHIE — rail le plus sombre, page
-      // au-dessus, cartes encore au-dessus. Trois marches, pas deux.
-      if (lRail != null && lPage != null && lCarte != null)
-        dit(lRail < lPage && lPage < lCarte, 'la hiérarchie sombre tient : rail < page < carte',
-          `${lRail.toFixed(4)} < ${lPage.toFixed(4)} < ${lCarte.toFixed(4)}`);
+      // §7 (style Vitrine du 31 oct. : « cartes à filet d'1 px, plus d'aplats gris
+      // empilés ») : aucune surface plus claire que la page (le rail était resté
+      // blanc une fois), et la carte se détache par son FILET, visible sur la page.
+      if (lRail != null && lPage != null && lCarte != null) {
+        const lFilet = d.filet ? lum(d.filet.c) : null;
+        dit(lRail <= lPage + 0.01 && lCarte <= 0.15, 'le sombre tient : rail et cartes sombres comme la page, rien de clair',
+          `rail ${lRail.toFixed(4)} · page ${lPage.toFixed(4)} · carte ${lCarte.toFixed(4)}`);
+        dit(!!d.filet && d.filet.l >= 1 && lFilet != null && (Math.max(lFilet, lPage) + .05) / (Math.min(lFilet, lPage) + .05) >= 1.2,
+          'et la carte se détache par un filet visible', JSON.stringify(d.filet));
+      }
     }
     await pg.close();
   }
