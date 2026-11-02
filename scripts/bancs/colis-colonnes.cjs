@@ -263,7 +263,37 @@ async function main() {
         dit(L.sw <= L.cw + 1, `${T} aucun débordement horizontal`, `${L.sw} > ${L.cw}`);
         if (ordi) {
           dit(L.barre && /Tape un N°/.test(L.barreTxt) && /\//.test(L.barreTxt), `${T} la barre du haut : « Tape un N°… » avec la touche « / »`, L.barreTxt);
-          dit(!!L.bouton && /rgb\(36, 66, 184\)/.test(L.bouton.bg), `${T} le bouton d'impression est cobalt`, L.bouton && L.bouton.bg);
+          // (2 nov.) L'accent est le bleu Apple (§3 Palette) : #0071E3 en clair.
+          dit(!!L.bouton && /rgb\(0, 113, 227\)/.test(L.bouton.bg), `${T} le bouton d'impression porte l'accent (bleu Apple)`, L.bouton && L.bouton.bg);
+        }
+        // (2 nov., capture de Julien au téléphone : « …01 (relevé il y a 47 h)
+        // Chronopost ne trouve pas c… » écrit UNE LETTRE PAR LIGNE à côté de
+        // « Suivre chez le transporteur ».) AUCUN TEXTE ÉCRASÉ : tout replis ouvert,
+        // un bloc de texte de plus de 12 caractères ne fait jamais moins de 60 px
+        // de large sur plus de 3 lignes.
+        await pg.evaluate(() => { document.querySelectorAll('.vrm-main details').forEach((d) => { d.open = true; }); });
+        await pg.waitForTimeout(400);
+        const ecrases = await pg.evaluate(() => {
+          const out = [];
+          for (const el of document.querySelectorAll('.vrm-main *')) {
+            const direct = [...el.childNodes].filter((n) => n.nodeType === 3).map((n) => n.textContent).join('').trim();
+            if (direct.length < 12) continue;
+            const r = el.getBoundingClientRect(); if (!r.width || !r.height) continue;
+            const lh = parseFloat(getComputedStyle(el).lineHeight) || parseFloat(getComputedStyle(el).fontSize) * 1.3 || 16;
+            if (r.width < 60 && r.height > lh * 3.2) out.push({ t: direct.slice(0, 50), w: Math.round(r.width), h: Math.round(r.height) });
+          }
+          return out.slice(0, 5);
+        });
+        dit(!ecrases.length, `${T} aucun texte écrasé en colonne d'une lettre (replis ouverts)`, JSON.stringify(ecrases));
+        if (process.env.TRANCHES) {
+          const H = await pg.evaluate(() => { const m = document.querySelector('.vrm-main'); return m ? m.scrollHeight : document.documentElement.scrollHeight; });
+          for (let i = 0, y = 0; y < H && i < 12; i++, y += vp.height - 120) {
+            await pg.evaluate((yy) => { const m = document.querySelector('.vrm-main'); if (m) m.scrollTop = yy; window.scrollTo(0, yy); }, y);
+            await pg.waitForTimeout(250);
+            await pg.screenshot({ path: path.join(SHOTS, `colis-${vp.width}-t${String(i).padStart(2, '0')}.png`) });
+          }
+          await pg.evaluate(() => { const m = document.querySelector('.vrm-main'); if (m) m.scrollTop = 0; window.scrollTo(0, 0); });
+          await pg.evaluate(() => { document.querySelectorAll('.vrm-main details').forEach((d) => { d.open = false; }); });
         }
         await pg.screenshot({ path: path.join(SHOTS, `colis-colonnes-${vp.width}.png`), fullPage: false });
         if (process.env.PLEINE) await pg.evaluate(() => { const m = document.querySelector('.vrm-main'); if (m) m.scrollTop = 900; }).then(() => pg.waitForTimeout(300)).then(() => pg.screenshot({ path: path.join(SHOTS, `colis-colonnes-${vp.width}-bas.png`) })).then(() => pg.evaluate(() => { const m = document.querySelector('.vrm-main'); if (m) m.scrollTop = 0; }));
