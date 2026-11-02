@@ -256,8 +256,11 @@ const confirmation = (source, code, { auth = AUTH_GOOGLE, langue = 'fr', codeCor
     await recevoir(ventePro('sophie@gmail.com', '24000000001'));
     await recevoir(ventePro('proprio@boutique.test', '24000000002'));
     const fB = base.filter((x) => x.owner === B && /^email_invoice_/.test(x.id)), fJ = base.filter((x) => x.owner === J && /^email_invoice_/.test(x.id));
-    dit(fB.length === 1 && fB[0].data.status !== 'queued', "D. la facture Pro d'une autre vendeuse n'est PAS mise « en file d'envoi » (rien ne l'enverrait)", JSON.stringify(fB.map((x) => x.data.status)));
-    dit(fJ.length === 1 && fJ[0].data.status === 'queued', "D. celle du propriétaire de l'installation part toujours (l'autre sens)", JSON.stringify(fJ.map((x) => x.data.status)));
+    // (2 nov.) La facture Pro part de la boîte de CHAQUE vendeur, sur son clic
+    // (api/_lib/facture-pro.js) : plus aucune file « queued », pour personne, et
+    // aucun numéro donné à l'arrivée de l'email.
+    dit(fB.length === 1 && fB[0].data.status === 'draft' && !fB[0].data.number, "D. la vente Pro d'une autre vendeuse : un brouillon sans numéro, jamais « en file d'envoi »", JSON.stringify(fB.map((x) => [x.data.status, x.data.number])));
+    dit(fJ.length === 1 && fJ[0].data.status === 'draft' && !fJ[0].data.number, "D. celle du propriétaire : la même règle (plus de file réservée)", JSON.stringify(fJ.map((x) => [x.data.status, x.data.number])));
   });
 
   // ── E. L'assistant IA : « prête » seulement pour celui que la clé sert ──

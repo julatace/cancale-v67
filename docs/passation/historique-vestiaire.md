@@ -494,3 +494,40 @@ L'audit des parcours du 1er novembre avait mesuré que Vestiaire vivait à part 
   dites à côté de chaque total. Mesurer la forme réelle (`vc_ventes.forme`) avant
   d'apprendre une clé à l'extension.
 - A3 (même paire sur deux comptes Vinted), A5, A7–A9, A11–A14 : hors de ce chantier.
+
+## 2 novembre (soir) — 5.314.0 : « Mes articles » Vestiaire enfin LUS (la forme réelle)
+
+Julien : « est-ce que l'extension est prête pour Vestiaire ? j'ai fait une vente ». Mesuré (lecture seule) :
+`vc_listings` du 1er nov. portait `formeInconnue` — chaque élément de `/users/me/product-listings` est
+une ENVELOPPE `{ type: 'published', published: { product: { id, headline, subHeadline, price.cents,
+sellerEarnings, picturePath, path }, listingDate, negotiationsSummary } }`, sans id au premier niveau :
+`tableauAnnonces` n'y voyait aucune liste ⇒ AUCUNE annonce Vestiaire lue. `vc_ventes` : une seule lecture
+(« à expédier », vide, le 1er nov. 22 h) ; aucun e-mail Vestiaire n'arrive dans VRM.
+- `vc-inject.js` : l'enveloppe est DÉPLIÉE (`deplier`) — son contenu, `status` = le type, l'identifiant
+  de SON produit, titre = headline + subHeadline (affichage seul). Rien d'autre deviné ; la photo
+  (`picturePath`, chemin relatif d'hôte inconnu) n'est PAS reconstruite (un blanc plutôt qu'un faux).
+  Les ventes et achats passent par la même fonction : une enveloppe y est dépliée de même.
+- `audit-capture-vc-lbc` C10 (forme réelle, valeurs inventées) : rouge sur la 5.313, vert sur la 5.314.
+Geste : installer la 5.314.0, puis sur vestiairecollective.com ouvrir « Mes articles » ET « Mes ventes »
+(défiler jusqu'au bout) : la vente apparaît dans VRM à ce moment-là.
+
+## 2 novembre (soir) — 5.315.0 : « TOUT Vestiaire » gardé tel quel
+
+Julien : « fais vraiment une extension qui capte tout Vestiaire : dès que je vais sur un onglet, ça
+enregistre, pour après pouvoir capter toutes les infos — les ventes, les bordereaux, etc. »
+- Rien n'est DEMANDÉ à Vestiaire (aucune requête de plus, aucun geste simulé) : on garde ce que la page
+  charge déjà, sur SON compte, dans SON onglet.
+- `vc-inject.js` : toute réponse JSON 2xx de vestiairecollective.com (≤ 400 Ko), les données de page
+  (`__NEXT_DATA__`) à chaque chargement, et tout PDF reçu par la page (bordereau, ≤ 3 Mo, d'où qu'il
+  vienne, en-tête `%PDF` vérifié). Paramètres d'adresse « secrets » masqués (`token=_`).
+- Le fond (`rangerVcBrut`, `rangerVcPdf`) : une ligne par adresse `vc_brut_{empreinte}` = { url, methode,
+  sorte (api/page), page, compte (celui de l'onglet, `compteVcCapture`), at, taille, json } — la dernière
+  réponse vue ; clés secrètes du contenu VIDÉES (`[retiré]` : jetons, mots de passe, carte, IBAN…) ;
+  `vc_pdf_{empreinte}` = { url, page, compte, at, taille, b64 }. Deux budgets (taille de la base) : SES
+  données (/me/, commandes, ventes, envois, bordereaux, messages, porte-monnaie…) 1 500 adresses × 400 Ko ;
+  le reste (catalogue, autres vendeurs) 300 × 100 Ko (`chrome.storage.local`, §4.9). L'app ne lit pas
+  ces lignes : elles servent à construire les lectures exactes (ventes, montant versé, bordereaux) sur la
+  forme RÉELLE.
+- `audit-capture-vc-lbc` C11.
+Geste : installer la 5.315.0 et se promener sur Vestiaire (Mes articles, Mes ventes, une vente ouverte,
+son bordereau, les messages, le porte-monnaie) ; puis dire à la session : « regarde ce qu'elle a capté ».

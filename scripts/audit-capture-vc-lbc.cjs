@@ -104,7 +104,7 @@ function pageVc() {
       appels.push({ u: String(u), methode: (init && init.method) || 'GET' });
       const r = routes[String(u)] || { status: 200, body: '{}' };
       const texte = typeof r.body === 'string' ? r.body : JSON.stringify(r.body);
-      return { status: r.status, ok: r.status >= 200 && r.status < 300, headers: { get: () => r.ctype || 'application/json' }, clone() { return this; }, text: async () => texte };
+      return { status: r.status, ok: r.status >= 200 && r.status < 300, headers: { get: () => r.ctype || 'application/json' }, clone() { return this; }, text: async () => texte, arrayBuffer: async () => (r.octets ? r.octets.buffer.slice(r.octets.byteOffset, r.octets.byteOffset + r.octets.byteLength) : new ArrayBuffer(0)) };
     },
     addEventListener: (t, f) => { if (t === 'message') ecoutes.push(f); },
   };
@@ -129,12 +129,13 @@ function pageVc() {
   win.XMLHttpRequest = FauxXhr;
   const ctx = { window: win, XMLHttpRequest: FauxXhr, document: { currentScript: {}, createElement: () => ({}), head: { appendChild() {} }, addEventListener() {}, getElementById: () => null },
     location: { origin: ORIGINE, hostname: 'fr.vestiairecollective.com', pathname: '/members/profile/', href: ORIGINE + '/members/profile/' }, history: { pushState() {}, replaceState() {} },
-    URL, console: { log() {}, warn() {}, error() {} }, setTimeout, clearTimeout, setInterval: () => 0, clearInterval() {}, JSON, Date, Math, Map, Set, Promise, encodeURIComponent };
+    URL, console: { log() {}, warn() {}, error() {} }, setTimeout, clearTimeout, setInterval: () => 0, clearInterval() {}, JSON, Date, Math, Map, Set, Promise, encodeURIComponent, btoa: (x) => Buffer.from(x, 'latin1').toString('base64'), Uint8Array, ArrayBuffer, String };
   vm.createContext(ctx); vm.runInContext(INJ, ctx, { filename: 'vc-inject.js' });
   const charge = async (url, corps, status = 200) => { routes[url] = { status, body: corps }; const n = posts.length; await win.fetch(url); await attendre(15); return posts.slice(n); };
   const xhr = async (url, corps, type) => { routes[url] = { status: 200, body: corps }; const n = posts.length; const x = new win.XMLHttpRequest(); x.open('GET', url); x.responseType = type; x.send(); await attendre(20); return posts.slice(n); };
   const ordre = (d) => new Promise((res) => { const n = posts.length; win.postMessage(Object.assign({ __tag: 'CANCALE_VC_ORDRE', kind: 'repondre' }, d)); setTimeout(() => res(posts.slice(n)), 30); });
-  return { charge, xhr, ordre, posts, appels, routes };
+  const route = async (url, r) => { routes[url] = r; const n = posts.length; await win.fetch(url); await attendre(15); return posts.slice(n); };
+  return { charge, xhr, ordre, posts, appels, routes, route };
 }
 // Le VRAI relais vc.js : ce qu'il transmet au fond.
 function relais() {
@@ -318,6 +319,46 @@ function fonctionsApp() {
   } catch (e) { _app = null; }
   return _app;
 }
+// C10 (2 nov., 5.314) — LA FORME RÉELLE de « Mes articles » chez Julien (noms de
+// clés relevés par la 5.299 dans `vc_listings.formeInconnue`, valeurs INVENTÉES) :
+// chaque élément est une enveloppe `{ type, [type]: { product: {...} } }`, sans id
+// au premier niveau. Sur la 5.313 toute la liste tombait en « forme inconnue ».
+async function c10() {
+  const p = pageVc();
+  const env = (id, type, titre, sous, cents) => ({ type, [type]: { product: { id, headline: titre, subHeadline: sous, picturePath: '/p/x.jpg', price: { formatted: 'x', cents, currency: 'EUR' }, sellerEarnings: { formatted: 'x', cents: cents - 1500, currency: 'EUR' }, path: '/x.shtml', segment: 'x' }, listingDate: '2026-10-30T10:00:00Z', negotiationsSummary: { totalNegotiationsCount: 0, ongoingNegotiationsCount: 0, pendingSellerActionCount: 0 }, singleNegotiationId: null, hasPriceDropRecommendation: false } });
+  const d = (await p.charge(`${API}/users/me/product-listings?offset=0&limit=20`, { meta: { limit: 20, offset: 0, count: 2 }, data: [env(60001, 'published', 'Nike', 'Baskets Dunk Low', 12000), env(60002, 'published', 'Adidas', 'Baskets Samba', 9000)] })).find((x) => x.kind === 'vcannonces');
+  const it = (d && d.items) || [];
+  dit(d && !d.inconnu && it.length === 2, 'C10 · la forme réelle (enveloppe « published ») est LUE : deux annonces, pas une forme inconnue', JSON.stringify(d && { n: it.length, inconnu: !!d.inconnu }));
+  dit(it[0] && it[0].id === '60001' && it[1] && it[1].id === '60002', 'C10 · chaque annonce a l’identifiant de SON produit', JSON.stringify(it.map((x) => x.id)));
+  dit(it[0] && it[0].titre === 'Nike Baskets Dunk Low' && it[0].prix && it[0].prix.valeur === 120 && it[0].statut === 'published', 'C10 · titre (headline + subHeadline), prix 120 €, état « published »', JSON.stringify(it[0] && { t: it[0].titre, p: it[0].prix, s: it[0].statut }));
+  dit(d && d.complet && d.complet.length === 2, 'C10 · la liste lue en entier fait foi', JSON.stringify(d && d.complet));
+}
+// C11 (2 nov., 5.315) — « TOUT VESTIAIRE » : la réponse entière gardée telle quelle,
+// sans secret, un PDF (bordereau) gardé, rien d'un autre site, rien d'une erreur.
+async function c11() {
+  const p = pageVc();
+  const vente = { meta: { count: 1 }, data: [{ id: 'S1', product: { id: 70001, name: 'Paire' }, buyer: { firstname: 'Acheteur' }, shipping: { label: { url: 'https://x/label.pdf' } }, access_token: 'SECRET-JETON', payout: { cents: 9000 } }] };
+  const m1 = (await p.charge(`${API}/users/me/sales?offset=0&limit=20&token=abc`, vente)).filter((x) => x.kind === 'vcbrut');
+  const m2 = (await p.charge(`${API}/users/me/sales/S1`, { erreur: 1 }, 404)).filter((x) => x.kind === 'vcbrut');
+  const m3 = (await p.charge('https://analytics.exemple.test/collect', { a: 1 })).filter((x) => x.kind === 'vcbrut');
+  const octets = Buffer.from('%PDF-1.4\n bordereau de banc\n%%EOF');
+  const m4 = (await p.route('https://etiquettes.exemple.test/label/S1.pdf', { status: 200, ctype: 'application/pdf', body: '', octets })).filter((x) => x.kind === 'vcpdf');
+  dit(m1.length === 1 && JSON.parse(m1[0].texte).data[0].shipping.label.url === 'https://x/label.pdf' && /token=_/.test(m1[0].url) && !/abc/.test(m1[0].url), 'C11 · une réponse de Vestiaire part ENTIÈRE (bordereau compris), le paramètre secret de l’adresse masqué', JSON.stringify(m1.map((x) => x.url)));
+  dit(!m2.length && !m3.length, 'C11 · ni une réponse d’erreur, ni un autre site', JSON.stringify({ e: m2.length, autre: m3.length }));
+  dit(m4.length === 1 && Buffer.from(m4[0].b64, 'base64').slice(0, 5).toString() === '%PDF-', 'C11 · un PDF reçu par la page (bordereau) est gardé', JSON.stringify(m4.length));
+  // Le relais puis le fond : rangé, SANS le secret du contenu.
+  const f = faireFond({ src: F.src, lignes: {} });
+  await f.ctx.noterSessionVc('compteA', 30, []);
+  const r = relais();
+  for (const d of [...m1, ...m4]) { const msg = r(Object.assign({}, d, { moi: 'compteA' })).find((y) => y.action === 'vcBrut' || y.action === 'vcPdf'); if (msg) await f.envoyer(msg, senderVc(30)); }
+  const brut = Object.entries(f.lignes).filter(([k]) => /^vc_brut_/.test(k)).map(([, v]) => v);
+  const pdf = Object.entries(f.lignes).filter(([k]) => /^vc_pdf_/.test(k)).map(([, v]) => v);
+  dit(brut.length === 1 && brut[0].json.data[0].payout.cents === 9000 && brut[0].json.data[0].access_token === '[retiré]' && !JSON.stringify(brut[0]).includes('SECRET-JETON') && brut[0].compte === 'compteA', 'C11 · le fond la range (vc_brut_…) : tout le contenu, le jeton retiré, le compte de l’onglet', JSON.stringify(brut[0] && { compte: brut[0].compte, jeton: brut[0].json.data[0].access_token }));
+  dit(pdf.length === 1 && Buffer.from(pdf[0].b64, 'base64').slice(0, 5).toString() === '%PDF-', 'C11 · le bordereau est rangé (vc_pdf_…)', String(pdf.length));
+  const n0 = Object.keys(f.lignes).length;
+  const msg = r(Object.assign({}, m1[0], { moi: 'compteA' })).find((y) => y.action === 'vcBrut'); await f.envoyer(msg, senderVc(30));
+  dit(Object.keys(f.lignes).length === n0, 'C11 · la même réponse revue ne crée pas de seconde ligne', '');
+}
 async function c9() {
   const app = fonctionsApp();
   const lu = new Date().toISOString(), vieux = new Date(Date.now() - 3 * 86400e3).toISOString(), frais = new Date(Date.now() - 3600e3).toISOString();
@@ -329,7 +370,7 @@ async function c9() {
 }
 
 (async () => {
-  for (const [nom, f] of [['C1', c1], ['C2', c2], ['C3', c3], ['C4', c4], ['C5', c5], ['C6', c6], ['C7', c7], ['C8', c8], ['C9', c9]]) {
+  for (const [nom, f] of [['C1', c1], ['C2', c2], ['C3', c3], ['C4', c4], ['C5', c5], ['C6', c6], ['C7', c7], ['C8', c8], ['C9', c9], ['C10', c10], ['C11', c11]]) {
     try { await f(); } catch (e) { dit(false, `${nom} : l’audit a tourné jusqu’au bout`, String((e && e.stack) || e).slice(0, 300)); }
   }
   console.log(ko ? `\n❌ ${ko} contrôle(s) rouge(s)` : '\n✅ capture Vestiaire et Leboncoin : tout est vert');

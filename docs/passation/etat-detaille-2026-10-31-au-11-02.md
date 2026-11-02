@@ -118,3 +118,11 @@ Déplacé TEL QUEL depuis CLAUDE.md §9 le 2 novembre 2026 (le fichier dépassai
   Paramètres). → vestiaire.
 - **29 oct.** — Plafond d'actions **50/h** (sa décision) ; Republier comme Vintex (5.277-5.285).
   → vinted-extension.
+
+
+## Lignes de §9 déplacées telles quelles le 2 nov. (nuit)
+
+- **31 oct.** — CLAUDE.md allégé (1,36 Mo → < 60 Ko), historique déplacé tel quel dans
+  `docs/passation/historique-*.md`.
+- **30 oct.** — Intégration v30, extension **5.291.0** (5.288/5.290 étaient des numéros de
+  branche) : `docs/passation/2026-10-30.md`.

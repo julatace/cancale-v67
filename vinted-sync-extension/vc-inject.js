@@ -173,11 +173,32 @@
     visite(o, 0);
     return ref;
   }
+  // 5.314 (2 nov.) — LA FORME RÉELLE DE « MES ARTICLES » (mesurée chez Julien,
+  // noms de clés seulement) : chaque élément est une ENVELOPPE
+  // `{ type: 'published', published: { product: { id, headline, subHeadline,
+  // price: { cents, currency }, sellerEarnings, picturePath, path }, listingDate,
+  // negotiationsSummary } }`. Sans id au premier niveau, la liste entière tombait
+  // en « forme inconnue » : aucune annonce Vestiaire n'était lue. On DÉPLIE
+  // l'enveloppe (son contenu, plus `status` = le type) ; une annonce prend
+  // l'identifiant de SON produit. Rien d'autre n'est deviné.
+  const enveloppe = (e) => (e && typeof e === 'object' && !Array.isArray(e) && e.id == null && e.productId == null && e.product_id == null
+    && typeof e.type === 'string' && /^[\w-]{1,40}$/.test(e.type) && e[e.type] && typeof e[e.type] === 'object' && !Array.isArray(e[e.type])) ? e[e.type] : null;
+  function deplier(e) {
+    const env = enveloppe(e);
+    if (!env) return e;
+    const out = Object.assign({}, env, { status: e.type });
+    const p = env.product && typeof env.product === 'object' && !Array.isArray(env.product) ? env.product : null;
+    if (out.id == null && p && p.id != null) out.productId = p.id;
+    // Le titre affiché : « headline » et « subHeadline » de Vestiaire, mis bout à
+    // bout (affichage seul, jamais une identité — §5).
+    if (p && out.name == null && (typeof p.headline === 'string' || typeof p.subHeadline === 'string')) out.name = [p.headline, p.subHeadline].filter((x) => typeof x === 'string' && x.trim()).join(' ');
+    return out;
+  }
   function tableauAnnonces(obj) {
     const cands = [];
     const visite = (x, prof) => {
       if (!x || typeof x !== 'object' || prof > 3) return;
-      if (Array.isArray(x)) { if (x.length && x.every((e) => e && typeof e === 'object' && (e.id != null || e.productId != null || e.product_id != null))) cands.push(x); return; }
+      if (Array.isArray(x)) { const d = x.map(deplier); if (d.length && d.every((e) => e && typeof e === 'object' && (e.id != null || e.productId != null || e.product_id != null))) cands.push(d); return; }
       for (const k of Object.keys(x)) visite(x[k], prof + 1);
     };
     visite(obj, 0);
@@ -860,6 +881,39 @@
   }); } catch (_) {}
 
 
+  // ── 5.315 (2 nov., Julien : « une extension qui capte TOUT Vestiaire dès que je
+  //    vais sur un onglet, pour après pouvoir capter toutes les infos — les ventes,
+  //    les bordereaux, etc. ») — LA RÉPONSE ENTIÈRE, GARDÉE TELLE QUELLE.
+  //    Rien n'est DEMANDÉ à Vestiaire : on garde ce que la page charge déjà, sur
+  //    SON compte, dans SON onglet (aucune requête de plus, aucun geste simulé).
+  //    · toute réponse JSON 2xx de vestiairecollective.com (≤ 400 Ko) ;
+  //    · les données de la page (`__NEXT_DATA__`) à chaque chargement ;
+  //    · tout PDF que la page reçoit (un bordereau), d'où qu'il vienne (≤ 3 Mo).
+  //    Les paramètres d'adresse qui ressemblent à un secret sont masqués ici ; les
+  //    clés secrètes du contenu sont retirées par le fond avant d'écrire.
+  const BRUT_MAX = 400000;
+  const PDF_MAX = 3 * 1024 * 1024;
+  const SECRET_PARAM = /token|key|sig|signature|auth|session|password|secret|code|jwt/i;
+  const adresseBrut = (url) => { try { const x = new URL(url, location.origin); for (const k of [...x.searchParams.keys()]) if (SECRET_PARAM.test(k)) x.searchParams.set(k, '_'); return (x.hostname + x.pathname + x.search).slice(0, 400); } catch (_) { return ''; } };
+  function noteBrut(url, meth, statut, texte, sorte) {
+    try {
+      if (!DE_VC(url) || typeof texte !== 'string' || !texte || texte.length > BRUT_MAX) return;
+      const u = adresseBrut(url); if (!u) return;
+      post({ kind: 'vcbrut', url: u, methode: String(meth || 'GET').toUpperCase().slice(0, 8), statut: Number(statut) || 0, sorte: sorte || 'api', texte, page: (location.pathname || '').slice(0, 200), moi: moiId });
+    } catch (_) {}
+  }
+  function notePdf(url, statut, octets) {
+    try {
+      if (!octets || !octets.byteLength || octets.byteLength > PDF_MAX) return;
+      const b = new Uint8Array(octets);
+      if (!(b[0] === 0x25 && b[1] === 0x50 && b[2] === 0x44 && b[3] === 0x46)) return;   // « %PDF »
+      let bin = ''; for (let i = 0; i < b.length; i += 0x8000) bin += String.fromCharCode.apply(null, b.subarray(i, i + 0x8000));
+      post({ kind: 'vcpdf', url: adresseBrut(url), statut: Number(statut) || 0, b64: btoa(bin), page: (location.pathname || '').slice(0, 200), moi: moiId });
+    } catch (_) {}
+  }
+  const noteDonneesPage = () => { try { const el = document.getElementById('__NEXT_DATA__'); if (el && el.textContent) noteBrut(location.href, 'PAGE', 200, el.textContent, 'page'); } catch (_) {} };
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', noteDonneesPage, { once: true }); else setTimeout(noteDonneesPage, 0);
+
   const origFetch = window.fetch;
   if (origFetch) {
     window.fetch = function (input, init) {
@@ -876,7 +930,8 @@
             noteVu(url, meth, res.status, ct);
             if (DE_VC(url) && /^(POST|PUT)$/i.test(String(meth))) noteEnvoi(url, meth, res.status, corpsEnvoye, ent);
             // 5.299 : une réponse d'ERREUR (401, 404, 500…) n'est ni une liste, ni un compte, ni un schéma.
-            if (DE_VC(url) && res.status >= 200 && res.status < 300 && /json/i.test(String(ct || ''))) res.clone().text().then((t) => { noteSchema(url, t); noteCatalogue(url, t); noteMoi(url, t); noteAnnonces(url, t); noteVentes(url, t); noteCompteur(url, t); noteMessages(url, t); noteFil(url, t); noteAchats(url, t); notePublication(url, meth, res.status, t); }).catch(() => {});
+            if (res.status >= 200 && res.status < 300 && /pdf/i.test(String(ct || ''))) res.clone().arrayBuffer().then((o) => notePdf(url, res.status, o)).catch(() => {});
+            if (DE_VC(url) && res.status >= 200 && res.status < 300 && /json/i.test(String(ct || ''))) res.clone().text().then((t) => { noteBrut(url, meth, res.status, t, 'api'); noteSchema(url, t); noteCatalogue(url, t); noteMoi(url, t); noteAnnonces(url, t); noteVentes(url, t); noteCompteur(url, t); noteMessages(url, t); noteFil(url, t); noteAchats(url, t); notePublication(url, meth, res.status, t); }).catch(() => {});
           } catch (_) {}
         }).catch(() => {});
       } catch (_) {}
@@ -900,7 +955,8 @@
             let t = null;
             try { t = this.responseType === 'json' ? (this.response == null ? null : JSON.stringify(this.response)) : (this.responseType === '' || this.responseType === 'text') ? this.responseText : null; } catch (_) { t = null; }
             if (DE_VC(url) && /^(POST|PUT)$/i.test(String(this.__vcMeth || ''))) noteEnvoi(url, this.__vcMeth, this.status, this.__vcCorps, this.__vcH);
-            if (t && this.status >= 200 && this.status < 300 && /json/i.test(String(ct || ''))) { noteSchema(url, t); noteCatalogue(url, t); noteMoi(url, t); noteAnnonces(url, t); noteVentes(url, t); noteCompteur(url, t); noteMessages(url, t); noteFil(url, t); noteAchats(url, t); notePublication(url, this.__vcMeth, this.status, t); }
+            if (this.status >= 200 && this.status < 300 && /pdf/i.test(String(ct || '')) && this.response instanceof ArrayBuffer) notePdf(url, this.status, this.response);
+            if (t && this.status >= 200 && this.status < 300 && /json/i.test(String(ct || ''))) { noteBrut(url, this.__vcMeth, this.status, t, 'api'); noteSchema(url, t); noteCatalogue(url, t); noteMoi(url, t); noteAnnonces(url, t); noteVentes(url, t); noteCompteur(url, t); noteMessages(url, t); noteFil(url, t); noteAchats(url, t); notePublication(url, this.__vcMeth, this.status, t); }
           } catch (_) {}
         });
       } catch (_) {}

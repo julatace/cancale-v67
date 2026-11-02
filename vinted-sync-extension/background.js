@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.313.0';
+const CODE_VERSION = '5.315.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -2680,6 +2680,19 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           const compteOnglet = await compteVcCapture(sender && sender.tab && sender.tab.id, msg.moi);
           const ok = await rangerVcAnnonces({ items: msg.items, offset: msg.offset, total: msg.total, lus: msg.lus, forme: msg.forme, compte: compteOnglet, complet: msg.complet, inconnu: msg.inconnu });
           if (Array.isArray(msg.inconnu)) { noterDiag('vc_format_inconnu_annonces'); await noterVcCapte('annonces', ok === true, 0, { inconnu: true }); } else await noterVcCapte('annonces', ok === true, Array.isArray(msg.items) ? msg.items.length : 0);
+          sendResponse({ ok: ok === true });
+        } catch (e) { sendResponse({ ok: false, error: String(e) }); }
+      })();
+      return true;
+    }
+    // 5.315 : TOUT Vestiaire, tel que la page l'a chargé (voir vc-inject.js `noteBrut`).
+    if (msg && msg.from === 'cancale-vc' && (msg.action === 'vcBrut' || msg.action === 'vcPdf')) {
+      (async () => {
+        try {
+          let hote = ''; try { hote = new URL((sender && sender.tab && sender.tab.url) || '').hostname; } catch (_) {}
+          if (!/(^|\.)vestiairecollective\.com$/i.test(hote)) { sendResponse({ ok: false }); return; }
+          const compteOnglet = await compteVcCapture(sender && sender.tab && sender.tab.id, msg.moi);
+          const ok = msg.action === 'vcBrut' ? await rangerVcBrut(msg, compteOnglet) : await rangerVcPdf(msg, compteOnglet);
           sendResponse({ ok: ok === true });
         } catch (e) { sendResponse({ ok: false, error: String(e) }); }
       })();
@@ -15379,6 +15392,67 @@ function ficheVcAnnonce(x, prev, compte, maintenant) {
     prix: prix || prev.prix || null,
     statut: String(x.statut || '').slice(0, 40) || prev.statut || '',
     compte: compte || prev.compte || '' };
+}
+// ── 5.315 — TOUT VESTIAIRE, GARDÉ TEL QUEL ──────────────────────────────────
+// Une ligne par ADRESSE (méthode + chemin + paramètres) : `vc_brut_{empreinte}` =
+// { url, methode, sorte, page, compte, at, taille, json } — la DERNIÈRE réponse
+// vue à cette adresse (une adresse revue avec le même contenu n'est pas
+// réécrite avant 30 min). Les clés qui portent un secret (jeton, mot de passe,
+// carte…) sont VIDÉES avant d'écrire. Au plus 3 000 adresses distinctes (au-delà,
+// seules les adresses déjà gardées se mettent à jour) — tenu dans
+// `chrome.storage.local` (le fond MV3 meurt toutes les 30 s, §4.9).
+// Les PDF (bordereaux) : `vc_pdf_{empreinte}` = { url, page, compte, at, taille, b64 }.
+// ⚠️ La base gratuite a une taille : deux budgets. TES données (ce qui porte
+// /me/, commandes, ventes, envois, bordereaux, messages, porte-monnaie…) : 1 500
+// adresses, 400 Ko chacune. Le RESTE (catalogue, pages d'autres vendeurs) :
+// 300 adresses, 100 Ko chacune.
+const VC_BRUT_MIEN = /\/me(\/|\b|$)|order|sale|sold|ship|label|transaction|negotiat|conversation|message|wallet|payout|invoice|return|bordereau|expedi|purchase|bought|account|profile/i;
+const VC_SECRET_CLE = /^(access_?token|refresh_?token|id_?token|token|jwt|password|passwd|secret|api_?key|authorization|cookie|session_?id|csrf|xsrf|card_?number|cardNumber|cvv|cvc|iban|bic)$/i;
+const empreinteVc = (t) => { let h = 0x811c9dc5; for (let i = 0; i < t.length; i++) { h ^= t.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0; } return h.toString(36); };
+function sansSecretsVc(x, prof = 0) {
+  if (prof > 40 || x == null || typeof x !== 'object') return x;
+  if (Array.isArray(x)) return x.map((v) => sansSecretsVc(v, prof + 1));
+  const o = {};
+  for (const k of Object.keys(x)) o[k] = VC_SECRET_CLE.test(k) ? '[retiré]' : sansSecretsVc(x[k], prof + 1);
+  return o;
+}
+const _vcBrutVu = new Map();   // empreinte → { c: empreinte du contenu, at } (mémo : perdu, il coûte une écriture)
+async function vcBrutPlace(id, mien) {
+  const cle = mien ? 'vrmVcBrutIds' : 'vrmVcBrutAutres';
+  const g = await chrome.storage.local.get(cle);
+  const ids = Array.isArray(g && g[cle]) ? g[cle] : [];
+  if (ids.includes(id)) return true;
+  if (ids.length >= (mien ? 1500 : 300)) return false;
+  ids.push(id); await chrome.storage.local.set({ [cle]: ids });
+  return true;
+}
+async function rangerVcBrut(m, compte) {
+  const texte = typeof m.texte === 'string' ? m.texte : '';
+  if (!texte || texte.length > 400000) return false;
+  let json; try { json = JSON.parse(texte); } catch (_) { return false; }
+  const cle = `${m.methode || 'GET'} ${m.url || ''}`;
+  const mien = VC_BRUT_MIEN.test(String(m.url || '')) || (m.sorte === 'page' && VC_BRUT_MIEN.test(String(m.page || '')));
+  if (!mien && texte.length > 100000) return false;
+  const id = 'vc_brut_' + empreinteVc(cle);
+  const propre = sansSecretsVc(json);
+  const c = empreinteVc(JSON.stringify(propre));
+  const vu = _vcBrutVu.get(id);
+  if (vu && vu.c === c && Date.now() - vu.at < 30 * 60 * 1000) return true;
+  if (!(await vcBrutPlace(id, mien))) return false;
+  const ok = await supabaseUpsert('app_data', [{ id, data: { url: String(m.url || ''), methode: String(m.methode || 'GET'), sorte: m.sorte === 'page' ? 'page' : 'api', page: String(m.page || ''), compte: compte || '', at: new Date().toISOString(), taille: texte.length, json: propre } }], 'id');
+  if (ok === true) _vcBrutVu.set(id, { c, at: Date.now() });
+  return ok === true;
+}
+async function rangerVcPdf(m, compte) {
+  const b64 = typeof m.b64 === 'string' ? m.b64 : '';
+  if (!b64 || b64.length > 4300000) return false;
+  const id = 'vc_pdf_' + empreinteVc(b64.length + ':' + b64.slice(0, 4000) + b64.slice(-4000));
+  const vu = _vcBrutVu.get(id);
+  if (vu) return true;
+  if (!(await vcBrutPlace(id, true))) return false;
+  const ok = await supabaseUpsert('app_data', [{ id, data: { url: String(m.url || ''), page: String(m.page || ''), compte: compte || '', at: new Date().toISOString(), taille: Math.floor(b64.length * 3 / 4), b64 } }], 'id');
+  if (ok === true) _vcBrutVu.set(id, { c: '', at: Date.now() });
+  return ok === true;
 }
 let _vcAnnoncesChaine = Promise.resolve();
 function rangerVcAnnonces(patch) {
