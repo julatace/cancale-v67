@@ -65,3 +65,4 @@ Déplacé TEL QUEL depuis CLAUDE.md §9 le 2 novembre 2026 (le fichier dépassai
   sans booster, ventes, achats, messages) ; statut fiscal adapté à la personne ; arrivée
   guidée (`Bienvenue.jsx`) ; annonces en fiches produit ; un article parti sort du Stock.
 - **31 oct. (soir)** — Les colis à retirer vivent dans Colis seulement ; Achats à part ; sections de site en sous-onglets. → historique interface-stock. Geste : aucun.
+- **31 oct. (nuit)** — Recherche en place et notifications qui mènent à l'endroit exact (`api/_lib/lien-notif.js` ⇄ `src/cibleNotif.js`). → historiques interface-stock et sécurité. Geste : aucun.
