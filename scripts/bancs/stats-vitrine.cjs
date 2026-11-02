@@ -242,7 +242,7 @@ const capture=async(pg,nom)=>{
           const bar=BARRES[p], bcours=BARRES[p+'EnCours'];
           dit(r.barres===bar && r.enCours===bcours,`${p} : barres ${bar} (en cours n° ${bcours})`,`${r.barres} · ${r.enCours} · ${r.libs}`);
           dit(r.cours.length===1 && r.autres.length>0 && r.autres.every(c=>c!==r.cours[0]),`${p} : la barre en cours seule dans la couleur d’accent, les autres en gris`,JSON.stringify({cours:r.cours,autres:[...new Set(r.autres)]}));
-          if(p==='mois') dit(r.libs==='s37,s38,s39,s40,s41,s42,s43,s44','mois : 8 semaines s37 → s44',r.libs);
+          if(p==='mois') dit(r.libs==='07/09,14/09,21/09,28/09,05/10,12/10,19/10,26/10','mois : 8 semaines dites par leur lundi (07/09 → 26/10), plus « s37 »',r.libs);
           if(a.rapides) dit(r.rapides===a.rapides,`${p} : ce qui part vite — médianes ${a.rapides} (du plus rapide au plus lent)`,r.rapides);
           const cA=r.comptes['Vinted|atelier_sneak']||{}, cP=r.comptes['Vinted|paris_kicks']||{};
           dit(cA.n===String(a.comptes['111'].n) && cP.n===String(a.comptes['222'].n) && (a.comptes['111'].med==null || (cA.med===a.comptes['111'].med && cP.med===a.comptes['222'].med)),
