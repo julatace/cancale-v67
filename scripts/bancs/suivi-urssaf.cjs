@@ -15,6 +15,7 @@
 require('./_porte-banc.cjs');                       // la session de banc (l'accès direct n'existe plus)
 const { chromium } = require('playwright');
 const { metaVersData } = require('./_meta.cjs');
+const { ouvrirDetailCompta } = require('./_compta.cjs');
 const fs = require('fs'), http = require('http'), path = require('path');
 const DIST = path.join(__dirname, '..', '..', 'dist');
 const PORT = Number(process.env.BANC_PORT) || 6351;
@@ -112,6 +113,9 @@ const aller = async (pg, tab, repere, ms = 1500) => {
   await pg.goto(`http://localhost:${PORT}/?tab=${tab}`, { waitUntil: 'domcontentloaded' });
   if (repere) await pg.waitForFunction((r) => document.querySelector(r) || /pas pu s'afficher/.test(document.body.innerText), repere, { timeout: 25000 }).catch(() => {});
   await pg.waitForTimeout(ms);
+  // (2 nov., Comptabilité claire) Le suivi vit dans « Le détail », replié : on l'ouvre comme
+  // Julien, d'un toucher sur son titre (sans effet sur un code d'avant).
+  if (tab === 'compta') await ouvrirDetailCompta(pg, { attendre: 3000 }).catch(() => {});
 };
 const touche = async (pg, sel, vp) => { const l = pg.locator(sel).first(); await l.scrollIntoViewIfNeeded(); if (vp.width < 600) await l.tap(); else await l.click(); };
 const attrs = (pg, sel, pref) => pg.evaluate(([s, p]) => { const e = document.querySelector(s); if (!e) return null; const o = {}; for (const a of e.getAttributeNames()) if (a.startsWith(p)) o[a.slice(p.length)] = e.getAttribute(a); return o; }, [sel, pref]);

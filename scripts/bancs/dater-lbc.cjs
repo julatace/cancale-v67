@@ -10,6 +10,7 @@
 //   5. une date dans l'avenir est refusée, et dite.
 const { chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'));
 const { metaVersData } = require('./_meta.cjs');
+const { ouvrirDetailCompta } = require('./_compta.cjs');
 const fs = require('fs'), http = require('http'), path = require('path'), os = require('os');
 const DIST = path.join(__dirname, '..', '..', 'dist');
 const PORT = Number(process.env.BANC_PORT) || 4581;
@@ -100,6 +101,9 @@ const attendre = async (pg, f, ms = 8000) => { const t0 = Date.now(); for (;;) {
       const r0 = await attendre(pg, (r) => r.etat === 'lu' && r.n > 0);
       dit(r0.n === 1 && r0.txs.join() === 'L1', 'seule la vente sans date est proposée à dater', JSON.stringify(r0.txs));
       dit(r0.ca.vendu === 0 && r0.ca.finalise === 0, 'avant : elle n’est dans aucune période, la vente datée par l’extension reste au mois dernier', JSON.stringify(r0.ca));
+      // (2 nov., Comptabilité claire) « Vendu et reçu » vit dans « Le détail », replié : on l'ouvre
+      // comme Julien, d'un toucher sur son titre (sans effet sur un code d'avant).
+      await ouvrirDetailCompta(pg, { attendre: 3000 }).catch(() => {});
       await pg.fill('[data-dater-lbc-tx="L1"] input[type="date"]', DEMAIN);
       await pg.click('[data-dater-lbc-ok="L1"]');
       const r1 = await attendre(pg, (r) => !!r.alerte, 2000);
