@@ -69,7 +69,9 @@ export const numVcAnnonce = (id, it, liens) => cleNum((id != null && objet(liens
 // ── L'ARGENT ────────────────────────────────────────────────────────────────
 // Le NOM de la clé dit que c'est ce que le vendeur reçoit (versement, gain,
 // net vendeur…). « price », « amount », « total » seuls ne le disent pas.
-export const CLE_RECU_VC = /payout|earning|net.?(amount|price|seller|vendeur)|seller.?(amount|net|payout|revenue|earning|price)|amount.?to.?(seller|receive|pay)|you.?(get|receive|earn)|to.?receive|versement|vers[ée]|gain/i;
+// (2 nov.) `vousGagnez` : « Vous gagnez » de l'email de vente Vestiaire
+// (api/_lib/vestiaire-email.js) — la même valeur que `sellerEarning`, mesurée.
+export const CLE_RECU_VC = /payout|earning|vous.?gagnez|net.?(amount|price|seller|vendeur)|seller.?(amount|net|payout|revenue|earning|price)|amount.?to.?(seller|receive|pay)|you.?(get|receive|earn)|to.?receive|versement|vers[ée]|gain/i;
 export function montantRecuVc(v) {
   const m = v && objet(v.montant);
   if (!m || typeof m.valeur !== 'number' || !isFinite(m.valeur) || m.valeur < 0) return { eur: null, raison: 'montant pas lu' };

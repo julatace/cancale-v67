@@ -67,8 +67,8 @@ const POURQUOI_PAS_DELIER = {
 };
 
 const ANCIEN = 'Classé avant le 31 oct. — détail non gardé.';
-const ongletDuType = { suivi: 'cat_bord', bordereau: 'cat_bord', achat: 'achats', vente: 'cat_ventes', finalisation: 'cat_ventes', offre: 'cat_msg', message: 'cat_msg', favori: 'cat_annonces', action: 'cat_msg' };
-const TYPES_ANCIENS = { suivi: 'Suivi de colis', bordereau: 'Bordereau', achat: 'Reçu d’achat', vente: 'Vente', finalisation: 'Versement', offre: 'Offre', message: 'Message', favori: 'Favori', action: 'Demande Vinted', 'connu-sans-action': 'Information', information: 'Information', ignoré: 'Email non reconnu' };
+const ongletDuType = { suivi: 'cat_bord', bordereau: 'cat_bord', achat: 'achats', vente: 'cat_ventes', 'vente-vestiaire': 'cat_ventes', finalisation: 'cat_ventes', offre: 'cat_msg', message: 'cat_msg', favori: 'cat_annonces', action: 'cat_msg' };
+const TYPES_ANCIENS = { suivi: 'Suivi de colis', bordereau: 'Bordereau', achat: 'Reçu d’achat', vente: 'Vente', 'vente-vestiaire': 'Vente Vestiaire', finalisation: 'Versement', offre: 'Offre', message: 'Message', favori: 'Favori', action: 'Demande Vinted', 'connu-sans-action': 'Information', information: 'Information', ignoré: 'Email non reconnu' };
 
 // e : une ligne du journal (route `mode=journal`) ; delies : { [id de la ligne
 // du reçu]: { tx } } — les reçus que LUI a déliés (« Ce n'est pas ça »).
@@ -149,6 +149,19 @@ export function lectureEmail(e, delies = {}) {
       o = { quoi: `Vente${r.a ? ` : ${r.a}` : ''}${r.px ? ` · ${euros(r.px)}` : ''}${r.ps ? ` · à ${r.ps}` : ''}`,
         fait: `Notée, notification envoyée${r.n ? ` · N°${r.n}` : ''}${r.fac ? ` · facture ${r.fac}` : ''}`,
         lien: lien('cat_ventes'), num: r.n ? String(r.n) : null };
+      break;
+    }
+    case 'vente-vestiaire': {
+      if (r.av === 'analyse') {
+        o = { quoi: `Vente Vestiaire · « ${sujet} »`, fait: 'Gardé entier, rien noté',
+          raison: 'Je reconnais une vente Vestiaire, mais je n’ai pas su lire de quelle annonce il s’agit (ou deux références différentes).',
+          geste: 'Vérifie la vente sur Vestiaire : elle arrive aussi par l’extension.', lien: lien('cat_ventes') };
+        break;
+      }
+      const jour = r.lim && /^\d{4}-\d{2}-\d{2}/.test(r.lim) ? r.lim.slice(8, 10) + '/' + r.lim.slice(5, 7) : '';
+      o = { quoi: `Vente Vestiaire${r.a ? ` : ${r.a}` : ''}${r.mt ? ` · tu reçois ${euros(r.mt)}` : ''}`,
+        fait: `${r.nv ? 'Ajoutée à tes ventes et à tes colis à envoyer' : 'Déjà connue : complétée'} · annonce ${r.p}${jour ? ` · à envoyer avant le ${jour}` : ''}`,
+        lien: lien('cat_ventes') };
       break;
     }
     case 'offre':
