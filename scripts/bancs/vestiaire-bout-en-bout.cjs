@@ -232,8 +232,8 @@ const lireEcran = (pg, attr) => pg.evaluate((a) => {
       dit(j.nc === '1' && (j.vendu === '' || j.partiel === '1'), '« Vendu en … » : la vente Vestiaire au montant pas sûr n’est pas comptée, elle est NOMMÉE (« au moins »)', JSON.stringify({ vendu: j.vendu, nc: j.nc, partiel: j.partiel }));
       await o.pg.screenshot({ path: path.join(CAPTURES, 'vc-bout-journee-1512.png'), fullPage: true }).catch(() => {});
       await o.pg.goto(o.pg.url().split('?')[0] + '?tab=cat_bord', { waitUntil: 'domcontentloaded' }).catch(() => {});
-      await o.pg.waitForSelector('[data-cc-carte][data-site="vestiaire"]', { timeout: 20000 }).catch(() => {});
-      const c = await o.pg.evaluate(() => [...document.querySelectorAll('[data-cc-carte][data-site="vestiaire"]')].map((x) => x.getAttribute('data-cc-carte')));
+      await o.pg.waitForSelector('[data-colis-ident^="vc:"]', { timeout: 20000 }) /* (2 nov.) Colis → « À envoyer » : la ligne Vestiaire porte son identité */.catch(() => {});
+      const c = await o.pg.evaluate(() => [...document.querySelectorAll('[data-colis-ident^="vc:"]')].map((x) => x.getAttribute('data-colis-ident')));
       dit(c.length === 1 && (!j.pub || j.pub.vestiaire === c.length), 'Colis porte la même vente Vestiaire (une carte) : Colis = Ma journée = la cloche', JSON.stringify(c));
       dit(o.errs.length === 0, 'aucune erreur d’app', o.errs.join(' | ').slice(0, 160));
       await o.ctx.close();
