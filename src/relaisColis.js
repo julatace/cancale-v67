@@ -443,7 +443,7 @@ export function requetesBan(p) {
 
 // La raison, en français simple, pour laquelle la Base Adresse n'a pas placé un point.
 export const RAISONS_BAN = {
-  introuvable: 'cette adresse n’existe pas dans la Base Adresse Nationale',
+  introuvable: 'adresse introuvable sur la carte',
   incertain: 'l’adresse n’a pas été reconnue avec assez de certitude',
   ville: 'la ville trouvée n’est pas celle du message (ou la ville n’est pas écrite) : rien n’est deviné',
   ambigu: 'plusieurs endroits possibles pour cette adresse : aucun n’est choisi',
