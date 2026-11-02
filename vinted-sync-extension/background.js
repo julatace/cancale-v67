@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.309.0';
+const CODE_VERSION = '5.310.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -9233,10 +9233,14 @@ async function reglerAvant(uid, acc, it, ids, reponses, ctx = {}) {
   const poses = await appliquerReponses(uid, it, reponses);
   let codes = [];
   let manque = await champsManquantsAvant(uid, acc, it, ids, { cacheSeul: true, codesManque: codes });
-  let completes = [];
-  if (manque.length) {
-    completes = await completerParIdentite(uid, acc, it, ids, codes.slice());
-    if (completes.length) { codes = []; manque = await champsManquantsAvant(uid, acc, it, ids, { cacheSeul: true, codesManque: codes }); }
+  const completes = [];
+  // Deux tours au plus : une catégorie reprise peut rendre d'autres champs
+  // obligatoires (l'état, la taille de CETTE catégorie), repris au second tour.
+  for (let tour = 0; tour < 2 && manque.length; tour++) {
+    const faits = await completerParIdentite(uid, acc, it, ids, codes.slice());
+    if (!faits.length) break;
+    completes.push(...faits);
+    codes = []; manque = await champsManquantsAvant(uid, acc, it, ids, { cacheSeul: true, codesManque: codes });
   }
   const question = manque.length ? await questionRepub(uid, it, codes, ctx) : null;
   return { manque, question, completes, reponses: poses };
