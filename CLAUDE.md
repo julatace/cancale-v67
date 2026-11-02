@@ -529,6 +529,7 @@ vérifier par `curl https://vrm.center/api/sante`.
 
 ### Décisions et chantiers (octobre–novembre 2026)
 Une ligne par chantier. Le récit complet des lignes du 31 oct. au 2 nov. est, mot pour mot, dans `docs/passation/etat-detaille-2026-10-31-au-11-02.md`.
+- **2 nov. (nuit)** — E-mails et Statistiques plus simples : E-mails = « Oui, tes e-mails arrivent » + À faire + Ce que VRM en a fait ; Stats = 4 chiffres expliqués, compte qui vend le mieux, modèles et tailles, le reste en 2 volets (banc `emails-stats-clairs`, règles inchangées). → historique interface-stock. Geste : regarder Paramètres → E-mails et Statistiques.
 - **2 nov. (nuit)** — Transporteur LU (jamais deviné, sinon « Transporteur pas lu ») en logo + nom à côté du bordereau, ventes et achats (`src/transporteursVisuels.js`, `src/PastilleTransporteur.jsx`, banc `transporteurs-logos`) ; achats Vestiaire sortis de « À envoyer ». Reste : n° Mondial Relay dans l'email du bordereau, eBay avant étiquette, stats. → historique colis-retraits. Geste : regarder Colis au téléphone (logos).
 - **2 nov. (nuit)** — Carte des relais immobile (transition des boutons + arrondi MapLibre, banc `carte-stable`) ; parcours d'un nouveau vendeur : 13 défauts corrigés (banc `nouveau-vendeur`). → historique interface-stock. Geste : aucun.
 - **2 nov. (nuit)** — **Extension 5.316.0** : vente Vestiaire complète (photo, titre, montant versé `sellerEarning`, transporteur, suivi, bordereau PDF rapatrié → « Imprimer le bordereau » ; C10, C12). → historique vestiaire.
@@ -569,14 +570,6 @@ Une ligne par chantier. Le récit complet des lignes du 31 oct. au 2 nov. est, m
 - **1er nov.** — Récapitulatif d'une vente (frise Vendue → Argent reçu cochée seulement PROUVÉE, `src/recapVente.js`). → historique interface-stock. Geste : regarder une vente.
 - **1er nov.** — Stock : « Où est la N° ? » propose « Ranger ici / Autre case » pour une paire pas rangée ; cases dites en rangée/colonne ; ranger, retirer, sortir du stock le disent. Annonces : plus de chiffres d'argent ni « À faire aujourd'hui » en tête (ils restent dans Ventes). Menu « Republier et brouillons » (ordre inchangé). → historique interface-stock. Geste : aucun.
 - **1er nov.** — Finition « premium » (`src/styles-finition.css` chargée en dernier, plus d'emoji, étiquettes ≥ 12 px). → historique interface-stock. Geste : aucun.
-- **1er nov.** — Vestiaire en fiches + lectures Leboncoin relues sur 401/5xx (extension **5.296.0**). → historiques vestiaire et leboncoin. Geste : ouvrir « Mes ventes » / « Articles à expédier » sur Vestiaire.
-- **1er nov.** — Quatre défauts d'interface (barre sous l'île, fiche d'annonce au téléphone, Colis sans redite, tiroir de vente en feuille). → historique interface-stock. Geste : aucun.
-- **1er nov.** — Mode emballage (Colis → « Emballer ») et « Toute l'histoire du N° » par identité. → historiques colis-retraits et interface-stock. Geste : aucun.
-- **1er nov.** — Ventes : bénéfice sur la ligne (« au plus » si frais non confirmés), « Déposé » annulable 5 s. (La Tournée de ce lot a été retirée ensuite, voir plus haut.) → historique interface-stock. Geste : dire si « au plus » lui va.
-- **1er nov.** — Paramètres, compta, arrivée, communauté plus simples (groupe « Comptes et emails », suppressions qui demandent). → historiques interface-stock et compta. Geste : aucun.
-- **1er nov.** — Colis → « À retirer » par point relais : aucun colis écarté (« Point pas encore connu » + raison), même relais écrit deux fois = un point (nom propre + CP), position Vinted ou Base Adresse, compteur = Ma journée (`vrm_colis_retirer`), même n° de suivi compté une fois. → historique colis-retraits (« 1er nov. »). Geste : aucun.
-- **31 oct.** — Compétence **taste** (Leonxlnx/taste-skill, MIT) installée dans `.claude/skills/taste-skill/` à sa demande : tout changement de style passe par elle (`references/app-screens.md` pour les écrans de l'app) ; §7 et ses refus priment. → `.claude/skills/README.md`.
-- **31 oct.** — Style « Vitrine » (son choix parmi 4 maquettes) appliqué à toute l'app, clair et sombre → historique interface-stock (« Vitrine »). Geste : regarder l'app ; dire si « Tout imprimer » doit être fixé au-dessus de la barre du bas.
 - **Avant le 20 oct.** — `docs/passation/etat-detaille-2026-10-31-au-11-02.md` (fin) et `docs/journal-2026.md`.
 
 ---
