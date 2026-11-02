@@ -121,7 +121,9 @@ export const unionPool = (l, n, cleNum) => {
 
 // Les clés qui ne se fusionnent pas comme les autres.
 export const CLE_POOL = 'vinted_used_numeros';
-export const CLES_FICHES = ['vinted_annonce_numeros', 'vinted_sale_overrides'];
+// (2 nov., soir) + les N° donnés aux annonces Vestiaire : la même annonce
+// numérotée différemment des deux côtés est un conflit (rien n'est écrit).
+export const CLES_FICHES = ['vinted_annonce_numeros', 'vinted_sale_overrides', 'vrm_vc_numeros'];
 export const CLE_SERVEUR = 'vrm_numerotation';
 
 // Toute la ligne : `cles` = les clés synchronisées. Rend { data, conflit } :
