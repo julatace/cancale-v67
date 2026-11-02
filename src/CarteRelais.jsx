@@ -336,6 +336,7 @@ export function ColonneRetirer({ vue, C, Photo, gestes = null, detail = null, no
                 <b className="vrm-rp-nom" data-relais-nom="">{p.nom || p.adresseCourte || 'Point relais'}</b>
                 {p.nom && (p.adresse || p.adresseCourte) ? <span className="vrm-rp-adresse" data-relais-adresse="">{p.adresse || p.adresseCourte}</span> : null}
                 {trNom ? <span className="vrm-rp-adresse" data-relais-transporteur={trCode}>{trNom}</span> : null}
+                {(() => { const n = comptes.filter((c) => c.trInconnu).length; return n ? <span className="vrm-rp-adresse" data-transp="transporteur-inconnu" data-transp-n={n}>Transporteur pas encore connu{n > 1 ? ` pour ${n} colis` : ''} : le suivi Vinted ne le nomme pas</span> : null; })()}
                 <span className="vrm-rp-resume">
                   {morceaux.map((m, i) => <span key={i} data-relais-compte={i === 0 && p.nComptes ? p.nComptes : undefined}>{i ? ' · ' : ''}{m}</span>)}
                   {lim && p.nComptes ? <span className={p.urgent ? 'is-ambre' : ''} data-relais-limite={p.prochaineLimite}> · {lim}</span> : null}
@@ -373,6 +374,8 @@ export function ColonneRetirer({ vue, C, Photo, gestes = null, detail = null, no
           <header className="vrm-rp-tete">
             <span className="vrm-rp-ident">
               <b className="vrm-rp-nom">À vérifier · {aVerifier.length}</b>
+              {(() => { const n = aVerifier.filter((c) => c.trInconnu).length; return n ? <span className="vrm-rp-adresse" data-transp="transporteur-inconnu" data-transp-n={n}>Transporteur pas encore connu{n > 1 ? ` pour ${n} colis` : ''} : le suivi Vinted ne le nomme pas</span> : null; })()}
+              {(() => { const n = aVerifier.filter((c) => String(c.cle || '').startsWith('r:c:')).length; return n ? <span className="vrm-rp-resume" data-en-verification={n}>{n > 1 ? `${n} achats en cours de vérification` : '1 achat en cours de vérification'} : Vinted {n > 1 ? 'les dit' : 'le dit'} au point relais, mais rien ne {n > 1 ? 'les' : 'le'} relie encore à un colis ci-dessus — peut-être le même. Hors du compte.</span> : null; })()}
               <span className="vrm-rp-resume">{raisonCommune ? `${raisonCommune[0].toUpperCase()}${raisonCommune.slice(1)}. ` : ''}Hors du compte « à retirer » : regarde le suivi, et touche « J’ai retiré » si tu l’as eu.{(() => { const n = aVerifier.filter((c) => c.encoreCode || c.code || c.qr).length; return n ? ` ${n > 1 ? `${n} ont encore leur code ou leur QR` : '1 a encore son code ou son QR'} : peut-être encore au relais.` : ''; })()}</span>
             </span>
           </header>
