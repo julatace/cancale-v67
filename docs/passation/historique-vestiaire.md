@@ -552,3 +552,60 @@ gardé (`vc_brut_*`, formes réelles) :
 Reste : les ACTIONS depuis VRM (baisser un prix, répondre à une offre, retirer une annonce…) — Julien
 doit dire lesquelles ; chacune s'apprend sur SON geste fait une fois sur Vestiaire (recette, comme
 `vcrepondre`), jamais devinée.
+
+## 2 novembre (soir) — Vestiaire comme Vinted et Leboncoin : photo entière, un N° par annonce, ventes et colis à la même forme, bordereau tamponné
+
+Julien (captures du 2 nov., 21 h) : « pour Vestiaire c'est bien, juste c'est beaucoup zoomé sur le produit ; et
+pour la vente je veux la même mise en page avec les mêmes fonctionnalités que Vinted, Leboncoin ; je veux un
+numéro attribué par annonce et je veux que le titre de l'annonce soit tamponné sur le bordereau. »
+Aucune modification de l'extension (tout ce qu'il faut était déjà rangé par la 5.316).
+
+- **Photo entière** : `PhotoVc` est CONTENUE sur fond blanc (`object-fit: contain`), la fiche garde ses
+  proportions 4/5 (`.vrm-vc-catalog`, styles-vitrine.css) ; même photo contenue sur les lignes de vente et de colis.
+- **Un N° par annonce** (`src/numerosVestiaire.js`, `numeroterVestiaire` dans App.jsx) : identité = `productId`
+  (jamais le titre). Pas de N° neuf si l'annonce en porte déjà un : lien posé par VRM à la publication
+  (`vc_listings.liens`), référence VRM-n° lue, N° déjà donné. Sinon `prochainLibre` — LE mécanisme de Vinted,
+  passé en paramètre — sur TOUS les N° servis (pool, fiches, ventes, liens Leboncoin et Vestiaire, réservés, refs
+  lues) : le plus haut + 1, jamais un trou. Rangé dans `main.vrm_vc_numeros` ({ productId: { numero,
+  numberedAt, auto } }, synchronisée, **fusionnée comme les fiches** : `CLES_FICHES` — la même annonce numérotée
+  différemment sur deux appareils ⇒ conflit, rien écrit) et ajouté au pool append-only. Une annonce retirée n'en
+  reçoit pas ; une vente « à expédier » dont l'annonce n'a jamais été lue reçoit le N° de SON produit ; la vente
+  hérite du N° de son annonce par `productId` (`numVcVente(v, liens, auto)`, `numVcAnnonce(id, it, liens, auto)`
+  dans `api/_lib/vestiaire-regle.js` : lien > référence > N° donné). Tous les lecteurs de l'app passent `auto`
+  (`avecNumerosVc`), le widget et les rappels aussi (ils lisent `main.vrm_vc_numeros`).
+  ⚠️ Écriture dans `main` (risque mesuré, fait au plus sûr) : rien sans version de la numérotation relue
+  (`numerotationPermise`), ni pendant une écriture de numéros en route dans l'onglet (`_saveTimers` du pool,
+  des fiches, des ventes ⇒ on repasse 1,5 s plus tard) ; une lecture ratée (annonces, ventes, réservés) ⇒ rien.
+  Les N° donnés sont visibles tout de suite (`_vcMem`) et les 4 numérotations automatiques de Vinted les
+  comptent (`ajouterNumerosHorsEcran`). Aucune migration, rien sur le localStorage seul.
+- **Ventes** : `LigneVenteVc` = `LigneVenteCompacte` comme Vinted (`vrm-sale-row`, `data-tx="vc:…"`,
+  « N° · titre », date · « à envoyer avant … », l'étape, ce que Vestiaire verse, Achat · Bénéfice — prix
+  d'achat SAISI pour le N° (`vinted_buyprice_by_num`, seulement si ≤ 1 fiche porte ce N°), « Prix d'achat » sur
+  la ligne) et le récapitulatif au toucher (frise, l'argent, détails, Imprimer, Colis fait, Fiche de la paire).
+- **Colis → À envoyer** : `CarteColisVc` = la carte d'un colis Vinted (`vrm-colis-carte`, `data-bord-card`,
+  Imprimer · Imprimé · Colis fait, `data-geste`) ; « Chronopost · suivi … » n'est plus écrit deux fois : la
+  pastille transporteur (`PastilleTransporteur`, module transporteurs fusionné en #971) à côté du bouton, le n° de
+  suivi seul en texte. « Colis fait » (`main.vrm_vc_colis_done`) sort le colis de « à poster » PARTOUT
+  (`colisVcAPoster(d.fait)` : Colis, Ma journée, cloche, widget, rappels) ; « Imprimé » (`main.vrm_vc_imprimes`).
+- **Bordereau tamponné** : `imprimerBordereauVc` lit `vc_label_{produit}` au clic et le passe à
+  `annotateAndDownloadBordereau` (la fonction de Vinted et Leboncoin : version relue, `confirmerNumerosAVerifier`,
+  même cartouche N° + titre) ; la ligne rangée n'est jamais réécrite.
+
+### Preuves (§6)
+- `scripts/audit-numeros-vestiaire.cjs` : 25 verts (50 annonces au même titre ⇒ 50 N°, plus haut + 1, relue
+  garde, jamais redonné, la vente prend le N° de son annonce partout, lien/référence d'abord, titre jamais lu,
+  retirée/annulée) ; `--mutations` 7/7 tuées (N° donné oublié, lien oublié, identité par titre, trou comblé, vente
+  sans N° d'annonce, retirée numérotée, numérotation Vinted aveugle aux N° Vestiaire).
+- Banc `scripts/bancs/vestiaire-parite.cjs` (données inventées, 390 tactile clair + 1512 sombre) : 68 verts ; le
+  PDF produit est relu par pdf.js (titre et N° dedans). pdf.js 3.11 n'est pas téléchargeable ici : le banc sert la
+  pdfjs-dist du dépôt en `window.pdfjsLib` (BANC_PDFJS_DIR prend la 3.11 si on l'a).
+- Bancs `vestiaire-colis` et `vestiaire-fiches` remis à la règle (« sans référence ⇒ pas de N° » devient « un N°
+  neuf », le montant SÛR s'affiche), `vestiaire`, `recap-vente` verts.
+
+### Ce qui reste / à décider
+- Une paire en vente sur Vinted ET sur Vestiaire sans référence VRM-n° ni publication depuis VRM reçoit un SECOND
+  N° (aucune identité ne relie les deux annonces) : il faut alors publier depuis VRM ou poser « VRM-n° » dans la
+  description Vestiaire. Un « Relier à une paire » à la main (comme Leboncoin) n'est pas fait.
+- Les annonces Vestiaire seules n'entrent pas encore au Stock (`vinted_nums_physiques` reste Vinted/eBay/Leboncoin).
+- Le bénéfice d'une vente Vestiaire est sur la ligne ; le total « bénéfice » dit toujours « sans N vente Vestiaire ».
+- Le serveur (e-mail entrant) ne lit pas `vrm_vc_numeros` pour l'anti double vente immédiate (l'app, oui).

@@ -175,7 +175,9 @@ const LIGNES = [
       dit(an && an.etat === 'lu' && an.n === '3' && an.f.length === 3, 'Annonces : une fiche par annonce lue', JSON.stringify(an && an.f.map((x) => x.id)));
       dit(P('P1') && P('P1').num === '41' && P('P1').prix === '99' && /99,00/.test(P('P1').t) && P('P1').etat === 'en-ligne' && /banc-P1\.jpg/.test(P('P1').img), 'Annonces : la fiche porte la photo, le N° relié par la référence, le prix lu et « en ligne »', JSON.stringify(P('P1')));
       dit(P('P2') && P('P2').etat === 'vendue', 'Annonces : une annonce dont une VENTE est lue (même article) est « vendue », même si Vestiaire écrit encore on_sale', JSON.stringify(P('P2') && P('P2').etat));
-      dit(P('P3') && P('P3').etat === 'attente' && P('P3').num === '' && /Pas reliée/.test(P('P3').t) && P('P3').prix === '', 'Annonces : sans référence ⇒ pas de N° deviné (jamais par le titre) ; sans prix ⇒ « — »', JSON.stringify(P('P3')));
+      // (2 nov., soir, « un numéro par annonce ») Sans référence, l'annonce reçoit un N° NEUF
+      // (par son productId, au-dessus de tout N° servi) — jamais celui d'une autre, jamais par le titre.
+      dit(P('P3') && P('P3').etat === 'attente' && Number(P('P3').num) > 42 && P('P3').prix === '', 'Annonces : sans référence ⇒ un N° neuf (jamais deviné, jamais par le titre) ; sans prix ⇒ « — »', JSON.stringify(P('P3')));
       dit(an && /lues? sur Vestiaire il y a 2 h/.test(an.fr) && !/À confirmer/.test(an.fr), 'Annonces : la fraîcheur de la lecture dite une fois, en tête', an && an.fr.slice(0, 140));
       await o.pg.screenshot({ path: path.join(CAPTURES, `vc-fiches-annonces-${vp.width}.png`), fullPage: true }).catch(() => {});
       // 2. Les ventes.
@@ -190,7 +192,9 @@ const LIGNES = [
       dit(V('V1') && V('V1').etape === 'a-expedier' && /À expédier/.test(V('V1').t) && /à envoyer avant le/.test(V('V1').t), 'Ventes : « à expédier » en tête, avec la date limite', JSON.stringify(V('V1')));
       dit(V('V2') && V('V2').etape === 'controle', 'Ventes : « authentication_in_progress » ⇒ l’étape « contrôle par Vestiaire »', JSON.stringify(V('V2') && V('V2').etape));
       dit(V('V3') && V('V3').etape === 'autre' && /« paid »/.test(V('V3').t), 'Ventes : « paid » (payée par qui ?) n’est pas rangé : recopié tel quel', JSON.stringify(V('V3')));
-      dit(ve && !/123[,.]45|87[,.]65|54[,.]32/.test(ve.txt) && ve.phrase === 1, 'Ventes : AUCUN montant à l’écran, et la raison dite une seule fois', `phrase×${ve && ve.phrase}`);
+      // (2 nov., soir) Comme Vinted, la ligne montre ce que Vestiaire VERSE quand c'est sûr
+      // (`montantRecuVc` : la clé « earnings » le dit) ; un montant pas sûr ne s'affiche jamais.
+      dit(ve && !/123[,.]45|54[,.]32/.test(ve.txt) && /87,65/.test(ve.txt) && ve.phrase === 1, 'Ventes : seul le montant SÛR (versé) à l’écran, jamais un montant pas sûr ; la raison dite une seule fois', `phrase×${ve && ve.phrase}`);
       await o.pg.screenshot({ path: path.join(CAPTURES, `vc-fiches-ventes-${vp.width}.png`), fullPage: true }).catch(() => {});
       // 3. Le flou, sur les quatre écrans.
       for (const [k, nom, att, selA, selB] of LIGNES) {

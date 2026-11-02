@@ -26921,8 +26921,9 @@ function LigneVenteVc({ v, fait, enV, flou, i = 0 }) {
   const { etat, ton } = etatLigneVc(v, fait);
   const titre = v.titre || 'Article Vestiaire';
   const nomLigne = v.num ? `N°${v.num} · ${titre}` : titre;
-  // Comme Vinted : la date sur la ligne ; le transporteur à côté du bouton bordereau (récapitulatif).
-  const sous = v.date ? dateCourteVc(v.date) : '';
+  // Comme Vinted : la date sur la ligne (et, à expédier, « à envoyer avant … » — le
+  // « à poster avant » de la carte Colis) ; le transporteur à côté du bouton bordereau.
+  const sous = [v.date ? dateCourteVc(v.date) : '', v.aExpedier && !fait ? limiteVcTexte(v) : ''].filter(Boolean).join(' · ');
   const trV = transporteurDuColis({ declare: v.transporteur, suivi: v.suivi });
   const benef = lb.etat === 'annulee' ? null : { etat: lb.etat, achatCentimes: lb.achat != null ? Math.round(lb.achat * 100) : null, benefCentimes: lb.benefice != null ? Math.round(lb.benefice * 100) : null,
     achatTxt: lb.achat != null ? `${eurosLigne(lb.achat)} €` : (v.num ? 'à saisir' : '—'), benefTxt: texteBenefice(lb),
@@ -39310,6 +39311,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // l'écran se redessine quand ils changent (`useVcLocal`), posé AVANT tout
   // `useMemo` qui les lit (§4.6).
   const vcLoc0 = useVcLocal();
+  // Une annonce (ou une vente à expédier) Vestiaire sans N° en reçoit un — ici aussi, pour que
+  // Colis et Ma journée ne montrent pas « N° en attente » à qui n'ouvre jamais l'écran Vestiaire.
+  useNumerotationVestiaire();
   const vcLocCle = JSON.stringify([vcLoc0.auto, vcLoc0.fait]);
   // (1er nov., audit A2) Les ventes Vestiaire entrent dans chaque total « toutes
   // plateformes » : comptées si leur argent est sûr, NOMMÉES sinon (§5). Posées
