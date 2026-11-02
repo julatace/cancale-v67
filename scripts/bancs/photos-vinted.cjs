@@ -356,7 +356,14 @@ const ouvrir = async (pg, onglet, ms = 6000) => { await pg.goto(`http://localhos
 // « Tes achats Vinted › » sous la tâche. Toujours DANS la page (aucun
 // rechargement : le cache des photos et le pont restent ceux de la visite).
 const allerSection = async (pg, id) => {
-  if (id === 'achats') { await pg.locator('[data-espace-site="vinted"]:visible').first().click({ timeout: 8000 }); return; }
+  // (2 nov.) La porte « Tes achats Vinted › » n'existe plus (31 oct., soir,
+  // b5418826) : Achats est un écran de la navigation, ouvert DANS la page par le
+  // même chemin que les liens (`vrm:aller`, `?tab=cat_achats&vue=achats`).
+  if (id === 'achats') {
+    await pg.evaluate(() => window.dispatchEvent(new CustomEvent('vrm:aller', { detail: '?tab=cat_achats&vue=achats' })));
+    await pg.waitForSelector('[data-achats-onglet], [data-tache="achats"]', { timeout: 8000 });
+    return;
+  }
   await pg.locator(`.vrm-mobile-nav [data-nav-entree="${id}"]:visible, .vrm-sidebar [data-nav-entree="${id}"]:visible`).first().click({ timeout: 8000 });
   // Un seul site lu (Vinted) ⇒ pas de rangée de filtres : l'écran est déjà celui de Vinted.
   await pg.waitForSelector(`[data-tache="${id}"]`, { timeout: 8000 });

@@ -75,7 +75,7 @@ async function cadrer(pg, { comptes = [] } = {}) {
 async function survol(pg, sel) {
   const el = await pg.$(sel);
   if (!el) return null;
-  const lire = () => el.evaluate((e) => { const s = getComputedStyle(e); return { ombre: s.boxShadow, tr: s.transform }; });
+  const lire = () => el.evaluate((e) => { const s = getComputedStyle(e); return { ombre: s.boxShadow, tr: s.transform, fond: s.backgroundColor }; });
   const avant = await lire();
   await el.hover();
   await pg.waitForTimeout(320);
@@ -83,6 +83,13 @@ async function survol(pg, sel) {
   return { avant, apres };
 }
 const bouge = (p) => !!p && (p.avant.ombre !== p.apres.ombre || p.avant.tr !== p.apres.tr);
+// (2 nov.) Depuis le style « Vitrine » (31 oct., SON choix, historique
+// interface-stock : « cartes qui se soulèvent au survol, entrée en cascade »
+// sont des « tells » RETIRÉS), une carte répond sous la souris par un APLAT plus
+// soutenu (fond), plus par une ombre ni une translation. On juge donc : la
+// carte de l'accueil RÉPOND (fond, ombre ou translation changent) ; dans l'app,
+// rien ne se soulève et rien ne fait son entrée.
+const repond = (p) => !!p && (bouge(p) || p.avant.fond !== p.apres.fond);
 
 (async () => {
   if (!fs.existsSync(path.join(DIST, 'index.html'))) { console.log('❌ dist/ absent — lance npm run build'); process.exit(1); }
@@ -101,10 +108,10 @@ const bouge = (p) => !!p && (p.avant.ombre !== p.apres.ombre || p.avant.tr !== p
     const q = await pg.$('.acc-q');
     dit(!!q, 'la page d’accueil rend ses cartes-questions (.acc-q)');
     const pq = await survol(pg, '.acc-q');
-    dit(bouge(pq), 'une carte-question s’élève au survol (ombre/translation)',
-      pq ? `avant ${pq.avant.ombre.slice(0,24)}… → après ${pq.apres.ombre.slice(0,24)}…` : 'carte introuvable');
+    dit(repond(pq), 'une carte-question répond au survol (fond, ombre ou translation)',
+      pq ? `fond ${pq.avant.fond} → ${pq.apres.fond} · ombre ${pq.avant.ombre.slice(0,24)}… → ${pq.apres.ombre.slice(0,24)}…` : 'carte introuvable');
     const pp = await survol(pg, '.acc-prix');
-    dit(bouge(pp), 'la carte Prix s’élève au survol', pp ? `tr ${pp.avant.tr} → ${pp.apres.tr}` : 'carte Prix introuvable');
+    dit(repond(pp), 'la carte Prix répond au survol', pp ? `tr ${pp.avant.tr} → ${pp.apres.tr}` : 'carte Prix introuvable');
     dit(!erreurs.length, 'accueil : aucune erreur de page', erreurs[0]);
     await ctx.close();
   }
@@ -128,14 +135,12 @@ const bouge = (p) => !!p && (p.avant.ombre !== p.apres.ombre || p.avant.tr !== p
     const aClasse = carte && await carte.evaluate((e) => e.classList.contains('vrm-card'));
     dit(!!aClasse, 'la carte d’accueil porte la primitive .vrm-card');
     const pc = await survol(pg, '[data-etape]');
-    dit(bouge(pc), 'la carte d’accueil s’élève au survol (ombre/translation)',
-      pc ? `ombre ${pc.avant.ombre.slice(0,20)}… → ${pc.apres.ombre.slice(0,20)}…` : 'carte introuvable');
-    // La cascade d'entrée : les étapes portent l'animation `vrmMonte`.
+    dit(!!pc && !bouge(pc), 'Vitrine : la carte d’accueil ne se soulève pas au survol (ni ombre ni translation)',
+      pc ? `ombre ${pc.avant.ombre.slice(0,20)}… → ${pc.apres.ombre.slice(0,20)}… · tr ${pc.avant.tr} → ${pc.apres.tr}` : 'carte introuvable');
+    // Vitrine §9 « rien ne fait son entrée » : les étapes sont là, sans cascade.
     const anim = await pg.$$eval('.vrm-stagger > *', (els) => els.map((e) => getComputedStyle(e).animationName));
-    dit(anim.length >= 2 && anim.every((a) => /vrmMonte/.test(a)),
-      'les étapes entrent en cascade (.vrm-stagger → animation vrmMonte)', `noms = ${anim.join(', ') || '(aucun)'}`);
-    const delais = await pg.$$eval('.vrm-stagger > *', (els) => els.map((e) => getComputedStyle(e).animationDelay));
-    dit(new Set(delais).size >= 2, 'chaque étape a son propre délai (vraie cascade, pas un bloc)', `délais = ${delais.join(', ')}`);
+    dit(anim.length >= 2 && anim.every((a) => a === 'none'),
+      'Vitrine : les étapes s’affichent sans entrée en cascade (animation none)', `noms = ${anim.join(', ') || '(aucun)'}`);
     dit(!erreurs.length, 'premier écran : aucune erreur de page', erreurs[0]);
     await ctx.close();
   }

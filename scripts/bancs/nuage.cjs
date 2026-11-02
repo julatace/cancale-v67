@@ -38,10 +38,16 @@ const srv = http.createServer((q, r) => {
     await pg.route('**/auth/v1/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ access_token: 'jeton-de-banc', refresh_token: 'r', expires_in: 3600, user: SESSION.user }) }));
     await pg.route('**/rest/v1/**', (r) => {
       const u = r.request().url(), m = r.request().method();
-      if (m === 'POST' && /app_data/.test(u) && /"id":"main"/.test(r.request().postData() || '')) {
+      // (2 nov.) Une ligne `main` qui existe s'écrit par PATCH `id=eq.main`
+      // conditionnel sur `data.rev` (« Données sûres », 1er nov.) — réponse : la
+      // ligne écrite. Le POST reste (premier jour, la ligne n'existe pas).
+      const patchMain = m === 'PATCH' && /app_data/.test(u) && /[?&]id=eq\.main(&|$)/.test(u);
+      if (patchMain || (m === 'POST' && /app_data/.test(u) && /"id":"main"/.test(r.request().postData() || ''))) {
         envois++;
         if (enPanne) return r.fulfill({ status: 503, contentType: 'text/html', body: '<html>503</html>' });
-        envoisOk++; return r.fulfill({ status: 201, body: '' });
+        envoisOk++;
+        if (patchMain) return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([{ id: 'main' }]) });
+        return r.fulfill({ status: 201, body: '' });
       }
       if (/id=eq\.main/.test(u)) return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([{ data: { vrm_prenom: 'Banc' } }]) });
       return r.fulfill({ status: 200, contentType: 'application/json', headers: { 'content-range': '0-0/0' }, body: '[]' });
