@@ -118,6 +118,8 @@ import { DESCRIPTION_ORGANISATION } from "./operations/description.js";
 // (31 oct.) Colis → « À retirer » : la carte des points relais (règle pure + carte).
 import { regrouperRelais, pointsARetirer, lieuCompleteParTransporteur } from "./relaisColis.js";
 import CarteRelaisColis, { ColonneRetirer } from "./CarteRelais.jsx";
+import PastilleTransporteur, { LogoTransporteur } from "./PastilleTransporteur.jsx";
+import { transporteurDuColis, cleStatTransporteur, cleTransporteur } from "./transporteursVisuels.js";
 import { CarteTournee, TourneePleinEcran } from "./Tournee.jsx";
 // (1er nov.) Julien : « enlève Tournée » — la carte n'est plus sur Ma journée.
 const TOURNEE_SUR_JOURNEE = false;
@@ -5293,12 +5295,18 @@ const carrierKey = (raw) => {
 // Nom lisible d'un transporteur (repli « Transporteur » si inconnu).
 const carrierName = (raw) => { const c = CARRIERS[carrierKey(raw)]; return c ? c.name : 'Transporteur'; };
 // Badge de transporteur (pastille de marque).
+// (2 nov.) Julien : « avec le logo Chronopost… le logo Mondial Relay ». Le logo
+// officiel (src/PastilleTransporteur.jsx, l'icône publiée par le transporteur sur
+// SON domaine) ; tant qu'il ne s'est pas chargé, ou s'il échoue, une pastille
+// NEUTRE avec le code court — jamais une image cassée, plus de couleur de marque
+// imitée.
 function CarrierBadge({ carrier, size = 22 }) {
-  const c = CARRIERS[carrierKey(carrier)] || null;
+  const k = carrierKey(carrier);
+  const c = CARRIERS[k] || null;
   if (!c) return null;
-  return (
-    <span title={c.name} style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minWidth: size, height: size, padding: '0 5px', borderRadius: 6, background: c.bg, color: c.fg, fontSize: size * 0.46, fontWeight: 900, letterSpacing: 0.3, flexShrink: 0, boxShadow: '0 1px 2px rgba(0,0,0,0.15)' }}>{c.short}</span>
-  );
+  const cle = cleTransporteur(carrier);
+  const repli = <span aria-hidden="true" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minWidth: size, height: size, padding: '0 5px', borderRadius: Math.round(size * 0.27), background: C.bg, border: `1px solid ${C.border}`, boxSizing: 'border-box', color: C.muted, fontSize: size * 0.42, fontWeight: 700, letterSpacing: 0.2, flexShrink: 0 }}>{c.short}</span>;
+  return <span title={c.name} data-carrier-badge={cle || k} style={{ display: 'inline-flex', alignItems: 'center', flexShrink: 0 }}>{cle ? <LogoTransporteur cle={cle} taille={size} repli={repli}/> : repli}</span>;
 }
 
 // Le fond vectoriel de la mini-carte (MapLibre chargé à la demande).
@@ -19606,7 +19614,7 @@ function LeboncoinColis({ lbcVentes = { ventes: [] } }) {
     const n = numDe(o);
     const posted = estFait(o);
     return (
-      <div className="vrm-lbc-package" key={o.txId} data-bord-card style={{ padding: '11px 12px', border: `1px solid ${o.label && o.label.voucherUrl ? INV_STATUS.online.color + '44' : C.border}`, background: C.card, borderRadius: 10, marginBottom: 8, opacity: posted ? 0.55 : 1 }}>
+      <div className="vrm-lbc-package" key={o.txId} data-bord-card data-transporteur={cleStatTransporteur(transporteurDuColis({ declare: o.deliveryMethod || o.deliveryLabel || '' }))} style={{ padding: '11px 12px', border: `1px solid ${o.label && o.label.voucherUrl ? INV_STATUS.online.color + '44' : C.border}`, background: C.card, borderRadius: 10, marginBottom: 8, opacity: posted ? 0.55 : 1 }}>
         <div className="vrm-lbc-package-head" style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
           <PhotoVente src={photoArticle(o)} size={58} />
           <div style={{ flex: '1 1 150px', minWidth: 0 }}>
@@ -19615,7 +19623,8 @@ function LeboncoinColis({ lbcVentes = { ventes: [] } }) {
               <span style={{ fontSize: 13.5, fontWeight: 600, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{o.title || '(sans titre)'}</span>
             </div>
             <div style={{ fontSize: 11, color: C.muted, marginTop: 4, display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-              <span style={{ flexShrink: 0 }}>{o.deliveryLabel || o.deliveryMethod || 'Transporteur'}</span>
+              {/* (2 nov.) Le transporteur que Leboncoin écrit (`deliveryMethod`), logo + nom ; sinon « pas lu ». */}
+              <PastilleTransporteur t={transporteurDuColis({ declare: o.deliveryMethod || o.deliveryLabel || '' })} C={C} seul taille={16}/>
               {euro(o.price) && <span style={{ flexShrink: 0, fontWeight: 600, color: C.text }}>{euro(o.price)}</span>}
               {o.label && o.label.reference && <span style={{ flexShrink: 0 }}>bordereau {o.label.reference}</span>}
               {posted && <span style={{ flexShrink: 0, color: INV_STATUS.online.color, fontWeight: 600 }}>✓ posté</span>}
@@ -26897,11 +26906,12 @@ function joursAvantVc(iso) { const t = Date.parse(iso || ''); return isFinite(t)
 function ColisVestiaireBloc({ vc }) {
   if (vc === undefined || (vc && !vc.aEnvoyer && !vc.enRoute)) return null;
   if (vc === null) return <div data-colis-vestiaire="passu" style={{ marginBottom: 10 }}><LignePanne>Les colis Vestiaire n'ont pas pu être lus pour l'instant. Rien n'est perdu : rouvre Colis dans un moment.</LignePanne></div>;
-  const E = vc.aEnvoyer || [], R = vc.enRoute || [];
-  if (!E.length && !R.length) return null;
+  // (2 nov.) Les achats en route (`vc.enRoute`) ne sont plus ici : `AchatsVestiaireEnRoute`, sous « À retirer ».
+  const E = vc.aEnvoyer || [];
+  if (!E.length) return null;
   const titre = (t, n) => <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: '.07em', textTransform: 'uppercase', color: C.muted }}>{t} <span style={{ color: C.text, fontVariantNumeric: 'tabular-nums' }}>· {n}</span></span>;
   return (
-    <div data-colis-vestiaire={E.length} data-colis-vestiaire-route={R.length} style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 16 }}>
+    <div data-colis-vestiaire={E.length} style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 16 }}>
       {E.length > 0 && <>
         {titre('Ventes Vestiaire à envoyer', E.length)}
         <div className="vrm-aide" style={{ fontSize: 12, color: C.muted, lineHeight: 1.5 }}>{E.every((v) => v.bordereau) ? 'Les bordereaux sont dans VRM (« Imprimer le bordereau »). ' : 'Le bordereau se prend sur Vestiaire (onglet « articles à expédier ») — ou ici, une fois la page de la vente ouverte sur Vestiaire. '}Ce que VRM lit vient de ta dernière visite sur Vestiaire avec l'extension.</div>
@@ -26919,17 +26929,30 @@ function ColisVestiaireBloc({ vc }) {
             {!v.num ? <div style={{ fontSize: 11, color: C.muted }}>Aucune référence VRM-n° lue sur l'article : VRM ne devine pas la paire.</div> : null}
           </div>); })}
       </>}
-      {R.length > 0 && <>
-        {titre('Achats Vestiaire en route', R.length)}
-        {R.map((v) => (
-          <div key={v.id} data-vc-route={v.id} style={{ border: `1px solid ${C.border}`, borderRadius: 10, padding: '10px 12px', background: C.card }}>
-            <div style={{ fontSize: 13, fontWeight: 600, color: C.text, overflowWrap: 'anywhere' }}>{v.nom || 'Article sans nom lu'}</div>
-            <div style={{ fontSize: 11.5, color: C.muted }}>{v.etat ? `Vestiaire : « ${v.etat} » · ` : ''}suivi {v.suivi}{v.transporteur ? ` (${v.transporteur})` : ''}</div>
-            <BoutonSuivreColis transporteur={v.transporteur} suivi={v.suivi}/>
-          </div>
-        ))}
-      </>}
     </div>
+  );
+}
+// (2 nov.) LES ACHATS VESTIAIRE EN ROUTE — sortis de « À envoyer » (Julien : ce qui
+// ARRIVE n'a rien à faire avec ce qu'on envoie) : ils vivent sous « À retirer »,
+// HORS du compte « à retirer » (en route, pas encore au relais — rien n'est caché,
+// §5). Même liste qu'avant (`colisVestiaire(d).enRoute`), le transporteur LU en plus.
+function AchatsVestiaireEnRoute({ vc, transporteurDe }) {
+  if (vc === null) return <div data-colis-vestiaire-route="passu" style={{ marginTop: 14 }}><LignePanne>Les achats Vestiaire en route n'ont pas pu être lus pour l'instant. Rien n'est perdu : rouvre Colis dans un moment.</LignePanne></div>;
+  const R = (vc && vc.enRoute) || [];
+  if (!R.length) return null;
+  return (
+    <section className="vrm-colis-en-route" data-colis-vestiaire-route={R.length} style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 18 }}>
+      <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: '.07em', textTransform: 'uppercase', color: C.muted }}>Achats Vestiaire en route <span style={{ color: C.text, fontVariantNumeric: 'tabular-nums' }}>· {R.length}</span></span>
+      {R.map((v) => { const tr = transporteurDe ? transporteurDe(v.transporteur, v.suivi) : transporteurDuColis({ declare: v.transporteur, suivi: v.suivi }); return (
+        <div key={v.id} data-vc-route={v.id} data-colis-ident={'vcr:' + v.id} data-transporteur={cleStatTransporteur(tr)} style={{ border: `1px solid ${C.border}`, borderRadius: 10, padding: '10px 12px', background: C.card, display: 'flex', flexDirection: 'column', gap: 4 }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: C.text, overflowWrap: 'anywhere' }}>{v.nom || 'Article sans nom lu'}</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            <PastilleTransporteur t={tr} C={C} seul taille={18}/>
+            <span style={{ fontSize: 11.5, color: C.muted, overflowWrap: 'anywhere' }}>{v.etat ? `Vestiaire : « ${v.etat} » · ` : ''}suivi {v.suivi}</span>
+          </div>
+          <BoutonSuivreColis transporteur={tr.cle || v.transporteur} suivi={v.suivi}/>
+        </div>); })}
+    </section>
   );
 }
 // ══════════════════════════════════════════════════════════════════════════════
@@ -27237,6 +27260,24 @@ function VestiaireMesure() {
 // (17 oct.) L'écran « Collectif » est retiré — Julien : « il ne sert à rien, il
 // est déjà représenté dans les statistiques ». `?tab=collectif` mène aux
 // Statistiques (`ONGLETS_DEPLACES`).
+// (2 nov.) Un volet replié des Statistiques : un titre, une phrase qui dit ce qu'il
+// contient, ouvert d'un geste. Son état ouvert/fermé est une commodité de CET
+// appareil (localStorage, protégé) — jamais une donnée.
+const REPLIS_STATS = 'vrm_stats_replis';
+function RepliStats({ id, titre, phrase, children }) {
+  const [ouvert, setOuvert] = React.useState(() => { try { return !!(JSON.parse(localStorage.getItem(REPLIS_STATS) || '{}') || {})[id]; } catch (_) { return false; } });
+  const basculer = (e) => {
+    const o = e.currentTarget.open; setOuvert(o);
+    try { const v = JSON.parse(localStorage.getItem(REPLIS_STATS) || '{}') || {}; v[id] = o; localStorage.setItem(REPLIS_STATS, JSON.stringify(v)); } catch (_) {}
+  };
+  return (
+    <details className="vrm-repli vrm-stats-repli" data-stats-repli={id} data-ouvert={ouvert ? '1' : '0'} open={ouvert} onToggle={basculer}>
+      <summary><span className="vrm-stats-repli-tete"><span className="vrm-stats-repli-titre">{titre}</span><span className="vrm-stats-repli-phrase">{phrase}</span></span></summary>
+      {/* Monté seulement ouvert : rien n'est calculé pour un volet fermé. */}
+      {ouvert ? <div className="vrm-stats-repli-corps">{children}</div> : null}
+    </details>
+  );
+}
 function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,baseKO,premierJour,lbcVentes={ventes:[],inconnues:0},ebayCa=null,ebayCommandes,panelOff=null,ventesVc}) {
   // Les N° des annonces « à confirmer » (la liste dépliée sous « Annonces en ligne ») :
   // relus avec les chiffres, jamais un « sans N° » inventé (revue de la 5.167).
@@ -27580,6 +27621,10 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
     <div className="vrm-finance-page vrm-statistiques-premium" style={{padding:16,display:'flex',flexDirection:'column',gap:18}}>
       <ScreenHead icon="chart" title="Statistiques" right={<Segmente label="Période" className="vrm-sv-periode" value={periodeStats} onChange={setPeriodeStats} options={Object.entries(PERIODES).map(([v,l])=>({v,l,data:{'data-sv-choix':v}}))}/>}/>
       <StatsVitrine liveStats={liveStats} panelOff={panelOff} periode={periodeStats}/>
+      {/* (2 nov., « beaucoup d'incompréhension » — Julien) En haut, les chiffres qui
+          comptent pour la période ; tout le reste est rangé en deux volets repliés,
+          ouverts d'un geste et gardés ouverts sur cet appareil. Aucune règle ne change. */}
+      <RepliStats id="argent" titre="L’argent depuis le début" phrase="Finalisé par plateforme et par compte, mois par mois, objectif du mois, entre deux dates.">
 
       {/* Stats principales — priorité aux valeurs Vinted en direct (liveStats) :
           Articles en stock = nb de numéros étiquetés au garage · Valeur du stock =
@@ -27823,15 +27868,15 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
         // est publié par le même calcul que `caEncaisse` (§11), sur exactement
         // les mêmes ventes finalisées. Tant que la moisson n'a rien publié, tiret.
         const cases = [
-          ['× moyen', hv?'—':`×${avgX}`, null, true],
+          ['Multiplicateur moyen (vente ÷ achat)', hv?'—':`×${avgX}`, null, true],
           ['Vente moyenne', venteMoy==null?'—':fmt(venteMoy), hv?`sur ${liveStats.soldTotal} vente${liveStats.soldTotal>1?'s':''}`:null, false],
-          ['Bénéf. moyen / vente', hv?'—':fmt(avgProfit), null, true],
+          ['Bénéfice moyen par vente', hv?'—':fmt(avgProfit), null, true],
           ['CA / jour de vente', hv && liveStats.joursVente>0 ? fmt(liveStats.caEncaisse/liveStats.joursVente) : '—',
             hv && liveStats.joursVente>0 ? `${liveStats.joursVente} jour${liveStats.joursVente>1?'s':''} où tu as vendu` : 'en attente de la synchro Vinted', false],
         ];
         return (
           <div data-stats-carte="details" style={sCarte}>
-            <div style={{...sTitre,marginBottom:4}}>Détails</div>
+            <div style={{...sTitre,marginBottom:4}}>Moyennes</div>
             <div className="vrm-mois-grille" style={{display:'grid',gridTemplateColumns:'repeat(2,minmax(0,1fr))',gap:0}}>
               {cases.map(([l,v,sub,sourd])=>(
                 <div key={l} style={{minWidth:0,padding:'12px 0',borderTop:`1px solid ${C.border}`}}>
@@ -27937,6 +27982,8 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
       {/* Ce qui se vend : marque, taille, modèle, pays, temps de vente (17 oct.). */}
       {/* (31 oct.) Rythme, marges par groupe, temps de vente, jours et heures,
           stock qui dort, rotation, annulations — chacun avec sa couverture. */}
+      </RepliStats>
+      <RepliStats id="vente" titre="Ce qui se vend, ton rythme, le stock qui dort" phrase="Marges par marque, temps de vente, jours et heures où tu vends, paires en ligne depuis longtemps, boost.">
       <StatsDetaillees liveStats={liveStats} panelOff={panelOff}/>
       <AnalysesStatistiques panelOff={panelOff}/>
 
@@ -28005,6 +28052,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
         </Card>
       )}
 
+      </RepliStats>
       {/* Récap mensuel */}
       {showMonthly&&monthlyRecapData.count>0&&(
         <Card>
@@ -36802,34 +36850,34 @@ function StatsVitrine({ liveStats, panelOff, periode }) {
   const tVendu = V == null
     ? tuile('vendu', 'Vendu', '—', vendu === null ? 'ventes pas pu être lues' : 'je lis tes ventes…', { 'data-sv-etat': vendu === null ? 'passu' : 'encours' })
     : tuile('vendu', 'Vendu', `${partielVendu ? 'au moins ' : ''}${fmt(V.eur)}`,
-      <>{pl(V.n, 'vente')}{V.ecart != null && !partielVendu ? <span title={`Comparé à ${nomPrec}${auMemePoint ? ', au même jour' : ''} : ${fmt(V.prec.eur)}`}>{` · ${V.ecart > 0 ? '+' : ''}${V.ecart} %`}</span> : null}{manque.length ? ` · sans ${manque.join(', ')}` : ''}{ncPeriode.length ? ` · ${ncPeriode.length} non comptée${ncPeriode.length > 1 ? 's' : ''}` : ''}</>,
+      <>{pl(V.n, 'vente')}{V.ecart != null && !partielVendu ? <span title={`Comparé à ${nomPrec}${auMemePoint ? ', au même jour' : ''} : ${fmt(V.prec.eur)}`}>{` · ${V.ecart > 0 ? '+' : ''}${V.ecart} % par rapport à ${nomPrec}`}</span> : null}{manque.length ? ` · sans ${manque.join(', ')}` : ''}{ncPeriode.length ? ` · ${ncPeriode.length} non comptée${ncPeriode.length > 1 ? 's' : ''}` : ''}</>,
       { 'data-sv-etat': 'lu', 'data-sv-n': V.n, 'data-sv-eur': cents(V.eur), 'data-sv-prec': cents(V.prec.eur), 'data-sv-ecart': V.ecart == null ? '' : V.ecart, 'data-sv-partiel': partielVendu ? '1' : '0', 'data-sv-non-comptees': ncPeriode.length || undefined }, ncPeriode.length ? `Pas dans ce montant : ${phraseNonComptees(ncPeriode)}` : undefined);
   const tBenef = !B
     ? tuile('benefice', 'Bénéfice', '—', 'ouvre Ventes une fois : il s’y calcule', { 'data-sv-etat': 'passu' })
     : B.n === 0
       ? tuile('benefice', 'Bénéfice', '—', 'aucune vente finalisée', { 'data-sv-etat': 'lu', 'data-sv-n': 0, 'data-sv-ncout': 0, 'data-sv-brut': '' })
       : B.nCout === 0
-        ? tuile('benefice', 'Bénéfice', '—', `aucun prix d’achat sur ${pl(B.n, 'vente')}`, { 'data-sv-etat': 'lu', 'data-sv-n': B.n, 'data-sv-ncout': 0, 'data-sv-brut': '' })
-        : tuile('benefice', 'Bénéfice', `${B.nCout < B.n ? 'au moins ' : ''}${fmt(B.brut)}`, `${B.nCout} vente${B.nCout > 1 ? 's' : ''} sur ${B.n} avec prix d’achat`,
+        ? tuile('benefice', 'Bénéfice', '—', `il manque le prix d’achat de tes ${pl(B.n, 'vente')}`, { 'data-sv-etat': 'lu', 'data-sv-n': B.n, 'data-sv-ncout': 0, 'data-sv-brut': '' })
+        : tuile('benefice', 'Bénéfice', `${B.nCout < B.n ? 'au moins ' : ''}${fmt(B.brut)}`, B.nCout < B.n ? `${B.nCout} vente${B.nCout > 1 ? 's' : ''} sur ${B.n} ont leur prix d’achat : il manque celui des autres` : `vente − prix d’achat, sur ${pl(B.n, 'vente finalisée', 'ventes finalisées')}`,
           { 'data-sv-etat': 'lu', 'data-sv-n': B.n, 'data-sv-ncout': B.nCout, 'data-sv-brut': cents(B.brut) }, 'Brut : vente − prix d’achat, ventes finalisées, sur les seules ventes au prix d’achat connu.');
   const tDelai = !releve
-    ? tuile('delai', 'Délai médian', '—', 'ouvre Ventes une fois : il s’y calcule', { 'data-sv-etat': 'passu' })
-    : extras === undefined ? tuile('delai', 'Délai médian', '—', 'je lis tes annonces…', { 'data-sv-etat': 'encours' })
-      : datesPasSu ? tuile('delai', 'Délai médian', '—', 'annonces pas pu être lues', { 'data-sv-etat': 'passu' })
-        : !Dl || Dl.nDelai === 0 ? tuile('delai', 'Délai médian', '—', Dl && Dl.n ? `aucune des ${pl(Dl.n, 'vente')} Vinted n’a de date de mise en ligne` : 'aucune vente Vinted finalisée', { 'data-sv-etat': 'lu', 'data-sv-mediane': '', 'data-sv-couv': Dl ? `0/${Dl.n}` : '0/0' })
-          : tuile('delai', 'Délai médian', joursLong(Dl.mediane), `entre mise en ligne et vente${Dl.nDelai < Dl.n ? ` · sur ${Dl.nDelai} ventes sur ${Dl.n}` : ''}`,
+    ? tuile('delai', 'Temps pour vendre', '—', 'ouvre Ventes une fois : il s’y calcule', { 'data-sv-etat': 'passu' })
+    : extras === undefined ? tuile('delai', 'Temps pour vendre', '—', 'je lis tes annonces…', { 'data-sv-etat': 'encours' })
+      : datesPasSu ? tuile('delai', 'Temps pour vendre', '—', 'annonces pas pu être lues', { 'data-sv-etat': 'passu' })
+        : !Dl || Dl.nDelai === 0 ? tuile('delai', 'Temps pour vendre', '—', Dl && Dl.n ? `aucune des ${pl(Dl.n, 'vente')} Vinted n’a de date de mise en ligne` : 'aucune vente Vinted finalisée', { 'data-sv-etat': 'lu', 'data-sv-mediane': '', 'data-sv-couv': Dl ? `0/${Dl.n}` : '0/0' })
+          : tuile('delai', 'Temps pour vendre', joursLong(Dl.mediane), `la moitié de tes paires partent plus vite${Dl.nDelai < Dl.n ? ` · ${Dl.nDelai} ventes datées sur ${Dl.n}` : ''}`,
             { 'data-sv-etat': 'lu', 'data-sv-mediane': Dl.mediane, 'data-sv-couv': `${Dl.nDelai}/${Dl.n}` }, 'Vinted seulement : Leboncoin et eBay ne donnent pas la date de mise en ligne.');
   const enLigneTxt = texteEnLigne(liveStats);
   const dort = stock && stock.dort && stock.dort.seuils ? (stock.dort.seuils[30] || { n: 0 }).n : null;
   const tEnLigne = tuile('enligne', 'En ligne',
     <span data-dash-stat="online">{enLigneTxt === '—' ? '—' : <><b style={{ fontWeight: 'inherit' }}>{enLigneTxt}</b> annonce{enLigneTxt === '1' ? '' : 's'}</>}</span>,
-    dort == null ? 'qui dorment : ouvre Annonces une fois' : `dont ${dort} qui dor${dort > 1 ? 'ment' : 't'} (30 j et plus)`,
+    dort == null ? 'qui dorment : ouvre Annonces une fois' : `dont ${dort} en ligne depuis 30 jours ou plus`,
     { 'data-sv-etat': enLigneTxt === '—' ? 'passu' : 'lu', 'data-sv-dort': dort == null ? '' : dort }, 'Aujourd’hui, quelle que soit la période choisie.');
 
   // ── Les barres ──
   const maxB = barres ? Math.max(1, ...barres.map((x) => x.eur)) : 1;
   const libBarre = (x) => b.type === 'semaine' ? new Date(x.debut).toLocaleDateString('fr-FR', { weekday: 'short' }).replace('.', '')
-    : b.type === 'annee' ? new Date(x.debut).toLocaleDateString('fr-FR', { month: 'short' }).replace('.', '') : `s${x.semaine}`;
+    : b.type === 'annee' ? new Date(x.debut).toLocaleDateString('fr-FR', { month: 'short' }).replace('.', '') : new Date(x.debut).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' });
   const titreBarres = b.type === 'semaine' ? 'Vendu par jour' : b.type === 'annee' ? 'Vendu par mois' : 'Vendu par semaine';
   const noteBarres = b.type === 'semaine' ? 'cette semaine' : b.type === 'annee' ? String(new Date(b.de).getFullYear()) : '8 dernières semaines';
   const H = 190;
@@ -36863,7 +36911,7 @@ function StatsVitrine({ liveStats, panelOff, periode }) {
               ))}
             </div>
           ), { 'data-sv-carte': 'barres' }, 'vrm-sv-large')}
-        {carte('sv-rapides', 'Ce qui part vite', rapides && rapides.length ? 'médiane' : null, !lignes
+        {carte('sv-rapides', 'Les modèles qui partent vite', rapides && rapides.length ? 'jours pour vendre' : null, !lignes
           ? vide('Il se calcule avec le relevé de tes ventes : ouvre Ventes une fois.', { 'data-sv-etat': 'passu' })
           : extras === undefined ? vide('Je lis les dates de mise en ligne…', { 'data-sv-etat': 'encours' })
             : datesPasSu ? vide('Tes annonces n’ont pas pu être lues : aucun délai.', { 'data-sv-etat': 'passu' })
@@ -36879,11 +36927,12 @@ function StatsVitrine({ liveStats, panelOff, periode }) {
                     ))}
                   </div>
                 ), { 'data-sv-carte': 'rapides' })}
-        {carte('sv-comptes', 'Par compte', null, !comptes
+        {carte('sv-comptes', 'Quel compte vend le mieux', comptes && comptes.length ? 'ventes · jours pour vendre' : null, !comptes
           ? vide(vendu === null ? 'Tes ventes n’ont pas pu être lues.' : 'Je lis tes ventes…', { 'data-sv-etat': vendu === null ? 'passu' : 'encours' })
           : !comptes.length ? vide('Aucune vente sur la période.', { 'data-sv-etat': 'lu' })
             : (
               <div className="vrm-sv-lignes vrm-sv-comptes" data-sv-etat="lu">
+                {comptes.length > 1 && comptes[0].n > comptes[1].n && <p className="vrm-sv-phrase" data-sv-meilleur={comptes[0].k}>{comptes[0].nom}{comptes[0].site ? ` (${comptes[0].site})` : ''} vend le plus sur la période.</p>}
                 {comptes.slice(0, 6).map((c) => (
                   <div key={c.k} className="vrm-sv-ligne-compte" data-sv-compte={c.k} data-n={c.n} data-mediane={c.mediane == null ? '' : c.mediane}>
                     <span className="vrm-sv-nom">{c.nom}{c.site ? <span className="vrm-sv-site"> ({c.site})</span> : null}</span>
@@ -36896,7 +36945,7 @@ function StatsVitrine({ liveStats, panelOff, periode }) {
             ), { 'data-sv-carte': 'comptes' })}
       </div>
       <div className="vrm-sv-rangee vrm-sv-rangee-2">
-        {carte('sv-tailles', 'Par taille', tailles && tailles.groupes.length ? 'médiane de vente' : null, !lignes
+        {carte('sv-tailles', 'Les tailles qui se vendent', tailles && tailles.groupes.length ? 'ventes · jours pour vendre' : null, !lignes
           ? vide('Il se calcule avec le relevé de tes ventes : ouvre Ventes une fois.', { 'data-sv-etat': 'passu' })
           : !tailles ? vide('Je lis tes annonces…', { 'data-sv-etat': 'encours' })
             : !tailles.groupes.length ? vide(tailles.n ? `Aucune taille connue sur ${pl(tailles.n, 'vente finalisée', 'ventes finalisées')}.` : 'Aucune vente finalisée sur la période.', { 'data-sv-etat': 'lu' })
@@ -36942,9 +36991,8 @@ function StatsVitrine({ liveStats, panelOff, periode }) {
         })()}
       </div>
       <div className="vrm-sv-note vrm-sv-pied">
-        Vendu : toutes plateformes, au jour de la vente, ventes en cours comprises. Bénéfice, délai, modèles et tailles : ventes finalisées (délai : Vinted seulement).{liveStats && liveStats.venduSansDate ? ` ${pl(liveStats.venduSansDate, 'vente')} Leboncoin sans date : dans aucune période.` : ''}{liveStats && (liveStats.venduNonComptees || []).length ? <span data-stats-non-comptees={liveStats.venduNonComptees.length}>{` Pas dans « vendu » (l'argent ne se lit pas) : ${phraseNonComptees(liveStats.venduNonComptees)} — les montants sont « au moins ».`}</span> : null}
+        Vendu : toutes tes plateformes, au jour de la vente, ventes en cours comprises. Bénéfice, temps pour vendre, modèles et tailles : ventes finalisées seulement. « Jours pour vendre » : de la mise en ligne à la vente, pour la moitié des paires — connu sur Vinted seulement.{liveStats && liveStats.venduSansDate ? ` ${pl(liveStats.venduSansDate, 'vente')} Leboncoin sans date : dans aucune période.` : ''}{liveStats && (liveStats.venduNonComptees || []).length ? <span data-stats-non-comptees={liveStats.venduNonComptees.length}>{` Pas dans « vendu » (l'argent ne se lit pas) : ${phraseNonComptees(liveStats.venduNonComptees)} — les montants sont « au moins ».`}</span> : null}
       </div>
-      <h2 className="vrm-sv-detail-titre">Tout le détail</h2>
     </div>
   );
 }
@@ -40897,6 +40945,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // n° ajouté à la main (`etapeDuSuiviManuel`).
   const finsSuivis = useMemo(() => finsColis(tracking, suivisEnvoyes, transp), [tracking, suivisEnvoyes, transp]);
   const transpMap = useMemo(() => transpParSuivi(transp), [transp]);
+  // (2 nov.) LE TRANSPORTEUR D'UN COLIS, LU (src/transporteursVisuels.js, une règle) :
+  // la ligne lue chez le transporteur pour ce n°, ce qu'écrit la plateforme ou
+  // l'e-mail du MÊME n°, sinon la forme du n° — jamais deviné ; rien ⇒ « pas lu ».
+  // Une vente Vinted : par le n° de suivi de SON bordereau (e-mail du bordereau).
+  const transporteurColis = (declare, suivi) => transporteurDuColis({ declare: declare || '', suivi: suivi || '', transp: transpMap, suivisEmail: Array.isArray(tracking) ? tracking : null });
+  const transporteurVente = (b) => transporteurColis('', b && b.suivi);
   useEffect(() => {
     // ⚠️ ON NE PUBLIE PAS UNE PHOTO À MOITIÉ DÉVELOPPÉE (§4.2 : une capture
     // partielle n'écrase jamais une complète). Mesuré : rendu depuis Ma journée
@@ -44177,7 +44231,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // ⚠️ Ma journée aussi (revue visuelle du 17 oct.) : sans les emails de suivi,
   // sa tuile « À retirer » comptait les seuls colis vus par Vinted (1) quand
   // l'écran Achats en montrait 2 — la même notion, deux nombres (§11).
-  useEffect(() => { if ((curSub==='bordereaux'||curSub==='achats'||curSub==='journee') && tracking===null) lireSuivis(); /* eslint-disable-next-line */ }, [sub]);
+  // (2 nov.) + Ventes : le récapitulatif d'une vente dit son transporteur LU (e-mail ou ligne du
+  // transporteur du même n°) — la même lecture partagée (`cachedRow`), pas une de plus.
+  useEffect(() => { if ((curSub==='bordereaux'||curSub==='achats'||curSub==='journee'||curSub==='ventes') && tracking===null) lireSuivis(); /* eslint-disable-next-line */ }, [sub]);
   // ── LES PHOTOS DES ACHATS, LUES DANS LEUR TRANSACTION (Achats seulement) ──
   // (23 oct.) Ma journée lisait ces transactions pour leurs n° de suivi
   // (`shipment.tracking_code`) — mesuré : 0 sur 1 290 en porte. Les n° viennent
@@ -46892,7 +46948,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         : groupe === 'pret' ? (lim || 'bordereau prêt')
         : [lectureFinie ? 'bordereau pas encore là' : 'bordereau pas encore lu', lim].filter(Boolean).join(' · ');
       L.push({ cle: 'v:' + (e.txn || e.key), groupe, site: 'vinted', nom: nomAvecTaille(o ? o.title : (b && (b.modele || b.article)) || 'Bordereau', o), photo: o ? orderPhoto(o) : bordPhoto(b),
-        num, etat, ambre: groupe !== 'fait' && e.dl != null && e.dl <= 1, ouvrir: groupe !== 'fait', tx: e.txn || '' });
+        num, etat, ambre: groupe !== 'fait' && e.dl != null && e.dl <= 1, ouvrir: groupe !== 'fait', tx: e.txn || '', transp: transporteurVente(b) });
     }
     if (colisEb) {
       const numEb = (x) => x.ordre ? (numLigneEbay(x.ordre, (x.ordre.lineItems || [])[0]) || '') : '';
@@ -46937,14 +46993,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       const a = achatDuColis(t, buysBase, indexSuivisAchats); const lu = lieuDeLigne(t); const code = codeDeLigne(t); const eE = etatColisEmail(t, maintenant); const ej = eE.jours;
       L.push({ cle: 'r:e:' + (suiviDeLigne(t) || t.id || ''), groupe: 'retirer', site: 'vinted', nom: nomAvecTaille(a ? a.title : (t.artTitle || (nomTr(t.carrier) ? `Colis ${nomTr(t.carrier)}` : 'Colis à retirer')), a), photo: a ? photoAchat(a) : (t.photo || null),
         etat: [lu.lieuNom || nomTr(t.carrier), dernierJour(ej) || (code ? code : (qrImage(t) ? 'QR code' : 'code pas encore lu'))].filter(Boolean).join(' · '), ambre: Number.isFinite(ej) && ej <= 1, ouvrir: true,
-        ...lu, transporteur: t.carrier || '', code, code2: codeRetrait(t.code2) || '', qr: !!qrImage(t) && !code, jours: Number.isFinite(ej) ? ej : null, tri: urgenceTri(eE), ...(lu.lieuNom ? {} : { sansLieu: sansLieuEmail(t) }), src: { t } });
+        ...lu, transporteur: t.carrier || '', transp: transporteurColis(t.carrier, suiviDeLigne(t)), code, code2: codeRetrait(t.code2) || '', qr: !!qrImage(t) && !code, jours: Number.isFinite(ej) ? ej : null, tri: urgenceTri(eE), ...(lu.lieuNom ? {} : { sansLieu: sansLieuEmail(t) }), src: { t } });
     }
     for (const o of (pickupUnion.extra || [])) {
       const r = relaisDe(o); const lu = lieuDe(r && r.lieu); const code = r ? codeRetrait(r.code) : ''; const eV = etatColisVinted(o, maintenant, tpmC); const ej = eV.jours;
       const suV = suivisAchat(o, indexSuivisAchats)[0] || ''; const eSV = entreeSuiviAchat(o); const trInconnu = !!suV && !((r && r.transporteur) || (eSV && eSV.transporteur) || transporteurDeForme(suV));
       L.push({ cle: 'r:v:' + o.transaction_id, groupe: 'retirer', site: 'vinted', nom: nomAvecTaille(o.title || 'Achat', o), photo: photoAchat(o), num: '', trInconnu,
         etat: [lu.lieuNom || 'au point relais', dernierJour(ej) || (code || 'code pas encore lu')].filter(Boolean).join(' · '), ambre: Number.isFinite(ej) && ej <= 1, ouvrir: true,
-        ...lu, transporteur: (r && r.transporteur) || '', code, qr: !!(r && r.qr) && !code, jours: Number.isFinite(ej) ? ej : null, tri: urgenceTri(eV), ...(lu.lieuNom ? {} : { sansLieu: r && r.lieu ? { raison: 'La conversation Vinted ne nomme pas clairement le point.', geste: 'Ouvre la conversation du colis : le point y est écrit.' } : sansLieuVinted(o) }) , src: { o } });
+        ...lu, transporteur: (r && r.transporteur) || '', transp: transporteurColis((r && r.transporteur) || (eSV && eSV.transporteur) || '', suV), code, qr: !!(r && r.qr) && !code, jours: Number.isFinite(ej) ? ej : null, tri: urgenceTri(eV), ...(lu.lieuNom ? {} : { sansLieu: r && r.lieu ? { raison: 'La conversation Vinted ne nomme pas clairement le point.', geste: 'Ouvre la conversation du colis : le point y est écrit.' } : sansLieuVinted(o) }) , src: { o } });
     }
     for (const x of (pickupUnion.aVerifier || [])) {
       const o = x.kind === 'email' ? (x.o || achatDuColis(x.t, buysBase, indexSuivisAchats)) : x.o;
@@ -46955,7 +47011,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       const code = x.kind === 'email' ? codeDeLigne(x.t) : codeRetrait((relaisDe(x.o) || {}).code);
       L.push({ cle: x.kind === 'email' ? 'r:e:' + (suiviDeLigne(x.t) || (x.t && x.t.id) || '') : 'r:v:' + (x.o && x.o.transaction_id), groupe: 'retirer', site: 'vinted', nom: nomAvecTaille(o ? o.title : (x.t && nomTr(x.t.carrier) ? 'Colis ' + nomTr(x.t.carrier) : 'Colis à retirer'), o), photo: o ? photoAchat(o) : ((x.t && x.t.photo) || null), trInconnu,
         etat: [lu.lieuNom || (x.kind === 'email' ? nomTr(x.t && x.t.carrier) : ''), 'à vérifier : délai dépassé ou incident'].filter(Boolean).join(' · '), aVerifier: true, horsCompte: true, ouvrir: true,
-        ...lu, transporteur: (x.kind === 'email' ? (x.t && x.t.carrier) : ((relaisDe(x.o) || {}).transporteur)) || '', code, jours: null,
+        ...lu, transporteur: (x.kind === 'email' ? (x.t && x.t.carrier) : ((relaisDe(x.o) || {}).transporteur)) || '', transp: transporteurColis((x.kind === 'email' ? (x.t && x.t.carrier) : ((relaisDe(x.o) || {}).transporteur || (eSX && eSX.transporteur))) || '', suX), code, jours: null,
         ...(lu.lieuNom ? {} : { sansLieu: x.kind === 'email' ? sansLieuEmail(x.t) : sansLieuVinted(x.o) }),
         // (2 nov.) Présentation seulement : la raison (`raisonAVerifier`, la même que
         // l'ancien bloc « à vérifier ») et la source, pour les gestes de SA carte.
@@ -46963,7 +47019,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     }
     for (const o of (pickupUnion.aConfirmer || [])) { const r = relaisDe(o); const lu = lieuDe(r && r.lieu); const suC = suivisAchat(o, indexSuivisAchats)[0] || ''; const eSC = entreeSuiviAchat(o); const trInconnu = !!suC && !((r && r.transporteur) || (eSC && eSC.transporteur) || transporteurDeForme(suC));
       L.push({ cle: 'r:c:' + o.transaction_id, groupe: 'retirer', site: 'vinted', nom: nomAvecTaille(o.title || 'Achat', o), photo: photoAchat(o), trInconnu, etat: 'au point relais · à vérifier (compte pas relu)', aVerifier: true, horsCompte: true, ouvrir: true,
-        ...lu, transporteur: (r && r.transporteur) || '', code: '', jours: null, ...(lu.lieuNom ? {} : { sansLieu: { raison: 'Peut-être le même colis qu’un e-mail : son compte Vinted n’a pas encore été relu.', geste: `Passe sur Vinted${o._acc ? ` connecté sur ${accName(o._acc)}` : ''} : l’extension relie le colis à son e-mail.` } }),
+        ...lu, transporteur: (r && r.transporteur) || '', transp: transporteurColis((r && r.transporteur) || (eSC && eSC.transporteur) || '', suC), code: '', jours: null, ...(lu.lieuNom ? {} : { sansLieu: { raison: 'Peut-être le même colis qu’un e-mail : son compte Vinted n’a pas encore été relu.', geste: `Passe sur Vinted${o._acc ? ` connecté sur ${accName(o._acc)}` : ''} : l’extension relie le colis à son e-mail.` } }),
         raisonVerif: `peut-être le même colis qu’un e-mail : compte ${o._acc ? accName(o._acc) + ' ' : ''}pas encore relu sur Vinted`, src: { o } }); }
     // Partis : la règle de la section « Partis » plus bas (même filtre, même ordre).
     if (Array.isArray(sales.items)) {
@@ -47009,8 +47065,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         : !x.num ? { etat: 'pas-range', texte: 'Sans N° : pas de place dans le Stock' }
         : (plan || meublesLus) ? { etat: 'pas-range', texte: 'Pas rangée dans le Stock' }
         : { etat: 'pas-lu', texte: 'Stock pas encore lu sur cet appareil' };
-      const tr = b && b.transporteur ? nomTransporteurSuivi(b.transporteur) : '';
-      const transporteur = tr && tr !== 'Colis' ? tr : '';
+      // (2 nov.) Le transporteur LU (la règle de la carte, src/transporteursVisuels.js) :
+      // `b.transporteur` n'existe sur aucun bordereau (mesuré : 214 lignes, aucun champ).
+      const transporteur = transporteurVente(b).nom || '';
       const lim = e ? (texteLimiteEnvoi(e.lim) || '') : '';
       return { cle: x.cle, tx: x.tx, num: x.num || '', nom: x.nom, photo: x.photo || null, e,
         sous: [o && o._acc ? accNameOf(o._acc) : '', lim].filter(Boolean).join(' · '),
@@ -48262,7 +48319,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           if (baseKO || premierJour || loading) return null;
           try {
             const tEnv = T.find(x => x.id === 'envoyer'), tRet = T.find(x => x.id === 'retirer');
-            const lignesImpr = lignesLot().map(l => ({ cle: l.cle, imprime: l.imprime, transporteur: (l.e && l.e.b && l.e.b.suivi) ? (transporteurDeForme(l.e.b.suivi) || '') : '' }));
+            const lignesImpr = lignesLot().map(l => ({ cle: l.cle, imprime: l.imprime, transporteur: transporteurVente(l.e && l.e.b).cle || '' }));
             // La règle de la case « À envoyer » (plus haut) : sans les bordereaux captés
             // (lus par Colis seulement), le nombre publié par Colis s'il parle du même
             // lot, sinon « au moins » ce que les e-mails disent (§5).
@@ -48270,7 +48327,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             const pretsExact = labelsPrets || toShip.length === 0 || !!(pubPrets && pubPrets.total === toShip.length);
             const nPrets = (!labelsPrets && pubPrets && pubPrets.total === toShip.length) ? Math.max(pubPrets.prets, lignesImpr.length) : lignesImpr.length;
             const aPoster = toShip.map(t => { const o = t.o || {}; const tx = String(o.transaction_id || ''); const b = tx ? bordsParTxn[tx] : null; const en = effEntry(o);
-                return { cle: 'v:' + tx, num: (b ? numForBord(b) : '') || (en && en.numero) || '', titre: o.title || '', transporteur: b && b.suivi ? (transporteurDeForme(b.suivi) || '') : '', jours: Number.isFinite(t.daysLeft) ? t.daysLeft : null, site: 'vinted' }; })
+                return { cle: 'v:' + tx, num: (b ? numForBord(b) : '') || (en && en.numero) || '', titre: o.title || '', transporteur: transporteurVente(b).cle || '', jours: Number.isFinite(t.daysLeft) ? t.daysLeft : null, site: 'vinted' }; })
               .concat(((colisEb && colisEb.aPoster) || []).map(x => ({ cle: 'e:' + x.compte + ':' + x.orderId, num: x.ordre ? (numLigneEbay(x.ordre, (x.ordre.lineItems || [])[0]) || '') : '', titre: x.titre || '', transporteur: '', jours: Number.isFinite(x.jours) ? x.jours : null, site: 'ebay' })))
               // (1er nov., audit A4) Leboncoin et Vestiaire : les colis de la case « À envoyer ».
               .concat((colisAutres.leboncoin || []).map(x => ({ cle: 'l:' + x.txId, num: '', titre: x.titre || '', transporteur: '', jours: null, site: 'leboncoin' })))
@@ -49063,6 +49120,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 return arch ? { k: 'renvoi', t: `Si la paire t'est renvoyée, elle prendra un numéro neuf (le N°${num} est un ancien numéro).` } : { t: `Si la paire t'est renvoyée, republie-la avec le N°${num}.` };
               })();
               const bordGeste = !hidden && st !== 'cancelled' && aExpedier(o) && !isShipDone(o) && o.transaction_id != null;
+              // (2 nov.) Le transporteur LU de la vente (n° de SON bordereau) : à côté du bouton
+              // bordereau tant qu'il y a un colis à envoyer, sinon une ligne des détails (dit une fois).
+              const trRecap = transporteurVente(bordE);
               return <>
                 <header className="vrm-recap-tete">
                   <div className="vrm-sale-photo vrm-recap-photo">{photo ? <PhotoArticleAgrandissable src={photo} titre={o.title}><PhotoVenteSources {...photoSourcesProps} data-photo-vente="detail" style={{width:'100%',height:'100%',objectFit:'cover'}}/></PhotoArticleAgrandissable> : <Icon name="image" size={22} style={{color:C.muted,opacity:.55}}/>}</div>
@@ -49100,6 +49160,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     {acheteur ? <div className="vrm-recap-ligne"><dt>Acheteur</dt><dd>{acheteur}</dd></div> : null}
                     {o._acc ? <div className="vrm-recap-ligne"><dt>Compte</dt><dd>{accNameOf(o._acc)} · Vinted</dd></div> : null}
                     {(!etapes || !o.date) ? <div className="vrm-recap-ligne"><dt>Vendue</dt><dd>{o.date ? dateFr(o.date, { weekday: 'short', day: 'numeric', month: 'short' }) : '— date pas lue'}</dd></div> : null}
+                    {!bordGeste && (trRecap.cle || trRecap.nom) ? <div className="vrm-recap-ligne"><dt>Transporteur</dt><dd><PastilleTransporteur t={trRecap} C={C} seul data-recap-transporteur=""/></dd></div> : null}
                     {bordE && bordE.suivi ? <div className="vrm-recap-ligne"><dt>Suivi</dt><dd className="vrm-recap-mono">{bordE.suivi}</dd></div> : null}
                     {cell ? <div className="vrm-recap-ligne"><dt>Rangement</dt><dd><button type="button" className="vrm-lien-action" onClick={()=>{fermer();onLocate&&onLocate(num);}} title="Voir la paire au stock">{garageCellLabel(cell)}</button></dd></div>
                       : (num && aExpedier(o) && garageUtilise) ? <div className="vrm-recap-ligne"><dt>Rangement</dt><dd>pas au garage</dd></div> : null}
@@ -49107,7 +49168,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   </dl>
                 </section>
                 <section className="vrm-recap-gestes" aria-label="Actions">
-                  {bordGeste ? <div className="vrm-recap-principal"><BoutonBordereau grand uid={o._acc && o._acc.vinted_user_id} tx={String(o.transaction_id)} conv={o.conversation_id} login={accNameOf(o._acc)}
+                  {bordGeste ? <div className="vrm-recap-principal"><PastilleTransporteur t={trRecap} C={C} data-recap-transporteur=""/><BoutonBordereau grand uid={o._acc && o._acc.vinted_user_id} tx={String(o.transaction_id)} conv={o.conversation_id} login={accNameOf(o._acc)}
                     aGenerer pdf={!!(labelsCaptes[txL] || bordParTx[txL])} onImprimer={()=>imprimerBordereauVente(o)} onFait={(u)=>rechargerLabels(u)}/></div> : null}
                   <div className="vrm-recap-grille">
                     {o.conversation_id && onNav ? <Bouton variante="secondaire" icone="chat" data-recap-conversation="" onClick={()=>{ fermer(); poserCible({ type: 'conv', conv: String(o.conversation_id), compte: String((o._acc && o._acc.vinted_user_id) || '') }, redirigerOnglet('messages', null, ONGLETS_DEPLACES).tab); onNav('messages'); }}>Conversation</Bouton> : null}
@@ -50867,7 +50928,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 )}
                 {/* (24 oct.) En route : ce que dit le transporteur, par le n° de CET achat. */}
                 {!cancelled && !st.retour && st.step>=1 && st.step<4 && (()=>{ const su = suivi || suivisAchat(o, indexSuivisAchats)[0]; const e = entreeSuiviAchat(o);
-                  return su ? <LigneTransporteur transp={transpMap} suivi={su} carrier={(tk && tk.carrier) || (e && e.transporteur) || transporteurDeForme(su) || ''}/> : null; })()}
+                  // (2 nov.) Le transporteur LU (logo + nom), puis ce qu'il dit.
+                  const trA = transporteurColis((tk && tk.carrier) || (e && e.transporteur) || '', su);
+                  return su ? <div className="vrm-buy-transp" data-achat-transporteur={cleStatTransporteur(trA)} style={{display:'flex',flexDirection:'column',gap:2,marginTop:4}}><PastilleTransporteur t={trA} C={C} seul taille={18}/><LigneTransporteur transp={transpMap} suivi={su} carrier={(tk && tk.carrier) || (e && e.transporteur) || transporteurDeForme(su) || ''}/></div> : null; })()}
                 {/* ⚠️ LITIGE / RETOUR : il doit RENVOYER la paire, et générer le
                     bordereau de retour. VRM ne le crée PAS à sa place : la route
                     qui GÉNÈRE un retour n'a jamais été observée (§4.10), et agir
@@ -52389,6 +52452,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 {colRet && colRet.cartes.length > 0
                   ? <ColonneRetirer vue={parPoint} C={C} Photo={photoCarte} gestes={gestesRetrait} detail={arriveeRetrait} nomTransporteur={(k) => (CARRIERS[k] && CARRIERS[k].name) || ''} avecCarte={ordiColis} enRouteSansRelais={(groupesRelais && groupesRelais.enRouteSansRelais) || 0}/>
                   : (toutLuRet ? <p className="vrm-colis-vide" data-retraits-vide="">Aucun colis à aller chercher pour l’instant.</p> : null)}
+                {voitSite('vestiaire') ? <AchatsVestiaireEnRoute vc={colisVestiaire(vcEtat)} transporteurDe={transporteurColis}/> : null}
               </section>
             )}
           </>);
@@ -52902,6 +52966,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 // capté par l'extension juste après l'avoir généré.
                 const capte = e.txn ? labelsCaptes[e.txn] : null;
                 const pdf = !!(b && b.hasPdf) || !!capte;
+                // (2 nov.) Le transporteur LU de ce colis (n° de son bordereau), à côté du bouton.
+                const trV = transporteurVente(b);
                 const acc = o ? o._acc : null;
                 // Une charnière de groupe : le premier colis d'un groupe porte
                 // son intertitre (voir `groupeDe` plus haut). C'est ce qui rend
@@ -52922,7 +52988,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       {sousGrp && <span className="vrm-aide" style={{fontSize:12,color:C.muted,lineHeight:1.45,maxWidth:640}}>{sousGrp}</span>}
                     </div>
                   )}
-                  <div data-bord-card data-groupe-carte={grp} data-tx-colis={e.txn||''} data-colis-ident={'v:'+(e.txn||e.key)} data-limite={e.lim&&e.lim.limite||''} data-limite-heure={e.lim&&e.lim.heure||''} data-jours={dl==null?'':String(dl)} className="vrm-colis-carte" style={{padding:'14px',border:`1px solid ${dl!=null&&dl<0?C.warn+'66':C.border}`,background:C.card,borderRadius:12,opacity:posted?0.55:1}}>
+                  <div data-bord-card data-groupe-carte={grp} data-transporteur={cleStatTransporteur(trV)} data-tx-colis={e.txn||''} data-colis-ident={'v:'+(e.txn||e.key)} data-limite={e.lim&&e.lim.limite||''} data-limite-heure={e.lim&&e.lim.heure||''} data-jours={dl==null?'':String(dl)} className="vrm-colis-carte" style={{padding:'14px',border:`1px solid ${dl!=null&&dl<0?C.warn+'66':C.border}`,background:C.card,borderRadius:12,opacity:posted?0.55:1}}>
                     <div style={{display:'flex',gap:12,alignItems:'flex-start'}}>
                       <div className="vrm-colis-photo" style={{width:64,height:80,borderRadius:8,background:C.card2||C.bg,border:`1px solid ${C.border}`,boxSizing:'border-box',flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
                         {ph?<PhotoVinted src={ph} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<Icon name="image" size={20} style={{color:C.muted,opacity:.55}}/>}
@@ -53032,6 +53098,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                         <button type="button" onClick={()=>startBordereau(num, titre, acc, o && o.transaction_id)} title="J'ai déjà téléchargé le PDF : le tamponner avec le numéro"
                           className="vrm-colis-sec" style={{...sec,flex:'0 1 auto',border:`1px solid ${C.border}`,background:'transparent',color:C.text}}>J'ai le PDF</button>
                       </>)}
+                      {/* (2 nov.) Julien : « à côté du bouton bordereau, marqué Chronopost avec le logo
+                          Chronopost ou Mondial Relay avec le logo Mondial Relay ». Le transporteur LU
+                          (n° du bordereau, ligne du transporteur, e-mail du même n°) ; sinon « pas lu ». */}
+                      <PastilleTransporteur t={trV} C={C} data-colis-transporteur={e.txn||e.key}/>
                       {!num && b && <button type="button" onClick={()=>{ setLinkPickFor(b); setLinkSearch(''); }} title="Relier ce bordereau à un article numéroté" className="vrm-colis-sec" style={{...sec,border:`1px solid ${C.warn}88`,background:'transparent',color:C.warn}}><Icon name="link" size={14} style={{verticalAlign:'-2px',marginRight:5}}/>Relier</button>}
                       {/* Sans bordereau, il n'y avait AUCUN moyen de poser le numéro
                           sur cette vente — or c'est lui qu'on tamponne. Le numéro
@@ -53062,7 +53132,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                         className="vrm-colis-sec vrm-colis-ter" style={{...sec,border:`1px solid ${C.border}`,background:posted?C.bg:'transparent',color:posted?C.text:C.muted}}>
                         {posted?'↺ Pas encore':'✓ Colis fait'}
                       </button>
-                      {b && b.suivi && <a href={trackUrl(b.transporteur||'', b.suivi)} target="_blank" rel="noreferrer" title={`Suivre le colis n°${b.suivi}`} data-geste="suivre" className="vrm-colis-sec vrm-colis-ter" style={{...sec,border:`1px solid ${C.border}`,background:'transparent',color:C.muted,textDecoration:'none',display:'inline-flex',alignItems:'center'}}><Icon name="truck" size={13} style={{marginRight:5}}/>Suivre</a>}
+                      {b && b.suivi && <a href={trackUrl(trV.cle||'', b.suivi)} target="_blank" rel="noreferrer" title={`Suivre le colis n°${b.suivi}`} data-geste="suivre" className="vrm-colis-sec vrm-colis-ter" style={{...sec,border:`1px solid ${C.border}`,background:'transparent',color:C.muted,textDecoration:'none',display:'inline-flex',alignItems:'center'}}><Icon name="truck" size={13} style={{marginRight:5}}/>Suivre</a>}
                       {capte && <span className="vrm-colis-source" style={{fontSize:11.5,color:C.muted,fontWeight:500,flexBasis:'100%'}}>Bordereau récupéré chez Vinted par l'extension{b && b.hasPdf ? ' · confirmé par l\'email' : ''}</span>}
                       {/* ⚠️ « Bordereau pas encore reçu » disait, sur la MÊME carte
                           et à trois lignes d'écart, exactement ce que le bandeau
@@ -58331,7 +58401,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       { id:'connexions', type:'panneau', ic:'sync', lib:'État des connexions', desc:'Ce qui marche, ce qui attend un geste', titreInterne:true, el:<ConnexionsSetting key={AUTH.user?.id||'sans-session'} comptes={comptes||[]} onComptes={()=>setTab('vintedaccounts')} onPlateforme={versPlateforme}/> },
       // (31 oct., soir) L'ancien « eBay → Compte » : connexion et comptes eBay reliés.
       ebayCompte && { id:'ebay', type:'panneau', ic:'link', lib:'Comptes eBay', desc:'Connexion à eBay, comptes reliés', el:ebayCompte },
-      { id:'adresses', type:'panneau', ic:'mail', lib:'Réception des emails', desc:'Transfert et emails reçus', titreInterne:true, el:<EmailsSetting onComptes={()=>setTab('vintedaccounts')}/> },
+      { id:'adresses', type:'panneau', ic:'mail', lib:'E-mails', desc:'Est-ce qu’ils arrivent, ce que VRM en a fait, tes adresses', titreInterne:true, el:<EmailsSetting onComptes={()=>setTab('vintedaccounts')}/> },
       proprioInst && { id:'import', type:'panneau', nu:true, ic:'calendar', lib:'Import des emails Vinted', desc:'Date de début de l’historique', el:<EmailStartSetting key={AUTH.user?.id||'sans-session'} nu/> },
       { id:'securite', type:'panneau', ic:'key', lib:'Sécurité des données', desc:'Qui peut lire et écrire tes données', el:<SecuriteSetting/> },
     ]},
@@ -60807,6 +60877,9 @@ function EmailsSetting({onComptes}) {
   const [versionReception,setVersionReception]=useState(0);
   const [rubriqueEmail,setRubriqueEmail]=useState(()=>DEMANDE_ADRESSES.on?(DEMANDE_ADRESSES.vers||'adresses'):'reception');
   const [journalFiltre,setJournalFiltre]=useState(()=>DEMANDE_ADRESSES.vers==='journal'?DEMANDE_ADRESSES.filtre:'');
+  // (2 nov.) L'Aperçu ouvre le journal sur un état OU un type (« 2 bordereaux ajoutés à Colis » → les bordereaux).
+  const [journalType,setJournalType]=useState('');
+  const ouvrirJournal=(etat,type)=>{setJournalFiltre(etat||'');setJournalType(type||'');setRubriqueEmail('journal');requestAnimationFrame(()=>{try{racine.current&&racine.current.scrollIntoView({block:'start',behavior:'smooth'});}catch(_){}});};
   // Les reçus d'achat qu'il a déliés (« Ce n'est pas ça ») — réversible, rien n'est supprimé.
   const [recusDelies,setRecusDelies]=useStateCle('vrm_recus_delies', ()=>load('vrm_recus_delies',{})||{});
   useEffect(()=>{const relire=()=>setRecusDelies(load('vrm_recus_delies',{})||{});const off=onCloudReady(relire);const f=e=>{if(e&&e.detail&&e.detail.k==='vrm_recus_delies')relire();};window.addEventListener('vrm:save',f);return()=>{off();window.removeEventListener('vrm:save',f);};},[]);
@@ -61023,7 +61096,7 @@ function EmailsSetting({onComptes}) {
   };
   return (
     <div ref={racine}>
-    <EspaceEmails onglet={rubriqueEmail} onOnglet={setRubriqueEmail} adresses={reg?liste.length:null} aRattacher={Array.isArray(quarantaine)?quarantaine.length:null} idBase={espaceId} theme={C}>
+    <EspaceEmails onglet={rubriqueEmail} onOnglet={(o)=>{if(o==='journal'){setJournalFiltre('');setJournalType('');}setRubriqueEmail(o);}} idBase={espaceId} theme={C}>
     <div id={espaceId+'-adresses'} data-email-panneau="adresses" hidden={rubriqueEmail!=='adresses'}>
     <div data-reglage-adresses="" style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:10,padding:'12px 14px'}}>
       <div style={{fontSize:13,fontWeight:600,color:C.text,marginBottom:2}}>Mes adresses de réception</div>
@@ -61174,15 +61247,15 @@ function EmailsSetting({onComptes}) {
     {/* (31 oct.) Monté seulement quand on le regarde : aucune lecture pour un
         onglet caché (« sauf si c'est trop lourd en données »). */}
     <div id={espaceId+'-journal'} data-email-panneau="journal" hidden={rubriqueEmail!=='journal'}>
-      {rubriqueEmail==='journal'&&<JournalEmails headers={sbAuth} filtreInitial={journalFiltre} delies={recusDelies} onDelier={delierRecu} onRelier={relierRecu}
+      {rubriqueEmail==='journal'&&<JournalEmails key={journalFiltre+'|'+journalType} headers={sbAuth} filtreInitial={journalFiltre} typeInitial={journalType} delies={recusDelies} onDelier={delierRecu} onRelier={relierRecu}
         onNav={(t)=>{try{window.dispatchEvent(new CustomEvent('vrm:aller',{detail:t}));}catch(_){}}}
         onNum={(n)=>{try{window.dispatchEvent(new CustomEvent('vrm:fiche-article',{detail:String(n)}));}catch(_){}}}/>}
     </div>
     <div id={espaceId+'-reception'} data-email-panneau="reception" hidden={rubriqueEmail==='a-traiter'||rubriqueEmail==='journal'}>
-      <SuiviReceptionEmails onAdresseGuide={setAdresseGuide} adresseGuide={adresseGuide} guideOuvert={guideOuvert} onFermerGuide={()=>setGuideOuvert(false)} onVoirReception={()=>setRubriqueEmail('reception')} section={rubriqueEmail==='adresses'?'configuration':'reception'} key={uid} owner={uid} headers={sbAuth} theme={C} version={versionReception} onAdresses={setSuiviAdresses} onComptes={onComptes} onDeclarer={ajouterAdresses} preuves={preuves} onConfirmer={adr=>confirmerAdresse(adr,false)} quarantaine={quarantaine} onVerifier={()=>{setRubriqueEmail('a-traiter');requestAnimationFrame(()=>racine.current?.querySelector('[data-emails-mis-de-cote]')?.scrollIntoView({block:'center',behavior:'smooth'}));}}/>
+      <SuiviReceptionEmails onAdresseGuide={setAdresseGuide} adresseGuide={adresseGuide} guideOuvert={guideOuvert} onFermerGuide={()=>setGuideOuvert(false)} onVoirReception={()=>setRubriqueEmail('reception')} onJournal={ouvrirJournal} onOnglet={setRubriqueEmail} section={rubriqueEmail==='adresses'?'configuration':'reception'} key={uid} owner={uid} headers={sbAuth} theme={C} version={versionReception} onAdresses={setSuiviAdresses} onComptes={onComptes} onDeclarer={ajouterAdresses} preuves={preuves} onConfirmer={adr=>confirmerAdresse(adr,false)} quarantaine={quarantaine} onVerifier={()=>{setRubriqueEmail('a-traiter');requestAnimationFrame(()=>racine.current?.querySelector('[data-emails-mis-de-cote]')?.scrollIntoView({block:'center',behavior:'smooth'}));}}/>
     </div>
     <div id={espaceId+'-a-traiter'} data-email-panneau="a-traiter" hidden={rubriqueEmail!=='a-traiter'} className="vrm-email-rattachement">
-      <h3>Emails à rattacher</h3><p>Les emails conservés en attendant de retrouver leur compte.</p>
+      <h3>E-mails à rattacher</h3><p>Arrivés sur une adresse que VRM ne peut pas encore relier à toi : ils sont gardés entiers. Touche « C’est à moi » sur ceux qui sont à toi.</p>
       {quarantaine===undefined&&<p role="status">Lecture des emails mis de côté…</p>}
       {Array.isArray(quarantaine)&&quarantaine.length===0&&<div className="vrm-email-vide">Aucun email à rattacher pour le moment.</div>}
       {/* Pas su ≠ aucun. Une seule phrase, et seulement si le registre, lui, a
@@ -61195,16 +61268,15 @@ function EmailsSetting({onComptes}) {
       {enAttente.length > 0 && (
         <div data-emails-mis-de-cote="" style={{marginTop:12,borderTop:`1px solid ${C.border}`,paddingTop:10}}>
           <div style={{fontSize:12.5,fontWeight:600,color:C.text,marginBottom:6}}>{enAttente.length} email{enAttente.length>1?'s':''} conservé{enAttente.length>1?'s':''}</div>
-          <div className="vrm-aide" style={{fontSize:11.5,color:C.muted,marginBottom:8,lineHeight:1.45}}>Arrivés avant que leur adresse soit déclarée. Gardés entiers.</div>
           <label className="vrm-email-recherche">Rechercher dans les emails à rattacher<input type="search" value={rechercheRattachement} onChange={e=>{setRechercheRattachement(e.target.value);setLimiteRattachement(10);}} placeholder="Sujet ou motif"/></label>
-          <p className="vrm-email-resultats">{rattachementsVisibles.length} sur {enAttente.length} emails{motsRattachement?' · recherche appliquée':''}</p>
+          {motsRattachement&&<p className="vrm-email-resultats">{rattachementsVisibles.length} sur {enAttente.length} · recherche appliquée</p>}
           {/* (30 oct.) Un parcours : où j'en suis, une barre, combien. */}
           {lot ? <Avancement titre={`Email ${Math.min(lot.fait + 1, lot.total)} sur ${lot.total}`} part={lot.total ? lot.fait / lot.total : 0}
               phrase="Chaque email repasse dans le traitement normal. Rien n'est supprimé avant la fin."
               compte={compteAvancement({ faites: lot.ok, ratees: lot.fait - lot.ok, restent: lot.total - lot.fait, motFait: 'traité' })}
               data={{ 'data-rejeu-lot': `${lot.fait}/${lot.total}` }}/>
             : <button type="button" onClick={toutRejouer} className="vrm-b vrm-b-primaire vrm-b-plein" style={{marginBottom:10}}>
-              {`Réessayer les ${enAttente.length} emails`}
+              {enAttente.length>1?`Réessayer les ${enAttente.length} e-mails`:'Réessayer cet e-mail'}
             </button>}
           {rattachementsVisibles.slice(0,limiteRattachement).map(q => (
             <div key={q.id} style={{display:'flex',alignItems:'center',gap:8,padding:'7px 0',borderTop:`1px solid ${C.border}`}}>

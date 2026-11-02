@@ -69,3 +69,21 @@ commande d'installation, aucun appel externe, aucune clé.
 Relus et **non repris** du même dépôt : `theme-factory` (dix thèmes génériques pour
 diapositives, dont un violet), `canvas-design` (affiches PNG/PDF, 5,6 Mo de polices :
 hors sujet pour l'app).
+
+## Ajoutées le 2 novembre 2026 (demande de Julien : « installe des skills pour faire de beaux designs »)
+
+| compétence | source | quand elle sert dans VRM |
+|---|---|---|
+| `impeccable` | `github.com/pbakaus/impeccable` (commit `9c3808b`), Apache 2.0 (`impeccable/LICENSE`, `NOTICE.md`) | direction de design complète pour les écrans d'app (mode **Operate**) : hiérarchie, mise en page, typo, couleur, finition (`reference/craft-floor.md` avant toute retouche visuelle), `audit`, `critique`, `polish`, `quieter`, `bolder` |
+| `design-critique` | `github.com/anthropics/knowledge-work-plugins` `design/` (commit `2574e29`), Apache 2.0 | critiquer une capture d'écran avant de la montrer à Julien |
+| `design-system` | même source | tenir les jetons (couleurs, rayons, ombres, espacements) d'un seul endroit |
+| `ux-copy` | même source | les phrases des boutons, états vides, erreurs |
+| `accessibility-review` | même source | contraste, cibles au doigt, lecteur d'écran |
+
+⚠️ `impeccable/scripts/impeccable` télécharge un binaire au premier lancement :
+ne PAS le lancer (réseau limité, et inutile) — lire `SKILL.md` et les fichiers
+`reference/` directement (son mode « Launcher unavailable »).
+
+**Règle de travail** : tout chantier visuel lit `impeccable` (+ `craft-floor.md`),
+`emil-design-eng` et `apple-design`, et passe ses captures par `design-critique`
+avant de les montrer. Les règles de `CLAUDE.md` (§7, refus) passent toujours avant.
