@@ -2167,7 +2167,7 @@ const RA = {};
     for (const action of ['pubverify', 'publish']) {
       for (const [nom, offre] of [['seuil 1e-9 confirmé', { accepte: 1e-9, sousMoitie: true }], ['seuil 5e-324 confirmé', { accepte: 5e-324, sousMoitie: true }], ['refus 1e-9', { accepte: 66, refuse: 1e-9 }]]) {
         avecR();
-        const x = await app(JWT_J, { action, item: { ...itemC, offre } });
+        const x = await app(JWT_J, { action, confirme: true, item: { ...itemC, offre } });
         const parti = auCompte(x.journal).find((y) => /AddFixed|VerifyAdd/.test(y.appel));
         dit(x.code === 400 && x.corps.reason === 'offre' && zero(x), `[R-crea] ${action} ${nom} ⇒ 400 « offre », zéro appel eBay (jamais « 0.00 » chez eBay)`, `HTTP ${x.code} · ${parti ? (parti.corps.match(/<(?:BestOfferAutoAcceptPrice|MinimumBestOfferPrice)[^>]*>[^<]*</g) || []).join(' ') : 'rien parti'}`);
       }
