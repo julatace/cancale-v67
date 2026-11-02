@@ -127,19 +127,26 @@ export const CLE_SERVEUR = 'vrm_numerotation';
 // Toute la ligne : `cles` = les clés synchronisées. Rend { data, conflit } :
 // `data` ne porte que les clés présentes (une clé retirée par l'appareil et
 // pas touchée ailleurs reste retirée), jamais `rev` (posé par l'écrivain).
-export const fusionnerLigne = ({ cles, base, local, nuage, cleNum, localGagne = [] }) => {
+// (2 nov., file d'envoi — src/fileEnvoi.js) `nuageGagne` : les clés dont le
+// nuage a été écrit APRÈS le dernier geste pas encore envoyé de l'appareil ; sur
+// une valeur changée des deux côtés, celle du nuage reste (la fusion est la même,
+// les deux côtés échangés — ajouts et retraits de chacun gardés pareil).
+export const fusionnerLigne = ({ cles, base, local, nuage, cleNum, localGagne = [], nuageGagne = [] }) => {
   const B = estObjet(base) ? base : {}, L = estObjet(local) ? local : {}, N = estObjet(nuage) ? nuage : {};
   const data = {};
   for (const k of cles) {
     let v;
+    const inverse = nuageGagne.includes(k);
     if (k === CLE_SERVEUR) v = N[k] !== undefined ? N[k] : L[k];
     else if (localGagne.includes(k)) v = L[k] !== undefined ? L[k] : N[k];
     else if (k === CLE_POOL) v = (L[k] === undefined && N[k] === undefined) ? undefined : unionPool(L[k], N[k], cleNum);
     else if (CLES_FICHES.includes(k)) {
-      const r = fusionFichesNumeros(k, B[k], L[k], N[k], cleNum, { base: B[CLE_POOL], local: L[CLE_POOL], nuage: N[CLE_POOL] });
+      const r = inverse
+        ? fusionFichesNumeros(k, B[k], N[k], L[k], cleNum, { base: B[CLE_POOL], local: N[CLE_POOL], nuage: L[CLE_POOL] })
+        : fusionFichesNumeros(k, B[k], L[k], N[k], cleNum, { base: B[CLE_POOL], local: L[CLE_POOL], nuage: N[CLE_POOL] });
       if (r.conflit) return { conflit: r.conflit };
       v = r.val;
-    } else v = fusion3(B[k], L[k], N[k]);
+    } else v = inverse ? fusion3(B[k], N[k], L[k]) : fusion3(B[k], L[k], N[k]);
     if (v !== undefined && v !== null) data[k] = v;
     else if (v === null && (L[k] === null || N[k] === null)) data[k] = null;
   }
