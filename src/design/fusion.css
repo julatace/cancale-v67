@@ -272,8 +272,8 @@ html body .vrm-app-shell .vrm-day-layout.vrm-fu-ecran .vrm-carrousel > button { 
 
 /* ── 5. VENTES ────────────────────────────────────────────────────────────── */
 /* Chaque vente devient une carte blanche ; la frise sous l'en-tête de la ligne. */
-html body .vrm-app-shell .vrm-fu-ecran .vrm-ventes-liste { display: flex; flex-direction: column; gap: 10px; background: transparent !important; border: 0 !important; box-shadow: none !important; padding: 0 !important; overflow: visible !important; }
-html body .vrm-app-shell .vrm-fu-ecran .vrm-ventes-liste .vrm-sale-row[data-fu-ligne] {
+html body .vrm-app-shell .vrm-ventes-liste[data-fu-liste] { display: flex; flex-direction: column; gap: 10px; background: transparent !important; border: 0 !important; box-shadow: none !important; padding: 0 !important; overflow: visible !important; }
+html body .vrm-app-shell .vrm-ventes-liste[data-fu-liste] .vrm-sale-row[data-fu-ligne] {
   border: 0 !important; border-top: 0 !important; border-radius: var(--fu-r-carte) !important; background: var(--fu-carte) !important;
   box-shadow: var(--fu-ombre) !important; padding: 14px !important; gap: 12px !important; margin: 0 !important;
 }
@@ -291,11 +291,11 @@ html body .vrm-app-shell .vrm-fu-ecran .vrm-ventes-liste .vrm-sale-row[data-fu-l
 .vrm-fu-principal:active { transform: scale(.98); }
 .vrm-fu-principal[disabled] { opacity: .5; cursor: default; }
 /* La vignette de la ligne : 60 px, rayon 14. */
-html body .vrm-app-shell .vrm-fu-ecran .vrm-sale-row[data-fu-ligne] .vrm-ledger-photo-empty { width: 60px !important; height: 60px !important; flex: none !important; border-radius: var(--fu-r-photo) !important; overflow: hidden !important; background: var(--fu-case) !important; }
-html body .vrm-app-shell .vrm-fu-ecran .vrm-sale-row[data-fu-ligne] .vrm-ledger-photo-empty :is(img, picture, .vrm-photo-vente) { width: 100% !important; height: 100% !important; border-radius: 0 !important; object-fit: cover !important; }
-html body .vrm-app-shell .vrm-fu-ecran .vrm-sale-row[data-fu-ligne] .vrm-ledger-sale-nom { font: 600 15px/1.3 var(--vrm-police) !important; color: var(--fu-encre) !important; letter-spacing: -.01em; }
-html body .vrm-app-shell .vrm-fu-ecran .vrm-sale-row[data-fu-ligne] .vrm-ledger-sale-amount { font: 700 15px/1.3 var(--vrm-police) !important; color: var(--fu-encre) !important; font-variant-numeric: tabular-nums; }
-html body .vrm-app-shell .vrm-fu-ecran .vrm-sale-row[data-fu-ligne] .vrm-ledger-sale-sous { font: 500 12px/1.35 var(--vrm-police) !important; color: var(--fu-gris) !important; }
+html body .vrm-app-shell .vrm-sale-row[data-fu-ligne] .vrm-ledger-photo-empty { width: 60px !important; height: 60px !important; flex: none !important; border-radius: var(--fu-r-photo) !important; overflow: hidden !important; background: var(--fu-case) !important; }
+html body .vrm-app-shell .vrm-sale-row[data-fu-ligne] .vrm-ledger-photo-empty :is(img, picture, .vrm-photo-vente) { width: 100% !important; height: 100% !important; border-radius: 0 !important; object-fit: cover !important; }
+html body .vrm-app-shell .vrm-sale-row[data-fu-ligne] .vrm-ledger-sale-nom { font: 600 15px/1.3 var(--vrm-police) !important; color: var(--fu-encre) !important; letter-spacing: -.01em; }
+html body .vrm-app-shell .vrm-sale-row[data-fu-ligne] .vrm-ledger-sale-amount { font: 700 15px/1.3 var(--vrm-police) !important; color: var(--fu-encre) !important; font-variant-numeric: tabular-nums; }
+html body .vrm-app-shell .vrm-sale-row[data-fu-ligne] .vrm-ledger-sale-sous { font: 500 12px/1.35 var(--vrm-police) !important; color: var(--fu-gris) !important; }
 /* L'en-tête des groupes de ventes (« Aujourd'hui », « Cette semaine »…) */
 html body .vrm-app-shell .vrm-fu-ecran .vrm-ventes-groupe-titre, html body .vrm-app-shell .vrm-fu-ecran .vrm-sales-day-head { font: 700 13px/1.3 var(--vrm-police) !important; color: var(--fu-gris2) !important; text-transform: none !important; letter-spacing: 0 !important; background: transparent !important; border: 0 !important; padding: 12px 4px 2px !important; }
 
@@ -343,3 +343,10 @@ html body .vrm-app-shell .vrm-fu-ecran [data-fu-colis] { border: 0 !important; b
 }
 .vrm-fu-compta-grille { display: flex; flex-direction: column; gap: 14px; }
 @media (min-width: 900px) { .vrm-fu-compta-grille { display: grid; } }
+
+/* Les gestes d'une vente Fusion (prix d'achat, relier, déposé) : en rangée, alignés
+   sur la carte — plus d'alinéa sous la photo. */
+html body .vrm-app-shell .vrm-main .vrm-sale-row[data-fu-ligne] > .vrm-ledger-gestes { padding: 0 !important; margin: 0 !important; }
+html body .vrm-app-shell .vrm-main .vrm-sale-row[data-fu-ligne] > .vrm-ledger-gestes .vrm-gestes-pile { flex-direction: row; flex-wrap: wrap; align-items: center; }
+html body .vrm-app-shell .vrm-main .vrm-sale-row[data-fu-ligne] > .vrm-ledger-gestes :is(button, .vrm-b) { border-radius: 12px !important; background: var(--fu-case) !important; border: 0 !important; color: var(--fu-encre) !important; }
+html body .vrm-app-shell .vrm-main .vrm-sale-row[data-fu-ligne] > button.vrm-ledger-sale-toggle { padding-top: 0 !important; padding-bottom: 0 !important; min-height: 0 !important; }

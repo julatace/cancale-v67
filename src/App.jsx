@@ -43759,6 +43759,33 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const nomsVentesKO = (Array.isArray(sales.failedUids) ? sales.failedUids : [])
     .filter(u => !acctOff(u))
     .map(u => { const a = (accounts || []).find(x => String(x.vinted_user_id) === String(u)); return a ? accNameOf(a) : `#${u}`; });
+  // (2 nov., style « Fusion ») LES PREUVES DE LA FRISE D'UNE VENTE VINTED, lues
+  // une fois pour le tiroir (cinq étapes), la ligne (quatre segments) et la carte
+  // du mois de Ventes (combien en route, combien livrées) : la MÊME `friseVente`
+  // (src/recapVente.js — une étape n'est cochée que PROUVÉE). Appelée au rendu,
+  // après toutes les lectures de l'écran.
+  const preuvesFriseDe = (o) => {
+    const txL = String(o.transaction_id);
+    const st = classifyOrderStatus(o.status);
+    const s = String(o.status || ''); const tus = String(o.transaction_user_status || '').toLowerCase();
+    const vs = venteStage(o);
+    const horsParcours = ETATS_HORS_PARCOURS.includes(vs.label) || st === 'cancelled';
+    const bordE = bordParTx[txL] || null, bordC = labelsCaptes[txL] || null;
+    const posteMain = isShipDone(o);
+    const etx = etatTxn(o.transaction_id);
+    const finalisee = /finalis/i.test(s) || tus === 'completed' || !!(etx && etx.s === 450);
+    const livreeLue = finalisee || /\blivr[ée]|remis\b|r[ée]ceptionn/i.test(s);
+    const bougeLu = livreeLue || tus === 'waiting' || COLIS_DEJA_BOUGE.test(s) || isAtRelayStatus(s);
+    const versement = versements ? (versements[txL] || null) : null;
+    const etapes = horsParcours ? null : friseVente({
+      vendue: { lu: true, t: o.date || null },
+      bordereau: { lu: !!(bordE || bordC), t: (bordE && bordE.receivedAt) || (bordC && bordC.capturedAt) || null },
+      deposee: { lu: posteMain || bougeLu, t: posteMain ? shipDone[txL] : null },
+      livree: { lu: livreeLue, t: null },
+      argent: { lu: finalisee, t: versement },
+    });
+    return { s, tus, vs, horsParcours, bordE, bordC, posteMain, finalisee, versement, etapes };
+  };
   // Suit l'ENSEMBLE des comptes (`cleComptes`), pas leur nombre : un compte lié
   // ou retiré relit (le cache ne sert plus une liste qui ne le couvre pas).
   useEffect(() => { if (accounts.length) loadOrders('sold', setSales); /* eslint-disable-next-line */ }, [cleComptes]);
@@ -48848,6 +48875,48 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
 
       {curSub==='ventes' && (<>
         {!dansPlateforme && <ScreenHead icon="cash" title="Ventes" desc="Tout ce que tu as vendu : bénéfice par article, expédition, et tes documents comptables."/>}
+        {/* (2 nov., style « Fusion », son choix : « la première photo avec les stats
+            novembre ») LA CARTE DU MOIS. Le grand chiffre est le VENDU du mois, toutes
+            plateformes (`bilanVentes` sur `vendus` — la règle de « Vendu » de Ma
+            journée), « au moins » si un compte n'a pas été lu ; la courbe en est le
+            cumul jour par jour (mêmes lignes). Les cases comptent les ventes Vinted de
+            la liste : « à poster » = la règle « À expédier » (`aExpedier`, pas encore
+            déposée), « en route » / « argent à venir » = la frise de chaque vente
+            (`preuvesFriseDe` → `friseVente`, une étape n'est comptée que PROUVÉE). */}
+        {!baseKO && Array.isArray(sales.items) && (() => {
+          const d0 = new Date(); d0.setHours(0, 0, 0, 0);
+          const debut = new Date(d0); debut.setDate(1);
+          const { n: nMois, eur: eurMois } = bilanVentes(debut.getTime());
+          const jours = d0.getDate();
+          const parJour = new Array(jours).fill(0);
+          for (const l of vendus.lignes) { if (l.ts >= debut.getTime()) { const k = new Date(l.ts).getDate() - 1; if (k >= 0 && k < jours) parJour[k] += l.eur; } }
+          let cumul = 0; const courbe = parJour.map((x) => (cumul += x));
+          let aPoster = 0, enRoute = 0, aVenir = 0;
+          for (const o of sales.items) {
+            if (!o || o.transaction_id == null || isHidden(o)) continue;
+            const stO = classifyOrderStatus(o.status);
+            if (stO === 'cancelled') continue;
+            if (aExpedier(o) && !isShipDone(o)) { aPoster += 1; continue; }
+            const p = preuvesFriseDe(o); const f = p.etapes ? friseVenteFusion(p.etapes) : null;
+            if (!f) continue;
+            const fait = Object.fromEntries(f.map((e) => [e.cle, e.fait]));
+            if (fait.postee && !fait.livree) enRoute += 1;
+            else if (fait.livree && !fait.payee) aVenir += 1;
+          }
+          const partiel = nomsVentesKO.length > 0;
+          const moisLong = d0.toLocaleDateString('fr-FR', { month: 'long' });
+          return (
+            <CarteMois className="vrm-fu-ecran vrm-fu-ventes" surtitre={moisLong} data-fu-vendu-mois={Math.round(eurMois * 100)} data-fu-partiel={partiel ? '1' : undefined}
+              valeur={<>{partiel ? <span className="vrm-fu-borne">au moins</span> : null}{eurosRecap(eurMois)}</>}
+              sous={<>{nMois} vente{nMois > 1 ? 's' : ''} · toutes plateformes{partiel ? ` · sans ${nomsVentesKO.join(', ')} (pas lu)` : ''}</>}
+              courbe={courbe.length > 1 ? courbe : null}
+              cases={[
+                { cle: 'aposter', n: aPoster, l: 'à poster', titre: 'Ventes Vinted à expédier, pas encore déposées', onClick: () => setVFilter('aexpedier'), attrs: { 'data-n': String(aPoster) } },
+                { cle: 'enroute', n: enRoute, l: 'en route', titre: 'Déposées, pas encore livrées', onClick: () => setVFilter('transit'), attrs: { 'data-n': String(enRoute) } },
+                { cle: 'avenir', n: aVenir, l: 'argent à venir', titre: "Livrées : l'argent arrive quand l'acheteur confirme", attrs: { 'data-n': String(aVenir) } },
+              ]}/>
+          );
+        })()}
         {/* ⚠️ LES OUTILS DE TRAVAIL AVANT LES COMMENTAIRES. La période et la
             recherche étaient sous six bandeaux d'explication : il fallait
             défiler un écran et demi pour filtrer ses ventes. Ce qu'on manipule
@@ -48965,7 +49034,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             bordereau » sont grisés pour la même raison : on la dit ici, au-dessus
             de la liste, au lieu de la répéter sous chaque vente. */}
         <RaisonBordereauxGrises ventes={ventesAffichees.filter(o=>o && o.transaction_id!=null && !isHidden(o) && classifyOrderStatus(o.status)!=='cancelled' && aExpedier(o) && !isShipDone(o) && !labelsCaptes[String(o.transaction_id)] && !bordParTx[String(o.transaction_id)])}/>
-        <div className="vrm-ventes-liste" style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:12,overflow:'hidden',boxShadow:C.shadow||'none'}}>
+        <div className="vrm-ventes-liste" data-fu-liste="" style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:12,overflow:'hidden',boxShadow:C.shadow||'none'}}>
           <div className="vrm-ledger-heading" aria-hidden="true"><span>Article</span><span className="vrm-ledger-state-heading">État</span><span>Montant</span></div>
           {/* (1er nov.) Sur ordinateur : les colonnes Prix · Achat · Bénéfice (maquette « ventes-ordi »). */}
           <div className="vrm-ventes-entete" aria-hidden="true" data-ventes-entete-cols=""><span/><span>Article</span><span>État</span><span className="is-droite">Prix</span><span className="is-droite">Achat</span><span className="is-droite">Bénéfice</span><span/></div>
@@ -49028,26 +49097,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             // (2 nov., Fusion) LES PREUVES DE LA FRISE, lues une fois : le tiroir (cinq
             // étapes) et la ligne (quatre segments, `friseVenteFusion`) passent par la
             // MÊME `friseVente` — une règle, deux formes.
-            const preuvesFrise = (() => {
-              const s = String(o.status || ''); const tus = String(o.transaction_user_status || '').toLowerCase();
-              const vs = venteStage(o);
-              const horsParcours = ETATS_HORS_PARCOURS.includes(vs.label) || st === 'cancelled';
-              const bordE = bordParTx[txL] || null, bordC = labelsCaptes[txL] || null;
-              const posteMain = isShipDone(o);
-              const etx = etatTxn(o.transaction_id);
-              const finalisee = /finalis/i.test(s) || tus === 'completed' || !!(etx && etx.s === 450);
-              const livreeLue = finalisee || /\blivr[ée]|remis\b|r[ée]ceptionn/i.test(s);
-              const bougeLu = livreeLue || tus === 'waiting' || COLIS_DEJA_BOUGE.test(s) || isAtRelayStatus(s);
-              const versement = versements ? (versements[txL] || null) : null;
-              const etapes = horsParcours ? null : friseVente({
-                vendue: { lu: true, t: o.date || null },
-                bordereau: { lu: !!(bordE || bordC), t: (bordE && bordE.receivedAt) || (bordC && bordC.capturedAt) || null },
-                deposee: { lu: posteMain || bougeLu, t: posteMain ? shipDone[txL] : null },
-                livree: { lu: livreeLue, t: null },
-                argent: { lu: finalisee, t: versement },
-              });
-              return { s, tus, vs, horsParcours, bordE, bordC, posteMain, finalisee, versement, etapes };
-            })();
+            const preuvesFrise = preuvesFriseDe(o);
             const fuEtapes = preuvesFrise.etapes ? friseVenteFusion(preuvesFrise.etapes, { geste: peutDeposer }) : null;
             const fuTransp = preuvesFrise.bordE && preuvesFrise.bordE.suivi ? (transporteurDeForme(preuvesFrise.bordE.suivi) || '') : '';
             const fuPdf = !!(labelsCaptes[txL] || bordParTx[txL]);
