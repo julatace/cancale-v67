@@ -52195,7 +52195,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             return (<>
               <LigneArrivee arr={arr || null} style={{marginTop:0}}/>
               {!x.horsCompte && (jl != null
-                ? <span className={'vrm-rp-sous' + (jl <= 1 ? ' is-ambre' : '')} data-colis-limite={String(lim).slice(0,10)}>{texteLimiteRetrait(jl, lim, limAt)}</span>
+                ? <span className={'vrm-rp-sous' + (jl <= 1 ? ' is-ambre' : '')} data-colis-limite={String(lim).slice(0,10)} data-colis-limite-transp={t ? undefined : ''}>{texteLimiteRetrait(jl, lim, limAt)}</span>
                 : vers ? <span className="vrm-rp-sous" data-colis-limite="vers" data-colis-limite-vers={String(vers)}>À retirer vers le {new Date(String(vers).slice(0,10)+'T00:00:00').toLocaleDateString('fr-FR',{day:'2-digit',month:'2-digit'})} (estimé : le transporteur ne donne pas la date)</span>
                 : <span className="vrm-rp-sous" data-colis-limite="inconnue">Date limite de retrait inconnue (4 à 7 j en général)</span>)}
               {(su || (plusieursComptesRet && cpt)) ? <span className="vrm-rp-suivi" data-rp-suivi={su} data-colis-compte={cpt}>{[su ? `n° ${su}` : '', plusieursComptesRet && cpt ? `compte ${cpt}` : ''].filter(Boolean).join(' · ')}</span> : null}

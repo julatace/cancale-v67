@@ -477,15 +477,16 @@ async function navigateur() {
     ];
     const lireE = (pg) => pg.evaluate(() => {
       const conv = (el) => [...el.querySelectorAll('a[href*="/inbox/"]')].map((a) => (a.getAttribute('href') || '').split('/inbox/')[1]);
-      const cartes = [...document.querySelectorAll('.vrm-pickup-card')].map((c) => { const s = c.querySelector('[data-colis-suivi]'); const lt = c.querySelector('[data-colis-limite-transp]'); return { suivi: s ? s.getAttribute('data-colis-suivi') : null, conv: conv(c), t: c.innerText, limTransp: lt ? lt.getAttribute('data-colis-limite') : null, limTxt: lt ? lt.innerText : '' }; });
+      // (2 nov., colis clair) Colis → « À retirer » : cartes par point, « à vérifier » en bas.
+      const cartes = [...document.querySelectorAll('[data-cc-colonne="retirer"] [data-cc-carte]:not([data-hors-compte])')].map((c) => { const s0 = c.querySelector('[data-rp-suivi]'); const s = s0 && s0.getAttribute('data-rp-suivi') ? { getAttribute: () => s0.getAttribute('data-rp-suivi') } : null; const lt = c.querySelector('[data-colis-limite-transp]'); return { suivi: s ? s.getAttribute('data-colis-suivi') : null, conv: conv(c), t: c.innerText, limTransp: lt ? lt.getAttribute('data-colis-limite') : null, limTxt: lt ? lt.innerText : '' }; });
       return {
-        cartes, total: (document.querySelector('[data-achats-onglet="attente"]') || { getAttribute: () => null }).getAttribute('data-n'),
-        verif: [...document.querySelectorAll('[data-a-verifier] [data-oublie]')].map((x) => x.getAttribute('data-colis-suivi')),
-        verifV: [...document.querySelectorAll('[data-a-verifier] [data-a-verifier-vinted]')].map((x) => x.getAttribute('data-a-verifier-vinted')),
+        cartes, total: (document.querySelector('[data-colis-onglet-choix="retirer"]') || { getAttribute: () => null }).getAttribute('data-colis-onglet-n'),
+        verif: [...document.querySelectorAll('[data-retirer-a-verifier] [data-cc-carte^="r:e:"]')].map((x) => (x.querySelector('[data-rp-suivi]') || { getAttribute: () => null }).getAttribute('data-rp-suivi')),
+        verifV: [...document.querySelectorAll('[data-retirer-a-verifier] [data-cc-carte^="r:v:"]')].map((x) => x.getAttribute('data-cc-carte').slice(4)),
         repS: [...document.querySelectorAll('[data-repartis] [data-reparti-suivi]')].map((x) => x.getAttribute('data-reparti-suivi')),
         repT: [...document.querySelectorAll('[data-repartis] [data-reparti-tx]')].map((x) => x.getAttribute('data-reparti-tx')),
         enVerif: [...document.querySelectorAll('[data-en-verification-tx]')].map((x) => x.getAttribute('data-en-verification-tx')),
-        verifTxt: (document.querySelector('[data-a-verifier]') || { innerText: '' }).innerText,
+        verifTxt: (document.querySelector('[data-retirer-a-verifier]') || document.querySelector('[data-a-verifier]') || { innerText: '' }).innerText,
         texte: document.body.innerText, deborde: document.documentElement.scrollWidth > window.innerWidth + 1,
       };
     });
