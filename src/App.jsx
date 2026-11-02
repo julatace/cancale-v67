@@ -24603,24 +24603,29 @@ function AgentEbay({ comptes, comptesEbay, onAnnonces }) {
         {pause && <p data-agent-pause="" style={{ fontSize: 12.5, color: E.text, margin: '8px 0 0' }}>Mis de côté jusqu'à demain. <button type="button" onClick={reprendre} style={s({ marginLeft: 6 })}>Reprendre</button></p>}
         {!pause && prop.proposees.length > 0 && <div style={{ display: 'grid', gap: 8, marginTop: 12 }}>
           {prop.proposees.map((x) => { const pr = preps[kp(x)]; const rs = resultats[x.cle]; const coche = pr && pr.etat === 'prete' && !rs && !choix.has(x.cle);
-            return <div key={x.cle} data-agent-paire={x.num} data-agent-prep={pr ? pr.etat : 'attente'} data-agent-resultat={rs ? rs.etat : undefined} style={{ display: 'flex', gap: 10, alignItems: 'center', border: `1px solid ${E.border}`, borderRadius: 10, padding: 8, minWidth: 0 }}>
+            return <div key={x.cle} data-agent-paire={x.num} data-agent-prep={pr ? pr.etat : 'attente'} data-agent-resultat={rs ? rs.etat : undefined} style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center', border: `1px solid ${E.border}`, borderRadius: 10, padding: 8, minWidth: 0 }}>
               <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minWidth: 44, minHeight: 44, cursor: pr && pr.etat === 'prete' && !rs ? 'pointer' : 'default' }}>
                 <input type="checkbox" aria-label={`Publier la N°${x.num}`} disabled={!(pr && pr.etat === 'prete') || !!rs || busy} checked={!!coche} onChange={() => setChoix((c) => { const n = new Set(c); if (n.has(x.cle)) n.delete(x.cle); else n.add(x.cle); return n; })} style={{ width: 20, height: 20 }}/>
               </label>
               {(x.paire.cover || (x.paire.photos || [])[0]) ? <PhotoVinted src={x.paire.cover || x.paire.photos[0]} alt="" loading="lazy" style={{ width: 48, height: 60, objectFit: 'cover', borderRadius: 8, flexShrink: 0, background: E.surface }}/> : <span style={{ width: 48, height: 60, borderRadius: 8, background: E.surface, flexShrink: 0 }}/>}
-              <span style={{ flex: 1, minWidth: 0, fontSize: 12.5, lineHeight: 1.4, color: E.text }}>
+              {/* (2 nov., capture de Julien) Au téléphone, les boutons « Compléter » et « Jamais »
+                  écrasaient le texte en une colonne d'une lettre : le texte garde au moins 180 px
+                  et les boutons passent à la ligne (flexWrap sur la rangée). */}
+              <span style={{ flex: '1 1 180px', minWidth: 0, fontSize: 12.5, lineHeight: 1.4, color: E.text }}>
                 <b style={{ display: 'block' }}>N°{x.num} · {eurEbay(x.prix)}{x.prix !== x.prixVinted ? <span style={{ color: E.muted, fontWeight: 400 }}> (Vinted {eurEbay(x.prixVinted)})</span> : null}</b>
                 <span style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: E.muted }}>{(pr && pr.titre) || x.paire.title}</span>
                 <span data-agent-frais={pr && pr.etat === 'prete' ? (pr.frais == null ? '' : String(pr.frais)) : undefined} style={{ display: 'block', color: rs && rs.etat !== 'publiee' ? E.warn : E.muted }}>
                   {rs ? (rs.etat === 'publiee' ? <>Publiée{rs.url ? <> · <a href={rs.url} target="_blank" rel="noopener noreferrer" style={{ color: E.text }}>voir sur eBay ↗</a></> : null}</> : rs.texte)
                     : !pr || pr.etat === 'prepare' ? 'Je prépare l\'annonce (catégorie, critères, frais)…'
                       : pr.etat === 'prete' ? `${pr.categorie || 'Catégorie eBay'} · frais ${pr.frais == null ? 'non annoncés par eBay' : eurEbay(pr.frais)}`
-                        : pr.etat === 'a-completer' ? (pr.manquants ? `À compléter : ${pr.manquants.join(', ')} (Vinted ne le dit pas) — « Compléter » ouvre l'annonce préparée` : pr.erreur)
+                        : pr.etat === 'a-completer' ? (pr.manquants ? `À compléter : ${pr.manquants.join(', ')}. Vinted ne le donne pas : touche « Compléter ».` : pr.erreur)
                           : `eBay : ${pr.erreur}`}
                 </span>
               </span>
+              <span style={{ display: 'flex', gap: 8, marginLeft: 'auto', flexShrink: 0 }}>
               {!rs && pr && pr.etat === 'a-completer' && pr.brouillon && <button type="button" data-agent-completer={x.num} disabled={busy} onClick={() => completer(x)} style={s({ fontSize: 12, flexShrink: 0 })}>Compléter</button>}
               {!rs && <button type="button" data-agent-jamais={x.num} disabled={busy} onClick={() => jamaisCelleCi(x)} style={s({ fontSize: 12, fontWeight: 500, color: E.muted, flexShrink: 0 })}>Jamais</button>}
+              </span>
             </div>; })}
         </div>}
         {!pause && pretes.length > 0 && <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 12 }}>
