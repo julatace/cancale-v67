@@ -22,7 +22,7 @@
 // `--prouve` réaffaiblit le mouchard (il relève les VALEURS) → le contrôle de
 // fuite passe au ROUGE (§6.1 : la preuve n'est pas « la fonction n'existait pas »,
 // c'est que le banc ATTRAPE la règle fautive).
-const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
+const { chromium } = require(require('path').join(__dirname, '..', 'node_modules', 'playwright'));
 const fs = require('fs'), path = require('path');
 const racine = path.join(__dirname, '..');
 let INJ = fs.readFileSync(path.join(racine, 'vinted-sync-extension', 'lbc-inject.js'), 'utf8');

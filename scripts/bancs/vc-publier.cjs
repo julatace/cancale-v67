@@ -8,7 +8,7 @@
 //   · une paire déjà notée publiée n'est pas proposée ;
 //   · extension trop ancienne / absente : la raison dite, le clic n'envoie rien ;
 //   · l'écran ne dit plus « pas encore reliée ».
-const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
+const { chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'));
 const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http'), path = require('path');
 const DIST = path.join(__dirname, '..', '..', 'dist');

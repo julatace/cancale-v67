@@ -41,7 +41,7 @@
 // Lancer : npm run build, puis
 //   NODE_OPTIONS="--require /tmp/claude-0/redir-pw.cjs" BANC_PORT=9131 node scripts/bancs/ebay-inactives.cjs
 // `BANC_SEUL=A,C,…` ne lance que ces scénarios (lettres ci-dessous).
-const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
+const { chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'));
 const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http'), path = require('path');
 const DIST = path.join(__dirname, '..', '..', 'dist');

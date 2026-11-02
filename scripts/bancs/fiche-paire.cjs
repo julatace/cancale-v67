@@ -13,7 +13,7 @@
 //      « pas encore vendue ») ;
 //   E. depuis la recherche : le N° tapé, « Toute l'histoire du N° » ouvre la fiche ;
 //   F. cibles ≥ 44 px, aucun débordement, aucune erreur ; captures regardées.
-const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
+const { chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'));
 const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http'), path = require('path'), os = require('os');
 const DIST = path.join(__dirname, '..', '..', 'dist');

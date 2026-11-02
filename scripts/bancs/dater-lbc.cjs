@@ -8,7 +8,7 @@
 //   4. une date tapée pour une vente DÉJÀ datée par l'extension ne la déplace
 //      jamais (l'extension gagne) : la vente du mois dernier reste au mois dernier ;
 //   5. une date dans l'avenir est refusée, et dite.
-const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
+const { chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'));
 const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http'), path = require('path'), os = require('os');
 const DIST = path.join(__dirname, '..', '..', 'dist');

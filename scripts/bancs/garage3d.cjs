@@ -18,7 +18,7 @@
 //   · aucune erreur.
 // ⚠️ WebGL logiciel = lent : on juge des ÉTATS finaux (la sonde `data-cam-*`
 //    posée par l'app), jamais des durées.
-const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
+const { chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'));
 const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http'), path = require('path');
 const DIST = path.join(__dirname, '..', '..', 'dist');

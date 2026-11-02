@@ -34,7 +34,7 @@ const codeEtat = (v) => auMoinsBanc(v, CODE_DANS_ETAT_BANC) ? { code: v, ext: 'b
 const RACINE = path.join(__dirname, '..', '..');
 const { faireFond, projette } = require(path.join(RACINE, 'scripts/_fond-vm.cjs'));
 const { metaVersData } = require('./_meta.cjs');
-const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
+const { chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'));
 const DIST = path.join(RACINE, 'dist');
 const PORT = Number(process.env.BANC_PORT) || 4913;
 

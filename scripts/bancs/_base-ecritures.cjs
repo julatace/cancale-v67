@@ -170,7 +170,7 @@ function brancher(page, base, { faute = null, nom = '' } = {}) {
   });
 }
 
-const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
+const { chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'));
 async function lancer() {
   return chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
 }

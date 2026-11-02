@@ -22,7 +22,7 @@
 //   4. aucune erreur d'app.
 // Ce qui est jugé : les requêtes réseau (le relais, la ligne relue) et les
 // cartes rendues (`data-carte-annonce`) — pas une formulation.
-const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
+const { chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'));
 const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http'), path = require('path');
 const DIST = path.join(__dirname, '..', '..', 'dist');

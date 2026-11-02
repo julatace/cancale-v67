@@ -11,7 +11,7 @@
 //     (fait · refusé), sans jamais « fait » sur un refus ;
 //   · les favoris : un NOMBRE par annonce, jamais « qui » ;
 //   · 390 px tactile et 1512 px : rien ne déborde, cibles de 44 px.
-const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
+const { chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'));
 const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http'), path = require('path');
 const DIST = path.join(__dirname, '..', '..', 'dist');

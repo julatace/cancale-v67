@@ -4,7 +4,7 @@
 // vidées (préfixe exact, jamais celles d'un autre compte), la recherche ne le
 // montre plus (l'autre sens : un compte vivant reste trouvé), et la carte d'un
 // compte ne dit que « Actif » (sans « Tester la connexion »).
-const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
+const { chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'));
 const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http'), path = require('path');
 const DIST = path.join(__dirname, '..', '..', 'dist');

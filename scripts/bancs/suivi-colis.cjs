@@ -25,7 +25,7 @@
 //     rangé une ligne par n°, jamais « à retirer » ;
 //   · et, côté serveur (la vraie route du cron du matin) : « 📍 Dernier jour pour
 //     retirer » part une fois, et pas pour un colis retiré sous une autre clé.
-const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
+const { chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'));
 const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http'), path = require('path');
 const RACINE = path.join(__dirname, '..', '..');

@@ -9,7 +9,7 @@
 //   4. toucher un résultat montre SA case (elle clignote) ;
 //   5. la fiche d'une case dit « rangée … colonne … » ;
 //   6. sur ordinateur, un chiffre tapé n'importe où ouvre la recherche.
-const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
+const { chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'));
 const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http'), path = require('path');
 const DIST = path.join(__dirname, '..', '..', 'dist');

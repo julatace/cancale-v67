@@ -26,7 +26,7 @@
 // pont absent · pont ancien · pont à jour. L'état « muet » (présent, sans
 // version) est le plus en retard de tous, et c'était le seul à ne rien
 // déclencher — il est testé ici aussi.
-const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
+const { chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'));
 const { metaVersData } = require('./_meta.cjs');
 const { dressingsDuJour } = require('./_instantane.cjs'); // fx/ est une photo datée : la lecture du dressing la plus récente = « il y a 1 min » (règle « en ligne » ≤ 24 h)
 const fs=require('fs'), http=require('http'), path=require('path');

@@ -38,7 +38,7 @@
 const path = require('path');
 let chromium;
 try { ({ chromium } = require(path.join(__dirname, '..', '..', 'node_modules', 'playwright'))); }
-catch (_) { ({ chromium } = require('/home/user/cancale-v67/node_modules/playwright')); }
+catch (_) { ({ chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'))); }
 const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http'), os = require('os');
 const DIST = path.join(__dirname, '..', '..', 'dist');

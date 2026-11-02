@@ -51,7 +51,7 @@ require('./_porte-banc.cjs');
 // ════════════════════════════════════════════════════════════════════════════
 const fs = require('fs'), path = require('path'), os = require('os'), https = require('https'), crypto = require('crypto');
 const { execFileSync } = require('child_process');
-const chargerPw = () => { for (const p of [__dirname, process.cwd(), '/home/user/cancale-v67']) { try { return require(require.resolve('playwright', { paths: [p] })); } catch (_) {} } return null; };
+const chargerPw = () => { for (const p of [__dirname, process.cwd(), require('path').join(__dirname, '..', '..')]) { try { return require(require.resolve('playwright', { paths: [p] })); } catch (_) {} } return null; };
 const pw = chargerPw();
 const CHROME = '/opt/pw-browsers/chromium';
 const PORT = Number(process.env.BANC_PORT) || 4794;

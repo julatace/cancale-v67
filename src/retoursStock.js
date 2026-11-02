@@ -170,3 +170,22 @@ export function remiseEnStock(ligne, { numeros, presentes, cleNum, estArchive })
   }
   return { ok: true, num: String(ligne.num), archive: !!(estArchive && estArchive(ligne.num)), conflit };
 }
+
+// (2 novembre) Le filtre de site de Colis s'applique aux retours : jamais une
+// ligne Vinted sous « eBay », jamais « pas pu lire tes retours eBay » sous
+// « Vinted ». Les retours ne sont suivis que sur Vinted et eBay : un autre site
+// rend `null` (pas de bloc). Sur « eBay », des ventes Vinted illisibles ne
+// regardent pas ce filtre : `null` aussi.
+export function retoursPourSite(res, site) {
+  if (!site || site === 'toutes') return res || null;
+  if (site !== 'vinted' && site !== 'ebay') return null;
+  if (!res) return null;
+  if (res.etat !== 'lu') return site === 'ebay' ? null : res;
+  const estEbay = (m) => /eBay/.test(m);
+  return {
+    ...res,
+    lignes: res.lignes.filter(l => l.plateforme === site),
+    remises: res.remises.filter(l => l.plateforme === site),
+    manques: res.manques.filter(m => (site === 'ebay') === estEbay(m)),
+  };
+}

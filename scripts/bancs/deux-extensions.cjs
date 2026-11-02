@@ -32,7 +32,7 @@
 //      au-dessus de « Lecture seule » — il porte le même blocage que la pastille
 //      (`data-liaison-reste`) et le geste ; seule, il ne l'invente pas.
 // Ce qui est jugé : des `data-*` et ce que les ponts ont REÇU — pas une formulation.
-const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
+const { chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'));
 const { metaVersData } = require('./_meta.cjs');
 const { monterTiroirs } = require('./_tiroirs.cjs');
 const fs = require('fs'), http = require('http'), path = require('path'), os = require('os');

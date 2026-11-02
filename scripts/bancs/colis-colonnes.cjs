@@ -30,7 +30,7 @@
 // compteurs = total = nombre de colis posés) ; chaque compteur = ses cartes ;
 // le bouton « Imprimer les N prêts » = le compteur des prêts, et il ouvre le
 // lot d'impression ; la barre du haut (recherche, touche « / ») sur ordinateur.
-const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
+const { chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'));
 const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http'), path = require('path'), os = require('os');
 const DIST = path.join(__dirname, '..', '..', 'dist');

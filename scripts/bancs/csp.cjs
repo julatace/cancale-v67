@@ -58,7 +58,7 @@ require('./_porte-banc.cjs');   // l'« accès direct » est retiré de l'app (2
 const path = require('path'), fs = require('fs');
 let chromium;
 try { ({ chromium } = require(path.join(__dirname, '..', '..', 'node_modules', 'playwright'))); }
-catch (_) { ({ chromium } = require('/home/user/cancale-v67/node_modules/playwright')); }
+catch (_) { ({ chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'))); }
 const V = require('./_vercel.cjs');
 const { fabriquer, repondre } = require('./_base-volume.cjs');
 const DIST = path.join(__dirname, '..', '..', 'dist');

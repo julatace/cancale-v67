@@ -4,7 +4,7 @@
 //     messagerie de Leboncoin ; un compte lié jamais relevé dit « — », pas « 0 » ;
 //   · jamais relevé : aucune ligne à zéro, la consigne (ouvrir leboncoin.fr) ;
 //   · lecture ratée (522) : ni zéro ni « jamais », la phrase de panne.
-const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
+const { chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'));
 const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http'), path = require('path');
 const DIST = path.join(__dirname, '..', '..', 'dist');

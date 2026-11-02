@@ -125,5 +125,5 @@ try { poser(require('playwright')); } catch (_) {}
 // arbre, `require('playwright')` d'ici rend un second module : la porte était posée
 // sur lui, le banc lançait l'autre — écran de connexion, et des dizaines de rouges
 // qui ne mesuraient rien (photos-vinted : 40). `poser` ne pose qu'une fois par module.
-try { poser(require('/home/user/cancale-v67/node_modules/playwright')); } catch (_) {}
+try { poser(require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'))); } catch (_) {}
 module.exports = { SCRIPT_PORTE_BANC: SCRIPT, poserPorteBanc: poser };

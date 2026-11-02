@@ -25,7 +25,7 @@
 //   I. cibles ≥ 44 px, aucun débordement, aucune erreur ; captures regardées.
 // `BANC_MUTATION` : `tri` (trier par emplacement), `rouge` (ignorer les conflits),
 // `auto` (marquer posté sans clic), `moitie` (n'écrire que la vente) ⇒ rouge.
-const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
+const { chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'));
 const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http'), path = require('path'), os = require('os');
 const DIST = path.join(__dirname, '..', '..', 'dist');

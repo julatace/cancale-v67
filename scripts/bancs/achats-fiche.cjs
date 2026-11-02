@@ -13,7 +13,7 @@
 //    « Copie impossible », jamais « copié » (réaffaiblir à try{writeText}catch
 //    le ferait mentir — c'est la preuve qui compte, pas « la fonction est neuve ») ;
 //  • un achat ANNULÉ/remboursé → PAS d'entrée « Copier le prix payé » (gated).
-const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
+const { chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'));
 const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http'), path = require('path');
 const DIST = path.join(__dirname, '..', '..', 'dist');

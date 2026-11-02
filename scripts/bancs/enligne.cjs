@@ -29,7 +29,7 @@
 //      extension connectée à VRM ; et les lectures publiques illisibles se disent.
 // Ce qui est jugé : les cartes (`data-carte-annonce`), les attributs `data-*` et
 // les nombres rendus — pas une formulation.
-const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
+const { chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'));
 const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http'), path = require('path'), os = require('os');
 const DIST = path.join(__dirname, '..', '..', 'dist');

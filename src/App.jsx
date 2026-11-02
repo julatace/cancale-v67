@@ -96,7 +96,7 @@ import { lirePhotoroom, appelPhotoroom, phraseVerif, phraseSansReponse, dateCour
 // §11 : l'adresse de réception se compare avec LA forme du serveur (celle qui
 // décide à qui appartient un email) — jamais une seconde normalisation ici.
 import { normAdresse, ADRESSE_COLLECTRICE, estAdresseCollectrice } from "../api/_lib/proprietaire-email.js";
-import { retoursEnCours, remiseEnStock, LIBELLE_ETAPE, ETAPES_RETOUR } from "./retoursStock.js";
+import { retoursEnCours, retoursPourSite, remiseEnStock, LIBELLE_ETAPE, ETAPES_RETOUR } from "./retoursStock.js";
 import { etatVinted, NIVEAU_ETAT_MAX } from "./carteAnnonce.js";
 import ChoixPeriode from "./ChoixPeriode.jsx";
 import { libellePlage, phrasePlage } from "./periodeCalendrier.js";
@@ -38287,8 +38287,10 @@ const acctColor = (uid) => { let h=0; const s=String(uid||''); for(let i=0;i<s.l
 // « Reçu chez moi » (son clic), puis « Remise en stock » (son clic). Le geste
 // commun est dit une fois en tête (§7). Aucune couleur d'alerte : un retour
 // n'est pas une erreur.
-function RetoursEnCoursBloc({ res, nomCompte, plusieursComptes, onRecu, onRemettre, onMasquer, onAnnulerRemise }) {
+function RetoursEnCoursBloc({ res: resBrut, site = 'toutes', nomCompte, plusieursComptes, onRecu, onRemettre, onMasquer, onAnnulerRemise }) {
   const [ouvrirAnciens, setOuvrirAnciens] = React.useState(false);
+  // (2 nov.) Le filtre de site de Colis vaut aussi ici (`retoursPourSite`).
+  const res = retoursPourSite(resBrut, site);
   if (!res) return null;
   if (res.etat === 'encours') return null;
   if (res.etat === 'passu') return (
@@ -38296,8 +38298,15 @@ function RetoursEnCoursBloc({ res, nomCompte, plusieursComptes, onRecu, onRemett
       Retours en cours : je n'ai pas pu lire tes ventes — je ne peux pas dire s'il y en a. Rouvre Colis dans un moment.
     </div>);
   const { lignes, remises, manques } = res;
+  // Ce qui n'a pas pu être lu, dit PAR SITE et à part des lignes : un avertissement
+  // eBay posé au-dessus d'une ligne Vinted la faisait passer pour un retour eBay.
+  const manquesVinted = manques.filter(m => !/eBay/.test(m)), manqueEbay = manques.some(m => /eBay/.test(m));
+  const pasSu = (manquesVinted.length || manqueEbay) ? <div data-retours-pas-su="" style={{fontSize:11.5,color:C.muted,lineHeight:1.45,display:'grid',gap:2}}>
+    {manquesVinted.length > 0 && <div data-retours-pas-su-site="vinted">Vinted : je n'ai pas pu lire {manquesVinted.join(', ')} — un retour peut manquer.</div>}
+    {manqueEbay && <div data-retours-pas-su-site="ebay">eBay : je n'ai pas pu lire tes retours eBay — un retour eBay peut manquer.</div>}
+  </div> : null;
   if (!lignes.length && !remises.length) {
-    return manques.length ? <div data-retours-encours="0" data-retours-manques={manques.length} style={{fontSize:11.5,color:C.muted,margin:'0 0 12px'}}>Retours en cours : aucun vu — mais je n'ai pas pu lire {manques.join(', ')}.</div> : null;
+    return pasSu ? <div data-retours-encours="0" data-retours-manques={manques.length} style={{margin:'0 0 12px'}}>{pasSu}</div> : null;
   }
   const recents = lignes.filter(l => !l.ancien), anciens = lignes.filter(l => l.ancien);
   const lien = (l) => l.plateforme === 'ebay'
@@ -38343,7 +38352,7 @@ function RetoursEnCoursBloc({ res, nomCompte, plusieursComptes, onRecu, onRemett
         <span aria-hidden="true" style={{color:C.muted,flexShrink:0,marginTop:1}}><Icon name="truck" size={18}/></span>
         <div style={{minWidth:0}}>
           <div style={{fontSize:13.5,fontWeight:700,color:C.text}}>Retours en cours{lignes.length ? ` · ${lignes.length}` : ''}</div>
-          <div style={{fontSize:11.5,color:C.muted,marginTop:3,lineHeight:1.45}}>« Reçu » à l'arrivée, puis « Remise en stock » (le N° reste). <Pourquoi label="Pourquoi">Rien ne change tout seul : c'est toi qui dis que le colis est revenu. La vente remboursée sort déjà de ton CA.</Pourquoi>{manques.length ? <span data-retours-pas-su> Je n'ai pas pu lire {manques.join(', ')} : un retour peut manquer.</span> : null}</div>
+          <div style={{fontSize:11.5,color:C.muted,marginTop:3,lineHeight:1.45}}>« Reçu » à l'arrivée, puis « Remise en stock » (le N° reste). <Pourquoi label="Pourquoi">Rien ne change tout seul : c'est toi qui dis que le colis est revenu. La vente remboursée sort déjà de ton CA.</Pourquoi></div>
         </div>
       </div>
       <div style={{display:'grid',gap:6,marginTop:9}}>
@@ -38352,6 +38361,7 @@ function RetoursEnCoursBloc({ res, nomCompte, plusieursComptes, onRecu, onRemett
         {ouvrirAnciens && anciens.map(l => <Ligne key={l.cle} l={l}/>)}
         {remises.map(l => <Ligne key={l.cle} l={l} remise/>)}
       </div>
+      {pasSu && <div style={{marginTop:9}}>{pasSu}</div>}
     </div>);
 }
 function AcctTag({ acc, name }) {
@@ -46594,6 +46604,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // ventes Vinted, `colisEbay`, `colisVestiaire`, `pickupUnion` pour les
   // retraits, `venteStage` pour les partis. `colonnesColis` les range.
   const [siteColis, setSiteColis] = useState(() => (SITES_COLIS.includes(siteColisDemande) && siteColisDemande !== 'leboncoin') ? siteColisDemande : 'toutes');
+  // (2 nov., Julien : « des données Vinted dans eBay, inadmissible ») Le filtre de
+  // site vaut pour TOUT Colis, pas seulement les colonnes : un bloc d'un site ne
+  // s'affiche que sous « Tous les sites » ou sous SON site. Seul le rouge « deux
+  // paires sous un N° » reste partout (le seul risque irréversible, §5).
+  const voitSite = (s) => siteColis === 'toutes' || siteColis === s;
   const cartesColis = () => {
     const L = [];
     const nomAvecTaille = (titre, o) => { const t = String(titre || '').trim(); const e = o ? effEntry(o) : null; const tl = e && e.taille ? String(e.taille) : ''; return tl && !tailleDansTitre(t, tl) ? `${t} · ${tl}` : t; };
@@ -51949,7 +51964,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             L'ANNULATION (19 oct.). En tête de Colis : un colis posté quand même,
             c'est une paire partie pour rien. La règle est `colisEbay` (§11) ; le
             geste (accepter / refuser) vit dans eBay → À traiter. */}
-        {colisEb && colisEb.nePasPoster.length>0 && (
+        {voitSite('ebay') && colisEb && colisEb.nePasPoster.length>0 && (
           <div data-ebay-ne-pas-poster={colisEb.nePasPoster.length} style={{border:`1px solid ${C.warn}66`,background:`${C.warn}10`,borderRadius:10,padding:'11px 13px',marginBottom:12}}>
             <div style={{fontSize:13.5,fontWeight:700,color:C.text}}>Ne poste pas {colisEb.nePasPoster.length>1?`ces ${colisEb.nePasPoster.length} colis eBay`:'ce colis eBay'}</div>
             <div style={{fontSize:12,color:C.muted,marginTop:3,lineHeight:1.45}}>{colisEb.nePasPoster.length>1?'Les acheteurs ont':"L'acheteur a"} demandé l'annulation. Accepte ou refuse dans eBay → À traiter : tant que ce n'est pas tranché, le colis reste chez toi.</div>
@@ -51964,7 +51979,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             remboursée en entier, ni partie, mais que VRM ne sait pas dire « à
             poster » (remboursée en partie, paiement pas confirmé, état
             d'expédition inconnu) : dite, jamais cachée. Le geste est dans eBay. */}
-        {colisEb && Array.isArray(colisEb.aVerifier) && colisEb.aVerifier.length>0 && (
+        {voitSite('ebay') && colisEb && Array.isArray(colisEb.aVerifier) && colisEb.aVerifier.length>0 && (
           <div data-ebay-a-verifier={colisEb.aVerifier.length} style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:10,padding:'11px 13px',marginBottom:12}}>
             <div style={{fontSize:13.5,fontWeight:700,color:C.text}}>{colisEb.aVerifier.length>1?`${colisEb.aVerifier.length} commandes eBay à vérifier avant de poster`:'Une commande eBay à vérifier avant de poster'}</div>
             <div style={{fontSize:12,color:C.muted,marginTop:3,lineHeight:1.45}}>Ni annulée, ni partie : regarde-la dans eBay avant de poster ou non.</div>
@@ -51974,8 +51989,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             })}
           </div>
         )}
-        {emailBordsKO && emailBords===null && <div data-bords-ko style={{marginBottom:10}}><LignePanne>Les bordereaux reçus par email n'ont pas pu être lus pour l'instant — rien n'est perdu. Un colis « en attente de bordereau » ci-dessous a peut-être déjà le sien : l'écran réessaie tout seul.</LignePanne></div>}
-        {(()=>{
+        {voitSite('vinted') && emailBordsKO && emailBords===null && <div data-bords-ko style={{marginBottom:10}}><LignePanne>Les bordereaux reçus par email n'ont pas pu être lus pour l'instant — rien n'est perdu. Un colis « en attente de bordereau » ci-dessous a peut-être déjà le sien : l'écran réessaie tout seul.</LignePanne></div>}
+        {voitSite('vinted') && (()=>{
           if (sales.loading && emailBords===null) return <div style={{fontSize:12,color:C.muted,marginBottom:10}}>Chargement des colis à envoyer…</div>;
           const ex = expeditions();
           const aPoster = ex.filter(e=>!(e.o && isShipDone(e.o)));
@@ -52002,8 +52017,17 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           const tot = aPoster.length + nEb;
           // Sans compte relié ni colis : le geste est dit en tête, pas « aucun envoi ».
           if (colisSansCompte) return null;
+          const uRecap = urgenceColis();
+          // Sans geste visible au téléphone (l'imprimante y est cachée, styles-telephone.css).
+          const recapSansGeste = !(nEb>0) && !(uRecap.total && uRecap.total>=aPoster.length) && !(aGenItems.length>0) && !lot;
+          const recapVide = recapSansGeste && !(avecPdf.length>0);
           return (
-            <div data-colis-recap={tot} data-colis-recap-vinted={aPoster.length} data-colis-recap-ebay={colisEb === undefined ? 'encours' : colisEb === null ? 'passu' : String(nEb)} className="vrm-colis-recap" style={{position:'relative',display:'flex',gap:12,alignItems:'flex-start',flexWrap:'wrap',background:C.card,border:`1px solid ${C.border}`,borderRadius:12,padding:'18px',marginBottom:16,overflow:'hidden',boxShadow:C.shadow||'none'}}>
+            <div data-colis-recap={tot} data-colis-recap-vinted={aPoster.length} data-colis-recap-ebay={colisEb === undefined ? 'encours' : colisEb === null ? 'passu' : String(nEb)} data-colis-recap-vide={recapVide ? '1' : '0'} data-colis-recap-sans-geste={recapSansGeste ? '1' : '0'} className="vrm-colis-recap" style={recapVide
+              // (2 nov.) Le texte du récapitulatif n'est plus que lu à l'écran (1er nov.) :
+              // sans ligne eBay, urgence, « Générer » ni lot, la carte restait une boîte
+              // VIDE en haut de Colis (vue au téléphone). Elle garde son texte lu, sans cadre.
+              ? {position:'relative',margin:0,padding:0,border:0,background:'transparent'}
+              : {position:'relative',display:'flex',gap:12,alignItems:'flex-start',flexWrap:'wrap',background:C.card,border:`1px solid ${C.border}`,borderRadius:12,padding:'18px',marginBottom:16,overflow:'hidden',boxShadow:C.shadow||'none'}}>
               <div className="vrm-colis-recap-tete" style={{display:'flex',alignItems:'center',gap:16,flexWrap:'wrap',flex:'1 1 190px',minWidth:0}}>
                 {/* (1er nov.) LES COLONNES DU HAUT DISENT DÉJÀ CES NOMBRES (Prêts · En attente),
                     §7 : « le même nombre ne s'écrit jamais deux fois sur un écran ». Le récapitulatif
@@ -52140,8 +52164,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             limite, le compte). « ↺ Pas encore posté » la remet dans « à
             envoyer » avec son bordereau, si le carton est encore là. */}
         {/* Retours en cours (21 octobre) : la seule voix des retours (§7). */}
-        <RetoursEnCoursBloc res={retoursSuivis} nomCompte={accNameOf} plusieursComptes={(accounts||[]).length>1} onRecu={basculerRetourRecu} onRemettre={remettreEnStock} onMasquer={masquerRetour} onAnnulerRemise={annulerRemise}/>
-        {cochesNonPartis.length>0 && (()=>{
+        <RetoursEnCoursBloc res={retoursSuivis} site={siteColis} nomCompte={accNameOf} plusieursComptes={(accounts||[]).length>1} onRecu={basculerRetourRecu} onRemettre={remettreEnStock} onMasquer={masquerRetour} onAnnulerRemise={annulerRemise}/>
+        {voitSite('vinted') && cochesNonPartis.length>0 && (()=>{
           const nb = cochesNonPartis.length, pl = nb>1?'s':'';
           const plusieursComptes = (accounts || []).length > 1;
           return (
@@ -52193,7 +52217,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             58 j » — l'âge d'une liste de points relais, lu comme l'âge des
             données de Colis. */}
         {/* Bordereau capté par l'extension (téléchargé sur Vinted) → tamponnage 1 clic. */}
-        {freshLabel && (()=>{
+        {voitSite('vinted') && freshLabel && (()=>{
           // Bordereau frais capté → on cherche la vente À EXPÉDIER de CE compte.
           // S'il n'y en a qu'UNE, on la pré-associe : bouton « Tamponner N°X » en
           // 1 tap (auto number + titre + fichier capté). Sinon on invite à cliquer
@@ -52215,7 +52239,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           );
         })()}
         {/* Rappel d'urgence quand l'app est ouverte (complète la notif push quotidienne). */}
-        {(()=>{
+        {voitSite('vinted') && (()=>{
           // ⚠️ `overdue` DOIT être destructuré : il est lu deux lignes plus bas.
           // Il ne l'était pas depuis §5.64 — donc l'écran Colis TOMBAIT (« overdue
           // is not defined ») dès que l'urgence était un sous-ensemble strict,
@@ -52300,12 +52324,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             eBay : l'acheteur a payé le port, VRM n'achète rien (§2.8). La phrase
             commune est dite UNE fois (§7) ; la ligne ne garde que ce qui la
             distingue. */}
-        {only === 'bordereaux' ? <ColisVestiaireBloc vc={colisVestiaire(vcEtat)}/> : null}
+        {only === 'bordereaux' && voitSite('vestiaire') ? <ColisVestiaireBloc vc={colisVestiaire(vcEtat)}/> : null}
         {/* (31 oct.) Les emails reçus et ce que VRM en a fait — l'ambre quand un
             email attend un geste (bordereau au N° deviné, reçu sans n°…). */}
         {only === 'bordereaux' ? <EntreeJournalEmails headers={sbAuth} onOuvrir={(f)=>{demanderJournalEmails(f); onNav && onNav('settings');}}/> : null}
-        {colisEb === null && <div data-colis-ebay="passu" style={{marginBottom:10}}><LignePanne>Les ventes eBay n'ont pas pu être lues pour l'instant — un colis eBay à poster n'est peut-être pas dans ce compte. Rien n'est perdu : rouvre Colis dans un moment.</LignePanne></div>}
-        {colisEb && colisEb.aPoster.length>0 && (()=>{
+        {voitSite('ebay') && colisEb === null && <div data-colis-ebay="passu" style={{marginBottom:10}}><LignePanne>Les ventes eBay n'ont pas pu être lues pour l'instant — un colis eBay à poster n'est peut-être pas dans ce compte. Rien n'est perdu : rouvre Colis dans un moment.</LignePanne></div>}
+        {voitSite('ebay') && colisEb && colisEb.aPoster.length>0 && (()=>{
           const L = colisEb.aPoster, n = L.length;
           const comptes = [...new Set(L.map(x => x.pseudo || x.compte))];
           const plusieurs = comptes.length > 1;
@@ -52349,9 +52373,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             </div>
           );
         })()}
-        {sales.loading && !sales.items && <Skeleton variant="row" count={4}/>}
-        {sales.error && <LoadError onRetry={()=>loadOrders('sold',setSales,true)}/>}
-        {!sales.loading && !sales.error && (()=>{
+        {voitSite('vinted') && sales.loading && !sales.items && <Skeleton variant="row" count={4}/>}
+        {voitSite('vinted') && sales.error && <LoadError onRetry={()=>loadOrders('sold',setSales,true)}/>}
+        {voitSite('vinted') && !sales.loading && !sales.error && (()=>{
           // ⚠️ 30 septembre (Julien : « les bordereaux doivent s'enlever quand
           // les ventes sont expédiées ») : un colis coché « colis fait » QUITTE
           // la liste. Pas en silence (« un colis caché est un colis perdu ») :
@@ -52640,7 +52664,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             aucune décision automatique. Replié : ce n'est pas du travail. Un
             retour ou un colis non réclamé passe en tête — c'est le seul qui
             peut demander un geste (vérifier que la paire revient). */}
-        {curSub==='bordereaux' && Array.isArray(sales.items) && (()=>{
+        {curSub==='bordereaux' && voitSite('vinted') && Array.isArray(sales.items) && (()=>{
           const LIMITE_J = 45;
           const ordre = { 'Retournée': 0, 'Retour en cours': 0, 'Au relais': 1, 'En transit': 2, 'Livrée': 3 };
           const partis = sales.items

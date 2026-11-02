@@ -52,7 +52,7 @@
 //     aucune » dans le même paragraphe), ni code périmé, ni sa 5.164 d'aujourd'hui
 //     (périmée ou muette), ni pas connectée / autre compte VRM, ni absente — et
 //     l'autre sens : une 5.170 connectée (commande possible) les garde.
-const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
+const { chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'));
 const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http'), path = require('path'), os = require('os');
 // Une extension ≥ CODE_DANS_ETAT (5.171) porte dans son état la version du CODE

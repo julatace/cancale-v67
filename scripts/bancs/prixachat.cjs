@@ -8,7 +8,7 @@
 //   • la suggestion sûre existante n'a pas disparu (« C'est ça » toujours là).
 // §6.1 : rouge sur le code d'avant (0 « à vérifier », ~111 pastilles en tout),
 // vert après (« à vérifier » > 0, total >= 200).
-const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
+const { chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'));
 const { metaVersData } = require('./_meta.cjs');
 const { dressingsDuJour } = require('./_instantane.cjs'); // fx/ est une photo datée : la lecture du dressing la plus récente = « il y a 1 min » (règle « en ligne » ≤ 24 h)
 const fs=require('fs'), http=require('http'), path=require('path');

@@ -28,7 +28,7 @@ const iSrc = process.argv.indexOf('--src');
 const RACINE = iSrc > 0 ? path.resolve(process.argv[iSrc + 1]) : path.join(__dirname, '..');
 const iMut = process.argv.indexOf('--mutation');
 const MUTATION = iMut > 0 ? process.argv[iMut + 1] : '';
-const NM = fs.existsSync(path.join(__dirname, '..', 'node_modules')) ? path.join(__dirname, '..', 'node_modules') : '/home/user/cancale-v67/node_modules';
+const NM = fs.existsSync(path.join(__dirname, '..', 'node_modules')) ? path.join(__dirname, '..', 'node_modules') : require('path').join(__dirname, '..', 'node_modules');
 const parser = require(path.join(NM, '@babel', 'parser'));
 
 let ko = 0, ok = 0;

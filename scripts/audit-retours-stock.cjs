@@ -29,6 +29,10 @@ const MUTATIONS = {
   finalisee: ["if (!rembourse && (/finalis/i.test(st) || String(vente.transaction_user_status || '') === 'completed')) return null;", ''],
   // La correction posée sur la vente ignorée (l'annonce gagne).
   correction: ['  if (corr) return { num: String(corr), itemId };', ''],
+  // (2 nov.) Le filtre de site ignoré : une ligne Vinted reste sous « eBay ».
+  'site-ignore': ["    lignes: res.lignes.filter(l => l.plateforme === site),", "    lignes: res.lignes,"],
+  // L'avertissement eBay gardé sous « Vinted ».
+  'site-manques': ["    manques: res.manques.filter(m => (site === 'ebay') === estEbay(m)),", "    manques: res.manques,"],
 };
 
 const arg = process.argv.slice(2);
@@ -179,6 +183,22 @@ if (arg.includes('--prouve')) {
     dit(c.ok && !c.conflit, 'la même fiche, plus présente ⇒ aucun conflit (l\'historique ne bloque pas)', c);
     const d = R.remiseEnStock(ligne(res, 't5'), { numeros, presentes, cleNum, estArchive: (n) => /^B/.test(n) });
     dit(d.ok && d.archive === true, 'ancien numéro (B60) ⇒ « numéro neuf à la republication »', d);
+  });
+
+  console.log('\n7. LE FILTRE DE SITE DE COLIS (2 nov.) — jamais Vinted sous eBay');
+  essaie('site', () => {
+    const v = { cle: 'v1', plateforme: 'vinted' }, e = { cle: 'e1', plateforme: 'ebay' };
+    const lu = { etat: 'lu', lignes: [v, e], remises: [v], manques: ['l\'état des transactions Vinted', 'tes retours eBay'] };
+    const sE = R.retoursPourSite(lu, 'ebay');
+    dit(sE.lignes.length === 1 && sE.lignes[0].plateforme === 'ebay' && sE.remises.length === 0, 'eBay ⇒ aucune ligne Vinted', sE);
+    dit(sE.manques.length === 1 && /eBay/.test(sE.manques[0]), 'eBay ⇒ seul l\'avertissement eBay', sE.manques);
+    const sV = R.retoursPourSite(lu, 'vinted');
+    dit(sV.lignes.length === 1 && sV.lignes[0].plateforme === 'vinted' && sV.remises.length === 1, 'Vinted ⇒ aucune ligne eBay', sV);
+    dit(sV.manques.every(m => !/eBay/.test(m)) && sV.manques.length === 1, 'Vinted ⇒ jamais « pas pu lire tes retours eBay »', sV.manques);
+    dit(R.retoursPourSite(lu, 'toutes') === lu, 'Tous les sites ⇒ tout, inchangé');
+    dit(R.retoursPourSite(lu, 'vestiaire') === null && R.retoursPourSite(lu, 'leboncoin') === null, 'Vestiaire / Leboncoin ⇒ pas de bloc (retours non suivis)');
+    const passu = { etat: 'passu', lignes: [], remises: [], manques: ['tes ventes Vinted'] };
+    dit(R.retoursPourSite(passu, 'ebay') === null && R.retoursPourSite(passu, 'vinted') === passu, 'ventes Vinted illisibles : dit sous Vinted, pas sous eBay');
   });
 
   console.log(`\n${n - ko} vert(s), ${ko} rouge(s).${mut ? ' (mutation « ' + mut + ' »)' : ''}`);

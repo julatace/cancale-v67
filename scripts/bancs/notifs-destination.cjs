@@ -15,7 +15,7 @@
 //   · jamais un écran blanc ni le garde-fou ; aucune erreur.
 // Données INVENTÉES (le dépôt est public), à la forme des lignes réelles.
 // BANC_MUTATION=sanscible : les adresses perdent leur cible ⇒ doit rougir.
-const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
+const { chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'));
 const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http'), path = require('path'), os = require('os');
 const RACINE = path.join(__dirname, '..', '..');

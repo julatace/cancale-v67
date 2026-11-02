@@ -50,7 +50,7 @@
 //     dans git), devant un service worker qui reprend les réponses du vrai
 //     code : session morte → reconnectée ; deux copies → rien ; « Se
 //     déconnecter » puis reconnexion à VRM → reconnectée.
-const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
+const { chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'));
 const { metaVersData } = require('./_meta.cjs');
 const { monterTiroirs } = require('./_tiroirs.cjs');
 const { execFileSync } = require('child_process');

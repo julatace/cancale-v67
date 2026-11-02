@@ -16,7 +16,7 @@
 //     plus basse (plafonds), et rien ne déborde.
 // BANC_CAPTURES=dossier : captures d'écran (ECRANS=n écrans défilés, SOMBRE=1).
 const fs=require('fs'),http=require('http'),path=require('path');
-const {chromium}=require('/home/user/cancale-v67/node_modules/playwright');
+const {chromium}=require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'));
 const {metaVersData}=require('./_meta.cjs');
 const DIST=process.env.BANC_DIST||path.join(__dirname,'..','..','dist');
 const OUT=process.env.BANC_CAPTURES||'';

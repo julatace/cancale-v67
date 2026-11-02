@@ -27,7 +27,7 @@
 //   8. l'autre sens, sur ordinateur (1512 px, sans extension) : le relais n'est
 //      pas utilisé, même pas lu.
 // On juge les ÉTATS (`data-*`) et ce qui est ÉCRIT dans la base.
-const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
+const { chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'));
 const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http'), path = require('path'), os = require('os');
 const DIST = path.join(__dirname, '..', '..', 'dist');

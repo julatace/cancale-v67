@@ -11,7 +11,7 @@
 // sort ; puis il exécute le VRAI relais `vc.js` avec un faux `chrome.runtime`, et
 // le VRAI `storeVcRecon` dans un `vm` (un relevé sans rien de neuf ne lit ni
 // n'écrit la base).
-const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
+const { chromium } = require(require('path').join(__dirname, '..', 'node_modules', 'playwright'));
 const fs = require('fs'), path = require('path'), vm = require('vm');
 const racine = path.join(__dirname, '..');
 const EXT = path.join(racine, 'vinted-sync-extension');

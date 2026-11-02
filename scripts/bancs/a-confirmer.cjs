@@ -11,7 +11,7 @@
 //     jamais « rien à confirmer » ; ligne absente ⇒ rien ;
 //   · un colis dont la conversation a donné l'heure d'arrivée ⇒ date SÛRE.
 // `BANC_MUTATION=passu` : l'app lit une ligne illisible comme vide (doit rougir).
-const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
+const { chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'));
 const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http'), path = require('path');
 const DIST = path.join(__dirname, '..', '..', 'dist');

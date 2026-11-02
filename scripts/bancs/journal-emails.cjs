@@ -13,7 +13,7 @@ require('./_porte-banc.cjs');
 const path = require('path'), http = require('http'), fs = require('fs');
 let chromium;
 try { ({ chromium } = require(path.join(__dirname, '..', '..', 'node_modules', 'playwright'))); }
-catch (_) { ({ chromium } = require('/home/user/cancale-v67/node_modules/playwright')); }
+catch (_) { ({ chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'))); }
 const DIST = path.join(__dirname, '..', '..', 'dist');
 const PORT = Number(process.env.BANC_PORT || process.env.PORT || 9231);
 const CAPT = process.env.CAPTURE_DIR || path.join(__dirname, '..', '..', 'docs', 'style-2026-10-31', 'emails');

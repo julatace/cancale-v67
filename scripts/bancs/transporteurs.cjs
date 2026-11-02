@@ -32,7 +32,7 @@
 //     les lignes `transp_*`, sans recharger.
 // `BANC_DIST=/chemin/dist` : rendre un autre build (mutation, §6.1).
 // `BANC_SEUL=A,B` : ne jouer que ces sections.
-const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
+const { chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'));
 const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http'), path = require('path');
 const RACINE = path.join(__dirname, '..', '..');

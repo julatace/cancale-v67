@@ -34,7 +34,7 @@
 //   4. que le PDF se génère, même avec un emoji dans un titre (les polices
 //      standard de pdf-lib ne savent pas l'écrire : tout l'export échouait), et
 //      qu'il contienne bien les deux registres.
-const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
+const { chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'));
 const { metaVersData } = require('./_meta.cjs');
 const { monterTiroirs } = require('./_tiroirs.cjs');
 const fs = require('fs'), http = require('http'), path = require('path');

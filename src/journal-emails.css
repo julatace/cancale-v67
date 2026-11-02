@@ -41,3 +41,8 @@
 .vrm-journal-entree{margin:12px 0}
 .vrm-journal-entree button{width:100%;display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:44px;padding:0 14px;border-radius:12px;border:1px solid var(--vrm-line,#e4e4df);background:var(--vrm-surface,#f5f5f2);color:var(--vrm-ink,#111);font:inherit;cursor:pointer;text-align:left}
 @media(max-width:440px){.vrm-journal-entete,.vrm-journal-filtres,.vrm-journal-ligne{padding-left:14px;padding-right:14px}.vrm-journal-couverture,.vrm-journal-vide{margin-left:14px;margin-right:14px}.vrm-journal select{font-size:16px}.vrm-journal-plus{margin-left:14px;margin-right:14px;width:calc(100% - 28px)}}
+/* (2 nov.) Au téléphone, le titre et « N à vérifier » se coupaient en deux lignes
+   chacun (« 2 à / vérifier ») : taille de l'écran Colis, pastille jamais coupée. */
+.vrm-journal-entree button{font-size:14px;font-weight:600;padding:10px 14px}
+.vrm-journal-entree button>span:first-child{min-width:0;flex:1 1 auto}
+.vrm-journal-entree .vrm-journal-n-ambre{white-space:nowrap;flex:0 0 auto;font-size:12.5px;padding:2px 9px}

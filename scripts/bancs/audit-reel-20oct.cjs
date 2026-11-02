@@ -18,7 +18,7 @@ require('./_porte-banc.cjs');
 //  G. Fraîcheur : seul le compte le plus en retard était nommé (jujuf38, 6 j) —
 //     julatace35260 (3 j) ne l'était pas, sur aucun écran.
 // Port : BANC_PORT (défaut 4917). Les deux sens sont vérifiés.
-const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
+const { chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'));
 const fs = require('fs'), http = require('http'), path = require('path');
 const { servir } = require('./_minipgrest.cjs');
 const DIST = path.join(__dirname, '..', '..', 'dist');

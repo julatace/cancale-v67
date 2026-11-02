@@ -17,7 +17,7 @@
 //      ligne le dit UNE fois, aucun « 0 » eBay, aucune action eBay ;
 //   D. aucun résumé rangé : rien d'eBay (ni attribut, ni ligne, ni action).
 // On juge les attributs et les nombres rendus, jamais une formulation.
-const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
+const { chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'));
 const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http'), path = require('path'), os = require('os');
 const DIST = path.join(__dirname, '..', '..', 'dist');

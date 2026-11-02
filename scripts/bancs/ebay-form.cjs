@@ -4,7 +4,7 @@
 // demande de Julien), on choisit le MODE DE LIVRAISON, et eBay vérifie avant de
 // publier. La logique d'envoi est couverte par ebay-write.cjs / ebay-api.cjs ;
 // ici c'est le RENDU + le flux « comme dans l'app ».
-const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
+const { chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'));
 const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http'), path = require('path');
 const DIST = path.join(__dirname, '..', '..', 'dist');

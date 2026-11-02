@@ -10,7 +10,7 @@
 //   3. l'autre sens : sans retrait, tout reste ;
 //   4. le geste dans Comptes liés range le choix par identifiant de compte, la
 //      carte le dit, et « Les remettre » l'annule.
-const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
+const { chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'));
 const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http'), path = require('path'), os = require('os');
 const DIST = path.join(__dirname, '..', '..', 'dist');
