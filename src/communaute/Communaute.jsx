@@ -160,7 +160,7 @@ function Carte({ cells, moi, sombre, onCellules, onEchec }) {
           } else onCellules(g.cells);
         });
         porteur.append(b);
-        marqueurs.current.push(new lib.Marker({ element: porteur, anchor: 'center' }).setLngLat([g.lon, g.lat]).addTo(m));
+        marqueurs.current.push(new lib.Marker({ element: porteur, anchor: 'center', subpixelPositioning: true }).setLngLat([g.lon, g.lat]).addTo(m));
       }
     };
     dessiner();

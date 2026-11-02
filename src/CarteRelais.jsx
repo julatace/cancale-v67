@@ -208,8 +208,10 @@ export function FondRelais({ points, selection, onChoisir, C, etiquette, hauteur
             el.addEventListener('click', (e) => { e.stopPropagation(); onChoisir && onChoisir(p.cle); });
             elements.current.set(p.cle, el);
             // Deux points au même endroit : côte à côte (38 px), jamais superposés.
+            // `subpixelPositioning` : l'épingle suit le fond au sous-pixel près (sans lui,
+            // MapLibre l'arrondit au pixel quand la carte se pose : un saut de 0,5 px).
             const k = dec[i];
-            marqueurs.push(new ml.Marker({ element: el, anchor: 'bottom', offset: [k ? (k % 2 ? 1 : -1) * Math.ceil(k / 2) * 38 : 0, 0] }).setLngLat([p.lon, p.lat]).addTo(carte));
+            marqueurs.push(new ml.Marker({ element: el, anchor: 'bottom', subpixelPositioning: true, offset: [k ? (k % 2 ? 1 : -1) * Math.ceil(k / 2) * 38 : 0, 0] }).setLngLat([p.lon, p.lat]).addTo(carte));
           });
           marquerChoisi(elements.current, selection);
           f.poserFond(carte, { sombre: false, annule: () => !vivant }).then(() => { if (vivant) setEtat('pret'); }).catch(() => { if (vivant) setEtat('ko'); });

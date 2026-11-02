@@ -2849,3 +2849,22 @@ n'apparaît plus) : à sonder, la cause n'est pas trouvée.
 - Décision de Julien contre le banc : `finition-premium` — Envoyer en bleu Apple
   sombre `#0A84FF` sous une icône blanche = contraste 3,65, le banc exige 4,5
   (la norme pour une icône seule est 3). À lui de dire.
+
+## 2 novembre (nuit) — Le parcours d'un nouveau vendeur, et la carte qui ne bouge plus
+
+Julien : « mets-toi à la place d'une personne qui crée son compte […] les points relais bougent un tout
+petit peu dès qu'on bouge la caméra : pour moi c'est important ».
+- **Carte** : deux causes, toutes deux nécessaires — une `transition: transform .12s` sur tous les boutons
+  (`src/styles-mouvement.css`) faisait traîner l'épingle (un bouton que MapLibre déplace à chaque image) ;
+  et l'arrondi au pixel de MapLibre à l'arrêt (0,5 px CSS). Corrigé : aucune transition sur
+  `.maplibregl-marker`, `subpixelPositioning: true` (`CarteRelais.jsx`, `communaute/Communaute.jsx`).
+  Écart mesuré image par image : 0,33 à 1,71 px avant, 0,00 px après. Banc `carte-stable` (13 rouges sur
+  l'avant ; mutations : une seule des deux corrections laisse du rouge).
+- **Nouveau vendeur** (banc `nouveau-vendeur`, compte vide puis petit jeu inventé, 390/1512, clair/sombre,
+  aucune écriture en base) : 13 défauts corrigés — « 0 € au moins » / « au moins 0,00 € » remplacés par
+  « — », fautes et majuscules, puces orphelines, cibles de 40 px, carte collée au sélecteur, « 0 à relire »
+  sans compte, emoji, décalages d'Annonces, impasse « ouvre Ventes » sans compte (maintenant « Relier mon
+  compte »), « Marquer imprimé » sur deux lignes.
+- À trancher par Julien : Vestiaire visible pour qui ne l'utilise pas ; « Vérifications » sans compte
+  Vinted ; chiffres d'un vendeur sans Vinted. Relevés non corrigés : onglets de Stock coupés à 390 px,
+  barres de mois de 25 px, traits d'union insécables espacés (police du banc ?).

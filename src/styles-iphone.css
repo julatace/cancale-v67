@@ -214,7 +214,7 @@
  :root body .vrm-main [role="switch"]{min-height:44px!important;height:44px!important;min-width:46px!important;}
  :root body .vrm-main [data-stock3d]{height:min(52vh,460px)!important;min-height:320px!important;}
  :root body .vrm-main .vrm-sale-row>button.vrm-ledger-sale-toggle{min-height:48px!important;}
- :root body .vrm-main .vrm-ann-toolbar :is(.vrm-ann-tri,.vrm-ann-outils>button){min-width:40px!important;}
+ :root body .vrm-main .vrm-ann-toolbar :is(.vrm-ann-tri,.vrm-ann-outils>button){min-width:44px!important;}
  /* (20 oct., revue) La marge négative des liens-textes suivait encore les 55 px
     de l'ancien zoom (-16 px) : à 44 px, la boîte ne gardait que 12 px dans la
     ligne — « Retirer mon argent » sortait de sa carte, « voir », « tout voir »,

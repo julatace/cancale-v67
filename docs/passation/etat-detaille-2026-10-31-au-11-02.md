@@ -126,3 +126,10 @@ Déplacé TEL QUEL depuis CLAUDE.md §9 le 2 novembre 2026 (le fichier dépassai
   `docs/passation/historique-*.md`.
 - **30 oct.** — Intégration v30, extension **5.291.0** (5.288/5.290 étaient des numéros de
   branche) : `docs/passation/2026-10-30.md`.
+
+- **31 oct. (soir)** — Vinted/extension **5.293.0** (intégrée avec Leboncoin en 5.293.0) : le pont photo relaie le `statut` du CDN (lien mort 404/410 plus redemandé avant 30 min, refus passagers en tête du témoin) ; détourage Vestiaire : `cle-pas-su` arrête la série et se dit en français. → historique vinted-extension. Geste : installer la 5.293.0 une fois fusionnée.
+- **31 oct.** — Tournée de tous les bancs et audits : 5 défauts corrigés (purge d'un
+  compte supprimé, cartes Leboncoin remontées, table de reprise lue deux fois…). Les
+  panneaux des Paramètres s'ouvrent en sous-écran aussi sur ordinateur (`[data-sous-ouvrir]`).
+  Rouges laissés : `session` G/P (Chrome 153), `mobile`, `profil-avatar` (instables).
+  → historique divers / interface.

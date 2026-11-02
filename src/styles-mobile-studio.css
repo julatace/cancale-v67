@@ -370,14 +370,15 @@
  .vrm-main .vrm-shared-workbar>.vrm-sales-filters{margin-bottom:0!important;}
 }
 @media(max-width:767px){
- .vrm-main .vrm-ann-toolbar{display:grid!important;grid-template-columns:minmax(0,1fr) 40px 40px!important;}
+ /* (2 nov.) 44 px au doigt (§7) : le tri et « ⋯ » faisaient 40 px de large. */
+ .vrm-main .vrm-ann-toolbar{display:grid!important;grid-template-columns:minmax(0,1fr) 44px 44px!important;}
  .vrm-main .vrm-ann-toolbar .vrm-ann-search{grid-column:1!important;grid-row:1!important;width:100%;max-width:none!important;box-sizing:border-box;}
- .vrm-main .vrm-ann-toolbar .vrm-ann-tri{grid-column:2!important;grid-row:1!important;width:40px!important;max-width:40px!important;min-width:0;box-sizing:border-box;}
+ .vrm-main .vrm-ann-toolbar .vrm-ann-tri{grid-column:2!important;grid-row:1!important;width:44px!important;max-width:44px!important;min-width:0;box-sizing:border-box;}
  .vrm-main .vrm-ann-toolbar .vrm-ann-outils{grid-column:3!important;grid-row:1!important;}
 }
 
 @media(max-width:767px){
- .vrm-main .vrm-ann-toolbar .vrm-ann-outils>button{width:40px!important;min-width:40px!important;max-width:40px;box-sizing:border-box;}
+ .vrm-main .vrm-ann-toolbar .vrm-ann-outils>button{width:44px!important;min-width:44px!important;max-width:44px;box-sizing:border-box;}
 }
 
 /* Direction Gestion : repères de colonnes et lignes compactes sur téléphone.
@@ -489,3 +490,9 @@
  .vrm-main .vrm-ann-toolbar>.vrm-ann-actions{grid-column:1/-1!important;grid-row:2!important;display:flex!important;gap:8px;}
  .vrm-main .vrm-ann-toolbar>.vrm-ann-actions>button{flex:1 1 0;min-height:44px!important;width:auto!important;}
 }
+
+/* (2 nov.) Le groupe « Republier… » de la barre d'Annonces porte la classe des
+   actions d'une CARTE (.vrm-ann-actions) : il en prenait le retrait de 12-16 px,
+   le fond et le filet — au téléphone le bouton ne s'alignait plus sur la
+   recherche, sur ordinateur il flottait dans un pavé gris. Partout : rien. */
+:root body .vrm-main .vrm-ann-toolbar>.vrm-ann-actions.vrm-ann-actions.vrm-ann-actions{padding:0!important;background:transparent!important;border:0!important;}
