@@ -2576,10 +2576,13 @@ Nationale » et « La carte ne s'affiche pas ici… » dans la liste du téléph
   (`data-poste-sans-depart`) mène à « Partis ».
 - **À retirer** : `ColonneRetirer` (src/CarteRelais.jsx) refait — par point (règle
   `pointsARetirer` inchangée) : nom, adresse, « N colis · dernier jour … » ; chaque colis :
-  ce que c'est, sa date d'arrivée (`LigneArrivee`), puis SES gestes (`gestesRetrait`, App) :
+  ce que c'est, sa date d'arrivée (`LigneArrivee`), SA date limite exacte (`texteLimiteRetrait`,
+  « inconnue » / « vers le … (estimé) » compris), son n° de suivi, son compte (s'il y en a plusieurs),
+  la nouvelle de Vinted et le statut du transporteur (seulement quand il a répondu), puis SES gestes (`gestesRetrait`, App) :
   « Code de retrait 123456 » copiable (`CodeRetraitCopiable`), le QR, « Suivre ↗ » court,
   « J'ai retiré » (`markCollected` / `markPickupDone`). « Point pas encore connu » + raison.
-  Les « à vérifier » (`horsCompte`) dans un groupe à part en bas « À vérifier · N », raison
+  En tête du point : nom, adresse complète, transporteur (s'il est le même pour tous), « N colis ·
+  dernier jour … ». « N colis : compte non reconnu » dit une fois. Les « à vérifier » (`horsCompte`) dans un groupe à part en bas « À vérifier · N », raison
   dite une fois quand elle est commune (`raisonVerif` = `raisonAVerifier`). Sous la liste, la
   coque monte les OUTILS de retrait seulement (`retraitsOutils` : « Tout est OK », suivi Vinted,
   n° de suivi à la main, réception des e-mails, colis repartis) — sans redire un colis.
