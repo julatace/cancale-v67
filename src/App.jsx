@@ -96,7 +96,7 @@ import { lirePhotoroom, appelPhotoroom, phraseVerif, phraseSansReponse, dateCour
 // §11 : l'adresse de réception se compare avec LA forme du serveur (celle qui
 // décide à qui appartient un email) — jamais une seconde normalisation ici.
 import { normAdresse, ADRESSE_COLLECTRICE, estAdresseCollectrice } from "../api/_lib/proprietaire-email.js";
-import { retoursEnCours, remiseEnStock, LIBELLE_ETAPE, ETAPES_RETOUR } from "./retoursStock.js";
+import { retoursEnCours, retoursPourSite, remiseEnStock, LIBELLE_ETAPE, ETAPES_RETOUR } from "./retoursStock.js";
 import { etatVinted, NIVEAU_ETAT_MAX } from "./carteAnnonce.js";
 import ChoixPeriode from "./ChoixPeriode.jsx";
 import { libellePlage, phrasePlage } from "./periodeCalendrier.js";
@@ -38287,8 +38287,10 @@ const acctColor = (uid) => { let h=0; const s=String(uid||''); for(let i=0;i<s.l
 // « Reçu chez moi » (son clic), puis « Remise en stock » (son clic). Le geste
 // commun est dit une fois en tête (§7). Aucune couleur d'alerte : un retour
 // n'est pas une erreur.
-function RetoursEnCoursBloc({ res, nomCompte, plusieursComptes, onRecu, onRemettre, onMasquer, onAnnulerRemise }) {
+function RetoursEnCoursBloc({ res: resBrut, site = 'toutes', nomCompte, plusieursComptes, onRecu, onRemettre, onMasquer, onAnnulerRemise }) {
   const [ouvrirAnciens, setOuvrirAnciens] = React.useState(false);
+  // (2 nov.) Le filtre de site de Colis vaut aussi ici (`retoursPourSite`).
+  const res = retoursPourSite(resBrut, site);
   if (!res) return null;
   if (res.etat === 'encours') return null;
   if (res.etat === 'passu') return (
@@ -38296,8 +38298,15 @@ function RetoursEnCoursBloc({ res, nomCompte, plusieursComptes, onRecu, onRemett
       Retours en cours : je n'ai pas pu lire tes ventes — je ne peux pas dire s'il y en a. Rouvre Colis dans un moment.
     </div>);
   const { lignes, remises, manques } = res;
+  // Ce qui n'a pas pu être lu, dit PAR SITE et à part des lignes : un avertissement
+  // eBay posé au-dessus d'une ligne Vinted la faisait passer pour un retour eBay.
+  const manquesVinted = manques.filter(m => !/eBay/.test(m)), manqueEbay = manques.some(m => /eBay/.test(m));
+  const pasSu = (manquesVinted.length || manqueEbay) ? <div data-retours-pas-su="" style={{fontSize:11.5,color:C.muted,lineHeight:1.45,display:'grid',gap:2}}>
+    {manquesVinted.length > 0 && <div data-retours-pas-su-site="vinted">Vinted : je n'ai pas pu lire {manquesVinted.join(', ')} — un retour peut manquer.</div>}
+    {manqueEbay && <div data-retours-pas-su-site="ebay">eBay : je n'ai pas pu lire tes retours eBay — un retour eBay peut manquer.</div>}
+  </div> : null;
   if (!lignes.length && !remises.length) {
-    return manques.length ? <div data-retours-encours="0" data-retours-manques={manques.length} style={{fontSize:11.5,color:C.muted,margin:'0 0 12px'}}>Retours en cours : aucun vu — mais je n'ai pas pu lire {manques.join(', ')}.</div> : null;
+    return pasSu ? <div data-retours-encours="0" data-retours-manques={manques.length} style={{margin:'0 0 12px'}}>{pasSu}</div> : null;
   }
   const recents = lignes.filter(l => !l.ancien), anciens = lignes.filter(l => l.ancien);
   const lien = (l) => l.plateforme === 'ebay'
@@ -38343,7 +38352,7 @@ function RetoursEnCoursBloc({ res, nomCompte, plusieursComptes, onRecu, onRemett
         <span aria-hidden="true" style={{color:C.muted,flexShrink:0,marginTop:1}}><Icon name="truck" size={18}/></span>
         <div style={{minWidth:0}}>
           <div style={{fontSize:13.5,fontWeight:700,color:C.text}}>Retours en cours{lignes.length ? ` · ${lignes.length}` : ''}</div>
-          <div style={{fontSize:11.5,color:C.muted,marginTop:3,lineHeight:1.45}}>« Reçu » à l'arrivée, puis « Remise en stock » (le N° reste). <Pourquoi label="Pourquoi">Rien ne change tout seul : c'est toi qui dis que le colis est revenu. La vente remboursée sort déjà de ton CA.</Pourquoi>{manques.length ? <span data-retours-pas-su> Je n'ai pas pu lire {manques.join(', ')} : un retour peut manquer.</span> : null}</div>
+          <div style={{fontSize:11.5,color:C.muted,marginTop:3,lineHeight:1.45}}>« Reçu » à l'arrivée, puis « Remise en stock » (le N° reste). <Pourquoi label="Pourquoi">Rien ne change tout seul : c'est toi qui dis que le colis est revenu. La vente remboursée sort déjà de ton CA.</Pourquoi></div>
         </div>
       </div>
       <div style={{display:'grid',gap:6,marginTop:9}}>
@@ -38352,6 +38361,7 @@ function RetoursEnCoursBloc({ res, nomCompte, plusieursComptes, onRecu, onRemett
         {ouvrirAnciens && anciens.map(l => <Ligne key={l.cle} l={l}/>)}
         {remises.map(l => <Ligne key={l.cle} l={l} remise/>)}
       </div>
+      {pasSu && <div style={{marginTop:9}}>{pasSu}</div>}
     </div>);
 }
 function AcctTag({ acc, name }) {
@@ -52140,7 +52150,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             limite, le compte). « ↺ Pas encore posté » la remet dans « à
             envoyer » avec son bordereau, si le carton est encore là. */}
         {/* Retours en cours (21 octobre) : la seule voix des retours (§7). */}
-        <RetoursEnCoursBloc res={retoursSuivis} nomCompte={accNameOf} plusieursComptes={(accounts||[]).length>1} onRecu={basculerRetourRecu} onRemettre={remettreEnStock} onMasquer={masquerRetour} onAnnulerRemise={annulerRemise}/>
+        <RetoursEnCoursBloc res={retoursSuivis} site={siteColis} nomCompte={accNameOf} plusieursComptes={(accounts||[]).length>1} onRecu={basculerRetourRecu} onRemettre={remettreEnStock} onMasquer={masquerRetour} onAnnulerRemise={annulerRemise}/>
         {cochesNonPartis.length>0 && (()=>{
           const nb = cochesNonPartis.length, pl = nb>1?'s':'';
           const plusieursComptes = (accounts || []).length > 1;
