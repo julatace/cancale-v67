@@ -54,7 +54,7 @@ Gravité : **bloquant** · **grave** · **gênant** · **détail**. « vérifié
 - **Preuve** : banc, commande `A` (31/10 23:30Z) ⇒ rangée en `2026-11` (minuit à Paris) ; aucune date de versement eBay n'est lue nulle part.
 - **Correction** : au minimum, la phrase « eBay : daté au jour de la commande » sous le total (comme Leboncoin) ; à terme, la date de versement lue dans l'API Finances (`payouts`).
 
-### P8 — GÊNANT · eBay ne supprime aucune donnée quand un utilisateur eBay ferme son compte (vérifié par lecture ; conformité)
+### P8 — CORRIGÉ le 2 nov. (`audit-ebay-suppression`, historique eBay) · eBay ne supprimait aucune donnée quand un utilisateur eBay fermait son compte
 - **Où** : `api/ebay.js:1811` : `POST ?mode=deletion` ⇒ `200 {ok:true}`, rien d'autre. Ni signature vérifiée, ni données effacées.
 - **Défaut** : l'engagement pris en s'inscrivant aux notifications « Marketplace Account Deletion » est d'effacer les données de l'utilisateur eBay désigné. Or VRM garde les pseudos et adresses des acheteurs dans `ebay_orders`, et le pseudo du vendeur dans le registre des comptes.
 - **Correction** : vérifier la signature (`x-ebay-signature`), puis effacer ou anonymiser, chez tous les vendeurs, les commandes et messages de ce `userId` ou `username`. La ligne n'est réécrite que si la lecture a réussi (§5 « Lectures et écritures »).

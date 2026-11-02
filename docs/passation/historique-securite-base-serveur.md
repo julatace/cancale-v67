@@ -2504,3 +2504,15 @@ vraiment absente (premier jour), la base de la fusion est vide (`baseFusion`) : 
 que porte l'appareil est gardé. Preuve : `deux-appareils` §H (ligne relue absente ⇒ prénom
 et fiches gardés, aucune ligne réécrite sans eux) — **2 rouges** sur 5d7b34f4 (prénom et
 fiches effacés), vert après ; `reglages-premium` lancé 5 fois de suite : 5 verts.
+
+### La CSP passe EN VIGUEUR (2 novembre)
+Son choix parmi les propositions du 2 nov. (« 8 ok »). Journal des violations relu avant
+(lecture seule, `plantage_*` origine `csp`) : en tout DEUX depuis le 21 oct. — un script
+`connect.facebook.net` injecté dans Safari iOS par un tiers (le bloquer est le but), et un
+`connect-src` Supabase isolé le 25 oct. sur Mac Chrome (Réglages → ventes), non reproduit.
+Geste fait : dans la règle `/((?!sw\.js).*)` de `vercel.json`, la clé
+`Content-Security-Policy-Report-Only` devient `Content-Security-Policy`. Retour arrière :
+renommer la clé à l'inverse. Les violations restent notées (`ecouterViolationsCsp`).
+👤 À regarder à l'œil, sur l'iPhone ET l'ordinateur, le jour même : la carte de la
+Communauté montre la carte (pas la liste), un bordereau s'ouvre, Réglages → Imprimante →
+« Voir les aperçus » dessine les aperçus.
