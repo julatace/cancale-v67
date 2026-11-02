@@ -499,12 +499,12 @@ sans la fonction.
 Une ligne par chantier ou décision, le plus récent d'abord. Détail : le fichier
 d'historique du thème (cherche le titre ou la date).
 
-**Extension servie : 5.313.0** (2 nov.). **À lire en premier : `docs/passation/2026-11-02-liste.md`.** **Production** : https://vrm.center,
+**Extension servie : 5.314.0** (2 nov.). **À lire en premier : `docs/passation/2026-11-02-liste.md`.** **Production** : https://vrm.center,
 vérifier par `curl https://vrm.center/api/sante`.
 
 ### Gestes encore attendus de Julien
 - Facture Pro : compléter la fiche (Comptabilité → Factures → Facturation Pro : SIRET, forme, régime de TVA), connecter sa boîte e-mail (Gmail : mot de passe d'application) et s'envoyer un essai.
-- Installer l'extension **5.313.0** (remplacer le dossier, puis ⟳ dans CHAQUE Chrome).
+- Installer l'extension **5.314.0** (remplacer le dossier, puis ⟳ dans CHAQUE Chrome), puis ouvrir « Mes articles » et « Mes ventes » sur Vestiaire.
 - Sur leboncoin.fr, ouvrir « Mes annonces » sur CHACUN de ses comptes Leboncoin.
 - Recoller `scripts/gmail-forwarder.gs` (avec sa clé) dans la boîte qui fait tourner le
   script, puis poser `EMAIL_INBOUND_SECRET` sur Vercel (l'ancien script lit encore la
@@ -529,6 +529,7 @@ vérifier par `curl https://vrm.center/api/sante`.
 
 ### Décisions et chantiers (octobre–novembre 2026)
 Une ligne par chantier. Le récit complet des lignes du 31 oct. au 2 nov. est, mot pour mot, dans `docs/passation/etat-detaille-2026-10-31-au-11-02.md`.
+- **2 nov. (nuit)** — **Extension 5.314.0** : « Mes articles » Vestiaire lus (la forme réelle est une enveloppe `{type, published:{product}}` : toute la liste tombait en « forme inconnue ») (`audit-capture-vc-lbc` C10). → historique vestiaire. Geste : installer, ouvrir Mes articles / Mes ventes.
 - **2 nov. (nuit)** — **Facture Pro refaite** : « Envoyer la facture à l'acheteur » sur chaque vente Pro PROUVÉE (transaction), mentions légales (EI, 293 B / marge sans TVA / TVA), numéro sans trou au clic (journal, comparer-et-échanger ; l'email ne numérote plus), instantané + avoir, PDF identique app/serveur, envoi depuis la boîte du VENDEUR (SMTP, mot de passe chiffré, §2.9) (`src/facturePro/`, `api/_lib/facture-pro.js`, `audit-facture-pro`, banc `facture-pro`). → historique compta. Geste : voir « Gestes ».
 - **2 nov. (soir)** — Saisies sans réseau gardées sur l'appareil (file d'envoi `src/fileEnvoi.js`, rejouée par la fusion clé par clé au chargement, vidée quand la base ACCEPTE ; « N changements en attente d'envoi » dit une fois) : les prix tapés en 4G faible ne se perdent plus quand l'iPhone ferme l'app. Banc `file-envoi` (rouge sur l'avant). → historique sécurité-base-serveur. Geste : aucun.
 - **2 nov. (soir)** — Tournée de tous les audits sur `main` : 221/221 verts (SQL sur Postgres 17 ; sur Postgres 18 les empreintes de forme changent car les NOT NULL vont dans `pg_constraint` — 016 corrigée, 014/018-020 déjà appliquées laissées). Revue indépendante ⇒ 5.313.0. Tournée des 257 bancs en cours (branche `claude/tournee-bancs`). Geste : aucun.
