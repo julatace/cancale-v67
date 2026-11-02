@@ -181,12 +181,12 @@ function PONT(o) {
 
 const ouvrir = async (pg, errs) => {
   await pg.goto(`http://localhost:${PORT}/?tab=cat_achats`, { waitUntil: 'domcontentloaded' });
-  await pg.locator('.vrm-pickup-card').first().waitFor({ timeout: 20000 }).catch(async (e) => { console.log('ÉCRAN : ' + (await pg.locator('body').innerText()).slice(0, 1200)); console.log('ERREURS : ' + errs.join(' | ')); throw e; });
+  await pg.locator('[data-cc-colonne="retirer"] [data-cc-carte]').first().waitFor({ timeout: 20000 }) /* (2 nov.) Colis → « À retirer » */.catch(async (e) => { console.log('ÉCRAN : ' + (await pg.locator('body').innerText()).slice(0, 1200)); console.log('ERREURS : ' + errs.join(' | ')); throw e; });
   await pg.waitForTimeout(1800);
 };
 const lire = (pg) => pg.evaluate(() => {
-  const cartes = [...document.querySelectorAll('.vrm-pickup-card')].map((c) => {
-    const s = c.querySelector('[data-colis-suivi]');
+  const cartes = [...document.querySelectorAll('[data-cc-colonne="retirer"] [data-cc-carte]:not([data-en-verification-tx])')].map((c) => {
+    const s0 = c.querySelector('[data-rp-suivi]'); const s = s0 ? { getAttribute: () => s0.getAttribute('data-rp-suivi') || null } : null;
     const conv = [...c.querySelectorAll('a[href*="/inbox/"]')].map((a) => a.getAttribute('href'));
     return {
       t: c.innerText, suivi: s ? s.getAttribute('data-colis-suivi') : null, conv,
@@ -194,7 +194,7 @@ const lire = (pg) => pg.evaluate(() => {
       suivre: [...c.querySelectorAll('a[data-suivre-colis]')].map((a) => { const r = a.getBoundingClientRect(); return { href: a.getAttribute('href'), site: a.getAttribute('data-suivre-site'), n: a.getAttribute('data-suivre-colis'), cp: a.getAttribute('data-suivre-cp'), h: r.height, t: a.innerText }; }),
     };
   });
-  const onglet = document.querySelector('[data-achats-onglet="attente"]');
+  const onglet0 = document.querySelector('[data-colis-onglet-choix="retirer"]'); const onglet = onglet0 ? { getAttribute: () => onglet0.getAttribute('data-colis-onglet-n') } : null;
   const etat = document.querySelector('[data-suivi-vinted-etat]');
   return {
     cartes, total: onglet ? onglet.getAttribute('data-n') : null,

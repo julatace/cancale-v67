@@ -52191,6 +52191,16 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 : vers ? <span className="vrm-rp-sous" data-colis-limite="vers" data-colis-limite-vers={String(vers)}>À retirer vers le {new Date(String(vers).slice(0,10)+'T00:00:00').toLocaleDateString('fr-FR',{day:'2-digit',month:'2-digit'})} (estimé : le transporteur ne donne pas la date)</span>
                 : <span className="vrm-rp-sous" data-colis-limite="inconnue">Date limite de retrait inconnue (4 à 7 j en général)</span>)}
               {(su || (plusieursComptesRet && cpt)) ? <span className="vrm-rp-suivi" data-rp-suivi={su} data-colis-compte={cpt}>{[su ? `n° ${su}` : '', plusieursComptesRet && cpt ? `compte ${cpt}` : ''].filter(Boolean).join(' · ')}</span> : null}
+              {/* (23-24 oct.) La dernière nouvelle de Vinted et ce que dit le transporteur, par
+                  l'identité de CE colis (n° de suivi, transaction) — rien quand il n'y a rien. */}
+              {t ? <>
+                  <LigneNouvelleVinted nv={nouvelleDe(pickupUnion.cmdParColis && pickupUnion.cmdParColis.get(colisKey(t)))} transp={transpMap} suivi={suiviDeLigne(t)}/>
+                  <LigneTransporteur transp={transpMap} suivi={suiviDeLigne(t)} carrier={t.carrier} court limiteCarte={t.limite || t.limiteVers || ''}/>
+                </>
+                : o ? (() => { const su2 = suivisAchat(o, indexSuivisAchats)[0] || ''; const e2 = entreeSuiviAchat(o); return <>
+                  <LigneNouvelleVinted nv={nouvelleDe(o)} transp={transpMap} suivi={su2}/>
+                  {su2 ? <LigneTransporteur transp={transpMap} suivi={su2} carrier={(e2 && e2.transporteur) || transporteurDeForme(su2) || ''} court limiteCarte={(ev && (ev.limite || ev.limiteVers)) || ''}/> : null}
+                </>; })() : null}
             </>); };
           const toutLuRet = !notes.retirer && !baseKO && tracking !== null && Array.isArray(buys.items) && !buys.error;
           return (<>
