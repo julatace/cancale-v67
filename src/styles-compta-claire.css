@@ -1,0 +1,80 @@
+/* (2 nov.) Comptabilité en trois questions — Julien : « beaucoup d'incompréhension
+   […] SURTOUT comptabilité ». 1. Combien j'ai gagné ? · 2. Combien je dois
+   déclarer ? · 3. Le détail (replié). Chaque réponse : un libellé, UN chiffre, une
+   phrase dessous ; le reste se replie. Neutre partout (§7) : l'encre, le gris, le
+   filet ; l'accent reste aux liens et au seul bouton « Déclarer sur l'URSSAF ».
+   Chargée après Vitrine et la finition. Aucune règle de calcul ici. */
+
+.vrm-main .vrm-compta-q { display: flex; flex-direction: column; gap: 10px; margin: 0; }
+.vrm-main .vrm-compta-q + .vrm-compta-q,
+.vrm-main #compta-benefice + .vrm-compta-q { margin-top: 12px; }
+
+.vrm-main .vrm-compta-q-tete {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px 14px;
+  flex-wrap: wrap; padding: 0 2px;
+}
+.vrm-main .vrm-compta-question {
+  display: flex; align-items: center; gap: 10px; margin: 0;
+  font-size: 20px; line-height: 1.25; font-weight: 700; letter-spacing: -0.35px;
+  color: var(--vrm-ink);
+}
+.vrm-main .vrm-compta-q-n {
+  flex: none; display: inline-flex; align-items: center; justify-content: center;
+  width: 24px; height: 24px; border-radius: 999px;
+  border: 1.5px solid var(--vrm-line); color: var(--vrm-muted);
+  font-size: 13px; font-weight: 650; letter-spacing: 0; font-variant-numeric: tabular-nums;
+}
+.vrm-main .vrm-compta-periode { margin: 0; flex: 0 1 300px; min-width: 0; }
+
+.vrm-main .vrm-compta-carte {
+  background: var(--vrm-surface); border: 1px solid var(--vrm-line); border-radius: 16px;
+  padding: 18px 18px 8px; box-sizing: border-box; min-width: 0;
+}
+.vrm-main .vrm-compta-libelle {
+  font-size: 13px; font-weight: 600; color: var(--vrm-muted); margin: 0 0 6px; line-height: 1.35;
+}
+.vrm-main .vrm-compta-hero {
+  font-size: 40px; line-height: 1.05; font-weight: 700; letter-spacing: -1.2px;
+  font-variant-numeric: tabular-nums; white-space: nowrap; color: var(--vrm-ink);
+}
+.vrm-main .vrm-compta-hero-2 { font-size: 32px; letter-spacing: -0.9px; }
+.vrm-main .vrm-compta-phrase {
+  margin: 8px 0 0; font-size: 14px; line-height: 1.5; color: var(--vrm-muted); max-width: 62ch;
+}
+.vrm-main .vrm-compta-geste { margin-top: 6px; font-size: 14px; }
+.vrm-main .vrm-compta-geste :is(button, a) { min-height: 44px; display: flex; align-items: center; }
+.vrm-main .vrm-compta-geste [data-depenses-choix] { gap: 0 18px; font-size: 14px; }
+
+/* Le détail du calcul du bénéfice : une liste à filets, sans boîte dans la boîte. */
+.vrm-main .vrm-compta-calcul { margin-top: 6px; border-top: 1px solid var(--vrm-line); }
+.vrm-main .vrm-compta-calcul > summary { font-size: 14px; }
+.vrm-main .vrm-compta-lignes { background: transparent !important; border: 0 !important; box-shadow: none !important; }
+.vrm-main .vrm-compta-lignes > .vrm-set-ligne { padding-left: 0; padding-right: 0; }
+
+/* La carte URSSAF : la prochaine déclaration en tête, le mois en cours dessous. */
+.vrm-main [data-stats-carte="mois"].vrm-compta-carte { padding-bottom: 10px; }
+
+/* Les replis de « Le détail » : une liste de rangées de 44 px et plus. */
+.vrm-main .vrm-compta-replis {
+  display: flex; flex-direction: column;
+  background: var(--vrm-surface); border: 1px solid var(--vrm-line); border-radius: 16px;
+  padding: 2px 16px; box-sizing: border-box;
+}
+.vrm-main .vrm-compta-replis > :is(.vrm-compta-repli, .vrm-micro-repli) { margin: 0 !important; background: transparent !important; border: 0 !important; border-radius: 0 !important; padding: 0 !important; }
+.vrm-main .vrm-compta-replis > * + * { border-top: 1px solid var(--vrm-line) !important; }
+.vrm-main .vrm-compta-replis > :is(.vrm-compta-repli, .vrm-micro-repli) > summary { min-height: 60px; padding-block: 10px; }
+.vrm-main .vrm-compta-repli-tete { display: flex; flex-direction: column; gap: 3px; flex: 1 1 auto; min-width: 0; }
+.vrm-main .vrm-compta-repli-titre { font-size: 15px; font-weight: 600; color: var(--vrm-ink); }
+.vrm-main .vrm-compta-repli-resume { font-size: 13px; font-weight: 500; color: var(--vrm-muted); line-height: 1.4; }
+.vrm-main .vrm-compta-repli[open] > .vrm-compta-repli-corps,
+.vrm-main .vrm-compta-replis > .vrm-micro-repli[open] > [data-micro-entreprise] { padding-bottom: 14px; }
+.vrm-main .vrm-compta-avance > .vrm-compta-repli-corps,
+.vrm-main .vrm-compta-avance[open] > div { padding-bottom: 14px; }
+
+@media (max-width: 599px) {
+  .vrm-main .vrm-compta-question { font-size: 19px; }
+  .vrm-main .vrm-compta-hero { font-size: 36px; }
+  .vrm-main .vrm-compta-hero-2 { font-size: 30px; }
+  .vrm-main .vrm-compta-periode { flex: 1 1 100%; }
+  .vrm-main .vrm-compta-replis { padding: 2px 14px; }
+}

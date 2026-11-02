@@ -102,6 +102,8 @@ import './styles-recap-vente.css';
 import './styles-finition.css';
 // (1er nov.) Ma journée calme : colonne tenue, listes à filets, une hiérarchie — après la finition.
 import './styles-journee-mieux.css';
+// (2 nov.) Comptabilité en trois questions (gagné · déclarer · détail) — après la finition.
+import './styles-compta-claire.css';
 import { suivreRangeesDefilantes } from './rangeesDefilantes.js';
 if (typeof document !== 'undefined') { if (document.body) suivreRangeesDefilantes(); else document.addEventListener('DOMContentLoaded', suivreRangeesDefilantes); }
 

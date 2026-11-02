@@ -35146,7 +35146,7 @@ function DaterVentesLbc({ ventes, dates }) {
 // (29 oct.) Le nom de la carte, UNE source : son titre, le sommaire de
 // Comptabilité et les phrases qui y renvoient (la carte URSSAF du mois) le lisent.
 const TITRE_CARTE_CA = 'Vendu et reçu';
-function CaParPeriodeCarte({ lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, accounts }) {
+function CaParPeriodeCarte({ lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, accounts, dansRepli = false }) {
   const { ventes, ko } = useVentesCoque();
   const [datesLbc] = useLigneSynchro('vrm_lbc_dates', lireDatesLbc);
   const ventesVc = useVentesVestiaire();
@@ -35214,12 +35214,13 @@ function CaParPeriodeCarte({ lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, acc
     <Card style={{ padding: 0, overflow: 'hidden' }}>
       <div data-ca-periode={periode} data-ca-etat={calc.etat} data-ca-partiel={partiel ? '1' : '0'}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '13px 16px', borderBottom: `1px solid ${C.border}`, flexWrap: 'wrap' }}>
-          <span aria-hidden="true" style={{ flexShrink: 0, width: 30, height: 30, borderRadius: 8, background: `${C.accent}14`, color: C.accent, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Icon name="chart" size={16} /></span>
+          {!dansRepli && <span aria-hidden="true" style={{ flexShrink: 0, width: 30, height: 30, borderRadius: 8, background: `${C.accent}14`, color: C.accent, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Icon name="chart" size={16} /></span>}
           <div style={{ flex: '1 1 160px', minWidth: 0 }}>
-            {/* (29 oct., revue) Deux cartes du haut, deux périodes : le titre dit
-                que ce choix ne vaut que pour CETTE carte (le bénéfice a le sien). */}
-            <div data-titre-carte-ca="" style={{ fontSize: 15, fontWeight: 700, color: C.text }}>{TITRE_CARTE_CA}</div>
-            <div data-ca-sa-periode="" style={{ fontSize: 11, color: C.muted, marginTop: 1 }}>Toutes plateformes · la période choisie ici ne vaut que pour cette carte.</div>
+            {/* (29 oct., revue) Deux cartes, deux périodes : la phrase dit que ce
+                choix ne vaut que pour CETTE carte (le bénéfice a le sien).
+                (2 nov.) Dans « Le détail », le repli porte le titre. */}
+            {!dansRepli && <div data-titre-carte-ca="" style={{ fontSize: 15, fontWeight: 700, color: C.text }}>{TITRE_CARTE_CA}</div>}
+            <div data-ca-sa-periode="" style={{ fontSize: dansRepli ? 12.5 : 11, color: C.muted, marginTop: 1, lineHeight: 1.45 }}>{dansRepli ? <>Vendu : au jour de la vente. Reçu : au jour où la plateforme t'a versé l'argent (c'est lui qui se déclare). La période choisie ici ne vaut que pour cette carte.</> : 'Toutes plateformes · la période choisie ici ne vaut que pour cette carte.'}</div>
           </div>
           {/* (16 oct.) Le contrôle segmenté PARTAGÉ (`.vrm-seg`, celui des
               sous-onglets de plateforme) : plus de segment rempli d'accent. */}
@@ -35762,22 +35763,21 @@ const MOIS_NOMS_FR = ['janvier','février','mars','avril','mai','juin','juillet'
 // carte URSSAF du mois (ses dépenses), avant le suivi et « Ta micro-entreprise »
 // — rendu dans TOUS les états (statut en lecture, pas choisi, autre régime) :
 // les dépenses ne disparaissent jamais avec le statut.
-function StatutFiscal({ liveStats, onNav, apresMois = null }) {
+// (2 nov., « surtout comptabilité ») L'écran répond à trois questions dans
+// l'ordre ; ce composant y est rendu en TROIS endroits (`partie`), chacun sa
+// place : `declarer` (la question 2 : la carte URSSAF, ou la question du
+// statut, ou la phrase d'un autre régime), `suivi` (dans « Le détail » : les
+// déclarations passées et « Ta micro-entreprise »), `statut` (dans « Documents
+// et réglages » : le statut et « Changer »). Aucune règle ne change ; les
+// dépenses ne passent plus par ici (elles sont rendues par Comptabilité, à une
+// place fixe : la saisie ne se démonte jamais à l'arrivée du nuage).
+function StatutFiscal({ liveStats, onNav, partie = 'declarer' }) {
   const regime = useRegimeFiscal();
   const [changer, setChanger] = useState(false);
   const [taux, setTaux] = useState(() => tauxUrssaf());
   useEffect(() => { const f = (e) => { if (e && e.detail && e.detail.k === 'vinted_urssaf_taux') setTaux(tauxUrssaf()); }; window.addEventListener('vrm:save', f); return () => window.removeEventListener('vrm:save', f); }, []);
   useEffect(() => onCloudReady(() => setTaux(tauxUrssaf())), []);
-  // (29 oct., revue) UNE forme pour tous les états : six places fixes, une
-  // place vide vaut `null`. Les dépenses (`apresMois`) sont TOUJOURS la 4ᵉ.
-  // Avant, elles étaient à la racine tant que le statut n'était pas lu, puis 2ᵉ
-  // ou 3ᵉ d'un fragment : à l'arrivée du nuage React démontait tout
-  // « Tes dépenses » — une dépense en cours de saisie perdait le focus et les
-  // touches suivantes (banc compta-simple, scénario C).
-  const places = (entete, statutCarte, carteMois, suivi, micro) => (
-    <>{entete}{statutCarte}{carteMois}{apresMois}{suivi}{micro}</>
-  );
-  if (regime === undefined) return places(null, null, null, null, null);
+  if (regime === undefined) return partie === 'declarer' ? <div className="vrm-compta-carte"><p className="vrm-compta-phrase" style={{ margin: 0 }}>Je lis ton statut…</p></div> : null;
   const choisir = (k) => { save('vinted_regime', k); setChanger(false); };
   const vl = [false, 'avant', 'apres'].some((a) => tauxMicroVente({ liberatoire: true, acre: a }) === taux);
   const acre = ['apres', 'avant'].find((a) => [false, true].some((l) => tauxMicroVente({ acre: a, liberatoire: l }) === taux)) || false;
@@ -35794,7 +35794,7 @@ function StatutFiscal({ liveStats, onNav, apresMois = null }) {
       ))}
     </div>
   );
-  if (!regime || changer) return places(null,
+  const carteChoix = (
     <Card style={{ padding: 18 }}>
       <div data-statut-carte={regime ? 'changer' : 'question'}>
         <h3 className="vrm-titre-compta" style={{ margin: '0 0 4px', fontSize: 16, fontWeight: 700, color: C.text }}>{regime ? 'Change ton statut' : 'Quel est ton statut ?'}</h3>
@@ -35802,30 +35802,72 @@ function StatutFiscal({ liveStats, onNav, apresMois = null }) {
         {choix}
         {regime && <button type="button" className="vrm-lien-action" onClick={() => setChanger(false)} style={{ marginTop: 10, border: 'none', background: 'transparent', color: C.muted, fontFamily: 'inherit', fontSize: 13, cursor: 'pointer', padding: 0 }}>Annuler</button>}
       </div>
-    </Card>, null, null, null);
-  const entete = (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', margin: '0 16px 8px' }}>
-      <span data-statut-actuel={regime} style={{ fontSize: 13, color: C.muted }}>Statut : <b style={{ color: C.text }}>{libelleRegime(regime)}</b></span>
-      <button type="button" className="vrm-lien-action" data-statut-changer="" onClick={() => setChanger(true)} style={{ border: 'none', background: 'transparent', color: C.accent, fontWeight: 600, fontFamily: 'inherit', fontSize: 13, cursor: 'pointer', padding: 0 }}>Changer</button>
-    </div>
+    </Card>
   );
+  if (partie === 'statut') {
+    if (!regime) return null;                      // la question est posée en haut (question 2)
+    if (changer) return carteChoix;
+    return (
+      <div className="vrm-set-groupe vrm-compta-groupe" style={{ margin: 0 }}>
+        <h3 className="vrm-titre-compta" data-titre-section="" style={{ fontSize: 15, fontWeight: 600, color: C.text, letterSpacing: -0.15, margin: '0 16px 8px' }}>Ton statut</h3>
+        <div className="vrm-set-liste" style={{ background: C.card, border: `1px solid ${C.border}`, '--vrm-set-filet': C.border }}>
+          <div className="vrm-set-ligne">
+            <span className="vrm-set-lib" data-statut-actuel={regime}><b style={{ color: C.text }}>{libelleRegime(regime)}</b><small style={{ color: C.muted }}>VRM adapte ta comptabilité à ce statut.</small></span>
+            <button type="button" className="vrm-lien-action" data-statut-changer="" onClick={() => setChanger(true)} style={{ border: 'none', background: 'transparent', color: C.accent, fontWeight: 600, fontFamily: 'inherit', fontSize: 14, cursor: 'pointer', padding: '0 4px', minHeight: 44 }}>Changer</button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+  if (partie === 'suivi') {
+    if (regime !== 'micro') return null;
+    return (<>
+      <ComptaRepli id="compta-suivi" titre="Tes déclarations URSSAF" resume="Ce que tu as déclaré et payé, période par période">
+        <SuiviUrssaf onNav={onNav} sansTitre />
+      </ComptaRepli>
+      <MicroEntreprise taux={taux} poserTaux={(o) => poserTaux(o)} officiel={officiel} vlTaux={vl} acreTaux={acre} />
+    </>);
+  }
+  // partie === 'declarer'
+  if (!regime) return carteChoix;
   if (regime !== 'micro') {
     const texte = regime === 'particulier'
-      ? <>Tu vends tes propres affaires : rien à déclarer à l'URSSAF, et VRM n'estime aucune cotisation. Bon à savoir : chaque année, Vinted transmet aux impôts les vendeurs qui dépassent <b>30 ventes ou 2 000 €</b> (le détail, compte par compte, est dans Ventes → Outils → Registre annuel). Si tu achètes pour revendre, c'est une activité : choisis « Micro-entrepreneur » ou « Société ».</>
+      ? <>Tu vends tes propres affaires : rien à déclarer à l'URSSAF, et VRM n'estime aucune cotisation. Bon à savoir : chaque année, Vinted transmet aux impôts les vendeurs qui dépassent <b>30 ventes ou 2 000 €</b> (le détail, compte par compte, est dans Ventes → Outils → Registre annuel). Si tu achètes pour revendre, c'est une activité : choisis « Micro-entrepreneur » ou « Société » (Documents et réglages → Ton statut).</>
       : regime === 'marge'
         ? <>Régime de la marge : VRM calcule la TVA sur ta marge dans le rapport comptable (Ventes → Outils). Tes cotisations ne se calculent pas sur ton chiffre d'affaires : VRM ne les estime pas — ton comptable s'en charge.</>
-        : <>En société, tes impôts et tes cotisations ne se calculent pas sur ton chiffre d'affaires : VRM ne les estime pas et ne t'envoie aucun rappel URSSAF. Ton chiffre d'affaires et ton bénéfice restent ci-dessus, pour ton comptable.</>;
-    return places(entete,
-      <Card style={{ padding: 18 }}><div data-statut-carte={regime} style={{ fontSize: 13.5, color: C.text, lineHeight: 1.6 }}>{texte}</div></Card>,
-      null, null, null);
+        : <>En société, tes impôts et tes cotisations ne se calculent pas sur ton chiffre d'affaires : VRM ne les estime pas et ne t'envoie aucun rappel URSSAF. Ton chiffre d'affaires et ton bénéfice restent sur cet écran, pour ton comptable.</>;
+    return <div className="vrm-compta-carte"><div data-statut-carte={regime} style={{ fontSize: 14, color: C.text, lineHeight: 1.6 }}>{texte}</div></div>;
   }
-  // (29 oct.) Ce qui se FAIT ce mois d'abord (la déclaration, le suivi),
-  // puis le profil, le calendrier, les seuils et l'impôt — qui se lisent.
-  return places(entete, null,
-    <CarteUrssafMois liveStats={liveStats} onNav={onNav} />,
-    <SuiviUrssaf onNav={onNav} />,
-    <MicroEntreprise taux={taux} poserTaux={(o) => poserTaux(o)} officiel={officiel} vlTaux={vl} acreTaux={acre} />);
+  return <CarteUrssafMois liveStats={liveStats} onNav={onNav} />;
 }
+// ── LES REPLIS DE « LE DÉTAIL » (2 nov.) ─────────────────────────────────
+// Une rangée de 44 px : le titre, une ligne qui dit ce qu'il y a dedans (sans
+// chiffre : un nombre ne s'écrit qu'une fois sur l'écran), le chevron. Non
+// contrôlé : `ouvrirRepliCompta(id)` l'ouvre depuis un renvoi (« dater dans
+// « Vendu et reçu » »), sans qu'un état React le referme au rendu suivant.
+function ComptaRepli({ id, titre, resume, children, attrs }) {
+  const [ouvert, setOuvert] = React.useState(false);
+  return (
+    <details id={id} className="vrm-repli vrm-compta-repli" data-compta-repli={id} data-compta-repli-etat={ouvert ? 'ouvert' : 'ferme'} onToggle={(e) => setOuvert(e.currentTarget.open)} {...(attrs || {})}>
+      <summary>
+        <span className="vrm-compta-repli-tete">
+          <span className="vrm-compta-repli-titre">{titre}</span>
+          {resume ? <span className="vrm-compta-repli-resume">{resume}</span> : null}
+        </span>
+      </summary>
+      {/* Rendu même replié : les cartes gardent leur état et leurs lectures. */}
+      <div className="vrm-compta-repli-corps">{children}</div>
+    </details>
+  );
+}
+const ouvrirRepliCompta = (id) => {
+  try {
+    const d = document.getElementById(id);
+    if (!d) return;
+    if (!d.open) d.open = true;
+    requestAnimationFrame(() => { try { d.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch (_) {} });
+  } catch (_) {}
+};
 // ── TA MICRO-ENTREPRISE (29 octobre) ─────────────────────────────────────
 // Julien : « vois si la personne a choisi le versement libératoire », « si elle
 // paie tous les mois, elle déclare août mais paie en septembre », « une jauge
@@ -36078,7 +36120,7 @@ function MicroEntreprise({ taux, poserTaux, officiel, vlTaux, acreTaux }) {
     <div data-micro-entreprise="" className="vrm-micro-grille" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 440px), 1fr))', gap: 12, alignItems: 'stretch', marginTop: 8 }}>{calendrier}{seuils}{profil}{impots}</div>
   </details>);
 }
-function SuiviUrssaf({ onNav }) {
+function SuiviUrssaf({ onNav, sansTitre = false }) {
   const v = useLigneUrssaf();
   const [regLu, regPret] = useLigneSynchro('vrm_urssaf_declare', lireDeclarations);
   // Son rythme : synchronisé (§5.49) et suivi s'il le change ailleurs.
@@ -36091,9 +36133,10 @@ function SuiviUrssaf({ onNav }) {
   const nomMois = (ym) => MOIS_NOMS_FR[Number(String(ym).slice(5)) - 1];
   const ETAT = { declaree: 'Notée déclarée', a_declarer: 'À déclarer', en_retard: 'Pas notée', en_cours: 'En cours' };
   const ambre = C.warn || C.amber || '#B7791F';
-  const titre = <div style={{ fontSize: 15, fontWeight: 700, color: C.text }}>Suivi de tes déclarations URSSAF</div>;
-  if (suivi === undefined) return <Card style={{ padding: '14px 16px', marginTop: 12 }}><div data-suivi-urssaf="charge">{titre}<div style={{ fontSize: 13, color: C.muted, marginTop: 6 }}>Lecture de tes déclarations…</div></div></Card>;
-  if (suivi === null) return <Card style={{ padding: '14px 16px', marginTop: 12 }}><div data-suivi-urssaf="passu">{titre}<div style={{ fontSize: 13, color: C.muted, marginTop: 6 }}>Je n'ai pas pu lire tes déclarations notées — rien n'est perdu, rouvre cet écran.</div></div></Card>;
+  // (2 nov.) Dans « Le détail », le repli porte déjà le titre : pas de redite.
+  const titre = sansTitre ? null : <div style={{ fontSize: 15, fontWeight: 700, color: C.text }}>Suivi de tes déclarations URSSAF</div>;
+  if (suivi === undefined) return <Card style={{ padding: '14px 16px', marginTop: sansTitre ? 0 : 12 }}><div data-suivi-urssaf="charge">{titre}<div style={{ fontSize: 13, color: C.muted, marginTop: 6 }}>Lecture de tes déclarations…</div></div></Card>;
+  if (suivi === null) return <Card style={{ padding: '14px 16px', marginTop: sansTitre ? 0 : 12 }}><div data-suivi-urssaf="passu">{titre}<div style={{ fontSize: 13, color: C.muted, marginTop: 6 }}>Je n'ai pas pu lire tes déclarations notées — rien n'est perdu, rouvre cet écran.</div></div></Card>;
   const lignes = ouvert ? suivi.lignes : suivi.lignes.slice(0, 4);
   const a = suivi.annee;
   const exporter = () => telechargerFichier(new Blob(['﻿' + suiviUrssafCsv(suivi)], { type: 'text/csv;charset=utf-8' }), `vrm-suivi-urssaf-${new Date().toISOString().slice(0, 10)}.csv`, 'text/csv;charset=utf-8');
@@ -36107,7 +36150,7 @@ function SuiviUrssaf({ onNav }) {
   const champ = { border: `1px solid ${C.border}`, borderRadius: 8, padding: '8px 10px', fontSize: 16, background: C.bg, color: C.text, width: '100%', maxWidth: 200, minHeight: 44, boxSizing: 'border-box', fontFamily: 'inherit' };
   const btn = { fontSize: 13, fontWeight: 600, color: C.text, background: 'transparent', border: `1px solid ${C.border}`, borderRadius: 10, padding: '8px 14px', minHeight: 44, cursor: 'pointer', fontFamily: 'inherit' };
   return (
-    <Card style={{ padding: '14px 16px', marginTop: 12 }}>
+    <Card style={{ padding: '14px 16px', marginTop: sansTitre ? 0 : 12 }}>
       <div data-suivi-urssaf="lu" data-suivi-retard={String(suivi.enRetard)} data-suivi-regul={String(suivi.aRegulariser)}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
           {titre}
@@ -36238,7 +36281,6 @@ function CarteUrssafMois({ liveStats, onNav }) {
   const sCarte = {padding:18,background:C.card,border:`1px solid ${C.border}`,borderRadius:12,boxShadow:C.shadow};
   return (
     <section data-compta-urssaf="" style={{display:'flex',flexDirection:'column',gap:8}}>
-      <h3 className="vrm-titre-compta" data-titre-section="" style={{fontSize:15,fontWeight:600,color:C.text,letterSpacing:-0.15,margin:'8px 2px 0'}}>Ta déclaration URSSAF</h3>
       {/* ── LE MOIS EN COURS, EN UNE SEULE CARTE ────────────────────────────
           ⚠️ Il y en avait DEUX à la suite, toutes deux titrées du même mois
           (« Mois en cours — septembre », puis « À payer pour septembre »), et
@@ -36283,80 +36325,16 @@ function CarteUrssafMois({ liveStats, onNav }) {
           // ici, des mêmes lignes que le total — le chiffre est un minimum (§5).
           if (ncInfo && ncInfo.n > 0) morceaux.push(<Puce key="nc" warn><span data-urssaf-non-comptees={ncInfo.n}>{phraseNonCompteesPar(ncInfo.par)} : dans aucun chiffre — ce total est un minimum</span>{ncInfo.par && Object.keys(ncInfo.par).some(k => k.startsWith('Vestiaire|')) ? <>. VRM ne sait pas encore si le chiffre que Vestiaire écrit est le prix ou ce qu'il te verse : vérifie ces ventes sur Vestiaire avant de déclarer</> : null}</Puce>);
           if (adV && adV.n > 0) morceaux.push(<Puce key="av">{adV.n} vente{adV.n>1?'s':''} Vinted finalisée{adV.n>1?'s':''} sans date de versement (<Mt v={adV.ca}/>) : dans aucun mois pour l'instant{extSait('versement')==='retard' && <span style={{color:C.warn}}> — mets l'extension à jour ({EXT_CAPACITES.versement}) : c'est elle qui va chercher ces dates</span>}</Puce>);
-          if (adL && adL.n > 0) morceaux.push(<Puce key="a">{adL.n} vente{adL.n>1?'s':''} Leboncoin sans date (<Mt v={adL.ca}/>) : dans aucun mois tant que {adL.n>1?'leur date n\'est pas captée':'sa date n\'est pas captée'} — tu peux {adL.n>1?'les':'la'} dater dans <span data-renvoi-carte-ca="">« {TITRE_CARTE_CA} »</span> (en haut){extSait('lbcdate')==='retard' && <span style={{color:C.warn}}> — mets d'abord l'extension à jour ({EXT_CAPACITES.lbcdate})</span>}</Puce>);
+          if (adL && adL.n > 0) morceaux.push(<Puce key="a">{adL.n} vente{adL.n>1?'s':''} Leboncoin sans date (<Mt v={adL.ca}/>) : dans aucun mois tant que {adL.n>1?'leur date n\'est pas captée':'sa date n\'est pas captée'} — tu peux {adL.n>1?'les':'la'} dater dans <button type="button" className="vrm-lien-action" data-renvoi-carte-ca="" onClick={() => ouvrirRepliCompta('compta-ca')} style={{background:'none',border:0,padding:0,color:C.accent,fontWeight:600,cursor:'pointer',fontSize:'inherit',fontFamily:'inherit',minHeight:0}}>« {TITRE_CARTE_CA} »</button> (dans « Le détail »){extSait('lbcdate')==='retard' && <span style={{color:C.warn}}> — mets d'abord l'extension à jour ({EXT_CAPACITES.lbcdate})</span>}</Puce>);
           // (29 oct.) « Vestiaire Co : pas encore relié » retiré : affiché à tous, même sans compte Vestiaire, il n'apprenait rien.
         }
-        const Chiffre = ({ lib, val, fort, couleur, sous, sousStyle }) => (
-          <div style={{minWidth:0}}>
-            <div style={sLib}>{lib}</div>
-            <div className="vrm-display" style={{...sHero,fontSize:fort?28:20,letterSpacing:fort?-0.8:-0.5,marginTop:5,color:couleur||C.text}}>{val}</div>
-            {sous && <div style={{...sNote,fontSize:11,marginTop:3,...(sousStyle||{})}}>{sous}</div>}
-          </div>
-        );
         return (
-      <div data-stats-carte="mois" style={{...sCarte,padding:'20px 20px 16px'}}>
-        <div style={{display:'flex',alignItems:'baseline',justifyContent:'space-between',gap:'4px 12px',flexWrap:'wrap'}}>
-          <div style={{...sTitre,fontSize:15,textTransform:'capitalize'}}>{moisCourant.nom}</div>
-          <div style={{...sNote,fontSize:13}}>Ce que tu déclares à l'URSSAF</div>
-        </div>
-        <div className="vrm-mois-grille" style={{display:'grid',gridTemplateColumns:'repeat(2,minmax(0,1fr))',gap:'18px 16px',marginTop:16}}>
-          <Chiffre fort lib={`À payer (${String(tauxUrssaf()).replace('.',',')} %)`} val={urssafEstime==null?'—':fmt(urssafEstime)} couleur={urssafEstime==null?C.muted:C.text}/>
-          <Chiffre fort lib="Net après paiement" val={netApresUrssaf==null?'—':fmt(netApresUrssaf)} couleur={netApresUrssaf==null?C.muted:C.text}/>
-          {/* LA COUVERTURE À CÔTÉ, jamais à la place : une vente de ce mois
-              n'est pas encore finalisée, elle n'entre donc pas dans ce qu'il
-              doit déclarer — mais elle existe, et il l'a vue sur Ventes. */}
-          {/* ⚠️ (revue des chiffres, 17 octobre) « sur N vendues ce mois-ci »
-              présentait les finalisées comme une PARTIE des vendues. Depuis le
-              3 octobre elles sont comptées au mois du VERSEMENT : une vente
-              faite le mois dernier et versée ce mois-ci est dedans, sans être
-              « vendue ce mois-ci » (banc chiffres-croises : « 3 sur 4 » quand
-              2 seulement des 4 en font partie). Deux notions côte à côte, chacune
-              son mot — jamais « sur ». */}
-          <Chiffre lib="Ventes finalisées" val={moisCourantN!=null?moisCourantN:'—'} couleur={moisCourantN!=null?C.text:C.muted}
-            sous={moisCourantN!=null && liveStats && liveStats.ventesMois!=null && liveStats.ventesMois!==moisCourantN ? <span data-mois-vendues={liveStats.ventesMois}>argent versé ce mois · {liveStats.ventesMois} vente{liveStats.ventesMois>1?'s':''} faite{liveStats.ventesMois>1?'s':''} ce mois-ci</span> : null}/>
-          {/* (29 oct.) La tuile « Bénéfice — · saisis tes prix d'achat » est retirée :
-              le bénéfice (brut et net, avec sa porte vers la saisie des prix
-              d'achat) est la carte juste au-dessus dans Comptabilité — deux
-              « bénéfice » sur un écran, l'un chiffré, l'autre en tiret (§11). */}
-        </div>
-        {/* ⚠️⚠️ CETTE PHRASE CITAIT `moisCourant.ca` — L'ANCIENNE ARCHIVE, VIDE
-            DEPUIS JUILLET 2026, donc « (0,00 €) ». Les CHIFFRES avaient été
-            rebranchés sur la ligne publiée, la phrase qui les explique était
-            restée en arrière (§5). Elle cite le MÊME montant que celui qui
-            produit « à payer », et reste visible (le banc urssaf.cjs la lit).
-            ⚠️ (revue du 6 octobre) une vente versée ce mois-ci mais déjà
-            déclarée ailleurs est EXCLUE : la phrase le dit, des MÊMES champs de
-            la MÊME ligne publiée (`nAilleurs`, `caAilleurs`, `ailleurs`) — et
-            dit aussi quand le registre n'était pas encore lu (`declare`). */}
-        <div style={{...sNote,fontSize:13,marginTop:10,paddingTop:14,borderTop:`1px solid ${C.border}`,lineHeight:1.55}}>
-          {moisCourantCA==null
-            ? <>— pas encore calculé</>
-            : <span data-urssaf-declare={decl}>Calculé sur le CA des ventes finalisées en {moisCourant.nom}, toutes plateformes{ncInfo && ncInfo.n > 0 ? ' (au moins : voir ci-dessous)' : ''} (<b style={{color:C.text,fontWeight:600}}><Mt v={moisCourantCA}/></b>)
-                {nA > 0 && <span data-urssaf-ailleurs={Math.round(caA*100)} data-urssaf-ailleurs-n={nA}>, hors {nA} vente{nA>1?'s':''} (<Mt v={caA}/>) déjà dans ta déclaration{ou ? <> de {ou}</> : null}</span>}
-                .
-                {decl === 'pasSu' && <span style={{color:C.warn}}> Tes déclarations passées (« J'ai déclaré ce mois ») n'étaient pas encore chargées quand ce chiffre a été calculé : une vente déjà déclarée peut encore y être comptée — ouvre l'écran <b>Ventes</b> pour le mettre à jour.</span>}
-              </span>}
-        </div>
-        {morceaux.length > 0 && <div data-urssaf-couverture style={{...sNote,marginTop:8,display:'flex',flexDirection:'column',gap:4}}>{morceaux}</div>}
-        {/* ⚠️ HONNÊTETÉ (§5.57) : l'URSSAF veut le CA ENCAISSÉ, et l'app dit
-            comment elle date chaque vente — replié, pas retiré. */}
-        <details className="vrm-stats-calcul" style={{marginTop:10}}>
-          <summary style={{cursor:'pointer',fontSize:13,fontWeight:500,color:C.muted,padding:'6px 0'}}>Comment c'est calculé</summary>
-          <div style={{...sNote,display:'flex',flexDirection:'column',gap:8,padding:'4px 0 6px'}}>
-            {moisCourantCA!=null && <div>On additionne les ventes <b>finalisées</b> (argent versé) en {moisCourant.nom}, <b>toutes plateformes</b>, ventes masquées comprises{nA > 0 && <> — {nA>1?'les ventes versées':'la vente versée'} ce mois-ci mais déjà dans ta déclaration{ou ? <> de {ou}</> : null} {nA>1?'ne sont pas recomptées':'n\'est pas recomptée'} ici</>}. C'est la somme à verser à la fin du mois (versement libératoire).</div>}
-            {moisCourantCA!=null && adV && adV.n > 0 && extSait('versement')!=='retard' && <div>Ventes Vinted sans date de versement : {extSait('versement')==='ok' ? <>l'extension va chercher leur date à tes prochaines visites sur Vinted (compte par compte)</> : <>c'est l'extension, sur ton ordinateur, qui va chercher ces dates</>}.</div>}
-            {moisCourantCA!=null && adL && adL.n > 0 && <div>Ventes Leboncoin sans date : {extSait('lbcdate')==='ok' ? <>ouvre « Mes transactions » sur leboncoin.fr, l'extension la relève au passage</> : extSait('lbcdate')==='retard' ? <>une fois l'extension à jour, ouvre « Mes transactions » sur leboncoin.fr</> : <>depuis l'ordinateur où l'extension est installée, ouvre « Mes transactions » sur leboncoin.fr</>}.</div>}
-            {moisCourantCA!=null && (e.par||{}).Leboncoin && <div>Leboncoin : daté au jour de la vente (sa date de versement n'est pas encore captée).</div>}
-            {/* (2 nov., audit P7) eBay ne transmet pas la date de son versement : le dire. */}
-            {moisCourantCA!=null && (e.par||{}).eBay && <div data-ca-ebay-date="">eBay : daté au jour de la commande (eBay ne transmet pas la date de son versement).</div>}
-            <div>Ces ventes sont datées au jour où la plateforme t'a <b>versé l'argent</b> (la commande finalisée par l'acheteur), pas au jour de la vente. Vérifie ton taux et ton chiffre sur autoentrepreneur.urssaf.fr — je ne suis pas comptable.</div>
-          </div>
-        </details>
+      <div data-stats-carte="mois" className="vrm-compta-carte">
         {/* Prochaine échéance de DÉCLARATION (rappel) — un encart neutre ; la
             couleur ne vient QUE si l'échéance presse (≤ 14 j) ou est passée. */}
-        <div style={{marginTop:12,paddingTop:14,borderTop:`1px solid ${C.border}`}}>
+        <div data-compta-echeance="">
           <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:10,flexWrap:'wrap'}}>
-            <span style={{...sTitre,fontSize:13,flex:1}}>Prochaine déclaration</span>
+            <span className="vrm-compta-libelle" style={{flex:1,margin:0}}>Prochaine déclaration</span>
             <span data-urssaf-rythme={urssafFreq} style={{fontSize:12.5,color:C.muted}}>{urssafFreq==='mensuel'?'chaque mois':'chaque trimestre'}</span>
           </div>
           {urssafDue ? (()=>{
@@ -36392,7 +36370,7 @@ function CarteUrssafMois({ liveStats, onNav }) {
                       <span style={{fontSize:15,fontWeight:700,color:C.text,letterSpacing:-0.2,whiteSpace:'nowrap'}}>{suivante.dueDate.toLocaleDateString('fr-FR',{day:'numeric',month:'long',year:'numeric'})}</span>
                       <span data-echeance-suivante-jours={suivante.daysLeft} style={{fontSize:13,fontWeight:600,whiteSpace:'nowrap'}}>dans {suivante.daysLeft} j</span>
                     </div>
-                    <div style={{marginTop:4}}>Pour <b style={{color:C.text,fontWeight:600}}>{suivante.label}</b>{_startOfDay(new Date()) <= _startOfDay(suivante.periodEnd) ? (urssafFreq==='mensuel' ? <> — en cours : son montant est celui du mois, juste au-dessus</> : <> — en cours</>) : null}.</div>
+                    <div style={{marginTop:4}}>Pour <b style={{color:C.text,fontWeight:600}}>{suivante.label}</b>{_startOfDay(new Date()) <= _startOfDay(suivante.periodEnd) ? (urssafFreq==='mensuel' ? <>, le mois en cours : ce qu'il faut mettre de côté est juste en dessous</> : <>, la période en cours</>) : null}.</div>
                   </>) : null}
                   <div style={{marginTop:suivante?6:0}}><span style={{textTransform:'capitalize'}}>{urssafDue.label}</span> : déclaration notée ✓</div>
                 </div>
@@ -36410,7 +36388,7 @@ function CarteUrssafMois({ liveStats, onNav }) {
                       VERSEMENT : c'est le « Reçu (versé) » du tableau juste au-dessus,
                       pas son « Finalisé ». Le libellé « CA finalisé » le contredisait
                       sur le même écran (septembre : 0,00 € ici, 4 224,77 € là). */}
-                  <span>Reçu (versé)</span><span data-echeance-ca={urssafPeriodCA==null?'':String(urssafPeriodCA)} data-echeance-de={urssafDue.periodStart.toISOString()} data-echeance-a={urssafDue.periodEnd.toISOString()} data-echeance-partiel={echeancePartiel||undefined} style={{color:urssafPeriodCA==null?C.muted:C.text,fontWeight:500,textAlign:'right'}}>{urssafPeriodCA==null?'—':<>{echeancePartiel>0?'au moins ':''}<Mt v={urssafPeriodCA}/></>}</span>
+                  <span>À déclarer (argent reçu)</span><span data-echeance-ca={urssafPeriodCA==null?'':String(urssafPeriodCA)} data-echeance-de={urssafDue.periodStart.toISOString()} data-echeance-a={urssafDue.periodEnd.toISOString()} data-echeance-partiel={echeancePartiel||undefined} style={{color:urssafPeriodCA==null?C.muted:C.text,fontWeight:500,textAlign:'right'}}>{urssafPeriodCA==null?'—':<>{echeancePartiel>0?'au moins ':''}<Mt v={urssafPeriodCA}/></>}</span>
                   <span>À payer ≈</span><span data-echeance-apayer={urssafPeriodCA==null?'':String(aPayerUrssaf(urssafPeriodCA, TAUX_URSSAF*100))} style={{color:urssafPeriodCA==null?C.muted:C.text,fontWeight:700,textAlign:'right'}}>{urssafPeriodCA==null?'—':<>{echeancePartiel>0?'au moins ':''}<Mt v={aPayerUrssaf(urssafPeriodCA, TAUX_URSSAF*100)}/></>}</span>
                 </div>
                 {(
@@ -36428,6 +36406,38 @@ function CarteUrssafMois({ liveStats, onNav }) {
               </div>
             );
           })() : <div style={{fontSize:13,color:C.muted}}>Aucune échéance à venir.</div>}
+        </div>
+        <div data-compta-mois="" style={{marginTop:16,paddingTop:16,borderTop:`1px solid ${C.border}`}}>
+          <div className="vrm-compta-libelle">À payer ({String(tauxUrssaf()).replace('.',',')} %) · <span style={{textTransform:'none'}}>{moisCourant.nom}, en cours</span></div>
+          <div className="vrm-compta-hero vrm-compta-hero-2 vrm-display" data-compta-chiffre="urssaf-mois" data-eur={urssafEstime==null?'':String(urssafEstime)} style={{color:urssafEstime==null?C.muted:C.text}}>{urssafEstime==null?'—':fmt(urssafEstime)}</div>
+          {/* (2 nov.) La phrase vient de la MÊME ligne publiée que le chiffre :
+              le CA reçu du mois (`moisCourantCA`) et son nombre de ventes. « Net
+              après paiement » et la tuile « Ventes finalisées » sont retirés :
+              le premier redisait le bénéfice autrement, le second se lit ici. */}
+          <p className="vrm-compta-phrase" data-compta-phrase="urssaf-mois">
+            {moisCourantCA==null
+              ? <>— pas encore calculé</>
+              : <span data-urssaf-declare={decl} data-urssaf-mois-n={moisCourantN}>À mettre de côté : {String(tauxUrssaf()).replace('.',',')} % de l'argent reçu en {moisCourant.nom}, toutes plateformes{ncInfo && ncInfo.n > 0 ? ' (au moins : voir ci-dessous)' : ''} (<b style={{color:C.text,fontWeight:600}}><Mt v={moisCourantCA}/></b>{moisCourantN>0 ? <>, {moisCourantN} vente{moisCourantN>1?'s':''}</> : null})
+                {nA > 0 && <span data-urssaf-ailleurs={Math.round(caA*100)} data-urssaf-ailleurs-n={nA}>, hors {nA} vente{nA>1?'s':''} (<Mt v={caA}/>) déjà dans ta déclaration{ou ? <> de {ou}</> : null}</span>}
+                .
+                {decl === 'pasSu' && <span style={{color:C.warn}}> Tes déclarations passées (« J'ai déclaré ce mois ») n'étaient pas encore chargées quand ce chiffre a été calculé : une vente déjà déclarée peut encore y être comptée — ouvre l'écran <b>Ventes</b> pour le mettre à jour.</span>}
+              </span>}
+          </p>
+        {morceaux.length > 0 && <div data-urssaf-couverture style={{...sNote,marginTop:8,display:'flex',flexDirection:'column',gap:4}}>{morceaux}</div>}
+        {/* ⚠️ HONNÊTETÉ (§5.57) : l'URSSAF veut le CA ENCAISSÉ, et l'app dit
+            comment elle date chaque vente — replié, pas retiré. */}
+        <details className="vrm-stats-calcul" style={{marginTop:10}}>
+          <summary style={{cursor:'pointer',fontSize:13,fontWeight:500,color:C.muted,padding:'6px 0'}}>Comment c'est calculé</summary>
+          <div style={{...sNote,display:'flex',flexDirection:'column',gap:8,padding:'4px 0 6px'}}>
+            {moisCourantCA!=null && <div>On additionne les ventes <b>finalisées</b> (argent versé) en {moisCourant.nom}, <b>toutes plateformes</b>, ventes masquées comprises{nA > 0 && <> — {nA>1?'les ventes versées':'la vente versée'} ce mois-ci mais déjà dans ta déclaration{ou ? <> de {ou}</> : null} {nA>1?'ne sont pas recomptées':'n\'est pas recomptée'} ici</>}. C'est la somme à verser à la fin du mois (versement libératoire).</div>}
+            {moisCourantCA!=null && adV && adV.n > 0 && extSait('versement')!=='retard' && <div>Ventes Vinted sans date de versement : {extSait('versement')==='ok' ? <>l'extension va chercher leur date à tes prochaines visites sur Vinted (compte par compte)</> : <>c'est l'extension, sur ton ordinateur, qui va chercher ces dates</>}.</div>}
+            {moisCourantCA!=null && adL && adL.n > 0 && <div>Ventes Leboncoin sans date : {extSait('lbcdate')==='ok' ? <>ouvre « Mes transactions » sur leboncoin.fr, l'extension la relève au passage</> : extSait('lbcdate')==='retard' ? <>une fois l'extension à jour, ouvre « Mes transactions » sur leboncoin.fr</> : <>depuis l'ordinateur où l'extension est installée, ouvre « Mes transactions » sur leboncoin.fr</>}.</div>}
+            {moisCourantCA!=null && (e.par||{}).Leboncoin && <div>Leboncoin : daté au jour de la vente (sa date de versement n'est pas encore captée).</div>}
+            {/* (2 nov., audit P7) eBay ne transmet pas la date de son versement : le dire. */}
+            {moisCourantCA!=null && (e.par||{}).eBay && <div data-ca-ebay-date="">eBay : daté au jour de la commande (eBay ne transmet pas la date de son versement).</div>}
+            <div>Ces ventes sont datées au jour où la plateforme t'a <b>versé l'argent</b> (la commande finalisée par l'acheteur), pas au jour de la vente. Vérifie ton taux et ton chiffre sur autoentrepreneur.urssaf.fr — VRM ne remplace pas un comptable.</div>
+          </div>
+        </details>
         </div>
       </div>
         );
@@ -37470,9 +37480,25 @@ function BeneficeCompta({ compta, onNav, onSansDepenses, onAjouterDepense, sansC
       <span className="vrm-display" style={{ fontSize: fort ? 20 : 15, fontWeight: fort ? 700 : 600, color: val == null ? C.muted : C.text, whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{val == null ? '—' : fmt(val)}</span>
     </div>
   );
-  const lienSaisie = <button type="button" onClick={versSaisiePrix} data-benef-porte="" style={{ background: 'none', border: 0, padding: 0, color: C.accent, fontWeight: 600, cursor: 'pointer', fontSize: 'inherit', fontFamily: 'inherit' }}>Compléter les prix d'achat</button>;
+  const lienSaisie = <button type="button" onClick={versSaisiePrix} data-benef-porte="" className="vrm-lien-action" style={{ background: 'none', border: 0, padding: 0, color: C.accent, fontWeight: 600, cursor: 'pointer', fontSize: 'inherit', fontFamily: 'inherit' }}>Compléter les prix d'achat</button>;
+  // (2 nov., « surtout comptabilité ») LA PREMIÈRE QUESTION : « Combien j'ai
+  // gagné ? ». Un chiffre (le net de `beneficePeriode`, inchangé), une phrase
+  // venue du MÊME calcul (sa raison, sa couverture), le geste qui le complète ;
+  // les lignes du calcul (brut, frais, charges, cotisations) se replient sous
+  // « Le détail du calcul » — elles redisaient sur l'écran le « à payer »
+  // URSSAF et les dépenses du mois (§7 : un nombre, une fois).
+  const titreNet = B && B.depenses === 'jamais' ? 'Net avant tes dépenses' : 'Ton bénéfice';
+  const phrase = !B ? null
+    : B.raison === 'achats' ? <>Il manque le prix d'achat de {sansAchat} vente{sansAchat > 1 ? 's' : ''} sur {B.n} : sans lui, VRM ne peut pas calculer ce que tu as gagné.</>
+    : B.raison === 'frais' ? <>Des frais eBay ne sont pas encore connus : sans eux, VRM ne peut pas calculer ce que tu as gagné.</>
+    : B.raison === 'cotisations' ? <>En attente de ton chiffre d'affaires déclaré : ouvre l'écran Ventes une fois.</>
+    : B.n === 0 ? <>Aucune vente finalisée sur la période{B.depenses === 'jamais' ? '' : ' : seules tes dépenses comptent'}.</>
+    : <>Ce qu'il te reste{B.depenses === 'jamais' ? ' avant tes dépenses' : ''} : tes ventes finalisées, moins le prix d'achat des paires{B.fraisCouverts > 0 ? ', les frais de vente' : ''}{B.depenses === 'jamais' ? '' : ', tes dépenses'}{B.sansCotis ? '' : " et l'URSSAF"}.</>;
+  const couverture = !B || B.n === 0 ? null
+    : B.nCout === B.n ? <>Prix d'achat {B.n === 1 ? 'connu pour 1 vente' : `connus pour les ${B.n} ventes`}.</>
+    : <span data-benef-manque="" style={{ color: C.warn }}>Prix d'achat {B.nCout > 1 ? 'connus' : 'connu'} pour {B.nCout} vente{B.nCout > 1 ? 's' : ''} sur {B.n}.</span>;
   return (
-    <section className="vrm-set-groupe vrm-compta-groupe" style={{ margin: 0 }}
+    <section className="vrm-compta-q" data-compta-q="gagne" style={{ margin: 0 }}
       data-benef-etat={etat} data-benef-periode={periode}
       data-benef-n={B ? String(B.n) : ''} data-benef-ncout={B ? String(B.nCout) : ''}
       data-benef-brut={B && B.nCout > 0 ? e2(B.brut) : ''} data-benef-ventes-net={B && B.nCout > 0 ? e2(B.net) : ''}
@@ -37480,50 +37506,50 @@ function BeneficeCompta({ compta, onNav, onSansDepenses, onAjouterDepense, sansC
       data-benef-net={B ? e2(B.netFinal) : ''} data-benef-raison={B ? B.raison : ''}
       data-benef-couverture={B ? couvertureBenefice(B) : ''} data-benef-plateformes={B ? (B.toutes ? 'toutes' : 'vinted') : ''}
       data-benef-depenses={B ? (nuagePret ? B.depenses : 'passu') : ''}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', margin: '0 16px 8px' }}>
-        <h3 className="vrm-titre-compta" data-titre-section="" style={{ fontSize:15,fontWeight:600,color:C.text,letterSpacing:-0.15, margin: 0, flex: '1 1 auto' }}>Ton bénéfice{B ? ` · ${B.libelle}` : ''}</h3>
+      <div className="vrm-compta-q-tete">
+        <h2 className="vrm-compta-question" data-compta-question="gagne"><span className="vrm-compta-q-n" aria-hidden="true">1</span>Combien j'ai gagné ?</h2>
         {/* (30 oct.) Sans bénéfice publié, changer de période ne changeait rien : le choix attend. */}
-        {B && <Segmente label="Période du bénéfice" plein value={periode} onChange={choisir} style={{ margin: 0, flex: '0 1 300px' }}
+        {B && <Segmente label="Période du bénéfice" plein value={periode} onChange={choisir} className="vrm-compta-periode"
           options={PERIODES_BENEF.map(([k, l]) => ({ v: k, l, data: { 'data-benef-choix': k } }))} />}
       </div>
-      <div className="vrm-set-liste" style={{ background: C.card, border: `1px solid ${C.border}`, '--vrm-set-filet': C.border }}>
+      <div className="vrm-compta-carte">
         {!B ? (
-          <div className="vrm-set-ligne"><span className="vrm-set-lib"><small style={{ color: C.muted, marginTop: 0, lineHeight: 1.5 }}>
+          <p className="vrm-compta-phrase" data-compta-phrase="gagne" style={{ margin: 0 }}>
             {etat === 'encours' ? 'Je lis ton bénéfice…' : sansCompte ? <span data-benefice-sans-compte="">Ton bénéfice arrivera ici dès qu’un compte Vinted sera relié (le bandeau du haut dit comment).</span> : <>Ton bénéfice se calcule dans l'écran Ventes, à partir de tes prix d'achat : ouvre-le une fois{onNav ? <> (<a href="?tab=cat_ventes" onClick={(ev) => { ev.preventDefault(); onNav('cat_ventes'); }} style={{ color: C.accent, fontWeight: 600, textDecoration: 'none' }}>Ventes</a>)</> : null}, il arrivera ici.</>}
-          </small></span></div>
+          </p>
         ) : (<>
-          <Ligne lib="Bénéfice brut" val={B.nCout > 0 ? B.brut : (B.n === 0 ? 0 : null)}
-            sous={B.n === 0 ? (B.toutes ? 'aucune vente finalisée sur la période' : 'aucune vente Vinted finalisée sur la période')
-              : B.nCout === B.n ? (B.n === 1 ? "CA − prix d'achat · prix d'achat connu pour 1 vente" : `CA − prix d'achat · prix d'achat connus pour les ${B.n} ventes`)
-              : <>CA − prix d'achat · prix d'achat connus pour {B.nCout} vente{B.nCout > 1 ? 's' : ''} sur {B.n} — {lienSaisie}</>}
-            data={{ 'data-benef-ligne': 'brut' }} />
-          {B.nCout > 0 && (B.fraisCouverts > 0 || B.fraisInconnus > 0) && <Ligne lib="− boosts et frais de vente" val={B.fraisInconnus > 0 ? null : B.fraisCouverts} sous={B.fraisInconnus > 0 ? `frais eBay pas connus pour ${B.fraisInconnus} vente${B.fraisInconnus > 1 ? 's' : ''}` : 'des mêmes ventes'} data={{ 'data-benef-ligne': 'frais' }} />}
-          <Ligne lib="− charges" val={B.depenses === 'jamais' ? null : B.charges}
-            sous={B.depenses === 'jamais' ? (nuagePret && onSansDepenses ? null : 'aucune dépense notée') : B.depenses === 'aucune' ? 'aucune — tu as indiqué ne pas avoir de dépenses à noter' : 'abonnements, dépenses, packs et coûts fixes de la période'}
-            data={{ 'data-benef-ligne': 'charges' }} />
-          {B.depenses === 'jamais' && nuagePret && onSansDepenses && (
-            <div className="vrm-set-ligne"><span className="vrm-set-lib" style={{ minWidth: 0 }}>
-              <ChoixDepenses onAucune={onSansDepenses} onAjouter={onAjouterDepense} />
-            </span></div>
-          )}
-          {B.sansCotis ? <div data-benef-ligne="cotis" data-benef-sans-cotis="" style={{ fontSize: 12, color: C.muted, lineHeight: 1.45, padding: '2px 0' }}>Aucune cotisation URSSAF déduite — {regimeFiscal() ? `statut : ${libelleRegime(regimeFiscal())}` : 'ton statut n\'est pas encore choisi (Comptabilité → Ton statut)'}.</div> :
-          <Ligne lib="− cotisations URSSAF" val={B.cotis}
-            sous={B.cotis == null ? 'ton CA déclaré se calcule dans l\'écran Ventes' : `${String(tauxUrssaf()).replace('.', ',')} % du CA ${B.toutes ? 'déclaré (Vinted, Leboncoin, eBay)' : 'Vinted'} versé sur la période (${fmt(B.caDecl)})`}
-            data={{ 'data-benef-ligne': 'cotis' }} />}
-          <Ligne lib={B.depenses === 'jamais' ? 'Net avant tes dépenses' : 'Bénéfice net'} fort val={B.netFinal}
-            sous={B.raison === 'achats' ? <>il manque le prix d'achat de {sansAchat} vente{sansAchat > 1 ? 's' : ''} : sans lui, le net ne se calcule pas{(B.n > 0 && B.nCout !== B.n) ? '' : <> — {lienSaisie}</>}</>
-              : B.raison === 'frais' ? 'des frais eBay ne sont pas connus : sans eux, le net ne se calcule pas'
-              : B.raison === 'cotisations' ? 'en attente de ton CA déclaré (écran Ventes)'
-              : B.depenses === 'jamais' ? 'brut − frais − cotisations'
-              : 'brut − frais − charges − cotisations'}
-            data={{ 'data-benef-ligne': 'net' }} />
-          {/* (29 oct., revue) Le « comment c'est calculé » se REPLIE : six lignes
-              affichées en permanence au-dessus de l'URSSAF, pour une explication
-              qui se lit une fois. La couverture reste visible sur la ligne
-              « Bénéfice brut » (« prix d'achat connus pour… », §5). */}
-          <details className="vrm-repli" data-benef-calcul="" style={{ margin: 0, padding: '0 16px' }}><summary>Comment c'est calculé</summary><div style={{ paddingBottom: 12 }}><small style={{ color: C.muted, marginTop: 0, lineHeight: 1.5, display: 'block' }}>
-            {B.toutes ? <>Ventes finalisées Vinted, Leboncoin et eBay, au jour de la vente — la même règle que l'écran Ventes.{couvertureBenefice(B) ? ` Prix d'achat connus : ${couvertureBenefice(B)}.` : ''} Une vente Leboncoin ou eBay se relie à sa paire par son SKU VRM, sa référence ou un lien posé, jamais par son titre.</> : <>Ventes Vinted finalisées, au jour de la vente — publiées par une version d'avant de l'écran Ventes : ouvre-le une fois pour y ajouter Leboncoin et eBay.</>} Les cotisations sont celles du CA versé sur la période.{pub.at ? ` Calculé avec tes ventes lues le ${new Date(pub.at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' })}.` : ''}
-          </small></div></details>
+          <div className="vrm-compta-libelle">{titreNet} · {B.libelle}</div>
+          <div className="vrm-compta-hero vrm-display" data-compta-chiffre="gagne" data-eur={e2(B.netFinal)} style={{ color: B.netFinal == null ? C.muted : C.text }}>{B.netFinal == null ? '—' : fmt(B.netFinal)}</div>
+          <p className="vrm-compta-phrase" data-compta-phrase="gagne">{phrase}{couverture ? <> {couverture}</> : null}</p>
+          {(B.raison === 'achats' || (B.nCout < B.n)) && <div className="vrm-compta-geste">{lienSaisie}</div>}
+          {B.depenses === 'jamais' && nuagePret && onSansDepenses ? (
+            <div className="vrm-compta-geste"><ChoixDepenses onAucune={onSansDepenses} onAjouter={onAjouterDepense} /></div>
+          ) : onAjouterDepense && nuagePret ? (
+            <div className="vrm-compta-geste"><button type="button" className="vrm-lien-action" data-benef-ajouter-depense="" onClick={onAjouterDepense} style={{ background: 'none', border: 0, padding: 0, color: C.accent, fontWeight: 600, cursor: 'pointer', fontSize: 'inherit', fontFamily: 'inherit' }}>Ajouter une dépense</button></div>
+          ) : null}
+          {/* Le calcul, ligne par ligne : replié (il se lit une fois). */}
+          <details className="vrm-repli vrm-compta-calcul" data-benef-calcul="">
+            <summary>Le détail du calcul</summary>
+            <div className="vrm-set-liste vrm-compta-lignes" style={{ '--vrm-set-filet': C.border }}>
+              <Ligne lib="Bénéfice sur tes ventes" val={B.nCout > 0 ? B.brut : (B.n === 0 ? 0 : null)}
+                sous={B.n === 0 ? (B.toutes ? 'aucune vente finalisée sur la période' : 'aucune vente Vinted finalisée sur la période')
+                  : B.nCout === B.n ? (B.n === 1 ? "prix de vente − prix d'achat · prix d'achat connu pour 1 vente" : `prix de vente − prix d'achat · prix d'achat connus pour les ${B.n} ventes`)
+                  : `prix de vente − prix d'achat · prix d'achat connus pour ${B.nCout} vente${B.nCout > 1 ? 's' : ''} sur ${B.n}`}
+                data={{ 'data-benef-ligne': 'brut' }} />
+              {B.nCout > 0 && (B.fraisCouverts > 0 || B.fraisInconnus > 0) && <Ligne lib="− boosts et frais de vente" val={B.fraisInconnus > 0 ? null : B.fraisCouverts} sous={B.fraisInconnus > 0 ? `frais eBay pas connus pour ${B.fraisInconnus} vente${B.fraisInconnus > 1 ? 's' : ''}` : 'des mêmes ventes'} data={{ 'data-benef-ligne': 'frais' }} />}
+              <Ligne lib="− tes dépenses" val={B.depenses === 'jamais' ? null : B.charges}
+                sous={B.depenses === 'jamais' ? 'aucune dépense notée' : B.depenses === 'aucune' ? 'aucune — tu as indiqué ne pas avoir de dépenses à noter' : 'abonnements, dépenses, packs et coûts fixes de la période'}
+                data={{ 'data-benef-ligne': 'charges' }} />
+              {B.sansCotis ? <div className="vrm-set-ligne" data-benef-ligne="cotis" data-benef-sans-cotis=""><span className="vrm-set-lib"><small style={{ color: C.muted, marginTop: 0 }}>Aucune cotisation URSSAF déduite — {regimeFiscal() ? `statut : ${libelleRegime(regimeFiscal())}` : 'ton statut n\'est pas encore choisi (Documents et réglages → Ton statut)'}.</small></span></div> :
+              <Ligne lib="− URSSAF" val={B.cotis}
+                sous={B.cotis == null ? 'ton chiffre d\'affaires déclaré se calcule dans l\'écran Ventes' : `${String(tauxUrssaf()).replace('.', ',')} % de l'argent reçu sur la période (${B.toutes ? 'Vinted, Leboncoin, eBay' : 'Vinted'})`}
+                data={{ 'data-benef-ligne': 'cotis' }} />}
+              <div className="vrm-set-ligne" data-benef-ligne="net"><span className="vrm-set-lib"><b style={{ color: C.text }}>= {titreNet.toLowerCase()}</b></span><span className="vrm-set-lib" style={{ flex: '0 0 auto', textAlign: 'right' }}><small style={{ color: C.muted, marginTop: 0 }}>le chiffre au-dessus</small></span></div>
+            </div>
+            <small style={{ color: C.muted, lineHeight: 1.5, display: 'block', padding: '10px 2px 4px' }}>
+              {B.toutes ? <>Ventes finalisées Vinted, Leboncoin et eBay, au jour de la vente — la même règle que l'écran Ventes.{couvertureBenefice(B) ? ` Prix d'achat connus : ${couvertureBenefice(B)}.` : ''} Une vente Leboncoin ou eBay se relie à sa paire par son SKU VRM, sa référence ou un lien posé, jamais par son titre.</> : <>Ventes Vinted finalisées, au jour de la vente — publiées par une version d'avant de l'écran Ventes : ouvre-le une fois pour y ajouter Leboncoin et eBay.</>} L'URSSAF déduite est celle de l'argent reçu sur la période.{pub.at ? ` Calculé avec tes ventes lues le ${new Date(pub.at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' })}.` : ''}
+            </small>
+          </details>
         </>)}
       </div>
     </section>
@@ -38132,10 +38158,6 @@ function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, pan
   // « Avancé » : replié à chaque ouverture de l'écran (jamais mémorisé). Le
   // sommaire l'ouvre avant d'y descendre.
   const [avance, setAvance] = React.useState(false);
-  const allerA = (id) => {
-    if (id === 'compta-avance') setAvance(true);
-    requestAnimationFrame(() => { const e = document.getElementById(id); if (e) e.scrollIntoView({ behavior: 'smooth', block: 'start' }); });
-  };
 
   const ajouterDepense = () => {
     const m = parseMontant(dMnt);
@@ -38227,7 +38249,7 @@ function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, pan
   const ligneComptaPub = useLigneUrssaf();
   return (
     <div className="vrm-finance-page" style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 16 }}>
-      <ScreenHead icon="euro" title="Comptabilité" desc="Ce que tu as vendu et reçu, ton bénéfice, ton URSSAF et tes dépenses." />
+      <ScreenHead icon="euro" title="Comptabilité" desc="Ce que tu as gagné, ce que tu dois déclarer à l'URSSAF, puis le détail." />
       {!ligneComptaPub && <div data-compta-pas-calcule="" style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', padding: '10px 14px', borderRadius: 12, background: 'var(--vrm-b-teinte)', fontSize: 13, color: C.text }}>
         {/* (2 nov.) Un compte neuf, sans compte Vinted : « ouvre Ventes » ne menait
             nulle part (Ventes n'a rien à publier). La cause vraie et son geste —
@@ -38240,65 +38262,67 @@ function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, pan
         <Bouton className="vrm-b-petit" onClick={() => onNav && onNav('cat_ventes')}>Ouvrir Ventes</Bouton>
         </>)}
       </div>}
-      {/* (29 octobre) Julien : « pour la compta, améliore tout, mets de côté la
-          facturation électronique et fais quelque chose de simple ». En haut, ce
-          qu'il regarde : vendu et reçu, bénéfice, URSSAF à payer et prochaine
-          échéance, dépenses. Le reste (résultat de l'année, récap mensuel, packs,
-          ton entreprise, factures, facturation électronique) est rangé dans
-          « Avancé », replié en bas. Rien n'est supprimé, aucune règle de calcul ne
-          change (§11) : les cartes sont les mêmes, seul leur ordre change. */}
-      <nav aria-label="Parties de la comptabilité" data-compta-sommaire="" className="vrm-rangee vrm-compta-sommaire" style={{ display: 'flex', gap: 8, margin: '-4px 0 0' }}>
-        {[['compta-ca', TITRE_CARTE_CA], ['compta-benefice', 'Bénéfice'], ['compta-urssaf', 'URSSAF'], ['compta-charges', 'Dépenses'], ['compta-avance', 'Avancé']].map(([id, l]) => (
-          <button key={id} type="button" data-compta-aller={id} onClick={() => allerA(id)}
-            style={{ flex: '0 0 auto', minHeight: 40, padding: '0 14px', borderRadius: 999, border: `1px solid ${C.border}`, background: C.card, color: C.text, fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' }}>{l}</button>
-        ))}
-      </nav>
-
-      <div id="compta-ca" style={{ scrollMarginTop: 72 }}>
-      <CaParPeriodeCarte lbcVentes={lbcVentes} lbcCoqueLu={lbcCoqueLu} ebayCommandes={ebayCommandes} panelOff={panelOff} accounts={accounts} />
-      </div>
-
+      {/* (2 nov.) Julien : « beaucoup d'incompréhension […] SURTOUT comptabilité. Je
+          veux que ce soit le plus simple possible ». L'écran répond à TROIS
+          questions, dans l'ordre : 1. Combien j'ai gagné ? (le bénéfice) ·
+          2. Combien je dois déclarer ? (l'URSSAF : la prochaine déclaration,
+          puis ce qu'il faut mettre de côté ce mois-ci) · 3. Le détail, replié
+          (vendu et reçu, dépenses, déclarations passées, micro-entreprise, puis
+          « Documents et réglages »). Le sommaire à pastilles est retiré (trois
+          questions se lisent d'un coup d'œil). Aucune règle de calcul ne change :
+          les cartes sont les mêmes, seuls leur ordre, leurs mots et leurs replis
+          changent (§5, §11). */}
       <div id="compta-benefice" style={{ scrollMarginTop: 72 }}>
       <BeneficeCompta compta={data} onNav={onNav} sansCompte={comptesLus && Array.isArray(accounts) && accounts.length === 0}
         onSansDepenses={() => repondreSansDepenses(data, maj)}
-        onAjouterDepense={() => { setOuvert('dep'); setVersDepense((n) => n + 1); }} />
+        onAjouterDepense={() => { ouvrirRepliCompta('compta-charges'); setOuvert('dep'); setVersDepense((n) => n + 1); }} />
       </div>
 
-      <div id="compta-urssaf" style={{ scrollMarginTop: 72 }}>
-      {/* (29 oct., revue) Les dépenses passent JUSTE APRÈS la carte URSSAF du
-          mois (`apresMois`) : « Ta micro-entreprise » s'ouvre d'elle-même tant
-          qu'une question n'est pas tranchée (règle de l'autre session, gardée),
-          et poussait les dépenses à ~4 écrans du haut au téléphone. */}
-      <StatutFiscal liveStats={liveStats} onNav={onNav} apresMois={
-      <div id="compta-charges" style={{ display: 'flex', flexDirection: 'column', gap: 16, scrollMarginTop: 72, margin: '16px 0' }}>
-        {/* Trois repères de charges — une liste groupée, comme Réglages : le
-            libellé à gauche, le montant à droite (les data-compta-kpi restent). */}
-        <section className="vrm-set-groupe vrm-compta-groupe" data-compta-depenses="" style={{ margin: 0 }}>
-          <h3 className="vrm-titre-compta" data-titre-section="" style={{ fontSize:15,fontWeight:600,color:C.text,letterSpacing:-0.15, margin: '0 2px 8px' }}>Tes dépenses</h3>
-          <div className="vrm-set-liste" style={{ background: C.card, border: `1px solid ${C.border}`, '--vrm-set-filet': C.border }}>
-            {[
-              { k: 'abo', l: 'Abonnements ce mois', v: chargesDuMois.abo, s: abonnements.length ? `${abonnements.length} abonnement${abonnements.length > 1 ? 's' : ''}` : 'aucun déclaré' },
-              { k: 'mois', l: 'Charges ce mois', v: chargesMois, s: 'abonnements + dépenses + packs' },
-              { k: 'annee', l: `Total charges ${annee}`, v: chargesAnnee, s: 'depuis janvier' },
-            ].map((x) => (
-              <div key={x.k} className="vrm-set-ligne" data-compta-kpi={x.k} data-eur={String(Math.round(x.v * 100) / 100)}>
-                <span className="vrm-set-lib"><b style={{ color: C.text }}>{x.l}</b><small style={{ color: C.muted }}>{x.s}</small></span>
-                <span className="vrm-display" style={{ fontSize: 15, fontWeight: 600, color: C.text, whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{fmt(x.v)}</span>
+      <section id="compta-urssaf" className="vrm-compta-q" data-compta-q="declarer" style={{ scrollMarginTop: 72 }}>
+        <div className="vrm-compta-q-tete">
+          <h2 className="vrm-compta-question" data-compta-question="declarer"><span className="vrm-compta-q-n" aria-hidden="true">2</span>Combien je dois déclarer ?</h2>
+        </div>
+        <StatutFiscal partie="declarer" liveStats={liveStats} onNav={onNav} />
+      </section>
+
+      <section id="compta-detail" className="vrm-compta-q" data-compta-q="detail" style={{ scrollMarginTop: 72 }}>
+        <div className="vrm-compta-q-tete">
+          <h2 className="vrm-compta-question" data-compta-question="detail"><span className="vrm-compta-q-n" aria-hidden="true">3</span>Le détail</h2>
+        </div>
+        <div className="vrm-compta-replis">
+          <ComptaRepli id="compta-ca" titre={TITRE_CARTE_CA} resume="Tes ventes par période : le jour de la vente, puis le jour où l'argent t'est versé">
+            <CaParPeriodeCarte dansRepli lbcVentes={lbcVentes} lbcCoqueLu={lbcCoqueLu} ebayCommandes={ebayCommandes} panelOff={panelOff} accounts={accounts} />
+          </ComptaRepli>
+
+          <ComptaRepli id="compta-charges" titre="Tes dépenses" resume={(depenses.length || abonnements.length || packs.length || fixes.length)
+              ? [depenses.length ? `${depenses.length} dépense${depenses.length > 1 ? 's' : ''}` : null, abonnements.length ? `${abonnements.length} abonnement${abonnements.length > 1 ? 's' : ''}` : null, packs.length ? `${packs.length} pack${packs.length > 1 ? 's' : ''}` : null].filter(Boolean).join(' · ') + ' — cartons, abonnements, frais : ce que tu paies pour vendre'
+              : 'Cartons, abonnements, frais : ce que tu paies pour vendre. Rien de noté pour l\'instant'}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            {/* Deux repères : le mois et l'année (les data-compta-kpi restent ; l'abonnement
+                du mois n'est plus redit en tête : il est sur sa ligne, juste en dessous). */}
+            <section className="vrm-set-groupe vrm-compta-groupe" data-compta-depenses="" style={{ margin: 0 }}>
+              <div className="vrm-set-liste" style={{ background: C.card, border: `1px solid ${C.border}`, '--vrm-set-filet': C.border }}>
+                <span hidden data-compta-kpi="abo" data-eur={String(Math.round(chargesDuMois.abo * 100) / 100)} />
+                {[
+                  { k: 'mois', l: 'Ce mois-ci', v: chargesMois, s: 'dépenses, abonnements et packs du mois' },
+                  { k: 'annee', l: `Depuis janvier ${annee}`, v: chargesAnnee, s: 'tout ce que tu as noté cette année' },
+                ].map((x) => (
+                  <div key={x.k} className="vrm-set-ligne" data-compta-kpi={x.k} data-eur={String(Math.round(x.v * 100) / 100)}>
+                    <span className="vrm-set-lib"><b style={{ color: C.text }}>{x.l}</b><small style={{ color: C.muted }}>{x.s}</small></span>
+                    <span className="vrm-display" style={{ fontSize: 15, fontWeight: 600, color: C.text, whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{fmt(x.v)}</span>
+                  </div>
+                ))}
+                {chargesAnnee > 0 && (
+                  <button type="button" className="vrm-set-ligne" onClick={exporterCharges}>
+                    <span className="vrm-set-lib"><b style={{ color: C.accent, fontWeight: 600 }}>Exporter mes dépenses {annee} (CSV)</b></span>
+                    <span className="vrm-set-chev" aria-hidden="true" style={{ color: C.muted }}><Icon name="save" size={16} /></span>
+                  </button>
+                )}
               </div>
-            ))}
-            {chargesAnnee > 0 && (
-              <button type="button" className="vrm-set-ligne" onClick={exporterCharges}>
-                <span className="vrm-set-lib"><b style={{ color: C.accent, fontWeight: 600 }}>Exporter mes charges {annee} (CSV)</b></span>
-                <span className="vrm-set-chev" aria-hidden="true" style={{ color: C.muted }}><Icon name="save" size={16} /></span>
-              </button>
-            )}
-          </div>
-        </section>
-
-
+            </section>
         <div className="vrm-compta-grille" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 460px), 1fr))', gap: 16, alignItems: 'start' }}>
           {/* DÉPENSES PONCTUELLES */}
-          <Section data="depenses" titre="Dépenses" note="Emballage, fournitures, frais… tout ce que tu paies pour ton activité." total={depenses.length ? somme(depenses.filter(d => cetteAnnee(d.date)), x => x.montant) : null} totalSub={depenses.length ? `en ${annee}` : null}>
+          <Section data="depenses" titre="Dépenses" note="Emballage, fournitures, frais… tout ce que tu paies pour ton activité." total={null}>
             {depenses.length === 0 && ouvert !== 'dep'
               ? vide('Note ta première dépense — ça prend cinq secondes, et ça allège ton résultat.')
               : listeBox(depenses.map((d) => <Ligne key={d.id} gauche={<><b style={{ color: C.text }}>{d.libelle}</b><small style={{ color: C.muted }}>{d.cat} · {dateFr(d.date)}</small></>} droite={fmt(d.montant)} onDel={() => retirer('depenses', d.id)} />))}
@@ -38328,7 +38352,7 @@ function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, pan
 
           {/* ABONNEMENTS RÉCURRENTS */}
           <Section data="abonnements" titre="Abonnements" note="Logiciels et services qui reviennent tout seuls : comptés à chaque échéance (une échéance compte dès le début de son mois), jamais dans ton CA."
-            total={abonnements.length ? charges.aboTotal : null} totalSub={abonnements.length ? `en ${annee}` : null}>
+            total={null}>
             {abonnements.length === 0 && ouvert !== 'abo' ? vide('Ton abonnement VRM, Canva, une appli de retouche ? Ajoute-le une fois.') : null}
             {abonnements.length > 0 && listeBox(abonnements.map((a) => {
                 const ech = echeancesAbonnement(a, moisCle);
@@ -38379,21 +38403,24 @@ function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, pan
           </Section>
 
         </div>
-      </div>
-      } />
-      </div>
+          </div>
+          </ComptaRepli>
 
-      {/* AVANCÉ — rangé, replié : ce qu'on ouvre rarement. Rendu même replié
-          (les cartes gardent leur état et leurs lectures), jamais supprimé. */}
-      <details id="compta-avance" className="vrm-repli vrm-compta-avance" data-compta-avance={avance ? 'ouvert' : 'ferme'} open={avance}
-        onToggle={(e) => setAvance(e.currentTarget.open)} style={{ scrollMarginTop: 72, borderTop: `1px solid ${C.border}`, paddingTop: 4 }}>
+          <StatutFiscal partie="suivi" liveStats={liveStats} onNav={onNav} />
+
+      {/* DOCUMENTS ET RÉGLAGES (l'ancien « Avancé ») — rangé, replié : ce qu'on
+          ouvre rarement. Rendu même replié (les cartes gardent leur état et leurs
+          lectures), jamais supprimé. */}
+      <details id="compta-avance" className="vrm-repli vrm-compta-repli vrm-compta-avance" data-compta-avance={avance ? 'ouvert' : 'ferme'} open={avance}
+        onToggle={(e) => setAvance(e.currentTarget.open)} style={{ scrollMarginTop: 72 }}>
         <summary>
-          <span style={{ display: 'flex', flexDirection: 'column', gap: 2, flex: '1 1 auto', minWidth: 0 }}>
-            <span>Avancé</span>
-            <small style={{ fontSize: 12.5, fontWeight: 500, color: C.muted, lineHeight: 1.4 }}>Résultat de l'année, récap mensuel, packs, ton entreprise, factures, facturation électronique</small>
+          <span className="vrm-compta-repli-tete">
+            <span className="vrm-compta-repli-titre">Documents et réglages</span>
+            <span className="vrm-compta-repli-resume">Ton statut, ton entreprise, tes factures, le récap mensuel, le résultat de l'année, les packs, la facturation électronique</span>
           </span>
         </summary>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16, paddingTop: 10 }}>
+          <StatutFiscal partie="statut" liveStats={liveStats} onNav={onNav} />
           {/* ── HÉRO : LE RÉSULTAT ─────────────────────────────────────────────────
               Recettes déclarées (ligne publiée par Ventes, §11) − charges. Le seul
               endroit où l'accent est permis (§7 : rare) : le filet du haut. */}
@@ -38493,6 +38520,8 @@ function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, pan
           <FacturationElectroniqueCarte data={data} maj={maj} lbcVentes={lbcVentes} lbcCoqueLu={lbcCoqueLu} ebayCommandes={ebayCommandes} panelOff={panelOff} accounts={accounts} />
         </div>
       </details>
+        </div>
+      </section>
     </div>
   );
 }
