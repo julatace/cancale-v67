@@ -1,288 +1,223 @@
-require('./_porte-banc.cjs');
 // ════════════════════════════════════════════════════════════════════════════
-//  BANC « MA JOURNÉE HORS LIGNE » (21 octobre)
+//  RIEN NE SE PERD SI LE RÉSEAU COUPE (2 nov., demande de Julien)
 //
-//  Au point relais sans 4G, dans le métro : ouvrir VRM sans réseau doit montrer
-//  Ma journée telle qu'à la dernière ouverture RÉUSSIE — colis à expédier, colis
-//  à retirer AVEC leurs codes et QR, la liste du soir — en lecture seule, avec
-//  UNE ligne « Hors ligne — ce que tu vois date de {heure} ; rien ne peut être
-//  envoyé ». Jamais « Tout est à jour » hors ligne.
+//  « Une saisie (prix d'achat, N°, note) faite sans réseau est gardée et envoyée
+//  au retour, avec "en attente d'envoi" affiché. » Il utilise l'app sur iPhone
+//  en 4G : le réseau « faible » laisse `navigator.onLine` à vrai, mais chaque
+//  requête échoue — c'est ce que sert ce banc (`coupe` : la requête avorte
+//  comme un réseau coupé), puis le hors-ligne mesuré (`setOffline`).
 //
-//  Trois scénarios, aux deux tailles (390 tactile, 1512) :
-//   A. lecture COMPLÈTE en ligne → photo écrite → hors ligne (jeton EXPIRÉ) :
-//      la photo s'affiche, le QR vient de la réserve du service worker, aucun
-//      geste actif, pas de déconnexion ; le réseau revient → la ligne disparaît ;
-//   B. lecture PARTIELLE (les emails de suivi — les codes — ne répondent pas) → aucune photo → hors
-//      ligne : « aucune copie », rien de fêté ;
-//   C. un AUTRE vendeur a laissé une photo sur l'appareil (sa clé, et une clé
-//      au bon nom dont le contenu le nomme) → hors ligne : rien de lui n'est
-//      servi.
-//  Aucune fixture : tout est inventé (le banc vit dans le dépôt).
-//  Lancer : node scripts/bancs/hors-ligne.cjs   (BANC_PORT pour changer le port)
+//  Base à ÉTAT et à la vraie forme (`_base-ecritures.cjs` : PATCH conditionnel
+//  sur `data->>rev`, garde-fou des numéros). Un compte et six paires INVENTÉS,
+//  aucune `fx/`. Les prix sont saisis À L'ÉCRAN (saisie en série).
+//
+//   P  coupure, saisie du prix du N°1, l'app est FERMÉE avant le retour du
+//      réseau, puis rouverte avec le réseau ⇒ le prix arrive en base (mesuré
+//      sur main : le chargement recopiait le nuage par-dessus ⇒ perdu) ; une
+//      seconde ouverture n'écrit plus rien (envoyé une fois).
+//   M  la mention « N changement(s) en attente d'envoi » est là pendant la
+//      coupure (et sur l'écran hors ligne), absente une fois envoyé.
+//   R  coupure, saisie du N°2, le réseau revient SANS fermer l'app ⇒ envoyé.
+//   N  coupure, saisie du N°3 et du N°5 ; pendant ce temps un AUTRE appareil
+//      met 53 au N°3 et 54 au N°4 ⇒ au retour, 53 et 54 restent (plus récents),
+//      45 arrive.
+//   L  « lecture KO, écriture OK » : au retour, la ligne entière ne se LIT pas
+//      (500) mais les écritures passeraient ⇒ aucune écriture, rien d'effacé ;
+//      la panne finie, la saisie arrive.
+//   F  numéros : pool intact, aucun N° changé, aucun doublon.
+//
+//  §6.1 : rouge sur le build d'avant (`BANC_DIST=<dist d'avant>`), vert après ;
+//  mutations : `scripts/audit-file-envoi.cjs --prouve`.
+//  Lancer : NODE_OPTIONS="--require $PWD/scripts/bancs/_porte-banc.cjs" BANC_PORT=9412 node scripts/bancs/hors-ligne.cjs
 // ════════════════════════════════════════════════════════════════════════════
-const http = require('http'), fs = require('fs'), path = require('path');
-const { servir } = require('./_minipgrest.cjs');
-const { cspBanc, bilanCsp } = require('./_vercel.cjs');   // CSP de vercel.json servie et observée (22 oct. : service worker, QR)
-let chromium;
-try { ({ chromium } = require(path.join(__dirname, '..', '..', 'node_modules', 'playwright'))); }
-catch (_) { ({ chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'))); }
+require('./_meta.cjs');
+const H = require('./_base-ecritures.cjs');
+const fs = require('node:fs'), path = require('node:path');
+const CAPT = process.env.BANC_CAPTURES || path.join(require('node:os').tmpdir(), 'vrm-bancs', 'hors-ligne');
+fs.mkdirSync(CAPT, { recursive: true });
+let ko = 0, ok = 0;
+const dit = (c, m, d) => { if (c) ok++; else ko++; console.log((c ? 'OK  ' : 'KO  ') + m + (d ? ' — ' + d : '')); };
+const SEUL = (process.env.BANC_SEUL || '').split(',').filter(Boolean);
+const joue = (x) => !SEUL.length || SEUL.includes(x);
 
-const DIST = path.join(__dirname, '..', '..', 'dist');   // jamais un chemin absolu (§6.1)
-const PORT = Number(process.env.BANC_PORT) || 4961;
-const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.png': 'image/png', '.svg': 'image/svg+xml', '.webmanifest': 'application/manifest+json', '.woff2': 'font/woff2', '.zip': 'application/zip', '.onnx': 'application/octet-stream' };
-
-const UID_A = '11111111-2222-3333-4444-555555555555';
-const UID_B = '99999999-8888-7777-6666-555555555555';
-const JETON = (() => { const b = (o) => Buffer.from(JSON.stringify(o)).toString('base64url'); return b({ alg: 'HS256' }) + '.' + b({ sub: UID_A, aal: 'aal1', role: 'authenticated' }) + '.sig'; })();
-const SESSION = { access_token: JETON, refresh_token: 'r', expires_at: Date.now() + 3600e3, user: { id: UID_A, email: 'vendeuse@exemple.fr' }, totp: [] };
-const COMPTE = { vinted_user_id: '900000001', login: 'compte-de-banc', owner: UID_A, access_token: 'x', refresh_token: 'x', csrf_token: 'x', updated_at: new Date().toISOString(), created_at: new Date().toISOString() };
-const QR_URL = 'https://qr.exemple.test/api/barcode/AztecCode?d=PICKUPPASS:BANC';
-// (22 oct., revue) Le QR Vinted Go tel qu'il est dans sa base : en http (15 sur
-// 15). Il n'entrait JAMAIS dans la réserve (rechaufferQr et le service worker ne
-// prennent que https://) et faisait signaler une violation à chaque affichage.
-const QR_VG = 'http://p.vintedgo.com/public/v1/qr_codes/BANC0000000000:C49341:BANC0000000000?v=1';
-const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAAAAAA6mKC9AAAAHUlEQVR4nGNgYGD4z8DAwMDAxMDAwMDAwMDAwMAAAxQAAXy7tqQAAAAASUVORK5CYII=', 'base64');
-
-const maintenant = new Date();
-const iso = (ms) => new Date(ms).toISOString();
-const jour = (d) => { const x = new Date(Date.now() + d * 864e5); return `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, '0')}-${String(x.getDate()).padStart(2, '0')}`; };
-const meta = (data) => { const m = {}; for (const [k, v] of Object.entries(data || {})) if (v == null || typeof v !== 'object') { if (String(v).length <= 600) m[k] = v; } return m; };
-const ligne = (id, data) => ({ id, owner: UID_A, data, meta: meta(data), updated_at: iso(Date.now()) });
-
-const VENTE = { transaction_id: 70001, title: 'Nike Air Max 1 banc', status: 'Le paiement a été validé', transaction_user_status: 'needs_action',
-  price: { amount: '60.0', currency_code: 'EUR' }, date: iso(Date.now() - 2 * 864e5) };
-const TRACK = { status: 'available', statusLabel: 'Arrivé au point de retrait', code: '4321', lieu: 'Tabac du Port Cancale', carrier: 'mondial_relay',
-  suivi: 'MR999000111', artTitle: '', qrUrl: QR_URL, receivedAt: iso(Date.now() - 3600e3), limite: jour(5) };
-const TRACK_VG = { status: 'available', statusLabel: 'Arrivé au point de retrait', code: 'C49341', lieu: 'Consigne Vinted Go Laverie du Port', carrier: 'vinted',
-  suivi: 'VGSBANC000001', artTitle: '', qrUrl: QR_VG, receivedAt: iso(Date.now() - 2 * 3600e3), limite: jour(4) };
-const ROWS = [
-  ligne('main', {}),
-  ligne(`harvest_${COMPTE.vinted_user_id}_orders_sold`, { capturedAt: iso(Date.now()), payload: { my_orders: [VENTE] } }),
-  ligne(`harvest_${COMPTE.vinted_user_id}_orders_purchased`, { capturedAt: iso(Date.now()), payload: { my_orders: [] } }),
-  ligne('email_track_mondial_relay_MR999000111', TRACK),
-  ligne('email_track_vinted_VGSBANC000001', TRACK_VG),
-  ligne('panel_colis_relais', {}),
-];
-// (revue du 23 oct., défauts 9 et 13) Deux colis « à vérifier » de plus : un
-// Mondial Relay SANS date limite arrivé il y a 10 jours (plus que la garde de
-// Mondial Relay, 5 j) et un colis dont la date limite écrite était hier.
-const ROWS_D = ROWS.concat([
-  ligne('email_track_mondialrelay_MR555000111', { status: 'available', statusLabel: 'Arrivé au point de retrait', code: '5555', lieu: 'Relais Vieux Cancale', carrier: 'mondialrelay',
-    suivi: 'MR555000111', artTitle: '', receivedAt: iso(Date.now() - 10 * 864e5), limite: null }),
-  ligne('email_track_chronopost_XW666000111FR', { status: 'available', statusLabel: 'Arrivé au point de retrait', code: '6666', lieu: 'Presse Hier Cancale', carrier: 'chronopost',
-    suivi: 'XW666000111FR', artTitle: '', receivedAt: iso(Date.now() - 3 * 864e5), limite: jour(-1) }),
-]);
-
-const srv = http.createServer((q, r) => {
-  let f = decodeURIComponent(q.url.split('?')[0]); if (f === '/' || !path.extname(f)) f = '/index.html';
-  const p = path.join(DIST, f);
-  if (!p.startsWith(DIST) || !fs.existsSync(p)) { r.writeHead(404); return r.end(); }
-  r.writeHead(200, { 'content-type': MIME[path.extname(p)] || 'application/octet-stream' }); fs.createReadStream(p).pipe(r);
-});
-
-let ko = 0;
-const dit = (bon, quoi, detail) => { if (!bon) ko++; console.log(`  ${bon ? '✅' : '❌'} ${quoi}${detail ? ' — ' + detail : ''}`); };
-const essaie = async (nom, f) => { try { await f(); } catch (e) { dit(false, nom + ' — le contrôle a pu s’exécuter', String(e && e.message).split('\n')[0].slice(0, 160)); } };
-
-// Un faux Supabase / API / hôte du QR, posé sur le CONTEXTE (il voit aussi les
-// requêtes du service worker). `etat.hors` : tout échoue (comme hors ligne).
-async function brancher(ctx, etat) {
-  const json = (route, d, extra) => route.fulfill({ status: 200, contentType: 'application/json', headers: Object.assign({ 'access-control-allow-origin': '*', 'access-control-expose-headers': 'content-range' }, extra || {}), body: JSON.stringify(d) });
-  await ctx.route(/supabase\.co\/rest\/v1\//, (route) => {
-    if (etat.hors) return route.abort('internetdisconnected');
-    const req = route.request(); const u = req.url(); const h = req.headers();
-    if (req.method() === 'OPTIONS') return route.fulfill({ status: 200, headers: { 'access-control-allow-origin': '*', 'access-control-allow-headers': '*', 'access-control-allow-methods': '*' } });
-    if (etat.baseKO) return route.fulfill({ status: 522, contentType: 'text/html', headers: { 'access-control-allow-origin': '*' }, body: '<html>522</html>' });
-    if (/select=owner/.test(u) && !/rpc/.test(u)) return json(route, []);
-    if (req.method() !== 'GET') return json(route, []);
-    if (!String(h.authorization || '').includes(JETON)) return json(route, []);
-    if (/\/rest\/v1\/vinted_accounts/.test(u)) return json(route, [COMPTE]);
-    if (/\/rest\/v1\/rpc\//.test(u)) return json(route, null);
-    if (!/\/rest\/v1\/app_data/.test(u)) return json(route, [], { 'content-range': '*/0' });
-    if (etat.suiviKO && /email_track/.test(decodeURIComponent(u))) return route.fulfill({ status: 502, contentType: 'text/html', headers: { 'access-control-allow-origin': '*' }, body: '<html>502</html>' });
-    const r = servir(etat.rows || ROWS, u, h);
-    return json(route, r.body, { 'content-range': r.range });
+const UID = '3150002222';
+const IDS = ['7200000001', '7200000002', '7200000003', '7200000004', '7200000005', '7200000006'];
+const frais = (ms) => new Date(Date.now() - ms).toISOString();
+function fabriquer() {
+  const items = IDS.map((id, i) => ({ id: Number(id), title: `Nike Dunk ${i + 1} taille 4${i}`, brand_title: 'Nike', size_title: '4' + i, status: 'Très bon état', price: { amount: String(60 + i) + '.0', currency_code: 'EUR' }, is_closed: false, is_hidden: false, is_draft: false, favourite_count: 0, view_count: 3, created_at_ts: frais((i + 2) * 86400000), photo: { url: `https://images1.vinted.net/t/${id}/f800/p.jpeg` } }));
+  const fiches = {};
+  IDS.forEach((id, i) => { fiches[id] = { numero: String(i + 1), numberedAt: frais((i + 2) * 86400000), auto: false, manuelAt: frais((i + 2) * 86400000), title: items[i].title }; });
+  return H.creerBase({
+    accounts: [{ id: 1, vinted_user_id: UID, login: 'vendeur_banc', domain: 'www.vinted.fr', updated_at: frais(3600e3), created_at: frais(60 * 86400000) }],
+    lignes: [
+      { id: 'main', data: { vrm_prenom: 'Banc', vinted_dark: false, vinted_buyprice_by_num: {}, vinted_annonce_numeros: fiches, vinted_used_numeros: IDS.map((_, i) => String(i + 1)), vrm_bienvenue_vue: { at: 'banc' }, vrm_visite_vue: { at: 'banc' }, rev: 3 } },
+      { id: `harvest_${UID}_listings`, data: { capturedAt: frais(60e3), nItems: items.length, payload: { items, pagination: { total_entries: items.length } } } },
+      { id: `harvest_${UID}_enligne`, data: { capturedAt: frais(60e3), complet: true, n: items.length, ids: items.map((x) => x.id), items: items.map((x) => ({ id: x.id, title: x.title })) } },
+      { id: `harvest_${UID}_profile`, data: { capturedAt: frais(60e3), payload: { user: { id: Number(UID), login: 'vendeur_banc' } } } },
+      { id: `harvest_${UID}_orders_sold`, data: { capturedAt: frais(60e3), nItems: 0, payload: { my_orders: [] } } },
+    ],
   });
-  await ctx.route(/supabase\.co\/auth\/v1\//, (route) => {
-    if (etat.hors) return route.abort('internetdisconnected');
-    return route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify({ access_token: JETON, refresh_token: 'r', expires_in: 3600, user: SESSION.user }) });
-  });
-  await ctx.route(/\/api\//, (route) => etat.hors ? route.abort('internetdisconnected') : route.fulfill({ status: 200, contentType: 'application/json', body: '{}' }));
-  await ctx.route(/qr\.exemple\.test/, (route) => { etat.qrServis = (etat.qrServis || 0) + 1; return etat.hors ? route.abort('internetdisconnected') : route.fulfill({ status: 200, contentType: 'image/png', body: PNG }); });
-  await ctx.route(/^https?:\/\/p\.vintedgo\.com\//, (route) => { const k = route.request().url().startsWith('https:') ? 'vgHttps' : 'vgHttp'; etat[k] = (etat[k] || 0) + 1; return etat.hors ? route.abort('internetdisconnected') : route.fulfill({ status: 200, contentType: 'image/png', body: PNG }); });
-  await ctx.route(/vinted\.net|fonts\.(googleapis|gstatic)\.com|jsdelivr|cdnjs/, (route) => route.abort());
 }
+const numerosIntacts = (avant, apres) => {
+  const pa = new Set((avant.vinted_used_numeros || []).map(H.cleNum));
+  const pb = new Set((apres.vinted_used_numeros || []).map(H.cleNum));
+  const perdus = [...pa].filter((c) => !pb.has(c));
+  const fa = avant.vinted_annonce_numeros || {}, fb = apres.vinted_annonce_numeros || {};
+  const changes = Object.keys(fa).filter((id) => fa[id] && String(fa[id].numero || '') && H.cleNum(fa[id].numero) !== H.cleNum((fb[id] || {}).numero));
+  const par = {}; for (const [id, e] of Object.entries(fb)) { const c = e && e.numero != null && String(e.numero).trim() ? H.cleNum(e.numero) : ''; if (c) (par[c] = par[c] || []).push(id); }
+  const doublons = Object.entries(par).filter(([, l]) => l.length > 1).map(([c]) => c);
+  return { perdus, changes, doublons };
+};
+const ouvrirSaisiePrix = async (pg, base) => {
+  await pg.goto(base + '/?tab=cat_annonces', { waitUntil: 'domcontentloaded' });
+  await H.attendre(async () => (await pg.getByRole('button', { name: /Outils/ }).count()) > 0, 15000);
+  await pg.getByRole('button', { name: /Outils/ }).first().click().catch(() => {});
+  await H.attendre(async () => (await pg.getByText(/Compl[ée]ter les prix d'achat/).count()) > 0, 5000);
+  await pg.getByText(/Compl[ée]ter les prix d'achat/).first().click().catch(() => {});
+  return H.attendre(async () => (await pg.locator('[data-fillbuy]').count()) > 0, 8000);
+};
+const saisirPrix = async (pg, numero, prix) => {
+  const i = await pg.evaluate((n) => { const champs = [...document.querySelectorAll('[data-fillbuy]')]; const c = champs.find((x) => { let p = x; for (let k = 0; k < 8 && p; k++) { if (/N°\s*(\d+)/.test(p.innerText || '') && (p.innerText || '').match(/N°\s*(\d+)/)[1] === n) return true; p = p.parentElement; } return false; }); return c ? c.getAttribute('data-fillbuy') : null; }, String(numero));
+  if (i == null) return false;
+  const champ = pg.locator(`[data-fillbuy="${i}"]`);
+  await champ.click(); await champ.fill(String(prix)); await champ.press('Enter');
+  return true;
+};
+const prixFiche = (d, id) => String(((d && d.vinted_annonce_numeros) || {})[id]?.buyPrice || '');
+// Toute requête vers la base avorte, comme un réseau coupé (`navigator.onLine`
+// reste vrai : la 4G faible de l'iPhone).
+const COUPE = () => ({ coupe: true });
+// La mention de la file : le NOMBRE rendu (jamais le libellé).
+const mention = (pg) => pg.evaluate(() => { const el = document.querySelector('[data-file-envoi]'); return el ? Number(el.getAttribute('data-file-envoi')) : 0; }).catch(() => -1);
+// Un AUTRE appareil écrit la ligne (comme le ferait son `cloudPush`).
+const ecrireAilleurs = (base, maj) => {
+  const m = base.lignes.get('main');
+  const d = JSON.parse(JSON.stringify(m.data));
+  maj(d);
+  d.rev = (Number.isSafeInteger(m.data.rev) ? m.data.rev : 0) + 1;
+  m.data = d; m.updated_at = new Date().toISOString();
+};
 
-async function ouvrirEnLigne(pg) {
-  await pg.goto(`http://localhost:${PORT}/?tab=journee`, { waitUntil: 'domcontentloaded' });
-  await pg.evaluate(() => navigator.serviceWorker && navigator.serviceWorker.ready).catch(() => {});
-  if (!(await pg.evaluate(() => !!(navigator.serviceWorker && navigator.serviceWorker.controller)))) await pg.reload({ waitUntil: 'domcontentloaded' });
-  await pg.waitForTimeout(1500);
-}
-const photoDe = (pg, uid) => pg.evaluate((u) => { try { return JSON.parse(localStorage.getItem('vrm_hl_photo_' + u) || 'null'); } catch (_) { return null; } }, uid);
+(async () => {
+  const srv = await H.serveur(process.env.BANC_PORT || process.env.PORT || 0);
+  const nav = await H.lancer();
+  const base = fabriquer();
+  const depart = JSON.parse(JSON.stringify(H.dataMain(base)));
+  const A = await H.appareil(nav, base, { nom: 'A', vp: { width: 390, height: 844 } });
+  const errs = [];
+  let o = await A.ouvrir('A'); errs.push(o.errs);
+  dit(await ouvrirSaisiePrix(o.pg, srv.url), 'la saisie en série des prix d\'achat s\'ouvre');
 
-async function main() {
-  await new Promise((res, rej) => { srv.once('error', (e) => rej(e.code === 'EADDRINUSE' ? new Error(`le port ${PORT} est pris — relance ce banc seul`) : e)); srv.listen(PORT, res); });
-  const nav = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
-  try {
-    for (const vp of [{ width: 390, height: 844 }, { width: 1512, height: 950 }]) {
-      const T = vp.width < 600 ? '📱 390' : '🖥️ 1512';
-      const opts = { viewport: vp, ...(vp.width < 600 ? { isMobile: true, hasTouch: true } : {}) };
-
-      // ── A. lecture complète, puis hors ligne avec un jeton expiré ─────────
-      console.log(`\n── ${T} · A. lecture complète → hors ligne → retour du réseau`);
-      await essaie(`${T} A`, async () => {
-        const ctx = await nav.newContext(opts);
-        await cspBanc(ctx, `http://localhost:${PORT}`, `hors-ligne ${vp.width}`);
-        const etat = { hors: false };
-        await brancher(ctx, etat);
-        await ctx.addInitScript(([s, uid]) => { try { if (!localStorage.getItem('vrm_session')) localStorage.setItem('vrm_session', JSON.stringify(s)); localStorage.setItem('vrm_local_owner', uid); } catch (_) {} }, [SESSION, UID_A]);
-        const pg = await ctx.newPage();
-        const erreurs = []; pg.on('pageerror', (e) => erreurs.push(String(e).slice(0, 140)));
-        await ouvrirEnLigne(pg);
-        let photo = null;
-        for (let i = 0; i < 40 && !(photo = await photoDe(pg, UID_A)); i++) await pg.waitForTimeout(500);
-        dit(!!photo, 'en ligne, lecture complète : la photo de CE vendeur est écrite sur l\'appareil', photo ? `${photo.nEnvoyer} à envoyer · ${photo.nRetirer} à retirer` : 'aucune');
-        dit(!!photo && photo.uid === UID_A && photo.nEnvoyer === 1 && photo.nRetirer === 2 && ['4321', 'C49341'].every((c) => photo.retirer.some((x) => x.code === c)), 'elle porte le colis à expédier et les deux colis à retirer avec leur code', photo ? JSON.stringify({ e: photo.envoyer.map((x) => x.titre), r: photo.retirer.map((x) => x.code) }) : '');
-        dit(!!photo && photo.retirer.some((x) => /^https:\/\/p\.vintedgo\.com\//.test(x.qr || '')), 'le QR Vinted Go (http dans l\'email) est gardé en https dans la photo', photo ? JSON.stringify(photo.retirer.map((x) => String(x.qr || '').slice(0, 30))) : '');
-        let cles = [];
-        for (let i = 0; i < 30 && cles.length < 2; i++) { cles = await pg.evaluate(async () => (await (await caches.open('vrm-hl-qr')).keys()).map((r) => decodeURIComponent(r.url.replace(/^.*?u=/, '')))).catch(() => []); if (cles.length < 2) await pg.waitForTimeout(300); }
-        dit(cles.length > 0, 'le QR du colis est mis en réserve pour le service worker', cles.length + ' entrée(s)');
-        dit(cles.some((u) => /^https:\/\/p\.vintedgo\.com\//.test(u)), 'le QR Vinted Go est mis en réserve aussi (avant : jamais, il était en http)', JSON.stringify(cles.map((u) => u.slice(0, 30))));
-        dit(!etat.vgHttp && etat.vgHttps > 0, 'le QR Vinted Go n\'est demandé qu\'en https', `https ${etat.vgHttps || 0} · http ${etat.vgHttp || 0}`);
-        // Hors ligne, jeton EXPIRÉ : la session ne doit pas partir.
-        await pg.evaluate(() => { const s = JSON.parse(localStorage.getItem('vrm_session')); s.expires_at = Date.now() - 3600e3; localStorage.setItem('vrm_session', JSON.stringify(s)); });
-        etat.hors = true; await ctx.setOffline(true);
-        await pg.reload({ waitUntil: 'domcontentloaded' }).catch(() => {});
-        await pg.waitForSelector('[data-hors-ligne]', { timeout: 15000 }).catch(() => {});
-        await pg.waitForTimeout(1200);
-        const r = await pg.evaluate(() => {
-          const v = document.querySelector('[data-hors-ligne]');
-          const qrs = [...document.querySelectorAll('[data-hl-qr]')];
-          return {
-            vue: v && v.getAttribute('data-hors-ligne'),
-            lignes: [...document.querySelectorAll('[data-hors-ligne-ligne]')].map((x) => x.innerText),
-            colis: [...document.querySelectorAll('[data-hl-colis]')].map((x) => x.innerText),
-            code: !!document.querySelector('[data-hl-code="4321"]') && !!document.querySelector('[data-hl-code="C49341"]'),
-            qr: qrs.length ? qrs.map((q) => ({ etat: q.getAttribute('data-hl-qr'), w: q.naturalWidth || 0 })) : null,
-            soir: document.querySelector('[data-hl-soir]') ? document.querySelector('[data-hl-soir]').getAttribute('data-hl-soir-n') : null,
-            gestesActifs: v ? [...v.querySelectorAll('button')].filter((b) => !b.disabled).map((b) => b.innerText) : ['(pas de vue)'],
-            gestes: v ? v.querySelectorAll('[data-hl-geste]').length : 0,
-            texte: document.body.innerText,
-            mdp: !!document.querySelector('input[type="password"]'),
-            session: !!localStorage.getItem('vrm_session'),
-            debordement: document.documentElement.scrollWidth > window.innerWidth + 1,
-          };
-        });
-        dit(r.vue === 'photo', 'hors ligne : Ma journée s\'ouvre sur la photo', 'vue ' + r.vue);
-        dit(r.lignes.length === 1 && /^Hors ligne — ce que tu vois date de .+ ; rien ne peut être envoyé\.?$/.test(r.lignes[0].trim()), 'UNE ligne en tête qui dit de quand ça date et que rien ne part', JSON.stringify(r.lignes));
-        dit(r.colis.length === 1 && /Nike Air Max 1 banc/.test(r.colis[0]), 'le colis à expédier est là', JSON.stringify(r.colis));
-        dit(r.code, 'les codes de retrait sont là (4321, C49341)');
-        dit(!!r.qr && r.qr.length === 2 && r.qr.every((q) => q.etat === 'ok' && q.w > 0), 'les deux QR (Pickup et Vinted Go) s\'affichent SANS réseau (réserve du service worker)', JSON.stringify(r.qr));
-        dit(r.soir === '1', 'la liste du soir dit le colis à poster demain', 'n=' + r.soir);
-        dit(!/Tout est à jour/i.test(r.texte), 'jamais « Tout est à jour » hors ligne');
-        dit(r.gestes >= 2 && r.gestesActifs.length === 0, 'aucun geste actif hors ligne (les boutons sont grisés)', `${r.gestes} geste(s) grisé(s) · actifs : ${JSON.stringify(r.gestesActifs)}`);
-        dit(!r.mdp && r.session, 'un jeton expiré hors ligne ne déconnecte pas', `écran de connexion : ${r.mdp} · session : ${r.session}`);
-        dit(!r.debordement, 'aucun débordement horizontal');
-        await pg.screenshot({ path: path.join(require('os').tmpdir(), `hors-ligne-${vp.width}.png`), fullPage: false }).catch(() => {});
-        // Le réseau revient : relecture normale, la ligne disparaît.
-        etat.hors = false; await ctx.setOffline(false);
-        let parti = false;
-        for (let i = 0; i < 40 && !parti; i++) { await pg.waitForTimeout(500); parti = await pg.evaluate(() => !document.querySelector('[data-hors-ligne]') && !!document.querySelector('main')).catch(() => false); }
-        await pg.waitForTimeout(2500);
-        const apres = await pg.evaluate(() => ({ hl: document.querySelectorAll('[data-hors-ligne-ligne]').length, t: document.body.innerText })).catch(() => ({ hl: -1, t: '' }));
-        dit(parti && apres.hl === 0, 'le réseau revient : la ligne « Hors ligne » disparaît', `lignes ${apres.hl}`);
-        dit(/Je n.arrive pas à joindre/.test(apres.t) === false, 'et la relecture a eu lieu (pas de panne affichée)');
-        dit(erreurs.length === 0, 'aucune erreur d\'app', erreurs.join(' | '));
-        await ctx.close();
-      });
-
-      // ── B. lecture partielle : aucune photo ───────────────────────────────
-      console.log(`\n── ${T} · B. lecture partielle (emails de suivi en panne) → aucune photo`);
-      await essaie(`${T} B`, async () => {
-        const ctx = await nav.newContext(opts);
-        await cspBanc(ctx, `http://localhost:${PORT}`, `hors-ligne ${vp.width}`);
-        const etat = { hors: false, suiviKO: true };
-        await brancher(ctx, etat);
-        await ctx.addInitScript(([s, uid]) => { try { if (!localStorage.getItem('vrm_session')) localStorage.setItem('vrm_session', JSON.stringify(s)); localStorage.setItem('vrm_local_owner', uid); } catch (_) {} }, [SESSION, UID_A]);
-        const pg = await ctx.newPage();
-        await ouvrirEnLigne(pg);
-        await pg.waitForTimeout(8000);
-        const photo = await photoDe(pg, UID_A);
-        dit(!photo, 'une lecture partielle n\'écrit AUCUNE photo', photo ? `photo écrite : ${photo.nEnvoyer} à envoyer` : '');
-        etat.hors = true; await ctx.setOffline(true);
-        await pg.reload({ waitUntil: 'domcontentloaded' }).catch(() => {});
-        await pg.waitForSelector('[data-hors-ligne]', { timeout: 15000 }).catch(() => {});
-        const r = await pg.evaluate(() => ({ vue: (document.querySelector('[data-hors-ligne]') || { getAttribute: () => null }).getAttribute('data-hors-ligne'), t: document.body.innerText, lignes: document.querySelectorAll('[data-hors-ligne-ligne]').length }));
-        dit(r.vue === 'sans-photo' && r.lignes === 1, 'hors ligne : « aucune copie gardée », dit une fois', `vue ${r.vue} · ${r.lignes} ligne(s)`);
-        dit(!/Nike Air Max 1 banc|4321|C49341/.test(r.t), 'aucune donnée partielle présentée comme ta journée');
-        dit(!/Tout est à jour/i.test(r.t), 'jamais « Tout est à jour » hors ligne');
-        await ctx.close();
-      });
-
-      // ── D. (revue du 23 oct.) « à retirer » hors ligne = la tuile en ligne ──
-      console.log(`\n── ${T} · D. les colis « à vérifier » ne comptent pas dans « à retirer » hors ligne`);
-      await essaie(`${T} D`, async () => {
-        const ctx = await nav.newContext(opts);
-        await cspBanc(ctx, `http://localhost:${PORT}`, `hors-ligne ${vp.width}`);
-        const etat = { hors: false, rows: ROWS_D };
-        await brancher(ctx, etat);
-        await ctx.addInitScript(([s, uid]) => { try { if (!localStorage.getItem('vrm_session')) localStorage.setItem('vrm_session', JSON.stringify(s)); localStorage.setItem('vrm_local_owner', uid); } catch (_) {} }, [SESSION, UID_A]);
-        const pg = await ctx.newPage();
-        await ouvrirEnLigne(pg);
-        let photo = null;
-        for (let i = 0; i < 40 && !(photo = await photoDe(pg, UID_A)); i++) await pg.waitForTimeout(500);
-        await pg.waitForTimeout(1500);
-        const tuile = await pg.evaluate(() => { const t = document.querySelector('[data-tuile="retirer"]'); return t ? t.getAttribute('data-n') : null; });
-        etat.hors = true; await ctx.setOffline(true);
-        await pg.reload({ waitUntil: 'domcontentloaded' }).catch(() => {});
-        await pg.waitForSelector('[data-hors-ligne]', { timeout: 15000 }).catch(() => {});
-        await pg.waitForTimeout(1000);
-        const r = await pg.evaluate(() => {
-          const ret = document.querySelector('[data-hl-retirer]'), av = document.querySelector('[data-hl-a-verifier]');
-          return { retirer: ret ? ret.getAttribute('data-hl-retirer') : null, aVerifier: av ? av.getAttribute('data-hl-a-verifier') : null,
-            raisons: [...document.querySelectorAll('[data-hl-raison]')].map((x) => ({ r: x.getAttribute('data-hl-raison'), t: x.innerText })), texte: document.body.innerText,
-            codes: ['5555', '6666'].filter((c) => !!document.querySelector(`[data-hl-code="${c}"]`)) };
-        });
-        dit(tuile === '2' && r.retirer === tuile, 'hors ligne, « À retirer » dit le MÊME nombre que la tuile en ligne (les colis « à vérifier » n\'y sont pas)', `en ligne ${tuile} · hors ligne ${r.retirer}`);
-        dit(r.aVerifier === '2' && r.codes.length === 2, 'les deux colis « à vérifier » ont leur bloc à part, avec leur code (peut-être encore au relais)', `bloc ${r.aVerifier} · codes ${r.codes.join(',')}`);
-        const tl = r.raisons.find((x) => x.r === 'trop_long'), dd = r.raisons.find((x) => x.r === 'delai_depasse');
-        dit(!!tl && /plus de 5 jours/.test(tl.t) && !!dd && /délai de retrait dépassé/.test(dd.t), 'chacun dit SA raison : « plus de 5 jours » (garde Mondial Relay, sans date limite) · « délai de retrait dépassé »', JSON.stringify(r.raisons.map((x) => x.r + ': ' + x.t.replace(/\n/g, ' ¦ ').slice(0, 90))));
-        dit(!/hors délai/i.test(r.texte), 'jamais « hors délai » sur un colis sans date limite (le mot n\'est plus écrit hors ligne)');
-        await ctx.close();
-      });
-
-      // ── C. la photo d'un autre vendeur n'est jamais servie ────────────────
-      console.log(`\n── ${T} · C. la photo d'un autre vendeur reste à lui`);
-      await essaie(`${T} C`, async () => {
-        const ctx = await nav.newContext(opts);
-        await cspBanc(ctx, `http://localhost:${PORT}`, `hors-ligne ${vp.width}`);
-        const etat = { hors: false, baseKO: true };
-        await brancher(ctx, etat);
-        const photoB = { v: 1, uid: UID_B, at: Date.now() - 600e3, nEnvoyer: 1, nRetirer: 1, nePasPoster: 0,
-          envoyer: [{ titre: 'Paire de la vendeuse B', numero: '77', compte: 'compte-b', plateforme: 'vinted', limite: jour(1) }],
-          retirer: [{ titre: 'Colis de B', lieu: 'Relais B', code: '9999', qr: '', compte: 'compte-b', transporteur: '', suivi: '', horsDelai: false }] };
-        await ctx.addInitScript(([s, uid, uidB, pB]) => { try {
-          if (!localStorage.getItem('vrm_session')) localStorage.setItem('vrm_session', JSON.stringify(s));
-          localStorage.setItem('vrm_local_owner', uid);
-          localStorage.setItem('vrm_hl_photo_' + uidB, JSON.stringify(pB));     // sa clé à lui
-          localStorage.setItem('vrm_hl_photo_' + uid, JSON.stringify(pB));      // la bonne clé, son contenu à lui
-        } catch (_) {} }, [SESSION, UID_A, UID_B, photoB]);
-        const pg = await ctx.newPage();
-        await ouvrirEnLigne(pg);
-        etat.hors = true; await ctx.setOffline(true);
-        await pg.reload({ waitUntil: 'domcontentloaded' }).catch(() => {});
-        await pg.waitForSelector('[data-hors-ligne]', { timeout: 15000 }).catch(() => {});
-        const r = await pg.evaluate(() => ({ vue: (document.querySelector('[data-hors-ligne]') || { getAttribute: () => null }).getAttribute('data-hors-ligne'), t: document.body.innerText }));
-        dit(r.vue === 'sans-photo', 'la photo d\'un autre vendeur n\'est pas servie', 'vue ' + r.vue);
-        dit(!/vendeuse B|Colis de B|9999/.test(r.t), 'aucune de ses données n\'apparaît');
-        await ctx.close();
-      });
-    }
-  } catch (e) { dit(false, 'le banc a tourné jusqu\'au bout', String(e && e.message).slice(0, 160)); }
-  finally { await nav.close(); srv.close(); }
-  ko += bilanCsp();
-  console.log(ko ? `\n❌ hors-ligne : ${ko} rouge(s)` : '\n✅ hors-ligne : tout est vert');
+  // ── P + M ──────────────────────────────────────────────────────────────────
+  if (joue('P') || joue('M')) {
+    A.etat.faute = COUPE;
+    dit(await saisirPrix(o.pg, 1, '41'), 'P : prix du N°1 saisi pendant la coupure');
+    await o.pg.waitForTimeout(3000);
+    dit(prixFiche(H.dataMain(base), IDS[0]) === '', 'P : pendant la coupure, rien n\'est arrivé en base (normal)');
+    const ls = await o.pg.evaluate((id) => { try { return (JSON.parse(localStorage.getItem('vinted_annonce_numeros') || '{}')[id] || {}).buyPrice || ''; } catch (_) { return 'illisible'; } }, IDS[0]);
+    dit(String(ls) === '41', 'P : la saisie est gardée sur l\'appareil', JSON.stringify(ls));
+    const n = await mention(o.pg);
+    dit(n === 1, 'M : « 1 changement en attente d\'envoi » est affiché', String(n) + (process.env.BANC_DEBUG ? ' ' + await o.pg.evaluate(() => { const f = JSON.parse(localStorage.getItem('vrm_file_envoi') || '{}'); return JSON.stringify(Object.entries(f.cles || {}).map(([k, e]) => [k, String(JSON.stringify(e.base)).slice(0, 60), (localStorage.getItem(k) || '').slice(0, 60)])); }) : ''));
+    await o.pg.screenshot({ path: path.join(CAPT, 'M-coupure-390.png') });
+    // Le hors-ligne MESURÉ : l'écran de lecture seule dit aussi la file.
+    await A.ctx.setOffline(true); await o.pg.waitForTimeout(800);
+    const nh = await mention(o.pg);
+    dit(nh === 1, 'M : l\'écran hors ligne dit aussi la file', String(nh));
+    await o.pg.screenshot({ path: path.join(CAPT, 'M-hors-ligne-390.png') });
+    // L'app est FERMÉE (iOS tue la PWA) avant que le réseau revienne.
+    await o.pg.close();
+    await A.ctx.setOffline(false);
+    A.etat.faute = null;
+    const t0 = Date.now();
+    o = await A.ouvrir('A-rouverte'); errs.push(o.errs);
+    await o.pg.goto(srv.url + '/?tab=settings', { waitUntil: 'domcontentloaded' });
+    await H.attendre(() => prixFiche(H.dataMain(base), IDS[0]) === '41', 12000);
+    dit(prixFiche(H.dataMain(base), IDS[0]) === '41', 'P : rouverte avec le réseau, le prix du N°1 arrive en base', JSON.stringify(prixFiche(H.dataMain(base), IDS[0])));
+    const ls2 = await o.pg.evaluate((id) => { try { return (JSON.parse(localStorage.getItem('vinted_annonce_numeros') || '{}')[id] || {}).buyPrice || ''; } catch (_) { return 'illisible'; } }, IDS[0]);
+    dit(String(ls2) === '41', 'P : et il est toujours sur l\'appareil (pas recopié par l\'ancienne valeur)', JSON.stringify(ls2));
+    await o.pg.waitForTimeout(2000);
+    dit((await mention(o.pg)) === 0, 'M : envoyé ⇒ la mention disparaît', String(await mention(o.pg)));
+    // Envoyé UNE fois : une écriture acceptée a fait passer le prix (aucune
+    // autre ne le « re-pose ») et la réouverture suivante ne le renvoie pas.
+    const poseurs = H.ecrituresMain(base, t0).filter((e) => typeof e.resultat === 'number' && e.resultat > 0 && prixFiche((e.corps && e.corps.data) || {}, IDS[0]) === '41');
+    dit(poseurs.length >= 1, 'P : une écriture acceptée porte le prix', String(poseurs.length));
+    await o.pg.waitForTimeout(1500);
+    const t1 = Date.now();
+    await o.pg.reload({ waitUntil: 'domcontentloaded' }); await o.pg.waitForTimeout(5000);
+    const reecr = H.ecrituresMain(base, t1).filter((e) => e.page === 'A-rouverte' && prixFiche((e.corps && e.corps.data) || {}, IDS[0]) === '41');
+    const prixAvant = prixFiche(H.dataMain(base), IDS[0]);
+    dit(prixAvant === '41' && (await mention(o.pg)) === 0, 'P : la réouverture suivante n\'a plus rien en attente', JSON.stringify({ prix: prixAvant, ecritures: reecr.length }));
+  }
+  // ── R (le réseau revient sans fermer l'app) ────────────────────────────────
+  if (joue('R')) {
+    dit(await ouvrirSaisiePrix(o.pg, srv.url), 'R : saisie en série rouverte');
+    A.etat.faute = COUPE;
+    dit(await saisirPrix(o.pg, 2, '42'), 'R : prix du N°2 saisi pendant la coupure');
+    await o.pg.waitForTimeout(2500);
+    dit((await mention(o.pg)) === 1, 'R : la mention est là', String(await mention(o.pg)));
+    A.etat.faute = null;
+    await o.pg.evaluate(() => window.dispatchEvent(new Event('online')));
+    await H.attendre(() => prixFiche(H.dataMain(base), IDS[1]) === '42', 20000);
+    dit(prixFiche(H.dataMain(base), IDS[1]) === '42', 'R : le réseau revient ⇒ le prix du N°2 part', JSON.stringify(prixFiche(H.dataMain(base), IDS[1])));
+    await H.attendre(async () => (await mention(o.pg)) === 0, 5000);
+    dit((await mention(o.pg)) === 0, 'R : puis la mention disparaît');
+  }
+  // ── N (plus récent ailleurs) ───────────────────────────────────────────────
+  if (joue('N')) {
+    dit(await ouvrirSaisiePrix(o.pg, srv.url), 'N : saisie en série rouverte');
+    A.etat.faute = COUPE;
+    dit(await saisirPrix(o.pg, 3, '43'), 'N : prix du N°3 saisi pendant la coupure');
+    await o.pg.waitForTimeout(400);
+    dit(await saisirPrix(o.pg, 5, '45'), 'N : prix du N°5 saisi pendant la coupure');
+    await o.pg.waitForTimeout(2500);
+    // Plus tard, un autre appareil (en ligne) met 53 au N°3 et 54 au N°4.
+    ecrireAilleurs(base, (d) => { d.vinted_annonce_numeros[IDS[2]].buyPrice = '53'; d.vinted_annonce_numeros[IDS[3]].buyPrice = '54'; });
+    await o.pg.close();
+    A.etat.faute = null;
+    o = await A.ouvrir('A-N'); errs.push(o.errs);
+    await o.pg.goto(srv.url + '/?tab=settings', { waitUntil: 'domcontentloaded' });
+    await H.attendre(() => prixFiche(H.dataMain(base), IDS[4]) === '45', 12000);
+    await o.pg.waitForTimeout(1500);
+    const d = H.dataMain(base) || {};
+    dit(prixFiche(d, IDS[4]) === '45', 'N : le prix du N°5 (pas touché ailleurs) arrive', JSON.stringify(prixFiche(d, IDS[4])));
+    dit(prixFiche(d, IDS[2]) === '53', 'N : le N°3 garde 53, posé PLUS TARD sur l\'autre appareil', JSON.stringify(prixFiche(d, IDS[2])));
+    dit(prixFiche(d, IDS[3]) === '54', 'N : le N°4 de l\'autre appareil reste', JSON.stringify(prixFiche(d, IDS[3])));
+  }
+  // ── L (lecture KO, écriture OK) ────────────────────────────────────────────
+  if (joue('L')) {
+    dit(await ouvrirSaisiePrix(o.pg, srv.url), 'L : saisie en série rouverte');
+    A.etat.faute = COUPE;
+    dit(await saisirPrix(o.pg, 6, '46'), 'L : prix du N°6 saisi pendant la coupure');
+    await o.pg.waitForTimeout(2500);
+    await o.pg.close();
+    // Ailleurs, une clé de plus en base (que l'appareil ne connaît pas).
+    ecrireAilleurs(base, (d) => { d.vrm_ville = 'Cancale'; });
+    const avant = JSON.parse(JSON.stringify(H.dataMain(base)));
+    // Au retour : la ligne ENTIÈRE ne se lit pas (500) ; tout le reste répond.
+    A.etat.faute = (u, meth) => (meth === 'GET' && /id=eq\.main/.test(u) && /select=(owner,)?data/.test(u) ? { status: 500 } : null);
+    const t0 = Date.now();
+    o = await A.ouvrir('A-L'); errs.push(o.errs);
+    await o.pg.goto(srv.url + '/?tab=settings', { waitUntil: 'domcontentloaded' });
+    await o.pg.waitForTimeout(6000);
+    const passees = H.ecrituresMain(base, t0).filter((e) => e.page === 'A-L');
+    dit(passees.length === 0, 'L : lecture en panne ⇒ aucune écriture de la ligne', passees.map((e) => e.meth + '→' + e.resultat).join(', '));
+    const d = H.dataMain(base) || {};
+    dit(d.vrm_ville === 'Cancale' && d.vrm_prenom === avant.vrm_prenom && prixFiche(d, IDS[2]) === '53', 'L : rien d\'effacé en base');
+    dit((await mention(o.pg)) >= 1, 'L : la saisie reste en attente (pas « envoyée »)', String(await mention(o.pg)));
+    A.etat.faute = null;
+    await H.attendre(() => prixFiche(H.dataMain(base), IDS[5]) === '46', 40000);
+    const d2 = H.dataMain(base) || {};
+    dit(prixFiche(d2, IDS[5]) === '46' && d2.vrm_ville === 'Cancale', 'L : la panne finie, la saisie arrive, fusionnée', JSON.stringify({ n6: prixFiche(d2, IDS[5]), ville: d2.vrm_ville }));
+  }
+  // ── F ──────────────────────────────────────────────────────────────────────
+  {
+    const r = numerosIntacts(depart, H.dataMain(base) || {});
+    dit(!r.perdus.length && !r.changes.length && !r.doublons.length, 'F : pool intact, aucun N° changé, aucun doublon', JSON.stringify(r));
+  }
+  await o.pg.screenshot({ path: path.join(CAPT, 'fin-390.png') }).catch(() => {});
+  const jsErr = errs.flat().filter((m) => !/ResizeObserver|Failed to fetch|NetworkError|internet/i.test(m));
+  dit(jsErr.length === 0, 'aucune erreur JS', jsErr.slice(0, 3).join(' | '));
+  console.log(`\n${ok} OK, ${ko} KO`);
+  await nav.close(); srv.fermer();
   process.exit(ko ? 1 : 0);
-}
-main().catch((e) => { console.log('❌ ' + e.message); process.exit(1); });
+})().catch((e) => { console.error(e); process.exit(2); });
