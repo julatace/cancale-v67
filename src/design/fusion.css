@@ -720,3 +720,5 @@ html body .vrm-app-shell .vrm-main .vrm-finance-page.vrm-fu-ecran .vrm-fu-compta
 .vrm-fu-compta .vrm-fu-panneau-tete { margin-bottom: 18px; }
 .vrm-fu-compta .vrm-fu-panneau-tete h3 { font-size: 17px; }
 .vrm-fu-compta .vrm-fu-anneau svg { width: 122px; height: 122px; }
+/* Le bouton rond de la carte Colis passe devant la règle à classes répétées (rayon 12). */
+html body .vrm-app-shell .vrm-main:has(.vrm-fu-colis) .vrm-colis-carte[data-bord-card]:not([data-vc-colis]) .vrm-rangee-bord button.vrm-colis-primaire.vrm-colis-primaire.vrm-colis-primaire.vrm-colis-primaire.vrm-colis-primaire.vrm-colis-primaire.vrm-colis-primaire.vrm-colis-primaire[data-imprime] { border-radius: 50% !important; }

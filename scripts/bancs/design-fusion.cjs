@@ -153,7 +153,8 @@ const mesure = (pg) => pg.evaluate(() => {
     deb: document.documentElement.scrollWidth - vw, hors: hors.slice(0, 6), petites,
     carte: !!document.querySelector('[data-fu-carte]'), violet,
     encaisse: /encaiss/i.test(document.querySelector('.vrm-main') ? document.querySelector('.vrm-main').innerText : ''),
-    rangees: [...document.querySelectorAll('[data-rangee-bord]')].filter(vis).map((r) => {
+    // (Dans une carte Colis Vinted, la rangée est devenue le bouton rond : sa puce n'y est plus — elle est jugée à part.)
+    rangees: [...document.querySelectorAll('[data-rangee-bord]')].filter(vis).filter((r) => !r.closest('[data-bord-card]:not([data-vc-colis])')).map((r) => {
       const puce = r.querySelector('.vrm-puce-transp'); const autre = [...r.children].find((c) => c !== puce && vis(c));
       const bt = autre ? (autre.matches('button,a') ? autre : autre.querySelector('button,a')) : null;
       if (!puce) return { ok: false, pourquoi: 'pas de puce' };
