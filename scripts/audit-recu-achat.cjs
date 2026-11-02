@@ -275,7 +275,7 @@ essaie('transaction', () => {
 // d'identité partagée, indexée sur les SEULS vrais reçus.
 {
   const rf = (/const receiptFor = [^\n]*/.exec(src) || [''])[0];
-  dit(/recuDeLAchat\(o, indexRecusAchat\)/.test(rf) && !/normTitle/.test(rf) && /indexRecusParTransaction\(recusAchat\b/.test(src),
+  dit(/recuDeLAchat\(o, indexRecusAchat\)/.test(rf) && !/normTitle/.test(rf) && /const indexRecusAchat = useMemo\(\(\) => indexRecusParTransaction\((?:recusAchat|Array\.isArray\(recusAchat\) \? recusAchat\.filter\(\(r\) => !\(r && r\.id && recusDelies\[r\.id\]\)\) : recusAchat)\s*[,)][^\n]*\]\);/.test(src),
     'receiptFor ne lit que les vrais reçus, par le n° de transaction SEULEMENT — le titre ne relie rien (§5)', rf.slice(0, 120));
 }
 

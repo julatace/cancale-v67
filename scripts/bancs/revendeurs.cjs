@@ -140,7 +140,9 @@ async function brancher(p){
     check(await p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'journée sans débordement '+zoom);
     if(process.env.BANC_CAPTURES){fs.mkdirSync(process.env.BANC_CAPTURES,{recursive:true});await p.screenshot({path:path.join(process.env.BANC_CAPTURES,'journee-'+zoom+'.png')});}
   }
-  check((await p.locator('.vrm-day-stock').innerText()).includes('1 à compléter'),'stock sans prix connu expliqué sans faux montant');
+  // (1er nov., « très répétitif ») Le total d'annonces est écrit juste au-dessus : la couverture
+  // ne le redit plus (« 0 sur 1 · 1 à compléter ») — « Aucune avec un prix d'achat · Compléter ›».
+  { const t=await p.locator('.vrm-day-stock').innerText(); check(/Aucune avec un prix d.achat/.test(t) && /Compléter/.test(t) && !/€/.test(t.split('Coût')[1]||'—'),'stock sans prix connu expliqué sans faux montant'); }
   await p.locator('.vrm-day-stock').getByRole('button',{name:'Ouvrir le stock'}).click();await p.getByRole('heading',{name:'Stock',exact:true}).waitFor();
   await p.setViewportSize({width:390,height:844});
   // (31 oct., navigation par tâche) `plat_vinted` / `plat_leboncoin` / `plat_ebay` ouvrent

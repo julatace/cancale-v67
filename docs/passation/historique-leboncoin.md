@@ -1248,3 +1248,18 @@ Laissés (vérifiés, pas de défaut reproduit) : les statistiques d'une annonce
 remplacent l'objet `stats` entier (un relevé sans `TotalFavorites` ne garde pas
 l'ancien nombre — choix : ne pas mêler deux périodes) ; un total nul de la liste
 complète ne décide rien (choix du 22 oct.). Geste de Julien : installer la 5.299.0.
+
+## 1er novembre — « Supprimer de Leboncoin » et « Mettre en pause » ne partaient jamais (X4, extension 5.307.0)
+
+L'extension relisait l'annonce par `select=a:data->items->${id}`. PostgREST lit un
+segment numérique NU comme un index de tableau : au-delà de 2 147 483 647 il répond 400
+(« la base VRM n'a pas répondu »), en dessous `objet -> int` rend NULL (« pas parmi tes
+annonces captées »). Le même piège était déjà contourné dans `lireFicheAnnonce`. Clé
+mise entre guillemets (`->"${id}"`) aux deux endroits. Les audits restaient verts parce
+que les fausses bases prenaient tout segment pour une clé : `scripts/_chemin-json.cjs`
+(commun à `_fond-vm.cjs`, `audit-lbc-supprimer`, `audit-lbc-plus-vue-pause`) traite
+maintenant un segment nu comme PostgREST (index ; NULL sur un objet ; 400 au-delà d'un
+int). Sur origin/main ces deux audits passent ROUGES (11 et 13). Nouvel audit
+`audit-chemin-json-guillemets.cjs` : aucun identifiant interpolé nu dans un chemin JSON
+(app, extension, serveur — seules les clés fixes `${k}`/`${c}`/`${cle}` sont permises).
+Non mesuré : une requête réelle dans les journaux Supabase.

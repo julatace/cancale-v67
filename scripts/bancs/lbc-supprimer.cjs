@@ -134,7 +134,7 @@ async function ouvrir(b, vp, pont, o = {}) {
     return j([]);
   });
   await pg.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"pret":true}' }));
-  await pg.goto(`http://localhost:${PORT}/?tab=${o.tab || 'leboncoin'}`, { waitUntil: 'domcontentloaded' });
+  await pg.goto(`http://localhost:${PORT}/?tab=${o.tab || 'leboncoin'}${o.query || ''}`, { waitUntil: 'domcontentloaded' });
   if (o.tab && o.tab !== 'leboncoin') { await pg.waitForTimeout(2500); return { ctx, pg, errs }; }
   await pg.waitForSelector('[data-lbc-retirer]', { timeout: 20000 }).catch(() => {});
   await pg.waitForTimeout(1500);
@@ -291,6 +291,24 @@ const cliquer = (pg, texte) => pg.evaluate((tx) => { const b = [...document.quer
       dit(cible, '« Voir » de Ma journée trouve « vendue sur eBay — à retirer » sur l’écran Leboncoin');
       dit(oje.errs.length === 0, 'aucune erreur d’app (Ma journée, eBay)', oje.errs.join(' | ').slice(0, 160));
       await oje.ctx.close();
+
+      // (1er nov., audit A5) La notification « double vente » Leboncoin (adresse
+      // de `api/_lib/lien-notif.js`, `num` = la clé du N°) met en avant LA ligne
+      // de ce N° — jamais la première ligne de la liste. Deux paires vendues ici :
+      // N°18 (reliée par référence, `data-lbc-retirer` = l'identifiant Leboncoin)
+      // et N°14. Un N° absent ⇒ aucune ligne marquée, UNE phrase le dit.
+      for (const [num, attendu] of [['14', 'N°14'], ['18', 'N°18'], ['99', null]]) {
+        console.log(`── ${vp.width} px · notification double vente Leboncoin, num=${num}`);
+        const on = await ouvrir(b, vp, { mode: 'ok', suite: 'fait' }, { tab: 'annonces', query: `&site=leboncoin&cible=doublon&plat=leboncoin&num=${num}`, items: { '3270000004': Object.assign({}, ITEMS['3270000004'], { seenAt: auj.toISOString(), plusVueAt: undefined }) } });
+        await on.pg.waitForSelector(attendu ? '[data-cible-notif="doublon"]' : '[data-cible-absente="doublon"]', { timeout: 20000 }).catch(() => {});
+        await on.pg.waitForTimeout(800);
+        const cn = await on.pg.evaluate(() => ({ marques: [...document.querySelectorAll('[data-cible-notif="doublon"]')].map((e) => (/N°(\S+)/.exec(e.innerText) || [])[0] || e.tagName), absente: (document.querySelector('[data-cible-absente="doublon"]') || {}).innerText || '', lignes: [...document.querySelectorAll('[data-lbc-retirer]')].map((e) => (/N°(\S+)/.exec(e.innerText) || [])[0]) }));
+        if (attendu) dit(cn.marques.length === 1 && cn.marques[0] === attendu && !cn.absente, `notification du ${attendu} : SA ligne est mise en avant (pas la première de la liste)`, JSON.stringify(cn));
+        dit(cn.lignes.includes('N°14') && cn.lignes.includes('N°18'), 'deux paires vendues à retirer de Leboncoin (la notification doit choisir la sienne)', JSON.stringify(cn.lignes));
+        if (!attendu) dit(cn.marques.length === 0 && /plus dans la liste/.test(cn.absente), 'notification d’un N° qui n’est plus à retirer : aucune ligne marquée, une phrase le dit', JSON.stringify(cn));
+        dit(on.errs.length === 0, 'aucune erreur d’app (notification)', on.errs.join(' | ').slice(0, 160));
+        await on.ctx.close();
+      }
 
       // (29 oct., revue) Ma journée et le logo VRM : LA MÊME preuve que l'écran
       // Leboncoin (la transaction). La N°15 n'est « vendue » que par un rapprochement

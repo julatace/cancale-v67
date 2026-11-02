@@ -119,7 +119,14 @@ export function lecturePeutPorter(chemin, ids) {
     if (/^in\.\(.*\)$/.test(v)) { const l = v.slice(4, -1).split(',').map((x) => x.replace(/^"|"$/g, '')); return ids.some((x) => l.includes(x)); }
     if (v.startsWith('like.')) {
       const motif = v.slice(5);
-      const re = new RegExp('^' + motif.split('').map((ch) => (ch === '*' || ch === '%') ? '.*' : ch === '_' ? '.' : ch.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('') + '$');
+      // (1er nov.) `\` échappe le caractère suivant (motif `harvest\_35\_*`).
+      let src = '^';
+      for (let i = 0; i < motif.length; i++) {
+        const ch = motif[i];
+        if (ch === '\\' && i + 1 < motif.length) { src += motif[++i].replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); continue; }
+        src += (ch === '*' || ch === '%') ? '.*' : ch === '_' ? '.' : ch.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      }
+      const re = new RegExp(src + '$');
       return ids.some((x) => re.test(x));
     }
     return true;

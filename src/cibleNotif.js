@@ -31,6 +31,13 @@ const TYPES = ['conv', 'offres', 'vente', 'colis', 'retrait', 'colonne', 'achat'
 const propre = (v) => { const s = String(v == null ? '' : v).trim(); return ID.test(s) ? s : ''; };
 // Échappe une valeur d'attribut CSS (les identités sont déjà filtrées par `ID`).
 const q = (s) => String(s).replace(/["\\]/g, '\\$&');
+// La clé d'un N° — la même que `cleNum` (App.jsx, api/_lib/numerotation.js) :
+// « 007 » = « 7 », « b125 » = « B125 ». `audit-flux-divers.cjs` les compare.
+export const cleNumCible = (v) => {
+  let s = String(v == null ? '' : v).trim().toUpperCase().replace(/[\s\-_.]/g, '');
+  if (/^\d+$/.test(s)) s = String(parseInt(s, 10));
+  return s;
+};
 
 // La cible lue dans l'adresse ; `null` si rien de reconnu (l'écran s'ouvre nu).
 export function lireCible(params) {
@@ -66,11 +73,22 @@ export function selecteursCible(c) {
     case 'colonne': return { essais: [`[data-cc-colonne="${q(c.colonne)}"]`], ouvrir: null, deplier: [] };
     case 'achat': return { essais: [`.vrm-buy-row[data-achat-tx="${q(c.tx)}"]`], ouvrir: null, deplier: [] };
     case 'urssaf': return { essais: ['[data-compta-urssaf]', '#compta-urssaf'], ouvrir: null, deplier: [] };
-    case 'doublon': return {
-      essais: c.plat === 'leboncoin'
-        ? [c.num ? `[data-lbc-retirer="${q(c.num)}"]` : null, '[data-lbc-retirer]'].filter(Boolean)
-        : [c.num ? `[data-ebay-doublon="${q(c.num)}"]` : null, '[data-ebay-a-retirer]'].filter(Boolean),
-      ouvrir: null, deplier: [] };
+    // ⚠️ (1er nov., audit A5) Avec un N°, SEULE la ligne de ce N° répond —
+    // jamais un repli sur « la première ligne » : la notification parlait du
+    // N°40 et l'écran surlignait le N°12. Le N° de la notification est une
+    // `cleNum` (`api/_lib/double-vente.js`) ; la ligne Leboncoin porte la clé de
+    // chacun de ses N° (`data-lbc-retirer-num`, liste séparée par des espaces,
+    // un lot « 12+15 » répond à 12 ET à 15), la ligne eBay son N° (déjà une clé).
+    // Ligne absente ⇒ l'écran reste, une phrase le dit (`phraseAbsente`). Sans
+    // N° (aucune identité), on montre le BLOC où se règle la double vente.
+    case 'doublon': {
+      const n = c.num ? cleNumCible(c.num) : '';
+      return {
+        essais: c.plat === 'leboncoin'
+          ? (n ? [`[data-lbc-retirer-num~="${q(n)}"]`] : ['[data-lbc-retirer-bloc]'])
+          : (n ? [`[data-ebay-doublon="${q(n)}"]`, `[data-ebay-doublon-ailleurs="${q(n)}"]`] : ['[data-ebay-a-retirer]', '[data-ebay-a-retirer-ailleurs]']),
+        ouvrir: null, deplier: [] };
+    }
     default: return { essais: [], ouvrir: null, deplier: [] };
   }
 }
@@ -86,7 +104,9 @@ export function phraseAbsente(c) {
     case 'colonne': return 'Rien dans cette colonne pour l\u2019instant.';
     case 'achat': return "Cet achat n'est pas dans la liste affichée.";
     case 'urssaf': return 'La carte URSSAF ne s\u2019affiche pas pour ton statut.';
-    case 'doublon': return 'Cette paire n\u2019est plus en vente ailleurs : la double vente est réglée.';
+    // Ne promet pas « réglée » : la ligne peut manquer parce que la liste n'est
+    // pas encore relue. Le geste est dit.
+    case 'doublon': return 'Cette paire n\u2019est plus dans la liste « à retirer » : la double vente est sans doute déjà réglée. Vérifie dans tes annonces de la plateforme si tu as un doute.';
     default: return '';
   }
 }

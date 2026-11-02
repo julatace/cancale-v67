@@ -152,10 +152,17 @@ async function lancer(mutation) {
     dit(/conversationRetiree\(convRetirees,/.test(APP) && /data-conv-retirer/.test(APP) && /data-conv-remettre/.test(APP), 'la liste écarte les conversations retirées, le fil porte « Retirer », la liste « Les remettre »');
     dit(/side:data->payload->conversation->transaction->>current_user_side/.test(APP) && /side: typeof tr\.current_user_side === 'string'/.test(APP), 'le côté (vendeur / acheteur) est lu pour la liste ET le fil');
     dit(/const offrePartieDuFil = /.test(APP) && /statutVu=close\?'Plus acceptable'/.test(APP), "la bulle de l'offre suit la règle (« Plus acceptable », jamais « En attente »)");
-    dit(/\{!offrePartieDuFil\(openConv\) && <div className="vrm-chat-rapides"/.test(APP), "pas de réponse rapide « toujours disponible » sous une annonce partie");
+    // (1er nov.) Les réponses rapides sont rendues par `RapidesConv` (qui porte
+    // `vrm-chat-rapides`) ; la garde reste devant. Et (audit A13) sans offre, une
+    // annonce prouvée partie retire les réponses « disponible » (`rapidesDuFil`).
+    dit((/\{!offrePartieDuFil\(openConv\) && <div className="vrm-chat-rapides"/.test(APP)
+      || (/\{!offrePartieDuFil\(openConv\) && <RapidesConv liste=\{rapidesDuFil\(listeRapides\(quickReplies\), annonceDuFilPartie\(openConv\)\)\}/.test(APP)
+        && /function RapidesConv\([^)]*\) \{\s*return \(\s*<div className="vrm-chat-rapides"/.test(APP)
+        && /const annonceDuFilPartie = \(oc\) => \{[\s\S]{0,500}annonceOffreEnVente\(/.test(APP))), "pas de réponse rapide « toujours disponible » sous une annonce partie");
     dit(/data-offre-retirer/.test(APP) && !/« Retirer », en haut/.test(APP), 'le bloc porte LE geste, sans renvoyer à un bouton sans texte');
     dit(/const reponseAttendue=c=>!derniereOffreClose\(c\)&&/.test(APP), "« À répondre » laisse une offre close de côté");
-    dit(/\['messages','Messages', msgNonLus > 0\]/.test(APP) && /e\.detail\.k===CONVERSATIONS_RETIREES/.test(APP), 'le point « nouveau » suit le geste sans recharger');
+    // (1er nov.) Le point de la navigation par tâche : `badgesNav.messages`.
+    dit((/\['messages','Messages', msgNonLus > 0\]/.test(APP) || /badgesNav=\{[^}]*\bmessages: msgNonLus>0/.test(APP)) && /e\.detail\.k===CONVERSATIONS_RETIREES/.test(APP), 'le point « nouveau » suit le geste sans recharger');
     dit(!/dès qu.un nouveau message arrive/.test(APP) && (APP.match(/phraseRetour\(/g) || []).length >= 3, "l'écran dit QUAND elle revient par `phraseRetour` (titre du bouton, ligne sous la liste, recherche) — plus « dès qu'un nouveau message arrive »");
     dit(/'vrm_conversations_retirees'/.test(APP.slice(APP.indexOf('const SYNC_KEYS'), APP.indexOf('const SYNC_KEYS') + 20000)), 'le choix est synchronisé entre ses appareils (SYNC_KEYS)');
   });

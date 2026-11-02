@@ -833,27 +833,48 @@ async function notifierDoubleVente(numero, titre) {
   } catch (_) {}
 }
 
-// Prix d'achat d'une paire d'après le titre de l'annonce (pour le Copilote
-// d'offres). Renvoie un nombre, ou null si introuvable / titre ambigu (plusieurs
-// paires même titre avec des prix d'achat différents).
-async function findBuyPriceByTitle(title) {
-  if (!title) return null;
+// Prix d'achat d'une paire d'après le TITRE de l'annonce (pour le conseil d'une
+// offre reçue par email). ⚠️ (1er nov., audit des parcours A7) L'email d'offre ne
+// porte AUCUNE identité de la paire (ni annonce, ni transaction) : son titre est
+// une RESSEMBLANCE (§5 — 22 % des ventes ont un titre en double). Le résultat
+// n'est donc qu'une PROPOSITION, jamais un fait :
+//   · l'ambiguïté se juge sur TOUTES les fiches de ce titre, AVANT d'écarter
+//     celles sans prix (une homonyme sans prix d'achat rend le cas ambigu —
+//     avant, elle était ignorée et le prix de l'autre paire était donné) ;
+//   · rend { etat: 'unique', prix } (une seule fiche, prix connu), 'sans-prix'
+//     (une seule fiche, prix pas saisi), 'ambigu' (plusieurs fiches), 'aucune',
+//     ou null (pas su : lecture ratée).
+// Pure : `jugerPrixParTitre` (exécutée par `audit-flux-divers.cjs`).
+export function jugerPrixParTitre(title, map) {
+  const norm = (s) => String(s || '').toLowerCase().replace(/\s+/g, ' ').trim();
+  const t = norm(title); if (!t) return { etat: 'aucune' };
+  const memes = Object.values(map || {}).filter((e) => e && norm(e.title) === t);
+  if (!memes.length) return { etat: 'aucune' };
+  if (memes.length > 1) return { etat: 'ambigu', n: memes.length };
+  const brut = memes[0].buyPrice;
+  const b = brut == null || String(brut).trim() === '' ? NaN : parseFloat(String(brut).replace(',', '.'));
+  return Number.isFinite(b) && b > 0 ? { etat: 'unique', prix: b } : { etat: 'sans-prix' };
+}
+async function prixAchatParTitre(title) {
+  if (!title) return { etat: 'aucune' };
   try {
-    const norm = s => String(s || '').toLowerCase().replace(/\s+/g, ' ').trim();
-    const t = norm(title); if (!t) return null;
     const res = await fetch(await duVendeur(`${SUPABASE_URL}/rest/v1/app_data?id=eq.main&select=data->vinted_annonce_numeros`), {
       headers: { ...sbCle(SUPABASE_KEY) },
     });
     if (!res.ok) return null;
     const rows = await res.json();
-    const map = (rows[0] && rows[0].vinted_annonce_numeros) || {};
-    const matches = Object.values(map).filter(e => e && norm(e.title) === t && e.buyPrice != null && String(e.buyPrice).trim() !== '');
-    if (!matches.length) return null;
-    const distinct = [...new Set(matches.map(e => String(e.buyPrice)))];
-    if (distinct.length > 1) return null; // ambigu → on ne devine pas
-    const b = parseFloat(String(matches[0].buyPrice).replace(',', '.'));
-    return isNaN(b) ? null : b;
+    return jugerPrixParTitre(title, (rows[0] && rows[0].vinted_annonce_numeros) || {});
   } catch (_) { return null; }
+}
+// La phrase du conseil, dans la notification. Sans identité, AUCUN « Accepte :
+// +X € net » : au mieux « une paire à ce titre a coûté X € — vérifie que c'est
+// elle ». Pure, exécutée par `audit-flux-divers.cjs`.
+export function phraseConseilOffre(juge, offre) {
+  const o = Number(offre);
+  if (!juge || !juge.etat) return ' — expire en 24h.';
+  if (juge.etat === 'ambigu') return ` — ${juge.n || 'plusieurs'} paires portent ce titre dans VRM : ouvre la conversation pour savoir laquelle avant de répondre.`;
+  if (juge.etat === 'unique' && Number.isFinite(o)) return ` — une paire à ce titre a coûté ${Math.round(juge.prix)} € dans VRM (reconnue au titre seulement) : vérifie que c'est elle avant de répondre.`;
+  return ' — expire en 24h.';
 }
 
 // ── Emails transporteurs (Mondial Relay / Chronopost) : n° de suivi + étape ──
@@ -2415,23 +2436,24 @@ export async function traiterEmail(req, res) {
       // ── COPILOTE D'OFFRES : conseil chiffré instantané ─────────────────────
       // On retrouve le prix d'achat de la paire → on dit s'il faut accepter et
       // combien il reste net, ou refuser (offre sous le coût).
-      const buy = await findBuyPriceByTitle(article);
+      // ⚠️ (1er nov.) Le titre n'est pas une identité : jamais « Accepte : +X €
+      // net » écrit comme un fait (voir `jugerPrixParTitre`). `buy` n'est rangé
+      // que si UNE seule fiche porte ce titre, marqué « reconnu au titre » ;
+      // `net` n'est plus calculé (rien ne le lit, et il se présentait comme sûr).
+      const juge = await prixAchatParTitre(article);
       const offerAmt = parseFloat(String(montant).replace(',', '.'));
-      let advice = '', net = null;
-      if (buy != null && !isNaN(offerAmt)) {
-        net = Math.round((offerAmt - buy) * 100) / 100;
-        advice = net > 0 ? ` → ✅ Accepte : +${Math.round(net)} € net (achat ${Math.round(buy)} €)`
-                          : ` → ⚠️ Refuse : sous ton coût (${Math.round(buy)} €)`;
-      }
+      const buy = juge && juge.etat === 'unique' ? juge.prix : null;
+      const net = null;
+      const advice = phraseConseilOffre(juge, offerAmt);
       try { await pushOnce({
         title: `💰 Offre ${montant ? montant + ' €' : ''}${qui ? ' de ' + qui : ''}`,
-        body: `${article ? `« ${article.trim().slice(0, 40)} »` : 'Un acheteur t\'a fait une offre'}${acc.login ? ` (${acc.login})` : ''}${advice || ' — expire en 24h.'}`,
+        body: `${article ? `« ${article.trim().slice(0, 40)} »` : 'Un acheteur t\'a fait une offre'}${acc.login ? ` (${acc.login})` : ''}${advice}`,
         tag: `offer-${key}`, url: DESTINATIONS.message({ conv: conversationDeLEmail(mail), compte: acc.uid }),
         _cat: 'offre',
       }); } catch (_) {}
       // Archive l'offre + le conseil pour le panneau « Copilote d'offres » de l'app.
       try { await supabaseUpsert([{ id: `email_offer_${key}`, data: {
-        type: 'offre', qui, article, montant, buy, net,
+        type: 'offre', qui, article, montant, buy, net, ...(buy != null ? { buySur: 'titre' } : {}),
         // ⚠️ Quand l'extraction échoue, on garde un ÉCHANTILLON du texte (300
         // caractères) au lieu de deviner une nouvelle regex à l'aveugle — c'est
         // la méthode qui a fini par expliquer la fiche article (§5.24 → §5.26).

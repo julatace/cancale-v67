@@ -166,7 +166,10 @@ async function sain(pg, ecran) {
           const l = document.querySelector('[data-job="colis-limite"]');
           // Les teintes portées par la ligne (texte et icône au trait).
           const teintes = l ? [...new Set([l, ...l.querySelectorAll('*')].flatMap((e) => { const cs = getComputedStyle(e); return [cs.color, cs.stroke]; }))] : [];
-          return { n: t ? t.getAttribute('data-n') : null, teintes, job: l ? { n: l.getAttribute('data-n'), heure: l.getAttribute('data-limite-heure'), txt: (l.innerText || '').replace(/\s+/g, ' ') } : null };
+          return { n: t ? t.getAttribute('data-n') : null, teintes, job: l ? { n: l.getAttribute('data-n'), heure: l.getAttribute('data-limite-heure'), vu: (l.innerText || '').replace(/\s+/g, ' '),
+            // (1er nov., « très répétitif ») Au téléphone, le détail tient sur UNE ligne, coupé à la
+            // fin d'un mot : la phrase entière (heure, nom de la paire) est dans l'infobulle.
+            txt: (l.getAttribute('title') || l.innerText || '').replace(/\s+/g, ' ') } : null };
         });
         dit(j.n === '5', 'Ma journée : « À envoyer » vaut 5', 'lu ' + j.n);
         dit(!!j.job && j.job.n === '4', 'Ma journée : une ligne compte les 4 colis pressés (en retard, estimée dépassée, aujourd’hui, demain) — pas celui dû dans 5 jours', JSON.stringify(j.job));
@@ -176,7 +179,7 @@ async function sain(pg, ecran) {
         // teinte crie au loup.
         const { ROUGE, AMBRE } = TEINTES;
         dit(!!j.job && !j.teintes.some((x) => ROUGE.includes(x)) && j.teintes.some((x) => AMBRE.includes(x)), 'Ma journée : la ligne « colis-limite » est AMBRE, jamais rouge (§7 : le rouge est pour deux paires sous un même N°)', j.teintes.filter((x) => ROUGE.includes(x) || AMBRE.includes(x)).join(' · ') || 'ni rouge ni ambre');
-        dit(!!j.job && j.job.heure === '07:00' && /en retard — c'était avant 7 h aujourd'hui/.test(j.job.txt) && /Lima Runner/.test(j.job.txt), 'Ma journée : la ligne dit l’heure du plus pressé et le nomme (« en retard — c’était avant 7 h aujourd’hui »)', j.job ? j.job.txt.slice(0, 160) : 'ligne absente');
+        dit(!!j.job && j.job.heure === '07:00' && /en retard — c'était avant 7 h aujourd'hui/.test(j.job.txt) && /Lima Runner/.test(j.job.txt) && /en retard/.test(j.job.vu), 'Ma journée : la ligne dit l’heure du plus pressé et le nomme (« en retard — c’était avant 7 h aujourd’hui »)', j.job ? j.job.txt.slice(0, 160) : 'ligne absente');
         await pg.screenshot({ path: path.join(os.tmpdir(), 'colis-heure-journee-' + vp.width + '.png'), fullPage: true }).catch(() => {});
         await sain(pg, 'Ma journée');
       });
