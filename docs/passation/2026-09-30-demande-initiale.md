@@ -1,4 +1,9 @@
-# Passation en cours — prompt du 30 septembre 2026
+# Demande initiale du 30 septembre 2026 (archive)
+
+> ⚠️ **ARCHIVE, statuts FIGÉS au 30 septembre.** Ce fichier s'appelait `docs/passation-en-cours.md`
+> et n'a plus été tenu à jour : beaucoup de ⬜ ont été faits depuis (ex. A2, la liaison
+> extension ↔ app, livrée en 5.171.0). **Ne pas reprendre ces tâches d'ici** : l'état réel est
+> `CLAUDE.md` §9 et les historiques. Rangé ici le 2 novembre 2026.
 
 > **Pour l'IA qui reprend** : lis `CLAUDE.md` en entier, puis ce fichier. Ici vit
 > la demande COMPLÈTE de Julien (rien n'a été résumé au point de perdre une
