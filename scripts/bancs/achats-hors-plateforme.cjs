@@ -123,7 +123,7 @@ async function main() {
       // ── ACHAT HORS PLATEFORME : ajouter, modifier, supprimer ────────────────
       await essaie(`${T} achat hors plateforme`, async () => {
         const { ctx, pg, errs, ecrits, dernierMain } = await preparer(b, vp);
-        await pg.goto(`http://localhost:${PORT}/?tab=cat_achats`, { waitUntil: 'domcontentloaded' });
+        await pg.goto(`http://localhost:${PORT}/?tab=cat_achats&vue=achats`, { waitUntil: 'domcontentloaded' });
         await pg.locator('[data-achat-hors-ajouter]').first().waitFor({ timeout: 12000 });
         dit((await hauteur(pg, '[data-achat-hors-ajouter]')) >= 44, `${T} « + Ajouter » est une cible d’au moins 44 px`);
         await tap(pg, '[data-achat-hors-ajouter]');

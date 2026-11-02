@@ -157,7 +157,7 @@ async function preparer(b, vp, sombre, police) {
     return j([]);
   });
   await ctx.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"pret":true}' }));
-  await pg.goto(`http://localhost:${PORT}/?tab=cat_achats`, { waitUntil: 'domcontentloaded' });
+  await pg.goto(`http://localhost:${PORT}/?tab=cat_achats&vue=achats`, { waitUntil: 'domcontentloaded' });
   await pg.locator('[data-recus-email]').waitFor({ timeout: 20000 });
   await pg.waitForTimeout(1500);
   return { ctx, pg, errs };

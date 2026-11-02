@@ -168,7 +168,7 @@ async function preparer(b, V) {
     return j([]);
   });
   await ctx.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"pret":true}' }));
-  await pg.goto(`http://localhost:${PORT}/?tab=cat_achats`, { waitUntil: 'domcontentloaded' });
+  await pg.goto(`http://localhost:${PORT}/?tab=cat_achats&vue=achats`, { waitUntil: 'domcontentloaded' });
   await pg.locator('[data-recus-email]').waitFor({ timeout: 20000 });
   const tous = pg.locator('button', { hasText: /^Tous$/ });
   if (await tous.count()) { await tous.first().click(); }
