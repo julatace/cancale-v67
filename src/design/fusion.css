@@ -469,3 +469,34 @@ html body .vrm-recap .vrm-recap-principal.vrm-rangee-bord button { min-height: 4
   html body .vrm-app-shell .vrm-main .vrm-colis-grille[data-colis-lignes] .vrm-colis-carte .vrm-colis-actions > .vrm-rangee-bord { grid-column: 1 !important; grid-row: 1 !important; }
   html body .vrm-app-shell .vrm-main .vrm-colis-grille[data-colis-lignes] .vrm-colis-carte .vrm-colis-actions:has(> .vrm-rangee-bord) > :is(button, [data-bouton-bord], a) { width: 116px !important; max-width: 116px !important; flex: none !important; }
 }
+
+/* ── 9. COMPTABILITÉ EN TROIS QUESTIONS, HABILLÉE FUSION ──────────────────────
+   La carte de « Combien j'ai gagné ? » devient la carte SOMBRE (le chiffre du
+   mois, maquette FusionCompta) ; les autres réponses et « Le détail » deviennent
+   des cartes blanches. Un nombre, une fois : rien n'est ajouté, seulement habillé. */
+html body .vrm-app-shell .vrm-main .vrm-finance-page.vrm-fu-ecran .vrm-compta-carte,
+html body .vrm-app-shell .vrm-main .vrm-finance-page.vrm-fu-ecran .vrm-compta-replis {
+  background: var(--fu-carte) !important; border: 0 !important; border-radius: var(--fu-r-carte) !important; box-shadow: var(--fu-ombre) !important;
+}
+html body .vrm-app-shell .vrm-main .vrm-finance-page.vrm-fu-ecran .vrm-compta-question { font-size: 22px !important; font-weight: 700 !important; letter-spacing: -.02em !important; }
+html body .vrm-app-shell .vrm-main .vrm-finance-page.vrm-fu-ecran .vrm-compta-q-n { border: 0 !important; background: var(--fu-encre) !important; color: var(--fu-carte) !important; font-weight: 700 !important; }
+html body .vrm-app-shell .vrm-main .vrm-finance-page.vrm-fu-ecran .vrm-compta-hero { font-weight: 800 !important; letter-spacing: -.03em !important; }
+/* La carte sombre */
+html body .vrm-app-shell .vrm-main .vrm-finance-page.vrm-fu-ecran [data-compta-q="gagne"] > .vrm-compta-carte {
+  background: var(--fu-sombre) !important; box-shadow: var(--fu-ombre-sombre) !important; border-radius: var(--fu-r-sombre) !important;
+  padding: 22px 20px 10px !important; color: #fff !important; --vrm-b-lien: #fff; --vrm-ink: #fff; --vrm-muted: rgba(255,255,255,.66); --vrm-line: rgba(255,255,255,.14);
+}
+html body .vrm-app-shell .vrm-main .vrm-finance-page.vrm-fu-ecran [data-compta-q="gagne"] > .vrm-compta-carte .vrm-compta-libelle { color: rgba(255,255,255,.6) !important; text-transform: uppercase; letter-spacing: .06em; font-size: 12px !important; }
+html body .vrm-app-shell .vrm-main .vrm-finance-page.vrm-fu-ecran [data-compta-q="gagne"] > .vrm-compta-carte .vrm-compta-hero { color: #fff !important; font-size: 44px !important; }
+html body .vrm-app-shell .vrm-main .vrm-finance-page.vrm-fu-ecran [data-compta-q="gagne"] > .vrm-compta-carte .vrm-compta-hero[data-eur=""] { color: rgba(255,255,255,.5) !important; }
+html body .vrm-app-shell .vrm-main .vrm-finance-page.vrm-fu-ecran [data-compta-q="gagne"] > .vrm-compta-carte :is(.vrm-compta-phrase, small, .vrm-set-lib small) { color: rgba(255,255,255,.7) !important; }
+html body .vrm-app-shell .vrm-main .vrm-finance-page.vrm-fu-ecran [data-compta-q="gagne"] > .vrm-compta-carte :is(b, .vrm-display, summary, .vrm-set-lib b) { color: #fff !important; }
+html body .vrm-app-shell .vrm-main .vrm-finance-page.vrm-fu-ecran [data-compta-q="gagne"] > .vrm-compta-carte [data-benef-manque] { color: #ffc773 !important; }
+html body .vrm-app-shell .vrm-app-shell .vrm-main .vrm-finance-page.vrm-fu-ecran [data-compta-q="gagne"] > .vrm-compta-carte :is(.vrm-compta-geste button, .vrm-compta-geste a, .vrm-lien-action, [data-depenses-choix] button),
+html body .vrm-app-shell .vrm-main .vrm-finance-page.vrm-fu-ecran [data-compta-q="gagne"] > .vrm-compta-carte :is(.vrm-compta-geste button, .vrm-compta-geste a, .vrm-lien-action, [data-depenses-choix] button) {
+  color: #fff !important; text-decoration-color: rgba(255,255,255,.4) !important;
+}
+html body .vrm-app-shell .vrm-main .vrm-finance-page.vrm-fu-ecran [data-compta-q="gagne"] > .vrm-compta-carte .vrm-compta-calcul { border-top-color: rgba(255,255,255,.14) !important; }
+html body .vrm-app-shell .vrm-main .vrm-finance-page.vrm-fu-ecran [data-compta-q="gagne"] > .vrm-compta-carte .vrm-set-ligne { border-color: rgba(255,255,255,.1) !important; --vrm-set-filet: rgba(255,255,255,.1) !important; }
+html body .vrm-app-shell .vrm-main .vrm-finance-page.vrm-fu-ecran .vrm-fu-compta { margin: 0 !important; }
+@media (min-width: 768px) { html body .vrm-app-shell .vrm-main .vrm-finance-page.vrm-fu-ecran [data-compta-q="gagne"] > .vrm-compta-carte { padding: 26px 28px 12px !important; } html body .vrm-app-shell .vrm-main .vrm-finance-page.vrm-fu-ecran [data-compta-q="gagne"] > .vrm-compta-carte .vrm-compta-hero { font-size: 52px !important; } }

@@ -317,7 +317,9 @@ const juge = (cs, quoi) => {
         await aller(pg, 'journee', '[data-journee-benef-etat="lu"]', 1500);
         await aller(pg, 'compta', '[data-benef-depenses]:not([data-benef-depenses=""])', 2000);
         const c = await attrs(pg, '[data-benef-etat]', 'data-benef-');
-        const lib = await pg.evaluate(() => { const l = document.querySelector('[data-benef-ligne="net"]'); return l ? l.innerText : ''; });
+        // (2 nov.) Le net est le chiffre de la question 1 : son libellé (`data-benef-titre`) le nomme ;
+        // la ligne « net » du calcul est repliée. Sur un code d'avant, la ligne « net ».
+        const lib = await pg.evaluate(() => { const l = document.querySelector('[data-benef-titre]') || document.querySelector('[data-benef-ligne="net"]'); return l ? l.innerText : ''; });
         dit(!!c && c.depenses === 'jamais' && /avant tes dépenses/i.test(lib), `F ${T} : Comptabilité dit aussi « net avant tes dépenses »`, lib.replace(/\n/g, ' | '));
         dit((await pg.locator('[data-depenses-choix]').count()) === 1, `F ${T} : une cause, une phrase : le choix est écrit UNE fois sur l'écran`);
         if (vp.width >= 600) await aller(pg, 'journee', '[data-journee-benef]', 3000);

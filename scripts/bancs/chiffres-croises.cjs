@@ -201,7 +201,9 @@ const lireEcheance=(pg)=>pg.evaluate(()=>{
       // mois dernier en fait partie. Les écrire « sur N vendues ce mois-ci »
       // les présente comme une partie des vendues — faux sur ces ventes (3
       // finalisées dont 1 vendue le mois dernier, 4 vendues ce mois-ci).
-      const carte=await pg.evaluate(()=>{ const c=document.querySelector('[data-stats-carte="mois"]'); const t=c?(c.innerText||''):''; const m=/Ventes finalisées\s*\n\s*(\d+)\s*\n([^\n]*)/i.exec(t); return m?{ n:Number(m[1]), sous:m[2] }:null; });
+      // (2 nov., Comptabilité claire) Le nombre de ventes est dans la phrase sous le chiffre
+      // (`data-urssaf-mois-n`) ; sur un code d'avant, la tuile « Ventes finalisées ».
+      const carte=await pg.evaluate(()=>{ const c=document.querySelector('[data-stats-carte="mois"]'); const t=c?(c.innerText||''):''; const m=/Ventes finalisées\s*\n\s*(\d+)\s*\n([^\n]*)/i.exec(t); if(m) return { n:Number(m[1]), sous:m[2] }; const p=document.querySelector('[data-compta-phrase="urssaf-mois"]'), s=document.querySelector('[data-urssaf-mois-n]'); return p&&s?{ n:Number(s.getAttribute('data-urssaf-mois-n')), sous:p.innerText }:null; });
       dit(!!carte && !/\bsur \d+ vendue/.test(carte.sous),'les finalisées (au versement) ne sont pas écrites « sur N vendues ce mois-ci »',JSON.stringify(carte));
       await aller(pg,'dashboard','[data-dash-stat="caMois"]',3000);
       const dashMois=await pg.evaluate(()=>{ const e=document.querySelector('[data-dash-stat="caMois"]'); return e?Number(e.getAttribute('data-dash-cents')):null; });

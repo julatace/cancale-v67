@@ -529,6 +529,7 @@ vérifier par `curl https://vrm.center/api/sante`.
 
 ### Décisions et chantiers (octobre–novembre 2026)
 Une ligne par chantier. Le récit complet des lignes du 31 oct. au 2 nov. est, mot pour mot, dans `docs/passation/etat-detaille-2026-10-31-au-11-02.md`.
+- **2 nov. (nuit)** — Comptabilité en 3 questions (Combien j'ai gagné ? · Combien je dois déclarer ? · Le détail replié), un montant écrit une fois, liens à l'encre (contraste), règles inchangées (banc `compta-claire`, 68 rouges sur main). → historique compta. Geste : regarder Compta au téléphone ; dire « Noter ma déclaration » ou « J'ai déclaré ».
 - **2 nov. (nuit)** — E-mails et Statistiques plus simples : E-mails = « Oui, tes e-mails arrivent » + À faire + Ce que VRM en a fait ; Stats = 4 chiffres expliqués, compte qui vend le mieux, modèles et tailles, le reste en 2 volets (banc `emails-stats-clairs`, règles inchangées). → historique interface-stock. Geste : regarder Paramètres → E-mails et Statistiques.
 - **2 nov. (nuit)** — Transporteur LU (jamais deviné, sinon « Transporteur pas lu ») en logo + nom à côté du bordereau, ventes et achats (`src/transporteursVisuels.js`, `src/PastilleTransporteur.jsx`, banc `transporteurs-logos`) ; achats Vestiaire sortis de « À envoyer ». Reste : n° Mondial Relay dans l'email du bordereau, eBay avant étiquette, stats. → historique colis-retraits. Geste : regarder Colis au téléphone (logos).
 - **2 nov. (nuit)** — Carte des relais immobile (transition des boutons + arrondi MapLibre, banc `carte-stable`) ; parcours d'un nouveau vendeur : 13 défauts corrigés (banc `nouveau-vendeur`). → historique interface-stock. Geste : aucun.
@@ -568,8 +569,6 @@ Une ligne par chantier. Le récit complet des lignes du 31 oct. au 2 nov. est, m
 - **1er nov.** — Une épingle par point relais avec le nombre de colis ; adresse ambiguë ⇒ « pas sur la carte » + raison (`jugerBan`). → historique colis-retraits. Geste : aucun.
 - **1er nov.** — Chiffres de Ma journée épurés (semaine en barres, un grand chiffre + Bénéfice · Reçu · À mettre de côté · CA), règles inchangées. → historique interface-stock. Geste : aucun.
 - **1er nov.** — Récapitulatif d'une vente (frise Vendue → Argent reçu cochée seulement PROUVÉE, `src/recapVente.js`). → historique interface-stock. Geste : regarder une vente.
-- **1er nov.** — Stock : « Où est la N° ? » propose « Ranger ici / Autre case » pour une paire pas rangée ; cases dites en rangée/colonne ; ranger, retirer, sortir du stock le disent. Annonces : plus de chiffres d'argent ni « À faire aujourd'hui » en tête (ils restent dans Ventes). Menu « Republier et brouillons » (ordre inchangé). → historique interface-stock. Geste : aucun.
-- **1er nov.** — Finition « premium » (`src/styles-finition.css` chargée en dernier, plus d'emoji, étiquettes ≥ 12 px). → historique interface-stock. Geste : aucun.
 - **Avant le 20 oct.** — `docs/passation/etat-detaille-2026-10-31-au-11-02.md` (fin) et `docs/journal-2026.md`.
 
 ---

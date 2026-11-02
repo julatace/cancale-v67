@@ -35,6 +35,16 @@
 //     l'ordinateur), mais on y entre par Réglages → Stock et rangement, et
 //     `?tab=organisation` marche toujours.
 //
+// ⚠️ (2 nov.) REMIS À LA NOUVELLE RÈGLE — « Comptabilité claire » (banc
+// compta-claire.cjs) : l'écran répond à trois questions (combien j'ai gagné ·
+// combien je dois déclarer · le détail) ; « Vendu et reçu », les dépenses, le
+// suivi URSSAF, la micro-entreprise et « Documents et réglages » (l'ancien
+// « Avancé ») sont des REPLIS de « Le détail ». Le sommaire à pastilles est
+// retiré. Ce banc garde ce qu'il jugeait (chiffres inchangés, une phrase une
+// fois, micro-entreprise ouverte sur une question, « Année » sans tableau vide,
+// deux périodes nommées, renvoi vers une carte qui existe, saisie qui survit au
+// nuage, trimestre écrit une fois) et ouvre les replis comme Julien.
+//
 // Lancer : npm run build && node scripts/bancs/compta-simple.cjs
 //          (BANC_PORT pour changer de port ; CHROMIUM_PATH pour le navigateur)
 
@@ -128,6 +138,7 @@ const attr = (pg, sel, a) => pg.evaluate(([sel, a]) => { const e = document.quer
 // La position d'un élément dans la page qui défile (px depuis le haut du contenu).
 const topDe = (pg, sel) => pg.evaluate((sel) => { const e = document.querySelector(sel); if (!e) return null; const sc = document.querySelector('.vrm-main'); const t = e.getBoundingClientRect().top + (sc && sc.scrollHeight > sc.clientHeight ? sc.scrollTop : (document.scrollingElement || document.documentElement).scrollTop); return Math.round(t); }, sel);
 const texte = (pg, sel) => pg.evaluate((sel) => { const e = document.querySelector(sel); return e ? e.innerText : null; }, sel);
+const ouvrirRepli = async (pg, id) => { if (await pg.evaluate((id) => { const d = document.getElementById(id); return !!(d && !d.open); }, id)) { await pg.click(`#${id} > summary`); await pg.waitForFunction((id) => document.getElementById(id).open, id, { timeout: 5000 }); await pg.waitForTimeout(150); } };
 const dansAvance = (pg, sel) => pg.evaluate((sel) => { const d = document.querySelector('[data-compta-avance]'); const e = document.querySelector(sel); return !!(d && e && d.contains(e)); }, sel);
 
 async function scenarioA(b, vp, sombre) {
@@ -141,7 +152,7 @@ async function scenarioA(b, vp, sombre) {
     // mesurait la machine (« se calcule dans l'écran Ventes »), pas l'app.
     await pg.waitForFunction(() => !!localStorage.getItem('vrm_benefice_jours'), null, { timeout: 90000 });
     await ouvrir(pg, 'compta');
-    await pg.locator('[data-ca-cur="vendu"]').first().waitFor({ timeout: 40000 });
+    await pg.locator('[data-ca-cur="vendu"]').first().waitFor({ state: 'attached', timeout: 40000 });
     await pg.locator('[data-benef-etat="lu"]').first().waitFor({ timeout: 40000 });
     await pg.locator('[data-urssaf-declaree]').first().waitFor({ timeout: 40000 });
     await pg.locator('[data-micro-repli]').first().waitFor({ timeout: 40000 });
@@ -160,10 +171,13 @@ async function scenarioA(b, vp, sombre) {
   await essaie(`A ${nom}`, async () => {
     check(!(await mort(pg)), `A ${nom} — aucun écran tombé sur le garde-fou`);
     // ── l'ordre de lecture
-    check(await avant(pg, '[data-ca-periode]', '[data-benef-etat]'), `A ${nom} — « Vendu et reçu » avant le bénéfice`);
+    // (2 nov.) Le bénéfice (question 1), l'URSSAF (question 2), puis « Le détail » qui porte le reste.
     check(await avant(pg, '[data-benef-etat]', '[data-compta-urssaf]'), `A ${nom} — le bénéfice avant l'URSSAF`);
-    check(await avant(pg, '[data-compta-urssaf]', '[data-compta-depenses]'), `A ${nom} — l'URSSAF avant les dépenses`);
-    check(await avant(pg, '[data-compta-depenses]', '[data-compta-avance]'), `A ${nom} — les dépenses avant « Avancé »`);
+    check(await avant(pg, '[data-compta-urssaf]', '[data-compta-question="detail"]'), `A ${nom} — l'URSSAF avant « Le détail »`);
+    for (const [sel, lib] of [['[data-ca-periode]', 'Vendu et reçu'], ['[data-compta-depenses]', 'les dépenses'], ['[data-compta-avance]', '« Documents et réglages »']]) {
+      check(await pg.evaluate((sel) => { const q = document.querySelector('[data-compta-q="detail"]'), e = document.querySelector(sel); return !!(q && e && q.contains(e)); }, sel), `A ${nom} — ${lib} vit dans « Le détail »`);
+    }
+    check(await avant(pg, '[data-compta-depenses]', '[data-compta-avance]'), `A ${nom} — les dépenses avant « Documents et réglages »`);
     // ── « Avancé » replié, et ce qui y vit
     check((await attr(pg, '[data-compta-avance]', 'data-compta-avance')) === 'ferme', `A ${nom} — « Avancé » est replié par défaut`);
     for (const [sel, lib] of [['[data-compta-resultat]', 'le résultat de l\'année'], ['[data-recap-regle]', 'le récap mensuel'], ['[data-compta-section="packs"]', 'les packs'], ['[data-profil-fiscal]', 'l\'entreprise'], ['#compta-factures', 'les factures'], ['[data-fe-etat]', 'la facturation électronique']]) {
@@ -171,7 +185,7 @@ async function scenarioA(b, vp, sombre) {
       check(!(await visible(pg, sel)), `A ${nom} — ${lib} n'est pas affiché tant qu'« Avancé » est replié`);
     }
     // ── l'essentiel, visible
-    for (const [sel, lib] of [['[data-ca-cur="vendu"]', 'Vendu'], ['[data-ca-cur="recu"]', 'Reçu'], ['[data-benef-net]', 'le bénéfice'], ['[data-echeance-suivante]', 'la prochaine déclaration'], ['[data-dep-ouvrir]', 'Ajouter une dépense'], ['[data-compta-kpi="mois"]', 'les dépenses du mois']]) {
+    for (const [sel, lib] of [['[data-compta-chiffre="gagne"]', 'le bénéfice'], ['[data-echeance-suivante]', 'la prochaine déclaration'], ['[data-compta-chiffre="urssaf-mois"]', 'l\'URSSAF du mois'], ['[data-benef-ajouter-depense]', 'Ajouter une dépense']]) {
       check(await visible(pg, sel), `A ${nom} — ${lib} est visible sans rien ouvrir`);
     }
     // ── les chiffres n'ont pas bougé (mêmes valeurs que sur le code d'avant)
@@ -192,11 +206,12 @@ async function scenarioA(b, vp, sombre) {
     const carteMois = await pg.evaluate(() => { const e = document.querySelector('[data-stats-carte="mois"]'); return e ? e.innerText : null; });
     check(carteMois != null && !/Bénéfice/.test(carteMois), `A ${nom} — la carte URSSAF du mois ne redit pas « Bénéfice » (la carte Bénéfice est juste au-dessus)`);
     // ── (revue du 29 oct.) les dépenses près du haut, même micro-entreprise ouverte
-    const dep = await topDe(pg, '#compta-charges'), suivi = await topDe(pg, '[data-suivi-urssaf]'), micro = await topDe(pg, '[data-micro-repli]');
+    const dep = await topDe(pg, '#compta-charges'), suivi = await topDe(pg, '#compta-suivi'), micro = await topDe(pg, '[data-micro-repli]');
     const seuilDep = tel ? 2400 : 1900;
     check(dep != null && dep < seuilDep, `A ${nom} — « Tes dépenses » à moins de ${seuilDep} px du haut : ${dep} px`);
     check(dep != null && micro != null && dep < micro && (suivi == null || dep < suivi), `A ${nom} — les dépenses avant le suivi URSSAF et « Ta micro-entreprise » (dépenses ${dep}, suivi ${suivi}, micro ${micro})`);
-    // ── une phrase une fois : l'URSSAF du mois en cours
+    // ── une phrase une fois : l'URSSAF du mois en cours (le suivi ouvert, comme pour le lire)
+    await ouvrirRepli(pg, 'compta-suivi');
     // (la carte Bénéfice retire aussi ces cotisations de son net : c'est un autre calcul, hors du compte)
     const tout = await pg.evaluate(() => { const m = document.querySelector('.vrm-main'); if (!m) return ''; const c = m.cloneNode(true); for (const b of c.querySelectorAll('[data-benef-etat]')) b.remove(); document.body.appendChild(c); const t = c.innerText; c.remove(); return t; });
     const nApayer = (tout.match(/7,44/g) || []).length;
@@ -231,10 +246,11 @@ async function scenarioA(b, vp, sombre) {
     check(!!opts && opts.liberatoire === 'non', `A ${nom} — sa réponse est enregistrée (vrm_micro_options.liberatoire = non)`);
     // ── cibles au doigt
     if (tel) {
-      const hauteurs = await pg.evaluate(() => [...document.querySelectorAll('[data-compta-aller], [data-compta-avance] > summary, [data-micro-repli] > summary')].map((e) => Math.round(e.getBoundingClientRect().height)));
-      check(hauteurs.length >= 7 && hauteurs.every((h) => h >= 43), `A ${nom} — sommaire et replis ≥ 44 px au doigt : ${hauteurs.join(', ')}`);
+      const hauteurs = await pg.evaluate(() => [...document.querySelectorAll('[data-compta-repli] > summary, [data-compta-avance] > summary, [data-micro-repli] > summary')].map((e) => Math.round(e.getBoundingClientRect().height)));
+      check(hauteurs.length >= 5 && hauteurs.every((h) => h >= 43), `A ${nom} — replis ≥ 44 px au doigt : ${hauteurs.join(', ')}`);
     }
-    // ── deux cartes, deux périodes : « Année » sur Vendu et reçu
+    // ── deux cartes, deux périodes : « Année » sur Vendu et reçu (son repli ouvert)
+    await ouvrirRepli(pg, 'compta-ca');
     await pg.locator('[data-ca-choix="annee"]').first().click();
     await pg.waitForFunction(() => { const e = document.querySelector('[data-ca-periode]'); return e && e.getAttribute('data-ca-periode') === 'annee'; }, null, { timeout: 5000 }).catch(() => {});
     await pg.waitForTimeout(300);
@@ -245,10 +261,10 @@ async function scenarioA(b, vp, sombre) {
     check(/ne vaut que pour cette carte/.test((await texte(pg, '[data-ca-periode]')) || ''), `A ${nom} — la carte Vendu et reçu dit que sa période ne vaut que pour elle`);
     await pg.locator('[data-ca-choix="mois"]').first().click();
     await pg.waitForTimeout(300);
-    // ── le sommaire mène à « Avancé » et l'ouvre
-    await pg.locator('[data-compta-aller="compta-avance"]').first().click();
+    // ── un toucher sur « Documents et réglages » l'ouvre
+    await pg.locator('[data-compta-avance] > summary').first().click();
     await pg.waitForTimeout(700);
-    check((await attr(pg, '[data-compta-avance]', 'data-compta-avance')) === 'ouvert', `A ${nom} — « Avancé » du sommaire ouvre le repli`);
+    check((await attr(pg, '[data-compta-avance]', 'data-compta-avance')) === 'ouvert', `A ${nom} — « Documents et réglages » s'ouvre d'un toucher`);
     check(await visible(pg, '[data-compta-resultat]'), `A ${nom} — le résultat de l'année apparaît une fois « Avancé » ouvert`);
     check(await visible(pg, '[data-fe-etat]'), `A ${nom} — la facturation électronique est là, en bas`);
     // ── le geste de la facturation électronique nomme une carte qui existe
@@ -362,8 +378,9 @@ async function scenarioE(b, vp, sombre) {
   const { ctx, pg } = await page(b, vp, sombre, true, errs, { retenu });
   await essaie(`E ${nom}`, async () => {
     await ouvrir(pg, 'compta');
-    await pg.locator('[data-dep-ouvrir]').first().waitFor({ timeout: 40000 });
+    await pg.locator('#compta-charges > summary').first().waitFor({ timeout: 40000 });
     check((await pg.locator('[data-stats-carte="mois"]').count()) === 0, `E ${nom} — le nuage est bien retenu (statut pas encore lu)`);
+    await ouvrirRepli(pg, 'compta-charges');
     await pg.locator('[data-dep-ouvrir]').first().click();
     await pg.locator('[data-dep-libelle]').first().click();
     await pg.keyboard.type('car');
@@ -391,6 +408,8 @@ async function scenarioF(b, vp, sombre) {
   const { ctx, pg } = await page(b, vp, sombre, true, errs, { extra });
   await essaie(`F ${nom}`, async () => {
     await ouvrir(pg, 'compta');
+    await pg.locator('#compta-suivi > summary').first().waitFor({ timeout: 40000 });
+    await ouvrirRepli(pg, 'compta-suivi');
     await pg.locator('[data-suivi-urssaf="lu"]').first().waitFor({ timeout: 40000 });
     await pg.locator('[data-suivi-periode="T3 2026"]').first().waitFor({ timeout: 40000 });
     await pg.waitForTimeout(600);
