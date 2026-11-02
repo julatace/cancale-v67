@@ -9,6 +9,7 @@ import {sendPushToAll,pushCategorieActive} from './push.js';
 import {contexteVendeur} from './owner.js';
 import {DESTINATIONS} from './lien-notif.js';
 import {preparerMessageFavori} from '../../src/favorisVinted.js';
+import {etatAuto,reglerAuto,stopAuto,trierFavorisAuto,ajouterAuto,notificationsCompletes,favorisDepuisNotifications,etatDressingAuto,etatAnnonceAuto,gardeRefuse} from './favoris-auto.js';
 
 // The neutral row cannot be edited by the browser (RLS). One row per Vinted
 // UID, including the rolling quota shared across all devices and VRM owners.
@@ -45,6 +46,78 @@ async function notifierFinFavoris(owner,fin){
     const {title,body}=texteFinFavoris(fin);
     return sendPushToAll({title,body,url:DESTINATIONS.favorisFile(),tag:'favoris-file-'+String(fin.lot||'')});
   });
+}
+// ── LE TOUR DU MODE AUTOMATIQUE (2 nov.) ─────────────────────────────────────
+// Appelé par le pilote de l'app (VRM ouvert dans un onglet, intervalle tiré au
+// hasard). 1. L'état de la file seule (éteint, pause, horaires, quotas…) : rien
+// d'autre n'est lu s'il ne permet rien. 2. Les captures du vendeur, projetées.
+// 3. Un favori à la fois : identité prouvée, paire en vente (dressing complet de
+// moins de 24 h + garde des ventes ailleurs), aucune conversation avec cette
+// personne. 4. Le comparer-et-échanger revérifie tout et pose AU PLUS un message
+// dans la file existante (autorisation unique, consommée par l'extension 5.309).
+// Toute lecture ratée ⇒ `lecture` : rien n'est ajouté (« pas su » ≠ « oui »).
+const lecture=async(req,chemin)=>{const r=await lireCommeVendeur(req,chemin);if(!Array.isArray(r))throw Object.assign(Error('lecture'),{auto:'lecture'});return r;};
+export async function tourAuto(req,{owner,uid,cle,maintenant}){
+  const avant=await modifierNeutre(cle,d=>({valeur:{e:etatAuto(d,owner,maintenant),vue:vueFile(initialiserFile(d),owner)}}));
+  if(!avant)return {etat:'lecture',ajoute:false};
+  if(avant.valeur.e.etat!=='libre')return {etat:avant.valeur.e.etat,jusqua:avant.valeur.e.jusqua||null,ajoute:false,vue:avant.valeur.vue};
+  const stop=etat=>({etat,ajoute:false,vue:avant.valeur.vue});
+  try{
+    const ids=[`harvest_${uid}_notifications`,`harvest_${uid}_wreq_api_v2_conversations`,`vrm_favoris_reglages_${uid}`,`harvest_${uid}_favoris_archive`];
+    const rows=await lecture(req,`app_data?owner=eq.${owner}&id=in.(${ids.join(',')})&select=id,owner,data`);
+    if(rows.some(x=>x.owner!==owner))return stop('lecture');
+    const lire=id=>rows.find(x=>x.id===id)?.data;
+    const prefs=lire(ids[2]);if(prefs?.version!==1||prefs.envoisActifs!==false)return stop('reglages');
+    let p;try{p=validerReglagesFavoris(prefs);}catch{return stop('reglages');}
+    const message=preparerMessageFavori(p.message,p.pourcentage).message;if(!message)return stop('reglages');
+    const offre=p.offreMode?{mode:p.offreMode,valeur:p.offreMode==='pct'?p.pourcentage:p.offreValeur,arrondi:p.arrondi===true}:null;
+    const archive=lire(ids[3]),capture0=lire(ids[0])||archive,trace=lire(ids[1]);
+    if(!capture0||capture0.type!=='notifications'||String(capture0.uid)!==uid||!trace)return stop('capture');
+    if(archive&&(archive.archiveVersion!==1||String(archive.uid)!==uid||!Array.isArray(archive.payload?.notifications)))return stop('capture');
+    let capture;try{capture=notificationsCompletes(capture0,archive);}catch{return stop('capture');}
+    const lignes=favorisDepuisNotifications(capture.payload,capture.domain).lignes;
+    const opts={uid,capture,trace,traces:archive?.creations||[],lectures:archive?.lecturesLiees||[]};
+    let conversations=null,ailleurs=null;
+    const resoudre=async id=>{
+      const essai=extra=>resoudreCiblesFavoris({...opts,...extra,selection:[id]})[0];
+      try{return essai({});}catch(e){if(e.code!=='favoris_preuve_absente'&&e.code!=='favoris_identite_non_unique')throw e;}
+      if(conversations==null)conversations=await lirePreuvesConversationsFavoris(req,{owner,uid,capture,selection:[id]}).catch(()=>[]);
+      try{return essai({conversations});}catch(e){if(e.code!=='favoris_preuve_absente')throw e;}
+      if(ailleurs==null)ailleurs=await parametresDesAutresComptes(req,{owner,uid}).catch(()=>[]);
+      if(!ailleurs.length)throw Error('non prouvé');
+      return essai({conversations,parametresAilleurs:ailleurs});
+    };
+    // Les cibles d'abord (synchrone sur ce qui est déjà lu), puis les lectures d'appoint.
+    const cibles=new Map();
+    for(const l of lignes){try{cibles.set(l.id,await resoudre(l.id));}catch{}}
+    const lu=await modifierNeutre(cle,d=>({valeur:initialiserFile(d)}));if(!lu)return stop('lecture');
+    const tri=trierFavorisAuto({lignes,d:lu.valeur,owner,maintenant,resoudre:id=>{const c=cibles.get(id);if(!c)throw Error('non prouvé');return c;}});
+    const sauts=[...tri.sauts];let choisi=null;
+    if(tri.prets.length){
+      // La paire : dressing COMPLET de moins de 24 h, et la garde des ventes ailleurs.
+      const [dr]=await lecture(req,`app_data?owner=eq.${owner}&id=eq.harvest_${uid}_listings&select=cap:data->>capturedAt,pg:data->payload->pagination,items:data->payload->items`).then(r=>r.length?r:[null]);
+      const ed=etatDressingAuto(dr,maintenant);if(ed)return stop(ed);
+      const m=await lecture(req,`app_data?owner=eq.${owner}&id=eq.main&select=g:data->vinted_offres_garde`);
+      const garde=m[0]?.g||null;
+      const gTout=gardeRefuse(garde,'0',maintenant);if(gTout&&gTout!=='vendue-ailleurs')return stop('garde_absente');
+      // La boîte de réception, lue il y a moins de 24 h (« pas su » ⇒ rien).
+      const [bx]=await lecture(req,`app_data?owner=eq.${owner}&id=eq.harvest_${uid}_inbox&select=cap:data->>capturedAt`).then(r=>r.length?r:[null]);
+      const cb=Date.parse(bx?.cap||'');if(!Number.isFinite(cb)||maintenant-cb>24*3600000)return stop('boite_ancienne');
+      for(const pr of tri.prets.slice(0,5)){
+        const ea=etatAnnonceAuto(pr.cible.itemId,dr,gardeRefuse(garde,pr.cible.itemId,maintenant));
+        if(ea){sauts.push({...pr,raison:ea});continue;}
+        // Une conversation avec cette personne (n'importe quel article) : jamais.
+        const n=Number(pr.cible.recipientId);if(!Number.isSafeInteger(n))continue;
+        const dansBoite=await lecture(req,`app_data?owner=eq.${owner}&id=eq.harvest_${uid}_inbox&data->payload->conversations=cs.${encodeURIComponent(JSON.stringify([{opposite_user:{id:n}}]))}&select=id`);
+        const fil=await lecture(req,`app_data?owner=eq.${owner}&id=like.harvest_${uid}_conv_*&data->payload->conversation->opposite_user->>id=eq.${n}&select=id&limit=1`);
+        if(dansBoite.length||fil.length){sauts.push({...pr,raison:'conversation_existante'});continue;}
+        choisi=pr;break;
+      }
+    }
+    const r=await modifierNeutre(cle,d=>ajouterAuto(d,{owner,maintenant,choisi,sauts,message,offre,prochainFavori:tri.prochainFavori}));
+    if(!r)return stop('lecture');
+    return r.valeur;
+  }catch(e){if(e?.auto)return stop(e.auto);if(e instanceof RefusFavoris)throw e;return stop('lecture');}
 }
 export async function routeFavoris(req,res){
   res.setHeader('Cache-Control','no-store');
@@ -95,18 +168,26 @@ export async function routeFavoris(req,res){
         }
         const lot=randomUUID();const offre=p.offreMode?{mode:p.offreMode,valeur:p.offreMode==='pct'?p.pourcentage:p.offreValeur,arrondi:p.arrondi===true}:null;
         decision=d=>lancerFile(d,{owner,targets,message,intervalleMinutes:p.intervalleMinutes,intervalleMax:p.intervalleMaxMinutes,maintenant,lot,pourcentage:p.pourcentage,offre});
+      }else if(c.action==='auto_regler'){
+        decision=d=>reglerAuto(d,{owner,reglages:c.reglages,confirme:c.confirme===true,maintenant});
+      }else if(c.action==='auto_stop'){
+        decision=d=>stopAuto(d,{owner,maintenant});
+      }else if(c.action==='auto'){
+        const r=await tourAuto(req,{owner,uid,cle,maintenant});
+        return res.status(200).json({ok:true,uid,...r,serveur:maintenant});
       }else if(c.action==='suivant'){
         const jeton=randomUUID(),suivi=randomUUID();decision=d=>reserverFile(d,{owner,maintenant,jeton,suivi});
       }else if(c.action==='terminer'){
         if(typeof c.jeton!=='string'||!/^[0-9a-f-]{36}$/.test(c.jeton))throw new RefusFavoris('Tentative invalide.',400);
-        decision=d=>terminerFile(d,{owner,jeton:c.jeton,resultat:c.resultat,raison:c.raison,maintenant});
+        decision=d=>terminerFile(d,{owner,jeton:c.jeton,resultat:c.resultat,raison:c.raison,maintenant,ecrits:Number.isInteger(c.ecrits)?c.ecrits:null});
       }else if(c.action==='consommer'){
         const v=typeof c.version==='string'&&c.version.length<32?/^(\d+)\.(\d+)\.(\d+)$/.exec(c.version):null;
         if(!v||!(Number(v[1])>5||Number(v[1])===5&&Number(v[2])>=217))throw new RefusFavoris('Recharge l’extension 5.217 pour vérifier l’historique avant tout envoi.');
         if(typeof c.jeton!=='string'||!/^[0-9a-f-]{36}$/.test(c.jeton))throw new RefusFavoris('Tentative invalide.',400);
         const version5281=Number(v[1])>5||Number(v[1])===5&&Number(v[2])>=281;
         const version5280=Number(v[1])>5||Number(v[1])===5&&Number(v[2])>=280;
-        decision=d=>consommerFile(d,{owner,jeton:c.jeton,maintenant,version5281,version5280});
+        const version5309=Number(v[1])>5||Number(v[1])===5&&Number(v[2])>=309;
+        decision=d=>consommerFile(d,{owner,jeton:c.jeton,maintenant,version5281,version5280,version5309});
       }else if(c.action==='verifier'){
         if(typeof c.jeton!=='string'||!/^[0-9a-f-]{36}$/.test(c.jeton))throw new RefusFavoris('Tentative invalide.',400);
         decision=d=>verifierReservation(d,{owner,jeton:c.jeton,maintenant});
