@@ -50,7 +50,7 @@ comptabilité. Il n'est **pas développeur** et pilote tout par des sessions Cla
 | **Serverless** | `api/*.js` | emails entrants, widget iPhone, notifications push, IA |
 | **Données** | Supabase `app_data` (clé-valeur JSONB) + `vinted_accounts` | pas de vrai schéma relationnel |
 | **Prod** | https://vrm.center (Vercel, auto-déployé sur `main`) | |
-| **Dépôt** | `julatace/cancale-v67`, **PUBLIC** ⚠️ | une branche `claude/…` par session, fusionnée par PR (dernière : `claude/amazing-lovelace-xd7obl`) |
+| **Dépôt** | `julatace/cancale-v67`, **PUBLIC** ⚠️ | une branche `claude/…` par session, fusionnée par PR (en cours : `claude/chantiers-2nov`) |
 
 ---
 
@@ -85,7 +85,6 @@ comptabilité. Il n'est **pas développeur** et pilote tout par des sessions Cla
    n'a ni l'un ni l'autre se tait et dit pourquoi — jamais un repli sur sa clé.
 
 ---
-
 
 ## 3. Ce qui est refusé — et les nuances qui comptent
 
@@ -418,7 +417,7 @@ déploient pas (`vercel.json`) ; ne jamais « promouvoir » une prévisualisatio
 
 ## 8. Ce que sait faire l'extension dépend de SA version — `EXT_CAPACITES`
 
-⚠️ **La vérité est `EXT_CAPACITES` dans `src/App.jsx`** (vérifiée par `audit-coherence`) ; cette table doit la recopier (écarts corrigés le 2 nov.).
+⚠️ **La vérité est `EXT_CAPACITES` dans `src/App.jsx`** (vérifiée par `audit-coherence`) ; cette table la recopie.
 L'app tient **une table**, chaque capacité portant **la version où elle est arrivée**
 (jamais la dernière publiée). `extSait(quoi)` rend **trois états** : `absente` ·
 `retard` · `ok` ; une extension muette compte comme `retard`. **« Pas su » ne vaut pas
@@ -488,7 +487,6 @@ sans la fonction.
 | `relaisdest` | `relaisDestination` | **5.295.0** | « le point relais où arrivent tes achats (quand le suivi Vinted le donne) » |
 | `vcfiche` | `ficheVcAnnonce` | **5.296.0** (1er nov.) | annonces Vestiaire en fiches (photo, titre, prix, état) et le compte de l'onglet sur annonces/ventes/achats (flou par compte) |
 
-
 ---
 
 ## 9. État actuel et décisions récentes
@@ -496,7 +494,7 @@ sans la fonction.
 Une ligne par chantier ou décision, le plus récent d'abord. Détail : le fichier
 d'historique du thème (cherche le titre ou la date).
 
-**Extension servie : 5.308.0** (2 nov.). **Liste de travail en cours : `docs/passation/2026-11-02-liste.md`** (lire en premier). **Production** : https://vrm.center,
+**Extension servie : 5.308.0** (2 nov.). **À lire en premier : `docs/passation/2026-11-02-liste.md`.** **Production** : https://vrm.center,
 vérifier par `curl https://vrm.center/api/sante`.
 
 ### Gestes encore attendus de Julien
@@ -632,7 +630,6 @@ Une ligne par chantier. Le récit complet des lignes du 31 oct. au 2 nov. est, m
   numéros à lettres, CA daté au versement, abonnement Stripe (mode test), sécurité
   (routes fermées, RLS, origines exactes de l'extension).
 - **Septembre** — le reste : `docs/journal-2026.md` et les historiques.
-
 
 ---
 
