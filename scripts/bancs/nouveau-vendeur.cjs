@@ -240,6 +240,19 @@ const INSPECTE = (pg, tel) => pg.evaluate((tel) => {
     if (vis(rech) && vis(rep) && rep.getBoundingClientRect().top >= rech.getBoundingClientRect().bottom && Math.abs(rep.getBoundingClientRect().left - rech.getBoundingClientRect().left) > 1.5) colles.push(`« Republier… » décalé de ${Math.round(rep.getBoundingClientRect().left - rech.getBoundingClientRect().left)} px par rapport à la recherche`); }
   { const g = document.querySelector('.vrm-ann-toolbar > .vrm-ann-actions');
     if (vis(g)) { const cs = getComputedStyle(g); if (parseFloat(cs.paddingLeft) > 0 || parseFloat(cs.borderLeftWidth) > 0 || !/rgba\(0, 0, 0, 0\)|transparent/.test(cs.backgroundColor)) colles.push(`le groupe « Republier… » porte un fond ou un retrait de carte (${cs.paddingLeft}, ${cs.borderLeftWidth}, ${cs.backgroundColor})`); } }
+  // Un bouton au libellé court (≤ 3 mots) dont le texte passe sur deux lignes.
+  for (const bt of document.querySelectorAll('.vrm-main button')) {
+    if (!vis(bt) || ferme(bt) || bt.closest('svg')) continue;
+    const t = (bt.innerText || '').trim(); if (!t || /\n/.test(t) || t.split(/\s+/).length > 3) continue;
+    // Les rectangles du TEXTE seul (pas l'icône), regroupés en lignes qui ne se chevauchent pas.
+    const rects = [];
+    const twb = document.createTreeWalker(bt, NodeFilter.SHOW_TEXT);
+    for (let n = twb.nextNode(); n; n = twb.nextNode()) { if (!/\S/.test(n.nodeValue) || !vis(n.parentElement)) continue; const r = document.createRange(); r.selectNodeContents(n); for (const x of r.getClientRects()) if (x.width > 1 && x.height > 4) rects.push(x); }
+    rects.sort((x, y) => x.top - y.top);
+    let lignes = 0, bas = -Infinity;
+    for (const x of rects) { if (x.top >= bas - 2) { lignes++; bas = x.bottom; } else bas = Math.max(bas, x.bottom); }
+    if (lignes > 1 && colles.length < 8) colles.push(`bouton « ${t} » sur ${lignes} lignes`);
+  }
   // Titres coupés par une ellipse.
   const coupes = [];
   for (const e of document.querySelectorAll('.vrm-main h1, .vrm-main h2, .vrm-main h3, [data-phrase-ecran]')) {
@@ -269,7 +282,7 @@ async function tournee(nav, { W, sombre, scenario, base }) {
     dit(!r.mauvais.length, `${T} ${nom} : aucun NaN / undefined / Invalid Date / null à l'écran`, r.mauvais.join(' ¦ '));
     dit(!r.regles.length, `${T} ${nom} : aucun zéro creux ni « au moins 0 € », et un français juste`, r.regles.join(' ¦ '));
     dit(!r.pointsSeuls.length, `${T} ${nom} : aucune ligne qui commence par « · »`, r.pointsSeuls.join(' ¦ '));
-    dit(!r.colles.length, `${T} ${nom} : rien n'est collé (carte vide et ce qui suit, texte et son bandeau)`, r.colles.join(' ¦ '));
+    dit(!r.colles.length, `${T} ${nom} : rien n'est collé ni cassé (carte vide et ce qui suit, texte et son bandeau, bouton sur deux lignes)`, r.colles.join(' ¦ '));
     dit(!r.debord && !r.dehors.length, `${T} ${nom} : rien ne déborde à droite`, JSON.stringify(r.dehors));
     if (scenario === 'vide' && tab === 'compta') {
       // Sans compte Vinted, « ouvre Ventes » ne mène nulle part : la vraie cause et son geste.
