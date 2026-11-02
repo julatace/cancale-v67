@@ -6067,9 +6067,13 @@ const TAUX_URSSAF_DEFAUT = 12.4;
 // contribution à la formation (commerçant) = 12,4 %. Le versement libératoire
 // ajoute 1 % (13,4 %) ; l'ACRE divise les cotisations par deux la première
 // année (6,2 % + 0,1 %). `tauxMicroVente` les compose (`TAUX_MICRO`).
-const TAUX_MICRO = { cotisations: 12.3, acre: 6.2, formation: 0.1, liberatoire: 1 };
+// (2 nov., audit P5 — décret n° 2026-69 du 6 février 2026) L'ACRE dépend de la DATE
+// DE DÉBUT d'activité : avant le 1er juillet 2026, 50 % des cotisations (6,2 %) ;
+// à partir du 1er juillet 2026, 75 % (12,3 × 0,75 = 9,225 %). `acre` : false · true
+// ou 'avant' (l'ancienne réponse « Oui ») · 'apres'.
+const TAUX_MICRO = { cotisations: 12.3, acre: 6.2, acre2026: 9.225, formation: 0.1, liberatoire: 1 };
 const tauxMicroVente = ({ liberatoire = false, acre = false } = {}) =>
-  Math.round(((acre ? TAUX_MICRO.acre : TAUX_MICRO.cotisations) + TAUX_MICRO.formation + (liberatoire ? TAUX_MICRO.liberatoire : 0)) * 10) / 10;
+  Math.round(((acre === 'apres' ? TAUX_MICRO.acre2026 : acre ? TAUX_MICRO.acre : TAUX_MICRO.cotisations) + TAUX_MICRO.formation + (liberatoire ? TAUX_MICRO.liberatoire : 0)) * 10) / 10;
 // (22 oct.) La règle de lecture est À PART de la lecture du navigateur : le
 // rappel URSSAF du serveur (api/ship-reminders.js) lit le MÊME réglage dans la
 // ligne `main` et passe par la même règle (`tauxDe`, recopiée dans
@@ -35578,9 +35582,9 @@ function StatutFiscal({ liveStats, onNav, apresMois = null }) {
   );
   if (regime === undefined) return places(null, null, null, null, null);
   const choisir = (k) => { save('vinted_regime', k); setChanger(false); };
-  const vl = [tauxMicroVente({ liberatoire: true }), tauxMicroVente({ liberatoire: true, acre: true })].includes(taux);
-  const acre = [tauxMicroVente({ acre: true }), tauxMicroVente({ liberatoire: true, acre: true })].includes(taux);
-  const officiel = [false, true].some((a) => [false, true].some((l) => tauxMicroVente({ acre: a, liberatoire: l }) === taux));
+  const vl = [false, 'avant', 'apres'].some((a) => tauxMicroVente({ liberatoire: true, acre: a }) === taux);
+  const acre = ['apres', 'avant'].find((a) => [false, true].some((l) => tauxMicroVente({ acre: a, liberatoire: l }) === taux)) || false;
+  const officiel = [false, 'avant', 'apres'].some((a) => [false, true].some((l) => tauxMicroVente({ acre: a, liberatoire: l }) === taux));
   const poserTaux = (o) => { const t = tauxMicroVente(o); save('vinted_urssaf_taux', t); setTaux(t); };
   const choix = (
     <div data-statut-choix="" className="vrm-statut-grille">
@@ -35682,24 +35686,24 @@ function MicroEntreprise({ taux, poserTaux, officiel, vlTaux, acreTaux }) {
   const jauge = React.useMemo(() => jaugeSeuils({ ligne, now }), [ligne]); // eslint-disable-line react-hooks/exhaustive-deps
   const cal = React.useMemo(() => calendrierUrssaf(freq, now, 3), [freq]); // eslint-disable-line react-hooks/exhaustive-deps
   const vl = opts.liberatoire;                     // 'oui' · 'non' · null (pas répondu)
-  const acre = opts.acre || (opts.at === 0 && acreTaux);
+  const acre = opts.acre || (opts.at === 0 && acreTaux) || false;   // false · 'avant' · 'apres'
   const s = seuilsDe(now.getFullYear());
   const [microOuvert, setMicroOuvert] = React.useState(false);
   const besoin = (optsPret && opts.liberatoire == null) || !!(jauge && ((jauge.tva && jauge.tva.etat && jauge.tva.etat !== 'ok') || (jauge.plafond && jauge.plafond.etat && jauge.plafond.etat !== 'ok')));
   React.useEffect(() => { if (besoin) setMicroOuvert(true); }, [besoin]);
   const poserOptions = (o) => {
     const n = { ...opts, ...o, at: Date.now() };
-    save('vrm_micro_options', { liberatoire: n.liberatoire, acre: !!n.acre, at: n.at });
+    save('vrm_micro_options', { liberatoire: n.liberatoire, acre: n.acre === 'apres' ? 'apres' : n.acre ? 'avant' : false, at: n.at });
     // Le taux suit ses réponses — sauf un taux posé À LA MAIN (Réglages), qu'on
     // ne remplace jamais en silence.
-    if (officiel) poserTaux({ liberatoire: n.liberatoire === 'oui', acre: !!n.acre });
+    if (officiel) poserTaux({ liberatoire: n.liberatoire === 'oui', acre: n.acre === 'apres' ? 'apres' : !!n.acre });
   };
   const poserFreq = (f) => save('vinted_urssaf_freq', f);
   const jour = (d) => `${d.getDate() === 1 ? '1er' : d.getDate()} ${d.toLocaleDateString('fr-FR', { month: 'long' })}`;
   const sTitre = { fontSize: 15, fontWeight: 700, color: C.text, letterSpacing: -0.15 };
   const sCarte = { padding: '16px 18px', margin: 0, height: '100%', boxSizing: 'border-box' };
   const lignesTaux = [
-    ['Cotisations sociales', acre ? TAUX_MICRO.acre : TAUX_MICRO.cotisations, acre ? 'ACRE, 1ʳᵉ année' : 'vente de marchandises (BIC)'],
+    ['Cotisations sociales', acre === 'apres' ? TAUX_MICRO.acre2026 : acre ? TAUX_MICRO.acre : TAUX_MICRO.cotisations, acre === 'apres' ? 'ACRE, 1ʳᵉ année (début depuis le 1er juillet 2026)' : acre ? 'ACRE, 1ʳᵉ année' : 'vente de marchandises (BIC)'],
     ['Formation professionnelle', TAUX_MICRO.formation, 'commerçant'],
     ...(vl === 'oui' || (vl == null && vlTaux) ? [['Impôt sur le revenu', TAUX_MICRO.liberatoire, 'versement libératoire']] : []),
   ];
@@ -35722,9 +35726,9 @@ function MicroEntreprise({ taux, poserTaux, officiel, vlTaux, acreTaux }) {
           <Segmente label="Versement libératoire" value={vl} onChange={(v) => poserOptions({ liberatoire: v })}
             options={[{ v: 'oui', l: 'Oui', data: { 'data-taux-option': 'liberatoire' } }, { v: 'non', l: 'Non', data: { 'data-micro-vl-choix': 'non' } }]} />
         </LigneProfil>
-        <LigneProfil titre="ACRE (première année)" attr={{ 'data-micro-acre': acre ? 'oui' : 'non' }} aide="L'aide à la création réduit tes cotisations sociales la première année d'activité.">
-          <Segmente label="ACRE" value={acre ? 'oui' : 'non'} onChange={(v) => poserOptions({ acre: v === 'oui' })}
-            options={[{ v: 'oui', l: 'Oui', data: { 'data-taux-option': 'acre' } }, { v: 'non', l: 'Non' }]} />
+        <LigneProfil titre="ACRE (première année)" attr={{ 'data-micro-acre': acre === 'apres' ? 'apres' : acre ? 'oui' : 'non' }} aide="L'aide à la création réduit tes cotisations la première année. Elle dépend de ta date de début d'activité : moitié moins avant le 1er juillet 2026, un quart de moins ensuite.">
+          <Segmente label="ACRE" value={acre === 'apres' ? 'apres' : acre ? 'oui' : 'non'} onChange={(v) => poserOptions({ acre: v === 'apres' ? 'apres' : v === 'oui' })}
+            options={[{ v: 'non', l: 'Non' }, { v: 'oui', l: 'Avant juil. 2026', data: { 'data-taux-option': 'acre' } }, { v: 'apres', l: 'Depuis juil. 2026', data: { 'data-taux-option': 'acre2026' } }]} />
         </LigneProfil>
         <div data-statut-taux={String(taux)} style={{ borderTop: `1px solid ${C.border}`, paddingTop: 12, marginTop: 2 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8 }}>

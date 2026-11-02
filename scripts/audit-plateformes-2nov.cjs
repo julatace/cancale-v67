@@ -56,6 +56,17 @@ const sansCommentaires = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[
   dit(/si tu as reçu un avis/.test(app) && /sous 5 000 €/.test(app), 'CFE : au conditionnel, et rien sous 5 000 € de CA');
   dit(/data-ca-ebay-date=""/.test(app), 'CA déclaré : « eBay : daté au jour de la commande » est dit');
 
+  console.log('\nP5 — ACRE (décret n° 2026-69)');
+  const mt = app.match(/const TAUX_MICRO = [^\n]+\n(const tauxMicroVente = [^\n]+\n[^\n]+)/);
+  if (mt) {
+    const TAUX_MICRO = eval('(' + app.match(/const TAUX_MICRO = ([^;]+);/)[1] + ')');
+    const tauxMicroVente = eval('(' + mt[1].replace('const tauxMicroVente = ', '').replace(/;\s*$/, '') + ')');
+    dit(tauxMicroVente({}) === 12.4, 'sans ACRE : 12,4 %', tauxMicroVente({}));
+    dit(tauxMicroVente({ acre: true }) === 6.3 && tauxMicroVente({ acre: 'avant' }) === 6.3, 'ACRE, début avant le 1er juillet 2026 : 6,3 %');
+    dit(tauxMicroVente({ acre: 'apres' }) === 9.3, 'ACRE, début depuis le 1er juillet 2026 : 9,3 %', tauxMicroVente({ acre: 'apres' }));
+    dit(tauxMicroVente({ acre: 'apres', liberatoire: true }) === 10.3, 'avec versement libératoire : 10,3 %');
+  } else dit(false, 'TAUX_MICRO et tauxMicroVente lisibles dans App.jsx');
+
   console.log(`\n${ok} vert(s), ${ko} rouge(s).`);
   process.exit(ko ? 1 : 0);
 })();
