@@ -233,9 +233,11 @@ const lire = (pg) => pg.evaluate((rougeSrc) => {
     cpTete: [...document.querySelectorAll('[data-transp-cp]')].map((x) => ({ k: x.getAttribute('data-transp-cp'), n: x.getAttribute('data-transp-cp-n'), t: x.innerText })),
     passu: passu ? passu.innerText : null, nPassu: document.querySelectorAll('[data-transp-passu]').length, hReessayer: h(reessayer), hAjouter: h(ajouter),
     suivre: [...document.querySelectorAll('[data-cc-colonne="retirer"] [data-cc-carte] a[data-suivre-colis]')].map((a) => a.getBoundingClientRect().height),
-    total: onglet ? onglet.getAttribute('data-n') : null,
+    // (2 nov., colis clair) Le nombre de « À retirer » est sur le sélecteur de Colis.
+    total: (document.querySelector('[data-colis-onglet-choix="retirer"]') || onglet || { getAttribute: () => null }).getAttribute(document.querySelector('[data-colis-onglet-choix="retirer"]') ? 'data-colis-onglet-n' : 'data-n'),
     // L'ambre de CE thème (C.warn) : la bordure du bloc « à vérifier » le porte.
-    ambre: (() => { const v = document.querySelector('[data-a-verifier]'); return v ? getComputedStyle(v).borderTopColor : null; })(),
+    // (2 nov.) L'ambre du thème, lu sur la variable `--vrm-warn` (le bloc « à vérifier » n'a plus de bordure).
+    ambre: (() => { const e = document.createElement('span'); e.style.color = 'var(--vrm-warn)'; (document.querySelector('.vrm-main') || document.body).appendChild(e); const c = getComputedStyle(e).color; e.remove(); return c && c !== 'rgba(0, 0, 0, 0)' ? c : null; })(),
     texte: document.body.innerText, deborde: document.documentElement.scrollWidth > window.innerWidth + 1,
     bg: getComputedStyle(document.body).backgroundColor,
   };
@@ -314,7 +316,9 @@ async function navigateur() {
         dit(lu && lu.etat === 'lu' && lu.court && /^Confirmé chez Mondial Relay (il y a|à l'instant)/.test(lu.t) && !/Point Relais|jusqu|vers le/i.test(lu.t), `${nom} A : ligne LUE « disponible » : une marque courte (« Confirmé chez Mondial Relay il y a 1 h »), sans redire le point ni la limite`, lu && lu.t);
         dit(lu && ambre && lu.color !== ambre, `${nom} A : une ligne « disponible » reste NEUTRE (l'ambre est pour un retour, un incident, un inconnu)`, lu && lu.color);
         dit(passu && passu.transp && passu.transp.etat === 'passu' && /n'a pas répondu/.test(passu.transp.t), `${nom} A : ligne PAS SU : « n'a pas répondu — VRM réessaie plus tard »`, passu && passu.transp && passu.transp.t);
-        dit(jamais && jamais.transp && jamais.transp.etat === 'jamais' && /pas encore lu chez le transporteur/.test(jamais.transp.t), `${nom} A : ligne JAMAIS LUE : « pas encore lu chez le transporteur »`, jamais && jamais.transp && jamais.transp.t);
+        // (2 nov., colis clair) « pas encore lu chez le transporteur » sur chaque carte était la même
+        // phrase partout (§7) : une ligne jamais lue n'écrit RIEN sur la carte (rien n'est affirmé).
+        dit(jamais && !jamais.transp, `${nom} A : ligne JAMAIS LUE : rien d'affirmé sur la carte (pas de ligne du transporteur)`, jamais && jamais.transp && jamais.transp.t);
         // (tour 2 n° 2) Le geste est dit UNE fois en tête, la carte n'en garde que l'état.
         dit(cpi && cpi.transp && cpi.transp.etat === 'cp-inconnu' && /code postal du point relais inconnu/.test(cpi.transp.t) && !/N° de suivi ajoutés/.test(cpi.transp.t), `${nom} A : « code postal inconnu » sur la carte, sans le geste (dit en tête)`, cpi && cpi.transp && cpi.transp.t);
         dit(r.cpTete.length === 1 && r.cpTete[0].k === 'inconnu' && r.cpTete[0].n === '1' && /N° de suivi ajoutés/.test(r.cpTete[0].t), `${nom} A : « code postal inconnu » : le GESTE (l'ajouter avec son code postal) dit UNE fois en tête de liste`, JSON.stringify(r.cpTete));
