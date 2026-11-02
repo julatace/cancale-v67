@@ -529,6 +529,7 @@ vérifier par `curl https://vrm.center/api/sante`.
 
 ### Décisions et chantiers (octobre–novembre 2026)
 Une ligne par chantier. Le récit complet des lignes du 31 oct. au 2 nov. est, mot pour mot, dans `docs/passation/etat-detaille-2026-10-31-au-11-02.md`.
+- **2 nov. (nuit)** — Vestiaire comme Vinted : photo entière (4/5, fond blanc), un N° par annonce Vestiaire (`productId`, `prochainLibre`, rangé dans `main.vrm_vc_numeros`, compté par les numérotations Vinted), ventes et colis sur la ligne/carte Vinted (Colis fait), bordereau tamponné titre + N°, « article » (`audit-numeros-vestiaire`, banc `vestiaire-parite`). Reste : relier un article Vinted+Vestiaire (double N° possible), stock Vestiaire. → historique vestiaire. Geste : regarder Ventes et Colis Vestiaire.
 - **2 nov. (nuit)** — Comptabilité en 3 questions (Combien j'ai gagné ? · Combien je dois déclarer ? · Le détail replié), un montant écrit une fois, liens à l'encre (contraste), règles inchangées (banc `compta-claire`, 68 rouges sur main). → historique compta. Geste : regarder Compta au téléphone ; dire « Noter ma déclaration » ou « J'ai déclaré ».
 - **2 nov. (nuit)** — E-mails et Statistiques plus simples : E-mails = « Oui, tes e-mails arrivent » + À faire + Ce que VRM en a fait ; Stats = 4 chiffres expliqués, compte qui vend le mieux, modèles et tailles, le reste en 2 volets (banc `emails-stats-clairs`, règles inchangées). → historique interface-stock. Geste : regarder Paramètres → E-mails et Statistiques.
 - **2 nov. (nuit)** — Transporteur LU (jamais deviné, sinon « Transporteur pas lu ») en logo + nom à côté du bordereau, ventes et achats (`src/transporteursVisuels.js`, `src/PastilleTransporteur.jsx`, banc `transporteurs-logos`) ; achats Vestiaire sortis de « À envoyer ». Reste : n° Mondial Relay dans l'email du bordereau, eBay avant étiquette, stats. → historique colis-retraits. Geste : regarder Colis au téléphone (logos).
@@ -567,8 +568,6 @@ Une ligne par chantier. Le récit complet des lignes du 31 oct. au 2 nov. est, m
 - **1er nov.** — Cohérence de chaque bouton (banc `tous-boutons`, 99 écrans) : Échap ferme les feuilles, « Paramètres » partout. → historique interface-stock. Geste : aucun.
 - **1er nov.** — Ma journée calme (colonne centrée, Urgent → À faire → chiffres, liste à filets `src/UneLigne.jsx`) ; « tout sans défiler » exigé seulement en densité 0,65. → historique interface-stock. Geste : dire si l'écran aéré lui va.
 - **1er nov.** — Une épingle par point relais avec le nombre de colis ; adresse ambiguë ⇒ « pas sur la carte » + raison (`jugerBan`). → historique colis-retraits. Geste : aucun.
-- **1er nov.** — Chiffres de Ma journée épurés (semaine en barres, un grand chiffre + Bénéfice · Reçu · À mettre de côté · CA), règles inchangées. → historique interface-stock. Geste : aucun.
-- **1er nov.** — Récapitulatif d'une vente (frise Vendue → Argent reçu cochée seulement PROUVÉE, `src/recapVente.js`). → historique interface-stock. Geste : regarder une vente.
 - **Avant le 20 oct.** — `docs/passation/etat-detaille-2026-10-31-au-11-02.md` (fin) et `docs/journal-2026.md`.
 
 ---

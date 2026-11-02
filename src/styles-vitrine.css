@@ -631,3 +631,12 @@ html .vrm-app-shell .vrm-atelier-rail [data-nav-groupe] .vrm-rail-section-label 
   html .vrm-app-shell .vrm-atelier-rail .vrm-rail-button { min-height: 34px; }
   html .vrm-app-shell .vrm-atelier-rail [data-nav-groupe].vrm-rail-management-group { margin-top: 8px; }
 }
+
+/* ── (2 nov., soir) VESTIAIRE : la photo ENTIÈRE ──────────────────────────────
+   Julien : « c'est beaucoup zoomé sur le produit ». Vestiaire pose ses produits
+   détourés sur blanc : la fiche garde ses proportions (4/5, comme Vinted et
+   Leboncoin) mais la photo est CONTENUE sur fond blanc, jamais recadrée. */
+html body .vrm-app-shell .vrm-vc-catalog li > img {
+  object-fit: contain !important; background: #fff !important; padding: 6%; box-sizing: border-box;
+}
+html body .vrm-app-shell img[data-photo-vc] { object-fit: contain !important; background: #fff !important; }
