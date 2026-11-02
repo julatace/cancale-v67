@@ -201,7 +201,13 @@ const ECRANS = [
           }
           // La puce transporteur : à GAUCHE du bouton, même rangée, 44 px, rayon 12, une ligne.
           const R = m.rangees.filter(Boolean);
-          if (E.id === 'ventes' || E.id === 'colis') dit(R.length > 0, 'une rangée « puce + bordereau » au moins', String(R.length));
+          if (E.id === 'ventes') dit(R.length > 0, 'une rangée « puce + bordereau » au moins', String(R.length));
+          // Colis (maquette FusionColis, 2 nov. 22 h) : le transporteur est l'en-tête de son groupe, un bouton rond imprime.
+          if (E.id === 'colis') {
+            const g = await pg.evaluate(() => ({ groupes: [...document.querySelectorAll('[data-groupe-transp]')].map((x) => x.getAttribute('data-groupe-transp')), ronds: document.querySelectorAll('[data-fu-rond]').length, rondPret: document.querySelectorAll('[data-fu-rond].is-pret').length }));
+            dit(g.groupes.length > 0 && new Set(g.groupes).size === g.groupes.length, 'colis rangés par transporteur, un en-tête par transporteur', g.groupes.join(' | '));
+            dit(g.ronds > 0 && g.rondPret > 0, 'un bouton rond par colis, bleu quand le bordereau est là', `${g.rondPret}/${g.ronds}`);
+          }
           if (R.length) {
             const mauvaises = R.filter((r) => !(r.ok && r.memeLigne && r.gauche && r.h === 44 && r.uneLigne && r.rayon === '12px'));
             dit(!mauvaises.length, 'la puce est à gauche du bouton, même ligne, 44 px, rayon 12, libellé sur une ligne', JSON.stringify(mauvaises[0] || R[0]).slice(0, 220));

@@ -123,6 +123,8 @@ import { transporteurDuColis, cleStatTransporteur, cleTransporteur } from "./tra
 import { CarteTournee, TourneePleinEcran } from "./Tournee.jsx";
 // (1er nov.) Julien : « enlève Tournée » — la carte n'est plus sur Ma journée.
 const TOURNEE_SUR_JOURNEE = false;
+// (2 nov., 22 h, Julien : « recopie à l'identique » la maquette FusionJournee) : la grille des widgets n'est plus sur Ma journée.
+const JOURNEE_AVEC_WIDGETS = false;
 import { UneLigne } from "./UneLigne.jsx";
 import { GlisserVente, useDeposeDiffere, BarreAnnulerDepose } from "./GlisserDepose.jsx";
 import { beneficeLigneVente, texteBenefice, euros as eurosLigne } from "./beneficeLigne.js";
@@ -15168,7 +15170,7 @@ function CibleNotif({ tab, sub }) {
     </p>
   );
 }
-function ScreenHead({ icon, title, desc, right, principal, sous }) {
+function ScreenHead({ icon, title, desc, right, principal, sous, date = '' }) {
   const line = typeof icon === 'string' && ICON_PATHS[icon];
   const Titre = React.useContext(DansEspacePlateforme) ? 'h2' : 'h1';
   // ⚠️ UNE MANCHETTE, PAS UN EN-TÊTE DE TABLEAU DE BORD. Le titre était une
@@ -15197,6 +15199,8 @@ function ScreenHead({ icon, title, desc, right, principal, sous }) {
           {line
             ? <span aria-hidden="true" style={{display:'flex',color:C.muted,flexShrink:0}}><Icon name={icon} size={20}/></span>
             : (icon ? <span aria-hidden="true" style={{fontSize:18}}>{icon}</span> : null)}
+          {/* (2 nov., 22 h, maquettes Fusion) La date au-dessus du titre. */}
+          {date ? <span className="vrm-fu-date-tete" data-date-tete="">{date}</span> : null}
           <Titre className="vrm-display" style={{color:C.text}}>{title}</Titre>
           {sous ? <div className="vrm-screen-head-sous" data-sous-titre="">{sous}</div> : null}
           {/* ⚠️ LA DESCRIPTION D'ÉCRAN N'EST PLUS AFFICHÉE. Julien : « il y a trop
@@ -19537,7 +19541,11 @@ function FiltresVentes({ value, onChange, search, onSearch, cancelled = false, d
 // (2 nov., Fusion) `frise` : la frise de suivi de la vente (src/design/Frise.jsx),
 // posée sous la ligne ; `bas` : le geste principal (« Imprimer le bordereau ») et
 // le transporteur. Absents ⇒ la ligne d'avant.
-function LigneVenteCompacte({ photo, photoNoeud = null, titre, sous = '', etat, etatNoeud = null, ton = '', montant, children, numerosArticle = [], plateforme = '', initialOuvert = false, gestes = null, montantCentimes, benef, recap = null, frise = null, bas = null, ...props }) {
+// (2 nov., 22 h, maquette FusionVentes « à l'identique ») `fusion` : { nom, num, site } —
+// la ligne prend la forme de la maquette : photo 60 px, le nom et le prix sur la première
+// ligne, la puce N° noire et le site, l'état ; les colonnes Achat · Bénéfice restent dans
+// la page (mêmes `data-*`) mais ne s'affichent plus sur la carte (le tiroir les porte).
+function LigneVenteCompacte({ photo, photoNoeud = null, titre, sous = '', etat, etatNoeud = null, ton = '', montant, children, numerosArticle = [], plateforme = '', initialOuvert = false, gestes = null, montantCentimes, benef, recap = null, frise = null, bas = null, fusion = null, ...props }) {
   const [ouvert, setOuvert] = React.useState(initialOuvert);
   const panneau = React.useId();
   const declencheur = React.useRef(null);
@@ -19609,9 +19617,14 @@ function LigneVenteCompacte({ photo, photoNoeud = null, titre, sous = '', etat, 
   const dejaOuvert = React.useRef(false);
   if (ouvert) dejaOuvert.current = true;
   const numerosFiche=[...new Set(numerosArticle.map(n=>String(n||'').trim()).filter(Boolean))];
-  return <div {...props} data-ligne-ouverte={ouvert} data-plateforme-vente={plateforme||undefined} data-benef-cols={benef?'':undefined}>
+  return <div {...props} data-ligne-ouverte={ouvert} data-plateforme-vente={plateforme||undefined} data-benef-cols={benef?'':undefined} data-fu-forme={fusion?'':undefined}>
     <button ref={declencheur} type="button" className="vrm-ledger-sale-toggle" aria-expanded={ouvert} aria-controls={panneau} aria-haspopup="dialog" aria-label={`Ouvrir les actions : ${titre || 'vente'}`} onClick={()=>setOuvert(v=>!v)}>
       <span className="vrm-ledger-photo-empty">{photoNoeud || <PhotoVente src={photo} size={46} portrait/>}</span>
+      {fusion ? <span className="vrm-fu-vente-txt">
+        <span className="vrm-fu-vente-l1"><span className="vrm-fu-vente-nom">{fusion.nom || '(sans titre)'}</span><span className="vrm-fu-vente-prix" aria-hidden="true">{fusion.prix || montant}</span></span>
+        <span className="vrm-fu-vente-l2">{fusion.num ? <span className="vrm-fu-num">N°{fusion.num}</span> : null}<span className="vrm-fu-site" data-site={fusion.site || plateforme}>{fusion.siteNom || ''}</span></span>
+        <span className="vrm-fu-vente-l3" data-ton={ton || undefined}>{etatNoeud || etat}</span>
+      </span> : null}
       <span className="vrm-ledger-sale-title" title={titre}><span className="vrm-ledger-sale-nom">{titre || '(sans titre)'}</span>{sous ? <span className="vrm-ledger-sale-sous" data-vente-sous="">{sous}</span> : null}</span>
       <span className="vrm-ledger-sale-state" title={etat} data-ton={ton || undefined}>{etatNoeud || etat}</span>
       <span className="vrm-ledger-sale-amount" data-prix-vente={montantCentimes ?? undefined}>{montant}</span>
@@ -37828,9 +37841,16 @@ function useBeneficeCalcul(compta, periode) {
 //     en pointillé (« pas su », jamais 0).
 // L'anneau ne se dessine que si le NET du mois se calcule (tous les prix d'achat,
 // frais et cotisations connus) : ses parts somment alors au vendu du mois.
-function ComptaFusion({ compta }) {
+function ComptaFusion({ compta, onNav }) {
   const { pub, etat, B } = useBeneficeCalcul(compta, 'mois');
+  const ligneUrssaf = useLigneUrssaf();
+  const regime = useRegimeFiscal();
   if (etat === 'encours' || !pub) return null;
+  // L'encart « Déclaration URSSAF » (maquette) : le rappel de Ma journée (`rappelUrssaf`), « J'ai
+  // déclaré » ouvre le formulaire de toujours (`demanderDeclaration`) ; rien sinon.
+  const micro = regime === undefined || urssafConcerne(regime);
+  const rappel = micro ? rappelUrssaf({ freq: load('vinted_urssaf_freq', 'trimestriel'), declare: lireDeclarations(), ligne: ligneUrssaf }) : null;
+  const dateRappel = rappel ? (() => { const [y, m, d] = String(rappel.dueIso).split('-').map(Number); return new Date(y, m - 1, d).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' }); })() : '';
   const moisLong = new Date().toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
   const anneau = (() => {
     if (!B || B.netFinal == null || !(B.ca > 0) || B.nCout !== B.n) return null;
@@ -37855,7 +37875,6 @@ function ComptaFusion({ compta }) {
   return (
     <div className="vrm-fu-compta vrm-fu-ecran vrm-fu-compta-grille" data-fu-compta="">
       <section className="vrm-fu-panneau" aria-label="Où passe l'argent vendu" data-fu-anneau={anneau ? String(anneau.pct) : ''}>
-        <div className="vrm-fu-panneau-tete"><h3>Où passe l'argent</h3><span>{moisLong}</span></div>
         {anneau ? (
           <div className="vrm-fu-anneau">
             <svg width="132" height="132" viewBox="0 0 132 132" role="img" aria-label={`Il te reste ${anneau.pct} % de ce que tu as vendu`}>
@@ -37865,13 +37884,13 @@ function ComptaFusion({ compta }) {
               <text x="66" y="87" textAnchor="middle" className="vrm-fu-anneau-sous">te reste</text>
             </svg>
             <ul className="vrm-fu-legende">
-              {anneau.parts.map(([cle, lib, , p]) => <li key={cle} data-fu-part={cle} data-fu-pct={String(p)}><i className={'is-' + cle}/><span>{lib}</span><b>{p} %</b></li>)}
+              {anneau.parts.filter(([cle, , v]) => !(cle === 'frais' && !(v > 0))).map(([cle, lib, , p]) => <li key={cle} data-fu-part={cle} data-fu-pct={String(p)}><i className={'is-' + cle}/><span>{lib}</span><b>{p} %</b></li>)}
             </ul>
           </div>
         ) : <p className="vrm-fu-note" data-fu-anneau-pourquoi="">{!B ? 'Rien à répartir tant que le bénéfice n’est pas calculé.' : B.n === 0 ? 'Aucune vente finalisée ce mois-ci.' : B.nCout < B.n ? 'La répartition s’affiche quand tous les prix d’achat du mois sont saisis.' : 'La répartition s’affiche quand les frais et les cotisations du mois sont connus.'}</p>}
       </section>
       <section className="vrm-fu-panneau" aria-label="Bénéfice sur tes ventes, six derniers mois" data-fu-mois6={mois6.map((m) => (m.v == null ? '' : Math.round(m.v))).join(',')}>
-        <div className="vrm-fu-panneau-tete"><h3>6 derniers mois</h3><span>bénéfice sur tes ventes</span></div>
+        <div className="vrm-fu-panneau-tete"><h3>6 derniers mois</h3><span>bénéfice</span></div>
         <div className="vrm-fu-barres">
           {mois6.map((m) => (
             <div key={m.cle} className="vrm-fu-barre" data-courant={m.courant ? '' : undefined} data-vide={m.v == null ? '' : undefined}
@@ -37882,6 +37901,12 @@ function ComptaFusion({ compta }) {
           ))}
         </div>
       </section>
+      {rappel && rappel.aNoter && rappel.aNoter.length ? (
+        <section className="vrm-fu-declaration" data-fu-urssaf={rappel.dueIso} aria-label="Déclaration URSSAF">
+          <div><b>Déclaration URSSAF</b><span>avant le {dateRappel}</span></div>
+          <button type="button" className="vrm-fu-encre-btn" data-fu-geste="" data-urssaf-cest-declare={rappel.aNoter[0]} onClick={() => demanderDeclaration(rappel.aNoter[0], onNav)}>J'ai déclaré</button>
+        </section>
+      ) : null}
     </div>
   );
 }
@@ -37967,10 +37992,20 @@ function BeneficeCompta({ compta, onNav, onSansDepenses, onAjouterDepense, sansC
             {etat === 'encours' ? 'Je lis ton bénéfice…' : sansCompte ? <span data-benefice-sans-compte="">Ton bénéfice arrivera ici dès qu’un compte Vinted sera relié (le bandeau du haut dit comment).</span> : <>Ton bénéfice se calcule dans l'écran Ventes, à partir de tes prix d'achat : ouvre-le une fois{onNav ? <> (<a href="?tab=cat_ventes" onClick={(ev) => { ev.preventDefault(); onNav('cat_ventes'); }} style={{ color: C.accent, fontWeight: 600, textDecoration: 'none' }}>Ventes</a>)</> : null}, il arrivera ici.</>}
           </p>
         ) : (<>
-          <div className="vrm-compta-libelle" data-benef-titre="">{titreNet} · {B.libelle}</div>
+          {/* (2 nov., 22 h, maquette FusionCompta « à l'identique ») « Ce que tu as gagné », le
+              chiffre, UNE ligne courte (le vendu, le manque nommé et son geste), trois cases. */}
+          <div className="vrm-compta-libelle" data-benef-titre="" title={`${titreNet} · ${B.libelle}`}>Ce que tu as gagné</div>
           <div className="vrm-compta-hero vrm-display" data-compta-chiffre="gagne" data-eur={e2(B.netFinal)} style={{ color: B.netFinal == null ? C.muted : C.text }}>{B.netFinal == null ? '—' : fmt(B.netFinal)}</div>
-          <p className="vrm-compta-phrase" data-compta-phrase="gagne">{phrase}{couverture ? <> {couverture}</> : null}</p>
-          {(B.raison === 'achats' || (B.nCout < B.n)) && <div className="vrm-compta-geste">{lienSaisie}</div>}
+          <p className="vrm-compta-phrase vrm-fu-compta-sous" data-compta-phrase="gagne" title={typeof phrase === 'string' ? phrase : undefined}>
+            {B.n === 0 ? 'Aucune vente finalisée ce mois-ci' : <>sur {fmt(B.ca)} vendus</>}
+            {B.nCout < B.n ? <> · <button type="button" onClick={versSaisiePrix} data-benef-porte="" data-benef-manque="" className="vrm-lien-action">{sansAchat} prix d'achat à saisir</button></> : null}
+            {B.raison === 'frais' ? <> · frais eBay pas connus</> : B.raison === 'cotisations' ? <> · CA déclaré pas encore calculé</> : null}
+          </p>
+          <div className="vrm-fu-cases vrm-fu-compta-cases" style={{ '--n': B.sansCotis ? 2 : 3 }}>
+            <div className="vrm-fu-case" data-fu-case="declarer" data-eur={e2(B.caDecl)}><b className={B.caDecl == null ? 'is-vide' : undefined}>{B.caDecl == null ? '—' : fmt(B.caDecl)}</b><span>à déclarer</span></div>
+            {B.sansCotis ? null : <div className="vrm-fu-case" data-fu-case="urssaf" data-eur={e2(B.cotis)}><b className={B.cotis == null ? 'is-vide' : undefined}>{B.cotis == null ? '—' : fmt(B.cotis)}</b><span>URSSAF</span></div>}
+            <div className="vrm-fu-case" data-fu-case="ventes"><b>{B.n}</b><span>vente{B.n > 1 ? 's' : ''}</span></div>
+          </div>
           {B.depenses === 'jamais' && nuagePret && onSansDepenses ? (
             <div className="vrm-compta-geste"><ChoixDepenses onAucune={onSansDepenses} onAjouter={onAjouterDepense} /></div>
           ) : onAjouterDepense && nuagePret ? (
@@ -38041,7 +38076,7 @@ function useBeneficeJournee() {
   // `on` : montré (tout sauf « masqué par lui ») ; `choix` : les trois états.
   return [choix !== false, poser, choix];
 }
-function BeneficeJournee({ onNav, place, edition = false }) {
+function BeneficeJournee({ onNav, place, edition = false, fusion = false }) {
   const [on, poser, choix] = useBeneficeJournee();
   const [compta, comptaPret] = useLigneSynchro('vrm_compta', lireComptaSynchro);
   const { pub, etat, B } = useBeneficeCalcul(compta, 'mois');
@@ -38054,7 +38089,7 @@ function BeneficeJournee({ onNav, place, edition = false }) {
   // Par défaut (jamais choisi) : seulement s'il y a un bénéfice à montrer — une
   // publication ET au moins une vente du mois au prix d'achat connu. Jamais une
   // case de « — » ou « se calcule ailleurs » qu'il n'a pas demandée.
-  if (choix === null && !(B && B.nCout > 0)) return null;
+  if (choix === null && !(B && B.nCout > 0) && !fusion) return null;
   const minuit = new Date(); minuit.setHours(0, 0, 0, 0);
   const demain = new Date(minuit); demain.setDate(demain.getDate() + 1);
   const J = pub ? beneficeDesJours(pub.jours, minuit, demain) : null;
@@ -38116,9 +38151,26 @@ function BeneficeJournee({ onNav, place, edition = false }) {
       )}
     </>
   );
+  // (2 nov., 22 h, maquette FusionJournee) Dans la tête sombre : « Bénéfice du mois » et le
+  // montant, rien d'autre (le détail vit dans Comptabilité, d'un toucher).
+  if (fusion) return (
+    <button type="button" className="vrm-fu-case is-jour" data-fu-case="benefice" title={titre} {...attrs} onClick={allerCompta}>
+      <span>Bénéfice du mois</span>
+      <b className={valeur == null ? 'is-vide' : undefined} data-journee-benef-ligne={avecNet ? 'net' : 'brut'}>{valeur == null ? '—' : <>{B && B.nCout < B.n ? <span className="vrm-fu-borne">≥</span> : null}{Math.round(valeur).toLocaleString('fr-FR')}{'\u00a0'}€</>}</b>
+    </button>
+  );
   return place === 'integre'
     ? <div className="vrm-jc-cell" title={titre} {...attrs}>{corps}</div>
     : <div className="vrm-day-card vrm-jc vrm-jc-carte" title={titre} {...attrs} style={{ border: `1px solid ${C.border}`, background: C.card }}><div className="vrm-jc-cell">{corps}</div></div>;
+}
+// (2 nov., 22 h, maquette FusionVentes) « · bénéfice X € » sous le vendu du mois : le NET du
+// mois de `useBeneficeCalcul` (la lecture de Ma journée et de Comptabilité), seulement
+// quand il se calcule — sinon rien (jamais un brut présenté comme le bénéfice).
+function BeneficeMoisCourt() {
+  const [compta] = useLigneSynchro('vrm_compta', lireComptaSynchro);
+  const { B } = useBeneficeCalcul(compta, 'mois');
+  if (!B || B.netFinal == null || B.n === 0) return null;
+  return <span data-fu-benef-mois={String(B.netFinal)}> · bénéfice {Math.round(B.netFinal).toLocaleString('fr-FR')}{'\u00a0'}€</span>;
 }
 // (31 oct.) Plus d'interrupteur dans Réglages → Affichage (sa décision) : le
 // bénéfice se masque et se remet DANS Ma journée, en mode « Modifier ».
@@ -38698,7 +38750,7 @@ function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, pan
   const ligneComptaPub = useLigneUrssaf();
   return (
     <div className="vrm-finance-page vrm-fu-ecran" style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 16 }}>
-      <ScreenHead icon="euro" title="Comptabilité" desc="Ce que tu as gagné, ce que tu dois déclarer à l'URSSAF, puis le détail." />
+      <ScreenHead icon="euro" title="Compta" date={(()=>{ const t = new Date().toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' }); return t.charAt(0).toUpperCase() + t.slice(1); })()} desc="Ce que tu as gagné, ce que tu dois déclarer à l'URSSAF, puis le détail." />
       {!ligneComptaPub && <div data-compta-pas-calcule="" style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', padding: '10px 14px', borderRadius: 12, background: 'var(--vrm-b-teinte)', fontSize: 13, color: C.text }}>
         {/* (2 nov.) Un compte neuf, sans compte Vinted : « ouvre Ventes » ne menait
             nulle part (Ventes n'a rien à publier). La cause vraie et son geste —
@@ -38727,7 +38779,7 @@ function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, pan
         onAjouterDepense={() => { ouvrirRepliCompta('compta-charges'); setOuvert('dep'); setVersDepense((n) => n + 1); }} />
       </div>
       {/* (2 nov., style « Fusion ») L'anneau et les six mois — des parts et des hauteurs, aucun montant redit. */}
-      <ComptaFusion compta={data}/>
+      <ComptaFusion compta={data} onNav={onNav}/>
 
       <section id="compta-urssaf" className="vrm-compta-q" data-compta-q="declarer" style={{ scrollMarginTop: 72 }}>
         <div className="vrm-compta-q-tete">
@@ -49211,93 +49263,90 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           ) : null;
         }
         return (
-          <div className="vrm-day-layout vrm-fu-ecran">
+          <div className="vrm-day-layout vrm-fu-ecran vrm-fu-journee">
             <ScreenHead icon="sun" title="Ma journée"/>
 
-            {/* (2 nov., style « Fusion », son choix) LA TÊTE SOMBRE : la date, le
-                bonjour, la semaine (un point sous un jour qui a vendu), puis deux
-                cases — « Vendu aujourd'hui » (`bilanVentes`, la règle de « Vendu ») et
-                le bénéfice du mois (`BeneficeJournee`, la publication
-                `vrm_benefice_jours` — il n'est plus redit plus bas, §7). Les
-                classes d'avant restent (`vrm-day-greeting`, `vrm-day-hello`…) :
-                mêmes repères pour les bancs, une autre forme. */}
+            {/* (2 nov., 22 h, Julien : « recopie à l'identique » la maquette FusionJournee,
+                « sans textes explicatifs ») LA TÊTE SOMBRE, bord à bord : le bonjour, le
+                titre, la semaine, deux cases — « Vendu aujourd'hui » (`bilanVentes`, la règle
+                de « Vendu ») et « Bénéfice du mois » (`BeneficeJournee`, publication
+                `vrm_benefice_jours`). Rien d'autre. */}
             {!baseKO && (() => {
               const actifsT = (accounts||[]).filter(a=>!acctOff(a.vinted_user_id)).length;
               const ventesPasLues = actifsT>0 && nomsVentesKO.length>=actifsT && jourN===0;
-              const venduLu = vuHero && !ventesPasLues;
               return (
-              <section className="vrm-day-greeting vrm-w-tete vrm-fu-carte vrm-fu-tete" data-fu-carte="" aria-label="Ta journée">
-                <div className="vrm-fu-tete-haut">
-                  <div className="vrm-day-date vrm-fu-bonjour">{dateStr}</div>
-                  <div className="vrm-day-hello vrm-fu-titre-tete">{hello}{prenomLisible(prenom) ? ' ' + prenomLisible(prenom) : ''}</div>
-                  <p className="vrm-phrase-ecran vrm-fu-date" data-phrase-ecran="journee">{PHRASES_ECRAN.journee}</p>
-                  {!loading && jobs.length>0 && <div className="vrm-day-todo vrm-fu-date"><b>{jobs.length} chose{jobs.length>1?'s':''}</b> à faire aujourd'hui</div>}
-                </div>
-                {!premierJour && !editJournee && (
-                  <button type="button" className="vrm-w-modifier" data-widgets-modifier="" aria-label="Modifier les widgets de Ma journée" onClick={()=>setEditJournee(true)}>Modifier</button>
-                )}
-                {vuHero && Array.isArray(semaine) && semaine.length===7 && (
-                  <ol className="vrm-fu-semaine" aria-label="Cette semaine" data-fu-semaine="">
-                    {semaine.map((j)=>(
-                      <li key={j.cle} className="vrm-fu-jour" data-auj={j.auj?'':undefined} data-futur={j.futur?'':undefined} data-vendu={j.futur||ventesPasLues?undefined:String(j.vendu.n)} title={j.futur ? j.long : `${j.long} : ${j.vendu.n} vente${j.vendu.n>1?'s':''}`}>
-                        <span aria-hidden="true">{j.jour.charAt(0)}</span><b>{j.num}</b>
-                      </li>
-                    ))}
-                  </ol>
-                )}
+              <section className="vrm-day-greeting vrm-w-tete vrm-fu-tete" data-fu-carte="" aria-label="Ta journée">
+                <div className="vrm-day-hello vrm-fu-bonjour">{hello}{prenomLisible(prenom) ? ' ' + prenomLisible(prenom) : ''}</div>
+                <h1 className="vrm-fu-titre-tete">Ma journée</h1>
+                {/* Les sept derniers jours, aujourd'hui à droite (maquette). */}
+                <ol className="vrm-fu-semaine" aria-label="Les sept derniers jours" data-fu-semaine="">
+                  {[6,5,4,3,2,1,0].map((k)=>{ const d = new Date(); d.setHours(0,0,0,0); d.setDate(d.getDate()-k);
+                    return (
+                      <li key={k} className="vrm-fu-jour" data-auj={k===0?'':undefined} title={d.toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long'})}>
+                        <span aria-hidden="true">{['D','L','M','M','J','V','S'][d.getDay()]}</span><b>{d.getDate()}</b>
+                      </li>); })}
+                </ol>
                 {!premierJour && (
                   <div className="vrm-fu-cases">
-                    {(venduLu || jourN>0) ? (
-                      <button type="button" className="vrm-fu-case is-jour" data-fu-case="jour" data-fu-vendu-jour={Math.round(jourEur*100)} title={`Vendu aujourd'hui, toutes plateformes (date de la vente)${nomsVentesKO.length?` — sans ${nomsVentesKO.join(', ')} (ventes pas lues)`:''}`} onClick={()=>onNav&&onNav('cat_ventes')}>
-                        <span>Vendu aujourd'hui</span>
-                        <b><Montant v={jourEur}/></b>
-                        <span className="vrm-fu-case-sous">{nomsVentesKO.length ? 'au moins · ' : ''}{jourN>0 ? `${jourN} vente${jourN>1?'s':''}` : 'aucune vente pour l’instant'}</span>
-                      </button>
-                    ) : (vuHero && ventesPasLues) ? (
-                      <div className="vrm-fu-case is-jour" data-fu-case="jour" data-fu-vendu-jour="">
-                        <span>Vendu aujourd'hui</span><b className="is-vide">—</b><span className="vrm-fu-case-sous">ventes pas lues</span>
-                      </div>
-                    ) : null}
-                    <BeneficeJournee onNav={onNav} place="integre" edition={editJournee}/>
+                    <button type="button" className="vrm-fu-case is-jour" data-fu-case="jour" data-fu-vendu-jour={vuHero && !ventesPasLues ? Math.round(jourEur*100) : ''} onClick={()=>onNav&&onNav('cat_ventes')}>
+                      <span>Vendu aujourd'hui</span>
+                      <b className={vuHero && !ventesPasLues ? undefined : 'is-vide'}>{vuHero && !ventesPasLues ? <>{nomsVentesKO.length ? <span className="vrm-fu-borne">≥</span> : null}{Math.round(jourEur).toLocaleString('fr-FR')}{' '}€</> : '—'}</b>
+                    </button>
+                    <BeneficeJournee onNav={onNav} place="integre" fusion edition={false}/>
                   </div>
                 )}
               </section>
               ); })()}
 
-            {/* ⚠️ Rétabli (retiré par #500) : si le serveur ne peut plus envoyer
-                AUCUNE notification, il faut le voir ICI. */}
             {!baseKO && !premierJour && <NotifsMuettes onNav={onNav}/>}
 
-            {/* LES ALERTES QUI COÛTENT DE L'ARGENT : toujours en tête, hors grille,
-                jamais retirables — une alerte cachée, c'est une paire vendue deux
-                fois ou un colis qui ne part pas. */}
-            {!loading && alertesArgent.length>0 && (
-              <section className="vrm-day-urgent" aria-label="Urgent">
-                <h2 className="vrm-day-titre-section">Urgent</h2>
-                {listeTaches(alertesArgent, {'data-alertes-argent': ''})}
-              </section>
-            )}
-            {editJournee && !loading && alertesArgent.length>0 && (
-              <div className="vrm-aide" data-alertes-fixes="" style={{fontSize:12,color:C.muted,margin:'-4px 2px 12px'}}>Ces alertes restent en tête : elles peuvent te coûter de l'argent.</div>
-            )}
+            {/* « À FAIRE » (maquette) : une carte par geste — pastille chiffrée (encre ; ambre
+                si c'est pressé), un titre, une ligne courte, le geste en pilule. Les cases du
+                jour (À envoyer, À retirer, Messages, Prix à baisser : leurs MÊMES compteurs,
+                `data-tuile`) et les alertes (urgentes d'abord), puis le reste. */}
+            {!baseKO && !premierJour && (() => {
+              const cases = T.filter((x) => !x.pasSu && x.t && x.t.n > 0);
+              const nPretsJournee = (tuiles.envoyer && tuiles.envoyer.emballer && tuiles.envoyer.emballer.n) || 0;
+              // « Emballer » est le geste de la carte « Colis à poster » : pas une seconde carte.
+              const autres = jobsAFaire.filter((j) => j.id !== 'emballer');
+              const libCase = { envoyer: 'Colis à poster', retirer: 'Colis à retirer', messages: 'Messages', prix: 'Prix à baisser' };
+              const gesteCaseF = { envoyer: nPretsJournee > 0 ? 'Imprimer' : 'Voir', retirer: 'Voir', messages: 'Répondre', prix: 'Voir' };
+              const nGestes = cases.length + alertesArgent.length + autres.length + (urssafJob ? 1 : 0);
+              const carteCase = (x) => {
+                const so = sousCase(x);
+                const presse = !!(x.t && x.t.presses && (x.t.presses.urgent || x.t.presses.nAuj > 0)) || !!(x.t && x.t.alerte);
+                return (
+                  <button key={x.id} type="button" className="vrm-day-task vrm-fu-tache" data-tuile={x.id} data-n={String(x.t.n)} data-case={x.id}
+                    data-presses={x.id === 'envoyer' && x.t && x.t.presses ? String(x.t.presses.n) : undefined} data-limite-heure={x.id === 'envoyer' && x.t && x.t.presses ? x.t.presses.heure : undefined} data-a-verifier={x.id === 'retirer' && x.t && x.t.aVerifier ? String(x.t.aVerifier) : undefined}
+                    title={titreCase(x)} onClick={()=>{ if (x.id === 'envoyer' && nPretsJournee > 0) _pendingBordPrint = true; if (onNav) onNav(x.tab); }}>
+                    <span className={'vrm-fu-pastille' + (presse ? ' is-urgent' : '')} aria-hidden="true">{x.t.n > 999 ? '999+' : x.t.n}</span>
+                    <span className="vrm-day-task-textes"><span className="vrm-day-task-title">{libCase[x.id] || x.l}</span>{so ? <span className="vrm-day-task-note" data-sous-ligne={so.cle}>{so.texte}</span> : (x.id === 'envoyer' && nPretsJournee > 0) ? <span className="vrm-day-task-note">{nPretsJournee} prêt{nPretsJournee > 1 ? 's' : ''} à imprimer</span> : null}</span>
+                    <span className="vrm-day-task-action"><span className="vrm-day-task-action-mot">{gesteCaseF[x.id] || 'Voir'}</span></span>
+                  </button>
+                );
+              };
+              if (loading) return null;
+              if (nGestes === 0) return <p className="vrm-fu-vide" data-tout-a-jour="">Rien à faire</p>;
+              return (
+                <section className="vrm-fu-afaire" aria-label="À faire">
+                  <div className="vrm-fu-titre-section"><h2 className="vrm-day-titre-section">À faire</h2><span data-fu-gestes={nGestes}>{nGestes} geste{nGestes > 1 ? 's' : ''}</span></div>
+                  <div className="vrm-day-task-list" data-barre-jour="">
+                    {alertesArgent.length ? <div style={{display:'contents'}} data-alertes-argent="">{alertesArgent.map(tache)}</div> : null}
+                    {cases.map(carteCase)}
+                    {autres.map(tache)}
+                    {urssafJob ? tache(urssafJob, 99) : null}
+                  </div>
+                  {/* Les cases à zéro restent lisibles par les autres écrans et les bancs (mêmes compteurs), sans place à l'écran. */}
+                  <div hidden>{T.filter((x) => !cases.includes(x)).map((x) => <span key={x.id} data-tuile={x.id} data-n={x.pasSu ? '' : String(x.t ? x.t.n : 0)}/>)}</div>
+                </section>
+              );
+            })()}
 
-            {/* (1er nov.) LA TOURNÉE : Imprimer → Emballer → Déposer → Retirer, en tête. */}
-            {TOURNEE_SUR_JOURNEE && tournee && <CarteTournee tournee={tournee} nArrets={tournee.arrets.length} onEtape={ouvrirEtapeTournee} onOuvrirTournee={()=>setTourneeOuverte(true)}/>}
-            {TOURNEE_SUR_JOURNEE && tournee && tourneeOuverte && <TourneePleinEcran arrets={tournee.arrets} C={C} zIndex={Z_CONFIRMATION} Retour={FermeAuRetour} onFermer={()=>setTourneeOuverte(false)}
-              onArret={(a)=>{ setTourneeOuverte(false); ouvrirEtapeTournee(a.type === 'depot' ? 'deposer' : 'retirer'); }}/>}
-
-            {/* (21 octobre) Les messages eBay n'ont pas pu être lus : dit UNE fois,
-                sans chiffre — la case « Messages » ne compte alors que Vinted. */}
-            {!baseKO && !premierJour && !loading && tuiles.messages && tuiles.messages.ebay === null && (
-              <div data-ebay-msg-passu="" style={{fontSize:12.5,color:C.muted,margin:'-4px 2px 12px'}}>Messages eBay pas lus — la case « Messages » ne compte que Vinted pour l'instant.</div>
-            )}
-
-            {/* ⚠️ La grille est rendue AUSSI le premier jour : ses widgets s'y
-                taisent d'eux-mêmes (barre, héros, stock…), mais « À faire » peut
-                déjà porter une action — des emails mis de côté, par exemple.
-                La cacher avec le reste les faisait disparaître (vu au banc
-                `emails-mis-de-cote`, 22 oct.). On n'y propose pas « Modifier ». */}
-            <GrilleJournee dispo={dispoJournee} poser={poserDispoJournee} rendus={W} edition={editJournee} setEdition={setEditJournee} peutModifier={!baseKO && !premierJour}/>
+            {/* (2 nov., 22 h) La grille des widgets (Vendu du mois, semaine, attente, dernières
+                ventes, stock, tendances) n'est plus rendue sur Ma journée : la maquette n'a que la
+                tête et « À faire ». Les chiffres vivent dans Ventes, Statistiques et Comptabilité.
+                Un drapeau suffit à la remettre. */}
+            {JOURNEE_AVEC_WIDGETS && <GrilleJournee dispo={dispoJournee} poser={poserDispoJournee} rendus={W} edition={editJournee} setEdition={setEditJournee} peutModifier={!baseKO && !premierJour}/>}
 
             {loading && <Skeleton variant="card" count={4}/>}
 
@@ -49307,7 +49356,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 l'app le matin, lit ça, et ne poste pas ses colis.
                 « Rien à faire » ne se dit QUE si on a pu regarder. */}
             {!loading && jobs.length===0 && (baseKO
-              ? <LignePanne>Je n'ai pas pu lire tes données — liste vide pour ça, pas parce qu'il n'y a rien à faire.</LignePanne>
+              ? <LignePanne>Données pas lues pour l’instant.</LignePanne>
               /* ⚠️⚠️ LA FÊTE SUR UNE BOUTIQUE QUI N'EXISTE PAS ENCORE. Mesuré au
                  rendu le 16 septembre, sur une installation neuve : « 🎉 Tout
                  est à jour ! Rien à expédier, rien à retirer » — à quelqu'un
@@ -49323,9 +49372,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               ? <PremiersPas onNav={onNav}
                   titreNeuf="Bienvenue — il reste une chose à brancher"
                   introNeuf={<>Aucun compte Vinted n'est encore relié&nbsp;: c'est l'extension, dans Chrome, qui range tes ventes.</>}/>
-              : (tuiles.envoyer && tuiles.envoyer.n === 0 && colisEb != null && tuiles.retirer && tuiles.retirer.n === 0 && tracking !== null && !(tuiles.messages && tuiles.messages.n > 0)
-                  ? <div data-tout-a-jour="" style={{fontSize:12.5,color:C.muted,margin:'-4px 2px 14px'}}><span style={{fontWeight:600,color:C.text}}>Tout est à jour.</span> Rien à expédier ni à retirer.</div>
-                  : null)
+              : null
             )}
 
             {/* ⚠️ `accounts.length===0` veut dire « aucun compte » OU « je n'ai
@@ -49336,9 +49383,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 des actions sans aucun compte lié (des colis repérés par email,
                 par exemple) — là seulement elle apprend quelque chose. */}
             {/* (2 nov., audit des données ; limites n°3) Seulement quand la liste des comptes est REVENUE : base lente ≠ « aucun compte ». */}
-            {accounts.length===0 && accountsReady===true && !baseKO && !(jobs.length===0 && !loading && premierJour) && (
-              <div style={{marginTop:16,fontSize:13,color:C.muted,textAlign:'center',lineHeight:1.5,padding:'0 10px'}}>Lie un compte Vinted (Paramètres → Comptes liés) pour remplir ta journée.</div>
-            )}
+
             {/* Le bénéfice vit dans « Vendu et reçu » ; si cette carte n'est pas
                 sur l'écran (retirée), il garde sa propre carte ici : allumé dans
                 Réglages ⇒ toujours visible (un seul propriétaire, §11). */}
@@ -49399,12 +49444,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           return (
             <CarteMois className="vrm-fu-ecran vrm-fu-ventes" surtitre={moisLong} data-fu-vendu-mois={Math.round(eurMois * 100)} data-fu-partiel={partiel ? '1' : undefined}
               valeur={<>{partiel ? <span className="vrm-fu-borne">au moins</span> : null}{eurosRecap(eurMois)}</>}
-              sous={<>{nMois} vente{nMois > 1 ? 's' : ''} · toutes plateformes{partiel ? ` · sans ${nomsVentesKO.join(', ')} (pas lu)` : ''}</>}
+              sous={<>{nMois} vente{nMois > 1 ? 's' : ''}<BeneficeMoisCourt/></>}
               courbe={courbe.length > 1 ? courbe : null}
               cases={[
-                { cle: 'aposter', n: aPoster, l: 'à poster', titre: 'Ventes Vinted à expédier, pas encore déposées', onClick: () => setVFilter('aexpedier'), attrs: { 'data-n': String(aPoster) } },
-                { cle: 'enroute', n: enRoute, l: 'en route', titre: 'Déposées, pas encore livrées', onClick: () => setVFilter('transit'), attrs: { 'data-n': String(enRoute) } },
-                { cle: 'avenir', n: aVenir, l: 'argent à venir', titre: "Livrées : l'argent arrive quand l'acheteur confirme", attrs: { 'data-n': String(aVenir) } },
+                // (2 nov., 22 h) Les filtres de la liste ne sont plus affichés (maquette) : ces deux cases
+                // les portent — un toucher filtre, un second toucher rend toute la liste.
+                { cle: 'aposter', n: aPoster, l: 'à poster', titre: 'Ventes à expédier, pas encore déposées', onClick: () => setVFilter((v) => v === 'aexpedier' ? 'all' : 'aexpedier'), attrs: { 'data-n': String(aPoster), 'aria-pressed': vFilter === 'aexpedier' } },
+                { cle: 'enroute', n: enRoute, l: 'en route', titre: 'Déposées, pas encore livrées', onClick: () => setVFilter((v) => v === 'transit' ? 'all' : 'transit'), attrs: { 'data-n': String(enRoute), 'aria-pressed': vFilter === 'transit' } },
+                { cle: 'avenir', n: aVenir, l: 'à payer', titre: "Livrées : l'argent arrive quand l'acheteur confirme", attrs: { 'data-n': String(aVenir) } },
               ]}/>
           );
         })()}
@@ -49716,7 +49763,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               // pas de carte encadrée séparée — style démo, comme Achats).
               <LigneVenteCompacte montantCentimes={sell!=null?Math.round(sell*100):undefined} numerosArticle={num?[num]:[]} plateforme="vinted" photo={photo} photoNoeud={photo?<PhotoVenteSources {...photoSourcesProps} data-photo-vente="ligne" style={{width:28,height:36,borderRadius:8,objectFit:'cover',flexShrink:0}}/>:null} titre={(()=>{ const t=String((e&&e.size)||o.size||'').trim(); const nom=t&&!tailleDansTitre(o.title,t)?`${o.title} · taille ${t}`:o.title; return num?`N°${num} · ${nom}`:nom; })()}
                 {...gp} benef={benefLigne} recap={recapVente} data-depose-attente={deposeIci?'1':undefined}
-                data-fu-ligne="" frise={fuEtapes ? <Frise etapes={fuEtapes} cle={txL} className="vrm-fu-ligne-frise" label="Où en est la vente"/> : null}
+                data-fu-ligne="" fusion={{ prix: sell!=null && !(o.price?.currency_code && o.price.currency_code!=='EUR') ? eurosRecap(sell) : null, nom: (()=>{ const t=String((e&&e.size)||o.size||'').trim(); return t&&!tailleDansTitre(o.title,t)?`${o.title} · ${t}`:o.title; })(), num, site: 'vinted', siteNom: 'Vinted' }} frise={fuEtapes ? <Frise etapes={fuEtapes} cle={txL} className="vrm-fu-ligne-frise" label="Où en est la vente"/> : null}
                 bas={peutDeposer && fuPdf ? <div className="vrm-rangee-bord" data-rangee-bord="" data-sans-glisse="">
                   <PastilleTransporteur t={fuTransp} C={C} className="vrm-fu-transp" data-fu-transporteur=""/>
                   <button type="button" className="vrm-fu-principal" data-fu-geste="" data-fu-imprimer={txL} onClick={()=>imprimerBordereauVente(o)}><Icon name="printer" size={16}/><span className="vrm-lib-long">Imprimer le bordereau</span><span className="vrm-lib-court">Imprimer</span></button>
@@ -52816,7 +52863,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           // colonnes restent aussi : il y a quelque chose de LU à montrer.
           colisSansCompte = noAcc && !baseKO && vue.total === 0;
           if (colisSansCompte) return (<>
-            <ScreenHead icon="doc" title="Colis" sous={<span className="vrm-phrase-ecran" data-phrase-ecran="colis">{PHRASES_ECRAN.colis}</span>}/>
+            <ScreenHead icon="doc" title="Colis" date={dateJourFr(new Date())} sous={PHRASES_ECRAN.colis ? <span className="vrm-phrase-ecran" data-phrase-ecran="colis">{PHRASES_ECRAN.colis}</span> : null}/>
             <div data-colis-sans-compte="">
               <EmptyState icon="link" title="Relie ton compte Vinted pour voir tes colis"
                 desc="Tant qu'aucun compte n'est relié, VRM ne lit rien : il ne peut pas encore dire ce qui est à envoyer, à retirer ou parti. Installe l'extension Chrome sur ton ordinateur, puis ouvre vinted.fr une fois, connecté à ton compte."
@@ -52917,7 +52964,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             </>); };
           const toutLuRet = !notes.retirer && !baseKO && tracking !== null && Array.isArray(buys.items) && !buys.error;
           return (<>
-            <ScreenHead icon="doc" title="Colis" sous={<span className="vrm-phrase-ecran" data-phrase-ecran="colis">{PHRASES_ECRAN.colis}</span>}
+            <ScreenHead icon="doc" title="Colis" date={dateJourFr(new Date())} sous={PHRASES_ECRAN.colis ? <span className="vrm-phrase-ecran" data-phrase-ecran="colis">{PHRASES_ECRAN.colis}</span> : null}
               desc="Ce que Vinted attend de toi, capté par l'extension. Le bordereau manquant est généré tout seul quand tu passes sur Vinted, puis déposé ici. Un colis parti disparaît sans rien cocher."
               right={onglet === 'envoyer' && nPrets>0 && (siteColis==='toutes'||siteColis==='vinted') ? <Bouton variante="primaire" icone="printer" data-lot-ouvrir="1" data-imprimer-prets={nPrets} onClick={ouvrirLot} disabled={batchBusy}
                 title="Tamponne tous les bordereaux reçus (numéro + titre) et les met à la suite dans un seul PDF">{batchBusy?'Préparation…':`Imprimer ${nPrets===1?'le prêt':`les ${nPrets} prêts`}`}</Bouton> : null}/>
@@ -52950,8 +52997,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             <div className="vrm-colis-onglets" data-colis-onglet={onglet} data-colis-total={vue.total}>
               <Segmente plein label="Colis à envoyer ou à retirer" value={onglet} onChange={(v) => onOngletColis && onOngletColis(v)}
                 options={[
-                  { v: 'envoyer', l: 'À envoyer', n: nEnv != null ? `${nEnv}${envPartiel ? '+' : ''}` : null, data: { 'data-colis-onglet-choix': 'envoyer', 'data-colis-onglet-n': nEnv != null ? String(nEnv) : '', 'data-urgent': urgentEnv ? '1' : '0', title: envPartiel ? `Au moins ${nEnv} : un site n'a pas pu être lu` : undefined } },
-                  { v: 'retirer', l: 'À retirer', n: nRet != null ? `${nRet}${retPartiel ? '+' : ''}` : null, data: { 'data-colis-onglet-choix': 'retirer', 'data-colis-onglet-n': nRet != null ? String(nRet) : '', 'data-urgent': urgentRet ? '1' : '0', title: retPartiel && nRet != null ? `Au moins ${nRet} : les e-mails de suivi n'ont pas pu être lus` : undefined } },
+                  { v: 'envoyer', l: 'J’envoie', n: nEnv != null ? `${nEnv}${envPartiel ? '+' : ''}` : null, data: { 'data-colis-onglet-choix': 'envoyer', 'data-colis-onglet-n': nEnv != null ? String(nEnv) : '', 'data-urgent': urgentEnv ? '1' : '0', title: envPartiel ? `Au moins ${nEnv} : un site n'a pas pu être lu` : undefined } },
+                  { v: 'retirer', l: 'Je reçois', n: nRet != null ? `${nRet}${retPartiel ? '+' : ''}` : null, data: { 'data-colis-onglet-choix': 'retirer', 'data-colis-onglet-n': nRet != null ? String(nRet) : '', 'data-urgent': urgentRet ? '1' : '0', title: retPartiel && nRet != null ? `Au moins ${nRet} : les e-mails de suivi n'ont pas pu être lus` : undefined } },
                 ]}/>
             </div>
             {siteColis!=='toutes' && <div data-colis-filtre-note="" style={{fontSize:12,color:C.muted,margin:'0 2px 6px'}}>{vue.colonnes.reduce((t,c)=>t+c.cartes.length,0)} colis {nomSite[siteColis]} sur {vue.total} · <button type="button" className="vrm-lien-action" onClick={()=>setSiteColis('toutes')} style={{border:0,background:'transparent',padding:0,color:C.text,fontWeight:600,cursor:'pointer',fontFamily:'inherit',fontSize:12,minHeight:44}}>tout voir</button></div>}
@@ -53470,7 +53517,17 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   quand il prépare ses cartons. `minmax(min(430px,100%), 1fr)` —
                   le `min()` évite qu'une piste de 430 px déborde un téléphone. */}
               <div className="vrm-colis-grille" data-colis-lignes="1" style={{display:'flex',flexDirection:'column',gap:6}}>
-              {ex.map((e,ix)=>{
+              {(()=>{
+                // (2 nov., 22 h, maquette FusionColis) LES COLIS RANGÉS PAR TRANSPORTEUR : un en-tête
+                // (la tuile du logo, son nom, « N colis »), les colis dessous dans l'ordre d'avant
+                // (le plus pressé d'abord) ; les transporteurs dans l'ordre de leur premier colis.
+                const trNomDe = (x) => { const t = transporteurVente(x.b); return (t && t.nom) || 'Transporteur pas lu'; };
+                const ordreT = new Map(); ex.forEach((x) => { const k = trNomDe(x); if (!ordreT.has(k)) ordreT.set(k, ordreT.size); });
+                const exT = [...ex].sort((a, b) => ordreT.get(trNomDe(a)) - ordreT.get(trNomDe(b)));
+                const nParT = {}; ex.forEach((x) => { const k = trNomDe(x); nParT[k] = (nParT[k] || 0) + 1; });
+                return exT.map((e,ix)=>{
+                const ouvreT = ix === 0 || trNomDe(exT[ix-1]) !== trNomDe(e);
+                const trG = transporteurVente(e.b);
                 const o=e.o, b=e.b;
                 // IDENTITÉ : la photo et le titre viennent de la VENTE quand on
                 // l'a (le n° de transaction est une identité certaine), jamais
@@ -53513,14 +53570,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 const grp = groupeDe(e);
                 // (2 nov.) Toujours l'intertitre (« Prêts à imprimer », « En attente du
                 // bordereau ») : le résumé en colonnes qui les nommait est retiré.
-                const ouvreGrp = ix === 0 || groupeDe(ex[ix-1]) !== grp;
-                const [titreGrp, sousGrp] = TITRE_GROUPE[grp] || ['', ''];
                 return (
                   <React.Fragment key={e.key}>
-                  {ouvreGrp && (
-                    <div data-groupe={grp} className="vrm-colis-groupe" style={{gridColumn:'1 / -1',display:'flex',flexDirection:'column',gap:4,padding:ix===0?'0 2px 2px':'18px 2px 2px'}}>
-                      <span style={{fontSize:11,fontWeight:600,letterSpacing:'.07em',textTransform:'uppercase',color:C.muted}}>{titreGrp}</span>{/* (1er nov.) son nombre est celui de sa colonne, en haut (§7) : pas redit. */}
-                      {sousGrp && <span className="vrm-aide" style={{fontSize:12,color:C.muted,lineHeight:1.45,maxWidth:640}}>{sousGrp}</span>}
+                  {ouvreT && (
+                    <div data-groupe-transp={trNomDe(e)} className="vrm-fu-groupe-transp" style={{gridColumn:'1 / -1'}}>
+                      <span className="vrm-fu-groupe-tuile" aria-hidden="true">{trG && trG.cle ? <LogoTransporteur cle={trG.cle} taille={22}/> : null}</span>
+                      <h3>{trNomDe(e)}</h3>
+                      <span>{nParT[trNomDe(e)]} colis</span>
                     </div>
                   )}
                   <div data-bord-card data-groupe-carte={grp} data-transporteur={cleStatTransporteur(trV)} data-tx-colis={e.txn||''} data-colis-ident={'v:'+(e.txn||e.key)} data-limite={e.lim&&e.lim.limite||''} data-limite-heure={e.lim&&e.lim.heure||''} data-jours={dl==null?'':String(dl)} className="vrm-colis-carte" style={{padding:'14px',border:`1px solid ${dl!=null&&dl<0?C.warn+'66':C.border}`,background:C.card,borderRadius:12,opacity:posted?0.55:1}}>
@@ -53530,7 +53586,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       </div>
                       <div style={{flex:'1 1 150px',minWidth:0}}>
                         <div style={{display:'flex',alignItems:'flex-start',gap:10}}>
-                          <span className="vrm-colis-titre" title={titre} style={{flex:1,minWidth:0,fontSize:14,fontWeight:600,lineHeight:1.35,color:C.text,letterSpacing:'-.01em',display:'-webkit-box',WebkitLineClamp:2,WebkitBoxOrient:'vertical',overflow:'hidden'}}>{titre}</span>
+                          <span className="vrm-colis-titre" title={titre} style={{flex:1,minWidth:0,fontSize:14,fontWeight:600,lineHeight:1.35,color:C.text,letterSpacing:'-.01em',display:'-webkit-box',WebkitLineClamp:2,WebkitBoxOrient:'vertical',overflow:'hidden'}}>{num ? `N°${num} · ` : ''}{titre}</span>
                           {o && o.price && <span className="vrm-display vrm-colis-prix" style={{flexShrink:0,fontSize:17,fontWeight:700,color:C.text,whiteSpace:'nowrap',fontVariantNumeric:'tabular-nums',letterSpacing:'-.02em'}}>{(parseFloat(o.price.amount ?? o.price)||0).toFixed(2).replace('.',',')} €</span>}
                         </div>
                         <div style={{fontSize:12,color:C.muted,marginTop:6,display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
@@ -53544,8 +53600,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                               deux éléments d'une rangée qui passe à la ligne, la seconde
                               ligne commençait par « · » (390 px). Le point reste collé. */}
                           {(o && o.date) || urgTxt ? <span data-colis-dates="" style={{flex:'0 1 auto',minWidth:0}}>
-                            {o && o.date ? `vendue le ${dateFr(o.date, {day:'numeric',month:'short'})}` : ''}
-                            {urgTxt && <span data-colis-limite-texte="" style={{overflowWrap:'anywhere',color:urgCol,fontWeight:dl!=null&&dl<=1?600:500}}>{o && o.date ? '\u00a0·\u00a0' : ''}{urgTxt}</span>}
+                            {urgTxt && <span data-colis-limite-texte="" style={{overflowWrap:'anywhere',color:urgCol,fontWeight:dl!=null&&dl<=1?600:500}}>{urgTxt}</span>}
                           </span> : null}
                           {cell
                             ? <button type="button" onClick={()=>onLocate&&onLocate(num)} style={{flexShrink:0,border:'none',background:'transparent',color:C.blue||C.accent,fontWeight:600,cursor:'pointer',padding:0,fontSize:12,fontFamily:'inherit'}}>· {garageCellLabel(cell)}</button>
@@ -53590,6 +53645,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       {b && <button type="button" onClick={async ()=>{
                         if(await askConfirm('Masquer ce bordereau ? (il disparaît de la liste)')) hideBord(b);
                       }} title="Masquer" aria-label="Masquer" className="vrm-icon-control vrm-colis-masquer" style={{alignSelf:'flex-start',flexShrink:0,border:'none',background:'transparent',color:C.muted,cursor:'pointer',width:32,height:32,margin:'-6px -6px 0 0',display:'inline-flex',alignItems:'center',justifyContent:'center',borderRadius:8,fontFamily:'inherit'}}><Icon name="close" size={15}/></button>}
+                      {/* (2 nov., 22 h, maquette FusionColis) Le bouton rond : imprimer (bleu) quand le PDF est là —
+                          le MÊME geste que « Imprimer » de la rangée (il le déclenche) ; gris sinon. */}
+                      <button type="button" className={'vrm-fu-rond' + (pdf ? ' is-pret' : '')} data-fu-rond={e.txn||e.key} disabled={!pdf} aria-label={pdf ? 'Imprimer le bordereau' : 'Bordereau pas encore là'}
+                        onClick={(ev)=>{ const bt = ev.currentTarget.closest('[data-bord-card]').querySelector('.vrm-rangee-bord [data-imprime]'); if (bt) bt.click(); }}><Icon name="printer" size={20}/></button>
                     </div>
                     {/* ACTION PRINCIPALE : imprimer si le PDF est là, sinon aller
                         le générer sur Vinted. Le glisser-fichier reste dispo pour
@@ -53686,7 +53745,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   </div>
                   </React.Fragment>
                 );
-              })}
+              }); })()}
               </div>
               {/* (2 nov., colis clair) Sous la liste : ce n'est pas un geste du moment. */}
               {/* (17 oct.) Julien : « un bouton dans l'onglet Colis qui met en couleur
@@ -64645,6 +64704,7 @@ function AppCoeur() {
     return (
       <section className="vrm-tache" data-tache={t} data-tache-site={site} data-tache-section={sec} aria-label={TITRES_TACHE[t]}>
         <header className="vrm-market-heading vrm-tache-tete" data-tache-tete={t}>
+          {t === 'ventes' ? <span className="vrm-fu-date-tete" data-date-tete="">{dateJourFr(new Date())}</span> : null}
           <h1>{TITRES_TACHE[t]}</h1>
           {PHRASES_ECRAN[t] ? <p className="vrm-phrase-ecran" data-phrase-ecran={t}>{PHRASES_ECRAN[t]}</p> : null}
         </header>

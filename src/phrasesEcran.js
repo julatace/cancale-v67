@@ -4,11 +4,12 @@
 // pose sous le titre (`data-phrase-ecran`), le banc la lit ici et vérifie
 // qu'elle est courte et sans jargon. Elle dit ce qu'on FAIT, jamais comment
 // marche l'outil (« capté », « relu », « sync »… sont interdits : JARGON).
+// (2 nov., 22 h, Julien : « tout le temps tu ajoutes des textes explicatifs partout, ce
+// qui est horrible ») Ma journée, Ventes et Colis n'ont plus de phrase : la maquette
+// Fusion n'en montre aucune. Retiré à la demande de Julien, 2 nov. 22 h.
+export const ECRANS_SANS_PHRASE = ['journee', 'ventes', 'colis'];
 export const PHRASES_ECRAN = {
-  journee: 'Ce qui presse aujourd’hui, dans l’ordre.',
   annonces: 'Tes paires en vente, avec leur numéro.',
-  ventes: 'Ce que tu as vendu, et ton bénéfice.',
-  colis: 'Imprime, emballe, poste ; retire tes achats.',
   messages: 'Réponds aux acheteurs et à leurs offres.',
   settings: 'Tes comptes, tes emails et l’affichage.',
 };

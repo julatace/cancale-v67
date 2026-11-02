@@ -202,7 +202,10 @@ const capture = async (pg, nom) => { if (!CAPTURES) return; fs.mkdirSync(CAPTURE
         await avec.ctx.close();
       }
       // ── V10 : une phrase par écran (le compte neuf, visite déjà vue).
-      const ECRANS = [['journee', 'journee'], ['annonces', 'annonces'], ['ventes', 'ventes'], ['cat_bord', 'colis'], ['messages', 'messages'], ['settings', 'settings']];
+      // (Ma journée, Ventes et Colis : plus de phrase sous le titre — retiré à la demande de Julien, 2 nov. 22 h ;
+      // le banc vérifie à la place qu'aucune phrase n'y est rendue.)
+      const ECRANS = [['annonces', 'annonces'], ['messages', 'messages'], ['settings', 'settings']];
+
       const p10 = await page(nav, { telephone, base: { data: { vrm_bienvenue_vue: { at: 'banc' }, vrm_visite_vue: { at: 'banc' } }, ecritures: 0 }, comptes: [{ vinted_user_id: '777', login: 'vendeuse', owner: SESSION.user.id }] });
       for (const [tab, cle] of ECRANS) {
         await p10.pg.goto(`http://localhost:${PORT}/?tab=${tab}`, { waitUntil: 'domcontentloaded' });
@@ -215,6 +218,12 @@ const capture = async (pg, nom) => { if (!CAPTURES) return; fs.mkdirSync(CAPTURE
         dit(!!e.phrase && mots(e.phrase) <= MOTS_MAX_PHRASE && !JARGON.test(e.phrase), `${T} V10 ${cle} : une phrase courte sous le titre, sans jargon`, String(e.phrase));
         dit(e.prim.length <= 1, `${T} V10 ${cle} : au plus un bouton principal visible`, JSON.stringify(e.prim));
         if (CAPTURES && (cle === 'colis' || cle === 'annonces' || cle === 'settings')) await capture(p10.pg, `demo-bulles-${W}-ecran-${cle}`);
+      }
+      for (const [tab, cle] of [['journee', 'journee'], ['ventes', 'ventes'], ['cat_bord', 'colis']]) {
+        await p10.pg.goto(`http://localhost:${PORT}/?tab=${tab}`, { waitUntil: 'domcontentloaded' });
+        await p10.pg.waitForTimeout(2600);
+        const n = await p10.pg.evaluate((c) => [...document.querySelectorAll(`[data-phrase-ecran="${c}"]`)].filter((x) => x.getClientRects().length).length, cle);
+        dit(n === 0, `${T} V10 ${cle} : aucune phrase sous le titre (maquette Fusion, retiré à la demande de Julien, 2 nov. 22 h)`, String(n));
       }
       await p10.ctx.close();
       // ── Échap ferme (et note vu).
