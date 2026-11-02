@@ -44175,7 +44175,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // ⚠️ Ma journée aussi (revue visuelle du 17 oct.) : sans les emails de suivi,
   // sa tuile « À retirer » comptait les seuls colis vus par Vinted (1) quand
   // l'écran Achats en montrait 2 — la même notion, deux nombres (§11).
-  useEffect(() => { if ((curSub==='bordereaux'||curSub==='achats'||curSub==='journee') && tracking===null) lireSuivis(); /* eslint-disable-next-line */ }, [sub]);
+  // (2 nov.) + Ventes : le récapitulatif d'une vente dit son transporteur LU (e-mail ou ligne du
+  // transporteur du même n°) — la même lecture partagée (`cachedRow`), pas une de plus.
+  useEffect(() => { if ((curSub==='bordereaux'||curSub==='achats'||curSub==='journee'||curSub==='ventes') && tracking===null) lireSuivis(); /* eslint-disable-next-line */ }, [sub]);
   // ── LES PHOTOS DES ACHATS, LUES DANS LEUR TRANSACTION (Achats seulement) ──
   // (23 oct.) Ma journée lisait ces transactions pour leurs n° de suivi
   // (`shipment.tracking_code`) — mesuré : 0 sur 1 290 en porte. Les n° viennent

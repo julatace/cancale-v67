@@ -347,7 +347,7 @@ export function ColonneRetirer({ vue, C, Photo, gestes = null, detail = null, no
               <span className="vrm-rp-ident">
                 <b className="vrm-rp-nom" data-relais-nom="">{p.nom || p.adresseCourte || 'Point relais'}</b>
                 {p.nom && (p.adresse || p.adresseCourte) ? <span className="vrm-rp-adresse" data-relais-adresse="">{p.adresse || p.adresseCourte}</span> : null}
-                {tCommun && (tCommun.cle || tCommun.nom)
+                {tCommun && (tCommun.cle || tCommun.nom || !comptes.some((c) => c.trInconnu))
                   ? <span className="vrm-rp-transp" data-relais-transporteur={trCode || tCommun.cle || ''}><PastilleTransporteur t={tCommun} C={C} seul taille={18}/></span>
                   : (trNom && !tParCarte ? <span className="vrm-rp-adresse" data-relais-transporteur={trCode}>{trNom}</span> : null)}
                 {(() => { const n = comptes.filter((c) => c.trInconnu).length; return n ? <span className="vrm-rp-adresse" data-transp="transporteur-inconnu" data-transp-n={n}>Transporteur pas encore connu{n > 1 ? ` pour ${n} colis` : ''} : le suivi Vinted ne le nomme pas</span> : null; })()}
