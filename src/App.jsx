@@ -16778,12 +16778,17 @@ function etatExtensionFavoris(uid,mesure=null){
 // (2 nov.) Le mode automatique des favoris ne part que d'une extension 5.309,
 // connectée au même compte VRM, dont l'onglet Vinted est CONNU sur CE compte
 // (« pas su » ne vaut pas « oui » : un compte Vinted inconnu ⇒ rien ne part).
+// `code` : le geste que le serveur DEMANDERA à Julien (src/favorisAuto.js, DEMANDES_AUTO).
 function etatExtensionFavorisAuto(uid){
   const e=etatExtensionFavoris(uid);
-  if(!e.disponible)return e;
   const version=String(__vmrEtat?.version||vmrExtVersion()||'');
-  if(cmpVersion(version,EXT_CAPACITES.favorisauto)<0)return {disponible:false,raison:'Le mode automatique demande l’extension 5.309. Mets-la à jour puis recharge-la (⟳).'};
-  if(String(__vmrEtat?.vinted?.uid||'')!==String(uid))return {disponible:false,raison:'Ouvre vinted.fr dans ce Chrome, connecté sur ce compte, et laisse l’onglet ouvert.'};
+  if(!e.disponible){
+    const code=/version|5\.2|Installe/i.test(e.raison||'')?'extension_version':/même compte VRM|connectée/i.test(e.raison||'')?'session_extension':/autre compte Vinted/i.test(e.raison||'')?'compte_vinted_different':'extension_indisponible';
+    return {...e,code};
+  }
+  if(cmpVersion(version,EXT_CAPACITES.favorisauto)<0)return {disponible:false,code:'extension_version',raison:'Le mode automatique demande l’extension 5.309. Mets-la à jour puis recharge-la (⟳).'};
+  const actif=String(__vmrEtat?.vinted?.uid||'');
+  if(actif!==String(uid))return {disponible:false,code:actif?'compte_vinted_different':'onglet_vinted',raison:actif?'Chrome est connecté à un autre compte Vinted : passe sur ce compte dans l’onglet vinted.fr.':'Ouvre vinted.fr dans ce Chrome, connecté sur ce compte, et laisse l’onglet ouvert.'};
   return {disponible:true,raison:''};
 }
 // Les comptes sont tous passés : le SERVEUR n'agit que sur ceux où le mode a été

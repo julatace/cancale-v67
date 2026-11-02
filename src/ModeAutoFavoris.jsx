@@ -7,7 +7,7 @@
 import React from 'react';
 import {requeteJsonBornee} from './requeteJsonBornee.js';
 import {RAISONS_FAVORIS} from './favorisProgression.js';
-import {AUTO_DEFAUT,JOURS_AUTO,RAISONS_AUTO,ETATS_AUTO,validerAutoFavoris,limiteJourAuto,AUTO_JOUR_MS,AUTO_HEURE_MS} from './favorisAuto.js';
+import {DEMANDES_AUTO,AUTO_DEFAUT,JOURS_AUTO,RAISONS_AUTO,ETATS_AUTO,validerAutoFavoris,limiteJourAuto,AUTO_JOUR_MS,AUTO_HEURE_MS} from './favorisAuto.js';
 
 const heure=t=>{try{return new Date(t).toLocaleString('fr-FR',{timeZone:'Europe/Paris',weekday:'short',day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});}catch{return '';}};
 export const RISQUE_AUTO='VRM écrira tout seul aux personnes qui mettent tes annonces en favori, avec ton message et ton offre enregistrés, depuis l’onglet vinted.fr de ce compte.\n\nGarde-fous : jamais une conversation déjà ouverte avec la personne, jamais quelqu’un contacté ces 30 derniers jours, jamais une paire réservée, vendue (ici ou ailleurs), en pause ou masquée ; attente au hasard après le favori ; tes horaires ; tes limites par heure et par 24 h ; 10 messages par jour la 1re semaine, 20 la 2e ; pause de 24 h au premier signe de Vinted.\n\n⚠️ Vinted peut quand même voir ça comme un robot : c’est un risque pour le compte, que tu prends en l’allumant. Aucune garantie contre un blocage.';
@@ -48,8 +48,9 @@ export default function ModeAutoFavoris({uid,owner,ownerActuel,headers,nomCompte
         :<button type="button" data-favoris-auto-allumer disabled={occupe||vue===undefined} onClick={()=>{setOuvert(true);setConfirmer(false);setForm(f=>({...AUTO_DEFAUT,...(reg||{}),...(f||{})}));}}>Régler et allumer</button>}
     </header>
     {vue===undefined&&!erreur&&<p role="status">Lecture…</p>}
-    {vue!==undefined&&<p role="status" className={geste?'vrm-favoris-auto-geste':undefined} data-favoris-auto-phrase>{phrase}</p>}
-    {actif&&extensionAuto&&!extensionAuto.disponible&&<p className="vrm-favoris-auto-geste" data-favoris-auto-extension>{extensionAuto.raison}</p>}
+    {vue!==undefined&&!(actif&&auto?.demande)&&<p role="status" className={geste?'vrm-favoris-auto-geste':undefined} data-favoris-auto-phrase>{phrase}</p>}
+    {actif&&auto?.demande&&DEMANDES_AUTO[auto.demande.code]&&<p role="alert" className="vrm-favoris-auto-geste" data-favoris-auto-demande={auto.demande.code}><strong>À faire : </strong>{DEMANDES_AUTO[auto.demande.code]}</p>}
+    {actif&&extensionAuto&&!extensionAuto.disponible&&auto?.demande?.code!==extensionAuto.code&&<p className="vrm-favoris-auto-geste" data-favoris-auto-extension>{extensionAuto.raison}</p>}
     {actif&&<p className="vrm-favoris-note">Les messages partent tant que VRM est ouvert dans un onglet de cet ordinateur (pas besoin de rester sur cet écran), avec l’onglet vinted.fr de ce compte ouvert. Ordinateur éteint ou VRM fermé : rien ne part, rien n’est rattrapé en rafale.</p>}
     {reg&&<p className="vrm-favoris-auto-compteurs" data-favoris-auto-compteurs>
       <span><b>{envois.length}</b> / {limite} sur 24 h{limite<reg.parJour?' (montée progressive)':''}</span>
@@ -77,7 +78,7 @@ export default function ModeAutoFavoris({uid,owner,ownerActuel,headers,nomCompte
     {erreur&&<p role="alert">{erreur}</p>}
     {!!auto?.journal?.length&&<details className="vrm-repli" data-favoris-auto-journal>
       <summary>Journal ({auto.journal.length})</summary>
-      <ul>{auto.journal.slice(0,60).map((x,i)=><li key={x.notificationId+':'+x.at+':'+i} data-favoris-auto-ligne={x.etat}><time>{heure(x.at)}</time> <b>{x.nom||'Favori'}</b> — {RAISONS_AUTO[x.raison]||RAISONS_FAVORIS[x.raison]||RAISONS_AUTO[x.etat]||'Interrompu : rien envoyé.'}</li>)}</ul>
+      <ul>{auto.journal.slice(0,60).map((x,i)=><li key={x.notificationId+':'+x.at+':'+i} data-favoris-auto-ligne={x.etat}{...(x.reprise?{'data-favoris-auto-reprise':''}:{})}><time>{heure(x.at)}</time> <b>{x.nom||'Favori'}</b> — {RAISONS_AUTO[x.raison]||RAISONS_FAVORIS[x.raison]||RAISONS_AUTO[x.etat]||'Interrompu : rien envoyé.'}{x.reprise?' Un dernier essai sera fait plus tard.':''}</li>)}</ul>
     </details>}
   </section>;
 }

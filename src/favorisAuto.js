@@ -150,11 +150,42 @@ export const RAISONS_AUTO = {
   annonce_absente: 'Annonce absente de ton dressing lu : aucun message.',
   destinataire_non_prouve: 'VRM ne sait pas encore à qui écrire pour ce favori (identité non prouvée). Ouvre un favori depuis la cloche de Vinted pour qu’il apprenne.',
   expire: 'Favori trop ancien (plus de 3 jours) : laissé de côté.',
+  essais_epuises: 'Pas pu partir après deux essais (rien n’est parti chez Vinted) : laissé de côté, VRM passe au suivant.',
+  offre_refusee: 'Vinted a refusé l’offre : le message n’est pas parti, favori laissé de côté.',
+  offre_prix_inconnu: 'Prix de l’annonce illisible : ni offre ni message, favori laissé de côté.',
   attente: 'En attente : le message partira après le délai tiré au hasard.',
   vinted_frein: 'Vinted a demandé de ralentir : mode auto en pause 24 h sur ce compte.',
   vinted_robot: 'Vinted a parlé d’activité automatisée (ou d’un captcha) : mode auto en pause 24 h sur ce compte.',
   pause_vinted: 'Vinted demande de ralentir : mode auto en pause 24 h sur ce compte.',
 };
+// (2 nov., 13 h — Julien : « il doit pouvoir régler tous les problèmes lui-même, ou
+// demander s'il en a un ») Le mode auto ne BOUCLE JAMAIS : un favori qui n'a pas pu
+// partir avant toute écriture chez Vinted est retenté au plus AUTO_ESSAIS fois en
+// tout, puis laissé de côté avec sa raison. Et quand un geste de Julien débloquerait
+// la situation, VRM le lui DEMANDE une fois (dans l'app et par notification), en une
+// phrase avec le geste. La demande tombe d'elle-même quand le problème est réglé.
+export const AUTO_ESSAIS = 2;
+export const DEMANDES_AUTO = {
+  destinataire_non_prouve: 'Pour écrire aux nouveaux favoris, VRM doit apprendre à qui écrire : sur vinted.fr, ouvre UN favori depuis la cloche (connecté sur ce compte), attends sa page de message, puis reviens.',
+  onglet_vinted: 'Ouvre vinted.fr dans Chrome, connecté sur ce compte, et laisse l’onglet ouvert : les messages automatiques partent de là.',
+  compte_vinted_absent: 'Connecte-toi à Vinted avec ce compte dans Chrome : les messages automatiques partent de l’onglet de CE compte.',
+  compte_vinted_different: 'Chrome est connecté à un autre compte Vinted : passe sur ce compte dans l’onglet vinted.fr.',
+  extension_indisponible: 'L’extension ne répond pas : recharge-la dans Chrome (⟳), puis recharge VRM.',
+  extension_version: 'Installe l’extension 5.309 (Paramètres → Extension), puis recharge-la (⟳) : le mode automatique en a besoin.',
+  session_extension: 'Reconnecte l’extension à ton compte VRM (ouvre l’extension → Connecter).',
+  garde_absente: 'VRM n’a pas pu vérifier tes paires vendues ailleurs : ouvre l’écran Annonces de VRM une fois.',
+  dressing_absent: 'Ouvre ton dressing sur vinted.fr avec ce compte : VRM doit voir quelles paires sont en vente.',
+  dressing_ancien: 'Ouvre ton dressing sur vinted.fr avec ce compte : sa dernière lecture a plus de 24 h.',
+  dressing_partiel: 'Ouvre ton dressing sur vinted.fr et fais-le défiler jusqu’au bout : VRM n’en a lu qu’une partie.',
+  boite_ancienne: 'Ouvre ta messagerie sur vinted.fr avec ce compte : VRM vérifie que personne n’est déjà en conversation avec toi.',
+  capture: 'Ouvre la cloche de Vinted avec ce compte : VRM n’a pas encore vu ses favoris.',
+  reglages: 'Enregistre ton message : Envoyer un message aux favoris → 2. Message → Enregistrer sans envoyer.',
+  a_verifier: 'Un message est « à vérifier » : regarde la conversation sur Vinted, puis « J’ai vérifié » dans la file des favoris. Le mode auto attend.',
+};
+// Les états de la file qui DEMANDENT un geste (les autres attendent seuls).
+export const ETATS_DEMANDE = ['destinataire_non_prouve', 'garde_absente', 'dressing_absent', 'dressing_ancien', 'dressing_partiel', 'boite_ancienne', 'capture', 'reglages', 'a_verifier'];
+// Les refus d'un envoi automatique qui DEMANDENT un geste.
+export const RAISONS_DEMANDE = ['onglet_vinted', 'compte_vinted_absent', 'compte_vinted_different', 'extension_indisponible', 'session_extension'];
 // L'état du mode, en une phrase et un geste (écran « Mode automatique »).
 export const ETATS_AUTO = {
   eteint: 'Éteint : aucun message ne part tout seul.',
@@ -174,6 +205,8 @@ export const ETATS_AUTO = {
   dressing_partiel: 'Rien ne part : ton dressing lu n’est pas complet. Ouvre ton dressing sur vinted.fr et fais-le défiler jusqu’au bout.',
   boite_ancienne: 'Rien ne part : tes conversations Vinted n’ont pas été relues depuis 24 h. Ouvre ta messagerie sur vinted.fr avec ce compte.',
   capture: 'Rien ne part : les favoris de ce compte n’ont pas été lus. Ouvre la cloche de Vinted avec ce compte.',
+  destinataire_non_prouve: 'Rien ne part : VRM ne sait pas encore à qui écrire sur ce compte. Ouvre un favori depuis la cloche de Vinted.',
+  extension: 'Un message est prêt, mais l’extension ne peut pas l’envoyer maintenant (voir le geste demandé).',
   reglages: 'Rien ne part : enregistre d’abord ton message (Envoyer un message aux favoris → 2. Message → Enregistrer).',
   lecture: 'La base VRM n’a pas répondu : rien n’est parti, nouvel essai dans quelques minutes.',
 };

@@ -2,7 +2,7 @@
 // recipients from native captures before passing targets here. No network IO
 // inside a CAS decision: a retry must never repeat a Vinted request.
 export class RefusFavoris extends Error { constructor(message,status=409){super(message);this.status=status;} }
-import {AUTO_FREINS,AUTO_PAUSE_MS,dansPlageAuto,ecartAutoMs} from '../../src/favorisAuto.js';
+import {AUTO_FREINS,AUTO_PAUSE_MS,AUTO_ESSAIS,AUTO_AVANT_ECRITURE,DEMANDES_AUTO,RAISONS_DEMANDE,dansPlageAuto,ecartAutoMs} from '../../src/favorisAuto.js';
 const entier=v=>typeof v==='string'&&/^[1-9]\d{0,19}$/.test(v);
 const clone=v=>structuredClone(v);
 // Tirage du temps avant le message suivant, entre le minimum et le maximum
@@ -31,7 +31,7 @@ function vueAuto(d,g){
   const pause=Number(d?.pauseAutoJusqua)||0;
   if(!g?.auto&&!pause)return null;
   const env=Array.isArray(d?.autoEnvois)?d.autoEnvois:[];
-  return {reglages:g?.auto?.reglages||null,allumeLe:g?.auto?.allumeLe||null,pauseJusqua:pause||null,pauseRaison:d?.pauseAutoRaison||null,envois:env.slice(-60),journal:(g?.auto?.journal||[]).slice(0,60),etat:g?.auto?.etat||null,prochain:g?.auto?.prochain||null};
+  return {reglages:g?.auto?.reglages||null,demande:g?.auto?.demande||null,allumeLe:g?.auto?.allumeLe||null,pauseJusqua:pause||null,pauseRaison:d?.pauseAutoRaison||null,envois:env.slice(-60),journal:(g?.auto?.journal||[]).slice(0,60),etat:g?.auto?.etat||null,prochain:g?.auto?.prochain||null};
 }
 export function vueFile(d,owner){
   const g=d?.groupes?.[owner];
@@ -124,16 +124,25 @@ export function terminerFile(d,{owner,jeton,resultat,maintenant,raison,ecrits=nu
   // le mode AUTO de ce compte Vinted se met en pause 24 h, pour tous les
   // propriétaires de la file (l'heure de reprise est dite dans l'app).
   if(AUTO_FREINS.includes(raison)){d.pauseAutoJusqua=Math.max(d.pauseAutoJusqua||0,fin+AUTO_PAUSE_MS);d.pauseAutoRaison=raison;}
+  let nouvelleDemande=null;
   if(j.auto&&g.auto){
     const nom=String(j.nom||'').slice(0,80);
-    g.auto.journal=[{at:fin,notificationId:j.notificationId,itemId:j.itemId,...(nom?{nom}:{}),etat:resultat,raison:resultat==='envoye'?'envoye':(raison||resultat)},...(g.auto.journal||[])].slice(0,200);
+    // (2 nov., 13 h) Jamais de boucle : un refus avant toute écriture est retenté au
+    // plus AUTO_ESSAIS fois en tout ; ensuite le favori est laissé de côté, dit.
+    const reprise=resultat==='refuse'&&j.ecrits===0&&AUTO_AVANT_ECRITURE.includes(j.raison)&&(Number(j.essais)||1)<AUTO_ESSAIS;
+    const epuise=resultat==='refuse'&&j.ecrits===0&&AUTO_AVANT_ECRITURE.includes(j.raison)&&!reprise;
+    g.auto.journal=[{at:fin,notificationId:j.notificationId,itemId:j.itemId,...(nom?{nom}:{}),etat:resultat,raison:resultat==='envoye'?'envoye':epuise?'essais_epuises':(raison||resultat),...(reprise?{reprise:true}:{})},...(g.auto.journal||[])].slice(0,200);
+    // Un refus qu'un geste de Julien réglerait : VRM le lui DEMANDE (une fois).
+    const code=RAISONS_DEMANDE.includes(raison)?raison:null;
+    if(code&&DEMANDES_AUTO[code]&&g.auto.demande?.code!==code){g.auto.demande={code,at:fin};nouvelleDemande=code;}
+    if(resultat==='envoye'&&g.auto.demande&&RAISONS_DEMANDE.includes(g.auto.demande.code))delete g.auto.demande;
   }
   if(j.auto&&['envoye','ignore'].includes(resultat)){if(!g.jobs.some(x=>x.etat==='attente'))g.active=false;}
   else if(!['envoye','ignore'].includes(resultat)){g.active=false;g.raison=raison==='article_vendu'?'Article vendu : aucun message envoyé pour cette tentative. Les messages restants ne sont pas envoyés.':raison==='ecran_inactif'?'Écran des favoris quitté avant le départ. Les messages restants ne sont pas envoyés.':resultat==='incertain'?'Réponse incertaine : vérifie la conversation sur Vinted. Aucun renvoi automatique.':'Vinted ou l’extension a interrompu la file. Les messages restants ne sont pas envoyés.';}
   else {if(!g.jobs.some(x=>x.etat==='attente'))g.active=false;if(!g.active)g.raison='Sélection traitée ou file arrêtée.';}
   // (28 oct.) La file vient de se TERMINER (finie ou interrompue) : son bilan,
   // une seule fois (la transition active → inactive), pour la notification.
-  const valeur=vueFile(d,owner);
+  const valeur=vueFile(d,owner);if(nouvelleDemande)valeur.nouvelleDemande=nouvelleDemande;
   if(etaitActive&&!g.active&&!j.auto){const lot=g.jobs.filter(x=>x.lot===g.lot);const n=k=>lot.filter(x=>x.etat===k).length;valeur.fin={lot:g.lot||null,total:lot.length,envoyes:n('envoye'),incertains:n('incertain'),interrompus:n('refuse'),interrompue:!['envoye','ignore'].includes(resultat)};}
   return {data:d,valeur};
 }

@@ -15,7 +15,7 @@
 // vinted.fr de CE compte, qui envoie (comme pour un envoi sur son clic).
 // « Pas su » ne vaut pas « oui » : toute lecture ratée ⇒ rien n'est ajouté.
 import {initialiserFile,vueFile,RefusFavoris} from './favoris-file.js';
-import {validerAutoFavoris,dansPlageAuto,limiteJourAuto,attenteFavoriMs,AUTO_FAVORI_MAX_MS,AUTO_RECONTACT_MS,AUTO_AVANT_ECRITURE,AUTO_JOUR_MS,AUTO_HEURE_MS,etatDressingAuto,etatAnnonceAuto} from '../../src/favorisAuto.js';
+import {AUTO_ESSAIS,DEMANDES_AUTO,ETATS_DEMANDE,validerAutoFavoris,dansPlageAuto,limiteJourAuto,attenteFavoriMs,AUTO_FAVORI_MAX_MS,AUTO_RECONTACT_MS,AUTO_AVANT_ECRITURE,AUTO_JOUR_MS,AUTO_HEURE_MS,etatDressingAuto,etatAnnonceAuto} from '../../src/favorisAuto.js';
 import {gardeRefuse} from '../../src/offresGarde.js';
 import {favorisDepuisNotifications} from '../../src/favorisVinted.js';
 
@@ -23,9 +23,21 @@ const ENVOI_FAIT=['envoye','incertain','reserve','verifie','ignore'];
 // Ce couple article/personne a-t-il déjà été traité (pour toujours) ? Seuls un
 // favori annulé avant départ, et un refus CERTAIN avant toute écriture chez Vinted
 // (l'extension 5.309 dit `ecrits: 0`), laissent le mode auto le reprendre.
+// (2 nov., 13 h) Jamais de boucle : un favori refusé avant toute écriture n'est
+// repris que tant qu'il lui reste un essai (AUTO_ESSAIS en tout), puis il est traité.
+export const reprenable=j=>j.etat==='annule'||j.etat==='refuse'&&j.ecrits===0&&AUTO_AVANT_ECRITURE.includes(j.raison)&&(Number(j.essais)||1)<AUTO_ESSAIS;
 export function coupleDejaTraite(d,itemId,recipientId){
   const id=itemId+':'+recipientId;
-  return Object.values(d?.groupes||{}).some(g=>(g.jobs||[]).some(j=>j.id===id&&!(j.etat==='annule'||j.etat==='refuse'&&j.ecrits===0&&AUTO_AVANT_ECRITURE.includes(j.raison))));
+  return Object.values(d?.groupes||{}).some(g=>(g.jobs||[]).some(j=>j.id===id&&!reprenable(j)));
+}
+// LA DEMANDE À JULIEN (2 nov., 13 h) : un geste de sa part débloquerait le mode
+// auto. Posée une fois (`nouvelle` vrai la première fois : la route envoie alors
+// une notification), elle reste affichée tant que le problème dure, et tombe
+// d'elle-même dès qu'un tour repart (message posé, ou plus rien qui bloque).
+export function noterDemande(g,code,maintenant){
+  if(!g?.auto||!DEMANDES_AUTO[code])return false;
+  if(g.auto.demande?.code===code)return false;
+  g.auto.demande={code,at:maintenant};return true;
 }
 // Cette personne a-t-elle reçu (ou pu recevoir) un message de ce compte Vinted ces 30 jours ?
 export function contacteRecemment(d,recipientId,maintenant){
@@ -94,7 +106,7 @@ export function trierFavorisAuto({lignes,d,owner,maintenant,resoudre}){
 }
 // Dans le comparer-et-échanger : revérifie sur l'état RELU et pose au plus un
 // message. `choisi` = { l, cible } (ou null), `sauts` = à noter au journal.
-export function ajouterAuto(d,{owner,maintenant,choisi,sauts=[],message,offre,prochainFavori=null}){
+export function ajouterAuto(d,{owner,maintenant,choisi,sauts=[],message,offre,prochainFavori=null,extension=null,demande=null}){
   d=initialiserFile(d);const g=d.groupes[owner];
   const e=etatAuto(d,owner,maintenant);
   if(!g?.auto)return {valeur:{...e,vue:vueFile(d,owner)}};
@@ -105,18 +117,35 @@ export function ajouterAuto(d,{owner,maintenant,choisi,sauts=[],message,offre,pr
     journal.unshift({at:maintenant,notificationId:s.l.id,...(s.cible?{itemId:s.cible.itemId}:{}),...(s.l.nom?{nom:String(s.l.nom).slice(0,80)}:{}),etat:'saute',raison:s.raison});
   }
   g.auto.journal=journal.slice(0,200);
-  let ajoute=false,etat=e.etat;
-  if(e.etat==='libre'&&choisi&&!coupleDejaTraite(d,choisi.cible.itemId,choisi.cible.recipientId)&&!contacteRecemment(d,choisi.cible.recipientId,maintenant)){
-    const t=choisi.cible,id=t.itemId+':'+t.recipientId;
-    g.jobs=[...g.jobs.filter(x=>x.id!==id),{id,notificationId:t.notificationId,itemId:t.itemId,recipientId:t.recipientId,initiator:t.initiator,etat:'attente',auto:true,message,intervalleMinutes:0,...(offre?{offre}:{}),lot:'auto',...(choisi.l.nom?{nom:String(choisi.l.nom).slice(0,80)}:{})}];
+  let ajoute=false,etat=e.etat,nouvelle=false;
+  const pret=e.etat==='libre'&&choisi&&!coupleDejaTraite(d,choisi.cible.itemId,choisi.cible.recipientId)&&!contacteRecemment(d,choisi.cible.recipientId,maintenant);
+  // Un message est prêt, mais l'extension ne peut pas l'envoyer (onglet, compte,
+  // version) : rien n'est posé (aucun essai gâché), et VRM DEMANDE le geste.
+  if(pret&&extension&&extension.disponible!==true){etat='extension';nouvelle=noterDemande(g,DEMANDES_AUTO[extension.code]?extension.code:'extension_indisponible',maintenant);change=change||nouvelle;}
+  else if(pret){
+    const t=choisi.cible,id=t.itemId+':'+t.recipientId,ancien=g.jobs.find(x=>x.id===id);
+    const essais=(ancien&&ancien.etat==='refuse'?Number(ancien.essais)||1:0)+1;
+    g.jobs=[...g.jobs.filter(x=>x.id!==id),{id,notificationId:t.notificationId,itemId:t.itemId,recipientId:t.recipientId,initiator:t.initiator,etat:'attente',auto:true,essais,message,intervalleMinutes:0,...(offre?{offre}:{}),lot:'auto',...(choisi.l.nom?{nom:String(choisi.l.nom).slice(0,80)}:{})}];
     if(g.jobs.length>500){const sansAuto=g.jobs.filter(x=>!(x.auto&&['annule','refuse'].includes(x.etat)&&x.ecrits===0));if(sansAuto.length>500)throw new RefusFavoris('La file a atteint sa capacité. Aucun historique de dédoublonnage n’a été effacé.');g.jobs=sansAuto;}
     g.active=true;g.raison='';ajoute=true;change=true;etat='pret';
   }else if(e.etat==='libre')etat=prochainFavori?'attente_favori':'veille';
+  // La demande : un état de la file qui attend un geste, ou une demande calculée par
+  // le tour (identité jamais prouvée) ; sinon, plus rien ne bloque ⇒ elle tombe.
+  if(ETATS_DEMANDE.includes(e.etat)){nouvelle=noterDemande(g,e.etat,maintenant)||nouvelle;change=true;}
+  else if(demande&&!ajoute){nouvelle=noterDemande(g,demande,maintenant)||nouvelle;change=change||nouvelle;}
+  else if(etat!=='extension'&&g.auto.demande&&(ajoute||['veille','attente_favori'].includes(etat))){delete g.auto.demande;change=true;}
   const prochain=e.jusqua||(etat==='attente_favori'?prochainFavori:null);
   if(g.auto.etat!==etat||g.auto.prochain!==prochain){g.auto.etat=etat;g.auto.prochain=prochain;change=true;}
   d.proprietaires=Object.keys(d.groupes);
   if(JSON.stringify(d).length>1500000)throw new RefusFavoris('La file a atteint sa capacité.');
-  return {...(change?{data:d}:{}),valeur:{etat,ajoute,vue:vueFile(d,owner)}};
+  return {...(change?{data:d}:{}),valeur:{etat,ajoute,...(nouvelle?{nouvelleDemande:g.auto.demande.code}:{}),vue:vueFile(d,owner)}};
+}
+// Un tour arrêté AVANT le comparer-et-échanger final (lecture qui demande un geste :
+// dressing, garde, boîte, capture, réglages) : la demande est posée quand même.
+export function demanderAuto(d,{owner,code,maintenant}){
+  d=initialiserFile(d);const g=d.groupes[owner];
+  if(!g?.auto?.reglages?.actif||!noterDemande(g,code,maintenant))return {valeur:{nouvelle:false}};
+  return {data:d,valeur:{nouvelle:true}};
 }
 // La fusion archive + capture, exactement comme le lancement sur clic.
 export function notificationsCompletes(capture,archive){

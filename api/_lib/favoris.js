@@ -10,7 +10,8 @@ import {contexteVendeur} from './owner.js';
 import {DESTINATIONS} from './lien-notif.js';
 import {preparerMessageFavori} from '../../src/favorisVinted.js';
 import {AUTO_FAVORI_MAX_MS} from '../../src/favorisAuto.js';
-import {etatAuto,reglerAuto,stopAuto,trierFavorisAuto,ajouterAuto,notificationsCompletes,favorisDepuisNotifications,etatDressingAuto,etatAnnonceAuto,gardeRefuse} from './favoris-auto.js';
+import {DEMANDES_AUTO} from '../../src/favorisAuto.js';
+import {demanderAuto,etatAuto,reglerAuto,stopAuto,trierFavorisAuto,ajouterAuto,notificationsCompletes,favorisDepuisNotifications,etatDressingAuto,etatAnnonceAuto,gardeRefuse} from './favoris-auto.js';
 
 // The neutral row cannot be edited by the browser (RLS). One row per Vinted
 // UID, including the rolling quota shared across all devices and VRM owners.
@@ -58,24 +59,42 @@ async function notifierFinFavoris(owner,fin){
 // dans la file existante (autorisation unique, consommée par l'extension 5.309).
 // Toute lecture ratée ⇒ `lecture` : rien n'est ajouté (« pas su » ≠ « oui »).
 const lecture=async(req,chemin)=>{const r=await lireCommeVendeur(req,chemin);if(!Array.isArray(r))throw Object.assign(Error('lecture'),{auto:'lecture'});return r;};
-export async function tourAuto(req,{owner,uid,cle,maintenant}){
+// (2 nov., 13 h) Une demande NOUVELLE à Julien part aussi en notification (catégorie
+// « favoris »), une seule fois par demande : la ligne neutre la garde jusqu'à ce que
+// le problème soit réglé.
+async function notifierDemandeAuto(owner,code){
+  return contexteVendeur.run({owner},async()=>{
+    if(!(await pushCategorieActive('favoris')))return {envoye:false};
+    return sendPushToAll({title:'Messages automatiques aux favoris : un geste à faire',body:DEMANDES_AUTO[code],url:DESTINATIONS.favorisFile(),tag:'favoris-auto-'+code});
+  });
+}
+export async function tourAuto(req,{owner,uid,cle,maintenant,extension=null}){
   const avant=await modifierNeutre(cle,d=>({valeur:{e:etatAuto(d,owner,maintenant),vue:vueFile(initialiserFile(d),owner)}}));
   if(!avant)return {etat:'lecture',ajoute:false};
+  if(avant.valeur.e.etat==='a_verifier'){const r=await modifierNeutre(cle,d=>demanderAuto(d,{owner,code:'a_verifier',maintenant}));return {etat:'a_verifier',ajoute:false,vue:avant.valeur.vue,...(r?.valeur?.nouvelle?{nouvelleDemande:'a_verifier'}:{})};}
   if(avant.valeur.e.etat!=='libre')return {etat:avant.valeur.e.etat,jusqua:avant.valeur.e.jusqua||null,ajoute:false,vue:avant.valeur.vue};
-  const stop=etat=>({etat,ajoute:false,vue:avant.valeur.vue});
+  // Un arrêt qui attend un geste de Julien (dressing, garde, boîte, capture,
+  // réglages) : la demande est posée (une fois) avant de rendre la main.
+  let nouvelleDemande=null;
+  const stop=async etat=>{
+    if(DEMANDES_AUTO[etat]){const r=await modifierNeutre(cle,d=>demanderAuto(d,{owner,code:etat,maintenant}));if(r?.valeur?.nouvelle)nouvelleDemande=etat;}
+    return {etat,ajoute:false,vue:avant.valeur.vue,...(nouvelleDemande?{nouvelleDemande}:{})};
+  };
   try{
     const ids=[`harvest_${uid}_notifications`,`harvest_${uid}_wreq_api_v2_conversations`,`vrm_favoris_reglages_${uid}`,`harvest_${uid}_favoris_archive`];
     const rows=await lecture(req,`app_data?owner=eq.${owner}&id=in.(${ids.join(',')})&select=id,owner,data`);
-    if(rows.some(x=>x.owner!==owner))return stop('lecture');
+    if(rows.some(x=>x.owner!==owner))return await stop('lecture');
     const lire=id=>rows.find(x=>x.id===id)?.data;
-    const prefs=lire(ids[2]);if(prefs?.version!==1||prefs.envoisActifs!==false)return stop('reglages');
-    let p;try{p=validerReglagesFavoris(prefs);}catch{return stop('reglages');}
-    const message=preparerMessageFavori(p.message,p.pourcentage).message;if(!message)return stop('reglages');
+    const prefs=lire(ids[2]);if(prefs?.version!==1||prefs.envoisActifs!==false)return await stop('reglages');
+    let p;try{p=validerReglagesFavoris(prefs);}catch{return await stop('reglages');}
+    const message=preparerMessageFavori(p.message,p.pourcentage).message;if(!message)return await stop('reglages');
     const offre=p.offreMode?{mode:p.offreMode,valeur:p.offreMode==='pct'?p.pourcentage:p.offreValeur,arrondi:p.arrondi===true}:null;
     const archive=lire(ids[3]),capture0=lire(ids[0])||archive,trace=lire(ids[1]);
-    if(!capture0||capture0.type!=='notifications'||String(capture0.uid)!==uid||!trace)return stop('capture');
-    if(archive&&(archive.archiveVersion!==1||String(archive.uid)!==uid||!Array.isArray(archive.payload?.notifications)))return stop('capture');
-    let capture;try{capture=notificationsCompletes(capture0,archive);}catch{return stop('capture');}
+    if(!capture0||capture0.type!=='notifications'||String(capture0.uid)!==uid)return await stop('capture');
+    // Aucune création native observée sur ce compte : VRM ne sait encore à personne écrire.
+    if(!trace)return await stop('destinataire_non_prouve');
+    if(archive&&(archive.archiveVersion!==1||String(archive.uid)!==uid||!Array.isArray(archive.payload?.notifications)))return await stop('capture');
+    let capture;try{capture=notificationsCompletes(capture0,archive);}catch{return await stop('capture');}
     const lignes=favorisDepuisNotifications(capture.payload,capture.domain).lignes;
     const opts={uid,capture,trace,traces:archive?.creations||[],lectures:archive?.lecturesLiees||[]};
     let conversations=null,ailleurs=null;
@@ -94,19 +113,19 @@ export async function tourAuto(req,{owner,uid,cle,maintenant}){
     const allumeLe=Number(avant.valeur.vue?.auto?.allumeLe)||Infinity;
     const cibles=new Map();
     for(const l of lignes){const t=Date.parse(l.date||'');if(!Number.isFinite(t)||t<allumeLe||maintenant-t>AUTO_FAVORI_MAX_MS)continue;try{cibles.set(l.id,await resoudre(l.id));}catch{}}
-    const lu=await modifierNeutre(cle,d=>({valeur:initialiserFile(d)}));if(!lu)return stop('lecture');
+    const lu=await modifierNeutre(cle,d=>({valeur:initialiserFile(d)}));if(!lu)return await stop('lecture');
     const tri=trierFavorisAuto({lignes,d:lu.valeur,owner,maintenant,resoudre:id=>{const c=cibles.get(id);if(!c)throw Error('non prouvé');return c;}});
     const sauts=[...tri.sauts];let choisi=null;
     if(tri.prets.length){
       // La paire : dressing COMPLET de moins de 24 h, et la garde des ventes ailleurs.
       const [dr]=await lecture(req,`app_data?owner=eq.${owner}&id=eq.harvest_${uid}_listings&select=cap:data->>capturedAt,pg:data->payload->pagination,items:data->payload->items`).then(r=>r.length?r:[null]);
-      const ed=etatDressingAuto(dr,maintenant);if(ed)return stop(ed);
+      const ed=etatDressingAuto(dr,maintenant);if(ed)return await stop(ed);
       const m=await lecture(req,`app_data?owner=eq.${owner}&id=eq.main&select=g:data->vinted_offres_garde`);
       const garde=m[0]?.g||null;
-      const gTout=gardeRefuse(garde,'0',maintenant);if(gTout&&gTout!=='vendue-ailleurs')return stop('garde_absente');
+      const gTout=gardeRefuse(garde,'0',maintenant);if(gTout&&gTout!=='vendue-ailleurs')return await stop('garde_absente');
       // La boîte de réception, lue il y a moins de 24 h (« pas su » ⇒ rien).
       const [bx]=await lecture(req,`app_data?owner=eq.${owner}&id=eq.harvest_${uid}_inbox&select=cap:data->>capturedAt`).then(r=>r.length?r:[null]);
-      const cb=Date.parse(bx?.cap||'');if(!Number.isFinite(cb)||maintenant-cb>24*3600000)return stop('boite_ancienne');
+      const cb=Date.parse(bx?.cap||'');if(!Number.isFinite(cb)||maintenant-cb>24*3600000)return await stop('boite_ancienne');
       for(const pr of tri.prets.slice(0,5)){
         const ea=etatAnnonceAuto(pr.cible.itemId,dr,gardeRefuse(garde,pr.cible.itemId,maintenant));
         if(ea){sauts.push({...pr,raison:ea});continue;}
@@ -118,10 +137,13 @@ export async function tourAuto(req,{owner,uid,cle,maintenant}){
         choisi=pr;break;
       }
     }
-    const r=await modifierNeutre(cle,d=>ajouterAuto(d,{owner,maintenant,choisi,sauts,message,offre,prochainFavori:tri.prochainFavori}));
-    if(!r)return stop('lecture');
+    // Aucun favori prêt, et au moins un sauté faute d'identité prouvée : un geste de
+    // Julien (ouvrir un favori depuis la cloche) le réglera — VRM le demande.
+    const demande=!choisi&&sauts.some(x=>x.raison==='destinataire_non_prouve')?'destinataire_non_prouve':null;
+    const r=await modifierNeutre(cle,d=>ajouterAuto(d,{owner,maintenant,choisi,sauts,message,offre,prochainFavori:tri.prochainFavori,extension,demande}));
+    if(!r)return await stop('lecture');
     return r.valeur;
-  }catch(e){if(e?.auto)return stop(e.auto);if(e instanceof RefusFavoris)throw e;return stop('lecture');}
+  }catch(e){if(e?.auto)return await stop(e.auto);if(e instanceof RefusFavoris)throw e;return await stop('lecture');}
 }
 export async function routeFavoris(req,res){
   res.setHeader('Cache-Control','no-store');
@@ -177,7 +199,13 @@ export async function routeFavoris(req,res){
       }else if(c.action==='auto_stop'){
         decision=d=>stopAuto(d,{owner,maintenant});
       }else if(c.action==='auto'){
-        const r=await tourAuto(req,{owner,uid,cle,maintenant});
+        // L'état de l'extension vu par l'app (onglet, compte, version) : seulement
+        // pour DEMANDER un geste ; le serveur ne lui fait jamais confiance pour envoyer
+        // (l'autorisation reste consommée par l'extension elle-même, version vérifiée).
+        const x=c.extension&&typeof c.extension==='object'?c.extension:null;
+        const extension=x?{disponible:x.disponible===true,code:typeof x.code==='string'&&DEMANDES_AUTO[x.code]?x.code:'extension_indisponible'}:null;
+        const r=await tourAuto(req,{owner,uid,cle,maintenant,extension});
+        if(r.nouvelleDemande)await notifierDemandeAuto(owner,r.nouvelleDemande).catch(()=>{});
         return res.status(200).json({ok:true,uid,...r,serveur:maintenant});
       }else if(c.action==='suivant'){
         const jeton=randomUUID(),suivi=randomUUID();decision=d=>reserverFile(d,{owner,maintenant,jeton,suivi});
@@ -205,6 +233,7 @@ export async function routeFavoris(req,res){
     // avec le bilan (catégorie « favoris », activée par défaut). Un échec d'envoi
     // ne change rien à la réponse : la file est déjà rangée.
     if(req.method==='POST'&&req.body?.action==='terminer'&&r.valeur?.fin)await notifierFinFavoris(owner,r.valeur.fin).catch(()=>{});
+    if(req.method==='POST'&&req.body?.action==='terminer'&&r.valeur?.nouvelleDemande)await notifierDemandeAuto(owner,r.valeur.nouvelleDemande).catch(()=>{});
     return res.status(200).json({ok:true,uid,...(['suivant','consommer','verifier'].includes(req.body?.action)?r.valeur:{vue:r.valeur}),serveur:maintenant});
   }catch(e){return res.status(e instanceof RefusFavoris?e.status:503).json({message:e instanceof RefusFavoris?e.message:'La file n’a pas pu être confirmée. Actualise avant toute nouvelle action.',...(e instanceof RefusFavoris&&['favoris_preuve_absente','favoris_identite_non_unique'].includes(e.code)?{code:e.code,diagnostic:e.diagnostic}:{})});}
 }

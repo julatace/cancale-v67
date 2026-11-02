@@ -19,12 +19,13 @@ const tirage = () => Math.round(PILOTE_ECART_MS[0] + Math.random() * (PILOTE_ECA
 // Un tour pour un compte : `api(action, donnees)` appelle /api/compte?mode=favoris&uid=…
 // `executer(travail)` envoie par l'extension. Rend ce qui s'est passé (pour l'écran).
 export async function tourPiloteFavoris({ api, executer, disponible }) {
-  // Sans extension prête sur CE compte (onglet vinted.fr, 5.309, même compte VRM),
-  // le serveur n'est même pas sollicité : rien n'est posé, rien ne part.
-  const d = disponible ? await disponible() : { disponible: false };
-  if (!d?.disponible) return { etat: 'extension', raison: d?.raison || '' };
-  const t = await api('auto');
+  // L'état de l'extension sur CE compte (onglet vinted.fr, 5.309, même compte VRM)
+  // part avec le tour : sans elle, le serveur ne pose RIEN mais, si un message était
+  // prêt, il DEMANDE à Julien le geste qui débloque (2 nov., 13 h : « ou demander »).
+  const d = disponible ? await disponible() : { disponible: false, code: 'extension_indisponible' };
+  const t = await api('auto', { extension: { disponible: d?.disponible === true, ...(d?.code ? { code: d.code } : {}) } });
   if (!t?.ajoute) return { etat: t?.etat || 'lecture', vue: t?.vue || null };
+  if (!d?.disponible) return { etat: 'extension', vue: t?.vue || null };
   const s = await api('suivant');
   if (!s?.travail) return { etat: 'pret', vue: s?.vue || null };
   let r = null; try { r = await executer(s.travail); } catch (_) { r = null; }

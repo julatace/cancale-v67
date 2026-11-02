@@ -292,6 +292,43 @@ async function scenarios() {
       await call('auto_stop');
       const c = await call('consommer', { jeton: s.body.travail.jeton, version: '5.309.0' });
       dit(c.code === 409, 'Stop pendant la préparation : l’autorisation est refusée, rien ne part', c.code); }
+    // 14. (2 nov., 13 h — « régler tout seul, ou demander ») Jamais de boucle, et une
+    //     demande à Julien quand un geste de sa part débloque.
+    { horloge = T0; const { b, call } = neuf(); await allumer(call); horloge = T0 + 2 * H;
+      monde(b, { maintenant: horloge, favoris: [['n1', 201, 101, 61 * MIN], ['n2', 202, 102, 61 * MIN]] });
+      // L'onglet Vinted manque : rien n'est posé, la demande est posée UNE fois.
+      const t1 = await call('auto', { extension: { disponible: false, code: 'onglet_vinted' } });
+      const t2 = await call('auto', { extension: { disponible: false, code: 'onglet_vinted' } });
+      dit(t1.body.ajoute === false && t1.body.vue?.auto?.demande?.code === 'onglet_vinted' && t1.body.nouvelleDemande === 'onglet_vinted' && !t2.body.nouvelleDemande, "onglet Vinted absent : rien n'est posé, VRM DEMANDE le geste — une seule fois", JSON.stringify({ a: t1.body.nouvelleDemande, b: t2.body.nouvelleDemande, d: t1.body.vue?.auto?.demande }));
+      const f0 = file(b);
+      dit(!(f0.autoEnvois || []).length, "aucun essai gâché pendant que l'onglet manque (quota intact)");
+      // L'onglet est là : le message part ; la demande tombe d'elle-même.
+      const t3 = await call('auto', { extension: { disponible: true } });
+      dit(t3.body.ajoute === true && !t3.body.vue?.auto?.demande, 'geste fait : le message est posé et la demande disparaît', JSON.stringify(t3.body.vue?.auto?.demande));
+      // Refus AVANT toute écriture (onglet fermé entre-temps) : un essai de plus au plus.
+      let s = await call('suivant'); await call('consommer', { jeton: s.body.travail.jeton, version: '5.309.0' });
+      const r1 = await call('terminer', { jeton: s.body.travail.jeton, resultat: 'refuse', raison: 'onglet_vinted', ecrits: 0 });
+      dit(r1.body.vue?.auto?.demande?.code === 'onglet_vinted' && r1.body.vue?.nouvelleDemande === 'onglet_vinted', "refus de l'extension faute d'onglet : la demande est posée", JSON.stringify(r1.body.vue?.auto?.demande));
+      horloge += 13 * MIN;
+      const t4 = await call('auto', { extension: { disponible: true } }); s = await call('suivant');
+      dit(t4.body.ajoute === true && s.body.travail?.recipientId === '201', 'rien n’était parti : le même favori a droit à UN second essai', JSON.stringify(s.body.travail));
+      await call('consommer', { jeton: s.body.travail.jeton, version: '5.309.0' });
+      const r2 = await call('terminer', { jeton: s.body.travail.jeton, resultat: 'refuse', raison: 'onglet_vinted', ecrits: 0 });
+      dit((r2.body.vue?.auto?.journal || [])[0]?.raison === 'essais_epuises', 'deuxième échec : le favori est laissé de côté, raison dite (jamais de boucle)', JSON.stringify((r2.body.vue?.auto?.journal || [])[0]));
+      horloge += 13 * MIN;
+      const t5 = await call('auto', { extension: { disponible: true } }); s = await call('suivant');
+      dit(t5.body.ajoute === true && s.body.travail?.recipientId === '202', 'VRM passe au favori suivant', JSON.stringify(s.body.travail)); }
+    { horloge = T0; const { b, call } = neuf(); await allumer(call); horloge = T0 + 2 * H;
+      monde(b, { maintenant: horloge, favoris: [['n1', 201, 101, 61 * MIN]] });
+      b.poser(`harvest_${UID}_listings`, { capturedAt: new Date(horloge - 30 * H).toISOString(), payload: { pagination: { total_entries: 1 }, items: [{ id: 101 }] } });
+      const t = await call('auto', { extension: { disponible: true } });
+      dit(t.body.vue?.auto?.demande?.code === 'dressing_ancien' || t.body.nouvelleDemande === 'dressing_ancien', 'dressing ancien : VRM demande de rouvrir le dressing', JSON.stringify(t.body).slice(0, 200));
+      const v = await call();
+      dit(v.body.vue?.auto?.demande?.code === 'dressing_ancien', "la demande est gardée côté serveur (l'écran la lit)", JSON.stringify(v.body.vue?.auto?.demande)); }
+    { horloge = T0; const { b, call } = neuf(); await allumer(call); horloge = T0 + 2 * H;
+      monde(b, { maintenant: horloge, favoris: [['n9', 'pas-un-id', 109, 61 * MIN]] });
+      const t = await call('auto', { extension: { disponible: true } });
+      dit(t.body.ajoute === false && t.body.vue?.auto?.demande?.code === 'destinataire_non_prouve', 'aucun destinataire prouvé : VRM demande d’ouvrir un favori depuis la cloche', JSON.stringify(t.body).slice(0, 200)); }
   } finally { global.fetch = ancienFetch; Date.now = ancienNow; }
 }
 
@@ -352,10 +389,14 @@ const MUTATIONS = [
   ['api/_lib/favoris-auto.js', "return Object.values(d?.groupes||{}).some(g=>(g.jobs||[]).some(j=>j.id===id&&", "return Object.values(d?.groupes||{}).some(g=>(g.jobs||[]).some(j=>false&&", 'un message par couple oublié (partout)'],
   ['api/_lib/favoris-auto.js', "if(quand>maintenant){", "if(false){", 'attente après le favori retirée'],
   ['api/_lib/favoris.js', "if(dansBoite.length||fil.length){sauts.push({...pr,raison:'conversation_existante'});continue;}", '', 'conversation existante ignorée'],
-  ['api/_lib/favoris.js', "if(gTout&&gTout!=='vendue-ailleurs')return stop('garde_absente');", '', 'garde absente acceptée'],
-  ['api/_lib/favoris.js', "const ed=etatDressingAuto(dr,maintenant);if(ed)return stop(ed);", '', 'dressing non vérifié'],
+  ['api/_lib/favoris.js', "if(gTout&&gTout!=='vendue-ailleurs')return await stop('garde_absente');", '', 'garde absente acceptée'],
+  ['api/_lib/favoris.js', "const ed=etatDressingAuto(dr,maintenant);if(ed)return await stop(ed);", '', 'dressing non vérifié'],
   ['src/favorisAuto.js', "if (it.is_reserved) return 'reservee';", '', 'paire réservée acceptée'],
   ['api/_lib/favoris-file.js', "if(AUTO_FREINS.includes(raison)){", "if(false){", 'frein de Vinted sans pause'],
+  ['src/favorisAuto.js', "export const AUTO_ESSAIS = 2;", "export const AUTO_ESSAIS = 99;", 'boucle : essais illimités'],
+  ['api/_lib/favoris-auto.js', "if(pret&&extension&&extension.disponible!==true){", "if(false){", 'extension absente : message posé quand même, rien demandé'],
+  ['api/_lib/favoris-auto.js', "if(g.auto.demande?.code===code)return false;", "", 'demande répétée à chaque tour'],
+  ['api/_lib/favoris.js', "if(DEMANDES_AUTO[etat]){const r=", "if(false){const r=", 'arrêt muet (aucune demande)'],
   ['api/_lib/favoris-file.js', "if(j.auto&&!version5309)", "if(false)", 'vieille extension autorisée'],
   ['vinted-sync-extension/background.js', "if(body.auto===true&&(c.messages.length>0", "if(false&&(c.messages.length>0", 'extension : conversation existante écrite'],
   ['vinted-sync-extension/background.js', "if (/captcha|datadome|", "if (/xxcaptchaxx|", 'extension : captcha non reconnu'],
