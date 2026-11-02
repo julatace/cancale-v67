@@ -500,3 +500,13 @@ html body .vrm-app-shell .vrm-main .vrm-finance-page.vrm-fu-ecran [data-compta-q
 html body .vrm-app-shell .vrm-main .vrm-finance-page.vrm-fu-ecran [data-compta-q="gagne"] > .vrm-compta-carte .vrm-set-ligne { border-color: rgba(255,255,255,.1) !important; --vrm-set-filet: rgba(255,255,255,.1) !important; }
 html body .vrm-app-shell .vrm-main .vrm-finance-page.vrm-fu-ecran .vrm-fu-compta { margin: 0 !important; }
 @media (min-width: 768px) { html body .vrm-app-shell .vrm-main .vrm-finance-page.vrm-fu-ecran [data-compta-q="gagne"] > .vrm-compta-carte { padding: 26px 28px 12px !important; } html body .vrm-app-shell .vrm-main .vrm-finance-page.vrm-fu-ecran [data-compta-q="gagne"] > .vrm-compta-carte .vrm-compta-hero { font-size: 52px !important; } }
+
+/* ── 10. CONTRASTE (revue ui-ux-pro-max §1, craft-floor) ──────────────────────
+   Tout TEXTE gris passe à 4,5:1 au moins : le gris le plus clair (#aeaeb2,
+   #8e8e93) ne sert plus qu'aux pistes et aux formes, jamais aux mots. */
+.vrm-fu-seg > span { color: var(--fu-gris) !important; font-size: 11px !important; font-weight: 500 !important; }
+.vrm-fu-seg[data-fait="1"] > span, .vrm-fu-seg[data-cours] > span { color: var(--fu-encre) !important; font-weight: 600 !important; }
+.vrm-fu-seg[data-cours][data-ton="urgent"] > span { color: var(--fu-ambre-txt) !important; }
+.vrm-fu-barre > span, .vrm-fu-panneau-tete span, .vrm-fu-titre-section span { color: var(--fu-gris) !important; }
+.vrm-fu-jour[data-futur] > b { color: rgba(255,255,255,.5) !important; }
+:root:not([data-theme="dark"]) { --fu-ambre-txt: #9a4a00; }

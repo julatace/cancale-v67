@@ -2904,3 +2904,62 @@ regroupement seulement : **aucune règle ne change** (mêmes routes `reception`/
 - À trancher par Julien : retirer la liste technique repliée (doublon du journal, mais seule
   recherche plein texte) ; les deux « Boost rentable ? » (période en haut, tout le temps dans le
   volet) ; « Articles ajoutés par jour » et les deux courbes mensuelles du volet « argent ».
+
+## 2 nov. (nuit) — Le style « Fusion » (branche `claude/design-fusion`)
+
+Julien a choisi « Fusion » sur les maquettes (FusionJournee, FusionVentes, FusionColis,
+FusionCompta) : « j'aime la barre de progression pour le suivi », « la première photo avec
+les stats novembre », puis « sans trop de couleur non plus, ça doit être premium ». Base
+neutre (fond #f2f2f7, cartes blanches rayon 20, ombre très douce), UNE carte sombre par
+écran (dégradé #1f3a5f → #1d1d1f), le bleu d'Apple seulement pour le bouton principal et
+les segments franchis, l'ambre seulement pour un geste urgent.
+
+**Composants partagés** (`src/design/`) :
+- `CarteMois.jsx` — la carte sombre : surtitre, UN grand chiffre (« — » si `null`), sous-ligne,
+  cases translucides, courbe monotone (`courbeMonotone.js`) quand c'est une tendance. Elle
+  n'invente rien : chaque valeur lui est passée par l'écran, qui la tient de SA règle.
+- `Frise.jsx` + `friseFusion.js` — la frise à 4 segments. AUCUNE règle neuve : pour une vente,
+  projection des cinq étapes de `friseVente` (src/recapVente.js) en Vendue · Postée
+  (= Déposée) · Livrée · Payée (= Argent reçu) ; pour un colis, Imprimé · Déposé · En route ·
+  Livré avec la même loi (faite si SA preuve est lue ou si une étape plus loin l'est ; « pas
+  su » jamais coché). Chaque segment porte `data-fu-etape`, `data-fait`, `data-preuve`,
+  `data-cours`.
+- `fusion.css` — jetons (`--fu-*`, clair et sombre CHOISI), chargée en tout dernier.
+
+**Ma journée** : la tête devient la carte sombre (date, bonjour, la semaine avec un point sous
+un jour qui a vendu, « Vendu aujourd'hui » = `bilanVentes` et le bénéfice du mois =
+`BeneficeJournee` sur `vrm_benefice_jours`). Le bénéfice n'est plus redit dans « Vendu en … »
+ni en carte de secours (§7). « À faire » en cartes : pastille chiffrée NEUTRE (encre ; ambre
+pâle seulement si urgent), le geste en pilule. Les cases du jour en cartes blanches.
+
+**Ventes** : carte du mois (vendu du mois toutes plateformes = `bilanVentes` sur `vendus`,
+« au moins » si un compte n'est pas lu ; courbe = cumul jour par jour ; cases « à poster »
+= `aExpedier` pas encore déposée, « en route » / « argent à venir » = la frise de chaque
+vente). Les preuves de la frise sont lues UNE fois (`preuvesFriseDe`, au niveau de
+l'écran) pour le tiroir (cinq étapes), la ligne (quatre segments) et la carte.
+
+**Colis** : carte « Aujourd'hui » (`vrm_colis_aposter`, `lignesLot`, `gestesDepuis(shipDone)`,
+`vrm_colis_retirer` — aucun nombre recalculé), frise par colis, cartes blanches.
+
+**La puce transporteur** (Julien, 21 h 36, « laide ») : `PastilleTransporteur` (non `seul`)
+devient une puce de 44 px, fond #f2f2f7 (sombre #2c2c2e), rayon 12, tuile du logo 20 px
+(rayon 5, blanche), nom 13 px 600 ; « Transporteur pas lu » = même puce sans tuile, en gris.
+Elle vit dans `.vrm-rangee-bord`, À GAUCHE du bouton bordereau, même rangée, jamais à la
+ligne : le libellé passe de « Imprimer le bordereau » à « Imprimer » par une requête de
+conteneur sur le bouton (≤ 236 px). Partout : Colis (Vinted, Vestiaire, en lignes sur
+ordinateur), ligne de vente, récapitulatif (Vinted et Vestiaire), Leboncoin, achats.
+
+**Compta** (structure « trois questions » de `claude/compta-simple`, gardée) : la carte de
+« Combien j'ai gagné ? » devient la carte sombre (CSS seulement) ; dessous, `ComptaFusion` :
+l'anneau (parts EN %, jamais un montant redit) seulement quand le net du mois se calcule,
+et les six derniers mois en barres (bénéfice sur les ventes, `beneficeDesJours`, montant en
+infobulle, « pas su » en pointillé). `compta-claire` 98/98.
+
+**Preuves** : banc `scripts/bancs/design-fusion.cjs` (Ma journée, Ventes, Colis, Compta ×
+390/1512 × clair/sombre) : frise = prouvé seulement (mutation `FUSION_MUTATION=1` ⇒ rouge),
+rangée puce + bordereau (même ligne, 44 px, rayon 12, une ligne), débordement, violet,
+« encaissé », erreurs. Bancs voisins : `recap-vente`, `compta-claire`, `vestiaire-parite`.
+Revue de contraste (ui-ux-pro-max §1) : aucun texte gris sous 4,5:1.
+
+**Reste** : la frise sur les lignes Leboncoin, eBay et Vestiaire (il leur faut leurs preuves
+propres, pas de règle à inventer) ; Annonces, Achats, Messages, Paramètres dans le même esprit.
