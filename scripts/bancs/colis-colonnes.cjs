@@ -168,7 +168,19 @@ const PARTIS = ['v:7005', 'p:7101', 'p:7102', 'p:7103'];
 // Ce que l'écran montre (DOM de l'écran Colis) : identités, codes, textes.
 const lire = (pg) => pg.evaluate((CODES) => {
   const main = document.querySelector('.vrm-main') || document.body;
-  const idents = [...main.querySelectorAll('[data-colis-ident]')].map((e) => ({ cle: e.getAttribute('data-colis-ident'),
+  // L'identité d'un colis à l'écran, quelle que soit la forme qui la porte (la
+  // nouvelle `data-colis-ident`, ou celles d'avant : carte de colonne, carte de
+  // bordereau, ligne d'e-mail par n° de suivi, achat à vérifier / en vérification,
+  // ligne « coché posté », ligne « Partis ») — sinon le contrôle « une fois »
+  // ne pourrait pas échouer sur l'avant (§6 : il doit pouvoir être rouge).
+  const identDe = (e) => e.getAttribute('data-colis-ident') || e.getAttribute('data-cc-carte')
+    || (e.hasAttribute('data-bord-card') && e.getAttribute('data-tx-colis') ? 'v:' + e.getAttribute('data-tx-colis') : '')
+    || (e.getAttribute('data-colis-suivi') ? 'r:e:' + e.getAttribute('data-colis-suivi') : '')
+    || (e.getAttribute('data-a-verifier-vinted') ? 'r:v:' + e.getAttribute('data-a-verifier-vinted') : '')
+    || (e.getAttribute('data-en-verification-tx') ? 'r:c:' + e.getAttribute('data-en-verification-tx') : '')
+    || (e.hasAttribute('data-limite') && e.getAttribute('data-tx') ? 'v:' + e.getAttribute('data-tx') : '') || '';
+  const SEL = '[data-colis-ident],[data-cc-carte],[data-bord-card][data-tx-colis],[data-colis-suivi],[data-a-verifier-vinted],[data-en-verification-tx],[data-limite][data-tx]';
+  const idents = [...main.querySelectorAll(SEL)].filter((e) => identDe(e) && e.getClientRects().length + (e.closest('details') ? 1 : 0) > 0).map((e) => ({ cle: identDe(e),
     groupe: e.getAttribute('data-groupe-carte') || '', partis: !!e.closest('[data-colis-partis]'), verif: !!e.closest('[data-retirer-a-verifier]'),
     point: (e.closest('[data-relais-point]') || { getAttribute: () => '' }).getAttribute('data-relais-point'), ambre: e.getAttribute('data-ambre') === '1',
     retire: !!e.querySelector('[data-colis-retire]'), txt: e.innerText }));
@@ -270,7 +282,7 @@ async function main() {
         dit(!L.ecrases.length, `${T} À retirer : aucun texte écrasé`, JSON.stringify(L.ecrases.slice(0, 5)));
         dit(L.sw <= L.cw + 1, `${T} À retirer : aucun débordement horizontal`, `${L.sw} > ${L.cw}`);
         // ── « À ENVOYER » ──
-        await pg.click('[data-colis-onglet-choix="envoyer"]');
+        if (await pg.$('[data-colis-onglet-choix="envoyer"]')) await pg.click('[data-colis-onglet-choix="envoyer"]');
         await pg.waitForTimeout(800);
         L = await lire(pg);
         if (process.env.PLAN) console.log(`\n──── PLAN ${T} · À envoyer ────\n${L.texte}\n────`);
@@ -302,6 +314,21 @@ async function main() {
           await pg.keyboard.press('Escape').catch(() => {});
           await pg.waitForTimeout(300);
         }
+        // ── LE LIEN « À RETIRER » (Ma journée, notification, ancien `?tab=retraits`) ──
+        // Il ouvrait le détail des retraits SOUS les colonnes : les colis et leurs
+        // codes y étaient redits. Il ouvre maintenant « À retirer », chaque code une fois.
+        await pg.goto(`http://localhost:${PORT}/?tab=retraits`, { waitUntil: 'domcontentloaded' });
+        for (let i = 0; i < 40; i++) { const n = await pg.evaluate(() => document.querySelectorAll('[data-code-retrait]').length); if (n >= 10) break; await pg.waitForTimeout(500); }
+        await pg.waitForTimeout(2500);
+        L = await lire(pg);
+        dit(L.onglet === 'retirer', `${T} le lien « à retirer » ouvre l'onglet « À retirer »`, String(L.onglet));
+        const doublesR = RETIRER.filter((k) => fois(L, k) !== 1).map((k) => `${k}×${fois(L, k)}`);
+        dit(!doublesR.length, `${T} lien « à retirer » : chaque colis à retirer EXACTEMENT une fois dans le DOM`, JSON.stringify(doublesR));
+        const codesR = Object.entries(L.codes).filter(([, n]) => n !== 1);
+        dit(!codesR.length, `${T} lien « à retirer » : chaque code de retrait écrit UNE fois`, JSON.stringify(L.codes));
+        dit(!L.ban, `${T} lien « à retirer » : jamais « Base Adresse Nationale »`, '');
+        if (!ordi) dit(!L.phraseCarte, `${T} lien « à retirer » : au téléphone, aucune phrase sur la carte`, '');
+        dit(!L.ecrases.length, `${T} lien « à retirer » : aucun texte écrasé`, JSON.stringify(L.ecrases.slice(0, 5)));
         dit(!errs.length, `${T} aucune erreur d'app`, errs[0]);
         await ctx.close();
       });
