@@ -28,3 +28,14 @@ Déplacé TEL QUEL depuis CLAUDE.md §9 le 2 novembre 2026 (le fichier dépassai
 - **31 oct.** — Extension **5.295.0** (intégrée avec la 5.294.0) : Vestiaire — compte ouvert, conversations lues, réponse sur son clic par recette APPRISE, favoris en nombre ; Colis → « À retirer » par point relais sur une carte, arrivées estimées (suivi Vinted). → historique vestiaire / colis-retraits. Geste : installer, envoyer UNE réponse soi-même sur Vestiaire, toucher « Suivre le colis » d'un achat en route.
 - **31 oct.** — Statistiques détaillées (rythme, marges par marque/modèle/taille/plateforme/compte, temps de vente, jours/heures, stock qui dort, rotation, annulations) + widget « Tendances » ; le bénéfice de Ma journée est là par défaut et se masque/remet en mode « Modifier » (interrupteur de Réglages retiré) ; une carte nouvelle arrive d'elle-même (`connus`). → historiques interface-stock et compta (« 31 octobre »). Geste : regarder Statistiques et Ma journée.
 - **31 oct.** — **Navigation par tâche** (son choix « A », puis « réorganiser les onglets ») : barre Journée · Annonces · Ventes · Colis · Plus ; colonne Ma journée · Annonces · Ventes · Messages · Colis + groupes Vendre · Expédier · Gérer · Argent · Plateformes · Moi ; filtres de site dans Annonces/Ventes/Messages (« Vinted » = l'ancien écran Vinted), « Toutes » pour Ventes seulement ; anciens `?tab=` redirigés (`src/navigationTache.js`). → historique interface-stock (« Navigation par tâche »). Geste : regarder la carte, trancher les points ouverts.
+
+
+## Lignes les plus anciennes de §9, déplacées TEL QUELLES le 2 novembre 2026 (mode auto des favoris)
+
+- **16-19 oct.** — Relais du téléphone (5.183), double vérification TOTP, studio photo,
+  mode équipe (016), carte et classement de la communauté (018-020, appliquées). → divers.
+- **11 oct.** — Remise à zéro des numéros (013, appliquée), prix 12,99 €, Messages eBay.
+- **3-9 oct.** — L'app pilote l'extension (bordereaux, publication), messagerie intégrée,
+  numéros à lettres, CA daté au versement, abonnement Stripe (mode test), sécurité
+  (routes fermées, RLS, origines exactes de l'extension).
+- **Septembre** — le reste : `docs/journal-2026.md` et les historiques.
