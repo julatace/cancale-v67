@@ -64,3 +64,4 @@ Déplacé TEL QUEL depuis CLAUDE.md §9 le 2 novembre 2026 (le fichier dépassai
 - **27 oct.** — Atelier de republication (tranches 1-5) ; Vestiaire depuis VRM (publier
   sans booster, ventes, achats, messages) ; statut fiscal adapté à la personne ; arrivée
   guidée (`Bienvenue.jsx`) ; annonces en fiches produit ; un article parti sort du Stock.
+- **31 oct. (soir)** — Colis en 4 colonnes (Prêts · En attente · À retirer · Partis, sa maquette) + barre du haut ordinateur (recherche « / », filtres de site à droite) ; aucune règle neuve, la liste d'avant reste sous « Colis par colis ». → historique colis-retraits. Geste : regarder Colis sur ordinateur.
