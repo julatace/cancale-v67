@@ -26904,12 +26904,18 @@ function ColisVestiaireBloc({ vc }) {
     <div data-colis-vestiaire={E.length} data-colis-vestiaire-route={R.length} style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 16 }}>
       {E.length > 0 && <>
         {titre('Ventes Vestiaire à envoyer', E.length)}
-        <div className="vrm-aide" style={{ fontSize: 12, color: C.muted, lineHeight: 1.5 }}>Le bordereau se prend sur Vestiaire (onglet « articles à expédier »). Ce que VRM lit vient de ta dernière visite sur Vestiaire avec l'extension.</div>
+        <div className="vrm-aide" style={{ fontSize: 12, color: C.muted, lineHeight: 1.5 }}>{E.every((v) => v.bordereau) ? 'Les bordereaux sont dans VRM (« Imprimer le bordereau »). ' : 'Le bordereau se prend sur Vestiaire (onglet « articles à expédier ») — ou ici, une fois la page de la vente ouverte sur Vestiaire. '}Ce que VRM lit vient de ta dernière visite sur Vestiaire avec l'extension.</div>
         {E.map((v) => { const j = joursAvantVc(v.limite); return (
           <div key={v.id} data-vc-colis={v.id} data-colis-ident={'vc:'+v.id} data-vc-colis-num={v.num || ''} data-vc-colis-limite={v.limite ? v.limite.slice(0, 10) : ''} style={{ border: `1px solid ${C.border}`, borderRadius: 10, padding: '10px 12px', background: C.card }}>
+            {v.titre || v.photo ? <div data-vc-colis-fiche="" style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 4 }}>
+              <span style={{ width: 44, height: 44, borderRadius: 8, overflow: 'hidden', background: C.bg, flexShrink: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}><PhotoVc src={v.photo || ''}/></span>
+              <span style={{ fontSize: 13.5, fontWeight: 600, color: C.text, minWidth: 0, overflowWrap: 'anywhere' }}>{v.titre || 'Article Vestiaire'}</span>
+            </div> : null}
             <div style={{ fontSize: 13, fontWeight: 600, color: C.text }}>{v.num ? `N°${v.num}` : 'Pas reliée à une paire'}
               {j != null ? <span style={{ marginLeft: 8, color: j <= 1 ? C.warn : C.muted, fontWeight: 600 }}>· {j < 0 ? `date limite passée (${new Date(v.limite).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })})` : j === 0 ? 'à envoyer aujourd’hui' : j === 1 ? 'à envoyer demain' : `à envoyer avant le ${new Date(v.limite).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}`}</span> : null}</div>
             <div style={{ fontSize: 11.5, color: C.muted }}>{v.limite ? '' : 'date limite non dite par Vestiaire · '}{v.etiquette === true ? 'bordereau disponible sur Vestiaire' : v.etiquette === false ? 'pas encore de bordereau' : 'bordereau : pas su'}{v.transporteur ? ` · ${v.transporteur}` : ''}{v.suivi ? ` · suivi ${v.suivi}` : ''}</div>
+            {v.suivi ? <div style={{ fontSize: 11.5, color: C.muted }}>{v.transporteur ? v.transporteur + ' · ' : ''}suivi {v.suivi}</div> : null}
+            {v.bordereau ? <BoutonBordereauVc id={v.bordereau.id} titre={v.titre}/> : null}
             {!v.num ? <div style={{ fontSize: 11, color: C.muted }}>Aucune référence VRM-n° lue sur l'article : VRM ne devine pas la paire.</div> : null}
           </div>); })}
       </>}
@@ -52785,7 +52791,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           );
           if (!ex.length) return (<>{lignePostes}
             <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'22px 16px',lineHeight:1.6}}>
-              Aucun colis à envoyer.<br/>
+              {(() => { const cv = colisVestiaire(vcEtat); return cv && Array.isArray(cv.aEnvoyer) && cv.aEnvoyer.length && voitSite('vestiaire') ? 'Aucun colis Vinted à envoyer.' : 'Aucun colis à envoyer.'; })()}<br/>
               <span style={{fontSize:12}}>Dès que Vinted te demande un envoi, l'article apparaît ici — l'extension le capte sans que tu fasses rien.</span>
             </div></>
           );
