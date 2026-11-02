@@ -39,3 +39,7 @@ Déplacé TEL QUEL depuis CLAUDE.md §9 le 2 novembre 2026 (le fichier dépassai
   numéros à lettres, CA daté au versement, abonnement Stripe (mode test), sécurité
   (routes fermées, RLS, origines exactes de l'extension).
 - **Septembre** — le reste : `docs/journal-2026.md` et les historiques.
+- **20 oct.** — Doublons de N° réglés seuls ; revues « argent » (app, extension, eBay) ;
+  eBay se relit tout seul ; Leboncoin : compte de session, date de vente. → numeros / ebay.
+- **21 oct.** — Discord sur téléphone, date d'arrivée des colis, rappel du soir, « Tout
+  sur le N° », captcha prêt, revue visuelle. → `docs/passation/2026-10-21.md`.
