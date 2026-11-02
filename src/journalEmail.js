@@ -81,7 +81,7 @@ export function lectureEmail(e, delies = {}) {
   if ((e && e.etat === 'erreur') || (r && r.t === 'panne')) {
     return { ...base, etat: 'reessai', quoi: sujet, fait: 'Pas encore rangé : le service de réception va le renvoyer tout seul.',
       raison: 'Le rangement n’a pas été confirmé (serveur de données injoignable ou traitement interrompu).',
-      geste: 'Rien à faire : il revient tout seul. S’il est encore là dans une heure, regarde l’onglet Réception.' };
+      geste: 'Rien à faire : il revient tout seul. S’il est encore là dans une heure, regarde l’Aperçu des e-mails.' };
   }
   if (!r) {
     const ancienIncompris = e && e.type === 'ignoré';

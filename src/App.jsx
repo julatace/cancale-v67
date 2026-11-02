@@ -58326,7 +58326,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       { id:'connexions', type:'panneau', ic:'sync', lib:'État des connexions', desc:'Ce qui marche, ce qui attend un geste', titreInterne:true, el:<ConnexionsSetting key={AUTH.user?.id||'sans-session'} comptes={comptes||[]} onComptes={()=>setTab('vintedaccounts')} onPlateforme={versPlateforme}/> },
       // (31 oct., soir) L'ancien « eBay → Compte » : connexion et comptes eBay reliés.
       ebayCompte && { id:'ebay', type:'panneau', ic:'link', lib:'Comptes eBay', desc:'Connexion à eBay, comptes reliés', el:ebayCompte },
-      { id:'adresses', type:'panneau', ic:'mail', lib:'Réception des emails', desc:'Transfert et emails reçus', titreInterne:true, el:<EmailsSetting onComptes={()=>setTab('vintedaccounts')}/> },
+      { id:'adresses', type:'panneau', ic:'mail', lib:'E-mails', desc:'Est-ce qu’ils arrivent, ce que VRM en a fait, tes adresses', titreInterne:true, el:<EmailsSetting onComptes={()=>setTab('vintedaccounts')}/> },
       proprioInst && { id:'import', type:'panneau', nu:true, ic:'calendar', lib:'Import des emails Vinted', desc:'Date de début de l’historique', el:<EmailStartSetting key={AUTH.user?.id||'sans-session'} nu/> },
       { id:'securite', type:'panneau', ic:'key', lib:'Sécurité des données', desc:'Qui peut lire et écrire tes données', el:<SecuriteSetting/> },
     ]},
@@ -60802,6 +60802,9 @@ function EmailsSetting({onComptes}) {
   const [versionReception,setVersionReception]=useState(0);
   const [rubriqueEmail,setRubriqueEmail]=useState(()=>DEMANDE_ADRESSES.on?(DEMANDE_ADRESSES.vers||'adresses'):'reception');
   const [journalFiltre,setJournalFiltre]=useState(()=>DEMANDE_ADRESSES.vers==='journal'?DEMANDE_ADRESSES.filtre:'');
+  // (2 nov.) L'Aperçu ouvre le journal sur un état OU un type (« 2 bordereaux ajoutés à Colis » → les bordereaux).
+  const [journalType,setJournalType]=useState('');
+  const ouvrirJournal=(etat,type)=>{setJournalFiltre(etat||'');setJournalType(type||'');setRubriqueEmail('journal');requestAnimationFrame(()=>{try{racine.current&&racine.current.scrollIntoView({block:'start',behavior:'smooth'});}catch(_){}});};
   // Les reçus d'achat qu'il a déliés (« Ce n'est pas ça ») — réversible, rien n'est supprimé.
   const [recusDelies,setRecusDelies]=useStateCle('vrm_recus_delies', ()=>load('vrm_recus_delies',{})||{});
   useEffect(()=>{const relire=()=>setRecusDelies(load('vrm_recus_delies',{})||{});const off=onCloudReady(relire);const f=e=>{if(e&&e.detail&&e.detail.k==='vrm_recus_delies')relire();};window.addEventListener('vrm:save',f);return()=>{off();window.removeEventListener('vrm:save',f);};},[]);
@@ -61018,7 +61021,7 @@ function EmailsSetting({onComptes}) {
   };
   return (
     <div ref={racine}>
-    <EspaceEmails onglet={rubriqueEmail} onOnglet={setRubriqueEmail} adresses={reg?liste.length:null} aRattacher={Array.isArray(quarantaine)?quarantaine.length:null} idBase={espaceId} theme={C}>
+    <EspaceEmails onglet={rubriqueEmail} onOnglet={(o)=>{if(o==='journal'){setJournalFiltre('');setJournalType('');}setRubriqueEmail(o);}} idBase={espaceId} theme={C}>
     <div id={espaceId+'-adresses'} data-email-panneau="adresses" hidden={rubriqueEmail!=='adresses'}>
     <div data-reglage-adresses="" style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:10,padding:'12px 14px'}}>
       <div style={{fontSize:13,fontWeight:600,color:C.text,marginBottom:2}}>Mes adresses de réception</div>
@@ -61169,15 +61172,15 @@ function EmailsSetting({onComptes}) {
     {/* (31 oct.) Monté seulement quand on le regarde : aucune lecture pour un
         onglet caché (« sauf si c'est trop lourd en données »). */}
     <div id={espaceId+'-journal'} data-email-panneau="journal" hidden={rubriqueEmail!=='journal'}>
-      {rubriqueEmail==='journal'&&<JournalEmails headers={sbAuth} filtreInitial={journalFiltre} delies={recusDelies} onDelier={delierRecu} onRelier={relierRecu}
+      {rubriqueEmail==='journal'&&<JournalEmails key={journalFiltre+'|'+journalType} headers={sbAuth} filtreInitial={journalFiltre} typeInitial={journalType} delies={recusDelies} onDelier={delierRecu} onRelier={relierRecu}
         onNav={(t)=>{try{window.dispatchEvent(new CustomEvent('vrm:aller',{detail:t}));}catch(_){}}}
         onNum={(n)=>{try{window.dispatchEvent(new CustomEvent('vrm:fiche-article',{detail:String(n)}));}catch(_){}}}/>}
     </div>
     <div id={espaceId+'-reception'} data-email-panneau="reception" hidden={rubriqueEmail==='a-traiter'||rubriqueEmail==='journal'}>
-      <SuiviReceptionEmails onAdresseGuide={setAdresseGuide} adresseGuide={adresseGuide} guideOuvert={guideOuvert} onFermerGuide={()=>setGuideOuvert(false)} onVoirReception={()=>setRubriqueEmail('reception')} section={rubriqueEmail==='adresses'?'configuration':'reception'} key={uid} owner={uid} headers={sbAuth} theme={C} version={versionReception} onAdresses={setSuiviAdresses} onComptes={onComptes} onDeclarer={ajouterAdresses} preuves={preuves} onConfirmer={adr=>confirmerAdresse(adr,false)} quarantaine={quarantaine} onVerifier={()=>{setRubriqueEmail('a-traiter');requestAnimationFrame(()=>racine.current?.querySelector('[data-emails-mis-de-cote]')?.scrollIntoView({block:'center',behavior:'smooth'}));}}/>
+      <SuiviReceptionEmails onAdresseGuide={setAdresseGuide} adresseGuide={adresseGuide} guideOuvert={guideOuvert} onFermerGuide={()=>setGuideOuvert(false)} onVoirReception={()=>setRubriqueEmail('reception')} onJournal={ouvrirJournal} onOnglet={setRubriqueEmail} section={rubriqueEmail==='adresses'?'configuration':'reception'} key={uid} owner={uid} headers={sbAuth} theme={C} version={versionReception} onAdresses={setSuiviAdresses} onComptes={onComptes} onDeclarer={ajouterAdresses} preuves={preuves} onConfirmer={adr=>confirmerAdresse(adr,false)} quarantaine={quarantaine} onVerifier={()=>{setRubriqueEmail('a-traiter');requestAnimationFrame(()=>racine.current?.querySelector('[data-emails-mis-de-cote]')?.scrollIntoView({block:'center',behavior:'smooth'}));}}/>
     </div>
     <div id={espaceId+'-a-traiter'} data-email-panneau="a-traiter" hidden={rubriqueEmail!=='a-traiter'} className="vrm-email-rattachement">
-      <h3>Emails à rattacher</h3><p>Les emails conservés en attendant de retrouver leur compte.</p>
+      <h3>E-mails à rattacher</h3><p>Arrivés sur une adresse que VRM ne peut pas encore relier à toi : ils sont gardés entiers. Touche « C’est à moi » sur ceux qui sont à toi.</p>
       {quarantaine===undefined&&<p role="status">Lecture des emails mis de côté…</p>}
       {Array.isArray(quarantaine)&&quarantaine.length===0&&<div className="vrm-email-vide">Aucun email à rattacher pour le moment.</div>}
       {/* Pas su ≠ aucun. Une seule phrase, et seulement si le registre, lui, a
@@ -61190,16 +61193,15 @@ function EmailsSetting({onComptes}) {
       {enAttente.length > 0 && (
         <div data-emails-mis-de-cote="" style={{marginTop:12,borderTop:`1px solid ${C.border}`,paddingTop:10}}>
           <div style={{fontSize:12.5,fontWeight:600,color:C.text,marginBottom:6}}>{enAttente.length} email{enAttente.length>1?'s':''} conservé{enAttente.length>1?'s':''}</div>
-          <div className="vrm-aide" style={{fontSize:11.5,color:C.muted,marginBottom:8,lineHeight:1.45}}>Arrivés avant que leur adresse soit déclarée. Gardés entiers.</div>
           <label className="vrm-email-recherche">Rechercher dans les emails à rattacher<input type="search" value={rechercheRattachement} onChange={e=>{setRechercheRattachement(e.target.value);setLimiteRattachement(10);}} placeholder="Sujet ou motif"/></label>
-          <p className="vrm-email-resultats">{rattachementsVisibles.length} sur {enAttente.length} emails{motsRattachement?' · recherche appliquée':''}</p>
+          {motsRattachement&&<p className="vrm-email-resultats">{rattachementsVisibles.length} sur {enAttente.length} · recherche appliquée</p>}
           {/* (30 oct.) Un parcours : où j'en suis, une barre, combien. */}
           {lot ? <Avancement titre={`Email ${Math.min(lot.fait + 1, lot.total)} sur ${lot.total}`} part={lot.total ? lot.fait / lot.total : 0}
               phrase="Chaque email repasse dans le traitement normal. Rien n'est supprimé avant la fin."
               compte={compteAvancement({ faites: lot.ok, ratees: lot.fait - lot.ok, restent: lot.total - lot.fait, motFait: 'traité' })}
               data={{ 'data-rejeu-lot': `${lot.fait}/${lot.total}` }}/>
             : <button type="button" onClick={toutRejouer} className="vrm-b vrm-b-primaire vrm-b-plein" style={{marginBottom:10}}>
-              {`Réessayer les ${enAttente.length} emails`}
+              {enAttente.length>1?`Réessayer les ${enAttente.length} e-mails`:'Réessayer cet e-mail'}
             </button>}
           {rattachementsVisibles.slice(0,limiteRattachement).map(q => (
             <div key={q.id} style={{display:'flex',alignItems:'center',gap:8,padding:'7px 0',borderTop:`1px solid ${C.border}`}}>
