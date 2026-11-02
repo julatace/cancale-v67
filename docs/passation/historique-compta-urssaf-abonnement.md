@@ -1647,3 +1647,78 @@ Même tournée que « Paramètres, arrivée guidée et communauté » (historiqu
 
 Banc : `compta-abonnements` — « × » ⇒ la confirmation nomme l'abonnement ; « Annuler » ne
 retire rien (écran et `vrm_compta`) ; « Supprimer » le retire des deux et le dit.
+
+---
+
+## 2 novembre — La facture Pro refaite : une vraie facture, émise d'un clic sur la vente, envoyée depuis la boîte du vendeur
+
+**Demande de Julien** : « mettre à disposition la possibilité de créer sa propre facture quand on est en
+compte Pro […] on remplit toutes les informations nécessaires, on peut mettre son logo, et à côté de chaque
+vente professionnelle on appuie sur “Envoyer la facture à l'acheteur” et VRM l'envoie. Une facture
+personnalisable mais une vraie facture, parfaite. »
+
+**Mesuré avant (lecture seule)** : 5 ventes Pro réelles (`email_sale_*`, `pro:true`, toutes avec e-mail
+d'acheteur et n° de transaction) ; 5 brouillons `email_invoice_tx*` numérotés FA-2026-0001…0005 à
+l'ARRIVÉE de l'e-mail, jamais envoyés (la file ne partait que par le script Gmail de Julien, pas recollé) ;
+la fiche `vrm_pro_facture` presque vide ; la facture d'avant (`buildInvoiceHtml`) ne portait ni « EI », ni
+date de vente, ni quantité/prix unitaire, calculait une TVA sur un prix en régime de la marge (interdit,
+art. 297 E) et ne partait que pour le propriétaire de l'installation.
+
+**Ce qui est fait**
+- `src/facturePro/regle.js` (pur, app ET serveur) : les mentions obligatoires d'une vente de biens à un
+  particulier (L441-9 C. com., 242 nonies A ann. II CGI) — n° unique continu, dates d'émission et de vente
+  (heure de Paris), vendeur (nom + « EI » pour un entrepreneur individuel, adresse, SIRET vérifié par Luhn,
+  RCS et capital pour une société, n° de TVA si assujetti), acheteur (nom, adresse), désignation, quantité,
+  prix unitaire HT, totaux en CENTIMES ; trois régimes jamais devinés : franchise (« TVA non applicable,
+  art. 293 B du CGI »), marge (« Régime particulier – Biens d'occasion », AUCUNE TVA écrite), TVA classique
+  (HT + TVA = TTC au centime) ; facture acquittée (« payée le … via Vinted ») ; nature « Livraison de
+  biens ». `manquantsVendeur` / `manquantsVente` disent ce qui manque, en mots — rien n'est émis sinon.
+  L'adresse de l'e-mail Vinted Pro (« rue, n°, ville, CP, code, pays » — forme mesurée sur les 5 réelles)
+  est remise en lignes postales (`adresseVintedLisible`).
+- `src/facturePro/pdf.js` (pdf-lib, le même dans l'app et sur le serveur) : A4, logo, couleur choisie,
+  tableau, totaux, mentions, pied de page légal ; caractères impossibles (emoji) retirés, textes longs
+  coupés ; aucune marque VRM.
+- `api/_lib/facture-pro.js` (`/api/compte?mode=facture-pro`, 12 fonctions inchangées) :
+  - **numérotation sans trou ni doublon** : compteur par vendeur (`vrm_invoice_counter`, avoirs
+    `vrm_avoir_counter`) en comparer-et-échanger, avec un JOURNAL n → transaction (deux clics simultanés ou
+    une coupure redonnent le MÊME numéro à la même vente) ; compteur ou fiche illisible ⇒ 503, rien de pris ;
+    l'ancien compteur (un nombre) est repris ; les 5 brouillons d'avant gardent LEUR numéro ;
+  - une facture émise est un **instantané** (`contenu`) qui ne change plus ; la corriger = un **avoir**
+    numéroté AV-AAAA-NNNN, montants négatifs, lié à la facture (`annuleePar`) ;
+  - **envoi depuis la boîte du VENDEUR** (§2.9 : aucun service d'envoi payé par Julien pour les autres ;
+    l'acheteur voit l'adresse du vendeur et lui répond) : mot de passe d'application collé une fois,
+    vérifié (connexion + AUTH, sans rien envoyer), rangé CHIFFRÉ dans le coffre (usage `smtp-facture-v1`,
+    ligne `facture_boite`), jamais relu par le navigateur ; « M'envoyer un essai » ; copie cachée au
+    vendeur (réglable) ; PDF + formulaire de retour Vinted joints, puis ses octets purgés ;
+  - **trois issues** (envoyée · refusée · incertaine), « en cours » posé AVANT l'envoi (pas de double
+    envoi), « Renvoyer » explicite.
+- `api/_lib/smtp.js` : client SMTP sans dépendance (le registre npm n'était pas joignable) — TLS 465 /
+  STARTTLS 587 (jamais en clair), AUTH PLAIN/LOGIN, MIME (en-têtes encodés, pièces jointes base64,
+  points doublés) ; le serveur d'envoi doit être un NOM public (jamais une IP ni un nom local).
+- `api/email-inbound.js` : l'e-mail de vente ne NUMÉROTE plus rien (un numéro se donne à l'émission) ; il
+  garde le brouillon (acheteur + formulaire de retour) d'une vente Pro qui a sa transaction.
+- `src/FacturePro.jsx` + `src/facture-pro.css` :
+  - **sur la vente** (récapitulatif) : « Envoyer la facture à l'acheteur » — seulement sur une vente Pro
+    PROUVÉE (e-mail Vinted Pro de SA transaction, ou profil du compte lu « professionnel » par la règle
+    `typeCompteVinted`) ; acheteur prérempli par la transaction (jamais par ressemblance) ; aperçu ; une
+    confirmation ; « Émettre et envoyer » / « Émettre sans envoyer » ; puis l'état (envoyée le …, à …),
+    « Voir le PDF », « Partager » (feuille de partage de l'iPhone), « Renvoyer », « Annuler par un avoir » ;
+  - **la fiche** (Comptabilité → Factures → Facturation Pro, ou « Compléter ma fiche » depuis la vente,
+    le doigt sur le champ qui manque) : SIRET (nom et adresse retrouvés au registre public), forme, TVA,
+    logo (réduit dans le navigateur, ≤ 200 Ko), couleur, début des numéros, note, message de l'e-mail,
+    aperçu EN DIRECT, boîte d'envoi ;
+  - **la liste des factures émises** (Factures) en scalaires — l'ancienne lecture `select=data` toutes
+    les 5 minutes est retirée (§4.4), comme l'ancien circuit « mise en file » Gmail.
+- La même ligne `vrm_pro_facture` reste la seule fiche (« Ton entreprise » de Comptabilité l'écrit aussi) :
+  la fiche relit la ligne juste avant d'écrire et ne réécrit que SES champs.
+
+**Preuves** : `scripts/audit-facture-pro.cjs` (48 contrôles — vraie route, fausse base à la vraie forme,
+FAUX SERVEUR SMTP en TLS qui parle SMTP pour de vrai ; mutations : journal retiré ⇒ trou N5 ;
+comparer-et-échanger retiré ⇒ six fois le même numéro) ; banc `scripts/bancs/facture-pro.cjs` (44, 390
+clair + 1512 sombre ; mutation : état d'envoi pas gardé ⇒ rouge) ; `audit-routes-revue` A/A2/B et
+`audit-vendeur-neutre` D, `compact` remis à la nouvelle règle.
+
+**Gestes de Julien** : compléter sa fiche (Comptabilité → Factures → Facturation Pro : SIRET, forme, régime
+de TVA) ; connecter sa boîte (Gmail : « mot de passe d'application ») et s'envoyer un essai ; puis, sur une
+vente Pro, « Envoyer la facture à l'acheteur ». Les 5 ventes Pro déjà reçues gardent leurs numéros
+FA-2026-0001…0005.
