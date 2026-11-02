@@ -52163,6 +52163,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               {(t || o) ? <button className="vrm-pickup-collect" type="button" data-colis-retire="" onClick={() => (t ? markCollected(t) : markPickupDone(o))} aria-label="J’ai retiré ce colis"><span aria-hidden="true">✓</span><span className="vrm-pickup-collect-label"> J’ai retiré</span></button> : null}
             </>);
           };
+          // Depuis quand il attend (demande de Julien, 23 oct.) : la date d'arrivée de CE
+          // colis, celle de l'ancien détail (`LigneArrivee`), sur sa carte.
+          const arriveeRetrait = (x) => { const t = (x.src && x.src.t) || null, o = (x.src && x.src.o) || null;
+            const arr = t ? arriveeColisEmail(t) : (o ? (etatColisVinted(o, Date.now(), transpMap) || {}).arr : null);
+            return arr ? <LigneArrivee arr={arr} style={{marginTop:0}}/> : null; };
           const toutLuRet = !notes.retirer && !baseKO && tracking !== null && Array.isArray(buys.items) && !buys.error;
           return (<>
             <ScreenHead icon="doc" title="Colis" sous={<span className="vrm-phrase-ecran" data-phrase-ecran="colis">{PHRASES_ECRAN.colis}</span>}
@@ -52196,7 +52201,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               <section className="vrm-colis-retirer" data-cc-colonne="retirer" data-cc-n={colRet ? colRet.n : 0} data-cc-hors={colRet ? colRet.nHors : 0}>
                 {notes.retirer ? <p className="vrm-colis-note" data-cc-note="retirer">{notes.retirer}</p> : null}
                 {colRet && colRet.cartes.length > 0
-                  ? <ColonneRetirer vue={parPoint} C={C} Photo={photoCarte} gestes={gestesRetrait} avecCarte={ordiColis} enRouteSansRelais={(groupesRelais && groupesRelais.enRouteSansRelais) || 0}/>
+                  ? <ColonneRetirer vue={parPoint} C={C} Photo={photoCarte} gestes={gestesRetrait} detail={arriveeRetrait} avecCarte={ordiColis} enRouteSansRelais={(groupesRelais && groupesRelais.enRouteSansRelais) || 0}/>
                   : (toutLuRet ? <p className="vrm-colis-vide" data-retraits-vide="">Aucun colis à aller chercher pour l’instant.</p> : null)}
               </section>
             )}

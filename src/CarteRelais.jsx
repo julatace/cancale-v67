@@ -252,7 +252,7 @@ function marquerChoisi(els, selection) {
 const plur = (n, s, p) => `${n} ${n > 1 ? (p || s + 's') : s}`;
 const texteLimite = (j) => (j == null ? '' : j < 0 ? 'date limite passée' : j === 0 ? 'dernier jour aujourd’hui' : j === 1 ? 'dernier jour demain' : `encore ${j} jours`);
 
-function CarteColisRetirer({ x, Photo, gestes, limiteSurCarte, avecLieu = false, raison = '' }) {
+function CarteColisRetirer({ x, Photo, gestes, detail, limiteSurCarte, avecLieu = false, raison = '' }) {
   const ph = x.photo && Photo ? Photo(x.photo) : null;
   const sousTitre = [avecLieu ? (x.lieuNom || '') : '', raison, limiteSurCarte && x.jours != null ? texteLimite(x.jours) : ''].filter(Boolean);
   const codeTxt = x.code ? x.code : x.qr ? 'QR code' : '';
@@ -266,6 +266,7 @@ function CarteColisRetirer({ x, Photo, gestes, limiteSurCarte, avecLieu = false,
         <span className="vrm-rp-quoi">
           <span className="vrm-cc-nom" title={x.titre}>{x.titre}</span>
           {sousTitre.length ? <span className={'vrm-rp-sous' + (limiteSurCarte && x.jours != null && x.jours <= 1 ? ' is-ambre' : '')} data-rp-sous="">{sousTitre.join(' · ')}</span> : null}
+          {detail ? detail(x) : null}
         </span>
         {x.num ? <span className="vrm-cc-num" data-numero={x.num}>N°{x.num}</span> : null}
       </span>
@@ -279,7 +280,7 @@ function CarteColisRetirer({ x, Photo, gestes, limiteSurCarte, avecLieu = false,
   );
 }
 
-export function ColonneRetirer({ vue, C, Photo, gestes = null, avecCarte = true, enRouteSansRelais = 0 }) {
+export function ColonneRetirer({ vue, C, Photo, gestes = null, detail = null, avecCarte = true, enRouteSansRelais = 0 }) {
   const points = (vue && vue.points) || [];
   const connus = points.filter((p) => !p.inconnu);
   const inconnu = points.find((p) => p.inconnu) || null;
@@ -334,7 +335,7 @@ export function ColonneRetirer({ vue, C, Photo, gestes = null, avecCarte = true,
               </span>
             </header>
             <div className="vrm-rp-liste">
-              {comptes.map((x) => <CarteColisRetirer key={x.cle || x.id} x={x} Photo={Photo} gestes={gestes} limiteSurCarte={jMixte}/>)}
+              {comptes.map((x) => <CarteColisRetirer key={x.cle || x.id} x={x} Photo={Photo} gestes={gestes} detail={detail} limiteSurCarte={jMixte}/>)}
               {p.attendus.map((c) => (
                 <div key={c.id} className="vrm-rp-attendu" data-relais-attendu={c.id} data-relais-estimee={c.estimee || ''}>
                   En route{c.titre ? ` · ${c.titre}` : ''} — {c.estimee ? <>arrivée estimée {jourFr(c.estimee)}</> : <span>date d’arrivée pas encore dite</span>}
@@ -353,7 +354,7 @@ export function ColonneRetirer({ vue, C, Photo, gestes = null, avecCarte = true,
             </span>
           </header>
           <div className="vrm-rp-liste">
-            {inconnusComptes.map((x) => <CarteColisRetirer key={x.cle || x.id} x={x} Photo={Photo} gestes={gestes}/>)}
+            {inconnusComptes.map((x) => <CarteColisRetirer key={x.cle || x.id} x={x} Photo={Photo} gestes={gestes} detail={detail}/>)}
           </div>
         </section>
       )}
@@ -367,7 +368,7 @@ export function ColonneRetirer({ vue, C, Photo, gestes = null, avecCarte = true,
             </span>
           </header>
           <div className="vrm-rp-liste">
-            {aVerifier.map((x, i) => <CarteColisRetirer key={x.cle || x.id} x={x} Photo={Photo} gestes={gestes} avecLieu raison={raisonCommune ? '' : raisons[i]}/>)}
+            {aVerifier.map((x, i) => <CarteColisRetirer key={x.cle || x.id} x={x} Photo={Photo} gestes={gestes} detail={detail} avecLieu raison={raisonCommune ? '' : raisons[i]}/>)}
           </div>
         </section>
       )}
