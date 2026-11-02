@@ -31,6 +31,7 @@ const DIST = path.join(__dirname, '..', '..', 'dist');
 const PORT = Number(process.env.BANC_PORT || process.env.PORT || 4398);
 const SHOTS = process.env.SHOTS || '';
 const MUTATION = process.env.FUSION_MUTATION === '1';
+const VUES = process.env.FUSION_VUES ? process.env.FUSION_VUES.split(',') : null;
 const SEUL = process.env.FUSION_ECRANS ? process.env.FUSION_ECRANS.split(',') : null;
 
 const maintenant = new Date(2026, 10, 2, 17, 30, 0);
@@ -116,6 +117,9 @@ const ouvrir = async (b, vp, sombre, tab) => {
   } catch (_) {} }, !!sombre);
   await pg.route(/^https?:\/\/[^/]*vinted\.net\//i, (r) => { const m = /\/b(\d+)\//.exec(r.request().url()); return r.fulfill({ status: 200, contentType: 'image/svg+xml', body: photoSvg(m ? Number(m[1]) : 0) }); });
   await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1|[^/]*vinted\.net)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) ? r.abort() : r.continue()));
+  // Les logos des transporteurs (leur favicon, sur LEUR domaine) : le réseau du banc est
+  // fermé ; on sert une tuile NEUTRE (un carré gris) pour voir la forme — jamais un logo dessiné.
+  await pg.route(/\/favicon\.ico$/i, (r) => r.fulfill({ status: 200, contentType: 'image/svg+xml', body: '<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32"><rect x="4" y="4" width="24" height="24" rx="5" fill="#8e8e93"/></svg>' }));
   await pg.route('**/rest/v1/**', (route) => {
     const u = decodeURIComponent(metaVersData(route.request().url()));
     if (route.request().method() !== 'GET') return route.fulfill({ status: 201, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: '[]' });
@@ -148,6 +152,15 @@ const mesure = (pg) => pg.evaluate(() => {
     deb: document.documentElement.scrollWidth - vw, hors: hors.slice(0, 6), petites,
     carte: !!document.querySelector('[data-fu-carte]'), violet,
     encaisse: /encaiss/i.test(document.querySelector('.vrm-main') ? document.querySelector('.vrm-main').innerText : ''),
+    rangees: [...document.querySelectorAll('[data-rangee-bord]')].filter(vis).map((r) => {
+      const puce = r.querySelector('.vrm-puce-transp'); const autre = [...r.children].find((c) => c !== puce && vis(c));
+      const bt = autre ? (autre.matches('button,a') ? autre : autre.querySelector('button,a')) : null;
+      if (!puce || !bt) return { ok: false, pourquoi: !puce ? 'pas de puce' : 'pas de bouton' };
+      const a = puce.getBoundingClientRect(), b = bt.getBoundingClientRect();
+      const txt = bt.innerText.trim();
+      return { ok: true, memeLigne: Math.abs(a.top - b.top) < 2 && Math.abs(a.height - b.height) < 2, h: Math.round(a.height), gauche: a.right <= b.left + 1,
+        uneLigne: b.height < 50 && !/\n/.test(txt), fond: getComputedStyle(puce).backgroundColor, rayon: getComputedStyle(puce).borderTopLeftRadius, txt };
+    }),
     frises: [...document.querySelectorAll('[data-fu-frise]')].map((f) => ({ cle: f.getAttribute('data-fu-frise'), faits: [...f.querySelectorAll('[data-fu-etape]')].filter((s) => s.getAttribute('data-fait') === '1').map((s) => s.getAttribute('data-fu-etape')).join(','), cours: (f.querySelector('[data-cours]') || { getAttribute: () => '' }).getAttribute('data-fu-etape') })),
   };
 });
@@ -163,6 +176,7 @@ const ECRANS = [
   const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] }).catch(() => chromium.launch());
   try {
     for (const [vp, sombre, nom] of [[{ width: 390, height: 844 }, false, '390-clair'], [{ width: 390, height: 844 }, true, '390-sombre'], [{ width: 1512, height: 982 }, false, '1512-clair'], [{ width: 1512, height: 982 }, true, '1512-sombre']]) {
+      if (VUES && !VUES.includes(nom)) continue;
       for (const E of ECRANS) {
         if (SEUL && !SEUL.includes(E.id)) continue;
         console.log(`\n— ${E.id} · ${nom}`);
@@ -178,6 +192,14 @@ const ECRANS = [
           dit(!m.petites.length, 'les gestes Fusion font 44 px', m.petites.join(' | '));
           dit(!m.encaisse, 'jamais « encaissé »');
           dit(!m.violet, 'pas de violet');
+          // La puce transporteur : à GAUCHE du bouton, même rangée, 44 px, rayon 12, une ligne.
+          const R = m.rangees;
+          if (E.id === 'ventes' || E.id === 'colis') dit(R.length > 0, 'une rangée « puce + bordereau » au moins', String(R.length));
+          if (R.length) {
+            const mauvaises = R.filter((r) => !(r.ok && r.memeLigne && r.gauche && r.h === 44 && r.uneLigne && r.rayon === '12px'));
+            dit(!mauvaises.length, 'la puce est à gauche du bouton, même ligne, 44 px, rayon 12, libellé sur une ligne', JSON.stringify(mauvaises[0] || R[0]).slice(0, 220));
+          }
+          if (SHOTS && R.length) { const el = pg.locator('[data-rangee-bord]').first(); await el.scrollIntoViewIfNeeded(); const carte = el.locator('xpath=ancestor::*[@data-fu-ligne or @data-bord-card or contains(@class,"vrm-recap")][1]'); await ((await carte.count()) ? carte.first() : el).screenshot({ path: path.join(SHOTS, `pastille-${E.id}-${nom}.png`) }); }
           if (E.id === 'ventes') {
             for (const [tx, att] of Object.entries(ATTENDU)) {
               const f = m.frises.find((x) => x.cle === tx);

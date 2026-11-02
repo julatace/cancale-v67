@@ -368,3 +368,75 @@ html body .vrm-app-shell .vrm-main .vrm-sale-row[data-fu-ligne] > button.vrm-led
 .vrm-fu-declaration.is-calme { background: var(--fu-carte); color: var(--fu-encre); box-shadow: var(--fu-ombre); }
 .vrm-fu-declaration.is-calme span { color: var(--fu-gris); }
 .vrm-fu-compta .vrm-fu-carte { margin: 0; }
+
+/* ── 8. LA PUCE TRANSPORTEUR ET LA RANGÉE DU BORDEREAU (2 nov. au soir) ──────
+   Julien, sur la maquette FusionVentes : à GAUCHE du bouton bordereau, sur la
+   MÊME rangée, une puce de même hauteur (44 px), fond gris clair, rayon 12, la
+   tuile du logo (20 px, rayon 5, blanche) puis le nom (13 px, 600). Le bouton
+   bleu prend le reste. Au téléphone aussi sur UNE rangée : le libellé passe à
+   « Imprimer » quand la place manque (requête de conteneur), jamais à la ligne.
+   « Transporteur pas lu » : la même puce, sans tuile, texte gris. */
+:root { --fu-puce: #f2f2f7; }
+:root[data-theme="dark"] { --fu-puce: #2c2c2e; }
+html body .vrm-puce-transp {
+  display: inline-flex !important; align-items: center !important; gap: 8px !important;
+  box-sizing: border-box !important; height: 44px !important; min-height: 44px !important; padding: 0 14px 0 12px !important; margin: 0 !important;
+  border-radius: 12px !important; border: 0 !important; background: var(--fu-puce) !important; box-shadow: none !important;
+  flex: 0 1 auto; min-width: 0 !important; max-width: 100%; vertical-align: middle; white-space: nowrap;
+}
+html body .vrm-puce-transp > [data-transporteur-logo] { width: 20px !important; height: 20px !important; border-radius: 5px !important; margin: 0 !important; flex: none !important; background: #fff !important; box-shadow: 0 0 0 .5px rgba(0,0,0,.12), 0 1px 2px rgba(0,0,0,.08) !important; }
+html body .vrm-puce-transp > [data-transporteur-logo] img { width: 16px !important; height: 16px !important; }
+html body .vrm-puce-transp > [data-transporteur-nom] {
+  font: 600 13px/1.2 var(--vrm-police) !important; letter-spacing: -.01em; color: var(--fu-encre) !important;
+  white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; min-width: 0;
+}
+html body .vrm-puce-transp[data-lu="0"] > [data-transporteur-nom] { color: var(--fu-gris) !important; font-weight: 500 !important; }
+
+/* La rangée : puce + bouton principal, jamais à la ligne. */
+html body .vrm-rangee-bord {
+  display: flex !important; flex-wrap: nowrap !important; align-items: stretch !important; gap: 8px !important;
+  flex: 1 1 100% !important; width: 100% !important; min-width: 0 !important; max-width: none !important; margin: 0 !important; box-sizing: border-box;
+}
+html body .vrm-rangee-bord > .vrm-puce-transp { flex: 0 1 auto !important; max-width: 52% !important; }
+html body .vrm-rangee-bord > :not(.vrm-puce-transp) { flex: 1 1 0 !important; min-width: 0 !important; max-width: none !important; }
+html body .vrm-rangee-bord > :not(.vrm-puce-transp) > button { width: 100% !important; }
+html body .vrm-rangee-bord :is(button, a):not(.vrm-puce-transp *) {
+  box-sizing: border-box !important; min-height: 44px !important; height: 44px; white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important;
+  justify-content: center !important; border-radius: 12px !important;
+}
+/* Le bouton principal : le bleu d'Apple, plein, une seule ligne. */
+html body .vrm-rangee-bord :is(.vrm-fu-principal, .vrm-colis-primaire, .vrm-lbc-package-primary, [data-bouton-bord="pdf"]) {
+  display: inline-flex !important; align-items: center !important; justify-content: center !important; gap: 8px !important; width: 100% !important;
+  padding: 0 16px !important; border: 0 !important; background: var(--fu-bleu) !important; color: #fff !important;
+  font: 600 15px/1 var(--vrm-police) !important; letter-spacing: -.01em; text-decoration: none !important; cursor: pointer;
+  transition: transform 140ms cubic-bezier(.23, 1, .32, 1), filter 140ms ease;
+}
+html body .vrm-rangee-bord :is(.vrm-fu-principal, .vrm-colis-primaire, .vrm-lbc-package-primary, [data-bouton-bord="pdf"]):active { transform: scale(.97); }
+@media (hover: hover) and (pointer: fine) { html body .vrm-rangee-bord :is(.vrm-fu-principal, .vrm-colis-primaire, .vrm-lbc-package-primary, [data-bouton-bord="pdf"]):hover { filter: brightness(1.08); } }
+html body .vrm-rangee-bord :is(.vrm-fu-principal, .vrm-colis-primaire, .vrm-lbc-package-primary, [data-bouton-bord="pdf"]) svg { flex: none; }
+/* « Générer le bordereau » (l'extension commande) : la même hauteur, en contour bleu. */
+html body .vrm-rangee-bord > [data-bouton-bord]:not([data-bouton-bord="pdf"]) { display: flex !important; flex-direction: column !important; align-items: stretch !important; }
+html body .vrm-rangee-bord > [data-bouton-bord]:not([data-bouton-bord="pdf"]) > button { justify-content: center !important; font: 600 15px/1 var(--vrm-police) !important; }
+/* Les deux libellés : le long par défaut, le court quand LE BOUTON est trop étroit
+   pour lui (le bouton est son propre conteneur : sa largeur vient de la rangée). */
+html body .vrm-rangee-bord :is(button, a):not(.vrm-puce-transp *) { container-type: inline-size; }
+.vrm-lib-court { display: none; }
+@container (max-width: 236px) {
+  .vrm-lib-long { display: none !important; }
+  .vrm-lib-court { display: inline !important; }
+}
+
+/* Les gestes de la ligne de vente : des pilules grises, 44 px, texte 14 px. */
+html body .vrm-app-shell .vrm-main .vrm-sale-row[data-fu-ligne] > .vrm-ledger-gestes :is(button, .vrm-b) { min-height: 44px !important; padding: 0 14px !important; font: 600 14px/1 var(--vrm-police) !important; }
+html body .vrm-app-shell .vrm-main .vrm-sale-row[data-fu-ligne] > .vrm-ledger-gestes .vrm-gestes-pile { gap: 8px !important; }
+html body .vrm-app-shell .vrm-main .vrm-sale-row[data-fu-ligne] > .vrm-ledger-gestes .vrm-cout-rangee { flex-wrap: wrap; }
+/* Dans les cartes Colis (styles-mineral range chaque geste en `flex: 1 1 0`) : la rangée prend toute la ligne. */
+html body .vrm-colis-carte .vrm-colis-actions > .vrm-rangee-bord, html body .vrm-colis-actions > .vrm-rangee-bord, html body .vrm-lbc-package-actions > .vrm-rangee-bord { flex: 1 1 100% !important; max-width: none !important; min-width: 0 !important; }
+html body .vrm-colis-carte .vrm-colis-actions > .vrm-rangee-bord > .vrm-puce-transp { flex: 0 1 auto !important; min-height: 44px !important; padding: 0 14px 0 12px !important; justify-content: flex-start !important; }
+/* (Fusion) Dans la rangée du bordereau, « Imprimer » redevient LE bouton bleu de la carte
+   (maquette FusionColis/FusionVentes) : la couche Vitrine le passait en aplat neutre,
+   avec une classe répétée — répétée une fois de plus ici pour passer devant. */
+html body .vrm-app-shell .vrm-main .vrm-colis-carte .vrm-rangee-bord button.vrm-colis-primaire.vrm-colis-primaire.vrm-colis-primaire.vrm-colis-primaire.vrm-colis-primaire.vrm-colis-primaire.vrm-colis-primaire.vrm-colis-primaire[data-imprime],
+html body .vrm-app-shell .vrm-colis-carte .vrm-rangee-bord button.vrm-colis-primaire.vrm-colis-primaire.vrm-colis-primaire.vrm-colis-primaire.vrm-colis-primaire.vrm-colis-primaire.vrm-colis-primaire.vrm-colis-primaire[data-imprime] {
+  background: var(--fu-bleu) !important; color: #fff !important; border: 0 !important; border-radius: 12px !important;
+}
