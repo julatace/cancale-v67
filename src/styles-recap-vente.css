@@ -143,3 +143,7 @@ html body .vrm-recap .vrm-recap-modifier[open] { display: flex; flex-direction: 
   html body .vrm-ledger-drawer.vrm-recap { width: min(520px, 100%); }
   .vrm-recap-corps > header, .vrm-recap-corps > section { padding: 20px 24px; }
 }
+
+/* (2 nov.) Le transporteur LU, juste au-dessus du bouton bordereau (src/PastilleTransporteur.jsx). */
+.vrm-recap-principal { display: flex; flex-direction: column; gap: 8px; }
+.vrm-recap-principal > .vrm-transporteur { align-self: flex-start; width: auto; }

@@ -529,6 +529,7 @@ vérifier par `curl https://vrm.center/api/sante`.
 
 ### Décisions et chantiers (octobre–novembre 2026)
 Une ligne par chantier. Le récit complet des lignes du 31 oct. au 2 nov. est, mot pour mot, dans `docs/passation/etat-detaille-2026-10-31-au-11-02.md`.
+- **2 nov. (nuit)** — Transporteur LU (jamais deviné, sinon « Transporteur pas lu ») en logo + nom à côté du bordereau, ventes et achats (`src/transporteursVisuels.js`, `src/PastilleTransporteur.jsx`, banc `transporteurs-logos`) ; achats Vestiaire sortis de « À envoyer ». Reste : n° Mondial Relay dans l'email du bordereau, eBay avant étiquette, stats. → historique colis-retraits. Geste : regarder Colis au téléphone (logos).
 - **2 nov. (nuit)** — Carte des relais immobile (transition des boutons + arrondi MapLibre, banc `carte-stable`) ; parcours d'un nouveau vendeur : 13 défauts corrigés (banc `nouveau-vendeur`). → historique interface-stock. Geste : aucun.
 - **2 nov. (nuit)** — **Extension 5.316.0** : vente Vestiaire complète (photo, titre, montant versé `sellerEarning`, transporteur, suivi, bordereau PDF rapatrié → « Imprimer le bordereau » ; C10, C12). → historique vestiaire.
 - **2 nov. (nuit)** — **Extensions 5.314.0 / 5.315.0** : annonces Vestiaire lues (forme réelle `{type, published:{product}}`, C10) ; puis « tout Vestiaire » GARDÉ tel que la page le charge (`vc_brut_*`, `vc_pdf_*` pour les bordereaux, secrets retirés, aucune requête de plus, C11). → historique vestiaire. Geste : installer, se promener sur Vestiaire.
