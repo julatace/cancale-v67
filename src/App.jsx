@@ -16140,9 +16140,13 @@ function AuthScreen() {
             {/* ⚠️ Ne PAS promettre l'isolation tant que la base ne la fait pas :
                 sans la colonne `owner` (§12), un compte créé ici tombe dans les
                 MÊMES données que le vendeur existant. Le dire avant, pas après. */}
+            {/* (2 nov.) « Pas su » ne vaut pas « non » (§5) : la sonde de schéma
+                qui n'a pas répondu (réseau, base lente) ne fait plus dire à une
+                personne qui s'inscrit que ses données seront partagées — seul un
+                « colonne absente » MESURÉ (400) le dit ; sinon, rien. */}
             {mode==='up' ? (CLOISONNE
               ? 'Tes données (annonces, stock, compta) ne seront visibles que par toi.'
-              : 'Attention : la séparation des données n\'est pas encore activée en base. Un compte créé maintenant ouvre la MÊME boutique — à réserver à toi-même.')
+              : SCHEMA_MESURE ? 'Attention : la séparation des données n\'est pas encore activée en base. Un compte créé maintenant ouvre la MÊME boutique — à réserver à toi-même.' : null)
              : mode==='reset' ? 'On t\'envoie un lien pour en choisir un nouveau.'
              : mode==='newpw' ? 'Choisis-en un nouveau, tu resteras connecté.'
              : null /* « Ta boutique t'attend » est déjà dit au-dessus (§7) */}
@@ -18207,9 +18211,9 @@ function PremiersPas({ onNav, titreNeuf, introNeuf }) {
       {mobile === 'firefox-android' && <p style={{margin:'0 0 10px'}} data-premiers-mobile="firefox-android-pas-encore">Firefox pour Android accepte l’extension, mais sa version Firefox n’est pas encore en ligne dans la boutique de Firefox.</p>}
       {mobile!=='ios-orion'&&<p style={{margin:0}}>
         {mobile === 'firefox-android' || mobile === 'samsung' || mobile === 'android' || mobile === 'duckduckgo'
-          ? <>En attendant, cette première étape se passe <b style={{color:C.text}}>sur un ordinateur</b>&nbsp;: </>
-          : <>Cette première étape se passe <b style={{color:C.text}}>sur un ordinateur</b>&nbsp;: c’est là que vit l’extension, et ton appareil n’en accepte pas. </>}
-        ouvre <b style={{color:C.text}}>vrm.center</b> dans le Chrome de ton ordinateur — tu y retrouveras exactement cet écran, avec la marche à suivre. Une fois que c’est fait, tout revient ici tout seul{mobile === 'ios' ? <span data-premiers-relais="ios">, et depuis ton iPhone tu pourras faire agir l’extension de l’ordinateur allumé (bordereaux, réponses, publication)</span> : null}.
+          ? <>En attendant, cette première étape se passe <b style={{color:C.text}}>sur un ordinateur</b>&nbsp;: ouvre </>
+          : <>Cette première étape se passe <b style={{color:C.text}}>sur un ordinateur</b>&nbsp;: c’est là que vit l’extension, et ton appareil n’en accepte pas. Ouvre </>}
+        <b style={{color:C.text}}>vrm.center</b> dans le Chrome de ton ordinateur — tu y retrouveras exactement cet écran, avec la marche à suivre. Une fois que c’est fait, tout revient ici tout seul{mobile === 'ios' ? <span data-premiers-relais="ios">, et depuis ton iPhone tu pourras faire agir l’extension de l’ordinateur allumé (bordereaux, réponses, publication)</span> : null}.
       </p>}
       {mobile === 'ios-orion' && <p style={{margin:'10px 0 0'}} data-premiers-orion="dans-orion">Le paquet pour <b style={{color:C.text}}>Orion sur iPhone et iPad</b> est disponible ci-dessous. Importe-le depuis le menu Extensions d’Orion, puis autorise VRM sur les sites utilisés. <a href={NOTICE_ORION} target="_blank" rel="noreferrer" style={{color:C.accent}}>Voir les étapes</a>. Le fonctionnement sur ton appareil reste à vérifier.</p>}
       {orion && mobile === 'ios' && <p style={{margin:'10px 0 0'}} data-premiers-orion="telephone">Sur iPhone, le navigateur <b style={{color:C.text}}>Orion</b> (gratuit) peut aussi installer l’extension depuis sa boutique — VRM n’y a pas encore été essayé&nbsp;: si l’écran n’avance pas, passe par l’ordinateur.</p>}
@@ -35269,6 +35273,8 @@ function CaParPeriodeCarte({ lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, acc
   // (§5, une règle pour le « reçu pas su »).
   const recuMin = calc.etat === 'lu' && calc.aDater.length > 0;
   const montant = (x) => x == null ? '—' : fmt(x.eur);
+  // (2 nov.) « Au moins 0,00 € » ne se dit jamais (§5) : un minimum nul s'écrit « — ».
+  const minNul = (x, k) => (partiel || (k === 'recu' && recuMin)) && x != null && !(Number(x.eur) > 0);
   const nb = (x) => x == null ? '' : `${x.n} vente${x.n > 1 ? 's' : ''}`;
   const COLS = [
     ['vendu', 'Vendu', 'au jour de la vente, en cours comprises'],
@@ -35304,7 +35310,7 @@ function CaParPeriodeCarte({ lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, acc
             {COLS.map(([k, l, s], i) => (
               <div key={k} data-ca-cur={k} data-ca-eur={cur[k] == null ? '' : String(cur[k].eur)} data-ca-min={((partiel || (k === 'recu' && recuMin)) && cur[k] != null) ? '1' : undefined} style={{ padding: '14px 16px', borderLeft: i ? `1px solid ${C.border}` : 'none' }}>
                 <div style={{ fontSize: 11, color: C.muted, fontWeight: 500 }}>{l} · {cur.libelle}</div>
-                <div className="vrm-display" style={{ fontSize: 20, fontWeight: 750, color: cur[k] == null ? C.muted : C.text, marginTop: 4, letterSpacing: -0.5 }}>{(partiel || (k === 'recu' && recuMin)) && cur[k] != null ? <span style={{ fontSize: 13, fontWeight: 600, color: C.muted }}>au moins </span> : null}{montant(cur[k])}</div>
+                <div className="vrm-display" style={{ fontSize: 20, fontWeight: 750, color: cur[k] == null || minNul(cur[k], k) ? C.muted : C.text, marginTop: 4, letterSpacing: -0.5 }}>{(partiel || (k === 'recu' && recuMin)) && cur[k] != null && !minNul(cur[k], k) ? <span style={{ fontSize: 13, fontWeight: 600, color: C.muted }}>au moins </span> : null}{minNul(cur[k], k) ? '—' : montant(cur[k])}</div>
                 <div style={{ fontSize: 11, color: C.muted, marginTop: 2 }}>{cur[k] == null ? s : `${nb(cur[k])} · ${s}`}</div>
               </div>
             ))}
@@ -35323,7 +35329,7 @@ function CaParPeriodeCarte({ lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, acc
                 {lignesPassees.map((r) => (
                   <tr key={r.cle} data-ca-ligne={r.libelle} style={{ borderTop: `1px solid ${C.border}` }}>
                     <td style={{ padding: '9px 16px', color: C.text, whiteSpace: 'nowrap' }}>{r.libelle}</td>
-                    {COLS.map(([k]) => <td key={k} data-ca-cellule={k} data-ca-min={((partiel || (k === 'recu' && recuMin)) && r[k] != null) ? '1' : undefined} style={{ padding: '9px 16px 9px 8px', textAlign: 'right', color: r[k] == null ? C.muted : C.text, whiteSpace: 'nowrap' }}>{(partiel || (k === 'recu' && recuMin)) && r[k] != null ? <span style={{ color: C.muted, fontSize: 11.5 }}>au moins </span> : null}{montant(r[k])}</td>)}
+                    {COLS.map(([k]) => <td key={k} data-ca-cellule={k} data-ca-min={((partiel || (k === 'recu' && recuMin)) && r[k] != null) ? '1' : undefined} style={{ padding: '9px 16px 9px 8px', textAlign: 'right', color: r[k] == null || minNul(r[k], k) ? C.muted : C.text, whiteSpace: 'nowrap' }}>{(partiel || (k === 'recu' && recuMin)) && r[k] != null && !minNul(r[k], k) ? <span style={{ color: C.muted, fontSize: 11.5 }}>au moins </span> : null}{minNul(r[k], k) ? '—' : montant(r[k])}</td>)}
                   </tr>
                 ))}
               </tbody>
@@ -48527,22 +48533,24 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               <div className="vrm-jc-cell" data-recu-mois={recuMois==null?'':Math.round(recuMois*100)} data-recu-sans={recuSans ? nomsVentesKO.join(',') : ''} data-recu-non-comptees={recuNonComptees.length || undefined}
                 title={`Reçu en ${libMois} : tes ventes versées ce mois (date du versement).${recuSans ? ` Sans ${nomsVentesKO.join(', ')} (ventes pas lues).` : ''}${adTous > 0 ? ` ${adTous} vente${adTous>1?'s':''} finalisée${adTous>1?'s':''} sans date de versement : dans aucun mois pour l'instant.` : ''}${phraseNcRecu ? ` Comptées nulle part : ${phraseNcRecu}.` : ''}${aDaterTitre}`}>
                 <div className="vrm-jc-l">Reçu en {libMois}</div>
-                <div className="vrm-jc-v">{declarables === undefined ? <span className="vrm-jc-montant vrm-jc-vide">…</span> : <Montant v={recuMois}/>}</div>
+                {/* (2 nov.) « Au moins 0 € » ne se dit jamais (§5) : un minimum nul
+                    s'écrit « — », et la ligne dessous dit ce qui manque. */}
+                <div className="vrm-jc-v">{declarables === undefined ? <span className="vrm-jc-montant vrm-jc-vide">…</span> : <Montant v={auMoinsRecu && !(recuMois > 0) ? null : recuMois}/>}</div>
                 {declarables === null ? <div className="vrm-jc-sous">pas lu</div>
-                  : auMoinsRecu ? <div className="vrm-jc-sous" data-recu-adater={adTous > 0 ? adTous : undefined} data-a-dater={adVinted > 0 ? adVinted : undefined}>au moins{adTous > 0 ? ` · ${adTous} à dater` : ''}{recuNonComptees.length ? ` · ${recuNonComptees.length} non comptée${recuNonComptees.length>1?'s':''}` : ''}</div> : null}
+                  : auMoinsRecu ? <div className="vrm-jc-sous" data-recu-adater={adTous > 0 ? adTous : undefined} data-a-dater={adVinted > 0 ? adVinted : undefined}>{[recuMois > 0 ? 'au moins' : '', adTous > 0 ? `${adTous} à dater` : '', recuNonComptees.length ? `${recuNonComptees.length} non comptée${recuNonComptees.length>1?'s':''}` : '', nomsVentesKO.length && !(recuMois > 0) && !adTous && !recuNonComptees.length ? 'pas lu' : ''].filter(Boolean).join(' · ')}</div> : null}
               </div>
               {cotisMois != null && (
                 <div className="vrm-jc-cell" data-cotis-mois={Math.round(cotisMois*100)} data-cotis-aumoins={cotisAuMoins?'1':''}
                   title={`Cotisations URSSAF à mettre de côté, sur le CA déclaré de ${libMois} — ${load('vinted_urssaf_freq','trimestriel')==='mensuel' ? 'à payer le mois prochain' : 'à payer après la fin du trimestre'}.`}>
                   <div className="vrm-jc-l">À mettre de côté</div>
-                  <div className="vrm-jc-v"><Montant v={cotisMois} prefixe="≈ "/></div>
-                  <div className="vrm-jc-sous">{cotisAuMoins ? 'au moins · ' : ''}URSSAF</div>
+                  <div className="vrm-jc-v"><Montant v={cotisAuMoins && !(cotisMois > 0) ? null : cotisMois} prefixe="≈ "/></div>
+                  <div className="vrm-jc-sous">{cotisAuMoins && cotisMois > 0 ? 'au moins · ' : ''}URSSAF</div>
                 </div>
               )}
               <div className="vrm-jc-cell" data-ca-annee={caAnnee==null?'':Math.round(caAnnee*100)} data-ca-non-comptees={recuNonComptees.length || undefined} title={`Chiffre d'affaires ${anIci} : tes ventes versées cette année, toutes plateformes (le CA déclaré).${phraseNcRecu ? ` Au moins : pas dans ce chiffre — ${phraseNcRecu}.` : ''}`}>
                 <div className="vrm-jc-l">CA {anIci}</div>
-                <div className="vrm-jc-v">{declarables === undefined ? <span className="vrm-jc-montant vrm-jc-vide">…</span> : <Montant v={caAnnee}/>}</div>
-                {(adTous > 0 || phraseNcRecu) && <div className="vrm-jc-sous" data-ca-adater={adTous || undefined}>au moins</div>}
+                <div className="vrm-jc-v">{declarables === undefined ? <span className="vrm-jc-montant vrm-jc-vide">…</span> : <Montant v={(adTous > 0 || phraseNcRecu) && !(caAnnee > 0) ? null : caAnnee}/>}</div>
+                {(adTous > 0 || phraseNcRecu) && <div className="vrm-jc-sous" data-ca-adater={adTous || undefined}>{caAnnee > 0 ? 'au moins' : adTous > 0 ? `${adTous} à dater` : 'non comptées'}</div>}
               </div>
             </div>
           </div>
@@ -52965,8 +52973,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                           {acc ? <AcctTag acc={acc} name={accNameOf(acc)}/> : (b && b.account ? <span style={{display:'inline-flex',alignItems:'center',gap:4,background:`${C.muted}22`,color:C.muted,fontSize:11,fontWeight:600,padding:'2px 7px',borderRadius:8,whiteSpace:'nowrap'}}>{b.account}</span> : null)}
                         </div>
                         <div style={{fontSize:12,color:C.muted,marginTop:6,display:'flex',alignItems:'center',gap:4,flexWrap:'wrap'}}>
-                          {o && o.date && <span style={{flexShrink:0}}>vendue le {dateFr(o.date, {day:'numeric',month:'short'})}</span>}
-                          {urgTxt && <span data-colis-limite-texte="" style={{flex:'0 1 auto',minWidth:0,overflowWrap:'anywhere',color:urgCol,fontWeight:dl!=null&&dl<=1?600:500}}>{o && o.date ? '· ' : ''}{urgTxt}</span>}
+                          {/* (2 nov.) La date de vente et la date limite dans UN texte : en
+                              deux éléments d'une rangée qui passe à la ligne, la seconde
+                              ligne commençait par « · » (390 px). Le point reste collé. */}
+                          {(o && o.date) || urgTxt ? <span data-colis-dates="" style={{flex:'0 1 auto',minWidth:0}}>
+                            {o && o.date ? `vendue le ${dateFr(o.date, {day:'numeric',month:'short'})}` : ''}
+                            {urgTxt && <span data-colis-limite-texte="" style={{overflowWrap:'anywhere',color:urgCol,fontWeight:dl!=null&&dl<=1?600:500}}>{o && o.date ? '\u00a0·\u00a0' : ''}{urgTxt}</span>}
+                          </span> : null}
                           {cell
                             ? <button type="button" onClick={()=>onLocate&&onLocate(num)} style={{flexShrink:0,border:'none',background:'transparent',color:C.blue||C.accent,fontWeight:600,cursor:'pointer',padding:0,fontSize:12,fontFamily:'inherit'}}>· {garageCellLabel(cell)}</button>
                             /* ⚠️ Même règle que sur les Ventes (§11) : « pas rangée »
@@ -53105,7 +53118,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 return (
                   <button type="button" data-colis-stock={nums.length} onClick={() => { DEMANDE_STOCK_CHERCHE.nums = nums; DEMANDE_STOCK_CHERCHE.at = Date.now(); onNav && onNav('garage'); }}
                     style={{alignSelf:'flex-start',display:'inline-flex',alignItems:'center',gap:8,border:`1px solid ${C.border}`,borderRadius:10,background:C.card,color:C.text,padding:'0 14px',minHeight:44,fontSize:13.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>
-                    <Icon name="home" size={16}/>{/* (1er nov.) sans le nombre : c'est celui des colonnes (§7) */}Où sont {nums.length>1?'ces articles':'cet article'} dans le stock
+                    <Icon name="home" size={16}/>{/* (1er nov.) sans le nombre : c'est celui des colonnes (§7) */}{nums.length>1?'Où sont ces articles':'Où est cet article'} dans le stock
                   </button>
                 );
               })()}

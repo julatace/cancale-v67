@@ -38,7 +38,10 @@ html body .vrm-app-shell .vrm-day-layout .vrm-day-greeting :is(.vrm-day-date, .v
   display: inline !important; flex: 0 0 auto !important; font-size: 15px !important; font-weight: 500 !important; line-height: 1.4 !important;
   color: var(--vrm-muted) !important; margin: 0 !important; grid-column: auto !important; white-space: nowrap;
 }
-html body .vrm-app-shell .vrm-day-layout .vrm-day-greeting .vrm-day-todo::before { content: '·'; margin: 0 8px; color: var(--vrm-muted); }
+/* (2 nov.) Le point sépare la date et le nombre de choses à faire quand ils sont
+   sur la même ligne ; la phrase de l'écran passe entre les deux depuis le 2 nov. :
+   la ligne commençait par « · ». Le point seulement quand ils se suivent. */
+html body .vrm-app-shell .vrm-day-layout .vrm-day-greeting .vrm-day-date + .vrm-day-todo::before { content: '·'; margin: 0 8px; color: var(--vrm-muted); }
 html body .vrm-app-shell .vrm-day-layout .vrm-day-greeting .vrm-day-todo b { color: var(--vrm-ink) !important; font-weight: 600 !important; }
 html body .vrm-app-shell .vrm-day-layout .vrm-day-greeting .vrm-w-modifier { top: 0 !important; right: 0 !important; transform: none !important; font-size: 14px !important; }
 @media (max-width: 767px) {
