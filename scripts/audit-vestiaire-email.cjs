@@ -243,6 +243,17 @@ const faireRes = () => { const x = { code: null, corps: null }; x.status = (c) =
     dit(L.lireEmailVenteVc({ from: FROM, subject: SUJET(), html: '' }, 'Vente confirmée 14/11/26', '2026-11-16T10:00:00Z').vente.date === '2026-11-14', 'P10 email d’un autre jour que la vente ⇒ le jour seul');
   });
 
+  await essaie('J — « Tes emails, ce que VRM en a fait »', async () => {
+    const { resumeClassement } = await import(path.join(R, 'api/_lib/resume-email.js'));
+    const { lectureEmail } = await import(path.join(R, 'src/journalEmail.js'));
+    const r = resumeClassement(200, { type: 'vente-vestiaire', productId: PID, nouvelle: true, gain: '139.50', limite: '2026-11-21T23:59:59+01:00' }, { article: 'LOEWE Pochette' });
+    const l = lectureEmail({ subject: SUJET(), etat: 'integre', type: 'vente-vestiaire', resume: r });
+    dit(l.etat === 'range' && l.lien && l.lien.tab === 'cat_ventes' && /139,50/.test(l.quoi) && /21\/11/.test(l.fait) && l.fait.includes(PID), 'J1 la phrase dit l’argent reçu, la limite et l’annonce', JSON.stringify(l).slice(0, 200));
+    dit(!/paire|chaussure/i.test(l.quoi + l.fait), 'J2 « l’article », jamais « la paire » (un sac n’est pas une paire)');
+    const g = lectureEmail({ subject: SUJET(), etat: 'a-verifier', type: 'vente-vestiaire', resume: resumeClassement(200, { type: 'vente-vestiaire', garde: true }, {}) });
+    dit(g.etat === 'verifier' && g.raison, 'J3 rien rangé ⇒ « à vérifier » avec la raison');
+  });
+
   console.log(`\n${ok} ✅ · ${ko} ❌`);
   process.exit(ko ? 1 : 0);
 })();
