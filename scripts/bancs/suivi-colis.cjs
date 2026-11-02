@@ -418,7 +418,7 @@ async function revue24(b) {
       await ouvrir(pg, errs);
       const g = await pg.evaluate(() => {
         const W = window.innerWidth;
-        return [...document.querySelectorAll('[data-a-verifier] .vrm-oublie-gestes')].map((x) => [...x.children].map((c) => { const r = c.getBoundingClientRect(); return { t: (c.innerText || c.getAttribute('aria-label') || c.tagName).slice(0, 30), l: Math.round(r.left), r: Math.round(r.right), ok: r.left >= -0.5 && r.right <= W + 0.5 }; }));
+        return [...document.querySelectorAll('[data-a-verifier] .vrm-oublie-gestes, [data-retirer-a-verifier] .vrm-rp-gestes')].map((x) => [...x.children].map((c) => { const r = c.getBoundingClientRect(); return { t: ((c.querySelector && c.querySelector('strong')) ? c.querySelector('strong').innerText : (c.innerText || c.getAttribute('aria-label') || c.tagName)).slice(0, 30), l: Math.round(r.left), r: Math.round(r.right), ok: r.left >= -0.5 && r.right <= W + 0.5 }; }));
       });
       const tous = g.flat();
       dit(g.length >= 2 && tous.length >= 4, `F ${nom} : les rangées « à vérifier » (e-mail et Vinted) sont rendues`, `${g.length} rangée(s)`);
