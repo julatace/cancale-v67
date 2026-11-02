@@ -292,3 +292,6 @@
 .vrm-favoris-auto [data-favoris-auto-journal] ul{list-style:none;margin:6px 0 0;padding:0;max-height:280px;overflow:auto;}
 .vrm-favoris-auto [data-favoris-auto-journal] li{padding:6px 0;border-top:1px solid var(--vrm-line);overflow-wrap:anywhere;}
 .vrm-favoris-auto [data-favoris-auto-journal] time{color:var(--vrm-muted);font-variant-numeric:tabular-nums;}
+/* Jours cochés : neutres (l'accent reste rare, §7). */
+.vrm-favoris-auto .vrm-favoris-auto-jours button[aria-pressed=true]{background:var(--vrm-ink);color:var(--vrm-surface);}
+.vrm-favoris-auto .vrm-favoris-auto-jours button{min-width:0;padding:0 4px;}
