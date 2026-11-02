@@ -185,7 +185,7 @@ async function preparer(b, vp, sombre, opts = {}) {
 
 const ouvrirAchats = async (pg, errs) => {
   await pg.goto(`http://localhost:${PORT}/?tab=cat_achats`, { waitUntil: 'domcontentloaded' });
-  await pg.locator('.vrm-pickup-card').first().waitFor({ timeout: 20000 }).catch(async (e) => { console.log('ÉCRAN : ' + (await pg.locator('body').innerText()).slice(0, 1200)); console.log('ERREURS : ' + errs.join(' | ')); throw e; });
+  await pg.locator('[data-cc-colonne="retirer"] [data-cc-carte]').first().waitFor({ timeout: 20000 }).catch(async (e) => { console.log('ÉCRAN : ' + (await pg.locator('body').innerText()).slice(0, 1200)); console.log('ERREURS : ' + errs.join(' | ')); throw e; });
   await pg.waitForTimeout(1800);
 };
 const ouvrirJournee = async (pg, errs) => {
@@ -199,18 +199,19 @@ const ouvrirJournee = async (pg, errs) => {
 const ROUGE_JS = `(v) => { const m = /rgba?\\(([\\d.]+),\\s*([\\d.]+),\\s*([\\d.]+)/.exec(v || ''); if (!m) return false; const r=+m[1], g=+m[2], b=+m[3]; return r > 150 && g < 120 && b < 120 && r - g > 80 && Math.abs(g - b) < 40; }`;
 const lire = (pg) => pg.evaluate((rougeSrc) => {
   const rouge = new Function('return ' + rougeSrc)();
-  const lieuDuGroupe = (el) => { for (let e = el; e; e = e.parentElement) { const d = e.querySelector && e.querySelector('.vrm-pickup-dest'); if (d) return d.innerText; } return ''; };
+  // (2 nov., colis clair) Colis → « À retirer » : le lieu est l'en-tête du point de la carte.
+  const lieuDuGroupe = (el) => { const p = el.closest('[data-relais-point]'); const d = p && p.querySelector('.vrm-rp-tete'); return d ? d.innerText : ''; };
   const ligneT = (c) => { const x = c.querySelector('.vrm-transp'); return x ? { etat: x.getAttribute('data-transp'), etatLu: x.getAttribute('data-transp-etat'), t: x.innerText, color: getComputedStyle(x).color, court: x.hasAttribute('data-transp-court') } : null; };
-  const cartes = [...document.querySelectorAll('.vrm-pickup-card')].map((c) => {
-    const s = c.querySelector('[data-colis-suivi]');
+  const cartes = [...document.querySelectorAll('[data-cc-colonne="retirer"] [data-cc-carte]:not([data-hors-compte])')].map((c) => {
+    const s0 = c.querySelector('[data-rp-suivi]'); const s = s0 ? { getAttribute: () => s0.getAttribute('data-rp-suivi') || null } : null;
     const lim = c.querySelector('[data-colis-limite]');
     return { suivi: s ? s.getAttribute('data-colis-suivi') : null, t: c.innerText, transp: ligneT(c), lieu: lieuDuGroupe(c),
       limite: lim ? lim.getAttribute('data-colis-limite') : null, limiteVers: lim ? lim.getAttribute('data-colis-limite-vers') : null,
       codePasLu: (c.querySelector('[data-colis-code-pas-lu]') || {}).getAttribute ? c.querySelector('[data-colis-code-pas-lu]').getAttribute('data-colis-code-pas-lu') : null };
   });
-  const verif = [...document.querySelectorAll('[data-a-verifier] [data-oublie]')].map((x) => ({ suivi: x.getAttribute('data-colis-suivi'), raison: x.getAttribute('data-a-verifier-raison'), transp: ligneT(x), t: x.innerText }));
+  const verif = [...document.querySelectorAll('[data-retirer-a-verifier] [data-cc-carte]')].map((x) => ({ suivi: (x.querySelector('[data-rp-suivi]') || { getAttribute: () => null }).getAttribute('data-rp-suivi'), raison: x.getAttribute('data-a-verifier-raison'), transp: ligneT(x), t: x.innerText }));
   const repartis = [...document.querySelectorAll('[data-repartis] [data-reparti-suivi]')].map((x) => ({ suivi: x.getAttribute('data-reparti-suivi'), transp: ligneT(x), t: x.innerText }));
-  const zones = [...document.querySelectorAll('.vrm-pickup-card, [data-a-verifier], [data-repartis], [data-transp-mr], [data-transp-mr-refus], [data-transp-passu], [data-transp-non-lu]')];
+  const zones = [...document.querySelectorAll('[data-cc-colonne="retirer"] [data-cc-carte], [data-a-verifier], [data-repartis], [data-transp-mr], [data-transp-mr-refus], [data-transp-passu], [data-transp-non-lu]')];
   const rougesVus = [];
   // La pastille de MARQUE d'un transporteur (CarrierBadge : titre + graisse 900,
   // le rouge de Chronopost) n'est pas une alerte : elle est écartée.
@@ -231,7 +232,7 @@ const lire = (pg) => pg.evaluate((rougeSrc) => {
     mrOrdi: mrOrdi ? mrOrdi.innerText : null, nMr: document.querySelectorAll('[data-transp-mr-refus]').length,
     cpTete: [...document.querySelectorAll('[data-transp-cp]')].map((x) => ({ k: x.getAttribute('data-transp-cp'), n: x.getAttribute('data-transp-cp-n'), t: x.innerText })),
     passu: passu ? passu.innerText : null, nPassu: document.querySelectorAll('[data-transp-passu]').length, hReessayer: h(reessayer), hAjouter: h(ajouter),
-    suivre: [...document.querySelectorAll('.vrm-pickup-card a[data-suivre-colis]')].map((a) => a.getBoundingClientRect().height),
+    suivre: [...document.querySelectorAll('[data-cc-colonne="retirer"] [data-cc-carte] a[data-suivre-colis]')].map((a) => a.getBoundingClientRect().height),
     total: onglet ? onglet.getAttribute('data-n') : null,
     // L'ambre de CE thème (C.warn) : la bordure du bloc « à vérifier » le porte.
     ambre: (() => { const v = document.querySelector('[data-a-verifier]'); return v ? getComputedStyle(v).borderTopColor : null; })(),

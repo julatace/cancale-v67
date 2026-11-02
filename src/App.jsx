@@ -52163,7 +52163,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 // La conversation a été LUE (le lieu en vient) et ne porte aucun code :
                 // il arrive par l'e-mail du transporteur (même phrase que l'ancien détail).
                 ? <span className="vrm-rp-sans-code" data-colis-sans-code="" data-colis-sans-code-conv="">Code par l’e-mail du transporteur</span>
-                : <span className="vrm-rp-sans-code" data-colis-sans-code="">{t ? 'Code dans l’e-mail du transporteur' : 'Code pas encore lu'}</span>) : null}
+                : <span className="vrm-rp-sans-code" data-colis-sans-code="" data-colis-code-pas-lu={t && t.viaTransporteur ? 'transporteur' : ''}>{t ? (t.viaTransporteur ? 'Code de retrait : dans l’e-mail du transporteur ou la conversation Vinted' : 'Code pas lu — ouvre l’e-mail du transporteur') : 'Code pas encore lu'}</span>) : null}
               {hrefV ? <Bouton variante="discret" href={hrefV} target="_blank" rel="noreferrer" data-colis-conv="">{relV && relV.qr ? 'Voir le QR ↗' : 'Conversation ↗'}</Bouton> : null}
               {suivre}
               {(t || o) ? <button className="vrm-pickup-collect" type="button" data-colis-retire="" onClick={() => (t ? markCollected(t) : markPickupDone(o))} aria-label="J’ai retiré ce colis"><span aria-hidden="true">✓</span><span className="vrm-pickup-collect-label"> J’ai retiré</span></button> : null}
