@@ -266,7 +266,7 @@ html body .vrm-app-shell .vrm-day-layout.vrm-fu-ecran .vrm-day-bar > .vrm-day-ca
 html body .vrm-app-shell .vrm-day-layout.vrm-fu-ecran .vrm-day-bar .vrm-day-bar-ic { display: none !important; }
 html body .vrm-app-shell .vrm-day-layout.vrm-fu-ecran .vrm-day-bar .vrm-day-bar-n { font-family: var(--vrm-police) !important; font-weight: 800 !important; font-size: 26px !important; letter-spacing: -.03em !important; }
 html body .vrm-app-shell .vrm-day-layout.vrm-fu-ecran .vrm-day-bar .vrm-day-bar-l { font-size: 13.5px !important; color: var(--fu-gris) !important; }
-html body .vrm-app-shell .vrm-day-layout.vrm-fu-ecran .vrm-day-case-geste { margin: 0 12px 12px 12px !important; border-radius: 999px !important; background: var(--fu-case) !important; border: 0 !important; color: var(--fu-encre) !important; }
+html body .vrm-app-shell .vrm-day-layout.vrm-fu-ecran .vrm-day-case-geste { margin: 0 12px 12px 12px !important; max-width: calc(100% - 24px) !important; box-sizing: border-box !important; white-space: normal !important; text-align: left !important; padding: 6px 14px !important; height: auto !important; border-radius: 999px !important; background: var(--fu-case) !important; border: 0 !important; color: var(--fu-encre) !important; }
 @media (hover: hover) and (pointer: fine) { html body .vrm-app-shell .vrm-day-layout.vrm-fu-ecran .vrm-day-bar > .vrm-day-case > button[data-tuile]:hover { background: transparent !important; } }
 html body .vrm-app-shell .vrm-day-layout.vrm-fu-ecran .vrm-carrousel > button { background: var(--fu-carte) !important; border: 0 !important; border-radius: 18px !important; box-shadow: var(--fu-ombre) !important; }
 

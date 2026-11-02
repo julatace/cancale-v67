@@ -181,7 +181,7 @@ const ECRANS = [
           }
           if (SHOTS) {
             await pg.screenshot({ path: path.join(SHOTS, `${E.id}-${nom}.png`) });
-            if (vp.width < 600) await pg.screenshot({ path: path.join(SHOTS, `${E.id}-${nom}-long.png`), fullPage: true });
+            if (vp.width < 600) { await pg.setViewportSize({ width: vp.width, height: 2400 }); await pg.waitForTimeout(500); await pg.screenshot({ path: path.join(SHOTS, `${E.id}-${nom}-long.png`) }); await pg.setViewportSize(vp); }
           }
         });
         dit(!errs.length, 'aucune erreur d’app', errs.join(' | ').slice(0, 300));

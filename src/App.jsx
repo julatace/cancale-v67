@@ -19413,7 +19413,10 @@ function FiltresVentes({ value, onChange, search, onSearch, cancelled = false, d
 // d'état et frise, l'argent en lignes, les détails, les gestes). Absent ⇒ le
 // tiroir d'avant (Leboncoin, eBay). Rien d'autre ne change : même feuille, même
 // fermeture d'un toucher à côté, même `FermeAuRetour`, même portail.
-function LigneVenteCompacte({ photo, photoNoeud = null, titre, sous = '', etat, etatNoeud = null, ton = '', montant, children, numerosArticle = [], plateforme = '', initialOuvert = false, gestes = null, montantCentimes, benef, recap = null, ...props }) {
+// (2 nov., Fusion) `frise` : la frise de suivi de la vente (src/design/Frise.jsx),
+// posée sous la ligne ; `bas` : le geste principal (« Imprimer le bordereau ») et
+// le transporteur. Absents ⇒ la ligne d'avant.
+function LigneVenteCompacte({ photo, photoNoeud = null, titre, sous = '', etat, etatNoeud = null, ton = '', montant, children, numerosArticle = [], plateforme = '', initialOuvert = false, gestes = null, montantCentimes, benef, recap = null, frise = null, bas = null, ...props }) {
   const [ouvert, setOuvert] = React.useState(initialOuvert);
   const panneau = React.useId();
   const declencheur = React.useRef(null);
@@ -19495,7 +19498,9 @@ function LigneVenteCompacte({ photo, photoNoeud = null, titre, sous = '', etat, 
       {benef ? <span className="vrm-ledger-sale-benef" data-benef-ligne={benef.benefCentimes ?? ''} data-benef-etat={benef.etat} aria-label={benef.aria || undefined}>{benef.etat === 'partiel' ? <><span className="vrm-benef-borne">au plus </span>{benef.benefTxt}</> : benef.benefTxt}</span> : null}
       <span className="vrm-ledger-sale-plus" aria-hidden="true">{ouvert?'−':'⋯'}</span>
     </button>
+    {frise}
     {gestes ? <div className="vrm-ledger-gestes" data-gestes-ligne="">{gestes}</div> : null}
+    {bas}
     {/* « Retour » (geste du téléphone, ← du navigateur) ferme d'abord le tiroir. */}
     {ouvert && <FermeAuRetour fermer={close}/>}
     {dejaOuvert.current && createPortal(<div className="vrm-app-shell vrm-ledger-drawer-host" hidden={!ouvert}>
@@ -49020,7 +49025,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             // (mêmes règles qu'avant : `beneficeLigneVente`/`beneficePaire`), les détails, puis
             // les gestes — les MÊMES fonctions et écritures que l'ancien tiroir, rien de retiré.
             // ⚠️ La frise REMPLACE la pastille de statut ici (jamais les deux, cf. 28 sept.).
-            const recapVente = ({ titreId, fermerRef, fermer }) => {
+            // (2 nov., Fusion) LES PREUVES DE LA FRISE, lues une fois : le tiroir (cinq
+            // étapes) et la ligne (quatre segments, `friseVenteFusion`) passent par la
+            // MÊME `friseVente` — une règle, deux formes.
+            const preuvesFrise = (() => {
               const s = String(o.status || ''); const tus = String(o.transaction_user_status || '').toLowerCase();
               const vs = venteStage(o);
               const horsParcours = ETATS_HORS_PARCOURS.includes(vs.label) || st === 'cancelled';
@@ -49038,6 +49046,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 livree: { lu: livreeLue, t: null },
                 argent: { lu: finalisee, t: versement },
               });
+              return { s, tus, vs, horsParcours, bordE, bordC, posteMain, finalisee, versement, etapes };
+            })();
+            const fuEtapes = preuvesFrise.etapes ? friseVenteFusion(preuvesFrise.etapes, { geste: peutDeposer }) : null;
+            const fuTransp = preuvesFrise.bordE && preuvesFrise.bordE.suivi ? (transporteurDeForme(preuvesFrise.bordE.suivi) || '') : '';
+            const fuPdf = !!(labelsCaptes[txL] || bordParTx[txL]);
+            const recapVente = ({ titreId, fermerRef, fermer }) => {
+              const { s, tus, vs, horsParcours, bordE, bordC, posteMain, finalisee, versement, etapes } = preuvesFrise;
               const aExp = !hidden && st !== 'cancelled' && aExpedier(o) && !posteMain;
               const phrase = phraseVente({ etat: vs.label, aide: vs.aide, etapes: etapes || [], aExpedier: aExp, posteMain });
               const jourCourt = (t) => t == null ? '' : new Date(t).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
@@ -49154,7 +49169,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               // Ligne de vente dans la liste groupée (filet fin entre les lignes,
               // pas de carte encadrée séparée — style démo, comme Achats).
               <LigneVenteCompacte montantCentimes={sell!=null?Math.round(sell*100):undefined} numerosArticle={num?[num]:[]} plateforme="vinted" photo={photo} photoNoeud={photo?<PhotoVenteSources {...photoSourcesProps} data-photo-vente="ligne" style={{width:28,height:36,borderRadius:8,objectFit:'cover',flexShrink:0}}/>:null} titre={(()=>{ const t=String((e&&e.size)||o.size||'').trim(); const nom=t&&!tailleDansTitre(o.title,t)?`${o.title} · taille ${t}`:o.title; return num?`N°${num} · ${nom}`:nom; })()}
-                {...gp} benef={benefLigne} recap={recapVente} data-depose-attente={deposeIci?'1':undefined} gestes={(gesteCout || gesteDepose) ? <div className="vrm-gestes-pile">{gesteCout}{gesteDepose}</div> : null} sous={[o.date?dateFr(o.date, {day:'numeric',month:'short'}):'', (o._acc && !ventesUnCompte) ? accNameOf(o._acc) : ''].filter(Boolean).join(' · ')} etat={venteStage(o).label} ton={st!=='cancelled' && aExpedier(o) && !isShipDone(o) ? 'action' : (st==='cancelled' ? 'annule' : '')} montant={sell!=null?`${Number.isInteger(sell)?sell:sell.toFixed(2).replace('.',',')} ${cur(o.price?.currency_code)}`:'—'} className="vrm-sale-row" key={o.transaction_id} data-tx={String(o.transaction_id)} style={{borderTop:i>0?`1px solid ${C.border}`:'none',opacity:hidden?0.5:(st==='cancelled'?0.6:1),padding:'12px 14px',display:'flex',flexDirection:'column',gap:10,...(estFloute(o)?STYLE_FLOU:null),...(gp.style||{})}}>
+                {...gp} benef={benefLigne} recap={recapVente} data-depose-attente={deposeIci?'1':undefined}
+                data-fu-ligne="" frise={fuEtapes ? <Frise etapes={fuEtapes} cle={txL} className="vrm-fu-ligne-frise" label="Où en est la vente"/> : null}
+                bas={peutDeposer && fuPdf ? <div className="vrm-fu-ligne-bas" data-sans-glisse="">
+                  {fuTransp ? <span className="vrm-fu-transp" data-fu-transporteur={fuTransp}>{fuTransp}</span> : null}
+                  <button type="button" className="vrm-fu-principal" data-fu-geste="" data-fu-imprimer={txL} onClick={()=>imprimerBordereauVente(o)}><Icon name="printer" size={16}/>Imprimer le bordereau</button>
+                </div> : null} gestes={(gesteCout || gesteDepose) ? <div className="vrm-gestes-pile">{gesteCout}{gesteDepose}</div> : null} sous={[o.date?dateFr(o.date, {day:'numeric',month:'short'}):'', (o._acc && !ventesUnCompte) ? accNameOf(o._acc) : ''].filter(Boolean).join(' · ')} etat={venteStage(o).label} ton={st!=='cancelled' && aExpedier(o) && !isShipDone(o) ? 'action' : (st==='cancelled' ? 'annule' : '')} montant={sell!=null?`${Number.isInteger(sell)?sell:sell.toFixed(2).replace('.',',')} ${cur(o.price?.currency_code)}`:'—'} className="vrm-sale-row" key={o.transaction_id} data-tx={String(o.transaction_id)} style={{borderTop:i>0?`1px solid ${C.border}`:'none',opacity:hidden?0.5:(st==='cancelled'?0.6:1),padding:'12px 14px',display:'flex',flexDirection:'column',gap:10,...(estFloute(o)?STYLE_FLOU:null),...(gp.style||{})}}>
               </LigneVenteCompacte>
               )}</GlisserVente>
             );
