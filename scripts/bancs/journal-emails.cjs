@@ -52,7 +52,7 @@ async function ouvrir(nav, { viewport, tab = 'settings', tactile = false }) {
   const ctx = await nav.newContext({ viewport, hasTouch: tactile, isMobile: tactile });
   const pg = await ctx.newPage(); pg.setDefaultTimeout(10000);
   const erreurs = []; pg.on('pageerror', (e) => erreurs.push(e.message));
-  await pg.addInitScript((s) => { try { localStorage.setItem('vrm_session', JSON.stringify(s)); localStorage.setItem('vrm_bienvenue_vue', '1'); } catch (_) {} }, SESSION);
+  await pg.addInitScript((s) => { try { localStorage.setItem('vrm_session', JSON.stringify(s)); localStorage.setItem('vrm_bienvenue_vue', '1'); localStorage.setItem('vrm_visite_vue', '1'); } catch (_) {} }, SESSION);
   await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) ? r.abort() : r.continue()));
   await pg.route('**/auth/v1/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ access_token: 'jeton-de-banc', refresh_token: 'r', expires_in: 3600, user: SESSION.user }) }));
   await pg.route('**/rest/v1/**', (r) => {

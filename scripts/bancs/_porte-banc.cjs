@@ -47,6 +47,11 @@ const SCRIPT = `(() => {
   // neuf — ce que simulent la plupart des bancs. Elle recouvrirait l'écran qu'ils
   // jugent : on la marque vue, sauf pour un banc qui la juge (vrm_banc_bienvenue).
   try { if (ls.getItem('vrm_banc_bienvenue') !== '1' && !ls.getItem('vrm_bienvenue_vue')) Storage.prototype.setItem.call(ls, 'vrm_bienvenue_vue', JSON.stringify({ at: 'banc' })); } catch (_) {}
+  // (2 nov.) De même la visite en bulles (src/VisiteBulles.jsx), qui suit Bienvenue
+  // pour un compte neuf : vue, sauf pour un banc qui la juge (vrm_banc_visite).
+  // (Le script de la porte passe AVANT ceux du banc : demo-bulles.cjs retire
+  //  cette marque de banc au premier chargement, puis pose vrm_banc_visite.)
+  try { if (ls.getItem('vrm_banc_visite') !== '1' && !ls.getItem('vrm_visite_vue')) Storage.prototype.setItem.call(ls, 'vrm_visite_vue', JSON.stringify({ at: 'banc' })); } catch (_) {}
   const vrai = window.fetch.bind(window);
   window.fetch = async function (entree, init) {
     const url = typeof entree === 'string' ? entree : (entree && entree.url) || '';

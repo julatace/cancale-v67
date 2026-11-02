@@ -1,0 +1,70 @@
+/* La visite en bulles (src/VisiteBulles.jsx), 2 nov. Hors de la coque (portail
+   sur <body>) : ses couleurs suivent `data-theme` de la racine. §7 : neutre, le
+   bleu Apple sur le SEUL geste principal ; pas de dégradé, pas de lueur, pas de
+   flou ; une ombre parce que la bulle flotte (taste, app-screens §13). */
+.vrm-visite {
+  --v-carte: #ffffff; --v-encre: #1d1d1f; --v-doux: #6e6e73; --v-filet: #e5e5ea;
+  --v-accent: #0071E3; --v-voile: rgba(0, 0, 0, .28);
+  position: fixed; inset: 0; font-family: inherit; -webkit-tap-highlight-color: transparent;
+}
+:root[data-theme="dark"] .vrm-visite {
+  --v-carte: #1c1c1e; --v-encre: #f5f5f7; --v-doux: #a1a1a6; --v-filet: #38383a;
+  --v-accent: #0A84FF; --v-voile: rgba(0, 0, 0, .5);
+}
+.vrm-visite-voile { position: absolute; inset: 0; background: transparent; }
+/* Le trou : l'onglet montré reste net, le reste s'assombrit. */
+.vrm-visite-trou {
+  position: absolute; border-radius: 12px; pointer-events: none;
+  box-shadow: 0 0 0 200vmax var(--v-voile);
+  transition: left .28s cubic-bezier(.2,.8,.2,1), top .28s cubic-bezier(.2,.8,.2,1), width .28s cubic-bezier(.2,.8,.2,1), height .28s cubic-bezier(.2,.8,.2,1);
+}
+.vrm-visite-bulle {
+  position: absolute; width: min(300px, calc(100vw - 32px)); box-sizing: border-box;
+  padding: 16px 16px 12px; border-radius: 14px;
+  background: var(--v-carte); color: var(--v-encre); border: 1px solid var(--v-filet);
+  box-shadow: 0 1px 2px rgba(0,0,0,.06), 0 12px 32px rgba(0,0,0,.16);
+  animation: vrm-visite-entre .22s cubic-bezier(.2,.8,.2,1) both;
+}
+.vrm-visite-fleche {
+  position: absolute; width: 12px; height: 12px; background: var(--v-carte);
+  border: 1px solid var(--v-filet); transform: rotate(45deg);
+}
+.vrm-visite-bulle[data-cote="dessus"] .vrm-visite-fleche { bottom: -7px; left: calc(var(--fleche-x) - 6px); border-top: 0; border-left: 0; }
+.vrm-visite-bulle[data-cote="dessous"] .vrm-visite-fleche { top: -7px; left: calc(var(--fleche-x) - 6px); border-bottom: 0; border-right: 0; }
+.vrm-visite-bulle[data-cote="droite"] .vrm-visite-fleche { left: -7px; top: calc(var(--fleche-y) - 6px); border-top: 0; border-right: 0; }
+.vrm-visite-bulle[data-cote="mesure"] .vrm-visite-fleche { display: none; }
+.vrm-visite-titre { margin: 0 0 4px; font-size: 17px; line-height: 22px; font-weight: 600; letter-spacing: -.01em; }
+.vrm-visite-texte { margin: 0 0 10px; font-size: 15px; line-height: 21px; color: var(--v-doux); }
+.vrm-visite-pied { display: flex; align-items: center; gap: 4px; }
+.vrm-visite-points { flex: 1; display: flex; gap: 6px; align-items: center; min-width: 0; }
+.vrm-visite-points span { width: 6px; height: 6px; border-radius: 50%; background: var(--v-filet); }
+.vrm-visite-points span[data-fait="ici"] { background: var(--v-encre); }
+.vrm-visite-passer, .vrm-visite-suivant {
+  min-height: 44px; min-width: 44px; padding: 0 14px; border-radius: 10px; border: 0;
+  font: inherit; font-size: 15px; font-weight: 600; cursor: pointer; white-space: nowrap;
+}
+.vrm-visite-passer { background: transparent; color: var(--v-doux); }
+.vrm-visite-passer:hover { color: var(--v-encre); }
+.vrm-visite-suivant { background: var(--v-accent); color: #fff; }
+.vrm-visite-passer:focus-visible, .vrm-visite-suivant:focus-visible { outline: 2px solid var(--v-accent); outline-offset: 2px; }
+.vrm-visite-suivant:active, .vrm-visite-passer:active { transform: scale(.97); }
+@keyframes vrm-visite-entre { from { opacity: 0; transform: translateY(4px) scale(.98); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) {
+  .vrm-visite-bulle, .vrm-visite-trou { animation: none !important; transition: none !important; }
+  .vrm-visite-suivant:active, .vrm-visite-passer:active { transform: none; }
+}
+
+/* ── UNE PHRASE PAR ÉCRAN (2 nov., D2 — src/phrasesEcran.js). Une ligne grise
+   sous le titre, 15 px, rien d'autre : elle dit ce qu'on fait sur l'écran. */
+html .vrm-app-shell .vrm-phrase-ecran { margin: 4px 0 0; font-size: 15px; line-height: 20px; font-weight: 400; color: var(--vrm-muted, #6e6e73); letter-spacing: 0; text-transform: none; }
+html .vrm-app-shell .vrm-tache .vrm-tache-tete { flex-direction: column; align-items: flex-start; gap: 0; }
+html .vrm-app-shell .vrm-phrase-reglages { margin: -8px 0 16px; }
+html .vrm-app-shell .vrm-day-greeting .vrm-phrase-ecran { flex-basis: 100%; margin-top: 2px; }
+/* Téléphone : le titre que la barre du haut dit déjà se tait, sa PHRASE reste. */
+@media (max-width: 767px) {
+  html body .vrm-app-shell .vrm-screen-head.vrm-screen-head-doublon:has(.vrm-screen-head-sous .vrm-phrase-ecran) { display: block; }
+  html body .vrm-app-shell .vrm-screen-head-doublon .vrm-screen-head-titre:has(.vrm-phrase-ecran) { display: flex; }
+  html .vrm-app-shell .vrm-screen-head-doublon .vrm-screen-head-titre:has(.vrm-phrase-ecran) > :not(.vrm-screen-head-sous) { display: none; }
+  html .vrm-app-shell .vrm-screen-head-doublon .vrm-screen-head-sous { margin-top: 0; }
+  html .vrm-app-shell .vrm-phrase-reglages { margin: 0 0 14px; }
+}
