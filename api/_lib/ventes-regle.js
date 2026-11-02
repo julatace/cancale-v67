@@ -173,6 +173,14 @@ export const ventesDeclarables = ({ vinted, lbc, ebay, vestiaire, masquee, exclu
     if (garde(l)) lignes.push(place(l));
   }
   for (const e of (ebay || [])) {
+    // (2 nov., audit P1) Une commande REMBOURSÉE EN PARTIE (`PARTIALLY_REFUNDED`)
+    // sortait de partout sans rien dire : elle est mise à part et NOMMÉE (« au
+    // moins »), son montant réel n'étant pas lu (§5 : un total partiel se dit).
+    if (e && e.orderId && String(e.orderPaymentStatus || '').toUpperCase() === 'PARTIALLY_REFUNDED') {
+      const idp = 'ebay:' + e.orderId;
+      if (!vus.has(idp)) { vus.add(idp); ecartees.push({ id: idp, plateforme: 'eBay', raison: 'remboursement partiel — montant à vérifier sur eBay', titre: (Array.isArray(e.lineItems) && e.lineItems[0] && e.lineItems[0].title) || '', manque: true }); }
+      continue;
+    }
     if (!e || String(e.orderPaymentStatus || '').toUpperCase() !== 'PAID' || !e.orderId) continue;
     // (revue argent, 19 oct.) Une commande ANNULÉE garde `PAID` (eBay le temps
     // du remboursement, et VRM quand il accepte une annulation :
@@ -240,6 +248,8 @@ export const ventesFaites = ({ vinted, lbc, ebay, vestiaire, cachee } = {}) => {
     if (garde('lbc:' + v.txId)) lignes.push({ plateforme: 'Leboncoin', ts: t, eur, compte: String(v.account || ''), heureLue: !(v.dateSaisie === true || /^\d{4}-\d{2}-\d{2}$/.test(String(v.dateVente).trim())) });
   }
   for (const e of (ebay || [])) {
+    // (2 nov., P1) Remboursée en partie : vendue, mais son montant n'est pas sûr ⇒ nommée.
+    if (e && e.orderId && String(e.orderPaymentStatus || '').toUpperCase() === 'PARTIALLY_REFUNDED') { if (garde('ebay:' + e.orderId)) nonComptees.push({ plateforme: 'eBay', raison: 'remboursement partiel — montant à vérifier', ts: Date.parse(e.creationDate || '') || null }); continue; }
     if (!e || String(e.orderPaymentStatus || '').toUpperCase() !== 'PAID' || !e.orderId) continue;
     if (!commandeEbayEngagee(e)) continue;   // annulée : rien de vendu (même règle que le CA déclaré)
     const eur = montantRecuEbay(e).eur, t = Date.parse(e.creationDate || '');
