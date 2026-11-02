@@ -32,7 +32,7 @@ export function ilYa(v, maintenant = Date.now()) {
 //    que `etatCollecteur` le juge, écrit pour un vendeur.
 export function reponseReception(d, maintenant = Date.now()) {
   if (d === undefined) return { etat: 'lecture', titre: 'Je regarde si tes e-mails arrivent…', phrase: '' };
-  if (d === null) return { etat: 'passu', titre: 'Je n’ai pas pu vérifier', phrase: 'La lecture n’a pas abouti — rien n’est perdu, réessaie dans un moment.' };
+  if (d === null) return { etat: 'passu', titre: 'Je n’ai pas pu lire la réception', phrase: 'La lecture n’a pas abouti — rien n’est perdu, réessaie dans un moment.' };
   const s = etatCollecteur(d.collecteur, maintenant);
   const dernier = ilYa(d.dernierEmail, maintenant);
   const derniere = d.dernierEmail ? (dernier ? `Dernier e-mail reçu ${dernier}.` : '') : 'Aucun e-mail reçu pour l’instant.';

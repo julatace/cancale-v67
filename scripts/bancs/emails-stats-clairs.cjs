@@ -178,6 +178,7 @@ const capture = async (pg, nom) => {
 };
 const versEmails = async (pg) => {
   await aller(pg, 'settings', 2500);
+  await pg.waitForFunction(() => { const e = document.querySelector('[data-espace-emails]'); return (e && e.offsetParent) || [...document.querySelectorAll('[data-sous-ouvrir="adresses"]')].some((x) => x.offsetParent); }, null, { timeout: 20000 }).catch(() => {});
   const sous = pg.locator('[data-sous-ouvrir="adresses"]').first();
   if (await sous.isVisible().catch(() => false)) { await sous.click(); await pg.waitForTimeout(800); }
   await pg.locator('[data-espace-emails]').first().waitFor({ timeout: 15000 });
@@ -185,9 +186,141 @@ const versEmails = async (pg) => {
 };
 const texte = (pg, sel) => pg.evaluate((s) => { const e = document.querySelector(s); return e ? e.innerText : ''; }, sel);
 
+
+// ── Ce que l'écran dit, lu dans le DOM (data-* et nombres) ──────────────────
+const lireApercu = (pg) => pg.evaluate(() => {
+  const q = (x) => document.querySelector(x);
+  const ap = q('[data-emails-apercu]');
+  const pos = (x) => { const e = q(x); return e ? e.getBoundingClientRect().top + (document.scrollingElement || document.documentElement).scrollTop : null; };
+  const avant = (a, b) => { const x = q(a), y = q(b); return !!(x && y && (x.compareDocumentPosition(y) & Node.DOCUMENT_POSITION_FOLLOWING)); };
+  const nav = q('[aria-label="Rubriques des emails"]');
+  const lignes = (sel, cle) => Object.fromEntries([...document.querySelectorAll(sel)].map((e) => [e.getAttribute(cle), Number(e.getAttribute('data-n'))]));
+  const visibles = ap ? [...ap.querySelectorAll('button')].filter((b) => b.offsetParent) : [];
+  const geste = q('[data-apercu-geste] .vrm-apercu-geste');
+  return {
+    onglet: (q('[data-espace-emails]') || {}).getAttribute ? q('[data-espace-emails]').getAttribute('data-onglet') : null,
+    reponse: ap ? ap.getAttribute('data-reponse') : null,
+    ordre: avant('[data-apercu-reponse]', '[data-apercu-gestes]') && avant('[data-apercu-gestes]', '[data-apercu-fait]'),
+    gestes: lignes('[data-apercu-geste]', 'data-apercu-geste'),
+    nGestes: q('[data-apercu-gestes]') ? q('[data-apercu-gestes]').getAttribute('data-apercu-gestes') : null,
+    fait: lignes('[data-apercu-famille]', 'data-apercu-famille'),
+    sur: q('[data-apercu-fait]') ? Number(q('[data-apercu-fait]').getAttribute('data-apercu-fait')) : null,
+    navTexte: nav ? nav.innerText : '', nOnglets: nav ? nav.querySelectorAll('button').length : 0,
+    ongletsH: nav ? Math.min(...[...nav.querySelectorAll('button')].map((b) => b.getBoundingClientRect().height)) : 0,
+    cibles: visibles.length ? Math.min(...visibles.map((b) => b.getBoundingClientRect().height)) : 0,
+    texte: ap ? ap.innerText : '',
+    gesteCouleur: geste ? getComputedStyle(geste).color : '', texteCouleur: ap ? getComputedStyle(ap).color : '',
+    listeOuverte: q('[data-reception-liste]') ? q('[data-reception-liste]').open : null,
+    deborde: document.documentElement.scrollWidth > innerWidth + 1,
+  };
+});
+const lireStats = (pg) => pg.evaluate(() => {
+  const q = (x) => document.querySelector(x);
+  const sc = document.scrollingElement || document.documentElement;
+  const top = (x) => { const e = q(x); return e ? e.getBoundingClientRect().top + sc.scrollTop : null; };
+  const tuiles = [...document.querySelectorAll('[data-sv-tuile]')].map((e) => ({ k: e.getAttribute('data-sv-tuile'), sous: (e.querySelector('.vrm-sv-tuile-sous') || {}).innerText || '', eur: e.getAttribute('data-sv-eur') }));
+  const meilleur = q('[data-sv-meilleur]');
+  const lignesCompte = [...document.querySelectorAll('[data-sv-compte]')].map((e) => ({ k: e.getAttribute('data-sv-compte'), n: Number(e.getAttribute('data-n')) }));
+  const replis = [...document.querySelectorAll('[data-stats-repli]')].map((e) => ({ id: e.getAttribute('data-stats-repli'), ouvert: e.open }));
+  const vit = q('.vrm-stats-vitrine');
+  const page = q('.vrm-statistiques-premium');
+  return { tuiles, meilleur: meilleur ? meilleur.getAttribute('data-sv-meilleur') : null, lignesCompte, replis,
+    hero: !!q('[data-stats-carte="hero"]'), vitTexte: vit ? vit.innerText : '', pageTexte: page ? page.innerText : '',
+    topComptes: top('[data-sv-carte="comptes"]'), topBarres: top('[data-sv-carte="barres"]'),
+    deborde: document.documentElement.scrollWidth > innerWidth + 1 };
+});
+
 module.exports = { MAINTENANT };
-if (require.main === module) (async () => {
+if (require.main === module && !EXPLORE) (async () => {
   await new Promise((r) => srv.listen(PORT, r));
+  const b = await chromium.launch({ executablePath: fs.existsSync('/opt/pw-browsers/chromium') ? '/opt/pw-browsers/chromium' : undefined, args: ['--no-sandbox', '--use-angle=swiftshader'] });
+  try {
+    for (const T of TAILLES) {
+      const suf = `${T.nom}${T.sombre ? '-sombre' : ''}`;
+      console.log(`── E-mails ${suf}`);
+      await essaie('emails ' + suf, async () => {
+        const { ctx, pg, errs, appels } = await page(b, T);
+        await versEmails(pg);
+        await pg.locator('[data-apercu-reponse="oui"]').waitFor();
+        await pg.waitForTimeout(600);
+        const r = await lireApercu(pg);
+        await capture(pg, `emails-apercu-${suf}`);
+        dit(r.onglet === 'reception' && r.reponse === 'oui', `${suf} : l'écran ouvre sur l'Aperçu, qui répond « oui, tes e-mails arrivent »`, `${r.onglet} · ${r.reponse}`);
+        dit(/il y a 4 min/.test(r.texte), `${suf} : la dernière arrivée est dite (il y a 4 min)`);
+        dit(r.ordre, `${suf} : ordre — la réponse, puis ce qu'il reste à faire, puis ce que VRM en a fait`);
+        dit(r.gestes.rattacher === 1 && r.gestes.verifier === 1 && Object.keys(r.gestes).length === 2, `${suf} : À faire — 1 e-mail mis de côté, 1 à vérifier, rien d'autre (adresses confirmées)`, JSON.stringify(r.gestes));
+        const ranges = JOURNAL.filter((e) => e.etat === 'integre').length;
+        const somme = Object.entries(r.fait).filter(([k]) => k !== 'attente').reduce((s2, [, n]) => s2 + n, 0);
+        dit(r.sur === JOURNAL.length && somme === ranges && r.fait.attente === 1 && r.fait.bordereau === 1 && r.fait.colis === 1 && r.fait.achat === 1 && r.fait.messages === 1 && r.fait.autre === 1,
+          `${suf} : Ce que VRM en a fait — ${ranges} rangés par famille (somme = ${ranges}) + 1 en attente, sur ${JOURNAL.length}`, JSON.stringify(r.fait));
+        dit(!('verifier' in r.fait) && !('rattacher' in r.fait), `${suf} : un nombre n'est écrit qu'une fois (« à vérifier » seulement dans À faire)`);
+        dit(r.nOnglets === 4 && !/\d/.test(r.navTexte) && r.ongletsH >= 44, `${suf} : 4 onglets nus — aucun nombre, 44 px au doigt`, `${r.nOnglets} · « ${r.navTexte.replace(/\n/g, ' | ')} » · ${r.ongletsH}px`);
+        dit(r.cibles >= 44, `${suf} : chaque bouton de l'Aperçu fait au moins 44 px`, r.cibles + 'px');
+        dit(r.gesteCouleur && r.gesteCouleur !== r.texteCouleur, `${suf} : le geste à faire est en ambre, pas dans la couleur du texte`, `${r.gesteCouleur} / ${r.texteCouleur}`);
+        dit(!/Collecteur|Intégré|suivis\b|quarantaine|pipeline|n\/d/i.test(r.texte), `${suf} : aucun mot technique sur l'Aperçu (collecteur, intégré, suivis, quarantaine)`);
+        dit(r.listeOuverte === false, `${suf} : la liste technique est repliée (« Chercher un e-mail précis »)`);
+        // Toucher une famille ouvre les e-mails de cette famille.
+        await pg.locator('[data-apercu-famille="bordereau"] button').click();
+        await pg.locator('[data-journal-emails]').waitFor();
+        await pg.waitForTimeout(500);
+        const typeJournal = await pg.locator('[data-journal-type]').inputValue();
+        const appelJ = appels.filter((x) => x === 'journal').length;
+        dit(typeJournal === 'bordereau' && await pg.locator('[data-email-onglet="journal"]').getAttribute('aria-pressed') === 'true' && appelJ >= 1, `${suf} : « 1 bordereau ajouté à Colis » ouvre les e-mails, filtrés sur les bordereaux`, typeJournal);
+        await capture(pg, `emails-journal-${suf}`);
+        await pg.locator('[data-email-onglet="reception"]').click();
+        await pg.locator('[data-apercu-geste="rattacher"] button').click();
+        await pg.waitForTimeout(300);
+        dit(await pg.locator('[data-email-onglet="a-traiter"]').getAttribute('aria-pressed') === 'true', `${suf} : « Le voir » ouvre les e-mails à rattacher`);
+        await pg.locator('[data-email-onglet="adresses"]').click(); await pg.waitForTimeout(400);
+        await capture(pg, `emails-adresses-${suf}`);
+        dit(!(await lireApercu(pg)).deborde, `${suf} : aucun débordement horizontal`);
+        dit(errs.length === 0, `${suf} : aucune erreur d'app`, errs.join(' | ').slice(0, 200));
+        await ctx.close();
+      });
+      await essaie('emails pas su ' + suf, async () => {
+        const { ctx, pg } = await page(b, T, { panne: true });
+        await versEmails(pg);
+        await pg.locator('[data-apercu-reponse="passu"]').waitFor();
+        const r = await lireApercu(pg);
+        dit(r.reponse === 'passu' && !/Oui, tes e-mails/.test(r.texte) && !/Rien à faire/.test(r.texte) && r.nGestes == null && r.sur == null,
+          `${suf} : réception illisible ⇒ « pas pu lire », ni « oui » ni « rien à faire » ni compte inventé`, r.texte.replace(/\n/g, ' | ').slice(0, 160));
+        await ctx.close();
+      });
+      console.log(`── Statistiques ${suf}`);
+      await essaie('stats ' + suf, async () => {
+        const { ctx, pg, errs } = await page(b, T);
+        await publier(pg);
+        await aller(pg, 'dashboard', 2500);
+        await pg.locator('[data-sv-tuile="vendu"][data-sv-etat="lu"]').waitFor({ timeout: 20000 });
+        await pg.waitForTimeout(600);
+        let r = await lireStats(pg);
+        await capture(pg, `stats-${suf}`);
+        dit(r.tuiles.map((t) => t.k).join(',') === 'vendu,benefice,delai,enligne' && r.tuiles.every((t) => t.sous.trim().length > 8), `${suf} : 4 chiffres en tête, chacun avec sa phrase`, r.tuiles.map((t) => t.k + ':' + t.sous).join(' / '));
+        dit(/par rapport à septembre/.test(r.tuiles[0].sous), `${suf} : l'écart dit à quoi il se compare`, r.tuiles[0].sous);
+        dit(!/médiane?|\bs\d\d\b|Délai médian/.test(r.vitTexte), `${suf} : ni « médiane » ni « s44 » en haut de l'écran`);
+        const l = r.lignesCompte;
+        dit(r.meilleur === l[0].k && l[0].n > l[1].n, `${suf} : « quel compte vend le mieux » nomme celui qui a le plus de ventes`, `${r.meilleur} · ${JSON.stringify(l)}`);
+        if (T.nom === '390') dit(r.topComptes != null && r.topBarres != null && r.topComptes < r.topBarres, '390 : au téléphone, le compte qui vend le mieux passe avant le graphique', `${r.topComptes} < ${r.topBarres}`);
+        dit(r.replis.length === 2 && r.replis.every((x) => !x.ouvert) && !r.hero, `${suf} : le détail est rangé en 2 volets fermés, rien n'y est calculé`, JSON.stringify(r.replis));
+        const eur = r.tuiles[0].eur; const montant = (Number(eur) / 100).toLocaleString('fr-FR', { minimumFractionDigits: 2 }) + ' €';
+        const fois = r.pageTexte.split(montant.replace(/ /g, ' ')).length - 1 || r.pageTexte.split(montant).length - 1;
+        dit(fois === 1, `${suf} : le montant vendu de la période (${montant}) est écrit une seule fois`, String(fois));
+        await pg.locator('[data-stats-repli="argent"] > summary').click(); await pg.waitForTimeout(800);
+        r = await lireStats(pg);
+        dit(r.hero && r.replis.find((x) => x.id === 'argent').ouvert, `${suf} : ouvrir « L'argent depuis le début » montre le finalisé`);
+        await aller(pg, 'dashboard', 2500);
+        await pg.locator('[data-stats-repli]').first().waitFor({ timeout: 20000 }).catch(() => {});
+        r = await lireStats(pg);
+        dit(r.replis.find((x) => x.id === 'argent') && r.replis.find((x) => x.id === 'argent').ouvert && !r.replis.find((x) => x.id === 'vente').ouvert, `${suf} : le volet ouvert le reste sur cet appareil`);
+        dit(!r.deborde, `${suf} : aucun débordement horizontal`);
+        dit(errs.length === 0, `${suf} : aucune erreur d'app`, errs.join(' | ').slice(0, 200));
+        await ctx.close();
+      });
+    }
+  } finally { await b.close(); srv.close(); }
+  console.log(`\n${ko ? '❌' : '✅'} emails-stats-clairs : ${ok} verts, ${ko} rouge${ko > 1 ? 's' : ''}`); process.exit(ko ? 1 : 0);
+})();
+if (require.main === module && EXPLORE) (async () => {  await new Promise((r) => srv.listen(PORT, r));
   const b = await chromium.launch({ executablePath: fs.existsSync('/opt/pw-browsers/chromium') ? '/opt/pw-browsers/chromium' : undefined, args: ['--no-sandbox', '--use-angle=swiftshader'] });
   try {
     for (const T of TAILLES) {
