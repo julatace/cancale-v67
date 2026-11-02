@@ -2613,3 +2613,58 @@ boutons grisés sans redire N, « Tes emails… » et « Où sont ces articles �
 de phrase permanente « …est dans Partis » (le nombre est sur « Partis », `data-partis-coches`) ;
 au téléphone la phrase sous le titre prend toute la largeur. Banc `colis-colonnes` : 9 rouges
 sur a80e584d, vert après (a205264e).
+
+## 2 novembre (soir) — Le transporteur à côté du bouton bordereau, ventes ET achats (branche `claude/transporteurs`)
+Julien (2 nov., 20 h 41) : « quand je fais une vente, je veux qu'à côté du bouton bordereau, ça soit
+marqué Chronopost avec le logo Chronopost ou Mondial Relay avec le logo Mondial Relay. Que ça soit
+pour les ventes et les achats… ça peut être dans Colis, mais pas dans les choses à expédier » ; plus
+tôt : « dans les colis je veux que tu mettes les transporteurs, après on fera des stats ».
+**Mesuré en base (lecture seule)** : `email_bord_*` (214 lignes) n'a AUCUN champ transporteur ; son
+`suivi` est rempli 94 fois, toujours à la forme Chronopost stricte (2 lettres + 9 chiffres + 2
+lettres), vide 120 fois — `parseBordereauEmail` (api/email-inbound.js) ne capte qu'un n° qui
+commence par deux lettres : les n° Mondial Relay (8 chiffres) ne sont jamais lus. Ni la transaction
+(`harvest_*_txn_*` : `shipment` = id/statut seulement), ni la liste des ventes, ni le bordereau capté
+par l'extension (`harvest_*_label_*` : une URL S3 neutre) ne nomment le transporteur. 30 bordereaux
+ont un e-mail de transporteur du MÊME n° (`email_track_*`). Leboncoin écrit `deliveryMethod`
+(« mondial_relay », « shop2shop ») ; Vestiaire écrit `transporteur` (« Chronopost »).
+**Fait** :
+- `src/transporteursVisuels.js` — LE module : `transporteurDuColis({ declare, suivi, transp,
+  suivisEmail })` rend `{ cle, nom, source }` (la ligne lue chez le transporteur pour ce n° ⇒ ce que
+  la plateforme/l'e-mail écrit, un transporteur nommé battant le « vinted » par défaut d'un e-mail
+  shipping@ ⇒ la forme du n° `transporteurDeForme` ; rien ⇒ `cle: null`, « Transporteur pas lu ») ;
+  `cleTransporteur(texte)`, `nomDuTransporteur`, `logosDuTransporteur`, `cleStatTransporteur(t)`
+  (clé des stats : la clé, « autre », « pas-lu »), `PAS_LU`, `TRANSPORTEURS`.
+- `src/PastilleTransporteur.jsx` — `<PastilleTransporteur t C taille seul/>` (logo + nom, ou « pas
+  lu » gris sans image ; `data-transporteur`, `data-transporteur-source`) et
+  `<LogoTransporteur cle taille repli/>`. Logo = l'icône publiée par le transporteur sur SON domaine
+  (`https://www.chronopost.fr/favicon.ico`, mondialrelay.fr, laposte.fr, vintedgo.com, …) dans une
+  tuile blanche arrondie (lisible en sombre) ; aucun logo redessiné ; une image qui échoue est
+  retirée (retenue pour la page), le nom reste. Shop2Shop : aucune adresse sûre ⇒ nom seul.
+  ⚠️ **Non vérifié d'ici** : le réseau de la machine refuse ces domaines, et Playwright n'intercepte
+  JAMAIS une adresse en « /favicon.ico » — le banc ne voit que le repli. À regarder sur l'iPhone.
+- Colis → À envoyer (carte Vinted) : la pastille juste après le bouton bordereau (téléphone : sa
+  ligne sous le bouton ; ordinateur : sous le bouton), `data-transporteur` sur la carte ; « Suivre »
+  vise le site du transporteur lu (avant : `b.transporteur`, un champ qui n'existe pas). Mode
+  emballage et Tournée lisent la même règle (`transporteurVente`). Récapitulatif d'une vente :
+  pastille au-dessus de « Imprimer le bordereau », sinon une ligne « Transporteur » (dite une fois) ;
+  Ventes lit maintenant les suivis (`lireSuivis`, lecture partagée) pour la dire.
+- Colis → À retirer : chaque carte porte `transp` (même règle) ; le transporteur commun d'un point
+  s'écrit UNE fois en tête (logo + nom), sinon sur chaque carte ; les « à vérifier » et « point pas
+  encore connu » aussi. `CarrierBadge` (Achats) : logo officiel, repli neutre (plus de couleur de
+  marque imitée). Achats en route : pastille au-dessus de la ligne du transporteur. Leboncoin → colis :
+  la pastille du `deliveryMethod`.
+- **Achats Vestiaire en route** sortis de « À envoyer » (`ColisVestiaireBloc` ne rend plus que les
+  ventes) : `AchatsVestiaireEnRoute` sous « À retirer », HORS du compte (en route, pas au relais),
+  pas su dit une fois. Banc `vestiaire-colis` mis à la règle.
+**Preuve** : banc NOUVEAU `scripts/bancs/transporteurs-logos.cjs` (390 tactile clair, 1512 sombre ;
+le nom `transporteurs.cjs` était déjà pris par le banc du STATUT lu chez le transporteur) : 40 rouges
+sur origin/main c4f39ac4, vert après ; mutation « deviner Mondial Relay quand rien n'est lu » ⇒ 10
+rouges. Verts aussi : `colis-colonnes`, `vestiaire-colis`, `recap-vente` (68), `compact` (30),
+`retrait-carte`. Rouges D'AVANT, identiques sur origin/main : `transporteurs` F n° 8 (« Reçus 1,7 k »),
+`revendeurs` (« actions quotidiennes en haut à densité 0.65 »).
+**Reste** : (1) l'e-mail du bordereau Vinted : lire le n° Mondial Relay (8 chiffres) et le nom du
+transporteur (`parseBordereauEmail`, route des e-mails — autre session) ; tant qu'il manque, la moitié
+des ventes disent « Transporteur pas lu ». (2) eBay : le transporteur n'est connu qu'après l'étiquette
+(rien n'est affiché avant). (3) Les lignes Vestiaire (ventes) : brancher `PastilleTransporteur` +
+`transporteurDuColis({ declare: v.transporteur, suivi: v.suivi })` (autre session). (4) Les stats par
+transporteur : lire `cleStatTransporteur` (ou `data-transporteur`), jamais une autre règle.

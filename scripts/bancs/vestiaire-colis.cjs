@@ -100,11 +100,14 @@ async function sain(pg, ecran) {
   const m = /n'a pas pu s'afficher|n’a pas pu s’afficher|Cannot access|is not defined/.exec(r.t);
   dit(!m, `${ecran} : l'écran n'est pas tombé sur le garde-fou`, m && m[0]);
 }
+// (2 nov.) Les achats en route ne sont plus dans « À envoyer » : sous « À retirer »
+// (`[data-colis-vestiaire-route]`, sa propre section). `lire` lit l'onglet ouvert.
 const lire = (pg) => pg.evaluate(() => {
   const bl = document.querySelector('[data-colis-vestiaire]');
-  const s = bl && bl.querySelector('[data-suivre-colis]');
+  const rt = document.querySelector('section[data-colis-vestiaire-route]');
+  const s = rt && rt.querySelector('[data-suivre-colis]');
   return {
-    bloc: bl ? bl.getAttribute('data-colis-vestiaire') : null, route: bl ? bl.getAttribute('data-colis-vestiaire-route') : null,
+    bloc: bl ? bl.getAttribute('data-colis-vestiaire') : null, route: rt ? rt.getAttribute('data-colis-vestiaire-route') : null,
     ventes: [...document.querySelectorAll('[data-vc-colis]')].map((x) => ({ id: x.getAttribute('data-vc-colis'), num: x.getAttribute('data-vc-colis-num'), lim: x.getAttribute('data-vc-colis-limite'), t: x.innerText })),
     achats: [...document.querySelectorAll('[data-vc-route]')].map((x) => x.getAttribute('data-vc-route')),
     suivre: s ? s.href : '', h: s ? s.getBoundingClientRect().height : 0,
@@ -138,8 +141,12 @@ const jobs = (pg) => pg.evaluate(() => ({ env: (document.querySelector('[data-jo
             const v1 = c.ventes.find((v) => v.id === 'V1') || {}, v2 = c.ventes.find((v) => v.id === 'V2') || {};
             dit(v1.num === '401' && v1.lim && /demain/.test(v1.t) && /bordereau disponible/.test(v1.t), 'V1 : N°401 (référence VRM), à envoyer demain, bordereau disponible', v1.t);
             dit(v2.num === '' && /Pas reliée/.test(v2.t) && /bordereau : pas su/.test(v2.t), 'V2 : pas reliée (aucun titre deviné), bordereau « pas su »', v2.t);
-            dit(c.route === '1' && c.achats.join() === 'A1', 'Colis : l’achat en route, pas celui livré', JSON.stringify(c.achats));
-            dit(/chronopost\.fr/.test(c.suivre) && c.h >= 44, 'Suivre l’achat sur Chronopost (44 px)', c.suivre);
+            dit(c.route === null && !c.achats.length, '« À envoyer » : aucun achat en route (ce qui arrive n’est pas à envoyer)', JSON.stringify(c.achats));
+            await pg.click('[data-colis-onglet-choix="retirer"]'); await pg.waitForTimeout(800);
+            const r = await lire(pg);
+            dit(r.route === '1' && r.achats.join() === 'A1', 'Colis → « À retirer » : l’achat en route, pas celui livré', JSON.stringify(r.achats));
+            dit(/chronopost\.fr/.test(r.suivre) && r.h >= 44, 'Suivre l’achat sur Chronopost (44 px)', r.suivre);
+            await pg.click('[data-colis-onglet-choix="envoyer"]'); await pg.waitForTimeout(500);
             const vide = await pg.evaluate(() => /Aucun colis à envoyer\./.test(document.body.innerText));
             dit(!vide, 'jamais « Aucun colis à envoyer » sous deux colis Vestiaire à envoyer (« Aucun colis Vinted à envoyer »)', String(vide));
           } else if (mode === 'panne') {

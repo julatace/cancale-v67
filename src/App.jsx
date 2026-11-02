@@ -118,6 +118,8 @@ import { DESCRIPTION_ORGANISATION } from "./operations/description.js";
 // (31 oct.) Colis → « À retirer » : la carte des points relais (règle pure + carte).
 import { regrouperRelais, pointsARetirer, lieuCompleteParTransporteur } from "./relaisColis.js";
 import CarteRelaisColis, { ColonneRetirer } from "./CarteRelais.jsx";
+import PastilleTransporteur, { LogoTransporteur } from "./PastilleTransporteur.jsx";
+import { transporteurDuColis, cleStatTransporteur, cleTransporteur } from "./transporteursVisuels.js";
 import { CarteTournee, TourneePleinEcran } from "./Tournee.jsx";
 // (1er nov.) Julien : « enlève Tournée » — la carte n'est plus sur Ma journée.
 const TOURNEE_SUR_JOURNEE = false;
@@ -5293,12 +5295,18 @@ const carrierKey = (raw) => {
 // Nom lisible d'un transporteur (repli « Transporteur » si inconnu).
 const carrierName = (raw) => { const c = CARRIERS[carrierKey(raw)]; return c ? c.name : 'Transporteur'; };
 // Badge de transporteur (pastille de marque).
+// (2 nov.) Julien : « avec le logo Chronopost… le logo Mondial Relay ». Le logo
+// officiel (src/PastilleTransporteur.jsx, l'icône publiée par le transporteur sur
+// SON domaine) ; tant qu'il ne s'est pas chargé, ou s'il échoue, une pastille
+// NEUTRE avec le code court — jamais une image cassée, plus de couleur de marque
+// imitée.
 function CarrierBadge({ carrier, size = 22 }) {
-  const c = CARRIERS[carrierKey(carrier)] || null;
+  const k = carrierKey(carrier);
+  const c = CARRIERS[k] || null;
   if (!c) return null;
-  return (
-    <span title={c.name} style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minWidth: size, height: size, padding: '0 5px', borderRadius: 6, background: c.bg, color: c.fg, fontSize: size * 0.46, fontWeight: 900, letterSpacing: 0.3, flexShrink: 0, boxShadow: '0 1px 2px rgba(0,0,0,0.15)' }}>{c.short}</span>
-  );
+  const cle = cleTransporteur(carrier);
+  const repli = <span aria-hidden="true" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minWidth: size, height: size, padding: '0 5px', borderRadius: Math.round(size * 0.27), background: C.bg, border: `1px solid ${C.border}`, boxSizing: 'border-box', color: C.muted, fontSize: size * 0.42, fontWeight: 700, letterSpacing: 0.2, flexShrink: 0 }}>{c.short}</span>;
+  return <span title={c.name} data-carrier-badge={cle || k} style={{ display: 'inline-flex', alignItems: 'center', flexShrink: 0 }}>{cle ? <LogoTransporteur cle={cle} taille={size} repli={repli}/> : repli}</span>;
 }
 
 // Le fond vectoriel de la mini-carte (MapLibre chargé à la demande).
@@ -19606,7 +19614,7 @@ function LeboncoinColis({ lbcVentes = { ventes: [] } }) {
     const n = numDe(o);
     const posted = estFait(o);
     return (
-      <div className="vrm-lbc-package" key={o.txId} data-bord-card style={{ padding: '11px 12px', border: `1px solid ${o.label && o.label.voucherUrl ? INV_STATUS.online.color + '44' : C.border}`, background: C.card, borderRadius: 10, marginBottom: 8, opacity: posted ? 0.55 : 1 }}>
+      <div className="vrm-lbc-package" key={o.txId} data-bord-card data-transporteur={cleStatTransporteur(transporteurDuColis({ declare: o.deliveryMethod || o.deliveryLabel || '' }))} style={{ padding: '11px 12px', border: `1px solid ${o.label && o.label.voucherUrl ? INV_STATUS.online.color + '44' : C.border}`, background: C.card, borderRadius: 10, marginBottom: 8, opacity: posted ? 0.55 : 1 }}>
         <div className="vrm-lbc-package-head" style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
           <PhotoVente src={photoArticle(o)} size={58} />
           <div style={{ flex: '1 1 150px', minWidth: 0 }}>
@@ -19615,7 +19623,8 @@ function LeboncoinColis({ lbcVentes = { ventes: [] } }) {
               <span style={{ fontSize: 13.5, fontWeight: 600, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{o.title || '(sans titre)'}</span>
             </div>
             <div style={{ fontSize: 11, color: C.muted, marginTop: 4, display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-              <span style={{ flexShrink: 0 }}>{o.deliveryLabel || o.deliveryMethod || 'Transporteur'}</span>
+              {/* (2 nov.) Le transporteur que Leboncoin écrit (`deliveryMethod`), logo + nom ; sinon « pas lu ». */}
+              <PastilleTransporteur t={transporteurDuColis({ declare: o.deliveryMethod || o.deliveryLabel || '' })} C={C} seul taille={16}/>
               {euro(o.price) && <span style={{ flexShrink: 0, fontWeight: 600, color: C.text }}>{euro(o.price)}</span>}
               {o.label && o.label.reference && <span style={{ flexShrink: 0 }}>bordereau {o.label.reference}</span>}
               {posted && <span style={{ flexShrink: 0, color: INV_STATUS.online.color, fontWeight: 600 }}>✓ posté</span>}
@@ -26897,11 +26906,12 @@ function joursAvantVc(iso) { const t = Date.parse(iso || ''); return isFinite(t)
 function ColisVestiaireBloc({ vc }) {
   if (vc === undefined || (vc && !vc.aEnvoyer && !vc.enRoute)) return null;
   if (vc === null) return <div data-colis-vestiaire="passu" style={{ marginBottom: 10 }}><LignePanne>Les colis Vestiaire n'ont pas pu être lus pour l'instant. Rien n'est perdu : rouvre Colis dans un moment.</LignePanne></div>;
-  const E = vc.aEnvoyer || [], R = vc.enRoute || [];
-  if (!E.length && !R.length) return null;
+  // (2 nov.) Les achats en route (`vc.enRoute`) ne sont plus ici : `AchatsVestiaireEnRoute`, sous « À retirer ».
+  const E = vc.aEnvoyer || [];
+  if (!E.length) return null;
   const titre = (t, n) => <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: '.07em', textTransform: 'uppercase', color: C.muted }}>{t} <span style={{ color: C.text, fontVariantNumeric: 'tabular-nums' }}>· {n}</span></span>;
   return (
-    <div data-colis-vestiaire={E.length} data-colis-vestiaire-route={R.length} style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 16 }}>
+    <div data-colis-vestiaire={E.length} style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 16 }}>
       {E.length > 0 && <>
         {titre('Ventes Vestiaire à envoyer', E.length)}
         <div className="vrm-aide" style={{ fontSize: 12, color: C.muted, lineHeight: 1.5 }}>{E.every((v) => v.bordereau) ? 'Les bordereaux sont dans VRM (« Imprimer le bordereau »). ' : 'Le bordereau se prend sur Vestiaire (onglet « articles à expédier ») — ou ici, une fois la page de la vente ouverte sur Vestiaire. '}Ce que VRM lit vient de ta dernière visite sur Vestiaire avec l'extension.</div>
@@ -26919,17 +26929,30 @@ function ColisVestiaireBloc({ vc }) {
             {!v.num ? <div style={{ fontSize: 11, color: C.muted }}>Aucune référence VRM-n° lue sur l'article : VRM ne devine pas la paire.</div> : null}
           </div>); })}
       </>}
-      {R.length > 0 && <>
-        {titre('Achats Vestiaire en route', R.length)}
-        {R.map((v) => (
-          <div key={v.id} data-vc-route={v.id} style={{ border: `1px solid ${C.border}`, borderRadius: 10, padding: '10px 12px', background: C.card }}>
-            <div style={{ fontSize: 13, fontWeight: 600, color: C.text, overflowWrap: 'anywhere' }}>{v.nom || 'Article sans nom lu'}</div>
-            <div style={{ fontSize: 11.5, color: C.muted }}>{v.etat ? `Vestiaire : « ${v.etat} » · ` : ''}suivi {v.suivi}{v.transporteur ? ` (${v.transporteur})` : ''}</div>
-            <BoutonSuivreColis transporteur={v.transporteur} suivi={v.suivi}/>
-          </div>
-        ))}
-      </>}
     </div>
+  );
+}
+// (2 nov.) LES ACHATS VESTIAIRE EN ROUTE — sortis de « À envoyer » (Julien : ce qui
+// ARRIVE n'a rien à faire avec ce qu'on envoie) : ils vivent sous « À retirer »,
+// HORS du compte « à retirer » (en route, pas encore au relais — rien n'est caché,
+// §5). Même liste qu'avant (`colisVestiaire(d).enRoute`), le transporteur LU en plus.
+function AchatsVestiaireEnRoute({ vc, transporteurDe }) {
+  if (vc === null) return <div data-colis-vestiaire-route="passu" style={{ marginTop: 14 }}><LignePanne>Les achats Vestiaire en route n'ont pas pu être lus pour l'instant. Rien n'est perdu : rouvre Colis dans un moment.</LignePanne></div>;
+  const R = (vc && vc.enRoute) || [];
+  if (!R.length) return null;
+  return (
+    <section className="vrm-colis-en-route" data-colis-vestiaire-route={R.length} style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 18 }}>
+      <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: '.07em', textTransform: 'uppercase', color: C.muted }}>Achats Vestiaire en route <span style={{ color: C.text, fontVariantNumeric: 'tabular-nums' }}>· {R.length}</span></span>
+      {R.map((v) => { const tr = transporteurDe ? transporteurDe(v.transporteur, v.suivi) : transporteurDuColis({ declare: v.transporteur, suivi: v.suivi }); return (
+        <div key={v.id} data-vc-route={v.id} data-colis-ident={'vcr:' + v.id} data-transporteur={cleStatTransporteur(tr)} style={{ border: `1px solid ${C.border}`, borderRadius: 10, padding: '10px 12px', background: C.card, display: 'flex', flexDirection: 'column', gap: 4 }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: C.text, overflowWrap: 'anywhere' }}>{v.nom || 'Article sans nom lu'}</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            <PastilleTransporteur t={tr} C={C} seul taille={18}/>
+            <span style={{ fontSize: 11.5, color: C.muted, overflowWrap: 'anywhere' }}>{v.etat ? `Vestiaire : « ${v.etat} » · ` : ''}suivi {v.suivi}</span>
+          </div>
+          <BoutonSuivreColis transporteur={tr.cle || v.transporteur} suivi={v.suivi}/>
+        </div>); })}
+    </section>
   );
 }
 // ══════════════════════════════════════════════════════════════════════════════
@@ -40867,6 +40890,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // n° ajouté à la main (`etapeDuSuiviManuel`).
   const finsSuivis = useMemo(() => finsColis(tracking, suivisEnvoyes, transp), [tracking, suivisEnvoyes, transp]);
   const transpMap = useMemo(() => transpParSuivi(transp), [transp]);
+  // (2 nov.) LE TRANSPORTEUR D'UN COLIS, LU (src/transporteursVisuels.js, une règle) :
+  // la ligne lue chez le transporteur pour ce n°, ce qu'écrit la plateforme ou
+  // l'e-mail du MÊME n°, sinon la forme du n° — jamais deviné ; rien ⇒ « pas lu ».
+  // Une vente Vinted : par le n° de suivi de SON bordereau (e-mail du bordereau).
+  const transporteurColis = (declare, suivi) => transporteurDuColis({ declare: declare || '', suivi: suivi || '', transp: transpMap, suivisEmail: Array.isArray(tracking) ? tracking : null });
+  const transporteurVente = (b) => transporteurColis('', b && b.suivi);
   useEffect(() => {
     // ⚠️ ON NE PUBLIE PAS UNE PHOTO À MOITIÉ DÉVELOPPÉE (§4.2 : une capture
     // partielle n'écrase jamais une complète). Mesuré : rendu depuis Ma journée
@@ -44147,7 +44176,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // ⚠️ Ma journée aussi (revue visuelle du 17 oct.) : sans les emails de suivi,
   // sa tuile « À retirer » comptait les seuls colis vus par Vinted (1) quand
   // l'écran Achats en montrait 2 — la même notion, deux nombres (§11).
-  useEffect(() => { if ((curSub==='bordereaux'||curSub==='achats'||curSub==='journee') && tracking===null) lireSuivis(); /* eslint-disable-next-line */ }, [sub]);
+  // (2 nov.) + Ventes : le récapitulatif d'une vente dit son transporteur LU (e-mail ou ligne du
+  // transporteur du même n°) — la même lecture partagée (`cachedRow`), pas une de plus.
+  useEffect(() => { if ((curSub==='bordereaux'||curSub==='achats'||curSub==='journee'||curSub==='ventes') && tracking===null) lireSuivis(); /* eslint-disable-next-line */ }, [sub]);
   // ── LES PHOTOS DES ACHATS, LUES DANS LEUR TRANSACTION (Achats seulement) ──
   // (23 oct.) Ma journée lisait ces transactions pour leurs n° de suivi
   // (`shipment.tracking_code`) — mesuré : 0 sur 1 290 en porte. Les n° viennent
@@ -46862,7 +46893,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         : groupe === 'pret' ? (lim || 'bordereau prêt')
         : [lectureFinie ? 'bordereau pas encore là' : 'bordereau pas encore lu', lim].filter(Boolean).join(' · ');
       L.push({ cle: 'v:' + (e.txn || e.key), groupe, site: 'vinted', nom: nomAvecTaille(o ? o.title : (b && (b.modele || b.article)) || 'Bordereau', o), photo: o ? orderPhoto(o) : bordPhoto(b),
-        num, etat, ambre: groupe !== 'fait' && e.dl != null && e.dl <= 1, ouvrir: groupe !== 'fait', tx: e.txn || '' });
+        num, etat, ambre: groupe !== 'fait' && e.dl != null && e.dl <= 1, ouvrir: groupe !== 'fait', tx: e.txn || '', transp: transporteurVente(b) });
     }
     if (colisEb) {
       const numEb = (x) => x.ordre ? (numLigneEbay(x.ordre, (x.ordre.lineItems || [])[0]) || '') : '';
@@ -46907,14 +46938,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       const a = achatDuColis(t, buysBase, indexSuivisAchats); const lu = lieuDeLigne(t); const code = codeDeLigne(t); const eE = etatColisEmail(t, maintenant); const ej = eE.jours;
       L.push({ cle: 'r:e:' + (suiviDeLigne(t) || t.id || ''), groupe: 'retirer', site: 'vinted', nom: nomAvecTaille(a ? a.title : (t.artTitle || (nomTr(t.carrier) ? `Colis ${nomTr(t.carrier)}` : 'Colis à retirer')), a), photo: a ? photoAchat(a) : (t.photo || null),
         etat: [lu.lieuNom || nomTr(t.carrier), dernierJour(ej) || (code ? code : (qrImage(t) ? 'QR code' : 'code pas encore lu'))].filter(Boolean).join(' · '), ambre: Number.isFinite(ej) && ej <= 1, ouvrir: true,
-        ...lu, transporteur: t.carrier || '', code, code2: codeRetrait(t.code2) || '', qr: !!qrImage(t) && !code, jours: Number.isFinite(ej) ? ej : null, tri: urgenceTri(eE), ...(lu.lieuNom ? {} : { sansLieu: sansLieuEmail(t) }), src: { t } });
+        ...lu, transporteur: t.carrier || '', transp: transporteurColis(t.carrier, suiviDeLigne(t)), code, code2: codeRetrait(t.code2) || '', qr: !!qrImage(t) && !code, jours: Number.isFinite(ej) ? ej : null, tri: urgenceTri(eE), ...(lu.lieuNom ? {} : { sansLieu: sansLieuEmail(t) }), src: { t } });
     }
     for (const o of (pickupUnion.extra || [])) {
       const r = relaisDe(o); const lu = lieuDe(r && r.lieu); const code = r ? codeRetrait(r.code) : ''; const eV = etatColisVinted(o, maintenant, tpmC); const ej = eV.jours;
       const suV = suivisAchat(o, indexSuivisAchats)[0] || ''; const eSV = entreeSuiviAchat(o); const trInconnu = !!suV && !((r && r.transporteur) || (eSV && eSV.transporteur) || transporteurDeForme(suV));
       L.push({ cle: 'r:v:' + o.transaction_id, groupe: 'retirer', site: 'vinted', nom: nomAvecTaille(o.title || 'Achat', o), photo: photoAchat(o), num: '', trInconnu,
         etat: [lu.lieuNom || 'au point relais', dernierJour(ej) || (code || 'code pas encore lu')].filter(Boolean).join(' · '), ambre: Number.isFinite(ej) && ej <= 1, ouvrir: true,
-        ...lu, transporteur: (r && r.transporteur) || '', code, qr: !!(r && r.qr) && !code, jours: Number.isFinite(ej) ? ej : null, tri: urgenceTri(eV), ...(lu.lieuNom ? {} : { sansLieu: r && r.lieu ? { raison: 'La conversation Vinted ne nomme pas clairement le point.', geste: 'Ouvre la conversation du colis : le point y est écrit.' } : sansLieuVinted(o) }) , src: { o } });
+        ...lu, transporteur: (r && r.transporteur) || '', transp: transporteurColis((r && r.transporteur) || (eSV && eSV.transporteur) || '', suV), code, qr: !!(r && r.qr) && !code, jours: Number.isFinite(ej) ? ej : null, tri: urgenceTri(eV), ...(lu.lieuNom ? {} : { sansLieu: r && r.lieu ? { raison: 'La conversation Vinted ne nomme pas clairement le point.', geste: 'Ouvre la conversation du colis : le point y est écrit.' } : sansLieuVinted(o) }) , src: { o } });
     }
     for (const x of (pickupUnion.aVerifier || [])) {
       const o = x.kind === 'email' ? (x.o || achatDuColis(x.t, buysBase, indexSuivisAchats)) : x.o;
@@ -46925,7 +46956,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       const code = x.kind === 'email' ? codeDeLigne(x.t) : codeRetrait((relaisDe(x.o) || {}).code);
       L.push({ cle: x.kind === 'email' ? 'r:e:' + (suiviDeLigne(x.t) || (x.t && x.t.id) || '') : 'r:v:' + (x.o && x.o.transaction_id), groupe: 'retirer', site: 'vinted', nom: nomAvecTaille(o ? o.title : (x.t && nomTr(x.t.carrier) ? 'Colis ' + nomTr(x.t.carrier) : 'Colis à retirer'), o), photo: o ? photoAchat(o) : ((x.t && x.t.photo) || null), trInconnu,
         etat: [lu.lieuNom || (x.kind === 'email' ? nomTr(x.t && x.t.carrier) : ''), 'à vérifier : délai dépassé ou incident'].filter(Boolean).join(' · '), aVerifier: true, horsCompte: true, ouvrir: true,
-        ...lu, transporteur: (x.kind === 'email' ? (x.t && x.t.carrier) : ((relaisDe(x.o) || {}).transporteur)) || '', code, jours: null,
+        ...lu, transporteur: (x.kind === 'email' ? (x.t && x.t.carrier) : ((relaisDe(x.o) || {}).transporteur)) || '', transp: transporteurColis((x.kind === 'email' ? (x.t && x.t.carrier) : ((relaisDe(x.o) || {}).transporteur || (eSX && eSX.transporteur))) || '', suX), code, jours: null,
         ...(lu.lieuNom ? {} : { sansLieu: x.kind === 'email' ? sansLieuEmail(x.t) : sansLieuVinted(x.o) }),
         // (2 nov.) Présentation seulement : la raison (`raisonAVerifier`, la même que
         // l'ancien bloc « à vérifier ») et la source, pour les gestes de SA carte.
@@ -46933,7 +46964,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     }
     for (const o of (pickupUnion.aConfirmer || [])) { const r = relaisDe(o); const lu = lieuDe(r && r.lieu); const suC = suivisAchat(o, indexSuivisAchats)[0] || ''; const eSC = entreeSuiviAchat(o); const trInconnu = !!suC && !((r && r.transporteur) || (eSC && eSC.transporteur) || transporteurDeForme(suC));
       L.push({ cle: 'r:c:' + o.transaction_id, groupe: 'retirer', site: 'vinted', nom: nomAvecTaille(o.title || 'Achat', o), photo: photoAchat(o), trInconnu, etat: 'au point relais · à vérifier (compte pas relu)', aVerifier: true, horsCompte: true, ouvrir: true,
-        ...lu, transporteur: (r && r.transporteur) || '', code: '', jours: null, ...(lu.lieuNom ? {} : { sansLieu: { raison: 'Peut-être le même colis qu’un e-mail : son compte Vinted n’a pas encore été relu.', geste: `Passe sur Vinted${o._acc ? ` connecté sur ${accName(o._acc)}` : ''} : l’extension relie le colis à son e-mail.` } }),
+        ...lu, transporteur: (r && r.transporteur) || '', transp: transporteurColis((r && r.transporteur) || (eSC && eSC.transporteur) || '', suC), code: '', jours: null, ...(lu.lieuNom ? {} : { sansLieu: { raison: 'Peut-être le même colis qu’un e-mail : son compte Vinted n’a pas encore été relu.', geste: `Passe sur Vinted${o._acc ? ` connecté sur ${accName(o._acc)}` : ''} : l’extension relie le colis à son e-mail.` } }),
         raisonVerif: `peut-être le même colis qu’un e-mail : compte ${o._acc ? accName(o._acc) + ' ' : ''}pas encore relu sur Vinted`, src: { o } }); }
     // Partis : la règle de la section « Partis » plus bas (même filtre, même ordre).
     if (Array.isArray(sales.items)) {
@@ -46979,8 +47010,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         : !x.num ? { etat: 'pas-range', texte: 'Sans N° : pas de place dans le Stock' }
         : (plan || meublesLus) ? { etat: 'pas-range', texte: 'Pas rangée dans le Stock' }
         : { etat: 'pas-lu', texte: 'Stock pas encore lu sur cet appareil' };
-      const tr = b && b.transporteur ? nomTransporteurSuivi(b.transporteur) : '';
-      const transporteur = tr && tr !== 'Colis' ? tr : '';
+      // (2 nov.) Le transporteur LU (la règle de la carte, src/transporteursVisuels.js) :
+      // `b.transporteur` n'existe sur aucun bordereau (mesuré : 214 lignes, aucun champ).
+      const transporteur = transporteurVente(b).nom || '';
       const lim = e ? (texteLimiteEnvoi(e.lim) || '') : '';
       return { cle: x.cle, tx: x.tx, num: x.num || '', nom: x.nom, photo: x.photo || null, e,
         sous: [o && o._acc ? accNameOf(o._acc) : '', lim].filter(Boolean).join(' · '),
@@ -48232,7 +48264,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           if (baseKO || premierJour || loading) return null;
           try {
             const tEnv = T.find(x => x.id === 'envoyer'), tRet = T.find(x => x.id === 'retirer');
-            const lignesImpr = lignesLot().map(l => ({ cle: l.cle, imprime: l.imprime, transporteur: (l.e && l.e.b && l.e.b.suivi) ? (transporteurDeForme(l.e.b.suivi) || '') : '' }));
+            const lignesImpr = lignesLot().map(l => ({ cle: l.cle, imprime: l.imprime, transporteur: transporteurVente(l.e && l.e.b).cle || '' }));
             // La règle de la case « À envoyer » (plus haut) : sans les bordereaux captés
             // (lus par Colis seulement), le nombre publié par Colis s'il parle du même
             // lot, sinon « au moins » ce que les e-mails disent (§5).
@@ -48240,7 +48272,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             const pretsExact = labelsPrets || toShip.length === 0 || !!(pubPrets && pubPrets.total === toShip.length);
             const nPrets = (!labelsPrets && pubPrets && pubPrets.total === toShip.length) ? Math.max(pubPrets.prets, lignesImpr.length) : lignesImpr.length;
             const aPoster = toShip.map(t => { const o = t.o || {}; const tx = String(o.transaction_id || ''); const b = tx ? bordsParTxn[tx] : null; const en = effEntry(o);
-                return { cle: 'v:' + tx, num: (b ? numForBord(b) : '') || (en && en.numero) || '', titre: o.title || '', transporteur: b && b.suivi ? (transporteurDeForme(b.suivi) || '') : '', jours: Number.isFinite(t.daysLeft) ? t.daysLeft : null, site: 'vinted' }; })
+                return { cle: 'v:' + tx, num: (b ? numForBord(b) : '') || (en && en.numero) || '', titre: o.title || '', transporteur: transporteurVente(b).cle || '', jours: Number.isFinite(t.daysLeft) ? t.daysLeft : null, site: 'vinted' }; })
               .concat(((colisEb && colisEb.aPoster) || []).map(x => ({ cle: 'e:' + x.compte + ':' + x.orderId, num: x.ordre ? (numLigneEbay(x.ordre, (x.ordre.lineItems || [])[0]) || '') : '', titre: x.titre || '', transporteur: '', jours: Number.isFinite(x.jours) ? x.jours : null, site: 'ebay' })))
               // (1er nov., audit A4) Leboncoin et Vestiaire : les colis de la case « À envoyer ».
               .concat((colisAutres.leboncoin || []).map(x => ({ cle: 'l:' + x.txId, num: '', titre: x.titre || '', transporteur: '', jours: null, site: 'leboncoin' })))
@@ -49033,6 +49065,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 return arch ? { k: 'renvoi', t: `Si la paire t'est renvoyée, elle prendra un numéro neuf (le N°${num} est un ancien numéro).` } : { t: `Si la paire t'est renvoyée, republie-la avec le N°${num}.` };
               })();
               const bordGeste = !hidden && st !== 'cancelled' && aExpedier(o) && !isShipDone(o) && o.transaction_id != null;
+              // (2 nov.) Le transporteur LU de la vente (n° de SON bordereau) : à côté du bouton
+              // bordereau tant qu'il y a un colis à envoyer, sinon une ligne des détails (dit une fois).
+              const trRecap = transporteurVente(bordE);
               return <>
                 <header className="vrm-recap-tete">
                   <div className="vrm-sale-photo vrm-recap-photo">{photo ? <PhotoArticleAgrandissable src={photo} titre={o.title}><PhotoVenteSources {...photoSourcesProps} data-photo-vente="detail" style={{width:'100%',height:'100%',objectFit:'cover'}}/></PhotoArticleAgrandissable> : <Icon name="image" size={22} style={{color:C.muted,opacity:.55}}/>}</div>
@@ -49070,6 +49105,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     {acheteur ? <div className="vrm-recap-ligne"><dt>Acheteur</dt><dd>{acheteur}</dd></div> : null}
                     {o._acc ? <div className="vrm-recap-ligne"><dt>Compte</dt><dd>{accNameOf(o._acc)} · Vinted</dd></div> : null}
                     {(!etapes || !o.date) ? <div className="vrm-recap-ligne"><dt>Vendue</dt><dd>{o.date ? dateFr(o.date, { weekday: 'short', day: 'numeric', month: 'short' }) : '— date pas lue'}</dd></div> : null}
+                    {!bordGeste && (trRecap.cle || trRecap.nom) ? <div className="vrm-recap-ligne"><dt>Transporteur</dt><dd><PastilleTransporteur t={trRecap} C={C} seul data-recap-transporteur=""/></dd></div> : null}
                     {bordE && bordE.suivi ? <div className="vrm-recap-ligne"><dt>Suivi</dt><dd className="vrm-recap-mono">{bordE.suivi}</dd></div> : null}
                     {cell ? <div className="vrm-recap-ligne"><dt>Rangement</dt><dd><button type="button" className="vrm-lien-action" onClick={()=>{fermer();onLocate&&onLocate(num);}} title="Voir la paire au stock">{garageCellLabel(cell)}</button></dd></div>
                       : (num && aExpedier(o) && garageUtilise) ? <div className="vrm-recap-ligne"><dt>Rangement</dt><dd>pas au garage</dd></div> : null}
@@ -49077,7 +49113,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   </dl>
                 </section>
                 <section className="vrm-recap-gestes" aria-label="Actions">
-                  {bordGeste ? <div className="vrm-recap-principal"><BoutonBordereau grand uid={o._acc && o._acc.vinted_user_id} tx={String(o.transaction_id)} conv={o.conversation_id} login={accNameOf(o._acc)}
+                  {bordGeste ? <div className="vrm-recap-principal"><PastilleTransporteur t={trRecap} C={C} data-recap-transporteur=""/><BoutonBordereau grand uid={o._acc && o._acc.vinted_user_id} tx={String(o.transaction_id)} conv={o.conversation_id} login={accNameOf(o._acc)}
                     aGenerer pdf={!!(labelsCaptes[txL] || bordParTx[txL])} onImprimer={()=>imprimerBordereauVente(o)} onFait={(u)=>rechargerLabels(u)}/></div> : null}
                   <div className="vrm-recap-grille">
                     {o.conversation_id && onNav ? <Bouton variante="secondaire" icone="chat" data-recap-conversation="" onClick={()=>{ fermer(); poserCible({ type: 'conv', conv: String(o.conversation_id), compte: String((o._acc && o._acc.vinted_user_id) || '') }, redirigerOnglet('messages', null, ONGLETS_DEPLACES).tab); onNav('messages'); }}>Conversation</Bouton> : null}
@@ -50837,7 +50873,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 )}
                 {/* (24 oct.) En route : ce que dit le transporteur, par le n° de CET achat. */}
                 {!cancelled && !st.retour && st.step>=1 && st.step<4 && (()=>{ const su = suivi || suivisAchat(o, indexSuivisAchats)[0]; const e = entreeSuiviAchat(o);
-                  return su ? <LigneTransporteur transp={transpMap} suivi={su} carrier={(tk && tk.carrier) || (e && e.transporteur) || transporteurDeForme(su) || ''}/> : null; })()}
+                  // (2 nov.) Le transporteur LU (logo + nom), puis ce qu'il dit.
+                  const trA = transporteurColis((tk && tk.carrier) || (e && e.transporteur) || '', su);
+                  return su ? <div className="vrm-buy-transp" data-achat-transporteur={cleStatTransporteur(trA)} style={{display:'flex',flexDirection:'column',gap:2,marginTop:4}}><PastilleTransporteur t={trA} C={C} seul taille={18}/><LigneTransporteur transp={transpMap} suivi={su} carrier={(tk && tk.carrier) || (e && e.transporteur) || transporteurDeForme(su) || ''}/></div> : null; })()}
                 {/* ⚠️ LITIGE / RETOUR : il doit RENVOYER la paire, et générer le
                     bordereau de retour. VRM ne le crée PAS à sa place : la route
                     qui GÉNÈRE un retour n'a jamais été observée (§4.10), et agir
@@ -52359,6 +52397,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 {colRet && colRet.cartes.length > 0
                   ? <ColonneRetirer vue={parPoint} C={C} Photo={photoCarte} gestes={gestesRetrait} detail={arriveeRetrait} nomTransporteur={(k) => (CARRIERS[k] && CARRIERS[k].name) || ''} avecCarte={ordiColis} enRouteSansRelais={(groupesRelais && groupesRelais.enRouteSansRelais) || 0}/>
                   : (toutLuRet ? <p className="vrm-colis-vide" data-retraits-vide="">Aucun colis à aller chercher pour l’instant.</p> : null)}
+                {voitSite('vestiaire') ? <AchatsVestiaireEnRoute vc={colisVestiaire(vcEtat)} transporteurDe={transporteurColis}/> : null}
               </section>
             )}
           </>);
@@ -52872,6 +52911,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 // capté par l'extension juste après l'avoir généré.
                 const capte = e.txn ? labelsCaptes[e.txn] : null;
                 const pdf = !!(b && b.hasPdf) || !!capte;
+                // (2 nov.) Le transporteur LU de ce colis (n° de son bordereau), à côté du bouton.
+                const trV = transporteurVente(b);
                 const acc = o ? o._acc : null;
                 // Une charnière de groupe : le premier colis d'un groupe porte
                 // son intertitre (voir `groupeDe` plus haut). C'est ce qui rend
@@ -52892,7 +52933,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       {sousGrp && <span className="vrm-aide" style={{fontSize:12,color:C.muted,lineHeight:1.45,maxWidth:640}}>{sousGrp}</span>}
                     </div>
                   )}
-                  <div data-bord-card data-groupe-carte={grp} data-tx-colis={e.txn||''} data-colis-ident={'v:'+(e.txn||e.key)} data-limite={e.lim&&e.lim.limite||''} data-limite-heure={e.lim&&e.lim.heure||''} data-jours={dl==null?'':String(dl)} className="vrm-colis-carte" style={{padding:'14px',border:`1px solid ${dl!=null&&dl<0?C.warn+'66':C.border}`,background:C.card,borderRadius:12,opacity:posted?0.55:1}}>
+                  <div data-bord-card data-groupe-carte={grp} data-transporteur={cleStatTransporteur(trV)} data-tx-colis={e.txn||''} data-colis-ident={'v:'+(e.txn||e.key)} data-limite={e.lim&&e.lim.limite||''} data-limite-heure={e.lim&&e.lim.heure||''} data-jours={dl==null?'':String(dl)} className="vrm-colis-carte" style={{padding:'14px',border:`1px solid ${dl!=null&&dl<0?C.warn+'66':C.border}`,background:C.card,borderRadius:12,opacity:posted?0.55:1}}>
                     <div style={{display:'flex',gap:12,alignItems:'flex-start'}}>
                       <div className="vrm-colis-photo" style={{width:64,height:80,borderRadius:8,background:C.card2||C.bg,border:`1px solid ${C.border}`,boxSizing:'border-box',flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
                         {ph?<PhotoVinted src={ph} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<Icon name="image" size={20} style={{color:C.muted,opacity:.55}}/>}
@@ -53002,6 +53043,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                         <button type="button" onClick={()=>startBordereau(num, titre, acc, o && o.transaction_id)} title="J'ai déjà téléchargé le PDF : le tamponner avec le numéro"
                           className="vrm-colis-sec" style={{...sec,flex:'0 1 auto',border:`1px solid ${C.border}`,background:'transparent',color:C.text}}>J'ai le PDF</button>
                       </>)}
+                      {/* (2 nov.) Julien : « à côté du bouton bordereau, marqué Chronopost avec le logo
+                          Chronopost ou Mondial Relay avec le logo Mondial Relay ». Le transporteur LU
+                          (n° du bordereau, ligne du transporteur, e-mail du même n°) ; sinon « pas lu ». */}
+                      <PastilleTransporteur t={trV} C={C} data-colis-transporteur={e.txn||e.key}/>
                       {!num && b && <button type="button" onClick={()=>{ setLinkPickFor(b); setLinkSearch(''); }} title="Relier ce bordereau à un article numéroté" className="vrm-colis-sec" style={{...sec,border:`1px solid ${C.warn}88`,background:'transparent',color:C.warn}}><Icon name="link" size={14} style={{verticalAlign:'-2px',marginRight:5}}/>Relier</button>}
                       {/* Sans bordereau, il n'y avait AUCUN moyen de poser le numéro
                           sur cette vente — or c'est lui qu'on tamponne. Le numéro
@@ -53032,7 +53077,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                         className="vrm-colis-sec vrm-colis-ter" style={{...sec,border:`1px solid ${C.border}`,background:posted?C.bg:'transparent',color:posted?C.text:C.muted}}>
                         {posted?'↺ Pas encore':'✓ Colis fait'}
                       </button>
-                      {b && b.suivi && <a href={trackUrl(b.transporteur||'', b.suivi)} target="_blank" rel="noreferrer" title={`Suivre le colis n°${b.suivi}`} data-geste="suivre" className="vrm-colis-sec vrm-colis-ter" style={{...sec,border:`1px solid ${C.border}`,background:'transparent',color:C.muted,textDecoration:'none',display:'inline-flex',alignItems:'center'}}><Icon name="truck" size={13} style={{marginRight:5}}/>Suivre</a>}
+                      {b && b.suivi && <a href={trackUrl(trV.cle||'', b.suivi)} target="_blank" rel="noreferrer" title={`Suivre le colis n°${b.suivi}`} data-geste="suivre" className="vrm-colis-sec vrm-colis-ter" style={{...sec,border:`1px solid ${C.border}`,background:'transparent',color:C.muted,textDecoration:'none',display:'inline-flex',alignItems:'center'}}><Icon name="truck" size={13} style={{marginRight:5}}/>Suivre</a>}
                       {capte && <span className="vrm-colis-source" style={{fontSize:11.5,color:C.muted,fontWeight:500,flexBasis:'100%'}}>Bordereau récupéré chez Vinted par l'extension{b && b.hasPdf ? ' · confirmé par l\'email' : ''}</span>}
                       {/* ⚠️ « Bordereau pas encore reçu » disait, sur la MÊME carte
                           et à trois lignes d'écart, exactement ce que le bandeau
