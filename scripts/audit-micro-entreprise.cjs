@@ -63,7 +63,8 @@ const dit = (ok, l, d) => { n++; if (!ok) ko++; console.log(`${ok ? '✅' : '❌
   dit(/août 2026 se déclare et se paie du 1er septembre au 30 septembre/.test(M.phraseRythme('mensuel', new Date(2026, 8, 3))) || /août/.test(M.phraseRythme('mensuel', new Date(2026, 8, 3))), 'la phrase du rythme cite un vrai mois', M.phraseRythme('mensuel', new Date(2026, 8, 3)));
   // options
   dit(M.optionsMicro(null).liberatoire === null && M.optionsMicro({ liberatoire: 'peut-être' }).liberatoire === null, 'versement libératoire pas répondu ⇒ null (jamais deviné)');
-  dit(M.optionsMicro({ liberatoire: 'oui', acre: true }).liberatoire === 'oui' && M.optionsMicro({ liberatoire: 'oui', acre: true }).acre === true, 'réponse rangée relue telle quelle');
+  dit(M.optionsMicro({ liberatoire: 'oui', acre: true }).liberatoire === 'oui' && M.optionsMicro({ liberatoire: 'oui', acre: true }).acre === 'avant', 'réponse rangée relue telle quelle (l\'ancien « oui » à l\'ACRE = début avant juillet 2026)');
+  dit(M.optionsMicro({ acre: 'apres' }).acre === 'apres' && M.optionsMicro({ acre: 'n-importe' }).acre === false, 'ACRE depuis juillet 2026 relue ; une forme inconnue ⇒ pas d\'ACRE (jamais devinée)');
   // déclaration de revenus (2042-C-PRO 2026 vérifiée : 5TA avec VL, 5KO sans)
   const LI = L([['2025-11', 400], ['2025-12', 600], ['2026-01', 1000], ['2026-09', 300]]);
   const dP = M.declarationRevenus({ ligne: LI, now: new Date(2026, 4, 10, 12), liberatoire: 'non' });
