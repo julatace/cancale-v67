@@ -108,6 +108,9 @@ export function colisVcAPoster(d, maintenant = Date.now()) {
       id: String(id), num: numVcVente(v, liens), limite: v.limite || '', suivi: v.suivi || '', transporteur: v.transporteur || '',
       etiquette: v.etiquette === true ? true : v.etiquette === false ? false : null, date: v.date || '',
       jours: Number.isFinite(t) ? joursAvant(t, maintenant) : null,
+      // (2 nov., 5.316) pour l'affichage seulement — jamais une identité (§5).
+      titre: typeof v.titre === 'string' ? v.titre : '', photo: typeof v.photo === 'string' ? v.photo : '',
+      bordereau: v.bordereau && typeof v.bordereau === 'object' && typeof v.bordereau.id === 'string' ? v.bordereau : null,
     };
   }).sort((a, z) => String(a.limite || '9999').localeCompare(String(z.limite || '9999')));
 }

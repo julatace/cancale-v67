@@ -128,7 +128,9 @@ const jobs = (pg) => pg.evaluate(() => ({ env: (document.querySelector('[data-jo
           await pg.goto(`http://localhost:${PORT}/?tab=cat_bord`, { waitUntil: 'domcontentloaded' });
           // (2 nov., colis clair) Les colis à envoyer sont sous « À envoyer » (l'onglet urgent s'ouvre par défaut).
           await pg.waitForSelector('[data-colis-onglet-choix="envoyer"]', { timeout: 15000 }).then(() => pg.click('[data-colis-onglet-choix="envoyer"]')).catch(() => {});
-          await pg.waitForSelector('[data-colis-recap]', { timeout: 15000 });
+          // (2 nov.) Sans colis Vinted ni eBay, le récapitulatif n'est plus dessiné (colis clair) :
+          // on attend l'écran Colis lui-même, puis ce que Vestiaire y pose.
+          await pg.waitForSelector('[data-colis-onglet-choix]', { timeout: 15000 });
           await pg.waitForTimeout(3000);
           const c = await lire(pg);
           if (mode === 'lu') {
@@ -138,6 +140,8 @@ const jobs = (pg) => pg.evaluate(() => ({ env: (document.querySelector('[data-jo
             dit(v2.num === '' && /Pas reliée/.test(v2.t) && /bordereau : pas su/.test(v2.t), 'V2 : pas reliée (aucun titre deviné), bordereau « pas su »', v2.t);
             dit(c.route === '1' && c.achats.join() === 'A1', 'Colis : l’achat en route, pas celui livré', JSON.stringify(c.achats));
             dit(/chronopost\.fr/.test(c.suivre) && c.h >= 44, 'Suivre l’achat sur Chronopost (44 px)', c.suivre);
+            const vide = await pg.evaluate(() => /Aucun colis à envoyer\./.test(document.body.innerText));
+            dit(!vide, 'jamais « Aucun colis à envoyer » sous deux colis Vestiaire à envoyer (« Aucun colis Vinted à envoyer »)', String(vide));
           } else if (mode === 'panne') {
             dit(c.panne === 1 && !c.ventes.length, 'pas su : Colis le dit UNE fois, aucune vente inventée', JSON.stringify(c));
           } else dit(c.bloc === null && c.panne === 0, 'jamais lu : rien de Vestiaire dans Colis', JSON.stringify(c));
