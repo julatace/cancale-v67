@@ -188,7 +188,9 @@ export const ventesDeclarables = ({ vinted, lbc, ebay, vestiaire, masquee, exclu
     if (!commandeEbayEngagee(e)) continue;
     const id = 'ebay:' + e.orderId;
     const recu = montantRecuEbay(e);
-    if (recu.eur == null) { if (!vus.has(id)) { vus.add(id); ecartees.push({ id, plateforme: 'eBay', raison: recu.raison, titre: '' }); } continue; }
+    // (2 nov., audit des données G1) `manque` : elle n'est dans AUCUN mois, le
+    // « reçu », le CA déclaré et la carte URSSAF disent « au moins » et la nomment.
+    if (recu.eur == null) { if (!vus.has(id)) { vus.add(id); ecartees.push({ id, plateforme: 'eBay', raison: recu.raison, titre: '', manque: true, ts: Date.parse(e.creationDate || '') || null }); } continue; }
     const eur = recu.eur;
     const t = Date.parse(e.creationDate || '');
     if (!t) { if (!vus.has(id)) { vus.add(id); aDaterOuDeclaree({ id, plateforme: 'eBay', eur, titre: '', masquee: false }); } continue; }
@@ -253,6 +255,11 @@ export const ventesFaites = ({ vinted, lbc, ebay, vestiaire, cachee } = {}) => {
     if (!e || String(e.orderPaymentStatus || '').toUpperCase() !== 'PAID' || !e.orderId) continue;
     if (!commandeEbayEngagee(e)) continue;   // annulée : rien de vendu (même règle que le CA déclaré)
     const eur = montantRecuEbay(e).eur, t = Date.parse(e.creationDate || '');
+    // (2 nov., audit des données G1) Frais eBay pas encore lus, autre devise :
+    // la commande est VENDUE mais son argent ne se lit pas — NOMMÉE comme les
+    // autres (`nonComptees`, avec sa date), sinon Ma journée, Statistiques, le
+    // widget et le bilan disaient un « vendu » complet sans elle (§5).
+    if (eur == null && !vus.has('ebay:' + e.orderId)) nonComptees.push({ plateforme: 'eBay', raison: montantRecuEbay(e).raison, ts: t || null });
     if (eur == null) { if (garde('ebay:' + e.orderId)) ecartees += 1; continue; }
     if (!t) continue;
     if (garde('ebay:' + e.orderId)) lignes.push({ plateforme: 'eBay', ts: t, eur, compte: String(e._pseudo || e._compte || '') });

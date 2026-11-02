@@ -523,6 +523,7 @@ vérifier par `curl https://vrm.center/api/sante`.
 
 ### Décisions et chantiers (octobre–novembre 2026)
 Une ligne par chantier. Le récit complet des lignes du 31 oct. au 2 nov. est, mot pour mot, dans `docs/passation/etat-detaille-2026-10-31-au-11-02.md`.
+- **2 nov.** — Audit des données (E0c) : eBay aux frais pas lus « au moins » partout, « 1er », Vestiaire/Leboncoin dans « Finalisé par plateforme », pas lu ≠ 0 (base lente, semaine, NaN, Invalid Date), jours au fuseau local (`audit-donnees-ecrans`). → historique divers. Geste : aucun.
 - **2 nov.** — Offres auto : jamais sur une paire vendue ailleurs (**5.308.0**, `src/offresGarde.js`). Geste : installer.
 - **2 nov.** — Colis : le filtre de site vaut pour TOUT l'écran (`voitSite`, `retoursPourSite` : plus de Vinted sous eBay, Julien : « inadmissible ») ; boîte vide du récapitulatif au téléphone retirée ; 190 chemins absolus `/home/user/…` retirés des audits/bancs. Audits : tous verts sauf ceux qui exigent Postgres (6) ou `@babel/parser` (1), absents ici. Geste : regarder Colis au téléphone.
 - **2 nov. (matin)** — Audit du dossier : les 7 chantiers « en cours » de la nuit n'ont JAMAIS été poussés ⇒ perdus, à refaire (nuit §3) ; §9 condensé, §8 recopié du code, ancienne « passation en cours » archivée. Geste : si la session de la nuit est encore ouverte, lui faire pousser ses worktrees.
@@ -623,13 +624,7 @@ Une ligne par chantier. Le récit complet des lignes du 31 oct. au 2 nov. est, m
   sur le N° », captcha prêt, revue visuelle. → `docs/passation/2026-10-21.md`.
 - **20 oct.** — Doublons de N° réglés seuls ; revues « argent » (app, extension, eBay) ;
   eBay se relit tout seul ; Leboncoin : compte de session, date de vente. → numeros / ebay.
-- **16-19 oct.** — Relais du téléphone (5.183), double vérification TOTP, studio photo,
-  mode équipe (016), carte et classement de la communauté (018-020, appliquées). → divers.
-- **11 oct.** — Remise à zéro des numéros (013, appliquée), prix 12,99 €, Messages eBay.
-- **3-9 oct.** — L'app pilote l'extension (bordereaux, publication), messagerie intégrée,
-  numéros à lettres, CA daté au versement, abonnement Stripe (mode test), sécurité
-  (routes fermées, RLS, origines exactes de l'extension).
-- **Septembre** — le reste : `docs/journal-2026.md` et les historiques.
+- **Avant le 20 oct.** — `docs/passation/etat-detaille-2026-10-31-au-11-02.md` (fin) et `docs/journal-2026.md`.
 
 ---
 
