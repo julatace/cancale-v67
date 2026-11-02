@@ -150,12 +150,12 @@ export async function pdfFacture(contenu, { PDFLib } = {}) {
   if (contenu.regime === 'normal') {
     tot('Total HT', euros(T.ht));
     tot(`TVA ${String(contenu.taux).replace('.', ',')} %`, euros(T.tva));
-    page.drawLine({ start: { x: xL, y: y + 14 }, end: { x: W - M, y: y + 14 }, thickness: 0.5, color: c(FILET) });
+    page.drawLine({ start: { x: xL, y: y + 10 }, end: { x: W - M, y: y + 10 }, thickness: 0.5, color: c(FILET) }); y -= 4;
     tot(estAvoir ? 'Total TTC à rembourser' : 'Total TTC', euros(T.ttc), true);
   } else if (contenu.regime === 'franchise') {
     tot('Total HT', euros(T.ht));
     tot('TVA', 'non applicable');
-    page.drawLine({ start: { x: xL, y: y + 14 }, end: { x: W - M, y: y + 14 }, thickness: 0.5, color: c(FILET) });
+    page.drawLine({ start: { x: xL, y: y + 10 }, end: { x: W - M, y: y + 10 }, thickness: 0.5, color: c(FILET) }); y -= 4;
     tot(estAvoir ? 'Montant à rembourser' : 'Net à payer', euros(T.ttc), true);
   } else {
     tot(estAvoir ? 'Montant à rembourser' : 'Total à payer', euros(T.ttc), true);
