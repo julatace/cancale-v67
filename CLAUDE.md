@@ -499,11 +499,11 @@ sans la fonction.
 Une ligne par chantier ou décision, le plus récent d'abord. Détail : le fichier
 d'historique du thème (cherche le titre ou la date).
 
-**Extension servie : 5.312.0** (2 nov. ; la 5.311.0 n'a jamais été servie seule). **À lire en premier : `docs/passation/2026-11-02-liste.md`.** **Production** : https://vrm.center,
+**Extension servie : 5.313.0** (2 nov.). **À lire en premier : `docs/passation/2026-11-02-liste.md`.** **Production** : https://vrm.center,
 vérifier par `curl https://vrm.center/api/sante`.
 
 ### Gestes encore attendus de Julien
-- Installer l'extension **5.312.0** (remplacer le dossier, puis ⟳ dans CHAQUE Chrome).
+- Installer l'extension **5.313.0** (remplacer le dossier, puis ⟳ dans CHAQUE Chrome).
 - Sur leboncoin.fr, ouvrir « Mes annonces » sur CHACUN de ses comptes Leboncoin.
 - Recoller `scripts/gmail-forwarder.gs` (avec sa clé) dans la boîte qui fait tourner le
   script, puis poser `EMAIL_INBOUND_SECRET` sur Vercel (l'ancien script lit encore la
@@ -528,6 +528,7 @@ vérifier par `curl https://vrm.center/api/sante`.
 
 ### Décisions et chantiers (octobre–novembre 2026)
 Une ligne par chantier. Le récit complet des lignes du 31 oct. au 2 nov. est, mot pour mot, dans `docs/passation/etat-detaille-2026-10-31-au-11-02.md`.
+- **2 nov. (soir)** — **Extension 5.313.0** (revue indépendante) : le frein relu dans la file (une paire en attente ne part plus après le refus d'une autre), « limite » n'est plus une restriction 24 h, pas de recréation si l'annonce n'a pas pu être lue, plafond partagé au compte EXACT (`audit-recreer` R1-R5). → historique vinted-extension. Geste : installer la 5.313.0.
 - **2 nov. (soir)** — Sécurité : la politique CSP complète passe **en vigueur** (`vercel.json`, était en surveillance ; 2 violations relevées, aucune de VRM) ; banc `csp` vert. → historique sécurité. Geste : sur iPhone et ordinateur, vérifier que la carte de la Communauté s'affiche, qu'un bordereau s'ouvre, et Réglages → Imprimante → « Voir les aperçus ».
 - **2 nov. (soir)** — eBay : la notification « suppression de compte » est vérifiée (signature, sinon 412) puis appliquée (coordonnées d'acheteur effacées, montants gardés ; panne ⇒ 503, eBay renvoie) (`api/_lib/ebay-suppression.js`, `audit-ebay-suppression`). → historique ebay. Geste : aucun.
 - **2 nov. (soir)** — Favoris : écran simplifié (mode auto en une phrase + un geste, « Ton message », une ligne par favori rangée par état ; `src/favorisEcran.js`, `audit-favoris-ecran`, banc `favoris-ecran`). Geste : regarder Messages → Favoris reçus.
