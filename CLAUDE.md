@@ -529,6 +529,7 @@ vérifier par `curl https://vrm.center/api/sante`.
 
 ### Décisions et chantiers (octobre–novembre 2026)
 Une ligne par chantier. Le récit complet des lignes du 31 oct. au 2 nov. est, mot pour mot, dans `docs/passation/etat-detaille-2026-10-31-au-11-02.md`.
+- **2 nov. (nuit)** — Carte des relais immobile (transition des boutons + arrondi MapLibre, banc `carte-stable`) ; parcours d'un nouveau vendeur : 13 défauts corrigés (banc `nouveau-vendeur`). → historique interface-stock. Geste : aucun.
 - **2 nov. (nuit)** — **Extensions 5.314.0 / 5.315.0** : annonces Vestiaire lues (forme réelle `{type, published:{product}}`, C10) ; puis « tout Vestiaire » GARDÉ tel que la page le charge (`vc_brut_*`, `vc_pdf_*` pour les bordereaux, secrets retirés, aucune requête de plus, C11). → historique vestiaire. Geste : installer, se promener sur Vestiaire.
 - **2 nov. (nuit)** — **Facture Pro refaite** : « Envoyer la facture à l'acheteur » sur chaque vente Pro PROUVÉE (transaction), mentions légales (EI, 293 B / marge sans TVA / TVA), numéro sans trou au clic (journal, comparer-et-échanger ; l'email ne numérote plus), instantané + avoir, PDF identique app/serveur, envoi depuis la boîte du VENDEUR (SMTP, mot de passe chiffré, §2.9) (`src/facturePro/`, `api/_lib/facture-pro.js`, `audit-facture-pro`, banc `facture-pro`). → historique compta. Geste : voir « Gestes ».
 - **2 nov. (soir)** — Saisies sans réseau gardées sur l'appareil (file d'envoi `src/fileEnvoi.js`, rejouée par la fusion clé par clé au chargement, vidée quand la base ACCEPTE ; « N changements en attente d'envoi » dit une fois) : les prix tapés en 4G faible ne se perdent plus quand l'iPhone ferme l'app. Banc `file-envoi` (rouge sur l'avant). → historique sécurité-base-serveur. Geste : aucun.
@@ -573,12 +574,6 @@ Une ligne par chantier. Le récit complet des lignes du 31 oct. au 2 nov. est, m
 - **1er nov.** — Paramètres, compta, arrivée, communauté plus simples (groupe « Comptes et emails », suppressions qui demandent). → historiques interface-stock et compta. Geste : aucun.
 - **1er nov.** — Colis → « À retirer » par point relais : aucun colis écarté (« Point pas encore connu » + raison), même relais écrit deux fois = un point (nom propre + CP), position Vinted ou Base Adresse, compteur = Ma journée (`vrm_colis_retirer`), même n° de suivi compté une fois. → historique colis-retraits (« 1er nov. »). Geste : aucun.
 - **31 oct.** — Compétence **taste** (Leonxlnx/taste-skill, MIT) installée dans `.claude/skills/taste-skill/` à sa demande : tout changement de style passe par elle (`references/app-screens.md` pour les écrans de l'app) ; §7 et ses refus priment. → `.claude/skills/README.md`.
-- **31 oct. (soir)** — Vinted/extension **5.293.0** (intégrée avec Leboncoin en 5.293.0) : le pont photo relaie le `statut` du CDN (lien mort 404/410 plus redemandé avant 30 min, refus passagers en tête du témoin) ; détourage Vestiaire : `cle-pas-su` arrête la série et se dit en français. → historique vinted-extension. Geste : installer la 5.293.0 une fois fusionnée.
-- **31 oct.** — Tournée de tous les bancs et audits : 5 défauts corrigés (purge d'un
-  compte supprimé, cartes Leboncoin remontées, table de reprise lue deux fois…). Les
-  panneaux des Paramètres s'ouvrent en sous-écran aussi sur ordinateur (`[data-sous-ouvrir]`).
-  Rouges laissés : `session` G/P (Chrome 153), `mobile`, `profil-avatar` (instables).
-  → historique divers / interface.
 - **31 oct.** — Style « Vitrine » (son choix parmi 4 maquettes) appliqué à toute l'app, clair et sombre → historique interface-stock (« Vitrine »). Geste : regarder l'app ; dire si « Tout imprimer » doit être fixé au-dessus de la barre du bas.
 - **Avant le 20 oct.** — `docs/passation/etat-detaille-2026-10-31-au-11-02.md` (fin) et `docs/journal-2026.md`.
 
