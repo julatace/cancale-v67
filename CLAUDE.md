@@ -398,7 +398,7 @@ déploient pas (`vercel.json`) ; ne jamais « promouvoir » une prévisualisatio
 > chiffre ne porte une couleur que s'il y a vraiment quelque chose à rattraper ;
 > **ambre** pour un geste à faire, **rouge** seulement pour deux paires sous un N°.
 
-- Vitrine + Apple (police système, bleu Apple ; `src/styles-vitrine.css` en dernier), mode sombre CHOISI
+- Vitrine + Apple (police système, bleu Apple ; styles-vitrine.css en dernier), mode sombre CHOISI
   (`vinted_dark`, estampillé sur la racine avant le premier rendu).
 - Une forme par fonction : boutons (une règle de base, jamais `display:inline-flex`),
   `Segmente`, `vrm-filtres`, `vrm-repli`, `vrm-lien-action`, rangées défilantes.
