@@ -224,9 +224,26 @@ export const normRue = (s) => {
   for (const [re, w] of ABREV_RUE) t = t.replace(re, w);
   return t.replace(/\s+/g, '');
 };
+// (2 nov., mesuré en base) Des lignes `transp_vinted_…` rangées avant le
+// correctif du serveur portent le PAYS à la place de la ville et la ville collée à
+// la rue (rue « 13 Rue Saint-Vincent, Vannes », ville « France ») : la rue ne
+// ressemblait plus à celle de l'e-mail ⇒ « deux adresses » ⇒ pas sur la carte.
+// On les relit dans LEUR forme (« <rue>, <Ville> » + pays), sans rien deviner :
+// un pays seul en ville et une rue qui finit par « , <Ville> ». Sinon rien.
+export const PAYS_VILLE = /^(?:[A-Z]{2}|France|Belgique|Belgi[eë]|Belgium|Nederland|Pays-Bas|Netherlands|Deutschland|Allemagne|Germany|Italia|Italie|Italy|Espa[ñn]a|Espagne|Spain|Portugal|Österreich|Autriche|Austria|Polska|Pologne|Poland)$/i;
+export function lieuTransporteurRepare(tr) {
+  if (!tr || typeof tr !== 'object') return tr;
+  const ville = String(tr.lieuVille || '').trim();
+  const rue = String(tr.lieuRue || '').trim();
+  if (!PAYS_VILLE.test(ville)) return tr;
+  const m = /^(.+?),\s*(?:(\d{5})\s+)?([A-Za-zÀ-ÿ'’ -]{2,60})$/.exec(rue);
+  if (!m || !RUE.test(m[1].trim()) || PAYS_VILLE.test(m[3].trim())) return { ...tr, lieuVille: '' };   // un pays n'est jamais une ville
+  return { ...tr, lieuRue: m[1].trim(), lieuCp: /^\d{5}$/.test(String(tr.lieuCp || '')) ? String(tr.lieuCp) : (m[2] || ''), lieuVille: m[3].trim() };
+}
 export function lieuCompleteParTransporteur(lu, tr) {
   const base = { lieuNom: String((lu && lu.lieuNom) || ''), lieuAdresse: String((lu && lu.lieuAdresse) || '') };
   if (!tr || typeof tr !== 'object' || !['disponible', 'retire'].includes(tr.etat)) return base;
+  tr = lieuTransporteurRepare(tr);
   const trRue = String(tr.lieuRue || '').trim();
   const trCp = /^\d{5}$/.test(String(tr.lieuCp || '')) ? String(tr.lieuCp) : '';
   const trVille = String(tr.lieuVille || '').trim();
