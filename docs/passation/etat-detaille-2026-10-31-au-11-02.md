@@ -28,3 +28,39 @@ Déplacé TEL QUEL depuis CLAUDE.md §9 le 2 novembre 2026 (le fichier dépassai
 - **31 oct.** — Extension **5.295.0** (intégrée avec la 5.294.0) : Vestiaire — compte ouvert, conversations lues, réponse sur son clic par recette APPRISE, favoris en nombre ; Colis → « À retirer » par point relais sur une carte, arrivées estimées (suivi Vinted). → historique vestiaire / colis-retraits. Geste : installer, envoyer UNE réponse soi-même sur Vestiaire, toucher « Suivre le colis » d'un achat en route.
 - **31 oct.** — Statistiques détaillées (rythme, marges par marque/modèle/taille/plateforme/compte, temps de vente, jours/heures, stock qui dort, rotation, annulations) + widget « Tendances » ; le bénéfice de Ma journée est là par défaut et se masque/remet en mode « Modifier » (interrupteur de Réglages retiré) ; une carte nouvelle arrive d'elle-même (`connus`). → historiques interface-stock et compta (« 31 octobre »). Geste : regarder Statistiques et Ma journée.
 - **31 oct.** — **Navigation par tâche** (son choix « A », puis « réorganiser les onglets ») : barre Journée · Annonces · Ventes · Colis · Plus ; colonne Ma journée · Annonces · Ventes · Messages · Colis + groupes Vendre · Expédier · Gérer · Argent · Plateformes · Moi ; filtres de site dans Annonces/Ventes/Messages (« Vinted » = l'ancien écran Vinted), « Toutes » pour Ventes seulement ; anciens `?tab=` redirigés (`src/navigationTache.js`). → historique interface-stock (« Navigation par tâche »). Geste : regarder la carte, trancher les points ouverts.
+
+
+## Lignes les plus anciennes de §9, déplacées TEL QUELLES le 2 novembre 2026 (mode auto des favoris)
+
+- **16-19 oct.** — Relais du téléphone (5.183), double vérification TOTP, studio photo,
+  mode équipe (016), carte et classement de la communauté (018-020, appliquées). → divers.
+- **11 oct.** — Remise à zéro des numéros (013, appliquée), prix 12,99 €, Messages eBay.
+- **3-9 oct.** — L'app pilote l'extension (bordereaux, publication), messagerie intégrée,
+  numéros à lettres, CA daté au versement, abonnement Stripe (mode test), sécurité
+  (routes fermées, RLS, origines exactes de l'extension).
+- **Septembre** — le reste : `docs/journal-2026.md` et les historiques.
+- **20 oct.** — Doublons de N° réglés seuls ; revues « argent » (app, extension, eBay) ;
+  eBay se relit tout seul ; Leboncoin : compte de session, date de vente. → numeros / ebay.
+- **21 oct.** — Discord sur téléphone, date d'arrivée des colis, rappel du soir, « Tout
+  sur le N° », captcha prêt, revue visuelle. → `docs/passation/2026-10-21.md`.
+
+
+## Ligne retirée de CLAUDE.md §9 le 2 nov. (taille), telle quelle
+
+- **22 oct.** — Double vérification gratuite (second appareil) ; adresse de réception
+  PROUVÉE ; CSP en Report-Only (la bascule à faire : historique sécurité) ; Ma journée en
+  widgets ; carte de la communauté (OpenFreeMap) ; colis à l'heure ; « C'est déclaré ».
+  → `docs/passation/2026-10-22-integration.md`.
+
+
+## Lignes retirées de CLAUDE.md §9 le 2 nov. (taille), telles quelles
+
+- **23-24 oct.** — Suivi des colis par n° et par Vinted (5.216-5.217), colis à retirer
+  fiables (date limite lue, « à vérifier »), eBay « Inactives » (lecture seule), reçu
+  d'achat lisible, feuilles au-dessus de la barre sur iPhone. → colis / ebay / interface.
+- **26 oct.** — eBay multi-sites (chaque compte sur SON site, argent en euros), eBay à
+  l'international (destination, douane) ; retrait « pour de bon » par catégorie
+  (annonces, messages) ; suppression ciblée (bordereaux et relevés séparés). → ebay / divers.
+- **27 oct.** — Atelier de republication (tranches 1-5) ; Vestiaire depuis VRM (publier
+  sans booster, ventes, achats, messages) ; statut fiscal adapté à la personne ; arrivée
+  guidée (`Bienvenue.jsx`) ; annonces en fiches produit ; un article parti sort du Stock.

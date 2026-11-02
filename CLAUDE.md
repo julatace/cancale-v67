@@ -486,6 +486,8 @@ sans la fonction.
 | `vcfavoris` | `rangerVcAnnonces` | **5.295.0** | le NOMBRE de favoris par annonce Vestiaire (jamais qui) |
 | `relaisdest` | `relaisDestination` | **5.295.0** | « le point relais où arrivent tes achats (quand le suivi Vinted le donne) » |
 | `vcfiche` | `ficheVcAnnonce` | **5.296.0** (1er nov.) | annonces Vestiaire en fiches (photo, titre, prix, état) et le compte de l'onglet sur annonces/ventes/achats (flou par compte) |
+| `favorisauto` | `freinFavoriAuto` | **5.309.0** (2 nov.) | mode auto des favoris |
+| `republierquestion` | `reglerAvant` | **5.310.0** (2 nov.) | Republier remplit un champ manquant depuis l'annonce elle-même, sinon DEMANDE (valeurs de Vinted) ; un refus nommé n'est jamais renvoyé tel quel |
 
 ---
 
@@ -494,11 +496,11 @@ sans la fonction.
 Une ligne par chantier ou décision, le plus récent d'abord. Détail : le fichier
 d'historique du thème (cherche le titre ou la date).
 
-**Extension servie : 5.308.0** (2 nov.). **À lire en premier : `docs/passation/2026-11-02-liste.md`.** **Production** : https://vrm.center,
+**Extension servie : 5.310.0** (2 nov.). **À lire en premier : `docs/passation/2026-11-02-liste.md`.** **Production** : https://vrm.center,
 vérifier par `curl https://vrm.center/api/sante`.
 
 ### Gestes encore attendus de Julien
-- Installer l'extension **5.308.0** (remplacer le dossier, puis ⟳ dans CHAQUE Chrome).
+- Installer l'extension **5.310.0** (remplacer le dossier, puis ⟳ dans CHAQUE Chrome).
 - Sur leboncoin.fr, ouvrir « Mes annonces » sur CHACUN de ses comptes Leboncoin.
 - Recoller `scripts/gmail-forwarder.gs` (avec sa clé) dans la boîte qui fait tourner le
   script, puis poser `EMAIL_INBOUND_SECRET` sur Vercel (l'ancien script lit encore la
@@ -523,6 +525,10 @@ vérifier par `curl https://vrm.center/api/sante`.
 
 ### Décisions et chantiers (octobre–novembre 2026)
 Une ligne par chantier. Le récit complet des lignes du 31 oct. au 2 nov. est, mot pour mot, dans `docs/passation/etat-detaille-2026-10-31-au-11-02.md`.
+- **2 nov.** — **Republier qui règle ses problèmes** (**5.310.0**, `reglerAvant`, `audit-republier-question`) : champ vide repris de la recette de CETTE annonce (2 tours), sinon UNE question avec les valeurs de Vinted (« Choisir la catégorie » sur la ligne, réponse posée une fois) ; refus nommé retenu, jamais renvoyé ; plafond fermé si le stockage de l'extension est muet (P10) ; message de refus d'offre compté (P11). → historique vinted-extension. Geste : installer la 5.310.0.
+- **2 nov.** — Carte des relais : les consignes Vinted Go revenaient « deux adresses » (pays « France » rangé en ville, ville collée à la rue) ; le serveur retire le pays en lettres, l'app relit les lignes déjà rangées (`lieuTransporteurRepare`, `audit-vintedgo-adresse`). → historique colis-retraits. Geste : rouvrir Colis → À retirer.
+- **2 nov.** — **Mode auto des messages aux favoris** (éteint par défaut, **5.309.0**, `src/favorisAuto.js`, `api/_lib/favoris-auto.js`, `audit-favoris-auto`) : jamais de boucle, VRM demande le geste qui débloque. → historique favoris-messages. Geste : installer la 5.309, ouvrir un favori depuis la cloche, allumer.
+- **2 nov.** — Audit des données (E0c) : eBay aux frais pas lus « au moins » partout, « 1er », Vestiaire/Leboncoin dans « Finalisé par plateforme », pas lu ≠ 0 (base lente, semaine, NaN, Invalid Date), jours au fuseau local (`audit-donnees-ecrans`). → historique divers. Geste : aucun.
 - **2 nov.** — Offres auto : jamais sur une paire vendue ailleurs (**5.308.0**, `src/offresGarde.js`). Geste : installer.
 - **2 nov.** — Colis : le filtre de site vaut pour TOUT l'écran (`voitSite`, `retoursPourSite` : plus de Vinted sous eBay, Julien : « inadmissible ») ; boîte vide du récapitulatif au téléphone retirée ; 190 chemins absolus `/home/user/…` retirés des audits/bancs. Audits : tous verts sauf ceux qui exigent Postgres (6) ou `@babel/parser` (1), absents ici. Geste : regarder Colis au téléphone.
 - **2 nov. (matin)** — Audit du dossier : les 7 chantiers « en cours » de la nuit n'ont JAMAIS été poussés ⇒ perdus, à refaire (nuit §3) ; §9 condensé, §8 recopié du code, ancienne « passation en cours » archivée. Geste : si la session de la nuit est encore ouverte, lui faire pousser ses worktrees.
@@ -606,30 +612,7 @@ Une ligne par chantier. Le récit complet des lignes du 31 oct. au 2 nov. est, m
 - **28 oct.** — Vestiaire : formulaire « smart listing », étiquette en 2ᵉ photo, Taille/État/Prix.
 - **28 oct.** — Tour de chaque espace sur ses vraies données (Vinted, Leboncoin, eBay,
   Vestiaire, Ma journée, Colis).
-- **27 oct.** — Atelier de republication (tranches 1-5) ; Vestiaire depuis VRM (publier
-  sans booster, ventes, achats, messages) ; statut fiscal adapté à la personne ; arrivée
-  guidée (`Bienvenue.jsx`) ; annonces en fiches produit ; un article parti sort du Stock.
-- **26 oct.** — eBay multi-sites (chaque compte sur SON site, argent en euros), eBay à
-  l'international (destination, douane) ; retrait « pour de bon » par catégorie
-  (annonces, messages) ; suppression ciblée (bordereaux et relevés séparés). → ebay / divers.
-- **23-24 oct.** — Suivi des colis par n° et par Vinted (5.216-5.217), colis à retirer
-  fiables (date limite lue, « à vérifier »), eBay « Inactives » (lecture seule), reçu
-  d'achat lisible, feuilles au-dessus de la barre sur iPhone. → colis / ebay / interface.
-- **22 oct.** — Double vérification gratuite (second appareil) ; adresse de réception
-  PROUVÉE ; CSP en Report-Only (la bascule à faire : historique sécurité) ; Ma journée en
-  widgets ; carte de la communauté (OpenFreeMap) ; colis à l'heure ; « C'est déclaré ».
-  → `docs/passation/2026-10-22-integration.md`.
-- **21 oct.** — Discord sur téléphone, date d'arrivée des colis, rappel du soir, « Tout
-  sur le N° », captcha prêt, revue visuelle. → `docs/passation/2026-10-21.md`.
-- **20 oct.** — Doublons de N° réglés seuls ; revues « argent » (app, extension, eBay) ;
-  eBay se relit tout seul ; Leboncoin : compte de session, date de vente. → numeros / ebay.
-- **16-19 oct.** — Relais du téléphone (5.183), double vérification TOTP, studio photo,
-  mode équipe (016), carte et classement de la communauté (018-020, appliquées). → divers.
-- **11 oct.** — Remise à zéro des numéros (013, appliquée), prix 12,99 €, Messages eBay.
-- **3-9 oct.** — L'app pilote l'extension (bordereaux, publication), messagerie intégrée,
-  numéros à lettres, CA daté au versement, abonnement Stripe (mode test), sécurité
-  (routes fermées, RLS, origines exactes de l'extension).
-- **Septembre** — le reste : `docs/journal-2026.md` et les historiques.
+- **Avant le 20 oct.** — `docs/passation/etat-detaille-2026-10-31-au-11-02.md` (fin) et `docs/journal-2026.md`.
 
 ---
 

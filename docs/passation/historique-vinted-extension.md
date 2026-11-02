@@ -910,3 +910,29 @@ Julien (iPhone, Orion) : « fais le rattrapage quand je reviens sur Vinted ».
 - Version **5.307.0** (CODE_VERSION, manifeste, EXT_ATTENDUE, CAPTEUR_VERSION,
   relaisVersion), zip et paquets Orion régénérés ; `audit-extension-zip`,
   `audit-coherence`, les 40 audits sur `_fond-vm` verts.
+
+## 2 novembre — Republier qui règle ses problèmes (5.310.0)
+
+Julien : « si il manque une catégorie dans une annonce, ça tape indéfiniment sur le
+bouton Publier… il faut qu'elle puisse remplir elle-même ou demander ».
+Commencé par un agent (branche `claude/republier-intelligent`, extension seule, arrêté
+avant la fin), terminé sur `claude/republier-question` :
+- `reglerAvant` (background.js) : réponses de Julien, puis vérification des champs ;
+  un champ vide est repris UNE fois des sources d'IDENTITÉ de la paire (coffre de
+  l'ancienne annonce, sa recette acceptée par Vinted, sa fiche) — jamais d'une autre
+  annonce, jamais du titre. **Deux tours** : une catégorie reprise rend l'état
+  obligatoire, repris au second tour (défaut trouvé par l'audit sur le travail de l'agent).
+- Il manque encore un champ ⇒ RIEN n'est envoyé, l'extension rend `question`
+  { champ, nom, options (valeurs de Vinted déjà connues : grille en cache 24 h,
+  couleurs, catégories déjà acceptées), geste }. Aucune requête Vinted pour la poser.
+- App : `avecCouleurBrouillon` pose la question (feuille `askChoix`), une fois par
+  champ, trois au plus ; dans l'atelier, la file ne s'arrête pas : la ligne porte
+  « Choisir la catégorie », la réponse repart pour CETTE paire seulement.
+- Un refus de Vinted qui NOMME le champ est retenu (`vrmRefusRepub`, signature du
+  corps, 7 j) : le même corps n'est jamais renvoyé. Un refus muet n'est pas retenu.
+- P10 : `compterActionUn`/`compterLectureUn` rendaient `ok:true` sur un stockage en
+  panne ⇒ désormais fermés (`code:'stockage'`, phrase « Recharge l'extension »).
+- P11 : le message joint à un refus d'offre automatique prend sa place dans le plafond.
+Preuve : `audit-republier-question` 16 contrôles ; sur la 5.309 de `main` 6 rouges,
+sur le travail de l'agent 2 rouges (second tour), mutations (refus muet retenu,
+réponse hors liste acceptée) rouges.
