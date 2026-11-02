@@ -5,7 +5,7 @@
 // d'achat, N°, note) faite sans réseau est gardée et envoyée au retour, avec
 // "en attente d'envoi" affiché. » (iPhone, 4G.)
 //
-// MESURÉ sur `main` (banc `scripts/bancs/hors-ligne.cjs`, build d'avant) : la
+// MESURÉ sur `main` (banc `scripts/bancs/file-envoi.cjs`, build d'avant) : la
 // saisie restait bien dans le navigateur et `cloudPush` la retentait tant que
 // l'app restait OUVERTE. Mais `_baseNuage` (ce que l'appareil et le nuage
 // savaient ENSEMBLE) ne vivait qu'en mémoire : l'app fermée (iOS tue la PWA) puis
