@@ -37997,7 +37997,8 @@ function BeneficeCompta({ compta, onNav, onSansDepenses, onAjouterDepense, sansC
           <div className="vrm-compta-libelle" data-benef-titre="" title={`${titreNet} · ${B.libelle}`}>Ce que tu as gagné</div>
           <div className="vrm-compta-hero vrm-display" data-compta-chiffre="gagne" data-eur={e2(B.netFinal)} style={{ color: B.netFinal == null ? C.muted : C.text }}>{B.netFinal == null ? '—' : fmt(B.netFinal)}</div>
           <p className="vrm-compta-phrase vrm-fu-compta-sous" data-compta-phrase="gagne" title={typeof phrase === 'string' ? phrase : undefined}>
-            {B.n === 0 ? 'Aucune vente finalisée ce mois-ci' : <>sur {fmt(B.ca)} vendus</>}
+            {/* Le vendu n'est pas redit s'il vaut déjà « à déclarer » (§7 : un nombre, une fois). */}
+            {B.n === 0 ? 'Aucune vente finalisée ce mois-ci' : (B.caDecl != null && Math.round(B.caDecl * 100) === Math.round(B.ca * 100)) ? B.libelle : <>sur {fmt(B.ca)} vendus</>}
             {B.nCout < B.n ? <> · <button type="button" onClick={versSaisiePrix} data-benef-porte="" data-benef-manque="" className="vrm-lien-action">{sansAchat} prix d'achat à saisir</button></> : null}
             {B.raison === 'frais' ? <> · frais eBay pas connus</> : B.raison === 'cotisations' ? <> · CA déclaré pas encore calculé</> : null}
           </p>
@@ -53645,10 +53646,6 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       {b && <button type="button" onClick={async ()=>{
                         if(await askConfirm('Masquer ce bordereau ? (il disparaît de la liste)')) hideBord(b);
                       }} title="Masquer" aria-label="Masquer" className="vrm-icon-control vrm-colis-masquer" style={{alignSelf:'flex-start',flexShrink:0,border:'none',background:'transparent',color:C.muted,cursor:'pointer',width:32,height:32,margin:'-6px -6px 0 0',display:'inline-flex',alignItems:'center',justifyContent:'center',borderRadius:8,fontFamily:'inherit'}}><Icon name="close" size={15}/></button>}
-                      {/* (2 nov., 22 h, maquette FusionColis) Le bouton rond : imprimer (bleu) quand le PDF est là —
-                          le MÊME geste que « Imprimer » de la rangée (il le déclenche) ; gris sinon. */}
-                      <button type="button" className={'vrm-fu-rond' + (pdf ? ' is-pret' : '')} data-fu-rond={e.txn||e.key} disabled={!pdf} aria-label={pdf ? 'Imprimer le bordereau' : 'Bordereau pas encore là'}
-                        onClick={(ev)=>{ const bt = ev.currentTarget.closest('[data-bord-card]').querySelector('.vrm-rangee-bord [data-imprime]'); if (bt) bt.click(); }}><Icon name="printer" size={20}/></button>
                     </div>
                     {/* ACTION PRINCIPALE : imprimer si le PDF est là, sinon aller
                         le générer sur Vinted. Le glisser-fichier reste dispo pour
