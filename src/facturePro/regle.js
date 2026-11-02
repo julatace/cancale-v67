@@ -246,3 +246,23 @@ export function messageEmail(cfg, contenu) {
   const sujet = `${contenu.type === 'avoir' ? 'Avoir' : 'Facture'} ${contenu.numero} — ${contenu.vendeur.nom}`.slice(0, 200);
   return { sujet, corps };
 }
+
+// ── L'ADRESSE DE L'ACHETEUR, TELLE QUE VINTED L'ÉCRIT DANS L'E-MAIL PRO ─────
+// Mesuré (2 nov., 5 ventes Pro réelles, formes seulement) : « rue, [n°], ville,
+// code postal, code pays, pays » sur une ligne. On la remet en lignes postales :
+// « 12 rue X » / « 75011 Paris » / (pays s'il n'est pas la France). Rien n'est
+// inventé : une forme inattendue est rendue telle quelle, virgules comprises.
+export function adresseVintedLisible(brut) {
+  const parts = String(brut || '').split(/\s*,\s*/).map((x) => x.trim()).filter(Boolean);
+  if (parts.length < 3) return parts.join(', ');
+  let pays = '';
+  if (/^[A-Z]{2}$/.test(parts[parts.length - 2] || '') && /^[^\d]+$/.test(parts[parts.length - 1])) { pays = parts.pop(); parts.pop(); }
+  let iCp = -1;
+  for (let i = parts.length - 1; i >= 1; i--) if (/^(?=(?:\D*\d){3})[A-Z0-9 -]{3,10}$/i.test(parts[i])) { iCp = i; break; }
+  if (iCp < 2) return [parts.join(', '), pays && !/^france$/i.test(pays) ? pays : ''].filter(Boolean).join('\n');
+  const ville = parts[iCp - 1];
+  const rue = parts.slice(0, iCp - 1);
+  if (rue.length === 2 && /^\d+\s?[a-z]?$/i.test(rue[1])) rue.splice(0, 2, `${rue[1]} ${rue[0]}`);
+  const fin = parts.slice(iCp + 1);
+  return [rue.join(', '), `${parts[iCp]} ${ville}`, ...fin, pays && !/^france$/i.test(pays) ? pays : ''].filter(Boolean).join('\n');
+}

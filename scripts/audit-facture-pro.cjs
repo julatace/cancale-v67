@@ -208,6 +208,10 @@ const faireRes = () => { const r = { code: 0, corps: null }; r.status = (c) => {
   const cav = C({ tva_regime: 'franchise' }, { venteLe: '2026-10-31T23:30:00Z' });
   dit(cav.venteJour === '01/11/2026', 'M8 … et 23 h 30 UTC le 31 octobre est le 1er novembre à Paris', cav.venteJour);
 
+  const adr = regle.adresseVintedLisible;
+  dit(adr('rue de la Paix, 12, Saint Malo, 35400, FR, France') === '12 rue de la Paix\n35400 Saint Malo' && adr('12 rue Inventée, Lisbonne, 1000-001, PT, Portugal') === '12 rue Inventée\n1000-001 Lisbonne\nPortugal' && adr('forme inconnue') === 'forme inconnue',
+    'M9 l’adresse de l’e-mail Vinted Pro remise en lignes postales (pays dit hors de France), une forme inconnue rendue telle quelle', JSON.stringify(adr('rue de la Paix, 12, Saint Malo, 35400, FR, France')));
+
   // ══ P : LE PDF ════════════════════════════════════════════════════════════
   const octets = Buffer.from(await pdfFacture(cn));
   dit(octets.slice(0, 5).toString() === '%PDF-' && octets.length > 1500, 'P1 le PDF s’ouvre (en-tête %PDF, taille plausible)', `${octets.length} octets`);
