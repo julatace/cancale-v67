@@ -524,6 +524,7 @@ vérifier par `curl https://vrm.center/api/sante`.
 
 ### Décisions et chantiers (octobre–novembre 2026)
 Une ligne par chantier. Le récit complet des lignes du 31 oct. au 2 nov. est, mot pour mot, dans `docs/passation/etat-detaille-2026-10-31-au-11-02.md`.
+- **2 nov.** — Carte des relais : les consignes Vinted Go revenaient « deux adresses » (pays « France » rangé en ville, ville collée à la rue) ; le serveur retire le pays en lettres, l'app relit les lignes déjà rangées (`lieuTransporteurRepare`, `audit-vintedgo-adresse`). → historique colis-retraits. Geste : rouvrir Colis → À retirer.
 - **2 nov.** — **Mode auto des messages aux favoris** (éteint par défaut, **5.309.0**, `src/favorisAuto.js`, `api/_lib/favoris-auto.js`, `audit-favoris-auto`) : jamais de boucle, VRM demande le geste qui débloque. → historique favoris-messages. Geste : installer la 5.309, ouvrir un favori depuis la cloche, allumer.
 - **2 nov.** — Audit des données (E0c) : eBay aux frais pas lus « au moins » partout, « 1er », Vestiaire/Leboncoin dans « Finalisé par plateforme », pas lu ≠ 0 (base lente, semaine, NaN, Invalid Date), jours au fuseau local (`audit-donnees-ecrans`). → historique divers. Geste : aucun.
 - **2 nov.** — Offres auto : jamais sur une paire vendue ailleurs (**5.308.0**, `src/offresGarde.js`). Geste : installer.
