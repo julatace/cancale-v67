@@ -490,3 +490,9 @@
  .vrm-main .vrm-ann-toolbar>.vrm-ann-actions{grid-column:1/-1!important;grid-row:2!important;display:flex!important;gap:8px;}
  .vrm-main .vrm-ann-toolbar>.vrm-ann-actions>button{flex:1 1 0;min-height:44px!important;width:auto!important;}
 }
+
+/* (2 nov.) Le groupe « Republier… » de la barre d'Annonces porte la classe des
+   actions d'une CARTE (.vrm-ann-actions) : il en prenait le retrait de 12-16 px,
+   le fond et le filet — au téléphone le bouton ne s'alignait plus sur la
+   recherche, sur ordinateur il flottait dans un pavé gris. Partout : rien. */
+:root body .vrm-main .vrm-ann-toolbar>.vrm-ann-actions.vrm-ann-actions.vrm-ann-actions{padding:0!important;background:transparent!important;border:0!important;}

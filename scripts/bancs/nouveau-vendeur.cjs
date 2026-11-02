@@ -229,6 +229,17 @@ const INSPECTE = (pg, tel) => pg.evaluate((tel) => {
     const ecart = suiv.getBoundingClientRect().top - c.getBoundingClientRect().bottom;
     if (ecart > -1 && ecart < 4) colles.push(`${(c.innerText || '').trim().split('\n')[0].slice(0, 40)} ⇢ ${(suiv.innerText || suiv.className || '').trim().split('\n')[0].slice(0, 30)} (${Math.round(ecart)} px)`);
   }
+  // Un texte qui touche le bord haut ou bas de son bandeau (astuce des numéros).
+  for (const bd of document.querySelectorAll('[data-astuce-numeros]')) {
+    const ph = bd.querySelector('[data-numero-phrase]'); if (!vis(bd) || !ph) continue;
+    const a = bd.getBoundingClientRect(), t = ph.getBoundingClientRect();
+    if (t.top - a.top < 4 || a.bottom - t.bottom < 4) colles.push(`astuce des numéros : le texte touche le bord (${Math.round(t.top - a.top)} px / ${Math.round(a.bottom - t.bottom)} px)`);
+  }
+  // La barre d'Annonces : « Republier… » aligné sur la recherche au-dessus.
+  { const rech = document.querySelector('.vrm-ann-toolbar .vrm-ann-search'), rep = document.querySelector('.vrm-ann-toolbar [data-actions-ouvrir]');
+    if (vis(rech) && vis(rep) && rep.getBoundingClientRect().top >= rech.getBoundingClientRect().bottom && Math.abs(rep.getBoundingClientRect().left - rech.getBoundingClientRect().left) > 1.5) colles.push(`« Republier… » décalé de ${Math.round(rep.getBoundingClientRect().left - rech.getBoundingClientRect().left)} px par rapport à la recherche`); }
+  { const g = document.querySelector('.vrm-ann-toolbar > .vrm-ann-actions');
+    if (vis(g)) { const cs = getComputedStyle(g); if (parseFloat(cs.paddingLeft) > 0 || parseFloat(cs.borderLeftWidth) > 0 || !/rgba\(0, 0, 0, 0\)|transparent/.test(cs.backgroundColor)) colles.push(`le groupe « Republier… » porte un fond ou un retrait de carte (${cs.paddingLeft}, ${cs.borderLeftWidth}, ${cs.backgroundColor})`); } }
   // Titres coupés par une ellipse.
   const coupes = [];
   for (const e of document.querySelectorAll('.vrm-main h1, .vrm-main h2, .vrm-main h3, [data-phrase-ecran]')) {
@@ -258,7 +269,7 @@ async function tournee(nav, { W, sombre, scenario, base }) {
     dit(!r.mauvais.length, `${T} ${nom} : aucun NaN / undefined / Invalid Date / null à l'écran`, r.mauvais.join(' ¦ '));
     dit(!r.regles.length, `${T} ${nom} : aucun zéro creux ni « au moins 0 € », et un français juste`, r.regles.join(' ¦ '));
     dit(!r.pointsSeuls.length, `${T} ${nom} : aucune ligne qui commence par « · »`, r.pointsSeuls.join(' ¦ '));
-    dit(!r.colles.length, `${T} ${nom} : une carte vide n'est jamais collée à ce qui la suit`, r.colles.join(' ¦ '));
+    dit(!r.colles.length, `${T} ${nom} : rien n'est collé (carte vide et ce qui suit, texte et son bandeau)`, r.colles.join(' ¦ '));
     dit(!r.debord && !r.dehors.length, `${T} ${nom} : rien ne déborde à droite`, JSON.stringify(r.dehors));
     if (o.tel) dit(!r.petits.length, `${T} ${nom} : chaque cible au doigt fait 44 px`, r.petits.slice(0, 8).join(' ¦ '));
     dit(!r.coupes.length, `${T} ${nom} : aucun titre coupé`, r.coupes.join(' ¦ '));
@@ -269,7 +280,9 @@ async function tournee(nav, { W, sombre, scenario, base }) {
   await o.ctx.close();
 }
 
-(async () => {
+// Lancé seul : le parcours. Requis par un autre script : ses outils (pour sonder un écran).
+module.exports = { ouvrir, INSPECTE, JEU_LIGNES, JEU_COMPTES, srv, PORT };
+if (require.main === module) (async () => {
   await new Promise((ok) => srv.listen(PORT, ok));
   const nav = await chromium.launch({ executablePath: process.env.BANC_CHROMIUM || '/opt/pw-browsers/chromium', args: ['--no-sandbox', '--use-angle=swiftshader', '--no-proxy-server'] });
   try {
