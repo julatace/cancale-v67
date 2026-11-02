@@ -126,13 +126,16 @@ create table if not exists public.vrm_equipe (
 
 -- L'empreinte de la forme : une table d'une version différente fait TOUT
 -- refuser (create if not exists la sauterait en silence).
+-- (2 nov.) Postgres 18 range aussi les NOT NULL dans pg_constraint (contype 'n') :
+-- déjà comptés par `attnotnull` ci-dessous, ils sont écartés pour que l'empreinte
+-- soit la même sur 15, 17 et 18 (rien ne change avant 18).
 do $$ declare v text; begin
   select pg_catalog.md5(
       (select pg_catalog.string_agg(a.attname || ':' || pg_catalog.format_type(a.atttypid, a.atttypmod) || ':' || a.attnotnull::text, ',' order by a.attnum)
          from pg_catalog.pg_attribute a where a.attrelid = 'public.vrm_equipe'::regclass and a.attnum > 0 and not a.attisdropped)
       || '|' ||
       (select pg_catalog.string_agg(k.conname || '=' || pg_catalog.replace(pg_catalog.pg_get_constraintdef(k.oid), 'public.', ''), ',' order by k.conname)
-         from pg_catalog.pg_constraint k where k.conrelid = 'public.vrm_equipe'::regclass))
+         from pg_catalog.pg_constraint k where k.conrelid = 'public.vrm_equipe'::regclass and k.contype <> 'n'))
     into v;
   if v is distinct from '948f3ab6286e46db9db58b0041275a79' then
     raise exception 'vrm_equipe_forme : la table public.vrm_equipe existe sous une autre forme (empreinte %) — rien n''est installé', v;
