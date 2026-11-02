@@ -252,10 +252,8 @@ export function FicheFacturation({ deps, focus = null, surPrete = null }) {
           {champ({ k: "rcs", label: "Immatriculation", placeholder: "RCS Rennes" })}
           {champ({ k: "capital", label: "Capital social (€)", mode: "decimal", placeholder: "1 000" })}
         </div> : champ({ k: "rcs", label: "Immatriculation (facultatif)", placeholder: "RCS Rennes", aide: "Si tu es inscrit au registre du commerce." })}
-        <div className="vrm-fp-rangee">
-          {champ({ k: "email", label: "E-mail sur la facture", type: "email", auto: "email", mode: "email" })}
-          {champ({ k: "telephone", label: "Téléphone (facultatif)", type: "tel", auto: "tel", mode: "tel" })}
-        </div>
+        {champ({ k: "email", label: "E-mail sur la facture", type: "email", auto: "email", mode: "email", large: true })}
+        {champ({ k: "telephone", label: "Téléphone (facultatif)", type: "tel", auto: "tel", mode: "tel" })}
       </section>
 
       <section className="vrm-fp-section" data-fp-champ="tva_regime" data-fp-manque={champManque.has('tva_regime') ? '1' : undefined}>

@@ -54,7 +54,7 @@ export const REGIMES_TVA = [
   { v: 'normal', l: 'TVA classique', d: 'La TVA est calculée sur le prix et écrite sur la facture.' },
 ];
 export const FORMES = [
-  { v: 'EI', l: 'Entrepreneur individuel (EI, micro-entreprise)', societe: false },
+  { v: 'EI', l: 'Entrepreneur individuel (EI)', societe: false },
   { v: 'EURL', l: 'EURL', societe: true },
   { v: 'SASU', l: 'SASU', societe: true },
   { v: 'SARL', l: 'SARL', societe: true },
