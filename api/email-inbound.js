@@ -42,6 +42,8 @@ import { decoderEntitesHtml } from './_lib/entites-html.js';
 import { transactionDuRecu } from './_lib/recu-achat.js';
 import { suiviDuSujet, finsDesLignes, sortiParSuivis, SELECT_TRANSP_META, ligneTranspDeMeta } from './_lib/suivi-colis.js';
 import { modifierCas } from './_lib/suivi-vinted.js';
+import { estEmailVestiaire, lireEmailVenteVc, fusionnerVenteEmailVc } from './_lib/vestiaire-email.js';
+import { lienNotif } from './_lib/lien-notif.js';
 import { estConfirmationTransfert, lireConfirmationTransfert, authentifieGoogle, sansLienConfirmation, idCodeGmail } from './_lib/transfert-gmail.js';
 
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://lgonxzrzjcqthjtbdpzo.supabase.co';
@@ -2006,6 +2008,54 @@ export async function traiterEmail(req, res) {
   const now = (req && req.__recuLe) ? String(req.__recuLe) : new Date().toISOString();
 
   try {
+    // 00) VESTIAIRE COLLECTIVE (2 nov.) — AVANT les colis et les ventes Vinted :
+    // « Votre article vient d'être vendu » contient « vendu » (la branche vente
+    // Vinted le prenait et le gardait tronqué, « analyse impossible ») et parle
+    // d'étiquette d'expédition. La règle : api/_lib/vestiaire-email.js. Le
+    // vendeur a déjà été décidé plus haut par l'ADRESSE DE RÉCEPTION (§5) ;
+    // l'expéditeur ne choisit que la lecture.
+    if (estEmailVestiaire(mail)) {
+      const emailAt = dateDeLEmail(corpsBrut) || now;
+      const lu = lireEmailVenteVc(mail, corpsTexte, emailAt);
+      if (lu && !lu.ok) {
+        await garderInconnu(corpsBrut, mail, 'vente Vestiaire : ' + lu.raison, '');
+        await repondre(res, 200, { ok: false, type: 'vente-vestiaire', garde: true, raison: lu.raison });
+        return;
+      }
+      if (lu && lu.ok) {
+        const v = lu.vente;
+        // 1. L'email tel que lu, dans SA ligne (une par annonce : un rejeu la
+        //    réécrit à l'identique). Le prix de vente et la marque y restent.
+        const okLigne = await supabaseUpsert([{ id: `vc_email_vente_${v.productId}`, data: { ...v, emailAt, recuLe: now, messageId: String(mail.messageId || '').slice(0, 300) } }]);
+        if (!okLigne) { await repondre(res, 503, { ok: false, erreur: 'base-injoignable', message: "Je n'ai pas pu ranger cette vente Vestiaire : renvoie l'email." }); return; }
+        // 2. LA MÊME vente que l'extension (`vc_ventes`, clé = productId),
+        //    par comparer-et-échanger : jamais une écriture sur une lecture ratée.
+        let nouvelle = false;
+        const r = await modifierCas('vc_ventes', (cur) => { const f = fusionnerVenteEmailVc(cur, v, now); nouvelle = f.nouvelle; return f.change ? f.data : undefined; });
+        if (r === null) { marquerEcritureRatee(); await repondre(res, 503, { ok: false, erreur: 'base-injoignable', message: "Je n'ai pas pu ranger cette vente Vestiaire : renvoie l'email." }); return; }
+        { const st = contexteVendeur.getStore(); if (st) st.resumeExtra = { article: v.titre }; }
+        if (nouvelle) {
+          try { await pushOnce({ title: 'Vendu sur Vestiaire', body: `${v.titre || 'Ton article'}${v.montant ? ` — tu reçois ${String(v.montant.valeur.toFixed(2)).replace('.', ',')} €` : ''}${v.limite ? ` — à envoyer avant le ${v.limite.slice(8, 10)}/${v.limite.slice(5, 7)}` : ''}.`, tag: `vc-vente-${v.productId}`, url: lienNotif('plat_vestiaire') }, 'vente'); } catch (_) {}
+        }
+        await logEmail({ type: 'vente-vestiaire', subject, from: mail.from, productId: v.productId, nouvelle });
+        await repondre(res, 200, { ok: true, type: 'vente-vestiaire', productId: v.productId, nouvelle, gain: v.montant ? v.montant.valeur.toFixed(2) : '', prixVente: v.prixVente ? v.prixVente.valeur.toFixed(2) : '', limite: v.limite, date: v.date });
+        return;
+      }
+      // Un AUTRE email de Vestiaire (expédition, paiement, annulation…) : sa
+      // forme n'est pas encore apprise. Gardé ENTIER (jamais jeté, jamais
+      // tronqué) pour l'apprendre — sauf un email de transporteur, qui suit
+      // son chemin (un colis caché est un colis perdu). Le filet générique
+      // « autre » (mots de colis sans transporteur nommé) ne vaut pas pour
+      // Vestiaire : il fabriquait un suivi sans n° à partir de « livré à nos experts ».
+      const transpVc = detecterTransporteur(mail);
+      if (!transpVc || transpVc === 'autre') {
+        await garderInconnu(corpsBrut, mail, 'Vestiaire : forme pas encore apprise', '');
+        await logEmail({ type: 'ignoré', subject, from: mail.from, famille: '' });
+        await repondre(res, 200, { ok: true, type: 'ignoré', subject });
+        return;
+      }
+    }
+
     // 0) SUIVI DE COLIS.
     // Trois provenances : les transporteurs eux-mêmes (Mondial Relay /
     // Chronopost), leurs emails relayés par une adresse masquée iCloud

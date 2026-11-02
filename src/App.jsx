@@ -142,6 +142,7 @@ import FichePaire from "./FichePaire.jsx";
 import { SITES_TACHE, TACHES_SITE, estTacheSite, siteDeTache, sectionDeTache, sousSections, subDeTache, redirigerOnglet, filtreRetenu, retenirFiltre } from "./navigationTache.js";
 import { lireCible, selecteursCible, phraseAbsente } from "./cibleNotif.js";
 import { fusionnerLigne, fusion3, egal as egalStable, CLE_POOL, CLES_FICHES } from "./fusionNuage.js";
+import { produitsANumeroter, attribuerNumerosVc, carteNumerosVc } from "./numerosVestiaire.js";
 import { lireFile, noterSaisie, instantane, acquitter, compterEnAttente, nuagePlusRecent, fusionAuChargement, oublierCle, CLE_FILE, HORS_FILE } from "./fileEnvoi.js";
 // La migration qui cloisonne les vendeurs, lue depuis LE fichier (pas recopiée) :
 // deux copies finiraient par diverger, et c'est le genre de texte qu'on colle
@@ -1895,6 +1896,11 @@ const ENTREPRISE_VIDE = {
 const VENTES_MASQUEES_AUCUNE = () => [];
 const SYNC_KEYS = [
   'vrm_vc_etiquettes','vrm_lbc_dates',
+  // (2 nov., soir) VESTIAIRE comme Vinted et Leboncoin : le N° donné à chaque
+  // annonce Vestiaire qui n'en portait pas ({ [productId]: { numero, numberedAt,
+  // auto } }, src/numerosVestiaire.js — fusionné comme les fiches, §5), « Colis
+  // fait » et « Imprimé » posés par lui ({ [id de vente]: ts }).
+  'vrm_vc_numeros','vrm_vc_colis_done','vrm_vc_imprimes',
   // (31 oct.) Les reçus d'achat qu'IL a déliés depuis le journal des emails
   // (« Ce n'est pas ça ») : { [id de la ligne du reçu]: { tx, at } }. Rien n'est
   // supprimé ; « Relier à nouveau » retire la clé.
@@ -9344,6 +9350,113 @@ const SAUVEGARDE_AVANT_REMISE = "⚠ Cette sauvegarde date d'avant la remise à 
 const NUMEROS_PERIMES_IMPRESSION = "Cet écran a été ouvert avant la remise à zéro de tes numéros : recharge-le avant d'imprimer (aucun N° n'a été tamponné).";
 onVersionNumerotation((e) => { if (e.etat === 'ok') _verNum.okAt = e.at; });
 
+// ══════════════════════════════════════════════════════════════════════════════
+// UN N° PAR ANNONCE VESTIAIRE (2 novembre, soir) — le MÊME mécanisme que Vinted
+// ══════════════════════════════════════════════════════════════════════════════
+// Julien : « je veux un numéro attribué par annonce ». La règle est dans
+// src/numerosVestiaire.js (identité = `productId`, jamais le titre) ; le numéro
+// neuf vient de `prochainLibre` (ci-dessus, LA règle de Vinted : le plus haut + 1,
+// jamais un trou) sur TOUS les numéros déjà servis. Les numéros donnés vivent
+// dans `main.vrm_vc_numeros` (fusionnée comme les fiches : un conflit n'écrit
+// rien) et entrent dans le pool append-only (`vinted_used_numeros`).
+// ⚠️ ÉCRITURES CONCURRENTES DANS CET ONGLET : l'écran Annonces (Vinted) numérote
+//    aussi. (1) On ne numérote pas tant qu'une écriture de numéros est en route
+//    (`_saveTimers` du pool, des fiches, des ventes) — on repasse 1,5 s plus tard ;
+//    (2) les numéros donnés ici sont visibles TOUT DE SUITE (`_vcMem`) et la
+//    numérotation de Vinted les compte (`ajouterNumerosHorsEcran`).
+// ⚠️ Rien sur « pas su » : version de la numérotation pas relue, nuage pas
+//    chargé, une lecture (annonces, ventes, numéros réservés) qui échoue ⇒ rien.
+const _vcMem = {};
+const vcCarte = (k) => { if (_vcMem[k] !== undefined) return _vcMem[k]; const v = load(k, {}); return v && typeof v === 'object' && !Array.isArray(v) ? v : {}; };
+const _ecoutesVc = new Set();
+const signalerVc = () => { for (const f of _ecoutesVc) { try { f(); } catch (_) {} } };
+// Une clé Vestiaire posée par un geste : visible tout de suite, synchronisée par `save`.
+const vcPoser = (k, v) => { _vcMem[k] = v; save(k, v); signalerVc(); };
+if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
+  // La valeur gardée (fusionnée, ou venue d'un autre appareil) remplace la copie en mémoire.
+  window.addEventListener('vrm:save', (e) => { const k = e && e.detail && e.detail.k; if (k && k in _vcMem) { delete _vcMem[k]; signalerVc(); } });
+}
+// L'état « Vestiaire » d'un écran : se redessine quand une de ces clés change.
+function useVcLocal() {
+  const [, maj] = React.useReducer((x) => x + 1, 0);
+  React.useEffect(() => { _ecoutesVc.add(maj); return () => { _ecoutesVc.delete(maj); }; }, []);
+  return { auto: carteNumerosVc(vcCarte('vrm_vc_numeros')), fait: vcCarte('vrm_vc_colis_done'), imprimes: vcCarte('vrm_vc_imprimes') };
+}
+// Une lecture Vestiaire (`vc_ventes`/`vc_listings` projetés) + les numéros donnés
+// et les « Colis fait » de cet appareil : ce que lisent `ventesVcDe`,
+// `colisVcAPoster`, `annoncesVcEnLigne`, `retraitsVestiaire` (§11, une règle).
+const avecNumerosVc = (d) => (d && typeof d === 'object') ? { ...d, auto: carteNumerosVc(vcCarte('vrm_vc_numeros')), fait: vcCarte('vrm_vc_colis_done') } : d;
+// Les numéros que l'écran Vinted ne tient pas dans son état : ceux donnés aux
+// annonces Vestiaire et le pool tel que le navigateur le porte. Ajoutés aux pris
+// de chaque `prochainLibre` automatique (jamais retirés de rien).
+const ajouterNumerosHorsEcran = (taken, takenK) => {
+  const add = (v) => { const c = cleNum(v); if (!c) return; if (takenK) takenK.add(c); if (/^\d+$/.test(c)) taken.add(Number(c)); };
+  try { Object.values(carteNumerosVc(vcCarte('vrm_vc_numeros'))).forEach(add); } catch (_) {}
+  try { (load('vinted_used_numeros', []) || []).forEach(add); } catch (_) {}
+};
+const CLES_ECRITURE_NUMEROS = ['vinted_used_numeros', 'vinted_annonce_numeros', 'vinted_sale_overrides', 'vrm_vc_numeros'];
+let _numVcEnVol = null, _numVcRelance = null;
+async function numeroterVestiaire() {
+  if (_numVcEnVol) return _numVcEnVol;
+  _numVcEnVol = (async () => {
+    try {
+      if (!numerotationPermise()) { if (!_numVcRelance) _numVcRelance = setTimeout(() => { _numVcRelance = null; numeroterVestiaire(); }, 4000); return 0; }
+      const [jl, jv, jr] = await Promise.all([
+        lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vc_listings&select=items:data->items,liens:data->liens,capturedAt:data->>capturedAt`),
+        lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vc_ventes&select=ventes:data->ventes`),
+        lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.panel_num_reserves&select=data`),
+      ]);
+      if (!Array.isArray(jl) || !Array.isArray(jv) || !Array.isArray(jr)) return 0;
+      if (!numerotationPermise() || !isCloudReady()) return 0;
+      // Une écriture de numéros en route (cet onglet) : on repasse après elle.
+      if (CLES_ECRITURE_NUMEROS.some((k) => _saveTimers[k])) { if (!_numVcRelance) _numVcRelance = setTimeout(() => { _numVcRelance = null; numeroterVestiaire(); }, 1500); return 0; }
+      const L = jl[0] || {}, V = jv[0] || {};
+      const items = L.items && typeof L.items === 'object' ? L.items : null;
+      const ventes = V.ventes && typeof V.ventes === 'object' ? V.ventes : null;
+      // Une annonce ne se numérote que sur une liste LUE (capturedAt) ; une vente à expédier, toujours.
+      const auto = vcCarte('vrm_vc_numeros');
+      const ids = produitsANumeroter({ items: L.capturedAt ? items : null, ventes, liens: L.liens || {}, auto, cleNum,
+        etatRetiree: (it) => etatAnnonceVcBrut(it, false, L.capturedAt) === 'retiree', venteAnnulee: vcVenteAnnulee });
+      if (!ids.length) return 0;
+      // TOUS les numéros servis (lus maintenant, synchrone jusqu'à l'écriture).
+      const pris = new Set(), prisK = new Set();
+      const add = (v) => { const c = cleNum(v); if (!c) return; prisK.add(c); if (/^\d+$/.test(c)) pris.add(Number(c)); };
+      (load('vinted_used_numeros', []) || []).forEach(add);
+      Object.values(load('vinted_annonce_numeros', {}) || {}).forEach((e) => add(e && e.numero));
+      Object.values(load('vinted_sale_overrides', {}) || {}).forEach((e) => add(e && e.numero));
+      Object.values(load('vrm_lbc_liens', {}) || {}).forEach(add);
+      Object.values(L.liens || {}).forEach(add);
+      Object.values(carteNumerosVc(auto)).forEach(add);
+      numerosReserves(jr[0] ? jr[0].data : null).cles.forEach(add);
+      for (const it of Object.values(items || {})) if (it && it.ref) add(it.ref);
+      for (const v of Object.values(ventes || {})) if (v && v.ref) add(v.ref);
+      const r = attribuerNumerosVc({ ids, auto, pris, prisCles: prisK, pref: prefixeNumeros(), prochainLibre, cleNum });
+      if (!r.nouveaux.length) return 0;
+      // Le pool d'abord (append-only, union à la sauvegarde), puis la carte.
+      const pool = (load('vinted_used_numeros', []) || []).slice();
+      const dejaK = new Set(pool.map(cleNum));
+      for (const x of r.nouveaux) { const ep = entreePool(x.numero); if (ep != null && !dejaK.has(cleNum(ep))) { pool.push(ep); dejaK.add(cleNum(ep)); } }
+      save('vinted_used_numeros', pool.sort(triPool));
+      vcPoser('vrm_vc_numeros', r.auto);
+      emettreClesRelues(['vinted_used_numeros']);
+      return r.nouveaux.length;
+    } catch (_) { return 0; }
+    finally { setTimeout(() => { _numVcEnVol = null; }, 0); }
+  })();
+  return _numVcEnVol;
+}
+// Lancée par les écrans Vestiaire (Annonces, Ventes, Colis) et à chaque lecture
+// rangée par l'extension.
+function useNumerotationVestiaire() {
+  React.useEffect(() => {
+    numeroterVestiaire();
+    const f = (e) => { const x = e && e.detail; if (x && x.type === 'maj' && x.quoi === 'vestiaire') numeroterVestiaire(); };
+    window.addEventListener('vrm:ext', f);
+    const off = onCloudReady ? onCloudReady(() => numeroterVestiaire()) : null;
+    return () => { window.removeEventListener('vrm:ext', f); if (typeof off === 'function') off(); };
+  }, []);
+}
+
 // Un REFUS de la base (garde-fou de la migration 013) : l'écran a été chargé
 // avant une remise à zéro, ou un autre appareil a donné des numéros depuis.
 // Le code du refus voyage jusqu'au bloc de la coque (`BlocNumerosPerimes`).
@@ -9378,7 +9491,7 @@ const CHAMPS_NUMERO_VENTE = ['numero', 'autoAssigned', 'autoShip', 'manuelAt'];
 // Les clés « gestes » rejouées telles quelles (objets fusionnés, listes unies).
 const CLES_GESTES = ['vinted_ship_done', 'vinted_bords_printed', 'vinted_bords_hidden', 'vinted_bords_shipped', 'vinted_pickup_done',
   'vinted_offers_done', 'vinted_sales_hidden', 'vinted_purchases_hidden', 'vinted_annonces_vendues', 'vinted_retours_recus',
-  'vinted_retours_dismissed', 'vinted_retours_remis', 'vrm_colis_collected', 'vrm_colis_collected_at', 'vinted_achat_notes', 'vrm_urssaf_declare', 'vrm_lbc_colis_done'];
+  'vinted_retours_dismissed', 'vinted_retours_remis', 'vrm_colis_collected', 'vrm_colis_collected_at', 'vinted_achat_notes', 'vrm_urssaf_declare', 'vrm_lbc_colis_done', 'vrm_vc_colis_done', 'vrm_vc_imprimes'];
 const SAISIES_A_REJOUER = 'vrm_saisies_a_rejouer';
 const memoriserSaisies = () => {
   const avant = _instantaneCharge; if (!avant) return 0;
@@ -26373,10 +26486,14 @@ function nonLusVestiaire(compteur, compteurs) {
   return null;
 }
 const ageCourtVc = (iso) => { const t = Date.parse(iso || ''); if (!isFinite(t)) return ''; const h = Math.max(0, Math.round((Date.now() - t) / 3600000)); return h < 1 ? "il y a moins d'une heure" : h < 24 ? `il y a ${h} h` : `il y a ${Math.round(h / 24)} j`; };
-function PhotoVc({ src }) {
+// (2 nov., soir) La photo Vestiaire ENTIÈRE : `contenue` (fond blanc, rien de
+// recadré) — Vestiaire détoure ses produits sur blanc, un recadrage « cover »
+// zoomait sur un détail. `data-photo-vc` porte l'adresse (lue par les bancs).
+const urlPhotoVc = (src) => { try { const u = new URL(src); if (u.protocol === 'https:' && !u.username && !u.password && /(^|\.)vestiairecollective\.com$/i.test(u.hostname)) return u.href; } catch (_) {} return ''; };
+function PhotoVc({ src, style }) {
   const [ko, setKo] = useState(false);
-  let url = ''; try { const u = new URL(src); if (u.protocol === 'https:' && !u.username && !u.password && /(^|\.)vestiairecollective\.com$/i.test(u.hostname)) url = u.href; } catch (_) {}
-  return url && !ko ? <img src={url} alt="" loading="lazy" onError={() => setKo(true)}/> : <span aria-label="Photo indisponible" className="vrm-lbc-catalog-photo-empty">—</span>;
+  const url = urlPhotoVc(src);
+  return url && !ko ? <img src={url} alt="" loading="lazy" data-photo-vc="" onError={() => setKo(true)} style={{ objectFit: 'contain', background: '#fff', ...(style || {}) }}/> : <span aria-label="Photo indisponible" className="vrm-lbc-catalog-photo-empty" style={style}>—</span>;
 }
 // ══════════════════════════════════════════════════════════════════════════════
 // VESTIAIRE : TES ANNONCES EN FICHES (1er nov., extension 5.296)
@@ -26408,6 +26525,9 @@ function ExtVestiaireCompte() {
 function AnnoncesVestiaire() {
   const [d, setD] = useState(undefined);   // undefined en cours · null pas su · objet
   const vcOuvert = useCompteVcOuvert();
+  // (2 nov., soir) Un N° par annonce, comme Vinted et Leboncoin (src/numerosVestiaire.js).
+  const vcLoc = useVcLocal();
+  useNumerotationVestiaire();
   const relire = React.useCallback(async () => {
     const [rl, rv] = await Promise.all([
       lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vc_listings&select=items:data->items,liens:data->liens,capturedAt:data->>capturedAt,complet:data->complet,total:data->total,inconnu:data->formeInconnue`),
@@ -26435,7 +26555,7 @@ function AnnoncesVestiaire() {
   else if (!d.items || !d.capturedAt) corps = <div data-vc-annonces="jamais" style={style}>Tes annonces Vestiaire n'ont pas encore été lues : {geste}{extSait('vcfiche') === 'retard' ? <> — mise à jour en <b>{EXT_CAPACITES.vcfiche}</b> d'abord</> : ''}. Elle les lit en passant, sans rien cliquer.</div>;
   else {
     const liste = Object.entries(d.items).filter(([, it]) => it && typeof it === 'object').map(([id, it]) => {
-      const num = cleNum(d.liens[id] || it.ref || '');
+      const num = numVcAnnonce(id, it, d.liens, vcLoc.auto);
       return { id, it, num, ...etatAnnonceVc(it, d.vendus.has(String(id)), d.capturedAt) };
     });
     const ordre = { 'en-ligne': 0, attente: 1, autre: 2, 'pas-dit': 3, 'a-confirmer': 4, vendue: 5, retiree: 6 };
@@ -26452,7 +26572,9 @@ function AnnoncesVestiaire() {
           {vieille ? <> <b style={{ color: C.warn }}>À confirmer</b> : la lecture a plus de 24 h — {geste} pour la remettre à jour (rien n'est retiré d'ici).</> : null}
           {sansFiche ? <> Photo, titre et prix arrivent avec l'extension {EXT_CAPACITES.vcfiche}{extSait('vcfiche') === 'ok' ? <> : {geste} une fois</> : <> — mets-la à jour depuis Paramètres → État des connexions, puis {geste}</>}.</> : null}
         </div>
-        <section className="vrm-lbc-catalog" aria-label="Mes annonces Vestiaire" style={{ margin: 0 }}>
+        {/* (2 nov., soir) « c'est beaucoup zoomé sur le produit » : la photo ENTIÈRE
+            (contenue sur fond blanc, `vrm-vc-catalog`), aux proportions des fiches. */}
+        <section className="vrm-lbc-catalog vrm-vc-catalog" aria-label="Mes annonces Vestiaire" style={{ margin: 0 }}>
           <ul>{liste.map(({ id, it, num, etat, label, brut }) => {
             const flou = vcFloute(vcOuvert, it.compte);
             const prix = it.prix && isFinite(Number(it.prix.valeur)) ? (it.prix.devise && it.prix.devise !== 'EUR' ? `${Number(it.prix.valeur).toFixed(2).replace('.', ',')} ${it.prix.devise}` : fmt(it.prix.valeur)) : '—';
@@ -26462,7 +26584,7 @@ function AnnoncesVestiaire() {
                 <PhotoVc src={it.photo}/>
                 <div className="vrm-lbc-catalog-info">
                   <strong>{it.titre || (num ? `N°${num}` : 'Annonce sans titre lu')}</strong>
-                  <small>{num ? <span data-vc-annonce-numtxt="">N°{num}</span> : 'Pas reliée à une paire'}{extra ? ` · ${extra}` : ''}</small>
+                  <small>{num ? <span data-vc-annonce-numtxt="">N°{num}</span> : etat === 'retiree' ? 'Sans N° (retirée)' : 'N° en attente'}{extra ? ` · ${extra}` : ''}</small>
                   <div><span data-etat={etat === 'en-ligne' ? 'active' : etat === 'vendue' ? 'vendue' : 'autre'} title={brut ? `Vestiaire écrit « ${brut} »` : undefined}>{label}</span></div>
                 </div>
                 <b data-vc-annonce-prix={it.prix ? String(it.prix.valeur) : ''} title={it.prix && it.prix.cle ? `Prix lu sur « ${it.prix.cle} »` : undefined}>{prix}</b>
@@ -26470,7 +26592,10 @@ function AnnoncesVestiaire() {
             );
           })}</ul>
         </section>
-        {liste.some((l) => !l.num) ? <div style={{ ...style, marginTop: 8 }}>Une annonce « pas reliée » ne porte ni la référence VRM-n° ni le lien d'une publication faite depuis VRM : VRM ne devine pas la paire (jamais par le titre).</div> : null}
+        {/* (2 nov., soir) Chaque annonce reçoit un N° (comme Vinted et Leboncoin) : celui de
+            la paire publiée depuis VRM ou de sa référence VRM-n°, sinon un N° neuf — par
+            l'identifiant Vestiaire du produit, jamais par le titre. */}
+        {liste.some((l) => !l.num && l.etat !== 'retiree') ? <div data-vc-annonces-attente="" style={{ ...style, marginTop: 8 }}>« N° en attente » : le numéro arrive dès que VRM a relu tes numéros (quelques secondes, connexion nécessaire). Il se donne par l'identifiant Vestiaire de l'annonce, jamais par le titre.</div> : null}
         {d.ventesKO ? <div style={{ ...style, marginTop: 4 }}>Tes ventes Vestiaire n'ont pas pu être relues : « vendue » n'est dit que si Vestiaire l'écrit sur l'annonce.</div> : null}
       </div>
     );
@@ -26511,6 +26636,7 @@ function PublierVestiaire({ comptes }) {
   // 5.236 : tes annonces Vestiaire telles que l'extension les a lues, et leur
   // BOOST (`vc_listings`). Trois états : undefined en cours · null pas su · objet.
   const [vcAnn, setVcAnn] = React.useState(undefined);
+  const vcLoc = useVcLocal();
   const relireAnn = React.useCallback(async () => {
     try {
       const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vc_listings&select=items:data->items,liens:data->liens,capturedAt:data->>capturedAt,complet:data->complet,total:data->total`, { headers: sbAuth() });
@@ -26535,14 +26661,15 @@ function PublierVestiaire({ comptes }) {
     if (!vcAnn || !vcAnn.items) return m;
     const liens = vcAnn.liens || {};
     for (const [id, it] of Object.entries(vcAnn.items)) {
-      const n = cleNum(liens[id] || (it && it.ref) || '');
+      const n = numVcAnnonce(id, it, liens, vcLoc.auto);
       if (!n) continue;
       const prev = m.get(n);
       const b = it && (it.boost === true || it.boost === false) ? it.boost : null;
       m.set(n, prev === true ? true : (b === true ? true : (prev === false || b === false ? (b === null && prev == null ? null : false) : null)));
     }
     return m;
-  }, [vcAnn]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [vcAnn, JSON.stringify(vcLoc.auto)]);
   const resumeBoost = (() => {
     if (vcAnn === undefined) return null;
     if (vcAnn === null) return null;   // (1er nov.) dit par « Tes annonces Vestiaire » au-dessus
@@ -26554,9 +26681,9 @@ function PublierVestiaire({ comptes }) {
     const n = items.length, b = items.filter((x) => x && x.boost === true).length, inc = items.filter((x) => !x || x.boost == null).length;
     if (!n) return null;
     const nums = [...boostParNum.entries()].filter(([, v]) => v === true).map(([k]) => 'N°' + k).sort((a, z) => a.localeCompare(z, 'fr', { numeric: true }));
-    const sansN = b - items.filter((x, i) => x && x.boost === true && cleNum(((vcAnn.liens || {})[Object.keys(vcAnn.items)[i]]) || x.ref || '')).length;
+    const sansN = b - items.filter((x, i) => x && x.boost === true && numVcAnnonce(Object.keys(vcAnn.items)[i], x, vcAnn.liens || {}, vcLoc.auto)).length;
 
-    return { code: 'lu', b, texte: `Boost : ${b ? `${b} boostée${b > 1 ? 's' : ''}` : 'aucune boostée'}${nums.length ? ` (${nums.join(', ')}${sansN > 0 ? ` et ${sansN} pas reliée${sansN > 1 ? 's' : ''} à une paire` : ''})` : ''}${inc ? ` · ${inc} dont Vestiaire ne dit pas le boost` : ''}.` };
+    return { code: 'lu', b, texte: `Boost : ${b ? `${b} boostée${b > 1 ? 's' : ''}` : 'aucune boostée'}${nums.length ? ` (${nums.join(', ')}${sansN > 0 ? ` et ${sansN} pas reliée${sansN > 1 ? 's' : ''} à un article` : ''})` : ''}${inc ? ` · ${inc} dont Vestiaire ne dit pas le boost` : ''}.` };
   })();
   // 5.295 — LES FAVORIS VESTIAIRE : combien de personnes ont mis chaque annonce
   // en favori (un NOMBRE lu par l'extension, jamais qui). Par identité seulement
@@ -26571,7 +26698,7 @@ function PublierVestiaire({ comptes }) {
     const inc = items.length - sus.length;
     if (!sus.length) return { code: 'pas-dit', texte: "Vestiaire ne dit pas, dans la liste de tes articles, combien de personnes les ont mis en favori." };
     const total = sus.reduce((t, [, it]) => t + it.favoris, 0);
-    const parN = sus.filter(([, it]) => it.favoris > 0).map(([id, it]) => [cleNum(liens[id] || it.ref || ''), it.favoris]).filter(([n]) => n).sort((a, z) => z[1] - a[1]);
+    const parN = sus.filter(([, it]) => it.favoris > 0).map(([id, it]) => [numVcAnnonce(id, it, liens, vcLoc.auto), it.favoris]).filter(([n]) => n).sort((a, z) => z[1] - a[1]);
     return { code: 'lu', total, texte: `${total} favori${total > 1 ? 's' : ''} sur ${sus.length} annonce${sus.length > 1 ? 's' : ''}${parN.length ? ` (${parN.slice(0, 8).map(([n, f]) => `N°${n} · ${f}`).join(', ')})` : ''}${inc ? ` · ${inc} dont Vestiaire ne dit pas le nombre` : ''}. Qui les a mis en favori, Vestiaire ne l'a jamais montré à l'extension : VRM n'écrit donc à personne.` };
   })();
   const liste = (paires || []).filter((p) => !(publiees && publiees.has(String(p.id))));
@@ -26599,9 +26726,9 @@ function PublierVestiaire({ comptes }) {
   const btn = (accent) => ({ display: 'inline-flex', alignItems: 'center', minHeight: 36, borderRadius: 8, fontFamily: 'inherit', fontWeight: 600, fontSize: 12.5, padding: '7px 11px', cursor: 'pointer',
     border: `1px solid ${accent && !glob ? C.accent : C.border}`, background: accent && !glob ? `${C.accent}14` : 'transparent', color: accent && !glob ? C.accent : C.muted });
   let corps;
-  if (enLigne === undefined || publiees === undefined) corps = <div data-vc-publier="charge" style={{ fontSize: 12.5, color: C.muted }}>Lecture de tes paires en ligne…</div>;
+  if (enLigne === undefined || publiees === undefined) corps = <div data-vc-publier="charge" style={{ fontSize: 12.5, color: C.muted }}>Lecture de tes articles en ligne…</div>;
   else if (enLigne === null) corps = <div data-vc-publier="pas-su" style={{ fontSize: 12.5, color: C.muted }}>Je n'ai pas pu lire tes annonces Vinted — rien n'est perdu, réessaie dans un moment.</div>;
-  else if (!liste.length) corps = <div data-vc-publier="vide" style={{ fontSize: 12.5, color: C.muted }}>{paires.length ? 'Toutes tes paires en ligne sont notées publiées sur Vestiaire.' : "Aucune paire en ligne et numérotée pour l'instant."}</div>;
+  else if (!liste.length) corps = <div data-vc-publier="vide" style={{ fontSize: 12.5, color: C.muted }}>{paires.length ? 'Tous tes articles en ligne sont notés publiés sur Vestiaire.' : "Aucun article en ligne et numéroté pour l'instant."}</div>;
   else corps = (
     <div data-vc-publier="lu" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
       {publiees === null && <div style={{ fontSize: 11.5, color: C.muted }}>Je n'ai pas pu lire lesquelles sont déjà notées publiées sur Vestiaire — l'extension le revérifie au clic.</div>}
@@ -26650,12 +26777,12 @@ function PublierVestiaire({ comptes }) {
           </div>
         );
       })}
-      {liste.length > 12 && !tout && <button type="button" className="vrm-lien-action" onClick={() => setTout(true)} style={{ alignSelf: 'flex-start', background: 'none', border: 'none', color: C.accent, fontWeight: 600, fontSize: 12.5, cursor: 'pointer', fontFamily: 'inherit', padding: 0 }}>Voir les {liste.length} paires</button>}
+      {liste.length > 12 && !tout && <button type="button" className="vrm-lien-action" onClick={() => setTout(true)} style={{ alignSelf: 'flex-start', background: 'none', border: 'none', color: C.accent, fontWeight: 600, fontSize: 12.5, cursor: 'pointer', fontFamily: 'inherit', padding: 0 }}>Voir les {liste.length} articles</button>}
     </div>
   );
   return (
     <Card style={{ padding: 16 }}>
-      <div style={{ fontSize: 14, fontWeight: 700, color: C.text, marginBottom: 4 }}>Mettre une paire en vente sur Vestiaire</div>
+      <div style={{ fontSize: 14, fontWeight: 700, color: C.text, marginBottom: 4 }}>Mettre un article en vente sur Vestiaire</div>
       <div style={{ fontSize: 12, color: C.muted, lineHeight: 1.5, marginBottom: 10 }}>
         {auto
           ? <span data-vc-auto="oui">L'extension ouvre Vestiaire (clique « Vendre un article » si besoin), remplit la description, le prix et ce qu'elle reconnaît, attache les photos — détourées si ta clé Photoroom est posée, sinon elle te propose de les attacher sans détourage — <b style={{ color: C.text }}>et publie toute seule, sans booster</b> : elle décoche toute option payante et ne clique jamais un bouton qui porte un prix. Si Vestiaire exige un champ qu'elle ne devine pas (catégorie, modèle), elle attend que tu le choisisses, puis publie.</span>
@@ -26698,29 +26825,205 @@ function etapeVenteVc(v) {
   if (v && v.plusAExpedierDepuis) return { etape: 'plus-a-expedier', label: 'Plus dans « à expédier » (envoyée ou annulée — Vestiaire ne dit pas laquelle)', rang: null };
   return { etape: brut ? 'autre' : 'pas-dit', label: brut ? `Vestiaire : « ${brut} »` : 'Étape non dite par Vestiaire', rang: null };
 }
-// (2 nov., 5.316) LE BORDEREAU D'UNE VENTE VESTIAIRE : le PDF que l'extension a
-// rapatrié (`vc_label_{produit}`), lu AU CLIC seulement (§4.4).
-function BoutonBordereauVc({ id, titre }) {
+// ══════════════════════════════════════════════════════════════════════════════
+// (2 nov., soir) LES VENTES VESTIAIRE COMME CELLES DE VINTED ET LEBONCOIN
+// ══════════════════════════════════════════════════════════════════════════════
+// Julien : « pour la vente je veux la même mise en page avec les mêmes
+// fonctionnalités que Vinted, Leboncoin ; je veux que le titre de l'annonce soit
+// tamponné sur le bordereau ». La ligne de Ventes est LA ligne partagée
+// (`LigneVenteCompacte`, comme Vinted ; Leboncoin passe par `LigneVente`) : photo,
+// « N° · titre », date et transporteur, l'étape, ce que Vestiaire verse, l'achat
+// et le bénéfice, le récapitulatif au toucher. La carte de Colis reprend la carte
+// d'un colis Vinted (mêmes classes, mêmes `data-geste`) : Imprimer · Imprimé ·
+// Colis fait. Les règles restent celles de api/_lib/vestiaire-regle.js.
+//
+// LE BORDEREAU TAMPONNÉ : le PDF rapatrié (`vc_label_{produit}`) est lu AU CLIC
+// (§4.4), tamponné du N° et du titre par LA fonction de Vinted et Leboncoin
+// (`annotateAndDownloadBordereau` : version de la numérotation relue,
+// `confirmerNumerosAVerifier`, même cartouche) et ouvert. Le PDF rangé n'est
+// jamais réécrit. Imprimer marque « Imprimé » (comme un bordereau Vinted).
+const marquerVc = (cle, id, oui) => {
+  const u = { ...vcCarte(cle) };
+  if (oui) u[String(id)] = Date.now(); else delete u[String(id)];
+  vcPoser(cle, u);
+};
+async function imprimerBordereauVc({ bordId, num, titre, venteId }) {
+  const j = await lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${encodeURIComponent(bordId)}&select=b64:data->>b64`);
+  const b64 = Array.isArray(j) && j[0] && j[0].b64;
+  if (!b64) { libererOngletPdf(); return { etat: Array.isArray(j) ? 'absent' : 'passu' }; }
+  try {
+    const r = await annotateAndDownloadBordereau(num || '', titre || '', b64ToBytes(b64), null);
+    if (venteId) marquerVc('vrm_vc_imprimes', venteId, true);
+    return { etat: 'ok', r };
+  } catch (e) { return { etat: 'refus', texte: String((e && e.message) || e) }; }
+}
+// Le bouton « Imprimer » (le geste principal de la ligne et de la carte).
+// `data-imprime` : la visionneuse s'ouvre au clic (« préparation… »).
+function BoutonImprimerVc({ v, grand = false, carte = false }) {
   const [etat, setEtat] = useState('');
-  const ouvrir = async () => {
-    setEtat('lecture');
-    const j = await lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${encodeURIComponent(id)}&select=b64:data->>b64`);
-    const b64 = Array.isArray(j) && j[0] && j[0].b64;
-    if (!b64) { setEtat(Array.isArray(j) ? 'absent' : 'passu'); return; }
-    const url = URL.createObjectURL(new Blob([b64ToBytes(b64)], { type: 'application/pdf' }));
-    setEtat('');
-    if (!ouvrirPdfOnglet(url, 'bordereau-vestiaire.pdf', `Bordereau Vestiaire${titre ? ' — ' + titre : ''}`)) { const a = document.createElement('a'); a.href = url; a.target = '_blank'; a.rel = 'noopener'; document.body.appendChild(a); a.click(); a.remove(); }
+  const [lien, setLien] = useState(null);
+  if (!v || !v.bordereau || !v.bordereau.id) return null;
+  const go = async () => {
+    setEtat('lecture'); setLien(null);
+    const r = await imprimerBordereauVc({ bordId: v.bordereau.id, num: v.num, titre: v.titre, venteId: v.id });
+    setEtat(r.etat === 'ok' ? '' : r.etat);
+    if (r.etat === 'refus') toast(r.texte);
+    // iPhone (aucune visionneuse) : le PDF tamponné s'ouvre d'un vrai toucher.
+    if (r.etat === 'ok' && r.r && !r.r.ouvert) setLien(r.r);
   };
-  return <div style={{ margin: '4px 0 6px' }}>
-    <Bouton variante="secondaire" icone="printer" data-vc-bordereau={id} disabled={etat === 'lecture'} onClick={ouvrir}>{etat === 'lecture' ? 'Lecture du bordereau…' : 'Imprimer le bordereau'}</Bouton>
-    {etat === 'absent' ? <span style={{ display: 'block', fontSize: 12, color: C.muted, marginTop: 4 }}>Le bordereau n'est plus rangé — rouvre la vente sur Vestiaire.</span> : etat === 'passu' ? <span style={{ display: 'block', fontSize: 12, color: C.muted, marginTop: 4 }}>La base n'a pas répondu — réessaie.</span> : null}
-  </div>;
+  const libelle = etat === 'lecture' ? 'Lecture du bordereau…' : 'Imprimer';
+  return <>
+    {carte
+      ? <button type="button" data-imprime="1" data-vc-imprimer={v.id} disabled={etat === 'lecture'} onClick={go} title="Bordereau tamponné (titre + N°), puis impression"
+          className="vrm-colis-primaire" style={{flex:'1 1 160px',maxWidth:340,display:'inline-flex',alignItems:'center',justifyContent:'center',gap:8,border:'none',background:C.accent,color:'#fff',borderRadius:10,padding:'0 16px',minHeight:44,cursor:'pointer',fontSize:14,fontWeight:600,fontFamily:'inherit'}}><Icon name="printer" size={16}/>{libelle}</button>
+      : <Bouton variante={grand ? 'primaire' : 'secondaire'} icone="printer" data-imprime="1" data-vc-imprimer={v.id} disabled={etat === 'lecture'} onClick={go} title="Bordereau tamponné (titre + N°), puis impression">{etat === 'lecture' ? libelle : 'Imprimer le bordereau'}</Bouton>}
+    {lien ? <a href={lien.url} target="_blank" rel="noreferrer" data-vc-bordereau-lien="" style={{ color: C.accent, fontWeight: 600, fontSize: 13 }}>Ouvrir le bordereau</a> : null}
+    {etat === 'absent' ? <span data-vc-bordereau-etat="absent" style={{ flexBasis: '100%', fontSize: 12, color: C.muted }}>Le bordereau n'est plus rangé — rouvre la vente sur Vestiaire.</span>
+      : etat === 'passu' ? <span data-vc-bordereau-etat="passu" style={{ flexBasis: '100%', fontSize: 12, color: C.muted }}>La base n'a pas répondu — réessaie.</span> : null}
+  </>;
+}
+// Le prix d'achat d'une vente Vestiaire : celui SAISI pour son N°
+// (`vinted_buyprice_by_num`, la source de Vinted et Leboncoin, §11) — seulement
+// si au plus UNE fiche porte ce N° (deux fiches ⇒ coût ambigu, rien).
+const achatVc = (num) => {
+  if (!num) return null;
+  try {
+    const fiches = load('vinted_annonce_numeros', {}) || {};
+    if (Object.values(fiches).filter((f) => f && f.numero != null && cleNum(f.numero) === num).length > 1) return null;
+    const f = ficheUniqueDuNumero(fiches, num);
+    return prixAchatDe(f || { numero: num }, load('vinted_buyprice_by_num', {}) || {});
+  } catch (_) { return null; }
+};
+const poserAchatVc = (num, p) => {
+  if (!num) return;
+  const u = { ...(load('vinted_buyprice_by_num', {}) || {}), [num]: String(p) };
+  save('vinted_buyprice_by_num', u);
+  // L'écran Ventes Vinted tient la carte dans son état : il la relit.
+  setTimeout(() => emettreClesRelues(['vinted_buyprice_by_num']), 650);
+  signalerVc();
+};
+// Les colonnes Achat · Bénéfice de la ligne : ce que Vestiaire verse (commission
+// déjà retirée) − le prix d'achat. Un des deux manque ⇒ « — » (jamais 0, §5).
+function beneficeVc(v, fait) {
+  const verse = montantRecuVc(v).eur;
+  const annulee = vcVenteAnnulee(v);
+  const achat = achatVc(v.num);
+  if (annulee) return { etat: 'annulee', achat, benefice: null, verse };
+  if (verse == null) return { etat: 'prix', achat, benefice: null, verse };
+  if (achat == null) return { etat: 'achat', achat: null, benefice: null, verse };
+  return { etat: 'ok', achat, benefice: Math.round((verse - achat) * 100) / 100, verse };
+}
+// L'ÉTAPE comme la ligne de Vinted la dit, et le ton (ambre = un geste à faire).
+const etatLigneVc = (v, fait) => {
+  if (vcVenteAnnulee(v)) return { etat: 'Annulée', ton: 'annule' };
+  if (v.aExpedier && fait) return { etat: 'Colis fait', ton: '' };
+  if (v.aExpedier) return { etat: 'À expédier', ton: 'action' };
+  return { etat: v.label || '', ton: '' };
+};
+// La date limite d'envoi, en clair (la règle de Colis : jours à l'heure de Paris).
+const limiteVcTexte = (v) => {
+  if (!v || !v.aExpedier) return '';
+  if (!v.limite || !dateCourteVc(v.limite)) return 'date limite non dite par Vestiaire';
+  const j = joursAvantVc(v.limite);
+  return j == null ? `à envoyer avant le ${dateCourteVc(v.limite)}` : j < 0 ? `date limite passée (${dateCourteVc(v.limite)})` : j === 0 ? "à envoyer aujourd'hui" : j === 1 ? 'à envoyer demain' : `à envoyer avant le ${dateCourteVc(v.limite)}`;
+};
+// UNE LIGNE DE VENTE VESTIAIRE (écran Ventes) — `LigneVenteCompacte`, comme Vinted.
+function LigneVenteVc({ v, fait, enV, flou, i = 0 }) {
+  const lb = beneficeVc(v, fait);
+  const { etat, ton } = etatLigneVc(v, fait);
+  const titre = v.titre || 'Article Vestiaire';
+  const nomLigne = v.num ? `N°${v.num} · ${titre}` : titre;
+  // Comme Vinted : la date sur la ligne (et, à expédier, « à envoyer avant … » — le
+  // « à poster avant » de la carte Colis) ; le transporteur à côté du bouton bordereau.
+  const sous = [v.date ? dateCourteVc(v.date) : '', v.aExpedier && !fait ? limiteVcTexte(v) : ''].filter(Boolean).join(' · ');
+  const trV = transporteurDuColis({ declare: v.transporteur, suivi: v.suivi });
+  const benef = lb.etat === 'annulee' ? null : { etat: lb.etat, achatCentimes: lb.achat != null ? Math.round(lb.achat * 100) : null, benefCentimes: lb.benefice != null ? Math.round(lb.benefice * 100) : null,
+    achatTxt: lb.achat != null ? `${eurosLigne(lb.achat)} €` : (v.num ? 'à saisir' : '—'), benefTxt: texteBenefice(lb),
+    aria: lb.etat === 'achat' ? "Bénéfice : prix d'achat manquant" : undefined };
+  const coutManque = lb.etat !== 'annulee' && lb.achat == null && !!v.num;
+  const gesteCout = coutManque ? <CoutAchatVente surLigne onSaisir={(p) => poserAchatVc(v.num, p)}/> : null;
+  const photoNoeud = <PhotoVc src={v.photo || ''} style={{ width: 28, height: 36, borderRadius: 8, flexShrink: 0 }}/>;
+  const recap = ({ titreId, fermerRef, fermer }) => {
+    const partie = vcVentePartie(v), mot = etapeMotVc(v);
+    const etapes = vcVenteAnnulee(v) ? null : friseVente({
+      vendue: { lu: true, t: v.date || null },
+      bordereau: { lu: !!(v.bordereau && v.bordereau.id), t: (v.bordereau && v.bordereau.at) || null },
+      deposee: { lu: !!fait || partie, t: fait || null },
+      livree: { lu: ['livree', 'terminee', 'versee'].includes(mot), t: null },
+      argent: { lu: mot === 'versee', t: v.verseLe || null },
+    });
+    const ici = etapes ? (etapes.find((x) => x.ici) || {}).cle : null;
+    const phrase = vcVenteAnnulee(v) ? { gras: 'Annulée.', suite: 'L’article ne part pas : il reste chez toi.' }
+      : v.aExpedier && !fait ? { gras: 'À expédier.', suite: v.bordereau ? 'Imprime le bordereau (titre et N° tamponnés), puis dépose le colis.' : 'Le bordereau se prend sur Vestiaire, puis dépose le colis.' }
+      : v.aExpedier && fait ? { gras: 'Colis fait.', suite: 'Vestiaire confirmera l’envoi au premier passage chez le transporteur.' }
+      : mot === 'controle' ? { gras: 'Contrôle par Vestiaire.', suite: 'Vestiaire vérifie l’article avant de l’envoyer à l’acheteur.' }
+      : ici === 'argent' ? { gras: 'Terminée.', suite: 'Vestiaire a versé l’argent.' }
+      : ici === 'livree' ? { gras: 'Livrée.', suite: 'L’argent arrive quand Vestiaire le verse.' }
+      : { gras: `${v.label || 'En cours'}.`, suite: '' };
+    return <>
+      <header className="vrm-recap-tete">
+        <div className="vrm-sale-photo vrm-recap-photo"><PhotoVc src={v.photo || ''} style={{ width: '100%', height: '100%' }}/></div>
+        <div className="vrm-recap-ident">
+          {v.num ? <span className="vrm-recap-num" data-recap-num={v.num}>N°{v.num}</span> : <span className="vrm-recap-sans-num" data-recap-num="">Sans N° VRM</span>}
+          <h2 id={titreId} className="vrm-recap-nom">{titre}</h2>
+          <p className="vrm-recap-sous">Vestiaire Collective</p>
+        </div>
+        <button ref={fermerRef} type="button" className="vrm-recap-fermer" aria-label="Fermer les détails de la vente" onClick={fermer}><Icon name="close" size={18}/></button>
+      </header>
+      <section className="vrm-recap-etat" data-recap-etat={etat}>
+        <p className="vrm-recap-phrase" data-recap-phrase=""><strong>{phrase.gras}</strong>{phrase.suite ? ' ' + phrase.suite : ''}</p>
+        {etapes ? <ol className="vrm-recap-frise" data-recap-frise="" aria-label="Où en est la vente">
+          {etapes.map((x) => <li key={x.cle} data-etape={x.cle} data-fait={x.fait ? '1' : '0'} data-preuve={x.preuve || ''} data-ici={x.ici ? '1' : undefined}>
+            <span className="vrm-recap-point" aria-hidden="true"/>
+            <span className="vrm-recap-etape">{x.cle === 'argent' ? 'Argent versé' : x.label}</span>
+            <span className="vrm-recap-quand">{x.fait ? (x.t != null && x.cle !== 'argent' ? new Date(x.t).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }) : 'fait') : 'à venir'}</span>
+          </li>)}
+        </ol> : null}
+      </section>
+      <section className="vrm-recap-argent" aria-label="L'argent">
+        <h3 className="vrm-recap-titre">L'argent</h3>
+        <dl>
+          <div className="vrm-recap-ligne"><dt>Vestiaire te verse</dt><dd data-prix-vente={lb.verse != null ? Math.round(lb.verse * 100) : undefined}>{lb.verse != null ? eurosRecap(lb.verse) : '— pas sûr'}</dd></div>
+          {lb.etat !== 'annulee' ? <div className="vrm-recap-ligne" data-recap-achat={lb.achat != null ? lb.achat.toFixed(2) : ''}><dt>Prix d’achat</dt><dd>{lb.achat != null ? eurosRecap(-lb.achat) : coutManque ? <CoutAchatVente recap onSaisir={(p) => poserAchatVc(v.num, p)}/> : '—'}</dd></div> : null}
+          {lb.etat !== 'annulee' ? <div className="vrm-recap-ligne vrm-recap-benef" data-recap-benef-etat={lb.etat} data-benef-vente={lb.benefice != null ? lb.benefice.toFixed(2) : undefined}><dt>Bénéfice</dt><dd><span className="vrm-recap-valeur"><span className="vrm-recap-montant">{lb.benefice == null ? '—' : eurosRecap(lb.benefice)}</span></span>{lb.etat === 'prix' ? <small> montant versé pas sûr</small> : null}</dd></div> : null}
+          {v.paiementEstime ? <div className="vrm-recap-ligne"><dt>Paiement estimé</dt><dd>{v.paiementEstime}</dd></div> : null}
+        </dl>
+      </section>
+      <section className="vrm-recap-details" aria-label="Détails">
+        <dl>
+          <div className="vrm-recap-ligne"><dt>Vendue</dt><dd>{v.date ? dateCourteVc(v.date) : '— date pas lue'}</dd></div>
+          {v.aExpedier ? <div className="vrm-recap-ligne"><dt>Envoi</dt><dd>{limiteVcTexte(v)}</dd></div> : null}
+          {!(v.aExpedier && !fait && v.bordereau) && (trV.cle || trV.nom) ? <div className="vrm-recap-ligne"><dt>Transporteur</dt><dd><PastilleTransporteur t={trV} C={C} seul data-recap-transporteur=""/></dd></div> : null}
+          {v.suivi ? <div className="vrm-recap-ligne"><dt>Suivi</dt><dd className="vrm-recap-mono">{v.suivi}</dd></div> : null}
+          {v.etat && v.etape === 'autre' ? <div className="vrm-recap-ligne"><dt>Vestiaire écrit</dt><dd>« {v.etat} »</dd></div> : null}
+        </dl>
+        {enV ? <p data-vc-vente-vinted="" className="vrm-recap-issue">Encore en ligne sur Vinted — retire-la de Vinted pour ne pas la vendre deux fois. <a href={`https://www.vinted.fr/items/${enV.id}`} target="_blank" rel="noreferrer">Ouvrir l'annonce ↗</a></p> : null}
+      </section>
+      <section className="vrm-recap-gestes" aria-label="Actions">
+        {v.aExpedier && !fait && v.bordereau ? <div className="vrm-recap-principal"><PastilleTransporteur t={trV} C={C} data-recap-transporteur=""/><BoutonImprimerVc v={v} grand/></div> : null}
+        <div className="vrm-recap-grille">
+          {v.aExpedier ? <Bouton variante="secondaire" icone="check" data-geste="fait" data-vc-fait={v.id} onClick={() => marquerVc('vrm_vc_colis_done', v.id, !fait)}>{fait ? '↺ Pas encore' : 'Colis fait'}</Bouton> : null}
+          {v.num ? <Bouton variante="secondaire" icone="doc" data-recap-fiche={v.num} aria-label={`Fiche N°${v.num}`} onClick={() => { fermer(); window.dispatchEvent(new CustomEvent('vrm:fiche-article', { detail: v.num })); }}>Fiche de l’article</Bouton> : null}
+        </div>
+      </section>
+    </>;
+  };
+  return (
+    <LigneVenteCompacte className="vrm-sale-row" data-tx={'vc:' + v.id} data-vc-vente={v.id} data-vc-vente-num={v.num || ''} data-vc-vente-etape={v.etape} data-flou={flou ? '1' : '0'}
+      style={{ borderTop: i > 0 ? `1px solid ${C.border}` : 'none', opacity: vcVenteAnnulee(v) ? 0.6 : 1, padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 10, ...(flou ? STYLE_FLOU : null) }}
+      montantCentimes={lb.verse != null ? Math.round(lb.verse * 100) : undefined} numerosArticle={v.num ? [v.num] : []} plateforme="vestiaire"
+      photo={v.photo || ''} photoNoeud={photoNoeud} titre={nomLigne} sous={sous} etat={etat} ton={ton}
+      montant={lb.verse != null ? `${eurosLigne(lb.verse)} €` : '—'} benef={benef} recap={recap}
+      gestes={gesteCout ? <div className="vrm-gestes-pile">{gesteCout}</div> : null}/>
+  );
 }
 const dateCourteVc = (iso) => { const t = Date.parse(iso || ''); return isFinite(t) ? new Date(t).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }) : ''; };
 function VentesVestiaire({ comptes }) {
   const { paires, enLigne } = useEbayPaires(comptes);
   const [d, setD] = React.useState(undefined);   // undefined en cours · null pas su · objet
   const vcOuvert = useCompteVcOuvert();
+  const vcLoc = useVcLocal();
+  useNumerotationVestiaire();
   const relire = React.useCallback(async () => {
     // (1er nov.) Relues une fois sur un échec passager (`lireBaseRelue`).
     const [jv, jl] = await Promise.all([
@@ -26743,75 +27046,39 @@ function VentesVestiaire({ comptes }) {
   }, [paires]);
   const style = { fontSize: 12.5, color: C.muted, lineHeight: 1.55 };
   const geste = <>ouvre <b style={{ color: C.text }}>« Mes ventes »</b> et <b style={{ color: C.text }}>« Articles à expédier »</b> sur vestiairecollective.com, dans le Chrome où l'extension VRM est installée</>;
-  // ⚠️ (1er nov.) AUCUN MONTANT à l'écran : Vestiaire écrit un chiffre sur chaque
-  // vente, mais VRM ne sait pas encore si c'est le prix payé par l'acheteur ou ce
-  // que Vestiaire te verse (commission déduite). Le montant reste rangé, il n'est
-  // ni montré ni compté (CA, URSSAF, bénéfice) — c'est dit UNE fois, en tête.
   // (1er nov., audit A2) Une vente Vestiaire n'entre dans un total que si son
   // montant est SÛR (`montantRecuVc`) ; sinon elle est NOMMÉE à côté de chaque
   // total « toutes plateformes » (« au moins »). La phrase le dit, des mêmes lignes.
   const nPasSur = d && d.ventes ? Object.values(d.ventes).filter((v) => v && typeof v === 'object' && !vcVenteAnnulee(v) && montantRecuVc(v).eur == null).length : 0;
   const phraseMontant = <div data-vc-ventes-montant="" data-vc-ventes-pas-sur={nPasSur} style={{ ...style, marginTop: 8 }}>{nPasSur
     ? <>{nPasSur} vente{nPasSur > 1 ? 's' : ''} Vestiaire {nPasSur > 1 ? 'ne sont comptées' : "n'est comptée"} dans aucun total (vendu, chiffre d'affaires, URSSAF, bénéfice) : VRM ne sait pas encore si le chiffre lu est le prix de vente ou ce que Vestiaire te verse. Chaque total le dit à côté (« au moins »).</>
-    : <>Les montants Vestiaire comptés sont ceux que Vestiaire dit te verser, en euros.</>}</div>;
+    : <>Les montants Vestiaire sont ceux que Vestiaire dit te verser (sa commission déjà retirée), en euros.</>}</div>;
   let corps;
   if (d === undefined) corps = <div data-vc-ventes="charge" style={style}>Lecture de tes ventes Vestiaire…</div>;
   else if (d === null) corps = <div data-vc-ventes="pas-su" style={style}>Je n'ai pas pu lire tes ventes Vestiaire — rien n'est perdu, c'est la lecture qui a échoué. <button type="button" className="vrm-lien-action" data-vc-ventes-relire="" onClick={() => { setD(undefined); relire(); }} style={{ background: 'none', border: 'none', color: C.accent, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', minHeight: 44, padding: 0 }}>Réessayer</button></div>;
   else if (!d.ventes) corps = <div data-vc-ventes="jamais" style={style}>Pas encore lues : {geste}{extSait('vcventes') === 'retard' ? <> — mise à jour en <b>{EXT_CAPACITES.vcventes}</b> d'abord</> : ''}. Elle les lit en passant.</div>;
   else {
     const liste = Object.entries(d.ventes).filter(([, v]) => v && typeof v === 'object').map(([id, v]) => {
-      const num = cleNum((v.productId && d.liens[v.productId]) || v.ref || '');
+      const num = numVcVente(v, d.liens, vcLoc.auto);
       return { id, ...v, num, ...etapeVenteVc(v) };
     // (31 oct.) Les ventes À EXPÉDIER d'abord (la date limite la plus proche en tête), puis les autres, la plus récente d'abord.
     }).sort((a, z) => (z.aExpedier === true) - (a.aExpedier === true) || (a.aExpedier && z.aExpedier ? String(a.limite || '9999').localeCompare(String(z.limite || '9999')) : 0) || String(z.date || z.premiereVue || '').localeCompare(String(a.date || a.premiereVue || '')));
-    const aExp = liste.filter((v) => v.aExpedier);
+    const aExp = liste.filter((v) => v.aExpedier && !vcLoc.fait[v.id]);
     const lue = d.lectures && d.lectures['a-expedier'];
     const derniere = [d.lectures && d.lectures.ventes && d.lectures.ventes.at, lue && lue.at].filter(Boolean).sort().pop() || '';
     if (!liste.length) corps = <div data-vc-ventes="vide" style={style}>Aucune vente Vestiaire à la dernière lecture{derniere ? ` (${ageCourtVc(derniere)})` : ''}. Après une vente, {geste} : elle apparaît ici.</div>;
     else corps = (
-      <div data-vc-ventes="lu" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-        <div data-vc-ventes-resume="" style={style}>
+      <div data-vc-ventes="lu">
+        <div data-vc-ventes-resume="" style={{ ...style, marginBottom: 8 }}>
           {liste.length} vente{liste.length > 1 ? 's' : ''} vue{liste.length > 1 ? 's' : ''} · <b style={{ color: C.text }}>{aExp.length} à expédier</b>{lue && !lue.complet ? ' (au moins)' : ''}{derniere ? `, lues ${ageCourtVc(derniere)}` : ''}.
           {!lue ? <> La liste « Articles à expédier » n'a pas encore été lue : {geste}.</> : null}
         </div>
-        {liste.slice(0, 30).map((v) => {
-          const enV = v.num && enLigne ? enLigneParNum.get(v.num) : null;
-          const flou = vcFloute(vcOuvert, v.compte);
-          const jl = v.aExpedier ? joursAvantVc(v.limite) : null;
-          return (
-            <div key={v.id} data-vc-vente={v.id} data-vc-vente-num={v.num || ''} data-vc-vente-etape={v.etape} data-flou={flou ? '1' : '0'} style={{ borderTop: `1px solid ${C.border}`, paddingTop: 8, ...(flou ? STYLE_FLOU : {}) }}>
-              {/* (2 nov., 5.316) La vente telle que Vestiaire la montre : photo, titre, ce qu'il te verse, le bordereau. */}
-              {v.titre || v.photo ? <div data-vc-vente-fiche="" style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 6 }}>
-                <span className="vrm-vc-vente-photo" style={{ width: 52, height: 52, borderRadius: 8, overflow: 'hidden', background: C.bg, flexShrink: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}><PhotoVc src={v.photo || ''}/></span>
-                <span style={{ minWidth: 0 }}>
-                  <span style={{ display: 'block', fontSize: 14, fontWeight: 600, color: C.text, overflowWrap: 'anywhere' }}>{v.titre || 'Article Vestiaire'}</span>
-                  {montantRecuVc(v).eur != null ? <span data-vc-vente-verse={montantRecuVc(v).eur.toFixed(2)} style={{ display: 'block', fontSize: 12.5, color: C.muted }}>Vestiaire te verse {montantRecuVc(v).eur.toFixed(2).replace('.', ',')} €{v.paiementEstime ? ` · paiement estimé le ${v.paiementEstime}` : ''}</span> : null}
-                </span>
-              </div> : null}
-              {v.bordereau && v.bordereau.id ? <BoutonBordereauVc id={v.bordereau.id} titre={v.titre}/> : null}
-              <div style={{ fontSize: 13, color: C.text, fontWeight: 600 }}>{v.num ? `N°${v.num}` : 'Pas reliée à une paire'}<span data-vc-vente-etape-texte="" style={{ marginLeft: 8, color: v.aExpedier ? C.warn : C.muted, fontWeight: v.aExpedier ? 600 : 500 }}>· {v.label}</span>{v.aExpedier ? <span data-vc-vente-aexp="" hidden/> : null}</div>
-              {v.rang != null && v.etape !== 'annulee' ? (
-                <ol data-vc-vente-parcours={v.rang} aria-label="Étapes de la vente" style={{ listStyle: 'none', display: 'flex', gap: 4, padding: 0, margin: '6px 0 2px', flexWrap: 'wrap' }}>
-                  {VC_PARCOURS.map(([k, t], i) => <li key={k} aria-current={i === v.rang ? 'step' : undefined} style={{ fontSize: 11, padding: '2px 8px', borderRadius: 999, border: `1px solid ${i === v.rang ? C.text : C.border}`, color: i <= v.rang ? C.text : C.muted, fontWeight: i === v.rang ? 700 : 500 }}>{t}</li>)}
-                </ol>
-              ) : null}
-              <div style={{ fontSize: 11.5, color: C.muted }}>
-                {[v.date ? `vendue le ${dateCourteVc(v.date)}` : '', v.etat && v.etape !== 'autre' ? `Vestiaire : « ${v.etat} »` : ''].filter(Boolean).join(' · ') || 'date de vente non dite par Vestiaire'}
-              </div>
-              {/* (31 oct.) Le colis de la vente, tel que Vestiaire l'écrit (rangé depuis la 5.240) : la date limite d'envoi,
-                  le transporteur et le n° de suivi ; « plus à expédier » quand la liste lue EN ENTIER ne la porte plus
-                  (expédiée ou annulée — on ne dit pas laquelle). */}
-              {v.aExpedier || v.suivi || v.plusAExpedierDepuis ? <div data-vc-vente-colis="" style={{ fontSize: 11.5, color: C.muted }}>
-                {[v.aExpedier ? (v.limite && dateCourteVc(v.limite) ? (jl != null && jl < 0 ? `date limite passée (${dateCourteVc(v.limite)})` : `à envoyer avant le ${dateCourteVc(v.limite)}`) : 'date limite non dite par Vestiaire') : '',
-                  v.aExpedier ? (v.etiquette === true ? 'bordereau disponible sur Vestiaire' : v.etiquette === false ? 'pas encore de bordereau' : '') : '',
-                  v.suivi ? `${v.transporteur ? v.transporteur + ' ' : ''}n° ${v.suivi}` : '',
-                  !v.aExpedier && v.plusAExpedierDepuis && dateCourteVc(v.plusAExpedierDepuis) ? `plus dans « à expédier » depuis le ${dateCourteVc(v.plusAExpedierDepuis)}` : ''].filter(Boolean).join(' · ')}
-              </div> : null}
-              {!v.num ? <div style={{ fontSize: 11, color: C.muted }}>Aucune référence VRM-n° lue sur l'article : VRM ne devine pas la paire.</div> : null}
-              {enV ? <div data-vc-vente-vinted="" style={{ fontSize: 11.5, color: C.warn, marginTop: 2 }}>Encore en ligne sur Vinted — retire-la de Vinted pour ne pas la vendre deux fois. <a href={`https://www.vinted.fr/items/${enV.id}`} target="_blank" rel="noreferrer" style={{ color: C.accent, fontWeight: 600 }}>Ouvrir l'annonce ↗</a></div> : null}
-            </div>
-          );
-        })}
+        {/* La liste groupée de Vinted (`vrm-ventes-liste`) : une ligne par vente, filet fin. */}
+        <div className="vrm-ventes-liste" data-vc-ventes-liste="" style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:12,overflow:'hidden',boxShadow:C.shadow||'none'}}>
+          <div className="vrm-ledger-heading" aria-hidden="true"><span>Article</span><span className="vrm-ledger-state-heading">État</span><span>Montant</span></div>
+          <div className="vrm-ventes-entete" aria-hidden="true" data-ventes-entete-cols=""><span/><span>Article</span><span>État</span><span className="is-droite">Versé</span><span className="is-droite">Achat</span><span className="is-droite">Bénéfice</span><span/></div>
+          {liste.slice(0, 30).map((v, i) => <LigneVenteVc key={v.id} i={i} v={v} fait={vcLoc.fait[v.id] || null} enV={v.num && enLigne ? enLigneParNum.get(v.num) : null} flou={vcFloute(vcOuvert, v.compte)}/>)}
+        </div>
         {liste.length > 30 ? <div style={style}>Les 30 plus récentes sont montrées (sur {liste.length}).</div> : null}
       </div>
     );
@@ -26867,7 +27134,7 @@ function lireVentesVestiaire(force = false) {
   return _vcVentesLecture.p;
 }
 function useVentesVestiaire() { return ventesVcDeMemo(useVentesVestiaireBrut()); }
-function ventesVcDeMemo(d) { return React.useMemo(() => ventesVcDe(d), [d]); }
+function ventesVcDeMemo(d) { const loc = useVcLocal(); const k = JSON.stringify(loc.auto); return React.useMemo(() => ventesVcDe(avecNumerosVc(d)), [d, k]); }
 function useVentesVestiaireBrut() {
   const [d, setD] = React.useState(_vcVentesLecture.d);
   React.useEffect(() => {
@@ -26904,42 +27171,92 @@ function colisVestiaire(d) {
   if (d === null) return null;
   // (1er nov.) La règle vit dans api/_lib/vestiaire-regle.js (`colisVcAPoster`) :
   // la même pour Colis, Ma journée, la cloche, le widget et les rappels (§11).
-  const aEnvoyer = d.ventes ? colisVcAPoster(d) : null;
+  const dv = avecNumerosVc(d);
+  const aEnvoyer = d.ventes ? colisVcAPoster(dv) : null;
+  // (2 nov., soir) Ceux qu'il a cochés « Colis fait » : encore « à expédier » chez
+  // Vestiaire, plus à poster ici — montrés en bas (« Déjà postés »), annulables.
+  const faits = d.ventes ? (colisVcAPoster({ ...dv, fait: {} }) || []).filter((v) => dv.fait && dv.fait[v.id]) : [];
   const enRoute = d.achats ? Object.entries(d.achats).filter(([, v]) => v && v.suivi && !VC_ACHAT_FINI.test(String(v.etat || ''))).map(([id, v]) => ({
     id, nom: v.nom || '', suivi: v.suivi, transporteur: v.transporteur || '', etat: v.etat || '', date: v.date || '',
   })) : null;
   const nl = nonLusVestiaire(d.compteur, d.compteurs);
   const messages = nl ? nl.n : null;
-  return { aEnvoyer, enRoute, messages };
+  return { aEnvoyer, faits, enRoute, messages };
 }
 // (1er nov.) Les jours avant une date limite Vestiaire, à l'heure de PARIS — la
 // règle du widget et des rappels (`joursAvant`, api/_lib/ebay-a-expedier.js).
 function joursAvantVc(iso) { const t = Date.parse(iso || ''); return isFinite(t) ? joursAvantParis(t) : null; }
+// (2 nov., soir) UN COLIS VESTIAIRE = LA CARTE D'UN COLIS VINTED (mêmes classes,
+// mêmes gestes) : photo, titre et ce que Vestiaire verse, le N° (ou « N° en
+// attente »), « vendue le … · à envoyer avant … », le transporteur écrit UNE
+// fois avec son n° de suivi (« Chronopost · suivi … » était écrit deux fois),
+// puis Imprimer (tamponné titre + N°) · Imprimé · Colis fait.
+function CarteColisVc({ v, imprime, fait }) {
+  const j = joursAvantVc(v.limite);
+  const verse = montantRecuVc(v).eur;
+  const titre = v.titre || 'Article Vestiaire';
+  const urg = limiteVcTexte({ ...v, aExpedier: true });
+  const sec = { flex: '0 1 auto', minHeight: 44, borderRadius: 10, padding: '0 14px', fontSize: 13.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' };
+  return (
+    <div data-bord-card="" data-vc-colis={v.id} data-colis-ident={'vc:' + v.id} data-vc-colis-num={v.num || ''} data-vc-colis-limite={v.limite ? v.limite.slice(0, 10) : ''} data-jours={j == null ? '' : String(j)} data-plateforme-colis="vestiaire"
+      className="vrm-colis-carte" style={{ padding: '14px', border: `1px solid ${j != null && j < 0 ? C.warn + '66' : C.border}`, background: C.card, borderRadius: 12, opacity: fait ? 0.55 : 1 }}>
+      <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+        <div className="vrm-colis-photo" style={{ width: 64, height: 80, borderRadius: 8, background: '#fff', border: `1px solid ${C.border}`, boxSizing: 'border-box', flexShrink: 0, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <PhotoVc src={v.photo || ''} style={{ width: '100%', height: '100%' }}/>
+        </div>
+        <div style={{ flex: '1 1 150px', minWidth: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+            <span className="vrm-colis-titre" title={titre} style={{ flex: 1, minWidth: 0, fontSize: 14, fontWeight: 600, lineHeight: 1.35, color: C.text, letterSpacing: '-.01em', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{titre}</span>
+            {verse != null ? <span className="vrm-display vrm-colis-prix" data-vc-colis-verse={verse.toFixed(2)} title="Ce que Vestiaire te verse" style={{ flexShrink: 0, fontSize: 17, fontWeight: 700, color: C.text, whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums', letterSpacing: '-.02em' }}>{verse.toFixed(2).replace('.', ',')} €</span> : null}
+          </div>
+          <div style={{ fontSize: 12, color: C.muted, marginTop: 6, display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+            {v.num
+              ? <span className="vrm-colis-num" style={{ fontSize: 12, fontWeight: 700, color: C.text, background: C.bg, border: `1px solid ${C.border}`, borderRadius: 999, padding: '2px 9px', flexShrink: 0, fontVariantNumeric: 'tabular-nums' }}>N°{v.num}</span>
+              : <span className="vrm-colis-num" title="Le numéro arrive dès que VRM a relu tes annonces Vestiaire." style={{ fontSize: 11.5, fontWeight: 600, color: C.warn, background: 'transparent', border: `1px dashed ${C.warn}88`, borderRadius: 999, padding: '2px 9px', flexShrink: 0, whiteSpace: 'nowrap' }}>N° en attente</span>}
+            <span style={{ fontWeight: 600 }}>Vestiaire</span>
+          </div>
+          <div style={{ fontSize: 12, color: C.muted, marginTop: 6 }}>
+            <span data-colis-dates="">{v.date ? `vendue le ${dateCourteVc(v.date)}` : ''}{urg ? <span data-colis-limite-texte="" style={{ color: j != null && j <= 1 ? C.warn : C.muted, fontWeight: j != null && j <= 1 ? 600 : 500 }}>{v.date ? ' · ' : ''}{urg}</span> : null}</span>
+            {fait ? <span style={{ color: C.text, fontWeight: 600 }}> · ✓ posté</span> : null}
+          </div>
+          {/* Le transporteur est écrit UNE fois : la pastille à côté du bouton bordereau. */}
+          {v.suivi ? <div data-vc-colis-transport="" style={{ fontSize: 12, color: C.muted, marginTop: 4 }}>suivi {v.suivi}</div> : null}
+        </div>
+      </div>
+      <div className="vrm-colis-actions" style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 12, flexWrap: 'wrap' }}>
+        {v.bordereau ? <BoutonImprimerVc v={v} carte/> : <span data-vc-colis-bordereau={v.etiquette === true ? 'vestiaire' : v.etiquette === false ? 'pas-encore' : 'pas-su'} style={{ flex: '1 1 160px', fontSize: 12.5, color: C.muted }}>{v.etiquette === true ? 'Bordereau disponible sur Vestiaire — ouvre la vente sur Vestiaire, il arrive ici' : v.etiquette === false ? 'Pas encore de bordereau sur Vestiaire' : 'Bordereau : pas su'}</span>}
+        {/* (2 nov.) Le transporteur LU, à côté du bouton bordereau, comme Vinted (src/PastilleTransporteur.jsx). */}
+        <PastilleTransporteur t={transporteurDuColis({ declare: v.transporteur, suivi: v.suivi })} C={C} data-colis-transporteur={'vc:' + v.id}/>
+        {v.bordereau ? <button type="button" data-geste="imprime" data-vc-imprime={v.id} onClick={() => marquerVc('vrm_vc_imprimes', v.id, !imprime)} title={imprime ? 'Remettre en « à imprimer »' : 'Marquer comme imprimé'}
+          className="vrm-colis-sec vrm-colis-ter" style={{ ...sec, border: `1px solid ${C.border}`, background: imprime ? C.bg : 'transparent', color: imprime ? C.text : C.muted }}>{imprime ? '✓ Imprimé' : 'Marquer imprimé'}</button> : null}
+        <button type="button" data-geste="fait" data-vc-fait={v.id} onClick={() => marquerVc('vrm_vc_colis_done', v.id, !fait)} title={fait ? 'Annuler « colis fait »' : 'Marquer comme posté → il sort de la liste'}
+          className="vrm-colis-sec vrm-colis-ter" style={{ ...sec, border: `1px solid ${C.border}`, background: fait ? C.bg : 'transparent', color: fait ? C.text : C.muted }}>{fait ? '↺ Pas encore' : '✓ Colis fait'}</button>
+      </div>
+    </div>
+  );
+}
 function ColisVestiaireBloc({ vc }) {
+  const loc = useVcLocal();
   if (vc === undefined || (vc && !vc.aEnvoyer && !vc.enRoute)) return null;
   if (vc === null) return <div data-colis-vestiaire="passu" style={{ marginBottom: 10 }}><LignePanne>Les colis Vestiaire n'ont pas pu être lus pour l'instant. Rien n'est perdu : rouvre Colis dans un moment.</LignePanne></div>;
   // (2 nov.) Les achats en route (`vc.enRoute`) ne sont plus ici : `AchatsVestiaireEnRoute`, sous « À retirer ».
-  const E = vc.aEnvoyer || [];
-  if (!E.length) return null;
+  const E = vc.aEnvoyer || [], F = vc.faits || [];
+  if (!E.length && !F.length) return null;
   const titre = (t, n) => <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: '.07em', textTransform: 'uppercase', color: C.muted }}>{t} <span style={{ color: C.text, fontVariantNumeric: 'tabular-nums' }}>· {n}</span></span>;
   return (
-    <div data-colis-vestiaire={E.length} style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 16 }}>
+    <div data-colis-vestiaire={E.length} data-colis-vestiaire-faits={F.length} style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 16 }}>
       {E.length > 0 && <>
         {titre('Ventes Vestiaire à envoyer', E.length)}
-        <div className="vrm-aide" style={{ fontSize: 12, color: C.muted, lineHeight: 1.5 }}>{E.every((v) => v.bordereau) ? 'Les bordereaux sont dans VRM (« Imprimer le bordereau »). ' : 'Le bordereau se prend sur Vestiaire (onglet « articles à expédier ») — ou ici, une fois la page de la vente ouverte sur Vestiaire. '}Ce que VRM lit vient de ta dernière visite sur Vestiaire avec l'extension.</div>
-        {E.map((v) => { const j = joursAvantVc(v.limite); return (
-          <div key={v.id} data-vc-colis={v.id} data-colis-ident={'vc:'+v.id} data-vc-colis-num={v.num || ''} data-vc-colis-limite={v.limite ? v.limite.slice(0, 10) : ''} style={{ border: `1px solid ${C.border}`, borderRadius: 10, padding: '10px 12px', background: C.card }}>
-            {v.titre || v.photo ? <div data-vc-colis-fiche="" style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 4 }}>
-              <span style={{ width: 44, height: 44, borderRadius: 8, overflow: 'hidden', background: C.bg, flexShrink: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}><PhotoVc src={v.photo || ''}/></span>
-              <span style={{ fontSize: 13.5, fontWeight: 600, color: C.text, minWidth: 0, overflowWrap: 'anywhere' }}>{v.titre || 'Article Vestiaire'}</span>
-            </div> : null}
-            <div style={{ fontSize: 13, fontWeight: 600, color: C.text }}>{v.num ? `N°${v.num}` : 'Pas reliée à une paire'}
-              {j != null ? <span style={{ marginLeft: 8, color: j <= 1 ? C.warn : C.muted, fontWeight: 600 }}>· {j < 0 ? `date limite passée (${new Date(v.limite).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })})` : j === 0 ? 'à envoyer aujourd’hui' : j === 1 ? 'à envoyer demain' : `à envoyer avant le ${new Date(v.limite).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}`}</span> : null}</div>
-            <div style={{ fontSize: 11.5, color: C.muted }}>{v.limite ? '' : 'date limite non dite par Vestiaire · '}{v.etiquette === true ? 'bordereau disponible sur Vestiaire' : v.etiquette === false ? 'pas encore de bordereau' : 'bordereau : pas su'}{v.transporteur ? ` · ${v.transporteur}` : ''}{v.suivi ? ` · suivi ${v.suivi}` : ''}</div>
-            {v.suivi ? <div style={{ fontSize: 11.5, color: C.muted }}>{v.transporteur ? v.transporteur + ' · ' : ''}suivi {v.suivi}</div> : null}
-            {v.bordereau ? <BoutonBordereauVc id={v.bordereau.id} titre={v.titre}/> : null}
-            {!v.num ? <div style={{ fontSize: 11, color: C.muted }}>Aucune référence VRM-n° lue sur l'article : VRM ne devine pas la paire.</div> : null}
-          </div>); })}
+        <div className="vrm-aide" style={{ fontSize: 12, color: C.muted, lineHeight: 1.5 }}>{E.every((v) => v.bordereau) ? 'Le bordereau est là : imprime (titre et N° tamponnés), colle, dépose. ' : 'Un bordereau qui n’est pas encore là se prend sur Vestiaire : il arrive ici quand tu ouvres la vente sur Vestiaire. '}Ce que VRM lit vient de ta dernière visite sur Vestiaire avec l'extension.</div>
+        <div className="vrm-colis-grille" data-colis-lignes="1" style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          {E.map((v) => <CarteColisVc key={v.id} v={v} imprime={!!loc.imprimes[v.id]} fait={null}/>)}
+        </div>
+      </>}
+      {F.length > 0 && <>
+        <span data-groupe="fait" style={{ fontSize: 11, fontWeight: 600, letterSpacing: '.07em', textTransform: 'uppercase', color: C.muted, marginTop: E.length ? 12 : 0 }}>Vestiaire · déjà postés</span>
+        <div className="vrm-colis-grille" style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          {F.map((v) => <CarteColisVc key={v.id} v={v} imprime={!!loc.imprimes[v.id]} fait={loc.fait[v.id] || true}/>)}
+        </div>
       </>}
     </div>
   );
@@ -39128,6 +39445,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // DANS la même vague que les commandes eBay (aucun rendu de plus). Trois
   // états : undefined en cours · null pas su · objet (champs absents = jamais lu).
   const [vcEtat, setVcEtat] = useState(undefined);
+  // (2 nov., soir) Les N° donnés aux annonces Vestiaire et ses « Colis fait » :
+  // l'écran se redessine quand ils changent (`useVcLocal`), posé AVANT tout
+  // `useMemo` qui les lit (§4.6).
+  const vcLoc0 = useVcLocal();
+  // Une annonce (ou une vente à expédier) Vestiaire sans N° en reçoit un — ici aussi, pour que
+  // Colis et Ma journée ne montrent pas « N° en attente » à qui n'ouvre jamais l'écran Vestiaire.
+  useNumerotationVestiaire();
+  const vcLocCle = JSON.stringify([vcLoc0.auto, vcLoc0.fait]);
   // (1er nov., audit A2) Les ventes Vestiaire entrent dans chaque total « toutes
   // plateformes » : comptées si leur argent est sûr, NOMMÉES sinon (§5). Posées
   // ICI, avant tout `useMemo` qui les lit (§4.6, piège TDZ).
@@ -39204,9 +39529,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     leboncoin: lbcLu === undefined ? undefined : lbcLu === null ? null : colisLbcAPoster(lbcVentes.ventes || [], lbcColisFait),
     // Les colis de l'écran Colis (`colisVestiaire(vcEtat)`) quand il les a lus ;
     // sinon la lecture partagée (`vcBrut`) — la même ligne, la même règle.
-    vestiaire: vcEtat !== undefined ? (vcEtat === null ? null : (colisVcAPoster(vcEtat) || [])) : (vcBrut === undefined ? undefined : vcBrut === null ? null : (colisVcAPoster(vcBrut) || [])),
+    vestiaire: vcEtat !== undefined ? (vcEtat === null ? null : (colisVcAPoster(avecNumerosVc(vcEtat)) || [])) : (vcBrut === undefined ? undefined : vcBrut === null ? null : (colisVcAPoster(avecNumerosVc(vcBrut)) || [])),
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }), [lbcLu, lbcVentes, vcEtat, vcBrut, JSON.stringify(lbcColisFait)]);
+  }), [lbcLu, lbcVentes, vcEtat, vcBrut, JSON.stringify(lbcColisFait), vcLocCle]);
   // ── LES MESSAGES eBAY SANS RÉPONSE, POUR MA JOURNÉE (21 octobre) ─────────
   //    Lus dans le RÉSUMÉ rangé par la route (`ebay_messages{suffixe}`, écrit à
   //    chaque relecture ~10 min et à l'ouverture d'eBay → Messages) : AUCUN
@@ -41773,7 +42098,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     if (reservesNum) reservesNum.cles.forEach((c) => t.add(c));
     return t;
   }, [usedNumeros, numeros, saleOv, garageNums, reservesNum]);
-  const nextNumero = useMemo(() => prochainLibre(new Set(takenNums), new Set(takenCles), prefNum), [takenNums, takenCles, prefNum]);
+  const nextNumero = useMemo(() => { const t = new Set(takenNums), k = new Set(takenCles); ajouterNumerosHorsEcran(t, k); return prochainLibre(t, k, prefNum); }, [takenNums, takenCles, prefNum, vcLocCle]);
 
 
   // ── LES PAIRES QUI EXISTENT VRAIMENT (pour le Garage) ───────────────────────
@@ -42726,6 +43051,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const a = doublonsAReattribuer(conflitsNum, numeros).filter((x) => !DOUBLONS_FAITS.has(x.id + ':' + cleNum(x.ancien)));
     if (!a.length) return;
     const pris = new Set([...takenNums, ...numsOccupes]), prisK = new Set([...takenCles, ...Object.keys(porteursNum)]);
+    ajouterNumerosHorsEcran(pris, prisK);
     const tous = annoncesPresentes;      // 22 oct. : masquées comprises
     const now = new Date().toISOString(), faits = [];
     for (const x of a) {
@@ -44015,6 +44341,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // même si la libération le croyait disponible.
     const dejaPris = new Set([...takenNums, ...numsOccupes]);
     const dejaPrisK = new Set([...takenCles, ...Object.keys(porteursNum)]);
+    ajouterNumerosHorsEcran(dejaPris, dejaPrisK);
     let changed = false;
     // ⚠️ CHANGEMENT (juillet 2026) : on n'INVENTE plus JAMAIS de numéro pour une
     // vente. Inventer des numéros pour des ventes non reconnues faisait grimper le
@@ -44816,6 +45143,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     //    ne gardait que les entiers et la réécriture plus bas les EFFAÇAIT.
     const nextUsed = new Set(usedNumeros.map(entreePool).filter(x => x != null));
     const takenK = new Set(takenCles);
+    ajouterNumerosHorsEcran(taken, takenK);   // (2 nov.) les N° donnés aux annonces Vestiaire
     let changed = false;
     // La paire REPUBLIÉE reprend le numéro de l'annonce qu'elle remplace (et
     // une annonce renumérotée automatiquement par erreur le retrouve).
@@ -47899,7 +48227,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const rowsVc = resultats[3] && resultats[3].status === "fulfilled" ? resultats[3].value : null;
     if (Array.isArray(rowsVc) && rowsVc.every((r) => r.owner === owner && ["vc_listings", "vc_ventes"].includes(r.id))) {
       const lst = rowsVc.find((r) => r.id === "vc_listings") || null;
-      const rv = retraitsVestiaire({ lst, ventes: (rowsVc.find((r) => r.id === "vc_ventes") || {}).ventes || {} });
+      const rv = retraitsVestiaire({ lst: avecNumerosVc(lst), ventes: (rowsVc.find((r) => r.id === "vc_ventes") || {}).ventes || {} });
       annonces.push(...rv.annonces); ventes.push(...rv.ventes); manques.push(...rv.manques);
     } else manques.push("Vestiaire non relu");
     for(const l of ea?.lignes||[])if(l.ligne?.complet===true&&Number(l.ligne.capturedAt)>0)completes.push({plateforme:'eBay',compte:String(l.compte.ref),at:Number(l.ligne.capturedAt)});
@@ -53000,7 +53328,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             eBay : l'acheteur a payé le port, VRM n'achète rien (§2.8). La phrase
             commune est dite UNE fois (§7) ; la ligne ne garde que ce qui la
             distingue. */}
-        {only === 'bordereaux' && voitSite('vestiaire') ? <ColisVestiaireBloc vc={colisVestiaire(vcEtat)}/> : null}
+        {only === 'bordereaux' && voitSite('vestiaire') ? <ColisVestiaireBloc vc={colisVestiaire(vcEtat)} cle={vcLocCle}/> : null}
         {/* (31 oct.) Les emails reçus et ce que VRM en a fait — l'ambre quand un
             email attend un geste (bordereau au N° deviné, reçu sans n°…). */}
         {/* (2 nov., colis clair) « Tes emails, ce que VRM en a fait » n'est pas un geste
@@ -57335,7 +57663,7 @@ function LeboncoinScreen() {
     //    (`aRetirerDeLbcEbay`) ; Vestiaire pas lu ⇒ rien (pas su). Une paire déjà
     //    « à retirer » n'est pas doublée.
     try {
-      const soldVc = numerosVendusVc(ventesVcDe(await lireVentesVestiaire()));
+      const soldVc = numerosVendusVc(ventesVcDe(avecNumerosVc(await lireVentesVestiaire())));
       const deja = new Set(removals.filter((r) => r.etat === 'vendue').map((r) => cleNum(r.numero)).filter(Boolean));
       const re = aRetirerDeLbcEbay({ soldEbay: soldVc, posted, numeros, itemsLbc: lbcRows === null ? null : lbcItems, liens, vendusLbc: ventesLbcKO ? null : vendusLbc, sortis: numsSortis, deja });
       if (re && re.length) {
@@ -61971,7 +62299,7 @@ function VentesToutes({ sites, ventesVinted, ventesKO, comptes, panelOff, lbcVen
         if (!v) continue;
         out.push({ cle: 'vestiaire:' + id, site: 'vestiaire', id, titre: v.titre || v.title || 'Vente Vestiaire', t: ts(v.date) ?? ts(v.premiereVue),
           prix: null, devise: 'EUR', etat: v.aExpedier ? 'À expédier' : (v.etat || ''), compte: '',
-          num: cleNum((v.productId && vc.liens[v.productId]) || v.ref || ''), photo: photoArticle(v) || null });
+          num: numVcVente(v, vc.liens, carteNumerosVc(vcCarte('vrm_vc_numeros'))), photo: photoArticle(v) || null });
       }
     }
     // La plus récente d'abord ; une vente sans date lue va à la fin (jamais datée au hasard).
@@ -63942,7 +64270,7 @@ function AppCoeur() {
       // (rien d'inventé). VRM ne retire rien de Vinted (§3) : il le dit.
       let vcDoubles=0;
       try{
-        const lv=ventesVcDe(await lireVentesVestiaire());
+        const lv=ventesVcDe(avecNumerosVc(await lireVentesVestiaire()));
         if(Array.isArray(lv) && lv.length){
           const parN=new Map();
           for(const id in nums){ const k=cleNum((nums[id]||{}).numero); if(!k) continue; if(!parN.has(k)) parN.set(k,[]); parN.get(k).push(String(id)); }
@@ -64033,7 +64361,7 @@ function AppCoeur() {
         // vendue sur Leboncoin ou sur eBay est « à annuler » aussi.
         const liensV=load('vrm_lbc_liens',{})||{};
         // (1er nov., audit A1) + Vestiaire (par identité ; pas su ⇒ aucune alerte inventée).
-        const ventesVcN=ventesVcDe(await lireVentesVestiaire());
+        const ventesVcN=ventesVcDe(avecNumerosVc(await lireVentesVestiaire()));
         const verdict=(items)=>numerosDejaVendus({numeros:nums, enLigne:enLigneE, vendusVinted:vendusE, commandes:ords, ventesLbc:ventesLbcLu, itemsLbc:items, liensLbc:liensV, ventesVc:ventesVcN});
         let ventesE=verdict(lbcItemsLu);
         if(ventesE.lbcSansPaire>0 && (progE||[]).length){ const items=await lbcAnnoncesSession(); ventesE=verdict(items||null); }
@@ -64046,7 +64374,7 @@ function AppCoeur() {
         try{
           const rVc=await lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vc_listings&select=items:data->items,liens:data->liens,capturedAt:data->>capturedAt`);
           const brutVc=_vcVentesLecture.d||await lireVentesVestiaire();
-          const enLigneVc=Array.isArray(rVc)&&rVc[0]&&brutVc?annoncesVcEnLigne(rVc[0], brutVc.ventes||{}).parNum:null;
+          const enLigneVc=Array.isArray(rVc)&&rVc[0]&&brutVc?annoncesVcEnLigne(avecNumerosVc(rVc[0]), brutVc.ventes||{}).parNum:null;
           if(enLigneVc&&enLigneVc.size){
             const pv=await lirePreuvesVenteVinted().catch(()=>null);
             const vd=numerosDejaVendus({numeros:nums, enLigne:lbcOnlineIds, vendusVinted:pv&&pv.vendus?pv.vendus:null, commandes:ords, ventesLbc:ventesLbcLu, itemsLbc:lbcItemsLu===undefined?null:lbcItemsLu, liensLbc:liensV});

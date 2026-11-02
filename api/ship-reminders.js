@@ -173,7 +173,8 @@ async function lireCommandesEbay() {
     lireLigne: getRowProjete, lireToutes: (p) => fetchPaginated(scoped(p)), comptesActifs, normaliserRegistre,
   });
 }
-const MAIN_BILAN = ['vinted_accounts_hidden', 'vinted_ship_done', 'vinted_bords_shipped', 'vrm_paires_dorment', 'vrm_lbc_colis_done'];
+// (2 nov., soir) + Vestiaire : « Colis fait » et les N° donnés aux annonces (src/numerosVestiaire.js).
+const MAIN_BILAN = ['vinted_accounts_hidden', 'vinted_ship_done', 'vinted_bords_shipped', 'vrm_paires_dorment', 'vrm_lbc_colis_done', 'vrm_vc_colis_done', 'vrm_vc_numeros'];
 const ensemble = (v) => new Set(Array.isArray(v) ? v.map(String) : []);
 const objet = (v) => (v && typeof v === 'object' && !Array.isArray(v) ? v : {});
 
@@ -215,11 +216,11 @@ async function lireDonneesBilan() {
     lbc: lbcL === undefined ? null : Object.values(objet(lbcL && lbcL.ventes)),
     // Les colis Leboncoin et Vestiaire à poster (`txsAExpedier`) : les mêmes lignes.
     lbcVentes: lbcL === undefined ? null : (objet(lbcL && lbcL.ventes) || {}),
-    vc: (vcV === undefined || vcL === undefined) ? null : { ventes: (vcV && vcV.ventes) || null, liens: (vcL && vcL.liens) || {} },
+    vc: (vcV === undefined || vcL === undefined) ? null : { ventes: (vcV && vcV.ventes) || null, liens: (vcL && vcL.liens) || {}, auto: (mm && mm.vrm_vc_numeros) || {}, fait: (mm && mm.vrm_vc_colis_done) || {} },
     ebay: ebayL,
     versements: versementsDeLignes(txn),
     // `null` = illisible (le bilan le NOMME) ; ligne absente = aucune vente.
-    vestiaire: (vcV === undefined || vcL === undefined) ? null : ventesVcDe({ ventes: (vcV && vcV.ventes) || null, liens: (vcL && vcL.liens) || {} }),
+    vestiaire: (vcV === undefined || vcL === undefined) ? null : ventesVcDe({ ventes: (vcV && vcV.ventes) || null, liens: (vcL && vcL.liens) || {}, auto: (mm && mm.vrm_vc_numeros) || {} }),
     main: mm,
   };
 }
@@ -710,7 +711,7 @@ export function texteMatin({ overdue, aVerifier = 0, dueToday, dueTomorrow, ebay
 // projeté, §4.4), ventes moissonnées (liste + résumé), commandes eBay, et les
 // bordereaux reçus par email (leur date limite, AVEC l'heure). Chaque source
 // vaut `null` quand sa lecture a échoué (« rien lu » ne vaut pas « rien »).
-const MAIN_COLIS = ['vinted_ship_done', 'vinted_bords_shipped', 'vinted_bords_hidden', 'vrm_lbc_colis_done'];
+const MAIN_COLIS = ['vinted_ship_done', 'vinted_bords_shipped', 'vinted_bords_hidden', 'vrm_lbc_colis_done', 'vrm_vc_colis_done', 'vrm_vc_numeros'];
 async function lireDonneesColis() {
   const BORD = 'dateLimite:data->>dateLimite,transaction:data->>transaction,suivi:data->>suivi,numero:data->>numero,receivedAt:data->>receivedAt,filename:data->>filename';
   const [comptesL, m, lignes, ebay, bords, lbcL, vcV, vcL] = await Promise.all([
@@ -735,7 +736,7 @@ async function lireDonneesColis() {
   }
   return { comptes, commandes, main: m === undefined ? null : objet(m), ebay, bords,
     lbcVentes: lbcL === undefined ? null : (objet(lbcL && lbcL.ventes) || {}),
-    vc: (vcV === undefined || vcL === undefined) ? null : { ventes: (vcV && vcV.ventes) || null, liens: (vcL && vcL.liens) || {} } };
+    vc: (vcV === undefined || vcL === undefined) ? null : { ventes: (vcV && vcV.ventes) || null, liens: (vcL && vcL.liens) || {}, auto: (objet(m) && objet(m).vrm_vc_numeros) || {}, fait: (objet(m) && objet(m).vrm_vc_colis_done) || {} } };
 }
 // Les ventes par transaction (leur DATE sert à la limite estimée), des seuls
 // comptes encore liés — la même portée que `txsAExpedier`.

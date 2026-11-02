@@ -181,12 +181,13 @@ async function colisEbayDuVendeur() {
 // (1er nov., audit A4) Les colis Leboncoin et Vestiaire à poster — la règle de
 // Colis (`resumeColisSites`), sur leurs seules ventes (§4.4, jamais le blob).
 // Une lecture ratée ⇒ ce site vaut `null` : le widget dit « au moins » et le nomme.
-async function colisAutresSites(fait) {
+async function colisAutresSites(fait, m) {
   try {
     const [l, v, li] = await Promise.all([ligneProjetee('lbc_ventes', ['ventes']), ligneProjetee('vc_ventes', ['ventes']), ligneProjetee('vc_listings', ['liens'])]);
     return resumeColisSites({
       lbc: l === undefined ? null : ((l && l.ventes && typeof l.ventes === 'object') ? l.ventes : {}),
-      vc: (v === undefined || li === undefined) ? null : { ventes: (v && v.ventes) || null, liens: (li && li.liens) || {} },
+      // (2 nov., soir) « Colis fait » Vestiaire et les N° donnés (main), la règle de Colis.
+      vc: (v === undefined || li === undefined) ? null : { ventes: (v && v.ventes) || null, liens: (li && li.liens) || {}, auto: (m && m.vrm_vc_numeros) || {}, fait: (m && m.vrm_vc_colis_done) || {} },
       fait,
     });
   } catch (_) { return { leboncoin: null, vestiaire: null }; }
@@ -329,7 +330,7 @@ const atRelay = (s) => /d[ée]pos[ée]/i.test(s || '') && /point\s+relais|bureau
 // achats Vinted « déposé en point relais » : mesuré le 23 oct., « 1 à retirer »
 // (une Salomon sans doute repartie) quand l'app en comptait 7, et AUCUN colis
 // venu d'un e-mail (le Mondial Relay du 21 octobre compris).
-const MAIN_WIDGET = ['vrm_widget_token', 'vrm_lbc_colis_done', 'vinted_pickup_done', 'vinted_bords_hidden', 'vinted_ship_done', 'vinted_bords_shipped', 'vinted_urssaf_mois', 'vrm_colis_retirer', 'vrm_colis_collected', 'vinted_accounts_hidden'];
+const MAIN_WIDGET = ['vrm_widget_token', 'vrm_lbc_colis_done', 'vrm_vc_colis_done', 'vrm_vc_numeros', 'vinted_pickup_done', 'vinted_bords_hidden', 'vinted_ship_done', 'vinted_bords_shipped', 'vinted_urssaf_mois', 'vrm_colis_retirer', 'vrm_colis_collected', 'vinted_accounts_hidden'];
 // (23 oct.) LES COLIS ARRIVÉS PAR E-MAIL APRÈS LA DERNIÈRE PUBLICATION DE L'APP.
 // La liste publiée (`vrm_colis_retirer`) est une photo prise à la dernière
 // ouverture de l'app : un colis arrivé depuis, app fermée, n'y est pas — c'est
@@ -647,7 +648,7 @@ export default async function handler(req, res) {
       rows('email_sale_*'), main(), snapshot(), colisEbayDuVendeur(),
     ]);
     const sold = txSold ? [] : await harvestOrders('sold', vivants);
-    const autres = m ? await colisAutresSites(m.vrm_lbc_colis_done) : { leboncoin: null, vestiaire: null };
+    const autres = m ? await colisAutresSites(m.vrm_lbc_colis_done, m) : { leboncoin: null, vestiaire: null };
     const lbcC = autres.leboncoin, vcC = autres.vestiaire;
     const purchased = txBuy ? [] : await harvestOrders('purchased', vivants);
 

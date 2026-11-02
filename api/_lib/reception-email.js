@@ -29,7 +29,7 @@ const lectureComptes=(lire,owner)=>Promise.all([
 // Les compteurs portent sur les JOURNAL_COMPTES derniers emails (deux
 // scalaires par ligne) et le disent (`sur`).
 export const JOURNAL_PAGE=20, JOURNAL_COMPTES=200;
-export const JOURNAL_TYPES={colis:['suivi'],bordereau:['bordereau'],vente:['vente','finalisation'],achat:['achat'],messages:['offre','message','favori','action'],incompris:['ignoré'],autre:['connu-sans-action','information']};
+export const JOURNAL_TYPES={colis:['suivi'],bordereau:['bordereau'],vente:['vente','finalisation','vente-vestiaire'],achat:['achat'],messages:['offre','message','favori','action'],incompris:['ignoré'],autre:['connu-sans-action','information']};
 const PROJECTION='id,at:data->>at,etat:data->>etat,type:data->>type,subject:data->>subject,from:data->>from,sourceDate:data->>sourceDate,adresses:data->adresses,resume:data->resume';
 export async function lireJournalEmail({owner,url,headers,fetcher=fetch,page=0,etat='',type='',adresse='',compteSeul=false}){
  if(!owner || owner==='00000000-0000-0000-0000-000000000000')throw Error('connexion-requise');
