@@ -261,7 +261,7 @@ const INSPECTE = (pg, tel) => pg.evaluate((tel) => {
   return { mauvais, regles, pointsSeuls, colles, debord, dehors, petits, coupes, titre: (document.querySelector('.vrm-main h1, .vrm-main h2') || {}).innerText || '' };
 }, tel);
 
-const ECRANS = [['journee', 'Ma journée'], ['annonces', 'Annonces'], ['ventes', 'Ventes'], ['cat_bord', 'Colis'], ['messages', 'Messages'], ['garage', 'Stock'], ['achats', 'Achats'], ['dashboard', 'Statistiques'], ['compta', 'Comptabilité'], ['settings', 'Paramètres']];
+const ECRANS = [['journee', 'Ma journée'], ['annonces', 'Annonces'], ['ventes', 'Ventes'], ['cat_bord', 'Colis'], ['cat_bord:retirer', 'Colis · À retirer'], ['messages', 'Messages'], ['garage', 'Stock'], ['achats', 'Achats'], ['dashboard', 'Statistiques'], ['compta', 'Comptabilité'], ['settings', 'Paramètres']];
 
 async function capture(pg, nom) {
   if (!SHOTS) return;
@@ -272,13 +272,19 @@ async function capture(pg, nom) {
 async function tournee(nav, { W, sombre, scenario, base }) {
   const T = `[${scenario} ${W}px ${sombre ? 'sombre' : 'clair'}]`;
   const o = await ouvrir(nav, { W, sombre, base, tab: 'journee' });
-  for (const [tab, nom] of ECRANS) {
+  for (const [ecran, nom] of ECRANS) {
+    const [tab, sous] = ecran.split(':');
     await o.pg.goto(`http://localhost:${PORT}/?tab=${tab}`, { waitUntil: 'domcontentloaded' });
     await o.pg.waitForSelector('.vrm-main', { timeout: 20000 }).catch(() => {});
     await o.pg.waitForTimeout(2800);
+    if (sous) {
+      const choix = o.pg.locator(`[data-colis-onglet-choix="${sous}"]`).first();
+      if (await choix.count()) { await choix.click(); await o.pg.waitForTimeout(1500); }
+      else if (scenario === 'jeu') dit(false, `${T} ${nom} : l'onglet existe`, sous);
+    }
     if (process.env.BANC_SONDE) await o.pg.evaluate(() => { window.__bancSonde = 1; });
     const r = await INSPECTE(o.pg, o.tel);
-    await capture(o.pg, `nv-${scenario}-${W}-${sombre ? 'sombre' : 'clair'}-${tab}`);
+    await capture(o.pg, `nv-${scenario}-${W}-${sombre ? 'sombre' : 'clair'}-${ecran.replace(':', '-')}`);
     dit(!r.mauvais.length, `${T} ${nom} : aucun NaN / undefined / Invalid Date / null à l'écran`, r.mauvais.join(' ¦ '));
     dit(!r.regles.length, `${T} ${nom} : aucun zéro creux ni « au moins 0 € », et un français juste`, r.regles.join(' ¦ '));
     dit(!r.pointsSeuls.length, `${T} ${nom} : aucune ligne qui commence par « · »`, r.pointsSeuls.join(' ¦ '));
