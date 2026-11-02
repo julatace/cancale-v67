@@ -36408,7 +36408,7 @@ function CarteUrssafMois({ liveStats, onNav }) {
           })() : <div style={{fontSize:13,color:C.muted}}>Aucune échéance à venir.</div>}
         </div>
         <div data-compta-mois="" style={{marginTop:16,paddingTop:16,borderTop:`1px solid ${C.border}`}}>
-          <div className="vrm-compta-libelle">À payer ({String(tauxUrssaf()).replace('.',',')} %) · <span style={{textTransform:'none'}}>{moisCourant.nom}, en cours</span></div>
+          <div className="vrm-compta-libelle"><span style={{textTransform:'capitalize'}}>{moisCourant.nom}</span>, en cours · à payer ({String(tauxUrssaf()).replace('.',',')} %)</div>
           <div className="vrm-compta-hero vrm-compta-hero-2 vrm-display" data-compta-chiffre="urssaf-mois" data-eur={urssafEstime==null?'':String(urssafEstime)} style={{color:urssafEstime==null?C.muted:C.text}}>{urssafEstime==null?'—':fmt(urssafEstime)}</div>
           {/* (2 nov.) La phrase vient de la MÊME ligne publiée que le chiffre :
               le CA reçu du mois (`moisCourantCA`) et son nombre de ventes. « Net
@@ -37519,7 +37519,7 @@ function BeneficeCompta({ compta, onNav, onSansDepenses, onAjouterDepense, sansC
             {etat === 'encours' ? 'Je lis ton bénéfice…' : sansCompte ? <span data-benefice-sans-compte="">Ton bénéfice arrivera ici dès qu’un compte Vinted sera relié (le bandeau du haut dit comment).</span> : <>Ton bénéfice se calcule dans l'écran Ventes, à partir de tes prix d'achat : ouvre-le une fois{onNav ? <> (<a href="?tab=cat_ventes" onClick={(ev) => { ev.preventDefault(); onNav('cat_ventes'); }} style={{ color: C.accent, fontWeight: 600, textDecoration: 'none' }}>Ventes</a>)</> : null}, il arrivera ici.</>}
           </p>
         ) : (<>
-          <div className="vrm-compta-libelle">{titreNet} · {B.libelle}</div>
+          <div className="vrm-compta-libelle" data-benef-titre="">{titreNet} · {B.libelle}</div>
           <div className="vrm-compta-hero vrm-display" data-compta-chiffre="gagne" data-eur={e2(B.netFinal)} style={{ color: B.netFinal == null ? C.muted : C.text }}>{B.netFinal == null ? '—' : fmt(B.netFinal)}</div>
           <p className="vrm-compta-phrase" data-compta-phrase="gagne">{phrase}{couverture ? <> {couverture}</> : null}</p>
           {(B.raison === 'achats' || (B.nCout < B.n)) && <div className="vrm-compta-geste">{lienSaisie}</div>}
