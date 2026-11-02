@@ -166,27 +166,35 @@ const INSPECTE = (pg, tel) => pg.evaluate((tel) => {
   // §5 : « au moins 0 € » ne se dit jamais (un minimum nul s'écrit « — ») ; et le français.
   const regles = [];
   for (const re of [/au moins\s+0(?:,00)?\s*€/, /(^|\n)\s*0(?:,00)?\s*€\s*\n\s*au moins/, /Où sont cet\b/, /\.\s+ouvre\b/]) { const m = re.exec(texte); if (m) regles.push(texte.slice(Math.max(0, m.index - 30), m.index + 50).replace(/\s+/g, ' ')); }
-  // Une ligne qui COMMENCE par « · » (un séparateur passé à la ligne).
+  // Une ligne qui COMMENCE par « · » (un séparateur passé à la ligne) : le
+  // caractère visible qui le PRÉCÈDE est sur une ligne au-dessus. Vaut pour le
+  // texte et pour un « · » posé en CSS (::before).
   const pointsSeuls = [];
-  const bloc = (n) => { let e = n.parentElement; while (e && /^(inline|inline-block|contents)$/.test(getComputedStyle(e).display)) e = e.parentElement; return e; };
+  const rectCar = (n, i) => { const r = document.createRange(); r.setStart(n, i); r.setEnd(n, i + 1); return r.getBoundingClientRect(); };
+  const precedent = (n, i) => {
+    const tw = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT); tw.currentNode = n;
+    let t = n.nodeValue.slice(0, i), cur = n, pas = 0;
+    for (;;) {
+      for (let k = t.length - 1; k >= 0; k--) if (/\S/.test(t[k])) { const rc = rectCar(cur, k); if (rc.width) return rc; }
+      cur = tw.previousNode(); if (!cur || ++pas > 60) return null;
+      if (!vis(cur.parentElement)) { t = ''; continue; }
+      t = cur.nodeValue;
+    }
+  };
+  const ferme = (el) => !!el.closest('details:not([open])') && !el.closest('summary');   // un repli fermé ne se voit pas
+  const premierTexte = (el) => { const tw = document.createTreeWalker(el, NodeFilter.SHOW_TEXT); for (let n = tw.nextNode(); n; n = tw.nextNode()) if (/\S/.test(n.nodeValue)) return n; return null; };
+  const juger = (rc, prec, quoi) => { if (rc && rc.width && prec && prec.bottom <= rc.top + 2 && pointsSeuls.length < 6) pointsSeuls.push(quoi); };
   const tw = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
   for (let n = tw.nextNode(); n && pointsSeuls.length < 6; n = tw.nextNode()) {
-    const t = n.nodeValue; let i = t.indexOf('·');
-    while (i >= 0 && pointsSeuls.length < 6) {
-      const r = document.createRange(); r.setStart(n, i); r.setEnd(n, i + 1);
-      const rc = r.getBoundingClientRect(), b = bloc(n);
-      if (rc.width && b && vis(n.parentElement)) {
-        const cs = getComputedStyle(b), gauche = b.getBoundingClientRect().left + parseFloat(cs.paddingLeft) + parseFloat(cs.borderLeftWidth);
-        // Rien à gauche du point sur sa ligne, dans son bloc : la ligne commence par lui.
-        let seul = rc.left <= gauche + 3;
-        if (seul && /flex|grid/.test(cs.display)) {
-          for (const k of b.children) { const kr = k.getBoundingClientRect(); if (k.contains(n)) continue; if (kr.width && kr.right <= rc.left + 1 && kr.bottom > rc.top + 2 && kr.top < rc.bottom - 2) { seul = false; break; } }
-          const sr = n.parentElement.getBoundingClientRect(); if (sr.left < rc.left - 2) seul = false;
-        }
-        if (seul && /\S/.test(t.slice(i + 1))) pointsSeuls.push((t.slice(i, i + 40)).trim());
-      }
-      i = t.indexOf('·', i + 1);
-    }
+    const t = n.nodeValue; if (t.indexOf('·') < 0 || !vis(n.parentElement) || ferme(n.parentElement)) continue;
+    for (let i = t.indexOf('·'); i >= 0; i = t.indexOf('·', i + 1)) juger(rectCar(n, i), precedent(n, i), (t.slice(i, i + 40) + ' ' + ((n.nextSibling && n.nextSibling.textContent) || '').slice(0, 30)).trim() + (window.__bancSonde ? ' <' + (n.parentElement.parentElement || n.parentElement).outerHTML.slice(0, 400) + '>' : ''));
+  }
+  for (const el of document.querySelectorAll('.vrm-main *')) {
+    if (pointsSeuls.length >= 6) break;
+    if (!/·/.test(getComputedStyle(el, '::before').content || '') || !vis(el) || ferme(el)) continue;
+    const n = premierTexte(el); if (!n) continue;
+    const r0 = el.getClientRects()[0];
+    juger(r0, precedent(n, 0), '(::before) ' + el.innerText.trim().slice(0, 40));
   }
   const debord = document.documentElement.scrollWidth > document.documentElement.clientWidth + 1;
   // Éléments visibles qui sortent de l'écran à droite (hors rangées défilantes).
