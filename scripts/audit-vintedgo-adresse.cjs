@@ -66,6 +66,11 @@ const ban = (feats) => ({ type: 'FeatureCollection', features: feats.map((f) => 
     dit(lu.pointId === '900123', 'l’identifiant du point (`point_id`) est gardé', JSON.stringify(lu.pointId));
     const cp = T.lireReponseVintedGo(200, 'application/json', reponseVg('13 Rue Saint-Vincent, 56000 Vannes, FR'), { suivi: SUIVI });
     dit(cp.lieuRue === '13 Rue Saint-Vincent' && cp.lieuCp === '56000' && cp.lieuVille === 'Vannes', 'si un jour l’adresse porte « CP Ville », les deux sont lus', JSON.stringify([cp.lieuRue, cp.lieuCp, cp.lieuVille]));
+    // (2 nov., mesuré en base : ville « France », rue « 13 Rue Saint-Vincent, Vannes »)
+    for (const pays of ['France', 'FRANCE', 'Belgique']) {
+      const fr = T.lireReponseVintedGo(200, 'application/json', reponseVg('13 Rue Saint-Vincent, Vannes, ' + pays), { suivi: SUIVI });
+      dit(fr.lieuRue === '13 Rue Saint-Vincent' && fr.lieuVille === 'Vannes', `le pays en toutes lettres (« ${pays} ») n'est jamais pris pour la ville`, JSON.stringify([fr.lieuRue, fr.lieuVille]));
+    }
     const sans = T.lireReponseVintedGo(200, 'application/json', reponseVg(null), { suivi: SUIVI });
     dit(sans.etat === 'disponible' && !sans.lieuRue && !sans.lieuVille && !sans.lieuCp, '`metadata: {}` ⇒ disponible, aucun lieu (rien deviné)', JSON.stringify([sans.lieuRue, sans.lieuVille]));
     const ret = T.lireReponseVintedGo(200, 'application/json', reponseVg('13 Rue Saint-Vincent, Vannes, FR', 900123, { retire: true }), { suivi: SUIVI });
@@ -136,6 +141,15 @@ const ban = (feats) => ({ type: 'FeatureCollection', features: feats.map((f) => 
     const trMr = { carrier: 'mondialrelay', etat: 'disponible', lieuNom: 'TABAC EXEMPLE', lieuCp: '35260', lieuVille: 'CANCALE', lieuRue: '' };
     const m2 = M.lieuCompleteParTransporteur(mr, trMr);
     dit(JSON.stringify(m2) === JSON.stringify(mr), 'Mondial Relay / Chronopost (aucune rue) : le lieu de l’e-mail est rendu tel quel', JSON.stringify(m2));
+    // Les lignes déjà rangées avec le pays en ville (mesurées en base le 2 nov.) :
+    // relues dans leur forme, elles complètent l'e-mail et font une épingle.
+    const trVieux = { ...tr, lieuRue: '13 Rue Saint-Vincent, Vannes', lieuCp: '', lieuVille: 'France' };
+    const cv = M.lieuCompleteParTransporteur(email, trVieux);
+    dit(cv.lieuComplete === 'transporteur' && cv.lieuAdresse === '13 Rue Saint-Vincent, Vannes' && !cv.lieuConflit, 'une ligne rangée « rue, Ville » + ville « France » complète l’e-mail (plus de « deux adresses »)', JSON.stringify(cv));
+    const pvx = M.pointsARetirer({ colis: [1, 2, 3, 4].map((i) => ({ id: 'v' + i, transporteur: 'vinted', ...cv, nom: cv.lieuNom, adresse: cv.lieuAdresse })) }).points;
+    dit(pvx.length === 1 && pvx[0].ville === 'Vannes' && !!pvx[0].geocode && !pvx[0].sansCarte && pvx[0].epingle.n === 4, '… et ses 4 colis font UNE épingle « 4 » à Vannes', JSON.stringify(pvx.map((q) => [q.ville, q.geocode, q.sansCarte, q.epingle])));
+    const paysSeul = M.lieuCompleteParTransporteur({ lieuNom: 'Kusmi Tea', lieuAdresse: '13 Rue Saint-Vincent' }, { ...tr, lieuRue: '13 Rue Saint-Vincent', lieuVille: 'France' });
+    dit(!paysSeul.lieuComplete && paysSeul.lieuAdresse === '13 Rue Saint-Vincent', 'un pays seul en ville, sans ville dans la rue ⇒ rien d’inventé (« France » n’est jamais une ville)', JSON.stringify(paysSeul));
     const complet = { lieuNom: 'Tabavap', lieuAdresse: '29 Rue Hoche, 56000 Vannes' };
     dit(JSON.stringify(M.lieuCompleteParTransporteur(complet, { ...tr, lieuRue: '29 Rue Hoche' })) === JSON.stringify(complet), 'un e-mail déjà complet (rue, CP, ville) n’est pas touché', '');
   });

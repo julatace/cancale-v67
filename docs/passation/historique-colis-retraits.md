@@ -2536,3 +2536,17 @@ Vinted Go du colis dans Chrome.
 Banc `tournee` §K : la phrase commence par « 4 colis à retirer », pastille « 4 » sorte `aretirer`,
 4 cartes sans photo ⇒ 4 icônes, 0 carré vide (390 et 1512) ; sur l'avant, la capture montre « colis à
 retirer » sans nombre et les carrés gris (`colonne-AVANT` / `colonne-APRES` regardées).
+
+## 2 novembre — les consignes Vinted Go absentes de la carte
+
+Julien : « Pour les points relais, je n'ai toujours pas les Vinted GO… dans la carte ».
+Mesuré en base (lecture seule) : 4 lignes `transp_vinted_…` du point 124054 portaient
+`lieuRue` « 13 Rue Saint-Vincent, Vannes » et `lieuVille` « France » — l'adresse du
+suivi s'écrivait « <rue>, <Ville>, France » et seul le code pays à deux lettres (« FR »)
+était retiré. La rue ne ressemblait plus à celle de l'e-mail ⇒ `lieuConflit` « deux
+adresses » ⇒ « pas sur la carte ». Le point 107232 (« …, Vannes, FR ») allait bien.
+Correctif : `lieuVintedGo` retire aussi le pays en toutes lettres (`PAYS_FIN_ADRESSE`) ;
+côté app `lieuTransporteurRepare` relit les lignes déjà rangées dans cette forme
+(pays en ville ET rue finissant par « , <Ville> »), jamais « France » comme ville.
+`audit-vintedgo-adresse` : 6 contrôles neufs, rouges sur l'avant, 3 rouges si l'on
+retire la réparation (mutation).

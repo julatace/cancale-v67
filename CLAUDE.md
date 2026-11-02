@@ -524,6 +524,7 @@ vérifier par `curl https://vrm.center/api/sante`.
 
 ### Décisions et chantiers (octobre–novembre 2026)
 Une ligne par chantier. Le récit complet des lignes du 31 oct. au 2 nov. est, mot pour mot, dans `docs/passation/etat-detaille-2026-10-31-au-11-02.md`.
+- **2 nov.** — Carte des relais : les consignes Vinted Go revenaient « deux adresses » (pays « France » rangé en ville, ville collée à la rue) ; le serveur retire le pays en lettres, l'app relit les lignes déjà rangées (`lieuTransporteurRepare`, `audit-vintedgo-adresse`). → historique colis-retraits. Geste : rouvrir Colis → À retirer.
 - **2 nov.** — **Mode auto des messages aux favoris** (éteint par défaut, **5.309.0**, `src/favorisAuto.js`, `api/_lib/favoris-auto.js`, `audit-favoris-auto`) : jamais de boucle, VRM demande le geste qui débloque. → historique favoris-messages. Geste : installer la 5.309, ouvrir un favori depuis la cloche, allumer.
 - **2 nov.** — Audit des données (E0c) : eBay aux frais pas lus « au moins » partout, « 1er », Vestiaire/Leboncoin dans « Finalisé par plateforme », pas lu ≠ 0 (base lente, semaine, NaN, Invalid Date), jours au fuseau local (`audit-donnees-ecrans`). → historique divers. Geste : aucun.
 - **2 nov.** — Offres auto : jamais sur une paire vendue ailleurs (**5.308.0**, `src/offresGarde.js`). Geste : installer.
@@ -618,10 +619,6 @@ Une ligne par chantier. Le récit complet des lignes du 31 oct. au 2 nov. est, m
 - **23-24 oct.** — Suivi des colis par n° et par Vinted (5.216-5.217), colis à retirer
   fiables (date limite lue, « à vérifier »), eBay « Inactives » (lecture seule), reçu
   d'achat lisible, feuilles au-dessus de la barre sur iPhone. → colis / ebay / interface.
-- **22 oct.** — Double vérification gratuite (second appareil) ; adresse de réception
-  PROUVÉE ; CSP en Report-Only (la bascule à faire : historique sécurité) ; Ma journée en
-  widgets ; carte de la communauté (OpenFreeMap) ; colis à l'heure ; « C'est déclaré ».
-  → `docs/passation/2026-10-22-integration.md`.
 - **Avant le 20 oct.** — `docs/passation/etat-detaille-2026-10-31-au-11-02.md` (fin) et `docs/journal-2026.md`.
 
 ---
