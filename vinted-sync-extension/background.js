@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.308.0';
+const CODE_VERSION = '5.309.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -10824,7 +10824,10 @@ async function executerPourApp(msg, sender) {
 }
 async function executerMessageFavori(uid,acc,body){
   const id=v=>typeof v==='string'&&/^[1-9]\d{0,19}$/.test(v);
-  const rep=(resultat,status=0,raison=resultat==='incertain'?'reponse_inconnue':resultat==='refuse'?'vinted_refus':'')=>({ok:['envoye','ignore'].includes(resultat),status,json:{resultat,raison}});
+  // (5.309, mode auto) `ecrits` = combien d'écritures sont PARTIES chez Vinted : 0 ⇒
+  // rien n'est parti, le serveur peut laisser le mode auto reprendre ce favori.
+  let ecrits=0,frein='';
+  const rep=(resultat,status=0,raison=resultat==='incertain'?'reponse_inconnue':resultat==='refuse'?'vinted_refus':'')=>({ok:['envoye','ignore'].includes(resultat),status,json:{resultat,raison:frein&&!['envoye','ignore'].includes(resultat)?frein:raison,ecrits}});
   if(typeof body?.jeton!=='string'||!/^[0-9a-f-]{36}$/.test(body.jeton))return rep('refuse',400);
   const jeton=body.jeton;
   const session=await authToken();if(!session?.access_token)return rep('refuse',401,'session_extension');
@@ -10872,8 +10875,9 @@ async function executerMessageFavori(uid,acc,body){
   const arretPlafond=await gardeStricte(uid,acc,{reserve:RESERVE_GESTES,actions:nA,recu});
   if(arretPlafond)return rep('refuse',0,['plafond','plafond-bordereaux'].includes(arretPlafond.code)?'quota_extension':arretPlafond.code==='vinted-pause'?'pause_vinted':arretPlafond.code==='vinted-autre'?'compte_vinted_different':arretPlafond.code==='vinted-absent'?'compte_vinted_absent':'vinted_refus');
   const tRes=Number(recu.at)||0;
-  let ecrits=0;
-  const partie=x=>!(x&&(x.sansPage||x.pause));
+  // Chaque réponse de Vinted passe par `freinFavoriAuto` : 429/403, captcha ou
+  // « activité automatisée » ⇒ la raison dite au serveur (pause 24 h du mode auto).
+  const partie=x=>{const f=freinFavoriAuto(x);if(f&&!frein)frein=f;return !(x&&(x.sansPage||x.pause));};
   try{
   etape('conversation');
   const creation=await vintedPage(acc,'POST','/api/v2/conversations',{initiator:body.initiator,item_id:body.itemId,opposite_user_id:body.recipientId},{timeoutMs:12000});
@@ -10893,12 +10897,16 @@ async function executerMessageFavori(uid,acc,body){
   etape('verification');
   // Le fil : la réponse de création, si elle porte de quoi vérifier ; sinon relu (comme avant).
   let c=cc,lu={status:creation.status,json:creation.json}; // (29 oct., revue) la pagination de la réponse de création est vérifiée aussi
-  if(!filVerifiable(c)){noterDiag('favori_fil_relu');lu=await vintedPage(acc,'GET',`/api/v2/conversations/${convId}`,null,{timeoutMs:12000});c=lu.json?.conversation;if(!lu.ok)return rep('refuse',lu.status,'identite_non_confirmee');}
+  if(!filVerifiable(c)){noterDiag('favori_fil_relu');lu=await vintedPage(acc,'GET',`/api/v2/conversations/${convId}`,null,{timeoutMs:12000});c=lu.json?.conversation;if(!frein)frein=freinFavoriAuto(lu);if(!lu.ok)return rep('refuse',lu.status,'identite_non_confirmee');}
   // Both identities must be in the actual thread immediately before reply.
   const article=String(c?.transaction?.item_id||c?.transaction?.item?.id||c?.item?.id||c?.item_id||'');
   if(String(c?.id)!==convId||String(c?.opposite_user?.id)!==body.recipientId||article!==body.itemId||c?.allow_reply===false)return rep('refuse',lu.status,'identite_non_confirmee');
   etape('historique');
   if(!Array.isArray(c.messages))return rep('refuse',lu.status,'historique_non_verifie');
+  // (5.309, mode auto — garde-fou n° 1) Un message AUTOMATIQUE n'écrit RIEN dans une
+  // conversation qui porte déjà un message, quel qu'il soit : « conversation existante »
+  // (un résultat certain, jamais « incertain »).
+  if(body.auto===true&&(c.messages.length>0||Number(c.message_count)>0||Number(c.total_messages)>0||c.has_more===true||c.has_more_messages===true))return rep('ignore',lu.status,'conversation_existante');
   if(c.messages.some(m=>['message','offer_request_message','offer_request','offer','user_message','reply','text_message'].includes(m?.entity_type)))return rep('ignore',lu.status,'conversation_deja_contactee');
   const systemes=['offer_request_message','offer_request','offer','transaction','transaction_status','status_message','system','system_message','action','event'];
   if(c.messages.some(m=>!m||!systemes.includes(m.entity_type))||Number(c.pagination?.total_pages)>1||Number(lu.json?.pagination?.total_pages)>1||lu.json?.has_more===true||c.has_more===true||c.has_more_messages===true||Number(c.message_count)>0||Number(c.total_messages)>c.messages.length)return rep('refuse',lu.status,'historique_non_verifie');
@@ -10907,7 +10915,9 @@ async function executerMessageFavori(uid,acc,body){
   let prixAnnonce=null,devise='EUR';
   if(id(tx)){
     const t=await vintedPage(acc,'GET',`/api/v2/transactions/${tx}`,null,{timeoutMs:12000});
+    if(!frein)frein=freinFavoriAuto(t);
     if(t.sansPage)return rep('refuse',0,'onglet_vinted');
+    if(frein)return rep('refuse',t.status);
     const tr=t.ok?(t.json?.transaction||t.json):null;
     const artTx=String(tr?.item_id||tr?.item?.id||tr?.offer?.item_id||'');
     if(t.ok&&artTx&&artTx!==body.itemId)return rep('refuse',t.status,'identite_non_confirmee');
@@ -10952,6 +10962,19 @@ async function executerMessageFavori(uid,acc,body){
   if(r.ok&&r.json?.code===0){etape('confirmation');return rep('envoye',r.status);}
   return rep(!r.ok&&r.status>=400&&r.status<500?'refuse':'incertain',r.status);
   }finally{const reste=nA-ecrits;if(reste>0&&tRes)await rendreActions(String(uid),tRes,reste);}
+}
+// (5.309, 2 nov.) LES FREINS DE VINTED, pour le mode automatique des favoris : un
+// 429/403 (la pause de l'extension est déjà posée par `requeteVinted`), une page
+// de captcha, ou une réponse qui parle d'activité automatisée. Rend la raison que
+// le serveur comprend (`vinted_frein` · `vinted_robot` · `pause_vinted`), sinon ''.
+function freinFavoriAuto(r) {
+  if (!r || typeof r !== 'object') return '';
+  if (r.pause) return 'pause_vinted';
+  let txt = '';
+  try { txt = r.json == null ? '' : JSON.stringify(r.json).slice(0, 4000); } catch (_) {}
+  if (/captcha|datadome|automat|robot|\bbots?\b|unusual activity|activit[ée] inhabituelle|suspicious/i.test(txt)) return 'vinted_robot';
+  if (r.status === 429 || r.status === 403) return 'vinted_frein';
+  return '';
 }
 // Mesuré sur Vintex (29 oct., 9 favoris) : création → transaction 3,2–6,0 s ;
 // transaction → offre 0,3–0,8 s ; offre → message 0,4–0,5 s. Tiré au hasard.

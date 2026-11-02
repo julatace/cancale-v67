@@ -9,6 +9,7 @@ import {sendPushToAll,pushCategorieActive} from './push.js';
 import {contexteVendeur} from './owner.js';
 import {DESTINATIONS} from './lien-notif.js';
 import {preparerMessageFavori} from '../../src/favorisVinted.js';
+import {AUTO_FAVORI_MAX_MS} from '../../src/favorisAuto.js';
 import {etatAuto,reglerAuto,stopAuto,trierFavorisAuto,ajouterAuto,notificationsCompletes,favorisDepuisNotifications,etatDressingAuto,etatAnnonceAuto,gardeRefuse} from './favoris-auto.js';
 
 // The neutral row cannot be edited by the browser (RLS). One row per Vinted
@@ -88,8 +89,11 @@ export async function tourAuto(req,{owner,uid,cle,maintenant}){
       return essai({conversations,parametresAilleurs:ailleurs});
     };
     // Les cibles d'abord (synchrone sur ce qui est déjà lu), puis les lectures d'appoint.
+    // Seuls les favoris arrivés APRÈS l'allumage, de moins de 3 jours, sont résolus
+    // (jamais l'arriéré : un favori d'avant l'allumage n'est jamais repris).
+    const allumeLe=Number(avant.valeur.vue?.auto?.allumeLe)||Infinity;
     const cibles=new Map();
-    for(const l of lignes){try{cibles.set(l.id,await resoudre(l.id));}catch{}}
+    for(const l of lignes){const t=Date.parse(l.date||'');if(!Number.isFinite(t)||t<allumeLe||maintenant-t>AUTO_FAVORI_MAX_MS)continue;try{cibles.set(l.id,await resoudre(l.id));}catch{}}
     const lu=await modifierNeutre(cle,d=>({valeur:initialiserFile(d)}));if(!lu)return stop('lecture');
     const tri=trierFavorisAuto({lignes,d:lu.valeur,owner,maintenant,resoudre:id=>{const c=cibles.get(id);if(!c)throw Error('non prouvé');return c;}});
     const sauts=[...tri.sauts];let choisi=null;

@@ -275,3 +275,20 @@
 .vrm-favoris-offre .vrm-favoris-remise{margin:0;}
 .vrm-favoris-arrondi{display:flex;align-items:center;gap:8px;min-height:44px;max-width:none!important;}
 .vrm-favoris-arrondi input{width:20px;height:20px;}
+/* (2 nov.) Mode automatique des favoris : un encart neutre ; l'ambre seulement pour un geste à faire (§7). */
+.vrm-favoris-auto{margin:10px 0;padding:10px 12px;border:1px solid var(--vrm-line);border-radius:10px;background:var(--vrm-card2);display:flex;flex-direction:column;gap:8px;}
+.vrm-favoris-auto header{display:flex;align-items:center;justify-content:space-between;gap:10px;}
+.vrm-favoris-auto h4{margin:0;font-size:15px;}.vrm-favoris-auto header small{display:block;color:var(--vrm-muted);}
+.vrm-favoris-auto p{margin:0;line-height:1.45;}
+.vrm-favoris-auto .vrm-favoris-auto-geste{color:var(--vrm-warn);}
+.vrm-favoris-auto-compteurs{display:flex;flex-wrap:wrap;gap:6px 14px;font-variant-numeric:tabular-nums;color:var(--vrm-muted);}
+.vrm-favoris-auto-compteurs b{color:var(--vrm-ink);}
+.vrm-favoris-auto-reglages{display:flex;flex-direction:column;gap:10px;}
+.vrm-favoris-auto-reglages label{display:flex;flex-wrap:wrap;align-items:center;gap:6px;}
+.vrm-favoris-auto-reglages input{width:56px;min-height:44px;box-sizing:border-box;font:inherit;font-size:16px;padding:6px 8px;border:1px solid var(--vrm-line);border-radius:6px;background:var(--vrm-surface);color:var(--vrm-ink);}
+.vrm-favoris-auto-boutons{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;}
+.vrm-favoris-auto button{min-height:44px;}
+.vrm-favoris-auto-confirmer{display:flex;flex-direction:column;gap:8px;padding:10px;border:1px solid var(--vrm-line);border-radius:8px;background:var(--vrm-surface);}
+.vrm-favoris-auto [data-favoris-auto-journal] ul{list-style:none;margin:6px 0 0;padding:0;max-height:280px;overflow:auto;}
+.vrm-favoris-auto [data-favoris-auto-journal] li{padding:6px 0;border-top:1px solid var(--vrm-line);overflow-wrap:anywhere;}
+.vrm-favoris-auto [data-favoris-auto-journal] time{color:var(--vrm-muted);font-variant-numeric:tabular-nums;}

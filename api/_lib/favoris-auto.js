@@ -108,7 +108,7 @@ export function ajouterAuto(d,{owner,maintenant,choisi,sauts=[],message,offre,pr
   let ajoute=false,etat=e.etat;
   if(e.etat==='libre'&&choisi&&!coupleDejaTraite(d,choisi.cible.itemId,choisi.cible.recipientId)&&!contacteRecemment(d,choisi.cible.recipientId,maintenant)){
     const t=choisi.cible,id=t.itemId+':'+t.recipientId;
-    g.jobs=[...g.jobs.filter(x=>x.id!==id),{id,notificationId:t.notificationId,itemId:t.itemId,recipientId:t.recipientId,initiator:t.initiator,etat:'attente',auto:true,message,intervalleMinutes:0,...(offre?{offre}:{}),lot:g.lot||'auto',...(choisi.l.nom?{nom:String(choisi.l.nom).slice(0,80)}:{})}];
+    g.jobs=[...g.jobs.filter(x=>x.id!==id),{id,notificationId:t.notificationId,itemId:t.itemId,recipientId:t.recipientId,initiator:t.initiator,etat:'attente',auto:true,message,intervalleMinutes:0,...(offre?{offre}:{}),lot:'auto',...(choisi.l.nom?{nom:String(choisi.l.nom).slice(0,80)}:{})}];
     if(g.jobs.length>500){const sansAuto=g.jobs.filter(x=>!(x.auto&&['annule','refuse'].includes(x.etat)&&x.ecrits===0));if(sansAuto.length>500)throw new RefusFavoris('La file a atteint sa capacité. Aucun historique de dédoublonnage n’a été effacé.');g.jobs=sansAuto;}
     g.active=true;g.raison='';ajoute=true;change=true;etat='pret';
   }else if(e.etat==='libre')etat=prochainFavori?'attente_favori':'veille';
