@@ -173,11 +173,32 @@
     visite(o, 0);
     return ref;
   }
+  // 5.314 (2 nov.) — LA FORME RÉELLE DE « MES ARTICLES » (mesurée chez Julien,
+  // noms de clés seulement) : chaque élément est une ENVELOPPE
+  // `{ type: 'published', published: { product: { id, headline, subHeadline,
+  // price: { cents, currency }, sellerEarnings, picturePath, path }, listingDate,
+  // negotiationsSummary } }`. Sans id au premier niveau, la liste entière tombait
+  // en « forme inconnue » : aucune annonce Vestiaire n'était lue. On DÉPLIE
+  // l'enveloppe (son contenu, plus `status` = le type) ; une annonce prend
+  // l'identifiant de SON produit. Rien d'autre n'est deviné.
+  const enveloppe = (e) => (e && typeof e === 'object' && !Array.isArray(e) && e.id == null && e.productId == null && e.product_id == null
+    && typeof e.type === 'string' && /^[\w-]{1,40}$/.test(e.type) && e[e.type] && typeof e[e.type] === 'object' && !Array.isArray(e[e.type])) ? e[e.type] : null;
+  function deplier(e) {
+    const env = enveloppe(e);
+    if (!env) return e;
+    const out = Object.assign({}, env, { status: e.type });
+    const p = env.product && typeof env.product === 'object' && !Array.isArray(env.product) ? env.product : null;
+    if (out.id == null && p && p.id != null) out.productId = p.id;
+    // Le titre affiché : « headline » et « subHeadline » de Vestiaire, mis bout à
+    // bout (affichage seul, jamais une identité — §5).
+    if (p && out.name == null && (typeof p.headline === 'string' || typeof p.subHeadline === 'string')) out.name = [p.headline, p.subHeadline].filter((x) => typeof x === 'string' && x.trim()).join(' ');
+    return out;
+  }
   function tableauAnnonces(obj) {
     const cands = [];
     const visite = (x, prof) => {
       if (!x || typeof x !== 'object' || prof > 3) return;
-      if (Array.isArray(x)) { if (x.length && x.every((e) => e && typeof e === 'object' && (e.id != null || e.productId != null || e.product_id != null))) cands.push(x); return; }
+      if (Array.isArray(x)) { const d = x.map(deplier); if (d.length && d.every((e) => e && typeof e === 'object' && (e.id != null || e.productId != null || e.product_id != null))) cands.push(d); return; }
       for (const k of Object.keys(x)) visite(x[k], prof + 1);
     };
     visite(obj, 0);

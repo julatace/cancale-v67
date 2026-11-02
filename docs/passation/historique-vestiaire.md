@@ -494,3 +494,19 @@ L'audit des parcours du 1er novembre avait mesuré que Vestiaire vivait à part 
   dites à côté de chaque total. Mesurer la forme réelle (`vc_ventes.forme`) avant
   d'apprendre une clé à l'extension.
 - A3 (même paire sur deux comptes Vinted), A5, A7–A9, A11–A14 : hors de ce chantier.
+
+## 2 novembre (soir) — 5.314.0 : « Mes articles » Vestiaire enfin LUS (la forme réelle)
+
+Julien : « est-ce que l'extension est prête pour Vestiaire ? j'ai fait une vente ». Mesuré (lecture seule) :
+`vc_listings` du 1er nov. portait `formeInconnue` — chaque élément de `/users/me/product-listings` est
+une ENVELOPPE `{ type: 'published', published: { product: { id, headline, subHeadline, price.cents,
+sellerEarnings, picturePath, path }, listingDate, negotiationsSummary } }`, sans id au premier niveau :
+`tableauAnnonces` n'y voyait aucune liste ⇒ AUCUNE annonce Vestiaire lue. `vc_ventes` : une seule lecture
+(« à expédier », vide, le 1er nov. 22 h) ; aucun e-mail Vestiaire n'arrive dans VRM.
+- `vc-inject.js` : l'enveloppe est DÉPLIÉE (`deplier`) — son contenu, `status` = le type, l'identifiant
+  de SON produit, titre = headline + subHeadline (affichage seul). Rien d'autre deviné ; la photo
+  (`picturePath`, chemin relatif d'hôte inconnu) n'est PAS reconstruite (un blanc plutôt qu'un faux).
+  Les ventes et achats passent par la même fonction : une enveloppe y est dépliée de même.
+- `audit-capture-vc-lbc` C10 (forme réelle, valeurs inventées) : rouge sur la 5.313, vert sur la 5.314.
+Geste : installer la 5.314.0, puis sur vestiairecollective.com ouvrir « Mes articles » ET « Mes ventes »
+(défiler jusqu'au bout) : la vente apparaît dans VRM à ce moment-là.

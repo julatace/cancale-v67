@@ -318,6 +318,20 @@ function fonctionsApp() {
   } catch (e) { _app = null; }
   return _app;
 }
+// C10 (2 nov., 5.314) — LA FORME RÉELLE de « Mes articles » chez Julien (noms de
+// clés relevés par la 5.299 dans `vc_listings.formeInconnue`, valeurs INVENTÉES) :
+// chaque élément est une enveloppe `{ type, [type]: { product: {...} } }`, sans id
+// au premier niveau. Sur la 5.313 toute la liste tombait en « forme inconnue ».
+async function c10() {
+  const p = pageVc();
+  const env = (id, type, titre, sous, cents) => ({ type, [type]: { product: { id, headline: titre, subHeadline: sous, picturePath: '/p/x.jpg', price: { formatted: 'x', cents, currency: 'EUR' }, sellerEarnings: { formatted: 'x', cents: cents - 1500, currency: 'EUR' }, path: '/x.shtml', segment: 'x' }, listingDate: '2026-10-30T10:00:00Z', negotiationsSummary: { totalNegotiationsCount: 0, ongoingNegotiationsCount: 0, pendingSellerActionCount: 0 }, singleNegotiationId: null, hasPriceDropRecommendation: false } });
+  const d = (await p.charge(`${API}/users/me/product-listings?offset=0&limit=20`, { meta: { limit: 20, offset: 0, count: 2 }, data: [env(60001, 'published', 'Nike', 'Baskets Dunk Low', 12000), env(60002, 'published', 'Adidas', 'Baskets Samba', 9000)] })).find((x) => x.kind === 'vcannonces');
+  const it = (d && d.items) || [];
+  dit(d && !d.inconnu && it.length === 2, 'C10 · la forme réelle (enveloppe « published ») est LUE : deux annonces, pas une forme inconnue', JSON.stringify(d && { n: it.length, inconnu: !!d.inconnu }));
+  dit(it[0] && it[0].id === '60001' && it[1] && it[1].id === '60002', 'C10 · chaque annonce a l’identifiant de SON produit', JSON.stringify(it.map((x) => x.id)));
+  dit(it[0] && it[0].titre === 'Nike Baskets Dunk Low' && it[0].prix && it[0].prix.valeur === 120 && it[0].statut === 'published', 'C10 · titre (headline + subHeadline), prix 120 €, état « published »', JSON.stringify(it[0] && { t: it[0].titre, p: it[0].prix, s: it[0].statut }));
+  dit(d && d.complet && d.complet.length === 2, 'C10 · la liste lue en entier fait foi', JSON.stringify(d && d.complet));
+}
 async function c9() {
   const app = fonctionsApp();
   const lu = new Date().toISOString(), vieux = new Date(Date.now() - 3 * 86400e3).toISOString(), frais = new Date(Date.now() - 3600e3).toISOString();
@@ -329,7 +343,7 @@ async function c9() {
 }
 
 (async () => {
-  for (const [nom, f] of [['C1', c1], ['C2', c2], ['C3', c3], ['C4', c4], ['C5', c5], ['C6', c6], ['C7', c7], ['C8', c8], ['C9', c9]]) {
+  for (const [nom, f] of [['C1', c1], ['C2', c2], ['C3', c3], ['C4', c4], ['C5', c5], ['C6', c6], ['C7', c7], ['C8', c8], ['C9', c9], ['C10', c10]]) {
     try { await f(); } catch (e) { dit(false, `${nom} : l’audit a tourné jusqu’au bout`, String((e && e.stack) || e).slice(0, 300)); }
   }
   console.log(ko ? `\n❌ ${ko} contrôle(s) rouge(s)` : '\n✅ capture Vestiaire et Leboncoin : tout est vert');
