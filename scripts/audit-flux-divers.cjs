@@ -256,14 +256,10 @@ const faireRes = () => { const r = { code: null, corps: null }; r.status = (n) =
     const S = ['Le paiement a été validé', 'Commande finalisée', 'Commande annulée', 'La commande a été annulée', 'Remboursement effectué', 'Retour initié', 'Retournée à l’expéditeur',
       'Transaction suspendue', 'Le paiement a échoué', 'La livraison a échoué', 'Échec du paiement', 'Commande refusée', 'Cancelled', 'Colis déposé en point relais', 'Livré', 'Commande expédiée',
       'Commande non réclamée', 'La vérification a échoué', 'En attente du bordereau', ''];
-    // UN écart connu, nommé, dans le sens sûr pour l'anti double vente : « Échec du
-    // paiement » (mot « échec », pas « échoué ») est « pas vendu » pour Ventes et
-    // la compta, mais `PAS_UNE_VENTE` (partagée avec l'extension, qu'on ne
-    // republie pas ici) la croit vivante ⇒ la paire est dite vendue ailleurs (on
-    // alerte, on ne vend pas deux fois). À aligner à la prochaine version de
-    // l'extension. Tout AUTRE écart est rouge.
-    const CONNU = /^[ée]chec du paiement$/i;
-    const ecarts = S.filter((s) => (classifyOrderStatus(s) === 'cancelled') !== PAS_UNE_VENTE.test(s) && !(CONNU.test(s) && classifyOrderStatus(s) === 'cancelled'));
+    // (2 nov., extension 5.310) L'écart « Échec du paiement » (mot « échec », pas
+    // « échoué ») est aligné : `PAS_UNE_VENTE` le dit pas vendu, comme Ventes et la
+    // compta. Plus AUCUN écart toléré.
+    const ecarts = S.filter((s) => (classifyOrderStatus(s) === 'cancelled') !== PAS_UNE_VENTE.test(s));
     dit(ecarts.length === 0, 'A12 `classifyOrderStatus(s) === "cancelled"` ⇔ `PAS_UNE_VENTE.test(s)` sur chaque état (revenue d’un côté = pas vendue de l’autre)', ecarts.join(' · '));
     const V = await importer('api/_lib/ventes-regle.js');
     dit(S.every((s) => V.classifyOrderStatus(s) === classifyOrderStatus(s)), 'A12 la copie serveur (`api/_lib/ventes-regle.js`) dit la même chose');
