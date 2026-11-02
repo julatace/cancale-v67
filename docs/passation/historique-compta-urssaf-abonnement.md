@@ -1780,3 +1780,15 @@ Bancs remis à la nouvelle règle (en le disant dans chacun) : `compta-simple` (
 la phrase), `declare-urssaf` (le libellé du net `data-benef-titre`), `suivi-urssaf`, `dater-lbc` (replis
 ouverts d'un toucher, `ouvrirDetailCompta` de `_compta.cjs`) ; `audit-suivi-urssaf` accepte `sansTitre`.
 ⚠️ Non mesuré : sa vraie base ; un vrai iPhone.
+- **Rouge sur le code d'avant** : `compta-claire` lancé depuis un `git archive c4f39ac4` (origin/main) ⇒
+  **68 rouges** ; vert ici (98). **Mutation** (« Le détail du calcul » ouvert d'office) ⇒ 4 rouges U
+  (7,44 € écrit deux fois). Les rouges « … rangé au nuage » de `declare-urssaf`, `statut-fiscal`,
+  `suivi-urssaf` (4 à 6 chacun) sont **les mêmes sur origin/main** (le banc ne voit plus l'écriture de
+  `main`) : pas de ce lot, à regarder à part. Le contraste du choix des dépenses (E, 4,3:1, rouge sur
+  origin/main) est corrigé. Audits verts : `audit-urssaf`, `audit-micro-entreprise`, `audit-finir-compta`,
+  `audit-donnees-ecrans`, `audit-suivi-urssaf`, `audit-icones`, `audit-coherence` ; `audit-benefice`,
+  `audit-mentions-paiement`, `audit-vendeur-neutre` exigent `@babel/parser`, `audit-rappel-urssaf`
+  `web-push` (absents de ce conteneur : leurs autres contrôles sont verts).
+- **À décider par Julien** : retirer « Net après paiement » de la carte URSSAF (fait, réversible) ; le nom du
+  bouton (« Noter ma déclaration » gardé, plutôt que « J'ai déclaré ») ; « ventes finalisées » gardé (le mot
+  de Vinted) ; « Documents et réglages » au lieu d'« Avancé ».
