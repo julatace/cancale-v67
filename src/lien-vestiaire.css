@@ -1,0 +1,33 @@
+/* ── RELIER VINTED ↔ VESTIAIRE (3 nov.) — style « Fusion », jetons --fu-*.
+   La feuille reprend celle de « Changer le prix » (.vrm-ao-*) ; ici seulement la
+   photo, la recherche, le bouton « Relier » (neutre : l'accent reste rare, §7) et
+   le bloc « N° à barrer » (ambre : un geste à faire). */
+.vrm-lvc-feuille { z-index: 9101; }
+.vrm-lvc-cible { display: flex; align-items: center; gap: 12px; background: var(--fu-carte, #fff); border-radius: 20px; box-shadow: var(--fu-ombre); padding: 10px 12px; margin-bottom: 12px; }
+.vrm-lvc-photo { flex: none; width: 44px; height: 56px; border-radius: 12px; overflow: hidden; background: var(--fu-case, #f2f2f7); display: block; }
+.vrm-lvc-photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.vrm-lvc-ligne { padding-left: 12px; }
+.vrm-lvc-nom { flex: 1; min-width: 0; }
+.vrm-lvc-nom b { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 15px; }
+.vrm-lvc-cherche {
+  box-sizing: border-box; width: 100%; min-height: 44px; border: 0; border-radius: 12px; background: var(--fu-carte, #fff); color: inherit;
+  font: inherit; font-size: 17px; padding: 0 14px; margin-bottom: 12px; box-shadow: var(--fu-ombre);
+}
+.vrm-lvc-titre { margin: 4px 4px 6px; font-size: 13px; font-weight: 600; color: var(--fu-gris, #6e6e73); }
+.vrm-lvc-relier {
+  flex: none; min-height: 44px; min-width: 44px; padding: 0 14px; border-radius: 999px; border: 0; background: var(--fu-case, #f2f2f7);
+  color: var(--fu-encre, #1d1d1f); font: inherit; font-size: 15px; font-weight: 700; cursor: pointer;
+}
+.vrm-lvc-relier:disabled { opacity: .4; cursor: default; }
+.vrm-lvc-relier:focus-visible, .vrm-lvc-cherche:focus-visible { outline: 2px solid var(--fu-bleu, #0071e3); outline-offset: 2px; }
+/* Les N° à barrer : une ligne par article, « N°a → N°b », jusqu'à « C'est écrit ». */
+.vrm-lvc-barrer { background: var(--fu-carte, #fff); border-radius: 20px; box-shadow: var(--fu-ombre); padding: 6px 12px; margin-bottom: 12px; }
+.vrm-lvc-barrer h3 { margin: 6px 0 4px; font-size: 15px; font-weight: 700; color: var(--fu-ambre-txt, #b25000); }
+.vrm-lvc-barrer-ligne { display: flex; align-items: center; gap: 10px; min-height: 52px; }
+.vrm-lvc-barrer-ligne + .vrm-lvc-barrer-ligne { border-top: 1px solid var(--fu-filet, rgba(0,0,0,.06)); }
+.vrm-lvc-barrer-ligne span { flex: 1; min-width: 0; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.vrm-lvc-barrer-ligne s { color: var(--fu-gris, #6e6e73); }
+.vrm-lvc-geste {
+  flex: none; min-height: 44px; padding: 0 12px; border-radius: 999px; border: 0; background: var(--fu-case, #f2f2f7);
+  color: var(--fu-encre, #1d1d1f); font: inherit; font-size: 13px; font-weight: 700; cursor: pointer;
+}
