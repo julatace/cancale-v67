@@ -35,7 +35,7 @@
 /* Segmenté iOS : piste, pastille levée sur le choix. */
 .vrm-fa-seg { display: flex; gap: 2px; padding: 2px; border-radius: 10px; background: var(--fu-piste); min-width: 0; }
 .vrm-fa .vrm-fa-seg > button, .vrm-app-shell .vrm-main .vrm-fa .vrm-fa-seg > button {
-  flex: 1 1 0; min-width: 0; min-height: 40px; padding: 0 10px; border-radius: 8px !important;
+  flex: 1 1 auto; min-width: 0; min-height: 40px; padding: 0 8px; border-radius: 8px !important;
   background: transparent !important; color: var(--fu-encre) !important;
   font: 600 13px/1 var(--vrm-police) !important; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   transition: background-color .18s ease, box-shadow .18s ease;
@@ -47,7 +47,7 @@
 /* Dans la carte sombre : translucide, plus petit (ce n'est pas la commande de l'écran). */
 .vrm-fa .vrm-fa-seg-sombre { flex: none; background: rgba(255,255,255,.1); }
 .vrm-fa .vrm-fa-seg-sombre > button, .vrm-app-shell .vrm-main .vrm-fa .vrm-fa-seg-sombre > button {
-  flex: none; min-height: 32px; padding: 0 10px; color: rgba(255,255,255,.75) !important; font-size: 12px !important; border-radius: 7px !important;
+  flex: none; min-width: 44px; min-height: 32px; padding: 0 10px; color: rgba(255,255,255,.75) !important; font-size: 12px !important; border-radius: 7px !important;
 }
 .vrm-fa .vrm-fa-seg-sombre > button[aria-pressed="true"], .vrm-app-shell .vrm-main .vrm-fa .vrm-fa-seg-sombre > button[aria-pressed="true"] { background: rgba(255,255,255,.22) !important; color: #fff !important; box-shadow: none !important; }
 @media (pointer: coarse) { .vrm-fa .vrm-fa-seg-sombre > button { min-height: 36px; } }
@@ -96,6 +96,7 @@
 /* ── 3. LA BARRE : filtres + deux ronds ──────────────────────────────────── */
 .vrm-fa-barre { display: flex; align-items: center; gap: 8px; min-width: 0; margin-top: 4px; }
 .vrm-fa-barre .vrm-fa-seg { flex: 1 1 auto; }
+.vrm-fa-barre .vrm-fa-seg > button { text-overflow: clip !important; }
 .vrm-fa .vrm-fa-rond, .vrm-app-shell .vrm-main .vrm-fa .vrm-fa-rond {
   flex: none; width: 44px; height: 44px; padding: 0; border-radius: 50% !important; background: var(--fu-carte) !important; color: var(--fu-encre) !important;
   display: grid; place-items: center; box-shadow: var(--fu-ombre) !important;

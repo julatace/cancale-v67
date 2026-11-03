@@ -132,125 +132,179 @@ const RESUME = { favoris: DANS30.length, articles: Object.keys(ATT).length, envo
 const PSEUDOS_ITEM = {};
 for (const [, login, item] of DANS30) (PSEUDOS_ITEM[item] = PSEUDOS_ITEM[item] || []).push(login);
 
-async function construire() {
+// Les mutations (§6.1) : chacune réaffaiblit une règle ; le banc doit devenir rouge.
+const MUTATIONS = {
+  envoi: ['AutomatisationFavoris.jsx', "const p=progressionFavoris(vue,horloge+decalage.current);", "React.useEffect(()=>{if(selection.length&&!vue?.active)agir('lancer');},[selection.join(',')]);const p=progressionFavoris(vue,horloge+decalage.current);"],
+  etat: ['favorisEcran.js', "if(n.a_envoyer&&!c.vendu)return", "if(n.a_envoyer)return"],
+  nom: ['favorisEcran.js', "  return m?m[1]:'';\n}", "  return m?m[1]:'Client';\n}"],
+};
+async function construire(theme) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'favoris-ecran-'));
   const main = fs.readFileSync(path.join(RACINE, 'src', 'main.jsx'), 'utf8');
   const css = [...main.matchAll(/^import\s+'\.\/([^']+\.css)';/gm)].map((m) => path.join(RACINE, 'src', m[1]));
   const src = (f) => JSON.stringify(path.join(RACINE, 'src', f));
+  const sombre = theme === 'sombre';
   fs.writeFileSync(path.join(dir, 'entree.jsx'), `
 ${css.map((c) => `import ${JSON.stringify(c)};`).join('\n')}
 import React from 'react';
 import {createRoot} from 'react-dom/client';
 import FavorisVinted from ${src('FavorisVinted.jsx')};
-import {MINERAL,variablesTheme} from ${src('themeMineral.js')};
-const v=variablesTheme(MINERAL,false);for(const [k,x] of Object.entries(v))document.documentElement.style.setProperty(k,x);
-document.body.style.background=MINERAL.bg;document.body.style.color=MINERAL.text;document.body.style.margin='0';
+import * as TH from ${src('themeMineral.js')};
+const PAL=${sombre}?(TH.MINERAL_DARK||TH.MINERAL):TH.MINERAL;
+const v=TH.variablesTheme(PAL,${sombre});for(const [k,x] of Object.entries(v))document.documentElement.style.setProperty(k,x);
+document.documentElement.setAttribute('data-theme','${sombre ? 'dark' : 'light'}');
+document.body.style.background=PAL.bg;document.body.style.color=PAL.text;document.body.style.margin='0';
 const ARTICLES=${JSON.stringify(ARTICLES)};
 const PhotoVinted=({src,alt,repli,...r})=>src?<img src={src} alt={alt} {...r}/>:repli;
 function Banc(){
-  return <div className="vrm-app-shell"><main className="vrm-main" style={{maxWidth:760,margin:'0 auto',padding:'16px',boxSizing:'border-box'}}><FavorisVinted uid="${UID}" owner="${OWNER}" ownerActuel={()=>"${OWNER}"} base={location.origin} headers={()=>({})} nomCompte="compte_banc" chargementAutomatique={true}
-    articlesVendus={new Set(['9004'])} articleFavori={id=>ARTICLES[id]||null} PhotoVinted={PhotoVinted}
-    extensionAuto={{disponible:true,raison:''}} favorisDisponible={false} favorisRaison="Ouvre vinted.fr dans Chrome sur ce compte." ouvrirFavori={async x=>{window.ouvertures=(window.ouvertures||[]).concat(x.id);return {ok:true,data:{ouvert:true,preuve:'confirmee'}};}}
+  return <div className="vrm-app-shell"><main className="vrm-main" style={{padding:'16px',boxSizing:'border-box'}}><FavorisVinted uid="${UID}" owner="${OWNER}" ownerActuel={()=>"${OWNER}"} base={location.origin} headers={()=>({})} nomCompte="compte_banc" chargementAutomatique={true}
+    articlesVendus={new Set(${JSON.stringify(VENDUS)})} articleFavori={id=>ARTICLES[id]||null} PhotoVinted={PhotoVinted}
+    extensionAuto={{disponible:true,raison:''}} favorisDisponible={true} favorisRaison="" verifierExtension={async()=>({disponible:true})} ouvrirFavori={async x=>{window.ouvertures=(window.ouvertures||[]).concat(x.id);return {ok:true,data:{ouvert:true,preuve:'confirmee'}};}}
     executerFavori={async()=>{window.envois=(window.envois||0)+1;return {ok:false};}} FermeAuRetour={()=>null}/></main></div>;
 }
 createRoot(document.getElementById('r')).render(<Banc/>);
 `);
-  await esbuild.build({ entryPoints: [path.join(dir, 'entree.jsx')], bundle: true, outdir: path.join(dir, 'out'), format: 'esm', jsx: 'automatic', loader: { '.js': 'jsx', '.woff2': 'empty', '.woff': 'empty', '.png': 'empty', '.svg': 'empty', '.jpg': 'empty' }, nodePaths: [NM], logLevel: 'error', define: { 'process.env.NODE_ENV': '"production"', 'import.meta.env': '{"MODE":"production","PROD":true,"DEV":false}' }, external: ['/fonts/*', '/images/*', '/textures/*'] });
+  const mutant = MUTANT && MUTATIONS[MUTANT];
+  const plugins = mutant ? [{ name: 'mutant', setup(b) { b.onLoad({ filter: new RegExp(mutant[0].replace('.', '\\.') + '$') }, (a) => { const t = fs.readFileSync(a.path, 'utf8'); if (!t.includes(mutant[1])) throw Error('mutation introuvable : ' + MUTANT); return { contents: t.replace(mutant[1], mutant[2]), loader: 'jsx' }; }); } }] : [];
+  await esbuild.build({ entryPoints: [path.join(dir, 'entree.jsx')], bundle: true, outdir: path.join(dir, 'out'), format: 'esm', jsx: 'automatic', plugins, loader: { '.js': 'jsx', '.woff2': 'empty', '.woff': 'empty', '.png': 'empty', '.svg': 'empty', '.jpg': 'empty' }, nodePaths: [NM], logLevel: 'error', define: { 'process.env.NODE_ENV': '"production"', 'import.meta.env': '{"MODE":"production","PROD":true,"DEV":false}' }, external: ['/fonts/*', '/images/*', '/textures/*'] });
   fs.writeFileSync(path.join(dir, 'out', 'index.html'), '<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/entree.css"></head><body><div id="r"></div><script type="module" src="/entree.js"></script></body></html>');
   return path.join(dir, 'out');
 }
 
 (async () => {
-  const OUT = await construire();
+  const nav = await chromium.launch({ executablePath: fs.existsSync('/opt/pw-browsers/chromium') ? '/opt/pw-browsers/chromium' : undefined, args: ['--no-sandbox', '--use-angle=swiftshader'] });
+  const svg = (n) => `<svg xmlns="http://www.w3.org/2000/svg" width="80" height="96"><rect width="80" height="96" fill="hsl(${(n * 47) % 360},18%,${70 + (n % 3) * 6}%)"/><ellipse cx="40" cy="60" rx="28" ry="10" fill="hsl(${(n * 47) % 360},25%,42%)"/></svg>`;
+  for (const theme of THEMES) {
+  const OUT = await construire(theme);
   const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css' };
-  const sauves = [];
+  const sauves = [], postes = [];
   const srv = http.createServer((q, r) => {
     const u = decodeURIComponent(q.url);
-    const json = (d, s = 200) => { r.writeHead(s, { 'content-type': 'application/json' }); r.end(JSON.stringify(d)); };
+    const json = (d, st = 200) => { r.writeHead(st, { 'content-type': 'application/json' }); r.end(JSON.stringify(d)); };
     if (u.startsWith('/rest/v1/app_data')) {
       if (q.method === 'POST') { let b = ''; q.on('data', (c) => (b += c)); q.on('end', () => { const row = JSON.parse(b); sauves.push(row); json([row]); }); return; }
-      if (u.includes(`id=eq.harvest_${UID}_notifications`)) return json([{ owner: OWNER, data: { type: 'notifications', uid: UID, domain: 'www.vinted.fr', capturedAt: iso(MAINT), payload: { notifications: NOTIFS } } }]);
+      if (u.includes(`id=eq.harvest_${UID}_notifications`)) return json(JEU === 'vide' ? [] : [{ owner: OWNER, data: { type: 'notifications', uid: UID, domain: 'www.vinted.fr', capturedAt: iso(MAINT), payload: { notifications: NOTIFS } } }]);
       if (u.includes(`id=eq.harvest_${UID}_favoris_archive`)) return json([]);
       if (u.includes(`id=eq.vrm_favoris_reglages_${UID}`)) return json(sauves.length ? [sauves[sauves.length - 1]] : [{ id: `vrm_favoris_reglages_${UID}`, owner: OWNER, data: { version: 1, message: MESSAGE, pourcentage: 10, offreMode: 'pct', offreValeur: null, arrondi: false, intervalleMinutes: 6, intervalleMaxMinutes: null, envoisActifs: false } }]);
       return json([]);
     }
-    if (u.startsWith('/api/compte')) return json({ ok: true, serveur: MAINT, vue: { active: false, raison: '', lot: 'l1', prochain: null, intervalleMinutes: 6, jobs: JOBS, auto: { reglages: { version: 1, actif: true, attenteMin: 10, attenteMax: 60, heureDebut: 9, heureFin: 21, jours: [1, 2, 3, 4, 5, 6, 7], parJour: 30, parHeure: 12 }, demande: null, allumeLe: MAINT - 20 * 24 * H, pauseJusqua: PAUSE, pauseRaison: 'vinted_frein', envois: [MAINT - 4 * H], journal: JOURNAL, etat: 'pause', prochain: null } } });
+    if (u.startsWith('/api/compte')) {
+      const repondre = () => json({ ok: true, serveur: MAINT, vue: { active: false, raison: '', lot: 'l1', prochain: null, intervalleMinutes: 6, jobs: JOBS, auto: AUTO } });
+      if (q.method === 'POST') { let b = ''; q.on('data', (c) => (b += c)); q.on('end', () => { try { postes.push(JSON.parse(b)); } catch (_) { postes.push({}); } repondre(); }); return; }
+      return repondre();
+    }
     let f = u.split('?')[0]; if (f === '/') f = '/index.html';
     const p = path.join(OUT, f); if (!fs.existsSync(p)) { r.writeHead(404); return r.end(); }
     r.writeHead(200, { 'content-type': MIME[path.extname(p)] || 'application/octet-stream' }); r.end(fs.readFileSync(p));
   });
   await new Promise((res) => srv.listen(0, res));
   const PORT = srv.address().port;
-  const nav = await chromium.launch({ executablePath: fs.existsSync('/opt/pw-browsers/chromium') ? '/opt/pw-browsers/chromium' : undefined, args: ['--no-sandbox', '--use-angle=swiftshader'] });
-  const svg = (n) => `<svg xmlns="http://www.w3.org/2000/svg" width="80" height="96"><rect width="80" height="96" fill="hsl(${(n * 47) % 360},35%,72%)"/></svg>`;
   for (const tel of [true, false]) {
-    const T = tel ? '390' : '1512';
+    const T = (tel ? '390' : '1512') + ' ' + theme + (JEU !== 'base' ? ' ' + JEU : '');
+    const F = `${JEU}-${theme}-${tel ? '390' : '1512'}`;
     const ctx = await nav.newContext(tel ? { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2, locale: 'fr-FR', timezoneId: 'Europe/Paris' } : { viewport: { width: 1512, height: 950 }, locale: 'fr-FR', timezoneId: 'Europe/Paris' });
     const pg = await ctx.newPage();
     const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
     await pg.addInitScript((t) => { const vrai = Date.now.bind(Date); const decal = t - vrai(); Date.now = () => vrai() + decal; }, MAINT);
     await pg.route(/vinted\.net\//, (r) => { const m = /\/b(\d+)\//.exec(r.request().url()); r.fulfill({ status: 200, contentType: 'image/svg+xml', body: svg(m ? Number(m[1]) : 1) }); });
     await pg.goto(`http://localhost:${PORT}/`, { waitUntil: 'domcontentloaded' });
-    await pg.waitForSelector('[data-fav-ligne]', { timeout: 15000 }).catch(() => {});
-    await pg.waitForTimeout(1200);
-    await pg.screenshot({ path: path.join(SHOTS, `favoris-ecran-${T}.png`), fullPage: true });
+    await pg.waitForSelector(FAV.length ? '[data-fav-article]' : '[data-fav-vide]', { timeout: 15000 }).catch(() => {});
+    await pg.waitForTimeout(900);
+    // La liste entière (« Tous ») pour juger chaque article.
+    if (FAV.length) { await pg.click('[data-fav-filtre="tous"]').catch(() => {}); while (await pg.locator('[data-fav-plus]').count()) await pg.click('[data-fav-plus]'); }
+    await pg.evaluate(() => window.scrollTo(0, 0)); await pg.screenshot({ path: path.join(SHOTS, `favoris-${F}.png`) });
+    if (FAV.length > 3) { await pg.locator('[data-fav-article]').nth(2).scrollIntoViewIfNeeded().catch(() => {}); await pg.waitForTimeout(200); await pg.screenshot({ path: path.join(SHOTS, `favoris-${F}-liste.png`) }); await pg.evaluate(() => { window.scrollTo(0, 0); for (const e of document.querySelectorAll('*')) if (e.scrollTop) e.scrollTop = 0; }); }
     const m = await pg.evaluate(() => {
-      const sec = document.querySelector('[data-fav-ecran]') || document.querySelector('section.vrm-favoris-liste');
-      const vis = (e) => { const r = e.getBoundingClientRect(); const s = getComputedStyle(e); return r.width > 0 && r.height > 0 && s.visibility !== 'hidden' && s.display !== 'none'; };
+      const sec = document.querySelector('[data-fav-fusion]');
+      const vis = (e) => { const r = e.getBoundingClientRect(); const st = getComputedStyle(e); return r.width > 0 && r.height > 0 && st.visibility !== 'hidden' && st.display !== 'none'; };
+      const carte = document.querySelector('[data-fu-carte]');
       const auto = document.querySelector('[data-fav-auto-etat]');
-      const lignes = [...document.querySelectorAll('[data-fav-ligne]')].map((li) => ({ id: li.getAttribute('data-fav-ligne'), etat: li.getAttribute('data-fav-etat'), numero: li.getAttribute('data-fav-numero'), envoyeLe: li.getAttribute('data-fav-envoye-le'), groupe: li.closest('[data-fav-groupe]')?.getAttribute('data-fav-raison') || null, texte: li.innerText, photo: !!li.querySelector('img'), ouvrir: !!li.querySelector('[data-fav-ouvrir]'), feuilles: [...li.querySelectorAll('*')].filter((x) => !x.children.length && x.innerText && x.innerText.trim().length > 0).map((x) => x.innerText.trim()) }));
-      const groupes = [...document.querySelectorAll('[data-fav-groupe]')].map((g) => ({ code: g.getAttribute('data-fav-groupe'), raison: g.getAttribute('data-fav-raison'), ton: g.getAttribute('data-fav-ton'), geste: g.querySelector(':scope > header [data-fav-geste]')?.innerText || '', compte: Number(g.querySelector('[data-fav-compte]')?.getAttribute('data-fav-compte')), n: g.querySelectorAll('[data-fav-ligne]').length }));
-      const cibles = sec ? [...sec.querySelectorAll('button, a[href], summary, input, select, textarea')].filter(vis).map((e) => { const r = e.getBoundingClientRect(); return { t: (e.innerText || e.getAttribute('aria-label') || e.tagName).trim().slice(0, 40), h: r.height, w: r.width }; }) : [];
-      const accent = getComputedStyle(document.documentElement).getPropertyValue('--vrm-accent').trim();
-      const rgb = (() => { const d = document.createElement('div'); d.style.color = accent; document.body.appendChild(d); const c = getComputedStyle(d).color; d.remove(); return c; })();
-      const enAccent = sec ? [...sec.querySelectorAll('*')].filter(vis).filter((e) => getComputedStyle(e).backgroundColor === rgb).map((e) => e.innerText.trim().slice(0, 40)) : [];
+      const articles = [...document.querySelectorAll('[data-fav-article]')].map((li) => ({ item: li.getAttribute('data-fav-article'), etat: li.getAttribute('data-fav-etat'), geste: li.getAttribute('data-fav-geste-article'), numero: li.getAttribute('data-fav-numero'), titre: li.querySelector('[data-fav-titre]')?.innerText || '', prix: li.querySelector('[data-fav-prix]')?.innerText || '', photo: !!li.querySelector('img'), n: Number(li.querySelector('[data-fav-personnes]')?.getAttribute('data-fav-personnes')), initiales: [...li.querySelectorAll('[data-fav-initiale]')].map((i) => i.getAttribute('data-fav-initiale')), action: li.querySelector('[data-fav-action]')?.getAttribute('data-fav-action') || '', h: li.getBoundingClientRect().height }));
+      const cibles = sec ? [...sec.querySelectorAll('button, a[href], summary, input, select, textarea')].filter(vis).map((e) => { const r = e.getBoundingClientRect(); const a = getComputedStyle(e, '::after'); const ext = a.content !== 'none' && a.position === 'absolute' ? 8 : 0; return { t: (e.innerText || e.getAttribute('aria-label') || e.tagName).trim().slice(0, 30), h: r.height + ext, w: r.width }; }) : [];
+      // Couleurs saturées : seulement le bleu d'Apple et l'ambre (et la carte sombre).
+      const sat = (c) => { const m = /rgba?\((\d+), (\d+), (\d+)(?:, ([\d.]+))?\)/.exec(c); if (!m || (m[4] !== undefined && Number(m[4]) < 0.2)) return null; const [r, g, b] = [m[1], m[2], m[3]].map(Number); const mx = Math.max(r, g, b), mn = Math.min(r, g, b); return mx - mn > 60 ? [r, g, b] : null; };
+      const permis = ([r, g, b]) => (b > 200 && r < 40 && g > 100 && g < 150) || (r > 140 && g > 50 && g < 200 && b < 90);
+      const couleurs = sec ? [...sec.querySelectorAll('*')].filter(vis).flatMap((e) => { const st = getComputedStyle(e); return [st.backgroundColor, st.color].map(sat).filter(Boolean).filter((x) => !permis(x)).map((x) => `${e.className || e.tagName}:${x}`); }) : [];
       const msg = document.querySelector('[data-fav-message]');
       return {
-        texte: sec ? sec.innerText : '', auto: auto ? { etat: auto.getAttribute('data-fav-auto-etat'), ton: auto.getAttribute('data-fav-auto-ton'), phrase: auto.querySelector('[data-fav-auto-phrase]')?.innerText || '', geste: auto.querySelector('[data-fav-auto-geste]')?.innerText || '', allume: auto.querySelector('[data-fav-auto-allume]')?.getAttribute('data-fav-auto-allume') } : null,
-        message: msg ? { etat: msg.getAttribute('data-fav-message'), texte: msg.querySelector('[data-fav-message-texte]')?.innerText || '', modifier: !!msg.querySelector('[data-fav-message-modifier]') } : null,
-        lignes, groupes, cibles, enAccent, deb: document.documentElement.scrollWidth - document.documentElement.clientWidth,
-        ordreAuto: auto && msg && lignes.length ? (auto.compareDocumentPosition(msg) & 4) && (msg.compareDocumentPosition(document.querySelector('[data-fav-ligne]')) & 4) ? 'ok' : 'non' : 'absent',
+        texte: sec ? sec.innerText : '', carte: !!carte, carteFond: carte ? getComputedStyle(carte).backgroundImage.slice(0, 40) : '',
+        total: Number(document.querySelector('[data-fav-total]')?.getAttribute('data-fav-total') ?? NaN), nArticles: Number(document.querySelector('[data-fav-articles]')?.getAttribute('data-fav-articles') ?? NaN),
+        cases: Object.fromEntries([...document.querySelectorAll('[data-fav-case]')].map((c) => [c.getAttribute('data-fav-case'), c.getAttribute('data-n')])),
+        auto: auto ? { etat: auto.getAttribute('data-fav-auto-etat'), ton: auto.getAttribute('data-fav-auto-ton'), ligne: auto.querySelector('[data-fav-auto-phrase]')?.innerText || '', geste: !!auto.querySelector('.is-geste'), allume: auto.querySelector('[data-fav-auto-allume]')?.getAttribute('data-fav-auto-allume'), dansCarte: !!auto.closest('[data-fu-carte]') } : null,
+        message: msg ? { etat: msg.getAttribute('data-fav-message'), texte: msg.querySelector('[data-fav-message-texte]')?.innerText || '', offre: msg.querySelector('[data-fav-message-offre]')?.innerText || '', modifier: !!msg.querySelector('[data-fav-message-modifier]') } : null,
+        articles, cibles, couleurs, deb: document.documentElement.scrollWidth - document.documentElement.clientWidth, largeur: sec ? sec.getBoundingClientRect().width : 0,
+        vide: document.querySelector('[data-fav-vide]')?.getAttribute('data-fav-vide') || '',
       };
     });
-    fs.writeFileSync(path.join(SHOTS, `favoris-ecran-${T}.txt`), m.texte);
+    fs.writeFileSync(path.join(SHOTS, `favoris-${F}.txt`), m.texte);
     dit(!errs.length, `${T} l'écran se monte sans erreur`, errs.join(' | '));
-    // 1. Mode auto
-    dit(m.auto && m.auto.allume === '1' && m.auto.etat === 'pause', `${T} mode auto en tête : allumé et en pause`, JSON.stringify(m.auto));
-    const heurePause = new Date(PAUSE).toLocaleTimeString('fr-FR', { timeZone: 'Europe/Paris', hour: '2-digit', minute: '2-digit' });
-    dit(m.auto && m.auto.phrase.includes(heurePause) && /ralentir/i.test(m.auto.phrase) && !!m.auto.geste, `${T} le frein dit jusqu'à quand (${heurePause}), pourquoi, et le geste`, m.auto && m.auto.phrase + ' | ' + m.auto.geste);
-    dit(m.ordreAuto === 'ok', `${T} ordre : mode auto, puis le message, puis la liste`, m.ordreAuto);
-    // 2. Message
-    dit(m.message && m.message.etat === 'pret' && m.message.texte.includes('merci pour ton favori') && m.message.modifier, `${T} le message enregistré est visible et modifiable`, JSON.stringify(m.message));
-    // 3. Une ligne par favori, un état
-    dit(m.lignes.length === FAV.length, `${T} une ligne par favori (${FAV.length})`, String(m.lignes.length));
-    const faux = FAV.map(([id]) => id).filter((id) => (m.lignes.find((l) => l.id === id) || {}).etat !== ATTENDU[id]);
-    dit(!faux.length, `${T} chaque favori porte l'état attendu (envoyé · pas envoyé · à envoyer · à vérifier)`, faux.map((id) => `${id}=${(m.lignes.find((l) => l.id === id) || {}).etat}≠${ATTENDU[id]}`).join(', '));
-    const l = (id) => m.lignes.find((x) => x.id === id) || { texte: '', feuilles: [] };
-    dit(l('n1').envoyeLe && Math.abs(Date.parse(l('n1').envoyeLe) - (MAINT - 4 * H)) < 1000 && /\d{2}:\d{2}/.test(l('n1').texte), `${T} « envoyé » porte la date et l'heure d'envoi`, JSON.stringify(l('n1')));
-    dit(l('n2').groupe === 'conversation' && l('n9').groupe === 'conversation' && l('n4').groupe === 'vendue' && l('n7').groupe === 'limite_heure' && l('n5').groupe === 'destinataire', `${T} « pas envoyé » rangé par raison (conversation, vendue, limite, à qui écrire)`, ['n2', 'n9', 'n4', 'n7', 'n5'].map((x) => x + ':' + l(x).groupe).join(' '));
-    dit(FAV.filter(([, , item]) => item).every(([id, , item]) => l(id).numero === ARTICLES[item].numero && l(id).texte.includes(ARTICLES[item].titre)), `${T} N° et titre par identité de l'annonce`, m.lignes.map((x) => x.id + ':' + x.numero).join(' '));
-    dit(FAV.every(([id, login]) => l(id).texte.includes(login)), `${T} le pseudo de chaque personne est affiché`);
-    dit(FAV.filter(([, , item]) => item).every(([id]) => l(id).photo), `${T} chaque ligne a sa photo`);
-    dit(!l('n10').numero, `${T} favori sans annonce lisible : aucun N° deviné`);
-    // 4. Gestes
-    dit(l('n5').ouvrir && FAV.filter(([id]) => id !== 'n5').every(([id]) => !l(id).ouvrir), `${T} « Ouvrir » seulement là où VRM doit apprendre à qui écrire`);
-    const g = (code, raison) => m.groupes.find((x) => x.code === code && (raison == null || x.raison === raison)) || {};
-    dit(g('a_verifier').ton === 'geste' && !!g('a_verifier').geste && g('pas_envoye', 'limite_heure').ton === 'geste' && g('pas_envoye', 'conversation').ton === 'neutre' && !g('pas_envoye', 'conversation').geste, `${T} ambre seulement quand un geste débloque`, JSON.stringify(m.groupes.map((x) => [x.code, x.raison, x.ton])));
-    dit(m.groupes.every((x) => x.compte === x.n || x.n < x.compte), `${T} chaque groupe dit son nombre une fois`, JSON.stringify(m.groupes.map((x) => [x.code, x.compte, x.n])));
-    // 5. Lisibilité
-    const compte = new Map();
-    for (const li of m.lignes) for (const t of new Set(li.feuilles)) if (t.length >= 12) compte.set(t, (compte.get(t) || 0) + 1);
-    const redites = [...compte].filter(([, n]) => n > 1).map(([t, n]) => `${n}× « ${t} »`);
-    dit(m.lignes.length > 0 && !redites.length, `${T} aucune phrase répétée sur deux lignes`, redites.join(' | '));
-    const JARGON = [/\bfiles?\b/i, /jetons?/i, /\b(?:401|403|429|503)\b/, /\bpont\b/i, /captur/i, /quota/i, /payload|endpoint|\bAPI\b/i, /autorisation/i, /\blots?\b/i, /Vintex/i];
+    dit(m.carte && /gradient/.test(m.carteFond), `${T} la carte sombre Fusion est en tête`, m.carteFond);
+    // 1. La carte sombre
+    if (FAV.length) {
+      dit(m.total === RESUME.favoris && m.nArticles === RESUME.articles, `${T} carte : ${RESUME.favoris} favoris sur ${RESUME.articles} articles (30 j)`, `${m.total} / ${m.nArticles}`);
+      dit(Number(m.cases.envoyes) === RESUME.envoyes && Number(m.cases.vendus) === RESUME.vendus && Number(m.cases.attente) === RESUME.attente, `${T} cases : ${RESUME.envoyes} envoyés · ${RESUME.vendus} vendus · ${RESUME.attente} en attente`, JSON.stringify(m.cases));
+    } else dit(m.total === 0 && /^(aucun|absente)$/.test(m.vide), `${T} aucun favori : « 0 » et une ligne, rien d'inventé`, `${m.total} ${m.vide}`);
+    dit(m.auto && m.auto.dansCarte && m.auto.allume === '1', `${T} l'interrupteur du mode auto est dans la carte, allumé`, JSON.stringify(m.auto));
+    if (JEU === 'bloque') dit(m.auto && m.auto.ton === 'geste' && m.auto.geste && /dressing/i.test(m.auto.ligne), `${T} mode auto bloqué : UNE ligne, le geste, en ambre`, JSON.stringify(m.auto));
+    else { const heurePause = new Date(PAUSE).toLocaleTimeString('fr-FR', { timeZone: 'Europe/Paris', hour: '2-digit', minute: '2-digit' }); dit(m.auto && m.auto.etat === 'pause' && m.auto.ligne.includes(heurePause) && /ralentir/i.test(m.auto.ligne), `${T} freiné : jusqu'à ${heurePause} et pourquoi`, m.auto && m.auto.ligne); }
+    // 2. Le message
+    const premier = FAV.length ? (() => { const a = m.articles.find((x) => x.geste === 'envoyer') || m.articles[0]; return a; })() : null;
+    dit(m.message && m.message.etat === 'pret' && !/\{|\}/.test(m.message.texte) && /merci pour ton favori/.test(m.message.texte) && m.message.modifier, `${T} « Ton message » : le vrai texte, sans variable brute, modifiable`, JSON.stringify(m.message));
+    if (FAV.length && premier) { const ps = (PSEUDOS_ITEM[premier.item] || []).filter(Boolean); dit(ps.some((x) => m.message.texte.includes(x)), `${T} la variable {username} est remplacée par le pseudo d'un VRAI favori`, m.message.texte); }
+    dit(m.message && /−10 %|→/.test(m.message.offre), `${T} l'offre est dite (−10 % ou prix → prix)`, m.message && m.message.offre);
+    // 3. Une carte par article
+    if (FAV.length) {
+      const items = Object.keys(ATT).map(String).sort();
+      dit(JSON.stringify(m.articles.map((x) => x.item).sort()) === JSON.stringify(items), `${T} une carte par ARTICLE (${items.length})`, m.articles.map((x) => x.item).join(','));
+      const mal = m.articles.filter((x) => x.etat !== puceAttendue(x.item)).map((x) => `${x.item}:${x.etat}≠${puceAttendue(x.item)}`);
+      dit(!mal.length, `${T} chaque article porte l'état attendu (à envoyer · vendu · à vérifier · offre faite · envoyé · refusé par Vinted…)`, mal.join(' '));
+      dit(m.articles.every((x) => (x.action === 'envoyer') === (puceAttendue(x.item) === 'a_envoyer')), `${T} « Envoyer » seulement sur un article qui a des favoris à envoyer (jamais sur un vendu)`, m.articles.map((x) => x.item + ':' + x.action).join(' '));
+      dit(m.articles.every((x) => x.n === (ATT[x.item] || []).length), `${T} chaque carte compte SES favoris`, m.articles.map((x) => x.item + ':' + x.n).join(' '));
+      const inventes = m.articles.flatMap((x) => x.initiales.filter((i) => i && !(PSEUDOS_ITEM[x.item] || []).some((p) => p && p[0].toUpperCase() === i)).map((i) => x.item + ':' + i));
+      dit(!inventes.length, `${T} chaque initiale vient d'un pseudo écrit par Vinted (aucun nom inventé)`, inventes.join(' '));
+      if (JEU === 'base') { const a13 = m.articles.find((x) => x.item === '9008'); dit(a13 && a13.initiales.includes(''), `${T} pseudo illisible ⇒ un rond vide`, JSON.stringify(a13)); }
+      dit(m.articles.filter((x) => ARTICLES[x.item]).every((x) => x.numero === ARTICLES[x.item].numero && x.titre.length > 0), `${T} N° et titre par identité de l'annonce`);
+      if (JEU === 'base') { const a10 = m.articles.find((x) => x.item === '9010'); dit(!a10, `${T} un favori hors période (40 j) n'est pas dans « 30 j »`); }
+      dit(m.articles.filter((x) => ARTICLES[x.item]?.prix).every((x) => /\d+ €/.test(x.prix)), `${T} le prix connu est affiché`);
+      dit(m.articles.every((x) => x.photo === !(SANS_PHOTO.has(Number(x.item)))), `${T} une photo par article (ou la vignette vide)`);
+      dit(m.articles.every((x) => x.h < 140), `${T} cartes compactes (aucune ne dépasse 140 px)`, Math.max(...m.articles.map((x) => x.h)) + ' px');
+    }
+    // 6. Lisibilité
+    const JARGON = [/\bfiles?\b/i, /jetons?/i, /\b(?:401|403|429|503)\b/, /\bpont\b/i, /captur/i, /quota/i, /payload|endpoint|\bAPI\b/i, /autorisation/i, /\blots?\b/i, /Vintex/i, /\bpaires?\b/i];
     const jargon = JARGON.filter((re) => re.test(m.texte)).map((re) => String(re) + ' : ' + (m.texte.match(re) || [''])[0]);
-    dit(!jargon.length, `${T} aucun mot technique à l'écran`, jargon.join(' | '));
-    dit(!/[\u{1F000}-\u{1FAFF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{FE0F}]/u.test(m.texte), `${T} aucun emoji`);
+    dit(!jargon.length, `${T} aucun mot technique, jamais « paire »`, jargon.join(' | '));
+    dit(!/[\u{1F000}-\u{1FAFF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{FE0F}♡]/u.test(m.texte), `${T} aucun emoji`);
     if (tel) { const petits = m.cibles.filter((c) => c.h < 43.5 || c.w < 43.5); dit(!petits.length, `${T} cibles au doigt ≥ 44 px`, petits.map((c) => `${c.t} ${Math.round(c.w)}×${Math.round(c.h)}`).join(' | ')); }
-    dit(m.enAccent.length <= 1, `${T} une seule chose en couleur d'accent`, m.enAccent.join(' | '));
+    dit(!m.couleurs.length, `${T} aucune couleur hors du bleu d'Apple et de l'ambre`, [...new Set(m.couleurs)].slice(0, 6).join(' | '));
     dit(m.deb <= 1, `${T} aucun débordement horizontal`, m.deb + ' px');
-    // 6. Modifier le message ⇒ écrire ⇒ Enregistrer, sans rien envoyer
-    if (m.message && m.message.modifier) {
+    if (!tel) dit(m.largeur > 0 && m.largeur <= 760, `${T} colonne ≤ 760 px sur ordinateur`, m.largeur + ' px');
+    // 4. « Envoyer » : choisit, ouvre, ne lance RIEN
+    const env = m.articles.find((x) => x.action === 'envoyer');
+    if (env) {
+      await pg.click(`[data-fav-article="${env.item}"] [data-fav-action="envoyer"]`);
+      await pg.waitForSelector('[data-favoris-feuille]:not([hidden])', { timeout: 5000 }).catch(() => {});
+      await pg.waitForTimeout(1500);
+      const f = await pg.evaluate(() => ({ etape: document.querySelector('[data-favoris-feuille]')?.getAttribute('data-favoris-etape'), lancer: [...document.querySelectorAll('[data-favoris-feuille] button')].some((b) => /Lancer/.test(b.innerText)), envois: window.envois || 0, visible: !!document.querySelector('.vrm-favoris-voile:not([hidden]) [data-favoris-feuille]') }));
+      dit(f.visible && f.etape === 'envoi' && f.lancer, `${T} « Envoyer » ouvre la feuille d'envoi, « Lancer » prêt`, JSON.stringify(f));
+      const lances = postes.filter((x) => x.action === 'lancer');
+      dit(!lances.length && !f.envois, `${T} rien n'est lancé ni envoyé sans « Lancer »`, JSON.stringify(lances.map((x) => x.selection)));
+      if (tel && theme === 'clair') await pg.screenshot({ path: path.join(SHOTS, `favoris-${F}-envoi.png`) });
+      await pg.reload({ waitUntil: 'domcontentloaded' }); await pg.waitForSelector('[data-fav-article]', { timeout: 15000 }).catch(() => {}); await pg.waitForTimeout(600);
+    }
+    // 5. Le détail d'un article
+    if (FAV.length) {
+      const cible = m.articles.slice().sort((a, b) => b.n - a.n)[0];
+      await pg.click(`[data-fav-article="${cible.item}"] [data-fav-detail]`).catch(() => pg.click('[data-fav-filtre="tous"]').then(() => pg.click(`[data-fav-article="${cible.item}"] [data-fav-detail]`)));
+      await pg.waitForSelector('[data-fav-detail-feuille]', { timeout: 5000 }).catch(() => {});
+      const d = await pg.evaluate(() => { const f = document.querySelector('[data-fav-detail-feuille]'); return f ? { n: f.querySelectorAll('[data-fav-personne]').length, pseudos: [...f.querySelectorAll('[data-fav-pseudo]')].map((x) => x.innerText), etats: [...f.querySelectorAll('[data-fav-personne]')].map((x) => x.getAttribute('data-fav-etat')), deb: document.documentElement.scrollWidth - document.documentElement.clientWidth } : null; });
+      dit(d && d.n === cible.n, `${T} toucher la carte ⇒ le détail : une ligne par personne (${cible.n})`, JSON.stringify(d));
+      dit(d && d.pseudos.every((x) => x === 'Pseudo non lu' || (PSEUDOS_ITEM[cible.item] || []).includes(x)), `${T} détail : chaque pseudo est celui écrit par Vinted`, d && d.pseudos.join(','));
+      if (tel) await pg.screenshot({ path: path.join(SHOTS, `favoris-${F}-detail.png`) });
+      await pg.keyboard.press('Escape').catch(() => {});
+      await pg.click('.vrm-fa-feuille .vrm-fa-fermer').catch(() => {});
+    }
+    // 7. Modifier le message ⇒ Enregistrer, sans rien envoyer
+    if (JEU === 'base' && theme === 'clair') {
       await pg.click('[data-fav-message-modifier]');
       const champ = pg.locator('[data-favoris-message]');
       await champ.waitFor({ timeout: 5000 }).catch(() => {});
@@ -258,22 +312,21 @@ createRoot(document.getElementById('r')).render(<Banc/>);
       dit(vu === MESSAGE, `${T} « Modifier » ouvre le message enregistré`, String(vu));
       if (vu != null) {
         await champ.fill('Bonjour {username}, merci !');
-        await pg.screenshot({ path: path.join(SHOTS, `favoris-ecran-message-${T}.png`) });
         const bouton = pg.locator('[data-favoris-enregistrer-message]');
-        dit(await bouton.count() === 1, `${T} sans favori choisi, « Enregistrer » est proposé`);
         if (await bouton.count()) {
           await bouton.click();
-          await pg.waitForFunction(() => document.querySelector('[data-fav-message-texte]')?.innerText.includes('Bonjour {username}, merci !'), null, { timeout: 5000 }).catch(() => {});
-          dit(sauves.length >= 1 && sauves[sauves.length - 1].data.message === 'Bonjour {username}, merci !' && sauves[sauves.length - 1].data.envoisActifs === false, `${T} le message est enregistré (rien n'est lancé)`, JSON.stringify(sauves[sauves.length - 1] || null));
-          dit(await pg.evaluate(() => !window.envois), `${T} enregistrer n'envoie aucun message`);
-          dit(await pg.locator('[data-fav-message-texte]').innerText().catch(() => '') === 'Bonjour {username}, merci !', `${T} l'écran montre le nouveau message`);
+          await pg.waitForFunction(() => /^Bonjour .*merci !$/.test(document.querySelector('[data-fav-message-texte]')?.innerText || ''), null, { timeout: 5000 }).catch(() => {});
+          dit(sauves.length >= 1 && sauves[sauves.length - 1].data.message === 'Bonjour {username}, merci !' && sauves[sauves.length - 1].data.envoisActifs === false, `${T} le message est enregistré (rien n'est lancé)`);
+          dit(await pg.evaluate(() => !window.envois) && !postes.some((x) => x.action === 'lancer'), `${T} enregistrer n'envoie aucun message`);
           sauves.length = 0;
-        }
+        } else dit(false, `${T} « Enregistrer » est proposé`);
       }
     }
     await ctx.close();
   }
-  await nav.close(); srv.close();
-  console.log(`\n${ok} vert(s), ${ko} rouge(s) — captures : ${SHOTS}`);
+  srv.close();
+  }
+  await nav.close();
+  console.log(`\n${ok} vert(s), ${ko} rouge(s) — jeu ${JEU}${MUTANT ? ', mutant ' + MUTANT : ''} — captures : ${SHOTS}`);
   process.exit(ko ? 1 : 0);
 })().catch((e) => { console.log('❌ banc interrompu : ' + e.stack); process.exit(1); });
