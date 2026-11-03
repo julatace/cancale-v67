@@ -38090,7 +38090,7 @@ function BeneficeCompta({ compta, onNav, onSansDepenses, onAjouterDepense, sansC
           </p>
           <div className="vrm-fu-cases vrm-fu-compta-cases" style={{ '--n': B.sansCotis ? 2 : 3 }}>
             <div className="vrm-fu-case" data-fu-case="declarer" data-eur={e2(B.caDecl)}><b className={B.caDecl == null ? 'is-vide' : undefined}>{B.caDecl == null ? '—' : fmt(B.caDecl)}</b><span>à déclarer</span></div>
-            {B.sansCotis ? null : <div className="vrm-fu-case" data-fu-case="urssaf" data-eur={e2(B.cotis)}><b className={B.cotis == null ? 'is-vide' : undefined}>{B.cotis == null ? '—' : fmt(B.cotis)}</b><span title="L'URSSAF de ces ventes, retirée du bénéfice. Celle à payer se calcule sur l'argent reçu (« Combien je dois déclarer ? »).">URSSAF de ces ventes</span></div>}
+            {B.sansCotis ? null : <div className="vrm-fu-case" data-fu-case="urssaf" data-eur={e2(B.cotis)}><b className={B.cotis == null ? 'is-vide' : undefined}>{B.cotis == null ? '—' : fmt(B.cotis)}</b><span title="L'URSSAF de ces ventes, retirée du bénéfice. Celle à payer se calcule sur l'argent reçu (« Combien je dois déclarer ? »).">URSSAF</span></div>}
             <div className="vrm-fu-case" data-fu-case="ventes"><b>{B.n}</b><span>vente{B.n > 1 ? 's' : ''}</span></div>
           </div>
           {B.depenses === 'jamais' && nuagePret && onSansDepenses ? (
