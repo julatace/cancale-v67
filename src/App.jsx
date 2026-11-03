@@ -37807,7 +37807,11 @@ const caVintedDuMois = (m) => {
 const caBeneficeDuMois = (m, toutes) => {
   if (!toutes) return caVintedDuMois(m);
   const par = m && m.par && typeof m.par === 'object' ? m.par : null;
-  if (par && Object.keys(par).length) return ['Vinted', 'Leboncoin', 'eBay'].reduce((t, k) => t + (par[k] ? (Number(par[k].ca) || 0) : 0), 0);
+  // (3 nov.) + Vestiaire : depuis le 1er nov. une vente Vestiaire au montant sûr
+  // entre dans le bénéfice (publication `plateformes`) ET dans le CA déclaré ;
+  // ses cotisations n'étaient pas déduites (le bénéfice comptait la vente, pas
+  // son URSSAF). Les mêmes ventes des deux côtés.
+  if (par && Object.keys(par).length) return ['Vinted', 'Leboncoin', 'eBay', 'Vestiaire'].reduce((t, k) => t + (par[k] ? (Number(par[k].ca) || 0) : 0), 0);
   return Number(m && m.ca) || 0;
 };
 // Le bénéfice d'une période — fonction PURE (exécutée par audit-benefice.cjs).
@@ -37950,7 +37954,7 @@ function BeneficeCompta({ compta, onNav, onSansDepenses, onAjouterDepense, sansC
                 data={{ 'data-benef-ligne': 'charges' }} />
               {B.sansCotis ? <div className="vrm-set-ligne" data-benef-ligne="cotis" data-benef-sans-cotis=""><span className="vrm-set-lib"><small style={{ color: C.muted, marginTop: 0 }}>Aucune cotisation URSSAF déduite — {regimeFiscal() ? `statut : ${libelleRegime(regimeFiscal())}` : 'ton statut n\'est pas encore choisi (Documents et réglages → Ton statut)'}.</small></span></div> :
               <Ligne lib="− URSSAF" val={B.cotis}
-                sous={B.cotis == null ? 'ton chiffre d\'affaires déclaré se calcule dans l\'écran Ventes' : `${String(tauxUrssaf()).replace('.', ',')} % de l'argent reçu sur la période (${B.toutes ? 'Vinted, Leboncoin, eBay' : 'Vinted'})`}
+                sous={B.cotis == null ? 'ton chiffre d\'affaires déclaré se calcule dans l\'écran Ventes' : `${String(tauxUrssaf()).replace('.', ',')} % de l'argent reçu sur la période (${B.toutes ? 'Vinted, Leboncoin, eBay, Vestiaire' : 'Vinted'})`}
                 data={{ 'data-benef-ligne': 'cotis' }} />}
               <div className="vrm-set-ligne" data-benef-ligne="net"><span className="vrm-set-lib"><b style={{ color: C.text }}>= {titreNet.toLowerCase()}</b></span><span className="vrm-set-lib" style={{ flex: '0 0 auto', textAlign: 'right' }}><small style={{ color: C.muted, marginTop: 0 }}>le chiffre au-dessus</small></span></div>
             </div>
