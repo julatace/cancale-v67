@@ -132,7 +132,8 @@ import { DISCORD_ERREURS } from "./communaute/discordErreurs.js";
 import { noterTicketDiscord, ecouterDiscord, suivreCodeDiscord, etatCodeDiscord, reprendreDiscord, oublierTicketDiscord } from "./communaute/discordAttente.js";
 import { DESCRIPTION_ORGANISATION } from "./operations/description.js";
 // (31 oct.) Colis → « À retirer » : la carte des points relais (règle pure + carte).
-import { regrouperRelais, pointsARetirer, lieuCompleteParTransporteur } from "./relaisColis.js";
+import { regrouperRelais, pointsARetirer, lieuCompleteParTransporteur, lieuTransporteurRepare } from "./relaisColis.js";
+import { registrePointsConnus, completerParPointConnu, lieuLePlusComplet, memePoint, completudeLieu, cleTransporteurLieu } from "./villeRelais.js";
 import { lieuxRelusDansTextes } from "./lieuxRetrait.js";
 import CarteRelaisColis, { ColonneRetirer, villesDesPoints } from "./CarteRelais.jsx";
 import PastilleTransporteur, { LogoTransporteur } from "./PastilleTransporteur.jsx";
@@ -35479,7 +35480,9 @@ const colisRetireAilleurs = (t, retires) => { const k = suiviDeLigne(t); return 
 // Nettoie un « lieu » de point relais (souvent bruité par les emails Mondial
 // Relay : « ® MAISON DE LA PRESSE 40 RUE DU PORT 35260 CANCALE SUPER PRATIQUE
 // Retrouvez… »). Renvoie { nom, adresse, display } propres.
-const titleCasePR = (s) => s.toLowerCase().replace(/\b([a-zà-ÿ])/g, (m) => m.toUpperCase()).replace(/\b(De|Du|La|Le|Les|Des|Et)\b/g, w => w.toLowerCase());
+// (3 nov.) `\b` ne connaît pas les lettres accentuées : « BRETONNIÈRE » devenait « BretonnièRe »,
+// « THÉ BLEU » « ThÉ Bleu ». Une majuscule seulement en début de mot (après une espace, un tiret, une apostrophe).
+const titleCasePR = (s) => s.toLowerCase().replace(/(^|[^a-zà-ÿ0-9])([a-zà-ÿ])/g, (m, a, b) => a + b.toUpperCase()).replace(/(^|[^A-Za-zÀ-ÿ])(De|Du|La|Le|Les|Des|Et)(?=[^A-Za-zÀ-ÿ]|$)/g, (m, a, w) => a + w.toLowerCase());
 // (17 oct.) LE TYPE DE LIEU N'EST PAS SON NOM. Mesuré sur sa base : l'email
 // Vinted Go écrit « *Consigne Vinted Go*, * Kusmi Tea *, * 13 Rue Saint-Vincent »
 // (gras de la version texte compris), la conversation « Kusmi Tea, 13 Rue
@@ -35551,7 +35554,12 @@ const fusionLignesMemeSuivi = (m, s) => {
   // identifiant vont avec un AUTRE code : ils ne sont pas montrés à côté.
   const memeCode = !codeRetrait(src.code) || !codeRetrait(autre.code) || codeRetrait(autre.code) === codeRetrait(src.code);
   const qrSrc = qrImage(src) ? src : (memeCode && qrImage(autre)) ? autre : {};
-  return { ...m, lieu: (cleanLieu(p.lieu).nom ? p.lieu : (q.lieu || p.lieu)) || null,
+  // (3 nov., « il ne reconnaît pas les villes ») Les deux lignes nomment le MÊME point et
+  // l'autre porte l'adresse plus complète (code postal, ville) : c'est elle qui gagne.
+  const lp = cleanLieu(p.lieu), lq = cleanLieu(q.lieu);
+  const lpA = { lieuNom: lp.nom, lieuAdresse: lp.adresse }, lqA = { lieuNom: lq.nom, lieuAdresse: lq.adresse };
+  const lieuF = lp.nom ? ((lq.nom && memePoint(lpA, lqA) && completudeLieu(lqA) > completudeLieu(lpA)) ? q.lieu : p.lieu) : (q.lieu || p.lieu);
+  return { ...m, lieu: lieuF || null,
     code: src.code || null, code2: src.code2 || (memeCode ? autre.code2 : null) || null,
     qrB64: qrSrc.qrB64 || null, qrType: qrSrc.qrType || null, qrUrl: qrSrc.qrUrl || null, consigne: !!(m.consigne || s.consigne),
     limite: p.limite || q.limite || null, limiteAt: p.limiteAt || q.limiteAt || null };
@@ -48782,16 +48790,31 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // (1er nov.) Le lieu d'un e-mail complété par le suivi du transporteur du
     // MÊME n° (Vinted Go : rue + ville du point où le colis attend) — par
     // identité, jamais par le nom ; deux adresses ⇒ rien, dit (`lieuConflit`).
-    const lieuDeLigne = (t) => { const k = suiviDeLigne(t); return lieuCompleteParTransporteur(lieuDe(t && t.lieu), (t && t.transp) || (tpmC && k ? tpmC.get(k) : null)); };
+    // (3 nov., 18 h 59, Julien : « il ne reconnaît pas les villes ») LES POINTS DÉJÀ CONNUS : tous
+    // les lieux LUS (e-mails, conversations, lectures chez le transporteur), quel que soit l'état
+    // du colis. Un lieu sans code postal reprend l'adresse du MÊME point s'il est le seul de ce nom
+    // (`completerParPointConnu`, src/villeRelais.js) ; deux points du même nom ⇒ rien.
+    const registre = registrePointsConnus([
+      ...(Array.isArray(tracking) ? tracking : []).map(t => ({ ...lieuDe(t && t.lieu), transporteur: (t && t.carrier) || '', compte: (t && t.account) || '' })),
+      ...Object.values(colisRelais || {}).map(r => ({ ...lieuDe(r && r.lieu), transporteur: (r && r.transporteur) || '', compte: '' })),
+      ...(tpmC && typeof tpmC.values === 'function' ? [...tpmC.values()] : []).map(x => { const r = lieuTransporteurRepare(x) || {}; return { lieuNom: r.lieuNom || '', lieuAdresse: [r.lieuRue, [r.lieuCp, r.lieuVille].filter(Boolean).join(' ')].filter(Boolean).join(', '), transporteur: r.carrier || '' }; }),
+    ]);
+    const completer = (lu, transporteur, compte) => completerParPointConnu(lu, registre, { transporteur: cleTransporteurLieu(transporteur), compte: compte || '' });
+    // Le lieu d'un e-mail : complété par le suivi du MÊME n°, puis par la conversation de SON
+    // achat (relié par identité) quand elle nomme le même point avec une adresse plus complète,
+    // puis par le même point déjà connu.
+    const lieuDeLigne = (t, a) => { const k = suiviDeLigne(t); let lu = lieuCompleteParTransporteur(lieuDe(t && t.lieu), (t && t.transp) || (tpmC && k ? tpmC.get(k) : null));
+      const ra = a ? relaisDe(a) : null; if (ra && ra.lieu) lu = lieuLePlusComplet(lu, lieuDe(ra.lieu));
+      return completer(lu, t && t.carrier, t && t.account); };
     const codeDeLigne = (t) => codeRetrait(t && t.code) || '';
     for (const t of (pickupUnion.emailList || [])) {
-      const a = achatDuColis(t, buysBase, indexSuivisAchats); const lu = lieuDeLigne(t); const code = codeDeLigne(t); const eE = etatColisEmail(t, maintenant); const ej = eE.jours;
+      const a = achatDuColis(t, buysBase, indexSuivisAchats); const lu = lieuDeLigne(t, a); const code = codeDeLigne(t); const eE = etatColisEmail(t, maintenant); const ej = eE.jours;
       L.push({ cle: 'r:e:' + (suiviDeLigne(t) || t.id || ''), groupe: 'retirer', site: 'vinted', nom: nomAvecTaille(a ? a.title : (t.artTitle || (nomTr(t.carrier) ? `Colis ${nomTr(t.carrier)}` : 'Colis à retirer')), a), photo: a ? photoAchat(a) : (t.photo || null),
         etat: [lu.lieuNom || nomTr(t.carrier), dernierJour(ej) || (code ? code : (qrImage(t) ? 'QR code' : 'code pas encore lu'))].filter(Boolean).join(' · '), ambre: Number.isFinite(ej) && ej <= 1, ouvrir: true,
         ...lu, transporteur: t.carrier || '', transp: transporteurColis(t.carrier, suiviDeLigne(t)), code, code2: codeRetrait(t.code2) || '', qr: !!qrImage(t) && !code, jours: Number.isFinite(ej) ? ej : null, tri: urgenceTri(eE), ...(lu.lieuNom ? {} : { sansLieu: sansLieuEmail(t) }), src: { t } });
     }
     for (const o of (pickupUnion.extra || [])) {
-      const r = relaisDe(o); const lu = lieuDe(r && r.lieu); const code = r ? codeRetrait(r.code) : ''; const eV = etatColisVinted(o, maintenant, tpmC); const ej = eV.jours;
+      const r = relaisDe(o); const lu = completer(lieuDe(r && r.lieu), r && r.transporteur, ''); const code = r ? codeRetrait(r.code) : ''; const eV = etatColisVinted(o, maintenant, tpmC); const ej = eV.jours;
       const suV = suivisAchat(o, indexSuivisAchats)[0] || ''; const eSV = entreeSuiviAchat(o); const trInconnu = !!suV && !((r && r.transporteur) || (eSV && eSV.transporteur) || transporteurDeForme(suV));
       L.push({ cle: 'r:v:' + o.transaction_id, groupe: 'retirer', site: 'vinted', nom: nomAvecTaille(o.title || 'Achat', o), photo: photoAchat(o), num: '', trInconnu,
         etat: [lu.lieuNom || 'au point relais', dernierJour(ej) || (code || 'code pas encore lu')].filter(Boolean).join(' · '), ambre: Number.isFinite(ej) && ej <= 1, ouvrir: true,
@@ -48802,7 +48825,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       // (2 nov.) Même fait que les cartes « extra » : un n° vu sans transporteur nommé.
       const suX = x.kind === 'email' ? (suiviDeLigne(x.t) || '') : (suivisAchat(x.o, indexSuivisAchats)[0] || ''); const eSX = x.kind === 'email' ? null : entreeSuiviAchat(x.o);
       const trInconnu = !!suX && !((x.kind === 'email' ? (x.t && x.t.carrier) : (relaisDe(x.o) || {}).transporteur) || (eSX && eSX.transporteur) || transporteurDeForme(suX));
-      const lu = x.kind === 'email' ? lieuDeLigne(x.t) : lieuDe((relaisDe(x.o) || {}).lieu);
+      const lu = x.kind === 'email' ? lieuDeLigne(x.t, o) : completer(lieuDe((relaisDe(x.o) || {}).lieu), (relaisDe(x.o) || {}).transporteur, '');
       const code = x.kind === 'email' ? codeDeLigne(x.t) : codeRetrait((relaisDe(x.o) || {}).code);
       L.push({ cle: x.kind === 'email' ? 'r:e:' + (suiviDeLigne(x.t) || (x.t && x.t.id) || '') : 'r:v:' + (x.o && x.o.transaction_id), groupe: 'retirer', site: 'vinted', nom: nomAvecTaille(o ? o.title : (x.t && nomTr(x.t.carrier) ? 'Colis ' + nomTr(x.t.carrier) : 'Colis à retirer'), o), photo: o ? photoAchat(o) : ((x.t && x.t.photo) || null), trInconnu,
         etat: [lu.lieuNom || (x.kind === 'email' ? nomTr(x.t && x.t.carrier) : ''), 'à vérifier : délai dépassé ou incident'].filter(Boolean).join(' · '), aVerifier: true, horsCompte: true, ouvrir: true,
@@ -48812,7 +48835,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         // l'ancien bloc « à vérifier ») et la source, pour les gestes de SA carte.
         raisonVerif: raisonAVerifier(x), raisonCode: (x.e && x.e.etat) || '', encoreCode: aEncoreCode(x), src: x.kind === 'email' ? { t: x.t, o: x.o || null } : { o: x.o } });
     }
-    for (const o of (pickupUnion.aConfirmer || [])) { const r = relaisDe(o); const lu = lieuDe(r && r.lieu); const suC = suivisAchat(o, indexSuivisAchats)[0] || ''; const eSC = entreeSuiviAchat(o); const trInconnu = !!suC && !((r && r.transporteur) || (eSC && eSC.transporteur) || transporteurDeForme(suC));
+    for (const o of (pickupUnion.aConfirmer || [])) { const r = relaisDe(o); const lu = completer(lieuDe(r && r.lieu), r && r.transporteur, ''); const suC = suivisAchat(o, indexSuivisAchats)[0] || ''; const eSC = entreeSuiviAchat(o); const trInconnu = !!suC && !((r && r.transporteur) || (eSC && eSC.transporteur) || transporteurDeForme(suC));
       L.push({ cle: 'r:c:' + o.transaction_id, groupe: 'retirer', site: 'vinted', nom: nomAvecTaille(o.title || 'Achat', o), photo: photoAchat(o), trInconnu, etat: 'au point relais · à vérifier (compte pas relu)', aVerifier: true, horsCompte: true, ouvrir: true,
         ...lu, transporteur: (r && r.transporteur) || '', transp: transporteurColis((r && r.transporteur) || (eSC && eSC.transporteur) || '', suC), code: '', jours: null, ...(lu.lieuNom ? {} : { sansLieu: { raison: 'Peut-être le même colis qu’un e-mail : son compte Vinted n’a pas encore été relu.', geste: `Passe sur Vinted${o._acc ? ` connecté sur ${accName(o._acc)}` : ''} : l’extension relie le colis à son e-mail.` } }),
         raisonVerif: `peut-être le même colis qu’un e-mail : compte ${o._acc ? accName(o._acc) + ' ' : ''}pas encore relu sur Vinted`, src: { o } }); }
