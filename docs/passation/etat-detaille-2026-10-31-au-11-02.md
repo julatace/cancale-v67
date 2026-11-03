@@ -173,3 +173,7 @@ Déplacé TEL QUEL depuis CLAUDE.md §9 le 2 novembre 2026 (le fichier dépassai
 
 ### Lignes de §9 déplacées telles quelles
 - **1er nov.** — VRM pour d'autres vendeurs : 19 défauts corrigés (code Gmail au vendeur qui a PROUVÉ l'adresse, factures Pro au propriétaire seul, textes neutres `audit-vendeur-neutre`). → historique sécurité-base-serveur. Geste : recoller `scripts/gmail-forwarder.gs` + `EMAIL_INBOUND_SECRET`.
+
+### Lignes de §9 déplacées telles quelles
+- **2 nov.** — Passation de la nuit : 11 lots en ligne (PR #932 → #942, extension 5.307.0), 7 audits dans `docs/passation/audits-2026-11-01/`. → `docs/passation/2026-11-02-nuit.md`.
+- **1er nov.** — Audit des parcours A5-A14 (double vente Leboncoin par N°, « Vendus ailleurs » par `cleNum`, « …a échoué » ≠ vente, ventes plus masquables). Reste : « Échec du paiement »/`failed` à aligner à la prochaine extension. → historique divers. Geste : aucun.
