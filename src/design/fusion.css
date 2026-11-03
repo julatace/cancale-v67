@@ -767,10 +767,12 @@ html body .vrm-app-shell .vrm-main .vrm-day-layout.vrm-fu-journee .vrm-bilan-syn
 }
 html body .vrm-app-shell .vrm-main .vrm-day-layout.vrm-fu-journee .vrm-bilan-sync[data-vendus-ailleurs][open] > :not(summary) { margin: 0 14px 12px !important; }
 .vrm-fu-declaration .vrm-fu-decl-lien { display: inline-flex; align-items: center; min-height: 28px; font: 700 16px/1.25 var(--vrm-police); color: inherit; text-decoration: underline; text-decoration-thickness: 1.5px; text-underline-offset: 3px; text-decoration-color: rgba(154,74,0,.35); }
-/* (Revue) Un titre ou une ligne de détail de « À faire » ne se coupe jamais : deux lignes au plus,
-   à la fin d'un mot ; la pilule passe à 4,5:1 (bleu d'Apple foncé sur le gris). */
-html body .vrm-app-shell .vrm-day-layout.vrm-fu-journee .vrm-day-task .vrm-day-task-title,
-html body .vrm-app-shell .vrm-day-layout.vrm-fu-journee .vrm-day-task .vrm-day-task-note { white-space: normal !important; overflow: visible !important; text-overflow: clip !important; overflow-wrap: anywhere; }
+/* (3 nov.) Titre et détail de « À faire » sur UNE ligne chacun (règle de Julien du 1er nov.,
+   « très répétitif » : `UneLigne` coupe à la fin d'un mot, la phrase entière en infobulle et dans
+   le nom du bouton) ; les mots courts (src/design/tacheCourte.js) font que rien d'utile ne se perd.
+   La pilule passe à 4,5:1 (bleu d'Apple foncé sur le gris) ; le détail urgent en ambre foncé. */
+html body .vrm-app-shell .vrm-day-layout.vrm-fu-journee .vrm-day-task .vrm-day-task-note.is-urgent { color: #b25000 !important; }
+:root[data-theme="dark"] body .vrm-app-shell .vrm-day-layout.vrm-fu-journee .vrm-day-task .vrm-day-task-note.is-urgent { color: #ff9f0a !important; }
 html body .vrm-app-shell .vrm-day-layout.vrm-fu-journee .vrm-day-task .vrm-day-task-action, html body .vrm-app-shell .vrm-day-layout.vrm-fu-journee .vrm-day-task.is-urgent .vrm-day-task-action { color: #0062c4 !important; }
 :root[data-theme="dark"] body .vrm-app-shell .vrm-day-layout.vrm-fu-journee .vrm-day-task .vrm-day-task-action { color: #5eb0ff !important; }
 html body .vrm-app-shell .vrm-main .vrm-day-layout.vrm-fu-journee .vrm-bilan-sync[data-vendus-ailleurs] > summary > span { color: #0062c4 !important; }
@@ -909,3 +911,9 @@ html body .vrm-app-shell .vrm-main .vrm-sale-row[data-fu-forme] .vrm-rangee-bord
 html body .vrm-recap-frise[data-recap-frise] { display: block !important; margin: 16px 0 0 !important; grid-template-columns: none !important; }
 html body .vrm-recap-frise[data-recap-frise] > .vrm-fu-frise { margin: 0; }
 html body .vrm-recap-frise-detail { margin: 10px 0 0; font: 500 13px/1.4 var(--vrm-police); color: var(--fu-gris); }
+/* (3 nov.) Le détail d'une ligne « À faire » se lit : #6e6e73 sur blanc (5:1), jamais #8e8e93 (3,4:1). */
+:root body .vrm-app-shell .vrm-main .vrm-day-layout.vrm-fu-journee .vrm-day-task .vrm-day-task-note:not(.is-urgent) { color: #6e6e73 !important; }
+:root[data-theme="dark"] body .vrm-app-shell .vrm-main .vrm-day-layout.vrm-fu-journee .vrm-day-task .vrm-day-task-note:not(.is-urgent) { color: #98989d !important; }
+:root body .vrm-app-shell .vrm-main .vrm-day-layout.vrm-fu-journee .vrm-day-task :is(.vrm-day-task-title, .vrm-day-task-note) { white-space: nowrap !important; overflow: hidden !important; }
+/* (3 nov.) La visite en bulles : ses boutons gardent 44 px même quand une règle de bouton plus forte les tasse. */
+html body .vrm-visite .vrm-visite-pied :is(button, .vrm-b) { min-height: 44px !important; box-sizing: border-box !important; }

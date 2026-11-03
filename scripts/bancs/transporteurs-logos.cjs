@@ -162,13 +162,20 @@ const sain = async (pg, ecran) => {
         const r = await pg.evaluate(() => {
           const P2 = window.__P;
           return [...document.querySelectorAll('[data-bord-card][data-tx-colis]')].map((c) => {
-            const act = c.querySelector('.vrm-colis-actions'); const p = act && act.querySelector(':scope > .vrm-transporteur');
-            const prec = p && p.previousElementSibling;
-            const bouton = act && act.querySelector('[data-imprime], [data-bordereau-tx], button');
-            const rb = bouton && bouton.getBoundingClientRect(), rp = p && p.getBoundingClientRect();
+            // (2 nov., 21 h 36 puis 22 h, Julien) La puce n'est plus « juste après » le bouton : elle est
+            // À GAUCHE de lui, dans la MÊME rangée (`.vrm-rangee-bord`) ; sur la carte Colis (maquette
+            // FusionColis), le transporteur est dit par l'EN-TÊTE du groupe, la puce de la rangée
+            // restant dans le DOM. E2 juge donc : la puce et le bouton bordereau dans la même rangée,
+            // la puce d'abord, et l'en-tête du groupe au même transporteur.
+            const act = c.querySelector('.vrm-colis-actions'); const rg = act && act.querySelector('.vrm-rangee-bord');
+            const p = rg && rg.querySelector(':scope > .vrm-transporteur');
+            const bouton = rg && [...rg.children].find((x) => x !== p);
+            let h = c.previousElementSibling; while (h && !h.hasAttribute('data-groupe-transp')) h = h.previousElementSibling;
+            const nomP = p ? ((p.querySelector('[data-transporteur-nom]') || p).textContent || '').trim() : '';
+            const nomG = h ? h.getAttribute('data-groupe-transp') : '';
             return { tx: c.getAttribute('data-tx-colis'), carte: c.getAttribute('data-transporteur'), pastilles: P2(act || c),
-              apresBouton: !!(prec && (prec.matches('[data-imprime]') || prec.querySelector('[data-imprime]') || /bordereau/i.test(prec.innerText || ''))),
-              memeRangee: !!(rb && rp && Math.abs((rb.top + rb.bottom) / 2 - (rp.top + rp.bottom) / 2) < 30 || (rb && rp && rp.top >= rb.bottom - 2 && rp.top - rb.bottom < 24)) };
+              apresBouton: !!(p && bouton && (p.compareDocumentPosition(bouton) & Node.DOCUMENT_POSITION_FOLLOWING) && (bouton.matches('[data-imprime], [data-bouton-bord], .vrm-fu-principal, button') || bouton.querySelector('button'))),
+              memeRangee: !!(p && bouton && p.parentElement === bouton.parentElement && (nomG === nomP || (nomG === 'Autres' && /pas lu/i.test(nomP)))) };
           });
         });
         const envoyer = await pg.evaluate(() => ({ route: document.querySelectorAll('[data-vc-route]').length }));
@@ -176,7 +183,7 @@ const sain = async (pg, ecran) => {
           const c = r.find((x) => x.tx === tx);
           dit(c && c.carte === cle, `${T} E1 vente ${tx} : transporteur « ${cle} » sur la carte`, c ? c.carte : 'carte absente');
           const p = c && c.pastilles[0];
-          dit(p && p.cle === cle && c.apresBouton && c.memeRangee, `${T} E2 vente ${tx} : la pastille juste après le bouton bordereau`, JSON.stringify(c && { p, apres: c.apresBouton, rangee: c.memeRangee }));
+          dit(p && p.cle === cle && c.apresBouton && c.memeRangee, `${T} E2 vente ${tx} : la puce à gauche du bouton bordereau, même rangée, sous l'en-tête de son transporteur`, JSON.stringify(c && { p, apres: c.apresBouton, rangee: c.memeRangee }));
         }
         const pasLu = r.find((x) => x.tx === '8003'), p3 = pasLu && pasLu.pastilles[0];
         dit(p3 && /^Transporteur pas lu$/.test(p3.txt) && p3.imgs.length === 0, `${T} E3 « Transporteur pas lu », sans aucune image`, JSON.stringify(p3));
