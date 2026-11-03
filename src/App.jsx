@@ -64,6 +64,8 @@ import { CLE_WIDGETS_JOURNEE, WIDGETS_JOURNEE, NOM_TAILLE, DISPO_JOURNEE_DEFAUT,
 import { modeleSur, releveVentes } from "./ceQuiRapporte.js";
 import CeQuiRapporte from "./design/CeQuiRapporte.jsx";
 import { requeteDeLaVoix } from "./rechercheVocale.js";
+import { articlesQuiDorment, seuilValide } from "./quiDorment.js";
+import QuiDorment from "./design/QuiDorment.jsx";
 import { rythmeVendu, ecartPct, quandTuVends, margesPar, delaisPar, tranchePrix, TRANCHES_PRIX, stockQuiDort, SEUILS_DORT, rotationStock, tauxVenteMois, tauxAnnulation, PERIODES, bornesPeriode, dansBornes, venduPeriode, barresPeriode, ventesPar, plusRapides } from "./statsVentes.js";
 import "./stats-vitrine.css";
 import {appelerFavorisDirect} from './favorisTransport.js';
@@ -21715,6 +21717,15 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
     setAnalyse(false);
   };
   React.useEffect(() => { if (autoAnalyse && titre.trim() && !analyse) analyser(); /* eslint-disable-line */ }, [autoAnalyse]);
+  // (3 nov.) Venu d'« Articles qui dorment » → « Mettre sur eBay » : le formulaire
+  // s'ouvre sur CET article (son identifiant Vinted), comme si on l'avait choisi.
+  React.useEffect(() => {
+    const d = DEMANDE_EBAY_PAIRE;
+    if (!d.id || Date.now() - d.at > 60000 || !Array.isArray(paires) || !paires.length) return;
+    const p = paires.find((x) => String(x.id) === String(d.id));
+    d.id = null;
+    if (p) { setOuvert(true); choisirPaire(p); try { setTimeout(() => { if (racine.current && racine.current.scrollIntoView) racine.current.scrollIntoView({ block: 'start', behavior: 'smooth' }); }, 60); } catch (_) {} }
+  }, [paires]); // eslint-disable-line react-hooks/exhaustive-deps
   // Le formulaire, sous la forme d'un BROUILLON (5 octobre) : c'est ce qui est
   // enregistré, et c'est de lui que part l'annonce — `itemDeBrouillon`, la
   // MÊME règle que la liste des brouillons (§11). ebayGere: eBay gère la
@@ -24762,6 +24773,10 @@ function numerosEnBrouillon(brouillons, paires) {
 // La demande d'ouvrir un brouillon dans le formulaire d'eBay → Annonces
 // (« Compléter » de l'agent) : lue au montage de l'écran Annonces.
 const DEMANDE_EBAY_BROUILLON = { id: null, at: 0 };
+// (3 nov.) « Articles qui dorment » → « Mettre sur eBay » / « Mettre sur Leboncoin » :
+// l'article demandé (son identifiant Vinted), consommé UNE fois par l'écran qui s'ouvre.
+const DEMANDE_EBAY_PAIRE = { id: null, at: 0 };
+const DEMANDE_LBC_FICHE = { id: null, at: 0 };
 // `fond` : l'agent en FOND (pas l'écran) — ses lectures acceptent une réponse
 // partagée de quelques secondes (`vrmFond`, src/lecturesPartagees.js).
 function useEtatPublicationEbay(comptes, comptesEbay, fond = false) {
@@ -28558,7 +28573,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
           stock qui dort, rotation, annulations — chacun avec sa couverture. */}
       </RepliStats>
       <RepliStats id="vente" titre="Ce qui se vend, ton rythme, le stock qui dort" phrase="Marges par marque, temps de vente, jours et heures où tu vends, paires en ligne depuis longtemps, boost.">
-      <StatsDetaillees liveStats={liveStats} panelOff={panelOff}/>
+      <StatsDetaillees liveStats={liveStats} panelOff={panelOff} onVoirDorment={onGo ? () => { demanderVue('dorment'); onGo('vinted_annonces'); } : null}/>
       <AnalysesStatistiques panelOff={panelOff}/>
 
       {/* Le boost est-il rentable ? (21 oct.) — un repère, n'entre dans aucun total. */}
@@ -37610,7 +37625,7 @@ function StatsVitrine({ liveStats, panelOff, periode }) {
     </div>
   );
 }
-function StatsDetaillees({ liveStats, panelOff }) {
+function StatsDetaillees({ liveStats, panelOff, onVoirDorment = null }) {
   const sCarte = { padding: 18, background: C.card, border: `1px solid ${C.border}`, borderRadius: 12, boxShadow: C.shadow };
   const sTitre = { fontSize: 15, fontWeight: 600, color: C.text, letterSpacing: -0.15 };
   const sLib = { fontSize: 13, color: C.muted, fontWeight: 500 };
@@ -37779,15 +37794,17 @@ function StatsDetaillees({ liveStats, panelOff }) {
     {/* ── 5. LE STOCK ──────────────────────────────────────────────────── */}
     <section data-stats-carte="dort" data-stats-dort={stock ? 'lu' : 'passu'} style={sCarte}>
       <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
-        <div style={sTitre}>Les paires qui dorment</div>
+        <div style={sTitre}>Les articles qui dorment</div>
         {stock && <span style={{ fontSize: 13, color: C.muted }}>{pl(stock.dort.total, 'annonce')} Vinted en ligne</span>}
+        {/* (3 nov.) La LISTE, avec un geste par article : l'écran Annonces (« Articles qui dorment »). */}
+        {onVoirDorment && stock && (stock.dort.seuils[30] || {}).n > 0 && <button type="button" className="vrm-lien-action" data-stats-voir-dorment="" onClick={onVoirDorment} style={{ minHeight: 44 }}>Voir la liste</button>}
       </div>
       {!stock ? <div style={{ ...sNote, marginTop: 8 }}>Pas encore calculé sur cet appareil : ouvre Annonces une fois (il faut toutes tes annonces lues, avec leurs dates).</div> : (<>
         <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column' }}>
           {SEUILS_DORT.map((s) => { const b = stock.dort.seuils[s] || { n: 0, valeur: 0, nCout: 0, cout: 0 }; return (
             <div key={s} data-stats-dort-seuil={s} data-n={b.n} data-valeur={Math.round(b.valeur * 100)} style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1.3fr) minmax(0,0.8fr) minmax(0,1.4fr)', gap: 8, padding: '9px 0', borderBottom: `1px solid ${C.border}`, fontSize: 13, fontVariantNumeric: 'tabular-nums', alignItems: 'baseline' }}>
               <span style={{ color: C.text }}>En ligne depuis {s} j et plus</span>
-              <span style={{ textAlign: 'right', color: C.text, fontWeight: 600 }}>{pl(b.n, 'paire')}</span>
+              <span style={{ textAlign: 'right', color: C.text, fontWeight: 600 }}>{pl(b.n, 'article')}</span>
               <span style={{ textAlign: 'right', color: C.muted }}>{mt(b.valeur)} affichés{b.n ? <> · achat {b.nCout ? <>{b.nCout < b.n ? 'au moins ' : ''}{mt(b.cout)}</> : '—'}{b.nCout < b.n ? ` (${b.nCout}/${b.n})` : ''}</> : null}</span>
             </div>
           ); })}
@@ -40730,6 +40747,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const isHidden = (o) => hiddenSales.has(String(o.transaction_id)) || acctOffOf(o);
   const toggleHidden = () => {};   // (29 oct.) une vente ne se masque plus
   const [annSearch, setAnnSearch] = useVueSession('annonces-recherche', ''); // recherche annonces (titre/marque/N°)
+  // (3 nov.) « Articles qui dorment » : le seuil (30/60/90 j) est un confort de CET
+  // appareil (localStorage) ; le geste choisi sur une ligne (`dortAgir`) ouvre l'écran existant.
+  const [seuilDort, setSeuilDortEtat] = useState(() => { try { return seuilValide(localStorage.getItem('vrm_qd_seuil')); } catch (_) { return 30; } });
+  const setSeuilDort = (v) => { const x = seuilValide(v); setSeuilDortEtat(x); try { localStorage.setItem('vrm_qd_seuil', String(x)); } catch (_) {} };
+  const [dortAgir, setDortAgir] = useState(null);
   const [annSort, setAnnSort] = useVueSession('annonces-tri', 'oldest'); // oldest (défaut) | recent | price_desc | price_asc | favs | views | nonum | boost
   // (27 oct., décision de Julien) Acceptation AUTOMATIQUE des offres ≥ au mini.
   // Éteinte par défaut, synchronisée (`vinted_offres_auto`, rattrapée au nuage).
@@ -43697,8 +43719,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     }
     else if (annSort==='sleeping') {
       // « Qui dorment » : en ligne depuis longtemps -> baisser le prix / republier.
-      arr = arr.map(it=>({it,age:listedAgeDays(it)})).filter(x=>x.age!=null&&x.age>=SLEEP_DAYS)
-               .sort((a,b)=>b.age-a.age).map(x=>x.it);
+      // (3 nov.) LA règle « qui dort » (src/quiDorment.js), au seuil choisi (30/60/90 j).
+      arr = articlesQuiDorment(arr.map(it=>({id:String(it.id),it,age:listedAgeDays(it)})), seuilDort).liste.map(x=>x.it);
     }
     // ── FILTRE PAR COMPTE (sélecteur de l'onglet) + mise en avant du connecté ──
     // Un compte choisi ⇒ seulement SES annonces. « Tous » ⇒ celles du compte
@@ -43712,7 +43734,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     if (c) arr = [...arr].sort((a,b) => { const ac = uidAnn(a)===c, bc = uidAnn(b)===c; return ac===bc ? 0 : (ac ? -1 : 1); });
     return arr;
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [annBase, annAConfirmer, listings.lues, annSearch, annSort, numeros, compteSel, compteConnecte, selEff]);
+  }, [annBase, annAConfirmer, listings.lues, annSearch, annSort, numeros, compteSel, compteConnecte, selEff, seuilDort]);
   // Un seul compte à l'écran ⇒ le nommer sur chaque carte ne distingue rien (§7).
   const annUnCompte = useMemo(() => new Set(annShown.map(x => String(x._acc && x._acc.vinted_user_id || ''))).size <= 1, [annShown]);
   // Comptes bloqués actuellement présents (pour le bandeau d'alerte).
@@ -48227,6 +48249,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   React.useEffect(()=>{
     const appliquer=()=>{
       if(only==='annonces' && prendreVue('republier')) setActionsOpen(true);
+      if(only==='annonces' && prendreVue('dorment')) setAnnSort('sleeping');
       if(only==='messages' && prendreVue('favoris')) setZoneMessages('favoris');
       if(only==='achats' && !modeRetraits && prendreVue('achats')) setAFilter('all');
     };
@@ -52710,6 +52733,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             ailleurs, puis une ligne de chiffres TOUS libellés ; la saisie (N°,
             achat) en bas ; le reste dans « ⋯ ». Une seule couleur d'accent,
             rare (§7) : l'ambre ne sert qu'à « dort » et à une marge négative. */}
+        {annSort==='sleeping' ? (
+          <QuiDorment seuil={seuilDort} onSeuil={setSeuilDort} Segmente={Segmente} fmt={fmt} onAgir={(a)=>setDortAgir(a)}
+            liste={listings.items==null ? null : annShown.map(it=>{ const e=numeros[it.id]||{}; const pr=(it.price&&typeof it.price==='object')?it.price.amount:it.price; const n=Number(String(pr==null?'':pr).replace(',','.'));
+              return { id:String(it.id), it, numero:e.numero?String(e.numero):'', titre:it.title||'', photo:photoArticle(it)||'', prix:isFinite(n)&&n>0?n:null, age:listedAgeDays(it),
+                vues:Number.isFinite(it.views)?it.views:null, favoris:Number.isFinite(it.favourites)?it.favourites:null, compte:annUnCompte?'':((it._acc&&(it._acc.login||it._acc.username))||'') }; })}/>
+        ) : (<>
         <div className="vrm-ledger-heading vrm-ann-ledger-heading" aria-hidden="true"><span>Article · stock</span><span>Prix</span></div>
         <div className="vrm-ann-grid vrm-fiches" style={{display:'grid',gridTemplateColumns:'repeat(auto-fill, minmax(min(100%, 300px), 1fr))',gap:16}}>
           {annShown.map(it=>{
@@ -52901,6 +52930,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             );
           })}
         </div>
+        </>)}
       </>)}
       {curSub==='annonces' && <section className="vrm-ventes-controles" data-annonces-controles="" style={{display:'flex',flexDirection:'column',gap:8,margin:'16px 0 12px'}}>
         <h3 data-titre-section="" style={{fontSize:15,fontWeight:600,color:C.text,letterSpacing:-0.15,margin:'0 2px'}}>Vérifications</h3>
@@ -55915,6 +55945,36 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       {lotsOpen && (()=>{ const cands=(listings.items||[]).map(it=>{ const e=numeros[it.id]||{}; const key=String((e&&e.numero)||it.id); const d=drafts[key]||{}; const baseTitre=d.title!=null?d.title:(it.title||''); const bp=d.price!=null?d.price:((it.price&&typeof it.price==='object')?it.price.amount:it.price); const fl=prixAchatDe(e,buyByNum); return { key, id:it.id, titre:baseTitre, prix:(bp==null||bp==='')?null:Number(bp), floor:(fl!=null&&!isNaN(fl))?Number(fl):null }; }); return (
         <AtelierLots candidats={cands} onSave={(key,patch)=>saveDraft(key,patch)} onClose={()=>setLotsOpen(false)} />
       ); })()}
+      {/* (3 nov.) « Articles qui dorment » → UN geste au choix, chacun ouvre l'écran
+          EXISTANT : Modifier prix sur place (Republier → modifier), Republier (recréer),
+          la fiche « Publier sur Leboncoin », « Publier sur eBay ». Rien ne part tout seul. */}
+      {dortAgir && (()=>{
+        const a = dortAgir, it = a.it, e = numeros[it.id] || {};
+        const versRepub = (act) => { setDortAgir(null); setRepubReprise([String(it.id)]); setRepubAction(act); };
+        const choix = [
+          { k:'prix', t:'Baisser le prix', cap:'republiermodif', go:()=>versRepub('modifier') },
+          { k:'republier', t:'Republier', cap:'recreer', go:()=>versRepub('recreer') },
+          { k:'lbc', t:'Mettre sur Leboncoin', bloque: !a.numero ? 'Mets un N° à cet article d’abord.' : '', go:()=>{
+              setDortAgir(null);
+              if (!mpChoisi(e,'lbc')) updatePair(it, { mp: { ...(e.mp||{}), lbc: true } });
+              DEMANDE_LBC_FICHE.id = String(it.id); DEMANDE_LBC_FICHE.at = Date.now(); onNav && onNav('leboncoin'); } },
+          { k:'ebay', t:'Mettre sur eBay', go:()=>{ setDortAgir(null); DEMANDE_EBAY_PAIRE.id = String(it.id); DEMANDE_EBAY_PAIRE.at = Date.now(); onNav && onNav('ebay_annonces'); } },
+        ];
+        return (
+          <SheetShell onClose={()=>setDortAgir(null)} maxWidth={420}>
+            <div className="vrm-qd-menu" data-qd-menu={a.id}>
+              <div className="vrm-qd-menu-tete">
+                <h2 className="vrm-qd-menu-titre">{a.numero ? `N°${a.numero} · ` : ''}{a.titre}</h2>
+                <button type="button" className="vrm-qd-fermer" aria-label="Fermer" onClick={()=>setDortAgir(null)}>✕</button>
+              </div>
+              {choix.map(c=>{ const raison = c.bloque || (c.cap && extSait(c.cap)!=='ok' ? `Demande l'extension VRM ${EXT_CAPACITES[c.cap]} ou plus récente.` : ''); return (
+                <button key={c.k} type="button" className="vrm-qd-choix" data-qd-choix-geste={c.k} aria-disabled={raison?'true':undefined} title={raison||undefined}
+                  onClick={()=>{ if (raison) { toast(raison); return; } c.go(); }}>{c.t}</button>
+              ); })}
+            </div>
+          </SheetShell>
+        );
+      })()}
       {actionsOpen && (()=>{
         const nBr = brVinted.liste ? brVinted.liste.length : 0;
         const nPret = brVinted.liste ? brVinted.liste.filter(b=>b._place==='proposable').length : 0;
@@ -58304,6 +58364,15 @@ function LeboncoinScreen() {
   };
   // 5.182 : la fiche « Publier sur Leboncoin » ouverte (une paire de la file).
   const [fiche, setFiche] = useState(null);
+  // (3 nov.) Venu d'« Articles qui dorment » → « Mettre sur Leboncoin » : la fiche de
+  // CET article s'ouvre dès qu'il est dans la file (par son identifiant, jamais un titre).
+  useEffect(() => {
+    const d = DEMANDE_LBC_FICHE;
+    if (!d.id || Date.now() - d.at > 60000 || !data || !Array.isArray(data.queue)) return;
+    const q = data.queue.find((x) => String(x.id) === String(d.id));
+    d.id = null;
+    if (q) setFiche(q);
+  }, [data]);
   const [repubOuvert, setRepubOuvert] = useState(false);
   const n = data ? Math.max(data.postedCount, data.lbcCount) : 0;
   const lim = data ? (data.limit || null) : null;
