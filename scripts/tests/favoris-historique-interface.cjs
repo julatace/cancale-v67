@@ -40,7 +40,7 @@ const {build}=require('esbuild'),{chromium}=require('playwright');
  await ouvrir.click();await p.evaluate(()=>window.accuserOuverture({ok:true,data:{ouvert:true,preuve:'non_confirmee'}}));await p.getByText('Capture non confirmée',{exact:true}).waitFor();
  check(await p.getByText('Lien enregistré',{exact:true}).count()===0,'ouvrir un onglet sans preuve ne donne pas de faux statut positif');
  check(await p.locator('.vrm-favoris-diagnostic').evaluate(e=>!e.open),'technical assistance is collapsed initially');
- await p.getByText('Dépannage · favoris',{exact:true}).click();
+ await p.getByText('Assistance technique · favoris',{exact:true}).click();
  await p.getByRole('button',{name:'Copier le contrôle',exact:true}).click();
  const diagnostic=await p.evaluate(()=>window.controleCopie);check(diagnostic.includes('VRM-favoris-controle-v1')&&!['owner-test','Camille','https:','notificationId'].some(s=>diagnostic.includes(s)),'contrôle copiable sans données privées');
 
@@ -97,7 +97,7 @@ const {build}=require('esbuild'),{chromium}=require('playwright');
  check(refus.extension==='5.221.0'&&refus.code==='notifications_non_affichees'&&refus.etape==='commande'&&!refus.lancement,'la version mesurée et le refus sont copiés, sans recycler le lancement précédent');
 
  await p.getByRole('button',{name:'Fermer',exact:true}).click();
- await p.getByText('Dépannage · favoris',{exact:true}).click();
+ await p.getByText('Assistance technique · favoris',{exact:true}).click();
  await p.getByRole('button',{name:'Vérifier la capture des notifications',exact:true}).click();
  await p.getByRole('button',{name:'Copier le diagnostic',exact:true}).click();
  const assistance=await p.evaluate(()=>JSON.parse(window.controleCopie));

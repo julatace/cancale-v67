@@ -268,7 +268,7 @@ export default function FavorisVinted({uid,owner,ownerActuel,base,headers,nomCom
   const photoLigne=x=>x.photo&&PhotoVinted?<PhotoVinted src={x.photo} alt="" loading="lazy" repli={sansPhoto}/>:sansPhoto;
   return <section className="vrm-favoris-liste vrm-fav-ecran" aria-label="Favoris reçus" data-fav-ecran>
     <header><div><h3>Messages aux favoris</h3><small>{nomCompte||(uid?'Compte Vinted sélectionné':'Choisis le compte à consulter')}</small></div><div className="vrm-favoris-actions"><button type="button" onClick={charger} disabled={preparation||!uid||!owner||etat.charge||reglages.sauvegarde||importation} title={etat.charge?'Lecture en cours…':!uid?'Choisis d’abord le compte Vinted à consulter.':!owner?'Connecte-toi à VRM pour lire tes favoris.':preparation||importation?'Un envoi se prépare : attends qu’il finisse.':reglages.sauvegarde?'Ton message s’enregistre : un instant.':undefined}>{etat.charge?'Lecture…':data?'Actualiser':'Afficher les favoris'}</button></div></header>
-    {!uid&&<p className="vrm-favoris-note">Choisis un compte</p>}
+    {!uid&&<p className="vrm-favoris-note">Choisis un compte Vinted dans le sélecteur au-dessus pour afficher ses favoris.</p>}
     {uid&&owner&&<ModeAutoFavoris uid={uid} owner={owner} ownerActuel={ownerActuel} headers={headers} nomCompte={nomCompte} extensionAuto={extensionAuto} onVue={setVueAuto}/>}
     {uid&&owner&&<div className="vrm-fav-message" data-fav-message={!reglages.prets?(reglages.erreur?'erreur':'lecture'):messageAffiche?'pret':'vide'}>
       <div className="vrm-fav-message-tete"><h4>Ton message</h4><button type="button" className="vrm-fav-lien" data-fav-message-modifier disabled={preparation||fileActive} onClick={modifierMessage}>Modifier</button></div>
