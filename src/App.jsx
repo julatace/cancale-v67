@@ -37264,6 +37264,7 @@ function StatsVitrine({ liveStats, panelOff, periode }) {
       : CB.raison === 'achats' ? `il manque le prix d’achat de ${manquent} vente${manquent > 1 ? 's' : ''} sur ${BP.n}`
       : CB.raison === 'frais' ? 'des frais eBay ne sont pas encore connus'
       : CB.raison === 'cotisations' ? 'en attente de ton chiffre déclaré (écran Ventes)'
+      : CB.raison === 'rien' ? 'aucune vente finalisée ni dépense sur la période'
       : `${BP.n === 0 ? 'aucune vente finalisée · ' : ''}après prix d’achat, frais${BP.depenses === 'jamais' ? '' : ', dépenses'}${BP.sansCotis ? '' : ' et URSSAF'}${BP.depenses === 'jamais' ? ' · avant tes dépenses' : ''}`;
     return tuile('benefice', NOM_BENEFICE, CB.valeur == null ? '—' : fmt(CB.valeur), sous,
       { 'data-sv-etat': BP ? 'lu' : etatBP, 'data-sv-n': BP ? BP.n : undefined, 'data-sv-ncout': BP ? BP.nCout : undefined, 'data-sv-brut': BP && BP.nCout > 0 ? cents(BP.brut) : '', ...CB.attrs },
@@ -37881,10 +37882,23 @@ const beneficePeriode = ({ jours, compta, ligneUrssaf, taux, periode, maintenant
     ? Math.round(ligneUrssaf.mois.filter((m) => yms.includes(String(m.ym))).reduce((t, m) => t + caBeneficeDuMois(m, toutes), 0) * 100) / 100
     : null;
   // (27 oct.) Pas micro-entrepreneur ⇒ aucune cotisation estimée (0, dit `sansCotis`).
-  const cotis = !urssaf ? 0 : caDecl == null ? null : aPayerUrssaf(caDecl, taux);
+  // (3 nov., Julien : « Bénéfice du mois −5 € — je ne comprends pas du tout »)
+  // L'URSSAF RETIRÉE DU BÉNÉFICE = le taux × le montant des MÊMES ventes que
+  // celles qu'il compte (`v.ca` : les ventes de la période), la cotisation
+  // attachée à la vente. Avant : le taux × le CA DÉCLARÉ du mois (daté au
+  // VERSEMENT) — un AUTRE ensemble de ventes : en novembre, aucune vente
+  // comptée, une vente d'octobre versée le 2 novembre (38 €) ⇒ −4,71 € de
+  // « bénéfice ». La déclaration (CA déclaré, « à payer », registre, rappels)
+  // reste datée au versement : `caDecl` est gardé pour l'affichage, il n'entre
+  // plus dans le bénéfice.
+  const cotis = !urssaf ? 0 : aPayerUrssaf(v.ca, taux);
   const complet = v.nCout === v.n;
-  const netFinal = complet && v.net != null && cotis != null ? Math.round((v.net - charges - cotis) * 100) / 100 : null;
-  const raison = !complet ? 'achats' : v.net == null ? 'frais' : cotis == null ? 'cotisations' : '';
+  // Rien à calculer : aucune vente comptée ET aucune dépense sur la période ⇒
+  // « — » (raison « rien »), jamais un 0 ni un négatif sans cause. Un négatif
+  // n'existe que s'il est réel (vente à perte, dépenses).
+  const rien = v.n === 0 && !(Math.round(charges * 100) > 0);
+  const netFinal = complet && v.net != null && cotis != null && !rien ? Math.round((v.net - charges - cotis) * 100) / 100 : null;
+  const raison = !complet ? 'achats' : v.net == null ? 'frais' : cotis == null ? 'cotisations' : rien ? 'rien' : '';
   return { ...v, libelle: libellePeriodeCa(de, periode), charges: Math.round(charges * 100) / 100, caDecl, cotis, netFinal, raison, toutes, depenses: depensesEtat(compta), sansCotis: !urssaf };
 };
 // (20 oct.) UNE lecture du bénéfice pour DEUX écrans (§11) : la carte de
@@ -38035,6 +38049,7 @@ function BeneficeCompta({ compta, onNav, onSansDepenses, onAjouterDepense, sansC
     : B.raison === 'achats' ? <>Il manque le prix d'achat de {sansAchat} vente{sansAchat > 1 ? 's' : ''} sur {B.n} : sans lui, VRM ne peut pas calculer ce que tu as gagné.</>
     : B.raison === 'frais' ? <>Des frais eBay ne sont pas encore connus : sans eux, VRM ne peut pas calculer ce que tu as gagné.</>
     : B.raison === 'cotisations' ? <>En attente de ton chiffre d'affaires déclaré : ouvre l'écran Ventes une fois.</>
+    : B.raison === 'rien' ? <>Aucune vente finalisée ni dépense sur la période : rien à calculer.</>
     : B.n === 0 ? <>Aucune vente finalisée sur la période{B.depenses === 'jamais' ? '' : ' : seules tes dépenses comptent'}.</>
     : <>Ce qu'il te reste{B.depenses === 'jamais' ? ' avant tes dépenses' : ''} : tes ventes finalisées, moins le prix d'achat des paires{B.fraisCouverts > 0 ? ', les frais de vente' : ''}{B.depenses === 'jamais' ? '' : ', tes dépenses'}{B.sansCotis ? '' : " et l'URSSAF"}.</>;
   // La couverture n'est redite que si la phrase ne la dit pas déjà (raison « achats »).
@@ -38075,7 +38090,7 @@ function BeneficeCompta({ compta, onNav, onSansDepenses, onAjouterDepense, sansC
           </p>
           <div className="vrm-fu-cases vrm-fu-compta-cases" style={{ '--n': B.sansCotis ? 2 : 3 }}>
             <div className="vrm-fu-case" data-fu-case="declarer" data-eur={e2(B.caDecl)}><b className={B.caDecl == null ? 'is-vide' : undefined}>{B.caDecl == null ? '—' : fmt(B.caDecl)}</b><span>à déclarer</span></div>
-            {B.sansCotis ? null : <div className="vrm-fu-case" data-fu-case="urssaf" data-eur={e2(B.cotis)}><b className={B.cotis == null ? 'is-vide' : undefined}>{B.cotis == null ? '—' : fmt(B.cotis)}</b><span>URSSAF</span></div>}
+            {B.sansCotis ? null : <div className="vrm-fu-case" data-fu-case="urssaf" data-eur={e2(B.cotis)}><b className={B.cotis == null ? 'is-vide' : undefined}>{B.cotis == null ? '—' : fmt(B.cotis)}</b><span title="L'URSSAF de ces ventes, retirée du bénéfice. Celle à payer se calcule sur l'argent reçu (« Combien je dois déclarer ? »).">URSSAF</span></div>}
             <div className="vrm-fu-case" data-fu-case="ventes"><b>{B.n}</b><span>vente{B.n > 1 ? 's' : ''}</span></div>
           </div>
           {B.depenses === 'jamais' && nuagePret && onSansDepenses ? (
@@ -38098,12 +38113,12 @@ function BeneficeCompta({ compta, onNav, onSansDepenses, onAjouterDepense, sansC
                 data={{ 'data-benef-ligne': 'charges' }} />
               {B.sansCotis ? <div className="vrm-set-ligne" data-benef-ligne="cotis" data-benef-sans-cotis=""><span className="vrm-set-lib"><small style={{ color: C.muted, marginTop: 0 }}>Aucune cotisation URSSAF déduite — {regimeFiscal() ? `statut : ${libelleRegime(regimeFiscal())}` : 'ton statut n\'est pas encore choisi (Documents et réglages → Ton statut)'}.</small></span></div> :
               <Ligne lib="− URSSAF" val={B.cotis}
-                sous={B.cotis == null ? 'ton chiffre d\'affaires déclaré se calcule dans l\'écran Ventes' : `${String(tauxUrssaf()).replace('.', ',')} % de l'argent reçu sur la période (${B.toutes ? 'Vinted, Leboncoin, eBay, Vestiaire' : 'Vinted'})`}
+                sous={B.cotis == null ? 'ton chiffre d\'affaires déclaré se calcule dans l\'écran Ventes' : `${String(tauxUrssaf()).replace('.', ',')} % des mêmes ventes (${fmt(B.ca)})`}
                 data={{ 'data-benef-ligne': 'cotis' }} />}
               <div className="vrm-set-ligne" data-benef-ligne="net"><span className="vrm-set-lib"><b style={{ color: C.text }}>= {titreNet.toLowerCase()}</b></span><span className="vrm-set-lib" style={{ flex: '0 0 auto', textAlign: 'right' }}><small style={{ color: C.muted, marginTop: 0 }}>le chiffre au-dessus</small></span></div>
             </div>
             <small style={{ color: C.muted, lineHeight: 1.5, display: 'block', padding: '10px 2px 4px' }}>
-              {B.toutes ? <>Ventes finalisées Vinted, Leboncoin et eBay, au jour de la vente — la même règle que l'écran Ventes.{couvertureBenefice(B) ? ` Prix d'achat connus : ${couvertureBenefice(B)}.` : ''} Une vente Leboncoin ou eBay se relie à sa paire par son SKU VRM, sa référence ou un lien posé, jamais par son titre.</> : <>Ventes Vinted finalisées, au jour de la vente — publiées par une version d'avant de l'écran Ventes : ouvre-le une fois pour y ajouter Leboncoin et eBay.</>} L'URSSAF déduite est celle de l'argent reçu sur la période.{pub.at ? ` Calculé avec tes ventes lues le ${new Date(pub.at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' })}.` : ''}
+              {B.toutes ? <>Ventes finalisées Vinted, Leboncoin et eBay, au jour de la vente — la même règle que l'écran Ventes.{couvertureBenefice(B) ? ` Prix d'achat connus : ${couvertureBenefice(B)}.` : ''} Une vente Leboncoin ou eBay se relie à sa paire par son SKU VRM, sa référence ou un lien posé, jamais par son titre.</> : <>Ventes Vinted finalisées, au jour de la vente — publiées par une version d'avant de l'écran Ventes : ouvre-le une fois pour y ajouter Leboncoin et eBay.</>} L'URSSAF déduite est celle des ventes comptées ici (le taux × leur montant) ; celle à payer, datée au versement, se lit dans « Combien je dois déclarer ? ».{pub.at ? ` Calculé avec tes ventes lues le ${new Date(pub.at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' })}.` : ''}
             </small>
           </details>
         </>)}
@@ -38173,6 +38188,7 @@ function BeneficeJournee({ onNav, place, edition = false, fusion = false }) {
   const raisonNet = !B ? '' : B.raison === 'achats' ? `il manque le prix d'achat de ${sansAchat} vente${sansAchat > 1 ? 's' : ''}`
     : B.raison === 'frais' ? 'des frais eBay ne sont pas connus'
     : B.raison === 'cotisations' ? 'en attente de ton CA déclaré (écran Ventes)'
+    : B.raison === 'rien' ? 'aucune vente finalisée ni dépense ce mois-ci'
     : B.depenses === 'jamais' ? 'après frais et cotisations, avant tes dépenses'
     : 'après frais, charges et cotisations';
   const allerCompta = (ev) => { if (ev) ev.preventDefault(); if (onNav) onNav('compta'); };
@@ -38196,6 +38212,7 @@ function BeneficeJournee({ onNav, place, edition = false, fusion = false }) {
   else if (B.nCout < B.n) sous = <>{B.nCout} sur {B.n} · <button type="button" className="vrm-jc-geste" data-journee-benef-porte="" onClick={versSaisiePrix}>{sansAchat} prix d'achat ›</button></>;
   else if (!avecNet && B.raison === 'frais') sous = 'frais eBay inconnus';
   else if (!avecNet && B.raison === 'cotisations') sous = 'CA déclaré en attente';
+  else if (!avecNet && B.raison === 'rien') sous = 'aucune vente ce mois-ci';
   else if (B.depenses === 'jamais') sous = 'avant tes dépenses';
   // (1er nov., audit A2) Des ventes Vestiaire au montant pas sûr ne sont pas
   // dans ce bénéfice : dit (jamais « au moins » : elles peuvent être à perte).

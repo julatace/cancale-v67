@@ -1865,3 +1865,50 @@ Comptabilité (« Bénéfice brut du mois » sous la même case) : à la fusion,
   première `.vrm-summary-strip` qui n'était pas celle du bénéfice ; réparé). `chiffres-croises` : 1 rouge
   (« VENDU du mois » de Statistiques lu sur `[data-dash-stat="caMois"]`, absent depuis la refonte de
   Statistiques) — **le même rouge sur origin/main**, sans lien avec le bénéfice, laissé à part.
+
+---
+
+## 3 novembre (suite) — « Bénéfice du mois −5 € » : l'URSSAF des MÊMES ventes
+
+**Constat (Julien, 09 h 49, capture de Ma journée)** : « Bénéfice du mois −5 € — je ne comprends pas du tout ».
+**Cause (défaut de RÈGLE, pas d'affichage)** : `beneficePeriode` sommait les ventes d'un ensemble (vendues et
+finalisées dans le mois, publication `vrm_benefice_jours`) mais retirait l'URSSAF d'un AUTRE ensemble (le CA
+déclaré du mois, daté au VERSEMENT, `vinted_urssaf_mois`). En novembre : aucune vente comptée, une vente
+d'octobre versée le 2 novembre (38 €) ⇒ 0 − 12,4 % × 38 = **−4,71 €** (arrondi « −5 € » dans la case).
+
+**Règle (sa décision, transmise par la session principale)** : dans le bénéfice (notion de gestion), l'URSSAF
+retirée = le taux × le montant des MÊMES ventes que celles comptées (`aPayerUrssaf(v.ca, taux)`), la cotisation
+attachée à la vente. Aucune vente comptée ET aucune dépense ⇒ « — » (raison `rien`, « rien à calculer »),
+jamais 0 ni un négatif ; un négatif n'apparaît que s'il est réel (vente à perte, dépenses). Les dépenses du
+mois restent comptées dans leur mois. **Inchangés** : le CA déclaré daté au versement, « Combien je dois
+déclarer ? », `vrm_urssaf_declare`, les rappels, « à mettre de côté » de Ma journée, le récap (colonnes CA et
+URSSAF). Conséquence : le bénéfice n'attend plus le CA déclaré publié (raison `cotisations` ne sort plus du
+calcul ; `caDecl` reste rendu pour la case « à déclarer »).
+
+**Fait** :
+- `beneficePeriode` (App.jsx, seule propriétaire) : `cotis = aPayerUrssaf(v.ca, taux)` ; `rien` ⇒ `netFinal`
+  null, raison `rien`. Commentaire de règle dans `src/beneficeNoms.js` (`chiffreBenefice` passe `rien` tel quel).
+- Phrases : Statistiques « aucune vente finalisée ni dépense sur la période », Ma journée « aucune vente ce
+  mois-ci », Comptabilité « Aucune vente finalisée ni dépense sur la période : rien à calculer. ». Détail du
+  calcul : « − URSSAF · 12,4 % des mêmes ventes (X €) » ; la note dit que l'URSSAF à payer, datée au versement,
+  se lit dans « Combien je dois déclarer ? ». La case « URSSAF » de la carte garde son libellé court (« URSSAF de
+  ces ventes » était tronqué à 390 px, capture regardée) avec une infobulle qui le dit.
+- Les quatre écrans (Ma journée, Statistiques mois/année, Comptabilité, récap mensuel) passent déjà tous par
+  `beneficePeriode` + `chiffreBenefice` : la règle change partout d'un coup.
+
+**Preuves** :
+- `audit-benefice-unique` étendu : mois sans vente avec le versement d'une vente d'octobre (« — », raison
+  `rien`, jamais négatif, CA déclaré toujours lu — avec et sans « je n'ai pas de dépenses ») ; ventes et
+  versements croisés (CA déclaré 225 € / à payer 27,90 € inchangés, URSSAF du bénéfice 8,06 € sur les 65 €
+  vendus) ; vente à perte réelle (−33,72 € exactement) ; dépenses seules (−15,00 € exactement, sans URSSAF des
+  versements). **47 verts ; 12 rouges sur origin/main** (dont « −4,71 € » reproduit tel quel) ; mutations
+  `urssaf-decl` 6 rouges, `rien` 4 rouges, les anciennes toujours rouges.
+- `audit-benefice` remis à la règle (cotisations des ventes comptées, CA déclaré pas publié n'arrête plus le
+  bénéfice, aucune vente ni dépense ⇒ `rien`) : 48 verts (bouchon d'analyse hors dépôt, `@babel/parser`
+  absent) ; mutations duplique/zero/cotis/depenses rouges.
+- Bancs : `benefice-unique` 38/38, `benefice-journee` 52/52, `compta-claire` 92/92 ; `stats-compta` 54/58 —
+  les 4 mêmes rouges sur le build d'origin/main (« la déclaration URSSAF est dans Compta », « la prochaine
+  échéance est dans Compta » : la restructuration de Compta, sans lien avec le bénéfice). `audit-urssaf` et
+  `audit-suivi-urssaf` (21) verts.
+
+**Mesuré chez Julien (lecture seule)** — valeurs dans le rapport de session seulement.
