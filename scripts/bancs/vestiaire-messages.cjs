@@ -54,7 +54,13 @@ const PONT = ({ version, suite }) => {
   post({ __vmr: 'ready', version, id: 'ext-banc' });
 };
 
-async function ouvrir(b, vp, { version = '5.295.0', suite = 'fait', appris = true } = {}) {
+// (3 nov., 5.317) La messagerie Vestiaire passe par Stream : conversations lues par le fil des
+// notifications et par Stream, SANS référence VRM (titre et photo de l'ARTICLE) ; l'envoi vu sur
+// Stream est noté « messagerie-stream » ; l'ouverture d'une conversation (`/chat/channel/`) notée à
+// tort par les 5.295-5.316 n'est pas un essai.
+const CONV_S = '33334444-66668888';
+const PHOTO_S = 'https://images.vestiairecollective.com/produit/66668888-1_1.jpg';
+async function ouvrir(b, vp, { version = '5.295.0', suite = 'fait', appris = true, stream = '' } = {}) {
   const ctx = await b.newContext({ viewport: vp, ...(vp.width < 600 ? { isMobile: true, hasTouch: true } : {}) });
   const pg = await ctx.newPage();
   const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
@@ -67,6 +73,11 @@ async function ouvrir(b, vp, { version = '5.295.0', suite = 'fait', appris = tru
     const j = (d) => route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(d) });
     if (route.request().method() !== 'GET') return j([]);
     if (/select=owner/.test(u)) return route.fulfill({ status: 400, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: '{"m":1}' });
+    if (stream && /id=eq\.vc_messages/.test(u)) return j([{ compteur: { messages: 0, at: new Date(auj - 20 * 60e3).toISOString(), compte: '11112222' }, conversations: { [CONV_S]: { productId: '66668888', ref: '', nonLu: false, date: MESSAGES[2].at, apercu: 'Super, vous pouvez faire 110 € ?', apercuDeMoi: false, titre: 'Gucci Cabas en cuir Ophidia', photo: PHOTO_S, source: 'stream', compte: '' } }, lecture: { at: new Date(auj).toISOString(), total: null, complet: false, page: '/chat/' } }]);
+    if (stream && /id=like\.vc_fil_/.test(u)) return j([{ id: 'vc_fil_' + CONV_S, n: '3', da: MESSAGES[2].at, ap: MESSAGES[2].t, dm: 'false', pid: '66668888', ref: '' }]);
+    if (stream && /id=eq\.vc_fil_/.test(u)) return j([{ messages: MESSAGES, page: '/chat/', at: new Date(auj).toISOString() }]);
+    if (stream && /id=eq\.vc_envoi/.test(u)) return j([stream === 'canal' ? { appris: false, raison: 'texte-introuvable', chemin: '/chat/channel/', at: new Date(auj).toISOString() } : { appris: false, raison: 'messagerie-stream', chemin: '/channels/{x}/{x}/message', at: new Date(auj).toISOString() }]);
+    if (stream && /id=eq\.vc_listings/.test(u)) return j([{ items: {}, liens: {}, capturedAt: new Date(auj - 3600e3).toISOString(), complet: false, total: null }]);
     if (/id=eq\.vc_messages/.test(u)) return j([{ compteur: { messages: 1, at: new Date(auj - 20 * 60e3).toISOString() }, conversations: { C7777: { productId: '900001', ref: '401', nonLu: true, date: MESSAGES[2].at, apercu: 'Super, vous pouvez faire 110 € ?', apercuDeMoi: false } }, lecture: { at: new Date(auj).toISOString(), total: 1, complet: true, page: '/messages/' } }]);
     if (/id=like\.vc_fil_/.test(u)) return j([{ id: 'vc_fil_C7777', n: '3', da: MESSAGES[2].at, ap: MESSAGES[2].t, dm: 'false', pid: '900001', ref: '401' }]);
     if (/id=eq\.vc_fil_C7777/.test(u)) return j([{ messages: MESSAGES, page: '/messages/', at: new Date(auj).toISOString() }]);
@@ -130,6 +141,27 @@ async function ouvrir(b, vp, { version = '5.295.0', suite = 'fait', appris = tru
       const n = await pg.evaluate(() => window.__cmds.filter((x) => /vcRepondre/.test(x)).length);
       dit(n === 0, 'aucune commande d’envoi ne part', String(n));
       dit(errs.length === 0, 'aucune erreur d’app', errs.join(' | ').slice(0, 160));
+      await ctx.close();
+    }
+    for (const [vp, stream] of [[{ width: 390, height: 844 }, 'stream'], [{ width: 1512, height: 900 }, 'stream'], [{ width: 390, height: 844 }, 'canal']]) {
+      console.log(`── ${vp.width} px — messagerie Stream (5.317), ${stream === 'canal' ? 'ancien faux essai /chat/channel/' : 'envoi vu sur Stream'}`);
+      const { ctx, pg, errs } = await ouvrir(b, vp, { version: '5.317.0', appris: false, stream });
+      const ligne = await pg.evaluate((c) => { const e = document.querySelector(`[data-vc-conv="${c}"]`); if (!e) return null; const im = e.querySelector('img'); return { num: e.getAttribute('data-vc-conv-num'), t: e.innerText, img: im ? im.getAttribute('src') : '' }; }, CONV_S);
+      dit(ligne && ligne.num === '' && /Gucci Cabas en cuir Ophidia/.test(ligne.t) && !/Pas reliée/.test(ligne.t) && /Super, vous pouvez faire 110/.test(ligne.t), 'sans référence VRM : le TITRE de l’article lu, l’aperçu du dernier message', JSON.stringify(ligne));
+      dit(ligne && ligne.img === PHOTO_S, '… et la photo de l’article', JSON.stringify(ligne && ligne.img));
+      await pg.click(`[data-vc-conv="${CONV_S}"] button`).catch(() => {});
+      await pg.waitForSelector('[data-vc-fil="lu"]', { timeout: 8000 }).catch(() => {});
+      await pg.waitForSelector('[data-vc-repondre]', { timeout: 8000 }).catch(() => {});
+      const e = await pg.evaluate(() => { const x = document.querySelector('[data-vc-repondre]'); const f = document.querySelector('[data-vc-fil]'); return x ? { etat: x.getAttribute('data-vc-repondre'), ta: !!x.querySelector('textarea'), stream: !!x.querySelector('[data-vc-envoi-stream]'), t: x.innerText, fil: f && f.getAttribute('data-vc-fil-n') } : null; });
+      dit(e && e.fil === '3' && e.etat === 'pas-appris' && !e.ta, 'le fil se lit (3 messages) ; pas de champ « Envoyer »', JSON.stringify(e && { fil: e.fil, etat: e.etat, ta: e.ta }));
+      if (stream === 'stream') dit(e && e.stream && /service de messagerie à part/.test(e.t) && !/messagerie-stream/.test(e.t), 'la raison est dite en français (messagerie à part), jamais un code', e && e.t.slice(0, 200));
+      else dit(e && !e.stream && !/texte-introuvable/.test(e.t) && /envoie une réponse toi-même/.test(e.t), 'l’ouverture d’une conversation (`/chat/channel/`) n’est pas présentée comme un essai d’envoi', e && e.t.slice(0, 200));
+      const n = await pg.evaluate(() => window.__cmds.filter((x) => /vcRepondre/.test(x)).length);
+      dit(n === 0, 'aucune commande d’envoi ne part', String(n));
+      const r = await pg.evaluate(() => ({ sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth }));
+      dit(r.sw <= r.cw + 1, 'aucun débordement horizontal', `${r.sw} > ${r.cw}`);
+      dit(errs.length === 0, 'aucune erreur d’app', errs.join(' | ').slice(0, 160));
+      await pg.screenshot({ path: path.join(CAP, `vestiaire-messages-stream-${stream}-${vp.width}.png`), fullPage: false });
       await ctx.close();
     }
     console.log('── 390 px — Vestiaire refuse (429)');

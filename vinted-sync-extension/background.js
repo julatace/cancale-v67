@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.316.0';
+const CODE_VERSION = '5.317.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -2771,7 +2771,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           if (!/(^|\.)vestiairecollective\.com$/i.test(hote)) { sendResponse({ ok: false }); return; }
           const tabId = sender && sender.tab ? sender.tab.id : null;
           let ok = false;
-          if (msg.action === 'vcMoi') ok = await noterSessionVc(msg.id, tabId, msg.forme);
+          if (msg.action === 'vcMoi') ok = await noterSessionVc(msg.id, tabId, msg.forme, msg.source === 'stream' ? 'stream' : 'users/me');
           else if (msg.action === 'vcFil') { ok = await rangerVcFil(msg, await compteVcCapture(tabId, msg.moi)); await noterVcCapte('fils', ok === true, Array.isArray(msg.messages) ? msg.messages.length : 0); }
           else ok = await noterRecetteVc(msg.recette);
           sendResponse({ ok: ok === true });
@@ -15324,6 +15324,10 @@ async function rangerVcMessagesMaintenant(m) {
         apercu: coupeVc(x.apercu || prev.apercu || '', 160),
         apercuDeMoi: x.apercu ? (x.apercuDeMoi === true || x.apercuDeMoi === false ? x.apercuDeMoi : null) : (prev.apercuDeMoi === true || prev.apercuDeMoi === false ? prev.apercuDeMoi : null),
         compte: (m.compte && /^[\w-]{1,40}$/.test(String(m.compte))) ? String(m.compte) : (prev.compte || ''),
+        // 5.317 : le titre et la photo de l'ARTICLE (jamais de la personne), et d'où vient la ligne.
+        titre: coupeVc(x.titre || prev.titre || '', 120),
+        photo: /^https:\/\/images\.vestiairecollective\.com\/produit\/[\w.-]{1,60}$/i.test(String(x.photo || '')) ? String(x.photo) : (prev.photo || ''),
+        source: /^(stream|notifications|canal)$/.test(String(x.source || '')) ? String(x.source) : (prev.source || ''),
       };
     }
     const offset = Number(m.offset) || 0; const total = typeof m.total === 'number' ? m.total : null;
@@ -15617,12 +15621,14 @@ async function compteVcOnglet(tabId) {
   try { const m = (await chrome.storage.local.get(VC_ONGLETS))[VC_ONGLETS] || {}; const e = m[String(tabId)]; return e && /^[\w-]{1,40}$/.test(String(e.compte || '')) ? String(e.compte) : ''; } catch (_) { return ''; }
 }
 let _vcSessionChaine = Promise.resolve();
-function noterSessionVc(id, tabId, forme) {
-  const run = _vcSessionChaine.then(() => noterSessionVcMaintenant(id, tabId, forme)).catch(() => false);
+function noterSessionVc(id, tabId, forme, source) {
+  const run = _vcSessionChaine.then(() => noterSessionVcMaintenant(id, tabId, forme, source)).catch(() => false);
   _vcSessionChaine = run.then(() => {}, () => {});
   return run;
 }
-async function noterSessionVcMaintenant(id, tabId, forme) {
+// 5.317 : `source` dit d'où vient le compte — `users/me` (la page l'a lu) ou
+// `stream` (le `user_id` que la page donne à sa messagerie, mesuré le 3 nov.).
+async function noterSessionVcMaintenant(id, tabId, forme, source) {
   if (!/^[\w-]{1,40}$/.test(String(id || ''))) return false;
   const now = Date.now();
   try {
@@ -15637,7 +15643,7 @@ async function noterSessionVcMaintenant(id, tabId, forme) {
   if (cur.id === String(id) && cur.at && now - Date.parse(cur.at) < VC_SESSION_REECRIRE_MS) return true;
   const comptes = Object.assign({}, cur.comptes || {});
   comptes[String(id)] = new Date(now).toISOString();
-  const data = { id: String(id), at: new Date(now).toISOString(), source: 'users/me', forme: (Array.isArray(forme) ? forme : []).slice(0, 80).map(String), comptes: Object.fromEntries(Object.entries(comptes).slice(-10)) };
+  const data = { id: String(id), at: new Date(now).toISOString(), source: source === 'stream' ? 'stream' : 'users/me', forme: (Array.isArray(forme) ? forme : []).slice(0, 80).map(String), comptes: Object.fromEntries(Object.entries(comptes).slice(-10)) };
   const ok = await supabaseUpsert('app_data', [{ id: 'vc_session', data }], 'id');
   if (ok === true) notifierApp({ type: 'maj', quoi: 'vestiaire' });
   return ok === true;
@@ -15703,6 +15709,8 @@ async function rangerVcFilMaintenant(m, compte, deVrm) {
 function nettoyerRecetteVc(r) {
   if (!r || typeof r !== 'object') return null;
   const base = { methode: /^(POST|PUT)$/.test(String(r.methode)) ? String(r.methode) : '', hote: /^([a-z0-9-]+\.)*vestiairecollective\.com$/i.test(String(r.hote || '')) ? String(r.hote) : '', chemin: String(r.chemin || '').slice(0, 160) };
+  // 5.317 — un envoi vu sur la messagerie Stream : NOTÉ, jamais rejouable.
+  if (base.methode && /^([a-z0-9-]+\.)*(stream-chat\.com|stream-io-api\.com)$/i.test(String(r.hote || ''))) return { ...base, hote: String(r.hote), rejouable: false, raison: 'messagerie-stream' };
   if (!base.methode || !base.hote) return null;
   if (r.rejouable !== true) return { ...base, rejouable: false, raison: String(r.raison || 'inconnue').slice(0, 40) };
   const cleOk = (k) => /^[A-Za-z_][\w-]{0,40}$/.test(String(k));

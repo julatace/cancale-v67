@@ -18,7 +18,7 @@ export const annonceArriveeFuture=(texte)=>{const t=normaliser(texte);return FUT
 // Les PHRASES d'un texte (le retour se juge dans SA phrase, avec ses conditions).
 const phrases=(texte)=>String(texte||'').split(/[.!?;\n\r]+/).map(normaliser).filter(Boolean);
 // Une phrase qui pose une condition, une échéance ou une règle générale.
-const CONDITION=/(?:^|[\s,:(])(?:si|s'il|s'ils|s'elle|sinon|une\s+fois|passe\s+(?:ce|cette|le|la|les|un|une|ces)|au[\s-]dela|faute\s+d|a\s+defaut|sans\s+quoi|dans\s+le\s+cas|en\s+cas|lorsque|lorsqu'|quand|des\s+que|des\s+qu'|tant\s+que)(?=[\s,'’]|$)/;
+const CONDITION=/(?:^|[\s,:(])(?:si|s'il|s'ils|s'elle|sinon|une\s+fois|passe\s+(?:ce|cette|le|la|les|un|une|ces)|au[\s-]dela|faute\s+d|a\s+defaut|sans\s+quoi|dans\s+le\s+cas|au\s+cas\s+ou|en\s+cas|lorsque|lorsqu'|quand|des\s+que|des\s+qu'|tant\s+que)(?=[\s,'’]|$)/;
 const RETOUR=[
  // Constaté au passé : « il a été retourné à l'expéditeur ».
  /\b(?:a\s+ete|ont\s+ete)\s+(?:retourne|renvoye|reexpedie)e?s?\s+(?:a|vers|chez)\s+(?:l'|son\s+|ton\s+|votre\s+|leur\s+)?(?:expediteur|vendeur)/,
@@ -39,6 +39,34 @@ const ATTEND=/\bt'attend\b(?!\s+plus)|\bvous\s+attend\b(?!\s+plus)|\b(?:est|sont
 // 25/09/2026 », « Libère de la place dans la consigne… », Mondial Relay « Le temps
 // file : votre colis vous attend… »).
 const SUJET_RAPPEL=/\brappel\b|\brecuperez?\s+(?:ton|votre)\s+colis\b|\blibere\s+de\s+la\s+place\b|\ble\s+temps\s+file\b/;
+// (3 nov.) Le FUTUR et le CONDITIONNEL d'une phrase : elle n'annonce qu'un avenir.
+const FUTUR_PHRASE=/\b(?:sera|seront|serait|seraient|arrivera|arriveront|arriverait|pourra|pourras|pourrez|pourront|recevras|recevrez|va\s+(?:etre|arriver)|vont\s+(?:etre|arriver)|devrait|devraient|bientot|prochainement)\b|\b(?:colis|commande|paquet|envoi|article)\s+arrivent?\s+(?:aujourd'hui|demain|ce\s+(?:matin|soir|jour)|dans\b)/;
+// Ce qui CONSTATE qu'un colis attend au point (chacune est un mot entier : « indisponible »
+// n'est pas « disponible »).
+const CONSTAT_ARRIVEE=[
+ /\bt'attend\b(?!\s+plus)|\bvous\s+attend\b(?!\s+plus)/,
+ /(?:^|\b(?:est|sont|toujours|desormais|maintenant|deja|colis|commande|paquet)\s+)(?:bien\s+)?disponibles?\b/,
+ /\b(?:est|sont|a\s+ete|ont\s+ete|vient\s+d'etre)\s+(?:bien\s+)?(?:arrivee?s?|livree?s?|deposee?s?)\s+(?:dans|au|aux|en|chez|a)\b.*\b(?:point|relais|consigne|casier|locker|bureau|pickup|magasin)\b/,
+ /\bvient\s+d'arriver\s+(?:dans|au|en|a)\b.*\b(?:point|relais|consigne|casier|locker|pickup)\b/,
+ /\ba\s+(?:retirer|recuperer)\s+(?:avant|jusqu)/,
+ /\b(?:recupere|recuperez|retire|retirez)\s+(?:ton|votre)\s+colis\b/,
+ /\bpret\s+(?:pour\s+le\s+retrait|a\s+etre\s+retire)/,
+ /\b(?:arrive|livre|depose)e?\s+(?:en|au|dans\s+(?:le|la))\s+(?:point|relais|consigne|casier|locker)\b/,
+];
+const NEGATIF_RETRAIT=/(?:n[' ]a\s+pas|n[' ]avez\s+pas|pas\s+encore)\s+(?:encore\s+)?(?:ete\s+)?(?:retire|recupere)/;
+export function arriveeDansPhrase(ph){
+ const p=normaliser(ph);
+ if(!p||CONDITION.test(p))return false;
+ // « Il sera disponible JUSQU'AU 26/10 » : il EST là (la garde a une fin).
+ if(FUTUR_PHRASE.test(p)&&!/\bdisponibles?\s+jusqu/.test(p))return false;
+ // « Ton colis n'a pas encore été retiré » : il attend (un rappel).
+ return CONSTAT_ARRIVEE.some((r)=>r.test(p))||NEGATIF_RETRAIT.test(p);
+}
+export const arriveeConstatee=(texte)=>phrases(texte).some(arriveeDansPhrase);
+// (3 nov.) « Action requise : le colis semble avoir été perdu » (Vinted, mesuré le
+// 2 nov.) était rangé « livré / retiré » et sonnait « ✅ Colis livré ». Un colis
+// perdu n'est ni livré ni arrivé.
+export const colisPerdu=(sujet)=>/\b(?:perdu|egare|introuvable)\b/.test(normaliser(sujet));
 function lire(texte){
  const t=normaliser(texte);if(!t)return null;
  const negatif=/(?:n[' ]a\s+pas|n[' ]avez\s+pas|pas\s+encore|non)\s+(?:ete\s+)?(?:retire|recupere|receptionne)|(?:n'a|n'avez)\s+(?:toujours\s+|encore\s+)?pas\s+(?:encore\s+)?(?:ete\s+)?(?:retire|recupere|receptionne)/.test(t);
@@ -71,16 +99,27 @@ function lire(texte){
  // ⚠️ Étroit exprès : « il sera disponible JUSQU'AU 26/10 » (un colis qui EST là)
  // ne doit pas passer en transit — seul l'avenir de l'ARRIVÉE compte, et un
  // texte qui dit aussi « est disponible / t'attend » reste une arrivée.
- if((FUTUR.test(t)||ARRIVEE_A_VENIR.test(t))&&!/\b(?:est|sont)\s+(?:bien\s+)?(?:disponibles?|arrives?)|\bt'attend|vous\s+attend/.test(t))return 'transit';
- const point=/\b(?:livre|arrive|depose)\s+(?:dans\s+(?:le|la)|au|en|chez|a\s+(?:la|une|un))\s+(?:point|relais|consigne|casier|locker|bureau)/.test(t);
- if(point||/disponible|a\s+retirer|(?:vous|t')\s*attend|pret\s+(?:pour\s+le\s+retrait|a\s+etre\s+retire)/.test(t)||negatif)return 'available';
+ // (3 nov.) « dès qu'il EST disponible » (une condition) ne fait plus exception : la
+ // règle des phrases (`arriveeDansPhrase`) dit seule si une arrivée est constatée.
+ if((FUTUR.test(t)||ARRIVEE_A_VENIR.test(t))&&!phrases(texte).some(arriveeDansPhrase))return 'transit';
+  // (3 nov.) « ARRIVÉ » SEULEMENT SUR UNE PHRASE QUI LE CONSTATE (Julien : « elles
+ // disent "arrivé au point relais" alors que le message disait qu'il VA arriver »).
+ // Mesuré sur sa base (journal des e-mails, 14 jours) : « Où vous livrer en cas de
+ // point indisponible ? » (Mondial Relay, le colis roule encore — « disponible »
+ // était lu DANS « indisponible ») et « Confirmation de commande Mondial Relay »
+ // (« dès que votre colis sera disponible… ») ont été rangés « arrivé » et ont
+ // sonné « 📍 Colis arrivé au point de retrait ». La règle juge chaque PHRASE :
+ // un mot entier, au présent ou au passé composé, jamais dans une condition
+ // (« si », « au cas où », « dès que »…) ni au futur / conditionnel.
+ if(phrases(texte).some(arriveeDansPhrase))return 'available';
  if(/(?:sera|va etre|doit etre|pret a etre)\s+livre|(?:nous avons|nous avons bien|transporteur a)\s+(?:bien\s+)?recu|receptionne\s+(?:par le transporteur|dans notre)/.test(t))return 'transit';
  if(/\blivre\b|bien\s+recu|receptionne|livraison\s+(?:effectuee|reussie)/.test(t))return 'delivered';
- if(/acheminement|en\s+transit|expedie|pris\s+en\s+charge|en\s+cours\s+de\s+livraison/.test(t))return 'transit';
+ if(/acheminement|en\s+transit|expedie|pris\s+en\s+charge|en\s+cours\s+de\s+livraison|\ben\s+route\b|\ben\s+chemin\b/.test(t))return 'transit';
  return null;
 }
 export function etatColisDepuisTexte(sujet,texte='') {
  const s=normaliser(sujet);
+ if(colisPerdu(sujet))return null;
  if(/entre de bonnes mains|preuve de depot|confirmation du depot|depot de votre colis|colis est depose|bordereau d'envoi/.test(s)&&!/point|consigne|relais/.test(s))return 'transit';
  // Le sujet courant prime ; le texte n'est consulté que si le sujet est neutre.
  const parSujet=lire(sujet);if(parSujet)return parSujet;

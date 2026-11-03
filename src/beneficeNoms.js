@@ -15,17 +15,27 @@
 //     vente), sans dépenses ni URSSAF.
 // LA RÈGLE (§5 « une seule règle par notion ») — trois notions, trois noms :
 //   « Bénéfice »            = ce qu'il te reste : ventes − prix d'achat − frais de
-//                             vente − dépenses − URSSAF. Propriétaire :
-//                             `beneficePeriode` (App.jsx) sur la publication
-//                             `vrm_benefice_jours` de l'écran Ventes. « — » ⇔ la
-//                             règle dit « pas su » (prix d'achat manquant, frais
-//                             eBay pas lus, CA déclaré pas publié, rien publié) :
+//                             vente − dépenses − URSSAF DE CES VENTES.
+//                             Propriétaire : `beneficePeriode` (App.jsx) sur la
+//                             publication `vrm_benefice_jours` de l'écran Ventes.
+//                             « — » ⇔ la règle dit « pas su » (prix d'achat
+//                             manquant, frais eBay pas lus, rien publié) ou
+//                             « rien à calculer » (ni vente ni dépense) :
 //                             le même « — » sur tous les écrans.
 //   « Bénéfice brut »       = ventes − prix d'achat, sur les seules ventes au prix
 //                             d'achat connu, avec sa couverture (« 2 sur 3 »),
 //                             JAMAIS « au moins ».
 //   « Après frais de vente » = le brut − boosts et frais de vente (ni dépenses, ni
 //                             URSSAF : ce n'est pas le bénéfice).
+// (3 nov., Julien : « Bénéfice du mois −5 € — je ne comprends pas du tout »)
+// L'URSSAF du « Bénéfice » = le taux × le montant des MÊMES ventes que celles
+// qu'il compte (la cotisation attachée à la vente) — jamais celle du CA déclaré
+// du mois, daté au VERSEMENT (un autre ensemble : une vente d'octobre versée en
+// novembre retirait 4,71 € d'un novembre sans vente). La déclaration (CA déclaré,
+// « à payer », registre, rappels) reste datée au versement. Aucune vente comptée
+// ET aucune dépense ⇒ « — » (raison `rien` : rien à calculer), jamais 0 ni un
+// négatif ; un négatif n'apparaît que s'il est réel (vente à perte, dépenses).
+// La règle vit dans `beneficePeriode` (App.jsx), sa seule propriétaire.
 // Chaque chiffre rendu porte `data-benef-notion` et `data-benef-valeur`
 // (centimes, '' = « — ») : le banc compare les nombres d'une même notion.
 export const NOM_BENEFICE = 'Bénéfice';

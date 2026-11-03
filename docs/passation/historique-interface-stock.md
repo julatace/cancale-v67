@@ -3100,6 +3100,57 @@ Restent rouges ici : `mobile` à l'étape « 7 jours » de la période dans « O
 (saisie de dépense pendant que le nuage est retenu, 2), `annonces-ventes-brouillon` (16 rouges sur main,
 quelques-uns de plus ici, écrans Annonces/Messages surtout).
 
+### 3 nov. — La carte sombre réglable PAR PAGE (branche `claude/carte-stats`)
+
+Julien, 3 nov. 09 h 54 : « je veux l'onglet avec les statistiques, mais qu'il soit réglable sur
+chaque page comme il est déjà là, mais modifiable en fonction de ce qu'on a sélectionné » ;
+« je veux juste le CA, le bénéfice etc. dans cette case sombre sur chaque onglet ».
+
+**Fait** :
+- `src/design/carteChiffres.js` (pur) : le CATALOGUE (CA vendu, nombre de ventes, panier moyen 30 j,
+  reçu, bénéfice, bénéfice brut, à déclarer, URSSAF, ventes finalisées, à poster, à retirer, argent en
+  attente, disponible, annonces en ligne, qui dorment), ce que chacun SUIT (site, compte, période), le
+  DÉFAUT de chaque page (maquettes Fusion), le réglage rangé `vrm_carte_stats` (`{v:1, pages:{page:{g,c}}}`,
+  synchronisé dans `main`, rattrapé par `onCloudReady`), le PÉRIMÈTRE (« Novembre · Vinted · Bruno »),
+  et `valeursCarte` : chaque valeur TIRÉE DE SA RÈGLE, passée par l'app (`REGLES_CARTE`) —
+  `bilanLignes` (sortie de `bilanVentes` de Ventes, la même fonction) sur les lignes de `ventesFaites`
+  de la coque (`liveStatsVus.venduLignes`), `rythmeVendu` (panier), `beneficeDe` (sortie de
+  `useBeneficeCalcul` : la lecture de Compta) + `chiffreBenefice`/`chiffreBrut`, `beneficeDesJours`,
+  les publications `vrm_colis_aposter` (par site), `vrm_colis_retirer`, `vinted_urssaf_mois` (le reçu,
+  lu comme le widget `recuDuMoisPublie`), `vrm_paires_dorment`, le porte-monnaie et les annonces de
+  liveStats. Trois états : `null` = « — » ; `partiel` = « au moins » + manque NOMMÉ (jamais « au moins
+  0 ») ; `hors` = pas de sens pour la sélection (bénéfice, URSSAF, reçu par site ; un compte Vinted sur
+  eBay) ⇒ « — » et pas proposé dans la feuille.
+- `src/design/CarteStats.jsx` : la carte (`CarteMois`, + `action`, `nu`, `grandAttrs`), « Modifier »
+  (44 px, en haut à droite) ⇒ feuille en portail (`FermeAuRetour`) : 4 places (grand, cases 1-3), la
+  liste des chiffres proposés avec leur valeur, la période du chiffre quand la page n'a pas de filtre
+  de période, « Par défaut », « OK ». Chaque choix est rangé tout de suite. Le même chiffre à la même
+  période n'est jamais deux fois sur la carte (échange des places).
+- Branchement (App.jsx, `CarteStatsApp`, contexte `LiveStatsCarte`) : Ma journée (dans la tête, nue :
+  vendu aujourd'hui · bénéfice du mois · vendu du mois · reçu du mois), Ventes Vinted (vendu du mois
+  Vinted · à poster · en route · à payer ; la plage du calendrier « Outils » l'emporte), Ventes tous les
+  sites, Leboncoin et eBay (`KpiVentes` : ses trois cases deviennent les cases PROPRES de la page,
+  mêmes `data-kpi` ; périmètre « Depuis le début »), Vestiaire, Colis (le site choisi en tête),
+  Compta (dans la carte « Ce que tu as gagné », la période du segment l'emporte), Annonces et Achats
+  (Vinted). La bande « CA finalisé · Disponible · En attente » de l'espace Vinted ne redit plus ces
+  montants (§7) : ils se choisissent dans la carte. Attributs gardés sur LEUR chiffre :
+  `data-fu-vendu-mois`, `data-fu-vendu-jour`, `data-journee-benef…`, `data-compta-chiffre="gagne"`.
+- Statistiques : PAS de carte (l'écran EST les statistiques, ses tuiles et sa période ; une carte
+  redirait ses nombres).
+
+**Écarts dits** : « Vendu » de la carte de Ventes · Vinted est maintenant VINTED seul (avant : toutes
+plateformes sous l'onglet Vinted) — c'est la sélection. Les bancs qui lisent `data-fu-vendu-mois` sur
+un jeu multi-sites liront le vendu Vinted. Messages et Favoris ne sont pas au catalogue : aucune
+source publiée hors de leur écran (trois règles de non-lus coexistent, un chiffre ici pourrait
+contredire Messages).
+
+**Preuves** : `scripts/audit-carte-chiffres.cjs` (203 contrôles : chaque chiffre × site × compte ×
+période = la règle propriétaire ET le calcul à la main ; « — » sans source ; réglage ; branchement
+lu dans le code). Mutations rouges : `site` 44, `recalc` 73, `zero` 3, `benef` 5, `recu` 1, `compte` 18,
+`aumoins` 1. Sur `origin/main` : rouge (module et `bilanLignes`/`beneficeDe` absents). Banc
+`scripts/bancs/carte-stats.cjs` (390 tactile clair/sombre, 1512) : Vinted 257 € → tous les sites 297 €
+→ Leboncoin 40 €, périmètre qui suit, feuille (portail, 44 px, pas de bénéfice sur Vinted seul),
+réglage gardé au rechargement, Colis au défaut.
 
 ### LE CYCLE D'UN ARTICLE : « N°x SUPPRIMÉ DE VINTED », PROPOSITIONS eBAY/LEBONCOIN, RETRAIT eBAY APRÈS UNE VENTE AILLEURS (3 novembre, branche `claude/cycle-article`)
 Julien, 3 nov. 9 h 40 : il craint « plein de cas où il peut y avoir une ambiguïté et des erreurs

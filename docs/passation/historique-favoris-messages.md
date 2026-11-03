@@ -2107,3 +2107,48 @@ Republier, Annonces ».
   rendues (les siennes, X8).
 - Preuve : `audit-favoris-ecritures.cjs` (vrai `executerMessageFavori` dans le vm ;
   16 rouges sur origin/main ; `--prouve` : 5 mutations attrapées).
+
+## 3 novembre — Messages aux favoris en style « Fusion » : une carte par ARTICLE (branche `claude/favoris-fusion`)
+
+Julien (10 h 16) : « fais une meilleure interface pour les messages aux favoris » — premium, peu de
+couleur, AUCUN texte explicatif, des photos (« l'article en petit »), « article » et pas « paire ».
+
+**Mesuré en lecture seule sur sa base avant de coder** : une notification de favori n'a PAS de champ
+`actor` (clés : body, id, image{url}, link, updated_at, user_id…) ⇒ l'écran du 2 nov. affichait
+« Pseudo non lu » sur CHAQUE ligne réelle ; le texte est « <pseudo> a marqué ton article <titre> comme
+favori » ; `image.url` est la PHOTO DE L'ARTICLE (une adresse par article, jamais un avatar) ; lien
+`/items/<id>/want_it/new?offering_id=<n>` ; 120 favoris pour 14 articles sur un compte. Vinted ne
+donne aucun avatar.
+
+**L'écran** (`src/FavorisVinted.jsx`, règle pure `src/favorisEcran.js`, style `src/design/favoris.css`
+importé après `fusion.css`) :
+- la carte sombre (`CarteMois` ; `CarteStats` de main porte les chiffres de vente, pas ceux-ci) : nom du
+  compte, période 7 j · 30 j · Tout, « N favoris », « sur N articles », cases envoyés · vendus · en
+  attente ; dessous, l'interrupteur « Mode auto » (`ModeAutoFavoris variante="carte"`) : une ligne (le
+  geste en ambre s'il bloque, sinon l'état) ; allumer ouvre une feuille (réglages puis la confirmation
+  du risque, inchangées), éteindre = Stop ;
+- « Ton message » : une bulle avec le VRAI texte, `{username}` remplacé par le pseudo d'un favori réel,
+  l'offre sur le prix d'un article réel (« 95 € → 85,50 € ») ; « Modifier » ouvre la feuille existante ;
+- filtres À envoyer · Envoyés · Tous (sans choix : « À envoyer » s'il y a quelque chose, sinon « Tous »),
+  Actualiser, « … » (= l'ancienne feuille « Choisir », tous les outils gardés) ;
+- une carte par ARTICLE (`articlesFavoris`, par `/items/<id>`) : photo 56, titre (VRM, sinon la phrase de
+  Vinted pour CETTE carte), N°, prix (`articleFavori` donne maintenant `prix`), pile d'initiales (1re
+  lettre du pseudo que Vinted écrit — `pseudoFavori` ; illisible ⇒ rond vide), UNE puce (À vérifier ·
+  N à envoyer · Vendu · Refusé par Vinted · Offre faite · Envoyé · Déjà en conversation…), UN geste
+  (Envoyer bleu · Vérifier · Ouvrir) ; toucher ⇒ feuille de détail (une ligne par personne, son état).
+- « Offre faite » se PROUVE : envoyé avec ses 3 écritures (`ecrits===3`) ; la vue serveur
+  (`vueFile`, api/_lib/favoris-file.js) projette désormais `ecrits`. « Acceptée » et « ventes issues
+  d'un favori » : AUCUNE règle prouvée n'existe ⇒ pas affichées (la case dit « vendus » = articles mis
+  en favori prouvés vendus, par identité, sans causalité).
+- « Envoyer » choisit au plus 10 favoris À ENVOYER de cet article et ouvre la feuille d'envoi ; rien ne
+  part sans « Lancer » (plafonds, file, garde-fous inchangés). « paire » → « article » dans les raisons.
+
+**Preuves** : `audit-favoris-ecran` 42/42 ; `--prouve` rouge sur origin/main + 12 mutations rouges (dont
+offre sans preuve, nom inventé, vendu avec Envoyer, une carte par favori). Banc `favoris-ecran` refait
+(forme réelle, clair + sombre, 390 tactile + 1512) : base 122/122, `FAV_JEU` vide · un · gros (300
+favoris / 80 articles) · longs · sansphoto · bloque tous verts ; 15 rouges sur origin/main ; mutants
+`FAV_MUTANT` envoi (lancer sans clic), etat, offre, nom ⇒ rouges. Verts : `audit-favoris-auto` 54,
+`-vintex`, `-ecritures`, `-autres-comptes`, `audit-coherence`, `audit-fonctions-api`, `audit-icones`,
+12 tests `favoris-*.test.mjs`, construction. ⚠️ `scripts/tests/favoris-vinted-interface.cjs` et
+`favoris-historique-interface.cjs` étaient DÉJÀ rouges sur main (écran du 28 oct.), toujours rouges.
+Geste de Julien : regarder Messages → Favoris reçus (téléphone et ordinateur).
