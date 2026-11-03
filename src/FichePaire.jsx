@@ -6,8 +6,9 @@
 import React from 'react';
 import { createPortal } from 'react-dom';
 import './styles-fiche-paire.css';
+import './styles-annonces-outils.css';
 
-const ICONE = { achat: 'bag', stock: 'home', annonces: 'grid', vente: 'tag', colis: 'box', argent: 'euro' };
+const ICONE = { achat: 'bag', numero: 'pencil', stock: 'home', annonces: 'grid', prix: 'tag', offres: 'chat', favoris: 'heart', vente: 'cash', colis: 'box', argent: 'euro', retour: 'restore' };
 const eur = (c) => (c == null ? '—' : `${(c / 100).toFixed(Number.isInteger(c / 100) ? 0 : 2).replace('.', ',')} €`);
 const signe = (c) => (c == null ? '—' : `${c > 0 ? '+' : c < 0 ? '−' : ''}${eur(Math.abs(c))}`);
 const quand = (iso) => {
@@ -17,7 +18,16 @@ const quand = (iso) => {
   return d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
 };
 
-export default function FichePaire({ p, lecture = false, num, onFermer, onRetour, onBordereau, onEmballer, Photo, Icon, Retour }) {
+// (3 nov.) Une ligne d'événement de la chronologie : sa date LUE (sinon « — »),
+// son texte, sa preuve, son lien.
+const Evenement = ({ ev }) => (
+  <li className="vrm-fp-ev" data-fiche-ev={ev.cle} data-fiche-ev-date={ev.at || ''} data-fiche-tx={ev.tx || undefined}>
+    {ev.at ? <time dateTime={ev.at}>{quand(ev.at)}</time> : <span className="vrm-fp-ev-sansdate">—</span>}
+    <span className="vrm-fp-ev-txt">{ev.lien ? <a href={ev.lien} target="_blank" rel="noopener noreferrer">{ev.texte}</a> : ev.texte}{ev.preuve ? <small data-fiche-preuve="">{ev.preuve}</small> : null}</span>
+  </li>
+);
+
+export default function FichePaire({ p, lecture = false, num, onFermer, onRetour, onBordereau, onEmballer, onPrix, onDupliquer, neuve = null, onCopier, Photo, Icon, Retour }) {
   React.useEffect(() => {
     const k = (e) => { if (e.key === 'Escape' && !e.defaultPrevented) { e.preventDefault(); onFermer(); } };
     window.addEventListener('keydown', k, true);
@@ -33,7 +43,8 @@ export default function FichePaire({ p, lecture = false, num, onFermer, onRetour
       <div className="vrm-fp-entete">
         <span className={'vrm-fp-num' + (p.double ? ' is-double' : '')} data-fiche-grand-num="">{p.num}</span>
         <span className="vrm-fp-quoi">
-          <span className="vrm-fp-titre">{p.titre || (p.etat === 'rien' ? 'N° jamais servi' : 'Sans titre')}{p.taille ? ` · ${p.taille}` : ''}</span>
+          <span className="vrm-fp-titre">{(neuve && neuve.titre) || p.titre || (p.etat === 'rien' ? 'N° jamais servi' : 'Sans titre')}{(neuve && neuve.taille) || p.taille ? ` · ${(neuve && neuve.taille) || p.taille}` : ''}</span>
+          {neuve ? <span className="vrm-fp-sous" data-fiche-neuve="">Photos à prendre</span> : null}
           {p.ancienNumero ? <span className="vrm-fp-sous">Ancien numéro (d’avant la remise à zéro)</span> : null}
         </span>
         {p.photo && Photo ? <span className="vrm-fp-photo">{Photo(p.photo)}</span> : null}
@@ -47,6 +58,13 @@ export default function FichePaire({ p, lecture = false, num, onFermer, onRetour
           {r.benefice == null && r.raisonBenef ? <small>{r.raisonBenef}</small> : r.benefPartiel ? <small>frais pas tous confirmés</small> : null}
         </div>
       </div>
+      {(onPrix || onDupliquer) && !p.ancienNumero ? (
+        <div className="vrm-fp-outils">
+          {onPrix && !neuve ? <button type="button" className="vrm-ao-second" data-fiche-prix="" onClick={() => onPrix(p.num)}>Changer le prix</button> : null}
+          {onDupliquer && p.etat !== 'rien' ? <button type="button" className="vrm-ao-second" data-fiche-dupliquer="" onClick={() => onDupliquer(p.num)}>Dupliquer</button> : null}
+          {neuve && onCopier ? <button type="button" className="vrm-ao-second" data-fiche-copier="" onClick={() => onCopier(neuve)}>Copier le texte</button> : null}
+        </div>
+      ) : null}
       <ol className="vrm-fp-parcours">
         {p.etapes.map((e) => (
           <li key={e.cle} className={'vrm-fp-etape is-' + e.etat} data-fiche-etape={e.cle} data-fiche-etat={e.etat}>
@@ -54,6 +72,7 @@ export default function FichePaire({ p, lecture = false, num, onFermer, onRetour
             <span className="vrm-fp-txt">
               <span className="vrm-fp-ligne1"><b>{e.titre}</b>{e.date ? <time className="vrm-fp-date" dateTime={e.date}>{quand(e.date)}</time> : null}</span>
               {e.lignes ? e.lignes.map((l, j) => <span key={j} className="vrm-fp-detail" data-fiche-ligne={l.site} data-fiche-tx={l.tx || undefined}>{l.texte}{l.date && e.cle === 'vente' && e.lignes.length > 1 ? ` · ${quand(l.date)}` : ''}</span>) : null}
+              {e.evenements && e.evenements.length ? <ul className="vrm-fp-evs">{e.evenements.map((ev, j) => <Evenement key={j} ev={ev}/>)}</ul> : null}
               {e.detail ? <span className="vrm-fp-detail">{e.etat === 'passu' ? <>— <span data-fiche-raison="">{e.detail}</span></> : e.detail}</span> : null}
             </span>
           </li>
