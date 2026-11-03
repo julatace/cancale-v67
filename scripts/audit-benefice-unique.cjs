@@ -1,6 +1,6 @@
 // ═══════════════════════════════════════════════════════════════════════════
 // AUDIT : « BÉNÉFICE » = UNE RÈGLE SUR TOUS LES ÉCRANS (3 novembre)
-//         node scripts/audit-benefice-unique.cjs [--mutation=stats|journee|recap|vestiaire|aumoins|ventes]
+//         node scripts/audit-benefice-unique.cjs [--mutation=stats|journee|recap|vestiaire|aumoins|ventes|urssaf-decl|rien]
 // ═══════════════════════════════════════════════════════════════════════════
 // Constat d'une critique, sur les MÊMES données de banc : le bénéfice du mois
 // valait « — » dans Ma journée, 103 € dans Statistiques et 80,93 € dans
@@ -18,14 +18,22 @@
 //   1. la même valeur (ou le même « — ») partout où le libellé est « Bénéfice »
 //      — Ma journée, Statistiques (mois), Comptabilité, le récap mensuel ;
 //   2. cette valeur = celle calculée ICI à la main depuis les ventes inventées
-//      (ventes − prix d'achat − frais − dépenses − URSSAF du CA déclaré) ;
+//      (ventes − prix d'achat − frais − dépenses − URSSAF DES MÊMES VENTES) ;
+//      (3 nov., Julien : « Bénéfice du mois −5 € — je ne comprends pas du
+//      tout ») l'URSSAF retirée du bénéfice est le taux × le montant des ventes
+//      que CE bénéfice compte — jamais celle du CA déclaré du mois (daté au
+//      versement : un autre ensemble de ventes). Aucune vente comptée et aucune
+//      dépense ⇒ « — » (rien à calculer), jamais 0 ni un négatif ; un négatif
+//      n'existe que s'il est réel (vente à perte, dépenses) ;
 //   3. « — » seulement quand la règle dit « pas su » (prix d'achat manquant,
 //      frais eBay pas lus) ;
 //   4. les autres notions ont d'autres noms (Ventes, tuile de la semaine) et un
 //      brut partiel ne se dit jamais « au moins ».
 // Cas : tout connu · un prix d'achat manquant · frais eBay pas lus · vente
 // Vestiaire au montant sûr / pas sûr · vente à cheval sur deux mois (vendue en
-// octobre, versée en novembre) · compte exclu · aucune vente du mois.
+// octobre, versée en novembre) · compte exclu · aucune vente du mois ·
+// (3 nov.) mois sans vente avec le versement d'une vente d'octobre (« — ») ·
+// ventes et versements croisés · vente à perte réelle · dépenses seules.
 // `--mutation=…` réaffaiblit une règle dans une copie du source : rouge exigé.
 const fs = require('fs'), path = require('path'), vm = require('vm');
 const R = process.env.VRM_RACINE || path.join(__dirname, '..');
@@ -47,6 +55,10 @@ else if (MUT === 'recap') muter('app', 'profit: beneficeDuMois(m.ym)', 'profit: 
 else if (MUT === 'vestiaire') muter('app', "['Vinted', 'Leboncoin', 'eBay', 'Vestiaire'].reduce(", "['Vinted', 'Leboncoin', 'eBay'].reduce(");
 else if (MUT === 'aumoins') muter('app', ": `vente − prix d’achat, sur ${pl(B.n, 'vente finalisée', 'ventes finalisées')}`;\n      return tuile('benefice', NOM_BENEFICE_BRUT, R.valeur == null ? '—' : fmt(R.valeur)", ": `vente − prix d’achat, sur ${pl(B.n, 'vente finalisée', 'ventes finalisées')}`;\n      return tuile('benefice', NOM_BENEFICE_BRUT, R.valeur == null ? '—' : `${R.partiel ? 'au moins ' : ''}${fmt(R.valeur)}`");
 else if (MUT === 'ventes') muter('app', '<StatBox compact label={NOM_APRES_FRAIS}', '<StatBox compact label="Bénéfice net"');
+// (3 nov.) L'URSSAF du bénéfice reprise sur le CA DÉCLARÉ du mois (la règle d'avant).
+else if (MUT === 'urssaf-decl') muter('app', 'const cotis = !urssaf ? 0 : aPayerUrssaf(v.ca, taux);', 'const cotis = !urssaf ? 0 : caDecl == null ? null : aPayerUrssaf(caDecl, taux);');
+// (3 nov.) « Rien à calculer » oublié : un mois vide redit 0 € (ou −URSSAF).
+else if (MUT === 'rien') muter('app', 'const rien = v.n === 0 && !(Math.round(charges * 100) > 0);', 'const rien = false;');
 else if (MUT) { console.log('❌ mutation inconnue : ' + MUT); process.exit(2); }
 
 const sansCommentaires = (t) => t.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:'"`\\])\/\/[^\n]*/g, '$1');
@@ -109,8 +121,21 @@ function extraire(src, nom) {
     { nom: 'tout connu', ventes: BASE },
     { nom: 'un prix d’achat manquant', ventes: BASE.map((v) => v.id === 'v1' ? { ...v, achat: null } : v) },
     { nom: 'frais eBay pas lus', ventes: [...BASE, { id: 'e1', p: 'eBay', compte: 'E', vente: J(10, 11), verse: J(10, 11), eur: 80, achat: 25, frais: null }] },
-    { nom: 'aucune vente du mois, un versement à cheval', ventes: BASE.filter((v) => v.id === 'v2') },
+    // (3 nov.) Dépenses seules (et un versement d'octobre) : le négatif permis = −les dépenses, sans URSSAF.
+    { nom: 'aucune vente du mois, un versement à cheval, des dépenses', ventes: BASE.filter((v) => v.id === 'v2'), negatif: 'permis', exact: -15 },
     { nom: 'sans dépenses notées', ventes: BASE, compta: {} },
+    // (3 nov.) LE CAS DE JULIEN : aucune vente comptée en novembre, une vente
+    // d'octobre versée le 2 novembre (38 €), aucune dépense ⇒ « — », jamais −4,71 €.
+    { nom: 'mois sans vente, versement d’une vente d’octobre, sans dépenses', ventes: [{ id: 'j1', p: 'Vinted', compte: 'A', vente: J(9, 29), verse: J(10, 2), eur: 38, achat: 12, frais: 0 }], compta: {}, negatif: 'jamais', tiret: 'rien' },
+    { nom: 'idem, « je n’ai pas de dépenses » répondu', ventes: [{ id: 'j1', p: 'Vinted', compte: 'A', vente: J(9, 29), verse: J(10, 2), eur: 38, achat: 12, frais: 0 }], compta: { depenses: [], fixes: [], packs: [], abonnements: [], sansDepenses: { at: 1 } }, negatif: 'jamais', tiret: 'rien' },
+    // (3 nov.) Croisés : une vente d'octobre versée en novembre ET une vente de novembre pas encore versée.
+    { nom: 'ventes et versements croisés', ventes: [
+      { id: 'c1', p: 'Vinted', compte: 'A', vente: J(9, 30), verse: J(10, 3), eur: 200, achat: 50, frais: 0 },
+      { id: 'c2', p: 'Vinted', compte: 'A', vente: J(10, 15), verse: null, eur: 40, achat: 10, frais: 1 },
+      { id: 'c3', p: 'Leboncoin', compte: 'L', vente: J(10, 16), verse: J(10, 16), eur: 25, achat: 5, frais: 0 },
+    ], compta: {}, negatif: 'jamais' },
+    // (3 nov.) Vente à perte RÉELLE : le négatif est permis, et il est celui de la vente.
+    { nom: 'vente à perte réelle', ventes: [{ id: 'p1', p: 'Vinted', compte: 'A', vente: J(10, 12), verse: J(10, 15), eur: 30, achat: 60, frais: 0 }], compta: {}, negatif: 'permis', exact: -33.72 },
   ];
 
   // La publication de l'écran Ventes, comme lui : comptes exclus et Vestiaire
@@ -145,7 +170,10 @@ function extraire(src, nom) {
     if (comptees.some((v) => v.frais == null)) return { valeur: null, raison: 'frais' };
     const ventesNet = comptees.reduce((s, v) => s + Math.round(v.eur * 100) - Math.round(v.achat * 100) - Math.round(v.frais * 100), 0);
     const charges = Math.round(((compta.fixes || []).reduce((s, f) => s + f.montant, 0) + (compta.depenses || []).filter((d) => d.date.startsWith('2026-11')).reduce((s, d) => s + d.montant, 0)) * 100);
-    const ca = ventes.filter((v) => !v.exclu && !(v.p === 'Vestiaire' && !v.sur) && v.verse != null && dansNov(v.verse)).reduce((s, v) => s + Math.round(v.eur * 100), 0);
+    // (3 nov.) Rien à calculer : aucune vente comptée, aucune dépense.
+    if (!comptees.length && !charges) return { valeur: null, raison: 'rien' };
+    // (3 nov.) L'URSSAF des MÊMES ventes (celles comptées), pas celle des versements du mois.
+    const ca = comptees.reduce((s, v) => s + Math.round(v.eur * 100), 0);
     const cotis = Math.round(ca * 12.4 / 100);
     return { valeur: (ventesNet - charges - cotis) / 100, raison: '' };
   };
@@ -194,7 +222,24 @@ function extraire(src, nom) {
     dit(memes, '« Bénéfice » : la même valeur (ou le même « — ») sur les quatre écrans', vals);
     const c = mesures['Comptabilité'].valeur;
     dit(A.valeur == null ? c == null : (c != null && Math.abs(c - A.valeur) < 0.005), `= l’attendu calculé à la main (${eur(A.valeur)}${A.raison ? ', « pas su » : ' + A.raison : ''})`, `Comptabilité ${eur(c)}`);
-    dit(Object.values(mesures).every((m) => m.valeur !== null || A.valeur === null), '« — » seulement quand la règle dit « pas su »', vals);
+    dit(Object.values(mesures).every((m) => m.valeur !== null || A.valeur === null), '« — » seulement quand la règle dit « pas su » (ou « rien à calculer »)', vals);
+    if (cas.negatif === 'jamais') dit(Object.values(mesures).every((m) => !(m.valeur < 0)), 'jamais négatif : aucune vente à perte, aucune dépense', vals);
+    if (cas.exact != null) dit(Object.values(mesures).every((m) => m.valeur != null && Math.abs(m.valeur - cas.exact) < 0.005), `négatif RÉEL permis, exactement ${eur(cas.exact)}`, vals);
+    if (cas.tiret) {
+      const B = ctx.beneficePeriode({ jours: pub.jours, compta, ligneUrssaf: ligne, taux: 12.4, periode: 'mois', maintenant: MAINTENANT, toutes: true, urssaf: true });
+      const cb = N.chiffreBenefice(B);
+      dit(cb.valeur === null && B.raison === cas.tiret && (N.absent || cb.raison === cas.tiret), `« — » dit sa raison (« ${cas.tiret} »), la même pour tous les écrans`, `valeur ${eur(cb.valeur)} · raison ${B.raison || '∅'}`);
+      dit(B.caDecl != null && B.caDecl > 0, 'le CA déclaré du mois (daté au versement) reste lu, pour la déclaration', `caDecl ${B.caDecl}`);
+    }
+  }
+  console.log('── La déclaration reste datée au versement');
+  {
+    // Le CA déclaré et l'URSSAF à payer ne changent pas : `caDecl` = les versements du mois.
+    const cas = CAS.find((c) => c.nom === 'ventes et versements croisés');
+    const pub = publier(cas.ventes), ligne = ligneUrssaf(cas.ventes);
+    const B = ctx.beneficePeriode({ jours: pub.jours, compta: {}, ligneUrssaf: ligne, taux: 12.4, periode: 'mois', maintenant: MAINTENANT, toutes: true, urssaf: true });
+    dit(B.caDecl === 225 && ctx.aPayerUrssaf(B.caDecl, 12.4) === 27.9, 'CA déclaré de novembre = 200 + 25 versés (la vente du 15 pas encore versée n’y est pas), à payer 27,90 €', `caDecl ${B.caDecl}`);
+    dit(B.cotis === 8.06, 'l’URSSAF du bénéfice = 12,4 % des 65 € vendus en novembre (8,06 €), pas des 225 € versés', `cotis ${B.cotis}`);
   }
 
   console.log('── Les autres notions ont d’autres noms');
@@ -209,7 +254,7 @@ function extraire(src, nom) {
   dit(/tuile\('benefice', NOM_BENEFICE_BRUT/.test(zoneSemaine), 'Statistiques, semaine : la tuile dit « Bénéfice brut » (dépenses et URSSAF se comptent au mois)');
   const zoneTuile = sS.slice(sS.indexOf('const tBenef'), sS.indexOf('const tDelai'));
   dit(zoneTuile.length > 0 && !/au moins/.test(zoneTuile), 'jamais « au moins » sur un bénéfice ou un brut partiel (une paire au prix inconnu peut être à perte)');
-  dit(/\['Vinted', 'Leboncoin', 'eBay', 'Vestiaire'\]\.reduce\(/.test(extraire(APP, 'caBeneficeDuMois')), 'l’URSSAF déduite porte sur les mêmes plateformes que le bénéfice (Vestiaire compris)');
+  dit(/\['Vinted', 'Leboncoin', 'eBay', 'Vestiaire'\]\.reduce\(/.test(extraire(APP, 'caBeneficeDuMois')), 'le CA déclaré (« à déclarer ») couvre les mêmes plateformes que le bénéfice (Vestiaire compris)');
   if (!N.absent) dit(N.chiffreBrut({ n: 3, nCout: 2, brut: 40 }).partiel === true && N.chiffreBrut({ n: 3, nCout: 0, brut: 0 }).valeur === null && N.chiffreBrut({ n: 0, nCout: 0, brut: 0 }).valeur === 0,
     'brut : la couverture se dit, « — » sans aucun prix connu, 0 sans vente');
   if (!N.absent) dit(N.chiffreBenefice(null, 'encours').valeur === null && N.chiffreBenefice(null, 'encours').raison === 'encours' && N.chiffreBenefice(null).raison === 'publication',
