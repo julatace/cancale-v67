@@ -175,7 +175,11 @@ async function brancher(p){
    const sansNom=await p.locator('.vrm-app-shell button').evaluateAll(es=>es.filter(e=>{const r=e.getBoundingClientRect();return r.width&&r.height&&!e.getAttribute('aria-label')&&!e.getAttribute('title')&&!e.textContent.trim()&&!e.querySelector('img[alt]');}).length);
    check(sansNom===0,'boutons visibles nommés '+nom);
    const summary=p.locator('.vrm-platform-summary');
-   if(nom!=='Vinted' && await summary.count()===0){
+   // (2 nov., 22 h) Sur Ventes (maquette FusionVentes) le résumé replié n'est plus affiché : la carte
+   // sombre dit les chiffres — retiré à la demande de Julien, 2 nov. 22 h.
+   if(await summary.count()>0 && !(await summary.first().isVisible())){
+    check(await p.locator('[data-fu-carte], [data-ventes-kpi]').count()>0,'chiffres dits par la carte du mois '+nom);
+   } else if(nom!=='Vinted' && await summary.count()===0){
     // (17 oct.) Leboncoin/eBay : sur « Ventes », le résumé se tait — les trois cases le disent (§7).
     check(await p.locator('[data-ventes-kpi]').count()>0,'chiffres dits par les cases de Ventes '+nom);
    } else {

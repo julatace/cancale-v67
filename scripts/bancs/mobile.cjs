@@ -93,7 +93,7 @@ const menuEcrans=(p)=>p.locator('button.vrm-nav-more').first();
         check(!(await p.getByRole('button',{name:'7 jours',exact:true}).isVisible()),largeur+' périodes secondaires repliées');
         // (2 nov., 22 h) La période vit dans « Outils » (maquette FusionVentes) : on l'ouvre au doigt.
         {const o=p.locator('.vrm-outils-ventes button').first(); if(await o.count()){ await o.tap(); await p.waitForTimeout(300);} }
-        await p.getByRole('button',{name:'Toute la période',exact:true}).tap();
+        {const tp=p.getByRole('button',{name:'Toute la période',exact:true}); if(await tp.count()&&await tp.first().isVisible()) await tp.first().tap(); else await p.locator('[data-outils-recherche] .vrm-period button').first().tap();}
         await p.getByRole('button',{name:'7 jours',exact:true}).tap();
         check(await p.getByRole('button',{name:'7 derniers jours',exact:true}).isVisible(),largeur+' période secondaire sélectionnable');
       }

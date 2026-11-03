@@ -10,6 +10,11 @@ export const courtFusion = (j) => {
   const n = Number(j.n) || 0, s = n > 1 ? 's' : '';
   const t = String(j.title || '');
   const nums = (t.match(/N°[\w-]+/g) || []).slice(0, 3);
+  // (3 nov.) Une ligne de « À faire » tient sur une ligne au téléphone (banc journee-mieux B) :
+  // « Vérifier 1 colis coché « posté » » ⇒ « 1 dépôt à vérifier » ; « Déclarer l'URSSAF d'octobre »
+  // ⇒ « URSSAF d'octobre » (le geste « Noter » est à côté).
+  if (j.id === 'poste-sans-depart') return { court: `${n} dépôt${s} à vérifier`, detail: String(j.sub || '').split(' — ')[0] };
+  if (j.urssaf && /^Déclarer l'URSSAF /.test(String(j.court || ''))) return { court: String(j.court).replace(/^Déclarer l'/, ''), detail: j.detail || '' };
   if (j.id === 'numeros-en-double') return { court: `${n} numéro${s} en double`, detail: ((String(j.sub || '').match(/N°[\w-]+/g) || []).slice(0, 4)).join(', ') };
   if (j.id === 'double-vente') {
     if (/numéro/.test(t)) return { court: `${n} numéro${s} en double`, detail: nums.join(', ') };

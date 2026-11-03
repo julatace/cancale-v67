@@ -37,6 +37,8 @@ const dit = (c, m, d = '') => { if (c) { ok++; console.log('  ✅ ' + m); } else
     [{ id: 'a-faire-tag', n: 5, title: '5 paires à regarder pour eBay' }, '5 articles pour eBay', []],
     [{ id: 'emails-personne', title: '3 emails mis de côté que personne ne peut récupérer', sub: 'Déclare tes adresses dans Réglages' }, '3 e-mails à trier', []],
     [{ id: 'emballer', n: 2, title: 'Emballer les colis prêts', sub: '2 prêts — un par un : le N°, la photo, où est la paire' }, 'Emballer les colis prêts', ["l'article"]],
+    [{ id: 'poste-sans-depart', n: 1, title: 'Vérifier 1 colis coché « posté »', sub: "Vinted ne l'a pas vu partir — vérifie le dépôt" }, '1 dépôt à vérifier', ["Vinted ne l'a pas vu partir"]],
+    [{ id: 'a-faire-cash', n: 1, title: "Déclarer l'URSSAF d'octobre", court: "Déclarer l'URSSAF d'octobre", detail: 'Avant le 30 nov. · ≈ 14 € à payer', urssaf: { dueIso: '2026-11-30' } }, "URSSAF d'octobre", ['30 nov.']],
     [{ id: 'a-faire-info', n: 4, title: '4 paires sans numéro', sub: 'Pose un N° sur chaque paire' }, '4 articles sans numéro', ['chaque article']],
   ];
   for (const [j, attendu, garde] of cas) {

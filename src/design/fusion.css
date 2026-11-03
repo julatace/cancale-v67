@@ -626,7 +626,9 @@ html body .vrm-app-shell .vrm-main:has(.vrm-fu-ventes) .vrm-tache-tete h1, html 
   font: 800 34px/1.1 var(--vrm-police) !important; letter-spacing: -.03em !important; margin: 0 !important;
 }
 /* La barre de travail de Ventes : les filtres et « Outils » restent (des boutons) ; ni recherche ni période. */
-html body .vrm-app-shell .vrm-main:has(.vrm-fu-ventes) .vrm-sales-workbar > :not(.vrm-filtres-et-outils):not([class*="outils"]) { display: none !important; }
+html body .vrm-app-shell .vrm-main:has(.vrm-fu-ventes) .vrm-sales-workbar > :not(.vrm-filtres-et-outils):not([class*="outils"]):not(.vrm-menu-flottant):not(.vrm-menu-voile) { display: none !important; }
+/* (3 nov.) ⚠️ Au téléphone le menu « Outils » s’ouvre SOUS la barre (enfant direct de la barre) : il ne doit
+   jamais tomber sous la règle qui range la barre, sinon recherche et période sont introuvables (banc `mobile`). */
 .vrm-fu-ventes .vrm-fu-case[aria-pressed="true"] { background: rgba(255,255,255,.22); box-shadow: inset 0 0 0 1.5px rgba(255,255,255,.5); }
 
 /* ══ 14. COLIS = LA MAQUETTE FusionColis ══ */
