@@ -56,6 +56,10 @@ import VuesVentes from "./VuesVentes.jsx";
 import BordereauxAuto from "./BordereauxAuto.jsx";
 import {resumerStockJournee} from './stockJournee.js';
 import {jaugeSeuils,optionsMicro,calendrierUrssaf,phraseRythme,seuilsDe,declarationRevenus,rappelCfe} from './microEntreprise.js';
+import { moisAtteinte, dac7ParPlateforme } from './seuilsAnnee.js';
+import { previsionUrssaf } from './previsionUrssaf.js';
+import { annulationsParCompte } from './annulationsCompte.js';
+import { notesParCompte } from './notesRecues.js';
 import { toutSurLeNumero, lireNumeroCherche } from "./rechercheNumero.js";
 import { repriseNumerosRecreation, tableRecrees } from "./repriseNumero.js";
 import { etatCycle, cartesSupprimees, majVusEnLigne, indexPresentes, montantSaisi as montantCycle, CHOIX as CHOIX_CYCLE, LIBELLE_CHOIX } from "./cycleArticle.js";
@@ -37100,6 +37104,42 @@ function JaugeBarre({ pct, marques = [], etat, attr }) {
     </div>
   );
 }
+// ── DAC7 PAR PLATEFORME (3 nov.) ── `dac7ParPlateforme` (src/seuilsAnnee.js) sur
+// la ligne publiée : les MÊMES ventes que le CA déclaré (datées au versement,
+// comptes exclus retirés). Ton informatif (historique « 6 octobre ») : aucun
+// ambre, un seuil atteint se dit par le mot ; une plateforme pas lue ⇒ « — » ;
+// il manque des ventes ⇒ « au moins », jamais « sous ».
+function Dac7Plateformes({ ligne, annee }) {
+  const D = React.useMemo(() => dac7ParPlateforme({ ligne, annee }), [ligne, annee]);
+  if (!D || !D.plateformes.length) return null;
+  const eur = (c) => eurMicro(c / 100);
+  return (
+    <div data-dac7="" data-dac7-annee={annee} style={{ marginTop: 16, paddingTop: 12, borderTop: `1px solid ${C.border}` }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, fontSize: 13, marginBottom: 4 }}>
+        <span style={{ fontWeight: 600, color: C.text }}>DAC7</span>
+        <span style={{ color: C.muted }}>30 ventes ou plus de 2 000 €</span>
+      </div>
+      {D.plateformes.map((p) => {
+        const pct = p.etat !== 'lu' ? 0 : Math.min(100, Math.max(p.n / 30, p.centimes / 200000) * 100);
+        const droite = p.etat !== 'lu' ? '—'
+          : p.verdict === 'atteint' ? <b style={{ color: C.text }}>atteint</b>
+          : p.verdict === 'atteintSi' ? <>atteint si {p.nAd} à dater</>
+          : p.verdict === 'sous' ? <>encore {p.reste.n} vente{p.reste.n > 1 ? 's' : ''} ou {eur(p.reste.centimes)}</>
+          : <>au moins</>;
+        return (
+          <div key={p.plateforme} data-dac7-plateforme={p.plateforme} data-etat={p.etat} data-n={p.n == null ? '' : p.n} data-cts={p.centimes == null ? '' : p.centimes} data-verdict={p.verdict || ''} data-a-dater={p.nAd || ''} style={{ padding: '8px 0', borderTop: `1px solid ${C.border}` }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8, flexWrap: 'wrap', fontSize: 13 }}>
+              <span style={{ color: C.text, fontWeight: 600 }}>{p.plateforme}</span>
+              <span style={{ color: C.muted, fontVariantNumeric: 'tabular-nums' }}>{p.etat !== 'lu' ? '—' : <>{p.partiel ? 'au moins ' : ''}{p.n} vente{p.n > 1 ? 's' : ''} · {eur(p.centimes)}</>}</span>
+            </div>
+            {p.etat === 'lu' ? <div style={{ marginTop: 6 }}><JaugeBarre attr={{ 'data-dac7-jauge': p.plateforme }} pct={pct} etat="ok" /></div> : null}
+            <div style={{ fontSize: 13, color: C.muted, marginTop: 4 }}>{droite}</div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
 function MicroEntreprise({ taux, poserTaux, officiel, vlTaux, acreTaux }) {
   const freq = useFreqUrssaf();
   const [opts, optsPret] = useLigneSynchro('vrm_micro_options', lireOptionsMicro);
@@ -37248,11 +37288,27 @@ function MicroEntreprise({ taux, poserTaux, officiel, vlTaux, acreTaux }) {
             <JaugeBarre attr={{ 'data-micro-jauge': 'plafond' }} pct={j.plafond.pct} etat={j.plafond.etat} />
             <div data-micro-plafond-texte="" style={{ fontSize: 13, color: j.plafond.etat === 'ok' ? C.muted : C.text, marginTop: 6, lineHeight: 1.5 }}>{plafTxt}</div>
           </div>
-          {j.projection != null ? (
-            <div data-micro-projection-texte="" style={{ fontSize: 13, color: (j.projTva || j.projPlafond) ? C.text : C.muted, marginTop: 14, paddingTop: 10, borderTop: `1px solid ${C.border}`, lineHeight: 1.5 }}>
-              À ce rythme, tu finirais l'année vers <b>{eurRond(j.projection)}</b>{j.projPlafond ? <> : au-dessus du plafond de {eurRond(j.seuils.plafondVente)}.</> : j.projTva ? <> : au-dessus du seuil de TVA — anticipe ({eurRond(j.seuils.tvaBase)}).</> : '.'} Une estimation, pas une prévision.
-            </div>
-          ) : null}
+          {/* (3 nov.) « Vers quel mois » : projection LINÉAIRE sur les mois finis
+              (`moisAtteinte`, src/seuilsAnnee.js) — seulement si le total est complet
+              et porte au moins 2 mois finis ; sinon rien. Remplace « tu finirais
+              l'année vers X € » (jour par jour, mois en cours compris) : deux
+              estimations sur une carte se seraient contredites. */}
+          {(() => {
+            const at = [['tva', 'Seuil de TVA', j.seuils.tvaBase, j.tva.etat === 'ok' || j.tva.etat === 'proche'], ['plafond', 'Plafond', j.seuils.plafondVente, j.plafond.etat === 'ok' || j.plafond.etat === 'proche']]
+              .map(([k, lib, seuil, sous]) => ({ k, lib, r: sous ? moisAtteinte({ ligne, now, seuil }) : null }))
+              .filter((x) => x.r && x.r.mois != null);
+            return at.length ? (
+              <div data-micro-projection-texte="" style={{ marginTop: 14, paddingTop: 10, borderTop: `1px solid ${C.border}`, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                {at.map((x) => (
+                  <div key={x.k} data-micro-atteinte={x.k} data-mois={x.r.mois} data-base={x.r.base} style={{ display: 'flex', justifyContent: 'space-between', gap: 8, fontSize: 13 }}>
+                    <span style={{ color: C.muted }}>{x.lib} · au rythme actuel</span>
+                    <span style={{ color: C.text, fontWeight: 600 }}>vers {x.r.nom} <span style={{ color: C.muted, fontWeight: 400 }}>· estimation</span></span>
+                  </div>
+                ))}
+              </div>
+            ) : null;
+          })()}
+          <Dac7Plateformes ligne={ligne} annee={j.annee} />
           <Pourquoi label="D'où viennent ces seuils">Seuils {j.annee} de la vente de marchandises, vérifiés le {j.seuils.verifie} : franchise de TVA {eurRond(j.seuils.tvaBase)} (seuil majoré {eurRond(j.seuils.tvaMajore)}), plafond du régime micro {eurRond(j.seuils.plafondVente)}. Le chiffre est ce que tes plateformes t'ont versé dans l'année (toutes plateformes), hors comptes que tu as retirés.</Pourquoi>
         </div>
       </Card>
@@ -37455,8 +37511,18 @@ function CarteUrssafMois({ liveStats, onNav }) {
   // (`montantPeriodeUrssaf`, §11) : des ventes sans date de versement, ou une
   // ligne publiée avant la fin de la période ⇒ le montant est un MINIMUM (§5).
   const montantEcheance = montantPeriodeUrssaf(urssafDue, v, TAUX_URSSAF * 100);
-  const urssafPeriodCA = montantEcheance.ca;
-  const echeancePartiel = montantEcheance.partiel ? 1 : 0;
+  // (3 nov.) LA PRÉVISION de la prochaine échéance (`previsionUrssaf`,
+  // src/previsionUrssaf.js) : les MÊMES règles d'argent (passées en argument),
+  // plus — un rythme jamais choisi ⇒ « — » et le geste (jamais « trimestriel »
+  // deviné) ; un mois de la période déjà noté « déclaré » n'est pas recompté ;
+  // « au moins » + le nombre de ventes à dater. Registre pas encore lu ⇒ la
+  // lecture d'avant (`montantEcheance`), sans rien retirer.
+  const rythmeChoisi = (() => { const r = load('vinted_urssaf_freq', null); return r === 'mensuel' || r === 'trimestriel' ? r : null; })();
+  const prev = previsionUrssaf({ regime: 'micro', rythme: rythmeChoisi, now: new Date(), ligne: v, declare: registreDecl, taux: TAUX_URSSAF * 100,
+    regle: { nextUrssafDeadline, moisPeriodeUrssaf, montantPeriodeUrssaf, moisDeclare } });
+  const prevIci = (prev.etat === 'lu' || prev.etat === 'passu') && urssafDue && prev.label === urssafDue.label ? prev : null;
+  const urssafPeriodCA = prevIci ? prevIci.ca : montantEcheance.ca;
+  const echeancePartiel = (prevIci ? prevIci.partiel : montantEcheance.partiel) ? 1 : 0;
   const Mt = ({ v: x }) => <span style={{whiteSpace:'nowrap',fontVariantNumeric:'tabular-nums'}}>{fmt(x)}</span>;
   const sTitre = {fontSize:15,fontWeight:600,color:C.text,letterSpacing:-0.15};
   const sLib = {fontSize:13,color:C.muted,fontWeight:500};
@@ -37519,9 +37585,15 @@ function CarteUrssafMois({ liveStats, onNav }) {
         <div data-compta-echeance="">
           <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:10,flexWrap:'wrap'}}>
             <span className="vrm-compta-libelle" style={{flex:1,margin:0}}>Prochaine déclaration</span>
-            <span data-urssaf-rythme={urssafFreq} style={{fontSize:13,color:C.muted}}>{urssafFreq==='mensuel'?'chaque mois':'chaque trimestre'}</span>
+            {rythmeChoisi ? <span data-urssaf-rythme={urssafFreq} style={{fontSize:13,color:C.muted}}>{urssafFreq==='mensuel'?'chaque mois':'chaque trimestre'}</span> : null}
           </div>
-          {urssafDue ? (()=>{
+          {prev.etat === 'rythme' ? (
+            <div data-prevision-urssaf="rythme" style={{background:C.card2||C.bg,borderRadius:12,padding:'12px 14px',display:'flex',alignItems:'center',justifyContent:'space-between',gap:'8px 12px',flexWrap:'wrap'}}>
+              <span className="vrm-display" style={{fontSize:22,fontWeight:700,color:C.muted}}>—</span>
+              <Segmente label="Rythme de déclaration" value={null} onChange={(f) => save('vinted_urssaf_freq', f)}
+                options={[{ v: 'mensuel', l: 'Par mois', data: { 'data-prevision-rythme': 'mensuel' } }, { v: 'trimestriel', l: 'Par trimestre', data: { 'data-prevision-rythme': 'trimestriel' } }]} />
+            </div>
+          ) : urssafDue ? (()=>{
             // (22 oct.) « C'EST DÉCLARÉ » ICI, À CÔTÉ DU LIEN : le rappel envoie sur
             // cet écran, et le geste n'existait que dans Ventes → Outils → Rapport
             // comptable. Le bouton ouvre CE formulaire-là sur le mois à noter (un
@@ -37554,6 +37626,13 @@ function CarteUrssafMois({ liveStats, onNav }) {
                       <span style={{fontSize:15,fontWeight:700,color:C.text,letterSpacing:-0.2,whiteSpace:'nowrap'}}>{suivante.dueDate.toLocaleDateString('fr-FR',{day:'numeric',month:'long',year:'numeric'})}</span>
                       <span data-echeance-suivante-jours={suivante.daysLeft} style={{fontSize:13,fontWeight:600,whiteSpace:'nowrap'}}>dans {suivante.daysLeft} j</span>
                     </div>
+                    {prev.etat === 'lu' && prev.label === suivante.label ? (
+                      <div data-prevision-urssaf="lu" data-prevision-label={prev.label} data-prevision-ca={String(prev.ca)} data-prevision-apayer={String(prev.apayer)} data-prevision-partiel={prev.partiel ? '1' : ''} data-prevision-adater={prev.aDater || ''}
+                        style={{display:'flex',alignItems:'baseline',justifyContent:'space-between',gap:'2px 10px',flexWrap:'wrap',marginTop:6}}>
+                        <span>À payer ≈</span>
+                        <span style={{color:C.text,fontWeight:700,fontVariantNumeric:'tabular-nums'}}>{prev.partiel ? 'au moins ' : ''}<Mt v={prev.apayer}/>{prev.aDater > 0 ? <span style={{color:C.muted,fontWeight:400}}> · {prev.aDater} à dater</span> : null}</span>
+                      </div>
+                    ) : null}
                     <div style={{marginTop:4}}>Pour <b style={{color:C.text,fontWeight:600}}>{suivante.label}</b>{_startOfDay(new Date()) <= _startOfDay(suivante.periodEnd) ? (urssafFreq==='mensuel' ? <>, le mois en cours : ce qu'il faut mettre de côté est juste en dessous</> : <>, la période en cours</>) : null}.</div>
                   </>) : null}
                   <div style={{marginTop:suivante?6:0}}><span style={{textTransform:'capitalize'}}>{urssafDue.label}</span> : déclaration notée ✓</div>
@@ -37561,7 +37640,7 @@ function CarteUrssafMois({ liveStats, onNav }) {
               );
             }
             return (
-              <div style={{background:C.card2||C.bg,borderRadius:12,padding:'14px 14px 12px',border:(late||soon)?`1px solid ${col}55`:`1px solid transparent`}}>
+              <div data-prevision-urssaf={prevIci ? prevIci.etat : 'avant'} data-prevision-label={urssafDue.label} data-prevision-ca={prevIci && prevIci.ca != null ? String(prevIci.ca) : ''} data-prevision-partiel={prevIci && prevIci.partiel ? '1' : ''} style={{background:C.card2||C.bg,borderRadius:12,padding:'14px 14px 12px',border:(late||soon)?`1px solid ${col}55`:`1px solid transparent`}}>
                 <div style={{display:'flex',alignItems:'baseline',justifyContent:'space-between',gap:'2px 10px',flexWrap:'wrap'}}>
                   <span style={{fontSize:15,fontWeight:700,color:col,letterSpacing:-0.2,whiteSpace:'nowrap'}}>{urssafDue.dueDate.toLocaleDateString('fr-FR',{day:'numeric',month:'long',year:'numeric'})}</span>
                   <span style={{fontSize:13,fontWeight:600,color:(late||soon)?col:C.muted,whiteSpace:'nowrap'}}>{late?`en retard de ${-urssafDue.daysLeft} j`:urssafDue.daysLeft===0?"aujourd'hui !":`dans ${urssafDue.daysLeft} j`}</span>
@@ -37574,6 +37653,8 @@ function CarteUrssafMois({ liveStats, onNav }) {
                       sur le même écran (septembre : 0,00 € ici, 4 224,77 € là). */}
                   <span>À déclarer (argent reçu)</span><span data-echeance-ca={urssafPeriodCA==null?'':String(urssafPeriodCA)} data-echeance-de={urssafDue.periodStart.toISOString()} data-echeance-a={urssafDue.periodEnd.toISOString()} data-echeance-partiel={echeancePartiel||undefined} style={{color:urssafPeriodCA==null?C.muted:C.text,fontWeight:500,textAlign:'right'}}>{urssafPeriodCA==null?'—':<>{echeancePartiel>0?'au moins ':''}<Mt v={urssafPeriodCA}/></>}</span>
                   <span>À payer ≈</span><span data-echeance-apayer={urssafPeriodCA==null?'':String(aPayerUrssaf(urssafPeriodCA, TAUX_URSSAF*100))} style={{color:urssafPeriodCA==null?C.muted:C.text,fontWeight:700,textAlign:'right'}}>{urssafPeriodCA==null?'—':<>{echeancePartiel>0?'au moins ':''}<Mt v={aPayerUrssaf(urssafPeriodCA, TAUX_URSSAF*100)}/></>}</span>
+                  {prevIci && prevIci.aDater > 0 ? <><span>À dater</span><span data-prevision-adater={prevIci.aDater} style={{color:C.text,textAlign:'right'}}>{prevIci.aDater} vente{prevIci.aDater>1?'s':''}</span></> : null}
+                  {prevIci && prevIci.declares.length > 0 ? <><span>Déjà déclaré</span><span data-prevision-declares={prevIci.declares.join(',')} style={{color:C.muted,textAlign:'right'}}>{prevIci.declares.map(ym=>new Date(Number(ym.slice(0,4)),Number(ym.slice(5,7))-1,1).toLocaleDateString('fr-FR',{month:'long'})).join(', ')}</span></> : null}
                 </div>
                 {(
                 <div style={{display:'flex',alignItems:'center',gap:'6px 12px',flexWrap:'wrap',marginTop:12}}>
