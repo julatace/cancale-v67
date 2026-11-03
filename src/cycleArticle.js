@@ -91,20 +91,21 @@ export function etatCycle(id0, x) {
   if (dec && dec.choix === CHOIX.VENDU_MAIN) return { etat: 'vendue', preuve: 'main-propre' };
   if (dec && dec.choix === CHOIX.SEPARE) return { etat: 'sortie', preuve: 'separe' };
   if (typeof o.declaree === 'function' && o.declaree(id)) return { etat: 'sortie', preuve: 'declaree' };
-  // 2. Ce que la lecture de SON compte dit de CETTE annonce.
   const lec = estMap(o.lectures) ? o.lectures.get(uid) : null;
-  if (lec) {
-    if (estSet(lec.enLigne) && lec.enLigne.has(id)) return { etat: 'en-ligne' };
-    if (estSet(lec.masquees) && lec.masquees.has(id)) return { etat: 'masquee' };
-    if (estSet(lec.aConfirmer) && lec.aConfirmer.has(id)) return { etat: 'a-confirmer' };
-  }
-  // 3. Une vente PROUVÉE (n'importe quel site, par identité) ou marquée à la main.
+  // 2. Une vente PROUVÉE (n'importe quel site, par identité) ou marquée à la main —
+  //    AVANT « en ligne » : Vinted ne ferme pas toujours une annonce vendue.
   if (o.ventes === null) return { etat: 'pas-su', preuve: 'ventes' };
   const v = o.ventes || {};
   if (estSet(v.ids) && v.ids.has(id)) return { etat: 'vendue', preuve: 'transaction' };
   if (lec && estSet(lec.venduesDressing) && lec.venduesDressing.has(id)) return { etat: 'vendue', preuve: 'dressing' };
   if (estSet(o.vendusMain) && o.vendusMain.has(id)) return { etat: 'vendue', preuve: 'a-la-main' };
   if (estSet(v.nums) && v.nums.has(k)) return { etat: 'vendue', preuve: 'numero' };
+  // 3. Ce que la lecture de SON compte dit de CETTE annonce.
+  if (lec) {
+    if (estSet(lec.enLigne) && lec.enLigne.has(id)) return { etat: 'en-ligne' };
+    if (estSet(lec.masquees) && lec.masquees.has(id)) return { etat: 'masquee' };
+    if (estSet(lec.aConfirmer) && lec.aConfirmer.has(id)) return { etat: 'a-confirmer' };
+  }
   // 4. Le même article, présent sous une AUTRE annonce (republié) : le N° suit.
   const p = o.presentes || {};
   const autre = (s) => estSet(s) && [...s].some((x) => String(x) !== id);
