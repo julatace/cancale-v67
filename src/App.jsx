@@ -38066,7 +38066,7 @@ function BeneficeCompta({ compta, onNav, onSansDepenses, onAjouterDepense, sansC
               chiffre, UNE ligne courte (le vendu, le manque nommé et son geste), trois cases. */}
           <div className="vrm-compta-libelle" data-benef-titre="" title={`${titreNet} · ${B.libelle}`}>Ce que tu as gagné</div>
           {/* (3 nov.) « Bénéfice » = UNE règle sur tous les écrans (src/beneficeNoms.js, fusionnée de main). */}
-          {(() => { const cb = chiffreBenefice(B, etat); return <div className="vrm-compta-hero vrm-display" data-compta-chiffre="gagne" data-eur={e2(cb.valeur)} {...cb.attrs} style={{ color: cb.valeur == null ? C.muted : C.text }}>{cb.valeur == null ? '—' : fmt(cb.valeur)}</div>; })()}
+          <div className="vrm-compta-hero vrm-display" data-compta-chiffre="gagne" data-eur={e2(chiffreBenefice(B, etat).valeur)} {...chiffreBenefice(B, etat).attrs} style={{ color: chiffreBenefice(B, etat).valeur == null ? C.muted : C.text }}>{chiffreBenefice(B, etat).valeur == null ? '—' : fmt(chiffreBenefice(B, etat).valeur)}</div>
           <p className="vrm-compta-phrase vrm-fu-compta-sous" data-compta-phrase="gagne" title={typeof phrase === 'string' ? phrase : undefined}>
             {/* Le vendu n'est pas redit s'il vaut déjà « à déclarer » (§7 : un nombre, une fois). */}
             {B.n === 0 ? 'Aucune vente finalisée ce mois-ci' : (B.caDecl != null && Math.round(B.caDecl * 100) === Math.round(B.ca * 100)) ? B.libelle : <>sur {fmt(B.ca)} vendus</>}
