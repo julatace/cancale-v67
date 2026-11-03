@@ -133,6 +133,7 @@ async function controles(racine, silencieux) {
   let prochainLibre = null;
   try { const x = /const prochainLibre = \(prisInt, prisCles, pref\) => \{[\s\S]*?\n\};/.exec(APP); prochainLibre = x ? new Function(x[0] + '\nreturn prochainLibre;')() : null; } catch (_) { prochainLibre = null; }
   dit(typeof prochainLibre === 'function', 'D0 · le VRAI `prochainLibre` extrait d\'App.jsx');
+  const fichesH0 = { ...fiches['9027'], buyPrice: '30', buyFromId: '440027' };
   const source = { ...D.champsSource ? D.champsSource(fiches['9027'], { brand: 'Nike', etat: 'Très bon état', desc: 'Portée 2 fois', title: TITRE, size: '42', price: '60' }) : {} };
   const dup = (pris, pref = '') => D.dupliquerFiche(source, { pris, pref, prochainLibre, cleNum, id: 'n1', maintenant: '2026-11-03T10:00:00.000Z' });
   await essai('D1 · le N° neuf vient après le PLUS HAUT servi (jamais un trou, jamais un ancien)', () => {
@@ -152,6 +153,14 @@ async function controles(racine, silencieux) {
     const etrangers = Object.keys(r.fiche).filter((k) => !permis.has(k));
     const txt = JSON.stringify(r.fiche);
     return (!etrangers.length && r.fiche.photos.length === 0 && !/9027|pk27|x\/27\.jpg|"111"|"55"/.test(txt) && r.fiche.numero !== '27') || { etrangers, txt };
+  });
+  await essai('D4b · même nourrie d\'une fiche brute (identifiant, photo, compte, achat), la copie ne garde que la liste blanche', () => {
+    const r = D.dupliquerFiche({ ...fichesH0, titre: TITRE, id: '9027', item_id: '9027', transaction_id: '880001', sku: 'VRM-27' }, { pris: { int: new Set([50]), cles: new Set(['50']) }, prochainLibre, cleNum, id: 'n2' });
+    const txt = JSON.stringify(r.fiche);
+    return (!/9027|pk27|x\/27\.jpg|"111"|880001|VRM-27|"min"|buyPrice/.test(txt) && r.fiche.id === 'n2') || txt;
+  });
+  await essai('D7 · un `prochainLibre` qui rendrait un N° déjà servi ⇒ refus (aucune fiche)', () => {
+    try { D.dupliquerFiche(source, { pris: { int: new Set([3]), cles: new Set(['3']) }, prochainLibre: () => '3', cleNum, id: 'n3' }); return 'accepté'; } catch (e) { return /servi/.test(e.message) || e.message; }
   });
   await essai('D5 · mêmes champs : titre, marque, taille, état, description, prix', () => {
     const r = dup({ int: new Set([50]), cles: new Set(['50']) }).fiche;
@@ -271,8 +280,9 @@ const MUTATIONS = [
   ['P : prix illisible accepté', 'src/prixPartout.js', "if (!/^\\d{1,5}(?:\\.\\d{1,2})?$/.test(s)) return null;", ''],
   ['P : source pas lue = pas en ligne', 'src/prixPartout.js', "if (lbcItems == null) manques.push('Leboncoin');\n  else", 'if (lbcItems)'],
   ['P : journal note les refus', 'src/prixPartout.js', "res[s.cle].etat === 'fait' && !res[s.cle].inchange", 'res[s.cle]'],
-  ['D : comble les trous', 'src/dupliquerFiche.js', "if (!numero || avant.has(cleNum(numero))) throw new Error('numéro déjà servi');", ''],
-  ['D : copie la photo', 'src/dupliquerFiche.js', "const fiche = { id: String(id), numero, creeAt: maintenant, photos: [] };", "const fiche = { id: String(id), numero, creeAt: maintenant, photos: [], ...src };"],
+  ['D : garde du N° servi retirée', 'src/dupliquerFiche.js', "if (!numero || avant.has(cleNum(numero))) throw new Error('numéro déjà servi');", ''],
+  ['D : liste blanche retirée (tout est copié)', 'src/dupliquerFiche.js', "for (const k of CHAMPS_DUPLIQUES) fiche[k] = k === 'prix' ? prixDe(src[k]) : str(src[k]);", "Object.assign(fiche, src, { id: String(id), numero, photos: [] });"],
+  ['D : prochainLibre comble les trous (App.jsx)', 'src/App.jsx', 'for (const x of prisInt) { const n = Number(x); if (Number.isFinite(n) && n >= c) c = n + 1; }', 'while (prisInt.has(c)) c++;'],
   ['H : offres d\'un autre article', 'src/histoireArticle.js', "d.offres.filter((x) => x && idsSet.has(str(x.item)) && Number.isFinite(Number(x.prix)))", 'd.offres.filter((x) => x && Number.isFinite(Number(x.prix)))'],
   ['H : offres pas lues = aucune', 'src/histoireArticle.js', "if (d.offres == null) pose('offres', 'passu', 'Offres', [], 'conversations pas lues');\n  else {", '{ d.offres = d.offres || [];'],
   ['H : date de mise en ligne inventée', 'src/histoireArticle.js', "else ev.push({ at: null, texte: 'Sur Vinted'", "else ev.push({ at: new Date().toISOString(), texte: 'Sur Vinted'"],
