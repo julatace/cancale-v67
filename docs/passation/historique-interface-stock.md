@@ -2999,3 +2999,61 @@ horrible ». Les quatre écrans suivent maintenant les maquettes (valeurs relev�
 - Phrases d'écran retirées pour journee/ventes/colis (`src/phrasesEcran.js`).
 - Bancs mis à jour (note « retiré à la demande de Julien, 2 nov. 22 h ») : `compta-claire`,
   `demo-bulles`, `design-fusion`.
+
+### 2-3 nov. — Revue du coordinateur, cas extrêmes, Ma journée sur ordinateur (`claude/design-fusion`)
+
+**Revue (6 points)** : aucune fonction perdue — recherche et période dans le menu
+« Outils » de Ventes ; Factures dans « Documents et réglages » ; « Déclaration URSSAF »
+en lien sur l'encart de Compta ; sur chaque carte Colis, « … » ouvre « Marquer imprimé /
+Suivre / Colis fait » ; « … » de l'en-tête Colis ouvre Emballer, Tout générer, imprimante.
+Relier / Poser N° en pilule seulement quand il le faut. Ventes « à expédier » : puce
+transporteur + Imprimer (ou Générer) sur une rangée, « Déposé » après ; titre court + taille
+sur la ligne N°/site. « Vendus ailleurs » en carte À faire.
+
+**Publications vérifiées** (retrait de la grille de Ma journée, `JOURNEE_AVEC_WIDGETS =
+false`) : `vrm_benefice_jours` et `vinted_urssaf_mois` sont écrites par les effets de
+Comptabilité, `widget_stats` par la coque — aucune ne vivait dans la grille.
+
+**Bancs Ma journée réalignés** (journee-chiffres, benefice-journee, chiffres-croises,
+journee-mieux, vendu-recu, journee-premium, journee-widgets, demo-bulles) : l'affichage
+retiré est noté « retiré à la demande de Julien, 2 nov. 22 h » ; les CHIFFRES restent jugés
+(vendu du jour sur la tête, vendu du mois sur la carte de Ventes, bénéfice = Comptabilité,
+reçu et cotisations sur Compta).
+⚠️ `chiffres-croises` garde UN rouge, **déjà rouge sur `main`** (mesuré sur
+`git archive origin/main`, banc de main) : Statistiques (`data-dash-stat="caMois"`) ne pose
+pas de montant dans ce jeu de données (`liveStatsVus.caMois` = null) alors que Ventes et
+Comptabilité disent 228,30 €. Hors du chantier de style — à regarder à part.
+
+**Cas extrêmes** (Julien, 3 nov. : « tout doit être parfait, regarde tous les cas de figure
+du monde ») : `design-fusion` prend `FUSION_JEU` = base · vide (0 vente) · une · deux-cents
+· longs (titres de 120 caractères) · gros (montants à 5 chiffres) · passu (ventes,
+transactions et bordereaux en 503). Sur chaque jeu, 4 écrans × 390/1512 × clair/sombre :
+pas de débordement, gestes 44 px, jamais « encaissé », pas de violet, **aucun montant
+rogné**, et en « passu » aucune carte ne dit « 0 € ». Corrigé en route :
+- « 35 211,9… » sur la carte du mois : `CarteMois` réduit la taille du grand chiffre pixel
+  par pixel jusqu'à ce qu'il tienne (plancher 22 px), mesuré, recalculé au redimensionnement ;
+- « Vérifications » sous la liste des ventes (4 composants, 3 retraits, 3 hauteurs de
+  chevron) : une liste groupée façon Réglages ; « 1 comptes » → « 1 compte » ;
+- « Outils » de Ventes : la pilule des filtres voisins (était un carré gris décalé) ;
+- bénéfice du mois sur une partie des ventes : plus de « ≥ » (une vente au prix d'achat
+  inconnu peut être à perte, ce n'est pas un plancher) — « Bénéfice brut du mois » et la
+  couverture « · 1 sur 3 » à côté ;
+- sombre : la page était #0e0e0d entourée de bandes #000 (règle Vitrine plus forte) — un
+  seul fond.
+
+**Ma journée sur ordinateur** (Julien, 3 nov. 07 h 47, capture : « j'aime pas trop cet
+endroit » — ligne coupée sous la barre collée, bloc Urgent + 4 tuiles vides + longue liste,
+« paires », jargon) : la maquette FusionJournee à 720 px, centrée ; pas de bloc Urgent ni
+de tuiles (l'urgent = pastille ambre dans la liste) ; mots courts par
+`src/design/tacheCourte.js` (« 2 annonces à retirer de Leboncoin · N°18, N°23 · vendus sur
+Vinted », « Vente Vestiaire à envoyer », « 5 articles pour eBay », « 3 e-mails à trier »,
+« paire(s) » → « article(s) ») — la phrase entière reste dans l'infobulle et le nom du
+bouton, aucun compteur ni cible ne change (`scripts/audit-journee-court.cjs`, 47 contrôles,
+rouge sur main et par mutation). La barre de recherche collée prend le fond de la page,
+voilée et floutée, avec un filet : le texte qui défile dessous n'est plus tranché sur une
+bande blanche (partout sur ordinateur). Banc : `design-fusion` vérifie à 1512 clair et
+sombre une colonne ≤ 760 px centrée, aucune tuile ni bloc Urgent, jamais « paire », la
+barre au fond de la page.
+⚠️ Le jeu du banc ne fabrique pas encore les sources de la capture de Julien (Leboncoin à
+retirer, Vestiaire, agent eBay, e-mails mis de côté) : la forme courte est prouvée par
+l'audit, la mise en page par le banc avec les gestes du jeu de base.
