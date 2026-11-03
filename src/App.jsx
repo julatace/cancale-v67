@@ -2406,8 +2406,8 @@ function ConfirmHost() {
         <div className="vrm-verif-liste" style={{marginTop:12,display:'flex',flexDirection:'column',borderTop:`1px solid ${C.border}`}}>
           {(q.lignes || []).map((l, i) => (
             <div key={i} data-verif-probleme={l.code} data-verif-qui={l.qui || undefined} style={{padding:'10px 0',borderBottom:`1px solid ${C.border}`,display:'flex',flexDirection:'column',gap:2}}>
-              <span style={{fontSize:14,fontWeight:600,color:C.text,lineHeight:1.35}}>{l.qui ? <span style={{color:C.muted,fontWeight:600}}>{l.qui} · </span> : null}{l.texte}</span>
-              <span style={{fontSize:12.5,color:C.muted,lineHeight:1.4}}>{l.geste}</span>
+              <span style={{fontSize:15,fontWeight:600,color:C.text,lineHeight:1.35}}>{l.qui ? <span style={{color:C.muted,fontWeight:600}}>{l.qui} · </span> : null}{l.texte}</span>
+              <span style={{fontSize:13,color:C.muted,lineHeight:1.4}}>{l.geste}</span>
             </div>
           ))}
         </div>
