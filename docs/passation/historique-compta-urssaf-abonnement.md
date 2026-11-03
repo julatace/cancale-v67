@@ -1859,3 +1859,9 @@ Sur le jeu de l'audit, origin/main affiche « Ma journée 66,40 € · Statistiq
 colonne « Bénéfice » par vente de l'écran Ventes est vente − achat − frais (une autre granularité). À
 trancher avec Julien. La branche `claude/design-fusion` réécrit les mêmes lignes de Ma journée et de
 Comptabilité (« Bénéfice brut du mois » sous la même case) : à la fusion, garder `chiffreBenefice`.
+- Tournée des bancs liés (build de cette branche) : `benefice-journee` 62/62, `stats-compta` 58/58,
+  `compta-claire` 98/98, `stats-vitrine` 112/112, `emails-stats-clairs` 53/53, `benefice-brut-net` vert (il
+  lisait une rangée vide — 4 rouges aussi sur origin/main : « Chiffres de la plateforme » replié au téléphone,
+  première `.vrm-summary-strip` qui n'était pas celle du bénéfice ; réparé). `chiffres-croises` : 1 rouge
+  (« VENDU du mois » de Statistiques lu sur `[data-dash-stat="caMois"]`, absent depuis la refonte de
+  Statistiques) — **le même rouge sur origin/main**, sans lien avec le bénéfice, laissé à part.
