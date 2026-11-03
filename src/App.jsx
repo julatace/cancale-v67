@@ -117,6 +117,7 @@ import { noterTicketDiscord, ecouterDiscord, suivreCodeDiscord, etatCodeDiscord,
 import { DESCRIPTION_ORGANISATION } from "./operations/description.js";
 // (31 oct.) Colis → « À retirer » : la carte des points relais (règle pure + carte).
 import { regrouperRelais, pointsARetirer, lieuCompleteParTransporteur } from "./relaisColis.js";
+import { lieuxRelusDansTextes } from "./lieuxRetrait.js";
 import CarteRelaisColis, { ColonneRetirer } from "./CarteRelais.jsx";
 import PastilleTransporteur, { LogoTransporteur } from "./PastilleTransporteur.jsx";
 import { transporteurDuColis, cleStatTransporteur, cleTransporteur } from "./transporteursVisuels.js";
@@ -4480,8 +4481,12 @@ const fetchEmailTrackingBrut = async () => {
     // (23 oct.) + le n° de suivi écrit dans le SUJET après « # » (Vinted Go :
     // « Ton colis arrive aujourd'hui ! #… ») pour une ligne qui n'en porte pas —
     // une IDENTITÉ, jamais un statut changé (api/_lib/suivi-colis.js, §11).
-    return rows.map(r => avecSuiviDuSujet(reclassifyTrack(r.data))).filter(Boolean)
+    const liste = rows.map(r => avecSuiviDuSujet(reclassifyTrack(r.data))).filter(Boolean)
       .sort((a, b) => new Date(b.receivedAt || 0) - new Date(a.receivedAt || 0));
+    // (2 nov., 23 h) Un colis au point relais dont le lieu rangé n'a pas d'adresse
+    // (locker d'une autre ville) : relu dans le texte gardé de SON e-mail, même règle
+    // que le serveur (src/lieuxRetrait.js). Lecture ratée ⇒ la liste telle quelle.
+    return await lieuxRelusDansTextes(liste, async (q) => { const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?${q}`, { headers: sbAuth() }); if (!r.ok) throw new Error('lecture'); return r.json(); });
   } catch (_) { return null; }
 };
 const fetchEmailTracking = async (opts = {}) => {

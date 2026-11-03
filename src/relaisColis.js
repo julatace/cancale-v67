@@ -71,12 +71,18 @@ export function nomRelaisPropre(nom, ville = '') {
 // et le résultat n'est gardé que si SA ville termine le texte et SON adresse en
 // est tout le début, mot pour mot (`jugerBan`, mode `texte`) — sinon rien, dit.
 const RUE = /^\d{1,4}\s*(?:bis|ter)?[\s,]+\S{2,}/i;
+// (2 nov., 23 h) Une VOIE sans numéro (« Rue de la Bretonnière », le locker d'un
+// supermarché) est une adresse cherchable AVEC son code postal seulement : la Base
+// Adresse rend alors la rue (type `street`) et `jugerBan` exige le même code postal.
+// Sans code postal, une rue sans numéro reste trop vague : rien.
+const VOIE_SANS_NUMERO = /^(?:rue|avenue|av\.?|boulevard|bd|place|quai|chemin|all[ée]e|route|impasse|cours|square|faubourg|passage|esplanade|promenade|rond-point|r[ée]sidence|zac|za|zi|zone|parc|lotissement|lieu[- ]dit|centre\s+commercial)\s+\S{2,}/i;
+export const rueCherchable = (rue, cp) => { const r = String(rue || '').trim(); return RUE.test(r) || (/^\d{5}$/.test(String(cp || '')) && VOIE_SANS_NUMERO.test(r)); };
 // Un nom suivi de « <numéro> <type de voie> … » : l'adresse collée au nom.
 const ADRESSE_DANS_NOM = /^(.*?[A-Za-zÀ-ÿ].*?)[\s,]+(\d{1,4}\s*(?:bis|ter)?[\s,]+(?:rue|avenue|av\.?|boulevard|bd|place|pl\.?|quai|chemin|all[ée]e|route|impasse|cours|square|faubourg|passage|esplanade|promenade|rond-point|r[ée]sidence|zac|za|zi)\b.*)$/i;
 export function adresseGeocodable(p) {
   if (!p) return null;
   const rue = String(p.rue || '').trim(), cp = String(p.cp || '').trim(), ville = String(p.ville || '').trim();
-  if (!RUE.test(rue)) return null;
+  if (!rueCherchable(rue, cp)) return null;
   if (!/^\d{5}$/.test(cp) && ville.length < 2) return rue.split(/\s+/).length >= 4 && !rue.includes(',') ? rue.replace(/\s+/g, ' ') : null;
   return `${rue}, ${[cp, ville].filter(Boolean).join(' ')}`.replace(/\s+/g, ' ').trim();
 }
@@ -141,7 +147,7 @@ export function regrouperRelais({ arrives = [], attendus = [] } = {}) {
     }
     const cp = /^\d{5}$/.test(String(morceaux.cp || '')) ? String(morceaux.cp) : '';
     const rueLue = String(morceaux.rue || '').trim();
-    const rueOk = RUE.test(rueLue) ? rueLue : '';
+    const rueOk = rueCherchable(rueLue, cp) ? rueLue : '';
     const nom = nomRelaisPropre(nomLu, morceaux.ville);
     // L'identité d'un LIEU : son nom propre + son code postal ; sans nom, sa rue
     // + son code postal (une adresse est un endroit) ; sans rien, « pas connu ».

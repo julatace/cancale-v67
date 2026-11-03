@@ -2668,3 +2668,45 @@ des ventes disent « Transporteur pas lu ». (2) eBay : le transporteur n'est co
 (rien n'est affiché avant). (3) Les lignes Vestiaire (ventes) : brancher `PastilleTransporteur` +
 `transporteurDuColis({ declare: v.transporteur, suivi: v.suivi })` (autre session). (4) Les stats par
 transporteur : lire `cleStatTransporteur` (ou `data-transporteur`), jamais une autre règle.
+
+
+### « Un colis arrivé dans une autre ville, je veux qu'il soit affiché » (2–3 nov., 23 h)
+Julien (2 nov., 23 h 04) : « j'ai un colis arrivé à Cancale, je veux qu'il soit affiché même s'il
+n'est pas dans la même ville, trouve une solution » ; (23 h 09) « tout doit être parfait, regarde
+tous les cas de figure ».
+**Mesuré sur sa base (lecture seule)** : sa ville réglée (`vrm_ville`) est Vannes ; ses autres colis
+attendent à Vannes. **Aucun filtre par ville, par distance ni par rayon** n'existe dans Colis →
+À retirer, Ma journée ou le widget (`vrm_ville` n'est plus lu nulle part pour filtrer) ; le colis
+était COMPTÉ (`vrm_colis_retirer.total` = 5, son n° dedans) et listé — mais sous un point « Super U »
+SANS adresse, jamais sur la carte (« le message ne donne pas l'adresse du point »), la carte se
+cadrant sur les seuls points placés, à Vannes. Cause : **depuis fin octobre, les e-mails Mondial
+Relay écrivent une LIGNE VIDE entre chaque ligne** (« POINT RELAIS ® / <nom> / <rue> / <CP Ville> »,
+mesuré sur les 4 derniers : le locker de l'autre ville ET les relais de Vannes). La lecture du lieu
+sous son en-tête (`api/email-inbound.js`) s'arrêtait à la ligne vide après le nom : le lieu rangé
+n'était que le nom (« LOCKER 24/7 <ENSEIGNE> »). Et la rue du locker n'a PAS de numéro
+(« Rue de … ») : même lue, elle n'était pas une adresse cherchable (`RUE` exige un numéro).
+Le suivi lu chez Mondial Relay ne donne pas le lieu (lieuNom/Rue/Cp/Ville vides).
+**Correctif** :
+- `lieuSousEnTete` (api/_lib/retrait-colis.js, une règle pour le serveur ET l'app, §11) : sortie
+  telle quelle d'`email-inbound`, une ligne vide est franchie tant que la ligne « CP Ville » arrive
+  dans les lignes suivantes (5 morceaux au plus, rien du pied d'e-mail avant elle).
+- Les lignes DÉJÀ rangées : `src/lieuxRetrait.js` relit, pour un colis au point relais dont le lieu
+  n'a pas de code postal, le texte gardé de SON e-mail — par identité : `email_reception_{clé}`
+  `resume.s` = son n° de suivi → `email_texte_{clé}` (projection, ≤ 40 colis). Un seul lieu lu, qui
+  COMMENCE par le lieu rangé ⇒ il le complète ; sinon rien (lecture ratée ⇒ liste telle quelle).
+- `rueCherchable` (src/relaisColis.js) : une voie SANS numéro (« Rue de … », « Avenue … ») est une
+  adresse AVEC son code postal seulement (la Base Adresse rend la rue, `jugerBan` exige le même CP).
+- La carte se cadrait déjà sur tous les points placés (`fitBounds`) : le cadre est maintenant porté
+  en `data-relais-cadre` (et `data-relais-pas-carte` sur chaque point) pour qu'un banc le juge.
+**Preuve** : banc NOUVEAU `scripts/bancs/retrait-autre-ville.cjs` (390 tactile, 1512), formes
+mesurées, valeurs inventées : ville réglée, AUTRE ville d'un autre département (lieu rangé sans
+adresse + e-mail gardé), rue sans numéro, deux relais du même nom dans deux villes, lieu non
+géocodable, colis sans lieu, colis retiré, deux comptes ; puis 0 colis et 30 colis dans 30 villes.
+Exige chaque code une fois, colonne = `vrm_colis_retirer`, les 5 points à adresse sur la carte, le
+cadre = l'étendue de tous. 8 rouges sur origin/main d659423e ; mutations : relecture coupée ⇒ 5,
+voie sans numéro refusée ⇒ 7, ligne vide non franchie ⇒ 5.
+**Reste / non touché** : (1) le vieil effet d'Achats qui géocode les points par leur NOM seul et les
+range dans `vrm_points_relais` (« auto ») pose des positions fausses (un « Taba'Vap » en Savoie) ;
+cette liste n'est plus rendue nulle part — à retirer un jour (code mort qui appelle le réseau).
+(2) Un lieu SANS code postal rejoint encore le SEUL autre point du même nom (`regrouperRelais`),
+même dans une autre ville ; avec l'adresse relue, le cas mesuré n'y passe plus.
