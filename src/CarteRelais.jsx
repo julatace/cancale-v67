@@ -305,10 +305,12 @@ function LigneRetraitF({ x, Photo, gestes, detail, echeance, statut, retirer }) 
   const aCode = !!(x.code || x.qr || x.code2);
   const attrs = { 'data-cc-carte': x.cle, 'data-cc-dans': 'retirer', 'data-site': x.site || 'vinted', 'data-ambre': x.ambre ? '1' : undefined, 'data-a-verifier': x.aVerifier ? '1' : undefined, 'data-hors-compte': x.horsCompte ? '1' : undefined, 'data-sans-lieu': x.sansLieu ? '1' : undefined, 'data-colis-ident': x.cle, 'data-en-verification-tx': String(x.cle || '').startsWith('r:c:') ? String(x.cle).slice(4) : undefined,
     'data-a-verifier-raison': x.horsCompte && x.raisonCode ? x.raisonCode : undefined, 'data-a-verifier-code': x.horsCompte ? (x.encoreCode || x.code || x.qr ? 'oui' : 'non') : undefined,
-    'data-transporteur': x.transp ? cleStatTransporteur(x.transp) : undefined, 'data-code-retrait': x.code || '' };
+    'data-transporteur': x.transp ? cleStatTransporteur(x.transp) : undefined };
   const basculer = () => setOuvert((o) => !o);
   return (
     <div className="vrm-rpf-ligne" {...attrs} data-ouvert={ouvert ? '1' : undefined}>
+      {/* Le code de CE colis, lisible par les autres écrans et les bancs (`data-code-retrait`) ; affiché au toucher. */}
+      {x.code ? <span hidden data-code-retrait={x.code}/> : null}
       <div className="vrm-rpf-rang" role="button" tabIndex={0} aria-expanded={ouvert} onClick={basculer} onKeyDown={(ev) => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); basculer(); } }}>
         <span className={'vrm-rpf-vignette' + (ph ? '' : ' is-sans')} aria-hidden="true" data-sans-photo={ph ? undefined : ''}>
           {ph || <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" strokeLinecap="round"><path d="M3.5 7.5 12 3l8.5 4.5v9L12 21l-8.5-4.5z"/><path d="M3.5 7.5 12 12l8.5-4.5M12 12v9"/></svg>}
@@ -326,7 +328,7 @@ function LigneRetraitF({ x, Photo, gestes, detail, echeance, statut, retirer }) 
       </div>
       {ouvert ? <div className="vrm-rpf-detail" data-rp-detail="">
         {detail ? <div className="vrm-rpf-detail-txt">{detail(x)}</div> : null}
-        {gestes ? <div className="vrm-rp-gestes" data-code-retrait={x.code || ''}>{gestes(x)}</div> : null}
+        {gestes ? <div className="vrm-rp-gestes">{gestes(x)}</div> : null}
       </div> : null}
     </div>
   );
