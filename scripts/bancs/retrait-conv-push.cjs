@@ -105,7 +105,7 @@ const JETON = 'aaa.bbb.ccc';
     base.set(`${OWNER}|push_subs`, { subs: [{ endpoint: 'https://web.push.apple.com/iphone' }] });
     if (prefs) base.set(`${OWNER}|push_prefs`, prefs);
   };
-  const relais = () => pushes.filter((p) => /point de retrait|à retirer/i.test(`${p.title} ${p.body}`));
+  const relais = () => pushes.filter((p) => /point de retrait|à retirer|t'attend/i.test(`${p.title} ${p.body}`));
 
   console.log('── A. L’extension range un code neuf : « 📍 Colis à retirer », une fois');
   await essaie('A', async () => {
@@ -115,7 +115,7 @@ const JETON = 'aaa.bbb.ccc';
     const p = relais()[0] || {};
     console.log(`     sur le téléphone : « ${p.title} » / « ${p.body} »`);
     dit(r.code === 200, 'la route répond 200', `HTTP ${r.code} ${JSON.stringify(r.corps)}`);
-    dit(relais().length === 1 && /Colis à retirer/.test(p.title || ''), 'une notification « 📍 Colis à retirer »', `${relais().length}`);
+    dit(relais().length === 1 && /^📍 .+ t'attend$/.test(p.title || ''), 'une notification « 📍 … t’attend » (3 nov.)', `${relais().length}`);
     dit(/C65735/.test(p.body || '') && /Consigne Banc/.test(p.body || ''), 'le code et le lieu relus dans SA ligne sont dedans', p.body);
     dit(p.url === `/?tab=cat_bord&cible=retrait&tx=${TX}`, 'le clic ouvre Colis → « À retirer », SA carte (par la transaction) — 31 oct.', p.url);
     await extension(TX);
