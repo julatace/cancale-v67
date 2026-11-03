@@ -94,7 +94,7 @@ import { candidatsVenteSansAnnonce } from "./candidatsVente.js";
 import { fusionnerConversation } from "./conversations.js";
 import {etatCommandeEbay} from '../api/_lib/ebay-etat-commande.js';
 import {colisEbay} from '../api/_lib/ebay-a-expedier.js';
-import {annoncesVcEnLigne,stockVestiaire,retraitsVestiaire,VC_VENTE_ETAPES,VC_ANNONCE_ETATS,etapeMotVc,vcVenteAnnulee,vcVentePartie,numVcVente,numVcAnnonce,montantRecuVc,dateVersementVc,dateVenteVc,ventesVcDe,colisVcAPoster,resumeColisVc,etatAnnonceVcBrut} from '../api/_lib/vestiaire-regle.js';
+import {annoncesVcEnLigne,stockVestiaire,retraitsVestiaire,VC_VENTE_ETAPES,VC_ANNONCE_ETATS,etapeMotVc,vcVenteAnnulee,vcVentePartie,numVcVente,numVcAnnonce,numerosVcAvecLiens,montantRecuVc,dateVersementVc,dateVenteVc,ventesVcDe,colisVcAPoster,resumeColisVc,etatAnnonceVcBrut} from '../api/_lib/vestiaire-regle.js';
 import {colisLbcAPoster,lbcColisAPoster,totalColis,colisLbcVendeur} from '../api/_lib/colis-sites.js';
 import {CLE_COMPTES_EXCLUS,excluAutreDe,estExclu,basculerExclu} from '../api/_lib/comptes-exclus.js';
 import {PLATEFORMES_COMPTES,etatCompteLie,ageLecture,comptesLbcLies,comptesVcLies,comptesEbayLies,refDeLigneEbay,nomCompteLie,LIBELLE_ETAT} from './comptesLies.js';
@@ -1938,6 +1938,9 @@ const SYNC_KEYS = [
   // auto } }, src/numerosVestiaire.js — fusionné comme les fiches, §5), « Colis
   // fait » et « Imprimé » posés par lui ({ [id de vente]: ts }).
   'vrm_vc_numeros','vrm_vc_colis_done','vrm_vc_imprimes',
+  // (3 nov.) La liaison Vinted ↔ Vestiaire posée par SON clic (src/lienVestiaire.js) :
+  // { [productId]: { numero, item, de, at, ecrit } } — un seul N° pour l'article.
+  'vrm_vc_liens',
   // (31 oct.) Les reçus d'achat qu'IL a déliés depuis le journal des emails
   // (« Ce n'est pas ça ») : { [id de la ligne du reçu]: { tx, at } }. Rien n'est
   // supprimé ; « Relier à nouveau » retire la clé.
@@ -9571,6 +9574,11 @@ const _ecoutesVc = new Set();
 const signalerVc = () => { for (const f of _ecoutesVc) { try { f(); } catch (_) {} } };
 // Une clé Vestiaire posée par un geste : visible tout de suite, synchronisée par `save`.
 const vcPoser = (k, v) => { _vcMem[k] = v; save(k, v); signalerVc(); };
+// (3 nov.) Les N° des annonces Vestiaire tels qu'ils s'AFFICHENT et s'identifient :
+// le N° donné par VRM, remplacé par celui de l'annonce Vinted quand il les a
+// reliées (`vrm_vc_liens`, src/lienVestiaire.js). Le N° donné reste dans
+// `vrm_vc_numeros` (servi, jamais redonné) : défaire la liaison le rend.
+const numerosVcEffectifs = () => carteNumerosVc(numerosVcAvecLiens(vcCarte('vrm_vc_numeros'), vcCarte('vrm_vc_liens')));
 if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
   // La valeur gardée (fusionnée, ou venue d'un autre appareil) remplace la copie en mémoire.
   window.addEventListener('vrm:save', (e) => { const k = e && e.detail && e.detail.k; if (k && k in _vcMem) { delete _vcMem[k]; signalerVc(); } });
@@ -9579,12 +9587,12 @@ if (typeof window !== 'undefined' && typeof window.addEventListener === 'functio
 function useVcLocal() {
   const [, maj] = React.useReducer((x) => x + 1, 0);
   React.useEffect(() => { _ecoutesVc.add(maj); return () => { _ecoutesVc.delete(maj); }; }, []);
-  return { auto: carteNumerosVc(vcCarte('vrm_vc_numeros')), fait: vcCarte('vrm_vc_colis_done'), imprimes: vcCarte('vrm_vc_imprimes') };
+  return { auto: numerosVcEffectifs(), donnes: carteNumerosVc(vcCarte('vrm_vc_numeros')), liens: vcCarte('vrm_vc_liens'), fait: vcCarte('vrm_vc_colis_done'), imprimes: vcCarte('vrm_vc_imprimes') };
 }
 // Une lecture Vestiaire (`vc_ventes`/`vc_listings` projetés) + les numéros donnés
 // et les « Colis fait » de cet appareil : ce que lisent `ventesVcDe`,
 // `colisVcAPoster`, `annoncesVcEnLigne`, `retraitsVestiaire` (§11, une règle).
-const avecNumerosVc = (d) => (d && typeof d === 'object') ? { ...d, auto: carteNumerosVc(vcCarte('vrm_vc_numeros')), fait: vcCarte('vrm_vc_colis_done') } : d;
+const avecNumerosVc = (d) => (d && typeof d === 'object') ? { ...d, auto: numerosVcEffectifs(), fait: vcCarte('vrm_vc_colis_done') } : d;
 // Les numéros que l'écran Vinted ne tient pas dans son état : ceux donnés aux
 // annonces Vestiaire et le pool tel que le navigateur le porte. Ajoutés aux pris
 // de chaque `prochainLibre` automatique (jamais retirés de rien).
@@ -9614,7 +9622,10 @@ async function numeroterVestiaire() {
       const ventes = V.ventes && typeof V.ventes === 'object' ? V.ventes : null;
       // Une annonce ne se numérote que sur une liste LUE (capturedAt) ; une vente à expédier, toujours.
       const auto = vcCarte('vrm_vc_numeros');
-      const ids = produitsANumeroter({ items: L.capturedAt ? items : null, ventes, liens: L.liens || {}, auto, cleNum,
+      // (3 nov.) Une annonce reliée à la main (`vrm_vc_liens`) porte DÉJÀ le N° de
+      // son annonce Vinted : jamais un N° neuf pour elle.
+      const liensMainVc = carteNumerosVc(numerosVcAvecLiens({}, vcCarte('vrm_vc_liens')));
+      const ids = produitsANumeroter({ items: L.capturedAt ? items : null, ventes, liens: { ...liensMainVc, ...(L.liens || {}) }, auto, cleNum,
         etatRetiree: (it) => etatAnnonceVcBrut(it, false, L.capturedAt) === 'retiree', venteAnnulee: vcVenteAnnulee });
       if (!ids.length) return 0;
       // TOUS les numéros servis (lus maintenant, synchrone jusqu'à l'écriture).
@@ -15529,7 +15540,7 @@ const numeroVcIdentite = (id, it, liens) => {
   const ks = new Set();
   const l = liens ? liens[String(id)] : null; if (l != null && String(l).trim()) ks.add(cleNum(l));
   if (it && it.ref && /VRM/i.test(String(it.ref))) { const k = refVRMDe(it.ref); if (k) ks.add(k); }
-  const a = carteNumerosVc(vcCarte('vrm_vc_numeros'))[String(id)]; if (a) ks.add(cleNum(a));
+  const a = numerosVcEffectifs()[String(id)]; if (a) ks.add(cleNum(a));
   ks.delete('');
   return ks.size === 1 ? [...ks][0] : '';
 };
@@ -63988,7 +63999,7 @@ function VentesToutes({ sites, ventesVinted, ventesKO, comptes, panelOff, lbcVen
         if (!v) continue;
         out.push({ cle: 'vestiaire:' + id, site: 'vestiaire', id, titre: v.titre || v.title || 'Vente Vestiaire', t: ts(v.date) ?? ts(v.premiereVue),
           prix: null, devise: 'EUR', etat: v.aExpedier ? 'À expédier' : (v.etat || ''), compte: '',
-          num: numVcVente(v, vc.liens, carteNumerosVc(vcCarte('vrm_vc_numeros'))), photo: photoArticle(v) || null });
+          num: numVcVente(v, vc.liens, numerosVcEffectifs()), photo: photoArticle(v) || null });
       }
     }
     // La plus récente d'abord ; une vente sans date lue va à la fin (jamais datée au hasard).
