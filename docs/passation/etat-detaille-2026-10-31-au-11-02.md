@@ -189,3 +189,6 @@ Déplacé TEL QUEL depuis CLAUDE.md §9 le 2 novembre 2026 (le fichier dépassai
 ### Lignes de §9 déplacées telles quelles
 - **2 nov.** — Carte des relais : les consignes Vinted Go revenaient « deux adresses » (pays « France » rangé en ville, ville collée à la rue) ; le serveur retire le pays en lettres, l'app relit les lignes déjà rangées (`lieuTransporteurRepare`, `audit-vintedgo-adresse`). → historique colis-retraits. Geste : rouvrir Colis → À retirer.
 - **2 nov.** — **Mode auto des messages aux favoris** (éteint par défaut, **5.309.0**, `src/favorisAuto.js`, `api/_lib/favoris-auto.js`, `audit-favoris-auto`) : jamais de boucle, VRM demande le geste qui débloque. → historique favoris-messages. Geste : installer la 5.309, ouvrir un favori depuis la cloche, allumer.
+
+### Lignes de §9 déplacées telles quelles
+- **2 nov.** — **Republier qui règle ses problèmes** (**5.310.0**, `reglerAvant`, `audit-republier-question`) : champ vide repris de la recette de CETTE annonce (2 tours), sinon UNE question avec les valeurs de Vinted (« Choisir la catégorie » sur la ligne, réponse posée une fois) ; refus nommé retenu, jamais renvoyé ; plafond fermé si le stockage de l'extension est muet (P10) ; message de refus d'offre compté (P11). → historique vinted-extension. Geste : installer la 5.310.0.
