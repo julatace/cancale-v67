@@ -4507,7 +4507,11 @@ const fetchEmailTrackingBrut = async () => {
     const lireQ = async (q) => { const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?${q}`, { headers: sbAuth() }); if (!r.ok) throw new Error('lecture'); return r.json(); };
     // (3 nov.) + les achats « qui t'attendent » des e-mails Vinted déjà reçus
     // (« Commande mise à jour », src/arriveesRelues.js) : même règle que le serveur.
-    return await arriveesRelues(await lieuxRelusDansTextes(liste, lireQ), lireQ);
+    // (3 nov.) Les relectures sont un COMPLÉMENT : si elles échouent, la liste lue reste (jamais « pas su » pour tout le suivi).
+    let complete = liste;
+    try { complete = await lieuxRelusDansTextes(complete, lireQ) || complete; } catch (_) {}
+    try { complete = await arriveesRelues(complete, lireQ) || complete; } catch (_) {}
+    return complete;
   } catch (_) { return null; }
 };
 const fetchEmailTracking = async (opts = {}) => {
