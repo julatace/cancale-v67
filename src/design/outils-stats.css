@@ -25,7 +25,8 @@
 .vrm-cr-rang { font-size: 13px; font-weight: 600; color: var(--fu-gris3); font-variant-numeric: var(--fu-chiffres); text-align: center; }
 .vrm-cr-centre { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .vrm-cr-nom { font-size: 15px; font-weight: 700; color: var(--fu-encre); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; letter-spacing: -.01em; }
-.vrm-cr-sous { font-size: 13px; color: var(--fu-gris); font-variant-numeric: var(--fu-chiffres); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vrm-cr-sous { font-size: 13px; color: var(--fu-gris); font-variant-numeric: var(--fu-chiffres); line-height: 1.35; overflow-wrap: anywhere; }
+.vrm-cr-sous > .vrm-cr-bloc { white-space: nowrap; }
 .vrm-cr-droite { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
 .vrm-cr-brut { font-size: 17px; font-weight: 800; letter-spacing: -.02em; color: var(--fu-encre); font-variant-numeric: var(--fu-chiffres); white-space: nowrap; }
 .vrm-cr-brut[data-vide] { color: var(--fu-gris3); }
@@ -58,7 +59,8 @@
 .vrm-qd-centre { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .vrm-qd-nom { font-size: 15px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .vrm-qd-num { font-weight: 800; margin-right: 6px; }
-.vrm-qd-sous { font-size: 13px; color: var(--fu-gris); font-variant-numeric: var(--fu-chiffres); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vrm-qd-sous { font-size: 13px; color: var(--fu-gris); font-variant-numeric: var(--fu-chiffres); line-height: 1.35; overflow-wrap: anywhere; }
+.vrm-qd-sous > .vrm-qd-bloc { white-space: nowrap; }
 .vrm-qd-age { font-weight: 700; color: var(--fu-encre); }
 .vrm-qd-agir { min-height: 44px; min-width: 44px; padding: 0 16px; border-radius: 999px; border: 0; background: var(--fu-case); color: var(--fu-encre); font: inherit; font-size: 14px; font-weight: 700; cursor: pointer; white-space: nowrap; }
 .vrm-qd-agir:focus-visible { outline: 2px solid var(--fu-bleu); outline-offset: 2px; }

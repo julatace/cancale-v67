@@ -41,7 +41,7 @@ export default function CeQuiRapporte({ lignes, Segmente, fmt, etat }) {
                 <span className="vrm-cr-centre">
                   <span className="vrm-cr-nom">{g.nom}</span>
                   <span className="vrm-cr-sous">
-                    {pl(g.n, 'vendu')}{g.moyen != null ? <> · moy. {fmt(g.moyen)}</> : null}{g.marge != null ? <> · marge {String(g.marge).replace('.', ',')} %</> : null}
+                    <span className="vrm-cr-bloc">{pl(g.n, 'vendu')}</span>{g.moyen != null ? <> · <span className="vrm-cr-bloc">moy. {fmt(g.moyen)}</span></> : null}{g.marge != null ? <> · <span className="vrm-cr-bloc">marge {String(g.marge).replace('.', ',')} %</span></> : null}
                   </span>
                   {phrase ? <span className="vrm-cr-sous vrm-cr-delai">{phrase}</span> : null}
                 </span>

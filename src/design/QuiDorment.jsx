@@ -27,7 +27,7 @@ export default function QuiDorment({ liste, seuil, onSeuil, onAgir, Segmente, fm
                   {a.photo ? <img className="vrm-qd-photo" src={a.photo} alt="" loading="lazy"/> : <span className="vrm-qd-photo" aria-hidden="true"/>}
                   <span className="vrm-qd-centre">
                     <span className="vrm-qd-nom">{a.numero ? <span className="vrm-qd-num">N°{a.numero}</span> : null}{a.titre || 'Sans titre'}</span>
-                    <span className="vrm-qd-sous"><span className="vrm-qd-age">{a.age} j</span>{a.prix != null ? <> · {fmt(a.prix)}</> : null}{a.vues != null ? <> · {pl(a.vues, 'vue')}</> : null}{a.favoris != null ? <> · {pl(a.favoris, 'favori')}</> : null}</span>
+                    <span className="vrm-qd-sous"><span className="vrm-qd-age vrm-qd-bloc">{a.age} j</span>{a.prix != null ? <> · <span className="vrm-qd-bloc">{fmt(a.prix)}</span></> : null}{a.vues != null ? <> · <span className="vrm-qd-bloc">{pl(a.vues, 'vue')}</span></> : null}{a.favoris != null ? <> · <span className="vrm-qd-bloc">{pl(a.favoris, 'favori')}</span></> : null}</span>
                     {a.compte ? <span className="vrm-qd-sous">{a.compte}</span> : null}
                   </span>
                   <button type="button" className="vrm-qd-agir" data-qd-agir={a.id} aria-haspopup="dialog" onClick={() => onAgir(a)}>Agir</button>

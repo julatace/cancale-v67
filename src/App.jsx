@@ -14394,7 +14394,7 @@ const Icon = ({ name, size = 24, style }) => {
 // QUE si l'API existe (Safari iPhone ne la fournit pas) : sinon RIEN, jamais un
 // bouton mort (§2.7, une fonction qui ne peut pas tenir se tait). On ne DEVINE
 // pas le texte — on pose ce que le navigateur a reconnu, à lui de corriger.
-const DICTEE_OK = typeof window !== 'undefined' && ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window);
+const DICTEE_OK = typeof window !== 'undefined' && typeof (window.SpeechRecognition || window.webkitSpeechRecognition) === 'function';
 // (3 nov.) Le micro REFUSÉ (permission du navigateur, ou service coupé) : le
 // bouton disparaît aussi — partout, pour la session — sans un mot.
 const DICTEE_REFUS = { non: false };
@@ -55954,11 +55954,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         const choix = [
           { k:'prix', t:'Baisser le prix', cap:'republiermodif', go:()=>versRepub('modifier') },
           { k:'republier', t:'Republier', cap:'recreer', go:()=>versRepub('recreer') },
+          // ⚠️ On change d'écran AVANT de fermer la feuille : fermée d'abord, elle
+          // retirait son entrée d'historique (history.back) avant que le nouvel
+          // écran soit rendu, et ce retour ramenait Vinted (mesuré au banc, 1 fois sur 2).
+          // Le nouvel écran démonte la feuille ; la fermeture différée ne sert qu'en secours.
           { k:'lbc', t:'Mettre sur Leboncoin', bloque: !a.numero ? 'Mets un N° à cet article d’abord.' : '', go:()=>{
-              setDortAgir(null);
               if (!mpChoisi(e,'lbc')) updatePair(it, { mp: { ...(e.mp||{}), lbc: true } });
-              DEMANDE_LBC_FICHE.id = String(it.id); DEMANDE_LBC_FICHE.at = Date.now(); onNav && onNav('leboncoin'); } },
-          { k:'ebay', t:'Mettre sur eBay', go:()=>{ setDortAgir(null); DEMANDE_EBAY_PAIRE.id = String(it.id); DEMANDE_EBAY_PAIRE.at = Date.now(); onNav && onNav('ebay_annonces'); } },
+              DEMANDE_LBC_FICHE.id = String(it.id); DEMANDE_LBC_FICHE.at = Date.now(); onNav && onNav('leboncoin'); setTimeout(()=>setDortAgir(null), 400); } },
+          { k:'ebay', t:'Mettre sur eBay', go:()=>{ DEMANDE_EBAY_PAIRE.id = String(it.id); DEMANDE_EBAY_PAIRE.at = Date.now(); onNav && onNav('ebay_annonces'); setTimeout(()=>setDortAgir(null), 400); } },
         ];
         return (
           <SheetShell onClose={()=>setDortAgir(null)} maxWidth={420}>

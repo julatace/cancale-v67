@@ -68,7 +68,7 @@ async function audit(src, bavard) {
   const dit = (c, m) => { if (!c) ko++; console.log((c ? '✅ ' : '❌ ') + m); };
   dit(/const dicterRecherche = \(t\) => \{ const r = requeteDeLaVoix\(t\);[^}]*setGsQ\(r\.requete\)/.test(code), 'la barre de recherche pose la requête lue par `requeteDeLaVoix`');
   dit((code.match(/<MicDictee nu titre="Chercher à la voix" onText=\{dicterRecherche\}\/>/g) || []).length === 2, 'le micro est dans la barre, sur ordinateur ET au téléphone');
-  dit(/if \(!DICTEE_OK \|\| refus\) return null;/.test(code) && /'SpeechRecognition' in window \|\| 'webkitSpeechRecognition' in window/.test(code), 'sans l’API, ou micro refusé : pas de bouton');
+  dit(/if \(!DICTEE_OK \|\| refus\) return null;/.test(code) && /typeof \(window\.SpeechRecognition \|\| window\.webkitSpeechRecognition\) === 'function'/.test(code), 'sans l’API, ou micro refusé : pas de bouton');
   dit(/rec\.lang = 'fr-FR'/.test(code), 'reconnaissance en fr-FR');
   dit(!/fetch\([^)]*(speech|whisper|transcri|audio)/i.test(code) && !/MediaRecorder/.test(code), 'aucun son enregistré ni envoyé à un service (ni MediaRecorder, ni appel de transcription)');
   console.log(ko ? `\n❌ audit-recherche-vocale : ${ko} rouge(s)` : '\n✅ audit-recherche-vocale : tout vert');
