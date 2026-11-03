@@ -49495,18 +49495,22 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             else if (fait.livree && !fait.payee) aVenir += 1;
           }
           const partiel = nomsVentesKO.length > 0;
+          // (3 nov., cas extrêmes) « Au moins 0,00 € » ne se dit jamais (§5) : des ventes illisibles et
+          // rien de lu ce mois ⇒ « — », et les cases « — » aussi (rien lu ne vaut pas rien).
+          const pasSu = partiel && !(eurMois > 0);
           const moisLong = d0.toLocaleDateString('fr-FR', { month: 'long' });
+          if (pasSu) { aPoster = null; enRoute = null; aVenir = null; }
           return (
-            <CarteMois className="vrm-fu-ecran vrm-fu-ventes" surtitre={moisLong} data-fu-vendu-mois={Math.round(eurMois * 100)} data-fu-partiel={partiel ? '1' : undefined}
-              valeur={<>{partiel ? <span className="vrm-fu-borne">au moins</span> : null}{eurosRecap(eurMois)}</>}
-              sous={<>{nMois} vente{nMois > 1 ? 's' : ''}<BeneficeMoisCourt/></>}
+            <CarteMois className="vrm-fu-ecran vrm-fu-ventes" surtitre={moisLong} data-fu-vendu-mois={pasSu ? '' : Math.round(eurMois * 100)} data-fu-partiel={partiel ? '1' : undefined} data-fu-pas-su={pasSu ? '1' : undefined}
+              valeur={pasSu ? null : <>{partiel ? <span className="vrm-fu-borne">au moins</span> : null}{eurosRecap(eurMois)}</>}
+              sous={pasSu ? <>Ventes pas lues : {nomsVentesKO.slice(0, 2).join(', ')}{nomsVentesKO.length > 2 ? '…' : ''}</> : <>{nMois} vente{nMois > 1 ? 's' : ''}<BeneficeMoisCourt/></>}
               courbe={courbe.length > 1 ? courbe : null}
               cases={[
                 // (2 nov., 22 h) Les filtres de la liste ne sont plus affichés (maquette) : ces deux cases
                 // les portent — un toucher filtre, un second toucher rend toute la liste.
-                { cle: 'aposter', n: aPoster, l: 'à poster', titre: 'Ventes à expédier, pas encore déposées', onClick: () => setVFilter((v) => v === 'aexpedier' ? 'all' : 'aexpedier'), attrs: { 'data-n': String(aPoster), 'aria-pressed': vFilter === 'aexpedier' } },
-                { cle: 'enroute', n: enRoute, l: 'en route', titre: 'Déposées, pas encore livrées', onClick: () => setVFilter((v) => v === 'transit' ? 'all' : 'transit'), attrs: { 'data-n': String(enRoute), 'aria-pressed': vFilter === 'transit' } },
-                { cle: 'avenir', n: aVenir, l: 'à payer', titre: "Livrées : l'argent arrive quand l'acheteur confirme", attrs: { 'data-n': String(aVenir) } },
+                { cle: 'aposter', n: aPoster, l: 'à poster', titre: 'Ventes à expédier, pas encore déposées', onClick: () => setVFilter((v) => v === 'aexpedier' ? 'all' : 'aexpedier'), attrs: { 'data-n': aPoster == null ? '' : String(aPoster), 'aria-pressed': vFilter === 'aexpedier' } },
+                { cle: 'enroute', n: enRoute, l: 'en route', titre: 'Déposées, pas encore livrées', onClick: () => setVFilter((v) => v === 'transit' ? 'all' : 'transit'), attrs: { 'data-n': enRoute == null ? '' : String(enRoute), 'aria-pressed': vFilter === 'transit' } },
+                { cle: 'avenir', n: aVenir, l: 'à payer', titre: "Livrées : l'argent arrive quand l'acheteur confirme", attrs: { 'data-n': aVenir == null ? '' : String(aVenir) } },
               ]}/>
           );
         })()}

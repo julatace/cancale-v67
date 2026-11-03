@@ -914,6 +914,8 @@ html body .vrm-recap-frise-detail { margin: 10px 0 0; font: 500 13px/1.4 var(--v
 /* (3 nov.) Le détail d'une ligne « À faire » se lit : #6e6e73 sur blanc (5:1), jamais #8e8e93 (3,4:1). */
 :root body .vrm-app-shell .vrm-main .vrm-day-layout.vrm-fu-journee .vrm-day-task .vrm-day-task-note:not(.is-urgent) { color: #6e6e73 !important; }
 :root[data-theme="dark"] body .vrm-app-shell .vrm-main .vrm-day-layout.vrm-fu-journee .vrm-day-task .vrm-day-task-note:not(.is-urgent) { color: #98989d !important; }
-:root body .vrm-app-shell .vrm-main .vrm-day-layout.vrm-fu-journee .vrm-day-task :is(.vrm-day-task-title, .vrm-day-task-note) { white-space: nowrap !important; overflow: hidden !important; }
+/* Le titre : une ou deux lignes, coupé à la fin d'un mot (`UneLigne`, lignesTel=2) ; le détail : une ligne. */
+:root body .vrm-app-shell .vrm-main .vrm-day-layout.vrm-fu-journee .vrm-day-task .vrm-day-task-title { white-space: normal !important; overflow: visible !important; text-overflow: clip !important; }
+:root body .vrm-app-shell .vrm-main .vrm-day-layout.vrm-fu-journee .vrm-day-task .vrm-day-task-note { white-space: nowrap !important; overflow: hidden !important; }
 /* (3 nov.) La visite en bulles : ses boutons gardent 44 px même quand une règle de bouton plus forte les tasse. */
-html body .vrm-visite .vrm-visite-pied :is(button, .vrm-b) { min-height: 44px !important; box-sizing: border-box !important; }
+html body .vrm-visite .vrm-visite-pied :is(button, .vrm-b) { min-height: 44px !important; height: 44px !important; box-sizing: border-box !important; }

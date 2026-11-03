@@ -153,9 +153,9 @@ async function scenarioA(b, vp, sombre) {
     await pg.waitForFunction(() => !!localStorage.getItem('vrm_benefice_jours'), null, { timeout: 90000 });
     await ouvrir(pg, 'compta');
     await pg.locator('[data-ca-cur="vendu"]').first().waitFor({ state: 'attached', timeout: 40000 });
-    await pg.locator('[data-benef-etat="lu"]').first().waitFor({ timeout: 40000 });
-    await pg.locator('[data-urssaf-declaree]').first().waitFor({ timeout: 40000 });
-    await pg.locator('[data-micro-repli]').first().waitFor({ timeout: 40000 });
+    await pg.locator('[data-benef-etat="lu"]').first().waitFor({ state: 'attached', timeout: 40000 });
+    await pg.locator('[data-urssaf-declaree]').first().waitFor({ state: 'attached', timeout: 40000 });
+    await pg.locator('[data-micro-repli]').first().waitFor({ state: 'attached', timeout: 40000 });
     await pg.waitForTimeout(800);
   });
   // SHOTS=dossier : capture de tout l'écran (à regarder : §6.2).
@@ -186,7 +186,11 @@ async function scenarioA(b, vp, sombre) {
     }
     // ── l'essentiel, visible
     for (const [sel, lib] of [['[data-compta-chiffre="gagne"]', 'le bénéfice'], ['[data-echeance-suivante]', 'la prochaine déclaration'], ['[data-compta-chiffre="urssaf-mois"]', 'l\'URSSAF du mois'], ['[data-benef-ajouter-depense]', 'Ajouter une dépense']]) {
-      check(await visible(pg, sel), `A ${nom} — ${lib} est visible sans rien ouvrir`);
+      // (2 nov., 22 h) Compta = la maquette FusionCompta : la carte sombre, l'anneau, six mois et l'encart
+      // de déclaration. L'échéance, l'URSSAF du mois et « Ajouter une dépense » ne sont plus affichés en
+      // tête — retiré à la demande de Julien, 2 nov. 22 h ; ils restent dans l'écran (rien n'est supprimé).
+      if (sel === '[data-compta-chiffre="gagne"]') check(await visible(pg, sel), `A ${nom} — ${lib} est visible sans rien ouvrir`);
+      else check((await pg.locator(sel).count()) > 0, `A ${nom} — ${lib} reste dans l'écran (plus affiché en tête, maquette FusionCompta)`);
     }
     // ── les chiffres n'ont pas bougé (mêmes valeurs que sur le code d'avant)
     check((await attr(pg, '[data-ca-cur="vendu"]', 'data-ca-eur')) === '60', `A ${nom} — Vendu du mois 60 € (inchangé)`);
@@ -288,12 +292,13 @@ async function scenarioB(b, vp, sombre) {
   const { ctx, pg } = await page(b, vp, sombre, true, errs);
   await essaie(`B ${nom}`, async () => {
     await ouvrir(pg, 'compta');
-    await pg.locator('[data-micro-repli]').first().waitFor({ timeout: 40000 });
+    await pg.locator('[data-micro-repli]').first().waitFor({ state: 'attached', timeout: 40000 });
     await pg.waitForTimeout(1500);
     check((await attr(pg, '[data-micro-repli]', 'data-micro-attention')) !== '1', `B ${nom} — versement libératoire déjà dit : rien à trancher`);
     check((await attr(pg, '[data-micro-repli]', 'data-micro-repli')) === 'ferme', `B ${nom} — « Ta micro-entreprise » reste repliée`);
     check(!(await visible(pg, '[data-micro-profil]')), `B ${nom} — son profil URSSAF n'occupe pas l'écran`);
-    check(await visible(pg, '[data-echeance-suivante]'), `B ${nom} — la prochaine déclaration reste visible au-dessus`);
+    // (2 nov., 22 h) L'échéance n'est plus affichée en tête (maquette FusionCompta) : l'encart de déclaration la porte.
+    check((await pg.locator('[data-echeance-suivante]').count()) > 0 || (await visible(pg, '.vrm-fu-declaration')), `B ${nom} — la prochaine déclaration reste dans l'écran`);
     check(!errs.length, `B ${nom} — aucune erreur JavaScript${errs.length ? ' : ' + errs[0].slice(0, 160) : ''}`);
   });
   await ctx.close();
@@ -353,7 +358,7 @@ async function scenarioD(b, vp, sombre) {
   const { ctx, pg } = await page(b, vp, sombre, true, errs, { ligne });
   await essaie(`D ${nom}`, async () => {
     await ouvrir(pg, 'compta');
-    await pg.locator('[data-urssaf-couverture]').first().waitFor({ timeout: 40000 });
+    await pg.locator('[data-urssaf-couverture]').first().waitFor({ state: 'attached', timeout: 40000 });
     const r = await pg.evaluate(() => {
       const c = document.querySelector('[data-urssaf-couverture]');
       const t = c ? c.innerText : '';
