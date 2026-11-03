@@ -423,7 +423,10 @@ function ColonneRetirerF({ vue: vueTout, C, Photo, gestes, detail, avecCarte, ec
   const ligne = (x, parLigne = true) => <LigneRetraitF key={x.cle || x.id} x={x} Photo={Photo} gestes={gestes} detail={detail} echeance={x.horsCompte ? null : echeance} statut={x.horsCompte ? statut : null} retirer={retirer} C={C} avecTransp={parLigne && trConnu(x)} titreDe={titreDe}/>;
   // Le rangement : chaque colis dans SA section, avec son point.
   const parSection = { aujourdhui: [], prets: [], avenir: [], lieu: [], verifier: [] };
-  for (const p of points) for (const x of p.arrives) parSection[sectionDuColis(x, p)].push({ x, p });
+  // (3 nov., 19 h) Une ville choisie : un point SANS ville (nom seul, homonyme) va sous « Lieu à
+  // confirmer », avec son nom — jamais compté dans la ville, jamais caché.
+  const aConfirmer = (x, p) => !!vChoisie && !p.inconnu && sansVille.has(p.cle) && !x.horsCompte && !(Number.isFinite(x.jours) && x.jours <= 0);
+  for (const p of points) for (const x of p.arrives) parSection[aConfirmer(x, p) ? 'lieu' : sectionDuColis(x, p)].push({ x, p });
   const attendus = connus.flatMap((p) => p.attendus.map((c) => ({ c, p })));
   const routeSans = vChoisie ? [] : (enRoute || []);
   const nRoute = attendus.length + routeSans.length;
@@ -479,9 +482,10 @@ function ColonneRetirerF({ vue: vueTout, C, Photo, gestes, detail, avecCarte, ec
         <section className="vrm-rpf-section" data-rp-section="lieu" data-rp-section-n={parSection.lieu.length}>
           {titre('Lieu à confirmer', parSection.lieu.length, 'lieu')}
           <div className="vrm-rpf-section-corps">
-            <section className="vrm-rpf-point is-inconnu" data-relais-point={parSection.lieu[0].p.cle} data-relais-point-comptes={parSection.lieu.length}>
-              <div className="vrm-rpf-liste">{parSection.lieu.map(({ x }) => ligne(x))}</div>
-            </section>
+            {parPoint(parSection.lieu.filter((i) => !i.p.inconnu)).map(({ p, items: its }) => cartePoint(p, its, 'lieu'))}
+            {parSection.lieu.some((i) => i.p.inconnu) ? <section className="vrm-rpf-point is-inconnu" data-relais-point={parSection.lieu.find((i) => i.p.inconnu).p.cle} data-relais-point-comptes={parSection.lieu.filter((i) => i.p.inconnu).length}>
+              <div className="vrm-rpf-liste">{parSection.lieu.filter((i) => i.p.inconnu).map(({ x }) => ligne(x))}</div>
+            </section> : null}
           </div>
         </section>) : null}
       {parSection.verifier.length ? (

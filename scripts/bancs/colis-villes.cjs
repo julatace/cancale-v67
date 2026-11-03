@@ -169,6 +169,9 @@ const mesurer = (pg) => pg.evaluate(() => ({
         dit(v.ville === 'vannes' && nV === 2 && v.carte === '2', 'Vannes choisie : ses 2 colis (les consignes sans code postal), la carte sombre dit 2', JSON.stringify({ ville: v.ville, nV, carte: v.carte }));
         dit(v.points.filter((p) => p.ville && p.ville !== 'vannes').length === 0, '… aucun point d’une autre ville', JSON.stringify(v.points.filter((p) => p.ville && p.ville !== 'vannes').map((p) => p.ville)));
         dit(v.points.some((p) => p.inconnu) && v.points.some((p) => /carrefour/i.test(p.nom)), '… « Lieu à confirmer » et le point sans ville restent VISIBLES', JSON.stringify(v.points.map((p) => p.nom || p.cle)));
+        const secs = await pg.evaluate(() => Object.fromEntries([...document.querySelectorAll('[data-rp-section]')].map((x) => [x.getAttribute('data-rp-section'), Number(x.getAttribute('data-rp-section-n'))])));
+        const carrefourSec = await pg.evaluate(() => { const p = [...document.querySelectorAll('.vrm-rpf .vrm-rpf-nom')].find((e) => /carrefour/i.test(e.textContent)); return p ? (p.closest('[data-rp-section]') || { getAttribute: () => '' }).getAttribute('data-rp-section') : null; });
+        dit(carrefourSec === 'lieu' && secs.lieu === 2 && (secs.prets || 0) + (secs.avenir || 0) + (secs.aujourdhui || 0) === 2, '… sous « Lieu à confirmer » (2, avec son nom), et les sections de la ville disent 2 comme la carte', JSON.stringify({ secs, carrefourSec }));
         if (SHOTS) await pg.screenshot({ path: path.join(SHOTS, `villes-vannes-${nom}.png`) });
         dit(m.deb <= 1 && v.deb <= 1, 'rien ne déborde', `${m.deb} / ${v.deb}`);
         dit(!errs.length, 'aucune erreur de page', errs.join(' | '));
