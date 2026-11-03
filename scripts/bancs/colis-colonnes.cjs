@@ -1,3 +1,4 @@
+// (3 nov. : nouvelle mise en page — trois onglets, « Partis » = « Envoyés », « À retirer » en sections ; toutes les vérifications de règles et de compteurs gardées)
 // ── BANC : COLIS CLAIR (2 nov. ; avant : quatre colonnes, 31 oct.) ───────────
 // Julien, au téléphone : « Il y a des colis dans tous les sens avec des codes
 // de retrait partout, on ne comprend rien dans l'application. Refais ça bien. »
@@ -183,10 +184,13 @@ const lire = (pg) => pg.evaluate((CODES) => {
   const idents = [...main.querySelectorAll(SEL)].filter((e) => identDe(e) && e.getClientRects().length + (e.closest('details') ? 1 : 0) > 0).map((e) => ({ cle: identDe(e),
     groupe: e.getAttribute('data-groupe-carte') || '', partis: !!e.closest('[data-colis-partis]'), verif: !!e.closest('[data-retirer-a-verifier]'),
     point: (e.closest('[data-relais-point]') || { getAttribute: () => '' }).getAttribute('data-relais-point'), ambre: e.getAttribute('data-ambre') === '1',
-    retire: !!e.querySelector('[data-colis-retire]'), txt: e.innerText }));
+    retire: !!e.querySelector('[data-colis-retire]'), txt: e.innerText, codesIci: [...e.querySelectorAll('[data-code-retrait]')].map((x) => x.getAttribute('data-code-retrait')).filter(Boolean),
+    echeance: (e.querySelector('[data-rp-echeance]') || { getAttribute: () => null }).getAttribute('data-rp-echeance'), echeanceAmbre: !!e.querySelector('[data-rp-echeance].is-ambre'), section: (e.closest('[data-rp-section]') || { getAttribute: () => '' }).getAttribute('data-rp-section') }));
   const texte = main.innerText || '';
   const compte = (s) => texte.split(s).length - 1;
-  const codes = Object.fromEntries(CODES.map((c) => [c, compte(c)]));
+  // (3 nov., nouvelle mise en page) Le code s'affiche au toucher (« Code ») : il est PORTÉ une fois par la ligne
+  // de SON colis (`data-code-retrait`), et écrit en clair seulement dans le détail ouvert.
+  const codes = Object.fromEntries(CODES.map((c) => [c, main.querySelectorAll(`[data-code-retrait="${c}"]`).length + compte(c)]));
   const seg = [...document.querySelectorAll('[data-colis-onglet-choix]')].map((b) => ({ v: b.getAttribute('data-colis-onglet-choix'), n: b.getAttribute('data-colis-onglet-n'), urgent: b.getAttribute('data-urgent'), presse: b.getAttribute('aria-pressed'), txt: b.innerText.trim() }));
   const onglet = (document.querySelector('[data-colis-onglet]') || { getAttribute: () => null }).getAttribute('data-colis-onglet');
   // Texte écrasé : un bloc de texte réduit à une colonne étroite (une lettre par ligne).
@@ -199,7 +203,7 @@ const lire = (pg) => pg.evaluate((CODES) => {
     if (r.width < 48 && r.height > lh * 3) ecrases.push(t.slice(0, 30) + ` (${Math.round(r.width)}×${Math.round(r.height)})`);
   }
   const points = [...main.querySelectorAll('[data-relais-point]')].map((p) => ({ cle: p.getAttribute('data-relais-point'), compte: Number(p.getAttribute('data-relais-point-comptes')),
-    resume: ((p.querySelector('.vrm-rp-resume') || {}).innerText || ''), ambre: !!p.querySelector('.vrm-rp-resume .is-ambre'),
+    resume: ((p.querySelector('.vrm-rp-resume, .vrm-rpf-n') || {}).innerText || ''), ambre: !!p.querySelector('.vrm-rp-resume .is-ambre, [data-rp-echeance].is-ambre'),
     raisons: [...p.querySelectorAll('[data-sans-lieu-raison]')].map((x) => x.innerText) }));
   const verif = main.querySelector('[data-retirer-a-verifier]');
   let pubRet = null, pubEnv = null; try { pubRet = JSON.parse(localStorage.getItem('vrm_colis_retirer') || 'null'); pubEnv = JSON.parse(localStorage.getItem('vrm_colis_aposter') || 'null'); } catch (_) {}
@@ -246,7 +250,8 @@ async function main() {
         let L = await lire(pg);
         dit(!L.ancien.colonnes && !L.ancien.detail && !L.ancien.boutonRetraits, `${T} plus de colonnes, plus de « Colis par colis », plus de « Codes, QR et points relais » (les redites)`, JSON.stringify(L.ancien));
         const sEnv = L.seg.find((x) => x.v === 'envoyer'), sRet = L.seg.find((x) => x.v === 'retirer');
-        dit(!!sEnv && !!sRet && L.seg.length === 2, `${T} un sélecteur « À envoyer » / « À retirer »`, JSON.stringify(L.seg));
+        // (3 nov., nouvelle mise en page) Trois onglets : À envoyer · Envoyés (l'ancien « Partis ») · À retirer.
+        dit(!!sEnv && !!sRet && L.seg.length === 3 && L.seg.map((x) => x.v).join() === 'envoyer,envoyes,retirer', `${T} un sélecteur « À envoyer » / « Envoyés » / « À retirer »`, JSON.stringify(L.seg));
         dit(!!sEnv && !!L.pubEnv && sEnv.n === String(L.pubEnv.total) && new RegExp(`À envoyer\\s*${L.pubEnv.total}\\b`).test(sEnv.txt), `${T} « À envoyer · N » = le nombre de Ma journée (vrm_colis_aposter)`, JSON.stringify([sEnv, L.pubEnv && L.pubEnv.total]));
         dit(!!sRet && !!L.pubRet && sRet.n === String(L.pubRet.total) && new RegExp(`À retirer\\s*${L.pubRet.total}\\b`).test(sRet.txt), `${T} « À retirer · N » = le nombre de Ma journée (vrm_colis_retirer)`, JSON.stringify([sRet, L.pubRet && L.pubRet.total]));
         dit(L.onglet === 'retirer' && sRet && sRet.urgent === '1' && sEnv && sEnv.urgent === '0', `${T} par défaut : l'onglet qui a de l'urgent (« À retirer », son nombre en ambre)`, JSON.stringify([L.onglet, sEnv && sEnv.urgent, sRet && sRet.urgent]));
@@ -262,19 +267,29 @@ async function main() {
         const malRanges = Object.entries(POINT).filter(([cle, pt]) => !HORS_COMPTE.includes(cle)).filter(([cle, pt]) => { const x = L.idents.find((y) => y.cle === cle); return !x || x.point !== pt; }).map(([cle, pt]) => `${cle}: attendu ${pt}, vu ${(L.idents.find((y) => y.cle === cle) || {}).point || 'aucun'}`);
         dit(!malRanges.length, `${T} chaque colis à retirer est sous SON point (même relais écrit deux fois = un point ; sans lieu = « pas encore connu »)`, JSON.stringify(malRanges));
         const ver = L.idents.find((x) => x.cle === HORS_COMPTE[0]);
-        dit(!!ver && ver.verif && L.nVerif === HORS_COMPTE.length && /771234/.test(ver.txt) && /À vérifier · 1/.test(L.verifTxt || '') && /(délai|depuis plus de|dépassé)/.test(L.verifTxt || ''), `${T} le colis « à vérifier » reste VISIBLE, à part en bas (« À vérifier · 1 »), avec sa raison et son code`, L.verifTxt);
+        // (3 nov.) « À vérifier » est une section repliée ; ouverte, la ligne dit sa raison en une puce et garde son code.
+        await pg.evaluate(() => { const d = document.querySelector('[data-retirer-a-verifier]'); if (d && 'open' in d) d.open = true; }); await pg.waitForTimeout(200);
+        const Lv = await lire(pg); const verV = Lv.idents.find((x) => x.cle === HORS_COMPTE[0]);
+        dit(!!verV && verV.verif && Lv.nVerif === HORS_COMPTE.length && verV.codesIci.includes('771234') && /À vérifier\s*·?\s*1/.test(Lv.verifTxt || '') && /(délai|depuis|dépassé|longtemps|retour)/i.test(verV.txt || ''), `${T} le colis « à vérifier » reste VISIBLE, à part en bas (« À vérifier · 1 »), avec sa raison et son code`, Lv.verifTxt);
+        await pg.evaluate(() => { const d = document.querySelector('[data-retirer-a-verifier]'); if (d && 'open' in d) d.open = false; });
         const pointsComptes = L.points.filter((p) => p.cle !== '__inconnu').reduce((t, p) => t + p.compte, 0) + ((L.points.find((p) => p.cle === '__inconnu') || {}).compte || 0);
         dit(!!L.pubRet && pointsComptes === L.pubRet.total, `${T} la somme des colis par point = « À retirer · N » (Ma journée)`, `${pointsComptes} / ${L.pubRet && L.pubRet.total}`);
         const tv = L.points.find((p) => p.cle === 'tabavap|56000');
         dit(!!tv && tv.compte === 2 && /^2 colis\b/.test(tv.resume), `${T} TABA'VAP (e-mail) et TABAVAP (conversation) : un point, « 2 colis »`, tv && JSON.stringify(tv));
         const terra = L.idents.filter((x) => x.point === 'terracbd|56000');
-        dit(terra.length === 1 && /551200/.test(terra[0].txt), `${T} le même n° écrit par Vinted (code) et Chronopost (lieu) : un colis, son code, sous Terra Cbd`, JSON.stringify(terra.map((x) => x.txt)));
+        dit(terra.length === 1 && terra[0].codesIci.includes('551200'), `${T} le même n° écrit par Vinted (code) et Chronopost (lieu) : un colis, son code, sous Terra Cbd`, JSON.stringify(terra.map((x) => x.txt)));
         const inc = L.points.find((p) => p.cle === '__inconnu');
-        dit(!!inc && inc.raisons.length === 1 && /Chronopost ne nomme pas le point/.test(inc.raisons[0]), `${T} un colis sans lieu : sous « Point pas encore connu », avec la raison et le geste`, inc && JSON.stringify(inc));
+        // (3 nov., Julien : « aucun texte explicatif ») Le colis sans lieu est sous « Lieu à confirmer », sans phrase.
+        dit(!!inc && inc.compte === 1 && !inc.raisons.length && /Lieu à confirmer/.test(L.texte) && !/ne nomme pas le point/.test(L.texte), `${T} un colis sans lieu : sous « Lieu à confirmer », sans phrase`, inc && JSON.stringify(inc));
         const mermoz = L.points.find((p) => p.cle === 'relaispressingmermoz|35000');
-        dit(!!mermoz && mermoz.ambre && /dernier jour (demain|aujourd’hui)/.test(mermoz.resume) && L.points[0] && L.points[0].cle === 'relaispressingmermoz|35000', `${T} le point au dernier jour : en tête, « dernier jour » en ambre`, mermoz && JSON.stringify([mermoz.resume, L.points[0] && L.points[0].cle]));
-        const puma = L.idents.find((x) => x.cle === 'r:v:9402');
-        dit(!!puma && /Puma Suede taille 42/.test(puma.txt) && /Code de retrait\s*998877/.test(puma.txt), `${T} une carte à retirer dit ce que c'est et SON code, nommé (« Code de retrait 998877 »)`, puma && puma.txt);
+        const rowsMermoz = L.idents.filter((x) => x.point === 'relaispressingmermoz|35000' || (x.section === 'aujourdhui'));
+        const premierPret = L.idents.find((x) => x.cle.startsWith('r:') && !x.verif);
+        dit(!!mermoz && rowsMermoz.some((x) => x.echeanceAmbre && /dernier|demain/.test(x.echeance || '')) && premierPret && (premierPret.point === 'relaispressingmermoz|35000'), `${T} le point au dernier jour : en tête, « dernier jour » en ambre`, JSON.stringify([rowsMermoz.map((x) => [x.cle, x.echeance, x.section]), premierPret && premierPret.point]));
+        // (3 nov.) Le code s'ouvre au toucher de « Code » : nommé (« Code de retrait 998877 »).
+        await pg.click('[data-cc-carte="r:v:9402"] [data-rp-code]').catch(() => {}); await pg.waitForTimeout(250);
+        const pumaTxt = await pg.evaluate(() => (document.querySelector('[data-cc-carte="r:v:9402"]') || {}).innerText || '');
+        dit(/Puma Suede taille 42/.test(pumaTxt) && /Code de retrait\s*998877/.test(pumaTxt), `${T} une carte à retirer dit ce que c'est et SON code, nommé (« Code de retrait 998877 »)`, pumaTxt);
+        await pg.click('[data-cc-carte="r:v:9402"] .vrm-rpf-rang').catch(() => {}); await pg.waitForTimeout(200);
         const sansGeste = L.idents.filter((x) => x.cle.startsWith('r:') && !x.retire).map((x) => x.cle);
         dit(!sansGeste.length, `${T} chaque colis à retirer porte « J'ai retiré » sur SA carte`, JSON.stringify(sansGeste));
         // (2 nov., n° 1) « J'ai retiré » se LIT : le texte visible du bouton (rendu, pas le
@@ -306,7 +321,7 @@ async function main() {
         if (process.env.PLAN) console.log(`\n──── PLAN ${T} · À envoyer ────\n${L.texte}\n────`);
         await tranches(pg, `colis-clair-${vp.width}-envoyer`);
         dit(L.onglet === 'envoyer', `${T} toucher « À envoyer » montre les colis à envoyer`, L.onglet);
-        const doublesE = ENVOYER.filter((k) => fois(L, k) !== 1).map((k) => `${k}×${fois(L, k)}`);
+        const doublesE = ENVOYER.filter((k) => !PARTIS.includes(k)).filter((k) => fois(L, k) !== 1).map((k) => `${k}×${fois(L, k)}`);
         dit(!doublesE.length, `${T} À envoyer : chaque colis (par son identité) est dans le DOM EXACTEMENT une fois`, JSON.stringify(doublesE));
         const intrusE = L.idents.filter((x) => x.cle.startsWith('r:')).map((x) => x.cle);
         dit(!intrusE.length, `${T} À envoyer : aucun colis à retirer n'y est redit`, JSON.stringify(intrusE));
@@ -314,9 +329,16 @@ async function main() {
         dit(!codesE.length, `${T} À envoyer : aucun code de retrait (ils ne sont que sous « À retirer »)`, JSON.stringify(codesE));
         const grpFaux = Object.entries(GROUPE_ENV).filter(([cle, g]) => { const x = L.idents.find((y) => y.cle === cle); return !x || x.groupe !== g; });
         dit(!grpFaux.length, `${T} chaque colis à envoyer est dans SON groupe (Prêts à imprimer · En attente du bordereau)`, JSON.stringify(grpFaux));
-        dit(/Prêts à imprimer/.test(L.texte) && /En attente du bordereau/.test(L.texte), `${T} les groupes sont nommés`, '');
-        const partisFaux = PARTIS.filter((k) => !(L.idents.find((y) => y.cle === k) || {}).partis);
-        dit(!partisFaux.length && L.partisOuvert === false, `${T} « Partis » : replié, et chaque colis parti y est (coché posté compris)`, JSON.stringify([partisFaux, L.partisOuvert]));
+        // (3 nov., nouvelle mise en page) Les colis sont rangés sous l'en-tête de LEUR transporteur (le groupe
+        // Prêts/En attente reste porté par `data-groupe-carte`, jugé juste au-dessus).
+        const grT = await pg.evaluate(() => [...document.querySelectorAll('[data-groupe-transp]')].map((x) => x.getAttribute('data-groupe-transp')));
+        dit(grT.length > 0 && new Set(grT).size === grT.length, `${T} les groupes sont nommés (un en-tête par transporteur)`, grT.join(' | '));
+        const partisIci = PARTIS.filter((k) => fois(L, k) > 0);
+        await pg.click('[data-colis-onglet-choix="envoyes"]'); await pg.waitForTimeout(600);
+        const Lp = await lire(pg);
+        const partisFaux = PARTIS.filter((k) => fois(Lp, k) !== 1 || !(Lp.idents.find((y) => y.cle === k) || {}).partis);
+        dit(!partisFaux.length && !partisIci.length, `${T} « Partis » = l'onglet « Envoyés » : chaque colis parti y est UNE fois (coché posté compris), aucun dans « À envoyer »`, JSON.stringify([partisFaux, partisIci]));
+        await pg.click('[data-colis-onglet-choix="envoyer"]'); await pg.waitForTimeout(500);
         const nPrets = Object.values(GROUPE_ENV).filter((g) => g === 'pret').length;
         dit(!!L.bouton && L.bouton.n === nPrets && new RegExp(`\\b${nPrets}\\b`).test(L.bouton.txt) && /prêts?/.test(L.bouton.txt), `${T} « Imprimer les N prêts » = les prêts`, JSON.stringify(L.bouton));
         dit(L.emballer, `${T} « Emballer » reste accessible`, '');
@@ -354,7 +376,8 @@ async function main() {
         dit(haut.journal !== 'dessus' && haut.stock !== 'dessus', `${T} À envoyer : « Tes emails… » et « Où sont ces articles » sous la liste, pas avant la première carte`, JSON.stringify([haut.journal, haut.stock]));
         dit(!haut.posteFixe, `${T} À envoyer : pas de phrase permanente « … est dans Partis » (le nombre est sur « Partis »)`, '');
         if (!ordi) {
-          dit(!!haut.sous && !haut.sous.cote && haut.sous.lignes <= 1, `${T} le sous-titre tient sur UNE ligne, le bouton du haut n'est pas à côté de lui`, JSON.stringify(haut.sous));
+          // (3 nov.) Style Fusion : plus de phrase sous le titre de Colis (Julien, 2 nov. 22 h). S'il y en a une, elle tient sur une ligne.
+          dit(!haut.sous || (!haut.sous.cote && haut.sous.lignes <= 1), `${T} le sous-titre (s'il existe) tient sur UNE ligne, le bouton du haut n'est pas à côté de lui`, JSON.stringify(haut.sous));
           dit(haut.premiereTop != null && haut.premiereTop < haut.vh - 60, `${T} la première carte de colis est au-dessus de la ligne de flottaison (un colis prêt)`, `${haut.premiereTop} / ${haut.vh}`);
         }
         dit(!L.ban, `${T} À envoyer : jamais « Base Adresse Nationale »`, '');
@@ -362,7 +385,8 @@ async function main() {
         dit(L.sw <= L.cw + 1, `${T} À envoyer : aucun débordement horizontal`, `${L.sw} > ${L.cw}`);
         await pg.screenshot({ path: path.join(SHOTS, `colis-clair-${vp.width}.png`), fullPage: false });
         if (L.bouton) {
-          await pg.click('[data-imprimer-prets]');
+          // (Fusion) « Imprimer les N prêts » vit dans les outils de « … » : on le touche par le DOM.
+          await pg.evaluate(() => { const b = document.querySelector('[data-imprimer-prets]'); if (b) b.click(); });
           await pg.waitForSelector('[data-lot][role=dialog]', { timeout: 5000 }).catch(() => {});
           const lot = await pg.evaluate(() => { const d = document.querySelector('[data-lot][role=dialog]'); return d ? Number(d.getAttribute('data-lot')) : null; });
           dit(lot === L.bouton.n, `${T} le bouton ouvre le lot d'impression des ${L.bouton.n} prêts (l'action de « Tout imprimer »)`, String(lot));
@@ -372,7 +396,8 @@ async function main() {
         // ── LE LIEN « À RETIRER » (Ma journée, notification, ancien `?tab=retraits`) ──
         // Il ouvrait le détail des retraits SOUS les colonnes : les colis et leurs
         // codes y étaient redits. Il ouvre maintenant « À retirer », chaque code une fois.
-        await pg.goto(`http://localhost:${PORT}/?tab=retraits`, { waitUntil: 'domcontentloaded' });
+        // (l'onglet d'impression qui se ferme peut interrompre la navigation : ERR_ABORTED ⇒ une seconde fois)
+        await pg.goto(`http://localhost:${PORT}/?tab=retraits`, { waitUntil: 'domcontentloaded' }).catch(() => pg.waitForTimeout(600).then(() => pg.goto(`http://localhost:${PORT}/?tab=retraits`, { waitUntil: 'domcontentloaded' })));
         for (let i = 0; i < 40; i++) { const n = await pg.evaluate(() => document.querySelectorAll('[data-code-retrait]').length); if (n >= 10) break; await pg.waitForTimeout(500); }
         await pg.waitForTimeout(2500);
         L = await lire(pg);
