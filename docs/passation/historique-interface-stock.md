@@ -3057,3 +3057,34 @@ barre au fond de la page.
 ⚠️ Le jeu du banc ne fabrique pas encore les sources de la capture de Julien (Leboncoin à
 retirer, Vestiaire, agent eBay, e-mails mis de côté) : la forme courte est prouvée par
 l'audit, la mise en page par le banc avec les gestes du jeu de base.
+
+### 3 nov. — Critique complète (coordinateur), points traités sur les 4 écrans Fusion
+
+Rapport : `scratchpad/critique/RAPPORT.md` (hors dépôt). Traités ici :
+- **#2** Téléphone : sur Ma journée, Ventes, Colis et Compta, la barre du haut ne redit plus le
+  titre (ni tuile logo, ni titre centré) ; icônes seules, sur le fond de l'écran (le noir de la
+  tête sur Ma journée). **« Compta » partout** (colonne, menu Plus, titre) ; `tous-boutons`,
+  `compta-simple`, `menu-range`, `mobile`, `revendeurs`, `annonces-ventes-brouillon` suivent.
+- **#3** Leboncoin et eBay : `KpiVentes` rend la carte sombre (`CarteMois`) avec les MÊMES valeurs
+  et attributs (`data-kpi`), « — » quand ce n'est pas lu ; les ventes Leboncoin portent la frise
+  (`friseVenteLue` : « Postée » = expédiée, « Livrée »/« Payée » = finalisée, lu par l'extension).
+  Reste : la frise sur les lignes eBay et Vestiaire (statuts à projeter un par un).
+- **#5** Une carte de vente = deux commandes (puce + bordereau) ; « Prix d'achat », « Relier un
+  achat », « Déposé », « sur Vinted » derrière « … » (comme Colis) ; l'état sous le titre ne redit
+  plus la frise (seule l'urgence « À expédier ») ; transporteur pas lu ⇒ pas de puce, le bouton
+  prend la rangée.
+- **#6** Le récapitulatif porte LA frise de la ligne (`RecapFrise` → `Frise.jsx`, 4 étapes, mêmes
+  mots) ; « Bordereau reçu le … » devient une ligne de détail. `recap-vente` relit les 4 segments
+  sous les noms de `friseVente` (même règle jugée).
+- **#10** Sombre : fond #000 (la règle Vitrine `:root[data-theme=dark] .vrm-main` gagnait), cartes
+  #1C1C1E, filet clair autour des cartes sombres, pastilles #3A3A3C (plus de carré blanc pur).
+- **#11** Ma journée : pastilles 42/13/800 17 — ambre = dû aujourd'hui, encre, gris #c7c7cc pour
+  « à saisir » ; le titre ne redit plus le nombre de la pastille (`titreSansNombre`, audité) ;
+  URSSAF au même gabarit (« Noter » en pilule, la phrase en infobulle) ; « Vendus ailleurs » 600.
+- **#12** Courbe : rien sous 3 points (2 points faisaient un trait plat sur un bloc).
+- **#13** Ordinateur : les 4 écrans dans une colonne de 760 px centrée ; plus d'en-têtes de
+  colonnes sur Ventes ; étiquettes 13 px, frise 12 px (11 au téléphone).
+- **#15** (Colis seulement) le groupe « Transporteur pas lu » s'appelle « Autres ».
+
+Non faits ici (annoncés pour le chantier suivant) : palette globale (#1), phrases des autres
+écrans (#4), pastilles de site (#8), échelle typographique globale (#9), autres écrans.
