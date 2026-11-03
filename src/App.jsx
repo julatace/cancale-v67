@@ -54,6 +54,7 @@ import { toutSurLeNumero, lireNumeroCherche } from "./rechercheNumero.js";
 import { repriseNumerosRecreation, tableRecrees } from "./repriseNumero.js";
 import { etatCycle, cartesSupprimees, majVusEnLigne, indexPresentes, montantSaisi as montantCycle, CHOIX as CHOIX_CYCLE, LIBELLE_CHOIX } from "./cycleArticle.js";
 import { chezMoiProposables } from "./propositionsSites.js";
+import { retraitsEbayAutoAilleursPermis, RAISON_RETRAIT_AILLEURS } from "./retraitAilleurs.js";
 import { polyDe, estRectangle, normaliserPoly, FORMES, rectDans, empreinte, chevauche, placerSansTraverser, modeCase, capaciteCase, articlesAutresPlateformes, unParArticle, empilerDansCase, retirerDeCase, retirerDePile, ajouterAPile, cartonsDePile, hauteurPile, changerHauteurPile, prochainePlaceMeuble, estPoseSur, caler, proposerPiece, planchesCases, planchesRangees, plateauxMeuble, plateauxReglables, tasserPlateaux } from './stockRegles.js';
 import {formaterMontantEbay} from './montantsEbay.js';
 import {cibleEbay} from "./ebayParcours.js";
@@ -24117,7 +24118,7 @@ function EbayInactives({ comptesEbay, tick, vue = '*', connected, ventes, dejaSu
     const url = URL_ITEM_EBAY(l.itemId);
     const prix = Number(String(l.price || '').replace(',', '.'));
     const etatLigne = vendue ? `vendue sur ${vendue} — ne la remets pas en vente`
-      : retraitAuto ? `retirée par VRM${Number.isFinite(Number(retraitAuto.at)) ? ' le ' + new Date(Number(retraitAuto.at)).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }) : ''} : vendue sur Vinted — ne la remets pas en vente`
+      : retraitAuto ? `retirée par VRM${Number.isFinite(Number(retraitAuto.at)) ? ' le ' + new Date(Number(retraitAuto.at)).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }) : ''} : vendue sur ${retraitAuto.ou || 'Vinted'} — ne la remets pas en vente`
       : memeEnLigne ? 'aussi dans tes annonces en ligne — état à relire chez eBay'
       : relancee ? 'déjà remise en vente sur eBay'
       : deja ? (deja.etat === 'programmee' ? 'déjà programmée de nouveau sur eBay' : 'déjà de nouveau en vente sur eBay')
@@ -56777,14 +56778,21 @@ const RAISON_RETRAIT_AUTO = {
 //     pendant le passage compte ;
 //   · puis la règle la plus stricte (`retraitsEbayAutoPermis`).
 // Rend `{ lance, raison, permis, ecartes }` (pour l'audit ; la coque n'attend pas).
-async function passageRetraitEbayAuto({ nuageAuDepart, continuer, annonces, commandes, enLigne, toutesLues, vendusVinted, lireNumeros, comptesBloques, maintenant }) {
+// (3 nov.) + `ventes` (le verdict « déjà vendue, toutes plateformes ») et
+// `ailleurs` ({ lbc, vc, revenues }) : une vente Leboncoin ou Vestiaire PROUVÉE
+// par identité retire aussi l'annonce eBay (`retraitsEbayAutoAilleursPermis`,
+// src/retraitAilleurs.js — la même rigueur que pour Vinted). Sans eux : comme avant.
+async function passageRetraitEbayAuto({ nuageAuDepart, continuer, annonces, commandes, enLigne, toutesLues, vendusVinted, lireNumeros, comptesBloques, maintenant, ventes = null, ailleurs = null }) {
   const peut = () => (typeof continuer === 'function' ? !!continuer() : false);
   if (!nuageAuDepart) return { lance: false, raison: 'nuage', permis: [], ecartes: [] };
   if (!peut()) return { lance: false, raison: 'arrete', permis: [], ecartes: [] };
   if (!vendusVinted || !toutesLues) return { lance: false, raison: 'pas-su', permis: [], ecartes: [] };
   const numeros = (typeof lireNumeros === 'function' ? lireNumeros() : null) || {};
-  const dv = doublesVenteEbay({ annonces, commandes, numeros, enLigne: enLigne || null, vendusVinted, programmees: [], ventes: null });
-  const { permis, ecartes } = retraitsEbayAutoPermis({ aRetirerEbay: dv.aRetirerEbay, numeros, vendusVinted, toutesLues, comptesBloques, ...(maintenant ? { maintenant } : {}) });
+  const dv = doublesVenteEbay({ annonces, commandes, numeros, enLigne: enLigne || null, vendusVinted, programmees: [], ventes: ventes || null });
+  const pv = retraitsEbayAutoPermis({ aRetirerEbay: dv.aRetirerEbay, numeros, vendusVinted, toutesLues, comptesBloques, ...(maintenant ? { maintenant } : {}) });
+  const pa = ailleurs ? retraitsEbayAutoAilleursPermis({ aRetirerEbayAilleurs: dv.aRetirerEbayAilleurs, numeros, revenues: ailleurs.revenues, lbc: ailleurs.lbc, vc: ailleurs.vc,
+    cle: cleNum, numEbayLu, clesAnnonce: clesAnnonceLbc, lbcAnnulee, ...(maintenant ? { maintenant } : {}) }) : { permis: [], ecartes: [] };
+  const permis = [...pv.permis, ...pa.permis], ecartes = [...pv.ecartes, ...pa.ecartes];
   if (!permis.length || !peut()) return { lance: false, raison: permis.length ? 'arrete' : 'rien', permis, ecartes };
   await retirerEbayAuto(permis, peut);
   return { lance: true, raison: '', permis, ecartes };
@@ -56829,14 +56837,14 @@ const retirerEbayAuto = async (liste, continuer) => {
       };
       try {
         const r = await fetch('/api/ebay', { method: 'POST', headers: { 'content-type': 'application/json', ...enTeteSession() },
-          body: JSON.stringify({ action: 'retirer', itemId: id, confirme: true, auto: true, sku: skuEbayDe(d.numero) || a.sku, titre: a.title || '', venduLe: d.venduLe || '', ...corpsCompteEbay(a._compte) }) });
+          body: JSON.stringify({ action: 'retirer', itemId: id, confirme: true, auto: true, sku: skuEbayDe(d.numero) || a.sku, titre: a.title || '', venduLe: d.venduLe || '', ou: d.ou || 'Vinted', ...corpsCompteEbay(a._compte) }) });
         const code = r && Number.isFinite(r.status) ? r.status : 0;
         const j = await r.json().catch(() => null);
         if (j && j.ok) {
           n += 1;
           // Le journal est ce qui lui permet de RELIRE ce qui est parti en son
           // nom : s'il n'a pas pu être écrit, on le dit.
-          toast(`N°${d.numero} retirée d'eBay automatiquement : elle est vendue sur Vinted.${j.journal === false ? ' (Pas notée dans l’historique des retraits — la base n’a pas répondu.)' : ''}`, 'ok');
+          toast(`N°${d.numero} retiré d'eBay automatiquement : vendu sur ${d.ou || 'Vinted'}.${j.journal === false ? ' (Pas notée dans l’historique des retraits — la base n’a pas répondu.)' : ''}`, 'ok');
         } else if (j && EBAY_DEJA_TERMINEE.test(String(j.error || ''))) {
           /* déjà close : ne prend pas une des 5 places */
         } else if (!j || code === 504 || (j && j.reason === 'incertain')) { n += 1; incertain(); }
@@ -64690,14 +64698,25 @@ function AppCoeur() {
         // lues — puis la règle la plus stricte (`retraitsEbayAutoPermis`), jugée
         // sur les fiches RELUES juste avant (une saisie faite pendant le
         // passage compte). Sinon : rien, et la cloche dit « à retirer ».
-        if(dvE.aRetirerEbay.length) passageRetraitEbayAuto({
-          nuageAuDepart,
-          continuer:()=>!cancelled && load('vrm_ebay_retrait_auto',false)===true,
-          annonces:annE||[], commandes:ords||[], enLigne:enLigneE,
-          toutesLues:!!(lusE && lusE.toutesLues), vendusVinted:vendusE,
-          lireNumeros:()=>load('vinted_annonce_numeros',{})||{},
-          comptesBloques:comptesBloquesVinted(),
-        }).catch(()=>{});   // un passage qui tombe ne retire rien (il reste « à retirer »)
+        // (3 nov.) + les ventes Leboncoin et Vestiaire PROUVÉES par identité
+        // (src/retraitAilleurs.js) : « vendu sur un site ⇒ retiré d'eBay ».
+        if(dvE.aRetirerEbay.length || (dvE.aRetirerEbayAilleurs||[]).length) (async()=>{
+          const pvA=(dvE.aRetirerEbayAilleurs||[]).length?await lirePreuvesVenteVinted().catch(()=>null):null;
+          const lbcRow=(dvE.aRetirerEbayAilleurs||[]).some(d=>d&&d.ou==='Leboncoin')?await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.lbc_ventes&select=cap:data->>updatedAt`,{headers:sbAuth()}).then(r=>r.ok?r.json():null,()=>null):null;
+          const vcCap=(dvE.aRetirerEbayAilleurs||[]).some(d=>d&&d.ou==='Vestiaire')?await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vc_ventes&select=cap:data->>capturedAt`,{headers:sbAuth()}).then(r=>r.ok?r.json():null,()=>null):null;
+          return passageRetraitEbayAuto({
+            nuageAuDepart,
+            continuer:()=>!cancelled && load('vrm_ebay_retrait_auto',false)===true,
+            annonces:annE||[], commandes:ords||[], enLigne:enLigneE,
+            toutesLues:!!(lusE && lusE.toutesLues), vendusVinted:vendusE,
+            lireNumeros:()=>load('vinted_annonce_numeros',{})||{},
+            comptesBloques:comptesBloquesVinted(),
+            ventes:ventesE,
+            ailleurs:{ revenues:pvA&&pvA.revenuesItems?pvA.revenuesItems:null,
+              lbc:ventesLbcLu&&Array.isArray(lbcRow)&&lbcRow[0]?{ ventes:ventesLbcLu, items:lbcItemsLu||null, liens:liensV, cap:lbcRow[0].cap }:null,
+              vc:Array.isArray(ventesVcN)&&Array.isArray(vcCap)&&vcCap[0]?{ ventes:ventesVcN, cap:vcCap[0].cap }:null },
+          });
+        })().catch(()=>{});   // un passage qui tombe ne retire rien (il reste « à retirer »)
       }catch(_){}
       // ── (3 nov.) LE CYCLE D'UN ARTICLE : « N°x supprimé de Vinted » ─────────
       // La règle est PURE (src/cycleArticle.js). D'abord sur les lectures déjà
