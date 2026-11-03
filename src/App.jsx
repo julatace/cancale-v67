@@ -50221,7 +50221,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               const bordGeste = !hidden && st !== 'cancelled' && aExpedier(o) && !isShipDone(o) && o.transaction_id != null;
               // (2 nov.) Le transporteur LU de la vente (n° de SON bordereau) : à côté du bouton
               // bordereau tant qu'il y a un colis à envoyer, sinon une ligne des détails (dit une fois).
-              const trRecap = transporteurVente(bordE);
+              const trRecap = transporteurVente(bordE); try { (window.__trDbg = window.__trDbg || []).push({ tx: txL, suivi: bordE && bordE.suivi, nb: Array.isArray(tracking) ? tracking.length : String(tracking), has: Array.isArray(tracking) ? tracking.filter(x => x && String(x.suivi||'').includes('0410')).map(x => [x.suivi, x.carrier]) : null, transp: transpMap ? 'm' : String(transpMap), only, cle: trRecap.cle }); } catch (_) {}
               return <>
                 <header className="vrm-recap-tete">
                   <div className="vrm-sale-photo vrm-recap-photo">{photo ? <PhotoArticleAgrandissable src={photo} titre={o.title}><PhotoVenteSources {...photoSourcesProps} data-photo-vente="detail" style={{width:'100%',height:'100%',objectFit:'cover'}}/></PhotoArticleAgrandissable> : <Icon name="image" size={22} style={{color:C.muted,opacity:.55}}/>}</div>
