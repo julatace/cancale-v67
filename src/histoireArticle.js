@@ -36,6 +36,7 @@ const parDate = (a, b) => { const ta = t(a.at), tb = t(b.at); if (ta == null && 
 // coffres   { [itemId]: { firstSavedAt } } | null      (null = pas lu)
 // offres    [{ item, at, prix, sens: 'recue'|'faite', etat }] | null
 // journalPrix [{ at, prix, sites: [{ site, id, avant }] }] | null
+// prixVinted  `vinted_prix_historique` (Republier) [{ item, avant, apres, at }]
 // recus     Set des n° de transaction d'achat qui ont un reçu | null
 // autresEnLigne [{ site, id, lien, prix }] (Leboncoin, Vestiaire, par identité) | null
 export function histoireArticle(rn, d = {}, o = {}) {
@@ -102,8 +103,12 @@ export function histoireArticle(rn, d = {}, o = {}) {
   // 5. CHANGEMENTS DE PRIX — le journal de VRM (sites FAITS seulement).
   if (d.journalPrix == null) pose('prix', 'passu', 'Prix', [], 'journal des prix pas lu');
   else {
-    const ev = d.journalPrix.filter((j) => j && Array.isArray(j.sites) && j.sites.length && Number.isFinite(Number(j.prix)))
-      .map((j) => ({ at: iso(j.at), texte: `${j.sites.map((s) => NOM[s.site] || s.site).join(', ')} · ${j.sites[0].avant != null ? eur(j.sites[0].avant) + ' → ' : ''}${eur(Number(j.prix))}`, preuve: 'changé depuis VRM', cle: 'prix' }));
+    // Republier (« modifier sur place ») range déjà ses prix changés par annonce
+    // (`vinted_prix_historique`, { item, avant, apres, at }) : lus par l'identifiant.
+    const evR = (d.prixVinted || []).filter((x) => x && idsSet.has(str(x.item)) && Number.isFinite(Number(x.apres)))
+      .map((x) => ({ at: iso(x.at), texte: `Vinted · ${Number.isFinite(Number(x.avant)) ? eur(Number(x.avant)) + ' → ' : ''}${eur(Number(x.apres))}`, preuve: `annonce ${str(x.item)} · Republier`, cle: 'prix' }));
+    const ev = evR.concat(d.journalPrix.filter((j) => j && Array.isArray(j.sites) && j.sites.length && Number.isFinite(Number(j.prix)))
+      .map((j) => ({ at: iso(j.at), texte: `${j.sites.map((s) => NOM[s.site] || s.site).join(', ')} · ${j.sites[0].avant != null ? eur(j.sites[0].avant) + ' → ' : ''}${eur(Number(j.prix))}`, preuve: 'changé depuis VRM', cle: 'prix' })));
     pose('prix', ev.length ? 'fait' : 'absent', 'Prix', ev, ev.length ? null : 'aucun changement fait depuis VRM');
   }
 
