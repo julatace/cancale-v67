@@ -3088,3 +3088,14 @@ Rapport : `scratchpad/critique/RAPPORT.md` (hors dépôt). Traités ici :
 
 Non faits ici (annoncés pour le chantier suivant) : palette globale (#1), phrases des autres
 écrans (#4), pastilles de site (#8), échelle typographique globale (#9), autres écrans.
+
+**Fin du 3 nov. (fusion de main « bénéfice unique » comprise)** : la tête de Ma journée, la carte
+Compta et la ligne de Ventes suivent `chiffreBenefice` (« — » si pas su ; « Bénéfice brut du mois »
+retiré) ; les barres des 6 mois de Compta disent « bénéfice brut ». Trouvé en route : au téléphone, le
+menu « Outils » de Ventes (recherche, période) tombait sous la règle qui range la barre — corrigé.
+Rouges connus, **déjà rouges sur `main`** (mesurés sur `git archive origin/main`) : `chiffres-croises`
+(1) et `vendu-recu` (10) — Statistiques ne pose pas son montant du mois dans ces jeux ;
+`demo-bulles` (boutons de la visite à 43 px) ; `mobile` (s'arrête plus loin sur main, au menu Colis).
+Restent rouges ici : `mobile` à l'étape « 7 jours » de la période dans « Outils », `compta-simple` E
+(saisie de dépense pendant que le nuage est retenu, 2), `annonces-ventes-brouillon` (16 rouges sur main,
+quelques-uns de plus ici, écrans Annonces/Messages surtout).
