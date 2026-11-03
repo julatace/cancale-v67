@@ -227,3 +227,9 @@ html body .vrm-visite .vrm-visite-pied :is(button, .vrm-b) { min-height: 46px !i
 /* La puce transporteur reste sur UNE ligne (« Transporteur inconnu » passait à la ligne et décalait la rangée). */
 html body .vrm-rangee-bord > .vrm-puce-transp, html body .vrm-rangee-bord > .vrm-puce-transp * { white-space: nowrap !important; }
 html body .vrm-rangee-bord > .vrm-puce-transp { overflow: hidden !important; text-overflow: ellipsis !important; }
+:root:root body .vrm-carte-periode-cal > * { flex: 1 1 auto; display: flex; gap: 8px; align-items: center; min-width: 0; }
+:root:root body .vrm-carte-periode-cal .vrm-cal-declencheur { flex: 1 1 auto !important; position: relative; }
+:root:root body .vrm-carte-periode-cal .vrm-cal-declencheur::after { content: ''; width: 7px; height: 7px; margin-left: auto; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; transform: translateY(-2px) rotate(45deg); opacity: .6; flex: none; }
+:root:root body .vrm-carte-periode-cal .vrm-cal { flex: 1 1 auto; margin: 0 !important; }
+:root:root body .vrm-carte-periode-cal .vrm-cal > .vrm-rangee { display: flex !important; width: 100%; }
+:root:root body .vrm-carte-periode-cal .vrm-cal > .vrm-rangee > .vrm-cal-declencheur { flex: 1 1 auto !important; display: flex !important; align-items: center; gap: 8px; }

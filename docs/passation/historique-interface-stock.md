@@ -3328,3 +3328,23 @@ avec les articles ». Décisions (rapportées par la session qui pilote) et ce q
   (2) comment déclarer une vente en main propre (CA/URSSAF), (3) s'il veut (b) sur Leboncoin
   (version d'extension), (4) garder le retrait eBay automatique ALLUMÉ maintenant qu'il couvre
   Leboncoin et Vestiaire ; ouvrir « Mes transactions » Leboncoin pour rafraîchir la liste.
+
+### 3 nov. (après-midi) — Le calendrier de la carte (Julien : « fais un calendrier »)
+
+Sur la feuille « Modifier » de la carte sombre, la rangée « Aujourd'hui · Semaine · Mois · Trimestre ·
+Année » était coupée en hauteur et défilait de côté. Pour un chiffre qui se calcule sur des dates
+libres (`PLAGE_IDS` : CA vendu, nombre de ventes, bénéfice brut, ventes finalisées), la période se
+choisit maintenant dans LE calendrier de l'app (`ChoixPeriode`, celui de Ventes/Achats/Statistiques,
+nouvelle option `raccourcis` = `raccourcisCarte` : Aujourd'hui · Cette semaine · Ce mois · Mois dernier ·
+Ce trimestre · Cette année, + plage libre) ; un bouton pleine largeur « Novembre ▾ ». Un raccourci qui
+est une période nommée redevient ce mot (calculé par `debutPeriode`) ; sinon la place garde
+`{ de, a, label }` (bornes [de, a) en jours entiers, `etiquettePlage` : « 30 oct.–1 nov. »), qui se lit
+en tête de carte. Un chiffre qui ne se calcule pas sur une plage (bénéfice, à déclarer, URSSAF…) garde
+ses seules périodes en contrôle segmenté, et une plage posée sur lui rend « — » (`valeurChiffre`),
+jamais un faux total ; `reglageDePage` ne la garde pas. Le calendrier passe au-dessus de la feuille
+(portail, z-index). Finitions : « Modifier » de la tête de Ma journée en haut à droite ; cases en
+capitale initiale ; « CA finalisé » → « Finalisé » ; détail des cases en infobulle ; plus de « Aucune
+vente finalisée ce mois-ci » sous la carte de Compta.
+Preuves : `carte-stats` D (plage du 30 oct. au 1er nov. = 3 ventes à la main, étiquette, rangement,
+retour à « Ce mois ») ; `audit-carte-chiffres` +5 (rouges sur main : bénéfice sur plage de la place,
+plage gardée au réglage).
