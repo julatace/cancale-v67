@@ -1140,3 +1140,31 @@ html body .vrm-carte-feuille .vrm-carte-place { min-height: 56px !important; }
 html body .vrm-app-shell .vrm-main:has(.vrm-fu-colis) .vrm-colis-retirer { margin-bottom: 0 !important; }
 html body .vrm-app-shell .vrm-main:has(.vrm-fu-colis) [data-colis-retraits="outils"] > * { padding-top: 0 !important; }
 html body .vrm-app-shell .vrm-main:has(.vrm-fu-colis) [data-colis-retraits="outils"] .vrm-repartis-courts { margin-top: 0 !important; }
+/* ══ 24. 3 NOV., 13 h 02 — « À RETIRER » EN SECTIONS (Julien : « tu dois mieux SÉPARER ») ══
+   Un titre de section sobre (17/700, le nombre en gris), 28 px d'air entre les sections ; « À retirer
+   aujourd'hui » seule en ambre discret ; une carte par point (en-tête sur un fond légèrement différent). */
+.vrm-rpf { gap: 0 !important; }
+.vrm-rpf > .vrm-rpf-carte, .vrm-rpf > .vrm-relais-fond { margin-bottom: 12px; }
+.vrm-rpf-section { margin-top: 28px; }
+.vrm-rpf > .vrm-rpf-villes + .vrm-rpf-section, .vrm-rpf > .vrm-rpf-section:first-child { margin-top: 20px; }
+.vrm-rpf-section-titre { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin: 0 2px 10px; font: 700 17px/1.25 var(--vrm-police, system-ui); color: var(--fu-encre, #1d1d1f); letter-spacing: -.01em; list-style: none; }
+.vrm-rpf-section-titre > span:first-child { display: inline-flex; align-items: baseline; gap: 8px; }
+.vrm-rpf-section-n { font: 600 14px/1 var(--vrm-police, system-ui); color: var(--fu-gris2, #8e8e93); margin-left: 8px; }
+.vrm-rpf-section-titre .vrm-rpf-section-n { margin-left: 8px; }
+.vrm-rpf-section.is-ambre > .vrm-rpf-section-titre { color: var(--fu-ambre-txt, #b25000); }
+.vrm-rpf-section.is-ambre .vrm-rpf-point { box-shadow: 0 0 0 1px rgba(255,159,10,.35), var(--fu-ombre); }
+.vrm-rpf-section-corps { display: flex; flex-direction: column; gap: 12px; }
+.vrm-rpf-section.is-repli > summary { cursor: pointer; min-height: 44px; align-items: center; }
+.vrm-rpf-section.is-repli > summary::-webkit-details-marker { display: none; }
+.vrm-rpf-section.is-repli[open] .vrm-rpf-chevron { transform: rotate(90deg); }
+.vrm-rpf-section.is-repli:not([open]) > .vrm-rpf-section-corps { display: none !important; }
+.vrm-rpf-point { padding: 0 !important; overflow: hidden; }
+.vrm-rpf-point > .vrm-rpf-tete { padding: 10px 14px !important; background: rgba(118,118,128,.06); border-bottom: .5px solid rgba(60,60,67,.14); min-height: 0 !important; }
+:root[data-theme="dark"] .vrm-rpf-point > .vrm-rpf-tete { background: rgba(255,255,255,.04); border-bottom-color: rgba(84,84,88,.5); }
+.vrm-rpf-point > .vrm-rpf-liste { padding: 0 14px; }
+.vrm-rpf-point > .vrm-rpf-liste > .vrm-rpf-ligne:first-child { border-top: 0 !important; }
+.vrm-rpf-point.is-inconnu { background: var(--fu-carte, #fff) !important; box-shadow: var(--fu-ombre) !important; }
+:root[data-theme="dark"] .vrm-rpf-point.is-inconnu { background: #1c1c1e !important; }
+:root body .vrm-app-shell .vrm-main .vrm-rpf-point.is-inconnu :is(.vrm-rpf-code, .vrm-rpf-retire, .vrm-rpf-vignette, .vrm-rpf-puce) { background: var(--fu-case, #f2f2f7) !important; }
+:root[data-theme="dark"] body .vrm-app-shell .vrm-main .vrm-rpf-point.is-inconnu :is(.vrm-rpf-code, .vrm-rpf-retire, .vrm-rpf-vignette, .vrm-rpf-puce) { background: #2c2c2e !important; }
+html body .vrm-app-shell .vrm-main:has(.vrm-fu-colis) [data-colis-retraits="outils"] [data-rp-section="argent"] { margin-top: -12px; } /* (le bas de l’écran Colis porte déjà 40 px : 28 px d’air comme entre les autres sections) */

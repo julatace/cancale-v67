@@ -51914,6 +51914,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           // par colis reparti — sa photo (l'achat lui-même), « Remboursement à vérifier · 19,64 € », « Ouvrir »
           // (la conversation de LA commande). Mêmes listes, même montant (`montantCommande`), aucune phrase.
           if (retraitsOutils) return (
+            <section className="vrm-rpf-section" data-rp-section="argent" data-rp-section-n={rendus.length}>
+            <h3 className="vrm-rpf-section-titre" data-rp-section-titre="argent">Argent à vérifier<span className="vrm-rpf-section-n">{rendus.length}</span></h3>
             <div className="vrm-repartis-courts" data-repartis={rendus.length} data-repartis-total={tot > 0 ? tot.toFixed(2) : ''}>
               {rendus.map((r, ix) => { const o = r.o, t = r.t; const ph = o ? orderPhoto(o) : null; const m = o ? montantCommande(o) : 0;
                 const href = o ? lienConv(o) : (t && t.suivi ? trackUrl(t.carrier || '', String(t.suivi)) : '');
@@ -51927,6 +51929,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     </div>
                   </div>); })}
             </div>
+            </section>
           );
           return (
             <div className="vrm-achats-bloc" data-repartis={rendus.length} style={{background:C.card,border:`1px solid ${C.border}`}}>
@@ -53641,7 +53644,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 au toucher) et « N comptes à relire » (la fraîcheur des lectures, `FraicheurDonnees` — elle ouvre
                 les comptes). Remplacent les bandeaux de texte du bas de l'écran. */}
             {(() => {
-              const nRoute = onglet === 'retirer' ? ((groupesRelais && groupesRelais.enRouteSansRelais) || 0) : 0;
+              const nRoute = 0;  // (3 nov., 13 h 02) « En route » est une section repliée à la fin de « À retirer »
               const ls = liveStats && Number(liveStats.dataAgeJours) > 1 ? liveStats : null;
               const nRelire = ls ? Math.max(1, (Array.isArray(ls.dataAgeComptes) ? ls.dataAgeComptes.filter((x) => x && x.login).length : 0)) : 0;
               if (!nRoute && !nRelire) return null;
@@ -53680,9 +53683,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   if (!adresseLibre) return null;
                   return <p className="vrm-colis-note" data-pickup-sans-compte={n}>{n>1?`${n} colis sont arrivés`:'1 colis est arrivé'} sur une adresse e-mail reliée à aucun de tes comptes Vinted : ils sont ci-dessous. Relie l’adresse pour qu’ils comptent.{' '}
                     <button type="button" className="vrm-lien-action" data-pickup-sans-compte-geste="" onClick={() => onNav && onNav('vintedaccounts')} style={{border:0,background:'transparent',padding:0,minHeight:44,color:C.text,fontWeight:600,cursor:'pointer',fontFamily:'inherit',fontSize:'inherit',textDecoration:'underline'}}>Paramètres → Comptes liés</button></p>; })()}
-                {colRet && colRet.cartes.length > 0
+                {colRet && (colRet.cartes.length > 0 || ((groupesRelais && groupesRelais.enRouteSansRelais) || 0) > 0)
                   ? <ColonneRetirer vue={parPoint} C={C} Photo={photoCarte} gestes={gestesRetrait} detail={arriveeRetrait} nomTransporteur={(k) => (CARRIERS[k] && CARRIERS[k].name) || ''} avecCarte={ordiColis} enRouteSansRelais={(groupesRelais && groupesRelais.enRouteSansRelais) || 0}
-                      fusion echeance={echeanceRetrait} statut={statutAVerifier} retirer={retirerColis} ville={villeRetrait} onVille={setVilleRetrait} titreDe={titreRetrait}/>
+                      fusion echeance={echeanceRetrait} statut={statutAVerifier} retirer={retirerColis} ville={villeRetrait} onVille={setVilleRetrait} titreDe={titreRetrait} enRoute={(groupesRelais && groupesRelais.sansRelais) || []}/>
                   : (toutLuRet ? <p className="vrm-colis-vide" data-retraits-vide="">Aucun colis à aller chercher pour l’instant.</p> : null)}
                 {voitSite('vestiaire') ? <AchatsVestiaireEnRoute vc={colisVestiaire(vcEtat)} transporteurDe={transporteurColis}/> : null}
               </section>
