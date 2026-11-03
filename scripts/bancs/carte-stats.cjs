@@ -280,8 +280,13 @@ const deborde = (pg) => pg.evaluate(() => document.documentElement.scrollWidth -
         await shot('[data-carte-stats="annonces"]', 'carte-annonces');
         await aller(pg, 'achats', '[data-carte-stats="achats"]');
         const h = await carte(pg, 'achats');
-        dit(!!h && h.grand.id === 'retirer', 'Achats : à retirer en grand', JSON.stringify(h && h.grand));
+        // (3 nov.) La carte d'Achats parle d'achats : Dépensé du mois en grand, jamais « Vendu · mois ».
+        dit(!!h && h.grand.id === 'depense' && h.cases.map((c) => c.id).join(',') === 'enroute,retirer,recus', 'Achats : dépensé en grand, en route · à retirer · reçus', JSON.stringify(h && { g: h.grand, c: h.cases.map((c) => c.id) }));
+        dit(!!h && !/vendu/i.test(JSON.stringify(h.cases.map((c) => c.t))), 'Achats : aucune case « Vendu »');
         await shot('[data-carte-stats="achats"]', 'carte-achats');
+        // (3 nov.) Rien de rogné dans une case, jamais « ≥ » sur un chiffre de case.
+        const rog = await pg.evaluate(() => [...document.querySelectorAll('.vrm-fu-case:not(.is-jour)')].flatMap((c) => [...c.querySelectorAll('b, :scope > span')].filter((e) => e.scrollWidth > e.clientWidth + 1 || /≥/.test(e.textContent)).map((e) => e.textContent)));
+        dit(!rog.length, 'cases : aucun libellé ni chiffre rogné, aucun « ≥ »', rog.join(' | '));
         const d = await deborde(pg);
         dit(d <= 1, 'aucun débordement horizontal', `${d}px`);
       });

@@ -51548,7 +51548,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           const n = { route: 0, recu: 0 }; if (lu) buysBase.forEach((o) => { const ph = phaseReception(o); if (n[ph] != null) n[ph]++; });
           return <CarteStatsApp page="achats" liveStats={liveStats} className="vrm-fu-ecran" ici="achats" onNav={onNav} sel={{ site: 'toutes', compte: null, periode: null }}
             locaux={{
-              depense: { nom: 'Dépensé du mois', court: 'Dépensé', type: 'eur', valeur: depense, attrs: { 'data-n': lu ? String(mois.length) : '' } },
+              depense: { nom: 'Dépensé du mois', court: 'Dépensé', type: 'eur', valeur: depense, quand: (() => { const m = m0.toLocaleDateString('fr-FR', { month: 'long' }); return m.charAt(0).toUpperCase() + m.slice(1); })(), attrs: { 'data-n': lu ? String(mois.length) : '' } },
               enroute: { nom: 'En route', court: 'En route', type: 'n', valeur: lu ? n.route : null, attrs: { 'data-n': lu ? String(n.route) : '' } },
               recus: { nom: 'Reçus', court: 'Reçus', type: 'n', valeur: lu ? n.recu : null, attrs: { 'data-n': lu ? String(n.recu) : '' } },
             }}/>;

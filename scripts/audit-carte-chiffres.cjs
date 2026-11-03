@@ -262,7 +262,7 @@ const proche = (a, b) => (a == null && b == null) || (a != null && b != null && 
 
   console.log('── 7. Le réglage par page');
   for (const page of M.PAGES) {
-    const r = M.reglageDePage(null, page, { enroute: { nom: 'x', court: 'x', type: 'n' }, apayer: { nom: 'y', court: 'y', type: 'n' }, imprimer: { nom: 'i', type: 'n' }, deposes: { nom: 'd', type: 'n' }, ca: { nom: 'c', type: 'eur' }, encours: { nom: 'e', type: 'n' }, 'finalisees-site': { nom: 'f', type: 'n' } });
+    const r = M.reglageDePage(null, page, { enroute: { nom: 'x', court: 'x', type: 'n' }, apayer: { nom: 'y', court: 'y', type: 'n' }, imprimer: { nom: 'i', type: 'n' }, deposes: { nom: 'd', type: 'n' }, ca: { nom: 'c', type: 'eur' }, encours: { nom: 'e', type: 'n' }, 'finalisees-site': { nom: 'f', type: 'n' }, depense: { nom: 'D', type: 'eur' }, recus: { nom: 'R', type: 'n' } });
     dit(!!r && !!r.g && r.c.length === 3 && r.defaut, `${page} : un grand chiffre et trois cases par défaut`, JSON.stringify(r));
   }
   const reg = M.reglageAEnregistrer(null, 'colis', { g: { id: 'vendu', p: 'semaine' }, c: [{ id: 'retirer' }, { id: 'aposter' }, { id: 'vendu', p: 'semaine' }] });
@@ -287,7 +287,9 @@ const proche = (a, b) => (a == null && b == null) || (a != null && b != null && 
   dit(/'vrm_carte_stats',/.test(A) && /onCloudReady\(\(\) => setV\(\(cur\) => cur === null \? lireReglageCarte\(\) : cur\)\)/.test(A), 'le réglage est synchronisé (`main`) et rattrapé par onCloudReady');
   for (const page of ['journee', 'ventes', 'ventes-toutes', 'vestiaire', 'colis', 'compta']) dit(new RegExp(`<CarteStatsApp page="${page}"`).test(A), `la page « ${page} » monte sa carte`);
   dit(/<CarteStatsApp page=\{plateforme\}/.test(A) && /<KpiVentes plateforme="leboncoin"/.test(A) && /<KpiVentes plateforme="ebay"/.test(A), 'Leboncoin et eBay montent leur carte (KpiVentes)');
-  dit(/page=\{achats \? 'achats' : 'annonces'\}/.test(A), 'Annonces et Achats montent leur carte');
+  // (3 nov.) Achats monte SA carte dans l'écran Achats, avec ses chiffres d'achat (jamais « Vendu · mois »).
+  dit(/page="annonces"/.test(A) && /page="achats"[^>]*locaux=\{\{\s*depense:/.test(A), 'Annonces et Achats montent leur carte (Achats : chiffres d’achat)');
+  dit(M.PAGES_CARTE.achats.g.id === 'depense' && ![M.PAGES_CARTE.achats.g, ...M.PAGES_CARTE.achats.c].some((x) => ['vendu', 'ventes', 'attente', 'aposter'].includes(x.id)), 'Achats : aucun chiffre de vente par défaut');
 
   console.log(`\n${ko ? '❌' : '✅'} carte-chiffres : ${ok} vert(s), ${ko} rouge(s)${MUT ? ` (mutation ${MUT})` : ''}`);
   process.exit(ko ? 1 : 0);
