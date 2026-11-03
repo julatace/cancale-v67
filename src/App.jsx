@@ -52,6 +52,8 @@ import {resumerStockJournee} from './stockJournee.js';
 import {jaugeSeuils,optionsMicro,calendrierUrssaf,phraseRythme,seuilsDe,declarationRevenus,rappelCfe} from './microEntreprise.js';
 import { toutSurLeNumero, lireNumeroCherche } from "./rechercheNumero.js";
 import { repriseNumerosRecreation, tableRecrees } from "./repriseNumero.js";
+import { etatCycle, cartesSupprimees, majVusEnLigne, indexPresentes, montantSaisi, CHOIX as CHOIX_CYCLE, LIBELLE_CHOIX } from "./cycleArticle.js";
+import { chezMoiProposables } from "./propositionsSites.js";
 import { polyDe, estRectangle, normaliserPoly, FORMES, rectDans, empreinte, chevauche, placerSansTraverser, modeCase, capaciteCase, articlesAutresPlateformes, unParArticle, empilerDansCase, retirerDeCase, retirerDePile, ajouterAPile, cartonsDePile, hauteurPile, changerHauteurPile, prochainePlaceMeuble, estPoseSur, caler, proposerPiece, planchesCases, planchesRangees, plateauxMeuble, plateauxReglables, tasserPlateaux } from './stockRegles.js';
 import {formaterMontantEbay} from './montantsEbay.js';
 import {cibleEbay} from "./ebayParcours.js";
@@ -1941,6 +1943,9 @@ const SYNC_KEYS = [
   // Retirer d'eBay, sans demander, une paire PROUVÉE vendue sur Vinted
   // (proposition 8). Éteint par défaut ; la route le relit elle-même.
   'vrm_ebay_retrait_auto',
+  // (3 nov.) Le cycle d'un article (src/cycleArticle.js) : SA réponse à « N°x
+  // supprimé de Vinted » (son clic seul) et la dernière lecture qui l'a vu en ligne.
+  'vrm_cycle_decisions','vrm_vus_en_ligne',
   // Par annonce eBay, le prix Vinted de la dernière baisse faite depuis VRM
   // (proposition 9) : rien n'est reproposé tant qu'il n'a pas bougé.
   'vrm_ebay_baisses',
@@ -3489,6 +3494,24 @@ function masqueesPresentes(masquees, fiches, perdues) {
   return (Array.isArray(masquees) ? masquees : []).filter((it) => it && !annonceDeclareePartie(it.id, fiches, perdues));
 }
 // </masquees-regle>
+// ── LE CYCLE D'UN ARTICLE (3 nov., src/cycleArticle.js) ─────────────────────
+// `vrm_cycle_decisions` = { [idAnnonce]: { choix, numero, at, montant? } } — SA
+// réponse à « N°x supprimé de Vinted », écrite seulement sur SON clic.
+// `vrm_vus_en_ligne` = { [idAnnonce]: iso } — la dernière lecture COMPLÈTE qui
+// l'a vue en ligne (`majVusEnLigne`) : sans elle, une absence ne se demande pas.
+const CYCLE_DECISIONS = 'vrm_cycle_decisions';
+const VUS_EN_LIGNE = 'vrm_vus_en_ligne';
+const lireObjet = (cle) => { try { const v = load(cle, {}); return v && typeof v === 'object' && !Array.isArray(v) ? v : {}; } catch (_) { return {}; } };
+// Les entrées d'`etatCycle` pour la liste eBay : seules les annonces en ligne
+// sont connues ici (Set lu), les ventes sont jugées par l'agent (`numerosDejaVendus`).
+function chezMoiEntrees(fiches, online) {
+  const lectures = new Map();
+  for (const id in (fiches || {})) { const u = String((fiches[id] || {}).accountId || ''); if (!lectures.has(u)) lectures.set(u, { enLigne: online }); }
+  const perdues = lireObjet('vinted_pairs_lost');
+  let vendusMain; try { vendusMain = new Set((load('vinted_annonces_vendues', []) || []).map(String)); } catch (_) { vendusMain = new Set(); }
+  return { lectures, presentes: indexPresentes(fiches, lectures, cleNum), recrees: {}, viaVrm: new Set(), ventes: {}, vendusMain,
+    decisions: lireObjet(CYCLE_DECISIONS), declaree: (id) => annonceDeclareePartie(id, fiches, perdues), cle: cleNum };
+}
 // Ce que la dernière lecture a écarté, par compte (pour le DIRE, une fois, §7).
 const _supprRetirees = {};
 // La ligne d'un compte : `ids` · `{}` (aucune) · `null` (la base n'a pas répondu).
@@ -22172,6 +22195,7 @@ function useEbayPaires(comptes) {
   // la liste n'en garde qu'une (le formulaire), mais l'agent ne doit proposer
   // AUCUNE des deux (§5) — clé du N° → combien de paires le portent.
   const [doubles, setDoubles] = React.useState(() => new Map());
+  const [chezMoiS, setChezMoiS] = React.useState(() => new Set());
   React.useEffect(() => onCloudReady(() => setNuage((n) => n + 1)), []);
   React.useEffect(() => { let stop = false; (async () => {
     try {
@@ -22205,12 +22229,17 @@ function useEbayPaires(comptes) {
         for (const r of (Array.isArray(rows) ? rows : [])) { const m = /^coffre_[^_]+_(.+)$/.exec(String(r.id || '')); if (m) coffre[m[1]] = r; }
       } catch (_) { coffre = {}; }
       const norm = (p) => typeof p === 'string' ? p : (p && (p.url || p.full_size_url)) || '';
+      // (3 nov., Julien) + les articles supprimés de Vinted qu'il a dits
+      // « Toujours chez moi » : leur fiche et les photos de leur dernière annonce
+      // lue (src/propositionsSites.js). Annonces en ligne pas lues ⇒ aucun (pas su).
+      const chezMoi = online ? chezMoiProposables(fiches, chezMoiEntrees(fiches, online)) : new Set();
       const vus = new Set(), out = [], parCle = new Map();
       for (const id in fiches) {
         const f = fiches[id] || {}; const n = f.numero != null ? String(f.numero).trim() : '';
-        if (n && online && online.has(String(id))) { const k = cleNum(n); if (k) parCle.set(k, (parCle.get(k) || 0) + 1); }
+        const present = !!(online && (online.has(String(id)) || chezMoi.has(String(id))));
+        if (n && present) { const k = cleNum(n); if (k) parCle.set(k, (parCle.get(k) || 0) + 1); }
         if (!n || vus.has(n)) continue;
-        if (online && !online.has(String(id))) continue;      // en ligne seulement (vendue/retirée écartée)
+        if (online && !present) continue;      // en ligne ou « toujours chez moi » seulement (vendue/retirée écartée)
         if (!online && presents && !presents.has(cleNum(n))) continue; // à défaut : au moins « en stock » si on le sait
         vus.add(n);
         const cover = f.photo || couvMap[String(id)] || null;
@@ -22228,13 +22257,14 @@ function useEbayPaires(comptes) {
         const etatV = String(etatMap[String(id)] || cf.etat || '').trim();
         const tailleV = String(tailleMap[String(id)] || cf.size || '').trim();
         out.push({ id: String(id), num: n, photoK: f.photoK || null, title: titreP, taille: tailleV || extractSize(titreP) || '', tailleVinted: tailleV, marque, etat: etatV, cover, photos, desc, nPhotos: nPhotosMap[String(id)], prix: prixMap[String(id)] ?? null, uid: compteMap[String(id)] || '',
-          catalogId: catMap[String(id)] ?? (details[id] && details[id].catalogId) ?? null, couleur: couleurMap[String(id)] || '', cree: creeMap[String(id)] ?? null });
+          catalogId: catMap[String(id)] ?? (details[id] && details[id].catalogId) ?? null, couleur: couleurMap[String(id)] || '', cree: creeMap[String(id)] ?? null,
+          ...(chezMoi.has(String(id)) ? { chezMoi: true, prix: prixMap[String(id)] ?? (f.price != null && f.price !== '' ? f.price : null), uid: compteMap[String(id)] || String(f.accountId || '') } : {}) });
       }
       out.sort((a, b) => (parseInt(b.num, 10) || 0) - (parseInt(a.num, 10) || 0));
-      if (!stop) { setPaires(out); setDoubles(new Map([...parCle].filter(([, c]) => c > 1))); setPret(true); }
-    } catch (_) { if (!stop) { setPaires([]); setEnLigne(null); setToutesLues(false); setPret(true); } }
+      if (!stop) { setPaires(out); setChezMoiS(chezMoi); setDoubles(new Map([...parCle].filter(([, c]) => c > 1))); setPret(true); }
+    } catch (_) { if (!stop) { setPaires([]); setChezMoiS(new Set()); setEnLigne(null); setToutesLues(false); setPret(true); } }
   })(); return () => { stop = true; }; }, [comptes, nuage]);
-  return { paires, enLigne, toutesLues, pret, doubles };
+  return { paires, enLigne, toutesLues, pret, doubles, chezMoi: chezMoiS };
 }
 
 // Les raisons d'échec de la connexion eBay, dites en clair (la route renvoie
@@ -24573,7 +24603,7 @@ const DEMANDE_EBAY_BROUILLON = { id: null, at: 0 };
 // `fond` : l'agent en FOND (pas l'écran) — ses lectures acceptent une réponse
 // partagée de quelques secondes (`vrmFond`, src/lecturesPartagees.js).
 function useEtatPublicationEbay(comptes, comptesEbay, fond = false) {
-  const { paires, enLigne: enLigne0, pret, doubles } = useEbayPaires(Array.isArray(comptes) ? comptes : null);
+  const { paires, enLigne: enLigne0, pret, doubles, chezMoi } = useEbayPaires(Array.isArray(comptes) ? comptes : null);
   const [tick, setTick] = React.useState(0);
   const [items, setItems] = React.useState(undefined);
   const [luesA, setLuesA] = React.useState(undefined);
@@ -24657,7 +24687,7 @@ function useEtatPublicationEbay(comptes, comptesEbay, fond = false) {
   return {
     paires: Array.isArray(comptes) && pret ? paires : undefined,
     enLigne: Array.isArray(comptes) && pret ? enLigne0 : undefined,
-    ventes, dejaSurEbay, jumelles, fiches, luesA, brouillons, doubles,
+    ventes, dejaSurEbay, jumelles, fiches, luesA, brouillons, doubles, chezMoi,
     relire: () => setTick((t) => t + 1),
   };
 }
@@ -24759,10 +24789,10 @@ function AgentEbay({ comptes, comptesEbay, onAnnonces }) {
     if (comptesStatut === null) return { etat: 'pas-su', pasSu: ['tes comptes eBay'] };
     if (!relies.length) return { etat: 'sans-ebay' };
     if (deviseCompte !== 'EUR') return { etat: 'devise' };
-    return propositionAgent({ regles, paires: etat.paires, enLigne: etat.enLigne, ventes: etat.ventes, dejaSurEbay: dejaSurEbayEff, jumelles: etat.jumelles,
+    return propositionAgent({ regles, paires: etat.paires, enLigne: etat.enLigne, chezMoi: etat.chezMoi, ventes: etat.ventes, dejaSurEbay: dejaSurEbayEff, jumelles: etat.jumelles,
       achatDe: (p) => prixAchatDe(etat.fiches[p.id], buyByNum), cochee: (p) => mpChoisi(etat.fiches[p.id], 'ebay') === true,
       incertains, brouillons: enBrouillon, doubles: etat.doubles, publieesAujourdhui: jour.publiees, cle: cleNum });
-  }, [comptesStatut, relies, deviseCompte, regles, etat.paires, etat.enLigne, etat.ventes, dejaSurEbayEff, etat.jumelles, etat.fiches, buyByNum, incertains, enBrouillon, etat.doubles, jour.publiees]);
+  }, [comptesStatut, relies, deviseCompte, regles, etat.paires, etat.enLigne, etat.ventes, dejaSurEbayEff, etat.jumelles, etat.fiches, buyByNum, incertains, enBrouillon, etat.doubles, etat.chezMoi, jour.publiees]);
   // ── LA PRÉPARATION : une par une, les proposées seulement, sur le compte choisi ──
   // (revue du 29 oct.) Un JETON par passe : quand les paires ou le prix
   // changent, la passe en cours s'arrête à la paire suivante et une nouvelle
@@ -25071,7 +25101,7 @@ function AgentEbayFondCalcul({ comptes, comptesEbay }) {
     const ref = (regles.compteEbay && comptesEbay.some((c) => c.ref === regles.compteEbay)) ? regles.compteEbay : comptesEbay[0].ref;
     if (marcheEbayDeRef(ref).devise !== 'EUR') { fait.current = true; publierResumeAgent({ etat: 'devise' }); return; }
     const incertains = incertainsAttendusAgent(lireIncertainsAgent(), etat.luesA);
-    const prop = propositionAgent({ regles, paires: etat.paires, enLigne: etat.enLigne, ventes: etat.ventes, dejaSurEbay: etat.dejaSurEbay, jumelles: etat.jumelles,
+    const prop = propositionAgent({ regles, paires: etat.paires, enLigne: etat.enLigne, chezMoi: etat.chezMoi, ventes: etat.ventes, dejaSurEbay: etat.dejaSurEbay, jumelles: etat.jumelles,
       achatDe: (p) => prixAchatDe(etat.fiches[p.id], load('vinted_buyprice_by_num', {}) || {}), cochee: (p) => mpChoisi(etat.fiches[p.id], 'ebay') === true,
       incertains, brouillons: numerosEnBrouillon(etat.brouillons, etat.paires), doubles: etat.doubles, publieesAujourdhui: lireJourAgent().publiees, cle: cleNum });
     if (prop.etat !== 'lu') return;
@@ -25079,7 +25109,7 @@ function AgentEbayFondCalcul({ comptes, comptesEbay }) {
     // Sans préparation chez eBay : le résumé dit « N paires à regarder »,
     // jamais « prêtes » (seul l'écran de l'agent prépare).
     publierResumeAgent(prop);
-  }, [regles, comptesEbay, etat.paires, etat.enLigne, etat.ventes, etat.dejaSurEbay, etat.jumelles, etat.fiches, etat.luesA, etat.brouillons]);
+  }, [regles, comptesEbay, etat.paires, etat.enLigne, etat.ventes, etat.dejaSurEbay, etat.jumelles, etat.fiches, etat.luesA, etat.brouillons, etat.chezMoi]);
   return null;
 }
 const agentEbayFondUtile = () => { const r = load(AGENT_CLE_RESUME, null); return !(r && Date.now() - (Number(r.at) || 0) < 20 * 3600000); };
