@@ -481,7 +481,7 @@ sans la fonction.
 | `republierfile` | `miseEnLigneTick` | **5.279.0** | (ajoutée à la table le 30 oct.) |
 | `favorisperso` | `erreurVariablesFavori` | **5.281.0** | (ajoutée à la table le 30 oct.) |
 | `vcsession` | `noterSessionVc` | **5.295.0** (31 oct.) | le compte Vestiaire ouvert dans l'onglet (`vc_session`) — si Vestiaire charge `/users/me` |
-| `vcfil` | `rangerVcFil` | **5.295.0** | « lire tes conversations Vestiaire » (texte, date, « de toi », jamais un nom) |
+| `vcfil` | `rangerVcFil` | **5.317.0** (3 nov. ; la 5.295 ne lisait pas la messagerie Stream) | « lire tes conversations Vestiaire » (messagerie Stream + fil des notifications ; texte, date, « de toi », jamais un nom) |
 | `vcrepondre` | `repondreVestiaire` | **5.295.0** | « Envoyer sur Vestiaire » sur son clic — seulement après une recette APPRISE de son propre envoi (`vc_envoi.appris`) |
 | `vcfavoris` | `rangerVcAnnonces` | **5.295.0** | le NOMBRE de favoris par annonce Vestiaire (jamais qui) |
 | `relaisdest` | `relaisDestination` | **5.295.0** | « le point relais où arrivent tes achats (quand le suivi Vinted le donne) » |
@@ -499,12 +499,12 @@ sans la fonction.
 Une ligne par chantier ou décision, le plus récent d'abord. Détail : le fichier
 d'historique du thème (cherche le titre ou la date).
 
-**Extension servie : 5.316.0** (2 nov.). **À lire en premier : `docs/passation/2026-11-02-liste.md`.** **Production** : https://vrm.center,
+**Extension servie : 5.317.0** (3 nov.). **À lire en premier : `docs/passation/2026-11-02-liste.md`.** **Production** : https://vrm.center,
 vérifier par `curl https://vrm.center/api/sante`.
 
 ### Gestes encore attendus de Julien
 - Facture Pro : compléter la fiche (Comptabilité → Factures → Facturation Pro : SIRET, forme, régime de TVA), connecter sa boîte e-mail (Gmail : mot de passe d'application) et s'envoyer un essai.
-- Installer l'extension **5.316.0** (remplacer le dossier, puis ⟳ dans CHAQUE Chrome), puis rouvrir sur Vestiaire « Mes articles » et la vente (sa page de suivi).
+- Installer l'extension **5.317.0** (remplacer le dossier, puis ⟳ dans CHAQUE Chrome), puis sur Vestiaire ouvrir la messagerie (`/chat/`) et une conversation.
 - Sur leboncoin.fr, ouvrir « Mes annonces » sur CHACUN de ses comptes Leboncoin.
 - Recoller `scripts/gmail-forwarder.gs` (avec sa clé) dans la boîte qui fait tourner le
   script, puis poser `EMAIL_INBOUND_SECRET` sur Vercel (l'ancien script lit encore la
@@ -529,6 +529,7 @@ vérifier par `curl https://vrm.center/api/sante`.
 
 ### Décisions et chantiers (octobre–novembre 2026)
 Une ligne par chantier. Le récit complet des lignes du 31 oct. au 2 nov. est, mot pour mot, dans `docs/passation/etat-detaille-2026-10-31-au-11-02.md`.
+- **3 nov.** — **Extension 5.317.0** : messages Vestiaire enfin lus — ils passent par la messagerie Stream (`chat.stream-chat.com`), que l'extension n'écoutait pas ; conversations + fil + compte ouvert (`user_id` Stream), fil des notifications, aucune permission ajoutée ; « Envoyer sur Vestiaire » reste fermé (Stream non rejouable). `audit-vc-messages` (33 rouges sur main, 16/16 mutations). → historique vestiaire. Geste : installer la 5.317.0, ouvrir /chat/ sur Vestiaire.
 - **3 nov.** — Bénéfice : l'URSSAF retirée = 12,4 % des MÊMES ventes comptées (plus celle des versements du mois) ⇒ plus de « −5 € » sans vente ; rien à calculer ⇒ « — » ; déclaration URSSAF toujours datée au versement (`beneficePeriode`, `audit-benefice-unique` 12 rouges sur main). → historique compta. Geste : aucun.
 - **3 nov.** — **Style « Fusion » carte sombre** (son choix, maquettes recopiées à l'identique, SANS texte explicatif) sur Ma journée, Ventes, Colis, Compta : carte du mois sombre, frise Vendue → Postée → Livrée → Payée (une seule, `friseVente`, étapes PROUVÉES), puce transporteur + « Imprimer le bordereau » sur une rangée, colis groupés par transporteur, Ma journée = une liste « À faire » en cartes (`src/design/*`, `tacheCourte.js`), colonne 760 px sur ordinateur, sombre #000/#1C1C1E ; fonctions déplacées dans « Outils » / « … », aucune perdue. Banc `design-fusion` (7 jeux extrêmes), `audit-journee-court`. Reste : reste de l'app au style (rapport `critique`), frise eBay/Vestiaire. → historique interface-stock. Geste : regarder les 4 écrans.
 - **3 nov.** — « Bénéfice » = une seule notion partout (ce qu'il reste après tout, la règle de Compta ; « — » si pas su), « Bénéfice brut » et « Après frais de vente » nommés à part, jamais « au moins » sur un brut (`src/beneficeNoms.js`) ; URSSAF des ventes Vestiaire désormais déduite. `audit-benefice-unique` (15 rouges sur main), banc `benefice-unique`. Reste : cellules « Bénéfice estimé / marge » de Statistiques. → historique compta. Geste : aucun.
@@ -559,8 +560,6 @@ Une ligne par chantier. Le récit complet des lignes du 31 oct. au 2 nov. est, m
 - **2 nov.** — Offres auto : jamais sur une paire vendue ailleurs (**5.308.0**, `src/offresGarde.js`). Geste : installer.
 - **2 nov.** — Colis : le filtre de site vaut pour TOUT l'écran (`voitSite`, `retoursPourSite` : plus de Vinted sous eBay, Julien : « inadmissible ») ; boîte vide du récapitulatif au téléphone retirée ; 190 chemins absolus `/home/user/…` retirés des audits/bancs. Audits : tous verts sauf ceux qui exigent Postgres (6) ou `@babel/parser` (1), absents ici. Geste : regarder Colis au téléphone.
 - **2 nov. (matin)** — Audit du dossier : les 7 chantiers « en cours » de la nuit n'ont JAMAIS été poussés ⇒ perdus, à refaire (nuit §3) ; §9 condensé, §8 recopié du code, ancienne « passation en cours » archivée. Geste : si la session de la nuit est encore ouverte, lui faire pousser ses worktrees.
-- **2 nov.** — Passation de la nuit : 11 lots en ligne (PR #932 → #942, extension 5.307.0), 7 audits dans `docs/passation/audits-2026-11-01/`. → `docs/passation/2026-11-02-nuit.md`.
-- **1er nov.** — Audit des parcours A5-A14 (double vente Leboncoin par N°, « Vendus ailleurs » par `cleNum`, « …a échoué » ≠ vente, ventes plus masquables). Reste : « Échec du paiement »/`failed` à aligner à la prochaine extension. → historique divers. Geste : aucun.
 - **Avant le 20 oct.** — `docs/passation/etat-detaille-2026-10-31-au-11-02.md` (fin) et `docs/journal-2026.md`.
 
 ---
