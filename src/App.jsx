@@ -35365,7 +35365,9 @@ const colisRetireAilleurs = (t, retires) => { const k = suiviDeLigne(t); return 
 // Nettoie un « lieu » de point relais (souvent bruité par les emails Mondial
 // Relay : « ® MAISON DE LA PRESSE 40 RUE DU PORT 35260 CANCALE SUPER PRATIQUE
 // Retrouvez… »). Renvoie { nom, adresse, display } propres.
-const titleCasePR = (s) => s.toLowerCase().replace(/\b([a-zà-ÿ])/g, (m) => m.toUpperCase()).replace(/\b(De|Du|La|Le|Les|Des|Et)\b/g, w => w.toLowerCase());
+// (3 nov.) `\b` ne connaît pas les lettres accentuées : « BRETONNIÈRE » devenait « BretonnièRe »,
+// « THÉ BLEU » « ThÉ Bleu ». Une majuscule seulement en début de mot (après une espace, un tiret, une apostrophe).
+const titleCasePR = (s) => s.toLowerCase().replace(/(^|[^a-zà-ÿ0-9])([a-zà-ÿ])/g, (m, a, b) => a + b.toUpperCase()).replace(/(^|[^A-Za-zÀ-ÿ])(De|Du|La|Le|Les|Des|Et)(?=[^A-Za-zÀ-ÿ]|$)/g, (m, a, w) => a + w.toLowerCase());
 // (17 oct.) LE TYPE DE LIEU N'EST PAS SON NOM. Mesuré sur sa base : l'email
 // Vinted Go écrit « *Consigne Vinted Go*, * Kusmi Tea *, * 13 Rue Saint-Vincent »
 // (gras de la version texte compris), la conversation « Kusmi Tea, 13 Rue
