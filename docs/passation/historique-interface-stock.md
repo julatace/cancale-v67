@@ -3185,6 +3185,48 @@ lu dans le code). Mutations rouges : `site` 44, `recalc` 73, `zero` 3, `benef` 5
 → Leboncoin 40 €, périmètre qui suit, feuille (portail, 44 px, pas de bénéfice sur Vinted seul),
 réglage gardé au rechargement, Colis au défaut.
 
+### 3 nov. — Trois outils choisis par Julien (13 h 02) : « Ce qui rapporte le plus », « Articles qui dorment », recherche par la voix (branche `claude/stats-outils`)
+
+**1. Statistiques → « Ce qui rapporte le plus »** (`src/ceQuiRapporte.js`, carte `src/design/CeQuiRapporte.jsx`,
+style Fusion `src/design/outils-stats.css`) : classement segmenté Modèle · Marque · Taille · Compte · Site, sur les ventes
+finalisées de la PÉRIODE choisie (`lp` de `StatsVitrine`) : bénéfice brut total (tri), moyen par article, marge, nombre
+vendu, médiane du temps pour vendre dite en mots (« la moitié part en moins de 6 j » : `floor(médiane)+1`), couverture
+« prix d'achat connus N/M » en tête et « n/N » sur la ligne ; toucher une ligne ⇒ ses articles (titre, date, compte, prix,
+brut). Jamais « au moins » sur un brut ; groupe sans prix d'achat ⇒ « — ». Le **modèle** n'est qu'une statistique
+(`modeleSur`) : catalogue fermé où chaque modèle porte ses marques ; marque lue sur l'annonce (Vinted `brand`, reliée par
+la transaction) qui contredit ⇒ « Autres » ; numéro seul (« 550 ») sans New Balance lue ⇒ « Autres » ; mots entiers
+(« air max 1 » n'est pas dans « air max 180 »). Mesuré en lecture seule sur la vraie base : `brand` et `size` sont des
+chaînes sur 532/536 annonces, tailles variées (« XL », « M / 38 / 10 ») ; tout n'est pas chaussure ⇒ « article ».
+Le relevé `vrm_stats_ventes` est désormais construit par `releveVentes` (déplacé tel quel du `useEffect` de Ventes, pour
+être EXÉCUTÉ par l'audit) ; seul changement : le prix Vinted lu par `montantCommandeLu` (un prix illisible était 0 €,
+il est `null` et le classement l'écarte, `ecartees`).
+**2. Annonces → « Articles qui dorment »** (`src/quiDorment.js`, `src/design/QuiDorment.jsx`) : unifié avec la vue
+existante « À relancer » / tri « En ligne depuis longtemps » (`annSort==='sleeping'`) — la liste remplace la grille dans
+cette vue ; base `annBase` (règle « en ligne ») ; seuil 30/60/90 j (localStorage `vrm_qd_seuil`), mêmes bornes que
+`stockQuiDort` de Statistiques ; le plus ancien d'abord ; vues/favoris s'ils sont lus ; « Agir » ⇒ Baisser le prix
+(atelier Republier « modifier », article pré-choisi), Republier (« recréer »), Mettre sur Leboncoin (file + fiche
+`FicheLbc` ouverte par `DEMANDE_LBC_FICHE`), Mettre sur eBay (`EbayPublier` ouvert sur l'article, `DEMANDE_EBAY_PAIRE`) ;
+grisés avec la raison quand l'extension ne sait pas. Rien ne part tout seul. Statistiques → « Les articles qui dorment »
+porte « Voir la liste » (`demanderVue('dorment')`). ⚠️ Trouvé : fermer une feuille PUIS changer de section dans le même
+onglet faisait `history.back()` avant le rendu du nouvel écran ⇒ retour à Vinted 1 fois sur 2 ; ici on navigue d'abord
+(la feuille se démonte avec l'écran). Le même motif existe ailleurs (ex. « Conversation » du récapitulatif de vente) : pas touché.
+« Prix à baisser » de Ma journée reste une autre notion (vues sans favori), pas fusionnée.
+**3. Recherche par la voix** (`src/rechercheVocale.js`) : le micro existant (`MicDictee`, Web Speech du navigateur,
+`fr-FR`, aucun son envoyé par VRM) est posé dans la barre (ordinateur et téléphone, 44 px, `nu`) ; « numéro 124 »,
+« N 124 », « cent vingt-quatre », « quatre-vingt-dix-sept » ⇒ 124/97 ; « B 125 », « bé 125 » ⇒ B125 ; sinon le texte.
+Le bouton n'apparaît que si `SpeechRecognition` est une fonction, et disparaît si le micro est refusé (`not-allowed` ou
+permission `denied`). La recherche du Stock passe aussi par `requeteDeLaVoix`.
+
+**Preuves** : `audit-ce-qui-rapporte` (84 contrôles ; jeu fabriqué : deux comptes, 50 articles au même titre, achats
+manquants, annulée, masquée, prix illisible, eBay en livres écarté par `ventesAutresBenefice` extraite d'App.jsx ;
+12/12 mutations rouges ; rouge sur `origin/main`), `audit-qui-dorment` (4/4 mutations, 5 rouges sur main),
+`audit-recherche-vocale` (37 cas, 6/6 mutations, 3 rouges sur main). Banc `scripts/bancs/outils-stats.cjs` (390 tactile
+clair/sombre, 1512, fausse `SpeechRecognition`) : 109 verts, 12 rouges sur main. Non régressés : stats-vitrine,
+carte-stats (81), audits stats-ventes, benefice-unique, carte-chiffres, coherence, icones, identite ; rouges identiques
+à main : stats-detail (14), audit-chiffres, lectures, politique-hotes, vc-recon ; absents ici : `@babel/parser`,
+`fast-xml-parser`, Postgres.
+**Reste** : « Les modèles qui partent vite » groupe encore par `extractModel` (pas le modèle sûr) ; le catalogue de
+modèles est court (à enrichir sur ses ventes réelles).
 **3 nov., après revue (13 h)** — fusion de main (carte sombre réglable `CarteStatsApp` gardée sur Colis/Ma journée ;
 sur « À retirer » la carte dit les colis à retirer) ; « Bénéfice du mois 0 € » venait d'une base d'avant
 `benefice-urssaf` : la fusion rend « — » (`chiffreBenefice`). **« À retirer » en SECTIONS** (Julien, 13 h 02 :

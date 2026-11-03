@@ -214,3 +214,7 @@ Déplacé TEL QUEL depuis CLAUDE.md §9 le 2 novembre 2026 (le fichier dépassai
 
 ### Lignes de §9 déplacées telles quelles
 - **2 nov. (soir)** — Saisies sans réseau gardées sur l'appareil (file d'envoi `src/fileEnvoi.js`, rejouée par la fusion clé par clé au chargement, vidée quand la base ACCEPTE ; « N changements en attente d'envoi » dit une fois) : les prix tapés en 4G faible ne se perdent plus quand l'iPhone ferme l'app. Banc `file-envoi` (rouge sur l'avant). → historique sécurité-base-serveur. Geste : aucun.
+
+### Lignes de §9 déplacées telles quelles
+- **2 nov. (nuit)** — **Extensions 5.314.0 / 5.315.0** : annonces Vestiaire lues (forme réelle `{type, published:{product}}`, C10) ; puis « tout Vestiaire » GARDÉ tel que la page le charge (`vc_brut_*`, `vc_pdf_*` pour les bordereaux, secrets retirés, aucune requête de plus, C11). → historique vestiaire. Geste : installer, se promener sur Vestiaire.
+- **2 nov. (nuit)** — **Facture Pro refaite** : « Envoyer la facture à l'acheteur » sur chaque vente Pro PROUVÉE (transaction), mentions légales (EI, 293 B / marge sans TVA / TVA), numéro sans trou au clic (journal, comparer-et-échanger ; l'email ne numérote plus), instantané + avoir, PDF identique app/serveur, envoi depuis la boîte du VENDEUR (SMTP, mot de passe chiffré, §2.9) (`src/facturePro/`, `api/_lib/facture-pro.js`, `audit-facture-pro`, banc `facture-pro`). → historique compta. Geste : voir « Gestes ».

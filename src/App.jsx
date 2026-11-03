@@ -65,6 +65,11 @@ import {centimes,coutsVente,beneficePaire,champsCharges} from "./beneficePaire.j
 import CoutsVente from "./CoutsVente.jsx";
 import { boostRentable, SEUIL_BOOST } from "./boostRentable.js";
 import { CLE_WIDGETS_JOURNEE, WIDGETS_JOURNEE, NOM_TAILLE, DISPO_JOURNEE_DEFAUT, normaliserDispoJournee, deplacerWidget, retirerWidget, widgetFixe, tailleSuivante, tailleDefautWidget, caseVisible, widgetsAjoutables, dispoAEnregistrer } from "./journeeWidgets.js";
+import { modeleSur, releveVentes } from "./ceQuiRapporte.js";
+import CeQuiRapporte from "./design/CeQuiRapporte.jsx";
+import { requeteDeLaVoix } from "./rechercheVocale.js";
+import { articlesQuiDorment, seuilValide } from "./quiDorment.js";
+import QuiDorment from "./design/QuiDorment.jsx";
 import { rythmeVendu, ecartPct, quandTuVends, margesPar, delaisPar, tranchePrix, TRANCHES_PRIX, stockQuiDort, SEUILS_DORT, rotationStock, tauxVenteMois, tauxAnnulation, PERIODES, bornesPeriode, dansBornes, venduPeriode, barresPeriode, ventesPar, plusRapides } from "./statsVentes.js";
 import "./stats-vitrine.css";
 import {appelerFavorisDirect} from './favorisTransport.js';
@@ -14538,11 +14543,22 @@ const Icon = ({ name, size = 24, style }) => {
 // QUE si l'API existe (Safari iPhone ne la fournit pas) : sinon RIEN, jamais un
 // bouton mort (§2.7, une fonction qui ne peut pas tenir se tait). On ne DEVINE
 // pas le texte — on pose ce que le navigateur a reconnu, à lui de corriger.
-const DICTEE_OK = typeof window !== 'undefined' && ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window);
-function MicDictee({ onText, titre = 'Dicter' }) {
+const DICTEE_OK = typeof window !== 'undefined' && typeof (window.SpeechRecognition || window.webkitSpeechRecognition) === 'function';
+// (3 nov.) Le micro REFUSÉ (permission du navigateur, ou service coupé) : le
+// bouton disparaît aussi — partout, pour la session — sans un mot.
+const DICTEE_REFUS = { non: false };
+function MicDictee({ onText, titre = 'Dicter', nu = false }) {
   const [ecoute, setEcoute] = React.useState(false);
+  const [refus, setRefus] = React.useState(DICTEE_REFUS.non);
   const recRef = React.useRef(null);
-  if (!DICTEE_OK) return null;
+  React.useEffect(() => {
+    if (!DICTEE_OK || DICTEE_REFUS.non) return undefined;
+    let mort = false;
+    try { const p = navigator.permissions && navigator.permissions.query ? navigator.permissions.query({ name: 'microphone' }) : null;
+      if (p && p.then) p.then((r) => { if (!mort && r && r.state === 'denied') { DICTEE_REFUS.non = true; setRefus(true); } }).catch(() => {}); } catch (_) {}
+    return () => { mort = true; };
+  }, []);
+  if (!DICTEE_OK || refus) return null;
   const lancer = () => {
     if (ecoute) { try { recRef.current && recRef.current.stop(); } catch (_) {} return; }
     try {
@@ -14550,17 +14566,17 @@ function MicDictee({ onText, titre = 'Dicter' }) {
       const rec = new SR();
       rec.lang = 'fr-FR'; rec.interimResults = false; rec.maxAlternatives = 1;
       rec.onresult = (e) => { const t = e && e.results && e.results[0] && e.results[0][0] && e.results[0][0].transcript; if (t) onText(String(t).trim()); };
-      rec.onerror = () => setEcoute(false);
+      rec.onerror = (e) => { setEcoute(false); if (e && (e.error === 'not-allowed' || e.error === 'service-not-allowed')) { DICTEE_REFUS.non = true; setRefus(true); } };
       rec.onend = () => { setEcoute(false); recRef.current = null; };
       recRef.current = rec; setEcoute(true); rec.start();
     } catch (_) { setEcoute(false); recRef.current = null; }
   };
   return (
-    <button className="vrm-icon-control" type="button" data-mic-dictee onClick={lancer} aria-label={titre} aria-pressed={ecoute}
+    <button className={nu ? 'vrm-micro' : 'vrm-icon-control'} type="button" data-mic-dictee data-micro-ecoute={ecoute ? '1' : '0'} onClick={lancer} aria-label={titre} aria-pressed={ecoute}
       title={ecoute ? 'À l’écoute… parle, puis touche pour arrêter' : titre}
-      style={{flexShrink:0,display:'inline-flex',alignItems:'center',justifyContent:'center',width:38,height:38,borderRadius:8,cursor:'pointer',fontFamily:'inherit',
+      style={nu ? undefined : {flexShrink:0,display:'inline-flex',alignItems:'center',justifyContent:'center',width:38,height:38,borderRadius:8,cursor:'pointer',fontFamily:'inherit',
         border:`1px solid ${ecoute?C.accent:C.border}`,background:ecoute?`${C.accent}18`:C.card,color:ecoute?C.accent:C.muted,transition:'background .15s,color .15s,border-color .15s'}}>
-      <Icon name="mic" size={17}/>
+      <Icon name="mic" size={nu ? 19 : 17}/>
     </button>
   );
 }
@@ -21938,6 +21954,15 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
     setAnalyse(false);
   };
   React.useEffect(() => { if (autoAnalyse && titre.trim() && !analyse) analyser(); /* eslint-disable-line */ }, [autoAnalyse]);
+  // (3 nov.) Venu d'« Articles qui dorment » → « Mettre sur eBay » : le formulaire
+  // s'ouvre sur CET article (son identifiant Vinted), comme si on l'avait choisi.
+  React.useEffect(() => {
+    const d = DEMANDE_EBAY_PAIRE;
+    if (!d.id || Date.now() - d.at > 60000 || !Array.isArray(paires) || !paires.length) return;
+    const p = paires.find((x) => String(x.id) === String(d.id));
+    d.id = null;
+    if (p) { setOuvert(true); choisirPaire(p); try { setTimeout(() => { if (racine.current && racine.current.scrollIntoView) racine.current.scrollIntoView({ block: 'start', behavior: 'smooth' }); }, 60); } catch (_) {} }
+  }, [paires]); // eslint-disable-line react-hooks/exhaustive-deps
   // Le formulaire, sous la forme d'un BROUILLON (5 octobre) : c'est ce qui est
   // enregistré, et c'est de lui que part l'annonce — `itemDeBrouillon`, la
   // MÊME règle que la liste des brouillons (§11). ebayGere: eBay gère la
@@ -24994,6 +25019,10 @@ function numerosEnBrouillon(brouillons, paires) {
 // La demande d'ouvrir un brouillon dans le formulaire d'eBay → Annonces
 // (« Compléter » de l'agent) : lue au montage de l'écran Annonces.
 const DEMANDE_EBAY_BROUILLON = { id: null, at: 0 };
+// (3 nov.) « Articles qui dorment » → « Mettre sur eBay » / « Mettre sur Leboncoin » :
+// l'article demandé (son identifiant Vinted), consommé UNE fois par l'écran qui s'ouvre.
+const DEMANDE_EBAY_PAIRE = { id: null, at: 0 };
+const DEMANDE_LBC_FICHE = { id: null, at: 0 };
 // `fond` : l'agent en FOND (pas l'écran) — ses lectures acceptent une réponse
 // partagée de quelques secondes (`vrmFond`, src/lecturesPartagees.js).
 function useEtatPublicationEbay(comptes, comptesEbay, fond = false) {
@@ -28834,7 +28863,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
           stock qui dort, rotation, annulations — chacun avec sa couverture. */}
       </RepliStats>
       <RepliStats id="vente" titre="Ce qui se vend, ton rythme, le stock qui dort" phrase="Marges par marque, temps de vente, jours et heures où tu vends, paires en ligne depuis longtemps, boost.">
-      <StatsDetaillees liveStats={liveStats} panelOff={panelOff}/>
+      <StatsDetaillees liveStats={liveStats} panelOff={panelOff} onVoirDorment={onGo ? () => { demanderVue('dorment'); onGo('vinted_annonces'); } : null}/>
       <AnalysesStatistiques panelOff={panelOff}/>
 
       {/* Le boost est-il rentable ? (21 oct.) — un repère, n'entre dans aucun total. */}
@@ -33079,7 +33108,7 @@ function StockMeubles() {
           type="search" enterKeyHint="search" autoComplete="off"
           placeholder="N°, marque, taille…" aria-label="Retrouver un article dans le stock"
           style={{ width: '100%', boxSizing: 'border-box', padding: `13px ${DICTEE_OK ? 92 : 40}px 13px 40px`, borderRadius: 12, border: `1.5px solid ${filtre ? C.accent : C.line}`, background: C.card, color: C.text, fontSize: 16, outline: 'none', minHeight: 48 }} />
-        <span style={{ position: 'absolute', right: (q || cibles.length > 0) ? 46 : 5, top: '50%', transform: 'translateY(-50%)' }}><MicDictee titre="Chercher à la voix (« numéro 12 », « nike noire »)" onText={(t) => { setQ(String(t).replace(/[.!?]+$/, '')); setCibles([]); }} /></span>
+        <span style={{ position: 'absolute', right: (q || cibles.length > 0) ? 46 : 5, top: '50%', transform: 'translateY(-50%)' }}><MicDictee titre="Chercher à la voix (« numéro 12 », « nike noire »)" onText={(t) => { setQ(requeteDeLaVoix(t).requete); setCibles([]); }} /></span>
         {(q || cibles.length > 0) && <button type="button" onClick={() => { setQ(''); setCibles([]); }} aria-label="Effacer la recherche" style={{ position: 'absolute', right: 2, top: '50%', transform: 'translateY(-50%)', width: 44, height: 44, background: 'transparent', border: 'none', color: C.muted, fontSize: 20, cursor: 'pointer' }}>×</button>}
       </div>
       {filtre && (
@@ -37694,7 +37723,7 @@ function useReleveStats() {
       const [plateforme, compte, id, ts, eur, achat, frais, titre] = r;
       const t = plateforme === 'Vinted' && x.txn && id ? x.txn[String(id)] : null;
       const it = t && t.item && x.items ? x.items[t.item] : null;
-      return { plateforme, compte, id, ts, eur, achat, frais, ...clesVenteStats(titre, it), enLigne: it ? dateMiseEnLigneMs(it, x.dates || null) : null };
+      return { plateforme, compte, id, ts, eur, achat, frais, titre, ...clesVenteStats(titre, it), modeleSur: modeleSur((it && it.brand) || '', titre), enLigne: it ? dateMiseEnLigneMs(it, x.dates || null) : null };
     });
   }, [releve, extras]);
   return { releve, stock, benef, extras, lignes };
@@ -37905,6 +37934,8 @@ function StatsVitrine({ liveStats, panelOff, periode }) {
               </div>
             ), { 'data-sv-carte': 'comptes' })}
       </div>
+      {/* (3 nov.) « Ce qui rapporte le plus » : le relevé de la période, classé (src/ceQuiRapporte.js). */}
+      <CeQuiRapporte lignes={lp} Segmente={Segmente} fmt={fmt} etat={!releve ? 'passu' : 'encours'}/>
       <div className="vrm-sv-rangee vrm-sv-rangee-2">
         {carte('sv-tailles', 'Les tailles qui se vendent', tailles && tailles.groupes.length ? 'ventes · jours pour vendre' : null, !lignes
           ? vide('Il se calcule avec le relevé de tes ventes : ouvre Ventes une fois.', { 'data-sv-etat': 'passu' })
@@ -37957,7 +37988,7 @@ function StatsVitrine({ liveStats, panelOff, periode }) {
     </div>
   );
 }
-function StatsDetaillees({ liveStats, panelOff }) {
+function StatsDetaillees({ liveStats, panelOff, onVoirDorment = null }) {
   const sCarte = { padding: 18, background: C.card, border: `1px solid ${C.border}`, borderRadius: 12, boxShadow: C.shadow };
   const sTitre = { fontSize: 15, fontWeight: 600, color: C.text, letterSpacing: -0.15 };
   const sLib = { fontSize: 13, color: C.muted, fontWeight: 500 };
@@ -38126,15 +38157,17 @@ function StatsDetaillees({ liveStats, panelOff }) {
     {/* ── 5. LE STOCK ──────────────────────────────────────────────────── */}
     <section data-stats-carte="dort" data-stats-dort={stock ? 'lu' : 'passu'} style={sCarte}>
       <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
-        <div style={sTitre}>Les paires qui dorment</div>
+        <div style={sTitre}>Les articles qui dorment</div>
         {stock && <span style={{ fontSize: 13, color: C.muted }}>{pl(stock.dort.total, 'annonce')} Vinted en ligne</span>}
+        {/* (3 nov.) La LISTE, avec un geste par article : l'écran Annonces (« Articles qui dorment »). */}
+        {onVoirDorment && stock && (stock.dort.seuils[30] || {}).n > 0 && <button type="button" className="vrm-lien-action" data-stats-voir-dorment="" onClick={onVoirDorment} style={{ minHeight: 44 }}>Voir la liste</button>}
       </div>
       {!stock ? <div style={{ ...sNote, marginTop: 8 }}>Pas encore calculé sur cet appareil : ouvre Annonces une fois (il faut toutes tes annonces lues, avec leurs dates).</div> : (<>
         <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column' }}>
           {SEUILS_DORT.map((s) => { const b = stock.dort.seuils[s] || { n: 0, valeur: 0, nCout: 0, cout: 0 }; return (
             <div key={s} data-stats-dort-seuil={s} data-n={b.n} data-valeur={Math.round(b.valeur * 100)} style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1.3fr) minmax(0,0.8fr) minmax(0,1.4fr)', gap: 8, padding: '9px 0', borderBottom: `1px solid ${C.border}`, fontSize: 13, fontVariantNumeric: 'tabular-nums', alignItems: 'baseline' }}>
               <span style={{ color: C.text }}>En ligne depuis {s} j et plus</span>
-              <span style={{ textAlign: 'right', color: C.text, fontWeight: 600 }}>{pl(b.n, 'paire')}</span>
+              <span style={{ textAlign: 'right', color: C.text, fontWeight: 600 }}>{pl(b.n, 'article')}</span>
               <span style={{ textAlign: 'right', color: C.muted }}>{mt(b.valeur)} affichés{b.n ? <> · achat {b.nCout ? <>{b.nCout < b.n ? 'au moins ' : ''}{mt(b.cout)}</> : '—'}{b.nCout < b.n ? ` (${b.nCout}/${b.n})` : ''}</> : null}</span>
             </div>
           ); })}
@@ -41194,6 +41227,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const isHidden = (o) => hiddenSales.has(String(o.transaction_id)) || acctOffOf(o);
   const toggleHidden = () => {};   // (29 oct.) une vente ne se masque plus
   const [annSearch, setAnnSearch] = useVueSession('annonces-recherche', ''); // recherche annonces (titre/marque/N°)
+  // (3 nov.) « Articles qui dorment » : le seuil (30/60/90 j) est un confort de CET
+  // appareil (localStorage) ; le geste choisi sur une ligne (`dortAgir`) ouvre l'écran existant.
+  const [seuilDort, setSeuilDortEtat] = useState(() => { try { return seuilValide(localStorage.getItem('vrm_qd_seuil')); } catch (_) { return 30; } });
+  const setSeuilDort = (v) => { const x = seuilValide(v); setSeuilDortEtat(x); try { localStorage.setItem('vrm_qd_seuil', String(x)); } catch (_) {} };
+  const [dortAgir, setDortAgir] = useState(null);
   const [annSort, setAnnSort] = useVueSession('annonces-tri', 'oldest'); // oldest (défaut) | recent | price_desc | price_asc | favs | views | nonum | boost
   // (27 oct., décision de Julien) Acceptation AUTOMATIQUE des offres ≥ au mini.
   // Éteinte par défaut, synchronisée (`vinted_offres_auto`, rattrapée au nuage).
@@ -44166,8 +44204,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     }
     else if (annSort==='sleeping') {
       // « Qui dorment » : en ligne depuis longtemps -> baisser le prix / republier.
-      arr = arr.map(it=>({it,age:listedAgeDays(it)})).filter(x=>x.age!=null&&x.age>=SLEEP_DAYS)
-               .sort((a,b)=>b.age-a.age).map(x=>x.it);
+      // (3 nov.) LA règle « qui dort » (src/quiDorment.js), au seuil choisi (30/60/90 j).
+      arr = articlesQuiDorment(arr.map(it=>({id:String(it.id),it,age:listedAgeDays(it)})), seuilDort).liste.map(x=>x.it);
     }
     // ── FILTRE PAR COMPTE (sélecteur de l'onglet) + mise en avant du connecté ──
     // Un compte choisi ⇒ seulement SES annonces. « Tous » ⇒ celles du compte
@@ -44181,7 +44219,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     if (c) arr = [...arr].sort((a,b) => { const ac = uidAnn(a)===c, bc = uidAnn(b)===c; return ac===bc ? 0 : (ac ? -1 : 1); });
     return arr;
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [annBase, annAConfirmer, listings.lues, annSearch, annSort, numeros, compteSel, compteConnecte, selEff]);
+  }, [annBase, annAConfirmer, listings.lues, annSearch, annSort, numeros, compteSel, compteConnecte, selEff, seuilDort]);
   // Un seul compte à l'écran ⇒ le nommer sur chaque carte ne distingue rien (§7).
   const annUnCompte = useMemo(() => new Set(annShown.map(x => String(x._acc && x._acc.vinted_user_id || ''))).size <= 1, [annShown]);
   // Comptes bloqués actuellement présents (pour le bandeau d'alerte).
@@ -46497,29 +46535,22 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       // seulement) — Statistiques le CONSOMME, il ne relit aucun prix d'achat
       // (§11). Rangé sur CET appareil seulement (pas dans `main`, qui est lu
       // partout) : Ma journée et Ventes le reposent à chaque lecture complète.
-      // Une ligne : [plateforme, compte, tx|id, ts, vente €, achat € | null,
+      // Une ligne : [plateforme, compte, tx|id, ts, vente € | null (prix illisible : `montantCommandeLu`, 3 nov.), achat € | null,
       // frais € | null, titre].
-      const releve = [];
-      for (const o of sales.items) {
-        if (isHidden(o) || classifyOrderStatus(o.status) !== 'completed') continue;
-        const t = o.date ? Date.parse(o.date) : NaN;
-        if (isNaN(t) || new Date(t).getFullYear() < an0) continue;
-        const e = effEntry(o);
-        const v = montantCommande(o);
-        // (3 nov.) + [8] le N° de la fiche, [9] la date de versement lue ('' pas lue) — le récap du mois.
-        const vers = versements && o.transaction_id != null ? (versements[String(o.transaction_id)] || '') : '';
-        releve.push(['Vinted', String((o._acc && (o._acc.login || o._acc.vinted_user_id)) || ''), String(o.transaction_id || ''), t, v, achatDe(e), chargesVente(e), String(o.title || '').slice(0, 90), String((e && e.numero) || ''), vers ? String(vers) : '']);
-      }
+      // (3 nov.) La construction vit dans `releveVentes` (src/ceQuiRapporte.js),
+      // inchangée, pour que l'audit « Ce qui rapporte » l'EXÉCUTE.
+      // (3 nov.) + [8] le N° de la fiche, [9] la date de versement lue ('' pas lue) — le récap du mois.
       // Le titre d'une vente Leboncoin ou eBay : celui de LA vente, retrouvée par
       // SON identifiant (transaction, commande) — jamais pour relier une paire,
       // seulement pour en lire la marque, le modèle et la taille.
       const titreDe = {};
       for (const v of ((lbcVentes && lbcVentes.ventes) || [])) if (v && v.txId) titreDe['lbc:' + v.txId] = v.title || '';
       for (const c of (ebayCmd || [])) if (c && c.orderId) titreDe['ebay:' + c.orderId] = (Array.isArray(c.lineItems) && c.lineItems[0] && c.lineItems[0].title) || '';
-      for (const x of autresBenefice) {
-        if (!isFinite(x.ts) || new Date(x.ts).getFullYear() < an0) continue;
-        releve.push([x.plateforme, '', x.id, x.ts, x.eur, x.achat, x.frais, String(titreDe[x.id] || '').slice(0, 90), String(x.num || ''), new Date(x.ts).toISOString()]);
-      }
+      const releve = releveVentes({ vinted: sales.items, estMasquee: isHidden, estFinalisee: (o) => classifyOrderStatus(o.status) === 'completed', an0,
+        montant: montantCommandeLu, achat: (o) => achatDe(effEntry(o)), frais: (o) => chargesVente(effEntry(o)),
+        compte: (o) => (o._acc && (o._acc.login || o._acc.vinted_user_id)) || '', autres: autresBenefice, titreDe,
+        numero: (o) => { const e = effEntry(o); return (e && e.numero) || ''; },
+        versement: (o) => (versements && o.transaction_id != null ? (versements[String(o.transaction_id)] || '') : '') });
       const r0 = load('vrm_stats_ventes', null);
       if (!(r0 && JSON.stringify(r0.l) === JSON.stringify(releve))) save('vrm_stats_ventes', { v: 1, l: releve, at: Date.now() });
     } catch (_) {}
@@ -48831,6 +48862,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   React.useEffect(()=>{
     const appliquer=()=>{
       if(only==='annonces' && prendreVue('republier')) setActionsOpen(true);
+      if(only==='annonces' && prendreVue('dorment')) setAnnSort('sleeping');
       if(only==='messages' && prendreVue('favoris')) setZoneMessages('favoris');
       if(only==='achats' && !modeRetraits && prendreVue('achats')) setAFilter('all');
     };
@@ -53402,6 +53434,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             achat) en bas ; le reste dans « ⋯ ». Une seule couleur d'accent,
             rare (§7) : l'ambre ne sert qu'à « dort » et à une marge négative. */}
         <FichesNeuves/>
+        {annSort==='sleeping' ? (
+          <QuiDorment seuil={seuilDort} onSeuil={setSeuilDort} Segmente={Segmente} fmt={fmt} onAgir={(a)=>setDortAgir(a)}
+            liste={listings.items==null ? null : annShown.map(it=>{ const e=numeros[it.id]||{}; const pr=(it.price&&typeof it.price==='object')?it.price.amount:it.price; const n=Number(String(pr==null?'':pr).replace(',','.'));
+              return { id:String(it.id), it, numero:e.numero?String(e.numero):'', titre:it.title||'', photo:photoArticle(it)||'', prix:isFinite(n)&&n>0?n:null, age:listedAgeDays(it),
+                vues:Number.isFinite(it.views)?it.views:null, favoris:Number.isFinite(it.favourites)?it.favourites:null, compte:annUnCompte?'':((it._acc&&(it._acc.login||it._acc.username))||'') }; })}/>
+        ) : (<>
         <div className="vrm-ledger-heading vrm-ann-ledger-heading" aria-hidden="true"><span>Article · stock</span><span>Prix</span></div>
         <div className="vrm-ann-grid vrm-fiches" style={{display:'grid',gridTemplateColumns:'repeat(auto-fill, minmax(min(100%, 300px), 1fr))',gap:16}}>
           {annShown.map(it=>{
@@ -53596,6 +53634,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             );
           })}
         </div>
+        </>)}
       </>)}
       {curSub==='annonces' && <section className="vrm-ventes-controles" data-annonces-controles="" style={{display:'flex',flexDirection:'column',gap:8,margin:'16px 0 12px'}}>
         <h3 data-titre-section="" style={{fontSize:15,fontWeight:600,color:C.text,letterSpacing:-0.15,margin:'0 2px'}}>Vérifications</h3>
@@ -56701,6 +56740,39 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       {lotsOpen && (()=>{ const cands=(listings.items||[]).map(it=>{ const e=numeros[it.id]||{}; const key=String((e&&e.numero)||it.id); const d=drafts[key]||{}; const baseTitre=d.title!=null?d.title:(it.title||''); const bp=d.price!=null?d.price:((it.price&&typeof it.price==='object')?it.price.amount:it.price); const fl=prixAchatDe(e,buyByNum); return { key, id:it.id, titre:baseTitre, prix:(bp==null||bp==='')?null:Number(bp), floor:(fl!=null&&!isNaN(fl))?Number(fl):null }; }); return (
         <AtelierLots candidats={cands} onSave={(key,patch)=>saveDraft(key,patch)} onClose={()=>setLotsOpen(false)} />
       ); })()}
+      {/* (3 nov.) « Articles qui dorment » → UN geste au choix, chacun ouvre l'écran
+          EXISTANT : Modifier prix sur place (Republier → modifier), Republier (recréer),
+          la fiche « Publier sur Leboncoin », « Publier sur eBay ». Rien ne part tout seul. */}
+      {dortAgir && (()=>{
+        const a = dortAgir, it = a.it, e = numeros[it.id] || {};
+        const versRepub = (act) => { setDortAgir(null); setRepubReprise([String(it.id)]); setRepubAction(act); };
+        const choix = [
+          { k:'prix', t:'Baisser le prix', cap:'republiermodif', go:()=>versRepub('modifier') },
+          { k:'republier', t:'Republier', cap:'recreer', go:()=>versRepub('recreer') },
+          // ⚠️ On change d'écran AVANT de fermer la feuille : fermée d'abord, elle
+          // retirait son entrée d'historique (history.back) avant que le nouvel
+          // écran soit rendu, et ce retour ramenait Vinted (mesuré au banc, 1 fois sur 2).
+          // Le nouvel écran démonte la feuille ; la fermeture différée ne sert qu'en secours.
+          { k:'lbc', t:'Mettre sur Leboncoin', bloque: !a.numero ? 'Mets un N° à cet article d’abord.' : '', go:()=>{
+              if (!mpChoisi(e,'lbc')) updatePair(it, { mp: { ...(e.mp||{}), lbc: true } });
+              DEMANDE_LBC_FICHE.id = String(it.id); DEMANDE_LBC_FICHE.at = Date.now(); onNav && onNav('leboncoin'); setTimeout(()=>setDortAgir(null), 400); } },
+          { k:'ebay', t:'Mettre sur eBay', go:()=>{ DEMANDE_EBAY_PAIRE.id = String(it.id); DEMANDE_EBAY_PAIRE.at = Date.now(); onNav && onNav('ebay_annonces'); setTimeout(()=>setDortAgir(null), 400); } },
+        ];
+        return (
+          <SheetShell onClose={()=>setDortAgir(null)} maxWidth={420}>
+            <div className="vrm-qd-menu" data-qd-menu={a.id}>
+              <div className="vrm-qd-menu-tete">
+                <h2 className="vrm-qd-menu-titre">{a.numero ? `N°${a.numero} · ` : ''}{a.titre}</h2>
+                <button type="button" className="vrm-qd-fermer" aria-label="Fermer" onClick={()=>setDortAgir(null)}>✕</button>
+              </div>
+              {choix.map(c=>{ const raison = c.bloque || (c.cap && extSait(c.cap)!=='ok' ? `Demande l'extension VRM ${EXT_CAPACITES[c.cap]} ou plus récente.` : ''); return (
+                <button key={c.k} type="button" className="vrm-qd-choix" data-qd-choix-geste={c.k} aria-disabled={raison?'true':undefined} title={raison||undefined}
+                  onClick={()=>{ if (raison) { toast(raison); return; } c.go(); }}>{c.t}</button>
+              ); })}
+            </div>
+          </SheetShell>
+        );
+      })()}
       {actionsOpen && (()=>{
         const nBr = brVinted.liste ? brVinted.liste.length : 0;
         const nPret = brVinted.liste ? brVinted.liste.filter(b=>b._place==='proposable').length : 0;
@@ -59097,6 +59169,15 @@ function LeboncoinScreen() {
   };
   // 5.182 : la fiche « Publier sur Leboncoin » ouverte (une paire de la file).
   const [fiche, setFiche] = useState(null);
+  // (3 nov.) Venu d'« Articles qui dorment » → « Mettre sur Leboncoin » : la fiche de
+  // CET article s'ouvre dès qu'il est dans la file (par son identifiant, jamais un titre).
+  useEffect(() => {
+    const d = DEMANDE_LBC_FICHE;
+    if (!d.id || Date.now() - d.at > 60000 || !data || !Array.isArray(data.queue)) return;
+    const q = data.queue.find((x) => String(x.id) === String(d.id));
+    d.id = null;
+    if (q) setFiche(q);
+  }, [data]);
   const [repubOuvert, setRepubOuvert] = useState(false);
   const n = data ? Math.max(data.postedCount, data.lbcCount) : 0;
   const lim = data ? (data.limit || null) : null;
@@ -66231,6 +66312,9 @@ function AppCoeur() {
   // tape dedans), sur téléphone dans l'en-tête (la loupe l'ouvre, le clavier
   // monte sans changer d'écran). Échap ou un toucher dehors referme ; la page
   // derrière ne bouge pas.
+  // (3 nov.) La voix : ce que le navigateur a reconnu passe par `requeteDeLaVoix`
+  // (« numéro 124 », « cent vingt-quatre » ⇒ 124 ; « B 125 » ⇒ B125 ; sinon le texte).
+  const dicterRecherche = (t) => { const r = requeteDeLaVoix(t); if (!r.requete) return; setGsQ(r.requete); if (!gsOpen) setGsOpen(true); };
   const champRecherche = (mobile) => (
     <input ref={gsChampRef} type="search" className="vrm-recherche-champ" data-recherche-champ="" enterKeyHint="search" autoComplete="off" spellCheck={false}
       aria-label={mobile ? 'Rechercher une paire : N°, modèle ou marque' : 'Rechercher une paire'} placeholder={mobile ? 'N°, modèle ou marque…' : 'Tape un N°, un modèle, une marque…'}
@@ -66244,6 +66328,7 @@ function AppCoeur() {
       <label className="vrm-barre-recherche" data-barre-recherche="">
         <Icon name="search" size={18}/>
         {champRecherche(false)}
+        <MicDictee nu titre="Chercher à la voix" onText={dicterRecherche}/>
         {gsQ ? <button type="button" className="vrm-recherche-effacer" aria-label="Effacer la recherche" onClick={()=>{ setGsQ(''); try{ gsChampRef.current&&gsChampRef.current.focus(); }catch(_){} }}><Icon name="close" size={14}/></button>
           : <kbd className="vrm-barre-kbd">/</kbd>}
       </label>
@@ -66254,6 +66339,7 @@ function AppCoeur() {
     <div className="vrm-hdr-recherche" data-recherche-zone="" style={{background:C.bg}}>
       <Icon name="search" size={18} style={{color:C.muted,flexShrink:0}}/>
       {champRecherche(true)}
+      <MicDictee nu titre="Chercher à la voix" onText={dicterRecherche}/>
       <button type="button" className="vrm-hdr-recherche-fermer" aria-label="Fermer la recherche" onClick={fermerRecherche} style={{color:C.text}}>Fermer</button>
     </div>
   );
