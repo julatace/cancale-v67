@@ -174,7 +174,7 @@ async function lireCommandesEbay() {
   });
 }
 // (2 nov., soir) + Vestiaire : « Colis fait » et les N° donnés aux annonces (src/numerosVestiaire.js).
-const MAIN_BILAN = ['vinted_accounts_hidden', 'vinted_ship_done', 'vinted_bords_shipped', 'vrm_paires_dorment', 'vrm_lbc_colis_done', 'vrm_vc_colis_done', 'vrm_vc_numeros'];
+const MAIN_BILAN = ['vinted_accounts_hidden', 'vinted_ship_done', 'vinted_bords_shipped', 'vrm_paires_dorment', 'vrm_lbc_colis_done', 'vrm_vc_colis_done', 'vrm_vc_numeros', 'vrm_comptes_exclus'];
 const ensemble = (v) => new Set(Array.isArray(v) ? v.map(String) : []);
 const objet = (v) => (v && typeof v === 'object' && !Array.isArray(v) ? v : {});
 
@@ -212,6 +212,7 @@ async function lireDonneesBilan() {
     comptes, commandes,
     masquesTx: mm ? new Set() : null,   // (29 oct.) une vente ne se masque plus
     masquesComptes: mm ? ensemble(mm.vinted_accounts_hidden) : null,
+    exclusAutres: mm ? objet(mm.vrm_comptes_exclus) : null,
     panneau: panneau === undefined ? null : objet(panneau),
     lbc: lbcL === undefined ? null : Object.values(objet(lbcL && lbcL.ventes)),
     // Les colis Leboncoin et Vestiaire à poster (`txsAExpedier`) : les mêmes lignes.
@@ -382,7 +383,10 @@ async function rappelsColisRetrait(maintenant = Date.now()) {
   for (const x of nouveaux) memo[x.cle] = today;
   if (!(await ecrireDedup('colis_retrait_dedup', { envoyes: memo, at: new Date(maintenant).toISOString() }))) return 'mémo non écrit — rien envoyé';
   let envoi = null;
-  for (const x of nouveaux) {
+  // (3 nov.) « Colis à vérifier » ne sonne plus : un délai dépassé ne dit pas où
+  // est le colis (mesuré le 29 oct. : 5 sur 5 avaient été retirés) — ce n'est
+  // pas un fait. Il reste dans Colis → « à vérifier ». Seul « dernier jour » sonne.
+  for (const x of nouveaux.filter((y) => y.etat === 'dernier')) {
     const t = texteRappelRetrait(x);
     envoi = await sendPushToAll({ title: t.title, body: t.body, tag: 'retrait-' + x.cle, url: DESTINATIONS.retrait({ suivi: x.suivi, tx: (() => { const t = txsPar.get(x.suivi); return t && t.size === 1 ? [...t][0] : ''; })() }) });
   }

@@ -1912,3 +1912,133 @@ calcul ; `caDecl` reste rendu pour la case « à déclarer »).
   `audit-suivi-urssaf` (21) verts.
 
 **Mesuré chez Julien (lecture seule)** — valeurs dans le rapport de session seulement.
+
+---
+
+## 3 novembre (après-midi) — Trois outils de compta choisis par Julien (13 h 02)
+
+### 1. Prix d'achat en un geste (`src/prixAchatPropose.js`)
+
+**Demande** : quand un article (N°) est relié PAR IDENTITÉ à un achat et que son prix d'achat est vide,
+VRM propose le montant réellement payé (« Utiliser 42,90 € »), détail sur une ligne ; rien n'est écrit
+sans son tap ; jamais par ressemblance de titre ; une action groupée « Valider les N prix proposés »
+avec une confirmation qui liste chaque N° et son montant.
+
+**Mesuré avant de coder (lecture seule, sa base, 3 nov.)** :
+- fiches `vinted_annonce_numeros` : 505 (toutes numérotées), 8 avec un prix, **5 reliées à un achat
+  (`buyFromId`), toutes avec leur prix** (le lien « Relier un achat » écrit déjà le prix de l'article) ;
+  corrections de vente `vinted_sale_overrides` : 561, 165 avec un prix, aucune reliée ;
+- achats captés : 632 (430 finalisés) ; reçus d'achat (`email_achat_*`) : 172 lignes, 136 avec n° de
+  transaction et « Montant payé », 63 reliés à un achat capté ; aucun des 5 achats reliés n'a de reçu ;
+- identité par la photo (achat ↔ vente) : **0 au fichier exact** ; 3 au même DOSSIER (« revendre » de
+  Vinted), dont les 3 achats sont « Remboursement validé » (ventes entre ses propres comptes) ;
+- ⇒ **aujourd'hui, aucune de ses ventes sans prix d'achat n'a un achat relié par identité** : la
+  proposition ne s'affichera chez lui que pour un lien futur sans prix lu, ou une revente au même
+  fichier photo. Le titre (seule autre piste) est refusé (§2.4). Le gain réel viendrait d'une identité
+  NEUVE achat → annonce (à mesurer : l'annonce créée par « revendre » garde-t-elle le fichier ?).
+
+**Fait** :
+- La règle, pure (`src/prixAchatPropose.js`) : identité = le lien qu'IL a posé (`buyFromId`), sinon le
+  fichier photo EXACT (`photoKey`, jamais `photoDir`) d'UN seul achat ; écartés : deux achats au même
+  fichier, l'achat de la même transaction que la vente, un achat remboursé/annulé/échoué, un achat
+  postérieur à la vente, un achat déjà relié à un autre article. Montant : le reçu de l'achat (par SON
+  n° de transaction) quand sa ventilation tombe juste au centime (« Article 30,00 € · Frais de port
+  2,63 € · Frais Vinted 2,00 € »), sinon le prix de l'article (« Article seul ») ; autre devise ⇒ rien.
+  Un achat n'est proposé qu'à UN article (ventes les plus récentes d'abord, puis fiches).
+- App.jsx (`propositionsPrix`, après `fillBuySugg`) : calcul sans écriture ; `appliquerProposition` =
+  la même écriture que « Relier un achat » (prix + `buyFromId` + instantané `buyFrom`, `recu` en plus).
+  Branché sur : la ligne de vente et le récapitulatif (`CoutAchatVente propose`, bouton « Utiliser
+  X € » + la ligne de détail ; une vente reliée sans prix montre maintenant le geste), la saisie en série
+  (« Prix d'achat à compléter », la piste par ressemblance s'efface derrière la proposition par
+  identité), et « Valider les N prix proposés » (Ventes et saisie en série, à partir de 2) avec
+  `askConfirm` qui liste « N°12 · 34,63 € » par ligne.
+- Ventes relit les achats captés (`chargerAchats`, relecture de l'extension seulement) ; les reçus ne
+  sont lus que s'il existe au moins une proposition.
+
+**Preuves** : `scripts/audit-prix-achat-propose.cjs` — 27 verts : 50 articles au même titre et 50 achats
+au même titre, un seul relié par son n° (posé sur le DERNIER) ⇒ une seule proposition, la sienne ;
+photo exacte / dossier / ambiguë / remboursé / postérieur / même transaction / déjà pris ; montant du
+reçu juste, reçu faux, autre devise ; un achat un article ; App.jsx : 4 appels d'écriture, tous dans un
+`onClick`/`onUtiliser` ou après la confirmation groupée, aucun dans le calcul, `photoKey` seule, aucun
+titre lu. **Rouge sur origin/main** (module absent). **Mutations** : `titre` 2 rouges, `sans-tap` 2,
+`dossier` 1, `recu` 1, `unique` 1.
+
+### 2. « Récap de [mois] » — PDF et tableur (`src/recapMois.js`)
+
+**Demande** : Compta → Documents → « Récap de [mois] » ⇒ PDF ET tableur : ventes (date, site, N°, titre,
+vendu, reçu, frais), CA déclaré daté au versement, URSSAF, dépenses, bénéfice, couverture ; mêmes règles
+que l'écran ; logo et entreprise de la fiche de facturation si remplie ; jamais « encaissé ».
+
+**Fait** :
+- `src/recapMois.js` MET EN PAGE, ne calcule rien : bénéfice = `chiffreBenefice(beneficePeriode(mois))`
+  (la colonne « Bénéfice » du récap mensuel, Ma journée, Statistiques) ; CA déclaré et URSSAF = la ligne
+  du mois publiée par Ventes (`vinted_urssaf_mois`) et `aPayerUrssaf` (les cellules du tableau) ;
+  dépenses = `lignesChargesMois` (nouvelle, App.jsx : fixes, dépenses et packs du mois, échéances
+  d'abonnement — son total EST `comptaChargesMois(...).total`) ; ventes = le relevé de Ventes
+  (`vrm_stats_ventes`, les MÊMES ventes que le bénéfice : finalisées, hors masquées, au jour de la vente),
+  auquel s'ajoutent `[8]` le N° de la fiche et `[9]` la date de versement lue (Leboncoin/eBay/Vestiaire :
+  leur date ; `ventesAutresBenefice` rend désormais `num`). « Pas su » = « — », raison en une ligne
+  (« il manque des prix d'achat ») ; couverture « Prix d'achat connus 2/3 » = celle du bénéfice.
+- PDF (pdf-lib, Helvetica, A4) : en-tête avec logo/nom/SIRET/adresse de `vrm_pro_facture` si remplie,
+  « Récap de novembre 2026 », résumé (libellé · montant, filets), ventes, dépenses, totaux ; caractères
+  impossibles retirés, titres longs coupés. Tableur : CSV `;`, BOM, montants « 12,50 ».
+- Écran : carte « Récap de [mois] » en tête de `RecapComptableMensuel` (Documents et réglages), choix du
+  mois (13 derniers), « PDF » et « Tableur ». L'ancien « Récap comptable mensuel » (tableau + CSV) reste.
+
+**Preuves** : banc `scripts/bancs/recap-mois.cjs` (données inventées, 1512 sombre + 390 tactile, A tous
+les prix connus / B un prix manquant) : le PDF lu par pdf.js et le tableur disent le MÊME bénéfice que
+« Combien j'ai gagné ? » et la colonne du récap mensuel (52,31 € ; « — » en B), le même CA déclaré et la
+même URSSAF que le tableau (149,40 € · 18,53 €), les dépenses du mois de Comptabilité (32,50 €), le nombre
+de ventes et la couverture du bénéfice (3 · 3/3, 2/3), jamais « encaissé », une ligne par vente avec site
+et titre, les dépenses listées ; aucun débordement, aucune erreur. **88 verts**. Rouge sur origin/main et
+sous mutation : voir plus bas.
+
+### 3. Boîte à dépenses — le ticket en photo (`src/depensesTicket.js`)
+
+**Demande** : ajouter une dépense en un geste depuis Compta avec la PHOTO du ticket ; montant/date/catégorie
+saisis par lui ; lecture du montant SEULEMENT si gratuite et locale, sinon champ manuel sans paragraphe ;
+catégories Emballage, Achats de stock, Envois, Abonnements, Autre ; les dépenses entrent dans le bénéfice
+par la règle existante (dans leur mois).
+
+**Fait** :
+- Le formulaire « Ajouter une dépense » (Tes dépenses, ouvert aussi par le geste de « Combien j'ai
+  gagné ? ») commence par « Photo du ticket » (`capture="environment"` : l'appareil photo au téléphone),
+  aperçu, « Changer la photo », « Retirer ». Photo réduite dans le navigateur (1100 px, JPEG 0,7).
+- Lecture du montant DANS la page, gratuite : `TextDetector` du navigateur s'il existe, sinon Tesseract
+  5.1.1 en WASM chargé de cdn.jsdelivr.net (déjà autorisé par la CSP : script, connect, wasm) avec ses
+  chemins explicites (worker, cœur, langue `fra`) ; borné à 45 s ; tout échec ⇒ champ vide, sans un mot.
+  `montantDuTicket` ne prend qu'un TOTAL écrit (net à payer, total TTC, total, CB), jamais le sous-total,
+  le HT, la TVA, le rendu ; sans mot de total ⇒ rien. Le montant n'est que PRÉ-REMPLI : « Ajouter » écrit.
+- La photo a SA ligne `depense_ticket_{id}` (comme `achat_hors_photo_{id}`, jamais `main` ni
+  `vrm_compta`) ; la dépense porte `ticket:true` seulement si la base a accepté la photo, sinon elle est
+  gardée sans photo et c'est dit. La ligne de la dépense a un bouton appareil photo qui relit le ticket
+  (une lecture, à la demande) et l'affiche ; supprimer la dépense vide la ligne du ticket.
+- Catégories = `CATEGORIES_DEPENSE` (exemples sous le champ). Libellé facultatif quand il y a une photo
+  (la catégorie le remplace).
+- ⚠️ **À trancher par Julien** : « Achats de stock » en DÉPENSE compte deux fois si la paire porte aussi
+  son prix d'achat (le bénéfice retire le prix d'achat des ventes ET les dépenses du mois). Gardé tel que
+  demandé ; à dire à Julien.
+- ⚠️ Non vérifié ici : le chargement réel de Tesseract depuis jsdelivr (le conteneur n'y a pas accès) ;
+  à essayer sur l'iPhone (Safari n'a pas `TextDetector` : c'est Tesseract qui lira).
+
+**Preuves** : banc `scripts/bancs/depense-ticket.cjs` (1512 sombre + 390 tactile ; détecteur simulé qui lit
+« SOUS-TOTAL 10,42 / TVA 2,08 / TOTAL TTC 12,50 / CB 12,50 », puis aucun détecteur et jsdelivr coupé) :
+catégories de Julien, champ pré-rempli à 12,50 (pas 10,42), rien écrit avant « Ajouter », dépense
+« Envois » 12,50 € `ticket:true`, image seulement dans `depense_ticket_{id}`, bénéfice du mois de
+Comptabilité −12,50 € exactement, bouton du ticket qui rouvre la photo, sans lecture : champ vide et aucun
+message, cibles ≥ 44 px. `scripts/audit-depense-ticket.cjs` (10 verts ; mutations `plus-grand` et `ht`
+rouges). Le banc `stats-compta` est remis aux catégories de Julien (« Envois » au lieu de « Transport »,
+la pastille « Abonnements » n'est plus refusée), en le disant dedans.
+
+### Preuves communes (3 nov., après `git merge origin/main`)
+- **Rouge sur origin/main** (arbres `git archive`, bancs copiés dedans) : `recap-mois` 12 rouges / 0 vert,
+  `depense-ticket` 12 rouges / 0 vert, `audit-prix-achat-propose` rouge (module absent).
+- **Mutations** : récap au bénéfice recalculé à part (vendu − achat − frais) ⇒ `recap-mois` 12 rouges ;
+  photo du ticket jamais envoyée ⇒ `depense-ticket` 16 rouges ; `audit-prix-achat-propose` `titre` 2,
+  `sans-tap` 2, `dossier` 1, `recu` 1, `unique` 1 ; `audit-depense-ticket` `plus-grand` 1, `ht` 1.
+- Verts sur cette branche : `recap-mois` 88, `depense-ticket` 56, `compta-claire` 92, `benefice-unique`
+  38, `audit-benefice-unique` 47, `audit-carte-chiffres` 203, `audit-icones`, `audit-urssaf`,
+  `audit-fonctions-api`, `audit-coherence`. `stats-compta` 54/58 : les 4 mêmes rouges que sur origin/main
+  (« la déclaration URSSAF est dans Compta », « la prochaine échéance ») — sans lien, laissés.
+- Captures regardées : carte « Récap de novembre 2026 » (390), formulaire avec la photo et 12,50 pré-rempli
+  (390), PDF d'essai (données inventées) sobre, une page.

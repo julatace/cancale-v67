@@ -231,12 +231,16 @@ const compte = (t, mot) => (String(t).match(new RegExp(mot, 'g')) || []).length;
         await pg.waitForSelector('[data-colis-onglet-choix="envoyer"]', { timeout: 15000 }).then(() => pg.click('[data-colis-onglet-choix="envoyer"]')).catch(() => {});
         await pg.waitForSelector('[data-vc-colis="V1"]', { timeout: 15000 });
         await pg.waitForTimeout(500);
-        const c = await pg.evaluate(() => { const x = document.querySelector('[data-vc-colis="V1"]'); return { classe: x.className, bord: x.hasAttribute('data-bord-card'), num: x.getAttribute('data-vc-colis-num'), chip: (x.querySelector('.vrm-colis-num') || {}).textContent || '', t: x.innerText,
-          gestes: [...x.querySelectorAll('[data-geste]')].map((g) => g.getAttribute('data-geste')), imprimer: !!x.querySelector('[data-imprime].vrm-colis-primaire'), titre: !!x.querySelector('.vrm-colis-titre'), h: Math.min(...[...x.querySelectorAll('button')].map((b) => b.getBoundingClientRect().height)) }; });
+        // (3 nov.) La carte Vestiaire = la carte Vinted du style Fusion : « Imprimé » et « Colis fait » derrière « … »,
+        // le transporteur en en-tête de son groupe (une fois), le n° de suivi dans le récapitulatif.
+        await pg.click('[data-colis-plus="vc:V1"]').catch(() => {});
+        await pg.waitForTimeout(200);
+        const c = await pg.evaluate(() => { const x = document.querySelector('[data-vc-colis="V1"]'); let g = x.previousElementSibling; while (g && !g.hasAttribute('data-groupe-transp')) g = g.previousElementSibling; const tete = g ? g.innerText : ''; return { classe: x.className, bord: x.hasAttribute('data-bord-card'), num: x.getAttribute('data-vc-colis-num'), chip: (x.querySelector('.vrm-colis-num') || {}).textContent || '', t: x.innerText + '\n' + tete,
+          gestes: [...x.querySelectorAll('[data-geste]')].map((g) => g.getAttribute('data-geste')), imprimer: !!x.querySelector('[data-imprime].vrm-colis-primaire'), titre: !!x.querySelector('.vrm-colis-titre'), h: Math.min(...[...x.querySelectorAll('button')].filter((b) => b.getBoundingClientRect().height > 0).map((b) => b.getBoundingClientRect().height)) }; });
         dit(/vrm-colis-carte/.test(c.classe) && c.bord && c.titre && c.imprimer, 'C · la carte d’un colis Vinted (vrm-colis-carte, data-bord-card, Imprimer en tête)', c.classe);
         dit(c.num === n1 && c.chip === `N°${n1}`, 'C · le N° de son annonce sur la carte', `${c.num} · ${c.chip}`);
         dit(c.gestes.join() === 'imprime,fait', 'C · Imprimé · Colis fait, comme Vinted', c.gestes.join());
-        dit(compte(c.t, 'Chronopost') === 1 && compte(c.t, 'XW000000001FR') === 1, 'C · « Chronopost · suivi … » écrit UNE fois (il l’était deux fois)', `${compte(c.t, 'Chronopost')} / ${compte(c.t, 'XW000000001FR')}`);
+        dit(compte(c.t, 'Chronopost') === 1 && compte(c.t, 'XW000000001FR') <= 1, 'C · « Chronopost » écrit UNE fois (en-tête du groupe), le suivi au plus une fois', `${compte(c.t, 'Chronopost')} / ${compte(c.t, 'XW000000001FR')}`);
         dit(c.h >= 44, 'C · gestes à 44 px', String(c.h));
         const tr = await pg.evaluate(() => { const x = document.querySelector('[data-vc-colis="V1"] .vrm-colis-actions [data-colis-transporteur]'); return x ? x.getAttribute('data-transporteur') : ''; });
         dit(tr === 'chronopost', 'C · la pastille transporteur à côté du bouton bordereau, comme Vinted', tr);
@@ -265,14 +269,19 @@ const compte = (t, mot) => (String(t).match(new RegExp(mot, 'g')) || []).length;
         // La visionneuse du PDF qui se ferme peut interrompre la navigation (ERR_ABORTED) : on la refait une fois.
         await pg.goto(`http://localhost:${PORT}/?tab=cat_bord`, { waitUntil: 'domcontentloaded' }).catch(() => pg.waitForTimeout(500).then(() => pg.goto(`http://localhost:${PORT}/?tab=cat_bord`, { waitUntil: 'domcontentloaded' })));
         await pg.waitForSelector('[data-colis-onglet-choix="envoyer"]', { timeout: 15000 }).then(() => pg.click('[data-colis-onglet-choix="envoyer"]')).catch(() => {});
-        await pg.waitForSelector('[data-vc-fait="V1"]', { timeout: 15000 });
-        await pg.click('[data-vc-fait="V1"]');
+        await pg.waitForSelector('[data-vc-colis="V1"]', { timeout: 15000 });
+        await pg.click('[data-colis-plus="vc:V1"]').catch(() => {});
+        await pg.click('[data-vc-colis="V1"] [data-vc-fait="V1"]');
         await pg.waitForTimeout(500);
-        const e = await pg.evaluate(() => { const b = document.querySelector('[data-colis-vestiaire]'); return { n: b && b.getAttribute('data-colis-vestiaire'), f: b && b.getAttribute('data-colis-vestiaire-faits'), txt: (document.querySelector('[data-vc-fait="V1"]') || {}).textContent || '' }; });
-        dit(e.n === '0' && e.f === '1' && /Pas encore/.test(e.txt), 'E · « Colis fait » : il sort de « à envoyer », annulable', JSON.stringify(e));
-        await pg.click('[data-vc-fait="V1"]');
+        // (3 nov.) Le colis fait quitte « À envoyer » et va dans l'onglet « Envoyés », annulable.
+        const sortie = await pg.evaluate(() => !document.querySelector('[data-vc-colis="V1"]'));
+        await pg.click('[data-colis-onglet-choix="envoyes"]'); await pg.waitForTimeout(400);
+        const e = await pg.evaluate(() => ({ envoye: !!document.querySelector('[data-colis-envoye="vc:V1"]'), txt: (document.querySelector('[data-colis-envoye="vc:V1"] [data-vc-fait="V1"]') || {}).textContent || '' }));
+        dit(sortie && e.envoye && /Pas encore/.test(e.txt), 'E · « Colis fait » : il sort de « à envoyer » pour « Envoyés », annulable', JSON.stringify({ sortie, ...e }));
+        await pg.click('[data-colis-envoye="vc:V1"] [data-vc-fait="V1"]');
         await pg.waitForTimeout(400);
-        const e2 = await pg.evaluate(() => (document.querySelector('[data-colis-vestiaire]') || { getAttribute: () => null }).getAttribute('data-colis-vestiaire'));
+        await pg.click('[data-colis-onglet-choix="envoyer"]'); await pg.waitForTimeout(400);
+        const e2 = await pg.evaluate(() => document.querySelector('[data-vc-colis="V1"]') ? '1' : '0');
         dit(e2 === '1', 'E · « ↺ Pas encore » le remet à envoyer', e2);
       });
       dit(errs.length === 0, 'aucune erreur de page', errs.join(' | ').slice(0, 200));

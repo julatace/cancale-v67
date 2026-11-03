@@ -169,22 +169,24 @@ export const classementRapporte = (lignes, axe = 'modele') => {
 // ── LE RELEVÉ (déplacé tel quel de l'écran Ventes, 3 nov.) ──────────────────
 // Une ligne par vente FINALISÉE, hors masquées, datée depuis le 1er janvier de
 // l'année d'avant : [plateforme, compte, tx|id, ts, vente €, achat € | null,
-// frais € | null, titre]. Vinted : par la règle de l'écran (`estFinalisee`,
+// frais € | null, titre, N° de la fiche, date de versement lue ('' pas lue) ; pour
+// Leboncoin, eBay, Vestiaire : la date de la vente]. Vinted : par la règle de l'écran (`estFinalisee`,
 // `estMasquee`, `montant`, `achat`, `frais`, `compte` passés par l'appelant) ;
 // Leboncoin, eBay et Vestiaire : `autres` (= `ventesAutresBenefice`, déjà
 // finalisées, en euros, prix d'achat par identité) et le titre de LA vente
 // retrouvé par SON identifiant (`titreDe`).
-export const releveVentes = ({ vinted = [], estMasquee = () => false, estFinalisee = () => false, montant, achat, frais, compte, autres = [], titreDe = {}, an0 }) => {
+export const releveVentes = ({ vinted = [], estMasquee = () => false, estFinalisee = () => false, montant, achat, frais, compte, numero = () => '', versement = () => '', autres = [], titreDe = {}, an0 }) => {
   const out = [];
   for (const o of (Array.isArray(vinted) ? vinted : [])) {
     if (!o || estMasquee(o) || !estFinalisee(o)) continue;
     const t = o.date ? Date.parse(o.date) : NaN;
     if (isNaN(t) || new Date(t).getFullYear() < an0) continue;
-    out.push(['Vinted', String(compte(o) || ''), String(o.transaction_id || ''), t, montant(o), achat(o), frais(o), String(o.title || '').slice(0, 90)]);
+    const vers = versement(o);
+    out.push(['Vinted', String(compte(o) || ''), String(o.transaction_id || ''), t, montant(o), achat(o), frais(o), String(o.title || '').slice(0, 90), String(numero(o) || ''), vers ? String(vers) : '']);
   }
   for (const x of (Array.isArray(autres) ? autres : [])) {
     if (!x || !isFinite(x.ts) || new Date(x.ts).getFullYear() < an0) continue;
-    out.push([x.plateforme, '', x.id, x.ts, x.eur, x.achat, x.frais, String(titreDe[x.id] || '').slice(0, 90)]);
+    out.push([x.plateforme, '', x.id, x.ts, x.eur, x.achat, x.frais, String(titreDe[x.id] || '').slice(0, 90), String(x.num || ''), new Date(x.ts).toISOString()]);
   }
   return out;
 };

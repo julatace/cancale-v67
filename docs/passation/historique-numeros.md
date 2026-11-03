@@ -1469,3 +1469,7 @@ Audit « actions » (rapport X1-X9). Ce qui change pour les numéros :
 - Non mesuré : combien de N° de la vraie base deviennent rouges avec la nouvelle règle
   (lecture seule à faire) — une vente encore sans identité à côté de SON annonce encore
   ouverte s'allume jusqu'à la relecture du dressing (mieux vaut un rouge qu'un faux).
+
+
+### UNE ANNONCE SUPPRIMÉE DE VINTED : LE N° SUIT OU ON DEMANDE (3 novembre)
+Récit complet : `historique-interface-stock.md`, « LE CYCLE D'UN ARTICLE ». Aucun numéro ne change : republiée (même N°, même photo, table de recréation) ⇒ rien ; sinon une question dans Ma journée ; « Je m'en sépare » passe par `vinted_pairs_lost` (clé `cleDeclarationPartie`). `src/cycleArticle.js`, `audit-cycle-article.cjs`.

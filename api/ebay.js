@@ -1538,7 +1538,9 @@ async function handleRetirer(b, ctx) {
     // (31 octobre) Comparer-et-échanger (`modifierDonnee`) : deux retraits
     // automatiques simultanés relisaient la même liste et le second effaçait la
     // ligne du premier. Lecture ratée ⇒ `null` ⇒ rien n'est écrit.
-    const entree = { itemId, sku: skuAttendu, titre: String(b.titre || '').slice(0, 140), at: Date.now() };
+    // (3 nov.) Le site de la vente (Vinted, Leboncoin, Vestiaire) — dit tel quel, jamais deviné.
+    const ou = ['Vinted', 'Leboncoin', 'Vestiaire'].includes(String(b.ou || '')) ? String(b.ou) : 'Vinted';
+    const entree = { itemId, sku: skuAttendu, titre: String(b.titre || '').slice(0, 140), at: Date.now(), ou };
     const w = await modifierDonnee(ligneDe('ebay_retraits_auto', ctx), ctx.owner, (d) => {
       const l = (d && Array.isArray(d.items)) ? d.items : [];
       return { ...(d || {}), items: [entree, ...l].slice(0, 50) };

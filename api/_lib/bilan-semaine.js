@@ -40,6 +40,7 @@
 //      · pour le reçu : des ventes finalisées sans date de versement (elles
 //        peuvent avoir été payées cette semaine — le dire, pas les deviner).
 import { ventesFaites, ventesDeclarables, compteEcarte } from './ventes-regle.js';
+import { excluAutreDe } from './comptes-exclus.js';
 
 const JOUR = 86400000;
 const PARIS = 'Europe/Paris';
@@ -106,6 +107,7 @@ const dansSemaine = (ts, debut, fin) => ts >= debut && ts < fin;
 //   comptes   [{ uid, login }]                — les comptes Vinted liés
 //   commandes { uid: { orders, cap } }        — `harvest_{uid}_orders_sold`
 //   masquesTx, masquesComptes (Set), panneau  — ce que l'app écarte (son choix)
+//   exclusAutres {leboncoin,vestiaire,ebay}  — les comptes des autres sites écartés (son choix, 3 nov.)
 //   lbc [], ebay [], versements {}            — comme l'écran Ventes
 //   colis (nombre, ventes eBay comprises), colisAuMoins (eBay illisible), dorment ({ n, total, datesKnown, at })
 export function calculerBilan(e) {
@@ -158,7 +160,8 @@ export function calculerBilan(e) {
   const cachee = vintedLisible ? (o) => e.masquesTx.has(String(o && o.transaction_id)) || compteEcarte(o && o._acc && o._acc.vinted_user_id, e.masquesComptes, e.panneau) : () => false;
 
   // ── VENDU : `ventesFaites`, au jour de la VENTE ──
-  const vf = ventesFaites({ vinted, lbc, ebay, vestiaire, cachee });
+  const excluAutre = excluAutreDe(e.exclusAutres);
+  const vf = ventesFaites({ vinted, lbc, ebay, vestiaire, cachee, excluAutre });
   let n = 0, eur = 0;
   for (const l of vf.lignes) if (dansSemaine(l.ts, debut, fin)) { n += 1; eur += l.eur; }
   const manqueVendu = [...manque];
@@ -170,7 +173,7 @@ export function calculerBilan(e) {
   if (e.versements == null && vintedLisible) {
     out.recu = { etat: 'pas-su', eur: 0, manque: ['dates de versement illisibles'] };
   } else {
-    const vd = ventesDeclarables({ vinted, lbc, ebay, vestiaire, exclu: vintedLisible ? (o) => compteEcarte(o && o._acc && o._acc.vinted_user_id, e.masquesComptes, e.panneau) : undefined, versements: e.versements || {} });
+    const vd = ventesDeclarables({ vinted, lbc, ebay, vestiaire, exclu: vintedLisible ? (o) => compteEcarte(o && o._acc && o._acc.vinted_user_id, e.masquesComptes, e.panneau) : undefined, excluAutre, versements: e.versements || {} });
     let r = 0;
     for (const l of vd.lignes) if (dansSemaine(l.ts, debut, fin)) r += l.eur;
     const manqueRecu = [...manque];

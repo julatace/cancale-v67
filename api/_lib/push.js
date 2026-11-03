@@ -18,6 +18,7 @@ import {endpointPushPermis} from './abonnement-push.js';
 import { proprietaireCourant } from './owner.js';
 import { sbCle } from './cle.js';
 import { accesVendeur } from './abonnement.js';
+import { decisionNotif, CATEGORIES_RETIREES } from './notif-textes.js';
 
 // La base sait-elle séparer les vendeurs ? Trois réponses, jamais deux :
 // 200 → oui · 400 (colonne inconnue) → non · le reste (522, délai) → PAS SU.
@@ -138,10 +139,10 @@ export const PUSH_DEFAUT = {
 const _prefsVues = new Map();                       // vendeur → dernières préférences LUES
 const _copieVue = new Map();                        // vendeur → la copie déjà rangée avec ses appareils (JSON)
 export const oublierPrefsVues = () => { _prefsVues.clear(); _copieVue.clear(); };   // bancs : instance froide
-const decider = (prefs, cat) => {
-  const v = prefs[cat];
-  return typeof v === 'boolean' ? v : (PUSH_DEFAUT[cat] !== false);
-};
+// (3 nov.) La décision vient des FAMILLES (api/_lib/notif-textes.js) : la
+// famille réglée décide, sinon l'ancien réglage de la catégorie, sinon le défaut.
+// Les catégories retirées (`suivi`, `achat`, `favori`) ne sonnent plus jamais.
+const decider = (prefs, cat) => decisionNotif(prefs, cat);
 // Rend les préférences lues (`{}` si la ligne n'existe pas), ou `null` = pas su.
 async function lirePrefs() {
   try {
@@ -176,6 +177,7 @@ async function copierPrefs(qui, prefs) {
 }
 export async function pushCategorieActive(cat) {
   if (!cat) return true;
+  if (CATEGORIES_RETIREES.has(cat)) return false;          // (3 nov.) plus jamais, sans même lire
   const qui = vendeurDuPush() || '';
   let lues = await lirePrefs();
   if (!lues) lues = await lirePrefs();              // un hoquet : on relit une fois
@@ -188,7 +190,7 @@ export async function pushCategorieActive(cat) {
   if (vues) return decider(vues, cat);
   const lu = await lireSubsVersion();
   if (lu && lu.prefs) return decider(lu.prefs, cat);
-  return PUSH_DEFAUT[cat] !== false;
+  return decisionNotif({}, cat);
 }
 
 export async function loadSubs() {

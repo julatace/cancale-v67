@@ -238,18 +238,20 @@ const ouvrir = async (b, vp, tab, opts = {}) => {
         await pg.click('[data-dep-ouvrir]');
         await pg.waitForSelector('[data-dep-form]', { timeout: 3000 });
         const forme = await pg.evaluate(() => ({ cats: [...document.querySelectorAll('[data-dep-cat]')].map((e) => e.getAttribute('data-dep-cat')), labels: [...document.querySelectorAll('[data-dep-form] label')].map((l) => l.innerText.split('\n')[0].trim()), abo: [...document.querySelectorAll('[data-dep-cat]')].some((e) => /Abonnement/.test(e.textContent)) }));
-        dit(forme.cats.length >= 5 && !forme.abo && ['Ce que tu as payé', 'Montant', 'Payé le'].every((l) => forme.labels.includes(l)),
+        // (3 nov.) Les catégories de Julien comprennent « Abonnements » (sa liste : Emballage,
+        // Achats de stock, Envois, Abonnements, Autre) : le refus de la pastille est levé.
+        dit(forme.cats.length >= 5 && ['Ce que tu as payé', 'Montant', 'Payé le'].every((l) => forme.labels.includes(l)),
           'dépense : on choisit « c’est pour quoi » en pastilles, chaque champ a son libellé', `${forme.cats.join(',')} · ${forme.labels.join(' / ')}`);
-        await pg.click('[data-dep-cat="Transport"]');
+        await pg.click('[data-dep-cat="Envois"]');
         const ph = await pg.getAttribute('[data-dep-libelle]', 'placeholder');
-        dit(/essence/.test(ph || ''), 'l’exemple suit la catégorie choisie', ph);
+        dit(/relais/.test(ph || ''), 'l’exemple suit la catégorie choisie', ph);
         await pg.fill('[data-dep-montant]', '12,50');
         await pg.click('[data-dep-ajouter]');
         const err = await pg.evaluate(() => (document.querySelector('[data-dep-erreur]') || {}).innerText || '');
         dit(/ce que tu as payé/i.test(err), 'un ajout sans libellé DIT pourquoi (jamais en silence)', err);
         await pg.fill('[data-dep-libelle]', 'Essence relais');
         await pg.click('[data-dep-ajouter]'); await pg.waitForTimeout(300);
-        const ajoute = await pg.evaluate(() => /Essence relais[\s\S]{0,80}Transport/.test(document.querySelector('[data-compta-section="depenses"]').innerText));
+        const ajoute = await pg.evaluate(() => /Essence relais[\s\S]{0,80}Envois/.test(document.querySelector('[data-compta-section="depenses"]').innerText));
         dit(ajoute, 'la dépense est ajoutée, avec sa catégorie');
         // Abonnement : les plus courants
         await pg.click('[data-abo-ouvrir]');

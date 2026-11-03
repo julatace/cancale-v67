@@ -223,7 +223,7 @@ async function audit(src, bavard) {
 
   // ── 5. Le branchement dans App.jsx (lu dans le code, commentaires retirés) ──
   const code = APP.replace(/\/\*[\s\S]*?\*\//g, '').split('\n').map((l) => l.replace(/(^|[^:'"`])\/\/.*$/, '$1')).join('\n');
-  const appel = (/releveVentes\(\{[\s\S]*?titreDe \}\)/.exec(code) || [''])[0];
+  const appel = (/const releve = releveVentes\(\{[\s\S]*?\}\);/.exec(code) || [''])[0];
   dit(/estMasquee: isHidden/.test(appel) && /estFinalisee: \(o\) => classifyOrderStatus\(o\.status\) === 'completed'/.test(appel) && /montant: montantCommandeLu\b/.test(appel) && /autres: autresBenefice/.test(appel),
     'l’écran Ventes construit le relevé par `releveVentes` : masquées et non finalisées écartées, prix par `montantCommandeLu`, autres plateformes par `ventesAutresBenefice`', appel.replace(/\s+/g, ' ').slice(0, 160));
   dit(/save\('vrm_stats_ventes', \{ v: 1, l: releve/.test(code), 'ce relevé est celui publié dans `vrm_stats_ventes`');
