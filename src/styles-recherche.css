@@ -51,6 +51,10 @@ html .vrm-app-shell .vrm-recherche-champ:focus, html .vrm-app-shell .vrm-recherc
     max-height: min(70dvh, calc(100dvh - 140px)); border-radius: 0 0 16px 16px; border-width: 0 0 1px;
   }
   .vrm-recherche-corps { padding: 6px 12px 12px; }
+  /* (3 nov., recherche unique) Dès qu'il tape, les résultats prennent tout l'écran
+     sous l'en-tête (le clavier reste ouvert, `dvh` suit sa hauteur) ; champ vide :
+     rien ne s'ouvre — jamais un grand écran blanc. */
+  .vrm-recherche-panneau:not([data-recherche-q=""]) { bottom: 0; max-height: none; border-radius: 0; border-width: 0; }
 }
 
 /* ── LA CIBLE D'UNE NOTIFICATION (31 oct.) ───────────────────────────────────

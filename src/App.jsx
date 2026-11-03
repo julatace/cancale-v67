@@ -124,6 +124,7 @@ import { lirePhotoroom, appelPhotoroom, phraseVerif, phraseSansReponse, dateCour
 // décide à qui appartient un email) — jamais une seconde normalisation ici.
 import { normAdresse, ADRESSE_COLLECTRICE, estAdresseCollectrice } from "../api/_lib/proprietaire-email.js";
 import { retoursEnCours, retoursPourSite, remiseEnStock, LIBELLE_ETAPE, ETAPES_RETOUR, numeroDuRetourVinted } from "./retoursStock.js";
+import { indexMemo as indexRechercheMemo, chercherPartout, destinationResultat } from "./rechercheUnique.js";
 import { litigesEnCours, litigeDeVente, requeteEmailsLitiges, texteLimite as texteLimiteLitige, LIBELLE_GENRE as LIBELLE_LITIGE } from "./litiges.js";
 import { etatVinted, NIVEAU_ETAT_MAX } from "./carteAnnonce.js";
 import ChoixPeriode from "./ChoixPeriode.jsx";
@@ -64560,7 +64561,17 @@ function AppCoeur() {
     const po=(await sb('app_data?id=like.harvest_*_orders_purchased&select=id,data')||[]).filter(duCompte);
     const seenP=new Set(); for(const r of po){ const p=(r.data&&r.data.payload)||{}; for(const o of (p.my_orders||[])){ const t=String(o.transaction_id||o.id||''); if(t&&!seenP.has(t)){ seenP.add(t); bought.push(o); } } }
     const lp=await sb('app_data?id=eq.vinted_lbc_posted&select=data'); ((lp&&lp[0]&&lp[0].data&&lp[0].data.ids)||[]).forEach(x=>lbc.add(String(x)));
-    setGsData({online,sold,bought,lbc});
+    // (3 nov.) LA RECHERCHE UNIQUE (src/rechercheUnique.js) : pseudo de l'acheteur et
+    // n° de transaction écrits dans le MÊME e-mail de vente, n° de suivi du bordereau de
+    // la vente, colis des e-mails de transporteur (suivi, code de retrait). Scalaires
+    // seulement (§4.4), toutes les pages (§4.5) ; une lecture ratée ⇒ cette source
+    // manque (rien d'inventé).
+    const [pseudos,bordereaux,colis]=await Promise.all([
+      lireTout('id=like.email_sale_*&select=tx:meta->>transaction,pseudo:meta->>pseudo').catch(()=>null),
+      lireTout('id=like.email_bord_*&select=tx:meta->>transaction,suivi:meta->>suivi').catch(()=>null),
+      lireTout('id=like.email_track_*&select=id,suivi:meta->>suivi,code:meta->>code,code2:meta->>code2,lieu:meta->>lieu,status:meta->>status,sens:meta->>sens,art:meta->>artTitle,carrier:meta->>carrier,at:meta->>receivedAt').catch(()=>null),
+    ]);
+    setGsData({online,sold,bought,lbc,pseudos,bordereaux,colis});
   })(); /* eslint-disable-next-line */ },[gsOpen]);
   // ── « TOUT SUR LE N° » (21 octobre) : les sources de la recherche par
   // numéro, lues UNE fois à l'ouverture de la recherche. Chaque source rend
@@ -66642,7 +66653,7 @@ function AppCoeur() {
         const lbcSet = (gsData && gsData.lbc) || new Set();
         const garageBoxOf = (numero)=>{ for(const [box,arr] of Object.entries(garageGrid||{})){ if(Array.isArray(arr)&&arr.some(v=>String(v).trim()===String(numero))) return box; } return null; };
         const hit = (s)=> q && String(s||'').toLowerCase().includes(q);
-        let pairs=[], ventes=[], achats=[];
+        let pairs=[], ventes=[], achats=[], colisT=[], trouve=null;
         const kNumQ = lireNumeroCherche(gsQ, { cleNum }, [prefixeNumeros(), archiveNumeros()]);
         if(q){
           // Paires numérotées (index principal : N°, titre, marque).
@@ -66655,10 +66666,14 @@ function AppCoeur() {
             .sort((a,b)=>(parseInt(a.numero,10)||0)-(parseInt(b.numero,10)||0))
             .slice(0,40);
           const numeredIds = new Set(pairs.map(p=>String(p.id)));
-          ventes = soldCache.filter(o=> (hit(o.title)||hit(extractBrand(o.title||''))) ).slice(0,25);
-          achats = buyCache.filter(o=> (hit(o.title)||hit(extractBrand(o.title||''))) ).slice(0,25);
+          // (3 nov.) Une seule recherche pour le reste : pseudo, n° de suivi, code de retrait,
+          // n° de transaction, titre (src/rechercheUnique.js, index mémorisé). Le titre ne
+          // sert qu'à CHERCHER : chaque ligne ouvre SA vente, SON achat, SON colis.
+          const idx = indexRechercheMemo({ ventes: soldCache, achats: buyCache, pseudos: gsData && gsData.pseudos, bordereaux: gsData && gsData.bordereaux, colis: gsData && gsData.colis });
+          trouve = chercherPartout(idx, gsQ);
+          ventes = trouve.groupes.vente; achats = trouve.groupes.achat; colisT = trouve.groupes.colis;
         }
-        const total = pairs.length+ventes.length+achats.length;
+        const total = pairs.length+ventes.length+achats.length+colisT.length;
         // (31 oct.) Une ligne mène à SON élément (la vente ouverte, la carte du colis).
         const go=(tab,cible)=>{ setGsOpen(false); if(cible) poserCible(cible, redirigerOnglet(tab, null, ONGLETS_DEPLACES).tab); setTab(tab); };
         // Un NUMÉRO tapé (« 128 », « B128 », « n128 ») : le bloc « Tout sur le
@@ -66678,8 +66693,8 @@ function AppCoeur() {
           style={ordi?{background:C.bg,borderColor:C.border}:{top:hautRecherche,background:C.bg,borderColor:C.border}} onMouseDown={e=>{ if(e.target===e.currentTarget) e.preventDefault(); }}>
           <FermeAuRetour fermer={()=>setGsOpen(false)}/>
           <div className="vrm-recherche-corps">
-            {!q && <div data-recherche-vide="" style={{padding:'14px 12px',textAlign:'left',color:C.muted,fontSize:13,lineHeight:1.6}}>Tape un <b>numéro</b>, un <b>modèle</b> ou une <b>marque</b>.<br/><span style={{fontSize:12}}>Cherche partout : annonces en ligne, ventes, achats, garage {gsData?'et Leboncoin':'…'}{!gsData?<> · <span style={{opacity:0.8}}>indexation en cours…</span></>:''}</span></div>}
-            {q && total===0 && !estNumQ && <div data-recherche-rien="" style={{padding:'14px 12px',textAlign:'left',color:C.muted,fontSize:13}}>Aucun résultat pour « {gsQ} ».<br/><span style={{fontSize:12}}>{gsData?'Aucune paire, vente ou achat ne correspond.':'Indexation en cours, réessaie dans un instant…'}</span></div>}
+            {!q && <div data-recherche-vide="" hidden/>}
+            {q && total===0 && !estNumQ && <div data-recherche-rien="" style={{padding:'14px 12px',textAlign:'left',color:C.muted,fontSize:13}}>{gsData?'Aucun résultat':'…'}</div>}
             {q && estNumQ && <ToutSurLeNumero q={gsQ} numData={numData} comptes={vintedAccounts} onNav={go} onFiche={(n)=>setFicheNum(String(n))} onChercher={(n)=>setGsQ(String(n))} onStock={(n)=>{ setGsOpen(false); setGarageLocate(String(n)); DEMANDE_STOCK_CHERCHE.nums=[String(n)]; DEMANDE_STOCK_CHERCHE.at=Date.now(); setTab('garage'); }}/>}
             {pairs.length>0 && <div style={{fontSize:11,fontWeight:700,color:C.muted,textTransform:'uppercase',letterSpacing:0.4,margin:'12px 2px 6px'}}>Paires numérotées ({pairs.length})</div>}
             {pairs.map(p=>(
@@ -66700,30 +66715,30 @@ function AppCoeur() {
                 <span style={{fontSize:17,color:C.muted}}>›</span>
               </button>
             ))}
-            {ventes.length>0 && <div style={{fontSize:11,fontWeight:700,color:C.muted,textTransform:'uppercase',letterSpacing:0.4,margin:'14px 2px 6px'}}>Ventes ({ventes.length})</div>}
-            {ventes.map((o,i)=>(
-              <button key={'v'+(o.transaction_id||i)} type="button" onClick={()=>{ setGsOpen(false); if(o.transaction_id!=null) poserCible({type:'vente',tx:String(o.transaction_id)},'ventes'); subVoulue.current='vinted'; setTab('ventes'); }} data-recherche-vente={o.transaction_id!=null?String(o.transaction_id):undefined}
-                style={{width:'100%',minHeight:44,display:'flex',alignItems:'center',gap:11,padding:'9px 10px',marginBottom:6,background:C.card,border:`1px solid ${C.border}`,borderRadius:12,cursor:'pointer',fontFamily:'inherit',textAlign:'left'}}>
-                {thumb(orderPhoto(o),'💸')}
-                <div style={{flex:1,minWidth:0}}>
-                  <div style={{fontSize:13,fontWeight:600,color:C.text,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{o.title||'(sans titre)'}</div>
-                  <div data-recherche-statut={etapeVente(o, { poste: posteMain }).label} style={{fontSize:12,color:C.muted,fontWeight:500,marginTop:2}}>{etapeVente(o, { poste: posteMain }).label}{o.date?' · '+jourCourt(o.date):''}</div>
-                </div>
-                <span style={{fontSize:17,color:C.muted}}>›</span>
-              </button>
-            ))}
-            {achats.length>0 && <div style={{fontSize:11,fontWeight:700,color:C.muted,textTransform:'uppercase',letterSpacing:0.4,margin:'14px 2px 6px'}}>Achats ({achats.length})</div>}
-            {achats.map((o,i)=>(
-              <button key={'a'+(o.transaction_id||i)} type="button" onClick={()=>{ setGsOpen(false); demanderVue('achats'); if(o.transaction_id!=null) poserCible({type:'achat',tx:String(o.transaction_id)},'achats'); setTab('achats'); }} data-recherche-achat={o.transaction_id!=null?String(o.transaction_id):undefined}
-                style={{width:'100%',minHeight:44,display:'flex',alignItems:'center',gap:11,padding:'9px 10px',marginBottom:6,background:C.card,border:`1px solid ${C.border}`,borderRadius:12,cursor:'pointer',fontFamily:'inherit',textAlign:'left'}}>
-                {thumb(orderPhoto(o),'📦')}
-                <div style={{flex:1,minWidth:0}}>
-                  <div style={{fontSize:13,fontWeight:600,color:C.text,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{o.title||'(sans titre)'}</div>
-                  <div data-recherche-statut={etapeAchat(o, null).label} style={{fontSize:12,color:C.muted,fontWeight:500,marginTop:2}}>{etapeAchat(o, null).label}{o.date?' · '+jourCourt(o.date):''}</div>
-                </div>
-                <span style={{fontSize:17,color:C.muted}}>›</span>
-              </button>
-            ))}
+            {/* (3 nov.) Les résultats de la recherche unique, groupés par type : chaque ligne
+                dit PAR QUOI elle a été trouvée (pseudo, suivi, code, transaction) et ouvre
+                SON écran par son identité (`destinationResultat`). */}
+            {[['vente','Ventes',ventes],['achat','Achats',achats],['colis','Colis',colisT]].map(([type,lib,liste])=> liste.length ? (
+              <div key={type} data-recherche-groupe={type} data-recherche-n={liste.length}>
+                <div className="vrm-recherche-groupe" style={{fontSize:11,fontWeight:700,color:C.muted,textTransform:'uppercase',letterSpacing:0.4,margin:'14px 2px 6px'}}>{lib} ({liste.length})</div>
+                {liste.map((r,i)=>{ const e=r.e; const o=e.o; const c=e.c||{};
+                  const etat = type==='vente' ? etapeVente(o, { poste: posteMain }).label : type==='achat' ? etapeAchat(o, null).label : ({ available:'À retirer', retour:'Reparti', delivered:'Retiré' }[c.status] || (c.lieu ? String(c.lieu).split(',')[0] : (c.carrier || '')));
+                  const quand = e.date ? jourCourt(e.date) : '';
+                  const par = r.par==='pseudo' ? r.valeur : r.par==='suivi' ? `Suivi ${r.valeur}` : r.par==='code' ? `Code ${r.valeur}` : r.par==='transaction' ? `N° ${r.valeur}` : '';
+                  const ouvrir = ()=>{ const d=destinationResultat(r); if(!d) return; setGsOpen(false); if(type==='achat') demanderVue('achats'); if(type==='vente') subVoulue.current='vinted'; if(d.cible) poserCible(d.cible, redirigerOnglet(d.tab, null, ONGLETS_DEPLACES).tab); setTab(d.tab); };
+                  return (
+                  <button key={type+(e.cle||i)} type="button" className="vrm-recherche-ligne" onClick={ouvrir} data-recherche-resultat={type} data-recherche-par={r.par} data-recherche-cle={e.cle}
+                    data-recherche-vente={type==='vente'&&e.tx?e.tx:undefined} data-recherche-achat={type==='achat'&&e.tx?e.tx:undefined}
+                    style={{width:'100%',minHeight:44,display:'flex',alignItems:'center',gap:11,padding:'9px 10px',marginBottom:6,background:C.card,border:`1px solid ${C.border}`,borderRadius:12,cursor:'pointer',fontFamily:'inherit',textAlign:'left'}}>
+                    {thumb(o ? orderPhoto(o) : null, type==='colis' ? <Icon name="box" size={18} style={{color:C.muted}}/> : null)}
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{fontSize:13,fontWeight:600,color:C.text,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{e.titre || (type==='colis' ? (c.carrier ? `Colis ${c.carrier}` : 'Colis') : '(sans titre)')}</div>
+                      <div data-recherche-statut={etat} style={{fontSize:12,color:C.muted,fontWeight:500,marginTop:2,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{[etat, quand].filter(Boolean).join(' · ')}</div>
+                    </div>
+                    {par ? <span className="vrm-recherche-par" data-recherche-par-valeur={r.valeur} style={{flexShrink:1,minWidth:0,maxWidth:'40%',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',fontSize:12,fontWeight:600,color:C.text,background:C.bg,borderRadius:999,padding:'4px 9px'}}>{par}</span> : null}
+                    <span style={{fontSize:17,color:C.muted}}>›</span>
+                  </button>); })}
+              </div>) : null)}
           </div>
         </div>
         );
@@ -66737,9 +66752,9 @@ function AppCoeur() {
   const dicterRecherche = (t) => { const r = requeteDeLaVoix(t); if (!r.requete) return; setGsQ(r.requete); if (!gsOpen) setGsOpen(true); };
   const champRecherche = (mobile) => (
     <input ref={gsChampRef} type="search" className="vrm-recherche-champ" data-recherche-champ="" enterKeyHint="search" autoComplete="off" spellCheck={false}
-      aria-label={mobile ? 'Rechercher une paire : N°, modèle ou marque' : 'Rechercher une paire'} placeholder={mobile ? 'N°, modèle ou marque…' : 'Tape un N°, un modèle, une marque…'}
+      aria-label={mobile ? 'Rechercher : N°, pseudo, suivi, code, titre' : 'Rechercher une paire'} placeholder={mobile ? 'N°, pseudo, suivi, code…' : 'N°, pseudo, n° de suivi, code de retrait, titre…'}
       role="combobox" aria-autocomplete="list" aria-expanded={gsOpen} aria-controls="vrm-recherche-resultats" aria-keyshortcuts={mobile ? undefined : '/'}
-      title={mobile ? undefined : 'Rechercher : un N°, un modèle, une marque (touche /)'}
+      title={mobile ? undefined : 'Rechercher : N°, pseudo, n° de suivi, code de retrait, n° de transaction, titre (touche /)'}
       value={gsQ} onChange={e=>{ setGsQ(e.target.value); if(!gsOpen) setGsOpen(true); }} onFocus={()=>{ if(!gsOpen) setGsOpen(true); }}
       onKeyDown={e=>{ if(e.key==='Escape'){ e.preventDefault(); e.stopPropagation(); fermerRecherche(); } }}/>
   );
