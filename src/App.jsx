@@ -63,6 +63,7 @@ import {formaterMontantEbay} from './montantsEbay.js';
 import {cibleEbay} from "./ebayParcours.js";
 import {centimes,coutsVente,beneficePaire,champsCharges} from "./beneficePaire.js";
 import CoutsVente from "./CoutsVente.jsx";
+import { feuillesExport, fichiersExport, zipStocke, nomExport } from "./exportDonnees.js";
 import { suggestionsAchat, tousAchatsLibres, filtresAchats, etiquetteLot, liensParAchat, lotDe, prixIndicatifLot, ecritureLot } from "./suggestionsAchat.js";
 import { boostRentable, SEUIL_BOOST } from "./boostRentable.js";
 import { CLE_WIDGETS_JOURNEE, WIDGETS_JOURNEE, NOM_TAILLE, DISPO_JOURNEE_DEFAUT, normaliserDispoJournee, deplacerWidget, retirerWidget, widgetFixe, tailleSuivante, tailleDefautWidget, caseVisible, widgetsAjoutables, dispoAEnregistrer } from "./journeeWidgets.js";
@@ -36235,6 +36236,37 @@ function ProfilFiscalCarte({ onNav }) {
 // neuf repartirait de 0001 et doublerait un numéro déjà donné.
 const ymListe = (n = 12, maintenant = Date.now()) => { const out = []; const d = new Date(maintenant); d.setDate(1); for (let i = 0; i < n; i++) { out.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`); d.setMonth(d.getMonth() - 1); } return out; };
 const libelleYm = (ym) => { const [a, m] = String(ym).split('-'); return `${MOIS_COMPTA[Number(m) - 1] || ''} ${a}`; };
+// ── (3 nov.) « EXPORTER MES DONNÉES » (Paramètres, src/exportDonnees.js) ─────
+// Les sources des écrans, telles quelles ; lectures en base PAGINÉES (`lireTout`)
+// et PROJETÉES (jamais `select=data`). Une source ratée ⇒ sa feuille dit « — ».
+// Rien ne part ailleurs : le zip est téléchargé sur l'appareil.
+async function sourcesExportDonnees() {
+  const rel = load('vrm_stats_ventes', null), urs = load('vinted_urssaf_mois', null);
+  const fiches = load('vinted_annonce_numeros', null);
+  const [lignesAchats, comptesV, factures] = await Promise.all([
+    lireTout('id=like.harvest_*_orders_purchased&select=id,orders:data->payload->my_orders').catch(() => null),
+    fetch(`${SUPABASE_URL}/rest/v1/vinted_accounts?select=vinted_user_id,login`, { headers: sbAuth() }).then((r) => (r.ok ? r.json() : null)).catch(() => null),
+    lireTout('id=like.email_invoice_*&select=id,number:data->>number,status:data->>status,emiseLe:data->>emiseLe,tx:data->>transaction,annuleePar:data->>annuleePar,type:data->>type').catch(() => null),
+  ]);
+  const login = new Map((Array.isArray(comptesV) ? comptesV : []).map((c) => [String(c.vinted_user_id), String(c.login || '')]));
+  const achats = Array.isArray(lignesAchats) ? lignesAchats.flatMap((r) => { const k = /^harvest_(\d+)_orders_purchased$/.exec(String(r && r.id || '')); const uid = k ? k[1] : ''; return (Array.isArray(r && r.orders) ? r.orders : []).map((o) => ({ ...o, compte: login.get(uid) || uid })); }) : null;
+  return {
+    releve: rel && Array.isArray(rel.l) ? rel.l : null,
+    urssaf: urs && Array.isArray(urs.mois) ? urs.mois.map((m) => ({ ym: m.ym, n: m.n != null ? m.n : m.count, ca: m.ca })) : null,
+    aPayer: (ca) => aPayerUrssaf(ca, tauxUrssaf()),
+    declarations: lireDeclarations(),
+    fiches: fiches && typeof fiches === 'object' ? fiches : null,
+    achats, compta: lireComptaSynchro(),
+    factures: Array.isArray(factures) ? factures.filter((f) => f && (f.type === 'facture_pro' || f.number)) : null,
+  };
+}
+async function exporterMesDonnees() {
+  try {
+    const src = await sourcesExportDonnees();
+    const zip = zipStocke(fichiersExport(feuillesExport(src)));
+    telechargerFichier(new Blob([zip], { type: 'application/zip' }), nomExport(), 'application/zip');
+  } catch (e) { toast('Export pas créé : ' + (e && e.message || e)); }
+}
 const telechargerFichier = (contenu, nom, type) => {
   const blob = contenu instanceof Blob ? contenu : new Blob([contenu], { type });
   const url = URL.createObjectURL(blob); const a = document.createElement('a');
@@ -60144,6 +60176,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       urlWidget && { id:'widget', type:'panneau', nu:true, ic:'chart', lib:'Widget iPhone', desc:'Ton lien privé pour Scriptable', el:widget },
     ]},
     { id:'sauvegarde', titre:'Sauvegarde', items:[
+      { id:'donnees', type:'action', ic:'save', lib:'Exporter mes données', onClick:exporterMesDonnees, data:{ 'data-exporter-donnees':'' } },
       { id:'export', type:'action', ic:'save', lib:'Sauvegarde complète', desc:'Réglages, numéros et données captées.', onClick:onExport, data:{ 'data-reglage-sauvegarde':'' } },
       { id:'restaurer', type:'action', ic:'restore', lib:'Restaurer une sauvegarde', onClick:onImport },
     ], pied: (

@@ -40,7 +40,7 @@ async function passe(b, nom, ctxOpts, sombre) {
   const pg = await ctx.newPage();
   const errs = [], ecrits = [];
   pg.on('pageerror', (e) => errs.push(e.message));
-  await pg.addInitScript(() => { try { localStorage.setItem('vrm_acces_direct', '1'); } catch (_) {} });
+  await pg.addInitScript((sb) => { try { localStorage.setItem('vrm_acces_direct', '1'); if (sb) localStorage.setItem('vinted_dark', 'true'); } catch (_) {} }, sombre);
   await pg.route('**/rest/v1/**', (route) => {
     const req = route.request(), u = metaVersData(req.url());
     const j = (d) => route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(d) });
