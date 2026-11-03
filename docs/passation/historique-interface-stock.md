@@ -3099,3 +3099,37 @@ Rouges connus, **déjà rouges sur `main`** (mesurés sur `git archive origin/ma
 Restent rouges ici : `mobile` à l'étape « 7 jours » de la période dans « Outils », `compta-simple` E
 (saisie de dépense pendant que le nuage est retenu, 2), `annonces-ventes-brouillon` (16 rouges sur main,
 quelques-uns de plus ici, écrans Annonces/Messages surtout).
+
+### 3 nov. — « À faire » en photos, Colis en trois onglets, « À retirer » propre (`claude/journee-photos`)
+
+Julien (09 h 49, capture de Ma journée) : « les couleurs… j'aime pas trop ; il faut que ce soit les PHOTOS en
+tout petit — s'il y en a plusieurs, des photos SUPERPOSÉES » ; « je veux des colis ENVOYÉS, et dans un autre
+onglet ; Vestiaire : tout va être ensemble » ; puis (10 h 19 / 10 h 23 / 10 h 27) sur Colis → À retirer :
+« beaucoup trop brouillon », « tout doit être parfait », « sélectionner une ville ».
+
+- **Ma journée** : la pastille chiffrée colorée devient une vignette (`src/design/PileVignettes.jsx`, 44 px,
+  rayon 10) ; plusieurs articles ⇒ pile de 2-3 décalées + « +k » neutre ; sans photo, tuile neutre + icône.
+  Les photos sont posées par l'écran, PAR IDENTITÉ (`photosCase` : la vente/achat/conversation/annonce
+  elle-même, `cmdParColis` pour un colis d'e-mail, txId Leboncoin, vente Vestiaire ; jobs : `photos` des
+  mêmes listes ; « à retirer de Leboncoin » : l'annonce `lbcId`, sinon la fiche N° de l'annonce Vinted). Le
+  titre reprend le nombre (« 5 colis à poster ») ; urgence = sous-ligne ambre ou point ambre ; un seul fond de
+  carte ; pilules neutres, bleu seulement sur « Imprimer » ; « Vendus ailleurs » au même gabarit. La carte
+  « Vente Vestiaire à envoyer » n'est plus redite (déjà dans « N colis à poster »). `titreSansNombre` reste
+  exporté mais n'est plus appelé (audit-journee-court §6 à réaligner si besoin).
+- **Colis** : « À envoyer · N / Envoyés · N / À retirer · N ». À envoyer : Vinted, Vestiaire (`CarteColisVc`,
+  même rond, « … », frise), eBay et Leboncoin (`CarteColisSite`) dans UNE liste rangée par transporteur ; plus
+  de bloc eBay ni « Ventes Vestiaire à envoyer » séparé. Envoyés (`listeEnvoyes`) : l'ancien « Partis » (Vinted,
+  45 j) + cochés « Colis fait » + Vestiaire faits + Leboncoin en livraison, frise ne cochant que le prouvé ;
+  attributs `data-colis-partis`/`data-parti`/`data-annuler-poste` gardés. eBay expédiés : pas de liste lue.
+- **À retirer** (`ColonneRetirer fusion`, src/CarteRelais.jsx) : carte sombre « N colis à retirer » (dernier
+  jour · avec code · à vérifier) ; puces « N en route » (liste au toucher, `groupesRelais.sansRelais`) et
+  « N comptes à relire » ; sélecteur de ville (CP + ville LUS dans l'adresse, `villesDesPoints`, choix mémorisé
+  `vrm_retirer_ville`, la carte sombre suit) ; une carte par point, une ligne par colis (vignette, titre,
+  échéance en puce : « dernier jour » ambre / « jusqu'au jj/mm » / rien si inconnue, « Code » ou « Code à
+  venir », « J'ai retiré ») ; détail au toucher ; « Lieu à confirmer » gris à la fin ; « À vérifier · N » replié,
+  statut en puce (« Fin d'instance » ⇒ « Retour à l'expéditeur ? ») ; repartis = « Remboursement à vérifier ·
+  19,64 € » + « Ouvrir » ; plus de bandeaux (fraîcheur, achats relus, suivi Vinted, réception e-mails) ;
+  « Suivre un colis par son n° » dans le « … » de Colis ; attribution de carte en tout petit DANS la carte.
+- **Preuves** : bancs `journee-photos` (Ma journée + Colis, jeux base · zero · un · trente · sansphoto, mutation
+  `JP_MUTATION=titre` ⇒ rouge, rouge sur origin/main) et `colis-retirer-propre` (le cas de Julien inventé, jeux
+  base · zero · un · neuf · trente, rouge sur origin/main 14/25).
