@@ -53,7 +53,7 @@ export const CHIFFRES = {
   benefice:   { nom: 'Bénéfice', court: 'bénéfice', type: 'eur', periodes: PERIODES_BENEF, sites: ['toutes'], compte: false, aller: 'compta' },
   brut:       { nom: 'Bénéfice brut', court: 'bénéfice brut', type: 'eur', periodes: TOUTES_PERIODES, sites: ['toutes'], compte: false, aller: 'compta' },
   declarer:   { nom: 'À déclarer', court: 'à déclarer', type: 'eur', periodes: PERIODES_BENEF, sites: ['toutes'], compte: false, aller: 'compta' },
-  urssaf:     { nom: 'URSSAF', court: 'URSSAF', type: 'eur', periodes: PERIODES_BENEF, sites: ['toutes'], compte: false, aller: 'compta' },
+  urssaf:     { nom: 'URSSAF', court: 'URSSAF', type: 'eur', periodes: PERIODES_BENEF, sites: ['toutes'], compte: false, aller: 'compta', titre: 'L’URSSAF de ces ventes, retirée du bénéfice. Celle à payer se calcule sur l’argent reçu (« Combien je dois déclarer ? »).' },
   finalisees: { nom: 'Ventes finalisées', court: 'finalisées', type: 'n', periodes: TOUTES_PERIODES, sites: ['toutes'], compte: false, aller: 'compta' },
   aposter:    { nom: 'À poster', court: 'à poster', type: 'n', periodes: null, sites: SITES, compte: false, aller: 'cat_bord' },
   retirer:    { nom: 'À retirer', court: 'à retirer', type: 'n', periodes: null, sites: ['toutes'], compte: false, aller: 'cat_bord' },
