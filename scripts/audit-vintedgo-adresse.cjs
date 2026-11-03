@@ -156,9 +156,9 @@ const ban = (feats) => ({ type: 'FeatureCollection', features: feats.map((f) => 
 
   await essaie('E. Colis branche la règle', async () => {
     const A = fs.readFileSync(path.join(R, 'src', 'App.jsx'), 'utf8').replace(/\/\/[^\n]*/g, '');
-    dit(/const lieuDeLigne = \(t\) => \{[^}]*lieuCompleteParTransporteur\(lieuDe\(t && t\.lieu\), \(t && t\.transp\) \|\| \(tpmC && k \? tpmC\.get\(k\)/.test(A), 'les cartes « À retirer » complètent le lieu par la ligne `transp_` du MÊME n° (`suiviDeLigne`)', '');
-    dit(/for \(const t of \(pickupUnion\.emailList \|\| \[\]\)\) \{\s*const a = achatDuColis\(t, buysBase, indexSuivisAchats\); const lu = lieuDeLigne\(t\);/.test(A), '… pour les e-mails « à retirer »', '');
-    dit(/const lu = x\.kind === 'email' \? lieuDeLigne\(x\.t\)/.test(A), '… et pour les « à vérifier »', '');
+    dit(/const lieuDeLigne = \(t(?:, a)?\) => \{[^}]*lieuCompleteParTransporteur\(lieuDe\(t && t\.lieu\), \(t && t\.transp\) \|\| \(tpmC && k \? tpmC\.get\(k\)/.test(A), 'les cartes « À retirer » complètent le lieu par la ligne `transp_` du MÊME n° (`suiviDeLigne`)', '');
+    dit(/for \(const t of \(pickupUnion\.emailList \|\| \[\]\)\) \{\s*const a = achatDuColis\(t, buysBase, indexSuivisAchats\); const lu = lieuDeLigne\(t(?:, a)?\);/.test(A), '… pour les e-mails « à retirer »', '');
+    dit(/const lu = x\.kind === 'email' \? lieuDeLigne\(x\.t(?:, o)?\)/.test(A), '… et pour les « à vérifier »', '');
     const C = fs.readFileSync(path.join(R, 'src', 'CarteRelais.jsx'), 'utf8');
     dit(/if \(p\.sansCarte\) return p\.sansCarteCode \|\| 'adresse';/.test(C), 'le code de la raison (`data-raison`) suit la règle (`deux-adresses`, `vintedgo-pas-lu`)', '');
   });

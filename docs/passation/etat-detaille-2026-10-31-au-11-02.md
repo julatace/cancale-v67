@@ -223,3 +223,9 @@ Déplacé TEL QUEL depuis CLAUDE.md §9 le 2 novembre 2026 (le fichier dépassai
 - **2 nov. (nuit)** — Transporteur LU (jamais deviné, sinon « Transporteur pas lu ») en logo + nom à côté du bordereau, ventes et achats (`src/transporteursVisuels.js`, `src/PastilleTransporteur.jsx`, banc `transporteurs-logos`) ; achats Vestiaire sortis de « À envoyer ». Reste : n° Mondial Relay dans l'email du bordereau, eBay avant étiquette, stats. → historique colis-retraits. Geste : regarder Colis au téléphone (logos).
 - **2 nov. (nuit)** — Carte des relais immobile (transition des boutons + arrondi MapLibre, banc `carte-stable`) ; parcours d'un nouveau vendeur : 13 défauts corrigés (banc `nouveau-vendeur`). → historique interface-stock. Geste : aucun.
 - **2 nov. (nuit)** — **Extension 5.316.0** : vente Vestiaire complète (photo, titre, montant versé `sellerEarning`, transporteur, suivi, bordereau PDF rapatrié → « Imprimer le bordereau » ; C10, C12). → historique vestiaire.
+
+### Lignes de §9 déplacées telles quelles
+- **2 nov. (nuit)** — E-mails et Statistiques plus simples : E-mails = « Oui, tes e-mails arrivent » + À faire + Ce que VRM en a fait ; Stats = 4 chiffres expliqués, compte qui vend le mieux, modèles et tailles, le reste en 2 volets (banc `emails-stats-clairs`, règles inchangées). → historique interface-stock. Geste : regarder Paramètres → E-mails et Statistiques.
+
+### Lignes de §9 déplacées telles quelles
+- **2 nov. (nuit)** — Comptabilité en 3 questions (Combien j'ai gagné ? · Combien je dois déclarer ? · Le détail replié), un montant écrit une fois, liens à l'encre (contraste), règles inchangées (banc `compta-claire`, 68 rouges sur main). → historique compta. Geste : regarder Compta au téléphone ; dire « Noter ma déclaration » ou « J'ai déclaré ».

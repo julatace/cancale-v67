@@ -173,7 +173,11 @@ export function regrouperRelais({ arrives = [], attendus = [] } = {}) {
   for (const [cle, p] of [...points.entries()]) {
     if (p.cp || p.inconnu || cle.startsWith('adr:')) continue;
     const autres = [...points.values()].filter((q) => q !== p && q.cp && !q.inconnu && !q.cle.startsWith('adr:'));
-    let memes = autres.filter((q) => nomDe(q.cle) === nomDe(cle));
+    // (3 nov.) Jamais dans une AUTRE ville, jamais à une AUTRE rue : quand le lieu les donne, ils
+    // doivent être ceux du point rejoint (avant : « le seul autre point du même nom », même ailleurs).
+    let memes = autres.filter((q) => nomDe(q.cle) === nomDe(cle)
+      && (!p.ville || !q.ville || normNomRelais(q.ville) === normNomRelais(p.ville))
+      && (!p.rue || !q.rue || normRue(q.rue) === normRue(p.rue)));
     if (memes.length > 1 && p.ville) memes = memes.filter((q) => normNomRelais(q.ville) === normNomRelais(p.ville));
     if (memes.length > 1 && p.rue) memes = memes.filter((q) => normNomRelais(q.rue) === normNomRelais(p.rue));
     if (!memes.length) {
@@ -417,14 +421,16 @@ export function jugerBan(json, attendu = {}) {
       if (!c || c.length < 3 || !texte.endsWith(c) || texte.slice(0, texte.length - c.length) !== nm) { raison = 'ville'; continue; }
     }
     if (!cp && !ville && !texte) { /* aucun contrôle de lieu possible */ raison = 'ville'; continue; }
-    bons.push({ lat, lon, score: Number(pr.score), type: String(pr.type || '') });
+    bons.push({ lat, lon, score: Number(pr.score), type: String(pr.type || ''), ville: String(pr.city || ''), cpTrouve: String(pr.postcode || '') });
   }
   if (!bons.length) return { echec: raison };
   const numeros = bons.filter((b) => b.type === 'housenumber');
   const parmi = (numeros.length ? numeros : bons).sort((a, b) => b.score - a.score);
   const tete = parmi[0];
   if (parmi.some((b) => b !== tete && b.score >= tete.score - 0.1 && metres(b, tete) > 80)) return { echec: 'ambigu' };
-  return { lat: tete.lat, lon: tete.lon };
+  // (3 nov.) La ville et le code postal du résultat SÛR (pour nommer la ville d'un point qui n'a
+  // que son code postal — `villeDuPoint`, src/villeRelais.js, au même code postal seulement).
+  return { lat: tete.lat, lon: tete.lon, ville: tete.ville, cp: tete.cpTrouve };
 }
 // L'ancienne forme (un repère ou `null`), gardée pour ceux qui ne veulent pas la raison.
 export function repereDepuisBan(json, cpAttendu) {

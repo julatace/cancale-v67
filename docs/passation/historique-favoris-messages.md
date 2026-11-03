@@ -2152,3 +2152,35 @@ favoris / 80 articles) · longs · sansphoto · bloque tous verts ; 15 rouges su
 12 tests `favoris-*.test.mjs`, construction. ⚠️ `scripts/tests/favoris-vinted-interface.cjs` et
 `favoris-historique-interface.cjs` étaient DÉJÀ rouges sur main (écran du 28 oct.), toujours rouges.
 Geste de Julien : regarder Messages → Favoris reçus (téléphone et ordinateur).
+
+
+### Contre-offre en un tap « Proposer X € » (3 novembre)
+Choisie par Julien parmi trois améliorations. Sur une offre reçue TROP BASSE (Messages →
+conversation → carte d'offre), le bouton du milieu devient **« Proposer X € »**.
+- **Règle** (`contreOffreMini`, `src/messagesVolets.js`) : X = SON prix mini (posé à côté du
+  N°, `vinted_annonce_numeros[item_id].min`, par l'`item_id` de la transaction, §5) arrondi à
+  l'euro supérieur ; jamais sous le mini ; jamais au-dessus du prix affiché (un mini qui
+  s'arrondirait au-dessus ⇒ X = le prix affiché, toujours ≥ mini) ; seulement si l'offre est
+  SOUS le mini (sinon « Accepter » est mis en avant comme avant) ; pas de mini, pas de prix
+  affiché lu (vente/annonce par identité, en euros) ou mini au-dessus du prix ⇒ pas de bouton
+  (« Contre-offre » ouvre le champ, vide). L'ancien « milieu arrondi aux 5 € »
+  (`contreOffreProposee`) est retiré : X ne vient QUE de son mini.
+- **Envoi** : le tap appelle `actionOffre('offre', off, X)` — le chemin existant (`vmrExec`,
+  POST `/transactions/{tx}/offers`, l'offre relue juste avant pour vérifier qu'elle n'a pas
+  changé, verrou anti double tap). Côté extension, POST /offers n'est pas une lecture :
+  `gardeStricte` le compte dans le plafond de 50 actions/h du compte. Rien d'automatique.
+  Extension absente / en retard / plusieurs : « Proposer X € · à faire sur Vinted ↗ » (lien
+  vers la conversation).
+- Mesuré (lecture seule) : 13 fiches portent un mini chez un compte VRM, 0 ailleurs.
+- **Preuves** : `scripts/audit-contre-offre-mini.cjs` (règle exécutée + balayage
+  offre × prix × mini ; écran ; `EXEC_PERMIS` + `gardeStricte` du VRAI background.js exécutés)
+  — 8 rouges sur origin/main, `--prouve` 5/5 mutations (X sous le mini, au-dessus du prix,
+  mini deviné, offre déjà au mini, sans prix affiché). Banc `messages-volets` mis à jour :
+  « Refuser · Proposer 105 € · Accepter », le tap envoie UNE offre de 105 € sur SA transaction
+  au nom de SON compte (rouge sur main) ; son faux pont porte maintenant `code` (sans lui,
+  l'app jugeait l'extension « périmée » et n'envoyait rien). `audit-moteur-offres` vert ;
+  `audit-offres-auto` : 2 rouges eBay déjà rouges sur main (`api/_lib/ebay-gestion.js`
+  RespondToBestOffer, `api/_lib/ebay.js`) ; `audit-coherence` vert.
+- ⚠️ Vu en passant (pas touché, défaut de main) : à 1512 px, Messages en trois volets dans
+  la colonne de 760 px du style Fusion ne laisse que ~110 px au fil (`messages-volets-1512`).
+- Geste de Julien : sur une offre sous son mini, toucher « Proposer X € ».
