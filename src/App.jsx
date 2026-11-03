@@ -36,6 +36,8 @@ import {preparerLiaisonOAuth,lireLiaisonOAuth,resultatLiaisonPermis} from './aut
 import ConnexionsCompte from './auth/ConnexionsCompte.jsx';
 import {etatColisDepuisTexte,normaliserSuivi} from '../api/_lib/etat-colis-email.js';
 import {achatDuColis,suivisAchat,entreeIndexAchat} from './liensColis.js';
+import {achatParConversation, regrouperArrivees} from '../api/_lib/achat-arrive-relais.js';
+import {arriveesRelues} from './arriveesRelues.js';
 import {avecSuiviDuSujet,finsDesLignes,sortiParSuivis,sortiParSuivi,suiviDeLigne,lienSuivi,codePostalLu,nouvelleVinted,transporteurDeForme,suiviValide,TRANSPORTEURS_SAISIE,normaliserCodePostal,idSuiviManuel,relireLigneSuivi,finDeCommandeAchat,fusionTransporteur,ligneDuTransporteur,ligneDeSuiviTransporteur,leverGarde,SELECT_TRANSP_META,ligneTranspDeMeta,sensDeLigne,incidentDeSuivis,incidentDeLigne,repartiAffichable,nomTransporteurSuivi} from '../api/_lib/suivi-colis.js';
 import {ligneTransporteur,texteCodePostalMr,carrierLisible,carrierNonLu,nomTransporteur,LECTURE_SERVEUR_TRANSP,heureParis} from '../api/_lib/transporteurs.js';
 import PhotoProfil,{AvatarCompte} from './profil/AvatarPersonnel.jsx';
@@ -4494,7 +4496,10 @@ const fetchEmailTrackingBrut = async () => {
     // (2 nov., 23 h) Un colis au point relais dont le lieu rangé n'a pas d'adresse
     // (locker d'une autre ville) : relu dans le texte gardé de SON e-mail, même règle
     // que le serveur (src/lieuxRetrait.js). Lecture ratée ⇒ la liste telle quelle.
-    return await lieuxRelusDansTextes(liste, async (q) => { const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?${q}`, { headers: sbAuth() }); if (!r.ok) throw new Error('lecture'); return r.json(); });
+    const lireQ = async (q) => { const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?${q}`, { headers: sbAuth() }); if (!r.ok) throw new Error('lecture'); return r.json(); };
+    // (3 nov.) + les achats « qui t'attendent » des e-mails Vinted déjà reçus
+    // (« Commande mise à jour », src/arriveesRelues.js) : même règle que le serveur.
+    return await arriveesRelues(await lieuxRelusDansTextes(liste, lireQ), lireQ);
   } catch (_) { return null; }
 };
 const fetchEmailTracking = async (opts = {}) => {
@@ -19274,6 +19279,8 @@ const raisonAVerifier = (x) => {
     const i = x.e.incident; const nom = nomTransporteur((i && i.carrier) || (x.t && carrierLisible(x.t.carrier, x.t.suivi)) || '');
     return i && i.libelle ? `${nom} dit « ${String(i.libelle).slice(0,120)} »` : `${nom} signale un problème`;
   }
+  // (3 nov.) Annoncé par Vinted, au même relais qu'un colis du transporteur, sans identité commune.
+  if (x.e.etat==='doute_meme_relais') return "peut-être le même colis qu'un autre e-mail de ce relais — rien ne les relie";
   if (x.e.etat==='delai_depasse' && x.e.heurePassee && x.e.limiteAt) return `délai de retrait passé aujourd'hui à ${heureParis(x.e.limiteAt)}`;
   if (x.e.etat==='delai_depasse') { const lim = x.kind==='email' && x.t ? x.t.limite : (x.e.limite || null); const jj = lim ? new Date(String(lim).slice(0,10)+'T00:00:00').toLocaleDateString('fr-FR',{day:'2-digit',month:'2-digit'}) : ''; return `délai de retrait dépassé${jj?` le ${jj}`:''}`; }
   // (revue du 23 oct.) La garde de SON transporteur (`x.e.garde`).
@@ -34684,7 +34691,9 @@ const moyennesParModele = (commandes, ecarte) => {
 // Tout passe désormais par ces fonctions, module-level, lisibles de partout.
 // ⚠️ (23 oct.) Un n° lu dans le SUJET (`suiviLuDansSujet`) ne change pas la clé :
 // une coche « J'ai retiré » posée sur ce colis avant ce jour porte son sujet.
-const colisKey = (t) => String((t && ((t.suiviLuDansSujet ? t.subject : t.suivi) || t.subject)) || '').trim();
+// (3 nov.) Un colis annoncé par Vinted sans n° de suivi a pour clé SA ligne
+// (sa conversation) : deux achats au même titre ont le même sujet.
+const colisKey = (t) => String((t && ((t.suiviLuDansSujet ? t.subject : t.suivi) || (t.source === 'vinted-commande' && t.cleLigne) || t.subject)) || '').trim();
 // (revue du 23 oct.) Au-delà de ce nombre de jours, la ligne de fraîcheur d'Achats
 // nomme le compte : ses colis ne le redisent pas (§7).
 const FRAICHEUR_ACHATS_J = 2;
@@ -41176,6 +41185,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     for (const [tx, r] of Object.entries(colisRelais || {})) { const c = r ? normCode(r.code) : ''; if (c) txParCode.set(c, txParCode.has(c) ? null : String(tx)); }
     const achatParTx = new Map((buysBase || []).map(o => [String(o.transaction_id), o]));
     const commandeDuColis = (t) => {
+      // (3 nov.) Le colis annoncé par Vinted (« Commande mise à jour ») porte la
+      // CONVERSATION de sa commande : une identité (api/_lib/achat-arrive-relais.js).
+      if (t && t.conv) { const ac = achatParConversation(t.conv, buysBase); if (ac) return ac; }
       const a = achatDuColis(t, buysBase, indexColis); if (a) return a;
       const c = normCode(t && t.code); const tx = c ? txParCode.get(c) : null;
       return tx ? (achatParTx.get(tx) || null) : null;
@@ -41296,6 +41308,18 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         if (cmdParColis.has(colisKey(s)) && !cmdParColis.has(colisKey(garde[i]))) cmdParColis.set(colisKey(garde[i]), cmdParColis.get(colisKey(s)));
       }
       if (garde.length !== emailList.length) emailList.splice(0, emailList.length, ...garde);
+    }
+    // ⚠️ (3 nov.) LA MÊME COMMANDE, UNE LIGNE — et un doute se dit, il ne se
+    // tranche pas (api/_lib/achat-arrive-relais.js, `regrouperArrivees`) : l'e-mail
+    // de Vinted « ton achat t'attend » (relié par sa conversation) et celui du
+    // transporteur (n° de suivi, code) menant à la MÊME commande = un colis ; un
+    // colis annoncé par Vinted sans commande au même code postal qu'un colis de
+    // transporteur sans commande = « à vérifier » (jamais compté deux fois).
+    {
+      const r = regrouperArrivees(emailList, { commandeDe: (t) => cmdParColis.get(colisKey(t)) || null, score: scoreLigneRetrait, fusion: fusionLignesMemeSuivi });
+      r.liste.forEach((t, i) => { if (r.commandes[i]) cmdParColis.set(colisKey(t), r.commandes[i]); });
+      for (const t of r.doutes) aVerifier.push({ kind: 'email', t, e: { etat: 'doute_meme_relais' }, o: null });
+      emailList.splice(0, emailList.length, ...r.liste);
     }
     // Le transporteur ÉCRIT que le colis repart (statut « retour », 23 oct.).
     // Gardé 30 jours : c'est le temps de vérifier le remboursement.

@@ -44,7 +44,7 @@ import { suiviDuSujet, finsDesLignes, sortiParSuivis, SELECT_TRANSP_META, ligneT
 import { modifierCas } from './_lib/suivi-vinted.js';
 import { estEmailVestiaire, lireEmailVenteVc, fusionnerVenteEmailVc } from './_lib/vestiaire-email.js';
 import { lienNotif } from './_lib/lien-notif.js';
-import { lireArriveeAchat, cleArrivee } from './_lib/achat-arrive-relais.js';
+import { lireArriveeAchat, cleArrivee, ligneArrivee } from './_lib/achat-arrive-relais.js';
 import { estConfirmationTransfert, lireConfirmationTransfert, authentifieGoogle, sansLienConfirmation, idCodeGmail } from './_lib/transfert-gmail.js';
 
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://lgonxzrzjcqthjtbdpzo.supabase.co';
@@ -2020,31 +2020,14 @@ export async function traiterEmail(req, res) {
     {
       const arr = lireArriveeAchat(mail, corpsTexte);
       if (arr) {
-        const rowId = cleArrivee(arr, mail.messageId, shortHash);
+        const rowId = cleArrivee(arr, mail.messageId);
         const avant = await supabaseLireRow(rowId);
         if (!avant.lu) { marquerEcritureRatee(); await repondre(res, 503, { ok: false, erreur: 'base-injoignable' }); return; }
         const prev = avant.data || null;
-        const emailAt = dateDeLEmail(corpsBrut) || now;
-        // La PREMIÈRE arrivée reste l'arrivée (un second e-mail du même colis ne la
-        // repousse pas) ; un état « retiré » déjà rangé n'est jamais redescendu.
-        const arriveLe = [emailAt, prev && prev.arriveLe].filter((x) => Number.isFinite(Date.parse(x || ''))).sort()[0] || emailAt;
-        const emailAtLigne = [emailAt, prev && prev.emailAt].filter((x) => Number.isFinite(Date.parse(x || ''))).sort().pop() || emailAt;
-        const retire = prev && prev.status === 'delivered';
+        const retire = !!(prev && prev.status === 'delivered');
         const st = contexteVendeur.getStore();
         const recu = (st && st.reception && Array.isArray(st.reception.adresses) && st.reception.adresses.length) ? st.reception.adresses : adresses;
-        const ok = await supabaseUpsert([{ id: rowId, data: {
-          ...(prev || {}),
-          type: 'suivi', carrier: 'autre', suivi: (prev && prev.suivi) || '', status: retire ? 'delivered' : 'available',
-          statusLabel: retire ? prev.statusLabel : 'Arrivé au point relais (Vinted)', subject, receivedAt: now,
-          emailAt: emailAtLigne, arriveLe,
-          code: arr.code || (prev && prev.code) || null, code2: (prev && prev.code2) || null,
-          artTitle: arr.titre, lieu: arr.lieu || (prev && prev.lieu) || null,
-          limite: (prev && prev.limite) || null, consigne: arr.forme === 'ici' || !!(prev && prev.consigne),
-          conv: arr.conv || '', source: 'vinted-commande', forme: arr.forme,
-          qrB64: (prev && prev.qrB64) || null, qrType: (prev && prev.qrType) || null, qrUrl: (prev && prev.qrUrl) || null,
-          account: acc.login || '',
-          ...(acc.login ? {} : (Array.isArray(recu) && recu.length ? { recuSur: recu.map((x) => String(x).toLowerCase().trim()).filter(Boolean).slice(0, 3) } : {})),
-        } }]);
+        const ok = await supabaseUpsert([{ id: rowId, data: ligneArrivee(arr, { cleLigne: rowId, subject, emailAt: dateDeLEmail(corpsBrut) || now, recuLe: now, prev, account: acc.login || '', recuSur: recu }) }]);
         if (!ok) { await repondre(res, 503, { ok: false, erreur: 'base-injoignable' }); return; }
         if (!retire) try { await pushOnce({
           title: '📍 Achat arrivé au point relais',

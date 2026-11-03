@@ -92,9 +92,17 @@ export function lireArriveeAchat(mail, texte) {
 // La clé de la ligne : la conversation (un colis = une conversation), sinon le
 // Message-ID (jamais le titre). Les deux étapes d'un même colis (« t'attend »
 // puis « livré dans le Point Relais ») tombent sur la même ligne.
-export function cleArrivee(lu, messageId, hash) {
+// L'empreinte est calculée ICI (la même au serveur et dans l'app : une relecture
+// retombe sur la ligne que le serveur aurait rangée).
+function empreinte(s) {
+  let h1 = 5381, h2 = 52711;
+  for (let i = 0; i < s.length; i++) { const c = s.charCodeAt(i); h1 = (h1 * 33) ^ c; h2 = (h2 * 33) ^ c; }
+  return (h1 >>> 0).toString(36) + (h2 >>> 0).toString(36);
+}
+export function cleArrivee(lu, messageId) {
   if (lu && lu.conv) return `email_track_autre_conv-${lu.conv}`;
-  return `email_track_autre_arr-${hash(String(messageId || '') || `${lu ? lu.titre : ''}|${lu ? lu.lieu : ''}`)}`;
+  const m = String(messageId || '').trim();
+  return `email_track_autre_arr-${empreinte(m || `${lu ? lu.titre : ''}|${lu ? lu.lieu : ''}|${lu ? lu.forme : ''}`)}`;
 }
 
 // La commande d'une ligne par SA conversation (identité) — une seule, sinon
@@ -113,4 +121,83 @@ export function achatParConversation(conv, achats) {
 export function cpDuLieu(lieu) {
   const m = /\b(\d{5})\b/.exec(String(lieu || ''));
   return m ? m[1] : '';
+}
+
+// ── UN COLIS, UNE LIGNE — DANS LA LISTE « À RETIRER » (§11 : l'app l'appelle) ──
+// `liste` : les lignes d'e-mail à retirer ; `commandeDe(t)` : la commande reliée
+// par IDENTITÉ (conversation, n° de suivi, code) ou null ; `score`, `fusion` :
+// la règle de l'app pour garder la ligne la plus complète.
+// 1. Deux lignes qui mènent à la MÊME commande sont le même colis : une ligne.
+// 2. Une ligne annoncée par Vinted SANS commande, au même code postal qu'une
+//    ligne de transporteur elle aussi sans commande : peut-être le même carton,
+//    rien ne le dit ⇒ `doutes` (montrée « à vérifier », jamais comptée deux fois).
+//    Seule à son code postal, elle reste à retirer. Le titre n'entre jamais ici.
+export function regrouperArrivees(liste, { commandeDe, score = () => 0, fusion = (m, s) => ({ ...s, ...m }) } = {}) {
+  const parTx = new Map(); const garde = []; const cmds = [];
+  for (const t of liste || []) {
+    const c = commandeDe(t); const k = c && c.transaction_id != null ? String(c.transaction_id) : '';
+    if (!k) { garde.push(t); cmds.push(null); continue; }
+    if (!parTx.has(k)) { parTx.set(k, garde.length); garde.push(t); cmds.push(c); continue; }
+    const i = parTx.get(k); const a = garde[i];
+    const [m, s] = score(t) > score(a) ? [t, a] : [a, t];
+    garde[i] = { ...fusion(m, s), artTitle: m.artTitle || s.artTitle || null, conv: m.conv || s.conv || '', source: m.source || s.source };
+  }
+  const cpOrphelins = new Map();
+  garde.forEach((t, i) => { if (!cmds[i] && t.source !== 'vinted-commande') { const cp = cpDuLieu(t.lieu); if (cp) cpOrphelins.set(cp, (cpOrphelins.get(cp) || 0) + 1); } });
+  const reste = [], doutes = [], commandes = [];
+  garde.forEach((t, i) => {
+    const cp = !cmds[i] && t.source === 'vinted-commande' ? cpDuLieu(t.lieu) : '';
+    if (cp && cpOrphelins.get(cp) > 0) { doutes.push(t); return; }
+    reste.push(t); commandes.push(cmds[i]);
+  });
+  return { liste: reste, doutes, commandes };
+}
+
+// ── LA LIGNE RANGÉE (une forme pour le serveur ET la relecture de l'app) ──────
+// `prev` : la ligne déjà rangée sous la même clé (ou null). La PREMIÈRE arrivée
+// reste l'arrivée ; un « retiré » rangé n'est jamais redescendu ; ce qui est déjà
+// su (code, QR, limite, n° de suivi) n'est jamais effacé.
+const dateOk = (x) => Number.isFinite(Date.parse(x || ''));
+export function ligneArrivee(lu, { cleLigne, subject, emailAt, recuLe, prev = null, account = '', recuSur = null } = {}) {
+  const p = prev || {};
+  const arriveLe = [emailAt, p.arriveLe].filter(dateOk).sort()[0] || emailAt || recuLe || null;
+  const emailAtLigne = [emailAt, p.emailAt].filter(dateOk).sort().pop() || emailAt || null;
+  const retire = p.status === 'delivered';
+  return {
+    ...p,
+    type: 'suivi', carrier: p.carrier && p.carrier !== 'autre' ? p.carrier : 'autre', suivi: p.suivi || '',
+    status: retire ? 'delivered' : 'available',
+    statusLabel: retire ? (p.statusLabel || 'Livré / retiré') : 'Arrivé au point relais (Vinted)',
+    subject, receivedAt: recuLe || p.receivedAt || emailAt || null,
+    emailAt: emailAtLigne, arriveLe,
+    code: lu.code || p.code || null, code2: p.code2 || null,
+    artTitle: lu.titre, lieu: lu.lieu || p.lieu || null,
+    limite: p.limite || null, consigne: lu.forme === 'ici' || !!p.consigne,
+    conv: lu.conv || p.conv || '', source: 'vinted-commande', forme: lu.forme, cleLigne,
+    qrB64: p.qrB64 || null, qrType: p.qrType || null, qrUrl: p.qrUrl || null,
+    account: account || p.account || '',
+    ...(!account && Array.isArray(recuSur) && recuSur.length ? { recuSur: recuSur.map((x) => String(x).toLowerCase().trim()).filter(Boolean).slice(0, 3) } : {}),
+  };
+}
+
+// ── LA RELECTURE DES E-MAILS DÉJÀ REÇUS (classés « sans action » avant le 3 nov.)
+// Le corps gardé (`email_inconnu_*.brut`, borné à 2 000 caractères) est le JSON
+// reçu, COUPÉ : on en relit le champ `text` (le lien de la conversation y est,
+// mesuré avant le 900e caractère). Rien de lisible ⇒ null.
+export function texteDuBrut(brut) {
+  const s = String(brut || '');
+  const m = /"text"\s*:\s*"((?:[^"\\]|\\.)*)/.exec(s);
+  if (!m) return '';
+  return m[1].replace(/\\n/g, '\n').replace(/\\r/g, '').replace(/\\t/g, ' ').replace(/\\"/g, '"').replace(/\\u([0-9a-f]{4})/gi, (_, h) => String.fromCharCode(parseInt(h, 16))).replace(/\\\\/g, '\\');
+}
+export function arriveeDUnGarde(row) {
+  const d = row || {};
+  const subject = String(d.subject || '');
+  const text = texteDuBrut(d.brut);
+  if (!subject || !text) return null;
+  const lu = lireArriveeAchat({ subject, text, html: '' }, text);
+  if (!lu) return null;
+  const cleLigne = cleArrivee(lu, d.messageId || (/"messageId"\s*:\s*"([^"]{3,300})"/.exec(String(d.brut || '')) || [])[1] || '');
+  const emailAt = (/"sourceDate"\s*:\s*"(\d{4}-[^"]+)"/.exec(String(d.brut || '')) || [])[1] || d.receivedAt || null;
+  return ligneArrivee(lu, { cleLigne, subject, emailAt, recuLe: d.receivedAt || emailAt });
 }
