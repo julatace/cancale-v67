@@ -13,6 +13,7 @@ import {auteurDernierConfirme,suiviNegociationVinted,reponseAttendueVinted,insta
 import {retourReponseVinted,cleReponseVinted,creerBrouillonsReponses,etatActionVinted,cleActionOffreVinted} from './reponseVinted.js';
 import {etatOffreVinted,offreVintedEnAttente,cleOffreVinted,appliquerOffresConfirmees,annonceOffreEnVente,offreOuverte} from './offresVinted.js';
 import {contreOffreMini} from './messagesVolets.js';
+import { problemesAnnonce, problemesLot } from './verifAnnonce.js';
 // « 105 € » (un montant entier sans « ,00 »), « 44,50 € » sinon — la contre-offre en un tap.
 const eurCourt = (v) => (Number.isInteger(Number(v)) ? `${Number(v)} €` : `${Number(v).toFixed(2).replace('.', ',')} €`);
 import {CONVERSATIONS_RETIREES,cleConversation,conversationRetiree,retirerConversation,remettreConversations,majAuGeste,phraseRetour} from './conversationsRetirees.js';
@@ -2097,6 +2098,14 @@ const askConfirm = (opts) => new Promise((resolve)=>{
   _askListener({ ...o, resolve });
 });
 
+// (3 nov.) Avant une publication : rien à dire ⇒ `true` tout de suite ; sinon
+// la feuille de vérification, et SA réponse (« Publier quand même » ⇒ true).
+const verifierAvantPublication = async (lignes, opts = {}) => {
+  if (!Array.isArray(lignes) || !lignes.length) return true;
+  const n = lignes.length;
+  return (await askConfirm({ kind: 'verif', site: opts.site || '', lignes, title: opts.titre || `${n} point${n > 1 ? 's' : ''} à vérifier`, desc: lignes.map((l) => `${l.qui ? l.qui + ' · ' : ''}${l.texte} — ${l.geste}`).join('\n'), ok: opts.ok })) === true;
+};
+
 // Meme chose pour window.prompt : une saisie, dans la feuille de l'app.
 // Renvoie la chaine saisie, ou null si on annule — exactement comme avant,
 // pour que les appels existants (`|| ''`, `!= null`) continuent de marcher.
@@ -2387,6 +2396,26 @@ function ConfirmHost() {
   const close = (val) => { try { q.resolve(val); } catch (_) {} setQ(null); };
   // Dans document.body, posée en dernier, au-dessus de toute feuille (Z_CONFIRMATION).
   if (q.kind === 'text') return createPortal(<AskTextSheet q={q} close={close}/>, document.body);
+  // (3 nov.) VÉRIFIER AVANT DE PUBLIER (`src/verifAnnonce.js`) : une ligne par
+  // problème + son geste ; « Corriger » ferme, « Publier quand même » continue.
+  if (q.kind === 'verif') return createPortal(
+    <SheetShell onClose={() => close(false)} z={Z_CONFIRMATION}>
+      <div data-verif-sheet={q.site || ''} data-verif-n={(q.lignes || []).length}>
+        <div style={{fontSize:17,fontWeight:700,color:C.text,letterSpacing:'-0.02em',lineHeight:1.35}}>{q.title}</div>
+        <div className="vrm-verif-liste" style={{marginTop:12,display:'flex',flexDirection:'column',borderTop:`1px solid ${C.border}`}}>
+          {(q.lignes || []).map((l, i) => (
+            <div key={i} data-verif-probleme={l.code} data-verif-qui={l.qui || undefined} style={{padding:'10px 0',borderBottom:`1px solid ${C.border}`,display:'flex',flexDirection:'column',gap:2}}>
+              <span style={{fontSize:14,fontWeight:600,color:C.text,lineHeight:1.35}}>{l.qui ? <span style={{color:C.muted,fontWeight:600}}>{l.qui} · </span> : null}{l.texte}</span>
+              <span style={{fontSize:12.5,color:C.muted,lineHeight:1.4}}>{l.geste}</span>
+            </div>
+          ))}
+        </div>
+        <div style={{display:'flex',gap:9,marginTop:16}}>
+          <Bouton variante="discret" data-verif-publier="" onClick={() => close(true)} style={{flex:1}}>{q.ok || 'Publier quand même'}</Bouton>
+          <Bouton variante="primaire" autoFocus data-verif-corriger="" onClick={() => close(false)} style={{flex:1}}>Corriger</Bouton>
+        </div>
+      </div>
+    </SheetShell>, document.body);
   if (q.kind === 'choix') {
     const { titre: tc, corps: cc } = sheetTexte(q, 'Choisis');
     return createPortal(
@@ -13801,7 +13830,14 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
   // est sautée, et c'est dit sur sa ligne.
   const [figee, setFigee] = useState(null);
   const aFaire = mode !== 'idle' && figee ? figee : aFaireCalc;
-  const lancerFile = () => { setFigee(aFaireCalc.map((a) => ({ ...a }))); setMode('run'); };
+  // (3 nov.) Vérifier avant de republier (`src/verifAnnonce.js`) : le titre et le
+  // prix qui PARTIRONT (l'aperçu), les photos, la taille et la marque lues.
+  const lancerFile = async () => {
+    const lot = aFaireCalc.map((a) => { const x = action === 'enLigne' ? {} : apercu(a); return { numero: a.numero, titre: x.titre || a.titre, prix: x.prix != null ? x.prix : a.prix, achat: a.floor,
+      ...(a.nPhotos != null ? { nPhotos: a.nPhotos } : {}), ...(a.taille !== undefined ? { taille: a.taille, famille: a.famille || '' } : {}), ...(a.marque !== undefined ? { marque: a.marque } : {}) }; });
+    if (!(await verifierAvantPublication(problemesLot(lot, 'vinted'), { site: 'vinted' }))) return;
+    setFigee(aFaireCalc.map((a) => ({ ...a }))); setMode('run');
+  };
   // La paire suivante, dont le bloc d'avancée dit le temps : sa ligne ne le redit pas (§7).
   const idAnnoncee = mode === 'run' ? ((aFaire.find((a) => !st[a.id]) || {}).id || null) : null;
   const melanger = () => {
@@ -18035,6 +18071,12 @@ function FicheLbc({ q, compteLbc, onClose, onMarquer }) {
     if (envoi || fait) return;
     if (bloque && !enCours) { setRefus(bloque.texte); return; }
     if (abandonne && !confirme) { setAConfirmer(true); return; }
+    // (3 nov.) Vérifier avant de publier : une ligne par problème, « Publier quand même » possible.
+    if (!enCours && !confirme) {
+      const fam = familleArticle({ titre, description: desc, taille: q.taille, marque: q.marque }).famille;
+      const ok = await verifierAvantPublication(problemesAnnonce({ titre, taille: q.taille || '', famille: fam, marque: q.marque || '', categorie: categorieLbcDe(titre, desc, q.taille, '', q.marque), nPhotos: photos.length, prix, achat: q.achat }, 'lbc'), { site: 'lbc' });
+      if (!ok) return;
+    }
     setRefus(null); setAConfirmer(false); setEnvoi(true);
     let r = await envoyer(!!confirme);
     setEnvoi(false);
@@ -22105,6 +22147,19 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
   //   4. la vérification à blanc d'eBay (frais lus par nom) ; un refus ⇒ on s'arrête ;
   //   5. UNE confirmation qui dit tout (titre, prix, catégorie, critères, compte,
   //      frais), puis la publication — les gardes de `gardePublier` d'abord.
+  // (3 nov.) Vérifier avant de publier (`src/verifAnnonce.js`) : ce qui partira
+  // (titre, prix, photos, caractéristiques, catégorie) contre SON prix d'achat connu.
+  const verifEbay = (item) => {
+    const aspects = (item && item.aspects) || asp || {};
+    const cle = (re) => Object.keys(aspects).find((k) => re.test(k));
+    const kMarque = cle(/^(marque|brand)$/i), kTaille = cle(/pointure|taille|size/i);
+    const marque = kMarque ? aspects[kMarque] : ((pairSel && pairSel.marque) || '');
+    const taille = kTaille ? aspects[kTaille] : ((pairSel && pairSel.taille) || '');
+    let achat = null;
+    try { if (pairSel) achat = prixAchatDe((load('vinted_annonce_numeros', {}) || {})[pairSel.id], load('vinted_buyprice_by_num', {}) || {}); } catch (_) { achat = null; }
+    const nPh = String(photos || '').split(/\s+/).filter((u) => /^https?:\/\//.test(u.trim())).length;
+    return problemesAnnonce({ titre, taille: String(taille || ''), famille: familleArticle({ titre, taille: String(taille || ''), marque: String(marque || '') }).famille, marque: String(marque || ''), categorie: (cat && cat.categoryId) || '', nPhotos: nPh, prix: item ? item.price : prix, achat }, 'ebay');
+  };
   const [autoPub, setAutoPub] = React.useState(null);   // null · { id, etape: 'analyse' | 'verif' }
   const publierEnUnClic = (p) => { setRes(null); setCheck(null); setAutoPub({ id: p.id, etape: 'analyse' }); choisirPaire(p); };
   React.useEffect(() => {
@@ -22123,6 +22178,7 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
       if (b.err) { setAutoPub(null); setRes({ err: b.err }); return; }
       const g = gardePublier();
       if (g) { setAutoPub(null); setRes({ err: g.t }); return; }
+      if (!(await verifierAvantPublication(verifEbay(b.item), { site: 'ebay' }))) { setAutoPub(null); return; }
       setVerif(true);
       const { j } = await appelEbay({ action: 'pubverify', item: b.item, ...corpsCompteEbay(comptePub) });
       setVerif(false);
@@ -22142,12 +22198,13 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
       ].filter(Boolean).join('\n\n');
       const ok = await askConfirm({ title: 'Publier cet article sur eBay ?', desc: texteConf, ok: 'Oui, publier', cancel: 'Annuler' });
       setAutoPub(null);
-      if (ok) await publier({ dejaConfirme: true });
+      if (ok) await publier({ dejaConfirme: true, verifie: true });
     })();
   }, [autoPub, analyse, cat, asp, pairId]);   // eslint-disable-line react-hooks/exhaustive-deps
   const publier = async (opts = {}) => {
     const b = buildItem(); if (b.err) { setRes({ err: b.err }); return; }
     const g = gardePublier(); if (g) { setRes({ err: g.t }); return; }
+    if (!(opts && opts.verifie) && !(await verifierAvantPublication(verifEbay(b.item), { site: 'ebay' }))) return;
     // (9 octobre) Une RÈGLE D'OFFRE part avec l'annonce : eBay vendra la paire
     // sans lui demander. TOUJOURS une confirmation qui le dit (même avec un
     // seul compte) — le compte y est nommé s'il y en a plusieurs.
@@ -27209,6 +27266,10 @@ function PublierVestiaire({ comptes }) {
   const preparer = async (p) => {
     if (envoi) return;
     if (glob) { setMsg((m) => ({ ...m, [p.id]: glob.texte })); return; }
+    // (3 nov.) Vérifier avant de publier (`src/verifAnnonce.js`) ; la catégorie se choisit sur Vestiaire.
+    let achatV = null;
+    try { achatV = prixAchatDe((load('vinted_annonce_numeros', {}) || {})[String(p.id)], load('vinted_buyprice_by_num', {}) || {}); } catch (_) { achatV = null; }
+    if (!(await verifierAvantPublication(problemesAnnonce({ titre: p.title || '', taille: p.taille || '', famille: familleArticle({ titre: p.title, taille: p.taille, marque: p.marque }).famille, marque: p.marque || '', nPhotos: (p.photos || []).length, prix: p.prix, achat: achatV }, 'vestiaire'), { site: 'vestiaire' }))) return;
     setEnvoi(p.id); setMsg((m) => ({ ...m, [p.id]: '' }));
     const r = await vmrCmd({ cmd: 'vcPreparer', id: String(p.id), publier: auto }, 30000);
     setEnvoi('');
@@ -56906,7 +56967,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         const annoncesR = (listings.items||[]).filter(it=>it && it.id!=null).map(it=>{
           const e=numeros[it.id]||{}; const fl=prixAchatDe(e,buyByNum); const pr=(it.price&&typeof it.price==='object')?it.price.amount:it.price; const n=Number(String(pr==null?'':pr).replace(',','.'));
           const rc=Date.parse((e&&e.recreeAt)||'');
-          return { id:String(it.id), numero:(e&&e.numero)?String(e.numero):'', key:String((e&&e.numero)||it.id), titre:it.title||'', prix:isFinite(n)&&n>0?n:null, floor:(fl!=null&&!isNaN(fl))?Number(fl):null, photo:photoArticle(it)||'', photos:(()=>{ const L=(Array.isArray(it.photosDetail)&&it.photosDetail.length?it.photosDetail:(Array.isArray(it.photos)&&it.photos.length?it.photos:[])).map(p=>typeof p==='string'?p:((p&&(p.full_size_url||p.url))||'')).filter(Boolean); const c=photoArticle(it); return L.length?L.slice(0,20):(c?[c]:[]); })(), uid:it._acc?String(it._acc.vinted_user_id||''):'', compte:it._acc?(it._acc.login||it._acc.username||''):'', favoris:Number.isFinite(it.favourites)?it.favourites:null, vues:Number.isFinite(it.views)?it.views:null, age:listedAgeDays(it), recreeAt:isFinite(rc)?rc:null };
+          return { id:String(it.id), numero:(e&&e.numero)?String(e.numero):'', key:String((e&&e.numero)||it.id), titre:it.title||'', prix:isFinite(n)&&n>0?n:null, floor:(fl!=null&&!isNaN(fl))?Number(fl):null, photo:photoArticle(it)||'', photos:(()=>{ const L=(Array.isArray(it.photosDetail)&&it.photosDetail.length?it.photosDetail:(Array.isArray(it.photos)&&it.photos.length?it.photos:[])).map(p=>typeof p==='string'?p:((p&&(p.full_size_url||p.url))||'')).filter(Boolean); const c=photoArticle(it); return L.length?L.slice(0,20):(c?[c]:[]); })(), uid:it._acc?String(it._acc.vinted_user_id||''):'', compte:it._acc?(it._acc.login||it._acc.username||''):'', favoris:Number.isFinite(it.favourites)?it.favourites:null, vues:Number.isFinite(it.views)?it.views:null, age:listedAgeDays(it), recreeAt:isFinite(rc)?rc:null,
+            // (3 nov.) Pour « vérifier avant de republier » : ce que le dressing dit.
+            nPhotos:Number.isFinite(it.photoCount)?it.photoCount:null, taille:it.size||'', marque:it.brand||'', famille:familleArticle({ titre:it.title, taille:it.size, marque:it.brand }).famille };
         });
         const vc = vintedDeChrome(); const etatX = vc && vc.uid ? vc.uid : null;
         // (28 oct.) Supprimer et RECRÉER (sa décision). Le N° VRM de l'ancienne
@@ -58950,6 +59013,9 @@ function LeboncoinScreen() {
         etat: o.status || '', couleur: o.color || '', texte: lbcDescription(d.description),
         compte: nomCompteDe(o.uid),
         jumelle: twinDe(o.id),
+        // (3 nov.) Le prix d'achat CONNU (fiche du N°, sinon saisie par N°), pour
+        // « vérifier avant de publier » — jamais deviné (§2.5).
+        achat: (() => { try { return prixAchatDe(e, load('vinted_buyprice_by_num', {}) || {}); } catch (_) { return null; } })(),
       };
     };
     for (const o of online) {
