@@ -1912,3 +1912,53 @@ calcul ; `caDecl` reste rendu pour la case « à déclarer »).
   `audit-suivi-urssaf` (21) verts.
 
 **Mesuré chez Julien (lecture seule)** — valeurs dans le rapport de session seulement.
+
+---
+
+## 3 novembre (après-midi) — Trois outils de compta choisis par Julien (13 h 02)
+
+### 1. Prix d'achat en un geste (`src/prixAchatPropose.js`)
+
+**Demande** : quand un article (N°) est relié PAR IDENTITÉ à un achat et que son prix d'achat est vide,
+VRM propose le montant réellement payé (« Utiliser 42,90 € »), détail sur une ligne ; rien n'est écrit
+sans son tap ; jamais par ressemblance de titre ; une action groupée « Valider les N prix proposés »
+avec une confirmation qui liste chaque N° et son montant.
+
+**Mesuré avant de coder (lecture seule, sa base, 3 nov.)** :
+- fiches `vinted_annonce_numeros` : 505 (toutes numérotées), 8 avec un prix, **5 reliées à un achat
+  (`buyFromId`), toutes avec leur prix** (le lien « Relier un achat » écrit déjà le prix de l'article) ;
+  corrections de vente `vinted_sale_overrides` : 561, 165 avec un prix, aucune reliée ;
+- achats captés : 632 (430 finalisés) ; reçus d'achat (`email_achat_*`) : 172 lignes, 136 avec n° de
+  transaction et « Montant payé », 63 reliés à un achat capté ; aucun des 5 achats reliés n'a de reçu ;
+- identité par la photo (achat ↔ vente) : **0 au fichier exact** ; 3 au même DOSSIER (« revendre » de
+  Vinted), dont les 3 achats sont « Remboursement validé » (ventes entre ses propres comptes) ;
+- ⇒ **aujourd'hui, aucune de ses ventes sans prix d'achat n'a un achat relié par identité** : la
+  proposition ne s'affichera chez lui que pour un lien futur sans prix lu, ou une revente au même
+  fichier photo. Le titre (seule autre piste) est refusé (§2.4). Le gain réel viendrait d'une identité
+  NEUVE achat → annonce (à mesurer : l'annonce créée par « revendre » garde-t-elle le fichier ?).
+
+**Fait** :
+- La règle, pure (`src/prixAchatPropose.js`) : identité = le lien qu'IL a posé (`buyFromId`), sinon le
+  fichier photo EXACT (`photoKey`, jamais `photoDir`) d'UN seul achat ; écartés : deux achats au même
+  fichier, l'achat de la même transaction que la vente, un achat remboursé/annulé/échoué, un achat
+  postérieur à la vente, un achat déjà relié à un autre article. Montant : le reçu de l'achat (par SON
+  n° de transaction) quand sa ventilation tombe juste au centime (« Article 30,00 € · Frais de port
+  2,63 € · Frais Vinted 2,00 € »), sinon le prix de l'article (« Article seul ») ; autre devise ⇒ rien.
+  Un achat n'est proposé qu'à UN article (ventes les plus récentes d'abord, puis fiches).
+- App.jsx (`propositionsPrix`, après `fillBuySugg`) : calcul sans écriture ; `appliquerProposition` =
+  la même écriture que « Relier un achat » (prix + `buyFromId` + instantané `buyFrom`, `recu` en plus).
+  Branché sur : la ligne de vente et le récapitulatif (`CoutAchatVente propose`, bouton « Utiliser
+  X € » + la ligne de détail ; une vente reliée sans prix montre maintenant le geste), la saisie en série
+  (« Prix d'achat à compléter », la piste par ressemblance s'efface derrière la proposition par
+  identité), et « Valider les N prix proposés » (Ventes et saisie en série, à partir de 2) avec
+  `askConfirm` qui liste « N°12 · 34,63 € » par ligne.
+- Ventes relit les achats captés (`chargerAchats`, relecture de l'extension seulement) ; les reçus ne
+  sont lus que s'il existe au moins une proposition.
+
+**Preuves** : `scripts/audit-prix-achat-propose.cjs` — 27 verts : 50 articles au même titre et 50 achats
+au même titre, un seul relié par son n° (posé sur le DERNIER) ⇒ une seule proposition, la sienne ;
+photo exacte / dossier / ambiguë / remboursé / postérieur / même transaction / déjà pris ; montant du
+reçu juste, reçu faux, autre devise ; un achat un article ; App.jsx : 4 appels d'écriture, tous dans un
+`onClick`/`onUtiliser` ou après la confirmation groupée, aucun dans le calcul, `photoKey` seule, aucun
+titre lu. **Rouge sur origin/main** (module absent). **Mutations** : `titre` 2 rouges, `sans-tap` 2,
+`dossier` 1, `recu` 1, `unique` 1.
