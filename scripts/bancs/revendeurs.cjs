@@ -254,7 +254,9 @@ async function brancher(p){
       check(!!atteint && atteint.ba && atteint.vues,'« Bordereaux auto » et « Mes vues » touchables dans « ⋯ Outils » '+width);
       // Refermer comme un doigt : ce qui est sous le bouton (le voile du menu) reçoit le clic. Sur le
       // code d'avant le voile restait ouvert sur un menu invisible et bloquait tout l'écran.
-      await bOutils.evaluate(e=>{const b=e.getBoundingClientRect();const x=document.elementFromPoint(b.left+b.width/2,b.top+b.height/2);if(x&&!e.contains(x))x.click();}).catch(()=>{});await p.waitForTimeout(200);
+      // (3 nov.) Le doigt touche ce qui est sous lui : le voile, ou le bouton « Outils » lui-même s'il est
+      // au-dessus du voile (il referme alors le menu, comme sur iPhone). Dans les deux cas : un seul toucher.
+      await bOutils.evaluate(e=>{const b=e.getBoundingClientRect();const x=document.elementFromPoint(b.left+b.width/2,b.top+b.height/2);if(x)x.click();}).catch(()=>{});await p.waitForTimeout(200);
       check(await p.locator('.vrm-main button',{hasText:'Rapport comptable'}).count()===0 && await bOutils.getAttribute('aria-expanded')==='false','le menu « ⋯ Outils » se referme '+width);
     }
    }
