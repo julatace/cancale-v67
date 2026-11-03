@@ -21,6 +21,7 @@ const MUTS = {
   'taille-ignoree': ["if (!ta || ta !== taille) continue;", ''],
   'couleur-ignoree': ["if (!cs.some((c) => couleurs.includes(c))) continue; rang = 1;", 'rang = 1;'],
   'posterieur': ["if (!Number.isFinite(da) || (Number.isFinite(ref) && !(da < ref))) continue;", ''],
+  'modele-ignore': ["if (modele && mo && mo !== modele) continue;", ''],
   'deja-relie': ["if (!n) return true;", 'return true;'],
   'rembourse': ["if (!a || !txDe(a) || achatAnnule(a) || !achatDisponible(a, liens, cible.curTx)) continue;\n    const t", "if (!a || !txDe(a) || !achatDisponible(a, liens, cible.curTx)) continue;\n    const t"],
   'lot-sans-fin': ["return l.lot && (l.n == null || n < l.n);", 'return l.lot;'],
@@ -52,14 +53,15 @@ const APP = fs.readFileSync(path.join(R, 'src', 'App.jsx'), 'utf8');
 const bout = (debut, fin) => { const a = APP.indexOf(debut); const b = APP.indexOf(fin, a); if (a < 0 || b < 0) throw new Error('introuvable : ' + debut); return APP.slice(a, b + fin.length); };
 const ctx = {};
 vm.runInNewContext([bout('const KNOWN_BRANDS=[', '];'), bout('function extractBrand(text){', '\n}'), bout('const COULEURS = {', '\n};'),
-  bout('function extractColors(text){', '\n}'), 'this.extractBrand=extractBrand; this.extractColors=extractColors;'].join('\n'), ctx);
-const { extractBrand: marqueDe, extractColors: couleursDe } = ctx;
+  bout('function extractColors(text){', '\n}'), bout('const KNOWN_MODELS = [', '];'), bout('function extractModel(text){', '\n}'), bout('function contientModele(t,k){', '\n}'),
+  'this.extractBrand=extractBrand; this.extractColors=extractColors; this.extractModel=extractModel;'].join('\n'), ctx);
+const { extractBrand: marqueDe, extractColors: couleursDe, extractModel: modeleDe } = ctx;
 
 (async () => {
   const S = await import(require('url').pathToFileURL(MOD).href);
   const J = 86400e3, T0 = Date.parse('2026-10-20T12:00:00Z');
   const ach = (tx, title, jours = -10, o = {}) => ({ transaction_id: tx, title, date: new Date(T0 + jours * J).toISOString(), price: { amount: '30.0', currency_code: 'EUR' }, status: 'Commande finalisée', ...o });
-  const sugg = (cible, achats, liens = new Map()) => S.suggestionsAchat({ cible: { dateRef: new Date(T0).toISOString(), ...cible }, achats, liens, marqueDe, couleursDe });
+  const sugg = (cible, achats, liens = new Map()) => S.suggestionsAchat({ cible: { dateRef: new Date(T0).toISOString(), ...cible }, achats, liens, marqueDe, couleursDe, modeleDe });
   const cible = { titre: 'Adidas Spezial noir taille 42,5' };
 
   console.log('\n── T. La taille, normalisée d’écriture');
@@ -73,6 +75,7 @@ const { extractBrand: marqueDe, extractColors: couleursDe } = ctx;
   const s2 = sugg(cible, [ach(2, 'Adidas spezial pointure 42,5'), ach(3, 'adidas spezial black 42.5', -20)]);
   dit(s2.length === 2 && s2[0].achat.transaction_id === 3 && s2[1].rang === 2, 'S2 les trois critères d’abord, puis marque + taille', JSON.stringify(s2.map((x) => [x.achat.transaction_id, x.rang])));
   dit(sugg(cible, [ach(4, 'Nike Spezial noire 42.5')]).length === 0, 'S3 marque différente ⇒ écartée');
+  dit(sugg({ titre: 'adidas spezial noir 35,5' }, [ach(14, 'Adidas samba 35,5')]).length === 0 && sugg({ titre: 'adidas spezial noir 35,5' }, [ach(15, 'Adidas baskets 35,5')]).length === 1, 'S3b deux modèles connus et différents (Spezial / Samba) ⇒ écartée ; modèle inconnu d’un côté ⇒ gardée');
   dit(sugg(cible, [ach(5, 'Adidas Spezial noire 43')]).length === 0, 'S4 taille différente ⇒ écartée');
   dit(sugg(cible, [ach(6, 'Adidas Spezial noire 42 2/3')]).length === 0, 'S5 « 42 2/3 » face à « 42,5 » ⇒ écartée');
   dit(sugg(cible, [ach(7, 'Adidas Spezial bleue 42.5')]).length === 0, 'S6 couleur différente ⇒ écartée');

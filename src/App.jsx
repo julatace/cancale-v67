@@ -39764,7 +39764,7 @@ function RelierAchatCorps({ cible, achats, liens, curTx, compteDe, prixDe, onRel
   const [q, setQ] = useState('');
   const [compte, setCompte] = useState('');
   const [mois, setMois] = useState('');
-  const sugg = useMemo(() => (Array.isArray(achats) ? suggestionsAchat({ cible, achats, liens, marqueDe: extractBrand, couleursDe: extractColors }) : []), [cible, achats, liens]);
+  const sugg = useMemo(() => (Array.isArray(achats) ? suggestionsAchat({ cible, achats, liens, marqueDe: extractBrand, couleursDe: extractColors, modeleDe: extractModel }) : []), [cible, achats, liens]);
   const voirTous = tous || (Array.isArray(achats) && !sugg.length);
   const liste = useMemo(() => (voirTous && Array.isArray(achats) ? tousAchatsLibres({ achats, liens, curTx, q, compte, mois, compteDe, marqueDe: extractBrand }) : []), [voirTous, achats, liens, curTx, q, compte, mois]);
   const filtres = useMemo(() => (voirTous && Array.isArray(achats) ? filtresAchats(tousAchatsLibres({ achats, liens, curTx }), compteDe) : { mois: [], comptes: [] }), [voirTous, achats, liens, curTx]);

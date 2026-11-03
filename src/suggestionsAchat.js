@@ -11,6 +11,8 @@
 //   · même MARQUE obligatoire (inconnue d'un côté ⇒ pas de suggestion) ;
 //   · même TAILLE obligatoire, connue des DEUX côtés, comparée après
 //     normalisation d'écriture (« 42,5 » = « 42.5 » = « 42½ » ; « 42 2/3 » ≠ « 42,5 ») ;
+//   · MODÈLE (§5) : connu des deux côtés et différent ⇒ écartée (mesuré le 3 nov. :
+//     « adidas spezial noir 35,5 » se voyait proposer « Adidas samba 35,5 ») ;
 //   · COULEUR : connue des deux côtés et sans couleur commune ⇒ écartée ;
 //     commune ⇒ rang 1 (les trois critères) ; inconnue d'un côté ⇒ rang 2
 //     (marque + taille). Jamais la marque seule.
@@ -107,7 +109,7 @@ export function prixIndicatifLot(achat) {
 // vente), curTx? } · achats : la liste captée · liens : `liensParAchat`.
 // marqueDe(texte) → nom | null ; couleursDe(texte) → [noms].
 // Rend [{ achat, rang: 1|2, marque, taille, couleurs }] (au plus `max`).
-export function suggestionsAchat({ cible, achats, liens, marqueDe, couleursDe, max = 3 } = {}) {
+export function suggestionsAchat({ cible, achats, liens, marqueDe, couleursDe, modeleDe = null, max = 3 } = {}) {
   if (!cible || typeof marqueDe !== 'function' || typeof couleursDe !== 'function' || !Array.isArray(achats)) return [];
   const bas = (s) => String(s || '').trim().toLowerCase();
   const titre = String(cible.titre || '');
@@ -116,6 +118,8 @@ export function suggestionsAchat({ cible, achats, liens, marqueDe, couleursDe, m
   const couleurs = (couleursDe([cible.couleur || '', titre].join(' ')) || []).map(bas);
   if (!marque || !taille) return [];
   const ref = dateMs(cible.dateRef);
+  // §5 : deux MODÈLES connus et différents (« Spezial » / « Samba ») ⇒ écartée.
+  const modele = typeof modeleDe === 'function' ? modeleDe(titre) : null;
   const out = [];
   for (const a of achats) {
     if (!a || !txDe(a) || achatAnnule(a) || !achatDisponible(a, liens, cible.curTx)) continue;
@@ -123,6 +127,8 @@ export function suggestionsAchat({ cible, achats, liens, marqueDe, couleursDe, m
     if (bas(marqueDe(t)) !== marque) continue;
     const ta = tailleDuTitre(t);
     if (!ta || ta !== taille) continue;
+    const mo = modele ? modeleDe(t) : null;
+    if (modele && mo && mo !== modele) continue;
     const da = dateMs(a.date);
     if (!Number.isFinite(da) || (Number.isFinite(ref) && !(da < ref))) continue;
     const cs = (couleursDe(t) || []).map(bas);
