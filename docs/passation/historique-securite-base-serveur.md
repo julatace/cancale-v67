@@ -2565,3 +2565,43 @@ fixe) ; phase 3 réseau coupé rouge avant `BlocCodesHorsLigne`, verte après (3
 Audits remis au nouveau contrat (retiré / en route / à vérifier ne sonnent plus, textes) :
 `transp-notif` (vert), `suivi-vinted` (vert), `suivi-colis` (2 rouges @babel/parser, comme
 main), `retrait-fiable` (idem main), bancs `retrait-conv-push`, `emails-action`, `suivi-colis`.
+
+## 3 novembre (après-midi) — Double vente, app fermée, dans tous les sens (branche `claude/double-vente-export`)
+
+**Demande** (Julien, 14 h 09) : quand le SERVEUR apprend une vente, si l'article — par IDENTITÉ — est
+encore EN LIGNE sur un autre site, UNE notification « ⚠️ N°124 vendu sur Vinted · encore en ligne sur
+Leboncoin », qui ouvre l'annonce à retirer ; le retrait eBay automatique n'est pas dupliqué.
+
+**Existait** (`api/_lib/double-vente.js`) : vente Vinted ⇒ eBay / Leboncoin / Vestiaire. **Manquait** :
+Vinted comme site « ailleurs » (aucune règle « en ligne » côté serveur) et toute vente d'un autre site.
+
+**Mesuré (lecture seule, 3 nov.)** : `harvest_*_listings` 17 lignes ≤ 28 Ko, `harvest_*_enligne` 9,
+`harvest_*_supprimees` 4, `ebay_retraits_auto` 1 ; **aucun e-mail de vente Leboncoin ni eBay n'est jamais
+arrivé** (journal + `email_inconnu_*` : seulement « mis en vente », newsletters, « Boostez vos annonces ») ⇒
+aucun lecteur inventé pour ces formes ; la notification se branche le jour où une forme est apprise
+(`notifierDoubleVente(numero, titre, 'leboncoin' | 'ebay')`).
+
+**Fait** :
+- `api/_lib/enligne-regle.js` : COPIE REFABRIQUÉE des blocs `<supprimees-regle>` + `<enligne-regle>` de
+  `src/App.jsx` (`node scripts/recopie-enligne-serveur.cjs` ; `--verifier` rougit si elle diffère).
+- `annoncesVintedParNumero` : annonces EN LIGNE (lecture complète < 24 h, suppressions vues, comptes
+  retirés exclus) → N° de LEUR fiche (`vinted_annonce_numeros[id]`), jamais le titre.
+- `doubleVenteApprise(numero, ebay, lbc, vc, vinted, venduSur)` : le site de la vente n'est jamais « ailleurs ».
+- Texte : `⚠️ N°x vendu sur <site> · encore en ligne sur <sites>` (+ ` · retiré d'eBay` si
+  `ebay_retraits_auto` porte le SKU de ce N° depuis 48 h) ; corps = l'article seul ; clé = la vente.
+  Le serveur n'appelle JAMAIS eBay. Destination Vinted = Ma journée (carte « à retirer de Vinted »).
+- Vente Vestiaire par e-mail : son N° par identité (`numVcVente` : lien VRM, référence, N° donné par VRM),
+  liens illisibles ⇒ rien.
+- Lectures projetées et paginées (`lirePagine`), une lecture ratée ⇒ cette plateforme ne dit rien.
+
+**Preuves** : `scripts/audit-double-vente-ailleurs.cjs` EXÉCUTE la route (fausse base, deux vendeurs,
+web-push intercepté) : 27 verts ; **10 rouges sur origin/main** ; `--prouve` **6/6 mutations** (dédoublonnage,
+site de la vente compté, lecture ratée = vide, N° lu dans le titre, journal eBay ignoré, 24 h ignorées).
+Cas : texte exact, « pas su » (dressing illisible, lecture de 30 h, liens Vestiaire illisibles, suppression,
+compte retiré, suppressions illisibles), 50 annonces au même titre ⇒ seul le N° identifié, vente sans
+identité ⇒ rien, une seule notif par vente, « retiré d'eBay ». Banc `double-vente-push` remis au texte (29 verts).
+Voisins verts : audit-notifications, identite, fonctions-api, coherence, lbc-restes, flux-divers,
+vestiaire-partout.
+
+**Reste** : lecteurs d'e-mail de vente Leboncoin / eBay (aucune forme reçue) ; une vente eBay apprise par la
+synchro serveur (`api/ebay.js`) pourrait appeler la même règle.

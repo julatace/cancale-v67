@@ -2042,3 +2042,44 @@ la pastille « Abonnements » n'est plus refusée), en le disant dedans.
   (« la déclaration URSSAF est dans Compta », « la prochaine échéance ») — sans lien, laissés.
 - Captures regardées : carte « Récap de novembre 2026 » (390), formulaire avec la photo et 12,50 pré-rempli
   (390), PDF d'essai (données inventées) sobre, une page.
+
+## 3 novembre (après-midi) — Suggestions d'achat à relier, et « Exporter mes données » (branche `claude/double-vente-export`)
+
+### Suggestions pour relier une annonce / une vente à un achat (`src/suggestionsAchat.js`)
+Julien (14 h 12-14 h 14) a REMPLACÉ la « fiche prête à l'arrivée d'un achat » (abandonnée, rien n'a été
+fait) par : « je veux juste les SUGGESTIONS » ; « ne prends pas en compte la photo, mais la couleur, la
+taille et la marque » ; « on doit pouvoir relier à TOUS les achats non reliés, si ce n'est pas des lots ».
+- Tout « Relier un achat » (ligne de vente, récap, fiche d'annonce) ouvre la même feuille, désormais en
+  PORTAIL : 1 à 3 suggestions (photo, titre, date, prix payé, compte, « Relier »), puis « Voir tous les
+  achats » (recherche titre / marque / n° de transaction, filtres compte et mois).
+- Règle : marque obligatoire ; taille obligatoire, connue des deux côtés, normalisée d'écriture
+  (« 42,5 » = « 42.5 » = « 42½ », « 42 2/3 » ≠ « 42,5 ») ; couleur (règle de l'app `extractColors`) :
+  différente ⇒ écartée, commune ⇒ rang 1, inconnue ⇒ rang 2 ; deux MODÈLES connus et différents ⇒ écartée
+  (§5 — mesuré : « spezial » se voyait proposer « samba ») ; achat antérieur à la mise en ligne / vente ;
+  pas déjà relié ; pas remboursé (`ACHAT_SANS_COUT`). Rien ne passe ⇒ rien n'est affiché.
+- LOTS — forme mesurée (734 achats) : aucun champ de nombre d'articles ; le titre le dit (« Lot 3 articles »
+  ×34, « Lot de 2 paires … », 8 « Lot … » sans nombre). Un lot reste proposable jusqu'à son nombre ;
+  « lot · 2/3 reliés » ; relier un lot DEMANDE le prix de cet article (champ vide ; « 90 € ÷ 3 ≈ 30 € »
+  en indication seulement). Un achat simple : l'écriture de « Relier un achat », prix du reçu
+  (`prixAchatPropose`) s'il tombe juste.
+- Mesuré (lecture seule, approximation SQL de la règle) : 988 fiches sans achat relié ⇒ **266** auraient
+  au moins une suggestion (20 avec marque + taille + couleur), 3,6 candidats en moyenne ; 234 n'ont ni
+  marque ni taille lisibles (rien proposé).
+- Preuves : `audit-suggestions-achat.cjs` 34 verts (50 articles + 50 achats identiques : aucun lien sans
+  tap ; marque / taille / couleur / modèle / postérieur / relié / remboursé écartés ; lots ; recherche et
+  filtres) ; `--prouve` 9/9 mutations (dont « marque ignorée ») ; rouge sur main (module absent). Banc
+  `relier-achat-suggestions` 390 tactile + 1512 sombre : 28 verts (une seule suggestion juste, portail,
+  liste sans l'achat relié, « lot · 0/3 reliés », prix de lot demandé champ vide, annuler n'écrit rien,
+  « Relier » relie, 44 px) ; rouge sur main.
+
+### Paramètres → « Exporter mes données » (`src/exportDonnees.js`)
+Un zip téléchargé sur l'appareil (rien envoyé ailleurs), 7 tableaux CSV (« ; », virgule décimale, BOM) :
+ventes (le relevé de Ventes `vrm_stats_ventes`, toutes plateformes), achats captés (lus PAGINÉS par
+`lireTout`, projetés `data->payload->my_orders`, N° relié), stock / N° (fiches), dépenses (`vrm_compta`),
+URSSAF par mois (ligne publiée `vinted_urssaf_mois`, à payer par `aPayerUrssaf`), déclarations
+(`vrm_urssaf_declare`), factures Pro (métadonnées `email_invoice_*` projetées, jamais le PDF). Aucune
+bibliothèque xlsx ni zip dans le dépôt : zip « stored » écrit à la main, CRC-32. Source ratée ⇒ « — ».
+Preuves : `audit-export-donnees.cjs` 19 verts (chaque mois = `donneesRecapMois`, URSSAF = ligne publiée,
+zip relu + `unzip -t`, aucune écriture, jamais `select=data`) ; `--prouve` 5/5 ; banc `export-donnees`
+390 + 1512 sombre 14 verts (zip téléchargé, 7 tableaux, aucune requête d'écriture).
+Reste : les achats hors plateforme (saisis à la main) ne sont pas dans le tableau « achats ».
