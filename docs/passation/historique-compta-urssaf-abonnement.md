@@ -2083,3 +2083,31 @@ Preuves : `audit-export-donnees.cjs` 19 verts (chaque mois = `donneesRecapMois`,
 zip relu + `unzip -t`, aucune écriture, jamais `select=data`) ; `--prouve` 5/5 ; banc `export-donnees`
 390 + 1512 sombre 14 verts (zip téléchargé, 7 tableaux, aucune requête d'écriture).
 Reste : les achats hors plateforme (saisis à la main) ne sont pas dans le tableau « achats ».
+
+
+### « Boost rentable ? » refait — une seule carte (Statistiques, 3 novembre)
+Choisie par Julien parmi trois améliorations ; remplace la règle du 21 octobre (ci-dessus).
+- **Doublon retiré** : il y avait DEUX cartes (« Boost rentable ? » en tête, StatsVitrine, et
+  `BoostRentable` « Le boost est-il rentable ? » dans le volet replié « Ce qui se vend »). Il
+  n'en reste qu'une, en tête, qui suit la période choisie ; le composant `BoostRentable` est
+  supprimé.
+- **Mesuré (lecture seule, 3 nov.)** : « Boost payé » (`vinted_annonce_numeros[id].fees`)
+  saisi sur 0 fiche sur 1 005 (trois comptes VRM) ⇒ aujourd'hui « Pas assez de données ».
+- **Règle** (`src/boostRentable.js`, pure) : la population = les ANNONCES (vendues ou non)
+  mises en ligne dans la période ; boostée = montant saisi OU `promoted === true` ; non
+  boostée = `promoted === false` sans montant ; absent = « pas su » (compté à part) ; modèle =
+  `modeleSur` (src/ceQuiRapporte.js, marque + modèle sûrs ; `title` ajouté à l'index des
+  annonces de `lireExtrasRepartition`) ; on ne compare que les modèles présents des deux
+  côtés ; vendue = vente non annulée, compte non écarté, reliée par SA transaction (jamais le
+  titre). Moins de 3 boostées comparables ⇒ « Pas assez de données · n/3 boostés », aucun
+  chiffre. Sinon : vendus (n/N · %), délai médian, prix médian BOOST DÉDUIT (une boostée sans
+  montant n'y entre pas), coût = somme des montants saisis, « montant saisi a/b » (« au
+  moins » s'il en manque). Aucune couleur de jugement ; un repère, dans aucun total.
+- **Preuves** : `audit-boost-rentable.cjs` réécrit (jeu calculé à la main : 4 Dunk boostées /
+  3 non boostées, vendus 3/4 contre 1/3, délai 5 j contre 20 j, prix 62,50 € contre 50 €, coût
+  5 € 2/4 ; < 3 ⇒ rien ; lecture ratée ⇒ pas su ; une seule carte) — 13 rouges sur
+  origin/main, `--prouve` 11/11 mutations ; banc `bancs/boost-rentable.cjs` réécrit (1512
+  clair, 1512 et 390 sombres) 48 contrôles, 24 rouges sur le build de main ; banc
+  `stats-vitrine` mis à jour (son jeu n'a pas de modèle commun des deux côtés ⇒ « Pas assez de
+  données »), 112 verts.
+- Geste de Julien : saisir le boost payé dans la fiche des articles qu'il booste.
