@@ -275,8 +275,8 @@ const vieillir = (owner, id, h = 3) => { const k = `${owner}|${id}`; const d = b
       vieillir(A, id); await oublis();
       await C5();
       const l = base.get(`${A}|${id}`) || {};
-      const neuf = pushes.slice(p1).filter((p) => /disponible/.test(p.title || ''));
-      dit(p1 === 1 && neuf.length === 1 && /TABAC [BC]/.test(neuf[0].body || ''), `${nom} : la NOUVELLE arrivée sonne (avec son lieu)`, `1re ${p1}, ensuite ${neuf.length} — ligne ${l.etat}/${l.detail} « ${l.lieuNom} »`);
+      const neuf = pushes.slice(p1).filter((p) => /t'attend|disponible/.test(p.title || ''));
+      dit(p1 === 1 && neuf.length === 1 && /TABAC [BC]/i.test(neuf[0].body || ''), `${nom} : la NOUVELLE arrivée sonne (avec son lieu)`, `1re ${p1}, ensuite ${neuf.length} — ligne ${l.etat}/${l.detail} « ${l.lieuNom} »`);
       // La MÊME arrivée relue ne sonne pas une seconde fois.
       vieillir(A, id); await oublis();
       const p2 = pushes.length;
@@ -296,7 +296,7 @@ const vieillir = (owner, id, h = 3) => { const k = `${owner}|${id}`; const d = b
     vieillir(A, id); await oublis();
     const p3 = pushes.length;
     await C5();
-    const dispo = pushes.slice(p3).filter((p) => /disponible/.test(p.title || '')).length;
+    const dispo = pushes.slice(p3).filter((p) => /t'attend|disponible/.test(p.title || '')).length;
     dit(pQuitte === 1 && dispo === 1, 'revenu au point après « a quitté le point relais — ne te déplace pas » : il l\'APPREND', `quitté ${pQuitte}, de nouveau disponible ${dispo}`);
     // La première arrivée se tait toujours devant l'e-mail qui l'a annoncée.
     reset(); await oublis();
@@ -320,11 +320,11 @@ const vieillir = (owner, id, h = 3) => { const k = `${owner}|${id}`; const d = b
     H.pannes.clear(); await oublis();
     vieillir(A, id, 1);
     await C5();
-    const n2 = pushes.filter((p) => /disponible/.test(p.title || '')).length;
+    const n2 = pushes.filter((p) => /t'attend|disponible/.test(p.title || '')).length;
     dit(n2 === 1, 'base revenue : la notification « disponible » part au passage suivant', `${n2}`);
     vieillir(A, id, 1); await oublis();
     await C5(); await C5();
-    const n3 = pushes.filter((p) => /disponible/.test(p.title || '')).length;
+    const n3 = pushes.filter((p) => /t'attend|disponible/.test(p.title || '')).length;
     const l3 = base.get(`${A}|${id}`) || {};
     dit(n3 === 1 && !l3.notifEnAttente, 'et une seule fois (plus rien en attente dans la ligne)', `${n3} · attente ${l3.notifEnAttente || 'aucune'}`);
   });
@@ -346,7 +346,10 @@ const vieillir = (owner, id, h = 3) => { const k = `${owner}|${id}`; const d = b
         H.carrier = () => rep(vgJson(evs), 200, 'application/json');
         const vinted = async () => { const r = faireRes(); await push({ method: 'POST', query: {}, headers: AUTH_A, body: { action: 'suivi', tx: TX, uid: '111' } }, r); return r; };
         if (ordre === 'Vinted puis transporteur') { await vinted(); await C5(); } else { await C5(); await vinted(); }
-        dit(pushes.length === 1, `${ordre} · ${nom} : UNE notification pour un évènement`, pushes.map((p) => p.title).join(' | ') || 'aucune');
+        // (3 nov.) « retiré » et « en route » ne sonnent plus (famille suivi retirée,
+        // api/_lib/notif-textes.js) : zéro ; « repart » : UNE, toutes voies confondues.
+        const attendu = nom === 'repart' ? 1 : 0;
+        dit(pushes.length === attendu, `${ordre} · ${nom} : ${attendu ? 'UNE notification pour un évènement' : 'aucune notification (pas un geste)'}`, pushes.map((p) => p.title).join(' | ') || 'aucune');
       }
     }
   });
@@ -392,7 +395,7 @@ const vieillir = (owner, id, h = 3) => { const k = `${owner}|${id}`; const d = b
     const res2 = faireRes();
     await inbound.default({ method: 'POST', query: {}, headers: { 'x-vrm-email-key': 'cle-banc-suivi' }, body: { from: 'shipping@relay.vinted.com', to: 'boite@banc.test', subject: `Ton colis est arrivé à la consigne #${N}`, text: 'Bonjour,\nTon colis est arrivé à la consigne.\nCode de retrait : C65735\nAdresse\nConsigne Vinted Go\nConsigne Test\n1 rue Test\n56000 Vannes', html: '', attachments: [], messageId: '<vg-n5@banc>' } }, res2);
     g.ouvrir(); await pas;
-    const dispo = pushes.filter((p) => /disponible|arrivé|retirer/i.test(`${p.title} ${p.body}`));
+    const dispo = pushes.filter((p) => /disponible|arrivé|retirer|t'attend/i.test(`${p.title} ${p.body}`));
     dit(g.vu && dispo.length === 1, 'l\'e-mail « disponible » traité PENDANT le passage : une seule notification', `${g.vu ? '' : '(la lecture n\'a pas été retenue) '}${dispo.map((p) => p.tag).join(' | ')}`);
   });
 
@@ -533,7 +536,8 @@ const vieillir = (owner, id, h = 3) => { const k = `${owner}|${id}`; const d = b
     lacher(); await pas;
     g.ouvrir(); await em;
     const retires = pushes.filter((p) => /retir|récup|livr/i.test(p.title || ''));
-    dit(g.vu && appele && retires.length === 1, 'l\'e-mail « retiré » lu pendant que le transporteur annonce « retiré » : UN seul « retiré »', `${retires.length} notification(s)`);
+    // (3 nov.) Un « retiré » ne sonne plus (il l'a retiré lui-même) : zéro, par les deux voies.
+    dit(appele && retires.length === 0, 'l\'e-mail « retiré » lu pendant que le transporteur annonce « retiré » : aucun « retiré » ne sonne', `${retires.length} notification(s)`);
     // Un e-mail sur un AUTRE colis, écrit depuis une lecture d'avant le passage, n'efface pas la clé du transporteur.
     const M = 'VGS1234567890503';
     reset(); await oublis(); prepDispoVg(N, 'C22222');
@@ -550,11 +554,11 @@ const vieillir = (owner, id, h = 3) => { const k = `${owner}|${id}`; const d = b
     const p0 = pushes.length;
     await email(`Ton colis a été récupéré #${N}`, 'Bonjour,\nTon colis a été récupéré par le destinataire.', '<n11c@banc>');
     const encore = pushes.slice(p0).filter((p) => (p.tag || '').includes(N) || /retir|récup/i.test(p.title || ''));
-    dit(keys.some((k) => k.includes(N)) && encore.length === 0, 'l\'e-mail d\'un AUTRE colis n\'efface pas la clé posée par le transporteur', `clé ${keys.some((k) => k.includes(N)) ? 'présente' : 'EFFACÉE'}, puis le « retiré » de ce colis sonne ${encore.length} fois de plus`);
+    dit(encore.length === 0, 'l\'e-mail d\'un AUTRE colis puis le « retiré » de ce colis : rien ne sonne', `${encore.length} fois · clés ${keys.length}`);
     // L'autre sens : un e-mail « retiré » seul sonne.
     reset(); await oublis(); prepDispoVg(N, 'C33333');
     await email(`Ton colis a été récupéré #${N}`, 'Bonjour,\nTon colis a été récupéré par le destinataire.', '<n11d@banc>');
-    dit(pushes.filter((p) => /retir|récup|livr/i.test(p.title || '')).length === 1, 'l\'autre sens : l\'e-mail « retiré » seul sonne une fois', pushes.map((p) => p.title).join(' | ') || 'aucune');
+    dit(pushes.filter((p) => /retir|récup|livr/i.test(p.title || '')).length === 0, 'l\'autre sens : l\'e-mail « retiré » seul ne sonne pas non plus', pushes.map((p) => p.title).join(' | ') || 'aucune');
   });
 
   // ══ N12 — LE SUIVI VINTED ET LE TRANSPORTEUR, LA MÊME ARRIVÉE (n° 16) ═════

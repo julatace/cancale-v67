@@ -382,7 +382,10 @@ async function rappelsColisRetrait(maintenant = Date.now()) {
   for (const x of nouveaux) memo[x.cle] = today;
   if (!(await ecrireDedup('colis_retrait_dedup', { envoyes: memo, at: new Date(maintenant).toISOString() }))) return 'mémo non écrit — rien envoyé';
   let envoi = null;
-  for (const x of nouveaux) {
+  // (3 nov.) « Colis à vérifier » ne sonne plus : un délai dépassé ne dit pas où
+  // est le colis (mesuré le 29 oct. : 5 sur 5 avaient été retirés) — ce n'est
+  // pas un fait. Il reste dans Colis → « à vérifier ». Seul « dernier jour » sonne.
+  for (const x of nouveaux.filter((y) => y.etat === 'dernier')) {
     const t = texteRappelRetrait(x);
     envoi = await sendPushToAll({ title: t.title, body: t.body, tag: 'retrait-' + x.cle, url: DESTINATIONS.retrait({ suivi: x.suivi, tx: (() => { const t = txsPar.get(x.suivi); return t && t.size === 1 ? [...t][0] : ''; })() }) });
   }

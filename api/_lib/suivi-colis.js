@@ -573,8 +573,8 @@ export function texteRappelRetrait(x) {
   const heure = x.limiteAt ? heureParis(x.limiteAt) : '';
   if (x.etat === 'dernier') {
     return {
-      title: `📍 Dernier jour pour retirer ${lieu || 'n°' + x.suivi}`,
-      body: `${nom} — n°${x.suivi}${lieu ? `, chez ${lieu}` : ''} : à retirer aujourd'hui${heure ? ` avant ${heure}` : (jjmm(x.limite) ? ` (jusqu'au ${jjmm(x.limite)})` : '')}.`,
+      title: `📍 Dernier jour · ${lieu || `${nom} n°${x.suivi}`}`,
+      body: `À retirer aujourd'hui${heure ? ` avant ${heure}` : ''} · ${nom} n°${x.suivi}`,
     };
   }
   // ⚠️ (29 oct.) « Sans doute reparti » ne s'écrit plus : un délai dépassé ne

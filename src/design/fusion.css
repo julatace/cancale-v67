@@ -1169,3 +1169,18 @@ html body .vrm-app-shell .vrm-main:has(.vrm-fu-colis) [data-colis-retraits="outi
 :root[data-theme="dark"] body .vrm-app-shell .vrm-main .vrm-rpf-point.is-inconnu :is(.vrm-rpf-code, .vrm-rpf-retire, .vrm-rpf-vignette, .vrm-rpf-puce) { background: #2c2c2e !important; }
 html body .vrm-app-shell .vrm-main:has(.vrm-fu-colis) [data-colis-retraits="outils"] [data-rp-section="argent"] { margin-top: -12px; } /* (le bas de l’écran Colis porte déjà 40 px : 28 px d’air comme entre les autres sections) */
 [data-rp-section="avenir"] [data-rp-code-a-venir] { display: none !important; }
+/* (3 nov.) « N°x supprimé de Vinted » : la carte À faire (photo 44 px, titre court, détail)
+   et ses trois réponses en pilules de 44 px — à droite sur ordinateur, dessous au téléphone. */
+html body .vrm-app-shell .vrm-main .vrm-day-layout .vrm-day-task-list > .vrm-day-task.vrm-cycle-carte { display: flex !important; flex-wrap: wrap !important; align-items: center !important; gap: 10px 12px !important; padding: 14px !important; cursor: default; grid-template-columns: none !important; }
+html body .vrm-app-shell .vrm-main .vrm-day-layout .vrm-cycle-carte > .vrm-cycle-tete { flex: 1 1 260px; min-width: 0; display: flex; align-items: center; gap: 14px; min-height: 44px; }
+html body .vrm-app-shell .vrm-main .vrm-day-layout .vrm-cycle-carte .vrm-day-task-photos { flex: none !important; width: 44px !important; height: 44px !important; overflow: hidden !important; border-radius: 12px; }
+html body .vrm-app-shell .vrm-main .vrm-day-layout .vrm-cycle-carte .vrm-day-task-photos img { width: 44px !important; height: 44px !important; margin: 0 !important; border: 0 !important; border-radius: 12px !important; object-fit: cover; }
+html body .vrm-app-shell .vrm-main .vrm-day-layout .vrm-cycle-carte > .vrm-cycle-choix { flex: 0 1 auto; display: flex; flex-wrap: wrap; gap: 8px; }
+html body .vrm-app-shell .vrm-main .vrm-day-layout .vrm-cycle-carte > .vrm-cycle-choix > .vrm-day-task-geste {
+  flex: none !important; width: auto !important; margin: 0 !important; min-height: 44px !important; padding: 0 14px !important; border: 0 !important; border-radius: 999px !important;
+  background: var(--fu-case, rgba(120,120,128,.12)) !important; color: var(--fu-encre, inherit) !important; font: 600 13.5px/1 var(--vrm-police) !important; box-shadow: none !important; white-space: nowrap !important;
+}
+html body .vrm-app-shell .vrm-main .vrm-day-layout .vrm-cycle-carte > .vrm-cycle-choix > .vrm-day-task-geste svg { display: none !important; }
+@media (max-width: 600px) {
+  html body .vrm-app-shell .vrm-main .vrm-day-layout .vrm-cycle-carte > .vrm-cycle-choix { flex: 1 1 100%; }
+}

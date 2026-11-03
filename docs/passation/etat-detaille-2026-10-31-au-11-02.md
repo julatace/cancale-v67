@@ -192,3 +192,13 @@ Déplacé TEL QUEL depuis CLAUDE.md §9 le 2 novembre 2026 (le fichier dépassai
 
 ### Lignes de §9 déplacées telles quelles
 - **2 nov.** — **Republier qui règle ses problèmes** (**5.310.0**, `reglerAvant`, `audit-republier-question`) : champ vide repris de la recette de CETTE annonce (2 tours), sinon UNE question avec les valeurs de Vinted (« Choisir la catégorie » sur la ligne, réponse posée une fois) ; refus nommé retenu, jamais renvoyé ; plafond fermé si le stockage de l'extension est muet (P10) ; message de refus d'offre compté (P11). → historique vinted-extension. Geste : installer la 5.310.0.
+
+### Lignes de §9 déplacées telles quelles
+- **2 nov.** — Visite en bulles à la première connexion (`src/VisiteBulles.jsx`, `vrm_visite_vue` synchronisée, « Revoir la visite » dans Paramètres → Aide), onglets NUS (plus aucune explication à côté), une phrase sous le titre de 6 écrans (`src/phrasesEcran.js`) ; banc `demo-bulles` vert 390/1512. → historique interface-stock. Geste : regarder la visite au téléphone (Paramètres → Aide → Revoir la visite).
+- **2 nov.** — eBay : jeton d'accès gardé côté serveur jusqu'à 5 min de sa fin (`ebay_tokens_acces`, lié à l'empreinte du refresh, effacé à la déconnexion, `audit-ebay-jeton-cache`, P9) ; publier et changer un prix exigent `confirme:true` côté serveur (P12). → historique ebay. Geste : aucun.
+
+### Lignes de §9 déplacées telles quelles
+- **2 nov. (soir)** — **Extension 5.311.0** (sa plainte : « elle insistait, Vinted a détecté l'automatisation » ; « je ne veux pas voir les N° d'Arthur depuis Angèle » ; shop_cancale) : frein après tout refus de Vinted (`vrmFreinRepub`, 30 min / 24 h si `listing_restricted`, l'atelier s'arrête) ; ⚠️ **une lecture PUBLIQUE n'ajoute JAMAIS une annonce** (`<enligne-regle>`, sa décision) et les comptes jamais captés connectés ne sont plus relus ; N° affichés sur Vinted = ceux du compte de l'onglet seulement (`numerosDuCompte`, par `accountId`). → historique vinted-extension. Geste : installer la 5.311.0.
+
+### Lignes de §9 déplacées telles quelles
+- **2 nov. (soir)** — **Extension 5.312.0** : plafond 50/h par COMPTE tous Chrome confondus (`actions_compte_{uid}_{navigateur}`, base muette ⇒ ce Chrome seul) ; Republier LIT TOUJOURS l'annonce sur Vinted d'abord (une lecture, ses champs l'emportent sur une recette ancienne — « elle oubliait la couleur et la taille ») ; brouillons d'un autre compte grisés et nommés, brouillons disparus retirés (`src/brouillonsProposables.js`) ; avancée de Republier figée et toujours visible (banc `brouillons-avancee`). → historique vinted-extension. Geste : installer la 5.312.0.
