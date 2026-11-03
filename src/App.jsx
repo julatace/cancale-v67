@@ -63,6 +63,8 @@ import {formaterMontantEbay} from './montantsEbay.js';
 import {cibleEbay} from "./ebayParcours.js";
 import {centimes,coutsVente,beneficePaire,champsCharges} from "./beneficePaire.js";
 import CoutsVente from "./CoutsVente.jsx";
+import { feuillesExport, fichiersExport, zipStocke, nomExport } from "./exportDonnees.js";
+import { suggestionsAchat, tousAchatsLibres, filtresAchats, etiquetteLot, liensParAchat, lotDe, prixIndicatifLot, ecritureLot } from "./suggestionsAchat.js";
 import { boostRentable, SEUIL_BOOST } from "./boostRentable.js";
 import { CLE_WIDGETS_JOURNEE, WIDGETS_JOURNEE, NOM_TAILLE, DISPO_JOURNEE_DEFAUT, normaliserDispoJournee, deplacerWidget, retirerWidget, widgetFixe, tailleSuivante, tailleDefautWidget, caseVisible, widgetsAjoutables, dispoAEnregistrer } from "./journeeWidgets.js";
 import { modeleSur, releveVentes } from "./ceQuiRapporte.js";
@@ -36399,6 +36401,37 @@ function ProfilFiscalCarte({ onNav }) {
 // neuf repartirait de 0001 et doublerait un numéro déjà donné.
 const ymListe = (n = 12, maintenant = Date.now()) => { const out = []; const d = new Date(maintenant); d.setDate(1); for (let i = 0; i < n; i++) { out.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`); d.setMonth(d.getMonth() - 1); } return out; };
 const libelleYm = (ym) => { const [a, m] = String(ym).split('-'); return `${MOIS_COMPTA[Number(m) - 1] || ''} ${a}`; };
+// ── (3 nov.) « EXPORTER MES DONNÉES » (Paramètres, src/exportDonnees.js) ─────
+// Les sources des écrans, telles quelles ; lectures en base PAGINÉES (`lireTout`)
+// et PROJETÉES (jamais `select=data`). Une source ratée ⇒ sa feuille dit « — ».
+// Rien ne part ailleurs : le zip est téléchargé sur l'appareil.
+async function sourcesExportDonnees() {
+  const rel = load('vrm_stats_ventes', null), urs = load('vinted_urssaf_mois', null);
+  const fiches = load('vinted_annonce_numeros', null);
+  const [lignesAchats, comptesV, factures] = await Promise.all([
+    lireTout('id=like.harvest_*_orders_purchased&select=id,orders:data->payload->my_orders').catch(() => null),
+    fetch(`${SUPABASE_URL}/rest/v1/vinted_accounts?select=vinted_user_id,login`, { headers: sbAuth() }).then((r) => (r.ok ? r.json() : null)).catch(() => null),
+    lireTout('id=like.email_invoice_*&select=id,number:data->>number,status:data->>status,emiseLe:data->>emiseLe,tx:data->>transaction,annuleePar:data->>annuleePar,type:data->>type').catch(() => null),
+  ]);
+  const login = new Map((Array.isArray(comptesV) ? comptesV : []).map((c) => [String(c.vinted_user_id), String(c.login || '')]));
+  const achats = Array.isArray(lignesAchats) ? lignesAchats.flatMap((r) => { const k = /^harvest_(\d+)_orders_purchased$/.exec(String(r && r.id || '')); const uid = k ? k[1] : ''; return (Array.isArray(r && r.orders) ? r.orders : []).map((o) => ({ ...o, compte: login.get(uid) || uid })); }) : null;
+  return {
+    releve: rel && Array.isArray(rel.l) ? rel.l : null,
+    urssaf: urs && Array.isArray(urs.mois) ? urs.mois.map((m) => ({ ym: m.ym, n: m.n != null ? m.n : m.count, ca: m.ca })) : null,
+    aPayer: (ca) => aPayerUrssaf(ca, tauxUrssaf()),
+    declarations: lireDeclarations(),
+    fiches: fiches && typeof fiches === 'object' ? fiches : null,
+    achats, compta: lireComptaSynchro(),
+    factures: Array.isArray(factures) ? factures.filter((f) => f && (f.type === 'facture_pro' || f.number)) : null,
+  };
+}
+async function exporterMesDonnees() {
+  try {
+    const src = await sourcesExportDonnees();
+    const zip = zipStocke(fichiersExport(feuillesExport(src)));
+    telechargerFichier(new Blob([zip], { type: 'application/zip' }), nomExport(), 'application/zip');
+  } catch (e) { toast('Export pas créé : ' + (e && e.message || e)); }
+}
 const telechargerFichier = (contenu, nom, type) => {
   const blob = contenu instanceof Blob ? contenu : new Blob([contenu], { type });
   const url = URL.createObjectURL(blob); const a = document.createElement('a');
@@ -39921,6 +39954,55 @@ function RetoursEnCoursBloc({ res: resBrut, site = 'toutes', nomCompte, plusieur
       </div>
       {pasSu && <div style={{marginTop:9}}>{pasSu}</div>}
     </div>);
+}
+// ── RELIER UN ACHAT : SUGGESTIONS PUIS TOUS LES ACHATS (3 nov., Julien) ─────
+// 1 à 3 suggestions (marque + taille + couleur, `src/suggestionsAchat.js`), puis
+// « Voir tous les achats » : ceux pas encore reliés (un LOT reste jusqu'à son
+// nombre d'articles), recherche par mot, filtres compte et mois. Rien n'est
+// relié sans SON tap (`onRelier`). Aucun texte explicatif.
+function RelierAchatCorps({ cible, achats, liens, curTx, compteDe, prixDe, onRelier, C }) {
+  const [tous, setTous] = useState(false);
+  const [q, setQ] = useState('');
+  const [compte, setCompte] = useState('');
+  const [mois, setMois] = useState('');
+  const sugg = useMemo(() => (Array.isArray(achats) ? suggestionsAchat({ cible, achats, liens, marqueDe: extractBrand, couleursDe: extractColors, modeleDe: extractModel }) : []), [cible, achats, liens]);
+  const voirTous = tous || (Array.isArray(achats) && !sugg.length);
+  const liste = useMemo(() => (voirTous && Array.isArray(achats) ? tousAchatsLibres({ achats, liens, curTx, q, compte, mois, compteDe, marqueDe: extractBrand }) : []), [voirTous, achats, liens, curTx, q, compte, mois]);
+  const filtres = useMemo(() => (voirTous && Array.isArray(achats) ? filtresAchats(tousAchatsLibres({ achats, liens, curTx }), compteDe) : { mois: [], comptes: [] }), [voirTous, achats, liens, curTx]);
+  if (!Array.isArray(achats)) return <div data-relier-chargement style={{ fontSize: 13, color: C.muted, textAlign: 'center', padding: '20px 0' }}>…</div>;
+  const ligne = (a, attrs) => {
+    const ph = orderPhoto(a), lot = etiquetteLot(a, liens), px = prixDe(a);
+    const d = a.date ? new Date(a.date) : null;
+    return (
+      <div key={a.transaction_id} {...attrs} style={{ display: 'flex', gap: 10, alignItems: 'center', padding: '8px 0', borderBottom: `1px solid ${C.border}`, minHeight: 60 }}>
+        <div style={{ width: 44, height: 44, borderRadius: 8, background: C.border, flexShrink: 0, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{ph ? <PhotoVinted src={ph} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }}/> : <Icon name="image" size={18} style={{ color: C.muted, opacity: .55 }}/>}</div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 13.5, fontWeight: 600, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{a.title || '—'}</div>
+          <div style={{ fontSize: 12, color: C.muted, marginTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{[lot, d && !isNaN(d) ? d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' }) : '', compteDe(a)].filter(Boolean).join(' · ')}</div>
+        </div>
+        <div data-relier-prix style={{ fontSize: 14.5, fontWeight: 700, color: C.text, flexShrink: 0 }}>{px != null ? prixCourt(px) : '—'}</div>
+        <Bouton variante="secondaire" data-relier-achat={String(a.transaction_id)} onClick={() => onRelier(a)} style={{ flexShrink: 0, minHeight: 44 }}>Relier</Bouton>
+      </div>
+    );
+  };
+  const sel = { minHeight: 44, border: `1px solid ${C.border}`, borderRadius: 8, background: C.card, color: C.text, fontSize: 13, fontFamily: 'inherit', padding: '0 8px', flex: '1 1 0', minWidth: 0 };
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column' }}>
+      {sugg.length > 0 && <div data-suggestions-achat={sugg.length}>{sugg.map((x) => ligne(x.achat, { 'data-suggestion-achat': String(x.achat.transaction_id), 'data-rang': x.rang }))}</div>}
+      {!voirTous && <Bouton variante="discret" data-voir-tous-achats onClick={() => setTous(true)} style={{ alignSelf: 'flex-start', minHeight: 44, marginTop: 6 }}>Voir tous les achats</Bouton>}
+      {voirTous && (
+        <div data-tous-achats={liste.length} style={{ marginTop: sugg.length ? 10 : 0 }}>
+          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Titre, marque, n° de transaction" data-tous-achats-recherche
+            style={{ width: '100%', boxSizing: 'border-box', minHeight: 44, padding: '0 11px', border: `1px solid ${C.border}`, borderRadius: 8, background: C.card, color: C.text, fontSize: 16, fontFamily: 'inherit' }}/>
+          <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+            {filtres.comptes.length > 1 && <select aria-label="Compte" data-filtre-compte value={compte} onChange={(e) => setCompte(e.target.value)} style={sel}><option value="">Tous les comptes</option>{filtres.comptes.map((c) => <option key={c} value={c}>{c}</option>)}</select>}
+            {filtres.mois.length > 1 && <select aria-label="Mois" data-filtre-mois value={mois} onChange={(e) => setMois(e.target.value)} style={sel}><option value="">Tous les mois</option>{filtres.mois.map((m) => <option key={m} value={m}>{new Date(m + '-15').toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })}</option>)}</select>}
+          </div>
+          {liste.length ? liste.slice(0, 200).map((a) => ligne(a, { 'data-achat-libre': String(a.transaction_id) })) : <div style={{ fontSize: 13, color: C.muted, textAlign: 'center', padding: '20px 0' }}>—</div>}
+        </div>
+      )}
+    </div>
+  );
 }
 function AcctTag({ acc, name }) {
   // ⚠️ SEULE LA PASTILLE EST COLORÉE, pas l'étiquette entière. Avec huit
@@ -47426,6 +47508,46 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     toast(`${liste.length} prix d'achat enregistré${liste.length > 1 ? 's' : ''}`);
   };
 
+  // ── (3 nov.) RELIER UN ACHAT : suggestions + tous les achats (src/suggestionsAchat.js) ──
+  // La cible : l'annonce ou la vente du sélecteur (marque, taille, couleur de ses
+  // champs, sinon de son titre ; date de mise en ligne ou de vente).
+  const cibleRelier = useMemo(() => {
+    if (!pickerFor) return null;
+    const v = pickerFor._saleTx ? (sales.items || []).find((o) => String(o.transaction_id) === String(pickerFor._saleTx)) : null;
+    return { titre: pickerFor.title || '', marque: pickerFor.brand_title || pickerFor.brand || '', taille: pickerFor.size_title || pickerFor.size || '',
+      couleur: pickerFor.color1 || pickerFor.couleur || '', dateRef: pickerFor._dateRef || (v && v.date) || pickerFor.created_at_ts || null,
+      curTx: (numeros[pickerFor.id] && numeros[pickerFor.id].buyFromId) || '' };
+  }, [pickerFor, sales.items, numeros]);
+  const liensAchats = useMemo(() => liensParAchat(numeros, saleOv), [numeros, saleOv]);
+  const prixPayeAchat = (a) => {
+    if (lotDe(a).lot) { const v = Number(a && a.price && a.price.amount); return Number.isFinite(v) && v > 0 ? v : null; }
+    const p = propositionPrixAchat({ identite: { achat: a, par: 'choix' }, ventilationDe: ventilationDeTx });
+    if (p) return p.centimes / 100;
+    const v = Number(a && a.price && a.price.amount); return Number.isFinite(v) && v > 0 ? v : null;
+  };
+  // SON tap. Un achat simple : l'écriture de « Relier un achat » (prix payé du
+  // reçu s'il tombe juste — `prixAchatPropose` —, sinon le prix de l'achat).
+  // Un LOT : le prix de CET article est demandé (jamais deviné, jamais pré-rempli ;
+  // le prix du lot ÷ nombre d'articles n'est qu'une indication).
+  const relierAchat = async (a) => {
+    const cible = pickerFor; if (!cible || !a) return;
+    const accNom = accNameOf(a._acc) || '';
+    let w = null;
+    if (lotDe(a).lot) {
+      const l = lotDe(a), ind = prixIndicatifLot(a), px = prixPayeAchat(a);
+      const saisi = await askText({ title: "Prix d'achat de cet article", desc: ind != null ? `${prixCourt(px)} ÷ ${l.n} ≈ ${prixCourt(ind)}` : (px != null ? `Lot · ${prixCourt(px)}` : ''), numeric: true, value: '', ok: 'Relier', cancel: 'Annuler' });
+      if (saisi == null) return;
+      w = ecritureLot(a, saisi, { accNom, photo: orderPhoto(a) || '' });
+      if (!w) { toast("Montant illisible : rien n'a été relié"); return; }
+    } else {
+      const p = propositionPrixAchat({ identite: { achat: a, par: 'choix' }, ventilationDe: ventilationDeTx });
+      if (!p) { choosePick(a); return; }
+      w = ecritureProposition(p, { accNom, photoDe: orderPhoto });
+    }
+    if (cible._saleTx) setSaleOverride(cible._saleTx, w); else updatePair(cible, w);
+    setPickerFor(null);
+  };
+
   // Relier un achat à une paire depuis la liste (pas depuis le sélecteur) :
   // même écriture que `choosePick`, instantané compris (§5.36) — sinon le reçu
   // et la photo de l'achat ne seraient plus affichables sans tout recharger.
@@ -50729,7 +50851,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             const peutDeposer = !hidden && st!=='cancelled' && aExpedier(o) && !isShipDone(o) && o.transaction_id!=null;
             const libDepose = num ? `N°${num}` : (o.title || '');
             const gesteCout = coutManque ? <CoutAchatVente surLigne propose={propPrix} onUtiliser={propPrix ? ()=>appliquerProposition('v:'+o.transaction_id, propPrix) : null} onSaisir={p=>setSaleOverride(o.transaction_id,{buyPrice:p})}
-                  onRelier={()=>{ const idf = identiteAnnonce(o); openPicker(idf ? { id: idf, title: o.title, photo: photo, price: sell, _acc: o._acc } : { id: '_v'+o.transaction_id, _saleTx: String(o.transaction_id), title: o.title, photo: photo, price: sell, _acc: o._acc }); }}/> : null;
+                  onRelier={()=>{ const idf = identiteAnnonce(o); openPicker(idf ? { id: idf, title: o.title, photo: photo, price: sell, _acc: o._acc, _dateRef: o.date } : { id: '_v'+o.transaction_id, _saleTx: String(o.transaction_id), title: o.title, photo: photo, price: sell, _acc: o._acc, _dateRef: o.date }); }}/> : null;
             const gesteDepose = peutDeposer ? <Bouton variante="secondaire" icone="check" className="vrm-depose-bouton" data-depose-vente={txL} data-sans-glisse="" disabled={deposeIci} aria-label={`Marquer ${libDepose || 'ce colis'} déposé`} onClick={()=>demanderDepose(txL, o, libDepose)}>Déposé</Bouton> : null;
             // ── (1er nov.) LE RÉCAPITULATIF DE LA VENTE — maquette A, « fiche en lignes nettes »
             // (Julien : « applique tout, je veux que ce soit clair »). De haut en bas : la paire
@@ -50802,7 +50924,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   <dl>
                     <div className="vrm-recap-ligne"><dt>Prix de vente</dt><dd data-prix-vente={sell!=null?Math.round(sell*100):undefined}>{sell==null ? '—' : autreDevise ? `${String(sell).replace('.',',')} ${cur(devise)}` : eurosRecap(sell)}</dd></div>
                     {fraisConnus != null ? <div className="vrm-recap-ligne" data-recap-frais={fraisConnus.toFixed(2)}><dt>Frais</dt><dd>{eurosRecap(-fraisConnus)}</dd></div> : null}
-                    {st !== 'cancelled' ? <div className="vrm-recap-ligne" data-recap-achat={lb.achat != null ? lb.achat.toFixed(2) : ''}><dt>Prix d’achat</dt><dd>{lb.achat != null ? eurosRecap(-lb.achat) : coutManque ? <CoutAchatVente recap propose={propPrix} onUtiliser={propPrix ? ()=>appliquerProposition('v:'+o.transaction_id, propPrix) : null} onSaisir={p=>setSaleOverride(o.transaction_id,{buyPrice:p})} onRelier={()=>openPicker(saleItem)}/> : '—'}</dd></div> : null}
+                    {st !== 'cancelled' ? <div className="vrm-recap-ligne" data-recap-achat={lb.achat != null ? lb.achat.toFixed(2) : ''}><dt>Prix d’achat</dt><dd>{lb.achat != null ? eurosRecap(-lb.achat) : coutManque ? <CoutAchatVente recap propose={propPrix} onUtiliser={propPrix ? ()=>appliquerProposition('v:'+o.transaction_id, propPrix) : null} onSaisir={p=>setSaleOverride(o.transaction_id,{buyPrice:p})} onRelier={()=>openPicker({ ...saleItem, _dateRef: o.date })}/> : '—'}</dd></div> : null}
                     {st !== 'cancelled' ? <div className="vrm-recap-ligne vrm-recap-benef" data-recap-benef-etat={lb.etat} data-benef-vente={benef!=null?benef.toFixed(2):undefined}><dt>Bénéfice</dt><dd><span className="vrm-recap-valeur">{lb.etat === 'partiel' ? <span className="vrm-recap-borne">au plus </span> : null}<span className="vrm-recap-montant">{benefTexte}</span></span>{benefAide ? <small>{benefAide}</small> : null}</dd></div> : null}
                     {verse != null ? <div className="vrm-recap-ligne vrm-recap-verse" data-recap-verse={finalisee ? (versement ? 'date' : 'oui') : 'non'}><dt>Versé sur ton porte-monnaie</dt><dd>{verse}</dd></div> : null}
                   </dl>
@@ -55139,8 +55261,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
 
       {/* Modale : relier un achat (depuis Annonces) */}
       {/* Modale : relier un achat (depuis Annonces) */}
-      {pickerFor && (
-        <div onClick={()=>setPickerFor(null)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:1000,display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
+      {pickerFor && createPortal(
+        <div data-relier-feuille onClick={()=>setPickerFor(null)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:1000,display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
           <FermeAuRetour fermer={()=>setPickerFor(null)}/>
           <div onClick={e=>e.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:520,maxHeight:'85vh',borderRadius:'14px 14px 0 0',display:'flex',flexDirection:'column',overflow:'hidden'}}>
             {/* ⚠️ ON MONTRE LA PAIRE QU'ON RELIE. La modale couvrait l'écran et
@@ -55165,64 +55287,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               </div>
               <button type="button" onClick={()=>setPickerFor(null)} aria-label="Fermer" style={{flexShrink:0,border:'none',background:'transparent',fontSize:22,color:C.muted,cursor:'pointer'}}>×</button>
             </div>
-            <div style={{padding:'10px 12px',borderBottom:`1px solid ${C.border}`}}>
-              <input autoFocus value={pickerQ} onChange={e=>setPickerQ(e.target.value)}
-                placeholder="Chercher dans tes achats (titre, marque, taille…)"
-                style={{width:'100%',boxSizing:'border-box',padding:'9px 11px',border:`1px solid ${C.border}`,borderRadius:8,background:C.card,color:C.text,fontSize:13,fontFamily:'inherit'}}/>
-            </div>
-            <div style={{flex:1,overflow:'auto',padding:'8px 12px 12px',display:'flex',flexDirection:'column',gap:8}}>
-              {purchasesPick.loading && <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'20px 0'}}>Chargement de tes achats…</div>}
-              {!purchasesPick.loading && (() => {
-                const curId = numeros[pickerFor.id]?.buyFromId;
-                const q = normTitle(pickerQ);
-                const avail = purchasesPick.items
-                  .filter(p => !linkedBuyIds.has(String(p.transaction_id)) || String(p.transaction_id)===String(curId))
-                  .filter(p => !q || normTitle(p.title||'').includes(q));
-                if (avail.length===0) return <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'20px 0',lineHeight:1.6}}>
-                  {q ? <>Aucun achat ne correspond à « {pickerQ} ».<br/><span style={{fontSize:12}}>Un achat déjà relié à un autre article n'apparaît pas ici.</span></> : 'Aucun achat disponible.'}
-                </div>;
-                // Les meilleurs candidats (même marque ET même taille) sont
-                // signalés : avec ~700 achats, sans repère on ne sait pas par où
-                // commencer, et le prix d'achat finit par ne jamais être saisi.
-                return avail.map((p, iP) => (
-                  <button key={p.transaction_id} type="button" onClick={()=>choosePick(p)} style={{display:'flex',gap:10,alignItems:'center',padding:8,borderRadius:8,border:`1px solid ${C.border}`,background:C.surface,cursor:'pointer',textAlign:'left'}}>
-                    <div style={{width:44,height:44,borderRadius:8,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>{orderPhoto(p)?<PhotoVinted src={orderPhoto(p)} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:20}}><Icon name="image" size={20} style={{color:C.muted,opacity:.55}}/></span>}</div>
-                    <div style={{flex:1,minWidth:0}}>
-                      <div style={{fontSize:12,fontWeight:500,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
-                        {/* ⚠️ SEUIL 12, PAS 8. À 8 (marque + taille) le badge s'allumait sur des
-    paires sans rapport — « nike » + « 40 » désigne des centaines d'articles.
-    12 exige le MODÈLE en plus (4+4+5), ou un titre identique. Une paire dont
-    le modèle n'est pas reconnu n'est jamais « suggérée » : on ne se prononce
-    pas plutôt que d'induire un faux prix d'achat. */}
-                        {(p._score||0) >= SEUIL_SUGGERE && <span style={{marginRight:5,fontSize:10,fontWeight:600,color:C.accent,background:`${C.accent}14`,border:`1px solid ${C.accent}44`,borderRadius:8,padding:'1px 6px'}}>suggéré</span>}
-                        {p.title}
-                      </div>
-                      <div style={{fontSize:11,color:C.muted,marginTop:2}}><AcctTag acc={p._acc} name={accNameOf(p._acc)}/> {p.date?new Date(p.date).toLocaleDateString('fr-FR'):''}
-                        {/* ⚠️ DIRE POURQUOI. Un badge « suggéré » sans raison se
-                            croit sur parole ; ici on relie de l'argent à une
-                            paire, et un prix d'achat faux ne se voit jamais
-                            (§22). On nomme ce que les deux titres ont en commun
-                            — c'est vérifiable d'un coup d'œil. */}
-                        {(()=>{ const r=refAchat(pickerFor), t=String(p.title||'');
-                          // ⚠️ Les champs de `refAchat` s'appellent marque / taille /
-                          // modele (pas brand / size / model) : se tromper de nom
-                          // ne lève AUCUNE erreur, ça n'affiche simplement rien.
-                          const com=[];
-                          const mq=(extractBrand(t)||'').toLowerCase(), md=extractModel(t), tl=String(extractSize(t)||'').toLowerCase();
-                          if(r.marque&&mq&&mq===r.marque) com.push(r.marque);
-                          if(r.modele&&md&&md===r.modele) com.push(r.modele);
-                          if(r.taille&&tl&&tl===r.taille) com.push('taille '+r.taille);
-                          return com.length ? <span style={{color:C.accent,fontWeight:600}}> · {com.join(' · ')}</span> : null; })()}
-                      </div>
-                    </div>
-                    <div style={{fontSize:15,fontWeight:700,color:C.text,flexShrink:0}}>{p.price?.amount} {cur(p.price?.currency_code)}</div>
-                  </button>
-                ));
-              })()}
+            <div data-relier-achat-corps style={{flex:1,overflow:'auto',padding:'4px 14px 14px'}}>
+              <RelierAchatCorps C={C} cible={cibleRelier} achats={purchasesPick.loading ? null : purchasesPick.items} liens={liensAchats}
+                curTx={numeros[pickerFor.id]?.buyFromId || ''} compteDe={(a)=>accNameOf(a._acc)||''} prixDe={prixPayeAchat} onRelier={relierAchat}/>
             </div>
           </div>
-        </div>
-      )}
+        </div>, document.body)}
 
       {/* Modale conversation */}
       {bordPlace && <BordPlacer place={bordPlace} onConfirm={confirmBordPlacement} onCancel={cancelBordPlacement}/>}
@@ -60331,6 +60401,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       urlWidget && { id:'widget', type:'panneau', nu:true, ic:'chart', lib:'Widget iPhone', desc:'Ton lien privé pour Scriptable', el:widget },
     ]},
     { id:'sauvegarde', titre:'Sauvegarde', items:[
+      { id:'donnees', type:'action', ic:'save', lib:'Exporter mes données', onClick:exporterMesDonnees, data:{ 'data-exporter-donnees':'' } },
       { id:'export', type:'action', ic:'save', lib:'Sauvegarde complète', desc:'Réglages, numéros et données captées.', onClick:onExport, data:{ 'data-reglage-sauvegarde':'' } },
       { id:'restaurer', type:'action', ic:'restore', lib:'Restaurer une sauvegarde', onClick:onImport },
     ], pied: (
