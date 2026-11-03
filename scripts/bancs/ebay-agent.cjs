@@ -238,7 +238,7 @@ const preparees = (pg) => pg.waitForFunction(() => { const l = [...document.quer
           const bz = await pg.$eval('[data-agent-publier]', (e) => e.textContent).catch(() => '');
           await pg.click('[data-agent-paire="36"] input[type=checkbox]');
           const bz2 = await pg.$eval('[data-agent-publier]', (e) => e.textContent).catch(() => '');
-          dit(!/Publier ces 0/.test(bz2) && /Coche au moins une paire/.test(bz2) && /Publier celle-ci/.test(bz), 'rien de coché : « Coche au moins une paire », jamais « Publier ces 0 »', `${bz} / ${bz2}`);
+          dit(!/Publier ces 0/.test(bz2) && /Coche au moins un article/.test(bz2) && /Publier celle-ci/.test(bz), 'rien de coché : « Coche au moins une paire », jamais « Publier ces 0 »', `${bz} / ${bz2}`);
           dit(envois.some((e) => e.action === 'relire'), 'eBay est relu après le lot');
           await pg.waitForTimeout(1500);
           const res = await local(pg, 'vrm_agent_ebay_resume');

@@ -206,3 +206,19 @@
   :root:root body .vrm-app-shell .vrm-main[data-ecran="dashboard"] > .vrm-rubriques { padding-top: 4px !important; }
   :root:root body .vrm-app-shell .vrm-main[data-ecran="dashboard"] .vrm-screen-head { margin-bottom: 8px !important; }
 }
+/* Les segmentés partagent la largeur (le 4ᵉ onglet du Stock était coupé : « Ph… ») ; au téléphone, les mots seuls. */
+:root:root body .vrm-app-shell .vrm-main .vrm-seg > button:not(#fu) { flex: 1 1 0 !important; min-width: 0 !important; padding: 0 4px !important; justify-content: center !important; white-space: nowrap; }
+:root:root body .vrm-app-shell .vrm-main .vrm-seg { overflow: visible !important; -webkit-mask-image: none !important; mask-image: none !important; }
+@media (max-width: 430px) { :root:root body .vrm-app-shell .vrm-main [data-stock-vues] > button:not(#fu) > svg { display: none !important; } }
+
+/* ── 14. LE CALENDRIER DE LA CARTE (3 nov., Julien : « fais un calendrier ») ──
+   Dans la feuille « Modifier » : un bouton de période pleine largeur (44 px) ; le calendrier
+   (ChoixPeriode, le même que Ventes/Achats/Statistiques) passe AU-DESSUS de la feuille. */
+:root:root body .vrm-carte-periode-cal { margin: 4px 0 12px; position: relative; }
+:root:root body .vrm-carte-periode-cal .vrm-cal-declencheur { width: 100% !important; min-height: 44px !important; justify-content: space-between !important; border-radius: var(--r-ctrl) !important; background: var(--fu-remplir) !important; border: 0 !important; color: var(--fu-encre) !important; font: 600 15px/1.2 var(--vrm-police) !important; padding: 0 14px !important; box-sizing: border-box; }
+:root:root body .vrm-carte-periode-cal .vrm-cal-pop { position: fixed !important; left: 50% !important; top: 50% !important; right: auto !important; transform: translate(-50%, -50%); z-index: 20002 !important; max-height: calc(100vh - 48px); overflow: auto; }
+body:has(.vrm-carte-voile) .vrm-cal-voile { z-index: 20001 !important; }
+body:has(.vrm-carte-voile) .vrm-cal-feuille { z-index: 20002 !important; }
+:root:root body .vrm-carte-feuille .vrm-carte-periodes.vrm-seg { margin: 4px 0 12px !important; }
+/* La visite en bulles : « Passer » / « Suivant » à 44 px pleins (43 au rendu, arrondis). */
+html body .vrm-visite .vrm-visite-pied :is(button, .vrm-b) { min-height: 46px !important; height: 46px !important; }

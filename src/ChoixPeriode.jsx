@@ -78,7 +78,9 @@ function Mois({ annee, mois, sel, survol, setSurvol, toucher, max, auj, entete =
   );
 }
 
-export default function ChoixPeriode({ value: brut, onChange, Retour, Icon, titre = 'Période', data = {}, vide = 'Toute la période' }) {
+// (3 nov.) `raccourcis` : une autre liste de raccourcis (la carte sombre : Aujourd'hui · Cette semaine ·
+// Ce mois · Mois dernier · Ce trimestre · Cette année) ; `libelle` : ce que dit le bouton.
+export default function ChoixPeriode({ value: brut, onChange, Retour, Icon, titre = 'Période', data = {}, vide = 'Toute la période', raccourcis: listeRaccourcis = null, libelle = null }) {
   const value = normaliser(brut);
   const etroit = useEtroit();
   // Au doigt : 18 mois d'abord ; « Voir les mois d'avant » en ajoute 12 (ses
@@ -93,8 +95,10 @@ export default function ChoixPeriode({ value: brut, onChange, Retour, Icon, titr
   const boite = React.useRef(null);
   const pop = React.useRef(null);
   const defile = React.useRef(null);
-  const raccourcis = raccourcisPeriode(auj);
-  const actif = raccourciDe(value, auj);
+  const raccourcis = listeRaccourcis ? listeRaccourcis(auj) : raccourcisPeriode(auj);
+  const actif = listeRaccourcis
+    ? ((value && value.from && raccourcis.find((r) => cleJour(r.valeur.from) === cleJour(value.from) && cleJour(r.valeur.to) === cleJour(value.to || value.from))) || {}).cle || ''
+    : raccourciDe(value, auj);
 
   const ouvrir = (ev) => {
     const s = value && value.from ? { from: value.from, to: value.to || value.from } : { from: null, to: null };
@@ -182,7 +186,7 @@ export default function ChoixPeriode({ value: brut, onChange, Retour, Icon, titr
       <div className="vrm-rangee" style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
         <button type="button" className="vrm-cal-declencheur" data-periode-ouvrir onClick={(ev) => (ouvert ? fermer() : ouvrir(ev))}
           aria-expanded={ouvert} aria-haspopup="dialog" data-periode-valeur={value && value.from ? `${cleJour(value.from)}..${cleJour(value.to || value.from)}` : ''}>
-          {Icon ? <Icon name="calendar" size={15}/> : null}<span data-periode-libelle>{libelleValeur(value, vide)}</span>
+          {Icon ? <Icon name="calendar" size={15}/> : null}<span data-periode-libelle>{libelle || libelleValeur(value, vide)}</span>
         </button>
         {value && (value.from || value.to) ? <button type="button" className="vrm-icon-control vrm-cal-croix" aria-label="Effacer la période" onClick={() => { onChange(null); fermer(); }}>{Icon ? <Icon name="close" size={14}/> : '×'}</button> : null}
       </div>

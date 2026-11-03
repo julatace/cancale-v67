@@ -164,6 +164,18 @@ const proche = (a, b) => (a == null && b == null) || (a != null && b != null && 
   const attP = LIGNES.filter((l) => l.plateforme === 'Vinted' && l.ts >= plage.de && l.ts < plage.a).reduce((t, l) => t + l.eur, 0);
   dit(proche(vp.valeur, attP), 'vendu sur une plage choisie dans Ventes = à la main', `${vp.valeur} / ${attP}`);
   dit(V('benefice', { site: 'toutes', periode: plage }).valeur == null && !!V('benefice', { site: 'toutes', periode: plage }).hors, 'bénéfice sur une plage de dates : « — » (la règle se compte au mois)');
+  // (3 nov., le calendrier de la carte) Une plage LIBRE posée sur la place elle-même (feuille « Modifier »).
+  const vpl = V('vendu', { site: 'vinted', compte: null, periode: null }, undefined, { p: plage });
+  dit(proche(vpl.valeur, attP), 'vendu, plage libre de la place = à la main (la même règle que la plage de Ventes)', `${vpl.valeur} / ${attP}`);
+  const vbp = V('benefice', { site: 'toutes', periode: null }, undefined, { p: plage });
+  dit(vbp.valeur == null && !!vbp.hors, 'bénéfice, plage libre de la place : « — » (jamais un faux total)', JSON.stringify(vbp));
+  if (typeof M.reglageDePage === 'function') {
+    const rg = M.reglageDePage({ v: 1, pages: { ventes: { g: { id: 'vendu', p: plage }, c: [{ id: 'benefice', p: plage }, { id: 'ventes', p: plage }] } } }, 'ventes');
+    dit(rg && rg.g.p && typeof rg.g.p === 'object' && rg.g.p.de === plage.de && rg.g.p.a === plage.a, 'réglage rangé : la plage du vendu est gardée', JSON.stringify(rg && rg.g));
+    dit(rg && !rg.c.some((x) => x.id === 'benefice' && x.p && typeof x.p === 'object'), 'réglage rangé : une plage sur le bénéfice n’est pas gardée (il retombe sur sa période)', JSON.stringify(rg && rg.c));
+    const rk = M.reglageDePage({ v: 1, pages: { ventes: { g: { id: 'vendu', p: { de: 5, a: 2 } } } } }, 'ventes');
+    dit(rk && rk.g.p === 'mois', 'une plage illisible (fin avant début) n’est pas gardée : le mois', JSON.stringify(rk && rk.g));
+  }
 
   console.log('── 2. Partiel, pas su, jamais 0');
   const srcKO = sourcesDe({ vendu: { lignes: LIGNES, manque: ['bruno', 'eBay'], enAttente: false, nonComptees: [] } });

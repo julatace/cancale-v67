@@ -92,11 +92,18 @@ export const periodeDefaut = (def) => (!def || !Array.isArray(def.periodes) || !
 export const defDe = (id, locaux) => (locaux && Object.prototype.hasOwnProperty.call(locaux, id) ? { ...locaux[id], local: true } : (CHIFFRES[id] || null));
 
 // Une place valable : un id connu (catalogue ou local), une période permise.
+// (3 nov., le calendrier de la carte) Une PLAGE libre `{ de, a, label }` est gardée
+// seulement pour un chiffre qui se calcule sur des dates quelconques (`PLAGE_IDS`).
+export const PLAGE_IDS = ['vendu', 'ventes', 'brut', 'finalisees'];
+// La clé d'une période (pour « jamais deux fois le même chiffre à la même période »).
+export const clePeriode = (p) => (p && typeof p === 'object' ? `${p.de}-${p.a}` : (p || ''));
+export const plageValable = (p) => !!(p && typeof p === 'object' && !p.hors && isFinite(Number(p.de)) && isFinite(Number(p.a)) && Number(p.a) > Number(p.de));
 const placeValable = (x, locaux) => {
   if (!x || typeof x !== 'object' || typeof x.id !== 'string') return null;
   const d = defDe(x.id, locaux);
   if (!d) return null;
   const per = Array.isArray(d.periodes) ? d.periodes : null;
+  if (per && plageValable(x.p) && !d.local && PLAGE_IDS.includes(x.id)) return { id: x.id, p: { de: Number(x.p.de), a: Number(x.p.a), label: String(x.p.label || '') } };
   return per ? { id: x.id, p: per.includes(x.p) ? x.p : periodeDefaut(d) } : { id: x.id };
 };
 
@@ -110,14 +117,14 @@ export const reglageDePage = (reglage, page, locaux = null) => {
   if (!def) return null;
   const r = reglage && typeof reglage === 'object' && reglage.pages && typeof reglage.pages === 'object' ? reglage.pages[page] : null;
   const g = placeValable(r && r.g, locaux) || placeValable(def.g, locaux) || { id: 'vendu', p: 'mois' };
-  const cles = new Set([g.id + '|' + (g.p || '')]);
+  const cles = new Set([g.id + '|' + clePeriode(g.p)]);
   const c = [];
   for (let i = 0; i < 3; i++) {
     const brut = r && Array.isArray(r.c) ? r.c[i] : null;
     let x = placeValable(brut, locaux);
-    if (!x || cles.has(x.id + '|' + (x.p || ''))) x = placeValable(def.c[i], locaux);
-    if (!x || cles.has(x.id + '|' + (x.p || ''))) x = null;
-    if (x) cles.add(x.id + '|' + (x.p || ''));
+    if (!x || cles.has(x.id + '|' + clePeriode(x.p))) x = placeValable(def.c[i], locaux);
+    if (!x || cles.has(x.id + '|' + clePeriode(x.p))) x = null;
+    if (x) cles.add(x.id + '|' + clePeriode(x.p));
     c.push(x);
   }
   return { g, c: c.filter(Boolean), defaut: !r };
@@ -156,7 +163,7 @@ export const bornesPeriode = (p, regles, maintenant = Date.now()) => {
 // Le nom court d'une période, en tête de carte (« Novembre », « T4 2026 »…).
 export const nomPeriode = (p, maintenant = Date.now()) => {
   if (!p) return 'Aujourd’hui';
-  if (typeof p === 'object') return p.label || 'Période choisie';
+  if (typeof p === 'object') { const l = p.label || 'Période choisie'; return l.charAt(0).toUpperCase() + l.slice(1); }
   const d = new Date(maintenant);
   if (p === 'jour') return 'Aujourd’hui';
   if (p === 'semaine') return 'Cette semaine';
@@ -185,7 +192,7 @@ export const horsSelection = (id, sel, locaux = null) => {
   if (sel && sel.compte && !d.compte) return 'pas par compte';
   if (sel && sel.compte && site !== 'vinted' && site !== 'toutes') return 'pas par compte';
   if (sel && sel.periode && Array.isArray(d.periodes)) {
-    if (typeof sel.periode === 'object' && !['vendu', 'ventes', 'brut', 'finalisees'].includes(id)) return 'pas sur une plage de dates';
+    if (typeof sel.periode === 'object' && !PLAGE_IDS.includes(id)) return 'pas sur une plage de dates';
     if (typeof sel.periode === 'string' && !d.periodes.includes(sel.periode)) return `pas par ${COURT_PERIODE[sel.periode] || sel.periode}`;
   }
   return '';
@@ -196,7 +203,7 @@ export const horsSelection = (id, sel, locaux = null) => {
 export const libelleCase = (def, p, pGrand, sel) => {
   let l = def.court || def.nom || '';
   const cle = (x) => (x && typeof x === 'object' ? (x.label || 'plage') : (x || ''));
-  if (p && cle(p) !== cle(pGrand) && typeof p === 'string') l += ' · ' + (COURT_PERIODE[p] || p);
+  if (p && cle(p) !== cle(pGrand)) l += ' · ' + (typeof p === 'string' ? (COURT_PERIODE[p] || p) : (p.label || 'plage'));
   if (def.vinted && (!sel || !sel.site || sel.site === 'toutes')) l += ' · Vinted';
   return l;
 };
@@ -251,6 +258,8 @@ export const valeurChiffre = (id, place, sources, sel, regles, maintenant = Date
   const hors = horsSelection(id, sel, locaux);
   const p = periodeDePlace(place || {}, d, sel && sel.periode);
   if (hors) return vide('hors', { hors, p });
+  // Une plage libre sur un chiffre qui ne se calcule pas sur des dates quelconques : « — », jamais un faux total.
+  if (p && typeof p === 'object' && !p.hors && !PLAGE_IDS.includes(id)) return vide('hors', { hors: 'pas sur une plage de dates', p });
   const site = (sel && sel.site) || 'toutes';
   const plateforme = PLATEFORME_DE_SITE[site] || null;
   const login = sel && sel.compte ? String(sel.compte.login || '') : '';

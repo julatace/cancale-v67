@@ -330,7 +330,9 @@ async function scenarioC(b, vp, sombre) {
     await ouvrir(pg, 'settings');
     await pg.locator('[data-reglage-organisation]').first().waitFor({ timeout: 10000 });
     const descOrga = (await pg.locator('[data-reglage-organisation]').first().innerText()).replace(/\s+/g, ' ');
-    check(/à plusieurs|mises de côté|à racheter/.test(descOrga) && !/Missions, réservations, lots et consommables/.test(descOrga), `C ${nom} — l'entrée de Réglages dit à quoi sert Organisation : « ${descOrga.trim().slice(0, 140)} »`);
+    // (3 nov.) Une ligne de Réglages = son NOM seul : la phrase « à quoi ça sert » n'y est plus (retiré à la demande de Julien,
+    // 3 nov., critique #1.4) ; elle reste sous le titre de l'écran Organisation (contrôlé plus bas).
+    check(/^\s*Organisation\s*$/.test(descOrga) && !/Missions, réservations, lots et consommables/.test(descOrga), `C ${nom} — l'entrée de Réglages dit son nom, sans phrase : « ${descOrga.trim().slice(0, 140)} »`);
     await pg.locator('[data-reglage-organisation]').first().click();
     // L'écran (au téléphone son titre est celui de l'en-tête de l'app : on vise la section).
     const ecran = pg.locator('section.vrm-operations[aria-label="Organisation"]');
@@ -341,7 +343,7 @@ async function scenarioC(b, vp, sombre) {
     // (2 nov.) « Paramètres » partout (1er nov., banc tous-boutons, CLAUDE.md §9) :
     // l'écran d'où l'on vient s'appelle désormais « Paramètres ».
     check(!/gestion/i.test(tete.sur) && /paramètres/i.test(tete.sur), `C ${nom} — le surtitre de l'écran dit « Paramètres », plus « Gestion » : « ${tete.sur} »`);
-    check(!!tete.acc && descOrga.includes(tete.acc), `C ${nom} — sous le titre, la phrase de Réglages : « ${tete.acc} »`);
+    check(!!tete.acc && /à plusieurs|mises de côté|à racheter/.test(tete.acc), `C ${nom} — sous le titre de l'écran, à quoi sert Organisation : « ${tete.acc} »`);
     if (!tel) check((await pg.locator('.vrm-sidebar [aria-label="Paramètres"][aria-current="page"]').count()) === 1, `C ${nom} — la roue des Réglages est mise en avant dans le rail`);
     await ouvrir(pg, 'organisation');
     await ecran.waitFor({ timeout: 10000 });
