@@ -402,8 +402,10 @@ function ColonneRetirerF({ vue: vueTout, C, Photo, gestes, detail, avecCarte, ec
                 <b className="vrm-rpf-nom" data-relais-nom="">{p.nom || p.adresseCourte || 'Point relais'}</b>
                 {p.nom && (p.adresse || p.adresseCourte) ? <span className="vrm-rpf-adr" data-relais-adresse="">{p.adresse || p.adresseCourte}</span> : null}
               </span>
-              {tCommun ? <span className="vrm-rpf-transp" data-relais-transporteur={tCommun.cle || ''}><PastilleTransporteur t={tCommun} C={C} seul taille={18}/></span> : null}
-              <span className="vrm-rpf-n" data-relais-compte={p.nComptes}>{p.nComptes ? plur(p.nComptes, 'colis', 'colis') : (p.nAttendus ? `${p.nAttendus} en route` : '')}</span>
+              <span className="vrm-rpf-meta">
+                {tCommun ? <span className="vrm-rpf-transp" data-relais-transporteur={tCommun.cle || ''}><PastilleTransporteur t={tCommun} C={C} seul taille={18}/></span> : null}
+                <span className="vrm-rpf-n" data-relais-compte={p.nComptes}>{p.nComptes ? plur(p.nComptes, 'colis', 'colis') : (p.nAttendus ? `${p.nAttendus} en route` : '')}</span>
+              </span>
             </header>
             <div className="vrm-rpf-liste">
               {comptes.map(ligne)}

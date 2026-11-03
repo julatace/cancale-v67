@@ -1057,3 +1057,24 @@ html body .vrm-app-shell .vrm-main:has(.vrm-fu-colis) .vrm-colis-fraicheur { dis
    s'ouvre par le « … » de Colis (les outils). Les colis repartis restent (cartes courtes). */
 html body .vrm-app-shell .vrm-main:has(.vrm-fu-colis) [data-colis-retraits="outils"] :is([data-suivi-vinted-etat], .vrm-achats > details) { display: none !important; }
 html:not([data-colis-outils]) body .vrm-app-shell .vrm-main:has(.vrm-fu-colis) [data-colis-retraits="outils"] [data-suivis-manuels] { display: none !important; }
+/* Point : la ligne « nom · adresse », dessous la puce du transporteur et le nombre ; titre d'un colis sur 2 lignes. */
+.vrm-rpf-point:not(.vrm-rpf-verifier) > .vrm-rpf-tete { flex-wrap: wrap; row-gap: 4px; }
+.vrm-rpf-point:not(.vrm-rpf-verifier) > .vrm-rpf-tete > .vrm-rpf-ident { flex: 1 1 100%; }
+.vrm-rpf-meta { display: flex; align-items: center; gap: 8px; flex: 1 1 100%; min-width: 0; }
+.vrm-rpf-meta:empty { display: none; }
+.vrm-rpf-meta .vrm-rpf-n { margin-left: auto; }
+.vrm-rpf-meta:not(:has(.vrm-rpf-transp)) .vrm-rpf-n { margin-left: 0; }
+.vrm-rpf-titre { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
+.vrm-rpf-point.is-inconnu > .vrm-rpf-tete .vrm-rpf-meta { display: none; }
+.vrm-rpf-villes { display: flex !important; overflow-x: auto; scrollbar-width: none; margin: 0 0 2px !important; padding: 4px !important; border-radius: 14px !important; background: #e3e3e8 !important; gap: 2px; }
+:root[data-theme="dark"] .vrm-rpf-villes { background: #2c2c2e !important; }
+.vrm-rpf-villes::-webkit-scrollbar { display: none; }
+:root body .vrm-app-shell .vrm-main .vrm-rpf-villes .vrm-seg-btn { flex: 1 0 auto; min-height: 36px !important; padding: 0 12px !important; border-radius: 10px !important; border: 0 !important; background: transparent !important; color: var(--fu-encre) !important; font: 600 14px/1 var(--vrm-police) !important; white-space: nowrap; box-shadow: none !important; position: relative; }
+:root body .vrm-app-shell .vrm-main .vrm-rpf-villes .vrm-seg-btn::after { content: ''; position: absolute; inset: -4px 0; }
+:root body .vrm-app-shell .vrm-main .vrm-rpf-villes .vrm-seg-btn[aria-pressed="true"] { background: var(--fu-carte) !important; box-shadow: 0 1px 3px rgba(0,0,0,.1) !important; }
+:root[data-theme="dark"] body .vrm-app-shell .vrm-main .vrm-rpf-villes .vrm-seg-btn[aria-pressed="true"] { background: #48484a !important; }
+.vrm-rpf-villes .vrm-seg-n { color: var(--fu-gris2, #8e8e93); font-weight: 600; margin-left: 2px; }
+/* « Lieu à confirmer » (carte grise) : ses boutons et vignettes en blanc pour se détacher. */
+:root body .vrm-app-shell .vrm-main .vrm-rpf-point.is-inconnu :is(.vrm-rpf-code, .vrm-rpf-retire, .vrm-rpf-vignette, .vrm-rpf-puce) { background: var(--fu-carte, #fff) !important; }
+:root[data-theme="dark"] body .vrm-app-shell .vrm-main .vrm-rpf-point.is-inconnu :is(.vrm-rpf-code, .vrm-rpf-retire, .vrm-rpf-vignette, .vrm-rpf-puce) { background: #3a3a3c !important; }
+.vrm-rpf-verifier { padding-bottom: 4px; }

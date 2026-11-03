@@ -169,7 +169,7 @@ const ouvrir = async (b, vp, sombre) => {
             carte: (document.querySelector('[data-fu-colis-retirer]') || { getAttribute: () => null }).getAttribute('data-fu-colis-retirer'),
             idents: lignes.map((l) => l.getAttribute('data-cc-carte')),
             comptes: lignes.filter((l) => !l.hasAttribute('data-hors-compte')).length,
-            points: [...document.querySelectorAll('.vrm-rpf-point:not(.vrm-rpf-verifier)')].map((p) => ({ cle: p.getAttribute('data-relais-point'), nom: (p.querySelector('.vrm-rpf-nom') || {}).textContent, adr: (p.querySelector('[data-relais-adresse]') || {}).textContent || '', h: Math.round(p.querySelector('.vrm-rpf-tete').getBoundingClientRect().height), n: p.querySelectorAll('[data-cc-carte]').length, inconnu: p.classList.contains('is-inconnu') })),
+            points: [...document.querySelectorAll('.vrm-rpf-point:not(.vrm-rpf-verifier)')].map((p) => ({ cle: p.getAttribute('data-relais-point'), nom: (p.querySelector('.vrm-rpf-nom') || {}).textContent, adr: (p.querySelector('[data-relais-adresse]') || {}).textContent || '', h: (() => { const a = p.querySelector('.vrm-rpf-nom'), d = p.querySelector('[data-relais-adresse]'); return !d ? 0 : Math.abs(a.getBoundingClientRect().top - d.getBoundingClientRect().top) + Math.abs(a.getBoundingClientRect().height - d.getBoundingClientRect().height) > 8 ? 99 : 0; })(), n: p.querySelectorAll('[data-cc-carte]').length, inconnu: p.classList.contains('is-inconnu') })),
             rangs: lignes.filter(vis).map((l) => { const r = l.querySelector('.vrm-rpf-rang'); const v = l.querySelector('.vrm-rpf-vignette'); return { id: l.getAttribute('data-cc-carte'), code: !!l.querySelector('[data-rp-code]'), avenir: !!l.querySelector('[data-rp-code-a-venir]'), retire: !!l.querySelector('.vrm-rpf-rang [data-colis-retire]'), ech: (l.querySelector('[data-rp-echeance]') || { getAttribute: () => null }).getAttribute('data-rp-echeance'), statut: (l.querySelector('[data-rp-statut]') || {}).textContent || '', vw: v ? Math.round(v.getBoundingClientRect().width) : 0, boutons: [...l.querySelectorAll('.vrm-rpf-rang button')].map((x) => Math.round(x.getBoundingClientRect().height)), detail: !!l.querySelector('[data-rp-detail]') }; }),
             verif: (() => { const d = document.querySelector('.vrm-rpf-verifier'); return d ? { n: d.getAttribute('data-retirer-a-verifier'), ouvert: d.open } : null; })(),
             enRoute: (document.querySelector('[data-retirer-en-route-sans]') || { getAttribute: () => null }).getAttribute('data-retirer-en-route-sans'),
@@ -185,7 +185,7 @@ const ouvrir = async (b, vp, sombre) => {
         if (N) dit(m.carte === String(N), 'la carte sombre dit le même N', `${m.carte} / ${N}`);
         dit(m.comptes === N, 'autant de lignes comptées que N (chaque colis une fois)', `${m.comptes} / ${N}`);
         dit(new Set(m.idents).size === m.idents.length, 'chaque colis UNE fois à l’écran', m.idents.join(','));
-        dit(m.points.every((p) => p.h <= 60), 'en-tête de point sur une ligne (nom + adresse)', JSON.stringify(m.points.filter((p) => p.h > 60)));
+        dit(m.points.every((p) => p.h <= 60), 'nom et adresse du point sur UNE ligne', JSON.stringify(m.points.filter((p) => p.h > 60)));
         dit(m.rangs.every((r) => r.vw === 44), 'vignette 44 px sur chaque ligne', '');
         dit(m.rangs.every((r) => r.boutons.every((h) => h >= 44)), 'boutons de ligne ≥ 44 px', JSON.stringify(m.rangs.find((r) => r.boutons.some((h) => h < 44))));
         dit(m.rangs.filter((r) => !/^r:/.test(r.id)).every((r) => r.retire), '« J’ai retiré » sur chaque ligne', '');
@@ -242,7 +242,7 @@ const ouvrir = async (b, vp, sombre) => {
         if (SHOTS) {
           const suf = `${nom}${JEU === 'base' ? '' : '-' + JEU}`;
           await pg.screenshot({ path: path.join(SHOTS, `retirer-${suf}.png`) });
-          if (vp.width < 600) { const h = await pg.evaluate(() => document.documentElement.scrollHeight); await pg.setViewportSize({ width: vp.width, height: Math.min(6000, h + 50) }); await pg.waitForTimeout(500); await pg.screenshot({ path: path.join(SHOTS, `retirer-${suf}-long.png`) }); await pg.setViewportSize(vp); }
+          if (vp.width < 600) { const h = await pg.evaluate(() => document.documentElement.scrollHeight); await pg.setViewportSize({ width: vp.width, height: 3400 }); await pg.evaluate(() => window.scrollTo(0, 0)); await pg.waitForTimeout(500); await pg.screenshot({ path: path.join(SHOTS, `retirer-${suf}-long.png`) }); await pg.setViewportSize(vp); }
         }
       });
       dit(!errs.length, 'aucune erreur d’app', errs.join(' | ').slice(0, 300));
