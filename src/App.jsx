@@ -37936,7 +37936,7 @@ function ComptaFusion({ compta, onNav }) {
     for (let k = 5; k >= 0; k--) {
       const de = new Date(d.getFullYear(), d.getMonth() - k, 1), a = new Date(d.getFullYear(), d.getMonth() - k + 1, 1);
       const r = beneficeDesJours(pub.jours, de, a);
-      out.push({ cle: `${de.getFullYear()}-${de.getMonth() + 1}`, l: de.toLocaleDateString('fr-FR', { month: 'short' }).replace('.', ''), long: de.toLocaleDateString('fr-FR', { month: 'long' }), v: r.nCout > 0 ? r.brut : (r.n === 0 ? 0 : null), n: r.n, nCout: r.nCout, courant: k === 0 });
+      out.push({ cle: `${de.getFullYear()}-${de.getMonth() + 1}`, l: de.toLocaleDateString('fr-FR', { month: 'short' }), long: de.toLocaleDateString('fr-FR', { month: 'long' }), v: r.nCout > 0 ? r.brut : (r.n === 0 ? 0 : null), n: r.n, nCout: r.nCout, courant: k === 0 });
     }
     return out;
   })();
@@ -37958,8 +37958,8 @@ function ComptaFusion({ compta, onNav }) {
           </div>
         ) : <p className="vrm-fu-note" data-fu-anneau-pourquoi="">{!B ? 'Rien à répartir tant que le bénéfice n’est pas calculé.' : B.n === 0 ? 'Aucune vente finalisée ce mois-ci.' : B.nCout < B.n ? 'La répartition s’affiche quand tous les prix d’achat du mois sont saisis.' : 'La répartition s’affiche quand les frais et les cotisations du mois sont connus.'}</p>}
       </section>
-      <section className="vrm-fu-panneau" aria-label="Bénéfice sur tes ventes, six derniers mois" data-fu-mois6={mois6.map((m) => (m.v == null ? '' : Math.round(m.v))).join(',')}>
-        <div className="vrm-fu-panneau-tete"><h3>6 derniers mois</h3><span>bénéfice</span></div>
+      <section className="vrm-fu-panneau" aria-label="Bénéfice brut sur tes ventes, six derniers mois" data-fu-mois6={mois6.map((m) => (m.v == null ? '' : Math.round(m.v))).join(',')}>
+        <div className="vrm-fu-panneau-tete"><h3>6 derniers mois</h3>{/* (3 nov.) Ces barres sont le BRUT (ventes − prix d'achat) : elles portent son nom (src/beneficeNoms.js), jamais « bénéfice » seul. */}<span data-benef-notion="brut">{NOM_BENEFICE_BRUT.toLowerCase()}</span></div>
         <div className="vrm-fu-barres">
           {mois6.map((m) => (
             <div key={m.cle} className="vrm-fu-barre" data-courant={m.courant ? '' : undefined} data-vide={m.v == null ? '' : undefined}
