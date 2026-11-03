@@ -109,8 +109,9 @@ const LIGNES = [
   ] : []),
 ];
 // Ce que chaque case DOIT montrer (les photos de l'identité, dans l'ordre de la liste).
-// Base : l'ordre de Colis (le plus pressé d'abord) — 8101 (limite LUE demain), 8103 (vendue avant-hier), 8102.
-const PHOTOS_ENVOYER = SANS ? [] : JEU === 'base' ? [url(1), url(3), url(2), VC_PHOTO, LBC_PHOTO] : APOSTER.map((v) => v.photo && v.photo.url).filter(Boolean);
+// Base : l'ordre de Colis (`toShip`, le plus pressé d'abord ; limite estimée = vente + 7 j) — 8103
+// (vendue avant-hier), 8102 (hier), 8101 (aujourd'hui) ; puis Vestiaire, puis Leboncoin.
+const PHOTOS_ENVOYER = SANS ? [] : JEU === 'base' ? [url(3), url(2), url(1), VC_PHOTO, LBC_PHOTO] : APOSTER.map((v) => v.photo && v.photo.url).filter(Boolean);
 const JUMEAUX = [url(4), url(7)];  // la vente finalisée et l'annonce au même titre que 8101
 
 let ko = 0, ok = 0;
@@ -307,6 +308,7 @@ const mesureJournee = (pg) => pg.evaluate(() => {
           // « Envoyés »
           await pg.locator('[data-colis-onglet-choix="envoyes"]').first().click();
           await pg.waitForTimeout(900);
+          if (process.env.JP_DBG) console.log(await pg.evaluate(() => ({ sec: !!document.querySelector('[data-colis-envoyes]'), lect: (document.querySelector('[data-colis-lecture]') || {}).textContent, onglet: (document.querySelector('[data-colis-onglet]') || { getAttribute: () => '' }).getAttribute('data-colis-onglet'), txt: document.querySelector('.vrm-main').innerText.slice(0, 600) })));
           const ev = await pg.evaluate(() => ({
             n: (document.querySelector('[data-colis-onglet-choix="envoyes"]') || { getAttribute: () => null }).getAttribute('data-colis-onglet-n'),
             cartes: [...document.querySelectorAll('[data-colis-envoyes] [data-colis-envoye]')].map((c) => ({ id: c.getAttribute('data-colis-envoye'), site: c.getAttribute('data-plateforme-colis'), frise: c.querySelector('[data-fu-frise]') ? [...c.querySelectorAll('[data-fu-etape]')].filter((s) => s.getAttribute('data-fait') === '1').map((s) => s.getAttribute('data-fu-etape')).join(',') : null })),

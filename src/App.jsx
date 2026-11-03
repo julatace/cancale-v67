@@ -54065,6 +54065,42 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             aucune décision automatique. Replié : ce n'est pas du travail. Un
             retour ou un colis non réclamé passe en tête — c'est le seul qui
             peut demander un geste (vérifier que la paire revient). */}
+        {/* Historique : les bordereaux déjà partis restent consultables, mais ils
+            n'encombrent plus la liste de travail. */}
+        {Array.isArray(emailBords) && (()=>{
+          const faits = emailBords.filter(b=>!isBordHidden(b) && isBordDone(b));
+          if (!faits.length) return null;
+          return (
+            /* (revue du 19 oct.) Neutre : plus le vert de l'ancienne palette
+               menthe (§7, rien à rattraper ici), et un autre mot que le groupe
+               « Partis — Vinted suit le colis » juste au-dessus, qui compte
+               autre chose (les VENTES suivies, pas les bordereaux faits). */
+            <div data-bords-faits={faits.length} style={{fontSize:12,color:C.muted,marginTop:14,display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',background:C.card,border:`1px solid ${C.border}`,borderRadius:8,padding:'9px 12px'}}>
+              <span style={{color:C.text,fontWeight:600}}>{faits.length} bordereau{faits.length>1?'x':''} déjà traité{faits.length>1?'s':''}</span>
+              <span style={{flex:1,minWidth:0}}>retiré{faits.length>1?'s':''} tout seul{faits.length>1?'s':''} dès que Vinted confirme.</span>
+              <button type="button" data-bords-faits-voir="" onClick={()=>setShowBordDone(v=>!v)} style={{border:'none',background:'transparent',color:C.blue||C.accent,fontWeight:600,cursor:'pointer',fontSize:12,padding:0,fontFamily:'inherit',minWidth:44}}>{showBordDone?'masquer':'voir'}</button>
+            </div>
+          );
+        })()}
+        {showBordDone && Array.isArray(emailBords) && (
+          <div style={{display:'flex',flexDirection:'column',gap:6,marginTop:8}}>
+            {emailBords.filter(b=>!isBordHidden(b) && isBordDone(b))
+              .sort((a,b2)=>new Date(b2.receivedAt||0)-new Date(a.receivedAt||0))
+              .map((b,i)=>(
+                <div key={i} style={{display:'flex',gap:10,alignItems:'center',padding:'8px 10px',border:`1px solid ${C.border}`,background:C.card,borderRadius:10,opacity:0.7}}>
+                  <div style={{width:38,height:38,borderRadius:8,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
+                    {bordPhoto(b)?<PhotoVinted src={bordPhoto(b)} alt="" loading="lazy" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:16}}>📄</span>}
+                  </div>
+                  <div style={{flex:'1 1 120px',minWidth:0}}>
+                    <div style={{fontSize:12,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{numForBord(b)?`N°${numForBord(b)} · `:''}{b.modele||b.article||'Bordereau'}</div>
+                    <div style={{fontSize:11,color:C.muted}}>{b.receivedAt?`reçu le ${new Date(b.receivedAt).toLocaleDateString('fr-FR')}`:''}</div>
+                  </div>
+                  {b.hasPdf && <button type="button" data-imprime="1" onClick={async ()=>{ const lu=await lirePdfLigne(b._row); if(!lu||!lu.octets){libererOngletPdf();toast(messagePdfManquant(lu));return;} processBordereau(numForBord(b), b.modele||b.article||'', lu.octets); }} style={{flexShrink:0,border:`1px solid ${C.border}`,background:'transparent',color:C.muted,borderRadius:8,padding:'6px 10px',cursor:'pointer',fontSize:12,fontWeight:600,fontFamily:'inherit'}}>🖨 Réimprimer</button>}
+                </div>
+              ))}
+          </div>
+        )}
+        </>)}
         {/* ── (3 nov.) « ENVOYÉS » : L'ONGLET DES COLIS PARTIS, TOUS SITES ─────────────────────
             Julien : « je veux des colis ENVOYÉS, et dans un autre onglet ». Ce qui vivait replié en bas
             (« Partis », Vinted seul) devient l'onglet, avec Vestiaire et Leboncoin (`listeEnvoyes`, aucune
@@ -54135,42 +54171,6 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             </section>
           );
         })()}
-        {/* Historique : les bordereaux déjà partis restent consultables, mais ils
-            n'encombrent plus la liste de travail. */}
-        {Array.isArray(emailBords) && (()=>{
-          const faits = emailBords.filter(b=>!isBordHidden(b) && isBordDone(b));
-          if (!faits.length) return null;
-          return (
-            /* (revue du 19 oct.) Neutre : plus le vert de l'ancienne palette
-               menthe (§7, rien à rattraper ici), et un autre mot que le groupe
-               « Partis — Vinted suit le colis » juste au-dessus, qui compte
-               autre chose (les VENTES suivies, pas les bordereaux faits). */
-            <div data-bords-faits={faits.length} style={{fontSize:12,color:C.muted,marginTop:14,display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',background:C.card,border:`1px solid ${C.border}`,borderRadius:8,padding:'9px 12px'}}>
-              <span style={{color:C.text,fontWeight:600}}>{faits.length} bordereau{faits.length>1?'x':''} déjà traité{faits.length>1?'s':''}</span>
-              <span style={{flex:1,minWidth:0}}>retiré{faits.length>1?'s':''} tout seul{faits.length>1?'s':''} dès que Vinted confirme.</span>
-              <button type="button" data-bords-faits-voir="" onClick={()=>setShowBordDone(v=>!v)} style={{border:'none',background:'transparent',color:C.blue||C.accent,fontWeight:600,cursor:'pointer',fontSize:12,padding:0,fontFamily:'inherit',minWidth:44}}>{showBordDone?'masquer':'voir'}</button>
-            </div>
-          );
-        })()}
-        {showBordDone && Array.isArray(emailBords) && (
-          <div style={{display:'flex',flexDirection:'column',gap:6,marginTop:8}}>
-            {emailBords.filter(b=>!isBordHidden(b) && isBordDone(b))
-              .sort((a,b2)=>new Date(b2.receivedAt||0)-new Date(a.receivedAt||0))
-              .map((b,i)=>(
-                <div key={i} style={{display:'flex',gap:10,alignItems:'center',padding:'8px 10px',border:`1px solid ${C.border}`,background:C.card,borderRadius:10,opacity:0.7}}>
-                  <div style={{width:38,height:38,borderRadius:8,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
-                    {bordPhoto(b)?<PhotoVinted src={bordPhoto(b)} alt="" loading="lazy" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:16}}>📄</span>}
-                  </div>
-                  <div style={{flex:'1 1 120px',minWidth:0}}>
-                    <div style={{fontSize:12,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{numForBord(b)?`N°${numForBord(b)} · `:''}{b.modele||b.article||'Bordereau'}</div>
-                    <div style={{fontSize:11,color:C.muted}}>{b.receivedAt?`reçu le ${new Date(b.receivedAt).toLocaleDateString('fr-FR')}`:''}</div>
-                  </div>
-                  {b.hasPdf && <button type="button" data-imprime="1" onClick={async ()=>{ const lu=await lirePdfLigne(b._row); if(!lu||!lu.octets){libererOngletPdf();toast(messagePdfManquant(lu));return;} processBordereau(numForBord(b), b.modele||b.article||'', lu.octets); }} style={{flexShrink:0,border:`1px solid ${C.border}`,background:'transparent',color:C.muted,borderRadius:8,padding:'6px 10px',cursor:'pointer',fontSize:12,fontWeight:600,fontFamily:'inherit'}}>🖨 Réimprimer</button>}
-                </div>
-              ))}
-          </div>
-        )}
-        </>)}
       </>)}
 
       {/* Modale : relier un achat (depuis Annonces) */}
