@@ -57,3 +57,15 @@ export function friseColisFusion(lues = {}, { geste = false } = {}) {
   }));
   return avecCours(etapes, geste);
 }
+
+// (3 nov., critique #3) Les ventes Leboncoin, eBay et Vestiaire portent la MÊME frise que Vinted.
+// `lues` : { vendue, postee, livree, payee } — chacune un booléen LU par l'écran de la plateforme
+// (statut capté, jamais deviné) ; la même loi : faite si lue ou si une étape PLUS LOIN l'est.
+export function friseVenteLue(lues = {}, { geste = false } = {}) {
+  const l = ETAPES_VENTE_FUSION.map(([cle]) => lues[cle] === true);
+  const derniere = l.lastIndexOf(true);
+  const etapes = ETAPES_VENTE_FUSION.map(([cle, label], i) => ({
+    cle, label, fait: l[i] || i < derniere, preuve: l[i] ? 'lue' : (i < derniere ? 'deduite' : null), t: null, cours: false, ton: '',
+  }));
+  return avecCours(etapes, geste);
+}

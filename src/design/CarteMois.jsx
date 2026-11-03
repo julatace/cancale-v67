@@ -8,11 +8,11 @@ import React, { useLayoutEffect, useRef } from 'react';
 import { cheminMonotone } from '../courbeMonotone.js';
 
 // La courbe : des valeurs (une par jour), dessinées sans sommet inventé
-// (interpolation monotone), remplissage dégradé. Moins de deux points ⇒ rien.
+// (interpolation monotone), remplissage dégradé. Moins de trois points ⇒ rien (deux points font un trait plat, pas une tendance — critique du 3 nov., #12).
 export function Courbe({ valeurs, largeur = 96, hauteur = 46 }) {
   const id = React.useId().replace(/:/g, '');
   const v = (valeurs || []).filter((x) => Number.isFinite(x));
-  if (v.length < 2 || !v.some((x) => x > 0)) return null;
+  if (v.length < 3 || !v.some((x) => x > 0)) return null;
   const max = Math.max(...v), min = Math.min(0, ...v);
   const pad = 5;
   const pts = v.map((x, i) => [pad + (i * (largeur - 2 * pad)) / (v.length - 1), hauteur - pad - ((x - min) / ((max - min) || 1)) * (hauteur - 2 * pad)]);

@@ -180,7 +180,7 @@ async function brancher(p){
       check(await rail.locator('details').count()===0,'aucun groupe Détails ou Autres outils dans le rail');
       check(await rail.getByRole('button',{name:'Gérer',exact:true}).count()===0,'aucun bouton à déplier pour Gérer (ex-« Gestion »)');
       check(await rail.getByRole('region',{name:'Gérer',exact:true}).isVisible(),'gestion (« Gérer ») visible en permanence dans le rail');
-      check(await rail.getByRole('button',{name:'Stock',exact:true}).isVisible() && await rail.getByRole('button',{name:'Comptabilité',exact:true}).isVisible(),'stock et comptabilité (factures comprises) toujours accessibles');
+      check(await rail.getByRole('button',{name:'Stock',exact:true}).isVisible() && await rail.getByRole('button',{name:'Compta',exact:true}).isVisible(),'stock et comptabilité (factures comprises) toujours accessibles');
       check(await rail.getByRole('button',{name:'Stock',exact:true}).getAttribute('title')==='Stock','nom de l’accès au survol');
       check(await rail.getByRole('button',{name:'Paramètres',exact:true}).isVisible(),'paramètres directement accessibles dans le rail');
     }

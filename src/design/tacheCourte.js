@@ -26,3 +26,14 @@ export const courtFusion = (j) => {
   { const m = /(\d+) paires? à regarder pour eBay/.exec(t); if (m) return { court: `${m[1]} article${Number(m[1]) > 1 ? 's' : ''} pour eBay`, detail: '' }; }
   return null;
 };
+
+// (3 nov., critique #11) La pastille porte le nombre : le titre ne le redit pas
+// (« 1 » + « 1 vente Vestiaire à envoyer » ⇒ « Vente Vestiaire à envoyer »). Seulement
+// quand le titre COMMENCE par ce même nombre ; sinon rien ne change.
+export const titreSansNombre = (court, n) => {
+  const t = String(court || '');
+  if (!(Number(n) > 0)) return t;
+  const m = new RegExp('^' + Number(n) + '\\s+(.+)$').exec(t);
+  if (!m) return t;
+  return m[1].charAt(0).toUpperCase() + m[1].slice(1);
+};

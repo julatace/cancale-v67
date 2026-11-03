@@ -140,7 +140,13 @@ const ouvrirVente = async (pg, tx) => {
 const lire = (pg, id) => pg.evaluate((id) => {
   const d = document.getElementById(id); if (!d) return null;
   const vw = window.innerWidth;
-  const etapes = [...d.querySelectorAll('[data-recap-frise] > li')].map((li) => ({ cle: li.getAttribute('data-etape'), fait: li.getAttribute('data-fait') === '1', quand: (li.querySelector('.vrm-recap-quand') || {}).textContent || '' }));
+  // (3 nov., critique #6) Le récapitulatif porte LA frise de la ligne (Frise.jsx : vendue · postee ·
+  // livree · payee) ; le bordereau est une ligne de détail (`data-recap-bordereau`). Les étapes
+  // relues sous leurs noms de `friseVente` pour juger la MÊME règle qu'avant (preuve par étape).
+  const VERS = { vendue: 'vendue', postee: 'deposee', livree: 'livree', payee: 'argent' };
+  const fr = d.querySelector('[data-recap-frise]');
+  const segs = [...d.querySelectorAll('[data-recap-frise] [data-fu-etape]')].map((li) => ({ cle: VERS[li.getAttribute('data-fu-etape')] || li.getAttribute('data-fu-etape'), fait: li.getAttribute('data-fait') === '1', quand: li.getAttribute('data-fait') === '1' ? 'fait' : 'à venir' }));
+  const etapes = segs.length ? [segs[0], { cle: 'bordereau', fait: !!fr && fr.getAttribute('data-recap-bordereau') === '1', quand: '' }, ...segs.slice(1)] : [];
   const vis = (e) => { const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0 && !e.closest('details:not([open]) > :not(summary)'); };
   const txt = d.innerText;
   const montantsCasses = [];

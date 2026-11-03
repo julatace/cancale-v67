@@ -122,7 +122,7 @@ if(sub==='ventes'){
   dit(W<600?m.titreEcran.length===0:m.titreEcran.includes('Statistiques'),`[${W}] « Statistiques » : une fois sur téléphone (la barre du haut), présent sur ordinateur`,JSON.stringify(m.titreEcran));
   dit(m.courbeDoublons===0,`[${W}] « Vendu · 12 mois » ne réécrit pas ses mois arrondis autrement`,String(m.courbeDoublons));
 } else if(v==='compta'){
-  dit(W<600?m.titreEcran.length===0:m.titreEcran.includes('Comptabilité'),`[${W}] « Comptabilité » : une fois sur téléphone, présent sur ordinateur`,JSON.stringify(m.titreEcran));
+  dit(W<600?m.titreEcran.length===0:m.titreEcran.includes('Compta'),`[${W}] « Comptabilité » : une fois sur téléphone, présent sur ordinateur`,JSON.stringify(m.titreEcran));
   dit(m.nLignesCa>=1&&m.lignesZero===0,`[${W}] le tableau par période ne s'allonge pas de mois sans aucune vente`,`${m.lignesZero} / ${m.nLignesCa}`);
   dit(m.pictoSeuls===0,`[${W}] pas de ⓘ seul sous les cartes de Compta`,String(m.pictoSeuls));
 } else if(v==='settings'||v==='organisation'){

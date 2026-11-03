@@ -75,7 +75,7 @@ const INTERDITS = ['Collectif', 'Prix qui marche', 'Factures', 'Dans Vinted', 'A
       const { ctx, pg } = await page(nav, false, 'journee');
       const rail = await pg.evaluate(() => [...document.querySelectorAll('.vrm-sidebar button')].map((b) => b.getAttribute('aria-label') || b.innerText.trim()));
       for (const m of INTERDITS) dit(!rail.includes(m), `le rail ne porte plus « ${m} »`, rail.join(' · '));
-      for (const m of ['Statistiques', 'Comptabilité', 'Colis', 'Stock']) dit(rail.includes(m), `le rail garde « ${m} »`, rail.join(' · '));
+      for (const m of ['Statistiques', 'Compta', 'Colis', 'Stock']) dit(rail.includes(m), `le rail garde « ${m} »`, rail.join(' · '));
       await ctx.close();
     }
     for (const tel of [false, true]) {
@@ -97,7 +97,7 @@ const INTERDITS = ['Collectif', 'Prix qui marche', 'Factures', 'Dans Vinted', 'A
       {
         const { ctx, pg } = await page(nav, tel, 'invoices');
         const t = await texte(pg);
-        dit(/Comptabilit/.test(await actif(pg)) || /Comptabilité/.test(t), `${qui} : ?tab=invoices ouvre Comptabilité`, await actif(pg));
+        dit(/Compta/.test(await actif(pg)) || /Compta/.test(t), `${qui} : ?tab=invoices ouvre Comptabilité`, await actif(pg));
         dit(/Factures/.test(await rubriqueActive(pg)), `${qui} : la rubrique « Factures » est choisie`, await rubriqueActive(pg));
         dit(/Nouvelle facture/.test(t), `${qui} : l’écran des factures est rendu`, t.slice(0, 160));
         await ctx.close();
@@ -132,7 +132,7 @@ const INTERDITS = ['Collectif', 'Prix qui marche', 'Factures', 'Dans Vinted', 'A
       const feuille = await pg.evaluate(() => { const m = document.querySelector('.vrm-sheet'); return m ? m.innerText : ''; });
       dit(!!feuille, 'la feuille du menu s’ouvre', '');
       for (const m of INTERDITS) dit(!feuille.includes(m), `la feuille ne porte plus « ${m} »`, feuille.replace(/\n+/g, ' · '));
-      for (const m of ['Statistiques', 'Comptabilité']) dit(feuille.includes(m), `la feuille garde « ${m} »`, '');
+      for (const m of ['Statistiques', 'Compta']) dit(feuille.includes(m), `la feuille garde « ${m} »`, '');
       await ctx.close();
     }
   } catch (e) { dit(false, 'le banc a tourné jusqu’au bout', String(e && e.message).slice(0, 200)); }

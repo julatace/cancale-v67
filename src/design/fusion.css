@@ -116,7 +116,7 @@ button.vrm-fu-case:focus-visible { outline: 2px solid #0a84ff; outline-offset: 2
 .vrm-fu-frise { list-style: none; margin: 0; padding: 0; display: flex; gap: 5px; min-width: 0; }
 .vrm-fu-seg { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
 .vrm-fu-seg > i { display: block; height: 5px; border-radius: 3px; background: var(--fu-piste); transition: background-color .25s ease; }
-.vrm-fu-seg > span { font: 600 10.5px/1.2 var(--vrm-police); color: var(--fu-gris3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.vrm-fu-seg > span { font: 600 11px/1.2 var(--vrm-police); color: var(--fu-gris3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .vrm-fu-seg[data-fait="1"] > i { background: var(--fu-bleu); }
 .vrm-fu-seg[data-fait="1"] > span { color: var(--fu-encre); }
 .vrm-fu-seg[data-cours] > i { background: var(--fu-encre); }
@@ -839,3 +839,73 @@ html body .vrm-app-shell .vrm-main:has(.vrm-fu-ventes) [data-ventes-controles] >
   html body .vrm-app-shell .vrm-day-layout.vrm-fu-journee { max-width: 720px !important; margin-inline: auto !important; width: 100% !important; grid-template-columns: minmax(0, 1fr) !important; }
 }
 html body .vrm-app-shell .vrm-day-layout.vrm-fu-journee .vrm-fu-tete .vrm-fu-case.is-jour .vrm-fu-couv { font-size: 13px; font-weight: 600; letter-spacing: 0; color: rgba(255,255,255,.65); }
+
+/* ══ 17. CRITIQUE DU 3 NOV. (#10, #11) — Ma journée au gabarit de la maquette ══
+   Pastilles 42 / rayon 13 / 800 17 px : ambre = dû aujourd'hui (seule couleur, §7),
+   encre = geste du jour, gris #c7c7cc = à saisir quand il voudra (maquette). En sombre :
+   pastilles #3A3A3C (plus de carré blanc pur, l'élément le plus lumineux de l'écran). */
+html body .vrm-app-shell .vrm-main .vrm-day-layout.vrm-fu-journee .vrm-day-task span.vrm-fu-pastille.is-secondaire { background: #c7c7cc !important; color: #fff !important; }
+:root[data-theme="dark"] body .vrm-app-shell .vrm-main .vrm-day-layout.vrm-fu-journee .vrm-day-task span.vrm-fu-pastille { background: #3a3a3c !important; color: #fff !important; }
+:root[data-theme="dark"] body .vrm-app-shell .vrm-main .vrm-day-layout.vrm-fu-journee .vrm-day-task span.vrm-fu-pastille.is-urgent { background: #ff9f0a !important; color: #1d1d1f !important; }
+:root[data-theme="dark"] body .vrm-app-shell .vrm-main .vrm-day-layout.vrm-fu-journee .vrm-day-task span.vrm-fu-pastille.is-secondaire { background: #2c2c2e !important; color: #98989d !important; }
+:root[data-theme="dark"] body .vrm-app-shell .vrm-main .vrm-day-layout.vrm-fu-journee .vrm-day-task span.vrm-fu-pastille.is-icone { background: #2c2c2e !important; color: #98989d !important; }
+/* La ligne URSSAF : même carte, « Noter » en pilule à droite (plus de bouton dessous, plus de fond gris). */
+html body .vrm-app-shell .vrm-main .vrm-day-layout.vrm-fu-journee .vrm-day-task.is-groupe { flex-wrap: nowrap !important; align-items: center !important; }
+html body .vrm-app-shell .vrm-main .vrm-day-layout.vrm-fu-journee .vrm-day-task.is-groupe > .vrm-day-task-ouvrir { flex: 1 1 auto !important; min-width: 0 !important; }
+html body .vrm-app-shell .vrm-main .vrm-day-layout.vrm-fu-journee .vrm-day-task.is-groupe > .vrm-day-task-geste {
+  flex: none !important; width: auto !important; margin: 0 !important; min-height: 44px !important; padding: 0 14px !important; border: 0 !important; border-radius: 999px !important;
+  background: var(--fu-case) !important; color: #0062c4 !important; font: 600 13px/1 var(--vrm-police) !important; box-shadow: none !important;
+}
+:root[data-theme="dark"] body .vrm-app-shell .vrm-main .vrm-day-layout.vrm-fu-journee .vrm-day-task.is-groupe > .vrm-day-task-geste { color: #5eb0ff !important; }
+html body .vrm-app-shell .vrm-main .vrm-day-layout.vrm-fu-journee .vrm-day-task.is-groupe > .vrm-day-task-geste svg { display: none !important; }
+/* « Vendus ailleurs » : titre 600 comme les autres lignes. */
+html body .vrm-app-shell .vrm-main .vrm-day-layout.vrm-fu-journee .vrm-va-titre { font-weight: 600 !important; font-size: 15px !important; }
+/* Sombre (#10) : fond #000, cartes #1C1C1E, la carte du mois se détache d'un filet clair. */
+:root[data-theme="dark"] body .vrm-app-shell .vrm-main:has(.vrm-fu-ecran) :is(.vrm-day-task, .vrm-bilan-sync, .vrm-sale-row[data-fu-forme], [data-bord-card], [data-ventes-controles] > details) { background: #1c1c1e !important; }
+:root[data-theme="dark"] body .vrm-app-shell .vrm-main :is(.vrm-fu-carte, .vrm-fu-tete, .vrm-fu-ecran [data-fu-carte]) { box-shadow: 0 0 0 1px rgba(255,255,255,.08) !important; }
+:root[data-theme="dark"] body .vrm-app-shell .vrm-main:has(.vrm-fu-ecran) :is(.vrm-ledger-photo-empty, .vrm-sale-photo, .vrm-fu-vignette) { background-color: #2c2c2e !important; }
+/* Ordinateur (#13) : étiquettes ≥ 13 px, notes en 13 px. */
+@media (min-width: 768px) {
+  html body .vrm-app-shell .vrm-main .vrm-day-layout.vrm-fu-journee .vrm-day-task .vrm-day-task-note { font-size: 13px !important; }
+  html body .vrm-app-shell .vrm-main .vrm-fu-case > span, html body .vrm-app-shell .vrm-day-layout.vrm-fu-journee .vrm-fu-tete .vrm-fu-case.is-jour > span { font-size: 13px !important; }
+  html body .vrm-app-shell .vrm-main .vrm-fu-seg > span { font-size: 12px; }
+}
+/* Ordinateur (#13) : les quatre écrans Fusion tiennent dans une colonne lisible de 760 px,
+   centrée (la carte sombre ne s'étire plus sur 1 150 px) ; Ventes perd ses en-têtes de
+   colonnes (« Article / État / Prix… ») que les cartes ne suivent pas. */
+@media (min-width: 1024px), (min-width: 768px) and (hover: hover) and (pointer: fine) {
+  html body .vrm-app-shell .vrm-main:has(.vrm-fu-ecran) > :not(.vrm-barre-haut):not(style):not(script) { max-width: 760px !important; margin-left: auto !important; margin-right: auto !important; box-sizing: border-box !important; width: 100% !important; }
+}
+html body .vrm-app-shell .vrm-main:has(.vrm-fu-ventes) :is(.vrm-ledger-heading, [data-ventes-entete-cols]) { display: none !important; }
+
+/* ══ 18. CRITIQUE DU 3 NOV. (#2) — au téléphone, la barre du haut ne redit pas le titre ══
+   Sur les quatre écrans Fusion : ni tuile logo, ni titre centré (le grand titre est juste
+   dessous), seulement les icônes à droite, sur le fond de l'écran. Sur Ma journée, elle
+   prend le noir de la tête sombre, qui monte ainsi jusqu'en haut (maquette). */
+@media (max-width: 767px) {
+  html body .vrm-app-shell:has(.vrm-main .vrm-fu-ecran) .vrm-app-header :is(.vrm-header-logo, .vrm-hdr-entreprise, .vrm-hdr-titre) { display: none !important; }
+  html body .vrm-app-shell:has(.vrm-main .vrm-fu-ecran) .vrm-app-header { background: var(--fu-fond) !important; box-shadow: none !important; border-bottom: 0 !important; justify-content: flex-end !important; }
+  html body .vrm-app-shell:has(.vrm-main .vrm-fu-ecran) .vrm-app-header .vrm-header-brand:not(:has(> :not(.vrm-header-logo):not(.vrm-hdr-entreprise):not(:empty))) { flex: 0 0 auto !important; }
+  html body .vrm-app-shell:has(.vrm-main .vrm-fu-journee) .vrm-app-header { background: #1d1d1f !important; }
+  html body .vrm-app-shell:has(.vrm-main .vrm-fu-journee) .vrm-app-header .vrm-header-actions :is(button, a) { color: rgba(255,255,255,.85) !important; background: transparent !important; }
+}
+
+/* ══ 19. CRITIQUE DU 3 NOV. (#5) — une carte de vente, deux commandes ══ */
+html body .vrm-app-shell .vrm-main .vrm-sale-row[data-fu-forme] { position: relative !important; }
+html body .vrm-app-shell .vrm-main .vrm-sale-row[data-fu-forme] > .vrm-fu-plus-vente { position: absolute; right: 8px; top: 44px; color: var(--fu-gris); z-index: 1; }
+html body .vrm-app-shell .vrm-main .vrm-sale-row[data-fu-forme]:has(> .vrm-fu-plus-vente) .vrm-fu-vente-txt { padding-right: 40px; box-sizing: border-box; }
+html body .vrm-app-shell .vrm-main .vrm-sale-row[data-fu-forme]:has(> .vrm-fu-plus-vente) .vrm-fu-vente-l1 { margin-right: -40px; }
+html body .vrm-app-shell .vrm-main .vrm-sale-row[data-fu-forme]:not([data-plus-ouvert]) > .vrm-ledger-gestes,
+html body .vrm-app-shell .vrm-main .vrm-sale-row[data-fu-forme]:not([data-plus-ouvert]) .vrm-fu-apres,
+html body .vrm-app-shell .vrm-main .vrm-sale-row[data-fu-forme]:not([data-plus-ouvert]) [data-bord-vinted] { display: none !important; }
+html body .vrm-app-shell .vrm-main .vrm-sale-row[data-fu-forme][data-plus-ouvert] > .vrm-ledger-gestes :is(button, .vrm-b) { min-height: 44px !important; }
+/* L'état sous le titre redisait (et contredisait parfois) la frise : seule l'urgence reste. */
+html body .vrm-app-shell .vrm-main .vrm-sale-row[data-fu-forme]:has(.vrm-fu-frise) .vrm-fu-vente-l3:not([data-ton="action"]) { display: none !important; }
+/* (#3.4) Transporteur inconnu : pas de puce « Transporteur pas lu » ; le bouton prend la rangée. */
+html body .vrm-app-shell .vrm-main .vrm-sale-row[data-fu-forme] .vrm-rangee-bord > .vrm-puce-transp[data-lu="0"] { display: none !important; }
+html body .vrm-app-shell .vrm-main .vrm-sale-row[data-fu-forme] .vrm-rangee-bord:not(:has(> .vrm-puce-transp:not([data-lu="0"]))) > :not(.vrm-puce-transp) { flex: 1 1 100% !important; max-width: none !important; }
+
+/* ══ 20. CRITIQUE DU 3 NOV. (#6) — la frise du récapitulatif = celle de la ligne ══ */
+html body .vrm-recap-frise[data-recap-frise] { display: block !important; margin: 16px 0 0 !important; grid-template-columns: none !important; }
+html body .vrm-recap-frise[data-recap-frise] > .vrm-fu-frise { margin: 0; }
+html body .vrm-recap-frise-detail { margin: 10px 0 0; font: 500 13px/1.4 var(--vrm-police); color: var(--fu-gris); }

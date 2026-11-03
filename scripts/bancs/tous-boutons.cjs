@@ -110,14 +110,14 @@ const TRANSITOIRES = new Set([...APP.matchAll(/if\s*\(\s*tab\s*!==?\s*['"]([a-z_
 // LE NOM D'UN ÉCRAN, celui de la colonne de navigation (une source : la colonne).
 const NOMS = {
   journee: ['Ma journée', 'Journée'], annonces: ['Annonces'], ventes: ['Ventes'], messages: ['Messages'], cat_bord: ['Colis'],
-  garage: ['Stock'], achats: ['Achats'], dashboard: ['Statistiques'], compta: ['Comptabilité'], communaute: ['Communauté'], settings: ['Paramètres'],
+  garage: ['Stock'], achats: ['Achats'], dashboard: ['Statistiques'], compta: ['Compta']  /* (3 nov., Julien via la critique #2 : « Compta » partout) */, communaute: ['Communauté'], settings: ['Paramètres'],
 };
 // Les autres noms d'un écran, à ne plus écrire (E8) — `ou` : le contexte qui
 // les rend légitimes (« Réglages » de l'iPhone, l'onglet « Réglages » DANS Paramètres).
 const SYNONYMES = [
   { mot: /\bRéglages\b/, ecran: 'settings', ou: /(iPhone|ton nom|Connexion et sécurité|Se connecter avec Apple|réglages du navigateur|Réglages (des )?factures|Réglages\s*&|Réglages gardés|Réglages, numéros)/i },
   { mot: /\bStats\b/, ecran: 'dashboard' },
-  { mot: /\bCompta\b(?!bilité)/, ecran: 'compta' },
+  // (3 nov.) « Compta » est désormais LE nom (colonne, titre, menu) : plus un synonyme.
 ];
 
 const types = { '.js': 'text/javascript', '.css': 'text/css', '.html': 'text/html', '.png': 'image/png', '.svg': 'image/svg+xml', '.json': 'application/json', '.webmanifest': 'application/json', '.woff2': 'font/woff2', '.wasm': 'application/wasm', '.onnx': 'application/octet-stream' };

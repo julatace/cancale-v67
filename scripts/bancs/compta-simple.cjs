@@ -311,12 +311,12 @@ async function scenarioC(b, vp, sombre) {
       // Comptabilité sous « Plus ». La règle jugée reste la même (le menu la porte,
       // Organisation n'y est pas).
       await pg.locator('.vrm-tabbar').getByRole('button', { name: 'Plus', exact: true }).click();
-      await pg.getByRole('menuitem', { name: /^Comptabilité/ }).first().waitFor({ timeout: 8000 });
-      check(await pg.getByRole('menuitem', { name: /^Comptabilité/ }).first().isVisible(), `C ${nom} — le menu Plus s'ouvre (Comptabilité y est)`);
+      await pg.getByRole('menuitem', { name: /^Compta/ }).first().waitFor({ timeout: 8000 });
+      check(await pg.getByRole('menuitem', { name: /^Compta/ }).first().isVisible(), `C ${nom} — le menu Plus s'ouvre (Comptabilité y est)`);
       check((await pg.getByRole('menuitem', { name: /^Organisation/ }).count()) === 0, `C ${nom} — « Organisation » n'est pas dans le menu Plus`);
       await pg.keyboard.press('Escape');
     } else {
-      check((await pg.locator('.vrm-sidebar').getByRole('button', { name: 'Comptabilité', exact: true }).count()) === 1, `C ${nom} — le rail porte Comptabilité`);
+      check((await pg.locator('.vrm-sidebar').getByRole('button', { name: 'Compta', exact: true }).count()) === 1, `C ${nom} — le rail porte Comptabilité`);
       check((await pg.locator('.vrm-sidebar').getByRole('button', { name: 'Organisation', exact: true }).count()) === 0, `C ${nom} — « Organisation » n'est plus dans le rail`);
     }
     await ouvrir(pg, 'settings');

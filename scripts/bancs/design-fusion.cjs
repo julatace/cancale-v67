@@ -145,7 +145,7 @@ const ouvrir = async (b, vp, sombre, tab) => {
     const filtres = [...u.matchAll(/[?&]data->>([a-zA-Z_]+)=(not\.)?is\.null/g)];
     const passe = (r) => filtres.every(([, k, non]) => (r.data[k] == null) === !non);
     const eq = /[?&]id=eq\.([^&]*)/.exec(u);
-    if (JEU === 'passu' && /orders_sold|_txn_|email_bord/.test(u)) return route.fulfill({ status: 503, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: '{"message":"indisponible"}' });
+    if (JEU === 'passu' && /orders_|_txn_|email_bord/.test(u)) return route.fulfill({ status: 503, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: '{"message":"indisponible"}' });
     if (eq) return j(LIGNES.filter((r) => r.id === eq[1] && passe(r)).map(forme));
     const lk = /[?&]id=like\.([^&]*)/.exec(u);
     if (lk) { const re = new RegExp('^' + lk[1].replace(/[.]/g, '\\.').replace(/[*%]/g, '.*') + '$'); return j(LIGNES.filter((r) => re.test(r.id) && passe(r)).map(forme)); }
@@ -169,6 +169,9 @@ const mesure = (pg) => pg.evaluate(() => {
     encaisse: /encaiss/i.test(document.querySelector('.vrm-main') ? document.querySelector('.vrm-main').innerText : ''),
     // (Dans une carte Colis Vinted, la rangée est devenue le bouton rond : sa puce n'y est plus — elle est jugée à part.)
     rangees: [...document.querySelectorAll('[data-rangee-bord]')].filter(vis).filter((r) => !r.closest('[data-bord-card]:not([data-vc-colis])')).map((r) => {
+      // (3 nov., critique #3.4) Transporteur pas lu : la puce n'est plus montrée (le bouton prend la
+      // rangée). La règle « puce à gauche, même ligne » vaut pour une puce QUI DIT un transporteur.
+      if (r.querySelector('.vrm-puce-transp[data-lu="0"]') && !vis(r.querySelector('.vrm-puce-transp[data-lu="0"]'))) return null;
       const puce = r.querySelector('.vrm-puce-transp'); const autre = [...r.children].find((c) => c !== puce && vis(c));
       const bt = autre ? (autre.matches('button,a') ? autre : autre.querySelector('button,a')) : null;
       if (!puce) return { ok: false, pourquoi: 'pas de puce' };
@@ -266,7 +269,7 @@ const ECRANS = [
             await t.scrollIntoViewIfNeeded(); await t.click();
             const id = await t.getAttribute('aria-controls');
             await pg.locator(`[id="${id}"]`).waitFor({ state: 'visible', timeout: 8000 }); await pg.waitForTimeout(500);
-            const rr = (await mesure(pg)).rangees.filter((r) => r.ok);
+            const rr = (await mesure(pg)).rangees.filter((r) => r && r.ok);
             const recap = await pg.evaluate((id) => { const d = document.getElementById(id); const r = d && d.querySelector('[data-rangee-bord]'); if (!r) return null; const p = r.querySelector('.vrm-puce-transp'), b = [...r.children].find((c) => c !== p); const bt = b && (b.matches('button') ? b : b.querySelector('button')); if (!p || !bt) return { ok: false }; const a = p.getBoundingClientRect(), c = bt.getBoundingClientRect(); return { ok: Math.abs(a.top - c.top) < 2 && Math.round(a.height) === 44 && Math.round(c.height) === 44 && a.right <= c.left + 1 }; }, id);
             dit(recap && recap.ok, 'récapitulatif : la puce à gauche du bouton, même rangée, 44 px', JSON.stringify(recap));
             if (SHOTS) await pg.locator(`[id="${id}"] [data-rangee-bord]`).first().screenshot({ path: path.join(SHOTS, `pastille-recap-${nom}.png`) }).catch(() => {});

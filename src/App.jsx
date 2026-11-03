@@ -131,9 +131,9 @@ import { beneficeLigneVente, texteBenefice, euros as eurosLigne } from "./benefi
 import { friseVente, phraseVente, eurosRecap, ETATS_HORS_PARCOURS } from "./recapVente.js";
 // (2 nov.) Le style « Fusion » : la carte sombre du mois et la frise de suivi (src/design/).
 import CarteMois from "./design/CarteMois.jsx";
-import { courtFusion, enArticles } from "./design/tacheCourte.js";
+import { courtFusion, enArticles, titreSansNombre } from "./design/tacheCourte.js";
 import Frise from "./design/Frise.jsx";
-import { friseVenteFusion, friseColisFusion } from "./design/friseFusion.js";
+import { friseVenteFusion, friseColisFusion, friseVenteLue, ETAPES_VENTE_FUSION } from "./design/friseFusion.js";
 import { etapesTournee, arretsTournee, gestesDepuis } from "./tournee.js";
 import "./styles-barre-haut.css";
 import "./styles-recherche.css";
@@ -14535,7 +14535,7 @@ const GROUPES_PLUS=[
   ]},
   { titre:'Argent', items:[
     {id:'dashboard', icon:'chart', label:'Statistiques'},
-    {id:'compta',    icon:'euro',  label:'Comptabilité'},
+    {id:'compta',    icon:'euro',  label:'Compta'},
   ]},
   { titre:'Plateformes', ordi:true, items:[
     {id:'ebay_agent',     cle:'plat_ebay',      icon:'grid', site:'ebay',      label:'eBay'},
@@ -18717,18 +18717,20 @@ function Pourquoi({ children, label = 'Pourquoi ?', ecrit = false }) {
 // trois cases sur Leboncoin et eBay. Une case LUE vide vaut 0 ; une case qu'on
 // ne SAIT pas vaut « — » (§5 : pas su n'est pas zéro) ; la ligne du dessous dit
 // comment la remplir.
+// (3 nov., critique #3) Les ventes Leboncoin, eBay et Vestiaire ont LA carte sombre de Ventes
+// (CarteMois), avec les MÊMES valeurs qu'avant (aucune règle neuve) : le montant (« CA finalisé »)
+// en grand, les comptes en cases ; « — » quand ce n'est pas lu. Les attributs que les bancs lisent
+// (`data-ventes-kpi`, `data-kpi`, `data-kpi-valeur`) restent sur chaque valeur.
 function KpiVentes({ tuiles, note, plateforme }) {
+  const grand = tuiles.find((t) => t.cle === 'ca') || tuiles[tuiles.length - 1];
+  const autres = tuiles.filter((t) => t !== grand);
+  const kv = (t) => ({ 'data-kpi': t.cle, 'data-kpi-valeur': t.val == null ? '' : String(t.brut != null ? t.brut : t.val) });
   return (
-    <div className="vrm-kpi-ventes" data-ventes-kpi={plateforme}>
-      <div className="vrm-kpi-ventes-grille">
-        {tuiles.map((t) => (
-          <div key={t.cle} className="vrm-kpi-ventes-case" data-kpi={t.cle} data-kpi-valeur={t.val == null ? '' : String(t.brut != null ? t.brut : t.val)}>
-            <div className="vrm-kpi-ventes-lib">{t.lib}</div>
-            <div className={'vrm-display vrm-kpi-ventes-val' + (t.val == null ? ' vrm-kpi-ventes-vide' : '')}>{t.val == null ? '—' : t.val}</div>
-            {t.sub ? <div className="vrm-kpi-ventes-sub">{t.sub}</div> : null}
-          </div>
-        ))}
-      </div>
+    <div className="vrm-kpi-ventes vrm-fu-ecran vrm-fu-ventes-site" data-ventes-kpi={plateforme}>
+      <CarteMois surtitre={grand ? grand.lib : ''} valeur={grand && grand.val != null ? <span {...kv(grand)}>{grand.val}</span> : null}
+        sous={grand && grand.sub ? grand.sub : null}
+        cases={autres.map((t) => ({ cle: t.cle, n: t.val == null ? null : t.val, l: t.sub ? `${t.lib.toLowerCase()} · ${t.sub}` : t.lib.toLowerCase(), attrs: kv(t) }))}/>
+      {grand && grand.val == null ? <span hidden {...kv(grand)}/> : null}
       {note ? <div className="vrm-kpi-ventes-note">{note}</div> : null}
     </div>
   );
@@ -19546,6 +19548,21 @@ function FiltresVentes({ value, onChange, search, onSearch, cancelled = false, d
 // la ligne prend la forme de la maquette : photo 60 px, le nom et le prix sur la première
 // ligne, la puce N° noire et le site, l'état ; les colonnes Achat · Bénéfice restent dans
 // la page (mêmes `data-*`) mais ne s'affichent plus sur la carte (le tiroir les porte).
+// (3 nov., critique #6) La frise du récapitulatif = celle de la ligne (Frise.jsx, 4 segments,
+// « Vendue · Postée · Livrée · Payée »), projetée par `friseVenteFusion` des étapes PROUVÉES de
+// `friseVente` (aucune règle neuve). Le bordereau n'est plus une 5ᵉ étape : une ligne de détail
+// (« Bordereau reçu le 2 nov. »), seulement s'il est prouvé. Les dates des étapes faites suivent.
+function RecapFrise({ etapes, cle = '' }) {
+  const f = friseVenteFusion(etapes);
+  if (!f) return null;
+  const jour = (t) => new Date(t).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
+  const bord = etapes.find((x) => x.cle === 'bordereau');
+  const dates = ETAPES_VENTE_FUSION.map(([c, l, src]) => { const x = etapes.find((y) => y.cle === src); return x && x.fait && x.t != null && src !== 'argent' ? `${l} le ${jour(x.t)}` : null; }).filter(Boolean);
+  return <div className="vrm-recap-frise" data-recap-frise="" data-recap-bordereau={bord ? (bord.fait ? '1' : '0') : undefined}>
+    <Frise etapes={f} cle={cle} className="vrm-fu-recap-frise" label="Où en est la vente"/>
+    {(bord && bord.fait) || dates.length ? <p className="vrm-recap-frise-detail">{[bord && bord.fait ? (bord.t != null ? `Bordereau reçu le ${jour(bord.t)}` : 'Bordereau reçu') : null, ...dates].filter(Boolean).join(' · ')}</p> : null}
+  </div>;
+}
 function LigneVenteCompacte({ photo, photoNoeud = null, titre, sous = '', etat, etatNoeud = null, ton = '', montant, children, numerosArticle = [], plateforme = '', initialOuvert = false, gestes = null, montantCentimes, benef, recap = null, frise = null, bas = null, fusion = null, ...props }) {
   const [ouvert, setOuvert] = React.useState(initialOuvert);
   const panneau = React.useId();
@@ -19633,6 +19650,12 @@ function LigneVenteCompacte({ photo, photoNoeud = null, titre, sous = '', etat, 
       {benef ? <span className="vrm-ledger-sale-benef" data-benef-ligne={benef.benefCentimes ?? ''} data-benef-etat={benef.etat} aria-label={benef.aria || undefined}>{benef.etat === 'partiel' ? <><span className="vrm-benef-borne">au plus </span>{benef.benefTxt}</> : benef.benefTxt}</span> : null}
       <span className="vrm-ledger-sale-plus" aria-hidden="true">{ouvert?'−':'⋯'}</span>
     </button>
+    {/* (3 nov., critique #5) Maquette FusionVentes : deux commandes au plus sur la carte (puce +
+        bordereau). Le reste (prix d'achat, relier un achat, « Déposé », « sur Vinted ») passe
+        derrière « … », le même motif que Colis — rien n'est retiré, un toucher l'ouvre. */}
+    {fusion && (gestes || bas) ? <button type="button" className="vrm-fu-plus vrm-fu-plus-vente" data-vente-plus="" data-fu-geste="" aria-label="Plus d'actions sur cette vente" aria-expanded="false"
+      onClick={(e)=>{ const c = e.currentTarget.closest('[data-fu-forme]'); if (!c) return; const on = !c.hasAttribute('data-plus-ouvert'); c.toggleAttribute('data-plus-ouvert', on); e.currentTarget.setAttribute('aria-expanded', on ? 'true' : 'false'); }}>
+      <Icon name="more" size={18}/></button> : null}
     {frise}
     {gestes ? <div className="vrm-ledger-gestes" data-gestes-ligne="">{gestes}</div> : null}
     {bas}
@@ -19651,8 +19674,8 @@ function LigneVenteCompacte({ photo, photoNoeud = null, titre, sous = '', etat, 
     </div>,document.body)}
   </div>;
 }
-function LigneVente({ photo, titre, meta, montant, actions, etat, etatNoeud = null, details, sous = '', ton = '', data = null, numerosArticle = [], plateforme = '', floute = false, gestes = null }) {
-  return <LigneVenteCompacte {...(data || {})} gestes={gestes} numerosArticle={numerosArticle} plateforme={plateforme} photo={photo} titre={titre} sous={sous} ton={ton} etat={etat} etatNoeud={etatNoeud} montant={montant} initialOuvert={!!details?.props.ouvrir} className="vrm-sale-row vrm-shared-sale" style={{padding:'12px 14px',borderBottom:`1px solid ${C.border}`,...(floute?STYLE_FLOU:null)}}>
+function LigneVente({ photo, titre, meta, montant, actions, etat, etatNoeud = null, details, sous = '', ton = '', data = null, numerosArticle = [], plateforme = '', floute = false, gestes = null, frise = null }) {
+  return <LigneVenteCompacte {...(data || {})} gestes={gestes} frise={frise} numerosArticle={numerosArticle} plateforme={plateforme} photo={photo} titre={titre} sous={sous} ton={ton} etat={etat} etatNoeud={etatNoeud} montant={montant} initialOuvert={!!details?.props.ouvrir} className="vrm-sale-row vrm-shared-sale" style={{padding:'12px 14px',borderBottom:`1px solid ${C.border}`,...(floute?STYLE_FLOU:null)}}>
     <div className="vrm-sale-overview" style={{display:'flex',gap:12,alignItems:'flex-start'}}>
       <div className="vrm-sale-photo"><PhotoArticleAgrandissable src={photo} titre={titre}><PhotoVente src={photo} size={64} portrait/></PhotoArticleAgrandissable></div>
       <div className="vrm-sale-info" style={{flex:1,minWidth:0}}>
@@ -19906,7 +19929,10 @@ function CarteLbc({ o, num = '', benef = null, floute = false }) {
   // 390 px — sur une vente que les totaux comptent finalisée. L'étape brute
   // reste dans le détail.
   const etatCourt = lbcAnnulee(o) ? 'Annulée' : lbcFinalisee(o) ? 'Finalisée' : ton === 'action' ? 'À envoyer' : lbcExpediee(o) ? 'En transit' : (o.stepLabel || o.stepStatus || '');
-  return <LigneVente numerosArticle={num?[num]:[]} plateforme="leboncoin" data={{ 'data-lbc-vente': String(o.txId), 'data-lbc-etat': etatCourt, 'data-flou': floute ? '1' : '0' }} floute={floute} photo={photoArticle(o)} titre={titre} sous={sous} ton={ton} montant={lbcEuro(o.price)} etat={etatCourt}
+  // (3 nov., critique #3) La frise de Vinted, sur ce que l'extension a LU de la transaction :
+  // « Postée » = expédiée, « Livrée » et « Payée » = finalisée (Leboncoin verse à la finalisation).
+  const friseLbc = lbcAnnulee(o) ? null : <Frise etapes={friseVenteLue({ vendue: true, postee: lbcExpediee(o) || lbcFinalisee(o), livree: lbcFinalisee(o), payee: lbcFinalisee(o) }, { geste: ton === 'action' })} cle={'lbc' + o.txId} className="vrm-fu-ligne-frise" label="Où en est la vente"/>;
+  return <LigneVente frise={friseLbc} numerosArticle={num?[num]:[]} plateforme="leboncoin" data={{ 'data-lbc-vente': String(o.txId), 'data-lbc-etat': etatCourt, 'data-flou': floute ? '1' : '0' }} floute={floute} photo={photoArticle(o)} titre={titre} sous={sous} ton={ton} montant={lbcEuro(o.price)} etat={etatCourt}
     meta={<>{o.stepLabel || o.stepStatus || ''}{o.deliveryLabel ? ` · ${o.deliveryLabel}` : ''}{benef != null ? <span data-lbc-benef={benef.toFixed(2)} style={{ color: benef >= 0 ? C.text : C.warn, fontWeight: 600 }}> · marge avant frais {fmt(benef)}</span> : null}</>}/>;
 }
 // L'étape d'un ACHAT Leboncoin, dans les mêmes mots et les mêmes couleurs que
@@ -26986,13 +27012,10 @@ function LigneVenteVc({ v, fait, enV, flou, i = 0 }) {
       </header>
       <section className="vrm-recap-etat" data-recap-etat={etat}>
         <p className="vrm-recap-phrase" data-recap-phrase=""><strong>{phrase.gras}</strong>{phrase.suite ? ' ' + phrase.suite : ''}</p>
-        {etapes ? <ol className="vrm-recap-frise" data-recap-frise="" aria-label="Où en est la vente">
-          {etapes.map((x) => <li key={x.cle} data-etape={x.cle} data-fait={x.fait ? '1' : '0'} data-preuve={x.preuve || ''} data-ici={x.ici ? '1' : undefined}>
-            <span className="vrm-recap-point" aria-hidden="true"/>
-            <span className="vrm-recap-etape">{x.cle === 'argent' ? 'Argent versé' : x.label}</span>
-            <span className="vrm-recap-quand">{x.fait ? (x.t != null && x.cle !== 'argent' ? new Date(x.t).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }) : 'fait') : 'à venir'}</span>
-          </li>)}
-        </ol> : null}
+        {/* (3 nov., critique #6) UNE frise : la même que la ligne (4 segments, mêmes mots, src/design/Frise.jsx),
+            projetée des MÊMES étapes prouvées (`friseVente`) ; le bordereau n'est plus une étape mais
+            une ligne de détail sous la frise, datée quand elle l'est. */}
+        {etapes ? <RecapFrise etapes={etapes} cle={String(v.id || v.tx || '')}/> : null}
       </section>
       <section className="vrm-recap-argent" aria-label="L'argent">
         <h3 className="vrm-recap-titre">L'argent</h3>
@@ -48918,9 +48941,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         // du bouton (lecteur d'écran) ; aucune règle, aucun compteur, aucune cible ne change.
         const decouper = (j) => {
           const f = courtFusion(j);
-          if (f) return { court: f.court, detail: f.detail, plein: [j.title, j.sub].filter(Boolean).join(' — ') };
+          const avecPastille = !(j.photos && j.photos.length) && Number(j.n) > 0;
+          const sansN = (t) => avecPastille ? titreSansNombre(t, j.n) : t;
+          if (f) return { court: sansN(f.court), detail: f.detail, plein: [j.title, j.sub].filter(Boolean).join(' — ') };
           const x = decouperBrut(j);
-          return { ...x, court: enArticles(x.court), detail: enArticles(x.detail) };
+          // Le titre d'origine reste entier dans l'infobulle quand le nombre en est retiré.
+          const court = sansN(enArticles(x.court));
+          return { ...x, court, detail: enArticles(x.detail), plein: x.plein || (court !== enArticles(x.court) ? enArticles(x.court) : '') };
         };
         const decouperBrut = (j) => {
           // (1er nov.) Une ligne qui porte SA forme courte (titre + raison courte) :
@@ -48944,7 +48971,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               </span>
             : (j.n != null && Number.isFinite(Number(j.n)) && Number(j.n) > 0)
               /* (2 nov., Fusion) La pastille chiffrée, NEUTRE (encre ; ambre pâle seulement si urgent). */
-              ? <span className={'vrm-fu-pastille' + (j.urgent ? ' is-urgent' : '') + (Number(j.n) > 99 ? ' is-long' : '')} aria-hidden="true" data-fu-pastille={String(j.n)}>{Number(j.n) > 999 ? '999+' : j.n}</span>
+              ? <span className={'vrm-fu-pastille' + (j.urgent ? ' is-urgent' : (Number(j.prio) >= 3 ? ' is-secondaire' : '')) + (Number(j.n) > 99 ? ' is-long' : '')} aria-hidden="true" data-fu-pastille={String(j.n)}>{Number(j.n) > 999 ? '999+' : j.n}</span>
               : <span className={'vrm-fu-pastille is-icone' + (j.urgent ? ' is-urgent' : '')} aria-hidden="true"><Icon name={j.icon} size={20}/></span>}
           <span className="vrm-day-task-textes">
             <UneLigne className="vrm-day-task-title" texte={x.court} lignesTel={2}/>
@@ -48969,9 +48996,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             <button type="button" className="vrm-day-task-ouvrir" aria-label={plein.replace(/\n/g, ' — ')} onClick={()=>{ if (j.avant) j.avant(); if (onNav) onNav(j.tab); }}>
               {corpsTache(j, x)}
             </button>
-            <Bouton variante="secondaire" icone="check" className="vrm-b-petit vrm-day-task-geste" data-urssaf-cest-declare={j.urssaf.aNoter[0]} onClick={()=>demanderDeclaration(j.urssaf.aNoter[0], onNav)}>
-              {j.urssaf.mois && j.urssaf.mois.length > 1 ? `Noter ma déclaration — ${(() => { const [y, m] = j.urssaf.aNoter[0].split('-'); return new Date(Number(y), Number(m) - 1, 1).toLocaleDateString('fr-FR', { month: 'long' }); })()}` : 'Noter ma déclaration'}
-            </Bouton>
+            {(() => { const lib = j.urssaf.mois && j.urssaf.mois.length > 1 ? `Noter ma déclaration — ${(() => { const [y, m] = j.urssaf.aNoter[0].split('-'); return new Date(Number(y), Number(m) - 1, 1).toLocaleDateString('fr-FR', { month: 'long' }); })()}` : 'Noter ma déclaration'; return (
+            <Bouton variante="secondaire" className="vrm-b-petit vrm-day-task-geste" title={lib} aria-label={lib} data-urssaf-cest-declare={j.urssaf.aNoter[0]} onClick={()=>demanderDeclaration(j.urssaf.aNoter[0], onNav)}>
+              {/* (3 nov., critique #11) Le même gabarit que les autres lignes : « Noter » en pilule à droite ; la phrase entière en infobulle. */}
+              Noter
+            </Bouton>); })()}
           </div>
         ); };
         const listeTaches = (liste, attr) => (
@@ -49345,7 +49374,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   <button key={x.id} type="button" className="vrm-day-task vrm-fu-tache" data-tuile={x.id} data-n={String(x.t.n)} data-case={x.id}
                     data-presses={x.id === 'envoyer' && x.t && x.t.presses ? String(x.t.presses.n) : undefined} data-limite-heure={x.id === 'envoyer' && x.t && x.t.presses ? x.t.presses.heure : undefined} data-a-verifier={x.id === 'retirer' && x.t && x.t.aVerifier ? String(x.t.aVerifier) : undefined}
                     title={titreCase(x)} onClick={()=>{ if (x.id === 'envoyer' && nPretsJournee > 0) _pendingBordPrint = true; if (onNav) onNav(x.tab); }}>
-                    <span className={'vrm-fu-pastille' + (presse ? ' is-urgent' : '')} aria-hidden="true">{x.t.n > 999 ? '999+' : x.t.n}</span>
+                    <span className={'vrm-fu-pastille' + (presse ? ' is-urgent' : x.id === 'prix' ? ' is-secondaire' : '')} aria-hidden="true">{x.t.n > 999 ? '999+' : x.t.n}</span>
                     <span className="vrm-day-task-textes"><span className="vrm-day-task-title">{libCase[x.id] || x.l}</span>{so ? <span className="vrm-day-task-note" data-sous-ligne={so.cle}>{so.texte}</span> : (x.id === 'envoyer' && nPretsJournee > 0) ? <span className="vrm-day-task-note">{nPretsJournee} prêt{nPretsJournee > 1 ? 's' : ''} à imprimer</span> : null}</span>
                     <span className="vrm-day-task-action"><span className="vrm-day-task-action-mot">{gesteCaseF[x.id] || 'Voir'}</span></span>
                   </button>
@@ -49714,13 +49743,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   <p className="vrm-recap-phrase" data-recap-phrase=""><strong>{phrase.gras}</strong>{phrase.suite ? ' ' + phrase.suite : ''}</p>
                   {issue ? <p className="vrm-recap-issue" data-retour-archive={issue.k}>{issue.t}</p> : null}
                   {o._fromEmail ? <p className="vrm-recap-issue">Reconstituée depuis l'email — pas encore confirmée par Vinted.</p> : null}
-                  {etapes ? <ol className="vrm-recap-frise" data-recap-frise="" aria-label="Où en est la vente">
-                    {etapes.map((x) => <li key={x.cle} data-etape={x.cle} data-fait={x.fait ? '1' : '0'} data-preuve={x.preuve || ''} data-ici={x.ici ? '1' : undefined}>
-                      <span className="vrm-recap-point" aria-hidden="true"/>
-                      <span className="vrm-recap-etape">{x.label}</span>
-                      <span className="vrm-recap-quand">{x.fait ? (x.t != null && x.cle !== 'argent' ? jourCourt(x.t) : 'fait') : 'à venir'}</span>
-                    </li>)}
-                  </ol> : null}
+                  {/* (3 nov., critique #6) La frise de la ligne, mêmes 4 étapes et mêmes mots ; « Bordereau » en détail. */}
+                  {etapes ? <RecapFrise etapes={etapes} cle={txL}/> : null}
                 </section>
                 <section className="vrm-recap-argent" aria-label="L'argent">
                   <h3 className="vrm-recap-titre">L'argent</h3>
@@ -53562,7 +53586,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 // (2 nov., 22 h, maquette FusionColis) LES COLIS RANGÉS PAR TRANSPORTEUR : un en-tête
                 // (la tuile du logo, son nom, « N colis »), les colis dessous dans l'ordre d'avant
                 // (le plus pressé d'abord) ; les transporteurs dans l'ordre de leur premier colis.
-                const trNomDe = (x) => { const t = transporteurVente(x.b); return (t && t.nom) || 'Transporteur pas lu'; };
+                const trNomDe = (x) => { const t = transporteurVente(x.b); return (t && t.nom) || 'Autres'; };  // (3 nov., critique #15) « Autres », pas le jargon « Transporteur pas lu »
                 const ordreT = new Map(); ex.forEach((x) => { const k = trNomDe(x); if (!ordreT.has(k)) ordreT.set(k, ordreT.size); });
                 const exT = [...ex].sort((a, b) => ordreT.get(trNomDe(a)) - ordreT.get(trNomDe(b)));
                 const nParT = {}; ex.forEach((x) => { const k = trNomDe(x); nParT[k] = (nParT[k] || 0) + 1; });
@@ -53615,7 +53639,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   <React.Fragment key={e.key}>
                   {ouvreT && (
                     <div data-groupe-transp={trNomDe(e)} className="vrm-fu-groupe-transp" style={{gridColumn:'1 / -1'}}>
-                      <span className="vrm-fu-groupe-tuile" aria-hidden="true">{trG && trG.cle ? <LogoTransporteur cle={trG.cle} taille={22}/> : null}</span>
+                      <span className="vrm-fu-groupe-tuile" aria-hidden="true">{trG && trG.cle ? <LogoTransporteur cle={trG.cle} taille={22}/> : <Icon name="box" size={16}/>}</span>
                       <h3>{trNomDe(e)}</h3>
                       <span>{nParT[trNomDe(e)]} colis</span>
                     </div>
@@ -59067,7 +59091,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
     { id:'impression', titre:'Impression', items:[
       { id:'imprimante', type:'panneau', nu:true, ic:'printer', lib:'Imprimante et bordereaux', desc:'Papier et aperçus', val: imprimanteChoisie() === 'thermique' ? 'Thermique · 10×15' : 'Normale · A4', el:<ImprimanteSetting nu/> },
     ], pied: <>Le N° se pose dans un espace blanc du PDF, jamais au hasard. <Pourquoi label="Comment le N° est placé">VRM cherche sur chaque page une zone blanche avec une marge autour du numéro ; le document garde sa taille. Sans espace suffisant, le tamponnage est refusé plutôt que placé au hasard. Vérifie dans « Imprimante et bordereaux » → « Voir les aperçus ».</Pourquoi></> },
-    { id:'compta', titre:'Comptabilité', items:[
+    { id:'compta', titre:'Compta', items:[
       // (1er nov.) À droite, le statut CHOISI (lu dans `vinted_regime`, jamais deviné) :
       // « À choisir » tant qu'il ne l'a pas posé — avant, il fallait ouvrir pour savoir.
       { id:'regime', type:'panneau', nu:true, ic:'receipt', lib:'Régime fiscal', desc:'Statut et taux des rapports', val:valRegime, data:{ 'data-reglage-regime': regimeFiscal() || 'aucun' }, el:<RegimeSetting nu/> },
