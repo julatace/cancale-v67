@@ -22,7 +22,7 @@ export default function DiagnosticFavoris({uid, owner, ownerActuel, base, header
     try { await navigator.clipboard.writeText(JSON.stringify(rapport,null,2)); if (requete.current === numero) setEtat(x=>({...x,retour:'Diagnostic copié.'})); }
     catch { if (requete.current === numero) setEtat(x=>({...x,retour:'Copie indisponible : sélectionne le texte ci-dessous.'})); }
   };
-  return <details className="vrm-favoris-diagnostic"><summary>Assistance technique · favoris</summary>
+  return <details className="vrm-favoris-diagnostic"><summary>Dépannage · favoris</summary>
     <p role="status">{bilan}</p>
     {copierControle&&<button type="button" onClick={copierControle}>Copier le contrôle</button>}
     <p>Le rapport ci-dessous réunit la dernière vérification sur Vinted et la structure des données captées. Après « Vérifier un favori », copie ce rapport pour transmettre aussi le résultat de l’ouverture.</p>
