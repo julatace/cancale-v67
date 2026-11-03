@@ -112,11 +112,11 @@ export function prixEbayAgent(prixVinted, regles, achat) {
 // [singulier, pluriel] : « 1 déjà vendue ailleurs », « 2 déjà vendues ailleurs ».
 export const RAISONS_AGENT = {
   'pas-en-ligne': ['plus en vente sur Vinted', 'plus en vente sur Vinted'],
-  'numero-double': ['dont le N° est porté par deux paires — à régler dans Colis ou Annonces', 'dont le N° est porté par deux paires — à régler dans Colis ou Annonces'],
+  'numero-double': ['dont le N° est porté par deux articles — à régler dans Colis ou Annonces', 'dont le N° est porté par deux articles — à régler dans Colis ou Annonces'],
   vendue: ['déjà vendue ailleurs', 'déjà vendues ailleurs'],
   'deja-ebay': ['déjà en vente ou programmée sur eBay', 'déjà en vente ou programmées sur eBay'],
   brouillon: ['déjà en brouillon eBay, à programmer ou publier depuis Annonces', 'déjà en brouillon eBay, à programmer ou publier depuis Annonces'],
-  jumelle: ['à la même photo qu’une autre paire (une paire, une annonce)', 'à la même photo qu’une autre paire (une paire, une annonce)'],
+  jumelle: ['à la même photo qu’un autre article (un article, une annonce)', 'à la même photo qu’un autre article (un article, une annonce)'],
   incertain: ['à la publication incertaine, en attente d’une relecture chez eBay', 'à la publication incertaine, en attente d’une relecture chez eBay'],
   jamais: ['mise dans « jamais sur eBay »', 'mises dans « jamais sur eBay »'],
   'hors-regles': ['hors de tes règles', 'hors de tes règles'],
@@ -265,9 +265,9 @@ export function phraseResumeAgent(n0, pretes0) {
   const n = Math.round(Number(n0)), s = (k) => (k > 1 ? 's' : '');
   if (!(n > 0)) return '';
   const p = Number.isFinite(Number(pretes0)) && pretes0 !== null && pretes0 !== undefined && pretes0 !== '' ? Math.round(Number(pretes0)) : null;
-  if (p != null && p >= n) return `${n} paire${s(n)} prête${s(n)} pour eBay — je ${n > 1 ? 'les' : 'la'} publie ?`;
-  if (p != null && p > 0) return `${n} paire${s(n)} proposée${s(n)} pour eBay · ${p} prête${s(p)} à publier`;
-  return `${n} paire${s(n)} à regarder pour eBay`;
+  if (p != null && p >= n) return `${n} article${s(n)} prêt${s(n)} pour eBay — je ${n > 1 ? 'les' : 'le'} publie ?`;
+  if (p != null && p > 0) return `${n} article${s(n)} proposé${s(n)} pour eBay · ${p} prêt${s(p)} à publier`;
+  return `${n} article${s(n)} à regarder pour eBay`;
 }
 // La ligne de Ma journée : seulement un résumé frais, non nul, et pas mis de côté aujourd'hui.
 // L'agent est-il ARRÊTÉ par Julien ? — une règle pour Ma journée et le serveur
@@ -327,7 +327,7 @@ export function comprendrePhrase(texte, opts = {}) {
   if (neg) return { regles: {}, compris: [], pasCompris: [], vide: true, negation: neg[1] };
   const ote = (m) => { if (m) t = t.replace(m[0], ' '); };
   let m;
-  if ((m = /\bseulement (?:celles |ceux |les paires )?cochees?\b|\bcochees? (?:pour )?ebay\b/.exec(t))) { regles.seulementCochees = true; compris.push('seulement les paires cochées « eBay »'); ote(m); }
+  if ((m = /\bseulement (?:celles |ceux |les paires )?cochees?\b|\bcochees? (?:pour )?ebay\b/.exec(t))) { regles.seulementCochees = true; compris.push('seulement les articles cochés « eBay »'); ote(m); }
   if ((m = /\bqui dorment\b/.exec(t))) { regles.joursMin = 30; compris.push('en ligne sur Vinted depuis au moins 30 jours'); ote(m); }
   if ((m = new RegExp(`(?:en ligne )?depuis (?:plus de |au moins )?(\\d{1,3})\\s*(?:jours?|j)\\b|(?:plus de|au moins) (\\d{1,3})\\s*(?:jours?|j)\\b`).exec(t))) {
     const n = Number(m[1] || m[2]); if (n >= 1 && n <= 365) { regles.joursMin = n; compris.push(`en ligne sur Vinted depuis au moins ${n} jour${n > 1 ? 's' : ''}`); } ote(m);
@@ -422,7 +422,7 @@ export function texteRegles(regles, opts = {}) {
   if (r.seulementCochees) quoi.push('seulement celles cochées « eBay »');
   const noms = Array.isArray(opts.comptes) ? opts.comptes : [];
   if (r.comptesVinted.length) quoi.push(`compte${r.comptesVinted.length > 1 ? 's' : ''} ${r.comptesVinted.map((u) => (noms.find((c) => String(c.uid) === u) || {}).login || u).join(', ')}`);
-  l.push(quoi.length ? `Paires : ${quoi.join(' · ')}` : 'Paires : toutes tes paires en ligne sur Vinted');
+  l.push(quoi.length ? `Articles : ${quoi.join(' · ')}` : 'Articles : tous tes articles en ligne sur Vinted');
   const v = String(r.prixValeur).replace('.', ',');
   l.push(r.prixMode === 'pct' ? `Prix sur eBay : celui de Vinted ${r.prixValeur >= 0 ? '+' : '−'} ${v.replace('-', '')} % — jamais sous ton prix d’achat`
     : r.prixMode === 'eur' ? `Prix sur eBay : celui de Vinted ${r.prixValeur >= 0 ? '+' : '−'} ${v.replace('-', '')} € — jamais sous ton prix d’achat`

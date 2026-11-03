@@ -159,7 +159,7 @@ async function verifier(fichier, fichierRappel) {
   await essaie('numero-double', async () => {
     const p = A.propositionAgent(base({ paires: [paire(30, { id: 'a30', prix: 50 }), paire(30, { id: 'b30', prix: 90 }), paire(2)] }));
     dit(nums(p) === '2' && p.ecartees['numero-double'] === 2, 'deux paires en ligne sous le même N° : aucune n’est proposée, les deux sont comptées', nums(p) + ' ' + JSON.stringify(p.ecartees));
-    dit(/2 dont le N° est porté par deux paires/.test(A.phraseEcartees(p.ecartees)), 'et c’est dit', A.phraseEcartees(p.ecartees));
+    dit(/2 dont le N° est porté par deux articles/.test(A.phraseEcartees(p.ecartees)), 'et c’est dit', A.phraseEcartees(p.ecartees));
     const q = A.propositionAgent({ ...base({ paires: [paire(30, { id: 'a30' }), paire(2)] }), doubles: new Map([['30', 2]]) });
     dit(nums(q) === '2' && q.ecartees['numero-double'] === 2, 'la liste n’en garde qu’une (l’autre fiche n’y est pas) : la N°30 n’est pas proposée, et les DEUX paires sont comptées', nums(q) + ' ' + JSON.stringify(q.ecartees));
   });
@@ -195,13 +195,13 @@ async function verifier(fichier, fichierRappel) {
     dit(r && r.n === 3 && r.at === maintenant, 'le résumé publié porte le nombre proposé et l’heure', JSON.stringify(r));
     dit(A.resumeAgent(A.propositionAgent(base({ dejaSurEbay: null })), maintenant) === null, '« pas su » ne publie aucun résumé');
     const l = A.ligneJourneeAgent({ n: 2, at: maintenant - 3600000 }, '2026-10-29', maintenant);
-    dit(l && /2 paires à regarder pour eBay/.test(l.text) && !/prête/.test(l.text), 'Ma journée, sans préparation : « 2 paires à regarder pour eBay » (jamais « prêtes »)', l && l.text);
+    dit(l && /2 articles à regarder pour eBay/.test(l.text) && !/prête/.test(l.text), 'Ma journée, sans préparation : « 2 articles à regarder pour eBay » (jamais « prêtes »)', l && l.text);
     const l2 = A.ligneJourneeAgent({ n: 3, pretes: 1, at: maintenant }, '2026-10-29', maintenant);
-    dit(l2 && /3 paires proposées pour eBay · 1 prête à publier/.test(l2.text), 'Ma journée, préparées : « 3 paires proposées · 1 prête à publier »', l2 && l2.text);
+    dit(l2 && /3 articles proposés pour eBay · 1 prêt à publier/.test(l2.text), 'Ma journée, préparées : « 3 paires proposées · 1 prête à publier »', l2 && l2.text);
     const l3 = A.ligneJourneeAgent({ n: 2, pretes: 2, at: maintenant }, '2026-10-29', maintenant);
-    dit(l3 && /2 paires prêtes pour eBay — je les publie \?/.test(l3.text), 'Ma journée, toutes préparées et prêtes : « 2 paires prêtes pour eBay — je les publie ? »', l3 && l3.text);
+    dit(l3 && /2 articles prêts pour eBay — je les publie \?/.test(l3.text), 'Ma journée, toutes préparées et prêtes : « 2 articles prêts pour eBay — je les publie ? »', l3 && l3.text);
     const l4 = A.ligneJourneeAgent({ n: 3, pretes: 0, at: maintenant }, '2026-10-29', maintenant);
-    dit(l4 && /3 paires à regarder/.test(l4.text), 'préparées mais aucune prête ⇒ « à regarder »', l4 && l4.text);
+    dit(l4 && /3 articles à regarder/.test(l4.text), 'préparées mais aucune prête ⇒ « à regarder »', l4 && l4.text);
     const r4 = A.resumeAgent(p, maintenant, null, 2);
     dit(r4 && r4.n === 3 && r4.pretes === 2, 'le résumé porte les prêtes quand l’écran a préparé', JSON.stringify(r4));
     dit(!('pretes' in (A.resumeAgent(p, maintenant) || {})), 'sans préparation, le résumé ne porte AUCUN nombre de prêtes');
@@ -240,9 +240,9 @@ async function verifier(fichier, fichierRappel) {
   await essaie('rappel', async () => {
     const t = '2026-10-29';
     const ok = N.notificationAgentEbay({ resume: { n: 4, at: maintenant - 3600000 }, memo: null, today: t, maintenant });
-    dit(ok.envoyer && /4 paires à regarder pour eBay/.test(ok.titre) && !/prête/.test(ok.titre) && ok.url === '/?tab=ebay_agent', 'notification sans préparation : « 🛒 4 paires à regarder pour eBay » (jamais « prêtes »)', ok.titre);
+    dit(ok.envoyer && /4 articles à regarder pour eBay/.test(ok.titre) && !/prête/.test(ok.titre) && ok.url === '/?tab=ebay_agent', 'notification sans préparation : « 🛒 4 articles à regarder pour eBay » (jamais « prêtes »)', ok.titre);
     const ok2 = N.notificationAgentEbay({ resume: { n: 4, pretes: 4, at: maintenant - 3600000 }, memo: null, today: t, maintenant });
-    dit(ok2.envoyer && /4 paires prêtes pour eBay — je les publie \?/.test(ok2.titre), 'notification après préparation : « 🛒 4 paires prêtes pour eBay — je les publie ? »', ok2.titre);
+    dit(ok2.envoyer && /4 articles prêts pour eBay — je les publie \?/.test(ok2.titre), 'notification après préparation : « 🛒 4 articles prêts pour eBay — je les publie ? »', ok2.titre);
     dit(/À traiter/.test(ok.corps || ''), 'la notification dit où aller : eBay → À traiter', ok.corps);
     dit(!N.notificationAgentEbay({ resume: { n: 4, at: maintenant - 49 * 3600000 }, memo: null, today: t, maintenant }).envoyer, 'résumé de plus de 48 h ⇒ rien');
     dit(!N.notificationAgentEbay({ resume: undefined, memo: null, today: t, maintenant }).envoyer, 'résumé illisible ⇒ rien');

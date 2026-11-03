@@ -166,7 +166,7 @@ srv.listen(PORT);
       p = await sonde('project', 'g1', { cell: '2_3' });
       const d0 = (await etat()).dist;
       await pg.mouse.dblclick(p.x, p.y); await pg.waitForTimeout(2500);
-      dit(!(await dialogue(/N° de la boîte \(laisse vide/)) && !(await dialogue(/Ranger une paire/)), 'un double-clic n’ouvre pas la case');
+      dit(!(await dialogue(/N° de la boîte \(laisse vide/)) && !(await dialogue(/Ranger un article/)), 'un double-clic n’ouvre pas la case');
       const d1 = (await etat()).dist;
       dit(d1 < d0 * 0.6 && d1 > 1, 'il se met EN FACE de la case (la caméra s’approche)', `${d0.toFixed(1)} → ${d1.toFixed(1)} m`);
       await fermer();

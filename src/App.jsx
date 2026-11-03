@@ -13615,7 +13615,7 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
               const titre = mode === 'fini' ? (arret ? 'Arrêté' : (nPasFaites || nDouble) ? 'Fini' : 'Terminé') : mode === 'pause' ? (arret ? 'Arrêté' : 'En pause') : enCours ? `Paire ${aFaire.indexOf(enCours) + 1} sur ${total}` : `Paire ${prochN} sur ${total}`;
               const r = mode === 'run' && prochaine ? Math.max(0, Math.round((prochaine.at - Date.now()) / 1000)) : null;
               const phrase = mode === 'run'
-                ? (enCours ? <><b data-republier-en-cours={enCours.id} style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{enCours.numero ? `N°${enCours.numero} · ` : ''}{enCours.titre || 'sans titre'}</b>{suivante && tSuiv != null ? <span data-republier-suivante={tSuiv} style={{ display: 'block', color: C.muted, fontSize: 13 }}>{tSuiv > 0 ? `Puis la suivante, ${duree(tSuiv)} après celle-ci.` : 'Puis la suivante, tout de suite après.'}</span> : null}</> : r != null ? <span data-republier-prochaine={prochaine.s}>Prochaine paire dans {r >= 60 ? `${Math.floor(r / 60)} min ${String(r % 60).padStart(2, '0')} s` : `${r} s`}</span> : 'Préparation de la suite…')
+                ? (enCours ? <><b data-republier-en-cours={enCours.id} style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{enCours.numero ? `N°${enCours.numero} · ` : ''}{enCours.titre || 'sans titre'}</b>{suivante && tSuiv != null ? <span data-republier-suivante={tSuiv} style={{ display: 'block', color: C.muted, fontSize: 13 }}>{tSuiv > 0 ? `Puis la suivante, ${duree(tSuiv)} après celle-ci.` : 'Puis la suivante, tout de suite après.'}</span> : null}</> : r != null ? <span data-republier-prochaine={prochaine.s}>Prochain article dans {r >= 60 ? `${Math.floor(r / 60)} min ${String(r % 60).padStart(2, '0')} s` : `${r} s`}</span> : 'Préparation de la suite…')
                 : arret ? <span data-republier-arret>{String(arret).replace(/[.\s]+$/, '')}. Rien d'autre n'est parti.</span>
                 : mode === 'pause' ? 'Rien ne part tant que tu ne reprends pas.'
                 : (!(nPasFaites || nDouble) ? 'Tout est fait.' : null);
@@ -13659,7 +13659,7 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
         <div style={{ overflowY: 'auto', padding: '12px 16px 16px', display: 'flex', flexDirection: 'column', gap: 12, flex: 1, minHeight: 0 }}>
           {etape === 'choix' && <>
             <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-              <input value={q} onChange={(ev) => setQ(ev.target.value)} placeholder="Chercher un titre, un N°" aria-label="Chercher une paire" style={{ ...champ, flex: 1, minWidth: 0 }} />
+              <input value={q} onChange={(ev) => setQ(ev.target.value)} placeholder="Chercher un titre, un N°" aria-label="Chercher un article" style={{ ...champ, flex: 1, minWidth: 0 }} />
               {/* (30 oct.) « Tout » et « Aucune » faisaient deux boutons pour un geste : un seul, qui bascule. */}
               {(() => { const dispo = liste.filter((a) => !a.bloque); const tous = dispo.length > 0 && dispo.every((a) => sel.has(a.id));
                 return tous
@@ -13673,16 +13673,16 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
             </select>}
             <div data-republier-compte={compteUid || (compteVinted === null ? 'aucun' : 'passu')} style={{ fontSize: 13, color: compteUid ? C.muted : C.warn, lineHeight: 1.45 }}>
               {compteUid
-                ? <>Compte <b style={{ color: C.text }}>{nomCompte}</b> (ouvert dans Chrome){horsCompte > 0 ? <> · {horsCompte} {action === 'enLigne' ? 'autre' + (horsCompte > 1 ? 's' : '') : 'paire' + (horsCompte > 1 ? 's' : '')} sur tes autres comptes <Pourquoi label="Et mes autres comptes ?">Ouvre vinted.fr sur l'un d'eux dans Chrome pour {horsCompte > 1 ? 'les' : 'la'} voir ici : seul le compte ouvert dans Chrome peut être republié.</Pourquoi></> : null}</>
+                ? <>Compte <b style={{ color: C.text }}>{nomCompte}</b> (ouvert dans Chrome){horsCompte > 0 ? <> · {horsCompte} {action === 'enLigne' ? 'autre' + (horsCompte > 1 ? 's' : '') : 'article' + (horsCompte > 1 ? 's' : '')} sur tes autres comptes <Pourquoi label="Et mes autres comptes ?">Ouvre vinted.fr sur l'un d'eux dans Chrome pour {horsCompte > 1 ? 'les' : 'la'} voir ici : seul le compte ouvert dans Chrome peut être republié.</Pourquoi></> : null}</>
                 : compteVinted === null
                   ? "Aucun compte Vinted ouvert dans Chrome : ouvre vinted.fr sur le bon compte, puis rouvre."
                   : <>Compte ouvert dans Chrome pas encore connu : ouvre vinted.fr sur le bon compte, puis rouvre. <Pourquoi label="Pourquoi ?">L'extension VRM n'a pas encore été interrogée, ou elle ne répond pas.</Pourquoi></>}
             </div>
-            <div style={{ fontSize: 13, color: C.muted }}>{action === 'enLigne' ? `${s2(annonces.length, 'brouillon')} sur Vinted` : `${s2(annonces.length, 'paire')} en ligne sur Vinted`} · <b style={{ color: C.text }}>{sel.size} choisi{action === 'enLigne' ? '' : 'e'}{sel.size > 1 ? 's' : ''}</b></div>
+            <div style={{ fontSize: 13, color: C.muted }}>{action === 'enLigne' ? `${s2(annonces.length, 'brouillon')} sur Vinted` : `${s2(annonces.length, 'article')} en ligne sur Vinted`} · <b style={{ color: C.text }}>{sel.size} choisi{action === 'enLigne' ? '' : 'e'}{sel.size > 1 ? 's' : ''}</b></div>
             {action === 'modifier' && <div style={{ fontSize: 13, color: C.muted }}>Modifiées sur place : même annonce, favoris et vues gardés.</div>}
             {action === 'versBrouillon' && <div style={{ fontSize: 13, color: C.muted }}>Chaque annonce repasse en brouillon : favoris et vues ne suivent pas. <Pourquoi label="Comment ça marche">Chaque annonce est d'abord enregistrée dans VRM (photos, description, recette), puis retirée de la vente, puis recréée en brouillon sur Vinted. Si Vinted refuse de la retirer, rien d'autre n'est fait.</Pourquoi></div>}
             <div style={{ display: 'flex', flexDirection: 'column', border: `1px solid ${C.border}`, borderRadius: 12, overflow: 'hidden' }}>
-              {liste.length === 0 && <div style={{ padding: 14, fontSize: 13, color: C.muted }}>{annonces.length ? 'Aucune ne correspond.' : !compteUid ? 'Le compte ouvert dans Chrome n’est pas encore connu.' : action === 'enLigne' ? "Aucun brouillon sur ce compte d'après tes dressings lus par VRM." : "Aucune paire en ligne sur ce compte n'a été lue pour l'instant."}</div>}
+              {liste.length === 0 && <div style={{ padding: 14, fontSize: 13, color: C.muted }}>{annonces.length ? 'Aucune ne correspond.' : !compteUid ? 'Le compte ouvert dans Chrome n’est pas encore connu.' : action === 'enLigne' ? "Aucun brouillon sur ce compte d'après tes dressings lus par VRM." : "Aucun article en ligne sur ce compte n'a été lu pour l'instant."}</div>}
               {liste.map((a) => (
                 <label key={a.id} data-republier-paire={a.id} data-republier-bloque={a.bloque ? 'oui' : undefined} data-republier-place={a.place || undefined} data-republier-compte-paire={action === 'enLigne' ? (a.uid || '') : undefined} style={{ display: 'flex', gap: 10, alignItems: 'center', padding: '8px 10px', minHeight: 56, borderBottom: `1px solid ${C.border}`, cursor: a.bloque ? 'default' : 'pointer', background: sel.has(a.id) ? 'var(--vrm-b-teinte)' : 'transparent', opacity: a.bloque ? 0.6 : 1 }}>
                   <input type="checkbox" disabled={!!a.bloque} checked={sel.has(a.id) && !a.bloque} onChange={() => toggle(a.id)} style={{ width: 20, height: 20, accentColor: C.accent, flexShrink: 0 }} />
@@ -13748,7 +13748,7 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
               <div style={{ fontSize: 13, color: pageOk ? C.text : C.muted, lineHeight: 1.45 }}>{brouillonOk
                 ? (viaBrouillon
                   ? (pageOk
-                    ? <>Brouillon d'abord, puis en ligne 1 à 3 min après. Garde un onglet vinted.fr ouvert. <Pourquoi label="Comment ça marche">Comme Vintex : tout passe par l’onglet vinted.fr ouvert dans ce Chrome, connecté sur le bon compte. Chaque annonce est enregistrée dans VRM, rangée en brouillon sur Vinted, PUIS l’ancienne est supprimée, et le brouillon est mis en ligne 1 à 3 min plus tard.{extSait('republierfile') === 'ok' ? ' Pendant cette attente la paire suivante est déjà préparée (l’extension met chaque brouillon en ligne à son heure, même si tu fermes cette fenêtre).' : ''} Aucun essai en rafale : un refus s’arrête et le dit. Au plus 10 paires par jour et par compte. Si Vinted ne répond pas clairement, VRM s’arrête (jamais deux fois en ligne) ; rien n’est perdu, tout est enregistré dans VRM.</Pourquoi></>
+                    ? <>Brouillon d'abord, puis en ligne 1 à 3 min après. Garde un onglet vinted.fr ouvert. <Pourquoi label="Comment ça marche">Comme Vintex : tout passe par l’onglet vinted.fr ouvert dans ce Chrome, connecté sur le bon compte. Chaque annonce est enregistrée dans VRM, rangée en brouillon sur Vinted, PUIS l’ancienne est supprimée, et le brouillon est mis en ligne 1 à 3 min plus tard.{extSait('republierfile') === 'ok' ? ' Pendant cette attente l’article suivant est déjà préparé (l’extension met chaque brouillon en ligne à son heure, même si tu fermes cette fenêtre).' : ''} Aucun essai en rafale : un refus s’arrête et le dit. Au plus 10 paires par jour et par compte. Si Vinted ne répond pas clairement, VRM s’arrête (jamais deux fois en ligne) ; rien n’est perdu, tout est enregistré dans VRM.</Pourquoi></>
                     : <>Mets l’extension VRM à jour en {EXT_CAPACITES.republierpage} : elle passera par l’onglet vinted.fr. <Pourquoi label="Pourquoi ?">L’extension installée ici fait encore l’ancienne republication, depuis son fond, avec des renvois automatiques.</Pourquoi></>)
                   : 'L’annonce est créée directement en ligne.')
                 : `Demande l'extension VRM ${EXT_CAPACITES.republierbrouillon} ou plus récente dans ce navigateur.`}</div>
@@ -13808,22 +13808,22 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
           {etape === 'envoi' && <>
             {/* (28 oct.) Après un passage, les anciennes annonces sont supprimées de Vinted :
                 elles sortent de la liste et la phrase disait « 0 annonce à supprimer ». */}
-            {!aFaire.length && <div data-republier-vide style={{ fontSize: 13, color: C.text, lineHeight: 1.5 }}>{mode === 'idle' ? "Aucune des annonces choisies n'est encore en ligne (déjà republiées ou retirées) : reviens à « Choisir »." : 'Aucune paire dans cette file.'}</div>}
+            {!aFaire.length && <div data-republier-vide style={{ fontSize: 13, color: C.text, lineHeight: 1.5 }}>{mode === 'idle' ? "Aucune des annonces choisies n'est encore en ligne (déjà republiées ou retirées) : reviens à « Choisir »." : 'Aucun article dans cette file.'}</div>}
             {/* (30 oct.) Avant de lancer : UNE phrase par fait, le détail derrière ⓘ. */}
             {action === 'recreer' && !!aFaire.length && mode === 'idle' && <div data-republier-explique style={{ fontSize: 13, color: C.text, lineHeight: 1.5 }}><b>{s2(aFaire.length, 'annonce')}</b> à recréer sur Vinted, une par une. Le N° VRM passe sur la nouvelle. <Pourquoi label="Comment ça marche">Pour chacune : ses photos sont renvoyées{regNeutre ? '' : ' avec tes réglages'}, {viaBrouillon && brouillonOk ? "l'annonce est enregistrée dans VRM, retirée de Vinted, recréée en brouillon, puis mise en ligne. Si la mise en ligne échoue, le brouillon reste dans tes brouillons Vinted et rien n'est perdu." : 'la nouvelle annonce est créée, et seulement si elle est bien en ligne l’ancienne est supprimée.'}</Pourquoi></div>}
             {action === 'modifier' && !!aFaire.length && mode === 'idle' && <div data-republier-explique style={{ fontSize: 13, color: C.text, lineHeight: 1.5 }}><b>{s2(aFaire.length, 'annonce')}</b> à modifier sur place, une par une : même annonce, favoris et vues gardés.</div>}
             {action === 'versBrouillon' && !!aFaire.length && mode === 'idle' && <div data-republier-explique style={{ fontSize: 13, color: C.text, lineHeight: 1.5 }}><b>{s2(aFaire.length, 'annonce')}</b> à repasser en brouillon, une par une. <Pourquoi label="Comment ça marche">Pour chacune : elle est enregistrée dans VRM, ses photos sont renvoyées{regNeutre ? '' : ' avec tes réglages'}, l'annonce en ligne est retirée, puis le brouillon est créé sur Vinted. Un brouillon n'est jamais en ligne : rien ne peut se vendre deux fois. Tu la remettras en ligne depuis « Actions → Brouillons → en ligne ».</Pourquoi></div>}
             {action === 'enLigne' && !!aFaire.length && mode === 'idle' && <div data-republier-explique style={{ fontSize: 13, color: C.text, lineHeight: 1.5 }}><b>{s2(aFaire.length, 'brouillon')}</b> à mettre en ligne, un par un, tels que tu les as enregistrés.</div>}
             {recree && (() => { const fav = aFaire.reduce((n, a) => n + (a.favoris || 0), 0); const nFav = aFaire.filter((a) => a.favoris > 0).length; const nRec = aFaire.filter(recente).length; return mode === 'idle' && <>
-              {fav > 0 && <div data-republier-favoris={fav} style={{ fontSize: 13, color: C.warn }}>{s2(fav, 'favori')} {fav > 1 ? 'seront perdus' : 'sera perdu'} ({s2(nFav, 'paire')}). <Pourquoi label="Pourquoi ?">Une annonce recréée repart de zéro (favoris, vues, ancienneté). Pour une paire qui a des favoris, baisser le prix de l'annonce actuelle les prévient — c'est souvent mieux que la recréer.</Pourquoi></div>}
-              {nRec > 0 && <div data-republier-recentes={nRec} style={{ fontSize: 13, color: C.warn }}>{nRec > 1 ? `${nRec} paires déjà recréées` : '1 paire déjà recréée'} il y a moins de 2 jours : risque de doublon, retire-{nRec > 1 ? 'les' : 'la'}.</div>}
+              {fav > 0 && <div data-republier-favoris={fav} style={{ fontSize: 13, color: C.warn }}>{s2(fav, 'favori')} {fav > 1 ? 'seront perdus' : 'sera perdu'} ({s2(nFav, 'article')}). <Pourquoi label="Pourquoi ?">Une annonce recréée repart de zéro (favoris, vues, ancienneté). Pour un article qui a des favoris, baisser le prix de l'annonce actuelle les prévient — c'est souvent mieux que la recréer.</Pourquoi></div>}
+              {nRec > 0 && <div data-republier-recentes={nRec} style={{ fontSize: 13, color: C.warn }}>{nRec > 1 ? `${nRec} articles déjà recréés` : '1 article déjà recréé'} il y a moins de 2 jours : risque de doublon, retire-{nRec > 1 ? 'les' : 'la'}.</div>}
             </>; })()}
             {majExt && <div data-republier-maj style={{ fontSize: 13, color: C.warn }}>Extension VRM à mettre à jour ({EXT_ATTENDUE}) et à connecter : sinon rien ne partira.</div>}
             {autresComptes > 0 && <div data-republier-autres-comptes style={{ fontSize: 13, color: C.warn }}>{autresComptes} sur un autre compte : ouvre Vinted sur ce compte dans Chrome, sinon {autresComptes > 1 ? 'elles ne partiront' : 'elle ne partira'} pas.</div>}
             {mode === 'idle' && <>
               <div data-republier-esp={espMode} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                <span style={maj}>Temps entre deux paires</span>
-                <Segmente plein label="Temps entre deux paires" value={espMode} onChange={setEspMode} options={[{ v: 'vintex', l: 'Rapide (8–16 s)', data: { 'data-republier-esp-choix': 'vintex' } }, { v: 'aleatoire', l: `Lent (${minutesOk(espMin)}–${minutesOk(espMax)} min)`, data: { 'data-republier-esp-choix': 'aleatoire' } }, { v: 'fixe', l: 'Fixe', data: { 'data-republier-esp-choix': 'fixe' } }]} />
+                <span style={maj}>Temps entre deux articles</span>
+                <Segmente plein label="Temps entre deux articles" value={espMode} onChange={setEspMode} options={[{ v: 'vintex', l: 'Rapide (8–16 s)', data: { 'data-republier-esp-choix': 'vintex' } }, { v: 'aleatoire', l: `Lent (${minutesOk(espMin)}–${minutesOk(espMax)} min)`, data: { 'data-republier-esp-choix': 'aleatoire' } }, { v: 'fixe', l: 'Fixe', data: { 'data-republier-esp-choix': 'fixe' } }]} />
                 {(() => { const n = aFaire.length; if (n < 2) return null; const moy = espMode === 'vintex' ? 12 : espMode === 'fixe' ? fileClamp(esp) : (bornesAlea()[0] + bornesAlea()[1]) / 2; const sec = Math.round(moy * (n - 1)); const txt = sec < 60 ? `${sec} s` : sec < 3600 ? `${Math.round(sec / 60)} min` : `${Math.floor(sec / 3600)} h ${String(Math.round((sec % 3600) / 60)).padStart(2, '0')}`; return <div data-republier-esp-vintex={espMode === 'vintex' ? '' : undefined} data-republier-duree={sec} style={{ fontSize: 13, color: C.muted }}>Attente entre les {n} paires : environ {txt} en tout.</div>; })()}
                 {espMode === 'fixe' && <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: C.text }}>Une annonce toutes les <input data-republier-esp-fixe value={esp} onChange={(ev) => setEsp(fileClamp(ev.target.value))} inputMode="numeric" style={{ ...champ, width: 70 }} /> secondes</label>}
                 {espMode === 'aleatoire' && <>
@@ -13832,7 +13832,7 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
                     <span>et</span><input data-republier-esp-max value={espMax} onChange={(ev) => setEspMax(ev.target.value)} onBlur={() => setEspMax(minutesOk(espMax))} inputMode="decimal" aria-label="Maximum en minutes" style={{ ...champ, width: 64 }} /><span>minutes</span>
                   </div>
                   <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', fontSize: 13, color: C.muted }}>
-                    <span style={{ flex: '1 1 200px' }}>Un temps par paire (60 min au plus), écrit sur sa ligne.</span>
+                    <span style={{ flex: '1 1 200px' }}>Un temps par article (60 min au plus), écrit sur sa ligne.</span>
                     <Bouton variante="discret" data-republier-retirer onClick={refaitPlan}>Tirer d'autres temps</Bouton>
                   </div>
                 </>}
@@ -13844,7 +13844,7 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
             </>}
             {/* (29 oct., puis 30 oct.) Julien : « la barre de progression est incompréhensible ».
                 Un seul bloc, EN HAUT, une seule barre : où j'en suis (« Paire 2 sur 5 »),
-                la paire en cours et SON étape en une ligne (la liste des étapes repliée),
+                l’article en cours et SON étape en une ligne (la liste des étapes repliée),
                 combien sont faites / restent, ce qui a raté. Plus de seconde barre par
                 ligne : la ligne ne dit que son état. */}
             <div style={{ display: 'flex', flexDirection: 'column', border: `1px solid ${C.border}`, borderRadius: 12, overflow: 'hidden' }}>
@@ -13886,14 +13886,14 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
           </>}
         </div>
         <div className="vrm-b-rangee" style={{ padding: '10px 16px 12px', borderTop: `1px solid ${C.border}`, flexShrink: 0, flexWrap: 'nowrap' }}>
-          {etape === 'choix' && <Bouton variante="primaire" data-republier-suivant disabled={!sel.size} title={!sel.size ? 'Choisis au moins une paire' : undefined} onClick={() => setEtape(action === 'enLigne' ? 'envoi' : 'modif')}>Continuer ({sel.size})</Bouton>}
+          {etape === 'choix' && <Bouton variante="primaire" data-republier-suivant disabled={!sel.size} title={!sel.size ? 'Choisis au moins un article' : undefined} onClick={() => setEtape(action === 'enLigne' ? 'envoi' : 'modif')}>Continuer ({sel.size})</Bouton>}
           {etape === 'modif' && <>
             <Bouton variante="discret" onClick={() => setEtape('choix')}>Retour</Bouton>
-            <Bouton variante="primaire" data-republier-suivant disabled={!aFaire.length} title={!aFaire.length ? 'Rien à changer sur ces paires' : undefined} onClick={() => setEtape('envoi')}>Continuer ({aFaire.length})</Bouton>
+            <Bouton variante="primaire" data-republier-suivant disabled={!aFaire.length} title={!aFaire.length ? 'Rien à changer sur ces articles' : undefined} onClick={() => setEtape('envoi')}>Continuer ({aFaire.length})</Bouton>
           </>}
           {etape === 'envoi' && mode === 'idle' && <>
             <Bouton variante="discret" onClick={() => setEtape(action === 'enLigne' ? 'choix' : 'modif')}>Retour</Bouton>
-            <Bouton variante="primaire" data-republier-lancer disabled={!ok || !aFaire.length} title={!aFaire.length ? 'Aucune paire à envoyer' : !ok ? 'Coche « Je confirme » d’abord' : undefined} onClick={lancerFile}>{A.lancer} ({aFaire.length})</Bouton>
+            <Bouton variante="primaire" data-republier-lancer disabled={!ok || !aFaire.length} title={!aFaire.length ? 'Aucun article à envoyer' : !ok ? 'Coche « Je confirme » d’abord' : undefined} onClick={lancerFile}>{A.lancer} ({aFaire.length})</Bouton>
           </>}
           {mode === 'run' && <>
             <span style={{ flex: 1, minWidth: 0, fontSize: 13, color: C.muted }}>Garde cette fenêtre ouverte.</span>
@@ -14418,8 +14418,8 @@ function PiedSansEnvoi({ raison, lien, texteLien, attrs, children }) {
 // RELIÉE par identité par le site qui l'appelle ; sans elle : « Pas reliée » et
 // la raison du site. Lecture seule : aucun geste ici.
 function FicheConvVolet({ etat, fc, raison, site }) {
-  const a = { className: 'vrm-msg-fiche', 'aria-label': 'Fiche de la paire', 'data-fiche-site': site || undefined };
-  if (etat === 'aucune') return <aside {...a} data-fiche-conv="aucune"><p className="vrm-msg-fiche-vide">La fiche de la paire s’affiche ici quand tu ouvres une conversation.</p></aside>;
+  const a = { className: 'vrm-msg-fiche', 'aria-label': 'Fiche de l’article', 'data-fiche-site': site || undefined };
+  if (etat === 'aucune') return <aside {...a} data-fiche-conv="aucune"><p className="vrm-msg-fiche-vide">La fiche de l’article s’affiche ici quand tu ouvres une conversation.</p></aside>;
   if (etat === 'attente') return <aside {...a} data-fiche-conv="attente"/>;
   if (!fc) return (
     <aside {...a} data-fiche-conv="non-reliee">
@@ -23747,8 +23747,8 @@ function EbayPlanificateur({ brouillons = [], annoncesEbay, programmees, ventes,
             <b style={{ color: E.text }}>{exclues.length} ne {exclues.length > 1 ? 'partiront' : 'partira'} pas :</b> {exclues.map((x) => `${x.d.numero ? 'N°' + cleNum(x.d.numero) : (x.d.titre || 'sans titre')} (${x.raison})`).join(' · ')}.
           </div>
         )}
-        {ventes && Array.isArray(ventes.pasSu) && ventes.pasSu.length > 0 && <div data-planif-pas-su={ventes.pasSu.length} style={{ fontSize: 13, color: E.warn, lineHeight: 1.5, marginBottom: 10 }}>Je n'ai pas pu vérifier {ventes.pasSu.length === 1 ? ventes.pasSu[0] : ventes.pasSu.slice(0, -1).join(', ') + ' ni ' + ventes.pasSu[ventes.pasSu.length - 1]} : je ne programme rien tant que je ne sais pas qu'aucune de ces paires n'est déjà vendue. Rouvre l'écran dans un moment.</div>}
-        {(!ventes || ventes.enCours) && lignes.length > 0 && <div data-planif-ventes-en-cours="1" style={{ fontSize: 12, color: E.muted, lineHeight: 1.5, marginBottom: 10 }}>Je vérifie que ces paires ne sont pas déjà vendues (Vinted, eBay, Leboncoin)…</div>}
+        {ventes && Array.isArray(ventes.pasSu) && ventes.pasSu.length > 0 && <div data-planif-pas-su={ventes.pasSu.length} style={{ fontSize: 13, color: E.warn, lineHeight: 1.5, marginBottom: 10 }}>Je n'ai pas pu vérifier {ventes.pasSu.length === 1 ? ventes.pasSu[0] : ventes.pasSu.slice(0, -1).join(', ') + ' ni ' + ventes.pasSu[ventes.pasSu.length - 1]} : je ne programme rien tant que je ne sais pas qu'aucun de ces articles n'est déjà vendu. Rouvre l'écran dans un moment.</div>}
+        {(!ventes || ventes.enCours) && lignes.length > 0 && <div data-planif-ventes-en-cours="1" style={{ fontSize: 12, color: E.muted, lineHeight: 1.5, marginBottom: 10 }}>Je vérifie que ces articles ne sont pas déjà vendus (Vinted, eBay, Leboncoin)…</div>}
 
         {/* LES FRAIS, LUS CHEZ eBAY */}
         {lignes.length > 0 && !plan.erreur && (
@@ -24826,7 +24826,7 @@ function AgentEbay({ comptes, comptesEbay, onAnnonces }) {
     setPreps((m) => ({ ...m, ...Object.fromEntries(choisies.map((x) => [kp(x), pm[kp(x)]])) }));
     setRelitFrais(false); setBusy(false);
     const lot = choisies.filter((x) => pm[kp(x)] && pm[kp(x)].etat === 'prete');
-    if (!lot.length) { toast('Relues chez eBay, ces paires ne peuvent plus partir telles quelles — la raison est sur chaque paire. Rien n\'a été publié.', 'error'); return; }
+    if (!lot.length) { toast('Relues chez eBay, ces articles ne peuvent plus partir tels quels — la raison est sur chaque paire. Rien n\'a été publié.', 'error'); return; }
     const avecFrais = lot.filter((x) => typeof pm[kp(x)].frais === 'number');
     const totalLot = avecFrais.reduce((t, x) => t + pm[kp(x)].frais, 0);
     const lignes = lot.map((x) => `N°${x.num} · ${eurEbay(x.prix)}${typeof pm[kp(x)].frais === 'number' ? ` · frais ${eurEbay(pm[kp(x)].frais)}` : ' · frais non annoncés'}`);
@@ -24949,18 +24949,18 @@ function AgentEbay({ comptes, comptesEbay, onAnnonces }) {
   const carte = { border: `1px solid ${E.border}`, background: E.card, borderRadius: 12, padding: '14px 16px', marginBottom: 14 };
   // La question suit l'état des PRÉPARATIONS (revue du 29 oct.) : « prêtes »
   // seulement pour des paires préparées chez eBay qui peuvent partir telles quelles.
-  const titreQ = prop.etat !== 'lu' ? 'Paires à publier sur eBay'
-    : !nProp ? 'Aucune paire à proposer pour eBay'
-      : !prepFinie ? `${nProp} paire${nProp > 1 ? 's' : ''} proposée${nProp > 1 ? 's' : ''} pour eBay — je prépare les annonces…`
+  const titreQ = prop.etat !== 'lu' ? 'Articles à publier sur eBay'
+    : !nProp ? 'Aucun article à proposer pour eBay'
+      : !prepFinie ? `${nProp} article${nProp > 1 ? 's' : ''} proposé${nProp > 1 ? 's' : ''} pour eBay — je prépare les annonces…`
         : phraseResumeAgent(nProp, nPretes);
   const phraseEcart = prop.etat === 'lu' ? phraseEcartees(prop.ecartees) : '';
   return <section data-agent-ebay="" data-agent-etat={prop.etat} data-agent-n={prop.etat === 'lu' ? prop.proposees.length : undefined} data-agent-pretes={nPretes == null ? undefined : nPretes} style={{ marginBottom: 18 }}>
     <h2 data-agent-titre="" style={{ margin: '0 0 8px', fontSize: 13, fontWeight: 700, color: E.muted, letterSpacing: 0.2 }}>Agent eBay</h2>
     <div style={carte}>
       <h3 data-agent-question="" style={{ margin: 0, fontSize: 17, color: E.text }}>{titreQ}</h3>
-      {prop.etat === 'en-cours' && <p style={{ fontSize: 13, color: E.muted, margin: '8px 0 0' }}>Je relis tes paires, tes ventes et tes annonces eBay…</p>}
+      {prop.etat === 'en-cours' && <p style={{ fontSize: 13, color: E.muted, margin: '8px 0 0' }}>Je relis tes articles, tes ventes et tes annonces eBay…</p>}
       {prop.etat === 'pas-su' && <p data-agent-passu="" style={{ fontSize: 13, color: E.text, margin: '8px 0 0', lineHeight: 1.5 }}>Pas lu : {prop.pasSu.join(', ')}</p>}
-      {prop.etat === 'sans-ebay' && <p style={{ fontSize: 13, color: E.muted, margin: '8px 0 0' }}>Relie d'abord ton compte eBay (Paramètres → Comptes eBay) : je te proposerai ensuite les paires à publier.</p>}
+      {prop.etat === 'sans-ebay' && <p style={{ fontSize: 13, color: E.muted, margin: '8px 0 0' }}>Relie d'abord ton compte eBay (Paramètres → Comptes eBay) : je te proposerai ensuite les articles à publier.</p>}
       {prop.etat === 'devise' && <p data-agent-devise="" style={{ fontSize: 13, color: E.text, margin: '8px 0 0', lineHeight: 1.5 }}>Ton compte eBay « {nomCompte} » vend en {deviseCompte} : je ne convertis pas les prix de Vinted. Choisis un compte eBay en euros dans « Ce que je publie ».</p>}
       {prop.etat === 'eteint' && <p style={{ fontSize: 13, color: E.muted, margin: '8px 0 0' }}>L'agent est arrêté : il ne propose rien. <button type="button" onClick={() => garderRegles({ ...regles, actif: true })} style={s({ marginLeft: 6 })}>Le relancer</button></p>}
       {prop.etat === 'lu' && <>
@@ -24994,7 +24994,7 @@ function AgentEbay({ comptes, comptesEbay, onAnnonces }) {
             </div>; })}
         </div>}
         {!pause && pretes.length > 0 && <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 12 }}>
-          <button type="button" data-agent-publier="" disabled={busy || !choisies.length} onClick={publierLot} style={s({ background: E.accent, color: E.onAccent, border: 'none', opacity: busy || !choisies.length ? 0.55 : 1 })}>{relitFrais ? 'Je relis les frais chez eBay…' : busy ? 'En cours…' : choisies.length ? `Publier ${choisies.length > 1 ? `ces ${choisies.length}` : 'celle-ci'}` : 'Coche au moins une paire'}</button>
+          <button type="button" data-agent-publier="" disabled={busy || !choisies.length} onClick={publierLot} style={s({ background: E.accent, color: E.onAccent, border: 'none', opacity: busy || !choisies.length ? 0.55 : 1 })}>{relitFrais ? 'Je relis les frais chez eBay…' : busy ? 'En cours…' : choisies.length ? `Publier ${choisies.length > 1 ? `ces ${choisies.length}` : 'celle-ci'}` : 'Coche au moins un article'}</button>
           <button type="button" data-agent-plustard="" disabled={busy} onClick={pasMaintenant} style={s()}>Pas maintenant</button>
           <button type="button" data-agent-programmer="" disabled={busy || !choisies.length} onClick={programmerALaPlace} style={s({ fontWeight: 500 })}>Programmer plutôt</button>
         </div>}
@@ -25017,7 +25017,7 @@ function AgentEbay({ comptes, comptesEbay, onAnnonces }) {
         <button type="button" data-agent-comprendre="" disabled={!phrase.trim()} title={!phrase.trim() ? 'Écris d’abord ta phrase au-dessus.' : undefined} onClick={() => setCompris(comprendrePhrase(phrase, { comptes: comptesNoms, marques: marquesVues }))} style={s()}>Voir ce que je comprends</button>
       </div>
       {compris && <div data-agent-compris="" style={{ marginTop: 10, fontSize: 13, color: E.text, lineHeight: 1.5 }}>
-        {compris.negation ? <p data-agent-negation="" style={{ margin: 0 }}>Je ne sais pas encore EXCLURE avec une phrase (« {compris.negation} ») : je ne garde rien. Pour écarter une paire, touche « Jamais » sur sa ligne ; sinon, dis ce que tu VEUX publier (« publie les Nike à plus de 60 € »).</p>
+        {compris.negation ? <p data-agent-negation="" style={{ margin: 0 }}>Je ne sais pas encore EXCLURE avec une phrase (« {compris.negation} ») : je ne garde rien. Pour écarter un article, touche « Jamais » sur sa ligne ; sinon, dis ce que tu VEUX publier (« publie les Nike à plus de 60 € »).</p>
           : compris.vide ? <p style={{ margin: 0 }}>Je n'ai rien compris dans cette phrase — essaie une marque, une taille (« en 42 »), un prix (« à plus de 60 € »), « +10 % » ou « 3 par jour ».</p>
           : <><p style={{ margin: 0 }}>J'ai compris :</p><ul style={{ margin: '4px 0', paddingLeft: 18 }}>{texteRegles(appliquerPhrase(regles, compris, phrase), { comptes: comptesNoms }).map((l) => <li key={l}>{l}</li>)}</ul></>}
         {compris.pasCompris.length > 0 && <p data-agent-pascompris="" style={{ margin: '4px 0 0', color: E.warn }}>Je n'ai pas compris : {compris.pasCompris.map((w) => `« ${w} »`).join(', ')} — je ne le devine pas.</p>}
@@ -25034,7 +25034,7 @@ function AgentEbay({ comptes, comptesEbay, onAnnonces }) {
         {relies.length >= 2 && <label style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', minHeight: 44 }}>Compte eBay
           <select data-agent-compte="" value={compte || ''} onChange={(e) => garderRegles({ ...regles, compteEbay: e.target.value })} style={{ minHeight: 44, borderRadius: 12, border: `1px solid ${E.border}`, background: E.surface, color: E.text, padding: '0 8px', fontSize: 15 }}>
             {relies.map((c) => <option key={c.ref} value={c.ref}>{nomCompteEbay(c)}</option>)}</select></label>}
-        <label style={{ display: 'flex', gap: 8, alignItems: 'center', minHeight: 44 }}><input type="checkbox" checked={regles.seulementCochees} onChange={(e) => garderRegles({ ...regles, seulementCochees: e.target.checked })} style={{ width: 20, height: 20 }}/>Seulement les paires cochées « eBay »</label>
+        <label style={{ display: 'flex', gap: 8, alignItems: 'center', minHeight: 44 }}><input type="checkbox" checked={regles.seulementCochees} onChange={(e) => garderRegles({ ...regles, seulementCochees: e.target.checked })} style={{ width: 20, height: 20 }}/>Seulement les articles cochés « eBay »</label>
         {regles.jamais.length > 0 && <div data-agent-jamais-liste="">Jamais sur eBay : {regles.jamais.map((k) => <button key={k} type="button" onClick={() => garderRegles({ ...regles, jamais: regles.jamais.filter((x) => x !== k) })} style={s({ fontSize: 12, fontWeight: 500, margin: '4px 6px 0 0' })} aria-label={`Reproposer la N°${k}`}>N°{k} ✕</button>)}</div>}
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <button type="button" onClick={() => garderRegles({ ...REGLES_AGENT_DEFAUT, jamais: regles.jamais, compteEbay: regles.compteEbay, actif: regles.actif })} style={s({ fontWeight: 500 })}>Effacer les filtres</button>
@@ -25845,8 +25845,8 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
           <div data-ebay-retrait-auto-regle style={{ fontSize: 12, color: E.muted, lineHeight: 1.45 }}>{!reglageAutoLu
             ? 'Je relis ton réglage…'
             : retraitAuto
-              ? 'VRM retire TOUT SEUL d\'eBay, sans te demander, une paire prouvée vendue sur Vinted dont l\'annonce porte le N° — dès que VRM est ouvert, sur n\'importe lequel de tes appareils. Une annonce eBay terminée ne revient pas : si la vente Vinted est annulée ensuite, il faudra la republier. Tu ne l\'as pas voulu ? « Éteindre ».'
-              : 'VRM te montre les paires à retirer, c\'est toi qui cliques.'}</div>
+              ? 'VRM retire TOUT SEUL d\'eBay, sans te demander, un article prouvé vendu sur Vinted dont l\'annonce porte le N° — dès que VRM est ouvert, sur n\'importe lequel de tes appareils. Une annonce eBay terminée ne revient pas : si la vente Vinted est annulée ensuite, il faudra la republier. Tu ne l\'as pas voulu ? « Éteindre ».'
+              : 'VRM te montre les articles à retirer, c\'est toi qui cliques.'}</div>
         </div>
         <button type="button" data-ebay-retrait-auto-bouton disabled={!reglageAutoLu} onClick={basculerRetraitAuto} style={{ ...lienE, opacity: reglageAutoLu ? 1 : 0.5 }}>{retraitAuto ? 'Éteindre' : 'Allumer'}</button>
       </div>
@@ -25882,10 +25882,10 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
     skuCommandes && enLigne === null && 'tes annonces Vinted',
   ].filter(Boolean);
   const effets = [
-    (relieesEbay || progReliees) && vendusVinted === null && 'je ne peux pas te dire si une paire en vente ou programmée ici est déjà partie sur Vinted',
+    (relieesEbay || progReliees) && vendusVinted === null && 'je ne peux pas te dire si un article en vente ou programmé ici est déjà parti sur Vinted',
     ventesKO.length > 0 && `je ne peux pas te dire quelles ventes en cours ${ventesKO.length > 1 ? 'de ces comptes' : 'de ce compte'} ne sont pas encore reliées à leur annonce`,
     lbcPasSu && 'je ne peux pas te dire si un article programmé ici est déjà vendu sur Leboncoin',
-    (commandes === null || (skuCommandes && enLigne === null)) && 'je ne peux pas te dire si une paire vendue ici est encore en vente sur Vinted',
+    (commandes === null || (skuCommandes && enLigne === null)) && 'je ne peux pas te dire si un article vendu ici est encore en vente sur Vinted',
   ].filter(Boolean);
   const ligneComptesIllisibles = illisiblesAnnonces.filter((c) => dansVue({ _compte: c.ref })).length > 0 && (
     <div data-ebay-annonces-illisibles={illisiblesAnnonces.length} style={{ ...bloc(E.warn), fontSize: 13, color: E.text, lineHeight: 1.5 }}>
@@ -26124,7 +26124,7 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
         {' '}<button type="button" data-regles-relire-ventes disabled={relitVentes} onClick={relireVentesEbay} style={{ ...lienE, padding: '5px 9px', fontSize: 12, opacity: relitVentes ? 0.6 : 1 }}>{relitVentes ? 'Lecture…' : 'Relire mes ventes eBay'}</button>
       </div>
       <div data-regles-fenetre style={{ marginTop: 6, color: E.muted, fontSize: 12 }}>
-        Si une de ces paires se vend sur Vinted, VRM ne la retire d'eBay que quand tu ouvres VRM et que la vente Vinted a été captée{retraitAuto ? '' : ' — et seulement si le retrait automatique est allumé : sinon c\'est toi qui cliques'}. Entre les deux, eBay peut encore accepter une offre ici.
+        Si un de ces articles se vend sur Vinted, VRM ne le retire d'eBay que quand tu ouvres VRM et que la vente Vinted a été captée{retraitAuto ? '' : ' — et seulement si le retrait automatique est allumé : sinon c\'est toi qui cliques'}. Entre les deux, eBay peut encore accepter une offre ici.
       </div>
       {!retraitAuto && <div style={{ marginTop: 6 }}><button type="button" data-regles-vers-retrait onClick={versRetraitAuto} style={{ ...lienE, padding: '5px 9px', fontSize: 12 }}>Voir le retrait automatique</button></div>}
       {!pasSuRegle.length && porteToutes && <div style={{ marginTop: 8 }}>{porteToutes}</div>}
@@ -26274,8 +26274,8 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
       {bloqueCommun && (
         <div data-regles-bloquees-commun={bloqueCommun} style={{ fontSize: 12, color: bloqueCommun === 'pas-su' ? E.warn : E.muted, lineHeight: 1.5, margin: '0 2px 10px' }}>
           {bloqueCommun === 'pas-su'
-            ? `Je n'ai pas pu vérifier ${pasSuVentes.length <= 1 ? (pasSuVentes[0] || 'tes ventes') : pasSuVentes.slice(0, -1).join(', ') + ' ni ' + pasSuVentes[pasSuVentes.length - 1]} : pas de règle d'offre tant que je ne sais pas si la paire est déjà vendue.`
-            : 'Je vérifie encore que tes paires ne sont pas déjà vendues (Vinted, eBay, Leboncoin) : la règle d\'offre attend cette vérification.'}
+            ? `Je n'ai pas pu vérifier ${pasSuVentes.length <= 1 ? (pasSuVentes[0] || 'tes ventes') : pasSuVentes.slice(0, -1).join(', ') + ' ni ' + pasSuVentes[pasSuVentes.length - 1]} : pas de règle d'offre tant que je ne sais pas si l’article est déjà vendue.`
+            : 'Je vérifie encore que tes articles ne sont pas déjà vendus (Vinted, eBay, Leboncoin) : la règle d\'offre attend cette vérification.'}
         </div>
       )}
       {lotInterrompu && (
@@ -27440,7 +27440,7 @@ function FilVestiaire({ conv, num, titre, envoi, onFerme }) {
   else if (fil !== undefined) pied = <PiedSansEnvoi lien={lien} texteLien="Ouvrir sur Vestiaire ↗" raison="Sans le texte de la conversation, VRM ne répond pas d'ici."/>;
   return (
     <CadreFil etiquette="Conversation Vestiaire" onFermer={onFerme} attrs={{ 'data-vc-fil-ouvert': conv }}>
-      <TeteFil onFermer={onFerme} nom={num ? `N°${num}` : 'Conversation pas reliée à une paire'} titre={titre || ''} compte="Vestiaire"/>
+      <TeteFil onFermer={onFerme} nom={num ? `N°${num}` : 'Conversation pas reliée à un article'} titre={titre || ''} compte="Vestiaire"/>
       <div className="vrm-chat-history" style={{ flex: 1, overflow: 'auto', padding: 16, display: 'flex', flexDirection: 'column', gap: 8 }}>{corps}</div>
       {pied}
     </CadreFil>
@@ -27512,9 +27512,9 @@ function MessagesVestiaire() {
                   const fv = v.num ? ficheDuNumero(v.num) : null; const t = Date.parse(v.date || '');
                   return (
                     <div key={v.id} data-vc-conv={v.id} data-vc-conv-num={v.num || ''} data-vc-conv-nonlu={v.nonLu === true ? 'oui' : v.nonLu === false ? 'non' : 'passu'} data-vc-conv-lu={v.lu ? 'oui' : 'non'} data-flou={vcFloute(vcOuvert, v.compte) ? '1' : '0'} style={vcFloute(vcOuvert, v.compte) && ouvert !== v.id ? STYLE_FLOU : undefined}>
-                      <LigneConv actif={ouvert === v.id} onClick={() => setOuvert(v.id)} ariaLabel={`Ouvrir la conversation ${v.num ? 'du N°' + v.num : 'pas reliée à une paire'}`}
+                      <LigneConv actif={ouvert === v.id} onClick={() => setOuvert(v.id)} ariaLabel={`Ouvrir la conversation ${v.num ? 'du N°' + v.num : 'pas reliée à un article'}`}
                         photo={fv && fv.photo} nom="Vestiaire" quand={isFinite(t) ? t : null} couleurHeure={v.nonLu === true ? C.accent : C.muted}
-                        titre={(fv && fv.titre) || (v.num ? '' : 'Pas reliée à une paire')} num={v.num}
+                        titre={(fv && fv.titre) || (v.num ? '' : 'Pas reliée à un article')} num={v.num}
                         extrait={v.apercu || (v.lu ? '' : 'Texte pas encore lu')} toi={!!v.apercu && v.deMoi} couleurExtrait={v.nonLu === true ? C.text : C.muted}
                         apres={v.nonLu == null ? <span className="vrm-msg-etat" title="Vestiaire ne dit pas si elle est lue" style={{ color: C.muted, borderColor: C.border }}>lu ?</span> : null}
                         point={v.nonLu === true ? C.accent : null}/>
@@ -31503,7 +31503,7 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
               {aRanger.slice(0, 60).map(p => {
                 const on = pairePrete === p.numero;
                 return (
-                  <button type="button" key={p.numero} data-paire-a-ranger={p.numero} data-paire-plateformes={(p.plateformes || []).join(' ')} data-paire-aussi={(p.aussi || []).join(' ') || undefined} title={p.aussi && p.aussi.length ? `Même photo que N°${p.aussi.join(', N°')} : c'est une seule paire — range le carton sous le numéro écrit dessus.` : undefined} aria-pressed={on} onPointerDown={(e) => debutGlisser(e, p)} onClick={(e) => e.preventDefault()}
+                  <button type="button" key={p.numero} data-paire-a-ranger={p.numero} data-paire-plateformes={(p.plateformes || []).join(' ')} data-paire-aussi={(p.aussi || []).join(' ') || undefined} title={p.aussi && p.aussi.length ? `Même photo que N°${p.aussi.join(', N°')} : c'est un seul article — range le carton sous le numéro écrit dessus.` : undefined} aria-pressed={on} onPointerDown={(e) => debutGlisser(e, p)} onClick={(e) => e.preventDefault()}
                     style={{ flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 7, padding: '5px 10px 5px 5px', borderRadius: 999, border: `1px solid ${on ? C.text : C.border}`, background: on ? `${C.text}10` : C.bg, color: C.text, cursor: 'grab', fontFamily: 'inherit', touchAction: 'pan-x', userSelect: 'none' }}>
                     {p.photo ? <PhotoVinted src={p.photo} alt="" style={{ width: 28, height: 28, borderRadius: 999, objectFit: 'cover', background: C.card2 }}/> : <span style={{ width: 28, height: 28, borderRadius: 999, background: C.card2, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}><Icon name="box" size={14} style={{ color: C.muted }}/></span>}
                     <span style={{ fontSize: 13, fontWeight: 600 }}>N°{p.numero}{p.aussi && p.aussi.length ? <span style={{ fontWeight: 500, color: C.muted }}> · N°{p.aussi.join(' · N°')}</span> : null}</span>
@@ -31757,7 +31757,7 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
             return (
               <div style={{ flex: '1 1 100%', display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
                 {ft.cases && <span style={{ fontSize: 13, color: C.muted, flex: '1 1 200px' }}>{p ? <>Prochaine place libre : <b style={{ color: C.text }}>{nomCase(Math.max(1, selItem.rows || 1), p.cell, modeCase(ft), selItem)}</b></> : 'Ce meuble est plein.'} Touche une place libre (en transparence) pour y ranger ; une boîte pour la changer ou la sortir.</span>}
-                {ft.cases && p && <button className="vrm-b vrm-b-secondaire" type="button" data-ranger-dans-meuble="" onClick={() => { if (pairePrete) rangerPaire(pairePrete, selItem.id, p.cell); else fillCell(selItem.id, p.cell, { ghost: true }); }}>{pairePrete ? `Ranger N°${pairePrete} ici` : 'Ranger une paire ici'}</button>}
+                {ft.cases && p && <button className="vrm-b vrm-b-secondaire" type="button" data-ranger-dans-meuble="" onClick={() => { if (pairePrete) rangerPaire(pairePrete, selItem.id, p.cell); else fillCell(selItem.id, p.cell, { ghost: true }); }}>{pairePrete ? `Ranger N°${pairePrete} ici` : 'Ranger un article ici'}</button>}
                 {ft.build === 'pile' && <span className="vrm-aide" style={{ fontSize: 13, color: C.muted }}>Touche une boîte pour changer son numéro ou le retirer — ceux du dessus descendent d'un cran.</span>}
                 {!ft.cases && ft.build !== 'pile' && !ft.box && !ft.deco && <button className="vrm-b vrm-b-secondaire vrm-b-petit" type="button" onClick={() => setOpenItem(selItem.id)}>Ranger dedans ({storedCount(selItem)})</button>}
                 <button className="vrm-b vrm-b-secondaire vrm-b-petit" type="button" onClick={() => setEdition(true)} style={{ marginLeft: 'auto' }}>Régler ce meuble</button>
@@ -32206,9 +32206,9 @@ function StockPhotos() {
   return (<>
     <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
       <div data-stock-resume="" style={{ fontSize: 13, color: C.muted }}>{fiches.length} paire{fiches.length > 1 ? 's' : ''} en stock{nVendus > 0 ? <> · <b style={{ color: C.accent }}>{nVendus} vendue{nVendus > 1 ? 's' : ''} à sortir</b></> : (venduSu ? '' : ' · ventes pas encore lues')}</div>
-      <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="N° ou titre" aria-label="Chercher une paire" style={{ marginLeft: 'auto', padding: '7px 11px', borderRadius: 12, border: `1px solid ${C.line}`, background: C.card, color: C.text, fontSize: 13, maxWidth: 180 }} />
+      <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="N° ou titre" aria-label="Chercher un article" style={{ marginLeft: 'auto', padding: '7px 11px', borderRadius: 12, border: `1px solid ${C.line}`, background: C.card, color: C.text, fontSize: 13, maxWidth: 180 }} />
     </div>
-    {nVendus > 0 && <div style={{ fontSize: 13, color: C.muted, lineHeight: 1.5, display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>Celles qui clignotent sont vendues : touche <b style={{ color: C.text }}>Sortie du stock</b> une fois sortie. <Pourquoi label="Et si la vente est annulée ?">Une vente annulée qui repart en ligne s'éteint toute seule et la paire reste en stock.</Pourquoi></div>}
+    {nVendus > 0 && <div style={{ fontSize: 13, color: C.muted, lineHeight: 1.5, display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>Qui clignote = vendu · <b style={{ color: C.text }}>Sortie du stock</b> <Pourquoi label="Et si la vente est annulée ?">Une vente annulée qui repart en ligne s'éteint toute seule et l’article reste en stock.</Pourquoi></div>}
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(118px,1fr))', gap: 12 }}>
       {vus.map((f) => {
         const sold = estVendu(f);
@@ -32429,7 +32429,7 @@ function StockMeubles() {
         if (choix == null) { toast(`Rien n'a changé : N°${fo.numero} reste dans ${ici(m, i)}.`); return false; }
         if (choix === 'echanger' && ancien && mAncien) { u[occ] = ancien; suite = `N°${fo.numero} est maintenant dans ${ici(mAncien, ancien.i)}.`; }
         else { delete u[occ]; suite = choix === 'choisir' ? `Touche la case où tu poses N°${fo.numero}.` : `N°${fo.numero} est dans « À ranger ».`; if (choix === 'choisir') setPlace(occ); }
-      } else { if (ancien) u[occ] = ancien; else delete u[occ]; }   // case notée pour une paire qui n'est plus là
+      } else { if (ancien) u[occ] = ancien; else delete u[occ]; }   // case notée pour un article qui n'est plus là
     }
     u[cle] = { m: mid, i };
     ecrireSlots(u);
@@ -32609,8 +32609,8 @@ function StockMeubles() {
         <div data-stock-resultats={resultats.length} style={{ marginTop: 6, background: C.card, border: `1px solid ${C.line}`, borderRadius: 12, maxHeight: '46vh', overflowY: 'auto' }}>
           {resultats.length === 0
             ? <div data-stock-rien="" style={{ padding: '14px 14px', fontSize: 15, color: C.muted, lineHeight: 1.45 }}>{qEstNum
-                ? <>Aucune paire N°{motsQ[0].toUpperCase()} en stock — elle est peut-être vendue et partie, ou retirée du stock. La loupe en haut de l'écran dit tout sur ce numéro.</>
-                : <>Aucune paire en stock ne correspond à « {q.trim()} ».</>}</div>
+                ? <>Aucun article N°{motsQ[0].toUpperCase()} en stock — il est peut-être vendu et parti, ou retiré du stock. La loupe en haut de l'écran dit tout sur ce numéro.</>
+                : <>Aucun article en stock ne correspond à « {q.trim()} ».</>}</div>
             : resultats.slice(0, MAX_RES).map((f) => { const ou = ouEst(f); const sold = estVendu(f);
               return (
                 <button type="button" key={f.id} data-stock-res={cleDeFiche(f)} onClick={() => { if (ou) montrer(f); else setModal({ type: 'fiche', cle: cleDeFiche(f) }); }}
@@ -32665,7 +32665,7 @@ function StockMeubles() {
         <div style={{ display: 'flex', gap: 9, overflowX: 'auto', paddingBottom: 3 }}>
           {aRanger.map((f) => { const sold = estVendu(f); const sel = place === cleDeFiche(f);
             return (
-              <button type="button" key={f.id} onClick={() => setPlace(sel ? null : cleDeFiche(f))} aria-pressed={sel} aria-label={`Ranger la paire N°${f.numero}${f.title ? ' · ' + f.title : ''}${sold ? ' (vendue)' : ''}`} style={{ position: 'relative', flex: 'none', width: 70, height: 88, borderRadius: 12, overflow: 'hidden', cursor: 'pointer', padding: 0, background: C.card2, border: sel ? `2px solid ${C.accent}` : (sold ? `2px solid ${C.accent}` : `1px solid ${C.border}`), opacity: filtre && !correspond(f) ? 0.3 : 1 }}>
+              <button type="button" key={f.id} onClick={() => setPlace(sel ? null : cleDeFiche(f))} aria-pressed={sel} aria-label={`Ranger l’article N°${f.numero}${f.title ? ' · ' + f.title : ''}${sold ? ' (vendue)' : ''}`} style={{ position: 'relative', flex: 'none', width: 70, height: 88, borderRadius: 12, overflow: 'hidden', cursor: 'pointer', padding: 0, background: C.card2, border: sel ? `2px solid ${C.accent}` : (sold ? `2px solid ${C.accent}` : `1px solid ${C.border}`), opacity: filtre && !correspond(f) ? 0.3 : 1 }}>
                 <Vignette f={f} sold={sold} />
               </button>
             );
@@ -35006,7 +35006,7 @@ function Inventory({ inventory, setInventory, accounts, garageGrid, labels, onLo
   };
 
   const deletePair = async (id)=>{
-    if (!await askConfirm('Supprimer cette paire de l\'inventaire ?')) return;
+    if (!await askConfirm('Supprimer cet article de l\'inventaire ?')) return;
     persist(inventory.filter(p => p.id !== id));
   };
 
@@ -35172,7 +35172,7 @@ function Inventory({ inventory, setInventory, accounts, garageGrid, labels, onLo
             ? syncResult.msg
             : ((syncResult.sold + syncResult.pending) > 0
                 ? `✅ ${syncResult.sold} vente(s) finalisée(s) comptée(s)${syncResult.pending?`, ${syncResult.pending} en cours (non comptée(s), en attente de validation)`:''} — sur ${syncResult.scanned} commandes analysées.`
-                : `Aucune vente à reporter (${syncResult.scanned} commandes analysées). Chaque paire doit avoir le même titre que son annonce Vinted (via « Importer mes annonces »).`)}
+                : `Aucune vente à reporter (${syncResult.scanned} commandes analysées). Chaque article doit avoir le même titre que son annonce Vinted (via « Importer mes annonces »).`)}
         </div>
       )}
 
@@ -35189,7 +35189,7 @@ function Inventory({ inventory, setInventory, accounts, garageGrid, labels, onLo
 
       {showAdd && (
         <Card style={{marginBottom:14}}>
-          <div style={{fontWeight:600,marginBottom:10,color:C.text}}>Nouvelle paire</div>
+          <div style={{fontWeight:600,marginBottom:10,color:C.text}}>Nouvel article</div>
           <div style={{display:'flex',flexWrap:'wrap',gap:8,alignItems:'center'}}>
             <input value={addForm.numero} onChange={e=>setAddForm(f=>({...f,numero:e.target.value}))} placeholder="Numéro (ex : 2057)" style={{...inputStyle,width:150}}/>
             <input value={addForm.title} onChange={e=>setAddForm(f=>({...f,title:e.target.value}))} placeholder="Titre (ex : Adidas Spezial 38)" style={{...inputStyle,flex:1,minWidth:180}}/>
@@ -35257,7 +35257,7 @@ function Inventory({ inventory, setInventory, accounts, garageGrid, labels, onLo
 
       {filtered.length === 0 && (
         <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'30px 0'}}>
-          {inventory.length === 0 ? 'Ton inventaire est vide. Ajoute une paire ou importe tes annonces en ligne.' : 'Aucune paire pour ce filtre.'}
+          {inventory.length === 0 ? 'Ton inventaire est vide. Ajoute un article ou importe tes annonces en ligne.' : 'Aucun article pour ce filtre.'}
         </div>
       )}
 
@@ -35289,8 +35289,8 @@ function Inventory({ inventory, setInventory, accounts, garageGrid, labels, onLo
               </div>
               <div style={{display:'flex',gap:6,flexShrink:0}}>
                 <button className="vrm-icon-control" aria-label="Générer le bordereau annoté (numéro + titre)" type="button" title="Générer le bordereau annoté (numéro + titre)" onClick={()=>startBordereau(p)} style={{...btn('transparent',C.text),border:`1px solid ${C.border}`,padding:'6px 10px'}}><Icon name="doc" size={16}/></button>
-                <button className="vrm-icon-control" aria-label="Modifier la paire" type="button" onClick={()=>startEdit(p)} style={{...btn('transparent',C.text),border:`1px solid ${C.border}`,padding:'6px 10px'}}>✏️</button>
-                <button className="vrm-icon-control" aria-label="Supprimer la paire" type="button" onClick={()=>deletePair(p.id)} style={{...btn('transparent',C.danger),border:`1px solid ${C.border}`,padding:'6px 10px'}}>🗑️</button>
+                <button className="vrm-icon-control" aria-label="Modifier l’article" type="button" onClick={()=>startEdit(p)} style={{...btn('transparent',C.text),border:`1px solid ${C.border}`,padding:'6px 10px'}}>✏️</button>
+                <button className="vrm-icon-control" aria-label="Supprimer l’article" type="button" onClick={()=>deletePair(p.id)} style={{...btn('transparent',C.danger),border:`1px solid ${C.border}`,padding:'6px 10px'}}>🗑️</button>
               </div>
             </div>
           );
@@ -35301,7 +35301,7 @@ function Inventory({ inventory, setInventory, accounts, garageGrid, labels, onLo
         <div onClick={()=>{setEditing(null);setEditDraft(null);}} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:1000,display:'flex',alignItems:'center',justifyContent:'center',padding:16}}>
           <FermeAuRetour fermer={()=>{setEditing(null);setEditDraft(null);}}/>
           <div onClick={e=>e.stopPropagation()} style={{background:C.card,borderRadius:12,padding:20,width:'100%',maxWidth:420}}>
-            <div style={{fontWeight:600,fontSize:15,color:C.text,marginBottom:14}}>Modifier la paire</div>
+            <div style={{fontWeight:600,fontSize:15,color:C.text,marginBottom:14}}>Modifier l’article</div>
             <label style={{display:'block',fontSize:11,color:C.muted,marginBottom:4}}>Numéro</label>
             <input value={editDraft.numero} onChange={e=>setEditDraft(d=>({...d,numero:e.target.value}))} style={{...inputStyle,width:'100%',marginBottom:12}}/>
             <label style={{display:'block',fontSize:11,color:C.muted,marginBottom:4}}>Titre</label>
@@ -37273,7 +37273,7 @@ function StatsVitrine({ liveStats, panelOff, periode }) {
     : extras === undefined ? tuile('delai', 'Temps pour vendre', '—', 'je lis tes annonces…', { 'data-sv-etat': 'encours' })
       : datesPasSu ? tuile('delai', 'Temps pour vendre', '—', 'annonces pas pu être lues', { 'data-sv-etat': 'passu' })
         : !Dl || Dl.nDelai === 0 ? tuile('delai', 'Temps pour vendre', '—', Dl && Dl.n ? `aucune des ${pl(Dl.n, 'vente')} Vinted n’a de date de mise en ligne` : 'aucune vente Vinted finalisée', { 'data-sv-etat': 'lu', 'data-sv-mediane': '', 'data-sv-couv': Dl ? `0/${Dl.n}` : '0/0' })
-          : tuile('delai', 'Temps pour vendre', joursLong(Dl.mediane), `la moitié de tes paires partent plus vite${Dl.nDelai < Dl.n ? ` · ${Dl.nDelai} ventes datées sur ${Dl.n}` : ''}`,
+          : tuile('delai', 'Temps pour vendre', joursLong(Dl.mediane), `la moitié de tes articles partent plus vite${Dl.nDelai < Dl.n ? ` · ${Dl.nDelai} ventes datées sur ${Dl.n}` : ''}`,
             { 'data-sv-etat': 'lu', 'data-sv-mediane': Dl.mediane, 'data-sv-couv': `${Dl.nDelai}/${Dl.n}` }, 'Vinted seulement : Leboncoin et eBay ne donnent pas la date de mise en ligne.');
   const enLigneTxt = texteEnLigne(liveStats);
   const dort = stock && stock.dort && stock.dort.seuils ? (stock.dort.seuils[30] || { n: 0 }).n : null;
@@ -37504,7 +37504,7 @@ function StatsDetaillees({ liveStats, panelOff }) {
         {M.groupes.length === 0 ? <div style={{ ...sNote, marginTop: 10 }}>Aucune vente finalisée à répartir.</div> : (
           <div role="table" aria-label={`${NOM_BENEFICE_BRUT} par ${AXES_MARGE[axeMarge].toLowerCase()}`} style={{ marginTop: 12, display: 'flex', flexDirection: 'column' }}>
             <div role="row" style={{ ...ligneTab, fontSize: 11, color: C.muted, paddingBottom: 6, borderBottom: `1px solid ${C.border}` }}>
-              <span role="columnheader">{AXES_MARGE[axeMarge]}</span><span role="columnheader" style={{ textAlign: 'right' }}>Ventes</span><span role="columnheader" style={{ textAlign: 'right' }}>Brut</span><span role="columnheader" style={{ textAlign: 'right' }}>Marge</span><span role="columnheader" style={{ textAlign: 'right' }}>Par paire</span>
+              <span role="columnheader">{AXES_MARGE[axeMarge]}</span><span role="columnheader" style={{ textAlign: 'right' }}>Ventes</span><span role="columnheader" style={{ textAlign: 'right' }}>Brut</span><span role="columnheader" style={{ textAlign: 'right' }}>Marge</span><span role="columnheader" style={{ textAlign: 'right' }}>Par article</span>
             </div>
             {M.groupes.slice(0, 8).map((g) => (
               <div role="row" key={g.k} data-stats-marge-ligne={g.k} data-n={g.n} data-ncout={g.nCout} data-brut={g.brut == null ? '' : Math.round(g.brut * 100)} data-marge={g.marge == null ? '' : g.marge}
@@ -37574,7 +37574,7 @@ function StatsDetaillees({ liveStats, panelOff }) {
     {/* ── 5. LE STOCK ──────────────────────────────────────────────────── */}
     <section data-stats-carte="dort" data-stats-dort={stock ? 'lu' : 'passu'} style={sCarte}>
       <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
-        <div style={sTitre}>Les paires qui dorment</div>
+        <div style={sTitre}>Les articles qui dorment</div>
         {stock && <span style={{ fontSize: 13, color: C.muted }}>{pl(stock.dort.total, 'annonce')} Vinted en ligne</span>}
       </div>
       {!stock ? <div style={{ ...sNote, marginTop: 8 }}>Pas encore calculé sur cet appareil : ouvre Annonces une fois (il faut toutes tes annonces lues, avec leurs dates).</div> : (<>
@@ -37582,7 +37582,7 @@ function StatsDetaillees({ liveStats, panelOff }) {
           {SEUILS_DORT.map((s) => { const b = stock.dort.seuils[s] || { n: 0, valeur: 0, nCout: 0, cout: 0 }; return (
             <div key={s} data-stats-dort-seuil={s} data-n={b.n} data-valeur={Math.round(b.valeur * 100)} style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1.3fr) minmax(0,0.8fr) minmax(0,1.4fr)', gap: 8, padding: '9px 0', borderBottom: `1px solid ${C.border}`, fontSize: 13, fontVariantNumeric: 'tabular-nums', alignItems: 'baseline' }}>
               <span style={{ color: C.text }}>En ligne depuis {s} j et plus</span>
-              <span style={{ textAlign: 'right', color: C.text, fontWeight: 600 }}>{pl(b.n, 'paire')}</span>
+              <span style={{ textAlign: 'right', color: C.text, fontWeight: 600 }}>{pl(b.n, 'article')}</span>
               <span style={{ textAlign: 'right', color: C.muted }}>{mt(b.valeur)} affichés{b.n ? <> · achat {b.nCout ? <>{b.nCout < b.n ? 'au moins ' : ''}{mt(b.cout)}</> : '—'}{b.nCout < b.n ? ` (${b.nCout}/${b.n})` : ''}</> : null}</span>
             </div>
           ); })}
@@ -38103,7 +38103,7 @@ function BeneficeCompta({ compta, onNav, onSansDepenses, onAjouterDepense, sansC
               <div className="vrm-set-ligne" data-benef-ligne="net"><span className="vrm-set-lib"><b style={{ color: C.text }}>= {titreNet.toLowerCase()}</b></span><span className="vrm-set-lib" style={{ flex: '0 0 auto', textAlign: 'right' }}><small style={{ color: C.muted, marginTop: 0 }}>le chiffre au-dessus</small></span></div>
             </div>
             <small style={{ color: C.muted, lineHeight: 1.5, display: 'block', padding: '10px 2px 4px' }}>
-              {B.toutes ? <>Ventes finalisées Vinted, Leboncoin et eBay, au jour de la vente — la même règle que l'écran Ventes.{couvertureBenefice(B) ? ` Prix d'achat connus : ${couvertureBenefice(B)}.` : ''} Une vente Leboncoin ou eBay se relie à sa paire par son SKU VRM, sa référence ou un lien posé, jamais par son titre.</> : <>Ventes Vinted finalisées, au jour de la vente — publiées par une version d'avant de l'écran Ventes : ouvre-le une fois pour y ajouter Leboncoin et eBay.</>} L'URSSAF déduite est celle de l'argent reçu sur la période.{pub.at ? ` Calculé avec tes ventes lues le ${new Date(pub.at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' })}.` : ''}
+              {B.toutes ? <>Ventes finalisées Vinted, Leboncoin et eBay, au jour de la vente — la même règle que l'écran Ventes.{couvertureBenefice(B) ? ` Prix d'achat connus : ${couvertureBenefice(B)}.` : ''} Une vente Leboncoin ou eBay se relie à son article par son SKU VRM, sa référence ou un lien posé, jamais par son titre.</> : <>Ventes Vinted finalisées, au jour de la vente — publiées par une version d'avant de l'écran Ventes : ouvre-le une fois pour y ajouter Leboncoin et eBay.</>} L'URSSAF déduite est celle de l'argent reçu sur la période.{pub.at ? ` Calculé avec tes ventes lues le ${new Date(pub.at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' })}.` : ''}
             </small>
           </details>
         </>)}
@@ -59499,7 +59499,7 @@ const montantLisible = (n, devise) => {
 };
 const STATUT_FACTURE = { paid: 'Payée', open: 'À payer', void: 'Annulée', uncollectible: 'Impayée' };
 // Seuls les liens de Stripe s'ouvrent depuis la liste (le serveur filtre déjà ;
-// on ne fait pas confiance à une seule moitié).
+// on ne fait pas confiance à une seula moitié).
 const lienFacture = (u) => (typeof u === 'string' && /^https:\/\/(pay|invoice|files|invoicedata)\.stripe\.com\//.test(u) ? u : null);
 
 // ── FERMER MON COMPTE (5 octobre) ────────────────────────────────────────────

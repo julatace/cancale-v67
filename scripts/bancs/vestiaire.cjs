@@ -73,7 +73,7 @@ srv.listen(PORT);
       if (etat === 'lu') {
         dit(m && m.etat === 'lu' && m.n === '3' && /3 messages non lus/.test(m.t) && /il y a 30 min/.test(m.t), 'messages : le nombre de non-lus de Vestiaire et l’âge du relevé', m && m.t.slice(0, 140));
         dit(m && m.href === 'https://fr.vestiairecollective.com/messages/', 'le lien ouvre la page de messagerie VUE par l’extension (rien de deviné)', m && m.href);
-        dit(m && m.c.length === 2 && m.c[0].id === 'C1' && m.c[0].num === '401' && m.c[0].nl === 'oui' && m.c[1].num === '' && /Pas reliée à une paire/.test(m.t), 'conversations : reliées par la référence VRM, non lue en tête, sans référence ⇒ pas de paire devinée', JSON.stringify(m && m.c));
+        dit(m && m.c.length === 2 && m.c[0].id === 'C1' && m.c[0].num === '401' && m.c[0].nl === 'oui' && m.c[1].num === '' && /Pas reliée à un article/.test(m.t), 'conversations : reliées par la référence VRM, non lue en tête, sans référence ⇒ pas de paire devinée', JSON.stringify(m && m.c));
         dit(m && m.h >= 44, 'le lien se touche au doigt (44 px)', m && String(m.h));
       }
       if (etat === 'jamais') dit(m && m.etat === 'jamais' && !/\b0 message/.test(m.t), 'messages jamais relevés : le geste, aucun « 0 »', m && m.t.slice(0, 120));
