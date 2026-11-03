@@ -199,8 +199,9 @@ const proche = (a, b) => (a == null && b == null) || (a != null && b != null && 
     dit(proche(V('brut', { site: 'toutes' }, undefined, { p }).valeur, N.chiffreBrut(B).valeur), `bénéfice brut ${p} = chiffreBrut(B)`, `${N.chiffreBrut(B).valeur}`);
     dit(V('finalisees', { site: 'toutes' }, undefined, { p }).valeur === B.n, `ventes finalisées ${p} = B.n`, `${B.n}`);
   }
-  // À la main (novembre) : ventes 32,9 + 55 + 80,25 + 45,5 ; achats 12 + 20 + 30 + 15 ; frais 1 + 0,5 ; dépense 5 ; URSSAF 12,4 % de 168,15.
-  const urssafMain = Math.round(168.15 * 0.124 * 100) / 100;
+  // À la main (novembre) : ventes 32,9 + 55 + 80,25 + 45,5 ; achats 12 + 20 + 30 + 15 ; frais 1 + 0,5 ; dépense 5 ;
+  // URSSAF 12,4 % des MÊMES ventes (213,65 €, la règle de main depuis le 3 nov. : la cotisation attachée à la vente).
+  const urssafMain = Math.round(213.65 * 0.124 * 100) / 100;
   const netMain = Math.round((213.65 - 77 - 1.5 - 5 - urssafMain) * 100) / 100;
   dit(proche(V('benefice', { site: 'toutes' }, undefined, { p: 'mois' }).valeur, netMain), `bénéfice de novembre = à la main (${netMain} €)`, `${V('benefice', { site: 'toutes' }, undefined, { p: 'mois' }).valeur}`);
   const sem = ctx.beneficeDesJours(PUB.jours, new Date(lundi), new Date(T(10, 23, 0)));
