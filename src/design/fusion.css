@@ -978,3 +978,10 @@ html body .vrm-app-shell .vrm-main:has(.vrm-fu-colis) .vrm-colis-envoyes .vrm-co
 html body .vrm-app-shell .vrm-main:has(.vrm-fu-colis) .vrm-colis-envoye .vrm-colis-sec { border: 0 !important; background: var(--fu-case) !important; color: var(--fu-encre) !important; border-radius: 12px !important; }
 /* La carte Vestiaire dit, comme Vinted, l'urgence seule (la date de vente et le n° de suivi sont dans le récapitulatif). */
 html body .vrm-app-shell .vrm-main:has(.vrm-fu-colis) .vrm-colis-carte[data-vc-colis] :is(.vrm-colis-vendue, [data-vc-colis-transport]) { display: none !important; }
+/* (3 nov.) « Vendus ailleurs » au même gabarit que les lignes en photos : tuile neutre 44 / rayon 10,
+   icône grise ; « Vérifier » en pilule neutre (le bleu reste au seul geste principal). */
+:root body .vrm-app-shell .vrm-main .vrm-day-layout.vrm-fu-journee .vrm-bilan-sync[data-vendus-ailleurs] > summary::before {
+  width: 44px !important; height: 44px !important; border-radius: 10px !important; margin-right: 12px !important;
+  background: var(--fu-case) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%238e8e93' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20.6 13.4 13.4 20.6a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8Z'/%3E%3Ccircle cx='7.5' cy='7.5' r='1.5'/%3E%3C/svg%3E") center / 20px no-repeat !important; }
+:root body .vrm-app-shell .vrm-main .vrm-day-layout.vrm-fu-journee .vrm-bilan-sync[data-vendus-ailleurs] > summary > span { color: var(--fu-encre) !important; background: var(--fu-case) !important; }
+:root[data-theme="dark"] body .vrm-app-shell .vrm-main .vrm-day-layout.vrm-fu-journee .vrm-bilan-sync[data-vendus-ailleurs] > summary > span { color: #f5f5f7 !important; background: #2c2c2e !important; }
