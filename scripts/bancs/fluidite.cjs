@@ -184,10 +184,15 @@ const texte = (pg) => pg.evaluate(() => document.body.innerText);
         dit(recap !== null && !/en attente de bordereau/.test(recap), 'le récapitulatif n’annonce pas « en attente de bordereau » sur une lecture ratée', JSON.stringify(recap).slice(0, 160));
         // Les colis PARTIS ont leur groupe, replié, en lecture seule — et ils ne
         // gonflent pas le compte des colis à envoyer.
+        // (3 nov., nouvelle mise en page) « Partis » est l'onglet « Envoyés » : à part (pas dans « À envoyer »),
+        // en lecture seule (aucun bouton pour un colis suivi par Vinted).
+        const horsEnvoyer = await pg.evaluate(() => !document.querySelector('[data-colis-partis]'));
+        await pg.click('[data-colis-onglet-choix="envoyes"]').catch(() => {}); await pg.waitForTimeout(600);
         const p = await pg.evaluate(() => { const d = document.querySelector('[data-colis-partis]');
-          return d ? { n: Number(d.getAttribute('data-colis-partis')), ouvert: d.open, etats: [...d.querySelectorAll('[data-parti]')].map((x) => x.getAttribute('data-parti')), boutons: d.querySelectorAll('button').length } : null; });
-        dit(p && p.n === 1 && p.etats.join() === 'En transit', 'Colis montre le colis PARTI (en transit), à part', JSON.stringify(p));
-        dit(p && p.ouvert === false && p.boutons === 0, 'ce groupe est replié et ne porte aucun bouton (rien à faire)', JSON.stringify(p));
+          return d ? { n: Number(d.getAttribute('data-colis-partis')), etats: [...d.querySelectorAll('[data-parti]')].map((x) => x.getAttribute('data-parti')), boutons: d.querySelectorAll('button').length } : null; });
+        dit(p && p.n === 1 && p.etats.join() === 'En transit', 'Colis montre le colis PARTI (en transit), à part (onglet « Envoyés »)', JSON.stringify(p));
+        dit(horsEnvoyer && p && p.boutons === 0, 'il n’est pas dans « À envoyer » et ne porte aucun bouton (rien à faire)', JSON.stringify(p));
+        await pg.click('[data-colis-onglet-choix="envoyer"]').catch(() => {}); await pg.waitForTimeout(400);
         const aPoster = await pg.evaluate(() => { const e = document.querySelector('[data-colis-recap]'); return e ? Number(e.getAttribute('data-colis-recap')) : null; });
         dit(aPoster === 1, 'le compte des colis à envoyer ne compte que la vente à poster (pas les partis, pas la finalisée)', String(aPoster));
         const sw = await pg.evaluate(() => ({ sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth }));

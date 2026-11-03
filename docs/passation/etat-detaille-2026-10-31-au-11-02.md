@@ -202,3 +202,8 @@ Déplacé TEL QUEL depuis CLAUDE.md §9 le 2 novembre 2026 (le fichier dépassai
 
 ### Lignes de §9 déplacées telles quelles
 - **2 nov. (soir)** — **Extension 5.312.0** : plafond 50/h par COMPTE tous Chrome confondus (`actions_compte_{uid}_{navigateur}`, base muette ⇒ ce Chrome seul) ; Republier LIT TOUJOURS l'annonce sur Vinted d'abord (une lecture, ses champs l'emportent sur une recette ancienne — « elle oubliait la couleur et la taille ») ; brouillons d'un autre compte grisés et nommés, brouillons disparus retirés (`src/brouillonsProposables.js`) ; avancée de Republier figée et toujours visible (banc `brouillons-avancee`). → historique vinted-extension. Geste : installer la 5.312.0.
+
+### Lignes de §9 déplacées telles quelles
+- **2 nov. (soir)** — Sécurité : la politique CSP complète passe **en vigueur** (`vercel.json`, était en surveillance ; 2 violations relevées, aucune de VRM) ; banc `csp` vert. → historique sécurité. Geste : sur iPhone et ordinateur, vérifier que la carte de la Communauté s'affiche, qu'un bordereau s'ouvre, et Réglages → Imprimante → « Voir les aperçus ».
+- **2 nov. (soir)** — eBay : la notification « suppression de compte » est vérifiée (signature, sinon 412) puis appliquée (coordonnées d'acheteur effacées, montants gardés ; panne ⇒ 503, eBay renvoie) (`api/_lib/ebay-suppression.js`, `audit-ebay-suppression`). → historique ebay. Geste : aucun.
+- **2 nov. (soir)** — Favoris : écran simplifié (mode auto en une phrase + un geste, « Ton message », une ligne par favori rangée par état ; `src/favorisEcran.js`, `audit-favoris-ecran`, banc `favoris-ecran`). Geste : regarder Messages → Favoris reçus.
