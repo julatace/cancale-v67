@@ -1005,3 +1005,6 @@ dans `audit-recreer` (R1-R5), rouge sur la 5.312.0, vert en 5.313.0.
   maintenant `_` comme Postgres.
 - **R5** Modifier le prix sous frein consommait une action de l'heure : le frein est lu
   avant de compter.
+
+### 3 nov. — Prix partout, dupliquer, histoire, modèles (`claude/annonces-outils`)
+Récit : `historique-interface-stock.md` (« LES QUATRE OUTILS DES ANNONCES »). Ici : aucune version neuve : le prix Vinted passe par `republierVinted` (capacité `republiermodif`) ; sans elle « À faire sur le site ».

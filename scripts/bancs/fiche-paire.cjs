@@ -146,7 +146,9 @@ const rgb = (s) => (/rgba?\((\d+), (\d+), (\d+)/.exec(s || '') || []).slice(1).m
         const f = await fiche(pg, '117');
         dit(!!f && f.num === '117' && f.grand === '117', `A ${T} la fiche du N°117 s'ouvre`, f && f.num);
         if (!f) return;
-        dit(f.ordre.join() === 'achat,stock,annonces,vente,colis,argent', `A ${T} le parcours dans l'ordre : achat → stock → annonce → vente → colis → argent`, f.ordre.join());
+        // (3 nov.) La fiche est devenue l'HISTOIRE complète (src/histoireArticle.js) : numérotage,
+        // prix, offres, favoris et retour s'insèrent à leur place dans le cycle.
+        dit(f.ordre.join() === 'achat,numero,stock,annonces,prix,offres,favoris,vente,colis,argent,retour', `A ${T} l'histoire dans l'ordre : achat → numéro → stock → annonces → prix → offres → favoris → vente → colis → argent → retour`, f.ordre.join());
         dit(f.achat === '5200' && f.etapes.achat.etat === 'fait' && /tom\.kicks/.test(f.etapes.achat.txt) && /n° de transaction/.test(f.etapes.achat.txt), `A ${T} l'achat : 52 €, le vendeur, relié par n° de transaction`, f.achat + ' ' + (f.etapes.achat || {}).txt);
         dit(f.etapes.stock.etat === 'fait' && /Meuble B/.test(f.etapes.stock.txt), `A ${T} rangée dans le Stock (par N°)`, (f.etapes.stock || {}).txt);
         dit(f.etapes.vente.etat === 'fait' && /Vendue sur Vinted/.test(f.etapes.vente.txt) && f.vente === '9500' && f.txs.join() === '9117', `A ${T} vendue sur Vinted 95 €, par SA transaction`, f.vente + ' ' + f.txs.join() + ' ' + (f.etapes.vente || {}).txt);
@@ -163,7 +165,7 @@ const rgb = (s) => (/rgba?\((\d+), (\d+), (\d+)/.exec(s || '') || []).slice(1).m
         if (!f) { dit(false, `B ${T} la fiche du N°118 s'ouvre`); return; }
         dit(f.etapes.achat.etat === 'absent' && f.achat === '', `B ${T} prix d'achat pas saisi ⇒ étape grisée, aucun montant`, f.achat + ' ' + f.etapes.achat.txt);
         dit(f.etapes.stock.etat === 'absent' && /pas rangée/.test(f.etapes.stock.txt), `B ${T} pas rangée ⇒ grisée`, f.etapes.stock.txt);
-        dit(f.etapes.annonces.etat === 'fait' && /en ligne/.test(f.etapes.annonces.txt) && /14 fav/.test(f.etapes.annonces.txt) && /150 vues/.test(f.etapes.annonces.txt), `B ${T} en ligne, favoris et vues lus`, f.etapes.annonces.txt);
+        dit(f.etapes.annonces.etat === 'fait' && /en ligne/.test(f.etapes.annonces.txt) && /14 favoris/.test(f.etapes.favoris.txt) && /150 vues/.test(f.etapes.favoris.txt), `B ${T} en ligne, favoris et vues lus`, f.etapes.annonces.txt + ' / ' + f.etapes.favoris.txt);
         dit(['vente', 'colis', 'argent'].every((k) => f.etapes[k].etat === 'absent'), `B ${T} pas vendue ⇒ vente, colis, argent grisés`, JSON.stringify(['vente', 'colis', 'argent'].map((k) => f.etapes[k].etat)));
         dit(f.benef === '' && /—/.test(f.benefTxt), `B ${T} bénéfice « — », jamais un 0 inventé`, f.benefTxt);
         const g = rgb(f.gris); dit(g.length && g[0] > 60, `B ${T} une étape absente est écrite en gris`, f.gris);
