@@ -123,7 +123,8 @@ import { lirePhotoroom, appelPhotoroom, phraseVerif, phraseSansReponse, dateCour
 // §11 : l'adresse de réception se compare avec LA forme du serveur (celle qui
 // décide à qui appartient un email) — jamais une seconde normalisation ici.
 import { normAdresse, ADRESSE_COLLECTRICE, estAdresseCollectrice } from "../api/_lib/proprietaire-email.js";
-import { retoursEnCours, retoursPourSite, remiseEnStock, LIBELLE_ETAPE, ETAPES_RETOUR } from "./retoursStock.js";
+import { retoursEnCours, retoursPourSite, remiseEnStock, LIBELLE_ETAPE, ETAPES_RETOUR, numeroDuRetourVinted } from "./retoursStock.js";
+import { litigesEnCours, litigeDeVente, requeteEmailsLitiges, texteLimite as texteLimiteLitige, LIBELLE_GENRE as LIBELLE_LITIGE } from "./litiges.js";
 import { etatVinted, NIVEAU_ETAT_MAX } from "./carteAnnonce.js";
 import ChoixPeriode from "./ChoixPeriode.jsx";
 import { libellePlage, phrasePlage } from "./periodeCalendrier.js";
@@ -5741,6 +5742,8 @@ const TXN_ETATS = new Map();
 let TXN_ETATS_LU;
 // Les retours eBay lus sur Colis (10 min, une fois pour toutes les ouvertures).
 const RETOURS_EBAY_CACHE = { v: undefined, at: 0 };
+// (3 nov.) Les e-mails de litige (src/litiges.js) : une lecture par 10 min, partagée par les écrans.
+const EMAILS_LITIGES_CACHE = { v: undefined, at: 0 };
 const noterEtatsTxn = (rows) => { for (const r of (rows || [])) if (r && r.tx && r.s != null && isFinite(Number(r.s))) TXN_ETATS.set(String(r.tx), { s: Number(r.s), ss: String(r.ss || '') }); };
 const lireEtatsTxn = async () => { try { const rows = await lireTout(TXN_META_SELECT); if (rows === null) return false; noterEtatsTxn(rows); return true; } catch (_) { return false; } };
 const etatTxn = (tx) => (tx == null ? null : TXN_ETATS.get(String(tx)) || null);
@@ -44778,6 +44781,36 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     return res;
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sales.items, sales.failedUids, txnItem, numeros, saleOv, retoursRecus, retoursRemis, retoursDismissed, retoursEbayLus, listings.items, onlineAnnonceIds, accounts]);
+  // ── (3 nov.) LITIGES, RETOURS ET RÉCLAMATIONS EN COURS (src/litiges.js) ──
+  // Les e-mails Vinted « Action requise : problème avec la commande », « L'acheteur
+  // souhaite annuler son achat », « Retourne ta commande d'ici le … » (gardés par le
+  // serveur) : lus UNE fois par 10 min, en projection, sur Ma journée, Ventes et Colis.
+  // Trois états : `undefined` en cours · `null` pas su · la liste.
+  const [emailsLitiges, setEmailsLitiges] = useState(EMAILS_LITIGES_CACHE.v);
+  useEffect(() => {
+    if (only !== 'journee' && only !== 'ventes' && only !== 'bordereaux') return undefined;
+    let vivant = true;
+    (async () => {
+      const c = EMAILS_LITIGES_CACHE;
+      if (c.v !== undefined && Date.now() - c.at < 10 * 60 * 1000) { if (vivant) setEmailsLitiges(c.v); return; }
+      let v; try { const rows = await lireTout(requeteEmailsLitiges(), { maxPages: 1 }); v = Array.isArray(rows) ? rows : null; } catch (_) { v = null; }
+      c.v = v; c.at = Date.now();
+      if (vivant) setEmailsLitiges(v);
+    })();
+    return () => { vivant = false; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [only]);
+  const litigesSuivis = useMemo(() => {
+    const lu = (st, base) => st.items === null ? undefined : (st.error ? null : base);
+    return litigesEnCours({
+      ventes: lu(sales, (sales.items || []).filter(o => !acctOffOf(o))),
+      achats: lu(buys, (buys.items || []).filter(o => !acctOffOf(o))),
+      emails: emailsLitiges, etats: TXN_ETATS_LU === false ? null : etatTxn,
+      numeroDe: (o) => numeroDuRetourVinted(o, { txnItem, numeros, numeroVente: (tx) => { const v = saleOv[tx]; return v && String(v.numero || '').trim() ? String(v.numero).trim() : null; } }).num,
+      ebay: retoursEbayLus === undefined ? undefined : retoursEbayLus,
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sales.items, sales.error, buys.items, buys.error, emailsLitiges, txnItem, numeros, saleOv, retoursEbayLus, accounts]);
   // « Remise en stock » — SON clic. Le N° est gardé ; s'il est encore porté par
   // une autre paire présente, on DEMANDE (jamais deviné) ; un ancien numéro
   // (013) se dit « numéro neuf à la republication ». Rien d'autre ne change :
@@ -48588,7 +48621,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const annonce = txnItem[tx] != null ? lst.find((it) => it && String(it.id) === String(txnItem[tx])) : null;
     const etatArticle = annonce && typeof annonce.status === 'string' && /neuf|[ée]tat|satisfaisant/i.test(annonce.status) ? annonce.status : '';
     deps.push(etatArticle);
-    return { deps, e, baseE, photo, sourcesPhoto, ov, hidden, etatArticle };
+    // (3 nov.) Le litige / retour en cours de CETTE vente (src/litiges.js, par transaction ou conversation).
+    const litige = litigeDeVente(litigesSuivis, o);
+    deps.push(litige ? [litige.cle, litige.genre, litige.limite || '', litige.geste.url, litige.ancien ? 1 : 0].join('|') : '');
+    return { deps, e, baseE, photo, sourcesPhoto, ov, hidden, etatArticle, litige };
   };
   const actionsVentes = React.useRef(null);
   actionsVentes.current = { imprimerBordereauVente, markPairLost, unmarkPairLost, onLocate, openPicker, rechargerLabels, setSaleOverride, toggleHidden, demanderDepose: deposeVente.demander };
@@ -49946,6 +49982,23 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           if (ar.length) { const cs=[...new Set(ar.map(o=>o._acc?accNameOf(o._acc):'').filter(Boolean))];
             jobs.push({id:'a-renvoyer',n:ar.length,icon:'box',color:C.warn,photos:ar.map(o=>orderPhoto(o)),title:`Renvoyer ${ar.length} article${ar.length>1?'s':''} (litige)`,
               sub:`Étiquette de retour sur Vinted${cs.length===1?` — compte ${cs[0]}`:cs.length>1?` — comptes ${cs.slice(0,3).join(', ')}`:''}`,tab:'achats',prio:0.8}); } }
+        // (3 nov.) LITIGES, RETOURS, RÉCLAMATIONS EN COURS (src/litiges.js) : une carte
+        // par IDENTITÉ (transaction, conversation, retour eBay), la date limite seulement
+        // si elle est LUE, sinon « délai non lu » ; le geste = un lien vers le site. Le
+        // retour d'achat sans e-mail est déjà dit par « Renvoyer … (litige) » (§7).
+        if (litigesSuivis.etat === 'lu') {
+          const cartes = litigesSuivis.lignes.filter(l => !l.ancien && !(l.sens === 'achat' && l.genre === 'retour' && l.source === 'commande')).slice(0, 8);
+          for (const l of cartes) {
+            const lim = texteLimiteLitige(l);
+            const compte = l.compte ? accNameOf(l.compte) : '';
+            jobs.push({ id: 'litige', litige: l, n: 1, icon: 'alert', color: l.presse ? C.warn : C.text, urgent: !!l.presse,
+              photos: l.commande ? [orderPhoto(l.commande)] : null,
+              court: `${LIBELLE_LITIGE[l.genre] || 'Litige'}${l.num ? ` · N°${l.num}` : ''}`,
+              detail: [lim ? `avant le ${lim}` : 'délai non lu', compte].filter(Boolean).join(' · '),
+              plein: [l.titre, l.qui, l.raison ? `« ${l.raison} »` : ''].filter(Boolean).join(' · '),
+              tab: l.sens === 'achat' ? 'achats' : 'ventes', prio: l.presse ? 0.1 : 0.6 });
+          }
+        }
         // (21 oct., 5.204) « Tout est OK » à confirmer sur Vinted avant la date
         //    limite — sinon Vinted conclut sans lui. Même liste qu'Achats
         //    (`aConfirmer`, §11). « Pas su » ⇒ aucune ligne (on n'affirme rien).
@@ -50404,7 +50457,20 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             </Bouton>
           </div>
         ); };
-        const tache = (j, i) => { if (j.cycle) return tacheCycle(j, i); if (Array.isArray(j.lbcSuppr) && j.lbcSuppr.length && saitSupprLbc) return tacheLbc(j, i); if (!(j.urssaf && Array.isArray(j.urssaf.aNoter) && j.urssaf.aNoter.length > 0)) return tacheSimple(j, i);
+        // (3 nov.) Une carte de litige : la carte ouvre la vente (ou l'achat) par sa
+        // transaction ; la pilule ouvre le site (son clic, jamais une action de VRM).
+        const tacheLitige = (j, i) => { const l = j.litige; const x = decouper(j); const plein = [x.court, x.detail, x.plein].filter(Boolean).join('\n');
+          const mot = { probleme: 'Répondre', annulation: 'Trancher', retour: l.sens === 'achat' ? 'Renvoyer' : 'Suivre', suspendue: 'Voir' }[l.genre] || 'Voir';
+          return (
+          <div className={'vrm-day-task is-groupe' + (j.urgent ? ' is-urgent' : '')} key={'litige' + l.cle + i} role="group" data-job="litige" data-litige={l.cle} data-litige-genre={l.genre} data-litige-sens={l.sens}
+            data-litige-limite={l.limite || ''} data-litige-num={l.num || ''} data-litige-source={l.source} title={plein}>
+            <button type="button" className="vrm-day-task-ouvrir" aria-label={plein.replace(/\n/g, ' — ')} onClick={()=>{ if (l.tx) poserCible({ type: l.sens === 'achat' ? 'achat' : 'vente', tx: l.tx }, j.tab); if (onNav) onNav(j.tab); }}>
+              {corpsTache(j, x)}
+            </button>
+            <Bouton variante="secondaire" className="vrm-b-petit vrm-day-task-geste" href={l.geste.url} target="_blank" rel="noreferrer" title={l.geste.libelle + ' ↗'} aria-label={l.geste.libelle} data-litige-geste={l.geste.url}>{mot} ↗</Bouton>
+          </div>
+        ); };
+        const tache = (j, i) => { if (j.cycle) return tacheCycle(j, i); if (j.litige) return tacheLitige(j, i); if (Array.isArray(j.lbcSuppr) && j.lbcSuppr.length && saitSupprLbc) return tacheLbc(j, i); if (!(j.urssaf && Array.isArray(j.urssaf.aNoter) && j.urssaf.aNoter.length > 0)) return tacheSimple(j, i);
           const x = decouper(j); const plein = x.plein ? `${x.court}\n${x.detail ? x.detail + '\n' : ''}${x.plein}` : x.detail ? `${x.court}\n${x.detail}` : x.court;
           return (
           <div className="vrm-day-task is-groupe" key={(j.id||'j')+i} role="group" data-job={j.id||undefined} data-n={j.n!=null?j.n:undefined} data-urssaf-echeance={j.urssaf.dueIso} data-urssaf-apayer={j.urssaf.apayer==null?'':String(j.urssaf.apayer)} data-urssaf-partiel={j.urssaf.partiel?'1':undefined} title={plein}>
@@ -51169,6 +51235,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   <p className="vrm-recap-phrase" data-recap-phrase=""><strong>{phrase.gras}</strong>{phrase.suite ? ' ' + phrase.suite : ''}</p>
                   {issue ? <p className="vrm-recap-issue" data-retour-archive={issue.k}>{issue.t}</p> : null}
                   {o._fromEmail ? <p className="vrm-recap-issue">Reconstituée depuis l'email — pas encore confirmée par Vinted.</p> : null}
+                  {pre.litige && !pre.litige.ancien ? (() => { const l = pre.litige; const lim = texteLimiteLitige(l); return (
+                    <div className="vrm-recap-litige" data-recap-litige={l.genre} data-litige-limite={l.limite || ''} data-litige-cle={l.cle}>
+                      <p className="vrm-recap-issue"><strong>{LIBELLE_LITIGE[l.genre] || 'Litige'}</strong>{' · '}{lim ? `avant le ${lim}` : 'délai non lu'}</p>
+                      <Bouton variante="secondaire" className="vrm-b-petit" href={l.geste.url} target="_blank" rel="noreferrer" data-litige-geste={l.geste.url}>{l.geste.libelle} ↗</Bouton>
+                    </div>); })() : null}
                   {/* (3 nov., critique #6) La frise de la ligne, mêmes 4 étapes et mêmes mots ; « Bordereau » en détail. */}
                   {etapes ? <RecapFrise etapes={etapes} cle={txL}/> : null}
                 </section>
