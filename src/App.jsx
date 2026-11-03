@@ -131,6 +131,7 @@ import { beneficeLigneVente, texteBenefice, euros as eurosLigne } from "./benefi
 import { friseVente, phraseVente, eurosRecap, ETATS_HORS_PARCOURS } from "./recapVente.js";
 // (2 nov.) Le style « Fusion » : la carte sombre du mois et la frise de suivi (src/design/).
 import CarteMois from "./design/CarteMois.jsx";
+import { courtFusion, enArticles } from "./design/tacheCourte.js";
 import Frise from "./design/Frise.jsx";
 import { friseVenteFusion, friseColisFusion } from "./design/friseFusion.js";
 import { etapesTournee, arretsTournee, gestesDepuis } from "./tournee.js";
@@ -38159,8 +38160,11 @@ function BeneficeJournee({ onNav, place, edition = false, fusion = false }) {
   // montant, rien d'autre (le détail vit dans Comptabilité, d'un toucher).
   if (fusion) return (
     <button type="button" className="vrm-fu-case is-jour" data-fu-case="benefice" data-journee-benef-detail="" title={titre} {...attrs} onClick={allerCompta}>
-      <span>Bénéfice du mois</span>
-      <b className={valeur == null ? 'is-vide' : undefined} data-journee-benef-ligne={avecNet ? 'net' : 'brut'}>{valeur == null ? '—' : <>{B && B.nCout < B.n ? <span className="vrm-fu-borne">≥</span> : null}{Math.round(valeur).toLocaleString('fr-FR')}{'\u00a0'}€</>}</b>
+      {/* (3 nov., « rien ne ment ») Un brut sur une partie des ventes n'est pas un plancher
+          (une vente au prix d'achat inconnu peut être à perte) : jamais « ≥ » ; la
+          couverture « sur N » à côté, et « brut » quand le net ne se calcule pas. */}
+      <span>{B && !avecNet ? 'Bénéfice brut du mois' : 'Bénéfice du mois'}</span>
+      <b className={valeur == null ? 'is-vide' : undefined} data-journee-benef-ligne={avecNet ? 'net' : 'brut'}>{valeur == null ? '—' : <>{Math.round(valeur).toLocaleString('fr-FR')}{'\u00a0'}€{B && B.nCout < B.n ? <span className="vrm-fu-couv" data-fu-couverture={`${B.nCout}/${B.n}`}> · {B.nCout} sur {B.n}</span> : null}</>}</b>
     </button>
   );
   return place === 'integre'
@@ -48907,7 +48911,18 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         // sont celles d'avant, découpées à l'affichage : la partie avant « — »
         // est le titre, le reste et le sous-titre font le détail. Aucune règle,
         // aucune alerte, aucune cible ne change.
+        // (3 nov., Julien sur ordinateur : « j'aime pas trop cet endroit » — trop de phrases,
+        // jargon, « paires ») La forme Fusion : un titre COURT (« 2 annonces à retirer de
+        // Leboncoin », « Vente Vestiaire à envoyer », « 5 articles pour eBay », « 3 e-mails à
+        // trier ») et une sous-ligne courte. La phrase entière reste dans l'infobulle et le nom
+        // du bouton (lecteur d'écran) ; aucune règle, aucun compteur, aucune cible ne change.
         const decouper = (j) => {
+          const f = courtFusion(j);
+          if (f) return { court: f.court, detail: f.detail, plein: [j.title, j.sub].filter(Boolean).join(' — ') };
+          const x = decouperBrut(j);
+          return { ...x, court: enArticles(x.court), detail: enArticles(x.detail) };
+        };
+        const decouperBrut = (j) => {
           // (1er nov.) Une ligne qui porte SA forme courte (titre + raison courte) :
           // le texte long (`plein`) reste dans l'infobulle et pour le lecteur d'écran.
           if (j.court && j.detail !== undefined) return { court: j.court, detail: j.detail || '', plein: j.plein || '' };

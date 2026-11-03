@@ -204,7 +204,8 @@ const ECRANS = [
           await pg.waitForTimeout(1800);
           if (MUTATION) await pg.evaluate(() => { const s = document.querySelector('[data-fu-frise="8001"] [data-fu-etape="livree"]'); if (s) s.setAttribute('data-fait', '1'); });
           const m = await mesure(pg);
-          if (process.env.FUSION_DBG) console.log(await pg.evaluate((sel) => [...document.querySelectorAll(sel)].slice(0, 1).map((r) => [r, ...r.querySelectorAll('*')].slice(0, 6).map((e) => { const c = getComputedStyle(e); const b = e.getBoundingClientRect(); return `${e.tagName}.${String(e.className).slice(0, 30)} w${Math.round(b.width)} x${Math.round(b.left)} flex:${c.flex} disp:${c.display}`; }).join('\n')).join('\n'), process.env.FUSION_DBG));
+          if (process.env.FUSION_DBG2) console.log(await pg.evaluate((sel) => [...document.querySelectorAll(sel)].map((e) => { const b = e.getBoundingClientRect(); const c = getComputedStyle(e); return `${e.tagName} h${Math.round(b.height)} x${Math.round(b.left)} w${Math.round(b.width)} pad:${c.padding} bg:${c.backgroundColor} :: ${e.outerHTML.slice(0, 260)}`; }).join('\n'), process.env.FUSION_DBG2));
+          if (process.env.FUSION_DBG) console.log(await pg.evaluate((sel) => [...document.querySelectorAll(sel)].slice(0, 1).map((r) => [r, ...r.querySelectorAll('*')].slice(0, 14).map((e) => { const c = getComputedStyle(e); const b = e.getBoundingClientRect(); return `${e.tagName}.${String(e.className).slice(0, 30)} w${Math.round(b.width)} h${Math.round(b.height)} x${Math.round(b.left)} y${Math.round(b.top)} flex:${c.flex} disp:${c.display}`; }).join('\n')).join('\n'), process.env.FUSION_DBG));
           dit(m.carte, 'la carte sombre du mois est là');
           dit(m.deb <= 1 && !m.hors.length, 'aucun débordement horizontal', `${m.deb}px ${m.hors.join(' | ')}`);
           dit(!m.petites.length, 'les gestes Fusion font 44 px', m.petites.join(' | '));
@@ -215,6 +216,27 @@ const ECRANS = [
           if (JEU === 'passu') dit(!/(^|[^\d,])0(,00)?\s?€/.test(mensonge), 'ventes illisibles : aucune carte ne dit « 0 € » (« — »)', mensonge.replace(/\n/g, ' ').slice(0, 200));
           const rognes = await pg.evaluate(() => [...document.querySelectorAll('.vrm-fu-grand, .vrm-fu-case b, .vrm-fu-vente-prix')].filter((e) => e.scrollWidth > e.clientWidth + 1).map((e) => e.textContent.trim()));
           dit(!rognes.length, 'aucun montant rogné (grand chiffre, cases, prix)', rognes.join(' | '));
+          // (3 nov., Julien sur ordinateur : « j'aime pas trop cet endroit ») Ma journée à 1512 px :
+          // UNE colonne centrée (≤ 760 px), pas de bloc « Urgent » ni de tuiles, jamais « paire »,
+          // et la barre collée a le fond de la page (pas une bande blanche sur gris) avec un filet.
+          if (E.id === 'journee') {
+            const jj = await pg.evaluate(() => {
+              const l = document.querySelector('.vrm-fu-journee'), m = document.querySelector('.vrm-main');
+              const r = l && l.getBoundingClientRect(), rm = m && m.getBoundingClientRect();
+              const bar = document.querySelector('.vrm-main > .vrm-barre-haut'); const cb = bar && getComputedStyle(bar);
+              const fond = m && getComputedStyle(m).backgroundColor;
+              const txt = [...document.querySelectorAll('.vrm-fu-afaire')].map((e) => e.innerText).join(' ');
+              return { w: r ? Math.round(r.width) : null, g: r && rm ? Math.round(r.left - rm.left - parseFloat(getComputedStyle(m).paddingLeft)) : null, d: r && rm ? Math.round(rm.right - parseFloat(getComputedStyle(m).paddingRight) - r.right) : null,
+                urgentBloc: !!document.querySelector('.vrm-fu-journee [data-widget-tuile], .vrm-fu-journee .vrm-w-tuile, .vrm-fu-journee .vrm-day-urgent'),
+                bar: cb ? { bg: cb.backgroundColor, flou: cb.backdropFilter || cb.webkitBackdropFilter || '', ombre: cb.boxShadow } : null, fond, paire: /\bpaires?\b/.test(txt) };
+            });
+            dit(!jj.urgentBloc, 'Ma journée : pas de tuiles ni de bloc « Urgent » séparé');
+            dit(!jj.paire, 'Ma journée : jamais « paire » dans « À faire »');
+            if (vp.width > 1000) {
+              dit(jj.w != null && jj.w <= 760 && Math.abs(jj.g - jj.d) <= 2, 'Ma journée sur ordinateur : une colonne ≤ 760 px, centrée', JSON.stringify(jj));
+              dit(jj.bar && /blur/.test(jj.bar.flou) && jj.bar.bg !== 'rgb(255, 255, 255)' && !/^rgb\(255, 255, 255\)$/.test(jj.bar.bg), 'la barre collée prend le fond de la page (voile flouté, pas une bande blanche)', JSON.stringify(jj.bar));
+            }
+          }
           if (SHOTS) {
             await pg.screenshot({ path: path.join(SHOTS, `${E.id}-${nom}${JEU === 'base' ? '' : '-' + JEU}.png`) });
             if (vp.width < 600) { await pg.setViewportSize({ width: vp.width, height: 2400 }); await pg.waitForTimeout(500); await pg.screenshot({ path: path.join(SHOTS, `${E.id}-${nom}${JEU === 'base' ? '' : '-' + JEU}-long.png`) }); await pg.setViewportSize(vp); }

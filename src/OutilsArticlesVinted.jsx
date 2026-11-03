@@ -111,7 +111,7 @@ export function ComparaisonComptesVinted({
   return (
     <details className="vrm-outils" data-comparer-comptes>
       <summary>
-        Comparer mes comptes Vinted <span>{rows.length} comptes</span>
+        Comparer mes comptes Vinted <span>{rows.length} compte{rows.length > 1 ? 's' : ''}</span>
       </summary>
       <p>
         <b>{periode}</b> · ventes finalisées, à leur date de vente (masquées exclues).

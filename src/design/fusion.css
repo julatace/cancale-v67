@@ -58,7 +58,10 @@
 
 /* ── 0. LE FOND des écrans Fusion (le reste de l'app garde le sien) ───────── */
 html body .vrm-app-shell .vrm-main:has(.vrm-fu-ecran) { background-color: var(--fu-fond) !important; }
-html body .vrm-app-shell:has(.vrm-main .vrm-fu-ecran) { background-color: var(--fu-fond); }
+html body .vrm-app-shell:has(.vrm-main .vrm-fu-ecran) { background-color: var(--fu-fond) !important; }
+/* (3 nov.) En sombre, la règle Vitrine `:root[data-theme="dark"] .vrm-app-shell .vrm-main` gagnait :
+   page #0e0e0d, bandes #000 autour — deux noirs côte à côte. Même fond partout. */
+:root[data-theme="dark"] body .vrm-app-shell .vrm-main:has(.vrm-fu-ecran) { background-color: var(--fu-fond) !important; }
 .vrm-fu-ecran { font-variant-numeric: var(--fu-chiffres); }
 
 /* Lecteur d'écran seulement */
@@ -73,11 +76,13 @@ html body .vrm-app-shell:has(.vrm-main .vrm-fu-ecran) { background-color: var(--
   display: flex; flex-direction: column; gap: 14px; overflow: hidden; isolation: isolate;
 }
 .vrm-fu-carte-tete { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; min-width: 0; }
+/* (3 nov., cas extrêmes) Un montant à 5 chiffres ne se coupe jamais en « 35 211,9… » :
+   CarteMois réduit la taille jusqu'à ce qu'il tienne à côté de la courbe (mesuré). */
 .vrm-fu-carte-txt { min-width: 0; flex: 1 1 auto; }
 .vrm-fu-surtitre { display: block; font: 600 12px/1.3 var(--vrm-police); color: rgba(255,255,255,.6); text-transform: uppercase; letter-spacing: .06em; }
 .vrm-fu-grand {
   margin-top: 4px; font: 800 38px/1.08 var(--vrm-police); letter-spacing: -.03em; color: #fff;
-  font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden;
 }
 .vrm-fu-grand.is-vide { color: rgba(255,255,255,.55); }
 .vrm-fu-grand .vrm-fu-borne { font-size: 15px; font-weight: 600; letter-spacing: 0; color: rgba(255,255,255,.65); margin-right: 6px; vertical-align: .55em; }
@@ -770,3 +775,67 @@ html body .vrm-app-shell .vrm-day-layout.vrm-fu-journee .vrm-day-task .vrm-day-t
 :root[data-theme="dark"] body .vrm-app-shell .vrm-day-layout.vrm-fu-journee .vrm-day-task .vrm-day-task-action { color: #5eb0ff !important; }
 html body .vrm-app-shell .vrm-main .vrm-day-layout.vrm-fu-journee .vrm-bilan-sync[data-vendus-ailleurs] > summary > span { color: #0062c4 !important; }
 :root[data-theme="dark"] body .vrm-app-shell .vrm-main .vrm-day-layout.vrm-fu-journee .vrm-bilan-sync[data-vendus-ailleurs] > summary > span { color: #5eb0ff !important; }
+
+/* (3 nov.) « Outils » a la forme des filtres voisins (pilule, même hauteur, même filet),
+   au lieu d'un carré gris décalé vers le haut. */
+html body .vrm-app-shell .vrm-main:has(.vrm-fu-ventes) .vrm-filtres-et-outils { align-items: center !important; }
+html body .vrm-app-shell .vrm-main:has(.vrm-fu-ventes) .vrm-filtres-et-outils > .vrm-outils-ventes > button {
+  min-height: 44px !important; border-radius: 999px !important; border: 1px solid var(--vrm-line) !important;
+  background: var(--vrm-bg) !important; color: var(--vrm-ink) !important; font-weight: 600 !important; box-shadow: none !important; margin: 0 !important;
+}
+
+/* (3 nov.) « Vérifications » sous la liste des ventes : quatre blocs venus de quatre
+   composants (marges 50/54/58 px, chevrons à trois hauteurs, « Vérifier » flottant).
+   Ici une seule liste groupée façon Réglages : même retrait, même hauteur, un filet entre
+   deux lignes, titre puis valeur grise dessous, chevron à droite centré. Rien n'est retiré. */
+html body .vrm-app-shell .vrm-main:has(.vrm-fu-ventes) [data-ventes-controles] { gap: 0 !important; }
+html body .vrm-app-shell .vrm-main:has(.vrm-fu-ventes) [data-ventes-controles] > h3 { margin: 0 4px 8px !important; }
+html body .vrm-app-shell .vrm-main:has(.vrm-fu-ventes) [data-ventes-controles] > details {
+  margin: 0 !important; padding: 0 16px !important; border: 0 !important; border-radius: 0 !important;
+  background: var(--fu-carte) !important; box-shadow: none !important;
+  border-top: 1px solid var(--fu-filet) !important;
+}
+html body .vrm-app-shell .vrm-main:has(.vrm-fu-ventes) [data-ventes-controles] > h3 + details { border-top: 0 !important; border-radius: 16px 16px 0 0 !important; }
+html body .vrm-app-shell .vrm-main:has(.vrm-fu-ventes) [data-ventes-controles] > details:last-child { border-radius: 0 0 16px 16px !important; padding-bottom: 0 !important; }
+html body .vrm-app-shell .vrm-main:has(.vrm-fu-ventes) [data-ventes-controles] > h3 + details:last-child { border-radius: 16px !important; }
+html body .vrm-app-shell .vrm-main:has(.vrm-fu-ventes) [data-ventes-controles] > details > summary {
+  display: flex !important; flex-direction: column !important; justify-content: center !important; align-items: flex-start !important; gap: 2px !important;
+  min-height: 56px !important; padding: 10px 28px 10px 0 !important; margin: 0 !important;
+  position: relative !important; list-style: none !important; cursor: pointer;
+  font: 600 15px/1.3 var(--vrm-police) !important; color: var(--fu-encre) !important; text-align: left !important;
+}
+html body .vrm-app-shell .vrm-main:has(.vrm-fu-ventes) [data-ventes-controles] > details > summary::-webkit-details-marker { display: none; }
+html body .vrm-app-shell .vrm-main:has(.vrm-fu-ventes) [data-ventes-controles] > details > summary :is(b, .vrm-va-titre) { font: inherit !important; color: inherit !important; }
+html body .vrm-app-shell .vrm-main:has(.vrm-fu-ventes) [data-ventes-controles] > details > summary > span {
+  display: block !important; margin: 0 !important; font: 400 13px/1.35 var(--vrm-police) !important; color: var(--fu-gris) !important; white-space: normal !important;
+}
+html body .vrm-app-shell .vrm-main:has(.vrm-fu-ventes) [data-ventes-controles] > details > summary::after {
+  content: "" !important; position: absolute !important; right: 4px !important; top: 50% !important; left: auto !important; bottom: auto !important;
+  width: 7px !important; height: 7px !important; margin: -5px 0 0 !important; background: none !important;
+  border: 0 !important; border-right: 2px solid var(--fu-gris3) !important; border-bottom: 2px solid var(--fu-gris3) !important;
+  transform: rotate(-45deg) !important; opacity: 1 !important; transition: transform .2s ease;
+}
+html body .vrm-app-shell .vrm-main:has(.vrm-fu-ventes) [data-ventes-controles] > details[open] > summary::after { transform: rotate(45deg) !important; }
+html body .vrm-app-shell .vrm-main:has(.vrm-fu-ventes) [data-ventes-controles] > details[open] { padding-bottom: 14px !important; }
+
+/* (3 nov., Julien : « j'aime pas trop cet endroit », capture sur ordinateur) La barre de
+   recherche collée était BLANCHE sur une page grise, et le texte qui défilait passait dessous
+   coupé net. Elle prend le fond de la page (translucide, flou façon Apple) et un filet sous
+   elle : ce qui passe dessous est voilé, jamais tranché ; ailleurs, même geste sur fond blanc. */
+@media (min-width: 1024px), (min-width: 768px) and (hover: hover) and (pointer: fine) {
+  html body .vrm-app-shell .vrm-main > .vrm-barre-haut {
+    background-color: color-mix(in srgb, var(--vrm-bg, #fff) 84%, transparent) !important;
+    -webkit-backdrop-filter: saturate(180%) blur(18px); backdrop-filter: saturate(180%) blur(18px);
+    box-shadow: 0 -32px 0 0 var(--vrm-bg, #fff), 0 1px 0 0 var(--vrm-hair, rgba(0,0,0,.08)) !important;
+    padding-bottom: 8px !important; margin-bottom: 0 !important;
+  }
+  html body .vrm-app-shell .vrm-main:has(.vrm-fu-ecran) > .vrm-barre-haut {
+    background-color: color-mix(in srgb, var(--fu-fond) 84%, transparent) !important;
+    box-shadow: 0 -32px 0 0 var(--fu-fond), 0 1px 0 0 var(--fu-filet) !important;
+  }
+  html body .vrm-app-shell .vrm-main:has(> .vrm-barre-haut) { scroll-padding-top: 84px; }
+  /* Ma journée sur ordinateur : la maquette FusionJournee à la largeur d'une colonne
+     lisible (720 px), centrée — la tête sombre puis UNE liste « À faire ». */
+  html body .vrm-app-shell .vrm-day-layout.vrm-fu-journee { max-width: 720px !important; margin-inline: auto !important; width: 100% !important; grid-template-columns: minmax(0, 1fr) !important; }
+}
+html body .vrm-app-shell .vrm-day-layout.vrm-fu-journee .vrm-fu-tete .vrm-fu-case.is-jour .vrm-fu-couv { font-size: 13px; font-weight: 600; letter-spacing: 0; color: rgba(255,255,255,.65); }

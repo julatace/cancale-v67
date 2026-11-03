@@ -4,7 +4,7 @@
 // Elle n'invente rien : chaque valeur lui est passée par l'écran, qui la tient
 // de sa règle (§5 « une seule règle par notion »). Une valeur `null` s'écrit
 // « — » (pas su), jamais 0.
-import React from 'react';
+import React, { useLayoutEffect, useRef } from 'react';
 import { cheminMonotone } from '../courbeMonotone.js';
 
 // La courbe : des valeurs (une par jour), dessinées sans sommet inventé
@@ -31,13 +31,31 @@ export function Courbe({ valeurs, largeur = 96, hauteur = 46 }) {
 // cases : [{ cle, n, l, titre, onClick, attrs }] — `n` peut être un nœud.
 export default function CarteMois({ surtitre, valeur, sous = null, cases = [], courbe = null, enHaut = null, children = null, className = '', ...attrs }) {
   const vide = valeur == null || valeur === '';
+  // (3 nov., cas extrêmes) Un montant à 5 chiffres (« 35 211,97 € ») ne se coupe jamais
+  // en « 35 211,9… » : la taille descend d'un pixel à la fois jusqu'à ce qu'il tienne
+  // (plancher 22 px), et remonte quand la place revient. Mesuré, pas deviné.
+  const grandRef = useRef(null);
+  useLayoutEffect(() => {
+    const el = grandRef.current;
+    if (!el) return undefined;
+    const ajuste = () => {
+      el.style.fontSize = '';
+      let fs = parseFloat(getComputedStyle(el).fontSize) || 38;
+      while (el.scrollWidth > el.clientWidth + 0.5 && fs > 22) { fs -= 1; el.style.fontSize = fs + 'px'; }
+    };
+    ajuste();
+    if (typeof ResizeObserver === 'undefined') return undefined;
+    const ro = new ResizeObserver(ajuste);
+    ro.observe(el.parentElement || el);
+    return () => ro.disconnect();
+  }, [valeur, vide]);
   return (
     <section className={'vrm-fu-carte' + (className ? ' ' + className : '')} data-fu-carte="" {...attrs}>
       {enHaut}
       <div className="vrm-fu-carte-tete">
         <div className="vrm-fu-carte-txt">
           {surtitre ? <span className="vrm-fu-surtitre">{surtitre}</span> : null}
-          <div className={'vrm-fu-grand' + (vide ? ' is-vide' : '')}>{vide ? '—' : valeur}</div>
+          <div ref={grandRef} className={'vrm-fu-grand' + (vide ? ' is-vide' : '')}>{vide ? '—' : valeur}</div>
           {sous ? <div className="vrm-fu-sous">{sous}</div> : null}
         </div>
         {courbe && courbe.length ? <Courbe valeurs={courbe} /> : null}

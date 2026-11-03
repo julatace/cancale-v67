@@ -206,7 +206,9 @@ const lireEcheance=(pg)=>pg.evaluate(()=>{
       // (`data-urssaf-mois-n`) ; sur un code d'avant, la tuile « Ventes finalisées ».
       const carte=await pg.evaluate(()=>{ const c=document.querySelector('[data-stats-carte="mois"]'); const t=c?(c.innerText||''):''; const m=/Ventes finalisées\s*\n\s*(\d+)\s*\n([^\n]*)/i.exec(t); if(m) return { n:Number(m[1]), sous:m[2] }; const p=document.querySelector('[data-compta-phrase="urssaf-mois"]'), s=document.querySelector('[data-urssaf-mois-n]'); return p&&s?{ n:Number(s.getAttribute('data-urssaf-mois-n')), sous:p.innerText }:null; });
       dit(!!carte && !/\bsur \d+ vendue/.test(carte.sous),'les finalisées (au versement) ne sont pas écrites « sur N vendues ce mois-ci »',JSON.stringify(carte));
-      await aller(pg,'dashboard','[data-dash-stat="caMois"]',3000);
+      await aller(pg,'dashboard','[data-dash-stat="caMois"]',1000);
+      // La lecture des ventes est asynchrone : on attend le montant (ou on rapporte « pas su » au bout de 25 s).
+      await pg.waitForFunction(()=>{ const e=document.querySelector('[data-dash-stat="caMois"]'); return e&&e.hasAttribute('data-dash-cents'); },null,{timeout:25000}).catch(()=>{});
       const dashMois=await pg.evaluate(()=>{ const e=document.querySelector('[data-dash-stat="caMois"]'); return e?Number(e.getAttribute('data-dash-cents')):null; });
       // (2 nov., 22 h) « Vendu en … », « Reçu » et « CA de l'année » ne sont plus sur Ma journée — retiré à la demande de Julien, 2 nov. 22 h (maquette FusionJournee).
       // Le VENDU du mois est jugé sur la carte du mois de Ventes (même règle, `bilanVentes`).
