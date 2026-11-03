@@ -552,8 +552,8 @@ if (!bloc || !/caUrssafParMois/.test(bloc)) {
     const corps = SRC.slice(SRC.indexOf('() =>', i), j + 1);
     const run = (declarables, lbcLu, ebayCmd) => {
       // (1er nov.) + `ventesVc` (les ventes Vestiaire, lues à part) : aucune ici.
-      c.__arg = { declarables, lbcLu, lbcVentes: { ventes: [{ txId: 'A', isSeller: true, price: 7500, stepLabel: 'Paiement effectué', dateVente: '2026-10-02T10:00:00+02:00', title: 'lbc' }] }, ebayCmd, declUrssaf: {}, ventesVc: [] };
-      return vm.runInContext(`(() => { const { declarables, lbcLu, lbcVentes, ebayCmd, declUrssaf, ventesVc } = __arg; const datesLbc = {}; const avecDatesLbc = (v) => v; return (${corps})(); })()`, c);
+      c.__arg = { declarables, lbcLu, lbcVentes: { ventes: [{ txId: 'A', isSeller: true, price: 7500, stepLabel: 'Paiement effectué', dateVente: '2026-10-02T10:00:00+02:00', title: 'lbc' }] }, ebayCmd, declUrssaf: {}, ventesVc: [], excluAutre: null };   // (3 nov.) aucun compte d'un autre site écarté
+      return vm.runInContext(`(() => { const { declarables, lbcLu, lbcVentes, ebayCmd, declUrssaf, ventesVc, excluAutre } = __arg; const datesLbc = {}; const avecDatesLbc = (v) => v; return (${corps})(); })()`, c);
     };
     const EB = [{ orderId: 'E1', orderPaymentStatus: 'PAID', creationDate: '2026-10-03T10:00:00.000Z', pricingSummary: { total: { value: '72.00', currency: 'EUR' } }, paymentSummary: { totalDueSeller: { value: '66.00', currency: 'EUR' } }, totalMarketplaceFee: { value: '6.00', currency: 'EUR' } }];
     const pasSu = run(null, true, EB);

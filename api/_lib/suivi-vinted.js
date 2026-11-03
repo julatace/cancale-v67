@@ -46,6 +46,7 @@ import { etatColisDepuisTexte, normaliserSuivi } from './etat-colis-email.js';
 import { cleCodeRetrait } from '../email-inbound.js';
 import { clesEtapeTx, jourParis } from './transporteurs.js';
 import { DESTINATIONS } from './lien-notif.js';
+import { texteArrivee } from './notif-textes.js';
 
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://lgonxzrzjcqthjtbdpzo.supabase.co';
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imxnb254enJ6amNxdGhqdGJkcHpvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk1ODIyMjYsImV4cCI6MjA5NTE1ODIyNn0.QJQSKILJLEpbDvBP4w7xD-olxoUjX1H2rxrYdo63GWQ';
@@ -182,12 +183,17 @@ export async function notifierSuiviVinted(tx, uid) {
   const liste = (achats[0] && Array.isArray(achats[0].v)) ? achats[0].v : [];
   const commande = liste.find((o) => o && String(o.transaction_id) === tx);
   if (!commande) return { status: 404, raison: 'pas-un-achat' };
-  // 4. La préférence « suivi ».
-  if (!(await pushCategorieActive('suivi'))) return { status: 200, envoye: false, raison: 'preference' };
-  const n = notifSuivi(commande.title, dernier, tx);
+  // 4. (3 nov.) Seule l'ARRIVÉE constatée (« Disponible pour retrait ») sonne,
+  //    dans la famille « Colis arrivés », avec le texte de toutes les arrivées.
+  //    Les autres étapes (« vient d'arriver au centre de tri », « en cours de
+  //    livraison », « Délivré »…) : catégorie `suivi`, retirée — mesuré, 8 des 20
+  //    dernières étapes disaient « vient d'arriver au centre de tri », lu
+  //    « arrivé » sur le téléphone.
+  const relais = etatColisDepuisTexte(dernier.t) === 'available';
+  if (!(await pushCategorieActive(relais ? 'colis' : 'suivi'))) return { status: 200, envoye: false, raison: 'preference' };
+  const n = relais ? { title: texteArrivee({ article: commande.title }).title, body: `Vinted : « ${propre(dernier.t, 100)} »`, tag: `vrm-suivi-${tx}`, url: DESTINATIONS.retrait({ tx }) } : notifSuivi(commande.title, dernier, tx);
   if (!n) return { status: 200, envoye: false, raison: 'sans-etape' };
   // 5. L'arrivée au point relais : déjà annoncée par l'e-mail ou la conversation ?
-  const relais = etatColisDepuisTexte(dernier.t) === 'available';
   const n0 = normaliserSuivi(l.s || '');
   const numero = /^[A-Z0-9]{6,40}$/.test(n0) ? n0 : '';
   const aliasRelais = relais ? [`relais-tx${tx}-sans`, ...(numero ? [`relais-${numero}-sans`] : [])] : [];

@@ -117,7 +117,7 @@ export const indexDeclarations = (reg) => {
 
 export const moisDeclare = (reg, ym) => !!(reg && typeof reg === 'object' && reg[ym] && Array.isArray(reg[ym].ids));
 
-export const ventesDeclarables = ({ vinted, lbc, ebay, vestiaire, masquee, exclu, versements, declare } = {}) => {
+export const ventesDeclarables = ({ vinted, lbc, ebay, vestiaire, masquee, exclu, excluAutre, versements, declare } = {}) => {
   const lignes = [], aDater = [], ecartees = [], vus = new Set();
   let exclues = 0;
   const garde = (l) => { if (vus.has(l.id)) return false; vus.add(l.id); return true; };
@@ -164,6 +164,10 @@ export const ventesDeclarables = ({ vinted, lbc, ebay, vestiaire, masquee, exclu
   for (const v of (lbc || [])) {
     if (!v || v.isSeller !== true || !v.txId) continue;
     if (lbcAnnulee(v) || !lbcFinalisee(v)) continue;
+    // (3 nov.) Un compte Leboncoin, Vestiaire ou eBay écarté par SON choix
+    // (Paramètres → Comptes liés, `excluAutre`, api/_lib/comptes-exclus.js) :
+    // comme un compte Vinted exclu, sa vente n'entre dans AUCUN total.
+    if (excluAutre && excluAutre('leboncoin', v)) { exclues += 1; continue; }
     const eur = v.price != null ? Number(v.price) / 100 : NaN;
     const id = 'lbc:' + v.txId;
     if (!isFinite(eur)) { if (!vus.has(id)) { vus.add(id); ecartees.push({ id, plateforme: 'Leboncoin', raison: 'prix inconnu', titre: v.title || '', manque: true }); } continue; }
@@ -177,11 +181,13 @@ export const ventesDeclarables = ({ vinted, lbc, ebay, vestiaire, masquee, exclu
     // sortait de partout sans rien dire : elle est mise à part et NOMMÉE (« au
     // moins »), son montant réel n'étant pas lu (§5 : un total partiel se dit).
     if (e && e.orderId && String(e.orderPaymentStatus || '').toUpperCase() === 'PARTIALLY_REFUNDED') {
+      if (excluAutre && excluAutre('ebay', e)) { exclues += 1; continue; }
       const idp = 'ebay:' + e.orderId;
       if (!vus.has(idp)) { vus.add(idp); ecartees.push({ id: idp, plateforme: 'eBay', raison: 'remboursement partiel — montant à vérifier sur eBay', titre: (Array.isArray(e.lineItems) && e.lineItems[0] && e.lineItems[0].title) || '', manque: true }); }
       continue;
     }
     if (!e || String(e.orderPaymentStatus || '').toUpperCase() !== 'PAID' || !e.orderId) continue;
+    if (excluAutre && excluAutre('ebay', e)) { exclues += 1; continue; }
     // (revue argent, 19 oct.) Une commande ANNULÉE garde `PAID` (eBay le temps
     // du remboursement, et VRM quand il accepte une annulation :
     // `annulerCommandeRangee`). Ce n'est pas de l'argent reçu : hors du CA.
@@ -206,6 +212,7 @@ export const ventesDeclarables = ({ vinted, lbc, ebay, vestiaire, masquee, exclu
   // « à dater » ; pas encore versée ⇒ pas encore reçue (comme Vinted).
   for (const v of (vestiaire || [])) {
     if (!v || !v.id || vcVenteAnnulee(v)) continue;
+    if (excluAutre && excluAutre('vestiaire', v)) { exclues += 1; continue; }
     const id = 'vestiaire:' + v.id;
     if (vus.has(id)) continue;
     const recu = montantRecuVc(v);
@@ -218,7 +225,7 @@ export const ventesDeclarables = ({ vinted, lbc, ebay, vestiaire, masquee, exclu
   return { lignes, aDater, ecartees, exclues, declare: idx ? 'lu' : 'pasSu' };
 };
 
-export const ventesFaites = ({ vinted, lbc, ebay, vestiaire, cachee } = {}) => {
+export const ventesFaites = ({ vinted, lbc, ebay, vestiaire, cachee, excluAutre } = {}) => {
   const lignes = [], vus = new Set();
   let sansDate = 0, ecartees = 0;   // ecartees : commandes eBay au montant reçu illisible (montantRecuEbay)
   // (1er nov., audits A2 et A10) Les ventes FAITES dont l'argent ne se lit pas
@@ -240,6 +247,7 @@ export const ventesFaites = ({ vinted, lbc, ebay, vestiaire, cachee } = {}) => {
   }
   for (const v of (lbc || [])) {
     if (!v || v.isSeller !== true || !v.txId || lbcAnnulee(v)) continue;
+    if (excluAutre && excluAutre('leboncoin', v)) continue;   // (3 nov.) compte écarté par son choix
     const eur = v.price != null ? Number(v.price) / 100 : NaN;
     if (!isFinite(eur)) { if (garde('lbc:' + v.txId)) nonComptees.push({ plateforme: 'Leboncoin', raison: 'prix inconnu', ts: Date.parse(v.dateVente || '') || null }); continue; }
     const t = Date.parse(v.dateVente || '');
@@ -250,6 +258,7 @@ export const ventesFaites = ({ vinted, lbc, ebay, vestiaire, cachee } = {}) => {
     if (garde('lbc:' + v.txId)) lignes.push({ plateforme: 'Leboncoin', ts: t, eur, compte: String(v.account || ''), heureLue: !(v.dateSaisie === true || /^\d{4}-\d{2}-\d{2}$/.test(String(v.dateVente).trim())) });
   }
   for (const e of (ebay || [])) {
+    if (e && excluAutre && excluAutre('ebay', e)) continue;   // (3 nov.) compte écarté par son choix
     // (2 nov., P1) Remboursée en partie : vendue, mais son montant n'est pas sûr ⇒ nommée.
     if (e && e.orderId && String(e.orderPaymentStatus || '').toUpperCase() === 'PARTIALLY_REFUNDED') { if (garde('ebay:' + e.orderId)) nonComptees.push({ plateforme: 'eBay', raison: 'remboursement partiel — montant à vérifier', ts: Date.parse(e.creationDate || '') || null }); continue; }
     if (!e || String(e.orderPaymentStatus || '').toUpperCase() !== 'PAID' || !e.orderId) continue;
@@ -267,7 +276,7 @@ export const ventesFaites = ({ vinted, lbc, ebay, vestiaire, cachee } = {}) => {
   // VESTIAIRE, au jour de la VENTE : compté si le montant reçu est sûr et la
   // vente datée ; sinon NOMMÉ (`nonComptees`), jamais deviné.
   for (const v of (vestiaire || [])) {
-    if (!v || !v.id || vcVenteAnnulee(v) || !garde('vestiaire:' + v.id)) continue;
+    if (!v || !v.id || vcVenteAnnulee(v) || (excluAutre && excluAutre('vestiaire', v)) || !garde('vestiaire:' + v.id)) continue;
     const t = dateVenteVc(v), recu = montantRecuVc(v);
     if (recu.eur == null) { nonComptees.push({ plateforme: 'Vestiaire', raison: recu.raison, ts: t || null }); continue; }
     if (!t) { nonComptees.push({ plateforme: 'Vestiaire', raison: 'vente pas datée', ts: null }); continue; }

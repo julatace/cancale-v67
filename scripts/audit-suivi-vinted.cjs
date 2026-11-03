@@ -637,7 +637,7 @@ const ecrits = (f, id) => f.j.posts.filter((ids) => ids.includes(id)).length;
       const faireRes = () => { const r = { code: null, corps: null }; r.status = (n) => { r.code = n; return r; }; r.json = (o) => { r.corps = o; return r; }; r.setHeader = () => {}; r.end = () => r; return r; };
       const appel = async (tx, uid, jeton = 'aaa.bbb.ccc') => { const res = faireRes(); await push.default({ method: 'POST', query: {}, headers: jeton ? { authorization: `Bearer ${jeton}` } : {}, body: { action: 'suivi', tx, uid } }, res); return res; };
       const TX = '30000000777';
-      const suivi = (h, t = 'Colis en cours de livraison') => ({ v: 1, tx: TX, source: 'journey', capturedAt: H(0), etapes: [{ t, at: H(h), code: 'in_transit' }], dernier: { t, at: H(h), code: 'in_transit' }, transporteur: 'Transporteur Banc', suivi: 'TB12345678FR', forme: {} });
+      const suivi = (h, t = 'Disponible pour retrait') => ({ v: 1, tx: TX, source: 'journey', capturedAt: H(0), etapes: [{ t, at: H(h), code: 'in_transit' }], dernier: { t, at: H(h), code: 'in_transit' }, transporteur: 'Transporteur Banc', suivi: 'TB12345678FR', forme: {} });
       const reset = (prefs = { suivi: true }) => {
         base.clear(); pannes = new Set(); acces = true; pushes.length = 0; lectures.length = 0;
         if (typeof libPush.oublierPrefsVues === 'function') libPush.oublierPrefsVues();
@@ -657,12 +657,13 @@ const ecrits = (f, id) => f.j.posts.filter((ids) => ids.includes(id)).length;
       const p = pushes[0] || {};
       console.log(`     sur le téléphone : « ${p.title} » / « ${p.body} »`);
       dit(r1.code === 200 && r1.corps && r1.corps.envoye === true && pushes.length === 1, 'une étape neuve ⇒ 200, UNE notification', `HTTP ${r1.code} ${JSON.stringify(r1.corps)} · ${pushes.length}`);
-      dit(/Baskets banc A/.test(p.title || '') && /Vinted : « Colis en cours de livraison »/.test(p.body || '') && p.url === `/?tab=cat_achats&vue=achats&cible=achat&tx=${TX}`, 'le titre de l’achat (par la transaction) et l’étape relue dans SA ligne ; le clic ouvre Achats, SUR cet achat (31 oct.)', JSON.stringify(p));
+      // (3 nov.) Seule l'ARRIVÉE sonne, au texte de toutes les arrivées ; le clic ouvre Colis → À retirer, SUR ce colis.
+      dit(p.title === '📍 Baskets banc A t’attend'.replace('’', "'") && /Disponible pour retrait/.test(p.body || '') && p.url === `/?tab=cat_bord&cible=retrait&tx=${TX}`, 'l’arrivée : « 📍 <titre de l’achat> t’attend », l’étape relue dans SA ligne ; le clic ouvre Colis → À retirer, SUR ce colis (3 nov.)', JSON.stringify(p));
       const r2 = await appel(TX, '111');
       dit(r2.code === 200 && pushes.length === 1, 'la même étape redemandée ⇒ rien de plus (une fois par étape)', `${JSON.stringify(r2.corps)} · ${pushes.length}`);
       base.set(`${OWNER}|harvest_111_suivi_${TX}`, suivi(0.5, 'Colis livré'));
       await appel(TX, '111');
-      dit(pushes.length === 2 && /Colis livré/.test((pushes[1] || {}).body || ''), 'une étape PLUS RÉCENTE ⇒ une seconde notification', `${pushes.length}`);
+      dit(pushes.length === 1, 'une étape PLUS RÉCENTE qui n’est pas une arrivée (« Colis livré ») ⇒ rien de plus (3 nov.)', `${pushes.length}`);
       dit(lectures.length > 0 && lectures.every((h) => /owner=eq\.11111111/.test(h)), 'toutes les lectures portent owner=eq.<le vendeur de la session>', lectures.filter((h) => !/owner=eq\.11111111/.test(h)).join(' '));
 
       reset();
@@ -672,10 +673,13 @@ const ecrits = (f, id) => f.j.posts.filter((ids) => ids.includes(id)).length;
 
       reset(null);
       const r4 = await appel(TX, '111');
-      dit(r4.code === 200 && r4.corps && r4.corps.envoye === false && pushes.length === 0, 'préférence « suivi » coupée (le défaut) ⇒ rien ne sonne', `${JSON.stringify(r4.corps)} · ${pushes.length}`);
-      reset({ suivi: false });
+      dit(r4.code === 200 && r4.corps && r4.corps.envoye === true && pushes.length === 1, 'aucune préférence : la famille « Colis arrivés » est allumée par défaut ⇒ l’arrivée sonne', `${JSON.stringify(r4.corps)} · ${pushes.length}`);
+      reset({ suivi: true, familles: { arrives: false } });
       await appel(TX, '111');
-      dit(pushes.length === 0, 'préférence coupée à la main ⇒ rien ne sonne', pushes.length);
+      dit(pushes.length === 0, 'famille « Colis arrivés » coupée ⇒ rien ne sonne', pushes.length);
+      reset({ suivi: true }); base.set(`${OWNER}|harvest_111_suivi_${TX}`, suivi(1, 'Colis en cours de livraison'));
+      const r4b = await appel(TX, '111');
+      dit(pushes.length === 0 && r4b.corps && r4b.corps.raison === 'preference', 'une étape de transit, même avec l’ancien réglage « suivi » allumé ⇒ rien (catégorie retirée)', JSON.stringify(r4b.corps));
 
       reset(); base.set(`${OWNER}|harvest_111_suivi_${TX}`, suivi(80));
       const r5 = await appel(TX, '111');
@@ -709,18 +713,17 @@ const ecrits = (f, id) => f.j.posts.filter((ids) => ids.includes(id)).length;
       // ── (revue du 24 oct.) deux appels en même temps pour la même étape
       // (une première étape d'abord : la copie des préférences est en place, les
       //  deux appels suivants vont du même pas jusqu'à la réservation)
-      reset(); await appel(TX, '111');
-      base.set(`${OWNER}|harvest_111_suivi_${TX}`, suivi(0.5, 'Colis livré'));
+      reset(); await appel(TX, '1'); pushes.length = 0;   // la copie des préférences en place (sans rien envoyer)
       latence = 4;
       const [c1, c2] = await Promise.all([appel(TX, '111'), appel(TX, '111')]);
       latence = 0;
-      dit(pushes.length === 2 && [c1, c2].filter((r) => r.corps && r.corps.envoye).length === 1, 'deux appels SIMULTANÉS pour la même étape ⇒ UNE notification (la réservation est atomique)', `${pushes.length - 1} · ${JSON.stringify([c1.corps, c2.corps])}`);
+      dit(pushes.length === 1 && [c1, c2].filter((r) => r.corps && r.corps.envoye).length === 1, 'deux appels SIMULTANÉS pour la même étape ⇒ UNE notification (la réservation est atomique)', `${pushes.length} · ${JSON.stringify([c1.corps, c2.corps])}`);
       const r15 = await appel(TX, '111');
-      dit(pushes.length === 2 && r15.corps && r15.corps.raison === 'deja', 'puis redemandée : « déjà »', JSON.stringify(r15.corps));
+      dit(pushes.length === 1 && r15.corps && /deja/.test(r15.corps.raison || ''), 'puis redemandée : « déjà »', JSON.stringify(r15.corps));
       // la MÊME étape vue par une autre voie, à un autre instant (et un autre code)
-      base.set(`${OWNER}|harvest_111_suivi_${TX}`, { ...suivi(0.4), dernier: { t: 'Colis LIVRÉ.', at: H(0.4), code: 'autre' } });
+      base.set(`${OWNER}|harvest_111_suivi_${TX}`, { ...suivi(0.4), dernier: { t: 'DISPONIBLE pour retrait.', at: H(0.4), code: 'autre' } });
       const r16 = await appel(TX, '111');
-      dit(pushes.length === 2 && r16.corps && r16.corps.raison === 'deja', 'la même étape à un autre instant (une autre voie) ⇒ rien de plus (la clé est le libellé)', JSON.stringify(r16.corps));
+      dit(pushes.length === 1 && r16.corps && /deja/.test(r16.corps.raison || ''), 'la même étape à un autre instant (une autre voie) ⇒ rien de plus (la clé est le libellé)', JSON.stringify(r16.corps));
       // une étape datée dans l'avenir
       reset(); base.set(`${OWNER}|harvest_111_suivi_${TX}`, suivi(-3, 'Livraison prévue'));
       const r17 = await appel(TX, '111');

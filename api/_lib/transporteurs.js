@@ -31,6 +31,7 @@
 //     .be (`mr-be`) reste acceptée en C4. Les deux corps sont jugés ICI, avec le
 //     contrôle de l'ÉCHO (n° ET code postal).
 // ─────────────────────────────────────────────────────────────────────────────
+import { texteArrivee } from './notif-textes.js';
 import { normaliserSuivi } from './etat-colis-email.js';
 
 // ── LES TRANSPORTEURS LUS, LEURS VOIES, LEURS NOMS ──────────────────────────
@@ -1089,10 +1090,10 @@ export function texteNotifTransp(t, ch) {
   const lieu = lieuCourtTransp(t);
   const n = `n°${t.suivi}`;
   if (ch.etat === 'disponible') {
-    const lim = jjmm(t.limite);
-    const h = t.limiteSure ? heureParis(t.limiteAt) : '';
-    const limTxt = lim ? ` — à retirer ${t.limiteSure ? "jusqu'au" : 'vers le'} ${lim}${h ? ` à ${h}` : ''}` : '';
-    return { title: `📍 ${nom} : disponible au point relais`, body: `${lieu || n}${limTxt}${lieu ? ` · ${n}` : ''}${t.detail === 'autre_point' ? ' · un autre point relais que prévu' : ''}` };
+    // (3 nov.) Le texte de toutes les arrivées (api/_lib/notif-textes.js).
+    const lieuLong = [t.lieuNom, t.lieuCp && t.lieuVille ? `${t.lieuCp} ${t.lieuVille}` : ''].filter(Boolean).join(', ');
+    const a = texteArrivee({ transporteur: nom, lieu: lieuLong || lieu, limite: t.limite, limiteHeure: t.limiteSure ? heureParis(t.limiteAt) : '', vers: !t.limiteSure });
+    return { title: a.title, body: `${a.body}${t.detail === 'autre_point' ? ' · un autre point relais que prévu' : ''}` };
   }
   if (ch.etat === 'incident' && t.detail === 'quitte_relais') return { title: `⚠️ ${nom} : ton colis a quitté le point relais sans être retiré`, body: `Ne te déplace pas : ${n}${lieu ? ` (${lieu})` : ''}.` };
   if (ch.etat === 'incident') return { title: `⚠️ ${nom} : un problème sur ton colis`, body: `« ${propre(t.libelle, 120)} » — vérifie avant de te déplacer · ${n}` };

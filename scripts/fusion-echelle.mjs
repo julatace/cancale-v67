@@ -88,7 +88,9 @@ function fichiers(dir) {
 }
 
 const changes = [];
-for (const f of fichiers(path.join(RACINE, 'src'))) {
+// Laissés à leurs chantiers (3 nov.) : Favoris (`claude/favoris-fusion`), Comptes liés, Stock 3D.
+const HORS = /(?:^|[\\/])(favoris\.css|FavorisVinted\.jsx|favorisEcran\.js|comptes-lies\.css|Room3D\.jsx)$/;
+for (const f of fichiers(path.join(RACINE, 'src')).filter((x) => !HORS.test(x))) {
   const avant = fs.readFileSync(f, 'utf8');
   const apres = transformer(avant, f.endsWith('.css'));
   if (apres !== avant) { changes.push(path.relative(RACINE, f)); if (!VERIFIER) fs.writeFileSync(f, apres); }

@@ -2516,3 +2516,52 @@ renommer la clé à l'inverse. Les violations restent notées (`ecouterViolation
 👤 À regarder à l'œil, sur l'iPhone ET l'ordinateur, le jour même : la carte de la
 Communauté montre la carte (pas la liste), un bordereau s'ouvre, Réglages → Imprimante →
 « Voir les aperçus » dessine les aperçus.
+
+## 3 novembre — Les notifications disent un fait constaté, une fois (« arrivé » alors qu'il VA arriver)
+
+**Demande de Julien** (13 h 02) : « il y en a qui servent absolument à rien et qui ne sont
+vraiment pas cohérentes ; elles disent "arrivé au point relais" alors que le message disait
+qu'il VA arriver ». Inventaire complet, mesures et justification de chaque retrait :
+`docs/passation/notifications.md`.
+
+**Mesuré** (lecture seule, `push_dedup` + `email_journal`, 14 jours) — trois notifications
+FAUSSES réellement parties : « Où vous livrer en cas de point indisponible ? » ⇒ « 📍 Colis
+arrivé au point de retrait » (`disponible` cherché DANS « indisponible ») ; « Confirmation de
+commande Mondial Relay » (« dès que votre colis sera disponible ») ⇒ « 📍 arrivé … à retirer
+chez vous recevrez un e-mail » ; « Action requise : le colis semble avoir été perdu » ⇒ « ✅
+Colis livré ». Plus le bruit : ~60 « Achat confirmé » en 8 jours, favoris en rafale, « en
+transit » pour chaque « Ton colis arrive aujourd'hui ».
+
+**Correctifs** :
+- `api/_lib/etat-colis-email.js` : « disponible / à retirer » seulement sur une PHRASE qui le
+  constate (`arriveeDansPhrase` : mot entier, jamais dans une condition — « au cas où » ajouté —
+  ni au futur/conditionnel, « disponible jusqu'au » excepté) ; « perdu / égaré » n'est jamais
+  livré (`colisPerdu`) ; « en route / en chemin » = en transit. Règle partagée : l'app range
+  pareil (les deux faux « à retirer » disparaissent aussi de l'écran).
+- `api/_lib/notif-textes.js` (nouveau, pur) : six FAMILLES (Ventes, Colis à poster, Colis
+  arrivés, Offres, Messages, Compta) — `decisionNotif` : famille réglée > ancien réglage de la
+  catégorie > défaut ; catégories RETIRÉES `suivi`, `achat`, `favori`. Un texte d'arrivée pour
+  toutes les voies : « 📍 <article> t'attend » · « <Point>, <Ville> · code X · jusqu'au JJ/MM ».
+- `api/_lib/push.js` : `pushCategorieActive` passe par `decisionNotif`.
+- `api/email-inbound.js` : un e-mail de transporteur ne sonne que l'arrivée QU'IL constate
+  (pas un « disponible » gardé d'un e-mail précédent, pas un colis vendu) ou un retour ; la
+  « Commande mise à jour » Vinted ne sonne que la consigne AVEC code (clé du code partagée) ;
+  « ⚠️ Colis peut-être perdu » (Messages) ; « ⏳ À confirmer avant le … » au lieu de
+  « 📦 Achat livré ». Conversation (extension) : même texte d'arrivée.
+- `api/_lib/transporteurs.js` (disponible), `api/_lib/suivi-vinted.js` (seule l'étape
+  « Disponible pour retrait » sonne, famille Colis arrivés), `api/ship-reminders.js` (« Colis à
+  vérifier » ne sonne plus ; « 📍 Dernier jour · <point> »).
+- Paramètres → Notifications : six interrupteurs sans texte (`push_prefs.familles`, base).
+- Codes hors ligne : `BlocCodesHorsLigne` aussi dans « Ma journée hors ligne » sans photo
+  (réseau coupé : aucun code n'était affiché).
+
+**Preuves** : `scripts/audit-notifications.cjs` EXÉCUTE la route (fausse base, deux vendeurs,
+web-push intercepté) sur les formes mesurées : 30 verts ; **17 rouges sur origin/main
+8e11aae3** (il reproduit mot pour mot « à retirer chez vous recevrez un e-mail ») ; mutations
+rouges : condition + mot entier retirés (A1), catégories retirées rendues (F3), famille
+ignorée (F1, F2, F4, V2), consigne Vinted sans code qui sonne (C4), perdu = livré (D2),
+« disponible » gardé qui sonne (C6). Banc `codes-hors-ligne` : 4 rouges sur main (attente
+fixe) ; phase 3 réseau coupé rouge avant `BlocCodesHorsLigne`, verte après (390 et 1512).
+Audits remis au nouveau contrat (retiré / en route / à vérifier ne sonnent plus, textes) :
+`transp-notif` (vert), `suivi-vinted` (vert), `suivi-colis` (2 rouges @babel/parser, comme
+main), `retrait-fiable` (idem main), bancs `retrait-conv-push`, `emails-action`, `suivi-colis`.

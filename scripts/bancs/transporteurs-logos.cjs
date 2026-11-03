@@ -209,7 +209,7 @@ const sain = async (pg, ecran) => {
           const P2 = window.__P;
           const cartes = [...document.querySelectorAll('[data-cc-carte]')].map((c) => {
             const point = c.closest('[data-relais-point]');
-            const enTete = point && point.querySelector('.vrm-rp-tete .vrm-transporteur');
+            const enTete = point && point.querySelector('.vrm-rp-tete .vrm-transporteur, .vrm-rpf-tete .vrm-transporteur');
             const surCarte = c.querySelector('.vrm-transporteur');
             const vu = surCarte || enTete;
             return { cle: c.getAttribute('data-cc-carte'), tr: c.getAttribute('data-transporteur'), vu: vu ? vu.getAttribute('data-transporteur') : null, txt: vu ? vu.innerText.trim() : '' };
@@ -220,7 +220,8 @@ const sain = async (pg, ecran) => {
         });
         for (const [cle, tr] of Object.entries(ATTENDU_R)) {
           const c = r.cartes.find((x) => x.cle === cle);
-          dit(c && c.tr === tr && c.vu === tr, `${T} A1 colis à retirer ${cle} : « ${tr} » porté et montré`, JSON.stringify(c));
+          // (3 nov., Julien/coordinateur : « Transporteur pas lu ⇒ ne pas l'écrire ») « pas-lu » : porté, jamais montré.
+          dit(c && c.tr === tr && (tr === 'pas-lu' ? c.vu === null : c.vu === tr), `${T} A1 colis à retirer ${cle} : « ${tr} » porté${tr === 'pas-lu' ? ', pas écrit' : ' et montré'}`, JSON.stringify(c));
         }
         const vcA1 = r.vc && r.vc.find((x) => x.id === 'A1'), vcA3 = r.vc && r.vc.find((x) => x.id === 'A3');
         dit(vcA1 && vcA1.tr === ATTENDU_VC.A1 && /Chronopost/.test(vcA1.p.txt), `${T} A2 achat Vestiaire en route sous « À retirer », Chronopost`, JSON.stringify(r.vc));

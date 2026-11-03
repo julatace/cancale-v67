@@ -149,6 +149,8 @@ const marqueOk = (marque, marques) => {
 //  regles          : réglages normalisés (undefined = pas encore lus)
 //  paires          : [{ id, num, title, marque, taille, tailleVinted, prix, uid, photos, cover, cree }]
 //  enLigne         : Set des annonces Vinted EN VENTE (null = pas su)
+//  chezMoi         : Set des articles supprimés de Vinted marqués « Toujours chez moi »
+//                    (`chezMoiProposables`, src/propositionsSites.js) — absent = aucun
 //  ventes          : le verdict `numerosDejaVendus` (vendus, pasSu, enCours)
 //  dejaSurEbay     : Map N° → { etat } (en vente / programmée, jumelles comprises ; null = pas su)
 //  jumelles        : Map id → { gardeId } (`jumellesParPhoto`)
@@ -193,7 +195,7 @@ export function propositionAgent(o) {
   // photos de l'une sous un SKU qui en désigne deux. Comptées, et dites.
   const parCle = new Map();
   for (const p of x.paires) {
-    if (!p || p.num == null || !x.enLigne.has(String(p.id))) continue;
+    if (!p || p.num == null || !(x.enLigne.has(String(p.id)) || (estSet(x.chezMoi) && x.chezMoi.has(String(p.id))))) continue;
     const k = cle(p.num); if (!k) continue;
     const s = parCle.get(k) || new Set(); s.add(String(p.id)); parCle.set(k, s);
   }
@@ -204,7 +206,9 @@ export function propositionAgent(o) {
     const id = String(p.id);
     if (!k || vus.has(id)) continue;
     vus.add(id);
-    if (!x.enLigne.has(id)) { ecarte('pas-en-ligne'); continue; }
+    // (3 nov., Julien) (a) en ligne sur Vinted, ou (b) supprimé de Vinted et
+    // « Toujours chez moi » (`chezMoi`, src/propositionsSites.js) — rien d'autre.
+    if (!x.enLigne.has(id) && !(estSet(x.chezMoi) && x.chezMoi.has(id))) { ecarte('pas-en-ligne'); continue; }
     const nDouble = Math.max((parCle.get(k) || new Set()).size, estMap(x.doubles) ? Number(x.doubles.get(k)) || 0 : 0);
     if (nDouble > 1) { if (!doublesVus.has(k)) { doublesVus.add(k); ecartees['numero-double'] = (ecartees['numero-double'] || 0) + nDouble; } continue; }
     if (x.ventes.vendus.get(k)) { ecarte('vendue'); continue; }

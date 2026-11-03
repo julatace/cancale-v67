@@ -107,6 +107,7 @@ import './styles-compta-claire.css';
 // (2 nov.) Le style « Fusion » (son choix sur les maquettes) : cartes blanches, carte sombre du mois,
 // frises de suivi — en tout dernier, il a le dernier mot sur la forme des écrans qui le portent.
 import './design/fusion.css';
+import './design/favoris.css';
 // (3 nov.) Les jetons Fusion pour TOUTE l'app (échelle fermée, segmentés, cartes) — le tout dernier mot.
 import './design/jetons.css';
 import { suivreRangeesDefilantes } from './rangeesDefilantes.js';
