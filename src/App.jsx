@@ -151,6 +151,7 @@ import { SITES_TACHE, TACHES_SITE, estTacheSite, siteDeTache, sectionDeTache, so
 import { lireCible, selecteursCible, phraseAbsente } from "./cibleNotif.js";
 import { fusionnerLigne, fusion3, egal as egalStable, CLE_POOL, CLES_FICHES } from "./fusionNuage.js";
 import { NOM_BENEFICE, NOM_BENEFICE_BRUT, NOM_APRES_FRAIS, chiffreBenefice, chiffreBrut, chiffreApresFrais, finDuMois, moisCouvertParPublication } from "./beneficeNoms.js";
+import { achatParIdentite, propositionPrixAchat, propositionsUniques, listeConfirmation, ecritureProposition } from "./prixAchatPropose.js";
 import { produitsANumeroter, attribuerNumerosVc, carteNumerosVc } from "./numerosVestiaire.js";
 import { lireFile, noterSaisie, instantane, acquitter, compterEnAttente, nuagePlusRecent, fusionAuChargement, oublierCle, CLE_FILE, HORS_FILE } from "./fileEnvoi.js";
 // La migration qui cloisonne les vendeurs, lue depuis LE fichier (pas recopiée) :
@@ -11691,7 +11692,7 @@ function AchatsHorsPlateforme({ achats, ouvert, onBasculer, onAjouter, onModifie
 // (1er nov.) `recap` : dans le récapitulatif de la vente, à la place du montant
 // d'achat qui manque — un seul geste AMBRE « Saisir le prix d'achat » (§7 : un
 // geste à faire), « ou relier un achat » à côté, discret. Mêmes écritures.
-function CoutAchatVente({ onSaisir, onRelier, surLigne = false, recap = false }) {
+function CoutAchatVente({ onSaisir, onRelier, surLigne = false, recap = false, propose = null, onUtiliser = null }) {
   const [edit, setEdit] = useState(false);
   const [txt, setTxt] = useState('');
   const [err, setErr] = useState('');
@@ -11717,11 +11718,13 @@ function CoutAchatVente({ onSaisir, onRelier, surLigne = false, recap = false })
           </form>
         ) : (
           <>
+            {propose && onUtiliser ? <Bouton variante="primaire" data-prix-propose={propose.centimes} data-prix-propose-par={propose.par} onClick={onUtiliser}>Utiliser {propose.texte}</Bouton> : null}
             <Bouton variante="secondaire" icone="pencil" className={recap ? 'vrm-geste-ambre' : undefined} data-cout-vente-saisir onClick={() => setEdit(true)} title="Taper le prix payé, sans relier d'achat">{recap ? 'Saisir le prix d’achat' : 'Prix d’achat'}</Bouton>
             {onRelier && <Bouton variante={recap ? 'discret' : 'secondaire'} icone="link" data-cout-vente-relier onClick={onRelier} title="Choisir l'achat Vinted correspondant : son prix remplit le coût">{recap ? 'ou relier un achat' : 'Relier un achat'}</Bouton>}
           </>
         )}
       </div>
+      {propose && onUtiliser && !edit ? <div className="vrm-prix-propose-detail" data-prix-propose-detail="" style={{ fontSize: 12, color: C.muted, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{propose.detail}</div> : null}
       {err && <div role="alert" style={{ fontSize: 12, color: C.warn }}>{err}</div>}
     </div>
   );
@@ -46851,6 +46854,63 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     return out;
   }, [fillBuyOpen, fillBuyAchats.items, fillBuyRows, linkedBuyIds]);
 
+  // ── (3 nov.) LE PRIX D'ACHAT PROPOSÉ, PAR IDENTITÉ (src/prixAchatPropose.js) ──
+  // Une vente ou une fiche sans prix d'achat, reliée PAR IDENTITÉ à un achat
+  // (le lien qu'IL a posé, ou le fichier photo exact) : VRM propose le montant
+  // payé (reçu juste, sinon l'article seul). Rien n'est écrit sans son tap.
+  // Un achat ne se propose qu'à UN article (ventes au plus récent d'abord).
+  const achatsIdentite = fillBuyAchats.items || buys.items || null;
+  const ventilationDeTx = (tx) => { const r = indexRecusAchat.get(String(tx)); return r ? ventilationRecuAchat(r.texte) : null; };
+  const propositionsPrix = useMemo(() => {
+    const lignes = [];
+    const cleDePhoto = (a) => photoKey(orderPhoto(a));
+    const unePour = (e, photo, venteTx, venteDate, annulee) => {
+      const prixConnu = !!(e && e.buyPrice != null && String(e.buyPrice).trim() !== '');
+      if (prixConnu || annulee) return null;
+      const lie = e && e.buyFromId ? achatRelie(e) : null;
+      const pris = new Set(linkedBuyIds); if (e && e.buyFromId) pris.delete(String(e.buyFromId));
+      const identite = achatParIdentite({ lie, photo, venteTx, venteDate, achats: achatsIdentite, cleDePhoto, pris });
+      return propositionPrixAchat({ prixConnu, annulee, identite, ventilationDe: ventilationDeTx });
+    };
+    const ventes = [...(sales.items || [])].sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
+    for (const o of ventes) {
+      if (!o || o.transaction_id == null || o._fromEmail) continue;
+      const e = effEntry(o);
+      const p = unePour(e, photoKey(orderPhoto(o)), String(o.transaction_id), o.date, classifyOrderStatus(o.status) === 'cancelled');
+      lignes.push({ cle: 'v:' + o.transaction_id, proposition: p, numero: e && e.numero });
+    }
+    for (const k in numeros) {
+      const e = numeros[k]; if (!e || !String(e.numero || '').trim()) continue;
+      lignes.push({ cle: 'f:' + k, proposition: unePour(e, entryPhotoKey(e), '', null, false), numero: e.numero });
+    }
+    const m = propositionsUniques(lignes);
+    const nums = new Map(lignes.map((l) => [l.cle, l.numero]));
+    return { m, numero: (c) => nums.get(c) || '' };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sales.items, numeros, saleOv, buyByNum, achatsIdentite, indexRecusAchat, linkedBuyIds]);
+  const propositionVente = (tx) => propositionsPrix.m.get('v:' + tx) || null;
+  // Ventes et la saisie en série lisent les achats captés (relecture de l'extension
+  // seulement, `harvestOnly`) ; les reçus ne partent que s'il y a une proposition.
+  useEffect(() => { if (curSub === 'ventes' && accounts.length && !buys.items) chargerAchats(); /* eslint-disable-next-line */ }, [curSub, accounts.length]);
+  useEffect(() => { if ((curSub === 'ventes' || fillBuyOpen) && propositionsPrix.m.size && achEmails === undefined) fetchEmailAchats().then(setAchEmails); /* eslint-disable-next-line */ }, [curSub, fillBuyOpen, propositionsPrix.m.size]);
+  const nPropVentes = [...propositionsPrix.m.keys()].filter((c) => c.startsWith('v:')).length;
+  const propositionFiche = (k) => propositionsPrix.m.get('f:' + k) || null;
+  // SON tap : la même écriture que « Relier un achat » (prix + lien + instantané).
+  const appliquerProposition = (cle, p) => {
+    const w = ecritureProposition(p, { accNom: p.achat && p.achat._acc ? accNameOf(p.achat._acc) : '', photoDe: orderPhoto });
+    if (cle.startsWith('v:')) setSaleOverride(cle.slice(2), w);
+    else setNumeros(prev => { const k = cle.slice(2); const u = { ...prev, [k]: { ...(prev[k] || {}), ...w } }; save('vinted_annonce_numeros', u); return u; });
+  };
+  const validerPropositions = async (cles) => {
+    const choix = new Map([...propositionsPrix.m].filter(([c]) => !cles || cles.includes(c)));
+    if (!choix.size) return;
+    const liste = listeConfirmation(choix, propositionsPrix.numero);
+    const ok = await askConfirm({ title: `Valider ${liste.length} prix d'achat ?`, desc: liste.map((l) => `${l.numero ? 'N°' + l.numero : 'Sans N°'} · ${l.texte}`).join('\n'), ok: 'Valider', cancel: 'Annuler' });
+    if (!ok) return;
+    for (const [c, p] of choix) appliquerProposition(c, p);
+    toast(`${liste.length} prix d'achat enregistré${liste.length > 1 ? 's' : ''}`);
+  };
+
   // Relier un achat à une paire depuis la liste (pas depuis le sélecteur) :
   // même écriture que `choosePick`, instantané compris (§5.36) — sinon le reçu
   // et la photo de l'achat ne seraient plus affichables sans tout recharger.
@@ -47640,7 +47700,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       !!labelsCaptes[tx], !!bordParTx[tx], identiteAnnonce(o), !!(deposeVente.attente && deposeVente.attente.cle === tx),
       // (1er nov.) le récapitulatif de la vente lit aussi ces preuves (frise, versement, suivi)
       versements ? (versements[tx] || '') : versements, (bordParTx[tx] && bordParTx[tx].receivedAt) || '', (bordParTx[tx] && bordParTx[tx].suivi) || '',
-      (labelsCaptes[tx] && labelsCaptes[tx].capturedAt) || '', shipDone[tx] || 0, (etatTxn(tx) || {}).s ?? null, !!onNav, JSON.stringify(e && e.buyFromId ? achatRelie(e) : null)];
+      (labelsCaptes[tx] && labelsCaptes[tx].capturedAt) || '', shipDone[tx] || 0, (etatTxn(tx) || {}).s ?? null, !!onNav, JSON.stringify(e && e.buyFromId ? achatRelie(e) : null),
+      // (3 nov.) le prix d'achat proposé par identité (src/prixAchatPropose.js)
+      (propositionVente(tx) || {}).centimes ?? null, (propositionVente(tx) || {}).detail || ''];
     // L'état de l'article (« Très bon état ») : celui de SON annonce, trouvée par
     // identité (`txnItem`, la transaction), jamais par titre — sinon rien.
     const annonce = txnItem[tx] != null ? lst.find((it) => it && String(it.id) === String(txnItem[tx])) : null;
@@ -49969,6 +50031,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             absente, muette ou en retard, TOUS les boutons « Générer le
             bordereau » sont grisés pour la même raison : on la dit ici, au-dessus
             de la liste, au lieu de la répéter sous chaque vente. */}
+        {nPropVentes > 1 && <div className="vrm-prix-proposes" data-prix-proposes={nPropVentes} style={{display:'flex',justifyContent:'flex-end',margin:'0 0 10px'}}><Bouton variante="secondaire" icone="check" data-prix-proposes-valider="" onClick={()=>validerPropositions([...propositionsPrix.m.keys()].filter(c=>c.startsWith('v:')))}>Valider les {nPropVentes} prix proposés</Bouton></div>}
         <RaisonBordereauxGrises ventes={ventesAffichees.filter(o=>o && o.transaction_id!=null && !isHidden(o) && classifyOrderStatus(o.status)!=='cancelled' && aExpedier(o) && !isShipDone(o) && !labelsCaptes[String(o.transaction_id)] && !bordParTx[String(o.transaction_id)])}/>
         <div className="vrm-ventes-liste" data-fu-liste="" style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:12,overflow:'hidden',boxShadow:C.shadow||'none'}}>
           <div className="vrm-ledger-heading" aria-hidden="true"><span>Article</span><span className="vrm-ledger-state-heading">État</span><span>Montant</span></div>
@@ -50011,7 +50074,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             // pas confirmés (ce qui manque ne peut que baisser le bénéfice).
             const devise = o.price?.currency_code;
             const lb = (devise && devise !== 'EUR') ? { etat:'prix', achat:null, benefice:null } : beneficeLigneVente(o.price?.amount, e, { annulee: st==='cancelled' });
-            const coutManque = !hidden && st!=='cancelled' && buy==null && !(e && e.buyFromId);
+            const propPrix = !hidden && st!=='cancelled' && buy==null ? propositionVente(o.transaction_id) : null;
+            const coutManque = !hidden && st!=='cancelled' && buy==null && (!(e && e.buyFromId) || !!propPrix);
             const benefLigne = { etat: lb.etat, achatCentimes: lb.achat!=null ? Math.round(lb.achat*100) : null, benefCentimes: lb.benefice!=null ? Math.round(lb.benefice*100) : null,
               achatTxt: lb.achat!=null ? `${eurosLigne(lb.achat)} €` : (st==='cancelled' ? '' : coutManque ? 'à saisir' : '—'), benefTxt: texteBenefice(lb.etat==='partiel' ? { ...lb, etat:'ok' } : lb),
               aria: lb.etat==='partiel' ? `Bénéfice : au plus ${texteBenefice({ ...lb, etat:'ok' })}, frais pas confirmés` : lb.etat==='achat' ? "Bénéfice : prix d'achat manquant" : undefined };
@@ -50020,7 +50084,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             const deposeIci = !!(deposeVente.attente && deposeVente.attente.cle === txL);
             const peutDeposer = !hidden && st!=='cancelled' && aExpedier(o) && !isShipDone(o) && o.transaction_id!=null;
             const libDepose = num ? `N°${num}` : (o.title || '');
-            const gesteCout = coutManque ? <CoutAchatVente surLigne onSaisir={p=>setSaleOverride(o.transaction_id,{buyPrice:p})}
+            const gesteCout = coutManque ? <CoutAchatVente surLigne propose={propPrix} onUtiliser={propPrix ? ()=>appliquerProposition('v:'+o.transaction_id, propPrix) : null} onSaisir={p=>setSaleOverride(o.transaction_id,{buyPrice:p})}
                   onRelier={()=>{ const idf = identiteAnnonce(o); openPicker(idf ? { id: idf, title: o.title, photo: photo, price: sell, _acc: o._acc } : { id: '_v'+o.transaction_id, _saleTx: String(o.transaction_id), title: o.title, photo: photo, price: sell, _acc: o._acc }); }}/> : null;
             const gesteDepose = peutDeposer ? <Bouton variante="secondaire" icone="check" className="vrm-depose-bouton" data-depose-vente={txL} data-sans-glisse="" disabled={deposeIci} aria-label={`Marquer ${libDepose || 'ce colis'} déposé`} onClick={()=>demanderDepose(txL, o, libDepose)}>Déposé</Bouton> : null;
             // ── (1er nov.) LE RÉCAPITULATIF DE LA VENTE — maquette A, « fiche en lignes nettes »
@@ -50094,7 +50158,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   <dl>
                     <div className="vrm-recap-ligne"><dt>Prix de vente</dt><dd data-prix-vente={sell!=null?Math.round(sell*100):undefined}>{sell==null ? '—' : autreDevise ? `${String(sell).replace('.',',')} ${cur(devise)}` : eurosRecap(sell)}</dd></div>
                     {fraisConnus != null ? <div className="vrm-recap-ligne" data-recap-frais={fraisConnus.toFixed(2)}><dt>Frais</dt><dd>{eurosRecap(-fraisConnus)}</dd></div> : null}
-                    {st !== 'cancelled' ? <div className="vrm-recap-ligne" data-recap-achat={lb.achat != null ? lb.achat.toFixed(2) : ''}><dt>Prix d’achat</dt><dd>{lb.achat != null ? eurosRecap(-lb.achat) : coutManque ? <CoutAchatVente recap onSaisir={p=>setSaleOverride(o.transaction_id,{buyPrice:p})} onRelier={()=>openPicker(saleItem)}/> : '—'}</dd></div> : null}
+                    {st !== 'cancelled' ? <div className="vrm-recap-ligne" data-recap-achat={lb.achat != null ? lb.achat.toFixed(2) : ''}><dt>Prix d’achat</dt><dd>{lb.achat != null ? eurosRecap(-lb.achat) : coutManque ? <CoutAchatVente recap propose={propPrix} onUtiliser={propPrix ? ()=>appliquerProposition('v:'+o.transaction_id, propPrix) : null} onSaisir={p=>setSaleOverride(o.transaction_id,{buyPrice:p})} onRelier={()=>openPicker(saleItem)}/> : '—'}</dd></div> : null}
                     {st !== 'cancelled' ? <div className="vrm-recap-ligne vrm-recap-benef" data-recap-benef-etat={lb.etat} data-benef-vente={benef!=null?benef.toFixed(2):undefined}><dt>Bénéfice</dt><dd><span className="vrm-recap-valeur">{lb.etat === 'partiel' ? <span className="vrm-recap-borne">au plus </span> : null}<span className="vrm-recap-montant">{benefTexte}</span></span>{benefAide ? <small>{benefAide}</small> : null}</dd></div> : null}
                     {verse != null ? <div className="vrm-recap-ligne vrm-recap-verse" data-recap-verse={finalisee ? (versement ? 'date' : 'oui') : 'non'}><dt>Versé sur ton porte-monnaie</dt><dd>{verse}</dd></div> : null}
                   </dl>
@@ -54915,6 +54979,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   phrase={<>Tape le prix, <b>Entrée</b> passe au suivant.{fillBuyAchats.loading ? <> · recherche de tes achats…</> : nPiste > 0 ? <> · <b>{nPiste} article{nPiste>1?'s':''} avec une piste</b> : « C'est ça » le relie.</> : null}</>}/></div>; })()}
             </div>
             <div style={{overflowY:'auto',padding:'10px 12px 16px'}}>
+              {(()=>{ const cles=fillBuyRows.map(r=>'f:'+r.key).filter(c=>propositionsPrix.m.has(c)); if(cles.length<2) return null;
+                return <div data-prix-proposes={cles.length} style={{display:'flex',justifyContent:'flex-end',marginBottom:8}}><Bouton variante="secondaire" icone="check" data-prix-proposes-valider="" onClick={()=>validerPropositions(cles)}>Valider les {cles.length} prix proposés</Bouton></div>; })()}
               {fillBuyRows.length===0 && (
                 <div style={{textAlign:'center',padding:'28px 12px',color:C.muted,fontSize:13}}>🎉 Tous tes articles ont un prix d'achat.</div>
               )}
@@ -54950,7 +55016,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     <span style={{fontSize:11,color:C.muted}}>€</span>
                   </div>
                  </div>
-                 {(()=>{ const cs=fillBuySugg[r.key]; if(!cs||!cs.length) return null;
+                 {(()=>{ const pp=propositionFiche(r.key); if(!pp) return null;
+                   return <div className="vrm-prix-propose" data-prix-propose-fiche={r.key} style={{marginTop:6,display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
+                     <Bouton variante="primaire" data-prix-propose={pp.centimes} data-prix-propose-par={pp.par} onClick={()=>appliquerProposition('f:'+r.key, pp)}>Utiliser {pp.texte}</Bouton>
+                     <span data-prix-propose-detail="" style={{fontSize:12,color:C.muted,minWidth:0,flex:'1 1 140px',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{pp.detail}</span>
+                   </div>; })()}
+                 {(()=>{ const cs=propositionFiche(r.key) ? null : fillBuySugg[r.key]; if(!cs||!cs.length) return null;
                    // (30 oct.) Seules les pistes sûres (« C'est ça ») restent en clair ; les
                    // « à vérifier » se replient (« N pistes ») : l'œil va au champ, pas aux pistes.
                    // Le barème ne change pas (§5.23).
