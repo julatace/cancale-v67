@@ -153,6 +153,7 @@ import { fusionnerLigne, fusion3, egal as egalStable, CLE_POOL, CLES_FICHES } fr
 import { NOM_BENEFICE, NOM_BENEFICE_BRUT, NOM_APRES_FRAIS, chiffreBenefice, chiffreBrut, chiffreApresFrais, finDuMois, moisCouvertParPublication } from "./beneficeNoms.js";
 import { achatParIdentite, propositionPrixAchat, propositionsUniques, listeConfirmation, ecritureProposition } from "./prixAchatPropose.js";
 import { donneesRecapMois, csvRecapMois, pdfRecapMois, libelleMois, nomFichierRecap } from "./recapMois.js";
+import { CATEGORIES_DEPENSE, idTicket, montantDuTicket, texteMontantSaisie, texteDuTicket } from "./depensesTicket.js";
 import { produitsANumeroter, attribuerNumerosVc, carteNumerosVc } from "./numerosVestiaire.js";
 import { lireFile, noterSaisie, instantane, acquitter, compterEnAttente, nuagePlusRecent, fusionAuChargement, oublierCle, CLE_FILE, HORS_FILE } from "./fileEnvoi.js";
 // La migration qui cloisonne les vendeurs, lue depuis LE fichier (pas recopiée) :
@@ -11497,6 +11498,27 @@ const ecrirePhotoAchatHors = async (id, b64) => {
     });
     return !!(r && r.ok);
   } catch (_) { return false; }
+};
+// (3 nov.) Le TICKET d'une dépense : SA ligne (`depense_ticket_{id}`), jamais
+// `main`. true seulement si la base l'a acceptée ; lu à la demande (un toucher).
+const ecrireTicket = async (id, b64) => {
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=${SB_CONFLICT}`, {
+      method: 'POST',
+      headers: sbAuth({ 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' }),
+      body: JSON.stringify([withOwner({ id: idTicket(id), data: b64 ? { b64, at: new Date().toISOString() } : { b64: null, supprime: true, at: new Date().toISOString() } })]),
+    });
+    return !!(r && r.ok);
+  } catch (_) { return false; }
+};
+const lireTicket = async (id) => {
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${idTicket(id)}&select=b:data->>b64`, { headers: sbAuth() });
+    if (!r.ok) return null;
+    const j = await r.json();
+    const b = Array.isArray(j) && j[0] ? j[0].b : null;
+    return typeof b === 'string' && b.startsWith('data:image/') ? b : null;
+  } catch (_) { return null; }
 };
 // Trois états : `null` = la base n'a pas répondu (pas su), sinon { id → dataURL }.
 const lirePhotosAchatsHors = async () => {
@@ -35537,14 +35559,8 @@ function Inventory({ inventory, setInventory, accounts, garageGrid, labels, onLo
    sinon une saisie faite pendant le chargement serait écrasée. */
 const COMPTA_DEFAUT = { depenses: [], fixes: [], packs: [], abonnements: [] };
 const COMPTA_CATS = ['Emballage', 'Fournitures', 'Abonnement', 'Frais plateforme', 'Transport', 'Matériel', 'Autre'];
-const DEPENSE_CATS = [
-  { k: 'Emballage', ex: 'cartons, papier bulle, scotch' },
-  { k: 'Fournitures', ex: 'étiquettes, sachets, stylos' },
-  { k: 'Matériel', ex: 'imprimante thermique, lampe photo' },
-  { k: 'Transport', ex: 'essence pour aller au relais' },
-  { k: 'Frais plateforme', ex: 'boost, option de mise en avant' },
-  { k: 'Autre', ex: 'ce que tu as payé' },
-];
+// (3 nov.) Les catégories choisies par Julien (src/depensesTicket.js).
+const DEPENSE_CATS = CATEGORIES_DEPENSE;
 // Les abonnements les plus courants d'un revendeur : un clic remplit le NOM.
 // Le prix n'est rempli que pour VRM (celui des CGV, §11) — les autres, on ne
 // connaît pas son offre : il le tape (jamais un tarif deviné, §2.3).
@@ -39036,6 +39052,11 @@ function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, pan
   const [dCat, setDCat] = React.useState(COMPTA_CATS[0]);
   const [dMnt, setDMnt] = React.useState('');
   const [dErr, setDErr] = React.useState('');
+  const [dPhoto, setDPhoto] = React.useState(null);          // (3 nov.) la photo du ticket (dataURL) avant « Ajouter »
+  const [dLu, setDLu] = React.useState('');                   // '' · 'lecture' · 'lu' : le montant lu sur le ticket
+  const [ticketVu, setTicketVu] = React.useState(null);       // { titre, src } : le ticket affiché
+  const ticketRef = React.useRef(null);
+  const dMntRef = React.useRef(''); dMntRef.current = dMnt;
   const [pPlat, setPPlat] = React.useState('Leboncoin');
   const [pCpt, setPCpt] = React.useState('');
   const [pMnt, setPMnt] = React.useState('');
@@ -39071,14 +39092,40 @@ function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, pan
   // sommaire l'ouvre avant d'y descendre.
   const [avance, setAvance] = React.useState(false);
 
-  const ajouterDepense = () => {
+  // (3 nov.) La photo du ticket : réduite dans le navigateur, puis le montant lu
+  // DANS la page (gratuit, local) s'il est lisible et que le champ est vide.
+  const choisirTicket = async (ev) => {
+    const f = ev.target.files && ev.target.files[0];
+    ev.target.value = '';
+    if (!f) return;
+    const b64 = await compressImage(f, 1100, 0.7);
+    if (!b64) { setDErr("Cette photo n'a pas pu être lue — essaie une autre."); return; }
+    setDPhoto(b64); setDErr('');
+    if (String(dMntRef.current || '').trim()) return;
+    setDLu('lecture');
+    const c = montantDuTicket(await texteDuTicket(b64));
+    if (c != null && !String(dMntRef.current || '').trim()) { setDMnt(texteMontantSaisie(c)); setDLu('lu'); } else setDLu('');
+  };
+  const [dEnvoi, setDEnvoi] = React.useState(false);
+  const ajouterDepense = async () => {
+    if (dEnvoi) return;
     const m = parseMontant(dMnt);
-    if (!dLib.trim()) { setDErr('Dis en deux mots ce que tu as payé (ex. « cartons »).'); return; }
+    if (!dLib.trim() && !dPhoto) { setDErr('Dis en deux mots ce que tu as payé (ex. « cartons »).'); return; }
     if (!m) { setDErr('Le montant doit être un nombre en euros, par exemple 12,50.'); return; }
     setDErr('');
-    maj({ ...data, depenses: [{ id: rCompId(), date: dDate || auj, libelle: dLib.trim(), cat: dCat, montant: m }, ...depenses] });
-    toast(`✓ Dépense ajoutée : ${fmt(m)}`);
-    setDLib(''); setDMnt(''); setDCat(COMPTA_CATS[0]); setDDate(auj); setOuvert('');
+    const id = rCompId();
+    let ticket = false;
+    if (dPhoto) { setDEnvoi(true); ticket = await ecrireTicket(id, dPhoto); setDEnvoi(false); }
+    const libelle = dLib.trim() || dCat;
+    majFraiche((cur) => ({ ...cur, depenses: [{ id, date: dDate || auj, libelle, cat: dCat, montant: m, ...(ticket ? { ticket: true } : {}) }, ...((cur && cur.depenses) || [])] }));
+    if (dPhoto && !ticket) toast(`Dépense ajoutée : ${fmt(m)} — la photo n'a pas pu être envoyée`);
+    else toast(`✓ Dépense ajoutée : ${fmt(m)}`);
+    setDLib(''); setDMnt(''); setDCat(COMPTA_CATS[0]); setDDate(auj); setDPhoto(null); setDLu(''); setOuvert('');
+  };
+  const voirTicket = async (d) => {
+    const src = await lireTicket(d.id);
+    if (!src) { toast("Le ticket n'a pas pu être lu"); return; }
+    setTicketVu({ titre: d.libelle, src });
   };
   const ajouterPack = () => {
     const m = parseMontant(pMnt); if (!m) return;
@@ -39113,6 +39160,7 @@ function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, pan
     const x = (data[cle] || []).find((y) => y.id === id);
     if (!(await askConfirm({ title: `Supprimer « ${nomLigneCompta(cle, x)} » ?`, desc: `${x && Number(x.montant) ? fmt(Number(x.montant)) + ' sortent' : 'Elle sort'} de tes charges et de tes rapports.`, ok: 'Supprimer', cancel: 'Annuler', danger: true }))) return;
     majFraiche((cur) => ({ ...cur, [cle]: (cur[cle] || []).filter(y => y.id !== id) }));
+    if (cle === 'depenses' && x && x.ticket) ecrireTicket(id, null);   // (3 nov.) la ligne du ticket est vidée (un DELETE ne supprime rien)
     toast('Supprimé de tes charges');
   };
   // Export CSV des charges pour le comptable (date · type · libellé · montant).
@@ -39239,9 +39287,24 @@ function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, pan
           <Section data="depenses" titre="Dépenses" note="Emballage, fournitures, frais… tout ce que tu paies pour ton activité." total={null}>
             {depenses.length === 0 && ouvert !== 'dep'
               ? vide('Note ta première dépense — ça prend cinq secondes, et ça allège ton résultat.')
-              : listeBox(depenses.map((d) => <Ligne key={d.id} gauche={<><b style={{ color: C.text }}>{d.libelle}</b><small style={{ color: C.muted }}>{d.cat} · {dateFr(d.date)}</small></>} droite={fmt(d.montant)} onDel={() => retirer('depenses', d.id)} />))}
+              : listeBox(depenses.map((d) => <Ligne key={d.id} attrs={{ 'data-depense': d.id, 'data-depense-ticket': d.ticket ? '1' : '' }} gauche={<><b style={{ color: C.text }}>{d.libelle}</b><small style={{ color: C.muted }}>{d.cat} · {dateFr(d.date)}</small></>} droite={fmt(d.montant)}
+                  extra={d.ticket ? <button type="button" data-depense-voir-ticket="" aria-label={`Voir le ticket de ${d.libelle}`} onClick={() => voirTicket(d)} style={{ border: 'none', background: 'transparent', color: C.muted, cursor: 'pointer', minHeight: 44, minWidth: 44, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}><Icon name="camera" size={18} /></button> : null}
+                  onDel={() => retirer('depenses', d.id)} />))}
+            {ticketVu && createPortal(<div className="vrm-photo-viewer" data-ticket-vu="" onClick={() => setTicketVu(null)} onKeyDown={(e) => { if (e.key === 'Escape') { e.stopPropagation(); setTicketVu(null); } }}>
+              <FermeAuRetour fermer={() => setTicketVu(null)} />
+              <div role="dialog" aria-modal="true" aria-label={`Ticket de ${ticketVu.titre}`} className="vrm-photo-panel" onClick={(e) => e.stopPropagation()}>
+                <div><span>{ticketVu.titre}</span><button className="vrm-icon-control" type="button" aria-label="Fermer le ticket" onClick={() => setTicketVu(null)}><Icon name="close" size={22} /></button></div>
+                <img src={ticketVu.src} alt={`Ticket de ${ticketVu.titre}`} style={{ width: '100%', height: '100%', objectFit: 'contain', minHeight: 0 }} />
+              </div>
+            </div>, document.body)}
             <ComptaAjout ouvert={ouvert === 'dep'} onClick={() => basculer('dep')} libelle="Ajouter une dépense" data={{ 'data-dep-ouvrir': '' }} />
             {ouvert === 'dep' && <div style={formBox} data-dep-form>
+              <div className="vrm-dep-ticket" style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                {dPhoto ? <img data-dep-ticket-apercu="" src={dPhoto} alt="" style={{ width: 56, height: 56, borderRadius: 10, objectFit: 'cover', flexShrink: 0, border: `1px solid ${C.border}` }} /> : null}
+                <Bouton variante={dPhoto ? 'secondaire' : 'primaire'} icone="camera" data-dep-ticket="" onClick={() => ticketRef.current && ticketRef.current.click()} style={{ minHeight: 44 }}>{dPhoto ? 'Changer la photo' : 'Photo du ticket'}</Bouton>
+                {dPhoto ? <Bouton variante="discret" data-dep-ticket-retirer="" onClick={() => { setDPhoto(null); setDLu(''); }}>Retirer</Bouton> : null}
+                <input ref={ticketRef} data-dep-ticket-fichier="" type="file" accept="image/*" capture="environment" onChange={choisirTicket} style={{ display: 'none' }} />
+              </div>
               <div style={{ fontSize: 13, color: C.muted }}>C'est pour quoi ?</div>
               <div role="radiogroup" aria-label="Catégorie" style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                 {DEPENSE_CATS.map((c) => <button key={c.k} type="button" role="radio" aria-checked={dCat === c.k} data-dep-cat={c.k} onClick={() => { setDCat(c.k); setDErr(''); }} style={pastille(dCat === c.k)}>{c.k}</button>)}
@@ -39251,14 +39314,14 @@ function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, pan
                   <input type="text" placeholder={`ex. ${(DEPENSE_CATS.find((c) => c.k === dCat) || DEPENSE_CATS[DEPENSE_CATS.length - 1]).ex}`} data-dep-libelle value={dLib} onChange={e => { setDLib(e.target.value); setDErr(''); }} onKeyDown={e => { if (e.key === 'Enter') ajouterDepense(); }} style={{ ...inp, width: '100%' }} />
                 </label>
                 <label style={{ ...lab, flex: '0 1 110px' }}>Montant
-                  <input type="text" inputMode="decimal" placeholder="0,00 €" data-dep-montant value={dMnt} onChange={e => { setDMnt(e.target.value); setDErr(''); }} onKeyDown={e => { if (e.key === 'Enter') ajouterDepense(); }} style={{ ...inp, width: '100%' }} />
+                  <input type="text" inputMode="decimal" placeholder={dLu === 'lecture' ? '…' : '0,00 €'} data-dep-montant data-dep-montant-lu={dLu} value={dMnt} onChange={e => { setDMnt(e.target.value); setDErr(''); setDLu(''); }} onKeyDown={e => { if (e.key === 'Enter') ajouterDepense(); }} style={{ ...inp, width: '100%' }} />
                 </label>
               </div>
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'flex-end' }}>
                 <label style={lab}>Payé le
                   <input type="date" value={dDate} onChange={e => setDDate(e.target.value)} data-dep-date style={{ ...inp, width: '100%' }} />
                 </label>
-                <button type="button" onClick={ajouterDepense} data-dep-ajouter style={btnAdd}>Ajouter</button>
+                <button type="button" onClick={ajouterDepense} data-dep-ajouter disabled={dEnvoi} style={btnAdd}>{dEnvoi ? '…' : 'Ajouter'}</button>
               </div>
               {dErr && <div data-dep-erreur style={{ fontSize: 13, color: C.warn }}>{dErr}</div>}
             </div>}
