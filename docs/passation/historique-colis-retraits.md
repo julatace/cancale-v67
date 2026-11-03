@@ -3030,3 +3030,11 @@ d'avant rouge (aperçu absent). Voisins adaptés (ils cliquent « Imprimer » da
 `ventes-bordereau`, `vestiaire-parite`, `lbc-bordereau`. `scripts/tests/bordereau-placement-interface.cjs`
 retiré (il testait `BordPlacer`, supprimé). **Non mesuré** : un vrai iPhone (gestes Safari), une vraie
 impression.
+**Constaté en passant (non corrigé, autre règle)** : une vente à poster lue AVANT sa transaction reçoit un N°
+auto (`autoAssigned`, règle des ventes à poster), remplacé par celui de son annonce quand la transaction
+arrive ; et le N° d'une vente Vestiaire n'est donné qu'au passage de son écran. Pendant cette fenêtre, un
+lot ouvert porte d'autres N° : le garde-fou `verifierContexte` (empreinte N° comprise) ARRÊTE alors le lot
+(« Un article, son numéro ou son état a changé ») — rien n'est imprimé avec un N° faux. Le banc
+`tout-imprimer` attend la fin de ces lectures avant d'ouvrir le lot. Après la fusion du tampon libre
+(#998), le lot passe par `mergeAndDownloadBordereaux` → `choisirTampon({…, apercu:false})` : chaque
+bordereau sort à la place gardée pour SA forme (`vrm_tampon_positions`) — audit `colis-trois` 2g.

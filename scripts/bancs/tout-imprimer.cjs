@@ -123,7 +123,11 @@ async function scenario(b, nom, vue, LIGNES) {
   await pg.waitForSelector('button[data-lot-ouvrir="1"]', { timeout: 20000 }).catch(() => {});
   await pg.waitForFunction(() => document.querySelectorAll('[data-groupe-transp]').length >= 3, null, { timeout: 15000 }).catch(() => {});
   // Les N° arrivent avec les transactions (identité tx → annonce → fiche) : on attend qu'ils soient écrits.
-  const nums = await pg.waitForFunction(() => ['N°21', 'N°22', 'N°23', 'N°24', 'N°25'].every((n) => document.body.innerText.includes(n)), null, { timeout: 45000 }).then(() => true).catch(() => false);
+  // (Et le N° de la vente Vestiaire, donné à son passage : un N° qui change entre l'aperçu et l'impression
+  // ARRÊTE le lot — « Un article, son numéro ou son état a changé », le garde-fou `verifierContexte`.)
+  // ⚠️ Course de l'app (avant ce chantier, règle des ventes à poster) : une vente lue AVANT sa transaction reçoit
+  // un N° auto (`autoAssigned`), remplacé par celui de son annonce dès que la transaction arrive. On attend la fin.
+  const nums = await pg.waitForFunction(() => { const t = document.body.innerText; return ['N°21', 'N°22', 'N°23', 'N°24', 'N°25'].every((n) => t.includes(n)) && !['N°27', 'N°28', 'N°29', 'N°30'].some((n) => t.includes(n)) && /N°\d+ · Foxtrot/.test(t); }, null, { timeout: 45000 }).then(() => true).catch(() => false);
   dit(nums, `${nom} : les N° des ventes Vinted sont lus (transaction → annonce → fiche) avant le lot`);
   await pg.waitForTimeout(800);
   if (SHOTS) await pg.screenshot({ path: path.join(SHOTS, `tout-imprimer-${nom}-colis.png`) });
@@ -163,11 +167,22 @@ async function scenario(b, nom, vue, LIGNES) {
   if (!q && SHOTS) await pg.screenshot({ path: path.join(SHOTS, `tout-imprimer-${nom}-sans-question.png`) });
   dit(q, `${nom} : C le N° « à vérifier » (23) DEMANDE avant le PDF`, JSON.stringify(ap.map((x) => x.cle + "=" + x.num)));
   if (q) await pg.evaluate(() => { const bs = [...document.querySelectorAll('button')].filter((x) => /J'ai vérifié, imprimer/.test(x.innerText)); bs[bs.length - 1].click(); });
-  await pg.waitForFunction(() => window.__pdfs && window.__pdfs.length > 0, null, { timeout: 45000 }).catch(() => {});
+  // Jusqu'au PDF : une confirmation encore ouverte (animation, clic tombé à côté) est retouchée.
+  for (let i = 0; i < 180; i++) {
+    const etat = await pg.evaluate(() => {
+      if (window.__pdfs && window.__pdfs.length) return 'pdf';
+      const clic = (l) => { const bs = [...document.querySelectorAll('button')].filter((x) => x.innerText.trim() === l && x.offsetParent); if (bs.length) { bs[bs.length - 1].click(); return true; } return false; };
+      if (clic("J'ai vérifié, imprimer") || clic('Préparer quand même les PDF')) return 'clic';
+      return 'attente';
+    });
+    if (etat === 'pdf') break;
+    await pg.waitForTimeout(250);
+  }
   const b64 = await pg.evaluate(async () => { const bl = window.__pdfs[window.__pdfs.length - 1]; if (!bl) return null; const u = new Uint8Array(await bl.arrayBuffer()); let s = ''; for (let i = 0; i < u.length; i++) s += String.fromCharCode(u[i]); return btoa(s); });
   const nPdf = await pg.evaluate(() => window.__pdfs.length);
   if (SHOTS && nPdf !== 1) await pg.screenshot({ path: path.join(SHOTS, `tout-imprimer-${nom}-pdf.png`) });
-  dit(!!b64 && nPdf === 1, `${nom} : D UN seul PDF`, String(nPdf));
+  const toastTxt = nPdf === 1 ? '' : await pg.evaluate(() => document.body.innerText.split('\n').filter((l) => /PDF|chang|Erreur|lecture|Préparation|sélectionn|imprim/i.test(l)).join(' | ').slice(0, 600));
+  dit(!!b64 && nPdf === 1, `${nom} : D UN seul PDF`, String(nPdf) + ' ' + toastTxt);
   if (b64) {
     const pages = await pagesDuPdf(b64);
     const ordre = [];
