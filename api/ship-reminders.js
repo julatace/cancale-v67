@@ -174,7 +174,7 @@ async function lireCommandesEbay() {
   });
 }
 // (2 nov., soir) + Vestiaire : « Colis fait » et les N° donnés aux annonces (src/numerosVestiaire.js).
-const MAIN_BILAN = ['vinted_accounts_hidden', 'vinted_ship_done', 'vinted_bords_shipped', 'vrm_paires_dorment', 'vrm_lbc_colis_done', 'vrm_vc_colis_done', 'vrm_vc_numeros'];
+const MAIN_BILAN = ['vinted_accounts_hidden', 'vinted_ship_done', 'vinted_bords_shipped', 'vrm_paires_dorment', 'vrm_lbc_colis_done', 'vrm_vc_colis_done', 'vrm_vc_numeros', 'vrm_comptes_exclus'];
 const ensemble = (v) => new Set(Array.isArray(v) ? v.map(String) : []);
 const objet = (v) => (v && typeof v === 'object' && !Array.isArray(v) ? v : {});
 
@@ -212,6 +212,7 @@ async function lireDonneesBilan() {
     comptes, commandes,
     masquesTx: mm ? new Set() : null,   // (29 oct.) une vente ne se masque plus
     masquesComptes: mm ? ensemble(mm.vinted_accounts_hidden) : null,
+    exclusAutres: mm ? objet(mm.vrm_comptes_exclus) : null,
     panneau: panneau === undefined ? null : objet(panneau),
     lbc: lbcL === undefined ? null : Object.values(objet(lbcL && lbcL.ventes)),
     // Les colis Leboncoin et Vestiaire à poster (`txsAExpedier`) : les mêmes lignes.

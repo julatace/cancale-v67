@@ -80,6 +80,7 @@ import {etatCommandeEbay} from '../api/_lib/ebay-etat-commande.js';
 import {colisEbay} from '../api/_lib/ebay-a-expedier.js';
 import {annoncesVcEnLigne,stockVestiaire,retraitsVestiaire,VC_VENTE_ETAPES,VC_ANNONCE_ETATS,etapeMotVc,vcVenteAnnulee,vcVentePartie,numVcVente,numVcAnnonce,montantRecuVc,dateVersementVc,dateVenteVc,ventesVcDe,colisVcAPoster,resumeColisVc,etatAnnonceVcBrut} from '../api/_lib/vestiaire-regle.js';
 import {colisLbcAPoster,lbcColisAPoster,totalColis} from '../api/_lib/colis-sites.js';
+import {CLE_COMPTES_EXCLUS,excluAutreDe,estExclu,basculerExclu,SANS_COMPTE_VC} from '../api/_lib/comptes-exclus.js';
 import {joursAvant as joursAvantParis} from '../api/_lib/ebay-a-expedier.js';
 import {marcheDuCompte as marcheEbayDuCompte, MARCHE_DEFAUT as MARCHE_EBAY_DEFAUT, lienAnnonce as lienAnnonceMarche, lienCommande as lienCommandeMarche} from '../api/_lib/ebay-marches-table.js';
 import {arriveeColisEmail, arriveeColisVinted, jourLocal, texteArrivee} from '../api/_lib/arrivee-colis.js';
@@ -2004,6 +2005,9 @@ const SYNC_KEYS = [
   // masqué depuis Ma journée), rattrapé par `onCloudReady` seulement s'il est
   // resté au défaut (`useBeneficeJournee`).
   'vrm_journee_benefice',
+  // (3 nov.) Les comptes Leboncoin, Vestiaire et eBay écartés des totaux par SON
+  // choix (Paramètres → Comptes liés) — api/_lib/comptes-exclus.js.
+  'vrm_comptes_exclus',
   'vrm_annonces_retirees',
   // (26 octobre) Les messages retirés POUR DE BON d'un compte (même famille que
   // `vrm_annonces_retirees`) : un CHOIX, synchronisé, réactivable depuis la carte
@@ -6495,11 +6499,12 @@ const montantRecuEbay = (o) => {
   if (f.currency !== 'EUR') return { eur: null, raison: 'devise ' + (f.currency || 'inconnue') };
   return { eur: (Math.round(Number(d.value) * 100) - Math.round(Number(f.value) * 100)) / 100, raison: '' };
 };
-const ventesAutresBenefice = ({ lbc, ebay, vestiaire, numeros, achat, numLbc, numEbayLigne } = {}) => {
+const ventesAutresBenefice = ({ lbc, ebay, vestiaire, numeros, achat, numLbc, numEbayLigne, excluAutre } = {}) => {
   const out = [], vus = new Set();
   const achatDuNum = (k) => { const f = ficheUniqueDuNumero(numeros, k ? cleNum(k) : ''); if (!f) return null; const a = achat(f); return a != null && isFinite(Number(a)) ? Number(a) : null; };
   for (const v of (lbc || [])) {
     if (!v || v.isSeller !== true || !v.txId || lbcAnnulee(v) || !lbcFinalisee(v)) continue;
+    if (excluAutre && excluAutre('leboncoin', v)) continue;   // (3 nov.) compte écarté par son choix
     const eur = v.price != null ? Number(v.price) / 100 : NaN;
     if (!isFinite(eur) || vus.has('lbc:' + v.txId)) continue;
     vus.add('lbc:' + v.txId);
@@ -6507,6 +6512,7 @@ const ventesAutresBenefice = ({ lbc, ebay, vestiaire, numeros, achat, numLbc, nu
   }
   for (const o of (ebay || [])) {
     if (!o || !o.orderId || String(o.orderPaymentStatus || '').toUpperCase() !== 'PAID' || !commandeEbayEngagee(o)) continue;
+    if (excluAutre && excluAutre('ebay', o)) continue;
     // L'argent reçu (frais eBay déjà retirés, port jamais compté) : frais = 0.
     const eur = montantRecuEbay(o).eur;
     if (eur == null || vus.has('ebay:' + o.orderId)) continue;
@@ -6522,6 +6528,7 @@ const ventesAutresBenefice = ({ lbc, ebay, vestiaire, numeros, achat, numLbc, nu
   // compté par l'appelant pour le DIRE (jamais deviné).
   for (const v of (vestiaire || [])) {
     if (!v || !v.id || vcVenteAnnulee(v) || !['versee', 'terminee'].includes(etapeMotVc(v)) || vus.has('vestiaire:' + v.id)) continue;
+    if (excluAutre && excluAutre('vestiaire', v)) continue;
     const eur = montantRecuVc(v).eur;
     if (eur == null) continue;
     vus.add('vestiaire:' + v.id);
@@ -6531,7 +6538,7 @@ const ventesAutresBenefice = ({ lbc, ebay, vestiaire, numeros, achat, numLbc, nu
 };
 // Les ventes Vestiaire qui ne peuvent PAS entrer dans le bénéfice (montant pas
 // sûr), vivantes : le nombre que le bénéfice DIT (« sans N vente Vestiaire »).
-const vcHorsBenefice = (vestiaire) => (vestiaire || []).filter((v) => v && v.id && !vcVenteAnnulee(v) && montantRecuVc(v).eur == null).length;
+const vcHorsBenefice = (vestiaire, excluAutre) => (vestiaire || []).filter((v) => v && v.id && !vcVenteAnnulee(v) && !(excluAutre && excluAutre('vestiaire', v)) && montantRecuVc(v).eur == null).length;
 const netApresUrssafDe = (ca, tauxPct = tauxUrssaf()) => {
   const u = aPayerUrssaf(ca, tauxPct); if (u == null) return null;
   return (Math.round(Number(ca) * 100) - Math.round(u * 100)) / 100;
@@ -6638,7 +6645,7 @@ const avecDatesLbc = (ventes, dates) => {
   return change ? out : ventes;
 };
 const lireDeclarations = () => { const v = load('vrm_urssaf_declare', {}); return (v && typeof v === 'object' && !Array.isArray(v)) ? v : {}; };
-const ventesDeclarables = ({ vinted, lbc, ebay, vestiaire, masquee, exclu, versements, declare } = {}) => {
+const ventesDeclarables = ({ vinted, lbc, ebay, vestiaire, masquee, exclu, excluAutre, versements, declare } = {}) => {
   const lignes = [], aDater = [], ecartees = [], vus = new Set();
   let exclues = 0;
   const garde = (l) => { if (vus.has(l.id)) return false; vus.add(l.id); return true; };
@@ -6685,6 +6692,10 @@ const ventesDeclarables = ({ vinted, lbc, ebay, vestiaire, masquee, exclu, verse
   for (const v of (lbc || [])) {
     if (!v || v.isSeller !== true || !v.txId) continue;
     if (lbcAnnulee(v) || !lbcFinalisee(v)) continue;
+    // (3 nov.) Un compte Leboncoin, Vestiaire ou eBay écarté par SON choix
+    // (Paramètres → Comptes liés, `excluAutre`, api/_lib/comptes-exclus.js) :
+    // comme un compte Vinted exclu, sa vente n'entre dans AUCUN total.
+    if (excluAutre && excluAutre('leboncoin', v)) { exclues += 1; continue; }
     const eur = v.price != null ? Number(v.price) / 100 : NaN;
     const id = 'lbc:' + v.txId;
     if (!isFinite(eur)) { if (!vus.has(id)) { vus.add(id); ecartees.push({ id, plateforme: 'Leboncoin', raison: 'prix inconnu', titre: v.title || '', manque: true }); } continue; }
@@ -6698,11 +6709,13 @@ const ventesDeclarables = ({ vinted, lbc, ebay, vestiaire, masquee, exclu, verse
     // sortait de partout sans rien dire : elle est mise à part et NOMMÉE (« au
     // moins »), son montant réel n'étant pas lu (§5 : un total partiel se dit).
     if (e && e.orderId && String(e.orderPaymentStatus || '').toUpperCase() === 'PARTIALLY_REFUNDED') {
+      if (excluAutre && excluAutre('ebay', e)) { exclues += 1; continue; }
       const idp = 'ebay:' + e.orderId;
       if (!vus.has(idp)) { vus.add(idp); ecartees.push({ id: idp, plateforme: 'eBay', raison: 'remboursement partiel — montant à vérifier sur eBay', titre: (Array.isArray(e.lineItems) && e.lineItems[0] && e.lineItems[0].title) || '', manque: true }); }
       continue;
     }
     if (!e || String(e.orderPaymentStatus || '').toUpperCase() !== 'PAID' || !e.orderId) continue;
+    if (excluAutre && excluAutre('ebay', e)) { exclues += 1; continue; }
     // (revue argent, 19 oct.) Une commande ANNULÉE garde `PAID` (eBay le temps
     // du remboursement, et VRM quand il accepte une annulation :
     // `annulerCommandeRangee`). Ce n'est pas de l'argent reçu : hors du CA.
@@ -6727,6 +6740,7 @@ const ventesDeclarables = ({ vinted, lbc, ebay, vestiaire, masquee, exclu, verse
   // « à dater » ; pas encore versée ⇒ pas encore reçue (comme Vinted).
   for (const v of (vestiaire || [])) {
     if (!v || !v.id || vcVenteAnnulee(v)) continue;
+    if (excluAutre && excluAutre('vestiaire', v)) { exclues += 1; continue; }
     const id = 'vestiaire:' + v.id;
     if (vus.has(id)) continue;
     const recu = montantRecuVc(v);
@@ -6777,7 +6791,7 @@ const lectureIncomplete = ({ registre, ventes, ventesErreur, comptesEchec, verse
 //    serait une date fausse), elle est comptée dans `sansDate`. eBay : commande
 //    payée, en euros, datée de sa création (même lecture que le CA déclaré).
 //    Identité `plateforme:id`, jamais un titre (§5).
-const ventesFaites = ({ vinted, lbc, ebay, vestiaire, cachee } = {}) => {
+const ventesFaites = ({ vinted, lbc, ebay, vestiaire, cachee, excluAutre } = {}) => {
   const lignes = [], vus = new Set();
   let sansDate = 0, ecartees = 0;   // ecartees : commandes eBay au montant reçu illisible (montantRecuEbay)
   // (1er nov., audits A2 et A10) Les ventes FAITES dont l'argent ne se lit pas
@@ -6799,6 +6813,7 @@ const ventesFaites = ({ vinted, lbc, ebay, vestiaire, cachee } = {}) => {
   }
   for (const v of (lbc || [])) {
     if (!v || v.isSeller !== true || !v.txId || lbcAnnulee(v)) continue;
+    if (excluAutre && excluAutre('leboncoin', v)) continue;   // (3 nov.) compte écarté par son choix
     const eur = v.price != null ? Number(v.price) / 100 : NaN;
     if (!isFinite(eur)) { if (garde('lbc:' + v.txId)) nonComptees.push({ plateforme: 'Leboncoin', raison: 'prix inconnu', ts: Date.parse(v.dateVente || '') || null }); continue; }
     const t = Date.parse(v.dateVente || '');
@@ -6809,6 +6824,7 @@ const ventesFaites = ({ vinted, lbc, ebay, vestiaire, cachee } = {}) => {
     if (garde('lbc:' + v.txId)) lignes.push({ plateforme: 'Leboncoin', ts: t, eur, compte: String(v.account || ''), heureLue: !(v.dateSaisie === true || /^\d{4}-\d{2}-\d{2}$/.test(String(v.dateVente).trim())) });
   }
   for (const e of (ebay || [])) {
+    if (e && excluAutre && excluAutre('ebay', e)) continue;   // (3 nov.) compte écarté par son choix
     // (2 nov., P1) Remboursée en partie : vendue, mais son montant n'est pas sûr ⇒ nommée.
     if (e && e.orderId && String(e.orderPaymentStatus || '').toUpperCase() === 'PARTIALLY_REFUNDED') { if (garde('ebay:' + e.orderId)) nonComptees.push({ plateforme: 'eBay', raison: 'remboursement partiel — montant à vérifier', ts: Date.parse(e.creationDate || '') || null }); continue; }
     if (!e || String(e.orderPaymentStatus || '').toUpperCase() !== 'PAID' || !e.orderId) continue;
@@ -6826,7 +6842,7 @@ const ventesFaites = ({ vinted, lbc, ebay, vestiaire, cachee } = {}) => {
   // VESTIAIRE, au jour de la VENTE : compté si le montant reçu est sûr et la
   // vente datée ; sinon NOMMÉ (`nonComptees`), jamais deviné.
   for (const v of (vestiaire || [])) {
-    if (!v || !v.id || vcVenteAnnulee(v) || !garde('vestiaire:' + v.id)) continue;
+    if (!v || !v.id || vcVenteAnnulee(v) || (excluAutre && excluAutre('vestiaire', v)) || !garde('vestiaire:' + v.id)) continue;
     const t = dateVenteVc(v), recu = montantRecuVc(v);
     if (recu.eur == null) { nonComptees.push({ plateforme: 'Vestiaire', raison: recu.raison, ts: t || null }); continue; }
     if (!t) { nonComptees.push({ plateforme: 'Vestiaire', raison: 'vente pas datée', ts: null }); continue; }
@@ -6860,6 +6876,27 @@ const compteEcarte = (uid, masques, panneau) => {
   if (pa[k] === false) return false;
   return (masques && masques.has(k)) || pa[k] === true;
 };
+// (3 nov.) LES COMPTES LEBONCOIN, VESTIAIRE ET eBAY ÉCARTÉS DES TOTAUX — le même
+// choix que les comptes Vinted sélectionnés, rangé dans `vrm_comptes_exclus`
+// (synchronisé) et jugé par UNE règle (api/_lib/comptes-exclus.js, §11). Chaque
+// écran qui calcule un total passe le prédicat rendu ici (`excluAutre`) à
+// `ventesFaites`, `ventesDeclarables` et `ventesAutresBenefice` ; il se relit
+// dès que le choix change (sur cet appareil ou relu du nuage).
+const lireComptesExclus = () => { const v = load(CLE_COMPTES_EXCLUS, {}); return v && typeof v === 'object' && !Array.isArray(v) ? v : {}; };
+function useComptesExclus() {
+  const [v, setV] = useStateCle(CLE_COMPTES_EXCLUS, lireComptesExclus);
+  React.useEffect(() => {
+    const f = (e) => { if (e && e.detail && e.detail.k === CLE_COMPTES_EXCLUS) setV(lireComptesExclus()); };
+    window.addEventListener('vrm:save', f);
+    const stop = onCloudReady(() => setV(lireComptesExclus()));
+    return () => { window.removeEventListener('vrm:save', f); if (typeof stop === 'function') stop(); };
+  }, []);
+  return [v, setV];
+}
+function useExcluAutre() {
+  const [v] = useComptesExclus();
+  return React.useMemo(() => excluAutreDe(v), [v]);
+}
 // ══════════════════════════════════════════════════════════════════════════════
 // CE QUE VINTED TRANSMET AUX IMPÔTS — LES SEUILS, COMPTE PAR COMPTE (6 octobre)
 // ══════════════════════════════════════════════════════════════════════════════
@@ -35569,6 +35606,7 @@ function DaterVentesLbc({ ventes, dates }) {
 // Comptabilité et les phrases qui y renvoient (la carte URSSAF du mois) le lisent.
 const TITRE_CARTE_CA = 'Vendu et reçu';
 function CaParPeriodeCarte({ lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, accounts, dansRepli = false }) {
+  const excluAutre = useExcluAutre();
   const { ventes, ko } = useVentesCoque();
   const [datesLbc] = useLigneSynchro('vrm_lbc_dates', lireDatesLbc);
   const ventesVc = useVentesVestiaire();
@@ -35590,8 +35628,8 @@ function CaParPeriodeCarte({ lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, acc
     const lbc = lbcCoqueLu === true ? avecDatesLbc(((lbcVentes && lbcVentes.ventes) || []), datesLbc) : [];
     const ebay = Array.isArray(ebayCommandes) ? ebayCommandes : [];
     const vestiaire = ventesVc || [];
-    const vf = ventesFaites({ vinted: ventes, lbc, ebay, vestiaire, cachee: (o) => hTx.has(String(o && o.transaction_id)) || ecarte(uidDe(o)) });
-    const decl = ventesDeclarables({ vinted: ventes, lbc, ebay, vestiaire, masquee: (o) => hTx.has(String(o && o.transaction_id)), exclu: (o) => ecarte(uidDe(o)), versements: versements || {} });
+    const vf = ventesFaites({ vinted: ventes, lbc, ebay, vestiaire, cachee: (o) => hTx.has(String(o && o.transaction_id)) || ecarte(uidDe(o)), excluAutre });
+    const decl = ventesDeclarables({ vinted: ventes, lbc, ebay, vestiaire, masquee: (o) => hTx.has(String(o && o.transaction_id)), exclu: (o) => ecarte(uidDe(o)), excluAutre, versements: versements || {} });
     let finSansDate = 0;
     const finalise = [];
     for (const l of [...decl.lignes, ...decl.aDater]) {
@@ -35611,7 +35649,7 @@ function CaParPeriodeCarte({ lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, acc
     // (1er nov., audits A2/A10) Les ventes dont l'argent ne se lit pas : dites, jamais 0 €.
     return { etat: 'lu', vendu: vf.lignes, finalise, recu, aDater, venduSansDate: vf.sansDate, venduEbayEcartees: vf.ecartees || 0, finSansDate, manque, attente, venduNonComptees: vf.nonComptees || [], recuNonComptees: (decl.ecartees || []).filter((x) => x && x.manque) };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ventes, ko, lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, versements, accounts, tick, datesLbc, ventesVc]);
+  }, [ventes, ko, lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, versements, accounts, tick, datesLbc, ventesVc, excluAutre]);
   const lignes = calc.etat === 'lu' ? caParPeriodes({ vendu: calc.vendu, finalise: calc.finalise, recu: calc.recu }, periode, 6) : null;
   const cur = lignes ? lignes[0] : null;
   // Les périodes d'avant, sans les plus anciennes toutes vides (même règle qu'avant).
@@ -35865,6 +35903,7 @@ const telechargerFichier = (contenu, nom, type) => {
   setTimeout(() => URL.revokeObjectURL(url), 4000);
 };
 function FacturationElectroniqueCarte({ data, maj, lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, accounts }) {
+  const excluAutre = useExcluAutre();
   const { ventes, ko } = useVentesCoque();
   const [datesLbc] = useLigneSynchro('vrm_lbc_dates', lireDatesLbc);
   const ventesVcER = useVentesVestiaire();
@@ -35930,7 +35969,7 @@ function FacturationElectroniqueCarte({ data, maj, lbcVentes, lbcCoqueLu, ebayCo
     const uidDe = (o) => o && o._acc && o._acc.vinted_user_id;
     const lbc = lbcCoqueLu === true ? avecDatesLbc(((lbcVentes && lbcVentes.ventes) || []), datesLbc) : [];
     const ebay = Array.isArray(ebayCommandes) ? ebayCommandes : [];
-    const decl = ventesDeclarables({ vinted: versements ? ventes : [], lbc, ebay, vestiaire: ventesVcER || [], masquee: (o) => hTx.has(String(o && o.transaction_id)), exclu: (o) => ecarte(uidDe(o)), versements: versements || {} });
+    const decl = ventesDeclarables({ vinted: versements ? ventes : [], lbc, ebay, vestiaire: ventesVcER || [], masquee: (o) => hTx.has(String(o && o.transaction_id)), exclu: (o) => ecarte(uidDe(o)), excluAutre, versements: versements || {} });
     const loginDe = (uid) => { const a = (accounts || []).find((x) => String(x.vinted_user_id) === String(uid)); return (a && a.login) || String(uid); };
     // (1er nov., audits A2/A10) Vestiaire pas lu, et les ventes dont l'argent ne
     // se lit pas : NOMMÉES dans ce qui manque (jamais un total partiel complet).
@@ -35944,7 +35983,7 @@ function FacturationElectroniqueCarte({ data, maj, lbcVentes, lbcCoqueLu, ebayCo
     ];
     return { etat: 'lu', decl, manque, attente: lbcCoqueLu === undefined || ebayCommandes === undefined || versements === undefined || ventesVcER === undefined };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ventes, ko, lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, versements, accounts, tick, datesLbc, ventesVcER]);
+  }, [ventes, ko, lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, versements, accounts, tick, datesLbc, ventesVcER, excluAutre]);
   const recap = calc.etat === 'lu' ? recapEReporting({ lignes: calc.decl.lignes, aDater: versements ? calc.decl.aDater : [], ym, ymDe: ymDeTs, manque: calc.manque, attente: calc.attente, versementsLus: versements !== null }) : null;
 
   const fx = (data && data.facturx) || {};
@@ -40447,6 +40486,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     () => new Set((accounts || []).map(a => String(a.vinted_user_id || '')).filter(Boolean)),
     [accounts]);
   const acctOffOf = (o) => acctOff(o?._acc?.vinted_user_id);
+  // (3 nov.) Les comptes Leboncoin, Vestiaire et eBay écartés des totaux (Comptes liés).
+  const excluAutre = useExcluAutre();
   const isHidden = (o) => hiddenSales.has(String(o.transaction_id)) || acctOffOf(o);
   const toggleHidden = () => {};   // (29 oct.) une vente ne se masque plus
   const [annSearch, setAnnSearch] = useVueSession('annonces-recherche', ''); // recherche annonces (titre/marque/N°)
@@ -42305,10 +42346,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     if (lbcLu === undefined || ebayCmd === undefined || versements === undefined || ventesVc === undefined) return undefined;
     if (versements === null) return null;
     try {
-      return ventesDeclarables({ vinted: ventesComptees, lbc: lbcLu ? avecDatesLbc(lbcVentes.ventes, datesLbc) : [], ebay: ebayCmd || [], vestiaire: ventesVc || [], masquee: (o) => hiddenSales.has(String(o.transaction_id)), exclu: acctOffOf, versements, declare: declUrssaf });
+      return ventesDeclarables({ vinted: ventesComptees, lbc: lbcLu ? avecDatesLbc(lbcVentes.ventes, datesLbc) : [], ebay: ebayCmd || [], vestiaire: ventesVc || [], masquee: (o) => hiddenSales.has(String(o.transaction_id)), exclu: acctOffOf, excluAutre, versements, declare: declUrssaf });
     } catch (_) { return null; }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ventesComptees, hiddenSales, hiddenAccts, panelAcctOff, lbcLu, lbcVentes, ebayCmd, versements, datesLbc, ventesVc, declUrssaf]);
+  }, [ventesComptees, hiddenSales, hiddenAccts, panelAcctOff, lbcLu, lbcVentes, ebayCmd, versements, datesLbc, ventesVc, excluAutre, declUrssaf]);
   // Ce qui n'est compté dans AUCUN « reçu » parce que son argent ne se lit pas
   // (Vinted au prix pas lu, Leboncoin au prix inconnu, Vestiaire au montant pas
   // sûr) — et Vestiaire pas lu du tout. Chaque total « reçu » le dit (« au moins »).
@@ -42328,15 +42369,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     if (declarables) return { lignes: declarables.lignes, aDater: declarables.aDater, vinted: 'lu' };
     if (lbcLu === undefined || ebayCmd === undefined) return { lignes: [], aDater: [], vinted: 'encours' };
     try {
-      const r = ventesDeclarables({ lbc: lbcLu ? avecDatesLbc(lbcVentes.ventes, datesLbc) : [], ebay: ebayCmd || [], vestiaire: ventesVc || [], declare: declUrssaf });
+      const r = ventesDeclarables({ lbc: lbcLu ? avecDatesLbc(lbcVentes.ventes, datesLbc) : [], ebay: ebayCmd || [], vestiaire: ventesVc || [], excluAutre, declare: declUrssaf });
       return { lignes: r.lignes, aDater: r.aDater, vinted: 'passu' };
     } catch (_) { return { lignes: [], aDater: [], vinted: 'passu' }; }
-  }, [declarables, lbcLu, lbcVentes, ebayCmd, datesLbc, declUrssaf, ventesVc]);
+  }, [declarables, lbcLu, lbcVentes, ebayCmd, datesLbc, declUrssaf, ventesVc, excluAutre]);
   // Les ventes FAITES, toutes plateformes (`ventesFaites`) : « Vendu aujourd'hui »,
   // « Vendu ce mois » et la colonne VENDU du graphique.
-  const vendus = useMemo(() => ventesFaites({ vinted: sales.items || [], lbc: lbcLu ? avecDatesLbc(lbcVentes.ventes, datesLbc) : [], ebay: ebayCmd || [], vestiaire: ventesVc || [], cachee: isHidden }),
+  const vendus = useMemo(() => ventesFaites({ vinted: sales.items || [], lbc: lbcLu ? avecDatesLbc(lbcVentes.ventes, datesLbc) : [], ebay: ebayCmd || [], vestiaire: ventesVc || [], cachee: isHidden, excluAutre }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [sales.items, hiddenSales, hiddenAccts, panelAcctOff, lbcLu, lbcVentes, ebayCmd, datesLbc, ventesVc]);
+    [sales.items, hiddenSales, hiddenAccts, panelAcctOff, lbcLu, lbcVentes, ebayCmd, datesLbc, ventesVc, excluAutre]);
   // VENDU sur une période (aujourd'hui, ce mois) — sur `vendus`, la même liste
   // que le graphique : la carte et la colonne du jour ne peuvent pas diverger.
   const bilanVentes = React.useCallback((depuisTs, jusquaTs) => {
@@ -45617,10 +45658,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       return ventesAutresBenefice({ lbc: lbcVentes.ventes || [], ebay: ebayCmd, vestiaire: ventesVc || [], numeros,
         achat: (f) => achatDe(withBuyByNum(f)),
         numLbc: (v) => numeroLbcIdentite(v, lbcItemsBenef, liens),
-        numEbayLigne: (o, li) => numLigneEbay(o, li) });
+        numEbayLigne: (o, li) => numLigneEbay(o, li), excluAutre });
     } catch (_) { return null; }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lbcLu, lbcVentes, ebayCmd, lbcItemsBenef, numeros, buyByNum, ventesVc]);
+  }, [lbcLu, lbcVentes, ebayCmd, lbcItemsBenef, numeros, buyByNum, ventesVc, excluAutre]);
   const totals = useMemo(() => {
     // ⚠️ LES TOTAUX SUIVENT LA PÉRIODE AFFICHÉE. Sans ça, filtrer sur « ce mois »
     // laissait « CA finalisé 6 068 € · 212 ventes » au-dessus d'une liste de
@@ -45731,7 +45772,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       // (1er nov.) + Vestiaire (montant reçu sûr) ; les ventes Vestiaire au montant
       // pas sûr sont hors du bénéfice et publiées en NOMBRE (`horsVestiaire`) :
       // la case Bénéfice le dit (« sans N vente Vestiaire »), jamais tues.
-      const horsVestiaire = ventesVc === null ? null : vcHorsBenefice(ventesVc);
+      const horsVestiaire = ventesVc === null ? null : vcHorsBenefice(ventesVc, excluAutre);
       if (!(avant && JSON.stringify(avant.jours) === JSON.stringify(charge) && avant.horsVestiaire === horsVestiaire)) save('vrm_benefice_jours', { v: 2, plateformes: ['Vinted', 'Leboncoin', 'eBay', 'Vestiaire'], jours: charge, horsVestiaire, at: Date.now() });
       // (31 oct.) LE RELEVÉ VENTE PAR VENTE, pour les marges par marque, modèle,
       // taille, plateforme et compte de Statistiques : les MÊMES ventes et le
@@ -45765,7 +45806,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       if (!(r0 && JSON.stringify(r0.l) === JSON.stringify(releve))) save('vrm_stats_ventes', { v: 1, l: releve, at: Date.now() });
     } catch (_) {}
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sales.items, sales.failedUids, numeros, saleOv, buyByNum, hiddenSales, hiddenAccts, autresBenefice, ventesVc]);
+  }, [sales.items, sales.failedUids, numeros, saleOv, buyByNum, hiddenSales, hiddenAccts, autresBenefice, ventesVc, excluAutre]);
 
   // ── Achats HORS VINTED (brocante, fournisseur, particulier…) ──────────
   // Paires/objets achetés ailleurs que sur Vinted. Saisie manuelle : désignation,
@@ -46783,7 +46824,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // ⚠️ Dates de versement ILLISIBLES : ses ventes Vinted ne sont pas « sans
     //    date » (on n'a pas pu les lire) — seules Leboncoin et eBay comptent ici.
     const tousADater = versements === null ? (declRapport.aDater || [])
-      : ventesDeclarables({ vinted: ventesComptees || [], lbc: lbcLu ? avecDatesLbc(lbcVentes.ventes, datesLbc) : [], ebay: ebayCmd || [], exclu: acctOffOf, versements: versements || {}, declare: declUrssaf }).aDater;
+      : ventesDeclarables({ vinted: ventesComptees || [], lbc: lbcLu ? avecDatesLbc(lbcVentes.ventes, datesLbc) : [], ebay: ebayCmd || [], exclu: acctOffOf, excluAutre, versements: versements || {}, declare: declUrssaf }).aDater;
     const aDater = { n: tousADater.length, ca: tousADater.reduce((t, l) => t + l.eur, 0) };
     // Les comptes dont les ventes n'ont pas pu être lues — sauf ceux qu'il a
     // EXCLUS (leurs ventes ne comptent jamais : leur absence ne manque à rien).
@@ -46827,7 +46868,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       nApres, caApres, nDouble, caDouble, doubles: [...doubles].sort(), nAilleurs, caAilleurs, ailleurs, nVenteAvant, caVenteAvant, venteAvant, declaration, declarePasSu: declUrssaf == null, enCours,
       vinted: declRapport.vinted, incomplet };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [showReport, sales.items, sales.failedUids, sales.error, ventesComptees, accounts, buysBase, reportMonth, numeros, saleOv, buyByNum, hiddenSales, hiddenAccts, panelAcctOff, lbcLu, lbcVentes, ebayCmd, versements, declarables, declRapport, declUrssaf]);
+  }, [showReport, sales.items, sales.failedUids, sales.error, ventesComptees, accounts, buysBase, reportMonth, numeros, saleOv, buyByNum, hiddenSales, hiddenAccts, panelAcctOff, lbcLu, lbcVentes, ebayCmd, versements, declarables, declRapport, declUrssaf, excluAutre]);
 
   // ── « J'AI DÉCLARÉ CE MOIS » (6 octobre) ──────────────────────────────────
   // Il note, SUR SON CLIC, ce qu'il a déclaré à l'URSSAF pour un mois : l'app
@@ -64199,6 +64240,7 @@ function AppCoeur() {
     caEncaisse: null, caFinaliseParJour: null, enCours: null, soldTotal: null, joursVente: null, caParCompte: null, venduLignes: null, venduPasSu: true };
   // (1er nov., audit A2) Les ventes Vestiaire entrent dans « vendu » (montant sûr) ou sont nommées.
   const ventesVcCoque = useVentesVestiaire();
+  const excluAutreCoque = useExcluAutre();
   const liveStatsVus = useMemo(() => {
     if (!liveStats) return liveStats;
     if (ventesCoque === null) return { ...liveStats, ...VENDU_PAS_SU };
@@ -64208,7 +64250,7 @@ function AppCoeur() {
       const hAcc = new Set((load('vinted_accounts_hidden', []) || []).map(String));
       const ecarte = (uid) => compteEcarte(uid, hAcc, panelOffCoque);
       const cachee = (o) => hTx.has(String(o && o.transaction_id)) || ecarte(o && o._acc && o._acc.vinted_user_id);
-      const v = ventesFaites({ vinted: ventesCoque, lbc: lbcCoqueLu === true ? avecDatesLbc(((lbcVentes && lbcVentes.ventes) || []), lireDatesLbc()) : [], ebay: Array.isArray(ebayCommandes) ? ebayCommandes : [], vestiaire: ventesVcCoque || [], cachee });
+      const v = ventesFaites({ vinted: ventesCoque, lbc: lbcCoqueLu === true ? avecDatesLbc(((lbcVentes && lbcVentes.ventes) || []), lireDatesLbc()) : [], ebay: Array.isArray(ebayCommandes) ? ebayCommandes : [], vestiaire: ventesVcCoque || [], cachee, excluAutre: excluAutreCoque });
       const r = resumeVendu(v.lignes);
       const loginDe = (uid) => { const a = (vintedAccounts || []).find(x => String(x.vinted_user_id) === String(uid)); return (a && a.login) || String(uid); };
       const venduManque = [
@@ -64230,7 +64272,7 @@ function AppCoeur() {
         venduManque, venduEnAttente: lbcCoqueLu === undefined || ebayCommandes === undefined || ventesVcCoque === undefined };
     } catch (_) { return liveStats; }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [liveStats, ventesCoque, ventesKO, lbcVentes, lbcCoqueLu, ebayCommandes, panelOffCoque, nuagePret, masquesTick, jourCle, vintedAccounts, datesLbcTick, ventesVcCoque]);
+  }, [liveStats, ventesCoque, ventesKO, lbcVentes, lbcCoqueLu, ebayCommandes, panelOffCoque, nuagePret, masquesTick, jourCle, vintedAccounts, datesLbcTick, ventesVcCoque, excluAutreCoque]);
   // Le widget : écrit quand ce qu'il afficherait CHANGE (pas à chaque rendu),
   // et SEULEMENT un « vendu » complet : sources pas encore revenues, illisibles
   // ou un compte manquant ⇒ on n'écrit pas, l'iPhone garde la dernière photo
