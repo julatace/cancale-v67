@@ -1,8 +1,8 @@
 /* « Tes emails, ce que VRM en a fait » (31 oct.) — Vitrine : aplats « surface »,
    une seule couleur d'accent (rare), l'ambre pour un geste à faire, 44 px. */
-.vrm-journal{margin:0 0 16px;border-radius:14px;background:var(--vrm-card,#fff);color:var(--vrm-ink,#111);min-width:0;overflow:hidden;font-size:14px;line-height:1.45}
+.vrm-journal{margin:0 0 16px;border-radius:14px;background:var(--vrm-card,#fff);color:var(--vrm-ink,#111);min-width:0;overflow:hidden;font-size:15px;line-height:1.45}
 .vrm-journal-entete{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding:18px 18px 10px}
-.vrm-journal-entete h3{margin:0;font-size:18px;font-weight:800;letter-spacing:-.02em}
+.vrm-journal-entete h3{margin:0;font-size:17px;font-weight:800;letter-spacing:-.02em}
 .vrm-journal-entete p{margin:4px 0 0;font-size:13px;color:var(--vrm-muted,#6E6E73)}
 .vrm-journal button,.vrm-journal select{font:inherit;min-height:44px;box-sizing:border-box;border-radius:12px;border:1px solid var(--vrm-line,#E5E5EA);background:var(--vrm-surface,#FFFFFF);color:inherit;padding:0 14px;cursor:pointer}
 .vrm-journal button:disabled{opacity:.6;cursor:wait}
@@ -40,9 +40,9 @@
 .vrm-journal-plus{display:block;margin:12px 18px 18px;width:calc(100% - 36px)}
 .vrm-journal-entree{margin:12px 0}
 .vrm-journal-entree button{width:100%;display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:44px;padding:0 14px;border-radius:12px;border:1px solid var(--vrm-line,#E5E5EA);background:var(--vrm-surface,#FFFFFF);color:var(--vrm-ink,#111);font:inherit;cursor:pointer;text-align:left}
-@media(max-width:440px){.vrm-journal-entete,.vrm-journal-filtres,.vrm-journal-ligne{padding-left:14px;padding-right:14px}.vrm-journal-couverture,.vrm-journal-vide{margin-left:14px;margin-right:14px}.vrm-journal select{font-size:16px}.vrm-journal-plus{margin-left:14px;margin-right:14px;width:calc(100% - 28px)}}
+@media(max-width:440px){.vrm-journal-entete,.vrm-journal-filtres,.vrm-journal-ligne{padding-left:14px;padding-right:14px}.vrm-journal-couverture,.vrm-journal-vide{margin-left:14px;margin-right:14px}.vrm-journal select{font-size:17px}.vrm-journal-plus{margin-left:14px;margin-right:14px;width:calc(100% - 28px)}}
 /* (2 nov.) Au téléphone, le titre et « N à vérifier » se coupaient en deux lignes
    chacun (« 2 à / vérifier ») : taille de l'écran Colis, pastille jamais coupée. */
-.vrm-journal-entree button{font-size:14px;font-weight:600;padding:10px 14px}
+.vrm-journal-entree button{font-size:15px;font-weight:600;padding:10px 14px}
 .vrm-journal-entree button>span:first-child{min-width:0;flex:1 1 auto}
-.vrm-journal-entree .vrm-journal-n-ambre{white-space:nowrap;flex:0 0 auto;font-size:12.5px;padding:2px 9px}
+.vrm-journal-entree .vrm-journal-n-ambre{white-space:nowrap;flex:0 0 auto;font-size:13px;padding:2px 9px}

@@ -205,7 +205,7 @@ export function FondRelais({ points, selection, onChoisir, C, etiquette, hauteur
             // Une seule couleur d'accent, rare (§7) : l'épingle d'un point où des
             // colis ATTENDENT d'être retirés ; les autres restent neutres.
             const fort = ep.sorte === 'aretirer';
-            el.style.cssText = `min-width:34px;height:34px;padding:0 8px;border-radius:17px;border:2px solid #fff;font:700 14px/30px system-ui,sans-serif;cursor:pointer;box-shadow:0 2px 6px rgba(0,0,0,.3);color:${fort ? '#fff' : '#1d2430'};background:${fort ? (C.accent || '#2f5bd3') : '#fff'}`;
+            el.style.cssText = `min-width:34px;height:34px;padding:0 8px;border-radius:20px;border:2px solid #fff;font:700 15px/30px system-ui,sans-serif;cursor:pointer;box-shadow:0 2px 6px rgba(0,0,0,.3);color:${fort ? '#fff' : '#1d2430'};background:${fort ? (C.accent || '#2f5bd3') : '#fff'}`;
             if (fort) el.setAttribute('data-relais-arrives', '');
             el.addEventListener('click', (e) => { e.stopPropagation(); onChoisir && onChoisir(p.cle); });
             elements.current.set(p.cle, el);
@@ -228,7 +228,7 @@ export function FondRelais({ points, selection, onChoisir, C, etiquette, hauteur
   return (
     <div style={{ position: 'relative' }}>
       <div ref={boite} data-relais-fond={etat} data-relais-cadre={points.length ? [Math.min(...points.map((p) => p.lon)), Math.min(...points.map((p) => p.lat)), Math.max(...points.map((p) => p.lon)), Math.max(...points.map((p) => p.lat))].map((v) => Number(v).toFixed(3)).join(',') : ''} className="vrm-relais-fond" aria-hidden={ko ? 'true' : undefined}
-        style={{ width: '100%', height: hauteur, borderRadius: 10, overflow: 'hidden', background: '#eaeef2', ...(ko ? { position: 'absolute', left: 0, top: 0, visibility: 'hidden', pointerEvents: 'none' } : null) }}/>
+        style={{ width: '100%', height: hauteur, borderRadius: 12, overflow: 'hidden', background: '#eaeef2', ...(ko ? { position: 'absolute', left: 0, top: 0, visibility: 'hidden', pointerEvents: 'none' } : null) }}/>
       {ko && !muet && <div data-relais-carte-ko="" style={{ fontSize: 12, color: 'var(--vrm-muted, #667)', padding: '8px 0' }}>La carte ne s’affiche pas ici pour l’instant — la liste ci-dessous reste juste.</div>}
       {selection ? <span className="vrm-sr">{selection}</span> : null}
     </div>
@@ -432,18 +432,18 @@ export default function CarteRelaisColis({ donnees, C, compacte = false, sansLis
         </div>
       ))}
       {sansListe && avecRepere.length === 0 && <div data-relais-sans-repere-tous="" style={muted}>{groupes.some((g) => etatRepere(g) === 'cherche') ? 'Je place les points sur la carte…' : 'Aucun point n’a pu être placé sur la carte : adresse incomplète ou pas trouvée sûrement.'}</div>}
-      {!sansListe && sansRelais > 0 && <div style={{ ...muted, fontSize: 11.5 }}>{sansRelais} achat{sansRelais > 1 ? 's' : ''} en route sans destination connue.</div>}
-      {avecRepere.length > 0 && <div data-relais-note="" style={{ ...muted, fontSize: 10.5 }}>Fond : OpenFreeMap · © OpenMapTiles · © OpenStreetMap ; adresses : adresse.data.gouv.fr.</div>}
+      {!sansListe && sansRelais > 0 && <div style={{ ...muted, fontSize: 12 }}>{sansRelais} achat{sansRelais > 1 ? 's' : ''} en route sans destination connue.</div>}
+      {avecRepere.length > 0 && <div data-relais-note="" style={{ ...muted, fontSize: 11 }}>Fond : OpenFreeMap · © OpenMapTiles · © OpenStreetMap ; adresses : adresse.data.gouv.fr.</div>}
     </div>
   );
   return (
-    <div className="vrm-relais-carte" data-relais-carte={ouverte ? 'ouverte' : 'fermee'} data-relais-points={groupes.length} data-relais-arrives={nArr} data-relais-attendus={nAtt} style={{ marginBottom: 14, border: `1px solid ${C.border}`, borderRadius: 10, background: C.card, overflow: 'hidden' }}>
+    <div className="vrm-relais-carte" data-relais-carte={ouverte ? 'ouverte' : 'fermee'} data-relais-points={groupes.length} data-relais-arrives={nArr} data-relais-attendus={nAtt} style={{ marginBottom: 14, border: `1px solid ${C.border}`, borderRadius: 12, background: C.card, overflow: 'hidden' }}>
       <button type="button" onClick={() => setOuverte((o) => !o)} aria-expanded={ouverte} style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', minHeight: 44, padding: '10px 14px', background: 'transparent', border: 'none', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left' }}>
         <span style={{ flex: 1, minWidth: 0 }}>
-          <span style={{ display: 'block', fontSize: 14, fontWeight: 700, color: C.text }}>Par point relais</span>
+          <span style={{ display: 'block', fontSize: 15, fontWeight: 700, color: C.text }}>Par point relais</span>
           <span style={{ display: 'block', ...muted }}>{groupes.length ? `${groupes.length} point${groupes.length > 1 ? 's' : ''} · ${nArr} déjà arrivé${nArr > 1 ? 's' : ''}${nAtt ? ` · ${nAtt} attendu${nAtt > 1 ? 's' : ''}` : ''}` : 'Aucune destination encore connue'}</span>
         </span>
-        <span aria-hidden="true" style={{ fontSize: 16, color: C.muted }}>{ouverte ? '▴' : '▾'}</span>
+        <span aria-hidden="true" style={{ fontSize: 17, color: C.muted }}>{ouverte ? '▴' : '▾'}</span>
       </button>
       {ouverte && (
         <div style={{ padding: '0 14px 14px', display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -453,19 +453,19 @@ export default function CarteRelaisColis({ donnees, C, compacte = false, sansLis
             return (
               <div key={g.cle} data-relais-point={g.cle} data-relais-point-arrives={g.nArrives} data-relais-point-attendus={g.nAttendus} data-relais-repere={er}
                 style={{ borderTop: `1px solid ${C.border}`, paddingTop: 10, outline: choisi === g.cle ? `2px solid ${C.accent}` : 'none', outlineOffset: 2, borderRadius: 4 }}>
-                <div style={{ fontSize: 14, fontWeight: 700, color: C.text }}>{nomDe(g)}</div>
+                <div style={{ fontSize: 15, fontWeight: 700, color: C.text }}>{nomDe(g)}</div>
                 {g.adresse ? <div style={muted}>{g.adresse}</div> : null}
-                {er === 'non' && !g.inconnu && <div data-relais-sans-repere="" style={{ ...muted, fontSize: 11.5 }}>{!g.geocode ? "Pas sur la carte : l'adresse lue est incomplète (il faut la rue et le code postal)." : "Pas sur la carte : cette adresse n'a pas été trouvée sûrement."}</div>}
+                {er === 'non' && !g.inconnu && <div data-relais-sans-repere="" style={{ ...muted, fontSize: 12 }}>{!g.geocode ? "Pas sur la carte : l'adresse lue est incomplète (il faut la rue et le code postal)." : "Pas sur la carte : cette adresse n'a pas été trouvée sûrement."}</div>}
                 {g.nArrives > 0 && <div data-relais-ligne="arrives" style={{ fontSize: 13, color: C.text, marginTop: 4 }}><b>{g.nArrives}</b> déjà arrivé{g.nArrives > 1 ? 's' : ''}{(() => { const sc = g.arrives.filter((c) => !c.aCode).length; return sc ? ` · ${sc} sans code pour l'instant` : ''; })()}</div>}
                 {g.attendus.map((c) => (
-                  <div key={c.id} data-relais-attendu={c.id} data-relais-estimee={c.estimee || ''} style={{ fontSize: 12.5, color: C.text, marginTop: 3 }}>
+                  <div key={c.id} data-relais-attendu={c.id} data-relais-estimee={c.estimee || ''} style={{ fontSize: 13, color: C.text, marginTop: 3 }}>
                     En route{c.titre ? ` · ${c.titre}` : ''} — {c.estimee ? <>arrivée estimée {jourFr(c.estimee)}</> : <span style={{ color: C.muted }}>date d'arrivée pas encore dite</span>}
                   </div>
                 ))}
               </div>
             );
           })}
-          <div data-relais-note="" style={{ ...muted, fontSize: 11.5 }}>
+          <div data-relais-note="" style={{ ...muted, fontSize: 12 }}>
             Un colis n'est rangé sous un point que par ce qui le désigne lui (l'e-mail du transporteur, la conversation, ou le suivi Vinted de CET achat) — jamais deviné.
             {sansRelais > 0 ? ` ${sansRelais} achat${sansRelais > 1 ? 's' : ''} en route sans destination connue : elle ne vient que du suivi Vinted de l'achat, quand il la donne (l'extension le relit en passant).` : ''}
             {' '}Les arrivées sont celles que Vinted estime, pas une promesse. Fond : OpenFreeMap · © OpenMapTiles · © OpenStreetMap ; adresses : adresse.data.gouv.fr.

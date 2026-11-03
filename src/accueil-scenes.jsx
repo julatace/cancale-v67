@@ -30,18 +30,18 @@ const CSS = `
 .sc-tete{display:flex;align-items:center;justify-content:space-between;gap:10px;height:44px;padding:0 14px 0 16px;border-bottom:1px solid ${K.line}}
 .sc-tete b{font-family:-apple-system,BlinkMacSystemFont,'Inter',sans-serif;font-size:15px;font-weight:600;letter-spacing:-.01em;white-space:nowrap}
 .sc-tete b span{font-family:-apple-system,BlinkMacSystemFont,'Inter',system-ui,sans-serif;color:${K.muted};font-weight:500}
-.sc-bp{display:inline-flex;align-items:center;gap:7px;height:32px;padding:0 12px;border-radius:8px;background:${K.cta};color:#FFF;font-size:13px;font-weight:600;white-space:nowrap;box-shadow:inset 0 1px 0 rgba(255,255,255,.18),0 1px 2px rgba(0,0,0,.4)}
-.sc-bs{display:inline-flex;align-items:center;justify-content:center;height:30px;padding:0 11px;border-radius:8px;border:1px solid ${K.line2};background:${K.card2};color:${K.text};font-size:12px;font-weight:600;white-space:nowrap}
+.sc-bp{display:inline-flex;align-items:center;gap:7px;height:32px;padding:0 12px;border-radius:12px;background:${K.cta};color:#FFF;font-size:13px;font-weight:600;white-space:nowrap;box-shadow:inset 0 1px 0 rgba(255,255,255,.18),0 1px 2px rgba(0,0,0,.4)}
+.sc-bs{display:inline-flex;align-items:center;justify-content:center;height:30px;padding:0 11px;border-radius:12px;border:1px solid ${K.line2};background:${K.card2};color:${K.text};font-size:12px;font-weight:600;white-space:nowrap}
 .sc-groupe{height:26px;display:flex;align-items:flex-end;padding:0 16px 5px;font-size:12px;font-weight:600;color:${K.muted}}
 .sc-ligne{height:48px;display:flex;align-items:center;gap:12px;padding:0 14px 0 16px}
 .sc-ligne + .sc-ligne{border-top:1px solid ${K.line}}
 .sc-ligne .t{flex:1;min-width:0}
-.sc-ligne .t b{display:block;font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:18px}
+.sc-ligne .t b{display:block;font-size:15px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:18px}
 .sc-meta{display:flex;align-items:center;gap:6px;font-size:12px;color:${K.muted};white-space:nowrap;line-height:16px;margin-top:2px}
-.sc-badge{display:inline-flex;align-items:center;height:18px;padding:0 6px;border-radius:8px;background:${K.card2};border:1px solid ${K.line2};font-size:12px;font-weight:600;color:${K.text};font-variant-numeric:tabular-nums;white-space:nowrap}
+.sc-badge{display:inline-flex;align-items:center;height:18px;padding:0 6px;border-radius:12px;background:${K.card2};border:1px solid ${K.line2};font-size:12px;font-weight:600;color:${K.text};font-variant-numeric:tabular-nums;white-space:nowrap}
 .sc-delai{font-size:12px;color:${K.muted};white-space:nowrap}
-.sc-vign{width:32px;height:32px;border-radius:8px;flex-shrink:0;display:flex;align-items:center;justify-content:center;border:1px solid ${K.line}}
-.sc-feuille{position:absolute;display:flex;flex-direction:column;background:${K.paper};color:${K.ink};border-radius:5px;box-shadow:0 1px 2px rgba(0,0,0,.4),0 16px 40px rgba(0,0,0,.45);padding:12px 14px;overflow:hidden}
+.sc-vign{width:32px;height:32px;border-radius:12px;flex-shrink:0;display:flex;align-items:center;justify-content:center;border:1px solid ${K.line}}
+.sc-feuille{position:absolute;display:flex;flex-direction:column;background:${K.paper};color:${K.ink};border-radius:6px;box-shadow:0 1px 2px rgba(0,0,0,.4),0 16px 40px rgba(0,0,0,.45);padding:12px 14px;overflow:hidden}
 .sc-feuille .masque{display:flex;flex-direction:column;gap:5px;margin-top:10px}
 .sc-feuille .masque i{display:block;height:5px;border-radius:2px;background:#D9DEE6}
 .sc-feuille .hd{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:12px;line-height:16px}
@@ -50,48 +50,48 @@ const CSS = `
 .sc-feuille .rel{font-size:12px;line-height:16px;color:#4A5363;margin-top:2px;white-space:nowrap}
 .sc-cb{display:flex;align-items:stretch;gap:2px;margin-top:8px}
 .sc-cb i{display:block;background:${K.ink}}
-.sc-tampon{position:relative;display:inline-flex;align-items:center;gap:6px;height:24px;padding:0 8px;border:1.5px solid ${K.cta};border-radius:5px;background:rgba(36,88,230,.06);font-size:12px;font-weight:600;color:${K.ink};white-space:nowrap;font-variant-numeric:tabular-nums}
-.sc-encre{position:absolute;inset:-3px;border:2px solid ${K.accent};border-radius:7px;pointer-events:none}
-.sc-carton{position:absolute;border-radius:5px;background:${K.card2};border:1px solid ${K.line2};display:flex;align-items:flex-end;justify-content:center;padding-bottom:7px;font-size:12px;font-weight:600;color:${K.muted};font-variant-numeric:tabular-nums}
+.sc-tampon{position:relative;display:inline-flex;align-items:center;gap:6px;height:24px;padding:0 8px;border:1.5px solid ${K.cta};border-radius:6px;background:rgba(36,88,230,.06);font-size:12px;font-weight:600;color:${K.ink};white-space:nowrap;font-variant-numeric:tabular-nums}
+.sc-encre{position:absolute;inset:-3px;border:2px solid ${K.accent};border-radius:6px;pointer-events:none}
+.sc-carton{position:absolute;border-radius:6px;background:${K.card2};border:1px solid ${K.line2};display:flex;align-items:flex-end;justify-content:center;padding-bottom:7px;font-size:12px;font-weight:600;color:${K.muted};font-variant-numeric:tabular-nums}
 .sc-carton:before{content:"";position:absolute;left:0;right:0;top:14px;height:6px;background:rgba(255,255,255,.06)}
 .sc-carton:after{content:"";position:absolute;left:50%;top:0;width:10px;height:20px;margin-left:-5px;background:rgba(255,255,255,.07)}
-.sc-carton .contour{position:absolute;inset:-1px;border:1.5px solid ${K.accent};border-radius:5px}
+.sc-carton .contour{position:absolute;inset:-1px;border:1.5px solid ${K.accent};border-radius:6px}
 .sc-etiq{position:absolute;font-size:12px;font-weight:500;color:${K.text};white-space:nowrap;line-height:16px}
 .sc-curseur{position:absolute;left:0;top:0;width:18px;height:22px;z-index:20;pointer-events:none;transform-origin:2px 2px}
 .sc-anneau{position:absolute;width:14px;height:14px;margin:-7px 0 0 -7px;border-radius:50%;border:1.5px solid rgba(255,255,255,.85);z-index:19;pointer-events:none}
-.sc-vol{position:absolute;left:0;top:0;z-index:15;pointer-events:none;display:inline-flex;align-items:center;height:22px;padding:0 8px;border-radius:8px;background:rgba(0,113,227,.18);border:1px solid ${K.accent};font-size:12px;font-weight:600;color:${K.text};font-variant-numeric:tabular-nums;white-space:nowrap}
+.sc-vol{position:absolute;left:0;top:0;z-index:15;pointer-events:none;display:inline-flex;align-items:center;height:22px;padding:0 8px;border-radius:12px;background:rgba(0,113,227,.18);border:1px solid ${K.accent};font-size:12px;font-weight:600;color:${K.text};font-variant-numeric:tabular-nums;white-space:nowrap}
 .sc-plat{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:12px;color:${K.muted};line-height:16px}
 .sc-plat i{display:inline-block;width:7px;height:7px;border-radius:2px;margin-right:7px;vertical-align:1px}
 .sc-plat strong{font-family:-apple-system,BlinkMacSystemFont,'Inter',sans-serif;font-size:15px;font-weight:600;color:${K.text};font-variant-numeric:tabular-nums}
-.sc-ident{position:relative;display:inline-flex;align-items:center;height:22px;padding:0 8px;border-radius:8px;background:${K.card2};border:1px solid ${K.line2};font-size:12px;font-weight:600;color:${K.text};font-variant-numeric:tabular-nums;white-space:nowrap}
-.sc-ident .lum{position:absolute;inset:-1px;border-radius:8px;background:${K.accentSoft};border:1px solid rgba(0,113,227,.6)}
+.sc-ident{position:relative;display:inline-flex;align-items:center;height:22px;padding:0 8px;border-radius:12px;background:${K.card2};border:1px solid ${K.line2};font-size:12px;font-weight:600;color:${K.text};font-variant-numeric:tabular-nums;white-space:nowrap}
+.sc-ident .lum{position:absolute;inset:-1px;border-radius:12px;background:${K.accentSoft};border:1px solid rgba(0,113,227,.6)}
 .sc-ident span{position:relative}
 .sc-etat{position:relative;height:22px;flex:1;min-width:0}
 .sc-etat > span{position:absolute;right:0;top:0;height:22px;display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;white-space:nowrap}
-.sc-vendue{padding:0 8px;border-radius:8px;background:${K.text};color:${K.bg}}
+.sc-vendue{padding:0 8px;border-radius:12px;background:${K.text};color:${K.bg}}
 .sc-point{width:7px;height:7px;border-radius:50%;background:${K.warn};display:inline-block}
-.sc-bulle{position:absolute;z-index:12;width:260px;padding:14px;border-radius:10px;background:${K.card2};border:1px solid ${K.line2};box-shadow:0 1px 2px rgba(0,0,0,.5),0 16px 40px rgba(0,0,0,.55)}
+.sc-bulle{position:absolute;z-index:12;width:260px;padding:14px;border-radius:12px;background:${K.card2};border:1px solid ${K.line2};box-shadow:0 1px 2px rgba(0,0,0,.5),0 16px 40px rgba(0,0,0,.55)}
 .sc-bulle b{display:block;font-size:13px;font-weight:600;line-height:18px}
 .sc-bulle p{margin:3px 0 0;font-size:12px;color:${K.muted};line-height:16px}
 .sc-bulle .acts{display:flex;justify-content:flex-end;gap:8px;margin-top:12px}
 .sc-mois{position:absolute;left:0;top:0;right:0;background:${K.card};border:1px solid ${K.line2};border-radius:12px;box-shadow:${REFLET},${OMBRE_CARTE};padding:22px 24px 24px}
 .sc-mois .t1{font-size:13px;font-weight:600;color:${K.muted}}
-.sc-pastille{position:absolute;display:inline-flex;align-items:center;height:26px;padding:0 10px;border-radius:8px;background:rgba(0,113,227,.12);border:1px solid ${K.accent};font-size:12px;font-weight:600;color:${K.text};white-space:nowrap;font-variant-numeric:tabular-nums}
-.sc-total{font-family:-apple-system,BlinkMacSystemFont,'Inter',sans-serif;font-size:40px;font-weight:700;letter-spacing:-.02em;line-height:1.05;font-variant-numeric:tabular-nums;white-space:nowrap}
-.sc-n{position:relative;height:20px;font-size:14px;color:${K.muted};margin-top:6px}
+.sc-pastille{position:absolute;display:inline-flex;align-items:center;height:26px;padding:0 10px;border-radius:12px;background:rgba(0,113,227,.12);border:1px solid ${K.accent};font-size:12px;font-weight:600;color:${K.text};white-space:nowrap;font-variant-numeric:tabular-nums}
+.sc-total{font-family:-apple-system,BlinkMacSystemFont,'Inter',sans-serif;font-size:38px;font-weight:700;letter-spacing:-.02em;line-height:1.05;font-variant-numeric:tabular-nums;white-space:nowrap}
+.sc-n{position:relative;height:20px;font-size:15px;color:${K.muted};margin-top:6px}
 .sc-n span{position:absolute;left:0;top:0;white-space:nowrap}
-.sc-barre{position:relative;display:flex;gap:2px;height:10px;border-radius:5px;overflow:hidden;margin-top:20px}
+.sc-barre{position:relative;display:flex;gap:2px;height:10px;border-radius:6px;overflow:hidden;margin-top:20px}
 .sc-barre i{display:block;height:100%}
 .sc-leg{display:flex;flex-wrap:wrap;gap:6px 18px;margin-top:14px;font-size:13px;color:${K.muted}}
 .sc-leg span{display:inline-flex;align-items:center;gap:7px;white-space:nowrap}
 .sc-leg i{width:7px;height:7px;border-radius:2px;display:inline-block}
 .sc-leg b{color:${K.text};font-weight:600;font-variant-numeric:tabular-nums}
 .sc-adater{font-size:13px;color:${K.faint};margin-top:12px;line-height:1.45}
-.sc-dec{position:relative;display:inline-grid;align-items:center;justify-items:center;height:40px;padding:0 16px;margin-top:18px;border-radius:10px;border:1px solid ${K.line2};background:${K.card2};font-size:14px;font-weight:600;color:${K.text};white-space:nowrap}
+.sc-dec{position:relative;display:inline-grid;align-items:center;justify-items:center;height:40px;padding:0 16px;margin-top:18px;border-radius:12px;border:1px solid ${K.line2};background:${K.card2};font-size:15px;font-weight:600;color:${K.text};white-space:nowrap}
 .sc-dec > span{grid-area:1 / 1}
 .sc-joue{position:relative}
 .sc-revoir-l{position:absolute;left:0;right:0;top:100%;height:34px;display:flex;justify-content:flex-end;align-items:center}
-.sc.compact .sc-total{font-size:32px}
+.sc.compact .sc-total{font-size:34px}
 .sc.compact .sc-mois{padding:18px 18px 20px}
 `;
 // Une seule feuille de style pour les quatre écrans (et le film), posée une fois.
@@ -410,7 +410,7 @@ export function EcranAilleurs({ s, etat = 'joue', compact, libelle, cible, ident
             <div key={t.cle} className="sc-tuile" data-cible={i === 2 && cible ? 'ebay' : undefined} style={{ ...place(i), ...entre(i), padding: compact ? '10px 14px' : '16px 18px' }}>
               {compact ? <>
                 <div className="sc-plat" style={{ opacity: attenue }}><span><i style={{ background: plat.point }} />{plat.nom}{t.compte ? ` · ${t.compte}` : ''}</span><strong data-cible={i === 0 && cible ? 'prix' : undefined}>{euros(t.prix)}</strong></div>
-                <div style={{ fontSize: 14, fontWeight: 600, lineHeight: '18px', marginTop: 4, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', opacity: attenue }}>{t.titre}</div>
+                <div style={{ fontSize: 15, fontWeight: 600, lineHeight: '18px', marginTop: 4, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', opacity: attenue }}>{t.titre}</div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 8 }}>{ident}{etatTuile(i)}</div>
               </> : <>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, height: 22 }}>
@@ -420,7 +420,7 @@ export function EcranAilleurs({ s, etat = 'joue', compact, libelle, cible, ident
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 14, opacity: attenue }}>
                   <Vignette n={V.n} taille={40} />
                   <div style={{ minWidth: 0 }}>
-                    <div style={{ fontSize: 14, fontWeight: 600, lineHeight: '18px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{t.titre}</div>
+                    <div style={{ fontSize: 15, fontWeight: 600, lineHeight: '18px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{t.titre}</div>
                     <div data-cible={i === 0 && cible ? 'prix' : undefined} style={{ display: 'inline-block', fontFamily: "-apple-system,BlinkMacSystemFont,'Inter',sans-serif", fontSize: 15, fontWeight: 600, marginTop: 2, fontVariantNumeric: 'tabular-nums' }}>{euros(t.prix)}</div>
                   </div>
                 </div>

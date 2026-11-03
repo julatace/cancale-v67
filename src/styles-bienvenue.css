@@ -21,14 +21,14 @@
 }
 .vrm-bienvenue-tete { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
 .vrm-bienvenue-progres { flex: 1; display: flex; gap: 5px; }
-.vrm-bienvenue-progres span { flex: 1; height: 4px; border-radius: 4px; background: var(--b-filet); transition: background .3s ease; }
+.vrm-bienvenue-progres span { flex: 1; height: 4px; border-radius: 6px; background: var(--b-filet); transition: background .3s ease; }
 .vrm-bienvenue-progres span[data-fait="1"] { background: var(--b-accent); }
-.vrm-bienvenue-passer { min-height: 44px; padding: 0 10px; border: 0; background: transparent; color: var(--b-doux); font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; border-radius: 10px; }
+.vrm-bienvenue-passer { min-height: 44px; padding: 0 10px; border: 0; background: transparent; color: var(--b-doux); font: inherit; font-size: 15px; font-weight: 600; cursor: pointer; border-radius: 12px; }
 .vrm-bienvenue-passer:hover { color: var(--b-encre); }
 .vrm-bienvenue-corps { animation: vrm-b-entre .32s cubic-bezier(.2,.7,.2,1) both; }
 .vrm-bienvenue-sur { margin: 0 0 4px; font-size: 13px; font-weight: 600; color: var(--b-accent); letter-spacing: .01em; }
-.vrm-bienvenue h2 { margin: 0 0 10px; font-family: 'Space Grotesk', inherit; font-size: 27px; line-height: 1.15; letter-spacing: -.02em; font-weight: 700; }
-.vrm-bienvenue-texte { margin: 0 0 18px; font-size: 15.5px; line-height: 1.55; color: var(--b-doux); }
+.vrm-bienvenue h2 { margin: 0 0 10px; font-family: 'Space Grotesk', inherit; font-size: 28px; line-height: 1.15; letter-spacing: -.02em; font-weight: 700; }
+.vrm-bienvenue-texte { margin: 0 0 18px; font-size: 15px; line-height: 1.55; color: var(--b-doux); }
 .vrm-bienvenue-univers { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 4px 0 20px; }
 .vrm-bienvenue-univers button {
   display: flex; flex-direction: column; align-items: flex-start; gap: 3px; padding: 12px; min-height: 44px; text-align: left;
@@ -38,21 +38,21 @@
 .vrm-bienvenue-univers button[data-choisi="1"] { border-color: var(--b-accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--b-accent) 18%, transparent); }
 .vrm-bienvenue-univers button:active { transform: scale(.98); }
 .vrm-bienvenue-univers b { font-size: 15px; margin-top: 8px; }
-.vrm-bienvenue-univers small { font-size: 12.5px; color: var(--b-doux); }
-.vrm-bienvenue-apercu { width: 100%; aspect-ratio: 16 / 10; border-radius: 9px; padding: 9px; display: flex; flex-direction: column; gap: 6px; border: 1px solid rgba(0,0,0,.06); }
+.vrm-bienvenue-univers small { font-size: 13px; color: var(--b-doux); }
+.vrm-bienvenue-apercu { width: 100%; aspect-ratio: 16 / 10; border-radius: 12px; padding: 9px; display: flex; flex-direction: column; gap: 6px; border: 1px solid rgba(0,0,0,.06); }
 .vrm-bienvenue-apercu.clair { background: #f4f6fa; }
 .vrm-bienvenue-apercu.nuit { background: #07090d; border-color: #222a36; }
-.vrm-bienvenue-apercu i { display: block; height: 22%; border-radius: 5px; background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,.06); }
+.vrm-bienvenue-apercu i { display: block; height: 22%; border-radius: 6px; background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,.06); }
 .vrm-bienvenue-apercu.nuit i { background: #10141b; box-shadow: none; }
 .vrm-bienvenue-apercu i:first-child { width: 55%; background: #2458e6; }
 .vrm-bienvenue-apercu.nuit i:first-child { background: #3d7bff; }
 .vrm-bienvenue-demo { position: relative; margin: 6px 0 16px; padding: 14px; border-radius: 14px; background: var(--b-sol); border: 1px solid var(--b-filet); display: flex; flex-direction: column; gap: 8px; }
-.vrm-bienvenue-demo > div { display: flex; justify-content: space-between; gap: 10px; padding: 11px 12px; border-radius: 10px; background: var(--b-carte); border: 1px solid var(--b-filet); font-size: 14px; animation: vrm-b-ligne .4s cubic-bezier(.2,.7,.2,1) both; }
+.vrm-bienvenue-demo > div { display: flex; justify-content: space-between; gap: 10px; padding: 11px 12px; border-radius: 12px; background: var(--b-carte); border: 1px solid var(--b-filet); font-size: 15px; animation: vrm-b-ligne .4s cubic-bezier(.2,.7,.2,1) both; }
 .vrm-bienvenue-demo > div span { color: var(--b-doux); }
-.vrm-bienvenue-demo > div b { font-weight: 650; font-variant-numeric: tabular-nums; }
+.vrm-bienvenue-demo > div b { font-weight: 600; font-variant-numeric: tabular-nums; }
 .vrm-bienvenue-exemple { position: absolute; top: -9px; right: 12px; padding: 1px 8px; border-radius: 999px; font-size: 11px; font-weight: 600; color: var(--b-doux); background: var(--b-carte); border: 1px solid var(--b-filet); }
 .vrm-bienvenue-gestes { display: flex; gap: 10px; flex-wrap: wrap; justify-content: flex-end; }
-.vrm-bienvenue-principal, .vrm-bienvenue-second { min-height: 46px; padding: 0 18px; border-radius: 12px; font: inherit; font-size: 15px; font-weight: 650; cursor: pointer; transition: transform .12s ease, filter .15s ease; }
+.vrm-bienvenue-principal, .vrm-bienvenue-second { min-height: 46px; padding: 0 18px; border-radius: 12px; font: inherit; font-size: 15px; font-weight: 600; cursor: pointer; transition: transform .12s ease, filter .15s ease; }
 .vrm-bienvenue-principal { border: 0; background: var(--b-accent); color: #fff; margin-left: auto; }
 .vrm-bienvenue-principal:hover { filter: brightness(1.06); }
 .vrm-bienvenue-second { border: 1px solid var(--b-filet); background: transparent; color: var(--b-encre); }
@@ -60,7 +60,7 @@
 @media (max-width: 420px) {
   .vrm-bienvenue { align-items: flex-end; padding: 0; }
   .vrm-bienvenue-panneau { border-radius: 20px 20px 0 0; padding: 14px 18px calc(18px + env(safe-area-inset-bottom)); }
-  .vrm-bienvenue h2 { font-size: 24px; }
+  .vrm-bienvenue h2 { font-size: 22px; }
   .vrm-bienvenue-gestes > * { flex: 1 1 auto; }
 }
 @keyframes vrm-b-voile { from { opacity: 0; } to { opacity: 1; } }

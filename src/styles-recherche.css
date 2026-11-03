@@ -10,7 +10,7 @@
 .vrm-barre-recherche:focus-within { outline: 2px solid var(--vrm-focus, #0071E3); outline-offset: 2px; }
 .vrm-recherche-champ {
   flex: 1; min-width: 0; min-height: 44px; border: 0; background: transparent; color: var(--vrm-ink, inherit);
-  font: inherit; font-size: 14px; padding: 0; outline: none; -webkit-appearance: none; appearance: none;
+  font: inherit; font-size: 15px; padding: 0; outline: none; -webkit-appearance: none; appearance: none;
 }
 /* Le contour de focus est porté par la barre entière (`:focus-within`), pas
    par le champ : un seul cadre, pas deux emboîtés. */
@@ -19,7 +19,7 @@ html .vrm-app-shell .vrm-recherche-champ:focus, html .vrm-app-shell .vrm-recherc
 .vrm-recherche-champ::-webkit-search-cancel-button { display: none; }
 .vrm-recherche-effacer {
   flex: none; display: grid; place-items: center; width: 32px; height: 32px; margin-right: -8px;
-  border: 0; border-radius: 8px; background: transparent; color: var(--vrm-muted, #6E6E73); cursor: pointer;
+  border: 0; border-radius: 12px; background: transparent; color: var(--vrm-muted, #6E6E73); cursor: pointer;
 }
 .vrm-recherche-effacer:hover { background: var(--vrm-bg, #fff); }
 
@@ -39,8 +39,8 @@ html .vrm-app-shell .vrm-recherche-champ:focus, html .vrm-app-shell .vrm-recherc
   position: absolute; inset: 0; z-index: 2; display: flex; align-items: center; gap: 8px; box-sizing: border-box;
   padding: env(safe-area-inset-top) max(10px, env(safe-area-inset-right)) 0 max(12px, env(safe-area-inset-left));
 }
-.vrm-hdr-recherche .vrm-recherche-champ { font-size: 16px; /* pas de zoom d'iOS sous 16 px */
-  background: var(--vrm-surface, #FFFFFF); border-radius: 10px; padding: 0 12px; }
+.vrm-hdr-recherche .vrm-recherche-champ { font-size: 17px; /* pas de zoom d'iOS sous 16 px */
+  background: var(--vrm-surface, #FFFFFF); border-radius: 12px; padding: 0 12px; }
 .vrm-hdr-recherche-fermer {
   flex: none; min-height: 44px; min-width: 44px; padding: 0 6px; border: 0; background: transparent;
   font: inherit; font-size: 15px; font-weight: 600; cursor: pointer;
@@ -56,7 +56,7 @@ html .vrm-app-shell .vrm-recherche-champ:focus, html .vrm-app-shell .vrm-recherc
 /* ── LA CIBLE D'UNE NOTIFICATION (31 oct.) ───────────────────────────────────
    L'élément visé se signale un instant (un filet d'accent, l'accent RARE du §7),
    puis redevient neutre. */
-.vrm-cible-notif { box-shadow: 0 0 0 2px var(--vrm-accent, #0071E3) !important; border-radius: 10px; transition: box-shadow .3s ease; }
+.vrm-cible-notif { box-shadow: 0 0 0 2px var(--vrm-accent, #0071E3) !important; border-radius: 12px; transition: box-shadow .3s ease; }
 .vrm-cible-absente {
   display: flex; align-items: center; gap: 10px; margin: 8px 16px; padding: 4px 4px 4px 12px; min-height: 44px; box-sizing: border-box;
   border: 1px solid var(--vrm-line, #E5E5EA); border-radius: 12px; background: var(--vrm-surface, #FFFFFF);

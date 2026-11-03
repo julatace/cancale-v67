@@ -56,7 +56,7 @@
 }
 :root body .vrm-main .vrm-ann-grid .vrm-ann-card .vrm-ann-ledger-info > * { grid-column: auto !important; grid-row: auto !important; padding-right: 0 !important; }
 :root body .vrm-main .vrm-ann-grid .vrm-ann-card [data-titre] {
-  font-size: 14.5px !important; line-height: 1.35 !important; font-weight: 600 !important;
+  font-size: 15px !important; line-height: 1.35 !important; font-weight: 600 !important;
   color: var(--vrm-ink) !important; min-height: 2.7em;
 }
 :root body .vrm-main .vrm-ann-grid .vrm-ann-card .vrm-ann-price-line {
@@ -64,14 +64,14 @@
   align-items: center !important; justify-content: space-between; gap: 10px !important; margin: 0 !important;
 }
 :root body .vrm-main .vrm-ann-grid .vrm-ann-card [data-prix] {
-  font-size: 22px !important; line-height: 1.1 !important; font-weight: 750 !important; letter-spacing: -.03em !important;
+  font-size: 22px !important; line-height: 1.1 !important; font-weight: 700 !important; letter-spacing: -.03em !important;
 }
 :root body .vrm-main .vrm-ann-grid .vrm-ann-card .vrm-ann-price-line > span:last-child {
   margin: 0 !important; padding: 4px 10px !important; border: 1px solid var(--vrm-line) !important;
   background: var(--vrm-bg) !important; border-radius: 999px !important; font-size: 13px !important;
 }
 :root body .vrm-main .vrm-ann-grid .vrm-ann-card .vrm-ann-price-line [data-edition="numero"] { min-height: 44px !important; margin: -12px -10px !important; padding: 0 10px !important; }
-:root body .vrm-main .vrm-ann-grid .vrm-ann-card [data-etat-ligne] { font-size: 12.5px !important; }
+:root body .vrm-main .vrm-ann-grid .vrm-ann-card [data-etat-ligne] { font-size: 13px !important; }
 :root body .vrm-main .vrm-ann-grid .vrm-ann-card [data-chiffres] {
   display: flex !important; flex-wrap: wrap !important; gap: 6px !important;
   margin: 4px 0 0 !important; padding: 8px 0 0 !important; border-top: 1px solid var(--vrm-line) !important;
@@ -121,16 +121,16 @@
   :root body .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-ann-card { border-radius: 12px !important; }
   :root body .vrm-main .vrm-ann-grid .vrm-ann-card .vrm-ann-ledger-info { padding: 9px 10px 2px !important; gap: 5px !important; }
   :root body .vrm-main .vrm-ann-grid .vrm-ann-card [data-titre] { font-size: 13px !important; }
-  :root body .vrm-main .vrm-ann-grid .vrm-ann-card [data-prix] { font-size: 18px !important; }
+  :root body .vrm-main .vrm-ann-grid .vrm-ann-card [data-prix] { font-size: 17px !important; }
   :root body .vrm-main .vrm-ann-grid .vrm-ann-card .vrm-ann-price-line { gap: 6px !important; }
   :root body .vrm-main .vrm-ann-grid .vrm-ann-card .vrm-ann-price-line > span:last-child { padding: 3px 8px !important; font-size: 12px !important; }
-  :root body .vrm-main .vrm-ann-grid .vrm-ann-card [data-etat-ligne] { font-size: 11.5px !important; flex-wrap: wrap; }
+  :root body .vrm-main .vrm-ann-grid .vrm-ann-card [data-etat-ligne] { font-size: 12px !important; flex-wrap: wrap; }
   /* Les cases à taper (achat, mini, refus, Préparer) en grille 2 × 2 : compactes, alignées. */
   :root body .vrm-main .vrm-ann-grid .vrm-ann-card [data-chiffres] {
-    display: grid !important; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 5px !important; font-size: 11.5px !important;
+    display: grid !important; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 5px !important; font-size: 12px !important;
   }
   :root body .vrm-main .vrm-ann-grid .vrm-ann-card [data-chiffres] > * { min-width: 0; min-height: 44px !important; padding: 0 7px !important; gap: 3px !important; justify-content: flex-start !important; overflow: hidden; white-space: nowrap; }
-  :root body .vrm-main .vrm-ann-grid .vrm-ann-card [data-chiffres] > button { font-size: 11.5px !important; }
+  :root body .vrm-main .vrm-ann-grid .vrm-ann-card [data-chiffres] > button { font-size: 12px !important; }
   :root body .vrm-main .vrm-ann-grid .vrm-ann-card [data-chiffres] > [data-stats-annonce] { grid-column: 1 / -1; min-height: 0 !important; justify-content: flex-start; padding: 2px 0 0 !important; }
   :root body .vrm-main .vrm-ann-grid .vrm-ann-card .vrm-ann-actions.vrm-ann-actions { padding: 0 10px !important; }
   :root body .vrm-main .vrm-ann-grid .vrm-ann-card .vrm-ann-actions[open] { grid-column: auto; }

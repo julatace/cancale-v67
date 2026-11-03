@@ -40,7 +40,7 @@
 .vrm-visite-points span { width: 6px; height: 6px; border-radius: 50%; background: var(--v-filet); }
 .vrm-visite-points span[data-fait="ici"] { background: var(--v-encre); }
 .vrm-visite-passer, .vrm-visite-suivant {
-  min-height: 44px; min-width: 44px; padding: 0 14px; border-radius: 10px; border: 0;
+  min-height: 44px; min-width: 44px; padding: 0 14px; border-radius: 12px; border: 0;
   font: inherit; font-size: 15px; font-weight: 600; cursor: pointer; white-space: nowrap;
 }
 .vrm-visite-passer { background: transparent; color: var(--v-doux); }

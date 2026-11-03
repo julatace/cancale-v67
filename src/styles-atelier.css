@@ -2,7 +2,7 @@
 .vrm-atelier-rail { padding:24px 12px 18px; overflow:visible; box-sizing:border-box; }
 .vrm-atelier-rail .vrm-sidebar-brand { padding:4px 0 28px; display:flex; justify-content:center; }
 .vrm-rail-platforms { display:flex; flex-direction:column; align-items:center; gap:12px; overflow-y:auto; min-height:0; scrollbar-width:none; }
-.vrm-rail-button { position:relative; display:flex; align-items:center; justify-content:center; width:52px; min-height:48px; flex-shrink:0; padding:8px; border:1px solid transparent; border-radius:10px; background:transparent; color:inherit; cursor:pointer; transition:background .16s,border-color .16s; }
+.vrm-rail-button { position:relative; display:flex; align-items:center; justify-content:center; width:52px; min-height:48px; flex-shrink:0; padding:8px; border:1px solid transparent; border-radius:12px; background:transparent; color:inherit; cursor:pointer; transition:background .16s,border-color .16s; }
 .vrm-rail-button[aria-current="page"],.vrm-rail-button[data-active],.vrm-rail-button[aria-expanded="true"] { background:#ffffff15; border-color:#ffffff24; color:#fff; }
 .vrm-rail-button[aria-current="page"]::before,.vrm-rail-button[data-active]::before { content:''; position:absolute; left:-6px; height:18px; width:2px; border-radius:2px; background:#C3DEE5; }
 .vrm-rail-button:focus-visible { outline:2px solid #C3DEE5; outline-offset:2px; }
@@ -27,15 +27,15 @@
 .vrm-rail-button { width:64px; min-height:44px; }
 .vrm-rail-management { gap:2px; padding-top:4px; }
 .vrm-rail-management-group { margin-top:14px; padding-top:12px; }
-.vrm-rail-section-label { color:inherit; opacity:.65; font-size:9px; font-weight:600; letter-spacing:.08em; text-transform:uppercase; padding:0 0 6px; }
+.vrm-rail-section-label { color:inherit; opacity:.65; font-size:11px; font-weight:600; letter-spacing:.08em; text-transform:uppercase; padding:0 0 6px; }
 .vrm-day-lower { display:grid; grid-template-columns:minmax(0,1fr); gap:16px; }
 .vrm-day-lower .vrm-day-recent { margin-top:0!important; min-width:0; }
-.vrm-day-stock h3 { font-size:14px; margin:0; font-weight:600; }
+.vrm-day-stock h3 { font-size:15px; margin:0; font-weight:600; }
 .vrm-day-stock h3 span { font-size:11px; font-weight:400; color:var(--vrm-muted); margin-left:5px; }
 .vrm-day-stock-total { display:flex; gap:10px; align-items:baseline; margin:16px 0; }
-.vrm-day-stock-total strong { font-size:36px; letter-spacing:-.04em; font-variant-numeric:tabular-nums; }
+.vrm-day-stock-total strong { font-size:34px; letter-spacing:-.04em; font-variant-numeric:tabular-nums; }
 .vrm-day-stock-total>span,.vrm-day-stock p { color:var(--vrm-muted); font-size:12px; line-height:1.5; }
-.vrm-day-stock-meter { height:6px; background:var(--vrm-bg); border-radius:4px; overflow:hidden; margin-bottom:14px; }
+.vrm-day-stock-meter { height:6px; background:var(--vrm-bg); border-radius:6px; overflow:hidden; margin-bottom:14px; }
 .vrm-day-stock-meter span { display:block; height:100%; border-radius:inherit; }
 .vrm-day-stock-prices { display:flex; justify-content:space-between; gap:12px; font-size:12px; }
 .vrm-day-stock-prices span { color:var(--vrm-muted); }
@@ -68,7 +68,7 @@
  .vrm-day-top>.vrm-day-week { grid-column:2; grid-row:1; }
  .vrm-day-top>.vrm-day-wallet { grid-column:3; grid-row:1; display:flex; flex-direction:column; justify-content:center; }
  .vrm-day-layout .vrm-day-card { padding:14px 16px; }
- .vrm-day-layout .vrm-day-hero-n { font-size:36px; margin-top:8px; }
+ .vrm-day-layout .vrm-day-hero-n { font-size:34px; margin-top:8px; }
  .vrm-day-layout .vrm-day-recu { margin-top:10px; padding-top:10px; }
  .vrm-day-lower { grid-template-columns:minmax(0,1.8fr) minmax(280px,1fr); align-items:start; }
  .vrm-day-recent .vrm-carrousel { grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; }

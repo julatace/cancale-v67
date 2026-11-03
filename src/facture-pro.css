@@ -1,6 +1,6 @@
 /* ── La facture Pro (2 nov.) — style Vitrine/Apple : neutre, une couleur rare ── */
 .vrm-fp-fiche { display: grid; gap: 14px; min-width: 0; }
-.vrm-fp-carte { border: 1px solid var(--vrm-line); background: var(--vrm-card); border-radius: 12px; padding: 14px; font-size: 14px; color: var(--vrm-ink); }
+.vrm-fp-carte { border: 1px solid var(--vrm-line); background: var(--vrm-card); border-radius: 12px; padding: 14px; font-size: 15px; color: var(--vrm-ink); }
 .vrm-fp-muet { margin: 0; font-size: 13px; line-height: 1.45; color: var(--vrm-muted); }
 .vrm-fp-statut { margin: 0; font-size: 13px; color: var(--vrm-muted); }
 
@@ -16,9 +16,9 @@
 .vrm-fp-champ { display: grid; gap: 5px; min-width: 0; font-size: 13px; color: var(--vrm-ink); }
 .vrm-fp-champ > span { font-weight: 500; }
 .vrm-fp-champ input, .vrm-fp-champ select, .vrm-fp-champ textarea {
-  width: 100%; box-sizing: border-box; min-height: 44px; padding: 10px 12px; border-radius: 10px;
+  width: 100%; box-sizing: border-box; min-height: 44px; padding: 10px 12px; border-radius: 12px;
   border: 1px solid var(--vrm-line); background: var(--vrm-bg); color: var(--vrm-ink);
-  font: inherit; font-size: 16px; /* 16 px : iOS ne zoome pas */ outline: none;
+  font: inherit; font-size: 17px; /* 16 px : iOS ne zoome pas */ outline: none;
 }
 .vrm-fp-champ textarea { resize: vertical; line-height: 1.4; }
 .vrm-fp-champ input:focus, .vrm-fp-champ select:focus, .vrm-fp-champ textarea:focus { border-color: var(--vrm-accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--vrm-accent) 18%, transparent); }
@@ -27,9 +27,9 @@
 .vrm-fp-rangee { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; min-width: 0; }
 
 .vrm-fp-choix { display: grid; gap: 8px; }
-.vrm-fp-choix > button { display: grid; gap: 2px; text-align: left; padding: 11px 13px; min-height: 44px; border-radius: 10px; border: 1px solid var(--vrm-line); background: var(--vrm-bg); color: var(--vrm-ink); font: inherit; cursor: pointer; }
-.vrm-fp-choix > button b { font-size: 14px; font-weight: 600; }
-.vrm-fp-choix > button span { font-size: 12.5px; line-height: 1.4; color: var(--vrm-muted); }
+.vrm-fp-choix > button { display: grid; gap: 2px; text-align: left; padding: 11px 13px; min-height: 44px; border-radius: 12px; border: 1px solid var(--vrm-line); background: var(--vrm-bg); color: var(--vrm-ink); font: inherit; cursor: pointer; }
+.vrm-fp-choix > button b { font-size: 15px; font-weight: 600; }
+.vrm-fp-choix > button span { font-size: 13px; line-height: 1.4; color: var(--vrm-muted); }
 .vrm-fp-choix > button[aria-checked="true"] { border-color: var(--vrm-accent); box-shadow: inset 0 0 0 1px var(--vrm-accent); }
 
 .vrm-fp-logo { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
@@ -40,23 +40,23 @@
 .vrm-fp-couleurs > button { width: 44px; height: 44px; border-radius: 50%; border: 3px solid var(--vrm-card); box-shadow: 0 0 0 1px var(--vrm-line); cursor: pointer; padding: 0; }
 .vrm-fp-couleurs > button[aria-checked="true"] { box-shadow: 0 0 0 2px var(--vrm-ink); }
 
-.vrm-fp-case { display: flex; align-items: center; gap: 10px; min-height: 44px; font-size: 14px; color: var(--vrm-ink); cursor: pointer; }
+.vrm-fp-case { display: flex; align-items: center; gap: 10px; min-height: 44px; font-size: 15px; color: var(--vrm-ink); cursor: pointer; }
 .vrm-fp-case input { width: 20px; height: 20px; accent-color: var(--vrm-accent); }
 .vrm-fp-boite-ok { margin: 0; display: grid; gap: 3px; }
-.vrm-fp-boite-ok b { font-size: 14px; font-weight: 600; color: var(--vrm-ink); overflow-wrap: anywhere; }
+.vrm-fp-boite-ok b { font-size: 15px; font-weight: 600; color: var(--vrm-ink); overflow-wrap: anywhere; }
 .vrm-fp-boite-ok span { font-size: 13px; color: var(--vrm-muted); line-height: 1.45; }
 .vrm-fp-gestes { display: flex; flex-wrap: wrap; gap: 8px; }
 .vrm-fp-gestes.is-bas { display: grid; gap: 8px; position: sticky; bottom: calc(-16px - env(safe-area-inset-bottom)); margin: 0 -14px calc(-16px - env(safe-area-inset-bottom)); padding: 12px 14px calc(14px + env(safe-area-inset-bottom)); background: var(--vrm-bg); border-top: 1px solid var(--vrm-line); }
 .vrm-fp-plus summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; font-size: 13px; color: var(--vrm-muted); }
 .vrm-fp-plus[open] { display: grid; gap: 8px; }
-.vrm-fp-retour-msg { margin: 0; font-size: 14px; color: var(--vrm-ink); padding: 10px 12px; border-radius: 10px; background: var(--vrm-bg); }
+.vrm-fp-retour-msg { margin: 0; font-size: 15px; color: var(--vrm-ink); padding: 10px 12px; border-radius: 12px; background: var(--vrm-bg); }
 .vrm-fp-retour-msg.is-ko { color: var(--vrm-warn, #b25000); }
 
 /* ── La ligne sur une vente ── */
 .vrm-fp-vente { display: grid; gap: 6px; min-width: 0; }
-.vrm-fp-vente-ligne { display: grid; gap: 2px; text-align: left; width: 100%; min-height: 44px; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--vrm-line); background: var(--vrm-card); color: var(--vrm-ink); font: inherit; cursor: pointer; }
-.vrm-fp-vente-ligne b { font-size: 14px; font-weight: 600; }
-.vrm-fp-vente-ligne span { font-size: 12.5px; color: var(--vrm-muted); overflow-wrap: anywhere; }
+.vrm-fp-vente-ligne { display: grid; gap: 2px; text-align: left; width: 100%; min-height: 44px; padding: 10px 12px; border-radius: 12px; border: 1px solid var(--vrm-line); background: var(--vrm-card); color: var(--vrm-ink); font: inherit; cursor: pointer; }
+.vrm-fp-vente-ligne b { font-size: 15px; font-weight: 600; }
+.vrm-fp-vente-ligne span { font-size: 13px; color: var(--vrm-muted); overflow-wrap: anywhere; }
 .vrm-fp-vente-ligne[data-fp-vente="refusee"] span, .vrm-fp-vente-ligne[data-fp-vente="incertaine"] span { color: var(--vrm-warn, #b25000); }
 
 /* ── La feuille ── */
@@ -64,25 +64,25 @@
 .vrm-fp-feuille { width: 100%; max-width: 560px; max-height: 94dvh; background: var(--vrm-bg); color: var(--vrm-ink); border-radius: 18px 18px 0 0; display: flex; flex-direction: column; overflow: hidden; outline: none; }
 .vrm-fp-feuille.is-large { max-width: 720px; }
 .vrm-fp-feuille-tete { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-bottom: 1px solid var(--vrm-line); flex-shrink: 0; }
-.vrm-fp-feuille-tete h2 { margin: 0; font-size: 16px; font-weight: 600; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.vrm-fp-retour { width: 44px; height: 44px; border-radius: 10px; border: 1px solid var(--vrm-line); background: var(--vrm-card); color: var(--vrm-ink); font-size: 22px; font-weight: 600; line-height: 1; cursor: pointer; flex-shrink: 0; }
+.vrm-fp-feuille-tete h2 { margin: 0; font-size: 17px; font-weight: 600; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vrm-fp-retour { width: 44px; height: 44px; border-radius: 12px; border: 1px solid var(--vrm-line); background: var(--vrm-card); color: var(--vrm-ink); font-size: 22px; font-weight: 600; line-height: 1; cursor: pointer; flex-shrink: 0; }
 .vrm-fp-feuille-corps { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 14px 14px calc(16px + env(safe-area-inset-bottom)); display: grid; gap: 14px; align-content: start; }
 @media (min-width: 768px) {
   .vrm-fp-voile { align-items: center; padding: 24px; }
-  .vrm-fp-feuille { border-radius: 16px; max-height: 90vh; }
+  .vrm-fp-feuille { border-radius: 14px; max-height: 90vh; }
 }
 
 /* ── L'aperçu : une page blanche, quelle que soit l'apparence de l'app ── */
-.vrm-fp-apercu { --fp-accent: #1d1d1f; background: #fff; color: #1d1d1f; border: 1px solid var(--vrm-line); border-radius: 8px; padding: 18px 16px; font-size: 11.5px; line-height: 1.4; display: grid; gap: 12px; min-width: 0; overflow-wrap: anywhere; box-shadow: 0 1px 3px rgba(0,0,0,.06); }
+.vrm-fp-apercu { --fp-accent: #1d1d1f; background: #fff; color: #1d1d1f; border: 1px solid var(--vrm-line); border-radius: 12px; padding: 18px 16px; font-size: 12px; line-height: 1.4; display: grid; gap: 12px; min-width: 0; overflow-wrap: anywhere; box-shadow: 0 1px 3px rgba(0,0,0,.06); }
 .vrm-fp-a-tete { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
 .vrm-fp-a-logo { max-height: 44px; max-width: 45%; object-fit: contain; }
 .vrm-fp-a-titre { display: grid; justify-items: end; text-align: right; gap: 1px; }
-.vrm-fp-a-titre b { font-size: 18px; letter-spacing: .02em; }
+.vrm-fp-a-titre b { font-size: 17px; letter-spacing: .02em; }
 .vrm-fp-a-num { color: var(--fp-accent); font-weight: 700; }
 .vrm-fp-a-titre span:not(.vrm-fp-a-num) { color: #6b6b72; }
 .vrm-fp-a-parties { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .vrm-fp-a-parties > div { display: grid; gap: 1px; align-content: start; min-width: 0; }
-.vrm-fp-a-parties small { font-size: 9.5px; font-weight: 700; color: #6b6b72; text-transform: uppercase; letter-spacing: .04em; }
+.vrm-fp-a-parties small { font-size: 11px; font-weight: 700; color: #6b6b72; text-transform: uppercase; letter-spacing: .04em; }
 .vrm-fp-a-infos { margin: 0; color: #6b6b72; }
 .vrm-fp-a-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
 .vrm-fp-a-table th { text-align: right; font-weight: 700; padding: 5px 4px; border-bottom: 1.5px solid var(--fp-accent); background: color-mix(in srgb, var(--fp-accent) 8%, #fff); }
@@ -101,6 +101,6 @@
 .vrm-fp-liste { list-style: none; margin: 0; padding: 0; display: grid; }
 .vrm-fp-liste li + li { border-top: 1px solid var(--vrm-line); }
 .vrm-fp-liste button { width: 100%; display: grid; grid-template-columns: 1fr auto; grid-template-areas: "n m" "s m"; gap: 2px 10px; align-items: center; text-align: left; min-height: 52px; padding: 8px 2px; background: transparent; border: 0; color: var(--vrm-ink); font: inherit; cursor: pointer; }
-.vrm-fp-liste b { grid-area: n; font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; }
-.vrm-fp-liste span { grid-area: s; font-size: 12.5px; color: var(--vrm-muted); overflow-wrap: anywhere; }
-.vrm-fp-liste em { grid-area: m; font-style: normal; font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.vrm-fp-liste b { grid-area: n; font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.vrm-fp-liste span { grid-area: s; font-size: 13px; color: var(--vrm-muted); overflow-wrap: anywhere; }
+.vrm-fp-liste em { grid-area: m; font-style: normal; font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }

@@ -6,10 +6,10 @@ export default function BordereauxAuto({owner,lire,sauver}) {
   // Une ligne, au doigt comme à la souris : l'état dans le bouton, la précision
   // en petit à côté (sans « extension 5.204 », du vocabulaire d'informaticien).
   return <div style={{marginBottom:8,fontSize:12,display:'flex',gap:'4px 10px',alignItems:'center',flexWrap:'wrap'}}>
-    <button type="button" role="switch" className="vrm-switch-texte" aria-checked={active} disabled={!pret||attente} onClick={changer} style={{font:'inherit',padding:'7px 11px',border:'1px solid currentColor',borderRadius:8,background:'transparent',color:'inherit',cursor:'pointer'}}>
+    <button type="button" role="switch" className="vrm-switch-texte" aria-checked={active} disabled={!pret||attente} onClick={changer} style={{font:'inherit',padding:'7px 11px',border:'1px solid currentColor',borderRadius:12,background:'transparent',color:'inherit',cursor:'pointer'}}>
       Bordereaux auto : {attente?'enregistrement…':!pret?'chargement…':active?'activés':'désactivés'}
     </button>
-    <span style={{opacity:.72,fontSize:11.5}} title="Avec l'extension VRM 5.204 ou plus récente.">Tu peux toujours générer un bordereau toi-même.</span>
+    <span style={{opacity:.72,fontSize:12}} title="Avec l'extension VRM 5.204 ou plus récente.">Tu peux toujours générer un bordereau toi-même.</span>
     {erreur&&<span role="alert">{erreur}</span>}
   </div>;
 }

@@ -78,7 +78,7 @@
 :root:root body .vrm-app-shell .vrm-filtre-site > button:not(#fu),
 :root:root body .vrm-app-shell .vrm-main .vrm-filtre-site > button:not(#fu)[aria-pressed] {
   flex: 1 1 0 !important; min-width: 0 !important; min-height: 38px !important; height: 38px !important; padding: 0 4px !important; margin: 0 !important;
-  border: 0 !important; border-radius: 9px !important; background: transparent !important; box-shadow: none !important;
+  border: 0 !important; border-radius: 12px !important; background: transparent !important; box-shadow: none !important;
   color: var(--fu-encre) !important; font: 600 13px/1 var(--vrm-police) !important; letter-spacing: -.01em !important;
   white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; cursor: pointer;
   transition: background-color .2s ease, box-shadow .2s ease;
@@ -99,7 +99,7 @@
   border: 0 !important; border-radius: var(--r-ctrl) !important; background: var(--fu-remplir) !important; box-shadow: none !important;
 }
 :root:root body .vrm-app-shell .vrm-main :is(.vrm-seg, .vrm-messages-sections, .vrm-set-seg) > button:not(#fu) {
-  flex: 1 1 0; min-height: 38px !important; border: 0 !important; border-radius: 9px !important; background: transparent !important; box-shadow: none !important;
+  flex: 1 1 0; min-height: 38px !important; border: 0 !important; border-radius: 12px !important; background: transparent !important; box-shadow: none !important;
   color: var(--fu-encre) !important; font: 600 13px/1.1 var(--vrm-police) !important;
 }
 :root:root body .vrm-app-shell .vrm-main :is(.vrm-seg, .vrm-messages-sections) > button:not(#fu):is([aria-pressed="true"], [aria-current="page"]),

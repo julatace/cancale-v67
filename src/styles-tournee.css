@@ -12,7 +12,7 @@
 .vrm-tr-compte, .vrm-tr-ordre { font-size: 13px; color: var(--vrm-muted); }
 .vrm-tr-ouvrir-lien {
   margin-left: auto; display: inline-flex; align-items: center; gap: 4px; min-height: 44px; padding: 0 2px; border: 0; background: none;
-  color: var(--vrm-b-lien, var(--vrm-accent)); font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; white-space: nowrap;
+  color: var(--vrm-b-lien, var(--vrm-accent)); font: inherit; font-size: 15px; font-weight: 600; cursor: pointer; white-space: nowrap;
 }
 .vrm-tr-etapes, .vrm-tr-arrets { list-style: none; margin: 0; padding: 0; }
 .vrm-tr-etapes { border: 1px solid var(--vrm-line); border-radius: 12px; background: var(--vrm-bg); overflow: hidden; }
@@ -26,21 +26,21 @@
 .vrm-tr-etapes .vrm-tr-bouton { grid-template-columns: 32px minmax(0, 1fr) auto; column-gap: 12px; padding: 12px 16px; }
 @media (hover: hover) and (pointer: fine) { .vrm-tr-etapes .vrm-tr-bouton:hover { background: var(--vrm-surface); } }
 .vrm-tr-bouton:disabled { cursor: default; }
-.vrm-tr-bouton:focus-visible, .vrm-tr-arret-bouton:focus-visible, .vrm-tr-ouvrir:focus-visible, .vrm-tr-ouvrir-lien:focus-visible, .vrm-tr-fermer:focus-visible { outline: 2px solid var(--vrm-focus, var(--vrm-accent)); outline-offset: -2px; border-radius: 10px; }
+.vrm-tr-bouton:focus-visible, .vrm-tr-arret-bouton:focus-visible, .vrm-tr-ouvrir:focus-visible, .vrm-tr-ouvrir-lien:focus-visible, .vrm-tr-fermer:focus-visible { outline: 2px solid var(--vrm-focus, var(--vrm-accent)); outline-offset: -2px; border-radius: 12px; }
 .vrm-tr-pastille {
-  width: 44px; height: 44px; border-radius: 22px; display: grid; place-items: center;
+  width: 44px; height: 44px; border-radius: 24px; display: grid; place-items: center;
   font-size: 17px; font-weight: 600; font-variant-numeric: tabular-nums;
   background: var(--vrm-card2); color: var(--vrm-ink);
 }
-.vrm-tr-etapes .vrm-tr-pastille { width: 32px; height: 32px; border-radius: 16px; font-size: 14px; font-family: var(--vrm-police-mono, ui-monospace, monospace); font-weight: 500; }
+.vrm-tr-etapes .vrm-tr-pastille { width: 32px; height: 32px; border-radius: 14px; font-size: 15px; font-family: var(--vrm-police-mono, ui-monospace, monospace); font-weight: 500; }
 .vrm-tr-etapes .vrm-tr-pastille svg { width: 16px; height: 16px; }
 .vrm-tr-pastille.is-courante { background: var(--vrm-accent); color: var(--vrm-on-accent, #fff); }
 .vrm-tr-pastille.is-fait, .vrm-tr-pastille.is-arret { background: var(--vrm-ink); color: var(--vrm-bg); }
 .vrm-tr-texte { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .vrm-tr-t { font-size: 15px; font-weight: 600; line-height: 1.35; color: var(--vrm-ink); overflow-wrap: normal; }
 .vrm-tr-s { font-size: 13px; line-height: 1.4; color: var(--vrm-muted); overflow-wrap: normal; }
-.vrm-tr-arrets .vrm-tr-t { font-size: 16px; font-weight: 700; overflow-wrap: anywhere; }
-.vrm-tr-arrets .vrm-tr-s { font-size: 14px; overflow-wrap: anywhere; }
+.vrm-tr-arrets .vrm-tr-t { font-size: 17px; font-weight: 700; overflow-wrap: anywhere; }
+.vrm-tr-arrets .vrm-tr-s { font-size: 15px; overflow-wrap: anywhere; }
 .vrm-tr-passu { color: var(--vrm-muted); font-weight: 600; }
 .vrm-tr-etape.is-fait .vrm-tr-t { text-decoration: line-through; text-decoration-thickness: 1.5px; color: var(--vrm-muted); }
 .vrm-tr-etape.is-rien .vrm-tr-t, .vrm-tr-etape.is-passu .vrm-tr-t { color: var(--vrm-muted); }
@@ -72,8 +72,8 @@
   font-family: var(--vrm-police, inherit); padding-top: env(safe-area-inset-top); overflow-y: auto; overscroll-behavior: contain;
 }
 .vrm-tr-plein-barre { position: sticky; top: 0; z-index: 2; background: var(--vrm-bg, #fff); display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 16px; }
-.vrm-tr-fermer { width: 44px; height: 44px; border-radius: 22px; border: 0; background: var(--vrm-card2); color: var(--vrm-ink); display: grid; place-items: center; cursor: pointer; }
-.vrm-tr-plein-compte { font-size: 15px; font-weight: 650; padding: 10px 16px; border-radius: 22px; background: var(--vrm-surface, #fff); border: 1px solid var(--vrm-line); }
+.vrm-tr-fermer { width: 44px; height: 44px; border-radius: 24px; border: 0; background: var(--vrm-card2); color: var(--vrm-ink); display: grid; place-items: center; cursor: pointer; }
+.vrm-tr-plein-compte { font-size: 15px; font-weight: 600; padding: 10px 16px; border-radius: 24px; background: var(--vrm-surface, #fff); border: 1px solid var(--vrm-line); }
 .vrm-tr-plein-carte { padding: 0 16px; flex: 0 0 auto; }
 .vrm-tr-plein-carte .vrm-relais-fond { height: min(38vh, 320px) !important; }
 .vrm-tr-note { font-size: 13px; color: var(--vrm-muted); line-height: 1.45; margin: 8px 2px 0; }
@@ -81,17 +81,17 @@
 .vrm-tr-plein-tete { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 4px; }
 .vrm-tr-arret { display: flex; flex-direction: column; }
 .vrm-tr-quand { font-size: 13px; color: var(--vrm-muted); text-align: right; max-width: 120px; }
-.vrm-tr-quand.is-ambre { color: var(--vrm-warn); font-weight: 650; }
-.vrm-tr-plans { align-self: flex-start; margin: -6px 0 10px 58px; min-height: 44px; display: flex; align-items: center; font-size: 14px; font-weight: 600; color: var(--vrm-b-lien, var(--vrm-accent)); text-decoration: none; }
+.vrm-tr-quand.is-ambre { color: var(--vrm-warn); font-weight: 600; }
+.vrm-tr-plans { align-self: flex-start; margin: -6px 0 10px 58px; min-height: 44px; display: flex; align-items: center; font-size: 15px; font-weight: 600; color: var(--vrm-b-lien, var(--vrm-accent)); text-decoration: none; }
 @media (min-width: 768px) {
   .vrm-tr-plein { left: auto; width: min(520px, 100vw); border-left: 1px solid var(--vrm-line); box-shadow: -12px 0 40px rgba(0,0,0, .12); }
 }
 
 /* (1er nov.) Une phrase par point pas sur la carte, sous son arrêt ; la carte et la liste défilent ensemble. */
-.vrm-tr-hors { margin: -6px 0 10px 58px; font-size: 12.5px; color: var(--vrm-muted); line-height: 1.4; }
+.vrm-tr-hors { margin: -6px 0 10px 58px; font-size: 13px; color: var(--vrm-muted); line-height: 1.4; }
 .vrm-tr-credit { font-size: 11px; }
 /* (1er nov.) L'arrêt dont l'épingle vient d'être touchée. */
-.vrm-tr-arret.is-choisi { background: var(--vrm-surface-2, rgba(0,0,0, .04)); box-shadow: inset 3px 0 0 var(--vrm-ink, #1D1D1F); border-radius: 8px; scroll-margin: 80px; }
+.vrm-tr-arret.is-choisi { background: var(--vrm-surface-2, rgba(0,0,0, .04)); box-shadow: inset 3px 0 0 var(--vrm-ink, #1D1D1F); border-radius: 12px; scroll-margin: 80px; }
 /* (1er nov.) Pastille d'un retrait = son épingle (le nombre de colis, l'accent de l'épingle) ; d'un dépôt = une icône. */
 .vrm-tr-pastille.is-epingle { background: var(--vrm-accent); color: var(--vrm-on-accent, #fff); }
 .vrm-tr-pastille.is-epingle.is-neutre { background: var(--vrm-bg); color: var(--vrm-ink); box-shadow: inset 0 0 0 1.5px var(--vrm-line); }

@@ -53,7 +53,7 @@
 
 /* Les trois raccourcis sous le haut de page : des aplats. */
 .acc .acc-benefices > a { background: var(--acc-surface); border: 0; border-radius: 14px; box-shadow: none; }
-.acc .acc-benefice-icon { background: var(--acc-bg); border: 0; border-radius: 10px; color: var(--acc-encre); }
+.acc .acc-benefice-icon { background: var(--acc-bg); border: 0; border-radius: 12px; color: var(--acc-encre); }
 .acc .acc-benefices small { color: var(--acc-doux); }
 .acc .acc-benefices .acc-chev { color: var(--acc-doux); }
 

@@ -62,7 +62,7 @@ export default function PastilleTransporteur({ t, C, taille = 20, seul = false, 
       title={titre}
       style={{ display: 'inline-flex', alignItems: 'center', gap: 6, minWidth: 0, maxWidth: '100%', flexShrink: 0, verticalAlign: 'middle' }} {...rest}>
       {cle ? <LogoTransporteur key={cle} cle={cle} taille={taille}/> : null}
-      <span data-transporteur-nom="" style={{ fontSize: 12.5, fontWeight: lu ? 600 : 500, color: lu ? texte : muted, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', letterSpacing: '-.005em' }}>{lu ? nom : PAS_LU}</span>
+      <span data-transporteur-nom="" style={{ fontSize: 13, fontWeight: lu ? 600 : 500, color: lu ? texte : muted, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', letterSpacing: '-.005em' }}>{lu ? nom : PAS_LU}</span>
     </span>
   );
 }

@@ -123,19 +123,19 @@ class DernierFilet extends React.Component {
   render() {
     if (!this.state.err) return this.props.children;
     const msg = String((this.state.err && this.state.err.message) || this.state.err);
-    const btn = { border: '1px solid #d7dde3', background: 'transparent', borderRadius: 10, padding: '10px 15px',
-      fontSize: 14, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' };
+    const btn = { border: '1px solid #d7dde3', background: 'transparent', borderRadius: 12, padding: '10px 15px',
+      fontSize: 15, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' };
     return (
       <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 22,
         fontFamily: 'Inter, system-ui, sans-serif', background: '#f6f7f9', color: '#14181d' }}>
-        <div style={{ maxWidth: 420, width: '100%', background: '#fff', border: '1px solid #e6e9ee', borderRadius: 18, padding: '20px 18px' }}>
+        <div style={{ maxWidth: 420, width: '100%', background: '#fff', border: '1px solid #e6e9ee', borderRadius: 20, padding: '20px 18px' }}>
           <div style={{ fontSize: 17, fontWeight: 700, marginBottom: 6 }}>L'application n'a pas pu démarrer</div>
           <div style={{ fontSize: 13, color: '#5b6675', lineHeight: 1.5, marginBottom: 12 }}>
             Tes données sont intactes (elles sont dans le nuage, pas dans cette page). Recharge — si l'erreur revient,
             « Repartir propre » efface seulement les réglages de CE navigateur, puis retélécharge tout depuis ton compte.
           </div>
-          <div style={{ fontSize: 11.5, fontFamily: 'ui-monospace, monospace', background: '#f6f7f9', border: '1px solid #e6e9ee',
-            borderRadius: 10, padding: '9px 11px', overflowX: 'auto', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{msg}</div>
+          <div style={{ fontSize: 12, fontFamily: 'ui-monospace, monospace', background: '#f6f7f9', border: '1px solid #e6e9ee',
+            borderRadius: 12, padding: '9px 11px', overflowX: 'auto', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{msg}</div>
           <div style={{ display: 'flex', gap: 8, marginTop: 14, flexWrap: 'wrap' }}>
             <button type="button" style={{ ...btn, border: 'none', background: '#14181d', color: '#fff' }} onClick={() => location.reload()}>Recharger</button>
             <button type="button" style={btn} onClick={() => { try { navigator.clipboard.writeText(msg); } catch (_) {} }}>📋 Copier l'erreur</button>

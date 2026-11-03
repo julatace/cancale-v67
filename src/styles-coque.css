@@ -72,9 +72,9 @@
 .vrm-seg::-webkit-scrollbar { display: none; }
 .vrm-seg-btn {
   flex: 1 0 auto; display: inline-flex; align-items: center; justify-content: center; gap: 6px;
-  min-height: 34px; padding: 0 14px; border: 0; border-radius: 9px;
+  min-height: 34px; padding: 0 14px; border: 0; border-radius: 12px;
   background: transparent; color: var(--seg-muted);
-  font-size: 13.5px; font-weight: 600; letter-spacing: -.005em; white-space: nowrap; cursor: pointer;
+  font-size: 13px; font-weight: 600; letter-spacing: -.005em; white-space: nowrap; cursor: pointer;
   transition: background-color .18s var(--vrm-ease-out, ease), color .18s ease, box-shadow .18s ease;
 }
 .vrm-seg-btn[aria-current="page"] {
@@ -145,7 +145,7 @@
    Plus de texte gris sans affordance, plus de triangle du navigateur. */
 .vrm-main :is(.vrm-repli, .vrm-quick-settings, .vrm-ann-stock-tools, .vrm-label-help, .vrm-platform-summary) > summary {
   list-style: none; align-items: center; gap: 8px; min-height: 44px; box-sizing: border-box;
-  padding-block: 0; color: var(--vrm-ink); font-size: 14px; font-weight: 600; cursor: pointer;
+  padding-block: 0; color: var(--vrm-ink); font-size: 15px; font-weight: 600; cursor: pointer;
   -webkit-tap-highlight-color: transparent;
 }
 .vrm-main :is(.vrm-repli, .vrm-quick-settings, .vrm-ann-stock-tools, .vrm-label-help) > summary { display: flex; padding-inline: 2px; }
@@ -201,7 +201,7 @@
 .vrm-compte-ligne > select {
   flex: 1; min-width: 0; appearance: none; -webkit-appearance: none;
   border: 0; background: transparent; padding: 0 22px 0 4px; min-height: 44px;
-  font: 600 14px/1.2 inherit; font-family: inherit; text-align: right; text-align-last: right;
+  font: 600 15px/1.2 inherit; font-family: inherit; text-align: right; text-align-last: right;
   cursor: pointer; text-overflow: ellipsis;
 }
 .vrm-compte-ligne > select:focus-visible { outline: none; }
@@ -236,7 +236,7 @@
   .vrm-app-header.is-defile .vrm-hdr-titre { opacity: 1; transform: none; }
   .vrm-header-actions { grid-column: 3; justify-self: end; display: flex; align-items: center; gap: 0; }
   .vrm-header-logo { display: flex; align-items: center; justify-content: center; width: 40px; height: 44px; cursor: pointer; position: relative; }
-  .vrm-header-logo > img, .vrm-header-logo > svg { width: 30px !important; height: 30px !important; border-radius: 8px; object-fit: cover; }
+  .vrm-header-logo > img, .vrm-header-logo > svg { width: 30px !important; height: 30px !important; border-radius: 12px; object-fit: cover; }
 
   /* Les commandes de l'en-tête : des ICÔNES, sans boîte. Cible de 44 px. */
   .vrm-hbtn, .vrm-app-header [data-etat-actions], .vrm-app-header [data-stream-pastille] {
@@ -310,7 +310,7 @@
   .vrm-header-actions { display: flex; align-items: center; gap: 2px; }
   .vrm-hbtn {
     display: inline-flex; align-items: center; justify-content: center; width: 38px; height: 38px;
-    min-height: 38px; padding: 0; border: 0; border-radius: 10px; background: transparent;
+    min-height: 38px; padding: 0; border: 0; border-radius: 12px; background: transparent;
     color: var(--vrm-muted); cursor: pointer;
   }
   .vrm-hbtn[aria-pressed="true"], .vrm-hbtn[aria-expanded="true"] { background: var(--vrm-card2); color: var(--vrm-ink); }
@@ -360,7 +360,7 @@
 .vrm-sheet-row {
   display: flex; align-items: center; gap: 12px; width: 100%; min-height: 48px; position: relative;
   padding: 0 12px 0 14px; border: 0; border-radius: 0; background: transparent; color: var(--vrm-ink);
-  font-family: inherit; font-size: 16px; font-weight: 450; letter-spacing: -.01em; text-align: left; cursor: pointer;
+  font-family: inherit; font-size: 17px; font-weight: 500; letter-spacing: -.01em; text-align: left; cursor: pointer;
 }
 .vrm-sheet-row + .vrm-sheet-row::before { content: ''; position: absolute; top: 0; left: 50px; right: 0; border-top: 1px solid var(--vrm-hair); }
 .vrm-sheet-row:active:not(:disabled) { transform: none; filter: none; background: var(--vrm-card2); }
@@ -391,10 +391,10 @@
 
 /* (17 oct.) Le nom de l'entreprise, à côté du logo (retrouvé par le SIRET). */
 .vrm-sidebar-brand { flex-direction: column; align-items: center; gap: 7px; }
-.vrm-sidebar-entreprise { display: block; max-width: 136px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11.5px; font-weight: 600; letter-spacing: -.01em; opacity: .72; text-align: center; }
+.vrm-sidebar-entreprise { display: block; max-width: 136px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; font-weight: 600; letter-spacing: -.01em; opacity: .72; text-align: center; }
 .vrm-hdr-entreprise { display: none; }
 @media (max-width: 767px), (max-width: 1023px) and (hover: none), (max-width: 1023px) and (pointer: coarse), (max-width: 1023px) and (pointer: none) {
-  .vrm-hdr-entreprise { display: block; min-width: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; font-weight: 650; letter-spacing: -.015em; color: var(--vrm-ink); padding-left: 2px; transition: opacity .2s ease; }
+  .vrm-hdr-entreprise { display: block; min-width: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 15px; font-weight: 600; letter-spacing: -.015em; color: var(--vrm-ink); padding-left: 2px; transition: opacity .2s ease; }
   /* Au défilement, le titre de l'écran prend le centre : le nom s'efface. */
   .vrm-app-header.is-defile .vrm-hdr-entreprise { opacity: 0; }
 }

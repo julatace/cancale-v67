@@ -35,24 +35,24 @@ html body .vrm-recap .vrm-recap-tete .vrm-sale-photo.vrm-recap-photo {
 .vrm-recap-photo > *, .vrm-recap-photo img { width: 100% !important; height: 100% !important; object-fit: cover; display: block; }
 .vrm-recap-ident { min-width: 0; }
 .vrm-recap-num, .vrm-recap-sans-num {
-  display: inline-block; font-family: var(--recap-mono); font-size: 14px; line-height: 1; padding: 6px 8px;
-  border-radius: 8px; background: var(--recap-soft); color: var(--recap-ink); font-variant-numeric: tabular-nums;
+  display: inline-block; font-family: var(--recap-mono); font-size: 15px; line-height: 1; padding: 6px 8px;
+  border-radius: 12px; background: var(--recap-soft); color: var(--recap-ink); font-variant-numeric: tabular-nums;
 }
-.vrm-recap-sans-num { font-family: inherit; font-size: 12.5px; color: var(--recap-muted); }
+.vrm-recap-sans-num { font-family: inherit; font-size: 13px; color: var(--recap-muted); }
 html body .vrm-recap h2.vrm-recap-nom {
-  font-size: 19px !important; line-height: 1.2 !important; font-weight: 800; letter-spacing: -.02em;
+  font-size: 20px !important; line-height: 1.2 !important; font-weight: 800; letter-spacing: -.02em;
   margin: 8px 0 0 !important; color: var(--recap-ink); overflow-wrap: anywhere;
 }
-.vrm-recap-sous { margin: 6px 0 0; font-size: 14px; color: var(--recap-muted); }
+.vrm-recap-sous { margin: 6px 0 0; font-size: 15px; color: var(--recap-muted); }
 html body .vrm-recap .vrm-recap-fermer {
   width: 44px; height: 44px; border-radius: 12px; border: 0; background: var(--recap-soft); color: var(--recap-ink);
   display: flex; align-items: center; justify-content: center; cursor: pointer; padding: 0;
 }
 
 /* ── 2. Où en est la vente : une phrase, puis la frise ───────────────────── */
-.vrm-recap-phrase { margin: 0; font-size: 15.5px; line-height: 1.45; }
+.vrm-recap-phrase { margin: 0; font-size: 15px; line-height: 1.45; }
 .vrm-recap-phrase strong { font-weight: 700; }
-.vrm-recap-issue { margin: 8px 0 0; font-size: 13.5px; color: var(--recap-muted); line-height: 1.45; }
+.vrm-recap-issue { margin: 8px 0 0; font-size: 13px; color: var(--recap-muted); line-height: 1.45; }
 .vrm-recap-frise { list-style: none; margin: 18px 0 0; padding: 0; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); }
 .vrm-recap-frise > li { position: relative; display: flex; flex-direction: column; align-items: center; text-align: center; min-width: 0; gap: 4px; }
 /* le trait qui relie un point au suivant : plein si l'étape suivante est faite */
@@ -66,9 +66,9 @@ html body .vrm-recap .vrm-recap-fermer {
 }
 .vrm-recap-frise > li[data-fait="0"] .vrm-recap-point { background: var(--vrm-surface, #FFF); border-color: var(--recap-muted); }
 .vrm-recap-frise > li[data-ici="1"] .vrm-recap-point { background: var(--vrm-surface, #FFF); border: 4px solid var(--recap-accent); }
-.vrm-recap-etape { margin-top: 6px; font-size: 13px; font-weight: 650; line-height: 1.2; overflow-wrap: anywhere; hyphens: auto; }
+.vrm-recap-etape { margin-top: 6px; font-size: 13px; font-weight: 600; line-height: 1.2; overflow-wrap: anywhere; hyphens: auto; }
 .vrm-recap-frise > li[data-fait="0"] .vrm-recap-etape { color: var(--recap-muted); font-weight: 500; }
-.vrm-recap-quand { font-size: 12.5px; color: var(--recap-muted); font-variant-numeric: tabular-nums; }
+.vrm-recap-quand { font-size: 13px; color: var(--recap-muted); font-variant-numeric: tabular-nums; }
 
 /* ── 3. L'argent, en lignes nettes ───────────────────────────────────────── */
 html body .vrm-recap h3.vrm-recap-titre { margin: 0 0 6px !important; font-size: 13px !important; font-weight: 500 !important; color: var(--recap-muted); letter-spacing: 0 !important; font-family: inherit !important; }
@@ -79,7 +79,7 @@ html body .vrm-recap h3.vrm-recap-titre { margin: 0 0 6px !important; font-size:
 .vrm-recap-argent .vrm-recap-ligne > dd { font-family: var(--recap-mono); font-variant-numeric: tabular-nums; font-size: 15px; white-space: nowrap; }
 .vrm-recap-argent .vrm-recap-ligne > dd small { font-family: var(--vrm-police, inherit); font-size: 12px; color: var(--recap-muted); white-space: normal; }
 .vrm-recap-argent .vrm-recap-benef { border-top: 1.5px solid var(--recap-ink); margin-top: 8px; padding-top: 12px; min-height: 48px; }
-.vrm-recap-argent .vrm-recap-benef > dt { color: var(--recap-ink); font-weight: 700; font-size: 16.5px; }
+.vrm-recap-argent .vrm-recap-benef > dt { color: var(--recap-ink); font-weight: 700; font-size: 17px; }
 .vrm-recap-argent .vrm-recap-benef > dd { font-size: 22px; color: var(--recap-ink); }
 .vrm-recap-argent .vrm-recap-benef .vrm-recap-borne { font-family: var(--vrm-police, inherit); font-size: 13px; color: var(--recap-muted); margin-right: 4px; }
 .vrm-recap-argent .vrm-recap-valeur { display: inline-flex; align-items: baseline; gap: 0; flex-wrap: wrap; justify-content: flex-end; }
@@ -94,7 +94,7 @@ html body .vrm-recap h3.vrm-recap-titre { margin: 0 0 6px !important; font-size:
 html body .vrm-app-shell .vrm-main .vrm-cout-recap .vrm-b.vrm-geste-ambre,
 html body .vrm-app-shell .vrm-main .vrm-cout-recap .vrm-b.vrm-geste-ambre:not(:disabled):hover,
 html body .vrm-app-shell .vrm-main .vrm-cout-recap .vrm-b.vrm-geste-ambre:not(:disabled):active {
-  background: var(--vrm-warn-soft, #FFF4E0) !important; color: var(--recap-warn) !important; border-color: transparent !important; font-weight: 650;
+  background: var(--vrm-warn-soft, #FFF4E0) !important; color: var(--recap-warn) !important; border-color: transparent !important; font-weight: 600;
 }
 /* « Prix d'achat » à gauche, le geste ambre à droite, « ou relier » dessous */
 html body .vrm-ledger-drawer.vrm-recap .vrm-ledger-drawer-body .vrm-recap-argent .vrm-cout-recap .vrm-cout-rangee {
@@ -106,8 +106,8 @@ html body .vrm-ledger-drawer.vrm-recap .vrm-ledger-drawer-body .vrm-cout-recap .
 
 /* ── 4. Les détails ──────────────────────────────────────────────────────── */
 .vrm-recap-details .vrm-recap-ligne { min-height: 32px; }
-.vrm-recap-details .vrm-recap-ligne > dt { font-size: 14.5px; flex-shrink: 0; }
-.vrm-recap-details .vrm-recap-ligne > dd { font-size: 14.5px; flex-direction: row; align-items: center; gap: 8px; justify-content: flex-end; }
+.vrm-recap-details .vrm-recap-ligne > dt { font-size: 15px; flex-shrink: 0; }
+.vrm-recap-details .vrm-recap-ligne > dd { font-size: 15px; flex-direction: row; align-items: center; gap: 8px; justify-content: flex-end; }
 .vrm-recap-mono { font-family: var(--recap-mono); font-variant-numeric: tabular-nums; }
 .vrm-recap-achat-photo { width: 28px; height: 28px; border-radius: 6px; overflow: hidden; background: var(--recap-soft); flex-shrink: 0; display: inline-flex; }
 .vrm-recap-achat-photo:empty { display: none; }
@@ -124,7 +124,7 @@ html body .vrm-recap .vrm-recap-gestes .vrm-sale-invoice > button { width: 100% 
 html body .vrm-recap .vrm-recap-modifier { width: 100%; }
 html body .vrm-recap .vrm-recap-modifier > summary {
   min-height: 48px; box-sizing: border-box; display: flex; align-items: center; justify-content: space-between; gap: 8px;
-  padding: 0 14px !important; border-radius: 12px; background: var(--recap-soft); border: 0; font-size: 14.5px !important; font-weight: 600; cursor: pointer;
+  padding: 0 14px !important; border-radius: 12px; background: var(--recap-soft); border: 0; font-size: 15px !important; font-weight: 600; cursor: pointer;
 }
 html body .vrm-recap .vrm-recap-modifier[open] { display: flex; flex-direction: column; gap: 12px; }
 
@@ -133,10 +133,10 @@ html body .vrm-recap .vrm-recap-modifier[open] { display: flex; flex-direction: 
   .vrm-recap-corps > header, .vrm-recap-corps > section { padding: 16px 16px; }
   .vrm-recap-tete { grid-template-columns: 84px minmax(0, 1fr) 44px; gap: 12px; }
   html body .vrm-recap .vrm-recap-tete .vrm-sale-photo.vrm-recap-photo { width: 84px !important; height: 84px !important; }
-  html body .vrm-recap h2.vrm-recap-nom { font-size: 17.5px !important; }
+  html body .vrm-recap h2.vrm-recap-nom { font-size: 17px !important; }
   .vrm-recap-etape { font-size: 12px; }
-  .vrm-recap-quand { font-size: 11.5px; }
-  .vrm-recap-ligne > dt { font-size: 14.5px; }
+  .vrm-recap-quand { font-size: 12px; }
+  .vrm-recap-ligne > dt { font-size: 15px; }
 }
 /* Sur ordinateur, le panneau de droite : un peu plus large et aéré */
 @media (min-width: 1024px) {

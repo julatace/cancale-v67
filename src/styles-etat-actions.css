@@ -34,7 +34,7 @@
   flex-shrink: 0; width: 34px; height: 34px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center;
   color: var(--etat-ton); background: color-mix(in srgb, var(--etat-ton) 14%, transparent);
 }
-.vrm-etat-titre { font-weight: 750; font-size: 14.5px; line-height: 1.3; letter-spacing: -.01em; }
+.vrm-etat-titre { font-weight: 700; font-size: 15px; line-height: 1.3; letter-spacing: -.01em; }
 .vrm-etat-texte { margin-bottom: 10px; }
 
 /* La chaîne : un rond par maillon, reliés par un trait vertical. */
@@ -46,15 +46,15 @@
 }
 .vrm-etat-rond {
   flex-shrink: 0; width: 22px; height: 22px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center;
-  font-size: 11.5px; font-weight: 800; line-height: 1; color: var(--etat-ton);
+  font-size: 12px; font-weight: 800; line-height: 1; color: var(--etat-ton);
   background: color-mix(in srgb, var(--etat-ton) 15%, transparent); box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--etat-ton) 55%, transparent);
 }
 .vrm-etat-maillon-texte { min-width: 0; padding-top: 2px; overflow-wrap: anywhere; }
 .vrm-etat-maillon-detail { color: var(--vrm-muted); }
 .vrm-etat-pied { padding: 8px 0 0; margin-top: 2px; border-top: 1px solid var(--vrm-line); }
 .vrm-etat-geste { margin-top: 12px; }
-.vrm-etat-geste > button, .vrm-etat-geste > a { display: flex !important; width: 100%; justify-content: center; align-items: center; min-height: 40px; padding: 10px 14px !important; border-radius: 10px !important; box-sizing: border-box; text-align: center; font-size: 13px !important; }
-.vrm-etat-geste > span { display: block; padding: 10px 12px; border-radius: 10px; background: var(--vrm-card2); }
+.vrm-etat-geste > button, .vrm-etat-geste > a { display: flex !important; width: 100%; justify-content: center; align-items: center; min-height: 40px; padding: 10px 14px !important; border-radius: 12px !important; box-sizing: border-box; text-align: center; font-size: 13px !important; }
+.vrm-etat-geste > span { display: block; padding: 10px 12px; border-radius: 12px; background: var(--vrm-card2); }
 @media (pointer: coarse) {
   .vrm-etat-geste > button, .vrm-etat-geste > a { min-height: 44px; }
 }
