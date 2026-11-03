@@ -955,7 +955,7 @@ html body .vrm-visite .vrm-visite-pied :is(button, .vrm-b) { min-height: 44px !i
 :root body .vrm-app-shell .vrm-main .vrm-day-layout.vrm-fu-journee .vrm-day-task :is(.vrm-day-task-action, .vrm-day-task.is-urgent .vrm-day-task-action),
 :root body .vrm-app-shell .vrm-main .vrm-day-layout.vrm-fu-journee .vrm-day-task.is-groupe > .vrm-day-task-geste {
   background: var(--fu-case) !important; color: var(--fu-encre) !important; }
-:root body .vrm-app-shell .vrm-main .vrm-day-layout.vrm-fu-journee .vrm-day-task .vrm-day-task-action.is-principal { background: #0071e3 !important; color: #fff !important; }
+:root body .vrm-app-shell .vrm-main .vrm-day-layout.vrm-fu-journee .vrm-day-task-list .vrm-day-task.vrm-day-task .vrm-day-task-action.is-principal { background: #0071e3 !important; color: #fff !important; }
 :root[data-theme="dark"] body .vrm-app-shell .vrm-main .vrm-day-layout.vrm-fu-journee .vrm-day-task .vrm-day-task-action.is-principal { background: #0a84ff !important; color: #fff !important; }
 :root[data-theme="dark"] body .vrm-app-shell .vrm-main .vrm-day-layout.vrm-fu-journee .vrm-day-task :is(.vrm-day-task-action:not(.is-principal)),
 :root[data-theme="dark"] body .vrm-app-shell .vrm-main .vrm-day-layout.vrm-fu-journee .vrm-day-task.is-groupe > .vrm-day-task-geste { background: #2c2c2e !important; color: #f5f5f7 !important; }
