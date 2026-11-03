@@ -9707,79 +9707,220 @@ const bordereauFormatKey = (w, h) => `${Math.round(w)}x${Math.round(h)}`;
 // Les anciennes coordonnées ne prouvent pas qu'un autre PDF est dégagé.
 const smartDefaultBordPos = (w, h) => null;
 
-// Cherche une fenêtre entièrement blanche avec une marge autour du tampon.
-// Carte intégrale : chaque pixel non blanc compte, y compris images et QR.
-const trouverZoneBlanche = (pixels, width, height, boxW, boxH, marge) => {
-  const stride = width + 1, sums = new Uint32Array(stride * (height + 1));
-  for (let y=0;y<height;y++) {
-    let row=0;
-    for (let x=0;x<width;x++) {
-      const i=(y*width+x)*4;
-      row += pixels[i]<248 || pixels[i+1]<248 || pixels[i+2]<248 ? 1 : 0;
-      sums[(y+1)*stride+x+1]=sums[y*stride+x+1]+row;
-    }
+// ── LE TAMPON DU BORDEREAU : N° + TITRE, TOUJOURS (3 novembre) ──────────────
+// Julien, 3 nov. 09 h 59 : « le tamponnage du bordereau ne marche pas car il
+// veut absolument trouver un espace blanc ; il me dit qu'il n'en trouve pas ».
+// MESURÉ sur ses vrais PDF (lecture seule, copies hors dépôt) : en thermique,
+// l'étiquette Mondial Relay « Bordereau-Vinted » (Hermes/An Post, 150×100 mm
+// couchée) remplit la page 100×150 — il n'y a AUCUN blanc de 2 cm, et la
+// règle du 28 oct. (« aucun espace ⇒ aucun numéro, erreur ») bloquait tout.
+// La page Vestiaire (Chronopost, /Rotate 270) posait aussi le N° couché.
+// ⇒ UN chemin, quatre plateformes (`tamponnerBordereau`), trois issues, dans
+// cet ordre, et JAMAIS un échec :
+//   ① BLANC : une zone libre sur la page telle qu'elle s'affiche (rotation
+//      comprise), cherchée sur le RENDU (pdf.js) : un pixel compte comme
+//      « encre » sous la luminance 200 (le gris clair et le bruit d'un scan ne
+//      bloquent plus), par cellules de 3 px (un point isolé n'est pas de
+//      l'encre, un trait l'est), avec une marge de 5 mm à gauche et à droite
+//      (la zone de silence d'un code-barres) et 3,5 mm en haut et en bas.
+//      Trois tailles de cartouche, de la plus grande à la plus petite.
+//   ② BANDE : pas de zone libre, la page part ENTIÈRE à l'échelle 1:1 et une
+//      bande blanche de 14 mm est AJOUTÉE dessous (sur la page affichée) —
+//      seulement si la page agrandie tient encore sur une feuille A4 (aucune
+//      réduction à l'impression ; une étiquette 10×15 imprimée en A4).
+//   ③ FICHE : sinon (A4 déjà pleine, ou imprimante THERMIQUE : la page doit
+//      rester 100×150 exactement, la bande la ferait déborder sur l'étiquette
+//      suivante ou réduire l'étiquette), une petite page « fiche colis »
+//      10×15 cm, imprimée juste APRÈS l'étiquette, porte le N° et le titre.
+// Rien n'est jamais dessiné PAR-DESSUS l'étiquette d'origine ailleurs qu'en ①,
+// ni réduit, ni recouvert d'un rectangle. Le PDF rangé n'est jamais modifié :
+// on tamponne la copie chargée pour l'impression.
+const TAMPON = { encre: 200, cellule: 3, mx: 14, my: 10, bande: 40, echelle: 1.5 };
+const A4_PT = { w: 595.28, h: 841.89 };
+// Une variante de cartouche : taille du N°, du titre, largeur max (points).
+const CARTOUCHES = [{ tn: 18, tt: 8, l: 190 }, { tn: 15, tt: 7, l: 150 }, { tn: 12, tt: 6.5, l: 112 }];
+// Le texte qu'une police standard sait écrire (WinAnsi) — un emoji ou une
+// lettre hors de cet alphabet faisait lever pdf-lib, donc échouer l'impression.
+const texteEcrivable = (font, s) => {
+  let jeu = null; try { jeu = new Set(font.getCharacterSet()); } catch (_) {}
+  return Array.from(String(s == null ? '' : s).replace(/[\r\n\t]+/g, ' ')).filter((c) => !jeu || jeu.has(c.codePointAt(0))).join('').replace(/\s+/g, ' ').trim();
+};
+// Coupe `s` en au plus `n` lignes de largeur `l` ; « … » au bout si ça dépasse.
+const couperLignes = (font, taille, s, l, n) => {
+  const larg = (t) => font.widthOfTextAtSize(t, taille);
+  const mots = String(s || '').split(' ').filter(Boolean), lignes = [];
+  let cur = '';
+  const pousse = (m) => { while (m && larg(m) > l) { let k = m.length; while (k > 1 && larg(m.slice(0, k)) > l) k--; lignes.push(m.slice(0, k)); m = m.slice(k); } return m; };
+  for (const m of mots) {
+    const essai = cur ? cur + ' ' + m : m;
+    if (larg(essai) <= l) { cur = essai; continue; }
+    if (cur) lignes.push(cur);
+    cur = pousse(m);
   }
-  const w=boxW+2*marge,h=boxH+2*marge;
-  for(let y=0;y+h<=height;y+=4) for(let x=0;x+w<=width;x+=4) {
-    const n=sums[(y+h)*stride+x+w]-sums[y*stride+x+w]-sums[(y+h)*stride+x]+sums[y*stride+x];
-    if(n===0) return {x:x+marge,y:y+marge};
+  if (cur) lignes.push(cur);
+  if (lignes.length <= n) return lignes;
+  const out = lignes.slice(0, n); let d = out[n - 1];
+  while (d && larg(d + '…') > l) d = d.slice(0, -1);
+  out[n - 1] = d.replace(/\s+$/, '') + '…';
+  return out;
+};
+// Le cartouche (N° en gras, titre sur deux lignes) d'une variante : sa taille
+// et ses lignes, en points, origine en haut à gauche. `null` si le N° ne tient
+// pas dans la largeur (on essaie alors la variante suivante).
+const cartoucheTampon = (bold, reg, numero, titre, v) => {
+  const pad = 3, n = texteEcrivable(bold, numero), t = texteEcrivable(reg, titre);
+  const lignes = []; let h = pad, w = 0;
+  if (n) {
+    const txt = `N° ${n}`, lw = bold.widthOfTextAtSize(txt, v.tn);
+    if (lw > v.l - 2 * pad) return null;
+    h += v.tn * 0.78; lignes.push({ texte: txt, font: bold, taille: v.tn, y: h }); h += v.tn * 0.3; w = Math.max(w, lw);
+  }
+  if (t) for (const l of couperLignes(reg, v.tt, t, v.l - 2 * pad, 2)) {
+    h += v.tt * 1.05; lignes.push({ texte: l, font: reg, taille: v.tt, y: h }); w = Math.max(w, reg.widthOfTextAtSize(l, v.tt));
+  }
+  if (!lignes.length) return null;
+  return { w: Math.ceil(w + 2 * pad), h: Math.ceil(h + pad + 1), pad, lignes };
+};
+// Un point de la page AFFICHÉE (x vers la droite, y vers le bas, en points,
+// rotation /Rotate appliquée) → le point PDF correspondant. Pur : sert au
+// dessin, sans pdf.js. `b` = la boîte visible (CropBox), `r` = 0/90/180/270.
+const versPdfAffiche = (b, r, x, y) => {
+  if (r === 90) return { x: b.x + y, y: b.y + x };
+  if (r === 180) return { x: b.x + b.width - x, y: b.y + y };
+  if (r === 270) return { x: b.x + b.width - y, y: b.y + b.height - x };
+  return { x: b.x + x, y: b.y + b.height - y };
+};
+const rotationPage = (page) => { const a = ((Math.round(((page.getRotation() || {}).angle || 0) / 90) * 90) % 360 + 360) % 360; return a; };
+const tailleAffichee = (page) => { const b = page.getCropBox(), r = rotationPage(page); return r % 180 ? { w: b.height, h: b.width } : { w: b.width, h: b.height }; };
+// Écrit un cartouche dont le coin haut-gauche est en (x, y) de la page affichée.
+// Le texte est tourné de la rotation de la page : il se lit à l'endroit.
+const ecrireCartouche = (PL, page, c, x, y) => {
+  const b = page.getCropBox(), r = rotationPage(page);
+  page.resetPosition();
+  for (const l of c.lignes) {
+    const p = versPdfAffiche(b, r, x + c.pad, y + l.y);
+    page.drawText(l.texte, { x: p.x, y: p.y, size: l.taille, font: l.font, color: PL.rgb(0, 0, 0), rotate: PL.degrees(r) });
+  }
+};
+// Cherche une fenêtre libre (cartouche + marges) sur une carte de pixels RGBA.
+// `marge` : un nombre (les quatre côtés) ou { mx, my } en pixels. Une cellule
+// de `cellule` px est de l'encre si au moins 2 de ses pixels sont sous le
+// seuil de luminance. Rend le coin haut-gauche du CARTOUCHE, ou null.
+const trouverZoneBlanche = (pixels, width, height, boxW, boxH, marge, opts = {}) => {
+  const mx = typeof marge === 'number' ? marge : marge.mx, my = typeof marge === 'number' ? marge : marge.my;
+  const seuil = opts.encre != null ? opts.encre : TAMPON.encre, k = opts.cellule || TAMPON.cellule;
+  const cw = Math.ceil(width / k), ch = Math.ceil(height / k), encre = new Uint8Array(cw * ch);
+  for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) {
+    const i = (y * width + x) * 4;
+    if (0.299 * pixels[i] + 0.587 * pixels[i + 1] + 0.114 * pixels[i + 2] < seuil) { const c = ((y / k) | 0) * cw + ((x / k) | 0); if (encre[c] < 2) encre[c]++; }
+  }
+  const stride = cw + 1, sums = new Uint32Array(stride * (ch + 1));
+  for (let y = 0; y < ch; y++) { let row = 0; for (let x = 0; x < cw; x++) { row += encre[y * cw + x] >= 2 ? 1 : 0; sums[(y + 1) * stride + x + 1] = sums[y * stride + x + 1] + row; } }
+  const w = Math.ceil((boxW + 2 * mx) / k), h = Math.ceil((boxH + 2 * my) / k);
+  for (let y = 0; y + h <= ch; y++) for (let x = 0; x + w <= cw; x++) {
+    const n = sums[(y + h) * stride + x + w] - sums[y * stride + x + w] - sums[(y + h) * stride + x] + sums[y * stride + x];
+    if (n === 0) return { x: x * k + mx, y: y * k + my };
   }
   return null;
 };
-const espaceBlancBordereau = async (pdf, avecTitre = false, choix = null) => {
-  let documentPdf;
+// Rend la page 1 de `pdf` (pdf-lib) avec pdf.js : { pixels, w, h, s } dans le
+// sens AFFICHÉ, `s` pixels par point. Lève si pdf.js manque (hors ligne…).
+const rendrePremierePage = async (pdf) => {
+  const L = await chargerPdfjs();
+  const d = await L.getDocument({ data: await pdf.save(), isEvalSupported: false }).promise;
   try {
-    const L=await chargerPdfjs();
-    documentPdf=await L.getDocument({data:await pdf.save(),isEvalSupported:false,stopAtErrors:true}).promise;
-    const page=await documentPdf.getPage(1), viewport=page.getViewport({scale:1.5});
-    const w=Math.ceil(viewport.width), h=Math.ceil(viewport.height);
-    if(w*h>12000000) throw Error('page trop grande');
-    const canvas=document.createElement('canvas'); canvas.width=w;canvas.height=h;
-    const ctx=canvas.getContext('2d',{willReadFrequently:true});
-    ctx.fillStyle='#fff';ctx.fillRect(0,0,w,h);
-    await page.render({canvasContext:ctx,viewport}).promise;
-    const bw=avecTitre?160:84,bh=avecTitre?38:28;
-    const tourne=viewport.rotation%180!==0, rw=(tourne?bh:bw)*1.5, rh=(tourne?bw:bh)*1.5;
-    const pixels=ctx.getImageData(0,0,w,h).data;
-    let point;
-    if(choix && Number.isFinite(choix.vx) && Number.isFinite(choix.vy)) {
-      const x=Math.round(choix.vx*w-rw/2),y=Math.round(choix.vy*h-rh/2);
-      if(x<18||y<18||x+Math.ceil(rw)+18>w||y+Math.ceil(rh)+18>h) throw Error('le numéro dépasse de la page ou de sa marge');
-      for(let py=y-18;py<y+Math.ceil(rh)+18;py++) for(let px=x-18;px<x+Math.ceil(rw)+18;px++) {
-        const i=(py*w+px)*4;
-        if(pixels[i]<248||pixels[i+1]<248||pixels[i+2]<248) throw Error('cette zone contient du texte, une image ou un code');
-      }
-      point={x,y};
-    } else point=trouverZoneBlanche(pixels,w,h,Math.ceil(rw),Math.ceil(rh),18);
-    if(!point) throw Error('aucun espace blanc suffisant');
-    const corners=[viewport.convertToPdfPoint(point.x,point.y),viewport.convertToPdfPoint(point.x+rw,point.y+rh)];
-    return {x:Math.min(corners[0][0],corners[1][0]),y:Math.min(corners[0][1],corners[1][1]),w:Math.abs(corners[0][0]-corners[1][0]),h:Math.abs(corners[0][1]-corners[1][1]),verifie:true};
-  } catch(e) {
-    throw Error('Placement du numéro non vérifié : '+String(e.message||e)+'. Aucun numéro ajouté sur ce bordereau.');
-  } finally { if(documentPdf) await documentPdf.destroy(); }
+    const page = await d.getPage(1), s = TAMPON.echelle, v = page.getViewport({ scale: s });
+    const w = Math.ceil(v.width), h = Math.ceil(v.height);
+    if (w * h > 12000000) throw Error('page trop grande');
+    const canvas = document.createElement('canvas'); canvas.width = w; canvas.height = h;
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, w, h);
+    await page.render({ canvasContext: ctx, viewport: v }).promise;
+    return { pixels: ctx.getImageData(0, 0, w, h).data, w, h, s };
+  } finally { try { await d.destroy(); } catch (_) {} }
 };
-const drawBordereauStamp = (pdf, rgb, bold, reg, numero, title, pos) => {
-  const first=pdf.getPages()[0];
-  const hasNum=numero!=null && String(numero).trim()!=='';
-  if(!hasNum && !String(title||'').trim()) return false;
-  if(!pos || pos.verifie!==true) throw Error('Espace blanc non vérifié : aucun tampon ajouté.');
-  const {x,y,w,h}=pos;
-  // L'analyse sérialise le PDF. Un document assemblé (thermique) a déjà un
-  // flux de dessin mis en cache par pdf-lib : écrire dans ce même flux peut
-  // faire disparaître le numéro à la sauvegarde. Cette API publique ouvre un
-  // nouveau flux, sans déplacer ni redimensionner les éléments existants.
-  first.resetPosition();
-  const fit=(text,font,size)=>{let t=String(text||'').replace(/[\r\n]+/g,' ');while(t&&font.widthOfTextAtSize(t,size)>w-8)t=t.slice(0,-1);return t;};
-  // Pas de rectangle opaque, de bande, de réduction ni de changement de page.
-  if(hasNum) {
-    const texte=`N° ${numero}`; let taille=18;
-    while(taille>9 && bold.widthOfTextAtSize(texte,taille)>w-8) taille--;
-    if(bold.widthOfTextAtSize(texte,taille)>w-8) throw Error('Numéro trop long pour cet espace blanc : aucun numéro tronqué.');
-    first.drawText(texte,{x:x+4,y:y+h-21,size:taille,font:bold,color:rgb(0,0,0)});
+// ① Où poser le cartouche sur la page affichée ? `choix` = un point choisi à
+// la main ({vx, vy} en fraction de la page), revérifié sur les pixels.
+// Rend { x, y, c } (points, page affichée) ou null.
+const chercherPlaceTampon = async (pdf, bold, reg, numero, titre, choix = null) => {
+  const rendu = await rendrePremierePage(pdf), s = rendu.s;
+  const marge = { mx: Math.round(TAMPON.mx * s), my: Math.round(TAMPON.my * s) };
+  for (const v of CARTOUCHES) {
+    const c = cartoucheTampon(bold, reg, numero, titre, v); if (!c) continue;
+    const bw = Math.ceil(c.w * s), bh = Math.ceil(c.h * s);
+    if (choix && Number.isFinite(choix.vx) && Number.isFinite(choix.vy)) {
+      const x = Math.round(choix.vx * rendu.w - bw / 2), y = Math.round(choix.vy * rendu.h - bh / 2);
+      if (x - marge.mx < 0 || y - marge.my < 0 || x + bw + marge.mx > rendu.w || y + bh + marge.my > rendu.h) continue;
+      // La même règle que la recherche : on la joue sur la fenêtre choisie.
+      const sous = new Uint8ClampedArray((bw + 2 * marge.mx) * (bh + 2 * marge.my) * 4);
+      for (let py = 0; py < bh + 2 * marge.my; py++) sous.set(rendu.pixels.subarray(((y - marge.my + py) * rendu.w + x - marge.mx) * 4, ((y - marge.my + py) * rendu.w + x - marge.mx + bw + 2 * marge.mx) * 4), py * (bw + 2 * marge.mx) * 4);
+      if (trouverZoneBlanche(sous, bw + 2 * marge.mx, bh + 2 * marge.my, bw, bh, marge)) return { x: x / s, y: y / s, c };
+      continue;
+    }
+    const p = trouverZoneBlanche(rendu.pixels, rendu.w, rendu.h, bw, bh, marge);
+    if (p) return { x: p.x / s, y: p.y / s, c };
   }
-  const t=fit(title,reg,8);
-  if(t) first.drawText(t,{x:x+4,y:y+3,size:8,font:reg,color:rgb(0,0,0)});
-  return hasNum;
+  return null;
+};
+// ② La page 1 redessinée telle qu'elle s'affiche, à l'échelle 1:1, sur une
+// page plus haute de `TAMPON.bande` : le cartouche va dans la bande, dessous.
+const pageAvecBande = async (PL, pdf, bold, reg, numero, titre) => {
+  const page = pdf.getPages()[0], b = page.getCropBox(), r = rotationPage(page), { w, h } = tailleAffichee(page);
+  const B = TAMPON.bande;
+  const emb = await pdf.embedPage(page, { left: b.x, bottom: b.y, right: b.x + b.width, top: b.y + b.height });
+  const neuve = pdf.insertPage(0, [w, h + B]);
+  // pdf-lib tourne autour du coin bas-gauche, dans le sens trigonométrique.
+  const pose = r === 90 ? { x: 0, y: B + b.width, a: -90 } : r === 180 ? { x: b.width, y: B + b.height, a: 180 } : r === 270 ? { x: b.height, y: B, a: 90 } : { x: 0, y: B, a: 0 };
+  neuve.drawPage(emb, { x: pose.x, y: pose.y, rotate: PL.degrees(pose.a) });
+  pdf.removePage(1);
+  for (const v of CARTOUCHES) {
+    const c = cartoucheTampon(bold, reg, numero, titre, { ...v, l: Math.min(v.l, w - 16) });
+    if (c && c.h <= B - 4) { ecrireCartouche(PL, neuve, c, 8, h + (B - c.h) / 2); return true; }
+  }
+  return false;
+};
+// ③ La fiche colis : une page 10×15 cm juste après la page 1.
+const ajouterFicheColis = (PL, pdf, bold, reg, numero, titre) => {
+  const W = 100 * MM_PT, H = 150 * MM_PT, m = 8 * MM_PT;
+  const p = pdf.insertPage(1, [W, H]);
+  const n = texteEcrivable(bold, numero), t = texteEcrivable(reg, titre);
+  let y = H - m;
+  if (n) {
+    const txt = `N° ${n}`; let tn = 64;
+    while (tn > 12 && bold.widthOfTextAtSize(txt, tn) > W - 2 * m) tn--;
+    y -= tn * 0.8; p.drawText(txt, { x: m, y, size: tn, font: bold, color: PL.rgb(0, 0, 0) }); y -= tn * 0.45;
+  }
+  for (const l of couperLignes(reg, 15, t, W - 2 * m, 6)) { y -= 18; p.drawText(l, { x: m, y, size: 15, font: reg, color: PL.rgb(0, 0, 0) }); }
+  p.drawText(texteEcrivable(reg, 'Fiche colis VRM — pas une étiquette de transport'), { x: m, y: m, size: 7.5, font: reg, color: PL.rgb(0.35, 0.35, 0.35) });
+};
+// LE chemin unique. Tamponne la page 1 de `pdf` (pdf-lib, déjà la COPIE
+// d'impression). `thermique` : la page doit garder sa taille (pas de bande).
+// `choix` + `strict` : le point choisi à la main dans l'aperçu ; refusé ⇒
+// erreur (l'aperçu le dit) seulement si `strict`, sinon recherche normale.
+// Rend { mode: 'blanc'|'bande'|'fiche'|'rien', raison }. Ne lève jamais
+// (sauf `strict`) : le bordereau s'imprime toujours.
+const tamponnerBordereau = async (PL, pdf, { numero, titre, thermique = false, choix = null, strict = false } = {}) => {
+  const n = String(numero == null ? '' : numero).trim(), t = String(titre == null ? '' : titre).trim();
+  if (!n && !t) return { mode: 'rien', raison: '' };
+  const bold = await pdf.embedFont(PL.StandardFonts.HelveticaBold), reg = await pdf.embedFont(PL.StandardFonts.Helvetica);
+  let raison = '';
+  try {
+    let place = await chercherPlaceTampon(pdf, bold, reg, n, t, choix);
+    if (!place && choix && strict) throw Object.assign(Error('cette zone contient du texte, une image ou un code, ou le numéro dépasse de la page'), { strict: true });
+    if (!place && choix) place = await chercherPlaceTampon(pdf, bold, reg, n, t, null);
+    if (place) { ecrireCartouche(PL, pdf.getPages()[0], place.c, place.x, place.y); return { mode: 'blanc', raison: '' }; }
+    raison = 'aucun espace libre sur la page';
+  } catch (e) {
+    if (e && e.strict) throw Error('Placement refusé : ' + e.message + '.');
+    raison = 'aperçu du PDF indisponible (' + String((e && e.message) || e).slice(0, 60) + ')';
+  }
+  const { w, h } = tailleAffichee(pdf.getPages()[0]);
+  const tientA4 = (a, b) => (a <= A4_PT.w + 1 && b <= A4_PT.h + 1) || (a <= A4_PT.h + 1 && b <= A4_PT.w + 1);
+  if (!thermique && tientA4(w, h + TAMPON.bande)) {
+    try { if (await pageAvecBande(PL, pdf, bold, reg, n, t)) return { mode: 'bande', raison }; } catch (_) {}
+  }
+  ajouterFicheColis(PL, pdf, bold, reg, n, t);
+  return { mode: 'fiche', raison };
 };
 // ── IMPRIMANTE NORMALE OU THERMIQUE ─────────────────────────────────────────
 // Demande de Julien, 15 septembre : « il y a des personnes qui font simplement
@@ -10137,8 +10278,9 @@ const placementThermique = (r, sens, avecNum) => {
 };
 // Pose les étiquettes de `page` (zone `z`, déjà reconnue) dans `out`, une page
 // 100×150 chacune. Rend le nombre de pages ajoutées.
-const poserEtiquettesThermiques = async (PL, out, page, z, numero, bold) => {
+const poserEtiquettesThermiques = async (PL, out, page, z, numero, bold, titre = '') => {
   const n = numero != null ? String(numero).trim() : '';
+  const modes = [];
   const rects = z.etiquettes && z.etiquettes.length ? z.etiquettes : [z];
   let k = 0;
   for (const r of rects) {
@@ -10147,14 +10289,12 @@ const poserEtiquettesThermiques = async (PL, out, page, z, numero, bold) => {
     const pl=placementThermique(r,r.sens!=null?r.sens:z.sens,false);
     const p=temp.addPage([ETIQ_TH.w,ETIQ_TH.h]);
     p.drawPage(emb,{x:pl.x,y:pl.y,xScale:pl.s,yScale:pl.s,rotate:PL.degrees(pl.angle)});
-    if(n) {
-      const position=await espaceBlancBordereau(temp);
-      drawBordereauStamp(temp,PL.rgb,await temp.embedFont(PL.StandardFonts.HelveticaBold),await temp.embedFont(PL.StandardFonts.Helvetica),n,'',position);
-    }
-    (await out.copyPages(temp,[0])).forEach(p=>out.addPage(p));
+    // La page reste 100×150 : pas de bande en thermique (fiche à la suite).
+    modes.push((await tamponnerBordereau(PL, temp, { numero: n, titre, thermique: true })).mode);
+    (await out.copyPages(temp,temp.getPageIndices())).forEach(p=>out.addPage(p));
     k++;
   }
-  return k;
+  return { k, modes };
 };
 // LE réglage d'imprimante, lu au moment d'imprimer (§11 : un seul réglage
 // `vrm_imprimante`, que Colis et Réglages écrivent tous les deux).
@@ -10166,21 +10306,21 @@ const imprimanteChoisie = () => imprMode(load('vrm_imprimante', 'normale'));
 //   sinon ⇒ page originale, numéro dans un espace blanc vérifié sur ce PDF.
 // Rend `{ isole, etiquettes, raison }` — l'écran dit ce qui a vraiment été fait.
 const poserBordereau = async (PL, out, src, { numero, title, pos, thermique }) => {
-  const { rgb, StandardFonts } = PL;
+  const { StandardFonts } = PL;
   const first = src.getPages()[0];
   const z = thermique ? zoneEtiquette(PL, first) : { ok: false };
   if (thermique && z.ok) {
     if (!out.__vrmGras) out.__vrmGras = await out.embedFont(StandardFonts.HelveticaBold);
-    const n = await poserEtiquettesThermiques(PL, out, first, z, numero, out.__vrmGras);
+    const { k: n, modes } = await poserEtiquettesThermiques(PL, out, first, z, numero, out.__vrmGras, title);
     const reste = src.getPageIndices().slice(1);
     if (reste.length) (await out.copyPages(src, reste)).forEach((p) => out.addPage(p));
-    return { isole: true, etiquettes: n, raison: '' };
+    return { isole: true, etiquettes: n, raison: '', tampons: modes };
   }
-  const sBold = await src.embedFont(StandardFonts.HelveticaBold);
-  const sReg = await src.embedFont(StandardFonts.Helvetica);
-  if (String(numero||'').trim() || String(title||'').trim()) drawBordereauStamp(src, rgb, sBold, sReg, numero, title, await espaceBlancBordereau(src,!!title,pos));
+  // Page entière (A4 normale, ou thermique sans étiquette repérée) : le même
+  // tampon ; la bande n'est permise que si la page agrandie tient sur un A4.
+  const t = await tamponnerBordereau(PL, src, { numero, titre: title, thermique, choix: pos });
   (await out.copyPages(src, src.getPageIndices())).forEach((p) => out.addPage(p));
-  return { isole: false, etiquettes: 0, raison: thermique ? (z.raison || 'mise en page inconnue') : '' };
+  return { isole: false, etiquettes: 0, raison: thermique ? (z.raison || 'mise en page inconnue') : '', tampons: [t.mode] };
 };
 
 // ── QUEL TYPE DE BORDEREAU EST-CE ? ──────────────────────────────────────────
@@ -39264,7 +39404,7 @@ function LoadError({ onRetry }) {
 function BordPlacer({place,onConfirm,onCancel}) {
   const original=React.useRef(null),apercu=React.useRef(null),sequence=React.useRef(0),pointClavier=React.useRef({vx:.5,vy:.5});
   const [choix,setChoix]=React.useState(null),[etat,setEtat]=React.useState('charge'),[erreur,setErreur]=React.useState('');
-  const [confirme,setConfirme]=React.useState(false);
+  const [confirme,setConfirme]=React.useState(false),[modeTampon,setModeTampon]=React.useState('blanc');
   React.useEffect(()=>{
     let vivant=true;
     dessinerPdf(original.current,place.pdfBuf,{largeur:Math.min(460,window.innerWidth-72)}).then(()=>{if(vivant)setEtat('pret');}).catch(()=>{if(vivant){setEtat('erreur');setErreur('Aperçu indisponible. Aucun emplacement validé.');}});
@@ -39274,8 +39414,7 @@ function BordPlacer({place,onConfirm,onCancel}) {
     const id=++sequence.current;setEtat('verification');setErreur('');setChoix(null);
     try {
       const PL=await import('pdf-lib'),doc=await PL.PDFDocument.load(place.pdfBuf);
-      const pos=await espaceBlancBordereau(doc,!!place.title,candidat);
-      drawBordereauStamp(doc,PL.rgb,await doc.embedFont(PL.StandardFonts.HelveticaBold),await doc.embedFont(PL.StandardFonts.Helvetica),place.numero,place.title,pos);
+      const t=await tamponnerBordereau(PL,doc,{numero:place.numero,titre:place.title,choix:candidat,strict:!!candidat});
       const bytes=await doc.save();if(id!==sequence.current)return;
       const rendu=document.createElement('canvas');
       await dessinerPdf(rendu,bytes,{largeur:Math.min(460,window.innerWidth-72)});
@@ -39283,7 +39422,7 @@ function BordPlacer({place,onConfirm,onCancel}) {
       apercu.current.width=rendu.width;apercu.current.height=rendu.height;
       apercu.current.style.width=rendu.style.width;apercu.current.style.height=rendu.style.height;
       apercu.current.getContext('2d').drawImage(rendu,0,0);
-      setChoix(candidat||null);setEtat(candidat?'valide':'auto');
+      setModeTampon(t.mode);setChoix(candidat||null);setEtat(candidat?'valide':'auto');
     } catch(e){if(id===sequence.current){setEtat('erreur');setErreur(String(e.message||e));}}
   };
   const choisir=e=>{
@@ -39301,7 +39440,7 @@ function BordPlacer({place,onConfirm,onCancel}) {
         const d={ArrowLeft:[-.02,0],ArrowRight:[.02,0],ArrowUp:[0,-.02],ArrowDown:[0,.02]}[e.key];
         if(!d||etat==='charge'||confirme)return;e.preventDefault();
         pointClavier.current={vx:Math.max(0,Math.min(1,pointClavier.current.vx+d[0])),vy:Math.max(0,Math.min(1,pointClavier.current.vy+d[1]))};verifier(pointClavier.current);
-      }} style={{cursor:'crosshair'}}/></div><div><b>Résultat avant impression</b><canvas ref={apercu} hidden={!['valide','auto'].includes(etat)}/><p role="status">{etat==='charge'?'Chargement…':etat==='verification'?'Vérification de la zone…':['valide','auto'].includes(etat)?'Zone blanche vérifiée.':erreur||'Choisis un emplacement ou lance la recherche automatique.'}</p></div></div>
+      }} style={{cursor:'crosshair'}}/></div><div><b>Résultat avant impression</b><canvas ref={apercu} hidden={!['valide','auto'].includes(etat)}/><p role="status">{etat==='charge'?'Chargement…':etat==='verification'?'Vérification de la zone…':['valide','auto'].includes(etat)?(modeTampon==='bande'?'Pas de zone libre : le N° est dans une bande ajoutée sous le bordereau, à taille réelle.':modeTampon==='fiche'?'Pas de zone libre : le N° est sur une fiche colis imprimée juste après.':'Zone blanche vérifiée.'):erreur||'Choisis un emplacement ou lance la recherche automatique.'}</p></div></div>
       <div className="vrm-placement-actions"><button type="button" disabled={confirme} onClick={onCancel}>Annuler</button><button type="button" data-imprime="1" disabled={confirme||!['valide','auto'].includes(etat)} onClick={valider}>{confirme?'Préparation…':'Valider et ouvrir le PDF'}</button></div>
     </div>
   </div>,document.body);
@@ -60417,11 +60556,8 @@ async function imprimerBordereauEquipe(vendeur, row, numero, titre) {
   if (!lu || !lu.octets) { libererOngletPdf(); return { ok: false, message: messagePdfManquant(lu) }; }
   try {
     const PL = await import('pdf-lib');
-    const { PDFDocument, rgb, StandardFonts } = PL;
-    const pdf = await PDFDocument.load(lu.octets);
-    const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
-    const reg = await pdf.embedFont(StandardFonts.Helvetica);
-    drawBordereauStamp(pdf, rgb, bold, reg, numero || '', titre || '', await espaceBlancBordereau(pdf,!!titre));
+    const pdf = await PL.PDFDocument.load(lu.octets);
+    await tamponnerBordereau(PL, pdf, { numero: numero || '', titre: titre || '' });
     posePrefsImpression(PL, pdf);
     const url = URL.createObjectURL(new Blob([await pdf.save()], { type: 'application/pdf' }));
     return { ok: true, url, ouvert: ouvrirPdfOnglet(url) };
