@@ -32,7 +32,7 @@
 //  FAV_JEU = base (défaut) · vide (0 favori) · un (1 favori) · gros (300 favoris
 //  sur 80 articles) · longs (titres de 160 caractères, pseudos de 40) · sansphoto ·
 //  bloque (mode auto allumé, bloqué : un geste demandé). FAV_THEME = clair · sombre
-//  (défaut : les deux). FAV_MUTANT = envoi · etat · nom (§6.1 : chacune doit
+//  (défaut : les deux). FAV_MUTANT = envoi · etat · offre · nom (§6.1 : chacune doit
 //  rendre le banc rouge). Variable RACINE : l'arbre à juger.
 //  `node scripts/bancs/favoris-ecran.cjs` (esbuild, pas Vite).
 // ════════════════════════════════════════════════════════════════════════════
@@ -135,7 +135,8 @@ for (const [, login, item] of DANS30) (PSEUDOS_ITEM[item] = PSEUDOS_ITEM[item] |
 // Les mutations (§6.1) : chacune réaffaiblit une règle ; le banc doit devenir rouge.
 const MUTATIONS = {
   envoi: ['AutomatisationFavoris.jsx', "const p=progressionFavoris(vue,horloge+decalage.current);", "React.useEffect(()=>{if(selection.length&&!vue?.active)agir('lancer');},[selection.join(',')]);const p=progressionFavoris(vue,horloge+decalage.current);"],
-  etat: ['favorisEcran.js', "if(n.a_envoyer&&!c.vendu)return", "if(n.a_envoyer)return"],
+  etat: ['favorisEcran.js', "if(vendue)return {code:'pas_envoye',raison:'vendue'};", ''],
+  offre: ['favorisEcran.js', "...(job.ecrits===3?{offre:true}:{})", '...({offre:true})'],
   nom: ['favorisEcran.js', "  return m?m[1]:'';\n}", "  return m?m[1]:'Client';\n}"],
 };
 async function construire(theme) {
@@ -211,7 +212,7 @@ createRoot(document.getElementById('r')).render(<Banc/>);
     await pg.waitForSelector(FAV.length ? '[data-fav-article]' : '[data-fav-vide]', { timeout: 15000 }).catch(() => {});
     await pg.waitForTimeout(900);
     // La liste entière (« Tous ») pour juger chaque article.
-    if (FAV.length) { await pg.click('[data-fav-filtre="tous"]').catch(() => {}); while (await pg.locator('[data-fav-plus]').count()) await pg.click('[data-fav-plus]'); }
+    if (FAV.length) { await pg.click('[data-fav-filtre="tous"]').catch(() => {}); for (let i = 0; i < 10 && await pg.locator('[data-fav-plus]').count(); i++) await pg.click('[data-fav-plus]', { timeout: 3000 }).catch(() => {}); }
     await pg.evaluate(() => window.scrollTo(0, 0)); await pg.screenshot({ path: path.join(SHOTS, `favoris-${F}.png`) });
     if (FAV.length > 3) { await pg.locator('[data-fav-article]').nth(2).scrollIntoViewIfNeeded().catch(() => {}); await pg.waitForTimeout(200); await pg.screenshot({ path: path.join(SHOTS, `favoris-${F}-liste.png`) }); await pg.evaluate(() => { window.scrollTo(0, 0); for (const e of document.querySelectorAll('*')) if (e.scrollTop) e.scrollTop = 0; }); }
     const m = await pg.evaluate(() => {
@@ -292,7 +293,7 @@ createRoot(document.getElementById('r')).render(<Banc/>);
       await pg.reload({ waitUntil: 'domcontentloaded' }); await pg.waitForSelector('[data-fav-article]', { timeout: 15000 }).catch(() => {}); await pg.waitForTimeout(600);
     }
     // 5. Le détail d'un article
-    if (FAV.length) {
+    if (FAV.length && m.articles.length) {
       const cible = m.articles.slice().sort((a, b) => b.n - a.n)[0];
       await pg.click(`[data-fav-article="${cible.item}"] [data-fav-detail]`).catch(() => pg.click('[data-fav-filtre="tous"]').then(() => pg.click(`[data-fav-article="${cible.item}"] [data-fav-detail]`)));
       await pg.waitForSelector('[data-fav-detail-feuille]', { timeout: 5000 }).catch(() => {});
