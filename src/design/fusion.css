@@ -887,9 +887,9 @@ html body .vrm-app-shell .vrm-main:has(.vrm-fu-ventes) :is(.vrm-ledger-heading, 
    dessous), seulement les icônes à droite, sur le fond de l'écran. Sur Ma journée, elle
    prend le noir de la tête sombre, qui monte ainsi jusqu'en haut (maquette). */
 @media (max-width: 767px) {
-  html body .vrm-app-shell:has(.vrm-main .vrm-fu-ecran) .vrm-app-header :is(.vrm-header-logo, .vrm-hdr-entreprise, .vrm-hdr-titre) { display: none !important; }
-  html body .vrm-app-shell:has(.vrm-main .vrm-fu-ecran) .vrm-app-header { background: var(--fu-fond) !important; box-shadow: none !important; border-bottom: 0 !important; justify-content: flex-end !important; }
-  html body .vrm-app-shell:has(.vrm-main .vrm-fu-ecran) .vrm-app-header .vrm-header-brand:not(:has(> :not(.vrm-header-logo):not(.vrm-hdr-entreprise):not(:empty))) { flex: 0 0 auto !important; }
+  html body .vrm-app-shell .vrm-app-header :is(.vrm-header-logo, .vrm-hdr-entreprise, .vrm-hdr-titre) { display: none !important; }
+  html body .vrm-app-shell .vrm-app-header { background: var(--fu-fond) !important; box-shadow: none !important; border-bottom: 0 !important; justify-content: flex-end !important; }
+  html body .vrm-app-shell .vrm-app-header .vrm-header-brand:not(:has(> :not(.vrm-header-logo):not(.vrm-hdr-entreprise):not(:empty))) { flex: 0 0 auto !important; }
   html body .vrm-app-shell:has(.vrm-main .vrm-fu-journee) .vrm-app-header { background: #1d1d1f !important; }
   html body .vrm-app-shell:has(.vrm-main .vrm-fu-journee) .vrm-app-header .vrm-header-actions :is(button, a) { color: rgba(255,255,255,.85) !important; background: transparent !important; }
 }

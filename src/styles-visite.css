@@ -60,11 +60,5 @@ html .vrm-app-shell .vrm-phrase-ecran { margin: 4px 0 0; font-size: 15px; line-h
 html .vrm-app-shell .vrm-tache .vrm-tache-tete { flex-direction: column; align-items: flex-start; gap: 0; }
 html .vrm-app-shell .vrm-phrase-reglages { margin: -8px 0 16px; }
 html .vrm-app-shell .vrm-day-greeting .vrm-phrase-ecran { flex-basis: 100%; margin-top: 2px; }
-/* Téléphone : le titre que la barre du haut dit déjà se tait, sa PHRASE reste. */
-@media (max-width: 767px) {
-  html body .vrm-app-shell .vrm-screen-head.vrm-screen-head-doublon:has(.vrm-screen-head-sous .vrm-phrase-ecran) { display: block; }
-  html body .vrm-app-shell .vrm-screen-head-doublon .vrm-screen-head-titre:has(.vrm-phrase-ecran) { display: flex; }
-  html .vrm-app-shell .vrm-screen-head-doublon .vrm-screen-head-titre:has(.vrm-phrase-ecran) > :not(.vrm-screen-head-sous) { display: none; }
-  html .vrm-app-shell .vrm-screen-head-doublon .vrm-screen-head-sous { margin-top: 0; }
-  html .vrm-app-shell .vrm-phrase-reglages { margin: 0 0 14px; }
+/* (3 nov.) Le grand titre ne se tait plus au téléphone : c'est la barre du haut qui ne le redit pas. */
 }

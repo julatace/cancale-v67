@@ -8834,9 +8834,9 @@ function raisonExtGlobale(sansSouris, opt) {
     // 19 oct. : Firefox pour Android accepte l'extension — dit seulement si sa
     // fiche est PUBLIÉE (`LIENS_BOUTIQUES`), jamais une boutique devinée.
     const ffAndroid = mobileIci() === 'firefox-android' && LIENS_BOUTIQUES.firefox;
-    return { code: 'telephone', relais: rl.niveau, mobile: mobileIci(), texte: `Depuis ton ordinateur : c'est là que tourne l'extension qui ${role}.${ffAndroid ? ' Ou installe-la dans ce Firefox, depuis sa boutique : elle agira alors d’ici.' : ''}` };
+    return { code: 'telephone', relais: rl.niveau, mobile: mobileIci(), texte: `Depuis ton ordinateur${ffAndroid ? ' — ou installe l’extension dans ce Firefox' : ''}`, role };
   }
-  if (!vmrExtPresent()) return { code: 'absente', texte: `Extension VRM pas détectée dans ce navigateur — c'est elle qui ${role}.` };
+  if (!vmrExtPresent()) return { code: 'absente', texte: 'Extension VRM pas détectée dans ce navigateur', role };
   // ⚠️⚠️ PLUSIEURS AVANT TOUT LE RESTE (5.165) : « mets à jour » ou « recharge »
   //    seraient faux — il vient de mettre à jour, et l'ancienne répond encore.
   if (__vmrPlusieurs) return { code: 'plusieurs', geste: 'extensions', texte: textePlusieurs() };
@@ -22691,11 +22691,11 @@ function EbayVentes({ baseKO,vue='*',comptesEbay,cible,onClearCible }) {
       { cle: 'encours', lib: 'En cours', val: passu ? null : enCours.length },
       { cle: 'finalisees', lib: 'Expédiées', val: passu ? null : exp.length },
       { cle: 'ca', lib: 'CA payé', val: caVal, brut: caVal == null ? null : (aPayee ? ca : 0), sub: plusieursEbay ? (vue === '*' ? `${comptesEbay.length} comptes` : nomCompteEbay(comptesEbay.find((c) => c.ref === vue) || {})) : null },
-    ]} note={jamais ? "Aucune vente eBay lue pour l'instant : relie ton compte dans « Compte » et synchronise — tes commandes, leur expédition et leur suivi arriveront ici." : passu ? `Je n'ai pas pu lire les ventes ${illisibles.length > 1 ? 'des comptes eBay' : 'du compte eBay'} ${illisibles.map(nomCompteEbay).join(', ')} — rien n'est perdu, réessaie dans un moment.` : !orders.length ? ((Array.isArray(comptesEbay) && comptesEbay.length)
+    ]} note={jamais ? "Aucune vente eBay" : passu ? `Je n'ai pas pu lire les ventes ${illisibles.length > 1 ? 'des comptes eBay' : 'du compte eBay'} ${illisibles.map(nomCompteEbay).join(', ')} — rien n'est perdu, réessaie dans un moment.` : !orders.length ? ((Array.isArray(comptesEbay) && comptesEbay.length)
       // (28 oct.) Compte relié et ventes LUES, aucune : « relie ton compte » lui
       // demandait un geste déjà fait (shcanc0 est relié).
-      ? "Aucune vente eBay pour l'instant : tes commandes, leur expédition et leur suivi arriveront ici dès la première."
-      : "Pas encore de vente eBay. Relie ton compte dans « Compte » et synchronise : tes commandes, leur expédition et leur suivi arrivent ici.") : null}/>;
+      ? "Aucune vente eBay"
+      : "Aucune vente eBay · relie ton compte dans « Compte »") : null}/>;
   })();
   if (!orders.length && !cible) return wrap(<>{head}{kpi}</>);
   const euro = formaterMontantEbay;
@@ -23899,7 +23899,7 @@ function EbayProgrammees({ programmees, brouillons, onRelire, onAnnule, vue = '*
         {onRelire && <button type="button" data-prog-relire="1" onClick={onRelire} style={{ ...btn, border: 'none', padding: '4px 0', color: E.accentSoft }}>Relire chez eBay</button>}
       </div>
       {etat === 'charge' && <div style={{ fontSize: 12.5, color: E.muted }}>Chargement…</div>}
-      {etat === 'jamais' && <div style={{ fontSize: 12.5, color: E.muted }}>Je lis tes annonces programmées chez eBay…</div>}
+      {etat === 'jamais' && <div style={{ fontSize: 13, color: E.muted }}>Lecture…</div>}
       {etat === 'pas-su' && <div style={{ fontSize: 12.5, color: E.warn, lineHeight: 1.5 }}>Je n'ai pas pu lire tes annonces programmées — rien n'est perdu. « Relire chez eBay » dans un moment.</div>}
       {groupes.map((g) => (
         <div key={g.date} data-prog-jour={g.date} style={{ marginTop: 6 }}>
@@ -25990,7 +25990,7 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
   // ⚠️ Une paire VENDUE sur eBay sort de cette liste (l'annonce est terminée) :
   //    c'est justement quand il n'en reste aucune que « retire-la de Vinted »
   //    compte le plus. Les alertes passent donc AVANT ce cas.
-  if (!itemsVue.length) return wrap(<>{head(0)}{publier}{alertes}{ligneComptesIllisibles}{lignePasSu}{ligneSansPreuve}{outilsSuite(pasSu)}<div style={{ color: E.muted, fontSize: 13, marginTop: 10, lineHeight: 1.5 }}>{vueSeule ? 'Pas d\'annonce en ligne sur ce compte eBay.' : 'Pas encore d\'annonce eBay en ligne.'} {connected === true ? 'Mets une paire en vente ci-dessus — elle apparaîtra ici.' : <>Connecte ton compte eBay dans <button type="button" className="vrm-lien-action" data-vers-comptes-ebay="" onClick={allerComptesEbay} style={{ background: 'none', border: 'none', padding: 0, color: E.text, fontWeight: 700, textDecoration: 'underline', cursor: 'pointer', fontFamily: 'inherit', fontSize: 'inherit' }}>Paramètres → Comptes eBay</button>, puis synchronise.</>}</div></>);
+  if (!itemsVue.length) return wrap(<>{head(0)}{publier}{alertes}{ligneComptesIllisibles}{lignePasSu}{ligneSansPreuve}{outilsSuite(pasSu)}<div style={{ color: E.muted, fontSize: 13, marginTop: 10, lineHeight: 1.5 }}>{vueSeule ? 'Aucune annonce sur ce compte' : 'Aucune annonce eBay'}{connected === true ? null : <div style={{ marginTop: 8 }}><button type="button" className="vrm-b vrm-b-primaire" data-vers-comptes-ebay="" onClick={allerComptesEbay} style={{ minHeight: 44 }}>Relier eBay</button></div>}</div></>);
   // ── 4. L'OFFRE AUX OBSERVATEURS et les annonces pas reliées : une phrase
   //    chacune, au-dessus de la liste ; sur la carte, seulement le bouton ou la
   //    pastille, qui distinguent (§7). ─────────────────────────────────────────
@@ -26391,7 +26391,6 @@ function ClePhotoroom({ cadre = true }) {
         <span aria-hidden="true" style={{ width: 40, height: 40, borderRadius: 10, display: 'grid', placeItems: 'center', background: `${C.text}0d`, color: C.text, flex: '0 0 auto' }}><Icon name="image" size={20}/></span>
         <span style={{ flex: 1, minWidth: 0 }}>
           <span style={{ display: 'block', fontSize: 15.5, fontWeight: 650, color: C.text, letterSpacing: '-.01em' }}>Ta clé Photoroom</span>
-          <span style={{ display: 'block', fontSize: 12.5, color: C.muted, marginTop: 2 }}>Pour mettre tes photos sur fond blanc, avec <b style={{ color: C.text, fontWeight: 600 }}>ton</b> compte Photoroom.</span>
         </span>
         {pastille}
       </div>
@@ -26444,6 +26443,9 @@ function ClePhotoroom({ cadre = true }) {
 
       {msg && <div data-photoroom-msg={msg.ton} role="status" style={{ ...ligneFine, color: msg.ton === 'attention' ? C.warn : C.text }}>{msg.texte}</div>}
 
+      {/* (3 nov., critique #4) Coût, usages, où la trouver : derrière un repli, plus étalés sous la carte. */}
+      <details className="vrm-repli vrm-photoroom-aide" data-photoroom-aide="">
+      <summary style={{ minHeight: 44, display: 'flex', alignItems: 'center', cursor: 'pointer', fontSize: 15, fontWeight: 600, color: C.text }}>Coût et aide</summary>
       <div className="vrm-photoroom-blocs" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: 14 }}>
         {bloc('Ce que ça coûte', <>C'est <b style={{ color: C.text }}>ton</b> compte Photoroom qui paie, à la photo — jamais VRM, jamais un autre vendeur. Environ 0,02 $ la photo avec leur formule de base (relevé le 4 octobre). Une photo déjà détourée et gardée par VRM n'est pas repayée. Une clé « sandbox » est gratuite, mais ses photos portent un filigrane.
           <a data-photoroom-tarifs="" href={LIEN_TARIFS} target="_blank" rel="noopener noreferrer" style={{ display: 'flex', alignItems: 'center', width: 'fit-content', minHeight: 44, color: C.text, fontWeight: 600, textDecoration: 'none' }}>Leurs tarifs ↗</a></>, 'cout')}
@@ -26459,6 +26461,7 @@ function ClePhotoroom({ cadre = true }) {
           <a data-photoroom-lien="" href={LIEN_CLE} target="_blank" rel="noopener noreferrer" style={{ display: 'inline-flex', alignItems: 'center', minHeight: 44, color: C.accent, fontWeight: 600, textDecoration: 'none' }}>Ouvrir Photoroom ↗</a>
         </>, 'trouver')}
       </div>
+      </details>
     </section>
   );
 }
@@ -26729,7 +26732,7 @@ function PublierVestiaire({ comptes }) {
     const nums = [...boostParNum.entries()].filter(([, v]) => v === true).map(([k]) => 'N°' + k).sort((a, z) => a.localeCompare(z, 'fr', { numeric: true }));
     const sansN = b - items.filter((x, i) => x && x.boost === true && numVcAnnonce(Object.keys(vcAnn.items)[i], x, vcAnn.liens || {}, vcLoc.auto)).length;
 
-    return { code: 'lu', b, texte: `Boost : ${b ? `${b} boostée${b > 1 ? 's' : ''}` : 'aucune boostée'}${nums.length ? ` (${nums.join(', ')}${sansN > 0 ? ` et ${sansN} pas reliée${sansN > 1 ? 's' : ''} à un article` : ''})` : ''}${inc ? ` · ${inc} dont Vestiaire ne dit pas le boost` : ''}.` };
+    return { code: 'lu', b, texte: `Boost : ${b ? `${b} boostée${b > 1 ? 's' : ''}` : 'aucune boostée'}${nums.length ? ` (${nums.join(', ')}${sansN > 0 ? ` et ${sansN} pas reliée${sansN > 1 ? 's' : ''} à un article` : ''})` : ''}${inc ? ` · ${inc} dont Vestiaire ne dit pas le boost` : ''}` };
   })();
   // 5.295 — LES FAVORIS VESTIAIRE : combien de personnes ont mis chaque annonce
   // en favori (un NOMBRE lu par l'extension, jamais qui). Par identité seulement
@@ -26742,10 +26745,10 @@ function PublierVestiaire({ comptes }) {
     const liens = vcAnn.liens || {};
     const sus = items.filter(([, it]) => typeof it.favoris === 'number');
     const inc = items.length - sus.length;
-    if (!sus.length) return { code: 'pas-dit', texte: "Vestiaire ne dit pas, dans la liste de tes articles, combien de personnes les ont mis en favori." };
+    if (!sus.length) return { code: 'pas-dit', texte: 'Favoris : pas lus' };
     const total = sus.reduce((t, [, it]) => t + it.favoris, 0);
     const parN = sus.filter(([, it]) => it.favoris > 0).map(([id, it]) => [numVcAnnonce(id, it, liens, vcLoc.auto), it.favoris]).filter(([n]) => n).sort((a, z) => z[1] - a[1]);
-    return { code: 'lu', total, texte: `${total} favori${total > 1 ? 's' : ''} sur ${sus.length} annonce${sus.length > 1 ? 's' : ''}${parN.length ? ` (${parN.slice(0, 8).map(([n, f]) => `N°${n} · ${f}`).join(', ')})` : ''}${inc ? ` · ${inc} dont Vestiaire ne dit pas le nombre` : ''}. Qui les a mis en favori, Vestiaire ne l'a jamais montré à l'extension : VRM n'écrit donc à personne.` };
+    return { code: 'lu', total, texte: `${total} favori${total > 1 ? 's' : ''} sur ${sus.length} annonce${sus.length > 1 ? 's' : ''}${parN.length ? ` (${parN.slice(0, 8).map(([n, f]) => `N°${n} · ${f}`).join(', ')})` : ''}${inc ? ` · ${inc} dont Vestiaire ne dit pas le nombre` : ''}` };
   })();
   const liste = (paires || []).filter((p) => !(publiees && publiees.has(String(p.id))));
   const visibles = tout ? liste : liste.slice(0, 12);
@@ -26774,7 +26777,7 @@ function PublierVestiaire({ comptes }) {
   let corps;
   if (enLigne === undefined || publiees === undefined) corps = <div data-vc-publier="charge" style={{ fontSize: 12.5, color: C.muted }}>Lecture de tes articles en ligne…</div>;
   else if (enLigne === null) corps = <div data-vc-publier="pas-su" style={{ fontSize: 12.5, color: C.muted }}>Je n'ai pas pu lire tes annonces Vinted — rien n'est perdu, réessaie dans un moment.</div>;
-  else if (!liste.length) corps = <div data-vc-publier="vide" style={{ fontSize: 12.5, color: C.muted }}>{paires.length ? 'Tous tes articles en ligne sont notés publiés sur Vestiaire.' : "Aucun article en ligne et numéroté pour l'instant."}</div>;
+  else if (!liste.length) corps = <div data-vc-publier="vide" style={{ fontSize: 13, color: C.muted }}>{paires.length ? 'Tout est publié' : 'Aucun article numéroté'}</div>;
   else corps = (
     <div data-vc-publier="lu" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
       {publiees === null && <div style={{ fontSize: 11.5, color: C.muted }}>Je n'ai pas pu lire lesquelles sont déjà notées publiées sur Vestiaire — l'extension le revérifie au clic.</div>}
@@ -26828,11 +26831,9 @@ function PublierVestiaire({ comptes }) {
   );
   return (
     <Card style={{ padding: 16 }}>
-      <div style={{ fontSize: 14, fontWeight: 700, color: C.text, marginBottom: 4 }}>Mettre un article en vente sur Vestiaire</div>
-      <div style={{ fontSize: 12, color: C.muted, lineHeight: 1.5, marginBottom: 10 }}>
-        {auto
-          ? <span data-vc-auto="oui">L'extension ouvre Vestiaire (clique « Vendre un article » si besoin), remplit la description, le prix et ce qu'elle reconnaît, attache les photos — détourées si ta clé Photoroom est posée, sinon elle te propose de les attacher sans détourage — <b style={{ color: C.text }}>et publie toute seule, sans booster</b> : elle décoche toute option payante et ne clique jamais un bouton qui porte un prix. Si Vestiaire exige un champ qu'elle ne devine pas (catégorie, modèle), elle attend que tu le choisisses, puis publie.</span>
-          : <span data-vc-auto="non">L'extension ouvre Vestiaire (clique « Vendre un article » si besoin), remplit la description, le prix et ce qu'elle reconnaît, et attache les photos{' '}— détourées si ta clé Photoroom est posée, sinon elle te propose de les attacher sans détourage. <b style={{ color: C.text }}>C'est toi qui choisis la catégorie et le modèle, puis qui publies</b>{extSait('vcauto') === 'retard' ? <> — pour qu'elle publie toute seule, sans booster, mets l'extension à jour ({EXT_CAPACITES.vcauto}).</> : '.'}</span>}
+      <div style={{ fontSize: 15, fontWeight: 700, color: C.text, marginBottom: 4 }}>Mettre en vente</div>
+      {/* (3 nov., critique #4) Plus de paragraphe « L'extension ouvre Vestiaire… » : le bouton le dit en infobulle. */}
+      <div data-vc-auto={auto ? 'oui' : 'non'} style={{ fontSize: 13, color: C.muted, lineHeight: 1.5, marginBottom: 10 }}>
         {glob ? <div data-vc-raison={glob.code} style={{ color: C.warn, marginTop: 6 }}>{glob.texte}</div> : null}
         {resumeBoost ? <div data-vc-boost-resume={resumeBoost.code} style={{ marginTop: 6 }}>{resumeBoost.texte}</div> : null}
         {resumeFavoris ? <div data-vc-favoris-resume={resumeFavoris.code} data-vc-favoris-total={resumeFavoris.total == null ? undefined : String(resumeFavoris.total)} style={{ marginTop: 6 }}>{resumeFavoris.texte}</div> : null}
@@ -27094,8 +27095,8 @@ function VentesVestiaire({ comptes }) {
   // total « toutes plateformes » (« au moins »). La phrase le dit, des mêmes lignes.
   const nPasSur = d && d.ventes ? Object.values(d.ventes).filter((v) => v && typeof v === 'object' && !vcVenteAnnulee(v) && montantRecuVc(v).eur == null).length : 0;
   const phraseMontant = <div data-vc-ventes-montant="" data-vc-ventes-pas-sur={nPasSur} style={{ ...style, marginTop: 8 }}>{nPasSur
-    ? <>{nPasSur} vente{nPasSur > 1 ? 's' : ''} Vestiaire {nPasSur > 1 ? 'ne sont comptées' : "n'est comptée"} dans aucun total (vendu, chiffre d'affaires, URSSAF, bénéfice) : VRM ne sait pas encore si le chiffre lu est le prix de vente ou ce que Vestiaire te verse. Chaque total le dit à côté (« au moins »).</>
-    : <>Les montants Vestiaire sont ceux que Vestiaire dit te verser (sa commission déjà retirée), en euros.</>}</div>;
+    ? <span title="Montant pas sûr : prix de vente ou somme versée ? Chaque total le dit à côté (« au moins »).">{nPasSur} vente{nPasSur > 1 ? 's' : ''} non comptée{nPasSur > 1 ? 's' : ''}</span>
+    : null}</div>;
   let corps;
   if (d === undefined) corps = <div data-vc-ventes="charge" style={style}>Lecture de tes ventes Vestiaire…</div>;
   else if (d === null) corps = <div data-vc-ventes="pas-su" style={style}>Je n'ai pas pu lire tes ventes Vestiaire — rien n'est perdu, c'est la lecture qui a échoué. <button type="button" className="vrm-lien-action" data-vc-ventes-relire="" onClick={() => { setD(undefined); relire(); }} style={{ background: 'none', border: 'none', color: C.accent, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', minHeight: 44, padding: 0 }}>Réessayer</button></div>;
@@ -27270,7 +27271,7 @@ function CarteColisVc({ v, imprime, fait }) {
         {/* (2 nov. au soir) Le transporteur LU dans la puce, À GAUCHE du bouton bordereau, même rangée (comme Vinted). */}
         <div className="vrm-rangee-bord" data-rangee-bord="">
         <PastilleTransporteur t={transporteurDuColis({ declare: v.transporteur, suivi: v.suivi })} C={C} data-colis-transporteur={'vc:' + v.id}/>
-        {v.bordereau ? <BoutonImprimerVc v={v} carte/> : <span data-vc-colis-bordereau={v.etiquette === true ? 'vestiaire' : v.etiquette === false ? 'pas-encore' : 'pas-su'} style={{ flex: '1 1 160px', fontSize: 12.5, color: C.muted }}>{v.etiquette === true ? 'Bordereau disponible sur Vestiaire — ouvre la vente sur Vestiaire, il arrive ici' : v.etiquette === false ? 'Pas encore de bordereau sur Vestiaire' : 'Bordereau : pas su'}</span>}
+        {v.bordereau ? <BoutonImprimerVc v={v} carte/> : <span data-vc-colis-bordereau={v.etiquette === true ? 'vestiaire' : v.etiquette === false ? 'pas-encore' : 'pas-su'} style={{ flex: '1 1 160px', fontSize: 12.5, color: C.muted }}>{v.etiquette === true ? 'Bordereau sur Vestiaire' : v.etiquette === false ? 'Pas encore de bordereau sur Vestiaire' : 'Bordereau : pas su'}</span>}
         </div>
         {v.bordereau ? <button type="button" data-geste="imprime" data-vc-imprime={v.id} onClick={() => marquerVc('vrm_vc_imprimes', v.id, !imprime)} title={imprime ? 'Remettre en « à imprimer »' : 'Marquer comme imprimé'}
           className="vrm-colis-sec vrm-colis-ter" style={{ ...sec, border: `1px solid ${C.border}`, background: imprime ? C.bg : 'transparent', color: imprime ? C.text : C.muted }}>{imprime ? '✓ Imprimé' : 'Marquer imprimé'}</button> : null}
@@ -27499,14 +27500,13 @@ function MessagesVestiaire() {
       <div data-vc-messages="lu" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         <div data-vc-messages-nonlus={n == null ? 'passu' : String(n)} style={style}>
           {n == null ? <>Nombre de non-lus pas encore relevé.</>
-            : <><b style={{ color: C.text }}>{n === 0 ? 'Aucun message non lu' : `${n} message${n > 1 ? 's' : ''} non lu${n > 1 ? 's' : ''}`}</b>{nl.comptes > 1 ? <span data-vc-messages-comptes={nl.comptes}> sur tes {nl.comptes} comptes Vestiaire, au dernier relevé de chacun (le plus ancien {age(nl.at)})</span> : <> sur Vestiaire, au dernier relevé ({age(nl.at)})</>}.</>}
-          {' '}<a data-vc-messages-ouvrir="" href={lien} target="_blank" rel="noreferrer" className="vrm-lien-action" style={{ color: C.accent, fontWeight: 600, display: 'inline-flex', alignItems: 'center', minHeight: 44 }}>{page ? 'Ouvrir ta messagerie Vestiaire ↗' : 'Ouvrir Vestiaire ↗'}</a>
-          {!page ? <> (la messagerie est dans le menu de ton compte)</> : null}
+            : <><b style={{ color: C.text }}>{n === 0 ? 'Aucun message non lu' : `${n} message${n > 1 ? 's' : ''} non lu${n > 1 ? 's' : ''}`}</b>{nl.comptes > 1 ? <span data-vc-messages-comptes={nl.comptes}> · {nl.comptes} comptes</span> : null}</>}
+          {' '}<a data-vc-messages-ouvrir="" href={lien} target="_blank" rel="noreferrer" className="vrm-lien-action" style={{ color: C.accent, fontWeight: 600, display: 'inline-flex', alignItems: 'center', minHeight: 44 }}>{page ? 'Ouvrir la messagerie' : 'Ouvrir Vestiaire'}</a>
         </div>
         <div className="vrm-message-workspace">
           <div className="vrm-inbox-column">
             {liste.length ? <>
-              <div style={{ ...style, marginBottom: 6 }}>{liste.length} conversation{liste.length > 1 ? 's' : ''} vue{liste.length > 1 ? 's' : ''}{d.lecture && !d.lecture.complet ? ' (au moins)' : ''}. Touche-en une pour la lire{extSait('vcrepondre') === 'ok' ? ' et y répondre' : ''} — VRM n'en garde jamais le nom de la personne.</div>
+              <div style={{ ...style, marginBottom: 6 }}>{liste.length} conversation{liste.length > 1 ? 's' : ''}{d.lecture && !d.lecture.complet ? ' (au moins)' : ''}</div>
               <div className="vrm-msg-list">
                 {liste.slice(0, 40).map((v) => {
                   const fv = v.num ? ficheDuNumero(v.num) : null; const t = Date.parse(v.date || '');
@@ -27626,7 +27626,7 @@ function VestiaireMesure() {
     <div data-vc-mesure="jamais" style={style}>
       {cap === 'ok' ? <>Pour que VRM apprenne à le lire : ouvre <b>Vestiaire Co</b> dans ce Chrome, connecté à ton compte vendeur, et passe sur tes ventes, tes articles et tes paiements. L'extension relève la <b>forme</b> des pages — jamais leur contenu.</>
         : cap === 'retard' ? <>Pour que VRM apprenne à lire Vestiaire, l'extension doit passer en <b>{EXT_CAPACITES.vestiaire}</b> : celle installée ne sait pas encore l'observer. Mets-la à jour depuis <b>Paramètres → État des connexions</b>.</>
-        : <>C'est l'extension, dans le Chrome de ton ordinateur, qui lit Vestiaire quand tu y passes.</>}
+        : <>Pas encore de passage sur Vestiaire</>}
     </div>
   );
 }
@@ -27646,7 +27646,7 @@ function RepliStats({ id, titre, phrase, children }) {
   };
   return (
     <details className="vrm-repli vrm-stats-repli" data-stats-repli={id} data-ouvert={ouvert ? '1' : '0'} open={ouvert} onToggle={basculer}>
-      <summary><span className="vrm-stats-repli-tete"><span className="vrm-stats-repli-titre">{titre}</span><span className="vrm-stats-repli-phrase">{phrase}</span></span></summary>
+      <summary><span className="vrm-stats-repli-tete"><span className="vrm-stats-repli-titre">{titre}</span>{/* (3 nov.) La phrase du volet n'est plus affichée (critique #4) : le titre suffit. */}</span></summary>
       {/* Monté seulement ouvert : rien n'est calculé pour un volet fermé. */}
       {ouvert ? <div className="vrm-stats-repli-corps">{children}</div> : null}
     </details>
@@ -32203,7 +32203,7 @@ function StockPhotos() {
     const cle = cleDeclarationPartie(f.numero, f.id, numeros);
     setPairsLost((prev) => { const u = { ...prev, [cle]: { id: String(f.id), at: new Date().toISOString(), title: f.title || '', from: 'stock' } }; save('vinted_pairs_lost', u); return u; });
   };
-  if (!fiches.length) return <Card style={{ fontSize: 13, color: C.muted, lineHeight: 1.5 }}>Aucune paire numérotée en stock. Donne un numéro à tes annonces dans l'onglet <b style={{ color: C.text }}>Annonces</b> et leur photo apparaîtra ici.</Card>;
+  if (!fiches.length) return <Card style={{ fontSize: 13, color: C.muted, lineHeight: 1.5 }}>Aucun article numéroté</Card>;
   return (<>
     <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
       <div data-stock-resume="" style={{ fontSize: 13, color: C.muted }}>{fiches.length} paire{fiches.length > 1 ? 's' : ''} en stock{nVendus > 0 ? <> · <b style={{ color: C.accent }}>{nVendus} vendue{nVendus > 1 ? 's' : ''} à sortir</b></> : (venduSu ? '' : ' · ventes pas encore lues')}</div>
@@ -32589,7 +32589,7 @@ function StockMeubles() {
   const btnSec = { flex: 1 };
   const btnPri = {};
 
-  if (!fiches.length) return <Card style={{ fontSize: 13, color: C.muted, lineHeight: 1.5 }}>Aucune paire numérotée en stock. Donne un numéro à tes annonces dans l'onglet <b style={{ color: C.text }}>Annonces</b> et tu pourras les ranger dans tes meubles ici.</Card>;
+  if (!fiches.length) return <Card style={{ fontSize: 13, color: C.muted, lineHeight: 1.5 }}>Aucun article numéroté</Card>;
 
   // Ce que la recherche montre : chaque article trouvé, et OÙ il est.
   const MAX_RES = 30;
@@ -37249,7 +37249,7 @@ function StatsVitrine({ liveStats, panelOff, periode }) {
   const tBenef = (() => {
     if (b.type === 'semaine') {
       const R = chiffreBrut(B);
-      const sous = !B ? 'ouvre Ventes une fois : il s’y calcule'
+      const sous = !B ? 'pas encore calculé'
         : B.n === 0 ? 'aucune vente finalisée'
         : B.nCout === 0 ? `il manque le prix d’achat de tes ${pl(B.n, 'vente')}`
         : R.partiel ? `${B.nCout} vente${B.nCout > 1 ? 's' : ''} sur ${B.n} ${B.nCout > 1 ? 'ont' : 'a'} leur prix d’achat : il manque celui des autres`
@@ -37260,7 +37260,7 @@ function StatsVitrine({ liveStats, panelOff, periode }) {
     }
     const CB = chiffreBenefice(BP, etatBP);
     const manquent = BP ? BP.n - BP.nCout : 0;
-    const sous = !BP ? (etatBP === 'encours' ? 'je le lis…' : 'ouvre Ventes une fois : il s’y calcule')
+    const sous = !BP ? (etatBP === 'encours' ? 'je le lis…' : 'pas encore calculé')
       : CB.raison === 'achats' ? `il manque le prix d’achat de ${manquent} vente${manquent > 1 ? 's' : ''} sur ${BP.n}`
       : CB.raison === 'frais' ? 'des frais eBay ne sont pas encore connus'
       : CB.raison === 'cotisations' ? 'en attente de ton chiffre déclaré (écran Ventes)'
@@ -37270,7 +37270,7 @@ function StatsVitrine({ liveStats, panelOff, periode }) {
       'Bénéfice : tes ventes finalisées moins le prix d’achat des paires, les frais de vente, tes dépenses et l’URSSAF — la même règle que Comptabilité et Ma journée.');
   })();
   const tDelai = !releve
-    ? tuile('delai', 'Temps pour vendre', '—', 'ouvre Ventes une fois : il s’y calcule', { 'data-sv-etat': 'passu' })
+    ? tuile('delai', 'Temps pour vendre', '—', 'pas encore calculé', { 'data-sv-etat': 'passu' })
     : extras === undefined ? tuile('delai', 'Temps pour vendre', '—', 'je lis tes annonces…', { 'data-sv-etat': 'encours' })
       : datesPasSu ? tuile('delai', 'Temps pour vendre', '—', 'annonces pas pu être lues', { 'data-sv-etat': 'passu' })
         : !Dl || Dl.nDelai === 0 ? tuile('delai', 'Temps pour vendre', '—', Dl && Dl.n ? `aucune des ${pl(Dl.n, 'vente')} Vinted n’a de date de mise en ligne` : 'aucune vente Vinted finalisée', { 'data-sv-etat': 'lu', 'data-sv-mediane': '', 'data-sv-couv': Dl ? `0/${Dl.n}` : '0/0' })
@@ -37280,7 +37280,7 @@ function StatsVitrine({ liveStats, panelOff, periode }) {
   const dort = stock && stock.dort && stock.dort.seuils ? (stock.dort.seuils[30] || { n: 0 }).n : null;
   const tEnLigne = tuile('enligne', 'En ligne',
     <span data-dash-stat="online">{enLigneTxt === '—' ? '—' : <><b style={{ fontWeight: 'inherit' }}>{enLigneTxt}</b> annonce{enLigneTxt === '1' ? '' : 's'}</>}</span>,
-    dort == null ? 'qui dorment : ouvre Annonces une fois' : `dont ${dort} en ligne depuis 30 jours ou plus`,
+    dort == null ? 'en ligne' : `dont ${dort} en ligne depuis 30 jours ou plus`,
     { 'data-sv-etat': enLigneTxt === '—' ? 'passu' : 'lu', 'data-sv-dort': dort == null ? '' : dort }, 'Aujourd’hui, quelle que soit la période choisie.');
 
   // ── Les barres ──
@@ -37321,7 +37321,7 @@ function StatsVitrine({ liveStats, panelOff, periode }) {
             </div>
           ), { 'data-sv-carte': 'barres' }, 'vrm-sv-large')}
         {carte('sv-rapides', 'Les modèles qui partent vite', rapides && rapides.length ? 'jours pour vendre' : null, !lignes
-          ? vide('Il se calcule avec le relevé de tes ventes : ouvre Ventes une fois.', { 'data-sv-etat': 'passu' })
+          ? vide('Pas encore calculé', { 'data-sv-etat': 'passu' })
           : extras === undefined ? vide('Je lis les dates de mise en ligne…', { 'data-sv-etat': 'encours' })
             : datesPasSu ? vide('Tes annonces n’ont pas pu être lues : aucun délai.', { 'data-sv-etat': 'passu' })
               : !rapides.length ? vide('Aucune vente Vinted datée sur la période (il faut la date de mise en ligne de son annonce).', { 'data-sv-etat': 'lu' })
@@ -37341,10 +37341,10 @@ function StatsVitrine({ liveStats, panelOff, periode }) {
           : !comptes.length ? vide('Aucune vente sur la période.', { 'data-sv-etat': 'lu' })
             : (
               <div className="vrm-sv-lignes vrm-sv-comptes" data-sv-etat="lu">
-                {comptes.length > 1 && comptes[0].n > comptes[1].n && <p className="vrm-sv-phrase" data-sv-meilleur={comptes[0].k}>{comptes[0].nom}{comptes[0].site ? ` (${comptes[0].site})` : ''} vend le plus sur la période.</p>}
+                {comptes.length > 1 && comptes[0].n > comptes[1].n && <p className="vrm-sv-phrase" data-sv-meilleur={comptes[0].k}>{comptes[0].nom}{comptes[0].site && comptes[0].site !== comptes[0].nom ? ` (${comptes[0].site})` : ''} vend le plus</p>}
                 {comptes.slice(0, 6).map((c) => (
                   <div key={c.k} className="vrm-sv-ligne-compte" data-sv-compte={c.k} data-n={c.n} data-mediane={c.mediane == null ? '' : c.mediane}>
-                    <span className="vrm-sv-nom">{c.nom}{c.site ? <span className="vrm-sv-site"> ({c.site})</span> : null}</span>
+                    <span className="vrm-sv-nom">{c.nom}{c.site && c.site !== c.nom ? <span className="vrm-sv-site"> ({c.site})</span> : null}</span>
                     <span className="vrm-sv-n">{pl(c.n, 'vente')}</span>
                     <span className="vrm-sv-chiffre" title={c.plat === 'Vinted' ? (c.mediane == null ? 'aucune vente datée' : `délai médian, sur ${pl(c.nDelai, 'vente datée', 'ventes datées')}`) : 'pas de date de mise en ligne sur cette plateforme'}>{jours(c.mediane)}</span>
                   </div>
@@ -37355,7 +37355,7 @@ function StatsVitrine({ liveStats, panelOff, periode }) {
       </div>
       <div className="vrm-sv-rangee vrm-sv-rangee-2">
         {carte('sv-tailles', 'Les tailles qui se vendent', tailles && tailles.groupes.length ? 'ventes · jours pour vendre' : null, !lignes
-          ? vide('Il se calcule avec le relevé de tes ventes : ouvre Ventes une fois.', { 'data-sv-etat': 'passu' })
+          ? vide('Pas encore calculé', { 'data-sv-etat': 'passu' })
           : !tailles ? vide('Je lis tes annonces…', { 'data-sv-etat': 'encours' })
             : !tailles.groupes.length ? vide(tailles.n ? `Aucune taille connue sur ${pl(tailles.n, 'vente finalisée', 'ventes finalisées')}.` : 'Aucune vente finalisée sur la période.', { 'data-sv-etat': 'lu' })
               : (
@@ -37375,7 +37375,7 @@ function StatsVitrine({ liveStats, panelOff, periode }) {
           const droite = etat === 'lu' ? pl(boost.boostees, 'boost lu', 'boosts lus') : null;
           const corps = etat === 'encours' ? vide('Je lis tes ventes et tes annonces…')
             : etat === 'passu' ? vide('Ventes ou annonces pas pu être lues : rien n’est comparé.')
-              : etat === 'aucun' ? vide(`Aucune vente boostée connue sur la période. Vinted ne dit « boostée » que pendant le boost : pour la suite, saisis le boost payé dans la fiche de la paire (Annonces).`)
+              : etat === 'aucun' ? vide('Aucune vente boostée')
                 : (<>
                   <div className="vrm-sv-boost">
                     <div className="vrm-sv-boost-case" data-sv-boost="cout" data-v={boost.avecMontant ? cents(boost.coutBoost) : ''}>
@@ -37400,7 +37400,8 @@ function StatsVitrine({ liveStats, panelOff, periode }) {
         })()}
       </div>
       <div className="vrm-sv-note vrm-sv-pied">
-        Vendu : toutes tes plateformes, au jour de la vente, ventes en cours comprises. Bénéfice, temps pour vendre, modèles et tailles : ventes finalisées seulement. « Jours pour vendre » : de la mise en ligne à la vente, pour la moitié des paires — connu sur Vinted seulement.{liveStats && liveStats.venduSansDate ? ` ${pl(liveStats.venduSansDate, 'vente')} Leboncoin sans date : dans aucune période.` : ''}{liveStats && (liveStats.venduNonComptees || []).length ? <span data-stats-non-comptees={liveStats.venduNonComptees.length}>{` Pas dans « vendu » (l'argent ne se lit pas) : ${phraseNonComptees(liveStats.venduNonComptees)} — les montants sont « au moins ».`}</span> : null}
+        {/* (3 nov., critique #4) Plus la phrase de définitions (« Vendu : toutes tes plateformes… ») : restent les seuls MANQUES nommés (§5). */}
+        {liveStats && liveStats.venduSansDate ? `${pl(liveStats.venduSansDate, 'vente')} Leboncoin sans date` : ''}{liveStats && (liveStats.venduNonComptees || []).length ? <span data-stats-non-comptees={liveStats.venduNonComptees.length}>{`${liveStats.venduSansDate ? ' · ' : ''}Pas dans « vendu » : ${phraseNonComptees(liveStats.venduNonComptees)}`}</span> : null}
       </div>
     </div>
   );
@@ -37489,7 +37490,7 @@ function StatsDetaillees({ liveStats, panelOff }) {
             titres={R.semaines.map((s) => `Semaine du ${new Date(s.debut).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })} : ${fmt(s.eur)} · ${pl(s.n, 'vente')}${s.enCours ? ' (en cours)' : ''}`)}/>
           <LegendeBarres libelles={R.semaines.map((s, i) => i % 3 === 2 ? new Date(s.debut).toLocaleDateString('fr-FR', { day: 'numeric', month: 'numeric' }) : '')}/>
         </div>
-        <div style={{ ...sNote, marginTop: 10 }}>Vendu, toutes plateformes, au jour de la vente (la règle de « Vendu » dans Ma journée). La dernière barre, plus claire, est la semaine en cours.{manque.length ? ` Sans ${manque.join(', ')} (lecture ratée) : les montants sont « au moins ».` : ''}{liveStats && liveStats.venduSansDate ? ` ${pl(liveStats.venduSansDate, 'vente')} Leboncoin sans date : dans aucune semaine.` : ''}{liveStats && (liveStats.venduNonComptees || []).length ? ` Pas comptées (l'argent ne se lit pas) : ${phraseNonComptees(liveStats.venduNonComptees)}.` : ''}</div>
+        <div style={{ ...sNote, marginTop: 10 }}>{manque.length ? `Sans ${manque.join(', ')} : au moins` : ''}{liveStats && liveStats.venduSansDate ? ` ${pl(liveStats.venduSansDate, 'vente')} Leboncoin sans date : dans aucune semaine.` : ''}{liveStats && (liveStats.venduNonComptees || []).length ? ` Pas comptées (l'argent ne se lit pas) : ${phraseNonComptees(liveStats.venduNonComptees)}.` : ''}</div>
       </>)}
     </section>
 
@@ -37528,7 +37529,7 @@ function StatsDetaillees({ liveStats, panelOff }) {
     {/* ── 3. LE TEMPS DE VENTE ─────────────────────────────────────────── */}
     <section data-stats-carte="delais" data-stats-delais={Dl && Dl !== 'passu' ? 'lu' : Dl === 'passu' ? 'passu' : 'encours'} data-stats-delai-n={Dl && Dl !== 'passu' ? `${Dl.nDelai}/${Dl.n}` : ''} style={sCarte}>
       <div style={sTitre}>Temps de vente</div>
-      {!Dl ? <div style={{ ...sNote, marginTop: 8 }}>{!releve ? 'Il se calcule avec le relevé de tes ventes (ouvre Ventes une fois).' : 'Je lis les dates de mise en ligne…'}</div>
+      {!Dl ? <div style={{ ...sNote, marginTop: 8 }}>{!releve ? 'Pas encore calculé' : 'Lecture…'}</div>
         : Dl === 'passu' ? <div style={{ ...sNote, marginTop: 8 }}>Tes annonces n'ont pas pu être lues : le temps de vente n'est pas calculé.</div> : (<>
         <div style={grille}>
           {fig('La moitié part en', jFmt(Dl.mediane), `médiane, sur ${pl(Dl.nDelai, 'vente datée', 'ventes datées')} (sur ${Dl.n})`, { 'data-stat-delai-mediane': Dl.mediane == null ? '' : Dl.mediane })}
@@ -39145,7 +39146,7 @@ function RetoursEnCoursBloc({ res: resBrut, site = 'toutes', nomCompte, plusieur
   const manquesVinted = manques.filter(m => !/eBay/.test(m)), manqueEbay = manques.some(m => /eBay/.test(m));
   const pasSu = (manquesVinted.length || manqueEbay) ? <div data-retours-pas-su="" style={{fontSize:11.5,color:C.muted,lineHeight:1.45,display:'grid',gap:2}}>
     {manquesVinted.length > 0 && <div data-retours-pas-su-site="vinted">Vinted : je n'ai pas pu lire {manquesVinted.join(', ')} — un retour peut manquer.</div>}
-    {manqueEbay && <div data-retours-pas-su-site="ebay">eBay : je n'ai pas pu lire tes retours eBay — un retour eBay peut manquer.</div>}
+    {manqueEbay && <div data-retours-pas-su-site="ebay">Retours eBay : pas lus</div>}
   </div> : null;
   if (!lignes.length && !remises.length) {
     return pasSu ? <div data-retours-encours="0" data-retours-manques={manques.length} style={{margin:'0 0 12px'}}>{pasSu}</div> : null;
@@ -39254,7 +39255,7 @@ function LoadError({ onRetry }) {
   return <div style={{textAlign:'center',padding:'28px 16px'}}>
     <div aria-hidden="true" style={{width:44,height:44,margin:'0 auto 10px',borderRadius:12,display:'flex',alignItems:'center',justifyContent:'center',background:C.card2,color:C.muted}}><Icon name="cloudOff" size={20}/></div>
     <div style={{fontSize:15,fontWeight:500,color:C.text,marginBottom:4}}>Impossible de charger ces données</div>
-    <div style={{fontSize:12,color:C.muted,marginBottom:16,lineHeight:1.4}}>Vérifie ta connexion, ou que ton compte Vinted est toujours actif.</div>
+    <div style={{marginBottom:12}}/>
     <button type="button" onClick={onRetry} style={{background:C.accent,color:C.onAccent,border:'none',borderRadius:12,padding:'0 22px',minHeight:44,cursor:'pointer',fontSize:14,fontWeight:650}}>Réessayer</button>
   </div>;
 }
@@ -47554,8 +47555,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     };
     const sansLieuVinted = (o) => {
       const qui = o && o._acc ? accName(o._acc) : '';
-      return { raison: 'La conversation Vinted de cet achat n’a pas encore été lue.',
-        geste: `Passe sur Vinted${qui ? ` connecté sur ${qui}` : ''} : l’extension y lit le point et le code. Ou ouvre la conversation du colis.` };
+      return { raison: 'Point et code pas encore lus',
+        geste: `Ouvre Vinted${qui ? ` sur ${qui}` : ''}` };
     };
     const lieuDe = (raw) => { const cl = cleanLieu(raw); return { lieuNom: cl.nom || '', lieuAdresse: cl.adresse || '' }; };
     // (1er nov.) Le lieu d'un e-mail complété par le suivi du transporteur du
@@ -51041,7 +51042,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                               Relay du 21 octobre la portait (« RETRAIT JUSQU'AU 26/10 »),
                               c'est la route qui ne savait pas la lire. */}
                           {jours==null && t.limiteVers && <div data-colis-limite="vers" data-colis-limite-vers={String(t.limiteVers)} style={{fontSize:11,color:C.text,marginTop:1}}>À retirer vers le {new Date(String(t.limiteVers).slice(0,10)+'T00:00:00').toLocaleDateString('fr-FR',{day:'2-digit',month:'2-digit'})} (estimé : le transporteur ne donne pas la date)</div>}
-                          {jours==null && !t.limiteVers && <div data-colis-limite="inconnue" style={{fontSize:11,color:C.muted,marginTop:1}} title="Un point relais garde un colis 4 à 7 jours">Date limite de retrait inconnue (4 à 7 j en général)</div>}
+                          {jours==null && !t.limiteVers && <div data-colis-limite="inconnue" style={{fontSize:11,color:C.muted,marginTop:1}} title="Un point relais garde un colis 4 à 7 jours">Date limite inconnue (4 à 7 j en général)</div>}
                           {jours!=null && (
                             /* ⚠️ CETTE LIGNE-LÀ NE SE COUPE PAS. Elle était en
                                `nowrap + ellipsis` comme ses voisines : à 430 px
@@ -53064,7 +53065,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               {!x.horsCompte && (jl != null
                 ? <span className={'vrm-rp-sous' + (jl <= 1 ? ' is-ambre' : '')} data-colis-limite={String(lim).slice(0,10)} data-colis-limite-transp={t ? undefined : ''}>{texteLimiteRetrait(jl, lim, limAt)}</span>
                 : vers ? <span className="vrm-rp-sous" data-colis-limite="vers" data-colis-limite-vers={String(vers)}>À retirer vers le {new Date(String(vers).slice(0,10)+'T00:00:00').toLocaleDateString('fr-FR',{day:'2-digit',month:'2-digit'})} (estimé : le transporteur ne donne pas la date)</span>
-                : <span className="vrm-rp-sous" data-colis-limite="inconnue">Date limite de retrait inconnue (4 à 7 j en général)</span>)}
+                : <span className="vrm-rp-sous" data-colis-limite="inconnue">Date limite inconnue</span>)}
               {(su || (plusieursComptesRet && cpt)) ? <span className="vrm-rp-suivi" data-rp-suivi={su} data-colis-compte={cpt}>{[su ? `n° ${su}` : '', plusieursComptesRet && cpt ? `compte ${cpt}` : ''].filter(Boolean).join(' · ')}</span> : null}
               {/* (23-24 oct.) La dernière nouvelle de Vinted et ce que dit le transporteur, par
                   l'identité de CE colis (n° de suivi, transaction) — rien quand il n'y a rien. */}
@@ -53262,7 +53263,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   </div>
                   </div>
                   {/* Ce que les colonnes ne disent pas : OÙ se prend l'étiquette eBay (sans le nombre). */}
-                  {nEb>0 && <div data-colis-recap-ebay-ligne="" style={{fontSize:12.5,color:C.muted,lineHeight:1.45}}>Ventes eBay : l'étiquette se prend dans eBay (ci-dessous).</div>}
+                  {false && nEb>0 && <div data-colis-recap-ebay-ligne="" style={{fontSize:12.5,color:C.muted,lineHeight:1.45}}>Ventes eBay : l'étiquette se prend dans eBay (ci-dessous).</div>}
                   {/* ⚠️ L'URGENCE EST ÉCRITE ICI QUAND ELLE CONCERNE TOUS LES
                       COLIS. Le bandeau rouge juste en dessous ne compte que
                       l'urgent : quand TOUS les colis sont en retard, il
@@ -53516,8 +53517,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             <div data-colis-ebay={n} className="vrm-colis-ebay" style={{display:'flex',flexDirection:'column',gap:6,marginBottom:16}}>
               <div style={{display:'flex',flexDirection:'column',gap:4,padding:'0 2px 2px'}}>
                 <span style={{fontSize:11,fontWeight:600,letterSpacing:'.07em',textTransform:'uppercase',color:C.muted}}>Ventes eBay à poster <span style={{color:C.text,fontVariantNumeric:'tabular-nums'}}>· {n}</span></span>
-                <span data-colis-ebay-phrase="" style={{fontSize:12,color:C.muted,lineHeight:1.45,maxWidth:640}}>L'étiquette se prend dans eBay : elle est prépayée par le port que l'acheteur a payé. Prends-la au moment d'imprimer — l'acheter marque la commande expédiée chez eBay.{!plusieurs && comptes[0] && comptes[0]!=='principal' ? ` Compte eBay ${comptes[0]}.` : ''}</span>
-                {ageH != null && ageH >= 6 && <span data-colis-ebay-age={ageH} style={{fontSize:12,color:C.muted,lineHeight:1.45}}>Commandes eBay lues il y a {ageH >= 48 ? `${Math.floor(ageH/24)} j` : `${ageH} h`} : une vente plus récente ou un colis déjà parti n'y est peut-être pas. eBay → Compte → Rafraîchir.</span>}
+                <span data-colis-ebay-phrase="" title="Prépayée par le port de l'acheteur ; la prendre marque la commande expédiée chez eBay." style={{fontSize:13,color:C.muted,lineHeight:1.45,maxWidth:640}}>Étiquette dans eBay{!plusieurs && comptes[0] && comptes[0]!=='principal' ? ` · ${comptes[0]}` : ''}</span>
+                {ageH != null && ageH >= 6 && <span data-colis-ebay-age={ageH} style={{fontSize:13,color:C.muted,lineHeight:1.45}}>Lu il y a {ageH >= 48 ? `${Math.floor(ageH/24)} j` : `${ageH} h`}</span>}
               </div>
               {L.map(x => {
                 const num = x.ordre ? (numLigneEbay(x.ordre, (x.ordre.lineItems || [])[0]) || '') : '';
@@ -55634,7 +55635,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               </div>
               {/* (30 oct.) La cause commune (extension à mettre à jour) se dit UNE fois en tête ;
                   une entrée qu'on ne peut pas lancer est grisée avec sa raison, jamais cachée. */}
-              {(()=>{ const manque = ent.filter(e=>e.cap && extSait(e.cap)!=='ok').map(e=>EXT_CAPACITES[e.cap]).filter(Boolean).sort(cmpVersion); return manque.length ? <div data-actions-maj style={{fontSize:12.5,color:C.warn,lineHeight:1.4}}>Grisés : ils demandent l'extension VRM {manque[manque.length-1]} ou plus récente sur ton ordinateur.</div> : null; })()}
+              {(()=>{ const manque = ent.filter(e=>e.cap && extSait(e.cap)!=='ok').map(e=>EXT_CAPACITES[e.cap]).filter(Boolean).sort(cmpVersion); return manque.length ? <div data-actions-maj data-version-min={manque[manque.length-1]} style={{fontSize:13,color:C.warn,lineHeight:1.4}}>Mets l'extension à jour</div> : null; })()}
               {ent.map(e=>{ const capOk = !e.cap || extSait(e.cap)==='ok'; const off = !capOk || !!e.vide; return (
                 <button key={e.k} type="button" data-action={e.k} data-action-ok={capOk?'oui':'non'} aria-disabled={off?'true':undefined} title={!capOk ? `Demande l'extension VRM ${EXT_CAPACITES[e.cap]} ou plus récente` : e.vide ? 'Aucun brouillon sur Vinted' : undefined}
                   onClick={()=>{ if (off) return; setActionsOpen(false); if(e.k==='voir') setBrouillonsOpen(true); else if(e.k==='refaire') setRefaireOpen(true); else setRepubAction(e.k); }}
@@ -58878,7 +58879,7 @@ function StatutSauvegardeReglages() {
   // va bien ⇒ rien (« synchronisées » écrit en permanence sur deux lignes, en
   // tête de chaque écran de réglage, était du bruit). En cours, raté, refusé :
   // dit, avec le geste. Sans synchronisation : dit une fois, en court.
-  if(!AUTH.user || !CLOISONNE) return <div className="vrm-settings-status" style={{color:C.muted}}>Réglages gardés sur cet appareil seulement (pas de synchronisation).</div>;
+  if(!AUTH.user || !CLOISONNE) return <div className="vrm-settings-status" style={{color:C.muted}}>Sur cet appareil seulement</div>;
   const attente=_settingsRevision>_settingsConfirmed;
   const stockage=[..._failedLocalSaves.values()].some(v=>v.owner===AUTH.user?.id);
   const echec=stockage||(attente&&['error','refus'].includes(_syncInfo.etat));
@@ -58899,7 +58900,7 @@ function ActionsReglages({comptes,onOuvrir}) {
   const actions=actionsReglages({comptes:comptes.filter(c=>!masques.has(String(c.vinted_user_id))),emails,preuves});
   if(!actions.length)return null;
   return <section className="vrm-settings-todo" style={{background:C.card,borderColor:C.border}} aria-label="À terminer">
-    <h3>À terminer</h3>{actions.map(a=><div key={a.id}><span><b>{a.titre}</b><small style={{color:C.muted}}>{a.texte}</small></span><Bouton variante="secondaire" className="vrm-b-petit" onClick={()=>onOuvrir(a.cible)}>{a.geste}</Bouton></div>)}
+    <h3>À terminer</h3>{actions.map(a=><div key={a.id}><span><b>{a.titre}</b>{a.texte?<small style={{color:C.muted}}>{a.texte}</small>:null}</span><Bouton variante="secondaire" className="vrm-b-petit" onClick={()=>onOuvrir(a.cible)}>{a.geste}</Bouton></div>)}
   </section>;
 }
 
@@ -59045,7 +59046,9 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       {it.ic && <IconeReglage name={it.ic}/>}
       <span className="vrm-set-lib">
         <b style={{color:C.text}}>{it.lib}</b>
-        {it.desc && <small style={{color:C.muted}}>{it.desc}</small>}
+        {/* (3 nov., critique #1.4) Une ligne de Réglages = son nom (et une VALEUR à droite) ; la
+            2ᵉ ligne d'explication n'est plus rendue, sauf une alerte (un élément, pas une phrase). */}
+        {it.desc && typeof it.desc !== 'string' && <small style={{color:C.muted}}>{it.desc}</small>}
       </span>
       {it.val != null && it.val !== '' && <span className="vrm-set-val" style={{color:C.muted}}>{it.val}</span>}
       {it.type === 'switch' && <Interrupteur on={it.on} label={it.lib} onClick={it.onClick} {...(it.data || {})}/>}
@@ -59149,7 +59152,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
     ]},
     { id:'impression', titre:'Impression', items:[
       { id:'imprimante', type:'panneau', nu:true, ic:'printer', lib:'Imprimante et bordereaux', desc:'Papier et aperçus', val: imprimanteChoisie() === 'thermique' ? 'Thermique · 10×15' : 'Normale · A4', el:<ImprimanteSetting nu/> },
-    ], pied: <>Le N° se pose dans un espace blanc du PDF, jamais au hasard. <Pourquoi label="Comment le N° est placé">VRM cherche sur chaque page une zone blanche avec une marge autour du numéro ; le document garde sa taille. Sans espace suffisant, le tamponnage est refusé plutôt que placé au hasard. Vérifie dans « Imprimante et bordereaux » → « Voir les aperçus ».</Pourquoi></> },
+    ]},
     { id:'compta', titre:'Compta', items:[
       // (1er nov.) À droite, le statut CHOISI (lu dans `vinted_regime`, jamais deviné) :
       // « À choisir » tant qu'il ne l'a pas posé — avant, il fallait ouvrir pour savoir.
@@ -59175,8 +59178,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       { id:'restaurer', type:'action', ic:'restore', lib:'Restaurer une sauvegarde', onClick:onImport },
     ], pied: (
       <span data-derniere-sauvegarde={derniereSauvegarde.old ? 'ancienne' : 'recente'} style={{color: derniereSauvegarde.old ? C.warn : C.muted, fontWeight: derniereSauvegarde.old ? 600 : 400}}>
-        {derniereSauvegarde.t ? `Dernière sauvegarde : ${derniereSauvegarde.days===0?"aujourd'hui":derniereSauvegarde.days===1?'hier':`il y a ${derniereSauvegarde.days} j`}${derniereSauvegarde.old?' — pense à en refaire une.':'.'}` : 'Jamais sauvegardé — fais-en une pour protéger tes données.'}
-        {' '}<span className="vrm-aide" style={{color:C.muted,fontWeight:400}}>Sans les PDF de bordereau ni tes connexions Vinted.</span>
+        {derniereSauvegarde.t ? `Dernière sauvegarde : ${derniereSauvegarde.days===0?"aujourd'hui":derniereSauvegarde.days===1?'hier':`il y a ${derniereSauvegarde.days} j`}${derniereSauvegarde.old?' · à refaire':''}` : 'Jamais sauvegardé'}
       </span>
     )},
     {id:'aide',titre:'Besoin d’aide ?',items:[
@@ -59283,7 +59285,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
         </div>
       ) : (<>
         <div className="vrm-set-tete"><h2 className="vrm-set-h1" style={{color:C.text}}>Paramètres</h2></div>
-        <p className="vrm-phrase-ecran vrm-phrase-reglages" data-phrase-ecran="settings">{PHRASES_ECRAN.settings}</p>
+        {PHRASES_ECRAN.settings ? <p className="vrm-phrase-ecran vrm-phrase-reglages" data-phrase-ecran="settings">{PHRASES_ECRAN.settings}</p> : null}
         <ReglagesPasLus/>
         {ongletsCompte && (
           <div role="tablist" aria-label="Paramètres" data-onglets-reglages="" className="vrm-set-seg" style={{background:`${C.text}0f`}}>
@@ -60868,7 +60870,6 @@ function StreamSetting() {
       <span className="vrm-set-lib">
         <b style={{color:C.text}}>Mode stream</b>
         {/* (1er nov.) Sans cette ligne, « Mode stream » ne disait rien au téléphone (vrm-aide s'y tait). */}
-        <small style={{color:C.muted}}>Floute pseudos, emails et codes pour filmer ton écran.</small>
       </span>
       <Interrupteur on={on} label="Mode stream" onClick={() => poserStream(!on)}/>
     </div>
@@ -65479,6 +65480,8 @@ function AppCoeur() {
             quelqu'un qui a neuf comptes : c'est ce qu'il voyait quand la base
             ne répondait pas. `baseKO` distingue « aucun compte » de « je n'ai
             pas pu lire », et l'écran le DIT au lieu de repartir de zéro. */}
+        {/* (3 nov., critique #2/#9) Un grand titre sur CHAQUE écran : la barre du haut ne le dit plus. */}
+        {(tab==='dashboard'||tab==='garage'||tab==='communaute')&&<header className="vrm-market-heading vrm-tache-tete" data-titre-ecran-grand=""><h1>{titreCourant}</h1></header>}
         {tab==='dashboard'&&!premierJour&&<div className="vrm-rubriques" style={{padding:'12px 16px 0'}}><PlatSubNav sub={platSub==='prix'?'prix':'stats'} setSub={setPlatSub} sections={[['stats','Vue d’ensemble'],['prix','Prix qui marche']]}/></div>}
         {tab==='dashboard'&&platSub==='prix'&&<PrixMarche data={pqmData} baseKO={baseKO}/>}
         {tab==='dashboard'&&premierJour&&<Onboarding setTab={setTab}/>}
