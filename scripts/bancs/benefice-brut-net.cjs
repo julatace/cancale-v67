@@ -81,9 +81,16 @@ const lireStrip = async (b, avecAchats) => {
   await brancher(pg, rowsPour(avecAchats));
   await pg.goto(`http://localhost:${PORT}/?tab=cat_ventes`, { waitUntil: 'domcontentloaded' });
   await pg.waitForTimeout(3000);
-  try { if (!(await pg.$('.vrm-summary-strip'))) await pg.getByText('Analyse de tes ventes', { exact: true }).click({ timeout: 4000 }); } catch (_) {}
+  // (3 nov.) Les ventes arrivent parfois après 3 s : on attend le bouton (il n'existe
+  // qu'avec des ventes), puis la rangée — un délai fixe lisait une rangée vide (rouge
+  // aussi sur origin/main).
+  // Au téléphone, « Chiffres de la plateforme » est replié : un toucher l'ouvre.
+  await pg.waitForSelector('details.vrm-platform-summary', { timeout: 20000 }).catch(() => {});
+  await pg.evaluate(() => { const d = document.querySelector('details.vrm-platform-summary'); if (d && !d.open) d.querySelector('summary').click(); });
+  try { if (!(await pg.$('[data-ventes-benef-n]'))) { const bt = pg.getByRole('button', { name: /Analyse de tes ventes/ }).first(); await bt.waitFor({ timeout: 20000 }); await bt.click(); } } catch (_) {}
+  await pg.waitForSelector('[data-ventes-benef-n]', { timeout: 10000 }).catch(() => {});
   await pg.waitForTimeout(600);
-  const strip = await pg.evaluate(() => (document.querySelector('.vrm-summary-strip') || {}).innerText || '');
+  const strip = await pg.evaluate(() => (document.querySelector('[data-ventes-benef-n]') || {}).innerText || '');
   return { strip, errs, ctx };
 };
 
