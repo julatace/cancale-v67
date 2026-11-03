@@ -79,23 +79,23 @@
 .vrm-fp-a-titre { display: grid; justify-items: end; text-align: right; gap: 1px; }
 .vrm-fp-a-titre b { font-size: 17px; letter-spacing: .02em; }
 .vrm-fp-a-num { color: var(--fp-accent); font-weight: 700; }
-.vrm-fp-a-titre span:not(.vrm-fp-a-num) { color: #6b6b72; }
+.vrm-fp-a-titre span:not(.vrm-fp-a-num) { color: #6E6E73; }
 .vrm-fp-a-parties { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .vrm-fp-a-parties > div { display: grid; gap: 1px; align-content: start; min-width: 0; }
-.vrm-fp-a-parties small { font-size: 11px; font-weight: 700; color: #6b6b72; text-transform: uppercase; letter-spacing: .04em; }
-.vrm-fp-a-infos { margin: 0; color: #6b6b72; }
+.vrm-fp-a-parties small { font-size: 11px; font-weight: 700; color: #6E6E73; text-transform: uppercase; letter-spacing: .04em; }
+.vrm-fp-a-infos { margin: 0; color: #6E6E73; }
 .vrm-fp-a-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
 .vrm-fp-a-table th { text-align: right; font-weight: 700; padding: 5px 4px; border-bottom: 1.5px solid var(--fp-accent); background: color-mix(in srgb, var(--fp-accent) 8%, #fff); }
 .vrm-fp-a-table th:first-child, .vrm-fp-a-table td:first-child { text-align: left; width: 48%; }
 .vrm-fp-a-table th:nth-child(2) { width: 9%; }
-.vrm-fp-a-table td { text-align: right; padding: 6px 4px; border-bottom: 1px solid #e3e3e6; vertical-align: top; font-variant-numeric: tabular-nums; }
+.vrm-fp-a-table td { text-align: right; padding: 6px 4px; border-bottom: 1px solid #E5E5EA; vertical-align: top; font-variant-numeric: tabular-nums; }
 .vrm-fp-a-totaux { margin: 0 0 0 auto; width: min(240px, 100%); display: grid; gap: 3px; }
 .vrm-fp-a-totaux > div { display: flex; justify-content: space-between; gap: 8px; font-variant-numeric: tabular-nums; }
 .vrm-fp-a-totaux dt, .vrm-fp-a-totaux dd { margin: 0; }
-.vrm-fp-a-totaux .is-fort { font-weight: 700; font-size: 13px; border-top: 1px solid #e3e3e6; padding-top: 4px; }
+.vrm-fp-a-totaux .is-fort { font-weight: 700; font-size: 13px; border-top: 1px solid #E5E5EA; padding-top: 4px; }
 .vrm-fp-a-paye { margin: 0; font-weight: 700; }
 .vrm-fp-a-mention { margin: 0; }
-.vrm-fp-a-note { margin: 0; color: #6b6b72; white-space: pre-line; }
+.vrm-fp-a-note { margin: 0; color: #6E6E73; white-space: pre-line; }
 @media (max-width: 380px) { .vrm-fp-a-parties { grid-template-columns: 1fr; } }
 
 .vrm-fp-liste { list-style: none; margin: 0; padding: 0; display: grid; }

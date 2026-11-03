@@ -14,8 +14,8 @@
 .vrm-journal-choix{display:grid;gap:3px;min-width:0;flex:1 1 180px}
 .vrm-journal-choix span{font-size:12px;color:var(--vrm-muted,#6E6E73)}
 .vrm-journal-choix select{width:100%;max-width:100%;background:var(--vrm-card,#fff)}
-.vrm-journal-n-ambre{font-weight:700;color:var(--vrm-warn,#9a5b00);background:var(--vrm-warn-soft,#fbf1e1);border-radius:999px;padding:1px 8px;font-variant-numeric:tabular-nums}
-.vrm-journal-segments button[aria-pressed=true] .vrm-journal-n-ambre{background:var(--vrm-warn-soft,#fbf1e1)}
+.vrm-journal-n-ambre{font-weight:700;color:var(--vrm-warn,#B25000);background:var(--vrm-warn-soft,#F2F2F7);border-radius:999px;padding:1px 8px;font-variant-numeric:tabular-nums}
+.vrm-journal-segments button[aria-pressed=true] .vrm-journal-n-ambre{background:var(--vrm-warn-soft,#F2F2F7)}
 .vrm-journal-couverture{margin:0 18px 8px;font-size:12px;color:var(--vrm-muted,#6E6E73)}
 .vrm-journal-vide{margin:12px 18px;color:var(--vrm-muted,#6E6E73)}
 .vrm-journal-vide button{margin-left:6px}
@@ -23,11 +23,11 @@
 .vrm-journal-ligne{padding:14px 18px;border-top:1px solid var(--vrm-hair,#F2F2F7);min-width:0;overflow-wrap:anywhere}
 .vrm-journal-tete{display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px;font-size:12px;color:var(--vrm-muted,#6E6E73)}
 .vrm-journal-etat{font-weight:700;color:var(--vrm-ink,#111);white-space:nowrap}
-.vrm-journal-etat[data-etat=verifier]{color:var(--vrm-warn,#9a5b00)}
+.vrm-journal-etat[data-etat=verifier]{color:var(--vrm-warn,#B25000)}
 .vrm-journal-etat[data-etat=incompris],.vrm-journal-etat[data-etat=reessai],.vrm-journal-etat[data-etat=delie]{color:var(--vrm-muted,#6E6E73)}
 .vrm-journal-quoi{margin:4px 0 0;font-size:15px;font-weight:700}
 .vrm-journal-fait{margin:2px 0 0;color:var(--vrm-ink,#111)}
-.vrm-journal-raison{margin:8px 0 0;padding:10px 12px;border-radius:12px;background:var(--vrm-warn-soft,#fbf1e1);color:var(--vrm-ink,#111);font-size:13px}
+.vrm-journal-raison{margin:8px 0 0;padding:10px 12px;border-radius:12px;background:var(--vrm-warn-soft,#F2F2F7);color:var(--vrm-ink,#111);font-size:13px}
 .vrm-journal-ligne:not([data-etat=verifier]) .vrm-journal-raison{background:var(--vrm-surface,#FFFFFF)}
 .vrm-journal-raison p{margin:0}.vrm-journal-raison p+p{margin-top:4px}
 .vrm-journal-gestes{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}

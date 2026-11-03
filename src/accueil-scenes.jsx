@@ -43,11 +43,11 @@ const CSS = `
 .sc-vign{width:32px;height:32px;border-radius:12px;flex-shrink:0;display:flex;align-items:center;justify-content:center;border:1px solid ${K.line}}
 .sc-feuille{position:absolute;display:flex;flex-direction:column;background:${K.paper};color:${K.ink};border-radius:6px;box-shadow:0 1px 2px rgba(0,0,0,.4),0 16px 40px rgba(0,0,0,.45);padding:12px 14px;overflow:hidden}
 .sc-feuille .masque{display:flex;flex-direction:column;gap:5px;margin-top:10px}
-.sc-feuille .masque i{display:block;height:5px;border-radius:2px;background:#D9DEE6}
+.sc-feuille .masque i{display:block;height:5px;border-radius:2px;background:#E5E5EA}
 .sc-feuille .hd{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:12px;line-height:16px}
 .sc-feuille .hd b{font-weight:700}
-.sc-feuille .hd span{color:#4A5363}
-.sc-feuille .rel{font-size:12px;line-height:16px;color:#4A5363;margin-top:2px;white-space:nowrap}
+.sc-feuille .hd span{color:#48484A}
+.sc-feuille .rel{font-size:12px;line-height:16px;color:#48484A;margin-top:2px;white-space:nowrap}
 .sc-cb{display:flex;align-items:stretch;gap:2px;margin-top:8px}
 .sc-cb i{display:block;background:${K.ink}}
 .sc-tampon{position:relative;display:inline-flex;align-items:center;gap:6px;height:24px;padding:0 8px;border:1.5px solid ${K.cta};border-radius:6px;background:rgba(36,88,230,.06);font-size:12px;font-weight:600;color:${K.ink};white-space:nowrap;font-variant-numeric:tabular-nums}
@@ -112,7 +112,7 @@ export function Curseur({ x, y, k = 1, opacite = 1 }) {
   return (
     <svg className="sc-curseur" data-curseur="" viewBox="0 0 18 22" aria-hidden="true"
       style={{ transform: `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px) scale(${k.toFixed(3)})`, opacity: opacite }}>
-      <path d="M2 2 L2 17.5 L6.2 13.6 L9 20 L11.8 18.8 L9.1 12.6 L14.8 12.4 Z" fill="#FFFFFF" stroke="#0B0E13" strokeWidth="1.4" strokeLinejoin="round" />
+      <path d="M2 2 L2 17.5 L6.2 13.6 L9 20 L11.8 18.8 L9.1 12.6 L14.8 12.4 Z" fill="#FFFFFF" stroke="#000000" strokeWidth="1.4" strokeLinejoin="round" />
     </svg>
   );
 }
@@ -127,7 +127,7 @@ const glisse = (a, b, p) => ({ x: mix(a.x, b.x, trajet(p)), y: mix(a.y, b.y, tra
 const pointe = (c) => (c ? { x: c.x - 3, y: c.y - 2 } : null);
 
 // ── Les vignettes dessinées (jamais une vraie photo) ───────────────────────
-const TONS = { '131': ['#2B323E', '#1A2029'], '128': ['#26303A', '#171E25'], '97': ['#2A2E3A', '#191C25'] };
+const TONS = { '131': ['#2C2C2E', '#1D1D1F'], '128': ['#2C2C2E', '#1D1D1F'], '97': ['#2C2C2E', '#1C1C1E'] };
 export function Vignette({ n, taille = 32 }) {
   const [a, b] = TONS[n] || TONS['128'];
   const veste = n === '97';

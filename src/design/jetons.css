@@ -71,13 +71,13 @@
    La rangée fait 44 px (cible), les segments 38 px visibles. */
 :root:root body .vrm-app-shell .vrm-filtre-site {
   display: flex !important; flex-wrap: nowrap !important; gap: 2px !important; overflow: visible !important;
-  box-sizing: border-box !important; width: 100% !important; max-width: 520px; min-height: 44px !important;
+  box-sizing: border-box !important; width: 100% !important; max-width: 520px; min-height: 50px !important;
   margin: 6px 0 10px !important; padding: 3px !important; border-radius: var(--r-ctrl) !important; background: var(--fu-remplir) !important;
   -webkit-mask-image: none !important; mask-image: none !important;
 }
 :root:root body .vrm-app-shell .vrm-filtre-site > button:not(#fu),
 :root:root body .vrm-app-shell .vrm-main .vrm-filtre-site > button:not(#fu)[aria-pressed] {
-  flex: 1 1 0 !important; min-width: 0 !important; min-height: 38px !important; height: 38px !important; padding: 0 4px !important; margin: 0 !important;
+  flex: 1 1 0 !important; min-width: 0 !important; min-height: 44px !important; height: 44px !important; padding: 0 4px !important; margin: 0 !important;
   border: 0 !important; border-radius: 12px !important; background: transparent !important; box-shadow: none !important;
   color: var(--fu-encre) !important; font: 600 13px/1 var(--vrm-police) !important; letter-spacing: -.01em !important;
   white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; cursor: pointer;
@@ -95,7 +95,7 @@
 
 /* ── 5. LES AUTRES CONTRÔLES SEGMENTÉS : la même forme (#1.2) ─────────────── */
 :root:root body .vrm-app-shell .vrm-main :is(.vrm-seg, .vrm-messages-sections, .vrm-set-seg) {
-  display: flex !important; gap: 2px !important; padding: 3px !important; min-height: 44px !important; box-sizing: border-box !important;
+  display: flex !important; gap: 2px !important; padding: 3px !important; min-height: 50px !important; box-sizing: border-box !important;
   border: 0 !important; border-radius: var(--r-ctrl) !important; background: var(--fu-remplir) !important; box-shadow: none !important;
 }
 :root:root body .vrm-app-shell .vrm-main :is(.vrm-seg, .vrm-messages-sections, .vrm-set-seg) > button:not(#fu) {
@@ -161,3 +161,13 @@
 
 /* Cinq sites (Ventes : Tous · Vinted · Leboncoin · eBay · Vestiaire) : 12 px, rien n'est coupé à 390. */
 :root:root body .vrm-app-shell .vrm-filtre-site:has(> button:not(#fu):nth-child(5)) > button:not(#fu) { font-size: 12px !important; letter-spacing: -.02em !important; padding: 0 2px !important; }
+
+/* ── 12. LES DÉFAUTS DU NAVIGATEUR portent la palette (craft-floor : « browser surfaces ») ──
+   Spécificité nulle (`:where`) : n'importe quelle règle d'un écran l'emporte encore. */
+:where(.vrm-app-shell) a { color: var(--fu-lien); }
+:where(.vrm-app-shell) button { color: inherit; background-color: var(--fu-remplir); }
+:where(.vrm-app-shell) ::selection { background: rgba(0,113,227,.22); }
+/* Les jours de la semaine sur la carte sombre : lisibles (0,5 tombait à 4,1:1). */
+:root:root body .vrm-app-shell .vrm-fu-jour > span { color: rgba(255,255,255,.72) !important; }
+/* Un lien bleu posé sur la carte sombre : en blanc (le bleu y tombait à 2,5:1). */
+:root:root body .vrm-app-shell :is(.vrm-fu-carte, .vrm-fu-tete) :is(a, button.vrm-lien-action) { color: #ffffff !important; }

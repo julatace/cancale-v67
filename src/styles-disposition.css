@@ -32,13 +32,13 @@
 .vrm-app-shell .vrm-day-layout .vrm-day-bar > button,
 .vrm-day-layout .vrm-day-bar > button {
   background: var(--vrm-surface) !important; border: 1px solid var(--vrm-line) !important;
-  border-radius: 14px !important; box-shadow: 0 1px 2px rgba(25,59,67,.03), 0 6px 18px rgba(25,59,67,.05);
+  border-radius: 14px !important; box-shadow: 0 1px 2px rgba(0,0,0,.03), 0 6px 18px rgba(0,0,0,.05);
 }
 :root[data-theme="dark"] .vrm-day-layout .vrm-day-bar > button { box-shadow: none; }
 .vrm-day-layout .vrm-day-bar-n { font-weight: 800; letter-spacing: -.03em; }
 .vrm-day-layout .vrm-day-bar-ic { color: var(--vrm-accent) !important; }
 @media (hover: hover) and (pointer: fine) {
-  .vrm-day-layout .vrm-day-bar > button:hover { transform: translateY(-2px); box-shadow: 0 2px 4px rgba(25,59,67,.05), 0 12px 28px rgba(25,59,67,.09); }
+  .vrm-day-layout .vrm-day-bar > button:hover { transform: translateY(-2px); box-shadow: 0 2px 4px rgba(0,0,0,.05), 0 12px 28px rgba(0,0,0,.09); }
 }
 
 /* Rail (ordinateur) : l'écran actif porte un trait à gauche. */
@@ -92,7 +92,7 @@
 @media (hover: hover) and (pointer: fine) {
   .vrm-widgets:not([data-edition]) .vrm-widget > .vrm-widget-in > * { transition: transform .2s cubic-bezier(.23,1,.32,1), box-shadow .2s ease; }
   .vrm-widgets:not([data-edition]) .vrm-widget:hover > .vrm-widget-in > :is(.vrm-day-card, .vrm-day-week, .vrm-day-money) {
-    transform: translateY(-3px); box-shadow: 0 2px 6px rgba(25,59,67,.06), 0 18px 40px rgba(25,59,67,.11) !important;
+    transform: translateY(-3px); box-shadow: 0 2px 6px rgba(0,0,0,.06), 0 18px 40px rgba(0,0,0,.11) !important;
   }
   .vrm-button { position: relative; overflow: hidden; }
   .vrm-button::after {

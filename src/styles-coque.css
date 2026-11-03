@@ -20,7 +20,7 @@
   --vrm-t-title: 28px; --vrm-t-section: 20px; --vrm-t-body: 15px;
   --vrm-t-secondary: 13px; --vrm-t-caption: 11px;
   --vrm-r-sm: 8px; --vrm-r-md: 12px; --vrm-r-lg: 16px;
-  --vrm-ombre-flottante: 0 1px 2px rgba(10,14,22,.06), 0 8px 24px rgba(10,14,22,.10);
+  --vrm-ombre-flottante: 0 1px 2px rgba(0,0,0,.06), 0 8px 24px rgba(0,0,0,.10);
 }
 @media (min-width: 1024px) { :root { --vrm-t-title: 30px; } }
 
@@ -79,7 +79,7 @@
 }
 .vrm-seg-btn[aria-current="page"] {
   background: var(--seg-on, var(--vrm-surface)); color: var(--seg-ink);
-  box-shadow: 0 1px 2px rgba(10,14,22,.10), 0 0 0 .5px rgba(10,14,22,.05);
+  box-shadow: 0 1px 2px rgba(0,0,0,.10), 0 0 0 .5px rgba(0,0,0,.05);
 }
 .vrm-seg-btn:active:not(:disabled) { transform: none; }
 :root[data-theme="dark"] .vrm-seg-btn[aria-current="page"] { background: var(--seg-on, color-mix(in srgb, var(--vrm-muted) 26%, var(--vrm-surface))); }
@@ -99,7 +99,7 @@
 .vrm-seg { --seg-ink: var(--vrm-ink); --seg-muted: var(--vrm-muted); }
 .vrm-seg-btn[aria-pressed="true"] {
   background: var(--seg-on, var(--vrm-surface)); color: var(--seg-ink);
-  box-shadow: 0 1px 2px rgba(10,14,22,.10), 0 0 0 .5px rgba(10,14,22,.05);
+  box-shadow: 0 1px 2px rgba(0,0,0,.10), 0 0 0 .5px rgba(0,0,0,.05);
 }
 :root[data-theme="dark"] .vrm-seg-btn[aria-pressed="true"] { background: var(--seg-on, color-mix(in srgb, var(--vrm-muted) 26%, var(--vrm-surface))); }
 .vrm-seg-btn:disabled { opacity: .45; cursor: not-allowed; }
@@ -322,7 +322,7 @@
 
 /* ── FEUILLE « TON ESPACE » : liste groupée façon iOS ──────────────────── */
 .vrm-sheet-voile {
-  position: fixed; inset: 0; z-index: 80; background: rgba(6,9,15,.40);
+  position: fixed; inset: 0; z-index: 80; background: rgba(0,0,0,.40);
   -webkit-backdrop-filter: blur(2px); backdrop-filter: blur(2px);
   animation: vrmVoile .2s ease;
 }
@@ -333,12 +333,12 @@
   background: var(--vrm-bg); color: var(--vrm-ink);
   max-height: calc(100dvh - 44px); overflow-y: auto; overscroll-behavior: contain;
   padding: 6px 16px calc(14px + env(safe-area-inset-bottom));
-  box-shadow: 0 -12px 40px rgba(6,9,15,.22);
+  box-shadow: 0 -12px 40px rgba(0,0,0,.22);
 }
 .vrm-sheet-bas { bottom: 0; border-radius: 16px 16px 0 0; animation: cancaleSheet .32s var(--vrm-ease-ios) backwards; }
 .vrm-sheet-haut {
   top: 0; border-radius: 0 0 16px 16px; padding-top: calc(8px + env(safe-area-inset-top));
-  padding-bottom: 18px; box-shadow: 0 12px 40px rgba(6,9,15,.22);
+  padding-bottom: 18px; box-shadow: 0 12px 40px rgba(0,0,0,.22);
   animation: vrmSheetHaut .28s var(--vrm-ease-ios) backwards;
 }
 .vrm-sheet-poignee { width: 36px; height: 5px; border-radius: 3px; margin: 2px auto 4px; background: var(--vrm-faint); opacity: .45; }

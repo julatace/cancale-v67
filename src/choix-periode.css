@@ -19,7 +19,7 @@
   position: absolute; top: calc(100% + 8px); z-index: 75; width: 660px; max-width: calc(100vw - 32px);
   box-sizing: border-box; padding: 16px 18px 14px; border: 1px solid var(--vrm-line); border-radius: 20px;
   background: var(--vrm-surface); color: var(--vrm-ink);
-  box-shadow: 0 2px 6px rgba(10, 20, 24, .06), 0 22px 48px -12px rgba(10, 20, 24, .28);
+  box-shadow: 0 2px 6px rgba(0,0,0,.06), 0 22px 48px -12px rgba(0,0,0,.28);
   animation: vrm-cal-entre .18s cubic-bezier(.23, 1, .32, 1) both;
 }
 .vrm-cal-pop.gauche { left: 0; }
@@ -79,13 +79,13 @@
 .vrm-cal-appliquer:disabled { opacity: .4; cursor: default; }
 
 /* Au doigt : une feuille du bas, UN calendrier qui défile. */
-.vrm-cal-voile { position: fixed; inset: 0; z-index: 89; background: rgba(8, 16, 20, .38); animation: vrm-cal-fondu .2s ease both; }
+.vrm-cal-voile { position: fixed; inset: 0; z-index: 89; background: rgba(0,0,0,.38); animation: vrm-cal-fondu .2s ease both; }
 @keyframes vrm-cal-fondu { from { opacity: 0; } to { opacity: 1; } }
 .vrm-cal-feuille {
   position: fixed; left: 0; right: 0; bottom: 0; z-index: 90; display: flex; flex-direction: column;
   max-height: min(88dvh, 760px); box-sizing: border-box; padding: 6px 0 calc(8px + env(safe-area-inset-bottom));
   border-radius: 20px 20px 0 0; background: var(--vrm-surface); color: var(--vrm-ink);
-  box-shadow: 0 -12px 40px rgba(8, 16, 20, .22); animation: vrm-cal-monte .26s cubic-bezier(.23, 1, .32, 1) both;
+  box-shadow: 0 -12px 40px rgba(0,0,0,.22); animation: vrm-cal-monte .26s cubic-bezier(.23, 1, .32, 1) both;
 }
 @keyframes vrm-cal-monte { from { transform: translateY(24px); opacity: .6; } to { transform: none; opacity: 1; } }
 /* Tout sauf la liste des mois garde sa hauteur : une rangée qui défile en

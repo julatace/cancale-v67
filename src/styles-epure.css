@@ -117,7 +117,7 @@
      la photo ENTIÈRE en haut de la carte, le titre et le prix dessous. */
   .vrm-app-shell .vrm-day-layout .vrm-day-recent .vrm-carrousel > button { display: block !important; border-radius: 20px !important; overflow: hidden !important; }
   .vrm-app-shell .vrm-day-layout .vrm-day-recent .vrm-carrousel > button > div:first-child {
-    min-height: 0 !important; aspect-ratio: 1 / 1 !important; width: 100% !important; background: #F1F3EF !important;
+    min-height: 0 !important; aspect-ratio: 1 / 1 !important; width: 100% !important; background: #F2F2F7 !important;
   }
   .vrm-app-shell .vrm-day-layout .vrm-day-recent .vrm-carrousel > button > div:first-child img {
     object-fit: contain !important; padding: 6px; box-sizing: border-box;
@@ -165,7 +165,7 @@ html:has(.vrm-app-shell), html:has(.vrm-app-shell) body { overflow: hidden; over
 
 /* (29 oct.) Ventes : les vérifications sous la liste — même forme pour les quatre. */
 .vrm-ventes-controles > *{margin:0 !important;}
-.vrm-ventes-controles .vrm-fiabilite-ventes{padding:12px 14px;border:1px solid var(--vrm-line,#dbe5e3);border-radius:12px;background:var(--vrm-surface,#fff);color:var(--vrm-ink,inherit);}
+.vrm-ventes-controles .vrm-fiabilite-ventes{padding:12px 14px;border:1px solid var(--vrm-line,#E5E5EA);border-radius:12px;background:var(--vrm-surface,#fff);color:var(--vrm-ink,inherit);}
 .vrm-ventes-controles .vrm-fiabilite-ventes > summary{display:flex;align-items:center;min-height:0;padding-block:0;font-weight:600;}
 
 /* ══ (30 oct.) Les surfaces FLOTTANTES gardent leur fond ═════════════════════
@@ -185,9 +185,9 @@ html:has(.vrm-app-shell), html:has(.vrm-app-shell) body { overflow: hidden; over
   html[data-theme="dark"] .vrm-app-shell .vrm-main .vrm-feuille-surface,
   html[data-theme="dark"] .vrm-app-shell .vrm-main [style*="position: absolute"][style*="background: rgb(28, 51, 57)"],
   html[data-theme="dark"] .vrm-app-shell .vrm-main [style*="position: fixed"][style*="background: rgb(28, 51, 57)"] {
-    background: #1C3339 !important; background-image: none !important;
+    background: #2C2C2E !important; background-image: none !important;
   }
-  .vrm-app-shell .vrm-main .vrm-menu-voile { background: rgba(2, 5, 10, .45) !important; z-index: 9290 !important; }
+  .vrm-app-shell .vrm-main .vrm-menu-voile { background: rgba(0,0,0,.45) !important; z-index: 9290 !important; }
   .vrm-app-shell .vrm-main .vrm-menu-flottant {
     position: fixed !important; left: 8px !important; right: 8px !important; top: auto !important;
     bottom: calc(8px + env(safe-area-inset-bottom, 0px)) !important; min-width: 0 !important; max-width: none !important;

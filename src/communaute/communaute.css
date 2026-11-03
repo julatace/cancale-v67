@@ -1,13 +1,13 @@
 /* L'écran « Communauté » — VRM Noir : une seule couleur d'accent, rare. */
 .vrm-communaute {
-  --cm-fond: #F4F6FA; --cm-carte: #FFFFFF; --cm-encre: #10151B; --cm-doux: #5B6472;
-  --cm-bord: #E3E7EE; --cm-accent: #2458E6; --cm-accent-fond: rgba(36,88,230,.10);
-  --cm-ombre: 0 1px 2px rgba(16,21,27,.06), 0 8px 24px rgba(16,21,27,.06);
+  --cm-fond: #F2F2F7; --cm-carte: #FFFFFF; --cm-encre: #1C1C1E; --cm-doux: #636366;
+  --cm-bord: #E5E5EA; --cm-accent: #0071E3; --cm-accent-fond: rgba(36,88,230,.10);
+  --cm-ombre: 0 1px 2px rgba(0,0,0,.06), 0 8px 24px rgba(0,0,0,.06);
   color: var(--cm-encre); padding: 16px; max-width: 1080px; margin: 0 auto; box-sizing: border-box;
 }
 .vrm-communaute[data-dark="true"] {
-  --cm-fond: #07090D; --cm-carte: #10141B; --cm-encre: #E8ECF2; --cm-doux: #98A2B3;
-  --cm-bord: #1F2530; --cm-accent: #3D7BFF; --cm-accent-fond: rgba(61,123,255,.16);
+  --cm-fond: #000000; --cm-carte: #1C1C1E; --cm-encre: #E5E5EA; --cm-doux: #AEAEB2;
+  --cm-bord: #1D1D1F; --cm-accent: #8DB8F2; --cm-accent-fond: rgba(61,123,255,.16);
   --cm-ombre: 0 1px 2px rgba(0,0,0,.4), 0 8px 24px rgba(0,0,0,.35);
 }
 .vrm-communaute * { box-sizing: border-box; }
@@ -57,11 +57,11 @@
 /* La carte MapLibre : contrôles de VRM (une seule forme de bouton, aucune
    couleur d'accent sur les contrôles — elle est réservée à SA épingle). */
 .vrm-cm-carte .maplibregl-map { font: inherit; }
-.vrm-communaute[data-dark="true"] .vrm-cm-carte .maplibregl-canvas-container { background: #10141B; }
-.vrm-cm-carte .maplibregl-ctrl-attrib { font-size: 11px; background: rgba(255,255,255,.82); color: #5B6472; }
-.vrm-cm-carte .maplibregl-ctrl-attrib a { color: #10151B; }
-.vrm-communaute[data-dark="true"] .vrm-cm-carte .maplibregl-ctrl-attrib { background: rgba(16,20,27,.82); color: #98A2B3; }
-.vrm-communaute[data-dark="true"] .vrm-cm-carte .maplibregl-ctrl-attrib a { color: #C7CEDA; }
+.vrm-communaute[data-dark="true"] .vrm-cm-carte .maplibregl-canvas-container { background: #1C1C1E; }
+.vrm-cm-carte .maplibregl-ctrl-attrib { font-size: 11px; background: rgba(255,255,255,.82); color: #636366; }
+.vrm-cm-carte .maplibregl-ctrl-attrib a { color: #1C1C1E; }
+.vrm-communaute[data-dark="true"] .vrm-cm-carte .maplibregl-ctrl-attrib { background: rgba(0,0,0,.82); color: #AEAEB2; }
+.vrm-communaute[data-dark="true"] .vrm-cm-carte .maplibregl-ctrl-attrib a { color: #D1D1D6; }
 .vrm-communaute[data-dark="true"] .vrm-cm-carte .maplibregl-ctrl-attrib-button { filter: invert(1); }
 /* Le « i » de l'attribution repliée (écran étroit) : UN seul pictogramme, à sa
    taille. Une règle générale de l'app lui donnait 44 px de haut, et l'image de
@@ -103,7 +103,7 @@
 .vrm-cm-conv span:not(.vrm-cm-pastille) { grid-column: 1; grid-row: 2; color: var(--cm-doux); font-weight: 500; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .vrm-cm-conv time { grid-column: 2; grid-row: 1; color: var(--cm-doux); font-size: 12px; font-weight: 500; }
 .vrm-cm-conv .vrm-cm-pastille { grid-column: 3; grid-row: 1 / span 2; align-self: center; }
-.vrm-cm-voile { position: fixed; inset: 0; z-index: 10000; background: rgba(7,9,13,.55); backdrop-filter: blur(3px); display: flex; align-items: flex-end; justify-content: center; }
+.vrm-cm-voile { position: fixed; inset: 0; z-index: 10000; background: rgba(0,0,0,.55); backdrop-filter: blur(3px); display: flex; align-items: flex-end; justify-content: center; }
 .vrm-cm-feuille { background: var(--cm-carte); color: var(--cm-encre); width: min(560px, 100%); max-height: 88vh; overflow: auto; border-radius: 16px 16px 0 0; padding: 14px 16px calc(20px + env(safe-area-inset-bottom)); box-shadow: var(--cm-ombre); animation: vrm-cm-monte .22s ease-out; }
 @media (min-width: 720px) { .vrm-cm-voile { align-items: center; } .vrm-cm-feuille { border-radius: 14px; } }
 @keyframes vrm-cm-monte { from { transform: translateY(24px); opacity: 0; } to { transform: none; opacity: 1; } }
@@ -191,9 +191,9 @@ form.vrm-cm-discord-moi { display: block !important; }
    ⇒ les valeurs d'avant restent (repli). */
 .vrm-communaute, .vrm-communaute[data-dark="true"] {
   --cm-accent: var(--vrm-accent, #0071E3);
-  --cm-accent-fond: var(--vrm-b-teinte, rgba(36, 78, 84, .08));
-  --cm-encre: var(--vrm-ink, #213B41);
-  --cm-doux: var(--vrm-muted, #53696D);
+  --cm-accent-fond: var(--vrm-b-teinte, rgba(0,0,0,.08));
+  --cm-encre: var(--vrm-ink, #38383A);
+  --cm-doux: var(--vrm-muted, #636366);
   --cm-carte: var(--vrm-surface, #FFFFFF);
 }
 .vrm-communaute .vrm-cm-carton { border-color: transparent; box-shadow: none; }

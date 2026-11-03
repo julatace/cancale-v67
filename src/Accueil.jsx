@@ -141,7 +141,7 @@ const CSS = `
 .acc .acc-btn:hover{filter:none}
 .acc-chev{display:inline-block;font-size:20px;line-height:1;margin-right:-4px;transition:transform 160ms ${COURBE_SORTIE}}
 @media (hover:hover) and (pointer:fine){
-  .acc .acc-p:hover{box-shadow:none;background:#1C3594}
+  .acc .acc-p:hover{box-shadow:none;background:#0071E3}
   .acc .acc-btn:hover .acc-chev{transform:translateX(2px)}
 }
 .acc .acc-lien{display:inline-flex;align-items:center;min-height:44px;padding:0 6px;border:none;background:none;cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,'Inter',system-ui,sans-serif;font-size:15px;font-weight:500;color:${K.muted};text-decoration:none;filter:none}
@@ -184,7 +184,7 @@ const CSS = `
      (≤1099 px) : pas de rotation (évite tout débord), le flottement suffit.
    Le film ne rend que CarteJourEcran : ces wrappers ne le touchent pas.
    Mouvement réduit : tout est coupé, carte à plat et immobile. */
-.acc-flotte{perspective:1100px;border-radius:14px;box-shadow:0 1px 3px rgba(18,27,44,.08),0 26px 60px rgba(18,27,44,.16),0 20px 60px rgba(43,69,72,.16)}
+.acc-flotte{perspective:1100px;border-radius:14px;box-shadow:0 1px 3px rgba(0,0,0,.08),0 26px 60px rgba(0,0,0,.16),0 20px 60px rgba(0,0,0,.16)}
 /* La carte se POSE en 3D au chargement (un rotateX qui s'aplatit) : le relief
    se voit sur téléphone comme sur ordinateur, UNE fois, puis la carte se fige
    À PLAT — texte net, chaque ligne cliquable (une démo qu'on lit et qu'on clique
@@ -261,9 +261,9 @@ const CSS = `
 .acc-fil{display:none}
 @media (min-width:1440px){
   .acc-fil{display:block;position:absolute;left:calc(50% - 620px);top:0;bottom:0;width:1px;background:${K.line2};pointer-events:none}
-  .acc-fil i{position:absolute;inset:0;background:rgba(238,241,246,.4);transform-origin:top}
+  .acc-fil i{position:absolute;inset:0;background:rgba(255,255,255,.4);transform-origin:top}
   .acc-fil span{position:absolute;right:12px;top:64px;white-space:nowrap;font-size:13px;font-weight:600;color:${K.text};line-height:18px}
-  .acc-fil span:after{content:"";position:absolute;right:-16px;top:6px;width:7px;height:7px;border-radius:50%;background:${K.bg};border:1px solid rgba(238,241,246,.5)}
+  .acc-fil span:after{content:"";position:absolute;right:-16px;top:6px;width:7px;height:7px;border-radius:50%;background:${K.bg};border:1px solid rgba(255,255,255,.5)}
 }
 @supports (animation-timeline:view()){
   .acc-fil i{animation:accRemplit linear both;animation-timeline:view();animation-range:entry 20% cover 55%}

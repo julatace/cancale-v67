@@ -694,17 +694,17 @@ const THEMES = {
     // ⚠️ PASSE « HAUT DE GAMME » (Julien, 27 sept. : « améliore les couleurs et
     // la qualité, ça fait pas haut de gamme »). On ne change PAS d'identité
     // (§7 : un seul accent, bleu, rare) : on l'AFFINE. Le bleu web un peu criard
-    // (#1E5FCC) devient un bleu profond et posé (#1D4FD6) — c'est la teinte des
+    // (#0071E3) devient un bleu profond et posé (#0071E3) — c'est la teinte des
     // apps « premium », plus dense, moins fluo. L'encre est plus franche
-    // (#0B0F15), les filets plus légers (cartes moins « encadrées »), le fond
+    // (#000000), les filets plus légers (cartes moins « encadrées »), le fond
     // très légèrement plus froid : ce sont les vrais signaux de finition, pas la
     // multiplication des couleurs. Une seule teinte d'accent, toujours.
     // Version claire de l'identité « Menthe » : accent menthe profonde (bon
     // contraste du texte blanc sur bouton), le bleu reste une seconde teinte.
-    bg:"#F4F6FA", surface:"#FFFFFF", card:"#FFFFFF", card2:"#EEF1F6", border:"#E3E7EE",
-    accent:"#2458E6", accentSoft:"#4C7BFF", onAccent:"#FFFFFF",
-    danger:"#C0392B", warn:"#A15C00", gold:"#7A6636",
-    blue:"#1D4FD6", purple:"#5B4B9E", text:"#0B0F15", muted:"#5A6472",
+    bg:"#F2F2F7", surface:"#FFFFFF", card:"#FFFFFF", card2:"#F2F2F7", border:"#E5E5EA",
+    accent:"#0071E3", accentSoft:"#8DB8F2", onAccent:"#FFFFFF",
+    danger:"#C0392B", warn:"#B25000", gold:"#7A6636",
+    blue:"#0071E3", purple:"#5B4B9E", text:"#000000", muted:"#636366",
     // Cartes BLANCHES sur fond gris : c'est l'écart entre les deux qui donne le
     // relief, et une ombre très douce qui les décolle. Les filets « imprimés »
     // du papier n'ont plus de sens ici.
@@ -714,9 +714,9 @@ const THEMES = {
     // le détail qui sépare « encadré » de « soigné », et il ne coûte rien.
     // Ombres à deux couches, un cran plus douces et plus larges : une carte qui
     // « flotte » sur un halo pâle lit plus soigné qu'une carte posée net.
-    shadow:"0 1px 2px rgba(11,15,21,.04), 0 3px 8px rgba(11,15,21,.05)",
-    shadowMd:"0 1px 2px rgba(11,15,21,.05), 0 8px 22px rgba(11,15,21,.07)",
-    shadowLg:"0 2px 6px rgba(11,15,21,.06), 0 22px 50px rgba(11,15,21,.13)",
+    shadow:"0 1px 2px rgba(0,0,0,.04), 0 3px 8px rgba(0,0,0,.05)",
+    shadowMd:"0 1px 2px rgba(0,0,0,.05), 0 8px 22px rgba(0,0,0,.07)",
+    shadowLg:"0 2px 6px rgba(0,0,0,.06), 0 22px 50px rgba(0,0,0,.13)",
     ring:"rgba(36,88,230,.16)",
     glass:"rgba(255,255,255,.88)",
     // LE CHROME RESTE À L'ENCRE, MÊME EN CLAIR : la navigation est un bloc
@@ -724,18 +724,18 @@ const THEMES = {
     // l'incohérence du thème sur les composants qui ne se redessinent pas
     // (`C` est une variable de module mutable, cf. §4). Encre ARDOISE désormais,
     // plus brune : deux températures sur le même écran, ça se voit.
-    chrome:"#0A0D12", onChrome:"#F2F5FA", chromeMuted:"#7D8798", chromeLine:"#1C222C",
-    s1:"#2458E6", s2:"#7C9CFF",
+    chrome:"#000000", onChrome:"#F2F2F7", chromeMuted:"#8E8E93", chromeLine:"#1D1D1F",
+    s1:"#0071E3", s2:"#8DB8F2",
     // (16 oct.) TROIS NIVEAUX DE TEXTE, définis une fois : `text` (encre),
     // `muted` (secondaire), `faint` (tertiaire : légendes, chevrons). Plus le
     // filet fin (`hair`) et le verre des barres de la coque (`bar`).
-    faint:"#8A93A6", hair:"rgba(18,27,44,.09)", bar:"rgba(255,255,255,.84)",
+    faint:"#8E8E93", hair:"rgba(0,0,0,.09)", bar:"rgba(255,255,255,.84)",
   },
   dark: {
     // Le sombre est la MÊME identité, la nuit : ardoise froide, même bleu
     // éclairci pour tenir le contraste. Ce n'est pas un inversement mécanique.
-    // ⚠️ LES MARCHES ÉTAIENT TROP RAPPROCHÉES : rail #0A0D12 contre fond
-    // #0E1116, soit quatre unités d'écart — la barre latérale se confondait
+    // ⚠️ LES MARCHES ÉTAIENT TROP RAPPROCHÉES : rail #000000 contre fond
+    // #000000, soit quatre unités d'écart — la barre latérale se confondait
     // avec la page et la signature du produit disparaissait la nuit. Chaque
     // niveau est écarté : rail le plus sombre, page au-dessus, cartes encore
     // au-dessus. C'est la hiérarchie qui porte le sombre, pas la teinte.
@@ -748,18 +748,18 @@ const THEMES = {
     // électrique. L'app était menthe : deux identités qui se contredisaient.
     // On garde la règle §7 (UN accent, rare) et la hiérarchie du sombre :
     // rail (chrome) < page (bg) < cartes (card), marches bien écartées.
-    bg:"#07090D", surface:"#10141B", card:"#10141B", card2:"#171C25", border:"#232A36",
-    accent:"#3D7BFF", accentSoft:"#78A3FF", onAccent:"#FFFFFF",
+    bg:"#000000", surface:"#1C1C1E", card:"#1C1C1E", card2:"#1C1C1E", border:"#2C2C2E",
+    accent:"#8DB8F2", accentSoft:"#8DB8F2", onAccent:"#FFFFFF",
     danger:"#FF6B6B", warn:"#FFB23E", gold:"#C9AE78",
-    blue:"#5B93FF", purple:"#A99AF0", text:"#F2F5FA", muted:"#8A94A6",
+    blue:"#8DB8F2", purple:"#A99AF0", text:"#F2F2F7", muted:"#8E8E93",
     shadow:"0 1px 1px rgba(0,0,0,.4), 0 2px 8px rgba(0,0,0,.45)",
     shadowMd:"0 1px 2px rgba(0,0,0,.5), 0 8px 20px rgba(0,0,0,.5)",
     shadowLg:"0 2px 6px rgba(0,0,0,.5), 0 22px 50px rgba(0,0,0,.65)",
     ring:"rgba(61,123,255,.24)",
-    glass:"rgba(16,20,27,.90)",
-    chrome:"#030406", onChrome:"#F2F5FA", chromeMuted:"#6D7788", chromeLine:"#161B24",
-    s1:"#3D7BFF", s2:"#8AB4FF",
-    faint:"#5F6878", hair:"rgba(255,255,255,.08)", bar:"rgba(3,4,6,.88)",   // §7 : la barre reste la marche la PLUS sombre (rail < page < carte)
+    glass:"rgba(0,0,0,.90)",
+    chrome:"#000000", onChrome:"#F2F2F7", chromeMuted:"#6E6E73", chromeLine:"#1C1C1E",
+    s1:"#8DB8F2", s2:"#8DB8F2",
+    faint:"#636366", hair:"rgba(255,255,255,.08)", bar:"rgba(0,0,0,.88)",   // §7 : la barre reste la marche la PLUS sombre (rail < page < carte)
   },
 };
 // ── IDENTITÉ CLAIRE (révisée par Julien, 16 octobre — maquette) ──────────────
@@ -2193,7 +2193,7 @@ const Z_MESSAGES = 30000;
 // Habillage commun aux deux feuilles : voile flouté + panneau qui monte du bas.
 function SheetShell({ onClose, children, maxWidth = 460, z = 2000 }) {
   return (
-    <div onClick={onClose} style={{position:'fixed',inset:0,background:'rgba(8,16,13,.46)',backdropFilter:'blur(3px)',WebkitBackdropFilter:'blur(3px)',zIndex:z,display:'flex',alignItems:'flex-end',justifyContent:'center',animation:'cancaleFadeIn .18s ease both'}}>
+    <div onClick={onClose} style={{position:'fixed',inset:0,background:'rgba(0,0,0,.46)',backdropFilter:'blur(3px)',WebkitBackdropFilter:'blur(3px)',zIndex:z,display:'flex',alignItems:'flex-end',justifyContent:'center',animation:'cancaleFadeIn .18s ease both'}}>
       <FermeAuRetour fermer={onClose}/>
       <div onClick={e => e.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth,borderRadius:'22px 22px 0 0',padding:'14px 18px calc(18px + env(safe-area-inset-bottom))',boxShadow:C.shadowLg||'none',maxHeight:'86vh',overflowY:'auto',animation:'cancaleSheet .26s cubic-bezier(.32,.72,0,1) both'}}>
         <div style={{width:36,height:4,borderRadius:12,background:C.border,margin:'0 auto 14px'}}/>
@@ -4964,8 +4964,8 @@ const openReceipt = (a) => {
   const breakdown = r.lignes.map((l) => `<tr data-recu-ligne="${esc(l.libelle)}" data-recu-centimes="${l.centimes == null ? '' : l.centimes}"><td style="padding:9px 0;color:#667;font-size:15px">${esc(l.libelle)}</td><td style="padding:9px 0;text-align:right;font-size:15px;color:#111;white-space:nowrap">${l.centimes == null ? '—' : esc(texteCentimesRecu(l.centimes))}</td></tr>`).join('');
   const meta = [line('Vendeur', vendeur), line('Mode de paiement', mode), line('Date du paiement', datePaie), line('N° de transaction', trans), line('Compte', compte)].join('');
   w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Reçu — ${esc(article)}</title></head>
-  <body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;margin:0;background:#f4f6f5;color:#111;-webkit-print-color-adjust:exact">
-    <div class="topbar" style="position:sticky;top:0;z-index:10;background:#f4f6f5;padding:12px 16px 8px;display:flex;align-items:center;gap:10px">
+  <body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;margin:0;background:#F2F2F7;color:#111;-webkit-print-color-adjust:exact">
+    <div class="topbar" style="position:sticky;top:0;z-index:10;background:#F2F2F7;padding:12px 16px 8px;display:flex;align-items:center;gap:10px">
       <button id="vrm-recu-fermer" type="button" style="border:none;border-radius:12px;background:#fff;box-shadow:0 1px 6px rgba(0,0,0,.12);padding:11px 18px;font-size:15px;font-weight:800;cursor:pointer;color:#111">‹ Fermer</button>
       <span style="font-size:12px;color:#99a">Retour à VRM</span>
     </div>
@@ -4977,12 +4977,12 @@ const openReceipt = (a) => {
         </div>
         ${hasStructured ? `
         <div style="padding:18px 20px">
-          ${paid ? `<div data-recu-total="${r.paye}" style="display:flex;justify-content:space-between;align-items:baseline;padding-bottom:14px;border-bottom:1px solid #eef1f0;margin-bottom:6px">
+          ${paid ? `<div data-recu-total="${r.paye}" style="display:flex;justify-content:space-between;align-items:baseline;padding-bottom:14px;border-bottom:1px solid #F2F2F7;margin-bottom:6px">
             <span style="font-size:15px;color:#667;font-weight:700">Montant payé</span>
             <span style="font-size:28px;font-weight:800;color:#111">${esc(paid)}</span></div>` : ''}
           ${breakdown ? `<table data-recu-lignes="" style="width:100%;border-collapse:collapse">${breakdown}</table>` : ''}
           <div data-recu-somme="${r.somme}"${r.phrase ? ' style="font-size:13px;color:#556;line-height:1.5;padding:8px 0 2px"' : ' hidden'}>${esc(r.phrase)}</div>
-          ${meta ? `<table style="width:100%;border-collapse:collapse;margin-top:8px;border-top:1px solid #eef1f0">${meta}</table>` : ''}
+          ${meta ? `<table style="width:100%;border-collapse:collapse;margin-top:8px;border-top:1px solid #F2F2F7">${meta}</table>` : ''}
         </div>` : `
         <div style="padding:18px 20px;white-space:pre-wrap;line-height:1.6;font-size:15px;color:#333">${esc(cleaned)}</div>`}
       </div>
@@ -5162,22 +5162,22 @@ const trackUrl = (carrier, suivi, codePostal = '') => { const l = lienSuivi(carr
 const CARRIERS = {
   mondialrelay: { name: 'Mondial Relay', short: 'MR', bg: '#E2001A', fg: '#fff', retrait: 'code' },
   chronopost:   { name: 'Chronopost',    short: 'CH', bg: '#00A0E3', fg: '#fff', retrait: 'qr'   },
-  ups:          { name: 'UPS',           short: 'UPS', bg: '#3C2415', fg: '#FFB500', retrait: 'auto' },
+  ups:          { name: 'UPS',           short: 'UPS', bg: '#2C2C2E', fg: '#FFB500', retrait: 'auto' },
   vinted:       { name: 'Vinted Go',     short: 'V',  bg: '#007782', fg: '#fff', retrait: 'auto' },
   relaiscolis:  { name: 'Relais Colis',  short: 'RC', bg: '#E30613', fg: '#fff', retrait: 'code' },
   colissimo:    { name: 'La Poste',      short: 'LP', bg: '#FFCD00', fg: '#111', retrait: 'home' },
-  amazon:       { name: 'Amazon',        short: 'AZ', bg: '#232F3E', fg: '#FF9900', retrait: 'code' },
+  amazon:       { name: 'Amazon',        short: 'AZ', bg: '#2C2C2E', fg: '#FF9900', retrait: 'code' },
   shop2shop:    { name: 'Shop2Shop',     short: 'S2S', bg: '#00B2A9', fg: '#fff', retrait: 'code' },
   inpost:       { name: 'InPost',        short: 'IP', bg: '#FFCD00', fg: '#111', retrait: 'code' },
   dpd:          { name: 'DPD',           short: 'DPD', bg: '#DC0032', fg: '#fff', retrait: 'auto' },
-  gls:          { name: 'GLS',           short: 'GLS', bg: '#0A5B9A', fg: '#FFD200', retrait: 'code' },
+  gls:          { name: 'GLS',           short: 'GLS', bg: '#0071E3', fg: '#FFD200', retrait: 'code' },
   dhl:          { name: 'DHL',           short: 'DHL', bg: '#FFCC00', fg: '#D40511', retrait: 'auto' },
   fedex:        { name: 'FedEx',         short: 'FX', bg: '#4D148C', fg: '#FF6600', retrait: 'auto' },
   // ⚠️ `autre` = le filet du serveur : un email de colis d'un transporteur non
   // listé est quand même traité (api/email-inbound.js). Sans cette entrée, sa
   // carte s'affichait sans nom ni couleur, et `retraitMode` n'avait pas de
   // préférence — donc aucune consigne au comptoir.
-  autre:        { name: 'Transporteur',  short: '📦', bg: '#64748B', fg: '#fff', retrait: 'auto' },
+  autre:        { name: 'Transporteur',  short: '📦', bg: '#6E6E73', fg: '#fff', retrait: 'auto' },
 };
 // Ce qu'il faut présenter au comptoir pour CE colis, selon son transporteur ET
 // ce qu'on a réellement reçu. Une seule règle, utilisée partout (modale de
@@ -5376,7 +5376,7 @@ function OsmMap({ points, height = 230, selected, onSelect }) {
   // (29 oct.) La carte garde ses couleurs claires en mode sombre (décision de Julien, comme la communauté).
   const sombreCarte = false;
   return (
-    <div data-mini-carte style={{ position: 'relative', width: '100%', height, overflow: 'hidden', background: sombreCarte ? '#1a1f27' : '#eaeef2' }}>
+    <div data-mini-carte style={{ position: 'relative', width: '100%', height, overflow: 'hidden', background: sombreCarte ? '#1D1D1F' : '#F2F2F7' }}>
       <FondMiniCarte lat={clat} lon={clon} zoom={z - 1} sombre={sombreCarte} />
       {(() => {
         // Anti-chevauchement : on écarte les épingles trop proches en spirale.
@@ -5399,7 +5399,7 @@ function OsmMap({ points, height = 230, selected, onSelect }) {
       })().map(({ p, ox, oy }) => {
         const isSel = selected === p.key;
         const car = CARRIERS[carrierKey(p.carrier)];
-        const col = car ? car.bg : (p.picked ? '#2e9e5b' : p.count > 0 ? '#e5484d' : '#8a94a6');
+        const col = car ? car.bg : (p.picked ? '#2e9e5b' : p.count > 0 ? '#e5484d' : '#8E8E93');
         const inner = car ? car.short : (p.count > 0 ? String(p.count) : p.picked ? '✓' : '');
         const innerFg = car ? car.fg : '#fff';
         const dim = !car && !p.picked && !(p.count > 0);
@@ -5416,12 +5416,12 @@ function OsmMap({ points, height = 230, selected, onSelect }) {
             {car && p.count > 0 && <span style={{ position: 'absolute', top: -5, right: -8, minWidth: 18, height: 18, borderRadius: 999, background: '#e5484d', color: '#fff', fontSize: 11, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 5px', boxShadow: '0 1px 3px rgba(0,0,0,0.3)', border: '1.5px solid #fff' }}>{p.count}</span>}
             {/* Étiquette NOM du point (rend chaque relais distinct d'un coup d'œil) */}
             {(() => { const lbl = p.label || p.key; return (pts.length <= 14 || isSel || p.count > 0) && lbl && (
-              <span style={{ position: 'absolute', left: '50%', top: '100%', transform: 'translate(-50%, 1px)', whiteSpace: 'nowrap', maxWidth: 110, overflow: 'hidden', textOverflow: 'ellipsis', fontSize: 11, fontWeight: 800, color: p.count > 0 ? '#b3261e' : '#26303a', background: 'rgba(255,255,255,0.92)', borderRadius: 6, padding: '1px 5px', boxShadow: '0 1px 2px rgba(0,0,0,0.18)', border: isSel ? `1.5px solid ${col}` : '1px solid rgba(0,0,0,0.06)' }}>{String(lbl).length > 20 ? String(lbl).slice(0, 19) + '…' : lbl}</span>
+              <span style={{ position: 'absolute', left: '50%', top: '100%', transform: 'translate(-50%, 1px)', whiteSpace: 'nowrap', maxWidth: 110, overflow: 'hidden', textOverflow: 'ellipsis', fontSize: 11, fontWeight: 800, color: p.count > 0 ? '#b3261e' : '#2C2C2E', background: 'rgba(255,255,255,0.92)', borderRadius: 6, padding: '1px 5px', boxShadow: '0 1px 2px rgba(0,0,0,0.18)', border: isSel ? `1.5px solid ${col}` : '1px solid rgba(0,0,0,0.06)' }}>{String(lbl).length > 20 ? String(lbl).slice(0, 19) + '…' : lbl}</span>
             ); })()}
           </div>
         );
       })}
-      <span data-mini-carte-attribution style={{ position: 'absolute', right: 5, bottom: 3, fontSize: 8, color: '#6b7280', background: 'rgba(255,255,255,0.8)', padding: '1px 5px', borderRadius: 4 }}>OpenFreeMap · © OpenMapTiles · © OpenStreetMap</span>
+      <span data-mini-carte-attribution style={{ position: 'absolute', right: 5, bottom: 3, fontSize: 8, color: '#6E6E73', background: 'rgba(255,255,255,0.8)', padding: '1px 5px', borderRadius: 4 }}>OpenFreeMap · © OpenMapTiles · © OpenStreetMap</span>
     </div>
   );
 }
@@ -6259,7 +6259,7 @@ const urssafCourt = (r, text, sub) => {
   const quoi = /^T\d/.test(String(r.label || '')) ? `du ${String(r.label).split(' ')[0]}` : (() => { const mois = String(r.label || '').split(' ')[0]; return /^[aeiouyéèh]/i.test(mois) ? `d'${mois}` : `de ${mois}`; })();
   const quand = r.daysLeft <= 0 ? "aujourd'hui" : r.daysLeft === 1 ? 'demain' : `dans ${r.daysLeft} jours`;
   const date = `avant le ${echeance.getDate()} ${echeance.toLocaleDateString('fr-FR', { month: 'short' })}`;
-  const montant = r.apayer == null ? 'montant : ouvre Ventes une fois' : `≈ ${Math.round(r.apayer)} € à payer${r.partiel ? ' (au moins)' : ''}`;
+  const montant = r.apayer == null ? 'montant : pas encore calculé' : `≈ ${Math.round(r.apayer)} € à payer${r.partiel ? ' (au moins)' : ''}`;
   const det = `${r.proche ? quand : date} · ${montant}`;
   return { court: `Déclarer l'URSSAF ${quoi}`, detail: det.charAt(0).toUpperCase() + det.slice(1), plein: [text, sub].filter(Boolean).join(' — ') };
 };
@@ -10264,7 +10264,7 @@ const dessinerPdf = async (canvas, octets, { page = 1, largeur = 220, zone = nul
   await pg.render({ canvasContext: c2, viewport: v }).promise;
   if (zone) {
     const H = v0.height;
-    c2.save(); c2.strokeStyle = '#2458E6'; c2.lineWidth = 2 * dpr; c2.setLineDash([6 * dpr, 4 * dpr]);
+    c2.save(); c2.strokeStyle = '#0071E3'; c2.lineWidth = 2 * dpr; c2.setLineDash([6 * dpr, 4 * dpr]);
     c2.strokeRect(zone.x * sc, (H - zone.y - zone.h) * sc, zone.w * sc, zone.h * sc); c2.restore();
   }
   return d.numPages;
@@ -10513,7 +10513,7 @@ function VisionneusePdf() {
   const btn = { minHeight:44, padding:'0 16px', borderRadius:12, border:`1px solid ${C.border}`, background:'transparent', color:C.text, fontSize:15, fontWeight:600, cursor:'pointer', fontFamily:'inherit', textDecoration:'none', display:'inline-flex', alignItems:'center' };
   return createPortal(
     <div data-visionneuse-pdf={v.prep ? 'prep' : 'pret'} role="dialog" aria-modal="true" aria-label={v.titre || 'Bordereau'} onClick={fermer}
-      style={{ position:'fixed', inset:0, zIndex:9500, background:'rgba(8,12,18,.55)', display:'flex', alignItems:'center', justifyContent:'center', padding:16 }}>
+      style={{ position:'fixed', inset:0, zIndex:9500, background:'rgba(0,0,0,.55)', display:'flex', alignItems:'center', justifyContent:'center', padding:16 }}>
       <FermeAuRetour fermer={fermer}/>
       <div onClick={(e) => e.stopPropagation()} style={{ width:'min(980px,100%)', height:'min(92vh,100%)', background:C.card, color:C.text, border:`1px solid ${C.border}`, borderRadius:12, display:'flex', flexDirection:'column', overflow:'hidden' }}>
         <div style={{ display:'flex', alignItems:'center', gap:8, padding:'10px 12px', borderBottom:`1px solid ${C.border}`, flexWrap:'wrap' }}>
@@ -11805,7 +11805,7 @@ const comptesRecherche = (liste) => {
 const MARQUES_PLAT = {
   vinted:    { nom: 'Vinted',    court: 'V',   bg: '#007782', fg: '#fff' },
   leboncoin: { nom: 'Leboncoin', court: 'lbc', bg: LBC_ORANGE, fg: '#fff' },
-  ebay:      { nom: 'eBay',      court: 'eBay', bg: '#fff', fg: '#0064D2', bord: '#D6DCE4' },
+  ebay:      { nom: 'eBay',      court: 'eBay', bg: '#fff', fg: '#0071E3', bord: '#D1D1D6' },
 };
 function MarquePlateforme({ p, taille = 18 }) {
   const m = MARQUES_PLAT[p]; if (!m) return null;
@@ -11834,7 +11834,7 @@ function PlateformeLogo({ p, title }) {
   const M = {
     vinted: { bg: '#09B1BA', t: 'Vinted' },
     lbc:    { bg: LBC_ORANGE, t: 'leboncoin' },
-    ebay:   { bg: '#3665F3', t: 'eBay' },
+    ebay:   { bg: '#0071E3', t: 'eBay' },
   };
   const m = M[p]; if (!m) return null;
   return (
@@ -15738,7 +15738,7 @@ function MonthDetail({mois,type,C,fmt,catMap,catalog,onClose}){
 // service inspire moins confiance qu'un bouton qui montre où on va.
 const BrandMark = ({ id }) => id === 'google' ? (
   <svg width="17" height="17" viewBox="0 0 48 48" aria-hidden="true" style={{flexShrink:0}}>
-    <path fill="#4285F4" d="M45.1 24.5c0-1.6-.1-3.1-.4-4.5H24v8.5h11.8c-.5 2.7-2 5-4.4 6.6v5.5h7.1c4.1-3.8 6.6-9.4 6.6-16.1z"/>
+    <path fill="#8DB8F2" d="M45.1 24.5c0-1.6-.1-3.1-.4-4.5H24v8.5h11.8c-.5 2.7-2 5-4.4 6.6v5.5h7.1c4.1-3.8 6.6-9.4 6.6-16.1z"/>
     <path fill="#34A853" d="M24 46c5.9 0 10.9-2 14.5-5.4l-7.1-5.5c-2 1.3-4.5 2.1-7.4 2.1-5.7 0-10.5-3.8-12.2-9H4.5v5.7C8.1 41.1 15.5 46 24 46z"/>
     <path fill="#FBBC05" d="M11.8 28.2c-.4-1.3-.7-2.7-.7-4.2s.2-2.9.7-4.2v-5.7H4.5C3 17 2.1 20.4 2.1 24s.9 7 2.4 9.9l7.3-5.7z"/>
     <path fill="#EA4335" d="M24 10.8c3.2 0 6.1 1.1 8.4 3.3l6.3-6.3C34.9 4.2 29.9 2 24 2 15.5 2 8.1 6.9 4.5 14.1l7.3 5.7c1.7-5.2 6.5-9 12.2-9z"/>
@@ -18708,7 +18708,7 @@ function FraicheurDonnees({ jours, compte, comptes = null, siAJour = true }) {
 // la marque dans SA couleur sur un fond très pâle de la même teinte — la seule
 // couleur de l'en-tête, petite (§7). eBay : le logo seul (le nom reste pour les
 // lecteurs d'écran).
-const COULEUR_PLATEFORME = { vinted: '#007782', leboncoin: '#EC5A13', ebay: '#0064D2' };
+const COULEUR_PLATEFORME = { vinted: '#007782', leboncoin: '#EC5A13', ebay: '#0071E3' };
 // (17 oct.) Julien : « trop de texte, ça rend moche » (écran Annonces eBay). Une
 // explication qui ne change pas d'une fois à l'autre se replie derrière un « ⓘ »
 // au bout du titre : le titre et les gestes restent, le POURQUOI s'ouvre au clic.
@@ -20217,7 +20217,7 @@ function ebayTitre(base, taille, max) {
 // toucher au reste de l'app. Les clés couvrent exactement celles utilisées ici.
 // Valeurs relevées sur ses captures eBay (iOS, mode sombre) : fond NOIR pur,
 // cartes gris iOS (#1C1C1E) bien détachées, champs un cran plus clairs (#2C2C2E),
-// texte blanc, gris iOS (#8E8E93), bleu eBay des boutons (#3665F3). Cartes PLATES
+// texte blanc, gris iOS (#8E8E93), bleu eBay des boutons (#0071E3). Cartes PLATES
 // (pas d'ombre, pas de bordure) — c'est le contraste gris/noir qui détache.
 // Tous les espaces suivent le thème choisi, y compris eBay.
 // (1er nov.) Le compte eBay vit dans Paramètres → Comptes eBay depuis le 31 oct. :
@@ -29005,14 +29005,14 @@ const Box = React.memo(function Box({val,isSold,highlight}) {
   if(!hasVal&&!highlight){
     return (
       <svg width={W+SW} height={H+TH} style={{display:'block'}}>
-        <rect x={0} y={TH} width={W} height={H} rx={2} fill="#2e2e2e"/>
+        <rect x={0} y={TH} width={W} height={H} rx={2} fill="#2C2C2E"/>
       </svg>
     );
   }
   let front,side,top,textCol;
   if(isSold)      {front='#8a1a2a';side='#5a0e1a';top='#aa2535';textCol='#ffaaaa';}
-  else if(hasVal) {front='#b07830';side='#7a5218';top='#d09040';textCol='#2a1200';}
-  else            {front='#2e2e2e';side='#1e1e1e';top='#3a3a3a';textCol='transparent';}
+  else if(hasVal) {front='#B25000';side='#B25000';top='#d09040';textCol='#B25000';}
+  else            {front='#2C2C2E';side='#1D1D1F';top='#3A3A3C';textCol='transparent';}
   return (
     <svg width={W+SW} height={H+TH} style={{display:'block',overflow:'visible',
       filter:highlight?'drop-shadow(0 0 8px #ffb830) drop-shadow(0 0 16px #ffb830) brightness(1.5)':'none'}}>
@@ -29028,17 +29028,17 @@ function Door({h}) {
   const W=80,H=h;
   return (
     <svg width={W} height={H} style={{display:'block',flexShrink:0}}>
-      <rect width={W} height={H} fill="#3a2a1a"/>
+      <rect width={W} height={H} fill="#2C2C2E"/>
       <rect x={4} y={4} width={W-8} height={H-4} rx={3} fill="#6a4828"/>
       <rect x={8} y={8} width={W-16} height={H-12} rx={2} fill="#c8a060"/>
-      <rect x={13} y={14} width={W-26} height={H*0.28} rx={2} fill="#b08848" stroke="#7a5820" strokeWidth="0.8"/>
-      <rect x={18} y={18} width={W-36} height={H*0.28-8} rx={1} fill="#88b8d8" opacity="0.4"/>
-      <rect x={13} y={14+H*0.28+8} width={W-26} height={H*0.42} rx={2} fill="#b08848" stroke="#7a5820" strokeWidth="0.8"/>
-      <circle cx={W-16} cy={H*0.56} r={5} fill="#d4a820" stroke="#8a6800" strokeWidth="1"/>
+      <rect x={13} y={14} width={W-26} height={H*0.28} rx={2} fill="#b08848" stroke="#B25000" strokeWidth="0.8"/>
+      <rect x={18} y={18} width={W-36} height={H*0.28-8} rx={1} fill="#8DB8F2" opacity="0.4"/>
+      <rect x={13} y={14+H*0.28+8} width={W-26} height={H*0.42} rx={2} fill="#b08848" stroke="#B25000" strokeWidth="0.8"/>
+      <circle cx={W-16} cy={H*0.56} r={5} fill="#d4a820" stroke="#B25000" strokeWidth="1"/>
       <circle cx={W-16} cy={H*0.56} r={2} fill="#ffe060"/>
-      <rect x={10} y={H*0.18} width={7} height={12} rx={1} fill="#4a3010"/>
-      <rect x={10} y={H*0.72} width={7} height={12} rx={1} fill="#4a3010"/>
-      <rect x={0} y={H-6} width={W} height={6} fill="#2a1a08"/>
+      <rect x={10} y={H*0.18} width={7} height={12} rx={1} fill="#B25000"/>
+      <rect x={10} y={H*0.72} width={7} height={12} rx={1} fill="#B25000"/>
+      <rect x={0} y={H-6} width={W} height={6} fill="#1D1D1F"/>
     </svg>
   );
 }
@@ -29538,7 +29538,7 @@ function generatePDF(inv,settings) {
 <style>
 body{font-family:Arial,sans-serif;color:#222;max-width:800px;margin:30px auto;padding:30px;background:#fff;}
 .header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:30px;}
-.logo{width:140px;height:140px;background:#0a0a0a;border-radius:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#fff;font-weight:800;text-align:center;padding:10px;box-sizing:border-box;}
+.logo{width:140px;height:140px;background:#000000;border-radius:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#fff;font-weight:800;text-align:center;padding:10px;box-sizing:border-box;}
 .logo .top{font-size:15px;letter-spacing:2px;border:1.5px solid #fff;border-radius:6px;padding:2px 8px;}
 .logo .shoe{font-size:50px;margin:8px 0;}
 .logo .bot{font-size:11px;letter-spacing:3px;}
@@ -29551,7 +29551,7 @@ body{font-family:Arial,sans-serif;color:#222;max-width:800px;margin:30px auto;pa
 .party-info{font-size:13px;line-height:1.5;}
 .party-info b{font-size:15px;}
 table{width:100%;border-collapse:collapse;margin-bottom:20px;}
-th{background:#f5f5f5;text-align:left;padding:10px;font-size:13px;border-bottom:2px solid #ddd;}
+th{background:#F2F2F7;text-align:left;padding:10px;font-size:13px;border-bottom:2px solid #ddd;}
 th.right{text-align:right;}
 td{padding:10px;font-size:13px;border-bottom:1px solid #eee;}
 td.right{text-align:right;}
@@ -29826,58 +29826,58 @@ const saveRoomPlan = async (data) => {
 // cintre), sinon 'colonne' (mur de boîtes : une case vidée fait tomber la
 // colonne). `build` = quel constructeur 3D utiliser.
 const FURN_TYPES = {
-  metal:   { label: 'Étagère métal', emoji: '🗄️', w: 1.2, h: 0.5, rows: 5, cols: 2, color: '#9aa3ad', h3d: 1.25, build: 'metal', cases: 'pile' },
+  metal:   { label: 'Étagère métal', emoji: '🗄️', w: 1.2, h: 0.5, rows: 5, cols: 2, color: '#AEAEB2', h3d: 1.25, build: 'metal', cases: 'pile' },
   bois:    { label: 'Étagère bois',  emoji: '📚', w: 1.2, h: 0.45, rows: 4, cols: 2, color: '#b08a5f', h3d: 1.2, build: 'metal', bois: true, cases: 'pile' },
-  bacs:    { label: 'Étagère à bacs', emoji: '🧺', w: 1.2, h: 0.45, rows: 4, cols: 3, color: '#9aa3ad', h3d: 1.25, build: 'metal', bacs: true, cases: 'pile' },
-  cintres: { label: 'Portant à cintres', emoji: '👕', w: 1.5, h: 0.5, rows: 1, cols: 8, color: '#8a8f98', h3d: 1.1, build: 'portant', cases: 'cintre' },
-  table:   { label: 'Table',   emoji: '🪵', w: 2, h: 1, rows: 1, cols: 3, color: '#b0916f', h3d: 0.5, build: 'table', cases: 'pile' },
+  bacs:    { label: 'Étagère à bacs', emoji: '🧺', w: 1.2, h: 0.45, rows: 4, cols: 3, color: '#AEAEB2', h3d: 1.25, build: 'metal', bacs: true, cases: 'pile' },
+  cintres: { label: 'Portant à cintres', emoji: '👕', w: 1.5, h: 0.5, rows: 1, cols: 8, color: '#8E8E93', h3d: 1.1, build: 'portant', cases: 'cintre' },
+  table:   { label: 'Table',   emoji: '🪵', w: 2, h: 1, rows: 1, cols: 3, color: '#8E8E93', h3d: 0.5, build: 'table', cases: 'pile' },
   pile:    { label: 'Boîtes au sol', emoji: '📦', w: 0.5, h: 0.5, rows: 5, cols: 1, cell: 0.5, start: 1, color: '#c9a24b', h3d: 0.34, build: 'pile', pile: true },
-  porte:   { label: 'Porte',   emoji: '🚪', w: 1, h: 0.35, rows: 1, cols: 1, color: '#b0916f', h3d: 1.4, build: 'porte', deco: true, structure: true },
-  fenetre: { label: 'Fenêtre', emoji: '🪟', w: 1.6, h: 0.35, rows: 1, cols: 1, color: '#dfe7ee', h3d: 1.0, build: 'fenetre', deco: true, structure: true },
+  porte:   { label: 'Porte',   emoji: '🚪', w: 1, h: 0.35, rows: 1, cols: 1, color: '#8E8E93', h3d: 1.4, build: 'porte', deco: true, structure: true },
+  fenetre: { label: 'Fenêtre', emoji: '🪟', w: 1.6, h: 0.35, rows: 1, cols: 1, color: '#E5E5EA', h3d: 1.0, build: 'fenetre', deco: true, structure: true },
   // ── ANCIENS TYPES (cachés de la palette, gardés pour les pièces existantes) ──
   commode: { label: 'Commode', emoji: '🗄️', w: 2, h: 1, rows: 3, cols: 1, color: '#c8935f', h3d: 1.0, build: 'commode', hidden: true },
-  etagere: { label: 'Étagère', emoji: '📚', w: 3, h: 1, rows: 4, cols: 3, color: '#7aa27a', h3d: 1.8, build: 'etagere', hidden: true },
-  casier:  { label: 'Casiers', emoji: '🔲', w: 2, h: 1, rows: 3, cols: 3, color: '#8a8f98', h3d: 1.6, build: 'etagere', hidden: true },
+  etagere: { label: 'Étagère', emoji: '📚', w: 3, h: 1, rows: 4, cols: 3, color: '#8E8E93', h3d: 1.8, build: 'etagere', hidden: true },
+  casier:  { label: 'Casiers', emoji: '🔲', w: 2, h: 1, rows: 3, cols: 3, color: '#8E8E93', h3d: 1.6, build: 'etagere', hidden: true },
   grille:  { label: 'Grille de boîtes', emoji: '🔳', w: 2, h: 0.5, rows: 3, cols: 4, cell: 0.5, color: '#c9a24b', h3d: 1.5, build: 'grille', hidden: true },
   armoire: { label: 'Armoire', emoji: '🚪', w: 2, h: 1, rows: 2, cols: 2, color: '#b08a5f', h3d: 1.9, build: 'armoire', hidden: true },
-  penderie:{ label: 'Penderie', emoji: '👕', w: 2, h: 1, rows: 1, cols: 4, color: '#6f8fb0', h3d: 1.6, build: 'penderie', hidden: true },
-  portant: { label: 'Portant', emoji: '👗', w: 2, h: 1, rows: 1, cols: 5, color: '#9a9aa2', h3d: 1.6, build: 'penderie', hidden: true },
+  penderie:{ label: 'Penderie', emoji: '👕', w: 2, h: 1, rows: 1, cols: 4, color: '#8E8E93', h3d: 1.6, build: 'penderie', hidden: true },
+  portant: { label: 'Portant', emoji: '👗', w: 2, h: 1, rows: 1, cols: 5, color: '#8E8E93', h3d: 1.6, build: 'penderie', hidden: true },
   carton:  { label: 'Boîte à empiler', emoji: '📦', w: 0.5, h: 0.5, rows: 1, cols: 1, color: '#c9a24b', h3d: 0.34, build: 'carton', box: true, hidden: true },
   boites:  { label: 'Boîtes',  emoji: '📦', w: 1, h: 1, rows: 2, cols: 2, color: '#c9a24b', h3d: 0.5, build: 'boites', hidden: true },
   bac:     { label: 'Bac',     emoji: '🧺', w: 1, h: 1, rows: 1, cols: 2, color: '#5fb0a3', h3d: 0.5, build: 'crate', hidden: true },
-  malle:   { label: 'Malle',   emoji: '🧳', w: 2, h: 1, rows: 1, cols: 2, color: '#8a6f57', h3d: 0.6, build: 'malle', hidden: true },
-  autre:   { label: 'Autre',   emoji: '🪑', w: 1, h: 1, rows: 2, cols: 2, color: '#9b8ec0', h3d: 1.0, build: 'generic', hidden: true },
+  malle:   { label: 'Malle',   emoji: '🧳', w: 2, h: 1, rows: 1, cols: 2, color: '#6E6E73', h3d: 0.6, build: 'malle', hidden: true },
+  autre:   { label: 'Autre',   emoji: '🪑', w: 1, h: 1, rows: 2, cols: 2, color: '#8E8E93', h3d: 1.0, build: 'generic', hidden: true },
   // ── DÉCOR ────────────────────────────────────────────────────────────────
   // Julien : « je veux un vrai jeu vidéo, je veux pouvoir tout créer dedans ».
   // Ces objets ne rangent RIEN (`deco: true`) : ils ne portent pas de case, ne
   // reçoivent pas de numéro et ne comptent dans aucun inventaire. Ils servent à
   // ce que la pièce ressemble à sa pièce — c'est ça qui fait qu'on s'y repère.
-  chaise:  { label: 'Chaise',  emoji: '🪑', w: 0.6, h: 0.6, rows: 1, cols: 1, color: '#8a6f57', h3d: 0.95, build: 'chaise', deco: true },
-  bureau:  { label: 'Bureau',  emoji: '🖥️', w: 1.6, h: 0.8, rows: 1, cols: 1, color: '#9c7b56', h3d: 0.76, build: 'bureau', deco: true },
-  canape:  { label: 'Canapé',  emoji: '🛋️', w: 2.2, h: 1,   rows: 1, cols: 1, color: '#5f7f9b', h3d: 0.85, build: 'canape', deco: true },
-  lit:     { label: 'Lit',     emoji: '🛏️', w: 2,   h: 1.6, rows: 1, cols: 1, color: '#7e8ba3', h3d: 0.6,  build: 'lit',    deco: true },
+  chaise:  { label: 'Chaise',  emoji: '🪑', w: 0.6, h: 0.6, rows: 1, cols: 1, color: '#6E6E73', h3d: 0.95, build: 'chaise', deco: true },
+  bureau:  { label: 'Bureau',  emoji: '🖥️', w: 1.6, h: 0.8, rows: 1, cols: 1, color: '#8E8E93', h3d: 0.76, build: 'bureau', deco: true },
+  canape:  { label: 'Canapé',  emoji: '🛋️', w: 2.2, h: 1,   rows: 1, cols: 1, color: '#6E6E73', h3d: 0.85, build: 'canape', deco: true },
+  lit:     { label: 'Lit',     emoji: '🛏️', w: 2,   h: 1.6, rows: 1, cols: 1, color: '#8E8E93', h3d: 0.6,  build: 'lit',    deco: true },
   tapis:   { label: 'Tapis',   emoji: '🟫', w: 2.4, h: 1.6, rows: 1, cols: 1, color: '#a8564f', h3d: 0.03, build: 'tapis',  deco: true },
   plante:  { label: 'Plante',  emoji: '🪴', w: 0.6, h: 0.6, rows: 1, cols: 1, color: '#3f7d4f', h3d: 1.3,  build: 'plante', deco: true },
   lampe:   { label: 'Lampadaire', emoji: '💡', w: 0.5, h: 0.5, rows: 1, cols: 1, color: '#d8c48a', h3d: 1.7, build: 'lampe', deco: true },
-  miroir:  { label: 'Miroir',  emoji: '🪞', w: 0.9, h: 0.3, rows: 1, cols: 1, color: '#cfd8e0', h3d: 1.6,  build: 'miroir', deco: true },
-  cadre:   { label: 'Cadre',   emoji: '🖼️', w: 0.8, h: 0.2, rows: 1, cols: 1, color: '#8a6f57', h3d: 0.6,  build: 'cadre',  deco: true },
-  poubelle:{ label: 'Poubelle',emoji: '🗑️', w: 0.5, h: 0.5, rows: 1, cols: 1, color: '#6b7280', h3d: 0.7,  build: 'poubelle', deco: true },
-  escabeau:{ label: 'Escabeau',emoji: '🪜', w: 0.7, h: 0.7, rows: 1, cols: 1, color: '#9aa0a6', h3d: 1.2,  build: 'escabeau', deco: true },
-  radiateur:{label: 'Radiateur',emoji:'♨️', w: 1.2, h: 0.3, rows: 1, cols: 1, color: '#e6e8ea', h3d: 0.6,  build: 'radiateur', deco: true },
-  velo:    { label: 'Vélo',    emoji: '🚲', w: 1.7, h: 0.6, rows: 1, cols: 1, color: '#3f4b5b', h3d: 1.0,  build: 'velo',   deco: true },
-  etabli:  { label: 'Établi',  emoji: '🛠️', w: 1.8, h: 0.8, rows: 1, cols: 1, color: '#8c7a63', h3d: 0.9,  build: 'etabli', deco: true },
+  miroir:  { label: 'Miroir',  emoji: '🪞', w: 0.9, h: 0.3, rows: 1, cols: 1, color: '#D1D1D6', h3d: 1.6,  build: 'miroir', deco: true },
+  cadre:   { label: 'Cadre',   emoji: '🖼️', w: 0.8, h: 0.2, rows: 1, cols: 1, color: '#6E6E73', h3d: 0.6,  build: 'cadre',  deco: true },
+  poubelle:{ label: 'Poubelle',emoji: '🗑️', w: 0.5, h: 0.5, rows: 1, cols: 1, color: '#6E6E73', h3d: 0.7,  build: 'poubelle', deco: true },
+  escabeau:{ label: 'Escabeau',emoji: '🪜', w: 0.7, h: 0.7, rows: 1, cols: 1, color: '#8E8E93', h3d: 1.2,  build: 'escabeau', deco: true },
+  radiateur:{label: 'Radiateur',emoji:'♨️', w: 1.2, h: 0.3, rows: 1, cols: 1, color: '#E5E5EA', h3d: 0.6,  build: 'radiateur', deco: true },
+  velo:    { label: 'Vélo',    emoji: '🚲', w: 1.7, h: 0.6, rows: 1, cols: 1, color: '#48484A', h3d: 1.0,  build: 'velo',   deco: true },
+  etabli:  { label: 'Établi',  emoji: '🛠️', w: 1.8, h: 0.8, rows: 1, cols: 1, color: '#6E6E73', h3d: 0.9,  build: 'etabli', deco: true },
 };
-const FURN_COLORS = ['#c8935f','#7aa27a','#6f8fb0','#b0916f','#c9a24b','#9b8ec0','#cf7b7b','#5fb0a3','#8a8f98','#3f3f46','#e0e0e4','#d98a3d'];
+const FURN_COLORS = ['#c8935f','#8E8E93','#8E8E93','#8E8E93','#c9a24b','#8E8E93','#cf7b7b','#5fb0a3','#8E8E93','#3A3A3C','#E5E5EA','#d98a3d'];
 // ── AMBIANCES du garage 3D : « crée ton propre univers ». Chaque preset ne fait
 // que changer des COULEURS et des INTENSITÉS de lumière (0 risque de casser le
 // rendu), appliquées en direct sur la scène. « Clair » = exactement le rendu
 // d'origine (aucune régression). wall/floor à null = on garde la matière de base.
 const GARAGE_AMBIANCES = [
-  { id:'clair',  name:'Clair',        emoji:'☀️', bg:'#eef1f6', sky:'#fff3e0', ground:'#a6a290', hemi:0.92, ambient:0.20, sun:'#fff1dc', sunI:1.05, fill:'#dfe8ff', fillI:0.32, wall:null,      floor:null,      exposure:1.12 },
-  { id:'chaud',  name:'Chaleureux',   emoji:'🔥', bg:'#efe6d8', sky:'#ffe4bd', ground:'#8a7a5a', hemi:0.95, ambient:0.22, sun:'#ffd6a0', sunI:1.15, fill:'#e8ddc8', fillI:0.24, wall:'#e8ded0', floor:'#ffe7cf', exposure:1.15 },
-  { id:'nuit',   name:'Néon nuit',    emoji:'🌙', bg:'#0e1220', sky:'#3a4a80', ground:'#0c0f18', hemi:0.55, ambient:0.16, sun:'#9fb8ff', sunI:0.85, fill:'#ff5fae', fillI:0.55, wall:'#161c2e', floor:'#242a40', exposure:1.28 },
-  { id:'luxe',   name:'Boutique luxe',emoji:'✨', bg:'#171310', sky:'#ffe6b8', ground:'#1c140c', hemi:0.50, ambient:0.20, sun:'#ffcf85', sunI:1.15, fill:'#fff0d0', fillI:0.30, wall:'#26201b', floor:'#5f4e3a', exposure:1.20 },
-  { id:'beton',  name:'Atelier béton',emoji:'🏗️', bg:'#d6d9dd', sky:'#e2e8ef', ground:'#9a9ea4', hemi:0.90, ambient:0.26, sun:'#f2f5ff', sunI:1.00, fill:'#dfe8ff', fillI:0.32, wall:'#c6cace', floor:'#c2c6ca', exposure:1.08 },
+  { id:'clair',  name:'Clair',        emoji:'☀️', bg:'#F2F2F7', sky:'#F2F2F7', ground:'#AEAEB2', hemi:0.92, ambient:0.20, sun:'#F2F2F7', sunI:1.05, fill:'#E5E5EA', fillI:0.32, wall:null,      floor:null,      exposure:1.12 },
+  { id:'chaud',  name:'Chaleureux',   emoji:'🔥', bg:'#E5E5EA', sky:'#FFF4E5', ground:'#6E6E73', hemi:0.95, ambient:0.22, sun:'#ffd6a0', sunI:1.15, fill:'#E5E5EA', fillI:0.24, wall:'#E5E5EA', floor:'#FFF4E5', exposure:1.15 },
+  { id:'nuit',   name:'Néon nuit',    emoji:'🌙', bg:'#1C1C1E', sky:'#3a4a80', ground:'#000000', hemi:0.55, ambient:0.16, sun:'#8DB8F2', sunI:0.85, fill:'#ff5fae', fillI:0.55, wall:'#1C1C1E', floor:'#2C2C2E', exposure:1.28 },
+  { id:'luxe',   name:'Boutique luxe',emoji:'✨', bg:'#1C1C1E', sky:'#FFF4E5', ground:'#1C1C1E', hemi:0.50, ambient:0.20, sun:'#ffcf85', sunI:1.15, fill:'#FFF4E5', fillI:0.30, wall:'#1D1D1F', floor:'#48484A', exposure:1.20 },
+  { id:'beton',  name:'Atelier béton',emoji:'🏗️', bg:'#D1D1D6', sky:'#E5E5EA', ground:'#8E8E93', hemi:0.90, ambient:0.26, sun:'#F2F2F7', sunI:1.00, fill:'#E5E5EA', fillI:0.32, wall:'#C7C7CC', floor:'#C7C7CC', exposure:1.08 },
 ];
 // VRAIE 3D (Three.js, chargé dynamiquement pour ne pas alourdir le bundle) :
 // pièce avec sol/murs/lumière, meubles en volumes 3D, caméra qu'on tourne au
@@ -29917,7 +29917,7 @@ const Room3D = React.lazy(() => import('./Room3D.jsx'));
 const StudioPhoto = React.lazy(() => import('./StudioPhoto.jsx'));
 // Un plan peut contenir PLUSIEURS pièces. On normalise l'ancien format
 // mono-pièce ({ room, items }) vers { rooms:[{id,name,room,items}], active }.
-const ROOM_DEFAULT = { w: 10, h: 8, wallH: 3.4, wallColor: '#e4e8ee' };
+const ROOM_DEFAULT = { w: 10, h: 8, wallH: 3.4, wallColor: '#E5E5EA' };
 function normalizePlan(p) {
   // (17 oct.) Une TABLE d'avant n'avait qu'une case invisible : on lui donne des
   // places sur son plateau, d'après sa largeur — seulement si elle est VIDE
@@ -31663,11 +31663,11 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
           <button className="vrm-icon-control vrm-b vrm-b-secondaire vrm-b-petit" type="button" aria-label="Augmenter la hauteur du plafond" onClick={() => patchRoom(r => ({ room: { ...r.room, wallH: Math.min(6, Math.round(((r.room.wallH || 3.4) + 0.4) * 10) / 10) } }))}>+</button>
           <button className="vrm-icon-control vrm-b vrm-b-secondaire vrm-b-petit" type="button" aria-label="Réduire la hauteur du plafond" onClick={() => patchRoom(r => ({ room: { ...r.room, wallH: Math.max(2.4, Math.round(((r.room.wallH || 3.4) - 0.4) * 10) / 10) } }))}>−</button>
           <span style={{ fontWeight: 800, marginLeft: 8 }}>Murs :</span>
-          {['#e4e8ee', '#dfe7d8', '#efe4d6', '#e2dced', '#d6e6ec', '#f0dede', '#d8dde3', '#2b2f36'].map(c => (
-            <button type="button" aria-label={`Couleur de mur ${['#e4e8ee', '#dfe7d8', '#efe4d6', '#e2dced', '#d6e6ec', '#f0dede', '#d8dde3', '#2b2f36'].indexOf(c)+1}`} aria-pressed={(room.wallColor || '#e4e8ee')===c} key={c} onClick={() => patchRoom(r => ({ room: { ...r.room, wallColor: c } }))} title="Couleur des murs" style={{ width: 18, height: 18, borderRadius: 6, background: c, border: (room.wallColor || '#e4e8ee') === c ? `2px solid ${C.accent}` : '1px solid rgba(0,0,0,0.2)', cursor: 'pointer', padding: 0 }} />
+          {['#E5E5EA', '#E5E5EA', '#E5E5EA', '#E5E5EA', '#E5E5EA', '#E5E5EA', '#E5E5EA', '#2C2C2E'].map(c => (
+            <button type="button" aria-label={`Couleur de mur ${['#E5E5EA', '#E5E5EA', '#E5E5EA', '#E5E5EA', '#E5E5EA', '#E5E5EA', '#E5E5EA', '#2C2C2E'].indexOf(c)+1}`} aria-pressed={(room.wallColor || '#E5E5EA')===c} key={c} onClick={() => patchRoom(r => ({ room: { ...r.room, wallColor: c } }))} title="Couleur des murs" style={{ width: 18, height: 18, borderRadius: 6, background: c, border: (room.wallColor || '#E5E5EA') === c ? `2px solid ${C.accent}` : '1px solid rgba(0,0,0,0.2)', cursor: 'pointer', padding: 0 }} />
           ))}
           <label title="Couleur libre des murs" style={{ width: 20, height: 20, borderRadius: 6, overflow: 'hidden', border: `1px solid ${C.border}`, cursor: 'pointer', position: 'relative', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, background: `conic-gradient(red,orange,yellow,lime,cyan,blue,magenta,red)` }}>
-            <input type="color" value={room.wallColor || '#e4e8ee'} onChange={e => patchRoom(r => ({ room: { ...r.room, wallColor: e.target.value } }))} style={{ position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer' }} />🎨
+            <input type="color" value={room.wallColor || '#E5E5EA'} onChange={e => patchRoom(r => ({ room: { ...r.room, wallColor: e.target.value } }))} style={{ position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer' }} />🎨
           </label>
         </div>
 
@@ -32576,7 +32576,7 @@ function StockMeubles() {
       </>);
     }
     return (
-      <div data-stock-modale="" onClick={fermerModal} style={{ position: 'fixed', inset: 0, background: 'rgba(2,5,10,0.55)', zIndex: 9400, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
+      <div data-stock-modale="" onClick={fermerModal} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 9400, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
         <div className="vrm-feuille-surface" onClick={(e) => e.stopPropagation()} style={{ width: 'min(540px,100%)', maxHeight: '86vh', overflowY: 'auto', background: C.card, border: `1px solid ${C.line}`, borderRadius: '20px 20px 0 0', padding: '18px 18px calc(20px + env(safe-area-inset-bottom,0px))' }}>
           <div style={{ display: 'flex', justifyContent: 'flex-end' }}><button type="button" onClick={fermerModal} aria-label="Fermer" style={{ background: 'transparent', border: 'none', color: C.muted, fontSize: 22, cursor: 'pointer', lineHeight: 1 }}>×</button></div>
           {corps}
@@ -34085,9 +34085,9 @@ const INV_STATUS = {
   // sous un texte blanc : en sombre l'encre est presque blanche (les deux
   // endroits qui le faisaient prennent l'accent, `onAccent`).
   online:       { label: 'En ligne',      get color() { return C.text; }, icon: '🟢' },
-  pending_sale: { label: 'Vente en cours', color: '#1D4FD6', icon: '⏳' },
-  sold:         { label: 'Vendu',         color: '#5C6672', icon: '💸' },
-  stock:        { label: 'Stock',         color: '#A15C00', icon: '📦' },
+  pending_sale: { label: 'Vente en cours', color: '#0071E3', icon: '⏳' },
+  sold:         { label: 'Vendu',         color: '#636366', icon: '💸' },
+  stock:        { label: 'Stock',         color: '#B25000', icon: '📦' },
 };
 // Normalise un titre pour comparer une annonce et une commande vendue (Vinted
 // renvoie le titre exact de l'article dans les deux). Insensible casse/espaces.
@@ -36535,7 +36535,7 @@ function MicroEntreprise({ taux, poserTaux, officiel, vlTaux, acreTaux }) {
     <summary>
       <span style={{ display: 'flex', flexDirection: 'column', gap: 2, flex: '1 1 auto', minWidth: 0 }}>
         <span style={{ fontSize: 15, fontWeight: 600, color: C.text }}>Ta micro-entreprise</span>
-        <span style={{ fontSize: 13, color: besoin ? (C.warn || '#B7791F') : C.muted, fontWeight: 500, lineHeight: 1.4 }}>{aConfirmer ? '1 question à confirmer · ' : ''}{seuilAlerte ? 'un seuil approche · ' : ''}taux {String(taux).replace('.', ',')} %{prochaine ? ` · ${prochaine.periode} à déclarer avant le ${prochaine.limite.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}` : ''} · seuils et impôts</span>
+        <span style={{ fontSize: 13, color: besoin ? (C.warn || '#B25000') : C.muted, fontWeight: 500, lineHeight: 1.4 }}>{aConfirmer ? '1 question à confirmer · ' : ''}{seuilAlerte ? 'un seuil approche · ' : ''}taux {String(taux).replace('.', ',')} %{prochaine ? ` · ${prochaine.periode} à déclarer avant le ${prochaine.limite.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}` : ''} · seuils et impôts</span>
       </span>
     </summary>
     <div data-micro-entreprise="" className="vrm-micro-grille" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 440px), 1fr))', gap: 12, alignItems: 'stretch', marginTop: 8 }}>{calendrier}{seuils}{profil}{impots}</div>
@@ -36553,7 +36553,7 @@ function SuiviUrssaf({ onNav, sansTitre = false }) {
   const jour = (d) => new Date(d).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' });
   const nomMois = (ym) => MOIS_NOMS_FR[Number(String(ym).slice(5)) - 1];
   const ETAT = { declaree: 'Notée déclarée', a_declarer: 'À déclarer', en_retard: 'Pas notée', en_cours: 'En cours' };
-  const ambre = C.warn || C.amber || '#B7791F';
+  const ambre = C.warn || C.amber || '#B25000';
   // (2 nov.) Dans « Le détail », le repli porte déjà le titre : pas de redite.
   const titre = sansTitre ? null : <div style={{ fontSize: 15, fontWeight: 700, color: C.text }}>Suivi de tes déclarations URSSAF</div>;
   if (suivi === undefined) return <Card style={{ padding: '14px 16px', marginTop: sansTitre ? 0 : 12 }}><div data-suivi-urssaf="charge">{titre}<div style={{ fontSize: 13, color: C.muted, marginTop: 6 }}>Lecture de tes déclarations…</div></div></Card>;
@@ -43259,7 +43259,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     updatePair(it, { reattribue: { ...f.reattribue, ecrit: new Date().toISOString() }, cartonVerifie: new Date().toISOString() });
   };
   const blocAEcrire = () => aEcrireCarton.length > 0 && (
-    <div data-numeros-a-ecrire={aEcrireCarton.length} style={{ background: C.card, border: `1px solid ${C.border}`, borderLeft: `3px solid ${C.warn || '#B45309'}`, borderRadius: 12, padding: '10px 12px', marginBottom: 12 }}>
+    <div data-numeros-a-ecrire={aEcrireCarton.length} style={{ background: C.card, border: `1px solid ${C.border}`, borderLeft: `3px solid ${C.warn || '#B25000'}`, borderRadius: 12, padding: '10px 12px', marginBottom: 12 }}>
       <div style={{ fontSize: 15, fontWeight: 700, color: C.text }}>{aEcrireCarton.length > 1 ? `${aEcrireCarton.length} nouveaux numéros à écrire sur tes cartons` : 'Un nouveau numéro à écrire sur un carton'}</div>
       <div style={{ fontSize: 12, color: C.text2, margin: '3px 0 6px', lineHeight: 1.45 }}>Ces numéros étaient portés par deux articles : VRM a donné un numéro neuf à l'un d'eux. Barre l'ancien sur son carton et écris le nouveau.</div>
       {aEcrireCarton.map((it) => { const f = numeros[it.id] || {}; return (
@@ -49266,7 +49266,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                         {ph && !imgMortes.has(ph)
                           ? <PhotoVinted src={ph} alt="" loading="lazy" onError={()=>noterImgMorte(ph)} style={{width:'100%',height:'100%',objectFit:'cover'}}/>
                           : <Icon name="image" size={30} style={{color:C.muted,opacity:.5}}/>}
-                        {num && <span style={{position:'absolute',top:9,right:9,fontSize:11,fontWeight:700,color:'#fff',background:'rgba(11,15,21,.62)',borderRadius:12,padding:'2px 8px'}}>N°{num}</span>}
+                        {num && <span style={{position:'absolute',top:9,right:9,fontSize:11,fontWeight:700,color:'#fff',background:'rgba(0,0,0,.62)',borderRadius:12,padding:'2px 8px'}}>N°{num}</span>}
                       </div>
                       <div style={{padding:'10px 11px 11px'}}>
                         <UneLigne texte={o.title||'—'} title={o.title||undefined} style={{display:'block',fontSize:13,fontWeight:600,color:C.text,overflow:'hidden',whiteSpace:'nowrap'}}/>
@@ -51989,7 +51989,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         {listings.items && !listings.error && listings.items.length===0 && blocMasquees()}
           {blocAEcrire()}
           {aVerifierCarton.length > 0 && (
-          <details data-numeros-a-verifier={aVerifierCarton.length} className="vrm-repli" open style={{ background: C.card, border: `1px solid ${C.border}`, borderLeft: `3px solid ${C.warn || '#B45309'}`, borderRadius: 12, padding: '4px 12px 10px', marginBottom: 12 }}>
+          <details data-numeros-a-verifier={aVerifierCarton.length} className="vrm-repli" open style={{ background: C.card, border: `1px solid ${C.border}`, borderLeft: `3px solid ${C.warn || '#B25000'}`, borderRadius: 12, padding: '4px 12px 10px', marginBottom: 12 }}>
             <summary style={{ fontSize: 15, fontWeight: 700, color: C.text }}>
               {aVerifierCarton.length} numéro{aVerifierCarton.length > 1 ? 's' : ''} à vérifier
             </summary>
@@ -53303,7 +53303,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   return (
                     <div data-noswipe="1" data-lot={L.length} role="dialog" aria-modal="true" aria-label="Bordereaux à imprimer"
                       onClick={e=>{ if(e.target===e.currentTarget) setLot(null); }}
-                      style={{position:'fixed',inset:0,zIndex:9000,background:'rgba(10,15,25,.45)',display:'flex',alignItems:'center',justifyContent:'center',padding:16}}>
+                      style={{position:'fixed',inset:0,zIndex:9000,background:'rgba(0,0,0,.45)',display:'flex',alignItems:'center',justifyContent:'center',padding:16}}>
                       <FermeAuRetour fermer={()=>setLot(null)}/>
                       <div style={{background:C.card,color:C.text,borderRadius:12,width:'100%',maxWidth:560,maxHeight:'86vh',display:'flex',flexDirection:'column',boxShadow:C.shadowLg||'0 16px 48px rgba(0,0,0,.2)'}}>
                         <div style={{padding:'16px 18px 10px',borderBottom:`1px solid ${C.border}`}}>
@@ -55856,7 +55856,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         <div onClick={()=>setQrView(null)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.82)',zIndex:1400,display:'flex',alignItems:'center',justifyContent:'center',padding:16}}>
           <FermeAuRetour fermer={()=>setQrView(null)}/>
           <div onClick={e=>e.stopPropagation()} style={{background:'#fff',width:'100%',maxWidth:420,borderRadius:12,padding:'22px 20px 18px',display:'flex',flexDirection:'column',alignItems:'center',gap:14,boxShadow:'0 12px 40px rgba(0,0,0,0.4)'}}>
-            {qrView.photo && <PhotoVinted src={qrView.photo} alt="" loading="lazy" style={{width:64,height:64,borderRadius:12,objectFit:'cover',border:'1px solid #e3e3e3'}}/>}
+            {qrView.photo && <PhotoVinted src={qrView.photo} alt="" loading="lazy" style={{width:64,height:64,borderRadius:12,objectFit:'cover',border:'1px solid #E5E5EA'}}/>}
             <div style={{fontSize:15,fontWeight:700,color:'#111',textAlign:'center',lineHeight:1.3}}>{qrView.title}</div>
             {/* Vrai QR uniquement (Chronopost). Si l'image hébergée ne charge
                 pas, on bascule sur le code — surtout pas sur un QR fabriqué. */}
@@ -55888,7 +55888,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             )}
             {qrView.lieu && <div style={{fontSize:13,fontWeight:600,color:'#111',textAlign:'center',lineHeight:1.35}}>{qrView.lieu}</div>}
             {qrView.limite && (()=>{ const j=Math.ceil((new Date(qrView.limite+'T23:59:59')-Date.now())/86400000);
-              return <div style={{fontSize:12,fontWeight:700,color:j<=2?'#c53030':'#9a5b16',textAlign:'center'}}>
+              return <div style={{fontSize:12,fontWeight:700,color:j<=2?'#c53030':'#B25000',textAlign:'center'}}>
                 {j<0?'délai de retrait dépassé':j===0?'dernier jour pour le retirer':j===1?'⏰ à retirer demain':`🗓 à retirer avant le ${new Date(qrView.limite).toLocaleDateString('fr-FR')} · ${j} j`}
               </div>; })()}
             {qrView.suivi && (qrView.img || qrView.code) && <div style={{fontSize:11,color:'#666'}}>{qrView.carrier?`${carrierName(qrView.carrier)} · `:''}n° {qrView.suivi}</div>}
@@ -62902,7 +62902,7 @@ function AppCoeur() {
   const toggleDark=()=>{ const d=!dark; setDark(d); save('vinted_dark',d); };
   // ⚠️⚠️ LE THÈME NE VIVAIT QUE DANS REACT. `C` était bien remplacé, mais le
   //    DOCUMENT lui-même restait clair : mesuré le 9 septembre, app en sombre,
-  //    `document.body` à `rgb(246,247,249)` et `theme-color` à `#F6F7F9` —
+  //    `document.body` à `rgb(246,247,249)` et `theme-color` à `#F2F2F7` —
   //    parce qu'`index.html` ne gérait le sombre que par `prefers-color-scheme`,
   //    c'est-à-dire la préférence du SYSTÈME, alors que le mode sombre de VRM
   //    est un CHOIX (§7). Téléphone en clair + app en sombre, et il obtenait :
@@ -65499,7 +65499,7 @@ function AppCoeur() {
             ne répondait pas. `baseKO` distingue « aucun compte » de « je n'ai
             pas pu lire », et l'écran le DIT au lieu de repartir de zéro. */}
         {/* (3 nov., critique #2/#9) Un grand titre sur CHAQUE écran : la barre du haut ne le dit plus. */}
-        {(tab==='garage'||tab==='communaute')&&<header className="vrm-market-heading vrm-tache-tete" data-titre-ecran-grand=""><h1>{titreCourant}</h1></header>}
+        {tab==='communaute'&&<header className="vrm-market-heading vrm-tache-tete" data-titre-ecran-grand=""><h1>{titreCourant}</h1></header>}
         {tab==='dashboard'&&!premierJour&&<div className="vrm-rubriques" style={{padding:'12px 16px 0'}}><PlatSubNav sub={platSub==='prix'?'prix':'stats'} setSub={setPlatSub} sections={[['stats','Vue d’ensemble'],['prix','Prix qui marche']]}/></div>}
         {tab==='dashboard'&&platSub==='prix'&&<PrixMarche data={pqmData} baseKO={baseKO}/>}
         {tab==='dashboard'&&premierJour&&<Onboarding setTab={setTab}/>}

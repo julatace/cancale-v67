@@ -23,7 +23,7 @@
   -webkit-tap-highlight-color:transparent;
 }
 button.vrm-set-ligne { cursor:pointer; }
-button.vrm-set-ligne:active { background:var(--vrm-set-appui, rgba(15,23,42,.05)); }
+button.vrm-set-ligne:active { background:var(--vrm-set-appui, rgba(0,0,0,.05)); }
 .vrm-set-ligne + .vrm-set-ligne::before { content:''; position:absolute; top:0; right:0; left:56px; height:1px; background:var(--vrm-set-filet); }
 .vrm-set-ic { width:28px; height:28px; border-radius:12px; flex-shrink:0; display:flex; align-items:center; justify-content:center; }
 .vrm-set-lib { flex:1; min-width:0; display:block; }
@@ -38,11 +38,11 @@ button.vrm-set-ligne:active { background:var(--vrm-set-appui, rgba(15,23,42,.05)
 /* Interrupteur : une seule forme dans tout l'écran. L'élément fait 51 × 44
    (la cible du doigt) ; la piste et le bouton rond sont dessinés dedans. */
 .vrm-switch { position:relative; flex-shrink:0; width:51px; height:44px; min-height:44px !important; min-width:51px !important; padding:0 !important; border:0 !important; border-radius:0 !important; background:transparent !important; cursor:pointer; -webkit-tap-highlight-color:transparent; }
-.vrm-switch::before { content:''; position:absolute; left:0; top:6.5px; width:51px; height:31px; border-radius:999px; background:var(--vrm-sw, rgba(120,120,128,.3)); transition:background-color .2s ease; }
+.vrm-switch::before { content:''; position:absolute; left:0; top:6.5px; width:51px; height:31px; border-radius:999px; background:var(--vrm-sw, rgba(0,0,0,.3)); transition:background-color .2s ease; }
 .vrm-switch::after { content:''; position:absolute; top:8.5px; left:2px; width:27px; height:27px; border-radius:50%; background:#fff; box-shadow:0 2px 4px rgba(0,0,0,.18), 0 0 0 .5px rgba(0,0,0,.05); transition:transform .22s cubic-bezier(.3,.7,.4,1); }
 .vrm-switch[aria-checked="true"]::after { transform:translateX(20px); }
 .vrm-switch:disabled { opacity:.45; cursor:default; }
-.vrm-switch:focus-visible { outline:2px solid var(--vrm-focus,#2458E6); outline-offset:2px; border-radius:999px !important; }
+.vrm-switch:focus-visible { outline:2px solid var(--vrm-focus,#0071E3); outline-offset:2px; border-radius:999px !important; }
 /* Sous-écran (téléphone) : une barre de retour, un titre, puis le panneau. */
 .vrm-set-nav { display:flex; align-items:center; min-height:44px; margin:0 0 4px -10px; }
 .vrm-set-retour { display:inline-flex; align-items:center; gap:2px; border:0; background:transparent; min-height:44px; padding:0 10px 0 4px; font-size:17px; font-weight:500; font-family:inherit; cursor:pointer; }
@@ -74,7 +74,7 @@ button.vrm-set-ligne:active { background:var(--vrm-set-appui, rgba(15,23,42,.05)
 }
 @media(max-width:1023px) { .vrm-set-sommaire { display:none; } }
 @media(hover:hover) and (pointer:fine) {
-  button.vrm-set-ligne:hover { background:var(--vrm-set-appui, rgba(15,23,42,.04)); }
+  button.vrm-set-ligne:hover { background:var(--vrm-set-appui, rgba(0,0,0,.04)); }
 }
 .vrm-set-sans-titre > .vrm-set-panneau > div:first-child > div:first-child { display:none; }
 /* Un panneau dont le titre partage sa ligne avec un verdict (Sécurité des données) :
@@ -127,19 +127,19 @@ button.vrm-set-ligne:active { background:var(--vrm-set-appui, rgba(15,23,42,.05)
 .vrm-settings-todo small{display:block;font-size:12px;margin-top:3px;}
 .vrm-settings-todo button:not(.vrm-b){font:inherit;font-size:12px;min-height:40px;padding:6px 12px;border:1px solid;border-radius:12px;background:transparent;cursor:pointer;}
 .vrm-settings-scope{font-size:11px;margin:4px 0 10px;}
-.vrm-placement-overlay{position:fixed;inset:0;z-index:12000;background:#0a192b99;display:grid;place-items:center;padding:16px;}
+.vrm-placement-overlay{position:fixed;inset:0;z-index:12000;background:#1C1C1E99;display:grid;place-items:center;padding:16px;}
 .vrm-placement-panel{width:100%;max-width:1050px;max-height:90dvh;overflow:auto;border-radius:14px;padding:20px;box-sizing:border-box;}
 .vrm-placement-panel h2{margin:0;font-size:20px;}
 .vrm-placement-panel p{font-size:13px;line-height:1.5;}
-.vrm-placement-panel button{min-height:44px;padding:8px 14px;font:inherit;font-size:13px;cursor:pointer;border-radius:12px;border:1px solid #839596;background:transparent;color:inherit;}
+.vrm-placement-panel button{min-height:44px;padding:8px 14px;font:inherit;font-size:13px;cursor:pointer;border-radius:12px;border:1px solid #8E8E93;background:transparent;color:inherit;}
 .vrm-placement-panel button:disabled{opacity:.5;cursor:default;}
 .vrm-placement-pages{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:16px;}
 .vrm-placement-pages>div{min-width:0;overflow:auto;font-size:12px;}
-.vrm-placement-pages canvas{display:block;max-width:100%;height:auto;border:1px solid #dce2e2;margin-top:8px;}
+.vrm-placement-pages canvas{display:block;max-width:100%;height:auto;border:1px solid #E5E5EA;margin-top:8px;}
 .vrm-placement-pages canvas[hidden]{display:none;}
 .vrm-placement-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:16px;}
 @media(max-width:767px){.vrm-placement-pages{grid-template-columns:1fr;}.vrm-placement-panel{padding:14px;}.vrm-placement-overlay{padding:10px;}}
-.vrm-settings-help details{padding:12px 0;border-bottom:1px solid #dce2e2;font-size:13px;line-height:1.6;}
+.vrm-settings-help details{padding:12px 0;border-bottom:1px solid #E5E5EA;font-size:13px;line-height:1.6;}
 .vrm-settings-help summary{font-weight:600;cursor:pointer;min-height:36px;}
 .vrm-settings-help button:not(.vrm-b){min-height:44px;padding:8px 12px;border:1px solid currentColor;border-radius:12px;background:transparent;color:inherit;font:inherit;cursor:pointer;}
 .vrm-numeros-recap{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px 16px;border:1px solid;border-radius:12px;padding:14px;margin-top:12px;font-size:13px;align-items:center;}

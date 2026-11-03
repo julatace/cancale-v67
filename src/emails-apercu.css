@@ -10,7 +10,7 @@
 /* L'aperçu */
 .vrm-emails-apercu { display: flex; flex-direction: column; gap: 0; }
 .vrm-apercu-reponse { display: grid; grid-template-columns: 14px minmax(0, 1fr) auto; gap: 12px; align-items: start; padding: 18px 20px 16px; }
-.vrm-apercu-pastille { width: 10px; height: 10px; border-radius: 50%; margin-top: 7px; background: var(--muted, #86868b); }
+.vrm-apercu-pastille { width: 10px; height: 10px; border-radius: 50%; margin-top: 7px; background: var(--muted, #8E8E93); }
 [data-apercu-reponse=oui] .vrm-apercu-pastille { background: var(--vrm-accent, #0071E3); }
 [data-apercu-reponse=verifier] .vrm-apercu-pastille { background: var(--email-ambre, #b25000); }
 .vrm-apercu-reponse h3 { font-size: 17px !important; font-weight: 600 !important; letter-spacing: -.01em; margin: 0 !important; line-height: 1.3; color: var(--text, inherit); }
@@ -31,7 +31,7 @@
 .vrm-reception .vrm-apercu-lien { all: unset; box-sizing: border-box; display: flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%; min-height: 44px; cursor: pointer; font-size: 15px; color: var(--text, inherit); }
 .vrm-reception .vrm-apercu-lien:hover { background: transparent; }
 .vrm-reception .vrm-apercu-lien:focus-visible { outline: 2px solid var(--vrm-accent, #0071E3); outline-offset: 2px; border-radius: 6px; }
-.vrm-apercu-lien > span[aria-hidden] { color: var(--muted, #86868b); font-size: 17px; }
+.vrm-apercu-lien > span[aria-hidden] { color: var(--muted, #8E8E93); font-size: 17px; }
 .vrm-apercu-note { font-size: 12px !important; color: var(--muted, #6e6e73); margin: 6px 0 4px !important; line-height: 1.45; }
 .vrm-apercu-rien { margin: 0 !important; padding: 12px 20px 14px; border-top: 1px solid var(--border, #e5e5ea); font-size: 15px; }
 .vrm-apercu-adresse { display: flex; flex-direction: column; min-width: 0; }

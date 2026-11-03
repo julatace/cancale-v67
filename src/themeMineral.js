@@ -21,16 +21,18 @@
 // #0F0F0E, #56564F…) : deux palettes côte à côte faisaient « deux apps collées ».
 // Le texte secondaire (muted ET faint) reste à #6E6E73 en clair : 4,5:1 sur le fond gris,
 // 5:1 sur le blanc (le #8E8E93 d'iOS tombait à 2,9:1). Bleu d'Apple rare, ambre pour un
-// geste à faire, rouge seulement pour deux articles sous un N° (§7).
+// geste à faire, rouge seulement pour deux articles sous un N° (§7). L'accent du TEXTE en clair est
+// #0066CC (le bleu des liens d'Apple : 5,3:1 sur le fond gris, #0071E3 n'y tenait que 4,2:1) ;
+// les aplats Fusion gardent #0071E3 (`--fu-bleu`).
 export const MINERAL = Object.freeze({
  bg:'#F2F2F7',surface:'#FFFFFF',card:'#FFFFFF',card2:'#F2F2F7',
  border:'#E5E5EA',text:'#1D1D1F',muted:'#6E6E73',faint:'#6E6E73',
- accent:'#0071E3',accentSoft:'#4A9BEF',onAccent:'#FFFFFF',
+ accent:'#0066CC',accentSoft:'#4A9BEF',onAccent:'#FFFFFF',
  danger:'#D70015',warn:'#B25000',warnSoft:'#FFF4E5',gold:'#B25000',blue:'#6E6E73',purple:'#6E6E73',
  shadow:'none',
  shadowMd:'0 1px 2px rgba(0,0,0,.04), 0 6px 20px rgba(0,0,0,.05)',
  shadowLg:'0 6px 16px rgba(0,0,0,.08), 0 24px 56px rgba(0,0,0,.14)',
- ring:'rgba(0,113,227,.20)',glass:'#FFFFFF',bar:'#F2F2F7',hair:'rgba(0,0,0,.06)',
+ ring:'rgba(0,102,204,.20)',glass:'#FFFFFF',bar:'#F2F2F7',hair:'rgba(0,0,0,.06)',
  sidebar:'#F2F2F7',chrome:'#F2F2F7',onChrome:'#1D1D1F',chromeMuted:'#6E6E73',chromeLine:'#E5E5EA',
  chromeGradient:'#F2F2F7',photo:'#F2F2F7',
  s1:'#0071E3',s2:'#8DB8F2',selection:'#0071E3'

@@ -1,9 +1,9 @@
 /* Finition Gestion : mêmes surfaces, repères et rythmes dans les espaces métier.
    Les zones interactives restent à taille réelle, sans zoom de la page. */
 .vrm-app-shell{
- --gestion-surface:var(--vrm-surface,#FFFFFF);--gestion-soft:var(--vrm-card2,#EAF0EC);
+ --gestion-surface:var(--vrm-surface,#FFFFFF);--gestion-soft:var(--vrm-card2,#F2F2F7);
  --gestion-line:var(--vrm-line,#E5E5EA);--gestion-ink:var(--vrm-ink,#1D1D1F);
- --gestion-muted:var(--vrm-muted,#53696D);--gestion-accent:var(--vrm-accent,#0071E3);
+ --gestion-muted:var(--vrm-muted,#636366);--gestion-accent:var(--vrm-accent,#0071E3);
  --gestion-on-accent:#fff;
 }
 :root[data-theme=dark] .vrm-app-shell{--gestion-on-accent:#173A40;}
@@ -94,7 +94,7 @@
 .vrm-main .vrm-finance-stock-grid{gap:12px!important;}
 .vrm-main :is(.vrm-stats-hero,.vrm-stats-calcul,.vrm-finance-stock){border-radius:12px!important;box-shadow:none!important;}
 /* L'espace équipe utilise aussi ce fichier lorsqu'il est rendu sans AppCoeur. */
-.vrm-operations{--ops-line:#dce5e1;}
+.vrm-operations{--ops-line:#E5E5EA;}
 .vrm-operations .ops-liste{grid-template-columns:1fr;gap:0;border:1px solid var(--ops-line);border-radius:12px;overflow:hidden;}
 .vrm-operations .ops-carte{border:0;border-bottom:1px solid var(--ops-line);border-radius:0;padding:14px 16px;box-shadow:none;}
 .vrm-operations .ops-carte:last-child{border-bottom:0;}
@@ -154,7 +154,7 @@
 /* (1er nov.) Téléphone : la feuille d'une vente couvre le bas de l'écran ; le temps qu'elle est ouverte, la page garde
    une marge de sa hauteur (posée par LigneVenteCompacte) pour que la ligne ouverte remonte au-dessus d'elle. */
 @media(max-width:767px){html[data-feuille-vente] .vrm-app-shell:not(.vrm-ledger-drawer-host)>.vrm-main::after{content:'';display:block;height:var(--vrm-feuille-vente,0px);pointer-events:none;}}
-.vrm-ledger-drawer{pointer-events:auto;position:absolute;right:0;top:0;bottom:0;width:min(460px,100%);display:flex;flex-direction:column;background:var(--gestion-surface);color:var(--gestion-ink);border-left:1px solid var(--gestion-line);box-shadow:-12px 0 40px #14282e20;}
+.vrm-ledger-drawer{pointer-events:auto;position:absolute;right:0;top:0;bottom:0;width:min(460px,100%);display:flex;flex-direction:column;background:var(--gestion-surface);color:var(--gestion-ink);border-left:1px solid var(--gestion-line);box-shadow:-12px 0 40px #1D1D1F20;}
 .vrm-ledger-drawer-head{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;padding:22px 20px 18px;border-bottom:1px solid var(--gestion-line);background:var(--gestion-soft);}
 .vrm-ledger-drawer-head>div{min-width:0;}
 .vrm-ledger-drawer-head span{font-size:11px;font-weight:600;letter-spacing:.08em;color:var(--gestion-muted);}
@@ -180,7 +180,7 @@
  .vrm-main .vrm-ann-toolbar{padding:12px!important;border-radius:12px!important;background:var(--gestion-surface)!important;}
 }
 @media(max-width:767px){
- .vrm-ledger-drawer{width:100%;top:auto;max-height:82dvh;border-left:0;border-top:1px solid var(--gestion-line);border-radius:14px 14px 0 0;box-shadow:0 -12px 40px #14282e30;padding-bottom:env(safe-area-inset-bottom);}
+ .vrm-ledger-drawer{width:100%;top:auto;max-height:82dvh;border-left:0;border-top:1px solid var(--gestion-line);border-radius:14px 14px 0 0;box-shadow:0 -12px 40px #1D1D1F30;padding-bottom:env(safe-area-inset-bottom);}
  .vrm-ledger-drawer-head{padding:14px 14px 12px;border-radius:14px 14px 0 0;}
  .vrm-ledger-drawer-head h2{font-size:15px;margin:5px 0;}
  .vrm-ledger-drawer .vrm-main.vrm-ledger-drawer-body{padding:14px!important;}
@@ -293,13 +293,13 @@
 .vrm-main .vrm-set-champ:focus-visible{outline:2px solid var(--gestion-accent);outline-offset:2px;border-radius:6px;}
 .vrm-main .vrm-set-titre{margin-left:12px;font-size:12px;line-height:1.5;}
 .vrm-main .vrm-set-carte-tete{padding-bottom:12px;border-bottom:1px solid var(--gestion-line);}
-.vrm-feuille{box-shadow:0 12px 48px #14282e24;border:1px solid var(--vrm-hair,#dce5e1);}
+.vrm-feuille{box-shadow:0 12px 48px #1D1D1F24;border:1px solid var(--vrm-hair,#E5E5EA);}
 .vrm-feuille :is(input,textarea,select):focus-visible{outline:2px solid var(--vrm-focus,#0071E3);outline-offset:2px;}
 /* Les messages éphémères sont rendus hors de la coque par React. */
 .vrm-toasts{--message-surface:var(--vrm-surface,#FFFFFF);--message-ink:var(--vrm-ink,#1D1D1F);--message-line:var(--vrm-line,#E5E5EA);}
 .vrm-toast{
  min-height:48px;border-radius:12px!important;border-color:var(--message-line)!important;
- background:var(--message-surface)!important;box-shadow:0 4px 20px #14282e1f!important;
+ background:var(--message-surface)!important;box-shadow:0 4px 20px #1D1D1F1f!important;
 }
 .vrm-toast>span:last-child{color:var(--message-ink)!important;min-width:0;overflow-wrap:anywhere;}
 .vrm-toast-icon{display:flex;align-items:center;justify-content:center;flex-shrink:0;width:24px;height:24px;}
@@ -315,7 +315,7 @@
  color:var(--gestion-muted);opacity:1;line-height:1.6;
 }
 .vrm-main .vrm-reception-entete-liste{background:var(--gestion-soft);}
-.vrm-main .vrm-ann-tools-pop{border-color:var(--gestion-line)!important;border-radius:12px!important;box-shadow:0 8px 28px #14282e20!important;}
+.vrm-main .vrm-ann-tools-pop{border-color:var(--gestion-line)!important;border-radius:12px!important;box-shadow:0 8px 28px #1D1D1F20!important;}
 .vrm-main .vrm-ann-tools-pop button{border-radius:6px;}
 .vrm-main .vrm-ann-tools-pop button:focus-visible{outline:2px solid var(--gestion-accent);outline-offset:-2px;}
 /* (22 oct.) « ⋯ Outils » des Ventes : sous 1 024 px la rangée des filtres défile
@@ -332,8 +332,8 @@
 
 /* Perle : fondus limités aux surfaces, jamais aux informations. */
 .vrm-app-shell .vrm-atelier-rail{background-image:var(--vrm-nav-gradient)!important;}
-.vrm-app-shell .vrm-main{background-image:radial-gradient(ellipse at 5% 0%,#91b1a514,transparent 64%)!important;}
-.vrm-rail-button[aria-current=page]::before,.vrm-rail-button[data-active]::before{background:#CABDA0;}
+.vrm-app-shell .vrm-main{background-image:radial-gradient(ellipse at 5% 0%,#AEAEB214,transparent 64%)!important;}
+.vrm-rail-button[aria-current=page]::before,.vrm-rail-button[data-active]::before{background:#C7C7CC;}
 .vrm-main :is(.vrm-surface,.vrm-day-card,.vrm-set-carte,.vrm-kpi-ventes-grille){border-color:var(--gestion-line)!important;}
 .vrm-main .vrm-set-carte{background:var(--gestion-surface);}
 .vrm-main .vrm-notice[data-tone=info]>span:first-child{background:var(--gestion-accent)!important;}
@@ -471,5 +471,5 @@
 .vrm-sales-workbar>.vrm-filtres-et-outils>.vrm-outils-ventes>button{min-height:40px;white-space:nowrap;}
 /* (30 oct.) « N° et frais » dans la feuille d'une vente : une rangée repliable comme
    les autres (sans bordure grise, chevron à droite), pas une 4ᵉ forme. */
-.vrm-ledger-drawer-body .vrm-sale-details>summary{border:0!important;background:var(--vrm-b-teinte,rgba(36,78,84,.08))!important;border-radius:12px!important;display:flex!important;align-items:center;justify-content:space-between;gap:8px;}
+.vrm-ledger-drawer-body .vrm-sale-details>summary{border:0!important;background:var(--vrm-b-teinte,rgba(0,0,0,.08))!important;border-radius:12px!important;display:flex!important;align-items:center;justify-content:space-between;gap:8px;}
 .vrm-ledger-drawer-body .vrm-sale-details>summary::after{margin-left:auto!important;}

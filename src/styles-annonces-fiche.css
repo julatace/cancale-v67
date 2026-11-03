@@ -145,9 +145,9 @@
   :root body .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche .vrm-fiche-plus-bouton { order: 3; }
   /* Le prix d'achat manquant : le geste à faire, en ambre (fermée comme ouverte). */
   :root body .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche [data-fiche-achat="inconnu"] {
-    border-color: var(--vrm-warn, #B7791F) !important; background: var(--vrm-warn-soft, transparent) !important;
+    border-color: var(--vrm-warn, #B25000) !important; background: var(--vrm-warn-soft, transparent) !important;
   }
-  :root body .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche [data-fiche-achat="inconnu"] .vrm-fiche-etat-haut > span:first-child { color: var(--vrm-warn, #B7791F) !important; }
+  :root body .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche [data-fiche-achat="inconnu"] .vrm-fiche-etat-haut > span:first-child { color: var(--vrm-warn, #B25000) !important; }
   :root body .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche .vrm-ann-ledger-info { gap: 6px !important; }
   :root body .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche [data-etat-ligne] { line-height: 1.35; }
   /* « Plus d'actions » : discret, toute la largeur ; 55 px CSS = 44 px au doigt (zoom 0,8). */

@@ -95,8 +95,8 @@
 
 /* Téléphone : une surface de travail, une navigation et des fiches lisibles. */
 @media(max-width:767px){
- .vrm-app-shell .vrm-app-header{background:var(--vrm-bg,#f2f5f5);border-bottom:0;}
- .vrm-main .vrm-market-space{background:var(--vrm-bg,#f2f5f5);}
+ .vrm-app-shell .vrm-app-header{background:var(--vrm-bg,#F2F2F7);border-bottom:0;}
+ .vrm-main .vrm-market-space{background:var(--vrm-bg,#F2F2F7);}
  .vrm-main .vrm-market-heading{padding:4px 16px 6px;gap:8px;}
  .vrm-main .vrm-market-heading h1{font-size:22px;letter-spacing:-.6px;}
  .vrm-main .vrm-plat-tuile{width:30px;height:30px;border-radius:12px;}
@@ -111,15 +111,15 @@
  .vrm-main [data-raison-bord]{border:0!important;border-left:2px solid #b98a38!important;background:transparent!important;border-radius:0!important;padding:4px 9px!important;font-size:11px!important;}
  .vrm-main [data-raison-bord] .vrm-label-help>summary{min-height:28px;padding:5px 0;font-size:11px!important;}
  .vrm-main .vrm-ventes-liste{background:transparent!important;border:0!important;border-radius:0!important;overflow:visible!important;}
- .vrm-app-shell .vrm-main .vrm-ventes-liste .vrm-sale-row{background:var(--vrm-surface,#fff);border:1px solid var(--vrm-line,#dfe7e9)!important;border-radius:14px!important;padding:12px!important;margin-bottom:9px;box-shadow:0 2px 5px #1D1D1F04;}
+ .vrm-app-shell .vrm-main .vrm-ventes-liste .vrm-sale-row{background:var(--vrm-surface,#fff);border:1px solid var(--vrm-line,#E5E5EA)!important;border-radius:14px!important;padding:12px!important;margin-bottom:9px;box-shadow:0 2px 5px #1D1D1F04;}
  .vrm-main .vrm-ventes-liste .vrm-sale-overview{grid-template-columns:62px minmax(0,1fr) auto!important;gap:3px 10px!important;}
  .vrm-main .vrm-ventes-liste .vrm-sale-photo{width:62px!important;height:82px!important;border-radius:12px!important;grid-row:1 / span 3;}
  .vrm-main .vrm-ventes-liste .vrm-sale-title{font-size:13px!important;line-height:1.4!important;font-weight:600!important;letter-spacing:-.15px!important;}
  .vrm-main .vrm-ventes-liste .vrm-sale-meta{font-size:11px!important;gap:5px 8px!important;margin-top:6px!important;}
- .vrm-main .vrm-ventes-liste .vrm-statut{font-size:11px;padding:3px 6px;background:var(--vrm-bg,#f2f5f5);border-radius:6px;}
+ .vrm-main .vrm-ventes-liste .vrm-statut{font-size:11px;padding:3px 6px;background:var(--vrm-bg,#F2F2F7);border-radius:6px;}
  .vrm-main .vrm-ventes-liste .vrm-sale-price>.vrm-display{font-size:17px!important;letter-spacing:-.6px;line-height:1.4;}
- .vrm-app-shell .vrm-main .vrm-ventes-liste .vrm-sale-bas{margin-top:8px;padding-top:5px;border-top:1px solid var(--vrm-line,#e7edef);gap:0 4px;}
- .vrm-main .vrm-ventes-liste .vrm-sale-footer>.vrm-sale-invoice{border-top:1px solid var(--vrm-line,#e7edef);}
+ .vrm-app-shell .vrm-main .vrm-ventes-liste .vrm-sale-bas{margin-top:8px;padding-top:5px;border-top:1px solid var(--vrm-line,#E5E5EA);gap:0 4px;}
+ .vrm-main .vrm-ventes-liste .vrm-sale-footer>.vrm-sale-invoice{border-top:1px solid var(--vrm-line,#E5E5EA);}
  .vrm-main .vrm-ventes-liste .vrm-sale-invoice button{color:var(--vrm-ink,#1D1D1F)!important;font-weight:600!important;font-size:11px!important;}
  .vrm-app-shell .vrm-tabbar{border-radius:16px 16px 0 0;box-shadow:0 -4px 18px #1D1D1F12;}
  .vrm-app-shell .vrm-tabbar>.vrm-tab{position:relative;}

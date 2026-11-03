@@ -77,11 +77,11 @@
  .vrm-main .vrm-achats .vrm-pickup-card>.vrm-pickup-collect{margin-left:auto!important;}
  .vrm-main .vrm-achats .vrm-pickup-codes:has(>.vrm-pickup-code:nth-child(2)){flex:1 1 100%!important;max-width:100%!important;}
 }
-.vrm-statistiques-premium .vrm-analyse-mini li:nth-child(2)>span:before{background:#6e9989;}
-.vrm-statistiques-premium .vrm-analyse-mini li:nth-child(3)>span:before{background:#8a9fa3;}
-.vrm-statistiques-premium .vrm-analyse-mini li:nth-child(4)>span:before{background:#c7bda5;}
-.vrm-statistiques-premium .vrm-analyse-mini li:nth-child(5)>span:before{background:#a7bbae;}
-.vrm-statistiques-premium .vrm-analyse-mini li:nth-child(6)>span:before{background:#738a95;}
+.vrm-statistiques-premium .vrm-analyse-mini li:nth-child(2)>span:before{background:#8E8E93;}
+.vrm-statistiques-premium .vrm-analyse-mini li:nth-child(3)>span:before{background:#8E8E93;}
+.vrm-statistiques-premium .vrm-analyse-mini li:nth-child(4)>span:before{background:#C7C7CC;}
+.vrm-statistiques-premium .vrm-analyse-mini li:nth-child(5)>span:before{background:#AEAEB2;}
+.vrm-statistiques-premium .vrm-analyse-mini li:nth-child(6)>span:before{background:#8E8E93;}
 .vrm-main .vrm-achats .vrm-pickup-card>.vrm-pickup-collect{align-self:center!important;height:44px;}
 @media(max-width:767px){
  .vrm-statistiques-premium>*{order:7;}
@@ -106,7 +106,7 @@
 .vrm-main .vrm-achats .vrm-pickup-point>div:last-child{display:block!important;}
 .vrm-app-shell .vrm-main .vrm-achats .vrm-pickup-card>button.vrm-pickup-code,.vrm-app-shell .vrm-main .vrm-achats .vrm-pickup-card>div:has(>.vrm-pickup-code)>button.vrm-pickup-code{flex:0 0 auto!important;width:max-content!important;min-width:110px!important;max-width:none!important;grid-template-columns:max-content 14px!important;}
 @media(max-width:767px){.vrm-app-shell .vrm-main .vrm-achats .vrm-pickup-card>button.vrm-pickup-code,.vrm-app-shell .vrm-main .vrm-achats .vrm-pickup-card>div:has(>.vrm-pickup-code)>button.vrm-pickup-code{min-width:88px!important;}}
-:root:not([data-theme=dark]) .vrm-chat-panel .vrm-bulle-moi>.vrm-bulle{background:#dce9df!important;color:#213b41!important;}
+:root:not([data-theme=dark]) .vrm-chat-panel .vrm-bulle-moi>.vrm-bulle{background:#E5E5EA!important;color:#38383A!important;}
 @media(min-width:1000px){.vrm-message-workspace .vrm-msg-av{width:36px!important;height:36px!important;border-radius:50%!important;}.vrm-message-workspace .vrm-msg-av img{border-radius:50%!important;}}
 
 .vrm-favoris-diagnostic{margin:0 0 12px;border:1px solid var(--vrm-line);border-radius:12px;background:var(--vrm-surface);padding:0 12px;color:var(--vrm-ink);font-size:12px;}
@@ -184,7 +184,7 @@
 /* Messages et favoris sont deux espaces explicites, pas deux listes empilées. */
 .vrm-messages-sections{display:flex;gap:4px;padding:4px;margin:0 0 14px;border:1px solid var(--vrm-line);border-radius:12px;background:var(--vrm-card2);width:fit-content;max-width:100%;box-sizing:border-box;}
 .vrm-messages-sections button{display:flex;align-items:center;justify-content:center;gap:8px;min-height:44px;padding:8px 18px;border:0;border-radius:6px;font:inherit;font-size:13px;font-weight:600;color:var(--vrm-muted);background:transparent;cursor:pointer;}
-.vrm-messages-sections button[aria-pressed=true]{background:var(--vrm-surface);color:var(--vrm-ink);box-shadow:0 1px 4px #142b3410;}
+.vrm-messages-sections button[aria-pressed=true]{background:var(--vrm-surface);color:var(--vrm-ink);box-shadow:0 1px 4px #2C2C2E10;}
 .vrm-messages-sections button:focus-visible{outline:2px solid currentColor;outline-offset:2px;}
 .vrm-favoris-compose h4{margin:0 0 10px;font-size:13px;}
 @media(max-width:767px){.vrm-messages-sections{width:100%;}.vrm-messages-sections button{flex:1;padding:8px 10px;font-size:12px;}}
@@ -205,8 +205,8 @@
 @media(max-width:767px){.vrm-chat-negociation>summary{min-height:44px;}.vrm-chat-offer-event{padding:8px 10px;}.vrm-chat-offer-event strong{font-size:15px;}}
 
 /* Le statut reste écrit : la couleur complète le libellé. */
-.vrm-chat-offer-event[data-offer-status="acceptee"]{border-inline-start:3px solid #367664;background:linear-gradient(110deg,rgba(54,118,100,.08),var(--vrm-surface));}
-.vrm-chat-offer-event[data-offer-status="refusee"]{border-inline-start:3px solid #9a746b;}
+.vrm-chat-offer-event[data-offer-status="acceptee"]{border-inline-start:3px solid #367664;background:linear-gradient(110deg,rgba(0,0,0,.08),var(--vrm-surface));}
+.vrm-chat-offer-event[data-offer-status="refusee"]{border-inline-start:3px solid #6E6E73;}
 .vrm-chat-offer-event>div{flex-wrap:wrap;}
 .vrm-chat-retour{font-size:12px;line-height:1.5;padding:8px 10px;border:1px solid var(--vrm-line);border-radius:12px;background:var(--vrm-surface);margin-bottom:8px;overflow-wrap:anywhere;}
 .vrm-chat-retour button{display:block;margin-top:6px;max-width:100%;white-space:normal;text-align:left;}
@@ -240,7 +240,7 @@
 .vrm-favoris-compte-rendu ul{list-style:none;margin:6px 0 0;padding:0;border:1px solid var(--vrm-line);border-radius:12px;}
 .vrm-favoris-compte-rendu li{display:flex;justify-content:space-between;gap:10px;padding:8px 10px;border-bottom:1px solid var(--vrm-line);}.vrm-favoris-compte-rendu li:last-child{border-bottom:0;}
 .vrm-favoris-compte-rendu li span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}.vrm-favoris-compte-rendu li b{font-weight:600;text-align:right;}
-.vrm-favoris-compte-rendu li[data-favoris-envoi=envoye] b{color:var(--vrm-ink);}.vrm-favoris-compte-rendu li[data-favoris-envoi=refuse] b,.vrm-favoris-compte-rendu li[data-favoris-envoi=incertain] b{color:var(--vrm-warn,#a86a12);}
+.vrm-favoris-compte-rendu li[data-favoris-envoi=envoye] b{color:var(--vrm-ink);}.vrm-favoris-compte-rendu li[data-favoris-envoi=refuse] b,.vrm-favoris-compte-rendu li[data-favoris-envoi=incertain] b{color:var(--vrm-warn,#B25000);}
 .vrm-favoris-feuille .vrm-favoris-automatisation{margin-top:0;}
 .vrm-favoris-badge.is-vendu{background:var(--vrm-card2);color:var(--vrm-ink);font-weight:600;}.vrm-favoris-vendu-action{font-size:11px;color:var(--vrm-muted);}
 /* Lecture opérationnelle : détails techniques repliés, montants et gestes proches. */

@@ -324,7 +324,7 @@ function Plateau({ t, W, H, portrait, court }) {
         const v = vers(x + 140, y + 110, 6);
         libres.push(<div key="feuille" style={{ position: 'absolute', left: x, top: y, width: 280, height: 220, borderRadius: 12, background: K.paper, color: K.ink, padding: 24,
           opacity: 0.9 * ap * v.o, transform: `translate(${v.dx.toFixed(1)}px, ${(v.dy + mix(20, 0, ap)).toFixed(1)}px) rotate(4deg) scale(${v.s.toFixed(3)})` }}>
-          {[78, 56, 70, 44].map((w, i) => <div key={i} style={{ height: 10, width: `${w}%`, background: '#D9DEE6', borderRadius: 3, marginTop: i ? 14 : 0 }} />)}
+          {[78, 56, 70, 44].map((w, i) => <div key={i} style={{ height: 10, width: `${w}%`, background: '#E5E5EA', borderRadius: 3, marginTop: i ? 14 : 0 }} />)}
           <div style={{ marginTop: 26, fontSize: 22, fontWeight: 600 }}>à déclarer : ? €</div>
         </div>);
       }

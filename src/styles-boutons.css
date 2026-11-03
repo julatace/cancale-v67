@@ -20,16 +20,16 @@
 
 :root {
   --vrm-on-accent: #FFFFFF;
-  --vrm-b-teinte: rgba(36, 78, 84, .08);
-  --vrm-b-teinte-f: rgba(36, 78, 84, .14);
-  --vrm-b-encre: var(--vrm-ink, #213B41);
+  --vrm-b-teinte: rgba(0,0,0,.08);
+  --vrm-b-teinte-f: rgba(0,0,0,.14);
+  --vrm-b-encre: var(--vrm-ink, #38383A);
   --vrm-b-lien: var(--vrm-accent, #0071E3);
   --vrm-b-h: 40px;
 }
 :root[data-theme="dark"] {
   --vrm-on-accent: #173A40;
-  --vrm-b-teinte: rgba(183, 214, 200, .11);
-  --vrm-b-teinte-f: rgba(183, 214, 200, .18);
+  --vrm-b-teinte: rgba(118,118,128,.11);
+  --vrm-b-teinte-f: rgba(118,118,128,.18);
 }
 @supports (color: color-mix(in srgb, red 10%, transparent)) {
   :root { --vrm-b-teinte: color-mix(in srgb, var(--vrm-accent, #0071E3) 8%, transparent); --vrm-b-teinte-f: color-mix(in srgb, var(--vrm-accent, #0071E3) 14%, transparent); }
@@ -116,7 +116,7 @@
     bottom: calc(76px + env(safe-area-inset-bottom));
     display: flex; gap: 8px; padding: 0; pointer-events: none;
   }
-.vrm-b-barre > .vrm-b{ flex: 1; pointer-events: auto; box-shadow: 0 6px 18px rgba(16, 32, 36, .18) !important; }
+.vrm-b-barre > .vrm-b{ flex: 1; pointer-events: auto; box-shadow: 0 6px 18px rgba(0,0,0,.18) !important; }
 }
 
 /* ── 2. LA NORMALISATION GLOBALE (prudente) ─────────────────────────────── */
@@ -185,7 +185,7 @@
     bottom: calc(76px + env(safe-area-inset-bottom));
     display: flex; gap: 8px; pointer-events: none;
   }
-  .vrm-b-principal > .vrm-b { flex: 1; pointer-events: auto; box-shadow: 0 6px 18px rgba(16, 32, 36, .18) !important; }
+  .vrm-b-principal > .vrm-b { flex: 1; pointer-events: auto; box-shadow: 0 6px 18px rgba(0,0,0,.18) !important; }
   .vrm-main:has(.vrm-b-principal)::after, .vrm-main:has(.vrm-b-barre)::after { content: ''; display: block; height: 64px; }
 }
 
@@ -193,12 +193,12 @@
 /* Où j'en suis (titre, gras) et combien (à droite), UNE barre, ce qui se passe,
    ce qui a raté. Couleurs du thème ; l'erreur en ambre (jamais rouge, §7). */
 .vrm-avancement { display: flex; flex-direction: column; gap: 6px; padding: 12px 14px; border-radius: 12px; background: var(--vrm-b-teinte); }
-.vrm-avancement-tete { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 12px; font-size: 15px; color: var(--vrm-ink, #213B41); }
-.vrm-avancement-compte { font-size: 13px; color: var(--vrm-muted, #53696D); font-variant-numeric: tabular-nums; }
+.vrm-avancement-tete { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 12px; font-size: 15px; color: var(--vrm-ink, #38383A); }
+.vrm-avancement-compte { font-size: 13px; color: var(--vrm-muted, #636366); font-variant-numeric: tabular-nums; }
 .vrm-avancement-barre { height: 8px; border-radius: 99px; background: var(--vrm-b-teinte-f); overflow: hidden; }
 .vrm-avancement-barre > span { display: block; height: 100%; border-radius: 99px; background: var(--vrm-accent, #0071E3); transition: width .4s cubic-bezier(.23, 1, .32, 1); }
-.vrm-avancement-phrase { font-size: 13px; color: var(--vrm-ink, #213B41); line-height: 1.45; }
-.vrm-avancement-erreur { font-size: 13px; color: #965900; line-height: 1.45; }
+.vrm-avancement-phrase { font-size: 13px; color: var(--vrm-ink, #38383A); line-height: 1.45; }
+.vrm-avancement-erreur { font-size: 13px; color: #B25000; line-height: 1.45; }
 :root[data-theme="dark"] .vrm-avancement-erreur { color: #EBC080; }
 @media (prefers-reduced-motion: reduce) { .vrm-avancement-barre > span { transition: none; } }
 
@@ -229,7 +229,7 @@
    un regard (pas faite, à vérifier) en ambre hachuré à la suite, le reste vide. */
 .vrm-avancement-barre { display: flex; }
 .vrm-avancement-barre > span { flex: 0 0 auto; }
-.vrm-avancement-barre > span.vrm-avancement-rate { border-radius: 0 99px 99px 0; background: repeating-linear-gradient(135deg, #C98A14 0 4px, rgba(201, 138, 20, .45) 4px 8px); }
+.vrm-avancement-barre > span.vrm-avancement-rate { border-radius: 0 99px 99px 0; background: repeating-linear-gradient(135deg, #B25000 0 4px, rgba(201, 138, 20, .45) 4px 8px); }
 /* (30 oct.) Les réductions de Republier : un CHOIX, pas une action. L'actif se lit
    en surface élevée cernée d'accent — jamais plein comme le bouton principal. */
 .vrm-app-shell [data-republier-reductions].vrm-filtres > button[aria-pressed="true"],
@@ -240,8 +240,8 @@
 /* (30 oct.) « Voir › » sur une carte « À faire » : la carte entière est déjà le
    bouton. Plus de pastille verte (4ᵉ forme) : un chevron discret, à la couleur
    des liens-actions. Une action nommée (« Imprimer », « Répondre ») garde son mot. */
-.vrm-app-shell .vrm-day-task .vrm-day-task-action { background: transparent !important; padding: 0 2px !important; color: var(--vrm-muted, #53696D) !important; font-weight: 600 !important; }
-:root[data-theme="dark"] .vrm-app-shell .vrm-day-task .vrm-day-task-action { background: transparent !important; color: var(--vrm-muted, #98A2B3) !important; }
+.vrm-app-shell .vrm-day-task .vrm-day-task-action { background: transparent !important; padding: 0 2px !important; color: var(--vrm-muted, #636366) !important; font-weight: 600 !important; }
+:root[data-theme="dark"] .vrm-app-shell .vrm-day-task .vrm-day-task-action { background: transparent !important; color: var(--vrm-muted, #AEAEB2) !important; }
 /* (30 oct.) La recherche de Réglages : même dessin que celle des achats — le champ vit
    DANS sa pastille, plus de second cadre gris à l'intérieur. */
 :root body .vrm-app-shell .vrm-main .vrm-settings-search input[type=search]:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=file]):not([type=hidden]) {

@@ -373,7 +373,7 @@ html .vrm-app-shell .vrm-main :is(.vrm-ann-search, .vrm-list-search) { border-ra
 html .vrm-app-shell .vrm-stagger > * { animation: none !important; }
 
 /* ── 10. LE SOMBRE : les mêmes marches, sans les teintes « bleu nuit » codées
-   en dur par les couches d'avant (#17262d, #21343e, #253b45…) ─────────────── */
+   en dur par les couches d'avant (#1D1D1F, #2C2C2E, #38383A…) ─────────────── */
 :root[data-theme="dark"] .vrm-app-shell .vrm-main { background-color: var(--vrm-bg) !important; }
 :root[data-theme="dark"] .vrm-app-shell :is(.vrm-day-card, .vrm-day-task, .vrm-day-money, .vrm-day-week) {
   background-color: var(--vrm-surface) !important;
@@ -382,7 +382,7 @@ html .vrm-app-shell .vrm-stagger > * { animation: none !important; }
 :root[data-theme="dark"] .vrm-app-shell .vrm-main .vrm-ventes-liste .vrm-statut { background: var(--vrm-card2); color: var(--vrm-ink) !important; }
 
 /* ── 11. LES RESTES DES PALETTES D'AVANT ─────────────────────────────────────
-   Le bleu de septembre (#2458E6, #3D7BFF) et le bleu nuit (#0E1A2B) survivaient
+   Le bleu de septembre (#0071E3, #8DB8F2) et le bleu nuit (#1C1C1E) survivaient
    en valeurs de repli : la ligne de conversation ouverte, la case
    « principale » des finances, la présentation d'arrivée. Ils prennent Vitrine. */
 html .vrm-app-shell .vrm-inbox-row.is-current { box-shadow: inset 3px 0 var(--vrm-ink) !important; }

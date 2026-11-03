@@ -76,7 +76,7 @@
 .vrm-apub-carte {
   min-width: 0; display: flex; flex-direction: column; gap: 10px; padding: 12px;
   border-radius: 12px; background: var(--vrm-surface); border: 1px solid var(--vrm-line);
-  box-shadow: 0 1px 1px rgba(16,21,27,.03), 0 6px 18px rgba(16,21,27,.04);
+  box-shadow: 0 1px 1px rgba(0,0,0,.03), 0 6px 18px rgba(0,0,0,.04);
 }
 :root[data-theme="dark"] .vrm-apub-carte { box-shadow: none; }
 .vrm-apub-carte[data-apub-jumelle] { opacity: .72; }
@@ -103,7 +103,7 @@
   font-size: 11px; font-weight: 600; line-height: 1; padding: 4px 7px; border-radius: 999px;
   color: var(--vrm-muted); background: var(--vrm-bg); border: 1px solid var(--vrm-line); white-space: nowrap;
 }
-.vrm-apub-pastille[data-ton="bloque"] { color: #A15C00; background: rgba(161,92,0,.08); border-color: rgba(161,92,0,.30); }
+.vrm-apub-pastille[data-ton="bloque"] { color: #B25000; background: rgba(161,92,0,.08); border-color: rgba(161,92,0,.30); }
 :root[data-theme="dark"] .vrm-apub-pastille[data-ton="bloque"] { color: #FFB23E; background: rgba(255,178,62,.12); border-color: rgba(255,178,62,.30); }
 .vrm-apub-vignettes { display: flex; gap: 5px; overflow-x: auto; padding-bottom: 1px; }
 .vrm-apub-vignettes > * { width: 40px; height: 40px; flex-shrink: 0; border-radius: 6px; object-fit: cover; background: var(--vrm-bg); border: 1px solid var(--vrm-line); }

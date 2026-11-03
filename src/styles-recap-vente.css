@@ -10,11 +10,11 @@
    ════════════════════════════════════════════════════════════════════════════ */
 html body .vrm-ledger-drawer.vrm-recap {
   --recap-ink: var(--vrm-ink, #1D1D1F);
-  --recap-muted: var(--vrm-muted, #5E5E58);
-  --recap-line: var(--vrm-line, #E4E4DE);
-  --recap-soft: var(--vrm-card2, #F1F1EC);
+  --recap-muted: var(--vrm-muted, #636366);
+  --recap-line: var(--vrm-line, #E5E5EA);
+  --recap-soft: var(--vrm-card2, #F2F2F7);
   --recap-accent: var(--vrm-accent, #0071E3);
-  --recap-warn: var(--vrm-warn, #A15C00);
+  --recap-warn: var(--vrm-warn, #B25000);
   --recap-mono: var(--vrm-police-mono, 'Geist Mono', ui-monospace, monospace);
   background: var(--vrm-surface, #FFFFFF);
   color: var(--recap-ink);
@@ -94,7 +94,7 @@ html body .vrm-recap h3.vrm-recap-titre { margin: 0 0 6px !important; font-size:
 html body .vrm-app-shell .vrm-main .vrm-cout-recap .vrm-b.vrm-geste-ambre,
 html body .vrm-app-shell .vrm-main .vrm-cout-recap .vrm-b.vrm-geste-ambre:not(:disabled):hover,
 html body .vrm-app-shell .vrm-main .vrm-cout-recap .vrm-b.vrm-geste-ambre:not(:disabled):active {
-  background: var(--vrm-warn-soft, #FFF4E0) !important; color: var(--recap-warn) !important; border-color: transparent !important; font-weight: 600;
+  background: var(--vrm-warn-soft, #F2F2F7) !important; color: var(--recap-warn) !important; border-color: transparent !important; font-weight: 600;
 }
 /* « Prix d'achat » à gauche, le geste ambre à droite, « ou relier » dessous */
 html body .vrm-ledger-drawer.vrm-recap .vrm-ledger-drawer-body .vrm-recap-argent .vrm-cout-recap .vrm-cout-rangee {

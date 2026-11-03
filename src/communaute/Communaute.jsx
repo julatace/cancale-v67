@@ -71,7 +71,7 @@ const CENTRE_FRANCE = [2.4, 46.6];
 // le style CLAIR (positron) quel que soit le thème ; le reste de l'écran suit
 // le mode sombre.
 const CARTE_TOUJOURS_CLAIRE = true;
-const FOND_ATTENTE = { clair: '#F2F3F0', sombre: '#0C0C0C' }; // le fond des styles : pas d'éclair au chargement
+const FOND_ATTENTE = { clair: '#F2F2F7', sombre: '#000000' }; // le fond des styles : pas d'éclair au chargement
 function Carte({ cells, moi, sombre, onCellules, onEchec }) {
   const boite = useRef(null), carte = useRef(null), ml = useRef(null), marqueurs = useRef([]), attrib = useRef(null);
   const [pret, setPret] = useState(false), [fond, setFond] = useState('charge');
