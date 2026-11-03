@@ -139,20 +139,18 @@ async function main() {
         dit(L['9205'] && L['9205'].b === '3300' && L['9205'].et === 'ok', `${T} 9205 : 60 − 27 = +33,00 €`, JSON.stringify(L['9205']));
         // Une vente annulée n'est pas dans la liste par défaut (filtre « Annulées ») ; si elle y est, sans bénéfice.
         dit(!L['9204'] || (L['9204'].et === 'annulee' && L['9204'].txt === ''), `${T} 9204 annulée : aucun bénéfice`, JSON.stringify(L['9204'] || 'hors de la liste'));
-        if (vp.width >= 768) {
-          const g = await pg.evaluate(() => { const r = document.querySelector('[data-tx="9201"] > button'); const x = (s) => { const e = r.querySelector(s); const bb = e && e.getBoundingClientRect(); return bb && bb.width ? Math.round(bb.left) : null; };
-            const h = document.querySelector('[data-ventes-entete-cols]'); return { prix: x('.vrm-ledger-sale-amount'), achat: x('.vrm-ledger-sale-achat'), benef: x('.vrm-ledger-sale-benef'), entete: !!(h && h.getBoundingClientRect().height > 0), txt: h && h.innerText }; });
-          dit(g.prix != null && g.achat != null && g.benef != null && g.prix < g.achat && g.achat < g.benef && g.entete && /Prix[\s\S]*Achat[\s\S]*Bénéfice/.test(g.txt || ''), `${T} ordinateur : colonnes Prix · Achat · Bénéfice, avec leur en-tête`, JSON.stringify(g));
-        } else {
-          const g = await pg.evaluate(() => { const r = document.querySelector('[data-tx="9201"] > button'); const a = r.querySelector('.vrm-ledger-sale-amount').getBoundingClientRect(), bn = r.querySelector('.vrm-ledger-sale-benef').getBoundingClientRect(); return { sous: bn.top >= a.bottom - 2, dr: Math.abs(bn.right - a.right) < 3, achatCache: r.querySelector('.vrm-ledger-sale-achat').getBoundingClientRect().width === 0 }; });
-          dit(g.sous && g.dr && g.achatCache, `${T} téléphone : le bénéfice sous le prix, aligné à droite`, JSON.stringify(g));
-        }
+        // (2 nov. 22 h puis critique du 3 nov. #13) Les colonnes Prix · Achat · Bénéfice et leur en-tête ne
+        // sont plus affichées : la ligne est la carte de la maquette FusionVentes (prix seul, frise) — retiré
+        // à la demande de Julien, 2 nov. 22 h. Les MONTANTS restent jugés ci-dessus (attributs de la ligne).
         const sw = await pg.evaluate(() => ({ sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth }));
         dit(sw.sw <= sw.cw + 1, `${T} aucun débordement`, JSON.stringify(sw));
         await pg.evaluate(() => { const e = document.querySelector('[data-tx="9201"]'); if (e) e.scrollIntoView({ block: 'start' }); });
         await pg.waitForTimeout(300);
         await pg.screenshot({ path: path.join(SHOTS, `ventes-benefice-${vp.width}.png`) });
         // Le bouton « Déposé » : sur les ventes à expédier seulement, visible.
+        // (3 nov., critique #5) « Déposé » est derrière « … » de la carte : on l'ouvre, comme Julien.
+        await pg.evaluate(() => { for (const x of document.querySelectorAll('[data-vente-plus]')) x.click(); });
+        await pg.waitForTimeout(300);
         const bt = await pg.evaluate(() => ['9201', '9202', '9203', '9204', '9205'].map((t) => { const e = document.querySelector(`[data-depose-vente="${t}"]`); return [t, !!(e && e.getBoundingClientRect().height >= 40)]; }));
         dit(JSON.stringify(bt) === JSON.stringify([['9201', true], ['9202', false], ['9203', true], ['9204', false], ['9205', true]]), `${T} bouton « Déposé » visible (≥ 40 px) sur les ventes à expédier, et seulement elles`, JSON.stringify(bt));
         dit(!errs.length, `${T} A aucune erreur d'app`, errs[0]);
@@ -208,6 +206,7 @@ async function main() {
     await essaie('C bouton', async () => {
       const { ctx, pg, errs } = await preparer(b, vpT);
       await ouvrirVentes(pg);
+      await pg.click('[data-tx="9201"] [data-vente-plus]');
       await pg.click('[data-depose-vente="9201"]');
       await pg.locator('[data-depose-barre="9201"]').waitFor({ timeout: 3000 });
       await pg.waitForTimeout(6800);
@@ -218,7 +217,10 @@ async function main() {
     await essaie('C Colis', async () => {
       const { ctx, pg, errs } = await preparer(b, vpT);
       await pg.goto(`http://localhost:${PORT}/?tab=cat_bord`, { waitUntil: 'domcontentloaded' });
-      await pg.locator('[data-tx-colis="9201"] [data-geste="fait"]').first().waitFor({ timeout: 25000 });
+      // (2 nov., revue) « Colis fait » est derrière le « … » de la carte Colis.
+      await pg.locator('[data-tx-colis="9201"] [data-geste="fait"]').first().waitFor({ state: 'attached', timeout: 25000 });
+      const plus = pg.locator('[data-tx-colis="9201"] [data-colis-plus]').first();
+      if (await plus.count()) await plus.click();
       await pg.click('[data-tx-colis="9201"] [data-geste="fait"]');
       await pg.waitForTimeout(1500);
       parColis = await lireStock(pg);

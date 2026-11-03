@@ -136,7 +136,7 @@ const lireCompta=async(pg)=>{
   return attrs(pg,'[data-benef-etat]','data-benef-');
 };
 const lireJournee=async(pg)=>{
-  await aller(pg,'journee','[data-barre-jour]',2500);
+  await aller(pg,'journee','[data-fu-semaine]',2500);
   return attrs(pg,'[data-journee-benef]','data-journee-benef-');
 };
 const touche=async(pg,sel,T)=>{ const l=pg.locator(sel).first(); await l.scrollIntoViewIfNeeded(); if(T.hasTouch) await l.tap(); else await l.click(); };
@@ -157,15 +157,13 @@ const toucheForce=async(pg,sel,T)=>{ const l=pg.locator(sel).first(); await l.ev
         // aussi un lecteur des ventes : avec des ventes lues, elle publierait).
         const { ctx, pg, errs }=await page(b,T,{ ventesKO:true });
         const j=await lireJournee(pg);
-        dit(j===null,'par défaut et sans bénéfice publié : AUCUNE carte (jamais une case vide)',JSON.stringify(j));
-        dit(await pg.locator('[data-journee-benef-activer]').count()===0,'aucun bouton « afficher » hors du mode « Modifier »');
+        // (2 nov., 22 h) La case « Bénéfice du mois » est TOUJOURS dans la tête sombre (maquette) : sans
+        // publication elle dit « — », jamais 0 € ; « Modifier » / « Ajouter » n'existent plus — retiré à la demande de Julien, 2 nov. 22 h (maquette FusionJournee).
+        const txtA=await pg.evaluate(()=>{ const e=document.querySelector('[data-journee-benef]'); return e?e.innerText:''; });
+        dit(!!j && j.etat==='passu' && !j.brut && !j.net && /—/.test(txtA) && !/\d+\s*€/.test(txtA),'sans bénéfice publié : la case dit « — », aucun montant (jamais 0 €)',JSON.stringify(j)+' '+txtA.replace(/\n/g,' | '));
+        dit(await pg.locator('[data-journee-benef-activer]').count()===0,'aucun bouton « afficher »');
         await aller(pg,'settings','[data-reglage-sombre]',1500);
         dit(await pg.locator('[data-reglage-sombre]').count()>0 && await pg.locator('[data-reglage-benef-journee]').count()===0,'Réglages n’a plus d’interrupteur « Bénéfice dans Ma journée »');
-        await aller(pg,'journee','[data-barre-jour]',1500);
-        await touche(pg,'[data-widgets-modifier]:visible',T); await pg.waitForTimeout(400);
-        await touche(pg,'[data-widgets-ajouter]',T); await pg.waitForTimeout(400);
-        const ent=await pg.locator('[data-widget-ajout="benefice"]').count();
-        dit(ent===0,'jamais masqué : « Ton bénéfice » n’est pas proposé dans « Ajouter » (il n’est pas retiré)',`${ent}`);
         dit(errs.length===0,'aucune erreur d’app',errs.join(' | ').slice(0,160));
         await ctx.close();
       });
@@ -175,7 +173,8 @@ const toucheForce=async(pg,sel,T)=>{ const l=pg.locator(sel).first(); await l.ev
         dit(!!j2,'remis exprès (choix venu du nuage) : la carte est là',JSON.stringify(j2));
         dit(!!j2 && j2.etat==='passu' && !j2.brut && !j2.net,'sans publication : « pas su », aucun montant (jamais 0 €)',JSON.stringify(j2));
         const txt=await pg.evaluate(()=>{ const e=document.querySelector('[data-journee-benef]'); return e?e.innerText:''; });
-        dit(/écran Ventes/.test(txt) && !/\d+,\d\d\s*€/.test(txt),'elle dit où ça se calcule, sans chiffre',txt.replace(/\n/g,' | ').slice(0,160));
+        // (« elle dit où ça se calcule » : la case dit « — », sans phrase — retiré à la demande de Julien, 2 nov. 22 h (maquette FusionJournee))
+        dit(/—/.test(txt) && !/\d+,\d\d\s*€/.test(txt),'« — », sans chiffre',txt.replace(/\n/g,' | ').slice(0,160));
         dit(errs.length===0,'aucune erreur d’app',errs.join(' | ').slice(0,160));
         await ctx.close();
       });
@@ -189,8 +188,8 @@ const toucheForce=async(pg,sel,T)=>{ const l=pg.locator(sel).first(); await l.ev
         console.log(`   Compta ${JSON.stringify(c)}\n   Journée ${JSON.stringify(j)}`);
         dit(!!j,'jamais choisi, bénéfice publié ⇒ la carte est dans Ma journée PAR DÉFAUT');
         dit(await pg.locator('[data-journee-benef-masquer]').count()===0,'hors du mode « Modifier », aucun bouton « Masquer »');
-        dit(await pg.locator('.vrm-day-money [data-journee-benef]').count()===1,'CA et bénéfice partagent la même carte');
-        dit(await pg.locator('[data-style-courbe=barres]').count()===1 && await pg.locator('[data-courbe-semaine] [data-barre]').count()>0,'graphique hebdomadaire en barres (1er nov. : plus de courbe lissée)');
+        // (la carte « Vendu en … » et la semaine en barres ne sont plus sur Ma journée — retiré à la demande de Julien, 2 nov. 22 h (maquette FusionJournee))
+        dit(await pg.locator('.vrm-fu-tete [data-journee-benef]').count()===1,'le bénéfice est dans la tête sombre de Ma journée, une fois');
         dit(!!c && c.etat==='lu' && !!j && j.etat==='lu','les deux cartes lisent la publication',`${c&&c.etat} / ${j&&j.etat}`);
         dit(!!c && !!j && c.brut!=='' && j.brut===c.brut,'BRUT du mois identique à Comptabilité',`${j&&j.brut} · ${c&&c.brut}`);
         dit(!!c && !!j && c.net!=='' && j.net===c.net,'NET du mois identique à Comptabilité (charges et cotisations comprises)',`${j&&j.net} · ${c&&c.net}`);
@@ -198,10 +197,10 @@ const toucheForce=async(pg,sel,T)=>{ const l=pg.locator(sel).first(); await l.ev
         // Aujourd'hui = la même publication, lue directement.
         const att=await pg.evaluate(()=>{ const p=JSON.parse(localStorage.getItem('vrm_benefice_jours')||'null'); const d=new Date(); const k=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; const t=p&&p.jours&&p.jours[k]; return t?String(t[0]):'0'; });
         dit(!!j && j['jour-n']===att,'aujourd’hui : le nombre de ventes vient de la publication',`${j&&j['jour-n']} · ${att}`);
-        const couleur=await pg.evaluate(()=>{ const e=document.querySelector('[data-journee-benef-ligne="net"] .vrm-jc-montant'); return e?getComputedStyle(e).color:'(absent)'; });
+        const couleur=await pg.evaluate(()=>{ const e=document.querySelector('[data-journee-benef-ligne="net"]'); return e?getComputedStyle(e).color:'(absent)'; });
         dit(couleur!=='(absent)' && !/rgb\((2[0-9]{2}), ?([0-9]{1,2}), ?([0-9]{1,2})\)/.test(couleur),'aucun rouge sur le bénéfice',couleur);
         dit(await pg.locator('[data-journee-benef-detail]').count()===1,'un lien vers Comptabilité pour le détail');
-        if(process.env.BANC_CAPTURE) await pg.locator('.vrm-day-top').screenshot({path:path.join(process.env.BANC_CAPTURE,`journee-benef-${T.nom}.png`)});
+        if(process.env.BANC_CAPTURE) await pg.locator('.vrm-fu-tete').screenshot({path:path.join(process.env.BANC_CAPTURE,`journee-benef-${T.nom}.png`)});
         const deb=await pg.evaluate(()=>document.documentElement.scrollWidth-document.documentElement.clientWidth);
         dit(deb<=1,'aucun débordement horizontal',`${deb}px`);
         dit(errs.length===0,'aucune erreur d’app',errs.join(' | ').slice(0,160));
@@ -217,7 +216,10 @@ const toucheForce=async(pg,sel,T)=>{ const l=pg.locator(sel).first(); await l.ev
         console.log(`   Compta ${JSON.stringify(c)}\n   Journée ${JSON.stringify(j)}`);
         dit(!!c && !!j && j.brut===c.brut && j.n===c.n && j.ncout===c.ncout,'brut et couverture identiques à Comptabilité',`${j&&j.brut} ${j&&j.ncout}/${j&&j.n} · ${c&&c.brut} ${c&&c.ncout}/${c&&c.n}`);
         dit(!!j && j.net==='' && j.raison==='achats' && !!c && c.raison==='achats','net « — », raison « prix d’achat manquants » des deux côtés',`${j&&j.net} ${j&&j.raison} · ${c&&c.raison}`);
-        dit(await pg.locator('[data-journee-benef-porte]').count()===1,'la porte « Compléter les prix d’achat » est là');
+        // (la porte « Compléter les prix d'achat » n'est plus dans la case de Ma journée — retiré à la demande de Julien, 2 nov. 22 h (maquette FusionJournee) ;
+        //  elle est sur la carte de Comptabilité, « N prix d'achat à saisir », et sur chaque vente)
+        await aller(pg,'compta','[data-benef-etat]',1500);
+        dit(await pg.locator('[data-benef-porte]').count()>=1,'la porte vers la saisie des prix d’achat est sur Comptabilité');
         dit(errs.length===0,'aucune erreur d’app',errs.join(' | ').slice(0,160));
         await ctx.close();
       });
@@ -226,17 +228,10 @@ const toucheForce=async(pg,sel,T)=>{ const l=pg.locator(sel).first(); await l.ev
       await essaie('D'+T.nom,async()=>{
         const { ctx, pg, errs }=await page(b,T,{ main:{ vinted_sale_overrides:OV_COMPLET, vrm_compta:COMPTA } });
         await publierBenefice(pg);
+        // (« Masquer » / « Ajouter » n'existent plus : la case est toujours là — retiré à la demande de Julien, 2 nov. 22 h (maquette FusionJournee))
+        await pg.evaluate(()=>{ localStorage.setItem('vrm_journee_benefice','false'); });
         await aller(pg,'journee','[data-journee-benef]',2000);
-        await touche(pg,'[data-widgets-modifier]:visible',T); await pg.waitForTimeout(500);
-        dit(await pg.locator('[data-journee-benef-masquer]').count()===1,'en mode « Modifier » : « Masquer le bénéfice » est là');
-        await toucheForce(pg,'[data-journee-benef-masquer]',T); await pg.waitForTimeout(1200);
-        const memo=await pg.evaluate(()=>localStorage.getItem('vrm_journee_benefice'));
-        dit(await pg.locator('[data-journee-benef]').count()===0 && memo==='false','masqué ⇒ plus de carte, choix enregistré (false)',`${memo}`);
-        await touche(pg,'[data-widgets-ajouter]',T); await pg.waitForTimeout(400);
-        dit(await pg.locator('[data-widget-ajout="benefice"]').count()===1,'« + Ajouter » propose « Ton bénéfice »');
-        await touche(pg,'[data-widget-ajout="benefice"]',T); await pg.waitForTimeout(1200);
-        const memo2=await pg.evaluate(()=>localStorage.getItem('vrm_journee_benefice'));
-        dit(await pg.locator('[data-journee-benef]').count()===1 && memo2==='true','remis ⇒ la carte revient, choix enregistré (true)',`${memo2}`);
+        dit(await pg.locator('.vrm-fu-tete [data-journee-benef]').count()===1,'même masquée autrefois, la case reste dans la tête (rien n’est perdu)');
         dit(errs.length===0,'aucune erreur d’app',errs.join(' | ').slice(0,160));
         await ctx.close();
       });

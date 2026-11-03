@@ -295,10 +295,13 @@ async function rendre(b, { mode, connecte, tel = false, vrm = null, session = fa
   // on ouvre chaque vente, comme une personne, avant de lire ses boutons (`_tiroirs.cjs`).
   if (/[?&]tab=cat_ventes\b/.test(url)) { await pg.waitForSelector('.vrm-sale-row[data-tx]', { state: 'attached', timeout: 15000 }).catch(() => {}); await monterTiroirs(pg); }
   const lire = () => pg.evaluate(() => ({
-    boutons: [...document.querySelectorAll('[data-bouton-bord]')].map((x) => ({ etat: x.getAttribute('data-bouton-bord'), tx: x.getAttribute('data-tx'), txt: x.innerText })),
+    // (2 nov., 22 h 30, maquette FusionVentes) Une vente à expédier porte son bouton bordereau sur la
+    // LIGNE et dans son récapitulatif (le même composant, la même règle) : on juge UN bouton par vente,
+    // celui de la ligne quand il y est (les tiroirs sont montés par `monterTiroirs`).
+    boutons: (() => { const vu = new Map(); for (const x of document.querySelectorAll('[data-bouton-bord]')) { const tx = x.getAttribute('data-tx'); const k = tx || ('#' + vu.size); if (!vu.has(k) || !x.closest('.vrm-ledger-drawer-host')) vu.set(k, x); } return [...vu.values()].map((x) => ({ etat: x.getAttribute('data-bouton-bord'), tx: x.getAttribute('data-tx'), txt: x.innerText })); })(),
     raisons: [...document.querySelectorAll('[data-raison-bord]')].map((x) => x.getAttribute('data-raison-bord') + ' | ' + x.innerText),
     recharger: document.querySelectorAll('[data-raison-bord] [data-recharger]').length,
-    surVinted: [...document.querySelectorAll('[data-bord-vinted]')].map((a) => a.getAttribute('href')),
+    surVinted: [...new Set([...document.querySelectorAll('[data-bord-vinted]')].map((a) => a.getAttribute('href')))],
     etat: (() => { const x = document.querySelector('[data-etat-actions]'); return x ? { niveau: x.getAttribute('data-etat-actions'), code: x.getAttribute('data-etat-code'), txt: x.innerText } : null; })(),
     sessions: window.__sessions || [],
     externes: window.__externes || [],

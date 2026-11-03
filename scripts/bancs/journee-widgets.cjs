@@ -284,6 +284,29 @@ const egaux = (x, y) => Math.abs(x - y) <= 3;
 module.exports = { page, lire, serveur, centre, touchSeq, pas, appuyer, TAILLES, DIST, PORT, chromium };
 if (require.main === module) (async () => {
   let b, srv, srvAv;
+  // (2 nov., 22 h) LA GRILLE DES WIDGETS N'EST PLUS RENDUE SUR MA JOURNÉE — retiré à la demande de
+  // Julien, 2 nov. 22 h (maquette FusionJournee ; drapeau `JOURNEE_AVEC_WIDGETS` de src/App.jsx).
+  // Tant que le drapeau est éteint, ce banc juge UNE chose : la grille, « Modifier » et les widgets
+  // n'apparaissent nulle part (les chiffres qu'ils portaient sont jugés par journee-chiffres,
+  // chiffres-croises et vendu-recu, là où ils s'affichent maintenant). Drapeau rallumé ⇒ banc complet.
+  const SRC_APP = fs.readFileSync(path.join(__dirname, '..', '..', 'src', 'App.jsx'), 'utf8');
+  if (/const JOURNEE_AVEC_WIDGETS = false;/.test(SRC_APP)) {
+    try {
+      srv = await serveur(DIST, PORT);
+      b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
+      for (const T of TAILLES) {
+        await essaie('sans grille ' + T.nom, async () => {
+          const { ctx, pg } = await page(b, T, PORT);
+          await pg.waitForSelector('[data-fu-semaine]', { timeout: 20000 });
+          const r = await pg.evaluate(() => ({ grille: document.querySelectorAll('.vrm-widgets, [data-widget-tuile], .vrm-day-money, [data-carte-jours]').length, modifier: [...document.querySelectorAll('[data-widgets-modifier]')].filter((e) => e.getClientRects().length).length, tete: !!document.querySelector('.vrm-fu-tete') }));
+          dit(r.grille === 0 && r.modifier === 0 && r.tete, `${T.nom} : ni grille ni « Modifier » ; la tête sombre est là`, JSON.stringify(r));
+          await ctx.close();
+        });
+      }
+    } finally { if (b) await b.close(); if (srv) srv.close(); }
+    console.log(`\n${ok} ✅ · ${ko} ❌`);
+    process.exit(ko ? 1 : 0);
+  }
   try {
     const avant = process.env.BANC_DIST && !process.env.BANC_DIST_AVANT ? null : distAvant();
     srv = await serveur(DIST, PORT);

@@ -165,9 +165,11 @@ const lire = (pg) => pg.evaluate(() => {
         // et le bonjour ne prend plus de place sur téléphone : 0 px est « compact ».
         // (27 oct.) Julien garde le bandeau pétrole du bonjour sur téléphone (« celui qui est là ») :
         // un bandeau d'au plus 130 px, jamais plus haut (sinon les gestes passent sous la ligne de flottaison).
-        if (vp.width < 600) dit(lu.hBonjour >= 0 && lu.hBonjour <= 130, 'le bandeau du bonjour reste court sur téléphone (≤ 130 px)', `${lu.hBonjour} px`);
-        dit(lu.courbeVisible, 'le graphique de la semaine est visible sans clic');
-        dit(lu.tuiles.length === 4, 'la barre des 4 gestes est là', JSON.stringify(lu.tuiles));
+        // (2 nov., 22 h) La tête sombre de la maquette porte le bonjour, le titre, les 7 jours et deux cases :
+        // ≤ 300 px au téléphone. Le graphique de la semaine n'est plus sur Ma journée, et une case à
+        // zéro ne prend plus de place (une carte « À faire » par geste) — retiré à la demande de Julien, 2 nov. 22 h (maquette FusionJournee).
+        if (vp.width < 600) dit(lu.hBonjour >= 0 && lu.hBonjour <= 300, 'la tête sombre reste compacte sur téléphone (≤ 300 px)', `${lu.hBonjour} px`);
+        dit(lu.tuiles.length >= 1 && lu.tuiles.every(([, n]) => Number(n) > 0), 'les gestes du jour sont là, un par carte, jamais une carte à zéro', JSON.stringify(lu.tuiles));
         dit(lu.tuiles.some(([id, n]) => id === 'envoyer' && n === '2'), '« À envoyer » compte les 2 ventes à expédier', JSON.stringify(lu.tuiles));
         dit(lu.deborde.length === 0, 'aucun texte ne sort de sa boîte', lu.deborde.join(' | '));
         await ctx.close();

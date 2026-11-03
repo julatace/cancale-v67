@@ -164,3 +164,9 @@ Déplacé TEL QUEL depuis CLAUDE.md §9 le 2 novembre 2026 (le fichier dépassai
 ### Lignes de §9 déplacées telles quelles
 - **1er nov.** — Capture Vestiaire/Leboncoin fiable (extension **5.299.0**) : une réponse inconnue n'est plus « lue, vide », compte de la page = compte de l'onglet, liste entière (`audit-capture-vc-lbc`). → historiques vestiaire et leboncoin. Geste : app ouverte sur le compte VRM de l'extension, « Mes articles » Vestiaire défilé jusqu'au bout.
 - **1er nov.** — Tournée RETIRÉE de Ma journée (sa demande) : `TOURNEE_SUR_JOURNEE = false`, code gardé. Geste : aucun.
+
+### Lignes de §9 déplacées telles quelles
+- **1er nov.** — Vestiaire partout : une vente Vestiaire rend sa paire « vendue » PAR IDENTITÉ sur tous les sites ; entre dans CA/URSSAF/bénéfice seulement si le montant est sûr, sinon « non comptée » nommée (`audit-vestiaire-partout`). → historique vestiaire. Geste : aucun.
+- **1er nov.** — Données sûres : `main` fusionnée clé par clé (`src/fusionNuage.js`) + PATCH conditionnel sur `data.rev`, `lireTout` sans trou, purge au préfixe exact (`audit-fusion-nuage`, `audit-purge-compte`). → historique sécurité-base-serveur. Geste : aucun.
+- **1er nov.** — Audit des actions X1-X9 (extension **5.307.0**) : deux paires au même titre sous un N° = rouge, Republier verrouillé et quota en base. (plafond par compte fait en 5.312.) → historiques numéros, favoris-messages, leboncoin, vinted-extension. Geste : installer la 5.307.0.
+- **1er nov.** — Ma journée sans redite (cases 2 × 2 au téléphone, « dont N aujourd'hui », une ligne « Colis à vérifier »). → historique interface-stock. Geste : regarder Ma journée au téléphone.

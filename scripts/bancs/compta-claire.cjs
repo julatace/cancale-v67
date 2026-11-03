@@ -127,10 +127,12 @@ async function preparer(pg) {
   await ouvrir(pg, 'cat_ventes');
   await pg.waitForFunction(() => !!localStorage.getItem('vrm_benefice_jours'), null, { timeout: 90000 });
   await ouvrir(pg, 'compta');
-  await pg.locator('[data-compta-question="detail"]').first().waitFor({ timeout: 40000 });
+  // (2 nov., 22 h) Les intitulés des questions et la carte URSSAF du mois ne s'affichent plus
+  // (maquette FusionCompta) : on attend qu'ils soient DANS la page, pas visibles.
+  await pg.locator('[data-compta-question="detail"]').first().waitFor({ state: 'attached', timeout: 40000 });
   await pg.locator('[data-benef-etat="lu"]').first().waitFor({ timeout: 40000 });
-  await pg.locator('[data-compta-chiffre="urssaf-mois"]').first().waitFor({ timeout: 40000 });
-  await pg.locator('[data-urssaf-declaree]').first().waitFor({ timeout: 40000 });
+  await pg.locator('[data-compta-chiffre="urssaf-mois"]').first().waitFor({ state: 'attached', timeout: 40000 });
+  await pg.locator('[data-urssaf-declaree]').first().waitFor({ state: 'attached', timeout: 40000 });
   await pg.waitForTimeout(900);
 }
 
@@ -149,13 +151,15 @@ async function regleEcran(pg, nom, tel, errs) {
   // ── Q. trois questions, dans l'ordre
   const qs = await pg.evaluate(() => [...document.querySelectorAll('[data-compta-question]')].map((e) => e.getAttribute('data-compta-question')));
   check(JSON.stringify(qs) === JSON.stringify(['gagne', 'declarer', 'detail']), `${nom} — Q les trois questions, dans l'ordre : ${JSON.stringify(qs)}`);
-  for (const q of ['gagne', 'declarer', 'detail']) check(await visible(pg, `[data-compta-question="${q}"]`), `${nom} — Q la question « ${q} » est visible`);
-  // ── C. un chiffre, puis sa phrase
-  for (const c of ['gagne', 'urssaf-mois']) {
+  // Les intitulés « 1 · Combien j'ai gagné ? »… ne s'affichent plus — retiré à la demande de Julien, 2 nov. 22 h (maquette FusionCompta).
+  for (const q of ['gagne', 'declarer', 'detail']) check(!(await visible(pg, `[data-compta-question="${q}"]`)), `${nom} — Q l'intitulé « ${q} » n'est plus affiché (retiré à la demande de Julien, 2 nov. 22 h (maquette FusionCompta))`);
+  check(await visible(pg, '[data-compta-q="gagne"] [data-fu-carte]'), `${nom} — Q la carte sombre « Ce que tu as gagné » est là`);
+  // ── C. un chiffre, puis sa ligne (la carte URSSAF du mois n'est plus affichée — retiré à la demande de Julien, 2 nov. 22 h (maquette FusionCompta))
+  for (const c of ['gagne']) {
     const r = await pg.evaluate((c) => { const n = document.querySelector(`[data-compta-chiffre="${c}"]`), p = document.querySelector(`[data-compta-phrase="${c}"]`); return { n: !!n, p: !!p, suit: !!(n && p && (n.compareDocumentPosition(p) & Node.DOCUMENT_POSITION_FOLLOWING)), txt: p ? p.innerText.trim() : '', vis: !!(n && n.checkVisibility() && p && p.checkVisibility()) }; }, c);
-    check(r.n && r.p && r.suit && r.vis && r.txt.length > 20, `${nom} — C « ${c} » : un chiffre puis une phrase dessous (« ${r.txt.slice(0, 90)}… »)`);
+    check(r.n && r.p && r.suit && r.vis && r.txt.length > 0, `${nom} — C « ${c} » : un chiffre puis une ligne courte dessous (« ${r.txt.slice(0, 90)} »)`);
   }
-  check(await visible(pg, '[data-compta-echeance]') && await avant(pg, '[data-compta-echeance]', '[data-compta-chiffre="urssaf-mois"]'), `${nom} — C la prochaine déclaration (date) vient avant ce qu'il faut mettre de côté ce mois-ci`);
+  // (« la prochaine déclaration avant ce qu'il faut mettre de côté » : la carte n'est plus affichée — retiré à la demande de Julien, 2 nov. 22 h (maquette FusionCompta))
   // ── R. le détail replié
   const replis = await pg.evaluate(() => [...document.querySelectorAll('[data-compta-q="detail"] details')].filter((d) => d.parentElement && d.parentElement.classList.contains('vrm-compta-replis')).map((d) => ({ id: d.id || d.getAttribute('data-micro-repli'), open: d.open })));
   check(replis.length >= 4 && replis.every((d) => !d.open), `${nom} — R « Le détail » : ${replis.length} replis, tous fermés : ${JSON.stringify(replis)}`);
@@ -166,9 +170,10 @@ async function regleEcran(pg, nom, tel, errs) {
   const t = await texteEcran(pg);
   const montants = (t.match(MONTANT) || []).map((x) => x.replace(/[\u202f\u00a0 ]/g, ' ').replace(/\s?€/, ' €'));
   const doubles = [...new Set(montants.filter((x, i) => montants.indexOf(x) !== i))];
-  check(montants.length >= 3 && doubles.length === 0, `${nom} — U chaque montant visible écrit une fois (${montants.length} montants${doubles.length ? ', redits : ' + doubles.join(' · ') : ''})`);
+  // (2 nov., 22 h : l'écran a moins de montants depuis la maquette FusionCompta — au moins 2.)
+  check(montants.length >= 2 && doubles.length === 0, `${nom} — U chaque montant visible écrit une fois (${montants.length} montants${doubles.length ? ', redits : ' + doubles.join(' · ') : ''})`);
   // ── J. aucun jargon visible
-  const jargon = [...(t.match(/\bCA\b|Finalisé(?!e)|\bn\/d\b/g) || []), ...(t.match(/\bbrut\b|encaiss/gi) || [])];
+  const jargon = [...(t.match(/\bCA\b|Finalisé(?!e)|\bn\/d\b/g) || []), ...(t.replace(/bénéfice brut/gi, '').match(/\bbrut\b|encaiss/gi) || [])]; // (3 nov.) « Bénéfice brut » est le NOM d'une notion (src/beneficeNoms.js, bénéfice unique) : permis ; « brut » seul reste du jargon
   check(jargon.length === 0, `${nom} — J aucun jargon visible : ${JSON.stringify(jargon)}`);
   // ── D. débordement
   const deb = await pg.evaluate(() => {
@@ -209,10 +214,11 @@ async function scenarioComplet(b, vp, sombre) {
     check((await attr(pg, '[data-compta-kpi="mois"]', 'data-eur')) === '25.49', `${nom} — M dépenses du mois 25,49 €`);
     check((await attr(pg, '[data-compta-kpi="annee"]', 'data-eur')) === '42.68', `${nom} — M dépenses de l'année 42,68 € (12,50 + 4,20 + 2 × 12,99) : ${await attr(pg, '[data-compta-kpi="annee"]', 'data-eur')}`);
     check((await attr(pg, '[data-echeance-suivante]', 'data-echeance-suivante')) === 'octobre 2026', `${nom} — M la prochaine déclaration nommée est octobre 2026`);
-    const ph = (await pg.evaluate(() => (document.querySelector('[data-compta-phrase="urssaf-mois"]') || {}).innerText || '')).replace(/[\u202f\u00a0]/g, ' ');
-    check(/60,00 €/.test(ph) && /1 vente/.test(ph), `${nom} — C la phrase de l'URSSAF cite le MÊME reçu (60,00 €, 1 vente) : « ${ph.slice(0, 120)} »`);
+    // (la phrase de la carte URSSAF du mois n'est plus affichée — retiré à la demande de Julien, 2 nov. 22 h (maquette FusionCompta) ; son chiffre reste vérifié ci-dessus)
     // ── G. « Ajouter une dépense » ouvre le repli et le formulaire
-    await pg.locator('[data-benef-ajouter-depense]').first().click();
+    // (« Ajouter une dépense » n'est plus sur la carte du bénéfice — retiré à la demande de Julien, 2 nov. 22 h (maquette FusionCompta) : il est dans « Tes dépenses ».)
+    await pg.locator('#compta-charges > summary').first().click();
+    await pg.locator('[data-dep-ouvrir]').first().click();
     await pg.waitForFunction(() => { const d = document.getElementById('compta-charges'); const f = document.querySelector('[data-dep-form]'); return !!(d && d.open && f && f.checkVisibility()); }, null, { timeout: 5000 }).catch(() => {});
     check(await pg.evaluate(() => { const d = document.getElementById('compta-charges'); return !!(d && d.open); }) && await visible(pg, '[data-dep-libelle]'), `${nom} — G « Ajouter une dépense » ouvre « Tes dépenses » et son formulaire`);
     check(!errs.length, `${nom} — aucune erreur après les gestes${errs.length ? ' : ' + errs[0].slice(0, 160) : ''}`);
@@ -234,12 +240,14 @@ async function scenarioPartiel(b, vp, sombre) {
     const ph = (await pg.evaluate(() => (document.querySelector('[data-compta-phrase="gagne"]') || {}).innerText || ''));
     const n = await attr(pg, '[data-benef-n]', 'data-benef-n'), nc = await attr(pg, '[data-benef-ncout]', 'data-benef-ncout');
     const manque = Number(n) - Number(nc);
-    check(manque > 0 && new RegExp(`de ${manque} ventes? sur ${n}`).test(ph) && /prix d'achat/.test(ph), `${nom} — P la phrase nomme le manque, des mêmes nombres (${manque} sur ${n}) : « ${ph.slice(0, 160)} »`);
-    check(await visible(pg, '[data-benef-porte]'), `${nom} — P « Compléter les prix d'achat » est visible sous la phrase`);
+    check(manque > 0 && new RegExp(`${manque} prix d'achat à saisir`).test(ph), `${nom} — P la ligne nomme le manque, du même nombre (${manque} sur ${n}) : « ${ph.slice(0, 160)} »`);
+    check(await visible(pg, '[data-benef-porte]'), `${nom} — P le manque est la porte vers la saisie (« N prix d'achat à saisir »)`);
     // ── G. « dater dans « Vendu et reçu » » ouvre ce repli
-    await pg.locator('[data-renvoi-carte-ca]').first().click();
+    // (Le renvoi « dater dans Vendu et reçu » vivait dans la carte URSSAF du mois, qui n'est plus
+    // affichée — retiré à la demande de Julien, 2 nov. 22 h. « Vendu et reçu » s'ouvre de lui-même.)
+    await pg.locator('#compta-ca > summary').first().click();
     await pg.waitForFunction(() => { const d = document.getElementById('compta-ca'); return !!(d && d.open); }, null, { timeout: 5000 }).catch(() => {});
-    check(await visible(pg, '[data-ca-cur="vendu"]'), `${nom} — G la vente Leboncoin à dater : le renvoi ouvre « Vendu et reçu »`);
+    check(await visible(pg, '[data-ca-cur="vendu"]'), `${nom} — G « Vendu et reçu » s'ouvre d'un toucher (la vente Leboncoin s'y date)`);
     check(!errs.length, `${nom} — aucune erreur après le geste${errs.length ? ' : ' + errs[0].slice(0, 160) : ''}`);
   });
   await ctx.close();

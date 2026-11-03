@@ -91,7 +91,9 @@ const menuEcrans=(p)=>p.locator('button.vrm-nav-more').first();
         const filtre=p.getByRole('button',{name:'Toutes',exact:true}).first();await filtre.scrollIntoViewIfNeeded();await filtre.tap();
         check((await p.locator('main').innerText()).includes('Nike P-6000'),largeur+' filtre accessible au doigt');
         check(!(await p.getByRole('button',{name:'7 jours',exact:true}).isVisible()),largeur+' périodes secondaires repliées');
-        await p.getByRole('button',{name:'Toute la période',exact:true}).tap();
+        // (2 nov., 22 h) La période vit dans « Outils » (maquette FusionVentes) : on l'ouvre au doigt.
+        {const o=p.locator('.vrm-outils-ventes button').first(); if(await o.count()){ await o.tap(); await p.waitForTimeout(300);} }
+        {const tp=p.getByRole('button',{name:'Toute la période',exact:true}); if(await tp.count()&&await tp.first().isVisible()) await tp.first().tap(); else await p.locator('[data-outils-recherche] .vrm-period button').first().tap();}
         await p.getByRole('button',{name:'7 jours',exact:true}).tap();
         check(await p.getByRole('button',{name:'7 derniers jours',exact:true}).isVisible(),largeur+' période secondaire sélectionnable');
       }
@@ -128,7 +130,7 @@ const menuEcrans=(p)=>p.locator('button.vrm-nav-more').first();
   check((await p.getByRole('navigation',{name:'Navigation principale'}).count())===1,'ordinateur: une seule navigation');check(await p.getByRole('button',{name:'Paramètres',exact:true}).isVisible(),'ordinateur: paramètres toujours accessibles (bas du rail)');await p.locator('.vrm-sale-row .vrm-ledger-sale-toggle').first().click();await p.locator('.vrm-sale-row[data-ligne-ouverte=true]').first().waitFor({timeout:5000});{const lg=(await p.locator('.vrm-sale-row[data-ligne-ouverte=true] .vrm-sale-photo').first().boundingBox()).width;check(lg>=64&&lg<=88,'ordinateur: photo de vente pleine, vente ouverte ('+lg+' px)');};
   // (17 oct.) Le rail n'a plus de groupes repliés : Gestion est toujours visible, Factures vit dans Comptabilité.
   const rail=p.locator('.vrm-atelier-rail');
-  check(await rail.getByRole('button',{name:'Comptabilité',exact:true}).isVisible(),'ordinateur: comptabilité (factures comprises) accessible depuis le rail');
+  check(await rail.getByRole('button',{name:'Compta',exact:true}).isVisible(),'ordinateur: comptabilité (factures comprises) accessible depuis le rail');
   await rail.getByRole('button',{name:'Vinted',exact:true}).click();
   await p.getByRole('button',{name:'Annonces',exact:true}).first().click();
   // (26 oct.) Dans l'espace Vinted, l'onglet « Annonces » est le titre : plus de second titre

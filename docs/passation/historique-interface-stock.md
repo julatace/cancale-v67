@@ -2904,3 +2904,198 @@ regroupement seulement : **aucune règle ne change** (mêmes routes `reception`/
 - À trancher par Julien : retirer la liste technique repliée (doublon du journal, mais seule
   recherche plein texte) ; les deux « Boost rentable ? » (période en haut, tout le temps dans le
   volet) ; « Articles ajoutés par jour » et les deux courbes mensuelles du volet « argent ».
+
+## 2 nov. (nuit) — Le style « Fusion » (branche `claude/design-fusion`)
+
+Julien a choisi « Fusion » sur les maquettes (FusionJournee, FusionVentes, FusionColis,
+FusionCompta) : « j'aime la barre de progression pour le suivi », « la première photo avec
+les stats novembre », puis « sans trop de couleur non plus, ça doit être premium ». Base
+neutre (fond #f2f2f7, cartes blanches rayon 20, ombre très douce), UNE carte sombre par
+écran (dégradé #1f3a5f → #1d1d1f), le bleu d'Apple seulement pour le bouton principal et
+les segments franchis, l'ambre seulement pour un geste urgent.
+
+**Composants partagés** (`src/design/`) :
+- `CarteMois.jsx` — la carte sombre : surtitre, UN grand chiffre (« — » si `null`), sous-ligne,
+  cases translucides, courbe monotone (`courbeMonotone.js`) quand c'est une tendance. Elle
+  n'invente rien : chaque valeur lui est passée par l'écran, qui la tient de SA règle.
+- `Frise.jsx` + `friseFusion.js` — la frise à 4 segments. AUCUNE règle neuve : pour une vente,
+  projection des cinq étapes de `friseVente` (src/recapVente.js) en Vendue · Postée
+  (= Déposée) · Livrée · Payée (= Argent reçu) ; pour un colis, Imprimé · Déposé · En route ·
+  Livré avec la même loi (faite si SA preuve est lue ou si une étape plus loin l'est ; « pas
+  su » jamais coché). Chaque segment porte `data-fu-etape`, `data-fait`, `data-preuve`,
+  `data-cours`.
+- `fusion.css` — jetons (`--fu-*`, clair et sombre CHOISI), chargée en tout dernier.
+
+**Ma journée** : la tête devient la carte sombre (date, bonjour, la semaine avec un point sous
+un jour qui a vendu, « Vendu aujourd'hui » = `bilanVentes` et le bénéfice du mois =
+`BeneficeJournee` sur `vrm_benefice_jours`). Le bénéfice n'est plus redit dans « Vendu en … »
+ni en carte de secours (§7). « À faire » en cartes : pastille chiffrée NEUTRE (encre ; ambre
+pâle seulement si urgent), le geste en pilule. Les cases du jour en cartes blanches.
+
+**Ventes** : carte du mois (vendu du mois toutes plateformes = `bilanVentes` sur `vendus`,
+« au moins » si un compte n'est pas lu ; courbe = cumul jour par jour ; cases « à poster »
+= `aExpedier` pas encore déposée, « en route » / « argent à venir » = la frise de chaque
+vente). Les preuves de la frise sont lues UNE fois (`preuvesFriseDe`, au niveau de
+l'écran) pour le tiroir (cinq étapes), la ligne (quatre segments) et la carte.
+
+**Colis** : carte « Aujourd'hui » (`vrm_colis_aposter`, `lignesLot`, `gestesDepuis(shipDone)`,
+`vrm_colis_retirer` — aucun nombre recalculé), frise par colis, cartes blanches.
+
+**La puce transporteur** (Julien, 21 h 36, « laide ») : `PastilleTransporteur` (non `seul`)
+devient une puce de 44 px, fond #f2f2f7 (sombre #2c2c2e), rayon 12, tuile du logo 20 px
+(rayon 5, blanche), nom 13 px 600 ; « Transporteur pas lu » = même puce sans tuile, en gris.
+Elle vit dans `.vrm-rangee-bord`, À GAUCHE du bouton bordereau, même rangée, jamais à la
+ligne : le libellé passe de « Imprimer le bordereau » à « Imprimer » par une requête de
+conteneur sur le bouton (≤ 236 px). Partout : Colis (Vinted, Vestiaire, en lignes sur
+ordinateur), ligne de vente, récapitulatif (Vinted et Vestiaire), Leboncoin, achats.
+
+**Compta** (structure « trois questions » de `claude/compta-simple`, gardée) : la carte de
+« Combien j'ai gagné ? » devient la carte sombre (CSS seulement) ; dessous, `ComptaFusion` :
+l'anneau (parts EN %, jamais un montant redit) seulement quand le net du mois se calcule,
+et les six derniers mois en barres (bénéfice sur les ventes, `beneficeDesJours`, montant en
+infobulle, « pas su » en pointillé). `compta-claire` 98/98.
+
+**Preuves** : banc `scripts/bancs/design-fusion.cjs` (Ma journée, Ventes, Colis, Compta ×
+390/1512 × clair/sombre) : frise = prouvé seulement (mutation `FUSION_MUTATION=1` ⇒ rouge),
+rangée puce + bordereau (même ligne, 44 px, rayon 12, une ligne), débordement, violet,
+« encaissé », erreurs. Bancs voisins : `recap-vente`, `compta-claire`, `vestiaire-parite`.
+Revue de contraste (ui-ux-pro-max §1) : aucun texte gris sous 4,5:1.
+
+**Reste** : la frise sur les lignes Leboncoin, eBay et Vestiaire (il leur faut leurs preuves
+propres, pas de règle à inventer) ; Annonces, Achats, Messages, Paramètres dans le même esprit.
+
+### 2 nov., 22 h — « recopie à l'identique, sans textes explicatifs » (Julien)
+
+Julien : « j'aime beaucoup la Fusion carte sombre mais le problème c'est que tu ne recopies pas
+à l'identique et que tout le temps tu ajoutes des textes explicatifs partout, ce qui est
+horrible ». Les quatre écrans suivent maintenant les maquettes (valeurs relevées dans les
+`.dc.html`), comparées côte à côte à 390 × 844 (`compare-*.png`) :
+
+- **Ma journée** : la tête sombre bord à bord (rayon 30 en bas), « Bonsoir … » puis « Ma
+  journée » 34/800, les sept derniers jours (aujourd'hui à droite, cercle blanc), « Vendu
+  aujourd'hui » et « Bénéfice du mois » (`BeneficeJournee fusion`). Puis « À faire · N gestes » :
+  une carte par geste — les cases du jour (Colis à poster / à retirer, Messages, Prix à baisser,
+  mêmes compteurs, mêmes `data-tuile`), les alertes, le rappel URSSAF ; pastille 42 px encre
+  (ambre si pressé), pilule d'action bleue. **La grille des widgets (Vendu du mois, semaine,
+  attente, dernières ventes, stock, tendances) n'est plus rendue** : drapeau
+  `JOURNEE_AVEC_WIDGETS = false` (src/App.jsx), un mot pour la remettre. Les bancs de ces
+  widgets (`journee-chiffres`, `journee-mieux`, `journee-premium`, `journee-widgets`,
+  `vendu-recu`, une partie de `chiffres-croises` et `benefice-journee`) sont rouges tant que
+  le drapeau est éteint : à trancher.
+- **Ventes** : la date au-dessus du titre, plus de phrase, ni « Chiffres », ni « À faire
+  aujourd'hui », ni recherche, ni période, ni raison commune ; la carte du mois (« N ventes ·
+  bénéfice X € » quand le net se calcule ; cases à poster · en route · à payer, qui filtrent la
+  liste d'un toucher) ; chaque vente a la forme de la maquette (`LigneVenteCompacte fusion`) —
+  les filtres et « Outils » restent (des boutons).
+- **Colis** : la date et le titre, la carte « Aujourd'hui », « J'envoie · N / Je reçois · N »,
+  les colis **rangés par transporteur** (en-tête : tuile du logo, nom, « N colis »), le bouton
+  rond en haut à droite = le bouton bordereau lui-même ; ni « Emballer », ni « Tout générer »,
+  ni imprimante, ni intertitres, ni aide. La carte Vestiaire garde sa rangée puce + bordereau.
+- **Compta** : « Novembre 2026 » / « Compta » ; la carte sombre « Ce que tu as gagné » (une
+  ligne courte, trois cases : à déclarer · URSSAF · ventes) ; l'anneau (parts en %) ; les six
+  mois (mois courant en bleu) ; l'encart ambre « Déclaration URSSAF » + « J'ai déclaré »
+  (`rappelUrssaf`). Les intitulés des trois questions, la carte URSSAF du mois et le détail du
+  calcul ne s'affichent plus ; « Le détail » (replis) reste dessous.
+- Phrases d'écran retirées pour journee/ventes/colis (`src/phrasesEcran.js`).
+- Bancs mis à jour (note « retiré à la demande de Julien, 2 nov. 22 h ») : `compta-claire`,
+  `demo-bulles`, `design-fusion`.
+
+### 2-3 nov. — Revue du coordinateur, cas extrêmes, Ma journée sur ordinateur (`claude/design-fusion`)
+
+**Revue (6 points)** : aucune fonction perdue — recherche et période dans le menu
+« Outils » de Ventes ; Factures dans « Documents et réglages » ; « Déclaration URSSAF »
+en lien sur l'encart de Compta ; sur chaque carte Colis, « … » ouvre « Marquer imprimé /
+Suivre / Colis fait » ; « … » de l'en-tête Colis ouvre Emballer, Tout générer, imprimante.
+Relier / Poser N° en pilule seulement quand il le faut. Ventes « à expédier » : puce
+transporteur + Imprimer (ou Générer) sur une rangée, « Déposé » après ; titre court + taille
+sur la ligne N°/site. « Vendus ailleurs » en carte À faire.
+
+**Publications vérifiées** (retrait de la grille de Ma journée, `JOURNEE_AVEC_WIDGETS =
+false`) : `vrm_benefice_jours` et `vinted_urssaf_mois` sont écrites par les effets de
+Comptabilité, `widget_stats` par la coque — aucune ne vivait dans la grille.
+
+**Bancs Ma journée réalignés** (journee-chiffres, benefice-journee, chiffres-croises,
+journee-mieux, vendu-recu, journee-premium, journee-widgets, demo-bulles) : l'affichage
+retiré est noté « retiré à la demande de Julien, 2 nov. 22 h » ; les CHIFFRES restent jugés
+(vendu du jour sur la tête, vendu du mois sur la carte de Ventes, bénéfice = Comptabilité,
+reçu et cotisations sur Compta).
+⚠️ `chiffres-croises` garde UN rouge, **déjà rouge sur `main`** (mesuré sur
+`git archive origin/main`, banc de main) : Statistiques (`data-dash-stat="caMois"`) ne pose
+pas de montant dans ce jeu de données (`liveStatsVus.caMois` = null) alors que Ventes et
+Comptabilité disent 228,30 €. Hors du chantier de style — à regarder à part.
+
+**Cas extrêmes** (Julien, 3 nov. : « tout doit être parfait, regarde tous les cas de figure
+du monde ») : `design-fusion` prend `FUSION_JEU` = base · vide (0 vente) · une · deux-cents
+· longs (titres de 120 caractères) · gros (montants à 5 chiffres) · passu (ventes,
+transactions et bordereaux en 503). Sur chaque jeu, 4 écrans × 390/1512 × clair/sombre :
+pas de débordement, gestes 44 px, jamais « encaissé », pas de violet, **aucun montant
+rogné**, et en « passu » aucune carte ne dit « 0 € ». Corrigé en route :
+- « 35 211,9… » sur la carte du mois : `CarteMois` réduit la taille du grand chiffre pixel
+  par pixel jusqu'à ce qu'il tienne (plancher 22 px), mesuré, recalculé au redimensionnement ;
+- « Vérifications » sous la liste des ventes (4 composants, 3 retraits, 3 hauteurs de
+  chevron) : une liste groupée façon Réglages ; « 1 comptes » → « 1 compte » ;
+- « Outils » de Ventes : la pilule des filtres voisins (était un carré gris décalé) ;
+- bénéfice du mois sur une partie des ventes : plus de « ≥ » (une vente au prix d'achat
+  inconnu peut être à perte, ce n'est pas un plancher) — « Bénéfice brut du mois » et la
+  couverture « · 1 sur 3 » à côté ;
+- sombre : la page était #0e0e0d entourée de bandes #000 (règle Vitrine plus forte) — un
+  seul fond.
+
+**Ma journée sur ordinateur** (Julien, 3 nov. 07 h 47, capture : « j'aime pas trop cet
+endroit » — ligne coupée sous la barre collée, bloc Urgent + 4 tuiles vides + longue liste,
+« paires », jargon) : la maquette FusionJournee à 720 px, centrée ; pas de bloc Urgent ni
+de tuiles (l'urgent = pastille ambre dans la liste) ; mots courts par
+`src/design/tacheCourte.js` (« 2 annonces à retirer de Leboncoin · N°18, N°23 · vendus sur
+Vinted », « Vente Vestiaire à envoyer », « 5 articles pour eBay », « 3 e-mails à trier »,
+« paire(s) » → « article(s) ») — la phrase entière reste dans l'infobulle et le nom du
+bouton, aucun compteur ni cible ne change (`scripts/audit-journee-court.cjs`, 47 contrôles,
+rouge sur main et par mutation). La barre de recherche collée prend le fond de la page,
+voilée et floutée, avec un filet : le texte qui défile dessous n'est plus tranché sur une
+bande blanche (partout sur ordinateur). Banc : `design-fusion` vérifie à 1512 clair et
+sombre une colonne ≤ 760 px centrée, aucune tuile ni bloc Urgent, jamais « paire », la
+barre au fond de la page.
+⚠️ Le jeu du banc ne fabrique pas encore les sources de la capture de Julien (Leboncoin à
+retirer, Vestiaire, agent eBay, e-mails mis de côté) : la forme courte est prouvée par
+l'audit, la mise en page par le banc avec les gestes du jeu de base.
+
+### 3 nov. — Critique complète (coordinateur), points traités sur les 4 écrans Fusion
+
+Rapport : `scratchpad/critique/RAPPORT.md` (hors dépôt). Traités ici :
+- **#2** Téléphone : sur Ma journée, Ventes, Colis et Compta, la barre du haut ne redit plus le
+  titre (ni tuile logo, ni titre centré) ; icônes seules, sur le fond de l'écran (le noir de la
+  tête sur Ma journée). **« Compta » partout** (colonne, menu Plus, titre) ; `tous-boutons`,
+  `compta-simple`, `menu-range`, `mobile`, `revendeurs`, `annonces-ventes-brouillon` suivent.
+- **#3** Leboncoin et eBay : `KpiVentes` rend la carte sombre (`CarteMois`) avec les MÊMES valeurs
+  et attributs (`data-kpi`), « — » quand ce n'est pas lu ; les ventes Leboncoin portent la frise
+  (`friseVenteLue` : « Postée » = expédiée, « Livrée »/« Payée » = finalisée, lu par l'extension).
+  Reste : la frise sur les lignes eBay et Vestiaire (statuts à projeter un par un).
+- **#5** Une carte de vente = deux commandes (puce + bordereau) ; « Prix d'achat », « Relier un
+  achat », « Déposé », « sur Vinted » derrière « … » (comme Colis) ; l'état sous le titre ne redit
+  plus la frise (seule l'urgence « À expédier ») ; transporteur pas lu ⇒ pas de puce, le bouton
+  prend la rangée.
+- **#6** Le récapitulatif porte LA frise de la ligne (`RecapFrise` → `Frise.jsx`, 4 étapes, mêmes
+  mots) ; « Bordereau reçu le … » devient une ligne de détail. `recap-vente` relit les 4 segments
+  sous les noms de `friseVente` (même règle jugée).
+- **#10** Sombre : fond #000 (la règle Vitrine `:root[data-theme=dark] .vrm-main` gagnait), cartes
+  #1C1C1E, filet clair autour des cartes sombres, pastilles #3A3A3C (plus de carré blanc pur).
+- **#11** Ma journée : pastilles 42/13/800 17 — ambre = dû aujourd'hui, encre, gris #c7c7cc pour
+  « à saisir » ; le titre ne redit plus le nombre de la pastille (`titreSansNombre`, audité) ;
+  URSSAF au même gabarit (« Noter » en pilule, la phrase en infobulle) ; « Vendus ailleurs » 600.
+- **#12** Courbe : rien sous 3 points (2 points faisaient un trait plat sur un bloc).
+- **#13** Ordinateur : les 4 écrans dans une colonne de 760 px centrée ; plus d'en-têtes de
+  colonnes sur Ventes ; étiquettes 13 px, frise 12 px (11 au téléphone).
+- **#15** (Colis seulement) le groupe « Transporteur pas lu » s'appelle « Autres ».
+
+Non faits ici (annoncés pour le chantier suivant) : palette globale (#1), phrases des autres
+écrans (#4), pastilles de site (#8), échelle typographique globale (#9), autres écrans.
+
+**Fin du 3 nov. (fusion de main « bénéfice unique » comprise)** : la tête de Ma journée, la carte
+Compta et la ligne de Ventes suivent `chiffreBenefice` (« — » si pas su ; « Bénéfice brut du mois »
+retiré) ; les barres des 6 mois de Compta disent « bénéfice brut ». Trouvé en route : au téléphone, le
+menu « Outils » de Ventes (recherche, période) tombait sous la règle qui range la barre — corrigé.
+Rouges connus, **déjà rouges sur `main`** (mesurés sur `git archive origin/main`) : `chiffres-croises`
+(1) et `vendu-recu` (10) — Statistiques ne pose pas son montant du mois dans ces jeux ;
+`demo-bulles` (boutons de la visite à 43 px) ; `mobile` (s'arrête plus loin sur main, au menu Colis).
+Restent rouges ici : `mobile` à l'étape « 7 jours » de la période dans « Outils », `compta-simple` E
+(saisie de dépense pendant que le nuage est retenu, 2), `annonces-ventes-brouillon` (16 rouges sur main,
+quelques-uns de plus ici, écrans Annonces/Messages surtout).

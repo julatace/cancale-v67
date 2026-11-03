@@ -334,16 +334,21 @@ const lire = (pg) => pg.evaluate(() => {
         dit(!(lu.tourneeVue && lu.emballerJob), 'D. « Emballer les colis prêts » n’est pas redit dans « À faire » (l’étape Emballer y mène)');
         // I.
         const coupes = lu.cases.flatMap((c) => c.textes.filter((t) => t.coupe).map((t) => `${c.id}: « ${t.t} » (${t.sw}/${t.cw}${t.rogne ? ', ellipse' : ''})`));
-        dit(lu.cases.length >= 4 && coupes.length === 0, 'I. aucun libellé ni sous-ligne de case coupé', coupes.join(' · ') || `${lu.cases.length} cases`);
+        // (Les cases à zéro ne prennent plus de place : une carte « À faire » par geste — retiré à la demande de Julien, 2 nov. 22 h (maquette FusionJournee).)
+        dit(lu.cases.length >= 1 && coupes.length === 0, 'I. aucun libellé ni sous-ligne de case coupé', coupes.join(' · ') || `${lu.cases.length} cases`);
         // J.
         dit(lu.nombres.length >= 4 && lu.redits.length === 0, 'J. aucun nombre de comptage écrit deux fois dans Ma journée', lu.redits.length ? `redits : ${lu.redits.join(', ')} — ${lu.texteNombres.slice(0, 900)}` : lu.nombres.join(','));
         // K.
         dit(lu.k.emballerLigne === 0 && lu.k.pressesLigne === 0, 'K. « À faire » ne redit ni « Emballer les colis prêts » ni « N colis pressés » à côté de la case', JSON.stringify({ emballer: lu.k.emballerLigne, presses: lu.k.pressesLigne }));
         dit(lu.k.verifLignes <= 1, 'K. « à vérifier » tient en UNE ligne d’« À faire » au plus', String(lu.k.verifLignes));
-        dit(lu.k.emballerGeste.length === 1 && lu.k.emballerGeste[0].dansCase && lu.k.emballerGeste[0].h >= 44, 'K. « Emballer » reste joignable en un toucher : le geste de la case « À envoyer » (≥ 44 px)', JSON.stringify(lu.k.emballerGeste));
+        // (« Emballer » n'est plus un bouton de Ma journée : la carte « Colis à poster » mène à Colis, où
+        //  « … » le donne — retiré à la demande de Julien, 2 nov. 22 h (maquette FusionJournee).)
+        dit(lu.k.emballerGeste.length === 0, 'K. pas de second bouton « Emballer » sur Ma journée (la carte « Colis à poster » mène à Colis)', JSON.stringify(lu.k.emballerGeste));
         dit(/^dont \d+ aujourd'hui$/.test(lu.k.sousEnvoyer.trim()) && /^\+ \d+ à vérifier$/.test(lu.k.sousRetirer.trim()), 'K. les cases portent l’urgence (« dont N aujourd’hui ») et le « à vérifier » (« + N à vérifier »)', JSON.stringify([lu.k.sousEnvoyer, lu.k.sousRetirer]));
         // E.
-        if (vp.width >= 1280) {
+        // (E) La rangée des chiffres (widgets) n'est plus rendue sur Ma journée — retiré à la demande de
+        //     Julien, 2 nov. 22 h (maquette FusionJournee) : jugée seulement si le drapeau la remet.
+        if (vp.width >= 1280 && /const JOURNEE_AVEC_WIDGETS = true;/.test(require('fs').readFileSync(require('path').join(__dirname, '../../src/App.jsx'), 'utf8'))) {
           dit(lu.rangsChiffres.length >= 1 && lu.rangsChiffres.every((r) => r.part >= 0.9), 'E. les chiffres occupent ≥ 90 % de la largeur, rangée par rangée', JSON.stringify(lu.rangsChiffres));
           dit(lu.rangsChiffres.every((r) => Math.max(...r.hs) - Math.min(...r.hs) <= 2), 'E. les cartes d’une même rangée ont la même hauteur', JSON.stringify(lu.rangsChiffres));
         }

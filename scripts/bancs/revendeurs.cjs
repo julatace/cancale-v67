@@ -117,6 +117,12 @@ async function brancher(p){
   });
   await p.setViewportSize({width:1512,height:900});
   await p.goto(base+'/?tab=journee');await p.locator('[data-barre-jour]').waitFor();
+  // (2 nov., 22 h) La grille de Ma journée (stock, dernières ventes, chiffres, courbe) n'est plus
+  // rendue — retiré à la demande de Julien, 2 nov. 22 h (maquette FusionJournee : la tête sombre
+  // puis « À faire »). Ces contrôles ne jouent que si le drapeau la remet ; sinon on juge la tête
+  // et l'absence de débordement, et le stock s'ouvre depuis la colonne.
+  const avecGrille=/const JOURNEE_AVEC_WIDGETS = true;/.test(fs.readFileSync(path.join(__dirname,'../../src/App.jsx'),'utf8'));
+  if(avecGrille){
   await p.getByRole('region',{name:'Aperçu du stock Vinted'}).waitFor();
   await p.waitForFunction(()=>document.querySelector('[data-stock-en-ligne]')?.dataset.stockEnLigne==='1');
   await p.evaluate(()=>document.fonts.ready);
@@ -143,7 +149,12 @@ async function brancher(p){
   // (1er nov., « très répétitif ») Le total d'annonces est écrit juste au-dessus : la couverture
   // ne le redit plus (« 0 sur 1 · 1 à compléter ») — « Aucune avec un prix d'achat · Compléter ›».
   { const t=await p.locator('.vrm-day-stock').innerText(); check(/Aucune avec un prix d.achat/.test(t) && /Compléter/.test(t) && !/€/.test(t.split('Coût')[1]||'—'),'stock sans prix connu expliqué sans faux montant'); }
-  await p.locator('.vrm-day-stock').getByRole('button',{name:'Ouvrir le stock'}).click();await p.getByRole('heading',{name:'Stock',exact:true}).waitFor();
+  
+  } else {
+    await p.locator('[data-fu-semaine]').waitFor();
+    check(await p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'journée sans débordement');
+  }
+  await p.goto(base+'/?tab=garage');await p.getByRole('heading',{name:'Stock',exact:true}).waitFor();
   await p.setViewportSize({width:390,height:844});
   // (31 oct., navigation par tâche) `plat_vinted` / `plat_leboncoin` / `plat_ebay` ouvrent
   //  « Ventes » filtré sur le site ; l'en-tête au logo du site vit dans l'ESPACE du site
@@ -164,7 +175,11 @@ async function brancher(p){
    const sansNom=await p.locator('.vrm-app-shell button').evaluateAll(es=>es.filter(e=>{const r=e.getBoundingClientRect();return r.width&&r.height&&!e.getAttribute('aria-label')&&!e.getAttribute('title')&&!e.textContent.trim()&&!e.querySelector('img[alt]');}).length);
    check(sansNom===0,'boutons visibles nommés '+nom);
    const summary=p.locator('.vrm-platform-summary');
-   if(nom!=='Vinted' && await summary.count()===0){
+   // (2 nov., 22 h) Sur Ventes (maquette FusionVentes) le résumé replié n'est plus affiché : la carte
+   // sombre dit les chiffres — retiré à la demande de Julien, 2 nov. 22 h.
+   if(await summary.count()>0 && !(await summary.first().isVisible())){
+    check(await p.locator('[data-fu-carte], [data-ventes-kpi]').count()>0,'chiffres dits par la carte du mois '+nom);
+   } else if(nom!=='Vinted' && await summary.count()===0){
     // (17 oct.) Leboncoin/eBay : sur « Ventes », le résumé se tait — les trois cases le disent (§7).
     check(await p.locator('[data-ventes-kpi]').count()>0,'chiffres dits par les cases de Ventes '+nom);
    } else {
@@ -180,7 +195,7 @@ async function brancher(p){
       check(await rail.locator('details').count()===0,'aucun groupe Détails ou Autres outils dans le rail');
       check(await rail.getByRole('button',{name:'Gérer',exact:true}).count()===0,'aucun bouton à déplier pour Gérer (ex-« Gestion »)');
       check(await rail.getByRole('region',{name:'Gérer',exact:true}).isVisible(),'gestion (« Gérer ») visible en permanence dans le rail');
-      check(await rail.getByRole('button',{name:'Stock',exact:true}).isVisible() && await rail.getByRole('button',{name:'Comptabilité',exact:true}).isVisible(),'stock et comptabilité (factures comprises) toujours accessibles');
+      check(await rail.getByRole('button',{name:'Stock',exact:true}).isVisible() && await rail.getByRole('button',{name:'Compta',exact:true}).isVisible(),'stock et comptabilité (factures comprises) toujours accessibles');
       check(await rail.getByRole('button',{name:'Stock',exact:true}).getAttribute('title')==='Stock','nom de l’accès au survol');
       check(await rail.getByRole('button',{name:'Paramètres',exact:true}).isVisible(),'paramètres directement accessibles dans le rail');
     }
@@ -239,7 +254,9 @@ async function brancher(p){
       check(!!atteint && atteint.ba && atteint.vues,'« Bordereaux auto » et « Mes vues » touchables dans « ⋯ Outils » '+width);
       // Refermer comme un doigt : ce qui est sous le bouton (le voile du menu) reçoit le clic. Sur le
       // code d'avant le voile restait ouvert sur un menu invisible et bloquait tout l'écran.
-      await bOutils.evaluate(e=>{const b=e.getBoundingClientRect();const x=document.elementFromPoint(b.left+b.width/2,b.top+b.height/2);if(x&&!e.contains(x))x.click();}).catch(()=>{});await p.waitForTimeout(200);
+      // (3 nov.) Le doigt touche ce qui est sous lui : le voile, ou le bouton « Outils » lui-même s'il est
+      // au-dessus du voile (il referme alors le menu, comme sur iPhone). Dans les deux cas : un seul toucher.
+      await bOutils.evaluate(e=>{const b=e.getBoundingClientRect();const x=document.elementFromPoint(b.left+b.width/2,b.top+b.height/2);if(x)x.click();}).catch(()=>{});await p.waitForTimeout(200);
       check(await p.locator('.vrm-main button',{hasText:'Rapport comptable'}).count()===0 && await bOutils.getAttribute('aria-expanded')==='false','le menu « ⋯ Outils » se referme '+width);
     }
    }

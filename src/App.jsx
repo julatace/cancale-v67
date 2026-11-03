@@ -124,10 +124,17 @@ import { transporteurDuColis, cleStatTransporteur, cleTransporteur } from "./tra
 import { CarteTournee, TourneePleinEcran } from "./Tournee.jsx";
 // (1er nov.) Julien : « enlève Tournée » — la carte n'est plus sur Ma journée.
 const TOURNEE_SUR_JOURNEE = false;
+// (2 nov., 22 h, Julien : « recopie à l'identique » la maquette FusionJournee) : la grille des widgets n'est plus sur Ma journée.
+const JOURNEE_AVEC_WIDGETS = false;
 import { UneLigne } from "./UneLigne.jsx";
 import { GlisserVente, useDeposeDiffere, BarreAnnulerDepose } from "./GlisserDepose.jsx";
 import { beneficeLigneVente, texteBenefice, euros as eurosLigne } from "./beneficeLigne.js";
 import { friseVente, phraseVente, eurosRecap, ETATS_HORS_PARCOURS } from "./recapVente.js";
+// (2 nov.) Le style « Fusion » : la carte sombre du mois et la frise de suivi (src/design/).
+import CarteMois from "./design/CarteMois.jsx";
+import { courtFusion, enArticles, titreSansNombre } from "./design/tacheCourte.js";
+import Frise from "./design/Frise.jsx";
+import { friseVenteFusion, friseColisFusion, friseVenteLue, ETAPES_VENTE_FUSION } from "./design/friseFusion.js";
 import { etapesTournee, arretsTournee, gestesDepuis } from "./tournee.js";
 import "./styles-barre-haut.css";
 import "./styles-recherche.css";
@@ -14534,7 +14541,7 @@ const GROUPES_PLUS=[
   ]},
   { titre:'Argent', items:[
     {id:'dashboard', icon:'chart', label:'Statistiques'},
-    {id:'compta',    icon:'euro',  label:'Comptabilité'},
+    {id:'compta',    icon:'euro',  label:'Compta'},
   ]},
   { titre:'Plateformes', ordi:true, items:[
     {id:'ebay_agent',     cle:'plat_ebay',      icon:'grid', site:'ebay',      label:'eBay'},
@@ -15170,7 +15177,7 @@ function CibleNotif({ tab, sub }) {
     </p>
   );
 }
-function ScreenHead({ icon, title, desc, right, principal, sous }) {
+function ScreenHead({ icon, title, desc, right, principal, sous, date = '' }) {
   const line = typeof icon === 'string' && ICON_PATHS[icon];
   const Titre = React.useContext(DansEspacePlateforme) ? 'h2' : 'h1';
   // ⚠️ UNE MANCHETTE, PAS UN EN-TÊTE DE TABLEAU DE BORD. Le titre était une
@@ -15199,6 +15206,8 @@ function ScreenHead({ icon, title, desc, right, principal, sous }) {
           {line
             ? <span aria-hidden="true" style={{display:'flex',color:C.muted,flexShrink:0}}><Icon name={icon} size={20}/></span>
             : (icon ? <span aria-hidden="true" style={{fontSize:18}}>{icon}</span> : null)}
+          {/* (2 nov., 22 h, maquettes Fusion) La date au-dessus du titre. */}
+          {date ? <span className="vrm-fu-date-tete" data-date-tete="">{date}</span> : null}
           <Titre className="vrm-display" style={{color:C.text}}>{title}</Titre>
           {sous ? <div className="vrm-screen-head-sous" data-sous-titre="">{sous}</div> : null}
           {/* ⚠️ LA DESCRIPTION D'ÉCRAN N'EST PLUS AFFICHÉE. Julien : « il y a trop
@@ -17219,7 +17228,7 @@ function BoutonBordereau({ uid, tx, conv, login, aGenerer, pdf, onImprimer, onFa
     fontSize: grand ? 14 : 12.5, padding: grand ? '11px 14px' : '7px 11px', cursor: 'pointer', whiteSpace: 'nowrap' };
   if (pdf) {
     return <button type="button" data-bouton-bord="pdf" data-imprime="1" data-tx={tx} onClick={onImprimer} title="Bordereau tamponné (titre + N°), puis impression"
-      style={{ ...base, border: 'none', background: C.accent, color: C.onAccent || '#fff' }}><Icon name="doc" size={grand ? 16 : 14}/>{grand ? 'Imprimer le bordereau' : 'Bordereau'}</button>;
+      style={{ ...base, border: 'none', background: C.accent, color: C.onAccent || '#fff' }}><Icon name="printer" size={grand ? 16 : 14}/>{grand ? <><span className="vrm-lib-long">Imprimer le bordereau</span><span className="vrm-lib-court">Imprimer</span></> : 'Bordereau'}</button>;
   }
   if (!aGenerer || !uid || !tx) return null;
   const glob = raisonExtGlobale(sansSouris);
@@ -18714,18 +18723,20 @@ function Pourquoi({ children, label = 'Pourquoi ?', ecrit = false }) {
 // trois cases sur Leboncoin et eBay. Une case LUE vide vaut 0 ; une case qu'on
 // ne SAIT pas vaut « — » (§5 : pas su n'est pas zéro) ; la ligne du dessous dit
 // comment la remplir.
+// (3 nov., critique #3) Les ventes Leboncoin, eBay et Vestiaire ont LA carte sombre de Ventes
+// (CarteMois), avec les MÊMES valeurs qu'avant (aucune règle neuve) : le montant (« CA finalisé »)
+// en grand, les comptes en cases ; « — » quand ce n'est pas lu. Les attributs que les bancs lisent
+// (`data-ventes-kpi`, `data-kpi`, `data-kpi-valeur`) restent sur chaque valeur.
 function KpiVentes({ tuiles, note, plateforme }) {
+  const grand = tuiles.find((t) => t.cle === 'ca') || tuiles[tuiles.length - 1];
+  const autres = tuiles.filter((t) => t !== grand);
+  const kv = (t) => ({ 'data-kpi': t.cle, 'data-kpi-valeur': t.val == null ? '' : String(t.brut != null ? t.brut : t.val) });
   return (
-    <div className="vrm-kpi-ventes" data-ventes-kpi={plateforme}>
-      <div className="vrm-kpi-ventes-grille">
-        {tuiles.map((t) => (
-          <div key={t.cle} className="vrm-kpi-ventes-case" data-kpi={t.cle} data-kpi-valeur={t.val == null ? '' : String(t.brut != null ? t.brut : t.val)}>
-            <div className="vrm-kpi-ventes-lib">{t.lib}</div>
-            <div className={'vrm-display vrm-kpi-ventes-val' + (t.val == null ? ' vrm-kpi-ventes-vide' : '')}>{t.val == null ? '—' : t.val}</div>
-            {t.sub ? <div className="vrm-kpi-ventes-sub">{t.sub}</div> : null}
-          </div>
-        ))}
-      </div>
+    <div className="vrm-kpi-ventes vrm-fu-ecran vrm-fu-ventes-site" data-ventes-kpi={plateforme}>
+      <CarteMois surtitre={grand ? grand.lib : ''} valeur={grand && grand.val != null ? <span {...kv(grand)}>{grand.val}</span> : null}
+        sous={grand && grand.sub ? grand.sub : null}
+        cases={autres.map((t) => ({ cle: t.cle, n: t.val == null ? null : t.val, l: t.sub ? `${t.lib.toLowerCase()} · ${t.sub}` : t.lib.toLowerCase(), attrs: kv(t) }))}/>
+      {grand && grand.val == null ? <span hidden {...kv(grand)}/> : null}
       {note ? <div className="vrm-kpi-ventes-note">{note}</div> : null}
     </div>
   );
@@ -19536,7 +19547,29 @@ function FiltresVentes({ value, onChange, search, onSearch, cancelled = false, d
 // d'état et frise, l'argent en lignes, les détails, les gestes). Absent ⇒ le
 // tiroir d'avant (Leboncoin, eBay). Rien d'autre ne change : même feuille, même
 // fermeture d'un toucher à côté, même `FermeAuRetour`, même portail.
-function LigneVenteCompacte({ photo, photoNoeud = null, titre, sous = '', etat, etatNoeud = null, ton = '', montant, children, numerosArticle = [], plateforme = '', initialOuvert = false, gestes = null, montantCentimes, benef, recap = null, ...props }) {
+// (2 nov., Fusion) `frise` : la frise de suivi de la vente (src/design/Frise.jsx),
+// posée sous la ligne ; `bas` : le geste principal (« Imprimer le bordereau ») et
+// le transporteur. Absents ⇒ la ligne d'avant.
+// (2 nov., 22 h, maquette FusionVentes « à l'identique ») `fusion` : { nom, num, site } —
+// la ligne prend la forme de la maquette : photo 60 px, le nom et le prix sur la première
+// ligne, la puce N° noire et le site, l'état ; les colonnes Achat · Bénéfice restent dans
+// la page (mêmes `data-*`) mais ne s'affichent plus sur la carte (le tiroir les porte).
+// (3 nov., critique #6) La frise du récapitulatif = celle de la ligne (Frise.jsx, 4 segments,
+// « Vendue · Postée · Livrée · Payée »), projetée par `friseVenteFusion` des étapes PROUVÉES de
+// `friseVente` (aucune règle neuve). Le bordereau n'est plus une 5ᵉ étape : une ligne de détail
+// (« Bordereau reçu le 2 nov. »), seulement s'il est prouvé. Les dates des étapes faites suivent.
+function RecapFrise({ etapes, cle = '' }) {
+  const f = friseVenteFusion(etapes);
+  if (!f) return null;
+  const jour = (t) => new Date(t).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
+  const bord = etapes.find((x) => x.cle === 'bordereau');
+  const dates = ETAPES_VENTE_FUSION.map(([c, l, src]) => { const x = etapes.find((y) => y.cle === src); return x && x.fait && x.t != null && src !== 'argent' ? `${l} le ${jour(x.t)}` : null; }).filter(Boolean);
+  return <div className="vrm-recap-frise" data-recap-frise="" data-recap-bordereau={bord ? (bord.fait ? '1' : '0') : undefined}>
+    <Frise etapes={f} cle={cle} className="vrm-fu-recap-frise" label="Où en est la vente"/>
+    {(bord && bord.fait) || dates.length ? <p className="vrm-recap-frise-detail">{[bord && bord.fait ? (bord.t != null ? `Bordereau reçu le ${jour(bord.t)}` : 'Bordereau reçu') : null, ...dates].filter(Boolean).join(' · ')}</p> : null}
+  </div>;
+}
+function LigneVenteCompacte({ photo, photoNoeud = null, titre, sous = '', etat, etatNoeud = null, ton = '', montant, children, numerosArticle = [], plateforme = '', initialOuvert = false, gestes = null, montantCentimes, benef, recap = null, frise = null, bas = null, fusion = null, ...props }) {
   const [ouvert, setOuvert] = React.useState(initialOuvert);
   const panneau = React.useId();
   const declencheur = React.useRef(null);
@@ -19608,9 +19641,14 @@ function LigneVenteCompacte({ photo, photoNoeud = null, titre, sous = '', etat, 
   const dejaOuvert = React.useRef(false);
   if (ouvert) dejaOuvert.current = true;
   const numerosFiche=[...new Set(numerosArticle.map(n=>String(n||'').trim()).filter(Boolean))];
-  return <div {...props} data-ligne-ouverte={ouvert} data-plateforme-vente={plateforme||undefined} data-benef-cols={benef?'':undefined}>
+  return <div {...props} data-ligne-ouverte={ouvert} data-plateforme-vente={plateforme||undefined} data-benef-cols={benef?'':undefined} data-fu-forme={fusion?'':undefined}>
     <button ref={declencheur} type="button" className="vrm-ledger-sale-toggle" aria-expanded={ouvert} aria-controls={panneau} aria-haspopup="dialog" aria-label={`Ouvrir les actions : ${titre || 'vente'}`} onClick={()=>setOuvert(v=>!v)}>
       <span className="vrm-ledger-photo-empty">{photoNoeud || <PhotoVente src={photo} size={46} portrait/>}</span>
+      {fusion ? <span className="vrm-fu-vente-txt">
+        <span className="vrm-fu-vente-l1"><span className="vrm-fu-vente-nom">{fusion.nom || '(sans titre)'}</span><span className="vrm-fu-vente-prix" aria-hidden="true">{fusion.prix || montant}</span></span>
+        <span className="vrm-fu-vente-l2">{fusion.num ? <span className="vrm-fu-num">N°{fusion.num}</span> : null}<span className="vrm-fu-site" data-site={fusion.site || plateforme}>{fusion.siteNom || ''}</span>{fusion.taille ? <span className="vrm-fu-vente-taille" data-fu-taille={fusion.taille}>· {fusion.taille}</span> : null}</span>
+        <span className="vrm-fu-vente-l3" data-ton={ton || undefined}>{etatNoeud || etat}</span>
+      </span> : null}
       <span className="vrm-ledger-sale-title" title={titre}><span className="vrm-ledger-sale-nom">{titre || '(sans titre)'}</span>{sous ? <span className="vrm-ledger-sale-sous" data-vente-sous="">{sous}</span> : null}</span>
       <span className="vrm-ledger-sale-state" title={etat} data-ton={ton || undefined}>{etatNoeud || etat}</span>
       <span className="vrm-ledger-sale-amount" data-prix-vente={montantCentimes ?? undefined}>{montant}</span>
@@ -19618,7 +19656,15 @@ function LigneVenteCompacte({ photo, photoNoeud = null, titre, sous = '', etat, 
       {benef ? <span className="vrm-ledger-sale-benef" data-benef-ligne={benef.benefCentimes ?? ''} data-benef-etat={benef.etat} aria-label={benef.aria || undefined}>{benef.etat === 'partiel' ? <><span className="vrm-benef-borne">au plus </span>{benef.benefTxt}</> : benef.benefTxt}</span> : null}
       <span className="vrm-ledger-sale-plus" aria-hidden="true">{ouvert?'−':'⋯'}</span>
     </button>
+    {/* (3 nov., critique #5) Maquette FusionVentes : deux commandes au plus sur la carte (puce +
+        bordereau). Le reste (prix d'achat, relier un achat, « Déposé », « sur Vinted ») passe
+        derrière « … », le même motif que Colis — rien n'est retiré, un toucher l'ouvre. */}
+    {fusion && (gestes || bas) ? <button type="button" className="vrm-fu-plus vrm-fu-plus-vente" data-vente-plus="" data-fu-geste="" aria-label="Plus d'actions sur cette vente" aria-expanded="false"
+      onClick={(e)=>{ const c = e.currentTarget.closest('[data-fu-forme]'); if (!c) return; const on = !c.hasAttribute('data-plus-ouvert'); c.toggleAttribute('data-plus-ouvert', on); e.currentTarget.setAttribute('aria-expanded', on ? 'true' : 'false'); }}>
+      <Icon name="more" size={18}/></button> : null}
+    {frise}
     {gestes ? <div className="vrm-ledger-gestes" data-gestes-ligne="">{gestes}</div> : null}
+    {bas}
     {/* « Retour » (geste du téléphone, ← du navigateur) ferme d'abord le tiroir. */}
     {ouvert && <FermeAuRetour fermer={close}/>}
     {dejaOuvert.current && createPortal(<div className="vrm-app-shell vrm-ledger-drawer-host" hidden={!ouvert}>
@@ -19634,8 +19680,8 @@ function LigneVenteCompacte({ photo, photoNoeud = null, titre, sous = '', etat, 
     </div>,document.body)}
   </div>;
 }
-function LigneVente({ photo, titre, meta, montant, actions, etat, etatNoeud = null, details, sous = '', ton = '', data = null, numerosArticle = [], plateforme = '', floute = false, gestes = null }) {
-  return <LigneVenteCompacte {...(data || {})} gestes={gestes} numerosArticle={numerosArticle} plateforme={plateforme} photo={photo} titre={titre} sous={sous} ton={ton} etat={etat} etatNoeud={etatNoeud} montant={montant} initialOuvert={!!details?.props.ouvrir} className="vrm-sale-row vrm-shared-sale" style={{padding:'12px 14px',borderBottom:`1px solid ${C.border}`,...(floute?STYLE_FLOU:null)}}>
+function LigneVente({ photo, titre, meta, montant, actions, etat, etatNoeud = null, details, sous = '', ton = '', data = null, numerosArticle = [], plateforme = '', floute = false, gestes = null, frise = null }) {
+  return <LigneVenteCompacte {...(data || {})} gestes={gestes} frise={frise} numerosArticle={numerosArticle} plateforme={plateforme} photo={photo} titre={titre} sous={sous} ton={ton} etat={etat} etatNoeud={etatNoeud} montant={montant} initialOuvert={!!details?.props.ouvrir} className="vrm-sale-row vrm-shared-sale" style={{padding:'12px 14px',borderBottom:`1px solid ${C.border}`,...(floute?STYLE_FLOU:null)}}>
     <div className="vrm-sale-overview" style={{display:'flex',gap:12,alignItems:'flex-start'}}>
       <div className="vrm-sale-photo"><PhotoArticleAgrandissable src={photo} titre={titre}><PhotoVente src={photo} size={64} portrait/></PhotoArticleAgrandissable></div>
       <div className="vrm-sale-info" style={{flex:1,minWidth:0}}>
@@ -19742,8 +19788,6 @@ function LeboncoinColis({ lbcVentes = { ventes: [] } }) {
               <span style={{ fontSize: 13.5, fontWeight: 600, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{o.title || '(sans titre)'}</span>
             </div>
             <div style={{ fontSize: 11, color: C.muted, marginTop: 4, display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-              {/* (2 nov.) Le transporteur que Leboncoin écrit (`deliveryMethod`), logo + nom ; sinon « pas lu ». */}
-              <PastilleTransporteur t={transporteurDuColis({ declare: o.deliveryMethod || o.deliveryLabel || '' })} C={C} seul taille={16}/>
               {euro(o.price) && <span style={{ flexShrink: 0, fontWeight: 600, color: C.text }}>{euro(o.price)}</span>}
               {o.label && o.label.reference && <span style={{ flexShrink: 0 }}>bordereau {o.label.reference}</span>}
               {posted && <span style={{ flexShrink: 0, color: INV_STATUS.online.color, fontWeight: 600 }}>✓ posté</span>}
@@ -19755,11 +19799,16 @@ function LeboncoinColis({ lbcVentes = { ventes: [] } }) {
             ouvre le PDF du bordereau Leboncoin ; « Générer » ouvre la vente sur
             Leboncoin pour qu'il y soit créé (l'extension le capte ensuite). */}
         <div className="vrm-lbc-package-actions" style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 12, flexWrap: 'wrap' }}>
+          {/* (2 nov. au soir) Le transporteur que Leboncoin écrit (`deliveryMethod`) : la puce À GAUCHE
+              du geste principal, sur la même rangée (logo + nom ; sinon « pas lu »). */}
+          <div className="vrm-rangee-bord" data-rangee-bord="">
+          <PastilleTransporteur t={transporteurDuColis({ declare: o.deliveryMethod || o.deliveryLabel || '' })} C={C}/>
           {principal === 'imprimer' && extSait('lbcpdf') === 'ok'
-            ? <button type="button" className="vrm-lbc-package-primary" data-imprime="1" data-imprime-lbc={o.txId} onClick={() => imprimerLbc(o, n)} style={{ flex: '1 1 160px', maxWidth: 340, textAlign: 'center', border: 'none', background: C.accent, color: C.onAccent || '#fff', borderRadius: 10, padding: '12px', fontSize: 15, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>🖨 Imprimer le bordereau</button>
+            ? <button type="button" className="vrm-lbc-package-primary" data-imprime="1" data-imprime-lbc={o.txId} onClick={() => imprimerLbc(o, n)} style={{ flex: '1 1 160px', maxWidth: 340, textAlign: 'center', border: 'none', background: C.accent, color: C.onAccent || '#fff', borderRadius: 10, padding: '12px', fontSize: 15, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}><span className="vrm-lib-long">Imprimer le bordereau</span><span className="vrm-lib-court">Imprimer</span></button>
             : principal === 'imprimer'
-            ? <a className="vrm-lbc-package-primary" href={/^https:\/\//i.test(String(o.label.voucherUrl)) ? o.label.voucherUrl : undefined} target="_blank" rel="noreferrer" title={extSait('lbcpdf') === 'retard' ? `Mets l'extension à jour (${EXT_CAPACITES.lbcpdf}) pour qu'il sorte tamponné du titre et du N°` : "Sans l'extension, le bordereau s'ouvre tel quel (sans N° ni titre)"} style={{ flex: '1 1 160px', maxWidth: 340, textAlign: 'center', border: 'none', background: C.accent, color: C.onAccent || '#fff', borderRadius: 10, padding: '12px', fontSize: 15, fontWeight: 600, textDecoration: 'none' }}>🖨 Imprimer le bordereau</a>
-            : <a className="vrm-lbc-package-primary" href={lbcUrl(o)} target="_blank" rel="noreferrer" style={{ flex: '1 1 160px', maxWidth: 340, textAlign: 'center', border: 'none', background: C.accent, color: C.onAccent || '#fff', borderRadius: 10, padding: '12px', fontSize: 15, fontWeight: 600, textDecoration: 'none' }}>↗ Générer le bordereau</a>}
+            ? <a className="vrm-lbc-package-primary" href={/^https:\/\//i.test(String(o.label.voucherUrl)) ? o.label.voucherUrl : undefined} target="_blank" rel="noreferrer" title={extSait('lbcpdf') === 'retard' ? `Mets l'extension à jour (${EXT_CAPACITES.lbcpdf}) pour qu'il sorte tamponné du titre et du N°` : "Sans l'extension, le bordereau s'ouvre tel quel (sans N° ni titre)"} style={{ flex: '1 1 160px', maxWidth: 340, textAlign: 'center', border: 'none', background: C.accent, color: C.onAccent || '#fff', borderRadius: 10, padding: '12px', fontSize: 15, fontWeight: 600, textDecoration: 'none' }}><span className="vrm-lib-long">Imprimer le bordereau</span><span className="vrm-lib-court">Imprimer</span></a>
+            : <a className="vrm-lbc-package-primary" href={lbcUrl(o)} target="_blank" rel="noreferrer" style={{ flex: '1 1 160px', maxWidth: 340, textAlign: 'center', border: 'none', background: C.accent, color: C.onAccent || '#fff', borderRadius: 10, padding: '12px', fontSize: 15, fontWeight: 600, textDecoration: 'none' }}><span className="vrm-lib-long">Générer le bordereau</span><span className="vrm-lib-court">Générer</span></a>}
+          </div>
           <button type="button" onClick={() => toggleFait(o)} title={posted ? 'Remettre dans les colis à poster' : 'Marquer comme posté'} style={{ flexShrink: 0, border: `1px solid ${posted ? INV_STATUS.online.color : C.border}`, background: posted ? `${INV_STATUS.online.color}18` : 'transparent', color: posted ? INV_STATUS.online.color : C.muted, borderRadius: 10, padding: '12px 13px', fontWeight: 600, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}>{posted ? '↺ Pas encore' : '✓ Colis fait'}</button>
         </div>
       </div>
@@ -19886,7 +19935,10 @@ function CarteLbc({ o, num = '', benef = null, floute = false }) {
   // 390 px — sur une vente que les totaux comptent finalisée. L'étape brute
   // reste dans le détail.
   const etatCourt = lbcAnnulee(o) ? 'Annulée' : lbcFinalisee(o) ? 'Finalisée' : ton === 'action' ? 'À envoyer' : lbcExpediee(o) ? 'En transit' : (o.stepLabel || o.stepStatus || '');
-  return <LigneVente numerosArticle={num?[num]:[]} plateforme="leboncoin" data={{ 'data-lbc-vente': String(o.txId), 'data-lbc-etat': etatCourt, 'data-flou': floute ? '1' : '0' }} floute={floute} photo={photoArticle(o)} titre={titre} sous={sous} ton={ton} montant={lbcEuro(o.price)} etat={etatCourt}
+  // (3 nov., critique #3) La frise de Vinted, sur ce que l'extension a LU de la transaction :
+  // « Postée » = expédiée, « Livrée » et « Payée » = finalisée (Leboncoin verse à la finalisation).
+  const friseLbc = lbcAnnulee(o) ? null : <Frise etapes={friseVenteLue({ vendue: true, postee: lbcExpediee(o) || lbcFinalisee(o), livree: lbcFinalisee(o), payee: lbcFinalisee(o) }, { geste: ton === 'action' })} cle={'lbc' + o.txId} className="vrm-fu-ligne-frise" label="Où en est la vente"/>;
+  return <LigneVente frise={friseLbc} numerosArticle={num?[num]:[]} plateforme="leboncoin" data={{ 'data-lbc-vente': String(o.txId), 'data-lbc-etat': etatCourt, 'data-flou': floute ? '1' : '0' }} floute={floute} photo={photoArticle(o)} titre={titre} sous={sous} ton={ton} montant={lbcEuro(o.price)} etat={etatCourt}
     meta={<>{o.stepLabel || o.stepStatus || ''}{o.deliveryLabel ? ` · ${o.deliveryLabel}` : ''}{benef != null ? <span data-lbc-benef={benef.toFixed(2)} style={{ color: benef >= 0 ? C.text : C.warn, fontWeight: 600 }}> · marge avant frais {fmt(benef)}</span> : null}</>}/>;
 }
 // L'étape d'un ACHAT Leboncoin, dans les mêmes mots et les mêmes couleurs que
@@ -26869,8 +26921,8 @@ function BoutonImprimerVc({ v, grand = false, carte = false }) {
   return <>
     {carte
       ? <button type="button" data-imprime="1" data-vc-imprimer={v.id} disabled={etat === 'lecture'} onClick={go} title="Bordereau tamponné (titre + N°), puis impression"
-          className="vrm-colis-primaire" style={{flex:'1 1 160px',maxWidth:340,display:'inline-flex',alignItems:'center',justifyContent:'center',gap:8,border:'none',background:C.accent,color:'#fff',borderRadius:10,padding:'0 16px',minHeight:44,cursor:'pointer',fontSize:14,fontWeight:600,fontFamily:'inherit'}}><Icon name="printer" size={16}/>{libelle}</button>
-      : <Bouton variante={grand ? 'primaire' : 'secondaire'} icone="printer" data-imprime="1" data-vc-imprimer={v.id} disabled={etat === 'lecture'} onClick={go} title="Bordereau tamponné (titre + N°), puis impression">{etat === 'lecture' ? libelle : 'Imprimer le bordereau'}</Bouton>}
+          className="vrm-colis-primaire" style={{flex:'1 1 160px',maxWidth:340,display:'inline-flex',alignItems:'center',justifyContent:'center',gap:8,border:'none',background:C.accent,color:'#fff',borderRadius:10,padding:'0 16px',minHeight:44,cursor:'pointer',fontSize:14,fontWeight:600,fontFamily:'inherit'}}><Icon name="printer" size={16}/>{etat === 'lecture' ? libelle : <><span className="vrm-lib-long">Imprimer le bordereau</span><span className="vrm-lib-court">Imprimer</span></>}</button>
+      : <Bouton variante={grand ? 'primaire' : 'secondaire'} icone="printer" data-imprime="1" data-vc-imprimer={v.id} disabled={etat === 'lecture'} onClick={go} title="Bordereau tamponné (titre + N°), puis impression">{etat === 'lecture' ? libelle : grand ? <><span className="vrm-lib-long">Imprimer le bordereau</span><span className="vrm-lib-court">Imprimer</span></> : 'Imprimer le bordereau'}</Bouton>}
     {lien ? <a href={lien.url} target="_blank" rel="noreferrer" data-vc-bordereau-lien="" style={{ color: C.accent, fontWeight: 600, fontSize: 13 }}>Ouvrir le bordereau</a> : null}
     {etat === 'absent' ? <span data-vc-bordereau-etat="absent" style={{ flexBasis: '100%', fontSize: 12, color: C.muted }}>Le bordereau n'est plus rangé — rouvre la vente sur Vestiaire.</span>
       : etat === 'passu' ? <span data-vc-bordereau-etat="passu" style={{ flexBasis: '100%', fontSize: 12, color: C.muted }}>La base n'a pas répondu — réessaie.</span> : null}
@@ -26966,13 +27018,10 @@ function LigneVenteVc({ v, fait, enV, flou, i = 0 }) {
       </header>
       <section className="vrm-recap-etat" data-recap-etat={etat}>
         <p className="vrm-recap-phrase" data-recap-phrase=""><strong>{phrase.gras}</strong>{phrase.suite ? ' ' + phrase.suite : ''}</p>
-        {etapes ? <ol className="vrm-recap-frise" data-recap-frise="" aria-label="Où en est la vente">
-          {etapes.map((x) => <li key={x.cle} data-etape={x.cle} data-fait={x.fait ? '1' : '0'} data-preuve={x.preuve || ''} data-ici={x.ici ? '1' : undefined}>
-            <span className="vrm-recap-point" aria-hidden="true"/>
-            <span className="vrm-recap-etape">{x.cle === 'argent' ? 'Argent versé' : x.label}</span>
-            <span className="vrm-recap-quand">{x.fait ? (x.t != null && x.cle !== 'argent' ? new Date(x.t).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }) : 'fait') : 'à venir'}</span>
-          </li>)}
-        </ol> : null}
+        {/* (3 nov., critique #6) UNE frise : la même que la ligne (4 segments, mêmes mots, src/design/Frise.jsx),
+            projetée des MÊMES étapes prouvées (`friseVente`) ; le bordereau n'est plus une étape mais
+            une ligne de détail sous la frise, datée quand elle l'est. */}
+        {etapes ? <RecapFrise etapes={etapes} cle={String(v.id || v.tx || '')}/> : null}
       </section>
       <section className="vrm-recap-argent" aria-label="L'argent">
         <h3 className="vrm-recap-titre">L'argent</h3>
@@ -26994,7 +27043,7 @@ function LigneVenteVc({ v, fait, enV, flou, i = 0 }) {
         {enV ? <p data-vc-vente-vinted="" className="vrm-recap-issue">Encore en ligne sur Vinted — retire-la de Vinted pour ne pas la vendre deux fois. <a href={`https://www.vinted.fr/items/${enV.id}`} target="_blank" rel="noreferrer">Ouvrir l'annonce ↗</a></p> : null}
       </section>
       <section className="vrm-recap-gestes" aria-label="Actions">
-        {v.aExpedier && !fait && v.bordereau ? <div className="vrm-recap-principal"><PastilleTransporteur t={trV} C={C} data-recap-transporteur=""/><BoutonImprimerVc v={v} grand/></div> : null}
+        {v.aExpedier && !fait && v.bordereau ? <div className="vrm-recap-principal vrm-rangee-bord" data-rangee-bord=""><PastilleTransporteur t={trV} C={C} data-recap-transporteur=""/><BoutonImprimerVc v={v} grand/></div> : null}
         <div className="vrm-recap-grille">
           {v.aExpedier ? <Bouton variante="secondaire" icone="check" data-geste="fait" data-vc-fait={v.id} onClick={() => marquerVc('vrm_vc_colis_done', v.id, !fait)}>{fait ? '↺ Pas encore' : 'Colis fait'}</Bouton> : null}
           {v.num ? <Bouton variante="secondaire" icone="doc" data-recap-fiche={v.num} aria-label={`Fiche N°${v.num}`} onClick={() => { fermer(); window.dispatchEvent(new CustomEvent('vrm:fiche-article', { detail: v.num })); }}>Fiche de l’article</Bouton> : null}
@@ -27218,9 +27267,11 @@ function CarteColisVc({ v, imprime, fait }) {
         </div>
       </div>
       <div className="vrm-colis-actions" style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 12, flexWrap: 'wrap' }}>
-        {v.bordereau ? <BoutonImprimerVc v={v} carte/> : <span data-vc-colis-bordereau={v.etiquette === true ? 'vestiaire' : v.etiquette === false ? 'pas-encore' : 'pas-su'} style={{ flex: '1 1 160px', fontSize: 12.5, color: C.muted }}>{v.etiquette === true ? 'Bordereau disponible sur Vestiaire — ouvre la vente sur Vestiaire, il arrive ici' : v.etiquette === false ? 'Pas encore de bordereau sur Vestiaire' : 'Bordereau : pas su'}</span>}
-        {/* (2 nov.) Le transporteur LU, à côté du bouton bordereau, comme Vinted (src/PastilleTransporteur.jsx). */}
+        {/* (2 nov. au soir) Le transporteur LU dans la puce, À GAUCHE du bouton bordereau, même rangée (comme Vinted). */}
+        <div className="vrm-rangee-bord" data-rangee-bord="">
         <PastilleTransporteur t={transporteurDuColis({ declare: v.transporteur, suivi: v.suivi })} C={C} data-colis-transporteur={'vc:' + v.id}/>
+        {v.bordereau ? <BoutonImprimerVc v={v} carte/> : <span data-vc-colis-bordereau={v.etiquette === true ? 'vestiaire' : v.etiquette === false ? 'pas-encore' : 'pas-su'} style={{ flex: '1 1 160px', fontSize: 12.5, color: C.muted }}>{v.etiquette === true ? 'Bordereau disponible sur Vestiaire — ouvre la vente sur Vestiaire, il arrive ici' : v.etiquette === false ? 'Pas encore de bordereau sur Vestiaire' : 'Bordereau : pas su'}</span>}
+        </div>
         {v.bordereau ? <button type="button" data-geste="imprime" data-vc-imprime={v.id} onClick={() => marquerVc('vrm_vc_imprimes', v.id, !imprime)} title={imprime ? 'Remettre en « à imprimer »' : 'Marquer comme imprimé'}
           className="vrm-colis-sec vrm-colis-ter" style={{ ...sec, border: `1px solid ${C.border}`, background: imprime ? C.bg : 'transparent', color: imprime ? C.text : C.muted }}>{imprime ? '✓ Imprimé' : 'Marquer imprimé'}</button> : null}
         <button type="button" data-geste="fait" data-vc-fait={v.id} onClick={() => marquerVc('vrm_vc_colis_done', v.id, !fait)} title={fait ? 'Annuler « colis fait »' : 'Marquer comme posté → il sort de la liste'}
@@ -27270,7 +27321,7 @@ function AchatsVestiaireEnRoute({ vc, transporteurDe }) {
         <div key={v.id} data-vc-route={v.id} data-colis-ident={'vcr:' + v.id} data-transporteur={cleStatTransporteur(tr)} style={{ border: `1px solid ${C.border}`, borderRadius: 10, padding: '10px 12px', background: C.card, display: 'flex', flexDirection: 'column', gap: 4 }}>
           <div style={{ fontSize: 13, fontWeight: 600, color: C.text, overflowWrap: 'anywhere' }}>{v.nom || 'Article sans nom lu'}</div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-            <PastilleTransporteur t={tr} C={C} seul taille={18}/>
+            <PastilleTransporteur t={tr} C={C}/>
             <span style={{ fontSize: 11.5, color: C.muted, overflowWrap: 'anywhere' }}>{v.etat ? `Vestiaire : « ${v.etat} » · ` : ''}suivi {v.suivi}</span>
           </div>
           <BoutonSuivreColis transporteur={tr.cle || v.transporteur} suivi={v.suivi}/>
@@ -37847,6 +37898,88 @@ function useBeneficeCalcul(compta, periode) {
   const B = pub ? beneficePeriode({ jours: pub.jours, compta, ligneUrssaf, taux: tauxUrssaf(), periode, toutes: Number(pub.v) >= 2, urssaf: regime === undefined || urssafConcerne(regime) }) : null;
   return { pub, etat, B };
 }
+// ── (2 nov.) COMPTA « FUSION » (le style choisi par Julien sur les maquettes) ──
+// Sous « Combien j'ai gagné ? » (dont la carte devient la carte SOMBRE, en CSS) :
+// l'anneau (où passe l'argent vendu du mois) et les barres des six derniers mois.
+// AUCUN chiffre n'est calculé ici (§5) et AUCUN montant n'est redit (§7) : le
+// grand chiffre et le détail du calcul vivent dans `BeneficeCompta` ; ici, des
+// PARTS (en %) et des hauteurs de barre (le montant de chaque mois en infobulle).
+//   · le mois = `useBeneficeCalcul(compta, 'mois')` — la MÊME lecture que la carte ;
+//   · les six mois = `beneficeDesJours` sur la même publication (`vrm_benefice_jours`),
+//     brut des ventes au prix d'achat connu ; un mois sans aucun prix connu ⇒ barre
+//     en pointillé (« pas su », jamais 0).
+// L'anneau ne se dessine que si le NET du mois se calcule (tous les prix d'achat,
+// frais et cotisations connus) : ses parts somment alors au vendu du mois.
+function ComptaFusion({ compta, onNav }) {
+  const { pub, etat, B } = useBeneficeCalcul(compta, 'mois');
+  const ligneUrssaf = useLigneUrssaf();
+  const regime = useRegimeFiscal();
+  if (etat === 'encours' || !pub) return null;
+  // L'encart « Déclaration URSSAF » (maquette) : le rappel de Ma journée (`rappelUrssaf`), « J'ai
+  // déclaré » ouvre le formulaire de toujours (`demanderDeclaration`) ; rien sinon.
+  const micro = regime === undefined || urssafConcerne(regime);
+  const rappel = micro ? rappelUrssaf({ freq: load('vinted_urssaf_freq', 'trimestriel'), declare: lireDeclarations(), ligne: ligneUrssaf }) : null;
+  const dateRappel = rappel ? (() => { const [y, m, d] = String(rappel.dueIso).split('-').map(Number); return new Date(y, m - 1, d).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' }); })() : '';
+  const moisLong = new Date().toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
+  const anneau = (() => {
+    if (!B || B.netFinal == null || !(B.ca > 0) || B.nCout !== B.n) return null;
+    const cotis = B.cotis || 0, achat = B.cout || 0, benef = B.netFinal;
+    const frais = Math.round((B.ca - achat - cotis - benef) * 100) / 100;
+    if (benef < 0 || frais < -0.01) return null;
+    const pc = (v) => Math.round((v / B.ca) * 100);
+    return { total: B.ca, pct: pc(benef), parts: [['benef', 'Bénéfice', benef, pc(benef)], ...(B.sansCotis ? [] : [['cotis', 'URSSAF', cotis, pc(cotis)]]), ['achat', "Prix d'achat", achat, pc(achat)], ['frais', 'Frais, dépenses', Math.max(0, frais), pc(Math.max(0, frais))]] };
+  })();
+  const R = 52, L = 2 * Math.PI * R;
+  let cumul = 0;
+  const mois6 = (() => {
+    const d = new Date(); const out = [];
+    for (let k = 5; k >= 0; k--) {
+      const de = new Date(d.getFullYear(), d.getMonth() - k, 1), a = new Date(d.getFullYear(), d.getMonth() - k + 1, 1);
+      const r = beneficeDesJours(pub.jours, de, a);
+      out.push({ cle: `${de.getFullYear()}-${de.getMonth() + 1}`, l: de.toLocaleDateString('fr-FR', { month: 'short' }), long: de.toLocaleDateString('fr-FR', { month: 'long' }), v: r.nCout > 0 ? r.brut : (r.n === 0 ? 0 : null), n: r.n, nCout: r.nCout, courant: k === 0 });
+    }
+    return out;
+  })();
+  const max6 = Math.max(1, ...mois6.map((m) => (m.v != null && m.v > 0 ? m.v : 0)));
+  return (
+    <div className="vrm-fu-compta vrm-fu-ecran vrm-fu-compta-grille" data-fu-compta="">
+      <section className="vrm-fu-panneau" aria-label="Où passe l'argent vendu" data-fu-anneau={anneau ? String(anneau.pct) : ''}>
+        {anneau ? (
+          <div className="vrm-fu-anneau">
+            <svg width="132" height="132" viewBox="0 0 132 132" role="img" aria-label={`Il te reste ${anneau.pct} % de ce que tu as vendu`}>
+              <circle cx="66" cy="66" r={R} fill="none" stroke="var(--fu-piste)" strokeWidth="16"/>
+              {anneau.parts.map(([cle, , v]) => { const part = anneau.total > 0 ? v / anneau.total : 0; const seg = <circle key={cle} className={'vrm-fu-arc is-' + cle} cx="66" cy="66" r={R} fill="none" strokeWidth="16" strokeDasharray={`${Math.max(0, part * L - 2)} ${L}`} strokeDashoffset={-cumul * L} transform="rotate(-90 66 66)"/>; cumul += part; return seg; })}
+              <text x="66" y="68" textAnchor="middle" className="vrm-fu-anneau-centre">{anneau.pct} %</text>
+              <text x="66" y="87" textAnchor="middle" className="vrm-fu-anneau-sous">te reste</text>
+            </svg>
+            <ul className="vrm-fu-legende">
+              {anneau.parts.filter(([cle, , v]) => !(cle === 'frais' && !(v > 0))).map(([cle, lib, , p]) => <li key={cle} data-fu-part={cle} data-fu-pct={String(p)}><i className={'is-' + cle}/><span>{lib}</span><b>{p} %</b></li>)}
+            </ul>
+          </div>
+        ) : <p className="vrm-fu-note" data-fu-anneau-pourquoi="">{!B ? 'Rien à répartir tant que le bénéfice n’est pas calculé.' : B.n === 0 ? 'Aucune vente finalisée ce mois-ci.' : B.nCout < B.n ? 'La répartition s’affiche quand tous les prix d’achat du mois sont saisis.' : 'La répartition s’affiche quand les frais et les cotisations du mois sont connus.'}</p>}
+      </section>
+      <section className="vrm-fu-panneau" aria-label="Bénéfice brut sur tes ventes, six derniers mois" data-fu-mois6={mois6.map((m) => (m.v == null ? '' : Math.round(m.v))).join(',')}>
+        <div className="vrm-fu-panneau-tete"><h3>6 derniers mois</h3>{/* (3 nov.) Ces barres sont le BRUT (ventes − prix d'achat) : elles portent son nom (src/beneficeNoms.js), jamais « bénéfice » seul. */}<span data-benef-notion="brut">{NOM_BENEFICE_BRUT.toLowerCase()}</span></div>
+        <div className="vrm-fu-barres">
+          {mois6.map((m) => (
+            <div key={m.cle} className="vrm-fu-barre" data-courant={m.courant ? '' : undefined} data-vide={m.v == null ? '' : undefined}
+              title={m.v == null ? `${m.long} : aucun prix d'achat connu (${m.n} vente${m.n > 1 ? 's' : ''})` : `${m.long} : ${fmt(m.v)}${m.nCout < m.n ? ` · ${m.nCout} vente${m.nCout > 1 ? 's' : ''} sur ${m.n} au prix d'achat connu` : ''}`}>
+              <div className="vrm-fu-barre-piste"><i style={{ height: m.v == null ? '24%' : `${Math.max(3, (Math.max(0, m.v) / max6) * 100)}%` }}/></div>
+              <span>{m.l}</span>
+            </div>
+          ))}
+        </div>
+      </section>
+      {rappel && rappel.aNoter && rappel.aNoter.length ? (
+        <section className="vrm-fu-declaration" data-fu-urssaf={rappel.dueIso} aria-label="Déclaration URSSAF">
+          {/* « Déclaration URSSAF » est le lien vers le site de l'URSSAF (un geste, aucun texte en plus). */}
+          <div><a className="vrm-fu-decl-lien" href="https://www.autoentrepreneur.urssaf.fr" target="_blank" rel="noopener noreferrer" data-fu-declarer-urssaf="">Déclaration URSSAF</a><span>avant le {dateRappel}</span></div>
+          <button type="button" className="vrm-fu-encre-btn" data-fu-geste="" data-urssaf-cest-declare={rappel.aNoter[0]} onClick={() => demanderDeclaration(rappel.aNoter[0], onNav)}>J'ai déclaré</button>
+        </section>
+      ) : null}
+    </div>
+  );
+}
 // (22 oct.) LE CHOIX, UNE SEULE FOIS : tant que rien n'a jamais été noté, le
 // « net » n'est qu'un net AVANT ses dépenses (cartons, scotch, essence…). Deux
 // réponses, synchronisées dans `vrm_compta` : « je n'ai pas de dépenses à
@@ -37923,17 +38056,28 @@ function BeneficeCompta({ compta, onNav, onSansDepenses, onAjouterDepense, sansC
         {B && <Segmente label="Période du bénéfice" plein value={periode} onChange={choisir} className="vrm-compta-periode"
           options={PERIODES_BENEF.map(([k, l]) => ({ v: k, l, data: { 'data-benef-choix': k } }))} />}
       </div>
-      <div className="vrm-compta-carte">
+      <div className="vrm-compta-carte" data-fu-carte="">
         {!B ? (
           <p className="vrm-compta-phrase" data-compta-phrase="gagne" style={{ margin: 0 }}>
             {etat === 'encours' ? 'Je lis ton bénéfice…' : sansCompte ? <span data-benefice-sans-compte="">Ton bénéfice arrivera ici dès qu’un compte Vinted sera relié (le bandeau du haut dit comment).</span> : <>Ton bénéfice se calcule dans l'écran Ventes, à partir de tes prix d'achat : ouvre-le une fois{onNav ? <> (<a href="?tab=cat_ventes" onClick={(ev) => { ev.preventDefault(); onNav('cat_ventes'); }} style={{ color: C.accent, fontWeight: 600, textDecoration: 'none' }}>Ventes</a>)</> : null}, il arrivera ici.</>}
           </p>
         ) : (<>
-          <div className="vrm-compta-libelle" data-benef-titre="">{titreNet} · {B.libelle}</div>
-          {/* (3 nov.) « Bénéfice » = UNE règle sur tous les écrans (src/beneficeNoms.js). */}
+          {/* (2 nov., 22 h, maquette FusionCompta « à l'identique ») « Ce que tu as gagné », le
+              chiffre, UNE ligne courte (le vendu, le manque nommé et son geste), trois cases. */}
+          <div className="vrm-compta-libelle" data-benef-titre="" title={`${titreNet} · ${B.libelle}`}>Ce que tu as gagné</div>
+          {/* (3 nov.) « Bénéfice » = UNE règle sur tous les écrans (src/beneficeNoms.js, fusionnée de main). */}
           <div className="vrm-compta-hero vrm-display" data-compta-chiffre="gagne" data-eur={e2(chiffreBenefice(B, etat).valeur)} {...chiffreBenefice(B, etat).attrs} style={{ color: chiffreBenefice(B, etat).valeur == null ? C.muted : C.text }}>{chiffreBenefice(B, etat).valeur == null ? '—' : fmt(chiffreBenefice(B, etat).valeur)}</div>
-          <p className="vrm-compta-phrase" data-compta-phrase="gagne">{phrase}{couverture ? <> {couverture}</> : null}</p>
-          {(B.raison === 'achats' || (B.nCout < B.n)) && <div className="vrm-compta-geste">{lienSaisie}</div>}
+          <p className="vrm-compta-phrase vrm-fu-compta-sous" data-compta-phrase="gagne" title={typeof phrase === 'string' ? phrase : undefined}>
+            {/* Le vendu n'est pas redit s'il vaut déjà « à déclarer » (§7 : un nombre, une fois). */}
+            {B.n === 0 ? 'Aucune vente finalisée ce mois-ci' : (B.caDecl != null && Math.round(B.caDecl * 100) === Math.round(B.ca * 100)) ? B.libelle : <>sur {fmt(B.ca)} vendus</>}
+            {B.nCout < B.n ? <> · <button type="button" onClick={versSaisiePrix} data-benef-porte="" data-benef-manque="" className="vrm-lien-action">{sansAchat} prix d'achat à saisir</button></> : null}
+            {B.raison === 'frais' ? <> · frais eBay pas connus</> : B.raison === 'cotisations' ? <> · CA déclaré pas encore calculé</> : null}
+          </p>
+          <div className="vrm-fu-cases vrm-fu-compta-cases" style={{ '--n': B.sansCotis ? 2 : 3 }}>
+            <div className="vrm-fu-case" data-fu-case="declarer" data-eur={e2(B.caDecl)}><b className={B.caDecl == null ? 'is-vide' : undefined}>{B.caDecl == null ? '—' : fmt(B.caDecl)}</b><span>à déclarer</span></div>
+            {B.sansCotis ? null : <div className="vrm-fu-case" data-fu-case="urssaf" data-eur={e2(B.cotis)}><b className={B.cotis == null ? 'is-vide' : undefined}>{B.cotis == null ? '—' : fmt(B.cotis)}</b><span>URSSAF</span></div>}
+            <div className="vrm-fu-case" data-fu-case="ventes"><b>{B.n}</b><span>vente{B.n > 1 ? 's' : ''}</span></div>
+          </div>
           {B.depenses === 'jamais' && nuagePret && onSansDepenses ? (
             <div className="vrm-compta-geste"><ChoixDepenses onAucune={onSansDepenses} onAjouter={onAjouterDepense} /></div>
           ) : onAjouterDepense && nuagePret ? (
@@ -38004,7 +38148,7 @@ function useBeneficeJournee() {
   // `on` : montré (tout sauf « masqué par lui ») ; `choix` : les trois états.
   return [choix !== false, poser, choix];
 }
-function BeneficeJournee({ onNav, place, edition = false }) {
+function BeneficeJournee({ onNav, place, edition = false, fusion = false }) {
   const [on, poser, choix] = useBeneficeJournee();
   const [compta, comptaPret] = useLigneSynchro('vrm_compta', lireComptaSynchro);
   const { pub, etat, B } = useBeneficeCalcul(compta, 'mois');
@@ -38013,11 +38157,13 @@ function BeneficeJournee({ onNav, place, edition = false }) {
   const depenses = B ? (comptaPret ? B.depenses : 'passu') : '';
   const sansDepenses = () => repondreSansDepenses(lireComptaSynchro(), (v) => save('vrm_compta', v));
   const ajouterDepense = () => { DEMANDE_DEPENSE.on = true; DEMANDE_DEPENSE.at = Date.now(); if (onNav) onNav('compta'); };
-  if (!on) return null;
+  // (2 nov., 22 h) Dans la tête sombre de Ma journée, la case est TOUJOURS là (maquette) : « — » tant que
+  // le bénéfice n'est pas su ; le choix « masqué » ne vaut plus que pour l'ancienne carte.
+  if (!on && !fusion) return null;
   // Par défaut (jamais choisi) : seulement s'il y a un bénéfice à montrer — une
   // publication ET au moins une vente du mois au prix d'achat connu. Jamais une
   // case de « — » ou « se calcule ailleurs » qu'il n'a pas demandée.
-  if (choix === null && !(B && B.nCout > 0)) return null;
+  if (choix === null && !(B && B.nCout > 0) && !fusion) return null;
   const minuit = new Date(); minuit.setHours(0, 0, 0, 0);
   const demain = new Date(minuit); demain.setDate(demain.getDate() + 1);
   const J = pub ? beneficeDesJours(pub.jours, minuit, demain) : null;
@@ -38084,9 +38230,29 @@ function BeneficeJournee({ onNav, place, edition = false }) {
       )}
     </>
   );
+  // (2 nov., 22 h, maquette FusionJournee) Dans la tête sombre : « Bénéfice du mois » et le
+  // montant, rien d'autre (le détail vit dans Comptabilité, d'un toucher).
+  if (fusion) return (
+    <button type="button" className="vrm-fu-case is-jour" data-fu-case="benefice" data-journee-benef-detail="" title={titre} {...attrs} onClick={allerCompta}>
+      {/* (3 nov.) La règle de main (src/beneficeNoms.js) : « Bénéfice » = la notion de Compta,
+          « — » quand elle dit « pas su » (jamais un brut partiel, jamais « ≥ »). */}
+      <span>{NOM_BENEFICE} du mois</span>
+      <b className={valeur == null ? 'is-vide' : undefined} data-journee-benef-ligne="net">{valeur == null ? '—' : <>{Math.round(valeur).toLocaleString('fr-FR')}{'\u00a0'}€</>}</b>
+    </button>
+  );
   return place === 'integre'
     ? <div className="vrm-jc-cell" title={titre} {...attrs}>{corps}</div>
     : <div className="vrm-day-card vrm-jc vrm-jc-carte" title={titre} {...attrs} style={{ border: `1px solid ${C.border}`, background: C.card }}><div className="vrm-jc-cell">{corps}</div></div>;
+}
+// (2 nov., 22 h, maquette FusionVentes) « · bénéfice X € » sous le vendu du mois : le NET du
+// mois de `useBeneficeCalcul` (la lecture de Ma journée et de Comptabilité), seulement
+// quand il se calcule — sinon rien (jamais un brut présenté comme le bénéfice).
+function BeneficeMoisCourt() {
+  const [compta] = useLigneSynchro('vrm_compta', lireComptaSynchro);
+  const { B, etat } = useBeneficeCalcul(compta, 'mois');
+  const cb = chiffreBenefice(B, etat);   // (3 nov.) la règle unique de main (src/beneficeNoms.js)
+  if (!B || cb.valeur == null || B.n === 0) return null;
+  return <span data-fu-benef-mois={String(cb.valeur)} {...cb.attrs}> · {NOM_BENEFICE.toLowerCase()} {Math.round(cb.valeur).toLocaleString('fr-FR')}{'\u00a0'}€</span>;
 }
 // (31 oct.) Plus d'interrupteur dans Réglages → Affichage (sa décision) : le
 // bénéfice se masque et se remet DANS Ma journée, en mode « Modifier ».
@@ -38665,8 +38831,8 @@ function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, pan
   // se dit UNE fois ici, avec le geste ; les cartes ne gardent que « — ».
   const ligneComptaPub = useLigneUrssaf();
   return (
-    <div className="vrm-finance-page" style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 16 }}>
-      <ScreenHead icon="euro" title="Comptabilité" desc="Ce que tu as gagné, ce que tu dois déclarer à l'URSSAF, puis le détail." />
+    <div className="vrm-finance-page vrm-fu-ecran" style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <ScreenHead icon="euro" title="Compta" date={(()=>{ const t = new Date().toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' }); return t.charAt(0).toUpperCase() + t.slice(1); })()} desc="Ce que tu as gagné, ce que tu dois déclarer à l'URSSAF, puis le détail." />
       {!ligneComptaPub && <div data-compta-pas-calcule="" style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', padding: '10px 14px', borderRadius: 12, background: 'var(--vrm-b-teinte)', fontSize: 13, color: C.text }}>
         {/* (2 nov.) Un compte neuf, sans compte Vinted : « ouvre Ventes » ne menait
             nulle part (Ventes n'a rien à publier). La cause vraie et son geste —
@@ -38694,6 +38860,8 @@ function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, pan
         onSansDepenses={() => repondreSansDepenses(data, maj)}
         onAjouterDepense={() => { ouvrirRepliCompta('compta-charges'); setOuvert('dep'); setVersDepense((n) => n + 1); }} />
       </div>
+      {/* (2 nov., style « Fusion ») L'anneau et les six mois — des parts et des hauteurs, aucun montant redit. */}
+      <ComptaFusion compta={data} onNav={onNav}/>
 
       <section id="compta-urssaf" className="vrm-compta-q" data-compta-q="declarer" style={{ scrollMarginTop: 72 }}>
         <div className="vrm-compta-q-tete">
@@ -44211,6 +44379,33 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const nomsVentesKO = (Array.isArray(sales.failedUids) ? sales.failedUids : [])
     .filter(u => !acctOff(u))
     .map(u => { const a = (accounts || []).find(x => String(x.vinted_user_id) === String(u)); return a ? accNameOf(a) : `#${u}`; });
+  // (2 nov., style « Fusion ») LES PREUVES DE LA FRISE D'UNE VENTE VINTED, lues
+  // une fois pour le tiroir (cinq étapes), la ligne (quatre segments) et la carte
+  // du mois de Ventes (combien en route, combien livrées) : la MÊME `friseVente`
+  // (src/recapVente.js — une étape n'est cochée que PROUVÉE). Appelée au rendu,
+  // après toutes les lectures de l'écran.
+  const preuvesFriseDe = (o) => {
+    const txL = String(o.transaction_id);
+    const st = classifyOrderStatus(o.status);
+    const s = String(o.status || ''); const tus = String(o.transaction_user_status || '').toLowerCase();
+    const vs = venteStage(o);
+    const horsParcours = ETATS_HORS_PARCOURS.includes(vs.label) || st === 'cancelled';
+    const bordE = bordParTx[txL] || null, bordC = labelsCaptes[txL] || null;
+    const posteMain = isShipDone(o);
+    const etx = etatTxn(o.transaction_id);
+    const finalisee = /finalis/i.test(s) || tus === 'completed' || !!(etx && etx.s === 450);
+    const livreeLue = finalisee || /\blivr[ée]|remis\b|r[ée]ceptionn/i.test(s);
+    const bougeLu = livreeLue || tus === 'waiting' || COLIS_DEJA_BOUGE.test(s) || isAtRelayStatus(s);
+    const versement = versements ? (versements[txL] || null) : null;
+    const etapes = horsParcours ? null : friseVente({
+      vendue: { lu: true, t: o.date || null },
+      bordereau: { lu: !!(bordE || bordC), t: (bordE && bordE.receivedAt) || (bordC && bordC.capturedAt) || null },
+      deposee: { lu: posteMain || bougeLu, t: posteMain ? shipDone[txL] : null },
+      livree: { lu: livreeLue, t: null },
+      argent: { lu: finalisee, t: versement },
+    });
+    return { s, tus, vs, horsParcours, bordE, bordC, posteMain, finalisee, versement, etapes, bougeLu, livreeLue };
+  };
   // Suit l'ENSEMBLE des comptes (`cleComptes`), pas leur nombre : un compte lié
   // ou retiré relit (le cache ne sert plus une liste qui ne le couvre pas).
   useEffect(() => { if (accounts.length) loadOrders('sold', setSales); /* eslint-disable-next-line */ }, [cleComptes]);
@@ -47628,6 +47823,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       <div className="vrm-menu-flottant" data-outils-ventes={sousBarre?'sous-barre':'bouton'} style={{position:'absolute',zIndex:71,background:C.card,border:`1px solid ${C.border}`,borderRadius:10,boxShadow:C.shadowLg||'0 8px 24px rgba(0,0,0,.2)',padding:6,display:'flex',flexDirection:'column',gap:2,...(sousBarre?{left:8,right:8,top:'calc(100% - 4px)'}:{right:0,top:'calc(100% + 6px)',minWidth:270})}}>
         {(
           <div className="vrm-outils-reglages" style={{padding:'4px 6px 8px',borderBottom:`1px solid ${C.border}`,marginBottom:2}}>
+            {/* (2 nov., 22 h) La recherche et la période ne sont plus sur l'écran (maquette FusionVentes) :
+                elles sont ici, à un geste — les mêmes états (`ordSearch`, `periode`). */}
+            {sales.items && sales.items.length>0 && <div className="vrm-outils-recherche" data-outils-recherche="" style={{display:'flex',flexDirection:'column',gap:8,padding:'4px 4px 10px'}}>
+              <div className="vrm-list-search"><Icon name="search" size={17}/><input aria-label="Rechercher dans les ventes Vinted" type="search" value={ordSearch} onChange={e=>setOrdSearch(e.target.value)} placeholder="Rechercher"
+                style={{width:'100%',boxSizing:'border-box',border:`1px solid ${C.border}`,borderRadius:10,padding:'10px 13px',fontSize:16,background:C.card,color:C.text,outline:'none',minHeight:44}}/></div>
+              <PeriodePicker value={periode} onChange={setPeriode} titre="Période des ventes"/>
+            </div>}
             <BordereauxAuto key={AUTH.user?.id} owner={AUTH.user?.id} lire={lireBordereauxAuto} sauver={sauverBordereauxAuto}/>
             <VuesVentes owner={AUTH.user?.id} plateforme="vinted" valeur={{filtre:vFilter,recherche:ordSearch,periode}} onAppliquer={v=>{setVFilter(v.filtre);setOrdSearch(v.recherche);setPeriode(v.periode);setToolsOpen(false);}}/>
           </div>
@@ -48783,7 +48985,22 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         // sont celles d'avant, découpées à l'affichage : la partie avant « — »
         // est le titre, le reste et le sous-titre font le détail. Aucune règle,
         // aucune alerte, aucune cible ne change.
+        // (3 nov., Julien sur ordinateur : « j'aime pas trop cet endroit » — trop de phrases,
+        // jargon, « paires ») La forme Fusion : un titre COURT (« 2 annonces à retirer de
+        // Leboncoin », « Vente Vestiaire à envoyer », « 5 articles pour eBay », « 3 e-mails à
+        // trier ») et une sous-ligne courte. La phrase entière reste dans l'infobulle et le nom
+        // du bouton (lecteur d'écran) ; aucune règle, aucun compteur, aucune cible ne change.
         const decouper = (j) => {
+          const f = courtFusion(j);
+          const avecPastille = !(j.photos && j.photos.length) && Number(j.n) > 0;
+          const sansN = (t) => avecPastille ? titreSansNombre(t, j.n) : t;
+          if (f) return { court: sansN(f.court), detail: f.detail, plein: [j.title, j.sub].filter(Boolean).join(' — ') };
+          const x = decouperBrut(j);
+          // Le titre d'origine reste entier dans l'infobulle quand le nombre en est retiré.
+          const court = sansN(enArticles(x.court));
+          return { ...x, court, detail: enArticles(x.detail), plein: x.plein || (court !== enArticles(x.court) ? enArticles(x.court) : '') };
+        };
+        const decouperBrut = (j) => {
           // (1er nov.) Une ligne qui porte SA forme courte (titre + raison courte) :
           // le texte long (`plein`) reste dans l'infobulle et pour le lecteur d'écran.
           if (j.court && j.detail !== undefined) return { court: j.court, detail: j.detail || '', plein: j.plein || '' };
@@ -48803,7 +49020,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   <PhotoVinted key={ph} src={ph} alt="" loading="lazy" onError={()=>noterImgMorte(ph)} style={{marginLeft:k?-14:0}}/>
                 ))}
               </span>
-            : <span className="vrm-day-task-ic" aria-hidden="true" style={{color:j.color}}><Icon name={j.icon} size={20}/></span>}
+            : (j.n != null && Number.isFinite(Number(j.n)) && Number(j.n) > 0)
+              /* (2 nov., Fusion) La pastille chiffrée, NEUTRE (encre ; ambre pâle seulement si urgent). */
+              ? <span className={'vrm-fu-pastille' + (j.urgent ? ' is-urgent' : (Number(j.prio) >= 3 ? ' is-secondaire' : '')) + (Number(j.n) > 99 ? ' is-long' : '')} aria-hidden="true" data-fu-pastille={String(j.n)}>{Number(j.n) > 999 ? '999+' : j.n}</span>
+              : <span className={'vrm-fu-pastille is-icone' + (j.urgent ? ' is-urgent' : '')} aria-hidden="true"><Icon name={j.icon} size={20}/></span>}
           <span className="vrm-day-task-textes">
             <UneLigne className="vrm-day-task-title" texte={x.court} lignesTel={2}/>
             {/* (1er nov., « très répétitif ») Le détail tient sur UNE ligne, téléphone compris :
@@ -48827,9 +49047,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             <button type="button" className="vrm-day-task-ouvrir" aria-label={plein.replace(/\n/g, ' — ')} onClick={()=>{ if (j.avant) j.avant(); if (onNav) onNav(j.tab); }}>
               {corpsTache(j, x)}
             </button>
-            <Bouton variante="secondaire" icone="check" className="vrm-b-petit vrm-day-task-geste" data-urssaf-cest-declare={j.urssaf.aNoter[0]} onClick={()=>demanderDeclaration(j.urssaf.aNoter[0], onNav)}>
-              {j.urssaf.mois && j.urssaf.mois.length > 1 ? `Noter ma déclaration — ${(() => { const [y, m] = j.urssaf.aNoter[0].split('-'); return new Date(Number(y), Number(m) - 1, 1).toLocaleDateString('fr-FR', { month: 'long' }); })()}` : 'Noter ma déclaration'}
-            </Bouton>
+            {(() => { const lib = j.urssaf.mois && j.urssaf.mois.length > 1 ? `Noter ma déclaration — ${(() => { const [y, m] = j.urssaf.aNoter[0].split('-'); return new Date(Number(y), Number(m) - 1, 1).toLocaleDateString('fr-FR', { month: 'long' }); })()}` : 'Noter ma déclaration'; return (
+            <Bouton variante="secondaire" className="vrm-b-petit vrm-day-task-geste" title={lib} aria-label={lib} data-urssaf-cest-declare={j.urssaf.aNoter[0]} onClick={()=>demanderDeclaration(j.urssaf.aNoter[0], onNav)}>
+              {/* (3 nov., critique #11) Le même gabarit que les autres lignes : « Noter » en pilule à droite ; la phrase entière en infobulle. */}
+              Noter
+            </Bouton>); })()}
           </div>
         ); };
         const listeTaches = (liste, attr) => (
@@ -48928,8 +49150,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               ? <div data-vendu-manque="" className="vrm-jc-sous">Tes ventes n'ont pas pu être lues — ce n'est pas zéro.</div>
               : <div className="vrm-jc-sous">{partiel ? 'au moins · ' : ''}{moisN} vente{moisN>1?'s':''}{jourN>0 && <> · <span data-vendu-jour={Math.round(jourEur*100)}>{jourN} aujourd'hui</span></>}{ncMois.length ? <> · <span data-vendu-manque-phrase="" title={phraseNcMois}>{ncMois.length} non comptée{ncMois.length>1?'s':''}</span></> : null}</div>}
             </>); })()}
-            <div className={`vrm-jc-rangee${cotisMois != null ? ' vrm-jc-4' : ''}`}>
-              <BeneficeJournee onNav={onNav} place="integre" edition={editJournee}/>
+            {/* (2 nov., Fusion) Le bénéfice est dans la tête sombre : plus redit ici (§7). */}
+            <div className="vrm-jc-rangee">
               <div className="vrm-jc-cell" data-recu-mois={recuMois==null?'':Math.round(recuMois*100)} data-recu-sans={recuSans ? nomsVentesKO.join(',') : ''} data-recu-non-comptees={recuNonComptees.length || undefined}
                 title={`Reçu en ${libMois} : tes ventes versées ce mois (date du versement).${recuSans ? ` Sans ${nomsVentesKO.join(', ')} (ventes pas lues).` : ''}${adTous > 0 ? ` ${adTous} vente${adTous>1?'s':''} finalisée${adTous>1?'s':''} sans date de versement : dans aucun mois pour l'instant.` : ''}${phraseNcRecu ? ` Comptées nulle part : ${phraseNcRecu}.` : ''}${aDaterTitre}`}>
                 <div className="vrm-jc-l">Reçu en {libMois}</div>
@@ -48954,19 +49176,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               </div>
             </div>
           </div>
-        ) : (jourN>0 || (!baseKO && !premierJour && benefJourneeOn)) ? (<>
-          {/* Le jour seul, quand le héros n'est pas là (lecture en cours d'un
-              autre bloc) : une ligne sobre, jamais un bandeau bleu. */}
-          {jourN>0 && (
-            <button type="button" onClick={()=>onNav&&onNav('cat_ventes')} className="vrm-day-card vrm-day-jour"
-              style={{border:`1px solid ${C.border}`,background:C.card,boxShadow:C.shadow||'none',textAlign:'left',cursor:'pointer',fontFamily:'inherit',width:'100%'}}>
-              <span className="vrm-day-k" style={{color:C.muted}}>Vendu aujourd'hui</span>
-              <span data-vendu-jour={Math.round(jourEur*100)} className="vrm-jc-v"><Montant v={jourEur}/></span>
-              <span className="vrm-jc-sous">{jourN} vente{jourN>1?'s':''}</span>
-            </button>
-          )}
-          {!baseKO && !premierJour && <BeneficeJournee onNav={onNav} place="carte" edition={editJournee}/>}
-        </>) : null;
+        ) : null;
+        // (2 nov., Fusion) « Vendu aujourd'hui » et le bénéfice vivent dans la tête
+        // sombre, toujours là : la carte de secours d'avant (le jour seul, le
+        // bénéfice en carte) les aurait redits (§7).
         W.semaine = vuHero ? (()=>{
           // (2 nov., audit des données ; limites n°10) Aucun compte lu : sept « 0 »
           // seraient un rien inventé (§5) — la carte le dit. Une partie seulement :
@@ -49156,57 +49369,90 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           ) : null;
         }
         return (
-          <div className="vrm-day-layout">
+          <div className="vrm-day-layout vrm-fu-ecran vrm-fu-journee">
             <ScreenHead icon="sun" title="Ma journée"/>
 
-            {/* La tête (bonjour, date, nombre de choses à faire) reste hors de la
-                grille ; le bouton « Modifier » y vit, discret. */}
-            {!baseKO && (
-              <div className="vrm-day-greeting vrm-w-tete">
-                <div className="vrm-day-hello" style={{color:C.text}}>{hello}{prenomLisible(prenom) ? ' ' + prenomLisible(prenom) : ''}</div>
-                <div className="vrm-day-date" style={{color:C.muted}}>{dateStr}</div>
-                <p className="vrm-phrase-ecran" data-phrase-ecran="journee">{PHRASES_ECRAN.journee}</p>
-                {!loading && jobs.length>0 && <div className="vrm-day-todo" style={{color:C.muted}}><b style={{color:C.text,fontWeight:600}}>{jobs.length} chose{jobs.length>1?'s':''}</b> à faire aujourd'hui</div>}
-                {!premierJour && !editJournee && (
-                  <button type="button" className="vrm-w-modifier" data-widgets-modifier="" aria-label="Modifier les widgets de Ma journée" onClick={()=>setEditJournee(true)} style={{color:'var(--vrm-b-lien)',fontWeight:600}}>Modifier</button>
+            {/* (2 nov., 22 h, Julien : « recopie à l'identique » la maquette FusionJournee,
+                « sans textes explicatifs ») LA TÊTE SOMBRE, bord à bord : le bonjour, le
+                titre, la semaine, deux cases — « Vendu aujourd'hui » (`bilanVentes`, la règle
+                de « Vendu ») et « Bénéfice du mois » (`BeneficeJournee`, publication
+                `vrm_benefice_jours`). Rien d'autre. */}
+            {!baseKO && (() => {
+              const actifsT = (accounts||[]).filter(a=>!acctOff(a.vinted_user_id)).length;
+              const ventesPasLues = actifsT>0 && nomsVentesKO.length>=actifsT && jourN===0;
+              return (
+              <section className="vrm-day-greeting vrm-w-tete vrm-fu-tete" data-fu-carte="" aria-label="Ta journée">
+                <div className="vrm-day-hello vrm-fu-bonjour">{hello}{prenomLisible(prenom) ? ' ' + prenomLisible(prenom) : ''}</div>
+                <h1 className="vrm-fu-titre-tete">Ma journée</h1>
+                {/* Les sept derniers jours, aujourd'hui à droite (maquette). */}
+                <ol className="vrm-fu-semaine" aria-label="Les sept derniers jours" data-fu-semaine="">
+                  {[6,5,4,3,2,1,0].map((k)=>{ const d = new Date(); d.setHours(0,0,0,0); d.setDate(d.getDate()-k);
+                    return (
+                      <li key={k} className="vrm-fu-jour" data-auj={k===0?'':undefined} title={d.toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long'})}>
+                        <span aria-hidden="true">{['D','L','M','M','J','V','S'][d.getDay()]}</span><b>{d.getDate()}</b>
+                      </li>); })}
+                </ol>
+                {!premierJour && (
+                  <div className="vrm-fu-cases">
+                    <button type="button" className="vrm-fu-case is-jour" data-fu-case="jour" data-fu-vendu-jour={vuHero && !ventesPasLues ? Math.round(jourEur*100) : ''} onClick={()=>onNav&&onNav('cat_ventes')}>
+                      <span>Vendu aujourd'hui</span>
+                      <b className={vuHero && !ventesPasLues ? undefined : 'is-vide'}>{vuHero && !ventesPasLues ? <>{nomsVentesKO.length ? <span className="vrm-fu-borne">≥</span> : null}{Math.round(jourEur).toLocaleString('fr-FR')}{' '}€</> : '—'}</b>
+                    </button>
+                    <BeneficeJournee onNav={onNav} place="integre" fusion edition={false}/>
+                  </div>
                 )}
-              </div>
-            )}
+              </section>
+              ); })()}
 
-            {/* ⚠️ Rétabli (retiré par #500) : si le serveur ne peut plus envoyer
-                AUCUNE notification, il faut le voir ICI. */}
             {!baseKO && !premierJour && <NotifsMuettes onNav={onNav}/>}
 
-            {/* LES ALERTES QUI COÛTENT DE L'ARGENT : toujours en tête, hors grille,
-                jamais retirables — une alerte cachée, c'est une paire vendue deux
-                fois ou un colis qui ne part pas. */}
-            {!loading && alertesArgent.length>0 && (
-              <section className="vrm-day-urgent" aria-label="Urgent">
-                <h2 className="vrm-day-titre-section">Urgent</h2>
-                {listeTaches(alertesArgent, {'data-alertes-argent': ''})}
-              </section>
-            )}
-            {editJournee && !loading && alertesArgent.length>0 && (
-              <div className="vrm-aide" data-alertes-fixes="" style={{fontSize:12,color:C.muted,margin:'-4px 2px 12px'}}>Ces alertes restent en tête : elles peuvent te coûter de l'argent.</div>
-            )}
+            {/* « À FAIRE » (maquette) : une carte par geste — pastille chiffrée (encre ; ambre
+                si c'est pressé), un titre, une ligne courte, le geste en pilule. Les cases du
+                jour (À envoyer, À retirer, Messages, Prix à baisser : leurs MÊMES compteurs,
+                `data-tuile`) et les alertes (urgentes d'abord), puis le reste. */}
+            {!baseKO && !premierJour && (() => {
+              const cases = T.filter((x) => !x.pasSu && x.t && x.t.n > 0);
+              const nPretsJournee = (tuiles.envoyer && tuiles.envoyer.emballer && tuiles.envoyer.emballer.n) || 0;
+              // « Emballer » est le geste de la carte « Colis à poster » : pas une seconde carte.
+              const autres = jobsAFaire.filter((j) => j.id !== 'emballer');
+              const libCase = { envoyer: 'Colis à poster', retirer: 'Colis à retirer', messages: 'Messages', prix: 'Prix à baisser' };
+              const gesteCaseF = { envoyer: nPretsJournee > 0 ? 'Imprimer' : 'Voir', retirer: 'Voir', messages: 'Répondre', prix: 'Voir' };
+              const nGestes = cases.length + alertesArgent.length + autres.length + (urssafJob ? 1 : 0);
+              const carteCase = (x) => {
+                const so = sousCase(x);
+                const presse = !!(x.t && x.t.presses && (x.t.presses.urgent || x.t.presses.nAuj > 0)) || !!(x.t && x.t.alerte);
+                return (
+                  <button key={x.id} type="button" className="vrm-day-task vrm-fu-tache" data-tuile={x.id} data-n={String(x.t.n)} data-case={x.id}
+                    data-presses={x.id === 'envoyer' && x.t && x.t.presses ? String(x.t.presses.n) : undefined} data-limite-heure={x.id === 'envoyer' && x.t && x.t.presses ? x.t.presses.heure : undefined} data-a-verifier={x.id === 'retirer' && x.t && x.t.aVerifier ? String(x.t.aVerifier) : undefined}
+                    title={titreCase(x)} onClick={()=>{ if (x.id === 'envoyer' && nPretsJournee > 0) _pendingBordPrint = true; if (onNav) onNav(x.tab); }}>
+                    <span className={'vrm-fu-pastille' + (presse ? ' is-urgent' : x.id === 'prix' ? ' is-secondaire' : '')} aria-hidden="true">{x.t.n > 999 ? '999+' : x.t.n}</span>
+                    <span className="vrm-day-task-textes"><span className="vrm-day-task-title">{libCase[x.id] || x.l}</span>{so ? <span className="vrm-day-task-note" data-sous-ligne={so.cle}>{so.texte}</span> : (x.id === 'envoyer' && nPretsJournee > 0) ? <span className="vrm-day-task-note">{nPretsJournee} prêt{nPretsJournee > 1 ? 's' : ''} à imprimer</span> : null}</span>
+                    <span className="vrm-day-task-action"><span className="vrm-day-task-action-mot">{gesteCaseF[x.id] || 'Voir'}</span></span>
+                  </button>
+                );
+              };
+              if (loading) return null;
+              if (nGestes === 0) return <p className="vrm-fu-vide" data-tout-a-jour="">Rien à faire</p>;
+              return (
+                <section className="vrm-fu-afaire" aria-label="À faire">
+                  <div className="vrm-fu-titre-section"><h2 className="vrm-day-titre-section">À faire</h2><span data-fu-gestes={nGestes}>{nGestes} geste{nGestes > 1 ? 's' : ''}</span></div>
+                  <div className="vrm-day-task-list" data-barre-jour="">
+                    {alertesArgent.length ? <div style={{display:'contents'}} data-alertes-argent="">{alertesArgent.map(tache)}</div> : null}
+                    {cases.map(carteCase)}
+                    {autres.map(tache)}
+                    {urssafJob ? tache(urssafJob, 99) : null}
+                  </div>
+                  {/* Les cases à zéro restent lisibles par les autres écrans et les bancs (mêmes compteurs), sans place à l'écran. */}
+                  <div hidden>{T.filter((x) => !cases.includes(x)).map((x) => <span key={x.id} data-tuile={x.id} data-n={x.pasSu ? '' : String(x.t ? x.t.n : 0)}/>)}</div>
+                </section>
+              );
+            })()}
 
-            {/* (1er nov.) LA TOURNÉE : Imprimer → Emballer → Déposer → Retirer, en tête. */}
-            {TOURNEE_SUR_JOURNEE && tournee && <CarteTournee tournee={tournee} nArrets={tournee.arrets.length} onEtape={ouvrirEtapeTournee} onOuvrirTournee={()=>setTourneeOuverte(true)}/>}
-            {TOURNEE_SUR_JOURNEE && tournee && tourneeOuverte && <TourneePleinEcran arrets={tournee.arrets} C={C} zIndex={Z_CONFIRMATION} Retour={FermeAuRetour} onFermer={()=>setTourneeOuverte(false)}
-              onArret={(a)=>{ setTourneeOuverte(false); ouvrirEtapeTournee(a.type === 'depot' ? 'deposer' : 'retirer'); }}/>}
-
-            {/* (21 octobre) Les messages eBay n'ont pas pu être lus : dit UNE fois,
-                sans chiffre — la case « Messages » ne compte alors que Vinted. */}
-            {!baseKO && !premierJour && !loading && tuiles.messages && tuiles.messages.ebay === null && (
-              <div data-ebay-msg-passu="" style={{fontSize:12.5,color:C.muted,margin:'-4px 2px 12px'}}>Messages eBay pas lus — la case « Messages » ne compte que Vinted pour l'instant.</div>
-            )}
-
-            {/* ⚠️ La grille est rendue AUSSI le premier jour : ses widgets s'y
-                taisent d'eux-mêmes (barre, héros, stock…), mais « À faire » peut
-                déjà porter une action — des emails mis de côté, par exemple.
-                La cacher avec le reste les faisait disparaître (vu au banc
-                `emails-mis-de-cote`, 22 oct.). On n'y propose pas « Modifier ». */}
-            <GrilleJournee dispo={dispoJournee} poser={poserDispoJournee} rendus={W} edition={editJournee} setEdition={setEditJournee} peutModifier={!baseKO && !premierJour}/>
+            {/* (2 nov., 22 h) La grille des widgets (Vendu du mois, semaine, attente, dernières
+                ventes, stock, tendances) n'est plus rendue sur Ma journée : la maquette n'a que la
+                tête et « À faire ». Les chiffres vivent dans Ventes, Statistiques et Comptabilité.
+                Un drapeau suffit à la remettre. */}
+            {JOURNEE_AVEC_WIDGETS && <GrilleJournee dispo={dispoJournee} poser={poserDispoJournee} rendus={W} edition={editJournee} setEdition={setEditJournee} peutModifier={!baseKO && !premierJour}/>}
 
             {loading && <Skeleton variant="card" count={4}/>}
 
@@ -49216,7 +49462,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 l'app le matin, lit ça, et ne poste pas ses colis.
                 « Rien à faire » ne se dit QUE si on a pu regarder. */}
             {!loading && jobs.length===0 && (baseKO
-              ? <LignePanne>Je n'ai pas pu lire tes données — liste vide pour ça, pas parce qu'il n'y a rien à faire.</LignePanne>
+              ? <LignePanne>Données pas lues pour l’instant.</LignePanne>
               /* ⚠️⚠️ LA FÊTE SUR UNE BOUTIQUE QUI N'EXISTE PAS ENCORE. Mesuré au
                  rendu le 16 septembre, sur une installation neuve : « 🎉 Tout
                  est à jour ! Rien à expédier, rien à retirer » — à quelqu'un
@@ -49232,9 +49478,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               ? <PremiersPas onNav={onNav}
                   titreNeuf="Bienvenue — il reste une chose à brancher"
                   introNeuf={<>Aucun compte Vinted n'est encore relié&nbsp;: c'est l'extension, dans Chrome, qui range tes ventes.</>}/>
-              : (tuiles.envoyer && tuiles.envoyer.n === 0 && colisEb != null && tuiles.retirer && tuiles.retirer.n === 0 && tracking !== null && !(tuiles.messages && tuiles.messages.n > 0)
-                  ? <div data-tout-a-jour="" style={{fontSize:12.5,color:C.muted,margin:'-4px 2px 14px'}}><span style={{fontWeight:600,color:C.text}}>Tout est à jour.</span> Rien à expédier ni à retirer.</div>
-                  : null)
+              : null
             )}
 
             {/* ⚠️ `accounts.length===0` veut dire « aucun compte » OU « je n'ai
@@ -49245,13 +49489,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 des actions sans aucun compte lié (des colis repérés par email,
                 par exemple) — là seulement elle apprend quelque chose. */}
             {/* (2 nov., audit des données ; limites n°3) Seulement quand la liste des comptes est REVENUE : base lente ≠ « aucun compte ». */}
-            {accounts.length===0 && accountsReady===true && !baseKO && !(jobs.length===0 && !loading && premierJour) && (
-              <div style={{marginTop:16,fontSize:13,color:C.muted,textAlign:'center',lineHeight:1.5,padding:'0 10px'}}>Lie un compte Vinted (Paramètres → Comptes liés) pour remplir ta journée.</div>
-            )}
+
             {/* Le bénéfice vit dans « Vendu et reçu » ; si cette carte n'est pas
                 sur l'écran (retirée), il garde sa propre carte ici : allumé dans
                 Réglages ⇒ toujours visible (un seul propriétaire, §11). */}
-            {!baseKO && !premierJour && !aWidget('vendu') && <BeneficeJournee onNav={onNav} place="carte" edition={editJournee}/>}
+            {/* (2 nov., Fusion) Le bénéfice vit dans la tête sombre, toujours rendue : plus de carte de secours ici. */}
             {/* (29 oct.) Le contrôle « vendus ailleurs » passe SOUS la journée : au-dessus du
                 bonjour il repoussait les compteurs du jour. Les vraies doubles ventes
                 restent en tête (alertes qui coûtent de l'argent).
@@ -49275,6 +49517,54 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
 
       {curSub==='ventes' && (<>
         {!dansPlateforme && <ScreenHead icon="cash" title="Ventes" desc="Tout ce que tu as vendu : bénéfice par article, expédition, et tes documents comptables."/>}
+        {/* (2 nov., style « Fusion », son choix : « la première photo avec les stats
+            novembre ») LA CARTE DU MOIS. Le grand chiffre est le VENDU du mois, toutes
+            plateformes (`bilanVentes` sur `vendus` — la règle de « Vendu » de Ma
+            journée), « au moins » si un compte n'a pas été lu ; la courbe en est le
+            cumul jour par jour (mêmes lignes). Les cases comptent les ventes Vinted de
+            la liste : « à poster » = la règle « À expédier » (`aExpedier`, pas encore
+            déposée), « en route » / « argent à venir » = la frise de chaque vente
+            (`preuvesFriseDe` → `friseVente`, une étape n'est comptée que PROUVÉE). */}
+        {!baseKO && Array.isArray(sales.items) && (() => {
+          const d0 = new Date(); d0.setHours(0, 0, 0, 0);
+          const debut = new Date(d0); debut.setDate(1);
+          const { n: nMois, eur: eurMois } = bilanVentes(debut.getTime());
+          const jours = d0.getDate();
+          const parJour = new Array(jours).fill(0);
+          for (const l of vendus.lignes) { if (l.ts >= debut.getTime()) { const k = new Date(l.ts).getDate() - 1; if (k >= 0 && k < jours) parJour[k] += l.eur; } }
+          let cumul = 0; const courbe = parJour.map((x) => (cumul += x));
+          let aPoster = 0, enRoute = 0, aVenir = 0;
+          for (const o of sales.items) {
+            if (!o || o.transaction_id == null || isHidden(o)) continue;
+            const stO = classifyOrderStatus(o.status);
+            if (stO === 'cancelled') continue;
+            if (aExpedier(o) && !isShipDone(o)) { aPoster += 1; continue; }
+            const p = preuvesFriseDe(o); const f = p.etapes ? friseVenteFusion(p.etapes) : null;
+            if (!f) continue;
+            const fait = Object.fromEntries(f.map((e) => [e.cle, e.fait]));
+            if (fait.postee && !fait.livree) enRoute += 1;
+            else if (fait.livree && !fait.payee) aVenir += 1;
+          }
+          const partiel = nomsVentesKO.length > 0;
+          // (3 nov., cas extrêmes) « Au moins 0,00 € » ne se dit jamais (§5) : des ventes illisibles et
+          // rien de lu ce mois ⇒ « — », et les cases « — » aussi (rien lu ne vaut pas rien).
+          const pasSu = partiel && !(eurMois > 0);
+          const moisLong = d0.toLocaleDateString('fr-FR', { month: 'long' });
+          if (pasSu) { aPoster = null; enRoute = null; aVenir = null; }
+          return (
+            <CarteMois className="vrm-fu-ecran vrm-fu-ventes" surtitre={moisLong} data-fu-vendu-mois={pasSu ? '' : Math.round(eurMois * 100)} data-fu-partiel={partiel ? '1' : undefined} data-fu-pas-su={pasSu ? '1' : undefined}
+              valeur={pasSu ? null : <>{partiel ? <span className="vrm-fu-borne">au moins</span> : null}{eurosRecap(eurMois)}</>}
+              sous={pasSu ? <>Ventes pas lues : {nomsVentesKO.slice(0, 2).join(', ')}{nomsVentesKO.length > 2 ? '…' : ''}</> : <>{nMois} vente{nMois > 1 ? 's' : ''}<BeneficeMoisCourt/></>}
+              courbe={courbe.length > 1 ? courbe : null}
+              cases={[
+                // (2 nov., 22 h) Les filtres de la liste ne sont plus affichés (maquette) : ces deux cases
+                // les portent — un toucher filtre, un second toucher rend toute la liste.
+                { cle: 'aposter', n: aPoster, l: 'à poster', titre: 'Ventes à expédier, pas encore déposées', onClick: () => setVFilter((v) => v === 'aexpedier' ? 'all' : 'aexpedier'), attrs: { 'data-n': aPoster == null ? '' : String(aPoster), 'aria-pressed': vFilter === 'aexpedier' } },
+                { cle: 'enroute', n: enRoute, l: 'en route', titre: 'Déposées, pas encore livrées', onClick: () => setVFilter((v) => v === 'transit' ? 'all' : 'transit'), attrs: { 'data-n': enRoute == null ? '' : String(enRoute), 'aria-pressed': vFilter === 'transit' } },
+                { cle: 'avenir', n: aVenir, l: 'à payer', titre: "Livrées : l'argent arrive quand l'acheteur confirme", attrs: { 'data-n': aVenir == null ? '' : String(aVenir) } },
+              ]}/>
+          );
+        })()}
         {/* ⚠️ LES OUTILS DE TRAVAIL AVANT LES COMMENTAIRES. La période et la
             recherche étaient sous six bandeaux d'explication : il fallait
             défiler un écran et demi pour filtrer ses ventes. Ce qu'on manipule
@@ -49392,7 +49682,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             bordereau » sont grisés pour la même raison : on la dit ici, au-dessus
             de la liste, au lieu de la répéter sous chaque vente. */}
         <RaisonBordereauxGrises ventes={ventesAffichees.filter(o=>o && o.transaction_id!=null && !isHidden(o) && classifyOrderStatus(o.status)!=='cancelled' && aExpedier(o) && !isShipDone(o) && !labelsCaptes[String(o.transaction_id)] && !bordParTx[String(o.transaction_id)])}/>
-        <div className="vrm-ventes-liste" style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:12,overflow:'hidden',boxShadow:C.shadow||'none'}}>
+        <div className="vrm-ventes-liste" data-fu-liste="" style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:12,overflow:'hidden',boxShadow:C.shadow||'none'}}>
           <div className="vrm-ledger-heading" aria-hidden="true"><span>Article</span><span className="vrm-ledger-state-heading">État</span><span>Montant</span></div>
           {/* (1er nov.) Sur ordinateur : les colonnes Prix · Achat · Bénéfice (maquette « ventes-ordi »). */}
           <div className="vrm-ventes-entete" aria-hidden="true" data-ventes-entete-cols=""><span/><span>Article</span><span>État</span><span className="is-droite">Prix</span><span className="is-droite">Achat</span><span className="is-droite">Bénéfice</span><span/></div>
@@ -49452,24 +49742,16 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             // (mêmes règles qu'avant : `beneficeLigneVente`/`beneficePaire`), les détails, puis
             // les gestes — les MÊMES fonctions et écritures que l'ancien tiroir, rien de retiré.
             // ⚠️ La frise REMPLACE la pastille de statut ici (jamais les deux, cf. 28 sept.).
+            // (2 nov., Fusion) LES PREUVES DE LA FRISE, lues une fois : le tiroir (cinq
+            // étapes) et la ligne (quatre segments, `friseVenteFusion`) passent par la
+            // MÊME `friseVente` — une règle, deux formes.
+            const preuvesFrise = preuvesFriseDe(o);
+            const fuEtapes = preuvesFrise.etapes ? friseVenteFusion(preuvesFrise.etapes, { geste: peutDeposer }) : null;
+            // Le transporteur : la règle de la pastille (`transporteurVente` → `transporteurDuColis`), la même que le tiroir.
+            const fuTransp = transporteurVente(preuvesFrise.bordE);
+            const fuPdf = !!(labelsCaptes[txL] || bordParTx[txL]);
             const recapVente = ({ titreId, fermerRef, fermer }) => {
-              const s = String(o.status || ''); const tus = String(o.transaction_user_status || '').toLowerCase();
-              const vs = venteStage(o);
-              const horsParcours = ETATS_HORS_PARCOURS.includes(vs.label) || st === 'cancelled';
-              const bordE = bordParTx[txL] || null, bordC = labelsCaptes[txL] || null;
-              const posteMain = isShipDone(o);
-              const etx = etatTxn(o.transaction_id);
-              const finalisee = /finalis/i.test(s) || tus === 'completed' || !!(etx && etx.s === 450);
-              const livreeLue = finalisee || /\blivr[ée]|remis\b|r[ée]ceptionn/i.test(s);
-              const bougeLu = livreeLue || tus === 'waiting' || COLIS_DEJA_BOUGE.test(s) || isAtRelayStatus(s);
-              const versement = versements ? (versements[txL] || null) : null;
-              const etapes = horsParcours ? null : friseVente({
-                vendue: { lu: true, t: o.date || null },
-                bordereau: { lu: !!(bordE || bordC), t: (bordE && bordE.receivedAt) || (bordC && bordC.capturedAt) || null },
-                deposee: { lu: posteMain || bougeLu, t: posteMain ? shipDone[txL] : null },
-                livree: { lu: livreeLue, t: null },
-                argent: { lu: finalisee, t: versement },
-              });
+              const { s, tus, vs, horsParcours, bordE, bordC, posteMain, finalisee, versement, etapes } = preuvesFrise;
               const aExp = !hidden && st !== 'cancelled' && aExpedier(o) && !posteMain;
               const phrase = phraseVente({ etat: vs.label, aide: vs.aide, etapes: etapes || [], aExpedier: aExp, posteMain });
               const jourCourt = (t) => t == null ? '' : new Date(t).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
@@ -49516,13 +49798,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   <p className="vrm-recap-phrase" data-recap-phrase=""><strong>{phrase.gras}</strong>{phrase.suite ? ' ' + phrase.suite : ''}</p>
                   {issue ? <p className="vrm-recap-issue" data-retour-archive={issue.k}>{issue.t}</p> : null}
                   {o._fromEmail ? <p className="vrm-recap-issue">Reconstituée depuis l'email — pas encore confirmée par Vinted.</p> : null}
-                  {etapes ? <ol className="vrm-recap-frise" data-recap-frise="" aria-label="Où en est la vente">
-                    {etapes.map((x) => <li key={x.cle} data-etape={x.cle} data-fait={x.fait ? '1' : '0'} data-preuve={x.preuve || ''} data-ici={x.ici ? '1' : undefined}>
-                      <span className="vrm-recap-point" aria-hidden="true"/>
-                      <span className="vrm-recap-etape">{x.label}</span>
-                      <span className="vrm-recap-quand">{x.fait ? (x.t != null && x.cle !== 'argent' ? jourCourt(x.t) : 'fait') : 'à venir'}</span>
-                    </li>)}
-                  </ol> : null}
+                  {/* (3 nov., critique #6) La frise de la ligne, mêmes 4 étapes et mêmes mots ; « Bordereau » en détail. */}
+                  {etapes ? <RecapFrise etapes={etapes} cle={txL}/> : null}
                 </section>
                 <section className="vrm-recap-argent" aria-label="L'argent">
                   <h3 className="vrm-recap-titre">L'argent</h3>
@@ -49547,7 +49824,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   </dl>
                 </section>
                 <section className="vrm-recap-gestes" aria-label="Actions">
-                  {bordGeste ? <div className="vrm-recap-principal"><PastilleTransporteur t={trRecap} C={C} data-recap-transporteur=""/><BoutonBordereau grand uid={o._acc && o._acc.vinted_user_id} tx={String(o.transaction_id)} conv={o.conversation_id} login={accNameOf(o._acc)}
+                  {bordGeste ? <div className="vrm-recap-principal vrm-rangee-bord" data-rangee-bord=""><PastilleTransporteur t={trRecap} C={C} data-recap-transporteur=""/><BoutonBordereau grand uid={o._acc && o._acc.vinted_user_id} tx={String(o.transaction_id)} conv={o.conversation_id} login={accNameOf(o._acc)}
                     aGenerer pdf={!!(labelsCaptes[txL] || bordParTx[txL])} onImprimer={()=>imprimerBordereauVente(o)} onFait={(u)=>rechargerLabels(u)}/></div> : null}
                   <div className="vrm-recap-grille">
                     {o.conversation_id && onNav ? <Bouton variante="secondaire" icone="chat" data-recap-conversation="" onClick={()=>{ fermer(); poserCible({ type: 'conv', conv: String(o.conversation_id), compte: String((o._acc && o._acc.vinted_user_id) || '') }, redirigerOnglet('messages', null, ONGLETS_DEPLACES).tab); onNav('messages'); }}>Conversation</Bouton> : null}
@@ -49590,7 +49867,20 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               // Ligne de vente dans la liste groupée (filet fin entre les lignes,
               // pas de carte encadrée séparée — style démo, comme Achats).
               <LigneVenteCompacte montantCentimes={sell!=null?Math.round(sell*100):undefined} numerosArticle={num?[num]:[]} plateforme="vinted" photo={photo} photoNoeud={photo?<PhotoVenteSources {...photoSourcesProps} data-photo-vente="ligne" style={{width:28,height:36,borderRadius:8,objectFit:'cover',flexShrink:0}}/>:null} titre={(()=>{ const t=String((e&&e.size)||o.size||'').trim(); const nom=t&&!tailleDansTitre(o.title,t)?`${o.title} · taille ${t}`:o.title; return num?`N°${num} · ${nom}`:nom; })()}
-                {...gp} benef={benefLigne} recap={recapVente} data-depose-attente={deposeIci?'1':undefined} gestes={(gesteCout || gesteDepose) ? <div className="vrm-gestes-pile">{gesteCout}{gesteDepose}</div> : null} sous={[o.date?dateFr(o.date, {day:'numeric',month:'short'}):'', (o._acc && !ventesUnCompte) ? accNameOf(o._acc) : ''].filter(Boolean).join(' · ')} etat={venteStage(o).label} ton={st!=='cancelled' && aExpedier(o) && !isShipDone(o) ? 'action' : (st==='cancelled' ? 'annule' : '')} montant={sell!=null?`${Number.isInteger(sell)?sell:sell.toFixed(2).replace('.',',')} ${cur(o.price?.currency_code)}`:'—'} className="vrm-sale-row" key={o.transaction_id} data-tx={String(o.transaction_id)} style={{borderTop:i>0?`1px solid ${C.border}`:'none',opacity:hidden?0.5:(st==='cancelled'?0.6:1),padding:'12px 14px',display:'flex',flexDirection:'column',gap:10,...(estFloute(o)?STYLE_FLOU:null),...(gp.style||{})}}>
+                {...gp} benef={benefLigne} recap={recapVente} data-depose-attente={deposeIci?'1':undefined}
+                data-fu-ligne="" fusion={{ prix: sell!=null && !(o.price?.currency_code && o.price.currency_code!=='EUR') ? eurosRecap(sell) : null, nom: String(o.title||'').replace(/[\s,·-]*(?:taille|t\.?)\s*[\d.,/ ]+(?:\s*(?:eu|fr|us|uk))?\s*$/i,'').trim() || o.title, num, site: 'vinted', siteNom: 'Vinted', taille: String((e&&e.size)||o.size||'').trim() || ((String(o.title||'').match(/taille\s*([\d.,/]+)/i)||[])[1]||'') }} frise={fuEtapes ? <Frise etapes={fuEtapes} cle={txL} className="vrm-fu-ligne-frise" label="Où en est la vente"/> : null}
+                bas={peutDeposer ? <>
+                  {/* (2 nov., 22 h 30) Une vente à expédier porte TOUJOURS la rangée de la maquette : la puce du
+                      transporteur et le bouton bordereau (« Imprimer le bordereau » si le PDF est là, sinon
+                      « Générer le bordereau », l'extension) ; « Déposé » vient après. */}
+                  <div className="vrm-rangee-bord" data-rangee-bord="" data-sans-glisse="">
+                    <PastilleTransporteur t={fuTransp} C={C} className="vrm-fu-transp" data-fu-transporteur=""/>
+                    {fuPdf
+                      ? <button type="button" className="vrm-fu-principal" data-fu-geste="" data-fu-imprimer={txL} onClick={()=>imprimerBordereauVente(o)}><Icon name="printer" size={16}/><span className="vrm-lib-long">Imprimer le bordereau</span><span className="vrm-lib-court">Imprimer</span></button>
+                      : <BoutonBordereau grand uid={o._acc && o._acc.vinted_user_id} tx={txL} conv={o.conversation_id} login={accNameOf(o._acc)} aGenerer pdf={false} onFait={(u)=>actionsVentesProxy.rechargerLabels(u)}/>}
+                  </div>
+                  {gesteDepose ? <div className="vrm-fu-apres" data-sans-glisse="">{gesteDepose}</div> : null}
+                </> : null} gestes={gesteCout ? <div className="vrm-gestes-pile">{gesteCout}</div> : null} sous={[o.date?dateFr(o.date, {day:'numeric',month:'short'}):'', (o._acc && !ventesUnCompte) ? accNameOf(o._acc) : ''].filter(Boolean).join(' · ')} etat={venteStage(o).label} ton={st!=='cancelled' && aExpedier(o) && !isShipDone(o) ? 'action' : (st==='cancelled' ? 'annule' : '')} montant={sell!=null?`${Number.isInteger(sell)?sell:sell.toFixed(2).replace('.',',')} ${cur(o.price?.currency_code)}`:'—'} className="vrm-sale-row" key={o.transaction_id} data-tx={String(o.transaction_id)} style={{borderTop:i>0?`1px solid ${C.border}`:'none',opacity:hidden?0.5:(st==='cancelled'?0.6:1),padding:'12px 14px',display:'flex',flexDirection:'column',gap:10,...(estFloute(o)?STYLE_FLOU:null),...(gp.style||{})}}>
               </LigneVenteCompacte>
               )}</GlisserVente>
             );
@@ -51313,7 +51603,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 {!cancelled && !st.retour && st.step>=1 && st.step<4 && (()=>{ const su = suivi || suivisAchat(o, indexSuivisAchats)[0]; const e = entreeSuiviAchat(o);
                   // (2 nov.) Le transporteur LU (logo + nom), puis ce qu'il dit.
                   const trA = transporteurColis((tk && tk.carrier) || (e && e.transporteur) || '', su);
-                  return su ? <div className="vrm-buy-transp" data-achat-transporteur={cleStatTransporteur(trA)} style={{display:'flex',flexDirection:'column',gap:2,marginTop:4}}><PastilleTransporteur t={trA} C={C} seul taille={18}/><LigneTransporteur transp={transpMap} suivi={su} carrier={(tk && tk.carrier) || (e && e.transporteur) || transporteurDeForme(su) || ''}/></div> : null; })()}
+                  return su ? <div className="vrm-buy-transp" data-achat-transporteur={cleStatTransporteur(trA)} style={{display:'flex',flexDirection:'column',gap:2,marginTop:4}}><PastilleTransporteur t={trA} C={C}/><LigneTransporteur transp={transpMap} suivi={su} carrier={(tk && tk.carrier) || (e && e.transporteur) || transporteurDeForme(su) || ''}/></div> : null; })()}
                 {/* ⚠️ LITIGE / RETOUR : il doit RENVOYER la paire, et générer le
                     bordereau de retour. VRM ne le crée PAS à sa place : la route
                     qui GÉNÈRE un retour n'a jamais été observée (§4.10), et agir
@@ -52690,7 +52980,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           // colonnes restent aussi : il y a quelque chose de LU à montrer.
           colisSansCompte = noAcc && !baseKO && vue.total === 0;
           if (colisSansCompte) return (<>
-            <ScreenHead icon="doc" title="Colis" sous={<span className="vrm-phrase-ecran" data-phrase-ecran="colis">{PHRASES_ECRAN.colis}</span>}/>
+            <ScreenHead icon="doc" title="Colis" date={dateJourFr(new Date())} sous={PHRASES_ECRAN.colis ? <span className="vrm-phrase-ecran" data-phrase-ecran="colis">{PHRASES_ECRAN.colis}</span> : null}/>
             <div data-colis-sans-compte="">
               <EmptyState icon="link" title="Relie ton compte Vinted pour voir tes colis"
                 desc="Tant qu'aucun compte n'est relié, VRM ne lit rien : il ne peut pas encore dire ce qui est à envoyer, à retirer ou parti. Installe l'extension Chrome sur ton ordinateur, puis ouvre vinted.fr une fois, connecté à ton compte."
@@ -52791,10 +53081,34 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             </>); };
           const toutLuRet = !notes.retirer && !baseKO && tracking !== null && Array.isArray(buys.items) && !buys.error;
           return (<>
-            <ScreenHead icon="doc" title="Colis" sous={<span className="vrm-phrase-ecran" data-phrase-ecran="colis">{PHRASES_ECRAN.colis}</span>}
+            <ScreenHead icon="doc" title="Colis" date={dateJourFr(new Date())} sous={PHRASES_ECRAN.colis ? <span className="vrm-phrase-ecran" data-phrase-ecran="colis">{PHRASES_ECRAN.colis}</span> : null}
               desc="Ce que Vinted attend de toi, capté par l'extension. Le bordereau manquant est généré tout seul quand tu passes sur Vinted, puis déposé ici. Un colis parti disparaît sans rien cocher."
-              right={onglet === 'envoyer' && nPrets>0 && (siteColis==='toutes'||siteColis==='vinted') ? <Bouton variante="primaire" icone="printer" data-lot-ouvrir="1" data-imprimer-prets={nPrets} onClick={ouvrirLot} disabled={batchBusy}
-                title="Tamponne tous les bordereaux reçus (numéro + titre) et les met à la suite dans un seul PDF">{batchBusy?'Préparation…':`Imprimer ${nPrets===1?'le prêt':`les ${nPrets} prêts`}`}</Bouton> : null}/>
+              right={<>
+                {/* (2 nov., 22 h) « … » : les outils de Colis (imprimer les prêts, Emballer, Tout générer,
+                    l'imprimante) ne s'affichent plus d'office (maquette FusionColis) ; un toucher les montre,
+                    à leur place, un second les range. */}
+                <button type="button" className="vrm-fu-plus" data-colis-outils-bascule="" aria-label="Outils des colis" aria-expanded="false"
+                  onClick={(ev)=>{ const r = document.documentElement; const o = !r.hasAttribute('data-colis-outils'); r.toggleAttribute('data-colis-outils', o); ev.currentTarget.setAttribute('aria-expanded', o ? 'true' : 'false'); }}><Icon name="more" size={20}/></button>
+                {onglet === 'envoyer' && nPrets>0 && (siteColis==='toutes'||siteColis==='vinted') ? <Bouton variante="primaire" icone="printer" data-lot-ouvrir="1" data-imprimer-prets={nPrets} onClick={ouvrirLot} disabled={batchBusy}
+                title="Tamponne tous les bordereaux reçus (numéro + titre) et les met à la suite dans un seul PDF">{batchBusy?'Préparation…':`Imprimer ${nPrets===1?'le prêt':`les ${nPrets} prêts`}`}</Bouton> : null}
+              </>}/>
+            {/* (2 nov., style « Fusion ») LA CARTE « AUJOURD'HUI ». Le grand chiffre est le
+                nombre de colis À ENVOYER publié par cet écran (`vrm_colis_aposter`, celui de Ma
+                journée et du sélecteur, « au moins » si un site n'est pas lu) ; « à imprimer » =
+                les bordereaux prêts (`lignesLot`, le compte de « Imprimer les N prêts ») ;
+                « déposés » = les « Colis fait » d'aujourd'hui (`gestesDepuis`, la règle de la
+                Tournée) ; « à retirer » = `vrm_colis_retirer`. Aucun nombre recalculé. */}
+            {!baseKO && (() => { const m0 = new Date(); m0.setHours(0, 0, 0, 0); const deposes = gestesDepuis(shipDone, m0.getTime());
+              return (
+              <CarteMois className="vrm-fu-ecran vrm-fu-colis" surtitre="Aujourd'hui" data-fu-colis-envoyer={nEnv == null ? '' : String(nEnv)}
+                valeur={nEnv == null ? null : <>{envPartiel ? <span className="vrm-fu-borne">au moins</span> : null}{nEnv} colis</>}
+                sous={nEnv == null ? 'Je lis tes colis…' : nEnv === 0 ? 'Rien à envoyer pour l’instant' : <>à envoyer{nPrets > 0 ? <> · <b>{nPrets} bordereau{nPrets > 1 ? 'x' : ''} prêt{nPrets > 1 ? 's' : ''}</b></> : null}</>}
+                cases={[
+                  { cle: 'imprimer', n: nPrets, l: 'à imprimer', titre: 'Bordereaux reçus, prêts à imprimer', onClick: nPrets > 0 ? () => onOngletColis && onOngletColis('envoyer') : undefined, attrs: { 'data-n': String(nPrets) } },
+                  { cle: 'deposes', n: deposes, l: deposes > 1 ? 'déposés' : 'déposé', titre: "Colis marqués « Colis fait » aujourd'hui", attrs: { 'data-n': String(deposes) } },
+                  { cle: 'retirer', n: nRet == null ? null : `${nRet}${retPartiel ? '+' : ''}`, l: 'à retirer', titre: retPartiel && nRet != null ? `Au moins ${nRet} : les e-mails de suivi n'ont pas pu être lus` : 'Colis arrivés à aller chercher', onClick: () => onOngletColis && onOngletColis('retirer'), attrs: { 'data-n': nRet == null ? '' : String(nRet) } },
+                ]}/>
+              ); })()}
             {/* (31 oct., soir) + « Leboncoin » quand il y a un compte : ses colis ont
                 leur écran (bordereau, QR), ouvert par la coque (`onColisLeboncoin`). */}
             {(sitesVus.length > 1 || onColisLeboncoin) && (
@@ -52807,8 +53121,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             <div className="vrm-colis-onglets" data-colis-onglet={onglet} data-colis-total={vue.total}>
               <Segmente plein label="Colis à envoyer ou à retirer" value={onglet} onChange={(v) => onOngletColis && onOngletColis(v)}
                 options={[
-                  { v: 'envoyer', l: 'À envoyer', n: nEnv != null ? `${nEnv}${envPartiel ? '+' : ''}` : null, data: { 'data-colis-onglet-choix': 'envoyer', 'data-colis-onglet-n': nEnv != null ? String(nEnv) : '', 'data-urgent': urgentEnv ? '1' : '0', title: envPartiel ? `Au moins ${nEnv} : un site n'a pas pu être lu` : undefined } },
-                  { v: 'retirer', l: 'À retirer', n: nRet != null ? `${nRet}${retPartiel ? '+' : ''}` : null, data: { 'data-colis-onglet-choix': 'retirer', 'data-colis-onglet-n': nRet != null ? String(nRet) : '', 'data-urgent': urgentRet ? '1' : '0', title: retPartiel && nRet != null ? `Au moins ${nRet} : les e-mails de suivi n'ont pas pu être lus` : undefined } },
+                  { v: 'envoyer', l: 'J’envoie', n: nEnv != null ? `${nEnv}${envPartiel ? '+' : ''}` : null, data: { 'data-colis-onglet-choix': 'envoyer', 'data-colis-onglet-n': nEnv != null ? String(nEnv) : '', 'data-urgent': urgentEnv ? '1' : '0', title: envPartiel ? `Au moins ${nEnv} : un site n'a pas pu être lu` : undefined } },
+                  { v: 'retirer', l: 'Je reçois', n: nRet != null ? `${nRet}${retPartiel ? '+' : ''}` : null, data: { 'data-colis-onglet-choix': 'retirer', 'data-colis-onglet-n': nRet != null ? String(nRet) : '', 'data-urgent': urgentRet ? '1' : '0', title: retPartiel && nRet != null ? `Au moins ${nRet} : les e-mails de suivi n'ont pas pu être lus` : undefined } },
                 ]}/>
             </div>
             {siteColis!=='toutes' && <div data-colis-filtre-note="" style={{fontSize:12,color:C.muted,margin:'0 2px 6px'}}>{vue.colonnes.reduce((t,c)=>t+c.cartes.length,0)} colis {nomSite[siteColis]} sur {vue.total} · <button type="button" className="vrm-lien-action" onClick={()=>setSiteColis('toutes')} style={{border:0,background:'transparent',padding:0,color:C.text,fontWeight:600,cursor:'pointer',fontFamily:'inherit',fontSize:12,minHeight:44}}>tout voir</button></div>}
@@ -53327,7 +53641,17 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   quand il prépare ses cartons. `minmax(min(430px,100%), 1fr)` —
                   le `min()` évite qu'une piste de 430 px déborde un téléphone. */}
               <div className="vrm-colis-grille" data-colis-lignes="1" style={{display:'flex',flexDirection:'column',gap:6}}>
-              {ex.map((e,ix)=>{
+              {(()=>{
+                // (2 nov., 22 h, maquette FusionColis) LES COLIS RANGÉS PAR TRANSPORTEUR : un en-tête
+                // (la tuile du logo, son nom, « N colis »), les colis dessous dans l'ordre d'avant
+                // (le plus pressé d'abord) ; les transporteurs dans l'ordre de leur premier colis.
+                const trNomDe = (x) => { const t = transporteurVente(x.b); return (t && t.nom) || 'Autres'; };  // (3 nov., critique #15) « Autres », pas le jargon « Transporteur pas lu »
+                const ordreT = new Map(); ex.forEach((x) => { const k = trNomDe(x); if (!ordreT.has(k)) ordreT.set(k, ordreT.size); });
+                const exT = [...ex].sort((a, b) => ordreT.get(trNomDe(a)) - ordreT.get(trNomDe(b)));
+                const nParT = {}; ex.forEach((x) => { const k = trNomDe(x); nParT[k] = (nParT[k] || 0) + 1; });
+                return exT.map((e,ix)=>{
+                const ouvreT = ix === 0 || trNomDe(exT[ix-1]) !== trNomDe(e);
+                const trG = transporteurVente(e.b);
                 const o=e.o, b=e.b;
                 // IDENTITÉ : la photo et le titre viennent de la VENTE quand on
                 // l'a (le n° de transaction est une identité certaine), jamais
@@ -53351,6 +53675,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 const pdf = !!(b && b.hasPdf) || !!capte;
                 // (2 nov.) Le transporteur LU de ce colis (n° de son bordereau), à côté du bouton.
                 const trV = transporteurVente(b);
+                // (2 nov., Fusion) LA FRISE DU COLIS : Imprimé → Déposé → En route → Livré. Rien de
+                // neuf : « imprimé » = la coche de toujours (`vinted_bords_printed`), « déposé » =
+                // « Colis fait » ou un statut Vinted qui a bougé, « en route » / « livré » = les
+                // preuves de la vente (`preuvesFriseDe`, la règle de la frise de Ventes). Une
+                // étape plus loin prouvée coche celles d'avant ; « pas su » n'est jamais coché.
+                // L'étape en cours est ambre seulement si la limite d'envoi est aujourd'hui/demain.
+                const pvC = o ? preuvesFriseDe(o) : null;
+                const imprimeC = !!((e.txn && bordsPrinted[e.txn]) || (b && isBordPrinted(b)));
+                const fuColis = friseColisFusion({ imprime: imprimeC, depose: posted || !!(pvC && pvC.bougeLu), enroute: !!(pvC && pvC.bougeLu), livre: !!(pvC && pvC.livreeLue) }, { geste: dl != null && dl <= 1 && !posted });
                 const acc = o ? o._acc : null;
                 // Une charnière de groupe : le premier colis d'un groupe porte
                 // son intertitre (voir `groupeDe` plus haut). C'est ce qui rend
@@ -53361,14 +53694,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 const grp = groupeDe(e);
                 // (2 nov.) Toujours l'intertitre (« Prêts à imprimer », « En attente du
                 // bordereau ») : le résumé en colonnes qui les nommait est retiré.
-                const ouvreGrp = ix === 0 || groupeDe(ex[ix-1]) !== grp;
-                const [titreGrp, sousGrp] = TITRE_GROUPE[grp] || ['', ''];
                 return (
                   <React.Fragment key={e.key}>
-                  {ouvreGrp && (
-                    <div data-groupe={grp} className="vrm-colis-groupe" style={{gridColumn:'1 / -1',display:'flex',flexDirection:'column',gap:4,padding:ix===0?'0 2px 2px':'18px 2px 2px'}}>
-                      <span style={{fontSize:11,fontWeight:600,letterSpacing:'.07em',textTransform:'uppercase',color:C.muted}}>{titreGrp}</span>{/* (1er nov.) son nombre est celui de sa colonne, en haut (§7) : pas redit. */}
-                      {sousGrp && <span className="vrm-aide" style={{fontSize:12,color:C.muted,lineHeight:1.45,maxWidth:640}}>{sousGrp}</span>}
+                  {ouvreT && (
+                    <div data-groupe-transp={trNomDe(e)} className="vrm-fu-groupe-transp" style={{gridColumn:'1 / -1'}}>
+                      <span className="vrm-fu-groupe-tuile" aria-hidden="true">{trG && trG.cle ? <LogoTransporteur cle={trG.cle} taille={22}/> : <Icon name="box" size={16}/>}</span>
+                      <h3>{trNomDe(e)}</h3>
+                      <span>{nParT[trNomDe(e)]} colis</span>
                     </div>
                   )}
                   <div data-bord-card data-groupe-carte={grp} data-transporteur={cleStatTransporteur(trV)} data-tx-colis={e.txn||''} data-colis-ident={'v:'+(e.txn||e.key)} data-limite={e.lim&&e.lim.limite||''} data-limite-heure={e.lim&&e.lim.heure||''} data-jours={dl==null?'':String(dl)} className="vrm-colis-carte" style={{padding:'14px',border:`1px solid ${dl!=null&&dl<0?C.warn+'66':C.border}`,background:C.card,borderRadius:12,opacity:posted?0.55:1}}>
@@ -53378,7 +53710,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       </div>
                       <div style={{flex:'1 1 150px',minWidth:0}}>
                         <div style={{display:'flex',alignItems:'flex-start',gap:10}}>
-                          <span className="vrm-colis-titre" title={titre} style={{flex:1,minWidth:0,fontSize:14,fontWeight:600,lineHeight:1.35,color:C.text,letterSpacing:'-.01em',display:'-webkit-box',WebkitLineClamp:2,WebkitBoxOrient:'vertical',overflow:'hidden'}}>{titre}</span>
+                          <span className="vrm-colis-titre" title={titre} style={{flex:1,minWidth:0,fontSize:14,fontWeight:600,lineHeight:1.35,color:C.text,letterSpacing:'-.01em',display:'-webkit-box',WebkitLineClamp:2,WebkitBoxOrient:'vertical',overflow:'hidden'}}>{num ? `N°${num} · ` : ''}{titre}</span>
                           {o && o.price && <span className="vrm-display vrm-colis-prix" style={{flexShrink:0,fontSize:17,fontWeight:700,color:C.text,whiteSpace:'nowrap',fontVariantNumeric:'tabular-nums',letterSpacing:'-.02em'}}>{(parseFloat(o.price.amount ?? o.price)||0).toFixed(2).replace('.',',')} €</span>}
                         </div>
                         <div style={{fontSize:12,color:C.muted,marginTop:6,display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
@@ -53392,8 +53724,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                               deux éléments d'une rangée qui passe à la ligne, la seconde
                               ligne commençait par « · » (390 px). Le point reste collé. */}
                           {(o && o.date) || urgTxt ? <span data-colis-dates="" style={{flex:'0 1 auto',minWidth:0}}>
-                            {o && o.date ? `vendue le ${dateFr(o.date, {day:'numeric',month:'short'})}` : ''}
-                            {urgTxt && <span data-colis-limite-texte="" style={{overflowWrap:'anywhere',color:urgCol,fontWeight:dl!=null&&dl<=1?600:500}}>{o && o.date ? '\u00a0·\u00a0' : ''}{urgTxt}</span>}
+                            {urgTxt && <span data-colis-limite-texte="" style={{overflowWrap:'anywhere',color:urgCol,fontWeight:dl!=null&&dl<=1?600:500}}>{urgTxt}</span>}
                           </span> : null}
                           {cell
                             ? <button type="button" onClick={()=>onLocate&&onLocate(num)} style={{flexShrink:0,border:'none',background:'transparent',color:C.blue||C.accent,fontWeight:600,cursor:'pointer',padding:0,fontSize:12,fontFamily:'inherit'}}>· {garageCellLabel(cell)}</button>
@@ -53438,11 +53769,21 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       {b && <button type="button" onClick={async ()=>{
                         if(await askConfirm('Masquer ce bordereau ? (il disparaît de la liste)')) hideBord(b);
                       }} title="Masquer" aria-label="Masquer" className="vrm-icon-control vrm-colis-masquer" style={{alignSelf:'flex-start',flexShrink:0,border:'none',background:'transparent',color:C.muted,cursor:'pointer',width:32,height:32,margin:'-6px -6px 0 0',display:'inline-flex',alignItems:'center',justifyContent:'center',borderRadius:8,fontFamily:'inherit'}}><Icon name="close" size={15}/></button>}
+                      {/* (2 nov., 22 h) « … » : « Colis fait », « Marquer imprimé », « Suivre » (maquette : rien sous la frise). */}
+                      <button type="button" className="vrm-fu-plus vrm-fu-plus-carte" data-colis-plus={e.txn||e.key} aria-label="Plus d’actions pour ce colis" aria-expanded="false"
+                        onClick={(ev)=>{ const c = ev.currentTarget.closest('[data-bord-card]'); const o = !c.hasAttribute('data-plus-ouvert'); c.toggleAttribute('data-plus-ouvert', o); ev.currentTarget.setAttribute('aria-expanded', o ? 'true' : 'false'); }}><Icon name="more" size={18}/></button>
                     </div>
                     {/* ACTION PRINCIPALE : imprimer si le PDF est là, sinon aller
                         le générer sur Vinted. Le glisser-fichier reste dispo pour
                         celui qui n'a pas branché sa boîte mail. */}
+                    <Frise etapes={fuColis} cle={String(e.txn||e.key)} className="vrm-colis-frise" label="Où en est le colis"/>
                     <div className="vrm-colis-actions" style={{display:'flex',gap:8,alignItems:'center',marginTop:12,flexWrap:'wrap'}}>
+                      {/* (2 nov. au soir) Julien : « à côté du bouton bordereau, marqué Chronopost avec le
+                          logo » — LA RANGÉE : la puce du transporteur LU (n° du bordereau, ligne du
+                          transporteur, e-mail du même n° ; sinon « pas lu ») à GAUCHE du geste principal,
+                          sur la même ligne, même hauteur. Les autres gestes passent dessous. */}
+                      <div className="vrm-rangee-bord" data-rangee-bord="">
+                      <PastilleTransporteur t={trV} C={C} data-colis-transporteur={e.txn||e.key}/>
                       {pdf ? (
                         <button type="button" data-imprime="1" onClick={async ()=>{
                           if (b && b.hasPdf && inv) { await printBordAndInvoice(b); return; }
@@ -53458,7 +53799,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                           if (!lu || !lu.octets) { libererOngletPdf(); toast(messagePdfManquant(lu)); return; }
                           processBordereau(num, titre, lu.octets);
                         }} title={inv?'Bordereau tamponné + facture pro, puis impression':'Bordereau tamponné, puis impression'}
-                        className="vrm-colis-primaire" style={{flex:'1 1 160px',maxWidth:340,display:'inline-flex',alignItems:'center',justifyContent:'center',gap:8,border:'none',background:C.accent,color:'#fff',borderRadius:10,padding:'0 16px',minHeight:44,cursor:'pointer',fontSize:14,fontWeight:600,fontFamily:'inherit'}}><Icon name="printer" size={16}/>Imprimer{inv?' + facture':''}</button>
+                        className="vrm-colis-primaire" style={{flex:'1 1 160px',maxWidth:340,display:'inline-flex',alignItems:'center',justifyContent:'center',gap:8,border:'none',background:C.accent,color:'#fff',borderRadius:10,padding:'0 16px',minHeight:44,cursor:'pointer',fontSize:14,fontWeight:600,fontFamily:'inherit'}}><Icon name="printer" size={16}/><span className="vrm-lib-long">{inv ? 'Imprimer + facture' : 'Imprimer le bordereau'}</span><span className="vrm-lib-court">Imprimer</span></button>
                       ) : (<>
                         {/* ⚠️ PLUS DE BOUTON « Générer sur Vinted ». C'est l'EXTENSION
                             qui génère le bordereau manquant dès que tu arrives sur
@@ -53478,14 +53819,16 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                           <BoutonBordereau grand uid={acc && acc.vinted_user_id} tx={String(o.transaction_id)} conv={o.conversation_id} login={accNameOf(acc)}
                             aGenerer pdf={false} onFait={(u)=>rechargerLabels(u)}/>
                         )}
+</>)}
+                      </div>
+                      {!pdf && (<>
                         <button type="button" onClick={()=>startBordereau(num, titre, acc, o && o.transaction_id)} title="J'ai déjà téléchargé le PDF : le tamponner avec le numéro"
                           className="vrm-colis-sec" style={{...sec,flex:'0 1 auto',border:`1px solid ${C.border}`,background:'transparent',color:C.text}}>J'ai le PDF</button>
-                      </>)}
+                                            </>)}
                       {/* (2 nov.) Julien : « à côté du bouton bordereau, marqué Chronopost avec le logo
                           Chronopost ou Mondial Relay avec le logo Mondial Relay ». Le transporteur LU
                           (n° du bordereau, ligne du transporteur, e-mail du même n°) ; sinon « pas lu ». */}
-                      <PastilleTransporteur t={trV} C={C} data-colis-transporteur={e.txn||e.key}/>
-                      {!num && b && <button type="button" onClick={()=>{ setLinkPickFor(b); setLinkSearch(''); }} title="Relier ce bordereau à un article numéroté" className="vrm-colis-sec" style={{...sec,border:`1px solid ${C.warn}88`,background:'transparent',color:C.warn}}><Icon name="link" size={14} style={{verticalAlign:'-2px',marginRight:5}}/>Relier</button>}
+                      {!num && b && <button type="button" data-geste="relier" onClick={()=>{ setLinkPickFor(b); setLinkSearch(''); }} title="Relier ce bordereau à un article numéroté" className="vrm-colis-sec" style={{...sec,border:`1px solid ${C.warn}88`,background:'transparent',color:C.warn}}><Icon name="link" size={14} style={{verticalAlign:'-2px',marginRight:5}}/>Relier</button>}
                       {/* Sans bordereau, il n'y avait AUCUN moyen de poser le numéro
                           sur cette vente — or c'est lui qu'on tamponne. Le numéro
                           n'est pas deviné (le titre de revente diffère souvent de
@@ -53494,7 +53837,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       {!num && !b && o && o.transaction_id!=null && <button type="button" onClick={async ()=>{
                         const v=(await askText({numeric:clavierNum()==='numeric',desc:`Quel numéro porte cet article ? « ${titre} »`,value:''})||'').trim();
                         if(v) setSaleOverride(o.transaction_id,{numero:v});
-                      }} title="Poser le numéro de boîte de cet article" className="vrm-colis-sec" style={{...sec,border:`1px solid ${C.warn}88`,background:'transparent',color:C.warn}}>Poser le N°</button>}
+                      }} title="Poser le numéro de boîte de cet article" data-geste="poser-num" className="vrm-colis-sec" style={{...sec,border:`1px solid ${C.warn}88`,background:'transparent',color:C.warn}}>Poser le N°</button>}
                       {/* ⚠️ UNE SEULE RANGÉE D'ACTIONS. Les états (imprimé, colis
                           fait, suivre) vivaient sur une deuxième rangée : sur un
                           colis sans PDF, la première n'avait plus qu'un bouton et
@@ -53525,7 +53868,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   </div>
                   </React.Fragment>
                 );
-              })}
+              }); })()}
               </div>
               {/* (2 nov., colis clair) Sous la liste : ce n'est pas un geste du moment. */}
               {/* (17 oct.) Julien : « un bouton dans l'onglet Colis qui met en couleur
@@ -58807,7 +59150,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
     { id:'impression', titre:'Impression', items:[
       { id:'imprimante', type:'panneau', nu:true, ic:'printer', lib:'Imprimante et bordereaux', desc:'Papier et aperçus', val: imprimanteChoisie() === 'thermique' ? 'Thermique · 10×15' : 'Normale · A4', el:<ImprimanteSetting nu/> },
     ], pied: <>Le N° se pose dans un espace blanc du PDF, jamais au hasard. <Pourquoi label="Comment le N° est placé">VRM cherche sur chaque page une zone blanche avec une marge autour du numéro ; le document garde sa taille. Sans espace suffisant, le tamponnage est refusé plutôt que placé au hasard. Vérifie dans « Imprimante et bordereaux » → « Voir les aperçus ».</Pourquoi></> },
-    { id:'compta', titre:'Comptabilité', items:[
+    { id:'compta', titre:'Compta', items:[
       // (1er nov.) À droite, le statut CHOISI (lu dans `vinted_regime`, jamais deviné) :
       // « À choisir » tant qu'il ne l'a pas posé — avant, il fallait ouvrir pour savoir.
       { id:'regime', type:'panneau', nu:true, ic:'receipt', lib:'Régime fiscal', desc:'Statut et taux des rapports', val:valRegime, data:{ 'data-reglage-regime': regimeFiscal() || 'aucun' }, el:<RegimeSetting nu/> },
@@ -64484,6 +64827,7 @@ function AppCoeur() {
     return (
       <section className="vrm-tache" data-tache={t} data-tache-site={site} data-tache-section={sec} aria-label={TITRES_TACHE[t]}>
         <header className="vrm-market-heading vrm-tache-tete" data-tache-tete={t}>
+          {t === 'ventes' ? <span className="vrm-fu-date-tete" data-date-tete="">{dateJourFr(new Date())}</span> : null}
           <h1>{TITRES_TACHE[t]}</h1>
           {PHRASES_ECRAN[t] ? <p className="vrm-phrase-ecran" data-phrase-ecran={t}>{PHRASES_ECRAN[t]}</p> : null}
         </header>
