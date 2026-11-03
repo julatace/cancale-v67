@@ -69,6 +69,7 @@ import CoutsVente from "./CoutsVente.jsx";
 import { feuillesExport, fichiersExport, zipStocke, nomExport } from "./exportDonnees.js";
 import { poserLienVc, defaireLienVc, numerosABarrer, marquerBarre, lienDe, produitDeVinted, vcReliable, suggestionsLienVc } from "./lienVestiaire.js";
 import FeuilleLienVc from "./LienVestiaire.jsx";
+import { preuvesFriseVc, preuvesFriseEbay } from "./friseSites.js";
 import { suggestionsAchat, tousAchatsLibres, filtresAchats, etiquetteLot, liensParAchat, lotDe, prixIndicatifLot, ecritureLot } from "./suggestionsAchat.js";
 import { boostRentable, SEUIL_BOOST } from "./boostRentable.js";
 import { CLE_WIDGETS_JOURNEE, WIDGETS_JOURNEE, NOM_TAILLE, DISPO_JOURNEE_DEFAUT, normaliserDispoJournee, deplacerWidget, retirerWidget, widgetFixe, tailleSuivante, tailleDefautWidget, caseVisible, widgetsAjoutables, dispoAEnregistrer } from "./journeeWidgets.js";
@@ -23370,7 +23371,10 @@ function EbayVentes({ baseKO,vue='*',comptesEbay,cible,onClearCible }) {
         // que « Bénéfice de l'article » du détail : `costs.buyPrice`). eBay n'a
         // pas de liaison à un achat : seul le prix est proposé.
         const gestesEbay = bilanO.entry && bilanO.achat == null ? <CoutAchatVente surLigne onSaisir={p=>sauverCouts(o._compte || 'principal',o.orderId,{buyPrice:p})}/> : null;
-        return <div className="vrm-ebay-order" data-ebay-vente={o.orderId} data-ebay-compte={o._compte || 'principal'} key={(o._compte || 'principal')+':'+(o.orderId || i)}><LigneVente gestes={gestesEbay} numerosArticle={(o.lineItems||[]).map(l=>numLigneEbay(o,l)).filter(Boolean)} plateforme="ebay" photo={img} titre={(li.title||'Commande')+(o.lineItems?.length>1?` · ${o.lineItems.length} articles`:'')} etat={statut} ton={etat.peutExpedier ? 'action' : ''}
+        // (3 nov.) La frise de Vinted : Postée = commande « FULFILLED » lue chez eBay, Payée = argent LIBÉRÉ lu (src/friseSites.js).
+        const pfE = preuvesFriseEbay(o);
+        const fuE = pfE ? friseVenteFusion(friseVente(pfE), { geste: etat.peutExpedier }) : null;
+        return <div className="vrm-ebay-order" data-ebay-vente={o.orderId} data-ebay-compte={o._compte || 'principal'} key={(o._compte || 'principal')+':'+(o.orderId || i)}><LigneVente gestes={gestesEbay} frise={fuE ? <Frise etapes={fuE} cle={'ebay' + (o._compte || 'principal') + o.orderId} className="vrm-fu-ligne-frise" label="Où en est la vente"/> : null} numerosArticle={(o.lineItems||[]).map(l=>numLigneEbay(o,l)).filter(Boolean)} plateforme="ebay" photo={img} titre={(li.title||'Commande')+(o.lineItems?.length>1?` · ${o.lineItems.length} articles`:'')} etat={statut} ton={etat.peutExpedier ? 'action' : ''}
           sous={[o.creationDate && !isNaN(Date.parse(o.creationDate)) ? new Date(o.creationDate).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }) : '', comptesEbay?.length > 1 ? (o._pseudo || nomCompteEbay(comptesEbay.find(c => c.ref === o._compte) || {})) : ''].filter(Boolean).join(' · ')}
           etatNoeud={<><span className="vrm-ebay-sale-status" data-state={etat.peutExpedier?'pending':etat.expedie?'shipped':'neutral'} style={{display:'inline-flex',alignItems:'center',gap:5,padding:0,background:'transparent',boxShadow:'none',borderRadius:0,fontSize:'inherit',color:C.text,fontWeight:600}}><span aria-hidden="true" style={{width:7,height:7,borderRadius:999,flexShrink:0,display:'inline-block',background:etat.peutExpedier?C.warn:etat.expedie?(C.blue||C.accent):C.muted}}/>{statut}</span></>}
           meta={<>{statut}{o.buyer?.username ? ` · ${o.buyer.username}` : ''}{o.lineItems?.length>1?` · ${o.lineItems.length} articles`:''}{comptesEbay?.length>1?` · ${o._pseudo || nomCompteEbay(comptesEbay.find(c=>c.ref===o._compte) || {})}`:''}</>}
@@ -27753,15 +27757,14 @@ function LigneVenteVc({ v, fait, enV, flou, i = 0 }) {
   const coutManque = lb.etat !== 'annulee' && lb.achat == null && !!v.num;
   const gesteCout = coutManque ? <CoutAchatVente surLigne onSaisir={(p) => poserAchatVc(v.num, p)}/> : null;
   const photoNoeud = <PhotoVc src={v.photo || ''} style={{ width: 28, height: 36, borderRadius: 12, flexShrink: 0 }}/>;
+  // (3 nov.) La frise de Vinted sur la ligne Vestiaire : chaque étape PROUVÉE par une donnée lue.
+  const preuvesVc = preuvesFriseVc(v, fait);
+  const etapesVc = preuvesVc ? friseVente(preuvesVc) : null;
+  const fuVc = etapesVc ? friseVenteFusion(etapesVc, { geste: ton === 'action' }) : null;
   const recap = ({ titreId, fermerRef, fermer }) => {
-    const partie = vcVentePartie(v), mot = etapeMotVc(v);
-    const etapes = vcVenteAnnulee(v) ? null : friseVente({
-      vendue: { lu: true, t: v.date || null },
-      bordereau: { lu: !!(v.bordereau && v.bordereau.id), t: (v.bordereau && v.bordereau.at) || null },
-      deposee: { lu: !!fait || partie, t: fait || null },
-      livree: { lu: ['livree', 'terminee', 'versee'].includes(mot), t: null },
-      argent: { lu: mot === 'versee', t: v.verseLe || null },
-    });
+    const mot = etapeMotVc(v);
+    // (3 nov.) Les MÊMES étapes prouvées que la ligne (src/friseSites.js : `etapesVc` de Vestiaire « done », Colis fait, le mot lu).
+    const etapes = etapesVc;
     const ici = etapes ? (etapes.find((x) => x.ici) || {}).cle : null;
     const phrase = vcVenteAnnulee(v) ? { gras: 'Annulée.', suite: 'L’article ne part pas : il reste chez toi.' }
       : v.aExpedier && !fait ? { gras: 'À expédier.', suite: v.bordereau ? 'Imprime le bordereau (titre et N° tamponnés), puis dépose le colis.' : 'Le bordereau se prend sur Vestiaire, puis dépose le colis.' }
@@ -27821,6 +27824,7 @@ function LigneVenteVc({ v, fait, enV, flou, i = 0 }) {
       montantCentimes={lb.verse != null ? Math.round(lb.verse * 100) : undefined} numerosArticle={v.num ? [v.num] : []} plateforme="vestiaire"
       photo={v.photo || ''} photoNoeud={photoNoeud} titre={nomLigne} sous={sous} etat={etat} ton={ton}
       montant={lb.verse != null ? `${eurosLigne(lb.verse)} €` : '—'} benef={benef} recap={recap}
+      frise={fuVc ? <Frise etapes={fuVc} cle={'vc' + v.id} className="vrm-fu-ligne-frise" label="Où en est la vente"/> : null}
       gestes={gesteCout ? <div className="vrm-gestes-pile">{gesteCout}</div> : null}/>
   );
 }
